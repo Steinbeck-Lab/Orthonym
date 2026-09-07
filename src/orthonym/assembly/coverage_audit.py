@@ -1,4 +1,4 @@
-"""Producer-agnostic coverage verdict for the ``_finish`` choke.
+"""Producer-agnostic coverage verdict for the ``_finish`` choke (v33 Phase 0 L0/L1).
 
 Two carrier-specific proofs feed ONE verdict:
   * ``GeneralEngineResult`` (has ``.bindings``) -> ``certify_general_result``
@@ -68,7 +68,7 @@ def audit_coverage(mol, name: str, result_obj,
             IGNORED when ``result_obj`` is not None (the GER path never needs
             it -- E1 is Java-free and strictly more informative: it covers
             bonds/charge, not merely constitution).
-        skip_reanchor:. When ``True`` (and
+        skip_reanchor: v33 Phase 0 L0 review fix (C1/C2). When ``True`` (and
             ``self01_complete`` is ``None``), skip the ``validate_atom_coverage``
             re-anchor ENTIRELY -- no OPSIN subprocess is spawned -- and return
             ``complete=True, method="unavailable"`` directly. Set by the caller

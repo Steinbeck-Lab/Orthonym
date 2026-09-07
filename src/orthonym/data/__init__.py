@@ -80,7 +80,7 @@ _COMPLETE_NAME_ENDINGS = (
     # Phase 150 RESEARCH section 4.2: complete-form endings produced by
     # _STEM_TO_COMPLETE_SUFFIX in scripts/import_opsin_xml.py
     "ocene", "hrene",
-    # Phase 150 Plan 02 deviation (Signal 1 extension per CONTEXT
+    # Phase 150 Plan 02 deviation (Signal 1 extension per CONTEXT D-02
     # "Extended with additional complete-form endings discovered during
     # round-trip validation"): additional IUPAC retained-name endings
     # surfaced by the validator's pass_smiles set. Each entry below
@@ -97,9 +97,9 @@ _COMPLETE_NAME_ENDINGS = (
     # to emit `(fluoroform-yl)` instead of `(trifluoromethyl)` for compounds
     # like FC(F)CC. Phase 150 Plan 02 leaves these to systematic naming;
     # Phase 154 substituent-pipeline work owns the trihalomethane substituent
-    # form. CONTEXT (out-of-scope guard for substituent pipeline).
+    # form. CONTEXT D-12 (out-of-scope guard for substituent pipeline).
     # NOTE: 'thranil' / 'anthranil' deliberately NOT added — anthranil is OPSIN
-    # data for c1ccc2nocc2c1, which Phase 149 byte-identical lock requires
+    # data for c1ccc2nocc2c1, which Phase 149 D-11 byte-identical lock requires
     # to render as '1,2-benzisoxazole'. Adding the ending would violate the lock.
     "phthalid",  # phthalid, isophthalid (P-25.4 retained lactone)
 )
@@ -127,7 +127,7 @@ def _is_complete_name(name: str) -> bool:
     return any(name_lower.endswith(ending) for ending in _COMPLETE_NAME_ENDINGS)
 
 
-# Phase 150: load IUPAC 2013 PIN allow-list (single source of truth).
+# Phase 150 D-06: load IUPAC 2013 PIN allow-list (single source of truth).
 # Single canonical store: src/orthonym/data/iupac_2013_pin_list.json.
 # Replaces the previous hard-coded _OPSIN_NON_PIN_EXCLUSIONS frozenset
 # (CD-02 promotion to JSON allow-list with citation per entry).
@@ -158,7 +158,7 @@ from .pin_policy import (
     PIN_DENY_HC as _PIN_DENY_HC,
 )
 
-# Phase 150: load round-trip cache (Plan 02 produces this)
+# Phase 150 D-04: load round-trip cache (Plan 02 produces this)
 _ROUNDTRIP_CACHE_PATH = (
     Path(__file__).parent / "opsin_imports" / "_phase150_validation.json"
 )
@@ -181,7 +181,7 @@ else:
 
 
 def _is_promotable(smiles: str, name: str) -> bool:
-    """3-signal AND gate per Phase 150 CONTEXT - pure function.
+    """3-signal AND gate per Phase 150 CONTEXT D-02 - pure function.
 
     Signal 1: _is_complete_name heuristic.
     Signal 2: data/iupac_2013_pin_list.json allow-list (PIN authority).
@@ -191,7 +191,7 @@ def _is_promotable(smiles: str, name: str) -> bool:
     Special case: explicit DENY in Signal 2 always REJECTS (overrides S1, S3).
     Provisional mode (Plan 01 before validator runs): (S1 OR S2) only.
 
-    Source: 150-CONTEXT.md +.
+    Source: 150-CONTEXT.md D-02 + D-06.
     Source: 150-RESEARCH.md section 4.1.
     """
     name_lower = name.lower().strip()
@@ -279,7 +279,7 @@ def _governed_out(smiles: str, name: str) -> bool:
     return name.lower().strip() not in _PIN_ALLOW
 
 
-# Phase 150: REFACTORED _OPSIN_NAMES filter (single-signal -> 3-signal AND).
+# Phase 150 D-02: REFACTORED _OPSIN_NAMES filter (single-signal -> 3-signal AND).
 _OPSIN_NAMES: Dict[str, str] = {
     smi: name for smi, name in _OPSIN_NAMES_RAW.items()
     if _is_promotable(smi, name) and not _governed_out(smi, name)
@@ -293,7 +293,7 @@ if _stem_count > 0:
         len(_OPSIN_NAMES), _stem_count, _PROVISIONAL_MODE
     )
 
-# Merge: OPSIN first, then hand-curated overwrites (: hand-curated wins)
+# Merge: OPSIN first, then hand-curated overwrites (D-11: hand-curated wins)
 # Phase 167 HYG-03: gate the hand-curated dict against _PIN_DENY_HC (the unified
 # deny set, hc_override-exempt) BEFORE the merge — eliminating the two-path
 # asymmetry where HC was merged RAW while OPSIN imports passed _is_promotable.
@@ -308,7 +308,7 @@ _HAND_CURATED_GATED: Dict[str, str] = {
 }
 ALL_RETAINED_NAMES: Dict[str, str] = {**_OPSIN_NAMES, **_HAND_CURATED_GATED}
 
-# Backward-compatible alias
+# Backward-compatible alias (D-12)
 RETAINED_NAMES = ALL_RETAINED_NAMES
 
 

@@ -1,4 +1,4 @@
-""": the proof ledger -- assert the spine on the FINAL name.
+"""v29 Phase 1: the proof ledger -- assert the spine on the FINAL name.
 
 WHY this module exists
 ----------------------

@@ -2,7 +2,7 @@
 
 The composer names a pure polyol (`1,5,6-tris(2,3-dihydroxypropoxy)hexane-2,3,4-triol`)
 cleanly because its only characteristic group is the alcohol. When the SAME polyol
-carries one or more esters, the ester
+carries one or more esters (v30 tail #21, a hexitol tris-methacrylate), the ester
 is senior (P-41), so parent selection commits to the ester and `name_ester`
 LINEARISES the 23-carbon polyol OR side into a wrong 'tricosyl 2-methylpropanoate'
 (SELF-01-suppressed), and the multiplicative-ester PIN neither reference builds.

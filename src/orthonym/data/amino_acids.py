@@ -34,7 +34,7 @@ STANDARD_AMINO_ACIDS: Dict[str, str] = {
     "NC(C(=O)O)CO": "serine",                 # Ser - alternate canonical
 
     # Sulfur-containing
-    # data fix: the key was CSCC(N)C(=O)O — that is C4
+    # v23 Phase 5 data fix: the key was CSCC(N)C(=O)O — that is C4
     # (CH3-S-CH2-CH(NH2)-COOH) = S-methylcysteine, NOT methionine. True
     # methionine is C5 (CH3-S-CH2-CH2-CH(NH2)-COOH); a C4 input was therefore
     # named 'methionine' (a DIFFERENT molecule). Re-keyed to the correct C5
@@ -71,18 +71,18 @@ STANDARD_AMINO_ACIDS: Dict[str, str] = {
 
 # Non-standard amino acids with trivial names
 NON_STANDARD_AMINO_ACIDS: Dict[str, str] = {
-    # C4 CH3-S-CH2-CH(NH2)-COOH = S-methylcysteine (the S-methyl
+    # v23 Phase 5: C4 CH3-S-CH2-CH(NH2)-COOH = S-methylcysteine (the S-methyl
     # derivative of cysteine), moved here from the STANDARD methionine slot it
     # had wrongly occupied. Name per Blue Book line 54569 (S-methyl-L-cysteine);
     # OPSIN parses 'S-methylcysteine' to this exact structure (RT verified).
     "CSCC(N)C(=O)O": "S-methylcysteine",
-    # follow-on (audit F2): cystine is the disulfide dimer of two
+    # v23 Phase 12 follow-on (audit F2): cystine is the disulfide dimer of two
     # cysteines. The natural L-cystine (2R,2'R) is already in the OPSIN-import
     # catalog; the D-enantiomer (2S,2'S) was unrecognised, so it is keyed here by
     # exact stereo SMILES. meso-cystine (2R,2'S) has no retained name and stays
     # fail-closed (unknown).
     #
-    # Item 1: the VALUE was `"D-cystine"` -- the descriptor written
+    # v29 P3-CLEANUP Item 1: the VALUE was `"D-cystine"` -- the descriptor written
     # straight into the table -- while the L form resolved through the OPSIN import
     # to a bare `"cystine"`. That is what made the two enantiomers asymmetric: D
     # kept a descriptor on EVERY path (including the deliberately bare
@@ -90,7 +90,7 @@ NON_STANDARD_AMINO_ACIDS: Dict[str, str] = {
     # Both now carry the BARE retained name and the single descriptor path
     # (`_dimeric_aa_forms`) supplies L-/D-, so the pair cannot drift again.
     "N[C@H](CSSC[C@@H](N)C(=O)O)C(=O)O": "cystine",
-    # Item 1: dopa is the OTHER Table 10.5 entry in this table that
+    # v29 P3-CLEANUP Item 1: dopa is the OTHER Table 10.5 entry in this table that
     # was dropping its P-103.1.3.1 descriptor. The OPSIN import supplies only the
     # L (2S) key, so the D enantiomer had NO retained name at all while L shipped a
     # bare `dopa`. Hand-curated here (hand-curated wins: `_integrate_opsin_simplegroup`
@@ -208,7 +208,7 @@ def _build_acyl_names(all_amino_acids: Dict[str, str],
     return generated
 
 
-# W8 P3 Task 3.1 (P-103.1.3.2.2): the C-3 epimer of L-threonine / L-isoleucine
+# v24 W8 P3 Task 3.1 (P-103.1.3.2.2): the C-3 epimer of L-threonine / L-isoleucine
 # has the retained name `L-allo<name>` — `L-allothreonine`, FUSED, no hyphen after
 # 'allo'. Base SMILES below are (L-form, L-allo form = C-3 inverted, CIP-verified):
 # L-Thr (2S,3R) / L-alloThr (2S,3S); L-Ile (2S,3S) / L-alloIle (2S,3R). The full
@@ -216,14 +216,14 @@ def _build_acyl_names(all_amino_acids: Dict[str, str],
 # descriptor prefix) so the retained lookup can prepend `L-`, `D-`, `L-allo` or
 # `D-allo`.
 #
-# MINOR 11: this comment wrote every allo descriptor with a
+# v29 P3-CLEANUP MINOR 11: this comment wrote every allo descriptor with a
 # TRAILING HYPHEN (`L-allo-<name>`, "prepend L-/D-/L-allo-/D-allo-") while the
 # values are `"L-allo"` / `"D-allo"` and `_allo_aa_forms`'s own docstring says
 # "*the last two carry NO trailing hyphen*" — one file contradicting itself about
 # the exact spelling that `eba5d3bb` had just adjudicated. Corrected here rather
 # than left as a second reading of the same rule.
 #
-# TWO CORRECTIONS to this comment,: (1) it said "PIN", but
+# TWO CORRECTIONS to this comment, v29 P3-REGRESSION I12: (1) it said "PIN", but
 # `### **P-100 INTRODUCTION**` (BlueBookV2.md:50939) states at :50943 that
 # "*Preferred IUPAC names (PINs) are not identified for the compounds in this
 # Chapter*" — these are prescribed retained names, not PINs; (2) the L was written
@@ -234,7 +234,7 @@ _ALLO_AA_BASE: Dict[str, tuple] = {
 }
 _ALLO_AA_FORMS_CACHE: Optional[Dict[str, Dict[str, str]]] = None
 
-# Item 1 (P-103.1.1.2 + P-103.1.3.1): the Table 10.5 "less common"
+# v29 P3-CLEANUP Item 1 (P-103.1.1.2 + P-103.1.3.1): the Table 10.5 "less common"
 # amino acids carry the SAME alpha-carbon D/L descriptor as the Table 10.4 ones.
 # `## **P-103.1.3.1** The stereodescriptors 'D' and 'L'` (BlueBookV2.md:54291)
 # scopes itself to "*the alpha-amino carboxylic acids*" -- NOT to Table 10.4 --
@@ -277,7 +277,7 @@ _DIMERIC_AA_FORMS_CACHE: Optional[Dict[str, Dict[str, str]]] = None
 # pattern returned the same counts as the literal one). Prepending `L-` to those
 # would invent a name the Blue Book does not give and that OPSIN cannot parse --
 # which the validity gate would then suppress to `unknown organic compound`,
-# trading a spelling nit for a coverage loss.
+# trading a spelling nit for a coverage loss (invariant 11).
 #
 #   cystine : Table 10.5 (:54238); named EXPLICITLY by P-103.1.3.1 at :54301.
 #             Descriptor via `_dimeric_aa_forms` (two alpha-carbons).
@@ -302,12 +302,12 @@ def _allo_aa_forms() -> Dict[str, Dict[str, str]]:
     and the OCR form `alloGthreonine`, with a positive control proving the `G`=hyphen
     pattern finds matches in this file). The hyphenated, ITALIC `*allo*-` does occur
     — but only as a CARBOHYDRATE/cyclitol configurational prefix (:53011, :53021,
-    :54890, e.g. `D-*allo*-non-3-ulose`, `*allo*-inositol`).
+    :54890, e.g. `D-*allo*-non-3-ulose`, `*allo*-inositol`). v29 P3-REGRESSION
     applied the sugar convention to amino acids; corrected here. This OVERTURNS the
     v24 W8 P3 spelling (recorded in baseline_targets `rebaselined_v28_aa_stereo_gold`),
     which cited P-103.1.3.2.2 — the section that spells it fused.
 
-    : the L forms used to map to ``''`` and ``'allo-'``, i.e.
+    v29 P3-REGRESSION I12: the L forms used to map to ``''`` and ``'allo-'``, i.e.
     the L was DROPPED. The suppression cited `P-103.1.3.2.2`, and that section
     refutes it — `## **P-103.1.3.2.2** Use of the prefix 'allo'`
     (BlueBookV2.md:54320) writes all four out at :54324-54330 WITH the descriptor
@@ -421,7 +421,7 @@ def _aa_config_descriptor(mol, name: str) -> Optional[str]:
     # (L = R for the S/Se side chains). Its verdict is now USED, not filtered.
     # (lazy import avoids the data<->rules circular import at module load).
     from ..rules.peptides import _alpha_stereo_undefined, _get_stereo_prefix
-    # T5 (stereo honesty, mirrors L3-2e's peptide fix): `_get_stereo_
+    # v33 Phase 0 T5 (stereo honesty, mirrors L3-2e's peptide fix): `_get_stereo_
     # prefix` falls back to "" both for TRUE achirality (glycine -- excluded
     # above the allo/dimeric branches) and for a genuine alpha-carbon
     # stereocentre the INPUT never defines (no wedge/parity, CHI_UNSPECIFIED).
@@ -491,11 +491,11 @@ def get_amino_acid_name(
     # WSD-07 descriptor path: STANDARD amino acids, PLUS the Blue-Book-attested
     # non-standard retained names that P-103.1.3.1 designates a D/L for.
     #
-    # Item 1: this used to be a blanket `if not is_standard`. The
+    # v29 P3-CLEANUP Item 1: this used to be a blanket `if not is_standard`. The
     # docstring's justification for that gate is real but NARROWER than the gate --
     # a non-standard `D-<name>` invented for an OPSIN-vocabulary entry (D-butyrine,
     # D-statine, ...) is not OPSIN-parseable and would be SUPPRESSED to 'unknown',
-    # i.e. a coverage loss traded for a spelling. That argument does
+    # i.e. a coverage loss traded for a spelling (invariant 11). That argument does
     # not reach a name the Blue Book itself prescribes the descriptor for and OPSIN
     # parses: `L-cystine` -> the exact input structure (RT-verified). Using
     # `is_standard` as the proxy therefore dropped the descriptor on the one
@@ -579,7 +579,7 @@ def get_amino_acid_acyl_name(trivial_name: str) -> Optional[str]:
     return AMINO_ACID_ACYL_NAMES.get(trivial_name)
 
 
-# W8 P3 (P-103.2.6, BB 54595-54608): the ester 'ate' stem for the
+# v24 W8 P3 (P-103.2.6, BB 54595-54608): the ester 'ate' stem for the
 # single-alpha-stereocentre monocarboxylic standard amino acids + glycine.
 # "Esters of amino acids ... are formed ... using the 'ate' ending obtained by
 # replacing the 'ic acid' ending or the final letter 'e' of the retained name

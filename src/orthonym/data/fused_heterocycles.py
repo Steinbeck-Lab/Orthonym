@@ -13,6 +13,7 @@ Keys are canonical SMILES (verified with RDKit), values contain:
 - iupac_locants: Mapping from canonical atom index to IUPAC peripheral locant
 """
 
+import re
 from collections import Counter
 from typing import Any, Dict, List, Optional, Tuple, Union
 
@@ -467,6 +468,142 @@ FUSED_HETEROCYCLE_DATA: Dict[str, Dict[str, Any]] = {
         'parent_atoms': 9,
         'iupac_locants': {0: 5, 1: 6, 2: 7, 3: '7a', 4: 1, 5: 2, 6: 3, 7: '3a', 8: 4},
     },
+    # ------------------------------------------------------------------
+    # Phase 9 (B3b) -- two-ring hetero/hetero ortho-fused PINs the
+    # systematic fusion builder cannot yet spell (it lacks the 1,3-dioxole /
+    # 1,2-oxazine / 1,3-oxathiole / 1,2,4-triazine / 1,2,3-oxathiazole
+    # components AND never computes fusion-path indicated hydrogen). Each
+    # `name` is a verbatim Blue-Book (PIN) example; each `iupac_locants` map
+    # is OPSIN-authoritative (derived via opsin_atom_locant_map, all round-trip
+    # inchi_match=True). Substituted forms of the 3-heteroatom / indicated-H
+    # systems (triazine, oxathiazolo, thieno-imidazole) remain a named residual
+    # for the general fusion engine -- the bare parents below are exact-match
+    # only.
+    # 2H-furo[2,3-d][1,3]dioxole -- P-25.3.2.4 (BB:12278 '2H-furo[2,3-d][1,3]dioxole (PIN)'
+    #   [dioxole (2 heteroatoms) preferred to furan (1 heteroatom)]).
+    'c1cc2c(o1)OCO2': {
+        'name': '2H-furo[2,3-d][1,3]dioxole',
+        'tautomer_locant': 2,
+        'ring_system': 'furo-dioxole',
+        'parent_atoms': 8,
+        'iupac_locants': {0: 5, 1: 6, 2: '6a', 3: '3a', 4: 4, 5: 3, 6: 2, 7: 1},
+    },
+    # 5H-pyrido[2,3-d][1,2]oxazine -- P-25.3.3.1.2 (BB:12269
+    #   '5H-pyrido[2,3-d][1,2]oxazine (PIN)' [oxazine (2 het) preferred to pyridine]).
+    'C1=NOCc2cccnc21': {
+        'name': '5H-pyrido[2,3-d][1,2]oxazine',
+        'tautomer_locant': 5,
+        'ring_system': 'pyrido-oxazine',
+        'parent_atoms': 10,
+        'iupac_locants': {0: 8, 1: 7, 2: 6, 3: 5, 4: '4a', 5: 4, 6: 3, 7: 2, 8: 1, 9: '8a'},
+    },
+    # 2H,4H-[1,3]oxathiolo[5,4-b]pyrrole -- verbatim (PIN) at BB:12556. Two
+    #   indicated H (CH2 at 2, NH at 4); tautomer_locant stores the lower (2) --
+    #   the baked `name` carries the full '2H,4H' string on the bare-parent path.
+    'c1cc2c([nH]1)OCS2': {
+        'name': '2H,4H-[1,3]oxathiolo[5,4-b]pyrrole',
+        'tautomer_locant': 2,
+        'ring_system': 'oxathiolo-pyrrole',
+        'parent_atoms': 8,
+        'iupac_locants': {0: 5, 1: 6, 2: '6a', 3: '3a', 4: 4, 5: 3, 6: 2, 7: 1},
+    },
+    # imidazo[1,2-b][1,2,4]triazine -- verbatim (PIN) at BB:12590 (P-25.3.3.1.2(c),
+    #   BB:12592 "the locant '4a' is lower than '8a'"). Fully mancude, no indicated H.
+    'c1cnn2ccnc2n1': {
+        'name': 'imidazo[1,2-b][1,2,4]triazine',
+        'tautomer_locant': None,
+        'ring_system': 'imidazo-triazine',
+        'parent_atoms': 9,
+        'iupac_locants': {0: 3, 1: 2, 2: 1, 3: 8, 4: 7, 5: 6, 6: 5, 7: '4a', 8: 4},
+    },
+    # 3H,5H-[1,3,2]oxathiazolo[4,5-d][1,2,3]oxathiazole -- verbatim (PIN) at
+    #   BB:12416 ("locants '1,2,3' are lower than '1,3,2'"). Two indicated H
+    #   (NH at 3 and 5); tautomer_locant stores the lower (3).
+    '[nH]1oc2os[nH]c=2s1': {
+        'name': '3H,5H-[1,3,2]oxathiazolo[4,5-d][1,2,3]oxathiazole',
+        'tautomer_locant': 3,
+        'ring_system': 'oxathiazolo-oxathiazole',
+        'parent_atoms': 8,
+        'iupac_locants': {0: 5, 1: 6, 2: '6a', 3: 1, 4: 2, 5: 3, 6: '3a', 7: 4},
+    },
+    # [1,3]selenazolo[5,4-d][1,3]thiazole -- verbatim (PIN) at BB:12311
+    #   (P-25.3.2.4(f); S,N senior to Se,N so [1,3]thiazole is the base). No iH.
+    'c1nc2[se]cnc2s1': {
+        'name': '[1,3]selenazolo[5,4-d][1,3]thiazole',
+        'tautomer_locant': None,
+        'ring_system': 'selenazolo-thiazole',
+        'parent_atoms': 8,
+        'iupac_locants': {0: 2, 1: 3, 2: '3a', 3: 4, 4: 5, 5: 6, 6: '6a', 7: 1},
+    },
+    # 1H-thieno[2,3-d]imidazole -- verbatim (PIN) at BB:12576 (P-25.3.3.1.2).
+    #   NH indicated H at 1. Replaces the systematic path's wrong '[3,2-d]'/no-iH spelling.
+    'c1nc2sccc2[nH]1': {
+        'name': '1H-thieno[2,3-d]imidazole',
+        'tautomer_locant': 1,
+        'ring_system': 'thieno-imidazole',
+        'parent_atoms': 8,
+        'iupac_locants': {0: 2, 1: 3, 2: '3a', 3: 4, 4: 5, 5: 6, 6: '6a', 7: 1},
+    },
+    # ------------------------------------------------------------------
+    # Phase 11 (B2 / CW-2 remainder) -- two-ring fused parents (4 hetero,
+    # 1 pure carbocycle) the systematic fusion / von-Baeyer path degrades: it
+    # lacks these small-ring components / fusion-path indicated hydrogen and so
+    # emits a von-Baeyer name (e.g. '2,7-dioxabicyclo[4.3.0]nona-...') instead of
+    # the fusion PIN. Each `name` is a verbatim Blue-Book (PIN); each
+    # `iupac_locants` map is OPSIN-authoritative (opsin_atom_locant_map, all
+    # round-trip inchi_match=True). Exact whole-molecule canonical-SMILES keys, so
+    # substituted forms (different canonical SMILES) never over-match the bare
+    # parents. Mirrors 6f1fe6333 (Phase 9 B3b). Row 4 (cyclopenta[8]annulene) is a
+    # pure carbocycle and confirmed to route through this same lookup (indene /
+    # pyrene positives).
+    # 2H-furo[3,2-b]pyran -- P-25.3.2.4 (BB:12246 '2H-furo[3,2-b]pyran (PIN)
+    #   [pyran (6 ring) preferred to furan (5 ring)]'). iH at 2.
+    'C1=COC2=CCOC2=C1': {
+        'name': '2H-furo[3,2-b]pyran',
+        'tautomer_locant': 2,
+        'ring_system': 'furo-pyran',
+        'parent_atoms': 9,
+        'iupac_locants': {0: 6, 1: 5, 2: 4, 3: '3a', 4: 3, 5: 2, 6: 1, 7: '7a', 8: 7},
+    },
+    # 2H-1,3-benzoxathiole -- verbatim (PIN) at BB:14575 (P-25.7.1.1). iH at 2.
+    'c1ccc2c(c1)OCS2': {
+        'name': '2H-1,3-benzoxathiole',
+        'tautomer_locant': 2,
+        'ring_system': 'benzoxathiole',
+        'parent_atoms': 9,
+        'iupac_locants': {0: 6, 1: 5, 2: 4, 3: '3a', 4: '7a', 5: 7, 6: 1, 7: 2, 8: 3},
+    },
+    # pyrrolo[3,2-b]pyrrole -- verbatim (PIN) at BB:14571 (P-25.7.1.1). Fully
+    #   mancude (both N are pyridine-type =N-, no NH; pentalene analog) -> no
+    #   indicated hydrogen, so gold correctly carries none.
+    'C1=CC2=NC=CC2=N1': {
+        'name': 'pyrrolo[3,2-b]pyrrole',
+        'tautomer_locant': None,
+        'ring_system': 'pyrrolo-pyrrole',
+        'parent_atoms': 8,
+        'iupac_locants': {0: 2, 1: 3, 2: '3a', 3: 4, 4: 5, 5: 6, 6: '6a', 7: 1},
+    },
+    # 1H-cyclopenta[8]annulene -- verbatim (PIN) at BB:13974 (P-25.3.8.1). Pure
+    #   carbocycle; iH at 1. Confirmed to reach this lookup via the carbocyclic
+    #   route (indene / pyrene are named through the same table).
+    'C1=CC=CC2=C(C=C1)C=CC2': {
+        'name': '1H-cyclopenta[8]annulene',
+        'tautomer_locant': 1,
+        'ring_system': 'cyclopenta-annulene',
+        'parent_atoms': 11,
+        'iupac_locants': {0: 6, 1: 7, 2: 8, 3: 9, 4: '9a', 5: '3a', 6: 4, 7: 5, 8: 3, 9: 2, 10: 1},
+    },
+    # 1H,3H-thieno[3,4-c]thiophene -- verbatim (PIN) at BB:14638 (P-25.7.1.3.2).
+    #   Two indicated H (CH2 at 1 and 3); tautomer_locant stores the lower (1).
+    #   (BB:14663 lists a separate 2lambda4,5lambda4 form -- not this molecule.)
+    'c1scc2c1CSC2': {
+        'name': '1H,3H-thieno[3,4-c]thiophene',
+        'tautomer_locant': 1,
+        'ring_system': 'thieno-thiophene',
+        'parent_atoms': 8,
+        'iupac_locants': {0: 6, 1: 5, 2: 4, 3: '3a', 4: '6a', 5: 1, 6: 2, 7: 3},
+    },
+    # ------------------------------------------------------------------
     # indoline
     'c1ccc2c(c1)CCN2': {
         # The name below IS the PIN. P-54.4.3.2 (BB:24256) names the retained form
@@ -484,9 +621,9 @@ FUSED_HETEROCYCLE_DATA: Dict[str, Dict[str, Any]] = {
         # system with hydrogen cited OUTSIDE it -- so the bare rename produced
         # `1,2'-spirobi[2,3-dihydro-1H-indene]`. The obvious shortcut is WORSE, not
         # merely wrong: `1,2'-spirobi[1H-indene]` denotes the UNSATURATED molecule --
-        # a wrong STRUCTURE, not a wrong spelling (session.
+        # a wrong STRUCTURE, not a wrong spelling (session invariant 11).
         #
-        # ✅ UNBLOCKED. `_name_spirobi_core` no longer reads saturation
+        # ✅ UNBLOCKED (v29 Phase C). `_name_spirobi_core` no longer reads saturation
         # out of this string at all: it derives the hydro prefixes and any indicated
         # hydrogen from the GRAPH (maximum noncumulative double-bond assignment over
         # the assembled skeleton, the spiro atom excluded) and hoists them in front of
@@ -517,9 +654,9 @@ FUSED_HETEROCYCLE_DATA: Dict[str, Dict[str, Any]] = {
         # system with hydrogen cited OUTSIDE it -- so the bare rename produced
         # `1,2'-spirobi[2,3-dihydro-1H-indene]`. The obvious shortcut is WORSE, not
         # merely wrong: `1,2'-spirobi[1H-indene]` denotes the UNSATURATED molecule --
-        # a wrong STRUCTURE, not a wrong spelling (session.
+        # a wrong STRUCTURE, not a wrong spelling (session invariant 11).
         #
-        # ✅ UNBLOCKED. `_name_spirobi_core` no longer reads saturation
+        # ✅ UNBLOCKED (v29 Phase C). `_name_spirobi_core` no longer reads saturation
         # out of this string at all: it derives the hydro prefixes and any indicated
         # hydrogen from the GRAPH (maximum noncumulative double-bond assignment over
         # the assembled skeleton, the spiro atom excluded) and hoists them in front of
@@ -562,6 +699,31 @@ FUSED_HETEROCYCLE_DATA: Dict[str, Dict[str, Any]] = {
     # isochromane -> PIN 3,4-dihydro-1H-2-benzopyran (BB line 17016)
     'c1ccc2c(c1)CCOC2': {
         'name': '3,4-dihydro-1H-2-benzopyran',
+        'tautomer_locant': None,
+        'ring_system': 'benzo-6-saturated',
+        'parent_atoms': 10,
+        'iupac_locants': {0: 6, 1: 7, 2: 8, 3: '8a', 4: '4a', 5: 5, 6: 4, 7: 3, 8: 2, 9: 1},
+    },
+    # isothiochromane -> PIN 3,4-dihydro-1H-2-benzothiopyran (BB Table 3.1, line 17018;
+    # retained name isothiochromane is NOT a PIN, P-31.2.3.3.1 line 16509 / P-54.4.3.2 line 24256)
+    'c1ccc2c(c1)CCSC2': {
+        'name': '3,4-dihydro-1H-2-benzothiopyran',
+        'tautomer_locant': None,
+        'ring_system': 'benzo-6-saturated',
+        'parent_atoms': 10,
+        'iupac_locants': {0: 6, 1: 7, 2: 8, 3: '8a', 4: '4a', 5: 5, 6: 4, 7: 3, 8: 2, 9: 1},
+    },
+    # isoselenochromane -> PIN 3,4-dihydro-1H-2-benzoselenopyran (BB Table 3.1, line 17020)
+    'c1ccc2c(c1)CC[Se]C2': {
+        'name': '3,4-dihydro-1H-2-benzoselenopyran',
+        'tautomer_locant': None,
+        'ring_system': 'benzo-6-saturated',
+        'parent_atoms': 10,
+        'iupac_locants': {0: 6, 1: 7, 2: 8, 3: '8a', 4: '4a', 5: 5, 6: 4, 7: 3, 8: 2, 9: 1},
+    },
+    # isotellurochromane -> PIN 3,4-dihydro-1H-2-benzotelluropyran (BB Table 3.1, line 17022)
+    'c1ccc2c(c1)CC[Te]C2': {
+        'name': '3,4-dihydro-1H-2-benzotelluropyran',
         'tautomer_locant': None,
         'ring_system': 'benzo-6-saturated',
         'parent_atoms': 10,
@@ -1114,9 +1276,9 @@ FUSED_HETEROCYCLE_DATA: Dict[str, Dict[str, Any]] = {
         # system with hydrogen cited OUTSIDE it -- so the bare rename produced
         # `1,2'-spirobi[2,3-dihydro-1H-indene]`. The obvious shortcut is WORSE, not
         # merely wrong: `1,2'-spirobi[1H-indene]` denotes the UNSATURATED molecule --
-        # a wrong STRUCTURE, not a wrong spelling (session.
+        # a wrong STRUCTURE, not a wrong spelling (session invariant 11).
         #
-        # ✅ UNBLOCKED. `_name_spirobi_core` no longer reads saturation
+        # ✅ UNBLOCKED (v29 Phase C). `_name_spirobi_core` no longer reads saturation
         # out of this string at all: it derives the hydro prefixes and any indicated
         # hydrogen from the GRAPH (maximum noncumulative double-bond assignment over
         # the assembled skeleton, the spiro atom excluded) and hoists them in front of
@@ -1378,9 +1540,13 @@ FUSED_HETEROCYCLE_DATA: Dict[str, Dict[str, Any]] = {
         'parent_atoms': 9,
         'iupac_locants': {0: 7, 1: 6, 2: 5, 3: 4, 4: 3, 5: 2, 6: 1, 7: '8a', 8: 8},
     },
-    # phenoxathiin
+    # phenoxathiine -- P-25.2.2.3 (BlueBookV2.md:11795) prints "X = S
+    # phenoxathiine (PIN)"; the terminal 'e' is part of the PIN stem (the whole
+    # C4OS-C6-C6 family: phenoxathiine/phenoxaselenine/phenoxaphosphinine at
+    # BB:14725). This catalog value is the on-path source for the bare parent
+    # (spy-verified: replacing it makes the OPSIN gate reject the emission).
     'c1ccc2c(c1)Oc1ccccc1S2': {
-        'name': 'phenoxathiin',
+        'name': 'phenoxathiine',
         'tautomer_locant': None,
         'ring_system': 'tricyclic',
         'parent_atoms': 14,
@@ -1473,6 +1639,24 @@ FUSED_HETEROCYCLE_DATA: Dict[str, Dict[str, Any]] = {
     # thiochromane -> PIN 3,4-dihydro-2H-1-benzothiopyran (BB line 17006)
     'c1ccc2c(c1)CCCS2': {
         'name': '3,4-dihydro-2H-1-benzothiopyran',
+        'tautomer_locant': None,
+        'ring_system': 'benzo-6-saturated',
+        'parent_atoms': 10,
+        'iupac_locants': {0: 6, 1: 7, 2: 8, 3: '8a', 4: '4a', 5: 5, 6: 4, 7: 3, 8: 2, 9: 1},
+    },
+    # selenochromane -> PIN 3,4-dihydro-2H-1-benzoselenopyran (BB Table 3.1, line 17008;
+    # retained name selenochromane is NOT a PIN, P-31.2.3.3.1 line 16509 / P-54.4.3.2 line 24256)
+    'c1ccc2c(c1)CCC[Se]2': {
+        'name': '3,4-dihydro-2H-1-benzoselenopyran',
+        'tautomer_locant': None,
+        'ring_system': 'benzo-6-saturated',
+        'parent_atoms': 10,
+        'iupac_locants': {0: 6, 1: 7, 2: 8, 3: '8a', 4: '4a', 5: 5, 6: 4, 7: 3, 8: 2, 9: 1},
+    },
+    # tellurochromane -> PIN 3,4-dihydro-2H-1-benzotelluropyran (BB Table 3.1, line 17010;
+    # retained name tellurochromane is NOT a PIN, P-31.2.3.3.1 line 16509 / P-54.4.3.2 line 24256)
+    'c1ccc2c(c1)CCC[Te]2': {
+        'name': '3,4-dihydro-2H-1-benzotelluropyran',
         'tautomer_locant': None,
         'ring_system': 'benzo-6-saturated',
         'parent_atoms': 10,
@@ -1652,7 +1836,7 @@ FUSED_HETEROCYCLE_DATA: Dict[str, Dict[str, Any]] = {
     # M6 Kind-C catalog expansion (2026-08-29): 2-ring fused cores measured
     # ABSENT from this catalog (`fused_component_uncatalogued`, guard
     # spiro.py:1468 / composer.py's plain ortho-fused branch), sized in
-    # + M6-KINDB-CONFIRM.md. The routing
+    # .planning/audit-v33/M6-FUSED-SPY.md + M6-KINDB-CONFIRM.md. The routing
     # to `match_fused_heterocycle_core` already exists and self-activates once
     # these are cataloged. Each name below OPSIN-round-trips (constitution-only
     # InChI match) to exactly this bare core before being added; the
@@ -2062,7 +2246,7 @@ def _match_covers_ring_systems(mol, atom_mapping) -> bool:
     This is the guard that stops a SMALLER catalog pattern from matching a LARGER
     fused ring system as a substructure (e.g. the 4-ring naphthacene pattern
     matching inside 5-ring pentacene, or chrysene inside picene) — a structure-
-    loss hallucination that otherwise yields a wrong parent name. v23 13B(a).
+    loss hallucination that otherwise yields a wrong parent name.  v23 13B(a).
     """
     core_atoms = {k for k in (atom_mapping or {}) if isinstance(k, int)}
     if not core_atoms:
@@ -2075,6 +2259,123 @@ def _match_covers_ring_systems(mol, atom_mapping) -> bool:
     return True
 
 
+# RISK-5: elements that can carry an indicated hydrogen (a mancude saturated
+# position). Mirrors ``rules.ring_assemblies._INDICATED_H_ATOM_ELEMENTS`` (kept
+# local to avoid a data->rules import): B, C, N, Si, P, Ge, As, Sn, Sb, Bi. The
+# divalent chalcogens O/S/Se are deliberately EXCLUDED — a ring O/S/Se is always
+# two-coordinate and never bears an indicated H, so it must not be read as a
+# saturated position.
+_FUSED_INDICATED_H_ELEMENTS = frozenset({5, 6, 7, 14, 15, 32, 33, 50, 51, 83})
+
+# Leading indicated-hydrogen descriptor of a catalog core name: ``1H-``,
+# ``2H,4H-``, ``10H-``. Captures the whole comma-joined descriptor before the
+# first hyphen so a genuinely-stated iH set can be compared to the input's.
+_LEADING_INDICATED_H_RE = re.compile(r"^((?:\d+[a-z]*H,)*\d+[a-z]*H)-")
+
+
+def _input_indicated_h_locants(
+    mol: Chem.Mol, atom_mapping: Dict[int, Union[int, str]]
+) -> Optional[List[int]]:
+    """Integer indicated-hydrogen locants the INPUT actually carries, in the
+    matched core's own numbering.
+
+    IUPAC P-25.7.1.3 (BB:14607): a fused-system PIN must cite indicated hydrogen
+    at the ring atom that is saturated where the mancude parent would carry a
+    double bond. The catalog's ``atom_mapping`` (an OPSIN-derived atom->locant
+    map for ONE reference tautomer) is applied by ``match_fused_heterocycle_core``
+    via a substructure match that ignores H position, so a DIFFERENT tautomer of
+    the same skeleton (NH on another ring atom) matches and inherits the reference
+    tautomer's baked indicated-H locant — a wrong PIN (RISK-5). This returns the
+    input's true saturated positions so the caller can detect that mismatch.
+
+    A saturated (indicated-H) position is a ring atom of an iH-capable element
+    (``_FUSED_INDICATED_H_ELEMENTS``) that, in the KEKULIZED structure, has NO
+    ring double bond and NO exocyclic double bond. Substituted-at-iH atoms (a
+    substituent or ring bond in place of the H) are KEPT — ``1-methyl-1H-indole``
+    still cites 1H — so a 0-H position is not excluded. An exocyclic double bond
+    IS excluded, which keeps an oxo/added-hydrogen position (``9H-fluoren-9-one``,
+    ``acridone``) out of the set so those are not mis-flagged as a tautomer swap.
+
+    Only INTEGER locants are returned; a fusion-atom locant (``'3a'``) is skipped,
+    so an indicated H at a fusion position is invisible here and the caller stays
+    conservative (it does not fire for a name whose iH descriptor carries a letter).
+
+    Returns the sorted integer locants, or ``None`` if the molecule cannot be
+    kekulized (caller then leaves the name unchanged).
+    """
+    core_atoms = {k for k in atom_mapping if isinstance(k, int)}
+    try:
+        km = Chem.Mol(mol)
+        Chem.Kekulize(km, clearAromaticFlags=True)
+    except Exception:
+        return None
+    out: List[int] = []
+    for idx in core_atoms:
+        atom = mol.GetAtomWithIdx(idx)
+        if atom.GetAtomicNum() not in _FUSED_INDICATED_H_ELEMENTS:
+            continue
+        katom = km.GetAtomWithIdx(idx)
+        has_ring_double = any(
+            bond.GetOtherAtomIdx(idx) in core_atoms
+            and bond.GetBondType() == Chem.BondType.DOUBLE
+            for bond in katom.GetBonds()
+        )
+        if has_ring_double:
+            continue
+        has_exo_double = any(
+            bond.GetOtherAtomIdx(idx) not in core_atoms
+            and bond.GetBondType() == Chem.BondType.DOUBLE
+            for bond in katom.GetBonds()
+        )
+        if has_exo_double:
+            continue
+        loc = atom_mapping.get(idx)
+        if isinstance(loc, int):
+            out.append(loc)
+    return sorted(out)
+
+
+def _correct_indicated_h_tautomer(
+    mol: Chem.Mol, name: str, atom_mapping: Dict[int, Union[int, str]]
+) -> Optional[str]:
+    """Guard a catalog core hit against the wrong-tautomer defect (RISK-5).
+
+    The substructure matcher accepts a hit by heavy-atom skeleton and returns the
+    reference tautomer's baked indicated-H locant. When the INPUT is a different
+    tautomer, that baked locant states an indicated hydrogen the molecule does not
+    have (``c1[nH]c2sccc2n1`` — the 3H tautomer — matching the 1H thieno[2,3-d]-
+    imidazole entry and emitting ``1H-``). P-25.7.1.3 (BB:14607) requires the
+    indicated H at the atom that actually bears it.
+
+    Fires only for a genuine tautomer conflict: the name STATES an integer
+    indicated-H set, the input carries a NON-EMPTY set, and the two differ. A
+    clean single-locant swap is CORRECTED by re-anchoring the descriptor to the
+    input's true iH locant (``1H-`` -> ``3H-``); the map is the authority, so the
+    corrected name places the iH at exactly the atom that bears it and round-trips
+    0-wrong. Anything less clean (multi-iH mismatch, letter-suffix locants) returns
+    ``None`` so the caller falls through to the algorithmic path rather than
+    emitting a wrong PIN.
+
+    Returns the (possibly corrected) name, or ``None`` to reject the hit.
+    """
+    m = _LEADING_INDICATED_H_RE.match(name)
+    if not m:
+        return name  # name states no indicated H (acridone, quinoline): nothing to verify
+    tokens = [t[:-1] for t in m.group(1).split(",")]  # strip trailing 'H'
+    if any(not t.isdigit() for t in tokens):
+        return name  # letter-suffix iH (e.g. '3aH'): stay conservative, leave unchanged
+    name_ih = {int(t) for t in tokens}
+    input_ih = _input_indicated_h_locants(mol, atom_mapping)
+    if not input_ih:
+        return name  # oxo / added-hydrogen consumed the position: keep as-is
+    if set(input_ih) == name_ih:
+        return name  # correct tautomer
+    # Wrong tautomer. Re-anchor a clean single-iH swap to the true locant.
+    if len(input_ih) == 1 and len(name_ih) == 1:
+        return f"{input_ih[0]}H-{name[m.end():]}"
+    return None  # ambiguous multi-iH mismatch: reject, let the caller degrade
+
+
 def match_fused_heterocycle_core(
     mol: Chem.Mol
 ) -> Optional[Tuple[str, Dict[int, Union[int, str]], str]]:
@@ -2085,20 +2386,30 @@ def match_fused_heterocycle_core(
     touches (P-25.3 — a base/retained ring system name must span the entire fused
     system, not a sub-part).  Without this, a larger non-cataloged PAH whose
     skeleton contains a cataloged subset (pentacene contains naphthacene, picene
-    contains chrysene) spuriously matched the smaller entry. v23 13B(a) S1.
+    contains chrysene) spuriously matched the smaller entry.  v23 13B(a) S1.
+
+    RISK-5: also verifies the input's indicated hydrogen matches the matched
+    entry's, correcting a clean single-locant tautomer swap (``1H-`` -> ``3H-``)
+    and rejecting an ambiguous mismatch — see ``_correct_indicated_h_tautomer``.
     """
     result = _match_fused_heterocycle_core_impl(mol)
     if result is None:
         return None
     if not _match_covers_ring_systems(mol, result[1]):
         return None
+    name, atom_mapping, key = result
+    corrected = _correct_indicated_h_tautomer(mol, name, atom_mapping)
+    if corrected is None:
+        return None
+    if corrected != name:
+        return (corrected, atom_mapping, key)
     return result
 
 
 def _match_fused_heterocycle_core_impl(
     mol: Chem.Mol
 ) -> Optional[Tuple[str, Dict[int, Union[int, str]], str]]:
-    """perf lever — a per-molecule memo over the fused-core matcher.
+    """v43 perf lever — a per-molecule memo over the fused-core matcher.
 
     Within ONE molecule's naming this matcher is re-run on the SAME ring-bearing
     fragment 100-390x (measured: the recursive substituent enumeration re-derives
@@ -2112,7 +2423,7 @@ def _match_fused_heterocycle_core_impl(
 
     0-wrong / byte-identity: the key is ``(non-canonical SMILES, atom OUTPUT ORDER)``
     (see the key line below) — the non-canonical SMILES alone does NOT pin the
-    index->atom correspondence, so the output order is required to
+    index->atom correspondence (review P3 Crit-1), so the output order is required to
     make the key COMPLETE for the atom-INDEX-keyed ``atom_mapping``. Validated:
     ``ORTHONYM_MEMO=on`` vs ``off`` emits the identical name over 258 PubChem-ORDERED
     fused molecules (atom order != RDKit DFS — the class that exposed the bug), and
@@ -2129,7 +2440,7 @@ def _match_fused_heterocycle_core_impl(
     from ..assembly.memo import cache_or_compute
     try:
         _smi = Chem.MolToSmiles(mol, canonical=False)
-        # the non-canonical SMILES ALONE does NOT pin the
+        # v43 (review P3 Crit-1): the non-canonical SMILES ALONE does NOT pin the
         # index->atom correspondence -- RDKit's non-canonical writer DFS-walks from
         # atom 0 taking the lowest-index neighbour, so any two labelings that make
         # the same branch choices produce the SAME string with DIFFERENT atom
@@ -2139,7 +2450,7 @@ def _match_fused_heterocycle_core_impl(
         # the engine presents one molecule as both MolFromSmiles(input) and
         # MolFromSmiles(canonical) within one scope). Pin the labeling with the atom
         # OUTPUT ORDER ``MolToSmiles`` just recorded -- same key construction the
-        # substituent memo uses (assembly/substituent_enumerator.py). Same
+        # M1 substituent memo uses (assembly/substituent_enumerator.py). Same
         # string + same output order == identical indexed graph.
         key = (_smi, mol.GetProp("_smilesAtomOutputOrder"))
     except Exception:
@@ -2371,7 +2682,7 @@ def _select_lowest_locant_match(mol, matches, iupac_locants):
     """Pick the automorphic substructure match giving the substituent-bearing
     core atoms the lowest locants (P-14.3.5 / P-14.4 / P-25.3.3.1.2(a)).
 
-    . For an asymmetric core there is exactly one match, so
+    v22 Phase E1 / DD4. For an asymmetric core there is exactly one match, so
     this returns ``matches[0]`` (byte-identical to the legacy first-match
     behaviour). For a C2v/Cs-symmetric core (acridine, carbazole,
     phenanthridine, ...) with a substituent, the multiple automorphic matches

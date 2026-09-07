@@ -1,7 +1,7 @@
 """Phase 160 boronic_acid handler — Tier B retained-name (gate 0.40).
 
 Verbatim lift of composer.py:1205-1214 (inline branch) +
-composer.py:2450-2497 (_name_boronic_acid body). Per CONTEXT,
+composer.py:2450-2497 (_name_boronic_acid body). Per CONTEXT D-24,
 body stays in composer.py until Plan-03 commit 03-10.
 
 Note: this handler's inline branch is OUT-OF-LINE in source code

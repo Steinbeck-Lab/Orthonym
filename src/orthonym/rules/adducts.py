@@ -93,7 +93,7 @@ def _name_component(frag_smi: str, style: str, *,
     same as routing/dispatch_table._handle_multi_component_neutral), so the
     per-fragment OPSIN validity gate stays ON in production.
 
-    : ``general_fallback`` / ``allow_aromatic_general`` (default False ->
+    v26 P4: ``general_fallback`` / ``allow_aromatic_general`` (default False ->
     byte-identical PIN behaviour) select the ``complete`` tier for the
     per-component namer, so a component nameable only by the general engine
     (e.g. a silyl-heteroarene, a von-Baeyer polyene cage) is named rather than
@@ -106,7 +106,7 @@ def _name_component(frag_smi: str, style: str, *,
     is_charged = Chem.GetFormalCharge(frag_mol) != 0
     if is_charged and not charged_ok:
         return None  # charged fragments belong to the salt/ion router
-    # a multi-atom charged ion (charged_ok) is named as a substitutive
+    # v43 P1-1d: a multi-atom charged ion (charged_ok) is named as a substitutive
     # ion word (…-ium / …-ide) by the fresh best-effort instance below, exactly as
     # a neutral multi-atom fragment. A single charged atom (a bare ion) stays out
     # of the P-14.8.2 single-atom table and refuses.
@@ -248,7 +248,7 @@ def name_adduct(mol, canonical_smiles: Optional[str] = None,
       * any charged fragment (salt/ion routing owns charged input);
       * ANY component the single-component pipeline cannot name.
 
-    : ``general_fallback`` / ``allow_aromatic_general`` (default False ->
+    v26 P4: ``general_fallback`` / ``allow_aromatic_general`` (default False ->
     byte-identical PIN output) select the ``complete`` tier for the
     per-component namer (see :func:`_name_component`), so a multi-fragment
     input whose only unnameable part was a general-engine-only component
@@ -264,7 +264,7 @@ def name_adduct(mol, canonical_smiles: Optional[str] = None,
         return None
     if not any(fm.GetNumHeavyAtoms() >= 2 for fm in frag_mols.values()):
         return None
-    # under best-effort, a net-charged multi-fragment assembly composes
+    # v43 P1-1d: under best-effort, a net-charged multi-fragment assembly composes
     # as a P-14.8.1-notation adduct of its (charged) ion components -- 'cation—anion
     # (1/1)' (measured 65% RT_FULL, 0 wrong). OPSIN preserves the net charge when a
     # cation IS present, but it PROTONATES a lone anion (e.g. 'acetate—water (1/1)'

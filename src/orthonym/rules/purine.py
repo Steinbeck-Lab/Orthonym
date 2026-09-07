@@ -93,7 +93,7 @@ def name_substituted_purine(mol) -> Optional[str]:
         # substituent -- i.e. denote a DIFFERENT molecule. Fail closed at the
         # source rather than trust an incomplete collection -- UNLESS best-effort
         # is on, in which case retry any unidentified/incomplete branch with the
-        # general recursive substituent namer: this is what lets a
+        # general recursive substituent namer (v33 Defect B): this is what lets a
         # giant arm -- e.g. a nucleotide's ribose-diphosphate-pantetheine chain on
         # a purine N9, as in acetyl-CoA -- be named as an ordinary ring substituent
         # instead of silently dropping the whole molecule to a malformed von

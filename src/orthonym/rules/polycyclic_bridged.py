@@ -231,7 +231,7 @@ def find_all_bridgeheads(mol) -> Set[int]:
         >>> len(find_all_bridgeheads(mol))  
         4
     """
-    # SUB-02/: delegate to the SINGLE consolidated predicate. The former
+    # SUB-02/D-08: delegate to the SINGLE consolidated predicate. The former
     # body's extra filters (atom_ring_count>=2, total-neighbours>=3) are
     # redundant given ring_neighbours>=3 (an atom with >=3 ring neighbours is
     # necessarily in >=2 rings and has >=3 total neighbours), so this is a

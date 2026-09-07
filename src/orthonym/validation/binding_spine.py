@@ -1,4 +1,4 @@
-""": the recursion-safe name<->graph binding spine.
+"""v29 Phase 1: the recursion-safe name<->graph binding spine.
 
 WHY this module exists
 ----------------------
@@ -214,7 +214,7 @@ class BindingKind(str, Enum):
 # (the only role a substituent-shaped token can safely be assumed to play)
 # and is recorded, never silently absorbed.
 #
-# T5: ``replacement`` joined the map when the ring producer began
+# v29 Phase 2 T5: ``replacement`` joined the map when the ring producer began
 # emitting one binding per skeletal-replacement morpheme ('oxa', 'aza', ...).
 # Phase 0c Task 2: ``charge`` joined the map when the charge-suffix producer
 # (``general_engine._append_charge_suffix``) began emitting a charge-claim

@@ -1,4 +1,4 @@
-"""Typed abstention limit-codes.
+"""Typed abstention limit-codes (v25 P0 Task 0.1).
 
 Orthonym's fail-closed paths all collapse into one descriptive fallback
 string, which is right for the naming contract but blind for measurement:
@@ -119,7 +119,7 @@ def record_suppression(code: AbstentionCode, detail: Optional[str] = None,
     overridden (first-wins among themselves). Never raises.
     """
     try:
-        # mirror into the candidate ledger BEFORE the first-writer-wins
+        # v30 PE-1: mirror into the candidate ledger BEFORE the first-writer-wins
         # logic below discards this event. That precedence rule is right for "which
         # site declined" and wrong for "what was thrown away" -- a suppression that
         # loses the race here still destroyed a candidate, and the ledger must see

@@ -334,7 +334,7 @@ def name_acyl_hetero_pseudoketone(mol) -> Optional[str]:
             if len(hub_frag) == 1:
                 hubyl = base
         else:
-            # the organyl guard is the shared chokepoint, so a hub organyl
+            # v29 P3: the organyl guard is the shared chokepoint, so a hub organyl
             # may now be cyclic, branched, unsaturated or long — and its prefix may
             # carry locants, a retained italicized prefix, or its own marks.  The
             # hub is a MONONUCLEAR skeleton, so composition follows P-16.5.1.3.1
@@ -368,7 +368,7 @@ def name_acyl_hetero_pseudoketone(mol) -> Optional[str]:
                     return None
                 names.append(nm)
             counts = Counter(names)
-            # Item A: arity bound local, multiplier word from
+            # v29 P3-CLOSEOUT Item A: arity bound local, multiplier word from
             # the shared primitive (P-16.3.5(a) bis/tris when SUBSTITUTED).
             _SUPPORTED_COUNTS = frozenset((1, 2, 3))
             parts = []

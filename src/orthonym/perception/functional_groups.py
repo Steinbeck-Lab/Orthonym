@@ -37,7 +37,7 @@ FUNCTIONAL_GROUP_SMARTS = {
     "thioic_S_acid": "[CX3](=O)[SX2H1]",    # R-C(=O)-SH -> thioic S-acid
     "thioic_O_acid": "[CX3](=S)[OX2H1]",    # R-C(=S)-OH -> thioic O-acid
     "dithioic_acid": "[CX3](=S)[SX2H1]",    # R-C(=S)-SH -> dithioic acid
-    # Phase 163 Tier FRN-A: chalcogen-on-acid (P-65.3) -- additive per CONTEXT
+    # Phase 163 Tier FRN-A: chalcogen-on-acid (P-65.3) -- additive per CONTEXT D-08
     "selenoic_Se_acid": "[CX3](=O)[SeX2H1]",     # R-C(=O)-SeH (P-65.3; AUDIT-FRN § 2)
     "selenoic_O_acid": "[CX3](=[SeX1])[OX2H1]",  # R-C(=Se)-OH (P-65.3; AUDIT-FRN § 2)
     "diselenoic_acid": "[CX3](=[SeX1])[SeX2H1]", # R-C(=Se)-SeH (P-65.3; AUDIT-FRN § 2)
@@ -89,7 +89,7 @@ FUNCTIONAL_GROUP_SMARTS = {
     "sulfonimidic_acid": "[SX4;$([SX4][#6])](=O)(=[NX2])[OX2H1]",
     "sulfinic_acid": "[SX3;$([SX3][#6])](=O)[OX2H1]",
     "sulfenic_acid": "[SX2]([OX2H])[#6]",  # DATA-05d: IUPAC P-65.3.1.4 R-S-OH
-    # (P-65.3 / Table 6.2): selenium & tellurium analogues of the
+    # v23 Phase 9 (P-65.3 / Table 6.2): selenium & tellurium analogues of the
     # sulfonic/sulfinic suffix acids, C-attached (parallel [#6] guard) so the
     # free chalcogen oxoacids are not mis-claimed -> ethaneselenonic acid etc.
     "selenonic_acid": "[SeX4;$([SeX4][#6])](=O)(=O)[OX2H1]",  # R-Se(=O)2-OH
@@ -113,6 +113,26 @@ FUNCTIONAL_GROUP_SMARTS = {
     "arsinic_acid": "[AsX4](=O)([OX2H1])([#6])[#6]",
     "stibonic_acid": "[SbX4;$([SbX4][#6])](=O)([OX2H1])[OX2H1]",
     "stibinic_acid": "[SbX4](=O)([OX2H1])([#6])[#6]",
+    # --- P-67.1.1.2 trivalent -ous organo-oxoacids of P, As, Sb (Phase 1B) --
+    # The trivalent (X3, NO =O) analogues of the -onic/-inic block above. BB gives
+    # the free parents as PRESELECTED (BB L35499-35507, L35413-35443):
+    #   HP(OH)2  phosphonous acid   H2P(OH)  phosphinous acid
+    #   HAs(OH)2 arsonous acid      H2As(OH) arsinous acid
+    #   HSb(OH)2 stibonous acid     H2Sb(OH) stibinous acid
+    # and the substituent-prefix PINs verbatim: (C6H5)2As(OH) diphenylarsinous
+    # acid (BB L35465), C6H5-Sb(OH)2 phenylstibonous acid (BB L35467),
+    # (naphthalene-2,6-diyl)bis(phosphonous acid) (BB L35472). The `$([...][#6])`
+    # carbon guard on -onous (and the two literal [#6] on -inous) is what keeps the
+    # FREE inorganic -ous oxoacids -- phosphorous P(OH)3, arsorous As(OH)3, stiborous
+    # Sb(OH)3 (separate preselected names, tabled in inorganic_acids.py) -- out of
+    # the organo class, exactly as the -onic/-inic guard does. Trivalent (no =O)
+    # distinguishes -ous from -ic; a P=N/P=S form is a different FG and never X3.
+    "phosphonous_acid": "[PX3;$([PX3][#6])]([OX2H1])[OX2H1]",   # R-P(OH)2
+    "phosphinous_acid": "[PX3]([OX2H1])([#6])[#6]",             # R2P-OH
+    "arsonous_acid": "[AsX3;$([AsX3][#6])]([OX2H1])[OX2H1]",    # R-As(OH)2
+    "arsinous_acid": "[AsX3]([OX2H1])([#6])[#6]",               # R2As-OH
+    "stibonous_acid": "[SbX3;$([SbX3][#6])]([OX2H1])[OX2H1]",   # R-Sb(OH)2
+    "stibinous_acid": "[SbX3]([OX2H1])([#6])[#6]",              # R2Sb-OH
     # === FREE INORGANIC OXOACIDS (functional-group perception fix/DEF-2, 169.7: P-67 functional parents) ===
     # Perceived so they are NOT silently dropped or mis-cast as carbon acids (the old
     # `OP(=O)(O)O → trihydrophosphate` malformed bug; now blocked by the [#6]-tightened
@@ -128,7 +148,7 @@ FUNCTIONAL_GROUP_SMARTS = {
     # === ACID DERIVATIVES ===
     "anhydride": "[CX3](=O)[OX2][CX3](=O)",
     "ester": "[CX3](=O)[OX2][#6]",
-    # Phase 163 Tier FRN-D: iminoester / imidate (P-65.1.7) -- additive per CONTEXT
+    # Phase 163 Tier FRN-D: iminoester / imidate (P-65.1.7) -- additive per CONTEXT D-08
     # AUDIT DECISION (AUDIT-FRN § 2.4): [NX2H1] only (=NH form); N-substituted iminoesters
     # (R-C(=NR')-O-R'') deferred to Phase 163.1 per Open Question 4. Free imidic acid form
     # (R-C(=NH)-OH) deferred per CONTEXT line 120. Cyclic imidates deferred per RESEARCH §5.4.
@@ -168,7 +188,7 @@ FUNCTIONAL_GROUP_SMARTS = {
     # any hydroxyimino-carbonic hybrid).
     "hydroximic_acid": "[CX3;!$([CX3]([#7,#8])(=[NX2][OX2H1])[OX2H1])](=[NX2][OX2H1])[OX2H1]",
     "thioester": "[CX3](=O)[SX2][#6]",
-    # Phase 163 Tier FRN-E: chalcogen-ester (P-65.6 ester extension) -- additive per CONTEXT
+    # Phase 163 Tier FRN-E: chalcogen-ester (P-65.6 ester extension) -- additive per CONTEXT D-08
     "selenoester": "[CX3](=O)[SeX2][#6]",         # R-C(=O)-Se-R' (P-65.6; Se-alkyl alkaneselenoate)
     "telluroester": "[CX3](=O)[TeX2][#6]",        # R-C(=O)-Te-R' (P-65.6; Te-alkyl alkanetelluroate)
     # W3-P07 (P-65.6.3.1.2 / P-65.6.3.4): PSEUDOESTER — a carboxylic acid whose
@@ -205,6 +225,26 @@ FUNCTIONAL_GROUP_SMARTS = {
     # 'unknown'. Match tuples: sulfonyl (S, =O, =O, X); sulfinyl (S, =O, X).
     "sulfonyl_halide": "[SX4;$([SX4][#6])](=[OX1])(=[OX1])[F,Cl,Br,I]",
     "sulfinyl_halide": "[SX3;$([SX3][#6])](=[OX1])[F,Cl,Br,I]",
+    # P4-3 (P-66.5.1.3.2, BB:34811 'CH3-SO2-CN methanesulfonyl cyanide
+    # (PIN)'): the cyanide of a sulfonic acid, named by functional class because
+    # a nitrile cannot be expressed substitutively over a sulfonyl centre. The
+    # $([SX4][#6]) guard requires a C-S (a genuine C-sulfonic acid), matching the
+    # sulfonyl_halide pattern; the -C#N replaces the -OH. Match tuple
+    # (S, =O, =O, cyanide-C, N).
+    "sulfonyl_cyanide": "[SX4;$([SX4][#6])](=[OX1])(=[OX1])[CX2]#[NX1]",
+    # Phase 2E (P-65.5.1): acyl halides of the CHALCOGEN / IMIDO analogues of
+    # carboxylic acid — R-C(=NH)-X (imidoyl), R-C(=S)-X (carbothioyl), R-C(=Se)-X
+    # (carboselenoyl). Named by the two-word functional class '{parent}carbo{imidoyl
+    # |thioyl|selenoyl} {halide}' for a ring parent, or '{chain-stem}{imidoyl|thioyl}
+    # {halide}' for a chain (BB 31438 'cyclohexanecarboximidoyl chloride (PIN)',
+    # 31442 'cyclohexanecarbothioyl chloride (PIN)'). The $([CX3][#6]) carbon guard
+    # keeps this to a genuine C-acyl halide (excludes carbonimidoyl/carbamimidoyl
+    # halides, whose acyl C bears N/O, and the 1-carbon methanimidoyl edge). The
+    # broad 'imine' / 'thioketone' / halo SMARTS otherwise claimed only the fragments
+    # and left the acyl unnamed -> abstain. Match tuple (C, =X, halide).
+    "imidoyl_halide": "[CX3;$([CX3][#6])](=[NX2])[F,Cl,Br,I]",
+    "carbothioyl_halide": "[CX3;$([CX3][#6])](=[SX1])[F,Cl,Br,I]",
+    "carboselenoyl_halide": "[CX3;$([CX3][#6])](=[SeX1])[F,Cl,Br,I]",
     # Wave2 T6c: acyl PSEUDOhalides (P-65.5.2.1 — functional-class PINs
     # 'butanoyl azide' / 'propanoyl cyanide' / 'acetyl isocyanate'). Without
     # these the bare azido/isocyanate/nitrile SMARTS claim only the tail and
@@ -223,7 +263,7 @@ FUNCTIONAL_GROUP_SMARTS = {
     # hydrazide). Cascade-suppresses thioamide + hydrazine_fg on its atoms.
     "thiohydrazide": "[CX3](=S)[NX3][NX3]",
     "imide": "[CX3](=O)[NX3][CX3](=O)",
-    # Phase 163 Tier FRN-B: chalcogen-on-amide (P-66.1.4.1.1 + P-66.6.3) -- additive per CONTEXT
+    # Phase 163 Tier FRN-B: chalcogen-on-amide (P-66.1.4.1.1 + P-66.6.3) -- additive per CONTEXT D-08
     # AUDIT DECISION (AUDIT-FRN § 2.2): single-permissive [NX3] (NOT 3-way primary/secondary/tertiary
     # split) captures all 3 N-substitution levels per Open Question 2 + RESEARCH §3.2 line 265.
     # CR-fix (post-merge regression closure): require explicit C neighbor on the chalcogen-carbonyl
@@ -383,7 +423,7 @@ FUNCTIONAL_GROUP_SMARTS = {
     "ketone": "[#6][CX3](=O)[#6]",
     "thioaldehyde": "[CX3H1](=S)",
     "thioketone": "[#6][CX3](=S)[#6]",
-    # Phase 163 Tier FRN-C: chalcogen-on-aldehyde/ketone (P-66.6.3) -- additive per CONTEXT
+    # Phase 163 Tier FRN-C: chalcogen-on-aldehyde/ketone (P-66.6.3) -- additive per CONTEXT D-08
     "selenoaldehyde": "[CX3H1](=[SeX1])",         # R-C(=Se)H (P-66.6.3)
     "telluroaldehyde": "[CX3H1](=[TeX1])",        # R-C(=Te)H (P-66.6.3 parallel)
     "selenoketone": "[#6][CX3](=[SeX1])[#6]",     # R-C(=Se)-R' (P-66.6.3); selone PIN suffix form
@@ -503,7 +543,7 @@ FUNCTIONAL_GROUP_SMARTS = {
     "phosphate_triester": "[PX4](=O)([OX2][#6])([OX2][#6])[OX2][#6]",
     "phosphate_diester": "[PX4](=O)([OX2][#6])([OX2][#6])[OX2H1]",
     "phosphate_monoester": "[PX4](=O)([OX2][#6])([OX2H1])[OX2H1]",
-    # tail #16 (P-67): phosphorous-acid TRIESTER -- a TRIVALENT P (no P=O)
+    # v30 tail #16 (P-67): phosphorous-acid TRIESTER -- a TRIVALENT P (no P=O)
     # bearing three ester oxygens (distinct from the PX4 phosphates above). The
     # ester O may carry a carbon (triethyl phosphite) or a sulfenyl -S-R
     # (tris(dodecylsulfanyl) phosphite). Trivalent-P phosphites were otherwise
@@ -511,13 +551,24 @@ FUNCTIONAL_GROUP_SMARTS = {
     # name_phosphate_ester already carries the phosphite stem ((False,0)); this
     # is the perception that finally reaches it. Each OX2 excludes P-O-P bridges.
     "phosphite_triester": "[PX3]([OX2][#6,#16])([OX2][#6,#16])[OX2][#6,#16]",
-    # tail #17 (P-67): phosphonic-acid DIESTER R-P(=O)(OR')2 -- a P=O with
+    # v30 tail #17 (P-67): phosphonic-acid DIESTER R-P(=O)(OR')2 -- a P=O with
     # exactly ONE P-C ligand and two ester oxygens (the '$([PX4][#6])' P-C guard
     # separates it from a phosphate triester, which has none). name_phosphate_ester
     # names the P-C ligand as the stem's carbon prefix (diisopropyl
     # (1-cyano-1-isocyanoethyl)phosphonate). Phosphonate diesters were otherwise
     # unperceived; the free-acid 'phosphonic_acid' row (2 OH) does not match.
     "phosphonate_diester": "[PX4;$([PX4][#6])](=O)([OX2][#6])[OX2][#6]",
+    # review-fix (P-41 Table 4.1 class 9): the phosphinic/arsinic/stibinic
+    # acid ESTER R2E(=O)(OR') -- TWO E-C bonds, one =O, one ester -O-C. This is the
+    # exact shape the multiplicative pnictogen guard declines (two identical/aryl
+    # C-E bonds), so declining the multiplicative name (1,1'-(methoxyphosphoryl)-
+    # dibenzene) hands the molecule to name_pnictogen_inate_ester -> the PIN
+    # 'methyl diphenylphosphinate' / 'methyl diphenylarsinate'. As/Sb had no ester
+    # perception at all; the two E-C guards separate this from the 1-C phosphonate
+    # diester and the 0-C phosphate triester above.
+    "phosphinate_ester": "[PX4]([#6])([#6])(=O)[OX2][#6]",
+    "arsinate_ester": "[AsX4]([#6])([#6])(=O)[OX2][#6]",
+    "stibinate_ester": "[SbX4]([#6])([#6])(=O)[OX2][#6]",
     # Phosphine oxide: R3P=O - three C attached to P(V)
     "phosphine_oxide": "[PX4](=O)([#6])([#6])[#6]",
     # Phosphines (P(III)) - check last as parent hydride
@@ -530,6 +581,15 @@ FUNCTIONAL_GROUP_SMARTS = {
     "sulfone": "[SX4](=[OX1])(=[OX1])([#6])[#6]",
     # Sulfoxide: S with 1 =O and 2 C neighbors (R-SO-R')
     "sulfoxide": "[SX3](=[OX1])([#6])[#6]",
+    # P6-6I (P-63.6, BB:28080/28090): Se/Te analogues of sulfone/sulfoxide.
+    # BB:28090 "selenium and tellurium ... named in the same way" (class names
+    # selenoxide/selenone, telluroxide/tellurone). SeX4/TeX4 = R-Se(=O)2-R'
+    # (selenonyl), SeX3/TeX3 = R-Se(=O)-R' (seleninyl). Two carbons are required
+    # so the free seleninic/selenonic acids (one C + OH) are not mis-claimed.
+    "selenone": "[SeX4](=[OX1])(=[OX1])([#6])[#6]",
+    "selenoxide": "[SeX3](=[OX1])([#6])[#6]",
+    "tellurone": "[TeX4](=[OX1])(=[OX1])([#6])[#6]",
+    "telluroxide": "[TeX3](=[OX1])([#6])[#6]",
 
     # === UNSATURATION ===
     "alkene": "[CX3]=[CX3]",
@@ -608,7 +668,26 @@ _ANHYDRIDE_BRIDGE_SMARTS = {
     # the molecule perceives as ester+cyanate/thiocyanate and mis-names.
     "cyanic_anhydride": "[CX3](=O)[OX2][CX2]#[NX1]",
     "thiocyanic_anhydride": "[CX3](=O)[SX2][CX2]#[NX1]",
+    # P2D (P-65.7.1/.2/.3, P-65.7.6.4.2/.3): thio/seleno-ACYL anhydrides
+    # R-C(=X1)-Y-C(=X2)-R' where an acyl chalcogen X1/X2 is S or Se (a
+    # '...thioic'/'...selenoic' acid component, BB 32451/32455/32467), with an
+    # O bridge ('propanethioic anhydride') or an S/Se/Te bridge
+    # ('ethanethioic propanethioic thioanhydride'). The existing bridge SMARTS
+    # all require [CX3](=O) acyls, so the C(=S)/C(=Se) case is missed entirely
+    # (SPY: principal_group=None, name_anhydride never reached). These broad
+    # SMARTS also match the (=O,=O) acyls already covered above, so the fold
+    # below DEDUPS them by atom-set against the existing 'anhydride' matches --
+    # only the genuinely-new thio/seleno-acyl motifs are added. Named by
+    # rules.anhydrides._name_thioacyl_anhydride (component acid affix from the
+    # acyl chalcogen; class word from the bridge chalcogen).
+    "thioacyl_oxo_anhydride":
+        "[CX3](=[OX1,SX1,SeX1])[OX2][CX3](=[OX1,SX1,SeX1])",
+    "thioacyl_chalcogen_anhydride":
+        "[CX3](=[OX1,SX1,SeX1])[SX2,SeX2,TeX2][CX3](=[OX1,SX1,SeX1])",
 }
+# P2D: the two broad thio/seleno-acyl SMARTS overlap the base O-bridge and
+# chalcogen-bridge matches, so their fold is DEDUPED by atom-set (below).
+_BROAD_ACYL_ANHYDRIDE = {"thioacyl_oxo_anhydride", "thioacyl_chalcogen_anhydride"}
 _COMPILED_ANHYDRIDE_BRIDGE = {}
 for _bk, _bsmarts in _ANHYDRIDE_BRIDGE_SMARTS.items():
     _bpat = Chem.MolFromSmarts(_bsmarts)
@@ -619,7 +698,7 @@ for _bk, _bsmarts in _ANHYDRIDE_BRIDGE_SMARTS.items():
 def _add_resonance_twin_matches(mol, results: Dict[str, List[Tuple[int, ...]]]) -> None:
     """ADD the resonance-shifted twins of ``azido``/``diazo`` that the fixed
     single-bond-order SMARTS above (:568-569) cannot see (Phase 3B SPY,
-     Q1/Q2/Q3). Purely
+    ``.planning/audit-v32/phase3b-resonance-spy.md`` Q1/Q2/Q3). Purely
     additive: the existing SMARTS matches are kept untouched, and a chain the
     SMARTS already found is skipped here (atom-set dedup), so canonical-
     drawing detection -- and its downstream naming -- is byte-identical.
@@ -708,7 +787,7 @@ def _detect_functional_groups_impl(mol) -> Dict[str, List[Tuple[int, ...]]]:
     # ('anhydride', [...]) suppression rule clears the sub-component reads
     # (thioester/peroxide/ketone) on the folded atoms.
     #
-    # Cluster D (P-41): a chalcogen-bridge anhydride (-CO-S/Se/Te-CO-) that
+    # v28 Cluster D (P-41): a chalcogen-bridge anhydride (-CO-S/Se/Te-CO-) that
     # is SUBORDINATE to a senior principal characteristic group (e.g. a free
     # carboxylic acid — ranked above 'anhydride' in SENIORITY_ORDER) is NOT a
     # 'carboxylic anhydride': the senior acid owns the suffix and the linkage is
@@ -727,12 +806,25 @@ def _detect_functional_groups_impl(mol) -> Dict[str, List[Tuple[int, ...]]]:
     _senior_to_anh_present = any(
         fg in _SEN_ORDER and _SEN_ORDER.index(fg) < _anh_rank for fg in results
     )
-    _SUBSTITUTIVE_BRIDGE = {"chalcogen_anhydride"}
+    # P2D: the S/Se/Te-bridge THIOACYL variant joins the subordinate skip
+    # (like chalcogen_anhydride, its substitutive read is owned by a senior
+    # co-group when one is present). The O-bridge thioacyl variant folds
+    # unconditionally, matching the base O-bridge (fail-closed, never wrong).
+    _SUBSTITUTIVE_BRIDGE = {"chalcogen_anhydride", "thioacyl_chalcogen_anhydride"}
+    # P2D: dedup the BROAD acyl folds by atom-set against everything already
+    # in the 'anhydride' bucket (base O-bridge FG + the earlier bridge keys), so
+    # a (=O,=O) match is not double-added -- only the new thio/seleno-acyl motifs.
+    _seen_anh = {frozenset(m) for m in results["anhydride"]}
     for _bk, _bpat in _COMPILED_ANHYDRIDE_BRIDGE.items():
         if _bk in _SUBSTITUTIVE_BRIDGE and _senior_to_anh_present:
             continue  # subordinate chalcogen-anhydride -> keep substitutive read
+        _dedup = _bk in _BROAD_ACYL_ANHYDRIDE
         for _bm in mol.GetSubstructMatches(_bpat, uniquify=True):
+            _fs = frozenset(_bm)
+            if _dedup and _fs in _seen_anh:
+                continue
             results["anhydride"].append(_bm)
+            _seen_anh.add(_fs)
 
     # Post-processing: remove generic FG matches that overlap with more-specific FGs
     results = _resolve_fg_collisions(results)
@@ -861,7 +953,7 @@ def get_chain_excluded_atoms(mol) -> Set[int]:
     (``_CHAIN_EXCLUDED_FG``) present in *mol*.
 
     These graph indices, derived from perception's OWN ``detect_functional_groups``
-    matches (NOT a per-FG SMARTS blocklist — CONTEXT), are the atoms that must
+    matches (NOT a per-FG SMARTS blocklist — CONTEXT D-04), are the atoms that must
     be excluded from skeletal/parent-chain finding. Only the heteroatoms (N=7, O=8)
     of each match are returned, so the carbon attachment point is preserved (the
     chain can still terminate there).
@@ -905,8 +997,24 @@ def _resolve_fg_collisions(results):
         # Wave2 T6c: acyl pseudohalides (P-65.5.2.1) own their whole
         # C(=O)-pseudohalogen unit — atom-overlap-scoped, so a separate
         # azide/nitrile/ketone elsewhere in the molecule is untouched.
+        # Phase 2E (P-65.5.1): imidoyl / carbothioyl / carboselenoyl halides are
+        # named by their handler ONLY when they are the principal group (a bare
+        # cycloalkane/chain acyl halide). We deliberately DO NOT suppress the broad
+        # imine (=NH) / thioketone / selenoketone / halo reads on the acyl C=X:
+        # when a SENIOR group (e.g. a carboxylic acid) is the parent, the acyl-halide
+        # FG is non-principal and has no substitutive prefix form, so the substituent
+        # layer must fall back to the atom-level 'chloro' + 'imino'/'sulfanylidene'
+        # prefixes ('5-chloro-5-iminopentanoic acid') rather than drop the group and
+        # abstain (P-14.3.3 essential-substituent citation; degrade, never silence).
+        # In the principal case the handler builds the whole name and ignores these
+        # co-present reads, so keeping them is harmless there.
         ('acyl_azide', ['azido', 'ketone', 'aldehyde', 'imine', 'azo']),
         ('acyl_cyanide', ['nitrile', 'ketone', 'aldehyde']),
+        # P4-3 (P-66.5.1.3.2): a sulfonyl cyanide R-SO2-C#N owns its whole
+        # unit -- suppress the plain nitrile read on the -C#N and the sulfone read
+        # on the S(=O)2 (S bears methyl + cyanide C) so the sulfonyl_cyanide
+        # handler names it 'methanesulfonyl cyanide'. Atom-scoped.
+        ('sulfonyl_cyanide', ['nitrile', 'sulfone']),
         ('acyl_isocyanate', ['isocyanate', 'ketone', 'aldehyde', 'imine',
                              'nitrile', 'primary_amide', 'secondary_amide']),
         # Carbamic acid: N-C(=O)-OH must NOT also match carboxylic_acid or amide

@@ -25,7 +25,7 @@ from typing import Dict, List, Optional, Set, Tuple, Union
 from .lambda_convention import nonstandard_bonding_number
 
 # ---------------------------------------------------------------------------
-# Element-seniority order for numbering tie-breaks (DD4 /.
+# Element-seniority order for numbering tie-breaks (DD4 / v22 Phase E1).
 #
 # Single source of truth for the IUPAC 2013 element-seniority sequence used in
 # numbering decisions (P-15.4.1.2 / P-15.4.3.2.1 skeletal-replacement; P-44.3.3
@@ -40,7 +40,7 @@ from .lambda_convention import nonstandard_bonding_number
 # fusion_descriptors.HETERO_PRIORITY). This constant is the canonical numbering
 # table; the numbering consumer (ring_substituents._HETEROATOM_SENIORITY) is
 # derived from it. ring_selection's table is a genuinely-different P-18
-# ring-selection order (lock) and is intentionally left separate.
+# ring-selection order (D-04 lock) and is intentionally left separate.
 # Source: https://iupac.qmul.ac.uk/BlueBook/P1.html P-15.4.1.2; DD4.
 # ---------------------------------------------------------------------------
 _ELEMENT_NUMBERING_ORDER: List[str] = [
@@ -66,7 +66,7 @@ def element_seniority_rank(symbol: str) -> int:
     """
     return ELEMENT_NUMBERING_SENIORITY.get(symbol, _ELEMENT_SENIORITY_DEFAULT)
 
-# Phase 147 /: locant type system extension.
+# Phase 147 D-01/D-02: locant type system extension.
 # Locants may be plain ints (e.g. 4) or (int_base, str_suffix) tuples for
 # fusion atoms (e.g. '4a' -> (4, 'a')). The empty string '' sorts
 # lexicographically before any letter, so (4, '') < (4, 'a') < (5, ''),
@@ -77,7 +77,7 @@ _Locant = Union[int, Tuple[int, str]]
 def _assert_homogeneous_locants(locants: List[_Locant]) -> None:
     """Raise ValueError if ``locants`` contains a mix of int and tuple types.
 
-    Per Phase 146: after coercion, a locant list must be uniformly
+    Per Phase 146 D-19: after coercion, a locant list must be uniformly
     int OR uniformly tuple. Mixed types indicate a caller bug (e.g.,
     ring_info populated only partially) and would cause Python's
     ``sorted()`` / ``min()`` to raise ``TypeError`` on mixed int/tuple
@@ -95,7 +95,7 @@ def _assert_homogeneous_locants(locants: List[_Locant]) -> None:
 
     Source: https://iupac.qmul.ac.uk/BlueBook/P1.html P-14.7
             (locant set comparison semantics)
-    Source: Phase 146 (locant type safety lock-in)
+    Source: Phase 146 D-19 (locant type safety lock-in)
     """
     has_int = any(isinstance(x, int) for x in locants)
     has_tuple = any(isinstance(x, tuple) for x in locants)
@@ -151,7 +151,7 @@ def compare_locant_sets(
     If all compared elements are equal, the shorter set wins (fewer locants
     needed means simpler name). If completely identical, returns 0.
 
-    Phase 147 extension: also accepts ``List[Tuple[int, str]]``
+    Phase 147 extension (D-01, D-02): also accepts ``List[Tuple[int, str]]``
     with first-point-of-difference semantics for fusion atoms. When one
     list contains tuples and the other contains ints, all ints are coerced
     to ``(n, '')`` tuples internally — empty string sorts before any
@@ -183,7 +183,7 @@ def compare_locant_sets(
         -1
 
     Source: https://iupac.qmul.ac.uk/BlueBook/P1.html P-14.5.2, P-14.7
-    Source: Phase 146 (locant type safety); Phase 147 /
+    Source: Phase 146 D-19 (locant type safety); Phase 147 D-01/D-02
     """
     # Phase 147: tuple-coercion entry path. If either list contains a
     # tuple locant, coerce all ints to (n, '') tuples in BOTH lists so
@@ -491,23 +491,38 @@ def orient_chain(
             if rev_alpha < fwd_alpha:
                 return reverse
 
-    # --- Criterion (f): P-45.6.3 — 'R' before 'S' at first difference ---
-    # Reached only when (a)-(e) all tie: the two orientations yield names
-    # identical except for the stereodescriptor sequence (meso-type
-    # symmetry). BB P-45.6.3 (BlueBookV2.md:22603). CIP labels are computed
-    # on a COPY (never mutate the shared mol); guarded to molecules that
-    # actually carry chiral tags so achiral chains stay byte-identical.
+    # --- Criterion (f): P-14.4(j) CIP-stereodescriptor lowest-locant tie-break ---
+    # Reached only when (a)-(e) all tie: the two orientations differ only in the
+    # locants their CIP stereodescriptors receive (meso-type / symmetric chains).
+    # BB P-14.4(j) (BlueBookV2.md:3346): the lower locant is assigned to the
+    # PREFERRED descriptor of each pair -- Z over E, R over S, M over P, and r
+    # over s (pseudoasymmetry). This REUSES cip_descriptor_rank_key (via
+    # _cip_numbering_key) so this numbering decision and the citation tie-break
+    # (prefix_citation_sort_key tier 3) share ONE preference table; a second,
+    # disagreeing comparator here was the defect this replaced. Both atom
+    # stereocentres AND stereogenic double bonds are ranked -- the old key saw
+    # only atoms, so a Z-vs-E numbering choice fell through to input order (it
+    # emitted '(2E,8Z)-deca-2,8-diene' for the PIN '(2Z,8E)-deca-2,8-diene').
+    # CIP labels are assigned through the canonical perception.stereo path
+    # (centres -> rdCIPLabeler -> legacy), idempotent so a pre-labelled mol is
+    # untouched and a missing JVM never hard-fails a name. Guarded to molecules
+    # that carry any stereo so achiral chains stay byte-identical.
     from rdkit import Chem as _Chem
-    if any(a.GetChiralTag() != _Chem.ChiralType.CHI_UNSPECIFIED
-           for a in mol.GetAtoms()):
+    has_stereo = any(
+        a.GetChiralTag() != _Chem.ChiralType.CHI_UNSPECIFIED for a in mol.GetAtoms()
+    ) or any(
+        b.GetStereo() != _Chem.BondStereo.STEREONONE for b in mol.GetBonds()
+    )
+    if has_stereo:
         try:
-            from rdkit.Chem import rdCIPLabeler
-            probe = _Chem.Mol(mol)
-            rdCIPLabeler.AssignCIPLabels(probe)
-            fwd_seq = _cip_sequence(forward, fwd_map, probe)
-            rev_seq = _cip_sequence(reverse, rev_map, probe)
-            if fwd_seq != rev_seq:
-                return forward if fwd_seq < rev_seq else reverse
+            from ..perception.stereo import assign_stereochemistry
+            assign_stereochemistry(mol)
+            fwd_key = _cip_numbering_key(forward, fwd_map, double_bonds,
+                                        chain_set, mol)
+            rev_key = _cip_numbering_key(reverse, rev_map, double_bonds,
+                                        chain_set, mol)
+            if fwd_key != rev_key:
+                return forward if fwd_key < rev_key else reverse
         except Exception:
             pass  # fail-closed to the deterministic forward fallback
 
@@ -798,15 +813,42 @@ def _get_bond_locant_atoms(
     return result
 
 
-def _cip_sequence(chain: List[int], atom_to_locant: Dict[int, int],
-                  labeled_mol) -> tuple:
-    """P-45.6.3 key: (locant, CIP code) pairs for chain stereocentres,
-    sorted by locant. 'R' < 'S' lexicographically, so tuple comparison
-    implements 'alphabetic order of the stereochemical descriptors'."""
-    pairs = []
+def _cip_numbering_key(chain: List[int], atom_to_locant: Dict[int, int],
+                       double_bonds: List[Tuple[int, int]],
+                       chain_set: Set[int], mol) -> tuple:
+    """P-14.4(j) rank tuple of a chain's CIP stereodescriptors, in locant order.
+
+    Collects every stereodescriptor the assembled name would cite for this
+    orientation -- atom stereocentres (R/S/r/s/M/P) and stereogenic double bonds
+    (Z/E) -- as (locant, code) pairs, orders them by locant exactly as the name
+    cites them, then ranks the sequence with
+    :func:`orthonym.assembly.naming_utils.cip_descriptor_rank_key`. Reusing that
+    one function is deliberate: this numbering tie-break and the citation
+    tie-break (``prefix_citation_sort_key`` tier 3) must never disagree -- and a
+    plain string comparison silently gets Z-vs-E backwards, because 'Z' is senior
+    to 'E' although 'E' < 'Z' alphabetically (P-14.4(j) / :45363).
+
+    Returns an empty tuple when the orientation cites no stereodescriptor, so
+    achiral chains tie and fall through. Lower tuple sorts first, i.e. is cited
+    first and takes the lower locant. ``mol`` must already carry CIP labels (the
+    caller routes them through ``perception.stereo.assign_stereochemistry``).
+    """
+    from ..assembly.naming_utils import cip_descriptor_rank_key
+    items: List[Tuple[int, str]] = []
     for a in chain:
-        atom = labeled_mol.GetAtomWithIdx(a)
+        atom = mol.GetAtomWithIdx(a)
         if atom.HasProp('_CIPCode'):
-            pairs.append((atom_to_locant[a], atom.GetProp('_CIPCode')))
-    pairs.sort()
-    return tuple(pairs)
+            items.append((atom_to_locant[a], atom.GetProp('_CIPCode')))
+    for i, j in double_bonds:
+        if i in chain_set and j in chain_set:
+            bond = mol.GetBondBetweenAtoms(i, j)
+            if bond is not None and bond.HasProp('_CIPCode'):
+                items.append((min(atom_to_locant[i], atom_to_locant[j]),
+                              bond.GetProp('_CIPCode')))
+    if not items:
+        return ()
+    # Locant order is the citation order; the (locant, code) secondary key only
+    # guards determinism if two descriptors ever shared a locant (they cannot).
+    items.sort(key=lambda t: (t[0], t[1]))
+    block = '(' + ','.join('%d%s' % (loc, code) for loc, code in items) + ')'
+    return cip_descriptor_rank_key(block)

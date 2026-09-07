@@ -1,7 +1,7 @@
-"""Phase 160 shared handler helpers (DECOMP-01 + CONTEXT).
+"""Phase 160 shared handler helpers (DECOMP-01 + CONTEXT D-08).
 
 Substrate commit 02-00: lazy re-export wrappers around the canonical
-implementations in ``composer.py``. Per CONTEXT incremental-migration
+implementations in ``composer.py``. Per CONTEXT D-24 incremental-migration
 discipline, composer.py STILL OWNS:
 
 * ``_name_iso_x_cyanate`` (composer.py:2204; 27 LOC) — shared between
@@ -23,9 +23,9 @@ function BODIES move here verbatim and composer.py's
 re-export shape ensures handler files do NOT need to change import paths
 at thinning time — only this delegation layer flips.
 
-Per CONTEXT catch-all helper convention: shared logic between
+Per CONTEXT D-08 catch-all helper convention: shared logic between
 multiple handlers MUST live in this module (not duplicated across
-handlers/). The "≥ 2 handler" threshold is per CONTEXT +
+handlers/). The "≥ 2 handler" threshold is per CONTEXT D-03 +
 160-AUDIT-DECOMP.md § 1.2 in-file-handler-body inventory.
 
 Anti-pattern hygiene:
@@ -40,9 +40,9 @@ References:
 - composer.py:2204-2230 (``_name_iso_x_cyanate``) — verbatim source.
 - composer.py:2233-2449 (``_name_r_group``) — verbatim source.
 - 160-PATTERNS.md § "Common Conventions" + line 458.
-- 160-CONTEXT.md + — catch-all helper convention + migration.
+- 160-CONTEXT.md D-08 + D-24 — catch-all helper convention + migration.
 
-PHASE 160.2 EXTENSION (Plan-02-01; CONTEXT +):
+PHASE 160.2 EXTENSION (Plan-02-01; CONTEXT D-02 + D-03):
 Six NEW public functions lifted verbatim from composer.py per the
 two-step "helpers-first" extraction:
   - _generate_chain_parent  (composer.py:3785-3818, 33 LOC)
@@ -52,15 +52,15 @@ two-step "helpers-first" extraction:
   - _generate_stereodescriptors (composer.py:6634-6704, 70 LOC)
   - _assemble_fragments     (composer.py:6799-6954, 155 LOC)
 
-Each function body is COPIED VERBATIM from composer.py per Phase 145.1
+Each function body is COPIED VERBATIM from composer.py per Phase 145.1 D-09
 mechanical-translation discipline. composer.py keeps thin re-export shims
 (``from .handlers._handler_shared import _generate_chain_parent`` at module
 top) so all in-file call sites in _name_oxime_or_hydrazone,
 _assemble_amide_name, _assemble_amine_name, _assemble_ring_with_ester_prefixes,
-_assemble_complex_ring_name remain byte-identical per CONTEXT
+_assemble_complex_ring_name remain byte-identical per CONTEXT D-13
 forbidden-boundary preservation.
 
-Per CONTEXT honest-fail-on-data: any byte-identical canary regression
+Per CONTEXT D-09 honest-fail-on-data: any byte-identical canary regression
 at commit 02-01 reverts the commit; remediation lands in a follow-up.
 
 Module-level dependencies resolve via LAZY imports inside each function
@@ -83,6 +83,7 @@ from ..naming_utils import (
     BRANCH_HANDLED_FGS,
     SIMPLE_MULTIPLIERS,
     alpha_sort_key,
+    enclose_if_compound,
     format_suffix_with_locants,
     get_suffix_multiplier_prefix,
     should_omit_locant_one,
@@ -97,7 +98,7 @@ def name_iso_x_cyanate(
     """Common implementation for isocyanate and isothiocyanate naming.
 
     Lazy delegate to ``composer.py:_name_iso_x_cyanate`` (composer.py:2204).
-    Per CONTEXT + PATTERNS § 5 first-wave guidance, composer.py owns
+    Per CONTEXT D-24 + PATTERNS § 5 first-wave guidance, composer.py owns
     the canonical body at this commit; this wrapper provides the
     forward-looking import path ``handlers._handler_shared.name_iso_x_cyanate``
     for handler files that want stable paths now.
@@ -131,7 +132,7 @@ def name_r_group(
     """Name an R group (substituent fragment) starting from start_idx.
 
     Lazy delegate to ``composer.py:_name_r_group`` (composer.py:2233).
-    Per CONTEXT + PATTERNS § 5 first-wave guidance.
+    Per CONTEXT D-24 + PATTERNS § 5 first-wave guidance.
 
     Args:
         mol: RDKit Mol object.
@@ -157,7 +158,7 @@ def cached_is_complex_ring_system(features: Any) -> bool:
     """WR-02: per-features memoization of composer._is_complex_ring_system.
 
     The SMARTS-based complex-ring check is heavy; predicates that call it
-    inside the dispatch loop violate the spirit of CONTEXT (predicates
+    inside the dispatch loop violate the spirit of CONTEXT D-25 (predicates
     are pure read-only over already-perceived state). Cache the result on
     the features object as a private attribute so partial_sat / polycyclic /
     ring_ester predicates share a single SMARTS evaluation per features
@@ -187,7 +188,7 @@ def cached_is_complex_ring_system(features: Any) -> bool:
 
 # =============================================================================
 # Phase 160.2 Plan-02-01: 6 _generate_* helpers lifted from composer.py
-# verbatim per CONTEXT + + Phase 145.1 mechanical-translation
+# verbatim per CONTEXT D-02 + D-03 + Phase 145.1 D-09 mechanical-translation
 # discipline. Each function body is byte-identical to its composer.py
 # counterpart prior to this commit. Composer-side symbols (NameFragment,
 # TERMINAL_GROUPS, _generate_alkyl_prefixes, etc.) resolve via lazy imports
@@ -384,7 +385,7 @@ def _ring_suffix_locant_is_trivial(features, oriented_ring, ring_idx_to_locant,
                                    suffix_ring_atoms=None) -> bool:
     """P-14.3.4.2(c): may a single non-terminal ring suffix drop its locant?
 
-    . **DENY BY DEFAULT** — P-14.3.3 "Citation of locants"
+    v29 Phase C tranche A. **DENY BY DEFAULT** — P-14.3.3 "Citation of locants"
     (``BlueBookV2.md:2869``) says *"if any locants are essential … then all locants
     must be cited"*, so this returns True only for the case where the Blue Book's own
     ``(PIN)`` rows show the locant withheld, and False for everything else including
@@ -526,7 +527,7 @@ def _ring_suffix_locant_is_trivial(features, oriented_ring, ring_idx_to_locant,
     # structural catch for the oxime: "Re-check against the ORIGINAL input, so anything
     # the perception layer moved out of `mol` still denies the licence."
     # **THAT CLAIM IS FALSE, and the guard is a NO-OP for the molecule it names.**
-    # Measured with a validated on two known positives (`cyclohexanone`,
+    # Measured with a call-spy validated on two known positives (`cyclohexanone`,
     # `cyclopentanol`), `ON=C1CCCCC1` reaches this predicate with:
     #     principal_group='imine'  len(ring)=6  mol.GetNumHeavyAtoms()=7
     #     features.canonical_smiles='N=C1CCCCC1'  -> re-parsed heavy atoms = 7
@@ -722,7 +723,7 @@ def _generate_suffix(features: Any) -> Optional["NameFragment"]:
           and getattr(features, 'oriented_ring', None)
           and features.principal_group_atoms
           and fg_name in TERMINAL_GROUPS):
-        # WS-A.1 S4: terminal groups appended to a RING parent
+        # v21 WS-A.1 S4: terminal groups appended to a RING parent
         # (-carbaldehyde / -carboxylic acid / -carbonitrile). Count and
         # locate only RING-ANCHORED matches (the exocyclic suffix carbon
         # bonded to a ring atom); a match wholly inside a demoted chain
@@ -851,7 +852,7 @@ def _generate_suffix(features: Any) -> Optional["NameFragment"]:
         if fg_locants:
             fg_count = len(fg_locants)
             locants = tuple(fg_locants)
-            # P-14.3.4.2(c). The TERMINAL ring branch
+            # P-14.3.4.2(c) (v29 Phase C tranche A). The TERMINAL ring branch
             # above already withholds a trivial mono-suffix locant -- which is why
             # `cyclohexanecarbaldehyde` is correct today -- while this
             # NON-terminal sibling cited it unconditionally, emitting
@@ -1107,7 +1108,7 @@ def _generate_prefixes(features: Any) -> List["NameFragment"]:
         if handled_ring_fg_atoms:
             matches = [m for m in matches if not any(a in handled_ring_fg_atoms for a in m)]
 
-        # an FG whose atoms are ENTIRELY within a RING substituent is already
+        # v31: an FG whose atoms are ENTIRELY within a RING substituent is already
         # cited by that substituent's own compound name (name_substituent emits e.g.
         # '4-carbamoylphenyl' / '4-acetylphenyl' — its decorations included,
         # regardless of ring size), so it must NOT also leak as a stray parent-level
@@ -1124,7 +1125,7 @@ def _generate_prefixes(features: Any) -> List["NameFragment"]:
             matches = [m for m in matches
                        if not any(all(a in s for a in m) for s in _ring_sub_sets)]
 
-        # (E3 Task 6): an ALDEHYDE fully contained in a chain
+        # v33 Phase 6 (E3 Task 6): an ALDEHYDE fully contained in a chain
         # substituent branch, cited a second time as an unlocated "oxo" on the
         # PARENT even though the branch's own compound name already speaks
         # for it. NOT a BRANCH_HANDLED_FGS addition -- that blanket-trust set
@@ -1209,7 +1210,7 @@ def _generate_prefixes(features: Any) -> List["NameFragment"]:
                                 if 1 <= c_count <= 3:
                                     on_small_branch = True
                                     break
-                                # (E3 Task 4): the <=3-carbon cap above
+                                # v33 Phase 6 (E3 Task 4): the <=3-carbon cap above
                                 # is a PROXY for "the branch's own compound name
                                 # already speaks for this FG" — verified only up
                                 # to 3 carbons (naming_utils.py BRANCH_HANDLED_FGS
@@ -1273,6 +1274,13 @@ def _generate_prefixes(features: Any) -> List["NameFragment"]:
                 )
 
         prefix_text = get_prefix(fg_name)
+        # P-16.3.3: a COMPOUND FG prefix (e.g. the oxime =N-OH prefix
+        # 'hydroxyimino') takes enclosing marks. Simple FG prefixes
+        # (hydroxy/oxo/amino/chloro/...) are returned bare by enclose_if_compound,
+        # so this is byte-identical except for the compound prefixes this shared
+        # ring/chain path previously emitted UNENCLOSED ('4-hydroxyimino-...').
+        if prefix_text:
+            prefix_text = enclose_if_compound(prefix_text)
         if prefix_text and matches:
             count = len(matches)
 
@@ -1470,7 +1478,7 @@ def _generate_stereodescriptors(features: Any, atom_to_locant_override: Optional
         # that cannot resolve. Every caller that assembles a parent selects it as
         # `if features.principal_chain: chain parent; elif ...: ring parent`, so a
         # truthy principal_chain means the chain map is the parent scope. Guarding both
-        # ring branches on it is the C1 class fix; a chain parent with no
+        # ring branches on it is the v29-P7 C1 class fix; a chain parent with no
         # numbering fails closed rather than borrowing another scope's locants.
         #
         # `caller_selects_parent` is what makes that inference sound: it is only true
@@ -1478,7 +1486,7 @@ def _generate_stereodescriptors(features: Any, atom_to_locant_override: Optional
         # does NOT (`_inject_stereo_if_missing`) keeps the legacy ring priority, because
         # a truthy principal_chain tells it nothing about the parent of the name it was
         # handed -- measured, it is sometimes a stale 1-2 atom fragment on a RING parent.
-        # Derivation + A/B:
+        # Derivation + A/B: .planning/audit-v29/p7-task2-stereo-locant-resolution.md
         _chain_is_parent = caller_selects_parent and getattr(features, 'principal_chain', None)
         if not _chain_is_parent:
             # For heterocycles, use ring-specific mapping
@@ -1504,7 +1512,7 @@ def _generate_stereodescriptors(features: Any, atom_to_locant_override: Optional
     if not descriptors:
         return None
 
-    # STEREO-06 (Phase 177 WSB-02): mononuclear-parent locant omission.
+    # STEREO-06 (Phase 177 WSB-02 D-10): mononuclear-parent locant omission.
     # When the parent hydride is a single skeletal atom (len(atom_to_locant)==1)
     # and the lone stereodescriptor's locant is that unique position, the locant
     # is omitted per P-91 (a unique position carries no locant) -> bare "(R)-".
@@ -1590,6 +1598,7 @@ def _l3_prefix_locant_omitted(features: Any, fragments: List["NameFragment"]) ->
     # (`locants_are_forced`, `scope_has_isotopic_modification`) it must also
     # establish that the scope's boundary IS the molecule being named -- the
     # fragment-boundary observation of
+    # `.planning/audit-v29/ARCH-a-licence-can-be-evaluated-on-the-wrong-molecule.md`.
     # Without it the decomposition engine can cap a fragment into a different
     # compound, have the licence fire CORRECTLY on that surrogate, and splice the
     # locant-free string into an enclosing scope that cites an essential `N`
@@ -1699,6 +1708,7 @@ def locant_scope_is_a_name_component() -> bool:
 
     This is the THIRD of the three things any P-14.3.4 licence that empties a scope
     of ALL its locants must consult -- see
+    ``.planning/audit-v29/ARCH-a-licence-can-be-evaluated-on-the-wrong-molecule.md``,
     § "The rule this establishes". The other two, ``locants_are_forced()`` and
     ``scope_has_isotopic_modification()``, are ambient declarations checked inside
     ``assembly.locant_omission`` itself; this one is a read-only observation of
@@ -1760,6 +1770,233 @@ def _prefix_fragments_without_locants(
     return out
 
 
+def _l4_locants_omitted(features: Any, fragments: List["NameFragment"]) -> bool:
+    """P-14.3.4.4 (BB:2953) "Omission of locants" -- the ISOMER-COUNT case, at
+    PARENT scope in the general-acyclic handler.
+
+        "Locants are omitted when no isomer can be generated by moving suffixes
+         and/or prefixes (if any) from their position to another or by
+         interchanging them between two different positions."
+
+    Its example block prints `diphenylethanedione` (BB:28338) and
+    `di(naphthalen-2-yl)ethanedione` (BB:28380): benzil and its dinaphthyl
+    homologue lose BOTH the substituent-prefix locants AND the suffix locants,
+    because the two chain carbons are the only positions and every decoration
+    (two =O, two aryl) fills them symmetrically -- no relocation yields a distinct
+    constitution. Applied by :func:`_fragments_without_locants`.
+
+    The decision is delegated whole to `assembly.locant_omission`
+    (:func:`l4_no_isomer_by_relocation`), the one place the P-14.3.4 licences live;
+    this function only supplies the parent-atom boundary and the THIRD of the three
+    checks `ARCH-a-licence-can-be-evaluated-on-the-wrong-molecule.md` requires --
+    the fragment-boundary observation -- exactly as `rules/polychalcogen.py` and
+    :func:`_l3_prefix_locant_omitted` do.
+
+    ★ parent_atoms is the parent HYDRIDE ONLY (`features.principal_chain`), NOT
+    `principal_group_atoms` as :func:`_l3_prefix_locant_omitted` uses: the =O of
+    each -one must be read as an order-2 DECORATION the isomer test relocates, so it
+    must NOT be folded into the parent. (The spy proved this: chain-only parent
+    gives OMIT=True for diphenylethanedione / dinaphthyl and OMIT=False for
+    butane-2,3-dione / hexane-3,4-dione / ethane-1,2-diamine / ethane-1,2-diol /
+    1-phenylpropane-1,2-dione -- the whole inventory BB-correct.)
+
+    Deny-by-default: anything unestablished retains the locants (P-14.3.3 is
+    deny-by-default, BB:2869).
+    """
+    if features is None or not fragments:
+        return False
+
+    # ⚠ THE THIRD THING TO CONSULT (see _l3 above and the ARCH-a doc). This licence
+    # empties its scope of ALL locants, so it may fire only when this naming call's
+    # result IS the whole compound -- never a sub-fragment being spliced into a
+    # multiplicative name, where P-14.3.3 restores every locant (BB:23385 keeps the
+    # trisulfane component's `3-`).
+    if _naming_call_produces_a_name_component():
+        return False
+
+    parents = [f for f in fragments if f.fragment_type == "parent"]
+    prefixes = [f for f in fragments if f.fragment_type == "prefix"]
+    suffixes = [f for f in fragments if f.fragment_type == "suffix"]
+    stereos = [f for f in fragments if f.fragment_type == "stereo"]
+
+    # P-14.3.3: any OTHER locant cited in the same scope restores them all. An
+    # unsaturation locant in the parent (`but-2-ene...`) forces citation AND takes
+    # the class out of this licence's scope -- the predicate's docstring is explicit
+    # that no unsaturated chain suffix is routed through it (the :3005
+    # prop-2-enoic-acid exception). Deny here rather than relocate a bond, mirroring
+    # `_l3`'s parent-unsaturation guard (:1655).
+    for pf in parents:
+        for bond_locants in (pf.locants or ()):
+            if bond_locants:
+                return False
+    if stereos and str(stereos[0].text or "").strip():
+        return False
+
+    parent_atoms = {int(i) for i in (getattr(features, "principal_chain", None) or ())}
+    if not parent_atoms:
+        return False
+
+    mol = getattr(features, "mol", None)
+    if mol is None:
+        return False
+
+    # COMPLETENESS of the chain-only enumeration. `l4_no_isomer_by_relocation`
+    # places every decoration over the CHAIN carbons only (parent_atoms), reading
+    # the =O of each -one/-al as an order-2 decoration. That enumeration is COMPLETE
+    # -- it sees every position a decoration could occupy -- only when the principal
+    # characteristic group is a CLOSED decoration: its atoms outside the chain bear
+    # no hydrogen (a ketone/aldehyde =O). When a suffix heteroatom DOES bear H (an
+    # -amine N-H, an -ol/-thiol chalcogen H) that atom is itself a position a prefix
+    # could relocate onto, which the chain-only enumeration cannot see -- so the
+    # isomer count would be understated and the licence could wrongly OMIT an
+    # essential locant (measured: `1,1,2,2,2-pentafluoroethan-1-amine`, whose
+    # N-fluoro isomer is real, and `pentafluoroethane-1-thiol`). Deny in that case,
+    # deny-by-default -- the class degrades to the fully-locanted (still BB-valid)
+    # spelling rather than an unlicensed omission. (The `-diol`/`-diamine` targets
+    # already deny on the isomer test itself; this guard also covers them, and is
+    # the load-bearing gate for the many-prefix + single-hetero-suffix class.)
+    n_atoms = mol.GetNumAtoms()
+    for match in (getattr(features, "principal_group_atoms", None) or ()):
+        for idx in match:
+            i = int(idx)
+            if i in parent_atoms:
+                continue
+            if 0 <= i < n_atoms and mol.GetAtomWithIdx(i).GetTotalNumHs() > 0:
+                return False
+
+    prefix_locants = [l for f in prefixes for l in (f.locants or ())]
+    suffix_locants = [l for f in suffixes for l in (f.locants or ())]
+
+    # P-14.3.4.5 (BB:3007), SECOND paragraph -- "In case of partial substitution or
+    # modification, all numerical prefixes must be indicated." When substituent
+    # PREFIXES are present but do NOT cover every principal-characteristic-group
+    # (suffix) position -- i.e. a suffix position bears the group but no prefix while
+    # another position DOES bear a prefix -- the compound is only PARTIALLY
+    # substituted, so all numerical prefixes are cited and, by P-14.3.3 deny-default
+    # (BB:2869), no locant in the scope is omitted.
+    #
+    # The P-14.3.4.4 isomer test alone cannot see this and OVER-OMITS here: on
+    # propane-1,2,3-trione the three =O saturate every position, so no isomer can be
+    # generated by relocating a decoration (OPSIN confirms `...propanetrione` is
+    # unambiguous) and the predicate returns True -- yet BB:28382 prints
+    # `1-(furan-2-yl)-3-(1H-pyrrol-2-yl)propane-1,2,3-trione (PIN)` and lists the
+    # locant-free `...propanetrione` only as the NON-PIN alternative, because the
+    # MIDDLE carbon carries the trione suffix but no aryl (partial substitution).
+    # `diphenylethanedione` (BB:28338) and `di(naphthalen-2-yl)ethanedione`
+    # (BB:28380) stay omitted: EVERY suffix position also bears a prefix, so the
+    # substitution is complete, not partial. Deny-by-default -- a wrong DENY only
+    # keeps the fully-locanted (still BB-valid) spelling, never a wrong molecule.
+    if prefix_locants and (set(suffix_locants) - set(prefix_locants)):
+        return False
+
+    from ..locant_omission import l4_no_isomer_by_relocation
+
+    try:
+        return bool(l4_no_isomer_by_relocation(
+            mol,
+            parent_atoms,
+            prefix_locants=prefix_locants,
+            suffix_locants=suffix_locants,
+            stereo_text="",
+            # A general-acyclic CHAIN parent never carries indicated hydrogen (a
+            # ring concept), so False is correct here -- as `rules/polychalcogen.py`
+            # also passes it. Passing True would only DENY (deny-by-default).
+            has_indicated_h=False,
+            has_isotope=any(a.GetIsotope() for a in mol.GetAtoms()),
+        ))
+    except Exception:                          # noqa: BLE001 -- deny-by-default
+        return False
+
+
+def _fragments_without_locants(
+    fragments: List["NameFragment"],
+    is_mononuclear_parent: bool = False,
+) -> List["NameFragment"]:
+    """Rebuild PREFIX *and* SUFFIX fragments so neither cites locants -- the way the
+    P-14.3.4.4 licence (:func:`_l4_locants_omitted`) is applied.
+
+    Like :func:`_prefix_fragments_without_locants` (which strips ONLY prefixes), but
+    L4 empties the WHOLE scope, so the SUFFIX locants go too: `ethane-1,2-dione` ->
+    `ethanedione`. The suffix's `count` is PRESERVED, so `name_tree_builder` still
+    derives the `di` multiplier from `max(len(locants), count)` and renders `dione`
+    -- verified: `format_suffix_with_locants('eth','an','one',[],'di') ==
+    'ethanedione'`.
+
+    ★ FAIL CLOSED (invariant 9 -- "removing a wrong output can unmask a worse
+    generator"): a PREFIX fragment whose `text` begins with a digit but supplies no
+    `text_without_locants` would render its baked-in locants unchanged
+    (`1,2-diphenyl`), giving the malformed `1,2-diphenylethanedione`. Rather than
+    emit that half-stripped name, return the fragments UNCHANGED so the caller keeps
+    the fully-locanted (still BB-valid, non-preferred) spelling. Task 6D-1 populates
+    `text_without_locants` on ring-substituent prefixes, so the two BB targets pass
+    this check; anything the producer did not instrument fails it closed.
+    """
+    import dataclasses as _dc
+    import re as _re
+
+    # Fail-closed pre-check: if ANY prefix would keep baked-in locants, do not omit.
+    for f in fragments:
+        if f.fragment_type != "prefix":
+            continue
+        _unlocanted = getattr(f, "text_without_locants", None)
+        if _re.match(r"^\d", f.text or ""):
+            if not _unlocanted or _re.match(r"^\d", _unlocanted):
+                return fragments
+
+    out = []
+    for f in fragments:
+        if f.fragment_type == "prefix":
+            _unlocanted = getattr(f, "text_without_locants", None)
+            if _unlocanted:
+                out.append(_dc.replace(f, locants=(), text=_unlocanted))
+            else:
+                out.append(_dc.replace(f, locants=()))
+        elif f.fragment_type == "suffix":
+            # Clear the suffix locants but PRESERVE `count`: the `di`/`tri`
+            # multiplier is derived from max(len(locants), count), so a suffix
+            # rebuilt with locants=() count=2 still renders `dione`.
+            out.append(_dc.replace(f, locants=()))
+        else:
+            out.append(f)
+
+    # BLOCKER-4: P-14.3.4.4 (BB:2971) rendering of MULTIPLE DIFFERENT
+    # no-locant prefixes. `ethylidene(methylidene)triphosphoxane`,
+    # `ethylidyne(methylidyne)disilane`, `chloro(silylidene)hydrazine`: when two or
+    # more DISTINCT substituent prefixes are juxtaposed with their locants omitted,
+    # the first (alphanumerically-lowest) is cited bare -- a compound/complex prefix
+    # keeps its own enclosing marks -- and every FURTHER prefix is enclosed in
+    # parentheses to mark the boundary. A multiplied prefix keeps its multiplier
+    # OUTSIDE the marks and is left bare, mirroring the P-16.5.1.3.1 mononuclear
+    # rule (`apply_mononuclear_enclosing`). Without this the asymmetric diaryl
+    # ethanedione class emitted the malformed `(4-methylphenyl)phenylethanedione`
+    # (a single boundary lost); the PIN is `(4-methylphenyl)(phenyl)ethanedione`.
+    #
+    # Scope: MONONUCLEAR parents are excluded -- their enclosing is already owned
+    # by `apply_mononuclear_enclosing` (called by BOTH renderers), which also
+    # carries the documented "any multiplied simple prefix => leave ALL bare"
+    # carve-out that protects `bromodichlorofluoromethane`. Applying the rule here
+    # too would double-govern them and break that carve-out. So this handles only
+    # the POLYNUCLEAR P-14.3.4.4 class (ethanedione, disilane, triphosphoxane, ...)
+    # that `apply_mononuclear_enclosing` never touches.
+    from ..naming_utils import _is_fully_enclosed
+    from ..composition_primitives import _MULTIPLIER_PREFIXES
+    prefix_idxs = [i for i, f in enumerate(out) if f.fragment_type == "prefix"]
+    if not is_mononuclear_parent and len(prefix_idxs) >= 2:
+        order = sorted(prefix_idxs, key=lambda i: alpha_sort_key(out[i].text))
+        for rank, i in enumerate(order):
+            if rank == 0:
+                continue  # first cited prefix keeps its natural enclosing
+            t = out[i].text or ""
+            if (
+                _is_fully_enclosed(t)
+                or _re.match(r"^\d", t)
+                or any(t.startswith(mp) for mp in _MULTIPLIER_PREFIXES)
+            ):
+                continue
+            out[i] = _dc.replace(out[i], text=f"({t})", text_without_locants=f"({t})")
+    return out
+
+
 def _naming_call_produces_a_name_component() -> bool:
     """True while this naming call's result will be spliced into a LARGER name.
 
@@ -1771,7 +2008,7 @@ def _naming_call_produces_a_name_component() -> bool:
     standing in for a substituent, because the enclosing scope's own locants are
     invisible from inside.
 
-    ★ MEASURED 2026-07-30, and it is the defectexists to catch. For
+    ★ MEASURED 2026-07-30, and it is the defect invariant 11 exists to catch. For
     ``F(CF2)7-CO-N(piperidine)`` the decomposition engine cuts the acyl bond, CAPS the
     fragment as the free acid, and names ``pentadecafluorooctanoic acid`` as a
     standalone molecule -- for which P-14.3.4.5 genuinely fires, 15 of 15 -- then
@@ -2259,7 +2496,7 @@ def _assemble_fragments(
     """
     from ..composer import NameFragment
 
-    # Phase 179: the composition-grammar primitives now live in the leaf
+    # Phase 179 (D-03): the composition-grammar primitives now live in the leaf
     # module composition_primitives.py (single source of truth shared with the
     # name-tree serializer). NameFragment stays in composer.
     from ..composition_primitives import (
@@ -2358,7 +2595,7 @@ def _assemble_fragments(
     # NOTE: Some prefixes already have locants baked in (ring substituent prefixes
     # like "4-phenyl"). Only add locants to those that don't already have them.
     import re
-    # Task 3b: the P-14.3.4.3 licence used to arrive here as an
+    # v29 Phase C Task 3b: the P-14.3.4.3 licence used to arrive here as an
     # `l3_omit_prefix_locant` PARAMETER that suppressed the locant at print time.
     # It is now applied upstream by rebuilding the prefix fragments with
     # `locants=()` (`_prefix_fragments_without_locants`), because this assembler is
@@ -2399,7 +2636,7 @@ def _assemble_fragments(
     # refinement (enclose the simple stem while excluding the multiplier from the
     # marks) is explicitly deferred; the PROTECT gold row `C(Br)(Cl)(Cl)F` ->
     # `bromodichlorofluoromethane` enforces this branch.
-    # this used to be a SECOND inline copy of the rule (and so a second copy
+    # v29: this used to be a SECOND inline copy of the rule (and so a second copy
     # of the compound-hyphen test), differing from composition_primitives.
     # apply_mononuclear_enclosing only in two comment words. Both were live —
     # this legacy assembler and the lifted serializer — so the P-16.3.4

@@ -1,4 +1,4 @@
-""".3 — the corrected three-metric coverage instrument.
+"""v25 P0 Task 0.3 — the corrected three-metric coverage instrument.
 
 Pure classifiers + aggregator. NO Java and NO Orthonym naming happen in
 this module: the round-trip is performed by an injected callable

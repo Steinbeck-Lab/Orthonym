@@ -160,7 +160,7 @@ POLYCYCLIC_DATA: Dict[str, Dict[str, Any]] = {
         'smarts': 'c1ccc2cc3ccccc3cc2c1',
         'num_atoms': 14,
         # IUPAC numbering for anthracene (linear tricyclic). AUTHORITATIVE:
-        # re-derived 2026-06-22 from OPSIN `anthracene -o extendedsmi`
+        # re-derived 2026-06-22 (v23 IH-01) from OPSIN `anthracene -o extendedsmi`
         # ($_AV: locants) mapped onto this canonical SMILES. The prior numbering
         # was INVALID — it placed a *meso* carbon (central-ring atoms 4 & 11) at
         # locant 5 instead of the correct 9/10, so 9-substituted/9,10-dihydro
@@ -220,7 +220,7 @@ POLYCYCLIC_DATA: Dict[str, Dict[str, Any]] = {
         'smarts': 'c1cc2ccc3cccc4ccc(c1)c2c34',
         'num_atoms': 16,
         # IUPAC numbering for pyrene (peri-condensed tetracyclic). AUTHORITATIVE:
-        # re-derived 2026-06-22 from OPSIN `pyrene -o extendedsmi`
+        # re-derived 2026-06-22 (v23 IH-01) from OPSIN `pyrene -o extendedsmi`
         # ($_AV: locants) mapped onto this canonical SMILES. The prior numbering
         # was INVALID (interior/fusion locants '3b'/'10a' instead of the correct
         # peri carbons 10a/10b/10c), so substituted pyrenes were mis-numbered.

@@ -361,7 +361,7 @@ def find_ring_bridgeheads(mol, ring_atoms: Set[int] = None) -> Set[int]:
     """Find von-Baeyer bridgehead atoms: ring-skeletal atoms bonded to >=3
     other ring-skeletal atoms.
 
-    SUB-02/: the SINGLE consolidated bridgehead predicate (seeded from
+    SUB-02/D-08: the SINGLE consolidated bridgehead predicate (seeded from
     VonBaeyerAnalyzer._find_all_bridgeheads, polycyclic.py:425-433). Counts
     only ring-member neighbours, so an exocyclic substituent (camphor's
     gem-dimethyl bridgehead) does NOT disqualify a bridgehead — exactly the

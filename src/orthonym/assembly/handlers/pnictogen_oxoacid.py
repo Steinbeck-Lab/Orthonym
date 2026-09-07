@@ -30,11 +30,22 @@ from ..name_tree import NameTreeNode, NamingResult
 logger = logging.getLogger(__name__)
 
 # functional-group key -> (rules.phosphorus function name, IUPAC cite)
+# Phase 1B adds the six TRIVALENT -ous organo-oxoacids (P, As, Sb) — the same
+# factory, the same fail-closed direct-return contract, delegating to the
+# element-generic -ous namers in rules.phosphorus. Including phosphonous/phosphinous
+# here (not in the P-only handlers.phosphonic_acid) keeps all six -ous siblings in
+# one place so they cannot drift apart.
 _PNICTOGEN_OXOACIDS = {
     "arsonic_acid": ("name_arsonic_acid", "P-67.1.1.2"),
     "arsinic_acid": ("name_arsinic_acid", "P-67.1.1.2"),
     "stibonic_acid": ("name_stibonic_acid", "P-67.1.1.2"),
     "stibinic_acid": ("name_stibinic_acid", "P-67.1.1.2"),
+    "phosphonous_acid": ("name_phosphonous_acid", "P-67.1.1.2"),
+    "phosphinous_acid": ("name_phosphinous_acid", "P-67.1.1.2"),
+    "arsonous_acid": ("name_arsonous_acid", "P-67.1.1.2"),
+    "arsinous_acid": ("name_arsinous_acid", "P-67.1.1.2"),
+    "stibonous_acid": ("name_stibonous_acid", "P-67.1.1.2"),
+    "stibinous_acid": ("name_stibinous_acid", "P-67.1.1.2"),
 }
 
 
@@ -87,6 +98,12 @@ _is_arsonic_acid, name_arsonic_acid = _make_pnictogen_oxoacid_handlers("arsonic_
 _is_arsinic_acid, name_arsinic_acid = _make_pnictogen_oxoacid_handlers("arsinic_acid")
 _is_stibonic_acid, name_stibonic_acid = _make_pnictogen_oxoacid_handlers("stibonic_acid")
 _is_stibinic_acid, name_stibinic_acid = _make_pnictogen_oxoacid_handlers("stibinic_acid")
+_is_phosphonous_acid, name_phosphonous_acid = _make_pnictogen_oxoacid_handlers("phosphonous_acid")
+_is_phosphinous_acid, name_phosphinous_acid = _make_pnictogen_oxoacid_handlers("phosphinous_acid")
+_is_arsonous_acid, name_arsonous_acid = _make_pnictogen_oxoacid_handlers("arsonous_acid")
+_is_arsinous_acid, name_arsinous_acid = _make_pnictogen_oxoacid_handlers("arsinous_acid")
+_is_stibonous_acid, name_stibonous_acid = _make_pnictogen_oxoacid_handlers("stibonous_acid")
+_is_stibinous_acid, name_stibinous_acid = _make_pnictogen_oxoacid_handlers("stibinous_acid")
 
 
 __all__ = [
@@ -94,4 +111,10 @@ __all__ = [
     "_is_arsinic_acid", "name_arsinic_acid",
     "_is_stibonic_acid", "name_stibonic_acid",
     "_is_stibinic_acid", "name_stibinic_acid",
+    "_is_phosphonous_acid", "name_phosphonous_acid",
+    "_is_phosphinous_acid", "name_phosphinous_acid",
+    "_is_arsonous_acid", "name_arsonous_acid",
+    "_is_arsinous_acid", "name_arsinous_acid",
+    "_is_stibonous_acid", "name_stibonous_acid",
+    "_is_stibinous_acid", "name_stibinous_acid",
 ]

@@ -50,17 +50,17 @@ def _select_primary_name(names):
 def _build_retained_names() -> Dict[str, str]:
     """Build consolidated SMILES-to-name lookup from 4 OPSIN sources.
 
-    Phase 150: broadened from 2 sources (cyclic + NP) to 4
+    Phase 150 D-02: broadened from 2 sources (cyclic + NP) to 4
     (adds aryl + simple). Stem-vs-PIN classification + round-trip gate
     happens DOWNSTREAM in data/__init__.py:_is_promotable (Phase 150's
     3-signal AND classifier).
 
-    Source: 150-CONTEXT.md.
+    Source: 150-CONTEXT.md D-02.
     Source: 150-RESEARCH.md section 4.3.
     """
     merged: Dict[str, str] = {}
 
-    # 4-source merge per CONTEXT (Phase 150 broadens from 2 to 4
+    # 4-source merge per CONTEXT D-02 (Phase 150 broadens from 2 to 4
     # sources). Cyclic + NP first (higher-quality data); aryl + simple
     # appended.
     sources = [
@@ -105,7 +105,7 @@ def _build_retained_names() -> Dict[str, str]:
     return merged
 
 
-# Consolidated SMILES -> name lookup
+# Consolidated SMILES -> name lookup (D-04)
 OPSIN_RETAINED_NAMES: Dict[str, str] = _build_retained_names()
 
 

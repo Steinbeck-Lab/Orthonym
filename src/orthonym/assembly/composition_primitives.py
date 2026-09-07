@@ -1,11 +1,11 @@
-"""Phase 179 (WSA-03 / CONTEXT) — shared name-composition primitives.
+"""Phase 179 (WSA-03 / CONTEXT D-03) — shared name-composition primitives.
 
 Single source of truth for the IUPAC P-14.5 / P-16 / P-31.1 string-composition
 grammar, called by BOTH the legacy fragment assembler
 (``handlers/_handler_shared.py:_assemble_fragments``) and the Name-Tree
 serializer (``name_tree_to_string._assemble_explicit_fields``). There is ONE
 implementation of each rule — not two — so the legacy path and the production
-flip path cannot drift (; the no-band-aid mandate in
+flip path cannot drift (D-03; the no-band-aid mandate in
 ``.claude/skills/fix-methodology.md``).
 
 The five core helpers (``_estimate_parent_size_from_name``,
@@ -347,7 +347,7 @@ def _join_prefixes(prefix_texts: List[str]) -> str:
         if result and current:
             last_char = result[-1]
             first_char = current[0]
-            # Item 4 (MINOR 8): `}` was missing from both tuples,
+            # v29 P3-CLEANUP Item 4 (MINOR 8): `}` was missing from both tuples,
             # so this copy dropped the separator after a brace-enclosed prefix
             # ('2-{[(methylcarbamoyl)amino]methyl}4-methyl') while the
             # `polyfunctional._join_prefixes` copy already hyphenated it. A closing
@@ -418,7 +418,7 @@ def retained_acetic_from_prefixes(prefix_texts: List[str], stereo: str = "") -> 
     function only performs the retained-name assembly.
     """
     unlocanted = [_ALPHA_LOCANT_RE.sub('', t) for t in prefix_texts]
-    # (P-16.3.3): stripping the alpha locant can leave a COMPLEX substituent
+    # v31 (P-16.3.3): stripping the alpha locant can leave a COMPLEX substituent
     # whose own enclosure no longer wraps the whole prefix -- e.g.
     # '[(methylsulfanyl)carbonyl]amino' (the [...] wraps only the acyl, 'amino'
     # trails outside). Joined bare it welds into '...aminoacetic acid'; P-16.3.3
@@ -446,7 +446,7 @@ def retained_acetic_from_prefixes(prefix_texts: List[str], stereo: str = "") -> 
 
 # Mononuclear parent stems (one heavy atom of any element), keyed by the bare
 # parent-hydride stem. Drives the serializer's structural `is_mononuclear`
-# derivation (CONTEXT — DERIVE, no NameTreeNode field add). For
+# derivation (CONTEXT D-09 — DERIVE, no NameTreeNode field add). For
 # `general_acyclic` only "meth" is reachable; the rest keep parity with the
 # legacy structural flag for non-carbon mononuclear parents.
 _MONONUCLEAR_STEMS = frozenset(

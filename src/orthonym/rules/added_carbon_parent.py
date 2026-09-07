@@ -188,7 +188,7 @@ def name_added_carbon_parent(features: Any, style: str = "pin") -> Optional[str]
 
     # All non-added carbons must lie ON this single chain (no branches). Every
     # parent carbon's heavy neighbour must be a parent/added carbon OR a nameable
-    # exocyclic SUBSTITUENT (citric-acid family -- a 2-hydroxy on the core;
+    # exocyclic SUBSTITUENT (v30: citric-acid family -- a 2-hydroxy on the core;
     # previously ANY extra neighbour returned None -> the molecule fell to a wrong
     # pentanedioic-chain candidate). Collect each substituent fragment and name it
     # via the recursive substituent namer; fail closed on anything un-nameable so a
@@ -266,7 +266,7 @@ def name_added_carbon_parent(features: Any, style: str = "pin") -> Optional[str]
             sub_name = name_substituent(mol, sorted(frag), ni)
             if not sub_name or sub_name == "substituent":
                 return None  # un-nameable substituent -> fail closed (0-wrong)
-            # fable BLOCKER 1: name_substituent's symbols-only fallback mis-names
+            # v30 fable BLOCKER 1: name_substituent's symbols-only fallback mis-names
             # constitutional isomers (nitrite -O-N=O -> 'nitro'); a gate-independent
             # CONSTITUTION re-anchor rejects that before it can ship gate-off.
             if not _substituent_constitution_ok(mol, frag, ni, sub_name):
@@ -292,9 +292,9 @@ def name_added_carbon_parent(features: Any, style: str = "pin") -> Optional[str]
     # parent chain (would live inside a substituent), is unassignable, is pseudo-
     # asymmetric r/s or axial M/P (OPSIN-unparseable / out of scope), or any stereo
     # double bond exists — a flat name would drop or mis-spell it. Uses the vendored-
-    # `centres` CIP path. (3 — a stale parse-time legacy _CIPCode surviving
+    # `centres` CIP path. (review RISK 3 — a stale parse-time legacy _CIPCode surviving
     # for an atom centres declined — is LATENT (no witness in the >=3-COOH acyclic class,
-    #; NOT hardened here because clearing _CIPCode breaks assign's
+    # invariant 10); NOT hardened here because clearing _CIPCode breaks assign's
     # repopulation. Tracked as a follow-up.)
     from ..perception.stereo import assign_stereochemistry
     assign_stereochemistry(mol)

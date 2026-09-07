@@ -1,8 +1,8 @@
 """Phase 1 Part A: the SINGLE certification gate for a general-engine result,
 shared by every best-effort emission lane.
 
-Root-cause of the per-lane drift
-(follow-on #1): three lanes ran
+Root-cause of the per-lane drift review named
+(``.planning/v30/phase0c-certificate-shipped.md`` follow-on #1): three lanes ran
 ``name_general`` and gated its ``GeneralEngineResult`` DIFFERENTLY --
 ``assembly/t4_coverage.py`` ran E1 + ``verify_spine`` (escalated), while the
 inline G1 lane (``namer.py:3900``) and the multifragment/recovery lane
@@ -74,7 +74,7 @@ _STRUCTURAL_BLOCKING_CODES = frozenset({
     _bs.SUBSTITUENT_STEREO_MISMATCH,                                    # P8 (provable)
 })
 
-#: ST.3: the stereo PROOF-GAP codes -- a rejection here means the
+#: v37 ST.3: the stereo PROOF-GAP codes -- a rejection here means the
 #: binding-spine could NOT decide (it could not positionally anchor which
 #: leading descriptor block is the parent's, because ``stereo_atom_to_locant``
 #: is int-locant-only and a compound/primed spiro locant is unmappable), NOT
@@ -174,7 +174,7 @@ def certify_general_result(mol, result: "GeneralEngineResult", *,
                 return True
         else:
             blocking = [f.code for f in proof.findings if f.severity == "error"]
-        # ST.3: RT-gated stereo PROOF-GAP rescue. When the ONLY thing
+        # v37 ST.3: RT-gated stereo PROOF-GAP rescue. When the ONLY thing
         # blocking certification is a stereo proof gap (STEREO_PARENT_BLOCK_
         # AMBIGUOUS -- the spine could not anchor which leading block is the
         # parent's, never a disproof), accept IFF the full name round-trips to

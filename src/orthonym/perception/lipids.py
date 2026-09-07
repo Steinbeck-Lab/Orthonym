@@ -3,7 +3,7 @@
 `detect_lipid_backbone(mol)` is a PURE, hard-gated structural deriver: it recognizes
 the three lipid backbone families and classifies each backbone position, or returns
 ``None`` on any dirty/unrecognized decoration so the molecule defers to the general
-pipeline (, fail-safe → zero non-lipid regression). It is the acyclic
+pipeline (D-06, fail-safe → zero non-lipid regression). It is the acyclic
 generalization of the Phase-176 ``recognize_sugar_skeleton`` ring deriver.
 
 The detector does NOT name anything — it produces a structured ``BackboneMatch`` that
@@ -110,7 +110,7 @@ def _classify_oxygen_site(mol, c_idx, o_idx):
             if sugar is not None:
                 return ("glycosyl", o_idx, sugar)
             return None  # ring carbon we can't resolve as a clean sugar → defer
-        # plain ether (O-alkyl) or vinyl-ether → defer (ether/plasmalogen,)
+        # plain ether (O-alkyl) or vinyl-ether → defer (ether/plasmalogen, D-06)
         return None
 
     return None
@@ -209,7 +209,7 @@ def _classify_head_group(mol, p_idx, backbone_o_idx):
         # glycerol head group: O-CH2-CH(OH)-CH2-OH
         if _is_glycerol_headgroup(mol, head_o):
             return ("glycerol", head_o)
-    # an esterified head we don't recognize → defer
+    # an esterified head we don't recognize → defer (D-06)
     return None
 
 
@@ -345,7 +345,7 @@ def _detect_sphingoid(mol) -> Optional[BackboneMatch]:
             sites[2] = ("n_acyl", acyl_c, n)
         else:
             # bare sphingoid (free amine) — defer: the systematic 2-aminoalkane-1,3-diol
-            # already names; claiming it risks regression. Documented in SUMMARY.
+            # already names; claiming it risks regression (D-06/D-11). Documented in SUMMARY.
             return None
 
         # Walk the linear sphingoid chain C1->Cn (C1 = the CH2-O end) for the
@@ -387,7 +387,7 @@ def _detect_sphingoid(mol) -> Optional[BackboneMatch]:
 # Public entry point
 # --------------------------------------------------------------------------- #
 def detect_lipid_backbone(mol) -> Optional[BackboneMatch]:
-    """Detect a clean lipid backbone, or return None (hard gate / fail-safe,)."""
+    """Detect a clean lipid backbone, or return None (hard gate / fail-safe, D-06)."""
     if mol is None:
         return None
     # sphingoid first (its 1,3-diol-2-amino core is more specific than the glycerol triol)

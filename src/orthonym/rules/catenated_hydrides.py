@@ -7,10 +7,14 @@ saturated with hydrogen::
 
     [SiH3]O[SiH3]              -> disiloxane        (2 Si, 1 O)
     [SiH3]O[SiH2]O[SiH3]       -> trisiloxane       (3 Si, 2 O)
-    [SiH3]N[SiH3]              -> disilazane        (N bridge)
+    [SiH3]N[SiH3]              -> N-silylsilanamine  (N bridge -> amine, P-21.2.3.1)
     [SiH3]S[SiH3]              -> disilathiane      (S bridge; linking 'a')
     [SnH3]O[SnH3]              -> distannoxane      (Sn)
     [GeH3]O[GeH3]              -> digermoxane       (Ge)
+
+A nitrogen bridge is the exception: an '-azane' parent hydride is non-PIN for
+these (P-21.2.3.1), so N-bridged chains are named substitutively as amines on the
+Group-14 hydride ('silane') -- see ``_name_nitrogen_bridged_group14``.
 
 Every emitted name round-trips through OPSIN 2.9.0.
 
@@ -90,14 +94,58 @@ def name_catenated_hydride(mol) -> Optional[str]:
         if len(heavy) != 2 or any(n.GetSymbol() != g14_sym for n in heavy):
             return None
 
+    # P-21.2.3.1 (BB 26243/23547/16015): a NITROGEN-bridged Group-14 a(ba)n chain
+    # is NOT named as an '-azane' parent hydride — 'disilazane'/'trisilazane' are
+    # explicitly non-PIN ("disilazane is not a recommended parent hydride, see
+    # P-21.2.3.1"). Nitrogen carries the amine functionality, so the PIN is built
+    # substitutively on the Group-14 hydride 'silane'/'germane'/... :
+    #   SiH3-NH-SiH3         -> N-silylsilanamine         (preselected name, BB 26243)
+    #   SiH3-NH-SiH2-NH-SiH3 -> N,N'-disilylsilanediamine (BB 23547)
+    if bridge_sym == 'N':
+        return _name_nitrogen_bridged_group14(g14_sym, len(g14_atoms))
+
     stem = _GROUP14_STEM[g14_sym]
     suffix = _BRIDGE_SUFFIX[bridge_sym]
     # Linking 'a' when the bridge suffix begins with a consonant (silathiane,
-    # not silthiane; siloxane / silazane keep no linker — vowel-initial).
+    # not silthiane; siloxane keeps no linker — vowel-initial).
     link = '' if suffix[0] in _VOWELS else 'a'
     base = f"{stem}{link}{suffix}"
     multiplier = get_multiplier_prefix(len(g14_atoms), base)
     return f"{multiplier}{base}"
+
+
+# Substitutive parent-hydride and 'yl' substituent names for the Group-14
+# elements, used by the nitrogen-bridged (silazane) amine renderer.
+_GROUP14_HYDRIDE_NAME = {'Si': 'silane', 'Ge': 'germane', 'Sn': 'stannane',
+                         'Pb': 'plumbane'}
+_GROUP14_YL_NAME = {'Si': 'silyl', 'Ge': 'germyl', 'Sn': 'stannyl',
+                    'Pb': 'plumbyl'}
+
+
+def _name_nitrogen_bridged_group14(g14_sym: str, n_g14: int) -> Optional[str]:
+    """Return the substitutive amine PIN for a nitrogen-bridged homonuclear
+    Group-14 a(ba)n chain (P-21.2.3.1 / P-62.2.2.1), else ``None`` (fail-closed).
+
+    Only the two Blue-Book-documented members are built — a longer N-bridged chain
+    is not a documented PIN and fails closed (cascade-continuation):
+
+        SiH3-NH-SiH3          -> N-silylsilanamine         (BB 26243, preselected)
+        SiH3-NH-SiH2-NH-SiH3  -> N,N'-disilylsilanediamine (BB 23547)
+    """
+    from ..assembly.naming_utils import apply_vowel_elision
+    hydride = _GROUP14_HYDRIDE_NAME.get(g14_sym)
+    yl = _GROUP14_YL_NAME.get(g14_sym)
+    if hydride is None or yl is None:
+        return None
+    if n_g14 == 2:
+        # One Group-14 hydride is the parent bearing the amine; the far -EH3 is an
+        # N-'yl' substituent (P-62.2.2.1 method 1, BB 26243).
+        return f"N-{yl}{apply_vowel_elision(hydride, 'amine')}"
+    if n_g14 == 3:
+        # The central Group-14 hydride bears both amines (a diamine); each amine
+        # nitrogen bears an -EH3 -> N,N'-di'yl' (BB 23547).
+        return f"N,N'-di{yl}{apply_vowel_elision(hydride, 'diamine')}"
+    return None  # longer N-bridged chains: not a BB-documented PIN, fail closed
 
 
 # ---------------------------------------------------------------------------
@@ -326,7 +374,7 @@ def name_heterochalcogen_aba(mol) -> Optional[str]:
     # Terminal organyls: no locants (the terminal positions are symmetric — BB
     # methyldithioxane / dimethyldithioxane / methyl(phenyl)dithioxane).
     #
-    # the organyl guard above is now the shared chokepoint, so a prefix
+    # v29 P3: the organyl guard above is now the shared chokepoint, so a prefix
     # reaching here may carry LOCANTS ('propan-2-yl'), a retained italicized
     # prefix ('tert-butyl') or its own enclosing marks ('(4-bromophenyl)methyl').
     # Raw `sorted()` + bare concatenation was correct only for the letters-only

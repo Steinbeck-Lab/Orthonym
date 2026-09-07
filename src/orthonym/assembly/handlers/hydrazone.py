@@ -3,7 +3,7 @@
 Verbatim lift of the hydrazone dispatch logic from composer.py:785-794
 (inline branch) + composer.py:1906-2042 (shared body of
 _name_oxime_or_hydrazone with second arg ``'hydrazone'``). Per CONTEXT
- incremental-migration discipline, the body stays in composer.py
+D-24 incremental-migration discipline, the body stays in composer.py
 until Plan-03 commit 03-10 thinning.
 
 IUPAC cite: P-66.6 (hydrazone functional class naming).
@@ -24,7 +24,7 @@ from ..name_tree import NameTreeNode, NamingResult
 def _is_hydrazone(features: Any) -> bool:
     """Mirrors composer.py:785 (``features.principal_group == 'hydrazone'``).
 
-    Pure read-only per CONTEXT / AP-160-26.
+    Pure read-only per CONTEXT D-25 / AP-160-26.
     """
     return getattr(features, 'principal_group', None) == 'hydrazone'
 
@@ -75,7 +75,7 @@ def name_hydrazone(
         return None
 
     # Per composer.py:793 inline branch: wrap in _inject_stereo_if_missing
-    # with atom_to_locant=None for byte-identical preservation per CONTEXT.
+    # with atom_to_locant=None for byte-identical preservation per CONTEXT D-13.
     final_name = _inject_stereo_if_missing(features, cand.name, atom_to_locant=None)
     return NamingResult(
         name=final_name,

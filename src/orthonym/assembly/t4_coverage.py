@@ -189,7 +189,7 @@ def _clone_features_with(features, **overrides):
 
 
 def _prefer_verified_floor(mol, candidate: "_Candidate") -> "_Candidate":
-    """#2 -- verify-before-commit for every best-effort cascade rung.
+    """v35 Track A #2 -- verify-before-commit for every best-effort cascade rung.
 
     Each early rung here (``_run_general_e1`` rung 0, the polyol rung, the
     feature-override cascade) is E1-complete -- E1 proves atom COVERAGE (every
@@ -202,7 +202,7 @@ def _prefer_verified_floor(mol, candidate: "_Candidate") -> "_Candidate":
     constitution-complete (and, since 33f5e47c, branch-stereo-complete). The
     wrong rung name then FAILS the downstream full-InChIKey gate -- and because
     it is the only offer, the whole molecule ABSTAINS, even though the floor
-    names it correctly offer-not-return; council Track A #2).
+    names it correctly (invariant 18 offer-not-return; council Track A #2).
 
     So: full-InChIKey verify the rung's name. If it verifies, keep it (the
     engine rungs give better nomenclature than the ugly floor). If it does NOT,
@@ -300,7 +300,7 @@ def _best_effort_candidate(mol, features) -> Optional[_Candidate]:
     depth cap -- every rung fails E1 and the producer HONESTLY abstains
     (``None``), never a fabricated or partial name. A suffix-free prefix name is
     a valid description of the right structure that is not a well-formed PIN;
-    that is licit here: "a table miss must degrade to an uglier
+    that is licit here (invariant 1: "a table miss must degrade to an uglier
     name, never to a refusal") and confined to this best-effort T4 branch.
 
     Task 6 (measured 2026-08-11) -- WHY the cascade STOPS at rung 2, and where
@@ -337,7 +337,7 @@ def _best_effort_candidate(mol, features) -> Optional[_Candidate]:
       * acyl substituents built as ``name(R)`` + ``carbonyl`` / ``amino`` so an
         internal C=C never blocks them (the ``C/C=C/C(=O)NCC(=O)O`` enamide
         "branch unnameable" class);
-      * OFFER-not-RETURN parent competition: a parent choice that
+      * OFFER-not-RETURN parent competition (invariant 18): a parent choice that
         leaves an unnameable fragment should lose to a competitor parent rather
         than terminate the molecule;
       * a peptide-residue namer for deep peptide/ester side chains (perindopril's
@@ -361,7 +361,7 @@ def _best_effort_candidate(mol, features) -> Optional[_Candidate]:
     if candidate is not None:
         return _prefer_verified_floor(mol, candidate)  # v35: verify-before-commit
 
-    # Rung 0.5: the acyclic polyol / polyether / POLYESTER class.
+    # Rung 0.5 (v30 tail #21): the acyclic polyol / polyether / POLYESTER class.
     # name_general is a ring/von-Baeyer engine and returns None for an acyclic
     # polyol chain (the composer names a plain polyol, but an ester's P-41
     # seniority makes the composer commit to the ester and LINEARISE the polyol
@@ -429,7 +429,7 @@ def _best_effort_candidate(mol, features) -> Optional[_Candidate]:
     # whole module is `_general_fallback`-gated in namer.py), so PIN is
     # untouched.
     try:
-        # A2 (C2): a SINGLE P-71 free-valence centre that the dedicated
+        # v36 A2 (C2): a SINGLE P-71 free-valence centre that the dedicated
         # radicals.py/route_charged path already declined (this whole rung is
         # reached only after that path's own candidate -- if any -- failed
         # its OPSIN ``-r`` gate check, per this module's header) gets ONE more

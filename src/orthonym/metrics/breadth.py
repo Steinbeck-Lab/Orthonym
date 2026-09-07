@@ -123,9 +123,9 @@ _DROP_RE = re.compile(
 # [^|] guard mirrors _DROP_RE so a capture can never run past its own log record.
 _REFUSE_RE = re.compile(r"general_engine_declined:\s*([^|]+?)\s*(?:\(tier|$)")
 
-# The two grammars above see PRODUCER refusals only, and measurement
+# v30 P0-T3. The two grammars above see PRODUCER refusals only, and measurement
 # showed that is not where these molecules die: of the 11 abstainers that logged
-# no code at all on the, NINE were terminated by a
+# no code at all on the v30 P0 best-effort run, NINE were terminated by a
 # post-hoc GATE — the name was built, then suppressed. The gate's own log line
 # was being read as noise (the superseded
 # ``test_parse_refusal_codes_ignores_unrelated_log_noise`` asserted exactly that),
@@ -253,7 +253,7 @@ def residual_refusal_code(row: Dict[str, Any]) -> str | None:
 
     * ``SKIP`` — RDKit could not parse the input; the namer never ran.
     * ``EXC`` — an unhandled exception. NOT a refusal: a crash the instrument's
-      own ``except`` turned into an abstainer row. On the
+      own ``except`` turned into an abstainer row. On the v30 P0 run this was one
       row, ``TypeError: '<' not supported between instances of 'str' and 'int'``.
     * ``TIMEOUT`` — the instrument's own per-molecule SIGALRM, not an engine
       decision.
@@ -489,7 +489,7 @@ def refusal_structure(rows: Sequence[Dict[str, Any]],
     ``only`` or the ceiling: uncoded is the opposite of known-single, and
     counting them would inflate the ceiling with rows whose blocker is unknown.
 
-    ``basis`` selects the ATTRIBUTION source; see
+    ``basis`` (v30 P0-T4) selects the ATTRIBUTION source; see
     :func:`row_attribution` and :func:`terminal_site` for why there are two.
 
     * ``"log"`` (default, unchanged) — every code the engine logged. ``first``
@@ -750,10 +750,10 @@ def aggregate(rows: Sequence[Dict[str, Any]],
         "tautomer_differs": sum(1 for r in rows if r.get("tautomer_differs")),
         "refusal_census": dict(census.most_common()),
         "refusal_census_abstain": dict(census_abstain.most_common()),
-        # the ONLY-ranked structure. Carried into the run JSON so the
+        # v30 P0-T2: the ONLY-ranked structure. Carried into the run JSON so the
         # build order is queryable without re-running a 675 s measurement.
         "refusal_structure": refusal_structure(rows),
-        # the same structure on TERMINAL attribution. `None`, not an
+        # v30 P0-T4: the same structure on TERMINAL attribution. `None`, not an
         # empty-looking structure, when the rows were measured before the
         # abstention channel was wired -- a zero here would be indistinguishable
         # from "the channel found nothing".

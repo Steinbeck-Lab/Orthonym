@@ -15,7 +15,7 @@ opt-in paths (`Orthonym.name(..., raise_on_limit=True)`,
 path is byte-identical to before.
 
 Provenance (each code cites the AUTONOM analog it mirrors):
-
+`.planning/research/autonom-comparison/AUTONOM-ARCHITECTURE.md §10`
 ("Hard limits & error catalog"): 40 codes in 0x104–0x18f, limits table
 (125 total atoms / 44 per chain·ring·assembly / 32 stem candidates /
 2 components / 255 chars), representative refusals ERR-210 (out of organic
@@ -72,7 +72,7 @@ def _build_descriptive_fallback_names() -> frozenset:
     The OPSIN validity gate (`namer._final_opsin_validity_gate`) skips
     re-gating these — they are intentional descriptive fallbacks that do
     not OPSIN-parse, so re-suppressing them is wasted work and must not
-    alter output. Relocated here from the
+    alter output. Relocated here (v21 ML retirement, ADR-21-01) from the
     deleted `ml_fallback.quality_gate`; behaviour is byte-identical.
     """
     base = {
@@ -307,7 +307,7 @@ def classify_failure_limit(mol: Chem.Mol,
     # byte-identical — the sole metal is trivially lowest.
     non_organic = {atom.GetSymbol() for atom in mol.GetAtoms()
                    if atom.GetSymbol() not in _ORGANIC_ELEMENTS}
-    # B3 honesty floor: the ORIGINAL non_organic test above is
+    # v36 B3 honesty floor: the ORIGINAL non_organic test above is
     # ELEMENT-SET-based, so a bare carbon-free ion built entirely from
     # `_ORGANIC_ELEMENTS` (nitrate O=[N+]([O-])[O-], sulfite, [S-2], [H+]) has
     # an EMPTY non_organic set and used to fall through to the "unknown

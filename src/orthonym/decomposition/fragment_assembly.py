@@ -30,7 +30,7 @@ from ..data.sugar_names import (
 from ..data.trivial_acids import TRIVIAL_ACID_TO_ACYLATE
 from ..errors import is_refusal_sentinel
 
-# Phase 176 /: structural seniority guard primitives. The aglycone is in
+# Phase 176 / D-09: structural seniority guard primitives. The aglycone is in
 # scope to flip to the functional-class form iff its principal characteristic
 # group is hydroxy-class or junior (rank >= primary_alcohol). This is a
 # structural decision via get_principal_group, NOT a string match on the name.
@@ -228,6 +228,11 @@ _TRIVIAL_AMINE_TO_PREFIX = {
     "aniline": "phenyl",
     "cyclohexanamine": "cyclohexyl",
     "cyclohexylamine": "cyclohexyl",
+    # P-68.3.1: hydroxylamine (HO-NH2) as an N-substituent on an amide/sulfonamide
+    # contributes the -OH prefix 'hydroxy', NOT 'hydroxyl'. Stripping the retained
+    # name to 'hydroxyl' (its systematic-looking '...yl' tail) mis-spells the -OH
+    # prefix -- 'hydroxyl' is not a prefix form. Gives N-hydroxymethanesulfonamide.
+    "hydroxylamine": "hydroxy",
 }
 
 
@@ -255,7 +260,7 @@ def assemble_fragment_name(
             For glycosides: {"sugar": "...", "aglycone": "..."}
         style: Naming style ("pin" for preferred IUPAC names).
         fragment_smiles: Optional dict mapping fragment roles to their SMILES,
-            keyed by the same side keys as fragment_names. Phase 176 /:
+            keyed by the same side keys as fragment_names. Phase 176 / D-03:
             only the glycoside assembler consumes this (the sugar-skeleton
             deriver and the aglycone seniority guard both need structure); all
             other assemblers ignore it, keeping them byte-identical.
@@ -272,7 +277,7 @@ def assemble_fragment_name(
     if not bond_type or not fragment_names:
         return None
 
-    # Phase 176 /: the glycoside assembler needs the fragment SMILES to
+    # Phase 176 / D-03: the glycoside assembler needs the fragment SMILES to
     # derive the sugar skeleton and run the aglycone seniority guard. Special-
     # case it so every other assembler keeps its two-arg (fragment_names, style)
     # signature byte-identical.
@@ -282,7 +287,7 @@ def assemble_fragment_name(
             parent_smiles=parent_smiles,
         )
 
-    # task 24: the amide assembler needs the amine SMILES for the acyl-float
+    # v30 task 24: the amide assembler needs the amine SMILES for the acyl-float
     # ambiguity guard (a bare 'N-<acyl>-' onto an amine with >=2 acylatable N is
     # ambiguous). Special-cased like the glycoside above so every other assembler
     # keeps its two-arg signature byte-identical.
@@ -597,7 +602,7 @@ def _assemble_ester(fragment_names: Dict[str, str], style: str) -> Optional[str]
     if not acid_name or not alkyl_name:
         return None
 
-    # BP-2 RC-2b (P-41 seniority / P-65.6.3.5): a mono-ester of a POLY-acid is
+    # v26 BP-2 RC-2b (P-41 seniority / P-65.6.3.5): a mono-ester of a POLY-acid is
     # a PARTIAL ester — the un-esterified free -COOH is the senior principal group
     # (carboxylic acid > ester), so the ester functional-class 'alkyl ...dicarboxylate'
     # is NOT the PIN. It also silently drops the 'hydrogen' the free acid needs, and
@@ -711,7 +716,7 @@ def _assemble_amide(fragment_names: Dict[str, str], style: str,
     if result is None:
         # Complex amine: use acyl prefix pattern
         # "N-acetylcyclohexanamine"
-        # task 24: refuse the bare 'N-<acyl>-' float when the amine fragment
+        # v30 task 24: refuse the bare 'N-<acyl>-' float when the amine fragment
         # has >=2 acylatable N -- the float would not say which N bears the acyl
         # (ambiguous name / no-jar fail-open). Same guard as engine.py's amide
         # branch. Needs the amine SMILES (threaded from assemble_fragment_name).
@@ -768,7 +773,7 @@ def _assemble_amide(fragment_names: Dict[str, str], style: str,
 def _aglycone_to_substituent(
     aglycone_name: str, aglycone_smiles: Optional[str]
 ) -> Optional[str]:
-    """Convert an aglycone fragment to a monovalent substituent prefix.
+    """Convert an aglycone fragment to a monovalent substituent prefix (D-08/D-09).
 
     The aglycone arrives from the glycoside cleavage as an *alcohol* (the
     glycosidic oxygen stays with it as -OH), so it is named e.g. ``methanol``,
@@ -776,7 +781,7 @@ def _aglycone_to_substituent(
     glycoside form it must be cited as a preceding monovalent substituent word
     (``methyl``, ``ethyl``, ``2-aminoethyl``, ``phenyl``).
 
-    Structural seniority guard (, P-102.5.6.1.1): if the aglycone bears a
+    Structural seniority guard (D-09, P-102.5.6.1.1): if the aglycone bears a
     characteristic group *senior to hydroxy* (ketone, aldehyde, acid, ...), the
     functional-class glycoside form is NOT used -- the ``-ose`` ending is
     retained and the aglycone is cited as an O-substituent instead. We detect
@@ -798,7 +803,7 @@ def _aglycone_to_substituent(
     if not aglycone_name:
         return None
 
-    # Structural seniority guard. Without the SMILES we cannot make the
+    # Structural seniority guard (D-09). Without the SMILES we cannot make the
     # structural decision, so fail closed to the legacy form.
     if not aglycone_smiles:
         return None
@@ -829,7 +834,7 @@ def _aglycone_to_substituent(
     # cannot convert (e.g. the diol "hydroquinone" -> "hydroquinone", which is
     # NOT a monovalent substituent prefix). A real substituent prefix ends in
     # "-yl"; if the converter could not produce one, fail closed to the legacy
-    # (glycosyloxy)R form (zero-regression default) rather than emit a
+    # (glycosyloxy)R form (D-10 zero-regression default) rather than emit a
     # malformed two-word name that the validity gate would then reject as
     # "unknown". All four in-scope aglycones convert to a -yl prefix
     # (methyl/ethyl/2-aminoethyl/phenyl/2-naphthyl).
@@ -839,7 +844,7 @@ def _aglycone_to_substituent(
 
 
 def _aglycone_structural_substituent(aglycone_smiles: Optional[str]) -> Optional[str]:
-    """Derive the aglycone monovalent substituent prefix from STRUCTURE.
+    """Derive the aglycone monovalent substituent prefix from STRUCTURE (v38 Incr-1a).
 
     Root-cause alternative to the string rule ``_alcohol_to_alkyl``, which FABRICATES
     an OPSIN-unparseable token for a retained-named aglycone (``borneol`` ->
@@ -849,11 +854,11 @@ def _aglycone_structural_substituent(aglycone_smiles: Optional[str]) -> Optional
     through the ring-substituent chokepoint ``name_ring_system_substituent`` (P-29.2),
     yielding e.g. ``4,7,7-trimethylbicyclo[2.2.1]heptan-5-yl``.
 
-    Determinism: the aglycone is re-parsed through its CANONICAL SMILES
+    Determinism (invariant 4): the aglycone is re-parsed through its CANONICAL SMILES
     first, so the von-Baeyer / ring numbering the chokepoint assigns is independent of
     the incoming atom order (that numbering is otherwise order-dependent).
 
-    Structural seniority guard (, P-102.5.6.1.1): a group senior to hydroxy keeps
+    Structural seniority guard (D-09, P-102.5.6.1.1): a group senior to hydroxy keeps
     the substitutive form -> return None. Fail closed (None) on a multi-hydroxy,
     purely acyclic, or unnameable aglycone -- the caller then keeps its legacy path.
     """
@@ -866,7 +871,7 @@ def _aglycone_structural_substituent(aglycone_smiles: Optional[str]) -> Optional
     mol = _Chem.MolFromSmiles(_Chem.MolToSmiles(mol))
     if mol is None:
         return None
-    # Seniority guard (structural,) -- mirrors _aglycone_to_substituent so a
+    # Seniority guard (structural, D-09) -- mirrors _aglycone_to_substituent so a
     # ketone/acid/aldehyde aglycone is never flipped to the functional-class form.
     try:
         pg, _atoms = get_principal_group(mol, detect_functional_groups(mol))
@@ -909,18 +914,18 @@ def _assemble_glycoside(
 
     Emits the Blue-Book functional-class two-word form
     ``<aglycone-substituent> <sugar>oside`` (P-102.5.6.2.2), e.g.
-    ``methyl beta-D-glucopyranoside``, when the self-gating triad holds:
+    ``methyl beta-D-glucopyranoside``, when the self-gating triad (D-10) holds:
 
       1. the sugar skeleton is recognized (lookup_sugar catalog fast-path FIRST
-         per, then the structure-derived recognize_sugar_skeleton); AND
+         per D-05, then the structure-derived recognize_sugar_skeleton); AND
       2. the aglycone resolves to a monovalent substituent prefix without a
-         group senior to hydroxy (/ via _aglycone_to_substituent); AND
+         group senior to hydroxy (D-08/D-09 via _aglycone_to_substituent); AND
       3. there is exactly one sugar unit (this single-glycosidic-bond assembler
          -- _assemble_multi_glycoside handles >=2, untouched).
 
     If ANY gate fails -- including the back-compat case where no fragment_smiles
     was threaded -- it falls through to the EXISTING legacy substitutive form
-    ``(glycosyloxy)aglycone``. Zero regression is the default failure mode (,
+    ``(glycosyloxy)aglycone``. Zero regression is the default failure mode (D-10,
     the project guarded-primitive standard).
 
     Accepts both key conventions from the decomposition engine:
@@ -931,7 +936,7 @@ def _assemble_glycoside(
         fragment_names: Fragment name dict with sugar/aglycone info.
         style: Naming style.
         fragment_smiles: Optional dict of fragment SMILES keyed by side
-            . Required for the functional-class flip; when None the
+            (D-03). Required for the functional-class flip; when None the
             legacy form is emitted (back-compat).
 
     Returns:
@@ -946,8 +951,8 @@ def _assemble_glycoside(
     if not sugar_name or not aglycone_name:
         return None
 
-    # --- Functional-class flip attempt (//) -------------------
-    # Only attempted when the fragment SMILES were threaded. Every gate
+    # --- Functional-class flip attempt (D-01/D-02/D-10) -------------------
+    # Only attempted when the fragment SMILES were threaded (D-03). Every gate
     # failure falls through to the legacy logic below (zero regression).
     if fragment_smiles:
         sugar_smiles = fragment_smiles.get("sugar") or fragment_smiles.get("acid")
@@ -955,7 +960,7 @@ def _assemble_glycoside(
             fragment_smiles.get("aglycone") or fragment_smiles.get("alkyl")
         )
 
-        # SUGAR gate: catalog fast-path FIRST, then the deriver on miss.
+        # SUGAR gate (D-05): catalog fast-path FIRST, then the deriver on miss.
         sugar_tuple = None
         if sugar_smiles:
             sugar_mol = _Chem.MolFromSmiles(sugar_smiles)
@@ -969,10 +974,10 @@ def _assemble_glycoside(
                 if sugar_tuple is None:
                     sugar_tuple = recognize_sugar_skeleton(sugar_mol)
 
-        # AGLYCONE gate: substituent prefix + structural seniority.
+        # AGLYCONE gate (D-08/D-09): substituent prefix + structural seniority.
         aglycone_prefix = _aglycone_to_substituent(aglycone_name, aglycone_smiles)
 
-        # SINGLE-SUGAR gate: this assembler is only reached for the
+        # SINGLE-SUGAR gate (D-10): this assembler is only reached for the
         # single-glycosidic-bond path (>=2 -> _assemble_multi_glycoside, which
         # is untouched). Defensive guard: a multi-sugar prefix would carry the
         # glycosyloxy stem more than once.
@@ -997,14 +1002,14 @@ def _assemble_glycoside(
             if head:
                 # Functional-class form "<substituent> <sugar>oside" (P-102.5.6.2.2);
                 # the alpha/beta + D/L descriptors come from the sugar tuple and are
-                # never dropped. Two aglycone-substituent sources:
+                # never dropped (D-11). Two aglycone-substituent sources:
                 #   - the string rule (`aglycone_prefix`), byte-identical for every
                 #     already-working glycoside (menthyl/cyclohexyl/phenyl/...);
-                # - Incr-1a: the aglycone '-yl' derived from STRUCTURE, which
+                #   - v38 Incr-1a: the aglycone '-yl' derived from STRUCTURE, which
                 #     rescues a retained-named aglycone whose string token is
                 #     fabricated and OPSIN-unparseable (borneol -> 'borneyl').
                 string_form = f"{aglycone_prefix} {head}" if aglycone_prefix else None
-                # Incr-1a: the aglycone '-yl' derived from STRUCTURE
+                # v38 Incr-1a: the aglycone '-yl' derived from STRUCTURE
                 # (canonicalised -> deterministic), used to (a) recognise when the
                 # string rule can be trusted WITHOUT OPSIN, and (b) rescue a
                 # fabricated string token. Only computed when the parent SMILES is
@@ -1039,7 +1044,7 @@ def _assemble_glycoside(
                 # best-effort-tier exposure, neither introduced nor widened by this
                 # change. Closing it (RT-gating the fast path) would re-introduce the
                 # warm-cache OPSIN perturbation documented at branch B / in the
-                # report, so it is deliberately DEFERRED (out of Incr-1a scope).
+                # report, so it is deliberately DEFERRED (out of v38 Incr-1a scope).
                 if string_form is not None and (
                     structural_prefix is None
                     or aglycone_prefix == structural_prefix
@@ -1382,10 +1387,10 @@ def _assemble_multi_ester(
     if not named_fragments or len(named_fragments) < 2:
         return None
 
-    # Per,: identify core by role, then by seniority
+    # Per D-06, D-07: identify core by role, then by seniority
     middle_frags = [(f, n) for f, n in named_fragments if f.get("side") == "middle"]
     if middle_frags:
-        # Per: multiple middles -> pick most senior
+        # Per D-08: multiple middles -> pick most senior
         core_frag, core_name = min(
             middle_frags,
             key=lambda pair: score_fragment_seniority(pair[0]["smiles"]),
@@ -1418,7 +1423,7 @@ def _assemble_multi_ester(
             if nc_mol is not None and nc_mol.GetNumHeavyAtoms() > core_ha:
                 return None
 
-    # Per: collect acid names from non-core fragments, count by name (not SMILES)
+    # Per D-04: collect acid names from non-core fragments, count by name (not SMILES)
     ate_names = []
     for frag, name in named_fragments:
         if frag is core_frag:
@@ -1430,7 +1435,7 @@ def _assemble_multi_ester(
     if not ate_names:
         return None
 
-    # Identical acids: use multiplicative prefix (per: compare names not SMILES)
+    # Identical acids: use multiplicative prefix (per D-04: compare names not SMILES)
     if len(set(ate_names)) == 1:
         _MULT_PREFIX = {1: "", 2: "di", 3: "tri", 4: "tetra", 5: "penta"}
         mult = _MULT_PREFIX.get(len(ate_names), str(len(ate_names)))
@@ -1479,10 +1484,10 @@ def _assemble_multi_glycoside(
         elif lookup_sugar(frag["smiles"]):
             sugar_indices.add(i)
 
-    # Per,: identify core by role first, then by non-sugar seniority
+    # Per D-06, D-07: identify core by role first, then by non-sugar seniority
     middle_frags = [(f, n) for f, n in named_fragments if f.get("side") == "middle"]
     if middle_frags:
-        # Per: multiple middles -> pick most senior
+        # Per D-08: multiple middles -> pick most senior
         core_frag, core_name = min(
             middle_frags,
             key=lambda pair: score_fragment_seniority(pair[0]["smiles"]),
@@ -1600,10 +1605,10 @@ def _assemble_multi_amide(
     if not named_fragments or len(named_fragments) < 2:
         return None
 
-    # Per,: identify core by role first, then by non-acid seniority
+    # Per D-06, D-07: identify core by role first, then by non-acid seniority
     middle_frags = [(f, n) for f, n in named_fragments if f.get("side") == "middle"]
     if middle_frags:
-        # Per: multiple middles -> pick most senior
+        # Per D-08: multiple middles -> pick most senior
         core_frag, core_name = min(
             middle_frags,
             key=lambda pair: score_fragment_seniority(pair[0]["smiles"]),
@@ -1784,7 +1789,7 @@ def _alcohol_to_alkylthio(name: str) -> Optional[str]:
 
 
 # ============================================================================
-# Pre-validation helpers (through)
+# Pre-validation helpers (D-09 through D-12)
 # ============================================================================
 
 def _looks_like_acid_name(name: str) -> bool:
@@ -1797,7 +1802,7 @@ def _looks_like_acid_name(name: str) -> bool:
     - Ends in "carboxylic" (ring-attached acid)
     - Is in the trivial acid lookup table
 
-    Per: used as pre-validation before any suffix transformation.
+    Per D-09: used as pre-validation before any suffix transformation.
     """
     n = name.strip().lower()
     if n.endswith(" acid"):
@@ -1855,7 +1860,7 @@ def _acid_to_ate(acid_name: str) -> Optional[str]:
 
     Returns:
         The '-ate' form (e.g., "acetate", "propanoate"), or None if input
-        is not a recognized acid name (per).
+        is not a recognized acid name (per D-09).
 
     Examples:
         >>> _acid_to_ate("acetic acid")
@@ -1874,7 +1879,7 @@ def _acid_to_ate(acid_name: str) -> Optional[str]:
     if name.endswith("ate") and " acid" not in name:
         return name
 
-    # Per: pre-validate that input looks like an acid name
+    # Per D-09: pre-validate that input looks like an acid name
     if not _looks_like_acid_name(name):
         return None  # Per D-09: not an acid -- don't fabricate
 
@@ -1904,7 +1909,7 @@ def _acid_to_ate(acid_name: str) -> Optional[str]:
     if stem.endswith("ic"):
         return stem[:-2] + "ate"
 
-    # Per: no recognized pattern matched -- return None instead of garbage
+    # Per D-09: no recognized pattern matched -- return None instead of garbage
     return None
 
 
@@ -1919,7 +1924,7 @@ def _acid_to_amide(acid_name: str) -> Optional[str]:
 
     Returns:
         The '-amide' form, or None if input is not a recognized acid name
-        (per).
+        (per D-10).
 
     Examples:
         >>> _acid_to_amide("acetic acid")
@@ -1938,7 +1943,7 @@ def _acid_to_amide(acid_name: str) -> Optional[str]:
     if name.endswith("amide") and " acid" not in name:
         return name
 
-    # Per: pre-validate that input looks like an acid name
+    # Per D-10: pre-validate that input looks like an acid name
     if not _looks_like_acid_name(name):
         return None  # Per D-10: not an acid -- don't fabricate
 
@@ -1970,7 +1975,7 @@ def _acid_to_amide(acid_name: str) -> Optional[str]:
     if stem.endswith("ic"):
         return stem[:-2] + "amide"
 
-    # Per: no recognized pattern matched -- return None instead of garbage
+    # Per D-10: no recognized pattern matched -- return None instead of garbage
     return None
 
 
@@ -1988,7 +1993,7 @@ def _acid_to_acyl(acid_name: str) -> Optional[str]:
 
     Returns:
         Acyl prefix (e.g., "acetyl", "propanoyl", "benzoyl"), or None if
-        input is not a recognized convertible name (per).
+        input is not a recognized convertible name (per D-10).
 
     Examples:
         >>> _acid_to_acyl("acetic acid")
@@ -2015,7 +2020,7 @@ def _acid_to_acyl(acid_name: str) -> Optional[str]:
     if name.lower() in _OPSIN_ACYL:
         return _OPSIN_ACYL[name.lower()]
 
-    # Per: pre-validate that input looks like a convertible name
+    # Per D-10: pre-validate that input looks like a convertible name
     # (acid, amide, or ester). Place AFTER trivial lookup to preserve shortcut.
     if not _looks_like_convertible_name(name):
         return None  # Per D-10: not convertible -- don't fabricate
@@ -2092,7 +2097,7 @@ def _acid_to_acyl(acid_name: str) -> Optional[str]:
     if stem.endswith("ic"):
         return stem[:-2] + "yl"
 
-    # Per: no recognized pattern matched -- return None instead of garbage
+    # Per D-10: no recognized pattern matched -- return None instead of garbage
     return None
 
 
@@ -2136,7 +2141,7 @@ def _acid_to_thioate(acid_name: str) -> Optional[str]:
     if name.lower() in _TRIVIAL_TO_THIOATE:
         return _TRIVIAL_TO_THIOATE[name.lower()]
 
-    # Per: pre-validate that input looks like an acid name
+    # Per D-10: pre-validate that input looks like an acid name
     # (placed AFTER carboxylic acid special case and trivial lookup)
     if not _looks_like_acid_name(name):
         return None  # Per D-10: not an acid -- don't fabricate
@@ -2155,7 +2160,7 @@ def _acid_to_thioate(acid_name: str) -> Optional[str]:
     if stem.endswith("ic"):
         return stem[:-2] + "ethioate"
 
-    # Per: no recognized pattern matched -- return None instead of garbage
+    # Per D-10: no recognized pattern matched -- return None instead of garbage
     return None
 
 

@@ -16,12 +16,12 @@ derivative simply will not match and cascades onward.
 
 Three tables, all consulted by :func:`name_inorganic_acid`:
   * ``_INORGANIC_OXOACIDS`` — the FREE acids (P-67.1.1 / P-65.2.1 / P-68).
-  * ``_INORGANIC_ACID_DERIVATIVES`` —: acid-halide acyl-word forms
+  * ``_INORGANIC_ACID_DERIVATIVES`` — v23 Phase 9: acid-halide acyl-word forms
     (``phosphoryl trichloride``, ``sulfuryl dichloride``, P-67.1.2.5.1) and the
     amide functional-class names (``phosphoric triamide``, ``sulfuric diamide``,
     ``sulfamic acid``, P-67.1.2.6.1). The acyl-halide names are spelled by the
     shared FRN engine (``rules.functional_replacement``).
-  * ``_CARBONIC_FRN`` —: the carbonic/carbamic functional-replacement
+  * ``_CARBONIC_FRN`` — v23 Phase 9: the carbonic/carbamic functional-replacement
     acids (P-65.2.1.2/.3) — ``carbonoperoxoic`` / ``carbonodithioic`` /
     ``carbonotrithioic`` / ``carbonimidic`` / ``carbamimidic`` / ``dicarbonic`` /
     ``tricarbonic`` — names built by the SAME FRN engine.
@@ -46,6 +46,30 @@ from .functional_replacement import (
 # Single-bonded halogen -> class-infix combining form (P-67.1.2.3.2 (1)).
 _HALIDO_INFIX = {"Cl": "chlorido", "F": "fluorido", "Br": "bromido", "I": "iodido"}
 
+# Phase 1B: P-67.1.2.4 central-atom stems for the class-infix FRN engine,
+# WITHOUT the linking vowel (build_p_frn_acid_name appends it). Keyed by element,
+# then by the skeletal (C + H) substituent count on the central atom: 0 -> the
+# -oric parent stem, 1 -> the -onic parent stem (phosphinic/-inic FRN, count 2,
+# is out of scope and fails closed). Extending the engine to As/Sb is exactly this
+# table plus a central-atom search over {P, As, Sb}; build_p_frn_acid_name is
+# unchanged.
+#
+# P-67.1.2.4.2 GUARD ("Name construction guidelines"): "The names phosphonous,
+# phosphinous, phosphonic and phosphinic acid (and similarly for arsenic, antimony
+# ...) can only be used when P, As or Sb is attached to atoms of hydrogen, carbon
+# or another atom of a parent hydride such as N, As, Si." Only C and H are counted
+# as skeletal here, so a halogen / -N< amido / replaced -O on the central atom is a
+# CLASS infix, never a skeletal substituent. Hence ClP(O)(OH)2 -> phosphorochloridic
+# acid (skeletal 0 -> 'phosphor'), NOT chlorophosphonic acid; and Cl-As(O)(OH)2 ->
+# arsorochloridic acid, not chloroarsonic acid. Any unrecognised neighbour fails the
+# neighbour loop closed, so a P/As/Sb bond to a non-parent-hydride element is never
+# silently absorbed into a wrong parent.
+_FRN_CENTRAL_STEMS = {
+    "P":  {0: "phosphor", 1: "phosphon"},
+    "As": {0: "arsor", 1: "arson"},
+    "Sb": {0: "stibor", 1: "stibon"},
+}
+
 # Keyed by RDKit ``Chem.MolToSmiles`` canonical SMILES of the neutral, fully
 # protonated acid. Every name has been confirmed to round-trip through OPSIN to
 # the same structure. Verify any new row against PIN-VERIFICATION before adding.
@@ -61,7 +85,7 @@ _INORGANIC_OXOACIDS = {
     "O=P(O)(O)OP(=O)(O)O": "diphosphoric acid",  # P-67.2.1   (HO)2P(O)-O-P(O)(OH)2
     "O=P(O)(O)P(=O)(O)O": "hypodiphosphoric acid",  # P-67.2.1 (HO)2P(O)-P(O)(OH)2 (direct P-P; W3-P10 idx 1892 parent)
     "O=S(=O)(O)OS(=O)(=O)O": "disulfuric acid",  # P-67.2.1   (HO)SO2-O-SO2(OH)
-    # ---: mononuclear halogen oxoacids (P-67.1.1.1, all preselected
+    # --- v23 Phase 7: mononuclear halogen oxoacids (P-67.1.1.1, all preselected
     #     PINs). RDKit canonicalises the hypervalent X(=O)n(OH) forms to a
     #     charge-separated SMILES, so the keys carry the [X+n]/[O-] charges; the
     #     molecule is neutral overall and reaches INORGANIC_ACID@40 (the dispatch
@@ -78,20 +102,112 @@ _INORGANIC_OXOACIDS = {
     "[O-][I+]O": "iodous acid",                   # P-67.1.1.1  I(O)(OH)
     "[O-][I+2]([O-])O": "iodic acid",            # P-67.1.1.1  I(O)2(OH)
     "[O-][I+3]([O-])([O-])O": "periodic acid",   # P-67.1.1.1  I(O)3(OH) (metaperiodic)
-    # ---: the three preselected/retained boron parent acids
+    # --- v23 Phase 8: the three preselected/retained boron parent acids
     #     (P-68.1.4.1 / P-67.1.1.1). These are the UNSUBSTITUTED parents; the
     #     carbon-bearing R-boronic acids (CB(O)O -> methylboronic acid) carry a
     #     carbon and so never match these exact carbon-free keys — they continue
     #     to the dedicated boronic_acid handler. Boron is kept OUT of the Group-14
     #     substitutive-suffix path (organometallics._GROUP14_SUFFIX_ELEMENTS) — a
-    # boron hydroxy acid is named here, never 'boranetriol' (the v22 G2 lesson).
+    #     boron hydroxy acid is named here, never 'boranetriol' (the v22 G2 lesson).
     #     Every name OPSIN-RT-confirmed. ---
     "OB(O)O": "boric acid",                      # P-68.1.4.1  B(OH)3   (H3BO3)
     "OBO": "boronic acid",                       # P-68.1.4.1  HB(OH)2  (H3BO2, parent)
     "BO": "borinic acid",                        # P-68.1.4.1  H2B(OH)  (H3BO,  parent)
+    # --- Phase 1 A.0: complete the P-67.1.1.1 mononuclear preselected
+    #     free-acid table. P-67.1.1.1 "Names of mononuclear noncarbon oxoacids":
+    #     "Preselected names (see P-12.2) of the mononuclear noncarbon oxoacids
+    #     used for deriving preferred IUPAC names ... are noted in the following
+    #     list". Every name below is verbatim "(preselected name)" in that list
+    #     — the CLOSED preselected table, so the correct PIN is a lookup, no
+    #     constitutional algorithm. Without these rows the engine either
+    #     abstained or emitted a right-molecule non-PIN skeletal name
+    #     (e.g. '2-hydroxy-1,3-dioxa-2-arsaprop-1-ene' for arsonic acid). Exact
+    #     full-molecule canonical-SMILES keys => zero false positives; every name
+    #     OPSIN-RT-confirmed (full InChIKey == input). The trivalent -ous /
+    #     substituted P-67.1.1.2 acids are producer work (A.1), not table rows.
+    # Arsenic (As):
+    "O=[AsH2]O": "arsinic acid",                 # P-67.1.1.1  H2As(O)(OH)
+    "O[AsH2]": "arsinous acid",                  # P-67.1.1.1  H2As(OH)
+    "O=[AsH](O)O": "arsonic acid",               # P-67.1.1.1  HAs(O)(OH)2
+    "O[AsH]O": "arsonous acid",                  # P-67.1.1.1  HAs(OH)2
+    "O=[As](O)(O)O": "arsoric acid",             # P-67.1.1.1  As(O)(OH)3 (preferred to 'arsenic acid')
+    "O[As](O)O": "arsorous acid",                # P-67.1.1.1  As(OH)3    (formerly arsen(i)ous acid)
+    # Nitrogen (N) oxoacids:
+    "[O-][NH2+]O": "azinic acid",                # P-67.1.1.1  H2N(O)(OH)
+    "[O-][NH+](O)O": "azonic acid",              # P-67.1.1.1  HN(O)(OH)2
+    "ONO": "azonous acid",                       # P-67.1.1.1  HN(OH)2
+    "ON(O)O": "azorous acid",                    # P-67.1.1.1  N(OH)3
+    "[O-][N+](O)(O)O": "nitroric acid",          # P-67.1.1.1  N(O)(OH)3
+    "O=NO": "nitrous acid",                      # P-67.1.1.1  HO-NO
+    # Fluorine (F):
+    "OF": "hypofluorous acid",                   # P-67.1.1.1  F(OH)
+    # Phosphorus (P):
+    "O=[PH2]O": "phosphinic acid",               # P-67.1.1.1  H2P(O)(OH)
+    "OP": "phosphinous acid",                    # P-67.1.1.1  H2P(OH)
+    "O=[PH](O)O": "phosphonic acid",             # P-67.1.1.1  HP(O)(OH)2
+    "OPO": "phosphonous acid",                   # P-67.1.1.1  HP(OH)2
+    "OP(O)O": "phosphorous acid",                # P-67.1.1.1  P(OH)3
+    # Selenium (Se) / Tellurium (Te):
+    "O=[Se](=O)(O)O": "selenic acid",            # P-67.1.1.1  Se(O)2(OH)2
+    "O=[Se](O)O": "selenous acid",               # P-67.1.1.1  Se(O)(OH)2
+    "O=[Te](=O)(O)O": "telluric acid",           # P-67.1.1.1  Te(O)2(OH)2
+    # Antimony (Sb):
+    "[O]=[SbH2][OH]": "stibinic acid",           # P-67.1.1.1  H2Sb(O)(OH)
+    "[OH][SbH2]": "stibinous acid",              # P-67.1.1.1  H2Sb(OH)
+    "[O]=[SbH]([OH])[OH]": "stibonic acid",      # P-67.1.1.1  HSb(O)(OH)2
+    "[OH][SbH][OH]": "stibonous acid",           # P-67.1.1.1  HSb(OH)2
+    "[O]=[Sb]([OH])([OH])[OH]": "stiboric acid",  # P-67.1.1.1 Sb(O)(OH)3 (preferred to 'antimonic acid')
+    "[OH][Sb]([OH])[OH]": "stiborous acid",      # P-67.1.1.1  Sb(OH)3   (formerly antimonous acid)
+    # --- Phase 1 B.1: the P-67.2.1 di-/tri-nuclear PRESELECTED free acids.
+    #     P-67.2.1 "Preselected names": "The following traditional names are
+    #     retained as preselected names ... for consistency ... the numerical
+    #     infix 'di' has been uniformly used in naming dinuclear 'hypo' acids".
+    #     Every name below is verbatim "(preselected name)" in that list — a
+    #     CLOSED table, so the PIN is a lookup, no constitutional algorithm.
+    #     Currently each abstained ('inorganic/arsenic/antimony compound (not
+    #     supported)'). KEYS ARE THE Blue-Book PIN's OWN OPSIN-PARSE canonical
+    #     SMILES (the bb_conformance oracle key), so every name round-trips
+    #     through OPSIN to its exact key by construction => zero false positives.
+    #     Note: diarsonic / hypodiarsonic / distibonic / hypodistibonic (the
+    #     P/As-with-H '-onic' V-analogues) and hypodiboric and the polymeric
+    #     'meta' acids are NOT here — OPSIN 2.9.0 parses them to a charged /
+    #     radical / unresolvable species, so they are not in the gold oracle and
+    #     cannot be RT-confirmed; they degrade to abstain (never a wrong name).
+    # Boron / silicon (P-67.2.1):
+    "OB(O)OB(O)O": "diboric acid",                      # (HO)2B-O-B(OH)2
+    "O[Si](O)(O)O[Si](O)(O)O": "disilicic acid",        # (HO)3Si-O-Si(OH)3
+    # Phosphorus di-nuclear (P-67.2.1). diphosphoric / hypodiphosphoric are above.
+    "O=[PH](O)O[PH](=O)O": "diphosphonic acid",         # (HO)HP(O)-O-HP(O)(OH)
+    "O=[PH](O)[PH](=O)O": "hypodiphosphonic acid",      # (HO)(O)HP-PH(O)(OH)
+    "OPOPO": "diphosphonous acid",                      # HO-PH-O-PH-OH
+    "OPPO": "hypodiphosphonous acid",                   # (HO)HP-PH(OH)
+    "OP(O)OP(O)O": "diphosphorous acid",                # (HO)2P-O-P(OH)2
+    "OP(O)P(O)O": "hypodiphosphorous acid",             # (HO)2P-P(OH)2
+    # Arsenic di-nuclear (P-67.2.1). '-orous'/'-onous'/'-oric' families:
+    "O[AsH]O[AsH]O": "diarsonous acid",                 # HO-AsH-O-AsH-OH
+    "O[AsH][AsH]O": "hypodiarsonous acid",              # (HO)HAs-AsH(OH)
+    "O=[As](O)(O)O[As](=O)(O)O": "diarsoric acid",      # (HO)2As(O)-O-As(O)(OH)2
+    "O=[As](O)(O)[As](=O)(O)O": "hypodiarsoric acid",   # (HO)2(O)As-As(O)(OH)2
+    "O[As](O)O[As](O)O": "diarsorous acid",             # (HO)2As-O-As(OH)2
+    "O[As](O)[As](O)O": "hypodiarsorous acid",          # (HO)2As-As(OH)2
+    # Antimony di-nuclear (P-67.2.1):
+    "[OH][SbH][O][SbH][OH]": "distibonous acid",        # HO-SbH-O-SbH-OH
+    "[OH][SbH][SbH][OH]": "hypodistibonous acid",       # (HO)HSb-SbH(OH)
+    "[O]=[Sb]([OH])([OH])[O][Sb](=[O])([OH])[OH]": "distiboric acid",     # (HO)2Sb(O)-O-Sb(O)(OH)2
+    "[O]=[Sb]([OH])([OH])[Sb](=[O])([OH])[OH]": "hypodistiboric acid",    # (HO)2(O)Sb-Sb(O)(OH)2
+    "[OH][Sb]([OH])[O][Sb]([OH])[OH]": "distiborous acid",   # (HO)2Sb-O-Sb(OH)2
+    "[OH][Sb]([OH])[Sb]([OH])[OH]": "hypodistiborous acid",  # (HO)2Sb-Sb(OH)2
+    # Sulfur di-nuclear (P-67.2.1). disulfuric is above; dithionic/dithionous are
+    # the S-S direct-bond 'hypo'-family preselected names (P-67.2.1).
+    "O=S(=O)(O)S(=O)(=O)O": "dithionic acid",           # HO-SO2-SO2-OH  (hypodisulfuric)
+    "O=S(O)S(=O)O": "dithionous acid",                  # HO-SO-SO-OH    (hypodisulfurous)
+    # Tri-nuclear (P-67.2.1):
+    "O=[PH](O)OP(=O)(O)O[PH](=O)O": "triphosphonic acid",       # (HO)HP(O)-O-HP(O)-O-HP(O)(OH)
+    "O=P(O)(O)OP(=O)(O)OP(=O)(O)O": "triphosphoric acid",       # (HO)2P(O)-O-P(O)(OH)-O-P(O)(OH)2
+    "O=S(=O)(O)OS(=O)(=O)OS(=O)(=O)O": "trisulfuric acid",      # HO-SO2-O-SO2-O-SO2-OH
 }
 
-# ---: acid-halide + amide functional-class derivatives ---
+# --- v23 Phase 9: acid-halide + amide functional-class derivatives ---
 # Acid halides of phosphoric/sulfuric (identical replaceable -OH groups) use the
 # acyl-group word (P-67.1.2.5.1); amides replace all -OH by -NH2 (P-67.1.2.6.1).
 # These intercept @40 BEFORE the OPSIN-imported retained tier (RETAINED_NAME@1300)
@@ -132,7 +248,7 @@ _INORGANIC_ACID_DERIVATIVES = {
     "N=C(N)NC(=N)N": "imidodicarbonimidic diamide",
 }
 
-# ---: carbonic/carbamic functional-replacement acids ---
+# --- v23 Phase 9: carbonic/carbamic functional-replacement acids ---
 # Plain (non-italic-locant) forms that OPSIN round-trips; names built by the
 # shared FRN engine. The single-chalcogen tautomer forms needing italic S-/O-
 # acid locants (carbonothioic S-acid) are DEFERRED to Phase 19 (no OPSIN RT).
@@ -163,16 +279,22 @@ _CARBONIC_ACID_HALIDES = {
 
 # --- W3-P05 (P-65.1.8.2): C-substituted formic acids (retained-name base) ---
 # Formic acid (H-CO-OH) whose formyl H is replaced by an approved substituent is
-# named on the retained 'formic acid' parent. The ONLY such PIN is the nitro
-# derivative (P-65.1.8.2; BB 30696: 'O2N-COOH nitroformic acid (PIN)') — this is
-# NOT a general substituted-formic-acid engine (P-65.1.8.1 @30670 forbids that:
-# the halides/pseudohalides are their own retained 'carbono...idic acid' PINs, not
-# 'chloroformic'/'cyanoformic'). Exact full-molecule canonical-SMILES key =>
-# zero false positives. Intercepts @40 before the general acid path; also
-# preempts the (now-tightened) carbamic_acid SMARTS whose old form false-matched
-# the nitro N and emitted a wrong 'carbamic acid'. OPSIN-RT-confirmed.
+# named on the retained 'formic acid' parent (P-65.1.8.2; BB 30692: 'permitted
+# when substituent groups are other than those cited in P-65.1.8.1'). This is NOT
+# a general substituted-formic-acid engine (P-65.1.8.1 @30670 forbids that: the
+# halides/pseudohalides are their own retained 'carbono...idic acid' PINs, not
+# 'chloroformic'/'cyanoformic'); each entry is a Blue-Book (PIN) whose substituent
+# is off the P-65.1.8.1 forbidden list. Exact full-molecule canonical-SMILES key
+# => zero false positives. Intercepts @40 before the general acid path; the nitro
+# entry also preempts the (now-tightened) carbamic_acid SMARTS whose old form
+# false-matched the nitro N and emitted a wrong 'carbamic acid'. OPSIN-RT-confirmed.
 _C1_ACID_C_SUBSTITUTED = {
-    "O=C(O)[N+](=O)[O-]": "nitroformic acid",   # P-65.1.8.2  O2N-CO-OH
+    "O=C(O)[N+](=O)[O-]": "nitroformic acid",              # P-65.1.8.2  O2N-CO-OH  BB 30696
+    # HOS2C-COOH: the -CS-O-SH acyl (dithiocarbonoperoxoyl) is off the P-65.1.8.1
+    # forbidden list, so the formic-parent name is a PIN (BB:30357, location of
+    # sulfur atoms unknown). The engine cannot build the compound acyl prefix, so
+    # this is an exact-SMILES catalog entry (mirrors 'nitroformic acid').
+    "O=C(O)C(=S)OS": "(dithiocarbonoperoxoyl)formic acid",  # P-65.1.8.2  BB:30357
 }
 
 # --- W3-P05 (P-65.2.1.4): carbonic-acid pseudohalides ---
@@ -349,7 +471,7 @@ def _amido_n_prefix(mol, n_idx: int, p_idx: int) -> Optional[str]:
     _MULT = {1: "", 2: "di", 3: "tri"}
     counts = Counter(sub_names)
     segs = []
-    # the guard above is the shared chokepoint, so a prefix here may carry
+    # v29 P3: the guard above is the shared chokepoint, so a prefix here may carry
     # a locant or a retained italicized prefix. The italic-N locant is joined by a
     # hyphen, so an unmarked locanted prefix would read as two locant sets --
     # enclosing marks come from the shared P-16.5.1.1 primitive:
@@ -375,26 +497,32 @@ def _amido_n_prefix(mol, n_idx: int, p_idx: int) -> Optional[str]:
 
 
 def name_p_oxoacid_frn(mol) -> Optional[str]:
-    """P-67.1.2.4 mononuclear-P oxoacid functional-replacement PIN (Engine A).
+    """P-67.1.2.4 mononuclear P/As/Sb oxoacid functional-replacement PIN (Engine A).
 
-    A NEUTRAL, single-fragment molecule with exactly one P that bears one ``P=O``,
-    at least one remaining ``-OH`` (so the class is 'acid', P-67.1.2.4), and at
-    least one ``-OH`` REPLACED by a class group — amido (``-N(R)(R')``), halido
-    (``-Cl/-F/-Br/-I``) or cyanatido (``-O-C#N``). The skeletal substituent count
-    on P selects the parent: 0 organyl/H -> phosphoric (``phosphor``); 1 ->
-    phosphonic (``phosphon``, P-67.1.2.4.2: a C-P bond forces the 'phosphono'
-    stem, never 'phosphinic').
+    A NEUTRAL, single-fragment molecule with exactly one central atom E in
+    {P, As, Sb} that bears one ``E=O``, at least one remaining ``-OH`` (so the
+    class is 'acid', P-67.1.2.4), and at least one ``-OH`` REPLACED by a class
+    group — amido (``-N(R)(R')``), halido (``-Cl/-F/-Br/-I``) or cyanatido
+    (``-O-C#N``). The skeletal (C + H) substituent count on E selects the parent:
+    0 -> the -oric stem (``phosphor`` / ``arsor`` / ``stibor``); 1 -> the -onic
+    stem (``phosphon`` / ``arson`` / ``stibon``). P-67.1.2.4.2: a C-E bond forces
+    the '-ono' stem, never '-ini'; a halogen/N/replaced-O is a CLASS infix, never
+    skeletal, so ``Cl-E(O)(OH)2`` is ``E-orochloridic acid``, never
+    ``chloro-E-onic acid``.
 
         (CH3)2N-P(O)(OH)2       -> N,N-dimethylphosphoramidic acid
         CH3-P(O)(OCN)(OH)       -> methylphosphonocyanatidic acid
         C6H5-P(O)(Cl)(OH)       -> phenylphosphonochloridic acid
+        Cl-As(O)(OH)2           -> arsorochloridic acid   (guard, P-67.1.2.4.2)
+        CH3-As(O)(Cl)(OH)       -> methylarsonochloridic acid
 
-    Fail-closed (returns ``None``) off this exact shape: a plain phosphonic /
-    phosphoric acid (no class group -> the existing suffix/table paths own it), a
-    fully-replaced acid with no -OH (an amide / acid-halide functional class), any
-    ester ``-OR`` neighbour, a P=N/P#N/P=S multiple bond, >=2 organyl groups
-    (phosphinic FRN — out of scope), or the organyl+N-substituent combination that
-    needs P-/N- locant disambiguation (P-45). Pure: no mol mutation.
+    Fail-closed (returns ``None``) off this exact shape: a plain -onic / -oric acid
+    (no class group -> the existing suffix/table paths own it), a fully-replaced
+    acid with no -OH (an amide / acid-halide functional class), any ester ``-OR``
+    or chalcogenol ``-SH/-SeH/-TeH`` neighbour (chalcogen-infix FRN is a separate
+    path), an E=N/E#N/E=S multiple bond, >=2 organyl groups (-inic FRN — out of
+    scope), a molecule carrying more than one P/As/Sb, or the organyl+N-substituent
+    combination that needs E-/N- locant disambiguation (P-45). Pure: no mol mutation.
     """
     from ..assembly.naming_utils import enclose_if_compound
     from .substituent_purity import organyl_prefix_name
@@ -403,10 +531,14 @@ def name_p_oxoacid_frn(mol) -> Optional[str]:
         return None
     if sum(a.GetFormalCharge() for a in atoms_of(mol)) != 0:
         return None
-    ps = [a for a in atoms_of(mol) if a.GetSymbol() == "P"]
-    if len(ps) != 1:
+    # Phase 1B: central atom is any one of P / As / Sb (the guard table keys),
+    # exactly one of them and no other pnictogen present (a molecule with both a P
+    # and an As is not a mononuclear oxoacid).
+    ctrs = [a for a in atoms_of(mol) if a.GetSymbol() in _FRN_CENTRAL_STEMS]
+    if len(ctrs) != 1:
         return None
-    p = ps[0]
+    p = ctrs[0]
+    symbol = p.GetSymbol()
     if p.GetFormalCharge() != 0 or p.GetNumRadicalElectrons() != 0:
         return None
 
@@ -457,10 +589,10 @@ def name_p_oxoacid_frn(mol) -> Optional[str]:
 
     if oh_count < 1 or not infix_counts:             # class 'acid' + >=1 replacement
         return None
-    skeletal = len(organyl_c) + p.GetTotalNumHs()
-    parent_stem = {0: "phosphor", 1: "phosphon"}.get(skeletal)
+    skeletal = len(organyl_c) + p.GetTotalNumHs()    # P-67.1.2.4.2: only C + H
+    parent_stem = _FRN_CENTRAL_STEMS[symbol].get(skeletal)
     if parent_stem is None:
-        return None                                  # phosphinic FRN out of scope
+        return None                                  # -inic FRN (skeletal 2) out of scope
 
     organyl_names = []
     for c_idx in organyl_c:
@@ -490,6 +622,504 @@ def name_p_oxoacid_frn(mol) -> Optional[str]:
     else:
         front = ""
     return build_p_frn_acid_name(front, parent_stem, infix_counts)
+
+
+# Phase 1B: single-bonded halogen -> halide class word (P-67.1.2.5.1).
+_HALIDE_CLASS_WORD = {"Cl": "chloride", "F": "fluoride", "Br": "bromide",
+                      "I": "iodide"}
+
+
+def _halide_pseudohalide_class_word(mol, nb, ctr_idx: int) -> Optional[str]:
+    """P-67.1.2.5.1 class word for a halide / pseudohalide attached to the central
+    atom, else ``None`` (so an unrecognised neighbour fails the caller closed).
+
+    Detection is tight (0-wrong): a bare halogen; azide ``-N=[N+]=[N-]``;
+    isocyanate ``-N=C=O`` / isothiocyanate ``-N=C=S``; cyanide ``-C#N``. Anything
+    else (an amido -N<, an -OH, an ester -OR, an organyl) returns ``None`` and is
+    handled by the caller's own classification.
+    """
+    sym = nb.GetSymbol()
+    if sym in _HALIDE_CLASS_WORD:
+        b = mol.GetBondBetweenAtoms(ctr_idx, nb.GetIdx())
+        if b.GetBondType() == Chem.BondType.SINGLE and nb.GetDegree() == 1:
+            return _HALIDE_CLASS_WORD[sym]
+        return None
+    others = [x for x in nb.GetNeighbors() if x.GetIdx() != ctr_idx]
+    # cyanide  ctr-C#N
+    if sym == "C" and nb.GetTotalNumHs() == 0 and len(others) == 1:
+        o = others[0]
+        bond = mol.GetBondBetweenAtoms(nb.GetIdx(), o.GetIdx())
+        if o.GetSymbol() == "N" and bond.GetBondType() == Chem.BondType.TRIPLE:
+            return "cyanide"
+        return None
+    if sym != "N" or nb.GetTotalNumHs() != 0 or len(others) != 1:
+        return None
+    o = others[0]
+    ctr_bond = mol.GetBondBetweenAtoms(ctr_idx, nb.GetIdx())
+    if ctr_bond.GetBondType() != Chem.BondType.SINGLE:
+        return None
+    mid_bond = mol.GetBondBetweenAtoms(nb.GetIdx(), o.GetIdx())
+    # azide  ctr-N=[N+]=[N-]
+    if o.GetSymbol() == "N" and mid_bond.GetBondType() == Chem.BondType.DOUBLE:
+        tails = [x for x in o.GetNeighbors() if x.GetIdx() != nb.GetIdx()]
+        if (len(tails) == 1 and tails[0].GetSymbol() == "N"
+                and mol.GetBondBetweenAtoms(o.GetIdx(), tails[0].GetIdx()).GetBondType()
+                == Chem.BondType.DOUBLE and tails[0].GetDegree() == 1):
+            return "azide"
+        return None
+    # isocyanate ctr-N=C=O / isothiocyanate ctr-N=C=S  (cumulated double bonds)
+    if o.GetSymbol() == "C" and mid_bond.GetBondType() == Chem.BondType.DOUBLE:
+        cts = [x for x in o.GetNeighbors() if x.GetIdx() != nb.GetIdx()]
+        if (len(cts) == 1
+                and mol.GetBondBetweenAtoms(o.GetIdx(), cts[0].GetIdx()).GetBondType()
+                == Chem.BondType.DOUBLE and cts[0].GetDegree() == 1):
+            if cts[0].GetSymbol() == "O":
+                return "isocyanate"
+            if cts[0].GetSymbol() == "S":
+                return "isothiocyanate"
+    return None
+
+
+# Phase 1B: chalcogenol -> chalcogen infix (P-67.1.2.3 / P-67.1.2.4.1.1).
+_CHALCOGEN_INFIX = {"S": "thio", "Se": "seleno", "Te": "telluro"}
+
+
+def name_p_oxoacid_chalcogen_frn(mol) -> Optional[str]:
+    """P-67.1.2.4.1.1 mononuclear P/As/Sb oxoacid CHALCOGEN-infix FRN (locant-free
+    subset only). E(=O) with two or more acidic -OH replaced by the SAME chalcogen
+    -SH / -SeH / -TeH, giving the position-undetermined, locant-free name::
+
+        As(O)(OH)(SH)2  -> arsorodithioic acid   (BB L35636)
+        P(O)(SH)3       -> phosphorotrithioic acid
+        C6H5-P(O)(SH)2  -> phenylphosphonodithioic acid
+
+    SAFELY NARROW by design (0-wrong + the P-65.1.5 tautomer-locant spelling-blind
+    spot): it fires ONLY when the =O is present and >=2 replacements are the SAME
+    chalcogen, so a locant is provably omitted. It FAILS CLOSED on every case that
+    needs an italic tautomer locant — a MONO replacement (``arsorothioic S-acid`` /
+    ``O,O,O-acid``), a =S/=Se double bond, a mixed chalcogen set, or a peroxo /
+    class-infix mix. Those belong to Phase 2 Group A's P-65.1.5.1 derivation; here
+    they degrade to the existing paths / abstain, never to a wrong spelling. Every
+    emission is OPSIN-round-trip gated downstream. Pure: no mol mutation.
+    """
+    from .functional_replacement import build_frn_acid_name
+    from ..assembly.naming_utils import enclose_if_compound
+    from .substituent_purity import organyl_prefix_name
+
+    if mol is None or len(Chem.GetMolFrags(mol)) != 1:
+        return None
+    if sum(a.GetFormalCharge() for a in atoms_of(mol)) != 0:
+        return None
+    ctrs = [a for a in atoms_of(mol) if a.GetSymbol() in _FRN_CENTRAL_STEMS]
+    if len(ctrs) != 1:
+        return None
+    ctr = ctrs[0]
+    symbol = ctr.GetSymbol()
+    if ctr.GetFormalCharge() != 0 or ctr.GetNumRadicalElectrons() != 0:
+        return None
+
+    # -oric/-onic bare stems WITHOUT the linking vowel (build_frn_acid_name adds it).
+    _FRN_BARE = {"P": {0: "phosphor", 1: "phosphon"},
+                 "As": {0: "arsor", 1: "arson"},
+                 "Sb": {0: "stibor", 1: "stibon"}}
+    dbl_o = 0
+    organyl_c: list = []
+    chalco_counts: dict = {}
+    oh_count = 0
+    for b in ctr.GetBonds():
+        o = b.GetOtherAtom(ctr)
+        bt = b.GetBondType()
+        if bt == Chem.BondType.DOUBLE and o.GetSymbol() == "O":
+            dbl_o += 1
+            continue
+        if bt != Chem.BondType.SINGLE:
+            return None                          # =S/=Se/=N -> tautomer-locant, defer
+        sym = o.GetSymbol()
+        if sym == "O":
+            if o.GetFormalCharge() != 0:
+                return None
+            others = [x for x in o.GetNeighbors() if x.GetIdx() != ctr.GetIdx()]
+            if o.GetTotalNumHs() == 1 and not others:
+                oh_count += 1
+            else:
+                return None                      # ester -OR / peroxide -> defer
+        elif sym in _CHALCOGEN_INFIX:
+            others = [x for x in o.GetNeighbors() if x.GetIdx() != ctr.GetIdx()]
+            if o.GetFormalCharge() != 0 or o.GetTotalNumHs() != 1 or others:
+                return None                      # -S-R / -S-S- etc. -> defer
+            chalco_counts[sym] = chalco_counts.get(sym, 0) + 1
+        elif sym == "C":
+            organyl_c.append(o.GetIdx())
+        else:
+            return None                          # halogen/N -> not a plain chalcogen FRN
+    if dbl_o != 1:
+        return None
+    if len(chalco_counts) != 1:                  # exactly one chalcogen type
+        return None
+    chalco_sym, n = next(iter(chalco_counts.items()))
+    if n < 2:                                    # MONO -> needs a tautomer locant, defer
+        return None
+    skeletal = len(organyl_c) + ctr.GetTotalNumHs()
+    base = _FRN_BARE[symbol].get(skeletal)
+    if base is None:                             # -inic (skeletal 2) can't hold di+, defer
+        return None
+
+    front = ""
+    if organyl_c:
+        nm = organyl_prefix_name(mol, organyl_c[0], ctr.GetIdx())
+        if nm is None:
+            return None
+        front = enclose_if_compound(nm)
+    acid = build_frn_acid_name(base, _CHALCOGEN_INFIX[chalco_sym], n)
+    if acid is None:
+        return None
+    return f"{front}{acid}"
+
+
+def name_p_oxoacid_halide_amide(mol) -> Optional[str]:
+    """P-67.1.2.5 / P-67.1.2.6 mononuclear P/As/Sb oxoacid HALIDE / AMIDE PIN.
+
+    The ``oh_count == 0`` sibling of :func:`name_p_oxoacid_frn`: every acidic -OH
+    is replaced, so the compound is not class 'acid' — its class word is a halide /
+    pseudohalide (P-67.1.2.5.1) or, when no halide is present and every -OH became
+    -NH2, an amide (P-67.1.2.6.1). The acid STEM WORD is the same one
+    :func:`name_p_oxoacid_frn` builds (``phenylphosphonous``, ``phenylphosphonic``,
+    ``N,N-dimethylphosphoramidic``); the halide/amide builders append the class
+    word(s) in P-67.1.5.2 / P-67.1.2.6.1(b) seniority order::
+
+        C6H5-PBrCl        -> phenylphosphonous bromide chloride   (BB L35718)
+        (C6H5)2P-Cl       -> diphenylphosphinous chloride         (BB L35712)
+        C6H5-PCl2         -> phenylphosphonous dichloride         (BB L35716)
+        (CH3)2N-P(O)Cl2   -> N,N-dimethylphosphoramidic dichloride
+
+    Fail-closed (``None``) off this exact shape. In particular it declines the
+    bare skeletal-0 no-infix case (``POCl3`` = phosphoryl trichloride, the
+    P-67.1.2.5.1 acyl-word exception — owned by the existing acyl path), any -OH
+    left (that is class 'acid' -> the acid paths own it), an E=N/E=S multiple bond,
+    an ester -OR neighbour, and the organyl+N-substituent combination that needs
+    E-/N- locant disambiguation. Pure: no mol mutation.
+    """
+    from ..rules.phosphorus import (_PNICTOGEN_OUS_STEMS, _PNICTOGEN_OXOACID_STEMS,
+                                    _build_substituent_string)
+    from .functional_replacement import (build_p_frn_acid_stem_word,
+                                          build_p_frn_amide_name,
+                                          build_p_frn_halide_name)
+    from ..assembly.naming_utils import enclose_if_compound
+    from .substituent_purity import organyl_prefix_name
+
+    if mol is None or len(Chem.GetMolFrags(mol)) != 1:
+        return None
+    if sum(a.GetFormalCharge() for a in atoms_of(mol)) != 0:
+        return None
+    ctrs = [a for a in atoms_of(mol) if a.GetSymbol() in _FRN_CENTRAL_STEMS]
+    if len(ctrs) != 1:
+        return None
+    ctr = ctrs[0]
+    symbol = ctr.GetSymbol()
+    if ctr.GetFormalCharge() != 0 or ctr.GetNumRadicalElectrons() != 0:
+        return None
+
+    oxo = 0
+    organyl_c: list = []
+    amido_n: list = []
+    class_counts: dict = {}          # halide/pseudohalide class word -> count
+    amide_n: list = []               # bare/substituted -NH2 (amide class candidates)
+    for b in ctr.GetBonds():
+        o = b.GetOtherAtom(ctr)
+        bt = b.GetBondType()
+        if bt == Chem.BondType.DOUBLE and o.GetSymbol() == "O":
+            oxo += 1
+            continue
+        if bt != Chem.BondType.SINGLE:
+            return None                              # E=N / E=S / E#N -> defer
+        cls = _halide_pseudohalide_class_word(mol, o, ctr.GetIdx())
+        if cls is not None:
+            class_counts[cls] = class_counts.get(cls, 0) + 1
+            continue
+        sym = o.GetSymbol()
+        if sym == "O":
+            if o.GetFormalCharge() != 0:
+                return None
+            nb_others = [x for x in o.GetNeighbors() if x.GetIdx() != ctr.GetIdx()]
+            if o.GetTotalNumHs() == 1 and not nb_others:
+                return None                          # -OH left -> class 'acid', defer
+            return None                              # ester -OR / other O -> defer
+        if sym == "C":
+            organyl_c.append(o.GetIdx())
+        elif sym == "N":
+            if o.GetFormalCharge() != 0:
+                return None
+            if any(bd.GetBondType() != Chem.BondType.SINGLE for bd in o.GetBonds()):
+                return None                          # imido/hydrazono -> defer
+            amido_n.append(o.GetIdx())
+            amide_n.append(o.GetIdx())
+        else:
+            return None
+    if oxo not in (0, 1):
+        return None
+    skeletal = len(organyl_c) + ctr.GetTotalNumHs()
+
+    organyl_names = []
+    for c_idx in organyl_c:
+        nm = organyl_prefix_name(mol, c_idx, ctr.GetIdx())
+        if nm is None:
+            return None
+        organyl_names.append(nm)
+
+    # ---- principal class = halide/pseudohalide if present, else amide -----------
+    if class_counts:
+        # halide/pseudohalide derivative: any -N< becomes an amido INFIX.
+        n_prefixes = []
+        for n_idx in amido_n:
+            seg = _amido_n_prefix(mol, n_idx, ctr.GetIdx())
+            if seg is None:
+                return None
+            if seg:
+                n_prefixes.append(seg)
+        if organyl_names and n_prefixes:
+            return None                              # E-/N- locant disambiguation, defer
+        infix_counts = {"amido": len(amido_n)} if amido_n else {}
+        stem_word = _pnictogen_acid_stem_word(
+            symbol, oxo, skeletal, organyl_names, n_prefixes, infix_counts,
+            _PNICTOGEN_OXOACID_STEMS, _PNICTOGEN_OUS_STEMS,
+            build_p_frn_acid_stem_word, enclose_if_compound, _build_substituent_string)
+        if stem_word is None:
+            return None
+        return build_p_frn_halide_name(stem_word, class_counts)
+
+    # ---- amide/hydrazide derivative (no halide; every -OH -> -NH2) --------------
+    if amide_n and not amido_n_has_substituent(mol, amide_n, ctr.GetIdx()):
+        # P-67.1.2.6.2 principle: the amide of a *bare* mononuclear hydride whose
+        # parent hydride is a preselected name is named SUBSTITUTIVELY, not by the
+        # functional class 'amide' (H2B-NH2 -> boranamine, *not* borinic amide).
+        # Phosphane/arsane/stibane (PH3/AsH3/SbH3) are preselected parent hydrides
+        # (P-21.1.1), so the bare trivalent -ous hydride amide H2E-NH2 / HE(NH2)2
+        # (oxo == 0 AND no organyl) is the substitutive amine phosphanamine /
+        # arsanamine / stibanamine (P-41, amine is expressed as suffix), NOT
+        # 'phosphinous amide'.  The functional-class -ous amide stays the PIN only
+        # when the acid carries organyl substituents (cf. dimethylphosphinous
+        # hydrazide, BB L23150; phenylphosphonous diamide) or is an oxoacid
+        # (oxo >= 1).  Decline here so the substitutive namer builds the PIN.
+        if oxo == 0 and not organyl_names:
+            return None
+        stem_word = _pnictogen_acid_stem_word(
+            symbol, oxo, skeletal, organyl_names, [], {},
+            _PNICTOGEN_OXOACID_STEMS, _PNICTOGEN_OUS_STEMS,
+            build_p_frn_acid_stem_word, enclose_if_compound, _build_substituent_string)
+        if stem_word is None:
+            return None
+        return build_p_frn_amide_name(stem_word, "amide", len(amide_n))
+    return None
+
+
+def amido_n_has_substituent(mol, n_idxs, ctr_idx: int) -> bool:
+    """True if any candidate amide nitrogen carries a non-H substituent (an
+    N-substituted amide needs N-/P- locant assembly — out of this simple scope)."""
+    for n_idx in n_idxs:
+        n = mol.GetAtomWithIdx(n_idx)
+        if any(x.GetIdx() != ctr_idx for x in n.GetNeighbors()):
+            return True
+    return False
+
+
+def _pnictogen_acid_stem_word(symbol, oxo, skeletal, organyl_names, n_prefixes,
+                              infix_counts, oxo_stems, ous_stems,
+                              build_stem_word, enclose_if_compound,
+                              build_sub_string) -> Optional[str]:
+    """Return the acid name minus ``" acid"`` for a P/As/Sb halide/amide parent,
+    else ``None``. Reused by :func:`name_p_oxoacid_halide_amide`."""
+    if infix_counts:
+        # class-infix FRN parent (amido) -> -oric/-onic stem, pentavalent only.
+        if not oxo:
+            return None
+        stem_base = _FRN_CENTRAL_STEMS[symbol].get(skeletal)
+        if stem_base is None:
+            return None
+        if organyl_names:
+            front = enclose_if_compound(organyl_names[0])
+        elif n_prefixes:
+            front = "-".join(sorted(n_prefixes))
+        else:
+            front = ""
+        return build_stem_word(front, stem_base, infix_counts)
+    # plain parent (no class infix): -onic/-inic (oxo) or -onous/-inous (trivalent).
+    table = oxo_stems if oxo else ous_stems
+    if skeletal == 1:
+        word = table[symbol][0]
+    elif skeletal == 2:
+        word = table[symbol][1]
+    else:
+        return None            # skeletal 0 plain -> phosphoryl/acyl-word exception, defer
+    front = build_sub_string(organyl_names) if organyl_names else ""
+    return f"{front}{word}"
+
+
+def name_p_frn_ester(mol) -> Optional[str]:
+    """P-67.1.2.4 FRN-modified phosphorus-acid ESTER PIN.
+
+    An ester of a functional-replacement-modified phosphorus acid: the central P
+    carries one or more ``-O-R`` ester owners AND at least one class infix (amido
+    ``-N<`` / halido ``-Cl/-F/-Br/-I`` / cyanatido ``-OCN``). The ester suffix is
+    ``-ate`` for the pentavalent (``P=O``) acid and ``-ite`` for the trivalent one,
+    replacing the acid's ``-ic`` ending on the SAME stem word that
+    :func:`build_p_frn_acid_stem_word` builds::
+
+        CH3-O-P(Cl)-N(CH3)2  -> methyl N,N-dimethylphosphoramidochloridite
+        CH3-O-P(=O)(Cl)-NH2  -> methyl phosphoramidochloridate
+
+    Requires >=1 ester owner AND >=1 class infix, so a plain phosphate/phosphite
+    ester (owned by :func:`~orthonym.rules.phosphorus.name_phosphate_ester`) and a
+    free FRN acid (owned by :func:`name_p_oxoacid_frn`) never reach here — this is a
+    non-overlapping ADDITION, not a change to the hot ester path. Fail-closed off
+    the shape (an ester -OR to non-C/S, an E=N/E=S bond, the organyl+N-substituent
+    combination needing E-/N- locants, or an atom left unaccounted). Pure: no mol
+    mutation.
+    """
+    from ..rules.phosphorus import (_p_ester_owner_group, _assemble_p_owner_text,
+                                    _HYDROGEN_MULT)
+    from .functional_replacement import build_p_frn_acid_stem_word
+    from ..assembly.naming_utils import enclose_if_compound
+    from .substituent_purity import organyl_prefix_name
+
+    if mol is None or len(Chem.GetMolFrags(mol)) != 1:
+        return None
+    if sum(a.GetFormalCharge() for a in atoms_of(mol)) != 0:
+        return None
+    ps = [a for a in atoms_of(mol) if a.GetSymbol() == "P"]   # P esters only (as name_phosphate_ester)
+    if len(ps) != 1:
+        return None
+    p = ps[0]
+    if p.GetFormalCharge() != 0 or p.GetNumRadicalElectrons() != 0 or p.IsInRing():
+        return None
+
+    accounted = {p.GetIdx()}
+    dbl_o = 0
+    oh_count = 0
+    organyl_c: list = []
+    amido_n: list = []
+    ester_oxys: list = []
+    infix_counts: dict = {}
+    for b in p.GetBonds():
+        o = b.GetOtherAtom(p)
+        bt = b.GetBondType()
+        if bt == Chem.BondType.DOUBLE and o.GetSymbol() == "O":
+            dbl_o += 1
+            accounted.add(o.GetIdx())
+            continue
+        if bt != Chem.BondType.SINGLE:
+            return None                              # P=N/P=S/P#N -> defer
+        sym = o.GetSymbol()
+        if sym == "O":
+            if o.GetFormalCharge() != 0:
+                return None
+            others = [x for x in o.GetNeighbors() if x.GetIdx() != p.GetIdx()]
+            if not others and o.GetTotalNumHs() >= 1:
+                oh_count += 1
+                accounted.add(o.GetIdx())
+            elif len(others) == 1 and others[0].GetSymbol() in ("C", "S"):
+                ester_oxys.append(o.GetIdx())        # -O-R ester owner
+                accounted.add(o.GetIdx())
+            elif _is_cyanatido_oxygen(mol, o, p.GetIdx()):
+                infix_counts["cyanatido"] = infix_counts.get("cyanatido", 0) + 1
+                accounted.add(o.GetIdx())
+                for x in o.GetNeighbors():           # the O-C#N atoms
+                    if x.GetIdx() != p.GetIdx():
+                        accounted.add(x.GetIdx())
+                        for y in x.GetNeighbors():
+                            accounted.add(y.GetIdx())
+            else:
+                return None                          # P-O-P / O-N -> defer
+        elif sym == "C":
+            organyl_c.append(o.GetIdx())
+        elif sym in _HALIDO_INFIX:
+            k = _HALIDO_INFIX[sym]
+            infix_counts[k] = infix_counts.get(k, 0) + 1
+            accounted.add(o.GetIdx())
+        elif sym == "N":
+            if o.GetFormalCharge() != 0:
+                return None
+            if any(bd.GetBondType() != Chem.BondType.SINGLE for bd in o.GetBonds()):
+                return None                          # imido/hydrazono -> defer
+            amido_n.append(o.GetIdx())
+            infix_counts["amido"] = infix_counts.get("amido", 0) + 1
+        else:
+            return None
+
+    if not ester_oxys:
+        return None                                  # no ester owner -> not this class
+    # require >=1 CLASS infix (else it's a plain ester -> name_phosphate_ester owns it)
+    if not infix_counts:
+        return None
+    if dbl_o > 1:
+        return None
+
+    skeletal = len(organyl_c) + p.GetTotalNumHs()
+    parent_stem = _FRN_CENTRAL_STEMS["P"].get(skeletal)
+    if parent_stem is None:
+        return None                                  # -inic FRN ester out of scope
+
+    organyl_names = []
+    for c_idx in organyl_c:
+        nm = organyl_prefix_name(mol, c_idx, p.GetIdx())
+        if nm is None:
+            return None
+        organyl_names.append(nm)
+    n_prefixes = []
+    for n_idx in amido_n:
+        seg = _amido_n_prefix(mol, n_idx, p.GetIdx())
+        if seg is None:
+            return None
+        if seg:
+            n_prefixes.append(seg)
+        accounted.add(n_idx)
+        for x in mol.GetAtomWithIdx(n_idx).GetNeighbors():   # N-substituent carbons
+            if x.GetIdx() != p.GetIdx():
+                stack = [x.GetIdx()]
+                while stack:
+                    a = stack.pop()
+                    if a in accounted:
+                        continue
+                    accounted.add(a)
+                    for y in mol.GetAtomWithIdx(a).GetNeighbors():
+                        if y.GetIdx() != n_idx and y.GetIdx() not in accounted:
+                            stack.append(y.GetIdx())
+    if organyl_names and n_prefixes:
+        return None                                  # P-/N- locant disambiguation -> defer
+
+    if organyl_names:
+        front = enclose_if_compound(organyl_names[0])
+    elif n_prefixes:
+        front = "-".join(sorted(n_prefixes))
+    else:
+        front = ""
+
+    stem_word = build_p_frn_acid_stem_word(front, parent_stem, infix_counts)
+    if stem_word is None or not stem_word.endswith("ic"):
+        return None
+    # P-67 ester suffix: -ate for the pentavalent (P=O) acid, -ite for the trivalent.
+    ester_stem = stem_word[:-2] + ("ate" if dbl_o == 1 else "ite")
+
+    owner_tokens = []
+    for o_idx in ester_oxys:
+        got = _p_ester_owner_group(mol, o_idx, p.GetIdx())
+        if got is None:
+            return None
+        token, frag = got
+        owner_tokens.append(token)
+        accounted |= frag
+    owner_text = _assemble_p_owner_text(owner_tokens)
+
+    if accounted != set(range(mol.GetNumAtoms())):
+        return None                                  # unaccounted atom -> not whole-molecule
+
+    hyd = _HYDROGEN_MULT.get(oh_count)
+    if hyd is None:
+        return None
+    pieces = [owner_text]
+    if hyd:
+        pieces.append(hyd)
+    pieces.append(ester_stem)
+    return " ".join(pieces)
 
 
 # Chalcogen replacement -> prefix (P-67.1.2.2 / P-67.1.2.3.3). No linking-o
@@ -593,13 +1223,39 @@ def name_borane_amine(mol) -> Optional[str]:
 # --- W3-P10 Engine B: di-/polynuclear noncarbon-oxoacid derivatives (P-67.2) ---
 # Parent (preselected) names keyed by (acid-centre element, bridge slot). A direct
 # centre-centre bond (no bridge) is the 'hypo' parent.
+#
+# Phase 1 B.2 (P-67.2.3/.2.4): the DERIVATIVE element set is extended from
+# {P, S, Se} to add the S-S direct 'dithionic' family and the pentavalent (=O,
+# degree-4) As / Sb '-oric' families, so a functional-class derivative of those
+# di-acids (diarsoric tetrachloride, distiboric tetraamide, a partial-amido
+# dithionic acid, ...) builds through the SAME fail-closed, OPSIN-RT-gated
+# producer as diphosphoric tetrachloride. Additive: the free parent acids are
+# tabled in _INORGANIC_OXOACIDS (matched at name_inorganic_acid's first lookup),
+# so they never reach this producer; and the producer runs LAST, only after every
+# other acid path abstains, so it can add a name but never regress a passing row.
+#
+# ONLY the =O-bearing degree-4 families fit the current fixed-oxo/degree-4
+# _find_polyacid_backbone shape. The trivalent '-orous'/'-onous' (degree-3, no =O)
+# di-acids, the boron 'diboric' (no =O), and 3-centre DERIVATIVE chains remain
+# out of the producer (their free acids are B.1 table rows; measured against the
+# 3,243 bb_conformance oracle NO gold derivative row needs them — the ch67.2
+# derivative gold rows all need isocyanate / trivalent-P-backbone / imido-=N /
+# N-locant features that are separately out of scope). They degrade to abstain,
+# never to a wrong name.
 _POLYACID_PARENT = {
     ("P", "bridge"): "diphosphoric acid",
     ("P", "direct"): "hypodiphosphoric acid",
     ("S", "bridge"): "disulfuric acid",
+    ("S", "direct"): "dithionic acid",          # HO-SO2-SO2-OH (P-67.2.1; 'hypodisulfuric')
     ("Se", "bridge"): "diselenic acid",
+    ("As", "bridge"): "diarsoric acid",         # (HO)2As(O)-O-As(O)(OH)2 (P-67.2.1)
+    ("As", "direct"): "hypodiarsoric acid",     # (HO)2(O)As-As(O)(OH)2   (P-67.2.1)
+    ("Sb", "bridge"): "distiboric acid",        # (HO)2Sb(O)-O-Sb(O)(OH)2 (P-67.2.1)
+    ("Sb", "direct"): "hypodistiboric acid",    # (HO)2(O)Sb-Sb(O)(OH)2   (P-67.2.1)
 }
-_POLYACID_OXO = {"P": 1, "S": 2, "Se": 2}       # =O count that marks an acid centre
+# =O count that marks a pentavalent (degree-4) acid centre. As/Sb '-oric' centres
+# carry exactly one =O, like the -ic phosphorus centre.
+_POLYACID_OXO = {"P": 1, "S": 2, "Se": 2, "As": 1, "Sb": 1}
 _BRIDGE_THIO_PREFIX = {"S": "thio", "Se": "seleno", "Te": "telluro"}
 
 # Irregular retained oxoanion words (P-67.2.5.1.1) — NOT a mechanical 'ic acid'
@@ -874,6 +1530,363 @@ def name_polyacid_anion(frag_mol) -> Optional[str]:
     return _POLYACID_ANION_WORD.get(parent)
 
 
+# =============================================================================
+# Phase 2 Group B: carbonic / poly-carbonic functional-replacement acids
+# (P-65.2.1.2/.1.3 mononuclear, P-65.2.3.1.2-.4 di-/tri-/tetra-carbonic).
+#
+# A CARBON-backbone analogue of name_polyacid_derivative (which is P/S/Se-centred):
+# a linear alternating chain of acyl carbons  C=X ... C=X  joined by O/S/Se/NH or
+# peroxy (-O-O-) bridges, the two ends bearing an acidic / functional group. Every
+# oxygen of the parent poly-carbonic acid may be replaced (P-65.2.3.1.2): a =O by
+# =S/=Se/=Te (thio/seleno/telluro), =NH (imido) or =N-NH2 (hydrazono); a bridging
+# -O- by -S-/-Se- (thio/seleno), -NH- (imido) or -O-O- (peroxy); an acidic -OH by
+# -SH/-SeH/-TeH (thio/seleno/telluro), -OOH (peroxy), -NH2 (amido, P-65.2.3.1.4),
+# -NHNH2 (hydrazido) or a halide (P-65.2.3.1.3). Fully fail-closed by TOTAL heavy-
+# atom accounting: any atom the template cannot place -> None (degrade to the
+# systematic name; never a wrong constitution). Every emitted name has been
+# confirmed to round-trip through OPSIN 2.9.0 to the input structure.
+#
+# 0-WRONG TAUTOMER GUARD (P-65.2.3.1.2.2/.3): the nonspecific 'n-thio...' spelling
+# is interpreted by OPSIN as the acyl-chalcogen tautomer (=S with -OH retained). So
+# a chalcogen on an acidic -XH position is emitted ONLY when the SAME chalcogen also
+# sits on that carbon's acyl (both determined, e.g. tetrathio); a determined
+# '=O + -SH' carbon (methanethioic S-acid territory, P-65.2.3.1.2.3) FAILS CLOSED
+# rather than emit an ambiguous name that would round-trip to the other tautomer.
+# =============================================================================
+
+# Poly-carbonic detachable-prefix words per replacement (P-65.2.3.1.2-.4); NOTE
+# these differ from the mononuclear STEM infixes (poly 'peroxy' vs mono 'peroxo').
+_CARB_CHALC_PREFIX = {"S": "thio", "Se": "seleno", "Te": "telluro"}
+_CARB_HALO_PREFIX = {"F": "fluoro", "Cl": "chloro", "Br": "bromo", "I": "iodo"}
+# Terminal-only prefixes (cannot sit at a bridge): a lone one on a symmetric parent
+# omits its locant (P-14.3.4; 'chlorodicarbonic acid', not '1-chloro...').
+_CARB_TERMINAL_ONLY = set(_CARB_HALO_PREFIX.values()) | {"amido", "hydrazido"}
+_CARB_MULT = {1: "", 2: "di", 3: "tri", 4: "tetra", 5: "penta", 6: "hexa",
+              7: "hepta", 8: "octa", 9: "nona", 10: "deca"}
+
+
+def _carb_acyl(mol, c):
+    """The (element, kind) of an acyl carbon's single double-bonded partner, or
+    None if the carbon is not a valid acyl carbon. kind in
+    {'O','S','Se','Te','imido','hydrazono'}; also returns the consumed heavy-atom
+    indices for that acyl group."""
+    dbl = [b for b in c.GetBonds() if b.GetBondType() == Chem.BondType.DOUBLE]
+    if len(dbl) != 1:
+        return None
+    x = dbl[0].GetOtherAtom(c)
+    if x.GetFormalCharge() != 0:
+        return None
+    sym = x.GetSymbol()
+    if sym in ("O", "S", "Se", "Te"):
+        if x.GetDegree() != 1 or x.GetTotalNumHs() != 0:
+            return None
+        return (sym, {x.GetIdx()})
+    if sym == "N":
+        others = [nb for nb in x.GetNeighbors() if nb.GetIdx() != c.GetIdx()]
+        if not others:                                   # =NH  -> imido
+            return ("imido", {x.GetIdx()}) if x.GetTotalNumHs() == 1 else None
+        if len(others) == 1 and others[0].GetSymbol() == "N":   # =N-NH2 -> hydrazono
+            n2 = others[0]
+            if (mol.GetBondBetweenAtoms(x.GetIdx(), n2.GetIdx()).GetBondType()
+                    == Chem.BondType.SINGLE and n2.GetDegree() == 1
+                    and n2.GetTotalNumHs() == 2 and n2.GetFormalCharge() == 0
+                    and x.GetTotalNumHs() == 0):
+                return ("hydrazono", {x.GetIdx(), n2.GetIdx()})
+        return None
+    return None
+
+
+def _carb_terminal(mol, c, nb):
+    """Classify a single-bonded non-bridge neighbour ``nb`` of acyl carbon ``c`` as
+    an acidic / functional terminal group. Returns (kind, consumed_heavy_idxs) with
+    kind in {'oh','thio','seleno','telluro','peroxy','amido','hydrazido',
+    'fluoro'/'chloro'/'bromo'/'iodo'} or None (fail-closed)."""
+    sym = nb.GetSymbol()
+    if nb.GetFormalCharge() != 0:
+        return None
+    if sym in _CARB_HALO_PREFIX:                         # -X halide
+        if nb.GetDegree() == 1:
+            return (_CARB_HALO_PREFIX[sym], {nb.GetIdx()})
+        return None
+    if sym in ("O", "S", "Se", "Te"):
+        if nb.GetDegree() == 1 and nb.GetTotalNumHs() == 1:   # -OH/-SH/-SeH/-TeH
+            return (({"O": "oh", "S": "thio", "Se": "seleno",
+                      "Te": "telluro"}[sym]), {nb.GetIdx()})
+        if sym == "O" and nb.GetDegree() == 2 and nb.GetTotalNumHs() == 0:
+            far = [x for x in nb.GetNeighbors() if x.GetIdx() != c.GetIdx()]
+            if (len(far) == 1 and far[0].GetSymbol() == "O"
+                    and far[0].GetDegree() == 1 and far[0].GetTotalNumHs() == 1
+                    and far[0].GetFormalCharge() == 0):       # -O-OH peroxy
+                return ("peroxy", {nb.GetIdx(), far[0].GetIdx()})
+        return None
+    if sym == "N":
+        if nb.GetDegree() == 1 and nb.GetTotalNumHs() == 2:   # -NH2 amido
+            return ("amido", {nb.GetIdx()})
+        if nb.GetDegree() == 2 and nb.GetTotalNumHs() == 1:   # -NH-NH2 hydrazido
+            far = [x for x in nb.GetNeighbors() if x.GetIdx() != c.GetIdx()]
+            if (len(far) == 1 and far[0].GetSymbol() == "N"
+                    and far[0].GetDegree() == 1 and far[0].GetTotalNumHs() == 2
+                    and far[0].GetFormalCharge() == 0):
+                return ("hydrazido", {nb.GetIdx(), far[0].GetIdx()})
+        return None
+    return None
+
+
+def _carb_bridge(mol, c, nb, acid_cs):
+    """If single-bonded neighbour ``nb`` of acyl carbon ``c`` starts a bridge to
+    ANOTHER acyl carbon, return (other_c_idx, kind, consumed_heavy_idxs); kind in
+    {'O','S','Se','imido','peroxy'}. Else None."""
+    sym = nb.GetSymbol()
+    if nb.GetFormalCharge() != 0:
+        return None
+    if sym in ("O", "S", "Se") and nb.GetDegree() == 2 and nb.GetTotalNumHs() == 0:
+        far = [x for x in nb.GetNeighbors() if x.GetIdx() != c.GetIdx()]
+        if len(far) != 1:
+            return None
+        w = far[0]
+        if w.GetIdx() in acid_cs:                        # single-atom O/S/Se bridge
+            return (w.GetIdx(), sym, {nb.GetIdx()})
+        if (sym == "O" and w.GetSymbol() == "O" and w.GetDegree() == 2
+                and w.GetTotalNumHs() == 0 and w.GetFormalCharge() == 0):
+            v = [x for x in w.GetNeighbors() if x.GetIdx() != nb.GetIdx()]
+            if len(v) == 1 and v[0].GetIdx() in acid_cs:  # -O-O- peroxy bridge
+                return (v[0].GetIdx(), "peroxy", {nb.GetIdx(), w.GetIdx()})
+        return None
+    if sym == "N" and nb.GetDegree() == 2 and nb.GetTotalNumHs() == 1:
+        far = [x for x in nb.GetNeighbors() if x.GetIdx() != c.GetIdx()]
+        if len(far) == 1 and far[0].GetIdx() in acid_cs:  # -NH- imido bridge
+            return (far[0].GetIdx(), "imido", {nb.GetIdx()})
+    return None
+
+
+def name_carbonic_frn_family(mol):
+    """P-65.2.1.2/.1.3 + P-65.2.3.1.2-.4: PIN for a mononuclear carbonic/carbamic
+    functional-replacement acid or a di-/tri-/tetra-carbonic FRN acid, else None.
+
+    Fail-closed by total heavy-atom accounting; pure (no mutation). The plain
+    parents (carbonic/dicarbonic acid) and the already-tabled FRN rows are matched
+    by the exact table BEFORE this producer, so it only fires on genuine gaps.
+    """
+    if mol is None or len(Chem.GetMolFrags(mol)) != 1:
+        return None
+    if sum(a.GetFormalCharge() for a in atoms_of(mol)) != 0:
+        return None
+
+    # 1) Acyl carbons: acyclic degree-3 C with exactly one =X (X in O/S/Se/Te/N).
+    acid_cs = {}
+    for a in atoms_of(mol):
+        if a.GetSymbol() != "C" or a.IsInRing() or a.GetFormalCharge() != 0:
+            continue
+        if a.GetDegree() != 3:
+            continue
+        acyl = _carb_acyl(mol, a)
+        if acyl is None:
+            continue
+        acid_cs[a.GetIdx()] = acyl
+    if not acid_cs:
+        return None
+    acid_set = set(acid_cs)
+
+    accounted = set()                      # heavy-atom indices placed by the template
+    for cidx, (_, acyl_atoms) in acid_cs.items():
+        accounted.add(cidx)
+        accounted |= acyl_atoms
+
+    # 2) Per carbon: split its two single-bond neighbours into bridges / terminals.
+    adj = {c: [] for c in acid_set}        # c -> [(other_c, bridge_kind, atoms)]
+    terminals = {c: [] for c in acid_set}  # c -> [(kind, atoms)]
+    for cidx in acid_set:
+        c = mol.GetAtomWithIdx(cidx)
+        for b in c.GetBonds():
+            if b.GetBondType() != Chem.BondType.SINGLE:
+                continue
+            nb = b.GetOtherAtom(c)
+            br = _carb_bridge(mol, c, nb, acid_set)
+            if br is not None:
+                other, kind, atoms = br
+                adj[cidx].append((other, kind, frozenset(atoms)))
+                accounted |= atoms
+                continue
+            term = _carb_terminal(mol, c, nb)
+            if term is None:
+                return None                # unplaceable neighbour -> fail closed
+            kind, atoms = term
+            terminals[cidx].append((kind, atoms))
+            accounted |= atoms
+
+    # 3) Total heavy-atom accounting -- nothing extra hangs off the skeleton.
+    heavy = {a.GetIdx() for a in atoms_of(mol) if a.GetAtomicNum() > 1}
+    if accounted != heavy:
+        return None
+
+    # 3a) The molecule must RETAIN the acid characteristic group: at least one
+    # terminal is an acidic -OH / -SH / -SeH / -TeH / -OOH. If EVERY terminal is a
+    # halide / amido / hydrazido, the -OH groups are fully replaced and the compound
+    # is an acid HALIDE / AMIDE / HYDRAZIDE functional CLASS (dicarbonyl dichloride,
+    # dicarbonic diamide, carbonimidic diamide, ...), owned by a different path --
+    # fail closed so it is not mis-named as an '-ic acid' (P-65.6 principal-group
+    # seniority). Without this, Cl-CO-O-CO-Cl and H2N-C(=NH)-NH-CO-NH2 were claimed.
+    _ACIDIC = {"oh", "thio", "seleno", "telluro", "peroxy"}
+    if not any(k in _ACIDIC for tl in terminals.values() for (k, _) in tl):
+        return None
+
+    n = len(acid_set)
+
+    # ---- Mononuclear (n == 1): carbonic / carbamic stem, no locants. ----
+    if n == 1:
+        cidx = next(iter(acid_set))
+        if adj[cidx]:
+            return None
+        acyl_kind = acid_cs[cidx][0]
+        terms = terminals[cidx]
+        if len(terms) != 2:               # a carbonic centre has exactly two -X(H)
+            return None
+        amido = [t for t in terms if t[0] == "amido"]
+        if len(amido) == 2:
+            return None                   # urea/guanidine diamide -> not an acid here
+        # A mononuclear halide / hydrazido / bare-parent is owned elsewhere (tabled
+        # carbono-chloridic; carbazic) -> out of this builder's scope.
+        stem = "carbam" if len(amido) == 1 else "carbon"
+        infixes = {}
+
+        def _bump(key):
+            infixes[key] = infixes.get(key, 0) + 1
+        # acyl replacement
+        if acyl_kind in ("S", "Se", "Te"):
+            _bump({"S": "thio", "Se": "seleno", "Te": "telluro"}[acyl_kind])
+        elif acyl_kind in ("imido", "hydrazono"):
+            _bump(acyl_kind)
+        # remaining (non-carbam) terminals
+        seen_amido = False
+        for kind, _ in terms:
+            if kind == "amido" and stem == "carbam" and not seen_amido:
+                seen_amido = True
+                continue
+            if kind == "oh":
+                continue
+            if kind in ("thio", "seleno", "telluro"):
+                _bump(kind)
+            elif kind == "peroxy":
+                _bump("peroxo")           # mononuclear STEM infix is 'peroxo'
+            else:
+                return None               # amido#2 / halide / hydrazido -> out of scope
+        if not infixes:
+            return None                   # plain carbonic/carbamic acid -> tabled
+        from .functional_replacement import build_carbonic_mono_frn
+        return build_carbonic_mono_frn(stem, infixes)
+
+    # ---- Poly (n >= 2): a linear alternating chain, cited with locants. ----
+    if n > 4:
+        return None                       # di/tri/tetra-carbonic only (CLOSED set)
+    # De-dupe undirected bridges; require exactly n-1 and a simple path.
+    bset = set()
+    for c, lst in adj.items():
+        for other, kind, atoms in lst:
+            bset.add((frozenset((c, other)), kind, atoms))
+    if len(bset) != n - 1:
+        return None
+    deg = {c: len(adj[c]) for c in acid_set}
+    if sorted(deg.values()) != [1, 1] + [2] * (n - 2):
+        return None
+    ends = [c for c in acid_set if deg[c] == 1]
+    if len(ends) != 2:
+        return None
+    # Walk the path from one end to build the carbon order + bridge-kind list.
+    order = [ends[0]]
+    bridges = []                          # bridge kind between order[i], order[i+1]
+    prev = None
+    cur = ends[0]
+    while len(order) < n:
+        nxts = [(o, k) for (o, k, _) in adj[cur] if o != prev]
+        if len(nxts) != 1:
+            return None
+        nxt, kind = nxts[0]
+        bridges.append(kind)
+        order.append(nxt)
+        prev, cur = cur, nxt
+
+    def _positions(carbon_order, bridge_kinds):
+        """Replacements as {infix: [locants...]} for one numbering direction, or
+        None if the 0-wrong tautomer guard trips."""
+        reps = {}
+
+        def _add(key, loc):
+            reps.setdefault(key, []).append(loc)
+        for i, cidx in enumerate(carbon_order):
+            pc = 2 * i + 1
+            acyl_kind = acid_cs[cidx][0]
+            is_terminal = deg[cidx] == 1
+            tkinds = [k for (k, _) in terminals[cidx]]
+            if acyl_kind in ("S", "Se", "Te"):
+                _add(_CARB_CHALC_PREFIX[acyl_kind], pc)
+            elif acyl_kind in ("imido", "hydrazono"):
+                _add("imido" if acyl_kind == "imido" else "hydrazono", pc)
+            for kind in tkinds:
+                if kind == "oh":
+                    continue
+                if kind in ("thio", "seleno", "telluro"):
+                    # tautomer guard: a chalcogen on the acidic -XH position is only
+                    # unambiguous when the acyl is the SAME chalcogen (both fixed).
+                    same = {"thio": "S", "seleno": "Se", "telluro": "Te"}[kind]
+                    if acyl_kind != same:
+                        return None
+                    _add(kind, pc)
+                elif kind in ("peroxy", "amido", "hydrazido") or kind in _CARB_HALO_PREFIX.values():
+                    _add(kind, pc)
+                else:
+                    return None
+        for j, kind in enumerate(bridge_kinds):
+            pb = 2 * j + 2
+            if kind == "O":
+                continue
+            if kind in ("S", "Se"):
+                _add(_CARB_CHALC_PREFIX[kind], pb)
+            elif kind == "imido":
+                _add("imido", pb)
+            elif kind == "peroxy":
+                _add("peroxy", pb)
+            else:
+                return None
+        return reps
+
+    fwd = _positions(order, bridges)
+    rev = _positions(order[::-1], bridges[::-1])
+    if fwd is None and rev is None:
+        return None
+
+    def _key(reps):
+        if reps is None:
+            return None
+        allpos = sorted(p for ps in reps.values() for p in ps)
+        second = tuple((k, sorted(reps[k])) for k in sorted(reps))
+        return (allpos, second)
+    cands = [r for r in (fwd, rev) if r is not None]
+    reps = min(cands, key=_key)
+
+    total_o = 2 * n + 1                    # replaceable O positions of the parent
+    n_reps = sum(len(v) for v in reps.values())
+
+    # Assemble the cited-prefix string (alphabetical; P-65.2.3.1.2 / P-14.5.2).
+    frags = []
+    single_infix = len(reps) == 1
+    for infix in sorted(reps):
+        locs = sorted(reps[infix])
+        cnt = len(locs)
+        mult = _CARB_MULT.get(cnt)
+        if mult is None:
+            return None
+        omit = (
+            (single_infix and cnt == total_o)                  # all positions same
+            or (n_reps == 1 and infix in _CARB_TERMINAL_ONLY)  # lone terminal-only
+        )
+        if omit:
+            frags.append(f"{mult}{infix}")
+        else:
+            frags.append(f"{','.join(str(x) for x in locs)}-{mult}{infix}")
+    prefix = "-".join(frags)
+    return f"{prefix}{_CARB_MULT[n]}carbonic acid"
+
+
 # --- Substituted / multiplicative hydrazinecarboxamide (semicarbazide) family ---
 # P-66.1.1.1.1.3 (BB 32675) 'carboxamide' + P-68.3.1.2.4 (systematic name is the
 # PIN) + P-15.3 (multiplicative). The exact base 'NNC(N)=O' -> 'hydrazinecarboxamide'
@@ -1133,6 +2146,13 @@ def name_inorganic_acid(mol) -> Optional[str]:
     hzc = name_hydrazinecarboxamide(mol)
     if hzc is not None:
         return hzc
+    # Phase 2B (P-65.2.1.2/.1.3 + P-65.2.3.1.2-.4): carbonic / poly-carbonic
+    # functional-replacement acids (carbonimidothioic acid, 2-imidodicarbonic acid,
+    # 1-amido-2-thiodicarbonic acid, ...). Fail-closed by total heavy-atom
+    # accounting; the plain parents + tabled FRN rows matched above never reach it.
+    carb_frn = name_carbonic_frn_family(mol)
+    if carb_frn is not None:
+        return carb_frn
     # W3-P10 (P-67.1.2.4): mononuclear-P oxoacid functional-replacement (Engine A):
     # phosphoramidic / phosphonocyanatidic / phosphonochloridic acids. Fires only on
     # an acid (>=1 -OH) carrying a class replacement group, so plain phosphonic /
@@ -1141,6 +2161,25 @@ def name_inorganic_acid(mol) -> Optional[str]:
     frn = name_p_oxoacid_frn(mol)
     if frn is not None:
         return frn
+    # Phase 1B (P-67.1.2.4.1.1): chalcogen-infix FRN, locant-free di+ subset
+    # (arsorodithioic / phosphorotrithioic). Fires only on >=2 identical -SH/-SeH/-TeH
+    # with a =O; mono / tautomer-locant cases fail closed (Phase 2's P-65.1.5).
+    chalco_frn = name_p_oxoacid_chalcogen_frn(mol)
+    if chalco_frn is not None:
+        return chalco_frn
+    # Phase 1B (P-67.1.2.5 / P-67.1.2.6): mononuclear P/As/Sb oxoacid HALIDE /
+    # AMIDE (oh_count == 0). Fires only when every -OH is replaced, so the acid
+    # paths above (>=1 -OH) never reach here; fail-closed on the phosphoryl/sulfuryl
+    # acyl-word exception so POCl3 stays 'phosphoryl trichloride'.
+    hal_amide = name_p_oxoacid_halide_amide(mol)
+    if hal_amide is not None:
+        return hal_amide
+    # Phase 1B (P-67.1.2.4): FRN-modified phosphorus-acid ESTER (>=1 -O-R owner
+    # AND >=1 class infix): methyl N,N-dimethylphosphoramidochloridite. A
+    # non-overlapping addition; a plain phosphate/phosphite ester never reaches here.
+    p_frn_ester = name_p_frn_ester(mol)
+    if p_frn_ester is not None:
+        return p_frn_ester
     # W3-P10 (P-67.1.2.4.1.2): chalcogen-prefix FRN on silicic acid (thiosilicic).
     si_frn = name_silicic_acid_frn(mol)
     if si_frn is not None:

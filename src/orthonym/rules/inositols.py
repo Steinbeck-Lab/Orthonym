@@ -1,6 +1,6 @@
 """Inositol (cyclitol) retained names — P-104.2.1.
 
-, finding F1).
+v23 Phase 12 follow-on (Blue Book audit unit p104-106, finding F1).
 
 The nine stereoisomers of cyclohexane-1,2,3,4,5,6-hexol each have a retained
 italic-prefix name (``myo-``, ``scyllo-``, ``cis-``, ``epi-``, ``neo-``,

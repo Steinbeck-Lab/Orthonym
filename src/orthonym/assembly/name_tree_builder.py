@@ -6,7 +6,7 @@ classification loop (``handlers/_handler_shared.py:779-787``) and parent
 unsaturation-locant unpacking (``:877-880``), producing the structured Name-Tree
 IR consumed by SCORE-02 / Phase 166 per-substring scoring.
 
- DUAL-CARRY: every derived node ALSO carries ``fragment_legacy`` — the
+D-02 DUAL-CARRY: every derived node ALSO carries ``fragment_legacy`` — the
 pre-assembled final name string — so ``name_tree_to_string`` round-trips
 byte-identically (SC-1). A single synthetic ``NameFragment`` CANNOT reproduce a
 multi-fragment concatenation (the parent path appends ``"ane"`` via
@@ -16,7 +16,7 @@ itself, returned verbatim by the ``name_tree_to_string`` str short-circuit
 string"). The structured fields and the string view both derive from the SAME
 fragment list, so they cannot disagree.
 
-Purity (AP-160-15 /): NO mutation of ``fragments``, its elements, or module
+Purity (AP-160-15 / D-25): NO mutation of ``fragments``, its elements, or module
 globals. ``NameFragment`` instances are read, never rewritten.
 """
 from __future__ import annotations
@@ -142,7 +142,7 @@ def fragments_to_tree(
     # the legacy string verbatim. This is HALF of the single-source-of-truth
     # coupling (the other half is the composer seam routing); both gate on the
     # SAME frozenset so the flip cannot be a silent no-op (Pitfall 2). Carrier
-    # classes keep the byte-identical str carrier (unchanged).
+    # classes keep the byte-identical str carrier (D-02 unchanged).
     from .name_tree_to_string import SERIALIZER_PRODUCTION_CLASSES
     fragment_legacy = (
         None

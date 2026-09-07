@@ -78,6 +78,9 @@ def name_anhydride(features) -> Optional[str]:
     _cn = _name_chalcogen_anhydride(mol)         # P-65.7.3  R-CO-S/Se/Te-CO-R'
     if _cn:
         return _cn
+    _tn = _name_thioacyl_anhydride(mol)          # P-65.7.6.4.2/.3  R-C(=X)-Y-C(=X)-R'
+    if _tn:
+        return _tn
     _pn = _name_peroxy_anhydride(mol)            # P-65.7.4  R-CO-OO-CO-R'
     if _pn:
         return _pn
@@ -165,7 +168,7 @@ def name_anhydride(features) -> Optional[str]:
 
     # Acyclic anhydride: name each acyl fragment as its corresponding acid.
     # Uses _name_acyl_acid() which calls _integrate_universal_prefixes()
-    # per to discover branch substituents on acyl chains.
+    # per D-01 to discover branch substituents on acyl chains.
     acid1_name, sub1 = _name_acyl_acid(mol, c1_idx, bridge_o, anhydride_info['o1'])
     acid2_name, sub2 = _name_acyl_acid(mol, c2_idx, bridge_o, anhydride_info['o2'])
 
@@ -260,6 +263,22 @@ def _name_sulfonic_anhydride(mol) -> Optional[str]:
 
 _CHALCOGEN_CLASS_TERM = {"S": "thioanhydride", "Se": "selenoanhydride",
                          "Te": "telluroanhydride"}
+
+# P2D (P-65.7.6.4.2): the anhydride CLASS WORD is fixed by the BRIDGE
+# chalcogen (O -> anhydride, S -> thioanhydride, Se -> selenoanhydride,
+# Te -> telluroanhydride). O just reuses _CHALCOGEN_CLASS_TERM's siblings.
+_BRIDGE_CLASS_WORD = {"O": "anhydride", "S": "thioanhydride",
+                      "Se": "selenoanhydride", "Te": "telluroanhydride"}
+
+# P2D (P-65.7.6.4.3): the ACYL chalcogen fixes each acid component's affix
+# (=O -> plain '...oic'/retained; =S -> '...thioic'; =Se -> '...selenoic').
+_ACYL_AFFIX = {"S": "thioic", "Se": "selenoic"}
+
+# P2D: generalized acyl-anhydride motif R-C(=X1)-Y-C(=X2)-R', X in {O,S,Se},
+# bridge Y in {O,S,Se,Te}. Broad on BOTH the acyl chalcogen and the bridge; the
+# handler declines the all-=O cases (owned by the base / chalcogen paths).
+_THIOACYL_ANHYDRIDE_SMARTS = (
+    "[CX3](=[OX1,SX1,SeX1])[OX2,SX2,SeX2,TeX2][CX3](=[OX1,SX1,SeX1])")
 
 
 _NUMERIC_MULT = {2: "di", 3: "tri", 4: "tetra", 5: "penta", 6: "hexa"}
@@ -385,22 +404,50 @@ def _name_dianhydride(mol, matches) -> Optional[str]:
     return " ".join(parts) + " " + class_term
 
 
+def _hydrazido_class_word(mol, nb, ctr_idx: int) -> Optional[str]:
+    """P-66.3.5.2 class word for a hydrazido leaving group (ctr-NH-NH2) on a
+    carbonic carbon -> 'hydrazide', else None. Kept LOCAL to the di-/polycarbonic
+    anhydride builder so the shared ``_halide_pseudohalide_class_word`` (also used
+    by the phosphorus FRN namer, where a -NH-NH2 is classified differently) is
+    unchanged. BB:34111 'dicarbonic dihydrazide (PIN)'."""
+    if nb.GetSymbol() != "N" or nb.GetTotalNumHs() != 1 or nb.GetFormalCharge() != 0:
+        return None
+    ctr_bond = mol.GetBondBetweenAtoms(ctr_idx, nb.GetIdx())
+    if ctr_bond.GetBondType() != Chem.BondType.SINGLE:
+        return None
+    others = [x for x in nb.GetNeighbors() if x.GetIdx() != ctr_idx]
+    if len(others) != 1:
+        return None
+    o = others[0]
+    if (o.GetSymbol() == "N" and o.GetDegree() == 1 and o.GetTotalNumHs() == 2
+            and o.GetFormalCharge() == 0
+            and mol.GetBondBetweenAtoms(nb.GetIdx(), o.GetIdx()).GetBondType()
+            == Chem.BondType.SINGLE):
+        return "hydrazide"
+    return None
+
+
 def _name_dicarbonic_dihalide(mol, c1: int, c2: int, bridge_o: int) -> Optional[str]:
-    """P-65.5.3.2: X-CO-O-CO-X (X = halogen) -> 'dicarbonic <halide word(s)>'.
+    """P-65.5.3.2 / P-66.3.5.2: X-CO-O-CO-Y (X, Y halide, pseudohalide, or
+    hydrazido) -> 'dicarbonic <class word(s)>'.
 
     BOTH carbonyl carbons must be 'carbono' units: bonded to the bridge O (single
-    bond) + exactly one =O + exactly one halogen (F/Cl/Br/I), with NO carbon
-    neighbour. Halide words are cited in ALPHABETICAL order (bromide < chloride <
-    fluoride < iodide); identical halides collapse with a numeric multiplier
-    ('dicarbonic dichloride'); different halides -> two words ('dicarbonic bromide
+    bond) + exactly one =O + exactly one halide/pseudohalide/hydrazido class group,
+    with NO carbon neighbour. Class words (halide F/Cl/Br/I, or pseudohalide
+    isocyanate / isothiocyanate / cyanide / azide, or hydrazido -> 'hydrazide') are
+    cited in ALPHABETICAL order; identical ones collapse with a numeric multiplier
+    ('dicarbonic dichloride', 'dicarbonic diisocyanate', 'dicarbonic dihydrazide',
+    BB 31492/31500/34111); different ones -> two words ('dicarbonic bromide
     chloride'). Returns None (fail-closed) if either side is a real acyl (has a
-    carbon neighbour) or lacks a halide."""
+    carbon neighbour) or lacks a recognised halide/pseudohalide/hydrazido."""
     from ..assembly.naming_utils import get_multiplier_prefix
-    halides = []
+    from .inorganic_acids import _halide_pseudohalide_class_word
+    words = []
     for c in (c1, c2):
         atom = mol.GetAtomWithIdx(c)
-        has_bridge = n_double_o = n_halide = n_carbon = 0
-        halide_sym = None
+        has_bridge = n_double_o = n_carbon = 0
+        class_word = None
+        n_class = 0
         for nb in atom.GetNeighbors():
             bond = mol.GetBondBetweenAtoms(c, nb.GetIdx())
             bt = bond.GetBondTypeAsDouble()
@@ -409,18 +456,21 @@ def _name_dicarbonic_dihalide(mol, c1: int, c2: int, bridge_o: int) -> Optional[
                 has_bridge += 1
             elif sym == 'O' and bt == 2.0:
                 n_double_o += 1
-            elif sym in ('F', 'Cl', 'Br', 'I') and bt == 1.0:
-                n_halide += 1
-                halide_sym = sym
             elif sym == 'C':
                 n_carbon += 1
             else:
-                return None
-        if not (has_bridge == 1 and n_double_o == 1 and n_halide == 1
+                cw = _halide_pseudohalide_class_word(mol, nb, c)
+                if cw is None:
+                    cw = _hydrazido_class_word(mol, nb, c)
+                if cw is None:
+                    return None
+                class_word = cw
+                n_class += 1
+        if not (has_bridge == 1 and n_double_o == 1 and n_class == 1
                 and n_carbon == 0):
             return None
-        halides.append(halide_sym)
-    words = sorted(_HALIDE_WORD[h] for h in halides)   # alphabetical
+        words.append(class_word)
+    words = sorted(words)                              # alphabetical
     if words[0] == words[1]:
         mult = get_multiplier_prefix(2, words[0])
         return f"dicarbonic {mult}{words[0]}"
@@ -502,6 +552,134 @@ def _name_chalcogen_anhydride(mol) -> Optional[str]:
         return f"{acid1} {class_term}"
     acids = sorted([acid1, acid2])
     return f"{acids[0]} {acids[1]} {class_term}"
+
+
+def _oxo_acid_name(smi: str) -> Optional[str]:
+    """Name the plain =O carboxylic acid of a capped free thio/seleno acid
+    (R-C(=X)-OH, X = S/Se): swap the terminal =S/=Se for =O and route through the
+    recursive fragment namer. Used only for the RING acyl fallback (the recursive
+    namer names 'ethanethioic O-acid' for chains but declines a ring thioacid, so
+    we build 'benzoic acid' -> 'benzenecarbothioic' from the =O form). Returns the
+    full '... acid' string or None."""
+    from ..assembly.fragment_naming import name_fragment_recursively
+    fm = Chem.MolFromSmiles(smi)
+    if fm is None:
+        return None
+    rw = Chem.RWMol(fm)
+    changed = False
+    for atom in rw.GetAtoms():
+        if atom.GetSymbol() in ("S", "Se") and atom.GetDegree() == 1:
+            b = atom.GetBonds()[0]
+            if b.GetBondTypeAsDouble() == 2.0:
+                atom.SetAtomicNum(8)
+                changed = True
+    if not changed:
+        return None
+    try:
+        Chem.SanitizeMol(rw)
+    except Exception:
+        return None
+    return name_fragment_recursively(Chem.MolToSmiles(rw))
+
+
+def _name_acyl_acid_component(mol, acyl_c: int, acyl_x: int, bridge: int):
+    """Name ONE acid component of a generalized acyl anhydride, returning
+    ``(name_without_acid_word, is_substituted)``.
+
+    The component's affix is fixed by the ACYL chalcogen ``acyl_x`` (=O -> the
+    retained/plain '...oic' acid via :func:`_name_acyl_acid`; =S -> '...thioic';
+    =Se -> '...selenoic'; P-65.7.6.4.3). The name is INDEPENDENT of the bridge
+    (the bridge picks the class word). Fail-closed (``(None, False)``) if it
+    cannot build the component."""
+    x_sym = mol.GetAtomWithIdx(acyl_x).GetSymbol()
+    if x_sym == "O":
+        # Plain =O acid: the existing retained-aware namer (acetic/propanoic/benzoic).
+        return _name_acyl_acid(mol, acyl_c, bridge, acyl_x)
+    affix = _ACYL_AFFIX.get(x_sym)
+    if affix is None:
+        return None, False
+    # Cap the acyl side into its free acid R-C(=X)-OH and name it. The recursive
+    # namer yields e.g. 'ethanethioic O-acid'/'propaneselenoic O-acid' for chains;
+    # strip the trailing acid word.
+    from ..assembly.fragment_naming import name_fragment_recursively
+    from .esters import _extract_fragment_smiles
+    keep = _bfs_side_atoms(mol, acyl_c, {bridge})
+    # 'substituted' (P-65.7.8.1 bis(...) wrap): any heteroatom on R other than the
+    # acyl chalcogen itself (C/H/O/S/Se are the acid's own atoms).
+    substituted = any(
+        mol.GetAtomWithIdx(a).GetAtomicNum() not in (1, 6, 8, 16, 34)
+        for a in keep if a != acyl_x
+    )
+    smi = _extract_fragment_smiles(mol, set(keep), acyl_c, cap_element=8)
+    if not smi:
+        return None, False
+    nm = name_fragment_recursively(smi)
+    if nm:
+        for suf in (" O-acid", " S-acid", " Se-acid", " acid"):
+            if nm.endswith(suf):
+                return nm[:-len(suf)].strip(), substituted
+    # Ring acyl fallback: the recursive namer declines a ring thioacid, so build
+    # the =O acid name ('benzoic'/'cyclohexanecarboxylic') and swap to the
+    # 'carbothioic'/'carboselenoic' form.
+    ox = _oxo_acid_name(smi)
+    if ox and ox.endswith(" acid"):
+        ox = ox[:-len(" acid")].strip()
+        if ox == "benzoic":
+            return f"benzenecarbo{affix}", substituted
+        if ox.endswith("carboxylic"):
+            return ox[:-len("carboxylic")] + "carbo" + affix, substituted
+    return None, False
+
+
+def _name_thioacyl_anhydride(mol) -> Optional[str]:
+    """P-65.7.6.4.2/.3: acyclic thio-/seleno-ACYL anhydride R-C(=X1)-Y-C(=X2)-R'
+    where at least one acyl chalcogen X is S/Se (a '...thioic'/'...selenoic'
+    component). Each component acid is named with its acyl-chalcogen affix
+    (:func:`_name_acyl_acid_component`), the two are cited in ALPHABETICAL order
+    (P-65.7.2), and the class word is fixed by the BRIDGE chalcogen Y
+    (O -> anhydride, S -> thioanhydride, Se -> selenoanhydride, Te ->
+    telluroanhydride; P-65.7.6.4.2).
+
+    Examples: CCC(=S)OC(=S)CC -> 'propanethioic anhydride'; CC(=S)OC(=O)CC ->
+    'ethanethioic propanoic anhydride'; CC(=O)[Se]C(=S)CC -> 'acetic
+    propanethioic selenoanhydride'.
+
+    Declines (returns None -> the caller falls through):
+      * both acyls =O (owned by the base O-bridge / chalcogen-bridge paths);
+      * >1 anhydride linkage (di-/polyanhydride, out of scope this cycle);
+      * a CYCLIC -C(=X)-Y-C(=X)- (a chalcogen analogue of a cyclic anhydride ->
+        Phase 9 ring-fusion/dione nomenclature);
+      * any component it cannot build (fail-closed, never a wrong name)."""
+    pat = Chem.MolFromSmarts(_THIOACYL_ANHYDRIDE_SMARTS)
+    if pat is None:
+        return None
+    matches = mol.GetSubstructMatches(pat, uniquify=True)
+    if not matches or len(matches) != 1:
+        return None  # 0 or >1 linkage -> not the single-linkage acyclic case
+    c1, x1, bridge, c2, x2 = matches[0]
+    # Both acyls =O -> the base/chalcogen paths own it; decline.
+    if (mol.GetAtomWithIdx(x1).GetSymbol() == "O"
+            and mol.GetAtomWithIdx(x2).GetSymbol() == "O"):
+        return None
+    # Cyclic (both carbonyls in one ring, reachable without crossing the bridge)
+    # -> Phase 9 cyclic-anhydride nomenclature; decline (fail-closed).
+    if c2 in _bfs_side_atoms(mol, c1, {bridge}):
+        return None
+    class_word = _BRIDGE_CLASS_WORD.get(mol.GetAtomWithIdx(bridge).GetSymbol())
+    if class_word is None:
+        return None
+    acid1, sub1 = _name_acyl_acid_component(mol, c1, x1, bridge)
+    acid2, sub2 = _name_acyl_acid_component(mol, c2, x2, bridge)
+    if acid1 is None or acid2 is None:
+        return None
+    if acid1 == acid2:
+        # Symmetric; a symmetrically SUBSTITUTED acid -> 'bis(...)' (P-65.7.8.1).
+        if sub1:
+            return f"bis({acid1}) {class_word}"
+        return f"{acid1} {class_word}"
+    from ..assembly.naming_utils import alpha_sort_key
+    acids = sorted([acid1, acid2], key=alpha_sort_key)
+    return f"{acids[0]} {acids[1]} {class_word}"
 
 
 def _name_chalcogen_dianhydride(mol, matches) -> Optional[str]:
@@ -826,7 +1004,7 @@ def _find_longest_chain(mol, start: int, frag_atoms: set) -> list:
 def _name_acyl_acid(mol, carbonyl_c: int, bridge_o: int, carbonyl_o: int):
     """Name an acyl fragment as its corresponding acid, with substituent prefixes.
 
-    Uses _integrate_universal_prefixes (per) to discover branch
+    Uses _integrate_universal_prefixes() (per D-01) to discover branch
     substituents on the acyl chain. For simple linear chains, falls back
     to the fast _build_acid_name() path.
 
@@ -881,7 +1059,7 @@ def _name_acyl_acid(mol, carbonyl_c: int, bridge_o: int, carbonyl_o: int):
         return get_acid_fragment_name(mol, frag_list), False
 
     # Branched or has heteroatom substituents: use _integrate_universal_prefixes()
-    # per to discover and name substituents on the acyl chain.
+    # per D-01 to discover and name substituents on the acyl chain.
     principal_chain = _find_longest_chain(mol, carbonyl_c, frag_atoms)
     chain_set = set(principal_chain)
 

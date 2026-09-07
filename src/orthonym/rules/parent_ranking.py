@@ -1,4 +1,4 @@
-""": the Blue-Book-ranked parent-candidate SET.
+"""v29 Phase 4 (P4-b): the Blue-Book-ranked parent-candidate SET.
 
 WHY THIS MODULE EXISTS
 ======================
@@ -7,7 +7,7 @@ internally and adds exactly ONE candidate to the pool, and the pool's *ranking*
 path is dead (``selection_mode='first_applicable'``,
 ``assembly/candidate_pool.py:135``, and the module says so at ``:953-955``).  So
 there was never a candidate set to filter — building the ranked set is the work.
-See Part A1/A3 and Part G.
+See ``.planning/audit-v29/PHASE4-rule-derivation.md`` Part A1/A3 and Part G.
 
 WHAT THE BLUE BOOK ACTUALLY LICENSES  (derivation Part B1 + B1a)
 ===============================================================

@@ -2,25 +2,25 @@
 
 Verbatim lift of the N-oxide dispatch logic from composer.py:813-820
 (inline branch) + composer.py:2044-2174 (body of _try_name_n_oxide +
-_name_aromatic_n_oxide + _name_aliphatic_n_oxide). Per CONTEXT,
+_name_aromatic_n_oxide + _name_aliphatic_n_oxide). Per CONTEXT D-24,
 the body stays in composer.py until Plan-03 commit 03-10 thinning.
 
 IUPAC cite: P-62.5 (N-oxides; functional class naming).
 
-Special case (per CONTEXT + 160-AUDIT-DECOMP.md § 2.4):
+Special case (per CONTEXT D-25 + 160-AUDIT-DECOMP.md § 2.4):
 - _try_name_n_oxide() makes a recursive name_fragment_recursively() call
   on a reduced (N-oxide → parent amine) RWMol copy. The recursion is
   PERMITTED because:
   (a) the recursive call instantiates a FRESH push_pool/pop_pool lifecycle
-      per Phase 145.1;
+      per Phase 145.1 D-09;
   (b) RWMol mutation operates on a COPY (Chem.RWMol(features.mol)),
       NOT the input features.mol;
   (c) the recursive name_fragment_recursively() runs in an isolated
       pool scope; no cross-handler shared state leaks.
-- side_effect_inventory remains per hard invariant (recursion
+- side_effect_inventory remains () per D-25 hard invariant (recursion
   is not a side effect on the outer features / outer pool).
 
-Predicate strategy (per CONTEXT):
+Predicate strategy (per CONTEXT D-25):
 - The predicate checks ``features.functional_groups.get('n_oxide_aromatic')``
   or ``features.functional_groups.get('n_oxide_aliphatic')`` (the keys
   populated by perception/functional_groups.py:70-71). This filters out
@@ -56,7 +56,7 @@ def _is_n_oxide(features: Any) -> bool:
     dispatch_inner can proceed to the next priority entry for non-N-oxide
     molecules.
 
-    Pure read-only per CONTEXT / AP-160-26: reads
+    Pure read-only per CONTEXT D-25 / AP-160-26: reads
     ``features.functional_groups`` dict (set by perception layer before
     assembly); no writes.
     """
@@ -75,8 +75,8 @@ def name_n_oxide(
     map>)`` on success; None when not an N-oxide.
 
     Per 160-AUDIT-DECOMP.md § 2.4: the recursive name_fragment_recursively
-    call inside _try_name_n_oxide is PERMITTED under because it
-    instantiates a fresh push_pool/pop_pool lifecycle per Phase 145.1
+    call inside _try_name_n_oxide is PERMITTED under D-25 because it
+    instantiates a fresh push_pool/pop_pool lifecycle per Phase 145.1 D-09
     and operates on a COPY of features.mol (no outer mutation).
     """
     # Lazy imports per PATTERNS § Lazy Import.
@@ -101,7 +101,7 @@ def name_n_oxide(
     # WR-03: use the candidate returned by pool.add() instead of pool.best()
     # to prevent silently returning a DIFFERENT handler's name when this
     # handler's candidate is rejected by the gate. Matches sibling pattern
-    # in oxime.py. Per CONTEXT: handlers own the name string they
+    # in oxime.py. Per CONTEXT D-13: handlers own the name string they
     # place in NamingResult.name.
     name_to_inject = cand.name if cand is not None else n_oxide_name
 

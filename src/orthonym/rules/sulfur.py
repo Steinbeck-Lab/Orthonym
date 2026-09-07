@@ -107,11 +107,13 @@ def name_sulfoxide(mol, sulfoxide_atoms: Tuple[int, ...]) -> Optional[str]:
     Returns:
         Functional class name, or None if not a simple sulfoxide
     """
-    # Find the sulfur atom (has =O and 2 C neighbors)
+    # Find the chalcogen atom (has =O and 2 C neighbors). P6-6I: accept
+    # Se/Te; a S molecule still finds S and keeps the 'sulfoxide' class word
+    # (byte-identical to HEAD).
     sulfur_idx = None
     for idx in sulfoxide_atoms:
         atom = mol.GetAtomWithIdx(idx)
-        if atom.GetSymbol() == 'S':
+        if atom.GetSymbol() in ('S', 'Se', 'Te'):
             sulfur_idx = idx
             break
 
@@ -119,6 +121,8 @@ def name_sulfoxide(mol, sulfoxide_atoms: Tuple[int, ...]) -> Optional[str]:
         return None
 
     sulfur = mol.GetAtomWithIdx(sulfur_idx)
+    class_word = {'S': 'sulfoxide', 'Se': 'selenoxide',
+                  'Te': 'telluroxide'}[sulfur.GetSymbol()]
 
     # Get carbon neighbors (exclude oxygen)
     neighbors = [n for n in sulfur.GetNeighbors() if n.GetSymbol() == 'C']
@@ -138,9 +142,9 @@ def name_sulfoxide(mol, sulfoxide_atoms: Tuple[int, ...]) -> Optional[str]:
 
     # Check for symmetry
     if sub_names[0] == sub_names[1]:
-        return f"di{sub_names[0]} sulfoxide"
+        return f"di{sub_names[0]} {class_word}"
     else:
-        return f"{sub_names[0]} {sub_names[1]} sulfoxide"
+        return f"{sub_names[0]} {sub_names[1]} {class_word}"
 
 
 def name_sulfone(mol, sulfone_atoms: Tuple[int, ...]) -> Optional[str]:
@@ -158,11 +162,12 @@ def name_sulfone(mol, sulfone_atoms: Tuple[int, ...]) -> Optional[str]:
     Returns:
         Functional class name, or None if not a simple sulfone
     """
-    # Find the sulfur atom
+    # Find the chalcogen atom. P6-6I: accept Se/Te; a S molecule still finds
+    # S and keeps the 'sulfone' class word (byte-identical to HEAD).
     sulfur_idx = None
     for idx in sulfone_atoms:
         atom = mol.GetAtomWithIdx(idx)
-        if atom.GetSymbol() == 'S':
+        if atom.GetSymbol() in ('S', 'Se', 'Te'):
             sulfur_idx = idx
             break
 
@@ -170,6 +175,8 @@ def name_sulfone(mol, sulfone_atoms: Tuple[int, ...]) -> Optional[str]:
         return None
 
     sulfur = mol.GetAtomWithIdx(sulfur_idx)
+    class_word = {'S': 'sulfone', 'Se': 'selenone',
+                  'Te': 'tellurone'}[sulfur.GetSymbol()]
 
     # Get carbon neighbors (exclude oxygens)
     neighbors = [n for n in sulfur.GetNeighbors() if n.GetSymbol() == 'C']
@@ -189,9 +196,9 @@ def name_sulfone(mol, sulfone_atoms: Tuple[int, ...]) -> Optional[str]:
 
     # Check for symmetry
     if sub_names[0] == sub_names[1]:
-        return f"di{sub_names[0]} sulfone"
+        return f"di{sub_names[0]} {class_word}"
     else:
-        return f"{sub_names[0]} {sub_names[1]} sulfone"
+        return f"{sub_names[0]} {sub_names[1]} {class_word}"
 
 
 def name_sulfonic_acid(mol, sulfonic_atoms: Tuple[int, ...], parent_name: str) -> str:
@@ -230,7 +237,7 @@ def name_sulfonyl_halide(features, style: str = "pin") -> Optional[str]:
     """
     mol = features.mol
     pg = features.principal_group
-    if pg not in ("sulfonyl_halide", "sulfinyl_halide"):
+    if pg not in ("sulfonyl_halide", "sulfinyl_halide", "sulfonyl_cyanide"):
         return None
     matches = features.functional_groups.get(pg, [])
     # Poly-sulfonyl-halide (>1) deferred: the two-word grammar would need a
@@ -238,21 +245,39 @@ def name_sulfonyl_halide(features, style: str = "pin") -> Optional[str]:
     if len(matches) != 1:
         return None
     match = matches[0]
-    # Match tuples: sulfonyl (S, =O, =O, X); sulfinyl (S, =O, X) — S first, X last.
-    halide_idx = match[-1]
-    halide_sym = mol.GetAtomWithIdx(halide_idx).GetSymbol()
-    from .acid_halides import _HALIDE_WORD
-    halide_word = _HALIDE_WORD.get(halide_sym)
-    if halide_word is None:
-        return None
 
-    # Cap the halide -> -OH, forming the parent oxoacid.
+    # Cap the S-bonded leaving group -> -OH, forming the parent sulfonic/sulfinic
+    # acid; ``halide_word`` is the functional-class word ('chloride' ... or
+    # 'cyanide' for the P-66.5.1.3.2 sulfonyl cyanide).
     rw = Chem.RWMol(mol)
-    o_atom = rw.GetAtomWithIdx(halide_idx)
-    o_atom.SetAtomicNum(8)
-    o_atom.SetFormalCharge(0)
-    o_atom.SetNumExplicitHs(0)
-    o_atom.SetNoImplicit(False)
+    if pg == "sulfonyl_cyanide":
+        # P4-3 (P-66.5.1.3.2, BB:34811 'CH3-SO2-CN methanesulfonyl cyanide
+        # (PIN)'). Match tuple (S, =O, =O, cyanide-C, N): drop the -C#N and cap S
+        # with -OH by converting the cyanide carbon to O and deleting the N.
+        halide_word = "cyanide"
+        cyanide_c = match[3]
+        nitrogen = match[4]
+        c_atom = rw.GetAtomWithIdx(cyanide_c)
+        c_atom.SetAtomicNum(8)
+        c_atom.SetFormalCharge(0)
+        c_atom.SetNumExplicitHs(0)
+        c_atom.SetNoImplicit(False)
+        rw.RemoveBond(cyanide_c, nitrogen)
+        rw.RemoveAtom(nitrogen)
+    else:
+        # Match tuples: sulfonyl (S, =O, =O, X); sulfinyl (S, =O, X) — S first,
+        # halide last.
+        halide_idx = match[-1]
+        halide_sym = mol.GetAtomWithIdx(halide_idx).GetSymbol()
+        from .acid_halides import _HALIDE_WORD
+        halide_word = _HALIDE_WORD.get(halide_sym)
+        if halide_word is None:
+            return None
+        o_atom = rw.GetAtomWithIdx(halide_idx)
+        o_atom.SetAtomicNum(8)
+        o_atom.SetFormalCharge(0)
+        o_atom.SetNumExplicitHs(0)
+        o_atom.SetNoImplicit(False)
     try:
         capped = rw.GetMol()
         Chem.SanitizeMol(capped)
@@ -363,7 +388,7 @@ def _acid_stem_unsaturated_oxide_prefix(
     # Isolate the fragment bearing the CAPPED SULFONYL S. Selecting the first piece
     # that contains ANY sulfur mis-picks the detached PARENT when that parent itself
     # holds a ring sulfur (a thiazole / thiophene host): the wrong piece has _acid_s=0
-    # so guard 1 spuriously fires. #29 gap-a: `2-(4-aminobenzene-1-sulfonamido)-
+    # so guard 1 spuriously fires. v30 #29 gap-a: `2-(4-aminobenzene-1-sulfonamido)-
     # 1,3-thiazole-5-carboxylic acid` abstained because the thiazole piece `Nc1nccs1`
     # was chosen over the arene sulfonic acid `Nc1ccc(S(=O)(=O)O)cc1`. RWMol.AddAtom
     # appends and RemoveBond does not reindex, so ``sulfur_idx`` is still valid in
@@ -386,7 +411,7 @@ def _acid_stem_unsaturated_oxide_prefix(
     # gate-DISABLED acid sub-namer, which a fable review of 7c621b84 showed could emit a
     # wrong constitution for the N-parent (sulfonamido) case. 8afa533c added the guards
     # but scoped them to the N-parent branch to avoid a gold-risk on a path it had not
-    # itself broken. confirmed the CARBON-parent sulfone/sulfoxide-prefix path
+    # itself broken. v30 F6 confirmed the CARBON-parent sulfone/sulfoxide-prefix path
     # has the SAME false friends (`CS(=O)(=O)CCS(O)(=O)=O` -> `ethane-1,2-disulfonyl`),
     # so both guards now fire for either parent element (C or N). Failing closed here
     # returns the caller to its own fail-closed handling; the corrupted stem never ships.
@@ -448,14 +473,14 @@ def _acid_stem_unsaturated_oxide_prefix(
     _sk_frag = _self_consistency_skeleton(acid_smiles)
     if _sk_name is None or _sk_frag is None or _sk_name != _sk_frag:
         return None
-    # #36 (fable F6 finding 3): the skeleton block above is the InChIKey first
+    # v30 #36 (fable F6 finding 3): the skeleton block above is the InChIKey first
     # block, which EXCLUDES stereo (ADR-18-07), so a WRONG CIP descriptor (E/Z, R/S)
     # from the gate-disabled acid sub-namer would re-anchor skeleton-exact and ship a
     # wrong-stereo `...sulfinyl/sulfonyl` prefix. Also require the C6 RegistrationHash
     # stereo layer (stereo-bearing, tautomer-canonical) to match — gate-INDEPENDENT,
     # fail-closed on mismatch/unhashable. No live witness today (the sub-namer routes
     # stereo through the standard CIP path, so its descriptors are correct), so this is
-    # defence-in-depth closing the gaprequires: honest WITHOUT the gate,
+    # defence-in-depth closing the gap invariant 2 requires: honest WITHOUT the gate,
     # for both the N-parent (8afa533c) and carbon-parent (F6) paths.
     _st_name = _registration_stereo_layer(_reparsed)
     _st_frag = _registration_stereo_layer(acid_smiles)
@@ -569,9 +594,13 @@ def name_chalcogen_oxide_substitutive(
     """
     from ..assembly.naming_utils import should_omit_locant_one
 
+    # P6-6I: accept Se/Te (chalcogen) as well as S. The match_atoms come
+    # from an element-specific SMARTS (sulfoxide -> S only; selenoxide -> Se
+    # only; ...), so the first chalcogen found is the intended central atom;
+    # the body below is already element-generic (it only walks C neighbours).
     sulfur_idx = None
     for idx in match_atoms:
-        if mol.GetAtomWithIdx(idx).GetSymbol() == 'S':
+        if mol.GetAtomWithIdx(idx).GetSymbol() in ('S', 'Se', 'Te'):
             sulfur_idx = idx
             break
     if sulfur_idx is None:
@@ -644,9 +673,10 @@ def chalcogen_oxide_fc_covers_molecule(
     dropping -S-CH3 (a different molecule). On False the handler declines
     and the polyfunctional path names the whole structure.
     """
+    # P6-6I: accept Se/Te as well as S (see name_chalcogen_oxide_substitutive).
     sulfur_idx = None
     for idx in match_atoms:
-        if mol.GetAtomWithIdx(idx).GetSymbol() == 'S':
+        if mol.GetAtomWithIdx(idx).GetSymbol() in ('S', 'Se', 'Te'):
             sulfur_idx = idx
             break
     if sulfur_idx is None:

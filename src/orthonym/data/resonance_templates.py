@@ -7,7 +7,7 @@ keeps its own literal bond orders / formal charges. Two independently-valid
 resonance drawings exist for each of these three P-59/P-61/P-73.2.2.3
 classes; a single closed 3-set of six ``(bond_orders, charges)`` vectors over
 the ordered attach->terminal nitrogen chain distinguishes all of them
-(Phase 3B SPY, Q3):
+(Phase 3B SPY, ``.planning/audit-v32/phase3b-resonance-spy.md`` Q3):
 
     class      | drawing                        | bond_orders | charges
     -----------|---------------------------------|-------------|------------------

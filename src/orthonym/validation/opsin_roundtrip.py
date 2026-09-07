@@ -191,7 +191,7 @@ def opsin_atom_locant_map(
     injector's accepted format) or None when it cannot be built (OPSIN
     unavailable/rejecting, atom-count/parse mismatch, or no isomorphism).
 
-    This is the ``re-anchor + audit`` primitive (CLAUDE.md: the
+    This is the ``re-anchor + audit`` primitive (CLAUDE.md invariant 18): the
     map is derived FROM the name+structure, never trusted from a builder's
     internal numbering, and the caller RT-verifies any name decorated with it.
     """
@@ -215,7 +215,7 @@ def opsin_atom_locant_map(
     # Constitutional isomorphism onto the input graph (chirality ignored — the
     # locants are constitutional; the stereo layer is what we are re-deriving).
     #
-    # DETERMINISM: a symmetric molecule has more
+    # DETERMINISM (review v43-P2 F2 / invariant 4): a symmetric molecule has more
     # than one automorphism, and ``GetSubstructMatch`` returns an ARBITRARY one
     # whose choice depends on the input atom order — so two SMILES spellings of,
     # e.g., meso-butane-2,3-diol would map the OPSIN locants onto different atoms
@@ -311,7 +311,7 @@ def opsin_roundtrip_check(
 def opsin_parse_both_versions(name: str) -> dict:
     """Cross-validate name against OPSIN 2.8.0 and 2.9.0.
 
-    Per: Test against both versions to identify version-specific
+    Per D-19: Test against both versions to identify version-specific
     parsing differences.
 
     Args:

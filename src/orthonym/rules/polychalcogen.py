@@ -263,7 +263,7 @@ def _cite_locanted_prefixes(by_name: dict) -> str:
     parts = []
     for name in _cited_order(by_name):
         locs = sorted(by_name[name])
-        # Item A: the multiplier WORD comes from the shared
+        # v29 P3-CLOSEOUT Item A: the multiplier WORD comes from the shared
         # primitive, which knows P-16.3.5(a); the local `_SUB_MULTIPLIER` table
         # could only ever say di/tri, so a SUBSTITUTED prefix on a polysulfane
         # could not take bis/tris. The arity bound stays local (fail closed).

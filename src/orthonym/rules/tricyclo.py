@@ -625,7 +625,7 @@ def name_polycyclo_system(mol) -> Optional[str]:
     if classification == 'tricyclo':
         return name_tricyclo_system(mol)
 
-    # Phase 151 routing: ≥4-ring (tetracyclo / pentacyclo / higher)
+    # Phase 151 D-04 routing: ≥4-ring (tetracyclo / pentacyclo / higher)
     # systems delegate to the dedicated polycyclic_von_baeyer module which
     # owns is_higher_polycyclo + name_higher_polycyclo + the
     # cascade-step-6 supplier. See 151-AUDIT-A.md verdict THIN_WRAPPER.

@@ -1,18 +1,18 @@
 """Phase 160 ion_dispatch handler — pre-pool bypass wrapper.
 
-Per CONTEXT, ion / salt / zwitterion / radical species use a
+Per CONTEXT D-09, ion / salt / zwitterion / radical species use a
 PRE-POOL bypass at composer.py:751-768. The pre-pool call site STAYS
 in composer.py (lines 751-768); only the body of ``assemble_ion_name``
 is hosted here as ``name_ion_dispatch``.
 
-This module hosts 4 sub-types in ONE file per CONTEXT (a single
+This module hosts 4 sub-types in ONE file per CONTEXT D-03 (a single
 ``ion_dispatch`` HANDLER_POLICIES key spans salt + zwitterion + radical +
 ion). All four sub-types share the same body (the inner switch on
 ``features.species_type`` is preserved verbatim).
 
 IUPAC cites:
 - P-65.6.2.1 / P-63.8.1 / P-77 + P-72/P-73 (salts: cation word(s) + anion)
-  (: corrected 169.6-04 — the old conjunctive-nomenclature cite was wrong)
+  (D-09: corrected 169.6-04 — the old conjunctive-nomenclature cite was wrong)
 - P-74 (zwitterions)
 - P-71 (radicals)
 - P-72 + P-73 (anions / cations)
@@ -25,7 +25,7 @@ architectural reviewers see ion_dispatch in the table) but unreachable
 in practice because the inline bypass runs FIRST.
 
 References:
-- composer.py:751-768 (inline pre-pool call site; PRESERVED per CONTEXT).
+- composer.py:751-768 (inline pre-pool call site; PRESERVED per CONTEXT D-09).
 - composer.py:assemble_ion_name (body STAYS until Plan-03 commit 03-10).
 - 160-AUDIT-DECOMP.md § 1 row 'ion_dispatch' + § 2.1 purity proof.
 """
@@ -56,7 +56,7 @@ def name_ion_dispatch(
 ) -> Optional[NamingResult]:
     """Pre-pool ion / salt / zwitterion / radical naming dispatcher.
 
-    Wraps ``composer.assemble_ion_name`` per CONTEXT. The inline
+    Wraps ``composer.assemble_ion_name`` per CONTEXT D-09. The inline
     bypass at composer.py:751-768 is the primary call path; this handler
     function exists as a callable target so the architecture is uniform
     across all HANDLER_POLICIES keys.

@@ -1,16 +1,16 @@
 """Phase 169 Plan-01: Group-split topology-table loader.
 
 Loads ``group_split_rules.json`` — the locked, TOPOLOGY-ONLY split-decomposition
-table (CONTEXT /) — into a ``Dict[str, SplitRule]`` keyed by ``fg_name``.
+table (CONTEXT D-02/D-03) — into a ``Dict[str, SplitRule]`` keyed by ``fg_name``.
 
 The split fires at the ``polyfunctional.py:get_fg_prefix_form()`` /
-``substituent_no_prefix_form`` site (CONTEXT /F2 — a coarse string path,
+``substituent_no_prefix_form`` site (CONTEXT D-01/F2 — a coarse string path,
 NOT an IR tree visitor). When a
 non-principal composite functional group has no clean strict-IUPAC prefix and
 would otherwise be dropped, the splitter (Plan-02) decomposes it into its
 component sub-prefixes per the topology recorded here.
 
-**Single source of truth (CONTEXT):** this table records ONLY the
+**Single source of truth (CONTEXT D-02):** this table records ONLY the
 decomposition TOPOLOGY — which sub-fragments (chalcogen / heteroatom linker) the
 composite splits into, and a ``resolves_via`` pointer naming the existing
 ``fg_name`` / dispatcher key whose ``seniority.PREFIX_FORMS`` /
@@ -18,7 +18,7 @@ composite splits into, and a ``resolves_via`` pointer naming the existing
 runtime. The prefix output strings (``oxo``, the alkoxy/sulfanyl forms, ...) are
 NEVER stored here — duplicating them would fork the authority and invite drift.
 
-Frozen-dataclass discipline mirrors Phase 165 SACRED + Phase 168's
+Frozen-dataclass discipline mirrors Phase 165 D-04 SACRED + Phase 168's
 ``triviality_controller_seed.py``: ``SplitRule`` / ``SplitComponent`` are
 ``@dataclass(frozen=True)`` and are never mutated after construction.
 
@@ -31,7 +31,7 @@ Self-contained loader (PATTERNS NOTE): the Phase-168 seed precedent uses its OWN
 module, NOT a ``data/__init__.py`` merge — this module mirrors that path and does
 not touch ``data/__init__.py``.
 
-Source: 169-CONTEXT.md,,,; 169-RESEARCH.md section "The #1
+Source: 169-CONTEXT.md D-01, D-02, D-03, D-04; 169-RESEARCH.md section "The #1
 Gate" + "Code Examples"; 169-PATTERNS.md "data/group_split_rules.json + loader".
 """
 
@@ -59,7 +59,7 @@ class SplitComponent:
 
     ``resolves_via`` names the existing ``fg_name`` / dispatcher key whose
     PREFIX_FORMS / substituent_prefix_forms entry supplies the prefix STRING at
-    runtime — the string itself is never stored here (CONTEXT).
+    runtime — the string itself is never stored here (CONTEXT D-02).
     """
 
     role: str                      # "chalcogen" | "linker"
@@ -70,10 +70,10 @@ class SplitComponent:
 
 @dataclass(frozen=True)
 class SplitRule:
-    """One locked split-decomposition entry, keyed by ``fg_name`` (CONTEXT).
+    """One locked split-decomposition entry, keyed by ``fg_name`` (CONTEXT D-03).
 
-    Immutable by Phase 165 SACRED discipline. Holds ONLY topology +
-    provenance — no prefix output strings (CONTEXT).
+    Immutable by Phase 165 D-04 SACRED discipline. Holds ONLY topology +
+    provenance — no prefix output strings (CONTEXT D-02).
     """
 
     fg_name: str
@@ -92,7 +92,7 @@ def load_split_rules(json_path: Path, *, validate: bool = False) -> Dict[str, Sp
     running RDKit — re-run ``scripts/lint_group_split_rules.py --rt`` to
     re-confirm round-trips (mirrors the Phase 168 R-10 warning).
 
-    With ``validate=True`` additionally runs the CONTEXT design-time
+    With ``validate=True`` additionally runs the CONTEXT D-04 design-time
     OPSIN-RT re-confirmation of each entry's documented example (off by default —
     runs at CI lint time, not at every import). Raises ``ValueError`` on the
     first entry that fails to round-trip. Raises the JSON-load errors on a
@@ -139,7 +139,7 @@ def load_split_rules(json_path: Path, *, validate: bool = False) -> Dict[str, Sp
 
 
 def _opsin_rt_validate_examples(entries) -> None:
-    """CONTEXT design-time OPSIN-RT re-confirmation (opt-in; slow).
+    """CONTEXT D-04 design-time OPSIN-RT re-confirmation (opt-in; slow).
 
     Parses each entry's documented example name through OPSIN ``-osmi`` and
     confirms it is non-empty. The connectivity-InChI equality check the full

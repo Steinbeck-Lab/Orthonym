@@ -18,7 +18,7 @@ logger = logging.getLogger(__name__)
 
 _CIP_ASSIGNED_PROP = '_Orthonym_CIPAssigned'
 
-# WSB-03 (Phase 177,): centres CIP engine. Read once at import time
+# WSB-03 (Phase 177, D-13): centres CIP engine. Read once at import time
 # (same idiom as namer.ORTHONYM_ENABLE_TRIVIALITY_CONTROLLER).
 #
 # STER-02 (Phase H, 2026-06-21): the default is now ON. The vendored `centres`
@@ -27,7 +27,7 @@ _CIP_ASSIGNED_PROP = '_Orthonym_CIPAssigned'
 # regressions vs RDKit** (centres remains a strict superset of RDKit on the
 # suite; the gain is exotic CIP rule cases RDKit mis-ranks). When centres is
 # unavailable (jar or Java absent) the code falls through to rdCIPLabeler
-# UNCHANGED -- a missing JVM never hard-fails a name. Set
+# UNCHANGED -- a missing JVM never hard-fails a name (D-13). Set
 # ORTHONYM_USE_CENTRES_CIP=0/off to force the legacy RDKit-only path.
 #
 # CIP-UPDATE (2026-06-27): engine refreshed 1.2.1 -> 1.5 (SiMolecule/centres
@@ -75,7 +75,7 @@ def _fill_missing_bond_cip_from_rdkit(mol) -> None:
         # propagate. A narrower clause let an unlisted exception escape to
         # assign_stereochemistry's outer ``except Exception``, which re-ran the
         # RDKit-only labeller on a mol centres had ALREADY labelled -- silently
-        # downgrading it from the 279/290 engine to 235/290 (review #3).
+        # downgrading it from the 279/290 engine to 235/290 (REVIEW review #3).
         return
 
 
@@ -100,7 +100,7 @@ def assign_stereochemistry(mol) -> None:
     if mol.HasProp(_CIP_ASSIGNED_PROP):
         return
 
-    # WSB-03: when the centres gate is ON AND the engine is available,
+    # WSB-03 (D-13): when the centres gate is ON AND the engine is available,
     # centres is the CIP source-of-truth (it sets the same _CIPCode props the
     # downstream consumers read). If the gate is OFF (default) or centres is
     # unavailable (jar/Java absent), this branch is skipped and the path below
@@ -327,7 +327,7 @@ def input_stereo_undefined(mol, atom_indices: Optional[Iterable[int]] = None) ->
     stereogenic double bond left undirected. When ``atom_indices`` is given, the
     tetrahedral check is restricted to those atoms (bond check is unrestricted).
 
-    The shared stereo-honesty predicate for: a config-implying
+    The shared stereo-honesty predicate for v33 Phase 1: a config-implying
     retained name (steroid ``cholest-``/``androst-``, amino acid
     ``S-methylcysteine``) asserts a specific configuration, so it must not be
     emitted when this returns True -- that would fabricate stereo the input

@@ -474,7 +474,7 @@ def compute_fused_numbering(
     if len(ring_atoms) < 6:
         return None
 
-    # 13B(a) S2a: heteroatoms in the rings are admitted (quinoline/acridine/
+    # v23 13B(a) S2a: heteroatoms in the rings are admitted (quinoline/acridine/
     # phenazine/pteridine/... families).  S2b: mixed 5/6-membered rings are
     # admitted too (indole/benzofuran/carbazole/...).  The embedding (hex for
     # all-6, regular-polygon for mixed) + peripheral walk are element- and

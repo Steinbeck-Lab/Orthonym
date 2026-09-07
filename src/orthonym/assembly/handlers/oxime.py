@@ -2,13 +2,13 @@
 
 Verbatim lift of the oxime dispatch logic from composer.py:771-782
 (inline branch) + composer.py:1906-2042 (body of _name_oxime_or_hydrazone).
-The body itself STAYS in composer.py per CONTEXT incremental-migration
+The body itself STAYS in composer.py per CONTEXT D-24 incremental-migration
 discipline — this handler module is a thin wrapper that invokes the
 existing composer.py logic via lazy import. Plan-03 commit 03-10
 (composer.py thinning) deletes the inline body from composer.py once
 the inner-dispatch substrate is fully wired.
 
-Byte-identical lock per CONTEXT (DECOMP-03): the handler's behavior
+Byte-identical lock per CONTEXT D-21 (DECOMP-03): the handler's behavior
 on every canary fixture MUST equal the inline branch's behavior bit-for-bit;
 verified by `python scripts/verify_decomp_byte_identical.py --mode delta`
 at the atomic commit gate.
@@ -20,7 +20,7 @@ References:
 - composer.py:1906-2042 (_name_oxime_or_hydrazone body; STAYS until 03-10).
 - 160-AUDIT-DECOMP.md § 1 row 'oxime' + § 2.2 predicate purity proof.
 - 160-PATTERNS.md § 6 (Tier-B lift handler pattern).
-- 160-CONTEXT.md (atomic-commit byte-identical canary lock).
+- 160-CONTEXT.md D-21 (atomic-commit byte-identical canary lock).
 """
 from __future__ import annotations
 
@@ -32,7 +32,7 @@ from ..name_tree import NameTreeNode, NamingResult
 def _is_oxime(features: Any) -> bool:
     """Mirrors composer.py:771 (``features.principal_group == 'oxime'``).
 
-    Pure read-only per CONTEXT / AP-160-26: reads
+    Pure read-only per CONTEXT D-25 / AP-160-26: reads
     ``features.principal_group`` attribute set by perception layer; no
     mutation of features, mol, or module-global state.
     """
@@ -49,25 +49,25 @@ def name_oxime(
     on success; ``None`` on gate-fail / not-applicable (pool gate
     threshold 0.40 per HANDLER_POLICIES['oxime']).
 
-    Wave-1 strategy per CONTEXT: lazy-import the composer.py body
+    Wave-1 strategy per CONTEXT D-24: lazy-import the composer.py body
     (``_name_oxime_or_hydrazone``) and the enrichment helper
     (``_enrich_handler_name``); call them with the same arguments the
     inline branch used; route through the same ``pool.add()`` call so
     Phase 145.1 byte-identical lock methodology is preserved.
 
     The ``mol`` parameter is accepted for API uniformity per CONTEXT
-     but not used here (composer.py:_name_oxime_or_hydrazone reads
+    D-05 but not used here (composer.py:_name_oxime_or_hydrazone reads
     features.mol directly). The ``style`` parameter is similarly unused
     for first-wave Tier-B handlers (style only affects Pass-2 assembly,
     not Tier-B handlers).
 
     Args:
         features: MolecularFeatures object.
-        mol: RDKit Mol object (not used in first-wave; reserved per).
-        style: Naming style (not used in first-wave Tier-B; reserved per).
+        mol: RDKit Mol object (not used in first-wave; reserved per D-05).
+        style: Naming style (not used in first-wave Tier-B; reserved per D-05).
 
     Returns:
-        NamingResult on success, or None on gate-fail. Per CONTEXT
+        NamingResult on success, or None on gate-fail. Per CONTEXT D-05
         the ``tree`` field is None for first-wave handlers; the ``name``
         field is the byte-identical contract per DECOMP-03.
     """
@@ -113,7 +113,7 @@ def name_oxime(
     if cand is None:
         return None
 
-    # Per CONTEXT layering: this handler's inline branch at
+    # Per CONTEXT D-13 layering: this handler's inline branch at
     # composer.py:781 wrapped the name in _inject_stereo_if_missing — we
     # preserve that byte-identical behavior here. The NamingResult.name
     # field is the FINAL name (post-stereo-injection); the dispatch caller

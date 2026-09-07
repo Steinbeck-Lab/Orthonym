@@ -32,14 +32,14 @@ MAX_DECOMP_LEVELS = 3  # Phase 107: max iterative decomposition levels for mixed
 
 def _name_fragment_with_fallback(smiles: str):
     """Name a fragment: recursive naming first, pipeline-only fallback, then
-    a T4/general-engine best-effort rescue.
+    a T4/general-engine best-effort rescue (v32 Phase 2).
 
-    Per: When name_fragment_recursively returns None (depth/cycle limit hit),
+    Per D-01: When name_fragment_recursively() returns None (depth/cycle limit hit),
     fall back to name_pipeline_only() instead of aborting the entire decomposition.
     name_pipeline_only() uses the full IUPAC pipeline without triggering decomposition
     recursion, preserving all substituents.
 
-    : when BOTH
+    v32 Phase 2 (`.planning/audit-v32/phase2-shared-mechanism-spy.md`): when BOTH
     PIN-tier attempts above fail, retry the fragment through a fresh best-effort
     (T4) namer before giving up (`_name_fragment_t4_rescue`). This rung is
     strictly SCOPED to run only after a PIN failure -- a fragment that already
@@ -61,12 +61,12 @@ def _name_fragment_with_fallback(smiles: str):
     if name and "unknown" not in name.lower():
         return name
 
-    # Fallback: full systematic pipeline without decomposition
+    # Fallback: full systematic pipeline without decomposition (D-01)
     name = name_pipeline_only(smiles)
     if name and "unknown" not in name.lower():
         return name
 
-    # Last resort: best-effort T4/general-engine rescue --
+    # Last resort (v32 Phase 2): best-effort T4/general-engine rescue --
     # only reached when both PIN-tier attempts above already failed.
     name = _name_fragment_t4_rescue(smiles)
     if name and "unknown" not in name.lower():
@@ -78,7 +78,7 @@ def _name_fragment_with_fallback(smiles: str):
 def _name_fragment_t4_rescue(smiles: str) -> Optional[str]:
     """Best-effort (T4/general-engine) rescue for a fragment PIN could not name.
 
-    , secondary
+    v32 Phase 2 (`.planning/audit-v32/phase2-shared-mechanism-spy.md`, secondary
     lever): every fragment named during decomposition previously went through
     ``name_pipeline_only``, whose fresh ``Orthonym`` defaults
     ``general_fallback=False`` (``namer.py:2047``) -- so the T4/general-engine
@@ -148,7 +148,7 @@ def _name_fragment_t4_rescue(smiles: str) -> Optional[str]:
 def _get_max_decomp_levels(mol) -> int:
     """Return max decomposition levels based on molecule size.
 
-    Per: HA > 50 molecules (phospholipids, polysaccharides) need one
+    Per D-04: HA > 50 molecules (phospholipids, polysaccharides) need one
     extra level to fully decompose mixed bond types.
     """
     if mol.GetNumHeavyAtoms() > 50:
@@ -198,7 +198,7 @@ _RETAINED_CORE_NAMES = frozenset({
     # Phase 099 additions: fused heterocycles and polycyclics
     'flavone', 'chromone', 'coumarin', 'pteridine', 'phenazine',
     'carbazole', 'phenanthridine',
-    # Cluster B: the PIN forms carry the [b,d] fusion descriptor; the exact
+    # v28 Cluster B: the PIN forms carry the [b,d] fusion descriptor; the exact
     # match at :377/:425 needs them so a >25-heavy-atom core still passes the
     # quality gate. Bare forms kept (harmless) for any legacy path.
     'dibenzo[b,d]furan', 'dibenzo[b,d]thiophene',
@@ -265,11 +265,11 @@ _BOND_TYPE_TOKENS = {
 def _compile_token_patterns(token_dict):
     """Build regex patterns for IUPAC morpheme-aware token matching.
 
-    Per: tokens match at IUPAC nomenclature boundaries (after hyphen,
+    Per D-14: tokens match at IUPAC nomenclature boundaries (after hyphen,
     after opening paren, at start of name, before closing paren, at end of name).
-    Per: short suffix tokens ('ate', 'oyl') match at word/morpheme end only,
+    Per D-15: short suffix tokens ('ate', 'oyl') match at word/morpheme end only,
     to prevent false positives from common English words.
-    Per: known false positive patterns ('polyester', 'polyamide', etc.) are
+    Per D-16: known false positive patterns ('polyester', 'polyamide', etc.) are
     excluded via a separate false-positive check BEFORE regex matching.
 
     Token matching strategy:
@@ -310,8 +310,8 @@ _COMPILED_TOKEN_PATTERNS = _compile_token_patterns(_BOND_TYPE_TOKENS)
 def _token_matches_name(name_lower, token_patterns, bond_type):
     """Check if any token for this bond type matches in the name.
 
-    Per: first checks for false positive patterns.
-    Per: never raises -- returns True on any exception (benefit of doubt).
+    Per D-16: first checks for false positive patterns.
+    Per D-17: never raises -- returns True on any exception (benefit of doubt).
     """
     try:
         false_pos = token_patterns.get("_false_positives", set())
@@ -533,7 +533,7 @@ def _name_covers_molecule(name: str, mol) -> bool:
 def _amine_acyl_ambiguous(amine_smiles: str) -> bool:
     """True when a bare ``N-<acyl>-`` float onto this amine fragment is AMBIGUOUS.
 
-    task 24 (acylspy). The float prepends ``N-`` to the amine PARENT name without
+    v30 task 24 (acylspy). The float prepends ``N-`` to the amine PARENT name without
     saying WHICH nitrogen carries the acyl. If the amine fragment has >=2 ACYLATABLE
     nitrogens (an N bearing >=1 hydrogen, i.e. one that could accept the acyl), the
     name denotes >=2 distinct molecules -- OPSIN resolves it to one by its own rule, so
@@ -551,7 +551,7 @@ def _amine_acyl_ambiguous(amine_smiles: str) -> bool:
         # acyl) OR an AROMATIC RING nitrogen: OPSIN will DEAROMATIZE a ring N to
         # host the acyl (measured: `N-formyl-2-(methylamino)-1,3-thiazole-5-
         # carboxylic acid` parsed with the formyl on the thiazole ring N, not the
-        # exocyclic amino N). #29-fable-BLOCKER: the H-only count missed the
+        # exocyclic amino N). v30 #29-fable-BLOCKER: the H-only count missed the
         # 0-H aromatic ring N, so a heteroaromatic amine parent + an exocyclic
         # amino floated an ambiguous `N-<acyl>` that shipped a WRONG constitution
         # at gate-off. Counting aromatic ring N as a target fails the float closed.
@@ -632,7 +632,7 @@ def _name_quality_is_acceptable(name: str, mol) -> bool:
             return True
         return False
 
-    #: chars/HA check for medium molecules (15-30 HA).
+    # D-04: chars/HA check for medium molecules (15-30 HA).
     #
     # ⚠ The example this comment used to give -- "catches names like
     # 'quinoline' (0.39 chars/HA) for a 23 HA molecule" -- is FALSE, measured
@@ -889,7 +889,7 @@ def _name_quality_is_acceptable(name: str, mol) -> bool:
     # entered ZERO times. Neither of the two tests that name this block reach
     # it either -- test_quality_gate.py:360 is rejected earlier by the
     # `len(name) < heavy_atoms // 2` guard (its own comment concedes this) and
-    #:331 by the chars/HA reject. So this block has no test coverage and
+    # :331 by the D-04 chars/HA reject. So this block has no test coverage and
     # no observed execution.
     # NOT removed: a reachable window exists (ratio in [0.65, 0.8) for
     # 15 < HA <= 30), so unlike the 0.45 test deleted above it is not provably
@@ -1115,7 +1115,7 @@ _BOND_TYPE_PRIORITY = {
 def _validate_assembly_tokens(assembled: str, fragment_names: list) -> bool:
     """Validate assembled name references tokens from ALL input fragment names.
 
-    Per: Each input fragment should contribute at least one morpheme
+    Per D-02: Each input fragment should contribute at least one morpheme
     (word token) to the assembled result. If a fragment's tokens are entirely
     absent, the assembly lost that fragment.
 
@@ -1313,8 +1313,8 @@ def _try_single_bond_decompose(mol, bond: Dict, style: str = "pin") -> Optional[
         return frag_mol.GetNumHeavyAtoms() if frag_mol else 999
     fragments.sort(key=_frag_sort_key)
 
-    # Name each fragment with fallback (Phase 127:)
-    # Phase 176 /: build a parallel fragment_smiles dict in lockstep with
+    # Name each fragment with fallback (Phase 127: D-01)
+    # Phase 176 / D-03: build a parallel fragment_smiles dict in lockstep with
     # fragment_names, keyed by the SAME frag["side"], so the glycoside assembler
     # can inspect fragment structure (the sugar-skeleton deriver and the
     # aglycone seniority guard both need the SMILES, not just the names). This
@@ -1428,7 +1428,7 @@ def _try_single_bond_decompose(mol, bond: Dict, style: str = "pin") -> Optional[
                     acid_name = fragment_names.get("acid", "")
                     amine_name = fragment_names.get("amine", "")
                     acyl = _acid_to_acyl(acid_name)
-                    # task 24: a bare 'N-<acyl>-' prefix names WHICH nitrogen bears
+                    # v30 task 24: a bare 'N-<acyl>-' prefix names WHICH nitrogen bears
                     # the acyl only by position in the parent name -- so if the amine
                     # fragment has >=2 ACYLATABLE nitrogens (N with >=1 H) the float is
                     # AMBIGUOUS (denotes >=2 molecules; OPSIN guesses one). Refuse to
@@ -1445,9 +1445,9 @@ def _try_single_bond_decompose(mol, bond: Dict, style: str = "pin") -> Optional[
             pass  # Any failure: fall through to normal assembly
 
     # Assemble (delegate to fragment_assembly module)
-    # Phase 176 /: thread fragment_smiles additively; only the glycoside
+    # Phase 176 / D-03: thread fragment_smiles additively; only the glycoside
     # assembler reads it, every other assembler ignores the kwarg.
-    # Incr-1a: thread the parent SMILES too -- the glycoside assembler
+    # v38 Incr-1a: thread the parent SMILES too -- the glycoside assembler
     # RT-gates the STRUCTURAL aglycone-substituent fallback against it (0-wrong).
     # Purely additive; every other assembler ignores the kwarg.
     return assemble_fragment_name(
@@ -1537,7 +1537,7 @@ def _try_multi_bond_decompose(
                          frag["smiles"], frag.get("side", "?"))
             continue
 
-        #: Fragment naming size validation -- reject names that cover
+        # D-05: Fragment naming size validation -- reject names that cover
         # less than 60% of the fragment's heavy atoms.
         # Bypass for retained core names (adenine, purine, etc.) which correctly
         # identify the key structural feature even when the fragment includes
@@ -1556,12 +1556,12 @@ def _try_multi_bond_decompose(
 
         named_fragments.append((frag, frag_name))
 
-    # (fail-closed, invariants 1/9 -- never partial-ship): a
+    # v32 Phase 2 (fail-closed, invariants 1/9 -- never partial-ship): a
     # fragment that STILL could not be named or adequately covered even after
     # `_name_fragment_with_fallback`'s T4/general-engine rescue rung is a
     # genuinely unnameable residue. Shipping a name built from `named_fragments`
     # alone would describe a SMALLER molecule than the input -- exactly the
-    # SELF-01-suppressed-partial shape `phase2-shared-.md`
+    # SELF-01-suppressed-partial shape `phase2-shared-mechanism-spy.md`
     # identified (a complete, well-formed name for the WRONG, smaller
     # molecule). Decline the whole assembly instead of ever silently dropping
     # atoms; the molecule then either abstains honestly or a different
@@ -1657,7 +1657,7 @@ def _try_iterative_mixed_decompose(
 
     parent_heavy = mol.GetNumHeavyAtoms()
 
-    # Iterative decomposition across levels (Phase 127: conditional levels)
+    # Iterative decomposition across levels (Phase 127: D-04 conditional levels)
     max_levels = _get_max_decomp_levels(mol)
     for level in range(max_levels - 1):  # Already did level 0
         new_fragments = []
@@ -1702,7 +1702,7 @@ def _try_iterative_mixed_decompose(
         if not changed:
             break
 
-    # Name each fragment (Phase 127: fallback)
+    # Name each fragment (Phase 127: D-01 fallback)
     # DECO-17/Pitfall 5: use list-of-tuples to preserve identical SMILES duplicates
     # DECO-25: partial assembly -- collect successful fragments, track failures
     named_fragments = []
@@ -1717,7 +1717,7 @@ def _try_iterative_mixed_decompose(
             logger.debug("Mixed-decomp fragment naming failed for %s", frag["smiles"])
             continue
 
-        #: Fragment naming size validation (with retained core name bypass)
+        # D-05: Fragment naming size validation (with retained core name bypass)
         frag_mol = Chem.MolFromSmiles(frag["smiles"])
         if frag_mol:
             frag_ha = frag_mol.GetNumHeavyAtoms()
@@ -1732,12 +1732,12 @@ def _try_iterative_mixed_decompose(
 
         named_fragments.append((frag, frag_name))
 
-    # (fail-closed, invariants 1/9 -- never partial-ship): same
+    # v32 Phase 2 (fail-closed, invariants 1/9 -- never partial-ship): same
     # discipline as `_try_multi_bond_decompose` above -- a fragment that still
     # could not be named/covered after the T4 rescue rung is genuinely
     # unnameable, and shipping a name for `named_fragments` alone would
     # describe a SMALLER molecule than the input (the exact
-    # "Mixed-decomp partial assembly" shape `phase2-shared-.md`
+    # "Mixed-decomp partial assembly" shape `phase2-shared-mechanism-spy.md`
     # traced live: GPI-mannoside -> 3/4 named -> SELF-01-suppressed). Decline
     # rather than silently drop atoms.
     if failed_count > 0:
@@ -1875,8 +1875,8 @@ def try_decompose(mol, style: str = "pin") -> Optional[str]:
                         break
 
     if quality_ok and not glycoside_bypass:
-        # Step 2 (the assembly WEAVER,
-        #): the length/token
+        # v32 Phase 2 Step 2 (the assembly WEAVER,
+        # `.planning/audit-v32/phase2b-weaver-spy.md`): the length/token
         # heuristic `_name_quality_is_acceptable` uses to decide "good
         # enough, skip decomposition" can be FOOLED by a wrong whole-molecule
         # PARENT choice that happens to be long enough to look complete --
@@ -2009,8 +2009,8 @@ def try_decompose(mol, style: str = "pin") -> Optional[str]:
                 if not (existing_name and _decomposition_is_worse(multi_result, existing_name, mol)):
                     return multi_result
 
-    # Step 2 -- the assembly WEAVER
-    #: a core-and-arms composer
+    # v32 Phase 2 Step 2 -- the assembly WEAVER
+    # (`.planning/audit-v32/phase2b-weaver-spy.md`): a core-and-arms composer
     # for star-topology multi-linkage molecules (glycerophospholipids and
     # relatives) that none of the flat assemblers above could weave into ONE
     # connected name (each fragment named fine on its own, but the suffix-
@@ -2018,7 +2018,7 @@ def try_decompose(mol, style: str = "pin") -> Optional[str]:
     # demoted fragment, so the molecule either space-joins -- SELF-01 sees
     # disconnected OPSIN components -- or silently drops the fragment).
     #
-    # Gating (PIN byte-identity + 0-wrong,: reached only here,
+    # Gating (PIN byte-identity + 0-wrong, invariant 1): reached only here,
     # after every earlier attempt in this function has already had its
     # chance to return. The decision to PREFER the weave candidate over
     # whatever `single_result` already holds is never a heuristic quality

@@ -1,23 +1,23 @@
 """Phase 168 Plan-01: Triviality-controller seed-table loader.
 
 Loads ``triviality_controller_seed.json`` (the locked PIN-authority seed per
-CONTEXT) into a ``Dict[str, SeedEntry]`` keyed by canonical SMILES, with:
+CONTEXT D-03) into a ``Dict[str, SeedEntry]`` keyed by canonical SMILES, with:
 
-* the Phase 150 ``_PIN_DENY`` gate enforced at LOAD time (CONTEXT —
+* the Phase 150 ``_PIN_DENY`` gate enforced at LOAD time (CONTEXT D-11 —
   deny-list-by-data; a deny-listed name in the JSON is a hard load error),
-* canonicalization-idempotence enforced per entry (CONTEXT —
+* canonicalization-idempotence enforced per entry (CONTEXT D-13 —
   ``Chem.CanonSmiles`` is the single source of truth for the match key),
-* an optional design-time OPSIN L1 round-trip pre-validator (CONTEXT T1;
+* an optional design-time OPSIN L1 round-trip pre-validator (CONTEXT D-07 T1;
   ``validate=True`` / ``scripts/lint_triviality_controller_seed.py --rt``).
 
-Frozen-dataclass discipline mirrors Phase 165 SACRED: ``SeedEntry`` is
+Frozen-dataclass discipline mirrors Phase 165 D-04 SACRED: ``SeedEntry`` is
 ``@dataclass(frozen=True)`` and is never mutated after construction.
 
 Graceful degradation (Phase 150 WR-06): a missing JSON or schema error degrades
 ``SEED_TABLE`` to ``{}`` so the downstream controller becomes a no-op, never a
 crash.
 
-Source: 168-CONTEXT.md,,,; 168-RESEARCH.md section 5.4;
+Source: 168-CONTEXT.md D-03, D-07, D-11, D-13; 168-RESEARCH.md section 5.4;
 168-PATTERNS.md "NEW: src/orthonym/data/triviality_controller_seed.py".
 """
 
@@ -42,7 +42,7 @@ logger = logging.getLogger(__name__)
 
 
 class SubstitutionType(str, Enum):
-    """IUPAC 2013 P-15.1.8.1-.3 retained-name substitution Types (CONTEXT).
+    """IUPAC 2013 P-15.1.8.1-.3 retained-name substitution Types (CONTEXT D-02).
 
     * ``TYPE_1``  — P-15.1.8.1: unlimited substitution (benzene, pyridine, ...).
     * ``TYPE_2A`` — P-15.1.8.2.1: substitution requires the senior group be
@@ -64,9 +64,9 @@ class SubstitutionType(str, Enum):
 
 @dataclass(frozen=True)
 class SeedEntry:
-    """One locked seed-table entry (CONTEXT +).
+    """One locked seed-table entry (CONTEXT D-03 + D-13).
 
-    Immutable by Phase 165 SACRED discipline. ``canonical_smiles`` is the
+    Immutable by Phase 165 D-04 SACRED discipline. ``canonical_smiles`` is the
     ``Chem.CanonSmiles``-stable match key; ``retained_pin_name`` is the
     substitution target the controller emits.
     """
@@ -87,8 +87,8 @@ class SeedEntry:
 def load_seed_table(json_path: Path, *, validate: bool = False) -> Dict[str, SeedEntry]:
     """Load + validate the seed JSON into a canonical-SMILES-keyed dict.
 
-    Enforces the deny gate and the canonicalization-idempotence gate at
-    load. With ``validate=True`` additionally runs the T1 OPSIN-RT
+    Enforces the D-11 deny gate and the D-13 canonicalization-idempotence gate at
+    load. With ``validate=True`` additionally runs the D-07 T1 OPSIN-RT
     design-time pre-validator (off by default — runs at CI lint time, not at
     every import).
 
@@ -155,7 +155,7 @@ def load_seed_table(json_path: Path, *, validate: bool = False) -> Dict[str, See
 
 
 def _t1_opsin_rt_validate_all(entries: Dict[str, SeedEntry]) -> None:
-    """CONTEXT T1 design-time OPSIN L1 round-trip pre-validator.
+    """CONTEXT D-07 T1 design-time OPSIN L1 round-trip pre-validator.
 
     Reuses ``find_opsin_jar`` + ``smiles_match_via_inchi`` from
     ``scripts/validate_retained_names.py`` verbatim (Phase 150 oracle). Raises

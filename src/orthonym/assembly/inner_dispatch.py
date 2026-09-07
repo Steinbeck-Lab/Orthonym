@@ -1,7 +1,7 @@
-"""Phase 160 inner-dispatch substrate (DECOMP-01 + CONTEXT).
+"""Phase 160 inner-dispatch substrate (DECOMP-01 + CONTEXT D-10).
 
 Mirrors Phase 158 outer CFR ``routing/dispatch_table.py`` substrate at the
-INNER (post-class-routing) dispatch layer. Per CONTEXT the inner
+INNER (post-class-routing) dispatch layer. Per CONTEXT D-10 the inner
 table is structurally identical to the outer CFR table:
 
 * ``@dataclass(frozen=True) class InnerDispatchEntry`` with 7 fields
@@ -19,7 +19,7 @@ table is structurally identical to the outer CFR table:
 Plan-02 substrate commit (02-00) ships the table EMPTY; commits 02-01..02-29
 each append ONE ``_register_inner(...)`` call (Tier-1 + Tier-1.5 handlers).
 Plan-03 ships the catch-all ``general_acyclic`` at priority 99999 (commit
-03-09) — per CONTEXT the catch-all closes the Plan-02 fallthrough gap.
+03-09) — per CONTEXT D-08 the catch-all closes the Plan-02 fallthrough gap.
 
 Anti-pattern hygiene:
 - AP-160-08 banned: silent fallthrough in inner-dispatch without explicit
@@ -29,9 +29,9 @@ Anti-pattern hygiene:
 - AP-160-09 banned: opt-out flag for inner dispatch (no ``_disable_inner_dispatch``
   kwarg or env-var-controlled bypass).
 - AP-160-13: module-global mutable state for inner-dispatch_stats — keep
-  per-Orthonym-instance counter mirror of Phase 158; stats helpers
+  per-Orthonym-instance counter mirror of Phase 158 D-16; stats helpers
   are stateful but per-instance-isolated.
-- AP-160-15 / hard invariant: ``side_effect_inventory == `` for every
+- AP-160-15 / D-25 hard invariant: ``side_effect_inventory == ()`` for every
   entry; ``_register_inner`` raises ``ValueError`` if a non-empty tuple is
   passed.
 - AP-160-10 banned: invent-as-you-go INNER_DISPATCH_TABLE entries not in
@@ -41,7 +41,7 @@ Anti-pattern hygiene:
 References:
 - 160-AUDIT-DECOMP.md § 1 — inner-dispatch branch enumeration (39 rows;
   source-of-truth for the 29 Plan-02 commits + 10 Plan-03 commits).
-- 160-CONTEXT.md — substrate shape matches Phase 158.
+- 160-CONTEXT.md D-10 — substrate shape matches Phase 158.
 - 160-PATTERNS.md § 3 — analog: routing/dispatch_table.py:130-211, 696-720.
 """
 from __future__ import annotations
@@ -60,25 +60,25 @@ NamingResultLike = Optional[Any]
 
 @dataclass(frozen=True)
 class InnerDispatchEntry:
-    """Phase 160: frozen dataclass row of INNER_DISPATCH_TABLE.
+    """Phase 160 D-10: frozen dataclass row of INNER_DISPATCH_TABLE.
 
-    Mirrors Phase 158 + (routing/dispatch_table.ClassDispatchEntry)
+    Mirrors Phase 158 D-05 + D-26 (routing/dispatch_table.ClassDispatchEntry)
     at the INNER dispatch layer. The 7-field schema is locked per CONTEXT
-    :
+    D-10:
 
         handler_id            HANDLER_POLICIES key (lowercase snake_case)
         priority              spaced int; lower = earlier; first-match-wins
         predicate             Callable[..., bool]; MolecularFeatures → bool;
-                              PURE per (no mutation of features / mol /
+                              PURE per D-25 (no mutation of features / mol /
                               module-global state)
         handler               Callable[..., Optional[NamingResult]]; the
                               handler module's name_<handler_id> entry point
         iupac_section         Blue Book P-section cite (audit metadata)
         description           one-line summary for audit logging
-        side_effect_inventory MUST be per hard invariant; non-empty
+        side_effect_inventory MUST be () per D-25 hard invariant; non-empty
                               tuples raise ValueError in _register_inner.
 
-    Per CONTEXT + AP-160-15: ``side_effect_inventory == `` is the
+    Per CONTEXT D-25 + AP-160-15: ``side_effect_inventory == ()`` is the
     HARD invariant; the integrity test
     ``test_side_effect_inventory_is_empty`` (Plan-04) asserts emptiness for
     every entry. AP-160-26 explicitly bans any predicate that mutates
@@ -99,15 +99,15 @@ class InnerDispatchEntry:
 
 @dataclass(frozen=True)
 class InnerDispatchResult:
-    """Phase 160 + Phase 160.1 / ADR-19-04: result of a successful
+    """Phase 160 D-10 + Phase 160.1 D-18 / ADR-19-04: result of a successful
     ``dispatch_inner(features, mol, style)`` call.
 
-    Pre-amendment (Phase 160): returned the matched-entry reference;
+    Pre-amendment (Phase 160 D-10): returned the matched-entry reference;
     the caller (composer.py:_assemble_name_impl) invoked ``result.handler(...)``
     separately and handled gate-fail (handler returning None) via inline
     fall-through to the legacy cascade.
 
-    Post-amendment (Phase 160.1 + ADR-19-04 — first-match-AND-succeeds-wins):
+    Post-amendment (Phase 160.1 D-18 + ADR-19-04 — first-match-AND-succeeds-wins):
     ``dispatch_inner`` invokes the handler INTERNALLY and retries the
     next-priority entry on gate-fail (handler returning ``None``). The new
     ``result: NamingResult`` field carries the non-None ``NamingResult``
@@ -118,9 +118,9 @@ class InnerDispatchResult:
       * Return non-None ``NamingResult`` ⇒ "I succeeded; use this result."
       * Return ``None`` ⇒ "I gate-failed; defer to next-priority handler."
       * Raise ``Exception`` ⇒ surfaced as ``RuntimeError`` chained via
-        ``__cause__`` (no swallowing per CONTEXT honest-fail-on-data).
+        ``__cause__`` (no swallowing per CONTEXT D-27 honest-fail-on-data).
 
-    Predicate purity (Phase 160) is preserved verbatim: predicates
+    Predicate purity (Phase 160 D-25) is preserved verbatim: predicates
     report whether a handler CAN POSSIBLY apply (cheap structural check);
     the handler's own gate decides whether it SHOULD apply (full IUPAC
     compliance check on coverage / orientation / locant feasibility / etc.).
@@ -128,7 +128,7 @@ class InnerDispatchResult:
     The ``audit_record`` field is a dict of audit metadata (handler_id,
     priority, iupac_section) for the Plan-04 ``--dump-tree`` CLI + the
     inner-dispatch stats counter (stats now count SUCCESSFUL handlers
-    only, not predicate matches per).
+    only, not predicate matches per D-18).
     """
     handler_id: str
     handler: Callable[..., NamingResultLike]
@@ -151,7 +151,7 @@ INNER_DISPATCH_TABLE: "OrderedDict[str, InnerDispatchEntry]" = OrderedDict()
 # INNER_DISPATCH_TABLE.values() directly without breaking dispatch.
 _SORTED_ENTRIES_CACHE: "Optional[Tuple[InnerDispatchEntry, ...]]" = None
 
-# Registration-freezing sentinel per CONTEXT. Plan-04 may toggle this
+# Registration-freezing sentinel per CONTEXT D-10. Plan-04 may toggle this
 # to True after Plan-03 commit 03-10 (composer.py thinning) to lock the
 # table against runtime modification. Plan-02/03 keeps it False so each
 # atomic commit can append.
@@ -159,7 +159,7 @@ _INNER_REGISTRATION_FROZEN: bool = False
 
 # Per-instance counter for the inner-dispatch stats helper (mirror of
 # Phase 158 routing/dispatcher.py:_dispatch_counter pattern, per CONTEXT
-# + AP-160-13).
+# D-18 + AP-160-13).
 #
 # Phase 160.2 Plan-04-02 WR-01 closure: wrapped in ``contextvars.ContextVar``
 # so concurrent Orthonym instances + ``ContextVar``-isolated test contexts
@@ -196,10 +196,10 @@ def _register_inner(
     description: str,
     side_effect_inventory: Tuple[str, ...] = (),
 ) -> None:
-    """Phase 160 / DECOMP-01: register one inner-dispatch entry.
+    """Phase 160 D-10 / DECOMP-01: register one inner-dispatch entry.
 
     Module-import-time-only helper; raises ``RuntimeError`` after the
-    table is frozen via ``freeze_inner_table``. Per CONTEXT +
+    table is frozen via ``freeze_inner_table()``. Per CONTEXT D-10 +
     AP-160-15 + AP-160-26: every ``side_effect_inventory`` MUST be ``()``;
     non-empty tuples raise ``ValueError`` immediately.
 
@@ -208,7 +208,7 @@ def _register_inner(
             the same ``handler_id`` is registered twice; or if the same
             ``priority`` is registered twice (priority uniqueness ensures
             deterministic first-match-wins iteration).
-        ValueError: if ``side_effect_inventory != `` (hard invariant
+        ValueError: if ``side_effect_inventory != ()`` (D-25 hard invariant
             per AP-160-15).
     """
     global _INNER_REGISTRATION_FROZEN  # noqa: PLW0603 — module-import-time sentinel
@@ -220,7 +220,7 @@ def _register_inner(
             f"table modification."
         )
 
-    # hard invariant per AP-160-15: side_effect_inventory MUST be.
+    # D-25 hard invariant per AP-160-15: side_effect_inventory MUST be ().
     if side_effect_inventory != ():
         raise ValueError(
             f"Inner-dispatch registration for {handler_id!r} violates D-25 "
@@ -264,7 +264,7 @@ def _register_inner(
 
 
 def freeze_inner_table() -> None:
-    """Phase 160: lock INNER_DISPATCH_TABLE against further registration.
+    """Phase 160 D-10: lock INNER_DISPATCH_TABLE against further registration.
 
     Called by Plan-03 commit 03-10 (composer.py thinning) at the end of
     module import; after this call, ``_register_inner(...)`` raises
@@ -281,7 +281,7 @@ def freeze_inner_table() -> None:
 def dispatch_inner(
     features: Any, mol: Any = None, style: str = "pin",
 ) -> Optional[InnerDispatchResult]:
-    """Phase 160 + Phase 160.1 / ADR-19-04: first-match-AND-
+    """Phase 160 D-10 + Phase 160.1 D-18 / ADR-19-04: first-match-AND-
     succeeds-wins inner-cascade dispatch.
 
     Iterates ``INNER_DISPATCH_TABLE`` in priority order (lowest first;
@@ -292,14 +292,14 @@ def dispatch_inner(
     per ADR-19-04 contract), CONTINUES to the next-priority entry. Final
     no-match returns ``None``.
 
-    ADR-19-04 amends Phase 160 CONTEXT from "first-match-wins" to
+    ADR-19-04 amends Phase 160 CONTEXT D-22 from "first-match-wins" to
     "first-match-AND-succeeds-wins." Handler contract:
       * Return non-None ``NamingResult`` ⇒ "I succeeded; use this result."
       * Return ``None`` ⇒ "I gate-failed; defer to next-priority handler."
       * Raise ``Exception`` ⇒ surfaced as ``RuntimeError`` chained via
         ``__cause__`` (no silent swallowing).
 
-    Predicate purity (Phase 160) preserved verbatim: predicates report
+    Predicate purity (Phase 160 D-25) preserved verbatim: predicates report
     whether a handler CAN POSSIBLY apply (cheap structural check);
     handlers may perform internal pool.add() side effects per their
     individual contracts.
@@ -316,10 +316,10 @@ def dispatch_inner(
         ``InnerDispatchResult`` carrying the SUCCESSFUL handler's
         ``NamingResult`` in ``.result``, or ``None`` if no handler
         succeeded. Once ``general_acyclic@99999`` catch-all ships
-        (Plan-03-03 per CONTEXT), the None branch is unreachable
+        (Plan-03-03 per CONTEXT D-08), the None branch is unreachable
         in production.
 
-    Per CONTEXT honest-fail-on-data: defensive try/except around BOTH
+    Per CONTEXT D-27 honest-fail-on-data: defensive try/except around BOTH
     predicate AND handler invocations surface bugs (NoneType attribute
     access, etc.) as ``RuntimeError`` chained via ``__cause__``.
     """
@@ -339,7 +339,7 @@ def dispatch_inner(
         try:
             matched = entry.predicate(features)
         except TypeError as exc:
-            # Per CONTEXT honest-fail-on-data + CR-01: do NOT silently
+            # Per CONTEXT D-27 honest-fail-on-data + CR-01: do NOT silently
             # re-execute or swallow. A TypeError from a predicate is almost
             # always a real bug (e.g., NoneType attribute access), not a
             # signature mismatch. Surface the bug at the PREDICATE source
@@ -354,19 +354,19 @@ def dispatch_inner(
         if not matched:
             continue
 
-        # Phase 160.1 / ADR-19-04: invoke handler internally; retry on
-        # gate-fail. Per CONTEXT + CR-01: handler exceptions are NOT
+        # Phase 160.1 D-18 / ADR-19-04: invoke handler internally; retry on
+        # gate-fail. Per CONTEXT D-27 + CR-01: handler exceptions are NOT
         # silently swallowed — they surface as RuntimeError chained via
         # __cause__, mirroring the predicate-TypeError pattern above.
         #
-        # Phase 160.1 exception: AttributeError / ValueError from a
+        # Phase 160.1 D-16 exception: AttributeError / ValueError from a
         # handler are propagated UN-WRAPPED so namer.name_compound's broad
         # `except (TypeError, KeyError, IndexError, AttributeError)` at
         # namer.py:1888 catches them and falls through to
         # _descriptive_fallback. This preserves the pre-amendment behavior
         # path for wildcard-bearing molecules whose ester_family handler
         # raises AttributeError per the Plan-03-01 cascade-removal
-        # preservation logic (handlers/ester_family.py guard).
+        # preservation logic (handlers/ester_family.py D-16 guard).
         try:
             result = entry.handler(features, _mol, style=style)
         except OrthonymLimitError:
@@ -376,7 +376,7 @@ def dispatch_inner(
             # NOT be wrapped in RuntimeError by the generic handler below.
             raise
         except (AttributeError, KeyError, IndexError, TypeError):
-            # Re-raise un-wrapped per. namer.name_compound's broad
+            # Re-raise un-wrapped per D-16. namer.name_compound's broad
             # except clause handles these as descriptive-fallback signals.
             raise
         except Exception as exc:
@@ -396,7 +396,7 @@ def dispatch_inner(
             continue
 
         # Handler succeeded. Increment per-handler stats (successful
-        # handler only per, mirroring outcome semantics over
+        # handler only per D-18, mirroring outcome semantics over
         # predicate-match semantics). Phase 160.2 Plan-04-02 WR-01:
         # route through _get_stats_dict() so each ContextVar context
         # mutates its own dict.
@@ -416,7 +416,7 @@ def dispatch_inner(
         )
 
     # No handler succeeded. Once general_acyclic@99999 catch-all ships
-    # (Plan-03-03 per CONTEXT), this branch is unreachable in
+    # (Plan-03-03 per CONTEXT D-08), this branch is unreachable in
     # production. Plan-03-00a + 03-00b leave it reachable so the inline
     # cascade in composer.py:858-948 + 1006-1322 continues to handle the
     # cases not yet routed via dispatch_inner.
@@ -424,7 +424,7 @@ def dispatch_inner(
 
 
 def get_inner_dispatch_stats() -> Dict[str, int]:
-    """Phase 160 + AP-160-13: read per-handler dispatch counters.
+    """Phase 160 D-18 + AP-160-13: read per-handler dispatch counters.
 
     Returns a COPY of the in-memory counter dict so callers cannot mutate
     the underlying state. Plan-04 wires this into the CLI (--audit-trace
@@ -437,7 +437,7 @@ def get_inner_dispatch_stats() -> Dict[str, int]:
 
 
 def reset_inner_dispatch_stats() -> None:
-    """Phase 160: clear the per-handler dispatch counters.
+    """Phase 160 D-18: clear the per-handler dispatch counters.
 
     Called by tests + Plan-04 benchmarks to isolate counter state across
     runs. Mirrors Phase 158 ``reset_dispatch_counter()`` per AP-160-13.
@@ -453,11 +453,11 @@ def reset_inner_dispatch_stats() -> None:
 # atomic commit per 160-AUDIT-DECOMP.md § 3 topological ordering).
 #
 # Each call MUST cite the audit row it implements; the audit § 1
-# enumeration is the LOCKED spec per CONTEXT + AP-160-10.
+# enumeration is the LOCKED spec per CONTEXT D-07 + AP-160-10.
 # ============================================================================
 
 # --- Plan-02 commit 02-01: oxime (Tier-1 LIFT; composer.py:771-782 inline
-# branch removed; composer.py:1906-2042 body stays per CONTEXT;
+#     branch removed; composer.py:1906-2042 body stays per CONTEXT D-24;
 #     audit § 1 row 'oxime' + § 2.2 predicate purity proof).
 from .handlers.oxime import _is_oxime, name_oxime  # noqa: E402
 
@@ -680,6 +680,27 @@ _register_inner(
     side_effect_inventory=(),
 )
 
+# --- Phase 2E (P-65.5.1): imidoyl / carbothioyl / carboselenoyl halide.
+#     Acid-halide tier (priority 1175, between the sulfonyl halide and anhydride).
+#     Distinct principal_group strings -> predicate mutex with the other halide
+#     handlers. Functional-class name '{parent}carbo{imidoyl|thioyl|selenoyl}
+#     {halide}' / '{chain-stem}{imidoyl|thioyl|selenoyl} {halide}'.
+from .handlers.imidoyl_thioyl_halide import (  # noqa: E402
+    _is_imidoyl_thioyl_halide,
+    name_imidoyl_thioyl_halide,
+)
+
+_register_inner(
+    handler_id="imidoyl_thioyl_halide",
+    priority=1175,
+    predicate=_is_imidoyl_thioyl_halide,
+    handler=name_imidoyl_thioyl_halide,
+    iupac_section="P-65.5.1",
+    description="Imidoyl/carbothioyl/carboselenoyl halide functional class naming "
+                "(cyclohexanecarboximidoyl chloride)",
+    side_effect_inventory=(),
+)
+
 # --- Plan-02 commit 02-12: anhydride (Tier-1.5 SHIM; audit § 1 + § 2.12).
 from .handlers.anhydride import _is_anhydride, name_anhydride  # noqa: E402
 
@@ -752,6 +773,51 @@ _register_inner(
     side_effect_inventory=(),
 )
 
+# --- P6-6I: Se/Te oxide handlers (P-63.6, BB:28090). Clones of the
+#     sulfoxide/sulfone shims over the shared element-generic body; predicates
+#     are FG-disjoint from S so priority spacing is cosmetic (right after S).
+from .handlers.chalcogen_oxide import (  # noqa: E402
+    _is_selenone, _is_selenoxide, _is_tellurone, _is_telluroxide,
+    name_selenone, name_selenoxide, name_tellurone, name_telluroxide,
+)
+
+_register_inner(
+    handler_id="selenoxide",
+    priority=1801,
+    predicate=_is_selenoxide,
+    handler=name_selenoxide,
+    iupac_section="P-63.6",
+    description="Selenoxide substitutive/functional-class naming (Tier B)",
+    side_effect_inventory=(),
+)
+_register_inner(
+    handler_id="telluroxide",
+    priority=1802,
+    predicate=_is_telluroxide,
+    handler=name_telluroxide,
+    iupac_section="P-63.6",
+    description="Telluroxide substitutive/functional-class naming (Tier B)",
+    side_effect_inventory=(),
+)
+_register_inner(
+    handler_id="selenone",
+    priority=1901,
+    predicate=_is_selenone,
+    handler=name_selenone,
+    iupac_section="P-63.6",
+    description="Selenone substitutive/functional-class naming (Tier B)",
+    side_effect_inventory=(),
+)
+_register_inner(
+    handler_id="tellurone",
+    priority=1902,
+    predicate=_is_tellurone,
+    handler=name_tellurone,
+    iupac_section="P-63.6",
+    description="Tellurone substitutive/functional-class naming (Tier B)",
+    side_effect_inventory=(),
+)
+
 # --- Plan-02 commit 02-17: thioether (Tier-1.5 SHIM; audit § 1 + § 2.21;
 #     cyclic + fused-heterocycle skip guards mirrored from inline branch).
 from .handlers.thioether import _is_thioether, name_thioether  # noqa: E402
@@ -800,6 +866,23 @@ _register_inner(
     side_effect_inventory=(),
 )
 
+# --- review-fix: pnictogen -inate ester (P/As/Sb) R2E(=O)(OR').
+#     principal_group in {phosphinate_ester, arsinate_ester, stibinate_ester}.
+from .handlers.pnictogen_inate_ester import (  # noqa: E402
+    _is_pnictogen_inate_ester,
+    name_pnictogen_inate_ester,
+)
+
+_register_inner(
+    handler_id="pnictogen_inate_ester",
+    priority=2210,
+    predicate=_is_pnictogen_inate_ester,
+    handler=name_pnictogen_inate_ester,
+    iupac_section="P-65.6.3.2",
+    description="Phosphinic/arsinic/stibinic acid ester (-inate) functional naming",
+    side_effect_inventory=(),
+)
+
 # --- Plan-02 commit 02-20: phosphine (Tier-1.5 SHIM; audit § 1 + § 2.24;
 #     covers tertiary/secondary/primary phosphine variants with benzene-parent
 #     skip guard).
@@ -815,7 +898,7 @@ _register_inner(
     side_effect_inventory=(),
 )
 
-# ---: phosphonic_acid (P-67.1.1.2 substituent-prefix PIN). Parallel
+# --- v23 Phase 9: phosphonic_acid (P-67.1.1.2 substituent-prefix PIN). Parallel
 #     to phosphinic_acid; @2350 so it intercepts an organyl phosphonic acid
 #     (principal_group == 'phosphonic_acid') BEFORE the generic suffix assembler
 #     emits the rejected 'ethanephosphonic' parent-hydride-stem form. Fail-closed
@@ -842,20 +925,43 @@ _register_inner(
 #     continuation) for a complex organyl, same as the phosphorus siblings.
 from .handlers.pnictogen_oxoacid import (  # noqa: E402
     _is_arsinic_acid,
+    _is_arsinous_acid,
     _is_arsonic_acid,
+    _is_arsonous_acid,
+    _is_phosphinous_acid,
+    _is_phosphonous_acid,
     _is_stibinic_acid,
+    _is_stibinous_acid,
     _is_stibonic_acid,
+    _is_stibonous_acid,
     name_arsinic_acid,
+    name_arsinous_acid,
     name_arsonic_acid,
+    name_arsonous_acid,
+    name_phosphinous_acid,
+    name_phosphonous_acid,
     name_stibinic_acid,
+    name_stibinous_acid,
     name_stibonic_acid,
+    name_stibonous_acid,
 )
 
+# Phase 1B: the six trivalent -ous organo-oxoacids register in the same
+# @2352+ acid-suffix window as their -onic/-inic siblings, so an organyl -ous
+# acid reaches its substituent-prefix PIN (BB L35465 diphenylarsinous acid)
+# instead of the round-trippable-but-wrong substitutive form
+# ((hydroxy(phenyl)arsanyl)benzene). Fail-closed for a complex organyl.
 for _pn_priority, _pn_id, _pn_pred, _pn_handler in (
     (2352, "arsonic_acid", _is_arsonic_acid, name_arsonic_acid),
     (2354, "arsinic_acid", _is_arsinic_acid, name_arsinic_acid),
     (2356, "stibonic_acid", _is_stibonic_acid, name_stibonic_acid),
     (2358, "stibinic_acid", _is_stibinic_acid, name_stibinic_acid),
+    (2360, "phosphonous_acid", _is_phosphonous_acid, name_phosphonous_acid),
+    (2362, "phosphinous_acid", _is_phosphinous_acid, name_phosphinous_acid),
+    (2364, "arsonous_acid", _is_arsonous_acid, name_arsonous_acid),
+    (2366, "arsinous_acid", _is_arsinous_acid, name_arsinous_acid),
+    (2368, "stibonous_acid", _is_stibonous_acid, name_stibonous_acid),
+    (2370, "stibinous_acid", _is_stibinous_acid, name_stibinous_acid),
 ):
     _register_inner(
         handler_id=_pn_id,
@@ -1045,7 +1151,7 @@ _register_inner(
 )
 
 # --- Plan-02 commit 02-26: ion_dispatch (Phase 160 addition; audit § 1 + § 2.1).
-# Per CONTEXT, ion / salt / zwitterion / radical species use a
+#     Per CONTEXT D-09, ion / salt / zwitterion / radical species use a
 #     PRE-POOL inline bypass at composer.py:751-768 — that call site STAYS
 #     unchanged. This inner-dispatch entry exists for architectural
 #     uniformity (so all HANDLER_POLICIES + Phase 160 additions appear in
@@ -1315,7 +1421,7 @@ _register_inner(
 
 
 # --- Plan-07 commit 07-01: ester_family composite (closes 3 of 8 deferred
-# handlers: polyfunctional, multi_ester, ester). Per CONTEXT +
+#     handlers: polyfunctional, multi_ester, ester). Per CONTEXT D-28 +
 #     ADR-19-02 §3.1 Option A composite-handler resolution path. Priority
 #     1500 fires AFTER ring_ester(1450) per inline cascade order.
 # --- W3-P07: non-carbon ester handler (pseudoester / sulfonic ester / sulfinic
@@ -1361,11 +1467,11 @@ _register_inner(
 
 
 # --- Phase 160.1 Plan-03-02: tier_a_ring composite (Phase 160 Plan-06
-# substrate; UNCHANGED handler body). Per CONTEXT + ADR-19-02
+#     substrate; UNCHANGED handler body). Per CONTEXT D-06 + ADR-19-02
 #     §3.2 Option A: encodes the Tier-A pool-compete cascade
 #     (composer.py:1006-1322, ~316 LOC) as a SINGLE composite handler
 #     so the dispatch_inner first-match-wins interface (Phase 160
-# CONTEXT / Phase 160.1 amendment) stays untouched.
+#     CONTEXT D-22 / Phase 160.1 D-18 amendment) stays untouched.
 #
 # Priority 4500 places tier_a_ring between sulfoxide@1800 / sulfone@1900
 # / thioether@2000 / phosphine_oxide@2100 / phosphate_ester@2200 /
@@ -1407,7 +1513,7 @@ _register_inner(
 
 
 # --- Phase 160.2 Plan-02-03: general_acyclic catch-all (DECOMP-01 closure).
-# Per CONTEXT + ADR-19-02 §3.1 + ADR-19-04 first-match-AND-succeeds-wins.
+#     Per CONTEXT D-08 + ADR-19-02 §3.1 + ADR-19-04 first-match-AND-succeeds-wins.
 #     Predicate _is_general_acyclic returns True for the chain-fallback
 #     section's effective domain (per AP-160.2-06 CASE B refinement: defers
 #     to inline amide/amine cascade branches in composer.py:917-931 since
@@ -1440,7 +1546,7 @@ _register_inner(
 
 
 # --- Phase 160.2 Plan-02-03: lock the inner dispatch table per Phase 160
-# CONTEXT + WR-06 fix (160.1-REVIEW). Eager freeze eliminates the
+#     CONTEXT D-10 + WR-06 fix (160.1-REVIEW). Eager freeze eliminates the
 #     lazy-init race in _SORTED_ENTRIES_CACHE (lines 304-308). All 33 entries
 #     have now been registered: 32 from Phase 160 + 160.1 + 1 from Phase 160.2
 #     (general_acyclic@99999). Per AP-160.2-04 the freeze MUST land in the

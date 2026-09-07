@@ -3,15 +3,15 @@
 Class-first dispatcher routing input mol -> handler before naming pipeline
 (Phase 158, CFR-01..04).
 
-Public exports per CONTEXT:
-- ``ClassFirstRouter`` — per-instance class-first dispatcher.
-- ``ClassDispatchResult`` — frozen dataclass returned by ``dispatch``.
-- ``StoutClass`` — StrEnum of dispatch class identifiers.
-- ``ClassDispatchEntry`` — frozen dataclass per ``DISPATCH_TABLE`` row.
+Public exports per CONTEXT D-04:
+- ``ClassFirstRouter`` — per-instance class-first dispatcher (D-03).
+- ``ClassDispatchResult`` — frozen dataclass returned by ``dispatch()`` (D-03).
+- ``StoutClass`` — StrEnum of dispatch class identifiers (D-11).
+- ``ClassDispatchEntry`` — frozen dataclass per ``DISPATCH_TABLE`` row (D-05).
 - ``DISPATCH_TABLE`` — ``OrderedDict[StoutClass, ClassDispatchEntry]``;
-  module-level frozen post-import.
+  module-level frozen post-import (D-05).
 - ``dispatch`` / ``get_dispatch_stats`` / ``reset_dispatch_stats`` —
-  module-level convenience wrappers.
+  module-level convenience wrappers (D-04).
 
 Internal helpers (``_register_dispatch``, ``_is_*``, ``_handle_*``,
 ``_invoke_audit_log``) are PRIVATE and intentionally not exported per

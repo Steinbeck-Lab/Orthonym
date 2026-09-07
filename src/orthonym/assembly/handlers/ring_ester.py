@@ -2,7 +2,7 @@
 
 Verbatim lift of composer.py:850-865 (inline dispatch branch). Body
 ``_assemble_ring_with_ester_prefixes`` at composer.py:3204-3455 (254 LOC)
-STAYS until Plan-03 commit 03-10 (composer.py thinning) per CONTEXT.
+STAYS until Plan-03 commit 03-10 (composer.py thinning) per CONTEXT D-24.
 
 Predicate gates on:
 1. ``principal_group == 'ester'``
@@ -12,7 +12,7 @@ Predicate gates on:
 ring_ester fires BEFORE polyfunctional + ester-family + Tier-A in the inline
 cascade order (composer.py:850), so no additional mutex is needed.
 
-Byte-identical contract per CONTEXT (DECOMP-03): handler's behavior
+Byte-identical contract per CONTEXT D-21 (DECOMP-03): handler's behavior
 on every canary fixture MUST equal the inline branch's behavior bit-for-bit;
 verified by `python scripts/verify_decomp_byte_identical.py --mode delta`
 at the atomic commit gate.
@@ -44,7 +44,7 @@ def _is_ring_ester(features: Any) -> bool:
     complex_ring mutex are NOT pure boolean attribute reads — they call
     ``rules.esters.detect_exocyclic_esters(mol)`` and
     ``composer._is_complex_ring_system(mol)`` respectively. Both helpers are
-    pure (read-only) per CONTEXT / AP-160-26.
+    pure (read-only) per CONTEXT D-25 / AP-160-26.
     """
     if getattr(features, 'principal_group', None) != 'ester':
         return False
@@ -139,7 +139,7 @@ def name_ring_ester(
     if not exocyclic:
         return None
 
-    # C1: record WHICH parent this handler numbered the name in, so the
+    # v29 P7 C1: record WHICH parent this handler numbered the name in, so the
     # stereo injector does not have to guess it (P-91.3, BB:44639 "NAMING OF
     # STEREOISOMERS", :44643 -- a front-of-name block is read in the parent's
     # numbering). Neither features.principal_chain nor features.chain_is_parent

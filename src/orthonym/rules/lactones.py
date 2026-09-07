@@ -127,7 +127,7 @@ def is_monocyclic_lactone(mol) -> Optional[Dict]:
                     if mol.GetAtomWithIdx(i).GetAtomicNum() != 6:
                         return None
 
-                # (A): unsaturated / dione monocyclic lactones.
+                # v33 Phase 6 (A): unsaturated / dione monocyclic lactones.
                 # name_lactone_ring/name_monocyclic_lactone only builds a
                 # SATURATED single-oxo stem (oxacyclo...an-2-one) -- an
                 # in-ring C=C or a second in-ring carbonyl would otherwise
@@ -188,7 +188,7 @@ def is_monocyclic_lactone(mol) -> Optional[Dict]:
                     # lactone) or 'S'/'Se'/'Te' (thiono/seleno/telluro lactone,
                     # P-65.6.3.5.1 -> -thione/-selone/-tellone suffix).
                     "chalcogen": mol.GetAtomWithIdx(carbonyl_o).GetSymbol(),
-                    # (A): in-ring C=C atom-idx pairs (empty for
+                    # v33 Phase 6 (A): in-ring C=C atom-idx pairs (empty for
                     # the saturated case). Only ever non-empty here for
                     # ring_size > 10 (the HW range declines above), so the
                     # macrocyclic ene-locant path is the sole consumer.
@@ -243,7 +243,7 @@ def name_lactone_ring(ring_size: int, extra_o_locant: Optional[int] = None,
             3 (the only geometry this namer describes), builds the
             1,3-dioxa Hantzsch-Widman parent (1,3-dioxan-2-one). Any other
             value returns None (fail closed).
-        ene_locants:. Sorted list of the lower-numbered
+        ene_locants: v33 Phase 6 (A). Sorted list of the lower-numbered
             locant of each in-ring C=C, on the SAME fixed O=1/C=2 numbering
             this function already uses. Ring sizes 11+ ONLY (the HW range
             has no replacement-nomenclature ring stem to attach an ene
@@ -330,7 +330,7 @@ def name_lactone_ring(ring_size: int, extra_o_locant: Optional[int] = None,
         # 'oxacyclo...an' ends in a consonant so no elision applies.
         return f"oxacyclo{chain_prefix}an-2-{suffix}"
 
-    # (A): unsaturated macrocyclic lactone. Replace the
+    # v33 Phase 6 (A): unsaturated macrocyclic lactone. Replace the
     # saturated '...an' stem with the standard cycloalkENE construction
     # ('...an' dropped, '-{locants}-{mult}ene' takes its place -- e.g.
     # cyclotridecane -> cyclotridec-10-ene), then join the -one suffix
@@ -409,7 +409,7 @@ def name_monocyclic_lactone(mol) -> Optional[str]:
         # Build atom-to-locant mapping (1-indexed)
         atom_to_locant = {atom_idx: i + 1 for i, atom_idx in enumerate(ordered)}
 
-    # (A): in-ring C=C locants (macrocyclic only -- see
+    # v33 Phase 6 (A): in-ring C=C locants (macrocyclic only -- see
     # name_lactone_ring's ene_locants docstring) on this SAME fixed
     # numbering. Each bond's cited locant is the LOWER of its two atoms'
     # locants; safe without a wraparound check because the only ring

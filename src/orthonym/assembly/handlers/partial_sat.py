@@ -4,7 +4,7 @@ Verbatim move of composer.py:1116-1131 dispatch logic. Wraps the inline
 ``_try_partially_saturated_carbocycle(features.mol)`` check + enrichment +
 pool.add gate.
 
-Per CONTEXT incremental migration: the underlying
+Per CONTEXT D-24 incremental migration: the underlying
 ``_try_partially_saturated_carbocycle`` body STAYS in composer.py during
 Plan-02 and moves to this module in Plan-03 commit 03-10.
 
@@ -35,7 +35,7 @@ def _is_partial_sat(features: Any) -> bool:
     WR-02: the ``_is_complex_ring_system`` SMARTS check is memoized on the
     features object via ``cached_is_complex_ring_system`` so partial_sat,
     polycyclic, and ring_ester predicates share one evaluation per dispatch
-    instead of three. CONTEXT predicate purity is preserved — the cache
+    instead of three. CONTEXT D-25 predicate purity is preserved — the cache
     is per-features-instance state owned by features itself.
     """
     from rdkit import Chem

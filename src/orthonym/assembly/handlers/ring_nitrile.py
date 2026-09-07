@@ -2,10 +2,10 @@
 
 Verbatim lift of composer.py:1337-1348 (inline dispatch branch) + the
 composer.py:4537-4605 (``_assemble_ring_nitrile_name``, 69 LOC) body via
-lazy import. Per CONTEXT the body STAYS in composer.py during Plan-03
+lazy import. Per CONTEXT D-24 the body STAYS in composer.py during Plan-03
 commits 03-01..03-09; Plan-03 commit 03-10 deletes the redundant body.
 
-Byte-identical contract per CONTEXT (DECOMP-03): handler's behavior
+Byte-identical contract per CONTEXT D-21 (DECOMP-03): handler's behavior
 on every canary fixture MUST equal the inline branch's behavior bit-for-bit.
 
 IUPAC cite: P-66.5.1 (ring-nitriles / carbonitriles on rings).
@@ -15,7 +15,7 @@ References:
 - composer.py:4537-4605 (``_assemble_ring_nitrile_name`` body; STAYS until 03-10).
 - 160-AUDIT-DECOMP.md § 1 row 'ring_nitrile' + § 3 Tier-2 row.
 - 160-PATTERNS.md § 6 (Tier B / mid-tier lift handler pattern).
-- 160-CONTEXT.md (atomic-commit byte-identical canary lock).
+- 160-CONTEXT.md D-21 (atomic-commit byte-identical canary lock).
 """
 from __future__ import annotations
 
@@ -33,7 +33,7 @@ def _is_ring_nitrile(features: Any) -> bool:
     Predicate: ``principal_group == 'nitrile'`` AND ``is_cyclic`` AND
     ``not chain_is_parent``.
 
-    Pure read-only per CONTEXT / AP-160-26.
+    Pure read-only per CONTEXT D-25 / AP-160-26.
     """
     if getattr(features, 'principal_group', None) != 'nitrile':
         return False
@@ -60,7 +60,7 @@ def name_ring_nitrile(
     _rn_name = _assemble_ring_nitrile_name(features, style)
     if not _rn_name:
         # CR-03: matches sibling ring_ester handler pattern. pool.add(None, ...)
-        # would violate the `name: str` contract per CONTEXT;
+        # would violate the `name: str` contract per CONTEXT D-05;
         # _inject_stereo_if_missing at the next step would then receive
         # None or a wrong handler's name from pool.best().
         return None

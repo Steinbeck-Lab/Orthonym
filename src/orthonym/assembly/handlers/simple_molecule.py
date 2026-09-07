@@ -3,7 +3,7 @@
 Verbatim move of composer.py:1388-1392 dispatch logic. The underlying
 ``_name_simple_molecule`` body STAYS in composer.py during Plan-02 and
 moves to this module in Plan-03 commit 03-10 (composer.py thinning) per
-CONTEXT incremental migration.
+CONTEXT D-24 incremental migration.
 
 IUPAC cite: P-14 (simple molecules; noble gases / single-atom symbols).
 

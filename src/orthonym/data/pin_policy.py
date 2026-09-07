@@ -56,7 +56,7 @@ PIN_DENY: FrozenSet[str] = frozenset(
 
 #: Deny subset that ALSO filters the hand-curated dicts. Excludes ``hc_override``
 #: rows (cumene/quinuclidine/acetylene), whose deny applies only to OPSIN-side
-#: promotion (Phase 150 / Phase 167 HYG-03).
+#: promotion (Phase 150 D-11 / Phase 167 HYG-03).
 PIN_DENY_HC: FrozenSet[str] = frozenset(
     e["name"].lower() for e in ENTRIES
     if e.get("pin") is False and not e.get("hc_override")

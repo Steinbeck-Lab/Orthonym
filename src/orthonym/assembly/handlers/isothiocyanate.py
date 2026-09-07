@@ -2,7 +2,7 @@
 
 Verbatim lift of composer.py:842-850 (inline branch) +
 composer.py:2192-2202 (_name_isothiocyanate body) + composer.py:2204-2230
-(shared _name_iso_x_cyanate helper). Per CONTEXT, bodies stay in
+(shared _name_iso_x_cyanate helper). Per CONTEXT D-24, bodies stay in
 composer.py until Plan-03 commit 03-10.
 
 IUPAC cite: P-66.5.4.3 (isothiocyanates; functional class naming).

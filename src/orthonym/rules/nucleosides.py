@@ -1,6 +1,6 @@
 """Nucleoside / nucleotide decoration engine (Blue Book P-105.2 / P-106).
 
-. Bare nucleosides (adenosine, guanosine, inosine, xanthosine,
+v23 Phase 14. Bare nucleosides (adenosine, guanosine, inosine, xanthosine,
 cytidine, thymidine, uridine + the 2'-deoxy series) are named by exact-SMILES
 retained-name lookup (``data/retained_names.py``).  This module handles the
 **decorated** species that those exact keys cannot reach:

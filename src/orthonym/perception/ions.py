@@ -228,7 +228,7 @@ def _get_internal_charge_atoms_impl(mol) -> Set[int]:
     Note: Only organic azides [N]=[N+]=[N-] are filtered, NOT the azide anion
     [N-]=[N+]=[N-] which is a genuine ion.
 
-    (root cause, mirrors errors.py's carbon-free structural honesty
+    v36 B3 (root cause, mirrors errors.py's carbon-free structural honesty
     floor): every class above is, by its own P-59/P-74.2 definition, a
     SUBSTITUENT GROUP hung off a carbon-bearing organic skeleton -- Table 5.1
     lists nitro/N-oxide/azide/diazo as prefix-only groups, never as a
@@ -269,7 +269,7 @@ def _resonance_twin_internal_atoms(mol) -> Set[int]:
     ONE literal bond-order pattern; RDKit does not normalise resonance forms,
     so the charge-separated twin (``R-[N-]-[N+]#N``) is invisible to them and
     used to fall through to the zwitterion path (Phase 3B SPY,
-     Q1/Q2). ADDITIVE: this is
+    ``.planning/audit-v32/phase3b-resonance-spy.md`` Q1/Q2). ADDITIVE: this is
     consulted alongside the SMARTS above, not instead of them -- a molecule
     the SMARTS already handle just gets the same atoms added again to a set
     (a no-op).

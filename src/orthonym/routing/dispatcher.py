@@ -1,29 +1,29 @@
 """Phase 158 ClassFirstRouter — dispatch substrate at _name_impl integration site.
 
 Architecture (158-CONTEXT.md):
-- ``dispatch`` — two-tier predicate evaluation (Tier-1 mol-only first;
+- ``dispatch()`` — D-07 two-tier predicate evaluation (Tier-1 mol-only first;
   perception ONCE between tiers; Tier-2 features-required last; GENERAL
-  catch-all per). For Phase 158 the perception step lives INSIDE the
+  catch-all per D-08). For Phase 158 the perception step lives INSIDE the
   GENERAL handler's caller (``_name_impl`` body) per Task 158-02-01 design
   choice (a) — the dispatcher itself never invokes ``_perceive`` directly,
-  preserving ``routing/`` as decoupled from ``composer.py`` (boundary).
-- ``get_dispatch_stats`` / ``reset_dispatch_stats`` — per-instance
+  preserving ``routing/`` as decoupled from ``composer.py`` (D-19 boundary).
+- ``get_dispatch_stats()`` / ``reset_dispatch_stats()`` — D-16 per-instance
   histogram counter accessor. Per-instance (NOT module-global) per AP-6.
-- ``_invoke_audit_log`` — ``ORTHONYM_DISPATCH_AUDIT`` env-var-gated
+- ``_invoke_audit_log()`` — D-08 ``ORTHONYM_DISPATCH_AUDIT`` env-var-gated
   INFO-level log. Default-OFF preserves CFR-04 stdout-byte-identical canary.
 
 Anti-pattern hygiene (158-AUDIT-CFR.md AP-block):
 - AP-1: silent fallthrough -> GENERAL @ 99999 with ``lambda *_: True``;
   impossible-state raises RuntimeError in dispatch() (defensive).
 - AP-6: module-global counter -> counter lives on ``self._dispatch_stats``
-  per CONTEXT.
+  per CONTEXT D-16.
 - AP-9: routing layer modifies handler output -> dispatcher returns
   ``ClassDispatchResult`` and lets the caller invoke ``result.handler(...)``;
   it does NOT mutate names.
 - AP-19: feature-flag-controlled CFR routing path -> NO opt-out flag per
-  CONTEXT; CFR is the only routing path post-Phase-158.
+  CONTEXT D-14; CFR is the only routing path post-Phase-158.
 
-Per CONTEXT honest-fail-on-data: ``dispatch`` raises RuntimeError if
+Per CONTEXT D-29 honest-fail-on-data: ``dispatch()`` raises RuntimeError if
 the GENERAL catch-all is unreachable (impossible by construction; defensive).
 """
 
@@ -47,7 +47,7 @@ logger = logging.getLogger(__name__)
 
 
 # ---------------------------------------------------------------------------
-# Module-level constants (CONTEXT +)
+# Module-level constants (CONTEXT D-08 + D-15)
 # ---------------------------------------------------------------------------
 
 ORTHONYM_DISPATCH_AUDIT_ENV_VAR: str = "ORTHONYM_DISPATCH_AUDIT"
@@ -55,27 +55,27 @@ _DISPATCH_P99_BUDGET_MS: float = 1.0  # D-15 hard gate (informational; benchmark
 
 
 # ---------------------------------------------------------------------------
-# ClassFirstRouter (CONTEXT + +)
+# ClassFirstRouter (CONTEXT D-03 + D-07 + D-16)
 # ---------------------------------------------------------------------------
 
 
 class ClassFirstRouter:
-    """: Class-first dispatcher; replaces the implicit cascade in _name_impl.
+    """D-03: Class-first dispatcher; replaces the implicit cascade in _name_impl.
 
     Three responsibilities (158-CONTEXT.md ``<domain>``):
 
     1. ``dispatch()`` — walks ``DISPATCH_TABLE`` in priority order; first-match-wins.
        Returns a frozen ``ClassDispatchResult`` whose ``handler`` field the
        caller invokes to produce the name string. The dispatcher does NOT
-       call the handler itself per AP-9 +.
-    2. ``get_dispatch_stats`` — per-instance histogram counter accessor.
+       call the handler itself per AP-9 + D-27.
+    2. ``get_dispatch_stats()`` — D-16 per-instance histogram counter accessor.
        Returns a defensive copy so callers cannot mutate internal state.
-    3. ``reset_dispatch_stats`` — explicit reset for batch-run
+    3. ``reset_dispatch_stats()`` — D-16 explicit reset for batch-run
        boundaries.
 
     Construction: ``ClassFirstRouter()`` with no args. Reads
     ``ORTHONYM_DISPATCH_AUDIT`` env var by default for the audit-log gate
-    ; the constructor kwarg ``_audit_log`` overrides for testing.
+    (D-08); the constructor kwarg ``_audit_log`` overrides for testing.
     """
 
     # Class-level constant: pre-seeded counter buckets (one per StoutClass).
@@ -83,15 +83,15 @@ class ClassFirstRouter:
     STAT_KEYS: tuple = tuple(c.value for c in StoutClass)
 
     def __init__(self, *, _audit_log: Optional[bool] = None) -> None:
-        #: env-var-gated audit log (default-OFF per CFR-04 byte-identical-stdout)
+        # D-08: env-var-gated audit log (default-OFF per CFR-04 byte-identical-stdout)
         if _audit_log is None:
             _audit_log = os.environ.get(ORTHONYM_DISPATCH_AUDIT_ENV_VAR) == "1"
         self._audit_log: bool = _audit_log
-        #: per-instance counter (no module-global state per AP-6)
+        # D-16: per-instance counter (no module-global state per AP-6)
         self._dispatch_stats: Counter = Counter()
 
     # -----------------------------------------------------------------------
-    # Public hot-path API (dispatch contract)
+    # Public hot-path API (D-03 dispatch contract)
     # -----------------------------------------------------------------------
 
     def dispatch(
@@ -102,9 +102,9 @@ class ClassFirstRouter:
         features: Optional[Any] = None,
         **kwargs: Any,
     ) -> ClassDispatchResult:
-        """: two-tier predicate evaluation; first-match-wins.
+        """D-07: two-tier predicate evaluation; first-match-wins.
 
-        Walks ``DISPATCH_TABLE`` in priority order (sorted-by-priority).
+        Walks ``DISPATCH_TABLE`` in priority order (D-06 sorted-by-priority).
         ``**kwargs`` is forwarded verbatim to predicate calls so callers can
         thread ``_skip_decomposition`` (RL-7 option (b)) and ``_style``
         (RETAINED_NAME / AMINO_ACID predicates) without bloating the
@@ -116,9 +116,9 @@ class ClassFirstRouter:
         Raises:
             RuntimeError: if no entry matched (impossible by construction;
                 GENERAL ``lambda *_: True`` always matches as the catch-all).
-                Defensive raise per honest-fail-on-data.
+                Defensive raise per D-29 honest-fail-on-data.
         """
-        #: explicit sort makes priority-ordering invariant (defense
+        # D-06: explicit sort makes priority-ordering invariant (defense
         # against RL-1 ordering drift).
         for entry in sorted(DISPATCH_TABLE.values(), key=lambda e: e.priority):
             # Predicate evaluation; signature is
@@ -149,7 +149,7 @@ class ClassFirstRouter:
                     audit_record=audit_record,
                     tier=entry.tier,
                 )
-        # Per CONTEXT: this is unreachable by construction (GENERAL's
+        # Per CONTEXT D-29: this is unreachable by construction (GENERAL's
         # ``lambda *_: True`` always matches). Defensive raise per
         # honest-fail-on-data discipline.
         raise RuntimeError(
@@ -158,23 +158,23 @@ class ClassFirstRouter:
         )
 
     # -----------------------------------------------------------------------
-    # Telemetry accessors (CONTEXT)
+    # Telemetry accessors (CONTEXT D-16)
     # -----------------------------------------------------------------------
 
     def get_dispatch_stats(self) -> Dict[StoutClass, int]:
-        """: defensive copy of the (StoutClass -> int) histogram."""
+        """D-16: defensive copy of the (StoutClass -> int) histogram."""
         return dict(self._dispatch_stats)
 
     def reset_dispatch_stats(self) -> None:
-        """: explicit reset for batch-run boundaries."""
+        """D-16: explicit reset for batch-run boundaries."""
         self._dispatch_stats.clear()
 
     # -----------------------------------------------------------------------
-    # Audit-log helper (CONTEXT; private)
+    # Audit-log helper (CONTEXT D-08; private)
     # -----------------------------------------------------------------------
 
     def _invoke_audit_log(self, audit_record: dict) -> None:
-        """: structured INFO log; gated by ``self._audit_log``.
+        """D-08: structured INFO log; gated by ``self._audit_log``.
 
         Default-OFF (env var unset). When enabled, emits one INFO line per
         dispatch with the JSON-serialized audit record. The canary harness
@@ -185,9 +185,9 @@ class ClassFirstRouter:
 
 
 # ---------------------------------------------------------------------------
-# Module-level convenience wrappers (CONTEXT)
+# Module-level convenience wrappers (CONTEXT D-04)
 #
-# Per CONTEXT + AP-6, per-instance counters are preferred for telemetry;
+# Per CONTEXT D-16 + AP-6, per-instance counters are preferred for telemetry;
 # these convenience wrappers are for one-off non-stat-tracking callers and
 # tests that don't need their own router instance.
 # ---------------------------------------------------------------------------
@@ -203,9 +203,9 @@ def dispatch(
     features: Optional[Any] = None,
     **kwargs: Any,
 ) -> ClassDispatchResult:
-    """ module-level wrapper for callers that don't carry a router instance.
+    """D-04 module-level wrapper for callers that don't carry a router instance.
 
-    Uses a lazily-initialized module-default router. Per CONTEXT + AP-6,
+    Uses a lazily-initialized module-default router. Per CONTEXT D-16 + AP-6,
     per-instance counters are preferred for telemetry; this convenience
     wrapper is for one-off non-stat-tracking callers.
     """
@@ -216,13 +216,13 @@ def dispatch(
 
 
 def get_dispatch_stats() -> Dict[StoutClass, int]:
-    """ +: stats from the module-default router."""
+    """D-04 + D-16: stats from the module-default router."""
     if _DEFAULT_ROUTER is None:
         return {}
     return _DEFAULT_ROUTER.get_dispatch_stats()
 
 
 def reset_dispatch_stats() -> None:
-    """ +: reset module-default router stats."""
+    """D-04 + D-16: reset module-default router stats."""
     if _DEFAULT_ROUTER is not None:
         _DEFAULT_ROUTER.reset_dispatch_stats()

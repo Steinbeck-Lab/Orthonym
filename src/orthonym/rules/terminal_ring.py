@@ -1,4 +1,4 @@
-""": the TERMINAL ring namer -- the audited systematic generator that
+"""v30 P3-T1b: the TERMINAL ring namer -- the audited systematic generator that
 stands where the ``'substituent'`` refusal sentinel used to.
 
 Why this module exists

@@ -44,7 +44,7 @@ from ..data.chain_names import get_chain_prefix as _get_chain_prefix
 # consulted first here and is deliberately no longer imported: the two tables
 # disagree by design for Al and In (``aluma``/``indiga`` vs ``alumina``/``inda``),
 # so reaching into the HW table from a non-HW context is a wrong-prefix bug. The
-# G4 note this comment replaced justified the HW-first order by saying
+# v22 G4 note this comment replaced justified the HW-first order by saying
 # ``get_heteroatom_prefix`` "has typos like Te->'tea'" -- that was not a typo but
 # its ``symbol.lower() + 'a'`` fabrication fallback, which is now removed.
 from ..data.hw_heteroatoms import (
@@ -57,7 +57,7 @@ from ..rules.lambda_convention import (
     LAMBDA as _LAMBDA,
 )
 
-# Phase 6: the P-31.1.4.2 / Table-2.8 lambda-convention logic was promoted
+# Phase 6 (v23): the P-31.1.4.2 / Table-2.8 lambda-convention logic was promoted
 # to the shared rules/lambda_convention.py so spiro, acyclic skeletal-replacement
 # and the mononuclear-hydride namers share one fail-closed implementation. The
 # private aliases preserve the spiro public surface (test_spiro_g4.py imports
@@ -69,14 +69,14 @@ from ..rules.lambda_convention import (
     nonstandard_bonding_number as _nonstandard_bonding_number,
 )
 
-# Phase 151-02 /: locant comparator reuse — no parallel comparator
+# Phase 151-02 D-11/D-20: locant comparator reuse — no parallel comparator
 # permitted in this module. Imported at the top so the source-grep lock in
 # tests/unit/rules/test_mixed_spiro_fused.py and test_spiro_numbering.py
 # can verify the invariant without inspecting individual function bodies.
 from ..rules.locants import compare_locant_sets  # noqa: F401 — re-export lock
 from ..rules.polycyclic_bridged import get_heteroatom_prefix
 
-# Phase 151-02 /: locant tuple type alias for cascade-step-6
+# Phase 151-02 D-13/D-21: locant tuple type alias for cascade-step-6
 # suppliers. Plain int for typical ring atoms; (int, str) tuple for
 # fusion atoms with a letter suffix (e.g., (4, 'a') -> "4a").
 _Locant = Union[int, Tuple[int, str]]
@@ -796,7 +796,7 @@ def _dispiro_numbering_candidates(
           spiro atom's two ring-neighbours starts the count);
       (3) which middle-ring arc is numbered first, when the two arcs TIE
           in length.
-    Task F found that leaving these to raw RDKit ring/neighbour
+    Task F (v39) found that leaving these to raw RDKit ring/neighbour
     iteration order (rather than enumerating them) made the heteroatom locant
     depend on the input SMILES atom order -- a determinism-gate violation,
     even though every resulting name still round-trips to the same molecule.
@@ -876,7 +876,7 @@ def _get_polyspiro_numbering(
     if ring_chain is None:
         return None
 
-    # Task F round 2: choose DETERMINISTICALLY among every P-24.2.2-legal
+    # v39 Task F round 2: choose DETERMINISTICALLY among every P-24.2.2-legal
     # numbering (see _dispiro_numbering_candidates) by P-24.2.4.1.1 lowest
     # heteroatom locants, then a canonical-rank tiebreak -- same selection
     # shape as ``get_spiro_numbering``'s monospiro ``_key``. Falls back to the
@@ -1492,23 +1492,23 @@ def get_rings_from_spiro_center(
 #
 # Source: 151-02-PLAN.md tasks 2-3; 151-AUDIT-B.md verdict
 # (PURE_SPIRO_PARTIAL · MIXED_SPIRO_FUSED_MISSING · Q-05 NESTED_FORM_PARSEABLE);
-# 151-CONTEXT.md ///; AUTONOM-1990-insights.md §4.
+# 151-CONTEXT.md D-09/D-13/D-21/D-24; AUTONOM-1990-insights.md §4.
 #
 # Design notes (codified from audit):
-# * lock — `is_spiro_system` body remains byte-identical. Mixed
+#  * D-09 lock — `is_spiro_system` body remains byte-identical. Mixed
 #    cases are a SEPARATE detector (`is_mixed_spiro_fused`) and a
 #    SEPARATE name builder (`name_mixed_spiro_fused`).
-# * + AUTONOM §4 — name_mixed_spiro_fused implements separable
+#  * D-13 + AUTONOM §4 — name_mixed_spiro_fused implements separable
 #    parts: identify fused component → name via existing fused-ring
 #    pipeline → identify spiro side ring → name algorithmically →
 #    recombine with primed locant on the side-ring's spiro-attachment
 #    locant only (Q-05 OPSIN preview confirmed parseable).
-# * — no postprocessor band-aids. When the algorithm cannot
+#  * D-24 — no postprocessor band-aids. When the algorithm cannot
 #    name a fixture, return None and let the caller log to
 #    AUTONOM-followups.md.
-# * v18 scope: monospiro mixed cases (1 spiro centre joining a fused
+#  * v18 scope: monospiro mixed cases (1 spiro centre joining a fused
 #    component to a single side ring). Multi-spiro mixed cases return
-# None and are logged as v19 follow-ups.
+#    None and are logged as v19 follow-ups.
 # ============================================================================
 
 
@@ -1518,7 +1518,7 @@ def is_mixed_spiro_fused(mol, allow_vonbaeyer: bool = False,
     Detect a mixed spiro / fused ring system AMENABLE TO AUTONOM §4 NAMING.
 
     A mixed spiro/fused system has:
-      (a) exactly ONE spiro atom
+      (a) exactly ONE spiro atom (v18 scope; multi-spiro mixed → v19)
       (b) at least one fused-ring junction (rings share an edge)
       (c) the spiro centre cleanly separates the ring graph into
           a FUSED component (≥2 rings sharing edges) on one side AND
@@ -1528,7 +1528,7 @@ def is_mixed_spiro_fused(mol, allow_vonbaeyer: bool = False,
           false-positive guard — steroids and alkaloids may carry RDKit
           ring perception artifacts that look spiro-like).
 
-    Mutually exclusive with `is_spiro_system` per Phase 151-02:
+    Mutually exclusive with `is_spiro_system` per Phase 151-02 D-09:
     `is_spiro_system` returns True only when n_rings == n_spiro + 1.
 
     Topology constraint (c) is critical for canary stability: hexacyclic
@@ -1537,7 +1537,7 @@ def is_mixed_spiro_fused(mol, allow_vonbaeyer: bool = False,
     Branch 5b — they belong to the polycyclic-bridged Von Baeyer branch.
     Logged as v19 follow-up #7 for both-sides-fused topology.
 
-    Phase 151-02 / / (b).
+    Phase 151-02 D-09 / D-13 / D-22(b).
 
     Args:
         mol: RDKit Mol object. Returns False if mol is None.
@@ -1569,7 +1569,7 @@ def is_mixed_spiro_fused(mol, allow_vonbaeyer: bool = False,
     from ..perception.natural_products import detect_natural_product
     if detect_natural_product(mol) is not None:
         return False
-    # CANARY-STABILITY GUARD per Phase 151-02 (b): only claim
+    # CANARY-STABILITY GUARD per Phase 151-02 D-22(b): only claim
     # mixed-spiro-fused when the AUTONOM §4 separable topology applies
     # AND we can actually name the fused part. This restricts the new
     # branch to canonical Q-05 OPSIN-validated forms (indoline, isoquinoline,
@@ -1617,7 +1617,7 @@ def is_mixed_spiro_fused(mol, allow_vonbaeyer: bool = False,
 
 def get_spiro_iupac_locants(mol) -> Optional[Dict[int, _Locant]]:
     """
-    Cascade-step-6 supplier for pure spiro systems (Phase 151-02).
+    Cascade-step-6 supplier for pure spiro systems (Phase 151-02 D-21).
 
     Wraps the existing `_get_polyspiro_numbering` (multi-spiro) and
     `get_spiro_numbering` (monospiro) helpers, returning the same
@@ -1864,7 +1864,7 @@ def _name_fused_component(
          on the retained-name early-exit path).
       3. Fall back to `name_ortho_fused_bicyclic` for systematic naming
          when no catalog match.
-      4. Otherwise return None.
+      4. Otherwise return None (v19 follow-up).
     """
     fused_atoms: Set[int] = set()
     for r in fused_rings:
@@ -2264,7 +2264,7 @@ def _name_side_ring(
             return None
         if not name:
             return None
-        # CT.2: for a PARTIALLY-SATURATED mancude heteromonocycle
+        # v37 CT.2: for a PARTIALLY-SATURATED mancude heteromonocycle
         # (thiazoline, dihydropyran, ...) ``name_heterocycle`` numbers the ring
         # through ``_mancude_hydro_select`` (the authority that owns the hydro /
         # indicated-H locants). The independent ``_walk_side_ring_locants`` walk
@@ -2424,7 +2424,7 @@ def _walk_side_ring_locants(
     atom (i.e., the atom at the spiro centre). For heterocyclic side
     rings, locant 1 is the highest-priority heteroatom (O > S > Se > N >
     P > Si > B per IUPAC P-25.2). The walk direction is the one giving
-    the lowest locant set for the spiro attachment atom (reuse).
+    the lowest locant set for the spiro attachment atom (D-11 reuse).
 
     Returns Dict[atom_idx -> locant_in_side_ring].
     """
@@ -2465,7 +2465,7 @@ def _walk_side_ring_locants(
 
     # Walk the ring and assign 1, 2, ..., N.
     # Two directions possible — pick the one giving the LOWEST set of
-    # spiro-locants (reuse).
+    # spiro-locants (D-11 reuse).
     candidates = []
     for first_step in adj[start]:
         path = [start, first_step]
@@ -2491,9 +2491,9 @@ def _walk_side_ring_locants(
 
     if not candidates:
         return {}
-    # Pick lowest spiro-locant set per first-point-of-difference
+    # Pick lowest spiro-locant set per first-point-of-difference (D-11)
     candidates.sort(key=lambda x: x[0])  # tuple comparison = first-pt-of-diff
-    # Verify with compare_locant_sets to honor the / lock —
+    # Verify with compare_locant_sets to honor the D-11/D-20 lock —
     # tuple-sort and compare_locant_sets agree on plain int lists.
     best = candidates[0]
     for cand in candidates[1:]:
@@ -2674,7 +2674,7 @@ def name_mixed_spiro_fused(
         # per-ring-system recursion; the sibling core is a substituent branch).
         spiro_atoms = {a for a in spiro_atoms if a in restrict_atoms}
     if len(spiro_atoms) != 1:
-        # scope: monospiro mixed only. Multi-spiro mixed is logged
+        # v18 scope: monospiro mixed only. Multi-spiro mixed is logged
         # to AUTONOM-followups for v19 in Task 2 commit message.
         return None
     spiro_center = list(spiro_atoms)[0]
@@ -2691,7 +2691,7 @@ def name_mixed_spiro_fused(
     fused_rings, side_rings = classification
 
     if len(side_rings) != 1:
-        return None # v19: multi-side-ring mixed (rare)
+        return None  # v19: multi-side-ring mixed (rare)
 
     # Step 2: name the fused component
     fused_named = _name_fused_component(
@@ -2769,7 +2769,7 @@ def name_mixed_spiro_fused(
     # spiro-core-plus-pendant-ring molecule outright (name_mixed_spiro_fused ->
     # None -> abstain), when the correct behaviour is to OFFER the core parent
     # and let the RT gate (SELF-01 / OPSIN) decide once the substituent supplier
-    # has attached the pendant rings: producers OFFER, they do not
+    # has attached the pendant rings (invariant 18: producers OFFER, they do not
     # RETURN a terminal None). 0-wrong is preserved: if a pendant ring (or any
     # off-core atom) cannot be named, the assembled name fails round-trip and
     # the molecule abstains — it never ships a wrong or atom-dropping
@@ -5608,7 +5608,30 @@ def _name_hw_monocycle_component(
         else:
             name = plain
     else:
-        name = _hw_bracket_name(numbered_het, ring_size)
+        # P-31.1.4.2 retained heterocycle PIN (piperidine, pyrrolidine, morpholine,
+        # piperazine, ...) is preferred over the Hantzsch-Widman systematic stem
+        # (azinane, azolidine, 1,4-oxazinane, 1,4-diazinane) for a spiro COMPONENT
+        # too: P-24.5.1 names each component by its own preferred ring name, and
+        # P-31.1.4.2 makes the retained saturated-heterocycle name the PIN. The
+        # retained name and the HW stem share the SAME P-31.1.4.3 heteroatom-lowest-
+        # locant numbering (N=1 for piperidine; O=1,N=4 for morpholine), so the `pos`
+        # map computed above is unchanged -- only the ring word swaps. `frag` is the
+        # extracted single saturated ring, so get_retained_name (keyed by exact
+        # canonical SMILES over the PIN-gated ALL_RETAINED_NAMES) returns a name ONLY
+        # for that ring: oxane/thiane/oxolane/thiolane/azetidine map to their own HW
+        # word (no-op) and non-retained rings (azepane, ...) return None (stay HW).
+        # Every spiro emission is offer-RT-gated downstream, so a numbering the swap
+        # would misstate abstains rather than ships. (Phase 11, 11C2 #31.)
+        name = None
+        try:
+            from ..data import get_retained_name
+            retained = get_retained_name(Chem.MolToSmiles(frag))
+        except Exception:
+            retained = None
+        if retained:
+            name = retained
+        else:
+            name = _hw_bracket_name(numbered_het, ring_size)
     if not name:
         return None
     a2l = {frag_to_orig[fi]: pos[fi] for fi in ring if fi in frag_to_orig}
@@ -5875,7 +5898,7 @@ def _name_spiro_vonbaeyer_core(mol):
     if loc_a is None or loc_b is None:
         return None
 
-    # spiro-hoist: re-anchor each component's substituent-hoisting locmap so
+    # v37 spiro-hoist: re-anchor each component's substituent-hoisting locmap so
     # ``locmap[spiro] == descriptor locant``. When the fused-ring catalog numbered
     # the spiro atom at a locant OTHER than the canonical (lowest-orbit) one used
     # in the ``spiro[...]`` descriptor, the hoisted substituent citations were
@@ -6026,13 +6049,20 @@ def _name_spiro_vonbaeyer_core(mol):
         ):
             return None
     elif hetero_prefix:
-        name = f"{hetero_prefix}{name}"
+        # P-14.5 / P-24.5.2: the replacement 'a'-prefix joins the descriptor
+        # DIRECTLY when it starts with a letter ('3-thia' + 'spiro[4.5]...' ->
+        # '3-thiaspiro[4.5]...'), but a hyphen separates it from a LOCANT-initial
+        # descriptor -- a spirobi cites its spiro locants first ('3,3'-spirobi'),
+        # so '6,6'-dioxa' + '3,3'-spirobi[...]' -> '6,6'-dioxa-3,3'-spirobi[...]',
+        # NOT '...dioxa3,3'-spirobi...'.
+        from ..assembly.composition_primitives import _join_prefix_to_name
+        name = _join_prefix_to_name(hetero_prefix, name)
 
     # Cage unsaturation (P-31.1.5.2) of a COMPONENT-NAME spiro was spliced INSIDE
     # each component's bracketed name above (re-anchored to that component's
     # numbering) as the name was assembled -- see ``_cage_side_ene`` /
     # ``_splice_cage_ene`` -- because the old trailing '-3-ene' form is
-    # OPSIN-grammar-invalid there. A SPIROBI (identical
+    # OPSIN-grammar-invalid there (v36-C1C2C6 Pattern A1). A SPIROBI (identical
     # cages, P-24.3.1) instead cites its multiplicative '-6,6'-diene' suffix AFTER
     # the bracket (a Blue-Book PIN form); that suffix is appended here.
     if _spirobi_trailing:

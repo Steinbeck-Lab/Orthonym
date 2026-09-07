@@ -13,7 +13,7 @@ from rdkit import Chem
 
 from ..rules.lambda_convention import nonstandard_bonding_number
 
-# (heteroatom-only-suffix acids): characteristic-heteroatom
+# v33 Phase 6 (heteroatom-only-suffix acids): characteristic-heteroatom
 # (atomic number) for FG classes whose SMARTS matches S/P + O with NO carbon
 # atom in the match tuple. sulfonic_acid, sulfinic_acid, phosphonic_acid and
 # the sulfonic-family imidic/peroxoic/thioic S variants all use a RECURSIVE
@@ -49,7 +49,7 @@ _HETEROACID_CHARACTERISTIC_Z: Dict[str, int] = {
     "sulfonoperoxoic_acid": 16, "sulfonothioic_S_acid": 16,
     "sulfonimidic_acid": 16, "sulfinimidic_acid": 16,
     "phosphonic_acid": 15, "phosphinic_acid": 15,
-    # Wave 2 (#4): same bearing-carbon defect for the remaining
+    # v33 Phase 6 Wave 2 (#4): same bearing-carbon defect for the remaining
     # Group-15/16 oxoacid FG classes (functional_groups.py ~94-114). arsonic_acid
     # and stibonic_acid use the same recursive carbon guard as sulfonic_acid
     # ("[AsX4;$([AsX4][#6])](=O)([OX2H1])[OX2H1]") -- carbon absent from the
@@ -65,6 +65,11 @@ _HETEROACID_CHARACTERISTIC_Z: Dict[str, int] = {
     "stibonic_acid": 51, "stibinic_acid": 51,
     "selenonic_acid": 34, "seleninic_acid": 34,
     "telluronic_acid": 52, "tellurinic_acid": 52,
+    # Phase 1B: trivalent -ous analogues — same central-heteroatom Z as their
+    # -onic/-inic siblings (P=15, As=33, Sb=51), same recursive carbon-guard shape.
+    "phosphonous_acid": 15, "phosphinous_acid": 15,
+    "arsonous_acid": 33, "arsinous_acid": 33,
+    "stibonous_acid": 51, "stibinous_acid": 51,
 }
 
 
@@ -502,7 +507,7 @@ def find_principal_chain(
         _members = _SENIORITY_CLASS_MEMBERS.get(_parent_class)
         _het_z = _CLASS_CHARACTERISTIC_Z.get(_parent_class)
         if _het_z is None:
-            # heteroatom-only-suffix acid classes (sulfonic/
+            # v33 Phase 6: heteroatom-only-suffix acid classes (sulfonic/
             # sulfinic/phosphonic/phosphinic + the sulfonic-family imidic/
             # peroxoic/thioic S variants) are singleton classes -- never a
             # _SENIORITY_PARENT value -- so _parent_class is always None for
@@ -523,7 +528,7 @@ def find_principal_chain(
                 _normalize_pcg_match(mol, m, _het_z)
                 for sub in _members for m in functional_groups.get(sub, [])
             ]
-        # R1 (P-44.1.1): a SKELETAL-suffix PCG -- the '-one' family -- puts
+        # v29 R1 (P-44.1.1): a SKELETAL-suffix PCG -- the '-one' family -- puts
         # the characteristic group's OWN atom into the parent hydride, so only
         # that atom may satisfy "this chain bears the PCG". The ketone SMARTS
         # '[#6][CX3](=O)[#6]' carries BOTH FLANKING carbons, and the whole-match
@@ -961,7 +966,7 @@ def find_principal_chain(
                     lams.append(lam)
         return tuple(sorted(lams, reverse=True))
 
-    # reverse-pair memo (PURE SPEEDUP — provably output-identical).
+    # v38 P2 reverse-pair memo (PURE SPEEDUP — provably output-identical).
     # `chain_score` is orientation-invariant: criteria 1-2 read set membership,
     # 3-5 count length/bonds (both orientation-free), 6-8 take a fwd/rev `max`,
     # and criterion 9 (`_compute_sub_locant_score`) returns the same tuple for a

@@ -1,7 +1,7 @@
 """Phase 160 handler enrichment helpers (DECOMP-01).
 
 Substrate commit 02-00: lazy re-export wrappers around the canonical
-implementations in ``composer.py``. Per CONTEXT incremental-migration
+implementations in ``composer.py``. Per CONTEXT D-24 incremental-migration
 discipline, composer.py STILL OWNS ``_enrich_handler_name`` (composer.py:191-277)
 and ``_integrate_universal_prefixes`` (composer.py:109-183) at this commit;
 those functions stay until Plan-03 commit 03-10 (composer.py thinning).
@@ -24,7 +24,7 @@ composer path now to minimize commit-02-00 risk: zero copy of composer.py
 logic; zero risk of stale-closure drift; the byte-identical canary delta
 gate is trivially satisfied.
 
-Anti-pattern hygiene (Phase 158 inheritance):
+Anti-pattern hygiene (Phase 158 D-26 inheritance):
 - AP-160-04 banned: pure read-only on ``features``; never mutates
   ``features.mol`` or ``features.functional_groups``. (The lazy delegate
   inherits composer.py's purity verbatim.)
@@ -38,7 +38,7 @@ References:
 - composer.py:109-183 (``_integrate_universal_prefixes``) — verbatim source.
 - composer.py:191-277 (``_enrich_handler_name``) — verbatim source.
 - 160-PATTERNS.md § 5 — analog: composer.py:109-277.
-- 160-CONTEXT.md — incremental-migration discipline.
+- 160-CONTEXT.md D-24 — incremental-migration discipline.
 """
 from __future__ import annotations
 
@@ -52,7 +52,7 @@ def enrich_handler_name(
     """Enrich a handler's base name with non-principal substituents.
 
     Lazy delegate to ``composer.py:_enrich_handler_name`` (composer.py:191-277).
-    Per CONTEXT + PATTERNS § 5 first-wave guidance, composer.py owns
+    Per CONTEXT D-24 + PATTERNS § 5 first-wave guidance, composer.py owns
     the canonical body at this commit; this wrapper provides the
     forward-looking import path ``handlers._enrichment.enrich_handler_name``
     for handler files that want stable paths now.
@@ -93,7 +93,7 @@ def integrate_universal_prefixes(
     """Discover and format all substituents on a parent structure.
 
     Lazy delegate to ``composer.py:_integrate_universal_prefixes``
-    (composer.py:109-183). Per CONTEXT + PATTERNS § 5 first-wave guidance.
+    (composer.py:109-183). Per CONTEXT D-24 + PATTERNS § 5 first-wave guidance.
 
     Args:
         mol: RDKit Mol object.

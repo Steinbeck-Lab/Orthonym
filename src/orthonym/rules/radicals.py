@@ -427,7 +427,7 @@ def _is_plain_alkyl_radical_fragment(mol, radical_idx: int, attach_idx: int) -> 
     are preferred IUPAC names' -- a FIXED short list of straight-chain/simple
     contractions, not a licence to count carbons on ANY hydrocarbon shape).
 
-     finding: the original guard checked only
+    REVIEW finding (v36 A2 hardening): the original guard checked only
     aromatic/ring/heteroatom and NOT branching or unsaturation, so a
     BRANCHED or UNSATURATED alkyl fragment was routed to the same carbon-
     COUNT contraction as a straight chain -- e.g. propan-2-yl (isopropyl)
@@ -598,12 +598,12 @@ def name_oxyl_radical(mol, radical_site: Dict[str, Any]) -> str:
     or per P-71.3.4 method (1) as ``(R)oxyl``/``R-peroxyl`` -- the VERIFIED
     PIN form ("Method (1) generates preferred IUPAC names",
     BlueBookV2.md:40679) -- when R itself carries a further substituent, via
-    ``_compose_oxyl_name``. generalisation: the R group is named
+    ``_compose_oxyl_name``. v36 A2 generalisation: the R group is named
     through the existing substituent-naming pipeline instead of being
-    collapsed to the unsubstituted retained form (the pre-bug: any
+    collapsed to the unsubstituted retained form (the pre-v36 bug: any
     aromatic-O radical mapped unconditionally to 'phenoxyl', dropping every
     ring substituent) or misnamed by a bare carbon count that ignored
-    branching/unsaturation (hardening, see
+    branching/unsaturation (v36 A2 REVIEW hardening, see
     ``_is_plain_alkyl_radical_fragment``).
 
     Args:

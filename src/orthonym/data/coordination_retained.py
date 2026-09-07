@@ -1,7 +1,7 @@
 """
 Retained-name table for N-coordinated metal-tetrapyrrole macrocycles.
 
-D1. These are Fe/Mg/Co/Ni tetrapyrrole coordination complexes
+v36 Milestone D1. These are Fe/Mg/Co/Ni tetrapyrrole coordination complexes
 (heme, chlorophyll, cobalamin, siroheme, coenzyme F430). OPSIN 2.9.0 cannot
 parse any of their names (measured: heme b / chlorophyll a / cyanocobalamin /
 siroheme / F430 all -> opsin_parse None), so a round-trip oracle is impossible
@@ -22,12 +22,12 @@ Charge / protonation states are enumerated as SEPARATE keys (ChEBI stores one
 row per charge state; standard InChI does not renormalise formal charge), so
 each key is an exact, unambiguous structural match.
 
-Scope: heme b/c/o, siroheme, chlorophyll/bacteriochlorophyll
+Scope (v36-D1 plan IN-list): heme b/c/o, siroheme, chlorophyll/bacteriochlorophyll
 family, the cobalamin group (cyano/adenosyl/methyl/aqua/hydroxo/nitrito/cob(I..III)),
-and coenzyme F430. additionally added the 13 cobyrinic-acid-type corrinoid /
+and coenzyme F430. v37 SP5-D1 additionally added the 13 cobyrinic-acid-type corrinoid /
 cobalt-precorrin rows (Co corrin/precorrin, no nucleotide loop) that each passed a strict
 per-row provenance check (verbatim ChEBI name, InChIKey re-derived == key, distinct id,
-opsin_parse == None); see SP5.1 addendum. Still OUT
+opsin_parse == None); see .planning/audit-v33/V37-SPY-SP5.md SP5.1 addendum. Still OUT
 (left abstaining): chlorophyllide/protochlorophyllide precursors, Zn/Cu porphyrin dyes,
 and the general P-69 additive namer (D2). Rows whose ChEBI name is malformed
 (unsigned charge, empty parentheses, stray double-hyphen) or whose structure has
@@ -96,7 +96,7 @@ COORDINATION_RETAINED: Dict[str, str] = {
     "SLHJCOLVGKWTAP-KHPXXVTNSA-M": "[methyl (3S,4S,13R,14R)-9-acetyl-14-ethyl-4,8,13,18-tetramethyl-20-oxo-3-(3-oxo-3-{[(2E,6E,10E)-3,7,11,15-tetramethylhexadeca-2,6,10,14-tetraen-1-yl]oxy}propyl)-13,14-dihydrophorbine-21-carboxylatato(3-)-kappa(4)N(23),N(24),N(25),N(26)]magnesate(1-)",
     #   ^ CHEBI:90849 -- bacteriochlorophyll-family magnesate charge variant
 
-    # === Cobyrinic-acid-type corrinoid precursors (Co corrin/precorrin, no nucleotide loop; ===
+    # === Cobyrinic-acid-type corrinoid precursors (Co corrin/precorrin, no nucleotide loop; v37 SP5-D1) ===
     "BKIWSQUNFCJSOI-LQRHGLAMSA-E": "{3,3',3'',3'''-[(7S,8S,12S,13S)-3,8,13,17-tetrakis(carboxymethyl)-8,13-dimethyl-3,7,8,12,13,20-hexahydroporphyrin-2,7,12,18-tetrayl-kappa(4)N(21),N(22),N(23),N(24)]tetrapropanoato(10-)}cobaltate(6-)",
     #   ^ CHEBI:60053 -- cobalt-precorrin (hexahydroporphyrin, cobaltate 6- charge variant)
     "BKIWSQUNFCJSOI-LQRHGLAMSA-M": "{3,3',3'',3'''-[(7S,8S,12S,13S)-3,8,13,17-tetrakis(carboxymethyl)-8,13-dimethyl-3,7,8,12,13,20-hexahydroporphyrin-2,7,12,18-tetrayl-kappa(4)N(21),N(22),N(23),N(24)]tetrapropanoato(2-)}cobalt",

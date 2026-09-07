@@ -739,7 +739,7 @@ def is_bridged_fused(mol) -> bool:
 
 
 # ============================================================================
-# Bridged-fused PIN constructor
+# Bridged-fused PIN constructor (v22 Phase G1, DD7 COV-01)
 # ============================================================================
 #
 # A bridged fused ring system (P-25.4.1.1) = a recognised fused parent (the

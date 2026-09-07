@@ -99,7 +99,7 @@ MONOCYCLIC_COMPONENTS: Dict[str, Dict[str, Any]] = {
         'ring_size': 5,
         'heteroatoms': ['N', 'N'],
         'hetero_positions': [1, 3],   # 1,3-diazole
-        # Phase 155.C: seniority corrected from 47 -> 50 per P-25.2.2.4
+        # Phase 155.C D-11: seniority corrected from 47 -> 50 per P-25.2.2.4
         # Jan 2022 errata. 155-AUDIT-C.md row 7: classification WRONG-tier
         # (expected 50-59 = 5-mem N-het band, was 47 in 6-mem N-het band
         # 40-49). Cross-check Phase 149 fused_ring_selection.py:
@@ -116,7 +116,7 @@ MONOCYCLIC_COMPONENTS: Dict[str, Dict[str, Any]] = {
         'ring_size': 5,
         'heteroatoms': ['N', 'N'],
         'hetero_positions': [1, 2],   # 1,2-diazole
-        # Phase 155.C: seniority corrected from 48 -> 51 per P-25.2.2.4
+        # Phase 155.C D-11: seniority corrected from 48 -> 51 per P-25.2.2.4
         # Jan 2022 errata. 155-AUDIT-C.md row 8: classification WRONG-tier
         # (expected 50-59 = 5-mem N-het band, was 48 in 6-mem N-het band
         # 40-49). Preserves pyrazole < pyrrole(55) and pyrazole > imidazole(50)
@@ -150,7 +150,7 @@ MONOCYCLIC_COMPONENTS: Dict[str, Dict[str, Any]] = {
         'ring_size': 5,
         'heteroatoms': ['N', 'S'],
         'hetero_positions': [1, 3],   # S at 1, N at 3
-        # Phase 155.C: seniority corrected from 77 -> 80 per P-25.2.2.4
+        # Phase 155.C D-11: seniority corrected from 77 -> 80 per P-25.2.2.4
         # Jan 2022 errata. 155-AUDIT-C.md row 11: classification WRONG-tier
         # (expected 80-89 = S/N+S-het band, was 77 in O-het band 70-79).
         # Cross-check: thiazole stays MORE senior than thiophene(85) under
@@ -165,7 +165,7 @@ MONOCYCLIC_COMPONENTS: Dict[str, Dict[str, Any]] = {
         'ring_size': 5,
         'heteroatoms': ['N', 'S'],
         'hetero_positions': [1, 2],   # S at 1, N at 2
-        # Phase 155.C: seniority corrected from 78 -> 81 per P-25.2.2.4
+        # Phase 155.C D-11: seniority corrected from 78 -> 81 per P-25.2.2.4
         # Jan 2022 errata. 155-AUDIT-C.md row 12: classification WRONG-tier
         # (expected 80-89 = S/N+S-het band, was 78 in O-het band 70-79).
         # Preserves isothiazole < thiophene(85) and isothiazole > thiazole(80)

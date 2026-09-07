@@ -1,4 +1,4 @@
-""": the TERMINAL FRAGMENT namer -- the complete-by-construction
+"""v30 Phase B: the TERMINAL FRAGMENT namer -- the complete-by-construction
 fallback that stands where a declining producer used to DROP a substituent.
 
 Why this module exists
@@ -14,7 +14,7 @@ SELF-01 then correctly rejects the atom-short name.
 So the lever is not a fix list. It is one fallback that always accounts for every
 atom -- the generalisation of the doctrine ``rules/terminal_ring.py`` already
 states: *a table miss degrades to an UGLIER name instead of a refusal*
-(CLAUDE.md, T4 clause).
+(CLAUDE.md invariant 1, T4 clause).
 
 Contract
 --------
@@ -46,7 +46,7 @@ from .ring_replacement import build_replacement_prefix
 # halogen is a terminal substituent expressed as a fluoro/chloro/... prefix, so
 # the backbone walk must not step onto one -- doing so miscounts the chain length
 # and drops halogens (``-O-CH2-CF3`` -> ``3,3-difluoro-1-oxabutan-1-yl``, a
-# 4-atom/2-F WRONG constitution for the real 3-atom/3-F chain)..
+# 4-atom/2-F WRONG constitution for the real 3-atom/3-F chain). v36 Wave F.
 _HALOGEN_ATOMIC_NUMS = frozenset({9, 17, 35, 53, 85})
 
 logger = logging.getLogger(__name__)
@@ -82,7 +82,7 @@ def _canonical_ranks(mol) -> Sequence[int]:
     """Spelling-independent atom ordering, for deterministic tie-breaks.
 
     Atom-index order varies with the SMILES spelling, and ordering by it is how a
-    latent P-14.4(g) tie became a live nondeterminism once before.
+    latent P-14.4(g) tie became a live nondeterminism once before (v29 Phase 6).
     """
     return list(Chem.CanonicalRankAtoms(mol, breakTies=True))
 
@@ -95,7 +95,7 @@ def _backbone_from(mol, atoms: Set[int], start: int,
     tree and the deepest root-to-leaf path is the backbone. Ties are broken on
     the path's canonical-rank sequence, never on atom index.
 
-    ``stop_at_ring``: when the fragment carries ring
+    ``stop_at_ring`` (v30 ring-branch lever): when the fragment carries ring
     systems but the attachment is acyclic, the backbone is the ACYCLIC chain and
     each ring system is a decoration. Ring atoms are then not valid backbone
     steps -- the walk stops at the ring boundary and ``_branches_off`` collects
@@ -109,7 +109,7 @@ def _backbone_from(mol, atoms: Set[int], start: int,
         children = [nb.GetIdx() for nb in mol.GetAtomWithIdx(cur).GetNeighbors()
                     if nb.GetIdx() in atoms and nb.GetIdx() not in seen
                     # A monovalent halogen is a substituent, never a skeletal
-                    # backbone step (: fixes the trifluoroethoxy
+                    # backbone step (v36 Wave F: fixes the trifluoroethoxy
                     # miscount -- see _HALOGEN_ATOMIC_NUMS).
                     and nb.GetAtomicNum() not in _HALOGEN_ATOMIC_NUMS
                     and not (stop_at_ring
@@ -153,7 +153,7 @@ def _has_defined_stereo(mol, frag: Set[int]) -> bool:
     belongs to whatever names that part; blocking on it would refuse fragments
     this module handles correctly.
 
-    Split into an ATOM half and a BOND half. A defined
+    Split (v30 internal-C=C lever) into an ATOM half and a BOND half. A defined
     R/S centre is still never expressible here, but a defined BACKBONE C=C
     configuration is now emitted as a leading ``(nE)/(nZ)`` block on the ACYCLIC
     path, so only the atom half unconditionally refuses; the bond half still
@@ -241,7 +241,7 @@ def _branches_off(mol, frag: Set[int], skeleton: Sequence[int],
     position-based; for a ring system it is the ring's own numbering, which skips
     ``4 -> 4a -> 5``, so a position-derived locant would silently disagree with
     the numbering the ring name was actually spelled from -- the same defect class
-    as.
+    as ``.planning/DEFECT-hydro-fused-substituent-locants.md``.
     """
     on_backbone = set(skeleton)
     backbone = skeleton
@@ -492,7 +492,7 @@ def _composite_fragment_name(
         token = enclose_if_compound(sub.name)
         prefix_tokens.append((alpha_sort_key(sub.name), locant, token))
 
-    # --- ring-system stereo -> one leading (nR,nZ,...) block ----------
+    # --- ring-system stereo -> one leading (nR,nZ,...) block (v30 §A) ----------
     # Cite the RING SYSTEM's own atom R/S + ring-bond E/Z with the RING numbering
     # (tr.numbering). Branch-internal stereo is ALREADY inside each branch token
     # (its recursion emitted it). A defined centre/geometry that is neither on the
@@ -575,21 +575,21 @@ def _terminal_fragment_name(
     # Stereochemistry. The COMPOSITE path (ring parent, below) emits NO
     # stereodescriptor, so it still refuses any defined stereo -- dropping a
     # centre/geometry there names a different molecule SELF-01 cannot catch. The
-    # ACYCLIC path below now emits BOTH backbone C=C geometry (nE/nZ,
-    # internal-C=C) AND backbone R/S centres, so a defined atom
+    # ACYCLIC path below now emits BOTH backbone C=C geometry (nE/nZ, v30
+    # internal-C=C) AND backbone R/S centres (v30 B3), so a defined atom
     # stereocentre no longer forces a blanket refusal there -- it is cited in the
     # leading (...) block, and any centre it cannot place (off-backbone) still
     # refuses. Every emitted descriptor is RT-verified by SELF-01 downstream.
     if mol.GetRingInfo().NumAtomRings(attach_idx) > 0:
         # Attachment is ON a ring system -> the ring is the parent (composite
-        # path). §A: that path now cites the ring system's own R/S + E/Z in a
+        # path). v30 §A: that path now cites the ring system's own R/S + E/Z in a
         # leading (...) block from the ring numbering, and refuses INTERNALLY any
         # centre it cannot place -- so the former blanket stereo refusal is gone.
         # SELF-01's C6 RegistrationHash stereo layer verifies every emitted
         # descriptor downstream, so a wrong CIP/locant abstains, never ships.
         return _composite_fragment_name(mol, frag, attach_idx)
 
-    # Attachment is ACYCLIC -> the chain path names it. ring-branch lever:
+    # Attachment is ACYCLIC -> the chain path names it. v30 ring-branch lever:
     # when the fragment ALSO carries ring system(s) -- a chain leading to a ring,
     # the case _composite_fragment_name explicitly declines ("attachment is
     # acyclic but the fragment carries a ring; out of implemented scope") -- the
@@ -597,7 +597,7 @@ def _terminal_fragment_name(
     # decoration recursed through _composite_fragment_name. The ring is spelled
     # by terminal_ring (REPLACEMENT nomenclature), so -C(=O)-Ph emits the
     # ugly-but-RT-correct `1-(cyclohexa-1,3,5-trien-1-yl)-2-oxaeth-1-en-1-yl`
-    # and -CH2CH2-cyclohexyl emits `2-(cyclohexan-1-yl)ethyl` 's T4
+    # and -CH2CH2-cyclohexyl emits `2-(cyclohexan-1-yl)ethyl` (invariant 1's T4
     # clause; retained ring names are a follow-on). The pure-acyclic case (no
     # ring) is stop_at_ring=False -> byte-identical.
     _frag_has_ring = not _is_acyclic(mol, frag)
@@ -631,7 +631,7 @@ def _terminal_fragment_name(
     numbering = {a: i + 1 for i, a in enumerate(backbone)}
 
     # --- backbone stereo -> one leading (nR,nZ,...) block ------------------
-    # BOTH atom R/S centres and backbone C=C geometry
+    # BOTH atom R/S centres (v30 B3) and backbone C=C geometry (v30 internal-C=C)
     # are cited, merged and locant-ordered. Locant = the atom's backbone locant
     # (for a C=C, the lower endpoint, P-31.1.1.1). A centre/geometry on the
     # backbone is cited here; one wholly inside a branch is cited by that

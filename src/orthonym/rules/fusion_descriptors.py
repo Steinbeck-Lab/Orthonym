@@ -438,9 +438,9 @@ def identify_parent_and_child(
         Tuple of (parent_name, child_name, parent_ring_list, child_ring_list)
         Returns ('', '', [], []) if rings cannot be identified
     """
-    # Phase 149: route base-component decision through FR-2.3 cascade.
+    # Phase 149 D-07: route base-component decision through FR-2.3 cascade.
     # Source: https://iupac.qmul.ac.uk/fusedring/FR23.html
-    # Source: 149-CONTEXT.md,.
+    # Source: 149-CONTEXT.md D-07, D-15.
     from .fused_ring_selection import select_base_component
 
     # Convert sets to lists for ordered operations
@@ -454,7 +454,7 @@ def identify_parent_and_child(
     if not name_a and not name_b:
         return ('', '', [], [])
 
-    # Phase 149 primary: FR-2.3 cascade.
+    # Phase 149 primary: FR-2.3 cascade (D-07).
     # The returned base_atoms determines parent/child ordering.
     base_atoms, _others = select_base_component(mol, [set(ring_a), set(ring_b)])
     if base_atoms == set(ring_a):
@@ -463,8 +463,8 @@ def identify_parent_and_child(
         return (name_b, name_a, ring_b_list, ring_a_list)
 
     # Total tie under FR-2.3 (a)-(f) — fall back to numeric seniority
-    # (preserves get_component_seniority as last-resort tiebreaker;
-    # reuse-not-rebuild discipline).
+    # (D-07 preserves get_component_seniority as last-resort tiebreaker;
+    # D-15 reuse-not-rebuild discipline).
     seniority_a = get_component_seniority(name_a) if name_a else 999
     seniority_b = get_component_seniority(name_b) if name_b else 999
     if seniority_a <= seniority_b:
@@ -1165,6 +1165,100 @@ def _orient_carbocyclic_for_fusion(
     return best_order if best_order else list(ring_atoms)
 
 
+# Element order for heteroatom-first ring numbering (senior element -> lowest
+# locant): O > S > Se > Te > N > P > As > Sb > B (Hantzsch-Widman element order;
+# P-25.3.3.1.2(b), BlueBookV2.md:12558). Mirrors _PCF_HET_NUM_SENIORITY in
+# fused_rings.py so the 2-ring and polycomponent paths agree on child numbering.
+_FUSION_HET_NUM_SENIORITY = {
+    'O': 0, 'S': 1, 'Se': 2, 'Te': 3, 'N': 4, 'P': 5, 'As': 6, 'Sb': 7, 'B': 8,
+}
+
+
+def _cooptimal_child_orderings(
+    mol,
+    ring_atoms: List[int],
+    shared_atoms: Set[int],
+) -> List[List[int]]:
+    """Enumerate the co-optimal IUPAC numberings of an attached (child) ring.
+
+    A child ring is numbered to give (1) lowest locants to its heteroatoms as a
+    set, senior element first (P-25.3.3.1.2(a) BlueBookV2.md:12543 / (b) :12558),
+    and then (2) lowest locants to the fusion-bond (shared) atoms. This returns
+    EVERY ordering tied on both keys.
+
+    - Asymmetric child (a heteroatom adjacent to the fusion bond): exactly one
+      ordering survives, so the caller's descriptor is forced -- a genuinely
+      descending citation such as [3,2-b] is preserved.
+    - Symmetric child (a heteroatom equidistant from the fusion bond): two
+      orderings survive tied on both keys, and the caller breaks the remaining
+      tie by citing the lower descriptor pair in the direction of the parent
+      lettering (P-25.3.1.3 :11911; P-25.3.4.2.4(d) :13403/:13409).
+
+    Returns [] for a non-simple cycle (a bridged/interior atom) so the caller can
+    fall back to the single-pick numbering and never lose a name it builds today.
+    """
+    ring_set = set(ring_atoms)
+    adj = {}
+    for idx in ring_atoms:
+        nbrs = [n.GetIdx() for n in mol.GetAtomWithIdx(idx).GetNeighbors()
+                if n.GetIdx() in ring_set]
+        if len(nbrs) != 2:
+            return []
+        adj[idx] = nbrs
+    start = ring_atoms[0]
+    cyc = [start]
+    prev, curr = start, adj[start][0]
+    while curr != start:
+        cyc.append(curr)
+        nxt = [n for n in adj[curr] if n != prev]
+        if not nxt:
+            return []
+        prev, curr = curr, nxt[0]
+    if len(cyc) != len(ring_atoms):
+        return []
+
+    n = len(cyc)
+    orderings = [[cyc[(s + d * i) % n] for i in range(n)]
+                 for s in range(n) for d in (1, -1)]
+
+    def het_key(order):
+        items = []
+        for i, a in enumerate(order):
+            sym = mol.GetAtomWithIdx(a).GetSymbol()
+            if sym in _FUSION_HET_NUM_SENIORITY:
+                items.append((i + 1, _FUSION_HET_NUM_SENIORITY[sym]))
+        return tuple(sorted(items))
+
+    best_het = min((het_key(o) for o in orderings), default=())
+    het_min = [o for o in orderings if het_key(o) == best_het]
+
+    def shared_key(order):
+        return tuple(sorted(order.index(s) + 1 for s in shared_atoms
+                            if s in order))
+
+    best_shared = min(shared_key(o) for o in het_min)
+    result, seen = [], set()
+    for o in het_min:
+        if shared_key(o) == best_shared and tuple(o) not in seen:
+            seen.add(tuple(o))
+            result.append(o)
+    return result
+
+
+def _fusion_descriptor_citation_key(descriptor: str):
+    """Sort key for choosing the lowest fusion descriptor among co-optimal child
+    numberings: edge letter first (P-25.3.1.3 BlueBookV2.md:11911 -- 'the letter
+    as early in the alphabet as possible'), then the child locants IN CITATION
+    ORDER (NOT sorted, so a genuinely descending PIN like [3,2-b] is preserved).
+    A benzene-child descriptor carries only a letter."""
+    inner = descriptor.strip('[]')
+    if '-' in inner:
+        locs, letter = inner.rsplit('-', 1)
+        nums = tuple(int(p) for p in locs.split(','))
+        return (letter,) + nums
+    return (inner,)
+
+
 def generate_systematic_name_for_fused_pair(
     mol,
     ring1: List[int],
@@ -1203,25 +1297,45 @@ def generate_systematic_name_for_fused_pair(
     if not parent_name or not child_name:
         return None
 
-    # Get IUPAC-ordered rings for correct descriptor generation
+    # Get IUPAC-ordered parent ring for correct descriptor generation.
     parent_iupac = _get_iupac_ring_order_for_fusion(
         mol, parent_ring, shared_atoms, is_child=False
     )
-    child_iupac = _get_iupac_ring_order_for_fusion(
-        mol, child_ring, shared_atoms, is_child=True
-    )
 
-    # Generate fusion descriptor using IUPAC-ordered rings
     # For carbocyclic child (all positions equivalent), omit child locants
     # benzene -> [b], cyclopentadiene -> [b], cycloheptadiene -> [b]
     CARBOCYCLIC_CHILDREN = {'benzene', 'cyclopentadiene', 'cyclopentene',
                             'cycloheptadiene', 'cycloheptene', 'cyclohexene'}
     child_is_carbo = child_name in CARBOCYCLIC_CHILDREN
-    descriptor = generate_fusion_descriptor(
-        parent_iupac, child_iupac, shared_atoms, child_is_benzene=child_is_carbo
-    )
-    if not descriptor:
+
+    # Enumerate the co-optimal child numberings and pick the fusion descriptor
+    # that is lowest in citation order. A SYMMETRIC child (heteroatom equidistant
+    # from the fusion bond, e.g. the meta-Se of selenopheno[3,4-b]selenophene)
+    # ties on heteroatom + fusion-bond locants; P-25.3.1.3 (BlueBookV2.md:11911)
+    # / P-25.3.4.2.4(d) (:13403) break that tie by the lower cited pair
+    # ((3,4) < (4,3) -> [3,4-b], not [4,3-b]). A decisive/asymmetric child yields
+    # a single ordering, so MATCH rows such as selenopheno[2,3-b]/[3,2-b]selenophene
+    # and thieno[2,3-b]furan are byte-identical.
+    child_orders = _cooptimal_child_orderings(mol, child_ring, shared_atoms)
+    if not child_orders:
+        # Non-simple cycle (bridged/interior atom): fall back to the single pick
+        # so nothing that names today can start returning None.
+        child_orders = [_get_iupac_ring_order_for_fusion(
+            mol, child_ring, shared_atoms, is_child=True)]
+
+    best = None  # (citation_key, descriptor)
+    for child_iupac in child_orders:
+        cand = generate_fusion_descriptor(
+            parent_iupac, child_iupac, shared_atoms, child_is_benzene=child_is_carbo
+        )
+        if not cand:
+            continue
+        key = _fusion_descriptor_citation_key(cand)
+        if best is None or key < best[0]:
+            best = (key, cand)
+    if best is None:
         return None
+    descriptor = best[1]
 
     # Build the systematic name
     return build_systematic_fusion_name(parent_name, child_name, descriptor)

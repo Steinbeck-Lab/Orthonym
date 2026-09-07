@@ -93,7 +93,7 @@ NATURAL_PRODUCT_SCAFFOLDS = {
 # Key = pre-canonicalized SMILES, value = retained/trivial name.
 
 NATURAL_PRODUCT_DERIVATIVES = {
-    # ----: NP parent-hydride catalog growth (P-101.2.7 Table 10.1) ----
+    # ---- v23 Phase 14: NP parent-hydride catalog growth (P-101.2.7 Table 10.1) ----
     # Bare stereoparents recognised by exact canonical SMILES (the audit p100-101
     # F8/F10 coverage reservoir).  All OPSIN-RT.  The exact lookup runs BEFORE
     # scaffold decoration, so the spiroketal steroids below intercept the prior
@@ -110,7 +110,7 @@ NATURAL_PRODUCT_DERIVATIVES = {
     "CC(C)[C@@H](C)[C@@]1(C)C[C@@H]1[C@@H](C)[C@H]1CC[C@H]2[C@@H]3CCC4CCCC[C@]4(C)[C@H]3CC[C@]12C": "gorgostane",
     "CC[C@@H](CC[C@@H](C)[C@H]1CC[C@H]2[C@@H]3CCC4CCCC[C@]4(C)[C@H]3CC[C@]12C)C(C)C": "poriferastane",
 
-    # ----: name-exact terpene/alkaloid stereoparent catalog ----
+    # ---- v23 Phase 14 CONTINUATION: name-exact terpene/alkaloid stereoparent catalog ----
     # (P-101.2.7 Table 10.1 a/c).  OPSIN cannot parse these parent-hydride names AND
     # PubChem name-lookup resolves none, so they are NAME-EXACT (no RT oracle): each
     # structure was sourced from ChEBI and cross-confirmed against Wikidata + PubChem
@@ -361,7 +361,7 @@ NATURAL_PRODUCT_DERIVATIVES = {
         "ceph-3-em",
 
     # ---- Flavonoid / chromene derivatives (Phase 89) ----
-    # flavone / flavanone / isoflavone DE-HEADLINED: these are
+    # flavone / flavanone / isoflavone DE-HEADLINED (v26 BP-4 Phase 4): these are
     # general-nomenclature trivial names only, not PINs (P-102.6.1.4 L53955 prints
     # them in the general column; the PIN column is '...-4H-1-benzopyran-4-one').
     # Removed from this dict + added pin:false to iupac_2013_pin_list.json, exactly
@@ -370,10 +370,10 @@ NATURAL_PRODUCT_DERIVATIVES = {
     # ('2-phenyl-4H-1-benzopyran-4-one' etc.) and places substituents via the
     # systematic 1-benzopyran numbering. 'flavone' stays in retained_names.py so
     # --trivial still emits it via GENERAL_RETAINED_NAMES.
-    # chromanone de-headlined: PIN is 2,3-dihydro-4H-1-benzopyran-4-one
+    # chromanone de-headlined (v23 IH-01h): PIN is 2,3-dihydro-4H-1-benzopyran-4-one
     # (P-64.2.2.2.2: the 4-one substitutes the 4H >CH2; chroman-4-one is the chromane-stem
     # acceptable name) -> emitted by the cyclic-oxo engine. Also pin:false in the PIN list.
-    # chromone de-headlined: PIN is 4H-1-benzopyran-4-one (1-benzopyran is
+    # chromone de-headlined (v23 IH-01f): PIN is 4H-1-benzopyran-4-one (1-benzopyran is
     # the PIN ring parent per P-19(d); P-64.2.2.2.2 ketone = substitution of the >CH2) ->
     # emitted by the cyclic-oxo engine. Also pin:false in iupac_2013_pin_list.json.
 
@@ -402,7 +402,7 @@ NATURAL_PRODUCT_DERIVATIVES = {
 }
 
 
-# CONTINUATION: the terpene/alkaloid stereoparent retained names that
+# v23 Phase 14 CONTINUATION: the terpene/alkaloid stereoparent retained names that
 # OPSIN cannot parse (verified name_to_smiles -> None for each).  Whitelisted in
 # namer._final_opsin_validity_gate so the name-exact PIN ships (the thioperoxol/inositol
 # template).  prostane/thromboxane/aconitane are EXCLUDED — those names DO OPSIN-RT and

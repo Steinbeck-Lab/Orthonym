@@ -2,7 +2,7 @@
 
 Verbatim lift of composer.py:1343-1356 (inline dispatch branch). Body
 ``_assemble_amide_name`` at composer.py:4154-4295 (142 LOC) STAYS until
-Plan-03 commit 03-10 (composer.py thinning) per CONTEXT.
+Plan-03 commit 03-10 (composer.py thinning) per CONTEXT D-24.
 
 Predicate gates on:
 1. ``principal_group in {primary_amide, secondary_amide, tertiary_amide}``
@@ -17,7 +17,7 @@ Predicate gates on:
    inline cascade where Tier-A ring competition runs first, then the inline
    amide block at composer.py:1343 picks up the post-Tier-A-rejection fallback.
 
-Byte-identical contract per CONTEXT (DECOMP-03): predicate gates capture
+Byte-identical contract per CONTEXT D-21 (DECOMP-03): predicate gates capture
 the inline cascade-order semantics so dispatch_inner reaches this handler
 only when the inline amide branch at composer.py:1343 would have fired.
 
@@ -56,7 +56,7 @@ def _is_amide(features: Any) -> bool:
     Gates on: principal_group is amide AND pg_count == 1 AND not is_polyfunctional
     AND (not is_cyclic OR chain_is_parent).
 
-    Pure read-only per CONTEXT.
+    Pure read-only per CONTEXT D-25.
     """
     if getattr(features, 'principal_group', None) not in _AMIDE_PRINCIPAL_GROUPS:
         return False
@@ -133,7 +133,7 @@ def name_amide(
     _amide_name = _assemble_amide_name(features, style)
     if not _amide_name:
         # CR-02: matches sibling name_amine pattern. pool.add(None, ...)
-        # would violate the `name: str` contract per CONTEXT and
+        # would violate the `name: str` contract per CONTEXT D-05 and
         # silently produce wrong output (the inline equivalent at
         # composer.py:1334 has implicit truthiness check via the if-block).
         return None
@@ -146,7 +146,7 @@ def name_amide(
 
     # Phase 165 SCORE-01: prefer the structured tree stashed by
     # _assemble_amide_name (unsaturated chain-fragment path); else a counted
-    # coarse node for the name_amide string paths (saturated/ring
+    # coarse node (D-03) for the name_amide() string paths (saturated/ring
     # amides) that build no fragment list. fragment_legacy=name guarantees a
     # byte-identical round-trip. Read best().tree so the tree matches the
     # RETURNED candidate (winner-guard).

@@ -44,7 +44,7 @@ _MULT_ALT = '|'.join(_MULTIPLIER_SYLLABLES)
 # trifluoromethyl, chloroethyl). These are compound substituents per
 # IUPAC P-31.1.2.3 and require enclosing marks.
 #
-# ⚠: the multiplier alternation used to stop at ``hexa``, which
+# ⚠ v29 Phase C Task 5a: the multiplier alternation used to stop at ``hexa``, which
 # was invisible for as long as every fully-halogenated alkyl carried locants --
 # ``is_complex_substituent`` returns True on the FIRST digit it sees, so this regex
 # was never the load-bearing gate. P-14.3.4.5 (``:3007``) removes those digits, and
@@ -118,7 +118,7 @@ BRANCH_HANDLED_FGS: frozenset = frozenset({
     'fluoro', 'chloro', 'bromo', 'iodo',  # -> "fluoromethyl" etc.
     'nitro',              # W2F-P3 -> "nitromethyl", "1,2-dinitropropyl"
 })
-# (E3 Task 6) tried adding 'aldehyde' here and REVERTED it: it
+# v33 Phase 6 (E3 Task 6) tried adding 'aldehyde' here and REVERTED it: it
 # broke `tests/unit/rules/test_bugb_guard.py::test_no_dangerous_entries`
 # (aldehyde/ketone/nitrile/... are deliberately excluded because this whole
 # set means "trust the branch namer blindly"), and doing so UNMASKED a
@@ -156,7 +156,7 @@ BRANCH_HANDLED_FGS: frozenset = frozenset({
 # mention italicized prefixes at all.
 # 'sec-' behaves identically ('sec-butyl', general nomenclature).
 #
-# THE ONE definition of this carve-out. Do not re-derive it inline: before
+# THE ONE definition of this carve-out. Do not re-derive it inline: before v29 P3
 # it existed as three divergent copies (is_complex_substituent's inline strip,
 # format_substituent_prefix's startswith() open-code, organometallics'
 # `'-' in name`) and was MISSING from needs_brackets, so the predicates disagreed
@@ -299,7 +299,7 @@ _COMPOUND_S_SUFFIXES_COMPLEX = (
     'disulfanyl',
 )
 
-# C4-C: roots that are NOT a substituent group — a chalcogen suffix carrying
+# v29 C4-C: roots that are NOT a substituent group — a chalcogen suffix carrying
 # only one of these is still a SIMPLE prefix and must stay bare. 'disulfanyl' is
 # 'di' + 'sulfanyl' (terminal -S-SH), 'trisulfanyl' is 'tri' + 'sulfanyl', and
 # so on: the leading morpheme multiplies the chalcogen chain rather than naming a
@@ -333,6 +333,12 @@ _COMPOUND_HETEROATOM_AMINO_PREFIXES = frozenset({
     # W3-P11 (P-67.1.4.3.1): -O-NO2 nitrooxy is a compound (acyl-on-oxy)
     # preselected prefix -> enclosing marks: '3-(nitrooxy)propanoic acid'.
     'nitrooxy',
+    # P11 (P-16.3.3): the oxime prefix =N-OH 'hydroxyimino' is a compound
+    # substituent (hydroxy on imino) and takes enclosing marks. The
+    # polyfunctional acyclic path already wrapped it via format_fg_prefix, but the
+    # ring/seniority composer path emitted it BARE ('4-hydroxyimino-...' instead
+    # of '4-(hydroxyimino)-...'). Centralising it here fixes both paths.
+    'hydroxyimino',
 })
 
 # Wave2 T3b: parent-hydride stems used as roots of the PIN acid-stem
@@ -539,6 +545,15 @@ TERMINAL_FG_TYPES = frozenset({
     "hydrazonamide",
     "hydrazidine",
     "thiohydrazide",
+    # Phase 11 (P-66.4.2.1, BB:34460): the imidohydrazide (amidrazone)
+    # characteristic carbon -C(=NH)-NH-NH2 is ALWAYS chain-terminal, exactly like
+    # its siblings hydrazide / amidine / hydrazonamide above, so its suffix
+    # locant-1 is implicit and elided -- 'cyclohexanecarboximidohydrazide' and
+    # 'ethanediimidohydrazide', never 'cyclohexane-1-carboximidohydrazide' /
+    # 'ethane-1,2-diimidohydrazide'. (It was already in _ETHANE_SUFFIX_ELIDE_FGS,
+    # which only covered the symmetric-ethane MONO case; the ring appended-carbon
+    # and the chain DI cases bypassed that and kept the locant.)
+    "imidohydrazide",
 })
 
 
@@ -956,7 +971,7 @@ def needs_brackets(name: str) -> bool:
     if '-' in name:
         return True
 
-    # follow-on: acyl-substituted amino prefixes (-oylamino) are
+    # v23 Phase 12 follow-on: acyl-substituted amino prefixes (-oylamino) are
     # compound substituents (a substituted amino) and take enclosing marks per
     # P-16.3.3 — carbamoylamino (the urea FG prefix), ethanoylamino,
     # benzoylamino, sulfamoylamino, etc. The '-oyl' acyl ending distinguishes
@@ -1012,7 +1027,7 @@ def needs_brackets(name: str) -> bool:
             if acyl and (acyl.endswith("oyl") or acyl in ("acetyl", "formyl")):
                 return True
 
-    # C4-C (P-16.3.3): ANY substituent root carrying a chalcogen suffix is a
+    # v29 C4-C (P-16.3.3): ANY substituent root carrying a chalcogen suffix is a
     # compound prefix, not just the alkyl/hydride-stem roots enumerated above.
     # The root loop at :792 is keyed on _ALKYL_ROOTS_FULL + _HYDRIDE_STEM_ROOTS,
     # so aryl ('phenyl'), cycloalkyl ('cyclohexyl') and alkoxy ('methoxy',
@@ -1046,7 +1061,7 @@ def needs_brackets(name: str) -> bool:
         if rest == "oxy" or rest in _COMPOUND_S_SUFFIXES_COMPLEX:
             return True
 
-    # (P-16.3.3): the alkoxycarbonyl / alkoxycarbonimidoyl compound-acyl
+    # v31 (P-16.3.3): the alkoxycarbonyl / alkoxycarbonimidoyl compound-acyl
     # family is a SUBSTITUTED acyl prefix (an alkoxy on -CO-/-C(=NH)-) and takes
     # enclosing marks — '4-(methoxycarbonyl)benzoic acid',
     # '4-(methoxycarbonimidoyl)benzoic acid'. This mirrors composer's local
@@ -1057,7 +1072,7 @@ def needs_brackets(name: str) -> bool:
     if name_lower.endswith("oxycarbonyl") or name_lower.endswith("oxycarbonimidoyl"):
         return True
 
-    # (P-16.3.3): a SUBSTITUTED alkyl whose substituent is itself a '-yl'
+    # v43 (P-16.3.3): a SUBSTITUTED alkyl whose substituent is itself a '-yl'
     # group — a cyclic-substituent-on-alkyl such as 'cyclohexylmethyl' (=
     # cyclohexyl + methyl) or 'phenylmethyl' — is a compound substituent and
     # takes enclosing marks. Without this the digit/hyphen/FG-prefix tests above
@@ -1073,6 +1088,15 @@ def needs_brackets(name: str) -> bool:
             if (remainder and remainder.endswith("yl")
                     and remainder not in _ALKYL_ROOTS_FULL):
                 return True
+
+    # P-66.5.1.2: the thiocyanato pseudohalide prefix (-S-C#N) is parenthesized
+    # in PINs — BB '3-(thiocyanato)propanoic acid (PIN)' :31013, 'S-ethyl
+    # 3-(thiocyanato)propanethioate (PIN)' :32041. Its N-anchored sibling
+    # isothiocyanato is NOT enclosed (isothiocyanatobenzene, isothiocyanatosilane),
+    # so match the bare word EXACTLY, never endswith (which would also catch
+    # 'isothiocyanato').
+    if name_lower == "thiocyanato":
+        return True
 
     return False
 
@@ -1335,7 +1359,7 @@ def is_complex_substituent(name: str) -> bool:
     # Phase 171 assembly/parenthesisation fix: without this,
     # coupling the paren/bis decision to is_complex_substituent over-parenthesised
     # tert-butyl. The leading-digit case above still catches genuine compounds.
-    # the strip is the SHARED primitive, not an inline copy.
+    # v29 P3: the strip is the SHARED primitive, not an inline copy.
     if has_structural_hyphen(name):
         return True
     # Check for embedded multiplier + substituent name patterns (IUPAC P-14.5.2)
@@ -1397,7 +1421,7 @@ def is_complex_substituent(name: str) -> bool:
     # -> the gold-oracle PIN `3-(methanesulfonamido)propanoic acid`,
     # `3-(benzenesulfonamido)propanoic acid`. The bare retained `sulfonamido`/`sulfinamido`
     # (no stem) and the acyl-amido family (`acetamido`, `benzamido`) stay SIMPLE.
-    # #29: without this the heterocycle _format_c_substituent path emitted the
+    # v30 #29: without this the heterocycle _format_c_substituent path emitted the
     # non-PIN bare `2-methanesulfonamido-1,3-thiazole-5-carboxylic acid`.
     if (name_lower.endswith(('sulfonamido', 'sulfinamido'))
             and name_lower not in ('sulfonamido', 'sulfinamido')):
@@ -1425,7 +1449,7 @@ def is_complex_substituent(name: str) -> bool:
     # ('cyclohexylmethyl', 'piperidinylmethyl') — enclosing marks per P-16.5.1.1.
     if _RINGYL_ALKYL_RE.search(name_lower):
         return True
-    # (P-16.3.3): a Group-14 silyl/germyl substituent carrying its OWN
+    # v23 Phase 8 (P-16.3.3): a Group-14 silyl/germyl substituent carrying its OWN
     # prefixes ('trihydroxysilyl', 'hydroxydimethylsilyl', 'aminodimethylsilyl') is
     # a compound prefix taking enclosing marks. The bare 'silyl'/'germyl' stems
     # stay simple; 'trimethylsilyl'/'triethylsilyl' are already caught by the
@@ -1909,7 +1933,7 @@ def _stem_splits_into_prefix_plus_stem(stem: str) -> bool:
             # `hydroxy` + `penta`, where `penta` = `pent` + euphonic 'a' before a
             # `dien`/`triyn` ending the flat stem table does not carry). Symmetric
             # with the same accept in `_is_bare_hydride_yl`; only fires on the
-            # euphonic shape the polyene substituent newly emits (fable-polyene
+            # euphonic shape the v30 polyene substituent newly emits (fable-polyene
             # BLOCKER 1). Additive -- no front-prefix + `<root>a` head occurs in
             # any pre-existing emitted name (gold-diff 0/1888).
             if tail.endswith('a') and tail[:-1] in _CHAIN_STEM_ROOTS:
@@ -1955,7 +1979,7 @@ def _is_bare_hydride_yl(token: str, require_known_stem: bool = False) -> bool:
         # Accept when dropping the euphonic 'a' yields a known chain-stem root AND
         # the ORIGINAL token actually carries the `-<locs>-di|tri|tetraen/yn`
         # marker that produced the 'a' -- so this only ever fires on the shape the
-        # polyene substituent newly emits (fable-polyene BLOCKER 1: a
+        # v30 polyene substituent newly emits (fable-polyene BLOCKER 1: a
         # SUBSTITUTED polyene prefix must take `bis`, not `di`, per P-16.3.5(a);
         # the UNSUBSTITUTED form stays `di` via the loose/_is_single_simple_unit
         # path and P-16.3.4(b)). Additive by construction.
@@ -2367,6 +2391,19 @@ CATENATION_AMBIGUOUS_PREFIXES = frozenset({
     "stibanyl",   # distibanyl (distibane P-21.1.2)
     "azanyl",     # diazanyl = hydrazinyl -NH-NH2
     "oxidanyl",   # dioxidanyl -OOH
+    # The catenated-chain prefixes themselves are ALSO ambiguous when multiplied:
+    # two -S-S-H groups are 'bis(disulfanyl)', because 'didisulfanyl' would read as
+    # a P-29.3.1 catenation ('di' + 'disulfanyl' = a 4-sulfur -SSSS- chain). BB
+    # verbatim: '3,4-bis(disulfanyl)benzamide (PIN)' (BlueBookV2.md:28021) and
+    # 'bis(disulfanyl) ... (not didisulfanyl)' (BlueBookV2.md:7196). The tri- forms
+    # (-S-S-S-H = trisulfanyl) collide the same way ('ditrisulfanyl' -> a -SSSSSS-
+    # chain), so they take bis/tris too.
+    "disulfanyl",  # -SSH   -> bis(disulfanyl)   (BB:28021, BB:7196)
+    "diselanyl",   # -SeSeH -> bis(diselanyl)
+    "ditellanyl",  # -TeTeH -> bis(ditellanyl)
+    "trisulfanyl", # -SSSH  -> bis(trisulfanyl)
+    "triselanyl",  # -SeSeSeH
+    "tritellanyl", # -TeTeTeH
 })
 
 
@@ -2421,7 +2458,7 @@ def get_multiplier_prefix(count: int, substituent_name: str) -> str:
     if count <= 1:
         return ""
 
-    # Item 4: the hyphen belongs to FORMING the multiplied token, so it
+    # v29 P3-FIX Item 4: the hyphen belongs to FORMING the multiplied token, so it
     # is produced here -- the one place that already knows both the count and the
     # name -- rather than at each of the ~40 call sites. Three of those sites had
     # open-coded around it and shipped `ditert-butyl` / `N,N-ditert-butyl...`,
@@ -2439,7 +2476,7 @@ def get_multiplier_prefix(count: int, substituent_name: str) -> str:
     # 'di', 'tri', etc." -- so `bis(tert-butyl)` and `di(tert-butyl)` are both
     # wrong, and neither occurs in the text.
     #
-    # Item A, ORDERING CORRECTION. This hyphen leg used to run
+    # v29 P3-CLOSEOUT Item A, ORDERING CORRECTION. This hyphen leg used to run
     # FIRST, on the asserted ground that "only ever fires for an italicized-
     # prefix-led name, which is simple by P-16.3.2(a) and therefore never takes
     # bis/tris, so the derived-multiplier branch below is unreachable with a
@@ -2612,7 +2649,7 @@ def _wrap_n_substituent(name: str) -> str:
     # P-16.5.4.1 via the shared primitive, which auto-detects the nesting depth
     # from the name's existing marks. The old `'(' in name -> f"[{name}]"` capped
     # at one level and produced a double `[[...]...]` when the name already held a
-    # square bracket (e.g. an N-[(biphenylyl)methyl] arm) --.
+    # square bracket (e.g. an N-[(biphenylyl)methyl] arm) -- v33 Phase 6 (B).
     if any(mark in name for mark in '(['):
         return apply_enclosing_marks(name, -1)
     return name
@@ -2801,7 +2838,7 @@ def format_substituent_prefix(name: str, locants: List[int], count: int) -> str:
     # heptanedioic acid'). Fold needs_brackets in here — the ONE canonical
     # enclosing-mark predicate the docstring mandates.
     #
-    # this used to carry a FOURTH copy of the P-16.3.3(b)/P-16.2.4.1(d) tert-/sec- carve-out
+    # v29 P3: this used to carry a FOURTH copy of the P-16.3.3(b)/P-16.2.4.1(d) tert-/sec- carve-out
     # (`and not name.lower().startswith(("tert-", "sec-"))`), because needs_brackets
     # lacked it. needs_brackets now owns the carve-out (via
     # strip_italicized_structural_prefix), so the open-code is gone. It was also
@@ -2849,13 +2886,13 @@ def format_substituent_prefix(name: str, locants: List[int], count: int) -> str:
     # keeps the hyphen boundary: '1,2-di-tert-butylbenzene' (PIN, BB
     # P-25.7.1.x example list), never 'ditert-butyl'.  Parenthesized names
     # never start with 'tert-'/'sec-', so the bis/tris path is unaffected.
-    # a DIFFERENT rule from the enclosure carve-out (this one inserts a
+    # v29 P3: a DIFFERENT rule from the enclosure carve-out (this one inserts a
     # hyphen, that one withholds marks) but the same DETECTION, so it shares the
     # one primitive rather than open-coding a fifth startswith(). The leg now has
     # its own named primitive (multiplier_needs_hyphen) because a SECOND producer
     # -- organometallics._ligand_token -- needed it and was shipping the
     # malformed 'ditert-butyl' for want of it.
-    # Item 4: the hyphen now comes from `get_multiplier_prefix` itself
+    # v29 P3-FIX Item 4: the hyphen now comes from `get_multiplier_prefix` itself
     # (the one place that has both the count and the name), so this second copy
     # is gone -- keeping it would emit `di--tert-butyl`. The assertion below is
     # the tripwire that the primitive really did it.
@@ -3023,7 +3060,7 @@ def _alpha_sort_key_core(substituent_name: str) -> str:
             remainder = text[len(prefix):]
             # Only strip if there is a remainder (avoid stripping entire word)
             if remainder:
-                # Item 7: a numeral that is part of the substituent's
+                # v29 P3-FIX Item 7: a numeral that is part of the substituent's
                 # own STEM is not a multiplicative prefix. `pentan-2-yl` is
                 # `pent` + `an-2-yl`, not `penta` + `n-2-yl`; stripping gave the
                 # key `n-2-yl`, which sorted it before `octyl` and (because
@@ -3426,6 +3463,24 @@ def format_suffix_with_locants(
     """
     # Build the base: stem + unsaturation (e.g., 'propan', 'buten')
     base = parent_stem + unsaturation
+
+    # P-16.3.5(b) (`:7104`): the 'thioic acid'/'dithioic acid' suffixes and their
+    # Se/Te analogues are multiplied with the DERIVED multiplier ('bis'/'tris'/…)
+    # AND enclosed in parentheses, and the italic chalcogen locant is OMITTED
+    # inside the enclosure — `hexanebis(thioic acid)` (`:30231`),
+    # `ethanebis(dithioic acid)` (`:30317`), NOT `hexanebisthioic O-acid`.
+    # Gated on the same closed exception family that `get_suffix_multiplier_prefix`
+    # already routed to 'bis' (`suffix_takes_derived_multiplier`), so it fires for
+    # exactly those suffixes and nothing else (P-16.3.3(a) 'dioic acid' still
+    # takes 'di', unenclosed). The italic locant is dropped with the shared
+    # infix regex so the drawn tautomer collapses to the "normally omitted"
+    # acid spelling (P-65.1.5.1 `:30215`; OPSIN round-trips both to one structure).
+    if suffix_multiplier and suffix_takes_derived_multiplier(suffix):
+        inner = ' '.join(_CHALCOGEN_LOCANT_INFIX_RE.sub('', suffix).split())
+        if suffix_locants:
+            locant_str = ",".join(str(loc) for loc in suffix_locants)
+            return f"{base}e-{locant_str}-{suffix_multiplier}({inner})"
+        return f"{base}e{suffix_multiplier}({inner})"
 
     if suffix_locants:
         # Format locants as comma-separated

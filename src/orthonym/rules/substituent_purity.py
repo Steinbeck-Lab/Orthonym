@@ -23,7 +23,7 @@ Two functions, deliberately not interchangeable:
     routing test silently changes which handler claims a molecule.
 
 There is deliberately no third, deprecated entry point.  ``pure_organyl_prefix_name``
-existed only as a shim while the nine families migrated; all 23 of
+existed only as a shim while the nine families migrated (v29 Phase 3); all 23 of
 its call sites now use one of the two functions above, so it was deleted rather
 than left with zero callers -- a zero-caller shim is how the next session acquires
 new ones.  ``_narrow_walk_name`` stays private and backs only the predicate.
@@ -60,7 +60,7 @@ constraint, not a walker artefact:
 Extending the class to heteroatom organyls needs that per-family seniority
 comparison; until it exists those fragments keep failing closed.
 
-The stereo-expression obligation
+The stereo-expression obligation (v29 P3-FIX Item 1)
 ----------------------------------------------------
 Widening the class widened it to STEREOGENIC fragments, and the chokepoint's
 generic stereo emitter (``assembly.substituent_naming._add_substituent_stereo``)
@@ -84,7 +84,7 @@ The repair has two halves, and both are needed:
    to express EXACTLY as many descriptor tokens as the fragment defines stereo
    elements. What that still refuses is the multi-centre acyclic case
    (``CC[C@@H](C)[C@@H](C)[As](C)C``), where ``### P-91.2.1.2.1`` demands a
-   locant per descriptor and forbids fabricating one — so the two
+   locant per descriptor and D-09 forbids fabricating one — so the two
    diastereomers now refuse instead of colliding on ``3-methylpentan-2-yl``.
 
 Ring stereo needed no work: the ring path already emitted
@@ -105,7 +105,7 @@ _PREFIX_ONLY_ELEMENTS = frozenset({'F', 'Cl', 'Br', 'I', 'At'})
 # leaked out where a single prefix TOKEN is required; the refusal sentinels
 # themselves are recognised by the shared ``errors.is_refusal_sentinel``.
 #
-# this module's own ``('unknown', 'not supported')`` tuple was the
+# v29 P3B: this module's own ``('unknown', 'not supported')`` tuple was the
 # FULLEST of the private copies of the refusal predicate — which is exactly why it
 # had to go: being the most complete copy made it the one most likely to be
 # mistaken for the definition. The sentinel families are now named in one place.
@@ -187,7 +187,7 @@ def organyl_prefix_name(mol, start_idx: int, exclude_idx: int) -> Optional[str]:
     if ' ' in name:
         return None
 
-    # Item 1: the STEREO-EXPRESSION obligation (see the module
+    # v29 P3-FIX Item 1: the STEREO-EXPRESSION obligation (see the module
     # docstring section below). The chokepoint's generic stereo emitter reads
     # only ATOM _CIPCode, so a fragment whose geometry or whose multi-centre
     # configuration it cannot locate comes back spelled as if achiral -- and a

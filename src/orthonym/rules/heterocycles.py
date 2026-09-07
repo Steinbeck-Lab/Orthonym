@@ -239,6 +239,11 @@ def orient_heterocycle(mol, ring_atoms) -> Tuple[List[int], Dict[int, int]]:
 #: test below; naming the elements states the chemistry rather than relying on it.
 _INDICATED_H_ELEMENTS = frozenset({7, 15, 33, 51, 83})  # N, P, As, Sb, Bi
 
+#: Group-14 ring heteroatoms whose mancude saturated position keeps its indicated
+#: hydrogen even when substitution has displaced every H (P-68.2.6, the
+#: ``1,1-dibutyl-1H-germole`` case).  Consumed by ``_monocycle_indicated_h_prefix``.
+_GROUP14_INDICATED_H = frozenset({14, 32, 50})  # Si, Ge, Sn
+
 
 def _occupies_indicated_h_position(mol, idx: int, ring_set: Set[int]) -> bool:
     """Does this ring atom hold the ring's indicated-hydrogen position?
@@ -1001,7 +1006,7 @@ def _has_room_for_ring_double_bond(mol, idx: int, ring: Set[int], lam) -> bool:
     i.e. as a HYDRO FORM, and the ``1 <= _d < _max_match`` guard in
     :func:`name_heterocycle` refuses it.  That is what withdrew the correct
     ``5-(3-fluorophenyl)-1H-pyridin-2-one`` (regression from `65a2206e`,
-    ). The compound is a
+    `.planning/audit-v29/REGRESSION-c-aryl-pyridinone.md`).  The compound is a
     **pseudoketone**, not a hydro form: P-66.1.3 "'Hidden' amides"
     (``BlueBookV2.md:33125``) and P-66.1.5.1 "Lactams and lactims" (``:33224``)
     both name this shape on the numbered mancude ring with an added suffix, and
@@ -1403,7 +1408,7 @@ def _mancude_hydro_select(mol, ring_set: Set[int],
     # clause over-included: for `-ol`/`-amine` the tuple carries the ring bearing
     # carbon, so its two RING neighbours were spuriously marked, flipping the
     # numbering of same-element-adjacent rings (pyridazine, 1,2-dithiine) and
-    # regressing them (fable-dihydro BLOCKER;.
+    # regressing them (fable-dihydro BLOCKER; invariant 9).
     exo_pcg = pcg_atoms - ring_set
     pcg_pos: Set[int] = set()
     if pcg_atoms:
@@ -1942,7 +1947,7 @@ def name_partially_saturated_monocyclic_heterocycle(
     n = len(ring_set)
     if n < 4:
         return None
-    # (A): scope to the Hantzsch-Widman ring-size range this
+    # v33 Phase 6 (A): scope to the Hantzsch-Widman ring-size range this
     # function's "mancude parent" premise applies to (build_hw_name / the
     # sibling _name_lambda_heteromonocycle both cap at 10 -- BlueBookV2.md
     # P-22.2.2.1.1's HW stems are defined for rings of size 3-10 only).
@@ -2453,13 +2458,38 @@ def _monocycle_indicated_h_prefix(mol, oriented: List[int], info) -> str:
     if len(db_pairs) != max_match:
         return ""  # hydro form (or over-perceived) — not this rule's scope
 
-    # The indicated-H atom: sp3 (no ring double bond), eligible, bearing H.
+    # The indicated-H atom: sp3 (no ring double bond), eligible, bearing H --
+    # OR a fully-substituted Group-14 (Si/Ge/Sn) mancude position, whose
+    # indicated hydrogen is cited even when substitution has displaced every H.
+    # P-68.2.6 "Silole, germole, ... rings" (``BlueBookV2.md:38228``):
+    # ``1,1-dibutyl-1H-germole (PIN) (note the indicated hydrogen atom)``. The
+    # indicated hydrogen is a property of the mancude PARENT, not of the
+    # substituted molecule, so a 1,1-disubstituted silole/germole/stannole keeps
+    # its ``1H`` (``1,1-diethyl-1H-silole``) exactly as the H-bearing parent does.
+    # The ``len(db_pairs) == max_match`` gate above already proved this is a
+    # mancude-maximum ring (not a hydro form), and ``eligible`` + ``not in
+    # db_atoms`` isolate the single saturated skeletal position; a substituent
+    # standing in the indicated H's place (P-15.1.8.1) does not move it.
     db_atoms = {a for pr in db_pairs for a in pr}
-    sp3h = [
+    h_bearing = [
         idx for pos, idx in enumerate(oriented)
         if idx not in db_atoms and eligible[pos]
         and mol.GetAtomWithIdx(idx).GetTotalNumHs() >= 1
     ]
+    if h_bearing:
+        # An H-bearing saturated position exists -> this is the historical path,
+        # byte-identical to before (the Group-14 branch below never runs), so no
+        # ring that already cited an indicated H can change.
+        sp3h = h_bearing
+    else:
+        # No saturated position still bears an H. A Group-14 (Si/Ge/Sn) mancude
+        # atom whose indicated H has been fully displaced by substitution still
+        # cites it -- ``1,1-diethyl-1H-silole`` / ``1,1-dibutyl-1H-germole``.
+        sp3h = [
+            idx for pos, idx in enumerate(oriented)
+            if idx not in db_atoms and eligible[pos]
+            and mol.GetAtomWithIdx(idx).GetAtomicNum() in _GROUP14_INDICATED_H
+        ]
     if len(sp3h) != 1:
         return ""
     target = sp3h[0]
@@ -2723,7 +2753,7 @@ def _build_replacement_name(
             # O/S/N/Si never reach it (an earlier producer, which already omits
             # the locant, handles them) so the defect only surfaced for an
             # element that falls through to here -- which Al and In began doing
-            # when. Without this the two new rows
+            # when v29 P2-T2b made them spellable. Without this the two new rows
             # would have shipped the non-PIN ``1-aluminacyclotridecane`` while
             # oxygen shipped ``oxacyclotridecane``.
             prefix_parts.append(hw_prefix)
@@ -2787,6 +2817,40 @@ def _ring_has_extra_heteroatom(mol, ring_set, carbonyl_idx) -> bool:
         elif sym not in ('C', 'H'):
             other_hetero += 1
     return other_hetero >= 1 or n_count >= 2
+
+
+def _is_cyclic_imide_carbonyl(mol, carbonyl_c_idx, ring_set) -> bool:
+    """True iff ``carbonyl_c_idx`` is a ring carbon of a CYCLIC imide motif:
+    it bears an exocyclic ``=O`` and is bonded to a ring N that is itself
+    bonded to a SECOND ring carbon which also bears an exocyclic ``=O`` — the
+    imide nitrogen flanked by two ring carbonyls. BOTH carbonyls of the imide
+    satisfy this, so both are reclassified to the ``-one`` suffix (yielding the
+    ring ``-dione`` name). Requiring the second flanking carbonyl keeps a plain
+    ring lactam/amide (a single carbonyl on the N) out of this branch — those
+    are handled by the secondary_amide/lactam paths."""
+    c = mol.GetAtomWithIdx(carbonyl_c_idx)
+    if carbonyl_c_idx not in ring_set or c.GetSymbol() != 'C':
+        return False
+
+    def _has_exocyclic_carbonyl_o(atom):
+        return any(
+            b.GetBondTypeAsDouble() == 2.0
+            and b.GetOtherAtom(atom).GetSymbol() == 'O'
+            and b.GetOtherAtom(atom).GetIdx() not in ring_set
+            for b in atom.GetBonds()
+        )
+
+    if not _has_exocyclic_carbonyl_o(c):
+        return False
+    for nb in c.GetNeighbors():
+        if nb.GetIdx() not in ring_set or nb.GetSymbol() != 'N':
+            continue
+        for nn in nb.GetNeighbors():
+            if (nn.GetIdx() in ring_set and nn.GetIdx() != carbonyl_c_idx
+                    and nn.GetSymbol() == 'C'
+                    and _has_exocyclic_carbonyl_o(nn)):
+                return True
+    return False
 
 
 def get_heterocycle_substituents(
@@ -2991,7 +3055,7 @@ def get_heterocycle_substituents(
                 if mol.GetAtomWithIdx(idx).GetSymbol() == 'C'
             )
 
-            # (P-63.2.2 / P-63.2.5): a heteroatom-rooted ETHER substituent on
+            # v26 (P-63.2.2 / P-63.2.5): a heteroatom-rooted ETHER substituent on
             # the ring -- -O-R / -S-R / -Se-R / -Te-R (carbon_count>0 because R has
             # carbons) -- is an (R)oxy / (R)sulfanyl / (R)selanyl / (R)tellanyl
             # prefix. classify_substituent below counts the arm carbons and DROPS
@@ -3047,7 +3111,7 @@ def get_heterocycle_substituents(
                         })
                         continue
 
-            # breadth (P-63.6): a ring-borne higher-oxide sulfur substituent
+            # v30 breadth (P-63.6): a ring-borne higher-oxide sulfur substituent
             # -S(=O)R (sulfinyl) / -S(=O)(=O)R (sulfonyl) is an (R)sulfinyl /
             # (R)sulfonyl PREFIX. The generic classify path below counts the R
             # carbons and DROPS the S + its =O, so the whole molecule abstained
@@ -3180,10 +3244,31 @@ def get_heterocycle_substituents(
                 and _ring_has_extra_heteroatom(mol, ring_set, ring_atom_idx)
             )
 
-            # (A fix, review finding): a ring carbonyl whose
+            # P-66.2.1 / P-66.1.3 "'Hidden' amides" (BB:33125, :33847): a CYCLIC
+            # imide -- a ring N flanked by two ring carbonyls -- is a ring
+            # pseudoketone named with the -DIONE suffix, NOT '2,5-dioxo...'
+            # detachable prefixes: succinimide -> pyrrolidine-2,5-dione (PIN),
+            # and BB:33847 spells `1-bromopyrrolidine-2,5-dione (PIN)` verbatim
+            # "(not N-bromosuccinimide; ...)". Each imide ring carbonyl's
+            # exocyclic =O becomes a '-one' on the numbered ring, exactly as the
+            # secondary_amide branch above does for a multi-heteroatom ring
+            # amide. The lactam handler always DECLINES an imide
+            # (is_monocyclic_lactam is None), so a single-N imide ring
+            # (pyrrolidine / piperidine) needs no extra-heteroatom gate; the
+            # `_is_cyclic_imide_carbonyl` check confines this to a carbonyl that
+            # is genuinely part of the in-ring imide motif.
+            ring_imide_suffix = (
+                not is_principal_suffix
+                and not ring_ketone_suffix
+                and principal_group == 'imide'
+                and hetero_sub_name == 'oxo'
+                and _is_cyclic_imide_carbonyl(mol, ring_atom_idx, ring_set)
+            )
+
+            # v33 Phase 6 (A fix, review finding): a ring carbonyl whose
             # principal group is an ESTER that the lactone handler DECLINED
             # (is_monocyclic_lactone returns None -- a dione, or an
-            # in-ring-C=C at HW ring size,
+            # in-ring-C=C at HW ring size, v33 Phase 6 Task 1) is named as
             # the ketone '-one'/'-dione' SUFFIX on the heterocycle parent,
             # NOT an 'oxo'/'dioxo' detachable PREFIX. P-66.6.3: the ring
             # carbonyl is the senior (only) characteristic group here, so
@@ -3201,12 +3286,52 @@ def get_heterocycle_substituents(
                 and _is_monocyclic_lactone(mol) is None
             )
 
+            # P-64.6.1 (BB:29504) chalcogen ketone-analogue SUFFIX: a ring
+            # carbon's C=S/C=Se/C=Te whose principal group is a CYCLIC
+            # thioamide/selenoamide/telluroamide (a "thiolactam" -- the
+            # chalcogen analogue of the lactam the lactam handler declines) is
+            # the ketone-analogue named with the -thione/-selone/-tellone
+            # SUFFIX (multiplied -> -dithione ...), NOT a sulfanylidene /
+            # selanylidene / tellanylidene detachable prefix. Mirrors the
+            # ring_ketone_suffix (lactam) branch, but there is NO thiolactam
+            # handler (unlike lactams), so ALL such rings are named here --
+            # single-N monocyclic (azepane-2-thione) and multi-heteroatom
+            # (1,3-thiazolidine-2,4-dithione) alike; no lactam-declined /
+            # extra-heteroatom gate is applicable. Seniority C=O > C=S > C=Se >
+            # C=Te (BB:29561) is already resolved UPSTREAM: when a ring also
+            # bears a senior C=O the principal group is 'secondary_amide' (not
+            # a *amide chalcogen class), so this branch never fires and the C=S
+            # correctly stays a sulfanylidene prefix (rhodanine
+            # O=C1CSC(=S)N1 -> 2-sulfanylidene-1,3-thiazolidin-4-one, unchanged).
+            # Within-family seniority (S > Se > Te) is honoured by matching only
+            # the chalcogen of the principal group: in a mixed ring only that
+            # chalcogen becomes the suffix, the rest stay ylidene prefixes.
+            # A ring thioKETONE (no ring N) already routes via is_principal_suffix
+            # (thioketone's own prefix == 'sulfanylidene'), so it is untouched.
+            _PG_TO_CHALCOGEN_SUFFIX = {
+                'thioamide': ('sulfanylidene', 'thione'),
+                'selenoamide': ('selanylidene', 'selone'),
+                'telluroamide': ('tellanylidene', 'tellone'),
+            }
+            _chalcogen_amide = _PG_TO_CHALCOGEN_SUFFIX.get(principal_group)
+            ring_thioamide_suffix = (
+                not is_principal_suffix
+                and not ring_ketone_suffix
+                and not ring_lactone_suffix
+                and not ring_imide_suffix
+                and _chalcogen_amide is not None
+                and hetero_sub_name == _chalcogen_amide[0]
+            )
+
             if is_principal_suffix:
                 sub_info['is_suffix'] = True
                 sub_info['suffix_name'] = pg_ring_suffix
-            elif ring_ketone_suffix or ring_lactone_suffix:
+            elif ring_ketone_suffix or ring_lactone_suffix or ring_imide_suffix:
                 sub_info['is_suffix'] = True
                 sub_info['suffix_name'] = 'one'
+            elif ring_thioamide_suffix:
+                sub_info['is_suffix'] = True
+                sub_info['suffix_name'] = _chalcogen_amide[1]
             else:
                 if hetero_sub_name:
                     sub_info['hetero_name'] = hetero_sub_name
@@ -3359,6 +3484,40 @@ def _identify_hetero_substituent(mol, sub_atoms, ring_set) -> Optional[str]:
     # Amino (-NH2)
     if symbol == 'N' and h_count == 2:
         return 'amino'
+
+    # Hydrazinyl (-NH-NH2) -- P-62.4 retained substituent prefix, but ONLY when
+    # the parent ring holds nitrogen. The attachment atom (sub_atoms[0], the BFS
+    # root) is a NEUTRAL -NH- single-bonded to the ring and to a terminal -NH2, and
+    # the whole substituent is EXACTLY those two N atoms. Without this a ring-borne
+    # hydrazine group is flagged 'unnameable' and the whole heterocycle candidate
+    # declines (BB 19376 `2-hydrazinylpyridine` (PIN); also
+    # 2-hydrazinyl-4,5-dihydro-1H-imidazole).
+    #
+    # ⚠ SENIORITY SCOPE (P-44.1). Hydrazine's senior skeletal element is N (the top
+    # of the P-44.1.2 order N > ... > O > S > ... > C). A ring is the senior parent
+    # over the 2-N chain ONLY when it, too, holds N -- then P-44.1.2.2's
+    # ring-senior-to-chain tie-break fires (pyridine/pyrimidine/pyrrole/dihydro-
+    # imidazole). A ring whose senior element is JUNIOR to N (all-carbon benzene/
+    # cyclohexane, or an O/S/Si heterocycle) is junior to the hydrazine chain, so
+    # hydrazine is the parent and the PIN is `<ring-yl>hydrazine`, NOT
+    # `hydrazinyl<ring>` -- e.g. `phenylhydrazine`, and BB 18950
+    # `1-(2H-pyran-3-yl)-2-(silolan-2-yl)hydrazine` (PIN) keeps hydrazine the parent
+    # even against two heterocyclic ring substituents. So gate on a nitrogen in the
+    # parent ring system; the non-N rings fall through to 'unnameable' (rules/
+    # polyazane owns the hydrazine-parent spelling for them). This adds no parent
+    # candidate, so phenylhydrazine / methylhydrazine are untouched. A substituted
+    # hydrazinyl (-NH-NHR / -N(R)-NH2) carries carbons and never reaches this
+    # carbon_count==0 path.
+    if (symbol == 'N' and h_count == 1 and first_atom.GetFormalCharge() == 0
+            and len(sub_atoms) == 2
+            and any(mol.GetAtomWithIdx(i).GetSymbol() == 'N' for i in ring_set)):
+        _term = mol.GetAtomWithIdx(sub_atoms[1])
+        _nn = mol.GetBondBetweenAtoms(sub_atoms[0], sub_atoms[1])
+        if (_term.GetSymbol() == 'N' and _term.GetFormalCharge() == 0
+                and _term.GetTotalNumHs() == 2
+                and _nn is not None
+                and _nn.GetBondType() == Chem.BondType.SINGLE):
+            return 'hydrazinyl'
 
     # Hydroxy (-OH)
     if symbol == 'O' and h_count == 1:
@@ -3524,7 +3683,7 @@ def _n_anchored_substituent_covers(mol, sub_name: str, sub_atoms) -> bool:
     """Gate-INDEPENDENT atom-coverage check for an N/O/S-anchored ring substituent
     named by the recursive ``name_substituent``.
 
-    #29: the recursive namer roots N-anchored compound substituents correctly
+    v30 #29: the recursive namer roots N-anchored compound substituents correctly
     (acetamido / methylamino / methanesulfonamido) but can also degrade a shape it
     only partly understands to a shorter prefix (an arenesulfonamido collapsing to
     bare ``amino``), which would drop atoms. Verify the prefix accounts for exactly
@@ -3587,7 +3746,7 @@ def name_substituted_heterocycle(
     from ..assembly.naming_utils import (
         _join_multiplied_suffix,  # P-63.1.2/P-64.2.2.1 multiplier-'a' elision (tetraol->tetrol)
         alpha_sort_key,
-        # (P-16.5.1.1): the italic-N substituent of a ring-amine /
+        # v29 Phase 8 (P-16.5.1.1): the italic-N substituent of a ring-amine /
         # ring-carboxamide suffix is enclosed iff it is a COMPOUND or COMPLEX
         # prefix. _wrap_n_substituent only ESCALATES a name that already carries
         # parentheses ("Simple names (no parentheses) are returned unchanged"),
@@ -3626,7 +3785,7 @@ def name_substituted_heterocycle(
     # C4: N-substituents carried on the amine ring-suffix (pyridin-4-amine ->
     # N-methyl/N-phenyl). Keyed by suffix_name; single-instance only in scope.
     suffix_n_substituents: Dict[str, List[str]] = {}
-    # companion (P-62.2.2): for a MULTI-amine ring parent (triazine-2,4-diamine
+    # v26 companion (P-62.2.2): for a MULTI-amine ring parent (triazine-2,4-diamine
     # etc.) the N-substituents on each amine nitrogen must carry that nitrogen's
     # RING locant as an italic-N superscript (N2-tert-butyl-N4-cyclopropyl-...),
     # so track them per ring locant (not merged under the single 'amine' key,
@@ -3713,7 +3872,7 @@ def name_substituted_heterocycle(
                     sub_name = name_substituent_fragment(
                         mol, sub_atoms, attach_idx, list(ring_set_local)
                     )
-                # #29: an N/O/S-anchored COMPOUND substituent (acetamido,
+                # v30 #29: an N/O/S-anchored COMPOUND substituent (acetamido,
                 # methylamino, methanesulfonamido, ...). name_substituent_fragment
                 # above is carbon-anchored only and mis-roots these (an N-attached
                 # -NHC(=O)CH3 came back 'carbamoylmethyl'), which is why the block
@@ -4088,7 +4247,7 @@ def name_substituted_heterocycle(
         # ring carboxamide (N,N-diethylfuran-2-carboxamide).
         if chosen_suffix == 'amine' and len(suffix_fg.get('amine', [])) > 1 \
                 and amine_n_by_locant:
-            # companion (P-62.2.2): MULTI-amine ring -> each amine nitrogen's
+            # v26 companion (P-62.2.2): MULTI-amine ring -> each amine nitrogen's
             # N-substituent(s) carry that nitrogen's RING locant as an italic-N
             # superscript (N2-tert-butyl-N4-cyclopropyl-...). Cited in ring-locant
             # order; the exocyclic order does not change the structure, so a

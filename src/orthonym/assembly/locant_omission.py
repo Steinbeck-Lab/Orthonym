@@ -1,6 +1,6 @@
 """P-14.3.4 -- omission of locants. The ONE place the licences are decided.
 
-. Pure module: RDKit mols in, booleans out. No I/O, no naming.
+v29 Phase C tranche B. Pure module: RDKit mols in, booleans out. No I/O, no naming.
 
 ⚠ **DENY BY DEFAULT.** ``P-14.3.3`` "Citation of locants"
 (``BlueBookV2/BlueBookV2.md:2869``) is the rule:
@@ -554,9 +554,11 @@ def l6_all_substitutable_h_share_one_locant(
 def _has_letter_locant(locants: Iterable) -> bool:
     """A non-plain-numeric locant (``N``, ``N1``, ``1'``, ``O``) is always essential.
 
-    ``N-methylurea`` keeps its ``N`` even though ``methylurea`` drops the numeral
-    (``:2943``), and a primed locant belongs to a ring assembly or multiplicative name,
-    both of which always cite.
+    ``N,N'-dimethylurea`` and ``N-methylthiourea`` keep their italic-``N`` locants,
+    and a primed locant belongs to a ring assembly or multiplicative name, both of
+    which always cite. (The MONOsubstituted urea ``methylurea`` omits its locant, but
+    by the separate composer-level P-14.3.4.3 rule (``:2943``) that never lets a
+    letter locant reach this scope, not by this predicate.)
     """
     for loc in locants:
         if isinstance(loc, bool):
@@ -641,7 +643,7 @@ def forced_locant_reason() -> "Optional[str]":
 # --------------------------------------------------------------------------------- #
 # "THIS NAMING SCOPE IS ISOTOPICALLY MODIFIED" -- weaker than forced_locant_scope     #
 # --------------------------------------------------------------------------------- #
-# ⚠ MEASURED 2026-07-29. ``forced_locant_scope`` above is NOT
+# ⚠ MEASURED 2026-07-29 (v29 Phase C Task 5a). ``forced_locant_scope`` above is NOT
 # sufficient for every licence, because ``rules/isotopes.py`` enters it *conditionally*
 # -- only once ``_enumerate`` has established that the descriptor needs a locant
 # (``loc_rank >= 1``). A validated spy at the two live substituent sites recorded, for
@@ -796,6 +798,7 @@ def l3_monosubstituted_locant_omitted(
     that an amide N-H is substitutable. ⚠ Do NOT "fix" the chalcogen exclusion to make
     trisulfane work: it is load-bearing HERE, and ``methyltrisulfane`` is licensed by a
     different sub-rule (P-14.3.4.4, unimplemented) -- see
+    ``.planning/audit-v29/PHASEC-P14-3-4-4-L4-derivation.md``.
 
     ⚠ **This licence is orthogonal to P-14.3.4.2(c)** (``_ring_suffix_locant_is_trivial``),
     which is restricted to saturated all-carbon monocycles and therefore cannot reach a

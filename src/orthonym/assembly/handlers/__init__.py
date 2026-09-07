@@ -5,7 +5,7 @@ Per-class IUPAC-name handlers lifted from
 package (DECOMP-01, DECOMP-05). Each handler exposes ONE public
 ``name_<handler_id>(features, mol=None, style='pin') -> Optional[NamingResult]``
 callable registered in ``src/orthonym/assembly/inner_dispatch.py`` per
-CONTEXT +.
+CONTEXT D-03 + D-05.
 
 Substrate commit 02-00 ships the package SKELETON: this ``__init__.py``,
 the private ``_enrichment.py`` + ``_handler_shared.py`` modules, and the
@@ -13,7 +13,7 @@ re-exports of NameTreeNode + NamingResult + name_tree_to_string. No
 handler files yet — those land in commits 02-01..02-29 (Plan-02 Tier-1 +
 Tier-1.5) + 03-01..03-09 (Plan-03 Tier-2 + Tier-3).
 
-Public exports per CONTEXT mirror (Phase 158 ``routing/__init__.py``
+Public exports per CONTEXT D-04 mirror (Phase 158 ``routing/__init__.py``
 shape):
 
 - ``name_<handler_id>`` callables (28 handlers + ``general_acyclic`` +
@@ -25,7 +25,7 @@ shape):
   ``assembly/inner_dispatch.py`` (convenience for tests + Plan-04 CLI).
 
 Internal helpers (``_enrichment.py``, ``_handler_shared.py``) are PRIVATE
-and intentionally not exported per CONTEXT + Phase 158 mirror
+and intentionally not exported per CONTEXT D-03 + Phase 158 D-04 mirror
 (no public plugin API; v20+ extracts one if needed).
 
 Anti-pattern hygiene:
@@ -37,7 +37,7 @@ Anti-pattern hygiene:
 
 References:
 - 160-AUDIT-DECOMP.md § 1 + § 3 — handler enumeration + dependency graph.
-- 160-CONTEXT.md — one file per HANDLER_POLICIES handler_id.
+- 160-CONTEXT.md D-03 — one file per HANDLER_POLICIES handler_id.
 - 160-PATTERNS.md § 4 — analog: routing/__init__.py:1-43.
 """
 from ..inner_dispatch import (

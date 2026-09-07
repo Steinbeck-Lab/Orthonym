@@ -14,7 +14,7 @@ Why this is NOT enriched: ``n_substituted_sulfonamide_name`` already spells the
 parent AND every N-substituent, so running the generic enricher over it could
 only re-discover the handler's own core and spell an atom twice — the second
 anti-pattern recorded in
-. Same reasoning as
+``.planning/audit-v29/FINDING-count-based-naming-sites.md``. Same reasoning as
 ``handlers/thiourea.py``.
 """
 from __future__ import annotations

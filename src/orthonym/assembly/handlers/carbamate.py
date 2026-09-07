@@ -1,7 +1,7 @@
 """Phase 160 carbamate handler — Tier B retained-name (gate 0.40).
 
 Verbatim lift of composer.py:865-874 (inline branch) +
-composer.py:2561-2671 (_name_carbamate body). Per CONTEXT, body
+composer.py:2561-2671 (_name_carbamate body). Per CONTEXT D-24, body
 stays in composer.py until Plan-03 commit 03-10.
 
 IUPAC cite: P-66.5.5.1 (carbamates; functional class naming).

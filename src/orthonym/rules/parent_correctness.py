@@ -3,10 +3,10 @@
 Scaffolds the 5th confidence factor (`parent_correctness`) in the candidate
 scoring pipeline. Phase 145.1 wires this into FACTOR_WEIGHTS with weight 0.0
 so the factor is computed and logged but does NOT influence selection
-(byte-identical safe by IEEE 754 + Python 3.7+ dict-order). Phase 146
+(byte-identical safe by D-14 IEEE 754 + Python 3.7+ dict-order). Phase 146
 raises the weight after 80/20 train/test calibration to activate it.
 
-REFERENCE SOURCE (, locked in 145.1-CONTEXT.md):
+REFERENCE SOURCE (D-04, locked in 145.1-CONTEXT.md):
     OPSIN round-trip of the reference name. The only non-circular option:
     - Option A (chosen): OPSIN parses the reference name -> reference SMILES.
       OPSIN is the inverse of Orthonym; reference names from ChEBI / PubChem
@@ -16,13 +16,13 @@ REFERENCE SOURCE (, locked in 145.1-CONTEXT.md):
     - Option C (rejected -- too narrow): hand-curated parent map covers only
       the 500-compound opsin_selftest corpus.
 
-EXTRACTION PIPELINE (, CD-01 -- locked from RESEARCH §4.2):
+EXTRACTION PIPELINE (D-05, CD-01 -- locked from RESEARCH §4.2):
     E1: regex parent-token + OPSIN re-parse + RDKit substructure match +
         canonical-rank tiebreak. Pure Python + subprocess + RDKit;
         no Java<->Python bridge dependency. Verified on 6/9 test cases;
         remaining 3 fall back to 0.5 (no-decision = safe).
 
-THREAD-LOCAL I/O (, locked):
+THREAD-LOCAL I/O (D-07, locked):
     Module-level _pc_context = threading.local() mirrors the established
     coverage_scoring._confidence_store pattern at coverage_scoring.py:404.
     Benchmark runners call set_reference_name(name) BEFORE orthonym.name(smiles).
@@ -86,7 +86,7 @@ def _resolve_opsin_jar() -> Path:
 
 OPSIN_JAR = _resolve_opsin_jar()
 
-# Match Phase 145 / benchmark_multi_corpus.py:DEFAULT_OPSIN_TIMEOUT (CD-05)
+# Match Phase 145 D-09 / benchmark_multi_corpus.py:DEFAULT_OPSIN_TIMEOUT (CD-05)
 OPSIN_TIMEOUT: float = 10.0
 
 

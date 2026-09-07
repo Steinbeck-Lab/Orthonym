@@ -17,17 +17,17 @@ Public API:
 
 Source:
 
-* 155-CONTEXT.md (mutual-exclusion topology gate; corrected SSSR
+* 155-CONTEXT.md D-03 (mutual-exclusion topology gate; corrected SSSR
   criterion per 155-AUDIT-A.md Critical Finding 0).
-* 155-CONTEXT.md (sub-class enum {PARACYCLOPHANE, METACYCLOPHANE,
+* 155-CONTEXT.md D-04 (sub-class enum {PARACYCLOPHANE, METACYCLOPHANE,
   ORTHOCYCLOPHANE, GENERIC_CYCLOPHANE}).
-* 155-CONTEXT.md (composite-locant dual rendering: ASCII default,
+* 155-CONTEXT.md D-05 (composite-locant dual rendering: ASCII default,
   Unicode superscript option).
-* 155-CONTEXT.md (mutual-exclusion contract enforced at the topology
-  gate; Phase 154 pattern -- canonical helper reuse via
+* 155-CONTEXT.md D-16 (mutual-exclusion contract enforced at the topology
+  gate; Phase 154 D-11 pattern -- canonical helper reuse via
   ``multiplicative._is_pure_single_bond_assembly``).
-* 155-CONTEXT.md (root-cause-only; no postprocessor band-aids).
-* 155-AUDIT-A.md Critical Finding 0 (wording correction: SSSR-based
+* 155-CONTEXT.md D-20 (root-cause-only; no postprocessor band-aids).
+* 155-AUDIT-A.md Critical Finding 0 (D-03 wording correction: SSSR-based
   criterion replaces the merged-ring-system phrasing because cyclophane
   macrocycles share atoms with both small rings, merging into a single
   ring system via ``perception.rings.get_ring_systems``).
@@ -45,14 +45,14 @@ from typing import Dict, FrozenSet, List, Optional, Set, Tuple
 from rdkit import Chem
 
 # ---------------------------------------------------------------------------
-# Sub-class enum
+# Sub-class enum (D-04)
 # ---------------------------------------------------------------------------
 
 
 class PhaneTopology(Enum):
     """Cyclophane sub-class per IUPAC P-26.4.
 
-    Source: 155-CONTEXT.md; 155-AUDIT-A.md §4.
+    Source: 155-CONTEXT.md D-04; 155-AUDIT-A.md §4.
     """
 
     PARACYCLOPHANE = "paracyclophane"
@@ -80,7 +80,7 @@ _SMALL_RING_MAX_SIZE = 8
 
 
 # ---------------------------------------------------------------------------
-# Public API: is_cyclophane (corrected SSSR criterion)
+# Public API: is_cyclophane (D-03 corrected SSSR criterion)
 # ---------------------------------------------------------------------------
 
 
@@ -101,7 +101,7 @@ def is_cyclophane(mol: Optional[Chem.Mol]) -> bool:
 
     Returns False for None input.
 
-    Source: 155-CONTEXT.md +; 155-AUDIT-A.md Critical Finding 0.
+    Source: 155-CONTEXT.md D-03 + D-16; 155-AUDIT-A.md Critical Finding 0.
     """
     if mol is None:
         return False
@@ -111,7 +111,7 @@ def is_cyclophane(mol: Optional[Chem.Mol]) -> bool:
     if len(sssr_rings) < 2:
         return False
 
-    # Total ring nodes (gate (b) in spirit -- originally said "ring atoms";
+    # Total ring nodes (gate (b) in spirit -- D-03 originally said "ring atoms";
     # use the union of SSSR rings as the corrected analogue).
     all_ring_atoms: Set[int] = set()
     for r in sssr_rings:
@@ -120,7 +120,7 @@ def is_cyclophane(mol: Optional[Chem.Mol]) -> bool:
         return False
 
     # Mutual-exclusion (d.1): pure single-bond ring assembly = Phase 151
-    # territory. Canonical helper reuse (-- avoid duplication).
+    # territory. Canonical helper reuse (D-16 -- avoid duplication).
     from .multiplicative import _is_pure_single_bond_assembly
 
     if _is_pure_single_bond_assembly(mol):
@@ -194,7 +194,7 @@ def _enumerate_inter_ring_chains(
 
     Used by ``_classify_phane_topology`` to determine ring-attachment positions.
 
-    Source: 155-CONTEXT.md (graph-topology classification);
+    Source: 155-CONTEXT.md D-03 (graph-topology classification);
     155-RESEARCH.md Code Examples §1.
     """
     chains: List[List[int]] = []
@@ -281,7 +281,7 @@ def _shortest_chain_path(
 
 
 # ---------------------------------------------------------------------------
-# _classify_phane_topology
+# _classify_phane_topology (D-04)
 # ---------------------------------------------------------------------------
 
 
@@ -297,7 +297,7 @@ def _classify_phane_topology(mol: Chem.Mol) -> PhaneTopology:
     * All at 1,2 -> ORTHOCYCLOPHANE
     * Otherwise (mixed, non-aromatic, or non-six-membered linkers) -> GENERIC_CYCLOPHANE
 
-    Source: 155-CONTEXT.md; 155-AUDIT-A.md §4.
+    Source: 155-CONTEXT.md D-04; 155-AUDIT-A.md §4.
     """
     if mol is None:
         return PhaneTopology.GENERIC_CYCLOPHANE
@@ -489,7 +489,7 @@ def _ring_distance(
 
 
 # ---------------------------------------------------------------------------
-# _build_composite_locant
+# _build_composite_locant (D-05)
 # ---------------------------------------------------------------------------
 
 
@@ -514,7 +514,7 @@ def _build_composite_locant(
     Raises:
       ValueError on unknown style.
 
-    Source: 155-CONTEXT.md; 155-AUDIT-A.md §5.
+    Source: 155-CONTEXT.md D-05; 155-AUDIT-A.md §5.
     """
     if style == "ascii":
         return f"{ring_idx}({ring_locant})"
@@ -1161,7 +1161,7 @@ def name_cyclophane(mol: Optional[Chem.Mol]) -> Optional[str]:
 
     Returns None for None input or non-cyclophane topology.
 
-    Source: 155-CONTEXT.md +; 155-AUDIT-A.md §3 + §10;
+    Source: 155-CONTEXT.md D-04 + D-05; 155-AUDIT-A.md §3 + §10;
     docs/superpowers/plans/2026-07-16-wave8-p8-phane.md Task 8.7.
     """
     if mol is None:

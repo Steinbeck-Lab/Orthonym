@@ -2,27 +2,27 @@
 OPSIN-grammar pre-validator (Phase 156).
 
 OPSIN-XML-driven authoritative validator + round-trip-gated suggest_fix.
-Layered ON TOP OF Phase 138 format_validator heuristics per CONTEXT.md.
+Layered ON TOP OF Phase 138 format_validator heuristics per CONTEXT.md D-06.
 
 Architecture (Plan-02 deliverable):
-    - Module-import-time XML loader: parses
+    - Module-import-time XML loader (D-04): parses
       `opsin/.../regexTokens.xml`, expands `%name%` placeholders to fixed
       point, and compiles each into a Python `re.Pattern`. Loud
       `ImportError` on adapter mismatch — never silent degradation
       (AP-7).
-    - `OpsinGrammar.validate(name) -> bool`: hot-path API. Layer-
-      cake: format_validator pre-screen first, then OPSIN-XML
+    - `OpsinGrammar.validate(name) -> bool`: D-08 hot-path API. Layer-
+      cake (D-06): format_validator pre-screen first, then OPSIN-XML
       strict checks for {bracket, hyphen, stereo} surfaces.
-    - `OpsinGrammar.suggest_fix(name, source_smiles=None)` (
+    - `OpsinGrammar.suggest_fix(name, source_smiles=None)` (D-10
       LOCKED signature, name FIRST, source_smiles SECOND): tries the
       bounded repair tables from `156-AUDIT.md` § 4 in order
       [bracket, hyphen, stereo], gates each candidate through
       `validate()` AND `opsin_roundtrip_check(smiles, candidate)`
       (AP-8 SMILES-first inside the oracle), and returns
       `(repaired, repair_class)` on success or `(None, None)`
-      otherwise. One repair attempt only — no retry loop
+      otherwise. One repair attempt only (D-15) — no retry loop
       (AP-5).
-    - Per-instance `_stats` counter (, AP-19) — never module-
+    - Per-instance `_stats` counter (D-17, AP-19) — never module-
       global mutable state.
 
 Anti-pattern hygiene (CONTEXT.md):
@@ -54,10 +54,10 @@ logger = logging.getLogger(__name__)
 
 
 # ---------------------------------------------------------------------------
-# Module-level constants (+)
+# Module-level constants (D-04 + D-05)
 # ---------------------------------------------------------------------------
 
-# OPSIN version this module is calibrated against.
+# OPSIN version this module is calibrated against (D-05).
 OPSIN_GRAMMAR_VERSION = "2.9.0"
 
 # Module-level path: from src/orthonym/validation/opsin_grammar.py up to
@@ -70,7 +70,7 @@ _REGEX_TOKENS_PATH = (
 )
 
 # Logical name (Phase 156) -> OPSIN regex name in regexTokens.xml.
-# Source: 156-AUDIT.md § 1 (Surfaces A/B/C). Adapter table per.
+# Source: 156-AUDIT.md § 1 (Surfaces A/B/C). Adapter table per D-04.
 _REGEX_TOKEN_MAP: Dict[str, str] = {
     # Surface A — Bracket nesting (P-16.5.4.1)
     "open_bracket": "openBracket",                              # line 22
@@ -91,7 +91,7 @@ _REGEX_TOKEN_MAP: Dict[str, str] = {
 
 
 # ---------------------------------------------------------------------------
-# Module-import-time XML loader (+ AP-7 loud failure)
+# Module-import-time XML loader (D-04 + AP-7 loud failure)
 # ---------------------------------------------------------------------------
 
 # Maximum number of placeholder-expansion iterations before giving up.
@@ -131,7 +131,7 @@ def _read_regex_tokens_xml() -> bytes:
 def _load_opsin_token_regexes() -> Dict[str, "re.Pattern[str]"]:
     """Module-load reader: parse regexTokens.xml -> compiled Python re.Pattern dict.
 
-    Raises ImportError on adapter-failure per CONTEXT.md + AP-7.
+    Raises ImportError on adapter-failure per CONTEXT.md D-04 + AP-7.
     Never silently degrades to a permissive pass-through.
 
     Returns:
@@ -217,7 +217,7 @@ def _load_opsin_token_regexes() -> Dict[str, "re.Pattern[str]"]:
 def _check_jar_version_drift() -> None:
     """One-shot WARN if the OPSIN JAR version differs from the XML version.
 
-    Per CONTEXT.md: WARN-only on JAR-vs-XML drift. JAR-side issues
+    Per CONTEXT.md D-05: WARN-only on JAR-vs-XML drift. JAR-side issues
     (e.g., JAR not present, Java unavailable) MUST NOT block module
     load. Wrapped in try/except to enforce that contract.
     """
@@ -236,7 +236,7 @@ def _check_jar_version_drift() -> None:
 
 
 # ---------------------------------------------------------------------------
-# OpsinGrammar class (layer-cake + return shape + stats)
+# OpsinGrammar class (D-06 layer-cake + D-08 return shape + D-17 stats)
 # ---------------------------------------------------------------------------
 
 
@@ -248,22 +248,22 @@ class OpsinGrammar:
            three surfaces (bracket nesting, stereo position, hyphen
            placement). Layered ON TOP OF Phase 138's
            `format_validator.validate_name_format` heuristic pre-screen
-           per.
+           per D-06.
         2. `suggest_fix(name, source_smiles=None)` — bounded repair
-           function with the LOCKED signature (name FIRST). Each
+           function with the D-10 LOCKED signature (name FIRST). Each
            repair candidate is gated through `validate()` AND
            `opsin_roundtrip_check(smiles, candidate)` (AP-8 SMILES-first
            inside the oracle). One attempt per repair class; NO retry
-           loop (/ AP-5).
+           loop (D-15 / AP-5).
         3. Per-instance telemetry via `self._stats` and
            `get_validation_stats()`.
 
     Construction: `OpsinGrammar()` (or `OpsinGrammar(stats=shared_dict)`
-    to share counters with an outer container per ref-pass
+    to share counters with an outer container per D-17 ref-pass
     pattern).
     """
 
-    # Per CONTEXT.md — exactly seven buckets.
+    # Per CONTEXT.md D-17 — exactly seven buckets.
     STAT_KEYS: Tuple[str, ...] = (
         "validate_passed",
         "repair_succeeded_bracket",
@@ -275,7 +275,7 @@ class OpsinGrammar:
     )
 
     def __init__(self, stats: Optional[Dict[str, int]] = None) -> None:
-        # Per-instance counter (/ AP-19). When `stats` is supplied
+        # Per-instance counter (D-17 / AP-19). When `stats` is supplied
         # the caller (e.g., Orthonym) shares the same dict by reference
         # so its `get_validation_stats()` reads the live counters.
         if stats is None:
@@ -289,7 +289,7 @@ class OpsinGrammar:
         self._last_repair_class: Optional[str] = None
 
     # -----------------------------------------------------------------
-    # Public hot-path API (bool return)
+    # Public hot-path API (D-08 bool return)
     # -----------------------------------------------------------------
 
     def validate(self, name: str) -> bool:
@@ -300,7 +300,7 @@ class OpsinGrammar:
     def _validate_detailed(self, name: str) -> Tuple[bool, str]:
         """Like validate() but returns (ok, reason_code).
 
-        Layer-cake order per: format_validator pre-screen first
+        Layer-cake order per D-06: format_validator pre-screen first
         (cheap heuristic), then OPSIN-XML-driven strict checks
         cheapest-first (bracket -> hyphen -> stereo). Used by tests
         and 156-AUDIT.md triage.
@@ -308,7 +308,7 @@ class OpsinGrammar:
         if not name:
             return False, "format_validator: empty_name"
 
-        # Layer 1: Phase 138 heuristic pre-screen.
+        # Layer 1 (D-06): Phase 138 heuristic pre-screen.
         from .format_validator import validate_name_format
         ok, reason = validate_name_format(name)
         if not ok:
@@ -332,15 +332,15 @@ class OpsinGrammar:
         name: str,
         source_smiles: Optional[str] = None,
     ) -> Tuple[Optional[str], Optional[str]]:
-        """Bounded round-trip-gated repair (LOCKED signature).
+        """Bounded round-trip-gated repair (D-10 LOCKED signature).
 
         Args:
             name: The (validate-failing) IUPAC name to repair. **FIRST
-                positional arg per.**
+                positional arg per D-10.**
             source_smiles: Original SMILES for the round-trip gate.
                 When `None` the round-trip gate is replaced by a
                 `validate()`-only check and an INFO log records the
-                degraded path.
+                degraded path (D-10).
 
         Returns:
             `(repaired_name, repair_class)` if a repair fired AND
@@ -349,11 +349,11 @@ class OpsinGrammar:
 
         Notes:
             - Tries each repair class once in deterministic order
-              [bracket, hyphen, stereo]. NO retry loop (/ AP-5).
+              [bracket, hyphen, stereo]. NO retry loop (D-15 / AP-5).
             - The round-trip oracle is called as
               `opsin_roundtrip_check(source_smiles, candidate)` —
               SMILES-first per AP-8. The (smiles, name) arg order to
-              the ORACLE is the OPPOSITE of `suggest_fix`'s own
+              the ORACLE is the OPPOSITE of `suggest_fix`'s own D-10
               signature; this is the most common confusion source in
               the codebase and the AP-8 grep gate enforces it.
         """
@@ -371,16 +371,16 @@ class OpsinGrammar:
             if candidate is None or candidate == name:
                 continue
 
-            # Gate 1: candidate must pass validate.
+            # Gate 1: candidate must pass validate() (D-09).
             if not self.validate(candidate):
                 self._stats["repair_failed_validate"] = (
                     self._stats.get("repair_failed_validate", 0) + 1
                 )
                 continue
 
-            # Gate 2: round-trip via OPSIN JAR.
+            # Gate 2: round-trip via OPSIN JAR (D-09).
             if source_smiles is None:
-                # Documented degraded path per — log INFO.
+                # Documented degraded path per D-10 — log INFO.
                 logger.info(
                     "OPSIN grammar repair (degraded — no source SMILES): "
                     "class=%s original=%r repaired=%r",
@@ -415,7 +415,7 @@ class OpsinGrammar:
         return None, None
 
     def get_validation_stats(self) -> Dict[str, int]:
-        """Return a defensive copy of the per-instance counters."""
+        """Return a defensive copy of the per-instance counters (D-17)."""
         return dict(self._stats)
 
     def last_repair_class(self) -> Optional[str]:
@@ -438,10 +438,10 @@ class OpsinGrammar:
 
         Indicated-hydrogen `(1H)` (P-16.5.4.1.1) and fusion brackets
         `[2,3-b]` (P-16.5.4.1.2) are non-nesting and are stripped via
-        the existing Phase 137-02 regexes (consumed under / AP-11
+        the existing Phase 137-02 regexes (consumed under D-21 / AP-11
         — not redefined here).
 
-        Per CONTEXT.md (permissive on uncovered surfaces): we do
+        Per CONTEXT.md D-07 (permissive on uncovered surfaces): we do
         NOT enforce that the OUTERMOST opener is `(`; valid PIN names
         legitimately start with `[` when their content already has
         `(...)`. Only directly-nested same-type opener-pairs are
@@ -541,7 +541,7 @@ class OpsinGrammar:
         # NOTE: HY-6 (heteroatom-prefix dash polycyclic-prefix, e.g.
         # `oxa-tetracyclo`) is NOT auto-detected here even though the
         # audit row HY-6.fix is corpus-mined from the Tier-B post-v18
-        # set. Reason: the canary suite (zero-flip HARD gate)
+        # set. Reason: the canary suite (D-19 zero-flip HARD gate)
         # contains many names where `oxa-tetracyclo` / `aza-tricyclo`
         # is the canonical expected form. A blanket detection here
         # over-fires and causes name-stability regressions across
@@ -565,7 +565,7 @@ class OpsinGrammar:
         Implements 156-AUDIT.md § 4.A rows BR-1, BR-2, BR-5. Returns
         `None` when no audit row matches (BR-4 sanity).
 
-        Per + AP-11 this method NEVER reimplements depth logic;
+        Per D-21 + AP-11 this method NEVER reimplements depth logic;
         it always delegates to `apply_enclosing_marks(depth=-1)`.
         """
         # Local-import per CONTEXT.md (keep cold-start cheap).
@@ -583,7 +583,7 @@ class OpsinGrammar:
         # AP-3: 156-AUDIT.md § 4.A BR-1 / BR-2 (top-level `((...))`).
         # BR-2's `(1H)` containment is handled inside
         # `apply_enclosing_marks` via `compute_nesting_depth`; we do
-        # NOT re-derive depth here (/ AP-11).
+        # NOT re-derive depth here (D-21 / AP-11).
         m = re.match(r"^\(\((?P<inner>.+)\)\)(?P<rest>.*)$", name)
         if m:
             return (
@@ -598,7 +598,7 @@ class OpsinGrammar:
         """Stereo position-only repair per 156-AUDIT.md § 4.B.
 
         Each repair preserves the (locant, descriptor) tuple verbatim;
-        only the token POSITION changes (/ AP-13). Source SMILES
+        only the token POSITION changes (D-23 / AP-13). Source SMILES
         is NEVER read here (AP-20); the round-trip gate (in
         `suggest_fix`) is the sole consumer.
         """
@@ -699,14 +699,14 @@ class OpsinGrammar:
 # Module bottom: eager load, version-drift check, public helpers
 # ---------------------------------------------------------------------------
 
-# Eager module-import-time XML load. ImportError propagates per AP-7.
+# Eager module-import-time XML load (D-04). ImportError propagates per AP-7.
 _TOKEN_REGEX: Dict[str, "re.Pattern[str]"] = _load_opsin_token_regexes()
 
-# JAR-vs-XML version-drift WARN — wrapped in try/except so JAR
+# JAR-vs-XML version-drift WARN (D-05) — wrapped in try/except so JAR
 # absence never blocks module load.
 _check_jar_version_drift()
 
-# Public-API singleton (helpers below). Per CONTEXT.md + AP-19 the
+# Public-API singleton (helpers below). Per CONTEXT.md D-17 + AP-19 the
 # singleton's `_stats` are SEPARATE from the per-`Orthonym`-instance
 # stats; the singleton serves standalone callers (tests, audit triage).
 _SINGLETON = OpsinGrammar()
@@ -716,7 +716,7 @@ def opsin_grammar_validate(name: str) -> bool:
     """Module-level convenience wrapper around `OpsinGrammar.validate`.
 
     Backed by an internal singleton with its own `_stats` counter
-    (NOT shared with any `Orthonym` instance per).
+    (NOT shared with any `Orthonym` instance per D-17).
     """
     return _SINGLETON.validate(name)
 
@@ -728,7 +728,7 @@ def opsin_grammar_suggest_fix(
     """Module-level convenience wrapper around `OpsinGrammar.suggest_fix`.
 
     **Return-shape divergence:** `OpsinGrammar.suggest_fix` returns
-    `Tuple[Optional[str], Optional[str]]` (per LOCKED); this
+    `Tuple[Optional[str], Optional[str]]` (per D-10 LOCKED); this
     helper drops the repair-class slot and returns `Optional[str]`
     only, for backward-compatible callers that just want the
     repaired name. Use the class API directly when the repair class

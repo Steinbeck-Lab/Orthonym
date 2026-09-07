@@ -59,6 +59,152 @@ HALOGEN_PREFIX = {
 _HALIDE_WORD = {"F": "fluoride", "Cl": "chloride", "Br": "bromide", "I": "iodide"}
 
 
+def _name_carbonyl_dihalide(mol, combined) -> Optional[str]:
+    """P-65.5.3.1: X-CO-Y (X, Y halogens) on a SINGLE carbonic carbon ->
+    'carbonyl <halide word(s)>' (BB 31478/31480: 'carbonyl dichloride',
+    'carbonyl bromide chloride').
+
+    The lone carbon is the carbonic acyl centre: exactly one =O, exactly two
+    single-bonded halogens, NO carbon neighbour (so a real R-CO-X acyl halide,
+    which has a carbon chain, never matches). Halide words are cited in
+    ALPHABETICAL order (bromide < chloride < fluoride < iodide); identical
+    halides collapse with a numeric multiplier ('carbonyl dichloride').
+    Returns None (fail-closed) on any other decoration."""
+    if len(combined) != 2:
+        return None
+    carbonyls = {m[0] for m, _ in combined}
+    if len(carbonyls) != 1:                # both halides must sit on ONE carbon
+        return None
+    c = mol.GetAtomWithIdx(next(iter(carbonyls)))
+    n_double_o = n_halide = n_carbon = 0
+    halide_syms = []
+    for nb in c.GetNeighbors():
+        bt = mol.GetBondBetweenAtoms(c.GetIdx(), nb.GetIdx()).GetBondTypeAsDouble()
+        sym = nb.GetSymbol()
+        if sym == 'O' and bt == 2.0:
+            n_double_o += 1
+        elif sym in ('F', 'Cl', 'Br', 'I') and bt == 1.0:
+            n_halide += 1
+            halide_syms.append(sym)
+        elif sym == 'C':
+            n_carbon += 1
+        else:
+            return None
+    if not (n_double_o == 1 and n_halide == 2 and n_carbon == 0):
+        return None
+    words = sorted(_HALIDE_WORD[s] for s in halide_syms)   # alphabetical
+    if words[0] == words[1]:
+        return f"carbonyl {get_multiplier_prefix(2, words[0])}{words[0]}"
+    return f"carbonyl {words[0]} {words[1]}"
+
+
+def _name_oxamoyl_halide(mol, acid_halide_matches, halide_word) -> Optional[str]:
+    """P-65.5.1 (retained acyl 'oxamoyl'): H2N-CO-CO-X -> 'oxamoyl <halide>'
+    (BB 31456 'H2N-CO-CO-Br oxamoyl bromide (PIN)').
+
+    'oxamoyl' is the retained acyl group of oxamic acid (H2N-CO-COOH); the -OH
+    of its carboxylic end is replaced by a halogen. Recognised by total heavy-
+    atom accounting on the exact 6-atom skeleton (acyl C + =O + halide; amide C
+    + =O + primary N-H2), so any extra decoration fails closed. Returns None
+    unless there is exactly ONE halide group and the amide carbon carries a bare
+    primary amide."""
+    if len(acid_halide_matches) != 1:
+        return None
+    acyl_c = acid_halide_matches[0][0]
+    a = mol.GetAtomWithIdx(acyl_c)
+    o_dbl = halide = c2 = None
+    for nb in a.GetNeighbors():
+        bt = mol.GetBondBetweenAtoms(acyl_c, nb.GetIdx()).GetBondTypeAsDouble()
+        sym = nb.GetSymbol()
+        if sym == 'O' and bt == 2.0:
+            o_dbl = nb.GetIdx()
+        elif sym in ('F', 'Cl', 'Br', 'I') and bt == 1.0:
+            halide = nb.GetIdx()
+        elif sym == 'C':
+            c2 = nb.GetIdx()
+        else:
+            return None
+    if o_dbl is None or halide is None or c2 is None:
+        return None
+    # c2 is the amide carbon: exactly one =O, one primary-amide N (NH2), and the
+    # bond back to the acyl carbon. Nothing else.
+    c2a = mol.GetAtomWithIdx(c2)
+    n_amide = o2 = None
+    for nb in c2a.GetNeighbors():
+        if nb.GetIdx() == acyl_c:
+            continue
+        bt = mol.GetBondBetweenAtoms(c2, nb.GetIdx()).GetBondTypeAsDouble()
+        sym = nb.GetSymbol()
+        if sym == 'O' and bt == 2.0:
+            o2 = nb.GetIdx()
+        elif sym == 'N' and bt == 1.0:
+            if nb.GetTotalNumHs() != 2 or nb.GetDegree() != 1 or nb.GetFormalCharge() != 0:
+                return None                # not a bare -NH2 -> out of scope
+            n_amide = nb.GetIdx()
+        else:
+            return None
+    if o2 is None or n_amide is None:
+        return None
+    # Total heavy-atom accounting: exactly {acyl_c, =O, halide, c2, =O2, N}.
+    accounted = {acyl_c, o_dbl, halide, c2, o2, n_amide}
+    heavy = {at.GetIdx() for at in mol.GetAtoms() if at.GetAtomicNum() > 1}
+    if accounted != heavy:
+        return None
+    return f"oxamoyl {halide_word}"
+
+
+def _name_carbamoyl_acyl(mol, match, class_word) -> Optional[str]:
+    """P-65.5.3.1 (retained acyl 'carbamoyl'): H2N-CO-Y -> 'carbamoyl <class>'
+    (BB 31488 'H2N-CO-NCO carbamoyl isocyanate (PIN)').
+
+    'carbamoyl' is the retained acyl group of carbamic acid (H2N-COOH); its -OH
+    is replaced by a halide or pseudohalide (Y). ``match`` is the acyl-halide /
+    -pseudohalide SMARTS tuple (acyl C, carbonyl =O, then the class-group atoms);
+    ``class_word`` is the already-resolved functional-class word for Y. The acyl
+    carbon must bear exactly: one =O, one bare primary amide -NH2, and the one
+    class group of ``match``. Recognised by total heavy-atom accounting on that
+    exact skeleton, so any other decoration (a second amide N-substituent, an
+    extra carbon) fails closed. Returns None otherwise."""
+    acyl_c = match[0]
+    a = mol.GetAtomWithIdx(acyl_c)
+    # The carbonyl =O in the match, and the class-group atoms (match minus the
+    # acyl carbon and that =O).
+    carbonyl_o = None
+    for idx in match[1:]:
+        at = mol.GetAtomWithIdx(idx)
+        b = mol.GetBondBetweenAtoms(acyl_c, idx)
+        if (at.GetSymbol() == 'O' and b is not None
+                and b.GetBondTypeAsDouble() == 2.0):
+            carbonyl_o = idx
+            break
+    if carbonyl_o is None:
+        return None
+    class_atoms = set(match) - {acyl_c, carbonyl_o}
+    if not class_atoms:
+        return None
+    # The acyl carbon's remaining neighbour (not =O, not the class group) must be
+    # a bare primary amide -NH2.
+    n_amide = None
+    for nb in a.GetNeighbors():
+        if nb.GetIdx() == carbonyl_o or nb.GetIdx() in class_atoms:
+            continue
+        if (nb.GetSymbol() == 'N' and nb.GetTotalNumHs() == 2
+                and nb.GetDegree() == 1 and nb.GetFormalCharge() == 0):
+            if n_amide is not None:
+                return None
+            n_amide = nb.GetIdx()
+        else:
+            return None                    # any other neighbour -> out of scope
+    if n_amide is None:
+        return None
+    # Total heavy-atom accounting: exactly {acyl_c, =O, class atoms, amide N}.
+    accounted = {acyl_c, carbonyl_o, n_amide} | class_atoms
+    heavy = {at.GetIdx() for at in mol.GetAtoms() if at.GetAtomicNum() > 1}
+    if accounted != heavy:
+        return None
+    return f"carbamoyl {class_word}"
+
+
 # P-65.2.1: the acid-anion word of a mono-ester of carbonic acid, keyed by the
 # acyl-halide FG type. 'chloride' -> 'carbonochloridate', etc. (OPSIN-verified).
 _CARBONO_HALIDATE_WORDS = {
@@ -147,6 +293,106 @@ def name_carbonic_monoester_acyl_halide(
     return f"{r_name} {carbono_word}"
 
 
+# Phase 2E (P-65.5.1): acyl-group interfixes for the imido / chalcogeno
+# analogues of carboxylic acid, keyed by the acyl-halide principal-group name.
+# ``ring`` is the ``…ane`` carbo-form for a ring parent ('cyclohexanecarboximidoyl
+# chloride'); ``chain_tail`` is appended to the alkane chain-prefix + 'an' for a
+# chain parent, with vowel-elision matching each affix ('ethanimidoyl chloride',
+# 'ethanethioyl chloride').
+_IMIDO_THIO_ACYL = {
+    # pg -> (ring carbo-form, chain '…an{tail}' tail)
+    "imidoyl_halide": ("carboximidoyl", "imidoyl"),      # =NH  (elide alkane 'e')
+    "carbothioyl_halide": ("carbothioyl", "ethioyl"),    # =S
+    "carboselenoyl_halide": ("carboselenoyl", "eselenoyl"),  # =Se
+}
+
+
+def name_imidoyl_thioyl_halide(features) -> Optional[str]:
+    """P-65.5.1: R-C(=NH)-X / R-C(=S)-X / R-C(=Se)-X -> the two-word functional
+    class '{parent}carbo{imidoyl|thioyl|selenoyl} {halide}' (ring parent) or
+    '{chain-stem}{imidoyl|thioyl|selenoyl} {halide}' (chain parent).
+
+    BB 31438 'cyclohexanecarboximidoyl chloride (PIN)', 31442 'cyclohexane-
+    carbothioyl chloride (PIN)'. Handles a bare cycloalkane ring parent or a bare
+    unbranched alkyl chain parent; fails closed (None -> abstain) on an aromatic
+    ring, a branch, any extra heteroatom/substituent, or an unknown parent, so a
+    less-certain case degrades to abstention rather than a guessed name.
+    Determinism: single SMARTS match, deterministic parent walk. Pure."""
+    mol = features.mol
+    pg = features.principal_group
+    forms = _IMIDO_THIO_ACYL.get(pg)
+    if forms is None:
+        return None
+    matches = features.functional_groups.get(pg, [])
+    if len(matches) != 1:                 # exactly one acyl-halide centre
+        return None
+    ring_form, chain_tail = forms
+    acyl_c, x_atom, halide_atom = matches[0]  # (C, =X, halide)
+    halide_word = _HALIDE_WORD.get(mol.GetAtomWithIdx(halide_atom).GetSymbol())
+    if halide_word is None:
+        return None
+
+    a = mol.GetAtomWithIdx(acyl_c)
+    # The R attachment = the neighbour that is neither the =X chalcogen/imido N nor
+    # the halide (P-65.5.1: the acyl parent).
+    r_atoms_nb = [nb.GetIdx() for nb in a.GetNeighbors()
+                  if nb.GetIdx() not in (x_atom, halide_atom)]
+    if len(r_atoms_nb) != 1:
+        return None
+    r = r_atoms_nb[0]
+    r_atom = mol.GetAtomWithIdx(r)
+    if r_atom.GetSymbol() != 'C':         # R must be a carbon (acyl on carbon)
+        return None
+
+    heavy = {at.GetIdx() for at in mol.GetAtoms() if at.GetAtomicNum() > 1}
+
+    # ---- Ring parent: a bare all-carbon NON-aromatic ring (cycloalkane). ----
+    if r_atom.IsInRing():
+        ring_name = _detect_ring_parent(mol, r)   # 'benzo' | 'cyclo{prefix}' | None
+        if not ring_name or not ring_name.startswith("cyclo"):
+            return None                   # aromatic / unknown ring -> fail closed
+        ring_atoms = None
+        for ring in mol.GetRingInfo().AtomRings():
+            if r in ring:
+                ring_atoms = set(ring)
+                break
+        if ring_atoms is None:
+            return None
+        # Total heavy-atom accounting: acyl C + =X + halide + exactly the ring.
+        if {acyl_c, x_atom, halide_atom} | ring_atoms != heavy:
+            return None
+        # ring_name = 'cyclohex' etc. -> '{ring}ane{carbo-form} {halide}'.
+        return f"{ring_name}ane{ring_form} {halide_word}"
+
+    # ---- Chain parent: a bare unbranched all-carbon chain (acyl C = locant 1). --
+    # Walk carbons from the acyl C; every atom must be an all-carbon unbranched
+    # chain member with no extra substituent (total heavy-atom accounting below).
+    chain = [acyl_c]
+    seen = {acyl_c, x_atom, halide_atom}
+    cur = r
+    prev = acyl_c
+    while True:
+        catom = mol.GetAtomWithIdx(cur)
+        if catom.GetSymbol() != 'C' or catom.IsInRing():
+            return None
+        chain.append(cur)
+        seen.add(cur)
+        nxts = [nb.GetIdx() for nb in catom.GetNeighbors()
+                if nb.GetIdx() != prev and nb.GetIdx() not in seen]
+        if not nxts:
+            break
+        if len(nxts) != 1:                # a branch -> fail closed
+            return None
+        prev, cur = cur, nxts[0]
+    if seen != heavy:                     # any extra atom -> fail closed
+        return None
+    chain_length = len(chain)
+    prefix = get_chain_prefix(chain_length)
+    if not prefix:
+        return None
+    return f"{prefix}an{chain_tail} {halide_word}"
+
+
 def name_acid_halide(features, scope_out: Optional[dict] = None) -> Optional[str]:
     """
     Name an acid halide compound using functional class nomenclature.
@@ -159,7 +405,7 @@ def name_acid_halide(features, scope_out: Optional[dict] = None) -> Optional[str
             ``scope_out['parent_scope'] = 'chain' | 'ring'`` for the branch it
             actually took, or leaves it absent when the parent is neither (or is
             not provably ``features.principal_chain``). Only the branch that
-            picks the parent can know this --
+            picks the parent can know this -- v29 P7 measured that it cannot be
             recovered downstream from ``features.principal_chain`` or
             ``features.chain_is_parent``, both of which report "chain" on
             ring-parented names. Consumed by ``handlers.acid_halide`` to tell
@@ -200,6 +446,16 @@ def name_acid_halide(features, scope_out: Optional[dict] = None) -> Optional[str
         for _m in features.functional_groups.get(_ft, []):
             _combined.append((_m, _sym))
 
+    # P4-3 (P-66.5.1.3.1 / P-66.5.3.1): a diacyl DIpseudohalide (NC-CO-CO-CN
+    # -> 'oxalyl dicyanide'). The pseudohalide contributes its own carbon, so the
+    # real-halide-only ``_combined`` list is empty and the diacyl-halide path
+    # below cannot see it; handle same-type acyl di-pseudohalides here.
+    if (pg in ("acyl_azide", "acyl_cyanide", "acyl_isocyanate")
+            and num_halide_groups == 2):
+        _dps = _name_diacyl_pseudohalide(mol, features, pg, halide_word)
+        if _dps is not None:
+            return _dps
+
     # P-35.4.2 / P-65.2.1 (BB 18114, W2E-P1FC Task 7): the acyl halide of a
     # MONO-ester of carbonic acid, X-C(=O)-O-R, is the functional-class name
     # '<R> carbono<halide>idate' (benzyl carbonochloridate, ethyl
@@ -211,6 +467,23 @@ def name_acid_halide(features, scope_out: Optional[dict] = None) -> Optional[str
                                                   halide_word)
         if _cc is not None:
             return _cc
+        # P-65.5.1 retained acyl 'oxamoyl' (H2N-CO-CO-X -> 'oxamoyl <halide>').
+        _ox = _name_oxamoyl_halide(mol, acid_halide_matches, halide_word)
+        if _ox is not None:
+            return _ox
+        # P-65.5.3.1 retained acyl 'carbamoyl' (H2N-CO-Y -> 'carbamoyl <class>').
+        _cbm = _name_carbamoyl_acyl(mol, acid_halide_matches[0], halide_word)
+        if _cbm is not None:
+            return _cbm
+
+    # P-65.5.3.1: a mononuclear carbonic dihalide X-CO-Y (both halides on one
+    # carbon, no carbon chain) -> 'carbonyl <halide word(s)>'. Checked before the
+    # single-acyl path, which would mis-read one halide as a 'halo' substituent
+    # ('1-bromoformyl chloride'). The same-halide case (carbonyl dichloride) is
+    # matched first by its retained-name table entry; this adds the mixed forms.
+    _cdh = _name_carbonyl_dihalide(mol, _combined)
+    if _cdh is not None:
+        return _cdh
 
     # W3-P06 Task 1 (P-65.5.1): TWO OR MORE acyl halides on the SAME benzene ring
     # -> 'benzene-{locants}-{mult}carbonyl {mult}{halide}' (benzene-1,2-dicarbonyl
@@ -284,7 +557,7 @@ def name_acid_halide(features, scope_out: Optional[dict] = None) -> Optional[str
 
     # Single acid halide: build acyl name.
     #
-    # `_build_acyl_name`'s `unsaturation` parameter (and the
+    # v29 P7: `_build_acyl_name`'s `unsaturation` parameter (and the
     # `get_enoate_name` grammar behind it) existed but had NO caller, so every
     # acyl chain was spelled saturated and the C=C was SILENTLY DROPPED --
     # `C[C@@H]1C[C@H]1/C=C/C(Cl)=O` was named `3-[...]propanoyl chloride`, which
@@ -312,11 +585,23 @@ def name_acid_halide(features, scope_out: Optional[dict] = None) -> Optional[str
     # Parent atoms = chain; exclude = all atoms consumed by acid halide groups
     # (carbonyl C, carbonyl O, halogen). This replaces the old
     # _get_chain_substituent_prefix() which only handled halogen substituents.
+    #
+    # P4-3: substituent LOCANTS must number from the carbonyl carbon = 1
+    # (P-65.5.1), i.e. over the ACYL chain, not over ``features.principal_chain``.
+    # For a PSEUDOhalide (cyanide/azide/isocyanate) the pseudo-group contributes
+    # its own carbon, which sits at the FRONT of principal_chain
+    # (``[nitrile-C, carbonyl-C, ...]`` for ClCCC(=O)C#N), so numbering over
+    # ``chain`` put the substituent one locant too high ('4-chloropropanoyl
+    # cyanide' for the 3-chloro PIN; OPSIN then rejected the wrong locant ->
+    # abstain). ``_acyl_atoms`` is exactly the acyl chain oriented carbonyl-first
+    # (== ``chain`` for a real halide), so it is the correct numbering basis;
+    # fall back to ``chain`` only when it could not be oriented (fail-closed [] ).
     from ..assembly.composer import _integrate_universal_prefixes
+    _sub_chain = _acyl_atoms if _acyl_atoms else chain
     sub_prefix = _integrate_universal_prefixes(
-        mol, set(chain) if chain else set(),
+        mol, set(_sub_chain) if _sub_chain else set(),
         parent_type="chain",
-        principal_chain=chain,
+        principal_chain=_sub_chain,
         exclude_atoms=consumed_atoms,
     )
 
@@ -505,12 +790,99 @@ def _name_diacyl_halide_combined(mol, combined, chain, chain_length) -> Optional
     if carbonyls != {chain[0], chain[-1]}:
         return None
     words = sorted(_HALIDE_WORD[sym] for _, sym in combined)
-    prefix = get_chain_prefix(chain_length)
     if words[0] == words[1]:
         halide_part = f"{get_multiplier_prefix(2, words[0])}{words[0]}"
     else:
         halide_part = f"{words[0]} {words[1]}"
+    # P-65.5.1: 'oxalyl' is the retained PIN acyl of ethanedioyl (oxalic acid);
+    # the systematic 'ethanedioyl' is the non-preferred form (BB 31448
+    # 'Cl-CO-CO-Cl oxalyl dichloride (PIN) ethanedioyl dichloride').
+    if chain_length == 2:
+        return f"oxalyl {halide_part}"
+    prefix = get_chain_prefix(chain_length)
     return f"{prefix}anedioyl {halide_part}"
+
+
+def _name_diacyl_pseudohalide(mol, features, pg, class_word) -> Optional[str]:
+    """P-66.5.1.3.1 / P-66.5.3.1 (BB:34805 / 34852): a diacyl DIpseudohalide with
+    an acyl pseudohalide (cyanide / azide / isocyanate) at BOTH ends of a bare
+    diacyl backbone -> 'oxalyl di<class>' (C2) or '{chain}dioyl di<class>'.
+
+    NC-CO-CO-CN -> 'oxalyl dicyanide (PIN)'. The real-halide-only ``_combined``
+    list used by ``_name_diacyl_halide_combined`` is EMPTY for a pseudohalide (its
+    carbon is not an F/Cl/Br/I atom), so the diacyl-halide path never sees this
+    shape and the single-acyl fallthrough drops one whole acyl group. Same-type
+    only. Fail-closed by total heavy-atom accounting on the exact skeleton (two
+    carbonyl C, each with one =O and one pseudohalide group, joined by a bare
+    unbranched all-carbon backbone), so any extra decoration falls through."""
+    matches = features.functional_groups.get(pg, [])
+    if len(matches) != 2:
+        return None
+    carbonyl_cs = []
+    carbonyl_os = set()
+    pseudo_atoms = set()          # pseudohalide-group atoms (NOT carbonyl C / =O)
+    all_match_atoms = set()
+    for m in matches:
+        c = m[0]
+        carbonyl_cs.append(c)
+        all_match_atoms.update(m)
+        o_dbl = None
+        for idx in m[1:]:
+            at = mol.GetAtomWithIdx(idx)
+            b = mol.GetBondBetweenAtoms(c, idx)
+            if (at.GetSymbol() == 'O' and b is not None
+                    and b.GetBondTypeAsDouble() == 2.0):
+                o_dbl = idx
+                break
+        if o_dbl is None:
+            return None
+        carbonyl_os.add(o_dbl)
+        pseudo_atoms.update(set(m[1:]) - {o_dbl})
+    if len(set(carbonyl_cs)) != 2:
+        return None
+    c1, c2 = carbonyl_cs
+    # Backbone = the all-carbon path between the two carbonyl carbons (avoid the
+    # carbonyl =O and every pseudohalide atom).
+    blocked = pseudo_atoms | carbonyl_os
+    parent = {c1: None}
+    q = deque([c1])
+    found = False
+    while q:
+        cur = q.popleft()
+        if cur == c2:
+            found = True
+            break
+        for nb in mol.GetAtomWithIdx(cur).GetNeighbors():
+            ni = nb.GetIdx()
+            if ni in parent or ni in blocked or nb.GetSymbol() != 'C':
+                continue
+            parent[ni] = cur
+            q.append(ni)
+    if not found:
+        return None
+    backbone = []
+    n = c2
+    while n is not None:
+        backbone.append(n)
+        n = parent[n]
+    backbone.reverse()            # c1 ... c2
+    # Total heavy-atom accounting: nothing hangs off the diacyl backbone.
+    heavy = {a.GetIdx() for a in mol.GetAtoms() if a.GetAtomicNum() > 1}
+    if (all_match_atoms | set(backbone)) != heavy:
+        return None
+    for a in backbone:            # bare unbranched all-carbon backbone
+        at = mol.GetAtomWithIdx(a)
+        if at.GetSymbol() != 'C' or at.IsInRing():
+            return None
+    chain_length = len(backbone)
+    mult = get_multiplier_prefix(2, class_word)
+    if chain_length == 2:
+        # P-65.5.1: 'oxalyl' is the retained PIN acyl of ethanedioyl.
+        return f"oxalyl {mult}{class_word}"
+    prefix = get_chain_prefix(chain_length)
+    if not prefix:
+        return None
+    return f"{prefix}anedioyl {mult}{class_word}"
 
 
 def _is_diacid_halide(mol, matches, chain) -> bool:

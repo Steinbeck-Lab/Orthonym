@@ -45,7 +45,7 @@ Isotopes, wildcard atoms and multi-fragment inputs are OUT OF SCOPE and void
 the whole call (``None``).  Radicals are OUT OF SCOPE for MORE than one
 free-valence centre (P-71.2.3 multi-site / diradicals / radical ions); a
 SINGLE monovalent/divalent/trivalent centre is IN SCOPE for ``_build_ctx``
- so ``name_universal_substituent_prefix`` can cite it as a
+(v36 A2, C2) so ``name_universal_substituent_prefix`` can cite it as a
 ``-yl``/``-ylidene``/``-ylidyne`` substituent prefix -- see that function's
 docstring and ``t4_coverage._best_effort_candidate``'s radical branch, the
 only wired caller. ``name_universal_substitutive`` (the whole-molecule entry
@@ -94,7 +94,7 @@ charge VOIDS the whole call, never mis-names):
   discovery for it, so it is deferred, not built. A carboxylate-anchored
   zwitterion (amino-acid style, e.g. glycine) therefore VOIDS -- carboxylate
   is out of scope for BOTH the skeletal and the -olate branch of the reused
-  primitive (it is owned by the charged-lever's dedicated ester-anion-word
+  primitive (it is owned by the v33 charged-lever's dedicated ester-anion-word
   mechanism, a different, specialized producer this module does not invoke).
 * Nitro (``C-N(+)(=O)[O-]``, P-59 internal charge) is spelled directly as a
   dedicated, charge-and-bond-order-VALIDATED leaf shortcut (``_nitro_shortcut``)
@@ -112,7 +112,7 @@ charge VOIDS the whole call, never mis-names):
   EVERY genuine ionic-centre atom index was actually resolved by some level's
   suffix, not merely trusted to be, before returning a name.
 
-Fix round 1 (task-review + adversarial, both on ``dc96929f`` -- see
+Fix round 1 (task-review + REVIEW adversarial, both on ``dc96929f`` -- see
 ``.superpowers/sdd/2026-08-21-no-abstain-universal-namer/
 task-B2b-fixround1-findings.md``): the four bullets above governed only the
 GENUINE ionic centres ``get_ion_sites`` reports. But ``get_ion_sites``
@@ -145,7 +145,7 @@ Gating: the constitution producers here are pure, but ``_resolve_floor_stereo``
 ``validation.reconstruct.verify_or_none`` (full-InChIKey round-trip, fail-closed)
 and returns the stereo-blind ``plain`` name when none round-trips — so a wrong or
 unparseable stereo descriptor (incl. the offered relative ``cis``/``trans``)
-degrades to abstain, never ships. (: was previously worded "PURE PRODUCER,
+degrades to abstain, never ships. (M2: was previously worded "PURE PRODUCER,
 never calls verify_or_none" — that was true before the stereo floor gained rungs
 1/1b/1c.)
 """
@@ -508,7 +508,7 @@ def _name_universal_substitutive_unsafe(
             return None  # unspellable internal charge -> void, never mis-name
 
     # Phase E: certify the atom->token partition through the SAME shared E1
-    # core that certifies coverage elsewhere: extend, don't
+    # core that certifies coverage elsewhere (invariant 12: extend, don't
     # duplicate), REPLACING the hand-rolled two-sided ``covers != heavy or
     # total_bound != len(heavy)`` self-check that lived here. That self-check
     # re-derived E1's P1 atom-partition -- GAP via ``covers != heavy``,
@@ -533,7 +533,7 @@ def _name_universal_substitutive_unsafe(
 
     covers = frozenset(a for _tok, ids in comp.bindings for a in ids)
 
-    # Track A -- STEREO: ``comp`` above is constitution-complete but its
+    # v35 Track A -- STEREO: ``comp`` above is constitution-complete but its
     # ``name`` is stereo-blind (it was built with ``emit_branch_stereo`` off so
     # the E1/charge partition asserts run on the canonical constitution, never
     # a stereo-decorated token). ``_resolve_floor_stereo`` now runs the
@@ -547,7 +547,7 @@ def _name_universal_substitutive_unsafe(
 
 def _resolve_floor_stereo(ctx: "_Ctx", mol, heavy: FrozenSet[int],
                           comp: "_ComponentResult", atom_work_budget: int) -> str:
-    """pick the most stereo-complete floor name that FULL-InChIKey
+    """v35 Track A: pick the most stereo-complete floor name that FULL-InChIKey
     verifies, degrading gracefully. Returns the name string to ship.
 
     Cascade (WS-STEREO extended from top-spine-only to branch-recursive):
@@ -577,7 +577,7 @@ def _resolve_floor_stereo(ctx: "_Ctx", mol, heavy: FrozenSet[int],
     plain = comp.name
     # Achiral fast path: no defined stereocentre or stereo bond means every
     # cascade rung would equal ``plain``, so skip the second tree build AND the
-    # OPSIN verifies entirely -- keeping the achiral cost identical to pre-
+    # OPSIN verifies entirely -- keeping the achiral cost identical to pre-v35
     # (``assign_stereochemistry`` already ran in ``_build_ctx``, so the tags are
     # set). This is the common case and must not pay the branch-stereo cost.
     m = ctx.mol
@@ -638,7 +638,7 @@ def _resolve_floor_stereo(ctx: "_Ctx", mol, heavy: FrozenSet[int],
         # When the two stereocentres sit in DIFFERENT rings of a fused/spiro spine,
         # a leading cis-/trans- denotes ring-FUSION stereo, not the substituent
         # relation, so it must not be offered there -- guard on same-ring
-        # membership (review #6). The offer full-InChIKey gate would still
+        # membership (REVIEW review #6). The offer full-InChIKey gate would still
         # veto a wrong sense, but a coincidental match could ship an ill-defined
         # name; this keeps the descriptor semantically correct by construction.
         same_ring = (len(ring_stereo_centres) == 2
@@ -649,7 +649,7 @@ def _resolve_floor_stereo(ctx: "_Ctx", mol, heavy: FrozenSet[int],
                 rel_name = rel + comp_full.name
                 if rel_name not in candidates:
                     candidates.append(rel_name)
-    # rung 1c: RING relative-stereo for a ring the spine carries as a
+    # rung 1c (M2.3): RING relative-stereo for a ring the spine carries as a
     # SUBSTITUENT (not the top spine, which rung 1b owns). The floor renders a
     # ring substituent's stereo through ``_stereo_prefix`` (line ~1081), which
     # emits the ring's ABSOLUTE pseudoasymmetric block (``(1s,3R)-``) INSIDE the
@@ -870,7 +870,7 @@ def _build_ctx(
     # 4 in this function's docstring -- never a silent, charge-blind name.
     if any(a.GetIsotope() for a in work.GetAtoms()):
         return None
-    # A2 (C2): the blanket "ANY radical electron -> void" guard used to
+    # v36 A2 (C2): the blanket "ANY radical electron -> void" guard used to
     # live here unconditionally, so a radical the dedicated
     # radicals.py/route_charged path DECLINES (e.g. it names a chain-hydride
     # -yl/-ylidene/-ylidyne primitive that itself falls through to a broken
@@ -995,7 +995,7 @@ def _name_universal_substituent_prefix_unsafe(
         return None
 
     # Phase E: certify the branch's atom->token partition through the SAME
-    # shared E1 core, scoped to ``frag`` (the branch's own
+    # shared E1 core (invariant 12), scoped to ``frag`` (the branch's own
     # heavy-atom set) via ``atoms=frag`` -- the analogue of the whole-molecule
     # certification in ``_name_universal_substitutive_unsafe``, REPLACING the
     # hand-rolled two-sided ``covers != frag or total_bound != len(frag)``
@@ -1043,7 +1043,7 @@ def _name_component(
     module docstring); the work budget is charged here, once per call, by
     component size, and fails closed on exhaustion.
 
-    - ``emit_branch_stereo``: when True, EVERY recursion level
+    v35 Track A -- ``emit_branch_stereo``: when True, EVERY recursion level
     prepends its OWN spine's stereodescriptor block (``(2R)-``/``(1E)-`` ...)
     to each branch it renders as a substituent, so a stereocentre buried in a
     branch is expressed with the branch's own internal locants (the SAME
@@ -1054,7 +1054,7 @@ def _name_component(
     ``_resolve_floor_stereo``). The flag is threaded unchanged into the
     recursive call so it reaches every depth.
 
-    .3 -- ``relative_ring_override``: an optional ``{frozenset(ring_atoms)
+    M2.3 -- ``relative_ring_override``: an optional ``{frozenset(ring_atoms)
     -> 'cis'|'trans'}`` map (only meaningful with ``emit_branch_stereo=True``).
     When a branch rendered as a substituent IS one of those rings (its spine's
     atom set equals a key), its branch-stereo prefix is the relative
@@ -1094,7 +1094,7 @@ def _name_component(
                 internal_atoms=internal_atoms,
             )
 
-        # WS7: a lone charged TERMINAL atom -- the bare
+        # WS7 (v34 composed-charge): a lone charged TERMINAL atom -- the bare
         # ``[O-]``/``[S-]`` an FG anion (carboxylate/sulfonate/phosphonate/
         # alkoxide/thiolate) decomposes to once its ``=O`` is threaded into the
         # skeleton, or a terminal ``-NH3(+)`` -- is rendered with its CHARGED
@@ -1192,7 +1192,7 @@ def _name_component(
         if sub is None:
             return None  # never ship a partial name: whole call voids
         rendered = _render_as_substituent(sub, order)
-        # Track A: prepend THIS branch's own spine stereo. ``sub.spine_
+        # v35 Track A: prepend THIS branch's own spine stereo. ``sub.spine_
         # atom_to_locant`` numbers the branch's own atoms (None for a leaf
         # shortcut -> no block); deeper sub-branch stereo is already baked into
         # ``sub.name`` by the recursion above. ``alpha_sort_key`` strips the
@@ -1200,7 +1200,7 @@ def _name_component(
         # and ``format_substituent_prefix`` supplies the enclosing marks the
         # now-complex prefix needs (``4-[(3R)-3-hydroxy...yl]``).
         if emit_branch_stereo and sub.spine_atom_to_locant:
-            # if THIS branch is an override ring (its spine's atom set
+            # M2.3: if THIS branch is an override ring (its spine's atom set
             # is a key), spell the relative ``cis-``/``trans-`` word in place of
             # the absolute pseudoasymmetric block ``_stereo_prefix`` would emit.
             rel = None
@@ -1301,7 +1301,7 @@ def _resolve_spine_charge(
     if not touches:
         return False, None, frozenset()
 
-    # WS7: ``parent_only=True`` -- this producer resolves charge PER SPINE
+    # WS7 (v34): ``parent_only=True`` -- this producer resolves charge PER SPINE
     # and expresses off-spine charges of the OTHER sign elsewhere (a terminal
     # ``[O-]``/``[NH3+]`` via ``_charged_leaf_shortcut``), so a SKELETAL cation
     # (or anion) on this spine gets its ``-ium``/``-ide`` suffix even in a
@@ -1420,7 +1420,7 @@ def _tree_neighbors(ctx: _Ctx, atom: int, component: FrozenSet[int]) -> List[int
     "aza" carries no trace of (see module docstring's charge-scope
     paragraph).
 
-    WS7: likewise NOT a singly-charged TERMINAL atom (a
+    WS7 (v34 composed-charge): likewise NOT a singly-charged TERMINAL atom (a
     degree-1 ``[O-]``/``[S-]``/``[NH3+]`` etc.). Such an atom is always resolved
     as a branch via ``_charged_leaf_shortcut`` (``oxido``/``sulfido``/
     ``azaniumyl``), which carries its charge -- threading it into the chain
@@ -1551,7 +1551,7 @@ def _locant_sort_key(loc) -> Tuple[int, int, str]:
     ``(prime_rank, number)`` form collided ``8a`` with ``8'`` (both rank 1) and
     raised ``ValueError`` on ``("8a", "'")`` (``int("8a")``) -- a wrong
     substituent citation order the full-InChIKey offer gate cannot see, plus a
-    crash that fell through to abstain (review #17).
+    crash that fell through to abstain (REVIEW review #17).
     """
     def _split(base: str) -> Tuple[int, str]:
         # split a bare position string ("8" / "8a" / "12b") into (number, letter)
@@ -2279,7 +2279,7 @@ def _leaf_shortcut(mol, component: FrozenSet[int], attach_hint: int):
     return None
 
 
-# WS7: charged terminal-atom substituent prefixes
+# WS7 (v34 composed-charge): charged terminal-atom substituent prefixes
 # (P-72 anionic / P-73 cationic substituent prefixes). In THIS module's
 # skeletal-replacement construction the carbonyl/sulfonyl/phosphoryl ``=O`` of a
 # carboxylate/sulfonate/phosphonate is THREADED INTO the parent skeleton (as an

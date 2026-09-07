@@ -27,7 +27,7 @@ from rdkit import Chem
 from ..assembly.naming_utils import SIMPLE_MULTIPLIERS
 from ..data.chain_names import get_chain_prefix
 
-# Phase 6: shared P-21.2.4 / P-31.1.4.2 λ-convention. A non-standard-valence
+# Phase 6 (v23): shared P-21.2.4 / P-31.1.4.2 λ-convention. A non-standard-valence
 # embedded chain heteroatom cites its bonding number after the locant
 # (``...lambda<n>...``); standard valences emit the bare locant (byte-identical).
 from .lambda_convention import format_lambda_token, nonstandard_bonding_number
@@ -73,7 +73,7 @@ _ALLOWED_HETERO_TERMINATORS = {'P', 'As', 'Sb', 'Bi',
 def _qualifies_for_pin_skeletal_replacement(
     backbone: List[int], mol,
 ) -> Tuple[bool, str]:
-    """Phase 154.A: lock PIN trigger to strict IUPAC P-15.4.1.2.
+    """Phase 154.A D-03: lock PIN trigger to strict IUPAC P-15.4.1.2.
 
     Three accept branches per IUPAC Blue Book P-15.4.1.2:
       (a) >= 4 same-kind embedded heteroatoms in the chain backbone
@@ -104,7 +104,7 @@ def _qualifies_for_pin_skeletal_replacement(
             {"no-heteroatoms", "single-hetero-short-chain"}.
 
     Source: IUPAC Blue Book 2013 P-15.4.1.2.
-    Source: 154-CONTEXT.md; 154-AUDIT-A.md gap inventory; 154-RESEARCH.md §3.2.
+    Source: 154-CONTEXT.md D-03; 154-AUDIT-A.md gap inventory; 154-RESEARCH.md §3.2.
     """
     from collections import Counter
     embedded = []
@@ -539,7 +539,7 @@ def try_skeletal_replacement_name(mol: Chem.Mol) -> Optional[str]:
     # characteristic groups (P-59 / P-65.5 / P-61), NOT chain skeletal atoms —
     # skeletal replacement must not walk them into an aza/oxa chain (e.g.
     # CN=[N+]=[N-] -> wrong '2,3-diazabutane'; should be 'azidomethane' via the
-    # substitutive azido prefix). This is the STRUCTURAL gate (CONTEXT):
+    # substitutive azido prefix). This is the STRUCTURAL gate (CONTEXT D-04):
     # derived from perception's own FG matches, NOT an extension of the per-FG
     # _PRIORITY_FG_SMARTS blocklist above.
     # ----------------------------------------------------------------
@@ -733,7 +733,7 @@ def try_skeletal_replacement_name(mol: Chem.Mol) -> Optional[str]:
             return None
 
     # ----------------------------------------------------------------
-    # Gate 5 (Phase 154.A): strict IUPAC P-15.4.1.2 PIN trigger.
+    # Gate 5 (Phase 154.A D-03): strict IUPAC P-15.4.1.2 PIN trigger.
     # Replaces the legacy single-hetero chain-len < 6 reject with explicit
     # branch labels. Rationale string is for debug logging + 154-AUDIT-A.md
     # evidence trail.
@@ -878,17 +878,17 @@ def _detect_terminal_oh(mol: Chem.Mol) -> Optional[Dict]:
     return None
 
 
-# Phase 154.A: terminal -amine / -thiol support DEFERRED to v19.
+# Phase 154.A D-05: terminal -amine / -thiol support DEFERRED to v19.
 # 154-AUDIT-A.md §4 corpus tally:
 #   acyclic-terminal-amine candidates: 275 mined, 2 eligible (no priority FG)
 #   acyclic-terminal-thiol candidates: 25 mined, 0 eligible (no priority FG)
-# Threshold per CONTEXT is 5 corpus compounds per FG; both below
+# Threshold per CONTEXT D-05 is 5 corpus compounds per FG; both below
 # threshold => v19 follow-ups IM-154-D05-amine / IM-154-D05-thiol.
 # Effective true-positive count is 0 cpd benefit because the 2 amine
 # candidates also carry phosphate priority FGs that gate-2 already rejects;
 # extending gate-3 with `_detect_terminal_amine` / `_detect_terminal_thiol`
 # does not unblock any v18 RT failures.
-# Source: 154-CONTEXT.md; 154-AUDIT-A.md §4.
+# Source: 154-CONTEXT.md D-05; 154-AUDIT-A.md §4.
 
 
 def _has_terminal_functional_group(
@@ -954,7 +954,7 @@ def _dichalcogen_bond_set(mol: Chem.Mol) -> set:
     A bond qualifies when BOTH endpoints are divalent chalcogens (O/S/Se/Te,
     no double/triple/aromatic bond, neutral, the ``-X-`` ether-oxidation state)
     joined by a single bond. This is a STRUCTURAL graph property derived from
-    the molecule itself (CONTEXT pattern), NOT a per-FG SMARTS blocklist —
+    the molecule itself (CONTEXT D-04 pattern), NOT a per-FG SMARTS blocklist —
     so it precisely forbids only the O-O/S-S traversal (leaving an unrelated
     C-O-C ether elsewhere in the chain walkable) and uniformly covers the Se/Te
     analogues and the terminal ``-SSH``/``-OOH`` cases that the carbon-flanked
@@ -1610,11 +1610,10 @@ def _try_cyclic_replacement_name(mol: Chem.Mol, ring_info) -> Optional[str]:
 
             hetero_locant_set = sorted(pos[0] for pos in positions)
 
-            # P-22.2.3 (mirrors P-15.4.3.2.1): on a positional tie, low
-            # locants go to the element cited first in the seniority order
-            # (O before N — 1,4,10,13-tetraoxa-7,16-diazacyclooctadecane,
-            # NOT 1,10-diaza-...). Key = per-element locant lists in
-            # seniority order, compared lexicographically.
+            # Per-element locant lists, in 'a'-prefix seniority order, compared
+            # lexicographically — the "then, if necessary, according to the
+            # order of seniority" criterion of P-22.2.3.2.3 (O before N in
+            # 1,4,10,13-tetraoxa-7,16-diazacyclooctadecane, NOT 1,10-diaza-...).
             by_element: Dict[str, List[int]] = defaultdict(list)
             for loc, sym in positions:
                 by_element[sym].append(loc)
@@ -1623,6 +1622,23 @@ def _try_cyclic_replacement_name(mol: Chem.Mol, ring_info) -> Optional[str]:
                 for sym in sorted(by_element,
                                   key=lambda s: _A_CITATION_INDEX.get(s, 99))
             ]
+
+            # P-22.2.3.2.3 (section P-22.2.3 "Heteromonocyclic hydrides named by
+            # skeletal replacement ('a') nomenclature", subsection P-22.2.3.2
+            # "Numbering"): "the locant '1' is given to the heteroatom first
+            # cited in the order of seniority ... The direction of numbering is
+            # then chosen to give lower locants to the heteroatoms as a set ...
+            # and then, if necessary, according to the order of seniority."
+            # So locant '1' to the MOST-SENIOR heteroatom present is the PRIMARY
+            # criterion (senior to low-locants-as-a-set). This is the RING rule;
+            # the low-locants-as-a-set-first rule is the CHAIN rule P-15.4.3.2.1
+            # and must NOT be applied here. Encoded as: minimise the lowest
+            # locant borne by the most-senior heteroatom present, so the winner
+            # necessarily carries that atom at locant 1.
+            senior_element = min(
+                by_element, key=lambda s: _A_CITATION_INDEX.get(s, 99)
+            )
+            senior_first_locant = min(by_element[senior_element])
 
             # Compute double bond locants for tiebreaker
             db_locants = []
@@ -1636,9 +1652,15 @@ def _try_cyclic_replacement_name(mol: Chem.Mol, ring_info) -> Optional[str]:
                         db_locants.append(i + 1)
                 db_locants.sort()
 
-            # Comparison key: heteroatom locant set, then element seniority,
-            # then DB locants
-            comparison_key = (hetero_locant_set, seniority_key, db_locants)
+            # P-22.2.3.2.3 numbering order: (1) locant '1' to the senior
+            # heteroatom; (2) low locants to the heteroatoms as a set; (3)
+            # seniority of the 'a' prefixes; then (4) low locants to the
+            # unsaturated sites ("Low locants are assigned first to the
+            # heteroatoms and then to unsaturated sites").
+            comparison_key = (
+                senior_first_locant, hetero_locant_set, seniority_key,
+                db_locants,
+            )
 
             if best_key is None or comparison_key < best_key:
                 best_key = comparison_key

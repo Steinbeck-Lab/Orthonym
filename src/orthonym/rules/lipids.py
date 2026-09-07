@@ -2,9 +2,9 @@
 
 Consumes the structured ``BackboneMatch`` from ``perception.lipids.detect_lipid_backbone``
 and builds the fully systematic substitutive / functional-class (Form B) name — the
-empirically OPSIN-round-trip-verified target form (180-CONTEXT.md). Every gate
+empirically OPSIN-round-trip-verified target form (180-CONTEXT.md D-01). Every gate
 failure returns ``None`` so the molecule cascade-continues to the general pipeline
-(/, fail-safe → zero non-lipid regression).
+(D-06/D-11, fail-safe → zero non-lipid regression).
 
 Acyl groups are named by the robust acid-fragment-reuse strategy: isolate the fatty
 acid, name it with the proven acid pipeline (systematic + E/Z), then convert
@@ -209,7 +209,7 @@ def _assemble_glyceride(mol, match, style) -> Optional[str]:
 
     # --- stereo: backbone C-2 R/S (acyl-chain E/Z already inside the acylate strings;
     # sugar stereo inside 'beta-D-...'). Build the descriptor directly from the
-    # authoritative {central: 2} locant map and prepend it; the coarse
+    # authoritative {central: 2} locant map (D-09) and prepend it; the coarse
     # needs_stereo_injection gate is bypassed because the backbone descriptor is
     # absent from the assembled name even when sugar/acyl descriptors are present. ---
     descriptors = collect_stereodescriptors(mol, {central: 2}, include_near_parent_ez=False)
@@ -222,7 +222,7 @@ def _alpha_key(acylate: str) -> str:
     """Alphabetization key (P-14.5): strip enclosing marks, locants, and the
     non-alphabetising stereo/config noise.
 
-    route the descriptor strip through the SHARED ``strip_alphanumerical_noise``
+    v43: route the descriptor strip through the SHARED ``strip_alphanumerical_noise``
     primitive, which removes the Greek α/β/ξ stereodescriptors and the D/L
     configuration that the old bare regex kept — so a sugar substituent
     alphabetises by its stem regardless of its descriptor SPELLING. The old form
@@ -247,7 +247,7 @@ _HEAD_GROUP_ALKOXY = {
 def _build_glycerol_prefixes(num, oh_atoms, glyco_atoms, atom_site, phospho_atoms=()) -> Optional[str]:
     """Build the detachable-prefix string (hydroxy / glycosyloxy / phosphoryloxy)
     preceding the attachment. Returns None if a phospho head group is unrecognized
-    in the substitutive (neutral) regime (honest-gate,)."""
+    in the substitutive (neutral) regime (honest-gate, D-11)."""
     subs = []  # (alpha_key, rendered)
     if oh_atoms:
         locs = sorted(num[a] for a in oh_atoms)
@@ -372,7 +372,7 @@ def _assemble_phospholipid(mol, match, style) -> Optional[str]:
     # "phosphate" yields the anionic/zwitterion form (matches PC, not neutral PE).
     head_alkyl = _HEAD_GROUP_ALKYL.get(head_desc)
     if head_alkyl is None:
-        # a FREE phosphatidic acid (no head group beyond the
+        # v23 Phase 14: a FREE phosphatidic acid (no head group beyond the
         # phosphate) is named as the functional-class phosphate monoester
         # '<2,3-bis(acyloxy)propyl> dihydrogen phosphate' (P-107.3.1). The
         # detector tags the bare -OPO(OH)2 site head_desc='phosphate'.
@@ -381,7 +381,7 @@ def _assemble_phospholipid(mol, match, style) -> Optional[str]:
             if glyceryl is None:
                 return None
             return f"{glyceryl} dihydrogen phosphate"
-        # SL: a neutral organic head (serine -> phosphatidylserine, P-107.3.3)
+        # v23 SL: a neutral organic head (serine -> phosphatidylserine, P-107.3.3)
         # named FROM STRUCTURE via the structure-loss-free substituent namer ->
         # functional-class hydrogen-phosphate diester '<glyceryl> <head> hydrogen
         # phosphate'. inositol (stereo-entangled ring head), ethanolamine/glycerol

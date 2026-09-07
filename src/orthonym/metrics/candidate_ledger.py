@@ -1,15 +1,15 @@
-"""Append-only candidate ledger.
+"""Append-only candidate ledger (v30 PE-1, the ``audit`` instrument's recorder).
 
 Every oracle this project owns answers *"does the EMITTED name denote the right
 molecule?"* — round-trip, SELF-01, E1, ``bb_conformance``. None answers **"was a
 correct name ever BUILT, and if so what threw it away?"**, which is the question
-that defeated task 5 and PA-1: three correct fixes moved dev500 by ~0
+that defeated v30 PB task 5 and PA-1: three correct fixes moved dev500 by ~0
 because hand-picked target lists kept landing off the mass.
 
 This module is that missing recorder. It is deliberately modelled on
 ``metrics/abstention.py`` — thread-local, side-effect-only, every recording call
 wrapped so telemetry can never raise into naming — with three deliberate
-differences, each forced by a measurement (
+differences, each forced by a measurement (``.planning/v30/PE1-audit-instrument-plan.md``
 §1):
 
 * **Append-only, not first-writer-wins.** ``abstention.py`` keeps one code per

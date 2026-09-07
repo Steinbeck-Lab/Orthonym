@@ -1,4 +1,4 @@
-"""P-66.5.4.1/2 neutral nitrile-oxide functional-class suffix handler (W2F p4).
+"""P-66.5.4.1/2 neutral nitrile-chalcogenide functional-class suffix handler (W2F p4).
 
 A neutral nitrile oxide ``R-C#[N+]-[O-]`` is named by functional-class method (1)
 of P-66.5.4.1 — the separate word ``oxide`` appended to the nitrile name
@@ -6,6 +6,11 @@ of P-66.5.4.1 — the separate word ``oxide`` appended to the nitrile name
 oxide`` BB:34883), which IS the preferred IUPAC name. Nitrile oxides are "classed
 with zwitterions in the order of compound classes" (P-66.5.4.1), so they are senior
 to acids/esters — a co-present ester/acid demotes to a prefix.
+
+The heavier chalcogen analogues ``R-C#[N+]-[S-]`` / ``[Se-]`` / ``[Te-]`` are named
+the same way (P-74.2.2.2.1.2), substituting the chalcogen word for ``oxide``:
+``acetonitrile sulfide`` / ``acetonitrile selenide`` / ``acetonitrile telluride``.
+Only the appended word changes; the nitrile parent is derived identically.
 
 Fires ONLY for a NEUTRAL molecule (net formal charge 0). The deprotonated
 salt/anion uses the ``(oxo-λ5-azanylidyne)methyl`` PREFIX path
@@ -25,7 +30,7 @@ compound prefix (P-16.3.3, a general substituent-rendering feature).
 
 Registered in inner_dispatch at priority 975 (specialty-intercept tier, before the
 acid/ester handlers so the senior nitrile oxide wins) — predicate-pure +
-direct-return + ``pool.add`` + ``_inject_stereo_if_missing`` (side_effect
+direct-return + ``pool.add`` + ``_inject_stereo_if_missing`` (D-25 side_effect
 inventory ()).
 """
 from __future__ import annotations
@@ -36,15 +41,19 @@ from rdkit import Chem
 
 from ..name_tree import NameTreeNode, NamingResult
 
-# R-C#[N+]-[O-] (the N-O bond is dative/single in the RDKit input); [C;+0] excludes
-# the deprotonated carbanion form so only the NEUTRAL zwitterion matches.
-_NITRILE_OXIDE_SMARTS = Chem.MolFromSmarts('[C;+0]#[N+]-[O-]')
+# R-C#[N+]-[X-], X in {O,S,Se,Te} (the N-X bond is dative/single in the RDKit
+# input); [C;+0] excludes the deprotonated carbanion form so only the NEUTRAL
+# zwitterion matches.
+_NITRILE_CHALCOGENIDE_SMARTS = Chem.MolFromSmarts('[C;+0]#[N+]-[O,S,Se,Te;-]')
+
+# Chalcogen atomic number -> the functional-class word (P-66.5.4.1 / P-74.2.2.2.1.2).
+_CHALCOGEN_WORD = {8: "oxide", 16: "sulfide", 34: "selenide", 52: "telluride"}
 
 
 def _nitrile_oxide_matches(mol: Any):
-    if mol is None or _NITRILE_OXIDE_SMARTS is None:
+    if mol is None or _NITRILE_CHALCOGENIDE_SMARTS is None:
         return ()
-    return mol.GetSubstructMatches(_NITRILE_OXIDE_SMARTS)
+    return mol.GetSubstructMatches(_NITRILE_CHALCOGENIDE_SMARTS)
 
 
 def _nitrile_ring_is_aromatic(mol: Any, nitrile_c_idx: int) -> bool:
@@ -57,7 +66,7 @@ def _nitrile_ring_is_aromatic(mol: Any, nitrile_c_idx: int) -> bool:
 
 
 def _is_nitrile_oxide(features: Any) -> bool:
-    """Predicate (pure, read-only): a NEUTRAL single-fragment molecule bearing
+    """Predicate (D-07 pure, read-only): a NEUTRAL single-fragment molecule bearing
     EXACTLY ONE ``R-C#[N+]-[O-]`` nitrile-oxide group.
 
     Neutral-only (net charge 0) excludes the anion/salt (prefix path owns it).
@@ -90,6 +99,13 @@ def name_nitrile_oxide(
     if len(matches) != 1:
         return None
     c_idx, n_idx, o_idx = matches[0][0], matches[0][1], matches[0][2]
+
+    # The functional-class word tracks the chalcogen (O->oxide, S->sulfide,
+    # Se->selenide, Te->telluride). Everything else (parent nitrile derivation) is
+    # chalcogen-independent — only this word changes.
+    chalc_word = _CHALCOGEN_WORD.get(mol.GetAtomWithIdx(o_idx).GetAtomicNum())
+    if chalc_word is None:
+        return None
 
     c_atom = mol.GetAtomWithIdx(c_idx)
     heavy_nbrs = [nb.GetIdx() for nb in c_atom.GetNeighbors() if nb.GetIdx() != n_idx]
@@ -131,7 +147,7 @@ def name_nitrile_oxide(
             # ring path (the '4-(methoxycarbonyl)benzonitrile oxide' follow-on).
             return None
 
-    name = f"{nitrile_name} oxide"
+    name = f"{nitrile_name} {chalc_word}"
     pool = get_current_pool()
     cand = pool.add(name, "nitrile_oxide", features)
     if cand is None:

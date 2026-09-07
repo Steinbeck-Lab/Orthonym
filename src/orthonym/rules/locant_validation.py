@@ -210,7 +210,7 @@ def _is_valid_locant(locant: Any, parent_size: int) -> bool:
             return 0 < base_num <= parent_size
         return False
 
-    # a PRIMED multi-component locant (n, "'"/"''") — the 2nd component
+    # v36-A2: a PRIMED multi-component locant (n, "'"/"''") — the 2nd component
     # of a spiro/fused name (e.g. (11, "'") for the tricyclo side of
     # spiro[oxolane-2,12'-tricyclo…]). It is numbered by its OWN component's
     # namer, so it must NOT be range-checked against parent_size, which reflects

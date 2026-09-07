@@ -5,20 +5,20 @@ This module provides RDKit-graph-based detection of metal-organometallic
 complexes per IUPAC 2013 Blue Book §P-69 + IUPAC Red Book §IR-10 + Salzer
 1999 IUPAC Recommendations.
 
-All functions are PREDICATE-PURE per CONTEXT + Phase 158 + Phase
-160 hard invariant:
+All functions are PREDICATE-PURE per CONTEXT D-12 + Phase 158 D-26 + Phase
+160 D-25 hard invariant:
 - NO mol mutation (no SanitizeMol, no UpdatePropertyCache, no
   AssignStereochemistry, no any other RDKit mutating method).
 - NO module-global state read/write.
 - NO exception swallowing (RDKit exceptions propagate; ValueError raised
-  by compute_hapticity is caught at the handler layer per CONTEXT).
+  by compute_hapticity is caught at the handler layer per CONTEXT D-12).
 
 The integrity test ``test_side_effect_inventory_is_empty`` parametrized
 over ``list(StoutClass)`` at ``tests/unit/routing/test_dispatch_table.py``
 will auto-extend to ORGANOMETALLIC after Plan-02 ships and assert ``()``
 for the new entry.
 
-Phase 161.
+Phase 161 (v19 first scope-expansion phase per ADR-19-07).
 """
 
 from __future__ import annotations
@@ -142,7 +142,7 @@ def detect_metal_complex(mol: "Chem.Mol") -> Optional[MetalComplex]:
     single-component main-group), Tier-2 (dot-separated metal carbonyls),
     and Tier-4 (mixed η-bonded / half-sandwich) topology branches.
 
-    PURE per CONTEXT: no mol mutation; only reads via GetAtoms /
+    PURE per CONTEXT D-12: no mol mutation; only reads via GetAtoms /
     GetBonds / GetSymbol / GetFormalCharge / GetBondType / GetIsAromatic /
     GetOtherAtomIdx / GetBondTypeAsDouble / GetAtomWithIdx / GetMolFrags.
     NEVER: SanitizeMol, UpdatePropertyCache, AssignStereochemistry.
@@ -317,7 +317,7 @@ def _build_sigma_ligand_groups(mol: "Chem.Mol",
     _HALIDE_SMARTS_KEYS so the rules layer can dispatch Grignard vs alkyl.
 
     Returns None if the topology doesn't match σ-bonded (e.g., aromatic
-    π-bonded ligand attached to metal). Pure per CONTEXT.
+    π-bonded ligand attached to metal). Pure per CONTEXT D-12.
     """
     metal_atom = mol.GetAtomWithIdx(metal_idx)
     sigma_groups: List[LigandGroup] = []
@@ -577,14 +577,14 @@ def compute_hapticity(mol: "Chem.Mol", metal_atom_idx: int,
                       ligand_atom_indices: Tuple[int, ...]) -> int:
     """Compute the hapticity of a ligand group bound to a metal.
 
-    Plan-03 implementation per CONTEXT hybrid:
+    Plan-03 implementation per CONTEXT D-05 hybrid:
     1. SMARTS-template fast path: consult LIGAND_ETA_DEFAULTS from
        data/organometallics.py; on hit, return catalog value.
     2. Graph-walk fallback (added in 03-04 Tier-4 commit): BFS over
        ligand_atom_indices counting contiguous π-system atoms.
     3. Edge case σ-bonded (single atom or no π-system): return 1.
 
-    PURE per CONTEXT.
+    PURE per CONTEXT D-12.
     """
     # Lazy import to avoid circular dependency
     from ..data.organometallics import LIGAND_ETA_DEFAULTS
@@ -596,7 +596,7 @@ def compute_hapticity(mol: "Chem.Mol", metal_atom_idx: int,
     if len(ligand_atom_indices) == 1:
         return 1
 
-    # Build the ligand subgraph as a separate mol (PURE per: submol only)
+    # Build the ligand subgraph as a separate mol (PURE per D-12: submol only)
     submol = Chem.RWMol()
     atom_map: dict = {}
     for idx in ligand_atom_indices:
@@ -648,7 +648,7 @@ _TRUE_METAL_SYMBOLS_FOR_VETO: FrozenSet[str] = METAL_ELEMENT_SYMBOLS - frozenset
 })
 
 
-# (levers 1b/1d): alkali + alkaline-earth (Groups 1-2). A net-0 salt or a
+# v43 P1 (levers 1b/1d): alkali + alkaline-earth (Groups 1-2). A net-0 salt or a
 # net-charged assembly of one of these with an organic ion is IN scope (P-12 binary
 # salt / P-14.8 adduct). Any OTHER true metal is out of scope by default (P-69), and
 # any true metal co-present with a carbanion/hydride is P-69 organometallic.
@@ -660,7 +660,7 @@ _ALKALI_ALKALINE_EARTH: FrozenSet[str] = frozenset({
 
 def assembly_has_out_of_scope_metal(mol: "Chem.Mol") -> bool:
     """True if a multi-fragment ionic assembly contains a P-69 out-of-scope true
-    metal, so the:
+    metal, so the v43 P1 best-effort ion/adduct widening must NOT fire (0-wrong:
     never render a coordination complex / organometallic as a salt or adduct).
 
     OUT ⇔ (i) any true metal (``_TRUE_METAL_SYMBOLS_FOR_VETO``) that is NOT
@@ -710,7 +710,7 @@ def has_covalent_metal_carbon_bond(mol: "Chem.Mol") -> bool:
     decomposed sub-fragment that drops the metal (the `C[Ti](Cl)(Cl)Cl` ->
     'methane' / `Cl[Pt]1(Cl)...` -> '...ole' leaks).
 
-    PURE per CONTEXT: read-only GetBonds/GetBeginAtom/GetEndAtom/
+    PURE per CONTEXT D-12: read-only GetBonds/GetBeginAtom/GetEndAtom/
     GetSymbol; no mol mutation.
     """
     if mol is None:
@@ -726,7 +726,7 @@ def has_covalent_metal_carbon_bond(mol: "Chem.Mol") -> bool:
 
 
 def has_metal_coordination_bond(mol: "Chem.Mol") -> bool:
-    """(ChEBI 3-way, 2026-08-28): True iff a TRUE metal atom (the SAME
+    """v38 (ChEBI 3-way, 2026-08-28): True iff a TRUE metal atom (the SAME
     ``_TRUE_METAL_SYMBOLS_FOR_VETO`` set as ``has_covalent_metal_carbon_bond``)
     is an endpoint of a DATIVE (coordination) bond -- a P-69 coordination
     compound whose metal binds via O/N/P dative bonds rather than a covalent
@@ -781,7 +781,7 @@ def detect_metallacycle(mol: "Chem.Mol") -> Optional["MetallacycleInfo"]:
     (``_GROUP_14_13_RING_DEFER``) — that set (Si/Ge/Sn/Pb/B) is disjoint from
     ``METALLACYCLE_A_PREFIX`` (Group 2-12) by construction.
 
-    PURE per CONTEXT: read-only RingInfo/GetAtoms/GetBonds/GetNeighbors;
+    PURE per CONTEXT D-12: read-only RingInfo/GetAtoms/GetBonds/GetNeighbors;
     no mol mutation.
     """
     from ..data.organometallics import METALLACYCLE_A_PREFIX
@@ -837,7 +837,7 @@ def enumerate_metal_ligand_groups(mol: "Chem.Mol") -> Tuple[LigandGroup, ...]:
        contiguous ligand component.
     4. Each component → LigandGroup with hapticity from compute_hapticity.
 
-    PURE per CONTEXT. O(V+E) per metal.
+    PURE per CONTEXT D-12. O(V+E) per metal.
     """
     # Plan-03 implementation lands here per RESEARCH §3.2 + AUDIT § 5
     return ()

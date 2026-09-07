@@ -1,7 +1,7 @@
 """Phase 160 urea handler — Tier B retained-name (gate 0.40).
 
 Verbatim lift of composer.py:876-885 (inline branch) +
-composer.py:2672-2759 (_try_name_urea body). Per CONTEXT, body
+composer.py:2672-2759 (_try_name_urea body). Per CONTEXT D-24, body
 stays in composer.py until Plan-03 commit 03-10.
 
 IUPAC cite: P-66.6 (ureas; retained name with N-substitution).

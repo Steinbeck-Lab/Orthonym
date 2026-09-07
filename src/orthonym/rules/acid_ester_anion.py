@@ -4,7 +4,7 @@ The anion of an acid-ester of a P or S oxoacid, where the ester owner R is a
 plain organyl: ``dodecyl phosphate``, ``dodecyl hydrogen phosphate``,
 ``diethyl phosphate``, ``dodecyl sulfate``. The protonation word is derived IN
 PLACE from the surviving free ``-OH`` count; the ``[O-]`` carry the charge and
-are not counted as hydrogens (— never neutralize-then-rename). Fail-closed
+are not counted as hydrogens (D-04 — never neutralize-then-rename). Fail-closed
 (``None``) off the clean single-centre ester-anion shape so a wrong molecule is
 never emitted; the immediate caller (``_validate_anion_name``) only checks
 suffix sanity (an ``'oic acid'`` / ``'methylidene'`` guard) — the actual
@@ -15,7 +15,7 @@ from typing import List, Optional, Set
 
 from rdkit import Chem
 
-# The number of PROTONATED terminal acidic oxygens -> the sulfate word.
+# The number of PROTONATED terminal acidic oxygens -> the sulfate word (D-04).
 # [1] ("hydrogen sulfate", the NEUTRAL form) is currently UNREACHABLE:
 # name_sulfate_ester_anion requires anion_count >= 1, so a returned name
 # always has oh_count == 0. Kept for a Slice-A follow-up (a neutral-path
@@ -97,11 +97,11 @@ def name_sulfate_ester_anion(mol, sulfur_idx: int) -> Optional[str]:
 def name_oxime_o_sulfate_anion(mol, sulfur_idx: int) -> Optional[str]:
     """Name the anion of an oxime/thiohydroximate O-sulfate ester
     ``R2C=N-O-S(=O)(=O)-[O-]`` -> ``[({R2C}ylidene)amino] sulfate`` (the
-    glucosinolate AGLYCONE motif,; P-72.2.2.2.1.2 sulfate-ester-anion
+    glucosinolate AGLYCONE motif, v33 Phase 3; P-72.2.2.2.1.2 sulfate-ester-anion
     class whose ester owner is anchored at an oxime NITROGEN, not the usual
     ester-oxygen-to-carbon owner ``name_sulfate_ester_anion`` handles).
 
-    SPY: confirmed ``name_sulfate_ester_anion`` declines this
+    SPY (invariant 8): confirmed ``name_sulfate_ester_anion`` declines this
     shape at its OWN oxygen-classification loop (``acid_ester_anion.py``
     lines ~60-73) -- the ester oxygen's non-sulfur neighbour is an ``N``, not
     a ``C``/``S``, so it falls straight to that loop's ``else: return None``
@@ -250,7 +250,7 @@ def name_acid_ester_anion(mol) -> Optional[str]:
     poly-phosphate / multi-centre species fails closed (``None`` -> the caller
     falls through). For sulfur, ``name_sulfate_ester_anion`` (the plain
     C-anchored ester owner) is tried FIRST so its byte-identical behaviour is
-    unchanged; ``name_oxime_o_sulfate_anion`` (, the N-anchored
+    unchanged; ``name_oxime_o_sulfate_anion`` (v33 Phase 3, the N-anchored
     oxime owner -- glucosinolate-type thiohydroximate/oxime O-sulfate anions)
     is only reached when that declines. ``None`` when nothing qualifies.
     """

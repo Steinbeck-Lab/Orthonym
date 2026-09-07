@@ -1,10 +1,11 @@
 """Phase 160 guanidine handler — Tier B retained-name (gate 0.40).
 
 Verbatim lift of composer.py:892-901 (inline branch) +
-composer.py:2760-2906 (_try_name_guanidine body). Per CONTEXT,
+composer.py:2760-2906 (_try_name_guanidine body). Per CONTEXT D-24,
 body stays in composer.py until Plan-03 commit 03-10.
 
-IUPAC cite: P-66.6 (guanidines; retained name with N-substitution).
+IUPAC cite: P-66.4.1.2.1 (guanidine and its derivatives; retained name with
+N-substitution).
 
 References:
 - composer.py:892-901 (inline dispatch branch; REMOVED at this commit).
@@ -49,7 +50,7 @@ def name_guanidine(
     final_name = _inject_stereo_if_missing(features, cand.name, atom_to_locant=None)
     return NamingResult(
         name=final_name,
-        tree=NameTreeNode(parent_stem=final_name, class_id="guanidine", iupac_section_cite="P-66.4.2", fragment_legacy=final_name),
+        tree=NameTreeNode(parent_stem=final_name, class_id="guanidine", iupac_section_cite="P-66.4.1.2.1", fragment_legacy=final_name),
         atom_to_locant_hint=None,
     )
 

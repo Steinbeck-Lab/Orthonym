@@ -1,7 +1,7 @@
 """v25 G1: unified Blue Book P-44 parent-structure scorer.
 
 ONE deterministic comparator over a POOLED ring+chain candidate list,
-replacing the staged class-specific ``select_parent`` cascade (the
+replacing the staged class-specific ``select_parent`` cascade (the v25 P0
 root-cause coverage gap: staged branches + fail-open default-to-ring).
 
 Rule grounding (BlueBookV2/BlueBookV2.md, verified 2026-07-19):
@@ -192,7 +192,7 @@ def _n_multiple_bonds(mol, atom_set) -> Tuple[int, int]:
 
 
 def _locant_sort_key(v):
-    """: TOTAL, crash-proof sort key for the locant
+    """v33 Phase 0 cleanup T3: TOTAL, crash-proof sort key for the locant
     values `_candidate_locants` collects (below).
 
     The `_Locant` type contract (`locants.py`) only ever admits ``int`` or
@@ -270,7 +270,7 @@ def _candidate_locants(mol, cand: ParentCandidate, target_atoms,
     # ((4, 'a'), (2, "'")). Coerce ints to (n, '') when any tuple is
     # present so BOTH this sort AND the downstream compare_locant_sets stay
     # type-safe (same idiom as _build_ring_pos:180-184 and
-    # compare_locant_sets). #40: fused ring assembly Tier-5 non-crash.
+    # compare_locant_sets). v30 #40: fused ring assembly Tier-5 non-crash.
     locs = [pos[a] for a in targets if a in pos]
     if any(isinstance(v, tuple) for v in locs):
         locs = [(v, '') if isinstance(v, int) else v for v in locs]
@@ -477,7 +477,7 @@ def select_parent_unified(
     Pre-empts (admission/priority rules) are preserved from the staged
     implementation; everything else is ONE pooled P-44 comparator sort.
 
-    (offer-not-return,: ``_offer_rank`` selects WHICH
+    v37 SP1.3 (offer-not-return, invariant 18): ``_offer_rank`` selects WHICH
     member of the P-44-ranked pool becomes the parent. ``_offer_rank == 0`` (the
     default at every normal call site) commits to ``ranked[0]`` — byte-identical
     to the pre-SP1.3 behaviour for every molecule. A best-effort retry may pass
@@ -566,7 +566,7 @@ def select_parent_unified(
     else:
         label = "only candidate"
 
-    # SP1.3: OFFER the ranked pool. ``_offer_rank == 0`` -> ``chosen`` IS
+    # v37 SP1.3: OFFER the ranked pool. ``_offer_rank == 0`` -> ``chosen`` IS
     # ``best`` (byte-identical). A best-effort retry may force a junior member;
     # an out-of-range rank clamps to ``best`` so the offer can never fabricate a
     # parent that was not in the P-44-ranked pool.

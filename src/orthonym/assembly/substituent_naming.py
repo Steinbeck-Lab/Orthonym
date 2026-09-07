@@ -461,7 +461,7 @@ def _name_unsaturated_chain(
     if best_name is None or best_chain is None:
         return None
 
-    # Item 1: the located stereodescriptor block. This producer is the
+    # v29 P3-FIX Item 1: the located stereodescriptor block. This producer is the
     # ONLY place that holds this substituent's own numbering, so it is the only
     # place that can put a locant on a descriptor -- and P-91.2.1.2.1 makes the
     # locant mandatory. `_add_substituent_stereo` (the generic emitter the caller
@@ -751,7 +751,7 @@ def _name_branched_alkenyl_substituent(mol, sub_atoms, attach_idx):
         prefix = _format_prefix_groups(branch_groups)
         body = f"{prefix}{core}"
 
-    # Item 1: the located stereodescriptor block, from the SAME
+    # v29 P3-FIX Item 1: the located stereodescriptor block, from the SAME
     # `chain_pos` numbering the name was built with -- see `_located_stereo_block`
     # for the citations. Only CHAIN-borne elements are cited here; a stereocentre
     # inside an off-chain branch is expressed by that branch's own recursive
@@ -1174,7 +1174,7 @@ def _name_saturated_substituted_chain(
     attachment — branched backbones, other heteroatoms, rings, and secondary
     attachment keep their existing naming.
 
-    :...and anything UNSATURATED. The docstring said "saturated"
+    v29 P3-FIX Item 1: ...and anything UNSATURATED. The docstring said "saturated"
     from the start but nothing enforced it, so a fragment carrying a C=C was named
     by the alkane stem and the double bond vanished: ``-CH2-CH=CH-Cl`` came back
     ``3-chloropropyl`` (an alkane) instead of ``3-chloroprop-2-en-1-yl``, and
@@ -1266,7 +1266,7 @@ def _name_saturated_substituted_chain(
     stem = get_chain_prefix(len(backbone))
 
     # P-14.3.4.5 (``:3007``), substituent enclosing-mark scope -- MEASURED-LIVE site
-    # for ``(pentafluoroethyl)cyclohexane`` (a validated recorded this
+    # for ``(pentafluoroethyl)cyclohexane`` (a validated call-spy recorded this
     # function as the sole productive namer of that fragment, reached from
     # ``name_substituent_fragment`` Step 2c; ``_located_acyclic_alkyl_name`` is
     # never productive for it). Deny-by-default: the helper returns None unless the
@@ -1298,14 +1298,14 @@ _POLYFUNC_OXO_PREFIX = "oxo"
 _POLYFUNC_HYDROXY_PREFIX = "hydroxy"
 _POLYFUNC_AMINO_PREFIX = "amino"
 _POLYFUNC_CARBOXY_PREFIX = "carboxy"
-# (glucosinolate/thiohydroximate O-sulfate anion): the S-analogue of
+# v33 Phase 3 (glucosinolate/thiohydroximate O-sulfate anion): the S-analogue of
 # hydroxy (P-63.1.5) for a terminal -SH branch on a backbone carbon
 # ('2-sulfanylethyl', the direct parallel to '2-hydroxyethyl'). Documented as
 # declined at the point below until this fix ("other tiers own them" was
 # unverified -- SPY showed no tier names a chain+thiol branch at all, not even
 # the 2-atom case).
 _POLYFUNC_SULFANYL_PREFIX = "sulfanyl"
-# Wave 2 (#5b, P-66.5.1): the nitro group, charge-separated in the
+# v33 Phase 6 Wave 2 (#5b, P-66.5.1): the nitro group, charge-separated in the
 # graph (-N+(=O)[O-]) but net-neutral as a substituent -- consumed by the
 # dedicated Pass 1c2 below BEFORE Pass 1d's generic cation loop and Pass 2's
 # blanket charge decline can see it, so it is numbered from the free valence
@@ -1692,7 +1692,7 @@ def _name_polyfunctional_acyclic_substituent_impl(
                 consumed.add(o_single.GetIdx())
                 _add_prefix(c_nbr[0], _POLYFUNC_CARBOXY_PREFIX)
 
-    # ---- Pass 1b: a SUBSTITUTED
+    # ---- Pass 1b (v30 RISK 5 Class 2, P-16.5.1.3.1 / P-62.2.1.1): a SUBSTITUTED
     # amine -N(R)(R') on a backbone carbon -> a composed '(dialkylamino)' PREFIX,
     # consuming the N and its alkyl branches so they never enter the backbone.
     # Delegates every ordering/marking decision to the ONE amino-prefix assembler
@@ -1798,7 +1798,7 @@ def _name_polyfunctional_acyclic_substituent_impl(
             consumed.update(branch_atoms)
             _add_prefix(host, f"({core})")
 
-    # ---- Pass 1e: a secondary/tertiary amide
+    # ---- Pass 1e (v33 Phase 6 E2b, P-66.1.1.4.3): a secondary/tertiary amide
     # -C(=O)-N(H)(R)- IN THE CHAIN -- the carbonyl carbon is a plain BACKBONE
     # atom, not a terminal -C(=O)OH/-C(=O)NH2 Pass-1/Pass-2 already own -- is
     # expressed as an 'oxo' prefix (the =O; Pass 2 below adds it unchanged,
@@ -1917,7 +1917,7 @@ def _name_polyfunctional_acyclic_substituent_impl(
             consumed.update(branch_atoms)
             _add_prefix(host, amino_pfx)
 
-    # ---- Pass 1f (, P-65.3.1 / P-66.1.1.4.2, WRONG-MOLECULE
+    # ---- Pass 1f (v33 Phase 6 E2c, P-65.3.1 / P-66.1.1.4.2, WRONG-MOLECULE
     # RISK): a sulfonamide -S(=O)(=O)-NH2/-NHR/-NR2 hanging off a backbone
     # carbon is the retained 'sulfamoyl' prefix, or its N-substituted
     # '(R-sulfamoyl)'/'(dialkylsulfamoyl)' form -- '(methylsulfamoyl)methyl'
@@ -2034,7 +2034,7 @@ def _name_polyfunctional_acyclic_substituent_impl(
             consumed.update(branch_atoms)
             _add_prefix(host_c, sulfamoyl_pfx)
 
-    # ---- Pass 1c: an ester whose
+    # ---- Pass 1c (v30 tail #7/#21, P-65.6.3.2.3 / P-16.3.3): an ester whose
     # OXYGEN sits on a backbone carbon (-C-O-C(=O)-R) is the ACYLOXY detachable
     # prefix '(Racyloxy)' -- '(acetyloxy)methyl' for -CH2-O-C(=O)CH3,
     # '3-(2-methylprop-2-enoyloxy)propyl' for the #21 arm. Tier 1.95 already owns
@@ -2144,7 +2144,7 @@ def _name_polyfunctional_acyclic_substituent_impl(
         if any(cnt >= 2 for cnt in _acyloxy_tokens.values()):
             return None
 
-    # ---- Pass 1c2: a pendant
+    # ---- Pass 1c2 (v33 Phase 6 Wave 2, #5b, P-61.5.1 / P-29.3.2): a pendant
     # NITRO group on a backbone carbon (-CH2-N+(=O)[O-], the charge-separated
     # graph form of -NO2) is the detachable 'nitro' prefix, consumed HERE --
     # before Pass 1d's generic cation loop just below, which ALSO matches on
@@ -2216,7 +2216,7 @@ def _name_polyfunctional_acyclic_substituent_impl(
         consumed.add(_neg_o)
         _add_prefix(_host_c, _POLYFUNC_NITRO_PREFIX)
 
-    # ---- Pass 1d: a pendant ONIUM --
+    # ---- Pass 1d (v33 Phase 3 enabler, P-74.1.3 / P-73): a pendant ONIUM --
     # cation branch off a backbone carbon (choline's -CH2-CH2-N+(CH3)3) is a
     # locanted detachable '(...)azaniumyl'-family prefix, consumed here just
     # like the substituted-amino (Pass 1b) / acyloxy (Pass 1c) branches above.
@@ -2316,7 +2316,7 @@ def _name_polyfunctional_acyclic_substituent_impl(
 
     # ---- Pass 2: every remaining (non-consumed) atom must be a recognised
     # single-atom prefix on a backbone carbon; backbone carbons bond only to
-    # backbone carbons / recognised prefix atoms. A backbone C=C is RECORDED (
+    # backbone carbons / recognised prefix atoms. A backbone C=C is RECORDED (v30
     # B2: unsaturated substituent chains, the aconitic/lignin-monomer family) and
     # named below; any other multiplicity (C#C / C=N / branch-C=C) still declines.
     core_double_bonds: Set[frozenset] = set()
@@ -2409,7 +2409,7 @@ def _name_polyfunctional_acyclic_substituent_impl(
                 and mol.GetBondBetweenAtoms(idx, c_host[0]).GetBondType()
                     == Chem.BondType.SINGLE
                 and a.GetTotalNumHs() >= 1):
-            # (glucosinolate/thiohydroximate O-sulfate anion,
+            # v33 Phase 3 (glucosinolate/thiohydroximate O-sulfate anion,
             # P-63.1.5): a terminal -SH (thiol) on a backbone carbon is the
             # 'sulfanyl' detachable prefix -- the direct S-analogue of the
             # 'hydroxy' branch above ('2-sulfanylethyl' parallels
@@ -2479,7 +2479,7 @@ def _name_polyfunctional_acyclic_substituent_impl(
                 _POLYFUNC_HYDROXY_PREFIX in _prefixes
                 or _POLYFUNC_OXO_PREFIX in _prefixes):
             return None
-        # oxo + sulfanyl on ONE carbon is the same thioic-S-acid
+        # v33 Phase 3: oxo + sulfanyl on ONE carbon is the same thioic-S-acid
         # shape (-C(=O)-SH, P-65.1.1.4) as the hydroxy/oxo carboxyl-carbon
         # case above -- never emit '1-oxo-1-sulfanyl...'; defer to the
         # dedicated S-acid prefix ('sulfanylcarbonyl', PREFIX_FORMS) tier.
@@ -2497,7 +2497,7 @@ def _name_polyfunctional_acyclic_substituent_impl(
     # left untouched: an acyl bearing a second detachable group is a rare edge that
     # those golds do not exercise -> follow-on.)
     if fg_count == 1 and _POLYFUNC_OXO_PREFIX in prefix_on.get(attach_idx, []):
-        # tail: a bare acyl -C(=O)-R (the sole FG is the oxo on the
+        # v30 tail: a bare acyl -C(=O)-R (the sole FG is the oxo on the
         # free-valence carbon) is the acyl PREFIX -- 'acetyl'/'propanoyl'/... --
         # per P-66.6 (BB:17762 'acetyl (preferred prefix)', :17944 "acyl groups
         # such as 'acetyl', for -CO-CH3, derived from acetic acid"). Emit it
@@ -2590,7 +2590,7 @@ def _name_polyfunctional_acyclic_substituent_impl(
             loc_str = ",".join(str(loc) for loc in locs)
             parts.append(f"{loc_str}-{mult}{prefix}")
 
-    # tail #22 (P-16.5.1.3.1 / P-16.3.3): a MONONUCLEAR substituent core
+    # v30 tail #22 (P-16.5.1.3.1 / P-16.3.3): a MONONUCLEAR substituent core
     # (single backbone carbon, locants elided) bearing >=2 simple detachable
     # prefixes must cite the FIRST bare and enclose EACH of the rest. The bare
     # concatenation is ambiguous -- '-CH(NH2)(COOH)' spelled 'aminocarboxymethyl'
@@ -2610,7 +2610,7 @@ def _name_polyfunctional_acyclic_substituent_impl(
     joined = ''.join(_joined_prefix_parts(parts))
     if not core_double_bonds:
         return f"{joined}{stem}yl"
-    # B2: unsaturated substituent chain (aconitic/lignin-monomer family).
+    # v30 B2: unsaturated substituent chain (aconitic/lignin-monomer family).
     # Add the 'ene' infix + free-valence yl locant + (nE/nZ) descriptor, numbered
     # from the free valence (locant 1, P-29.2 -- NOT the references' longest-chain
     # OPSIN-optimisation, which mis-roots the free valence: refconsult-b2 Q4.2).
@@ -2622,7 +2622,7 @@ def _name_polyfunctional_acyclic_substituent_impl(
 def _unsaturated_substituent_name(
     mol, ordered, pos, sub_set, core_double_bonds, joined, stem,
 ):
-    """Finish an UNSATURATED acyclic-chain substituent prefix.
+    """Finish an UNSATURATED acyclic-chain substituent prefix (v30 B2).
 
     Called only from :func:`_name_polyfunctional_acyclic_substituent` once the
     backbone, the detachable prefixes and the chain trace are already validated and
@@ -2699,7 +2699,7 @@ def _unsaturated_substituent_name(
     # exists (double-apply guard would drop the R/S), OR there are >=2 R/S centres
     # (`_add_substituent_stereo`'s multi-centre branch returns the name UNCHANGED,
     # dropping ALL R/S -> a stereo-dropped WRONG molecule; fable-polyene BLOCKER 2,
-    #. A single centre with no descriptor is left for `_stereo_route`
+    # invariant 9). A single centre with no descriptor is left for `_stereo_route`
     # to locate (RT-verified, e.g. `(S)-...`).
     n_chiral = sum(
         1 for i in sub_set
@@ -2815,7 +2815,7 @@ def _ether_chain_locants_omitted(mol, sub_atoms, backbone, groups,
 
     ⚠ Replaces a hand-rolled ``cite_locants = len(backbone) > 1`` that appeared
     nowhere in the Blue Book (recorded as an unaudited private licence in
-    ). The
+    ``.planning/audit-v29/ARCH-locant-rendering-is-duplicated-119-times.md``). The
     ANSWER it gave for a one-carbon backbone is right; the REASON was missing, and
     on a >1-carbon backbone it denied a licence P-14.3.4.5 grants.
 
@@ -2848,6 +2848,7 @@ def _ether_chain_locants_omitted(mol, sub_atoms, backbone, groups,
 
     The two ambient P-14.3.3 scopes are consulted because this licence empties a
     scope of ALL its locants -- see
+    ``.planning/audit-v29/ARCH-a-licence-can-be-evaluated-on-the-wrong-molecule.md``.
     The **fragment-boundary observation** (``_naming_call_produces_a_name_component``)
     is deliberately NOT consulted, and that is not a two-of-three omission: it asks
     *"is the molecule I measured the molecule whose name I am editing?"*, and here the
@@ -2877,7 +2878,7 @@ def _ether_chain_locants_omitted(mol, sub_atoms, backbone, groups,
     if mol is None or not backbone or not groups or not sub_atoms:
         return False
 
-    # E2d: the caller now also reaches this for a NON-TERMINAL free
+    # v33 Phase 6 E2d: the caller now also reaches this for a NON-TERMINAL free
     # valence (`attach_locant` >= 2, e.g. 'propan-2-yl'). For k >= 2 that locant
     # is itself essential -- it distinguishes e.g. propan-2-yl from
     # propan-1-yl -- so P-14.3.3 (BB:2869) *"if any locants are essential ...
@@ -3006,7 +3007,7 @@ def _name_ether_substituted_chain(
     # Backbone = carbons reachable from the attachment WITHOUT crossing ANY
     # heteroatom. Must be all-carbon, acyclic, saturated. A heteroatom
     # neighbour simply stops the walk here -- it is classified below as a
-    # potential backbone-attached ether/thioether LINK. (
+    # potential backbone-attached ether/thioether LINK. (v33 Phase 6
     # ring_fragment_declined_by_ring_engine
     # aryloxymethyl fix: this walk used to depend on a whole-fragment
     # heteroatom front filter that rejected on ANY non-O/S atom anywhere in
@@ -3089,7 +3090,7 @@ def _name_ether_substituted_chain(
     # Linear (unbranched) backbone -- every backbone atom has at most 2
     # backbone neighbours, so the backbone as a whole is a simple path. The
     # attachment may sit at EITHER a terminal (primary, k==1) or an INTERNAL
-    # (k>=2) position of that path: a non-terminal free
+    # (k>=2) position of that path (v33 Phase 6 E2d): a non-terminal free
     # valence is numbered from whichever end gives it the lowest locant
     # (P-46.1.8), exactly like the all-carbon `_located_acyclic_alkyl_name`
     # sibling -- '1,1-dimethoxypropan-2-yl' for -CH(CH3)-CH(OCH3)2 attached at
@@ -3272,7 +3273,7 @@ def _name_ether_substituted_chain(
     # ---- P-16.3 multiplier + P-14.3.4 locant licence, both DELEGATED. ----
     # This block used to carry a private ``_MULT = {2: 'bis', 3: 'tris', ...}`` (one
     # of the 27 divergent multiplier tables measured in
-    #) and a
+    # ``.planning/audit-v29/ARCH-locant-rendering-is-duplicated-119-times.md``) and a
     # hand-rolled ``cite_locants = len(backbone) > 1`` locant licence that appears
     # nowhere in the Blue Book. Both decisions now go to the shared primitives.
     from .naming_utils import (
@@ -3344,7 +3345,7 @@ def _name_ether_substituted_chain(
             for p in part_strings[1:])
     else:
         joined = ''.join(part_strings)
-    # E2d: a NON-TERMINAL free valence (k_attach >= 2) must cite its
+    # v33 Phase 6 E2d: a NON-TERMINAL free valence (k_attach >= 2) must cite its
     # own locant on the parent-hydride stem -- 'propan-2-yl', not 'propyl'
     # (P-29.2, BB:15813 elides the locant only when the free valence
     # "terminates a chain", i.e. k==1). A hyphen is needed before the digit
@@ -3560,7 +3561,7 @@ def acid_name_to_amido_prefix(acid_name: str) -> Optional[str]:
             # on a simple HALOGEN substituent puts that many halogens on C2, so
             # the locant must be REPEATED: 'dichloroacetic acid' ->
             # '2,2-dichloroacetamido', 'trifluoroacetic acid' ->
-            # '2,2,2-trifluoroacetamido' (the single '2-' form
+            # '2,2,2-trifluoroacetamido' (v38: the single '2-' form
             # '2-dichloroacetamido' dropped a locant and failed OPSIN round-trip,
             # abstaining the whole molecule once acyclic acyls were routed here).
             # SCOPED to bare halogens, which cannot nest a group -- so
@@ -3973,7 +3974,7 @@ def sulfonamido_prefix_from_n_branch(mol, n_idx: int, sub_atoms,
 
     # `_acid_stem_oxide_prefix` already delegates to `_acid_stem_unsaturated_oxide_prefix`
     # for a substituted / unsaturated R (substituent_prefix_forms.py), so a substituted-
-    # arene R (4-aminobenzene) reaches that builder here. #29 gap-a fixed that
+    # arene R (4-aminobenzene) reaches that builder here. v30 #29 gap-a fixed that
     # builder's piece-selection (it now picks the capped-sulfonyl-S fragment, not a
     # detached ring-sulfur host), which unblocks `2-(4-aminobenzene-1-sulfonamido)-
     # 1,3-thiazole-5-carboxylic acid`.
@@ -4527,7 +4528,7 @@ def parent_to_prefix(parent_name: str, chain_length: int, *, attach_locant) -> s
     if name_lower in _RETAINED_NAME_PREFIX:
         return _RETAINED_NAME_PREFIX[name_lower]
 
-    # C3: fail closed on FUNCTIONAL parents that have no '-yl' form.
+    # v29 P7 C3: fail closed on FUNCTIONAL parents that have no '-yl' form.
     # Hoisted ABOVE the suffix cascade on purpose — the '-ol' and '-amine'
     # branches match on a bare string ending and would otherwise capture these
     # (see _FUNCTIONAL_PARENT_NO_YL_FORM). Returning None makes the caller
@@ -4653,7 +4654,7 @@ def parent_to_prefix(parent_name: str, chain_length: int, *, attach_locant) -> s
 
     # ---- Locanted ketone: -N-one ----
     # e.g., "butan-2-one" -> "2-oxobutyl"
-    # Task L3-0: was anchored to a literal 'a'(+optional 'n')
+    # Task L3-0 (v33 Phase 0): was anchored to a literal 'a'(+optional 'n')
     # immediately before the locant digit (`an?-(\d+)-one$`), which requires
     # the locant to sit right after a saturated '-an-' infix. An unsaturated
     # chain hides the locant behind '-en-'/'-yn-' instead (e.g.
@@ -4685,7 +4686,7 @@ def parent_to_prefix(parent_name: str, chain_length: int, *, attach_locant) -> s
 
     # ---- Locanted amine: -N-amine ----
     # e.g., "propan-1-amine" -> "1-aminopropyl"
-    # Task L3-0: same narrow-anchor blind spot as `m_one` above
+    # Task L3-0 (v33 Phase 0): same narrow-anchor blind spot as `m_one` above
     # (`an?-(\d+)-amine$` misses an unsaturated "-en-N-amine"/"-yn-N-amine"
     # chain, e.g. "hept-2-en-4-amine"), widened the same way.
     m_amine = re.search(r'-(\d+)-amine$', name)
@@ -4775,7 +4776,7 @@ def parent_to_prefix(parent_name: str, chain_length: int, *, attach_locant) -> s
             return _prefix_stem_yl("carbamoyl", stem)
         return "carbamoyl"
 
-    # ----, WRONG-MOLECULE RISK: a
+    # ---- v33 Phase 6 E2c fail-closed guard, WRONG-MOLECULE RISK: a
     # SULFONAMIDE/SULFINAMIDE (or any other non-carboxamide '...amide'-suffix
     # functional class) must NEVER reach the generic '-amide' -> 'carbamoyl'
     # transform below. 'methanesulfonamide' ends in the literal substring
@@ -4870,7 +4871,7 @@ def parent_to_prefix(parent_name: str, chain_length: int, *, attach_locant) -> s
     # (parent 'dioxidane') became the OPSIN-unparseable 'dioxidyl' instead of 'dioxidanyl'.
     # ⚠ Group 14 (Si/Ge/Sn/Pb) is EXCLUDED: P-29.3.1 keeps them on method (1) -- the
     # retained silyl/germyl/stannyl/plumbyl (elide the whole 'ane'), NOT silanyl/stannanyl
-    # (5.1: silane->silanyl et al. is a PIN regression). Multiplied forms share the
+    # (REVIEW 5.1: silane->silanyl et al. is a PIN regression). Multiplied forms share the
     # stem, so match on the stem suffix.
     if name.endswith(('oxidane', 'sulfane', 'selane', 'tellane', 'azane',
                       'phosphane', 'arsane', 'stibane', 'bismuthane', 'borane',
@@ -4899,7 +4900,7 @@ def parent_to_prefix(parent_name: str, chain_length: int, *, attach_locant) -> s
     if name.endswith('ine'):
         return name[:-1] + "yl"  # pyridine -> pyridinyl
 
-    # ---- RC-1 fail-closed guard ----
+    # ---- RC-1 fail-closed guard (v26 BP-2) ----
     # A FUNCTIONAL-PARENT name that reaches the terminal fallbacks below has NO
     # valid '+yl' prefix — the correct prefix is a defined form (carboxy /
     # alkoxycarbonyl / isothiocyanato / oxo ...), never '«acid»yl' / '«formate»yl'
@@ -4916,10 +4917,10 @@ def parent_to_prefix(parent_name: str, chain_length: int, *, attach_locant) -> s
     # `if not sub_atoms or not name: return name`, so a None name comes back
     # None). Cited by SYMBOL, not by line: the two line numbers that used to
     # stand here (`:3604` and `line 3011`) were both stale — every insertion
-    # above them moves them, and.
+    # above them moves them, and v29 P7 alone shifted this file three times.
     # Class-specific to functional residues — never touches
     # -ene/-yne/-ane/-ine/-yl.
-    if (' ' in name # 5 Class 3: a SPACE marks a functional-class
+    if (' ' in name             # v30 RISK 5 Class 3: a SPACE marks a functional-class
                                 # multi-word name ('urea oxime', 'taxifoline acetate') --
                                 # never a valid single substituent token; the '-e'->'-yl'
                                 # fallback below would fabricate the unparseable 'urea oximyl'.
@@ -5220,7 +5221,7 @@ def _check_retained_substituent(
     # was the only thing that caught it.
     #
     # Same class as the heteroatom hardening noted just above, and of
-    #: a COUNT is not
+    # `.planning/audit-v29/FINDING-count-based-naming-sites.md`: a COUNT is not
     # a constitution. The ring test is structural (RDKit ring membership), not
     # another tally.
     if (carbon_count == 4 and len(c_neighbors_in_frag) == 3
@@ -5291,7 +5292,7 @@ def _located_acyclic_alkyl_name(mol, sub_atoms, attach_idx, with_pos=False,
     ring_info = mol.GetRingInfo()
     carbon_set = set()
     if allow_functional:
-        # re-rooted FG-capable substituent (P-46.1.12): the CHAIN is the
+        # v33 re-rooted FG-capable substituent (P-46.1.12): the CHAIN is the
         # acyclic, single-bonded carbon skeleton through the free valence; EVERY
         # other atom -- ring atoms, chain-carbon =O (oxo), -O-R ethers/esters,
         # -N< amines/amides, -S-R thioethers, phospho subgraphs -- is permitted
@@ -5555,7 +5556,7 @@ def _located_acyclic_alkyl_name(mol, sub_atoms, attach_idx, with_pos=False,
         return None
 
     # P-14.3.4.5 (``:3007``), substituent enclosing-mark scope -- MEASURED-LIVE site
-    # for ``1-chloro-2-(pentafluoroethyl)benzene`` (``:3023``). A validated
+    # for ``1-chloro-2-(pentafluoroethyl)benzene`` (``:3023``). A validated call-spy
     # recorded this function as the sole productive namer of that fragment, reached
     # from ``substituent_enumerator.py:1513``; ``_name_saturated_substituted_chain``
     # is never even CALLED for it -- the two live sites sit on two entirely
@@ -5579,7 +5580,7 @@ def _located_acyclic_alkyl_name(mol, sub_atoms, attach_idx, with_pos=False,
 
 
 def _located_fg_assemble(mol, sub_atoms, attach_idx, carbon_set, ring_info, with_pos):
-    """located substituent assembly (see ``_located_acyclic_alkyl_name``
+    """v33 FG-capable located substituent assembly (see ``_located_acyclic_alkyl_name``
     ``allow_functional``). The parent is the longest ACYCLIC carbon chain through the
     free valence (P-29.2, numbered from the free valence P-46.1.8); every off-chain
     atom -- a chain-carbon ``=O`` (oxo), ``-OH`` (hydroxy), ``-NH2`` (amino), and any
@@ -5682,7 +5683,19 @@ def _located_fg_assemble(mol, sub_atoms, attach_idx, carbon_set, ring_info, with
             branch_groups[bname].append(chain_pos[c])
 
     from .composer import _format_prefix_groups
-    prefix = _format_prefix_groups(branch_groups) if branch_groups else ""
+    if chain_len == 1 and branch_groups:
+        # P-14.3.4.2(a): a one-carbon (methyl) substituent parent has a single
+        # position, so every branch locant is '1' and is OMITTED -> 'disilylmethyl'
+        # / 'dichloromethyl', never '1,1-disilylmethyl'. Preserve the multiplier
+        # via the explicit count (mirrors the empty-locant call at :1151).
+        from .naming_utils import format_substituent_prefix
+        _parts = [
+            format_substituent_prefix(gname, [], len(branch_groups[gname]))
+            for gname in sorted(branch_groups.keys(), key=alpha_sort_key)
+        ]
+        prefix = "-".join(_parts)
+    else:
+        prefix = _format_prefix_groups(branch_groups) if branch_groups else ""
     try:
         if k == 1:
             base = get_alkyl_name(chain_len)
@@ -5693,7 +5706,7 @@ def _located_fg_assemble(mol, sub_atoms, attach_idx, carbon_set, ring_info, with
             name = f"{prefix}{stem}an-{k}-yl"
     except (ValueError, KeyError):
         return None
-    # cite this chain's OWN stereodescriptors from the SAME free-valence
+    # v33: cite this chain's OWN stereodescriptors from the SAME free-valence
     # numbering the name was built with (`chain_pos`), exactly as the sibling
     # located derivers do (`_located_acyclic_alkyl_name` at the alkenyl path,
     # BlueBookV2 P-91.2.1.2.1 / P-46.3). The docstring formerly said "stereo is
@@ -5742,7 +5755,7 @@ def _fg_branch_atoms(mol, start, block, sub_set):
 
 
 def _located_fg_hetero_root(mol, sub_atoms, attach_idx):
-    """FG-capable substituent rooted at a HETERO atom -- ``-O-R`` -> R-oxy,
+    """v33: FG-capable substituent rooted at a HETERO atom -- ``-O-R`` -> R-oxy,
     ``-S-R`` -> (R)sulfanyl, ``-N(<)`` -> (R)amino -- with R recursed through the
     central substituent entry (so a nested FG chain reaches Tier FG). Returns the
     prefix string or None (fail-closed)."""
@@ -5913,9 +5926,9 @@ def _add_substituent_stereo(mol, sub_atoms, name, attach_idx=None, located=None)
     for idx in sub_atoms:
         atom = mol.GetAtomWithIdx(idx)
         if atom.HasProp('_CIPCode'):
-            # SUB-04/: inherit the perception verdict verbatim (the single
+            # SUB-04/D-15: inherit the perception verdict verbatim (the single
             # source of truth). The former force-uppercase of pseudo-asymmetric
-            # r/s was a latent violation — it would CORRUPT a genuine
+            # r/s was a latent D-15 violation — it would CORRUPT a genuine
             # substituent-position pseudo-asymmetric centre. Verified dead on the
             # whole corpus (0 hits across the genuine-13 + ceramide leaks + 400
             # stereo molecules), so removal is zero-regression.
@@ -5925,7 +5938,7 @@ def _add_substituent_stereo(mol, sub_atoms, name, attach_idx=None, located=None)
     if not stereo_atoms:
         return name
 
-    # Task 3: double-apply guard for NESTED descriptor blocks.
+    # v27 Phase S Task 3: double-apply guard for NESTED descriptor blocks.
     # The _stereo_route re.match guard only catches a LEADING "(...)" block, so
     # a substituent whose stereocentre is already expressed inside a nested
     # sub-substituent block (e.g. "2-[(1R)-1-hydroxyethyl]cyclohexyl") would
@@ -5940,7 +5953,7 @@ def _add_substituent_stereo(mol, sub_atoms, name, attach_idx=None, located=None)
     if len(stereo_atoms) == 1:
         # Single stereocenter.
         s_idx, cip = stereo_atoms[0]
-        # STEREO-03 (Phase 177 WSB-02): a stereogenic acyclic-alkyl
+        # STEREO-03 (Phase 177 WSB-02 D-09): a stereogenic acyclic-alkyl
         # substituent needs the PIN systematic name + the descriptor at its
         # attachment locant (P-29.2 / P-31.1.4.3.4 / P-91). The name and the
         # locant are derived FROM STRUCTURE (the substituent atoms + attachment
@@ -5972,12 +5985,12 @@ def _add_substituent_stereo(mol, sub_atoms, name, attach_idx=None, located=None)
         # Otherwise: a single stereocenter on a parent-hydride-style substituent
         # (or any case where a structure-derived located form is not available)
         # takes the bare "(R)-"/"(S)-" (no locant) per the P-91 unique-position
-        # rule. Per a missing locant is never fabricated.
+        # rule. Per D-09 a missing locant is never fabricated.
         return f"({cip})-{name}"
 
     # Multiple stereocenters within one substituent.
     #
-    # WR-06 fix (Phase 177 WSB-02 /): the former raw-atom-index
+    # WR-06 fix (Phase 177 WSB-02 D-07/D-09): the former raw-atom-index
     # positional locants (`idx_to_internal = {idx: pos+1 for ...}`) were WRONG —
     # they number a leading heteroatom "1" and bear no relation to the IUPAC
     # numbering the substituent's NAME actually used. The correct locant must be
@@ -5987,7 +6000,7 @@ def _add_substituent_stereo(mol, sub_atoms, name, attach_idx=None, located=None)
     # independent numbering (e.g. BFS-from-attachment) is explicitly rejected as
     # "a DIFFERENT wrong heuristic — a band-aid the fix-methodology forbids."
     #
-    # L3-2a: for the ACYCLIC-ALKYL shape specifically, that
+    # v33 Phase 0 L3-2a: for the ACYCLIC-ALKYL shape specifically, that
     # recursion-contract change already exists. `_acyclic_alkyl_located_stereo_name`
     # -- the SAME deriver the single-centre branch above trusts (it returns
     # `pin_form` and ships it in place of the caller's `name`) -- exposes the
@@ -5999,10 +6012,10 @@ def _add_substituent_stereo(mol, sub_atoms, name, attach_idx=None, located=None)
     # '5-(propan-2-yl)heptan-2-yl'), so its `pos` is self-consistently the
     # numbering the emitted text already carries -- not a re-derived guess.
     # It declines (`None`) for every other shape (ring atoms, ethers, charged
-    # atoms, non-single bonds), so the "missing beats wrong" fallback
+    # atoms, non-single bonds), so the D-09 "missing beats wrong" fallback
     # below is unchanged for those.
     #
-    # bugfix (acyl-CoA pantetheine 3-hydroxy centre): a stereocentre this
+    # v33 bugfix (acyl-CoA pantetheine 3-hydroxy centre): a stereocentre this
     # deriver's OWN numbering does not cover is NOT necessarily unfindable —
     # it is typically one already expressed inside a nested recursively-named
     # branch prefix (a branch atom is never itself a member of `pos`, which
@@ -6028,7 +6041,7 @@ def _add_substituent_stereo(mol, sub_atoms, name, attach_idx=None, located=None)
             if block:
                 return f"{block}{pin_form}"
 
-    # Per (missing beats wrong): when the substituent's own numbering
+    # Per D-09 (missing beats wrong): when the substituent's own numbering
     # cannot be threaded (or covers none of this fragment's stereocentres),
     # emit NO multi-centre stereo block here — return the name unchanged. A
     # multi-centre stereo descriptor placed with fabricated locants is worse
@@ -6288,7 +6301,7 @@ def name_substituent_fragment(
                 and _a.GetTotalNumHs() == 0 and not _a.IsInRing()):
             _inner_nbrs = [n.GetIdx() for n in _a.GetNeighbors()
                            if n.GetIdx() in set(sub_atoms)]
-            # (P-67.2.6): an -O-P(=O)(…)… phosphoanhydride subgraph as a
+            # v33 (P-67.2.6): an -O-P(=O)(…)… phosphoanhydride subgraph as a
             # substituent. OST already names a terminal -O-P(=O)(OH)2 as
             # 'phosphonooxy' via FG perception, but a P-O-P bridge/chain (di/tri…
             # phosphate ester, as in acyl-CoA) matched no FG and fell through to a
@@ -6349,7 +6362,7 @@ def name_substituent_fragment(
     if _find_amine_oxide_n(mol, sub_atoms) is not None:
         return _lambda5_azanyl_prefix(mol, sub_atoms, attach_idx)
 
-    # Step 0c:
+    # Step 0c (v38 substituent_recursion_depth_exceeded, P-67.1.4.1 / P-72.6.1):
     # a CARBON-FREE P-oxo fragment attached at P -- a bare -P(=O)(OH)2
     # (phosphono) or -P(=O)(O-)2 (phosphonato). Steps 3-4 name a fragment by
     # round-tripping it through the whole-molecule namer, but the bare fragment
@@ -6378,7 +6391,7 @@ def name_substituent_fragment(
     if retained:
         return _add_substituent_stereo(mol, sub_atoms, retained, attach_idx=attach_idx)
 
-    # Step 1b (functional-group perception fix, 169.7; widened 6 E2a to include plain 'S'):
+    # Step 1b (functional-group perception fix, 169.7; widened v33 Phase 6 E2a to include plain 'S'):
     # chalcogen-ether substituent -S-R / -Se-R / -Te-R → (alkyl)sulfanyl /
     # (alkyl)selanyl / (alkyl)tellanyl (P-63.2.5 / P-63.6). Without this,
     # Step 4's recursive path names it as the parent hydride "methanethiol" /
@@ -6434,7 +6447,7 @@ def name_substituent_fragment(
             if _chal:
                 return _add_substituent_stereo(mol, sub_atoms, _chal, attach_idx=attach_idx)
 
-    # Step 1d: Group-14 (Si/Ge) substituent ->
+    # Step 1d (v23 Phase 8, P-68.2.2): Group-14 (Si/Ge) substituent ->
     # (prefixes)silyl / (prefixes)germyl. Without this, Step 4's recursive path
     # names a bare -SiH3 as the free molecule ('unknown organic compound') + 'yl'
     # = 'unknown organic compoundyl' (then dropped on a senior carbon parent,
@@ -6449,7 +6462,7 @@ def name_substituent_fragment(
         if _g14:
             return _g14
 
-    # Step 1e: the terminal pseudohalide
+    # Step 1e (v26 BP-2 RC-2a, P-66.5.1.2 / BB 1710): the terminal pseudohalide
     # groups -N=C=O, -N=C=S, -N#C and -S-C#N are ALWAYS cited as substituent
     # prefixes (isocyanato / isothiocyanato / isocyano / thiocyanato) in PINs
     # ("added to the list of characteristic groups that are always cited as
@@ -6478,7 +6491,7 @@ def name_substituent_fragment(
                     if _pfx:
                         return _pfx
 
-    # Step 1e2: a bare terminal NITROSO group -N=O is
+    # Step 1e2 (v33 Phase 6 E2e, P-66.5): a bare terminal NITROSO group -N=O is
     # the retained substituent prefix 'nitroso' (P-61.5, e.g. the amidine
     # N-substituent 'N-nitrosocarbamimidoyl', CHEBI:138933's
     # N(5)-(N-nitrosocarbamimidoyl)-L-ornithine). Without this, Step 3-4's
@@ -6603,7 +6616,7 @@ def name_substituent_fragment(
                     if _stem:
                         return f"{_stem}animidoyl"
 
-    # W3-P02-8: a carbamimidoyl
+    # W3-P02-8 (v33 Phase 6 E2e, P-66.4.1.3.1 / P-66.4.1.2): a carbamimidoyl
     # substituent -C(=NH)-NH-R attached to the PARENT via one of its own amino
     # nitrogens -- the N(5)-substituent-of-ornithine shape (CHEBI:138933,
     # N(5)-(N-nitrosocarbamimidoyl)-L-ornithine). From the WHOLE molecule's
@@ -6732,7 +6745,7 @@ def name_substituent_fragment(
             _ri = mol.GetRingInfo()
             if any(_ri.NumAtomRings(a) > 0 for a in sub_atoms):
                 from ..rules.ring_substituents import name_ring_system_substituent
-                # (giants engine, acyl-CoA): a chain-rooted ring-bearing
+                # v33 (giants engine, acyl-CoA): a chain-rooted ring-bearing
                 # fragment (P-29.1.2, ``-CH2-[ring]``) where the ring ALSO
                 # carries its own further ring-system substituent (e.g. the
                 # ribose ring's purine base, non-fused, joined by a single
@@ -6790,7 +6803,7 @@ def name_substituent_fragment(
     if unsat_name is not None:
         return _add_substituent_stereo(mol, sub_atoms, unsat_name, attach_idx=attach_idx)
 
-    # Step 2b-branched): a BRANCHED acyclic
+    # Step 2b-branched (v28 Cluster A Fix 4, P-32.1.1(1)): a BRANCHED acyclic
     # all-carbon alkenyl/alkynyl substituent. The linear namer above declines
     # branching; without this the recursion + parent_to_prefix drop the free-
     # valence locant ('2-methylprop-1-enyl') or mis-name the connectivity.
@@ -6798,7 +6811,7 @@ def name_substituent_fragment(
     if branched_unsat is not None:
         return _add_substituent_stereo(mol, sub_atoms, branched_unsat, attach_idx=attach_idx)
 
-    # Step 2b-oxo: unsaturated all-carbon chain
+    # Step 2b-oxo (v26 BP-2 RC-3, P-33 / P-14.4): unsaturated all-carbon chain
     # carrying an in-chain aldehyde/ketone -> oxo prefix numbered from the free
     # valence (-C(=CH2)CHO -> '3-oxoprop-1-en-2-yl'). Sits between the pure-alkenyl
     # namer (declines: =O is not C) and the saturated polyfunctional builder
@@ -6816,7 +6829,7 @@ def name_substituent_fragment(
     if halo_name is not None:
         return _add_substituent_stereo(mol, sub_atoms, halo_name, attach_idx=attach_idx)
 
-    # Step 2c-poly: a saturated
+    # Step 2c-poly (v23 SL — substituent structure-loss / locant-drop): a saturated
     # acyclic carbon chain bearing >=1 simple detachable prefixes (carboxy/amino/
     # hydroxy/oxo/halogen), numbered from the free valence. MUST precede the
     # recursive path, which caps the fragment to a free molecule and lets
@@ -6831,7 +6844,7 @@ def name_substituent_fragment(
     if poly_name is not None:
         return _add_substituent_stereo(mol, sub_atoms, poly_name, attach_idx=attach_idx)
 
-    # Step 2c-ether: saturated all-carbon chain
+    # Step 2c-ether (v22 C-T2 / V-3, P-63.2.2.2): saturated all-carbon chain
     # bearing ether -O-R substituent(s), numbered from the attachment. MUST
     # precede the recursive path, which caps the fragment to a free molecule and
     # mis-names a retained ether as '<molecule>yl' (-CH2-O-C6H5 -> 'anisolyl', a
@@ -6855,7 +6868,7 @@ def name_substituent_fragment(
         located_name, _k = located
         return _add_substituent_stereo(mol, sub_atoms, located_name, attach_idx=attach_idx)
 
-    # Tier FG: the PROPER re-rooted FG-capable located substituent namer.
+    # Tier FG (v33): the PROPER re-rooted FG-capable located substituent namer.
     # Placed here -- BEFORE the Wave2 T3a ring-atom guard just below -- because
     # that guard's "any ring atom anywhere in sub_atoms -> decline" check also
     # catches a shape T3a never intended to block: a fragment whose attach_idx
@@ -6893,7 +6906,7 @@ def name_substituent_fragment(
             if _asym in ('O', 'S', 'N'):
                 _fg_name = _located_fg_hetero_root(mol, list(sub_atoms), attach_idx)
             else:
-                # bugfix: request `with_pos=True` in the SAME call that
+                # v33 bugfix: request `with_pos=True` in the SAME call that
                 # builds `_fg_name`, and hand the resulting (name, k, pos)
                 # triple to `_add_substituent_stereo` as `located`. This chain
                 # is the ONLY deriver that can locate a stereocentre sitting on
@@ -6940,7 +6953,7 @@ def name_substituent_fragment(
     except Exception:
         pass
 
-    # Step 2e: a fragment with a REAL net formal
+    # Step 2e (v32 Phase 3A-b, P-74.1.3): a fragment with a REAL net formal
     # charge (a genuine onium cation on the branch -- e.g. the choline/
     # trimethylammonium head of a phosphatidylcholine-like lipid), NOT an
     # internal charge-separated pair that cancels within the same fragment
@@ -6954,7 +6967,7 @@ def name_substituent_fragment(
     # substituent. Measured: a real choline-phosphate compound substituent
     # came out '(2-phosphonooxy-N,N,N-trimethylethan-1-aminium)yl',
     # SELF-01-suppressed (a 0-wrong defect this project's PIN tiers must not
-    # rely on the OPSIN backstop alone to catch, CLAUDE.md.
+    # rely on the OPSIN backstop alone to catch, CLAUDE.md invariant 1).
     #
     # cation_to_prefix (P-74.1.3, the existing structured primitive, wired
     # previously only at charged_router.py:478 / rules/ions.py:4305) builds
@@ -7167,7 +7180,7 @@ def cation_to_prefix(mol, cation_idx: int, parent_attach_idx: int,
         # Bare protonated heteroatom with no extra substituents ([NH3+]-parent) is
         # the `<stem>iumyl` group itself (P-74.1.3): e.g. glycine zwitterion's
         # cation is `azaniumyl`. The caller decides whether to use this or keep the
-        # amino-acid neutral/retained form (sequenced first,).
+        # amino-acid neutral/retained form (sequenced first, D-06).
         return _onium_suffix
 
     return _compose_n_substituent_prefix(sub_prefixes) + _onium_suffix
@@ -7192,7 +7205,7 @@ def _collect_branch_atoms(mol, start_idx: int, block_idx: int) -> List[int]:
     return frag
 
 
-# (P-68.2.2): Group-14 substituent groups -XH3 named by method (2)
+# v23 Phase 8 (P-68.2.2): Group-14 substituent groups -XH3 named by method (2)
 # of P-29.2 -> silyl / germyl, with the substituents on the X centre cited as
 # prefixes (trimethylsilyl, trihydroxysilyl). Scoped to Si/Ge (the Phase-8 scope;
 # Sn/Pb stannyl/plumbyl deferred).
@@ -7241,7 +7254,7 @@ def _group14_neighbour_prefix(mol, idx, exclude_idx, frag_set) -> Optional[str]:
             # behaviour on ring-bearing / branched / unsaturated R is not
             # established. Widening this test would change which producer claims a
             # molecule rather than turn a refusal into an emission, so it keeps the
-            # narrow semantics under the explicitly narrow name.
+            # narrow semantics under the explicitly narrow name (v29 P3).
             from ..rules.substituent_purity import is_simple_unbranched_organyl
             r_c = others[0].GetIdx()
             if is_simple_unbranched_organyl(mol, r_c, idx):
@@ -7251,7 +7264,7 @@ def _group14_neighbour_prefix(mol, idx, exclude_idx, frag_set) -> Optional[str]:
                 if alk is not None:
                     return alk
         return None
-    # The organyl neighbour, NAMED (this string is the returned prefix).:
+    # The organyl neighbour, NAMED (this string is the returned prefix). v29 P3:
     # routed to the shared chokepoint, so a ring-bearing, branched, unsaturated or
     # long organyl on the Group-14 centre is named instead of refused. The refusal
     # here did NOT fail closed -- it handed the fragment to a sibling producer that
@@ -7362,7 +7375,7 @@ def _compose_group14_prefixes(prefixes: List[str]) -> str:
         if is_complex_substituent(name) and count > 1:
             parts.append(f"{mult}({name})")
         else:
-            # Item 4: a SIMPLE multiplier joined to a name that leads
+            # v29 P3-FIX Item 4: a SIMPLE multiplier joined to a name that leads
             # with an ITALICIZED structural prefix keeps the hyphen boundary.
             # `**P-16.2.4** Hyphens` -> `**P-16.2.4.1** Hyphens are used in
             # substitutive names:` -> clause `(d) to separate italic letters from

@@ -7,7 +7,7 @@ mononuclear hydride -> ``hexafluoro-lambda6-sulfane`` (SF6).
 
 This module is the single source of truth for the standard-bonding-number table
 and the "is this valence non-standard?" decision. It was promoted verbatim from
-``rules/spiro.py`` so that the spiro numberer, the acyclic
+``rules/spiro.py`` (v22 G4) so that the spiro numberer, the acyclic
 skeletal-replacement namer (P-21.2.4), and the mononuclear-hydride / chalcogen /
 halogen namers all share one fail-closed implementation rather than each
 re-deriving Table 2.8.

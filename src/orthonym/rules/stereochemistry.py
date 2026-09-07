@@ -48,7 +48,7 @@ def _composite_locant_sort_key(
     Per IUPAC P-91.1, composite locants like '3a' sort BETWEEN integer 3
     and integer 4 (after 3 because '' < 'a' in tuple-lex comparison).
 
-    Phase 153 -- single source of truth for descriptor ordering. Per
+    Phase 153 D-03 -- single source of truth for descriptor ordering. Per
     Pitfall 2, branches on isinstance(locant, int) FIRST so int input does
     NOT fall into the int('3'[:-1]) = int('') ValueError trap.
 
@@ -64,7 +64,7 @@ def _composite_locant_sort_key(
     # like (5, "'") / (3, "''") for the primed component (fused_rings /
     # multi-component numbering). Per P-14.3.2 a primed locant sorts AFTER its
     # unprimed twin at the same number ('' < "'" < "''"), so key on
-    # (number, prime-suffix). Fixes a TypeError crash:
+    # (number, prime-suffix). Fixes a TypeError crash (review RISK 6):
     # int(locant) on a tuple raised instead of failing closed.
     if isinstance(locant, tuple):
         num = locant[0] if locant and isinstance(locant[0], int) else 0
@@ -246,6 +246,7 @@ def collect_stereodescriptors(
                 # double bond that IS at that locant.
                 #
                 # So fail closed. Measured effect (n=1000, pubchem_2000): see
+                # .planning/audit-v29/p7-task2-stereo-locant-resolution.md.
                 continue
 
             cip_code = bond.GetProp('_CIPCode')  # 'E' or 'Z'
@@ -264,7 +265,7 @@ def collect_stereodescriptors(
         # If locant_atom not in atom_to_locant, the axial chirality element
         # is not on the principal chain/ring -- skip (same filtering as R/S)
 
-    # Sort by locant ascending.: use the composite-locant safe key so
+    # Sort by locant ascending. D-03: use the composite-locant safe key so
     # mixed int / '<int><letter>' (e.g. '3a', '7a' from ComplexRingResult.
     # atom_to_locant per fused_rings.py:317) sort per IUPAC P-91.1
     # ('3a' BETWEEN integer 3 and 4). Byte-identical to the pre-153
@@ -423,19 +424,19 @@ def format_stereodescriptor_string(
 
 
 # ---------------------------------------------------------------------------
-# Phase 152: Handler-level stereo injection (/ predicate-first wiring)
+# Phase 152: Handler-level stereo injection (D-01 / D-04 predicate-first wiring)
 # ---------------------------------------------------------------------------
 
-#: detection regex set REUSED VERBATIM from namer.py:62-75. DO NOT BROADEN.
+# D-03: detection regex set REUSED VERBATIM from namer.py:62-75. DO NOT BROADEN.
 # Pattern A — prefix form (already-stereoed name; matched against name start)
 _STEREO_PREFIX_RE = re.compile(
-    # Phase 153 / Pitfall 8: accept composite locants like '7a', '3a'
+    # Phase 153 D-03 / Pitfall 8: accept composite locants like '7a', '3a'
     # in addition to plain digits, so an already-stereoed name like
     # `(7aS)-2,3a-dichloro-...benzofuran-...` is correctly recognized as
     # already-stereoed and the injector does not double-emit the prefix.
     # Compatible with the existing `(2R)-` / `(R)-` / `(E)-` / `(2R,3S)-`
     # / `(2r,3s)-` matches (the locant prefix is optional via \d*).
-    # also accept an optional PRIME `'`/`''` after the locant, so a
+    # v36-A2: also accept an optional PRIME `'`/`''` after the locant, so a
     # correct multi-component (spiro/fused) block like `(2S,1'R,3'R,11'R)-` is
     # recognized as already-stereoed and the injector does not double-emit.
     # The prime is optional (`'{0,2}`), so unprimed matches are byte-identical.
@@ -443,18 +444,18 @@ _STEREO_PREFIX_RE = re.compile(
 )
 # Pattern B — embedded block (descriptor block anywhere in the name body)
 _STEREO_EMBEDDED_RE = re.compile(
-    # Phase 153: also accept composite locants like '7a', '3a' in
+    # Phase 153 D-03: also accept composite locants like '7a', '3a' in
     # embedded blocks (e.g., 'something-(3aR,7aS)-else').
-    # also accept an optional prime `'`/`''` after the locant (primed
+    # v36-A2: also accept an optional prime `'`/`''` after the locant (primed
     # spiro/fused component); optional, so unprimed matches are byte-identical.
     r"\(\d*[a-z]?'{0,2}[RSEZrsez](,\d*[a-z]?'{0,2}[RSEZrsez])*\)"
 )
-# Pattern C — carbohydrate / amino-acid traditional notation. also match the
+# Pattern C — carbohydrate / amino-acid traditional notation. v43: also match the
 # Blue-Book GREEK anomeric symbols α/β (P-102), now emitted in place of the ASCII
 # words (OPSIN parses both identically).
 _CARBOHYDRATE_STEREO_RE = re.compile(r'(alpha|beta|alfa|α|β)-[DL]-', re.IGNORECASE)
 
-# Phase 177 WS-B.0: Pattern D — a leading/embedded D-/L- configurational
+# Phase 177 WS-B.0 (D-01): Pattern D — a leading/embedded D-/L- configurational
 # token (D-alanine, d-glyceraldehyde, L-valine) AND peptide acyl chains
 # (L-valyl-… / D-glucosaminyl-…) are treated as stereo-already-present, alongside
 # the existing alpha/beta-anomeric Pattern C.  These names already encode their
@@ -547,7 +548,7 @@ def _looks_like_peptide(name: str) -> bool:
 # RS/SR, commas/hyphens/+/space), OR a bare rel-/rac-/cis-/trans-/(±)- prefix. A
 # substituent enclosing group like "(2-chloroethyl)-" does NOT match (its content has
 # non-descriptor letters). Deliberately SEPARATE from _STEREO_PREFIX_RE (do NOT broaden
-# that one — Phase 153).
+# that one — Phase 153 D-03).
 _STRIP_STEREO_LEADING_RE = re.compile(
     r"^(\((?:[0-9]+[a-z]?[rsezRSEZ*]|[rsezRSEZ]|RS|SR|[,\-+ ])+\)|rel|rac|cis|trans|\(±\))-",
     re.IGNORECASE,
@@ -616,7 +617,7 @@ def needs_stereo_injection(mol, name: str) -> bool:
     if mol is None or not name or name == 'unknown':
         return False
 
-    # Pattern A — prefix form (already-stereoed name;)
+    # Pattern A — prefix form (already-stereoed name; D-03)
     if _STEREO_PREFIX_RE.match(name):
         return False
     # Pattern B — embedded block
@@ -625,9 +626,9 @@ def needs_stereo_injection(mol, name: str) -> bool:
     # Pattern C — carbohydrate / amino acid traditional notation
     if _CARBOHYDRATE_STEREO_RE.search(name):
         return False
-    # Pattern D (Phase 177 WS-B.0 /) — a D/L configurational token or a
+    # Pattern D (Phase 177 WS-B.0 / D-01) — a D/L configurational token or a
     # peptide acyl chain means the name already carries its configuration.
-    # SHARED primitive: both the namer backstop (_final_stereo_check) and
+    # SHARED primitive (D-02): both the namer backstop (_final_stereo_check) and
     # inject_stereo_from_locant_map delegate detection here, so this suppresses
     # both injection seams uniformly.  Load-bearing for the Plan-02 backstop flip
     # (peptides report complex_ring/unknown/direct, NOT heterocycle — RESEARCH
@@ -643,7 +644,7 @@ def needs_stereo_injection(mol, name: str) -> bool:
     if _looks_like_peptide(name):
         return False
 
-    # Idempotent CIP assignment (read-only — assign_stereochemistry uses
+    # Idempotent CIP assignment (D-05 read-only — assign_stereochemistry uses
     # _Orthonym_CIPAssigned marker so re-entry is cheap and side-effect free
     # beyond what RDKit's CIP labeler already does).
     assign_stereochemistry(mol)
@@ -653,7 +654,7 @@ def needs_stereo_injection(mol, name: str) -> bool:
 
 
 def count_defined_stereo_elements(mol) -> int:
-    """Count the DEFINED CIP stereogenic units on *mol*.
+    """Count the DEFINED CIP stereogenic units on *mol* (v27 Phase S Task 1).
 
     Counts, after idempotent CIP assignment:
       * every atom with ``_CIPCode`` (R/S/r/s tetrahedral + pseudoasymmetric);
@@ -757,7 +758,7 @@ def count_expressed_stereo_descriptors(name: str) -> int:
 
 
 def general_engine_stereo_complete(mol, name: str) -> bool:
-    """: all-or-nothing stereo
+    """v27 Phase S Task 1 (accuracy keystone): all-or-nothing stereo
     completeness for GENERAL-ENGINE emissions.
 
     Returns True iff *name* expresses EXACTLY every defined CIP stereo element
@@ -830,11 +831,11 @@ def inject_stereo_from_locant_map(
     if not needs_stereo_injection(mol, name):
         return name
 
-    #: hard precondition — no atom-index fallback.
+    # D-09: hard precondition — no atom-index fallback.
     # WR-02 fix (Phase 152-02, 2026-05-03): also reject all-zero / non-positive
     # locant maps. A locant of 0 or negative is IUPAC-malformed (locants are
     # 1-indexed); accepting it would emit '(0R)-name' or '(-1R)-name' garbage.
-    # Per ("missing > wrong"), skip injection.
+    # Per D-09 ("missing > wrong"), skip injection.
     if not atom_to_locant or not any(
         isinstance(v, int) and v > 0 for v in atom_to_locant.values()
     ):
@@ -844,7 +845,7 @@ def inject_stereo_from_locant_map(
         )
         return name
 
-    #: include_near_parent_ez defaults to True for P-93.5.2 compliance
+    # D-11: include_near_parent_ez defaults to True for P-93.5.2 compliance
     # (top-level only; is_top_level_naming guard at the call site enforces
     # this). BL-02 fix (Phase 152-02, 2026-05-03): cycloalkane / cycloalkene
     # caller passes include_near_parent_ez=_ring_is_whole_molecule so chain-
@@ -930,7 +931,7 @@ def inject_stereo_reanchored_rt_gated(
                     return candidate_b
             except Exception:
                 pass
-    # — 0-wrong hardening. Re-anchor FAILED (no OPSIN locant map, or
+    # v36 Wave E — 0-wrong hardening. Re-anchor FAILED (no OPSIN locant map, or
     # candidate B still does not full-round-trip): the stereo descriptor cannot be
     # placed on a numbering OPSIN reads back correctly. Returning candidate A here
     # ships a name whose stereo layer OPSIN cannot verify — the OPSIN-validity stereo

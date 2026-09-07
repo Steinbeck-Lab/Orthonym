@@ -30,7 +30,7 @@ class E1Verdict:
 # tier, which ships on the certificate rather than on OPSIN-RT.
 #
 # The check is CONSERVATIVE and SOUND-BY-REFUSAL (mirrors name_morphemes' own
-# contract, and: a false rejection would regress breadth / unmask a
+# contract, and invariant 9: a false rejection would regress breadth / unmask a
 # worse generator). It rejects ONLY when a token is CONFIDENTLY all-carbon (a
 # plain alkane/alkyl stem or a carbocyclic retained name) yet is bound to a
 # NON-carbon heavy atom. Any token that could legitimately carry a heteroatom
@@ -89,7 +89,7 @@ def _verify_partition(mol, name, pairs, allow_charged: bool = False,
 
     Extracted verbatim from the historical ``verify_certificate`` body so that
     ONE certification core is shared across every producer whose output is an
-    atom->token partition: extend, don't duplicate). Two callers
+    atom->token partition (invariant 12: extend, don't duplicate). Two callers
     today: ``verify_certificate`` (the object-shape wrapper below, for a
     ``GeneralEngineResult``) and the universal recursive namer
     (``assembly/universal_substituent.py``), whose ``UniversalResult.bindings``
@@ -183,7 +183,7 @@ def verify_atom_coverage(mol, name, atom_id_groups, allow_charged: bool = True):
     This is the OPSIN-free, jar-independent guard that catches an atom-drop at
     CONSTRUCTION (defense-in-depth: jar-present SELF-01 would also catch it, but
     only after a JVM round-trip; jar-absent nothing else does). It reuses the E1
-    partition primitive rather than duplicating a coverage check:
+    partition primitive rather than duplicating a coverage check (invariant 12:
     extend, don't duplicate) and is deliberately scoped to the COVERAGE axis:
 
     * Groups are DEDUPLICATED before binding, so a benign double-listing of an
@@ -223,7 +223,7 @@ def verify_atom_coverage(mol, name, atom_id_groups, allow_charged: bool = True):
 def verify_certificate(mol, result, allow_charged: bool = False) -> E1Verdict:
     """Atom-partition certificate for a GeneralEngineResult.
 
-    : ``allow_charged`` (set only under ``complete``) lifts the
+    v26 P5: ``allow_charged`` (set only under ``complete``) lifts the
     net-formal-charge refusal -- the charge is expressed as a
     ``-ylium``/``-ide``/``-uide``/``-ium`` suffix on an already-bound skeletal
     atom, so it introduces NO new atom and the partition is still complete.

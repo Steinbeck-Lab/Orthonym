@@ -86,7 +86,7 @@ def find_true_bridgeheads(mol) -> Set[int]:
         >>> find_true_bridgeheads(mol)
         {2, 5}  # or similar indices for the bridgehead carbons
     """
-    # SUB-02/+: delegate to the SINGLE consolidated predicate
+    # SUB-02/D-07+D-08: delegate to the SINGLE consolidated predicate
     # (perception.rings.find_ring_bridgeheads, ring_neighbours >= 3). The old
     # body required exactly 3 TOTAL neighbours all-in-ring, which wrongly
     # excluded substituted/quaternary bridgeheads (camphor's gem-dimethyl) —
@@ -346,7 +346,7 @@ def generate_bicyclo_descriptor(mol) -> Optional[str]:
         return None
 
     # Scope the bridgehead count to the connected ring component (same fix
-    # as is_bicyclo_system,: a pendant ring single-bonded
+    # as is_bicyclo_system, v33 Phase 6 lead b): a pendant ring single-bonded
     # to the core must not inflate the whole-molecule bridgehead count and
     # falsely disqualify a genuinely bicyclic core.
     ri = mol.GetRingInfo()
@@ -536,7 +536,7 @@ def get_bicyclo_numbering(mol, suffix_ring_atoms: Optional[Set[int]] = None) -> 
     if not is_bicyclo_system(mol):
         return None
 
-    # Scope to the connected ring component before
+    # Scope to the connected ring component (v33 Phase 6 lead b) before
     # counting bridgeheads, so a pendant ring's junction atom is never
     # mistaken for a 3rd bridgehead.
     ring_atoms = get_bicyclo_ring_atoms(mol) or set()
@@ -564,10 +564,15 @@ def get_bicyclo_numbering(mol, suffix_ring_atoms: Optional[Set[int]] = None) -> 
     # P-14.4 feature atom-sets (structural; derived from mol, version-stable).
     hetero = {i for i in ring_atoms if mol.GetAtomWithIdx(i).GetSymbol() != 'C'}
     ring_multibonds = []
+    ring_double_bonds = []
     for b in mol.GetBonds():
         a1, a2 = b.GetBeginAtomIdx(), b.GetEndAtomIdx()
-        if a1 in ring_atoms and a2 in ring_atoms and b.GetBondTypeAsDouble() >= 2.0:
-            ring_multibonds.append((a1, a2))
+        if a1 in ring_atoms and a2 in ring_atoms:
+            order = b.GetBondTypeAsDouble()
+            if order >= 2.0:
+                ring_multibonds.append((a1, a2))
+            if order == 2.0:
+                ring_double_bonds.append((a1, a2))
     sub_bearing = set()
     for i in ring_atoms:
         if i in suffix_set:
@@ -604,9 +609,17 @@ def get_bicyclo_numbering(mol, suffix_ring_atoms: Optional[Set[int]] = None) -> 
     def _key_lists(a2l):
         het = sorted(a2l[i] for i in hetero if i in a2l)
         suf = sorted(a2l[i] for i in suffix_set if i in a2l)
+        # `ene` is the COMBINED ene+yne locant SET (P-31.1.4.3.4 general
+        # unsaturation tier); `dbl` is the DOUBLE-bond-only locant set that
+        # breaks a combined-set tie in favour of the ene (P-31.1.4.2.4,
+        # inherited by von-Baeyer parents via P-31.1.4.3.4). Mirrors
+        # `orient_chain` criteria (b) [combined] -> (c) [doubles only]:
+        # bicyclo[11.3.1]heptadec-2-en-11-yne, NOT ...-11-en-2-yne. Pure
+        # tie-break -- inert whenever `ene` already differs.
         ene = sorted(min(a2l[a], a2l[b]) for a, b in ring_multibonds if a in a2l and b in a2l)
+        dbl = sorted(min(a2l[a], a2l[b]) for a, b in ring_double_bonds if a in a2l and b in a2l)
         sub = sorted(a2l[i] for i in sub_bearing if i in a2l)
-        return (het, suf, ene, sub)
+        return (het, suf, ene, dbl, sub)
 
     def _cmp(x, y):
         kx, ky = _key_lists(x), _key_lists(y)
@@ -634,7 +647,7 @@ def _legacy_bicyclo_numbering(mol) -> Optional[Dict[int, int]]:
     shortest bridge). Preserved verbatim as the tie-break default so
     unsubstituted / symmetric bicyclics stay byte-identical.
 
-    P-23.2.3 direction fix (cephem von Baeyer defect,: the
+    P-23.2.3 direction fix (cephem von Baeyer defect, v33 Phase 3): the
     SECONDARY (second-longest) bridge must be numbered continuing FROM the
     second bridgehead BACK toward the first -- see this module's own
     ``get_bicyclo_numbering`` docstring example for norbornane, "Second
@@ -650,7 +663,7 @@ def _legacy_bicyclo_numbering(mol) -> Optional[Dict[int, int]]:
     that bridge, where the old forward order silently swapped it onto the
     wrong ring atom -- a WRONG MOLECULE, not merely a mis-numbered one.
     """
-    # Scope to the connected ring component: a pendant
+    # Scope to the connected ring component (v33 Phase 6 lead b): a pendant
     # ring's junction atom must not be mistaken for a 3rd bridgehead.
     ring_atoms = get_bicyclo_ring_atoms(mol)
     if not ring_atoms:
@@ -948,7 +961,7 @@ def get_complete_bicyclo_data(mol, suffix_ring_atoms: Optional[Set[int]] = None)
     # Get unsaturation
     unsaturation = detect_bicyclo_unsaturation(mol, ring_atoms)
 
-    # Get bridgeheads. Scoped to the connected ring component (
+    # Get bridgeheads. Scoped to the connected ring component (v33 Phase 6
     # lead b), same as is_bicyclo_system: a pendant ring's junction atom
     # must not be mistaken for a 3rd bridgehead.
     bridgeheads = find_ring_bridgeheads(mol, ring_atoms)

@@ -1,21 +1,21 @@
-"""Phase 160 name-tree IR (DECOMP-02 + CONTEXT).
+"""Phase 160 name-tree IR (DECOMP-02 + CONTEXT D-04).
 
 Authoritative ordered-n-ary tree intermediate representation between
 handler computation (Pass-1) and final string emission (Pass-2). Per
-CONTEXT: 12-field frozen dataclass; per CONTEXT: handlers
+CONTEXT D-04: 12-field frozen dataclass; per CONTEXT D-05: handlers
 return ``NamingResult(name, tree, atom_to_locant_hint)`` and may emit
 ``tree=None`` during the incremental migration (DECOMP-03 byte-identical
 lock binds the ``name`` field only).
 
 Architecture (160-CONTEXT.md):
-- ``NameTreeNode`` — 12-field frozen dataclass; immutable;
-  serializable for ``--dump-tree``. Tree shape is ordered n-ary
+- ``NameTreeNode`` — D-04 12-field frozen dataclass; immutable;
+  serializable for ``--dump-tree`` (D-19). Tree shape is ordered n-ary
   (``prefixes: Tuple[NameTreeNode, ...]`` is variadic per IUPAC P-23
   "complex prefixes are themselves names").
-- ``NamingResult`` — NamedTuple returned by every handler.
+- ``NamingResult`` — D-05 NamedTuple returned by every handler.
 - Field-coverage map: 160-AUDIT-DECOMP.md § 5.
 
-The 12-field schema is LOCKED at audit time per CONTEXT / AP-160-27:
+The 12-field schema is LOCKED at audit time per CONTEXT D-04 / AP-160-27:
 adding or removing fields mid-Phase-160 is a Rule 4 architectural
 decision, not a silent edit.
 
@@ -23,15 +23,15 @@ Anti-pattern hygiene:
 - AP-160-15 / AP-160-26: predicate purity invariant; NameTreeNode itself
   has no side effects by construction (frozen value type).
 - AP-160-27: NameTreeNode field additions/removals mid-Phase-160 banned;
-  the 12-field schema is the locked spec per CONTEXT.
-- Predicate purity inheritance from Phase 158: NO mutable defaults;
+  the 12-field schema is the locked spec per CONTEXT D-04.
+- Predicate purity inheritance from Phase 158 D-26: NO mutable defaults;
   every field defaults to ``None`` / ``()`` / ``False``.
 - IUPAC P-section cites for each field-slot live in
-  160-AUDIT-DECOMP.md § 5 (audit-as-locked-spec per Phase 156).
+  160-AUDIT-DECOMP.md § 5 (audit-as-locked-spec per Phase 156 D-12).
 
 References:
 - 160-AUDIT-DECOMP.md § 5 — NameTreeNode Field-Coverage Map.
-- 160-CONTEXT.md (12-field schema) + (NamingResult shape).
+- 160-CONTEXT.md D-04 (12-field schema) + D-05 (NamingResult shape).
 - 160-PATTERNS.md § 1 (analog: routing/dispatch_table.py:130-148).
 """
 from __future__ import annotations
@@ -42,7 +42,7 @@ from typing import Dict, NamedTuple, Optional, Tuple
 
 @dataclass(frozen=True)
 class NameTreeNode:
-    """Phase 160: 12-field frozen ordered-n-ary IR node.
+    """Phase 160 D-04: 12-field frozen ordered-n-ary IR node.
 
     Composition order per IUPAC P-14.5::
 
@@ -51,10 +51,10 @@ class NameTreeNode:
 
     ``fragment_legacy`` carries the legacy ``NameFragment`` leaf rep
     (composer.py:537) for incremental migration; handlers MAY return
-    ``tree=None`` per (DECOMP-03 byte-identical lock binds the
+    ``tree=None`` per D-05 (DECOMP-03 byte-identical lock binds the
     ``name`` field only).
 
-    Per CONTEXT: 12 fields exactly; frozen; immutable. Attempting
+    Per CONTEXT D-04: 12 fields exactly; frozen; immutable. Attempting
     ``node.parent_stem = 'X'`` raises ``FrozenInstanceError``.
 
     Field-coverage map (per 160-AUDIT-DECOMP.md § 5):
@@ -102,9 +102,9 @@ class NameTreeNode:
 
 
 class NamingResult(NamedTuple):
-    """Phase 160: handler return shape.
+    """Phase 160 D-05: handler return shape.
 
-    Per: handlers return ``NamingResult(name, tree, atom_to_locant_hint)``;
+    Per D-05: handlers return ``NamingResult(name, tree, atom_to_locant_hint)``;
     ``tree`` is Optional during incremental migration; ``atom_to_locant_hint``
     is the locant map the post-handler stereo injector consumes
     (composer.py:807, 1681-1683 today).
@@ -131,7 +131,7 @@ class NamingResult(NamedTuple):
 def _normalize_locants(locants: Tuple[int, ...]) -> Tuple[int, ...]:
     """Sort ascending + dedupe + freeze to a tuple.
 
-    Used by handlers to guarantee invariant ``locants`` is canonical
+    Used by handlers to guarantee D-04 invariant ``locants`` is canonical
     (sorted, deduplicated) for stable serialization by ``name_tree_to_string``.
 
     Example:

@@ -1,4 +1,4 @@
-""": the independent morpheme-arity oracle.
+"""v29 Phase 1: the independent morpheme-arity oracle.
 
 WHY this module exists
 ----------------------

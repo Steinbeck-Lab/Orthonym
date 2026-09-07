@@ -280,6 +280,12 @@ _ANION_SUFFIX_MAP = {
     "ol": "olate",
     "oic acid": "oate",
     "amine": "aminide",
+    # P-72.2.2.2.3 (BB:41049): an imine anion (=N-) -> 'iminide' ('imine' + 'ide'),
+    # the exact parallel of 'amine' -> 'aminide'. The cation map (below) already has
+    # the symmetric 'imine' -> 'iminium'; this closes the asymmetry. Distinct 5-char
+    # ending from 'amine' (a name ending "imine" never ends "amine"), so no
+    # trailing-suffix collision in the seam (apply_ion_suffix_to_name).
+    "imine": "iminide",
     "thiol": "thiolate",
     "sulfonic acid": "sulfonate",
     "sulfinic acid": "sulfinate",
@@ -295,7 +301,7 @@ _ANION_SUFFIX_MAP = {
     # 'ate' or 'ite', respectively" — the -ous-acid anion takes -ite, parallel
     # to the -ic-acid -> -ate transforms above.
     "ous acid": "ite",
-    #: "nitric acid": "nitrate" DEFERRED — Plan-01 reach = 2/7,500; the
+    # D-06: "nitric acid": "nitrate" DEFERRED — Plan-01 reach = 2/7,500; the
     # internal-charge-filter precision change (protecting every nitro) is not
     # justified at that frequency.
     "carboxylic acid": "carboxylate",  # P-72.2.2.2.1.1 (CORRECT — stays)

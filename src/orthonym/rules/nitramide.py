@@ -1,4 +1,4 @@
-"""Substitutive N-nitro / nitramide naming.
+"""Substitutive N-nitro / nitramide naming (v36 Milestone B3, Task 4).
 
 BLUE BOOK AUTHORITY
 -------------------
@@ -123,15 +123,45 @@ def _name_single_nitramide(mol, amide_n: int, nitro_n: int, style: str) -> Optio
     if len(covered) != mol.GetNumAtoms():
         return None
 
-    from .amides import _name_n_substituent, format_n_substitution
+    from .amides import _name_n_substituent
 
-    subs = []
+    names: List[str] = []
     for branch in branches:
         name = _name_n_substituent(mol, branch, len(branch))
         if not name:
             return None
-        subs.append({'name': name})
-    prefix = format_n_substitution(subs)
+        names.append(name)
+
+    # Fail-closed splice guard (mirrors format_n_substitution): a refusal
+    # sentinel must never be woven into the emitted name.
+    from ..errors import is_refusal_sentinel
+    if any(is_refusal_sentinel(n) for n in names):
+        return None
+
+    # P-67.1.2 (BB:35886, "(chloromethyl)(methyl)nitramide (PIN)"): the amide N
+    # of the `nitramide` functional parent is its ONLY substitutable position, so
+    # the substituent locants are OMITTED (P-14.3.4.2) -- the PIN is
+    # '(chloromethyl)(methyl)nitramide', NOT 'N-(chloromethyl)-N-methylnitramide'
+    # (that spelling is the alternative *methanamine*-parent name, where 'N'
+    # locants ARE needed). The prefixes are cited without the 'N-' locant, in
+    # P-14.5.2 alphanumerical order, enclosed per the mononuclear single-
+    # attachment rule P-16.5.1.3.1 (BB:7272): the first cited substituent is bare
+    # (unless compound/complex, P-16.5.1.1), the second and further are each
+    # parenthesised even when simple -> 'methyl(nitro)nitramide'. Multiplied
+    # identical simple substituents keep the multiplier outside the marks.
+    from collections import Counter
+    from ..assembly.naming_utils import (
+        apply_enclosing_marks, enclose_if_compound, multiplied_component,
+        prefix_citation_sort_key,
+    )
+    counts = Counter(names)
+    parts = []
+    for i, nm in enumerate(sorted(counts, key=prefix_citation_sort_key)):
+        marked = enclose_if_compound(nm)          # P-16.5.1.1 compound/complex
+        if i > 0 and marked == nm:                # P-16.5.1.3.1 second+ simple
+            marked = apply_enclosing_marks(nm, -1)
+        parts.append(multiplied_component(counts[nm], nm, marked))
+    prefix = ''.join(parts)
     if not prefix:
         return None
     return f"{prefix}nitramide"

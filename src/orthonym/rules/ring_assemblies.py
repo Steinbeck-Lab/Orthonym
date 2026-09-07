@@ -24,11 +24,11 @@ from rdkit import Chem
 from rdkit.Chem import rdchem
 
 
-# Phase 155.B: detect indicated-H prefix in a ring stem name like
+# Phase 155.B D-09: detect indicated-H prefix in a ring stem name like
 # "1H-indole" so name_ring_assembly can replicate the descriptor across
 # all primed rings ("1H,1'H-2,2'-biindole") instead of leaving it embedded
 # as a substring of a single ring name ("2,2'-bi1H-indole").
-# Source: 155-CONTEXT.md; AUTONOM-followups.md Follow-up 12 placement
+# Source: 155-CONTEXT.md D-09; AUTONOM-followups.md Follow-up 12 placement
 #         subset; IUPAC P-31.1.4.
 _INDICATED_H_RE = re.compile(r"^(\d+)H-(.*)$")
 
@@ -44,10 +44,10 @@ _INDICATED_H_RE = re.compile(r"^(\d+)H-(.*)$")
 # Source: 155-REVIEW.md WR-05; IUPAC P-31.1.4.4.
 _INDICATED_H_EMBEDDED_RE = re.compile(r"\(\d+H\)")
 
-# Phase 151-03 type alias: cascade-step-6 supplier returns int|tuple
+# Phase 151-03 D-21 type alias: cascade-step-6 supplier returns int|tuple
 # locants. Tuples are reserved for fusion-atom locants like (8, 'a');
 # ring assemblies use plain ints because primes are name-format-layer only
-# (per 151-PATTERNS.md Pattern S-3 and CONTEXT /).
+# (per 151-PATTERNS.md Pattern S-3 and CONTEXT D-19/D-20).
 _Locant = Union[int, Tuple[int, str]]
 
 
@@ -78,10 +78,139 @@ ASSEMBLY_MULTIPLIERS = {
 # cyclopentylidene) and von Baeyer polycyclics (bicyclo[2.2.1]heptane,
 # spiro[...]). Mancude rings (phenyl, pyridine, furan, naphthalene, indole) are
 # NOT enclosed: 1,1'-biphenyl, 2,2'-bipyridine, 2,3'-bifuran, 1,2'-binaphthalene.
-# Worked examples P-28.2.1; all PINs OPSIN-RT-verified.
+# Worked examples P-28.2.1; all PINs OPSIN-RT-verified (v22 G3 / COV-03).
 _VON_BAEYER_NAME_RE = re.compile(
     r"^cyclo[a-z]+(?:ane|ene|yne|adiene|atriene|ylidene)$"
 )
+
+
+# IUPAC P-28.2.3 "Indicated hydrogen" (BB:15593): in a ring assembly the
+# indicated hydrogen is cited at the position REQUIRED IN EACH COMPONENT RING
+# (per-ring, e.g. "1H,3'H-4,4'-biazepine"), never front-replicated from the
+# first ring. An indicated-H atom is a mancude-ring skeletal atom saturated at
+# a position that would be sp2 in the mancude parent. The elements below are
+# those whose mancude position can hold an indicated hydrogen (they are part of
+# the double-bond framework in the parent): C, B, N, Si, P, Ge, As, Sn, Sb, Bi.
+# Divalent O/S/Se/Te are always saturated ring linkers and never bear an
+# indicated hydrogen, so they are excluded — matching the group split used by
+# ``heterocycles._INDICATED_H_ELEMENTS`` / ``_GROUP14_INDICATED_H``.
+_INDICATED_H_ATOM_ELEMENTS = frozenset({5, 6, 7, 14, 15, 32, 33, 50, 51, 83})
+
+
+def _ring_indicated_h_atoms(mol, ring) -> List[int]:
+    """Ring atoms holding a mancude saturated (indicated-hydrogen) position.
+
+    IUPAC P-28.2.3 (BB:15593) / P-31.1.4: the indicated hydrogen of a component
+    ring is required at the ring atom that is saturated where the mancude parent
+    would carry a double bond (the ``2H`` of 2H-pyran's CH2, the ``1H`` of
+    1H-pyrrole's N-H). Kekulize a COPY so aromatic and explicit-double rings are
+    treated alike (hazard: an aromatic CH must NOT be mistaken for an
+    indicated-H position — ``GetTotalNumHs()>=1`` would over-match every
+    aromatic ring CH; the ring-double-bond test below does not). An indicated-H
+    atom has NO ring double bond in the kekulized structure and is an element
+    that would be sp2 in the mancude parent (``_INDICATED_H_ATOM_ELEMENTS``).
+
+    One refinement handles substitution AT the indicated-H position, which is
+    exactly what a ring–ring bond in an assembly is:
+      - A genuinely sp3 (non-aromatic) skeletal position KEEPS its indicated
+        hydrogen even when a substituent / ring bond takes one of its hydrogens
+        — ``2H,2'H-2,2'-bipyran`` attaches AT the 2H carbon and still cites it.
+      - An AROMATIC pyrrole-type atom whose hydrogen has been displaced (no H
+        left) leaves the ring fully mancude with NO saturated position, so no
+        indicated hydrogen is cited — ``1,1'-bipyrrole``, not ``1H,1'H-…``
+        (P-31.1.4).
+
+    Returns the list of such atom indices (unsorted; caller maps them to the
+    assembly numbering). Fails soft to ``[]`` if the ring cannot be kekulized.
+    """
+    ring_set = set(ring)
+    try:
+        km = Chem.Mol(mol)
+        Chem.Kekulize(km, clearAromaticFlags=True)
+    except Exception:
+        return []
+    out: List[int] = []
+    for idx in ring:
+        atom = mol.GetAtomWithIdx(idx)  # original: aromaticity + H count
+        if atom.GetAtomicNum() not in _INDICATED_H_ATOM_ELEMENTS:
+            continue
+        katom = km.GetAtomWithIdx(idx)
+        has_ring_double = any(
+            bond.GetOtherAtomIdx(idx) in ring_set
+            and bond.GetBondType() == rdchem.BondType.DOUBLE
+            for bond in katom.GetBonds()
+        )
+        if has_ring_double:
+            continue
+        # A ring atom bearing an EXOCYCLIC double bond (the ``=C`` junction of a
+        # P-28.2.2 ylidene ring assembly, or an exocyclic =O/=N) is sp2, not a
+        # saturated position, so it holds no indicated hydrogen. Excluding it is
+        # what leaves ``2'H,3H-2,3'-bifuranylidene`` citing only the CH2 positions
+        # (3 and 2') rather than also the two ylidene carbons.
+        has_exo_double = any(
+            bond.GetOtherAtomIdx(idx) not in ring_set
+            and bond.GetBondType() == rdchem.BondType.DOUBLE
+            for bond in katom.GetBonds()
+        )
+        if has_exo_double:
+            continue
+        # An indicated-H bearer stripped of its hydrogen holds NO indicated
+        # hydrogen (P-31.1.4). Two sub-cases, both keyed on 0 remaining H:
+        #   - AROMATIC: N-substituted pyrrole / the ring bond of 1,1'-bipyrrole
+        #     (the ring stays fully mancude -> no saturated position);
+        #   - NON-aromatic: the pyridine-type ring nitrogen at a ring-assembly
+        #     junction (2H-1,2'-bipyridine cites only the 2H CH2, NOT a 1H on the
+        #     substituted N). A pyridine N is sp2 with no H in the mancude parent,
+        #     so once substituted it carries a substituent, not an indicated H.
+        # A genuinely-sp3 indicated position (2H-pyran's C2) keeps 1 H after the
+        # ring bond and is still cited (2H,2'H-2,2'-bipyran), so 0-H is the clean
+        # discriminator regardless of aromaticity.
+        if atom.GetTotalNumHs() == 0:
+            continue
+        out.append(idx)
+    return out
+
+
+def _compute_per_ring_ih_locants(
+    mol, ring_systems, per_system_locants,
+) -> List[Optional[List[int]]]:
+    """Per-component indicated-hydrogen locants in the ASSEMBLY numbering.
+
+    IUPAC P-28.2.3 (BB:15593): the indicated hydrogen of a ring assembly is
+    cited per component ring at its own required position. For each SINGLE-RING
+    component (Fix1 scope; fused components keep the front-replicate path) this
+    returns the sorted list of assembly-numbering locants of its indicated-H
+    atoms (see ``_ring_indicated_h_atoms`` for which atoms qualify, including the
+    substitution rule that drops the aromatic ``1,1'-bipyrrole`` descriptor but
+    keeps the sp3 ``2H,2'H-2,2'-bipyran`` one).
+
+    Returns a list aligned to ``ring_systems``; each entry is the sorted locant
+    list for a single-ring component, or ``None`` when the component is fused
+    (multi-ring) or its numbering is unavailable — a ``None`` anywhere signals
+    the caller to fall back to the front-replicate descriptor for the whole
+    assembly.
+    """
+    ri = mol.GetRingInfo()
+
+    result: List[Optional[List[int]]] = []
+    for sys_idx, sys_atoms in enumerate(ring_systems):
+        sys_rings = [r for r in ri.AtomRings() if set(r) <= sys_atoms]
+        if len(sys_rings) != 1:
+            result.append(None)  # fused component: keep front-replicate
+            continue
+        ring = sys_rings[0]
+        ih_atoms = _ring_indicated_h_atoms(mol, ring)
+        if (per_system_locants is None
+                or sys_idx >= len(per_system_locants)
+                or per_system_locants[sys_idx] is None):
+            result.append(None)
+            continue
+        locmap = per_system_locants[sys_idx]
+        if any(a not in locmap for a in ih_atoms):
+            result.append(None)  # incomplete numbering: fall back
+            continue
+        result.append(sorted(locmap[a] for a in ih_atoms))
+    return result
 
 
 def _needs_von_baeyer_parens(name: str) -> bool:
@@ -140,6 +269,143 @@ def _is_saturated_carbocycle(mol, system_atoms: Set[int]) -> bool:
             and a2 in system_atoms
             and bond.GetBondType() == rdchem.BondType.DOUBLE
         ):
+            return False
+    return True
+
+
+def _mancude_ring_stem(mol, system_atoms: Set[int]) -> Optional[str]:
+    """Bare mancude parent-hydride stem of a monocyclic heterocyclic ring system.
+
+    IUPAC P-28.2.2 / P-28.2.3: a heterocyclic double-bond (ylidene) ring assembly
+    such as ``2'H,3H-2,3'-bifuranylidene`` is named on the MANCUDE parent stem
+    (``furan``), not the partially saturated component name that
+    ``_get_ring_parent_name`` returns for the actual ylidene ring
+    (``2,3-dihydrofuran``). Rebuild the ring as a fully aromatic system and let
+    RDKit validate the aromaticity, then name it with the heterocycle namer. This
+    handles the whole aromatizable-heterocycle class (furan, thiophene, ...) and
+    fails closed (``None``) for anything that is not a clean aromatic mancude ring
+    or whose stem is not a bare ``^[a-z]+$`` name (a stem carrying its own
+    indicated hydrogen or locant set, e.g. ``1H-pyrrole``, is not built here).
+    """
+    ri = mol.GetRingInfo()
+    ring = next((r for r in ri.AtomRings() if set(r) == set(system_atoms)), None)
+    if ring is None:
+        return None
+    if not any(mol.GetAtomWithIdx(i).GetSymbol() != "C" for i in ring):
+        return None  # carbocyclic ylidenes go through _to_ylidene, not here
+    n = len(ring)
+    ring_set = set(ring)
+    adj: Dict[int, List[int]] = {i: [] for i in ring}
+    for i in ring:
+        for bond in mol.GetAtomWithIdx(i).GetBonds():
+            j = bond.GetOtherAtomIdx(i)
+            if j in ring_set:
+                adj[i].append(j)
+    if any(len(v) != 2 for v in adj.values()):
+        return None  # not a simple monocycle
+    # Walk the ring in cyclic order.
+    order = [ring[0]]
+    prev, cur = None, ring[0]
+    while len(order) < n:
+        nxt = next((x for x in adj[cur] if x != prev), None)
+        if nxt is None:
+            return None
+        order.append(nxt)
+        prev, cur = cur, nxt
+    rw = Chem.RWMol()
+    idxmap: Dict[int, int] = {}
+    for i in order:
+        a = Chem.Atom(mol.GetAtomWithIdx(i).GetAtomicNum())
+        a.SetIsAromatic(True)
+        idxmap[i] = rw.AddAtom(a)
+    for k in range(n):
+        i, j = order[k], order[(k + 1) % n]
+        rw.AddBond(idxmap[i], idxmap[j], rdchem.BondType.AROMATIC)
+    m2 = rw.GetMol()
+    try:
+        Chem.SanitizeMol(m2)
+    except Exception:
+        return None
+    if not all(m2.GetAtomWithIdx(i).GetIsAromatic() for i in range(n)):
+        return None
+    from .heterocycles import name_heterocycle
+    m2_ring = next(
+        (r for r in m2.GetRingInfo().AtomRings() if len(r) == n), None)
+    if m2_ring is None:
+        return None
+    stem = name_heterocycle(m2, m2_ring)
+    if not stem or not re.match(r"^[a-z]+$", stem):
+        return None
+    return stem
+
+
+def _is_mancude_ylidene_component(mol, system_atoms: Set[int]) -> bool:
+    """True if a ring system is a single mancude heterocyclic ring nameable as a
+    P-28.2.2/P-28.2.3 ylidene assembly component (``furan`` -> ``bifuranylidene``).
+
+    Distinct from ``_is_saturated_carbocycle`` (carbocyclic ylidene, no
+    heteroatom) and from ``_is_replacement_assembly_candidate`` (SATURATED
+    heteromonocycle -> replacement 'a'-nomenclature). Delegates the clean-stem
+    test to ``_mancude_ring_stem`` so the admitted set is exactly what the ylidene
+    namer can spell."""
+    ri = mol.GetRingInfo()
+    rings = [r for r in ri.AtomRings() if set(r) <= system_atoms]
+    if len(rings) != 1 or set(rings[0]) != set(system_atoms):
+        return False
+    return _mancude_ring_stem(mol, system_atoms) is not None
+
+
+def _is_mancude_indicated_h_state(mol, system_atoms: Set[int]) -> bool:
+    """True if a single monocyclic ring is in a MANCUDE state -- carrying the
+    maximum number of noncumulative ring double bonds, so every saturated ring
+    position is a genuine indicated-hydrogen position and NOT a hydro (di- /
+    tetra- / perhydro) saturation.
+
+    IUPAC P-31.1.4 / P-28.2.3 (BB:15593): the indicated hydrogen of a ring
+    assembly component (the ``2H`` of ``2H-1,2'-bipyridine``) is a property OF the
+    one mancude parent; aromatic pyridine and its N-substituted 2H tautomer are
+    the SAME mancude ring in two indicated-hydrogen states. A ring that could
+    still accept a further noncumulative ring double bond -- two ADJACENT
+    saturated ring atoms that both still bear a hydrogen -- is instead a HYDRO
+    derivative (1,2-dihydropyridine, piperidine): a genuinely different parent,
+    NOT another indicated-H tautomer. ``_mancude_ring_stem`` re-aromatizes ANY
+    ring (piperidine normalizes to ``pyridine`` too), so this test is what keeps
+    the assembly detector from merging a mancude ring with its hydro partner.
+
+    A saturated ring atom = no ring OR exocyclic double bond in the kekulized
+    structure. A further double bond is addable between two adjacent saturated
+    ring atoms only when BOTH still carry a hydrogen -- a substituted nitrogen
+    with no H (as at the ring-assembly junction) cannot, which is exactly why the
+    N-substituted 2H-pyridine stays mancude. Fails soft to ``False`` if the ring
+    cannot be kekulized or is not a simple monocycle.
+    """
+    ri = mol.GetRingInfo()
+    ring = next((r for r in ri.AtomRings() if set(r) == set(system_atoms)), None)
+    if ring is None:
+        return False
+    ring_set = set(ring)
+    try:
+        km = Chem.Mol(mol)
+        Chem.Kekulize(km, clearAromaticFlags=True)
+    except Exception:
+        return False
+
+    def _saturated(idx: int) -> bool:
+        for bond in km.GetAtomWithIdx(idx).GetBonds():
+            if bond.GetBondType() == rdchem.BondType.DOUBLE:
+                return False  # a ring OR exocyclic double bond -> sp2, not saturated
+        return True
+
+    # NOT mancude if a further noncumulative ring double bond can be added: two
+    # adjacent saturated ring atoms that both still bear a hydrogen.
+    for bond in mol.GetBonds():
+        a1, a2 = bond.GetBeginAtomIdx(), bond.GetEndAtomIdx()
+        if a1 not in ring_set or a2 not in ring_set:
+            continue
+        if not _saturated(a1) or not _saturated(a2):
+            continue
+        if (mol.GetAtomWithIdx(a1).GetTotalNumHs() >= 1
+                and mol.GetAtomWithIdx(a2).GetTotalNumHs() >= 1):
             return False
     return True
 
@@ -209,16 +475,24 @@ _RA_REPL_ORDER = ['O', 'S', 'Se', 'Te']  # element seniority (P-28.4.2 set order
 def _is_replacement_assembly_candidate(
     mol, ring_systems: List[Set[int]], connections: List[Tuple[int, int, int, int]]
 ) -> bool:
-    """P-28.4.2 gate: exactly two SAME-SIZE saturated monocyclic components,
-    each all-carbon except AT MOST one neutral divalent ring heteroatom from
-    {O,S,Se,Te}, joined by exactly one ring-to-ring SINGLE bond. At least one
-    component must carry a heteroatom (else it is a plain carbocyclic assembly
-    handled elsewhere). Fail-closed for anything richer."""
+    """P-28.4.1/P-28.4.2 gate: exactly two SAME-SIZE saturated monocyclic
+    components of MORE THAN TEN ring atoms (the size at which the cycloalkane
+    carries its heteroatoms by skeletal replacement rather than a Hantzsch-Widman
+    stem), each all-carbon except AT MOST one neutral divalent ring heteroatom
+    from {O,S,Se,Te}, joined by exactly one ring-to-ring SINGLE or DOUBLE
+    (ylidene) bond. At least one component must carry a heteroatom (else it is a
+    plain carbocyclic assembly handled elsewhere). The two rings may be identical
+    (``3,3'-dioxa-1,1'-bi(cyclotetradecane)``,
+    ``2,2'-dithia-1,1'-bi(cyclododecylidene)``) or differ only by the replacement
+    heteroatom (``3'-oxa-2-thia-1,1'-bi(cyclotetradecane)``). Fail-closed for
+    anything richer."""
     if len(ring_systems) != 2 or len(connections) != 1:
         return False
     a1, a2, _, _ = connections[0]
     bond = mol.GetBondBetweenAtoms(a1, a2)
-    if bond is None or bond.GetBondType() != rdchem.BondType.SINGLE:
+    if bond is None or bond.GetBondType() not in (
+        rdchem.BondType.SINGLE, rdchem.BondType.DOUBLE
+    ):
         return False
     ri = mol.GetRingInfo()
     sizes = []
@@ -253,6 +527,11 @@ def _is_replacement_assembly_candidate(
                     b.GetBondType() == rdchem.BondType.DOUBLE:
                 return False
     if sizes[0] != sizes[1] or total_hetero == 0:
+        return False
+    # Only rings LARGER than the Hantzsch-Widman range (>10) are named by
+    # skeletal replacement; a small saturated heteromonocycle (oxane, thiane, ...)
+    # keeps its HW/retained assembly name and must NOT be diverted here.
+    if sizes[0] <= 10:
         return False
     # No substituents beyond the inter-ring bond (each ring atom degree <=2
     # except the two attachment atoms which are degree 3 via the junction).
@@ -352,25 +631,44 @@ def _name_replacement_ring_assembly(mol, assembly_info: Dict) -> Optional[str]:
     setB = _combined(optB)
     chosen = optA if setA <= setB else optB
 
-    # Cite 'a'-prefixes in element-seniority order (O>S>Se>Te), each with its
-    # (possibly primed) locant.
-    cited = []
+    # Cite 'a'-prefixes in element-seniority order (O>S>Se>Te). When the SAME
+    # replacement heteroatom appears in both rings it is cited ONCE with a
+    # multiplying prefix and a combined locant set (P-31.1.4.3.4 multiplication):
+    # two ring oxygens at 3 and 3' -> '3,3'-dioxa', two ring sulfurs at 2 and 2'
+    # -> '2,2'-dithia'; distinct elements stay separate ('3'-oxa-2-thia').
+    by_elem: Dict[str, List[Tuple[int, bool]]] = {}
     for loc, sym, primed in chosen:
         if loc is None or sym is None:
             continue
-        term = _RA_REPL_TERMS.get(sym)
-        if term is None:
+        if sym not in _RA_REPL_TERMS:
             return None
-        prime = "'" if primed else ""
-        cited.append((_RA_REPL_ORDER.index(sym), f"{loc}{prime}-{term}"))
-    if not cited:
+        by_elem.setdefault(sym, []).append((loc, primed))
+    if not by_elem:
         return None
+    _MULT = {1: '', 2: 'di', 3: 'tri', 4: 'tetra'}
+    cited: List[Tuple[int, str]] = []
+    for sym, entries in by_elem.items():
+        entries.sort()
+        mult = _MULT.get(len(entries))
+        if mult is None:
+            return None
+        locant_str = ",".join(
+            f"{loc}{chr(39) if primed else ''}" for loc, primed in entries)
+        cited.append(
+            (_RA_REPL_ORDER.index(sym),
+             f"{locant_str}-{mult}{_RA_REPL_TERMS[sym]}"))
     cited.sort(key=lambda x: x[0])
     prefix = "-".join(part for _, part in cited)
 
     stem = get_chain_prefix(n1)  # e.g. 'tetradec' for 14
-    # Both attachment atoms are locant 1 in their rings -> '1,1'-bi(cyclo...ane)'.
-    return f"{prefix}-1,1'-bi(cyclo{stem}ane)"
+    # P-28.2.2: a double-bond (ylidene) junction names the ring skeleton as
+    # 'cyclo...ylidene' (2,2'-dithia-1,1'-bi(cyclododecylidene)); a single-bond
+    # junction keeps 'cyclo...ane'. Both attachment atoms are locant 1 in their
+    # rings -> '1,1'-bi(cyclo...)'.
+    skeleton = (f"cyclo{stem}ylidene"
+                if assembly_info.get('double_bond_junction')
+                else f"cyclo{stem}ane")
+    return f"{prefix}-1,1'-bi({skeleton})"
 
 
 def _find_inter_system_bonds(
@@ -460,7 +758,7 @@ def _check_all_connected(
 def _check_path_topology(
     num_systems: int, connections: List[Tuple[int, int, int, int]]
 ) -> bool:
-    """Phase 151-03: linear-path requirement for ring assemblies.
+    """Phase 151-03 D-15: linear-path requirement for ring assemblies.
 
     Every system must have degree <= 2 in the inter-system bond graph.
     Branched arrangements (e.g., 1,3,5-triphenylbenzene where the central
@@ -477,7 +775,7 @@ def _check_path_topology(
         ``connections`` (a linear path / single bond ring assembly);
         False otherwise.
 
-    Source: 151-CONTEXT.md.
+    Source: 151-CONTEXT.md D-15.
     Source: 151-RESEARCH.md §"Code Examples" Example 4.
     Source: AUTONOM-1990 §5; IUPAC Blue Book P-28.2.
     """
@@ -597,7 +895,7 @@ def detect_ring_assembly(
           - count: number of identical ring systems
           - ring_type: 'carbocyclic' or 'heterocyclic'
 
-    Phase 154.B cross-handler contract:
+    Phase 154.B D-11 cross-handler contract:
         Ring-assembly detection (this function) and multiplicative naming
         (rules.multiplicative.name_multiplicative) are MUTUALLY EXCLUSIVE
         by topology.  Ring assemblies = identical rings joined directly by
@@ -609,11 +907,11 @@ def detect_ring_assembly(
             single bonds; bridge atoms are NOT in rings, so atom-bridged
             cases never produce inter-system bonds)
           - name_multiplicative rejects single-bond-only cases via
-            _is_pure_single_bond_assembly at the entry point (guard)
+            _is_pure_single_bond_assembly at the entry point (D-11 guard)
         Cross-handler regression test:
         tests/integration/test_assembly_vs_multiplicative_dispatch.py.
 
-    Source: 154-CONTEXT.md; 151-CONTEXT.md (path-topology contract).
+    Source: 154-CONTEXT.md D-11; 151-CONTEXT.md D-15 (path-topology contract).
     """
     if len(ring_systems) < 2:
         return None
@@ -627,46 +925,80 @@ def detect_ring_assembly(
     if not _check_all_connected(len(ring_systems), connections):
         return None
 
-    # Phase 151-03: linear-path requirement (every system degree <= 2).
+    # Phase 151-03 D-15: linear-path requirement (every system degree <= 2).
     # Rejects branched arrangements like 1,3,5-triphenylbenzene where the
     # central system has degree 3. AUTONOM-1990 §5 + IUPAC P-28.2.
     if not _check_path_topology(len(ring_systems), connections):
         return None
 
-    # Compare signatures -- all must be identical
+    # Compare signatures -- identical rings take the main naming path below.
     signatures = [_system_signature(mol, sys_atoms) for sys_atoms in ring_systems]
-    if len(set(signatures)) != 1:
-        # P-28.4.2: ring-assembly components need NOT be identical when they
-        # share the same ring SKELETON and differ only by skeletal-replacement
-        # heteroatoms; then 'a'-nomenclature names the assembly
-        # (3'-oxa-2-thia-1,1'-bi(cyclotetradecane)). Admit ONLY that narrow
-        # class (2 same-size single-heteroatom saturated monocycles, one
-        # ring-to-ring single-bond junction) tagged for the replacement namer;
-        # everything else keeps failing closed.
-        if _is_replacement_assembly_candidate(mol, ring_systems, connections):
-            return {
-                'ring_systems': ring_systems,
-                'connections': connections,
-                'count': len(ring_systems),
-                'ring_type': 'heterocyclic',
-                'double_bond_junction': False,
-                'replacement': True,
-            }
-        return None
+    identical = len(set(signatures)) == 1
+    mancude_tautomer = False  # set when merged via the indicated-H tautomer path
 
     # IUPAC P-28.2.2: a junction may be a DOUBLE bond (bi(...ylidene)).
-    # _find_inter_system_bonds now also returns double-bond junctions; restrict
-    # the ones this detector CLAIMS to the saturated-carbocycle class that the
-    # ylidene namer can build. Other double-bond junctions return None here so
-    # the molecule keeps its prior (substituent-based) naming instead of
-    # early-returning in namer.py to a fail-closed dead end (A10, no wrong names).
+    # _find_inter_system_bonds also returns double-bond junctions.
     double_bond_junction = any(
         (bond := mol.GetBondBetweenAtoms(a1, a2)) is not None
         and bond.GetBondType() == rdchem.BondType.DOUBLE
         for a1, a2, _, _ in connections
     )
-    if double_bond_junction and not all(
-        _is_saturated_carbocycle(mol, sys_atoms) for sys_atoms in ring_systems
+
+    # P-28.4.1/P-28.4.2: skeletal-replacement ('a') nomenclature names a
+    # two-component SATURATED heteromonocyclic assembly (>10-membered rings), be
+    # the rings identical (share a signature: 3,3'-dioxa-1,1'-bi(cyclotetradecane),
+    # 2,2'-dithia-1,1'-bi(cyclododecylidene)) or differing only by the replacement
+    # heteroatom (3'-oxa-2-thia-1,1'-bi(cyclotetradecane), signatures differ). The
+    # junction may be single (bi(cyclo...ane)) or double (bi(cyclo...ylidene)).
+    # Checked here for BOTH signature cases; everything richer falls through.
+    if _is_replacement_assembly_candidate(mol, ring_systems, connections):
+        return {
+            'ring_systems': ring_systems,
+            'connections': connections,
+            'count': len(ring_systems),
+            'ring_type': 'heterocyclic',
+            'double_bond_junction': double_bond_junction,
+            'replacement': True,
+        }
+
+    if not identical:
+        # P-28.2.3 (BB:15593) / P-31.1.4: two rings that are the SAME mancude
+        # parent in different indicated-hydrogen states (aromatic pyridine + its
+        # N-substituted 2H tautomer) form ONE ring assembly -- indicated H is a
+        # property OF the mancude parent, not a distinct ring system. Their
+        # _system_signature differs only in aromaticity / ring-double-bond count,
+        # yet both normalize to the SAME mancude monocycle stem. Merge them --
+        # SINGLE-bond junctions only, to leave the ylidene double-bond path (guard
+        # below) exactly as it is -- when EVERY component is a known mancude
+        # monocycle IN a mancude state (_is_mancude_indicated_h_state: not a hydro
+        # derivative) and all normalize to the same stem. 9-B3a's per-ring
+        # indicated-H recompute then cites the 2H on the correct component
+        # (2H-1,2'-bipyridine). The mancude-state test is essential: bare stem
+        # normalization also merges pyridine with piperidine / 1,2-dihydropyridine
+        # (both re-aromatize to 'pyridine'), which are hydro derivatives, NOT
+        # indicated-H tautomers.
+        if double_bond_junction:
+            return None
+        stems = [_mancude_ring_stem(mol, sys_atoms) for sys_atoms in ring_systems]
+        if not (all(s is not None for s in stems) and len(set(stems)) == 1):
+            return None
+        if not all(_is_mancude_indicated_h_state(mol, sys_atoms)
+                   for sys_atoms in ring_systems):
+            return None
+        identical = True
+        mancude_tautomer = True
+
+    # Restrict the double-bond junctions this detector CLAIMS to the classes the
+    # ylidene namer can build: the saturated-carbocycle class
+    # (1,1'-bi(cyclopentylidene)) and the mancude heterocyclic class
+    # (2'H,3H-2,3'-bifuranylidene). Other double-bond junctions return None here so
+    # the molecule keeps its prior (substituent-based) naming instead of
+    # early-returning in namer.py to a fail-closed dead end (A10, no wrong names).
+    if double_bond_junction and not (
+        all(_is_saturated_carbocycle(mol, sys_atoms)
+            for sys_atoms in ring_systems)
+        or all(_is_mancude_ylidene_component(mol, sys_atoms)
+               for sys_atoms in ring_systems)
     ):
         return None
 
@@ -706,6 +1038,7 @@ def detect_ring_assembly(
         'count': len(ring_systems),
         'ring_type': ring_type,
         'double_bond_junction': double_bond_junction,
+        'mancude_tautomer': mancude_tautomer,
     }
 
 
@@ -923,11 +1256,11 @@ def _number_carbocyclic_from_anchor(
     mol, system_atoms: Set[int], anchor_atom: int,
     other_inter_system_atoms: Set[int],
 ) -> Optional[Dict[int, int]]:
-    """Phase 151-03 /: per-ring numbering for a carbocyclic
+    """Phase 151-03 D-18 / D-19: per-ring numbering for a carbocyclic
     assembly component anchored at ``anchor_atom`` (which becomes locant 1).
 
     Numbers the ring atoms in the direction that gives the lowest locant
-    set for the OTHER inter-system bond atoms (first-point-of-difference
+    set for the OTHER inter-system bond atoms (D-19 first-point-of-difference
     via ``compare_locant_sets``). Used by ``_compute_per_system_ring_locants``
     to produce the per-system IUPAC locant maps that drive name emission
     AND the cascade-step-6 supplier.
@@ -946,9 +1279,9 @@ def _number_carbocyclic_from_anchor(
         Dict mapping atom_idx -> int locant covering all ring atoms in
         the (single-)ring system. Returns None for multi-ring systems
         (those use absolute numbering via _get_ring_parent_name). For
-        single-ring systems, the lowest-locant direction wins per.
+        single-ring systems, the lowest-locant direction wins per D-19.
 
-    Source: 151-CONTEXT.md,,.
+    Source: 151-CONTEXT.md D-18, D-19, D-20.
     Source: AUTONOM-1990 §3 (criterion order — lowest-locant tiebreak).
     Source: IUPAC Blue Book P-28.2.1.
     """
@@ -996,17 +1329,17 @@ def _number_carbocyclic_from_anchor(
 def _compute_per_system_ring_locants(
     mol, assembly_info: Dict,
 ) -> Optional[List[Dict[int, int]]]:
-    """Phase 151-03 /: per-system IUPAC locant maps for a ring
+    """Phase 151-03 D-18 / D-21: per-system IUPAC locant maps for a ring
     assembly. Each entry is a Dict[int, int] mapping atom_idx -> locant
     (within that system's own numbering).
 
     For carbocyclic single-ring components: locant 1 = the inter-system
     bond atom going TOWARDS the lower-indexed neighbour ring; the second
     bond atom (if present) gets the lowest-locant ring-walk distance per
-     ``compare_locant_sets`` tiebreak.
+    D-19 ``compare_locant_sets`` tiebreak.
 
     For heterocyclic components: heteroatom-priority numbering via
-    ``_get_connection_locant`` (existing logic, own-numbering).
+    ``_get_connection_locant`` (existing logic, D-18 own-numbering).
 
     For multi-ring fused components (e.g., biindole): absolute numbering
     by per-component canonical SMILES lookup is delegated to
@@ -1022,7 +1355,7 @@ def _compute_per_system_ring_locants(
         position (matching assembly_info['ring_systems'] order). Returns
         None if any system cannot be numbered fully.
 
-    Source: 151-CONTEXT.md,,.
+    Source: 151-CONTEXT.md D-18, D-19, D-21.
     Source: 151-PATTERNS.md Pattern S-3 (cascade-step-6 supplier).
     """
     ring_systems = assembly_info["ring_systems"]
@@ -1067,7 +1400,7 @@ def _compute_per_system_ring_locants(
                 mol.GetAtomWithIdx(i).GetSymbol() != "C" for i in ring
             )
             if not has_hetero:
-                # Carbocyclic single ring: number from anchor with
+                # Carbocyclic single ring: number from anchor with D-19
                 # lowest-locant tiebreak on other_atoms.
                 m = _number_carbocyclic_from_anchor(
                     mol, sys_atoms, anchor_atom, other_atoms
@@ -1080,7 +1413,7 @@ def _compute_per_system_ring_locants(
         # IUPAC P-25 absolute numbering (heteroatom = locant 1). Walking
         # direction is chosen to give the LOWEST locant set to the
         # inter-system bond atoms (P-28.2.1 connection-locant lowest-locant
-        # rule + first-point-of-difference via compare_locant_sets).
+        # rule + D-19 first-point-of-difference via compare_locant_sets).
         sys_map: Dict[int, int] = {}
         if len(sys_rings) == 1:
             ring = sys_rings[0]
@@ -1107,8 +1440,22 @@ def _compute_per_system_ring_locants(
                     ([anchor_atom] if anchor_atom is not None else [])
                     + sorted(other_atoms)
                 )
+                # BLOCKER-3: the indicated-hydrogen atoms of this ring, so
+                # their locant set can break a walking-direction tie. P-32.2.1
+                # (BB:17309) orders numbering criteria "heteroatoms have the
+                # lower possible locants, then indicated hydrogen atoms ..." and
+                # P-25.3.3.1.2(f) (BB:12612) "low locants are assigned to
+                # indicated hydrogen atoms". For a 2H-pyridin-1-yl junction the
+                # inter-system bond atom IS the heteroatom (locant 1 in BOTH
+                # directions), so the connection-locant set ties and direction
+                # used to fall to RDKit atom order -> 2H- or 6H- depending on the
+                # SMILES writing (non-deterministic, non-PIN). The iH locant set
+                # is the next tiebreak: 2 < 6 selects 2H-1,2'-bipyridine for
+                # every writing.
+                ih_atoms = _ring_indicated_h_atoms(mol, ring)
                 best_map: Optional[Dict[int, int]] = None
                 best_locant_set: Optional[List[int]] = None
+                best_ih_set: Optional[List[int]] = None
                 for direction in (1, -1):
                     oriented = [
                         ring_list[(start_pos + direction * i) % n]
@@ -1118,10 +1465,24 @@ def _compute_per_system_ring_locants(
                     cand_set = sorted(cand_map[a] for a in conn_atoms if a in cand_map)
                     if not cand_set:
                         continue
-                    if best_locant_set is None or compare_locant_sets(
-                        cand_set, best_locant_set
-                    ) < 0:
+                    cand_ih_set = sorted(
+                        cand_map[a] for a in ih_atoms if a in cand_map
+                    )
+                    if best_locant_set is None:
+                        take = True
+                    else:
+                        c = compare_locant_sets(cand_set, best_locant_set)
+                        # Primary: lowest connection-locant set (P-28.2.1). When
+                        # it ties, secondary: lowest indicated-H locant set
+                        # (P-32.2.1). direction +1 (tried first) is the final
+                        # stable tiebreak, so the order is total & deterministic.
+                        take = c < 0 or (
+                            c == 0
+                            and compare_locant_sets(cand_ih_set, best_ih_set) < 0
+                        )
+                    if take:
                         best_locant_set = cand_set
+                        best_ih_set = cand_ih_set
                         best_map = cand_map
                 if best_map is not None:
                     sys_map = best_map
@@ -1267,7 +1628,7 @@ def _reassign_carbocyclic_locants(mol, ring_systems, connections, substituents):
         # as origins for a deterministic, lowest-locant choice. Using only the
         # first junction made the disubstituted-middle-ring numbering
         # SMILES-order dependent (2'-carboxy-3'-chloro vs 3'-carboxy-2'-chloro;
-        # #41, the >=2-substituent sibling of the single-substituent fix in
+        # v30 #41, the >=2-substituent sibling of the single-substituent fix in
         # _get_substituent_info).
         conn_atoms = []
         for a1, a2, s1, s2 in connections:
@@ -1393,7 +1754,7 @@ def _get_substituent_info(
             # rings are equivalent, so the substituent's lowest achievable
             # locant is the min over all junction origins. Using only the
             # FIRST connection made the locant SMILES-order-dependent
-            # (2' vs 3'; #41, fable a998bea712). Taking the min is both
+            # (2' vs 3'; v30 #41, fable a998bea712). Taking the min is both
             # deterministic and the IUPAC lowest-locant choice.
             conn_atoms = []
             for a1, a2, s1, s2 in connections:
@@ -1755,7 +2116,7 @@ def _mixed_ring_assembly_prefix_name(
     supported carbocyclic-biaryl class, so the caller abstains rather than ship
     a garbage/dropped prefix (the local ``_name_substituent`` can still return an
     ``"unknown organic compound"`` mangle for groups it cannot name -- a no-Java
-    leak. Its former ``"substituent"`` placeholder is gone:
+    leak. Its former ``"substituent"`` placeholder is gone: v29 P7 T4 made that
     branch return None, so an unnameable group now fails closed at the source).
 
     Supported: demoted suffix-expressible PCG kinds (carboxy/formyl/cyano/
@@ -1935,8 +2296,15 @@ def _build_mixed_pcg_ring_assembly(
     smult = {1: '', 2: 'di', 3: 'tri', 4: 'tetra'}.get(len(suffix_keys))
     if smult is None:
         return None
+    # P-16.7.1(c) (BB 7623/7625): the terminal 'a' of a numerical multiplier is
+    # elided before a vowel-initial suffix ('tetra'+'ol' -> 'tetrol',
+    # 'tetra'+'amine' -> 'tetramine'); '-carboxylic acid'/'-carbaldehyde'/
+    # '-carbonitrile' (consonant-initial) and 'di'/'tri' (no terminal 'a') are
+    # left untouched. Route through the shared elision primitive rather than the
+    # raw f-string so ``[1,1'-biphenyl]-2,4,4',6-tetrol`` (PIN) is emitted.
+    from ..assembly.naming_utils import _join_multiplied_suffix
     core = (f"[{connection_str}-{multiplier}{ring_name}]"
-            f"-{suffix_loc_str}-{smult}{senior}")
+            f"-{suffix_loc_str}-{_join_multiplied_suffix(smult, senior)}")
 
     # Prefix block (alphanumerical, grouped multipliers). Directly abuts '[' with
     # NO hyphen (P-16.5.1.1: no hyphen before an opening enclosing mark).
@@ -2022,7 +2390,7 @@ def name_ring_assembly(
         return None
 
     # Build connection locant string per IUPAC P-28.2.1.
-    # Phase 151-03 /: use per-system numbering so ter-/quater-
+    # Phase 151-03 D-18 / D-19: use per-system numbering so ter-/quater-
     # assemblies emit the correct middle-ring back-attachment locant
     # (4 for para-terphenyl, 6 for terpyridine, 5 for terthiophene).
     # The pre-151-03 path called _get_connection_locant per pair, which
@@ -2054,7 +2422,7 @@ def name_ring_assembly(
     # nitro, halogen, alkyl, alkoxy). A blanket check here short-circuits both.
     # The abstention belongs where the prefix-only path actually consumes
     # ``s['name']`` -- see the veto loop below, which has fail-closed on a
-    # missing name since c6b9f6ba (P-29.2).
+    # missing name since c6b9f6ba (P-29.2). v29 P7 T4 (b0ec23eb) added the
     # hoisted duplicate and it cost the P2-RING-ASSEMBLY-MIXED gold target
     # (4'-nitro[1,1'-biphenyl]-4-carboxylic acid -> abstention): nitro reaches
     # ``_name_substituent`` first, gets None, and the assembly died before the
@@ -2080,6 +2448,13 @@ def name_ring_assembly(
     # the single-kind-suffix branch, the mixed prefix+suffix builder, and the
     # plain substituent-prefix branch) automatically consistent: they all key
     # off the same (now canonical) ``system_idx``.
+    # P-28.2.3 (BB:15593): per-component indicated-hydrogen locants, computed in
+    # the assembly numbering, drive both the priming tiebreak below (indicated H
+    # is senior to substituent prefixes, P-14.4(b) ahead of (g)) and the
+    # per-ring descriptor in the indicated-H branch further down.
+    per_ring_ih_locants = _compute_per_ring_ih_locants(
+        mol, ring_systems, per_system_locants)
+
     if count == 2 and len(ring_systems) == 2:
         def _combined_key(swap: bool):
             conn_key = []
@@ -2089,11 +2464,22 @@ def name_ring_assembly(
                     loc = _lookup_locant(
                         per_system_locants, sys, atom, ring_systems[sys])
                     conn_key.append((loc, eff_sys))
+            # P-28.2.3 / P-14.4(b): indicated hydrogen is senior to substituent
+            # prefixes when choosing which ring is unprimed. Only a tiebreak when
+            # the assembly is unsubstituted (all our per-ring iH targets are), so
+            # substituted rows keep their established (conn, subst) priming.
+            ih_key = []
+            if not substituent_list:
+                for sys_idx, locs in enumerate(per_ring_ih_locants):
+                    if locs:
+                        for loc in locs:
+                            eff_sys = (1 - sys_idx) if swap else sys_idx
+                            ih_key.append((loc, eff_sys))
             sub_key = []
             for s in substituent_list:
                 eff_sys = (1 - s['system_idx']) if swap else s['system_idx']
                 sub_key.append((s['locant'], eff_sys))
-            return (sorted(conn_key), sorted(sub_key))
+            return (sorted(conn_key), sorted(ih_key), sorted(sub_key))
 
         if _combined_key(True) < _combined_key(False):
             ring_systems = [ring_systems[1], ring_systems[0]]
@@ -2101,6 +2487,7 @@ def name_ring_assembly(
                            for (a1, a2, s1, s2) in connections]
             if per_system_locants is not None and len(per_system_locants) == 2:
                 per_system_locants = [per_system_locants[1], per_system_locants[0]]
+            per_ring_ih_locants = [per_ring_ih_locants[1], per_ring_ih_locants[0]]
             for s in substituent_list:
                 s['system_idx'] = 1 - s['system_idx']
 
@@ -2134,21 +2521,65 @@ def name_ring_assembly(
     connection_str = ":".join(connection_parts)
 
     # IUPAC P-28.2.2: a double-bond junction is named with the ylidene
-    # substituent-group form (method 2), enclosed in parentheses to avoid
-    # confusion with von Baeyer names: 1,1'-bi(cyclopentylidene). The detector
-    # restricts entry to saturated carbocycles; convert cyclopentane ->
-    # cyclopentylidene here. Fail closed (return None -> prior naming) if the
-    # component is not a clean cyclo...ane ring or carries substituents, since
-    # substituted ylidene assemblies are outside the built class (no wrong names).
+    # substituent-group form (method 2). Two classes: the saturated-carbocycle
+    # ring, enclosed in parentheses to avoid confusion with von Baeyer names
+    # (1,1'-bi(cyclopentylidene)); and the mancude heterocyclic ring, named on its
+    # mancude parent stem with per-component indicated hydrogen
+    # (2'H,3H-2,3'-bifuranylidene). Fail closed (return None -> prior naming) if
+    # the component carries substituents or is neither class (no wrong names).
     if assembly_info.get("double_bond_junction"):
-        ylidene = _to_ylidene(ring_name)
-        if ylidene is None:
-            return None
         if substituent_list:
             return None
-        return f"{connection_str}-{multiplier}{_enclose_component(ylidene)}"
+        ylidene = _to_ylidene(ring_name)
+        if ylidene is not None:
+            return f"{connection_str}-{multiplier}{_enclose_component(ylidene)}"
+        # Mancude heterocyclic ylidene (P-28.2.3): stem is the MANCUDE parent
+        # (furan, not the 2,3-dihydrofuran ring_name), with per-ring indicated
+        # hydrogen recomputed at each component's saturated position. Both stems
+        # must agree (identical rings) or fail closed.
+        stems = [_mancude_ring_stem(mol, s) for s in ring_systems]
+        if not stems[0] or any(s != stems[0] for s in stems):
+            return None
+        if any(locs is None for locs in per_ring_ih_locants):
+            return None
+        ih_tokens = sorted(
+            (loc, sys_idx)
+            for sys_idx, locs in enumerate(per_ring_ih_locants)
+            for loc in locs
+        )
+        ih_prefix = (",".join(f"{loc}{_format_prime(sys_idx)}H"
+                              for loc, sys_idx in ih_tokens) + "-"
+                     ) if ih_tokens else ""
+        return (f"{ih_prefix}{connection_str}-{multiplier}"
+                f"{stems[0]}ylidene")
 
-    # Phase 155.B: indicated-H placement subset for ring assemblies.
+    # P-28.2.3 (BB:15593) / P-31.1.4: a SINGLE-bond assembly of the SAME mancude
+    # parent in two indicated-hydrogen states (aromatic pyridine + its
+    # N-substituted 2H tautomer -> 2H-1,2'-bipyridine). detect_ring_assembly
+    # flags this 'mancude_tautomer'. Name it on the MANCUDE parent stem
+    # (pyridine), NOT the per-component partially-saturated name that
+    # _get_ring_parent_name returns for the actual ring (1,2-dihydropyridine),
+    # which would emit the WRONG-molecule "1,2'-bi(1,2-dihydropyridine)". The
+    # per-ring indicated hydrogen is recomputed at each component's saturated
+    # position (2H on the 2H-pyridine ring, none on the aromatic ring). Mirrors
+    # the ylidene mancude path above but for a single bond (no "ylidene"). Fail
+    # closed to the established path if the mancude stems disagree or numbering is
+    # missing (no wrong names); substituted rows are out of this narrow scope.
+    if assembly_info.get("mancude_tautomer") and not substituent_list:
+        stems = [_mancude_ring_stem(mol, s) for s in ring_systems]
+        if (stems[0] and all(s == stems[0] for s in stems)
+                and all(locs is not None for locs in per_ring_ih_locants)):
+            ih_tokens = sorted(
+                (loc, sys_idx)
+                for sys_idx, locs in enumerate(per_ring_ih_locants)
+                for loc in locs
+            )
+            ih_prefix = (",".join(f"{loc}{_format_prime(sys_idx)}H"
+                                  for loc, sys_idx in ih_tokens) + "-"
+                         ) if ih_tokens else ""
+            return f"{ih_prefix}{connection_str}-{multiplier}{stems[0]}"
+
+    # Phase 155.B D-09: indicated-H placement subset for ring assemblies.
     # If ring_name carries an indicated-H prefix like "1H-indole", emit the
     # descriptor once per primed ring ("1H,1'H-2,2'-biindole") instead of
     # leaving it embedded inside the multiplied stem ("2,2'-bi1H-indole",
@@ -2156,7 +2587,7 @@ def name_ring_assembly(
     # (per-ring indicated-H locants generically threaded into the assembly
     # base-name for biindole-class assemblies) stays in Phase 151's deferred-
     # warnings backlog (Follow-up 12 main thread).
-    # Source: 155-CONTEXT.md; AUTONOM-followups.md Follow-up 12 placement
+    # Source: 155-CONTEXT.md D-09; AUTONOM-followups.md Follow-up 12 placement
     #         subset; IUPAC P-31.1.4.  Reuses _format_prime above.
     indicated_h_match = _INDICATED_H_RE.match(ring_name)
     if indicated_h_match:
@@ -2175,6 +2606,35 @@ def name_ring_assembly(
         if re.match(r"^\d[\d,]*-", ring_stem):
             base_name = (
                 f"{connection_str}-{multiplier}({ring_name})"
+            )
+        elif all(locs is not None for locs in per_ring_ih_locants):
+            # IUPAC P-28.2.3 (BB:15593) "Indicated hydrogen ... in a ring
+            # assembly is added ... to each component ring as required": recompute
+            # each SINGLE-RING component's indicated hydrogen at its own position
+            # in the assembly numbering, rather than front-replicating the first
+            # ring's descriptor. This is required for asymmetric assemblies
+            # (``1H,3'H-4,4'-biazepine`` — the two rings differ) and to DROP a
+            # spurious descriptor when the indicated-H atom is the inter-ring
+            # attachment (``1,1'-bipyrrole``, cited with NO indicated H although
+            # the isolated component is 1H-pyrrole; P-31.1.4). ``per_ring_ih_locants``
+            # already excludes attachment atoms and follows the priming chosen by
+            # the tiebreak above. Fused components (any entry None) fall through to
+            # the front-replicate branch, which stays correct for the symmetric
+            # biindole/biindene class it was built for.
+            ih_tokens = sorted(
+                ((loc, sys_idx)
+                 for sys_idx, locs in enumerate(per_ring_ih_locants)
+                 for loc in locs),
+            )
+            if ih_tokens:
+                ih_prefix = ",".join(
+                    f"{loc}{_format_prime(sys_idx)}H"
+                    for loc, sys_idx in ih_tokens
+                ) + "-"
+            else:
+                ih_prefix = ""
+            base_name = (
+                f"{ih_prefix}{connection_str}-{multiplier}{ring_stem}"
             )
         else:
             indicated_h_replicated = ",".join(
@@ -2202,7 +2662,7 @@ def name_ring_assembly(
     # PRINCIPAL characteristic group as a prefix would be wrong here regardless
     # of spelling — it is the suffix rule above that forces the enclosed-parent
     # shape, not any defect in the prefix vocabulary.
-    # (Historical note, corrected: this comment used to justify
+    # (Historical note, corrected v29 P7 Task 3: this comment used to justify
     # itself by claiming the generic namer emits 'formaldehydyl' / 'hydrogen
     # cyanidyl'. It did, but that was a defect in parent_to_prefix, now fixed —
     # CHO -> 'formyl' and HCN -> 'cyano'. Do not re-derive a nomenclature rule
@@ -2246,8 +2706,14 @@ def name_ring_assembly(
             return None
         if indicated_h_match:
             return None  # indicated-H + suffix threading not built
+        # P-16.7.1(c) (BB 7623/7625): elide the multiplier's terminal 'a' before a
+        # vowel-initial suffix -- 'tetra'+'ol' -> 'tetrol', 'tetra'+'amine' ->
+        # 'tetramine' ([1,1'-biphenyl]-3,3',4,4'-tetramine, PIN) -- while leaving
+        # '-carboxylic acid'/'-carbaldehyde'/'-carbonitrile' and 'di'/'tri'
+        # untouched. Route through the shared elision primitive, not a raw f-string.
+        from ..assembly.naming_utils import _join_multiplied_suffix
         return (f"[{connection_str}-{multiplier}{ring_name}]"
-                f"-{locant_str}-{mult}{_suffix_stem}")
+                f"-{locant_str}-{_join_multiplied_suffix(mult, _suffix_stem)}")
 
     # P-28.2.1 + P-66: MIXED prefix+suffix assembly (a suffix-expressible PCG
     # coexists with other substituents). The senior PCG becomes the suffix, the
@@ -2396,7 +2862,7 @@ def name_ring_assembly_prefix(
     # carbocyclic connection atom, so a ter-/quater- assembly SUBSTITUENT
     # emitted the buggy '1,1':1',1''-terphenyl' (the middle ring's back-
     # attachment locant must be 4' for para-terphenyl). This bug was fixed on
-    # the parent path (151-03 /) but the substituent-prefix path kept
+    # the parent path (151-03 D-18/D-19) but the substituent-prefix path kept
     # the old code; a biphenyl (single junction) is unaffected either way.
     per_system_locants = _compute_per_system_ring_locants(mol, assembly_info)
 
@@ -2481,7 +2947,7 @@ def name_ring_assembly_prefix(
         )
     attach_prime = _format_prime(attach_system_idx)
 
-    # Phase 155.B: indicated-H placement subset for ring-assembly
+    # Phase 155.B D-09: indicated-H placement subset for ring-assembly
     # SUBSTITUENT prefix path. Mirrors the parent-path replication in
     # `name_ring_assembly` (line 1201-1212) so a biindole-bearing
     # substituent emits `[1H,1'H-2,2'-biindol]-5-yl` instead of the pre-fix
@@ -2681,11 +3147,11 @@ def name_mixed_ring_prefix(
 
 
 # ============================================================================
-# Phase 151-03: cascade-step-6 supplier (get_ring_assembly_iupac_locants)
+# Phase 151-03 D-21: cascade-step-6 supplier (get_ring_assembly_iupac_locants)
 # ============================================================================
 
 def get_ring_assembly_iupac_locants(mol) -> Optional[Dict[int, _Locant]]:
-    """Phase 151-03 cascade-step-6 supplier for ring assemblies size >= 2.
+    """Phase 151-03 D-21 cascade-step-6 supplier for ring assemblies size >= 2.
 
     Returns the per-system IUPAC numbering of every ring atom merged into a
     single ``Dict[int, int]`` covering ALL ring atoms in the assembly.
@@ -2708,7 +3174,7 @@ def get_ring_assembly_iupac_locants(mol) -> Optional[Dict[int, _Locant]]:
             (size < 2, mixed signatures, branched topology, oversize, etc.),
           * any system's per-ring numbering produces partial coverage.
 
-    Source: 151-CONTEXT.md,,.
+    Source: 151-CONTEXT.md D-18, D-19, D-21.
     Source: 151-PATTERNS.md Pattern S-3 (cascade-step-6 supplier contract).
     Source: 151-RESEARCH.md §"OPSIN Compatibility Evidence" (12 named cases).
     """

@@ -1,6 +1,6 @@
 """Phase 160.2 general_acyclic catch-all handler (DECOMP-01 closure).
 
-Per CONTEXT + ADR-19-02 §3.1 + CONTEXT RESEARCH §10: explicit
+Per CONTEXT D-08 + ADR-19-02 §3.1 + CONTEXT D-12 RESEARCH §10: explicit
 catch-all (priority 99999, predicate=lambda *_: True) closing the
 Plan-02 fallthrough gap so dispatch_inner first-match-AND-succeeds-wins
 (ADR-19-04) ALWAYS returns a non-None InnerDispatchResult.
@@ -23,7 +23,7 @@ mislabelled with a general_acyclic tree.
 CRITICAL: this handler lifts ONLY the chain-fallback section. The
 cycloalkane stereo backstop at composer.py:1057-1097 STAYS in
 _assemble_name_impl (orchestrator applies it AFTER dispatch_inner returns)
-per CONTEXT.
+per CONTEXT D-04.
 """
 from __future__ import annotations
 
@@ -36,7 +36,7 @@ logger = logging.getLogger(__name__)
 
 
 def _is_general_acyclic(features: Any) -> bool:
-    """Catch-all predicate per CONTEXT + AP-160-08.
+    """Catch-all predicate per CONTEXT D-08 + AP-160-08.
 
     AP-160.2-06 CASE B refinement (Phase 160.2 Plan-02-03 honest-fail-on-data):
     the catch-all MUST mirror the chain-fallback section's effective domain
@@ -47,7 +47,7 @@ def _is_general_acyclic(features: Any) -> bool:
     True-always catch-all would preempt those inline branches and break
     byte-identical for polyfunctional amide / amine cases.
 
-    Pure read-only per CONTEXT + AP-160-26.
+    Pure read-only per CONTEXT D-25 + AP-160-26.
 
     Inline-cascade-order mirror — returns False (defer to inline cascade) when:
     1. principal_group is amide AND pg_count == 1
@@ -59,7 +59,7 @@ def _is_general_acyclic(features: Any) -> bool:
     Refinement REVERTS automatically when Plan-02-04 ships in CASE A
     (predicate parity verified for amide / amine handlers); at that point
     the inline cascade is deleted and this predicate can collapse back to
-    `return True` per the original CONTEXT catch-all spec.
+    `return True` per the original CONTEXT D-08 catch-all spec.
     """
     pg = getattr(features, 'principal_group', None)
     # Mirror composer.py:917-919 inline amide branch guard.
@@ -206,6 +206,21 @@ def name_general_acyclic(
     from ._handler_shared import _l3_prefix_locant_omitted
     if _l3_prefix_locant_omitted(features, fragments):
         fragments = _prefix_fragments_without_locants(fragments)
+
+    # P-14.3.4.4 (BB:2953) at PARENT scope -- `diphenylethanedione` (BB:28338,
+    # verbatim (PIN)) and `di(naphthalen-2-yl)ethanedione` (BB:28380). Decided HERE
+    # for the same reason as the two licences above: the ISOMER-COUNT test needs the
+    # STRUCTURE (the parent hydride's positions and the decorations' bond orders),
+    # and `_assemble_fragments` receives only name fragments. `_l4_locants_omitted`
+    # delegates the rule itself to `assembly.locant_omission`; deny-by-default.
+    #
+    # Applied by REBUILDING the fragments so every renderer downstream agrees, like
+    # the two above. Unlike L3/L5, L4 empties the WHOLE scope, so the SUFFIX locants
+    # are cleared too (`ethane-1,2-dione` -> `ethanedione`); the helper's
+    # fail-closed check keeps a half-stripped name from shipping.
+    from ._handler_shared import _l4_locants_omitted, _fragments_without_locants
+    if _l4_locants_omitted(features, fragments):
+        fragments = _fragments_without_locants(fragments, is_mononuclear_parent)
     assembled = _assemble_fragments(
         fragments, style, is_mononuclear_parent=is_mononuclear_parent,
     )
@@ -268,7 +283,7 @@ def name_general_acyclic(
     # candidate. If a higher-priority handler already added one above,
     # pool.best() is that one (chain naming computed but not returned).
     # If no other handler fired (this is the only candidate), pool.best()
-    # is the chain candidate.: chain has priority=fallback in 145.1
+    # is the chain candidate. D-02: chain has priority=fallback in 145.1
     # (preserves byte-identical); Phase 146 raises priority for competition.
     pool = get_current_pool()
     # Phase 165 SCORE-01: derive a structured tree from the SAME fragment list

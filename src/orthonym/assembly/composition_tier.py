@@ -1,4 +1,4 @@
-"""Best-effort composition tier.
+"""Best-effort composition tier (v30 slice 1).
 
 When a producer builds an atom-short parent name on the best-effort tier, this module finishes
 it: it computes which heavy atoms the parent actually accounts for, isolates the uncovered

@@ -115,7 +115,7 @@ def net_formal_charge(mol: Chem.Mol) -> int:
 #    phosphanuide, silylium, phosphanium, ...) always carries its ionic suffix,
 #    so guard 1 already spares it even though its centre is in-scope -- the two
 #    guards together fire ONLY on a genuine main-group charge drop.
-# B3: added 'ite' (P-72.2.2/P-65.3.1's OTHER acid-anion suffix pair,
+# v36 B3: added 'ite' (P-72.2.2/P-65.3.1's OTHER acid-anion suffix pair,
 # '-ous acid' -> '-ite', sibling to '-ic acid' -> '-ate' -- chlorite,
 # nitrite, sulfite, phosphite, hypochlorite, ...). Missing it meant a
 # genuinely-ionic HALOGEN-centred retained name ending in '-ite' (chlorite,

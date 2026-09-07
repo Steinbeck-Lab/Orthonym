@@ -1,10 +1,10 @@
-"""Phase 151: Von Baeyer naming for tetracyclic and pentacyclic systems.
+"""Phase 151 D-04: Von Baeyer naming for tetracyclic and pentacyclic systems.
 
 Replaces the routing helpers at tricyclo.py:556 (_generate_higher_polycyclo_
 descriptor) and tricyclo.py:636 (_name_higher_polycyclo_system) with a
 dedicated module that exposes the cascade-step-6 supplier Phase 147
 reserved as a stub. bicyclo.py and tricyclo.py REMAIN authoritative for
-their proven 2-ring and 3-ring cases per CONTEXT.
+their proven 2-ring and 3-ring cases per CONTEXT D-04.
 
 Audit verdict (151-AUDIT-A.md): THIN_WRAPPER. The existing
 src/orthonym/rules/polycyclic.py::VonBaeyerAnalyzer (2,537 LOC, runs
@@ -19,18 +19,18 @@ IUPAC Reference: Blue Book 2013 P-23.3 (tricyclic and higher), P-23.2.5
 (numbering cascade), P-25.2 (heteroatom 'a'-prefix replacement).
 
 Source:
- - (,,,,,,).
- - §"Existing Code Audit", §"Risk Landmines".
- - verdict THIN_WRAPPER.
- - §3 (symmetric-ring locant
+ - .planning/phases/151-*/151-CONTEXT.md (D-04, D-05, D-06, D-07, D-08, D-12, D-21).
+ - .planning/phases/151-*/151-RESEARCH.md §"Existing Code Audit", §"Risk Landmines".
+ - .planning/phases/151-*/151-AUDIT-A.md verdict THIN_WRAPPER.
+ - .planning/references/AUTONOM-1990-insights.md §3 (symmetric-ring locant
    generation), §4 (hybrid dictionary + algorithmic).
 
-Naming-collision note (CONTEXT deviation; RESEARCH Q-01):
+Naming-collision note (CONTEXT D-06 deviation; RESEARCH Q-01):
  The cascade-step-6 supplier here is named ``get_higher_polycyclo_iupac_locants``
  — distinct from ``polycyclics.py:386::get_polycyclic_iupac_locants(mol,
  pah_name)`` which serves cataloged PAHs by name lookup. The two
  functions have different signatures and different responsibilities.
- The literal CONTEXT identifier (`get_polycyclic_iupac_locants`)
+ The literal CONTEXT D-06 identifier (`get_polycyclic_iupac_locants`)
  was renamed here to prevent an obscure import-shadowing bug.
 """
 from __future__ import annotations
@@ -42,23 +42,23 @@ from rdkit import Chem
 
 logger = logging.getLogger(__name__)
 
-# reuse — single canonical comparator across the project (no parallel
+# D-07 reuse — single canonical comparator across the project (no parallel
 # locant ranking ever introduced). This import is kept even though the
 # THIN_WRAPPER verdict means we don't currently invoke it directly: the
 # unit-test suite (test_polycyclic_von_baeyer.py::TestNoParallelComparator)
-# verifies its presence as a structural lock per CONTEXT /.
+# verifies its presence as a structural lock per CONTEXT D-07 / D-20.
 # Future v19 P-23.2.5(a) tiebreak refinement will use it.
 from .locants import compare_locant_sets  # noqa: F401
 
 # Engine — VonBaeyerAnalyzer (audit verdict THIN_WRAPPER per 151-AUDIT-A.md).
 from .polycyclic import VonBaeyerAnalyzer
 
-# anti-canary lock — bicyclo / tricyclo input must NOT be re-routed
+# D-04 anti-canary lock — bicyclo / tricyclo input must NOT be re-routed
 # through the new module; bicyclo.py and tricyclo.py keep authority on
 # their 99 + 13 canary blast-radius compounds (RESEARCH "Risk Landmines").
 from .polycyclic_bridged import classify_bridged_system
 
-# retained-name passthrough (AUTONOM §4 hybrid pattern).
+# D-08 retained-name passthrough (AUTONOM §4 hybrid pattern).
 # adamantane / twistane stay served by tricyclo.get_retained_tricyclo_name
 # regardless of cycle-rank. Plan 151-01 keeps this delegation explicit.
 from .tricyclo import (
@@ -67,25 +67,25 @@ from .tricyclo import (
     get_retained_tricyclo_name,
 )
 
-# Task S — the Java-free legality floor: the emitted descriptor STRING must
+# v29 Task S — the Java-free legality floor: the emitted descriptor STRING must
 # rebuild the input's cage. Shared with ``vonbaeyer_universal`` so the PIN-side
 # wrapper and the general-engine cage analyzer apply ONE proof, not two.
 from .vonbaeyer_universal import audit_von_baeyer_descriptor
 
-# Type alias: locants are int OR (int, str) per Phase 147 tuple-aware
+# Type alias: locants are int OR (int, str) per Phase 147 D-01 tuple-aware
 # format used for superscripted bridge locants like 8a.
 _Locant = Union[int, Tuple[int, str]]
 
 
 # ============================================================================
-# Classification predicate
+# Classification predicate (D-04)
 # ============================================================================
 
 
 def is_higher_polycyclo(mol) -> bool:
     """Return True iff *mol* is a Von Baeyer ≥4-ring system handled here.
 
-    Predicate (per CONTEXT + RESEARCH "Risk Landmines"):
+    Predicate (per CONTEXT D-04 + RESEARCH "Risk Landmines"):
       - mol is not None
       - ≥4 SSSR rings
       - single connected ring system (perception.rings.get_ring_systems)
@@ -95,7 +95,7 @@ def is_higher_polycyclo(mol) -> bool:
       - detect_natural_product(mol) is None (steroids/alkaloids stay
         retained — natural-product backbone short-circuit)
       - classify_bridged_system(mol) NOT in ('bicyclo', 'tricyclo')
-        (anti-canary — bicyclo.py / tricyclo.py retain authority)
+        (D-04 anti-canary — bicyclo.py / tricyclo.py retain authority)
 
     Returns False on any failed gate. Defensive: returns False on None
     input rather than raising.
@@ -134,14 +134,14 @@ def is_higher_polycyclo(mol) -> bool:
 
 
 # ============================================================================
-# Naming entry point (retained-name FIRST, algorithmic SECOND)
+# Naming entry point (D-08 retained-name FIRST, algorithmic SECOND)
 # ============================================================================
 
 
 def name_higher_polycyclo(mol) -> Optional[str]:
     """Generate the IUPAC name for a Von Baeyer ≥4-ring system.
 
-    Algorithm (CONTEXT, AUTONOM §4):
+    Algorithm (CONTEXT D-08, AUTONOM §4):
       1. Retained-name dictionary lookup FIRST. tricyclo.get_retained_
          tricyclo_name is consulted on the canonical SMILES regardless
          of ring count — adamantane / twistane stay retained.
@@ -171,12 +171,12 @@ def name_higher_polycyclo(mol) -> Optional[str]:
         descriptor = result.descriptor_string
         total_atoms = result.total_atoms
         numbering = result.numbering
-        # Legality floor: the descriptor STRING must rebuild this
+        # Legality floor (v29 Task S): the descriptor STRING must rebuild this
         # exact cage, or a name like ``tetracyclo[5.1.1.2^3,6]dodecane`` (11
         # bracketed atoms, ``dodecane`` = 12) gets built here. Both OPSIN gates
         # are documented FAIL-OPEN with no Java, so this must not rely on them.
         #
-        # Task S2 also wired this proof into ``analyze`` itself, which now
+        # v29 Task S2 also wired this proof into ``analyze`` itself, which now
         # publishes the same verdict as ``result.legality``. This call is kept
         # rather than replaced by the flag: it is the guard this module's own
         # tests exercise, it re-proves against the ring-atom set THIS function
@@ -191,7 +191,7 @@ def name_higher_polycyclo(mol) -> Optional[str]:
             return None
         parent_name = _get_alkane_name(total_atoms)
 
-        # Heteroatom 'a'-prefix per (delegate to existing helper that
+        # Heteroatom 'a'-prefix per D-12 (delegate to existing helper that
         # already handles VB locants, multiplier prefixes, and IUPAC
         # priority order O > S > Se > N > P > Si > B).
         heteroatoms = [
@@ -224,7 +224,7 @@ def name_higher_polycyclo(mol) -> Optional[str]:
 
 
 # ============================================================================
-# Cascade-step-6 supplier (+; Phase 147 SC-7 lock)
+# Cascade-step-6 supplier (D-06 + D-21; Phase 147 SC-7 lock)
 # ============================================================================
 
 
@@ -235,7 +235,7 @@ def get_higher_polycyclo_iupac_locants(mol) -> Optional[Dict[int, _Locant]]:
     ring atoms, or None if the predicate fails / coverage is partial.
     Partial maps are NEVER returned — Phase 147 SC-7 / Pitfall 7 gate.
 
-    Naming note (CONTEXT deviation; RESEARCH Q-01):
+    Naming note (CONTEXT D-06 deviation; RESEARCH Q-01):
       Distinct from polycyclics.py::get_polycyclic_iupac_locants which
       serves cataloged PAHs by ``pah_name`` lookup. This function is the
       Phase 147 cascade-step-6 supplier for non-cataloged ≥4-ring

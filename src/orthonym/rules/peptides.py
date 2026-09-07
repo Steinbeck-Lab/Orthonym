@@ -17,7 +17,7 @@ Examples (P-103.3.4 omits the L descriptor for Table-10.4 amino acids):
     Gly-L-Ala-L-Leu -> glycylalanylleucine
     D-Ala-Gly       -> D-alanylglycine   (D IS cited)
 
-, phase2e SPY --):
+v32 Phase 2 (breadth, phase2e SPY -- .planning/audit-v32/phase2e-peptide-spy.md):
 two ADDITIVE fallbacks, tried only when the flat acylamino convention above
 declines, and gated behind an explicit OPSIN round-trip (``_rt_verified``) so
 a table/topology miss degrades to abstention, never a wrong or atom-dropping
@@ -37,7 +37,7 @@ name (0-wrong ABSOLUTE):
   non-retained continuing acyl word (SPY-verified) and a bare 'glutamyl'
   shorthand imposes an L-configuration OPSIN does not know is undefined.
 
-: P-103.1.3.1 "The stereodescriptors 'D'
+v33 Phase 0 L3-2e (stereo honesty): P-103.1.3.1 "The stereodescriptors 'D'
 and 'L'" (BlueBookV2.md:54291) -- "The stereodescriptor 'xi' (Greek letter
 xi) indicates unknown configuration" -- and P-103.3.4 itself (:54715) --
 "A residue of unknown configuration is indicated by the prefix xi". A bare
@@ -50,7 +50,7 @@ B's donor-residue recovery is deliberately exempt: it builds its own
 locant-based descriptor and already treats an unresolved centre as "omit the
 descriptor" with no implied configuration.
 
-: Task 2.0 (dispatch SMARTS fix) + Task 2.1 (Lever C, capped
+v33 Phase 2: Task 2.0 (dispatch SMARTS fix) + Task 2.1 (Lever C, capped
 termini -- ``_try_capped_termini``) closed the two largest decline buckets.
 Task 2.2 adds ``_try_backbone_substitutive``, the general BACKBONE-
 SUBSTITUTIVE producer for the residual (giant / non-standard-residue
@@ -165,7 +165,7 @@ def name_peptide(mol) -> Optional[str]:
 
     # Step 1: Verify this is a true peptide
     if not _is_valid_peptide(mol):
-        # Lever A: an acylated (non-free) N-terminus may still be a
+        # v32 Lever A: an acylated (non-free) N-terminus may still be a
         # nameable N-acyl-capped peptide (SPY §3a). Fails closed to None
         # (unchanged behaviour) unless the cap is a genuine plain acyl group
         # AND the residues behind it are a fully standard >=2-residue chain
@@ -173,7 +173,7 @@ def name_peptide(mol) -> Optional[str]:
         result = _rt_verified(mol, _try_n_acyl_cap(mol))
         if result is not None:
             return result
-        # Task 2.1 Lever C: a capped-terminus shape `_is_valid_peptide`
+        # v33 Task 2.1 Lever C: a capped-terminus shape `_is_valid_peptide`
         # rejects for a DIFFERENT reason than Lever A covers -- most often a
         # C-terminal PRIMARY AMIDE (no free -COOH anywhere in the molecule,
         # so `_is_valid_peptide`'s COOH check fails and Lever A's own COOH
@@ -182,14 +182,14 @@ def name_peptide(mol) -> Optional[str]:
         result = _rt_verified(mol, _try_capped_termini(mol))
         if result is not None:
             return result
-        # Task 2.2: the general backbone-substitutive producer -- also
+        # v33 Task 2.2: the general backbone-substitutive producer -- also
         # self-contained (re-walks via `_extract_residues`), tried last.
         return _rt_verified(mol, _try_backbone_substitutive(mol))
 
     # Step 2: Extract residue SMILES by walking the peptide chain
     residue_smiles_list = _extract_residues(mol)
     if residue_smiles_list is None or len(residue_smiles_list) < 2:
-        # Lever B: a single non-alpha ('gamma'/'beta') bond from a
+        # v32 Lever B: a single non-alpha ('gamma'/'beta') bond from a
         # standard amino acid's own side-chain carboxyl (SPY §3b). Same
         # fail-closed-to-None-unless-round-tripped guarantee as Lever A.
         return _rt_verified(mol, _try_gamma_link_whole(mol))
@@ -200,7 +200,7 @@ def name_peptide(mol) -> Optional[str]:
     # ``_identify_residues``'s docstring.
     named_residues = _identify_residues(residue_smiles_list, strict_stereo=True)
     if named_residues is None:
-        # Task 2.1 Lever C: the whole-molecule gate passed (free termini
+        # v33 Task 2.1 Lever C: the whole-molecule gate passed (free termini
         # SMARTS matched -- a mono-N-methylated N-terminus is still `[NX3;H1]`,
         # so it slips through `_is_valid_peptide`'s free-NH2 check), but a
         # per-residue trivial-name lookup then failed -- typically the
@@ -211,14 +211,14 @@ def name_peptide(mol) -> Optional[str]:
         result = _rt_verified(mol, _try_capped_termini(mol))
         if result is not None:
             return result
-        # Task 2.2: the general backbone-substitutive producer -- also
+        # v33 Task 2.2: the general backbone-substitutive producer -- also
         # self-contained, tried last (e.g. a non-standard/undefined-stereo
         # residue that made `_identify_residues` decline here).
         return _rt_verified(mol, _try_backbone_substitutive(mol))
 
-    # Step 4: Assemble the peptide name. RT-gated: this
+    # Step 4: Assemble the peptide name. RT-gated (v33 Phase 2 Task 2.0): this
     # was the one candidate-emission site in this file NOT verified against
-    # the input mol -- every breadth lever (A/B, below) already routes
+    # the input mol -- every v32 breadth lever (A/B, below) already routes
     # through `_rt_verified`, but the ORIGINAL flat/acylamino-convention path
     # never did, because before Task 2.0 the dispatch predicate
     # (`amino_acids.is_peptide`) silently protected it from ever reaching a
@@ -235,7 +235,7 @@ def name_peptide(mol) -> Optional[str]:
     result = _rt_verified(mol, candidate)
     if result is not None:
         return result
-    # Task 2.2: last resort when the flat candidate itself failed
+    # v33 Task 2.2: last resort when the flat candidate itself failed
     # round-trip (a rare pre-existing bug elsewhere in this file, e.g. a
     # mis-mapped stereo prefix) -- self-contained, re-walks independently.
     return _rt_verified(mol, _try_backbone_substitutive(mol))
@@ -776,17 +776,17 @@ def _assemble_peptide_name(named_residues: List[Dict[str, str]]) -> str:
 
 
 # ============================================================================
-# breadth: N-acyl cap (Lever A) + gamma/beta side-chain-carboxyl
+# v32 Phase 2 breadth: N-acyl cap (Lever A) + gamma/beta side-chain-carboxyl
 # donor (Lever B). Both are ADDITIVE fallbacks tried only after the ordinary
 # flat acylamino convention above declines, and both are gated by
 # ``_rt_verified`` -- a table/topology miss degrades to abstention, never a
 # wrong or atom-dropping name. See phase2e SPY for the derivation and the
-# corpus-scale sizing.
+# corpus-scale sizing (.planning/audit-v32/phase2e-peptide-spy.md).
 # ============================================================================
 
 
 def _rt_verified(mol, candidate: Optional[str]) -> Optional[str]:
-    """0-wrong guarantee for the broadened paths (Lever A / Lever B).
+    """0-wrong guarantee for the v32 broadened paths (Lever A / Lever B).
 
     Returns ``candidate`` unchanged iff it OPSIN-round-trips to the EXACT
     input ``mol`` (full InChI match -- stricter than InChIKey, catches a
@@ -1156,9 +1156,9 @@ def _try_gamma_link_whole(mol) -> Optional[str]:
 
 
 # ============================================================================
-# Task 2.1: Lever C -- capped termini. Extends the flat acylamino
+# v33 Phase 2 Task 2.1: Lever C -- capped termini. Extends the flat acylamino
 # convention to accept two shapes the ordinary path declines on (SPY:
-# sec.3 -- 71% of the true-
+# `.planning/audit-v33/PHASE0-PEPTIDE-SCOPE.md` sec.3 -- 71% of the true-
 # peptide backlog is exactly one or both of these, the single dominant
 # blocker):
 #   - a C-TERMINAL PRIMARY AMIDE (``-C(=O)NH2``) instead of the free
@@ -1290,7 +1290,7 @@ def _acid_name_to_amide(name: str) -> str:
 
 
 def _try_capped_termini(mol) -> Optional[str]:
-    """Lever C: re-attempt the flat acylamino chain allowing
+    """Lever C (v33 Task 2.1): re-attempt the flat acylamino chain allowing
     the FIRST residue's own backbone amino N to carry a lone free N-methyl,
     and/or the LAST residue's own alpha-carboxyl to be a primary carboxamide
     instead of the free acid the ordinary convention assumes. Returns an
@@ -1354,10 +1354,10 @@ def _try_capped_termini(mol) -> Optional[str]:
 
 
 # ============================================================================
-# Task 2.2: the general BACKBONE-SUBSTITUTIVE producer -- the
+# v33 Phase 2 Task 2.2: the general BACKBONE-SUBSTITUTIVE producer -- the
 # real breadth lever for the ~214-row residual (giant / non-standard-residue
 # peptides Levers A/B/C cannot name). Tried LAST, only when every path above
-# has declined. See and the
+# has declined. See `.planning/audit-v33/PHASE0-PEPTIDE-SCOPE.md` and the
 # plan's Phase 2 Task 2.2 for the derivation.
 #
 # Mechanism (P-66.6.6 generalised to a non-standard/mixed chain): the
@@ -1612,7 +1612,7 @@ def _residue_open_forms(
 
 
 def _try_backbone_substitutive(mol) -> Optional[str]:
-    """.2: name ANY linear alpha-peptide (standard,
+    """v33 Phase 2 Task 2.2: name ANY linear alpha-peptide (standard,
     non-standard, or a mix) as one systematic name, tried only when every
     other path in this file has declined. See the module-section comment
     above for the full derivation. Returns an UNVERIFIED candidate string;

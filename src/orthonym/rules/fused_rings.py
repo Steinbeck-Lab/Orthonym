@@ -539,21 +539,21 @@ def _try_algorithmic_fusion_name(mol) -> Optional[str]:
     ri = mol.GetRingInfo()
     atom_rings = ri.AtomRings()
 
-    # Gate: must have at least 2 rings in SSSR (broadening — was != 2)
+    # Gate: must have at least 2 rings in SSSR (D-08 broadening — was != 2)
     if len(atom_rings) < 2:
         return None
 
-    # Phase 149: route base decision through select_base_component
+    # Phase 149 D-08: route base decision through select_base_component
     # for any N>=2. The naming engine remains 2-ring-only.
     #
     # Source: https://iupac.qmul.ac.uk/fusedring/FR23.html
-    # Source: 149-CONTEXT.md.
+    # Source: 149-CONTEXT.md D-08.
     from .fused_ring_selection import _enumerate_components, select_base_component
     components = _enumerate_components(mol)
     base_atoms, _others = select_base_component(mol, components)
 
     if len(atom_rings) != 2:
-        # 3+ component case (trade-off): emit decision-only.
+        # 3+ component case (D-08 trade-off): emit decision-only.
         # base_atoms is consumed by namer.Branch 6.5 (Task 02-03) via
         # features.parent_selection_result; full systematic-name assembly
         # deferred to 149.x or Phase 155.
@@ -702,7 +702,7 @@ def _try_algorithmic_fusion_name(mol) -> Optional[str]:
 
 
 # ============================================================================
-# Polycomponent ortho-fusion constructor (P-25.3.4) —
+# Polycomponent ortho-fusion constructor (P-25.3.4) — v22 Phase G1b (DD7 COV-01)
 # ============================================================================
 #
 # Builds systematic fusion PINs for the cata-fused single-base monocyclic-
@@ -862,7 +862,10 @@ def _pcf_name_with_base(mol, comps: List[List[int]], names: List[str],
                         base_idx: int) -> Optional[str]:
     """Try to name the system with comps[base_idx] as the single base ring.
     Returns the fusion name, or None if the star topology is not satisfied."""
-    from .fusion_descriptors import _get_iupac_ring_order_for_fusion
+    from .fusion_descriptors import (
+        _get_iupac_ring_order_for_fusion,
+        _cooptimal_child_orderings,
+    )
 
     base_ring = comps[base_idx]
     base_name = names[base_idx]
@@ -894,9 +897,27 @@ def _pcf_name_with_base(mol, comps: List[List[int]], names: List[str],
         per = []
         ok = True
         for (ci, nm, shared) in attachments:
-            child_order = _get_iupac_ring_order_for_fusion(
-                mol, comps[ci], shared, is_child=True)
-            res = _pcf_edge_descriptor(border, child_order, shared)
+            # Enumerate the co-optimal child numberings for this attachment and,
+            # for the fixed base `border`, cite the lower descriptor pair. A
+            # SYMMETRIC attached component (heteroatom equidistant from the fusion
+            # bond, e.g. the second furan of difuro[3,2-b:3',4'-e]pyridine) ties
+            # on heteroatom + fusion-bond locants; P-25.3.4.2.4(d)
+            # (BlueBookV2.md:13403/:13409) breaks that tie by the lower cited pair
+            # ((3,4) < (4,3) -> 3',4'-e, not 4',3'-e), the direction of parent
+            # lettering (P-25.3.1.3 :11911). An asymmetric child yields a single
+            # ordering, so the citation is the lettering-forced pair (may descend)
+            # and MATCH rows such as difuro[3,2-b:2',3'-e]pyridine are unchanged.
+            child_orders = _cooptimal_child_orderings(mol, comps[ci], shared)
+            if not child_orders:
+                child_orders = [_get_iupac_ring_order_for_fusion(
+                    mol, comps[ci], shared, is_child=True)]
+            res = None
+            for child_order in child_orders:
+                r = _pcf_edge_descriptor(border, child_order, shared)
+                if r is None:
+                    continue
+                if res is None or r[1] < res[1]:
+                    res = r
             if res is None:
                 ok = False
                 break
@@ -1042,7 +1063,7 @@ def _name_ortho_fused_generate_and_test(mol) -> Optional[str]:
     InChI before it can be returned).
 
     Fusion nomenclature is not derived de-novo here; instead — matching what do (an offline OPSIN-validated template index) and
-    CLAUDE.md(OFFER many, keep the one that round-trips) — a bounded
+    CLAUDE.md invariant 18 (OFFER many, keep the one that round-trips) — a bounded
     candidate set is generated from the actual ring components (a max-ring retained
     BASE named from a fused sub-core per P-25.3.2, plus the remaining monocycle as a
     fusion PREFIX with enumerated attachment locants/letters) and each is OPSIN-
@@ -1051,7 +1072,7 @@ def _name_ortho_fused_generate_and_test(mol) -> Optional[str]:
     Fail-CLOSED (None) on anything outside the handled sub-class, so it never emits
     an unverified name; the caller keeps its existing behaviour.
 
-    Scope (this session, C1C2C6 Build 2): exactly 3 SSSR rings, the whole
+    Scope (this session, v36-C1C2C6 Build 2): exactly 3 SSSR rings, the whole
     molecule is that one cata-fused (no atom in >=3 rings) neutral fully-aromatic
     ring system with >=1 ring heteroatom, no exocyclic heavy atoms. Higher
     component counts, peri-fused interior atoms, substituted cores and carbocyclic
@@ -1176,7 +1197,7 @@ def _rings_connected(subset: Set[int], adj: Dict[int, Set[int]]) -> bool:
 
 
 def _name_naphtho_fused_generate_and_test(mol) -> Optional[str]:
-    """CT.4: general N-component ortho-fused MANCUDE PIN construction for
+    """CT.4 (v37): general N-component ortho-fused MANCUDE PIN construction for
     the deferred CARBOCYCLIC-CHILD topology that ``_try_polycomponent_fusion_name``
     (:907) explicitly defers (A10): a senior heterocyclic 2-ring BASE
     (quinoxaline / quinoline / quinazoline / ...) ortho-fused to a NAPHTHALENE
@@ -1626,12 +1647,12 @@ def name_fused_heterocycle(mol):
         algorithmic_name = _try_algorithmic_fusion_name(mol)
         if algorithmic_name:
             return (algorithmic_name, ring_atoms, {}, True)
-        # G1b (P-25.3.4): polycomponent ortho-fusion constructor for 3+-
+        # v22 G1b (P-25.3.4): polycomponent ortho-fusion constructor for 3+-
         # component cata-fused monocyclic-component systems with no catalog core.
         poly = _try_polycomponent_fusion_name(mol)
         if poly:
             return (poly, ring_atoms, {}, True)
-        # Build 2 (P-25.3): bounded 3-component ortho/ortho-peri-fused
+        # v36-C1C2C6 Build 2 (P-25.3): bounded 3-component ortho/ortho-peri-fused
         # mancude namer for a novel system whose senior BASE is a 2-ring retained
         # component (e.g. pyrimido[4,5-b]quinoline) -- the case _try_polycomponent_
         # fusion_name cannot reach (it only builds star-of-monocycles bases).
@@ -1639,7 +1660,7 @@ def name_fused_heterocycle(mol):
         gen = _name_ortho_fused_generate_and_test(mol)
         if gen:
             return (gen, ring_atoms, {}, True)
-        # CT.4 (P-25.3.4): general N-component fusion -- the deferred
+        # v37 CT.4 (P-25.3.4): general N-component fusion -- the deferred
         # carbocyclic-child topology (naphtho[2,3-g]quinoxaline): a senior
         # heterocyclic 2-ring base ortho-fused to a naphthalene carbocyclic
         # prefix. UPGRADES the RT-true von-Baeyer degradation to the fusion PIN.
@@ -1664,7 +1685,7 @@ def name_fused_heterocycle(mol):
 
     core_name, atom_mapping, _core_smiles = core_result
 
-    # G1b (P-25.3.4): a 2-component catalog core (e.g. furo[3,2-b]pyridine)
+    # v22 G1b (P-25.3.4): a 2-component catalog core (e.g. furo[3,2-b]pyridine)
     # can match as a SUBSTRUCTURE of a larger polycomponent fused system (e.g.
     # difuropyridine); its leftover fused ring would be mis-named as a phantom
     # acyclic substituent (the G0 '7-ethoxyfuro[3,2-b]pyridine' defect). When the
@@ -1675,7 +1696,7 @@ def name_fused_heterocycle(mol):
         poly = _try_polycomponent_fusion_name(mol)
         if poly:
             return (poly, ring_atoms, {}, True)
-        # note: when poly is None here the matched catalog core is
+        # v23 Phase 5 note: when poly is None here the matched catalog core is
         # fused to leftover ring atoms it cannot name. The fall-through below
         # generates a phantom substituent name (the '7-ethoxyfuro[3,2-b]pyridine'
         # ring-as-acyclic class defect), which is suppressed downstream by the G0
@@ -1698,7 +1719,7 @@ def name_fused_heterocycle(mol):
     # Find substituents on the core
     substituents = get_fused_heterocycle_substituents(mol, atom_mapping)
 
-    # (fail-closed routing): get_fused_heterocycle_substituents silently
+    # v26 P3 (fail-closed routing): get_fused_heterocycle_substituents silently
     # skips any exocyclic branch _identify_fused_substituent cannot name
     # (``sub_info is None -> continue``), so the assembled name can DROP a whole
     # substituent and denote a DIFFERENT molecule (a boronate / methanesulfonyl /
@@ -2029,7 +2050,7 @@ def _identify_fused_substituent(
             # Ring-containing substituent (pyridinyl, naphthalenyl, indolyl,
             # naphthalenylmethyl, ...) -> the single WS-A delegate.
             #
-            # core-namer: thread the best-effort tier's ``allow_mancude``
+            # v36 core-namer: thread the best-effort tier's ``allow_mancude``
             # into the delegate exactly as the sibling enumerator already does at
             # ``substituent_naming.py:6657-6667``. A decorated / fused ring-bearing
             # compound substituent (the pantoprazole-class half) is named only by
@@ -2358,7 +2379,7 @@ def _identify_fused_substituent(
                             'atoms': [start_idx] + alkyl_atoms
                         }
 
-    # core-namer (general ring-bearing compound substituent, best-effort
+    # v36 core-namer (general ring-bearing compound substituent, best-effort
     # tier only). Every element-specific branch above returns early for the
     # shapes it recognises; a ring-bearing compound substituent rooted at a
     # HETEROATOM linker reaches here unrecognised and used to silently drop

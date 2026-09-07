@@ -8,7 +8,7 @@ Recommendations (Pure Appl. Chem. 71(8) 1557).
 Keys are RDKit canonical SMILES (verified per CONTEXT line 18 + RESEARCH §1.7
 empirical measurement). All entries are pure data; no logic in this module.
 
-Phase 161.
+Phase 161 (v19 first scope-expansion phase per ADR-19-07).
 
 Anti-patterns to avoid (PATTERNS lines 385-388):
 - NEVER use raw SMARTS without `[p for p in [...] if p is not None]` filter.
@@ -21,7 +21,7 @@ from typing import Dict, Optional, Tuple
 
 from rdkit import Chem
 
-# === RETAINED METALLOCENES (Phase 161 Tier-1; AUDIT § 1) ===
+# === RETAINED METALLOCENES (Phase 161 D-01 Tier-1; AUDIT § 1) ===
 # Canonical SMILES → retained PIN. All keys verified RDKit-canonical per
 # RESEARCH §2.2 empirical measurement.
 RETAINED_METALLOCENES: Dict[str, str] = {

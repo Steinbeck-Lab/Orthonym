@@ -1,5 +1,5 @@
 """
-.
+v32 Phase 2 Step 2 -- the assembly WEAVER (`.planning/audit-v32/phase2b-weaver-spy.md`).
 
 Step 1 (`be810755`) made every fragment of a multi-linkage molecule name
 successfully, but the whole molecule still abstained because the flat

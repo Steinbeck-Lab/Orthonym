@@ -3,7 +3,7 @@
 When a non-principal **composite** functional group (today only the
 empirically-firing ``ester`` / ``thioester`` — see ``data/group_split_rules``)
 has no clean strict-IUPAC prefix and would otherwise be **dropped** at the
-``polyfunctional.py:get_fg_prefix_form`` / ``substituent_no_prefix_form`` site (CONTEXT /F2),
+``polyfunctional.py:get_fg_prefix_form()`` / ``substituent_no_prefix_form`` site (CONTEXT D-01/F2),
 ``split_composite_fg`` decomposes it into its ordered sub-group prefix
 **components** instead of dropping it:
 
@@ -16,7 +16,7 @@ share it (CONTEXT worked example ``4-(ethylsulfanyl)-4-oxobutanoic acid``). The
 caller appends each component to ``all_prefixes`` so they re-enter the EXISTING
 ``format_fg_prefix`` + ``alpha_sort_key`` pipeline (POLY-02 native).
 
-**Single source of truth (CONTEXT):** every component's prefix STRING is
+**Single source of truth (CONTEXT D-02):** every component's prefix STRING is
 resolved through the EXISTING authority — ``oxo`` via ``seniority.get_prefix``,
 the alkoxy/sulfanyl forms via ``assembly.substituent_prefix_forms`` — NEVER
 hardcoded and NEVER a string-rewrite (no regex substitution, no string-replace
@@ -24,14 +24,14 @@ call, no postprocessor pass; ``.claude/skills/fix-methodology.md``). The
 decomposition acts at the FG-prefix-resolution layer and returns structured
 components.
 
-**RT safety (CONTEXT, FAIL-CLOSED):** when an ``OpsinOracle`` is supplied
+**RT safety (CONTEXT D-05, FAIL-CLOSED):** when an ``OpsinOracle`` is supplied
 (flag-ON only), the FULL assembled split name is OPSIN-round-trip-checked; a
 split that does not round-trip (incl. the FAIL-CLOSED ``oracle._jar is None``
 case) is rejected and the caller behaves exactly as today's ``substituent_no_prefix_form``
 ``continue`` — never emits a worse name (favorable asymmetry: the status-quo
 dropped-FG name already fails RT, so a rejected split only preserves it).
 
-Source: 169-CONTEXT.md.., F2; 169-RESEARCH.md "Architecture Patterns" +
+Source: 169-CONTEXT.md D-01..D-05, F2; 169-RESEARCH.md "Architecture Patterns" +
 "Code Examples"; 169-PATTERNS.md "group_splitting.py".
 """
 
@@ -109,7 +109,7 @@ class SplitComponent:
 
 @dataclass(frozen=True)
 class SplitEvent:
-    """Phase 169 diagnostic event (the reach-report data source)."""
+    """Phase 169 D-06 diagnostic event (the reach-report data source)."""
 
     kind: str            # "split_emit" | "split_reject_rt_unsafe" | "passthrough_not_in_table"
     fg_name: str
@@ -285,16 +285,16 @@ def split_composite_fg(
     Returns ``None`` (the caller then behaves exactly as today's ``substituent_no_prefix_form``
     ``continue``) when:
       * ``fg_name`` is not in the split table (deny-path — functional-class FGs
-        stay dropped, CONTEXT), OR
+        stay dropped, CONTEXT D-03), OR
       * the structural decomposition cannot resolve a clean component string, OR
       * the per-split OPSIN-RT gate rejects the assembled split name
-        (FAIL-CLOSED, CONTEXT — never a worse name).
+        (FAIL-CLOSED, CONTEXT D-05 — never a worse name).
 
     Otherwise returns the ordered ``[SplitComponent, ...]`` list (e.g.
     ``[oxo, ethoxy]``) the caller appends to ``all_prefixes`` (POLY-02 native).
     """
     # Deny-path first (short-circuits before touching mol — so a functional-class
-    # FG returns None even with null args; CONTEXT bound).
+    # FG returns None even with null args; CONTEXT D-03 bound).
     from ..data.group_split_rules import SPLIT_RULES  # Pattern-S3 lazy import
     if fg_name not in SPLIT_RULES:
         return None
@@ -309,7 +309,7 @@ def split_composite_fg(
 
     rule = SPLIT_RULES[fg_name]
 
-    # FAIL-CLOSED per-split RT gate (CONTEXT). Skipped inside the probe re-naming
+    # FAIL-CLOSED per-split RT gate (CONTEXT D-05). Skipped inside the probe re-naming
     # (base case) and when no oracle is supplied (flag-OFF never reaches here; unit
     # tests may pass oracle=None to exercise the pure decomposition).
     if oracle is not None and not getattr(_IN_SPLIT_PROBE, "active", False):

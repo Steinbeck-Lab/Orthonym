@@ -2,7 +2,7 @@
 
 Verbatim lift of composer.py:1374-1386 (inline dispatch branch). Body
 ``_assemble_amine_name`` at composer.py:4296-4536 (241 LOC) STAYS until
-Plan-03 commit 03-10 (composer.py thinning) per CONTEXT.
+Plan-03 commit 03-10 (composer.py thinning) per CONTEXT D-24.
 
 Predicate gates on:
 1. ``principal_group in {secondary_amine, tertiary_amine}`` (primary_amine
@@ -12,7 +12,7 @@ Predicate gates on:
 3. ``not is_cyclic OR chain_is_parent`` (Tier-A mutex — same pattern as
    partial_sat handler in Plan-02 commit 02-24)
 
-Byte-identical contract per CONTEXT (DECOMP-03): predicate gates capture
+Byte-identical contract per CONTEXT D-21 (DECOMP-03): predicate gates capture
 the inline cascade-order semantics so dispatch_inner reaches this handler
 only when the inline amine branch at composer.py:1374 would have fired.
 
@@ -51,7 +51,7 @@ def _is_amine(features: Any) -> bool:
     - NOT is_polyfunctional
     - (NOT is_cyclic OR chain_is_parent) (Tier-A mutex)
 
-    Pure read-only per CONTEXT.
+    Pure read-only per CONTEXT D-25.
     """
     if getattr(features, 'principal_group', None) not in _AMINE_PRINCIPAL_GROUPS:
         return False
@@ -92,7 +92,7 @@ def name_amine(
         )
 
     # Phase 165 SCORE-01: _assemble_amine_name builds the name via N-prefix
-    # string concatenation (no fragment list) -> counted coarse node,
+    # string concatenation (no fragment list) -> counted coarse node (D-03),
     # parity-safe via fragment_legacy. A structured upgrade requires a
     # fragments-based refactor of _assemble_amine_name (deferred; documented A1).
     tree = NameTreeNode(

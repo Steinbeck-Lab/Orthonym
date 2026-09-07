@@ -1,11 +1,11 @@
-"""Scoped-per-call memoization infrastructure.
+"""Scoped-per-call memoization infrastructure (M1, Levers C1 + E).
 
 A byte-identity-preserving cache whose lifetime is exactly ONE top-level naming
 call. The engine re-names the same substituent fragments many times inside one
 molecule -- the dispatch cascade, the ``_retry_cascade_on_gate_rejection``
 re-entries and the recursive Tier-4 cascade all re-derive the same fragment
 prefixes -- so a per-call cache removes that redundant work without changing any
-emitted name. See Part 2.
+emitted name. See ``.planning/audit-/PERF-OPTIMIZATION-PLAN.md`` Part 2.
 
 Design invariants (each is load-bearing for the 0-wrong / byte-identity contract):
 
@@ -30,7 +30,7 @@ import os
 #: RAISED as a loud failure, but the recursive naming cascade wraps the hot loops in
 #: broad ``except Exception`` and CATCHES it (degrading to a von-Baeyer name), so the
 #: raise alone is invisible from a full-engine ``verify`` run -- "0 MemoMismatch
-#: exceptions" is NOT "0 incomplete-key events". This list is
+#: exceptions" is NOT "0 incomplete-key events" (review P3 Crit-2). This list is
 #: appended BEFORE the raise, so a validation harness can COUNT incomplete-key events
 #: over a whole corpus even when every raise is swallowed. Read/reset via the helpers.
 _VERIFY_MISMATCHES = []
@@ -119,7 +119,7 @@ def cache_or_compute(namespace, key, compute_fn):
         if ck in cache and cache[ck] != val:
             # Record BEFORE raising: the naming cascade swallows the exception, so
             # this counter is the only observable signal of an incomplete key over a
-            # full-engine corpus run.
+            # full-engine corpus run (review P3 Crit-2).
             _VERIFY_MISMATCHES.append((namespace, key))
             raise MemoMismatch(namespace, key, cache[ck], val)
         cache[ck] = val

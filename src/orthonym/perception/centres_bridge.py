@@ -4,7 +4,7 @@ Adopts the `centres` reference CIP implementation (SiMolecule, LGPL-3.0)
 as an OPTIONAL source-of-truth for Cahn-Ingold-Prelog stereo descriptors,
 invoked out-of-process via a batched single-JVM subprocess.
 
-Design: this module mirrors two already-trusted JVM-bridge modules
+Design (D-12): this module mirrors two already-trusted JVM-bridge modules
 verbatim in posture --
   * ``validation/opsin_roundtrip.py``  -> jar resolution + ``_java_available``
     (5 s probe) + graceful ``None`` fallback,
@@ -16,7 +16,7 @@ verbatim in posture --
 No new JVM-bridge logic is invented; the only centres-specific work is the
 both-endpoint label parsing (centres labels C=C / C=N at BOTH 1-based atom
 endpoints, e.g. ``7E 8E``; tetrahedral is a single label, e.g. ``2S``) and the
-mapping of those per-atom labels back onto RDKit bond ``_CIPCode`` props.
+mapping of those per-atom labels back onto RDKit bond ``_CIPCode`` props (D-14).
 
 Security posture (threat model T-177-01/02/03):
   * SMILES are passed via the temp FILE, never shell-interpolated, never on
@@ -29,7 +29,7 @@ Security posture (threat model T-177-01/02/03):
 
 This engine is OPT-IN. Callers gate on ``ORTHONYM_USE_CENTRES_CIP`` and MUST
 treat a ``None`` return (jar/Java absent) as "fall back to RDKit" -- a missing
-JVM never hard-fails a name.
+JVM never hard-fails a name (D-13).
 """
 
 import logging
@@ -120,7 +120,7 @@ def _java_available() -> bool:
 
     Caching is safe because a Java runtime cannot appear or disappear inside one
     process, so this is **provably output-neutral**: no name can change. That matters
-    here — sessionrecords four occasions where a change that looked like a
+    here — session invariant 9 records four occasions where a change that looked like a
     pure cleanup altered what got emitted, so a performance fix has to be one that
     *cannot*.
 
@@ -191,7 +191,7 @@ def centres_label_batch(
 
     Returns:
         ``{smiles: {1-based-atom-idx: descriptor}}`` on success, or ``None``
-        when the jar or Java is absent (caller falls back to RDKit --).
+        when the jar or Java is absent (caller falls back to RDKit -- D-13).
         A SMILES that centres produced no labels for maps to an empty dict.
     """
     if not smiles_list:
@@ -290,7 +290,7 @@ def centres_label_batch(
 def apply_centres_labels(mol, label_map: Dict[int, str]) -> None:
     """Set RDKit ``_CIPCode`` props on atoms/bonds from a centres label map.
 
-    Resolution:
+    Resolution (D-14):
       * Tetrahedral / pseudoasymmetric (R/S/r/s) -- single labelled atom:
         ``mol.GetAtomWithIdx(idx-1).SetProp('_CIPCode', desc)``.
       * Cis-trans (E/Z) -- centres labels BOTH endpoints of the double bond
@@ -303,7 +303,7 @@ def apply_centres_labels(mol, label_map: Dict[int, str]) -> None:
     Axial / helical (M/P/m/p) descriptors centres emits for AT/HE compounds are
     set on the atom directly (RDKit's downstream consumers read ``_CIPCode``
     generically). Labels whose target cannot be resolved on this mol are skipped
-    (: a missing descriptor beats a wrong one).
+    (D-09: a missing descriptor beats a wrong one).
 
     The map uses 1-based atom indices (centres convention). ``mol`` is modified
     in place. This is the production analogue of the validation harness keying.
@@ -388,7 +388,7 @@ def centres_label_mol(mol) -> bool:
 
     Returns:
         True if centres produced a label map and it was applied (the engine
-        was available); False when the caller must fall back to RDKit.
+        was available); False when the caller must fall back to RDKit (D-13).
         False has TWO causes: (1) the engine was unavailable (jar/Java absent),
         or (2) the engine ran but the `_smilesAtomOutputOrder` remap could not
         be read while there were labels to place — declining beats misplacing
@@ -408,7 +408,7 @@ def centres_label_mol(mol) -> bool:
     if order is None:
         # No output-order map available (should not happen for a real
         # MolToSmiles). If there are labels to place we cannot safely remap
-        # them, so decline -> the caller falls back to RDKit (: a missing
+        # them, so decline -> the caller falls back to RDKit (D-09: a missing
         # descriptor beats a wrong one). If there are none, centres ran cleanly.
         return not raw_labels
     # Remap canonical SMILES positions -> mol's own 1-based atom indices.

@@ -135,7 +135,7 @@ def find_opsin_jar() -> Optional[str]:
     return None
 
 
-# giant-molecule hang fix: memoize OPSIN parse results. Parsing a name to a
+# v33 giant-molecule hang fix: memoize OPSIN parse results. Parsing a name to a
 # structure is a PURE, DETERMINISTIC function of (name, jar), so a process-global
 # cache is always correct AND improves determinism (a name that times out once is
 # thereafter a fast, consistent miss instead of a load-dependent flake). This is
@@ -184,7 +184,7 @@ def _parse_name_with_opsin_uncached(name: str, opsin_jar: str) -> Optional[str]:
     if not name or not opsin_jar:
         return None
 
-    # PERF: prefer the ONE lazily-started in-process JVM (jvm_bridge,
+    # PERF (v38 P1): prefer the ONE lazily-started in-process JVM (jvm_bridge,
     # JPype) over a fresh ~0.82 s cold `java -jar` launch per name -- that
     # cold-start dominated atom-coverage wall time. ``opsin_stdout`` returns
     # EXACTLY the bytes this ``java -jar ... -osmi`` invocation would have

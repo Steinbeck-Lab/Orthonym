@@ -1384,7 +1384,7 @@ def _ring_imine_carbons(mol, ring_set: Set[int]) -> List[int]:
 
 
 def _ring_chalcogenone_carbons(mol, ring_set: Set[int], symbol: str) -> List[int]:
-    """: ring carbons bearing an exocyclic ketone-type ``=S``/``=Se``
+    """v27 P4: ring carbons bearing an exocyclic ketone-type ``=S``/``=Se``
     (thione / selone), the heavier-chalcogen analogues of the ``-one`` ketone
     suffix (P-64.2 chalcogen replacement; e.g. ``pyridine-2(1H)-thione``,
     ``pyrimidine-2,4(1H,3H)-dithione``). Mirrors ``_ring_carbonyl_carbons``
@@ -1576,7 +1576,7 @@ def _resolve_oxo_parent(mol, ring_atoms):
     if len(rings) == 1:
         if all(mol.GetAtomWithIdx(i).GetSymbol() == 'C' for i in ring_set):
             return []  # carbocyclic monocycle -> cycloalkanone path
-        # (A): "mancude parent + added indicated hydrogen"
+        # v33 Phase 6 (A): "mancude parent + added indicated hydrogen"
         # (P-31.1.4.2) is a Hantzsch-Widman-range concept (rings of size
         # 3-10 -- the same bound name_heterocycle's own `ring_size > 10`
         # branch and _name_lambda_heteromonocycle already enforce). Past
@@ -1761,7 +1761,7 @@ def name_cyclic_oxo_compound(mol: Chem.Mol) -> Optional[str]:
     suffix_hetero_name = 'oxo'
     all_carbonyls = set(_ring_carbonyl_carbons(mol, all_ring_atoms))
     if not all_carbonyls:
-        # heavier-chalcogen ketone analogues (P-64.2 replacement) — thione
+        # v27 P4: heavier-chalcogen ketone analogues (P-64.2 replacement) — thione
         # (=S), then selone (=Se) — are senior to imine and take the -thione /
         # -selone suffix with the SAME added-indicated-H numbering as -one (the
         # engine is suffix-agnostic). Previously these fell through to the
@@ -1799,7 +1799,7 @@ def name_cyclic_oxo_compound(mol: Chem.Mol) -> Optional[str]:
     if not ring_set:
         return None
 
-    # BUILD-1 (parent-selection robustness; C3-SPY Site-3): the carbonyl
+    # v36 Wave-B BUILD-1 (parent-selection robustness; C3-SPY Site-3): the carbonyl
     # here is named on its FUSED ring system only (``ring_set``). When that system is
     # SPIRO- or BRIDGE-joined to further ring atoms — an SSSR ring that shares a
     # junction atom with ``ring_set`` yet also reaches outside it — this added-

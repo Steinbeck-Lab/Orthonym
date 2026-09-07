@@ -24,7 +24,7 @@ _NONCARBON_ESTER_PGS = ("pseudoester", "sulfonic_ester", "sulfinic_ester")
 
 def _is_noncarbon_ester(features: Any) -> bool:
     """Predicate: principal_group is one of the non-carbon ester classes AND a
-    concrete match tuple is available (pure read-only per)."""
+    concrete match tuple is available (pure read-only per D-25)."""
     if getattr(features, "principal_group", None) not in _NONCARBON_ESTER_PGS:
         return False
     return bool(getattr(features, "principal_group_atoms", None))

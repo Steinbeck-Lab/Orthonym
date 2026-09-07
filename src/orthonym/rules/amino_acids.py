@@ -25,8 +25,8 @@ from ..data.amino_acids import is_standard_amino_acid  # noqa: F401  re-exported
 # [CX4] - sp3 carbon (alpha carbon)
 # [CX3](=O)[OX2H1] - carboxylic acid
 #
-# Task 2.0: N broadened to also admit H0 -- mirrors
-# rules/peptides.py's own `_PEPTIDE_BOND_SMARTS` broadening. A
+# v33 Phase 2 Task 2.0: N broadened to also admit H0 -- mirrors
+# rules/peptides.py's own `_PEPTIDE_BOND_SMARTS` broadening (v30). A
 # peptide's C-TERMINAL residue's own N-Calpha-COOH triad is what this
 # pattern is meant to catch (N here can be the free N-terminus of a
 # mono-residue "peptide", OR the amide N carried over from the PRECEDING
@@ -37,7 +37,7 @@ from ..data.amino_acids import is_standard_amino_acid  # noqa: F401  re-exported
 # -- the H1/H2-only pattern silently missed every X-...-Pro peptide, which
 # is why `is_peptide()` (below) returned False even though
 # `rules.peptides.name_peptide()` already named these correctly once
-# reached directly (sec.4).
+# reached directly (`.planning/audit-v33/PHASE0-PEPTIDE-SCOPE.md` sec.4).
 # Was previously kept in sync with `peptides.py`'s pattern only by name, not
 # by value -- this restores that sync.
 ALPHA_AMINO_ACID_SMARTS = "[NX3;H2,H1,H0][CX4][CX3](=O)[OX2H1]"
@@ -50,21 +50,21 @@ ALPHA_AMINO_ACID_SMARTS = "[NX3;H2,H1,H0][CX4][CX3](=O)[OX2H1]"
 # This detects -C(=O)-NH-CH- (and -C(=O)-N(ring)-CH- for Pro/Hyp) linkages
 # typical of peptide bonds.
 #
-# Task 2.0: broadened to H0,H1 to match
+# v33 Phase 2 Task 2.0: broadened to H0,H1 to match
 # rules/peptides.py's `_PEPTIDE_BOND_SMARTS` exactly (same rationale as
 # ALPHA_AMINO_ACID_SMARTS above) -- a dipeptide whose ONLY bond is an X-Pro
 # bond (Pro as the sole C-terminal residue) has no OTHER bond to fall back
 # on, so this constant must admit H0 too, not just the amino-acid pattern.
 PEPTIDE_BOND_SMARTS = "[CX3](=O)[NX3;H0,H1][CX4]"
 
-# Task 2.1 (capped termini): a peptide whose C-TERMINAL residue's
+# v33 Phase 2 Task 2.1 (capped termini): a peptide whose C-TERMINAL residue's
 # alpha-carboxyl is a PRIMARY CARBOXAMIDE (-C(=O)NH2, e.g. a bioactive
 # peptide's amidated C-terminus) has NO free -COOH anywhere in the whole
 # molecule, so ALPHA_AMINO_ACID_SMARTS (which hard-requires `[OX2H1]`) never
 # matches and `is_peptide()` returned False -- the dispatcher never called
 # `rules.peptides.name_peptide` at all, even once that module's own
 # `_is_valid_peptide`/producer were extended to accept this cap
-# (sec.3: 71% of the true-
+# (`.planning/audit-v33/PHASE0-PEPTIDE-SCOPE.md` sec.3: 71% of the true-
 # peptide backlog is exactly this "both termini capped" shape). Deliberately
 # a SEPARATE constant rather than broadening `ALPHA_AMINO_ACID_SMARTS`
 # itself: that constant also gates `detect_amino_acid`/`name_amino_acid`,
@@ -74,7 +74,7 @@ PEPTIDE_BOND_SMARTS = "[CX3](=O)[NX3;H0,H1][CX4]"
 # `is_peptide()` below, so that unrelated path is untouched.
 _TERMINAL_PRIMARY_AMIDE_ALPHA_SMARTS = "[NX3;H2,H1,H0][CX4][CX3](=O)[NX3H2]"
 
-# (backbone-substitutive ester C-terminus): a peptide whose C-TERMINAL
+# v38 (backbone-substitutive ester C-terminus): a peptide whose C-TERMINAL
 # residue's alpha-carboxyl is esterified (-C(=O)-O-C, e.g. a Leu-Leu methyl
 # ester) has NO free -COOH and NO primary carboxamide anywhere, so neither
 # ALPHA_AMINO_ACID_SMARTS (hard-requires `[OX2H1]`) nor
@@ -83,7 +83,7 @@ _TERMINAL_PRIMARY_AMIDE_ALPHA_SMARTS = "[NX3;H2,H1,H0][CX4][CX3](=O)[NX3H2]"
 # `rules.peptides.name_peptide`, even though that module's
 # `_try_backbone_substitutive` now names the ester-C-terminus parent
 # systematically ('methyl (2S)-2-[(2S)-2-amino-4-methylpentanamido]-4-
-# methylpentanoate'). This is the exact structural analogue of the
+# methylpentanoate'). This is the exact structural analogue of the v33
 # primary-amide alternative above. Scoped to an ALPHA-amino-acid ester
 # (`[NX3][CX4]` on the ester carbonyl) so it does NOT broadly re-route
 # ordinary esters; combined with the `count_peptide_bonds(mol) >= 1`
@@ -99,7 +99,7 @@ _TERMINAL_ESTER_ALPHA_SMARTS = "[NX3;H2,H1,H0][CX4][CX3](=O)[OX2][CX4]"
 _EXTRA_FG_SMARTS = [
     '[OX2H1;!$([OX2H1]C=O)]',  # Hydroxy OH (not in COOH)
     '[SX2H1]',                   # Thiol SH
-    # (F-THIOETHER-DROP, BB P-103 audit F1): a thioether -S- (both
+    # v23 Phase 12 (F-THIOETHER-DROP, BB P-103 audit F1): a thioether -S- (both
     # neighbours carbon) is NOT a chain atom — the carbon-count systematic namer
     # would count the S-alkyl carbon(s) as backbone and silently DROP the sulfur
     # (methionine homologues / S-alkyl-cysteines named as plain '2-aminoalkanoic
@@ -107,7 +107,7 @@ _EXTRA_FG_SMARTS = [
     # emits the (alkylsulfanyl) prefix (2-amino-3-(ethylsulfanyl)propanoic acid).
     # Disulfides (S has an S neighbour) and ring S (rings already bail above) are
     # excluded by the two-carbon-neighbour requirement.
-    # BP-3 C1 (P-63.1.5): the Se/Te ether analogues have the SAME defect — the
+    # v26 BP-3 C1 (P-63.1.5): the Se/Te ether analogues have the SAME defect — the
     # carbon-count backbone walks through -Se-/-Te- and drops the chalcogen
     # (C[Se]CC(N)C(=O)O was named '2-aminobutanoic acid', a different molecule).
     # Bail so the polyfunctional pipeline emits the (methylselanyl)/(methyltellanyl)
@@ -157,10 +157,10 @@ def is_peptide(mol) -> bool:
     Returns:
         True if molecule is a peptide (has amino acid pattern AND peptide bonds)
     """
-    # Must have amino acid pattern AND peptide bonds. 2.1: OR in the
+    # Must have amino acid pattern AND peptide bonds. v33 Task 2.1: OR in the
     # terminal-primary-amide alternative (see the constant's docstring) so a
     # capped-C-terminus peptide still dispatches to `rules.peptides` instead
-    # of silently falling through to "unknown organic compound". OR in the
+    # of silently falling through to "unknown organic compound". v38: OR in the
     # ester-C-terminus alternative too, for the same reason (a '...oate'
     # C-terminus that _try_backbone_substitutive now names systematically).
     amide_pattern = Chem.MolFromSmarts(_TERMINAL_PRIMARY_AMIDE_ALPHA_SMARTS)
@@ -289,7 +289,7 @@ def name_amino_acid(mol, canonical_smiles: str) -> Optional[str]:
         canonical_smiles, mol=mol, with_descriptor=is_top_level_naming(),
     )
     if trivial:
-        # (C2b) STEREO HONESTY: the blanket policy is TOP-LEVEL naming +
+        # v33 Phase 1 (C2b) STEREO HONESTY: the blanket policy is TOP-LEVEL naming +
         # an undefined real stereocentre -> decline the retained AA name and fall
         # through to the stereo-free systematic name below. Config-fabrication is the
         # PRIMARY reason (a retained AA name implies a specific configuration -- L,
@@ -462,7 +462,7 @@ def _name_amino_acid_systematic(mol) -> str:
     if _has_extra_functional_groups(mol):
         return None
 
-    # (P-103.2.3 branched systematic AA, BB audit): the carbon-count
+    # v23 Phase 12 (P-103.2.3 branched systematic AA, BB audit): the carbon-count
     # stem below assumes a SINGLE unbranched chain (it names every carbon as
     # backbone -> '2-amino{stem}anoic acid'). A branched side chain (a carbon with
     # >2 carbon neighbours, e.g. CC[C@H](C)[C@@H](N)C(=O)O = a 3-methylpentanoic

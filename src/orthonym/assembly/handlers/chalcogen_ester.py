@@ -46,7 +46,7 @@ def _is_chalcogen_ester(features: Any) -> bool:
 
     Mirrors handlers/imidate._is_imidate predicate contract. Fires when
     features.principal_group identifies a chalcogen ester AND no higher-
-    seniority group outranks it. Side-effect-free per.
+    seniority group outranks it. Side-effect-free per D-07.
     """
     pg = getattr(features, "principal_group", None)
     if pg not in _CHALCOGEN_ESTER_TOKENS:

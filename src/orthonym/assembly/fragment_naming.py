@@ -39,12 +39,12 @@ MAX_NAMING_DEPTH = 7
 # is different. Generous limit (20 vs old limit of 7) to allow deep
 # but finite naming chains.
 _MAX_VISITED_SIZE = 50  # Phase 127: raised from 30 for deeper decomposition; fallback at limit
-# NOTE: raising this to 200 was measured INERT for the acyl-CoA giant (its
+# NOTE (v33): raising this to 200 was measured INERT for the acyl-CoA giant (its
 # pantetheine-thioester substituent fails for a different reason, not this net) and is a
 # global change with gate/perf risk, so it is NOT raised. Revisit as a measured breadth lever
 # once the per-top-level work budget is proven a sufficient anti-runaway guard corpus-wide.
 
-# giant-molecule hang fix: negative-cache sentinel. Stored in the runtime
+# v33 giant-molecule hang fix: negative-cache sentinel. Stored in the runtime
 # fragment cache to mark a fragment that is CONTEXT-INDEPENDENTLY unnameable (the
 # recursive namer refused it / it produced a refusal sentinel / it raised) so the
 # combinatorial partition search never re-descends the same dead fragment (e.g.
@@ -258,7 +258,7 @@ def start_naming_session():
     if depth == 1:
         # Only allocate a fresh cache when there is none. ``isolated_naming_session``
         # deliberately keeps the outer molecule's fragment cache alive across its
-        # depth reset: a fragment's name is a pure
+        # depth reset (v33 giant-molecule hang fix): a fragment's name is a pure
         # function of its canonical SMILES, so reusing a cached name is always
         # correct AND stops a giant molecule from re-naming the same fragment on
         # every nested recovery entry. A GENUINE top-level call arrives with
@@ -281,7 +281,7 @@ def end_naming_session():
     if depth <= 0:
         _fragment_guard.session_depth = 0
         _fragment_guard.visited = set()
-        # giant-molecule hang fix: the fragment memo cache is owned by the
+        # v33 giant-molecule hang fix: the fragment memo cache is owned by the
         # NAME SCOPE (enter/exit_name_scope, keyed to the true outermost name()),
         # NOT by the session. Inside an ``isolated_naming_session`` the session
         # depth is reset to 0, so the FIRST nested ``name_compound`` would drive
@@ -295,7 +295,7 @@ def end_naming_session():
         _fragment_guard.session_depth = depth
 
 
-# --- Per-top-level-call fragment work budget ---
+# --- Per-top-level-call fragment work budget (v33 giant-molecule hang fix) ---
 #
 # A hard ceiling on how many recursive fragment-naming ATTEMPTS one top-level
 # ``name()`` call may make. It guarantees that EVERY molecule terminates (name or
@@ -540,7 +540,7 @@ def isolated_naming_session(reset_cache: bool = False):
     """
     saved_depth = getattr(_fragment_guard, 'session_depth', 0)
     saved_visited = getattr(_fragment_guard, 'visited', None)
-    # giant-molecule hang fix: the fragment CACHE is deliberately NOT reset or
+    # v33 giant-molecule hang fix: the fragment CACHE is deliberately NOT reset or
     # restored here (unless ``reset_cache``). It memoizes (canonical SMILES -> name),
     # a context-free pure function, so keeping it live across the isolation boundary
     # is always correct and prevents a >60-heavy-atom molecule from re-naming the
@@ -625,7 +625,7 @@ def name_fragment_recursively(smiles: str, style: str = 'pin',
     # (or vice versa). For the default 'pin' style the key IS ``canonical`` and
     # every cache read/write below is byte-identical to the pre-style behaviour;
     # the static FRAGMENT_NAME_CACHE holds pin names, so a 'systematic' key never
-    # hits it and the systematic path falls through to name_compound. (
+    # hits it and the systematic path falls through to name_compound. (v30 Slice C
     # slice-2: the amido converter needs the systematic acid name for amino-acid
     # rings — 'pyrrolidine-2-carboxylic acid', not the retained 'proline'.)
     cache_key = canonical if style == 'pin' else f"{canonical}\x00{style}"
@@ -642,7 +642,7 @@ def name_fragment_recursively(smiles: str, style: str = 'pin',
         if dynamic is not None:
             return dynamic if dynamic is not _NEG_CACHE else None
 
-    # giant-molecule hang fix: charge the per-top-level work budget for every
+    # v33 giant-molecule hang fix: charge the per-top-level work budget for every
     # genuine naming ATTEMPT (a cache hit above is free and already returned). This
     # counts the cheap-but-unbounded outcomes too -- the depth-net and cycle
     # fallbacks below are exactly the hot loop a giant molecule spins in, so the
@@ -668,7 +668,7 @@ def name_fragment_recursively(smiles: str, style: str = 'pin',
             "CYCLE detected: smiles=%s already in visited set (size=%d)",
             smiles[:60], len(visited),
         )
-        # Task 0.1: fragment could not be named (cycle guard).
+        # v25 P0 Task 0.1: fragment could not be named (cycle guard).
         from ..metrics.abstention import AbstentionCode, record_abstention
         record_abstention(AbstentionCode.BRANCH_UNNAMEABLE,
                           detail='fragment_cycle')
@@ -687,14 +687,14 @@ def name_fragment_recursively(smiles: str, style: str = 'pin',
         # name_pipeline_only has no `style` parameter, so it can only honour the
         # default 'pin' request; for a 'systematic' request skip it (returning a
         # pin fallback would answer the wrong question) and fall through to the
-        # abstention below. Cache under the style-aware key.
+        # abstention below. Cache under the style-aware key. (review NIT 9.)
         fallback_name = (name_pipeline_only(canonical) if style == 'pin'
                          else None)
         if fallback_name is not None and not is_refusal_sentinel(fallback_name):
             if runtime_cache is not None:
                 runtime_cache[cache_key] = fallback_name
             return fallback_name
-        # Task 0.1: fragment could not be named (depth safety net).
+        # v25 P0 Task 0.1: fragment could not be named (depth safety net).
         from ..metrics.abstention import AbstentionCode, record_abstention
         record_abstention(AbstentionCode.BRANCH_UNNAMEABLE,
                           detail='fragment_depth_limit')
@@ -719,7 +719,7 @@ def name_fragment_recursively(smiles: str, style: str = 'pin',
             from ..metrics.abstention import AbstentionCode, record_abstention
             record_abstention(AbstentionCode.BRANCH_UNNAMEABLE,
                               detail='fragment_refusal_sentinel')
-            # this fragment is context-independently unnameable (the namer
+            # v33: this fragment is context-independently unnameable (the namer
             # refused it standalone). Negative-cache it so the partition search
             # never re-descends this dead end (giant-molecule hang fix).
             if runtime_cache is not None:
@@ -730,7 +730,7 @@ def name_fragment_recursively(smiles: str, style: str = 'pin',
             if runtime_cache is not None:
                 runtime_cache[cache_key] = result
             return result
-        # Task 0.1: fragment could not be named (empty result).
+        # v25 P0 Task 0.1: fragment could not be named (empty result).
         # NOT negative-cached: an empty result can be depth-INDUCED (name_compound's
         # own substituent recursion hit the depth net), so it may succeed at a
         # shallower depth -- caching it would cost breadth. Only the explicit
@@ -744,7 +744,7 @@ def name_fragment_recursively(smiles: str, style: str = 'pin',
             "Fragment naming exception: smiles=%s error=%s",
             smiles[:60], e,
         )
-        # Task 0.1: fragment could not be named (exception).
+        # v25 P0 Task 0.1: fragment could not be named (exception).
         from ..metrics.abstention import AbstentionCode, record_abstention
         record_abstention(AbstentionCode.BRANCH_UNNAMEABLE,
                           detail='fragment_exception')

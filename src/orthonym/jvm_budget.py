@@ -4,7 +4,7 @@ Replaces the blanket folk rule "never run two OPSIN jobs concurrently" with a
 measured budget and real enforcement. The rule it replaces was never measured;
 worse, it did not describe the code -- ``eval/harness.py`` has always run
 ``mp.Pool(cpu_count() - 4)`` = 12 concurrent JPype JVMs on this host.
-Measurements and citations:.
+Measurements and citations: ``.planning/audit-v29/FINDING-opsin-concurrency-budget.md``.
 
 Why a budget at all, given memory is not the constraint
 -------------------------------------------------------

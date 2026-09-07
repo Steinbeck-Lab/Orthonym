@@ -600,7 +600,7 @@ def find_cleavable_bonds(mol) -> List[Dict]:
             if _is_skeletal_ether(mol, oxygen):
                 continue
 
-            # C-T2 (V-3): aralkyl-ether guard. When an ether carbon is a
+            # v22 C-T2 (V-3): aralkyl-ether guard. When an ether carbon is a
             # benzylic sp3 linker (-CH2-/-CHR- on an aromatic ring), the molecule
             # is named substitutively as (aryloxy/alkoxy)alkyl, not by ether
             # cleavage which mis-places the O on the ring (phenoxytoluene).
@@ -616,7 +616,7 @@ def find_cleavable_bonds(mol) -> List[Dict]:
             side2 = _bfs_heavy_atoms(mol, carbon2, excluded={oxygen})
 
             # Minimum fragment size guard: skip if either side < 3 heavy atoms
-            # (: lowered from 5 to 3 to detect smaller ethers)
+            # (D-03: lowered from 5 to 3 to detect smaller ethers)
             if len(side1) < 3 or len(side2) < 3:
                 continue
 
@@ -666,7 +666,7 @@ def find_cleavable_bonds(mol) -> List[Dict]:
             side1 = _bfs_heavy_atoms(mol, carbon1, excluded={sulfur})
             side2 = _bfs_heavy_atoms(mol, carbon2, excluded={sulfur})
 
-            # Minimum fragment size guard: 3 HA per side
+            # Minimum fragment size guard: 3 HA per side (D-03)
             if len(side1) < 3 or len(side2) < 3:
                 continue
 
@@ -707,7 +707,7 @@ def find_cleavable_bonds(mol) -> List[Dict]:
             side1 = _bfs_heavy_atoms(mol, carbon1, excluded={nitrogen})
             side2 = _bfs_heavy_atoms(mol, carbon2, excluded={nitrogen})
 
-            # Minimum fragment size guard: 3 HA per side
+            # Minimum fragment size guard: 3 HA per side (D-03)
             if len(side1) < 3 or len(side2) < 3:
                 continue
 

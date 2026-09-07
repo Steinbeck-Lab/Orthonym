@@ -19,7 +19,7 @@ from ..name_tree import NameTreeNode, NamingResult
 
 
 def _is_nitrite_ester(features: Any) -> bool:
-    """Predicate (pure): the nitrite ester R-O-N=O is the senior/sole
+    """Predicate (D-07 pure): the nitrite ester R-O-N=O is the senior/sole
     characteristic group. Defers (False) when a higher-seniority PG is present,
     so the handler never claims a polyfunctional molecule where nitrite loses.
     NO mol/features mutation; NO module state."""
@@ -38,7 +38,7 @@ def name_nitrite_ester(
     Algorithm: from the ``nitrite`` SMARTS match (R_carbon, O, N, O), name the
     R (alkyl/aryl) fragment via the universal substituent pipeline and join as
     ``"<R> nitrite"``. Returns None (defer) if the R cannot be named.
-    Style is ignored (single PIN per compound, CONTEXT).
+    Style is ignored (single PIN per compound, CONTEXT D-04).
     """
     from ..candidate_pool import get_current_pool
     from ..composer import _inject_stereo_if_missing

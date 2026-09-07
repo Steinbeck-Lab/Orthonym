@@ -153,14 +153,14 @@ def classify_ring_system_type(
     if spiro_in_system:
         return RingSystemType.SPIRO
 
-    # Phase 155.A +: Cyclophane classification fires after spiro and
+    # Phase 155.A D-03 + D-26: Cyclophane classification fires after spiro and
     # before bridged-fused (P-44.2.2 hierarchy: SPIRO=1 < CYCLIC_PHANE=2 < FUSED=3).
-    # Source: 155-CONTEXT.md,,; ring_selection.py:48 enum.
-    # NOTE (root-cause-only, ISS-005): narrow exception scope to ImportError
+    # Source: 155-CONTEXT.md D-03, D-20, D-26; ring_selection.py:48 enum.
+    # NOTE (D-20 root-cause-only, ISS-005): narrow exception scope to ImportError
     # only -- circular-import-safe lazy import idiom (matches multiplicative.py
     # lazy-import pattern). Runtime errors from is_cyclophane MUST bubble up;
     # do NOT swallow them. is_cyclophane already returns False (not raises) for
-    # non-cyclophane mol per topology gate, so the try/except handles
+    # non-cyclophane mol per D-03 topology gate, so the try/except handles
     # ONLY the bootstrap ImportError case.
     try:
         from .phane import is_cyclophane
@@ -478,7 +478,7 @@ def _p25_8_component_rank(mol: Chem.Mol, system_atoms: Set[int]) -> Tuple[int, .
     _name, a2l = named
 
     def _base_int(v):
-        # CP2 widened the fused-component locant map to also carry lettered
+        # v38 CP2 widened the fused-component locant map to also carry lettered
         # fusion locants ('4a') and (int, primes) tuples. This P-25.8 (e)-criterion
         # het-locant tiebreak must use the BASE integer of each (as it did pre-CP2,
         # when the map was coerced to int upstream) so a heteroatom on a ring-fusion
@@ -845,7 +845,7 @@ def select_principal_ring_system(
     if len(ring_systems) == 1:
         return tuple(sorted(ring_systems[0]))
 
-    # tail (glycoside convention, best-effort only): a GLYCOSIDE names its
+    # v30 tail (glycoside convention, best-effort only): a GLYCOSIDE names its
     # AGLYCONE as the parent and every sugar as a glycosyloxy substituent
     # (P-102 / the natural-product convention), even though strict P-44.2 makes
     # a heterocyclic sugar ring senior to an all-carbon ring system. When exactly

@@ -49,7 +49,7 @@ so the anilide contraction must never be emitted for an N-phenyl sulfonamide.
 
 DESIGN — no count stands in for a structure proof
 -------------------------------------------------
-Per the parent is
+Per ``.planning/audit-v29/FINDING-count-based-naming-sites.md`` the parent is
 never derived from an atom count. Instead the N-substituent branches are
 EXCISED from the real molecule and the residual R-SO2-NH2 is named by
 re-entering the naming pipeline, exactly as ``handlers/hydroximic_acid.py:92``

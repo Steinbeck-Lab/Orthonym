@@ -398,7 +398,7 @@ def get_acid_fragment_name(mol, acid_atoms: List[int]) -> str:
     # Book PINs. get_acid_stem() is reached for an unsaturated acid only if that
     # branch returns falsy, which was already true for every unsaturated chain
     # outside the four deleted rows, so the rows were never the guard.
-    # See
+    # See .planning/audit-v29/TaskJ3-acyl-prefix-pin.md.
 
     # For unsaturated acids, extract the
     # fragment and name it via the naming pipeline to get the full systematic
@@ -634,7 +634,7 @@ def _alkyl_name_via_substituent_primitive(mol, alkyl_set: set) -> Optional[str]:
         # degrade to the legacy word, never break ester naming outright.
         word = None
 
-    # breadth: name_substituent_fragment DECLINES a ring-bearing alcohol
+    # v31 breadth: name_substituent_fragment DECLINES a ring-bearing alcohol
     # component (its ring_fragment_declined_by_ring_engine guard). The legacy count path below then LINEARISES
     # the ring -- `CC(=O)O[C@H]1CCCCC[C@@H]1O` came out `(1S,2S)-heptyl acetate`
     # (cycloheptane counted as 7 chain carbons, the -OH silently dropped): a
@@ -697,7 +697,7 @@ def get_alkyl_fragment_name(mol, alkyl_atoms: List[int]) -> str:
     if has_ring and _has_nonring_unsat:
         return ""
 
-    # ---: delegate to the centralized substituent primitive -----
+    # --- v29 Phase 5: delegate to the centralized substituent primitive -----
     # Everything below this point derives the organyl word from a CARBON COUNT
     # plus a branch check that only looks at the attachment carbon. Branching
     # anywhere else is silently lost, so CC(=O)OCC(C)C (isobutyl) came out
@@ -979,7 +979,7 @@ def _name_amino_acid_ester(
     if ate_stem is None:
         return None  # out of scope (diacid / 2-stereocentre / non-standard AA)
 
-    # T5 (stereo honesty, mirrors L3-2e + the amino_acids.py
+    # v33 Phase 0 T5 (stereo honesty, mirrors L3-2e + the amino_acids.py
     # standalone-AA fix): `_get_stereo_prefix` falls back to "" both for TRUE
     # achirality (glycine) and for a genuine alpha-carbon stereocentre the
     # INPUT never defines (no wedge/parity). Emitting the bare '-ate' stem in
@@ -1033,7 +1033,7 @@ def name_ester(mol, ester_match: tuple) -> Optional[str]:
     if not acid_atoms or not alkyl_atoms:
         return None  # Cannot determine fragments
 
-    # W8 P3 (P-103.2.6, BB 54595-54608): amino-acid esters use the
+    # v24 W8 P3 (P-103.2.6, BB 54595-54608): amino-acid esters use the
     # retained '-ate' stem (e.g. 'methyl L-alaninate') for the in-scope
     # single-alpha-stereocentre monocarboxylic standard AAs + glycine. Tried
     # BEFORE the normal alkanoate/ring-acid path; declines (returns None,
@@ -1082,7 +1082,7 @@ def name_ester(mol, ester_match: tuple) -> Optional[str]:
     # merely CONTAINS a ring down-chain is a chain acid with a ring
     # substituent — it takes the chain path below.
     #
-    # (C): anchored on the KNOWN carbonyl carbon
+    # v33 Phase 6 (C): anchored on the KNOWN carbonyl carbon
     # (``ester_match[0]``) via ``_carbonyl_is_ring_bonded``, never on a
     # BFS-scanned ``acid_atoms`` set -- see that helper's docstring for why
     # ``acid_is_ring_acid`` can wander into a second ester's atoms and
@@ -1097,7 +1097,7 @@ def name_ester(mol, ester_match: tuple) -> Optional[str]:
     from ..perception.stereo import assign_stereochemistry
     assign_stereochemistry(mol)
 
-    # the acid-side word (chain-vs-ring selection, acid-side
+    # v33 Phase 6: the acid-side word (chain-vs-ring selection, acid-side
     # substituent discovery, and R/S stereo citation) is built by the shared
     # primitive so `name_polyfunctional_diester_free_hydroxy` (the
     # diacylglycerol-shape multi-ester path) builds it identically for
@@ -1134,7 +1134,7 @@ def _build_ester_acid_word(
     """Build the acid-side word ('<stereo><prefixes><acid>oate') for ONE
     ester match (P-65.6.3.2: the ester's suffix half).
 
-    : extracted verbatim from ``name_ester`` (which used to build
+    v33 Phase 6: extracted verbatim from ``name_ester`` (which used to build
     this inline) so it is a SINGLE source of truth, shared by ``name_ester``
     itself and by ``name_polyfunctional_diester_free_hydroxy`` (the
     diacylglycerol-shape path, which builds the acid word for whichever of
@@ -1155,7 +1155,7 @@ def _build_ester_acid_word(
     # chain length (excluding branch carbons) and discover substituents.
     acid_set = set(acid_atoms)
     # WS-A task 9: chain-vs-ring acid naming is decided by the CARBONYL
-    # bond, not mere ring presence (see acid_is_ring_acid).:
+    # bond, not mere ring presence (see acid_is_ring_acid). v33 Phase 6 (C):
     # anchored on the KNOWN carbonyl carbon (``ester_match[0]``), never a
     # BFS-scanned ``acid_atoms`` set -- see ``_carbonyl_is_ring_bonded``.
     acid_has_ring = _carbonyl_is_ring_bonded(mol, ester_match[0])
@@ -1246,7 +1246,7 @@ def _build_ester_acid_word(
                     break
 
             if start_atom is not None:
-                # (C): try BOTH ring-walk directions and pick
+                # v33 Phase 6 (C): try BOTH ring-walk directions and pick
                 # the one giving lowest locants to the ring's OTHER
                 # substituents (P-31.1.4.2.4 (f)/(g)), reusing the SAME
                 # pg-aware orientation primitive the free-acid path already
@@ -1289,7 +1289,7 @@ def _build_ester_acid_word(
             if ester_o is not None:
                 exclude.add(ester_o)
 
-            # Wave 2 (#6): a SECOND, non-principal ester whose
+            # v33 Phase 6 Wave 2 (#6): a SECOND, non-principal ester whose
             # alcohol-side atom sits directly ON this ring (Ar-O-C(=O)R,
             # e.g. an aryl acetate substituent on the same ring that also
             # carries THIS ester's acid) is invisible to the exclude set
@@ -1342,7 +1342,7 @@ def _build_ester_acid_word(
 
     acylate_name = get_acylate_name(acid_name)
 
-    # (C), nit-1: P-14.3.3 "Citation of locants" is
+    # v33 Phase 6 (C), nit-1: P-14.3.3 "Citation of locants" is
     # deny-by-default -- once the ring bears a substituent prefix (an
     # essential locant), the ring's OWN suffix-attachment locant must also
     # be cited ('methyl 2-methylcyclohexane-1-carboxylate', never
@@ -1429,7 +1429,7 @@ def _collect_ester_fragment_stereo(mol, acid_atoms: List[int],
     # atoms so the acid parent cites only its chain stereo. A RING acid (the ring IS
     # the parent) still cites its ring stereo.
     #
-    # (C): anchored on the KNOWN carbonyl carbon
+    # v33 Phase 6 (C): anchored on the KNOWN carbonyl carbon
     # (``ester_match[0]``), never a BFS-scanned ``acid_atoms`` set -- see
     # ``_carbonyl_is_ring_bonded``.
     _chain_acid = not _carbonyl_is_ring_bonded(mol, ester_match[0])
@@ -1743,7 +1743,7 @@ def name_noncarbon_ester(mol, match: tuple) -> Optional[str]:
 # already the PIN and converted it BACK to the non-PIN word, which is how
 # '(palmitoyloxy)acetic acid' survived the Task J2 fix to the ester word. A
 # systematic key here cannot ever be correct -- by construction its input is
-# already preferred. See
+# already preferred. See .planning/audit-v29/TaskJ3-acyl-prefix-pin.md.
 TRIVIAL_ACID_TO_ACYLOXY = {
     # --- preferred prefixes (PIN); these MUST survive ---
     "formic": "formyloxy",           # formyloxy*  Appendix 2 :56044
@@ -2172,7 +2172,7 @@ def _carbonyl_is_ring_bonded(mol, carbonyl_c: int) -> bool:
     atom set) is itself in a ring (lactone-like) or directly bonded to a
     ring atom (benzoic-/cyclohexanecarboxylic-shape).
 
-    6 Wave 2 (#6, review fix): ``acid_is_ring_acid(mol,
+    v33 Phase 6 Wave 2 (#6, review fix): ``acid_is_ring_acid(mol,
     acid_atoms)`` decides this by scanning a whole ``acid_atoms`` set for
     the FIRST carbon that looks like a carbonyl and returning based on
     THAT one. For a multi-ester molecule, ``parse_ester_fragments``'s BFS
@@ -2200,7 +2200,7 @@ def _name_ring_principal_independent_esters(
     NON-PRINCIPAL esters sit on that same ring -- either directly
     (Ar-O-C(=O)R) or through a single pendant atom (Ar-CH2-O-C(=O)R).
 
-    6 Wave 2 (#6): the OLD code named the non-principal acid
+    v33 Phase 6 Wave 2 (#6): the OLD code named the non-principal acid
     ALONE (dropping the alcohol-side linking atom entirely -- the
     methylene of a '-CH2-O-C(=O)R' arm) and space-joined it in front of
     the whole name with no locant -- a wrong-molecule / OPSIN-unparseable
@@ -2221,7 +2221,7 @@ def _name_ring_principal_independent_esters(
     is proven wrong (dropped atom, no locant), never an acceptable
     "uglier but honest" degrade.
 
-    6 Wave 2 (#6, review fix): every structural decision here
+    v33 Phase 6 Wave 2 (#6, review fix): every structural decision here
     is anchored on the PRINCIPAL ester's own known match atoms
     (``principal['match']``), NEVER on ``principal['acid_atoms']`` --
     that set can be contaminated with a second ester's atoms (see
@@ -2401,7 +2401,7 @@ def name_independent_esters(mol, ester_matches: list) -> Optional[str]:
     # Principal ester: name as "alkyl [acid]oate"
     principal = ester_data[0]
 
-    # Wave 2 (#6): when the PRINCIPAL ester's acid is a RING
+    # v33 Phase 6 Wave 2 (#6): when the PRINCIPAL ester's acid is a RING
     # acid, the OLD space-joined/unlocanted acyloxy-prefix path below is
     # PROVEN WRONG (it drops the alcohol-side linking atom of any
     # non-principal ester whose alkyl carbon is a pendant substituent on
@@ -2737,7 +2737,7 @@ def name_polyfunctional_ester_via_acid(mol, ester_match: tuple) -> Optional[str]
     if not alkyl_atoms:
         return None
 
-    # W8 P3 (P-103.2.6, BB 54595-54608): amino-acid esters (the alpha-amino
+    # v24 W8 P3 (P-103.2.6, BB 54595-54608): amino-acid esters (the alpha-amino
     # group is what routes a molecule like 'methyl alaninate' through this
     # POLYFUNCTIONAL path rather than the plain single-FG name_ester) use the
     # retained '-ate' stem (e.g. 'methyl L-alaninate'). Tried BEFORE the
@@ -2845,7 +2845,7 @@ def name_polyfunctional_diester_free_hydroxy(
     and the free hydroxyl(s) to 'hydroxy' prefixes, both cited on the 'yl'
     word, exactly as P-65.6.3.3.4.2's worked examples do it.
 
-    : this closes the gap where ``name_polyfunctional_ester_via_
+    v33 Phase 6: this closes the gap where ``name_polyfunctional_ester_via_
     acid`` (the single-ester acid-analog strategy) declines outright for
     >1 ester match, and the legacy EL-02 fallback in
     ``rules/polyfunctional.py::name_polyfunctional`` then demoted BOTH

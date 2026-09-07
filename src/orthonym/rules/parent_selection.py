@@ -61,7 +61,7 @@ SKELETAL_SUFFIX_PGS = {
     "imine",
 }
 
-# the PGs whose characteristic heteroatom can carry MORE THAN ONE
+# v29 Phase 8: the PGs whose characteristic heteroatom can carry MORE THAN ONE
 # bearing carbon, and can therefore BRIDGE two parent candidates. These are the
 # only subtypes for which the RC-4 (heteroatom, bearing-C) normalisation in
 # seniority._normalize_pcg_match loses information -- it keeps one carbon and
@@ -119,7 +119,7 @@ def _pg_attachment_atoms(
 def _build_ring_pos(ring_set: Set[int], ring_info: dict = None) -> dict:
     """Build atom-to-locant map using IUPAC ring numbering.
 
-    Per ASML-19 / / Phase 147: uses actual IUPAC ring numbering
+    Per ASML-19 / D-10 / Phase 147 D-01: uses actual IUPAC ring numbering
     when available, instead of sorted atom index positional proxy.
 
     Phase 147 extension: accepts both int locants and ``(int, str)`` tuple
@@ -136,7 +136,7 @@ def _build_ring_pos(ring_set: Set[int], ring_info: dict = None) -> dict:
     2. Fallback: sorted atom indices mapped to 1-indexed positions
        (correct for carbocyclic rings where any consistent numbering
         produces equivalent comparison results due to ring symmetry,
-        preserved for back-compat with pre-147 callers per)
+        preserved for back-compat with pre-147 callers per D-09)
 
     Args:
         ring_set: Set of atom indices in the ring system
@@ -155,7 +155,7 @@ def _build_ring_pos(ring_set: Set[int], ring_info: dict = None) -> dict:
 
     Source: https://iupac.qmul.ac.uk/BlueBook/P4.html P-44.4.1.4+
     Source: https://iupac.qmul.ac.uk/BlueBook/P1.html P-14.5.2, P-14.7
-    Source: Phase 147 CONTEXT (tuple encoding), (back-compat),
+    Source: Phase 147 CONTEXT D-01 (tuple encoding), D-09 (back-compat),
             RESEARCH §3 Risk 3 (min() hazard at :416 site).
     """
     if ring_info and ring_info.get("iupac_locants"):
@@ -183,7 +183,7 @@ def _build_ring_pos(ring_set: Set[int], ring_info: dict = None) -> dict:
             return ring_pos
         # Partial coverage -> sorted fallback (back-compat with pre-147
         # callers; cascade step 6 in candidate_pool.py gates on complete
-        # coverage via _has_iupac_locants per Phase 146).
+        # coverage via _has_iupac_locants per Phase 146 D-02).
 
     # Fallback: sorted atom indices (correct for carbocyclic rings).
     ring_sorted = sorted(ring_set)
@@ -201,7 +201,7 @@ class ParentSelectionResult:
         reasoning: Explanation for debugging
         principal_ring_system: The senior ring system chosen by the single
             authoritative among-rings computation (P-44.2). Populated once by
-            namer._classify (Phase 178 chokepoint consolidation); the
+            namer._classify (Phase 178 D-03 chokepoint consolidation); the
             derived ``senior_ring_system`` / ``principal_ring`` feature fields
             are read from this one value. ``None`` until populated (e.g. pure
             acyclic, or before the post-pass runs).
@@ -210,9 +210,9 @@ class ParentSelectionResult:
     parent_atoms: List[int]
     substituent_rings: List[Tuple[int, ...]]  # Rings that become substituents
     reasoning: str  # For debugging
-    # (Phase 178): one authoritative principal-ring-system computation.
+    # D-03 (Phase 178): one authoritative principal-ring-system computation.
     principal_ring_system: Optional[Tuple[int, ...]] = None
-    # SP1.3 (offer-not-return,: the SIZE of the ranked P-44
+    # v37 SP1.3 (offer-not-return, invariant 18): the SIZE of the ranked P-44
     # parent pool this result was chosen from. 1 for the pre-empt branches and a
     # single-candidate pool; >=2 when several ring/chain candidates competed.
     # Pure metadata — no naming logic reads it — surfaced so the best-effort
@@ -277,7 +277,7 @@ def is_principal_group_on_ring(
                 if neighbor.GetIdx() in ring_atoms_set:
                     return True
 
-    # (P-44.1): a characteristic heteroatom that BRIDGES two parent
+    # v29 Phase 8 (P-44.1): a characteristic heteroatom that BRIDGES two parent
     # candidates -- a secondary/tertiary amine N bonded to a carbon of EACH ring
     # -- is attached to BOTH of them, so P-44.1 disqualifies neither and the
     # P-44.2 ring-seniority tiebreak is what decides (namer.py:4321 already says

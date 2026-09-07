@@ -56,7 +56,7 @@ SAFETY
   provenance — and centres 1.5).
 * **Fallback, never failure.** Every entry point returns a sentinel meaning "I could not
   do this; use your subprocess path" when jpype is absent, the jars are missing, or the
-  JVM will not start. A missing JVM must never hard-fail a name (``centres_bridge``).
+  JVM will not start. A missing JVM must never hard-fail a name (``centres_bridge`` D-13).
 * **fork-safe.** A JVM does not survive ``fork()``, and ``eval/harness.py`` uses
   ``mp.Pool`` (processes). A child that inherited a parent's JVM would see
   ``isJVMStarted() == True`` while the JVM's threads no longer exist — and a JNI call into

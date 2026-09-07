@@ -36,7 +36,7 @@ from typing import Optional
 from rdkit import Chem
 from rdkit.Chem import RWMol
 
-# candidate ledger. Leaf module (threading + typing only), so cycle-free;
+# v30 PE-1 candidate ledger. Leaf module (threading + typing only), so cycle-free;
 # OFF unless a consumer calls enable(), so the production cost is one boolean test.
 from ..metrics.candidate_ledger import Scope as _LedgerScope
 from ..metrics.candidate_ledger import Stage as _LedgerStage
@@ -629,8 +629,17 @@ def _nitrogen_ylidene_prefix(mol, frag_atoms, attach_idx, free_valence):
                 return None
             names.append(token)
         if not names:
-            return "hydrazin-1-ylidene"
-        # group identical substituent tokens, all at locant 2
+            return "hydrazinylidene"
+        # P-14.3.4 locant omission (BB:24611 verbatim "(dimethylcarbamoyl)
+        # hydrazinylidene (preferred prefix)"; BB:1703 makes 'hydrazinylidene' the
+        # systematic prefix for H2N-N=): the free valence is at N1, which is
+        # valence-FULL (=parent double bond + N2 single bond), so EVERY substituent
+        # must sit on N2 -- the '1' (free valence) and '2' (substituent) locants are
+        # unambiguous and carry no information, so both are omitted:
+        # '(propan-2-ylidene)hydrazinylidene', 'dimethylhydrazinylidene', never
+        # '2-(propan-2-ylidene)hydrazin-1-ylidene'. Identical tokens keep their
+        # multiplier; each candidate is still SELF-01/OPSIN-RT verified downstream,
+        # so a hypothetical ambiguous omission abstains rather than ships wrong.
         grouped = {}
         for t in names:
             grouped.setdefault(t, 0)
@@ -638,10 +647,9 @@ def _nitrogen_ylidene_prefix(mol, frag_atoms, attach_idx, free_valence):
         parts = []
         for t, count in grouped.items():
             mult = get_multiplier_prefix(count, t)
-            locs = ",".join(["2"] * count)
-            parts.append((alpha_sort_key(t), f"{locs}-{mult}{enclose_if_compound(t)}"))
+            parts.append((alpha_sort_key(t), f"{mult}{enclose_if_compound(t)}"))
         block = "".join(p for _, p in sorted(parts))
-        return f"{block}hydrazin-1-ylidene"
+        return f"{block}hydrazinylidene"
 
     # --- imino: the attached N bonds to zero further N (=N-R or =NH) -------
     if len(n_neighbours) == 0:
@@ -871,7 +879,7 @@ def carbon_free_valence_prefix(mol, frag_atoms, attach_idx) -> FreeValencePrefix
 
 def _route_fragment_to_general_engine(mol, frag_atoms, attach_idx):
     """M2 Task 2: last-resort route for a branch BOTH the cascade and the
-    Phase-B3 universal-substituent fallback declined (``
+    Phase-B3 universal-substituent fallback declined (``.planning/audit-v33/
     M2-PRODUCER-SPY.md``: 71 unique root fragments the cascade declines, 59 of
     them (83%) already nameable by the whole-molecule general engine -- the
     fused/spiro ring shapes ``universal_substituent``'s own narrower ring
@@ -1009,10 +1017,10 @@ def _route_fragment_to_general_engine(mol, frag_atoms, attach_idx):
 
 def _substituent_memo_key(mol, frag_atoms, attach_idx, allow_mancude,
                           best_effort_val):
-    """Complete cache key for:func:`name_substituent`.
+    """Complete cache key for :func:`name_substituent` (M1 Lever C1).
 
     Every component is a proven wrong-name mechanism if omitted
-    (Part 1 Lever C):
+    (``.planning/audit-/PERF-OPTIMIZATION-PLAN.md`` Part 1 Lever C):
 
     1. rooted canonical isomeric fragment SMILES -- structure, stereo parities,
        charges, isotopes AND attachment position (``pentyl`` vs ``pentan-2-yl``);
@@ -1056,7 +1064,7 @@ def _substituent_memo_key(mol, frag_atoms, attach_idx, allow_mancude,
             _bond_items.append(((_rank.get(_bi, -1), _rank.get(_ei, -1)), _cip))
     _bond_items.sort(key=lambda t: t[0])
     bond_cips = tuple(c for _, c in _bond_items)
-    # Item-1 fix: MolFragmentToSmiles drops each fragment atom's bonds to
+    # Item-1 fix (): MolFragmentToSmiles drops each fragment atom's bonds to
     # atoms OUTSIDE the fragment and back-fills implicit H, so two structurally
     # distinct substituents (terminal formyl-on-N `formamido` vs an acyl-bridge
     # `carbamoyl`) collide on the same `smi`. `ext_free_valence` above measures
@@ -1070,7 +1078,7 @@ def _substituent_memo_key(mol, frag_atoms, attach_idx, allow_mancude,
             for b in mol.GetAtomWithIdx(i).GetBonds()
             if b.GetOtherAtom(mol.GetAtomWithIdx(i)).GetIdx() not in frag_set))
         for i in _order)
-    # Item-1 fix, round 3: the fragment SMILES + external-bond
+    # Item-1 fix, round 3 (, review C1): the fragment SMILES + external-bond
     # ORDERS still describe only the fragment and the multiplicities of its
     # outward bonds -- NOT what those bonds lead to. Producers on the cascade read
     # BEYOND the fragment: ``_name_amino_branch`` walks the acyl carbon's external
@@ -1137,7 +1145,7 @@ def name_substituent(mol, frag_atoms, attach_idx, allow_mancude: bool = False):
     # ``name_substituent`` with the default ``allow_mancude=False``, so a
     # best-effort whole-molecule run still gated substituent naming at the
     # DEFAULT tier here and declined fragments the cascade names at
-    # best-effort (measured:).
+    # best-effort (measured: `.planning/audit-v33/M2-PRODUCER-SPY.md`).
     # Honor the ambient context here, once, so every caller inherits it.
     # DEFAULT/PIN tier is unchanged: ``best_effort_ctx`` is unset there, so
     # ``.get()`` is falsy and this is byte-identical to the prior behaviour.
@@ -1194,7 +1202,7 @@ def name_substituent(mol, frag_atoms, attach_idx, allow_mancude: bool = False):
             return verdict.prefix
         free_valence = verdict.free_valence
 
-        # B1 (P-29.2 + BB:1703): a NITROGEN attached by a DOUBLE bond is
+        # v30 Phase1 B1 (P-29.2 + BB :1703): a NITROGEN attached by a DOUBLE bond is
         # an ylidene free valence (hydrazin-1-ylidene for =N-N<, {R}imino for =N-R),
         # NOT a -yl. carbon_free_valence_prefix declines the non-carbon root and the
         # -NH-R amino intercept below requires all-single bonds, so without this the
@@ -1209,7 +1217,7 @@ def name_substituent(mol, frag_atoms, attach_idx, allow_mancude: bool = False):
             if _nyl is not None:
                 return _nyl
 
-        # breadth (P-63.2.2.2): an O-ROOTED ether substituent -O-R is an ALKOXY
+        # v30 breadth (P-63.2.2.2): an O-ROOTED ether substituent -O-R is an ALKOXY
         # prefix ('methoxy'/'ethoxy'/'phenoxy'), NOT the cascade's carbon-rooted
         # 'hydroxy(R)'. `carbon_free_valence_prefix` declines a non-carbon root, so
         # without this the cascade mis-roots -O-CH3 as `hydroxymethyl` -- a DIFFERENT
@@ -1245,7 +1253,7 @@ def name_substituent(mol, frag_atoms, attach_idx, allow_mancude: bool = False):
                     # (same molecule, wrong PIN). Peroxides fall through to the cascade,
                     # which already names them correctly.
                     #
-                    # tail #25: -O-C(=O)-/-C(=S)-/-C(=N)- is an ACYLOXY (ester,
+                    # v30 tail #25: -O-C(=O)-/-C(=S)-/-C(=N)- is an ACYLOXY (ester,
                     # carbamate, carbonate, thioester), NOT a plain alkoxy. Feeding it
                     # to get_alkoxy_prefix mis-names it -- -OC(=O)NHMe became the
                     # WRONG 'carbamoylmethoxy' (a different molecule, SELF-01-vetoed).
@@ -1263,7 +1271,7 @@ def name_substituent(mol, frag_atoms, attach_idx, allow_mancude: bool = False):
                         if _alk:
                             return _alk
 
-                # B5: SILYLOXY -O-[Si]< is '{silyl}oxy'
+                # v30 Phase1 B5: SILYLOXY -O-[Si]< is '{silyl}oxy'
                 # ('(trimethylsilyl)oxy'), NOT the cascade's mis-rooted
                 # 'hydroxy{silyl}' (a DIFFERENT molecule -Si-OH). Silicon is a
                 # substitutive-nomenclature parent hydride (silane -> silyl, P-21/P-29),
@@ -1283,7 +1291,7 @@ def name_substituent(mol, frag_atoms, attach_idx, allow_mancude: bool = False):
                     if _si and not is_refusal_sentinel(_si) and ' ' not in _si:
                         return f"{enclose_if_compound(_si)}oxy"
 
-            # breadth (P-62.2.3 / P-66.1.1.4.3): an N-ROOTED substituent -NH-R /
+            # v30 breadth (P-62.2.3 / P-66.1.1.4.3): an N-ROOTED substituent -NH-R /
             # -N(R)R' / -NH-C(=O)R is an amino/amido PREFIX (methylamino / dimethylamino
             # / acetamido), NOT the cascade's carbon-rooted misroot -- `carbon_free_valence_
             # prefix` declines the non-carbon root, so the cascade re-roots -NH-CH3 as
@@ -1306,7 +1314,41 @@ def name_substituent(mol, frag_atoms, attach_idx, allow_mancude: bool = False):
                         mol, frag_atoms_set, attach_idx, _parent_n)
                     if _amino:
                         return _amino
-                    # sub-lever A: best-effort -NH-R with a RING-bearing R
+                    # Phase 11 (11C2 #17), P-68.3.1.2: a BARE terminal -NH-NH2
+                    # free-valence leaf is the RETAINED substituent prefix
+                    # 'hydrazinyl' (H2N-NH-), not the compositional 'aminoamino' the
+                    # amino cascade falls through to (amino recursing into amino).
+                    # Fires ONLY for the two-nitrogen -NH-NH2 shape: the attach N
+                    # (single-bonded, uncharged, non-ring -- gated by the elif above)
+                    # has exactly ONE in-fragment neighbour, that neighbour is a
+                    # TERMINAL -NH2 nitrogen (no heavy neighbour but the attach N,
+                    # uncharged, no radical/isotope, non-ring, all single bonds), and
+                    # the fragment is exactly those two atoms. A SUBSTITUTED far
+                    # nitrogen (2-R-hydrazinyl), an =N-N< (hydrazinylidene, handled in
+                    # _nitrogen_ylidene_prefix), and an acyl hydrazide named as the
+                    # senior -hydrazide SUFFIX (which is claimed before this
+                    # prefix-leaf namer is ever reached) are all NOT matched and fall
+                    # through unchanged. Offer-RT-gated downstream.
+                    _inner_n = [nb.GetIdx() for nb in _root.GetNeighbors()
+                                if nb.GetIdx() in frag_atoms_set
+                                and mol.GetAtomWithIdx(nb.GetIdx()).GetSymbol() == 'N']
+                    _inner_all = [nb.GetIdx() for nb in _root.GetNeighbors()
+                                  if nb.GetIdx() in frag_atoms_set]
+                    if (len(frag_atoms_set) == 2 and len(_inner_n) == 1
+                            and len(_inner_all) == 1):
+                        _far = mol.GetAtomWithIdx(_inner_n[0])
+                        _far_heavy = [nb for nb in _far.GetNeighbors()
+                                      if nb.GetAtomicNum() > 1
+                                      and nb.GetIdx() != attach_idx]
+                        if (_far.GetFormalCharge() == 0
+                                and not _far.GetNumRadicalElectrons()
+                                and not _far.GetIsotope()
+                                and not _far.IsInRing()
+                                and not _far_heavy
+                                and all(b.GetBondType() == Chem.BondType.SINGLE
+                                        for b in _far.GetBonds())):
+                            return "hydrazinyl"
+                    # v30 sub-lever A: best-effort -NH-R with a RING-bearing R
                     # (cyclohexylamino, benzylamino, [(4-fluorophenyl)methyl]amino).
                     # _name_amino_branch declines a saturated-ring/ring-on-chain R;
                     # mirror the O-rooted alkoxy path which already recurses ring R.
@@ -1316,7 +1358,7 @@ def name_substituent(mol, frag_atoms, attach_idx, allow_mancude: bool = False):
                         if _amino_ring:
                             return _amino_ring
 
-            # sub-lever A: best-effort -S-R with a RING-bearing R
+            # v30 sub-lever A: best-effort -S-R with a RING-bearing R
             # (cyclohexylsulfanyl, benzylsulfanyl, (4-hydroxycyclohexyl)sulfanyl).
             # The chalcogen-rooted sulfanyl cascade tier declines a saturated-ring /
             # ring-on-chain R; mirror the O-rooted alkoxy + N-rooted amino ring paths.
@@ -1335,7 +1377,7 @@ def name_substituent(mol, frag_atoms, attach_idx, allow_mancude: bool = False):
         token = _name_substituent_cascade(
             mol, frag_atoms, attach_idx, allow_mancude=allow_mancude)
 
-        # candidate ledger: FRAGMENT scope, recorded at the cascade's single
+        # v30 PE-1 candidate ledger: FRAGMENT scope, recorded at the cascade's single
         # production call site rather than by wrapping the cascade itself (a rename
         # would break the AST assertions in
         # tests/unit/assembly/test_substituent_enumerator_tier_05.py).
@@ -1352,12 +1394,12 @@ def name_substituent(mol, frag_atoms, attach_idx, allow_mancude: bool = False):
                            scope=_LedgerScope.FRAGMENT,
                            detail=f"allow_mancude:{allow_mancude}")
 
-        # (generalizes SP2.1'): a PLAIN acyloxy ester substituent (``-O-C(=O)-R``
+        # v37 (generalizes SP2.1'): a PLAIN acyloxy ester substituent (``-O-C(=O)-R``
         # attached via its ester O) whose acyl is SYSTEMATIC is named by the cascade,
         # NOT as the P-65.6.3.2.3 ``<acyl>oxy`` PIN prefix, but as an oxa-replacement
         # chain (``…-2-oxo-1-oxabutyl``) -- because Tier-1.95 above intercepts only
         # RETAINED acyls (a static ``FRAGMENT_NAME_CACHE`` lookup) and a systematic acyl
-        # falls through. STEP-1 spy REFUTED the SP2.1' report's
+        # falls through. STEP-1 spy (invariant 8) REFUTED the SP2.1' report's
         # "OPSIN-grammar-invalid" premise: that oxa-chain form round-trips EXACT in
         # OPSIN and already ships on the best-effort tier -- so this is a SPELLING gap
         # there, and on the DEFAULT/PIN tier a BREADTH gap (the systematic acyl frag is
@@ -1397,7 +1439,7 @@ def name_substituent(mol, frag_atoms, attach_idx, allow_mancude: bool = False):
             # a ring carbon cannot carry an '-ylidyne' (free valence 3).
             if free_valence == 2:
                 _a = mol.GetAtomWithIdx(attach_idx)
-                # 0-WRONG guard: the decorated-ring substituent namer
+                # 0-WRONG guard (invariant 9): the decorated-ring substituent namer
                 # DROPS defined ring stereo, so a stereo-bearing fragment would yield a
                 # stereo-STRIPPED '-ylidene' (a different molecule -- #18's full InChIKey
                 # loses its -HOWMLNFFSA stereo layer). Convert only when the fragment
@@ -1445,12 +1487,12 @@ def name_substituent(mol, frag_atoms, attach_idx, allow_mancude: bool = False):
                 token, free_valence, attach_idx)
             return None if allow_mancude else "substituent"
 
-        # B2 stereo-completeness guard: a substituent whose fragment carries a
+        # v30 B2 stereo-completeness guard: a substituent whose fragment carries a
         # DEFINED-stereo double bond MUST cite its E/Z descriptor, else the token names
         # a different (stereo-dropped) molecule. Legacy alkenyl tiers emit an
         # `Xethenyl` form without the descriptor (e.g. -CH=CH-OMe -> `methoxyethenyl`);
         # the OPSIN validity gate's stereo carve-out then SHIPS it as a wrong molecule
-        # -- fable-b2 BLOCKER 1). Decline so the caller fails closed. The
+        # (invariant 9 -- fable-b2 BLOCKER 1). Decline so the caller fails closed. The
         # descriptor block is `(1E)`/`(E)`/`(1E,2R)`; a legitimate stereogenic-C=C name
         # always carries it, so this can only turn a wrong output into an abstention.
         if token and token != "substituent":
@@ -1534,7 +1576,7 @@ def name_substituent(mol, frag_atoms, attach_idx, allow_mancude: bool = False):
 
         return token
 
-    # ---: scoped-per-call substituent-naming memo ----------
+    # --- M1 Lever C1: scoped-per-call substituent-naming memo ----------
     # The dispatch cascade, the gate-rejection retries and the recursive Tier-4
     # cascade all re-name the SAME fragment many times inside ONE molecule
     # (measured 288/371 duplicate calls, ~12% of marginal runtime). Memoize on a
@@ -1543,7 +1585,7 @@ def name_substituent(mol, frag_atoms, attach_idx, allow_mancude: bool = False):
     # ``ORTHONYM_MEMO=verify``. Key construction is fail-open: any error, or an
     # unavailable canonical output-order prop, skips the cache and recomputes (a
     # miss can never corrupt). Scope + modes live in ``assembly/memo.py``; plan in
-    # Step 1.
+    # ``.planning/audit-/PERF-OPTIMIZATION-PLAN.md`` Step 1.
     try:
         _memo_key = _substituent_memo_key(
             mol, frag_atoms, attach_idx, allow_mancude, _best_effort_val)
@@ -1582,6 +1624,25 @@ def name_ylidene_substituent(mol, frag_atoms, attach_idx):
     token = name_substituent(mol, frag_atoms, attach_idx)
     estimate = free_valence_morphology(token)
     if estimate.confident and estimate.free_valences == 2:
+        return token
+    return None
+
+
+def name_ylidyne_substituent(mol, frag_atoms, attach_idx):
+    """Name a fragment whose bond to its parent is TRIPLE, or ``None``.
+
+    The P-29.2 ``-ylidyne`` sibling of :func:`name_ylidene_substituent`: for a
+    fragment attached by a triple bond (three free valences), e.g. the
+    ``CH3-C#`` of a nitrile imide ``CC#[N+][N-]C`` -> ``ethylidyne``. As with
+    the ylidene entry point, the token comes back from :func:`name_substituent`
+    already carrying the morphology its attachment bond earned, and is returned
+    only if its own text confirms the three free valences -- nothing is
+    appended, so producer and consumer cannot drift about the free valence.
+    """
+    from ..validation.name_morphemes import free_valence_morphology
+    token = name_substituent(mol, frag_atoms, attach_idx)
+    estimate = free_valence_morphology(token)
+    if estimate.confident and estimate.free_valences == 3:
         return token
     return None
 
@@ -2115,7 +2176,7 @@ def _name_substituent_cascade(mol, frag_atoms, attach_idx,
         mol: RDKit Mol of the full molecule.
         frag_atoms: Set/list of atom indices belonging to the substituent.
         attach_idx: Atom index WITHIN frag_atoms that bonds to the parent.
-        allow_mancude:.
+        allow_mancude: v27 P1 opt-in (complete/best-effort engine tier only).
             Threaded to the ring chokepoint so a multi-ring cage substituent the
             narrow PIN namers decline (tricyclo+/adamantane, mancude fused
             aromatics) is named via the universal von-Baeyer cage engine instead
@@ -2154,7 +2215,7 @@ def _name_substituent_cascade(mol, frag_atoms, attach_idx,
     if not frag_atoms_set:
         return "substituent"
 
-    # ---- (Phase 177 WSB-02): stereo-dropping tier double-apply guard ----
+    # ---- D-08 (Phase 177 WSB-02): stereo-dropping tier double-apply guard ----
     # Tiers 0.5/1/1.5/1.6/2/3 build their prefix from a canonicalised fragment
     # (e.g. Tier-2's MolFragmentToSmiles strips @/@@ before the cache lookup),
     # so they SHORT-CIRCUIT Tier-4 — the only tier that natively reaches
@@ -2201,7 +2262,7 @@ def _name_substituent_cascade(mol, frag_atoms, attach_idx,
             located=located,
         )
 
-    # ---- Tier 0.5 (Phase 160.1): IUPAC P-65 / P-66 prefix-form check ----
+    # ---- Tier 0.5 (Phase 160.1 D-04): IUPAC P-65 / P-66 prefix-form check ----
     # PURE read-only check. Returns the IUPAC-canonical prefix form for any
     # fragment that ENTIRELY contains one of the 14 non-principal functional
     # groups (ester, ether, amide, sulfoxide, sulfone, thioether, nitrile,
@@ -2209,7 +2270,7 @@ def _name_substituent_cascade(mol, frag_atoms, attach_idx,
     # for FG-bearing fragments, eliminating the 'methyl formatyl' /
     # 'hydroxymethyl' bug per RESEARCH §3 root-cause fix.
     try:
-        # (P-63.6): allow_mancude (complete/best-effort tier) also lifts
+        # v27 P2 (P-63.6): allow_mancude (complete/best-effort tier) also lifts
         # the S-attached sulfoxide/sulfone prefix-form guard so a ring-borne
         # -S(=O)(=O)-R / -S(=O)-R substituent is named (R)sulfonyl / (R)sulfinyl
         # instead of dropping the S and its =O. Gated so the PIN default path is
@@ -2223,6 +2284,63 @@ def _name_substituent_cascade(mol, frag_atoms, attach_idx,
     except Exception:
         # Defensive: any unexpected SMARTS / RDKit error falls through to Tier-1
         pass
+
+    # ---- Tier 0.55 (Phase 11, P-67.1.4.4.2): S-oxoacid acyl-oxy/-amino ----
+    # An -O-S(oxoacid) or -NH-S(oxoacid) tail, where the parent carries a group
+    # senior to the sulfur acid, is a substituent PREFIX (sulfooxy,
+    # (chlorosulfonyl)oxy, sulfamoyloxy, (aminosulfinyl)oxy, (methoxysulfinyl)oxy,
+    # (methoxysulfonyl)amino). The generic tiers name it by skeletal ('a')
+    # replacement ('…-1,3-dioxa-2λ6-thiapropyl') — a valid, round-tripping, but
+    # NON-PIN form (BlueBookV2/BlueBookV2.md:36484). Route BOTH linker shapes to
+    # the S-oxoacid namer; it fails closed on any S outside the neutral
+    # mono/di-oxo acyl class, so plain thioethers, carbon-R sulfonyls and parent
+    # sulfate/sulfamate esters are untouched.
+    if attach_idx is not None:
+        _att = mol.GetAtomWithIdx(attach_idx)
+        if (_att.GetSymbol() == 'O' and _att.GetFormalCharge() == 0
+                and _att.GetTotalNumHs() == 0 and not _att.IsInRing()):
+            _parent = [n.GetIdx() for n in _att.GetNeighbors()
+                       if n.GetIdx() not in frag_atoms_set]
+            _inner = [n.GetIdx() for n in _att.GetNeighbors()
+                      if n.GetIdx() in frag_atoms_set]
+            if (len(_parent) == 1 and len(_inner) == 1
+                    and mol.GetAtomWithIdx(_inner[0]).GetSymbol() == 'S'):
+                from ..rules.sulfur_oxoacid import (
+                    name_sulfur_oxoacid_oxy_substituent,
+                )
+                _so = name_sulfur_oxoacid_oxy_substituent(
+                    mol, attach_idx, _parent[0])
+                if _so is not None:
+                    return _stereo_route(_so)
+        elif _att.GetSymbol() == 'S':
+            from ..rules.sulfur_oxoacid import (
+                name_sulfur_oxoacid_acyl_for_amino,
+            )
+            _sa = name_sulfur_oxoacid_acyl_for_amino(
+                mol, attach_idx, frag_atoms_set)
+            if _sa is not None:
+                return _stereo_route(_sa)
+
+    # ---- Tier 0.6 (P-66.5.1.2 / BB 1710): thiocyanato pseudohalide ----
+    # The terminal thiocyanate group -S-C#N is ALWAYS cited as the substituent
+    # prefix 'thiocyanato' in PINs ("added to the list of characteristic groups
+    # that are always cited as prefixes ... in preferred IUPAC names"). Tier 0.5
+    # already emits isocyanato / isothiocyanato / isocyano for the three
+    # N-anchored pseudohalides, but -S-C#N falls through it and the generic
+    # tiers name it 'cyanosulfanyl' (a valid but non-PIN cyano+sulfanyl
+    # concatenation). This mirrors the identical detector on the sibling
+    # substituent namer (substituent_naming.py Step 1e). Fires only when the
+    # fragment is EXACTLY {S, C, N} anchored at the divalent S; any extra
+    # decoration falls through -> fail closed.
+    if attach_idx is not None and len(frag_atoms_set) == 3:
+        _tc_pat = Chem.MolFromSmarts('[SX2][CX2]#[NX1]')
+        if _tc_pat is not None:
+            for _m in mol.GetSubstructMatches(_tc_pat):
+                if set(_m) == frag_atoms_set and _m[0] == attach_idx:
+                    from ..rules.seniority import get_prefix as _pseudo_get_prefix
+                    _pfx = _pseudo_get_prefix('thiocyanate')
+                    if _pfx:
+                        return _stereo_route(_pfx)
 
     # ---- Tier 1: Retained substituent names ----
     # Checked first per IUPAC: retained names (phenyl, isopropyl, etc.)
@@ -2375,7 +2493,7 @@ def _name_substituent_cascade(mol, frag_atoms, attach_idx,
         except Exception:
             pass
 
-    # ---- Tier 1.9: ether-substituted carbon chain ----
+    # ---- Tier 1.9 (v22 C-T2 / V-3): ether-substituted carbon chain ----
     # A saturated all-carbon chain bearing ether -O-R substituent(s), numbered
     # from the free valence, named (R-oxy)alkyl per P-63.2.2.2 (phenoxymethyl,
     # 2-phenoxyethyl, methoxymethyl). MUST precede the cache (Tier 2): the cache
@@ -2395,7 +2513,7 @@ def _name_substituent_cascade(mol, frag_atoms, attach_idx,
         except Exception:
             pass
 
-    # ---- Tier 1.92: Group-14 silyl/germyl substituent --
+    # ---- Tier 1.92 (v23 Phase 8, P-68.2.2): Group-14 silyl/germyl substituent --
     # A monovalent Si/Ge substituent is named (prefixes)silyl / (prefixes)germyl,
     # with the substituents on the Si/Ge centre cited as prefixes. MUST precede the
     # Tier-2 cache and Tier-4 recursive namer, which drop a bare -SiH3 ('substituent')
@@ -2425,7 +2543,7 @@ def _name_substituent_cascade(mol, frag_atoms, attach_idx,
     # (falls through to 'substituent') on any decline. The λ5 branch is Task 3.
     if attach_idx is not None and attach_idx in frag_atoms_set:
         if mol.GetAtomWithIdx(attach_idx).GetSymbol() == 'P':
-            # substituent_recursion_depth_exceeded (P-67.1.4.1 / P-72.6.1): a
+            # v38 substituent_recursion_depth_exceeded (P-67.1.4.1 / P-72.6.1): a
             # CARBON-FREE P-oxo fragment
             # -- bare -P(=O)(OH)2 (phosphono) / -P(=O)(O-)2 (phosphonato). The
             # phosphanyl helper below EXCLUDES a phosphonic P=O (it names only a
@@ -2530,7 +2648,7 @@ def _name_substituent_cascade(mol, frag_atoms, attach_idx,
                     # stands -- e.g. '1-(bicyclo[2.2.1]heptan-2-yl)ethyl', whose
                     # 3 ring centres no producer here can cite: claiming only
                     # the carrier's would assert one configuration and leave
-                    # three silent (, missing beats wrong).
+                    # three silent (D-09, missing beats wrong).
                     from .substituent_naming import located_map_completes_substituent_stereo
                     _use_pos = bool(_carrier_pos) and \
                         located_map_completes_substituent_stereo(
@@ -2543,7 +2661,7 @@ def _name_substituent_cascade(mol, frag_atoms, attach_idx,
         except Exception:
             pass
 
-    # ---- Tier 1.96: acyclic substituent with detachable prefixes ----
+    # ---- Tier 1.96 (v23 SL): acyclic substituent with detachable prefixes ----
     # A saturated acyclic carbon chain bearing >=1 simple detachable prefixes
     # (carboxy/amino/hydroxy/oxo/halogen) is named from STRUCTURE, numbered from
     # the free valence. MUST precede the Tier-2 cache, which maps the H-capped
@@ -2568,7 +2686,7 @@ def _name_substituent_cascade(mol, frag_atoms, attach_idx,
     # W2E-P1FG Task 11 (P-66.1.6.1.1.3): a carbon chain terminated by a
     # -NH-C(=O)-NH2 urea unit -> '{loc}-(carbamoylamino){chain}yl' ('not
     # ureido'). MUST precede the Tier-2 cache / Tier-4 recursive path, which
-    # name the H-capped fragment as 'N-propylurea' -> 'N-propylureayl'.
+    # name the H-capped fragment as 'propylurea' -> 'propylureayl'.
     if attach_idx is not None and attach_idx in frag_atoms_set:
         try:
             from .substituent_naming import _name_carbamoylamino_chain_substituent
@@ -2580,7 +2698,7 @@ def _name_substituent_cascade(mol, frag_atoms, attach_idx,
         except Exception:
             pass
 
-    # ---- Tier 1.97: chalcogen-rooted sulfanyl ----
+    # ---- Tier 1.97 (v28 Composer1, P-63.2.5): chalcogen-rooted sulfanyl ----
     # A monovalent substituent attached VIA a divalent sulfur (-S-R) is the
     # (R)sulfanyl prefix. name_substituent_fragment's chalcogen-ether handler
     # (Step 1b) covers -Se-R/-Te-R but OMITS S, so an S-rooted -S-R reaching
@@ -2635,7 +2753,7 @@ def _name_substituent_cascade(mol, frag_atoms, attach_idx,
                     return _stereo_route(
                         f"{_HALOGEN_MAP[_x.GetSymbol()]}sulfanyl")
 
-    # ---- Tier 1.85: SULFINYL / SULFONYL-rooted substituent -----
+    # ---- Tier 1.85 (v36 Wave F): SULFINYL / SULFONYL-rooted substituent -----
     # A fragment rooted at a sulfinyl ``-S(=O)-`` or sulfonyl ``-S(=O)(=O)-``
     # sulfur bridging the parent to exactly ONE in-fragment carbon subtree R is
     # the substitutive prefix ``{R}sulfinyl`` / ``{R}sulfonyl`` (P-63.6) -- NOT
@@ -2890,7 +3008,7 @@ def _name_substituent_cascade(mol, frag_atoms, attach_idx,
         except Exception:
             pass
 
-    # ---- Tier 4.5: recursive decoration composition --
+    # ---- Tier 4.5 (v28 Composer1 Task 2): recursive decoration composition --
     # Every narrow producer has declined. Under the general-fallback context
     # (allow_mancude, threaded from the complete/best-effort engine) the
     # recursive composer partitions a ring-bearing fragment into its ring CORE
@@ -2909,7 +3027,7 @@ def _name_substituent_cascade(mol, frag_atoms, attach_idx,
             mol, frag_atoms_set, attach_idx, allow_mancude=True)
         if _rec is not None:
             return _rec
-        # ---- Tier 4.9: the AUDITED systematic ring generator ----
+        # ---- Tier 4.9 (v30 P3-T1b): the AUDITED systematic ring generator ----
         # The polarity inversion, localised. Every narrow producer AND the
         # recursive composer have declined, so the next line used to be the
         # ``'substituent'`` refusal sentinel (``errors.py:224``: "a REFUSAL, not
@@ -2929,7 +3047,7 @@ def _name_substituent_cascade(mol, frag_atoms, attach_idx,
             mol, frag_atoms_set, attach_idx)
         if _term is not None:
             return _term
-        # the DECORATED-fragment sibling of the generator above. Where
+        # v30 PB-5: the DECORATED-fragment sibling of the generator above. Where
         # ``_terminal_bare_ring_substituent`` requires the fragment to BE exactly
         # one bare ring system, this one names a ring system PLUS its decorations,
         # or a complex acyclic fragment, and is complete by construction: it
@@ -2952,7 +3070,7 @@ def _name_substituent_cascade(mol, frag_atoms, attach_idx,
         # census, that ordering rewrote ``2-hydroxy-…`` to ``2-(1-oxamethyl)-…``,
         # emitted ``1-oxa-2,3-diphosphapropyl`` where specific prefixes existed,
         # and LOST two correct names outright (EMIT -> ABSTAIN). Textbook
-        #: removing a refusal path unmasked a worse generator.
+        # invariant 9: removing a refusal path unmasked a worse generator.
         # So it runs only where the sentinel would otherwise be returned.
         _desc = _descriptive_fallback(mol, frag_atoms_set, attach_idx)
         if _desc != 'substituent':
@@ -2961,7 +3079,7 @@ def _name_substituent_cascade(mol, frag_atoms, attach_idx,
         _tf = terminal_fragment_name(mol, frag_atoms_set, attach_idx)
         if _tf is not None:
             return _tf.name
-        # ---- C4: decorated acyclic-chain substituent -----------------
+        # ---- C4 (v30): decorated acyclic-chain substituent -----------------
         # LAST resort for a chain-rooted multi-functional fragment the narrow
         # tiers, the ring composer, the descriptive fallback and the terminal
         # chain namer all declined. Demotes every characteristic group to a
@@ -2971,7 +3089,7 @@ def _name_substituent_cascade(mol, frag_atoms, attach_idx,
             mol, frag_atoms_set, attach_idx, allow_mancude=True)
         if _chain is not None:
             return _chain
-        # census-attribution fix: the best-effort ladder is now FULLY
+        # v43 P2 census-attribution fix: the best-effort ladder is now FULLY
         # exhausted for this branch (ring composer, bare-ring, descriptive,
         # terminal and chain composers all declined). Record the
         # ``enumerator_ring_fallback`` census blocker HERE, gated on the same
@@ -2991,7 +3109,7 @@ def _name_substituent_cascade(mol, frag_atoms, attach_idx,
 
     # ---- Tier 5: Descriptive fallback (guaranteed non-None) ----
     #
-    # ⚠, deliberately NOT the wiring site for the systematic ring
+    # ⚠ v30 P3-T1b, deliberately NOT the wiring site for the systematic ring
     # generator, although this is where the sentinel is returned from. Reaching
     # here means ``allow_mancude`` is False -- the general-fallback branch above
     # returns unconditionally -- i.e. this is the PIN/DEFAULT path. A von Baeyer
@@ -3068,16 +3186,16 @@ def _descriptive_fallback(mol, frag_atoms, attach_idx):
     try:
         _ri = mol.GetRingInfo()
         if any(_ri.NumAtomRings(a) > 0 for a in frag_atoms):
-            # Task 0.1: a ring-bearing branch reaching this last resort is
+            # v25 P0 Task 0.1: a ring-bearing branch reaching this last resort is
             # declined by the descriptive namer; return the explicit unnameable
             # marker rather than the alkyl-flatten below (which would be a wrong
-            # constitution).: the
+            # constitution). v43 P2 census-attribution fix: the
             # ``enumerator_ring_fallback`` BRANCH_UNNAMEABLE record is NO LONGER
             # made here. This function is reached from BOTH the PIN Tier-5 return
             # (name_substituent:2944, allow_mancude=False) and the best-effort
             # ladder (:2917) BEFORE its own terminal/chain composers run, so a
             # record here is first-writer-wins-set by an exploratory PIN attempt
-            # or by a branch the chain composer goes on to name (label-leak
+            # or by a branch the chain composer goes on to name (REVIEW label-leak
             # finding). The record now fires only at the best-effort ladder's TRUE
             # exhaustion in name_substituent (after the chain composer), so
             # blocker_detail reflects the real best-effort blocker.
@@ -3225,7 +3343,7 @@ def _descriptive_fallback(mol, frag_atoms, attach_idx):
                     pass
 
     # Absolute last resort
-    # Task 0.1: no tier could express this branch.
+    # v25 P0 Task 0.1: no tier could express this branch.
     from ..metrics.abstention import AbstentionCode, record_abstention
     record_abstention(AbstentionCode.BRANCH_UNNAMEABLE,
                       detail='enumerator_last_resort')
@@ -3233,7 +3351,7 @@ def _descriptive_fallback(mol, frag_atoms, attach_idx):
 
 
 # ============================================================================
-# Composer1 Task 1: detach-and-name ring-substituent primitive
+# v28 Composer1 Task 1: detach-and-name ring-substituent primitive
 # ============================================================================
 
 
@@ -3241,7 +3359,7 @@ def _detach_and_name_ring_substituent(mol, frag_atoms, attach_idx,
                                        allow_mancude: bool = False):
     """Name the RING-SYSTEM CORE of a substituent fragment as a ``-yl`` token.
 
-    NOTE: retained as a tested T1
+    NOTE (v28 Composer #1 final review, I2): retained as a tested T1
     primitive (see ``tests/unit/rules/test_v28_composer1.py``) but SUPERSEDED
     in production by ``_recursive_fragment_substituent_name``'s own core
     numbering (``_monocycle_position_map`` / ``polycyclic_core_numbering``),
@@ -3264,7 +3382,7 @@ def _detach_and_name_ring_substituent(mol, frag_atoms, attach_idx,
 
     Does NOT reimplement von-Baeyer/spiro/cage naming; does NOT walk
     substituents hanging off the ring core (that recursion is later v28
-    composer tasks). Not wired into ``name_substituent`` yet —
+    composer tasks). Not wired into ``name_substituent`` yet (v28 Task 4) —
     PIN-default (``allow_mancude=False`` callers) is unaffected by this
     addition.
 
@@ -3314,7 +3432,7 @@ def _detach_and_name_ring_substituent(mol, frag_atoms, attach_idx,
 
 
 # ============================================================================
-# Composer1 Task 2: recursive decoration composition
+# v28 Composer1 Task 2: recursive decoration composition
 # ============================================================================
 
 
@@ -3375,7 +3493,7 @@ def _monocycle_position_map(mol, core, attach_idx, deco_carriers, ring_info):
     if len(order) != n or order[0] not in adj[order[-1]]:
         return None  # not a single closed cycle
     het = [i for i in core if mol.GetAtomWithIdx(i).GetSymbol() != 'C']
-    # tranche T3: indicated hydrogen is a mancude-ring concept — a fully
+    # v28 tranche T3: indicated hydrogen is a mancude-ring concept — a fully
     # SATURATED ring has none, so its ring N-H atoms must NOT be read as
     # ambiguous indicated H (this was declining piperazine's two N-H, blocking
     # every decorated saturated N/O-heterocycle substituent). Account for
@@ -3479,7 +3597,7 @@ def _monocycle_core_tail(mol, core, attach_idx, pos, ring_info):
                 n_idx[0], n_idx[1]) is not None:
             stem = 'pyrazol'
     if stem is None:
-        # tranche T1 (resolves Composer #1 I1 duplication): the small
+        # v28 tranche T1 (resolves Composer #1 I1 duplication): the small
         # `_PIN_HETEROARYL_STEMS` table does not cover the systematic azoles
         # (isoxazole/oxazole/thiazole/triazole...) that `identify_ring_system`
         # reports as None. The authoritative dispatcher `get_ring_substituent_name`
@@ -3492,7 +3610,7 @@ def _monocycle_core_tail(mol, core, attach_idx, pos, ring_info):
         stem = _borrow_heteroarene_stem(mol, core, attach_idx)
     if stem is None:
         return None
-    # tranche T3: indicated H only on an aromatic/mancude core (a saturated
+    # v28 tranche T3: indicated H only on an aromatic/mancude core (a saturated
     # heterocycle's N-H is not indicated H) — mirrors _monocycle_position_map.
     ih = ([i for i in het if mol.GetAtomWithIdx(i).GetTotalNumHs() >= 1]
           if aromatic else [])
@@ -3503,7 +3621,7 @@ def _monocycle_core_tail(mol, core, attach_idx, pos, ring_info):
 
 
 def _terminal_monocycle_core_tail(mol, core, attach_idx, pos):
-    """: the AUDITED P-22.2.3 replacement tail for a monocyclic core
+    """v30 P3-T1b: the AUDITED P-22.2.3 replacement tail for a monocyclic core
     the PIN stem tables declined, on the caller's OWN ``pos`` numbering.
 
     ``None`` on any refusal, including a failed reconstruction audit. Kekulizes
@@ -3613,7 +3731,7 @@ def _recursive_fragment_substituent_name(mol, frag_atoms, attach_idx,
     if pos is not None:
         core_tail = _monocycle_core_tail(mol, core, attach_idx, pos, ring_info)
         if not core_tail or ' ' in core_tail:
-            # the PIN stem tables declined -- a mixed-saturation
+            # v30 P3-T1b: the PIN stem tables declined -- a mixed-saturation
             # carbocycle (needs ene locants), a non-aromatic heterocycle with a
             # ring multiple bond, or a stem no table carries. That used to abstain
             # for the WHOLE fragment. Fall through to the AUDITED systematic
@@ -3624,7 +3742,7 @@ def _recursive_fragment_substituent_name(mol, frag_atoms, attach_idx,
             if not core_tail or ' ' in core_tail:
                 return None
     else:
-        # Task 2b: POLYCYCLIC (fused / bridged / cage) decorated core. The
+        # v28 Task 2b: POLYCYCLIC (fused / bridged / cage) decorated core. The
         # monocycle numberer declined, so route the core through the shared
         # polycyclic numberer, which returns ONE consistent {atom: locant} map +
         # the bare `...-<fv>-yl` tail (fused-carbocyclic PAH + von-Baeyer cage;
@@ -3792,7 +3910,7 @@ def _recursive_chain_fragment_substituent_name(mol, frag_atoms, attach_idx,
     CHAIN-rooted multi-functional substituent as ``{decorations}{alkyl}-yl`` by
     demoting every characteristic group to a detachable prefix.
 
-    (keystone). Reached from ``name_substituent`` ONLY under the
+    v30 C4 (keystone). Reached from ``name_substituent`` ONLY under the
     general-fallback context (``allow_mancude=True``) after every narrow tier,
     the ring composer, the descriptive fallback and ``terminal_fragment_name``
     have declined, so the PIN default path is byte-identical. The gap this fills:
@@ -4289,7 +4407,7 @@ def classify_and_name_fragment(mol, frag_info, parent_atoms, features=None):
       - pure_alkyl: Only carbon atoms (methyl, ethyl, etc.)
       - compound: Carbon + heteroatoms (trifluoromethyl, hydroxymethyl, etc.)
 
-    Phase 160.1: Tier-0.5 prefix-form check runs FIRST so that any
+    Phase 160.1 D-04: Tier-0.5 prefix-form check runs FIRST so that any
     fragment matching the 14-row IUPAC P-65/P-66 prefix-form table is
     named via the canonical prefix form (e.g., -C(=O)OCH3 -> methoxycarbonyl)
     before falling through to compound/pure_alkyl/fg_only classification.
@@ -4310,7 +4428,7 @@ def classify_and_name_fragment(mol, frag_info, parent_atoms, features=None):
     frag_mol = frag_info.frag_mol
     frag_atoms = frag_info.frag_atoms
 
-    # ---- Tier 0.5 (Phase 160.1): IUPAC P-65 / P-66 prefix-form check ----
+    # ---- Tier 0.5 (Phase 160.1 D-04): IUPAC P-65 / P-66 prefix-form check ----
     # Pure read-only check. Applies to fragments that entirely contain one of
     # the 14 non-principal functional groups. The polyfunctional handler routes
     # substituent fragments here (via _name_compound_substituent fallback);
@@ -4339,7 +4457,7 @@ def classify_and_name_fragment(mol, frag_info, parent_atoms, features=None):
         _ri = mol.GetRingInfo()
         if attach_idx is not None and any(
                 _ri.NumAtomRings(a) > 0 for a in frag_atom_set):
-            # composition lever: under the best-effort tier, let the ring-
+            # v31 composition lever: under the best-effort tier, let the ring-
             # substituent chokepoint name a decorated (hetero)aryl branch that
             # name_substituent can only build with allow_mancude=True (e.g.
             # [4-(methanesulfonyl)phenyl]methyl). PIN default leaves
@@ -4610,11 +4728,11 @@ def _name_compound_substituent(mol, frag_info, parent_atoms):
 
     frag_set_for_chalcogen = set(frag_atoms)
 
-    # (generalizes SP2.1'): a PLAIN acyloxy ester '-O-C(=O)-R' with a SYSTEMATIC
+    # v37 (generalizes SP2.1'): a PLAIN acyloxy ester '-O-C(=O)-R' with a SYSTEMATIC
     # acyl must be caught HERE, before the alkoxy branch below mis-reads the ester O
     # as a plain ether (measured: '4-(pentyloxy)benzoic acid' for the
     # -O-C(=O)-CH2-C(CH3)2-OH frag -- a wrong molecule that SELF-01 then suppresses,
-    # so the whole molecule abstains). STEP-1 spy refuted the SP2.1'
+    # so the whole molecule abstains). STEP-1 spy (invariant 8) refuted the SP2.1'
     # 'OPSIN-invalid' premise (the oxa-chain the best-effort tier emits round-trips
     # exact); the real gap is a DEFAULT-tier abstain + best-effort ugly spelling.
     # Route it through the SAME recognizer name_substituent uses
@@ -4713,7 +4831,7 @@ def _name_compound_substituent(mol, frag_info, parent_atoms):
             else:
                 return name
 
-    # (P-74.1.3, 0-wrong): a fragment with a REAL net formal
+    # v32 Phase 3A-b (P-74.1.3, 0-wrong): a fragment with a REAL net formal
     # charge (a genuine onium cation on the branch, e.g. a choline/
     # trimethylammonium head), NOT an internal charge-separated pair that
     # cancels within the same fragment (nitro/N-oxide/azide/diazo net to 0
@@ -4753,7 +4871,7 @@ def _name_compound_substituent(mol, frag_info, parent_atoms):
     # (n_branch_ring_substituent_unnameable / c_branch_ring_substituent_unnameable /
     # ring_fragment_declined_by_ring_engine / amine_n_substituent_unnameable).
     #
-    # SP1.1b: the old ``if len(frag_atoms) <= 25`` size cap here dropped a
+    # v37 SP1.1b: the old ``if len(frag_atoms) <= 25`` size cap here dropped a
     # legitimately nameable large fragment on size alone (the 27-heavy-atom
     # disaccharide chain hung off a steroid aglycone; SP4 witnesses g1/g3).
     # Size is NOT the right guard: nameability is. Attempt the recursive name for
@@ -4762,7 +4880,7 @@ def _name_compound_substituent(mol, frag_info, parent_atoms):
     # decide — a fragment whose name does not round-trip is refused and the whole
     # molecule abstains, so 0-wrong is preserved by the gate, not by a constant.
     # Cost is bounded WITHOUT a size cap: name_fragment_recursively charges the
-    # per-top-level work budget (``spend_fragment_work``, the giant-molecule
+    # per-top-level work budget (``spend_fragment_work``, the v33 giant-molecule
     # hang fix) and enforces the ``_MAX_VISITED_SIZE`` depth net, so an
     # unbounded/expensive fragment abstains fast rather than dropping cheaply.
     frag_smiles = _get_frag_smiles(mol, frag_atoms)
@@ -5197,7 +5315,7 @@ def _name_amino_branch(mol, frag_atoms, attach_idx, parent_atoms):
             if amido_name:
                 return amido_name
 
-            # F-amido (P-66.1.1.4.3 method (1), BB:33040): the strict builder
+            # v30 F-amido (P-66.1.1.4.3 method (1), BB:33040): the strict builder
             # above refuses a SUBSTITUTED amide N (`-N(R')-C(=O)-R`), and the legacy
             # count fallback below refuses a non-mono-substituted N (37cd122d F1), so
             # `-N(CH3)C(=O)CH3` dropped to the ugly general replacement name. Build the
@@ -5339,7 +5457,7 @@ def _name_amino_branch(mol, frag_atoms, attach_idx, parent_atoms):
             # constitution-perceiving primitive the acid path uses, then through
             # the ONE assembler, so the amide and the acid cannot disagree.
             #
-            # (E3 Task 4): `has_hetero` used to gate this call OFF
+            # v33 Phase 6 (E3 Task 4): `has_hetero` used to gate this call OFF
             # entirely, so a branch carrying its own heteroatom decoration
             # (amino, carboxy, hydroxy, ...) beyond the attachment N -- e.g.
             # saccharopine's N-(5-amino-5-carboxypentyl) arm -- fell straight

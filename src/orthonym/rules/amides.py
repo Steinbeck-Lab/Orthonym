@@ -235,7 +235,7 @@ def _enrich_ring_n_substituent(mol, base_name: str, sub_atoms: List[int]) -> str
     # (e.g. '(4-hydroxyphenyl)methyl', '(4-methylphenyl)methyl'), so
     # re-discovering its ring substituents here and prepending them
     # DOUBLE-COUNTS them: '4-hydroxy(4-hydroxyphenyl)methyl' — a parseable
-    # WRONG molecule (found by the lever-A gate-OFF honesty sweep on the
+    # WRONG molecule (found by the v31 lever-A gate-OFF honesty sweep on the
     # N-(4-hydroxybenzyl) amide). The enricher is only needed for ALIPHATIC
     # ring stems that name_substituent returns bare (e.g. 'cyclohexyl' ->
     # '4-methylcyclohexyl'); _extract_ring_base_name already returns the full
