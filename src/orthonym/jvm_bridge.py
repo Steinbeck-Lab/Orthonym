@@ -53,7 +53,7 @@ SAFETY
   first actual use. Nothing is ever downloaded: jars are resolved by the existing
   ``_find_opsin_jar`` / ``_find_centres_jar`` helpers, which glob the vendored jars at
   PROJECT_ROOT (OPSIN 2.9.0 — the version ``eval/goals.json`` records in its baseline
-  provenance — and centres 1.5).
+  provenance — and centres 1.2.1).
 * **Fallback, never failure.** Every entry point returns a sentinel meaning "I could not
   do this; use your subprocess path" when jpype is absent, the jars are missing, or the
   JVM will not start. A missing JVM must never hard-fail a name (``centres_bridge`` D-13).

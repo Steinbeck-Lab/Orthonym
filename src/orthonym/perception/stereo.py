@@ -22,19 +22,21 @@ _CIP_ASSIGNED_PROP = '_Orthonym_CIPAssigned'
 # (same idiom as namer.ORTHONYM_ENABLE_TRIVIALITY_CONTROLLER).
 #
 # STER-02 (Phase H, 2026-06-21): the default is now ON. The vendored `centres`
-# scores 279/290 on the Hanson 2018 CIP Validation Suite vs
-# rdCIPLabeler's 235/290 -- a net +44 CORRECT labels with **0 per-compound
+# scores 281/290 on the Hanson 2018 CIP Validation Suite vs
+# rdCIPLabeler's 235/290 -- a net +46 CORRECT labels with **0 per-compound
 # regressions vs RDKit** (centres remains a strict superset of RDKit on the
 # suite; the gain is exotic CIP rule cases RDKit mis-ranks). When centres is
 # unavailable (jar or Java absent) the code falls through to rdCIPLabeler
 # UNCHANGED -- a missing JVM never hard-fails a name (D-13). Set
 # ORTHONYM_USE_CENTRES_CIP=0/off to force the legacy RDKit-only path.
 #
-# CIP-UPDATE (2026-06-27): engine refreshed 1.2.1 -> 1.5 (SiMolecule/centres
-# develop @ d4b3cf0). All R/S/E/Z labels are byte-identical to 1.2.1; the only
-# delta is 2 exotic CYCLIC-CUMULENE axial M/P labels (suite 281->279), which
-# Orthonym does NOT consume (allene/axial CIP is computed independently in
-# detect_axial_chirality + _manual_allene_cip), so naming is unaffected.
+# CIP-UPDATE (2026-09-07): engine reverted 1.5-SNAPSHOT -> 1.2.1 (the tagged
+# public release). The 1.5-SNAPSHOT (develop @ d4b3cf0) was unreleased and
+# regressed 2 CYCLIC-CUMULENE axial M/P labels (suite 279); 1.2.1 gets them
+# right (281). All R/S/E/Z labels are byte-identical between the two jars, and
+# Orthonym does NOT consume centres' cumulene axial M/P (it is computed
+# independently in detect_axial_chirality + _manual_allene_cip), so naming is
+# unchanged by the revert (verified 0/300 stereo names differ).
 _USE_CENTRES_CIP = os.environ.get(
     "ORTHONYM_USE_CENTRES_CIP", "on"
 ).strip().lower() in ("1", "true", "yes", "on")
@@ -44,7 +46,7 @@ def _fill_missing_bond_cip_from_rdkit(mol) -> None:
     """Complementary rdCIPLabeler pass: FILL double-bond ``_CIPCode`` that the
     primary labeller (centres) left empty, without touching any label it set.
 
-    The vendored ``centres`` engine is the CIP source-of-truth for atoms (279/290
+    The vendored ``centres`` engine is the CIP source-of-truth for atoms (281/290
     vs rdCIPLabeler's 235/290 on the Hanson 2018 suite) but does NOT emit an E/Z
     label for an *exocyclic* double bond to an aromatic-flagged ring atom -- the
     o-/p-quinoid and fulvenoid (``-ylidene``) systems -- so those bonds reached
@@ -75,7 +77,7 @@ def _fill_missing_bond_cip_from_rdkit(mol) -> None:
         # propagate. A narrower clause let an unlisted exception escape to
         # assign_stereochemistry's outer ``except Exception``, which re-ran the
         # RDKit-only labeller on a mol centres had ALREADY labelled -- silently
-        # downgrading it from the 279/290 engine to 235/290 (REVIEW review #3).
+        # downgrading it from the 281/290 engine to 235/290 (REVIEW review #3).
         return
 
 
