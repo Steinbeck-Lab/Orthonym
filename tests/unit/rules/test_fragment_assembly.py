@@ -297,7 +297,7 @@ class TestGlycosideAssembly:
         """Assembler accepts 'acid'/'alkyl' key convention from engine."""
         result = assemble_fragment_name(
             "glycosidic",
-            {"acid": "beta-D-glucopyranosyloxy", "alkyl": "phenol"},
+            {"acid": "β-D-glucopyranosyloxy", "alkyl": "phenol"},
         )
         assert result is not None
         assert "glucopyranosyloxy" in result
@@ -307,7 +307,7 @@ class TestGlycosideAssembly:
         """Assembler accepts 'sugar'/'aglycone' key convention."""
         result = assemble_fragment_name(
             "glycosidic",
-            {"sugar": "beta-D-glucopyranosyloxy", "aglycone": "phenol"},
+            {"sugar": "β-D-glucopyranosyloxy", "aglycone": "phenol"},
         )
         assert result is not None
         assert "glucopyranosyloxy" in result
@@ -317,9 +317,9 @@ class TestGlycosideAssembly:
         """Glycoside assembly produces '(prefix)aglycone' format."""
         result = assemble_fragment_name(
             "glycosidic",
-            {"acid": "beta-D-glucopyranosyloxy", "alkyl": "phenol"},
+            {"acid": "β-D-glucopyranosyloxy", "alkyl": "phenol"},
         )
-        assert "(beta-D-glucopyranosyloxy)" in result
+        assert "(β-D-glucopyranosyloxy)" in result
 
 
 # ============================================================================
@@ -508,7 +508,7 @@ class TestGlycosideAssemblyHyphenation:
         """When aglycone starts with digit, hyphen after closing paren."""
         result = assemble_fragment_name(
             "glycosidic",
-            {"sugar": "beta-D-glucopyranosyloxy", "aglycone": "5,6-dibutylphenol"},
+            {"sugar": "β-D-glucopyranosyloxy", "aglycone": "5,6-dibutylphenol"},
         )
         assert result is not None
         assert ")-5" in result, f"Expected hyphen after paren: {result}"
@@ -517,10 +517,10 @@ class TestGlycosideAssemblyHyphenation:
         """When aglycone starts with lowercase letter, no extra hyphen."""
         result = assemble_fragment_name(
             "glycosidic",
-            {"sugar": "beta-D-glucopyranosyloxy", "aglycone": "phenol"},
+            {"sugar": "β-D-glucopyranosyloxy", "aglycone": "phenol"},
         )
         assert result is not None
-        assert "(beta-D-glucopyranosyloxy)phenol" == result
+        assert "(β-D-glucopyranosyloxy)phenol" == result
 
 
 # ============================================================================
@@ -593,7 +593,7 @@ class TestLooksLikeConvertibleName:
 class TestTransformationFallbackSafety:
     """Tests that transformation functions return None for non-acid inputs.
 
-    Per D-09 through D-12: when non-acid fragments reach these functions
+    Per through: when non-acid fragments reach these functions
     (due to fragment role misidentification), they should return None
     instead of fabricating garbage names like 'ethanolate'.
     """

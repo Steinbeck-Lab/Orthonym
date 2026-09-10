@@ -1,4 +1,4 @@
-"""v32 Phase 2 Step 2 — the decomposition assembly WEAVER.
+""" a phase Step 2 — the decomposition assembly WEAVER.
 
 `decomposition/weave.py` is a core-and-arms composer that assembles the
 correctly-named fragments of a star-topology multi-linkage molecule (a
@@ -9,8 +9,8 @@ round-tripping IUPAC name — using the structure-based, attachment-atom-anchore
 flat weaver's suffix-string role converters that a T4-rescued/seniority-demoted
 fragment carries nothing for.
 
-Root cause + measured 9/9-fixable sample: .
-Step-1 precondition (fail-closed, never partial-ship): `be810755`.
+Root cause + measured 9/9-fixable sample: internal notes.
+Step-1 precondition (fail-closed, never partial-ship):.
 
 0-wrong is STRUCTURAL here: `weave.weave_is_verified` (Part C) ships a candidate
 only if it full-InChI round-trips to the exact input — so this composer can only
@@ -103,7 +103,7 @@ def test_triacetin_regression_unchanged():
 
 
 def test_ring_hub_out_of_scope_abstains_cleanly():
-    """v1 weaver is acyclic-core only (SPY (ii) bucket): a molecule whose hub is a
+    """v1 weaver is acyclic-core only (a trace (ii) bucket): a molecule whose hub is a
     RING must decline honestly (abstain / not-supported), NEVER a partial or a
     wrong name. GPI-type mannoside core."""
     smi = ("NCCOP(=O)(O)OC[C@H]1O[C@H](O[C@@H]2[C@@H](O)[C@H](O)[C@@H](O)"

@@ -1,8 +1,8 @@
-"""v29 Phase 7 / C2: the suffix locant of a phenol, aromatic amine or enol
+""" a phase / C2: the suffix locant of a phenol, aromatic amine or enol
 is the CARBON's locant, never the heteroatom's.
 
-Task 5 (5f46d505) made ``general_engine._inline_suffix_locant`` refuse when the
-characteristic atom is off the parent.  It delegates atom choice to
+Task 5 made ``general_engine._inline_suffix_locant`` refuse when the
+characteristic atom is off the parent. It delegates atom choice to
 ``rules.parent_selection._pg_attachment_atoms``, which is driven by
 ``seniority.PG_ATTACHMENT_INDICES`` and defaults to SMARTS-match index 0.
 ``phenol`` (``[OX2H][cX3]``), ``aromatic_amine`` (``[NX3H2][cX3]``) and ``enol``
@@ -12,15 +12,15 @@ names.
 
 Blue Book authority (heading + deciding sentence):
 
-  P-62.2.1.2 (BlueBookV2/BlueBookV2.md:26168) -- "Primary amines, R-NH2, are
+  P-62.2.1.2 (the Blue Book Blue Book) -- "Primary amines, R-NH2, are
   systematically named in the following ways: (1) by adding the suffix 'amine'
-  to the name of the parent hydride".  The suffix attaches to the PARENT
+  to the name of the parent hydride". The suffix attaches to the PARENT
   HYDRIDE, whose skeletal atoms carry the locants; the -NH2 nitrogen is not a
-  parent-hydride atom.  Its own examples are ``quinolin-4-amine (PIN)`` and
+  parent-hydride atom. Its own examples are ``quinolin-4-amine (PIN)`` and
   ``1-benzofuran-2-amine (PIN)`` -- the locant is the ring carbon.
 
   P-63.1.2 "Systematic names of alcohols, phenols, enols, and ynols"
-  (:26826) -- "(1) substitutively, using the suffix 'ol' ... When there is a
+  (:26826) -- "(1) substitutively, using the suffix 'ol'... When there is a
   choice for numbering, the starting point and the direction of numbering of a
   compound are chosen so as to give lowest locants to the 'ol' suffixes".
   Examples ``naphthalen-1-ol (PIN)`` (:26820) and ``2-nitrobenzene-1,3-diol
@@ -28,7 +28,7 @@ Blue Book authority (heading + deciding sentence):
   skeletal locant at all.
 
   P-14.3.3 "Citation of locants" (:2869) -- "the name 2-chloroethan-1-ol is the
-  PIN".  The '1' designates the carbon bearing the -OH, not the oxygen.
+  PIN". The '1' designates the carbon bearing the -OH, not the oxygen.
 """
 
 import pytest
@@ -37,7 +37,7 @@ from orthonym.rules.seniority import PG_ATTACHMENT_INDICES
 from orthonym.rules.parent_selection import _pg_attachment_atoms
 
 
-# Tier flags for the best-effort tier, mirroring 's
+# Tier flags for the best-effort tier, mirroring scripts/measure_breadth.py's
 # TIER_FLAGS['best-effort'] -- the only tier on which the guard is reachable.
 BEST_EFFORT = dict(general_fallback=True, general_fallback_unverified=True,
                    allow_aromatic_general=True)
@@ -114,7 +114,7 @@ class TestRecoveredName:
     @pytest.mark.slow
     @pytest.mark.opsin_gate
     def test_diaminothiadiazolopyrrole_is_named_again(self):
-        # Regression row from the Phase 7 400-row re-measurement: Task 5's
+        # Regression row from the a phase 400-row re-measurement: Task 5's
         # guard turned this correct, InChIKey-exact name into an abstention.
         #
         # Requires the OPSIN validity gate (conftest disables it suite-wide).
@@ -126,21 +126,21 @@ class TestRecoveredName:
 
         # Spelling updated with the P-16.7.1(a) elision fix on the von Baeyer
         # path: 'diamine' begins with a CONSONANT, so the terminal 'e' of the
-        # 'ene' ending is RETAINED ('...triene-3,4-diamine').  The previous
+        # 'ene' ending is RETAINED ('...triene-3,4-diamine'). The previous
         # expectation '...trien-3,4-diamine' encoded the defect -- the cage
         # producer hardcoded '-en' and never tested the suffix at all.
         #
         # Evidence for the moved value (OPSIN accepts BOTH spellings and
         # returns the same structure, so round-trip cannot adjudicate it):
-        #   * P-16.7 "ELISION OF VOWELS", P-16.7.1(a) (BlueBookV2.md:7595) --
-        #     elision applies to the 'ene'/'yne' endings only before a suffix
-        #     beginning 'a', 'e', 'i', 'o', 'u', or 'y'.
-        #   * Worked example in the Blue Book: 'undeca-2,9-diene-4,8-diol
-        #     (PIN)' -- the identical ene + consonant-initial multiplied suffix
-        #     shape, 'e' retained.  The elided 'trien-N-di...' form appears
-        #     nowhere in the Blue Book.
-        #   * Internal consistency: Orthonym's chain engine, an independent
-        #     producer, already spelled this 'but-2-ene-1,4-diamine'.
+        # * P-16.7 "ELISION OF VOWELS", P-16.7.1(a) (the Blue Book) --
+        # elision applies to the 'ene'/'yne' endings only before a suffix
+        # beginning 'a', 'e', 'i', 'o', 'u', or 'y'.
+        # * Worked example in the Blue Book: 'undeca-2,9-diene-4,8-diol
+        # (PIN)' -- the identical ene + consonant-initial multiplied suffix
+        # shape, 'e' retained. The elided 'trien-N-di...' form appears
+        # nowhere in the Blue Book.
+        # * Internal consistency: Orthonym's chain engine, an independent
+        # producer, already spelled this 'but-2-ene-1,4-diamine'.
         name = Orthonym(**BEST_EFFORT).name("C1=C(C(=C2N1C=NS2)N)N")
         assert name == (
             "6-thia-1,7-diazabicyclo[3.3.0]octa-2,4,7-triene-3,4-diamine"

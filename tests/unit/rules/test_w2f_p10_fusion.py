@@ -9,13 +9,13 @@ digit-initial parent stem off from a letter-ending substituent prefix with a
 hyphen.
 
 Fast, deterministic, OPSIN-free (production namer string assertions only). The
-name+OPSIN round-trip envelope was verified separately via 
+name+OPSIN round-trip envelope was verified separately via scripts/diagnose.py.
 """
 import pytest
 from rdkit import Chem
 from orthonym.namer import name_compound
 
-# Canonical SMILES -> expected PIN (BB:14527 for the full target)
+# Canonical SMILES -> expected PIN (the Blue Book for the full target)
 BARE = {
     # single first-order attached component (P-25.3.1)
     "c1ccc2cc3c(ccc4cc5ccc6cc7ccccc7cc6c5cc43)cc2c1":
@@ -48,7 +48,7 @@ def test_determinism_random_spellings(smiles, expected):
 def test_full_target_substituent_hyphen():
     """P-16.3.3: a substituent prefix before a locant-initial parent stem gets a
     hyphen (was 'N-methyl12,...' — a malformed PIN)."""
-    # 1-methyl-<full target>  (OPSIN structure, RDKit-canonical)
+    # 1-methyl-<full target> (OPSIN structure, RDKit-canonical)
     smi = ("CC1=CC=2C=C3C=CC=4C=C5C=CC6=C7C5=CC4C3=CC2C2=C1C=C1C=CC3="
            "C(C1=C2)C=C2C(C=CC(=C6)C2=C7)=C3")
     name = name_compound(smi)
@@ -73,6 +73,6 @@ def test_letter_initial_parent_unchanged():
 
 # NB: the fail-closed boundary for uncataloged polycomponent systems (e.g.
 # dibenzo[a,c]anthracene) is locked by the W2F-P10 `protect` gold in
-#  — it relies on the SELF-01
-# OPSIN round-trip gate and so is exercised in the OPSIN-backed pin_oracle eval,
+# benchmarks/the gold set/packs/rings_numbering.json — it relies on the SELF-01
+# OPSIN round-trip gate and so is exercised in the OPSIN-backed the gold set eval,
 # not in this OPSIN-free unit module.

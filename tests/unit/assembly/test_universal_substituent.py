@@ -15,8 +15,8 @@ Coverage:
     ``_build_parent_with_unsaturation``) including a substituent branch and
     two SEPARATE ring systems linked by a chain
   * hard-branch witnesses that abstain TODAY on ``main`` (confirmed by the
-    B.1 spy) -- complete coverage + ``verify_or_none`` CONFIRMS
-  * WS-STEREO (v34): the top-level spine's own stereo descriptor block is now
+    B.1 trace) -- complete coverage + ``verify_or_none`` CONFIRMS
+  * WS-STEREO (): the top-level spine's own stereo descriptor block is now
     prepended (mirroring ``general_engine``'s four parent engines) and
     0-wrong-gated through ``verify_or_none`` -- a witness whose stereocentres
     are all on the spine now FULL-InChIKey CONFIRMS; a witness with a
@@ -31,7 +31,7 @@ Coverage:
     substituent on a neutral parent, and the nitroethane-class internally
     charge-separated species (now NAMED, not voided, when spellable+
     verified) reusing ``general_engine``'s own charge-suffix primitives;
-    WS7 (v34) adds the FG-anion/terminal-cation charged-leaf
+    WS7 () adds the FG-anion/terminal-cation charged-leaf
     (``oxido``/``sulfido``/``azaniumyl``), so a carboxylate/sulfonate/
     alkoxide anion and an amino-acid-style zwitterion are now NAMED and
     full-InChIKey verified, never voided or mis-named
@@ -162,7 +162,7 @@ def test_two_separate_ring_systems_linked_by_a_chain():
 
 
 # ===========================================================================
-# Hard-branch witnesses -- confirmed abstaining on `main` TODAY (B.1 spy)
+# Hard-branch witnesses -- confirmed abstaining on `main` TODAY (B.1 trace)
 # ===========================================================================
 
 def test_hard_branch_witness_sulfooxy_carboxylic_acid():
@@ -171,7 +171,7 @@ def test_hard_branch_witness_sulfooxy_carboxylic_acid():
     ('unknown organic compound') on ``C/C=C(/COS(=O)(=O)O)C(=O)O`` -- a
     trisubstituted alkene carbon bearing BOTH a carboxylic acid branch and a
     sulfooxymethyl branch, which the existing recursive substituent namer
-    cannot compose (confirmed by the B.1 spy: neither branch nor whole
+    cannot compose (confirmed by the B.1 trace: neither branch nor whole
     compound reaches a completing tier). This module names it completely."""
     result, verified = _name_and_verify("CC=C(COS(=O)(=O)O)C(=O)O")
     assert verified == result.name
@@ -196,7 +196,7 @@ def test_hard_branch_witness_perindopril_fragment():
 
 def test_stereo_bearing_witness_now_full_ws_stereo_win():
     """The stereo-bearing ORIGINAL of the sulfooxy/carboxylic-acid witness.
-    WS-STEREO (v34) now prepends the top-level spine's own stereo descriptor
+    WS-STEREO () now prepends the top-level spine's own stereo descriptor
     block (mirroring ``general_engine``'s parent engines) and 0-wrong-gates it
     through ``verify_or_none``: BOTH defined descriptors here (the C=C bond
     E/Z is on the chain spine itself) are spine-scoped, so the with-stereo
@@ -218,7 +218,7 @@ def test_stereo_bearing_witness_now_full_ws_stereo_win():
 
 
 def test_stereo_bearing_perindopril_now_full_ws_stereo_win():
-    """WS-STEREO (v34): both defined stereocentres are chain-SPINE atoms, so
+    """WS-STEREO (): both defined stereocentres are chain-SPINE atoms, so
     the with-stereo candidate FULL-InChIKey CONFIRMS. Mutation-checked (see
     the sibling test above and task-WS-STEREO-report.md)."""
     smi = r"CCC[C@H](N[C@H](C)C=O)C(=O)OCC"
@@ -249,7 +249,7 @@ def test_internally_charged_species_now_named_not_voided():
     (nitro's charges are P-59 INTERNAL, excluded from
     ``perception.ions.get_ion_sites``'s genuine-ion-site perception, so this
     is spelled directly as a leaf, never via the charge-suffix machinery).
-    This is the the contributor guide-mandated regression check: an internally
+    This is the CLAUDE.md-mandated regression check: an internally
     charge-separated net-0 species must now be NAMED when it can be spelled
     correctly and verified, never silently left void."""
     result, verified = _name_and_verify("CC[N+](=O)[O-]")
@@ -456,7 +456,7 @@ def test_quaternary_ammonium_cation_gets_ium_suffix():
 
 
 def test_carboxylate_anion_names_via_charged_leaf():
-    """WS7 (v34 composed-charge): a net-charged FG anion is now NAMED, not
+    """WS7 (composed-charge): a net-charged FG anion is now NAMED, not
     voided. Acetate (``CC(=O)[O-]``) classifies 'carboxylate', but in THIS
     module's skeletal-replacement construction the carbonyl ``=O`` is threaded
     INTO the parent (``1-oxaprop-1-ene``), leaving the anionic ``[O-]`` as a
@@ -475,7 +475,7 @@ def test_carboxylate_anion_names_via_charged_leaf():
 
 
 def test_zwitterion_amino_acid_names_via_charged_leaves():
-    """WS7 (v34): the glycine zwitterion ``C(C(=O)[O-])[NH3+]`` (net-0,
+    """WS7 (): the glycine zwitterion ``C(C(=O)[O-])[NH3+]`` (net-0,
     internally charge-separated) is now NAMED, not voided. Both charged termini
     are rendered as charged substituent prefixes -- the aminium as ``azaniumyl``
     and the carboxylate ``[O-]`` (its ``=O`` threaded into the ``1-oxaprop-1-ene``
@@ -976,7 +976,7 @@ def test_single_heavy_atom_top_level_input_no_raise():
 
 # ===========================================================================
 # Phase E (no-abstain universal namer): the universal namer certifies its
-# output through the SHARED E1 core ``_verify_partition`` (invariant 12:
+# output through the SHARED E1 core ``_verify_partition`` (a project rule:
 # extend, don't duplicate), REPLACING its hand-rolled coverage self-check.
 # These prove (a) the shared core is actually on the execution path -- a dead
 # choke point shows no movement (feedback_choke_point_off_path); (b) the two

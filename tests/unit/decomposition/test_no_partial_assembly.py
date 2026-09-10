@@ -1,14 +1,14 @@
-"""v32 Phase 2 (name-all compositional) -- decomposition must never ship a
+""" a phase (name-all compositional) -- decomposition must never ship a
 partial assembly.
 
-Spec: . The SPY found
+Spec: internal notes. The a trace found
 `_try_multi_bond_decompose` and `_try_iterative_mixed_decompose` cut a large
 molecule at linkages, name each fragment, and ship a name built from whichever
 >= 2 fragments named -- SILENTLY DROPPING any fragment that failed. The
 shipped name denotes a SMALLER molecule than the input, which SELF-01 (rightly)
 suppresses, so the whole molecule abstains -- but a producer that dishonestly
 offers a smaller-molecule candidate is not the same thing as an honest
-abstention (invariant 1: "0-wrong is delivered by E1 + SELF-01 rejecting a
+abstention (a project rule: "0-wrong is delivered by E1 + SELF-01 rejecting a
 candidate, never by a producer declining to build one" -- but PIN-tier fail-
 closed is licensed by the SAME invariant's own carve-out, and this defect
 sits squarely on the PIN-shared decomposition path).
@@ -69,9 +69,9 @@ pytestmark = [
 
 
 # ---------------------------------------------------------------------------
-# Traced molecules ( +
+# Traced molecules (internal notes +
 # live corpus rows this session pulled from
-# {chebi,pubchem}500.json`, terminal_code
+# internal notes, terminal_code
 # GATE_SUPPRESSED / self01_mismatch).
 # ---------------------------------------------------------------------------
 
@@ -101,7 +101,7 @@ GPI_FAILING_FRAGMENT = (
 # 74-heavy-atom lipopeptide (fatty-acyl N-cap + 6 amide-linked residues,
 # non-standard/branched residues). VERIFIED (this session, monkeypatch trace):
 # `_try_multi_bond_decompose` (amide, 7 bonds) fires for this molecule --
-# confirms the SPY's ASSUMED call-site attribution for the peptide/lipid
+# confirms the a trace's ASSUMED call-site attribution for the peptide/lipid
 # family. In THIS instance all fragments name successfully (failed_count==0
 # even before this fix); the SELF-01 suppression here traces to a SEPARATE,
 # out-of-scope defect in `_assemble_multi_amide`'s "N,N-di..." grouping, not
@@ -184,8 +184,8 @@ class TestNoPartialShip:
         )
 
     def test_gpi_mannoside_honestly_abstains_not_partial(self):
-        """The GPI mannoside is the SPY's directly-traced positive: before
-        this fix it shipped 'alpha-D-mannopyranosyloxy alpha-D-mannopyranosyl-
+        """The GPI mannoside is the a trace's directly-traced positive: before
+        this fix it shipped 'α-D-mannopyranosyloxy α-D-mannopyranosyl-
         (...' (3/4 fragments, dropping the failed GlcN-thioether unit's 27
         atoms) and SELF-01 suppressed it. After this fix the assembler either
         ships an ATOM-COMPLETE candidate or the molecule abstains cleanly --
@@ -198,7 +198,7 @@ class TestNoPartialShip:
         )
 
     def test_lipopeptide_honestly_abstains_not_partial(self):
-        """The lipopeptide is the SPY's call-site-confirmed positive for
+        """The lipopeptide is the a trace's call-site-confirmed positive for
         `_try_multi_bond_decompose` (amide). Must never ship a name for a
         subset of its 74 heavy atoms.
         """

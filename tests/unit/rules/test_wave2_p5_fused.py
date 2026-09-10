@@ -155,22 +155,48 @@ class TestP25InteriorAtomNumberingFailClosed:
             f"emitted an interior-superscript fusion name: {out!r}"
         )
 
+    # (item 2): the engine no longer DECLINES these interior-atom systems —
+    # it degrades to a von-Baeyer systematic name that OPSIN round-trips (0-wrong,
+    # gate ON). The fail-closed contract that mattered — never an UNVERIFIABLE
+    # interior-superscript FUSION name — still holds via
+    # test_no_interior_superscript_fusion_name_emitted above.
+    #
+    # ⚠ This asserts only what is VERIFIABLE: the emission exists, round-trips to
+    # the input structure, and carries no interior-superscript token. It does NOT
+    # enshrine the exact von-Baeyer string, and it does NOT claim the von-Baeyer
+    # form is the PIN — it is not. Under P-52.2.4.1 (the Blue Book) fusion
+    # nomenclature is the PIN for a system with two or more rings of five or more
+    # members, so for these three fused six-membered rings the fusion name is the
+    # PIN and the von-Baeyer form is a general-nomenclature degrade. The engine
+    # today ships it labelled is_pin=True (a PRE-EXISTING tier mislabel, identical
+    # at BASE 984de1494 — NOT introduced by; filed for a follow-up), which is
+    # exactly why this test avoids pinning it as a "verified PIN". (a review I1.)
+
     @pytest.mark.parametrize("smiles", _INTERIOR_SMILES)
-    def test_production_gate_declines(self, smiles, monkeypatch):
+    def test_production_gate_emits_a_verified_degrade_not_the_sentinel(self, smiles, monkeypatch):
         # Re-enable the production SELF-01 validity gate (the conftest autouse
-        # fixture disables it) and assert the namer fails closed to the sentinel
-        # for these no-verifiable-oracle interior-atom systems.
-        m = Chem.MolFromSmiles(smiles)
+        # fixture disables it) and assert the namer emits a name that round-trips
+        # (rather than the sentinel), without enshrining the exact string or its
+        # tier. The systematic (von-Baeyer) degrade is acceptable HERE only because
+        # it denotes the right structure; the fusion PIN is a separate open item.
+        from rdkit import Chem as _Chem
+        from orthonym.validation import opsin_roundtrip_check
+        m = _Chem.MolFromSmiles(smiles)
         if m is None:
             pytest.skip("probe SMILES invalid in RDKit; substitute a valid interior-heteroatom peri-fused system")
         import orthonym.namer as _namer
         if not _namer._validity_gate_jar_present():
             pytest.skip("OPSIN jar not present; production gate cannot run")
         monkeypatch.setattr(_namer, "_DISABLE_VALIDITY_GATE", False, raising=False)
+        import re
         out = name_compound(smiles)
-        assert out in (None, "unknown organic compound"), (
-            f"production gate should decline interior-atom system, got {out!r}"
-        )
+        assert out not in (None, "unknown organic compound"), (
+            f"gate ON should emit a verified degrade, not the sentinel, got {out!r}")
+        # 0-wrong: it must round-trip to the input structure.
+        rt = opsin_roundtrip_check(smiles, out)
+        assert rt.get("passed"), f"{out!r} did not round-trip: {rt.get('error')}"
+        # fail-closed contract: never an unverifiable interior-superscript fusion name.
+        assert not re.search(r"\d+a\d+", out), f"emitted an interior-superscript fusion name: {out!r}"
 
 
 @pytest.mark.unit
@@ -180,7 +206,7 @@ class TestP25ThreeComponentOrthoPeri:
     REPRODUCE-FIRST DIVERGENCE (recorded): the plan's Task 8 premise was that
     the sibling p5_bridged plan builds these two targets and this plan only
     verifies. In fact p5_bridged DEFERRED both to the fusion engine (this plan):
-    its `test_trioxa_methano_cyclopentaazulene` is xfail'd "blocked on ... p5_fused"
+    its `test_trioxa_methano_cyclopentaazulene` is xfail'd "blocked on... p5_fused"
     and its `test_indeno_naphthalene_is_fusion_not_bridged` asserts the bridged
     constructor DECLINES so the fusion engine names it. Both PINs are
     OPSIN-RT-verified, so this plan CATALOGS them (closed-structure exact match,

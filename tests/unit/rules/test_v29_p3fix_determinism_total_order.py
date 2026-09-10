@@ -1,6 +1,6 @@
-"""v29 P3-FIX Item 2 — the P-14.5.4 citation tie-break must be a TOTAL order.
+"""-FIX Item 2 — the P-14.5.4 citation tie-break must be a TOTAL order.
 
-Phase 3 replaced several raw ``sorted()`` calls with ``prefix_citation_sort_key``
+a phase replaced several raw ``sorted()`` calls with ``prefix_citation_sort_key``
 to get Blue Book citation order. The key was right about the letters and wrong
 about the locants, and — decisively — it was **non-injective**: two prefixes that
 differ only in their own internal locant compared EQUAL, so ``sorted()`` (stable)
@@ -9,24 +9,24 @@ is how the SMILES happened to be written. One molecule, two spellings, two names
 
 Measured before the fix, all three the same molecule::
 
-    CCC(C)CSSSCCC(C)C  -> 1-(2-methylbutyl)-3-(3-methylbutyl)trisulfane
-    CC(C)CCSSSCC(CC)C  -> 1-(3-methylbutyl)-3-(2-methylbutyl)trisulfane
+    CCC(C)CSSSCCC(C)C -> 1-(2-methylbutyl)-3-(3-methylbutyl)trisulfane
+    CC(C)CCSSSCC(CC)C -> 1-(3-methylbutyl)-3-(2-methylbutyl)trisulfane
 
 The nomenclature rule, with its heading — ``### **P-14.5** ALPHANUMERICAL ORDER``
-→ ``**P-14.5.4**`` (``BlueBookV2.md:3517``): "*When two or more prefixes consist
+→ ``**P-14.5.4**`` (``the Blue Book``): "*When two or more prefixes consist
 of identical Roman letters, priority for order of citation is given to the group
 that contains the lowest locant(s) at the first point of difference.*" Its own
-first example is exactly this pair (``BlueBookV2.md:3521``):
+first example is exactly this pair (``the Blue Book``):
 
     4-(2-methylbutyl)-N-(3-methylbutyl)aniline (PIN)
     "(for ordering the substituents '2' is lower than '3'; the fact that 'N' is
      lower than '4' is irrelevant)"
 
-and ``BlueBookV2.md:3533`` fixes the COMPARISON to be term-by-term in order of
+and ``the Blue Book`` fixes the COMPARISON to be term-by-term in order of
 appearance rather than on a sorted set:
 
     1-(2-methylpentan-3-yl)-1-(3-methylpentan-2-yl)cyclopentane (PIN)
-    "[not ...; the locant set '2,3' is lower than '3,2']"
+    "[not...; the locant set '2,3' is lower than '3,2']"
 
 Root cause of the non-injectivity: ``prefix_citation_sort_key`` was stripping the
 prefix's LEADING locant set before collecting locants, so ``2-methylbutyl`` and
@@ -105,7 +105,7 @@ def test_a_double_digit_locant_is_compared_as_a_NUMBER_not_a_string():
 def test_letters_still_win_over_locants():
     """P-14.5.4 only applies once the Roman letters are IDENTICAL; it must not
     reorder prefixes that differ in letters (``### **P-14.5** ALPHANUMERICAL
-    ORDER`` preamble, ``BlueBookV2.md:3442``)."""
+    ORDER`` preamble, ``the Blue Book``)."""
     got = sorted(['2-methylbutyl', 'ethyl'], key=prefix_citation_sort_key)
     assert got == ['ethyl', '2-methylbutyl'], got
 
@@ -134,7 +134,7 @@ SPELLING_WITNESSES = [
 @pytest.mark.parametrize("family,smiles", SPELLING_WITNESSES)
 def test_one_molecule_gets_one_name_however_it_is_spelled(family, smiles):
     """Probed the way the gate probes: input + RDKit canonical + 6 seeded
-    re-spellings (``, the gate's own
+    re-spellings (``scripts/determinism_eval.probe_smiles``, the gate's own
     n_rand=6 / seed=0 defaults). ``determinism_eval``'s stated policy is that a
     non-quarantined probe yielding >1 name is a HARD FAIL."""
     import importlib.util
@@ -163,7 +163,7 @@ def test_the_trisulfane_witness_is_cited_in_the_blue_book_order():
 
 
 def test_the_locant_tier_is_in_order_of_appearance_not_sorted():
-    """``BlueBookV2.md:3533`` compares the locants term-by-term AS CITED:
+    """``the Blue Book`` compares the locants term-by-term AS CITED:
 
         1-(2-methylpentan-3-yl)-1-(3-methylpentan-2-yl)cyclopentane (PIN)
         "[not 1-(3-methylpentan-2-yl)-1-(2-methylpentan-3-yl)cyclopentane;
@@ -183,7 +183,7 @@ def test_the_locant_tier_is_in_order_of_appearance_not_sorted():
 
 
 def test_the_aniline_site_cites_by_the_groups_own_locant_not_the_parent_one():
-    """``**P-14.5.4**``'s own first example (``BlueBookV2.md:3521``) is an aniline:
+    """``**P-14.5.4**``'s own first example (``the Blue Book``) is an aniline:
 
         4-(2-methylbutyl)-N-(3-methylbutyl)aniline (PIN)
         "(for ordering the substituents '2' is lower than '3'; the fact that 'N'

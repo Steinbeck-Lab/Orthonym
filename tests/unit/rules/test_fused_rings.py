@@ -308,16 +308,17 @@ class TestGetFusedHeterocycleSubstituents:
 
     @pytest.mark.unit
     def test_n_methylindole_substituent_detection(self):
-        """Should detect N-methyl substituent on indole."""
+        """Indole's nitrogen IS ring position 1 (P-25.3.1.3), so the methyl on it
+        is detected as a position-1 RING substituent, not a separate 'N-'
+        substituent. (item 2: the PIN is 1-methyl-1H-indole; RT-verified.)"""
         mol = Chem.MolFromSmiles('Cn1ccc2ccccc12')  # N-methylindole
         result = match_fused_heterocycle_core(mol)
         assert result is not None
         core_name, atom_mapping, _core_smiles = result
 
         subs = get_fused_heterocycle_substituents(mol, atom_mapping)
-        assert 'n_substituents' in subs
-        # Should have methyl as an N-substituent
-        assert 'methyl' in subs['n_substituents'] or len(subs['n_substituents']) > 0
+        # methyl detected on ring position 1 (the nitrogen)
+        assert subs['c_substituents'].get('methyl') == [1]
 
 
 # ============================================================================
@@ -453,7 +454,7 @@ class TestEdgeCases:
     @pytest.mark.unit
     def test_indoline_saturated(self):
         """The saturated indole ring system is named by its PIN (P-54.4.3.2,
-        BB:24256; PIN printed at BB:16992)."""
+        the Blue Book; PIN printed at the Blue Book)."""
         mol = Chem.MolFromSmiles('c1ccc2c(c1)CCN2')  # indoline
         name = name_fused_heterocycle(mol)
         assert name == '2,3-dihydro-1H-indole'
@@ -641,12 +642,13 @@ class TestSubstituentLocantAssignment:
         assert name == '3-methyl-1H-indole', f"Got: {name}"
 
     @pytest.mark.unit
-    def test_n_methylindole_uses_n_locant(self):
-        """N-methylindole should use N, not position 1."""
+    def test_n_methylindole_uses_position_1_locant(self):
+        """N-methylindole: indole's nitrogen IS position 1 (P-25.3.1.3), so the
+        PIN is 1-methyl-1H-indole, not N-methyl (item 2; OPSIN-RT verified
+        2026-09-04, ITEM2-VERIFICATION.md)."""
         mol = Chem.MolFromSmiles('Cn1ccc2ccccc12')
         name = name_fused_heterocycle(mol)
-        assert 'N-methyl' in name, f"Expected N-methyl, got: {name}"
-        assert '1-methyl' not in name, f"Should not have 1-methyl, got: {name}"
+        assert name == '1-methyl-1H-indole', f"Expected 1-methyl-1H-indole, got: {name}"
 
     @pytest.mark.unit
     def test_4_chloroquinoline_locant(self):
@@ -734,13 +736,13 @@ class TestFunctionalizedSubstituents:
     def test_indole_acetonitrile_e2e(self):
         """N#CCc1c[nH]c2ccccc12 (indole-3-acetonitrile) should contain 'indol'.
 
-        Phase 148 Plan 02 Task 03: post-148 cascade per P-44.1(a) selects the
+        a phase Plan 02 Task 03: post-148 cascade per P-44.1(a) selects the
         chain as parent (chain bears nitrile PG). The chain-as-parent name is
         `2-(1H-indol-3-yl)ethanenitrile` ('ethanenitrile' suffix instead of
         the v17 'cyanomethyl'/'acetonitrile' prefix). Both renderings are
-        IUPAC-acceptable; v17 was ring-as-parent (P-44.1 violation), v18 is
+        IUPAC-acceptable; v17 was ring-as-parent (P-44.1 violation), is
         chain-as-parent (P-44.1 compliant). Updated assertion to accept the
-        post-148 form per ./skills/fix-methodology.md.
+        post-148 form per.claude/skills/fix-methodology.md.
         """
         from orthonym import name_compound
 
@@ -749,7 +751,7 @@ class TestFunctionalizedSubstituents:
         assert (
             'cyanomethyl' in result.lower()
             or 'acetonitrile' in result.lower()
-            or 'ethanenitrile' in result.lower()  # Phase 148 P-44.1(a) chain-as-parent
+            or 'ethanenitrile' in result.lower()  # a phase P-44.1(a) chain-as-parent
         ), f"Expected 'cyanomethyl' or 'acetonitrile' or 'ethanenitrile' in name, got: {result}"
 
     @pytest.mark.unit
@@ -765,13 +767,13 @@ class TestFunctionalizedSubstituents:
     def test_indole_acetic_acid_e2e(self):
         """OC(=O)Cc1c[nH]c2ccccc12 (indole-3-acetic acid) should contain 'indol'.
 
-        Phase 148 Plan 02 Task 03: post-148 cascade per P-44.1(a) selects the
+        a phase Plan 02 Task 03: post-148 cascade per P-44.1(a) selects the
         chain as parent (chain bears acid PG). The chain-as-parent name is
         `2-(1H-indol-3-yl)ethanoic acid` ('ethanoic acid' suffix instead of
         the v17 'carboxymethyl'/'acetic' prefix). Both renderings are
-        IUPAC-acceptable; v17 was ring-as-parent (P-44.1 violation), v18 is
+        IUPAC-acceptable; v17 was ring-as-parent (P-44.1 violation), is
         chain-as-parent (P-44.1 compliant). Updated assertion to accept the
-        post-148 form per ./skills/fix-methodology.md.
+        post-148 form per.claude/skills/fix-methodology.md.
         """
         from orthonym import name_compound
 
@@ -780,7 +782,7 @@ class TestFunctionalizedSubstituents:
         assert (
             'carboxymethyl' in result.lower()
             or 'acetic' in result.lower()
-            or 'ethanoic' in result.lower()  # Phase 148 P-44.1(a) chain-as-parent
+            or 'ethanoic' in result.lower()  # a phase P-44.1(a) chain-as-parent
         ), f"Expected 'carboxymethyl' or 'acetic' or 'ethanoic' in name, got: {result}"
 
     @pytest.mark.unit
@@ -851,15 +853,15 @@ class TestFunctionalizedSubstituents:
 
 
 # =============================================================================
-# Phase 155.B D-08: HERITAGE section 3(b) numbering-precedence regression lock
+# a phase.B: AUTONOM section 3(b) numbering-precedence regression lock
 # =============================================================================
 
 
 @pytest.mark.unit
-class TestHeritageBPrecedence:
-    """Phase 155.B D-08: HERITAGE section 3(b) numbering-precedence criterion ordering.
+class TestAutonomBPrecedence:
+    """a phase.B: AUTONOM section 3(b) numbering-precedence criterion ordering.
 
-    BRANCH A (no-op verdict in 155-AUDIT-B.md): HERITAGE section 3(b)-aware
+    BRANCH A (no-op verdict in 155-AUDIT-B.md): AUTONOM section 3(b)-aware
     regression lock test. The 153-row catalog audit + 18 corpus fixtures found
     NO entry where indicated-H placement materially decides the locant set
     chosen vs alternative orderings under (a) -> (c) -> (d) cascade. So
@@ -875,13 +877,13 @@ class TestHeritageBPrecedence:
     NOT a (b)-vs-(c) tiebreak verifier: the audit confirmed there is no
     such tiebreak fixture in the 153 catalog or the 18 corpus, so the
     `_compute_general_indicated_h` signature does NOT gain an
-    `heritage_b_precedence` keyword-only flag. If a future audit pass
+    `autonom_b_precedence` keyword-only flag. If a future audit pass
     surfaces a tiebreak case, this class flips to BRANCH B and asserts
-    `_compute_general_indicated_h(..., heritage_b_precedence=True)` returns
+    `_compute_general_indicated_h(..., autonom_b_precedence=True)` returns
     the criterion-(b)-preferred locant set.
 
-    Source: 155-CONTEXT.md D-08; HERITAGE-1990 section 3(b);
-            Blue Book P-31.1.4; 155-AUDIT-B.md HERITAGE section 3(b)
+    Source: internal notes; AUTONOM-1990 section 3(b);
+            Blue Book P-31.1.4; 155-AUDIT-B.md AUTONOM section 3(b)
             Cascade Audit verdict.
     """
 
@@ -896,8 +898,8 @@ class TestHeritageBPrecedence:
     # `octahydroindene` instead of `4H-indene` due to a saturation-
     # perception bug in the fused-ring handler (NOT in the indicated-H
     # surface this audit covers). Logged in
-    #  for follow-up;
-    # NOT in 155-02 scope per D-20 root-cause-only.
+    # internal notes for follow-up;
+    # NOT in 155-02 scope per root-cause-only.
     _SUBCLASS_FIXTURES = [
         # 1H subclass
         ("c1ccc2[nH]ccc2c1", 1, "1H-indole (1H)"),
@@ -957,7 +959,7 @@ class TestHeritageBPrecedence:
         else:
             # Indicated-H prefix expected; assert the locant appears in
             # the canonical "<n>H-" or "<n>H," form (the latter for
-            # ring-assemblies post-D-09). Substring match is sufficient
+            # ring-assemblies post-). Substring match is sufficient
             # because the canonical form is what the cascade emits.
             prefix = f"{expected_locant}H-"
             embedded = f"{expected_locant}H,"
@@ -968,12 +970,12 @@ class TestHeritageBPrecedence:
 
     @pytest.mark.unit
     def test_d09_biindole_replication(self):
-        """Phase 155.B D-09 placement subset regression test.
+        """a phase.B placement subset regression test.
 
         2,2'-biindole must emit the canonical IUPAC PIN
         ``1H,1'H-2,2'-biindole`` (NOT the buggy pre-fix
         ``2,2'-bi1H-indole``) per IUPAC P-31.1.4 +
-        HERITAGE-followups.md Follow-up 12.
+        AUTONOM-followups.md Follow-up 12.
         """
         from orthonym import name_compound
         biindole_smi = "c1ccc2[nH]c(-c3[nH]c4ccccc4c3)cc2c1"
@@ -1141,7 +1143,7 @@ class TestClusterAJunctionGeneralization:
     def test_existing_gold_smiles_still_correct_with_1h_fix(self):
         """The pre-existing gold_pins.json SMILES for octahydroindene
         (matching S,S descriptors) must now include the '1H-' indicated
-        hydrogen (P-31.1.4 -- indene's PIN is 1H-indene; BlueBookV2.md:11317)."""
+        hydrogen (P-31.1.4 -- indene's PIN is 1H-indene; the Blue Book)."""
         from orthonym import Orthonym
         o = Orthonym(_disable_opsin_validity_gate=True)
         out = o.name("C1CC[C@@H]2CCCC[C@@H]12")

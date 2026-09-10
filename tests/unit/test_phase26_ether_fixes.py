@@ -1,4 +1,4 @@
-"""Phase 26 Plan 01: Ether prefix fixes -- glycoside naming and aryloxy detection.
+"""a phase Plan 01: Ether prefix fixes -- glycoside naming and aryloxy detection.
 
 Tests:
   - Glycoside naming: (oxan-2-yl)oxy / (oxolan-2-yl)oxy instead of hexosyloxy/pentosyloxy
@@ -114,7 +114,7 @@ class TestAlkoxyNonRegression:
 
     @pytest.mark.unit
     @pytest.mark.parametrize("smiles,expected_name", [
-        ("COc1ccccc1", "methoxybenzene"),  # F-T9/DD6 RET-01: PIN (anisole is general-only)
+        ("COc1ccccc1", "anisole"),  # a review RISK 7: bare anisole IS the PIN (the Blue Book / the Blue Book)
         ("CCOc1ccccc1", "ethoxybenzene"),
         ("CCCOc1ccccc1", "propoxybenzene"),
     ])
@@ -129,7 +129,7 @@ class TestAlkoxyNonRegression:
 # ---------------------------------------------------------------------------
 
 class TestBGroupRegression:
-    """All 8 B-group ether compounds from Phase 24 should remain correct."""
+    """All 8 B-group ether compounds from a phase should remain correct."""
 
     @pytest.mark.unit
     @pytest.mark.parametrize("smiles,expected_name,test_id", [

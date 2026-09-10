@@ -213,7 +213,8 @@ class TestIonNamingRegression:
         self.namer = Orthonym()
 
     def test_ammonium(self):
-        assert self.namer.name('[NH4+]') == 'ammonium'
+        # NH4+ PIN is 'azanium' (P-73.1.1.2, the Blue Book; was 'ammonium')
+        assert self.namer.name('[NH4+]') == 'azanium'
 
     def test_acetate(self):
         assert self.namer.name('CC(=O)[O-]') == 'acetate'

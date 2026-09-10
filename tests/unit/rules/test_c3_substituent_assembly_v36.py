@@ -1,7 +1,7 @@
 """v36 Milestone C3 — substituent/assembly gap on WORKING ring cores.
 
 RED baseline + RT harness for the C3 witnesses (grounding spy
-``). The C3 charter is: name molecules
+``.planning/audit-v33/V36-SPY-C3.md``). The C3 charter is: name molecules
 whose ring system ALREADY names but which abstain because a ring-bearing
 SUBSTITUENT (or a spiro-linked partner ring) can't be rendered — by letting
 the working whole-molecule ring namer serve the substituent role too, all
@@ -14,7 +14,7 @@ build ``chebi_full_ost.jsonl``, from which the spy drew its 2,147 abstainers):
 the plan's Task-2 premise (a fail-closed DROP-24 guard in
 ``assembly/substituent_naming.py`` is THE dominant decline site and re-anchoring
 the whole-molecule ring namer ahead of it closes the category-(a) witnesses)
-is OFF-PATH for every named flagship witness. This is the contributor guide invariant 8
+is OFF-PATH for every named flagship witness. This is CLAUDE.md invariant 8
 ("the named choke point is off the path") holding again.
 
 The re-anchor mechanism the plan asks for ALREADY EXISTS and already works at the
@@ -89,7 +89,7 @@ OPSIN-round-trip; see ``test_c3_estramustine_names_GREEN`` and
 RED, re-bucketed to spiro-stereo / ring-program milestones.
 
 Regenerate the witness data in minutes via the spy's method
-(`` "Method").
+(``.planning/audit-v33/V36-SPY-C3.md`` "Method").
 """
 import pytest
 
@@ -179,7 +179,7 @@ def test_c3_reanchor_mechanism_already_works_at_milestone_tier():
     substituent role') ALREADY EXISTS: a complex cage ring in the substituent
     role names + round-trips at the milestone tier via allow_mancude. This is
     the evidence that a fresh DROP-24 re-anchor in assembly/ would be dead code
-    (the contributor guide invariant 17)."""
+    (CLAUDE.md invariant 17)."""
     name, passed = _c3_rt(ADAMANTYL_BENZOIC)
     assert not is_failure_name(name), f"cage substituent regressed: {name!r}"
     assert passed, f"cage substituent no longer round-trips: {name!r}"
@@ -239,7 +239,7 @@ def test_c3_estramustine_names_GREEN():
 C3_STEROID_ESTER_WITNESSES = {
     # 3-O-carbamate estradiol (the flagship): N,N-bis(2-chloroethyl)carbamate.
     "estramustine": ESTRAMUSTINE,
-    # cholesteryl acetate — single ring double bond → 'cholest-5-en-3beta-yl
+    # cholesteryl acetate — single ring double bond → 'cholest-5-en-3β-yl
     # acetate' (NO euphonic 'a'); acetate still built correctly by the general
     # namer (surrogate 'methyl acetate' → 'acetate').
     "cholesteryl_acetate": (

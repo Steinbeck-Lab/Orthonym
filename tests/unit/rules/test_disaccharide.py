@@ -1,15 +1,15 @@
-"""RED unit/integration tests for the P-102.7 disaccharide regime (Phase 183, WSC-04).
+"""RED unit/integration tests for the P-102.7 disaccharide regime (a phase, WSC-04).
 
-The disaccharide assembler (`rules/oligosaccharides.name_disaccharide`, D-02)
+The disaccharide assembler (`rules/oligosaccharides.name_disaccharide`,)
 reasons over the WHOLE multi-ring sugar structure: it detects the sugar units
 and the inter-unit glycosidic bond, splits each unit (FragmentOnBonds + cap the
 anomeric carbon with -OH), names each via the catalog / systematic-mono engine
-(per-unit anomer from that unit's OWN ring, D-09 — never inherited), detects the
-reducing end to choose the name shape (D-06: free hemiacetal -OH -> glycosylglycose
+(per-unit anomer from that unit's OWN ring, — never inherited), detects the
+reducing end to choose the name shape (: free hemiacetal -OH -> glycosylglycose
 `-ose` parent; none free -> glycosyl glycoside `-oside`), derives the (1->n)
-linkage locants (D-07, ASCII arrow per Pitfall 6), enforces the no-silent-drop
+linkage locants (, ASCII arrow per Pitfall 6), enforces the no-silent-drop
 completeness invariant over the ORIGINAL mol's heavy atoms + the shared bridging
-O (D-12, Pitfall 7), and fails closed (D-11) on anything out of scope (branched,
+O (, Pitfall 7), and fails closed () on anything out of scope (branched,
 trisaccharide non-linear, C-glycoside, polymeric).
 
 WAVE 0 CONTRACT (mirror tests/unit/rules/test_conjugate_controller.py): imports
@@ -17,15 +17,15 @@ of the not-yet-built `name_disaccharide` go INSIDE each test body, NOT at module
 level, so `pytest --collect-only` succeeds while the engine is RED at run time
 until Wave-2 (Plan 183-02) lands. `RDLogger.DisableLog("rdApp.*")` at module top.
 
-Root-cause-only (the contributor guide): assertions are structural (unit recognition,
+Root-cause-only (CLAUDE.md): assertions are structural (unit recognition,
 reducing-end detection, completeness invariant, fail-closed None) — the (1->4)
 arrow and trailing-parent checks pin the emitted form, not a string transform.
 
 Verified this session (OPSIN-RT True, ASCII descriptors + ASCII arrow):
-  beta-maltose -> alpha-D-glucopyranosyl-(1->4)-beta-D-glucopyranose  (W6B-T10:
+  beta-maltose -> α-D-glucopyranosyl-(1->4)-β-D-glucopyranose (W6B-T10:
              a DEFINED reducing-end anomer is cited, P-102.7.1.2; only an
-             UNSPECIFIED reducing anomer is omitted, D-09)
-  sucrose -> beta-D-fructofuranosyl alpha-D-glucopyranoside  (no free hemiacetal)
+             UNSPECIFIED reducing anomer is omitted,)
+  sucrose -> β-D-fructofuranosyl α-D-glucopyranoside (no free hemiacetal)
 """
 
 import pytest
@@ -45,7 +45,7 @@ MALTOSE_SMILES = (
     "[C@H](O)[C@@H](O)[C@@H]1O"
 )
 # Maltose with an UNSPECIFIED reducing anomer (reducing-C1 stereo removed): the
-# anomer is correctly omitted (mutarotation, D-09).
+# anomer is correctly omitted (mutarotation,).
 MALTOSE_UNSPEC_SMILES = (
     "OC[C@H]1O[C@H](O[C@H]2[C@H](O)[C@@H](O)C(O)O[C@@H]2CO)"
     "[C@H](O)[C@@H](O)[C@@H]1O"
@@ -53,8 +53,8 @@ MALTOSE_UNSPEC_SMILES = (
 # Sucrose: no free hemiacetal (both anomeric carbons in the glycosidic linkage)
 # -> glycosyl glycoside. NOTE (Plan 183-02): the SMILES previously copied from
 # retained_names.py:350 is stereochemically INCORRECT sucrose (its fructose ring
-# is not D-fructofuranose: InChI .../m0 vs real sucrose .../m1) — it round-trips
-# to neither real sucrose nor "beta-D-fructofuranosyl alpha-D-glucopyranoside".
+# is not D-fructofuranose: InChI.../m0 vs real sucrose.../m1) — it round-trips
+# to neither real sucrose nor "β-D-fructofuranosyl α-D-glucopyranoside".
 # Corrected here to the structurally-correct sucrose (PubChem CID 5988), which the
 # assembler derives + OPSIN-round-trips to the expected systematic name. The buggy
 # retained_names.py entry is a separate (trivial-name-path) defect, logged for a
@@ -64,8 +64,8 @@ SUCROSE_SMILES = (
     "[C@@H](O)[C@@H]1O"
 )
 
-MALTOSE_EXPECTED = "alpha-D-glucopyranosyl-(1->4)-beta-D-glucopyranose"
-SUCROSE_EXPECTED = "beta-D-fructofuranosyl alpha-D-glucopyranoside"
+MALTOSE_EXPECTED = "α-D-glucopyranosyl-(1->4)-β-D-glucopyranose"
+SUCROSE_EXPECTED = "β-D-fructofuranosyl α-D-glucopyranoside"
 
 
 @pytest.mark.integration
@@ -73,7 +73,7 @@ class TestDisaccharide:
     """WSC-04 P-102.7 disaccharide / oligosaccharide naming."""
 
     def test_glycosylglycose(self):
-        """Maltose names as the glycosylglycose form (free hemiacetal, D-06)."""
+        """Maltose names as the glycosylglycose form (free hemiacetal,)."""
         from orthonym.rules.oligosaccharides import name_disaccharide
 
         mol = Chem.MolFromSmiles(MALTOSE_SMILES)
@@ -81,7 +81,7 @@ class TestDisaccharide:
         assert name_disaccharide(mol) == MALTOSE_EXPECTED
 
     def test_glycosyl_glycoside(self):
-        """Sucrose names as the glycosyl-glycoside form (no free hemiacetal, D-06)."""
+        """Sucrose names as the glycosyl-glycoside form (no free hemiacetal,)."""
         from orthonym.rules.oligosaccharides import name_disaccharide
 
         mol = Chem.MolFromSmiles(SUCROSE_SMILES)
@@ -89,7 +89,7 @@ class TestDisaccharide:
         assert name_disaccharide(mol) == SUCROSE_EXPECTED
 
     def test_unspecified_reducing_end_no_anomer(self):
-        """UNSPECIFIED reducing-end anomer -> NO alpha/beta on the parent (D-09)."""
+        """UNSPECIFIED reducing-end anomer -> NO alpha/beta on the parent ()."""
         from orthonym.rules.oligosaccharides import name_disaccharide
 
         mol = Chem.MolFromSmiles(MALTOSE_UNSPEC_SMILES)
@@ -97,18 +97,18 @@ class TestDisaccharide:
         assert name is not None
         # The glucose parent trails as bare "-D-glucopyranose" (no invented anomer).
         assert name.endswith("-D-glucopyranose")
-        assert "alpha-D-glucopyranose" not in name
-        assert "beta-D-glucopyranose" not in name
+        assert "α-D-glucopyranose" not in name
+        assert "β-D-glucopyranose" not in name
 
     def test_defined_reducing_end_cites_anomer(self):
         """W6B-T10 (P-102.7.1.2): a DEFINED reducing-end anomer MUST be cited."""
         from orthonym.rules.oligosaccharides import name_disaccharide
 
         mol = Chem.MolFromSmiles(MALTOSE_SMILES)
-        assert name_disaccharide(mol) == "alpha-D-glucopyranosyl-(1->4)-beta-D-glucopyranose"
+        assert name_disaccharide(mol) == "α-D-glucopyranosyl-(1->4)-β-D-glucopyranose"
 
     def test_linkage_arrow_glyph(self):
-        """Linkage locant uses the ASCII (1->4) arrow matching the gold row (D-07)."""
+        """Linkage locant uses the ASCII (1->4) arrow matching the gold row ()."""
         from orthonym.rules.oligosaccharides import name_disaccharide
 
         mol = Chem.MolFromSmiles(MALTOSE_SMILES)
@@ -119,7 +119,7 @@ class TestDisaccharide:
         assert "→" not in name
 
     def test_completeness_invariant(self):
-        """No-silent-drop: an unclassifiable extra substituent -> None (D-12, Pitfall 7).
+        """No-silent-drop: an unclassifiable extra substituent -> None (, Pitfall 7).
 
         A disaccharide-shaped molecule where one unit carries an extra heavy-atom
         substituent the engine cannot classify (here an O-allyl ether on a ring
@@ -138,7 +138,7 @@ class TestDisaccharide:
         assert name_disaccharide(decorated) is None
 
     def test_disaccharide_fail_closed(self):
-        """Fail-closed (D-11): branched / C-glycoside / non-linear -> None."""
+        """Fail-closed (): branched / C-glycoside / non-linear -> None."""
         from orthonym.rules.oligosaccharides import name_disaccharide
 
         # C-glycoside (aglycone bonded by C, not the inter-unit glycosidic O) and
@@ -162,14 +162,14 @@ class TestW6bLinearOligosaccharide:
         assert name_compound(
             "OC[C@H]1O[C@H](O[C@H]2[C@H](O)[C@@H](O)[C@@H](O[C@H]3[C@H](O)"
             "[C@@H](O)C(O)O[C@@H]3CO)O[C@@H]2CO)[C@H](O)[C@@H](O)[C@@H]1O"
-        ) == "alpha-D-glucopyranosyl-(1->4)-alpha-D-glucopyranosyl-(1->4)-D-glucopyranose"
+        ) == "α-D-glucopyranosyl-(1->4)-α-D-glucopyranosyl-(1->4)-D-glucopyranose"
 
     def test_isomaltose_1_6(self):
         from orthonym import name_compound
         assert name_compound(
             "OC[C@H]1O[C@H](OC[C@H]2O[C@H](O)[C@H](O)[C@@H](O)[C@@H]2O)"
             "[C@H](O)[C@@H](O)[C@@H]1O"
-        ) == "alpha-D-glucopyranosyl-(1->6)-alpha-D-glucopyranose"
+        ) == "α-D-glucopyranosyl-(1->6)-α-D-glucopyranose"
 
     def test_branched_fails_closed(self):
         from orthonym.rules.oligosaccharides import name_linear_oligosaccharide
@@ -191,7 +191,7 @@ class TestW6bLinearOligosaccharide:
 
 
 class TestExtractUnitCappedNoIsotopeLeak:
-    """v33 P0 L3-2b: ``_extract_unit_capped`` (the multi-bond generalization of
+    """ L3-2b: ``_extract_unit_capped`` (the multi-bond generalization of
     the proven ``conjugate_controller._extract_capped_sugar`` primitive) calls
     ``Chem.FragmentOnBonds(..., addDummies=True)`` WITHOUT ``dummyLabels``, so
     RDKit isotope-labels each new capping dummy atom with the bonded partner's
@@ -205,11 +205,11 @@ class TestExtractUnitCappedNoIsotopeLeak:
 
     This is USUALLY masked: ``recognize_sugar_skeleton``'s connectivity/CIP
     fingerprint tolerates the stray isotopes for plain hexopyranoses (glucose,
-    galactose, ...). But the only recognizer that knows a MODIFIED sugar (e.g.
+    galactose,...). But the only recognizer that knows a MODIFIED sugar (e.g.
     2-acetamido-2-deoxy-glucopyranose / GlcNAc) is ``lookup_sugar``'s EXACT
     canonical-SMILES dictionary match, which an isotope-tagged SMILES can never
     hit — so every GlcNAc/GalNAc (etc.) unit in an oligosaccharide chain fails
-    recognition and the whole chain abstains (measured: v33 Phase 0 L3-2b SPY,
+    recognition and the whole chain abstains (measured: a phase L3-2b a trace,
     5 real oligosaccharide/glycoconjugate rows, ALL declining here)."""
 
     def test_middle_unit_capped_smiles_has_no_isotopes(self):
@@ -246,16 +246,16 @@ class TestExtractUnitCappedNoIsotopeLeak:
 
         # A GlcNAc unit capped at both bridging positions (C1 exocyclic O and
         # the C4-O acceptor), as _extract_unit_capped would isolate it from a
-        # real chain (v33 P0 L3-2b SPY row idx5 unit).
+        # real chain (L3-2b a trace row idx5 unit).
         capped_glcnac = "CC(=O)N[C@@H]1[C@@H](O)[C@H](O)[C@@H](CO)O[C@H]1O"
         mol = Chem.MolFromSmiles(capped_glcnac)
         canon = Chem.MolToSmiles(mol)
-        assert lookup_sugar(canon) == ("beta", "D", "2-acetamido-2-deoxy-glucopyranose")
+        assert lookup_sugar(canon) == ("β", "D", "2-acetamido-2-deoxy-glucopyranose")
 
 
 class TestAminoSugarOligosaccharideChain:
-    """v33 P0 L3-2b: a real hexasaccharide (3x beta-D-galactopyranose alternating
-    with 3x N-acetyl-beta-D-glucosamine, terminal D-glucopyranose reducing end)
+    """ L3-2b: a real hexasaccharide (3x β-D-galactopyranose alternating
+    with 3x N-acetyl-β-D-glucosamine, terminal D-glucopyranose reducing end)
     that abstained pre-fix because every GlcNAc unit failed recognition (the
     isotope-leak above). Root cause fixed at the unit-extraction primitive, not
     a per-molecule special case."""
@@ -283,7 +283,7 @@ class TestAminoSugarOligosaccharideChain:
 
 
 class TestV33Engine2DecoratedUnitVocabulary:
-    """v33 giants-engine Engine 2 (
+    """ giants-engine Engine 2 (docs/superpowers/plans/2026-08-19--giants-
     engine.md): extends ``name_monosaccharide_systematic``'s modification
     vocabulary to O-sulfate / O-phosphate-MONOester / N-sulfonate esters (BB
     P-102.5.6.1.2 @53197 / P-102.5.6.1.3 @53225), so a decorated GAG-style unit
@@ -304,7 +304,7 @@ class TestV33Engine2DecoratedUnitVocabulary:
         uronic/halo/N-sulfonate) must DECLINE here -- it is the EXISTING,
         already-PIN-tested ``name_sugar_ester``'s job (the BB P-102.5.6.1.2/
         .1.3 FUNCTIONAL-CLASS suffix form, ``"D-glucopyranose 6-(dihydrogen
-        phosphate)"``/``"alpha-D-glucopyranose 2-(hydrogen sulfate)"``,
+        phosphate)"``/``"α-D-glucopyranose 2-(hydrogen sulfate)"``,
         dispatched ahead of this engine). This engine's O- PREFIX form fires
         ONLY when a co-occurring modification makes the suffix form
         inexpressible (test_o_sulfate_plus_uronic_acid_co_occurrence,
@@ -320,12 +320,12 @@ class TestV33Engine2DecoratedUnitVocabulary:
     def test_n_sulfonate_glucosamine(self):
         from orthonym.data.sugar_names import name_monosaccharide_systematic
 
-        # N-sulfo-alpha-D-glucosamine (heparin's characteristic GlcNS unit).
+        # N-sulfo-α-D-glucosamine (heparin's characteristic GlcNS unit).
         mol = Chem.MolFromSmiles(
             "O[C@H]1O[C@H](COS(=O)(=O)O)[C@@H](O)[C@H](O)[C@H]1NS(=O)(=O)O"
         )
         assert name_monosaccharide_systematic(mol) == (
-            "2-deoxy-6-O-sulfo-2-(sulfoamino)-alpha-D-glucopyranose"
+            "2-deoxy-6-O-sulfo-2-(sulfoamino)-α-D-glucopyranose"
         )
 
     def test_uronic_acid_with_o_sulfate_co_occurs(self):
@@ -354,21 +354,21 @@ class TestV33Engine2DecoratedUnitVocabulary:
 
 
 class TestV33Engine2CappedTerminusChain:
-    """v33 giants-engine Engine 2 fix (b): the oligosaccharide chain's reducing
+    """ giants-engine Engine 2 fix (b): the oligosaccharide chain's reducing
     end may be capped with a simple alkyl/aryl glycoside (e.g. a methyl
     glycoside used as a synthetic capping group in a GAG fragment), not only a
     free hemiacetal. ``_oligo_topology`` accepts this terminus and
     ``name_linear_oligosaccharide`` renders it via the P-102.5.6.2.2 glycoside
     form (``"{cap} n-O-[...]-{glycoside}"``), never the free-sugar ``-ose``
     form. VERIFIED (OPSIN 2.9.0): the ``(1->c')`` suffix chain does NOT combine
-    with a glycoside head (``"glycosyl-(1->c')-methyl alpha-D-
+    with a glycoside head (``"glycosyl-(1->c')-methyl α-D-
     glucopyranoside"`` fails to parse); the ``n-O-[...]`` prefix form does.
     """
 
     def test_methyl_glycoside_disaccharide(self):
         from orthonym import name_compound
 
-        # methyl 3-O-beta-D-glucopyranosyl-alpha-D-glucopyranoside (single
+        # methyl 3-O-β-D-glucopyranosyl-α-D-glucopyranoside (single
         # donor -> no enclosing marks needed, P-16.3.3: a bare glycosyl prefix
         # carries no internal locant/parenthetical of its own).
         smi = (
@@ -376,12 +376,12 @@ class TestV33Engine2CappedTerminusChain:
             "[C@H](O)[C@H]2O)[C@H]1O"
         )
         name = name_compound(smi)
-        assert name == "methyl 3-O-beta-D-glucopyranosyl-alpha-D-glucopyranoside"
+        assert name == "methyl 3-O-β-D-glucopyranosyl-α-D-glucopyranoside"
 
     def test_heparin_pentasaccharide_methyl_glycoside(self):
         """A real heparin-fragment pentasaccharide (methyl-capped GlcNS6S --
         IdoA2S -- GlcNS3,6S -- GlcA -- GlcNS6S, all-N-sulfonate/O-sulfate, no
-        N-acyl) -- the exact SPY positive that motivated this engine. Full
+        N-acyl) -- the exact a trace positive that motivated this engine. Full
         InChIKey round-trip verified this session (KANJSNBRCNMZMV-ABRZTLGGSA-N)."""
         from orthonym import name_compound
         from orthonym.validation.opsin_roundtrip import opsin_roundtrip_check
@@ -401,7 +401,7 @@ class TestV33Engine2CappedTerminusChain:
 
 
 class TestV33Task1p2DecoratedUnitClassification:
-    """v33 Task 1.2 (breadth-lever program, Phase 1): ``_classify_units`` (and
+    """.2 (breadth-lever program, a phase): ``_classify_units`` (and
     the shared per-unit cascade every namer in this module goes through --
     ``_recognize_unit`` plus the 3 identical inline copies in
     ``name_linear_oligosaccharide`` / ``name_branched_oligosaccharide`` /
@@ -411,7 +411,7 @@ class TestV33Task1p2DecoratedUnitClassification:
     ``name_monosaccharide_systematic`` all miss, so the whole unit -- and
     therefore the whole chain -- returned ``None``.
 
-    Root cause (SPY, verified on the ``sulfo-27``/``sulfo-32`` backlog
+    Root cause (a trace, verified on the ``sulfo-27``/``sulfo-32`` backlog
     witnesses below before this fix): ``_classify_sugar_positions``
     (``data/sugar_names.py``) silently treated a plain-acyl ring oxygen as a
     bare hydroxyl (never idealized, so the clean-parent fingerprint never
@@ -419,7 +419,7 @@ class TestV33Task1p2DecoratedUnitClassification:
     "N-acyl / N-alkyl / charged N -> out of scope"); separately, even the
     ALREADY-classified O-sulfo/O-phospho case deferred to
     ``name_sugar_ester``'s two-word FUNCTIONAL-CLASS form
-    ("beta-D-galactopyranose 6-(hydrogen sulfate)") whenever the ester-
+    ("β-D-galactopyranose 6-(hydrogen sulfate)") whenever the ester-
     stripped residual was an exact-catalog sugar -- a form that cannot be
     embedded as a glycosyl unit inside a larger disaccharide/oligosaccharide
     name at all.
@@ -448,13 +448,13 @@ class TestV33Task1p2DecoratedUnitClassification:
     empty -- true for EVERY ``name_monosaccharide_systematic`` result, since
     that engine folds a KNOWN anomer/config into the base string itself
     rather than returning them as separate fields. Relaxing a centre the
-    name explicitly asserts (e.g. "...-6-O-sulfo-beta-D-glucopyranose")
+    name explicitly asserts (e.g. "...-6-O-sulfo-β-D-glucopyranose")
     makes the OPSIN round-trip fail (the parsed structure has that centre
     DEFINED; the relaxed comparison target does not) -- fixed by relaxing
     only when the anomeric centre is genuinely UNDEFINED on the input
     structure, never merely because the tuple fields are empty.
 
-    Provenance: ``sulfo-27``/``sulfo-32`` are REAL rows from the v33
+    Provenance: ``sulfo-27``/``sulfo-32`` are REAL rows from the
     breadth-lever glycan backlog (``glycan_413.json``, HA 27 / HA 32) --
     genuine two-real-sugar-ring disaccharides, hand-verified (not the
     heuristic ``sugar_glycan`` family tag, which independently confirmed

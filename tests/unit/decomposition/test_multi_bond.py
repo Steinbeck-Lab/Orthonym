@@ -1,8 +1,8 @@
-"""Unit tests for multi-bond decomposition (Phase 56-01, 56-02, and 099-02).
+"""Unit tests for multi-bond decomposition (a phase-01, 56-02, and 099-02).
 
 Tests the MAX_CLEAVABLE_BONDS performance guard, consecutive duplicate-word
 detection in _name_quality_is_acceptable(), multi-bond retry logic,
-recursive fragment decomposition, and Phase 099 multi-bond same-type
+recursive fragment decomposition, and a phase multi-bond same-type
 cleavage with multi-ester assembly.
 """
 
@@ -33,7 +33,7 @@ class TestPerformanceGuard:
     """Tests for the MAX_CLEAVABLE_BONDS performance guard in try_decompose()."""
 
     def test_performance_guard_constant_exists(self):
-        """MAX_CLEAVABLE_BONDS constant is defined and is 20 (Phase 099)."""
+        """MAX_CLEAVABLE_BONDS constant is defined and is 20 (a phase)."""
         assert MAX_CLEAVABLE_BONDS == 20
 
     def test_performance_guard_skips_many_bonds(self):
@@ -121,9 +121,9 @@ class TestPerformanceGuard:
         """The output-level half of the test above: skipping a decomposition
         that would only re-derive the same string must not change the name.
 
-        v29 Task J2 corrected the acyl word from the non-PIN 'palmitate':
-        P-65.1.2 "Systematic names" (BlueBookV2.md:29860) -- "Except for formic
-        acid, acetic acid, oxalic acid ..., and oxamic acid ..., systematically
+         corrected the acyl word from the non-PIN 'palmitate':
+        P-65.1.2 "Systematic names" (the Blue Book) -- "Except for formic
+        acid, acetic acid, oxalic acid..., and oxamic acid..., systematically
         formed names are preferred IUPAC names; the names given in P-65.1.1.2
         are retained names for use in general nomenclature." What this test
         asserts -- that the name is unchanged by skipping decomposition -- is
@@ -236,7 +236,7 @@ class TestQualityGateDuplicateWords:
 
 
 # ---------------------------------------------------------------------------
-# Multi-bond retry tests (Phase 56-02)
+# Multi-bond retry tests (a phase-02)
 # ---------------------------------------------------------------------------
 
 
@@ -365,7 +365,7 @@ class TestMultiBondRetry:
         ):
             result = try_decompose(mol)
 
-        # With coverage gate (Phase 87-02), "bad name 0" (10 chars) is
+        # With coverage gate (a phase-02), "bad name 0" (10 chars) is
         # rejected for a 30-atom molecule (need >= 18 chars). Result is None
         # when all decomposition attempts fail coverage + quality checks.
         assert result is None, (
@@ -379,7 +379,7 @@ class TestMultiBondRetry:
 
 
 # ---------------------------------------------------------------------------
-# Recursive fragment decomposition test (Phase 56-02, DECP-02)
+# Recursive fragment decomposition test (a phase-02, DECP-02)
 # ---------------------------------------------------------------------------
 
 
@@ -425,13 +425,13 @@ class TestRecursiveFragmentDecomposition:
 
 
 # ---------------------------------------------------------------------------
-# Phase 099-02: Multi-bond same-type cleavage tests
+# a phase-02: Multi-bond same-type cleavage tests
 # ---------------------------------------------------------------------------
 
 
 @pytest.mark.unit
 class TestMultiBondDecompose:
-    """Tests for _try_multi_bond_decompose() in engine.py (Phase 099-02)."""
+    """Tests for _try_multi_bond_decompose() in engine.py (a phase-02)."""
 
     def test_triacetin_produces_multifragment_name(self):
         """_try_multi_bond_decompose() with triacetin produces name with
@@ -461,7 +461,7 @@ class TestMultiBondDecompose:
         bonds = find_cleavable_bonds(mol)
         ester_bonds = [b for b in bonds if b["type"] == "ester"]
 
-        # Mock both recursive and pipeline fallback to return None (Phase 127)
+        # Mock both recursive and pipeline fallback to return None (a phase)
         with patch(
             "orthonym.decomposition.engine._name_fragment_with_fallback",
             return_value=None,
@@ -537,7 +537,7 @@ class TestMultiBondDecompose:
 
 @pytest.mark.unit
 class TestMultiEsterAssembly:
-    """Tests for _assemble_multi_ester() in fragment_assembly.py (Phase 099-02)."""
+    """Tests for _assemble_multi_ester() in fragment_assembly.py (a phase-02)."""
 
     def test_identical_acid_names_use_multiplicative_prefix(self):
         """Identical acid names produce multiplicative prefix (e.g., triacetate)."""
@@ -577,7 +577,7 @@ class TestMultiEsterAssembly:
         """Core fragment (glycerol) is identified as most senior by score_fragment_seniority.
 
         Uses acetic acid (4 HA) as non-core so glycerol (6 HA) passes the
-        core-size guard (Phase 099-05).
+        core-size guard (a phase-05).
         """
         named_fragments = [
             ({"smiles": "OCC(O)CO", "side": "middle"}, "glycerol"),
@@ -637,7 +637,7 @@ class TestMultiEsterAssembly:
         )
 
     def test_core_size_guard_rejects_small_core(self):
-        """Core-size guard rejects when core HA < max non-core HA (Phase 099-05).
+        """Core-size guard rejects when core HA < max non-core HA (a phase-05).
 
         Scenario: core has 2 HA (ethanol-like), non-core has 6 HA (butanoic acid).
         The guard should reject because the core is smaller than a non-core fragment,
@@ -656,7 +656,7 @@ class TestMultiEsterAssembly:
         )
 
     def test_core_size_guard_allows_large_core(self):
-        """Core-size guard allows when core HA >= all non-core HA (Phase 099-05).
+        """Core-size guard allows when core HA >= all non-core HA (a phase-05).
 
         Scenario: glycerol (6 HA) core, acetic acid (4 HA) non-core.
         The guard should allow because the core is larger.
@@ -674,7 +674,7 @@ class TestMultiEsterAssembly:
         assert "glycerol" in result.lower()
 
     def test_core_size_guard_allows_equal(self):
-        """Core-size guard allows when core HA == max non-core HA (Phase 099-05).
+        """Core-size guard allows when core HA == max non-core HA (a phase-05).
 
         Scenario: both core and non-core have 4 HA. Edge case: no rejection
         on equal sizes.
@@ -693,20 +693,20 @@ class TestMultiEsterAssembly:
 
 
 # ---------------------------------------------------------------------------
-# Phase 099-02 Task 2: Sugar bypass, raised limits, fragment-aware quality gate
+# a phase-02 Task 2: Sugar bypass, raised limits, fragment-aware quality gate
 # ---------------------------------------------------------------------------
 
 
 @pytest.mark.unit
 class TestRaisedPerformanceLimits:
-    """Tests for raised performance limits (Phase 099-02)."""
+    """Tests for raised performance limits (a phase-02)."""
 
     def test_max_cleavable_bonds_raised_to_20(self):
         """MAX_CLEAVABLE_BONDS should be 20 (raised from 12)."""
         assert MAX_CLEAVABLE_BONDS == 20
 
     def test_max_visited_size_raised_to_50(self):
-        """_MAX_VISITED_SIZE should be 50 (raised from 30 in Phase 127)."""
+        """_MAX_VISITED_SIZE should be 50 (raised from 30 in a phase)."""
         from orthonym.assembly.fragment_naming import _MAX_VISITED_SIZE
         assert _MAX_VISITED_SIZE == 50
 
@@ -731,7 +731,7 @@ class TestRaisedPerformanceLimits:
 
 @pytest.mark.unit
 class TestSugarDetectionBypass:
-    """Tests for sugar-detection bypass in _select_best_bond() (Phase 099-02)."""
+    """Tests for sugar-detection bypass in _select_best_bond() (a phase-02)."""
 
     def test_glycosidic_bond_with_sugar_gets_priority(self):
         """When a glycosidic bond leads to a known sugar, it should be preferred."""
@@ -760,7 +760,7 @@ class TestSugarDetectionBypass:
         # Mock _name_sugar_fragment to recognize glucose
         with patch(
             "orthonym.decomposition.engine._name_sugar_fragment",
-            side_effect=lambda s: "beta-D-glucopyranosyloxy" if "OC1OC" in s else None,
+            side_effect=lambda s: "β-D-glucopyranosyloxy" if "OC1OC" in s else None,
         ), patch(
             "orthonym.decomposition.fragment_capping.cleave_and_cap",
             side_effect=mock_cleave,
@@ -828,7 +828,7 @@ class TestSugarDetectionBypass:
 
 @pytest.mark.unit
 class TestFragmentAwareQualityGate:
-    """Tests for fragment-aware quality gate relaxation (Phase 099-02)."""
+    """Tests for fragment-aware quality gate relaxation (a phase-02)."""
 
     def _make_mol(self, heavy_atoms: int):
         """Create a mol with approximately the given number of heavy atoms."""
@@ -892,7 +892,7 @@ class TestFragmentAwareQualityGate:
     def test_retained_core_name_with_coverage_guard(self):
         """Retained core names pass only when coverage ratio >= 0.25 for HA > 20.
 
-        Phase 099-03: coverage guard added. 'adenine' (7 chars) for HA=35
+        a phase-03: coverage guard added. 'adenine' (7 chars) for HA=35
         molecule has ratio 0.20 < 0.25 threshold -> rejected.
         For HA=20 molecules, retained names always pass (HA <= 20).
         """
@@ -925,13 +925,13 @@ class TestFragmentAwareQualityGate:
 
 
 # ---------------------------------------------------------------------------
-# Phase 099-04: Multi-bond threshold and glycoside/amide assembly tests
+# a phase-04: Multi-bond threshold and glycoside/amide assembly tests
 # ---------------------------------------------------------------------------
 
 
 @pytest.mark.unit
 class TestMultiBondThresholds:
-    """Tests for bond-type-specific multi-bond thresholds (Phase 099-04)."""
+    """Tests for bond-type-specific multi-bond thresholds (a phase-04)."""
 
     def test_threshold_dict_has_correct_values(self):
         """_MULTI_BOND_THRESHOLD has glycosidic=2, amide=3, ester=2 (DECO-22)."""
@@ -943,15 +943,15 @@ class TestMultiBondThresholds:
 
 @pytest.mark.unit
 class TestMultiGlycosideAssembly:
-    """Tests for _assemble_multi_glycoside() in fragment_assembly.py (Phase 099-04)."""
+    """Tests for _assemble_multi_glycoside() in fragment_assembly.py (a phase-04)."""
 
     def test_two_sugars_one_aglycone(self):
         """2 sugar fragments + 1 aglycone produces multi-glycosyloxy pattern."""
         from orthonym.decomposition.fragment_assembly import _assemble_multi_glycoside
         named_fragments = [
             ({"smiles": "Oc1ccccc1", "side": "alkyl"}, "phenol"),
-            ({"smiles": "OC1OC(CO)C(O)C(O)C1O", "side": "acid"}, "beta-D-glucopyranosyloxy"),
-            ({"smiles": "OC1OC(CO)C(O)C(O)C1O", "side": "acid"}, "beta-D-glucopyranosyloxy"),
+            ({"smiles": "OC1OC(CO)C(O)C(O)C1O", "side": "acid"}, "β-D-glucopyranosyloxy"),
+            ({"smiles": "OC1OC(CO)C(O)C(O)C1O", "side": "acid"}, "β-D-glucopyranosyloxy"),
         ]
         result = _assemble_multi_glycoside(named_fragments, "pin")
         assert result is not None, "Should produce a multi-glycoside name"
@@ -981,9 +981,9 @@ class TestMultiGlycosideAssembly:
         """Core fragment (non-sugar) is identified as most senior."""
         from orthonym.decomposition.fragment_assembly import _assemble_multi_glycoside
         named_fragments = [
-            ({"smiles": "OC1OC(CO)C(O)C(O)C1O", "side": "acid"}, "beta-D-glucopyranosyloxy"),
+            ({"smiles": "OC1OC(CO)C(O)C(O)C1O", "side": "acid"}, "β-D-glucopyranosyloxy"),
             ({"smiles": "OC(=O)c1ccccc1", "side": "alkyl"}, "benzoic acid"),
-            ({"smiles": "OC1OC(CO)C(O)C(O)C1O", "side": "acid"}, "beta-D-glucopyranosyloxy"),
+            ({"smiles": "OC1OC(CO)C(O)C(O)C1O", "side": "acid"}, "β-D-glucopyranosyloxy"),
         ]
         result = _assemble_multi_glycoside(named_fragments, "pin")
         assert result is not None
@@ -997,8 +997,8 @@ class TestMultiGlycosideAssembly:
         from orthonym.decomposition.fragment_assembly import _assemble_multi_glycoside
         named_fragments = [
             ({"smiles": "Oc1ccccc1", "side": "alkyl"}, "phenol"),
-            ({"smiles": "OC1OC(CO)C(O)C(O)C1O", "side": "acid"}, "beta-D-glucopyranosyloxy"),
-            ({"smiles": "OC1OC(CO)C(O)C(O)C1O", "side": "acid"}, "beta-D-glucopyranosyloxy"),
+            ({"smiles": "OC1OC(CO)C(O)C(O)C1O", "side": "acid"}, "β-D-glucopyranosyloxy"),
+            ({"smiles": "OC1OC(CO)C(O)C(O)C1O", "side": "acid"}, "β-D-glucopyranosyloxy"),
         ]
         result = _assemble_multi_glycoside(named_fragments, "pin")
         assert result is not None
@@ -1011,7 +1011,7 @@ class TestMultiGlycosideAssembly:
 
 @pytest.mark.unit
 class TestMultiAmideAssembly:
-    """Tests for _assemble_multi_amide() in fragment_assembly.py (Phase 099-04)."""
+    """Tests for _assemble_multi_amide() in fragment_assembly.py (a phase-04)."""
 
     def test_two_acyl_one_amine(self):
         """2 acyl fragments + 1 amine core produces 'N-acyl1-N-acyl2-amine' pattern."""
@@ -1152,7 +1152,7 @@ class TestMultiBondIntegration:
 
 
 # ---------------------------------------------------------------------------
-# Phase 132-03: Fragment storage and role-based core identification tests
+# a phase-03: Fragment storage and role-based core identification tests
 # ---------------------------------------------------------------------------
 
 
@@ -1288,7 +1288,7 @@ class TestFragmentStorageAndRoles:
 
     def test_multiple_middles_ranked_by_seniority(self):
         """When 2 fragments have side='middle', the most senior one is used
-        as core (per D-08).
+        as core (per).
         """
         named_fragments = [
             ({"smiles": "OCC(O)CO", "side": "middle"}, "glycerol"),
@@ -1326,7 +1326,7 @@ class TestFragmentStorageAndRoles:
 
     def test_assembler_handles_none_from_acid_to_ate(self):
         """When _acid_to_ate returns None for a non-acid fragment, the
-        assembler skips that fragment (per D-11).
+        assembler skips that fragment (per).
 
         Simulates a fragment whose name doesn't look like an acid, so
         _acid_to_ate returns None. The assembler should skip it gracefully.
@@ -1336,7 +1336,7 @@ class TestFragmentStorageAndRoles:
             ({"smiles": "CC(=O)O", "side": "acid"}, "acetic acid"),
             ({"smiles": "CCCCCC", "side": "acid"}, "hexane"),  # Not an acid name
         ]
-        # _acid_to_ate("hexane") should return None (per D-09 pre-validation)
+        # _acid_to_ate("hexane") should return None (per pre-validation)
         # The assembler should skip hexane and still produce a result with
         # just the acetic acid arm
         result = _assemble_multi_ester(named_fragments)

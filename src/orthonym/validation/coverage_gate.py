@@ -1,8 +1,8 @@
-"""Phase 1 Part A: the SINGLE certification gate for a general-engine result,
+"""a phase Part A: the SINGLE certification gate for a general-engine result,
 shared by every best-effort emission lane.
 
-Root-cause of the per-lane drift review named
-(``.planning/v30/phase0c-certificate-shipped.md`` follow-on #1): three lanes ran
+Root-cause of the per-lane drift a review named
+(`internal notes` follow-on #1): three lanes ran
 ``name_general`` and gated its ``GeneralEngineResult`` DIFFERENTLY --
 ``assembly/t4_coverage.py`` ran E1 + ``verify_spine`` (escalated), while the
 inline G1 lane (``namer.py:3900``) and the multifragment/recovery lane
@@ -74,7 +74,7 @@ _STRUCTURAL_BLOCKING_CODES = frozenset({
     _bs.SUBSTITUENT_STEREO_MISMATCH,                                    # P8 (provable)
 })
 
-#: v37 ST.3: the stereo PROOF-GAP codes -- a rejection here means the
+#: ST.3: the stereo PROOF-GAP codes -- a rejection here means the
 #: binding-spine could NOT decide (it could not positionally anchor which
 #: leading descriptor block is the parent's, because ``stereo_atom_to_locant``
 #: is int-locant-only and a compound/primed spiro locant is unmappable), NOT
@@ -129,7 +129,7 @@ def certify_general_result(mol, result: "GeneralEngineResult", *,
     ``self._allow_aromatic_general`` so a legitimately-charged complete-tier
     name (``-ylium``/``-ide`` suffix on a bound atom) is NOT voided.
 
-    ``structural_only`` (Phase 1 B4, the broad-lane wiring) blocks ONLY on the
+    ``structural_only`` (a phase B4, the broad-lane wiring) blocks ONLY on the
     structural axes (``_STRUCTURAL_BLOCKING_CODES``: atom partition / bond
     totality / charge / stereo -- the swap-witness class) and treats the
     name-spelling axes (P4/P5/P6) as advisory, because on the best-effort lanes
@@ -174,7 +174,7 @@ def certify_general_result(mol, result: "GeneralEngineResult", *,
                 return True
         else:
             blocking = [f.code for f in proof.findings if f.severity == "error"]
-        # v37 ST.3: RT-gated stereo PROOF-GAP rescue. When the ONLY thing
+        # ST.3: RT-gated stereo PROOF-GAP rescue. When the ONLY thing
         # blocking certification is a stereo proof gap (STEREO_PARENT_BLOCK_
         # AMBIGUOUS -- the spine could not anchor which leading block is the
         # parent's, never a disproof), accept IFF the full name round-trips to

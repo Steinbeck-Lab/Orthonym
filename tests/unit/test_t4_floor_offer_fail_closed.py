@@ -1,4 +1,4 @@
-"""v33 no-abstain Phase A fix-round-1, Finding 1 (HIGH, FABLE adversarial 0-wrong
+""" no-abstain Phase A fix-round-1, Finding 1 (HIGH, FABLE adversarial 0-wrong
 review): the `t4_floor` offer used to fail-open on `gate_outcome=not_run`.
 
 Mechanism: `resolve_gate_outcome` returns `not_run` whenever no gate call was
@@ -6,12 +6,12 @@ recorded anywhere in the whole `name()` call (`metrics/provenance.py:222-223`).
 Several real exits -- the limit-path/exception-path exits, the wildcard exit,
 the isotope-decorator-failure exit -- return through `_finish` WITHOUT ever
 calling `_final_opsin_validity_gate`, so `not_run` is reachable on real
-inputs (measured: 8/41 real dev500 best-effort abstainers). `not_run` used to
+inputs (measured: 8/41 real a dev split best-effort abstainers). `not_run` used to
 be treated exactly like `carveout:*`/`gate_disabled` (a "no check is possible"
 outcome) inside `_offer_rt_ok`, so a `t4_floor` offer with NO recorded
 verdict at all could win `select_rt_passing` with ZERO verification.
 
-FABLE proved this end-to-end (): stubbing
+FABLE proved this end-to-end (`scratchpad/probe_whitebox_floor.py`): stubbing
 ONLY the T4 producer (`t4_coverage.name_t4_complete`) to return `"ethanol"`
 for the real `not_run` abstainer `CC(=O)C1=C(C)S[C@@H](C)CC1=O`, the genuine
 `_finish`/`_maybe_append_t4_floor_offer`/`_offer_rt_ok`/`select_rt_passing`
@@ -29,7 +29,7 @@ from orthonym.errors import is_failure_name
 
 pytestmark = [pytest.mark.unit, pytest.mark.opsin_gate]
 
-# Measured real dev500 best-effort abstainer whose whole name() call ends
+# Measured real a dev split best-effort abstainer whose whole name() call ends
 # with gate_outcome=not_run (task-A-fixround1-findings.md Finding 1).
 NOT_RUN_ABSTAINER = "CC(=O)C1=C(C)S[C@@H](C)CC1=O"
 

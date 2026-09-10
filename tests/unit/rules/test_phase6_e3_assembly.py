@@ -1,10 +1,10 @@
-"""v33 Phase 6 (E3) Tasks 4-6: producer ASSEMBLY/enumeration fixes.
+""" a phase (E3) Tasks 4-6: producer ASSEMBLY/enumeration fixes.
 
 All three witnesses share one shape: the substituent FRAGMENT names correctly
 (verified directly against `name_substituent_fragment`/`classify_and_name_fragment`
-in ), but the PARENT producer either
+in internal notes), but the PARENT producer either
 never enumerated the branch, mis-assembled it, or double-counted an atom it
-already spoke for. Fixed sites (all re-anchored by direct SPY, not by the
+already spoke for. Fixed sites (all re-anchored by direct a trace, not by the
 plan doc's guessed location -- `name_polyfunctional` was OFF PATH for two of
 the three witnesses, confirmed via producer tracing):
 

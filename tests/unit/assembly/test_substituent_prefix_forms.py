@@ -1,6 +1,6 @@
 """Per-FG unit tests for assembly/substituent_prefix_forms.py.
 
-Phase 160.1 Plan-02-03 — per CONTEXT D-10 + D-11 + RESEARCH §12 Dim 1.
+a phase.1 Plan-02-03 — per CONTEXT + + RESEARCH §12 Dim 1.
 
 Acceptance threshold: >= 56 tests (14 generators x 4 fixtures each).
 Per-FG isolation: each test class targets ONE generator function.
@@ -130,7 +130,7 @@ class TestPhenoxycarbonyl:
 
 
 # ====================================================================
-# Row 15 (v31): iminoester (imidate) - get_alkoxycarbonimidoyl_prefix
+# Row 15 (): iminoester (imidate) - get_alkoxycarbonimidoyl_prefix
 # per IUPAC P-65.2.1.5 / P-66: -C(=NH)-O-R -> R-oxycarbonimidoyl.
 # Exact mirror of the ester row's guards; N-unsubstituted only (SMARTS
 # [NX2H1]), so N-substituted imidates are never perceived here.
@@ -211,7 +211,7 @@ class TestAlkoxycarbonimidoyl:
         assert result is None
 
     def test_dispatcher_routes_iminoester(self):
-        """get_substituent_prefix_form('iminoester', ...) reaches the generator."""
+        """get_substituent_prefix_form('iminoester',...) reaches the generator."""
         mol = Chem.MolFromSmiles("CCC(=N)OC")
         atoms = _match_atoms(mol, "iminoester")
         result = get_substituent_prefix_form(
@@ -281,26 +281,31 @@ class TestPrimaryAmideCarbamoyl:
 
 
 # ====================================================================
-# Row 4: secondary_amide - get_n_alkyl_carbamoyl_prefix per IUPAC P-66.6.1
+# Row 4: secondary_amide - get_n_alkyl_carbamoyl_prefix per IUPAC P-66.1.1.4.1.1
 # ====================================================================
 
 
 class TestNAlkylCarbamoyl:
-    """Row 4: -C(=O)NHR -> N-(alkyl)carbamoyl per IUPAC P-66.6.1."""
+    """Row 4: -C(=O)NHR -> (alkyl)carbamoyl per IUPAC P-66.1.1.4.1.1.
+
+    The carbamoyl N is the sole substitutable locus, so its italic N-locant is
+    OMITTED (P-14.3.4). BB PINs: 'methylcarbamoyl', 'phenylcarbamoyl' (:30396),
+    '(4-nitrophenyl)carbamoyl' (:30400); the italic-N form is nowhere in the BB.
+    """
 
     def test_n_methylcarbamoyl_positive_minimal(self):
-        """-C(=O)NHCH3 -> N-methylcarbamoyl per P-66.6.1."""
+        """-C(=O)NHCH3 -> methylcarbamoyl per P-66.1.1.4.1.1 (N-locant omitted)."""
         mol = Chem.MolFromSmiles("CNC(=O)CC")  # N-methylpropanamide
         atoms = _match_atoms(mol, "secondary_amide")
         result = get_n_alkyl_carbamoyl_prefix(mol, atoms, principal_chain=None)
-        assert result == "N-methylcarbamoyl", f"got {result!r}"
+        assert result == "methylcarbamoyl", f"got {result!r}"
 
     def test_n_ethylcarbamoyl_positive_variant(self):
-        """-C(=O)NHC2H5 -> N-ethylcarbamoyl per P-66.6.1."""
+        """-C(=O)NHC2H5 -> ethylcarbamoyl per P-66.1.1.4.1.1 (N-locant omitted)."""
         mol = Chem.MolFromSmiles("CCNC(=O)CC")  # N-ethylpropanamide
         atoms = _match_atoms(mol, "secondary_amide")
         result = get_n_alkyl_carbamoyl_prefix(mol, atoms, principal_chain=None)
-        assert result == "N-ethylcarbamoyl", f"got {result!r}"
+        assert result == "ethylcarbamoyl", f"got {result!r}"
 
     def test_lactam_negative_returns_none(self):
         """Cyclic secondary amide (lactam) returns None per Guard 2."""
@@ -318,26 +323,33 @@ class TestNAlkylCarbamoyl:
 
 
 # ====================================================================
-# Row 5: tertiary_amide - get_n_n_dialkyl_carbamoyl_prefix per IUPAC P-66.6.1
+# Row 5: tertiary_amide - get_n_n_dialkyl_carbamoyl_prefix per IUPAC P-66.1.1.4.1.1
 # ====================================================================
 
 
 class TestNNDialkylCarbamoyl:
-    """Row 5: -C(=O)N(R)(R') -> N,N-(dialkyl)carbamoyl per IUPAC P-66.6.1."""
+    """Row 5: -C(=O)N(R)(R') -> (dialkyl)carbamoyl per IUPAC P-66.1.1.4.1.1.
+
+    Italic N-locants OMITTED (P-14.3.4). A MIXED pair is alphabetized and the
+    second substituent is enclosed per P-16.5.1.3.1 -- BB PIN witness
+    'methyl(phenyl)carbamoyl' in '5-methyl-2-[methyl(phenyl)carbamoyl]benzoic
+    acid' (:32957).
+    """
 
     def test_n_n_dimethylcarbamoyl_positive_minimal(self):
-        """-C(=O)N(CH3)2 -> N,N-dimethylcarbamoyl per P-66.6.1."""
+        """-C(=O)N(CH3)2 -> dimethylcarbamoyl per P-66.1.1.4.1.1 (N-locant omitted)."""
         mol = Chem.MolFromSmiles("CN(C)C(=O)CC")  # N,N-dimethylpropanamide
         atoms = _match_atoms(mol, "tertiary_amide")
         result = get_n_n_dialkyl_carbamoyl_prefix(mol, atoms, principal_chain=None)
-        assert result == "N,N-dimethylcarbamoyl", f"got {result!r}"
+        assert result == "dimethylcarbamoyl", f"got {result!r}"
 
     def test_n_ethyl_n_methylcarbamoyl_positive_mixed(self):
-        """-C(=O)N(CH3)(C2H5) alphabetized per IUPAC P-14.5.2."""
+        """-C(=O)N(CH3)(C2H5) -> ethyl(methyl)carbamoyl: alphabetized (P-14.5.2),
+        N-locants omitted, second enclosed (P-16.5.1.3.1)."""
         mol = Chem.MolFromSmiles("CCN(C)C(=O)CC")
         atoms = _match_atoms(mol, "tertiary_amide")
         result = get_n_n_dialkyl_carbamoyl_prefix(mol, atoms, principal_chain=None)
-        assert result == "N-ethyl-N-methylcarbamoyl", f"got {result!r}"
+        assert result == "ethyl(methyl)carbamoyl", f"got {result!r}"
 
     def test_cyclic_tertiary_amide_negative(self):
         """Cyclic tertiary amide returns None per Guard 2."""
@@ -720,12 +732,12 @@ class TestIsothiocyanate:
 
 
 # ====================================================================
-# Phase 160.2 Plan-04-01 — CR-01 unit-level Branch A vs Branch B routing
+# a phase.2 Plan-04-01 — CR-01 unit-level Branch A vs Branch B routing
 # ====================================================================
 
 
 class TestCarbamateAttachIdxRouting:
-    """Phase 160.2 Plan-04-01 CR-01 unit-level coverage of
+    """a phase.2 Plan-04-01 CR-01 unit-level coverage of
     ``_check_substituent_prefix_form`` Branch A vs Branch B routing per
     IUPAC P-66.6.4.
 
@@ -810,12 +822,12 @@ class TestCarbamateAttachIdxRouting:
 
 
 # ====================================================================
-# Phase 160.2 Plan-04-03a — WR-05 _PREFIX_FORM_PATTERNS thread-safety
+# a phase.2 Plan-04-03a — WR-05 _PREFIX_FORM_PATTERNS thread-safety
 # ====================================================================
 
 
 class TestWR05PrefixFormCacheThreadSafe:
-    """Phase 160.2 Plan-04-03a WR-05 closure: ``_PREFIX_FORM_PATTERNS``
+    """a phase.2 Plan-04-03a WR-05 closure: ``_PREFIX_FORM_PATTERNS``
     lazy init is thread-safe via ``threading.Lock`` double-check pattern.
 
     Validates the documented contract:
@@ -970,7 +982,7 @@ class TestAcylOnChalcogenSulfanyl:
         assert result == "propanoylsulfanyl", f"got {result!r}"
 
     def test_benzoylsulfanyl_plain_phenyl(self):
-        # O=C(c1ccccc1)SCCC(=O)O: O0=C1(ring 2-7) S8 C9 C10 C11(=O12)O13
+        # O=CSCCC(=O)O: O0=C1(ring 2-7) S8 C9 C10 C11(=O12)O13
         mol, m = self._thioether_atoms("O=C(c1ccccc1)SCCC(=O)O")
         result = get_sulfanyl_prefix(mol, m, principal_chain=[9, 10])
         assert result == "benzoylsulfanyl", f"got {result!r}"

@@ -1,4 +1,4 @@
-"""v22 Phase E2 (DD5) — parent/chain seniority cascade, rule-family coverage (A8).
+""" Phase E2 (DD5) — parent/chain seniority cascade, rule-family coverage (A8).
 
 Tests the OUTPUT of the SEN-01 (P-44.3/P-45 chain cascade + deterministic
 comparator) and SEN-04 (P-46 located-substituent re-basing) fixes as RULE FAMILIES,
@@ -246,11 +246,13 @@ SEN02_CARBON_OVER_ETHER = [
 # their established (skeletal / functional-class) names — NOT migrated here.
 # NOTE: COCCOC (homogeneous 2-O diether) was previously listed here as
 # "2,5-dioxahexane" but R4 (P-12.1/P-63.2.4) now routes it substitutive ->
-# '1,2-dimethoxyethane'.  Removed from this invariant set.
+# '1,2-dimethoxyethane'. Removed from this invariant set.
 SEN02_INVARIANT = [
     ("CSCSC", "2,4-dithiapentane"),      # homogeneous dithioether -> skeletal kept
-    ("CSC", "dimethyl sulfide"),         # simple sulfide -> functional-class kept
-    ("CSCC", "ethyl methyl sulfide"),
+    # P-63.2.5 (the Blue Book method 1 = PIN; the Blue Book): a simple sulfide's PIN is the
+    # substitutive form, not the functional-class "R R' sulfide" (sulfanyl slice).
+    ("CSC", "(methylsulfanyl)methane"),   # was 'dimethyl sulfide' (the Blue Book)
+    ("CSCC", "(methylsulfanyl)ethane"),   # was 'ethyl methyl sulfide'
     ("CS(=O)C", "(methanesulfinyl)methane"),   # Wave2 T3b: substitutive P-63.6 PIN (was functional-class 'dimethyl sulfoxide', now --trivial)
     ("OCCOCCOCCOC", "3,6,9-trioxadecan-1-ol"),  # terminal-OH polyether -> skeletal kept
 ]

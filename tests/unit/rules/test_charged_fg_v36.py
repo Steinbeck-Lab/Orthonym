@@ -1,6 +1,6 @@
-"""v36 Milestone B3 -- charged-acyclic FG + inorganic classification.
+""" Milestone B3 -- charged-acyclic FG + inorganic classification.
 
-Covers four spy-pinpointed fixes (``):
+Covers four trace-pinpointed fixes (`internal notes`):
 
 1. Inorganic-fragment honesty floor (``errors.py::classify_failure_limit``):
    a carbon-free bare ion must abstain to the honest "... (not supported)"
@@ -107,10 +107,17 @@ def test_looks_like_ionic_name_recognises_ite_suffix():
 # Task 4: substitutive nitramide / N-nitro producer
 # ---------------------------------------------------------------------------
 
+# a phase (task 11C1, P-67.1.2 / the Blue Book "(chloromethyl)(methyl)nitramide
+# (PIN)"): the amide N of the `nitramide` functional parent is its ONLY
+# substitutable position, so the N-locant is OMITTED (P-14.3.4.2) and the
+# substituent prefixes are enclosed per the mononuclear single-attachment rule
+# P-16.5.1.3.1 (the Blue Book). The `N,N'-dinitromethanediamine` row keeps its locants
+# -- it is the TWO-different-amide-nitrogens shape, where they disambiguate.
 @pytest.mark.opsin_gate
 @pytest.mark.parametrize("smi,expected", [
-    ("O=[N+]([O-])NCO", "N-(hydroxymethyl)nitramide"),
-    ("O=[N+]([O-])N(CO)CO", "N,N-bis(hydroxymethyl)nitramide"),
+    ("O=[N+]([O-])NCO", "(hydroxymethyl)nitramide"),
+    ("O=[N+]([O-])N(CO)CO", "bis(hydroxymethyl)nitramide"),
+    ("CN(CCl)[N+](=O)[O-]", "(chloromethyl)(methyl)nitramide"),
     ("O=[N+]([O-])NCN[N+](=O)[O-]", "N,N'-dinitromethanediamine"),
 ])
 def test_substituted_nitramide_names(namer, smi, expected):
@@ -157,8 +164,9 @@ def test_all_targets_round_trip_exact():
         ("C[N+](=O)[O-]", "nitromethane"),
         ("c1ccccc1[N+](=O)[O-]", "nitrobenzene"),
         ("CCO[N+](=O)[O-]", "nitrooxyethane"),
-        ("O=[N+]([O-])NCO", "N-(hydroxymethyl)nitramide"),
-        ("O=[N+]([O-])N(CO)CO", "N,N-bis(hydroxymethyl)nitramide"),
+        ("O=[N+]([O-])NCO", "(hydroxymethyl)nitramide"),
+        ("O=[N+]([O-])N(CO)CO", "bis(hydroxymethyl)nitramide"),
+        ("CN(CCl)[N+](=O)[O-]", "(chloromethyl)(methyl)nitramide"),
         ("O=[N+]([O-])NCN[N+](=O)[O-]", "N,N'-dinitromethanediamine"),
     ]
     for smi, name in pairs:

@@ -61,7 +61,7 @@ STOUTCLASS_REPRESENTATIVES: "OrderedDict[StoutClass, tuple]" = OrderedDict(
         (StoutClass.MULTI_COMPONENT_NEUTRAL, ("CCO.OCC",                "ethanol ethanol")),
         (StoutClass.MULTIPLICATIVE,          ("c1ccc(Cc2ccccc2)cc1",    "1,1'-methylenedibenzene")),
         (StoutClass.CARBOHYDRATE_LOOKUP,     ("OC[C@H]1O[C@H](O)[C@H](O)[C@@H](O)[C@@H]1O",
-                                              "alpha-D-glucopyranose")),
+                                              "α-D-glucopyranose")),
         (StoutClass.NATURAL_PRODUCT,         (
             "C[C@]12CC[C@H]3[C@@H](CCC4=CC(=O)CC[C@@]34C)[C@@H]1CC[C@@H]2O",
             "(8R,9S,10S,13S,14S,17S)-17-hydroxyandrost-4-en-3-one",

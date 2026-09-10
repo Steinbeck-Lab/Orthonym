@@ -1,25 +1,25 @@
-"""Phase 155.B integration tests: indicated-H corpus fixtures with OPSIN
+"""a phase.B integration tests: indicated-H corpus fixtures with OPSIN
 layer-1 InChI round-trip.
 
-Per CONTEXT D-15: every fixture pipes through OPSIN
+Per CONTEXT: every fixture pipes through OPSIN
 (``opsin-cli-2.9.0-jar-with-dependencies.jar``) and asserts InChI layer-1
 (skeleton, stereo-stripped) match against the input SMILES. Stereo-layer
-mismatches do not fail the test (Phase 152/153 owns stereo).
+mismatches do not fail the test (a phase/153 owns stereo).
 
 Fixtures: ``tests/fixtures/indicated_h/corpus_mined.json`` (>=15 entries
 spanning >=5 indicated-H subclasses; mined from chebi_5000 + pubchem_2000
 + opsin_selftest_500 + Blue Book hand-curated supplementaries per
-D-25 corpus-shortfall protocol).
+ corpus-shortfall protocol).
 
-Skip-vs-fail policy per D-20 (no band-aids):
+Skip-vs-fail policy per (no band-aids):
   * ``name_compound(smi) is None`` for an in-scope fixture: SKIP with
     155-AUDIT-B.md row cite (audit-acknowledged out-of-scope gap).
-  * OPSIN cannot parse Orthonym-emitted name: SKIP with Phase 156
+  * OPSIN cannot parse Orthonym-emitted name: SKIP with a phase
     quarantine note (the parent / cascade-other-than-indicated-H is
     where the bug lives).
   * OPSIN parses but InChI L1 mismatches: ASSERT FAIL (wrong-name bug).
 
-Source: 155-CONTEXT.md D-14, D-15, D-22, D-25;
+Source: internal notes,,,;
         tests/integration/test_skeletal_replacement_corpus.py:1-100
         (substrate copied verbatim).
 """
@@ -96,9 +96,9 @@ _CORPUS_FIXTURES = json.loads(_FIXTURE_PATH.read_text())
 
 
 # Fixtures known to fail L1 round-trip due to PRE-EXISTING handler bugs
-# unrelated to plan 155-02 (D-09 indicated-H placement). Each entry is
-# documented in  with the
-# upstream phase that owns the handler fix. Per D-20 root-cause-only,
+# unrelated to plan 155-02 (indicated-H placement). Each entry is
+# documented in internal notes with the
+# upstream phase that owns the handler fix. Per root-cause-only,
 # these are xfail-quarantined here, not band-aided.
 _QUARANTINED_FIXTURES = {
     "chebi_5000_4H_0_4H_indene": (
@@ -136,10 +136,10 @@ _QUARANTINED_FIXTURES = {
     ids=[f["fixture_id"] for f in _CORPUS_FIXTURES],
 )
 def test_indicated_h_corpus_opsin_roundtrip(fixture):
-    """D-15 mandatory: name_compound(smi) -> OPSIN -> InChI L1 == input InChI L1.
+    """ mandatory: name_compound(smi) -> OPSIN -> InChI L1 == input InChI L1.
 
     Stereo-layer differences are tolerated (constitutional skeleton match
-    only, per Phase 151 D-23 oracle).
+    only, per a phase oracle).
     """
     fid = fixture["fixture_id"]
     if fid in _QUARANTINED_FIXTURES:
@@ -175,7 +175,7 @@ def test_indicated_h_corpus_opsin_roundtrip(fixture):
 
 @pytest.mark.integration
 def test_corpus_count_and_subclass_coverage():
-    """Acceptance criterion: >= 15 fixtures across >= 5 subclasses (D-25)."""
+    """Acceptance criterion: >= 15 fixtures across >= 5 subclasses ()."""
     assert len(_CORPUS_FIXTURES) >= 15, (
         f"Corpus has only {len(_CORPUS_FIXTURES)} fixtures; "
         f"D-25 requires >= 15."

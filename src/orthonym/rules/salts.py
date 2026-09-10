@@ -29,7 +29,7 @@ from ..perception.ions import get_ion_sites, parse_salt_fragments
 from ..perception.metals import assembly_has_out_of_scope_metal
 from .ions import name_anion, name_cation
 
-# v36 B2: basic (protonatable) amine nitrogen -- an sp3 N that is not an amide,
+# B2: basic (protonatable) amine nitrogen -- an sp3 N that is not an amide,
 # sulfonamide, N-oxide/N-N/N-halide, nitro, or already-charged/aromatic N. Used
 # by the [H+]-diamine-hemisalt transform to place a floating proton.
 _BASIC_AMINE_N = Chem.MolFromSmarts(
@@ -37,11 +37,11 @@ _BASIC_AMINE_N = Chem.MolFromSmarts(
     "!$([NX3][#7,#8]);!$([N+]);!$([n])]")
 
 
-# === VARIABLE-VALENCE METALS (charged-species fix, 169.6 caveat / D-13) ===
+# === VARIABLE-VALENCE METALS (charged-species fix, 169.6 caveat /) ===
 # Metals that exhibit more than one common oxidation state and therefore carry a
 # Stock oxidation-state numeral in their salt cation word (IR-5.4.2.2 / P-65.6.2.1):
 # e.g. gold(I) chloride, iron(II/III). FIXED-valence metals (group 1/2, Al, Zn, Ag,
-# Sc, Ge, ...) do NOT carry a Stock numeral (sodium chloride, calcium dichloride).
+# Sc, Ge,...) do NOT carry a Stock numeral (sodium chloride, calcium dichloride).
 # This restores the 169.6-pre 'gold(I) chloride' that the salt path regressed to
 # 'gold chloride' (audit Dim-08 §B Cause 2, with the framing correction).
 _VARIABLE_VALENCE_METALS = frozenset({
@@ -104,7 +104,7 @@ COMPLEX_STOICHIOMETRIC_PREFIXES: Dict[int, str] = {
 # salt needlessly ABSTAINS even though ``bis(W)`` round-trips).
 #
 # COMPLETE + EXACT-MATCH set — every entry VERIFIED 2026-08-23 by
-# .planning/audit-v33/probe_oxoanion_collision.py + scratchpad
+# internal notes + scratchpad
 # probe_di_collision_complete.py: for each W, opsin_parse("di"+W) returns a SINGLE
 # connected RDKit fragment (a distinct condensed species). Probed the full
 # candidate universe = every INORGANIC_ANIONS value + every single-word oxoanion
@@ -143,7 +143,7 @@ def _ion_needs_enclosing_multiplier(name: str) -> bool:
       - is a bare mononuclear-oxoanion word whose ``di<name>`` collides with a
         real condensed poly species (``_DI_COLLISION_ANIONS``, e.g. phosphate →
         diphosphate=P2O7), or
-      - contains '(' , ')' or a space (already enclosed / multi-word), or
+      - contains '(', ')' or a space (already enclosed / multi-word), or
       - contains any digit (a locant; `di<name>` fuses ambiguously), or
       - contains '-' (catches no-digit stereo prefixes: D-/L-), or
       - starts with a multiplier word, or ends with a stem-collision suffix
@@ -192,8 +192,8 @@ RETAINED_AMINO_ACID_ZWITTERIONS = {
     # Alanine zwitterion
     'C[C@H]([NH3+])C(=O)[O-]': 'L-alanine',
     'C[C@@H]([NH3+])C(=O)[O-]': 'D-alanine',
-    # NOTE (v33 charged B1): the achiral (stereo-UNDEFINED) 'CC([NH3+])C(=O)[O-]'
-    # entry mapping to bare 'alanine' was DELETED. Per BlueBookV2.md:54291
+    # NOTE (charged B1): the achiral (stereo-UNDEFINED) 'CC([NH3+])C(=O)[O-]'
+    # entry mapping to bare 'alanine' was DELETED. Per the Blue Book
     # (P-103.1.3.1 "The stereodescriptors 'D' and 'L'"), a bare retained
     # amino-acid name denotes ONLY the defined (L) configuration -- OPSIN's
     # grammar always resolves 'alanine' to the L stereocentre (verified:
@@ -358,11 +358,11 @@ def normalize_imbalanced_acid_salt(smiles: str) -> Optional[str]:
 
 
 def _protonate_amines_with_h_plus(mol, n_protons: int):
-    """v36 B2: consume ``n_protons`` bare [H+] fragments by protonating that many
+    """ B2: consume ``n_protons`` bare [H+] fragments by protonating that many
     basic amine nitrogens, yielding EVERY reconstructed (charge-balanced) mol
     that results from a distinct choice of which amine site(s) to protonate.
 
-    REVIEW #1 (determinism fix): ``GetSubstructMatches`` returns matches in
+    FABLE #1 (determinism fix): ``GetSubstructMatches`` returns matches in
     ATOM-INDEX order, which is a PARSE-order artifact -- two SMILES spellings
     of the identical canonical molecule can enumerate the same amine sites in
     different orders, so a single ``[:n_protons]`` slice used to make the
@@ -425,7 +425,7 @@ def _protonate_amines_with_h_plus(mol, n_protons: int):
 
 
 def _reattach_protons_to_acids(mol):
-    """v38 (Sub-gap 2): reconstruct the NEUTRAL free acid of an organic oxoanion
+    """ (Sub-gap 2): reconstruct the NEUTRAL free acid of an organic oxoanion
     written ionically with bare [H+] protons and no neutral base
     (``dicarboxylate.[H+].[H+]``). Give every deprotonated acid oxygen (``[O-]``)
     its proton back and drop every bare ``[H+]``, yielding the single neutral parent
@@ -486,18 +486,18 @@ def _reattach_protons_to_acids(mol):
     return out
 
 
-# v43 P1-1b: alkali + alkaline-earth (Groups 1-2). A net-0 salt of one of these
+# -1b: alkali + alkaline-earth (Groups 1-2). A net-0 salt of one of these
 # with an organic ion is a P-12 binary salt (in scope, name_salt's domain). Any
 # OTHER true metal is out of scope by default (P-69 coordination complex), and any
 # true metal co-present with a carbanion/hydride is P-69 organometallic. The
-# census OUT predicate (.planning/audit-v43/*, _review_census5.py) — the 1b
+# census OUT predicate (internal notes _review_census5.py) — the 1b
 # widening is scoped to exactly the in-scope set.
 def _name_organic_ion_best_effort(ion_smiles: str, *,
                                   style: str = 'general',
                                   general_fallback: bool = False,
                                   general_fallback_unverified: bool = False,
                                   allow_aromatic_general: bool = False) -> str:
-    """v43 P1-1b: name a single organic ion fragment (a cation or anion the
+    """-1b: name a single organic ion fragment (a cation or anion the
     ordinary ``name_cation`` / ``route_charged`` / ``name_anion`` path could not
     name) via a fresh best-effort ``Orthonym`` instance -- the ``adducts.py``
     per-component pattern. Returns the ion word (``...-ium`` / ``...-ide`` /
@@ -527,6 +527,30 @@ def _name_organic_ion_best_effort(ion_smiles: str, *,
     if not name or is_failure_name(name):
         return ''
     return name
+
+
+def _ion_fragment_roundtrips(frag_mol, name: str) -> bool:
+    """True iff *name* OPSIN-round-trips to *frag_mol*'s FULL isomeric InChIKey.
+
+    Per-component 0-wrong oracle for the salt composer: a cation/anion word is
+    trustworthy only if OPSIN parses it back to the exact charged fragment. Used
+    to detect a CONFIDENTLY-WRONG ordinary ion name (measured: a fused
+    azatetracyclo cage cation named ``tropan-1-ium`` by ``name_cation``, a
+    different, smaller ring system) so the best-effort per-component namer can
+    replace it instead of being shadowed by the wrong name. Fail CLOSED (no JVM
+    / unparseable / any constitution-or-stereo mismatch -> False), so it never
+    accepts a wrong ion and never relaxes anything without a working OPSIN.
+    """
+    if frag_mol is None or not name:
+        return False
+    try:
+        from ..validation.opsin_roundtrip import opsin_roundtrip_check
+        smiles = Chem.MolToSmiles(frag_mol)  # canonical, isomeric (stereo kept)
+        if not smiles:
+            return False
+        return opsin_roundtrip_check(smiles, name).get("passed") is True
+    except Exception:  # fail-closed: a probe bug must never accept a wrong ion
+        return False
 
 
 def name_salt(mol, style: str = 'pin', *,
@@ -562,7 +586,7 @@ def name_salt(mol, style: str = 'pin', *,
     if mol is None:
         return ''
 
-    # v43 P1-1b (0-wrong): the best-effort ion widening is scoped to non-metal +
+    # -1b (0-wrong): the best-effort ion widening is scoped to non-metal +
     # alkali/alkaline-earth salts. If the assembly carries an out-of-scope true
     # metal (a bare transition/other metal, or any true metal with a carbanion/
     # hydride = P-69 organometallic), clear the best-effort flags so the metal
@@ -574,7 +598,7 @@ def name_salt(mol, style: str = 'pin', *,
         general_fallback_unverified = False
         allow_aromatic_general = False
 
-    # v32 Phase 3A-a (0-wrong): a salt is, by definition, charge-balanced
+    # a phase-a (0-wrong): a salt is, by definition, charge-balanced
     # overall (the cation charges sum to the anion charges sum -- it is a
     # neutral compound). A disconnected-fragment set carrying a NET charge
     # (e.g. ``CC(=O)[O-].[Pd+2]``, net +1: one acetate anion + a bare Pd2+
@@ -585,7 +609,7 @@ def name_salt(mol, style: str = 'pin', *,
     # measured, this shipped ``palladium(II) acetate``, which OPSIN round-trips
     # to the BALANCED diacetate Pd(OAc)2, not the 1:1 input (a different
     # molecule). Decline structurally here rather than rely on the SELF-01
-    # OPSIN backstop to catch it after the fact (invariant 16: that backstop
+    # OPSIN backstop to catch it after the fact (a project rule: that backstop
     # fails OPEN without a JVM). Mirrors the FIND-2 fail-closed guards below
     # (honest '' -> abstain, never a generic literal).
     if Chem.GetFormalCharge(mol) != 0:
@@ -628,7 +652,7 @@ def name_salt(mol, style: str = 'pin', *,
                 except (RecursionError, ValueError, RuntimeError):
                     pass
 
-    # v36 B2 ([H+]-diamine hemisalt): a base + organic-acid salt is often written
+    # B2 ([H+]-diamine hemisalt): a base + organic-acid salt is often written
     # with the proton(s) floating as bare [H+] and the base(s) left NEUTRAL, the
     # acid fully deprotonated (witness 9: 2 amine bases + a fumarate DIANION +
     # 2x[H+]). The hydroacid branch above did NOT fire (the anion is not a halide),
@@ -637,7 +661,7 @@ def name_salt(mol, style: str = 'pin', *,
     # on the reconstructed (charge-balanced) salt, which then routes each cation
     # through the ordinary cation loop. The recursive name_salt + top-level gate
     # verify the result, so a mis-protonation fails closed (0-wrong preserved).
-    # REVIEW #1: try EVERY candidate protonation-site combination (in a
+    # FABLE #1: try EVERY candidate protonation-site combination (in a
     # canonical, spelling-invariant order) and BACKTRACK to the next one if
     # the first fails to name -- never give up after a single try, and never
     # let the choice depend on which N happened to appear first in the input
@@ -652,7 +676,7 @@ def name_salt(mol, style: str = 'pin', *,
             if recur and not is_failure_name(recur):
                 return recur
 
-    # v38 (Sub-gap 2): an organic oxoacid written ionically -- the acid fully
+    # (Sub-gap 2): an organic oxoacid written ionically -- the acid fully
     # deprotonated with its proton(s) floating as bare [H+] and NO neutral base to
     # carry them (e.g. a dicarboxylate DIANION + 2x[H+]). The amine branch above
     # needs a neutral base (absent here), so the protons are still orphaned and the
@@ -676,7 +700,7 @@ def name_salt(mol, style: str = 'pin', *,
             except (RecursionError, ValueError, RuntimeError):
                 pass
 
-    # 0-wrong (review-found): a hydroacid written ionically ([H+].[X-], optionally
+    # 0-wrong (a review-found): a hydroacid written ionically ([H+].[X-], optionally
     # with water) leaves the proton orphaned unless the hydroacid-merge branch above
     # consumed it (which needs an ORGANIC neutral and RETURNS on success). If any
     # [H+] survives here it would be silently dropped and name_salt would emit an
@@ -703,7 +727,7 @@ def name_salt(mol, style: str = 'pin', *,
 
         word = get_cation_word(frag_mol)
         if word:
-            # D-13: variable-valence metal cations carry the Stock oxidation state
+            #: variable-valence metal cations carry the Stock oxidation state
             # (gold(I) chloride); fixed-valence metals (Na/K/Ca/...) do not.
             cation_names.append(_with_stock_if_variable_valence(frag_mol, word))
         elif smiles in INORGANIC_CATIONS:
@@ -711,8 +735,31 @@ def name_salt(mol, style: str = 'pin', *,
         else:
             # Substituted organic cation (e.g. tetramethylammonium) -> name_cation.
             name = name_cation(frag_mol, style)
+            _be = (general_fallback or general_fallback_unverified
+                   or allow_aromatic_general)
+            # abstain-recovery: name_cation can return a CONFIDENTLY-WRONG
+            # name for a complex organic cation (measured: a fused
+            # azatetracyclo cage cation -> 'tropan-1-ium', a different, smaller
+            # ring system). Being non-empty, that wrong name shadowed the
+            # best-effort fallback below (its `if not name:` guard never fired),
+            # so ONLY the top-level SELF-01 joined-salt gate caught it and the
+            # WHOLE salt abstained -- even though the cation names correctly via
+            # the full per-component namer. Under a best-effort flag, verify the
+            # ordinary cation name round-trips to THIS fragment; if it does not,
+            # replace it with the best-effort per-component name (itself
+            # RT-verified by the fresh instance's own gate). Replace ONLY when
+            # best-effort yields a verified alternative, so a correct ordinary
+            # name is never discarded -- PIN tier + canary salts stay
+            # byte-identical (PIN passes all flags False, so `_be` is False).
+            if _be and name and not _ion_fragment_roundtrips(frag_mol, name):
+                alt = _name_organic_ion_best_effort(
+                    smiles, style=style, general_fallback=general_fallback,
+                    general_fallback_unverified=general_fallback_unverified,
+                    allow_aromatic_general=allow_aromatic_general)
+                if alt:
+                    name = alt
             if not name:
-                # v43 P1-1b: best-effort fallback for a complex organic cation the
+                # -1b: best-effort fallback for a complex organic cation the
                 # ordinary namer cannot build (e.g. a fused-ring azabicyclo-ium).
                 # Best-effort-gated -> PIN tier unchanged.
                 name = _name_organic_ion_best_effort(
@@ -756,8 +803,23 @@ def name_salt(mol, style: str = 'pin', *,
         # Organic anion: chokepoint first (the sound parent decision), then the
         # legacy name_anion path on '' (retained carboxylate names etc.).
         name = route_charged(frag_mol, style) or name_anion(frag_mol, style)
+        _be = (general_fallback or general_fallback_unverified
+               or allow_aromatic_general)
+        # abstain-recovery (mirrors the cation branch): a confidently-wrong
+        # ordinary anion name would shadow the best-effort per-component namer.
+        # Under a best-effort flag, verify the ordinary anion name round-trips to
+        # THIS fragment; replace with the (RT-verified) best-effort name only
+        # when that yields a verified alternative, so a correct ordinary name is
+        # never discarded (PIN tier + canary salts stay byte-identical).
+        if _be and name and not _ion_fragment_roundtrips(frag_mol, name):
+            alt = _name_organic_ion_best_effort(
+                smiles, general_fallback=general_fallback,
+                general_fallback_unverified=general_fallback_unverified,
+                allow_aromatic_general=allow_aromatic_general)
+            if alt:
+                name = alt
         if not name:
-            # v43 P1-1b: best-effort fallback for a complex organic anion the
+            # -1b: best-effort fallback for a complex organic anion the
             # ordinary namer cannot build. Best-effort-gated -> PIN tier unchanged.
             name = _name_organic_ion_best_effort(
                 smiles, general_fallback=general_fallback,
@@ -775,7 +837,7 @@ def name_salt(mol, style: str = 'pin', *,
     if len(anion_names) != len(frags['anions']):
         return ''
 
-    # v33 Phase 4 Lever A2 (0-wrong preserved): a genuine NEUTRAL fragment
+    # a phase Lever A2 (0-wrong preserved): a genuine NEUTRAL fragment
     # reaching this point is unaccounted for. The only two places a neutral
     # fragment is legitimately consumed are the H+-merge hydroacid-salt
     # branch above (:294-318, which RETURNS directly on success) and -- not
@@ -919,8 +981,8 @@ def name_zwitterion(mol, style: str = 'pin') -> str:
     if mol is None:
         return ''
 
-    # Check for retained amino acid names first (D-06: amino-acid zwitterions +
-    # betaines sequenced first). These (glycine / L-alanine / ...) are valid
+    # Check for retained amino acid names first (: amino-acid zwitterions +
+    # betaines sequenced first). These (glycine / L-alanine /...) are valid
     # OPSIN-parseable retained names per P-74 (which allows retained names).
     if style != 'systematic':
         canonical = Chem.MolToSmiles(mol, canonical=True)
@@ -936,9 +998,9 @@ def name_zwitterion(mol, style: str = 'pin') -> str:
     if routed:
         return routed
 
-    # v33 charged Slice B (P-74.2.1.2, correcting the 4782742f over-reach): the
-    # NEUTRAL-form name of a zwitterion is NOT its PIN. P-74.2.1.2 (BlueBookV2.md
-    # :1779 item (e)) makes the IONIC form the PIN — the anion is the parent and
+    # charged Slice B (P-74.2.1.2, correcting the 4782742f over-reach): the
+    # NEUTRAL-form name of a zwitterion is NOT its PIN. P-74.2.1.2 (the Blue Book
+    #:1779 item (e)) makes the IONIC form the PIN — the anion is the parent and
     # each protonated-amine cation is an ``azaniumyl`` prefix — and that form is
     # built by ``route_charged`` GUARD 4 (called just above:
     # ``_name_primary_amine_azaniumyl_zwitterion``). The neutral-form namers below
@@ -1025,7 +1087,7 @@ def _name_amino_acid_zwitterion(mol, style: str) -> str:
         try:
             neutral_smiles = Chem.MolToSmiles(neutral_mol, canonical=True)
             if neutral_smiles:
-                # v24 W8 P3 (P-103.2.4.4) fail-closed veto: the P-103.2.4.1
+                # W8 P3 (P-103.2.4.4) fail-closed veto: the P-103.2.4.1
                 # "convenient neutral form" dispensation is licensed ONLY for the
                 # monoamino monocarboxylic acids RETAINED IN TABLE 10.4 (the 20
                 # canonical STANDARD_AMINO_ACIDS). BB's own P-103.2.4.4 example
@@ -1247,7 +1309,7 @@ def is_salt(mol) -> bool:
     if mol is None:
         return False
 
-    # v32 Phase 3A-a: a genuine salt is charge-balanced overall; see the
+    # a phase-a: a genuine salt is charge-balanced overall; see the
     # matching guard (and its rationale) in name_salt above.
     if Chem.GetFormalCharge(mol) != 0:
         return False

@@ -1,4 +1,4 @@
-"""Unit tests for the shared λ-convention module (v23 Phase 6).
+"""Unit tests for the shared λ-convention module (a phase).
 
 P-31.1.4.2 / Table 2.8 standard bonding numbers + the fail-closed
 "is this valence non-standard?" decision, promoted from spiro.py so spiro,
@@ -68,7 +68,7 @@ class TestNonstandardBondingNumber:
 
     def test_charged_atom_never_flagged(self):
         # Fail-closed: a charged atom returns None even if valence looks odd.
-        mol = Chem.MolFromSmiles("C[S+](C)C")  # sulfonium
+        mol = Chem.MolFromSmiles("C[S+](C)C")  # trimethylsulfanium (S+)
         assert nonstandard_bonding_number(mol, _idx_of(mol, "S")) is None
 
     def test_element_absent_from_table_none(self):

@@ -1,4 +1,4 @@
-"""v30 Piece 2 — decorated FUSED ring-substituents get a producer.
+""" Piece 2 — decorated FUSED ring-substituents get a producer.
 
 `_decorated_heteroaryl_substituent_name` names a decorated AROMATIC MONOCYCLE
 ring-substituent (`5-hydroxy-1,3-dimethylpyrazol-4-yl`, `4-methoxyphenyl`) but
@@ -13,7 +13,7 @@ Piece 2 reuses the fused-ring PARENT numbering (`compute_fused_numbering` +
 gives the FREE VALENCE the lowest locant (P-31.1.4.3.4 free-valence priority),
 then reads each decoration's locant off that same one numbering.
 
-Target verified by OPSIN round-trip ():
+Target verified by OPSIN round-trip (`scratchpad/piece2_spy_verify.py`):
 `2-(6-methoxynaphthalen-2-yl)acetic acid` canonicalises to the InChIKey of
 `COc1ccc2cc(CC(=O)O)ccc2c1` (`PHJFLPMVEFKEPL-UHFFFAOYSA-N`).
 """

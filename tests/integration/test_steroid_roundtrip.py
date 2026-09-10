@@ -1,8 +1,8 @@
-"""OPSIN round-trip integration tests for the steroid α/β assembler (Phase 181, WSC-02).
+"""OPSIN round-trip integration tests for the steroid α/β assembler (a phase, WSC-02).
 
 Generate name → OPSIN parse → compare canonical SMILES to the original. RT is the
 project's accuracy oracle. The 9 gold exemplars are conjugate-free so the RT-flip is
-attributable to Phase 181 (conjugated steroids await Phase 182, Pitfall 5). The negative
+attributable to a phase (conjugated steroids await a phase, Pitfall 5). The negative
 guard confirms a non-steroid stays correct.
 
 WAVE 0 CONTRACT: RED until Waves 1-2 build + wire the converter.
@@ -64,25 +64,25 @@ pytestmark = [pytest.mark.integration,
               pytest.mark.skipif(not _opsin_available(), reason="OPSIN/Java not available")]
 
 
-# The 9 conjugate-free α/β exemplars (181-00 <gold_smiles>) — RT attributable to Phase 181.
+# The 9 conjugate-free α/β exemplars (181-00 <gold_smiles>) — RT attributable to a phase.
 STEROID_CASES = [
-    ("5alpha-cholestan-3beta-ol",
+    ("5α-cholestan-3β-ol",
      "CC(C)CCC[C@@H](C)[C@H]1CC[C@H]2[C@@H]3CC[C@H]4C[C@H](CC[C@]4(C)[C@H]3CC[C@]12C)O"),
-    ("5alpha-cholestan-3alpha-ol",
+    ("5α-cholestan-3α-ol",
      "CC(C)CCC[C@@H](C)[C@H]1CC[C@H]2[C@@H]3CC[C@H]4C[C@@H](CC[C@]4(C)[C@H]3CC[C@]12C)O"),
-    ("5beta-cholestan-3alpha-ol",
+    ("5β-cholestan-3α-ol",
      "CC(C)CCC[C@@H](C)[C@H]1CC[C@H]2[C@@H]3CC[C@@H]4C[C@@H](CC[C@]4(C)[C@H]3CC[C@]12C)O"),
-    ("3beta-hydroxy-5alpha-androstan-17beta-ol",
+    ("3β-hydroxy-5α-androstan-17β-ol",
      "O[C@@H]1C[C@@H]2CC[C@H]3[C@@H]4CC[C@@H]([C@@]4(C)CC[C@@H]3[C@]2(CC1)C)O"),
-    ("androst-5-en-3beta-ol",
+    ("androst-5-en-3β-ol",
      "C[C@]12CC[C@H]3[C@@H](CC=C4C[C@@H](O)CC[C@]34C)[C@@H]1CCC2"),
-    ("5alpha-pregnane-3beta,20-diol",
+    ("5α-pregnane-3β,20-diol",
      "CC([C@H]1CC[C@H]2[C@@H]3CC[C@H]4C[C@H](CC[C@]4(C)[C@H]3CC[C@]12C)O)O"),
-    ("(20R,22R)-cholest-5-ene-3beta,20,22-triol",
+    ("(20R,22R)-cholest-5-ene-3β,20,22-triol",
      "CC(C)CC[C@H]([C@@](C)([C@H]1CC[C@H]2[C@@H]3CC=C4C[C@H](CC[C@]4(C)[C@H]3CC[C@]12C)O)O)O"),
-    ("5alpha-androstan-17beta-ol",
+    ("5α-androstan-17β-ol",
      "C[C@@]12[C@H](CC[C@H]1[C@@H]1CC[C@H]3CCCC[C@]3(C)[C@H]1CC2)O"),
-    ("17beta-hydroxy-5alpha-androstan-3-one",
+    ("17β-hydroxy-5α-androstan-3-one",
      "O=C1C[C@@H]2CC[C@H]3[C@@H]4CC[C@@H]([C@@]4(C)CC[C@@H]3[C@]2(CC1)C)O"),
 ]
 

@@ -1,24 +1,24 @@
 """Wave-8 P8 unit tests: the P-26 phane PIN subsystem.
 
-Per : OPSIN 2.9 cannot
+Per docs/superpowers/plans/2026-07-16-wave8-p8-phane.md: OPSIN 2.9 cannot
 parse ANY phane name (verified 2026-07-16 -- neither the P-26.2/.3
 simplified-skeletal PIN nor the legacy bracket-prefix
 '[2.2]paracyclophane'), so there is no round-trip oracle for this
 subsystem. Verification is BB-name-exact (the verbatim `(PIN)` string quoted
-from BlueBookV2.md at the cited line) + the source-level
+from the Blue Book at the cited line) + the source-level
 `_phane_formula_veto` atom-conservation guard + a tight `_PHANE_PIN_RE`
 validity-gate carve-out (namer.py, modeled on `_DIANHYDRIDE_PIN_RE`).
 
 Test classes / functions map 1:1 onto the plan's tasks:
-- Task 8.2  test_amplification_prefix_transform
-- Task 8.3  test_simplified_skeletal_name
-- Task 8.4  test_multiplied_amplificant
-- Task 8.1  TestSimplify (design-contract: perception + skeleton graph)
-- Task 8.5  TestNumberSkeleton (design-contract: superatom-locant numbering)
-- Task 8.6  TestAttachmentLocants (design-contract: attachment ordering)
-- Task 8.7  TestBuildPhanePin (integration: the 5 verified homophane golds)
-- Task 8.8  test_composite_locant_sort_key (design-contract, pure, BB tuple)
-- Task 8.9  test_apply_skeletal_replacement (design-contract, pure, BB trithia)
+- Task 8.2 test_amplification_prefix_transform
+- Task 8.3 test_simplified_skeletal_name
+- Task 8.4 test_multiplied_amplificant
+- Task 8.1 TestSimplify (design-contract: perception + skeleton graph)
+- Task 8.5 TestNumberSkeleton (design-contract: superatom-locant numbering)
+- Task 8.6 TestAttachmentLocants (design-contract: attachment ordering)
+- Task 8.7 TestBuildPhanePin (integration: the 5 verified homophane golds)
+- Task 8.8 test_composite_locant_sort_key (design-contract, pure, BB tuple)
+- Task 8.9 test_apply_skeletal_replacement (design-contract, pure, BB trithia)
             + test_simplify_rejects_heteroatom_bridge (safety-net veto)
 - Task 8.11 test_phane_amplificant_seniority_key_matches_bb_order (design-
             contract, pure, reuses ring_selection.ring_system_score)

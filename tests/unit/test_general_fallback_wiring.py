@@ -321,3 +321,22 @@ def test_oxo_ene_valence_illegal_guard_unit():
     assert oxo_ene_valence_illegal("2-oxobicyclo[4.4.0]dec-5(6)-ene") is False
     assert oxo_ene_valence_illegal("bicyclo[4.4.0]decan-2-one") is False    # no ene
     assert oxo_ene_valence_illegal("ethanol") is False
+
+    # v46 M4 (scope-aware): a 2-oxo cited INSIDE a substituent scope is a
+    # different atom-numbering from the parent ring's ene -- the global union
+    # falsely flagged these salt/decorated names. The oxo and the ene never
+    # share a scope, so no carbon is five-valent -> legal (was a false positive).
+    assert oxo_ene_valence_illegal(
+        "1-{2-oxo-3-oxapropan-1-yl}cyclohexa-1,3,5-triene") is False
+    assert oxo_ene_valence_illegal(
+        "1-{5-[4-(5-cyanocyclohexa-1,3,5-trien-1-yl)-1,4-diazacyclohexan-4-ium"
+        "-1-yl]-2-oxo-3-oxa-1-azapentan-1-yl}-6-(1-oxapropan-1-yl)"
+        "cyclohexa-1,3,5-triene chloride") is False
+    # a genuinely-illegal cation still fires when it is one salt word (the
+    # space-split must not lose a real same-scope collision)
+    assert oxo_ene_valence_illegal("2-oxobicyclo[2.2.2]oct-2-ene chloride") is True
+    # the caffeine collision survives even with an unrelated oxo-bearing
+    # substituent present elsewhere (parent-scope collision is independent)
+    assert oxo_ene_valence_illegal(
+        "2,4-dioxo-9-[2-oxoethyl]-3,5,7,9-tetraazabicyclo[4.3.0]nona-1,7-diene"
+    ) is True

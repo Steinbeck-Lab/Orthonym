@@ -1,7 +1,7 @@
-"""Phase 149 Tier-3 integration: FR-2.3 cascade activation on 20 stratified compounds.
+"""a phase Tier-3 integration: FR-2.3 cascade activation on 20 stratified compounds.
 
-Tier-3 evidence per Phase 149 CONTEXT D-10. The 20 compounds are drawn from
-``
+Tier-3 evidence per a phase CONTEXT. The 20 compounds are drawn from
+`internal notes`
 filtered for:
     compound_classes LIKE '%fused-ring%'
     AND parent_score < 1.0
@@ -16,7 +16,7 @@ ortho-peri-fused, edge-cases) by SSSR ring count + heteroatom presence:
   * edge-cases: 2-3 rings without heteroatom (carbocyclic fused systems)
 
 Each compound is OPSIN-parseable in v17 yet baseline produced wrong parent —
-i.e., exactly the population Phase 149's FR-2.3 cascade is supposed to fix.
+i.e., exactly the population a phase's FR-2.3 cascade is supposed to fix.
 Sort order: source_corpus ASC, corpus_row_id ASC; first 5 per bucket.
 
 Tests:
@@ -30,27 +30,27 @@ Tests:
 
 Source: https://iupac.qmul.ac.uk/fusedring/FR23.html FR-2.3
 Source: https://iupac.qmul.ac.uk/BlueBook/P2.html P-25.3.2.4
-Source: Phase 149 CONTEXT D-10 (Tier 3 evidence collection); D-09 (Branch 6.5 gate).
-Source: Phase 148 G2 HARD gate (zero RT=1 -> RT=0 regressions on OPSIN self-test 500).
-Source: HERITAGE-1990 §4 (Wisniewski separable-parts hybrid base-selection cascade).
-Baseline: 
+Source: a phase CONTEXT (Tier 3 evidence collection); (Branch 6.5 gate).
+Source: a phase G2 HARD gate (zero RT=1 -> RT=0 regressions on OPSIN self-test 500).
+Source: AUTONOM-1990 §4 (Wisniewski separable-parts hybrid base-selection cascade).
+Baseline: internal notes
 """
 import pytest
 
 
 # Frozen 20-compound corpus stratified 5+5+5+5 across (2-ring-fused-hetero,
 # 3-ring-fused-hetero, ortho-peri-fused, edge-cases). Filter:
-#   compound_classes LIKE '%fused-ring%'
-#   AND parent_score < 1.0
-#   AND opsin_score >= 1.0  (proxy for opsin_parses = TRUE)
-#   AND smiles NOT IN FUSED_HETEROCYCLE_DATA.keys
+# compound_classes LIKE '%fused-ring%'
+# AND parent_score < 1.0
+# AND opsin_score >= 1.0 (proxy for opsin_parses = TRUE)
+# AND smiles NOT IN FUSED_HETEROCYCLE_DATA.keys
 # Sort: source_corpus ASC, corpus_row_id ASC, name_index ASC; first 5 per bucket.
 # Extracted at 2026-04-28 from post148/benchmark_multi_corpus_results.csv.
-# Determinism guarantee per Phase 145.2: this list is FROZEN as a literal,
+# Determinism guarantee per a phase.2: this list is FROZEN as a literal,
 # not re-sampled at test-run time. baseline_parent_atoms is recorded as
 # the empty frozenset because the post-148.2 baseline did not capture
 # parent_atom_indices in the CSV; non-empty captured set post-149 counts
-# as a "changed" decision (cascade-effect signal per Phase 147 W-4 fix
+# as a "changed" decision (cascade-effect signal per a phase W-4 fix
 # precedent).
 PHASE149_TIER3_COMPOUNDS = [
     # ----- 2-ring fused-hetero (5) -----
@@ -180,7 +180,7 @@ PHASE149_TIER3_COMPOUNDS = [
 ]
 
 
-# Hard structural assertions — Phase 149 CONTEXT D-10 + Phase 147 W-3
+# Hard structural assertions — a phase CONTEXT + a phase W-3
 # precedent: 5+5+5+5 = 20 invariant must fail LOUDLY at collection time
 # if the literal drifts.
 assert len(PHASE149_TIER3_COMPOUNDS) == 20, (
@@ -203,17 +203,17 @@ CI_SUBSET_5 = [
 
 @pytest.fixture
 def score_based_mode(monkeypatch):
-    """Activate Phase 146 ``selection_mode='score_based'`` for the test.
+    """Activate a phase ``selection_mode='score_based'`` for the test.
 
     Branch 6.5 firings live behind ``selection_mode='score_based'`` in
-    ``CandidatePool.best`` (Phase 146 D-08). The default soak mode is
+    ``CandidatePool.best`` (a phase). The default soak mode is
     ``'first_applicable'`` (V17 byte-identical), under which Branch 6.5
-    NEVER fires regardless of populated base_component_atoms. Phase 149
+    NEVER fires regardless of populated base_component_atoms. a phase
     Tier 3 evidence therefore REQUIRES forcing score-based mode for these
     tests.
 
-    Source: Phase 146 D-08 (env-var soak gate).
-    Source: Phase 149 CONTEXT D-10 (Tier-3 evidence requires score_based mode).
+    Source: a phase (env-var soak gate).
+    Source: a phase CONTEXT (Tier-3 evidence requires score_based mode).
     """
     from orthonym.assembly import candidate_pool as cp_mod
     monkeypatch.setattr(cp_mod, "_DEFAULT_SELECTION_MODE", "score_based")
@@ -228,7 +228,7 @@ def select_base_component_counter(monkeypatch, score_based_mode):
     module-level binding; the in-module call site at namer.py Branch 6.5
     resolves through globals so this patch intercepts every invocation.
 
-    Source: Phase 149 CONTEXT D-10 (cascade activation must be observable,
+    Source: a phase CONTEXT (cascade activation must be observable,
     not just inferred from output names).
     """
     from orthonym.rules import fused_ring_selection as frs_mod
@@ -245,26 +245,26 @@ def select_base_component_counter(monkeypatch, score_based_mode):
 
 @pytest.mark.slow
 def test_branch_6_5_fires_on_at_least_N_of_20(select_base_component_counter):
-    """Phase 149 Tier-3 cascade activation evidence collection.
+    """a phase Tier-3 cascade activation evidence collection.
 
     Counts how many times ``select_base_component`` is invoked across the
     20-compound stratified Tier-3 corpus under
     ``selection_mode='score_based'``. The raw count is the diagnostic
     signal; the SC-5 gate is enforced separately by
-    `` against the multi-corpus
+    ``scripts/phase149_class_slice.py`` against the multi-corpus
     benchmark CSV (which is the authoritative measurement surface per
-    Phase 149 CONTEXT SC-5: "measured on the OPSIN-parseable non-RT
+    a phase CONTEXT SC-5: "measured on the OPSIN-parseable non-RT
     subset of the multi-corpus benchmark").
 
     Branch 6.5 is SCOPE-LIMITED to ``len(components) == 2`` per Plan 02
-    triage (Phase 149-02 SUMMARY: 3+ component systems fall through to
+    triage (a phase-02 SUMMARY: 3+ component systems fall through to
     existing branches). Therefore the cascade fires more often on the
     2-ring fused-hetero bucket and less often on the 3-ring + ortho-peri
     + edge-cases buckets where SSSR returns >2 rings.
 
     Source: https://iupac.qmul.ac.uk/fusedring/FR23.html
-    Source: Phase 149 CONTEXT SC-5 (multi-corpus CSV is authoritative).
-    Source: Phase 149 CONTEXT D-09 (Branch 6.5 gate); D-10 (Tier-3 evidence).
+    Source: a phase CONTEXT SC-5 (multi-corpus CSV is authoritative).
+    Source: a phase CONTEXT (Branch 6.5 gate); (Tier-3 evidence).
     """
     from orthonym.namer import name_compound
 
@@ -283,7 +283,7 @@ def test_branch_6_5_fires_on_at_least_N_of_20(select_base_component_counter):
         f"Branch 6.5 select_base_component fired "
         f"{select_base_component_counter['count']} times across 20 "
         f"Tier-3 compounds (diagnostic — SC-5 gate lives in "
-        f" against the multi-corpus CSV)"
+        f"scripts/phase149_class_slice.py against the multi-corpus CSV)"
     )
 
 
@@ -293,21 +293,21 @@ def test_branch_6_5_fires_on_at_least_N_of_20(select_base_component_counter):
     ids=[c["smiles"] for c in PHASE149_TIER3_COMPOUNDS],
 )
 def test_no_rt_regression(score_based_mode, compound):
-    """Phase 149 Tier-3 G2-style: name_compound produces a non-empty
+    """a phase Tier-3 G2-style: name_compound produces a non-empty
     name for each stratified compound.
 
     Surrogate for "no catastrophic regression" on the 20-compound corpus.
     Full RT regression analysis lives in
-    `` against the multi-corpus
+    ``scripts/benchmark_name_change_diff.py`` against the multi-corpus
     CSV.
 
-    This test guards the failure mode where Phase 149's cascade activation
+    This test guards the failure mode where a phase's cascade activation
     silently breaks the naming pipeline for a class of compounds — every
     compound must still produce SOME name (not raise, not return empty).
 
-    Source: Phase 146 D-07 triple-ship gate G2 (zero RT=1 -> RT=0
+    Source: a phase triple-ship gate G2 (zero RT=1 -> RT=0
         regressions on OPSIN self-test 500).
-    Source: Phase 149 CONTEXT G2 HARD carry-forward.
+    Source: a phase CONTEXT G2 HARD carry-forward.
     """
     from orthonym.namer import name_compound
 
@@ -337,7 +337,7 @@ def test_ci_subset_name_nonempty(score_based_mode, compound):
     Runs by default in pre-merge CI; the full 20-compound Tier-3 suite
     is gated by ``@pytest.mark.slow``.
 
-    Source: Phase 149 CONTEXT D-10 Tier-3 CI subset.
+    Source: a phase CONTEXT Tier-3 CI subset.
     Source: https://iupac.qmul.ac.uk/fusedring/FR23.html
     """
     from orthonym.namer import name_compound

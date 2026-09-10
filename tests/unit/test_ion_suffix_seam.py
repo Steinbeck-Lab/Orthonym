@@ -8,7 +8,7 @@ Every assertion carries the verbatim Blue Book authority that governs the
 transform (USER DIRECTIVE: every charged sub-class transform is cross-checked
 against the Blue Book rule, with the citation in the test). Worked targets come
 from 169.6-AUDIT-CHOKEPOINT.md §4/§5 and the verbatim P-72/P-73 extractions in
-
+.planning/research/bluebook-p44-grounding/.
 
 Covered:
   - the 4 corrected map entries (audit §4.1): anion amide/carboxamide/

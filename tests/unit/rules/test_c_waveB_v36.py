@@ -7,7 +7,7 @@ BUILD 1 — parent-selection robustness (C3 Site-3 + C1/C2/C6 Pattern-D).
     carbonyl's FUSED system and silently drops the spiro-joined partner), leaving
     an atom-incomplete partial that SELF-01 then suppressed -> abstain.
 
-    ROOT CAUSE (spy: `` Site-3, this session's
+    ROOT CAUSE (spy: ``.planning/audit-v33/V36-SPY-C3.md`` Site-3, this session's
     trace): the preempt fires BEFORE the whole-molecule complex_ring/spiro path.
     FIX: ``name_cyclic_oxo_compound`` fails closed (returns None) when the
     carbonyl's fused ring system is spiro-/bridge-joined to further ring atoms it
@@ -46,7 +46,7 @@ BUILD 2 — recursive-fragment retained-table reach (C4 glycan aglycone + C3 Sit
         already-working class + the reach wiring, and a 0-wrong guard on the
         witnesses.
 
-Fresh process per witness (warm-cache hazard, the contributor guide).  Run ONLY this file:
+Fresh process per witness (warm-cache hazard, CLAUDE.md).  Run ONLY this file:
     ``.venv/bin/python -m pytest tests/unit/rules/test_c_waveB_v36.py -q``
 (the whole suite deadlocks on an OPSIN pipe).
 """

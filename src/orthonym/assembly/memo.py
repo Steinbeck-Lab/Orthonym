@@ -5,7 +5,7 @@ call. The engine re-names the same substituent fragments many times inside one
 molecule -- the dispatch cascade, the ``_retry_cascade_on_gate_rejection``
 re-entries and the recursive Tier-4 cascade all re-derive the same fragment
 prefixes -- so a per-call cache removes that redundant work without changing any
-emitted name. See ``.planning/audit-/PERF-OPTIMIZATION-PLAN.md`` Part 2.
+emitted name. See `internal notes` Part 2.
 
 Design invariants (each is load-bearing for the 0-wrong / byte-identity contract):
 
@@ -17,7 +17,7 @@ Design invariants (each is load-bearing for the 0-wrong / byte-identity contract
   every call recomputes. A cache MISS can never corrupt output; only a false HIT
   could, and that is exactly what a COMPLETE key and ``verify`` mode prevent.
 * **``verify`` mode is the continuous completeness check.** It always recomputes
-  and raises :class:`MemoMismatch` the instant a stored value disagrees with a
+  and raises:class:`MemoMismatch` the instant a stored value disagrees with a
   fresh one for the same key -- turning an incomplete key into a loud failure
   rather than a silent wrong name.
 
@@ -30,7 +30,7 @@ import os
 #: RAISED as a loud failure, but the recursive naming cascade wraps the hot loops in
 #: broad ``except Exception`` and CATCHES it (degrading to a von-Baeyer name), so the
 #: raise alone is invisible from a full-engine ``verify`` run -- "0 MemoMismatch
-#: exceptions" is NOT "0 incomplete-key events" (review P3 Crit-2). This list is
+#: exceptions" is NOT "0 incomplete-key events" (a review P3 Crit-2). This list is
 #: appended BEFORE the raise, so a validation harness can COUNT incomplete-key events
 #: over a whole corpus even when every raise is swallowed. Read/reset via the helpers.
 _VERIFY_MISMATCHES = []
@@ -82,7 +82,7 @@ def push_scope():
     """Open a memo scope for this (and nested) calls, unless one is already open.
 
     Returns a ContextVar token when THIS call created the scope (the caller owns
-    teardown and must pass the token to :func:`pop_scope`), or ``None`` when a
+    teardown and must pass the token to:func:`pop_scope`), or ``None`` when a
     scope already existed (a nested re-entry -- it shares the outer cache and must
     NOT reset it).
     """
@@ -92,7 +92,7 @@ def push_scope():
 
 
 def pop_scope(token):
-    """Tear down the scope created by the matching :func:`push_scope`. A ``None``
+    """Tear down the scope created by the matching:func:`push_scope`. A ``None``
     token (nested re-entry) is a no-op, so only the outermost frame tears down."""
     if token is not None:
         _cache_var.reset(token)
@@ -106,7 +106,7 @@ def cache_or_compute(namespace, key, compute_fn):
       (fail-open; never caches).
     * ``on`` -> return the cached value if present, else compute + store + return.
     * ``verify`` -> ALWAYS recompute; if a value is already stored for the key and
-      differs, raise :class:`MemoMismatch`; then store + return the fresh value.
+      differs, raise:class:`MemoMismatch`; then store + return the fresh value.
     """
     if _MODE == "off":
         return compute_fn()
@@ -119,7 +119,7 @@ def cache_or_compute(namespace, key, compute_fn):
         if ck in cache and cache[ck] != val:
             # Record BEFORE raising: the naming cascade swallows the exception, so
             # this counter is the only observable signal of an incomplete key over a
-            # full-engine corpus run (review P3 Crit-2).
+            # full-engine corpus run (a review P3 Crit-2).
             _VERIFY_MISMATCHES.append((namespace, key))
             raise MemoMismatch(namespace, key, cache[ck], val)
         cache[ck] = val

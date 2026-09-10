@@ -7,12 +7,12 @@ monovalent prefix, producing a different molecule.
     methylpropyl)cyclohexane
 
 which spells the single thiourea unit TWICE and renders the ring->N bond as
-ring->C.  Traced by spy (not by reading): the substituent fragment handed to
+ring->C. Traced by trace (not by reading): the substituent fragment handed to
 ``_check_substituent_prefix_form`` was the bare 4-atom core ``{N,C,S,N}`` with
 **two** bonds leaving it -- one to the tert-butyl carbon, one to the ring
-carbon.  ``get_substituent_prefix_form`` then returned the STATIC string
+carbon. ``get_substituent_prefix_form`` then returned the STATIC string
 ``PREFIX_FORMS['thiourea']`` = ``carbamothioylamino``, which is the monovalent
-group ``H2N-CS-NH-``.  Naming a two-attachment bridge with a one-attachment
+group ``H2N-CS-NH-``. Naming a two-attachment bridge with a one-attachment
 prefix orphans everything past the distal nitrogen; the orphan was then
 re-attached elsewhere, inventing a C-C bond, and the core was consumed a second
 time from the other direction.
@@ -23,32 +23,32 @@ generator (``get_n_substituted_carbamoylamino_prefix``) whose
 12/12 None on the urea analogue, which then correctly re-parents onto urea.
 Thiourea never got that upgrade.
 
-Blue Book (quotations verified in ``BlueBookV2/BlueBookV2.md``, cross-checked
+Blue Book (quotations verified in ``the Blue Book Blue Book``, cross-checked
 online at <https://iupac.qmul.ac.uk/BlueBook/>):
 
 * **P-66.1.6.1.3 "Chalcogen analogues of urea and isourea"** (:33437), section
   **P-66.1.6.1.3.1** (:33439): *"Chalcogen analogues of urea are named by
   functional replacement nomenclature using the prefixes 'thio', 'seleno', and
   'telluro'. Preferred IUPAC names use the letter locants N, and N'. Numerical
-  locants may be used for thiourea in general nomenclature."*  And (:33446)
+  locants may be used for thiourea in general nomenclature."* And (:33446)
   *"Numerical locants are no longer used for thiourea in the IUPAC preferred
-  name."*  So a `1,3-...thiourea` spelling is general nomenclature, NOT the PIN.
+  name."* So a `1,3-...thiourea` spelling is general nomenclature, NOT the PIN.
 * The class exemplar, a `(PIN)` example of an N-substituted chalcogen urea
   named on the RETAINED PARENT (:33451): **`N-(butan-2-yl)selenourea (PIN)`**.
 * **P-41 "Seniority order for classes"**, Table 4.1: amides are class **11**
   (:18184), diazenes/azanes class **21** (:18197), carbon rings and chains
-  class **40** (:18216).  **P-44.1.1** (:18875) selects the parent by that
-  order.  The "a ring outranks a chain" licence is gated on sameness of class
-  -- **P-52.2.8** (:24096) *"Within the same heteroatom class ... a ring is
+  class **40** (:18216). **P-44.1.1** (:18875) selects the parent by that
+  order. The "a ring outranks a chain" licence is gated on sameness of class
+  -- **P-52.2.8** (:24096) *"Within the same heteroatom class... a ring is
   always selected as the parent hydride"* -- so it cannot promote cyclohexane
-  over the thiourea.  **P-66.1.6.1.1.2** (:33320) ranks urea *"as an amide of
+  over the thiourea. **P-66.1.6.1.1.2** (:33320) ranks urea *"as an amide of
   carbonic acid"*, and P-66.1.6.1.3.1 makes thiourea its retained chalcogen
-  analogue.  => **the thiourea is the parent; the ring is a substituent.**
+  analogue. => **the thiourea is the parent; the ring is a substituent.**
 * **P-66.1.6.1.3.3** (:33487) enumerates only the UNSUBSTITUTED prefix
   ``carbamothioylamino`` (:33489) with the example
-  ``3-(carbamothioylamino)propanoic acid (PIN)`` (:33501).  No substituted-
+  ``3-(carbamothioylamino)propanoic acid (PIN)`` (:33501). No substituted-
   distal-N row exists anywhere in the book (grep proven against known
-  positives).  The substituted form is therefore derived across the
+  positives). The substituted form is therefore derived across the
   P-66.1.6.1.3.1 chalcogen-replacement relationship from the oxo `(PIN)`
   example ``2-[(methylcarbamoyl)amino]naphthalene-1-carboxylic acid`` (:33354).
 
@@ -109,7 +109,7 @@ def test_r3_abstains_rather_than_emitting_a_wrong_constitution():
         N-tert-butyl-N'-[1-(tert-butyldiazenyl)cyclohexyl]thiourea
 
     (OPSIN 2.9.0 -> FJFCAHBBIQSNCA-UHFFFAOYSA-N, C15H30N4S, identical to the
-    input).  Reaching it needs the N'-substituent ``1-(tert-butyldiazenyl)
+    input). Reaching it needs the N'-substituent ``1-(tert-butyldiazenyl)
     cyclohexyl`` to be nameable, and this tree cannot yet name ANY
     1,1-disubstituted cycloalkyl substituent -- see the blocker test below.
     Until that gap closes the honest outcome is abstention, so
@@ -203,7 +203,7 @@ def test_blocker_1_1_disubstituted_cycloalkyl_substituent_is_unnameable():
       all named correctly even when this test was written, so the gem-
       disubstituted cycloalkyl substituent was never globally unnameable.
     * ``N-(1-methylcyclohexyl)acetamide`` and ``N-(1-methylcyclohexyl)thiourea``
-      now name (``b4705533``), yet THIS assertion still holds -- because
+      now name (``), yet THIS assertion still holds -- because
       ``name_substituent_fragment`` is a DIFFERENT tier from the Tier-1.6
       ``decorated_ring_substituent_name`` that was actually repaired. A test
       going green is not evidence that the tier it exercises was the blocker.
@@ -225,9 +225,9 @@ def test_blocker_1_1_disubstituted_cycloalkyl_substituent_is_unnameable():
 
 # ---------------------------------------------------------------------------
 # 2. The fail-closed invariant at the producer, stated structurally.
-#    A bridging core has a bond leaving it from an atom other than attach_idx;
-#    a monovalent prefix may not name it.  (Not an atom COUNT -- the test walks
-#    the actual bonds crossing the fragment boundary.)
+# A bridging core has a bond leaving it from an atom other than attach_idx;
+# a monovalent prefix may not name it. (Not an atom COUNT -- the test walks
+# the actual bonds crossing the fragment boundary.)
 # ---------------------------------------------------------------------------
 
 def _bridging_thiourea_core(smiles):
@@ -259,7 +259,7 @@ def test_bridging_core_has_two_exits_and_must_not_get_a_monovalent_prefix():
 
 
 def test_terminal_core_with_one_exit_still_gets_carbamothioylamino():
-    """The Blue Book's own example must keep working (P-66.1.6.1.3.3 :33501)."""
+    """The Blue Book's own example must keep working (P-66.1.6.1.3.3:33501)."""
     from orthonym.assembly.substituent_prefix_forms import (
         _check_substituent_prefix_form,
     )
@@ -277,7 +277,7 @@ def test_terminal_core_with_one_exit_still_gets_carbamothioylamino():
 
 # ---------------------------------------------------------------------------
 # 3. The class: thiourea prefix with a SUBSTITUTED distal nitrogen.
-#    Derived across P-66.1.6.1.3.1 from the oxo (PIN) example at :33354.
+# Derived across P-66.1.6.1.3.1 from the oxo (PIN) example at:33354.
 # ---------------------------------------------------------------------------
 
 @pytest.mark.parametrize("smiles,expected", [
@@ -377,14 +377,16 @@ def test_chalcogen_urea_retained_parents(namer, smiles, expected):
 
 
 # ---------------------------------------------------------------------------
-# 5. The oxo sibling must be BYTE-IDENTICAL (the contributor guide #9: check what is
-#    emitted afterwards, not merely that the bad path stopped firing).
+# 5. The oxo sibling must be BYTE-IDENTICAL (CLAUDE.md #9: check what is
+# emitted afterwards, not merely that the bad path stopped firing).
 # ---------------------------------------------------------------------------
 
 @pytest.mark.parametrize("smiles,expected", [
     ("NC(=O)N", "urea"),
-    ("CNC(=O)N", "N-methylurea"),
-    ("CC(C)(C)NC(=O)N", "N-tert-butylurea"),
+    # Monosubstituted urea omits the italic-N locant (P-14.3.4.3,:2943);
+    # disubstituted forms keep both letter locants.
+    ("CNC(=O)N", "methylurea"),
+    ("CC(C)(C)NC(=O)N", "tert-butylurea"),
     ("CNC(=O)NC", "N,N'-dimethylurea"),
     ("CC(C)(C)NC(=O)NC1CCCCC1", "N-cyclohexyl-N'-tert-butylurea"),
     ("NC(=O)NCCC(=O)O", "3-(carbamoylamino)propanoic acid"),

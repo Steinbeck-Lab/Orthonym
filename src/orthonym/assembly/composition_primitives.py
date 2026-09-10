@@ -1,16 +1,16 @@
-"""Phase 179 (WSA-03 / CONTEXT D-03) — shared name-composition primitives.
+"""a phase (WSA-03 / CONTEXT) — shared name-composition primitives.
 
 Single source of truth for the IUPAC P-14.5 / P-16 / P-31.1 string-composition
 grammar, called by BOTH the legacy fragment assembler
 (``handlers/_handler_shared.py:_assemble_fragments``) and the Name-Tree
 serializer (``name_tree_to_string._assemble_explicit_fields``). There is ONE
 implementation of each rule — not two — so the legacy path and the production
-flip path cannot drift (D-03; the no-band-aid mandate in
+flip path cannot drift (; the no-band-aid mandate in
 ``.claude/skills/fix-methodology.md``).
 
 The five core helpers (``_estimate_parent_size_from_name``,
 ``_build_unsaturation_infix``, ``_build_hydrocarbon_name``, ``_join_prefixes``,
-``_join_prefix_to_name``) were LIFTED VERBATIM from ``composer.py`` (Phase 179)
+``_join_prefix_to_name``) were LIFTED VERBATIM from ``composer.py`` (a phase)
 — their bodies are unchanged so the legacy carrier stays byte-identical.
 ``composer.py`` re-exports them under their original names for back-compat.
 
@@ -32,7 +32,7 @@ from .naming_utils import (
 )
 
 # ---------------------------------------------------------------------------
-# Core helpers — LIFTED VERBATIM from composer.py (Phase 179, byte-identical).
+# Core helpers — LIFTED VERBATIM from composer.py (a phase, byte-identical).
 # ---------------------------------------------------------------------------
 
 
@@ -40,7 +40,7 @@ def _estimate_parent_size_from_name(parent_name: str) -> int:
     """Estimate the number of atoms in the parent from its name.
 
     Used by collision detection to determine if a locant exceeds the parent
-    structure capacity.  Returns a conservative estimate; unknown parents
+    structure capacity. Returns a conservative estimate; unknown parents
     default to 100 (effectively disabling capacity validation).
 
     Args:
@@ -347,12 +347,12 @@ def _join_prefixes(prefix_texts: List[str]) -> str:
         if result and current:
             last_char = result[-1]
             first_char = current[0]
-            # v29 P3-CLEANUP Item 4 (MINOR 8): `}` was missing from both tuples,
+            # -CLEANUP Item 4 (MINOR 8): `}` was missing from both tuples,
             # so this copy dropped the separator after a brace-enclosed prefix
             # ('2-{[(methylcarbamoyl)amino]methyl}4-methyl') while the
             # `polyfunctional._join_prefixes` copy already hyphenated it. A closing
             # brace ends an enclosure exactly as `)` and `]` do — P-16.5.4's nesting
-            # cycle `{[({[( )]})]}` makes all three the same kind of boundary — and
+            # cycle `{[({[()]})]}` makes all three the same kind of boundary — and
             # 24 `}`-bearing gold rows route through THIS copy, so the two must
             # agree. (No current gold pairs a `}` with a following locant, which is
             # why the asymmetry survived; see the tests added alongside.)
@@ -399,26 +399,45 @@ def _join_prefix_to_name(prefix_str: str, name: str) -> str:
 _ALPHA_LOCANT_RE = re.compile(r'^\d+(?:,\d+)*-')
 
 
-def retained_acetic_from_prefixes(prefix_texts: List[str], stereo: str = "") -> str:
-    """Assemble a SUBSTITUTED acetic-acid PIN from already-formatted substituent
-    prefix strings (P-65.1.1.1 retained functional parent + P-14.3.4.6 locant
-    omission).
+def retained_acetic_from_prefixes(
+    prefix_texts: List[str],
+    stereo: str = "",
+    parent: str = "acetic acid",
+    enclose_subsequent: bool = False,
+) -> str:
+    """Assemble a SUBSTITUTED retained-functional-parent PIN from already-formatted
+    substituent prefix strings (P-65.1.1.1 / P-66.6.1.2.1 retained functional parent
+    + P-14.3.4.6 locant omission).
 
-    Acetic acid has a single substitutable position (the alpha carbon), so ALL
+    The retained parent (``acetic acid``; or ``acetaldehyde`` via ``parent=``, per
+    P-66.6.1.2.1) has a single substitutable position (the alpha carbon), so ALL
     substituent locants are omitted while multipliers and any INTERNAL locants of
     a complex substituent are preserved::
 
-        ['2-chloro']              -> 'chloroacetic acid'
-        ['2,2-difluoro']          -> 'difluoroacetic acid'   (BB 3037)
-        ['2-phenyl']              -> 'phenylacetic acid'      (BB 6694)
-        ['2-(4-chlorophenoxy)']   -> '(4-chlorophenoxy)acetic acid'
+        ['2-chloro'] -> 'chloroacetic acid'
+        ['2,2-difluoro'] -> 'difluoroacetic acid' (BB 3037)
+        ['2-phenyl'] -> 'phenylacetic acid' (BB 6694)
+        ['2-(4-chlorophenoxy)'] -> '(4-chlorophenoxy)acetic acid'
+        ['2-phenoxy'], parent='acetaldehyde'
+                                  -> 'phenoxyacetaldehyde' (BB 35076)
 
-    The caller is responsible for gating this to the substituted-2-carbon-monoacid
-    context (carboxylic-acid PCG, saturated ethane parent, single -COOH); this
+    ``enclose_subsequent`` (P-16.3.3 worked examples ``cyclopropyl(hydroxy)-
+    acetaldehyde`` BB 45259, ``cyclobutyl(cyclopropyl)methanol`` BB 45247):
+    when 2+ substituent prefixes are cited with their locants omitted, the FIRST
+    prefix is bare and each SUBSEQUENT prefix is set off by enclosing marks::
+
+        ['2-cyclopropyl','2-hydroxy'], parent='acetaldehyde', enclose_subsequent=True
+                                  -> 'cyclopropyl(hydroxy)acetaldehyde'
+
+    The caller must gate ``enclose_subsequent`` to a context where every prefix is a
+    simple, single-alpha-locant token (the multiplied ``di(phenyl)`` shape of BB
+    29852 is a DIFFERENT P-16.3.3 rule and must not be routed here) -- see the
+    aldehyde arm in ``rules/polyfunctional.py``. The caller is likewise responsible
+    for gating the whole assembly to the substituted-2-carbon-mono-FG context; this
     function only performs the retained-name assembly.
     """
     unlocanted = [_ALPHA_LOCANT_RE.sub('', t) for t in prefix_texts]
-    # v31 (P-16.3.3): stripping the alpha locant can leave a COMPLEX substituent
+    # (P-16.3.3): stripping the alpha locant can leave a COMPLEX substituent
     # whose own enclosure no longer wraps the whole prefix -- e.g.
     # '[(methylsulfanyl)carbonyl]amino' (the [...] wraps only the acyl, 'amino'
     # trails outside). Joined bare it welds into '...aminoacetic acid'; P-16.3.3
@@ -428,12 +447,43 @@ def retained_acetic_from_prefixes(prefix_texts: List[str], stereo: str = "") -> 
     # ('chloro') are left untouched (docstring examples preserved). Mirrors the
     # substituent_naming.py:2487 pattern.
     from .naming_utils import _is_fully_enclosed, apply_enclosing_marks
+
+    def _mult_self_enclosed(tok: str) -> bool:
+        # A 'bis(...)'/'tris(...)'/'tetrakis(...)'-shaped token is ALREADY fully
+        # enclosed by its own multiplicative parentheses (P-16.5.1.1: parentheses
+        # are used after 'bis','tris', etc.) -- the closing ')' is the last char
+        # with nothing trailing -- so it must NOT be re-escalated to '[bis(...)]'.
+        # _is_fully_enclosed only inspects the FIRST char, so it misses this (the
+        # token starts with 'b'/'t', not a bracket) -> 'bis(2-hydroxyethoxy)acetic
+        # acid', not '[bis(2-hydroxyethoxy)]acetic acid' (the Blue Book PIN).
+        for _m in ('bis', 'tris', 'tetrakis', 'pentakis', 'hexakis'):
+            if tok.startswith(_m) and _is_fully_enclosed(tok[len(_m):]):
+                return True
+        return False
+
     unlocanted = [
         apply_enclosing_marks(t, -1)
-        if (('(' in t or '[' in t) and not _is_fully_enclosed(t)) else t
+        if (('(' in t or '[' in t) and not _is_fully_enclosed(t)
+            and not _mult_self_enclosed(t)) else t
         for t in unlocanted
     ]
-    name = _join_prefix_to_name(_join_prefixes(unlocanted), "acetic acid")
+    # P-16.5.1.3.1/.3.2 (locant-omitted multi-prefix on a single-substitutable
+    # retained parent): the FIRST cited substituent is bare, each SUBSEQUENT one is
+    # set off by enclosing marks -- 'anilino(oxo)acetic acid' (the Blue Book),
+    # 'bromo(chloro)acetic acid' (the Blue Book). A multiplicative prefix stays OUTSIDE the
+    # marks (rule's last sentence,:7272): 'diphenyl' -> 'di(phenyl)', giving
+    # 'hydroxydi(phenyl)acetic acid' (the Blue Book) -- NOT the halomethane bare-all
+    # carve-out (which the BB's own di(phenyl) example contradicts here).
+    if enclose_subsequent and len(unlocanted) > 1:
+        def _enclose_after_first(t: str) -> str:
+            if _is_fully_enclosed(t):
+                return t
+            for _mp in _MULTIPLIER_PREFIXES:
+                if t.startswith(_mp) and len(t) > len(_mp):
+                    return f"{_mp}{apply_enclosing_marks(t[len(_mp):], -1)}"
+            return apply_enclosing_marks(t, -1)
+        unlocanted = [unlocanted[0]] + [_enclose_after_first(t) for t in unlocanted[1:]]
+    name = _join_prefix_to_name(_join_prefixes(unlocanted), parent)
     return f"{stereo}{name}" if stereo else name
 
 
@@ -446,7 +496,7 @@ def retained_acetic_from_prefixes(prefix_texts: List[str], stereo: str = "") -> 
 
 # Mononuclear parent stems (one heavy atom of any element), keyed by the bare
 # parent-hydride stem. Drives the serializer's structural `is_mononuclear`
-# derivation (CONTEXT D-09 — DERIVE, no NameTreeNode field add). For
+# derivation (CONTEXT — DERIVE, no NameTreeNode field add). For
 # `general_acyclic` only "meth" is reachable; the rest keep parity with the
 # legacy structural flag for non-carbon mononuclear parents.
 _MONONUCLEAR_STEMS = frozenset(
@@ -482,7 +532,7 @@ def apply_mononuclear_enclosing(
         # simple = no locant prefix, no existing enclosing marks, no compound
         # hyphen, no multiplicative prefix; bromo/chloro/fluoro/iodo/nitro etc.
         # A locant-bearing first substituent already routes through the
-        # `re.match(r'^\d', ...)` path in the caller and is excluded here (the
+        # `re.match(r'^\d',...)` path in the caller and is excluded here (the
         # Blue Book exempts only the locant-bearing first prefix from this rule).
         #
         # The italicized-prefix carve-out is the SHARED primitive, never a raw

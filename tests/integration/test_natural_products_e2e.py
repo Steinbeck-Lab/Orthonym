@@ -9,7 +9,7 @@ Tests the complete SMILES -> name pipeline for natural products:
 - Carotenoids (beta-carotene, lycopene)
 - Beta-lactam scaffolds (penam, cepham)
 - Regression checks (benzene, ethanol, etc. still named correctly)
-- Phase 14 success criteria from CONTEXT.md
+- a phase success criteria from CONTEXT.md
 """
 
 import pytest
@@ -401,7 +401,7 @@ class TestNoRegression:
 
 
 # ---------------------------------------------------------------------------
-# Phase 14 success criteria tests (from CONTEXT.md)
+# a phase success criteria tests (from CONTEXT.md)
 # ---------------------------------------------------------------------------
 
 class TestSuccessCriteria:
@@ -536,11 +536,11 @@ class TestParametrizedDerivatives:
 
 
 # ---------------------------------------------------------------------------
-# Phase 141 Compound Class Integration Tests
+# a phase Compound Class Integration Tests
 # ---------------------------------------------------------------------------
 
 class TestPhase141CompoundClassRouting:
-    """End-to-end tests for Phase 141 compound class pre-routing."""
+    """End-to-end tests for a phase compound class pre-routing."""
 
     @pytest.mark.integration
     def test_steroid_routing_cholesterol(self):
@@ -582,7 +582,7 @@ class TestPhase141CompoundClassRouting:
         """Glucose-like sugar routes through carbohydrate detection."""
         from orthonym.namer import classify_compound_class
         from rdkit import Chem
-        # beta-D-glucopyranose
+        # β-D-glucopyranose
         smi = "OC[C@H]1OC(O)[C@H](O)[C@@H](O)[C@@H]1O"
         mol = Chem.MolFromSmiles(smi)
         can = Chem.MolToSmiles(mol)

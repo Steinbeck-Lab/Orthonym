@@ -1,13 +1,13 @@
-"""Phase 150 SC-2 - OPSIN round-trip integration tests (Tier 2).
+"""a phase SC-2 - OPSIN round-trip integration tests (Tier 2).
 
-Per CONTEXT D-08 Tier 2: sample 50 entries per source dict (cyclic, NP, aryl,
+Per CONTEXT Tier 2: sample 50 entries per source dict (cyclic, NP, aryl,
 simple); 200+ round-trip tests total. Each test runs OPSIN CLI, computes
 InChI L1 for both source SMILES and OPSIN parse output, asserts L1 match.
 
-Determinism per Phase 145.2: sample is FROZEN as a sorted list at planning
+Determinism per a phase.2: sample is FROZEN as a sorted list at planning
 time (seed=42), NOT re-sampled at test-run time.
 
-Source: 150-CONTEXT.md D-04 + D-08 Tier 2.
+Source: 150-CONTEXT.md + Tier 2.
 Source: 150-RESEARCH.md section 10.2.
 Source: 150-PATTERNS.md "NEW test_opsin_retained_roundtrip.py".
 Source: https://iupac.qmul.ac.uk/BlueBook/P2.html (P-22 retained-name PIN tier).
@@ -31,7 +31,7 @@ from orthonym.data.opsin_imports import (
 
 # ---------------------------------------------------------------------------
 # Helpers REUSED INLINE from tests/integration/test_opsin_roundtrip_validation.py
-# (NOT cross-imported per CONTEXT D-08 Tier 2 acceptance: "helpers reused
+# (NOT cross-imported per CONTEXT Tier 2 acceptance: "helpers reused
 # verbatim as inline definitions, NOT cross-test-file import")
 # ---------------------------------------------------------------------------
 
@@ -56,7 +56,7 @@ def _opsin_jar_path():
 
 
 def _opsin_name_to_smiles(name: str, jar_path: str) -> str:
-    """Phase 150 REVIEW WR-02: catch TimeoutExpired so a single hung
+    """a phase REVIEW WR-02: catch TimeoutExpired so a single hung
     OPSIN invocation does not crash the test session. Returning ""
     routes the test through the existing 'OPSIN cannot parse' xfail
     branch in each parametrized test.
@@ -91,7 +91,7 @@ def _inchi_match(smi1: str, smi2: str) -> bool:
 
 
 # ---------------------------------------------------------------------------
-# Frozen 50-entry sample per source (sorted + seed=42; Phase 145.2 determinism)
+# Frozen 50-entry sample per source (sorted + seed=42; a phase.2 determinism)
 # ---------------------------------------------------------------------------
 
 
@@ -112,37 +112,37 @@ def _select_primary_name(names):
     return names[0]
 
 
-# Plan 03 cleanup (Phase 150 closeout): 5 known-failing OPSIN-ambiguous
+# Plan 03 cleanup (a phase closeout): 5 known-failing OPSIN-ambiguous
 # round-trip cases get xfail-with-citation markers. Each entry was identified
-# during Plan 02 SUMMARY review (
-# 150-02-SUMMARY.md "Plan 03 Unblock" +  +
-# ). Per the contributor guide root-cause discipline these
+# during Plan 02 SUMMARY review (internal notes
+# 150-02-SUMMARY.md "Plan 03 Unblock" + docs/retained_name_conflicts.md +
+# docs/known_opsin_limitations.md). Per CLAUDE.md root-cause discipline these
 # are NOT silenced — each xfail reason explains the OPSIN data-source bug.
 #
 # Strict=False because the OPSIN parser may improve in a future release; if a
 # previously-failing case starts passing, pytest reports XPASS but does not
-# fail the suite (per the standard Phase 150 SC-7 + RESEARCH section 7.2 pattern).
+# fail the suite (per the standard a phase SC-7 + RESEARCH section 7.2 pattern).
 _KNOWN_OPSIN_AMBIGUOUS_FAILURES = {
     # (test-target, name) -> citation text
     ("aryl", "lupetidine"): (
         "OPSIN-ambiguous: 'lupetidine' parses to a constitutionally-different "
         "structure than the OPSIN-stored SMILES. See "
-        " "
-        "section 'Tier 2 integration tests' +  "
+        ".planning/phases/150-opsin-xml-retained-name-expansion/150-02-SUMMARY.md "
+        "section 'Tier 2 integration tests' + docs/retained_name_conflicts.md. "
         "Phase 150 closes via xfail; Phase 156 OPSIN grammar pre-validation "
         "may resolve."
     ),
     ("aryl", "benzoquinone"): (
         "OPSIN-ambiguous: 'benzoquinone' bare form lacks the locant-prefix "
         "(1,4- or 1,2-) that OPSIN requires for unambiguous parse. See "
-        " "
+        ".planning/phases/150-opsin-xml-retained-name-expansion/150-02-SUMMARY.md "
         "section 'Tier 2 integration tests'. Phase 150 closes via xfail."
     ),
     ("cyclic", "lutidine"): (
         "Semantic data-source bug: 'lutidine' in the OPSIN cyclicGroups XML "
         "is keyed against a bare pyridine SMILES. The actual lutidines are "
         "2,3- / 2,4- / 2,6- / 3,4- / 3,5-dimethylpyridines per P-25.2.1.1.3. "
-        "Logged in  row 'lutidine' with "
+        "Logged in docs/retained_name_conflicts.md row 'lutidine' with "
         "'OPSIN data-source bug; HC overrides per CONTEXT D-03'. Phase 150 "
         "closes via xfail."
     ),
@@ -151,14 +151,14 @@ _KNOWN_OPSIN_AMBIGUOUS_FAILURES = {
         "structure than the OPSIN-stored aglycone SMILES (morphine-with-OH "
         "vs the bare phenanthrene-isoquinoline backbone the OPSIN entry "
         "claims). See "
-        " "
-        "section 'Tier 2 integration tests' + "
+        ".planning/phases/150-opsin-xml-retained-name-expansion/150-02-SUMMARY.md "
+        "section 'Tier 2 integration tests' + docs/known_opsin_limitations.md."
     ),
     ("np", "androstenedione"): (
         "OPSIN-ambiguous: 'androstenedione' name maps to androst-4-ene-3,17-"
         "dione (the historical canonical structure) but the OPSIN entry's "
         "SMILES is androstane-3,17-dione (no 4-ene). See "
-        " "
+        ".planning/phases/150-opsin-xml-retained-name-expansion/150-02-SUMMARY.md "
         "section 'Tier 2 integration tests'. Phase 150 closes via xfail."
     ),
 }
@@ -199,17 +199,17 @@ NP_PARAMS = _build_param(OPSIN_NATURAL_PRODUCTS, "np")
 
 
 # ---------------------------------------------------------------------------
-# Tests (4 parametrized; ~50 cases each → 200+ total per CONTEXT D-08)
+# Tests (4 parametrized; ~50 cases each → 200+ total per CONTEXT)
 # ---------------------------------------------------------------------------
 
 
 @pytest.mark.integration
 @pytest.mark.parametrize("smiles,name", ARYL_PARAMS)
 def test_aryl_groups_roundtrip(smiles, name):
-    """Phase 150 SC-2: aryl_groups entries round-trip via OPSIN L1.
+    """a phase SC-2: aryl_groups entries round-trip via OPSIN L1.
 
     Source: https://iupac.qmul.ac.uk/BlueBook/P2.html P-22.1.x
-    Source: 150-CONTEXT.md D-04 + D-08 Tier 2.
+    Source: 150-CONTEXT.md + Tier 2.
     """
     jar = _opsin_jar_path()
     if jar is None or not _java_available():
@@ -225,10 +225,10 @@ def test_aryl_groups_roundtrip(smiles, name):
 @pytest.mark.integration
 @pytest.mark.parametrize("smiles,name", SIMPLE_PARAMS)
 def test_simple_groups_roundtrip(smiles, name):
-    """Phase 150 SC-2: simple_groups entries round-trip via OPSIN L1.
+    """a phase SC-2: simple_groups entries round-trip via OPSIN L1.
 
     Source: https://iupac.qmul.ac.uk/BlueBook/P2.html P-22.x
-    Source: 150-CONTEXT.md D-04 + D-08 Tier 2.
+    Source: 150-CONTEXT.md + Tier 2.
     """
     jar = _opsin_jar_path()
     if jar is None or not _java_available():
@@ -244,10 +244,10 @@ def test_simple_groups_roundtrip(smiles, name):
 @pytest.mark.integration
 @pytest.mark.parametrize("smiles,name", CYCLIC_PARAMS)
 def test_cyclic_groups_roundtrip(smiles, name):
-    """Phase 150 SC-2: cyclic_groups entries round-trip via OPSIN L1.
+    """a phase SC-2: cyclic_groups entries round-trip via OPSIN L1.
 
     Source: https://iupac.qmul.ac.uk/BlueBook/P2.html P-22.2.1
-    Source: 150-CONTEXT.md D-04 + D-08 Tier 2.
+    Source: 150-CONTEXT.md + Tier 2.
     """
     jar = _opsin_jar_path()
     if jar is None or not _java_available():
@@ -263,10 +263,10 @@ def test_cyclic_groups_roundtrip(smiles, name):
 @pytest.mark.integration
 @pytest.mark.parametrize("smiles,name", NP_PARAMS)
 def test_natural_products_roundtrip(smiles, name):
-    """Phase 150 SC-2: natural_products entries round-trip via OPSIN L1.
+    """a phase SC-2: natural_products entries round-trip via OPSIN L1.
 
     Source: https://iupac.qmul.ac.uk/BlueBook/P2.html (NP retained names)
-    Source: 150-CONTEXT.md D-04 + D-08 Tier 2.
+    Source: 150-CONTEXT.md + Tier 2.
     """
     jar = _opsin_jar_path()
     if jar is None or not _java_available():

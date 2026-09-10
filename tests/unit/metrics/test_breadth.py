@@ -1,4 +1,4 @@
-"""v29 Phase 0 — tests for the committed breadth instrument (metrics/breadth.py).
+""" a phase — tests for the committed breadth instrument (metrics/breadth.py).
 
 The instrument is load-bearing: every prior breadth figure came from an ad-hoc
 harness in /tmp and at least one was a ~4x mirage (see memory
@@ -32,7 +32,7 @@ pytestmark = pytest.mark.unit
 def test_ring_systems_groups_fused_rings_into_one_system():
     """Naphthalene is ONE ring system, not two.
 
-    The v29 census bug (topo_census.py v1) over-counted 'fused' by treating
+    The census bug (topo_census.py v1) over-counted 'fused' by treating
     separate ring systems joined by linkers as fused; the inverse error - not
     merging genuinely fused rings - would under-count per-fragment components.
     """
@@ -151,7 +151,7 @@ def test_parse_refusal_codes_ignores_log_lines_that_do_not_refuse():
 def test_parse_refusal_codes_captures_the_self01_gate_suppression():
     """SELF-01 is a REFUSAL SITE, and the census was blind to it.
 
-    Measured on the v30 P0 best-effort run, one fresh process per molecule: 8 of
+    Measured on the best-effort run, one fresh process per molecule: 8 of
     the 11 abstainers that logged no refusal code died here — a name was built and
     then rejected as a different molecule. Ranking a build order without this site
     ranks the producers only, while the project record says the 0-wrong margin is
@@ -331,8 +331,8 @@ def test_aggregate_projection_uses_mean_of_powers_not_power_of_mean():
 def test_aggregate_reports_context_loss_separately_from_component_loss():
     """Two distinct loss terms, mapping to different build phases.
 
-    component loss (p < 1)  -> ring/fragment naming gaps
-    context loss            -> components that name STANDALONE but fail in
+    component loss (p < 1) -> ring/fragment naming gaps
+    context loss -> components that name STANDALONE but fail in
                                context (the assembly gap)
     Conflating them hides which phase is responsible for a flat number.
     """
@@ -357,7 +357,7 @@ def test_aggregate_nulls_per_fragment_fields_when_components_not_measured():
 def test_aggregate_counts_tautomer_differences_apart_from_wrong_structures():
     """A tautomer difference is NOT a wrong structure and must never inflate T3.
 
-    The first v29 baseline reported structure_wrong=2; both were mobile-H
+    The first baseline reported structure_wrong=2; both were mobile-H
     tautomers (a benzimidazole NH hop and a guanidine), adjudicated as correct
     names. Mobile-H is ubiquitous, so folding tautomers into T3 would manufacture
     phantom 0-wrong violations on the project's #1 invariant.
@@ -389,7 +389,7 @@ def test_aggregate_handles_empty_input_without_dividing_by_zero():
 
 
 def test_aggregate_carries_the_only_ranked_structure_into_the_summary():
-    """v30 P0-T2 item 5: queryable from the run JSON without re-measuring.
+    """-T2 item 5: queryable from the run JSON without re-measuring.
 
     The measurement costs ~675 s, so a census that lives only in stdout is a
     census whose numbers cannot be re-checked.
@@ -405,7 +405,7 @@ def test_aggregate_carries_the_only_ranked_structure_into_the_summary():
 def test_residual_refusal_code_names_an_exception_by_its_type():
     """An EXC row is a CRASH, not a refusal — and must not read as one.
 
-    One row on the v30 P0 run: TypeError "'<' not supported between instances of
+    One row on the run: TypeError "'<' not supported between instances of
     'str' and 'int'" on CC1(CCCC2(C1CC(=O)C3=C2CCC(C3)(C)C=C)C)C. The instrument's
     own `except` turned it into an abstainer, so the census inherited a row no
     producer ever refused.
@@ -557,7 +557,7 @@ def test_refusal_structure_ranks_by_only_not_by_touched():
     """The ordering IS the deliverable: touched cannot size a fix.
 
     Mirrors the live contrast — a high-touch site that is almost never the sole
-    blocker must rank BELOW a low-touch site that usually is. On the v30 P0 run
+    blocker must rank BELOW a low-touch site that usually is. On the run
     that is ring_fragment_declined_by_ring_engine (116 touched, ONLY 1) below pg='ester' (36 touched, ONLY 10).
     """
     rows = ([_row("ABSTAIN", codes=["HIGH_TOUCH", "OTHER"]) for _ in range(9)]
@@ -625,7 +625,7 @@ def test_refusal_structure_site_order_is_independent_of_row_order():
     assert fwd == rev == ["A:1", "B:1", "C:1"]
 
 
-# ------------------------------------------- v30 P0-T4: TERMINAL attribution
+# ------------------------------------------- -T4: TERMINAL attribution
 
 def _term_row(outcome="ABSTAIN", codes=(), code=None, detail=None,
               measured=True, **kw):
@@ -665,7 +665,7 @@ def test_terminal_attribution_does_not_credit_the_exploratory_producer_codes():
     # the four keep `touched` (hazard 3: the union must survive)
     assert innocent <= set(by_site)
     assert all(by_site[s]["touched"] == 1 for s in innocent)
-    # ... and lose every scrap of first/ONLY credit
+    #... and lose every scrap of first/ONLY credit
     assert all(by_site[s]["first"] == 0 for s in innocent)
     assert all(by_site[s]["only"] == 0 for s in innocent)
 
@@ -838,7 +838,7 @@ def test_terminal_stage_rollup_separates_capability_from_correctness():
     looser gate. Sizing a capability milestone off `suppressed` would aim it at
     the gate that is the only thing holding the 0-wrong invariant.
 
-    The bucket names are shared verbatim with  so
+    The bucket names are shared verbatim with scripts/abstention_census.py so
     the two censuses cannot drift into two vocabularies for one axis.
     """
     assert terminal_stage("TERM:GATE_SUPPRESSED:self01_mismatch") == "suppressed"

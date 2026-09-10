@@ -2,15 +2,15 @@
 
 WHY THIS FILE EXISTS -- a REFUTATION, pinned so it cannot silently rot.
 
-A v38 tail brief asserted that ``assembly.universal_substituent.
+A tail brief asserted that ``assembly.universal_substituent.
 name_universal_substitutive`` MIS-RENDERS aminoglycoside / cyclitol-glycoside
 inputs "via skeletal ('a')-replacement, producing OPSIN-UNPARSEABLE names"
 (``2-oxacyclohexane``, ``1-oxamethan-1-yl``, ``2-oxaethan-1-yl``), and that the
 renderer therefore needed to be rewritten to emit Hantzsch-Widman / ``oxy``
 forms to rescue lost breadth.
 
-Measured at HEAD ``c7d8643b`` with OPSIN 2.9.0 (the gate parser), that premise
-is FALSE.  The oxa-replacement forms the module emits are *valid* OPSIN
+Measured at HEAD `` with OPSIN 2.9.0 (the gate parser), that premise
+is FALSE. The oxa-replacement forms the module emits are *valid* OPSIN
 replacement nomenclature; OPSIN parses every one of them and they round-trip:
 
   * the three brief witnesses (below) each parse AND full-InChIKey round-trip
@@ -19,18 +19,18 @@ replacement nomenclature; OPSIN parses every one of them and they round-trip:
     iminosugar/oxepane rings, mono- & di-saccharides, charged & neutral) is
     12/12 full-InChIKey round-trip;
   * the whole 413-member ``sugar_glycan`` backlog witness set
-    (``): the raw producer emits
+    (`internal notes`): the raw producer emits
     279 and abstains 134, and of the 279 emitted names **0 are OPSIN-
     unparseable** -- 277 skeleton-match, 265 full-InChIKey-match through
     ``opsin_parse``.
 
 So there is no unparseable-rendering defect and no breadth to rescue on this
-class: every emitted name already parses.  ``2-oxacyclohexane`` and
+class: every emitted name already parses. ``2-oxacyclohexane`` and
 ``oxane`` are BOTH accepted by OPSIN and denote the same ring; converting the
 former to the latter would be a pure spelling change on NON-PIN best-effort
 (T4) output -- it moves neither the round-trip metric nor the PIN oracle, and
 touches ``_name_ring_spine`` which serves the entire monocyclic-hetero class,
-so it carries regression risk with zero breadth upside.  The renderer was
+so it carries regression risk with zero breadth upside. The renderer was
 therefore left unchanged; full evidence in the task report.
 
 These tests pin the load-bearing invariant that actually matters -- the class
@@ -74,7 +74,7 @@ def _skel_inchikey(smiles: str):
 def _emit(smiles: str):
     """Name via the universal floor; assert it emits with complete coverage.
 
-    Returns the ``UniversalResult``.  A None here is a real breadth loss for
+    Returns the ``UniversalResult``. A None here is a real breadth loss for
     this class (not merely an ugly spelling), so it is a hard failure.
     """
     mol = Chem.MolFromSmiles(smiles)
@@ -89,7 +89,7 @@ def _emit(smiles: str):
 
 # The three brief witnesses -- an aminoglycoside (W1), a charged cyclitol
 # glycoside (W2), and a 2-deoxystreptamine-style diaminocyclitol glycoside
-# (W3).  Each emits, PARSES in OPSIN, and full-InChIKey round-trips.
+# (W3). Each emits, PARSES in OPSIN, and full-InChIKey round-trips.
 _WITNESSES = {
     "W1_aminoglycoside": (
         "[NH3+]C[C@H]1O[C@H](OC2[C@@H](O)[C@H](O)C([NH3+])C[C@H]2O)"
@@ -121,7 +121,7 @@ def test_brief_witness_parses_and_full_round_trips(tag, smiles):
 
 
 # A minimal saturated-hetero-monocycle sanity spread across ring size and
-# heteroatom.  Spelling-agnostic: the invariant is that each sugar/cyclitol
+# heteroatom. Spelling-agnostic: the invariant is that each sugar/cyclitol
 # ring is rendered as an OPSIN-parseable hetero ring that round-trips (whether
 # spelled ``oxane`` or ``oxacyclohexane`` is not asserted).
 _RING_CLASS = {

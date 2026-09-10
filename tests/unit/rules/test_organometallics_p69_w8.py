@@ -1,10 +1,10 @@
 """Wave-8 Phase P9 unit tests for P-69 organometallic additive nomenclature.
 
-Covers  Tasks
+Covers docs/superpowers/plans/2026-07-16-wave8-p9-organometallics.md Tasks
 9.1-9.6. Every test targets a live reproduce-first finding (verified at HEAD
 both gated and gate-off raw per the plan's verified-scope table).
 
-NEVER uses @pytest.mark.xfail (CONTEXT D-29) — honest-fail-on-data.
+NEVER uses @pytest.mark.xfail (CONTEXT) — honest-fail-on-data.
 """
 import pytest
 from rdkit import Chem
@@ -37,10 +37,14 @@ class TestTask91EtaCarveOut:
             == "tricarbonyl(η⁶-benzene)chromium"
         )
 
-    def test_bis_allyl_nickel_ships_gated(self):
+    def test_bis_allyl_nickel_abstains_lossy_ligand(self):
+        # (item 4): neutral propene C=CC (C3H6) is NOT the η³-prop-2-en-1-yl
+        # anion (C3H5) — naming it so drops 1 H per ligand (C6H12Ni named for a
+        # C6H10Ni constitution). The conservation veto declines -> abstain
+        # (organometallics out of scope, P-69). See _organometallic_conserves.
         assert (
             Orthonym().name("[Ni].[CH2]=CC.[CH2]=CC")
-            == "bis(η³-prop-2-en-1-yl)nickel"
+            == "nickel compound (not supported)"
         )
 
     def test_cymantrene_systematic_name_ships_gated(self):
@@ -49,10 +53,14 @@ class TestTask91EtaCarveOut:
             == "tricarbonyl(η⁵-cyclopentadienyl)manganese"
         )
 
-    def test_tricarbonyl_cycloheptatrienyl_molybdenum_ships_gated(self):
+    def test_tricarbonyl_cycloheptatrienyl_molybdenum_abstains_lossy_ligand(self):
+        # (item 4, PREP-T4): the LIGAND_ETA_DEFAULTS key 'C1=CC=CC=CC=1'
+        # perceives a C7H6 fragment but is named 'cycloheptatrienyl' (C7H7) — the
+        # name over-claims 1 H, so the emitted constitution is wrong. The
+        # conservation veto declines -> abstain (organometallics out of scope).
         assert (
             Orthonym().name("[Mo].C1=CC=CC=CC=1.[C-]#[O+].[C-]#[O+].[C-]#[O+]")
-            == "tricarbonyl(η⁷-cycloheptatrienyl)molybdenum"
+            == "molybdenum compound (not supported)"
         )
 
     def test_gated_equals_raw_for_carveout_names(self):
@@ -268,11 +276,11 @@ class TestTask96DimetalClass1Class2:
         assert name.endswith("(not supported)")
 
     def test_class1_class2_dimetal_p6952_built(self):
-        """P-69.5.2 (v28 BUILD): class-1 central metal (Hg, Group 12) +
+        """P-69.5.2 (BUILD): class-1 central metal (Hg, Group 12) +
         class-2 substituent metalloid (Sb, Group 15). Named additively with
         Hg as central atom, the Sb-bearing aryl cited as the recursive
         substituent '4-(diphenylstibanyl)phenyl'. BB P-69.5.2 worked example
-        VERBATIM (BlueBookV2.md:40266). The complex ligand's enclosing marks
+        VERBATIM (the Blue Book). The complex ligand's enclosing marks
         upgrade to '[]' (P-16.3.3 nesting, since the name already contains
         '()'). Was previously deferred/fail-closed; now built via a class-
         aware metal partition + Group-12 recursive ligand naming + a general

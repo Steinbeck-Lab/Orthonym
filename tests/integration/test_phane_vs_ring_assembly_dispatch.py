@@ -1,20 +1,20 @@
-"""Phase 155.A D-16 cross-handler dispatch contract.
+"""a phase.A cross-handler dispatch contract.
 
 cyclophane vs ring_assembly vs multiplicative are MUTUALLY EXCLUSIVE by
 topology after Plan 155-01 ships:
 
   - >= 2 disjoint small rings linked by acyclic chain >= 2 atoms with
-    macrocyclic closure                                     -> cyclophane
-  - single-bond-joined identical rings                      -> ring_assemblies
+    macrocyclic closure -> cyclophane
+  - single-bond-joined identical rings -> ring_assemblies
   - atom/group-bridged identical units (typically 1-atom bridge) -> multiplicative
 
 Each test exercises both the topology-gate predicates directly AND the
 full ``name_compound`` pipeline so a future regression in either guard
 cannot be silently masked by the dispatch order in namer.py.
 
-Source: 155-CONTEXT.md D-03 / D-16 / D-26;
+Source: internal notes / /;
         tests/integration/test_assembly_vs_multiplicative_dispatch.py
-        (Phase 154 D-11 pattern).
+        (a phase pattern).
 """
 from __future__ import annotations
 
@@ -39,7 +39,7 @@ def test_phane_module_importable() -> None:
 
 @pytest.mark.integration
 class TestPhaneVsRingAssemblyDispatch:
-    """D-16 mutual-exclusion contract -- no double-fire on D-03 edge cases."""
+    """ mutual-exclusion contract -- no double-fire on edge cases."""
 
     @pytest.mark.parametrize(
         "smiles,label",
@@ -180,7 +180,7 @@ class TestPhaneVsRingAssemblyDispatch:
         all-benzene-homophane class -- OPSIN still cannot parse ANY phane
         form, but `_PHANE_PIN_RE` (namer.py) carves this correct-by-
         construction, formula-veto-guarded PIN out of the validity gate
-        (see )."""
+        (see docs/superpowers/plans/2026-07-16-wave8-p8-phane.md)."""
         result = name_compound(smiles)
         assert result == expected_pin, (
             f"name_compound({label}) returned {result!r}; expected the "

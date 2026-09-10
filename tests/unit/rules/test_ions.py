@@ -106,6 +106,25 @@ class TestClassifyAnion:
         anion_type = classify_anion(mol, sites['anions'][0])
         assert anion_type == 'thiolate'
 
+    def test_iminide(self):
+        """Imine anion (=N-) should be classified as iminide, NOT aminide.
+
+        P-72.2.2.2.3 (the Blue Book): an imine bearing a negative charge on the
+        nitrogen takes the 'iminide' suffix. The discriminator vs. 'aminide' is a
+        double bond on the anionic nitrogen (the Blue Book butaniminide CCCC=[N-]).
+        """
+        mol = Chem.MolFromSmiles('CCCC=[N-]')
+        sites = get_ion_sites(mol)
+        assert len(sites['anions']) == 1
+        assert classify_anion(mol, sites['anions'][0]) == 'iminide'
+
+    def test_aminide_single_bond_not_iminide(self):
+        """A single-bonded amine anion stays 'aminide' (no double bond on N)."""
+        mol = Chem.MolFromSmiles('C[NH-]')
+        sites = get_ion_sites(mol)
+        assert len(sites['anions']) == 1
+        assert classify_anion(mol, sites['anions'][0]) == 'aminide'
+
 
 class TestClassifyCation:
     """Test cation classification."""
@@ -128,7 +147,7 @@ class TestClassifyCation:
 
     def test_aminium_quaternary(self):
         """Tetramethylammonium (a quaternary N: +1, 0 H, degree 4) classifies as
-        'quaternary' (Phase 184 WS-E.1 / D-04). The dedicated class routes it to
+        'quaternary' (a phase WS-E.1 /). The dedicated class routes it to
         the systematic ``-aminium`` PIN (N,N,N-trimethylmethanaminium) via the
         CATION_QUATERNARY dispatch — a quaternary N cannot take the protonated-amine
         ('aminium') neutralize path (over-valent neutral N), so it is split out from
@@ -238,32 +257,38 @@ class TestNameCation:
     """Test cation naming."""
 
     def test_ammonium_retained(self):
-        """Ammonium should use retained name."""
+        """NH4+ PIN is 'azanium' (P-73.1.1.2, the Blue Book -- the mononuclear
+        parent-hydride cation, "not those given in Table 7.3"); mirrors
+        [PH4+]->phosphanium. Was 'ammonium' (Table-7.3 retained)."""
         mol = Chem.MolFromSmiles('[NH4+]')
         name = name_cation(mol)
-        assert name == 'ammonium'
+        assert name == 'azanium'
 
     def test_methylammonium_pin_is_methanaminium(self):
-        """v28 Cluster C (P-73.1.2.1): 'methylammonium' is general nomenclature
-        only; the PIN is the substitutive 'methanaminium' (BB line 26672). The
+        """ (P-73.1.2.1): 'methylammonium' is general nomenclature
+        only; the PIN is the substitutive 'methanaminium' (the Blue Book). The
         retained name stays available for general/common style."""
         mol = Chem.MolFromSmiles('C[NH3+]')
         assert name_cation(mol) == 'methanaminium'            # default = pin
         assert name_cation(mol, style='common') == 'methylammonium'
 
     def test_tetramethylammonium_pin_is_trimethylmethanaminium(self):
-        """(CH3)4N+ PIN is N,N,N-trimethylmethanaminium (BB line 41354);
+        """(CH3)4N+ PIN is N,N,N-trimethylmethanaminium (the Blue Book);
         'tetramethylammonium' is general only."""
         mol = Chem.MolFromSmiles('C[N+](C)(C)C')
         assert name_cation(mol) == 'N,N,N-trimethylmethanaminium'
         assert name_cation(mol, style='common') == 'tetramethylammonium'
 
-    def test_ammonium_stays_retained_pin(self):
-        """NH4+ 'ammonium' IS a genuine retained PIN -- not denied."""
-        assert name_cation(Chem.MolFromSmiles('[NH4+]')) == 'ammonium'
+    def test_ammonium_pin_is_azanium(self):
+        """NH4+ PIN is the parent-hydride cation 'azanium', NOT the Table-7.3
+        'ammonium' (P-73.1.1.2, the Blue Book: "the preferred IUPAC names and not
+        those given in Table 7.3"). 'ammonium' is general/common only."""
+        assert name_cation(Chem.MolFromSmiles('[NH4+]')) == 'azanium'
+        assert name_cation(Chem.MolFromSmiles('[NH4+]'),
+                           style='common') == 'azanium'
 
     def test_ethylammonium_pin_is_ethanaminium(self):
-        """v28 Cluster C: PIN is 'ethanaminium' (P-73.1.2.1); the general
+        """: PIN is 'ethanaminium' (P-73.1.2.1); the general
         'ethylammonium' retained name stays for common style."""
         mol = Chem.MolFromSmiles('CC[NH3+]')
         assert name_cation(mol) == 'ethanaminium'
@@ -276,10 +301,12 @@ class TestNameCation:
         assert name == 'methylium'
 
     def test_oxonium_retained(self):
-        """Oxonium should use retained name."""
+        """OH3+ PIN is 'oxidanium' (P-73.1.1.2, the Blue Book -- mononuclear
+        parent-hydride cation, "not those given in Table 7.3"); mirrors
+        [PH4+]->phosphanium. Was 'oxonium' (Table-7.3 retained)."""
         mol = Chem.MolFromSmiles('[OH3+]')
         name = name_cation(mol)
-        assert name == 'oxonium'
+        assert name == 'oxidanium'
 
     def test_phosphanium_pin(self):
         """H4P+ PIN is 'phosphanium' (W4-I3; BB 41378/42393 'phosphanium
@@ -655,7 +682,7 @@ class TestAromaticCarboxylateHelpers:
 
 
 # ============================================================================
-# Phase 169.5 SUB-01 — charge-aware naming (Wave 0 fixtures)
+# a phase.5 SUB-01 — charge-aware naming (Wave 0 fixtures)
 #
 # Negative canaries assert NOW (the currently-correct charged paths that the
 # SUB-01 routing change MUST NOT regress). The charge-aware targets are
@@ -705,7 +732,7 @@ class TestSUB01ChargeAwareNaming:
 
     def test_formylbenzenesulfonate_parent_and_suffix(self):
         name = name_compound("O=Cc1ccc(S(=O)(=O)[O-])cc1")
-        # D-06: assert correct parent + -sulfonate; the missing 4- locant is a
+        #: assert correct parent + -sulfonate; the missing 4- locant is a
         # SEPARATE pre-existing ring-substituent-locant defect, out of SUB-01 scope.
         assert "sulfonate" in name and "heptanolate" not in name
 
@@ -772,7 +799,7 @@ class TestSUB01ChargeAwareNaming:
         assert name == "phenylmethylium"
 
     def test_methanaminium(self):
-        # RESOLVED v28 Cluster C (was xfail): the general-only 'methylammonium'
+        # RESOLVED (was xfail): the general-only 'methylammonium'
         # retained name is denied on the PIN path (P-73.1.2.1) so the systematic
         # aminium PIN 'methanaminium' is emitted. 'methylammonium' stays for
         # general/common style.

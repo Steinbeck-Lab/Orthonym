@@ -3,7 +3,7 @@
 
 Tests RDKit rdCIPLabeler.AssignCIPLabels() against 300 molecules from
 Hanson et al. 2018 (CIP Validation Suite). Results document known
-RDKit CIP limitations for Phase 140 stereo pipeline planning.
+RDKit CIP limitations for a phase stereo pipeline planning.
 
 Source: https://github.com/CIPValidationSuite/ValidationSuite
 Paper: Hanson et al., "Algorithmic Analysis of Cahn-Ingold-Prelog Rules
@@ -84,7 +84,7 @@ def get_rdkit_cip_labels(mol) -> Dict[int, str]:
                 labels[atom.GetIdx() + 1] = code
 
     # Bond stereochemistry: E, Z
-    # FAIR both-endpoint keying (Phase 177 / D-14): the CIP Validation Suite and
+    # FAIR both-endpoint keying (a phase /): the CIP Validation Suite and
     # centres both label a C=C/C=N at BOTH 1-based atom endpoints (e.g. "7E 8E").
     # The legacy keying used only key = min(begin_idx, end_idx), scoring the upper
     # endpoint as <none> and artificially deflating RDKit to 182/290. Keying both
@@ -101,7 +101,7 @@ def get_rdkit_cip_labels(mol) -> Dict[int, str]:
 
 
 def load_cip_data() -> List[Dict]:
-    """Load CIP Validation Suite compounds from the .smi file.
+    """Load CIP Validation Suite compounds from the.smi file.
 
     Format: tab-separated columns:
       0: SMILES
@@ -182,7 +182,7 @@ def compare_labels(
 
 
 # ---------------------------------------------------------------------------
-# Suite pass-count helpers (Phase 177 / D-14, D-17)
+# Suite pass-count helpers (a phase /,)
 # ---------------------------------------------------------------------------
 
 
@@ -191,8 +191,8 @@ def score_suite(cip_data: List[Dict], label_fn) -> int:
 
     label_fn(mol) -> {1-based-atom-idx: descriptor}. Skips invalid SMILES and
     compounds with no expected labels (consistent with the documented gate
-    numbers: min-keyed RDKit 182, fair-keyed RDKit 235, centres 279
-    [centres 1.5; was 281 on 1.2.1 — see test_centres_engine_279]).
+    numbers: min-keyed RDKit 182, fair-keyed RDKit 235, centres 281
+    [centres 1.2.1 tagged release — see test_centres_engine_281]).
     """
     pass_count = 0
     for entry in cip_data:
@@ -238,7 +238,7 @@ def get_rdkit_cip_labels_minkeyed(mol) -> Dict[int, str]:
 def score_suite_centres(cip_data: List[Dict]) -> Optional[int]:
     """Count suite matches using centres in a SINGLE batched JVM invocation.
 
-    Mirrors the D-12 design (one JVM for the whole batch, ~3.2 s for 290
+    Mirrors the design (one JVM for the whole batch, ~3.2 s for 290
     compounds) rather than spawning a JVM per molecule. Sends every valid,
     expected-labelled compound's ORIGINAL suite SMILES (the suite's atom
     numbering is keyed to that SMILES, not RDKit's canonical reordering) to
@@ -294,7 +294,7 @@ def write_results_file(
     failures_by_type: Dict[str, int],
     failure_details: List[str],
 ):
-    """Write CIP validation results to a text file for Phase 140 reference."""
+    """Write CIP validation results to a text file for a phase reference."""
     timestamp = datetime.datetime.now(datetime.timezone.utc).strftime(
         "%Y-%m-%d %H:%M:%S UTC"
     )
@@ -376,7 +376,7 @@ class TestCIPValidationSuite:
 
         This test documents RDKit CIP accuracy rather than failing on mismatches.
         CIP failures are known RDKit limitations, not Orthonym bugs.
-        Results are written to rdkit_cip_results.txt for Phase 140 reference.
+        Results are written to rdkit_cip_results.txt for a phase reference.
         """
         pass_count = 0
         fail_count = 0
@@ -446,7 +446,7 @@ class TestCIPValidationSuite:
         if len(failure_details) > 50:
             print(f"  ... and {len(failure_details) - 50} more")
 
-        # Write results file for Phase 140 reference (CIP-03)
+        # Write results file for a phase reference (CIP-03)
         write_results_file(
             total=total,
             pass_count=pass_count,
@@ -469,7 +469,7 @@ class TestCIPValidationSuite:
             )
 
     def test_fair_keying_baseline_235(self, cip_data):
-        """Fair both-endpoint keying lifts RDKit 182 -> 235 (D-14 keying artifact).
+        """Fair both-endpoint keying lifts RDKit 182 -> 235 (keying artifact).
 
         The legacy min-keyed RDKit baseline (182) is retained as the documented
         'centres OFF' gate value; the fair both-endpoint keying (now used by
@@ -487,32 +487,40 @@ class TestCIPValidationSuite:
             f"Fair both-endpoint RDKit baseline drifted: expected 235, got {fair_keyed}"
         )
 
-    def test_centres_engine_279(self, cip_data):
-        """centres ON scores 279/290 -- the genuine +44 over fair-keyed RDKit.
+    def test_centres_engine_281(self, cip_data):
+        """centres ON scores 281/290 -- the genuine +46 over fair-keyed RDKit.
 
-        CIP-UPDATE (2026-06-27): the vendored engine was refreshed
-        1.2.1 -> 1.5 (SiMolecule/centres develop @ d4b3cf0). Every R/S/E/Z
-        label is byte-identical to 1.2.1; the only delta vs 1.2.1 is 2 exotic
-        CYCLIC-CUMULENE axial M/P labels (VS078 macrocyclic bis-allene, VS287
-        bicyclic allene), so the suite score moved 281 -> 279. Orthonym does
-        NOT consume centres' cumulene/allene M/P (it computes axial CIP
-        independently in perception.stereo.detect_axial_chirality +
-        _manual_allene_cip), so production naming is unaffected. centres
-        remains a strict superset of RDKit on the suite (no regression vs the
-        fair-keyed RDKit baseline of 235).
+        CIP-UPDATE (2026-09-07): the vendored engine was reverted
+        1.5-SNAPSHOT -> 1.2.1 (the TAGGED public release). The 1.5-SNAPSHOT
+        (SiMolecule/centres develop @ d4b3cf0) was an UNRELEASED local build,
+        unreproducible by anyone else, and it regressed 2 exotic CYCLIC-CUMULENE
+        axial M/P labels (VS078 macrocyclic bis-allene, VS287 bicyclic allene) --
+        both M/P inverted, wrong -- so its suite score was 279. 1.2.1 gets both
+        right (281). Every R/S / E/Z label is byte-identical between the two jars,
+        and Orthonym does NOT consume centres' cumulene/allene M/P (it computes
+        axial CIP independently in perception.stereo.detect_axial_chirality +
+        _manual_allene_cip), so production naming is unchanged by the revert
+        (verified: 0/300 stereo names differ). 1.2.1 is also cleanly BSD-2-Clause
+        and SHA-pinnable. centres remains a strict superset of RDKit on the suite
+        (fair-keyed RDKit baseline 235).
 
-        Uses a SINGLE batched JVM invocation (D-12). Skips cleanly when Java /
-        the centres jar is absent (graceful fallback is exercised by
+        This assertion is the objective gate: it fails if a future jar swap moves
+        the score, so a silent regression (like the 1.5-SNAPSHOT's) cannot recur.
+
+        Uses a SINGLE batched JVM invocation. Skips cleanly when Java / the centres
+        jar is absent (graceful fallback is exercised by
         tests/integration/test_centres_bridge.py).
         """
         centres_pass = score_suite_centres(cip_data)
         if centres_pass is None:
             pytest.skip("centres jar or Java runtime not available")
         print(f"\ncentres engine pass count: {centres_pass}/290")
-        assert centres_pass == 279, (
-            f"centres CIP-suite pass count drifted: expected 279, got {centres_pass}. "
-            f"(fair-keyed RDKit baseline is 235; the +44 engine gain is 279-235. "
-            f"centres 1.5 vs 1.2.1: -2 cyclic-cumulene M/P, R/S/E/Z identical.)"
+        assert centres_pass == 281, (
+            f"centres CIP-suite pass count drifted: expected 281 (centres 1.2.1), "
+            f"got {centres_pass}. (fair-keyed RDKit baseline is 235; the +46 engine "
+            f"gain is 281-235. The 1.5-SNAPSHOT scored 279: -2 cyclic-cumulene M/P, "
+            f"R/S/E/Z identical. If you swapped the vendored jar, update NOTICE + this "
+            f"assertion together and confirm production names are unchanged.)"
         )
 
     def test_stereo_type_coverage(self, cip_data):

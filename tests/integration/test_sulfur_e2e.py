@@ -29,23 +29,43 @@ class TestThiolE2E:
 
 
 class TestSulfideE2E:
-    """E2E tests for sulfide naming (SULFUR-02)."""
+    """E2E tests for sulfide naming (SULFUR-02).
+
+    P-63.2.5 (the Blue Book, section heading "Names of chalcogen analogues of ethers,
+    i.e., sulfides, selenides and tellurides"): "Method (1), substitutive
+    nomenclature, gives preferred IUPAC names". The functional-class "R R' sulfide"
+    (method 2) is NOT the PIN; the PIN is the substitutive (R'-sulfanyl)RH. These
+    assertions were migrated from the method-2 forms in the sulfanyl-vs-sulfide
+    slice; each new value OPSIN-round-trips to the input.
+    """
 
     def test_dimethyl_sulfide(self):
-        """CSC -> dimethyl sulfide"""
-        assert name_compound("CSC") == "dimethyl sulfide"
+        """CSC -> (methylsulfanyl)methane (PIN).
+
+        the Blue Book verbatim: "CH3-S-CH3 (1) (methylsulfanyl)methane (PIN)
+        (methylthio)methane (2) dimethyl sulfide"."""
+        assert name_compound("CSC") == "(methylsulfanyl)methane"
 
     def test_diethyl_sulfide(self):
-        """CCSCC -> diethyl sulfide"""
-        assert name_compound("CCSCC") == "diethyl sulfide"
+        """CCSCC -> (ethylsulfanyl)ethane (PIN).
+
+        P-63.2.5 method (1): the ethyl homologue of the Blue Book; ethane parent +
+        ethylsulfanyl prefix (ethylsulfanyl, P-63.2.5 Table, the Blue Book)."""
+        assert name_compound("CCSCC") == "(ethylsulfanyl)ethane"
 
     def test_ethyl_methyl_sulfide(self):
-        """CCSC -> ethyl methyl sulfide"""
-        assert name_compound("CCSC") == "ethyl methyl sulfide"
+        """CCSC -> (methylsulfanyl)ethane (PIN).
+
+        P-63.2.5 method (1); senior parent is the longer chain ethane (P-44.1.1),
+        with the shorter arm as the methylsulfanyl prefix."""
+        assert name_compound("CCSC") == "(methylsulfanyl)ethane"
 
     def test_methyl_propyl_sulfide(self):
-        """CCCSC -> methyl propyl sulfide"""
-        assert name_compound("CCCSC") == "methyl propyl sulfide"
+        """CCCSC -> 1-(methylsulfanyl)propane (PIN).
+
+        P-63.2.5 method (1); senior parent propane (P-44.1.1), methylsulfanyl at
+        C1 (locant cited for a C3+ chain, P-14.3.4)."""
+        assert name_compound("CCCSC") == "1-(methylsulfanyl)propane"
 
 
 class TestSulfoxideE2E:
@@ -110,15 +130,18 @@ class TestSulfurRetainedNames:
         result = name_compound("CS(=O)(=O)O")
         assert result == "methanesulfonic acid"
 
-    def test_dimethyl_sulfide_retained(self):
-        """CSC should return retained name."""
+    def test_dimethyl_sulfide_pin_substitutive(self):
+        """CSC -> (methylsulfanyl)methane (PIN), not the retained "dimethyl
+        sulfide" (P-63.2.5, the Blue Book). The functional-class name is demoted to
+        general nomenclature only (reachable via --trivial)."""
         result = name_compound("CSC")
-        assert result == "dimethyl sulfide"
+        assert result == "(methylsulfanyl)methane"
 
-    def test_diethyl_sulfide_retained(self):
-        """CCSCC should return retained name."""
+    def test_diethyl_sulfide_pin_substitutive(self):
+        """CCSCC -> (ethylsulfanyl)ethane (PIN), not the retained "diethyl
+        sulfide" (P-63.2.5, the Blue Book method (1))."""
         result = name_compound("CCSCC")
-        assert result == "diethyl sulfide"
+        assert result == "(ethylsulfanyl)ethane"
 
 
 class TestSulfurAdditionalCompounds:

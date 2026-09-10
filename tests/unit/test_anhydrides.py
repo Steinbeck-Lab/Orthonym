@@ -48,11 +48,59 @@ class TestMixedAnhydrides:
         assert result == "butanoic propanoic anhydride"
 
 
+class TestThioSelenoAcylAnhydrides:
+    """D: acyclic thio-/seleno-ACYL anhydrides R-C(=X)-Y-C(=X)-R'.
+
+    The acyl chalcogen (=O/=S/=Se) fixes each acid component's affix
+    ('...thioic'/'...selenoic'; P-65.7.6.4.3); components are cited in
+    ALPHABETICAL order (P-65.7.2); the BRIDGE chalcogen (O/S/Se/Te) fixes the
+    class word ('anhydride'/'thioanhydride'/'selenoanhydride'; P-65.7.6.4.2).
+    All names OPSIN-round-trip to the input structure.
+    """
+
+    def test_propanethioic_anhydride(self):
+        """P-65.7.1 symmetric thioacyl, O bridge: C(=S)-O-C(=S)."""
+        result = name_compound("CCC(=S)OC(=S)CC")
+        assert result == "propanethioic anhydride"
+
+    def test_benzenecarbothioic_anhydride(self):
+        """P-65.7.1 symmetric ring thioacyl (benzoyl =S), O bridge."""
+        result = name_compound("c1ccccc1C(=S)OC(=S)c1ccccc1")
+        assert result == "benzenecarbothioic anhydride"
+
+    def test_ethanethioic_propanoic_anhydride(self):
+        """P-65.7.2 mixed acyl (=S + =O), O bridge -> 'anhydride';
+        alphabetical order 'ethanethioic' < 'propanoic'."""
+        result = name_compound("CC(=S)OC(=O)CC")
+        assert result == "ethanethioic propanoic anhydride"
+
+    def test_ethanethioic_propanethioic_anhydride(self):
+        """P-65.7.3 both acyls =S, O bridge -> 'anhydride'."""
+        result = name_compound("CC(=S)OC(=S)CC")
+        assert result == "ethanethioic propanethioic anhydride"
+
+    def test_ethanethioic_propanethioic_thioanhydride(self):
+        """P-65.7.6.4.2 both acyls =S, S bridge -> 'thioanhydride'."""
+        result = name_compound("CC(=S)SC(=S)CC")
+        assert result == "ethanethioic propanethioic thioanhydride"
+
+    def test_ethanethioic_propanoic_thioanhydride(self):
+        """P-65.7.6.4.2 mixed acyl (=S + =O), S bridge -> 'thioanhydride'."""
+        result = name_compound("CC(=S)SC(=O)CC")
+        assert result == "ethanethioic propanoic thioanhydride"
+
+    def test_acetic_propanethioic_selenoanhydride(self):
+        """P-65.7.6.4.2 Se bridge -> 'selenoanhydride'; the =O acetic component
+        keeps its retained name, the =S propanethioic its thioic affix."""
+        result = name_compound("CC(=O)[Se]C(=S)CC")
+        assert result == "acetic propanethioic selenoanhydride"
+
+
 class TestCyclicAnhydrides:
     """Test cyclic anhydride naming (from dicarboxylic acids)."""
 
     def test_butanedioic_anhydride(self):
-        """Succinic anhydride - 5-membered ring. v23 D-FOLLOWON item 6: PIN is the
+        """Succinic anhydride - 5-membered ring. D-FOLLOWON item 6: PIN is the
         heterocyclic-pseudoketone dione (P-65.7.7.1 method 1), not the non-PIN
         functional-class 'butanedioic anhydride'."""
         result = name_compound("O=C1CCC(=O)O1")
@@ -77,16 +125,37 @@ class TestConsumedAtomFilteringAnhydride:
     """Test that anhydride consumed-atom filtering removes ester matches."""
 
     def test_anhydride_filters_ester(self):
-        """Anhydride atoms should be removed from ester FG detection."""
+        """Anhydride atoms must not double-name as an ester. The collision
+        resolver inside detect_functional_groups already suppresses the ester
+        sub-read on the anhydride atoms (the ('anhydride', [...,'ester',...])
+        rule), so ester is absent from detection; the consumed-atom filter then
+        also leaves anhydride owning its atoms."""
         from rdkit import Chem
         from orthonym.perception.functional_groups import detect_functional_groups
         from orthonym.namer import _filter_consumed_fg_atoms
 
         mol = Chem.MolFromSmiles("CC(=O)OC(=O)C")
         fgs = detect_functional_groups(mol)
-        assert "ester" in fgs  # Before filtering
         assert "anhydride" in fgs
+        assert "ester" not in fgs  # ester sub-read suppressed at detection
 
         filtered = _filter_consumed_fg_atoms(fgs)
-        assert "ester" not in filtered  # After filtering, ester removed
-        assert "anhydride" in filtered  # Anhydride still present
+        assert "ester" not in filtered  # still no ester after filtering
+        assert "anhydride" in filtered  # anhydride still present
+
+
+class TestDicarbonicDihalidePseudohalide:
+    """ a phase (P-65.5.3.2): dicarbonic dihalides / dipseudohalides,
+    X-CO-O-CO-Y -> 'dicarbonic <class word(s)>'."""
+
+    def test_dicarbonic_dichloride(self):
+        # the Blue Book 'Cl-CO-O-CO-Cl dicarbonic dichloride (PIN)'.
+        assert name_compound("ClC(=O)OC(=O)Cl") == "dicarbonic dichloride"
+
+    def test_dicarbonic_bromide_chloride(self):
+        # the Blue Book mixed halide, alphabetical order.
+        assert name_compound("ClC(=O)OC(=O)Br") == "dicarbonic bromide chloride"
+
+    def test_dicarbonic_diisocyanate(self):
+        # the Blue Book 'OCN-CO-O-CO-NCO dicarbonic diisocyanate (PIN)'.
+        assert name_compound("O=C=NC(=O)OC(=O)N=C=O") == "dicarbonic diisocyanate"

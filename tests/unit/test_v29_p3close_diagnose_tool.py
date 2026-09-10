@@ -1,7 +1,7 @@
-"""Item B — tests for the repo's own probe, .
+"""Item B — tests for the repo's own probe, `scripts/diagnose.py`.
 
 `diagnose.py` is the harness the project's briefs mandate for invariant-11
-before/after tables.  It had two defects that made it unable to prove what it
+before/after tables. It had two defects that made it unable to prove what it
 was being used to prove:
 
 1. it named ``Chem.CanonSmiles(input)`` rather than the SMILES as written, so
@@ -27,7 +27,7 @@ _DIAG = _ROOT / "scripts" / "diagnose.py"
 
 
 def _load():
-    """Import  as a module (it is a script, not a package)."""
+    """Import `scripts/diagnose.py` as a module (it is a script, not a package)."""
     spec = importlib.util.spec_from_file_location("_diagnose_under_test", _DIAG)
     mod = importlib.util.module_from_spec(spec)
     sys.modules["_diagnose_under_test"] = mod
@@ -74,27 +74,27 @@ def test_bad_smiles_still_reports_bad_smiles(diag):
 
 
 # ---------------------------------------------------------------------------
-# Defect 2, CORRECTED (v29 P3-FINAL Item 2) — `-r` must be ON by default,
+# Defect 2, CORRECTED (-FINAL Item 2) — `-r` must be ON by default,
 # because the SHIPPED validity oracle passes it unconditionally.
 #
 # The earlier direction of this test (`-r` off by default) was wrong twice over:
 #
-#  * it made the shared probe DISAGREE with production.  The oracle behind the
-#    validity gate spawns OPSIN with `-r` at every entry point --
-#    `assembly/retained_substitution.py:138` (`["java","-jar",jar,"-r","-osmi"]`),
-#    `:176` (`get_persistent_opsin(jar, ("-r","-osmi"))`), `:197`, and
-#    `validation/opsin_server.py:41`/`:140` (default `args=("-r","-osmi")`).
-#    So a name production ACCEPTS was reported `OPSIN-UNPARSEABLE` by the probe:
-#    13 of the 15 gold rows whose `expected_pin` is a bare substituent string
-#    flipped to a false failure.
-#  * its stated justification -- that `-r` lets a fragment-only emission score a
-#    clean `OK` -- cannot happen.  `diagnose`'s verdict compares OPSIN's output
-#    against the canonical form of the INPUT MOLECULE
-#    (`_canon(opsin_smi) == r["canonical"]`), and a bare substituent name parses
-#    under `-r` to a strict SUB-structure, which can never compare equal.  The
-#    only input for which `ethyl` compares equal is the ethyl radical itself --
-#    where the name is right.  So `-r` costs no strictness at all and buys
-#    agreement with the gate.
+# * it made the shared probe DISAGREE with production. The oracle behind the
+# validity gate spawns OPSIN with `-r` at every entry point --
+# `assembly/retained_substitution.py:138` (`["java","-jar",jar,"-r","-osmi"]`),
+# `:176` (`get_persistent_opsin(jar, ("-r","-osmi"))`), `:197`, and
+# `validation/opsin_server.py:41`/`:140` (default `args=("-r","-osmi")`).
+# So a name production ACCEPTS was reported `OPSIN-UNPARSEABLE` by the probe:
+# 13 of the 15 gold rows whose `expected_pin` is a bare substituent string
+# flipped to a false failure.
+# * its stated justification -- that `-r` lets a fragment-only emission score a
+# clean `OK` -- cannot happen. `diagnose`'s verdict compares OPSIN's output
+# against the canonical form of the INPUT MOLECULE
+# (`_canon(opsin_smi) == r["canonical"]`), and a bare substituent name parses
+# under `-r` to a strict SUB-structure, which can never compare equal. The
+# only input for which `ethyl` compares equal is the ethyl radical itself --
+# where the name is right. So `-r` costs no strictness at all and buys
+# agreement with the gate.
 # ---------------------------------------------------------------------------
 
 def test_opsin_batch_defaults_to_radicals_like_the_shipped_oracle(diag, monkeypatch):
@@ -137,7 +137,7 @@ def test_the_probes_default_opsin_args_match_the_shipped_oracles(diag, monkeypat
     """Tool-vs-gate agreement, pinned WITHOUT needing a JVM.
 
     This is the invariant that was violated: the probe and the production oracle
-    must invoke OPSIN with the same radical policy.  Comparing the two default
+    must invoke OPSIN with the same radical policy. Comparing the two default
     argument lists states that directly, and cannot deadlock on an OPSIN pipe.
     """
     from orthonym.validation.opsin_server import get_persistent_opsin  # noqa: F401
@@ -179,7 +179,7 @@ def test_a_gold_radical_pin_is_not_reported_unparseable(diag):
     if diag._gate_running():
         pytest.skip("gate running — never a second OPSIN job")
 
-    # `pentan-3-yl` is a verbatim gold `expected_pin` (
+    # `pentan-3-yl` is a verbatim gold `expected_pin` (benchmarks/the gold set/
     # gold_pins.json) whose SMILES is the radical `CC[CH]CC`.
     got = diag.opsin_batch(["pentan-3-yl"])
     assert got and got[0], (
@@ -286,12 +286,12 @@ def test_spelling_independence_treats_a_naming_failure_as_unstable(diag, monkeyp
 # ---------------------------------------------------------------------------
 
 def test_a_skipped_round_trip_is_never_reported_as_clean(diag, capsys):
-    """v29 P3-FINAL (review claim 41).
+    """-FINAL (review claim 41).
 
     With OPSIN skipped -- e.g. on a false-positive `_gate_running` hit -- every
     row still counted as `clean` and the tool still exited 0, so the summary read
-    `-- 1/1 clean` with ZERO round-trips performed.  A reader takes that line as
-    round-trip evidence.  It must say what it actually measured.
+    `-- 1/1 clean` with ZERO round-trips performed. A reader takes that line as
+    round-trip evidence. It must say what it actually measured.
     """
     rc = diag.main(["--no-opsin", "CCO"])
     err = capsys.readouterr().err
@@ -302,10 +302,10 @@ def test_a_skipped_round_trip_is_never_reported_as_clean(diag, capsys):
 
 
 def test_spelling_independence_separates_stability_from_refusal(diag, monkeypatch):
-    """v29 P3-FINAL (review claim 40).
+    """-FINAL (review claim 40).
 
     A molecule refused identically for every spelling is 'stable' in the trivial
-    sense and carries no information about naming stability.  On an 80-row slice,
+    sense and carries no information about naming stability. On an 80-row slice,
     40 of the 78 stable rows were of that kind, and the pass rate did not say so.
     """
     monkeypatch.setattr(diag, "respell", lambda s, n=4, seed=0: [s, s])
@@ -352,7 +352,7 @@ def test_cli_exposes_the_new_flags(diag):
 def test_help_no_longer_asserts_the_false_false_pass_claim(diag):
     """The `--help`/docstring assertion that `-r` produced a false `OK` was
     unsound, and a false in-code assertion is the class this range set out to
-    delete.  Pin its removal so it cannot creep back.
+    delete. Pin its removal so it cannot creep back.
     """
     doc = " ".join((diag.__doc__ or "").split())
     assert "scored a clean ``OK``" not in doc

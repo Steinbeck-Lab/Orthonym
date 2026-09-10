@@ -1,8 +1,8 @@
-"""Phase 3B: resonance-shifted azide/diazo/diazonium drawings.
+"""a phase: resonance-shifted azide/diazo/diazonium drawings.
 
 RDKit does not normalise resonance forms on ``MolFromSmiles``: each drawing
 keeps its own literal bond orders / formal charges. The canonical drawing of
-each class already names (SPY, ``);
+each class already names (a trace, `internal notes`);
 its resonance-shifted TWIN abstained before this fix. Acceptance is full
 round-trip InChIKey identity to the canonical molecule -- the emitted name
 string may legitimately differ (e.g. a demoted systematic form), per the
@@ -69,7 +69,7 @@ def test_diazonium_twin_names_and_round_trips():
 
 
 def test_genuine_radical_cation_not_swept_by_diazonium_carveout():
-    """Defense-in-depth (fable review, 2026-08-15): ``c1ccccc1[N+]=N`` is a
+    """Defense-in-depth (a review review, 2026-08-15): ``c1ccccc1[N+]=N`` is a
     GENUINE open-shell monoradical cation (1 radical electron on a degree-2
     N), not the valence-shortfall artifact the carve-out in
     ``rules.charged_router.route_charged`` targets (2 spurious radical

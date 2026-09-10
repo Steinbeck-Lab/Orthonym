@@ -323,3 +323,30 @@ class TestRingAttachedAmidesIntegration:
         from orthonym import name_compound
         result = name_compound("NC(=O)C1CCCCC1")
         assert result == "cyclohexanecarboxamide"
+
+
+class TestHydrazidesV42P43:
+    """-3 hydrazide PIN-spelling wins (P-66.3).
+
+    Every expectation is a Blue-Book verbatim (PIN) and OPSIN round-trips.
+    """
+
+    def test_oxalohydrazide_retained(self):
+        # P-66.3.1.2.1 (the Blue Book): 'oxalohydrazide (PIN)' — one of the five
+        # retained hydrazide PINs; the systematic form is 'ethanedihydrazide'.
+        from orthonym import name_compound
+        assert name_compound("C(C(=O)NN)(=O)NN") == "oxalohydrazide"
+
+    def test_dicarbonic_dihydrazide(self):
+        # P-66.3.5.2 (the Blue Book): 'dicarbonic dihydrazide (PIN)' — the hydrazide
+        # of dicarbonic acid, functional-class over the O-bridged dicarbonic
+        # skeleton (was 'bis(1-hydrazinylmethanoic) anhydride').
+        from orthonym import name_compound
+        assert name_compound("C(=O)(OC(=O)NN)NN") == "dicarbonic dihydrazide"
+
+    def test_plain_hydrazides_regression(self):
+        # Regression: the pre-existing systematic/retained hydrazides are intact.
+        from orthonym import name_compound
+        assert name_compound("C(CCCC)(=O)NN") == "pentanehydrazide"
+        assert name_compound("C(C)(=O)NN") == "acetohydrazide"
+        assert name_compound("C(C1=CC=CC=C1)(=O)NN") == "benzohydrazide"

@@ -1,4 +1,4 @@
-"""Phase H (v22) — stereo configuration sub-cases (STER-01) + centres CIP (STER-02).
+"""Phase H () — stereo configuration sub-cases (STER-01) + centres CIP (STER-02).
 
 A8 discipline: test the NAME OUTPUT and the structural invariant, not a flag.
 
@@ -146,7 +146,7 @@ def test_ster02_missing_output_order_declines():
 def test_v18_cysteine_no_malformed_locant():
     """V-18: L-cysteine must not carry a malformed '(1R)-' block on the retained name."""
     name = name_compound("N[C@@H](CS)C(=O)O")
-    # STALE EXPECTATION CORRECTED 2026-07-30: was `== "cysteine"`. The v29 P3REG
+    # STALE EXPECTATION CORRECTED 2026-07-30: was `== "cysteine"`. The REG
     # work made the L-descriptor explicit, and `data/amino_acids.py` now emits
     # `L-cysteine` -- which is right: the SMILES is specifically the (R)/L-enantiomer,
     # and a bare `cysteine` would under-specify it. There is NO code site to fix here;
@@ -170,4 +170,4 @@ def test_v20_sucrose_alpha_anomer():
     name = name_compound(
         "OC[C@H]1O[C@@](CO)(O[C@H]2O[C@H](CO)[C@@H](O)[C@H](O)[C@H]2O)[C@@H](O)[C@@H]1O"
     )
-    assert name == "beta-D-fructofuranosyl alpha-D-glucopyranoside"
+    assert name == "β-D-fructofuranosyl α-D-glucopyranoside"

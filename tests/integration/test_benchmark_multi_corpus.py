@@ -1,4 +1,4 @@
-"""Integration test for  (Phase 145-05).
+"""Integration test for scripts/benchmark_multi_corpus.py (a phase-05).
 
 Runs the full unified runner against 3 tiny fixture corpora (5 compounds each
 = 15 total) and verifies the produced artifacts have the right structure.

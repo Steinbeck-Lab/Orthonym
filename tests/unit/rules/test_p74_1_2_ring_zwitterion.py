@@ -1,22 +1,22 @@
 """P-74.1.2 — ring zwitterions carrying an anionic characteristic group.
 
-Task G2 (v29 residue). `rules/ions.py::emit_zwitterion_ring_carboxylate` used to
+Task G2 (residue). `rules/ions.py::emit_zwitterion_ring_carboxylate` used to
 splice a cation-substituent prefix built in ONE ring numbering onto a *substituted*
 ring name carrying its own, DIFFERENT numbering. On the default path that emitted
 malformed and mis-numbered names — and every one of them round-tripped cleanly
 through OPSIN, so neither the round-trip metric nor SELF-01 could see them. The
 report with the full measurement is
-.
+internal notes.
 
-Blue Book, `BlueBookV2/BlueBookV2.md` (every pointer re-opened with `sed -n '<N>p'`
+Blue Book, `the Blue Book Blue Book` (every pointer re-opened with `sed -n '<N>p'`
 at write time):
 
 * **P-74.1.2 "Zwitterionic compounds with at least one ionic center on a
   characteristic group"** — heading `:42445`. Sentence `:42447`, quoted whole
   because the decisive clause is the last one: *"Zwitterionic compounds with at
   least one ionic center on a characteristic group may be named by adding the
-  appropriate ionic suffix to the name of the ionic parent hydride.  In names,
-  cationic suffixes are cited before anionic suffixes.  For assignment of lower
+  appropriate ionic suffix to the name of the ionic parent hydride. In names,
+  cationic suffixes are cited before anionic suffixes. For assignment of lower
   locants, ionic centers on skeletal atoms of the parent hydride are preferred to
   the locants for positions of attachment of characteristic groups denoted by
   ionic suffixes."*
@@ -69,14 +69,14 @@ def _emit(smiles):
 # --------------------------------------------------------------------------
 
 BB_PIN_ROWS = [
-    # BB :42456 — the P-74.1.2 worked (PIN) example. Abstained before Task G2.
+    # BB:42456 — the P-74.1.2 worked (PIN) example. Abstained before Task G2.
     ("C[n+]1c(C(=O)[O-])cc(-c2ccccc2)cc1-c1ccccc1",
      "1-methyl-4,6-diphenylpyridin-1-ium-2-carboxylate",
      "BB :42456 (PIN)"),
 ]
 
 # Rows that were already correct before Task G2 and MUST stay byte-exact. The
-# first two are gold-oracle rows (
+# first two are gold-oracle rows (benchmarks/the gold set/packs/
 # characteristic_groups.json).
 PRE_EXISTING_ROWS = [
     ("[O-]C(=O)c1ccc[nH+]c1", "pyridin-1-ium-3-carboxylate"),
@@ -93,17 +93,17 @@ PRE_EXISTING_ROWS = [
 # Rows whose HEAD output was MALFORMED or mis-numbered. The comment on each row is
 # the exact string HEAD emitted, so a future regression is recognisable on sight.
 REPAIRED_ROWS = [
-    # HEAD: 1-methyl4-methylpyridin-1-ium-2-carboxylate  (no hyphen; prefixes unmerged)
+    # HEAD: 1-methyl4-methylpyridin-1-ium-2-carboxylate (no hyphen; prefixes unmerged)
     ("C[n+]1ccc(C)cc1C(=O)[O-]", "1,4-dimethylpyridin-1-ium-2-carboxylate"),
     ("C[n+]1c(C(=O)[O-])cc(C)cc1", "1,4-dimethylpyridin-1-ium-2-carboxylate"),
     # HEAD: 1-methyl3-methylpyridin-1-ium-2-carboxylate
     ("C[n+]1c(C(=O)[O-])c(C)ccc1", "1,3-dimethylpyridin-1-ium-2-carboxylate"),
-    # HEAD: 1-methyl4-bromopyridin-1-ium-2-carboxylate  (P-14.5.2: bromo < methyl)
+    # HEAD: 1-methyl4-bromopyridin-1-ium-2-carboxylate (P-14.5.2: bromo < methyl)
     ("C[n+]1ccc(Br)cc1C(=O)[O-]", "4-bromo-1-methylpyridin-1-ium-2-carboxylate"),
     ("C[n+]1ccc(Cl)cc1C(=O)[O-]", "4-chloro-1-methylpyridin-1-ium-2-carboxylate"),
     ("C[n+]1ccc(F)cc1C(=O)[O-]", "4-fluoro-1-methylpyridin-1-ium-2-carboxylate"),
     # HEAD: 1-methyl2,4-dimethylpyridin-1-ium-6-carboxylate
-    #       — carboxylate numbered 6 where P-74.1.2 :42447 requires 2
+    # — carboxylate numbered 6 where P-74.1.2:42447 requires 2
     ("C[n+]1c(C(=O)[O-])cc(C)cc1C", "1,4,6-trimethylpyridin-1-ium-2-carboxylate"),
     # HEAD: 1-methyl2-ethyl-4-methylpyridin-1-ium-6-carboxylate
     ("C[n+]1c(C(=O)[O-])cc(C)cc1CC",
@@ -162,7 +162,7 @@ def test_newly_named_rows(namer, smiles, expected):
 
 # The malformed-splice signature: a letter immediately followed by a digit, which
 # is what `1-methyl` + `4-methyl` -> `1-methyl4-methyl` produced. Computed over ALL
-# emitted rows and not just the failures (the contributor guide #14), so it cannot be a
+# emitted rows and not just the failures (CLAUDE.md #14), so it cannot be a
 # signature that also matches passing rows.
 _WELDED_LOCANT = re.compile(r"[a-z]\d")
 
@@ -183,7 +183,7 @@ def test_no_emitted_name_welds_a_locant_onto_a_prefix(namer):
 
 
 def test_every_emitted_name_cites_cation_before_anion(namer):
-    """P-74.1.2 :42447 'In names, cationic suffixes are cited before anionic
+    """P-74.1.2:42447 'In names, cationic suffixes are cited before anionic
     suffixes.' Spelling-independent: the '-ium' must precede the '-carboxylate'."""
     checked = 0
     for smiles, _expected in ALL_NAMED_ROWS:
@@ -201,7 +201,7 @@ def test_every_emitted_name_cites_cation_before_anion(namer):
 def test_substituent_set_cannot_decide_the_bb_example():
     """The reason the anion-attachment criterion is needed at all.
 
-    For BB :42456 both numbering directions put substituents at {1,2,4,6}, so
+    For BB:42456 both numbering directions put substituents at {1,2,4,6}, so
     criterion (e) is blind and, without the new criterion, an arbitrary
     canonical-rank tiebreak picks the direction. This test asserts the
     degeneracy, so if someone deletes the criterion believing (e) covers it, the

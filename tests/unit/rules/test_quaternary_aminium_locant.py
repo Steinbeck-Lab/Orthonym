@@ -1,4 +1,4 @@
-"""v31 (P-31.1.4.2.4 / P-73.1.2.1): a quaternary ammonium whose parent branch is
+""" (P-31.1.4.2.4 / P-73.1.2.1): a quaternary ammonium whose parent branch is
 substituted must number that branch with the N-attached carbon as C1 (the amine
 principal group takes the lowest locant). Regression: `CC[N+](CC)(CC)CCF` emitted
 `1-fluoro-N,N,N-triethylethanaminium` (fluoro at C1 — the chain numbered from the
@@ -41,7 +41,7 @@ def test_substituted_quaternary_aminium_locant_rt_exact(smiles):
 
 
 # =============================================================================
-# v33 Phase 3 (WS-Q): two independent bugs in `name_quaternary_aminium` that
+# a phase (WS-Q): two independent bugs in `name_quaternary_aminium` that
 # made a quaternary ammonium with an acid or phenol on the parent branch
 # abstain (correctly, via SELF-01 -- 0-wrong held, but breadth was lost).
 #
@@ -110,14 +110,30 @@ def test_quaternary_aminium_regressions_unchanged(smiles, expected):
 
 
 @pytest.mark.opsin_gate
-def test_n_aryl_quaternary_ammonium_fails_closed():
-    """A quaternary N bonded DIRECTLY to an aromatic ring (no carbon chain
-    exists off N at all -- e.g. phenyltrimethylammonium) is a separate,
-    out-of-scope shape: `_assemble_amine_name`'s ring branch has no
-    aromatic-ring amine-parent construction ('anilinium'-style), so
-    `find_principal_chain` legitimately returns empty and there is nothing
-    for the WS-Q.2 fix to rescue. Must FAIL CLOSED (abstain), never emit a
-    wrong molecule."""
-    name = _pin_name("c1ccccc1[N+](C)(C)C")
+@pytest.mark.parametrize("smiles,expected", [
+    # Task 8B RC2 (P-73.1.2.1, the Blue Book): a quaternary N bonded DIRECTLY to an
+    # (hetero)aromatic ring is named on the ring-amine parent (aniline is retained),
+    # not the chain amine. This class USED to fail closed -- `_assemble_amine_name`
+    # cannot name an aromatic ring parent ('_generate_ring_parent' returns '' ->
+    # malformed 'anaminium') -- and is now built via a neutral primary-amine proxy.
+    ("c1ccccc1[N+](C)(C)C", "N,N,N-trimethylanilinium"),        # the Blue Book (PIN)
+    ("CC[N+](C)(C)c1ccccc1", "N-ethyl-N,N-dimethylanilinium"),  # mixed N-substituents
+    ("C[N+](C)(C)c1ccc2ccccc2c1", "N,N,N-trimethylnaphthalen-2-aminium"),
+    ("C[N+](C)(C)c1ccncc1", "N,N,N-trimethylpyridin-4-aminium"),  # heteroaromatic ring
+])
+def test_aryl_quaternary_aminium_now_built(smiles, expected):
+    """Task 8B RC2 (P-73.1.2.1, the Blue Book): aryl-quaternary-N ->...anilinium."""
+    name = _pin_name(smiles)
+    assert name == expected, f"{smiles} -> {name!r}, expected {expected!r}"
+
+
+@pytest.mark.opsin_gate
+def test_substituted_aryl_quaternary_aminium_fails_closed():
+    """A SUBSTITUTED aromatic ring parent is deliberately DECLINED (P-73.1.2.1 scope
+    boundary): the bounded producer does not alphabetise the ring's C-substituent
+    prefixes against the N-locant block, and OPSIN still parses the mis-spelled
+    concatenation (the RT gate cannot catch it), so this must fail closed (abstain),
+    never emit a mis-spelled name."""
+    name = _pin_name("C[N+](C)(C)c1ccc(C)cc1")
     assert name == "unknown organic compound", (
         f"expected fail-closed abstention, got {name!r}")

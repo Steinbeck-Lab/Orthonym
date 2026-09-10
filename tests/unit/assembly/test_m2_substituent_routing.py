@@ -1,6 +1,6 @@
 """M2 Task 1 — tier propagation for ``name_substituent`` (best-effort scope only).
 
-Measured (,
+Measured (internal notes,
 `.superpowers/sdd/M1-PLAN/m2-task-1-report.md`): 75/166 pubchem10k rows hit the
 substituent cascade's ``substituent``/``unknown`` placeholder internally under the
 best-effort tier. Of the 71 unique declined root fragments, 37 (mapping to 38
@@ -10,8 +10,8 @@ standalone -- the "tier-propagation" bucket. ``name_substituent``
 ``allow_mancude=False``, so even inside a best-effort whole-molecule run the
 cascade was still gated at the DEFAULT tier and declined those fragments.
 
-An empirical fresh-process SPY over all 38 candidate rows (before vs. after the
-fix, via ``) found the TRUE conversion rate at the
+An empirical fresh-process a trace over all 38 candidate rows (before vs. after the
+fix, via ``scripts/an A/B check``) found the TRUE conversion rate at the
 best-effort tier (``general_fallback=True, general_fallback_unverified=True,
 allow_aromatic_general=True``) -- i.e. rows where the FINAL emitted name flips
 from the abstention sentinel to a real, OPSIN-round-trip-verified name -- is
@@ -29,7 +29,7 @@ gate, because gate-OFF ships whatever a recovery-lane candidate happens to
 build, unguarded. Measured directly: WITHOUT the marker,
 ``test_default_tier_unchanged`` spuriously FAILED for 3/6 witnesses (a
 gate-disabled recovery-lane artifact of the test harness, not a real
-default-tier widening -- confirmed absent via `` against a
+default-tier widening -- confirmed absent via ``scripts/an A/B check`` against a
 bare, unpatched ``orthonym`` import and reproduced/explained with
 ``tests/conftest.py``'s own ``_opsin_validity_gate_state`` fixture). WITH the
 marker (gate ON, matching production), all 6 pass byte-identically.
@@ -40,7 +40,7 @@ from orthonym import Orthonym
 from orthonym.errors import is_refusal_sentinel
 
 # The 7 measured TRUE conversions (best-effort: abstain -> real OPSIN-valid name).
-# pubchem10k.jsonl row indices kept in the comment for traceability back to the SPY.
+# pubchem10k.jsonl row indices kept in the comment for traceability back to the a trace.
 TIER_PROPAGATION_WITNESSES = [
     "CCC[C@H](N)C(=O)N(C)[C@H]1CC[C@@H]2CN(Cc3ccc(C(F)(F)F)cc3)C[C@@H]21",  # row 23
     "CCC[C@@H](C)NC(=O)C[C@H]1Sc2ccc(C(F)(F)F)cc2NC1=O",                    # row 28
@@ -51,7 +51,7 @@ TIER_PROPAGATION_WITNESSES = [
     "CNC(=O)c1cc(COC(=O)NC2CC3(CCN(c4ccc5cc(F)ccc5n4)CC3)C2)[nH]n1",       # row 141
 ]
 
-# A subset where PIN default was VERIFIED (head_ab.sh, HEAD vs. patched) to
+# A subset where PIN default was VERIFIED (an A/B check, HEAD vs. patched) to
 # abstain byte-identically both before and after the fix -- the default-tier
 # non-widening witnesses.
 DEFAULT_STILL_ABSTAINS = [
@@ -63,9 +63,9 @@ DEFAULT_STILL_ABSTAINS = [
     "CNC(=O)c1cc(COC(=O)NC2CC3(CCN(c4ccc5cc(F)ccc5n4)CC3)C2)[nH]n1",       # row 141
 ]
 
-# M4-fold nested-branch prefixes (
+# M4-fold nested-branch prefixes (internal notes
 # "M4-fold prefixes"): azido / sulfamoyl / methanesulfonyl on a substituent
-# branch off a diol backbone. NOTE (measured via head_ab.sh): these three are
+# branch off a diol backbone. NOTE (measured via an A/B check): these three are
 # UNCHANGED by the Task-1 edit -- best-effort already named them via a
 # different path before the fix, so they are regression/documentation
 # witnesses for the tier contrast, not conversions this fix produced.
@@ -114,7 +114,7 @@ def test_tier_propagation_roundtrips(eng, smi):
 @pytest.mark.parametrize("smi", DEFAULT_STILL_ABSTAINS)
 def test_default_tier_unchanged(pin_eng, smi):
     # These 6 rows abstain at PIN default both BEFORE and AFTER the fix
-    # (verified via  on src/orthonym/assembly/
+    # (verified via scripts/an A/B check on src/orthonym/assembly/
     # substituent_enumerator.py) -- best_effort_ctx is unset at default tier,
     # so name_substituent's effective allow_mancude is unchanged there. Needs
     # the ``opsin_gate`` marker (see module docstring) -- without it the
@@ -151,7 +151,7 @@ def test_m4_fold_besteffort_roundtrips(eng, tag, smi):
 # M2 Task 2 -- route the declined fragment to the general engine (-yl route)
 # =============================================================================
 #
-# Measured (,
+# Measured (internal notes,
 # `.superpowers/sdd/M1-PLAN/m2-task-2-report.md`): after Task 1, 28 of the
 # original 38 tier-propagation candidates still abstain because the cascade
 # DECLINES a ring/cage fragment that the whole-molecule general engine
@@ -164,23 +164,23 @@ def test_m4_fold_besteffort_roundtrips(eng, tag, smi):
 # ring producers, which build suffix-free names).
 #
 # ⚠ MEASURED, NOT ASSUMED (a genuine negative finding, not a gap in
-# searching): a fresh-process spy over the FIRST 62 rows of
+# searching): a fresh-process trace over the FIRST 62 rows of
 # `abstentions/pubchem10k.jsonl` (outer-wrap on `name_substituent`, gate ON,
 # capped per the task's efficiency bound) found 20 real molecules whose
 # naming hits this exact decline (rows 8, 9, 14, 18, 25, 27, 30, 32, 33, 35,
 # 37, 38, 39, 42, 44, 47, 49, 52, 57, 61) -- but EVERY one of them still
-# abstains even with this fix ( on
+# abstains even with this fix (`scripts/an A/B check` on
 # `substituent_enumerator.py`: identical abstain=True with and without the
 # fix), because each carries >=1 OTHER independent blocker elsewhere in the
 # same molecule (the "mean 4.08 distinct blockers per abstainer" finding).
 # A further forward scan of rows 62-165 found 8 rows that now name
-# successfully, but  proved every one of those ALSO
-# already named successfully at HEAD `58fe3146` (before this fix) via a
+# successfully, but `scripts/an A/B check` proved every one of those ALSO
+# already named successfully at HEAD (before this fix) via a
 # DIFFERENT, pre-existing candidate -- so none of them are attributable to
 # this routing either.
 #
 # The fragments themselves ARE genuinely routable, though (proof by
-# construction, the SAME method the SPY itself used for its "row 20" claim):
+# construction, the SAME method the a trace itself used for its "row 20" claim):
 # `_route_fragment_to_general_engine` returns a real, OPSIN-valid `-yl` token
 # for the exact declined fragments from pubchem10k.jsonl rows 42
 # (`Cc1cc2c(nc1OCCN1CCC1)OC1(CC1)CNS2=O`, attach atom 6 -- a
@@ -188,9 +188,9 @@ def test_m4_fold_besteffort_roundtrips(eng, tag, smi):
 # (`CCN(CC)OCC1C=CC(C2=CC3(CCCNCC3)Oc3ccc(F)cc32)=CN1`, attach atom 11 -- a
 # spiro-benzopyran-azepane). The reason NO single-occurrence molecule
 # (neither a real pubchem10k/pubchem_2000 row nor a constructed single-copy
-# molecule bearing either fragment, `head_ab.sh`-verified) demonstrates the
+# molecule bearing either fragment, `an A/B check`-verified) demonstrates the
 # fix in isolation is that the pre-existing "ring/cage-as-parent" universal
-# fallback (built in v33-v37, before M2) ALWAYS offers an alternative
+# fallback (built in -, before M2) ALWAYS offers an alternative
 # candidate that treats the ring system as the parent and everything else as
 # a prefix -- e.g. "4-acetamido-6-fluorospiro[1-benzopyran-2,4'-azepane]"
 # instead of "N-(6-fluorospiro[1-benzopyran-2,4'-azepane]-4-yl)acetamide" --
@@ -199,8 +199,8 @@ def test_m4_fold_besteffort_roundtrips(eng, tag, smi):
 # occurrences on the same simple acid chain) removes that escape hatch --
 # only ONE ring system can be the parent, so the OTHER MUST be named as a
 # substituent -- and is therefore the smallest construction that isolates
-# the mechanism. Verified via 
-# src/orthonym/assembly/substituent_enumerator.py -- ...`: HEAD (A)
+# the mechanism. Verified via `scripts/an A/B check
+# src/orthonym/assembly/substituent_enumerator.py --...`: HEAD (A)
 # abstains (`unknown organic compound`) on both; the working tree (B) names
 # both and both round-trip (OPSIN InChI match True).
 TASK2_ROUTED_WITNESSES = [
@@ -244,9 +244,9 @@ def test_task2_default_tier_unchanged(pin_eng, smi):
 
 def test_task2_route_declines_on_ring_cutting_extraction():
     """Fail-closed guard: a frag_atoms set whose extraction would CUT a ring
-    (one of the SPY's 4 fragmentation artifacts) must decline, never emit a
+    (one of the a trace's 4 fragmentation artifacts) must decline, never emit a
     fragment describing a different, ring-opened molecule. Reproduces the
-    exact ring-cutting (frag_atoms, attach_idx) pairs the spy measured as the
+    exact ring-cutting (frag_atoms, attach_idx) pairs the trace measured as the
     FIRST candidate attempt for pubchem10k rows 14/38/52 -- each a real
     intermediate the search tries and must reject."""
     from rdkit import Chem
@@ -271,7 +271,7 @@ def test_task2_route_declines_on_ring_cutting_extraction():
 
 def test_task2_route_declines_on_noncarbon_attach():
     """Fail-closed guard: OH-capping a non-carbon attach atom would change
-    the fragment's chemistry (N-OH is a hydroxylamine, O-OH a peroxide, ...),
+    the fragment's chemistry (N-OH is a hydroxylamine, O-OH a peroxide,...),
     so the route must decline rather than risk naming a different molecule.
     Reproduces pubchem10k row 8's NITROGEN-attach candidate (attach atom 14,
     a clean single-external-bond, non-ring-cutting extraction -- otherwise a
@@ -345,13 +345,13 @@ def test_placeholder_never_splices(eng):
     weave 'substituent'/'unknown' into an otherwise-real name.
 
     Measured (this task, fresh-process probe over all 166 rows, gate ON,
-    ``): 140 rows abstain with the exact honest
+    ``scratchpad/probe_task3.py``): 140 rows abstain with the exact honest
     sentinel 'unknown organic compound' (not an offender -- see
     ``_is_whole_name_abstention``); 0 timeouts; 0 exceptions; 0 rows where the
     placeholder is embedded in a longer/different constructed name reach the
     final ``eng.name()`` result -- Tasks 1-2 (tier propagation + routing) plus
     the existing OPSIN self-consistency gate (visible in this run's log as
-    'OPSIN validity gate suppressed unparseable name: ...unknown...' for
+    'OPSIN validity gate suppressed unparseable name:...unknown...' for
     several internal candidates, e.g. 'unknownmethanol') already void every
     would-be splice before it reaches the caller. This test therefore passes
     with zero offenders even without the M2 Task 3 guards -- they are
@@ -364,7 +364,7 @@ def test_placeholder_never_splices(eng):
     rows = [
         json.loads(line)
         for line in pathlib.Path(
-            ""
+            ".planning/audit-v33/abstentions/pubchem10k.jsonl"
         ).read_text().splitlines()[:400]
     ]
     offenders = [

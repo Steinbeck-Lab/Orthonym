@@ -49,12 +49,12 @@ class TestNPDecorationEnumeration:
         assert result == "cholesterol"
 
     def test_testosterone_decoration(self):
-        """Testosterone-configured input: 17beta-hydroxyandrost-4-en-3-one.
+        """Testosterone-configured input: 17β-hydroxyandrost-4-en-3-one.
 
         Has -OH at C-17 (prefix when ketone present), =O at C-3 (suffix),
         and C=C between C-4 and C-5 (ene suffix).
 
-        v33 Phase 1 (C2a stereo honesty, fix round 1): re-keyed from a flat
+         a phase (C2a stereo honesty, fix round 1): re-keyed from a flat
         (stereo-undefined) input to a fully stereo-defined one -- the flat form
         is now correctly declined by name_natural_product's steroid stereo-honesty
         guard (it fabricated the natural ring configuration). RT-full verified
@@ -62,14 +62,14 @@ class TestNPDecorationEnumeration:
         """
         smiles = "C[C@]12CC[C@H]3[C@@H](CCC4=CC(=O)CC[C@]34C)[C@@H]1CC[C@@H]2O"
         result = name_compound(smiles)
-        assert result == "17beta-hydroxyandrost-4-en-3-one", f"Got '{result}'"
+        assert result == "17β-hydroxyandrost-4-en-3-one", f"Got '{result}'"
 
     def test_progesterone_decoration(self):
         """Progesterone-configured input: pregn-4-ene-3,20-dione.
 
         Has two ketone groups (C-3 and C-20) and one double bond (C-4,5).
 
-        v33 Phase 1 (C2a stereo honesty, fix round 1): re-keyed from a flat
+         a phase (C2a stereo honesty, fix round 1): re-keyed from a flat
         (stereo-undefined) input to a fully stereo-defined one (a valid
         diastereomer distinct from the exact-derivative 'progesterone' lookup
         entry, so this test still exercises scaffold-based decoration
@@ -82,7 +82,7 @@ class TestNPDecorationEnumeration:
     def test_androstanedione_decoration(self):
         """Androst-4-ene-3,17-dione: two ketones + one double bond.
 
-        v33 Phase 1 (C2a stereo honesty, fix round 1): re-keyed from a flat
+         a phase (C2a stereo honesty, fix round 1): re-keyed from a flat
         (stereo-undefined) input to a fully stereo-defined one (natural ring
         config; C-4=C-5 is an enone double bond so C-5 is not a stereocentre
         here). RT-full verified. Also corrects a stale expected value: the
@@ -96,10 +96,10 @@ class TestNPDecorationEnumeration:
     def test_estradiol_decoration(self):
         """Estradiol-configured input: estrane with two -OH groups.
 
-        Aromatic ring A is now detected via Kekulized copy (Phase 101-02),
+        Aromatic ring A is now detected via Kekulized copy (a phase-02),
         producing ene locants for the aromatic C=C bonds.
 
-        v33 Phase 1 (C2a stereo honesty, fix round 1): re-keyed from a flat
+         a phase (C2a stereo honesty, fix round 1): re-keyed from a flat
         (stereo-undefined) input to a fully stereo-defined one (matches the
         W5-A2 gold row re-assertion). RT-full verified.
         """
@@ -121,13 +121,13 @@ class TestNPDecorationEnumeration:
     def test_camphor_not_steroid_enumeration(self):
         """Camphor must not be reached by steroid decoration enumeration.
 
-        v29 Task E2: renamed from test_camphor_exact_match and the expected value
+        : renamed from test_camphor_exact_match and the expected value
         changed from "camphor". Camphor is now an adjudicated non-PIN -- it is a
-        ketone, and P-64.2.1.1 (BlueBookV2.md:28297) makes chalcone "the only
+        ketone, and P-64.2.1.1 (the Blue Book) makes chalcone "the only
         retained name as a preferred IUPAC name", while P-64.2.1.2 (:28307) is a
         closed general-nomenclature list that excludes it. The point this test
         guards is unchanged: the name comes from the von Baeyer builder, NOT from
-        steroid enumeration. The value is the Blue Book's own form at :52648.
+        steroid enumeration. The value is the Blue Book's own form at:52648.
         """
         result = name_compound("CC12CCC(CC1=O)C2(C)C")
         assert result == "1,7,7-trimethylbicyclo[2.2.1]heptan-2-one"
@@ -137,7 +137,7 @@ class TestNPDecorationEnumeration:
 
         Saturated steroid with single -OH and no ketone uses -ol suffix.
 
-        v33 Phase 1 (C2a stereo honesty, fix round 1): re-keyed from a flat
+         a phase (C2a stereo honesty, fix round 1): re-keyed from a flat
         (stereo-undefined) input -- the flat form is now correctly declined
         (it fabricated the natural ring configuration + the new C-3 stereo-
         centre). RT-full verified.
@@ -168,7 +168,7 @@ class TestNPDecorationEdgeCases:
     def test_ketone_only_saturated(self):
         """Saturated steroid with only ketone decoration.
 
-        v33 Phase 1 (C2a stereo honesty, fix round 1): re-keyed from a flat
+         a phase (C2a stereo honesty, fix round 1): re-keyed from a flat
         (non-stereo) input to a fully stereo-defined one -- flat is now
         correctly declined (fabricated the natural ring configuration).
         RT-full verified.
@@ -189,7 +189,7 @@ class TestNPDecorationEdgeCases:
     def test_multiple_hydroxyls(self):
         """Steroid with multiple -OH groups.
 
-        v33 Phase 1 (C2a stereo honesty, fix round 1): re-keyed from a flat
+         a phase (C2a stereo honesty, fix round 1): re-keyed from a flat
         (stereo-undefined) input -- flat is now correctly declined (fabricated
         the natural ring configuration + both new stereocentres). RT-full
         verified.

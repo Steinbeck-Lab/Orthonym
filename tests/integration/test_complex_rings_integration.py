@@ -1,5 +1,5 @@
 """
-End-to-end integration tests for Phase 6: Complex Ring Systems.
+End-to-end integration tests for a phase: Complex Ring Systems.
 
 Verifies complex ring naming requirements (COMPLEX-01 through COMPLEX-05):
 - COMPLEX-01: Bicyclo compound naming (bicyclo[x.y.z] format)
@@ -168,9 +168,11 @@ class TestCOMPLEX03:
         # Benzimidazole
         ("c1ccc2[nH]cnc2c1", "1H-benzimidazole"),
         # Benzofuran (no indicated H needed)
-        ("c1ccc2occc2c1", "benzofuran"),
+        #: 1-benzofuran is the PIN (P-25.2.2.4, the Blue Book)
+        ("c1ccc2occc2c1", "1-benzofuran"),
         # Benzothiophene (no indicated H needed)
-        ("c1ccc2sccc2c1", "benzothiophene"),
+        #: 1-benzothiophene is the PIN (P-25.2.2.4, the Blue Book)
+        ("c1ccc2sccc2c1", "1-benzothiophene"),
     ])
     def test_fused_heterocycle_retained_names(self, smiles, expected):
         """Test fused heterocycle retained names with tautomer locants."""
@@ -313,7 +315,7 @@ class TestEdgeCases:
 # =============================================================================
 
 class TestCounts:
-    """Verify test coverage for Phase 6 Plan 5."""
+    """Verify test coverage for a phase Plan 5."""
 
     @pytest.mark.integration
     def test_sufficient_coverage(self):

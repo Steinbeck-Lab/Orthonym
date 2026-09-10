@@ -1,5 +1,5 @@
-"""v26 P6: retained-name preference over the general fallback (PIN-QUALITY
-GUARDRAIL, ``complete`` tier only; Heritage A3).
+""": retained-name preference over the general fallback (PIN-QUALITY
+GUARDRAIL, ``complete`` tier only; AutoNom A3).
 
 P6 is 0-new-coverage BY DESIGN (V26-MILESTONE-DESIGN.md P6). It sits inside
 the general-engine late-recovery (``namer.py:_try_general_engine_recovery``):
@@ -284,7 +284,7 @@ def test_preference_fails_closed_when_candidate_mismatches(monkeypatch):
     """Direct recovery-method call (see the PIN-PATH CONFOUND note on
     ``test_preference_fires_under_complete``).
 
-    v31: the engine's own candidate for ACCEPT_CASES[0] is now the retained
+    : the engine's own candidate for ACCEPT_CASES[0] is now the retained
     ``expected`` name (name_general recognizes it directly), so the fake oracle
     maps THAT (not the old von-Baeyer general_name) and the invariant asserts the
     fabricated retained preference is rejected -> the engine's real candidate ships."""
@@ -327,7 +327,7 @@ def test_preference_fails_closed_when_jar_absent(monkeypatch):
                      allow_aromatic_general=True,
                      general_fallback_unverified=True)
     got = comp._try_general_engine_recovery(canon)
-    # v31: jar absent -> the P6 retained-preference swap is skipped (it needs the
+    #: jar absent -> the P6 retained-preference swap is skipped (it needs the
     # oracle), so the fabricated preference never overrides the engine's own
     # candidate, which is now the retained ``expected`` name.
     assert got == expected, (
@@ -340,7 +340,7 @@ def test_preference_fails_closed_when_jar_absent(monkeypatch):
 # --------------------------------------------------------------------------
 @pytest.mark.parametrize("smiles,expected,_general", ACCEPT_CASES)
 def test_pin_names_accept_cases_directly(smiles, expected, _general, production_gate):
-    """v31 change-asserted-value (was test_pin_abstains_accept_cases): the PIN
+    """ change-asserted-value (was test_pin_abstains_accept_cases): the PIN
     path has since gained direct recognition of these fused-heterocycle / bridged
     retained parents, so it NO LONGER abstains — it names them (benzo[f]quinoline,
     quinolizidine) at pin, RT-verified. A conformance improvement: the P6
@@ -362,7 +362,7 @@ def test_complete_prefers_retained_name(smiles, expected, _general,
 
 
 def test_valid_tier_names_quinolizidine_directly(production_gate):
-    """v31 change-asserted-value (was ...keeps_von_baeyer_name...): the PIN/valid
+    """ change-asserted-value (was...keeps_von_baeyer_name...): the PIN/valid
     parent path now recognizes quinolizidine directly, so `valid` ships the
     retained name 'quinolizidine' (RT-exact), NOT the old von-Baeyer residual
     '1-azabicyclo[4.4.0]decane'. A conformance improvement, tier-independent."""

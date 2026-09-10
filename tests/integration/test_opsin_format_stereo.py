@@ -1,7 +1,7 @@
 """
 Integration tests: stereo descriptor format OPSIN compatibility.
 
-Phase 138 Plan 02: Each stereo-format compound from the v17.0 triage
+a phase Plan 02: Each stereo-format compound from the v17.0 triage
 (49 compounds) has been individually investigated by testing generated
 names against OPSIN 2.9.0 with and without stereo descriptors.
 
@@ -394,7 +394,7 @@ class TestStereoFormatSpecificPatterns:
 
     @pytest.mark.xfail(reason="OPSIN limitation: stereo after sugar prefix")
     def test_sugar_prefix_stereo(self):
-        """Compound #3: (beta-D-glucopyranosyloxy)(1S,...)-4-hydroxy-...
+        """Compound #3: (β-D-glucopyranosyloxy)(1S,...)-4-hydroxy-...
         Stereo descriptors positioned after sugar prefix in ester name.
         """
         name = name_compound(

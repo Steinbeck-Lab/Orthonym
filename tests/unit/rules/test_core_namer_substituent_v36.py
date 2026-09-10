@@ -1,17 +1,17 @@
-"""v36 core-namer: ring-bearing compound-substituent silent-drop witnesses.
+""" core-namer: ring-bearing compound-substituent silent-drop witnesses.
 
-At HEAD (before the v36 core-namer fix) each witness ABSTAINS at the best-effort
+At HEAD (before the core-namer fix) each witness ABSTAINS at the best-effort
 tier: a ring-parent substituent enumerator names the parent but silently drops a
 ring-bearing compound substituent it cannot render, and SELF-01 then suppresses
 the atom-incomplete partial name (final output ``unknown organic compound``).
 
-Two root causes were found (full spy trail:
-`` + the fix
+Two root causes were found (full trace trail:
+`internal notes` + the fix
 commits):
 
 1. The fused-heterocycle substituent enumerator
    (``rules/fused_rings.py::_identify_fused_substituent``) never delegated a
-   ring-bearing compound substituent rooted at a HETEROATOM linker.  The
+   ring-bearing compound substituent rooted at a HETEROATOM linker. The
    pantoprazole C2 ``-S(=O)-CH2-[pyridine]`` half is rooted at the sulfinyl S, so
    it never reached the carbon branch's ring delegate at ``:1724`` -- it hit the
    sulfur branch, which has no ring delegate, returned ``None``, and the caller
@@ -27,9 +27,9 @@ chalcogen (so the fragment degrades to the oxo-preserving replacement name).
 Each witness must then emit a name that round-trips through OPSIN to the full
 input InChIKey (0-wrong).
 
-Every witness below was A/B-verified with `` to ABSTAIN at
-HEAD and to NAME + round-trip with the fix.  Fresh process per witness
-(warm-cache hazard -- the contributor guide).
+Every witness below was A/B-verified with ``scripts/an A/B check`` to ABSTAIN at
+HEAD and to NAME + round-trip with the fix. Fresh process per witness
+(warm-cache hazard -- CLAUDE.md).
 """
 import json
 import subprocess
@@ -39,11 +39,11 @@ import pytest
 
 # --- fused-heterocycle parent, ring-bearing compound substituent (Tasks 2/4) --
 # The pantoprazole class: a benzimidazole parent carrying an S(=O)-rooted
-# ring-bearing compound substituent at C2.  All three ABSTAIN at HEAD.
+# ring-bearing compound substituent at C2. All three ABSTAIN at HEAD.
 FUSED_HETEROCYCLE_WITNESSES = [
     # pantoprazole (trifluoromethoxy variant) -- the charter anchor.
     "COc1ccnc(CS(=O)c2nc3ccc(OC(F)(F)F)cc3[nH]2)c1OC",
-    # pantoprazole (difluoromethoxy variant, the C4-spy shape).
+    # pantoprazole (difluoromethoxy variant, the C4-trace shape).
     "COc1ccnc(CS(=O)c2nc3ccc(OC(F)F)cc3[nH]2)c1OC",
     # a benzimidazole-sulfinyl-benzyl (trifluoromethyl on the benzo ring).
     "O=S(Cc1ccccc1)c1nc2ccc(C(F)(F)F)cc2[nH]1",
@@ -54,12 +54,12 @@ WITNESSES = list(FUSED_HETEROCYCLE_WITNESSES)
 # --- complex-ring (spiro / von-Baeyer) parent enumerator (Task 3) -------------
 # The composer's complex-ring substituent enumerator
 # (assembly/composer.py::_enrich_complex_ring_with_subs) is the spiro / von-Baeyer
-# sibling of the fused enumerator.  A ring-bearing compound substituent being
+# sibling of the fused enumerator. A ring-bearing compound substituent being
 # DROPPED there is off-path in the sampled ChEBI corpus (0 in 520+ molecules;
 # parent selection routes the ring substituent through the fused path instead --
-# invariant 8), so Task 3 is proven at the WIRING level: the composer must thread
+# a project rule), so Task 3 is proven at the WIRING level: the composer must thread
 # the best-effort context into ``name_substituent`` as ``allow_mancude=True``
-# exactly as the fused enumerator now does.  At HEAD it always passed ``False``.
+# exactly as the fused enumerator now does. At HEAD it always passed ``False``.
 # 9-methylspiro[5.5]undecane routes its substituent enumeration through the
 # enricher, so it exercises the wiring deterministically.
 COMPOSER_WIRING_SMILES = "CC1CCC2(CC1)CCCCC2"
@@ -68,9 +68,9 @@ COMPOSER_WIRING_SMILES = "CC1CCC2(CC1)CCCCC2"
 def _cn_rt(smiles):
     """Best-effort name + OPSIN full-InChIKey round-trip, in a FRESH process.
 
-    Returns ``{"name": str|None, "tier": str, "rt": bool|None}``.  A subprocess
+    Returns ``{"name": str|None, "tier": str, "rt": bool|None}``. A subprocess
     per call is deliberate: the fragment memo cache is per-process and warm-cache
-    state has repeatedly produced false greens in this project (the contributor guide).
+    state has repeatedly produced false greens in this project (CLAUDE.md).
     """
     out = subprocess.run(
         [sys.executable, __file__, smiles],
@@ -102,7 +102,7 @@ def test_fused_heterocycle_ring_bearing_substituent_names_and_rt(smiles):
 
 def test_composer_threads_best_effort_allow_mancude():
     """Task 3: the complex-ring (spiro/VB) substituent enumerator must thread the
-    best-effort context into ``name_substituent`` (``allow_mancude=True``).  RED at
+    best-effort context into ``name_substituent`` (``allow_mancude=True``). RED at
     HEAD, where the composer always passed ``allow_mancude=False``."""
     out = subprocess.run(
         [sys.executable, __file__, "--wiring-probe", COMPOSER_WIRING_SMILES],
@@ -159,7 +159,7 @@ def test_composer_fail_closed_on_unnameable_ring_bearing_substituent():
 
 
 def test_composer_keeps_skip_for_unnameable_nonring_substituent():
-    """Task 4 scoping (invariant 9): a NON-ring unnameable / mis-discovered drop
+    """Task 4 scoping (a project rule): a NON-ring unnameable / mis-discovered drop
     keeps the prior skip (returns the bare parent) -- only ring-bearing,
     atom-significant drops abort. Green at HEAD and with the fix."""
     from rdkit import Chem
@@ -188,7 +188,7 @@ def test_composer_keeps_skip_for_unnameable_nonring_substituent():
 def _composer_wiring_probe(smiles):
     """Report the ``allow_mancude`` values ``_enrich_complex_ring_with_subs``
     passes into ``name_substituent`` while naming ``smiles`` at the best-effort
-    tier.  The v36 Task-3 wiring makes these True; at HEAD they are always False."""
+    tier. The Task-3 wiring makes these True; at HEAD they are always False."""
     from orthonym.jvm_budget import jvm_slots
     with jvm_slots(1, purpose="v36-cn-wiring"):
         import orthonym.assembly.composer as comp

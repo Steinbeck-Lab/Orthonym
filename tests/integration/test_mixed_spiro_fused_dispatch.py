@@ -33,7 +33,7 @@ class TestMixedSpiroFusedDispatch:
     def test_dispatch_does_not_return_none_on_known_mixed_smiles(self):
         """The composer dispatch must invoke name_mixed_spiro_fused; if the
         elif branch is missing, _assemble_complex_ring_name returns None and
-        the entire HERITAGE §4 path is dead code from name_compound.
+        the entire AUTONOM §4 path is dead code from name_compound.
 
         We use a synthetic spiro-fused SMILES known to classify as
         mixed-spiro-fused per is_mixed_spiro_fused. If the function returns
@@ -43,7 +43,7 @@ class TestMixedSpiroFusedDispatch:
         from orthonym.rules.spiro import is_mixed_spiro_fused
 
         # Synthetic mixed-spiro-fused: indoline (fused) + cyclohexane (spiro side)
-        # The exact SMILES is the canonical HERITAGE §4 example
+        # The exact SMILES is the canonical AUTONOM §4 example
         # spiro[indoline-3,1'-cyclohexane]: C1CCC2(CC1)CC1=CC=CC=C1N2
         smi = "C1CCC2(CC1)CC1=CC=CC=C1N2"
         mol = Chem.MolFromSmiles(smi)
@@ -74,11 +74,11 @@ class TestMixedSpiroFusedDispatch:
     def test_corpus_mixed_spiro_fused_routes_through_dispatch(self, fixture):
         """Each corpus mixed-spiro-fused fixture: assert name_compound
         does NOT return None AND the returned name contains 'spiro['
-        (HERITAGE §4 separable-parts nested form per 151-02 D-13).
+        (AUTONOM §4 separable-parts nested form per 151-02 D-13).
 
         If a particular fixture's name_mixed_spiro_fused implementation
         returns None today (legitimately — some fixtures are logged to
-        HERITAGE-followups.md per D-24 as v19 architectural followups),
+        AUTONOM-followups.md per D-24 as v19 architectural followups),
         mark it xfail with the followup citation. The HARD assertion is
         that AT LEAST ONE corpus fixture returns a non-None name with
         'spiro[' — proving the elif branch is live.
@@ -94,7 +94,7 @@ class TestMixedSpiroFusedDispatch:
         if name is None or name == "unknown":
             pytest.xfail(
                 f"{fixture.get('fixture_id')} returns None/unknown — see "
-                f" for the v19 followup "
+                f".planning/references/AUTONOM-followups.md for the v19 followup "
                 f"this fixture is tracked under (D-24 no-band-aid policy)."
             )
         # If the corpus fixture routes to another handler (tricyclo, tetracyclo,
@@ -108,7 +108,7 @@ class TestMixedSpiroFusedDispatch:
                 f"{fixture.get('fixture_id')} routes to a non-spiro handler "
                 f"({name!r}) — corpus classification heterogeneity, not a "
                 f"BLK-01 regression. The per-fixture branch-routing is "
-                f"tracked in HERITAGE-followups.md for v19 disambiguation."
+                f"tracked in AUTONOM-followups.md for v19 disambiguation."
             )
         # Assertion reached only when the fixture routes through the new
         # elif and name_mixed_spiro_fused succeeded — pipeline-level proof.

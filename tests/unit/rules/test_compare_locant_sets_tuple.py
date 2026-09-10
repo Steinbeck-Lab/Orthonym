@@ -1,7 +1,7 @@
 """
 Tests for tuple-aware compare_locant_sets and _assert_homogeneous_locants.
 
-Phase 147 Plan 01 Task 1 (SC-2, SC-7 evidence).
+a phase Plan 01 Task 1 (SC-2, SC-7 evidence).
 
 These tests cover:
 - Pure-int back-compat (the existing 3 doctests must also pass byte-identical)
@@ -16,10 +16,10 @@ IUPAC source: https://iupac.qmul.ac.uk/BlueBook/P1.html
   - P-14.7 Locant set comparison
   - P-14.4(g) Lowest locants for substituents (alphabetical tiebreaker context)
 
-Project source: Phase 146 D-19 (locant type safety lock-in);
-                Phase 147 CONTEXT D-01, D-02 (tuple encoding + coercion strategy);
-                Phase 147 RESEARCH §3 Risk 3 (min() hazard downstream).
-HERITAGE-1990 §3 (criterion-order comparison after permutation generation).
+Project source: a phase (locant type safety lock-in);
+                a phase CONTEXT, (tuple encoding + coercion strategy);
+                a phase RESEARCH §3 Risk 3 (min() hazard downstream).
+AUTONOM-1990 §3 (criterion-order comparison after permutation generation).
 """
 
 import pytest
@@ -64,7 +64,7 @@ def test_pure_int_identical_sets():
 
 
 # ----------------------------------------------------------------------------
-# Pure-tuple comparison (Phase 147 new behavior)
+# Pure-tuple comparison (a phase new behavior)
 # ----------------------------------------------------------------------------
 
 
@@ -74,7 +74,7 @@ def test_pure_tuple_equivalent_to_pure_int_when_all_empty_suffix():
     a=[(2,''),(3,''),(5,'')] vs b=[(3,''),(4,''),(6,'')] → a wins at position 0.
 
     Source: https://iupac.qmul.ac.uk/BlueBook/P1.html P-14.5.2
-    Phase 146 D-19 (locant type safety).
+    a phase (locant type safety).
     """
     a = [(2, ''), (3, ''), (5, '')]
     b = [(3, ''), (4, ''), (6, '')]
@@ -88,7 +88,7 @@ def test_fusion_atom_empty_string_sorts_before_letter():
 
     IUPAC convention: plain locant 4 is "lower" than fusion locant 4a.
     Source: https://iupac.qmul.ac.uk/BlueBook/P1.html P-14.5.2
-    Phase 147 CONTEXT D-01 (tuple encoding with empty-string-prefix ordering).
+    a phase CONTEXT (tuple encoding with empty-string-prefix ordering).
     """
     a = [(4, ''), (5, '')]
     b = [(4, 'a'), (5, '')]
@@ -101,7 +101,7 @@ def test_fusion_letters_order_a_before_b():
     a=[(4,'a'),(5,'')] vs b=[(4,'b'),(5,'')] → a wins at position 0.
 
     Source: https://iupac.qmul.ac.uk/BlueBook/P1.html P-14.5.2
-    HERITAGE-1990 §3 (criterion-order comparison).
+    AUTONOM-1990 §3 (criterion-order comparison).
     """
     a = [(4, 'a'), (5, '')]
     b = [(4, 'b'), (5, '')]
@@ -114,7 +114,7 @@ def test_fusion_base_beats_next_integer():
     a=[(4,'b'),(5,'')] vs b=[(5,''),(5,'')] → a wins at position 0.
 
     Source: https://iupac.qmul.ac.uk/BlueBook/P1.html P-14.5.2
-    Phase 147 CONTEXT D-01 (tuple encoding).
+    a phase CONTEXT (tuple encoding).
     """
     a = [(4, 'b'), (5, '')]
     b = [(5, ''), (5, '')]
@@ -135,7 +135,7 @@ def test_shorter_tuple_set_wins_on_prefix_tie():
 
 
 # ----------------------------------------------------------------------------
-# Mixed int + tuple coercion (Phase 147 coercion semantics)
+# Mixed int + tuple coercion (a phase coercion semantics)
 # ----------------------------------------------------------------------------
 
 
@@ -146,7 +146,7 @@ def test_mixed_ints_with_one_tuple_coerces_via_empty_string_a_wins():
     and b'=[(1,''),(2,''),(3,'b')]; a wins at position 2 because 'a' < 'b'.
 
     Source: https://iupac.qmul.ac.uk/BlueBook/P1.html P-14.5.2
-    Phase 147 CONTEXT D-02 (coercion path).
+    a phase CONTEXT (coercion path).
     """
     a = [1, 2, (3, 'a')]
     b = [1, 2, (3, 'b')]
@@ -162,7 +162,7 @@ def test_mixed_coerces_both_directions_to_identical():
     Reverse direction also holds.
 
     Source: https://iupac.qmul.ac.uk/BlueBook/P1.html P-14.7
-    Phase 147 CONTEXT D-02 (symmetric coercion).
+    a phase CONTEXT (symmetric coercion).
     """
     a = [1, (2, 'a'), 3]
     b = [(1, ''), (2, 'a'), (3, '')]
@@ -179,7 +179,7 @@ def test_mixed_coerces_both_directions_to_identical():
 def test_assert_homogeneous_all_int_ok():
     """_assert_homogeneous_locants accepts all-int list silently (returns None).
 
-    Source: Phase 146 D-19 (locant type safety lock-in).
+    Source: a phase (locant type safety lock-in).
     """
     assert _assert_homogeneous_locants([1, 2, 3]) is None
 
@@ -187,7 +187,7 @@ def test_assert_homogeneous_all_int_ok():
 def test_assert_homogeneous_all_tuple_ok():
     """_assert_homogeneous_locants accepts all-tuple list silently (returns None).
 
-    Source: Phase 146 D-19 (locant type safety lock-in).
+    Source: a phase (locant type safety lock-in).
     Source: https://iupac.qmul.ac.uk/BlueBook/P1.html P-14.7
     """
     assert _assert_homogeneous_locants([(1, ''), (2, ''), (3, 'a')]) is None
@@ -198,7 +198,7 @@ def test_assert_homogeneous_rejects_mixed_with_diagnostic_message():
     raise ValueError with a message mentioning both "mixed" and the offending
     types.
 
-    Source: Phase 146 D-19 (raises ValueError, not TypeError — actionable for
+    Source: a phase (raises ValueError, not TypeError — actionable for
     callers to fix their construction).
     """
     with pytest.raises(ValueError, match="mixed int and tuple"):
@@ -208,7 +208,7 @@ def test_assert_homogeneous_rejects_mixed_with_diagnostic_message():
 def test_assert_homogeneous_rejects_mixed_tuple_first():
     """Guard works regardless of which type appears first (order-independent).
 
-    Source: Phase 146 D-19.
+    Source: a phase.
     """
     with pytest.raises(ValueError, match="mixed int and tuple"):
         _assert_homogeneous_locants([(1, ''), 2, (3, 'a')])
@@ -217,6 +217,6 @@ def test_assert_homogeneous_rejects_mixed_tuple_first():
 def test_assert_homogeneous_empty_list_ok():
     """Empty list is trivially homogeneous (vacuously true).
 
-    Source: Phase 146 D-19 (no-op on empty — don't raise).
+    Source: a phase (no-op on empty — don't raise).
     """
     assert _assert_homogeneous_locants([]) is None

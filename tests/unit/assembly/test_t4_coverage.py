@@ -35,7 +35,7 @@ _ESTER_ROUTED_EXPECTED = (
 # general engine's charge suffixes AND ``name_universal_substitutive`` (whose
 # B2b charge support explicitly DEFERS FG anions -- see its module docstring),
 # so every rung voids and the producer HONESTLY abstains (None), never a
-# partial. (The v33 charged-lever names ``acetate`` via its own specialized
+# partial. (The charged-lever names ``acetate`` via its own specialized
 # producer earlier in the pipeline, so this abstention is confined to the T4
 # best-effort layer and never surfaces to a user.) The former organophosphorus
 # fixture ``C1CCC(CC1)OC(=O)NP(=O)(Cl)Cl`` is NO LONGER unroutable -- the B4
@@ -142,7 +142,7 @@ def test_e1_fail_returns_none(monkeypatch):
 
 @pytest.mark.unit
 def test_e1_pass_returns_name(monkeypatch):
-    """A candidate that passes E1 AND the wired binding-spine audit (Phase 0c
+    """A candidate that passes E1 AND the wired binding-spine audit (a phase
     Task 2b) ships its name unchanged. ``result_obj`` needs a real (empty)
     ``.bindings`` -- the wiring calls ``BindingSpine.from_token_bindings``
     unconditionally once E1 passes -- and ``verify_spine`` itself is mocked so
@@ -150,7 +150,7 @@ def test_e1_pass_returns_name(monkeypatch):
     the spine's own proofs, which have their own dedicated tests."""
     mol = _mol()
     # In production the _Candidate.name and its result_obj.name are the SAME
-    # string (_run_general_e1 builds _Candidate(name=result.name, ...)); the
+    # string (_run_general_e1 builds _Candidate(name=result.name,...)); the
     # shared gate verifies result.name, so the sentinel carries it too.
     sentinel_result_obj = types.SimpleNamespace(bindings=(), name="good")
     monkeypatch.setattr(
@@ -170,7 +170,7 @@ def test_e1_pass_returns_name(monkeypatch):
 
 @pytest.mark.unit
 def test_spine_fail_returns_none(monkeypatch):
-    """Phase 0c Task 2b: a candidate that passes E1 but FAILS the wired
+    """a phase Task 2b: a candidate that passes E1 but FAILS the wired
     binding-spine audit is discarded -- the spine is an ADDITIONAL gate, not a
     substitute for E1, so a spine-only defect must still void the candidate."""
     mol = _mol()
@@ -200,7 +200,7 @@ def test_e1_passes_but_bond_drop_is_caught_by_the_wired_spine(monkeypatch):
     prefix spells (BOND_AMBIGUOUS_LINKAGE, mirroring
     ``test_p2_two_undeclared_cross_bonds_are_ambiguous`` in
     ``test_binding_spine.py``, exercised here through the actual T4 wiring).
-    Before Phase 0c Task 2 this candidate would have SHIPPED as
+    Before a phase Task 2 this candidate would have SHIPPED as
     'propylpropane' for cyclohexane -- a wrong structural claim E1 cannot see.
     """
     mol = Chem.MolFromSmiles("C1CCCCC1")
@@ -237,7 +237,7 @@ def test_t4_ring_plus_offring_fg_is_complete():
 
 @pytest.mark.unit
 def test_t4_chiral_ester_alkyl_word_does_not_void_the_parent_stereo():
-    """Phase 0c Task 4 FIX-ROUND regression (reviewer-found, real end-to-end
+    """a phase Task 4 FIX-ROUND regression (reviewer-found, real end-to-end
     reproduction): a functional-class two-word ester name whose ALKYL word
     is itself chiral (built by the fully general substituent namer, so it
     carries its OWN leading ``(nR)/(nS)`` block) used to make P8a select
@@ -306,7 +306,7 @@ def test_t4_routes_around_ester_decline():
 
 
 # --- Task 6: polyfunctional complete-or-abstain invariant locks ---------------
-# Task 6 diagnosis (*.py, measured 2026-08-11): name_general is
+# Task 6 diagnosis (scratchpad/diag_t6*.py, measured 2026-08-11): name_general is
 # ALL-OR-NOTHING (no partial-with-remainder to route), and the only feature-
 # override levers are principal_group / chain_is_parent, whose full toggle space
 # the rung 0-2 cascade already covers -- a chain_is_parent=True variant converts
@@ -317,7 +317,7 @@ def test_t4_routes_around_ester_decline():
 # atom-covering for a molecule it CAN name, and (b) a molecule it cannot complete
 # abstains HONESTLY (None) -- never a partial. They are regression locks, GREEN
 # because the invariant already holds; a "conversion" assertion would be an
-# unsatisfiable target (invariant 16), so it is deliberately not asserted.
+# unsatisfiable target (a project rule), so it is deliberately not asserted.
 
 # Polyfunctional (N-acetyl amide + aldehyde/oxo + carboxylic acid + one
 # stereocentre), all atoms covered. Converts today via rung 0 (perceived PG); the
@@ -402,7 +402,7 @@ def test_t4_polyfunctional_honest_abstain_no_partial(smi):
 # verified emission for cid 1542461.
 #
 # Enclosing marks per P-16.5.2.4 ("Brackets enclose substituent prefixes in
-# which parentheses have already been used", BlueBookV2.md:7416, verbatim PIN
+# which parentheses have already been used", the Blue Book, verbatim PIN
 # example ``4-[(hydroxyselanyl)methyl]benzoic acid``): the compound prefix
 # ``(dimethylamino)methyl`` already uses parentheses, so its enclosure is SQUARE
 # BRACKETS, not a doubled parenthesis. The former ``((dimethylamino)methyl)``
@@ -496,7 +496,7 @@ def test_t4_unparseable_name_abstains_not_ships_unverified(monkeypatch):
 
 # --- Task 7: backbone acceptance PROBE (not a gate) --------------------------
 # 12 vetted T4-reaching abstainers (from the atom-drop class corpus, pulled by
-# CID from `` -- the CSV is authoritative, not the
+# CID from ``benchmarks/pubchem_2000.csv`` -- the CSV is authoritative, not the
 # literal strings below). This is a PROBE, NOT a gate: it asserts the class
 # invariant (0-partial) and records the conversion count informationally.
 # NO threshold is asserted on how many of the 12 convert -- that number is
@@ -607,7 +607,7 @@ def test_t4_backbone_acceptance_probe():
 
 
 # --- Fix 4 (final review): rung 2 is a UNIQUE producer, not dead code ---------
-# Measured 2026-08-11 (, 400-molecule pubchem_2000
+# Measured 2026-08-11 (scratchpad/probe_rung2_wide.py, 400-molecule pubchem_2000
 # sample, short-circuited so rung 2 fires only when rungs 0 AND 1 both decline):
 # cascade rung 2 (suppress PG only, KEEP the perceived chain parent) is the SOLE
 # producer for 5/400 molecules -- the ring-less / chain-preferred class where

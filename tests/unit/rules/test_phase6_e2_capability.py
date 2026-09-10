@@ -1,10 +1,10 @@
-"""v33 Phase 6 (E2) Tasks 7-11: `name_substituent_fragment` CAPABILITY fixes.
+""" a phase (E2) Tasks 7-11: `name_substituent_fragment` CAPABILITY fixes.
 
 All five sites live in `assembly/substituent_naming.py::name_substituent_fragment`
-(+ its helpers), per . Each was SPY-verified
-directly against `name_substituent_fragment` before any code changed (invariant 8:
-"spy before you code"). Witness SMILES for the real CHEBI ids were re-derived from
- (the coordinator's own quoted witnesses for the sulfonamide
+(+ its helpers), per internal notes. Each was a trace-verified
+directly against `name_substituent_fragment` before any code changed (a project rule:
+"trace before you code"). Witness SMILES for the real CHEBI ids were re-derived from
+`benchmarks/chebi_5000.csv` (the coordinator's own quoted witnesses for the sulfonamide
 and ring-branch tasks did not match their targets) and each target InChIKey14 was
 independently verified against RDKit before use.
 
@@ -80,8 +80,8 @@ heavily shared functions in the tree, so a batch of unrelated, previously-correc
 substituents is asserted unchanged below (methyl/ethyl/phenyl/2-hydroxyethyl/
 cyclohexyl/(4-chlorophenyl)methyl).
 
-Pre-existing failures NOT touched by this batch (verified via 
-against `substituent_naming.py` at HEAD `a451b293` -- identical failures with and
+Pre-existing failures NOT touched by this batch (verified via `scripts/an A/B check`
+against `substituent_naming.py` at HEAD -- identical failures with and
 without this batch's changes, so they predate this session and are out of scope):
 `test_p14_3_4_task3b_baked_locants.py::test_defect_c_guards[...aspartic acid]`,
 `test_sulfonamido_substituent_general.py::test_helper_acidnamer_drop_R_fails_closed`,

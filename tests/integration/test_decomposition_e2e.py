@@ -1,5 +1,5 @@
 """
-End-to-end decomposition engine tests (Phase 39, Plan 04).
+End-to-end decomposition engine tests (a phase, Plan 04).
 
 Tests real molecules from the v3.0 gap analysis that were known fragment_loss
 cases. After integrating the decomposition engine into namer.py, these
@@ -123,7 +123,7 @@ class TestAmideDecomposition:
     def test_sugar_diamide_produces_name(self):
         """Sugar with two N-acetyl groups: complex trisaccharide.
 
-        With multi-bond retry (Phase 56-02), the recursive fragment naming
+        With multi-bond retry (a phase-02), the recursive fragment naming
         produces a longer existing pipeline name that passes the quality gate,
         so decomposition is skipped. The regular pipeline returns 'ethanediamide'
         which is a known limitation for complex trisaccharides.
@@ -144,7 +144,7 @@ class TestAmideDecomposition:
 
     @pytest.mark.integration
     def test_histidyl_adenylate_produces_complete_name(self):
-        """Nucleotide ester (histidyl-adenylate): Phase 099-03 coverage
+        """Nucleotide ester (histidyl-adenylate): a phase-03 coverage
         guard rejects 'adenine' (7 chars for 33 HA = ratio 0.21),
         triggering decomposition that produces a more complete name."""
         smi = (
@@ -153,7 +153,7 @@ class TestAmideDecomposition:
         )
         name = name_compound(smi)
         assert name != "unknown"
-        # Coverage guard (Phase 099-03): 'adenine' ratio 0.21 < 0.25 threshold
+        # Coverage guard (a phase-03): 'adenine' ratio 0.21 < 0.25 threshold
         # for HA=33 molecule -> decomposition produces more descriptive name
         assert name == "adenine (2S)-2-amino-3-imidazolylpropanoate", (
             f"Expected decomposition result, got '{name}'"
@@ -234,10 +234,10 @@ class TestPipelineIntegrity:
     def test_methyl_hexadecanoate_unchanged(self):
         """Long-chain ester that the existing pipeline names correctly.
 
-        v29 Task J2: the expectation was 'methyl palmitate'. The acyl word must
-        follow the PIN acid stem -- P-65.1.1.1 (BlueBookV2.md:29715) retains
+        : the expectation was 'methyl palmitate'. The acyl word must
+        follow the PIN acid stem -- P-65.1.1.1 (the Blue Book) retains
         only formic/oxalic/acetic/benzoic/oxamic as PINs and P-65.1.2 (:29860)
-        makes systematic names preferred for the rest; :29787 prints '(PIN)' on
+        makes systematic names preferred for the rest;:29787 prints '(PIN)' on
         'hexadecanoic acid'. What this test guards -- that decomposition leaves
         the pipeline name untouched -- is unaffected by the spelling.
         """
@@ -293,7 +293,7 @@ class TestDecompositionNameQuality:
 
 
 # ---------------------------------------------------------------------------
-# Section 5: Decomposition assembly bug fixes (Phase 44-02)
+# Section 5: Decomposition assembly bug fixes (a phase-02)
 # ---------------------------------------------------------------------------
 
 class TestDecompositionAssemblyFixes:
@@ -353,16 +353,16 @@ class TestDecompositionAssemblyFixes:
         from orthonym.decomposition.fragment_assembly import _join_components
         # Verify the helper handles this correctly
         result = _join_components(
-            "(beta-D-glucopyranosyloxy)", "5,6-dibutyl-cyclopentane"
+            "(β-D-glucopyranosyloxy)", "5,6-dibutyl-cyclopentane"
         )
-        assert result == "(beta-D-glucopyranosyloxy)-5,6-dibutyl-cyclopentane"
+        assert result == "(β-D-glucopyranosyloxy)-5,6-dibutyl-cyclopentane"
 
     @pytest.mark.integration
     def test_glycoside_paren_letter_no_extra_hyphen(self):
         """Glycoside names with ')' followed by lowercase letter need no hyphen."""
         from orthonym.decomposition.fragment_assembly import _join_components
-        result = _join_components("(beta-D-glucopyranosyloxy)", "phenol")
-        assert result == "(beta-D-glucopyranosyloxy)phenol"
+        result = _join_components("(β-D-glucopyranosyloxy)", "phenol")
+        assert result == "(β-D-glucopyranosyloxy)phenol"
 
     @pytest.mark.integration
     def test_amide_acyl_digit_boundary_gets_hyphen(self):

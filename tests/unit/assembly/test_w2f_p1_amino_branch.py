@@ -1,6 +1,6 @@
 """W2F-P1 Tasks 1-3 — P-35.4.1 decorated N-branch amino prefixes on CHAIN parents.
 
-BB P-35.4.1 (BlueBookV2.md:18112): "-NH-CH2Cl (chloromethyl)amino (preferred
+BB P-35.4.1 (the Blue Book): "-NH-CH2Cl (chloromethyl)amino (preferred
 prefix)". The ring-parent path already implements this (rules/benzene.py:1421,
 gold W2E-P1FC-10); the chain-parent path has TWO carbon-count-only sites in
 assembly/composer.py (_check_for_acylamino no-carbonyl fallback and
@@ -9,7 +9,7 @@ _name_n_attached_substituent_fallback) that silently drop the decoration
 SELF-01-suppressed to 'unknown organic compound'.
 
 Every expected name is OPSIN-2.9-verified (RDKit-canonical round-trip MATCH)
-in  §1.D.
+in internal notes §1.D.
 """
 import pytest
 from rdkit import Chem

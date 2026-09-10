@@ -295,6 +295,13 @@ def test_licence_declines_when_the_parent_is_the_wrong_atom_set():
         ("OC(=O)C(Cl)C(=O)O", "chloropropanedioic acid", ":2951"),
         # :2883 verbatim — L1 takes the suffix locants, L3 the substituent one.
         ("OC(=O)CC(Cl)C(=O)O", "chlorobutanedioic acid", ":2883"),
+        # Fused-PAH PREFIX join (rules/polycyclics.py). :2947 verbatim — coronene's
+        # twelve CH are ONE orbit (v42 Task 7B2).
+        ("Clc1cc2ccc3ccc4ccc5ccc6ccc1c1c2c3c4c5c61", "chlorocoronene", ":2947"),
+        # Retained-parent urea join (assembly/composer.py). :2943 verbatim — urea's
+        # four N-H are ONE orbit, so the monosubstituted italic-N locant is omitted
+        # (v42 Task 7B2). NOT the chalcogen analogues -> see the negatives below.
+        ("CNC(=O)N", "methylurea", ":2943"),
     ],
 )
 def test_targets(namer, smiles, expected, citation):
@@ -369,9 +376,14 @@ def test_an_essential_N_locant_restores_the_ring_suffix_locant(namer, smiles, ex
          "heteroatom locant set in the parent name"),
         ("OC(=O)c1ncncn1", "1,3,5-triazine-2-carboxylic acid", "ditto"),
         ("OC(=O)c1cc[nH]c1", "1H-pyrrole-3-carboxylic acid", "indicated hydrogen"),
-        # --- the urea class keeps its LETTER locant (dedicated tripwire file too) ---
-        ("CNC(=O)N", "N-methylurea", "letter locant is essential"),
+        # --- urea OMITS (see the positives above, :2943); its CHALCOGEN analogues
+        #     and its disubstituted forms KEEP the letter locant ---
         ("NC(=O)N", "urea", "the retained parent"),
+        ("CNC(=S)N", "N-methylthiourea",
+         "chalcogen analogue keeps its letter locant — P-66.1.6.1.3.1, :33451 "
+         "N-(butan-2-yl)selenourea (PIN); one-orbit but a MORE SPECIFIC rule"),
+        ("CNC(=O)NC", "N,N'-dimethylurea",
+         "TWO substituents — not 'monosubstituted' (:33327)"),
         # --- P-14.3.4.5 / L6 neighbours, none of which L3 may disturb ---
         ("OC(=O)C(F)(F)F", "trifluoroacetic acid", "L6, :3037"),
         ("OC(=O)CC(F)(F)F", "3,3,3-trifluoropropanoic acid", "partial -> :3009 retains"),
@@ -407,6 +419,36 @@ def test_an_essential_N_locant_restores_the_ring_suffix_locant(namer, smiles, ex
     ],
 )
 def test_negatives_unchanged(namer, smiles, expected, why):
+    assert namer.name(smiles) == expected
+
+
+# --------------------------------------------------------------------------- #
+# 5b. THE HETEROATOM-H BOUNDARY OF THE UREA LICENCE (v42 Task 7B2-fix)          #
+# --------------------------------------------------------------------------- #
+# P-14.3.4.3 omits the italic-N locant only while the parent keeps "only one kind
+# of substitutable hydrogen". Task 7B2 wired the licence for a CARBON substituent
+# (methylurea, BB:2943) but over-fired on a substituent that carries its OWN
+# substitutable heteroatom-H: N=C(N)NC(N)=O was mis-named `carbamimidoylurea`.
+# Carbamimidoyl (H2N-C(=NH)-) bears an imino and an amino N-H, which are a SECOND
+# kind of substitutable hydrogen, so the locant MUST be cited — BB:34292 verbatim
+# `N-carbamimidoylurea (PIN)` (also `N-carbamimidoylformamide` :34290,
+# `N-carbamimidoylacetamide` :34294). The omit rows are re-asserted alongside the
+# keep row so the keep assertion is not vacuously green (session invariant 11).
+@pytest.mark.parametrize(
+    "smiles,expected,why",
+    [
+        # ★ THE FIX. Substituent carries its own N-H -> a second kind -> KEEP the N-.
+        ("N=C(N)NC(N)=O", "N-carbamimidoylurea",
+         "carbamimidoyl bears imino + amino N-H -> two kinds (:34292 verbatim PIN)"),
+        # The gains Task 7B2 shipped, which the narrowed guard must NOT undo: a plain
+        # or halogenated hydrocarbyl substituent has no heteroatom-H -> one kind -> OMIT.
+        ("CNC(=O)N", "methylurea", "methyl: no heteroatom-H (:2943)"),
+        ("FC(F)(F)NC(=O)N", "(trifluoromethyl)urea", "CF3: F carries no H"),
+        ("CCNC(=O)N", "ethylurea", "ethyl: no heteroatom-H"),
+    ],
+)
+def test_urea_locant_kept_when_substituent_has_heteroatom_h(namer, smiles, expected, why):
+    """The WHOLE name is asserted (session invariant 11)."""
     assert namer.name(smiles) == expected
 
 

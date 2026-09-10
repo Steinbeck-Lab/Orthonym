@@ -1,14 +1,14 @@
-"""RED unit tests for the systematic monosaccharide engine (Phase 183, WSC-04).
+"""RED unit tests for the systematic monosaccharide engine (a phase, WSC-04).
 
 The systematic-mono engine (`data/sugar_names.name_monosaccharide_systematic`,
-D-01/D-04) is a *generalization* of the existing `recognize_sugar_skeleton`
+/) is a *generalization* of the existing `recognize_sugar_skeleton`
 fingerprint deriver: for a non-cataloged single sugar ring (deoxy / amino /
 uronic) it PHYSICALLY idealizes the ring to its parent aldose/ketose skeleton
 (deoxy -> add the missing exocyclic O; uronic -> reduce COOH -> CH2OH; amino ->
 ring N -> O), re-runs `rdCIPLabeler.AssignCIPLabels`, looks the idealized
 fingerprint up in `_SKELETON_FINGERPRINT_INDEX` to recover (anomer, config,
 base), then re-applies the modifications as detachable prefixes / the uronic
-suffix with derived locants. It is fail-closed (D-11): any out-of-scope ring
+suffix with derived locants. It is fail-closed (): any out-of-scope ring
 returns None -> existing pipeline.
 
 WAVE 0 CONTRACT (mirror tests/unit/rules/test_conjugate_controller.py): imports
@@ -17,15 +17,15 @@ for the Pitfall-3 non-catalog assertion) go INSIDE each test body, NOT at module
 level, so `pytest --collect-only` succeeds while the engine is RED at run time
 until Wave-1 (Plan 183-01) lands. `RDLogger.DisableLog("rdApp.*")` at module top.
 
-Root-cause-only (the contributor guide): every assertion is structural (physical
+Root-cause-only (CLAUDE.md): every assertion is structural (physical
 idealization, fingerprint recovery, fail-closed None) — never string surgery on
 a derived base name.
 
 Verified this session (OPSIN-RT True, ASCII descriptors per Pitfall 6):
-  deoxy  : C[C@H]1O[C@@H](O)[C@H](O)[C@@H](O)[C@@H]1O   -> 6-deoxy-beta-D-glucopyranose
-  uronic : O=C(O)[C@H]1O[C@@H](O)[C@H](O)[C@@H](O)[C@@H]1O -> beta-D-glucopyranuronic acid
-  amino  : N[C@@H]1[C@@H](O)[C@H](O)O[C@H](CO)[C@H]1O    -> 3-amino-3-deoxy-beta-D-glucopyranose
-           (idealizes to beta-D-glucopyranose; NOT in AMINO_SUGAR_NAMES -> Pitfall 3 OK)
+  deoxy: C[C@H]1O[C@@H](O)[C@H](O)[C@@H](O)[C@@H]1O -> 6-deoxy-β-D-glucopyranose
+  uronic: O=C(O)[C@H]1O[C@@H](O)[C@H](O)[C@@H](O)[C@@H]1O -> β-D-glucopyranuronic acid
+  amino: N[C@@H]1[C@@H](O)[C@H](O)O[C@H](CO)[C@H]1O -> 3-amino-3-deoxy-β-D-glucopyranose
+           (idealizes to β-D-glucopyranose; NOT in AMINO_SUGAR_NAMES -> Pitfall 3 OK)
 """
 
 import pytest
@@ -38,20 +38,20 @@ RDLogger.DisableLog("rdApp.*")
 # ---------------------------------------------------------------------------
 # Verified target SMILES (canonical, OPSIN-RT True this session)
 # ---------------------------------------------------------------------------
-# 6-deoxy-beta-D-glucopyranose (ring-CH3 instead of ring-CH2OH at C6).
+# 6-deoxy-β-D-glucopyranose (ring-CH3 instead of ring-CH2OH at C6).
 DEOXY_SMILES = "C[C@H]1O[C@@H](O)[C@H](O)[C@@H](O)[C@@H]1O"
-# beta-D-glucopyranuronic acid (C6 oxidized -CH2OH -> -COOH); free acid form (D-10).
+# β-D-glucopyranuronic acid (C6 oxidized -CH2OH -> -COOH); free acid form ().
 URONIC_SMILES = "O=C(O)[C@H]1O[C@@H](O)[C@H](O)[C@@H](O)[C@@H]1O"
-# 3-amino-3-deoxy-beta-D-glucopyranose: NON-cataloged amino sugar (Pitfall 3).
-# Built from clean beta-D-glucopyranose by replacing the C3 exocyclic O with N;
+# 3-amino-3-deoxy-β-D-glucopyranose: NON-cataloged amino sugar (Pitfall 3).
+# Built from clean β-D-glucopyranose by replacing the C3 exocyclic O with N;
 # idealizing N->O provably returns the gluco parent. InChI-matched to OPSIN's
-# parse of "3-amino-3-deoxy-beta-D-glucopyranose" this session.
+# parse of "3-amino-3-deoxy-β-D-glucopyranose" this session.
 AMINO_SMILES = "N[C@@H]1[C@@H](O)[C@H](O)O[C@H](CO)[C@H]1O"
 
 # Clean parent every idealization must reproduce (Pitfall 1 / RESEARCH §1).
 CLEAN_GLUCOPYRANOSE = "OC[C@H]1O[C@@H](O)[C@H](O)[C@@H](O)[C@@H]1O"
 
-# Open-chain aldoheptose (D-05 no-regression: the acyclic substitutive form
+# Open-chain aldoheptose (no-regression: the acyclic substitutive form
 # emits correctly today and MUST stay byte-identical; C7+ cyclic is honest-fail
 # per Assumption A3). HEAD output pinned below as the expected value.
 HEPTOSE_ACYCLIC_SMILES = "OC[C@@H](O)[C@H](O)[C@@H](O)[C@H](O)[C@H](O)C=O"
@@ -64,9 +64,9 @@ HEPTOSE_ACYCLIC_HEAD_NAME = "D-glycero-L-gulo-heptose"
 def _idealize_to_parent_inline(smiles):
     """Replicate the RESEARCH §1 physical idealization (Pitfall 1) inline.
 
-    deoxy : add an exocyclic O on the bare terminal ring-attached CH3.
+    deoxy: add an exocyclic O on the bare terminal ring-attached CH3.
     uronic: RemoveAtom the carbonyl =O so COOH -> CH2OH.
-    amino : SetAtomicNum(8) on the (single) nitrogen.
+    amino: SetAtomicNum(8) on the (single) nitrogen.
     Returns the canonical SMILES of the idealized molecule (a NEW mol so CIP
     re-runs cleanly). This proves the physical-idealization requirement; the
     Wave-1 helper (`_idealize_to_parent`) must reproduce this behaviour.
@@ -128,14 +128,14 @@ class TestSystematicMonosaccharide:
         assert "oxane" not in name
 
     def test_uronic_free_acid(self):
-        """Free uronic acid names as the OPSIN-parseable '...pyranuronic acid' (D-10)."""
+        """Free uronic acid names as the OPSIN-parseable '...pyranuronic acid' ()."""
         from orthonym.data.sugar_names import name_monosaccharide_systematic
 
         mol = Chem.MolFromSmiles(URONIC_SMILES)
         assert mol is not None
         name = name_monosaccharide_systematic(mol)
-        # The D-10 free-acid form, NOT 'glucuronopyranose' (OPSIN-unparseable).
-        assert name == "beta-D-glucopyranuronic acid"
+        # The free-acid form, NOT 'glucuronopyranose' (OPSIN-unparseable).
+        assert name == "β-D-glucopyranuronic acid"
 
     def test_amino_systematic(self):
         """A NON-cataloged amino-deoxy sugar names systematically (P-102.5.4, Pitfall 3)."""
@@ -164,7 +164,7 @@ class TestSystematicMonosaccharide:
         """Physical idealization restores the clean parent skeleton (Pitfall 1).
 
         For each modified-sugar class the idealized canonical SMILES MUST equal
-        clean beta-D-glucopyranose — proving idealization is physical (edit +
+        clean β-D-glucopyranose — proving idealization is physical (edit +
         re-CIP), not an analytic 'modification-tolerant fingerprint' (which
         FAILS because the modification re-ranks ring CIP). Where the engine
         exposes a `_idealize_to_parent` helper it is preferred; otherwise the
@@ -182,7 +182,7 @@ class TestSystematicMonosaccharide:
 
         for smi in (DEOXY_SMILES, URONIC_SMILES, AMINO_SMILES):
             assert idealize(smi) == clean, (
-                f"idealization of {smi} did not reproduce clean beta-D-glucopyranose"
+                f"idealization of {smi} did not reproduce clean β-D-glucopyranose"
             )
 
     def test_heptose_acyclic_catalog_pin(self):
@@ -195,7 +195,7 @@ class TestSystematicMonosaccharide:
         assert name_compound(HEPTOSE_ACYCLIC_SMILES) == HEPTOSE_ACYCLIC_HEAD_NAME
 
     def test_systematic_mono_fail_closed(self):
-        """Fail-closed (D-11): None for a non-sugar and an out-of-scope ring."""
+        """Fail-closed (): None for a non-sugar and an out-of-scope ring."""
         from orthonym.data.sugar_names import name_monosaccharide_systematic
 
         # Non-sugar (benzene) -> None.
@@ -212,7 +212,7 @@ class TestSystematicMonosaccharide:
 
 @pytest.mark.unit
 class TestCARB03ModifiedMonosaccharides:
-    """v23 CARB-03: uronic-acid family completion (P-102.5.6.6), halogeno-deoxy
+    """ CARB-03: uronic-acid family completion (P-102.5.6.6), halogeno-deoxy
     (P-102.5.3), and the anomer-unspecified D/L descriptor fix. All targets were
     OPSIN-round-trip verified; imports go inside each test body (module contract).
     """
@@ -224,13 +224,13 @@ class TestCARB03ModifiedMonosaccharides:
         cases = {
             # ido (L-iduronic, heparin/dermatan) — not in the old 2-stem map
             "O=C(O)[C@@H]1O[C@@H](O)[C@H](O)[C@@H](O)[C@@H]1O":
-                "alpha-L-idopyranuronic acid",
+                "α-L-idopyranuronic acid",
             # manno (D-mannuronic, alginate)
             "O=C(O)[C@H]1O[C@@H](O)[C@@H](O)[C@@H](O)[C@@H]1O":
-                "beta-D-mannopyranuronic acid",
+                "β-D-mannopyranuronic acid",
             # gulo (L-guluronic, alginate)
             "O=C(O)[C@@H]1O[C@H](O)[C@@H](O)[C@@H](O)[C@@H]1O":
-                "beta-L-gulopyranuronic acid",
+                "β-L-gulopyranuronic acid",
         }
         for smi, expected in cases.items():
             mol = Chem.MolFromSmiles(smi)
@@ -242,7 +242,7 @@ class TestCARB03ModifiedMonosaccharides:
         from orthonym.data.sugar_names import name_monosaccharide_systematic
 
         gluc = Chem.MolFromSmiles("O=C(O)[C@H]1O[C@@H](O)[C@H](O)[C@@H](O)[C@@H]1O")
-        assert name_monosaccharide_systematic(gluc) == "beta-D-glucopyranuronic acid"
+        assert name_monosaccharide_systematic(gluc) == "β-D-glucopyranuronic acid"
 
     def test_halogeno_deoxy(self):
         """A ring C-OH replaced by a halogen names x-deoxy-x-halogeno (P-102.5.3)."""
@@ -294,7 +294,7 @@ class TestSugarPhosphateSulfateEster:
 
     def test_glucose_6_dihydrogen_phosphate(self):
         from orthonym import name_compound
-        assert name_compound(self.GLC6P) == "beta-D-glucopyranose 6-(dihydrogen phosphate)"
+        assert name_compound(self.GLC6P) == "β-D-glucopyranose 6-(dihydrogen phosphate)"
 
     def test_mannose_6_dihydrogen_phosphate(self):
         from orthonym import name_compound
@@ -302,7 +302,7 @@ class TestSugarPhosphateSulfateEster:
 
     def test_glucose_2_hydrogen_sulfate_acid_form(self):
         from orthonym import name_compound
-        assert name_compound(self.GLC2S) == "alpha-D-glucopyranose 2-(hydrogen sulfate)"
+        assert name_compound(self.GLC2S) == "α-D-glucopyranose 2-(hydrogen sulfate)"
 
     def test_protonation_words(self):
         """The ester word is derived in-place from the acid centre's ionization
@@ -324,12 +324,12 @@ class TestSugarPhosphateSulfateEster:
 
     def test_glucose_1_dihydrogen_phosphate_glycosyl(self):
         from orthonym import name_compound
-        assert name_compound(self.GLC1P) == "alpha-D-glucopyranose 1-(dihydrogen phosphate)"
+        assert name_compound(self.GLC1P) == "α-D-glucopyranose 1-(dihydrogen phosphate)"
 
     def test_diphosphate_fails_closed(self):
         """A P-O-P (di/pyro-phosphate) bridge is out of scope -> not an ester name."""
         from orthonym.data.sugar_names import name_sugar_ester
-        # beta-D-glucopyranose 6-(trihydrogen diphosphate) core (P-O-P): fail closed.
+        # β-D-glucopyranose 6-(trihydrogen diphosphate) core (P-O-P): fail closed.
         smi = "O=P(O)(O)OP(=O)(O)OC[C@H]1O[C@@H](O)[C@H](O)[C@@H](O)[C@@H]1O"
         mol = Chem.MolFromSmiles(smi)
         assert name_sugar_ester(mol, Chem.CanonSmiles(smi)) is None
@@ -369,7 +369,7 @@ class TestW6bDeoxyHeptoseCatalog:
     def test_2_deoxy_erythro_pentofuranose(self):
         from orthonym import name_compound
         assert name_compound("O[C@H]1C[C@H](O)[C@H](O1)CO") == \
-            "2-deoxy-beta-D-erythro-pentofuranose"
+            "2-deoxy-β-D-erythro-pentofuranose"
 
     def test_heptose_ledger_is_glycero_ido(self):
         from orthonym import name_compound  # ledger 'D-glycero-D-gluco-heptose' label is WRONG
@@ -414,12 +414,12 @@ class TestW6bUlosonicAcid:
     def test_kdo(self):
         from orthonym import name_compound
         assert name_compound("C([C@@]1(O)C[C@@H](O)[C@@H](O)[C@H](O1)[C@H](O)CO)(=O)O") == \
-            "3-deoxy-alpha-D-manno-oct-2-ulopyranosonic acid"
+            "3-deoxy-α-D-manno-oct-2-ulopyranosonic acid"
 
     def test_kdn(self):
         from orthonym import name_compound
         assert name_compound("C([C@@]1(O)C[C@H](O)[C@@H](O)[C@@H](O1)[C@H](O)[C@H](O)CO)(=O)O") == \
-            "3-deoxy-alpha-D-glycero-D-galacto-non-2-ulopyranosonic acid"
+            "3-deoxy-α-D-glycero-D-galacto-non-2-ulopyranosonic acid"
 
     def test_neu5ac(self):
         from orthonym import name_compound
@@ -499,7 +499,7 @@ class TestW6bGlycosyloxyAglycone:
         from orthonym import name_compound
         # ACCURACY: previously the broken legacy (glycosyloxy)acetophenone -> unknown.
         assert name_compound("CC(=O)c1ccc(O[C@@H]2O[C@H](CO)[C@@H](O)[C@H](O)[C@H]2O)cc1") == \
-            "1-[4-(beta-D-glucopyranosyloxy)phenyl]ethan-1-one"
+            "1-[4-(β-D-glucopyranosyloxy)phenyl]ethan-1-one"
 
     def test_phenyl_glucoside_stays_glycoside(self):
         from orthonym.data.sugar_names import name_glycosyloxy_aglycone
@@ -524,11 +524,11 @@ class TestW6bCGlycosyl:
     def test_c_glucosyl_phloroglucinol(self):
         from orthonym import name_compound
         assert name_compound("Oc1cc(O)c([C@@H]2O[C@H](CO)[C@@H](O)[C@H](O)[C@H]2O)c(O)c1") == \
-            "2-(beta-D-glucopyranosyl)benzene-1,3,5-triol"
+            "2-(β-D-glucopyranosyl)benzene-1,3,5-triol"
 
     def test_plain_glucose_unaffected(self):
         from orthonym import name_compound
-        assert name_compound("OC[C@H]1O[C@@H](O)[C@H](O)[C@@H](O)[C@@H]1O") == "beta-D-glucopyranose"
+        assert name_compound("OC[C@H]1O[C@@H](O)[C@H](O)[C@@H](O)[C@@H]1O") == "β-D-glucopyranose"
 
     def test_n_o_yl_named(self):
         from orthonym import name_compound
@@ -537,7 +537,7 @@ class TestW6bCGlycosyl:
         # senior parent). The locant is RT-verified (fail-closed w/o Java). (Was
         # previously deferred fail-closed to 'unknown'.)
         got = name_compound("OC[C@H]1O[C@@H](O)[C@H](OCC(=O)O)[C@@H](O)[C@H]1O")
-        assert got == "(beta-D-galactopyranos-2-O-yl)acetic acid"
+        assert got == "(β-D-galactopyranos-2-O-yl)acetic acid"
 
 
 @pytest.mark.unit
@@ -553,18 +553,18 @@ class TestGlycosylamineAndHalide:
     def test_glucosylamine(self):
         from orthonym import name_compound
         assert name_compound("N[C@@H]1O[C@H](CO)[C@@H](O)[C@H](O)[C@H]1O") == \
-            "beta-D-glucopyranosylamine"
+            "β-D-glucopyranosylamine"
 
     def test_glucosyl_bromide(self):
         from orthonym import name_compound
         assert name_compound("OC[C@H]1O[C@H](Br)[C@H](O)[C@@H](O)[C@@H]1O") == \
-            "alpha-D-glucopyranosyl bromide"
+            "α-D-glucopyranosyl bromide"
 
     def test_c2_amino_sugar_not_misfired(self):
         """A C2-amino sugar (glucosamine) is NOT a glycosylamine -> stays catalog."""
         from orthonym import name_compound
         assert name_compound("N[C@@H]1[C@@H](O)[C@H](O)[C@@H](CO)O[C@@H]1O") == \
-            "alpha-D-glucosamine"
+            "α-D-glucosamine"
 
     def test_n_substituted_amine_fails_closed(self):
         """An N-acyl anomeric amine is out of scope for the bare -osylamine head."""
@@ -587,13 +587,13 @@ class TestSugarOMethyl:
     def test_tetra_o_methyl_glucopyranose(self):
         from orthonym import name_compound
         assert name_compound("CO[C@H]1[C@H](O)O[C@@H]([C@H]([C@@H]1OC)OC)COC") == \
-            "2,3,4,6-tetra-O-methyl-beta-D-glucopyranose"
+            "2,3,4,6-tetra-O-methyl-β-D-glucopyranose"
 
     def test_single_o_methyl_glucopyranose(self):
         """A single non-anomeric O-methyl -> '3-O-methyl-…' (no double hyphen)."""
         from orthonym import name_compound
         assert name_compound("CO[C@@H]1[C@H]([C@H](O)O[C@@H]([C@H]1O)CO)O") == \
-            "3-O-methyl-beta-D-glucopyranose"
+            "3-O-methyl-β-D-glucopyranose"
 
     def test_2_o_methyl_rhamnopyranose(self):
         """2-O-methyl-rhamnose: rhamnopyranose is a cataloged retained sugar, so the
@@ -601,13 +601,13 @@ class TestSugarOMethyl:
         composes correctly."""
         from orthonym import name_compound
         assert name_compound("CO[C@@H]1[C@H](O)[C@@H](O)[C@H](C)O[C@H]1O") == \
-            "2-O-methyl-alpha-L-rhamnopyranose"
+            "2-O-methyl-α-L-rhamnopyranose"
 
     def test_anomeric_o_methyl_is_glycoside_not_o_methyl(self):
-        """Methyl beta-D-glucopyranoside must NOT be named 1-O-methyl-..."""
+        """Methyl β-D-glucopyranoside must NOT be named 1-O-methyl-..."""
         from orthonym.data.sugar_names import name_sugar_o_methyl
         from rdkit import Chem
-        smi = "CO[C@@H]1O[C@H](CO)[C@@H](O)[C@H](O)[C@H]1O"  # methyl beta-D-glucoside
+        smi = "CO[C@@H]1O[C@H](CO)[C@@H](O)[C@H](O)[C@H]1O"  # methyl β-D-glucoside
         assert name_sugar_o_methyl(Chem.MolFromSmiles(smi), Chem.CanonSmiles(smi)) is None
 
     def test_plain_oxane_fails_closed(self):
@@ -627,7 +627,7 @@ class TestW6bMultiplierElision:
         # carbohydrate PIN (config + anomer RT-verified), not the systematic
         # oxane-tetrol it previously emitted.
         assert name_compound("OC[C@H]1O[C@@H](O)[C@](O)(c2ccccc2)[C@@H](O)[C@@H]1O") == \
-            "2-C-phenyl-beta-D-mannopyranose"
+            "2-C-phenyl-β-D-mannopyranose"
 
 
 class TestW6bSugarAcylEster:
@@ -637,18 +637,18 @@ class TestW6bSugarAcylEster:
     def test_glucose_6_acetate(self):
         from orthonym import name_compound
         assert name_compound("C(C)(=O)OC[C@@H]1[C@H]([C@@H]([C@H]([C@H](O)O1)O)O)O") == \
-            "beta-D-glucopyranose 6-acetate"
+            "β-D-glucopyranose 6-acetate"
 
     def test_glucose_6_benzoate_not_hexyl(self):
         from orthonym import name_compound
         # ACCURACY: previously mis-named '(...)-hexyl benzoate' (sugar dropped).
         assert name_compound("C(C1=CC=CC=C1)(=O)OC[C@@H]1[C@H]([C@@H]([C@H]([C@H](O)O1)O)O)O") == \
-            "beta-D-glucopyranose 6-benzoate"
+            "β-D-glucopyranose 6-benzoate"
 
     def test_glucopyranose_tetraacetate(self):
         from orthonym import name_compound
         assert name_compound("C(C)(=O)O[C@H]1[C@H](O)O[C@@H]([C@H]([C@@H]1OC(C)=O)OC(C)=O)COC(C)=O") == \
-            "beta-D-glucopyranose 2,3,4,6-tetraacetate"
+            "β-D-glucopyranose 2,3,4,6-tetraacetate"
 
     def test_anomeric_o_acyl_fails_closed(self):
         from orthonym.data.sugar_names import _find_sugar_acyl_esters
@@ -666,7 +666,7 @@ class TestW6bSugarAcylEster:
 
 @pytest.mark.unit
 class TestV33Task1p4FreeSugarNAcylDecoration:
-    """v33 Task 1.4 (BB P-102.5.4 / P-102.5.6.2): a STANDALONE free sugar
+    """.4 (BB P-102.5.4 / P-102.5.6.2): a STANDALONE free sugar
     bearing N-acyl (amide) decoration, or O-acyl COMBINED with N-acyl on the
     same ring -- the two shapes neither ``name_free_sugar`` (no functional-
     class analog for an amide) nor ``name_sugar_ester``'s O-acyl
@@ -682,7 +682,7 @@ class TestV33Task1p4FreeSugarNAcylDecoration:
 
     # Free 2-deoxy-2-propanamido-D-glucopyranose analog: N-propanoyl (NOT the
     # catalogued N-acetyl/GlcNAc) at the ring nitrogen, no O-acyl. Built from
-    # the catalog's own beta-D-GlcNAc SMILES with acetyl -> propanoyl.
+    # the catalog's own β-D-GlcNAc SMILES with acetyl -> propanoyl.
     N_ACYL_ONLY = "CCC(=O)N[C@@H]1[C@@H](O)[C@H](O)[C@@H](CO)O[C@@H]1O"
 
     # Same ring, PLUS a 6-O-acetyl ester (O-acyl + N-acyl combined).
@@ -749,4 +749,4 @@ class TestV33Task1p4FreeSugarNAcylDecoration:
         # byte-identical -- this new fallback is tried strictly AFTER it.
         from orthonym import name_compound
         assert name_compound("C(C)(=O)OC[C@@H]1[C@H]([C@@H]([C@H]([C@H](O)O1)O)O)O") == \
-            "beta-D-glucopyranose 6-acetate"
+            "β-D-glucopyranose 6-acetate"

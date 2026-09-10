@@ -1,20 +1,20 @@
-"""v38 substituent_no_prefix_form phosphodiester-bridge — regression guard + refuted-premise record.
+""" substituent_no_prefix_form phosphodiester-bridge — regression guard + refuted-premise record.
 
-The v38 substituent_no_prefix_form brief asked to render an asymmetric phosphodiester bridge
+The substituent_no_prefix_form brief asked to render an asymmetric phosphodiester bridge
 ``R-O-P(=O)(OH)-O-R'`` as a substituent prefix instead of dropping it, on the
-premise that the class ABSTAINS today (spy: ``COP(=O)(O)OC[C@H](N)C(=O)O`` →
+premise that the class ABSTAINS today (trace: ``COP(=O)(O)OC[C@H](N)C(=O)O`` →
 ``unknown``).
 
 That premise is REFUTED on HEAD 8773c400 for the entry point the eval harness
-(`` → ``name_tiered``) and ``
+(``eval/harness.py`` → ``name_tiered``) and ``scripts/measure_breadth.py``
 (→ ``name_tiered``) actually use: the whole addressable class already EMITS an
 RT-verified (full-InChIKey) name at best-effort tier T3 via the general engine.
-The spy's "abstains today" was an artifact of probing through
+The trace's "abstains today" was an artifact of probing through
 ``name_with_confidence()`` — an entry point that DIVERGES from
 ``name()`` / ``name_tiered()`` (it abstains where they emit) and is used by
 neither harness (only ``name_compound(..., include_confidence=True)`` reaches it).
 
-Full analysis: ``.
+Full analysis: `internal notes`.
 
 These tests therefore PIN the already-correct behaviour so it cannot silently
 regress:
@@ -48,8 +48,8 @@ WITNESS = "COP(=O)(O)OC[C@H](N)C(=O)O"  # O-phospho-L-serine methyl ester
 WITNESS_PIN = "(2S)-2-amino-3-{[hydroxy(methoxy)phosphoryl]oxy}propanoic acid"
 
 # --- invariant-14 controls: symmetric / small phosphate (di)esters that ALREADY
-#     name and MUST stay byte-identical (they never reach the substituent_no_prefix_form site —
-#     polyfunctional declines them, substituent_no_prefix_form does not fire). ---
+# name and MUST stay byte-identical (they never reach the substituent_no_prefix_form site —
+# polyfunctional declines them, substituent_no_prefix_form does not fire). ---
 SYMMETRIC_CONTROLS = {
     "COP(=O)(O)OC": "dimethyl hydrogen phosphate",
     "CCOP(=O)(O)OCC": "diethyl hydrogen phosphate",
@@ -79,7 +79,7 @@ def test_symmetric_diester_controls_byte_identical_besteffort(smiles, expected):
 @pytest.mark.roundtrip
 @pytest.mark.opsin_gate  # production runs gate-ON; the rescue depends on it
 def test_witness_emits_pin_ordered_prefix_at_besteffort_tiered():
-    """The witness already names via the  entry point
+    """The witness already names via the eval/breadth entry point
     (``name_tiered``) at best-effort tier T3, with the P-14.5.2 alphabetical
     prefix order ``hydroxy(methoxy)phosphoryl`` — NOT the head-first order."""
     res = Orthonym(general_fallback=True).name_tiered(WITNESS)
@@ -102,7 +102,7 @@ def test_witness_is_zero_wrong_full_inchikey():
 @pytest.mark.roundtrip
 @pytest.mark.opsin_gate
 def test_witness_spelling_is_deterministic_across_orderings():
-    """Determinism (invariant 4): different input SMILES orderings of the same
+    """Determinism (a project rule): different input SMILES orderings of the same
     structure must yield the identical name."""
     canon = Chem.MolToSmiles(Chem.MolFromSmiles(WITNESS))
     reorder = "OC(=O)[C@@H](N)COP(=O)(O)OC"

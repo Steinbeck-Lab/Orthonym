@@ -1,8 +1,8 @@
-"""v32 Phase 3A -- three narrow 0-wrong charge-producer fixes.
+""" a phase -- three narrow 0-wrong charge-producer fixes.
 
-SPY:  (the classifier-veto
+a trace: internal notes (the classifier-veto
 premise was REFUTED; these are the 3 measured WRONG-guess producers instead,
-each independently RT-validated). Plan: 
+each independently RT-validated). Plan: docs/superpowers/plans/
 2026-08-12-phase3-correctness-tail-hardening.md Sec 3A.
 
 3A-a: rules/salts.py -- is_salt/name_salt must require the disconnected
@@ -107,13 +107,13 @@ class TestSaltChargeBalance:
 class TestCationSubstituentPrefix:
     def test_choline_phosphate_lipid_never_ships_wrong_substituent_guess(self):
         """A choline-phosphate-ester compound substituent (-O-P(=O)(OH)-O-CH2-
-        CH2-N+(CH3)3) used to leak through the charge-blind recursion (SPY-
+        CH2-N+(CH3)3) used to leak through the charge-blind recursion (a trace-
         traced call site: substituent_naming.py::name_substituent_fragment
         Step 5, reached via perception/chains.py's substituent-cost
         evaluation) as '(2-phosphonooxy-N,N,N-trimethylethan-1-aminium)yl' --
         an OPSIN-unparseable guess. That specific leak must be gone (RT-
-        confirmed via a direct spy on parent_to_prefix's call args before/
-        after this fix -- ).
+        confirmed via a direct trace on parent_to_prefix's call args before/
+        after this fix -- internal notes).
 
         NOTE: this molecule also has a SEPARATE, unrelated wrong-candidate
         source (a different decomposition names the choline head as if it
@@ -150,7 +150,7 @@ class TestCationSubstituentPrefix:
         assert prefix == "trimethylazaniumyl", prefix
 
     def test_name_substituent_fragment_names_pendant_onium_branch(self):
-        """v33 Phase 3 enabler (P-74.1.3): the "no nested-substituent
+        """ a phase enabler (P-74.1.3): the "no nested-substituent
         composer exists for that shape yet" premise this test used to assert
         is no longer true -- `_name_polyfunctional_acyclic_substituent`
         (assembly/substituent_naming.py, Pass 1d) now composes a pendant

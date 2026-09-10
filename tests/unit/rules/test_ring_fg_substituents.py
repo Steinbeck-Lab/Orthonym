@@ -4,10 +4,10 @@ A ring demoted to a substituent of a chain parent must keep its
 characteristic groups as prefixes inside the enclosing marks
 (P-66.6.1 ketone->oxo; P-66.5.1 nitrile->cyano):
 
-    O=C1CCCCC1CCCC(=O)O  ->  4-(2-oxocyclohexyl)butanoic acid
+    O=C1CCCCC1CCCC(=O)O -> 4-(2-oxocyclohexyl)butanoic acid
     (HEAD before fix: "4-cyclohexylbutanoic acid" -- a structurally WRONG name)
 
-Design per  WS-D.1 (skeptic-
+Design per internal notes WS-D.1 (skeptic-
 corrected): the chemistry primitive lives in rules.ring_substituents and is
 consumed by composer._detect_ring_substituents; the widened (non-6-membered)
 ring path fires ONLY when an FG prefix is present (no silent activation of
@@ -77,7 +77,7 @@ class TestRingAtomFgPrefixes:
         assert ring_atom_fg_prefixes(mol, idx, ring) == []
 
     def test_carboxy_emitted(self):
-        # Phase 178 (D-08, P-65.1.7.2.1): ring-COOH demotion is now reachable
+        # a phase (, P-65.1.7.2.1): ring-COOH demotion is now reachable
         # (the S2 parent chokepoint landed), so the primitive emits 'carboxy'
         # for a ring atom bearing an exocyclic free carboxylic-acid carbon.
         mol = Chem.MolFromSmiles("OC(=O)C1CCCCC1C")

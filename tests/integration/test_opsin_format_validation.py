@@ -174,7 +174,7 @@ OPSIN_REGRESSION_CASES = [
     ("c1ccccc1", "benzene", "benzene retained name"),
     ("c1ccncc1", "pyridine", "pyridine retained name"),
     ("CC(=O)[O-]", "acetate", "carboxylate anion"),
-    ("[NH4+]", "ammonium", "ammonium cation"),
+    ("[NH4+]", "azanium", "azanium cation (P-73.1.1.2 PIN; was 'ammonium')"),
     ("CC(O)CC(=O)O", None, "hydroxy acid (polyfunctional)"),
     ("NC(N)CC(O)=O", "3,3-diaminopropanoic acid", "geminal diamino"),
     ("OCC(O)CO", None, "triol"),
@@ -383,13 +383,13 @@ class TestSpeciesTypeDetection:
             )
 
 
-# === STEREODESCRIPTOR CASE PRESERVATION TESTS (Phase 091-03) ===
+# === STEREODESCRIPTOR CASE PRESERVATION TESTS (a phase-03) ===
 
 
 class TestStereoCasePreservation:
     """Verify that E/Z stereodescriptors retain uppercase in acyloxy/ion names.
 
-    Bug: get_acyloxy_prefix() and ion naming functions used .lower() on the
+    Bug: get_acyloxy_prefix() and ion naming functions used.lower() on the
     entire acid name, converting (11Z,14Z) to (11z,14z). Fixed by preserving
     original case and using lowercase only for comparison/lookup.
     """

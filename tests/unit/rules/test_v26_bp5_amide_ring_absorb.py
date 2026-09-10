@@ -1,6 +1,6 @@
-"""v26 BP-5: the amide acyl parent chain must not absorb ring atoms.
+""" BP-5: the amide acyl parent chain must not absorb ring atoms.
 
-Root cause (*.md): the private acyl
+Root cause (internal notes): the private acyl
 walker in rules/amides.py (_find_longest_carbon_chain / get_amide_chain_length)
 had no ring awareness, so it descended from the carbonyl into an attached ring and
 counted ring carbons as chain carbons (O=C(Cc1ccncc1)NCc1ccccn1 -> '...pentanamide').

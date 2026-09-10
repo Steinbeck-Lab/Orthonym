@@ -5,19 +5,19 @@ Producer-level assertions only. Whole-molecule assertions are unsound in this
 suite: ``conftest`` disables the OPSIN gate suite-wide, so ``name_tiered`` can
 select a different producer than the CLI does. User-visible behaviour for these
 names is verified through the CLI, recorded in
-``.superpowers/sdd/v29-residue/TaskE-report.md``.
+``.superpowers/sdd/-residue/TaskE-report.md``.
 
 Blue Book basis (each row also carries its citation in
 ``data/iupac_2013_pin_list.json``):
 
-* P-100 "INTRODUCTION" (BlueBookV2.md:50939), sentence :50943 -- "Preferred
+* P-100 "INTRODUCTION" (the Blue Book), sentence:50943 -- "Preferred
   IUPAC names (PINs) are not identified for the compounds in this Chapter."
   So Chapter 10 names are *prescribed retained names*, never PINs, and a name
   absent from the P-103 tables is licensed by nothing.
-* P-103.1.1.3 "Systematic substitutive names" (:54247), sentence :54251 --
+* P-103.1.1.3 "Systematic substitutive names" (:54247), sentence:54251 --
   "When not denoted by a retained name, amino acids receive systematic
   substitutive names constructed by applying the principles, rules and
-  conventions of substitutive nomenclature." Precedent at :54253: the names
+  conventions of substitutive nomenclature." Precedent at:54253: the names
   'norvaline' and 'norleucine' "are not recommended".
 """
 
@@ -99,7 +99,7 @@ class TestAminoAcidSurfaceIsGated:
 class TestBlueBookRetainedAminoAcidsSurvive:
     """The `is_pin` field is NOT the gate.
 
-    `` hard-codes ``"is_pin": False`` (lines 268,
+    ``scripts/import_opsin_xml.py`` hard-codes ``"is_pin": False`` (lines 268,
     742, 847), so all 232 entries in ``amino_acids_opsin.py`` carry False. Gating
     on it would withdraw all 88 integrated names, including ``cystine`` -- a Blue
     Book Table 10.5 retained name (P-103.1.1.2). This test pins that trap shut.
@@ -152,9 +152,9 @@ class TestRetainedNameSurfaceIsGated:
 class TestNaturalProductSurfaceIsGated:
     """data/natural_products.py must consult the deny-list too.
 
-    A runtime spy showed ``camphor`` was emitted by this surface, not by the
+    A runtime trace showed ``camphor`` was emitted by this surface, not by the
     retained-names dict where it is ALSO keyed -- so a deny row alone was inert
-    until this module was wired. the contributor guide invariant 10: presence in a lookup
+    until this module was wired. CLAUDE.md a project rule: presence in a lookup
     table is not evidence the table is reached.
     """
 
@@ -206,7 +206,7 @@ class TestNotOverGated:
     """Names the audit flagged that this task must NOT withdraw."""
 
     def test_tert_butylbenzene_is_a_pin_construction(self):
-        """BlueBookV2.md:25717 '1,2-di-*tert*-butylbenzene (PIN)' and :3507
+        """the Blue Book '1,2-di-*tert*-butylbenzene (PIN)' and:3507
         '1-(butan-2-yl)-3-*tert*-butylbenzene (PIN)'. Raw grep gives 0 hits --
         the italic markup hides it -- so the audit read it as absent."""
         from orthonym.data import ALL_RETAINED_NAMES
@@ -224,7 +224,7 @@ class TestNotOverGated:
         "saccharin",          # 'unknown organic compound'
         "triphenylmethane",   # 'unknown organic compound'
         "morphine",           # fallback uses 'morphin-7-ene', but the BB's own
-                              # renderings (BB:2680, BB:52608) both use
+                              # renderings (the Blue Book, the Blue Book) both use
                               # '7,8-didehydromorphinan' -- replacement unverified
         "glycocyamine",       # fallback 'guanidinoacetic acid' uses a prefix the
                               # BB deprecates for PINs (P-66.4.1.2.1.3)
@@ -243,11 +243,11 @@ class TestNotOverGated:
     def test_guanidino_is_not_a_preferred_prefix(self):
         """Answers the audit's open question, and explains the glycocyamine row.
 
-        P-66.4.1.2.1.3 (BB:34266): 'In the presence of a characteristic group
+        P-66.4.1.2.1.3 (the Blue Book): 'In the presence of a characteristic group
         having seniority over guanidine (see item 11 in P-41), the following
         prefixes are used. The prefix guanidino may be used in general
-        nomenclature.' BB:34268 marks 'carbamimidoylamino (preferred prefix)'.
-        The P-66 introduction is blunter still, item (g) at BB:1700: "The prefix
+        nomenclature.' the Blue Book marks 'carbamimidoylamino (preferred prefix)'.
+        The P-66 introduction is blunter still, item (g) at the Blue Book: "The prefix
         'guanidino' is no longer acceptable in preferred IUPAC names but may be
         used in general nomenclature; the preferred prefix is
         'carbamimidoylamino'."
@@ -268,12 +268,12 @@ class TestNotOverGated:
 
 @pytest.mark.unit
 class TestFattyAcidEsterStemsAreOutOfDenyListReach:
-    """v29 Task E2: 'methyl laurate' is non-PIN, but a deny row would be INERT.
+    """: 'methyl laurate' is non-PIN, but a deny row would be INERT.
 
     THE BLUE BOOK EXCLUSION IS POSITIVE, not an absence argument. The retained
     carboxylic-acid names are FOUR closed lists and 'lauric' is in none of them:
 
-    * P-65.1.1.1 "Retained names as preferred IUPAC names" (BlueBookV2.md:29715)
+    * P-65.1.1.1 "Retained names as preferred IUPAC names" (the Blue Book)
       -- "Only the following five carboxylic acids retained names and are also
       preferred IUPAC names": formic, oxalic, acetic, benzoic, oxamic.
     * P-65.1.1.2.1 (:29733) -- general nomenclature WITH substitution: 2-furoic,
@@ -285,8 +285,8 @@ class TestFattyAcidEsterStemsAreOutOfDenyListReach:
       succinic, peracetic, perbenzoic, performic, EDTA.
     * P-65.1.1.2.3 (:29811) -- citric, lactic, glyceric, pyruvic, tartaric.
 
-    P-65.1.2 "Systematic names" (heading :29858) then states the disposal rule
-    outright, at :29860: "Except for formic acid, acetic acid, oxalic acid (see
+    P-65.1.2 "Systematic names" (heading:29858) then states the disposal rule
+    outright, at:29860: "Except for formic acid, acetic acid, oxalic acid (see
     P-65.1.1.1), and oxamic acid (see P-65.1.1.1), systematically formed names
     are preferred IUPAC names; the names given in P-65.1.1.2 are retained names
     for use in general nomenclature."
@@ -307,10 +307,10 @@ class TestFattyAcidEsterStemsAreOutOfDenyListReach:
     governs -- it is built from a CARBON-COUNT map, FATTY_ACID_TRIVIAL_BY_STRUCTURE,
     a local dict inside get_acid_fragment_name in rules/esters.py, which never
     consults data/iupac_2013_pin_list.json. Adding the row anyway would create a
-    second no-op like the documented 'indane' row (the contributor guide invariant 10:
+    second no-op like the documented 'indane' row (CLAUDE.md a project rule:
     presence in a lookup table is not evidence the table is reached).
 
-    RESOLVED for the SATURATED straight-chain rows by v29 Task J2. The analysis
+    RESOLVED for the SATURATED straight-chain rows by. The analysis
     above stands; only its "out of scope" conclusion is superseded. The fix was
     made in the two tables, NOT via a deny row, exactly as this class predicted.
 
@@ -318,7 +318,7 @@ class TestFattyAcidEsterStemsAreOutOfDenyListReach:
     the count map is only HALF the producer. data/trivial_acids.py also carried
     five rows keyed on the SYSTEMATIC stem ("hexadecanoic" -> "palmitate"), so
     correcting the count map ALONE changed 0 of 5 names -- measured. Both halves
-    had to go. See 
+    had to go. See internal notes
 
     The UNSATURATED rows (oleic, linoleic, linolenic, arachidonic) are non-PIN
     under the same P-65.1.2 disposal rule and are still present in the map. They
@@ -340,8 +340,8 @@ class TestFattyAcidEsterStemsAreOutOfDenyListReach:
     def test_saturated_fatty_stems_are_gone_from_the_count_map(self):
         """The count map must not hand a non-PIN stem to the ester acyl word.
 
-        P-65.1.2 (BlueBookV2.md:29860): "Except for formic acid, acetic acid,
-        oxalic acid ..., and oxamic acid ..., systematically formed names are
+        P-65.1.2 (the Blue Book): "Except for formic acid, acetic acid,
+        oxalic acid..., and oxamic acid..., systematically formed names are
         preferred IUPAC names; the names given in P-65.1.1.2 are retained names
         for use in general nomenclature."
         """

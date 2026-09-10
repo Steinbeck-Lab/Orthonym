@@ -190,7 +190,7 @@ class TestSkeletonIdealization:
     fingerprint does NOT equal the clean parent (Pitfall 1 — the modification
     re-ranks ring CIP), so idealization MUST be physical (edit the molecule, then
     re-run rdCIPLabeler). Each idealization restores the EXACT canonical SMILES of
-    clean beta-D-glucopyranose, and the existing deriver recovers (beta, D,
+    clean β-D-glucopyranose, and the existing deriver recovers (beta, D,
     glucopyranose) from it (RESEARCH §1).
     """
 
@@ -246,11 +246,11 @@ class TestSkeletonIdealization:
         return Chem.MolToSmiles(m)
 
     def test_idealization_reproduces_clean_parent(self):
-        """deoxy/uronic/amino each idealize to clean beta-D-glucopyranose (D-01)."""
+        """deoxy/uronic/amino each idealize to clean β-D-glucopyranose (D-01)."""
         clean = Chem.CanonSmiles(self._CLEAN)
         for smi in (self._DEOXY, self._URONIC, self._AMINO):
             assert self._idealize(smi) == clean, (
-                f"idealization of {smi} did not reproduce clean beta-D-glucopyranose"
+                f"idealization of {smi} did not reproduce clean β-D-glucopyranose"
             )
 
     def test_idealized_fingerprint_recovers_gluco(self):
@@ -260,7 +260,7 @@ class TestSkeletonIdealization:
             recovered = recognize_sugar_skeleton(ideal, anomeric_idx=None) or lookup_sugar(
                 Chem.MolToSmiles(ideal)
             )
-            assert recovered == ("beta", "D", "glucopyranose"), (
+            assert recovered == ("β", "D", "glucopyranose"), (
                 f"idealized {smi} recovered {recovered!r}, expected gluco"
             )
 
@@ -271,23 +271,26 @@ class TestGlycosideClassName:
 
     def test_glycoside_class_name_transform(self):
         assert (
-            sugar_to_glycoside_class_name("beta", "D", "glucopyranose")
-            == "beta-D-glucopyranoside"
+            sugar_to_glycoside_class_name("β", "D", "glucopyranose")
+            == "β-D-glucopyranoside"
         )
         assert (
-            sugar_to_glycoside_class_name("alpha", "L", "rhamnopyranose")
-            == "alpha-L-rhamnopyranoside"
+            sugar_to_glycoside_class_name("α", "L", "rhamnopyranose")
+            == "α-L-rhamnopyranoside"
         )
         assert (
-            sugar_to_glycoside_class_name("beta", "D", "fructofuranose")
-            == "beta-D-fructofuranoside"
+            sugar_to_glycoside_class_name("β", "D", "fructofuranose")
+            == "β-D-fructofuranoside"
         )
 
-    def test_glycoside_class_name_is_ascii(self):
-        """Descriptors stay ASCII — gold normalize() does NOT transliterate (Pitfall 6)."""
-        name = sugar_to_glycoside_class_name("beta", "D", "glucopyranose")
-        assert "β" not in name  # no Greek beta
-        assert name.startswith("beta-D-")
+    def test_glycoside_class_name_greek_anomer(self):
+        """v43: the anomeric descriptor is the Blue-Book GREEK β (P-102.5.6.6,
+        BlueBookV2.md uses β-D- 58×), NOT the ASCII word. (Was previously asserted
+        ASCII; the Blue Book uses the Greek symbol and OPSIN parses both identically,
+        so the emit was corrected to Greek — the D/L config stays ASCII small-capital.)"""
+        name = sugar_to_glycoside_class_name("β", "D", "glucopyranose")
+        assert name.startswith("β-D-")
+        assert "beta" not in name  # the ASCII word is NOT used
 
     def test_glycoside_class_name_no_descriptors(self):
         """Empty anomer/config yields the bare -oside head (no leading hyphens)."""
@@ -329,8 +332,8 @@ class TestSystematicMonosaccharideFamilyCoverage:
         # 2-ketopentoses (furanose only)
         "ribulofuranose", "xylulofuranose",
     ]
-    _WANT = {("D", "alpha"), ("D", "beta"), ("D", ""),
-             ("L", "alpha"), ("L", "beta"), ("L", "")}
+    _WANT = {("D", "α"), ("D", "β"), ("D", ""),
+             ("L", "α"), ("L", "β"), ("L", "")}
 
     def test_every_family_base_has_full_dl_anomer_coverage(self):
         coverage = {}

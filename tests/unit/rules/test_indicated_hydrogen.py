@@ -1,6 +1,6 @@
 """
 Unit tests for general indicated hydrogen algorithm and fused heterocycle
-dictionary expansion (Phase 107, Plan 01, Task 2).
+dictionary expansion (a phase, Plan 01, Task 2).
 
 Tests:
 - New 3-ring fused heterocycle dictionary entries produce correct retained names
@@ -35,7 +35,7 @@ class TestNewFusedHeterocycleEntries:
             f"Dibenzofuran ({can}) should be in FUSED_HETEROCYCLE_DATA"
         )
         entry = FUSED_HETEROCYCLE_DATA[can]
-        # PIN carries the fusion descriptor (v28 Cluster B, P-25.3.1.3).
+        # PIN carries the fusion descriptor (, P-25.3.1.3).
         assert entry["name"] == "dibenzo[b,d]furan"
 
     @pytest.mark.unit
@@ -47,7 +47,7 @@ class TestNewFusedHeterocycleEntries:
             f"Dibenzothiophene ({can}) should be in FUSED_HETEROCYCLE_DATA"
         )
         entry = FUSED_HETEROCYCLE_DATA[can]
-        # PIN carries the fusion descriptor (v28 Cluster B, P-25.3.1.3).
+        # PIN carries the fusion descriptor (, P-25.3.1.3).
         assert entry["name"] == "dibenzo[b,d]thiophene"
 
     @pytest.mark.unit
@@ -166,6 +166,40 @@ class TestGeneralIndicatedHydrogen:
         assert "H-" in name or "purine" in name.lower(), (
             f"Expected purine name with indicated H, got: {name}"
         )
+
+
+class TestGroup14HeteroleIndicatedH:
+    """Group-14 (Si/Ge/Sn) mancude heteroles keep their indicated hydrogen even
+    when every ring-position H is displaced by substitution.
+
+    P-68.2.6 "Silole, germole,... rings" (``the Blue Book``):
+    ``1,1-dibutyl-1H-germole (PIN) (note the indicated hydrogen atom)``. The
+    indicated hydrogen is a property of the mancude PARENT (which ring atom is
+    the saturated skeletal position), not of the substituted molecule, so a
+    1,1-disubstituted silole/germole/stannole keeps its ``1H`` where a carbon
+    heterocycle names the position only via its remaining hydrogen.
+    """
+
+    @pytest.mark.unit
+    @pytest.mark.parametrize("smiles,expected", [
+        # fully substituted (0 H at ring position 1) -> 1H still cited (the fix)
+        ("CC[Si]1(CC)C=CC=C1", "1,1-diethyl-1H-silole"),
+        ("CCCC[Ge]1(CCCC)C=CC=C1", "1,1-dibutyl-1H-germole"),   # BB P-68.2.6 PIN
+        ("CC[Sn]1(CC)C=CC=C1", "1,1-diethyl-1H-stannole"),
+    ])
+    def test_fully_substituted_group14_heterole_keeps_1h(self, smiles, expected):
+        assert name_compound(smiles) == expected
+
+    @pytest.mark.unit
+    @pytest.mark.parametrize("smiles,expected", [
+        # regression pins: the mono-sub and unsubstituted forms already worked
+        # via the H-bearing path and must be byte-identical after the fix.
+        ("C[SiH]1C=CC=C1", "1-methyl-1H-silole"),
+        ("[SiH2]1C=CC=C1", "1H-silole"),
+        ("[GeH2]1C=CC=C1", "1H-germole"),
+    ])
+    def test_h_bearing_group14_heterole_unchanged(self, smiles, expected):
+        assert name_compound(smiles) == expected
 
 
 class TestDictionaryCompleteness:

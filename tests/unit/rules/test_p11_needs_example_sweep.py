@@ -2,10 +2,10 @@
 
 Pins the ledger rows that were reproduced live at HEAD and confirmed to
 already emit the PIN (Clusters 1-3 of
-).
+docs/superpowers/plans/2026-07-16-wave8-p11-needs-example-sweep.md).
 These are verification/regression-lock tests, not red->green TDD: the
 rows were confirmed WORKING before this file was written. See that plan
-doc +  for the full row-by-row
+doc + internal notes for the full row-by-row
 disposition of the 128-row P11 scope (most rows are reclassified OPEN and
 routed to an owning phase, not gold-worthy).
 """
@@ -49,7 +49,7 @@ def test_p23_5_1_siloxane_pentaoxa_tetrasila():
     # Bonus finding: the ledger recorded this as a live Si-drop leak
     # ("3,5,7,9,10-pentaoxa-bicyclo[4.3.1]decane", Si silently dropped),
     # but reproducing at current HEAD shows the Group-14/15 heteroatom
-    # prefixes (v23 Phase 5) already fixed it -- Si is correctly cited
+    # prefixes (a phase) already fixed it -- Si is correctly cited
     # via 'sila', gated == raw, OPSIN RT-clean. No longer a live leak.
     smiles = "O1[SiH2]O[SiH]2O[SiH2]O[SiH]1O2"
     expected = "2,4,6,8,9-pentaoxa-1,3,5,7-tetrasilabicyclo[3.3.1]nonane"
@@ -68,7 +68,7 @@ def test_p93_5_7_3_ring_assembly_stereo_no_longer_wrong():
     # has the double bond). Post-fix, detect_ring_assembly correctly
     # declines the pair and a different handler names the real molecule.
     # This is NOT yet a full P-93.5.7.3 ring-assembly-stereo PIN engine
-    # (that stays routed to Phase 6) -- it only confirms the leak is gone.
+    # (that stays routed to a phase) -- it only confirms the leak is gone.
     smiles = r"C1CCCCC/C=C\1C1CCCCCCC1"
     expected = "(1E)-1-cyclooctylcyclooct-1-ene"
     namer_raw = Orthonym(_disable_opsin_validity_gate=True)
@@ -84,7 +84,7 @@ def test_p93_6_ex6_forbidden_multiplicative_fails_closed():
     # emitting a wrong stereoisomer. Verification-lock: confirms the veto
     # still fails closed (gated == raw == "unknown organic compound"), not a
     # new build -- the full per-substituent stereo-bracket PIN stays routed
-    # to Phase 6.
+    # to a phase.
     smiles = "C[C@H]1CC[C@@H](C[C@@H](O)C[C@@H]2CC[C@H](C)CC2)CC1"
     namer_raw = Orthonym(_disable_opsin_validity_gate=True)
     assert namer.name(smiles) == "unknown organic compound"

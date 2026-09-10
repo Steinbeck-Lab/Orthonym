@@ -4,7 +4,7 @@ Four defects, one interlocking fix. Each was independently masking the next, so 
 one of them landing alone made a name WORSE -- the reason this shipped as a unit.
 
 1. **Stereochemical / isotopic / Greek descriptors were in the primary key.**
-   `### **P-14.5** ALPHANUMERICAL ORDER` closes its preamble (``BlueBookV2.md:3446``):
+   `### **P-14.5** ALPHANUMERICAL ORDER` closes its preamble (``the Blue Book``):
 
        In these subsections the principles of alphanumerical order do not include
        Greek letters (except in conjunctive names) or isotopic or stereochemical
@@ -26,7 +26,7 @@ one of them landing alone made a name WORSE -- the reason this shipped as a unit
    cited ahead of `chloroethyl` and -- through P-14.4(g) -- took locant 1.
 
 4. **Letters and locants were compared as one string.** P-14.5's preamble (``:3442``)
-   compares "*Nonitalic Roman letters ... first*" and only "*When all the Roman letters
+   compares "*Nonitalic Roman letters... first*" and only "*When all the Roman letters
    are identical*" the locants. A single key string conflates the stages, so a leading
    digit decided comparisons that letters should have.
 
@@ -46,15 +46,15 @@ from orthonym.assembly.naming_utils import (
 
 
 class TestPrimaryKeyExcludesDescriptors:
-    """P-14.5 :3446 -- the descriptor is not part of the primary key."""
+    """P-14.5:3446 -- the descriptor is not part of the primary key."""
 
     @pytest.mark.parametrize("raw,expected", [
         # only the DESCRIPTOR goes here; the locant is stripped later, by
         # alpha_sort_key's own P-14.5.2 leading-locant step
         ("(E)-3-phenylprop-2-en-1-yl", "3-phenylprop-2-en-1-yl"),
         ("(1E,3E,5E)-hepta-1,3,5-trien-1-yl", "hepta-1,3,5-trien-1-yl"),
-        ("beta-D-glucopyranosyloxy", "glucopyranosyloxy"),   # Greek + configurational
-        ("[4-2H]benzoyl", "benzoyl"),                        # isotopic, :7104
+        ("β-D-glucopyranosyloxy", "glucopyranosyloxy"),   # Greek + configurational
+        ("[4-2H]benzoyl", "benzoyl"),                        # isotopic,:7104
         ("rel-(1R,2S)-2-chlorocyclohexyl", "2-chlorocyclohexyl"),
         ("trans-4-methylcyclohexyl", "4-methylcyclohexyl"),
     ])
@@ -94,7 +94,7 @@ class TestEnclosingMarksAreNotAlphanumerical:
 
 
 class TestCipTieBreak:
-    """P-14.4(j) :3346 / P-45.6.3 :22606."""
+    """P-14.4(j):3346 / P-45.6.3:22606."""
 
     @pytest.mark.parametrize("raw,rank", [
         ("(1R)-1-chloroethyl", (0,)),
@@ -145,7 +145,7 @@ class TestP1451VersusP1452:
         ("trioxo", "oxo"),
         ("dihydroxy", "hydroxy"),
         ("tetrachloro", "chloro"),
-        # P-14.5.2 -- internal to ONE compound substituent, counts. :3477's
+        # P-14.5.2 -- internal to ONE compound substituent, counts.:3477's
         # `7-(1,2-difluorobutyl)-5-ethyltridecane (PIN)` alphabetizes at 'd'.
         ("(R)-4,5-dihydroxypentyl", "dihydroxypentyl"),
         ("(2E,6E)-3,7,11-trimethyldodeca-2,6,10-trien-1-yl",

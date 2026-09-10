@@ -44,7 +44,7 @@ NOTE ON THE HARNESS: ``tests/conftest.py:267`` disables the OPSIN validity gate 
 every test, so ``Orthonym().name()`` here returns the RAW construction rather than
 the gate-filtered production output.  That is deliberate — these tests assert the
 PRODUCER.  Each expected name in this file was additionally OPSIN-round-trip
-verified against its SMILES (see ``);
+verified against its SMILES (see ``benchmarks/pin_oracle/packs/p62_anilino.json``);
 the round trip proves VALIDITY only, never PIN status, for which the Blue Book
 citations above are the sole authority.
 """

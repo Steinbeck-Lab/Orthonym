@@ -2,7 +2,7 @@
 naming + fail-closed count guard. Tasks 1 (defect a + b-het) and 2 (defect b-pure-C).
 
 All expected PINs OPSIN-verified (opsin-cli-2.9.0 -> RDKit canonical == input) at
-plan-authoring time; see  §A/§D.
+plan-authoring time; see internal notes §A/§D.
 """
 import pytest
 from rdkit import Chem

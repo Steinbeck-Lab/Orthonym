@@ -1,4 +1,4 @@
-"""v33 no-abstain Phase A fix-round-1, Finding 4 (HIGH, FABLE adversarial
+""" no-abstain Phase A fix-round-1, Finding 4 (HIGH, FABLE adversarial
 0-wrong review): the INLINE G1 emission lane (`namer.py::_name_impl`, the
 `if self._general_fallback and (not name or is_failure_name(name)):` block)
 consumed `_stereo_emit_decision`'s flag but never checked a flagged emission
@@ -14,7 +14,7 @@ DIFFERENT mechanism -- see the note below): for input
 configuration at the amino centre -- confirmed via full InChIKey: input
 `...-IUYQGCFVSA-N` vs the name's parse-back `...-SYPWQXSBSA-N`, same
 skeleton block `FERWBXLFSBWTDE`) was SHIPPED VERBATIM by `_name_impl` at
-HEAD before this fix ( confirmed: HEAD ships the
+HEAD before this fix (`scripts/an A/B check` confirmed: HEAD ships the
 conflict name unchanged; the fix abstains). This is a genuine wrong-
 stereoisomer ship with zero verification at the point `_name_impl` returns.
 
@@ -36,7 +36,7 @@ INSIDE the inline-G1 block, before ever setting `name = _eng.name`) ensures.
 The fix routes a FLAGGED (best-effort, `_stereo_emit_decision`'s
 `(True, True)`) emission through the SAME `_rt_match` superset gate the
 late-recovery lane already uses (proven omission-safe / conflict-rejecting,
-FABLE's Q1, ) before it may ship,
+FABLE's Q1, `scratchpad/probe_rtmatch_semantics.py`) before it may ship,
 without touching the unflagged (already stereo-complete) path at all.
 """
 from unittest import mock
@@ -48,7 +48,7 @@ from orthonym.assembly.general_engine import GeneralEngineResult
 
 pytestmark = [pytest.mark.unit, pytest.mark.opsin_gate]
 
-# 2 real stereocentres (confirmed via ).
+# 2 real stereocentres (confirmed via scratchpad/probe_finding4_g1_stereo.py).
 SMILES_2_CENTRES = "C[C@@H](O)[C@@H](N)C"
 
 # Omits the butan-2-ol centre entirely and asserts the WRONG (negated) value

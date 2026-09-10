@@ -1,4 +1,4 @@
-"""Tests for the Phase 109 fused heterocycle dictionary expansion.
+"""Tests for the a phase fused heterocycle dictionary expansion.
 
 Verifies that the expanded FUSED_HETEROCYCLE_DATA dictionary:
 - Has at least 150 entries (target: 150+)
@@ -63,9 +63,9 @@ class TestEntryIntegrity:
         """No duplicate locant values within a single entry.
 
         Note: benzo[g]quinoline has a known pre-existing duplicate ('9a')
-        that predates Phase 109. Excluded from this check.
+        that predates a phase. Excluded from this check.
         """
-        # Pre-existing entries with known locant issues (not added in Phase 109)
+        # Pre-existing entries with known locant issues (not added in a phase)
         known_issues = {"benzo[g]quinoline"}
         for smi, data in FUSED_HETEROCYCLE_DATA.items():
             if data["name"] in known_issues:
@@ -105,7 +105,7 @@ class TestEntryIntegrity:
 
 
 class TestSpecificNewEntries:
-    """Spot checks for specific entries added in Phase 109."""
+    """Spot checks for specific entries added in a phase."""
 
     def test_acridine_present(self):
         """Acridine (pre-existing) should still be present."""
@@ -174,8 +174,8 @@ class TestSpecificNewEntries:
     def test_indane_new(self):
         """The indane ring system is catalogued under its PIN.
 
-        P-54.4.3.2 (BB:24256) names 'indane' verbatim as NOT a preferred IUPAC
-        name; BB:16988 prints '(formerly indan) 2,3-dihydro-1H-indene (PIN)'.
+        P-54.4.3.2 (the Blue Book) names 'indane' verbatim as NOT a preferred IUPAC
+        name; the Blue Book prints '(formerly indan) 2,3-dihydro-1H-indene (PIN)'.
         """
         smi = Chem.CanonSmiles("C1Cc2ccccc2C1")
         assert smi in FUSED_HETEROCYCLE_DATA
@@ -183,11 +183,13 @@ class TestSpecificNewEntries:
         assert data["name"] == "2,3-dihydro-1H-indene"
 
     def test_phenoxathiin_new(self):
-        """Phenoxathiin should be a new entry."""
+        """Phenoxathiine should be a catalog entry (P-25.2.2.3 PIN)."""
         smi = Chem.CanonSmiles("c1ccc2c(c1)Oc1ccccc1S2")
         assert smi in FUSED_HETEROCYCLE_DATA
         data = FUSED_HETEROCYCLE_DATA[smi]
-        assert data["name"] == "phenoxathiin"
+        #: PIN keeps the terminal 'e' (P-25.2.2.3, the Blue Book
+        # "X = S phenoxathiine (PIN)").
+        assert data["name"] == "phenoxathiine"
 
     def test_xanthine_new(self):
         """Xanthine should be a new entry."""

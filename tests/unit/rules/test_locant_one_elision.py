@@ -261,6 +261,11 @@ class TestTerminalFGTypes:
             # imidic acid — the acid carbon is always chain-terminal
             # (methanehydrazonic acid).
             "hydrazonic_acid",
+            # v42 Phase 11 (P-66.4.2.1): imidohydrazide (amidrazone) — the
+            # characteristic carbon is always chain-terminal, so the ring/chain-di
+            # suffix locant elides (cyclohexanecarboximidohydrazide,
+            # ethanediimidohydrazide).
+            "imidohydrazide",
         }
         assert TERMINAL_FG_TYPES == expected
 
@@ -273,8 +278,9 @@ class TestTerminalFGTypes:
         (v23 D-FOLLOWON item 8) + 1 hydrazide (Wave 1 R8a, P-66.3.1.1) + 3 Wave2 T3d
         (hydrazonamide/hydrazidine/thiohydrazide) + 2 Wave2-completion-B4
         (peroxy_acid/imidic_acid, P-43.1/P-65.1.3.1) + 1 W3-P02
-        (hydrazonic_acid, P-65.1.3.2) = 33 entries."""
-        assert len(TERMINAL_FG_TYPES) == 33
+        (hydrazonic_acid, P-65.1.3.2) + 1 v42-Phase-11
+        (imidohydrazide, P-66.4.2.1) = 34 entries."""
+        assert len(TERMINAL_FG_TYPES) == 34
 
 
 # ============================================================================

@@ -5,16 +5,16 @@ Acid halides use two-word "functional class" naming:
     {acyl name} {halide word}
 
 Examples:
-    CC(=O)Cl     -> acetyl chloride (retained acyl name for C2)
-    CCC(=O)Cl    -> propanoyl chloride
+    CC(=O)Cl -> acetyl chloride (retained acyl name for C2)
+    CCC(=O)Cl -> propanoyl chloride
     O=C(Cl)c1ccccc1 -> benzoyl chloride (retained acyl name for benzene)
     ClC(=O)CCCC(=O)Cl -> pentanedioyl dichloride (diacid halide)
 
 The acyl name derives from the corresponding acid:
-    ethanoic acid  -> ethanoyl  (systematic)
-    acetic acid    -> acetyl    (retained, preferred for C2)
-    formic acid    -> formyl    (retained, preferred for C1)
-    benzoic acid   -> benzoyl   (retained, preferred for benzene-attached)
+    ethanoic acid -> ethanoyl (systematic)
+    acetic acid -> acetyl (retained, preferred for C2)
+    formic acid -> formyl (retained, preferred for C1)
+    benzoic acid -> benzoyl (retained, preferred for benzene-attached)
 
 Reference: IUPAC 2013 Blue Book, P-65.5.1 (Acyl halides)
 """
@@ -218,7 +218,7 @@ _CARBONO_HALIDATE_WORDS = {
 def name_carbonic_monoester_acyl_halide(
     mol, match, halide_word: str
 ) -> Optional[str]:
-    """P-35.4.2/P-65.2.1: X-C(=O)-O-R  ->  '<R> carbono<halide>idate'.
+    """P-35.4.2/P-65.2.1: X-C(=O)-O-R -> '<R> carbono<halide>idate'.
 
     ``match`` is the acyl-halide SMARTS tuple (carbonyl C, carbonyl O, halide).
     Returns None (fail-closed) unless the carbonyl C is a genuine carbonic-acid
@@ -293,7 +293,7 @@ def name_carbonic_monoester_acyl_halide(
     return f"{r_name} {carbono_word}"
 
 
-# Phase 2E (P-65.5.1): acyl-group interfixes for the imido / chalcogeno
+# a phase (P-65.5.1): acyl-group interfixes for the imido / chalcogeno
 # analogues of carboxylic acid, keyed by the acyl-halide principal-group name.
 # ``ring`` is the ``…ane`` carbo-form for a ring parent ('cyclohexanecarboximidoyl
 # chloride'); ``chain_tail`` is appended to the alkane chain-prefix + 'an' for a
@@ -301,7 +301,7 @@ def name_carbonic_monoester_acyl_halide(
 # 'ethanethioyl chloride').
 _IMIDO_THIO_ACYL = {
     # pg -> (ring carbo-form, chain '…an{tail}' tail)
-    "imidoyl_halide": ("carboximidoyl", "imidoyl"),      # =NH  (elide alkane 'e')
+    "imidoyl_halide": ("carboximidoyl", "imidoyl"),      # =NH (elide alkane 'e')
     "carbothioyl_halide": ("carbothioyl", "ethioyl"),    # =S
     "carboselenoyl_halide": ("carboselenoyl", "eselenoyl"),  # =Se
 }
@@ -405,13 +405,13 @@ def name_acid_halide(features, scope_out: Optional[dict] = None) -> Optional[str
             ``scope_out['parent_scope'] = 'chain' | 'ring'`` for the branch it
             actually took, or leaves it absent when the parent is neither (or is
             not provably ``features.principal_chain``). Only the branch that
-            picks the parent can know this -- v29 P7 measured that it cannot be
+            picks the parent can know this -- measured that it cannot be
             recovered downstream from ``features.principal_chain`` or
             ``features.chain_is_parent``, both of which report "chain" on
             ring-parented names. Consumed by ``handlers.acid_halide`` to tell
             ``_inject_stereo_if_missing`` which numbering a front-of-name
-            stereodescriptor block is read in (P-91.3, BB:44639 "NAMING OF
-            STEREOISOMERS", deciding sentence :44643).
+            stereodescriptor block is read in (P-91.3, the Blue Book "NAMING OF
+            STEREOISOMERS", deciding sentence:44643).
 
     Returns:
         IUPAC name string, or None if not an acid halide.
@@ -439,14 +439,14 @@ def name_acid_halide(features, scope_out: Optional[dict] = None) -> Optional[str
     # FG types. name_acid_halide's ``pg`` is a SINGLE senior halide type, so a
     # MIXED diacyl halide (Br-CO-...-CO-Cl) or a mixed ring dicarbonyl would
     # otherwise see only one end and mis-name the other as an oxo+halo
-    # substituent. ``combined`` = [(match, halide_symbol), ...] over every type.
+    # substituent. ``combined`` = [(match, halide_symbol),...] over every type.
     _combined = []
     for _ft, _sym in (("acid_chloride", "Cl"), ("acid_bromide", "Br"),
                       ("acid_fluoride", "F"), ("acid_iodide", "I")):
         for _m in features.functional_groups.get(_ft, []):
             _combined.append((_m, _sym))
 
-    # P4-3 (P-66.5.1.3.1 / P-66.5.3.1): a diacyl DIpseudohalide (NC-CO-CO-CN
+    # -3 (P-66.5.1.3.1 / P-66.5.3.1): a diacyl DIpseudohalide (NC-CO-CO-CN
     # -> 'oxalyl dicyanide'). The pseudohalide contributes its own carbon, so the
     # real-halide-only ``_combined`` list is empty and the diacyl-halide path
     # below cannot see it; handle same-type acyl di-pseudohalides here.
@@ -557,15 +557,15 @@ def name_acid_halide(features, scope_out: Optional[dict] = None) -> Optional[str
 
     # Single acid halide: build acyl name.
     #
-    # v29 P7: `_build_acyl_name`'s `unsaturation` parameter (and the
+    #: `_build_acyl_name`'s `unsaturation` parameter (and the
     # `get_enoate_name` grammar behind it) existed but had NO caller, so every
     # acyl chain was spelled saturated and the C=C was SILENTLY DROPPED --
     # `C[C@@H]1C[C@H]1/C=C/C(Cl)=O` was named `3-[...]propanoyl chloride`, which
     # OPSIN reads back as the saturated `CCC(=O)Cl` skeleton. Locants run from the
     # carbonyl carbon = 1 (P-65.5.1). Geometry is left EMPTY here on purpose: the
     # E/Z block is a stereodescriptor and belongs to the stereo layer, which
-    # cites it at the front of the complete name (P-91.3, BB:44639 "NAMING OF
-    # STEREOISOMERS", :44643); emitting it here too would double-cite it.
+    # cites it at the front of the complete name (P-91.3, the Blue Book "NAMING OF
+    # STEREOISOMERS",:44643); emitting it here too would double-cite it.
     _acyl_atoms = [a for a in chain
                    if a not in consumed_atoms or a in _carbonyl_cs] if chain else []
     if len(_acyl_atoms) > 1 and _acyl_atoms[0] not in _carbonyl_cs:
@@ -581,21 +581,21 @@ def name_acid_halide(features, scope_out: Optional[dict] = None) -> Optional[str
                 _unsaturation.append((_i + 1, ''))
     acyl_name = _build_acyl_name(chain_length, _unsaturation or None)
 
-    # Discover substituents on the acyl chain via universal pipeline (Phase 86).
+    # Discover substituents on the acyl chain via universal pipeline (a phase).
     # Parent atoms = chain; exclude = all atoms consumed by acid halide groups
     # (carbonyl C, carbonyl O, halogen). This replaces the old
     # _get_chain_substituent_prefix() which only handled halogen substituents.
     #
-    # P4-3: substituent LOCANTS must number from the carbonyl carbon = 1
+    # -3: substituent LOCANTS must number from the carbonyl carbon = 1
     # (P-65.5.1), i.e. over the ACYL chain, not over ``features.principal_chain``.
     # For a PSEUDOhalide (cyanide/azide/isocyanate) the pseudo-group contributes
     # its own carbon, which sits at the FRONT of principal_chain
-    # (``[nitrile-C, carbonyl-C, ...]`` for ClCCC(=O)C#N), so numbering over
+    # (``[nitrile-C, carbonyl-C,...]`` for ClCCC(=O)C#N), so numbering over
     # ``chain`` put the substituent one locant too high ('4-chloropropanoyl
     # cyanide' for the 3-chloro PIN; OPSIN then rejected the wrong locant ->
     # abstain). ``_acyl_atoms`` is exactly the acyl chain oriented carbonyl-first
     # (== ``chain`` for a real halide), so it is the correct numbering basis;
-    # fall back to ``chain`` only when it could not be oriented (fail-closed [] ).
+    # fall back to ``chain`` only when it could not be oriented (fail-closed []).
     from ..assembly.composer import _integrate_universal_prefixes
     _sub_chain = _acyl_atoms if _acyl_atoms else chain
     sub_prefix = _integrate_universal_prefixes(
@@ -804,7 +804,7 @@ def _name_diacyl_halide_combined(mol, combined, chain, chain_length) -> Optional
 
 
 def _name_diacyl_pseudohalide(mol, features, pg, class_word) -> Optional[str]:
-    """P-66.5.1.3.1 / P-66.5.3.1 (BB:34805 / 34852): a diacyl DIpseudohalide with
+    """P-66.5.1.3.1 / P-66.5.3.1 (the Blue Book / 34852): a diacyl DIpseudohalide with
     an acyl pseudohalide (cyanide / azide / isocyanate) at BOTH ends of a bare
     diacyl backbone -> 'oxalyl di<class>' (C2) or '{chain}dioyl di<class>'.
 
@@ -865,7 +865,7 @@ def _name_diacyl_pseudohalide(mol, features, pg, class_word) -> Optional[str]:
     while n is not None:
         backbone.append(n)
         n = parent[n]
-    backbone.reverse()            # c1 ... c2
+    backbone.reverse()            # c1... c2
     # Total heavy-atom accounting: nothing hangs off the diacyl backbone.
     heavy = {a.GetIdx() for a in mol.GetAtoms() if a.GetAtomicNum() > 1}
     if (all_match_atoms | set(backbone)) != heavy:

@@ -1,14 +1,14 @@
-"""v36 Milestone-C Wave D (phase C6) — component spiro / spiro-ketal (P-24.5).
+""" Milestone-C Wave D (phase C6) — component spiro / spiro-ketal (P-24.5).
 
-Grounding spy: 
+Grounding trace: internal notes
 
 The deliverable class this file locks is the ONE clean, RT-verified P-24.5 gap the
-spy found: a monospiro system where one component is a von-Baeyer CAGE and the
+trace found: a monospiro system where one component is a von-Baeyer CAGE and the
 OTHER is a SATURATED heteromonocycle too large for a Hantzsch-Widman stem
 (ring size > 10). Such a component must be named by skeletal-replacement ('a')
 nomenclature per
 
-    P-24.5.4 (BlueBookV2.md): "In the case of ring systems modified by skeletal
+    P-24.5.4 (the Blue Book): "In the case of ring systems modified by skeletal
     replacement ('a') nomenclature, P-24.5.1 and P-24.5.3 are applied to name the
     ring system before skeletal replacement ('a') nomenclature is applied as
     described in P-24.5.2."

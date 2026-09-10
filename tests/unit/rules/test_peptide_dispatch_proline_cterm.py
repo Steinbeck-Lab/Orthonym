@@ -1,12 +1,12 @@
 """
-v33 Phase 2 Task 2.0 -- fix the stale peptide dispatch SMARTS + RT-gate the
+ a phase Task 2.0 -- fix the stale peptide dispatch SMARTS + RT-gate the
 flat producer.
 
-Root cause ( sec.4):
+Root cause (internal notes sec.4):
 `rules/amino_acids.py::is_peptide()` -- the dispatch predicate that gates
 whether `rules/peptides.py::name_peptide` is ever called
 (`routing/dispatch_table.py:604-612`) -- used SMARTS that were never updated
-when `peptides.py`'s own backbone-bond pattern was broadened (v30) to admit
+when `peptides.py`'s own backbone-bond pattern was broadened () to admit
 a C-terminal cyclic imino acid (proline/hydroxyproline): the ring nitrogen
 loses its only hydrogen once acylated by the preceding residue's peptide
 bond (a tertiary amide, H0), so the stale `[NX3;H1]`/`[NX3;H2,H1]` patterns
@@ -53,8 +53,8 @@ def _full_rt(smiles: str, name: str) -> bool:
     return inchi.MolToInchiKey(mol_in) == inchi.MolToInchiKey(mol_out)
 
 
-# The 9 dispatch-blocked-but-nameable witnesses (Phase-0 SPY, re-derived
-# directly from 's `peptide`
+# The 9 dispatch-blocked-but-nameable witnesses (Phase-0 a trace, re-derived
+# directly from internal notes's `peptide`
 # bucket: `is_peptide()` False today, `name_peptide()` builds a candidate
 # when called directly). Index 0 is the ONE that OPSIN-round-trips WRONG.
 _WRONG_WITNESS = (
@@ -157,7 +157,7 @@ class TestNoOverBroadening:
         because `name_peptide()`'s own `_is_valid_peptide` (unchanged,
         requires a genuine free N-terminus + a >=2-residue chain for the
         acyl-cap lever) still declines it, so dispatch falls through exactly
-        as before -- verified end-to-end via  (A == B,
+        as before -- verified end-to-end via `scripts/an A/B check` (A == B,
         both 'unknown organic compound')."""
         mol = Chem.MolFromSmiles("CC(=O)N1CCCC1C(=O)O")
         assert is_peptide(mol) is True  # documents the predicate's known slack
@@ -168,7 +168,7 @@ class TestNoOverBroadening:
 @pytest.mark.unit
 class TestPinUnchanged:
     """Ordinary (non-proline) dipeptides: the dispatch fix under test does not
-    change their name. v38 (V38-PEPTIDE-PIN-VERDICT.md) later moved the peptide
+    change their name. (V38-PEPTIDE-PIN-VERDICT.md) later moved the peptide
     PIN to the SUBSTITUTIVE form (peptide names are non-PIN); both emissions
     below are full-InChIKey round-trip verified."""
 

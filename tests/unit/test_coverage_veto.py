@@ -1,5 +1,5 @@
 # tests/unit/test_coverage_veto.py
-"""v33 Phase 0 Task L1: the coverage AUDIT becomes a real VETO under
+""" a phase Task L1: the coverage AUDIT becomes a real VETO under
 `ORTHONYM_COVERAGE_AUDIT=veto`.
 
 L0 built the SHADOW audit at `namer.py::_finish` (telemetry only, never
@@ -23,7 +23,7 @@ from orthonym.assembly.coverage_audit import CoverageVerdict
 pytestmark = pytest.mark.unit
 
 # The exact canary from the L0.4 gap-oracle measurement log
-# ( via
+# (internal notes via
 # `l0_4_measure.log`): a general-engine best-effort winner whose
 # `certify_general_result` (E1 + binding spine) FAILS -- `e1_spine`
 # incomplete -- even though a malformed name shipped under SHADOW.
@@ -88,7 +88,7 @@ class TestVetoRejectsIncompleteEGeneralEngineWinner:
         assert verdict.complete is False
         # The veto must have fired: the incomplete-spine winner must NOT ship.
         assert name != _TERPENOID_MALFORMED_NAME
-        # ... and the rescue is a real, RT-verified complete name, NOT a
+        #... and the rescue is a real, RT-verified complete name, NOT a
         # sentinel abstain.
         assert not is_failure_name(name), (
             f"expected an RT-verified rescue, got abstain sentinel {name!r}")

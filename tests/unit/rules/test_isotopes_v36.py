@@ -1,4 +1,4 @@
-"""v36 Milestone A3 -- isotope-descriptor PLACEMENT gaps (P-82.2.1 / P-82.2.2.1 /
+""" Milestone A3 -- isotope-descriptor PLACEMENT gaps (P-82.2.1 / P-82.2.2.1 /
 P-82.6.3.2). The decorator (``rules/isotopes.py``) already exists and already
 names simple isotopologues; this file covers three measured placement gaps
 plus a regression guard for the working simple cases.
@@ -44,17 +44,17 @@ def test_per_deuterated_glycine_systematic_parent():
 # Task 2 -- ring single-label placement, 18F tracer
 # ---------------------------------------------------------------------------
 #
-# VERIFIED 2026-08-23 (Task 0 spy): the DECORATOR'S PLACEMENT LOGIC already
+# VERIFIED 2026-08-23 (Task 0 trace): the DECORATOR'S PLACEMENT LOGIC already
 # works generally for a single isotope label on a ring/parent atom that
 # carries its own substituent locant -- see the 3 positive witnesses below,
 # none of which needed any code change. This specific witness's skeleton
 # carries a P-92 pseudoasymmetric ring-stereo descriptor, "(1r,3r)-", and
 # OPSIN 2.9.0 cannot parse THAT at all -- verified directly:
-#   opsin_parse("(1r,3r)-1,3-difluorocyclobutane") -> None
-#   opsin_parse("(1R,3R)-1-amino-3-fluorocyclobutane-1-carboxylic acid") -> None
-#   opsin_parse("rel-(1R,3R)-...") -> None
-#   opsin_parse("cis-3-fluoro-1-aminocyclobutane-1-carboxylic acid") -> None
-#   opsin_parse("trans-...") -> None
+# opsin_parse("(1r,3r)-1,3-difluorocyclobutane") -> None
+# opsin_parse("(1R,3R)-1-amino-3-fluorocyclobutane-1-carboxylic acid") -> None
+# opsin_parse("rel-(1R,3R)-...") -> None
+# opsin_parse("cis-3-fluoro-1-aminocyclobutane-1-carboxylic acid") -> None
+# opsin_parse("trans-...") -> None
 # every stereo notation tried, even on the isotope-free skeleton and even on
 # the simplest possible instance of the pattern. Placing the isotope
 # descriptor correctly cannot make an unparseable base name round-trip: the
@@ -127,7 +127,7 @@ def test_c11_choline_salt_skeleton():
 @pytest.mark.parametrize(
     "smiles,expected",
     [
-        ("[13CH3]CO", "(2-13C1)ethan-1-ol"),
+        ("[13CH3]CO", "(2-13C)ethan-1-ol"),
         ("[2H]C([2H])([2H])O", "(2H3)methanol"),
     ],
 )

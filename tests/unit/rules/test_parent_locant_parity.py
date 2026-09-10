@@ -1,4 +1,4 @@
-"""Phase 147: ring-type parity between _build_ring_pos and handler orient functions.
+"""a phase: ring-type parity between _build_ring_pos and handler orient functions.
 
 Six ring-type parity tests proving that ``_build_ring_pos(ring_set, ring_info)``
 returns locants byte-equivalent to what the corresponding ring-type handler
@@ -7,17 +7,17 @@ orient function (or stored authoritative numbering) produces.
 Source: https://iupac.qmul.ac.uk/BlueBook/P4.html P-44.1
 Source: https://iupac.qmul.ac.uk/BlueBook/P1.html P-14.4(g), P-14.5.2
 Source: https://iupac.qmul.ac.uk/BlueBook/P2.html P-25, P-25.3
-Source: HERITAGE-1990 §3 (Wisniewski et al., J. Chem. Inf. Comput. Sci. 30, 324-332)
+Source: AUTONOM-1990 §3 (Wisniewski et al., J. Chem. Inf. Comput. Sci. 30, 324-332)
         — criterion order (a)-(f) for symmetric-ring numbering.
-Source: Phase 147 CONTEXT D-03, D-05, D-09, D-10.
+Source: a phase CONTEXT,,,.
 
-Per Phase 147 D-05 the criterion order applied within each handler orient
-function matches HERITAGE §3 (a)-(f) AND IUPAC P-14.5 / P-14.4:
-  (a) lowest locants for principal characteristic group   (P-14.3.5)
-  (b) lowest locants for indicated hydrogens              (P-31.1.4 / P-25.7.1)
-  (c) lowest locants for multiple bonds                   (P-14.3.5 / P-31.1.4)
-  (d) maximum number of substituents                      (P-14.5.2 secondary)
-  (e) lowest locants for substituents                     (P-14.3.5)
+Per a phase the criterion order applied within each handler orient
+function matches AUTONOM §3 (a)-(f) AND IUPAC P-14.5 / P-14.4:
+  (a) lowest locants for principal characteristic group (P-14.3.5)
+  (b) lowest locants for indicated hydrogens (P-31.1.4 / P-25.7.1)
+  (c) lowest locants for multiple bonds (P-14.3.5 / P-31.1.4)
+  (d) maximum number of substituents (P-14.5.2 secondary)
+  (e) lowest locants for substituents (P-14.3.5)
   (f) lowest locants for substituents in alphabetical citation order (P-14.4(g))
 """
 import pytest
@@ -38,7 +38,7 @@ from orthonym.namer import (
 def test_benzene_toluene_substituent_locant_1():
     """Toluene (Cc1ccccc1): the methyl-bearing ring C gets locant 1.
 
-    Criterion: HERITAGE §3 (e) lowest substituent locants; P-14.4(g) lowest
+    Criterion: AUTONOM §3 (e) lowest substituent locants; P-14.4(g) lowest
     locants for substituents in alphabetical citation order. With a single
     substituent the only constraint is "place it at C1" — orient_benzene
     gives the substituent-bearing aromatic C the locant 1 and the dispatch
@@ -46,8 +46,8 @@ def test_benzene_toluene_substituent_locant_1():
     branch 3 (BL-2 fix).
 
     Source: https://iupac.qmul.ac.uk/BlueBook/P1.html P-14.4(g)
-    Source: HERITAGE-1990 §3 (e)-(f).
-    Source: Phase 147 CONTEXT D-03 branch 3, D-05 (a)-(f), Plan 02 BL-2.
+    Source: AUTONOM-1990 §3 (e)-(f).
+    Source: a phase CONTEXT branch 3, (a)-(f), Plan 02 BL-2.
     """
     mol = Chem.MolFromSmiles('Cc1ccccc1')
     features = compute_features(mol)
@@ -83,14 +83,14 @@ def test_benzene_toluene_substituent_locant_1():
 def test_pyridine_nitrogen_locant_1():
     """Pyridine: N gets locant 1 per P-25.3 heteroatom seniority.
 
-    Criterion: HERITAGE §3 — heteroatom seniority anchor, then (e) lowest
+    Criterion: AUTONOM §3 — heteroatom seniority anchor, then (e) lowest
     substituent locants. orient_heterocycle_with_substituents (branch 4 of
     the dispatch helper) places N at position 1 for pyridine.
 
     Source: https://iupac.qmul.ac.uk/BlueBook/P2.html P-25.3
     Source: https://iupac.qmul.ac.uk/BlueBook/P4.html P-44.1
-    Source: HERITAGE-1990 §3 (heteroatom anchor, then (e)).
-    Source: Phase 147 CONTEXT D-03 branch 4, D-05.
+    Source: AUTONOM-1990 §3 (heteroatom anchor, then (e)).
+    Source: a phase CONTEXT branch 4,.
     """
     mol = Chem.MolFromSmiles('c1ccncc1')
     features = compute_features(mol)
@@ -121,9 +121,9 @@ def test_pyridine_nitrogen_locant_1():
 def test_morpholine_heteroatom_locants_1_and_4():
     """Morpholine (C1COCCN1): O=1, N=4. Lowest heteroatom locant set {1, 4}.
 
-    Criterion: HERITAGE §3 — heteroatom seniority/anchor + lowest heteroatom
+    Criterion: AUTONOM §3 — heteroatom seniority/anchor + lowest heteroatom
     locant set. P-25.3.1.3 heteroatom seniority for ring numbering ranks
-    O > N (the order is F, Cl, Br, I, O, S, Se, Te, N, P, ...), so when
+    O > N (the order is F, Cl, Br, I, O, S, Se, Te, N, P,...), so when
     both O and N are present in the same ring the higher-priority O gets
     locant 1. The locant set {1, 4} is the lowest possible for a six-
     membered ring with two heteroatoms separated by two carbons.
@@ -131,8 +131,8 @@ def test_morpholine_heteroatom_locants_1_and_4():
     Source: https://iupac.qmul.ac.uk/BlueBook/P2.html P-25.3.1.3
         (heteroatom seniority order for monocyclic Hantzsch-Widman names).
     Source: https://iupac.qmul.ac.uk/BlueBook/P4.html P-44.1
-    Source: HERITAGE-1990 §3 (lowest heteroatom locants).
-    Source: Phase 147 CONTEXT D-03 branch 4, D-05 (a)-(f).
+    Source: AUTONOM-1990 §3 (lowest heteroatom locants).
+    Source: a phase CONTEXT branch 4, (a)-(f).
     """
     mol = Chem.MolFromSmiles('C1COCCN1')
     features = compute_features(mol)
@@ -168,19 +168,19 @@ def test_morpholine_heteroatom_locants_1_and_4():
 # ============================================================================
 
 def test_naphthalene_fusion_tuples_present():
-    """Naphthalene (c1ccc2ccccc2c1): 8 peripheral int locants + 2 fusion tuples.
+    """Naphthalene: 8 peripheral int locants + 2 fusion tuples.
 
-    Criterion: HERITAGE §3 (b) lowest locants for indicated hydrogens / fused-
+    Criterion: AUTONOM §3 (b) lowest locants for indicated hydrogens / fused-
     system rule. Per P-25 PAH numbering is FIXED, not reoriented per
-    substituents. Per Plan 01 D-01 homogeneity coercion, the ring_pos dict
+    substituents. Per Plan 01 homogeneity coercion, the ring_pos dict
     is fully (int, str) tuples when ANY fusion atom appears — peripheral
     locants are coerced from int N to (N, '') so downstream min()/sort()
     operations stay type-safe (RESEARCH §3 Risk 3).
 
     Source: https://iupac.qmul.ac.uk/BlueBook/P2.html P-25
     Source: https://iupac.qmul.ac.uk/BlueBook/P4.html P-44.1
-    Source: HERITAGE-1990 §3 (b) — fused-system fixed numbering.
-    Source: Phase 147 CONTEXT D-01 (tuple encoding), D-03 branch 2.
+    Source: AUTONOM-1990 §3 (b) — fused-system fixed numbering.
+    Source: a phase CONTEXT (tuple encoding), branch 2.
     """
     mol = Chem.MolFromSmiles('c1ccc2ccccc2c1')
     features = compute_features(mol)
@@ -214,23 +214,23 @@ def test_naphthalene_fusion_tuples_present():
 
 
 # ============================================================================
-# Test 5 — Cyclohexane (carbocyclic monocycle, sorted-fallback per D-09)
+# Test 5 — Cyclohexane (carbocyclic monocycle, sorted-fallback per)
 # ============================================================================
 
 def test_cyclohexane_sorted_fallback():
     """Cyclohexane (C1CCCCC1): no authoritative numbering — sorted fallback OK.
 
-    Criterion: HERITAGE §3 — pure-carbon monocycle has no criterion-
+    Criterion: AUTONOM §3 — pure-carbon monocycle has no criterion-
     differentiated winner. P-14.5.2 ring symmetry makes any consistent
     numbering equivalent for a homocyclic carbocycle with no substituents.
-    Per Phase 147 D-09 back-compat, _build_ring_info_for_parent_selection
+    Per a phase back-compat, _build_ring_info_for_parent_selection
     branch 7 returns None, and _build_ring_pos falls through to the sorted
     1-indexed mapping.
 
     Source: https://iupac.qmul.ac.uk/BlueBook/P1.html P-14.5.2
-    Source: HERITAGE-1990 §3 (no criterion-differentiated winner for symmetric
+    Source: AUTONOM-1990 §3 (no criterion-differentiated winner for symmetric
         homocyclic carbocycle).
-    Source: Phase 147 CONTEXT D-03 branch 7, D-09.
+    Source: a phase CONTEXT branch 7,.
     """
     mol = Chem.MolFromSmiles('C1CCCCC1')
     features = compute_features(mol)
@@ -249,22 +249,22 @@ def test_cyclohexane_sorted_fallback():
 
 
 # ============================================================================
-# Test 6 — Indole (fused heterocycle, D-09 byte-identical preservation)
+# Test 6 — Indole (fused heterocycle, byte-identical preservation)
 # ============================================================================
 
 def test_indole_fused_hetero_atom_mapping():
     """Indole (c1ccc2[nH]ccc2c1): byte-identical to match_fused_heterocycle_core.
 
-    Criterion: HERITAGE §3 — stored arrangement for cataloged fused systems
+    Criterion: AUTONOM §3 — stored arrangement for cataloged fused systems
     (functionally equivalent: the FUSED_HETEROCYCLES registry stores the
     canonical IUPAC numbering, and branch 1 of the dispatch helper preserves
-    that mapping byte-identical to honor D-09 (back-compat with the existing
+    that mapping byte-identical to honor (back-compat with the existing
     fused-heterocycle path that ships in pre-147 Orthonym).
 
     Source: https://iupac.qmul.ac.uk/BlueBook/P2.html P-25
     Source: https://iupac.qmul.ac.uk/BlueBook/P4.html P-44.1
-    Source: HERITAGE-1990 §3 — stored arrangement for cataloged systems.
-    Source: Phase 147 CONTEXT D-03 branch 1, D-09 byte-identical.
+    Source: AUTONOM-1990 §3 — stored arrangement for cataloged systems.
+    Source: a phase CONTEXT branch 1, byte-identical.
     """
     mol = Chem.MolFromSmiles('c1ccc2[nH]ccc2c1')
     features = compute_features(mol)
@@ -280,12 +280,12 @@ def test_indole_fused_hetero_atom_mapping():
 
 
 # ============================================================================
-# Test 7 — Phase 151-01 D-21: VB ≥4-ring cascade-step-6 wiring
+# Test 7 — a phase-01: VB ≥4-ring cascade-step-6 wiring
 # ============================================================================
 
 
 class TestVB:
-    """Phase 151 D-21: cascade-step-6 fires for VB tetracyclo+ inputs.
+    """a phase: cascade-step-6 fires for VB tetracyclo+ inputs.
 
     Verifies that ``_build_ring_info_for_parent_selection`` Branch 6 routes
     >=4-ring non-cataloged bridged systems through the new
@@ -293,8 +293,8 @@ class TestVB:
     that the cascade-step-6 gate (`candidate_pool._has_iupac_locants`)
     consumes the resulting locants with FULL atom coverage.
 
-    Source: 151-CONTEXT.md D-04 / D-06 / D-21; 151-AUDIT-A.md verdict
-    THIN_WRAPPER; Phase 147 cascade-step-6 gate.
+    Source: 151-CONTEXT.md / /; 151-AUDIT-A.md verdict
+    THIN_WRAPPER; a phase cascade-step-6 gate.
     """
 
     @pytest.mark.unit
@@ -318,14 +318,14 @@ class TestVB:
 
     @pytest.mark.unit
     def test_adamantane_anticanary_predicate_false(self):
-        """D-08 lock: adamantane is tricyclic, is_higher_polycyclo False."""
+        """ lock: adamantane is tricyclic, is_higher_polycyclo False."""
         from orthonym.rules.polycyclic_von_baeyer import is_higher_polycyclo
         mol = Chem.MolFromSmiles('C1C2CC3CC1CC(C2)C3')
         assert is_higher_polycyclo(mol) is False
 
     @pytest.mark.unit
     def test_bicyclo222_octane_anticanary(self):
-        """D-04 anti-canary: bicyclo[2.2.2]octane retains bicyclo.py auth."""
+        """ anti-canary: bicyclo[2.2.2]octane retains bicyclo.py auth."""
         from orthonym.rules.polycyclic_von_baeyer import (
             get_higher_polycyclo_iupac_locants,
             is_higher_polycyclo,
@@ -336,7 +336,7 @@ class TestVB:
 
     @pytest.mark.unit
     def test_norbornane_anticanary(self):
-        """D-04 anti-canary: norbornane (bicyclo[2.2.1]heptane)."""
+        """ anti-canary: norbornane (bicyclo[2.2.1]heptane)."""
         from orthonym.rules.polycyclic_von_baeyer import (
             get_higher_polycyclo_iupac_locants,
             is_higher_polycyclo,
@@ -382,19 +382,19 @@ class TestVB:
 
 
 # ============================================================================
-# Test 8 — Phase 151-02 D-21: pure spiro cascade-step-6 wiring (Branch 5a)
+# Test 8 — a phase-02: pure spiro cascade-step-6 wiring (Branch 5a)
 # ============================================================================
 
 
 class TestSpiro:
-    """Phase 151-02 D-21: cascade-step-6 fires for pure spiro inputs.
+    """a phase-02: cascade-step-6 fires for pure spiro inputs.
 
     Verifies that ``_build_ring_info_for_parent_selection`` Branch 5
     routes pure spiro systems through ``get_spiro_iupac_locants`` and
     that the cascade-step-6 gate consumes the resulting locants with
     FULL atom coverage.
 
-    Source: 151-CONTEXT.md D-09 / D-21; 151-02-PLAN.md task 3.
+    Source: 151-CONTEXT.md /; 151-02-PLAN.md task 3.
     """
 
     @pytest.mark.unit
@@ -443,20 +443,20 @@ class TestSpiro:
 
 
 # ============================================================================
-# Test 9 — Phase 151-02 D-09 + D-21: mixed spiro/fused cascade-step-6 (Branch 5b)
+# Test 9 — a phase-02 +: mixed spiro/fused cascade-step-6 (Branch 5b)
 # ============================================================================
 
 
 class TestMixedSpiroFused:
-    """Phase 151-02 D-09 / D-13 / D-21: cascade-step-6 fires for mixed
-    spiro/fused inputs that the HERITAGE §4 separable-parts builder names.
+    """a phase-02 / /: cascade-step-6 fires for mixed
+    spiro/fused inputs that the AUTONOM §4 separable-parts builder names.
 
-    Source: 151-CONTEXT.md D-09 / D-13 / D-21; 151-02-PLAN.md task 3.
+    Source: 151-CONTEXT.md / /; 151-02-PLAN.md task 3.
     """
 
     @pytest.mark.unit
     def test_mixed_routes_to_mixed_classification(self):
-        """D-09 dispatch order: composer cascade picks mixed-spiro-fused
+        """ dispatch order: composer cascade picks mixed-spiro-fused
         BEFORE polycyclic-bridged AND BEFORE pure-spiro on a known mixed
         SMILES."""
         from orthonym.assembly.composer import _classify_complex_ring
@@ -489,7 +489,7 @@ class TestMixedSpiroFused:
     @pytest.mark.unit
     def test_mixed_indoline_cyclohexane_cascade(self):
         """spiro[indoline-2,1'-cyclohexane]: Branch 5b fires with full
-        coverage on HERITAGE §4 canonical input."""
+        coverage on AUTONOM §4 canonical input."""
         mol = Chem.MolFromSmiles('C12(CCCCC1)CNC1=CC=CC=C12')
         features = compute_features(mol)
         ring_info = _build_ring_info_for_parent_selection(features)
@@ -517,7 +517,7 @@ class TestMixedSpiroFused:
 
     @pytest.mark.unit
     def test_pure_spiro_not_mixed_classify(self):
-        """D-09 contract: pure spiro routes as 'spiro', NOT mixed-spiro-fused."""
+        """ contract: pure spiro routes as 'spiro', NOT mixed-spiro-fused."""
         from orthonym.assembly.composer import _classify_complex_ring
         mol = Chem.MolFromSmiles('C1CCC2(CC1)CCCCC2')
         ring_type = _classify_complex_ring(mol)
@@ -528,13 +528,13 @@ class TestMixedSpiroFused:
 
 
 # ============================================================================
-# Test 11 — Ring Assembly 3+ (Phase 151-03 D-21)
+# Test 11 — Ring Assembly 3+ (a phase-03)
 # ============================================================================
 class TestRingAssembly:
-    """Phase 151-03 D-15 / D-21: cascade-step-6 fires for ring assemblies
+    """a phase-03 /: cascade-step-6 fires for ring assemblies
     of size 3+ via Branch 7 in _build_ring_info_for_parent_selection.
 
-    Source: 151-CONTEXT.md D-15 / D-21; 151-03-PLAN.md task 2.
+    Source: 151-CONTEXT.md /; 151-03-PLAN.md task 2.
     """
 
     @pytest.mark.unit
@@ -568,7 +568,7 @@ class TestRingAssembly:
 
     @pytest.mark.unit
     def test_135_triphenylbenzene_does_not_fire(self):
-        """D-15 anti-canary: branched arrangement does NOT engage Branch 7."""
+        """ anti-canary: branched arrangement does NOT engage Branch 7."""
         mol = Chem.MolFromSmiles(
             'c1cc(-c2ccccc2)cc(-c2ccccc2)c1-c1ccccc1'
         )
@@ -602,11 +602,11 @@ class TestRingAssembly:
         name = name_compound('Cc1ccc(-c2ccccc2)cc1')
         assert name is not None
         assert "biphenyl" in name
-        assert "^" not in name  # D-16 carat not emitted
+        assert "^" not in name  # carat not emitted
 
     @pytest.mark.unit
     def test_phenyl_pyridyl_chain_does_not_fire_branch_7(self):
-        """D-14: heterogeneous chain falls through to substituent naming."""
+        """: heterogeneous chain falls through to substituent naming."""
         mol = Chem.MolFromSmiles('c1ccc(-c2ccncc2)cc1-c1ccccc1')
         features = compute_features(mol)
         ring_info = _build_ring_info_for_parent_selection(features)

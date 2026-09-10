@@ -1,4 +1,4 @@
-"""Phase 151-03 D-23 integration: OPSIN round-trip on ring assemblies 3+.
+"""a phase-03 integration: OPSIN round-trip on ring assemblies 3+.
 
 Parametrizes over the 12 literature_validated.json fixtures (each carrying
 its own ``opsin_smiles_validated`` evidence from RESEARCH §"OPSIN
@@ -6,11 +6,11 @@ Compatibility Evidence") and asserts that ``name_compound(smiles)`` emits
 a name OPSIN can parse back to a SMILES whose InChI layer 1 (formula +
 connectivity) matches the input.
 
-Per CONTEXT D-23 stereo-layer mismatches don't fail this test (handled in
-Phase 152/153). The InChI layer-1 split (``.split('/c')[0]``) restricts
+Per CONTEXT stereo-layer mismatches don't fail this test (handled in
+a phase/153). The InChI layer-1 split (``.split('/c')[0]``) restricts
 the comparison to the formula portion.
 
-Source: 151-CONTEXT.md D-23.
+Source: 151-CONTEXT.md.
 Source: 151-RESEARCH.md §"OPSIN Compatibility Evidence" (12 names).
 """
 from __future__ import annotations
@@ -67,14 +67,14 @@ _FIXTURE_DIR = (
 _LIT_FIXTURES = json.loads((_FIXTURE_DIR / "literature_validated.json").read_text())
 
 
-# Fixtures known to need v19 substituent-classification fix per
-# 151-AUDIT-C.md "Out-of-scope follow-ups" + HERITAGE-followups.md.
+# Fixtures known to need substituent-classification fix per
+# 151-AUDIT-C.md "Out-of-scope follow-ups" + AUTONOM-followups.md.
 _XFAIL_FIXTURES = {
     "ra_lit_terphenyl_dicarboxylic_acid": (
         "151-AUDIT-C.md out-of-scope: -CHO vs -COOH substituent "
         "classification bug emits 'diformyl' instead of "
         "'dicarboxylic acid'. Upstream substituent-detection issue "
-        "logged to HERITAGE-followups.md as v19 follow-up."
+        "logged to AUTONOM-followups.md as v19 follow-up."
     ),
 }
 
@@ -87,7 +87,7 @@ _XFAIL_FIXTURES = {
     ids=[f["fixture_id"] for f in _LIT_FIXTURES if f.get("expected_name")],
 )
 def test_ring_assembly_opsin_roundtrip_inchi_l1(fixture, request):
-    """D-23 round-trip: name_compound(smi) -> OPSIN -> InChI L1 == input.
+    """ round-trip: name_compound(smi) -> OPSIN -> InChI L1 == input.
 
     Skips fixtures whose name is None (corpus_mined.json placeholders).
     """

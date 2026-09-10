@@ -1,4 +1,4 @@
-"""v26 BP-3 cluster C2 — chalcogen-ether / sulfinyl-sulfonyl ARM recursion.
+""" BP-3 cluster C2 — chalcogen-ether / sulfinyl-sulfonyl ARM recursion.
 
 The `-S-R` / `-Se-R` / `-Te-R` / `-S(=O)-R` / `-S(=O)(=O)-R` substituent arm was
 named by CARBON-COUNT, collapsing unsaturation / branching / hetero / aryl to a
@@ -13,7 +13,7 @@ sulfonyl PIN (P-63.6) for an arm ``_classify_oxide_side`` declines.
 
 These assert the exact builder-return strings (no OPSIN); the enclosing-mark and
 fail-closed contract are what this lever changes. Full-name round-trips are
-verified separately via 
+verified separately via scripts/diagnose.py.
 """
 import pytest
 from rdkit import Chem

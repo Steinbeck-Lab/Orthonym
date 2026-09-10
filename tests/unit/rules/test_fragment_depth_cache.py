@@ -29,7 +29,7 @@ def _inchikey(smiles: str) -> str:
     strictly stronger than production's own skeleton-only SELF-01 check and
     stays a genuine 0-wrong guard. Used only by
     ``test_production_never_emits_a_wrong_name`` -- see RB-6 in
-    ."""
+    internal notes."""
     mol = Chem.MolFromSmiles(smiles)
     assert mol is not None, f"Invalid SMILES: {smiles}"
     return inchi.MolToInchiKey(mol)
@@ -321,9 +321,9 @@ DEPTH_LIMIT_COMPOUNDS = [
 # validity gate; production has it ON — `namer._DISABLE_VALIDITY_GATE` is False
 # by default):
 #
-#     failing round-trips ................................ 16 / 25
-#     of those, production emits 'unknown organic compound' 16 / 16
-#     of those, production ships the raw name .............. 0 / 16
+# failing round-trips................................ 16 / 25
+# of those, production emits 'unknown organic compound' 16 / 16
+# of those, production ships the raw name.............. 0 / 16
 #
 # So these are BREADTH gaps (the generator cannot yet name these structures and
 # the gate correctly abstains), NOT wrong-name defects — no incorrect name
@@ -332,7 +332,7 @@ DEPTH_LIMIT_COMPOUNDS = [
 # rotting into a permanent excuse. `test_production_never_emits_a_wrong_name`
 # below pins the invariant that actually matters for these rows.
 #
-# Full evidence: 
+# Full evidence: internal notes
 # ---------------------------------------------------------------------------
 _RT_BREADTH_GAPS = {
     "001_chloroquinoline_ester",
@@ -345,8 +345,8 @@ _RT_BREADTH_GAPS = {
     # 1-yl)amino)hexyloxy]phenyl})methanone'. Same treatment as 013/020.
     "011_macrolide_lactone",
     "012_biaryl_ether",
-    # "013_dipeptide_proline" -- REMOVED 2026-08-21 (v33 Phase 2 Task 2.2
-    # cleanup): verified via  that this already
+    # "013_dipeptide_proline" -- REMOVED 2026-08-21 (a phase Task 2.2
+    # cleanup): verified via `scripts/an A/B check` that this already
     # round-trips correctly at HEAD 799d3491 (before Task 2.2's own code),
     # i.e. Task 2.0/2.1 (the peptide dispatch SMARTS fix + Lever C) closed
     # this gap and nobody removed the stale xfail entry. Now

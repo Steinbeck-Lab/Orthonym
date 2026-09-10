@@ -153,14 +153,14 @@ def classify_ring_system_type(
     if spiro_in_system:
         return RingSystemType.SPIRO
 
-    # Phase 155.A D-03 + D-26: Cyclophane classification fires after spiro and
+    # a phase.A +: Cyclophane classification fires after spiro and
     # before bridged-fused (P-44.2.2 hierarchy: SPIRO=1 < CYCLIC_PHANE=2 < FUSED=3).
-    # Source: 155-CONTEXT.md D-03, D-20, D-26; ring_selection.py:48 enum.
-    # NOTE (D-20 root-cause-only, ISS-005): narrow exception scope to ImportError
+    # Source: internal notes,,; ring_selection.py:48 enum.
+    # NOTE (root-cause-only,): narrow exception scope to ImportError
     # only -- circular-import-safe lazy import idiom (matches multiplicative.py
     # lazy-import pattern). Runtime errors from is_cyclophane MUST bubble up;
     # do NOT swallow them. is_cyclophane already returns False (not raises) for
-    # non-cyclophane mol per D-03 topology gate, so the try/except handles
+    # non-cyclophane mol per topology gate, so the try/except handles
     # ONLY the bootstrap ImportError case.
     try:
         from .phane import is_cyclophane
@@ -176,10 +176,10 @@ def classify_ring_system_type(
     # 1. bridged-fused (detect_bridged_fused) FIRST
     # 2. bicyclo (is_bicyclo_system) -- pure 2-ring bridged
     # 3. classify_fused_system 'bridged-fused' -- catches cases missed by
-    #    detect_bridged_fused (e.g., benzonorbornadiene). Must come BEFORE
-    #    is_polycyclic_system because that function would catch these as VB.
+    # detect_bridged_fused (e.g., benzonorbornadiene). Must come BEFORE
+    # is_polycyclic_system because that function would catch these as VB.
     # 4. polycyclic-bridged (is_polycyclic_system) -- tricyclo+ pure VB
-    #    Must come after bridged-fused checks to avoid misclassification.
+    # Must come after bridged-fused checks to avoid misclassification.
     # 5. fused (ortho-fused/ortho-peri-fused)
 
     from .bicyclo import is_bicyclo_system
@@ -478,7 +478,7 @@ def _p25_8_component_rank(mol: Chem.Mol, system_atoms: Set[int]) -> Tuple[int, .
     _name, a2l = named
 
     def _base_int(v):
-        # v38 CP2 widened the fused-component locant map to also carry lettered
+        # CP2 widened the fused-component locant map to also carry lettered
         # fusion locants ('4a') and (int, primes) tuples. This P-25.8 (e)-criterion
         # het-locant tiebreak must use the BASE integer of each (as it did pre-CP2,
         # when the map was coerced to int upstream) so a heteroatom on a ring-fusion
@@ -565,15 +565,15 @@ def ring_system_score(
     Tuple ordering (39 elements; Tasks 12-17 + the P-44.2.2.2.4 pre-bridge
     metrics append P-44.2.2.2.x tiebreakers AFTER the P-44.4.1 tier so they only
     break within-type ties):
-    - [0]  -has_heteroatom: P-44.2.1(a) heterocyclic preferred (negated)
-    - [1]  -has_nitrogen: P-44.2.1(b) N-containing preferred (negated)
-    - [2]  -senior_heteroatom_rank: P-44.2.1(c) most senior heteroatom (negated)
-    - [3]  -num_rings: P-44.2.1(d) more rings = senior (negated)
-    - [4]  -num_skeletal_atoms: P-44.2.1(e) more atoms = senior (negated)
-    - [5]  -num_heteroatoms: P-44.2.1(f) more heteroatoms = senior (negated)
+    - [0] -has_heteroatom: P-44.2.1(a) heterocyclic preferred (negated)
+    - [1] -has_nitrogen: P-44.2.1(b) N-containing preferred (negated)
+    - [2] -senior_heteroatom_rank: P-44.2.1(c) most senior heteroatom (negated)
+    - [3] -num_rings: P-44.2.1(d) more rings = senior (negated)
+    - [4] -num_skeletal_atoms: P-44.2.1(e) more atoms = senior (negated)
+    - [5] -num_heteroatoms: P-44.2.1(f) more heteroatoms = senior (negated)
     - [6..25] heteroatom_variety_tuple: P-44.2.1(g) term-by-term comparison
               (20 elements: -count_N, -count_F, -count_Cl, -count_Br, -count_I,
-               -count_O, -count_S, -count_Se, -count_Te, -count_P, ...)
+               -count_O, -count_S, -count_Se, -count_Te, -count_P,...)
     - [26] type_rank: P-44.2.2 type hierarchy (tiebreaker, lower = senior)
     - [27] -num_multiple_bonds: P-44.4.1.1 max ring multiple bonds (negated)
     - [28] -num_double_bonds: P-44.4.1.2 then max double bonds (negated)
@@ -661,7 +661,7 @@ def ring_system_score(
                 num_double_bonds += 1
 
     # P-44.2.1(g): heteroatom variety -- term-by-term comparison by seniority
-    # Build tuple: (-count_of_N, -count_of_F, ..., -count_of_P)
+    # Build tuple: (-count_of_N, -count_of_F,..., -count_of_P)
     # Negated so min() selects ring with MORE of the most-senior element
     heteroatom_variety_tuple = tuple(
         -heteroatom_counts.get(elem, 0)
@@ -779,7 +779,7 @@ def _ylidene_linked_parent_ring(
 def _is_carbon_fused_system(mol, atoms: Set[int]) -> bool:
     """True iff ``atoms`` form an all-carbon ring system of >=2 fused rings
     (a triterpene/steroid-type aglycone core). Used ONLY by the best-effort
-    glycoside-parent preference in :func:`select_principal_ring_system`."""
+    glycoside-parent preference in:func:`select_principal_ring_system`."""
     ri = mol.GetRingInfo()
     n_rings = sum(1 for r in ri.AtomRings() if set(r) <= set(atoms))
     if n_rings < 2:
@@ -845,7 +845,7 @@ def select_principal_ring_system(
     if len(ring_systems) == 1:
         return tuple(sorted(ring_systems[0]))
 
-    # v30 tail (glycoside convention, best-effort only): a GLYCOSIDE names its
+    # tail (glycoside convention, best-effort only): a GLYCOSIDE names its
     # AGLYCONE as the parent and every sugar as a glycosyloxy substituent
     # (P-102 / the natural-product convention), even though strict P-44.2 makes
     # a heterocyclic sugar ring senior to an all-carbon ring system. When exactly
@@ -929,13 +929,38 @@ def select_principal_ring_system(
         return tuple(sorted(_ylidene_ring))
 
     # Score each ring system and select the one with minimum score
-    best_idx = 0
-    best_score = ring_system_score(mol, ring_systems[0])
-
-    for i in range(1, len(ring_systems)):
-        score = ring_system_score(mol, ring_systems[i])
-        if score < best_score:
-            best_score = score
-            best_idx = i
+    scores = [ring_system_score(mol, sy) for sy in ring_systems]
+    best_score = min(scores)
+    tied = [i for i, s in enumerate(scores) if s == best_score]
+    if len(tied) > 1:
+        # A1 (P-45.2.1): when >=2 candidate parent rings TIE on the P-44.2
+        # ring-system score, the senior parent is the one carrying the MAXIMUM
+        # number of substituents cited as prefixes (the Blue Book, "P-45.2.1
+        # the maximum number of substituent groups cited as prefixes"; worked
+        # examples:6235/:6249/:6257). Before this the tie fell to list order
+        # (ring_systems[0]) -- a non-preferred parent for e.g. a carotenoid/terpene
+        # of two carbocycles joined by a chain (the 3- vs 4-substituent ring).
+        # NARROWED to NON-AROMATIC ALL-CARBON tied rings: the aromatic ring path
+        # already resolves P-45.2.1, and a ring with skeletal heteroatoms (a
+        # glycoside's pyranose) is owned by conventions where an exocyclic-bond
+        # count is not the prefix count. Blast-radius measured (0 name changes / 0
+        # RT-regressions on pubchem_2000+a dev split+chebi_5000): the narrowing fires
+        # only on the intended carbocyclic-tie class. Deterministic + input-
+        # invariant. See internal notes
+        def _eligible(sy):
+            return all(mol.GetAtomWithIdx(a).GetAtomicNum() == 6
+                       and not mol.GetAtomWithIdx(a).GetIsAromatic() for a in sy)
+        def _exo_count(sy):
+            rset = set(sy)
+            return sum(1 for a in rset
+                       for nb in mol.GetAtomWithIdx(a).GetNeighbors()
+                       if nb.GetIdx() not in rset)
+        elig = [i for i in tied if _eligible(ring_systems[i])]
+        if len(elig) > 1 and len(elig) == len(tied):
+            best_idx = max(elig, key=lambda i: _exo_count(ring_systems[i]))
+        else:
+            best_idx = tied[0]
+    else:
+        best_idx = tied[0]
 
     return tuple(sorted(ring_systems[best_idx]))

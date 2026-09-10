@@ -1,14 +1,14 @@
 #!/usr/bin/env python3
-"""WSB-03 (Phase 177) coverage for the centres CIP-engine bridge.
+"""WSB-03 (a phase) coverage for the centres CIP-engine bridge.
 
 Covers:
   * centres-ON: with the jar present + Java available, the CIP validation
-    suite scores 279/290 via the centres engine (1.5; was 281 on 1.2.1).
+    suite scores 281/290 via the centres engine (1.2.1 tagged release).
   * graceful RDKit fallback: when _find_centres_jar() returns None (monkeypatch)
     OR Java is absent, centres_label_batch returns None so the caller falls
-    back to RDKit -- a missing JVM never hard-fails (D-13).
+    back to RDKit -- a missing JVM never hard-fails ().
   * both-endpoint -> RDKit-bond mapping: centres' per-atom E/Z labels at both
-    endpoints are applied onto the correct DOUBLE bond's _CIPCode (D-14).
+    endpoints are applied onto the correct DOUBLE bond's _CIPCode ().
   * label parsing: tetrahedral single label + both-endpoint E/Z token lists.
 
 Tests that need the live jar skip cleanly when Java / the jar is absent.
@@ -41,18 +41,18 @@ def _engine_available() -> bool:
 
 @pytest.mark.integration
 def test_find_centres_jar_at_project_root():
-    """The vendored jar resolves at PROJECT_ROOT as centres-cli-1.5.jar.
+    """The vendored jar resolves at PROJECT_ROOT as centres-cli-1.2.1.jar.
 
-    CIP-UPDATE (2026-06-27): engine refreshed 1.2.1 -> 1.5 (SiMolecule/centres
-    develop @ d4b3cf0). _find_centres_jar() now globs centres-cli-*.jar and
+    CIP-UPDATE (2026-09-07): engine reverted 1.5-SNAPSHOT -> 1.2.1 (tagged
+    release). _find_centres_jar() globs centres-cli-*.jar and
     picks the highest version, so this asserts the highest vendored jar.
     """
     jar = _find_centres_jar()
     assert jar is not None, "centres jar not vendored at project root"
-    assert Path(jar).name == "centres-cli-1.5.jar"
+    assert Path(jar).name == "centres-cli-1.2.1.jar"
     assert Path(jar).parent == PROJECT_ROOT
     # Vendored unmodified -> exact byte size (T-177-03 provenance).
-    assert Path(jar).stat().st_size == 2421241
+    assert Path(jar).stat().st_size == 2291742
 
 
 @pytest.mark.integration
@@ -84,7 +84,7 @@ def test_parse_centres_labels_empty():
 
 
 # ---------------------------------------------------------------------------
-# Bond mapping (D-14) -- no JVM needed (synthetic label map)
+# Bond mapping () -- no JVM needed (synthetic label map)
 # ---------------------------------------------------------------------------
 
 
@@ -130,7 +130,7 @@ def test_apply_labels_diene_targets_specific_bond():
 
 
 # ---------------------------------------------------------------------------
-# Graceful fallback (D-13) -- monkeypatched jar-absent, no JVM needed
+# Graceful fallback () -- monkeypatched jar-absent, no JVM needed
 # ---------------------------------------------------------------------------
 
 
@@ -153,11 +153,11 @@ def test_mol_label_returns_false_when_jar_absent(monkeypatch):
 
 @pytest.mark.integration
 def test_batch_returns_none_when_no_jvm_at_all(monkeypatch):
-    """Engine unavailable -> centres_label_batch returns None (D-13).
+    """Engine unavailable -> centres_label_batch returns None ().
 
     There are now TWO ways to reach a JVM, so both must be absent for the engine
     to count as unavailable: the in-process JVM (``jvm_bridge``, JPype) and the
-    external ``java`` binary. This asserts the D-13 contract itself -- no JVM by
+    external ``java`` binary. This asserts the contract itself -- no JVM by
     any route means None, so the caller falls back to RDKit rather than hard-failing.
 
     Note the SMILES must not already be in the process-level label cache, or the
@@ -244,15 +244,15 @@ def test_centres_live_mol_apply_double_bond():
 
 
 @pytest.mark.integration
-def test_centres_engine_scores_279_on_suite():
-    """centres-ON scores 279/290 on the CIP validation suite (D-17 gate).
+def test_centres_engine_scores_281_on_suite():
+    """centres-ON scores 281/290 on the CIP validation suite (gate).
 
-    CIP-UPDATE (2026-06-27): engine refreshed 1.2.1 -> 1.5 (develop @ d4b3cf0).
-    R/S/E/Z labels byte-identical to 1.2.1; the -2 vs 1.2.1 (281 -> 279) is two
+    CIP-UPDATE (2026-09-07): engine reverted 1.5-SNAPSHOT -> 1.2.1 (tagged
+    release). R/S/E/Z labels byte-identical between jars; 1.2.1 gets the two
     exotic cyclic-cumulene axial M/P labels Orthonym does not consume. See
-    test_cip_validation.test_centres_engine_279.
+    test_cip_validation.test_centres_engine_281.
 
-    Single batched JVM invocation (D-12) via the shared validation-suite
+    Single batched JVM invocation () via the shared validation-suite
     scorer.
     """
     if not _engine_available():
@@ -263,6 +263,6 @@ def test_centres_engine_scores_279_on_suite():
     )
     cip_data = load_cip_data()
     centres_pass = score_suite_centres(cip_data)
-    assert centres_pass == 279, (
-        f"centres CIP-suite pass count drifted: expected 279, got {centres_pass}"
+    assert centres_pass == 281, (
+        f"centres CIP-suite pass count drifted: expected 281, got {centres_pass}"
     )

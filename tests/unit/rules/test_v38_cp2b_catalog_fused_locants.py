@@ -1,4 +1,4 @@
-"""v38 CP2b -- carry letter fusion locants through the CATALOG fused branch.
+""" CP2b -- carry letter fusion locants through the CATALOG fused branch.
 
 Root-cause (sibling of CP2): ``spiro.py::_name_fused_component`` has two
 branches. CP2 fixed the SYSTEMATIC branch (``name_ortho_fused_bicyclic`` ->
@@ -21,7 +21,7 @@ the spiro slot). 0-wrong is absolute; every emission is round-trip gated.
 
 Governing rules: P-31.1.4 / P-25.3.1.3 (fusion-position letter locants),
 P-24.5.1 (spiro-component citation + low locants to the spiro atoms),
-BlueBookV2.md:2855 (fusion-position letter locants). OPSIN 2.9.0-verified.
+the Blue Book (fusion-position letter locants). OPSIN 2.9.0-verified.
 
 VERIFIED witness: ``CC12CCCCN2CC2(CC1)OC2`` (quinolizidine spiro-oxirane, methyl
 on the 9a ring-fusion carbon) abstained on HEAD; the fix names it to an
@@ -54,7 +54,7 @@ def _rt_ok(smiles: str, name: str) -> bool:
 
 
 # --- the verified witness: catalog fused heterocycle spiro component, methyl on
-#     the ring-fusion carbon (9a) -----------------------------------------------
+# the ring-fusion carbon (9a) -----------------------------------------------
 # oxirane sorts alphabetically before quinolizidine, so quinolizidine is the
 # PRIMED (second-cited) component and its fusion locant is carried as a primed
 # tuple ('9a', "'"); the undecorated core names spiro[oxirane-2,3'-quinolizidine].
@@ -110,7 +110,7 @@ def test_zero_wrong_sweep_rt_or_abstain(smiles):
 
 
 # --- PIN / no-regression controls: byte-identical to HEAD -------------------
-# Captured on HEAD 5b0562dd before the fix ( probe_cp2b_head.py). The
+# Captured on HEAD 5b0562dd before the fix (scratchpad probe_cp2b_head.py). The
 # undecorated catalog core spiro[oxirane-2,3'-quinolizidine] is the load-bearing
 # control -- it exercises the SAME catalog branch but carries no decoration on a
 # fusion atom, so it must stay byte-identical.

@@ -1,13 +1,13 @@
-"""Phase 158 CFR dispatch performance benchmark (D-15 HARD gate).
+"""a phase CFR dispatch performance benchmark (HARD gate).
 
-Per CONTEXT D-15: p99 < 1ms per dispatch call (HARD gate; phase fails if violated).
+Per CONTEXT: p99 < 1ms per dispatch call (HARD gate; phase fails if violated).
 Per RESEARCH § 5.2 interpretation (b) + Pitfall 8: measure DISPATCH OVERHEAD ONLY
-on cheap-path Tier-1 dispatch (retained-name lookup).  DO NOT measure end-to-end
+on cheap-path Tier-1 dispatch (retained-name lookup). DO NOT measure end-to-end
 ``name_compound()`` — that exceeds 1ms regardless of CFR (because
 ``name_multiplicative`` SMARTS or ``name_natural_product`` scaffold-detection
 dominates per RESEARCH § 5.1).
 
-Median target: < 100µs per CONTEXT D-15 (informational; not a HARD gate).
+Median target: < 100µs per CONTEXT (informational; not a HARD gate).
 
 The benchmark uses ``pytest-benchmark`` for percentile distribution recording.
 Per pytest-benchmark 5.x API: ``benchmark.stats.stats.<key>`` is the verified
@@ -25,21 +25,21 @@ from orthonym.routing.dispatcher import ClassFirstRouter
 
 @pytest.mark.benchmark(group="cfr_dispatch")
 def test_dispatch_p99_lt_1ms_cheap_path(benchmark):
-    """D-15 HARD gate: dispatch p99 < 1ms on cheap-path Tier-1 (retained-name).
+    """ HARD gate: dispatch p99 < 1ms on cheap-path Tier-1 (retained-name).
 
     Measurement scope per RESEARCH § 5.2 interpretation (b):
     - Pure dispatch overhead = predicate iteration + first-match return.
     - Cheap-path = Tier-1 retained-name (CCO → ethanol; <1µs predicate cost).
     - Excluded: SMARTS-heavy predicates (name_multiplicative,
       name_natural_product) which exceed 1ms regardless of CFR (Pitfall 8);
-      those are part of the existing v18 cost amortized in
-      
+      those are part of the existing cost amortized in
+      scripts/benchmark_performance.py.
 
     Module-load cost (StoutClass construction + DISPATCH_TABLE registration)
     is amortized by the test fixture; per-call cost is what's measured.
 
-    Per CONTEXT D-29 honest-fail-on-data: if p99 exceeds the HARD gate,
-    investigate cheap-path predicate cost.  NO band-aid relaxation of the
+    Per CONTEXT honest-fail-on-data: if p99 exceeds the HARD gate,
+    investigate cheap-path predicate cost. NO band-aid relaxation of the
     1ms threshold per AP-17 + AP-18 + AP-19.
     """
     router = ClassFirstRouter()
@@ -59,7 +59,7 @@ def test_dispatch_p99_lt_1ms_cheap_path(benchmark):
     # Smoke check: result is a ClassDispatchResult
     assert result.class_id is not None
 
-    # D-15 HARD gate (Phase 158 acceptance): p99 < 1ms (1.0e-3 seconds).
+    # HARD gate (a phase acceptance): p99 < 1ms (1.0e-3 seconds).
     # pytest-benchmark 5.x: benchmark.stats.stats.<percentile> is the API.
     stats_obj = benchmark.stats.stats
     p99_seconds = getattr(stats_obj, "p99", None)
@@ -79,7 +79,7 @@ def test_dispatch_p99_lt_1ms_cheap_path(benchmark):
         f"NO band-aid relaxation per CONTEXT D-29."
     )
 
-    # D-15 median target (informational; not a HARD gate): < 100µs.
+    # median target (informational; not a HARD gate): < 100µs.
     median_seconds = getattr(stats_obj, "median", None)
     if median_seconds is None:
         try:

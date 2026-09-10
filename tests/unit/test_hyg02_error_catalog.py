@@ -1,4 +1,4 @@
-"""HYG-02 (Phase 173) — named OrthonymLimitError catalog.
+"""HYG-02 (a phase) — named OrthonymLimitError catalog.
 
 Verifies: out-of-scope inputs raise a named error (opt-in); the default path is
 byte-identical to legacy descriptive fallbacks; the catalog never fires on
@@ -27,7 +27,7 @@ def test_wildcard_raises_named_limit():
     err = ei.value
     assert err.code == "WILDCARD_ATOMS"
     assert err.message  # non-empty human message
-    assert err.design_note_ref  # cites the HERITAGE analog
+    assert err.design_note_ref  # cites the AUTONOM analog
     assert err.code in LIMIT_CATALOG
 
 
@@ -170,7 +170,7 @@ def test_default_mode_never_raises_limit_on_canary_sample():
             # Pre-existing pipeline exceptions (ValueError on invalid SMILES, and
             # the AttributeError/KeyError/etc. that name_compound already catches)
             # are out of scope for this test — it only asserts the HYG-02 limit
-            # is never raised in default mode. Unchanged by Phase 173.
+            # is never raised in default mode. Unchanged by a phase.
             pass
 
 

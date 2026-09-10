@@ -1,8 +1,8 @@
-"""v37 TIER-POLICY — promote RT-verified general-engine rescues to the COMPLETE tier.
+""" TIER-POLICY — promote RT-verified general-engine rescues to the COMPLETE tier.
 
 WHAT THIS FILE GUARDS
 ---------------------
-A spy-before-code pass (invariant 8; 
+A trace-before-code pass (a project rule; internal notes
 CORESTEREO addendum + this task's report) established that ~88/150 ring+stereo
 abstainers ship a FULL-InChIKey-RT-verified name at the BEST-EFFORT tier
 (`gf=T, gfu=T`) but ABSTAIN at the verified COMPLETE tier (`gf=T, gfu=F`).
@@ -29,7 +29,7 @@ not RT-verified is promoted; best-effort behaviour is unchanged; the default
 byte-identical.
 
 The np-systematic DOWNGRADE at `namer.py:3294` is DELIBERATELY NOT promoted: it
-replaces a retained natural-product-parent PIN (`ursane`, `hopane`, ...) with a
+replaces a retained natural-product-parent PIN (`ursane`, `hopane`,...) with a
 systematic von-Baeyer form, which would REGRESS the PIN at the complete tier
 (governing priority #1). It stays best-effort-only.
 

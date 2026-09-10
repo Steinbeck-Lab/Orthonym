@@ -51,9 +51,9 @@ class TestIonFallThrough:
         assert result == 'ethoxide', f'Expected ethoxide, got: {result}'
 
     def test_retained_cation_ammonium(self):
-        """Ammonium should use retained name directly from namer.py."""
+        """NH4+ PIN is 'azanium' (P-73.1.1.2, the Blue Book; was 'ammonium')."""
         result = name_compound('[NH4+]')
-        assert result == 'ammonium', f'Expected ammonium, got: {result}'
+        assert result == 'azanium', f'Expected azanium, got: {result}'
 
     def test_retained_cation_methylammonium(self):
         """Methylammonium should use retained name directly from namer.py."""

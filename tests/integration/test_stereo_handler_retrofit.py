@@ -1,4 +1,4 @@
-"""Integration tests for stereo handler retrofit (Phase 124, Plan 02).
+"""Integration tests for stereo handler retrofit (a phase, Plan 02).
 
 Tests that Tier 2 handlers in composer.py produce stereodescriptors for
 compounds with stereocenters. Validates the near-miss stereo threshold
@@ -29,7 +29,7 @@ def _has_stereo_anywhere(name: str) -> bool:
     Matches (2R), (3S,4R), (9Z), (7aS), etc. including:
     - Whole-name prefix: (2R)-butanol
     - Embedded in ester: alkyl (2R)-alkanoate
-    - After glycoside prefix: (beta-D-...)(...2S)-...
+    - After glycoside prefix: (β-D-...)(...2S)-...
     - L/D amino acid notation: L-alanine
     """
     if re.search(r'\(\d+[a-z]*[RSrsEZez](,\d+[a-z]*[RSrsEZez])*\)', name):
@@ -270,7 +270,7 @@ class TestStereoMismatchCompounds:
 
     SM-40 and SM-42 may benefit from locant mapping improvements.
     SM-41 and SM-43 have no @/@@ in SMILES, so they cannot produce stereo
-    regardless of locant mapping -- documented as unfixable by Phase 124.
+    regardless of locant mapping -- documented as unfixable by a phase.
     """
 
     def test_sm40_stereo_present(self):
@@ -300,7 +300,7 @@ class TestStereoMismatchCompounds:
         """SM-41: No @/@@ in SMILES -- cannot produce stereo.
 
         This compound has NO stereochemistry in its SMILES input.
-        Phase 124 cannot fix this -- the input molecule has no stereo information.
+        a phase cannot fix this -- the input molecule has no stereo information.
         """
         smi = 'CCC(CCC(C)C1CCC2C3C(O)C=C4CC(O)CCC4(C)C3CCC12C)C(C)C'
         mol = Chem.MolFromSmiles(smi)

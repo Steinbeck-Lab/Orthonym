@@ -1,4 +1,4 @@
-"""Task A (v29 residue): the free valence is a STRUCTURAL fact, never a borrowed one.
+"""Task A (residue): the free valence is a STRUCTURAL fact, never a borrowed one.
 
 The Step-3/4 "cap the free valence with H -> name the capped molecule -> string-surgery
 the suffix into a prefix" path hands ``parent_to_prefix`` two things only: a *name string*
@@ -8,7 +8,7 @@ converter splices into the prefix is borrowed from the CAPPED molecule's own num
 That numbering is chosen to favour the capped molecule's principal characteristic group,
 which is exactly the numbering P-46.1.8 forbids for a substituent:
 
-    P-46.1 criterion (h) / P-46.1.8 (BlueBookV2.md): "The principal substituent chain has
+    P-46.1 criterion (h) / P-46.1.8 (the Blue Book): "The principal substituent chain has
     the lowest locants for free valences of any kind."
 
     P-29.2 "GENERAL METHODOLOGY FOR NAMING SUBSTITUENT GROUPS", method (2): "The locants
@@ -133,7 +133,7 @@ def test_pure_alkyl_numbering_is_unchanged():
 # --------------------------------------------------------------------------
 
 def test_attach_locant_is_a_required_argument():
-    """'Make a prefix unrenderable without its locant' (:345).
+    """'Make a prefix unrenderable without its locant' (eval/LOG.md:345).
     Omitting the attach locant must be impossible, not silently default to 1."""
     with pytest.raises(TypeError):
         parent_to_prefix("propan-2-ol", 3)          # positional-only call
@@ -179,7 +179,7 @@ def test_unlocanted_forms_are_unaffected(parent, n, expected):
 
 
 def test_existing_fail_closed_contract_is_preserved():
-    """v26 BP-2 RC-1 must keep holding through the new signature."""
+    """ BP-2 RC-1 must keep holding through the new signature."""
     for bad in ("isothiocyanic acid", "ethyl formate", "prop-2-enal"):
         assert parent_to_prefix(
             bad, chain_length=3, attach_locant=ATTACH_LOCANT_UNKNOWN) is None

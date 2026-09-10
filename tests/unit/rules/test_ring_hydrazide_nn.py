@@ -29,7 +29,7 @@ on N and N' now share one multiplier across the nitrogens
 ("N,N'-dimethyl...", the BB 'N1,N'4-dimethylnaphthalene-1,4-dicarbohydrazide'
 style, P-16.3.3) instead of being cited twice ("N-methyl-N'-methyl...").
 
-All expected PINs below are OPSIN-round-trip verified ().
+All expected PINs below are OPSIN-round-trip verified (scripts/diagnose.py).
 """
 
 import pytest
@@ -39,8 +39,8 @@ from orthonym import name_compound
 
 # ---------------------------------------------------------------------------
 # (1) Ring-parent N/N'-substituted hydrazides -- previously 'unknown'.
-#     N = the nitrogen bonded to the acyl C; N' = the terminal nitrogen
-#     (P-66.3.3).
+# N = the nitrogen bonded to the acyl C; N' = the terminal nitrogen
+# (P-66.3.3).
 # ---------------------------------------------------------------------------
 
 @pytest.mark.unit
@@ -71,7 +71,7 @@ def test_ring_hydrazide_nn_substituted(smiles, expected):
 
 # ---------------------------------------------------------------------------
 # (2) Retained benzo stem for the benzene carbohydrazide (P-66.3.1.2.1),
-#     substituted the same way as benzamide.
+# substituted the same way as benzamide.
 # ---------------------------------------------------------------------------
 
 @pytest.mark.unit

@@ -3,11 +3,11 @@
 Tests both trivial names for standard amino acids and systematic names
 for non-standard amino acids.
 
-v33 Phase 0 T5 (change-asserted-value, stereo honesty): most SMILES below carry
+ a phase T5 (change-asserted-value, stereo honesty): most SMILES below carry
 NO wedge/parity at the alpha-carbon (CHI_UNSPECIFIED) -- a genuinely
 stereo-undefined structure. The bare retained name (e.g. 'alanine') is Table
 10.4's name for the DEFINED (L) configuration only: `## **P-103.1.3.1** The
-stereodescriptors 'D' and 'L'` (BlueBookV2.md:54291) -- "The stereodescriptor
+stereodescriptors 'D' and 'L'` (the Blue Book) -- "The stereodescriptor
 'xi' (Greek letter xi) indicates unknown configuration" -- and OPSIN's grammar
 always resolves a bare amino-acid retained name to that ONE defined
 stereocentre, so asserting it against an undefined-stereo input is impossible
@@ -16,10 +16,10 @@ while OPSIN's parse of the bare name always has one (verified for asparagine:
 input `DCXYFEDJOCDNAF-UHFFFAOYSA-N` vs OPSIN('asparagine')
 `DCXYFEDJOCDNAF-REOHCLBHSA-N` -- same skeleton, stereo layer present only on
 the wrong side). Each new expected value below is the Blue Book's OWN
-systematic name for that amino acid (Table 10.4, BlueBookV2.md:54186-54245)
+systematic name for that amino acid (Table 10.4, the Blue Book-54245)
 and OPSIN-round-trips exactly to the stereo-free input (verified independently
-of this fix's code via ). Mutation-tested via
- against the pre-fix (35d5e921) versions of
+of this fix's code via `scripts/diagnose.py`). Mutation-tested via
+`scripts/an A/B check` against the pre-fix versions of
 `data/amino_acids.py` + `data/retained_names.py` + `rules/esters.py`: every
 updated assertion FAILS on the old code and PASSES on the fix. Stereo-DEFINED
 inputs (explicit `@`/`@@`) are untouched by this fix and are covered
@@ -80,7 +80,7 @@ class TestStandardAminoAcids:
         was impossible. Fixed by correcting the input, not the expected name,
         because the test's purpose is to cover methionine.
 
-        v33 Phase 0 T5: this input is also stereo-UNDEFINED, so the retained
+         a phase T5: this input is also stereo-UNDEFINED, so the retained
         name expectation moved to the systematic name too (see module note).
         """
         result = name_compound("CSCCC(N)C(=O)O")
@@ -128,10 +128,10 @@ class TestAcidicAminoAcids:
     def test_asparagine(self):
         """Asparagine, stereo-UNDEFINED input: the systematic name (see module note).
 
-        v33 Phase 0 T5: same defect + fix as `test_peptides.py::
+         a phase T5: same defect + fix as `test_peptides.py::
         test_asparagine_not_misrouted`, whose docstring carries the full
         3-artifact change-asserted-value evidence (BB citation, InChIKey
-        necessary-condition proof, head_ab.sh mutation test).
+        necessary-condition proof, an A/B check mutation test).
         """
         result = name_compound("NC(CC(N)=O)C(=O)O")
         assert result == "2,4-diamino-4-oxobutanoic acid"
@@ -173,26 +173,26 @@ class TestNonStandardAminoAcids:
         to '2-aminopropanoic acid' -- which is ALANINE, a DIFFERENT MOLECULE. The
         shipped name is correct only because SELF-01 vetoes that candidate:
 
-            gate OFF -> '2-aminopropanoic acid'    <- a different molecule
-            gate ON  -> '(methylamino)acetic acid' <- SELF-01 suppressed the above
+            gate OFF -> '2-aminopropanoic acid' <- a different molecule
+            gate ON -> '(methylamino)acetic acid' <- SELF-01 suppressed the above
 
         That is the same shape as the trap documented in tests/conftest.py:313, and
         an instance of the measured class where the 0-wrong margin is the GATE
         rather than the producers. Gating sarcosine did not create the bad
         candidate; it removed the trivial-name short-circuit that used to hide it
-        (the contributor guide invariant 9 -- removing a wrong output can unmask a worse
+        (CLAUDE.md a project rule -- removing a wrong output can unmask a worse
         generator). Asserting the gate-off value here would encode a wrong molecule
         as the expectation, so the marker is the correct resolution and the
         underlying producer defect is recorded for its own task.
 
-        v29 Task E2: was ``== "sarcosine"``. 'sarcosine' occurs NOWHERE in the Blue
+        : was ``== "sarcosine"``. 'sarcosine' occurs NOWHERE in the Blue
         Book (grep validated against known positives -- 'glycine' 26 hits,
         'norvaline'/'norleucine' found), and it is absent from both retained tables,
-        10.4 and 10.5 (BlueBookV2.md:54186-:54245). P-103.1.1.3 "Systematic
-        substitutive names" (:54247), sentence :54251, governs: "When not denoted by
+        10.4 and 10.5 (the Blue Book-:54245). P-103.1.1.3 "Systematic
+        substitutive names" (:54247), sentence:54251, governs: "When not denoted by
         a retained name, amino acids receive systematic substitutive names
         constructed by applying the principles, rules and conventions of
-        substitutive nomenclature." The Blue Book gives the precedent at :54253 --
+        substitutive nomenclature." The Blue Book gives the precedent at:54253 --
         norvaline and norleucine take systematic names and "The names 'norvaline'
         and 'norleucine' are not recommended."
 
@@ -202,7 +202,7 @@ class TestNonStandardAminoAcids:
         also preferred IUPAC names. All can be functionalized, but only acetic acid,
         benzoic acid, and oxamic acid can be substituted according to P-15.1.8.2.1".
         The same rule prints its own substituted-acetic-acid example WITHOUT
-        locants: "H2N-CO-COOH  oxamic acid (PIN)  amino(oxo)acetic acid".
+        locants: "H2N-CO-COOH oxamic acid (PIN) amino(oxo)acetic acid".
         """
         result = name_compound("CNCC(=O)O")
         assert result == "(methylamino)acetic acid"
@@ -210,7 +210,7 @@ class TestNonStandardAminoAcids:
     def test_ornithine(self):
         """Ornithine: 2,5-diaminopentanoic acid.
 
-        v33 Phase 1 (C2b): the flat SMILES leaves the alpha-carbon stereocentre
+         a phase (C2b): the flat SMILES leaves the alpha-carbon stereocentre
         undefined. Bare 'ornithine' is config-implying (OPSIN parses it to the
         DEFINED L configuration, same as 'L-ornithine' -- probed 2026-08-16), so
         emitting it here would fabricate stereo the input never defined
@@ -348,7 +348,7 @@ class TestIntegrationWithNameCompound:
     def test_amino_acid_through_full_pipeline(self):
         """Multiple amino acids work through the full pipeline.
 
-        v33 Phase 0 T5: glycine is achiral (unaffected); the other two are
+         a phase T5: glycine is achiral (unaffected); the other two are
         stereo-UNDEFINED, so they now emit the systematic name (see module note).
         """
         assert name_compound("NCC(=O)O") == "glycine"
@@ -359,7 +359,7 @@ class TestIntegrationWithNameCompound:
         """Regular compounds still work correctly."""
         # Simple acid
         assert name_compound("CC(=O)O") == "acetic acid"
-        # Simple amine. v22 Phase B (DD1 Fix 4 / H5): 'ethylamine' is a
+        # Simple amine. Phase B (DD1 Fix 4 / H5): 'ethylamine' is a
         # general-nomenclature functional-class name; the PIN is the substitutive
         # 'ethanamine' (P-62.2.1.2; ethane locant elided per P-14.3.4.4).
         assert name_compound("CCN") == "ethanamine"
@@ -371,13 +371,13 @@ class TestOPSINSimpleGroupAminoAcids:
     def test_opsin_simplegroup_amino_acids(self):
         """simpleGroup entries are lookupable by canonical SMILES.
 
-        v29 Task E2: 3 of the original 10 rows (statine, abrine, taurine) are now
+        : 3 of the original 10 rows (statine, abrine, taurine) are now
         adjudicated non-PINs and are withheld from this PIN-path lookup, so they
         moved to the companion assertion below. The 7 that remain still prove the
         simpleGroup integration is reached, which is what this test exists for.
 
         Why those 3 are withheld -- P-103.1.1.3 "Systematic substitutive names"
-        (BlueBookV2.md:54247), decisive sentence :54251: "When not denoted by a
+        (the Blue Book), decisive sentence:54251: "When not denoted by a
         retained name, amino acids receive systematic substitutive names constructed
         by applying the principles, rules and conventions of substitutive
         nomenclature." The retained sets are Tables 10.4/10.5 (:54186-:54245) and
@@ -489,8 +489,8 @@ class TestOPSINSimpleGroupAminoAcids:
     def test_abrine_in_data(self):
         """abrine should still be present in the expanded amino acid data.
 
-        v29 Task E2: abrine is an adjudicated non-PIN (P-103.1.1.3,
-        BlueBookV2.md:54247/:54251 -- amino acids not in the retained Tables
+        : abrine is an adjudicated non-PIN (P-103.1.1.3,
+        the Blue Book -- amino acids not in the retained Tables
         10.4/10.5 take systematic substitutive names), so it moved OUT of
         NON_STANDARD_AMINO_ACIDS and INTO GENERAL_ONLY_AMINO_ACIDS. The point of
         this test -- that the row was imported and is not lost -- is preserved by
@@ -509,8 +509,8 @@ class TestExpandedAminoAcidPipeline:
     def test_name_compound_new_amino_acid(self):
         """OPSIN simpleGroup amino acid is reachable via name_compound().
 
-        v29 Task E2: was ``assert "abrine" in result``. abrine is an adjudicated
-        non-PIN under P-103.1.1.3 (BlueBookV2.md:54247), decisive sentence :54251 --
+        : was ``assert "abrine" in result``. abrine is an adjudicated
+        non-PIN under P-103.1.1.3 (the Blue Book), decisive sentence:54251 --
         "When not denoted by a retained name, amino acids receive systematic
         substitutive names constructed by applying the principles, rules and
         conventions of substitutive nomenclature." It is in neither retained Table
@@ -529,9 +529,9 @@ class TestExpandedAminoAcidPipeline:
     def test_name_compound_taurine(self):
         """Taurine (sulfonic acid amino) is named systematically.
 
-        v29 Task E2: was ``assert "taurine" in result.lower()``. 'taurine' does not
-        occur anywhere in the Blue Book, and P-103.1.1.3 (BlueBookV2.md:54247),
-        sentence :54251, sends amino acids that are not in the retained Tables
+        : was ``assert "taurine" in result.lower()``. 'taurine' does not
+        occur anywhere in the Blue Book, and P-103.1.1.3 (the Blue Book),
+        sentence:54251, sends amino acids that are not in the retained Tables
         10.4/10.5 to systematic substitutive names. The molecule is still named --
         this is a demotion, not a coverage loss.
         """
@@ -567,7 +567,7 @@ class TestExpandedAminoAcidPipeline:
         undefined stereo, same as it now does for a STANDARD AA (see
         test_amino_acid_through_full_pipeline's alanine case).
 
-        v33 Phase 1 (C2b): this flat SMILES leaves the alpha-carbon
+         a phase (C2b): this flat SMILES leaves the alpha-carbon
         stereocentre undefined, so the NON_STANDARD-AA guard now uniformly
         applies WSD-07's existing STANDARD-AA policy here too and defers to
         the systematic name (not a coverage loss -- still names the identical
@@ -595,7 +595,7 @@ class TestExpandedAminoAcidPipeline:
     def test_all_proteinogenic_via_name_compound(self):
         """All 20 proteinogenic amino acids work through full pipeline.
 
-        v33 Phase 0 T5: every SMILES here is stereo-UNDEFINED (glycine
+         a phase T5: every SMILES here is stereo-UNDEFINED (glycine
         excepted, achiral), so each now emits the systematic name (see module
         note) instead of the bare, implicit-L retained name.
         """

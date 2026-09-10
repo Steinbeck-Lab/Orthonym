@@ -4,13 +4,13 @@ Tests the OUTPUT of the whole class (A8: not literal canary rows), via the publi
 ``Orthonym().name`` surface so the routing + emitter + suffix composition are all
 exercised end to end:
 
-  * P-73.1.1.2  ring-N -ium (protonated + N-substituted aromatic demote) with
+  * P-73.1.1.2 ring-N -ium (protonated + N-substituted aromatic demote) with
     'e' elision and the cationic-centre locant.
-  * P-72.2.2.1  ring carbanion -ide.
-  * P-72.2.2.1  acyclic Group-14/15 heteroatom -ide (P/As/Sb/Si/Ge).
-  * P-73.1.2.1  aryl amine -ium 'e' elision (anilinium).
-  * P-72.2.2.2  azanide preselected anion word.
-  * P-74.1.2    zwitterion cumulative -ium-...-carboxylate.
+  * P-72.2.2.1 ring carbanion -ide.
+  * P-72.2.2.1 acyclic Group-14/15 heteroatom -ide (P/As/Sb/Si/Ge).
+  * P-73.1.2.1 aryl amine -ium 'e' elision (anilinium).
+  * P-72.2.2.2 azanide preselected anion word.
+  * P-74.1.2 zwitterion cumulative -ium-...-carboxylate.
 
 Plus byte-identity protect families (the acyclic-carbon carbanion/radical path,
 carboxylate/alkoxide/thiolate/selenolate, and neutral parents) that MUST NOT
@@ -58,7 +58,30 @@ def test_n_substituted_aromatic_ring_demote(namer, smiles, expected):
 
 # --- P-72.2.2.1: ring carbanion -ide ------------------------------------------
 def test_ring_carbanion_ide(namer):
-    assert namer.name("[CH-]1CCCCC1") == "cyclohexan-1-ide"
+    assert namer.name("[CH-]1CCCCC1") == "cyclohexanide"  # locant omitted, P-14.3.4.2(c) the Blue Book
+
+
+# --- P-72.2.2.2.3: imine anion -iminide, WITH P-14.3.4 locant omission ---------
+@pytest.mark.parametrize("smiles,expected", [
+    # the Blue Book butaniminide (PIN) -- the imine-position locant is OMITTED
+    # (not butan-1-iminide); the =N- anion has no substitutable N-H.
+    ("CCCC=[N-]", "butaniminide"),
+    ("CCC=[N-]", "propaniminide"),
+    ("CC=[N-]", "ethaniminide"),
+    # the Blue Book trimethyl-λ5-phosphaniminide (PIN) -- the P,P,P substituent
+    # locants are OMITTED (P-14.3.4.3, only one kind of substitutable H on the
+    # sole heteroatom centre); contrast the NEUTRAL As,As,As-... which keeps them.
+    ("CP(C)(C)=[N-]", "trimethyl-λ5-phosphaniminide"),
+])
+def test_iminide_pin_locant_omission(namer, smiles, expected):
+    assert namer.name(smiles) == expected
+
+
+def test_iminide_internal_keeps_locant(namer):
+    # 0-wrong safety: an INTERNAL imine anion (butan-2-iminide) must KEEP its
+    # locant -- dropping it would collapse to the position-1 default (a different
+    # molecule), which the full-InChIKey RT audit rejects.
+    assert namer.name("CC(=[N-])CC") == "butan-2-iminide"
 
 
 # --- P-72.2.2.1: acyclic heteroatom -ide (the nameable heterane families) -----
@@ -103,7 +126,7 @@ def test_zwitterion_ring_carboxylate(namer, smiles, expected):
 
 # --- Byte-identity PROTECT families (must not regress) ------------------------
 @pytest.mark.parametrize("smiles,expected", [
-    # acyclic carbon carbanion / radical (Phase 184 primitive — unchanged)
+    # acyclic carbon carbanion / radical (a phase primitive — unchanged)
     ("[CH3-]", "methanide"),
     ("CC[CH-]CC", "pentan-3-ide"),
     ("CCC[CH-]CC", "hexan-3-ide"),
@@ -183,7 +206,7 @@ def test_unnameable_heteroatom_anion_never_emits_fake_ide():
 
 
 # --- Follow-on fixes: adjacent-N azolium (diazonium mis-class), indicated H,
-#     >=3-heteroatom rings, and the -uide / borate family --------------------
+# >=3-heteroatom rings, and the -uide / borate family --------------------
 @pytest.mark.parametrize("smiles,expected", [
     ("c1cc[nH+][nH]1", "1H-pyrazol-2-ium"),     # was 'pyrazolediazonium'
     ("c1cc[nH+]nc1", "pyridazin-1-ium"),         # was 'pyridazinediazonium'; cation lowest locant

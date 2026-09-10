@@ -1,29 +1,29 @@
 """P-14.4 is an ORDERED CASCADE, and it must terminate in the STRUCTURE.
 
-v29 Phase C Task 9b. Task 9 (``5f57e3b6``) implemented criterion **(c)** and left
+ Phase C Task 9b. Task 9 (``) implemented criterion **(c)** and left
 the cascade to fall through to RDKit's ring-atom enumeration order -- i.e. to the
 input SMILES. Consequence, one command:
 
-     "c1(O)c(Cl)cccc1C" "Cc1cccc(Cl)c1O"
-      c1(O)c(Cl)cccc1C  ->  6-chloro-2-methylphenol
-      Cc1cccc(Cl)c1O    ->  2-chloro-6-methylphenol      # THE SAME MOLECULE
+    scripts/diagnose.py "c1(O)c(Cl)cccc1C" "Cc1cccc(Cl)c1O"
+      c1(O)c(Cl)cccc1C -> 6-chloro-2-methylphenol
+      Cc1cccc(Cl)c1O -> 2-chloro-6-methylphenol # THE SAME MOLECULE
 
 Which one is right, derived at source
 -------------------------------------
-§**P-14.4 "NUMBERING"** (``BlueBookV2/BlueBookV2.md:3221``): *"When several
+§**P-14.4 "NUMBERING"** (``the Blue Book Blue Book``): *"When several
 structural features appear in cyclic and acyclic compounds, low locants are
 assigned to them in the following decreasing order of seniority:"*
 
-    :3227  (a) fixed numbering ...                    -- benzene has none
-    :3246  (b) indicated hydrogen ...                  -- benzene has none
-    :3256  (c) principal characteristic groups and free valences (suffixes);
-    :3270  (d) 'added indicated hydrogen'              -- benzene has none
-    :3288  (e) saturation/unsaturation                 -- benzene has no choice
-    :3301  (f) detachable alphabetized prefixes, all considered together in a
+    :3227 (a) fixed numbering... -- benzene has none
+    :3246 (b) indicated hydrogen... -- benzene has none
+    :3256 (c) principal characteristic groups and free valences (suffixes);
+    :3270 (d) 'added indicated hydrogen' -- benzene has none
+    :3288 (e) saturation/unsaturation -- benzene has no choice
+    :3301 (f) detachable alphabetized prefixes, all considered together in a
            series of increasing numerical order;
-    :3307  (g) lowest locants for the substituent cited first as a prefix in the
+    :3307 (g) lowest locants for the substituent cited first as a prefix in the
            name;
-    :3320  (h) nonstandard valence state               -- all carbons
+    :3320 (h) nonstandard valence state -- all carbons
 
 After (c) fixes the ``-ol`` at locant 1, BOTH orientations give the prefix set
 {2,6}, so **(f)** ties (worked at ``:3305``: *"the locant set '4,5,8' is lower than
@@ -40,7 +40,7 @@ locants are assigned to the prefix cited first in the name"** (``:26085``):
   * ``:26094`` ``1-azido-4-isocyanatobenzene (PIN)``
 
 So this was an **accuracy** defect as much as a determinism one, and neither the
-gold set nor `` could see it: the gate has 27 aryl-OH
+gold set nor ``scripts/determinism_eval.py`` could see it: the gate has 27 aryl-OH
 probes and not one mirror pair.
 """
 
@@ -87,7 +87,7 @@ def _respellings(smiles):
 
 
 # --------------------------------------------------------------------------
-# (g), through the emitted NAME. Session invariant 11: every row asserts the
+# (g), through the emitted NAME. Session a project rule: every row asserts the
 # COMPLETE name -- moving a locant has twice this phase unmasked something worse
 # (a lost enclosing mark, a fabricated morpheme), so "the locant moved" is not a
 # pass condition.
@@ -132,20 +132,20 @@ def test_g_decides_and_every_spelling_agrees(smiles, expected):
 
 
 # The BB's own (g) example transposed onto benzene, where we can actually run it:
-# :3317 is 1-methyl-4-nitronaphthalene (PIN) (not 4-methyl-1-nitronaphthalene).
+#:3317 is 1-methyl-4-nitronaphthalene (PIN) (not 4-methyl-1-nitronaphthalene).
 # methyl is cited before nitro, so methyl takes locant 1.
 BB_G_ANALOGUES = [
     ("Cc1ccc([N+](=O)[O-])cc1", "1-methyl-4-nitrobenzene"),
     ("Cc1cccc([N+](=O)[O-])c1", "1-methyl-3-nitrobenzene"),
     ("Cc1ccccc1[N+](=O)[O-]", "1-methyl-2-nitrobenzene"),
-    # :26085's own example is 1-bromo-2-chloroethane; on a ring, bromo < chloro.
+    #:26085's own example is 1-bromo-2-chloroethane; on a ring, bromo < chloro.
     ("Brc1ccccc1Cl", "1-bromo-2-chlorobenzene"),
 ]
 
 
 @pytest.mark.parametrize("smiles,expected", BB_G_ANALOGUES)
 def test_bb_g_worked_examples_on_benzene(smiles, expected):
-    """The prefix cited first takes the lower locant (BB:3317, BB:26085)."""
+    """The prefix cited first takes the lower locant (the Blue Book, the Blue Book)."""
     names = [name_compound(s) for s in _respellings(smiles)]
     assert set(names) == {expected}, sorted(set(names))
 
@@ -155,7 +155,7 @@ def test_bb_g_worked_examples_on_benzene(smiles, expected):
 # Witness derived after a MUTATION SURVIVED: replacing ``alpha_sort_key`` with a
 # plain ``sorted()`` in the (g) key was invisible to every other test here.
 #
-# §**P-14.5.3** (``BlueBookV2/BlueBookV2.md:3495``): *"When an alphanumerical
+# §**P-14.5.3** (``the Blue Book Blue Book``): *"When an alphanumerical
 # ordering is required and Roman letters do not permit a decision for the order of
 # citation, italicized letters are considered."* So the italicized ``tert`` is NOT
 # part of the primary comparison -- the BB's own example cites
@@ -164,7 +164,7 @@ def test_bb_g_worked_examples_on_benzene(smiles, expected):
 # identical so the italics decide. ``alpha_sort_key`` implements this; raw string
 # order does not ('c' < 't').
 #
-# ⚠ NOTE FOR THE READER: ``the contributor guide`` states "INCLUDE for alphabetization: iso-,
+# ⚠ NOTE FOR THE READER: ``CLAUDE.md`` states "INCLUDE for alphabetization: iso-,
 # neo-, cyclo-, sec-, tert-". That is right for the nonitalic iso/neo/cyclo and
 # WRONG for the italicized sec-/tert-, per P-14.5.3 above.
 # --------------------------------------------------------------------------
@@ -201,7 +201,7 @@ def test_the_alpha_key_and_raw_string_order_really_disagree_here():
     pair = ["tert-butyl", "chloro"]
     assert sorted(pair, key=alpha_sort_key) == ["tert-butyl", "chloro"]
     assert sorted(pair) == ["chloro", "tert-butyl"]
-    # ...and they AGREE on the control pair.
+    #...and they AGREE on the control pair.
     control = ["bromo", "tert-butyl"]
     assert sorted(control, key=alpha_sort_key) == sorted(control) == control
 
@@ -384,7 +384,7 @@ def test_functional_class_keys_all_exist_in_the_detector_registry():
 
 
 def test_azido_does_not_block_the_ol_promotion_p61_7():
-    """§P-61.7 AZIDES (BB:25991): azido is a substitutive PREFIX and gives PINs.
+    """§P-61.7 AZIDES (the Blue Book): azido is a substitutive PREFIX and gives PINs.
 
     ``:25997`` ``3-azidonaphthalene-2-sulfonic acid (PIN)`` shows azido cited as a
     detachable prefix while a SUFFIX governs the parent, so an azide cannot stop
@@ -421,7 +421,7 @@ def test_azido_does_not_block_the_ol_promotion_p61_7():
 def test_isocyanato_should_not_block_the_ol_promotion_p61_9():
     # The mono case, where the consequence is easiest to read.
     assert name_compound("Oc1ccc(N=C=O)cc1") == "4-isocyanatophenol"
-    # ...and the penta case from the Task 9 target family.
+    #...and the penta case from the Task 9 target family.
     assert (
         name_compound("Oc1c(O)c(O)c(O)c(O)c1N=C=O")
         == "6-isocyanatobenzene-1,2,3,4,5-pentol"
@@ -430,8 +430,8 @@ def test_isocyanato_should_not_block_the_ol_promotion_p61_9():
 
 # --------------------------------------------------------------------------
 # SPIES. A mutation-killed test proves a test is sensitive to the code it CALLS,
-# not that production ever calls it. Each spy below is validated on >=2 known
-# positives and >=1 known negative in the same run, so a spy that recorded
+# not that production ever calls it. Each trace below is validated on >=2 known
+# positives and >=1 known negative in the same run, so a trace that recorded
 # nothing could not pass.
 # --------------------------------------------------------------------------
 
@@ -613,7 +613,7 @@ def test_preferred_benzene_parent_ring_is_exercised_and_anchors(monkeypatch):
     assert len(seen) == 2, (
         "expected the anchor once per candidate ring: %s" % (seen,)
     )
-    # ...and it actually anchored the -OH ring rather than returning nothing.
+    #...and it actually anchored the -OH ring rather than returning nothing.
     assert any(pcg for _ring, pcg in seen), seen
 
     # positive 2: a different two-candidate shape
@@ -624,7 +624,7 @@ def test_preferred_benzene_parent_ring_is_exercised_and_anchors(monkeypatch):
     assert len(seen) == 2, seen
 
     # negative: no benzene ring at all, so there is no candidate set and the
-    # anchor site is never entered -- a spy that recorded unconditionally fails here.
+    # anchor site is never entered -- a trace that recorded unconditionally fails here.
     seen.clear()
     assert br._benzene_parent_candidates(Chem.MolFromSmiles("OC1CCCCC1")) == []
     assert br._preferred_benzene_parent_ring(Chem.MolFromSmiles("OC1CCCCC1")) is None
@@ -636,7 +636,7 @@ def test_parent_selection_hint_needs_no_hand_assigned_principal_group():
 
     The Task 9 test concealed this by ASSIGNING the attribute itself, so the
     anchor looked wired while being a no-op for all four external callers
-    (rules/ring_chalcogen_oxide.py:277, rules/multiplicative.py:1795 and :2454,
+    (rules/ring_chalcogen_oxide.py:277, rules/multiplicative.py:1795 and:2454,
     rules/ions.py:2240). Nothing is assigned here.
     """
     from orthonym.namer import (

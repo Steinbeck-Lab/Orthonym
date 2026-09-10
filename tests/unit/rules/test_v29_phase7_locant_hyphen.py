@@ -1,4 +1,4 @@
-"""v29 Phase 7 Task 4 -- the P-16.2.4.1(a) hyphen before a locant.
+""" a phase Task 4 -- the P-16.2.4.1(a) hyphen before a locant.
 
 Defect class C4: `parent_to_prefix` glued a prefix word fragment straight onto a
 stem that itself begins with a locant, producing OPSIN-unparseable fragments
@@ -6,21 +6,21 @@ such as `3-amino2,12-dimethyltetradecyl`.
 
 Governing rule, quoted with its section heading:
 
-  BB:6936, heading "P-16.2.4 Hyphens" --
+  the Blue Book, heading "P-16.2.4 Hyphens" --
     "P-16.2.4.1 Hyphens are used in substitutive names:
      (a) to separate locants from words or word fragments;
      Example: 2-chloro-2-methylpropane (PIN, P-61.3.1)"
 
-  BB:2847, heading "P-14.3.1 Types of locants" --
+  the Blue Book, heading "P-14.3.1 Types of locants" --
     "Traditional types of locants are arabic numbers, for example, 1, 2, 3;
      primed locants, for example, 1', 1''', 2''; locants including a lower case
      Roman letter, for example, 3a, 3b; italicized Roman letters, for example,
-     O, N, P; ..."
+     O, N, P;..."
   -- so an italic element locant takes the hyphen exactly as an arabic one does.
-  Confirmed verbatim by the PIN example under P-16.2.4.1(b), BB:6944:
+  Confirmed verbatim by the PIN example under P-16.2.4.1(b), the Blue Book:
     "N1-(2-aminoethyl)-N1,N2,N2-trimethylethane-1,2-diamine (PIN, P-62.2.4.1.3)"
 
-  The bounding counter-rule, BB:6968 "P-16.2.4.2": "No hyphen is placed after a
+  The bounding counter-rule, the Blue Book "P-16.2.4.2": "No hyphen is placed after a
   numerical prefix cited in front of a compound substituent enclosed by
   parentheses, even if that substituent begins with locants" -- example
   "N,1-bis(4-chlorophenyl)methanimine (PIN)". A '(' is not a locant, so the
@@ -63,7 +63,7 @@ class TestStartsWithLocant:
         ("tetradec", False),
         ("tert-butyl", False),
         ("sec-butyl", False),
-        ("beta-D-glucopyranosyl", False),
+        ("β-D-glucopyranosyl", False),
         ("D-gluco", False),
         ("R-methyl", False),
         ("(2E)-but-2-en", False),
@@ -71,7 +71,7 @@ class TestStartsWithLocant:
     ]
 
     def test_case_table_is_populated(self):
-        # Guard against a vacuous parametrisation (v29 Phase 6 shipped one).
+        # Guard against a vacuous parametrisation (a phase shipped one).
         assert len(self.CASES) == 17
         assert sum(1 for _, e in self.CASES if e) == 8
         assert sum(1 for _, e in self.CASES if not e) == 9
@@ -109,9 +109,9 @@ class TestPrefixStemYl:
 
 
 class TestParentToPrefixWitnesses:
-    """Whole-fragment pins on the two spy-proven producing branches."""
+    """Whole-fragment pins on the two trace-proven producing branches."""
 
-    # v29 residue Task A: these two witnesses used to assert the STRING the
+    # residue Task A: these two witnesses used to assert the STRING the
     # locanted-amine and multi-FG-amine branches produced. Those strings are
     # provably not general answers -- ``parent_to_prefix`` is handed only a name
     # and a carbon count, and that pair is NOT injective over fragments:
@@ -121,7 +121,7 @@ class TestParentToPrefixWitnesses:
     # is the same failure: OPSIN round-trips ``(3-amino-2,12-dimethyltetradecyl)
     # benzene`` to a different molecule, while the structurally numbered
     # ``(12-amino-3,13-dimethyltetradecan-3-yl)benzene`` is EXACT
-    # (P-46.1.8, BB:22718: "The principal substituent chain has the lowest
+    # (P-46.1.8, the Blue Book: "The principal substituent chain has the lowest
     # locants for free valences of any kind").
     #
     # The C4 HYPHEN behaviour they were written to guard is preserved by pinning
@@ -147,7 +147,7 @@ class TestParentToPrefixWitnesses:
 
     def test_witness_three_fails_closed(self):
         # 'aminoO-methylhydroxyl' came from the unlocanted-amine branch on the
-        # parent 'O-methylhydroxylamine'. P-29.2 (BB:15811) licenses '-yl' only
+        # parent 'O-methylhydroxylamine'. P-29.2 (the Blue Book) licenses '-yl' only
         # for a PARENT HYDRIDE, and a hydroxylamine is not one, so Task 3's
         # guard now declines the whole conversion -- the C4 hyphen is moot here
         # and the emitter abstains instead. Pinned so a later change to that

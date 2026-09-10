@@ -40,10 +40,10 @@ class TestRetainedAnions:
         assert get_anion_name('[O-]c1ccccc1') == 'phenoxide'
 
     def test_methanide(self):
-        """Methanide left the retained table (D-09, Plan 184-01): the
+        """Methanide left the retained table (, Plan 184-01): the
         systematic emit_parent_hydride_cumulative_suffix primitive is the
         single source of truth, so the TABLE lookup returns None (the name
-        path still emits 'methanide'). Assertion was stale since D-09."""
+        path still emits 'methanide'). Assertion was stale since."""
         assert get_anion_name('[CH3-]') is None
 
     def test_unknown_returns_none(self):
@@ -63,8 +63,8 @@ class TestRetainedCations:
     """Test organic cation name lookup."""
 
     def test_ammonium(self):
-        """Test ammonium lookup."""
-        assert get_cation_name('[NH4+]') == 'ammonium'
+        """Test azanium lookup (P-73.1.1.2 PIN for NH4+; was 'ammonium')."""
+        assert get_cation_name('[NH4+]') == 'azanium'
 
     def test_methylammonium(self):
         """Test methylammonium lookup."""
@@ -83,8 +83,8 @@ class TestRetainedCations:
         assert get_cation_name('[CH3+]') == 'methylium'
 
     def test_oxonium(self):
-        """Test oxonium lookup."""
-        assert get_cation_name('[OH3+]') == 'oxonium'
+        """Test oxidanium lookup (P-73.1.1.2 PIN for OH3+; was 'oxonium')."""
+        assert get_cation_name('[OH3+]') == 'oxidanium'
 
     def test_unknown_returns_none(self):
         """Test unknown cation returns None."""
@@ -167,7 +167,7 @@ class TestGetIonName:
     def test_cation_lookup(self):
         """Test get_ion_name finds cations."""
         assert get_ion_name('[Na+]') == 'sodium'
-        assert get_ion_name('[NH4+]') == 'ammonium'
+        assert get_ion_name('[NH4+]') == 'azanium'  # P-73.1.1.2 PIN (was 'ammonium')
 
     def test_anion_lookup(self):
         """Test get_ion_name finds anions."""

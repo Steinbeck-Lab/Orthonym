@@ -25,4 +25,6 @@ class TestCarbamoylaminoNSub:
             == "2-(carbamoylamino)ethanoic acid"
 
     def test_urea_parent_protect(self):
-        assert name_compound("CNC(N)=O", style="pin") == "N-methylurea"
+        # Urea parent still names as a urea (not hijacked by the carbamoylamino
+        # prefix path); monosubstituted urea omits the locant (P-14.3.4.3, the Blue Book).
+        assert name_compound("CNC(N)=O", style="pin") == "methylurea"

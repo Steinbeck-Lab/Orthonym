@@ -10,7 +10,7 @@ Handles:
 - Hantzsch-Widman (HW) systematic name generation
 
 IUPAC 2013 Rules for heterocycle numbering:
-- Position 1 goes to highest-priority heteroatom (O > S > Se > Te > N > P > ...)
+- Position 1 goes to highest-priority heteroatom (O > S > Se > Te > N > P >...)
 - Numbering direction chosen to give lowest locants to other heteroatoms
 - First-point-of-difference comparison (not sum of locants)
 
@@ -70,7 +70,7 @@ def classify_heterocycle(mol, ring_atoms) -> Dict:
         - dominant_heteroatom: str (highest priority element in ring)
 
     Examples:
-        >>> mol = Chem.MolFromSmiles('c1ccncc1')  # pyridine
+        >>> mol = Chem.MolFromSmiles('c1ccncc1') # pyridine
         >>> info = classify_heterocycle(mol, mol.GetRingInfo().AtomRings()[0])
         >>> info['ring_size']
         6
@@ -140,7 +140,7 @@ def number_heterocycle_ring(
         Position 1 (index 0) is the highest-priority heteroatom.
 
     Examples:
-        >>> mol = Chem.MolFromSmiles('c1ccncc1')  # pyridine
+        >>> mol = Chem.MolFromSmiles('c1ccncc1') # pyridine
         >>> ring = mol.GetRingInfo().AtomRings()[0]
         >>> oriented = number_heterocycle_ring(mol, ring)
         >>> # N atom should be at position 1 (index 0)
@@ -212,7 +212,7 @@ def orient_heterocycle(mol, ring_atoms) -> Tuple[List[int], Dict[int, int]]:
         - atom_to_locant: Dict mapping atom_idx to locant (1-indexed)
 
     Examples:
-        >>> mol = Chem.MolFromSmiles('c1ccncc1')  # pyridine
+        >>> mol = Chem.MolFromSmiles('c1ccncc1') # pyridine
         >>> ring = mol.GetRingInfo().AtomRings()[0]
         >>> oriented, mapping = orient_heterocycle(mol, ring)
         >>> # N is at locant 1
@@ -234,34 +234,34 @@ def orient_heterocycle(mol, ring_atoms) -> Tuple[List[int], Dict[int, int]]:
 
 
 #: Group 15 ring heteroatoms -- the only ones that carry an indicated hydrogen a
-#: substituent can displace while the atom stays NEUTRAL.  An aromatic ring O, S
+#: substituent can displace while the atom stays NEUTRAL. An aromatic ring O, S
 #: or Se with an exocyclic bond is an onium centre, excluded by the formal-charge
 #: test below; naming the elements states the chemistry rather than relying on it.
 _INDICATED_H_ELEMENTS = frozenset({7, 15, 33, 51, 83})  # N, P, As, Sb, Bi
 
 #: Group-14 ring heteroatoms whose mancude saturated position keeps its indicated
 #: hydrogen even when substitution has displaced every H (P-68.2.6, the
-#: ``1,1-dibutyl-1H-germole`` case).  Consumed by ``_monocycle_indicated_h_prefix``.
+#: ``1,1-dibutyl-1H-germole`` case). Consumed by ``_monocycle_indicated_h_prefix``.
 _GROUP14_INDICATED_H = frozenset({14, 32, 50})  # Si, Ge, Sn
 
 
 def _occupies_indicated_h_position(mol, idx: int, ring_set: Set[int]) -> bool:
     """Does this ring atom hold the ring's indicated-hydrogen position?
 
-    P-14.4 "NUMBERING" (``BlueBookV2/BlueBookV2.md:3219``) assigns low locants
+    P-14.4 "NUMBERING" (``the Blue Book Blue Book``) assigns low locants
     "in the following decreasing order of seniority", listing
     **(b) indicated hydrogen** ahead of **(c) principal characteristic groups
-    and free valences (suffixes)**.  So the atom holding the indicated hydrogen
-    has to be identified before the suffix can compete for locant 1.  (b)'s own
+    and free valences (suffixes)**. So the atom holding the indicated hydrogen
+    has to be identified before the suffix can compete for locant 1. (b)'s own
     caveat -- "a higher locant may be needed at another position to accommodate
     a substituent suffix in accordance with structural feature (d)" -- points at
     (d) *added* indicated hydrogen (``3,4-dihydronaphthalen-1(2H)-one``), not at
     ordinary substitution.
 
-    Testing ``GetTotalNumHs() >= 1`` answers a different question.  A substituent
+    Testing ``GetTotalNumHs() >= 1`` answers a different question. A substituent
     does not move the indicated hydrogen -- it stands in its place, and
     P-15.1.8.1 "Substitution rules for Type 1 retained names" (``:4916``),
-    sentence ``:4918``, allows that substitution without limit.  An N-substituted
+    sentence ``:4918``, allows that substitution without limit. An N-substituted
     azole nitrogen has no hydrogen left to count, so it read as pyridine-type and
     surrendered locant 1: ``Cn1nccc1C(=O)O`` was named
     ``2-methyl-1H-pyrazole-3-carboxylic acid``, whose ``1H`` and whose
@@ -269,7 +269,7 @@ def _occupies_indicated_h_position(mol, idx: int, ring_set: Set[int]) -> bool:
 
     The displacement is *proved*, not assumed: a neutral group-15 aromatic ring
     atom with no hydrogen and exactly ONE exocyclic SINGLE bond has had exactly
-    one hydrogen's worth of valence taken from it.  Nothing here consults a ring
+    one hydrogen's worth of valence taken from it. Nothing here consults a ring
     size or a heteroatom count.
     """
     atom = mol.GetAtomWithIdx(idx)
@@ -301,9 +301,9 @@ def orient_heterocycle_with_substituents(
     heteroatom is fixed at position 1 per P-31.1.4.3.3): after fixing the
     heteroatom at position 1, choose the numbering direction that gives lowest
     locants to, IN THIS ORDER:
-    1. Other heteroatoms (if any)                          [P-31.1.4.3.3]
-    2. The principal characteristic group (suffix)         [P-14.4(c)]
-    3. Other substituents (if the above tie)               [P-14.4(g)]
+    1. Other heteroatoms (if any) [P-31.1.4.3.3]
+    2. The principal characteristic group (suffix) [P-14.4(c)]
+    3. Other substituents (if the above tie) [P-14.4(g)]
 
     ``principal_group_atoms`` is the set of RING atom indices that bear the
     principal characteristic group (e.g. the ring carbon double-bonded to =O for
@@ -322,7 +322,7 @@ def orient_heterocycle_with_substituents(
         - atom_to_locant: Dict mapping atom_idx to locant (1-indexed)
 
     Examples:
-        >>> mol = Chem.MolFromSmiles('Cc1ccccn1')  # 2-methylpyridine
+        >>> mol = Chem.MolFromSmiles('Cc1ccccn1') # 2-methylpyridine
         >>> ring = mol.GetRingInfo().AtomRings()[0]
         >>> # Find which ring atom has the methyl substituent
         >>> sub_positions = {idx for idx in ring if _has_substituent(mol, idx, ring)}
@@ -351,11 +351,11 @@ def orient_heterocycle_with_substituents(
     # is not one (aromatic / fully saturated / not mancude), leaving the cascade
     # below unchanged for those. It supersedes the cascade for partially-saturated
     # mancude rings; the added (f)/canon tiers keep decorated rings PIN-correct and
-    # representation-stable (fable BLOCKER 1/2).
+    # representation-stable (a review BLOCKER 1/2).
     _man = _mancude_hydro_numbering(mol, ring_set, principal_group_atoms)
     if _man is None:
         # Sibling for the fully-mancude indicated-H parent (2H-pyran-6-carboxylic
-        # acid, the verbatim BB row at :3252): the hydro namer declines it
+        # acid, the verbatim BB row at:3252): the hydro namer declines it
         # (d == max_match), but the suffix still had no indicated-H tier.
         _man = _mancude_parent_suffix_numbering(mol, ring_set, principal_group_atoms)
     if _man is not None:
@@ -392,11 +392,11 @@ def orient_heterocycle_with_substituents(
     #
     # (b) used to be ``GetTotalNumHs() >= 1`` -- an atom count a substituent has
     # already consumed, so an N-substituted azole nitrogen read as pyridine-type
-    # and lost locant 1 to the suffix.  See ``_occupies_indicated_h_position``.
+    # and lost locant 1 to the suffix. See ``_occupies_indicated_h_position``.
     # For rings where all heteroatoms are equal-priority AND equal-H_count
     # (e.g. three sp2 N in 1,2,4-triazine) the old code fixed a single
     # start atom, producing wrong locants when that atom wasn't the optimal
-    # choice.  The new code collects ALL atoms sharing the best
+    # choice. The new code collects ALL atoms sharing the best
     # (priority, h_count) tier and tries every one as position-1 candidate,
     # picking the (start, direction) pair that yields the globally minimum
     # tiered (hetero > pg > sub) locant comparison.
@@ -461,7 +461,7 @@ def get_heteroatom_locants(oriented_ring: List[int], mol) -> List[Tuple[int, str
         sorted by locant.
 
     Examples:
-        >>> mol = Chem.MolFromSmiles('c1ncnc1')  # pyrimidine-like
+        >>> mol = Chem.MolFromSmiles('c1ncnc1') # pyrimidine-like
         >>> ring = mol.GetRingInfo().AtomRings()[0]
         >>> oriented, _ = orient_heterocycle(mol, ring)
         >>> locants = get_heteroatom_locants(oriented, mol)
@@ -544,7 +544,7 @@ def _ring_is_ortho_fused(mol, ring_atoms) -> bool:
 
     An ortho-fused ring is not a ring system of its own: indole contains a
     pyrrole ring and benzofuran a furan ring, yet each is its own retained
-    name.  Anything that reconstructs a ring's parent hydride must stop at a
+    name. Anything that reconstructs a ring's parent hydride must stop at a
     fusion bond or it starts naming indole as a substituted pyrrole.
     """
     ring_set = set(ring_atoms)
@@ -562,19 +562,19 @@ def _ring_is_ortho_fused(mol, ring_atoms) -> bool:
 def _ring_smiles_with_indicated_h_restored(mol, ring_atoms) -> Optional[str]:
     """Rebuild the ring key after a substituent displaced its indicated hydrogen.
 
-    P-14.7.1 "Indicated hydrogen" (``BlueBookV2.md:3721``) -- a mancude azole
-    carries one saturated ring position, the ``1H``.  When a substituent sits
+    P-14.7.1 "Indicated hydrogen" (``the Blue Book``) -- a mancude azole
+    carries one saturated ring position, the ``1H``. When a substituent sits
     there instead of the hydrogen, the ring atom's H count is zero, and the
     plain fragment extraction writes a bare aromatic ``n``: ``Cn1cccc1`` gives
-    ``c1ccnc1``, which is not a kekulisable molecule at all.  The parent hydride
+    ``c1ccnc1``, which is not a kekulisable molecule at all. The parent hydride
     the retained-name table is keyed on still has the hydrogen, so it is put
     back before the fragment is written.
 
     P-15.1.8.1 "Substitution rules for Type 1 retained names" (``:4916``),
     sentence ``:4918``: "Type 1 retained names of parent hydrides described in
     Chapters P-2 and P-3 have unlimited substitution by substituent groups cited
-    either as suffixes or prefixes."  Substitution never demotes the retained
-    name, so the key must survive it.  The Blue Book prints such a PIN outright
+    either as suffixes or prefixes." Substitution never demotes the retained
+    name, so the key must survive it. The Blue Book prints such a PIN outright
     under P-44.1 (``:18871``) at ``:18940``:
     ``1-(trimethylsilyl)-1H-imidazole (PIN)``.
 
@@ -637,15 +637,15 @@ def get_ring_canonical_smiles(mol, ring_atoms) -> str:
     ``MolFragmentToSmiles`` writes each atom with the hydrogen count it has in
     ``mol``, so a ring whose indicated hydrogen has been replaced by a
     substituent comes back as a string that describes no molecule at all
-    (``Cn1cccc1`` -> ``c1ccnc1``, unkekulisable).  Such a string can never equal
-    a table key, and the retained name is lost purely to the extraction.  When
+    (``Cn1cccc1`` -> ``c1ccnc1``, unkekulisable). Such a string can never equal
+    a table key, and the retained name is lost purely to the extraction. When
     -- and only when -- that happens, the displaced indicated hydrogen is
     restored and the fragment rewritten
     (``_ring_smiles_with_indicated_h_restored``).
 
     The repair is therefore **strictly additive**: a ring whose fragment already
     parses is returned exactly as before, so no key that resolves today can
-    change.  The only outcomes that move are keys that match nothing.
+    change. The only outcomes that move are keys that match nothing.
 
     Args:
         mol: RDKit Mol object
@@ -655,11 +655,11 @@ def get_ring_canonical_smiles(mol, ring_atoms) -> str:
         Canonical SMILES string for the ring
 
     Examples:
-        >>> mol = Chem.MolFromSmiles('c1ccncc1')  # pyridine
+        >>> mol = Chem.MolFromSmiles('c1ccncc1') # pyridine
         >>> ring = mol.GetRingInfo().AtomRings()[0]
         >>> get_ring_canonical_smiles(mol, ring)
         'c1ccncc1'
-        >>> mol = Chem.MolFromSmiles('Cn1cccc1')  # 1-methyl-1H-pyrrole
+        >>> mol = Chem.MolFromSmiles('Cn1cccc1') # 1-methyl-1H-pyrrole
         >>> ring = mol.GetRingInfo().AtomRings()[0]
         >>> get_ring_canonical_smiles(mol, ring)
         'c1cc[nH]c1'
@@ -695,7 +695,7 @@ def build_hw_name(
 
     Assembles a systematic HW name from heteroatom prefixes and ring stem:
     1. Group heteroatoms by element
-    2. Order by IUPAC priority (O > S > N > ...)
+    2. Order by IUPAC priority (O > S > N >...)
     3. Add multipliers and locants for multiple same heteroatoms
     4. Get stem based on ring size and saturation
     5. Apply 'a' elision (drop terminal 'a' before vowel stem)
@@ -728,7 +728,7 @@ def build_hw_name(
         element_locants[elem].append(locant)
 
     # Order elements by IUPAC (Hantzsch-Widman) seniority: F > Cl > Br > I >
-    # O > S > Se > Te > N > P ... (P-22.2.2.1 / Table 2.8). Prefixes are cited
+    # O > S > Se > Te > N > P... (P-22.2.2.1 / Table 2.8). Prefixes are cited
     # in this order.
     elements_by_priority = sorted(
         element_locants.keys(),
@@ -742,14 +742,14 @@ def build_hw_name(
     # 'oxazepane' is the 1,2-isomer — a different molecule).
     #
     # The ORDER of that citation is NOT a global ascending sort. P-22.2.2.1.3
-    # (BlueBookV2.md:8284), last sentence: "Locants are cited at the front of
+    # (the Blue Book), last sentence: "Locants are cited at the front of
     # the name, IN THE ORDER OF CITATION OF THE SKELETAL REPLACEMENT ('a')
     # PREFIXES." Set selection and set citation are two separate steps: the
     # numbering is chosen to give the lowest locant SET, then that set is spelled
     # grouped per element, each element's own locants ascending, in 'a'-prefix
     # seniority order. The rule's own example block is decisive —
-    #   1,6,2-dioxazepane   (PIN, :8300)  dioxa owns 1 and 6, aza owns 2
-    #   1,3,2-dioxaboretane (PIN, :37178) dioxa owns 1 and 3, bora owns 2
+    # 1,6,2-dioxazepane (PIN,:8300) dioxa owns 1 and 6, aza owns 2
+    # 1,3,2-dioxaboretane (PIN,:37178) dioxa owns 1 and 3, bora owns 2
     # — and the Blue Book prints the tie-break reasoning for the first as the
     # SET "'1,2,6' is lower than '1,3,4'" while citing the name as "1,6,2-".
     #
@@ -829,9 +829,9 @@ def build_hw_name(
 
     # Stem selection. TWO DIFFERENT RULES, by ring size — do not merge them:
     #
-    # 3-, 4- and 5-membered rings — P-22.2.2.1.5.2 (BlueBookV2.md:8394):
-    #   "The stems 'iridine', 'etidine', and 'olidine' are used when nitrogen
-    #   atoms are present in the ring; otherwise the 'ane' stems are used."
+    # 3-, 4- and 5-membered rings — P-22.2.2.1.5.2 (the Blue Book):
+    # "The stems 'iridine', 'etidine', and 'olidine' are used when nitrogen
+    # atoms are present in the ring; otherwise the 'ane' stems are used."
     # So the N-form is keyed on nitrogen being present ANYWHERE, not on nitrogen
     # being the senior heteroatom: 1,3-oxazolidine (O senior, N present) uses
     # -olidine, while N-free 1,3-oxathiolane keeps -olane. `stem_heteroatom`
@@ -934,19 +934,19 @@ def _mancude_bond_eligible(mol, oriented: List[int]) -> List[bool]:
     can take a ring double bond only if its BONDING NUMBER is three or more.
     For an atom in a standard valence state that is a property of the element
     -- the divalent chalcogens O/S/Se/Te cannot, everything else can -- which
-    is why this test used to be written on the element symbol alone.  Under
+    is why this test used to be written on the element symbol alone. Under
     the lambda-convention it is not a property of the element: a lambda-4
     sulfur has bonding number 4 and takes a ring double bond exactly as a
     carbon does, while its standard-valence twin cannot.
 
     **P-22.2.7 "Heteromonocyclic hydrides having heteroatoms with nonstandard
-    bonding numbers."** (``BlueBookV2.md:9156``), P-22.2.7.1 (``:9158``) --
+    bonding numbers."** (``the Blue Book``), P-22.2.7.1 (``:9158``) --
     "The indicated hydrogen symbol *H*, if required to denote saturated
-    skeletal atoms, is cited at the front of the complete name".  The decisive
+    skeletal atoms, is cited at the front of the complete name". The decisive
     statement is the parenthetical printed under ``1lambda6-thiopyran (PIN)``
     (``:9511``), at ``:9513``: "this heteromonocycle has the maximum number of
     double bonds and one double bond at every position; hence, no indicated
-    hydrogen is cited for the sulfur atom".  Three things follow, and the
+    hydrogen is cited for the sulfur atom". Three things follow, and the
     whole lambda-hydro producer rests on them:
 
     * a lambda atom DOES join the mancude matching;
@@ -961,7 +961,7 @@ def _mancude_bond_eligible(mol, oriented: List[int]) -> List[bool]:
     reimplementation of it: an atom for which ``nonstandard_bonding_number``
     returns None -- every standard-valence atom, and every charged atom, which
     the lambda helper excludes by design -- is still judged by
-    ``symbol not in _DIVALENT``.  So no ring without a lambda atom can change
+    ``symbol not in _DIVALENT``. So no ring without a lambda atom can change
     behaviour, and that needs no measurement to believe.
     """
     from .lambda_convention import nonstandard_bonding_number
@@ -996,7 +996,7 @@ def _has_room_for_ring_double_bond(mol, idx: int, ring: Set[int], lam) -> bool:
     "A ring atom already spends two of its valences on ring sigma bonds, so it
     can take a ring double bond only if its BONDING NUMBER is three or more" --
     but it was applied as if the only other claim on an atom's valences were
-    those two sigma bonds.  An **exocyclic double bond** is a third claim, and
+    those two sigma bonds. An **exocyclic double bond** is a third claim, and
     it is not removable by hydrogenation the way a hydrogen is: in
     ``pyridin-2(1H)-one`` the C-2 carbon spends 2 valences on ring sigma bonds
     and 2 on the exocyclic ``C=O``, so it cannot carry a ring double bond at
@@ -1004,16 +1004,16 @@ def _has_room_for_ring_double_bond(mol, idx: int, ring: Set[int], lam) -> bool:
 
     Without this, that ring reads as "2 double bonds where the parent has 3",
     i.e. as a HYDRO FORM, and the ``1 <= _d < _max_match`` guard in
-    :func:`name_heterocycle` refuses it.  That is what withdrew the correct
-    ``5-(3-fluorophenyl)-1H-pyridin-2-one`` (regression from `65a2206e`,
-    `.planning/audit-v29/REGRESSION-c-aryl-pyridinone.md`).  The compound is a
+    :func:`name_heterocycle` refuses it. That is what withdrew the correct
+    ``5-(3-fluorophenyl)-1H-pyridin-2-one`` (regression from,
+    internal notes). The compound is a
     **pseudoketone**, not a hydro form: P-66.1.3 "'Hidden' amides"
-    (``BlueBookV2.md:33125``) and P-66.1.5.1 "Lactams and lactims" (``:33224``)
+    (``the Blue Book``) and P-66.1.5.1 "Lactams and lactims" (``:33224``)
     both name this shape on the numbered mancude ring with an added suffix, and
     ``:33224``'s method (1) "generates preferred IUPAC names".
 
     ⚠ Only bonds of order **>= 2** are counted, and only to atoms OUTSIDE this
-    ring.  Counting single bonds would veto an N-methyl ring nitrogen, and
+    ring. Counting single bonds would veto an N-methyl ring nitrogen, and
     counting RDKit's aromatic order 1.5 would veto the fusion carbons of
     naphthalene -- measured: both stay eligible under this test, as they must.
     An atom with no exocyclic multiple bond returns True immediately, so
@@ -1043,18 +1043,18 @@ def _monocycle_numberings(mol, ordered: List[int]):
 
     Yields ``(het_key, loc)`` where ``loc`` maps a ring POSITION (index into
     ``ordered``) to its locant, and ``het_key`` ranks the numbering by the
-    heteroatom criteria alone.  Callers append their own tail to the key --
+    heteroatom criteria alone. Callers append their own tail to the key --
     indicated hydrogen, then hydro prefixes -- so that the heteroatom rules
     always outrank them.
 
-    P-22.2.2.1.3 (``BlueBookV2.md:8284``) fixes the first two criteria, and
+    P-22.2.2.1.3 (``the Blue Book``) fixes the first two criteria, and
     their order is not the intuitive one: "The locant '1' is given to a
     heteroatom that occurs first in the seniority sequence used for citation
-    of the skeletal replacement ('a') prefixes.  The numbering is THEN chosen
+    of the skeletal replacement ('a') prefixes. The numbering is THEN chosen
     to give lowest locants to heteroatoms considered as a set in ascending
-    numerical order."  Senior-heteroatom-at-1 OUTRANKS the lowest locant set,
+    numerical order." Senior-heteroatom-at-1 OUTRANKS the lowest locant set,
     which is why furazan is ``1,2,5-oxadiazole`` (``:14717``) and not
-    ``2,1,3-oxadiazole``.  P-22.2.3.2.3 (``:8806``) states the whole cascade
+    ``2,1,3-oxadiazole``. P-22.2.3.2.3 (``:8806``) states the whole cascade
     verbatim and adds the third criterion, "and then, if necessary, according
     to the order of seniority above".
 
@@ -1067,7 +1067,7 @@ def _monocycle_numberings(mol, ordered: List[int]):
     drift apart: the lambda branch used to inherit ``orient_heterocycle``'s
     numbering, which ranks heteroatoms but NOT indicated hydrogen, and so
     emitted ``5H-1lambda4-thiophene`` where P-14.4(b) (``:3246``) requires
-    ``2H-``.  Neither OPSIN nor an InChIKey can see that -- both names denote
+    ``2H-``. Neither OPSIN nor an InChIKey can see that -- both names denote
     the same molecule -- so it survived a 707/707 round-trip.
     """
     n = len(ordered)
@@ -1097,28 +1097,28 @@ def _apply_retained_stem(hw_name: str) -> str:
     """P-22.2.1: swap a Hantzsch-Widman stem for its RETAINED mancude name.
 
     The substitution is on the STEM -- the segment after the last hyphen --
-    and it must match the WHOLE stem, never a suffix of it.  A suffix test
+    and it must match the WHOLE stem, never a suffix of it. A suffix test
     says ``1,2-dithiole`` ends in ``thiole`` and rewrites it to the
     non-existent ``1,2-dithiophene``, destroying the Blue Book's own
-    ``1lambda4,3-dithiole (PIN)`` (``BlueBookV2.md:9527``); by the same route
-    ``1,3-oxazole`` would become ``1,3-furan``.  Whole-stem matching leaves
+    ``1lambda4,3-dithiole (PIN)`` (``the Blue Book``); by the same route
+    ``1,3-oxazole`` would become ``1,3-furan``. Whole-stem matching leaves
     both untouched, and a locant-carrying stem (``dioxine``, ``oxazole``) is
     never a key.
 
     ONE table, because it had drifted into three partial hand-copies that
     disagreed: ``_MANCUDE_RETAINED_STEM`` (10 rows, used by the hydro namer),
-    a 3-row dict in :func:`name_heterocycle` (oxine/azine/thiine) and a 3-row
-    tuple in :func:`_name_lambda_heteromonocycle` (thiole/selenole/tellurole,
-    matched with ``endswith`` -- the trap above).  Measured consequence on the
+    a 3-row dict in:func:`name_heterocycle` (oxine/azine/thiine) and a 3-row
+    tuple in:func:`_name_lambda_heteromonocycle` (thiole/selenole/tellurole,
+    matched with ``endswith`` -- the trap above). Measured consequence on the
     27,687-ring enumeration: ``2H-azole`` was emitted where P-22.2.1
     (``:8163``, "pyrrole (1H-isomer shown; the PIN is 1H-pyrrole)") and
     ``3,4-dihydro-2H-pyrrole (PIN)`` (``:16896``) require ``2H-pyrrole``, and
-    ``1lambda4-thiine`` where ``:8141`` ("pyran ... the PIN is 2H-pyran;
+    ``1lambda4-thiine`` where ``:8141`` ("pyran... the PIN is 2H-pyran;
     thiopyran (S instead of O)") requires ``1lambda4-thiopyran``.
 
     All ten rows re-opened at write time: pyran/thiopyran/selenopyran/
     telluropyran ``:8141``; pyrrole ``:8163``; selenophene ``:8165``;
-    tellurophene ``:8170``; thiophene ``:8174``; pyridine ``:8157``.  Table
+    tellurophene ``:8170``; thiophene ``:8174``; pyridine ``:8157``. Table
     2.2's own ``furan`` row survives only as an image in this OCR
     (``_page_149_Picture_3.jpeg``), so furan's PIN status is taken from
     ``:12047`` -- "furo (preferred prefix) (from furan, PIN)".
@@ -1135,13 +1135,13 @@ def _mancude_max_matching(mol, oriented: List[int]) -> Tuple[int, List[bool]]:
     noncumulative ring double bonds (= maximum matching on the ring cycle
     restricted to double-bond-eligible edges) and ``eligible[k]`` is the flag for
     ``oriented[k]``. Divalent chalcogens (O/S/Se/Te) never carry a mancude ring
-    double bond; every other ring atom (C, N, P, ...) is eligible. Ring size <= 10
+    double bond; every other ring atom (C, N, P,...) is eligible. Ring size <= 10
     -> exact brute force over the ring edges; deterministic.
 
-    Factored out of :func:`_monocycle_indicated_h_prefix` so the partial-saturation
+    Factored out of:func:`_monocycle_indicated_h_prefix` so the partial-saturation
     namer can reuse the exact mancude count for non-aromatizable (4-pi) HW rings.
 
-    Eligibility is delegated to :func:`_mancude_bond_eligible`, which is
+    Eligibility is delegated to:func:`_mancude_bond_eligible`, which is
     lambda-aware; see there for why that is byte-identical outside the
     lambda-convention class.
     """
@@ -1171,11 +1171,11 @@ def _mancude_max_matching(mol, oriented: List[int]) -> Tuple[int, List[bool]]:
     return max_match, eligible
 
 
-# P-22.2.1 retained mancude stems (BlueBookV2.md:8141 — "pyran (2H-isomer
-# shown; the PIN is 2H-pyran) thiopyran ... the PIN is 2H-thiopyran ...
-# selenopyran ... telluropyran"; BlueBookV2.md:2164 — "2H-pyran (PIN) (not
-# 2H-oxine, see P-22.2.2.1.1)"; the 5-ring row at :8165/:8174 gives
-# "selenophene (PIN)" / "thiophene (PIN)").  EXACT-name substitution only: the
+# P-22.2.1 retained mancude stems (the Blue Book — "pyran (2H-isomer
+# shown; the PIN is 2H-pyran) thiopyran... the PIN is 2H-thiopyran...
+# selenopyran... telluropyran"; the Blue Book — "2H-pyran (PIN) (not
+# 2H-oxine, see P-22.2.2.1.1)"; the 5-ring row at:8165/:8174 gives
+# "selenophene (PIN)" / "thiophene (PIN)"). EXACT-name substitution only: the
 # key is the whole Hantzsch-Widman stem, so '1,3-oxazole' can never become
 # '1,3-furan'.
 _MANCUDE_RETAINED_STEM: Dict[str, str] = {
@@ -1238,12 +1238,12 @@ def _kekulized_if_aromatic(mol, ring_set) -> Optional['Chem.Mol']:
     ``None`` if that cannot be done.
 
     RDKit's ``GetIsAromatic()`` answers "does this ring satisfy RDKit's
-    aromaticity model?".  It does NOT answer "is this ring mancude?", and three
-    separate sites in this module used it as though it did.  The two are
+    aromaticity model?". It does NOT answer "is this ring mancude?", and three
+    separate sites in this module used it as though it did. The two are
     different whenever a ring atom contributes a LONE PAIR to the pi system
     instead of a double bond: two or more pyrrole-type heteroatoms make a ring
     RDKit-aromatic while it carries FEWER ring double bonds than
-    P-22.2.2.1.1 (``BlueBookV2.md:8222``) demands of an unsaturated
+    P-22.2.2.1.1 (``the Blue Book``) demands of an unsaturated
     Hantzsch-Widman parent -- "Unsaturated compounds are those having the
     maximum number of noncumulative double bonds (mancude compounds) and at
     least one double bond."
@@ -1269,7 +1269,7 @@ def _kekulized_if_aromatic(mol, ring_set) -> Optional['Chem.Mol']:
 
 def _ring_double_bond_count(mol, ring_set) -> Optional[int]:
     """Number of DOUBLE bonds inside the ring once it is kekulised, or ``None``
-    if the ring cannot be kekulised.  See :func:`_kekulized_if_aromatic` for
+    if the ring cannot be kekulised. See:func:`_kekulized_if_aromatic` for
     why RDKit aromaticity may not be read as unsaturation."""
     kek = _kekulized_if_aromatic(mol, ring_set)
     if kek is None:
@@ -1286,17 +1286,17 @@ def _ring_double_bond_count(mol, ring_set) -> Optional[int]:
 def _mancude_hydro_select(mol, ring_set: Set[int],
                           principal_group_atoms=None) -> Optional[dict]:
     """Shared numbering + saturation analysis for a partially saturated mancude
-    heteromonocycle (P-54.4.1).  ONE selection, consumed by both
+    heteromonocycle (P-54.4.1). ONE selection, consumed by both
     :func:`_mancude_hydro_name` (builds the stem string) and
     :func:`_mancude_hydro_numbering` (hands the atom->locant map to the
     composer's suffix/substituent placement).
 
     This is the ROOT-CAUSE fix for the "two numbering authorities" class
     (RISK 2): the indicated hydrogen OUTRANKS the suffix for low locants
-    (P-14.4(b) ``BlueBookV2.md:3246``, verbatim ``2H-pyran-6-carboxylic acid
+    (P-14.4(b) ``the Blue Book``, verbatim ``2H-pyran-6-carboxylic acid
     (PIN)`` ``:3252``), so numbering the stem here and the suffix independently in
     ``orient_heterocycle_with_substituents`` (which had no indicated-H tier) let
-    them disagree and SELF-01 abstained.  read the suffix
+    them disagree and SELF-01 abstained. read the suffix
     locant from the SAME numbering map the indicated-H prefix uses; so do we now.
 
     P-54.4.1 'hydro' name for a partially saturated mancude heteromonocycle,
@@ -1304,20 +1304,20 @@ def _mancude_hydro_select(mol, ring_set: Set[int],
 
     Examples this closes: ``5,6-dihydro-4H-1,3-oxazine``, ``3,4-dihydro-2H-1,4-
     oxazine``, ``3,4-dihydro-2H-pyrrole``, ``2,3-dihydro-1H-azepine``,
-    ``2,3-dihydro-1,4-dioxine``.  Supersedes the earlier v1 fallback, whose
+    ``2,3-dihydro-1,4-dioxine``. Supersedes the earlier v1 fallback, whose
     gates admitted only parents needing ZERO indicated hydrogen and a single
     heteroatom (``1,2-dihydrophosphete``).
 
     Rules (each opened; heading + decisive sentence):
 
-    * **P-54.4.1 "Hantzsch-Widman heteromonocycles"** (``BlueBookV2.md:24169``),
+    * **P-54.4.1 "Hantzsch-Widman heteromonocycles"** (``the Blue Book``),
       sentence ``:24171`` — "'Hydro' prefixes added to names of fully
       unsaturated Hantzsch-Widman rings lead to preferred IUPAC names for
       partially unsaturated rings."
     * **P-31.2.2 "General methodology"** (``:16878``), sentence ``:16880`` —
       "Indicated hydrogen atoms have priority over 'hydro' prefixes for low
       locants. If indicated hydrogen atoms are present in a name, the 'hydro'
-      prefixes precede them."  That single sentence fixes BOTH the numbering
+      prefixes precede them." That single sentence fixes BOTH the numbering
       rank and the spelling order.
     * **P-14.4 "NUMBERING"** (``:3219``) — decreasing seniority for low locants:
       (a) fixed numbering ``:3227``, (b) indicated hydrogen ``:3246``, …
@@ -1327,13 +1327,13 @@ def _mancude_hydro_select(mol, ring_set: Set[int],
       indicated-hydrogen term is never dropped once the parent requires one.
 
     ⚠ The hydro positions are NOT "the parent's double-bonded atoms that lost
-    their bond".  The Blue Book's own ``2,7-dihydro-1H-azepine`` (``:16920``)
+    their bond". The Blue Book's own ``2,7-dihydro-1H-azepine`` (``:16920``)
     refutes that reading: 1H-azepine is unsaturated at 2-3/4-5/6-7 while the
     molecule is unsaturated at 3-4/5-6, so the remaining double bonds RELOCATE
-    when hydrogen is added.  What is therefore verified here is the reader's
+    when hydrogen is added. What is therefore verified here is the reader's
     reconstruction: saturating exactly (indicated-H ∪ hydro) must leave one and
     only one way to place the remaining noncumulative double bonds, and it must
-    be the molecule's.  Fail closed otherwise — never a wrong name.
+    be the molecule's. Fail closed otherwise — never a wrong name.
 
     Nothing in this function counts hydrogens; saturation and every candidate
     indicated-hydrogen position are decided by matchings on the ring graph.
@@ -1347,13 +1347,13 @@ def _mancude_hydro_select(mol, ring_set: Set[int],
     ordered = _macrocycle_ordered_ring(mol, ring_set)
     if ordered is None or len(ordered) != n:
         return None
-    # P-22.2.7.2 (``BlueBookV2.md:9515``) -- "If a further choice is needed
+    # P-22.2.7.2 (``the Blue Book``) -- "If a further choice is needed
     # between two or more of the same skeletal atom with different bonding
     # numbers, the lower locant is assigned in order of the decreasing value
     # of the bonding number" -- is NOT implemented in the numbering cascade
     # below, so a ring carrying a lambda on one of several same-element
     # heteroatoms must fail closed here rather than be numbered by a rule that
-    # cannot see the bonding number.  Self-defending: the lambda namer applies
+    # cannot see the bonding number. Self-defending: the lambda namer applies
     # the same guard before it delegates, but this function is also reachable
     # directly from ``name_partially_saturated_monocyclic_heterocycle``.
     for p, idx in enumerate(ordered):
@@ -1365,9 +1365,9 @@ def _mancude_hydro_select(mol, ring_set: Set[int],
             return None
     # An RDKit-aromatic ring carries no DOUBLE ring bonds, so the saturation
     # census below cannot read it as written -- this used to ``return None``
-    # for every such ring, "leaving them to the mancude namers".  That is only
+    # for every such ring, "leaving them to the mancude namers". That is only
     # sound if RDKit-aromatic implies mancude, and it does not: see
-    # :func:`_kekulized_if_aromatic`.  Kekulise instead, so the census reads
+    #:func:`_kekulized_if_aromatic`. Kekulise instead, so the census reads
     # the ring's REAL double bonds; a ring that is genuinely mancude then
     # leaves a few lines below on ``d == max_match`` exactly as before, and a
     # non-aromatic ring is untouched because the helper returns ``mol`` itself.
@@ -1408,7 +1408,7 @@ def _mancude_hydro_select(mol, ring_set: Set[int],
     # clause over-included: for `-ol`/`-amine` the tuple carries the ring bearing
     # carbon, so its two RING neighbours were spuriously marked, flipping the
     # numbering of same-element-adjacent rings (pyridazine, 1,2-dithiine) and
-    # regressing them (fable-dihydro BLOCKER; invariant 9).
+    # regressing them (a review-dihydro BLOCKER; a project rule).
     exo_pcg = pcg_atoms - ring_set
     pcg_pos: Set[int] = set()
     if pcg_atoms:
@@ -1481,22 +1481,22 @@ def _mancude_hydro_select(mol, ring_set: Set[int],
 
     # Numbering cascade.
     #
-    # P-22.2.2.1.3 (``BlueBookV2.md:8284``) fixes the FIRST two criteria, and
+    # P-22.2.2.1.3 (``the Blue Book``) fixes the FIRST two criteria, and
     # their order is not the intuitive one: "The locant '1' is given to a
     # heteroatom that occurs first in the seniority sequence used for citation
     # of the skeletal replacement ('a') prefixes. The numbering is THEN chosen
     # to give lowest locants to heteroatoms considered as a set in ascending
-    # numerical order."  Senior-heteroatom-at-1 OUTRANKS the lowest locant set,
-    # which is why furazan is ``1,2,5-oxadiazole`` (BB :14717) and not
+    # numerical order." Senior-heteroatom-at-1 OUTRANKS the lowest locant set,
+    # which is why furazan is ``1,2,5-oxadiazole`` (BB:14717) and not
     # ``2,1,3-oxadiazole`` even though {1,2,3} is the lower set. Ranking the set
     # first silently renumbered every N-O-N / N-S-N ring.
     #
     # P-22.2.3.2.3 (``:8806``) states the whole cascade verbatim and adds the
     # third criterion: "... the locant '1' is given to the heteroatom first
-    # cited in the order of seniority ... The direction of numbering is then
+    # cited in the order of seniority... The direction of numbering is then
     # chosen to give lower locants to the heteroatoms as a set without regard to
     # the kind of heteroatom, and then, if necessary, according to the order of
-    # seniority above."  Hence ``senior_at_one`` -> ``het_locs`` -> ``seniority``.
+    # seniority above." Hence ``senior_at_one`` -> ``het_locs`` -> ``seniority``.
     #
     # P-14.4 (``:3219``) then continues: (b) indicated hydrogen ``:3246`` before
     # (e)(i) hydro prefixes ``:3287`` -- restated for this exact combination by
@@ -1512,7 +1512,7 @@ def _mancude_hydro_select(mol, ring_set: Set[int],
     # only on het/ih/hydro locants, equal across any tie) — they only settle
     # WHICH numbering the shared map returns, so a decorated ring's substituent
     # gets its P-14.4(f) lowest locant deterministically instead of one chosen by
-    # ring-atom iteration order (fable BLOCKER 1/2: `3-methyl-1,4-dihydropyridine`
+    # ring-atom iteration order (a review BLOCKER 1/2: `3-methyl-1,4-dihydropyridine`
     # not `5-methyl`; representation-stable). Detachable = non-ring heavy
     # neighbour, EXCLUDING the pcg-bearing atoms (the suffix, tier c).
     sub_pos: Set[int] = set()
@@ -1556,8 +1556,8 @@ def _mancude_hydro_name(mol, ring_set: Set[int],
                         principal_group_atoms=None) -> Optional[str]:
     """P-54.4.1 'hydro' name for a partially saturated mancude heteromonocycle.
 
-    Thin builder over :func:`_mancude_hydro_select`, which owns the numbering
-    cascade and every fail-closed guard.  Emits ``<hydro-locants>-<prefix>
+    Thin builder over:func:`_mancude_hydro_select`, which owns the numbering
+    cascade and every fail-closed guard. Emits ``<hydro-locants>-<prefix>
     <indicated-H>-<HW stem>`` from the selected numbering, unchanged from before
     the selection was factored out (the selection is byte-identical).
     """
@@ -1579,7 +1579,7 @@ def _mancude_hydro_name(mol, ring_set: Set[int],
         (loc[p], mol.GetAtomWithIdx(ordered[p]).GetSymbol()) for p in het_pos
     )
     # P-22.2.7.1 (``:9158``): a nonstandard bonding number is cited as
-    # lambda^n immediately after its locant.  The map is EMPTY for every
+    # lambda^n immediately after its locant. The map is EMPTY for every
     # standard-valence ring, so this is a no-op outside the lambda class.
     lambda_by_locant: Dict[int, int] = {}
     for p in het_pos:
@@ -1609,11 +1609,11 @@ def _mancude_hydro_name(mol, ring_set: Set[int],
 def _mancude_hydro_numbering(mol, ring_set: Set[int],
                              principal_group_atoms=None) -> Optional[Dict[int, int]]:
     """Atom-index -> locant map for a partially-saturated mancude heteromonocycle,
-    from the SAME selection :func:`_mancude_hydro_name` uses for the stem.
+    from the SAME selection:func:`_mancude_hydro_name` uses for the stem.
 
     Returns ``None`` when the ring is not a partially-saturated mancude
     heteromonocycle (aromatic / fully saturated / not mancude), so the caller
-    keeps its own numbering unchanged.  Consulted FIRST by
+    keeps its own numbering unchanged. Consulted FIRST by
     ``orient_heterocycle_with_substituents`` — this is what unifies the stem and
     the suffix onto ONE numbering authority (RISK 2): the suffix locant now
     honours P-14.4(b) indicated-H-outranks-suffix exactly as the stem does
@@ -1631,8 +1631,8 @@ def _mancude_hydro_numbering(mol, ring_set: Set[int],
 def _mancude_parent_suffix_numbering(mol, ring_set: Set[int],
                                      principal_group_atoms=None) -> Optional[Dict[int, int]]:
     """Atom-index -> locant map for a FULLY-MANCUDE monocyclic heterocycle that
-    carries indicated hydrogen (2H-pyran, 4H-pyran, 6H-1,3-oxazine, ...) and a
-    suffix — the ``d == max_match`` sibling of :func:`_mancude_hydro_numbering`
+    carries indicated hydrogen (2H-pyran, 4H-pyran, 6H-1,3-oxazine,...) and a
+    suffix — the ``d == max_match`` sibling of:func:`_mancude_hydro_numbering`
     (which handles only the hydro forms, ``1 <= d < max_match``).
 
     The parent STEM is numbered by ``_monocycle_indicated_h_prefix`` (which
@@ -1640,7 +1640,7 @@ def _mancude_parent_suffix_numbering(mol, ring_set: Set[int],
     ``orient_heterocycle_with_substituents`` with no indicated-H tier, so
     ``2H-pyran`` + suffix collided at locant 2. This numbers with the indicated
     hydrogen OUTRANKING the suffix — the verbatim BB example
-    ``2H-pyran-6-carboxylic acid (PIN)`` (``BlueBookV2.md:3252``, P-14.4(b)).
+    ``2H-pyran-6-carboxylic acid (PIN)`` (``the Blue Book``, P-14.4(b)).
 
     Returns ``None`` outside its tight scope (fail-closed): aromatic rings (so
     pyridine/furan/thiophene numbering is untouched), rings that are NOT at the
@@ -1737,7 +1737,7 @@ def _aromatizable_hydro_name(mol, ring_atoms, ring_set, mol_unsat,
     """Hydro name via the RDKit-AROMATIZABLE mancude parent (1,2-dihydropyridine,
     2,3-dihydro-1H-pyrrole).
 
-    Split out of :func:`name_partially_saturated_monocyclic_heterocycle` so that
+    Split out of:func:`name_partially_saturated_monocyclic_heterocycle` so that
     every one of its fail-closed exits can hand off to the matching-based
     :func:`_mancude_hydro_name` instead of abstaining outright. Behaviour of
     this path is unchanged; only what happens after it declines is new.
@@ -1781,7 +1781,7 @@ def _aromatizable_hydro_name(mol, ring_atoms, ring_set, mol_unsat,
     # Name the mancude parent — DEFERRED until after the hydro check so a fully
     # mancude ring (hydro == {}) never reaches this recursive name_heterocycle
     # call (the all-aromatic guard above also blocks re-entry). An intrinsic
-    # indicated-H parent (1H-pyrrole, 1H-imidazole, ...) is KEPT: the hydro
+    # indicated-H parent (1H-pyrrole, 1H-imidazole,...) is KEPT: the hydro
     # positions are the saturated C's; the indicated-H N is never in a parent
     # ring double bond so it is never counted as hydro (P-31.1.4 + the parent's
     # own nH-) -> e.g. 2,3-dihydro-1H-pyrrole.
@@ -1798,11 +1798,11 @@ def _aromatizable_hydro_name(mol, ring_atoms, ring_set, mol_unsat,
     # The indicated-hydrogen atom(s) of the kept parent must take the LOWEST
     # locant, ranked ahead of the hydro set.
     #
-    # P-14.4 "NUMBERING" (BlueBookV2.md:3219) fixes the order: "low locants are
-    # assigned to them in the following decreasing order of seniority ...
-    # (b) indicated hydrogen for unsubstituted compounds" (:3246) ... "(e)
+    # P-14.4 "NUMBERING" (the Blue Book) fixes the order: "low locants are
+    # assigned to them in the following decreasing order of seniority...
+    # (b) indicated hydrogen for unsubstituted compounds" (:3246)... "(e)
     # saturation/unsaturation: (i) low locants are given to hydro/dehydro
-    # prefixes ... and 'ene' and 'yne' endings" (:3288).  P-31.2.2 "General
+    # prefixes... and 'ene' and 'yne' endings" (:3288). P-31.2.2 "General
     # methodology" (:16878) states the consequence outright, and — as so often
     # — in the LAST two sentences of its paragraph (:16880): "Indicated
     # hydrogen atoms have priority over 'hydro' prefixes for low locants. If
@@ -1814,18 +1814,18 @@ def _aromatizable_hydro_name(mol, ring_atoms, ring_set, mol_unsat,
     # "with a bonding number of three or higher connected to adjacent ring
     # atoms by single bonds only, and carrying one or more hydrogen atoms" —
     # i.e. a parent ring atom that holds no parent ring double bond and still
-    # has an H.  Deriving it from the parent also makes it element-agnostic
+    # has an H. Deriving it from the parent also makes it element-agnostic
     # (2H-pyran's is a CARBON, 2,3-dihydro-1H-phosphole's a PHOSPHORUS).
     #
     # This used to be guessed from the MOLECULE instead, as "any ring N bearing
-    # an H".  That guess cannot tell two N-H apart, so for every 2-N parent
+    # an H". That guess cannot tell two N-H apart, so for every 2-N parent
     # whose hydro form saturates the second nitrogen — pyrazole, imidazole and
     # all four diazonines — the tie-break went slack and the hydro criterion,
-    # ranked below it, was free to put locant 1 on a HYDRO nitrogen.  The result
+    # ranked below it, was free to put locant 1 on a HYDRO nitrogen. The result
     # cited locant 1 as a hydro position and as indicated hydrogen in the same
     # name ('1,2,6,7,8,9-hexahydro-1H-1,5-diazonine', '1,5-dihydro-1H-pyrazole').
     # A position can never be both: an indicated-hydrogen atom holds no double
-    # bond in the parent, so it has none to lose.  Every (PIN) example in
+    # bond in the parent, so it has none to lose. Every (PIN) example in
     # P-31.2.2 / P-31.2.3.1 keeps the two sets disjoint — 4,5-dihydro-3H-azepine
     # (:16888), 3,4-dihydro-2H-pyrrole (:16896), 2,7-dihydro-1H-azepine
     # (:16920), 2,3-dihydro-1H-phosphole (:16924).
@@ -1847,14 +1847,14 @@ def _aromatizable_hydro_name(mol, ring_atoms, ring_set, mol_unsat,
     # Only EXOCYCLIC pg atoms participate in the neighbor clause (see the twin
     # comment in _mancude_hydro_name): a ring-atom suffix self-marks, an exocyclic
     # suffix marks its ring-attachment atom, and a ring bearing-carbon in the
-    # tuple never leaks onto its ring neighbours (fable-dihydro BLOCKER).
+    # tuple never leaks onto its ring neighbours (a review-dihydro BLOCKER).
     _exo_pcg = _pcg_atoms - set(ring_atoms)
     for start in range(n):
         for direction in (1, -1):
             seq = [ordered[(start + k * direction) % n] for k in range(n)]
             loc = {a: idx + 1 for idx, a in enumerate(seq)}
-            # P-22.2.2.1.3 (BlueBookV2.md:8284): "The locant '1' is given to a
-            # heteroatom that occurs first in the seniority sequence ... The
+            # P-22.2.2.1.3 (the Blue Book): "The locant '1' is given to a
+            # heteroatom that occurs first in the seniority sequence... The
             # numbering is THEN chosen to give lowest locants to heteroatoms
             # considered as a set." Senior-at-1 outranks the lowest set. Without
             # it the hydro locants were numbered by the set rule while
@@ -1865,7 +1865,7 @@ def _aromatizable_hydro_name(mol, ring_atoms, ring_set, mol_unsat,
             # Scoped to the Hantzsch-Widman range (P-22.2.2 covers rings of 3 to
             # 10). Above it the parent is named by skeletal replacement ('a')
             # nomenclature, whose numbering rule is the lowest heteroatom SET
-            # (P-31.1.4.4, :16697) with no senior-at-1 clause -- and those parent
+            # (P-31.1.4.4,:16697) with no senior-at-1 clause -- and those parent
             # names really do carry locant 1 on a junior heteroatom
             # (7-oxa-1,4,11-triazacyclopentadeca-...). Applying the HW rule there
             # re-created the very mismatch this fixes.
@@ -1907,9 +1907,9 @@ def _aromatizable_hydro_name(mol, ring_atoms, ring_set, mol_unsat,
     if ih_locants & set(hydro_locants):
         return None
     # (2) The locants this numbering gives the parent's indicated-hydrogen
-    #     atoms must be exactly the ones parent_name already cites, or the
-    #     'nH-' in the appended parent name points at a different ring atom
-    #     than the hydro prefixes do.
+    # atoms must be exactly the ones parent_name already cites, or the
+    # 'nH-' in the appended parent name points at a different ring atom
+    # than the hydro prefixes do.
     cited = re.match(r'^((?:\d+H,)*\d+H)-', parent_name)
     cited_ih = {int(t) for t in re.findall(r'\d+', cited.group(1))} if cited else set()
     if cited_ih != ih_locants:
@@ -1947,9 +1947,9 @@ def name_partially_saturated_monocyclic_heterocycle(
     n = len(ring_set)
     if n < 4:
         return None
-    # v33 Phase 6 (A): scope to the Hantzsch-Widman ring-size range this
+    # a phase (A): scope to the Hantzsch-Widman ring-size range this
     # function's "mancude parent" premise applies to (build_hw_name / the
-    # sibling _name_lambda_heteromonocycle both cap at 10 -- BlueBookV2.md
+    # sibling _name_lambda_heteromonocycle both cap at 10 -- the Blue Book
     # P-22.2.2.1.1's HW stems are defined for rings of size 3-10 only).
     # Without this bound, a >10-membered partially-saturated heterocycle
     # (e.g. an unsaturated macrolactone ring) fell through to the mancude
@@ -1979,14 +1979,14 @@ def name_partially_saturated_monocyclic_heterocycle(
         # Fully saturated -> retained / HW saturated stem handles it.
         return None
     # "A fully-aromatic ring is mancude, so it has NO hydro positions" was the
-    # premise here, and it is FALSE -- see :func:`_kekulized_if_aromatic`.
+    # premise here, and it is FALSE -- see:func:`_kekulized_if_aromatic`.
     # Two or more pyrrole-type heteroatoms donate lone pairs instead of double
     # bonds, so ``c1c[nH][nH]1``, ``c1cc[nH]cc[nH]c1`` and ``c1ccc[nH][nH]cc1``
     # are all RDKit-aromatic while carrying one ring double bond FEWER than
-    # their mancude parent.  Returning None here dropped them through to the
+    # their mancude parent. Returning None here dropped them through to the
     # plain Hantzsch-Widman path, which named each as that parent --
     # 1,2-diazete / 1,4-diazocine / 1,2-diazocine -- a DIFFERENT MOLECULE by
-    # P-22.2.2.1.1 (``BlueBookV2.md:8222``).  P-54.4.1 "Hantzsch-Widman
+    # P-22.2.2.1.1 (``the Blue Book``). P-54.4.1 "Hantzsch-Widman
     # heteromonocycles" (``:24169``) gives the correct form at ``:24171``:
     # "'Hydro' prefixes added to names of fully unsaturated Hantzsch-Widman
     # rings lead to preferred IUPAC names for partially unsaturated rings."
@@ -1995,7 +1995,7 @@ def name_partially_saturated_monocyclic_heterocycle(
     #
     # Hand it to the matching-based namer, NOT to _aromatizable_hydro_name --
     # that is what keeps the infinite recursion this bail used to guard
-    # impossible.  _mancude_hydro_name builds its stem with build_hw_name and
+    # impossible. _mancude_hydro_name builds its stem with build_hw_name and
     # never calls name_heterocycle, whereas _aromatizable_hydro_name does, and
     # the "mancude parent" of an aromatic ring can be the ring itself.
     # _mancude_hydro_name returns None unless ``1 <= d < max_match``, so a
@@ -2003,7 +2003,7 @@ def name_partially_saturated_monocyclic_heterocycle(
     if all(mol.GetAtomWithIdx(i).GetIsAromatic() for i in ring_set):
         return _mancude_hydro_name(mol, ring_set, principal_group_atoms)
 
-    # (1) the RDKit-aromatizable mancude parent (pyridine, 1H-pyrrole, ...).
+    # (1) the RDKit-aromatizable mancude parent (pyridine, 1H-pyrrole,...).
     named = _aromatizable_hydro_name(mol, ring_atoms, ring_set, mol_unsat,
                                      principal_group_atoms)
     if named:
@@ -2019,7 +2019,7 @@ def _name_lambda_heteromonocycle(mol, oriented, heteroatom_locants, info) -> Opt
     """P-22.2.7.1: heteromonocycle with nonstandard-bonding-number heteroatom(s).
 
     Emits '<locants-with-lambda>-<HW name>' with indicated hydrogen, and hands
-    HYDRO forms to :func:`_mancude_hydro_name`.
+    HYDRO forms to:func:`_mancude_hydro_name`.
     Fail-closed contract — returns None for: rings >10 / aromatic-perceived
     rings; lambda on a skeletal CARBON; more than one atom of the lambda
     atom's element (P-22.2.7.2 tie-break unbuilt, ``:9515``); cumulated ring
@@ -2028,49 +2028,49 @@ def _name_lambda_heteromonocycle(mol, oriented, heteroatom_locants, info) -> Opt
 
     MEASURED RESIDUE (Task AA re-measurement; enumerate 27,687 bare
     heteromonocycles: sizes 3-14 x N/O/S/O+N/S+N/2N at every heteroatom
-    position x every independent-edge set of the ring).  Of the 2,848 rings of
+    position x every independent-edge set of the ring). Of the 2,848 rings of
     size <= 10, **707 abstained at producer level and all 707 fell on ONE code
-    branch** — the "hydro form of a lambda ring" refusal.  All 707 are now
+    branch** — the "hydro form of a lambda ring" refusal. All 707 are now
     named (0 lost, 0 wrong; 707/707 OPSIN round-trip to the input structure).
     It spans sizes 3-10 (2/4/13/24/53/96/185/330), so it is not a boundary
     effect: c3413078 only made sizes 7-10 *visible* by routing them here; sizes
-    3-6 abstained before it and were untouched by it.  (The other half of the
+    3-6 abstained before it and were untouched by it. (The other half of the
     residue recorded in 06093de6 — "4 nine-membered 2-N rings" — was never a
-    producer abstention at all.  Those emitted a malformed name that only the
+    producer abstention at all. Those emitted a malformed name that only the
     OPSIN validity gate suppressed downstream; the real class was 51 rings and
     is fixed in _aromatizable_hydro_name.)
 
     ⚠ The residue statement above is the shape of the class, but its claim
-    that all 707 "fail on ONE branch" is true only of the CODE.  In
+    that all 707 "fail on ONE branch" is true only of the CODE. In
     NOMENCLATURE they are two classes, and the single ``is any saturated ring
     atom a carbon?`` test merged them:
 
-    * **60** are not hydro forms at all.  They are mancude lambda parents
+    * **60** are not hydro forms at all. They are mancude lambda parents
       whose indicated hydrogen happens to sit on a CARBON — which is the Blue
       Book's own ``3H-1lambda4-thiophene (PIN)`` (``:9171``), the companion of
       ``1H-1lambda4-thiophene (PIN)`` (``:9167``) whose indicated hydrogen is
-      on the sulfur and which this producer already emitted.  So the refusal
-      was rejecting a verbatim (PIN) example.  Sizes 3/5/7/9 (2/8/18/32).
+      on the sulfur and which this producer already emitted. So the refusal
+      was rejecting a verbatim (PIN) example. Sizes 3/5/7/9 (2/8/18/32).
     * **647** are genuine hydro forms, sizes 4-10 (4/5/24/35/96/153/330).
 
-    Both are licensed.  P-66.1.5.2.3 "Intramolecular amides of amino sulfinic
+    Both are licensed. P-66.1.5.2.3 "Intramolecular amides of amino sulfinic
     acids." (``:33282``) gives ``3,4,5,6-tetrahydro-1<lambda>4,2-thiazin-1-ol
     (PIN)`` (``:33292``); **P-66.1.5.2.2** "Sultims are tautomers of sultams
-    and are named as described in P-66.1.5.2.1 ... using the term 'sultim'"
+    and are named as described in P-66.1.5.2.1... using the term 'sultim'"
     (``:33264``) gives ``1-hydroxy-4,5-dihydro-3H-1<lambda>6,2-thiazol-1-one
     (PIN)`` (``:33268``) — hydro prefixes on a lambda Hantzsch-Widman ring,
-    one also carrying indicated hydrogen, both (PIN).  (That second one was
+    one also carrying indicated hydrogen, both (PIN). (That second one was
     recorded here as P-66.1.5.2.1; re-opened, the heading above it is
-    P-66.1.5.2.2.)  A third, in another chapter, shows the same combination on
+    P-66.1.5.2.2.) A third, in another chapter, shows the same combination on
     a phosphorus ring: ``1,1,3,3-tetraphenyl-4,5-dihydro-1H-1,2,3lambda5-
     triphosphol-3-ium (PIN)`` (``:41403``).
 
     ⚠ Building it did NOT need P-14.4(h) (``:3320``), which this docstring
-    used to say it did.  (h) disambiguates "the same skeletal atom in
+    used to say it did. (h) disambiguates "the same skeletal atom in
     different valence states"; measured over the enumeration, all 707 rings
     carry exactly ONE lambda atom and it is lambda-4 in every one, so the
-    criterion can never fire for this class.  The guard above refuses the
-    multi-same-element case outright instead.  What it DID need was
+    criterion can never fire for this class. The guard above refuses the
+    multi-same-element case outright instead. What it DID need was
     ``_mancude_max_matching`` made lambda-aware — see
     :func:`_mancude_bond_eligible`.
     """
@@ -2115,7 +2115,7 @@ def _name_lambda_heteromonocycle(mol, oriented, heteroatom_locants, info) -> Opt
         sp3 = [idx for idx in oriented if idx not in in_double]
         # How many noncumulative ring double bonds the MANCUDE PARENT carries,
         # counted lambda-aware (a lambda-4 sulfur is matchable; see
-        # _mancude_bond_eligible).  Comparing the molecule against that number
+        # _mancude_bond_eligible). Comparing the molecule against that number
         # is what separates the two nomenclature classes that used to be
         # merged behind a single "is any saturated ring atom a carbon?" test.
         max_match, eligible = _mancude_max_matching(mol, oriented)
@@ -2125,8 +2125,8 @@ def _name_lambda_heteromonocycle(mol, oriented, heteroatom_locants, info) -> Opt
         if n_double > max_match:
             return None  # more double bonds than a mancude parent has
         if n_double < max_match:
-            # HYDRO FORM of a lambda ring.  P-66.1.5.2.3 "Intramolecular
-            # amides of amino sulfinic acids." (``BlueBookV2.md:33282``) gives
+            # HYDRO FORM of a lambda ring. P-66.1.5.2.3 "Intramolecular
+            # amides of amino sulfinic acids." (``the Blue Book``) gives
             # ``3,4,5,6-tetrahydro-1lambda4,2-thiazin-1-ol (PIN)`` (``:33292``)
             # and P-66.1.5.2.2 "Sultims are tautomers of sultams..."
             # (``:33264``) gives
@@ -2139,23 +2139,23 @@ def _name_lambda_heteromonocycle(mol, oriented, heteroatom_locants, info) -> Opt
             # Hand it to the general matching-based hydro namer, which already
             # implements the P-14.4(b)-over-(e)(i) numbering and the
             # unique-reconstruction proof; it became lambda-capable when
-            # _mancude_max_matching did.  Delegating from HERE, after the
+            # _mancude_max_matching did. Delegating from HERE, after the
             # guards above, is what keeps the P-22.2.7.2 same-element case
             # fail-closed.
             return _mancude_hydro_name(mol, ring_set)
         # n_double == max_match: the molecule IS the mancude parent, so the
         # only thing to add is indicated hydrogen.
         #
-        # RE-NUMBER first.  ``oriented`` arrives from ``orient_heterocycle``,
+        # RE-NUMBER first. ``oriented`` arrives from ``orient_heterocycle``,
         # which ranks the heteroatom criteria but knows nothing of indicated
         # hydrogen, so where those criteria TIE it picks arbitrarily between
         # numberings that P-14.4 "NUMBERING" (``:3219``) separates: "low
         # locants are assigned to them in the following decreasing order of
-        # seniority ... (b) indicated hydrogen for unsubstituted compounds"
-        # (``:3246``).  Measured on the 60 mancude lambda rings in the
+        # seniority... (b) indicated hydrogen for unsubstituted compounds"
+        # (``:3246``). Measured on the 60 mancude lambda rings in the
         # enumeration, 5 came out non-minimal -- ``5H-1lambda4-thiophene`` for
         # C1=CC[SH]=C1 where ``2H-`` is reachable, and the same in thiepine,
-        # thionine.  Invisible to both available structural oracles, because
+        # thionine. Invisible to both available structural oracles, because
         # the two numberings describe the SAME molecule.
         ih_of = {}
         for p, idx in enumerate(oriented):
@@ -2192,7 +2192,7 @@ def _name_lambda_heteromonocycle(mol, oriented, heteroatom_locants, info) -> Opt
             # It must NOT be read out of ``STANDARD_BONDING_NUMBER``: that
             # table deliberately omits carbon (adding 'C' there would give
             # every radical carbon a spurious lambda3), so a carbon scored 0
-            # and never qualified.  Harmless while a saturated ring carbon was
+            # and never qualified. Harmless while a saturated ring carbon was
             # refused outright one branch above; the moment that refusal was
             # lifted it silently dropped the '3H-' from the Blue Book's own
             # ``3H-1lambda4-thiophene (PIN)`` (``:9171``).
@@ -2210,7 +2210,7 @@ def _name_lambda_heteromonocycle(mol, oriented, heteroatom_locants, info) -> Opt
     if not hw:
         return None
     # P-22.2.1 retained stems (BB example: 1H-1lambda4-THIOPHENE at ``:9167``,
-    # not 1H-1lambda4-thiole).  Shared whole-stem helper: the three rows that
+    # not 1H-1lambda4-thiole). Shared whole-stem helper: the three rows that
     # used to be inlined here missed 'thiine' -> 'thiopyran', so
     # ``1lambda4-thiine`` was emitted for C1=CC=[SH]C=C1, and they were matched
     # with ``endswith``, which would have rewritten the Blue Book's own
@@ -2239,11 +2239,11 @@ def name_heterocycle(mol, ring_atoms, principal_group_atoms=None) -> Optional[st
         IUPAC name for the heterocycle
 
     Examples:
-        >>> mol = Chem.MolFromSmiles('c1ccncc1')  # pyridine
+        >>> mol = Chem.MolFromSmiles('c1ccncc1') # pyridine
         >>> ring = mol.GetRingInfo().AtomRings()[0]
         >>> name_heterocycle(mol, ring)
         'pyridine'
-        >>> mol2 = Chem.MolFromSmiles('C1CO1')  # oxirane
+        >>> mol2 = Chem.MolFromSmiles('C1CO1') # oxirane
         >>> ring2 = mol2.GetRingInfo().AtomRings()[0]
         >>> name_heterocycle(mol2, ring2)
         'oxirane'
@@ -2292,7 +2292,8 @@ def name_heterocycle(mol, ring_atoms, principal_group_atoms=None) -> Optional[st
     # conjugated macrocycle RDKit reads as aromatic) so a polyene is named with
     # ALL its bonds + locants instead of a single bare 'ene'.
     if ring_size > 10:
-        macro_het, double_locants = _orient_macrocycle_for_replacement(mol, ring_atoms)
+        macro_het, double_locants = _orient_macrocycle_for_replacement(
+            mol, ring_atoms, principal_group_atoms)
         if macro_het is None:
             # Could not enumerate -> fall back to the heteroatom-only orientation.
             macro_het, double_locants = heteroatom_locants, None
@@ -2311,7 +2312,7 @@ def name_heterocycle(mol, ring_atoms, principal_group_atoms=None) -> Optional[st
         )
 
     # The degree of hydrogenation the STEM is about to assert, checked against
-    # the structure.  P-22.2.2.1.1 (``BlueBookV2.md:8222``) defines what an
+    # the structure. P-22.2.2.1.1 (``the Blue Book``) defines what an
     # unsaturated Hantzsch-Widman stem means -- "Unsaturated compounds are
     # those having the maximum number of noncumulative double bonds (mancude
     # compounds) and at least one double bond" -- so spelling one for a ring
@@ -2329,7 +2330,7 @@ def name_heterocycle(mol, ring_atoms, principal_group_atoms=None) -> Optional[st
             # P-31.2.3.2 (``:16928``): "Preferred IUPAC names of saturated
             # heteromonocyclic compounds are either Hantzsch-Widman names
             # described in P-22.2.2.1.1 or retained names described in Table
-            # 2.3."  56 such rings in the enumeration, every one of size 3:
+            # 2.3." 56 such rings in the enumeration, every one of size 3:
             # 16 where a mancude double bond is possible at all, so the old
             # unsaturated stem denoted a DIFFERENT molecule (OPSIN decodes
             # 'triazirine' to N1=NN1, not to triaziridine); and 40 all-divalent
@@ -2340,10 +2341,10 @@ def name_heterocycle(mol, ring_atoms, principal_group_atoms=None) -> Optional[st
             # below reads the same verdict the stem does.
             info = {**info, 'is_saturated': True, 'is_aromatic': False}
         elif 1 <= _d < _max_match:
-            # A hydro form that :func:`name_partially_saturated_monocyclic_heterocycle`
-            # declined to name.  It must NOT fall through to the mancude stem:
+            # A hydro form that:func:`name_partially_saturated_monocyclic_heterocycle`
+            # declined to name. It must NOT fall through to the mancude stem:
             # that is precisely how 1,2-diazete / 1,4-diazocine / 1,2-diazocine
-            # were emitted for their dihydro molecules.  Fail closed -- an
+            # were emitted for their dihydro molecules. Fail closed -- an
             # abstention is recoverable, a wrong molecule is not.
             return None
 
@@ -2461,7 +2462,7 @@ def _monocycle_indicated_h_prefix(mol, oriented: List[int], info) -> str:
     # The indicated-H atom: sp3 (no ring double bond), eligible, bearing H --
     # OR a fully-substituted Group-14 (Si/Ge/Sn) mancude position, whose
     # indicated hydrogen is cited even when substitution has displaced every H.
-    # P-68.2.6 "Silole, germole, ... rings" (``BlueBookV2.md:38228``):
+    # P-68.2.6 "Silole, germole,... rings" (``the Blue Book``):
     # ``1,1-dibutyl-1H-germole (PIN) (note the indicated hydrogen atom)``. The
     # indicated hydrogen is a property of the mancude PARENT, not of the
     # substituted molecule, so a 1,1-disubstituted silole/germole/stannole keeps
@@ -2555,13 +2556,25 @@ def _macrocycle_db_locant(p: int, q: int, ring_size: int) -> int:
 
 
 def _orient_macrocycle_for_replacement(
-    mol, ring_atoms
+    mol, ring_atoms, principal_group_atoms=None
 ) -> Tuple[Optional[List[Tuple[int, str]]], Optional[List[int]]]:
     """Number a >10-membered heteromonocycle for replacement ("a") nomenclature.
 
     Returns ``(heteroatom_locants, double_bond_locants)`` where the numbering
-    minimises, in order (IUPAC 2013 P-31.1.4.3): the heteroatom locant set, then
-    the heteroatoms by element seniority, then the ring double-bond locant set.
+    minimises, in order (IUPAC 2013 P-31.1.4.3 / P-14.4): the heteroatom locant
+    set, then the heteroatoms by element seniority, then the PRINCIPAL
+    CHARACTERISTIC GROUP locant set (P-14.4(c) — the suffix, e.g. the ``-2,6-dione``
+    carbons), then the ring double-bond locant set.
+
+     M4: threading ``principal_group_atoms`` (the in-ring suffix-bearing atoms)
+    into the key is the fix for the macrolactam/macrolactone class whose in-ring
+    ``ene`` was numbered on a DIFFERENT direction than the composer's suffix
+    locants — the two disagreed and the spliced name was internally inconsistent
+    (OPSIN-unparseable → abstain). With the suffix ranked ABOVE unsaturation the
+    numberer picks the same direction the composer uses, so the name round-trips.
+    Empty ``principal_group_atoms`` (a bare ring / crown ether) leaves the key
+    unchanged, so the previously-passing cases are byte-identical (no regression),
+    and any residual mismatch still fails the OPSIN validity gate → abstain.
 
     The ring is *kekulised* first so a fully-conjugated macrocycle that RDKit
     perceives as aromatic (e.g. the V-6 azacyclotrideca-hexaene) yields its
@@ -2569,6 +2582,7 @@ def _orient_macrocycle_for_replacement(
     a single bare ``ene``). Returns ``(None, None)`` if the ring cannot be
     ordered/kekulised, so the caller can fall back safely.
     """
+    pg_atoms = set(principal_group_atoms or ())
     ring_set = set(ring_atoms)
     ring_size = len(ring_set)
     het = [a for a in ring_set if mol.GetAtomWithIdx(a).GetSymbol() != 'C']
@@ -2607,7 +2621,12 @@ def _orient_macrocycle_for_replacement(
                 _macrocycle_db_locant(loc[i], loc[j], ring_size)
                 for i, j in ring_double_bonds
             )
-            key = (het_set, seniority, dbl)
+            # P-14.4(c): the principal characteristic group takes low locants
+            # BEFORE unsaturation. Only in-ring suffix atoms carry a ring locant
+            # (an exocyclic -carboxylic-acid carbon is filtered by ``a in loc``);
+            # empty -> ``()`` -> no effect on the key (no regression).
+            pg_key = tuple(sorted(loc[a] for a in pg_atoms if a in loc))
+            key = (het_set, seniority, pg_key, dbl)
             if best is None or key < best[0]:
                 best = (key, loc, dbl)
 
@@ -2674,7 +2693,7 @@ def _build_replacement_name(
             element_locants[elem] = []
         element_locants[elem].append(locant)
 
-    # Order by IUPAC priority (O > S > N > ...)
+    # Order by IUPAC priority (O > S > N >...)
     elements_by_priority = sorted(
         element_locants.keys(),
         key=lambda e: HETEROATOM_PRIORITY.get(e, 999)
@@ -2684,16 +2703,16 @@ def _build_replacement_name(
     # OTHER locant is cited anywhere in the final name, which is the whole reason
     # the rule is safe: with nothing else numbered, the origin cannot be ambiguous.
     # Scoped by measurement, not by reading:
-    #   * the Blue Book KEEPS the locant on the unsaturated forms
-    #     ``1-oxacycloundeca-2,4,6,8,10-pentaene`` (PIN) and
-    #     ``1-azacyclotetradeca-1,3,5,7,9,11,13-heptaene`` (PIN) [BBv2:8488-8490],
-    #     where unsaturation locants are cited -> hence ``_saturated_ring``;
-    #   * and the shipped gold target ``1-selenacyclotridecan-3-one``
-    #     (W2-RINGKET-SELENA-PROTECT) keeps it too, because a SUFFIX locant is
-    #     cited. That name is assembled by this builder's CALLER, which appends
-    #     ``-3-one`` to the ``...ane`` parent returned here -- so this function
-    #     cannot see it, and an omission decided from the arguments alone
-    #     regressed that target (measured, not hypothesised).
+    # * the Blue Book KEEPS the locant on the unsaturated forms
+    # ``1-oxacycloundeca-2,4,6,8,10-pentaene`` (PIN) and
+    # ``1-azacyclotetradeca-1,3,5,7,9,11,13-heptaene`` (PIN) [BBv2:8488-8490],
+    # where unsaturation locants are cited -> hence ``_saturated_ring``;
+    # * and the shipped gold target ``1-selenacyclotridecan-3-one``
+    # (W2-RINGKET-SELENA-PROTECT) keeps it too, because a SUFFIX locant is
+    # cited. That name is assembled by this builder's CALLER, which appends
+    # ``-3-one`` to the ``...ane`` parent returned here -- so this function
+    # cannot see it, and an omission decided from the arguments alone
+    # regressed that target (measured, not hypothesised).
     # ``bare_ring`` is therefore required: the caller asserts the molecule IS the
     # ring, so there is provably no substituent, suffix or unsaturation locant to
     # collide with. That is the exact condition covering the book's
@@ -2713,18 +2732,18 @@ def _build_replacement_name(
         #
         # NOT ESTABLISHED -- which table governs HERE is genuinely ambiguous in
         # the book, and it matters for exactly two elements:
-        #   * P-22.2.3 points at P-15.4, i.e. Table 1.5;
-        #   * but P-22.2.3.1 [BBv2:8484] says the prefixes come from "(see
-        #     Table 2.4)" -- the Hantzsch-Widman table -- in the same sentence
-        #     that quotes Table 2.4's 22-element seniority order. (That
-        #     cross-reference may simply be reaching for the ORDER, which
-        #     Table 1.5 does not print at all.)
+        # * P-22.2.3 points at P-15.4, i.e. Table 1.5;
+        # * but P-22.2.3.1 [BBv2:8484] says the prefixes come from "(see
+        # Table 2.4)" -- the Hantzsch-Widman table -- in the same sentence
+        # that quotes Table 2.4's 22-element seniority order. (That
+        # cross-reference may simply be reaching for the ORDER, which
+        # Table 1.5 does not print at all.)
         # The two tables agree on 16 of the elements this path can reach, so the
         # question only bites for Al (``alumina`` vs ``aluma``) and In (``inda``
         # vs ``indiga``). Table 1.5 is kept because the Table 2.4 reading is
         # unverifiable downstream: ``alumacyclotridecane`` and
         # ``indigacyclotridecane`` are REJECTED by the round-trip parser
-        # ("cyclotridecane ... not parseable" after an HW prefix) while
+        # ("cyclotridecane... not parseable" after an HW prefix) while
         # ``aluminacyclotridecane`` and ``indacyclotridecane`` parse back to the
         # right structure. Switching would trade a verified name for an
         # unverifiable one, and SELF-01 fails OPEN on an unparseable name -- so
@@ -2753,7 +2772,7 @@ def _build_replacement_name(
             # O/S/N/Si never reach it (an earlier producer, which already omits
             # the locant, handles them) so the defect only surfaced for an
             # element that falls through to here -- which Al and In began doing
-            # when v29 P2-T2b made them spellable. Without this the two new rows
+            # when -T2b made them spellable. Without this the two new rows
             # would have shipped the non-PIN ``1-aluminacyclotridecane`` while
             # oxygen shipped ``oxacyclotridecane``.
             prefix_parts.append(hw_prefix)
@@ -2806,7 +2825,7 @@ def _is_monocyclic_lactone(mol):
 def _ring_has_extra_heteroatom(mol, ring_set, carbonyl_idx) -> bool:
     """True if the ring containing `carbonyl_idx` carries a ring heteroatom
     besides the single amide N — i.e. it is a multi-heteroatom saturated
-    heteroring (thiazolidine, oxazolidine, ...) that the lactam handler
+    heteroring (thiazolidine, oxazolidine,...) that the lactam handler
     declined. Counts a ring O/S/Se/Te, or a 2nd ring N, as the extra."""
     n_count = 0
     other_hetero = 0
@@ -2879,18 +2898,18 @@ def get_heterocycle_substituents(
         {
             locant: [
                 {
-                    'atoms': List[int],  # Atom indices in substituent
-                    'is_on_nitrogen': bool,  # True if attached to N
-                    'carbon_count': int,  # Number of C atoms (for alkyl naming)
-                    'connecting_atom': int,  # Ring atom the sub attaches to
-                    'is_ring': bool,  # True if substituent is a ring
-                    'ring_name': str,  # Ring substituent name (if is_ring)
+                    'atoms': List[int], # Atom indices in substituent
+                    'is_on_nitrogen': bool, # True if attached to N
+                    'carbon_count': int, # Number of C atoms (for alkyl naming)
+                    'connecting_atom': int, # Ring atom the sub attaches to
+                    'is_ring': bool, # True if substituent is a ring
+                    'ring_name': str, # Ring substituent name (if is_ring)
                 }
             ]
         }
 
     Examples:
-        >>> mol = Chem.MolFromSmiles('CN1CCCC1')  # N-methylpyrrolidine
+        >>> mol = Chem.MolFromSmiles('CN1CCCC1') # N-methylpyrrolidine
         >>> ring = mol.GetRingInfo().AtomRings()[0]
         >>> oriented, atom_to_loc = orient_heterocycle(mol, ring)
         >>> subs = get_heterocycle_substituents(mol, ring, oriented, atom_to_loc)
@@ -2905,7 +2924,7 @@ def get_heterocycle_substituents(
     # principal group GENERICALLY off the seniority tables: a no-carbon substituent
     # whose prefix form equals get_prefix(principal_group) AND whose class has a ring
     # suffix form (get_suffix(..., is_ring=True)) is the principal-group suffix
-    # (oxo->one, hydroxy->ol, amino->amine, sulfanyl->thiol, ...). Subordinate
+    # (oxo->one, hydroxy->ol, amino->amine, sulfanyl->thiol,...). Subordinate
     # same-prefix groups keep the prefix because only the principal group's prefix
     # matches. No per-FG `if`.
     pg_prefix = get_prefix(principal_group) if principal_group else None
@@ -3055,7 +3074,7 @@ def get_heterocycle_substituents(
                 if mol.GetAtomWithIdx(idx).GetSymbol() == 'C'
             )
 
-            # v26 (P-63.2.2 / P-63.2.5): a heteroatom-rooted ETHER substituent on
+            # (P-63.2.2 / P-63.2.5): a heteroatom-rooted ETHER substituent on
             # the ring -- -O-R / -S-R / -Se-R / -Te-R (carbon_count>0 because R has
             # carbons) -- is an (R)oxy / (R)sulfanyl / (R)selanyl / (R)tellanyl
             # prefix. classify_substituent below counts the arm carbons and DROPS
@@ -3111,7 +3130,7 @@ def get_heterocycle_substituents(
                         })
                         continue
 
-            # v30 breadth (P-63.6): a ring-borne higher-oxide sulfur substituent
+            # breadth (P-63.6): a ring-borne higher-oxide sulfur substituent
             # -S(=O)R (sulfinyl) / -S(=O)(=O)R (sulfonyl) is an (R)sulfinyl /
             # (R)sulfonyl PREFIX. The generic classify path below counts the R
             # carbons and DROPS the S + its =O, so the whole molecule abstained
@@ -3244,12 +3263,12 @@ def get_heterocycle_substituents(
                 and _ring_has_extra_heteroatom(mol, ring_set, ring_atom_idx)
             )
 
-            # P-66.2.1 / P-66.1.3 "'Hidden' amides" (BB:33125, :33847): a CYCLIC
+            # P-66.2.1 / P-66.1.3 "'Hidden' amides" (the Blue Book,:33847): a CYCLIC
             # imide -- a ring N flanked by two ring carbonyls -- is a ring
             # pseudoketone named with the -DIONE suffix, NOT '2,5-dioxo...'
             # detachable prefixes: succinimide -> pyrrolidine-2,5-dione (PIN),
-            # and BB:33847 spells `1-bromopyrrolidine-2,5-dione (PIN)` verbatim
-            # "(not N-bromosuccinimide; ...)". Each imide ring carbonyl's
+            # and the Blue Book spells `1-bromopyrrolidine-2,5-dione (PIN)` verbatim
+            # "(not N-bromosuccinimide;...)". Each imide ring carbonyl's
             # exocyclic =O becomes a '-one' on the numbered ring, exactly as the
             # secondary_amide branch above does for a multi-heteroatom ring
             # amide. The lactam handler always DECLINES an imide
@@ -3265,10 +3284,10 @@ def get_heterocycle_substituents(
                 and _is_cyclic_imide_carbonyl(mol, ring_atom_idx, ring_set)
             )
 
-            # v33 Phase 6 (A fix, review finding): a ring carbonyl whose
+            # a phase (A fix, review finding): a ring carbonyl whose
             # principal group is an ESTER that the lactone handler DECLINED
             # (is_monocyclic_lactone returns None -- a dione, or an
-            # in-ring-C=C at HW ring size, v33 Phase 6 Task 1) is named as
+            # in-ring-C=C at HW ring size, a phase Task 1) is named as
             # the ketone '-one'/'-dione' SUFFIX on the heterocycle parent,
             # NOT an 'oxo'/'dioxo' detachable PREFIX. P-66.6.3: the ring
             # carbonyl is the senior (only) characteristic group here, so
@@ -3286,19 +3305,19 @@ def get_heterocycle_substituents(
                 and _is_monocyclic_lactone(mol) is None
             )
 
-            # P-64.6.1 (BB:29504) chalcogen ketone-analogue SUFFIX: a ring
+            # P-64.6.1 (the Blue Book) chalcogen ketone-analogue SUFFIX: a ring
             # carbon's C=S/C=Se/C=Te whose principal group is a CYCLIC
             # thioamide/selenoamide/telluroamide (a "thiolactam" -- the
             # chalcogen analogue of the lactam the lactam handler declines) is
             # the ketone-analogue named with the -thione/-selone/-tellone
-            # SUFFIX (multiplied -> -dithione ...), NOT a sulfanylidene /
+            # SUFFIX (multiplied -> -dithione...), NOT a sulfanylidene /
             # selanylidene / tellanylidene detachable prefix. Mirrors the
             # ring_ketone_suffix (lactam) branch, but there is NO thiolactam
             # handler (unlike lactams), so ALL such rings are named here --
             # single-N monocyclic (azepane-2-thione) and multi-heteroatom
             # (1,3-thiazolidine-2,4-dithione) alike; no lactam-declined /
             # extra-heteroatom gate is applicable. Seniority C=O > C=S > C=Se >
-            # C=Te (BB:29561) is already resolved UPSTREAM: when a ring also
+            # C=Te (the Blue Book) is already resolved UPSTREAM: when a ring also
             # bears a senior C=O the principal group is 'secondary_amide' (not
             # a *amide chalcogen class), so this branch never fires and the C=S
             # correctly stays a sulfanylidene prefix (rhodanine
@@ -3411,7 +3430,7 @@ def _identify_suffix_fg(mol, start_idx: int, sub_atoms, ring_set) -> Optional[Di
 
     # Wave2 T5d (P-66.1.1.3.4): N-SUBSTITUTED ring carboxamides — secondary
     # C(=O)NHR and tertiary C(=O)NR2. The benzene path has handled these
-    # since Phase 85 (N,N-dimethylbenzamide); the heterocycle detector only
+    # since a phase (N,N-dimethylbenzamide); the heterocycle detector only
     # matched primary amides, so every N-substituted heterocycle-carboxamide
     # fell to unknown. Reuses the benzene N-substituent extractor; FAIL-CLOSED
     # count check: _detect_n_substituents silently omits branches it cannot
@@ -3494,7 +3513,7 @@ def _identify_hetero_substituent(mol, sub_atoms, ring_set) -> Optional[str]:
     # 2-hydrazinyl-4,5-dihydro-1H-imidazole).
     #
     # ⚠ SENIORITY SCOPE (P-44.1). Hydrazine's senior skeletal element is N (the top
-    # of the P-44.1.2 order N > ... > O > S > ... > C). A ring is the senior parent
+    # of the P-44.1.2 order N >... > O > S >... > C). A ring is the senior parent
     # over the 2-N chain ONLY when it, too, holds N -- then P-44.1.2.2's
     # ring-senior-to-chain tie-break fires (pyridine/pyrimidine/pyrrole/dihydro-
     # imidazole). A ring whose senior element is JUNIOR to N (all-carbon benzene/
@@ -3518,6 +3537,16 @@ def _identify_hetero_substituent(mol, sub_atoms, ring_set) -> Optional[str]:
                 and _nn is not None
                 and _nn.GetBondType() == Chem.BondType.SINGLE):
             return 'hydrazinyl'
+
+    # Hydroperoxy (-O-OH): two chained O, the attachment O bears no H and the
+    # terminal O bears one. P-63.4.1: on a ring heteroatom this is the -peroxol
+    # principal group; returning the matching 'hydroperoxy' prefix name lets the
+    # ring-suffix path recognise it (hetero_sub_name == pg_prefix) and attach the
+    # '-peroxol' suffix (pyrrolidine-1-peroxol), rather than emit a 'hydroxyoxy' prefix.
+    if (symbol == 'O' and h_count == 0 and len(sub_atoms) == 2):
+        _term = mol.GetAtomWithIdx(sub_atoms[1])
+        if _term.GetSymbol() == 'O' and _term.GetTotalNumHs() == 1:
+            return 'hydroperoxy'
 
     # Hydroxy (-OH)
     if symbol == 'O' and h_count == 1:
@@ -3624,7 +3653,7 @@ def _bfs_substituent(mol, start_idx: int, excluded: Set[int]) -> List[int]:
 # suffixed PIN must cite the heteroatom locant set immediately before the parent
 # stem: '1,3-thiazolidin-4-one', '1,3-oxazolidin-2-one'. Only these two retained
 # stems need the explicit locant citation, because only for them is the BARE stem
-# non-preferred: P-22.2.1 (``BlueBookV2.md:8182``) prints "oxazolidine
+# non-preferred: P-22.2.1 (``the Blue Book``) prints "oxazolidine
 # 1,3-oxazolidine (PIN) thiazolidine (S instead of O) 1,3-thiazolidine (PIN)".
 #
 # ⚠ CORRECTED 2026-08-03. This comment used to justify the exclusions with
@@ -3636,14 +3665,14 @@ def _bfs_substituent(mol, start_idx: int, excluded: Set[int]) -> List[int]:
 #
 # The EXCLUSIONS are nonetheless correct, on the real reason -- those families
 # already spell their PIN without a locant, so there is nothing to add:
-#   * the 1,2- forms are handled upstream and already emit their PINs
-#     (``C1CNSC1`` -> `1,2-thiazolidine`, ``C1CNOC1`` -> `1,2-oxazolidine`,
-#     both marked (PIN) at ``:8184`` against the non-preferred `isothiazolidine`
-#     / `isoselenazolidine`);
-#   * `pyrazolidine`, `imidazolidine`, `morpholine`, `piperidine`, `piperazine`
-#     are retained Table 2.3 names that ARE the preferred names, and are emitted
-#     as such (``C1CNNC1`` -> `pyrazolidine`, ``C1CNCN1`` -> `imidazolidine`,
-#     ``C1COCCN1`` -> `morpholine`).
+# * the 1,2- forms are handled upstream and already emit their PINs
+# (``C1CNSC1`` -> `1,2-thiazolidine`, ``C1CNOC1`` -> `1,2-oxazolidine`,
+# both marked (PIN) at ``:8184`` against the non-preferred `isothiazolidine`
+# / `isoselenazolidine`);
+# * `pyrazolidine`, `imidazolidine`, `morpholine`, `piperidine`, `piperazine`
+# are retained Table 2.3 names that ARE the preferred names, and are emitted
+# as such (``C1CNNC1`` -> `pyrazolidine`, ``C1CNCN1`` -> `imidazolidine`,
+# ``C1COCCN1`` -> `morpholine`).
 # Behaviour is unchanged by this correction; only the stated rationale was wrong.
 # A false rationale is how a missing check survives review, which is why it is
 # corrected rather than deleted. Value = expected element-ordered heteroatom
@@ -3683,7 +3712,7 @@ def _n_anchored_substituent_covers(mol, sub_name: str, sub_atoms) -> bool:
     """Gate-INDEPENDENT atom-coverage check for an N/O/S-anchored ring substituent
     named by the recursive ``name_substituent``.
 
-    v30 #29: the recursive namer roots N-anchored compound substituents correctly
+     #29: the recursive namer roots N-anchored compound substituents correctly
     (acetamido / methylamino / methanesulfonamido) but can also degrade a shape it
     only partly understands to a shorter prefix (an arenesulfonamido collapsing to
     bare ``amino``), which would drop atoms. Verify the prefix accounts for exactly
@@ -3738,22 +3767,22 @@ def name_substituted_heterocycle(
         '(2S)-N-methyl-2-propylpiperidine')
 
     Examples:
-        >>> mol = Chem.MolFromSmiles('CN1CCCC1')  # N-methylpyrrolidine
-        >>> # ... get ring, orient, get substituents ...
+        >>> mol = Chem.MolFromSmiles('CN1CCCC1') # N-methylpyrrolidine
+        >>> #... get ring, orient, get substituents...
         >>> name_substituted_heterocycle(mol, ring, 'pyrrolidine', subs, atom_to_loc)
         'N-methylpyrrolidine'
     """
     from ..assembly.naming_utils import (
         _join_multiplied_suffix,  # P-63.1.2/P-64.2.2.1 multiplier-'a' elision (tetraol->tetrol)
         alpha_sort_key,
-        # v29 Phase 8 (P-16.5.1.1): the italic-N substituent of a ring-amine /
+        # a phase (P-16.5.1.1): the italic-N substituent of a ring-amine /
         # ring-carboxamide suffix is enclosed iff it is a COMPOUND or COMPLEX
         # prefix. _wrap_n_substituent only ESCALATES a name that already carries
         # parentheses ("Simple names (no parentheses) are returned unchanged"),
         # so a bare compound prefix such as '2-bromophenyl' was cited naked ->
         # 'N-2-bromophenylpyridin-2-amine'. enclose_if_compound is the primitive
         # that answers the P-16.5.1.1 question, and it subsumes the escalation
-        # ( -> [ -> {) that _wrap_n_substituent provided. Safe at these call
+        # (-> [ -> {) that _wrap_n_substituent provided. Safe at these call
         # sites specifically because the multiplying prefix is applied OUTSIDE
         # the call (f"N,N-{_mp}{...(_subs[0])}"), so the argument is always the
         # SINGULAR substituent name -- enclose_if_compound('dimethyl') would
@@ -3785,7 +3814,7 @@ def name_substituted_heterocycle(
     # C4: N-substituents carried on the amine ring-suffix (pyridin-4-amine ->
     # N-methyl/N-phenyl). Keyed by suffix_name; single-instance only in scope.
     suffix_n_substituents: Dict[str, List[str]] = {}
-    # v26 companion (P-62.2.2): for a MULTI-amine ring parent (triazine-2,4-diamine
+    # companion (P-62.2.2): for a MULTI-amine ring parent (triazine-2,4-diamine
     # etc.) the N-substituents on each amine nitrogen must carry that nitrogen's
     # RING locant as an italic-N superscript (N2-tert-butyl-N4-cyclopropyl-...),
     # so track them per ring locant (not merged under the single 'amine' key,
@@ -3832,7 +3861,7 @@ def name_substituted_heterocycle(
             if 'prefix_name' in sub_info:
                 # P-29.2: the attachment bond is double or triple, and
                 # get_heterocycle_substituents already built the only prefix
-                # that spells that free valence (methylidene, ethylidene, ...).
+                # that spells that free valence (methylidene, ethylidene,...).
                 # Checked FIRST because every branch below would re-derive the
                 # name from the carbon count, which is exactly the reading that
                 # cannot see the bond order.
@@ -3872,8 +3901,8 @@ def name_substituted_heterocycle(
                     sub_name = name_substituent_fragment(
                         mol, sub_atoms, attach_idx, list(ring_set_local)
                     )
-                # v30 #29: an N/O/S-anchored COMPOUND substituent (acetamido,
-                # methylamino, methanesulfonamido, ...). name_substituent_fragment
+                # #29: an N/O/S-anchored COMPOUND substituent (acetamido,
+                # methylamino, methanesulfonamido,...). name_substituent_fragment
                 # above is carbon-anchored only and mis-roots these (an N-attached
                 # -NHC(=O)CH3 came back 'carbamoylmethyl'), which is why the block
                 # above excludes them and the fail-closed below used to decline the
@@ -3930,14 +3959,14 @@ def name_substituted_heterocycle(
                 c_groups[sub_name].append(locant)
 
     # ------------------------------------------------------------------ #
-    # P-16.3.3 (BB:7038) -- ONE multiplying prefix over the WHOLE locant set. #
+    # P-16.3.3 (the Blue Book) -- ONE multiplying prefix over the WHOLE locant set. #
     # ------------------------------------------------------------------ #
     # P-16.3.3 "The basic numerical prefixes 'di', 'tri', 'tetra', etc. are used to
-    # indicate a multiplicity of:", clause (b) (BB:7067) "simple substituent
-    # prefixes ...", whose own example list prints `dimethyl` (BB:7069). The
+    # indicate a multiplicity of:", clause (b) (the Blue Book) "simple substituent
+    # prefixes...", whose own example list prints `dimethyl` (the Blue Book). The
     # multiplicity is a property of the SUBSTITUENT NAME, not of which ring atom
     # carries it -- so a `methyl` on the ring N and a `methyl` on a ring C are ONE
-    # group of two, and P-14.3.3 (BB:2869, deny-by-default) then requires the whole
+    # group of two, and P-14.3.3 (the Blue Book, deny-by-default) then requires the whole
     # locant set to be cited: `1,2-dimethyl-1H-imidazole`.
     #
     # ⚠ This is NOT a name-string repair. `n_groups`/`c_groups` were two name-keyed
@@ -3949,31 +3978,31 @@ def name_substituted_heterocycle(
     #
     # A ring nitrogen that is a NUMBERED SKELETAL ATOM of the parent hydride takes an
     # ARABIC NUMERAL in a PIN; the italic 'N' belongs to a nitrogen that is not itself
-    # numbered. P-66.1.3 "'Hidden' amides" (BB:33125) is decisive on the direction:
+    # numbered. P-66.1.3 "'Hidden' amides" (the Blue Book) is decisive on the direction:
     # naming an acyl group as a substituent on a heterocyclic ring nitrogen "is allowed
     # but only in general nomenclature", because "preferred IUPAC names are constructed"
     # as pseudoketones -- i.e. on the numbered ring. P-66.1.5.1 "Lactams and lactims"
-    # (BB:33224) says the same for this shape: of its two methods, "(1) as heterocyclic
+    # (the Blue Book) says the same for this shape: of its two methods, "(1) as heterocyclic
     # pseudoketones" is the one that "generates preferred IUPAC names".
     #
     # The `(PIN)` examples spell the ring N as a numeral and print the italic form only
     # as the general-nomenclature alternative:
-    #   BB:27249  `pyrrolidine-1,2-diol (PIN)  1-hydroxypyrrolidin-2-ol
-    #              N-hydroxypyrrolidin-2-ol`   <- N is ring locant 1
-    #   BB:33847  `1-bromopyrrolidine-2,5-dione (PIN) (not N-bromosuccinimide; ...)`
-    #   BB:40645  `2,5-dioxopyrrolidin-1-yl (PIN)  succinimidyl`
+    # the Blue Book `pyrrolidine-1,2-diol (PIN) 1-hydroxypyrrolidin-2-ol
+    # N-hydroxypyrrolidin-2-ol` <- N is ring locant 1
+    # the Blue Book `1-bromopyrrolidine-2,5-dione (PIN) (not N-bromosuccinimide;...)`
+    # the Blue Book `2,5-dioxopyrrolidin-1-yl (PIN) succinimidyl`
     #
     # And the Blue Book multiplies across MIXED italic/numeral sets -- in both of these
     # the ring N is the numeral and the exocyclic amine N keeps the italic letter:
-    # BB:42460 `N,1,4-triphenyl-1H-1,2,4-triazol-4-ium-3-aminide (PIN)` and
-    # BB:42213 `N,N,N,1-tetramethylquinolin-1-ium-3-aminium (PIN)`.
+    # the Blue Book `N,1,4-triphenyl-1H-1,2,4-triazol-4-ium-3-aminide (PIN)` and
+    # the Blue Book `N,N,N,1-tetramethylquinolin-1-ium-3-aminium (PIN)`.
     #
-    # ⚠ Do NOT re-derive any of this from P-65.2.3.1.2.1 (BB:31041), which this comment
+    # ⚠ Do NOT re-derive any of this from P-65.2.3.1.2.1 (the Blue Book), which this comment
     # cited until 2026-08-02. Two independent faults: that sentence governs SUPERSCRIPTED
     # locants (N^2, N^3) and its section sits under P-65.2.3, "di-, tri-, tetra-, and
     # polycarbonic acids" -- not ring nitrogens at all; and it reads "nitrogen atoms that
-    # are not AMIDE LINKAGES that are part of the chain ...", so quoting it with "amide
-    # linkages" elided inverts the sentence. Its neighbour P-65.2.3.1.4 (BB:31107) states
+    # are not AMIDE LINKAGES that are part of the chain...", so quoting it with "amide
+    # linkages" elided inverts the sentence. Its neighbour P-65.2.3.1.4 (the Blue Book) states
     # the italic-N convention cleanly but is scoped by the same chapter heading
     # ("Replacement by NH2 and NHNH2 groups"), so it is not the general rule either.
     #
@@ -4012,14 +4041,14 @@ def name_substituted_heterocycle(
         prefix_parts.append((prefix, name))
 
     # ------------------------------------------------------------------ #
-    # P-14.3.4.3 (BB:2939) "Omission of locants" -- the ring-PREFIX case. #
+    # P-14.3.4.3 (the Blue Book) "Omission of locants" -- the ring-PREFIX case. #
     # ------------------------------------------------------------------ #
     # Sibling of the ring-SUFFIX licence further down (which serves
-    # `pyrazinecarboxylic acid`, BB:2949). BOTH halves of L3's own example block
+    # `pyrazinecarboxylic acid`, the Blue Book). BOTH halves of L3's own example block
     # are printed, and the prefix half is the one this branch serves:
     #
-    #     BB:2947   chlorocoronene (PIN)
-    #     BB:2951   chloropropanedioic acid (PIN)   chloromalonic acid
+    # the Blue Book chlorocoronene (PIN)
+    # the Blue Book chloropropanedioic acid (PIN) chloromalonic acid
     #
     # `chlorocoronene` is a monosubstituted symmetrical RING parent whose single
     # substituent PREFIX cites no locant -- exactly the shape of `chloropyrazine`.
@@ -4030,21 +4059,21 @@ def name_substituted_heterocycle(
     # (CanonicalRankAtoms(breakTies=False)). That is the ONLY thing separating
     # pyrazine (four ring CH, ONE orbit -> omit) from pyridine (2/6, 3/5, 4 =
     # THREE orbits -> `4-chloropyridine` and `2-chloropyridine` KEEP their locants)
-    # and from piperidine (N-H, C2/C6, C3/C5, C4 = FOUR orbits, BB:34730
+    # and from piperidine (N-H, C2/C6, C3/C5, C4 = FOUR orbits, the Blue Book
     # `piperidine-1-carbonitrile`). Measured on the parents themselves:
     # pyrazine True, pyridine False, piperidine False.
     #
-    # P-14.3.3 (BB:2869) is deny-by-default, so every locant that could share this
+    # P-14.3.3 (the Blue Book) is deny-by-default, so every locant that could share this
     # scope is excluded FIRST and anything not positively established retains:
-    #   * exactly ONE C-substituent prefix, ONE occurrence, ONE numeric locant
-    #   * no N-substituent prefixes -- those carry an ESSENTIAL italic-N or ring-N
-    #     locant, which restores every locant in the scope
-    #   * no suffix FG at all: a suffix cites its own locant (and the sibling
-    #     licence below owns that case), so a scope with both is not "the single
-    #     locant this licence may omit"
-    #   * a parent_name that is not purely alphabetic already cites a locant -- a
-    #     heteroatom set (`1,4-dioxane`) or an indicated hydrogen (`1H-pyrrole`)
-    #   * no stereodescriptors
+    # * exactly ONE C-substituent prefix, ONE occurrence, ONE numeric locant
+    # * no N-substituent prefixes -- those carry an ESSENTIAL italic-N or ring-N
+    # locant, which restores every locant in the scope
+    # * no suffix FG at all: a suffix cites its own locant (and the sibling
+    # licence below owns that case), so a scope with both is not "the single
+    # locant this licence may omit"
+    # * a parent_name that is not purely alphabetic already cites a locant -- a
+    # heteroatom set (`1,4-dioxane`) or an indicated hydrogen (`1H-pyrrole`)
+    # * no stereodescriptors
     # The `_het_loc_prefix` injection cannot apply here: it is computed only inside
     # the `if suffix_fg:` block below, which this branch excludes.
     #
@@ -4099,7 +4128,7 @@ def name_substituted_heterocycle(
     prefix_parts.sort(key=lambda x: alpha_sort_key(x[1]))
 
     # Join prefixes
-    # Closing brackets ], ), } all act as word boundaries needing hyphens
+    # Closing brackets ],), } all act as word boundaries needing hyphens
     _CLOSING_MARKS = (')', ']', '}')
     prefix_str = ""
     for i, (prefix, _) in enumerate(prefix_parts):
@@ -4182,12 +4211,12 @@ def name_substituted_heterocycle(
             combined = combined[:-1]
 
         # ------------------------------------------------------------------ #
-        # P-14.3.4.3 (BB:2939) "Omission of locants" -- the ring-SUFFIX case. #
+        # P-14.3.4.3 (the Blue Book) "Omission of locants" -- the ring-SUFFIX case. #
         # ------------------------------------------------------------------ #
         # "The locant is omitted in monosubstituted symmetrical parent hydrides or
-        #  parent compounds where there is only one kind of substitutable hydrogen."
+        # parent compounds where there is only one kind of substitutable hydrogen."
         #
-        # Its own example block prints `pyrazinecarboxylic acid (PIN)` (BB:2949) --
+        # Its own example block prints `pyrazinecarboxylic acid (PIN)` (the Blue Book) --
         # a SUFFIX substitution, which is why this licence lives at the suffix join
         # and not only on the prefix side. Pyrazine's four ring CH are one
         # CanonicalRankAtoms(breakTies=False) orbit, so `2` carries no information.
@@ -4197,26 +4226,26 @@ def name_substituted_heterocycle(
         # assembly.locant_omission.l3_locant_omitted_for_parent_atoms, the ONE place
         # the P-14.3.4 licences live, which measures the ORBITS of the substitutable
         # hydrogens. That is the only thing separating `pyrazinecarboxylic acid` from
-        # `piperidine-1-carbonitrile (PIN)` (BB:34730) -- piperidine's N-H, C2/C6,
+        # `piperidine-1-carbonitrile (PIN)` (the Blue Book) -- piperidine's N-H, C2/C6,
         # C3/C5 and C4 are FOUR orbits, so it keeps its locant -- and from
         # `pyridine-4-carboxylic acid`, whose ring is three orbits.
         #
-        # P-14.3.3 (BB:2869) is deny-by-default, so every essential locant that could
+        # P-14.3.3 (the Blue Book) is deny-by-default, so every essential locant that could
         # share this scope is excluded FIRST, and anything not positively established
         # retains the locant:
-        #   * no substituent prefixes at all           -> "monosubstituted"
-        #   * exactly one suffix group, one locant      -> ditto
-        #   * no OTHER suffix FG (those become carboxy/cyano prefixes below)
-        #   * a parent_name that is not purely alphabetic already cites a locant --
-        #     a heteroatom set (`1,4-dioxane`) or an indicated hydrogen (`1H-pyrrole`)
-        #     -- and P-14.3.3 then restores all of them. All five printed L3 positives
-        #     have locant-free parent names, so this is the conservative side of a
-        #     boundary the Blue Book does not settle.
-        #   * no retained-heteroatom locant prefix (P-31.1.4.3.4, injected above)
-        #   * no N-substituent / N-hydroxy prefix -- those carry ESSENTIAL italic-N
-        #     locants and are prepended AFTER this join, so they must be consulted
-        #     here or the scope would be emptied of a locant it still needs.
-        #   * no stereodescriptors
+        # * no substituent prefixes at all -> "monosubstituted"
+        # * exactly one suffix group, one locant -> ditto
+        # * no OTHER suffix FG (those become carboxy/cyano prefixes below)
+        # * a parent_name that is not purely alphabetic already cites a locant --
+        # a heteroatom set (`1,4-dioxane`) or an indicated hydrogen (`1H-pyrrole`)
+        # -- and P-14.3.3 then restores all of them. All five printed L3 positives
+        # have locant-free parent names, so this is the conservative side of a
+        # boundary the Blue Book does not settle.
+        # * no retained-heteroatom locant prefix (P-31.1.4.3.4, injected above)
+        # * no N-substituent / N-hydroxy prefix -- those carry ESSENTIAL italic-N
+        # locants and are prepended AFTER this join, so they must be consulted
+        # here or the scope would be emptied of a locant it still needs.
+        # * no stereodescriptors
         _l3_omit_suffix_locant = False
         if (not prefix_str and len(suffix_fg) == 1 and len(chosen_locants) == 1
                 and not multiplier
@@ -4247,7 +4276,7 @@ def name_substituted_heterocycle(
         # ring carboxamide (N,N-diethylfuran-2-carboxamide).
         if chosen_suffix == 'amine' and len(suffix_fg.get('amine', [])) > 1 \
                 and amine_n_by_locant:
-            # v26 companion (P-62.2.2): MULTI-amine ring -> each amine nitrogen's
+            # companion (P-62.2.2): MULTI-amine ring -> each amine nitrogen's
             # N-substituent(s) carry that nitrogen's RING locant as an italic-N
             # superscript (N2-tert-butyl-N4-cyclopropyl-...). Cited in ring-locant
             # order; the exocyclic order does not change the structure, so a
@@ -4376,7 +4405,7 @@ def _format_n_substituent(name: str, count: int, locants=None) -> str:
             # a mark but neither is_complex_substituent nor needs_brackets flags
             # it (mirrors enclose_if_compound's third arm) — e.g.
             # '[(butan-2-yl)oxy]methyl'. Route through apply_enclosing_marks so
-            # the mark ESCALATES per P-16.5.4 ( -> [ -> { ) instead of the old
+            # the mark ESCALATES per P-16.5.4 (-> [ -> {) instead of the old
             # raw '(' in name picker, which capped at '[' and produced a double
             # '[[...]]' when name already contained a '['. Fusion/spiro/von-
             # Baeyer brackets (e.g. '[2,3-b]') are excluded from the escalation
@@ -4413,11 +4442,11 @@ def _format_c_substituent(name: str, locants: List[int], count: int,
     (...), [...], {...} is P-16.5.4 (BB 7444), escalating per P-16.5.4.1.5 (BB 7509).
     Names already containing parentheses use square brackets.
 
-    ``omit_locants`` is the P-14.3.4.3 (BB:2939) licence, decided by the CALLER
+    ``omit_locants`` is the P-14.3.4.3 (the Blue Book) licence, decided by the CALLER
     (``name_substituted_heterocycle``) -- the only place with the ring structure the
     orbit test needs, exactly as for the sibling suffix licence. True means this
     scope's single substituent prefix cites no locant: ``chloropyrazine``,
-    ``methylpyrazine``, on the model of BB:2947 ``chlorocoronene (PIN)``.
+    ``methylpyrazine``, on the model of the Blue Book ``chlorocoronene (PIN)``.
     NOT a locant-stripping flag: it is only ever set by a positively-licensed
     structural predicate, it defaults False, and the ENCLOSING MARKS and multiplier
     below are still applied -- only the ``{locants}-`` head is withheld.
@@ -4455,7 +4484,7 @@ def _format_c_substituent(name: str, locants: List[int], count: int,
         #
         # Route through apply_enclosing_marks (P-16.5.4 nesting ORDER, BB
         # 7444; escalation P-16.5.4.1.5, BB 7509) under the P-16.5.1.1 marks
-        # requirement (BB 7232) so the mark ESCALATES ( -> [ -> { ) instead
+        # requirement (BB 7232) so the mark ESCALATES (-> [ -> {) instead
         # of the old raw '(' in name picker, which capped at '[' and
         # produced a double '[[...]]' when name already contained a '['.
         # Fusion/spiro/von-Baeyer brackets (e.g. '[2,3-b]') are excluded
@@ -4465,15 +4494,15 @@ def _format_c_substituent(name: str, locants: List[int], count: int,
         display_name = apply_enclosing_marks(name, -1)
     if count == 1:
         return display_name if omit_locants else f"{locant_str}-{display_name}"
-    # P-16.3.5(a) (BB:7104): 'bis'/'tris'/'tetrakis' indicate a multiplicity of
+    # P-16.3.5(a) (the Blue Book): 'bis'/'tris'/'tetrakis' indicate a multiplicity of
     # "compound or complex (i.e. substituted) prefixes", with the verbatim
     # preferred prefix `bis(bromomethyl)` in that rule's own example list and the
-    # assembled PIN `1,2-bis(bromomethyl)benzene (PIN)` at :25811. The private
+    # assembled PIN `1,2-bis(bromomethyl)benzene (PIN)` at:25811. The private
     # SIMPLE_MULTIPLIERS lookup that used to sit here could not express that at
     # all, so EVERY multiplied prefix on a heterocyclic parent came back `di`.
     # `multiplied_component` is THE shared join of multiplier + enclosure +
     # P-16.2.4 hyphen -- the same primitive the carbocyclic producer already
-    # uses, which is why benzene spelled :25811 correctly and pyridine did not.
+    # uses, which is why benzene spelled:25811 correctly and pyridine did not.
     # It consults `is_substituted_substituent` (the MULTIPLIER question), NOT
     # `is_complex_substituent` (the ENCLOSURE question decided above); the two
     # disagree, and `di(propan-2-yl)` (:25721) is the row that proves it.

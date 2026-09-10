@@ -1,11 +1,11 @@
-"""v33 P-67.2.6: recursive phosphoanhydride (P-O-P) substituent nomenclature.
+""" P-67.2.6: recursive phosphoanhydride (P-O-P) substituent nomenclature.
 
 The namer emits the Blue Book's method-(1) systematic form (recursive phosphoryl
 nesting) for a diphosphate/triphosphate ester bridge cited as a substituent — the
 class that blocked acyl-CoA (Orthonym named a terminal -O-P(=O)(OH)2 as
 'phosphonooxy' but returned 'unknown' for any P-O-P bridge). Best-effort tier;
 the PIN (diphosphoxane skeletal replacement) is a future PIN-tier build. See
-
+internal notes
 """
 import pytest
 from rdkit import Chem
@@ -33,7 +33,7 @@ def test_terminal_monophosphate_contracts_to_phosphonooxy():
 
 
 def test_diphosphate_bridge_recursive_phosphoryl():
-    # -O-P(=O)(OH)-O-P(=O)(OH)2  -> [hydroxy(phosphonooxy)phosphoryl]oxy
+    # -O-P(=O)(OH)-O-P(=O)(OH)2 -> [hydroxy(phosphonooxy)phosphoryl]oxy
     # (alphanumerical order: hydroxy before phosphonooxy, per P-14.5 / BB method 1).
     m, o, c = _o_and_parent('OCCOP(=O)(O)OP(=O)(O)O')
     assert name_pa(m, o, c) == '[hydroxy(phosphonooxy)phosphoryl]oxy'
@@ -50,7 +50,7 @@ def test_triphosphate_bridge_nests():
 
 def test_declines_phosphonate_p_c_bond():
     # A P-C bond (phosphonate) is a different nomenclature -> fail closed (None).
-    m, o, c = _o_and_parent('OCCOP(=O)(O)C')   # ...O-P(=O)(OH)-CH3 : P has a C ligand
+    m, o, c = _o_and_parent('OCCOP(=O)(O)C')   #...O-P(=O)(OH)-CH3: P has a C ligand
     assert name_pa(m, o, c) is None
 
 
@@ -79,7 +79,7 @@ def test_phosphoxane_compound_ester_branch_is_enclosed():
     # P-16.3.3: a COMPOUND ester branch (its own leading locant, e.g. the
     # contracted '2-methylpropoxy') must be enclosed before the diphosphoxane
     # locant is prepended, or the two locants collide into an unparseable
-    # '3-2-methylpropoxy'. Defect A, v33.
+    # '3-2-methylpropoxy'. Defect A,.
     from orthonym.rules.phosphorus import name_phosphoxane_oxy_substituent as name_px
     m, o, c = _o_and_parent('OCCOP(=O)(O)OP(=O)(O)OCC(C)C')
     out = name_px(m, o, c)

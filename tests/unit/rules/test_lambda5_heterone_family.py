@@ -1,6 +1,6 @@
 """The λ⁵-heterone family — what is BUILT, enumerated against the Blue Book.
 
-v29 residue Task R. The residue item recorded "λ⁵-heterones unnameable".
+ residue Task R. The residue item recorded "λ⁵-heterones unnameable".
 **The premise is stale.** Enumerating the class against every worked (PIN)
 example the Blue Book prints for it found the mono-oxo heterone family complete
 and byte-exact, including the λ-convention, the P-16.5.1.3 enclosing marks for
@@ -15,30 +15,41 @@ guard, was the last line executed for both targets, against line 588 — the
 success return — for the mono-oxo control). The guard is now a *window*
 ``1 <= len(doubles) <= 2`` plus a terminal-oxygen requirement, and the oxo count
 selects the stem. Derivation and evidence:
-``.
+`internal notes`.
+
+**The MONO-chalcogen half (=S/=Se/=Te) is now built (a phase).** The earlier
+"spelling would have to be invented" premise is stale: **P-68.3.2.3.1**
+"Substitutive nomenclature, suffix mode" (``:39109``) makes the suffix mode the
+PIN for ``=O, =S, =Se, =Te`` and is ELEMENT-GENERAL — its worked examples span
+both phosphane (``phenylphosphanone``) and arsane (``phenylarsanethione (PIN)``
+``:39141``, ``trimethyl-λ⁵-arsanetellone (PIN)`` ``:39135``), and ``P-74.2.1.4``
+``:43057`` extends "these methods" to arsine and stibine "sulfides, etc." So
+``phosphane + thione = phosphanethione`` is DETERMINED, exactly as
+``arsane + thione = arsanethione`` is printed. OPSIN 2.9.0 round-trips
+``triphenyl-λ⁵-phosphanethione`` to the input structure (validity). The Se word
+is ``selone`` (``:17533/:29508``; ``:18834`` "not selenone").
 
 One member remains deliberately unbuilt, and it is a **spelling** gap, not a
 perception gap:
 
-  * the **chalcogen analogue** ``R3P=S`` / ``R-PS2`` — the Blue Book prints no
-    worked example of a thione suffix on a phosphane stem, so its spelling
-    would have to be invented. It stays fail-closed through the terminal-oxygen
-    check, and that refusal is ASSERTED below so it cannot be widened by
-    accident.
+  * the two-**chalcogen DIONE** ``R-PS2`` / ``R-P(=Se)2`` — the Blue Book prints
+    no worked example of a two-chalcogen dione suffix, so its spelling would have
+    to be invented. It stays fail-closed through the ``len==2`` OXYGEN-only check,
+    and that refusal is ASSERTED below so it cannot be widened by accident.
 
 The refusals are asserted at **producer** level (``name_heterone(mol) is None``)
 rather than through the CLI, because ``conftest`` disables the OPSIN gate
 suite-wide: a whole-pipeline "must stay refused" assertion is gate-dependent and
 would silently measure the gate instead of this guard.
 
-Blue Book, ``BlueBookV2/BlueBookV2.md`` (every pointer re-opened with
+Blue Book, ``the Blue Book Blue Book`` (every pointer re-opened with
 ``sed -n '<N>p'`` at write time):
 
 * **P-74.2.1.4 "Phosphine oxides and chalcogen analogues"** (heading
   ``:43041``). Methods ``:43045-43047``; the decisive sentence is the one AFTER
   the list, ``:43049``: *"Method (3) leads to preferred IUPAC names."* — method
   (3) being ``:43047``: *"substitutively, as heterones, by using the suffix
-  '-one' and λ⁵-phosphane as the parent hydride."*  Worked (PIN) example
+  '-one' and λ⁵-phosphane as the parent hydride."* Worked (PIN) example
   ``:43054``: ``triphenyl-λ⁵-phosphanone``. Closing sentence ``:43057``:
   *"These methods are also applied to arsine and stibine oxides, sulfides,
   etc."*
@@ -55,7 +66,7 @@ Blue Book, ``BlueBookV2/BlueBookV2.md`` (every pointer re-opened with
   that makes the dione a member of the same class as the mono-oxo heterone, and
   that puts ``–AsO2`` in it alongside ``–PO2``.
 * **P-64.1.2.2 "Heterones"** body, ``:28281``: *"Heterones are compounds having
-  an oxygen atom formally doubly bonded to a heteroatom ... They are named in
+  an oxygen atom formally doubly bonded to a heteroatom... They are named in
   the same way as ketones except when expressed as compulsory prefixes"* — the
   clause that supplies the multiplied ``-dione`` suffix.
 """
@@ -161,6 +172,60 @@ BUILT_HETERONES = [
         "Same derivation as the phenyl arsanedione above; the methyl member is "
         "the exact -AsO2 analogue of the printed CH3-PO2 PIN at :28287.",
     ),
+    # --- the MONO-CHALCOGEN half (=S/=Se/=Te), shipped by a phase ---
+    (
+        "S=[As]c1ccccc1",
+        "phenylarsanethione",
+        "P-68.3.2.3.1 :39141 VERBATIM (PIN): 'phenylarsanethione (PIN) [not "
+        "phenyl(sulfanylidene)arsane]'. BOUNDARY: lambda-3 arsenic, no descriptor.",
+    ),
+    (
+        "C[As](C)(C)=[Te]",
+        "trimethyl-λ5-arsanetellone",
+        "P-68.3.2.3.1 :39135 VERBATIM (PIN): '(CH3)3As=Te trimethyl-λ5-"
+        "arsanetellone (PIN) trimethylarsane telluride'. arsane + tellone (no "
+        "elision, consonant-initial suffix).",
+    ),
+    (
+        "[Se]=[As]c1ccccc1",
+        "phenylarsaneselone",
+        "P-68.3.2.3.1 element-general suffix mode with the =Se word 'selone' "
+        "(:17533/:29508; :18834 'not selenone'). Not printed verbatim on an "
+        "arsane stem, but DETERMINED (arsane + selone) and OPSIN 2.9.0 round-"
+        "trips it to [As]=[Se]. The first 'selone'-suffix positive.",
+    ),
+    (
+        "S=P(c1ccccc1)(c1ccccc1)c1ccccc1",
+        "triphenyl-λ5-phosphanethione",
+        "P-68.3.2.3.1 :39109 makes suffix mode the PIN for =S and is ELEMENT-"
+        "GENERAL (phosphane + arsane examples under one heading); P-74.2.1.4 "
+        ":43057 'these methods are also applied to ... sulfides'. So phosphane + "
+        "thione = phosphanethione is DETERMINED, exactly as arsane + thione = "
+        "arsanethione (PIN :39141). 'phosphanethione' has 0 verbatim BB hits but "
+        "OPSIN 2.9.0 round-trips triphenyl-λ5-phosphanethione to the input. "
+        "REPLACES the stale v29 refusal (spelling was thought un-invented).",
+    ),
+    # --- Sb / Bi heterone hubs, shipped by a phase (P-68.3.3) ---
+    (
+        "O=[Bi](c1ccccc1)(c1ccccc1)c1ccccc1",
+        "triphenyl-λ5-bismuthanone",
+        "P-68.3.3 :39292 VERBATIM (PIN): '(C6H5)3Bi=O triphenyl-λ5-bismuthanone "
+        "(PIN) triphenylbismuthane oxide'. P-68.3.3 :39270 'chosen as for P, As, "
+        "and Sb parents and prefixes'.",
+    ),
+    (
+        "O=[Sb]c1ccccc1",
+        "phenylstibanone",
+        "P-68.3.3 / P-21.2.2 :1671 VERBATIM: 'phenylstibanone for C6H5Sb=O'. "
+        "BOUNDARY: lambda-3 antimony, so NO lambda descriptor.",
+    ),
+    (
+        "S=[Sb]c1ccccc1",
+        "phenylstibanethione",
+        "P-68.3.3 (Sb chosen as for P/As) + P-68.3.2.3.1 element-general =S "
+        "suffix; P-74.2.1.4 :43057 extends to stibine sulfides. DETERMINED "
+        "(stibane + thione); OPSIN 2.9.0 round-trips it to [Sb]=S.",
+    ),
 ]
 
 
@@ -168,18 +233,17 @@ BUILT_HETERONES = [
 # is off under pytest, so a CLI-level refusal assertion would measure the gate.
 FAIL_CLOSED = [
     (
-        "S=P(c1ccccc1)(c1ccccc1)c1ccccc1",
-        "P=S chalcogen heterone. P-74.2.1.4 :43043-:43049 does make method (3) "
-        "the PIN for phosphine sulfides, but the Blue Book prints NO worked "
-        "example of a thione suffix on a phosphane stem ('phosphanethione' has "
-        "0 hits), so the spelling would have to be invented. Deliberately not "
-        "built -- see ",
-    ),
-    (
         "O=P(=S)c1ccccc1",
         "Mixed =O/=S on one hub: the dione widening must not admit it just "
-        "because the double-bond COUNT is now 2. This is the row that pins the "
-        "terminal-oxygen requirement as separate from the count window.",
+        "because the double-bond COUNT is now 2. The len==2 dione branch is "
+        "OXYGEN-only (no BB-fixed two-chalcogen dione spelling), so a mixed "
+        "chalcogen pair stays fail-closed.",
+    ),
+    (
+        "S=P(=S)c1ccccc1",
+        "A pure two-=S DIONE. The MONO chalcogen heterone (=S) is now built, "
+        "but the two-chalcogen dione is not -- no BB worked example fixes its "
+        "spelling, so the len==2 OXYGEN-only check refuses it.",
     ),
     (
         "C=P(=O)c1ccccc1",
@@ -235,12 +299,12 @@ def _norm(name):
 def test_heterone_family_matches_the_blue_book_pin(
     namer, smiles, expected, provenance
 ):
-    """P-74.2.1.4 :43049 -- method (3) (substitutive, as a heterone) is the PIN."""
+    """P-74.2.1.4:43049 -- method (3) (substitutive, as a heterone) is the PIN."""
     assert _norm(namer.name(smiles)) == expected, provenance
 
 
 def test_lambda_descriptor_tracks_the_hub_bonding_number(namer):
-    """P-74.2.1.4 :43047 -- the parent hydride is λ⁵-phosphane only when the
+    """P-74.2.1.4:43047 -- the parent hydride is λ⁵-phosphane only when the
     phosphorus actually carries bonding number 5.
 
     The two phosphanones differ ONLY in the hub's bonding number, so this pins
@@ -277,7 +341,7 @@ def test_lambda_is_computed_for_the_dione_too(namer):
 
 
 def test_the_dione_element_gate_is_the_bluebook_class_not_the_hub_list():
-    """P-61.6 :25977 puts exactly ``-PO``, ``-PO2``, ``-AsO``, ``-AsO2`` in the
+    """P-61.6:25977 puts exactly ``-PO``, ``-PO2``, ``-AsO``, ``-AsO2`` in the
     heterone class, so the DIONE gate is narrower than the mono-oxo hub list:
     Si and Ge take ``-one`` but never ``-dione``.
 
@@ -310,8 +374,8 @@ def test_a_three_oxo_hub_is_outside_the_count_window():
 
 
 def test_p74_2_1_5_heterimine_also_emits(namer):
-    """P-74.2.1.5 "Phosphine imides" (heading :43061), :43069 'Method (3) leads
-    to preferred IUPAC names'; worked (PIN) example :43075.
+    """P-74.2.1.5 "Phosphine imides" (heading:43061),:43069 'Method (3) leads
+    to preferred IUPAC names'; worked (PIN) example:43075.
 
     The =NH/=NR sibling of the heterone, included because Task R's premise
     covered the λ⁵ parent hydride generally. It works, with the P,P,P- and N-
@@ -319,3 +383,24 @@ def test_p74_2_1_5_heterimine_also_emits(namer):
     """
     got = _norm(namer.name("CCN=P(c1ccccc1)(c1ccccc1)c1ccccc1"))
     assert got == "N-ethyl-P,P,P-triphenyl-λ5-phosphanimine"
+
+
+@pytest.mark.parametrize(
+    "smiles,expected",
+    [
+        ("C[Sb]=N", "1-methylstibanimine"),
+        ("C[Bi]=N", "1-methylbismuthanimine"),
+    ],
+    ids=["C[Sb]=N", "C[Bi]=N"],
+)
+def test_p68_3_3_standard_valence_stiban_bismuthan_imine(namer, smiles, expected):
+    """P-68.3.3 (the Blue Book) 'Preferred and preselected names are chosen
+    as for P, As, and Sb parents and prefixes' -> the standard-valence heteroimine
+    X=NH extends to stibane/bismuthane (a phase).
+
+    Only the standard-valence, single-organyl case is owned by ``name_heteroimine``;
+    the λ⁵ multi-organyl imide (``Bi,Bi,Bi-triphenyl-λ5-bismuthanimine``,:39294)
+    is owned by ``name_lambda5_phosphanimine`` and is NOT built here (deferred).
+    Both names round-trip through OPSIN 2.9.0 to the input structure.
+    """
+    assert _norm(namer.name(smiles)) == expected

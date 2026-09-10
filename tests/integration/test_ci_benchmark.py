@@ -21,7 +21,7 @@ import pytest
 from orthonym import name_compound
 
 # Pre-computed expected names for 100 ChEBI compounds (seed=123, first 100 of 500).
-# Generated on 2026-02-07 after Phase 24 Plans 01-04.
+# Generated on 2026-02-07 after a phase Plans 01-04.
 # Any change here indicates a naming regression that must be investigated.
 CI_BENCHMARK = [
     ("*=CC", "ethane"),
@@ -30,10 +30,10 @@ CI_BENCHMARK = [
         "[C@H]2O[C@]4(O)C[C@]3(C)O2)[C@H](O)[C@@H](O)[C@@H]1O",
         "(2S,3R,5R,6R,8S)-17-phenylheptadecyl acetate",
     ),
-    # Phase 148 Plan 02 Task 03: estra ring system locant correction
+    # a phase Plan 02 Task 03: estra ring system locant correction
     # 1,2,4-trien → 1,3,5-trien (canonical estra-1,3,5-triene numbering for
     # the aromatic A-ring per IUPAC P-31.1.5). Per Plan 01 SUMMARY this is
-    # "unrelated to Phase 148" (incidental locant correction, not a cascade
+    # "unrelated to a phase" (incidental locant correction, not a cascade
     # decision). Acceptable churn.
     (
         "CCCCN(C)C(=O)CCCCCCCCCC[C@@H]1Cc2cc(O)ccc2[C@H]2CC[C@]3(C)"
@@ -53,7 +53,7 @@ CI_BENCHMARK = [
     (
         "O=C(O)c1ccccc1-c1c2ccc(=O)c([As]3SCCS3)c-2oc2c([As]3SCCS3)"
         "c(O)ccc12",
-        "benzoic acid",  # Phase 81: benzoic acid substructure (old: garbled "hydroxycycloanecarboxylic acid")
+        "benzoic acid",  # a phase: benzoic acid substructure (old: garbled "hydroxycycloanecarboxylic acid")
     ),
     (
         "Cc1cc([C@@]2(C)CCCC2(C)C)c(O)c(O)c1-c1c(C)cc([C@@]2(C)CCCC2"
@@ -135,11 +135,11 @@ CI_BENCHMARK = [
         "N-[(2S)-2-(hexanoylamino)butanedioyl](1S,4S,7S,8R,11S,14S,17S,21R)-7-amino-4,17-dibutyl-21-hydroxy-8,15-dimethyl-14-octyl-11-propyl-9-oxa-2,5,12,15,18-pentaaza-bicyclo[16.3.1]docosane",
     ),
     ("CC(C)CCCCCCCC=O", "9-methyldecanal"),
-    # Phase 148 Plan 02 Task 03: tetracyclic flavone dimer. Pre-148 yielded
+    # a phase Plan 02 Task 03: tetracyclic flavone dimer. Pre-148 yielded
     # `6,6-dimethyl-2H-pyran` (already a known-bad partial); post-148
     # cascade unblock + decomposition fragment-naming bug yields
-    # `2-cycloheptadecylpropan-2-ol` (different partial). Phase 149 / IM-x.x
-    # decomposition layer fix territory. Marked xfail; NOT a Phase 148
+    # `2-cycloheptadecylpropan-2-ol` (different partial). a phase / IM-x.x
+    # decomposition layer fix territory. Marked xfail; NOT a a phase
     # regression — both old and new are partial outputs.
     pytest.param(
         "CC1(C)C=Cc2c(cc(O)c3c(=O)c4ccc(O[C@@H]5c6c(cc(O)c7c(=O)"
@@ -275,7 +275,7 @@ CI_BENCHMARK = [
         "OC[C@H]1O[C@H](OC[C@H]2O[C@H](OC[C@H]3O[C@H](O)[C@H](O)"
         "[C@@H](O)[C@@H]3O)[C@H](O)[C@@H](O)[C@H]2O)[C@H](O)"
         "[C@@H](O)[C@@H]1O",
-        "(alpha-D-glucopyranosyloxy)(2R,3R,4S,5R,6S)-3,4,5-trihydroxy-2-methyl-6-oxanyloxane",
+        "(α-D-glucopyranosyloxy)(2R,3R,4S,5R,6S)-3,4,5-trihydroxy-2-methyl-6-oxanyloxane",
     ),
     (
         "N[C@@H](Cc1ccccc1)C(=O)N[C@@H](CS)C(=O)N[C@@H](CS)C(=O)O",
@@ -322,7 +322,7 @@ CI_BENCHMARK = [
         "C[C@H]([C@H](C)CC[C@H](CC)C(C)C)[C@@]1(C)C[C@@H]3O",
         "(3S,5R,10S,12S,13R,14S,15S,17R,20R,24S)-stigmast-8-en-3,12,14,15-tetraol",
     ),
-    # Phase 125-03: fluorine on heterocycle now correctly detected
+    # a phase-03: fluorine on heterocycle now correctly detected
     ("Nc1[nH]c(=S)ncc1F", "4-amino-5-fluoro-1,3-diazine"),
     (
         "CC[C@@H](C)[C@H](NC(=O)[C@H](CC(C)C)N(C)C(=O)[C@@H](C)"
@@ -334,16 +334,16 @@ CI_BENCHMARK = [
         "[C@H](O[C@H]3O[C@H](CO)[C@@H](O)[C@H](O[C@@H]4O[C@H](CO)"
         "[C@H](O)[C@H](O)[C@H]4O)[C@H]3NC(C)=O)[C@H]2O)"
         "[C@@H](CO)O[C@H]1O",
-        "(beta-D-galactopyranosyloxy)ethanediamide",
+        "(β-D-galactopyranosyloxy)ethanediamide",
     ),
     (
         "CN1CCCN=C1/C=C/c1cccs1",
-        # Phase 157 cleanup: stereo descriptor rebaselined per ERRATA-02
+        # a phase cleanup: stereo descriptor rebaselined per ERRATA-02
         # (P-31.1.3 / P-91 mandatory E/Z for stereodefined acyclic
         # double bonds). The SMILES specifies (2E) trans-double-bond
-        # stereo via /C=C/, and the v18 stereo pipeline correctly emits
+        # stereo via /C=C/, and the stereo pipeline correctly emits
         # `(2E)-` per IUPAC P-91 rules. Live behavior verified at
-        # src/orthonym/rules/stereochemistry.py (Phase 137 ERRATA-02
+        # src/orthonym/rules/stereochemistry.py (a phase ERRATA-02
         # deliverable preserved).
         "(2E)-N-methyl-2-thienyl-1,3-diazine",
     ),
@@ -457,12 +457,12 @@ CI_BENCHMARK = [
     (
         "COC1=C(N[C@H](C(=O)O)[C@@H](C)O[C@@H]2O[C@H](CO)[C@H](O)"
         "[C@H](O)[C@H]2O)C[C@](O)(CO)CC1=NCC(=O)O",
-        "(beta-D-galactopyranosyloxy)(2S,3R)-3-hydroxybutanedioic acid",
+        "(β-D-galactopyranosyloxy)(2S,3R)-3-hydroxybutanedioic acid",
     ),
     (
         "CC(=O)CCC1=C(C)C[C@@]2(CC1=O)C(=O)[C@@H]1C[C@@](O)(CO1)C2=O",
         "(1S,3R,5R)-9-butyl-5-hydroxy-10-methyl-7-oxa-tricyclo"
-        "[3.2.1]tridec-9-en-2,4,13-trione",  # Phase 103-02: VB bridge filtering
+        "[3.2.1]tridec-9-en-2,4,13-trione",  # a phase-02: VB bridge filtering
     ),
     (
         "CCCCCCCCCCCCC1=C(OC(C)=O)C(=O)c2ccccc2C1=O",
@@ -470,7 +470,7 @@ CI_BENCHMARK = [
     ),
     (
         "Nc1ncnc2c1ncn2[C@@H]1O[C@H](COP(=O)(O)O)[C@@H](O)[C@H]1O.O",
-        "adenine",  # Phase 58: retained core name whitelist bypass (.O single-atom falls through)
+        "adenine",  # a phase: retained core name whitelist bypass (.O single-atom falls through)
     ),
     (
         "COc1cc2c(c(O)c1C/C=C(\\C)CCC=C(C)C)CN(CCc1c[nH]c3ccccc13)C2=O",
@@ -479,7 +479,7 @@ CI_BENCHMARK = [
     (
         "Nc1ncnc2c1ncn2[C@@H]1O[C@H](COP(=O)(O)O)[C@@H](OC(=O)"
         "[C@@H](N)Cc2c[nH]cn2)[C@H]1O",
-        "adenine (2S)-2-amino-3-imidazolylpropanoate",  # Phase 099-03: coverage guard rejects "adenine" for 33-HA molecule (ratio 0.21), decomposition produces complete name
+        "adenine (2S)-2-amino-3-imidazolylpropanoate",  # a phase-03: coverage guard rejects "adenine" for 33-HA molecule (ratio 0.21), decomposition produces complete name
     ),
     (
         "NC[C@H]1O[C@H](O[C@H]2[C@H](O)[C@@H](O)[C@H](N)C[C@@H]2N)"
@@ -494,7 +494,7 @@ CI_BENCHMARK = [
     (
         "CSCC[C@H](N)C(=O)N[C@@H](CC(N)=O)C(=O)N[C@@H](Cc1cnc[nH]1)"
         "C(=O)O",
-        "N-[(2S)-amino-2-(butanoylamino)-3-carbamoylmethylsulfanylpropanoyl](2S)-2-amino-3-imidazolylpropanoic acid",  # Phase 103-01: chain exclusion; N-bracket fix v15
+        "N-[(2S)-amino-2-(butanoylamino)-3-carbamoylmethylsulfanylpropanoyl](2S)-2-amino-3-imidazolylpropanoic acid",  # a phase-01: chain exclusion; N-bracket fix v15
     ),
     (
         "CC(C)=CCc1c(O)ccc(C(=O)C2C(c3c(O)cc(/C=C/c4cc(O)c(O)cc4O)"

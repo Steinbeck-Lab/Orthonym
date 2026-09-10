@@ -1,16 +1,16 @@
-"""v37 CORESTEREO — complex-ring / von-Baeyer CORE stereo completion.
+""" CORESTEREO — complex-ring / von-Baeyer CORE stereo completion.
 
 WHAT THIS FILE GUARDS (and why there is no new production code)
 --------------------------------------------------------------
 The assigned lever was: "for a complex_ring / von-Baeyer core whose
 constitution RT-matches but whose name LACKS the stereodescriptors the input
-has, COMPLETE the stereo." A spy-before-code pass (invariant 8) over 550
-census abstainers (, CORESTEREO
+has, COMPLETE the stereo." A trace-before-code pass (a project rule) over 550
+census abstainers (internal notes, CORESTEREO
 addendum) found the lever is **OFF-PATH — 0 addressable targets**:
 
   * The stereo-completion machinery is ALREADY wired and load-bearing:
     `handlers/tier_a_ring.py:546` (complex_ring), `assembly/general_engine.py:773`
-    (cage/chain, v37 ST.1), `assembly/composer.py:4625`, `rules/polycyclic.py:3385`
+    (cage/chain, ST.1), `assembly/composer.py:4625`, `rules/polycyclic.py:3385`
     all route parent-scope stereo through `inject_stereo_reanchored_rt_gated`,
     which computes CIP descriptors via the canonical `assign_stereochemistry`
     path and renders them RT-gated on the FULL InChIKey.
@@ -24,7 +24,7 @@ addendum) found the lever is **OFF-PATH — 0 addressable targets**:
     layer — none fixable by "rendering descriptors." Those are the acyloxy /
     ringsubst / glycan / charge levers, not stereo completion.
 
-So per invariant 17 (a measurement that refutes must not be coded around) this
+So per a project rule (a measurement that refutes must not be coded around) this
 file ships NO new handler; it CODIFIES the finding as regression guards:
   1. decorated complex-ring / von-Baeyer cores with correct constitution keep
      completing their stereo (byte-identical + full-RT) — guards the reanchor;

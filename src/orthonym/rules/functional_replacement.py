@@ -3,7 +3,7 @@
 ONE name-builder for the functional-replacement / functional-class derivatives of
 the retained acid *parents* (carbonic, carbamic, phosphoric, sulfuric, …), used by
 BOTH the carbon acids (P-65.2 carbonic family) and the non-carbon oxoacids (P-67).
-Per the v23 cross-cutting design (§7, FRN-infix owner = Phase 9) the construction
+Per the cross-cutting design (§7, FRN-infix owner = a phase) the construction
 logic lives here once, not duplicated per family.
 
 This module is PURE string assembly: it does NOT perceive structure. The caller
@@ -12,18 +12,18 @@ replacement a given structure represents — keyed on the exact canonical SMILES
 fail-closed — and asks this engine to spell the name. Keeping perception out of
 the builder is what makes it safely reusable and free of false positives.
 
-Coverage in v23 Phase 9 = the OPSIN-round-trippable plain forms:
-  * chalcogen / peroxo infix replacement on a retained acid  (``carbonoperoxoic``,
+Coverage in a phase = the OPSIN-round-trippable plain forms:
+  * chalcogen / peroxo infix replacement on a retained acid (``carbonoperoxoic``,
     ``carbonodithioic``, ``carbonotrithioic``)
-  * the =O -> =NH imido replacement                          (``carbonimidic``,
+  * the =O -> =NH imido replacement (``carbonimidic``,
     ``carbamimidic``)
-  * multiplicative poly-acids                                (``dicarbonic``,
+  * multiplicative poly-acids (``dicarbonic``,
     ``tricarbonic``)
-  * acyl-halide functional-class words                       (``phosphoryl
+  * acyl-halide functional-class words (``phosphoryl
     trichloride``, ``sulfuryl dichloride``)
 The italic O/S/Se tautomer-locant word-forms (``carbonothioic S-acid``) are
-DEFERRED to Phase 19 — OPSIN rejects the word-form, so they require name-exact
-gold rather than round-trip validation (V23 plan §6, Phase 19).
+DEFERRED to a phase — OPSIN rejects the word-form, so they require name-exact
+gold rather than round-trip validation (V23 plan §6, a phase).
 """
 import re
 from typing import Dict, Optional
@@ -31,27 +31,27 @@ from typing import Dict, Optional
 # Numerical multiplying prefixes (P-14.2). Index = count.
 _MULT = {1: "", 2: "di", 3: "tri", 4: "tetra", 5: "penta", 6: "hexa"}
 
-# --- Phase 1B: P-67.1.4.1.1 ACYL-PREFIX TABLE (SHARED — Phase 3 consumes it) -
+# --- a phase: P-67.1.4.1.1 ACYL-PREFIX TABLE (SHARED — a phase consumes it) -
 # P-67.1.4.1.1.2/.1.4: an acyl prefix is formed from the acid name by changing
 # 'ic acid' -> 'oyl', EXCEPT the retained -oryl / nitroryl forms for the -oric /
 # nitric (0-skeletal =O) acids (BB L36037-36046: the rule would give 'phosphoroyl'
 # but 'phosphoryl' is retained). Keyed by (element, =E token, skeletal C+H count on
 # the central atom): 0 -> the -oryl exception (or -oyl for thio/imido/nitrido), 1 ->
-# -onoyl, 2 -> -inoyl. This table is chapter-67-owned; Phase 3 (P-68.3.2.3.2.2)
+# -onoyl, 2 -> -inoyl. This table is chapter-67-owned; a phase (P-68.3.2.3.2.2)
 # looks up (hydroxyarsoryl) / (dimethylphosphinothioyl) / (phosphonimidoyl) here
 # rather than re-deriving the acyl names. Provenance per cell: (BB) = verbatim from
 # a P-67.1.4.1.1 example; (rule) = the 'ic acid'->'oyl' rule applied to a real acid.
 ACYL_PREFIX_TABLE = {
     # =O fundamental acyl groups (P-67.1.4.1.1.2)
-    ("P", "oxo", 0): "phosphoryl",       # phosphoric  (BB L36044, retained -oryl)
-    ("P", "oxo", 1): "phosphonoyl",      # phosphonic  (BB L36049)
-    ("P", "oxo", 2): "phosphinoyl",      # phosphinic  (BB L36050)
-    ("As", "oxo", 0): "arsoryl",         # arsoric     (BB L36045, retained -oryl)
-    ("As", "oxo", 1): "arsonoyl",        # arsonic     (rule)
-    ("As", "oxo", 2): "arsinoyl",        # arsinic     (rule)
-    ("Sb", "oxo", 0): "stiboryl",        # stiboric    (BB L36046, retained -oryl)
-    ("Sb", "oxo", 1): "stibonoyl",       # stibonic    (rule)
-    ("Sb", "oxo", 2): "stibinoyl",       # stibinic    (rule)
+    ("P", "oxo", 0): "phosphoryl",       # phosphoric (BB L36044, retained -oryl)
+    ("P", "oxo", 1): "phosphonoyl",      # phosphonic (BB L36049)
+    ("P", "oxo", 2): "phosphinoyl",      # phosphinic (BB L36050)
+    ("As", "oxo", 0): "arsoryl",         # arsoric (BB L36045, retained -oryl)
+    ("As", "oxo", 1): "arsonoyl",        # arsonic (rule)
+    ("As", "oxo", 2): "arsinoyl",        # arsinic (rule)
+    ("Sb", "oxo", 0): "stiboryl",        # stiboric (BB L36046, retained -oryl)
+    ("Sb", "oxo", 1): "stibonoyl",       # stibonic (rule)
+    ("Sb", "oxo", 2): "stibinoyl",       # stibinic (rule)
     # =S thioacyl groups (P-67.1.4.1.1.4)
     ("P", "thio", 0): "phosphorothioyl", # (BB L36132; 'thiophosphoryl' is the alt)
     ("P", "thio", 1): "phosphonothioyl", # (rule)
@@ -72,7 +72,7 @@ def acyl_prefix_for(element: str, chalcogen: str = "oxo",
     """P-67.1.4.1.1 acyl PREFIX base name for a mononuclear P/As/Sb acid core, or
     ``None`` if the cell is not tabled (fail-closed). ``chalcogen`` is the =E token
     ('oxo'/'thio'/'imido'/'nitrido'); ``skeletal`` is the C + H count on the central
-    atom (0 -> the -oryl exception, 1 -> -onoyl, 2 -> -inoyl). SHARED export: Phase 3
+    atom (0 -> the -oryl exception, 1 -> -onoyl, 2 -> -inoyl). SHARED export: a phase
     (P-68.3.2.3.2.2) must look up acyl names here, never re-spell them.
 
         acyl_prefix_for("P", "oxo", 0) -> "phosphoryl"
@@ -85,7 +85,7 @@ def acyl_prefix_for(element: str, chalcogen: str = "oxo",
 # oxoacid functional-replacement engine. Each combining form carries a trailing
 # linking ``o`` that is elided before a vowel (P-67.1.2.3.5). The chalcogen /
 # peroxo infixes (thio/seleno/telluro/peroxo) do NOT belong here — they never
-# elide their ``o`` and are spelled by :func:`build_frn_acid_name`. Keyed by the
+# elide their ``o`` and are spelled by:func:`build_frn_acid_name`. Keyed by the
 # combining form so the builder both validates the infix and orders it
 # alphabetically. ---
 _CLASS_INFIX = {
@@ -112,14 +112,14 @@ def build_p_frn_acid_name(front_prefix: str, parent_stem: str,
     (P-67.1.2.4) whose replacements are class infixes (amido / halido /
     pseudohalido), NOT chalcogen infixes.
 
-    ``front_prefix``  — already-assembled detachable-prefix string cited in front
+    ``front_prefix`` — already-assembled detachable-prefix string cited in front
                         (organyl on P: ``"methyl"`` / ``"phenyl"``; or the
                         N-locant amido substituents: ``"N,N-dimethyl"``). ``""``
                         for the bare parent.
-    ``parent_stem``   — parent-acid stem WITHOUT its linking vowel: ``"phosphor"``
+    ``parent_stem`` — parent-acid stem WITHOUT its linking vowel: ``"phosphor"``
                         (phosphoric), ``"phosphon"`` (phosphonic), ``"phosphin"``
                         (phosphinic), ``"arsor"``/``"arson"`` etc.
-    ``infix_counts``  — ``{combining-form: multiplicity}`` for the class infixes
+    ``infix_counts`` — ``{combining-form: multiplicity}`` for the class infixes
                         present, e.g. ``{"amido": 1}`` / ``{"chlorido": 1}`` /
                         ``{"cyanatido": 1}``.
 
@@ -143,7 +143,7 @@ def build_p_frn_acid_name(front_prefix: str, parent_stem: str,
 def build_p_frn_acid_stem_word(front_prefix: str, parent_stem: str,
                                infix_counts: Dict[str, int]) -> Optional[str]:
     """The class-infix FRN acid name WITHOUT the trailing ``" acid"`` — i.e. the
-    ``"{front}{stem}o{infixes}ic"`` stem word that :func:`build_p_frn_acid_name`
+    ``"{front}{stem}o{infixes}ic"`` stem word that:func:`build_p_frn_acid_name`
     appends ``" acid"`` to, and that the halide / amide builders append a class
     word to (P-67.1.2.5 / P-67.1.2.6 derive the halide/amide from the same acid
     stem). Fail-closed (``None``) for an unknown infix or out-of-range count.
@@ -181,10 +181,10 @@ def build_frn_acid_name(base_stem: str, infix: str, count: int = 1) -> Optional[
     Examples::
 
         build_frn_acid_name("carbon", "peroxo", 1) -> "carbonoperoxoic acid"
-        build_frn_acid_name("carbon", "thio", 2)   -> "carbonodithioic acid"
-        build_frn_acid_name("carbon", "thio", 3)   -> "carbonotrithioic acid"
-        build_frn_acid_name("carbon", "imido", 1)  -> "carbonimidic acid"
-        build_frn_acid_name("carbam", "imido", 1)  -> "carbamimidic acid"
+        build_frn_acid_name("carbon", "thio", 2) -> "carbonodithioic acid"
+        build_frn_acid_name("carbon", "thio", 3) -> "carbonotrithioic acid"
+        build_frn_acid_name("carbon", "imido", 1) -> "carbonimidic acid"
+        build_frn_acid_name("carbam", "imido", 1) -> "carbamimidic acid"
     """
     if count not in _MULT:
         return None
@@ -192,12 +192,12 @@ def build_frn_acid_name(base_stem: str, infix: str, count: int = 1) -> Optional[
         # carbon + o + [di|tri] + thio + ic acid
         return f"{base_stem}o{_MULT[count]}{infix}ic acid"
     if infix in _IMIDO_INFIX:
-        # carbon + imid + ic acid   (linking o elided; multiplier rare, supported)
+        # carbon + imid + ic acid (linking o elided; multiplier rare, supported)
         return f"{base_stem}{_MULT[count]}{_IMIDO_INFIX[infix]}ic acid"
     return None
 
 
-# --- Phase 2B (P-65.2.1.2/.1.3): MULTI-infix mononuclear carbonic/carbamic FRN
+# --- a phase (P-65.2.1.2/.1.3): MULTI-infix mononuclear carbonic/carbamic FRN
 # acid. Generalises build_frn_acid_name to a co-occurring set of =X (imido /
 # hydrazono) and chalcogen/peroxo (thio/seleno/telluro/peroxo) replacements on ONE
 # carbonic/carbamic centre, e.g. carbonimidothioic acid (HS-C(=NH)-OH) and
@@ -221,8 +221,8 @@ def build_carbonic_mono_frn(base_stem: str,
 
         build_carbonic_mono_frn("carbon", {"imido": 1, "thio": 1})
             -> "carbonimidothioic acid"
-        build_carbonic_mono_frn("carbam", {"peroxo": 1})   -> "carbamoperoxoic acid"
-        build_carbonic_mono_frn("carbon", {"peroxo": 2})   -> "carbonodiperoxoic acid"
+        build_carbonic_mono_frn("carbam", {"peroxo": 1}) -> "carbamoperoxoic acid"
+        build_carbonic_mono_frn("carbon", {"peroxo": 2}) -> "carbonodiperoxoic acid"
         build_carbonic_mono_frn("carbon", {"hydrazono": 1})-> "carbonohydrazonic acid"
         build_carbonic_mono_frn("carbam", {"imido": 1, "seleno": 1})
             -> "carbamimidoselenoic acid"
@@ -253,10 +253,10 @@ def build_carbonic_mono_frn(base_stem: str,
     return f"{linked}ic acid"
 
 
-# --- Phase 1B: acid-HALIDE / -AMIDE functional-class builders (P-67.1.2.5 /
+# --- a phase: acid-HALIDE / -AMIDE functional-class builders (P-67.1.2.5 /
 # P-67.1.2.6). Siblings of build_p_frn_acid_name: same acid stem word, but the
 # molecule has NO -OH left (oh_count == 0) so it is not class 'acid' — the class
-# word is a halide / pseudohalide / amide / hydrazide instead. SHARED with Phase 2
+# word is a halide / pseudohalide / amide / hydrazide instead. SHARED with a phase
 # (P-65 chalcogen acid halides/amides). Pure string assembly; the caller perceives
 # the shape and assembles the acid stem word (via build_p_frn_acid_name minus its
 # ' acid', or a bare -ous / -ic / -amidic stem word). ---
@@ -279,16 +279,16 @@ def build_p_frn_halide_name(acid_stem_word: str,
                             halide_counts: Dict[str, int]) -> Optional[str]:
     """Spell a mononuclear noncarbon-oxoacid HALIDE / pseudohalide (P-67.1.2.5.1).
 
-    ``acid_stem_word``  — the acid name with the trailing ``" acid"`` stripped:
+    ``acid_stem_word`` — the acid name with the trailing ``" acid"`` stripped:
                           ``"phenylphosphonous"`` (BB ``phenylphosphonous
                           dichloride``), ``"phenylphosphonic"``,
                           ``"diphenylphosphinous"``, or an FRN-infixed stem such
                           as ``"N,N-dimethylphosphoramidic"`` (BB
                           ``N,N-dimethylphosphoramidic dichloride``).
-    ``halide_counts``   — ``{class-word: multiplicity}`` for the halide /
+    ``halide_counts`` — ``{class-word: multiplicity}`` for the halide /
                           pseudohalide principal groups, e.g. ``{"chloride": 2}``
                           or ``{"bromide": 1, "chloride": 1}``. The class words are
-                          cited in :data:`_HALIDE_CLASS_ORDER`; identical ones are
+                          cited in:data:`_HALIDE_CLASS_ORDER`; identical ones are
                           multiplied (P-67.1.2.5.1).
 
     Returns ``None`` (fail-closed) for an unknown class word or out-of-range count.
@@ -319,15 +319,15 @@ def build_p_frn_amide_name(acid_stem_word: str, kind: str = "amide",
                            count: int = 1) -> Optional[str]:
     """Spell a mononuclear noncarbon-oxoacid AMIDE / hydrazide (P-67.1.2.6.1).
 
-    ``acid_stem_word``  — the acid name minus ``" acid"`` (including any N-/P-
+    ``acid_stem_word`` — the acid name minus ``" acid"`` (including any N-/P-
                           substituent prefixes already assembled), e.g.
                           ``"N,N,P,P-tetramethylphosphinic"`` (BB
                           ``N,N,P,P-tetramethylphosphinic amide``) or
                           ``"P-phenylphosphonic"`` for a diamide.
-    ``kind``            — ``"amide"`` or ``"hydrazide"`` (P-67.1.2.6.1: the class
+    ``kind`` — ``"amide"`` or ``"hydrazide"`` (P-67.1.2.6.1: the class
                           word when every -OH is replaced by -NH2 / -NH-NH2 and the
                           amide/hydrazide is the principal group).
-    ``count``           — multiplicity of the class word (``"diamide"``).
+    ``count`` — multiplicity of the class word (``"diamide"``).
 
     Returns ``None`` (fail-closed) for an unknown class or out-of-range count.
 

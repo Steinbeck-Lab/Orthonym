@@ -1,4 +1,4 @@
-"""Integration gold tests for steroid conjugate preservation (Phase 182, WSC-03).
+"""Integration gold tests for steroid conjugate preservation (a phase, WSC-03).
 
 Per-fragment triviality controller: a steroid scaffold conjugated through a
 heteroatom linker to a sulfate / phosphate / glycosyl(uronyl) fragment keeps BOTH
@@ -25,18 +25,18 @@ from orthonym import name_compound
 # 7 BINDING GOLD ROWS (all OPSIN-RT verified True this session)
 # ---------------------------------------------------------------------------
 def test_cholest_sulfate():
-    """CHEBI:136579 -> cholest-5-en-3beta-yl sulfate (anion -OSO2[O-] -> 'sulfate')."""
+    """CHEBI:136579 -> cholest-5-en-3β-yl sulfate (anion -OSO2[O-] -> 'sulfate')."""
     from orthonym.rules.conjugate_controller import classify_conjugate  # noqa: F401
 
     smiles = (
         "CC(C)CCC[C@@H](C)[C@H]1CC[C@H]2[C@@H]3CC=C4C[C@@H]"
         "(OS(=O)(=O)[O-])CC[C@]4(C)[C@H]3CC[C@]12C"
     )
-    assert name_compound(smiles) == "cholest-5-en-3beta-yl sulfate"
+    assert name_compound(smiles) == "cholest-5-en-3β-yl sulfate"
 
 
 def test_androstan_hydroxy_hsulfate():
-    """CHEBI:133103 -> 3alpha-hydroxy-5alpha-androstan-17beta-yl hydrogen sulfate
+    """CHEBI:133103 -> 3α-hydroxy-5α-androstan-17β-yl hydrogen sulfate
     (neutral -OSO2OH -> 'hydrogen sulfate')."""
     from orthonym.rules.conjugate_controller import classify_conjugate  # noqa: F401
 
@@ -46,12 +46,12 @@ def test_androstan_hydroxy_hsulfate():
     )
     assert (
         name_compound(smiles)
-        == "3alpha-hydroxy-5alpha-androstan-17beta-yl hydrogen sulfate"
+        == "3α-hydroxy-5α-androstan-17β-yl hydrogen sulfate"
     )
 
 
 def test_androstanone_hsulfate():
-    """CHEBI:138026 -> 3-oxo-5alpha-androstan-17beta-yl hydrogen sulfate."""
+    """CHEBI:138026 -> 3-oxo-5α-androstan-17β-yl hydrogen sulfate."""
     from orthonym.rules.conjugate_controller import classify_conjugate  # noqa: F401
 
     smiles = (
@@ -60,13 +60,13 @@ def test_androstanone_hsulfate():
     )
     assert (
         name_compound(smiles)
-        == "3-oxo-5alpha-androstan-17beta-yl hydrogen sulfate"
+        == "3-oxo-5α-androstan-17β-yl hydrogen sulfate"
     )
 
 
-def test_androstan_3beta_sulfate():
-    """CHEBI:136983 -> 3beta-hydroxy-5alpha-androstan-17beta-yl sulfate
-    (dissolves the 'androstan-3-olate' mis-assignment, D-05)."""
+def test_androstan_3β_sulfate():
+    """CHEBI:136983 -> 3β-hydroxy-5α-androstan-17β-yl sulfate
+    (dissolves the 'androstan-3-olate' mis-assignment,)."""
     from orthonym.rules.conjugate_controller import classify_conjugate  # noqa: F401
 
     smiles = (
@@ -75,7 +75,7 @@ def test_androstan_3beta_sulfate():
     )
     assert (
         name_compound(smiles)
-        == "3beta-hydroxy-5alpha-androstan-17beta-yl sulfate"
+        == "3β-hydroxy-5α-androstan-17β-yl sulfate"
     )
 
 
@@ -86,7 +86,7 @@ def test_ergostan_hsulfate():
     The WSC-03 conjugate-loss fix works for ergostane — the conjugate is kept, the word is the
     correct neutral-form `hydrogen sulfate` (free acid -OSO2OH), and the name round-trips.
     The ChEBI reference cites the ergostane ring-face α/β block
-    `(22S)-3beta-hydroxy-6-oxo-5alpha-ergostan-22-yl hydrogen sulfate`, but ergostane α/β is a
+    `(22S)-3β-hydroxy-6-oxo-5α-ergostan-22-yl hydrogen sulfate`, but ergostane α/β is a
     DEFERRED Phase-181 capability: `STEROID_NUMBERING_MAPS` mislabels ergostane (11<->12), so
     `collect_steroid_alpha_beta` declines and falls back to the whole-graph R/S leading block
     (which DOES round-trip). Building ergostane α/β is out of scope for this thin NP-conjugate
@@ -104,13 +104,13 @@ def test_ergostan_hsulfate():
     n = name_compound(smiles)
     # Conjugate kept (no silent drop) + correct neutral-form word + scaffold -yl anchor.
     assert n is not None and "hydrogen sulfate" in n and "ergostan" in n and "-yl " in n, n
-    # And the emitted name OPSIN-round-trips (D-10) — never a worse name than prior (dropped).
+    # And the emitted name OPSIN-round-trips () — never a worse name than prior (dropped).
     canon = Chem.MolToSmiles(Chem.MolFromSmiles(smiles))
     assert opsin_roundtrip_check(canon, n).get("passed"), n
 
 
 def test_androstanone_glucuronide():
-    """CHEBI:133504 -> 17-oxo-5beta-androstan-3beta-yl beta-D-glucopyranosiduronic acid."""
+    """CHEBI:133504 -> 17-oxo-5β-androstan-3β-yl β-D-glucopyranosiduronic acid."""
     from orthonym.rules.conjugate_controller import classify_conjugate  # noqa: F401
 
     smiles = (
@@ -119,13 +119,13 @@ def test_androstanone_glucuronide():
     )
     assert (
         name_compound(smiles)
-        == "17-oxo-5beta-androstan-3beta-yl beta-D-glucopyranosiduronic acid"
+        == "17-oxo-5β-androstan-3β-yl β-D-glucopyranosiduronic acid"
     )
 
 
-def test_androstan_3alpha_glucuronide():
-    """CHEBI:133517 -> 3alpha-hydroxy-5alpha-androstan-17beta-yl
-    beta-D-glucopyranosiduronic acid (BINDING GOLD — reference OPSIN-RTs True)."""
+def test_androstan_3α_glucuronide():
+    """CHEBI:133517 -> 3α-hydroxy-5α-androstan-17β-yl
+    β-D-glucopyranosiduronic acid (BINDING GOLD — reference OPSIN-RTs True)."""
     from orthonym.rules.conjugate_controller import classify_conjugate  # noqa: F401
 
     smiles = (
@@ -134,7 +134,7 @@ def test_androstan_3alpha_glucuronide():
     )
     assert (
         name_compound(smiles)
-        == "3alpha-hydroxy-5alpha-androstan-17beta-yl beta-D-glucopyranosiduronic acid"
+        == "3α-hydroxy-5α-androstan-17β-yl β-D-glucopyranosiduronic acid"
     )
 
 
@@ -146,10 +146,10 @@ def test_disulfate_honest_fail():
     """CHEBI:137389 (disulfate) -> must NOT silently drop a fragment.
 
     Out-of-scope multi-conjugate (two equal-seniority sulfates). The completeness
-    invariant (D-08) makes it honest-fail (None / legacy / 'unknown organic
+    invariant () makes it honest-fail (None / legacy / 'unknown organic
     compound') rather than emit a fragment-omitting name. The xfail marks the
     out-of-scope deferral — it is NOT an output band-aid. Full multi-conjugate
-    prefix treatment is Phase 183/184.
+    prefix treatment is a phase/184.
     """
     from orthonym.rules.conjugate_controller import classify_conjugate  # noqa: F401
 

@@ -1,5 +1,5 @@
 """
-Phase 80, Plan 02: Integration tests for polyfunctional naming with
+a phase, Plan 02: Integration tests for polyfunctional naming with
 sulfoxide/sulfone/thioether prefix forms, 3+ FG alphabetization,
 compound prefix parenthesization, and OPSIN round-trip validation.
 
@@ -98,9 +98,15 @@ class TestSulfoxideAsNonPrincipal:
 
     @pytest.mark.integration
     def test_methylsulfinyl_benzoic_acid(self):
-        """OC(=O)c1ccc(S(=O)C)cc1 -> 4-(methylsulfinyl)benzoic acid."""
+        """OC(=O)c1ccc(S(=O)C)cc1 -> 4-(methanesulfinyl)benzoic acid.
+
+        P-65.3.1 PIN: a ring-attached sulfoxide substituent is the acid-stem oxide
+        form ``methanesulfinyl``, not the ``methyl``+``sulfinyl`` concatenation.
+        Value corrected (was ``methylsulfinyl``): OPSIN round-trips the new form to
+        the input structure, and it matches the benzene-parent path's own output.
+        """
         result = name_compound("OC(=O)c1ccc(S(=O)C)cc1")
-        assert result == "4-(methylsulfinyl)benzoic acid"
+        assert result == "4-(methanesulfinyl)benzoic acid"
 
     @pytest.mark.integration
     def test_sulfinyl_prefix_present(self):
@@ -131,9 +137,15 @@ class TestSulfoneAsNonPrincipal:
 
     @pytest.mark.integration
     def test_methylsulfonyl_benzoic_acid(self):
-        """OC(=O)c1ccc(S(=O)(=O)C)cc1 -> 4-(methylsulfonyl)benzoic acid."""
+        """OC(=O)c1ccc(S(=O)(=O)C)cc1 -> 4-(methanesulfonyl)benzoic acid.
+
+        P-65.3.1 PIN: a ring-attached sulfone substituent is the acid-stem oxide
+        form ``methanesulfonyl``, not the ``methyl``+``sulfonyl`` concatenation.
+        Value corrected (was ``methylsulfonyl``): OPSIN round-trips the new form to
+        the input structure, and it matches the benzene-parent path's own output.
+        """
         result = name_compound("OC(=O)c1ccc(S(=O)(=O)C)cc1")
-        assert result == "4-(methylsulfonyl)benzoic acid"
+        assert result == "4-(methanesulfonyl)benzoic acid"
 
 
 # ============================================================================

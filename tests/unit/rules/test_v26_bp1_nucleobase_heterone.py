@@ -1,6 +1,6 @@
-"""v26 BP-1: mancude ring-heterone seniority + non-PIN nucleobase gating.
+""" BP-1: mancude ring-heterone seniority + non-PIN nucleobase gating.
 
-Root causes (see *.md):
+Root causes (see internal notes):
  - FIX 2: a ring-carbon exocyclic =O on a mancude ring (a heterone) was invisible
    to functional-group perception (the ketone SMARTS needs two C neighbours), so an
    amine wrongly won the principal-group slot. BB P-64.7.1 (line 29585): ketones/

@@ -1,4 +1,4 @@
-"""v26 P4: multi-fragment (adduct/solvate/co-crystal) split-name-join under
+""": multi-fragment (adduct/solvate/co-crystal) split-name-join under
 ``complete``.
 
 Root cause addressed: ``general_engine._common_refusal`` (and every single-
@@ -26,7 +26,7 @@ byte-identical) -- P4 never drops, placeholders, or partially joins a
 component.
 
 Reproduce-first (confirmed 2026-07-21, production OPSIN gate ON, single
-bounded probe process -- see ``-style batched-JVM RT):
+bounded probe process -- see ``scripts/diagnose.py``-style batched-JVM RT):
   - COVERAGE cases: pin abstains cleanly (``unknown organic compound``);
     complete emits the per-component split-name-join and it round-trips.
   - BYTE-IDENTICAL cases: wherever the PIN path already names the
@@ -65,7 +65,7 @@ pytestmark = pytest.mark.unit
 # complete name.)
 COVERAGE_CASES = [
     ("[SiH3]c1ccccn1.O", "2-silylpyridine—water (1/1)"),
-    # v31 change-asserted-value: the aza-cage heteroatom takes the LOWEST locant
+    # change-asserted-value: the aza-cage heteroatom takes the LOWEST locant
     # (P-31.1.4 heteroatoms-lowest over the equal-bridge bicyclo[4.4.0]). Here N
     # is adjacent to a bridgehead, so it attains locant 2 and the silyl carbon 3;
     # the old `4-silyl-5-aza` was a stale higher-locant numbering. Engine now
@@ -89,13 +89,13 @@ BYTE_IDENTICAL_CASES = [
 
 # FAIL-CLOSED: neither pin nor complete emits a name -- P4 must NEVER ship a
 # wrong/partial joined name.
-#  - a 3-fragment charged mixture (name_adduct's own charge != 0 refusal;
-#    the salt router also can't resolve NH4+/Cl-/benzene, so late recovery
-#    IS invoked and correctly declines rather than joining a partial name);
-#  - a neutral-but-unnameable component (diphenyliron has no organoiron
-#    support anywhere in the pipeline -- 'iron compound (not supported)' --
-#    so `_name_component` fails closed and `name_adduct` refuses the WHOLE
-#    adduct rather than dropping/placeholder-ing the Fe component).
+# - a 3-fragment charged mixture (name_adduct's own charge != 0 refusal;
+# the salt router also can't resolve NH4+/Cl-/benzene, so late recovery
+# IS invoked and correctly declines rather than joining a partial name);
+# - a neutral-but-unnameable component (diphenyliron has no organoiron
+# support anywhere in the pipeline -- 'iron compound (not supported)' --
+# so `_name_component` fails closed and `name_adduct` refuses the WHOLE
+# adduct rather than dropping/placeholder-ing the Fe component).
 FAIL_CLOSED_CASES = [
     ("[NH4+].[Cl-].c1ccccc1", "unknown organic compound"),
     ("[Fe](c1ccccc1)c1ccccc1.O", "iron compound (not supported)"),
@@ -257,7 +257,7 @@ def test_multifragment_recovery_is_complete_tier_only():
 
 # --------------------------------------------------------------------------
 # rules.adducts function-level: deterministic, gate-independent. Directly
-# pins the v26 P4 kwarg contract -- kwargs OMITTED (pre-P4 call signature)
+# pins the kwarg contract -- kwargs OMITTED (pre-P4 call signature)
 # reproduce the pre-P4 PIN-scope refusal; kwargs supplied opt into the
 # complete-tier per-component namer.
 # --------------------------------------------------------------------------

@@ -1,6 +1,6 @@
 """The single mandatory parent-selection chokepoint for charged species.
 
-Phase 169.6 Plan 03 (CHOKE-01, CHOKE-02). ROOT CAUSE of the flat round-trip
+a phase.6 Plan 03 (CHOKE-01, CHOKE-02). ROOT CAUSE of the flat round-trip
 wall (V20 audit RC-2): every charged class (alkoxide / phenolate / carbanion /
 thiolate / carbenium / onium / diazonium / aminium-fallback / radical) decided
 its own parent through a *parallel carbon-counting stub* that ignores
@@ -24,22 +24,22 @@ molecule — this is the multi-defect-collapsing fix, not a per-class patch.
 The four IUPAC-2013 guards (SYNTHESIS-authoritative-cascade.md §2; P-72.7 /
 P-73.7 / P-74), applied IN ORDER:
 
-  GUARD 1  FG-class-before-suffix (the ``heptanolate`` fix). A ``-S(=O)2-O-`` is
+  GUARD 1 FG-class-before-suffix (the ``heptanolate`` fix). A ``-S(=O)2-O-`` is
            an acid anion -> ``-sulfonate`` (P-72.2.2.2.1), NOT a hydroxy anion
            -> ``-olate`` (P-72.2.2.2.2). ``classify_anion`` picks the FG class;
            the per-class ``allowed_suffixes`` subset gates the textual seam so a
            sulfonate stem can NEVER mis-fire to ``-olate``.
-  GUARD 2  ionic-center-count-first (P-72.7 a-c / P-73.7 a-b). On a multi-center
+  GUARD 2 ionic-center-count-first (P-72.7 a-c / P-73.7 a-b). On a multi-center
            ion the parent maximizes anionic / ``ide`` / ``uide`` center count
            BEFORE P-44 length is considered (dicarboxylate dianions). Realized
            by neutralizing ALL same-sign centers and letting the re-entered
            pipeline name the multi-suffix parent (``butanedioate``), exactly as
            the proven anion seam already does.
-  GUARD 3  skeletal-charge element seniority (P-72.7 d / P-73.7 c):
+  GUARD 3 skeletal-charge element seniority (P-72.7 d / P-73.7 c):
            N > P > As > Sb > Bi > Si > Ge > Sn > Pb > B > Al > Ga > In > Tl > O
            > S > Se > Te > C. When the charge sits on a skeletal heteroatom the
            senior element bearing it is the parent, not the longest carbon chain.
-  GUARD 4  zwitterion anion-is-parent override (P-74.0). The anion is FORCED as
+  GUARD 4 zwitterion anion-is-parent override (P-74.0). The anion is FORCED as
            the parent; a separable cation (P-74.1.3, the betaine quaternary
            ammonium) is demoted to a structured ``(…azaniumyl)`` substituent
            prefix (``substituent_naming.cation_to_prefix``); a skeletal cation
@@ -49,7 +49,7 @@ P-73.7 / P-74), applied IN ORDER:
 
 Returns '' on any failure / out-of-scope shape (metal complex, multi-fragment
 salt, zwitterion, malformed re-entered parent) so the caller falls through to the
-existing retained/legacy cascade — preserving the v18 byte-identical no-crash
+existing retained/legacy cascade — preserving the byte-identical no-crash
 contract.
 
 NO carbon-counting. NO ``.replace``. NO molecule-specific branch. The router is
@@ -88,7 +88,7 @@ from .ions import (
 # =============================================================================
 _MAX_CHARGED_ROUTE_HEAVY_ATOMS = 50
 
-# charged-species fix, 169.6 caveats (Phase 169.7): canonical SMILES of retained charged species
+# charged-species fix, 169.6 caveats (a phase.7): canonical SMILES of retained charged species
 # that LACK a valid systematic PIN — their neutralize->re-name chokepoint path yields
 # an OPSIN-unparseable form (the 169.6 'unknown'/wrong-retained regression). These use
 # their sanctioned retained name (P-72/P-73/P-74). NARROW by design: alkoxides and
@@ -98,7 +98,7 @@ _MAX_CHARGED_ROUTE_HEAVY_ATOMS = 50
 _RETAINED_FIRST_CHARGED = frozenset({
     '[SH3+]',                                     # sulfonium (P-73.1.1.1)
     'N[O-]',                                      # aminoxide (P-74)
-    '[NH-]O',                                     # hydroxyazanide (P-72.2.2.2.4, BB:41083 preselected)
+    '[NH-]O',                                     # hydroxyazanide (P-72.2.2.2.4, the Blue Book preselected)
     'O=S(=O)([N-]S(=O)(=O)C(F)(F)F)C(F)(F)F',     # bistriflimide (P-72)
     # Wave2 T2d (P-63.8.1): the retained alkoxide names ARE the PINs
     # ("sodium methoxide (PIN) sodium methanolate" — BB verbatim), so the
@@ -137,14 +137,14 @@ _ELEMENT_SENIORITY = {
 # may take. The seam (apply_ion_suffix_to_name) is restricted to this subset so a
 # sulfonate stem (allowed={'sulfonic acid'}) can never match the bare 'ol' key.
 #
-#   anion 'sulfonate'/'sulfinate'/'phosphonate' -> the matching oxoacid suffix
-#       (P-72.2.2.2.1.1: acid anions -> -ate/-ite).
-#   anion 'carboxylate'  -> {'oic acid','carboxylic acid'}  (P-72.2.2.2.1.1)
-#   anion 'alkoxide'/'phenolate' -> {'ol'}  (P-72.2.2.2.2: hydroxy anions -> -olate)
-#   anion 'thiolate'     -> {'thiol'}       (P-72.2.2.2.2)
-#   anion 'carbanion'    -> None -> bare -> -ide  (P-72.1)
-#   anion 'aminide'      -> {'amine'}       (P-72.2.2.2.3)
-#   anion 'iminide'      -> {'imine'}       (P-72.2.2.2.3, the =N- imine anion)
+# anion 'sulfonate'/'sulfinate'/'phosphonate' -> the matching oxoacid suffix
+# (P-72.2.2.2.1.1: acid anions -> -ate/-ite).
+# anion 'carboxylate' -> {'oic acid','carboxylic acid'} (P-72.2.2.2.1.1)
+# anion 'alkoxide'/'phenolate' -> {'ol'} (P-72.2.2.2.2: hydroxy anions -> -olate)
+# anion 'thiolate' -> {'thiol'} (P-72.2.2.2.2)
+# anion 'carbanion' -> None -> bare -> -ide (P-72.1)
+# anion 'aminide' -> {'amine'} (P-72.2.2.2.3)
+# anion 'iminide' -> {'imine'} (P-72.2.2.2.3, the =N- imine anion)
 # =============================================================================
 _ANION_ALLOWED_SUFFIXES = {
     'sulfonate': frozenset({'sulfonic acid'}),
@@ -166,7 +166,7 @@ _ANION_ALLOWED_SUFFIXES = {
     # 'carbanion' -> None (bare -> -ide via the resolvers empty-suffix path).
 }
 
-# T3 (Phase 173.6): anion class -> the FG name forced as principal when a SENIOR
+# T3 (a phase.6): anion class -> the FG name forced as principal when a SENIOR
 # neutral acid (carboxylic) would otherwise hijack the re-entry's principal slot.
 # Per P-72/P-74 the CHARGED group is the principal characteristic group of an
 # anion: O=C(O)CCS(=O)(=O)[O-] -> 2-carboxyethanesulfonate (carboxy PREFIX,
@@ -187,7 +187,7 @@ _ANION_PCG_SENIORITY = ('carboxylate', 'sulfonate', 'sulfinate', 'phosphonate')
 
 
 def classify_charged_pcg(mol, sites) -> Optional[str]:
-    """Charge-first PCG classifier (WS-E.3, D-11/D-12). Runs on the ORIGINAL
+    """Charge-first PCG classifier (WS-E.3, /). Runs on the ORIGINAL
     (un-neutralized) mol. Returns the FG-name to FORCE as the principal
     characteristic group (a detect_functional_groups KEY: 'carboxylic_acid',
     'sulfonic_acid', 'sulfinic_acid', 'phosphonic_acid'), or None when the
@@ -196,14 +196,14 @@ def classify_charged_pcg(mol, sites) -> Optional[str]:
     suffix primitive / the existing suffix seam, NOT this override) or when a
     different route owns the molecule.
 
-    Ordering (D-12; P-72 anions / P-73 cations / P-74 zwitterion / P-33.3 radical):
+    Ordering (; P-72 anions / P-73 cations / P-74 zwitterion / P-33.3 radical):
       1. radical present -> None (P-33.3 radical>anion>cation; the -yl primitive owns it)
       2. mixed-sign (zwitterion) -> None (P-74 _route_zwitterion owns it)
       3. anion(s): senior ionized acid class per P-72 -> its acid-FG key
       4. cation(s) only -> None (the aminium / class-keyed cation transforms own it)
     The forced FG MUST be a features.functional_groups key (namer.py:1821) or it
     silently no-ops; for a class with no neutral FG anchor return None.
-    BlueBookV2.md:17580 (radical>anion>cation seniority)."""
+    the Blue Book (radical>anion>cation seniority)."""
     # Rule 1 (P-33.3): a radical co-occurring outranks the ionic centre; the
     # P-71 -yl/-ylidene primitive owns it, not this override.
     from ..perception.ions import get_radical_sites
@@ -242,7 +242,7 @@ _CATION_SPEC = {
 # WR-01 / 169.5 SUB-01 (reused verbatim): a re-entered parent that lost its
 # chain/ring stem (the deferred P-25 fused-ring limitation) leaves a bare
 # unsaturation marker glued onto a suffix stem or a locant ('anesulfonic acid',
-# 'ene-1-...'). A descriptive fallback ('unknown ...', 'not supported') is
+# 'ene-1-...'). A descriptive fallback ('unknown...', 'not supported') is
 # likewise not a valid parent. Refuse to propagate either; fall through instead.
 import re as _re
 
@@ -385,7 +385,7 @@ def _parent_has_chain_locants(parent_anion_name: str) -> bool:
 
 def _attachment_locant_on_polyacid_parent(mol, anion_idxs, parent_attach_idx):
     """Cation-substituent attachment locant on a MULTI-carboxylate anion parent
-    (v33 Phase 3, the ``_attachment_locant_on_anion_parent`` sibling for >= 2
+    (a phase, the ``_attachment_locant_on_anion_parent`` sibling for >= 2
     carboxylates).
 
     The cation was SEVERED before the parent was re-entered/renamed
@@ -415,7 +415,7 @@ def _attachment_locant_on_polyacid_parent(mol, anion_idxs, parent_attach_idx):
 
 
 def _name_ester_anion_zwitterion(mol, cation_idx: int, anion_idx: int) -> str:
-    """Name a choline-family acid-ester-anion ZWITTERION (v33 Phase 3 B1).
+    """Name a choline-family acid-ester-anion ZWITTERION (a phase B1).
 
     P-74.0 forces the anion (a P/S oxoacid mono-ester anion, P-72.2.2.2.1.2)
     as the parent -- but here, unlike the betaine path in `_route_zwitterion`
@@ -423,11 +423,11 @@ def _name_ester_anion_zwitterion(mol, cation_idx: int, anion_idx: int) -> str:
     a `(...azaniumyl)` prefix), the cation sits INSIDE the ester-owner arm R
     itself (``R-O-SO3[-]``, ``R`` = ``2-(trimethylazaniumyl)ethyl``). So the
     owner substituent is named WITH the cation in place (the shipped
-    cation-bearing-substituent capability, `e4936b8e`) via the same recursive
+    cation-bearing-substituent capability,) via the same recursive
     ``_p_ester_owner_group`` helper the neutral/pure-anion acid-ester
     producers use (`phosphorus.py`, `acid_ester_anion.py`), and the acid word
-    (``sulfate`` / ``hydrogen phosphate`` / ...) is derived IN PLACE from the
-    surviving free ``-OH`` count via ``conjugate_controller`` (D-04 — never
+    (``sulfate`` / ``hydrogen phosphate`` /...) is derived IN PLACE from the
+    surviving free ``-OH`` count via ``conjugate_controller`` (— never
     neutralize-then-rename): ``'{owner} {word}'``
     (``2-(trimethylazaniumyl)ethyl sulfate``).
 
@@ -527,7 +527,7 @@ def _name_ester_anion_zwitterion(mol, cation_idx: int, anion_idx: int) -> str:
 def _atom_coverage_ok_for_polyacid_zwitterion(mol, cation_idx: int,
                                               parent_attach_idx: int,
                                               anion_idxs: list) -> bool:
-    """Finding A (v33 Phase 3 review) -- atom-coverage guard for
+    """Finding A (a phase review) -- atom-coverage guard for
     ``_name_polyacid_zwitterion``.
 
     That function severs the cation and names the poly-acid parent, but its
@@ -569,7 +569,7 @@ def _atom_coverage_ok_for_polyacid_zwitterion(mol, cation_idx: int,
 
 
 def _name_polyacid_zwitterion(mol, cations: list, anions: list, style: str) -> str:
-    """P-74.1.3 generalized to a MULTI-carboxylate anion parent (v33 Phase 3).
+    """P-74.1.3 generalized to a MULTI-carboxylate anion parent (a phase).
 
     A single cation (protonated amine or quaternary onium) riding on a
     POLY-carboxylate parent -- >= 2 ``-C(=O)[O-]`` groups on one acyclic
@@ -583,9 +583,9 @@ def _name_polyacid_zwitterion(mol, cations: list, anions: list, style: str) -> s
     exactly-one to >= 2 carboxylate anions.
 
     Deliberately WITHOUT the single-anion branch's protonated-amine defer
-    (D-06, ``_route_zwitterion`` below): that defer exists because a
+    (, ``_route_zwitterion`` below): that defer exists because a
     MONO-carboxylate protonated-amine zwitterion has an established
-    retained/neutral-form name (glycine, GABA, ...) reachable via the legacy
+    retained/neutral-form name (glycine, GABA,...) reachable via the legacy
     amino-acid-zwitterion path. A >= 2-carboxylate one does not --
     ``_name_amino_acid_zwitterion``'s neutral-form dispensation is licensed
     only for the monoamino MONOcarboxylic Table-10.4 amino acids (P-103.2.4.4),
@@ -659,7 +659,7 @@ def _name_polyacid_zwitterion(mol, cations: list, anions: list, style: str) -> s
         if _parent_has_chain_locants(parent_anion_name):
             locant_prefix = f'{attach_locant}-'
         else:
-            # Finding B (v33 Phase 3 review): the parent-anion name is not a
+            # Finding B (a phase review): the parent-anion name is not a
             # form `_parent_has_chain_locants` recognizes (e.g. a 3+-carboxylate
             # `...tricarboxylate` from `name_carboxylate_anion` -- P-65.1.1 --
             # which matches none of anoate/enoate/ynoate/dioate). A required
@@ -691,9 +691,9 @@ def _name_polyacid_zwitterion(mol, cations: list, anions: list, style: str) -> s
 
 
 # =============================================================================
-# v33 charged Slice B (P-74.2.1.2) — primary protonated-amine azaniumyl PIN.
+# charged Slice B (P-74.2.1.2) — primary protonated-amine azaniumyl PIN.
 #
-# P-74.2.1.2 (BlueBookV2.md:1779 item (e)): a zwitterion whose ionic centres sit
+# P-74.2.1.2 (the Blue Book item (e)): a zwitterion whose ionic centres sit
 # in ONE parent is NOT named as a neutral suffix-bearing compound; its PIN is the
 # IONIC form -- the ANION is the parent (keeps its -oate/... suffix) and each
 # protonated-amine CATION becomes an ``azaniumyl`` substituent prefix (two or
@@ -755,15 +755,15 @@ def _iminide_omit_locants(name: str, mol) -> str:
     kind of substitutable H):
 
       * the imine-position suffix locant drops -- ``butan-1-iminide`` ->
-        ``butaniminide`` (BB:41061, the terminal ``=N`` group, P-14.3.4.1 family);
+        ``butaniminide`` (the Blue Book, the terminal ``=N`` group, P-14.3.4.1 family);
       * the substituent locants on the sole heteroatom parent centre drop when that
         centre carries the only kind of substitutable H (P-14.3.4.3):
         ``P,P,P-trimethyl-λ5-phosphaniminide`` -> ``trimethyl-λ5-phosphaniminide``
-        (BB:41063). Contrast the NEUTRAL ``As,As,As-trimethyl-λ5-arsanimine``
-        (BB:39143), which KEEPS them because its ``N-H`` is a second kind of H.
+        (the Blue Book). Contrast the NEUTRAL ``As,As,As-trimethyl-λ5-arsanimine``
+        (the Blue Book), which KEEPS them because its ``N-H`` is a second kind of H.
 
     Only these two structurally-licensed patterns are stripped (never an arbitrary
-    locant), and EVERY candidate is verified with :func:`_full_inchikey_rt_ok`, so a
+    locant), and EVERY candidate is verified with:func:`_full_inchikey_rt_ok`, so a
     strip that would change the molecule -- an internal ``butan-2-iminide`` collapsing
     to the position-1 default ``butaniminide`` -- is REJECTED and the locanted form is
     kept. Returns the maximally-omitted RT-verified name, or ``name`` unchanged (which
@@ -778,9 +778,9 @@ def _iminide_omit_locants(name: str, mol) -> str:
     if a != name:
         candidates.append(a)
     # (b) drop a leading run of identical element locants on the parent centre
-    #     ('P,P,P-'/'As,As,As-'): a capitalised element token repeated and joined
-    #     by commas. Substituent prefixes are lowercase and descriptors start with
-    #     '(', so a leading capitalised token is an element locant.
+    # ('P,P,P-'/'As,As,As-'): a capitalised element token repeated and joined
+    # by commas. Substituent prefixes are lowercase and descriptors start with
+    # '(', so a leading capitalised token is an element locant.
     for base in list(candidates):
         b = re.sub(r'^([A-Z][a-z]?)(?:,\1)*-', '', base)
         if b != base and b not in candidates:
@@ -905,7 +905,7 @@ def _name_primary_amine_azaniumyl_zwitterion(mol, cations, anions, style) -> str
 def _route_zwitterion(mol, sites, style: str) -> str:
     """GUARD 4: zwitterion anion-is-parent override (P-74.0).
 
-    P-74.0 (verbatim): "anionic centers ... become the parent structure, into
+    P-74.0 (verbatim): "anionic centers... become the parent structure, into
     which the cationic part is substituted." So: FORCE the anion as the parent.
 
     - P-74.1.3 (cation on a DIFFERENT parent, e.g. the betaine quaternary
@@ -916,9 +916,9 @@ def _route_zwitterion(mol, sites, style: str) -> str:
       pyridinium-2-carboxylate): the cation is kept on the parent as an ``-ium``
       suffix, NOT a prefix -> DEFER to the legacy path (returns '' here so the
       existing pipeline names it; route_charged does not own the skeletal-ium
-      cumulative-suffix construction this plan — D-06 honest scope boundary).
+      cumulative-suffix construction this plan — honest scope boundary).
 
-    Sequencing (D-06): amino-acid zwitterions + betaines first. Ylides /
+    Sequencing (): amino-acid zwitterions + betaines first. Ylides /
     amine-oxides / 1,n-dipolar (P-74.2) are out of scope -> '' (honest-fail).
 
     Returns the IUPAC name, or '' to fall through to the legacy path.
@@ -928,7 +928,7 @@ def _route_zwitterion(mol, sites, style: str) -> str:
     cations = sites['cations']
     anions = sites['anions']
 
-    # v33 Phase 3 B1 (choline-family acid-ester-anion zwitterion, P-72.2.2.2.1.2):
+    # a phase B1 (choline-family acid-ester-anion zwitterion, P-72.2.2.2.1.2):
     # a cation sitting INSIDE the ester-owner arm R of a P/S oxoacid mono-ester
     # anion (e.g. R-O-SO3[-], R = 2-(trimethylazaniumyl)ethyl -> choline
     # sulfate). Tried FIRST, before the single-cation/single-anion scope check
@@ -940,7 +940,7 @@ def _route_zwitterion(mol, sites, style: str) -> str:
     # `_name_ester_anion_zwitterion`'s own shape + atom-coverage validation
     # declines ('') anything that is not a clean single-cation, single-P/S-
     # centre mono-ester, so this is a pure ADD: every existing zwitterion class
-    # (carboxylate betaine, amino-acid, ring carboxylate, ...) has an anion
+    # (carboxylate betaine, amino-acid, ring carboxylate,...) has an anion
     # whose sole neighbour is a carbon, so `central.GetSymbol() not in ('P',
     # 'S')` declines INSTANTLY and falls through unchanged to the scope check
     # and legacy paths below -- 0 behaviour change for anything but the new
@@ -951,7 +951,7 @@ def _route_zwitterion(mol, sites, style: str) -> str:
         if est_name:
             return est_name
 
-    # v33 Phase 3 (P-74.1.3 generalized to a MULTI-carboxylate anion parent):
+    # a phase (P-74.1.3 generalized to a MULTI-carboxylate anion parent):
     # a single non-ring cation (protonated amine or quaternary onium) riding
     # on a POLY-carboxylate anion parent -- e.g. the glutamate/aspartate
     # zwitterion anion [NH3+]C(CCC(=O)[O-])C(=O)[O-] -> 2-azaniumylpentane-
@@ -966,7 +966,7 @@ def _route_zwitterion(mol, sites, style: str) -> str:
         if poly_name:
             return poly_name
 
-    # v33 charged Slice B (P-74.2.1.2): PRIMARY protonated-amine azaniumyl PIN.
+    # charged Slice B (P-74.2.1.2): PRIMARY protonated-amine azaniumyl PIN.
     # Handles the two shapes the sever paths above cannot: (a) a single-cation
     # single-anion amino acid whose alpha stereocentre must survive into the
     # ``(2R)-2-azaniumyl...oate`` descriptor (severing destroys it), and (b) a
@@ -980,7 +980,7 @@ def _route_zwitterion(mol, sites, style: str) -> str:
     if azm:
         return azm
 
-    # Scope (D-06): exactly one cationic and one anionic center (the amino-acid /
+    # Scope (): exactly one cationic and one anionic center (the amino-acid /
     # betaine majority). Multi-center dipolar zwitterions are deferred.
     if len(cations) != 1 or len(anions) != 1:
         return ''
@@ -1009,11 +1009,11 @@ def _route_zwitterion(mol, sites, style: str) -> str:
     if zwit:
         return zwit
 
-    # SCOPE (D-06): this single-cation SEVER path (below) builds GUARD 4's
+    # SCOPE (): this single-cation SEVER path (below) builds GUARD 4's
     # (azaniumyl) prefix for a QUATERNARY ammonium (0 H) betaine, whose severed
     # cation carbon is not a stereocentre. A PROTONATED amine (NH3+/NH2+/NH+, >0
     # H) whose azaniumyl PIN was buildable has ALREADY been named by
-    # `_name_primary_amine_azaniumyl_zwitterion` above (v33 charged Slice B,
+    # `_name_primary_amine_azaniumyl_zwitterion` above (charged Slice B,
     # P-74.2.1.2 — the stereo-preserving neutralize-in-place builder, tried
     # before the scope check). Reaching HERE with a protonated amine therefore
     # means that builder DECLINED (out of scope for it: a non-carboxylate anion,
@@ -1037,7 +1037,7 @@ def _route_zwitterion(mol, sites, style: str) -> str:
         return ''
     parent_attach_idx = path[1]  # the cation neighbour leading into the anion parent
 
-    # SCOPE (D-06): GUARD 4 confidently handles the amino-acid / betaine majority
+    # SCOPE (): GUARD 4 confidently handles the amino-acid / betaine majority
     # (a carboxylate anion) and clean hydroxy/thio anion parents. A phosphate /
     # sulfate ESTER oxygen ([O-] bonded to P or to an S that bears =O) is
     # mis-classified 'alkoxide' by classify_anion but is NOT a real alkoxide — a
@@ -1172,7 +1172,7 @@ def _diazonium_sever_parts(mol, cation_idx: int):
 
 
 def _name_poly_diazonium(mol, cation_indices, style: str) -> str:
-    """P-73.5.1.1 (BB:42130): a poly-diazonium cation — >= 2 terminal -N#N+
+    """P-73.5.1.1 (the Blue Book): a poly-diazonium cation — >= 2 terminal -N#N+
     groups on ONE ring parent hydride — named ``<ring>-<locants>-bis(diazonium)``
     (``N#[N+]c1ccc([N+]#N)cc1`` -> ``benzene-1,4-bis(diazonium)``). Suffix
     multiplication with the COMPLEX multiplier (bis/tris), mirroring the single
@@ -1217,7 +1217,7 @@ def _name_poly_diazonium(mol, cation_indices, style: str) -> str:
     except Exception:
         return ''
     # 3. The parent fragment is the one carrying every attachment atom (and no
-    #    diazo N). Build an original-index -> fragment-index map for numbering.
+    # diazo N). Build an original-index -> fragment-index map for numbering.
     attach_set = set(attach_atoms)
     parent_mol = None
     orig_to_frag = None
@@ -1280,8 +1280,8 @@ def _name_poly_diazonium(mol, cation_indices, style: str) -> str:
         return ''
     name = f"{parent}-{','.join(map(str, locs))}-{mult}(diazonium)"
     # 6. 0-wrong RT-gate (ring-numbering coupling can differ from the parent
-    #    name's own numbering on an exotic heteroarene): ship only if it parses
-    #    back to the input structure.
+    # name's own numbering on an exotic heteroarene): ship only if it parses
+    # back to the input structure.
     if not _cation_name_rt_ok(name, mol):
         return ''
     return name
@@ -1292,8 +1292,8 @@ def _name_diazonium(mol, cation_idx: int, style: str) -> str:
 
     The cationic N (``cation_idx``) sits somewhere in a terminal
     -N#N+/-N=N+ pair; WHICH of the two N atoms carries the formal charge is
-    a resonance-drawing choice RDKit does not normalise (Phase 3B SPY,
-    ``.planning/audit-v32/phase3b-resonance-spy.md`` Q4). The CANONICAL
+    a resonance-drawing choice RDKit does not normalise (a phase a trace,
+    `internal notes` Q4). The CANONICAL
     drawing (``R-N+#N``) puts the charge on the PROXIMAL N -- directly
     bonded to the parent-attachment atom. The charge-shifted TWIN
     (``R-N=N+``) puts it on the TERMINAL N instead, whose only neighbour is
@@ -1351,7 +1351,7 @@ def _bare_parent_ion_unit(mol, ion_idx: int, kind: str):
 
       ``kind='heteroatom_hydride_anion'`` -> ``<parent-hydride stem>ide``
           (P/As/Sb/Si/Ge/Sn/Pb: phosphanide, arsanide, silanide, …).
-      ``kind='onium'``                    -> ``cation_to_prefix(as_free_ion=True)``
+      ``kind='onium'`` -> ``cation_to_prefix(as_free_ion=True)``
           (the standalone onium-cation unit: phosphanium, sulfanium, oxidanium…).
 
     Returns ``(unit_name, attach_idx)`` or ``None`` (out of scope: a substituted
@@ -1443,8 +1443,8 @@ def _name_bis_parent_ion_linker(mol, ion_indices, kind: str, style: str) -> str:
     parent-ion units hanging off ONE di/polyvalent skeletal linker ->
     ``(LINKER)bis(UNIT)``:
 
-        [PH-]c1ccc([PH-])cc1  -> (1,4-phenylene)bis(phosphanide)   (anion)
-        [PH3+]c1ccc([PH3+])cc1 -> (1,4-phenylene)bis(phosphanium)  (cation)
+        [PH-]c1ccc([PH-])cc1 -> (1,4-phenylene)bis(phosphanide) (anion)
+        [PH3+]c1ccc([PH3+])cc1 -> (1,4-phenylene)bis(phosphanium) (cation)
 
     Mirrors ``emit_bis_quaternary_ammonium`` (the two units must be BYTE-IDENTICAL
     free-ion strings, the linker is named as one divalent substituent group), but
@@ -1533,6 +1533,62 @@ def _name_bis_acyl_azanide(mol, anion_indices, style: str) -> str:
     return name
 
 
+def emit_secondary_amine_azanide(mol, anion_idx: int, style: str) -> str:
+    """P-72.2.2.2.4 (the Blue Book, ``acetylazanide (PIN)``): a
+    DISUBSTITUTED azanide R-[N-]-R' — a deprotonated secondary amide /
+    sulfonamide / secondary amine named as azanide (NH2-) carrying two
+    N-substituent prefixes. P-72.2.2.2 point (3) disallows the ``...aminide``
+    method-(1) form for amides, so azanide IS the PIN for the acyl/sulfonyl
+    arms; for a pure secondary-amine arm the PIN is technically ``...aminide``
+    (P-72.2.2.2.3), and this azanide form is then a correct RT-verified
+    best-effort — either way the emitted structure is exactly the input.
+
+    Names each N-arm as a substituent prefix (``name_substituent_fragment``),
+    alphabetises (P-14.5), escalates the enclosing marks (P-16.3.3 via
+    ``apply_enclosing_marks``), and appends ``azanide``. RT-gated on the FULL
+    InChIKey (``_cation_name_rt_ok``) — fail closed to '' (never a wrong or
+    label-dropping name). Scoped to the ACYCLIC secondary-N-anion shape: a
+    non-aromatic N-, formal charge -1, no H, exactly two heavy neighbours that
+    fall into DISJOINT fragments once the two N-bonds are severed (a ring
+    bridging both arms back to N is an in-ring N-anion, a different class).
+    A trisubstituted N- (azanediide) is out of scope here.
+    """
+    from ..assembly.substituent_naming import name_substituent_fragment
+    from ..assembly.naming_utils import apply_enclosing_marks, alpha_sort_key
+    a = mol.GetAtomWithIdx(anion_idx)
+    if (a.GetSymbol() != 'N' or a.GetFormalCharge() != -1
+            or a.GetTotalNumHs() != 0 or a.GetIsAromatic()):
+        return ''
+    neighbours = [nb.GetIdx() for nb in a.GetNeighbors()
+                  if nb.GetSymbol() != 'H']
+    if len(neighbours) != 2:
+        return ''
+    rw = Chem.RWMol(mol)
+    for nb in neighbours:
+        rw.RemoveBond(anion_idx, nb)
+    frag = rw.GetMol()
+    comps = Chem.GetMolFrags(frag, asMols=False, sanitizeFrags=False)
+    idx_to_comp = {}
+    for ci, atoms in enumerate(comps):
+        for at in atoms:
+            idx_to_comp[at] = ci
+    if idx_to_comp[neighbours[0]] == idx_to_comp[neighbours[1]]:
+        return ''  # arms share a ring back to N -> in-ring N-anion, not azanide
+    prefixes = []
+    for nb in neighbours:
+        sub_atoms = list(comps[idx_to_comp[nb]])
+        pref = name_substituent_fragment(mol, sub_atoms, nb, [anion_idx])
+        if not pref:
+            return ''
+        prefixes.append(pref)
+    prefixes.sort(key=alpha_sort_key)
+    enclosed = ''.join(apply_enclosing_marks(p, -1) for p in prefixes)
+    name = f"{enclosed}azanide"
+    if not _cation_name_rt_ok(name, mol):
+        return ''
+    return name
+
+
 def emit_acylium(mol, cation_idx: int, style: str) -> str:
     """P-73.2.3.1 (BB 41623 PIN): name an acylium cation R-C(+)=O.
 
@@ -1588,15 +1644,15 @@ def _neutralize_fragment(mol, *, add_h_for_cation: bool = False):
     exactly P-72.7(a) "maximum number of anionic centers". Mirrors the verified
     _name_oxoacid_anion neutralize loop (ions.py:929-939).
 
-    Cation neutralization is class-dependent (CONTEXT D-02 — which neutral form):
+    Cation neutralization is class-dependent (CONTEXT — which neutral form):
       - PROTON-GAIN cations (protonated amine/onium): the cation has an EXTRA H,
         so removing |charge| H restores the neutral amine/hydride
-        (``[NH4+]``->``ammonia``, ``C[NH3+]``->``methylamine``).  ``add_h_for_cation
+        (``[NH4+]``->``ammonia``, ``C[NH3+]``->``methylamine``). ``add_h_for_cation
         = False``.
       - HYDRIDE-LOSS cations (carbenium ``ylium``, acylium): the cation is the
         parent hydride MINUS a hydride (H-), so ADDING |charge| H restores the
         parent hydride (``[CH3+]``->``methane``, then ``ane``->``ylium`` =
-        ``methylium``; P-73.2.2.1.1).  ``add_h_for_cation = True``.
+        ``methylium``; P-73.2.2.1.1). ``add_h_for_cation = True``.
     Internal (nitro/azide/N-oxide/diazo) charges are LEFT intact (P-59). Radical
     electrons are saturated with H (the P-71 suffix is re-applied by the caller).
     """
@@ -1650,11 +1706,11 @@ def _reenter(neutral_smi: str, style: str) -> str:
 
 
 def _best_effort_reenter_kwargs() -> dict:
-    """v33 breadth: when the OUTER call is best-effort, name the neutral parent
+    """ breadth: when the OUTER call is best-effort, name the neutral parent
     best-effort too, so a charged molecule whose neutral parent is nameable ONLY
     under the general/best-effort tier (a complex carboxylate/ammonium/phosphate,
     ~40% of the abstention census) converts instead of abstaining -- the charge is
-    incidental, not the blocker.  Reads ``best_effort_ctx`` so the PIN/default tier
+    incidental, not the blocker. Reads ``best_effort_ctx`` so the PIN/default tier
     (ctx False) re-enters PIN-only exactly as before (gate byte-identical); the
     best-effort name still faces the caller's E1/SELF-01 certification, so 0-wrong
     holds by construction."""
@@ -1669,7 +1725,7 @@ def _best_effort_reenter_kwargs() -> dict:
 
 
 def _reenter_forced(neutral_smi: str, style: str, principal_fg: str) -> str:
-    """T3 (Phase 173.6): re-enter the neutral skeleton with the anion's acid group
+    """T3 (a phase.6): re-enter the neutral skeleton with the anion's acid group
     FORCED as the principal characteristic group (P-72/P-74). Used only when the
     default re-entry let a senior neutral acid (carboxylic) take the principal slot,
     so the S/P-oxoacid suffix never appeared and the ionize step found no match."""
@@ -1680,7 +1736,7 @@ def _reenter_forced(neutral_smi: str, style: str, principal_fg: str) -> str:
 
 
 def _reenter_gated(neutral_smi: str, style: str) -> str:
-    """v36 B1: re-enter the neutral skeleton with the OPSIN validity gate ON.
+    """ B1: re-enter the neutral skeleton with the OPSIN validity gate ON.
 
     The default ``_reenter`` deliberately DISABLES the gate (SUB-03: a valid-but-
     unparseable INTERMEDIATE must not be suppressed before the ionize step). But
@@ -1699,7 +1755,7 @@ def _reenter_gated(neutral_smi: str, style: str) -> str:
 
 def _reenter_amine_forced_no_retained(neutral_smi: str, style: str,
                                       amine_fg: str) -> str:
-    """v36 B2: re-enter the neutral skeleton with the amine FORCED as the
+    """ B2: re-enter the neutral skeleton with the amine FORCED as the
     principal characteristic group AND the RETAINED_NAME dispatch handler
     excluded.
 
@@ -1734,16 +1790,16 @@ def _heavy_atom_multiset(smiles: str):
 
 
 def _reenter_atom_coverage(neutral_name: str, neutral_smi: str) -> Optional[bool]:
-    """v36 B1 atom-coverage guard (the ``covered == all-atoms``
+    """ B1 atom-coverage guard (the ``covered == all-atoms``
     precondition). Re-parse ``neutral_name`` through OPSIN (PLAIN, neutral-vs-
     neutral -- valid, unaffected by SUB-03's unparseable-INTERMEDIATE concern) and
     compare its heavy-atom multiset to ``neutral_smi``:
 
-      * True  -- the name's heavy-atom composition EQUALS the fragment's (covered).
+      * True -- the name's heavy-atom composition EQUALS the fragment's (covered).
       * False -- the name PARSES but its composition differs (the atom-DROP
                  signature: a parseable retained/NP name that silently omits
                  substituents, e.g. ``tropane`` for the benzatropine free base).
-      * None  -- the name is OPSIN-UNPARSEABLE. This is the legitimate SUB-03
+      * None -- the name is OPSIN-UNPARSEABLE. This is the legitimate SUB-03
                  intermediate shape; return None so the caller LEAVES IT as-is
                  (byte-identical, no retry) -- the atom-drop bug always produces a
                  PARSEABLE name, so an unparseable one is never the bug.
@@ -1787,7 +1843,7 @@ def _cation_name_rt_ok(name: str, mol) -> bool:
 
 
 def _ring_aza_cation_name(neutral_name: str, mol) -> str:
-    """v36 B1: derive the cationic name for a protonated RING nitrogen from the
+    """ B1: derive the cationic name for a protonated RING nitrogen from the
     (atom-coverage-verified) neutral von-Baeyer / replacement parent name.
 
     A ring-N cation cannot use the acyclic ``amine -> aminium`` text transform
@@ -1796,7 +1852,7 @@ def _ring_aza_cation_name(neutral_name: str, mol) -> str:
     replacement (``...8-azabicyclo[3.2.1]octane``); the cation at that same N is
     named by EITHER the parent-hydride ``-ium`` suffix cited at the aza locant
     (``...octan-8-ium``, P-73.1.2) OR the ``azonia`` replacement (``...8-azonia-
-    bicyclo[3.2.1]octane``, P-73.2.2.1.2). Both spellings are OPSIN-valid (SPY-B1
+    bicyclo[3.2.1]octane``, P-73.2.2.1.2). Both spellings are OPSIN-valid (a trace-B1
     §3). Build both candidates and RETURN THE FIRST that OPSIN round-trips against
     ``mol`` via ``_cation_name_rt_ok`` (the JPype ``opsin_parse`` path -- full-InChIKey
     identity, **fail-CLOSED** whether the jar is present OR absent; NOT the subprocess
@@ -1886,7 +1942,7 @@ _route_reentry = _threading.local()
 # form re-triggers charged/radical routing WITHOUT converging -- e.g. a radical
 # metal atom whose neutralization cannot remove the radical, so the re-entry is
 # still a radical: route_charged -> name_radical -> _reenter -> _handle_radical
-# -> name_radical -> route_charged -> ... forever (the `[99Tc]` 14.5h hang).
+# -> name_radical -> route_charged ->... forever (the `[99Tc]` 14.5h hang).
 # Bound it: beyond this depth route_charged bails to '' (legacy fallthrough)
 # instead of hanging. Thread-local so the benchmark's worker threads stay
 # independent.
@@ -1917,7 +1973,7 @@ def _aminium_or_azaniumyl(neutral_name: str, n_cation_sites: int) -> str:
     (cysteamine -> cysteaminium).
 
     P-73.1.1.1 / P-74: when a SENIOR characteristic group owns the suffix
-    (-oic acid / -ol / -one / -amide ...), the neutral pipeline already expresses
+    (-oic acid / -ol / -one / -amide...), the neutral pipeline already expresses
     the amine as an 'amino' substituent PREFIX, with its locant, N-substituents
     and enclosing marks placed correctly. The protonated nitrogen is then the
     cationic substituent prefix 'azaniumyl' (azanium = NH4+, P-73.1.1.1;
@@ -1947,7 +2003,7 @@ def _aminium_or_azaniumyl(neutral_name: str, n_cation_sites: int) -> str:
 def _quaternary_rt_ok(name: str, mol) -> bool:
     """Mono-cation OPSIN round-trip backstop for the quaternary-aminium name.
 
-    Phase 184 WS-E.1 (183 WR-01 precedent): parse the generated ``name`` back
+    a phase WS-E.1 (183 WR-01 precedent): parse the generated ``name`` back
     through OPSIN and confirm it reconstructs the SAME structure as ``mol`` (strict
     RDKit-canonical identity). A malformed quaternary name therefore fails CLOSED
     (the caller returns '') rather than shipping a structurally-wrong name.
@@ -1963,7 +2019,7 @@ def _quaternary_rt_ok(name: str, mol) -> bool:
         return False
     try:
         from ..assembly.retained_substitution import OpsinOracle
-        # Resolve the OPSIN jar the same way the namer does (Phase 168/169
+        # Resolve the OPSIN jar the same way the namer does (a phase/169
         # precedent); if it cannot be found the oracle's _jar stays None and
         # _invoke_opsin raises -> the outer except fails OPEN (jar-missing).
         _jar = None
@@ -2066,11 +2122,11 @@ def route_charged(mol, style: str = 'pin') -> str:
 
     Generalizes _name_oxoacid_anion to every charged class. Returns the IUPAC
     name, or '' on any failure / out-of-scope shape (caller falls through to the
-    legacy cascade — v18 byte-identical contract).
+    legacy cascade — byte-identical contract).
 
     Pipeline (IMPLEMENTATION-MAP §2):
-      1. metal complex                       -> '' (salt composition is Plan 04)
-      2. multi-fragment (salt / arbitrary)   -> '' (salt composition is Plan 04)
+      1. metal complex -> '' (salt composition is Plan 04)
+      2. multi-fragment (salt / arbitrary) -> '' (salt composition is Plan 04)
       3. classify ionic centers + GUARDS 1-4
       4. neutralize the fragment (+ sanitize)
       5. re-enter Orthonym(style).name(neutral_smi)
@@ -2096,7 +2152,7 @@ def route_charged(mol, style: str = 'pin') -> str:
     if mol.GetNumHeavyAtoms() > _MAX_CHARGED_ROUTE_HEAVY_ATOMS:
         return ''
 
-    # --- Step 2b (charged-species fix, 169.6 caveats, Phase 169.7): retained-name-first ONLY for
+    # --- Step 2b (charged-species fix, 169.6 caveats, a phase.7): retained-name-first ONLY for
     # the CATEGORY of retained charged species that LACK a valid systematic PIN — i.e.
     # whose neutralize -> re-name -> re-apply-suffix path produces an OPSIN-unparseable
     # systematic form that the SUB-03 gate then suppresses to 'unknown' (the documented
@@ -2143,7 +2199,21 @@ def route_charged(mol, style: str = 'pin') -> str:
             if cy:
                 return cy
 
-    # Task 8B RC3 (P-73.1.2.2, BB:41505): a SUBSTITUTED uronium / thiouronium cation
+    # P-73.1.1.2 (the Blue Book): a disubstituted halogen(III) cation R2X+ (diaryl-
+    # iodanium) is named on the halogen parent hydride + '-ium' — the SYSTEMATIC PIN
+    # ((C6H5)2I+ -> diphenyliodanium), the cation mirror of the diphenyliodanuide
+    # -uide anion. classify_cation returns 'unknown' for a halogen centre and the
+    # generic neutralize path cannot build it (drop-charge -> invalid neutral halogen
+    # radical; add-H -> the wrong λ-parent), so emit_halogen_onium owns it directly.
+    # RT-gated (0-wrong): a mis-built name fails CLOSED. Tightly scoped (halogen, +1,
+    # degree>=2) so no other cation class is disturbed.
+    if n_cations == 1 and not n_anions:
+        from .ions import emit_halogen_onium
+        ho = emit_halogen_onium(mol, sites['cations'][0]['atom_idx'])
+        if ho and _cation_name_rt_ok(ho, mol):
+            return ho
+
+    # Task 8B RC3 (P-73.1.2.2, the Blue Book): a SUBSTITUTED uronium / thiouronium cation
     # (protonated iso/urea — a C bonded to two N + one O/S, net +1) is named on the
     # retained parent cation 'uronium'/'thiouronium' with N,N'/O/S substituent locants
     # -> N,N'-dimethyl-O-phenyluronium. The neutralize path cannot reach it (the neutral
@@ -2156,7 +2226,7 @@ def route_charged(mol, style: str = 'pin') -> str:
         if ur and _uronium_rt_ok(ur, mol):
             return ur
 
-    # Phase 3B (SPY .planning/audit-v32/phase3b-resonance-spy.md Q4): the SAME
+    # a phase (a trace internal notes Q4): the SAME
     # RDKit valence-model artifact documented above for R-S+/R-Se+ also hits
     # the charge-shifted diazonium TWIN (R-N=N+). Its terminal N+ is degree-1
     # with only a DOUBLE bond (valence contribution 2) against the
@@ -2169,7 +2239,7 @@ def route_charged(mol, style: str = 'pin') -> str:
     # _apply_guard3_reorder and every other guard) handles both drawings
     # exactly alike via the existing 'diazonium' -> _name_diazonium branch.
     #
-    # Defense-in-depth (fable review, 2026-08-15): the condition MUST match the
+    # Defense-in-depth (a review review, 2026-08-15): the condition MUST match the
     # exact artifact signature, not just "1 radical site == 1 cation site,
     # classified diazonium" -- that looser test also matches a GENUINE
     # open-shell monoradical cation such as ``c1ccccc1[N+]=N`` (1 radical
@@ -2285,7 +2355,7 @@ def route_charged(mol, style: str = 'pin') -> str:
                 bis = _poly_to_bis_cation_suffix(_nn) if _nn else ''
                 if bis:
                     return bis
-            # Task 8C (P-73.2.2.1.1 / BB:7114): >= 2 carbenium -ylium centres
+            # (P-73.2.2.1.1 / the Blue Book): >= 2 carbenium -ylium centres
             # on ONE acyclic all-carbon parent -> suffix multiplication
             # 'parent-<locs>-bis(ylium)' ([CH2+]C[CH2+] -> propane-1,3-bis(ylium),
             # [CH2+][CH2+] -> ethane-1,2-bis(ylium)). emit_poly_cation_ylium fails
@@ -2297,7 +2367,7 @@ def route_charged(mol, style: str = 'pin') -> str:
                     mol, [c['atom_idx'] for c in sites['cations']])
                 if poly_yl:
                     return poly_yl
-            # Task 8C (P-73.5.1.1): >= 2 terminal -N#N+ diazonium groups on ONE
+            # (P-73.5.1.1): >= 2 terminal -N#N+ diazonium groups on ONE
             # ring parent -> 'ring-<locs>-bis(diazonium)' (N#[N+]c1ccc([N+]#N)cc1 ->
             # benzene-1,4-bis(diazonium)). _name_poly_diazonium severs every group,
             # names the ring parent, numbers the attachment set, and RT-gates the
@@ -2307,7 +2377,7 @@ def route_charged(mol, style: str = 'pin') -> str:
                     mol, [c['atom_idx'] for c in sites['cations']], style)
                 if pdz:
                     return pdz
-            # v33 Phase 3 (P-73.5.1.1/.2): a SYMMETRIC bis-quaternary-ammonium
+            # a phase (P-73.5.1.1/.2): a SYMMETRIC bis-quaternary-ammonium
             # dication joined by a straight, saturated, unbranched all-carbon
             # bridge -> the multiplicative '{bridge-diyl}bis({onium unit})'
             # assembly, e.g. hexamethonium
@@ -2320,7 +2390,7 @@ def route_charged(mol, style: str = 'pin') -> str:
                 biq = emit_bis_quaternary_ammonium(mol, sites['cations'])
                 if biq:
                     return biq
-            # Task 8D (P-73.5.1.1 Case B, BB:42113): exactly 2 IDENTICAL bare
+            # (P-73.5.1.1 Case B, the Blue Book): exactly 2 IDENTICAL bare
             # ONIUM units (O/S/P/Se+) on ONE divalent skeletal linker ->
             # '(LINKER)bis(onium)' ([PH3+]c1ccc([PH3+])cc1 -> (1,4-phenylene)-
             # bis(phosphanium)). Mirrors the bis-quaternary linker assembly but
@@ -2350,12 +2420,28 @@ def route_charged(mol, style: str = 'pin') -> str:
             acy = emit_acylium(mol, sites['cations'][0]['atom_idx'], style)
             if acy:
                 return acy
+        # P-73.2.2.1.1 method (1): a single ONIUM (P+/S+/O+/...) at a SPIRO
+        # JUNCTION -- a ring hetero-cation whose four bonds are all ring bonds --
+        # cannot be neutralized (the neutral atom is over-valent, SanitizeMol
+        # raises) so the generic neutralize -> re-enter seam below abstains. Name
+        # it as the neutral heteroatom-spiro PARENT + '-ium' at the cation locant
+        # (...phosphaspiro...-ium /...thiaspiro...-ium, the PIN method (1); NOT
+        # the 'onia' cationic-replacement form). name_charged_spiro_system is
+        # scoped to a spiro-ATOM cation, so it cannot override a working
+        # ring-member onium; RT-gate and ship only on a full-InChIKey match.
+        if ccls == 'onium' and len(sites['cations']) == 1:
+            cat_idx = sites['cations'][0]['atom_idx']
+            if mol.GetAtomWithIdx(cat_idx).IsInRing():
+                from .spiro import name_charged_spiro_system
+                spiro_ium = name_charged_spiro_system(mol, cat_idx)
+                if spiro_ium and _cation_name_rt_ok(spiro_ium, mol):
+                    return spiro_ium
         # (R-S+/R-Se+ sulfanylium is intercepted earlier, before the radical-ion
         # bail, because RDKit flags the 1-coordinate chalcogen cation as a radical.)
         # WS-E.1 (P-73.1.2.1 + Table 7.4): a QUATERNARY ammonium N (0 H, degree
         # >= 4) CANNOT take the _neutralize_fragment path — removing the lost
         # proton leaves an over-valent neutral N and SanitizeMol raises -> ''
-        # (RESEARCH Pitfall 2) — and it is NOT an azaniumyl-prefix case (D-05;
+        # (RESEARCH Pitfall 2) — and it is NOT an azaniumyl-prefix case (;
         # azaniumyl is zwitterion-only, P-74.1.3). Name it directly via the
         # demote-N -> find_principal_chain -> '-aminium' emitter on the ORIGINAL
         # mol. C[N+](C)(C)C -> N,N,N-trimethylmethanaminium.
@@ -2375,6 +2461,17 @@ def route_charged(mol, style: str = 'pin') -> str:
                 ring_ium = emit_parent_hydride_cumulative_suffix(mol, cat_idx, 'ium')
                 if ring_ium:
                     return ring_ium
+                # P-73.2.2.1.1 method (1): a quaternary onium at a SPIRO JUNCTION
+                # (a ring N+ whose four bonds are all ring bonds) has no exocyclic
+                # substituent for emit_parent_hydride's DEMOTE branch to sever, and
+                # it cannot be neutralized (the neutral 4-bonded N is over-valent).
+                # Name it as the neutral aza-spiro PARENT + '-ium' at the cation
+                # locant (...azaspiro...-ium, the PIN; NOT...azoniaspiro...), then
+                # RT-gate: ship only on a full-InChIKey match, else abstain.
+                from .spiro import name_charged_spiro_system
+                spiro_ium = name_charged_spiro_system(mol, cat_idx)
+                if spiro_ium and _cation_name_rt_ok(spiro_ium, mol):
+                    return spiro_ium
             from .ions import name_quaternary_aminium
             result = name_quaternary_aminium(mol, sites['cations'][0])
             if not result:
@@ -2495,7 +2592,7 @@ def route_charged(mol, style: str = 'pin') -> str:
             if het_name:
                 return het_name
             return ''   # primitive declined (un-nameable heterane) -> legacy
-        # Task 8D (P-72.5.1.1 Case B, BB:41163): exactly 2 IDENTICAL bare
+        # (P-72.5.1.1 Case B, the Blue Book): exactly 2 IDENTICAL bare
         # heteroatom-hydride -ide anions (P/As/Si/…) on ONE divalent skeletal
         # linker -> '(LINKER)bis(-ide)' ([PH-]c1ccc([PH-])cc1 -> (1,4-phenylene)-
         # bis(phosphanide)). Mirrors the onium/bis-quaternary linker assembly on
@@ -2507,7 +2604,7 @@ def route_charged(mol, style: str = 'pin') -> str:
                 'heteroatom_hydride_anion', style)
             if biq:
                 return biq
-        # Task 8D (P-72.5.1.1 Case B): >= 2 identical acyl-azanide anions
+        # (P-72.5.1.1 Case B): >= 2 identical acyl-azanide anions
         # (R-CO-NH-) on ONE di/polyacyl linker -> '<polyacyl>bis(azanide)'
         # ([NH-]C(=O)CCC([NH-])=O -> butanedioylbis(azanide)). The acyl linker
         # is named off the reconstructed neutral poly-acid (as the single
@@ -2575,12 +2672,12 @@ def route_charged(mol, style: str = 'pin') -> str:
         # P-72.2.2.2.3: a single =N- imine anion enables the RT-audited iminide
         # locant omission after the suffix seam (butan-1-iminide -> butaniminide).
         anion_is_iminide = (_single == {'iminide'} and len(sites['anions']) == 1)
-        # WS-E.3 (D-11/D-12): charge-first PCG on the ORIGINAL (un-neutralized) mol.
+        # WS-E.3 (/): charge-first PCG on the ORIGINAL (un-neutralized) mol.
         # The actually-ionized senior acid class anchors the name (P-72); a neutral
         # group of higher P-41 seniority is demoted to a prefix. Subsumes the old
         # per-site _ANION_PRINCIPAL_FG.get(...) lookup (same dict + seniority order).
         # The carbanion short-circuit above already returned; classify_charged_pcg
-        # returns None for carbanion/alkoxide-only anyway (== the old .get() == None),
+        # returns None for carbanion/alkoxide-only anyway (== the old.get() == None),
         # so the 173.6 sulfonate/sulfinate/phosphonate behavior is byte-identical.
         anion_override_fg = classify_charged_pcg(mol, sites)
     else:
@@ -2599,7 +2696,7 @@ def route_charged(mol, style: str = 'pin') -> str:
     if not neutral_name or _is_malformed_parent(neutral_name):
         return ''
 
-    # --- Step 5b (v36 B1): ATOM-COVERAGE GUARD for the aminium re-entry.
+    # --- Step 5b (B1): ATOM-COVERAGE GUARD for the aminium re-entry.
     # ``_reenter`` runs with the OPSIN validity gate DISABLED (SUB-03), which also
     # lets an atom-DROPPING retained / natural-product name through unchecked
     # (benzatropine free base -> ``tropane``, dropping the C3 diphenylmethoxy;
@@ -2626,7 +2723,7 @@ def route_charged(mol, style: str = 'pin') -> str:
         _radical_center_idx = radical_sites[0]['atom_idx']
         # P-29.2 / Table 3.4: radicals are named as SUBSTITUENT GROUPS. A SIMPLE
         # unbranched terminal radical keeps the contracted retained form WITHOUT a
-        # locant — the Blue Book lists 'CH3-CH2• ethyl (PIN)' (BlueBookV2.md:17597
+        # locant — the Blue Book lists 'CH3-CH2• ethyl (PIN)' (the Blue Book
         # Table 3.4 example), not 'ethan-1-yl'; likewise 'methyl'/'propyl'. So the
         # proven P-71.1.1 textual contraction (_apply_radical_suffix) IS the PIN for
         # those. It is ALSO the correct path for the single-carbon -ylidene/-ylidyne
@@ -2636,7 +2733,7 @@ def route_charged(mol, style: str = 'pin') -> str:
         # NON-terminal / branched / unsaturated radical: the centre needs a
         # first-class locant (P-71 / P-31.1.4.3.4 lowest-locant for the free
         # valence, competing with unsaturation/substituents per P-31/P-14.4) —
-        # exactly like the WS-E.2 carbanion -ide centre (BlueBookV2.md:17608
+        # exactly like the WS-E.2 carbanion -ide centre (the Blue Book
         # 'ethan-2-id-1-yl (PIN)'). Route through the 184-01 primitive so
         # CC[CH]CC -> 'pentan-3-yl', not the locant-less 'pentyl'.
         # CRITICAL (Pitfall 1): pass the ORIGINAL mol + the centre index in the
@@ -2660,7 +2757,7 @@ def route_charged(mol, style: str = 'pin') -> str:
     # the funnel — so deleting the stub's carbon-counting FALLBACK (Task 2) keeps
     # the aminium output byte-identical (methylaminium / pyrrolidineium etc.).
     if cation_kind == 'aminium':
-        # v36 B1: a protonated RING N (reached here when the ring-aware emitters at
+        # B1: a protonated RING N (reached here when the ring-aware emitters at
         # Step 3 declined -- a bridged / von-Baeyer bicyclic they cannot number)
         # takes the '-ium'/'azonia' cationic form cited at the aza locant, derived
         # from the (coverage-verified) neutral replacement name and RT-verified.
@@ -2672,11 +2769,11 @@ def route_charged(mol, style: str = 'pin') -> str:
                 ring_cat = _ring_aza_cation_name(neutral_name, mol)
                 if ring_cat:
                     return ring_cat
-        # T1 (Phase 173.6): a senior-group protonated amine becomes an 'azaniumyl'
+        # T1 (a phase.6): a senior-group protonated amine becomes an 'azaniumyl'
         # substituent prefix (P-73.1.1/P-74), not 'ium' appended to the parent;
         # a principal amine keeps the proven '-aminium' suffix.
         naive = _aminium_or_azaniumyl(neutral_name, len(sites['cations'])) or ''
-        # v36 B2 (aminium-suffix correctness): the naive transform blindly appends
+        # B2 (aminium-suffix correctness): the naive transform blindly appends
         # 'ium' to whatever neutral name it is handed. When that neutral name is a
         # RETAINED name whose principal suffix is NOT the amine (trometamol is
         # diol-principal), the result is OPSIN-unparseable ('trometamolium').
@@ -2721,7 +2818,19 @@ def route_charged(mol, style: str = 'pin') -> str:
             ionized = _iminide_omit_locants(ionized, mol)
         return ionized
 
-    # T3 (Phase 173.6): the first re-entry let a SENIOR neutral acid (carboxylic,
+    # M4 (P-72.2.2.2.4): the suffix-swap above has no ``-amine``/``-imine``
+    # token to convert for a disubstituted secondary-N-anion (its N is emitted as
+    # a prefix / ring-N, not an ``-amine`` suffix), so it returned ''. Before
+    # abstaining, try the disubstituted-azanide construction ``(A)(B)azanide``.
+    # Placed AFTER the ionize seam declines (never before), so no currently-named
+    # aminide changes name -- this only converts a would-be abstain, RT-gated.
+    if _single == {'aminide'} and len(sites['anions']) == 1:
+        az = emit_secondary_amine_azanide(
+            mol, sites['anions'][0]['atom_idx'], style)
+        if az:
+            return az
+
+    # T3 (a phase.6): the first re-entry let a SENIOR neutral acid (carboxylic,
     # P-41) take the principal slot, so the anion's S/P-oxoacid suffix never appeared
     # and the ionize match failed. Per P-72/P-74 the CHARGED group IS the principal
     # characteristic group of an anion -> re-enter with the anion's acid FG forced as
@@ -2764,9 +2873,9 @@ def _is_simple_terminal_radical(mol, center_idx: int) -> bool:
     if center.GetSymbol() != 'C':
         return False
     # Whole-molecule must be an unbranched acyclic SATURATED all-carbon chain:
-    #   - no rings, no heteroatoms, no multiple bonds;
-    #   - every carbon has at most 2 carbon neighbours (a straight chain);
-    #   - the radical centre is a terminus (<= 1 carbon neighbour) or a lone C.
+    # - no rings, no heteroatoms, no multiple bonds;
+    # - every carbon has at most 2 carbon neighbours (a straight chain);
+    # - the radical centre is a terminus (<= 1 carbon neighbour) or a lone C.
     if mol.GetRingInfo().NumRings() > 0:
         return False
     for atom in mol.GetAtoms():

@@ -352,7 +352,7 @@ _BENZENE_FG_SMARTS = {
     'thioamide': Chem.MolFromSmarts('[CX3](=[SX1])[NX3H2]'),
     'acid_cl': Chem.MolFromSmarts('[CX3](=O)[Cl]'),
     'thio_acid': Chem.MolFromSmarts('[CX3](=O)[SX2H1]'),
-    # Phase 2 Group A (P-65.1.3.2 / Table 4.3): ring-attached hydrazonic acid
+    # v42 Phase 2 Group A (P-65.1.3.2 / Table 4.3): ring-attached hydrazonic acid
     # -C(=N-NH2)-OH -> '-carbohydrazonic acid'.  Perception already fires
     # (`hydrazonic_acid` FG), but the benzene ring handler had no suffix routing,
     # so `NN=C(O)c1ccccc1` fell to systematic.  =N-NH2 (not =O / not single N) is
@@ -1334,7 +1334,7 @@ def _identify_substituent(mol, start_idx: int, ring_atoms: Set[int]) -> Optional
         from ..rules.phosphorus import (
             get_phosphanyl_prefix, name_acyl_prefix_substituent)
         sub_atoms = _bfs_substituent_atoms(mol, start_idx, ring_atoms)
-        # Phase 3c (P-68.3.2.3.2.2): a P ACYL group (a =E'-bearing P, e.g.
+        # v42 Phase 3c (P-68.3.2.3.2.2): a P ACYL group (a =E'-bearing P, e.g.
         # -P(=S)Me2) is cited as the P-67.1.4.1.1 acyl prefix
         # ('dimethylphosphinothioyl'), NOT the trivalent 'phosphanyl' — which
         # would silently drop the =E' chalcogen. Consumes the shared table; the
@@ -1358,7 +1358,7 @@ def _identify_substituent(mol, start_idx: int, ring_atoms: Set[int]) -> Optional
         from ..rules.mononuclear_hydrides import name_arsanyl_substituent
         from ..rules.phosphorus import name_acyl_prefix_substituent
         sub_atoms = _bfs_substituent_atoms(mol, start_idx, ring_atoms)
-        # Phase 3c (P-68.3.2.3.2.2): an As/Sb ACYL group (=E'-bearing, e.g.
+        # v42 Phase 3c (P-68.3.2.3.2.2): an As/Sb ACYL group (=E'-bearing, e.g.
         # -As(=O)(OH)) is cited as the P-67.1.4.1.1 acyl prefix ('hydroxyarsoryl'),
         # not the trivalent 'arsanyl' — which would drop the =E'. Fail-closed; a
         # plain trivalent As/Sb (no =E') falls through to the arsanyl namer.
@@ -2699,12 +2699,19 @@ def _identify_sulfur_group(mol, s_idx: int, ring_atoms: Set[int]) -> Optional[Di
         if alkyl_name:
             o_atom_idxs = [o.GetIdx() for o in o_double_neighbors]
             all_sub_atoms = [s_idx] + o_atom_idxs + alkyl_atoms
-            if len(o_double_neighbors) == 2:
-                # Sulfone: alkylsulfonyl
-                return {'name': f'{alkyl_name}sulfonyl', 'atoms': all_sub_atoms}
-            else:
-                # Sulfoxide: alkylsulfinyl
-                return {'name': f'{alkyl_name}sulfinyl', 'atoms': all_sub_atoms}
+            oxide_kind = 'sulfonyl' if len(o_double_neighbors) == 2 else 'sulfinyl'
+            # P-65.3.1 PIN: a ring-attached sulfone/sulfoxide substituent is the
+            # ACID-STEM oxide form (methanesulfonyl / ethanesulfonyl / methanesulfinyl),
+            # NOT the 'alkyl'+'sulfonyl' concatenation (methylsulfonyl). Route through
+            # the shared atom-aware builder -- the SAME producer the benzene-PARENT
+            # path already uses (name_chalcogen_oxide_substitutive), so the two paths
+            # agree. It re-derives the parent-hydride stem from the R' side of the
+            # graph (atom-anchored, not a string rewrite); fall back to the
+            # concatenated form only if it cannot classify that side (fail-safe).
+            from ..assembly.substituent_prefix_forms import _acid_stem_oxide_prefix
+            _pin = _acid_stem_oxide_prefix(mol, c_nbr.GetIdx(), s_idx, oxide_kind)
+            return {'name': _pin if _pin else f'{alkyl_name}{oxide_kind}',
+                    'atoms': all_sub_atoms}
 
     # Thioether (-S-R): named as alkylsulfanyl (methylsulfanyl, etc.)
     if len(c_neighbors) == 1 and len(o_double_neighbors) == 0:

@@ -1,12 +1,12 @@
 """v22 Phase-A: PIN-conformance gold packs — schema lock + fast protect tripwire.
 
-The per-class gold packs (*.json) are the v22 PRIMARY gate
-(scored by ). This is the *fast* (OPSIN-free) companion: it
+The per-class gold packs (benchmarks/pin_oracle/packs/*.json) are the v22 PRIMARY gate
+(scored by scripts/pin_conformance_eval.py). This is the *fast* (OPSIN-free) companion: it
 locks the pack schema, forbids duplicate SMILES across packs (incl. the two legacy files), and
 asserts every NEW-pack PROTECT row keeps producing its expected PIN. (Legacy gold_pins.json /
 among_rings_gold.json protect rows are guarded by their own existing tests.)
 
-See 
+See .planning/audit-bluebook-v21/remediation/DD8-validation-without-RT.md.
 """
 import json
 from pathlib import Path
@@ -53,10 +53,10 @@ def _all_pack_rows(include_legacy=False):
 
 class TestPacksExistAndLoad:
     def test_packs_dir_exists(self):
-        assert _PACK_DIR.is_dir(), "v22 Phase-A must create "
+        assert _PACK_DIR.is_dir(), "v22 Phase-A must create benchmarks/pin_oracle/packs/"
 
     def test_at_least_one_pack(self):
-        assert _pack_files(), "expected at least one gold pack in "
+        assert _pack_files(), "expected at least one gold pack in benchmarks/pin_oracle/packs/"
 
     def test_every_pack_is_valid_json_with_rows(self):
         for fp in _pack_files():

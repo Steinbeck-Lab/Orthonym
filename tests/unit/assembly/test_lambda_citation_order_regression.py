@@ -5,8 +5,8 @@ substituent ONLY by a P-45.3.1 lambda-convention marker.
 TWO independent root causes, both in code that predates the λ-spelling change
 and were masked by it, not caused by it:
 
-1. ``naming_utils._ALPHA_NOISE_HEAD`` (P-14.5 preamble, BlueBookV2.md:3446:
-   "Italicized Greek letters ... are not involved in the alphanumerical
+1. ``naming_utils._ALPHA_NOISE_HEAD`` (P-14.5 preamble, the Blue Book:
+   "Italicized Greek letters... are not involved in the alphanumerical
    order") matched only a BARE single Greek letter (``[α-ω]``), never a
    Greek letter immediately followed by a bonding-number digit
    (``λ5``, ``λ4``, ``λ6``). ``strip_alphanumerical_noise('λ5-phosphanyl')``
@@ -34,7 +34,7 @@ and were masked by it, not caused by it:
    as before.
 
 Both are P-14.5/.3.5 rule-derivation bugs in shared infrastructure, not
-lambda-spelling bugs -- see ``
+lambda-spelling bugs -- see `internal notes`
 and the lambda-fix-report.md append for the fast-gate finding
 (W2F-P7-04/W2F-P7-05, 1650/1652) that surfaced them.
 """
@@ -89,7 +89,7 @@ def test_locant_token_finder_still_reads_genuine_locant_lambda_tokens():
 
 @pytest.mark.unit
 def test_w2f_p7_04_lambda_before_phosphanylmethyl():
-    """W2F-P7-04 (BlueBookV2.md:22182, P-45.3.1 evidence PIN): once λ5 is
+    """W2F-P7-04 (the Blue Book, P-45.3.1 evidence PIN): once λ5 is
     excluded from alphanumerical order, 'phosphanyl' is a proper PREFIX of
     'phosphanylmethyl' and is cited first, regardless of which locant is
     numerically lower."""
@@ -99,7 +99,7 @@ def test_w2f_p7_04_lambda_before_phosphanylmethyl():
 
 @pytest.mark.unit
 def test_w2f_p7_05_lambda_before_plain_phosphanyl_on_tie():
-    """W2F-P7-05 (BlueBookV2.md:3318,3334, P-14.4(h)): 'phosphanyl' and
+    """W2F-P7-05 (the Blue Book,3334, P-14.4(h)): 'phosphanyl' and
     'λ5-phosphanyl' tie completely at P-14.5 tier 1 (both strip to the
     identical word); citation must not fall back to insertion-order luck."""
     assert Orthonym().name("OC(C[PH4])CP") == (

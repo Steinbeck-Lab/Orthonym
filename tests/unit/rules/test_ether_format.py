@@ -90,9 +90,9 @@ class TestEtherRegressionGuard:
     """Ensure currently-passing ether compounds remain correct."""
 
     @pytest.mark.parametrize("smiles,expected_substr", [
-        ("COc1ccccc1", "methoxybenzene"),  # F-T9/DD6 RET-01: PIN (anisole is general-only)
+        ("COc1ccccc1", "anisole"),  # a review RISK 7: bare anisole IS the PIN (the Blue Book / the Blue Book)
         ("CCOc1ccccc1", "ethoxy"),         # simple ether prefix
-        ("COc1ccc(C(=O)O)cc1", "methoxy"),  # methoxy on acid
+        ("COc1ccc(C(=O)O)cc1", "methoxy"),  # substituted -> methoxy (not anisole)
     ])
     def test_simple_ether_regression(self, smiles, expected_substr):
         """Simple ether naming should not regress."""

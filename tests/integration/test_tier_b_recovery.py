@@ -1,4 +1,4 @@
-"""Tier-B recovery test — Phase 156 SC-3 acceptance gate.
+"""Tier-B recovery test — a phase SC-3 acceptance gate.
 
 Plan-03 Task 3 deliverable. Parametrizes over the audit-locked
 `tier_b_v18_pre_156.json` fixture (Plan-01 deliverable) and asserts
@@ -10,7 +10,7 @@ per `156-AUDIT.md` § 3. With M_format_fixable = 5 the target is 4.
 
 Anti-pattern hygiene:
     AP-15: batched OPSIN call (single JVM startup) — `parse_batch_with_opsin`
-           helper from . Per-row
+           helper from `scripts/benchmark_chebi500.py`. Per-row
            `subprocess.run` is forbidden (would cost ~1269ms × N).
     AP-16: JAR candidate list contains v2.9.0 ONLY.
     AP-17: pytest.skip with classification reason for non-format-fixable
@@ -31,7 +31,7 @@ from orthonym.namer import Orthonym
 
 _FIXTURE_PATH = (
     Path(__file__).parent.parent.parent
-    / "" / "phases" / "156-opsin-grammar-pre-validation"
+    / ".planning" / "phases" / "156-opsin-grammar-pre-validation"
     / "tier_b_v18_pre_156.json"
 )
 
@@ -70,7 +70,7 @@ _SKIP = pytest.mark.skipif(
 
 
 def _parse_batch_with_opsin_helper(names, jar):
-    """Local re-import of .
+    """Local re-import of `scripts/benchmark_chebi500.parse_batch_with_opsin`.
 
     Per 156-PATTERNS.md line 575 + AP-15 prevention: ONE JVM startup, NOT N.
     """
@@ -89,7 +89,7 @@ def _parse_batch_with_opsin_helper(names, jar):
 
 @pytest.fixture(scope="module")
 def tier_b_with_156():
-    """Compute v18-with-156 outputs ONCE per test module run.
+    """Compute -with-156 outputs ONCE per test module run.
 
     Returns the rows list with two added keys per row:
         - `v18_name_with_156`: Orthonym().name(smiles) (grammar layer ON)
@@ -101,7 +101,7 @@ def tier_b_with_156():
     rows = _load_tier_b()
     namer = Orthonym()
 
-    # Phase 1: Name every row through the grammar-layer-ON pipeline.
+    # a phase: Name every row through the grammar-layer-ON pipeline.
     for r in rows:
         try:
             r["v18_name_with_156"] = namer.name(r["smiles"])
@@ -109,7 +109,7 @@ def tier_b_with_156():
             r["v18_name_with_156"] = ""
             r["v18_naming_error"] = str(e)
 
-    # Phase 2: Batch-OPSIN-parse all unique non-empty names in ONE JVM call
+    # a phase: Batch-OPSIN-parse all unique non-empty names in ONE JVM call
     # per AP-15 prevention. Per 156-AUDIT.md CF-1 the empirical OPSIN
     # call cost is 1269ms mean; per-row subprocess.run would cost ~89s
     # for 70 rows. Batched stdin/stdout streaming amortizes to ~17ms/name.
@@ -120,7 +120,7 @@ def tier_b_with_156():
     rt_map, _err_map = _parse_batch_with_opsin_helper(unique_names, jar)
 
     # InChI L1 score per row. The canonical helper lives at
-    # :inchi_l1_match` — try-import; if the
+    # `scripts/benchmark_7metric.py:inchi_l1_match` — try-import; if the
     # script path is unavailable, use a stdlib RDKit-direct fallback.
     try:
         from benchmark_7metric import inchi_l1_match  # type: ignore

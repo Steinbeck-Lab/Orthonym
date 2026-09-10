@@ -14,7 +14,7 @@ a phosgene -> carbonyl-dichloride retained-PIN rename, an oxalic-acid
 canonical-key fix, and an oxamic-acid retained-PIN add. The demoted trivial
 strings remain reachable only via the ``--trivial`` fallback.
 
-See .superpowers/sdd/task-1.9-1.10-context.md for the controller resolutions
+See.superpowers/sdd/task-1.9-1.10-context.md for the controller resolutions
 and the empirically-verified demote table.
 """
 
@@ -138,6 +138,58 @@ class TestDemoteNonPinTrivials:
                 f"{smi} should emit PIN {pin!r}"
             )
 
+    def test_task6c_wave1_data_deny_batch(self):
+        """Task 6C: veratrol / o-benzoquinone / barbituric acid are retained
+        NON-PIN names; each demotes to its systematic PIN (invariant-9: the
+        EXACT PIN, not abstain / von Baeyer / another retained variant).
+
+        - veratrol -> 1,2-dimethoxybenzene: P-63.2.2.2 'Retained names'
+          (the Blue Book '1,2-dimethoxybenzene (PIN; no substitution on anisole
+          for PINs)').
+        - o-benzoquinone -> cyclohexa-3,5-diene-1,2-dione: P-64.2.2.2.3
+          'Quinones' (the Blue Book 'No retained quinone names are used as
+          preferred IUPAC names'; the Blue Book '(PIN) (not 1,2-benzoquinone)').
+        - barbituric acid -> 1,3-diazinane-2,4,6-trione: P-64.3.1 pseudoketones
+          (the Blue Book '1,3-diazinane-2,4,6-trione (PIN)').
+        """
+        cases = {
+            "COc1ccccc1OC": "1,2-dimethoxybenzene",           # not veratrol
+            "O=C1C=CC=CC1=O": "cyclohexa-3,5-diene-1,2-dione",  # not o-benzoquinone
+            "O=C1CC(=O)NC(=O)N1": "1,3-diazinane-2,4,6-trione",  # not barbituric acid
+        }
+        for smi, pin in cases.items():
+            assert name_compound(smi, style="pin") == pin, (
+                f"{smi} should emit PIN {pin!r}"
+            )
+
+    def test_task6c_regressions_unchanged(self):
+        """The Task 6C denies key on the exact name only; the sibling retained
+        arene/quinone still emit their own PINs. UNSUBSTITUTED anisole IS the
+        bare PIN (a review RISK 7: the Blue Book 'anisole (PIN)'; the Blue Book
+        'Substitution is allowed on all structures except anisole') -- only
+        substituted derivatives become methoxybenzenes."""
+        assert name_compound("COc1ccccc1", style="pin") == "anisole"
+        assert (name_compound("O=C1C=CC(=O)C=C1", style="pin")
+                == "cyclohexa-2,5-diene-1,4-dione")
+
+    def test_anisole_bare_pin_but_substituted_are_methoxybenzenes(self):
+        """ a review RISK 7: UNSUBSTITUTED anisole is the PIN (the Blue Book
+        'anisole (PIN)'), but the Blue Book 'Substitution is allowed on all
+        structures except anisole' -- every substituted derivative is a
+        methoxybenzene, NOT an anisole. Dispatch is by exact canonical SMILES,
+        so only the bare parent hits the retained name."""
+        assert name_compound("COc1ccccc1", style="pin") == "anisole"
+        # substituted forms must NOT carry an 'anisole' base
+        for smi in ("COc1ccc(C)cc1", "COc1ccccc1Cl", "COc1ccc(Cl)cc1",
+                    "COc1ccccc1OC"):
+            got = name_compound(smi, style="pin")
+            assert "anisole" not in got.lower(), (
+                f"{smi} must be a methoxybenzene, not anisole-based; got {got!r}"
+            )
+            assert "methoxy" in got.lower(), (
+                f"{smi} should emit a methoxybenzene systematic name; got {got!r}"
+            )
+
     def test_oxalic_acid_both_key_forms(self):
         """Oxalic acid resolves under the canonical key regardless of input
         SMILES orientation (canonical-key fix, not the old non-canonical key)."""
@@ -169,7 +221,7 @@ class TestDemotedTrivialsAreDenied:
             "glycerol", "allyl alcohol", "chloroform", "phosgene",
             "catechol", "nicotinic acid", "dihydroxalate",
             "dihydrotartrate", "glyoxal",
-            "picric acid",  # v28 Cluster B (P-63.1.1.2): PIN is 2,4,6-trinitrophenol
+            "picric acid",  # (P-63.1.1.2): PIN is 2,4,6-trinitrophenol
         }
         present = {v for v in ALL_RETAINED_NAMES.values()
                    if v.lower() in demoted}
@@ -200,7 +252,8 @@ class TestDemoteRegressionGuards:
         assert name_compound("CC(=O)O", style="pin") == "acetic acid"
         assert name_compound("CCO", style="pin") == "ethanol"
         assert name_compound("OC(=O)c1ccccc1", style="pin") == "benzoic acid"
-        assert name_compound("COc1ccccc1", style="pin") == "methoxybenzene"
+        # a review RISK 7: bare anisole IS the PIN (the Blue Book / the Blue Book).
+        assert name_compound("COc1ccccc1", style="pin") == "anisole"
         assert name_compound("O=Cc1ccco1", style="pin") == "furfural"
 
     def test_purine_indicated_h_unchanged(self):
@@ -235,7 +288,7 @@ class TestC6HomoRingDemotions:
         """C1CNCCOC1 must NOT yield homomorpholine; PIN is 1,4-oxazepane.
         The HW locant-elision bug (P-22.2.2.1.2 STILL_WRONG) means the
         systematic builder currently emits a wrong-isomer name and SELF-01
-        catches it as unknown.  Either 'unknown organic compound' or
+        catches it as unknown. Either 'unknown organic compound' or
         '1,4-oxazepane' are acceptable (fail-closed better than wrong name)."""
         result = name_compound("C1CNCCOC1", style="pin")
         assert result != "homomorpholine", (

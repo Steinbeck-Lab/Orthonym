@@ -22,7 +22,7 @@ logger = logging.getLogger(__name__)
 
 def _is_sulfonyl_halide(features: Any) -> bool:
     """True iff the principal group is a sulfonyl/sulfinyl acid halide, or a
-    sulfonyl cyanide (P4-3, P-66.5.1.3.2 — same cap-and-rename body)."""
+    sulfonyl cyanide (v42 P4-3, P-66.5.1.3.2 — same cap-and-rename body)."""
     return getattr(features, 'principal_group', None) in (
         'sulfonyl_halide', 'sulfinyl_halide', 'sulfonyl_cyanide',
     )

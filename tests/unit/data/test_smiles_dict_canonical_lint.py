@@ -1,8 +1,8 @@
-"""Phase 169.7 BBR-HYG / D-11 — anti-drift lint for hard-coded SMILES dicts.
+"""a phase.7 BBR-HYG / — anti-drift lint for hard-coded SMILES dicts.
 
 The data layer keys several lookups by SMILES. If a key is NOT the RDKit canonical
 SMILES, the canonical-SMILES lookup silently MISSES it — a dead/mis-routed entry
-(audit Dim-02 §4; the D-10 mislabel class). This lint re-canonicalizes every
+(audit Dim-02 §4; the mislabel class). This lint re-canonicalizes every
 hard-coded SMILES-keyed dict against live RDKit so the drift surfaces on every CI
 run and NEW non-canonical keys are rejected.
 
@@ -13,7 +13,7 @@ keys (``_KNOWN_NONCANONICAL_RETAINED``) — a MIXED bag of redundant duplicates
 (``oxalic acid``'s correct-name key is dead while the canonical key carries the
 wrong ``dihydroxalate`` value). Re-canonicalizing them is behaviour-changing
 (activates dead retained names) and needs per-entry canary validation, so it is a
-TRACKED FOLLOW-ON (see  + 169.7-VERIFICATION.md).
+TRACKED FOLLOW-ON (see scripts/audit_smiles_dict_integrity.py + 169.7-VERIFICATION.md).
 This test pins the known set so the count can only SHRINK, never grow.
 """
 import pytest
@@ -22,7 +22,7 @@ from rdkit import Chem
 
 def _noncanonical(dictobj):
     """Return the list of non-canonical SMILES keys in a SMILES-keyed dict.
-    Composite ``||`` keys (Phase 136) are split and each part checked; keys RDKit
+    Composite ``||`` keys (a phase) are split and each part checked; keys RDKit
     cannot parse (e.g. OPSIN radical-prefix forms) are skipped (not the lint target)."""
     bad = []
     for k in dictobj:
@@ -37,7 +37,7 @@ def _noncanonical(dictobj):
     return sorted(set(bad))
 
 
-# Pre-existing non-canonical RETAINED_NAMES keys (BBR-HYG/D-11 baseline, 2026-06-05).
+# Pre-existing non-canonical RETAINED_NAMES keys (BBR-HYG/ baseline, 2026-06-05).
 # Re-canonicalizing these is a TRACKED FOLLOW-ON (behaviour-changing). New keys must
 # be canonical; this set may only shrink.
 _KNOWN_NONCANONICAL_RETAINED = frozenset({
@@ -86,7 +86,7 @@ def test_lint_detects_a_planted_bad_key():
 
 
 # ===========================================================================
-# WSD-03 (Phase 175) — NAME<->STRUCTURE integrity lint.
+# WSD-03 (a phase) — NAME<->STRUCTURE integrity lint.
 #
 # A SUPERSET of the canonical-key check: a key can be canonical yet map to the
 # WRONG molecule for its `name` (the 1,5-naphthyridine / pyrido[3,4-b]pyridine
@@ -95,10 +95,10 @@ def test_lint_detects_a_planted_bad_key():
 # entry's NAME, generated offline so the gate needs NO test-time Java). Any
 # entry whose key drifts from its committed name-structure — and is NOT in the
 # documented FIX/KEEP allowlist — fails. The live OPSIN regeneration is
-#  (run offline when entries change).
+# scripts/audit_smiles_dict_integrity.py (run offline when entries change).
 #
-# FIX (Phase 175): the naphthyridine pair was corrected
-#   (c1cnc2cccnc2c1 -> 1,5-naphthyridine; c1cnc2ccncc2c1 -> 1,6-naphthyridine)
+# FIX (a phase): the naphthyridine pair was corrected
+# (c1cnc2cccnc2c1 -> 1,5-naphthyridine; c1cnc2ccncc2c1 -> 1,6-naphthyridine)
 # so it is NOT allowlisted (it now matches).
 #
 # KEEP allowlist below = entries whose name legitimately differs from the key
@@ -111,14 +111,14 @@ _EXPECTED_CANON_PATH = _Path(__file__).parent / "fused_heterocycle_expected_cano
 
 _KEEP_NAME_STRUCTURE_MISMATCH = frozenset({
     # --- KEEP-tautomer: intentional Phase-142 purine tautomer entries. Standard
-    #     InChI normalizes the mobile ring N-H, so OPSIN emits a different (but
-    #     equivalent) tautomer's canonical SMILES for the trivial name — same
-    #     molecule, NOT a mislabel. After the v23 DATA-01 fused-heterocycle
-    #     data-integrity sweep (46 mislabeled entries corrected + heptalene key
-    #     fixed), these five are the ONLY remaining name<->structure mismatches.
-    #     The earlier KEEP-deferred block (the 43 isomer mislabels) and the
-    #     heptalene KEEP-aromaticity entry are now FIXED and removed (ratchet
-    #     shrinks). ---
+    # InChI normalizes the mobile ring N-H, so OPSIN emits a different (but
+    # equivalent) tautomer's canonical SMILES for the trivial name — same
+    # molecule, NOT a mislabel. After the DATA-01 fused-heterocycle
+    # data-integrity sweep (46 mislabeled entries corrected + heptalene key
+    # fixed), these five are the ONLY remaining name<->structure mismatches.
+    # The earlier KEEP-deferred block (the 43 isomer mislabels) and the
+    # heptalene KEEP-aromaticity entry are now FIXED and removed (ratchet
+    # shrinks). ---
     "Nc1ncnc2[nH]cnc12",            # adenine
     "Nc1nc(=O)c2[nH]cnc2[nH]1",     # guanine (tautomer)
     "Nc1nc2[nH]cnc2c(=O)[nH]1",     # guanine (tautomer)
@@ -146,7 +146,7 @@ def _name_structure_drift(expected_canon):
 
 @pytest.mark.unit
 def test_fused_heterocycle_name_structure_lint():
-    """GATE (D-06): no fused-heterocycle entry's key may drift from its committed
+    """GATE (): no fused-heterocycle entry's key may drift from its committed
     name-structure unless it is in the documented FIX/KEEP allowlist. Catches the
     silent wrong-molecule label-swap class (e.g. the naphthyridine bug, now fixed)."""
     expected_canon = _json.load(open(_EXPECTED_CANON_PATH))["expected_canon"]

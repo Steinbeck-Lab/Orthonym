@@ -1,23 +1,23 @@
 """§P-14.3.4 where the locant was BAKED INTO THE PREFIX TEXT before any licence ran.
 
-v29 Phase C Task 3b. Five defects, one shared root cause: a producer that renders
+ Phase C Task 3b. Five defects, one shared root cause: a producer that renders
 ``{locants}-{prefix}`` into a string, so the P-14.3.4 licence downstream has nothing
-left to withhold. Measured at HEAD ``c8d80c07`` with a spy validated on two known
+left to withhold. Measured at HEAD `` with a trace validated on two known
 positives (``chloropropanedioic acid``, ``chlorobutanedioic acid`` -> licence True)
 and a known negative (``ethanol`` -> zero calls at every site):
 
-======  =========================================  ==================================
-defect  producer that baked the locant             HEAD -> required
-======  =========================================  ==================================
-A       ``composer._generate_alkyl_prefixes``      ``2-methylpropanedioic acid`` ->
+====== ========================================= ==================================
+defect producer that baked the locant HEAD -> required
+====== ========================================= ==================================
+A ``composer._generate_alkyl_prefixes`` ``2-methylpropanedioic acid`` ->
                                                    ``methylpropanedioic acid``
-B       ``heterocycles._format_c_substituent``     ``2-chloropyrazine`` ->
+B ``heterocycles._format_c_substituent`` ``2-chloropyrazine`` ->
                                                    ``chloropyrazine``
-C       ``polyfunctional`` FG-prefix loop          ``2-aminopropanedioic acid`` ->
+C ``polyfunctional`` FG-prefix loop ``2-aminopropanedioic acid`` ->
                                                    ``aminopropanedioic acid``
-D       ``_name_ether_substituted_chain``          hand-rolled private licence
-E       same                                       ``bis(methoxy)`` -> ``dimethoxy``
-======  =========================================  ==================================
+D ``_name_ether_substituted_chain`` hand-rolled private licence
+E same ``bis(methoxy)`` -> ``dimethoxy``
+====== ========================================= ==================================
 
 ★ WHY THE GUARD ROWS ARE THE REAL TEST. For defect A the licence at HEAD refused at a
 "prefix text begins with a digit" guard, so ``2-methylpentanedioic acid`` was right by
@@ -36,7 +36,7 @@ Blue Book evidence, all verified by line:
 * ``:2951`` ``chloropropanedioic acid (PIN) chloromalonic acid`` and ``:2883``
   ``chlorobutanedioic acid (PIN)`` -- defects A and C's shape. ``:4973``
   ``propanedioic acid (PIN) malonic acid`` confirms the systematic parent is the PIN,
-  and ``tartronic``/``aminomalonic`` appear ZERO times in BlueBookV2.md, so no
+  and ``tartronic``/``aminomalonic`` appear ZERO times in the Blue Book, so no
   retained name pre-empts defect C's two targets.
 * ``:29834`` ``2,3-dihydroxybutanedioic acid (PIN)`` -- the DIsubstituted control:
   L3 requires monosubstitution, so this row must keep both locants.
@@ -76,7 +76,7 @@ def _mol(smiles):
 
 
 # --------------------------------------------------------------------------- #
-# 1. THE PREDICATE decides the guards -- orbits, never a molecule class        #
+# 1. THE PREDICATE decides the guards -- orbits, never a molecule class #
 # --------------------------------------------------------------------------- #
 @pytest.mark.parametrize(
     "smiles,label,expected",
@@ -101,7 +101,7 @@ def test_orbit_predicate_decides_every_guard(smiles, label, expected):
 
 
 # --------------------------------------------------------------------------- #
-# 2. DEFECT A -- alkyl prefixes on a chain parent (composer)                    #
+# 2. DEFECT A -- alkyl prefixes on a chain parent (composer) #
 # --------------------------------------------------------------------------- #
 @pytest.mark.parametrize(
     "smiles,expected",
@@ -124,8 +124,8 @@ def test_defect_a_root_cause_pair_same_parent_two_producers():
     carries no N-H, unlike the ``-diamide`` family whose amide N-H give it a second
     kind and keep its locant). At HEAD the two rows below DISAGREED::
 
-        N#CC(Cl)C#N   chloropropanedinitrile     <- `chloro` arrives as bare text
-        N#CC(C)C#N    2-methylpropanedinitrile   <- `2-methyl` arrives BAKED
+        N#CC(Cl)C#N chloropropanedinitrile <- `chloro` arrives as bare text
+        N#CC(C)C#N 2-methylpropanedinitrile <- `2-methyl` arrives BAKED
 
     Same molecule class, same parent, same one-prefix-one-locant scope; the only
     difference was which producer rendered the prefix. That is the defect, and it is
@@ -134,7 +134,7 @@ def test_defect_a_root_cause_pair_same_parent_two_producers():
     assert n.name("N#CC(Cl)C#N") == "chloropropanedinitrile"
     assert n.name("N#CC(C)C#N") == "methylpropanedinitrile"
     assert n.name("N#CC(C)CC#N") == "methylbutanedinitrile"
-    # And the family that must NOT move: an amide N-H IS substitutable (BB:2889
+    # And the family that must NOT move: an amide N-H IS substitutable (the Blue Book
     # `N1,N3-dimethylpropanediamide (PIN)`), so the diamide keeps its locant.
     assert n.name("CNC(=O)CC(=O)NC") == "N1,N3-dimethylpropanediamide"
 
@@ -157,7 +157,7 @@ def test_defect_a_guards_keep_their_locant(namer, smiles, expected):
 
 
 # --------------------------------------------------------------------------- #
-# 3. DEFECT B -- C-substituent prefixes on a heterocycle                       #
+# 3. DEFECT B -- C-substituent prefixes on a heterocycle #
 # --------------------------------------------------------------------------- #
 @pytest.mark.parametrize(
     "smiles,expected",
@@ -174,7 +174,7 @@ def test_defect_b_ring_prefix_locant_omitted(namer, smiles, expected):
     "smiles,expected",
     [
         # ★ A PRINTED BLUE BOOK PIN the brief did not mention, found by the targeted
-        # blast-radius sweep: BB:2035's P-13.1 table row is
+        # blast-radius sweep: the Blue Book's P-13.1 table row is
         # `| 7 | oxirane (PIN) | substitutive | phenyloxirane (PIN) | P-13.1 |`
         # -- a MONOsubstituted oxirane with the locant omitted. HEAD emitted
         # `2-phenyloxirane`, so defect B's fix corrects a row against the Blue Book's
@@ -182,7 +182,7 @@ def test_defect_b_ring_prefix_locant_omitted(namer, smiles, expected):
         ("c1ccccc1C1CO1", "phenyloxirane"),
         ("ClC1CO1", "chlorooxirane"),
         ("CC1CO1", "methyloxirane"),
-        # ...and its printed DIsubstituted counterpart, BB:28065
+        #...and its printed DIsubstituted counterpart, the Blue Book
         # `2-ethyl-2-methyloxirane (PIN)`, which must KEEP both locants because L3
         # requires monosubstitution. The two rows together are a boundary pair.
         ("CCC1(C)CO1", "2-ethyl-2-methyloxirane"),
@@ -218,7 +218,7 @@ def test_defect_b_guards_keep_their_locant(namer, smiles, expected):
 
 
 # --------------------------------------------------------------------------- #
-# 4. DEFECT C -- the THIRD handler (polyfunctional)                            #
+# 4. DEFECT C -- the THIRD handler (polyfunctional) #
 # --------------------------------------------------------------------------- #
 @pytest.mark.parametrize(
     "smiles,expected",
@@ -236,7 +236,7 @@ def test_defect_c_polyfunctional_prefix_locant_omitted(namer, smiles, expected):
 @pytest.mark.parametrize(
     "smiles,expected",
     [
-        # :29834 verbatim (PIN) -- DIsubstituted, so L3 (monosubstituted) denies.
+        #:29834 verbatim (PIN) -- DIsubstituted, so L3 (monosubstituted) denies.
         ("OC(=O)C(O)C(O)C(=O)O", "2,3-dihydroxybutanedioic acid"),
         # A monoacid parent: C2 and C3 are different orbits.
         ("OC(=O)C(O)C", "2-hydroxypropanoic acid"),
@@ -254,17 +254,17 @@ def test_defect_c_guards(namer, smiles, expected):
 
 
 # --------------------------------------------------------------------------- #
-# 5. DEFECTS D + E -- the ether-substituted chain                              #
+# 5. DEFECTS D + E -- the ether-substituted chain #
 # --------------------------------------------------------------------------- #
 @pytest.mark.parametrize(
     "smiles,expected",
     [
-        # E: `di`, not `bis`, for the contracted `methoxy` (:5098 / :17958).
+        # E: `di`, not `bis`, for the contracted `methoxy` (:5098 /:17958).
         ("COC(OC)c1ccccc1", "(dimethoxymethyl)benzene"),
         ("COC(OC)C1CCCCC1", "(dimethoxymethyl)cyclohexane"),
         ("COC(OC)(OC)c1ccccc1", "(trimethoxymethyl)benzene"),
         # E, the other side of the boundary: the UNCONTRACTED `methylsulfanyl` is a
-        # substituted prefix and keeps `bis(...)` per :35344 / P-16.3.5(a). At HEAD
+        # substituted prefix and keeps `bis(...)` per:35344 / P-16.3.5(a). At HEAD
         # this emitted `bis((methylsulfanyl))methylbenzene` -- double-enclosed, and
         # rejected by the OPSIN grammar check. ⚠ The MISSING OUTER MARKS
         # (`[bis(methylsulfanyl)methyl]benzene` would be right) are a separate,
@@ -313,7 +313,7 @@ def test_defect_d_licence_is_the_predicate_not_the_backbone_length():
 
 
 # --------------------------------------------------------------------------- #
-# 6. THE TWO RENDERERS MUST AGREE (the divergence a print-time flag caused)     #
+# 6. THE TWO RENDERERS MUST AGREE (the divergence a print-time flag caused) #
 # --------------------------------------------------------------------------- #
 @pytest.mark.parametrize(
     "smiles,expected_name",
@@ -371,7 +371,7 @@ def test_licensed_rows_keep_their_structured_tree(smiles, expected_name):
 
 
 # --------------------------------------------------------------------------- #
-# 7. THE THIRD SCOPE CHECK IS CONSULTED AT ALL THREE SITES                      #
+# 7. THE THIRD SCOPE CHECK IS CONSULTED AT ALL THREE SITES #
 # --------------------------------------------------------------------------- #
 def test_fragment_boundary_observation_reads_the_visited_set():
     """The observation itself: empty visited set => this IS the whole molecule."""
@@ -407,7 +407,7 @@ def test_every_site_consults_the_fragment_boundary_observation(
 ):
     """P-14.3.4 licences that empty a scope of ALL its locants must consult THREE
     things, and a licence consulting two of three is broken on the third's whole class
-    (``).
+    (`internal notes`).
     The other two are ambient ContextVars checked inside ``locant_omission``; this one
     is the read-only fragment-boundary observation.
 
@@ -430,11 +430,11 @@ def test_every_site_consults_the_fragment_boundary_observation(
 
 
 # --------------------------------------------------------------------------- #
-# 8. TRIPWIRES on the two things this task removed                             #
+# 8. TRIPWIRES on the two things this task removed #
 # --------------------------------------------------------------------------- #
 def test_no_private_multiplier_table_in_the_ether_chain_producer():
     """``_name_ether_substituted_chain`` carried one of the 27 divergent multiplier
-    tables (``),
+    tables (`internal notes`),
     hardcoded to ``bis``/``tris`` so it could never emit ``di``. The multiplier now
     comes from the shared ``multiplied_component``. This fails if a private table
     reappears in that function."""

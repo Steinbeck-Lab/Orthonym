@@ -1,6 +1,6 @@
-"""P-14.3.4.5 at PARENT scope -- v29 Phase C Task 5b.
+"""P-14.3.4.5 at PARENT scope -- Phase C Task 5b.
 
-Governing rule chain, verbatim from ``BlueBookV2/BlueBookV2.md`` with headings.
+Governing rule chain, verbatim from ``the Blue Book Blue Book`` with headings.
 
 ``P-14.3.3`` "Citation of locants" (``:2869``) is the **DENY-DEFAULT** --
 
@@ -31,8 +31,8 @@ goes.
 
 ★ THE SHARPEST BOUNDARY PAIR IN THE PHASE, and it needs no special case::
 
-    F3C-CF2-COOH    ->  pentafluoropropanoic acid            OMITS
-    F3C-CF2-CO-NH2  ->  2,2,3,3,3-pentafluoropropanamide     KEEPS
+    F3C-CF2-COOH -> pentafluoropropanoic acid OMITS
+    F3C-CF2-CO-NH2 -> 2,2,3,3,3-pentafluoropropanamide KEEPS
 
 Identical fluorination. The acid omits because its only remaining hydrogen is on
 oxygen and is carved out. Propanamide's substitutable set is C2(2H) + C3(3H) **+ the
@@ -50,7 +50,7 @@ is the only fully-substituted acyclic PARENT printed in the Blue Book, so
 acid`` below are DERIVED from the predicate, not verbatim rows. A table keyed on the
 spelling would be wrong on its complement by construction.
 
-MEASURED CODE PATH (call-spy validated on 2 known positives -- ``chloropropanedioic
+MEASURED CODE PATH (call-trace validated on 2 known positives -- ``chloropropanedioic
 acid`` and ``chlorobutanedioic acid``, whose P-14.3.4.3 sibling licence is wired at the
 same site -- and 2 known negatives, ``ethanol`` and ``benzene``, which record ZERO
 calls at EVERY candidate site):
@@ -68,7 +68,7 @@ instrumented site, because ``_is_general_acyclic`` defers a single-group primary
 to composer's inline amide branch. An end-to-end assertion alone would therefore be
 green for a reason that has nothing to do with the licence.
 
-Invariant 11: removing a locant can unmask something worse -- in v29 that happened four
+Invariant 11: removing a locant can unmask something worse -- in that happened four
 times, and in Task 5a dropping these very locants LOST THE ENCLOSING MARKS
 (``heptafluoropropylbenzene`` for ``(heptafluoropropyl)benzene``). Every check below
 asserts the FULL emitted name, never merely that a locant vanished.
@@ -99,7 +99,7 @@ def namer():
 
 
 # --------------------------------------------------------------------------- #
-# A features stand-in for the PREDICATE-level checks.                          #
+# A features stand-in for the PREDICATE-level checks. #
 # --------------------------------------------------------------------------- #
 # Needed because the critical amide guard is OFF-PATH end-to-end (measured: zero
 # calls), so an end-to-end assertion cannot exercise the licence on it. The stub
@@ -169,7 +169,7 @@ def test_stub_harness_is_valid_on_a_known_positive():
 
 
 # --------------------------------------------------------------------------- #
-# 1. The licence fires -- whole emitted name asserted                          #
+# 1. The licence fires -- whole emitted name asserted #
 # --------------------------------------------------------------------------- #
 class TestLicensedOmission:
     def test_the_verbatim_pin_witness(self, namer):
@@ -214,7 +214,7 @@ class TestLicensedOmission:
 
 
 # --------------------------------------------------------------------------- #
-# 2. ★ THE CRITICAL GUARD -- the amide keeps                                   #
+# 2. ★ THE CRITICAL GUARD -- the amide keeps #
 # --------------------------------------------------------------------------- #
 class TestAmideNitrogenHydrogenIsSubstitutable:
     def test_pentafluoropropanamide_keeps_every_locant(self, namer):
@@ -244,7 +244,7 @@ class TestAmideNitrogenHydrogenIsSubstitutable:
                    for i in substitutable_positions(acid)) == 5
         assert sum(substitutable_h_count(amide, i)
                    for i in substitutable_positions(amide)) == 7
-        # ...and the reason is exactly one atom: the acid's O-H is on a chalcogen.
+        #...and the reason is exactly one atom: the acid's O-H is on a chalcogen.
         assert substitutable_h_count(acid, 4) == 0      # the -OH oxygen
         assert substitutable_h_count(amide, 4) == 2     # the amide nitrogen
 
@@ -253,17 +253,20 @@ class TestAmideNitrogenHydrogenIsSubstitutable:
         ("CNC(=O)C(F)(F)C(F)(F)F", "2,2,3,3,3-pentafluoro-N-methylpropanamide"),
         # ``:2889`` proves the N-H substitutable; this row must stay put.
         ("CNC(=O)CC(=O)NC", "N1,N3-dimethylpropanediamide"),
-        ("CNC(=O)N", "N-methylurea"),
+        # ⚠ urea is the ONE member here that OMITS: its four N-H are a single orbit
+        # (one kind of substitutable H), so P-14.3.4.3 (:2943 `methylurea (PIN)`)
+        # fires -- unlike the diamides above, whose C-H + N-H give two kinds.
+        ("CNC(=O)N", "methylurea"),
     ])
     def test_the_whole_amide_family_keeps(self, namer, smiles, expected):
         assert namer.name(smiles) == expected
 
     @pytest.mark.parametrize("smiles", [
         # ★ The EXACT SMILES of gold row D8-AMIDINE-LOCANT in
-        #  -- asserted verbatim so
+        # benchmarks/the gold set/packs/characteristic_groups.json -- asserted verbatim so
         # the gate row and this suite cannot drift apart.
         "FC(F)(C(F)(F)F)C(=N)N",
-        # ...and a second spelling of the same molecule, so the assertion is about the
+        #...and a second spelling of the same molecule, so the assertion is about the
         # structure and not about one SMILES traversal.
         "NC(=N)C(F)(F)C(F)(F)F",
     ])
@@ -274,7 +277,7 @@ class TestAmideNitrogenHydrogenIsSubstitutable:
 
 
 # --------------------------------------------------------------------------- #
-# 3. PARTIAL substitution -- ``:3009`` restores every locant                    #
+# 3. PARTIAL substitution -- ``:3009`` restores every locant #
 # --------------------------------------------------------------------------- #
 class TestPartialSubstitutionRetains:
     @pytest.mark.parametrize("smiles,expected,why", [
@@ -318,7 +321,7 @@ class TestPartialSubstitutionRetains:
 
 
 # --------------------------------------------------------------------------- #
-# 4. UNIFORMITY -- "in the same way"                                           #
+# 4. UNIFORMITY -- "in the same way" #
 # --------------------------------------------------------------------------- #
 class TestUniformity:
     def test_the_29619_failure_mode(self, namer):
@@ -349,7 +352,7 @@ class TestUniformity:
 
 
 # --------------------------------------------------------------------------- #
-# 5. P-14.3.3 -- another cited locant in the scope restores them all           #
+# 5. P-14.3.3 -- another cited locant in the scope restores them all #
 # --------------------------------------------------------------------------- #
 class TestOtherCitedLocantsRestoreEverything:
     def test_a_cited_suffix_locant_keeps_a_COMPLETELY_substituted_chain(self, namer):
@@ -406,7 +409,7 @@ class TestOtherCitedLocantsRestoreEverything:
 
 
 # --------------------------------------------------------------------------- #
-# 6. ★ The two AMBIENT P-14.3.3 scopes (P-82.6.1.1)                            #
+# 6. ★ The two AMBIENT P-14.3.3 scopes (P-82.6.1.1) #
 # --------------------------------------------------------------------------- #
 class TestAmbientScopes:
     def test_an_isotopic_label_keeps_every_locant_end_to_end(self, namer):
@@ -415,11 +418,13 @@ class TestAmbientScopes:
         modification requires a locant to specify its position, then all locants must
         be specified and none are omitted."
 
-        The two propanoic-acid carbons C2/C3 are inequivalent, so the ``(2-13C1)``
+        The two propanoic-acid carbons C2/C3 are inequivalent, so the ``(2-13C)``
         position must be stated -- and then every locant in the scope must be.
+        (The count subscript is omitted per P-82.2.1, FIX-A: a carbon position
+        holds one carbon.)
         """
         assert namer.name("FC(F)(F)[13C](F)(F)C(=O)O") == \
-            "2,2,3,3,3-pentafluoro(2-13C1)propanoic acid"
+            "2,2,3,3,3-pentafluoro(2-13C)propanoic acid"
 
     def test_the_WEAKER_declaration_is_the_one_that_fires(self):
         """★ MEASURED, and it is why ``locants_are_forced()`` alone is insufficient.
@@ -447,20 +452,22 @@ class TestAmbientScopes:
     @pytest.mark.parametrize("smiles,expected", [
         # Task 5a's isotope witness, substituent scope -- must stay fixed.
         ("FC(F)(F)[13C](F)(F)C1CCCCC1",
-         "(1,1,2,2,2-pentafluoro(13C1)ethyl)cyclohexane"),
+         "(1,1,2,2,2-pentafluoro(13C)ethyl)cyclohexane"),
         # P-82.6.1.3 (``:44202``) ``(2H6)benzene (PIN)``: when every candidate
         # position is ONE orbit no locant is needed, so these keep their omission.
-        ("Cc1c(C)c(C)c(C)c(C)[13c]1C", "hexamethyl(13C1)benzene"),
-        ("Oc1c(O)c(O)c(O)c(O)[13c]1O", "(13C1)benzenehexol"),
-        ("OC[13CH3]", "(2-13C1)ethan-1-ol"),
-        ("OC1CCCC[13CH2]1", "(2-13C1)cyclohexan-1-ol"),
+        # The count subscript is omitted per P-82.2.1 (FIX-A: a carbon position
+        # holds one carbon); the locant behaviour under test is unchanged.
+        ("Cc1c(C)c(C)c(C)c(C)[13c]1C", "hexamethyl(13C)benzene"),
+        ("Oc1c(O)c(O)c(O)c(O)[13c]1O", "(13C)benzenehexol"),
+        ("OC[13CH3]", "(2-13C)ethan-1-ol"),
+        ("OC1CCCC[13CH2]1", "(2-13C)cyclohexan-1-ol"),
     ])
     def test_the_isotope_rows_already_shipped_do_not_move(self, namer, smiles, expected):
         assert namer.name(smiles) == expected
 
 
 # --------------------------------------------------------------------------- #
-# 6b. ★ The scope boundary must BE the molecule (the :29619 regression)         #
+# 6b. ★ The scope boundary must BE the molecule (the:29619 regression) #
 # --------------------------------------------------------------------------- #
 class TestTheScopeBoundaryMustBeTheWholeMolecule:
     """★ INVARIANT 11 FIRED HERE during implementation, and this is the whole story.
@@ -518,7 +525,7 @@ class TestTheScopeBoundaryMustBeTheWholeMolecule:
 
 
 # --------------------------------------------------------------------------- #
-# 7. Scope preconditions re-established inside the predicate                   #
+# 7. Scope preconditions re-established inside the predicate #
 # --------------------------------------------------------------------------- #
 class TestScopePreconditions:
     def test_a_ring_parent_is_denied_and_the_in_handler_control_holds(self, namer):
@@ -597,7 +604,7 @@ class TestScopePreconditions:
         from orthonym.errors import is_refusal_sentinel
         for smiles in ("F[Si](F)(F)[Si](F)(F)F", "FN(F)N(F)F", "F[P](F)[P](F)F"):
             assert is_refusal_sentinel(namer.name(smiles)), smiles
-        # ...and the predicate itself refuses a silicon chain, so the narrowing is
+        #...and the predicate itself refuses a silicon chain, so the narrowing is
         # asserted directly rather than resting on the molecule being unnameable.
         mol = Chem.MolFromSmiles("F[Si](F)(F)[Si](F)(F)F")
         assert [a.GetSymbol() for a in mol.GetAtoms()][1] == "Si"
@@ -632,7 +639,7 @@ class TestScopePreconditions:
 
 
 # --------------------------------------------------------------------------- #
-# 8. Invariant 11 -- what is EMITTED, not merely that a locant vanished        #
+# 8. Invariant 11 -- what is EMITTED, not merely that a locant vanished #
 # --------------------------------------------------------------------------- #
 class TestNothingWorseIsUnmasked:
     def test_the_multiplier_morpheme_survives_the_elision(self, namer):
@@ -664,7 +671,7 @@ class TestNothingWorseIsUnmasked:
     def test_the_two_renderers_agree_on_the_licensed_rows(self, namer):
         """★ The licence is applied by rebuilding the prefix FRAGMENTS, not by a
         print-time flag, so the legacy assembler and the name-tree serializer (which
-        is the production composition site for this handler --  ``general_acyclic`` is
+        is the production composition site for this handler -- ``general_acyclic`` is
         the sole member of ``SERIALIZER_PRODUCTION_CLASSES``) cannot disagree. A flag
         threaded into only one of them makes
         ``composer._serializer_flip_or_name`` silently fall back for exactly the rows
@@ -702,7 +709,7 @@ class TestNothingWorseIsUnmasked:
 
 
 # --------------------------------------------------------------------------- #
-# 9. Tripwires -- every name Phase C has already shipped                       #
+# 9. Tripwires -- every name Phase C has already shipped #
 # --------------------------------------------------------------------------- #
 class TestPhaseCTripwires:
     @pytest.mark.parametrize("smiles,expected", [

@@ -1,4 +1,4 @@
-"""v27 Phase 6 T6.1 — pin the --emit-tier -> namer-flag invariant table.
+""" a phase T6.1 — pin the --emit-tier -> namer-flag invariant table.
 
 The tier semantics are load-bearing for the 0-wrong guarantee: only
 ``best-effort`` may ship OPSIN-unverified names (``general_fallback_unverified``),
@@ -59,7 +59,7 @@ def test_best_effort_superset_of_complete_candidate_production():
         assert be[key] or not comp[key], key
 
 
-# v28 Composer1 Task 5 regression: name_tiered's honest T5 "clean abstain"
+# Composer1 Task 5 regression: name_tiered's honest T5 "clean abstain"
 # contract (name=None under general_fallback, see namer.name_tiered) was
 # shipped without updating cli.main's plain-text print branch, which did
 # `print(row["name"])` unconditionally -> printed the literal string
@@ -68,16 +68,16 @@ def test_best_effort_superset_of_complete_candidate_production():
 # disables the OPSIN validity gate for the whole test suite, so this
 # does not spawn an OPSIN subprocess/JVM).
 #
-# CHANGE-ASSERTED-VALUE UPDATE (v31 T4 final review): this molecule was an
+# CHANGE-ASSERTED-VALUE UPDATE (T4 final review): this molecule was an
 # abstainer when the test was written, but the best-effort engine has since
 # improved and now NAMES it (below). The naming is CORRECT, not a wrong
 # emission: the name OPSIN-parses back to the input's exact InChIKey
-# HCWJBNSAHCVPQL-UHFFFAOYSA-N (verified,  -- identical
+# HCWJBNSAHCVPQL-UHFFFAOYSA-N (verified, scratchpad/verify_fix2.py -- identical
 # canonical SMILES). It is NOT a T4 emission -- T4 fires 0x for it, and the
 # name carries a `-propanamide` principal-group suffix that T4's PG-suppressing
 # cascade structurally cannot produce; it is the pre-existing best-effort
 # engine. The two tests below now assert that verified named output. The CLI's
-# bare-"None" display guard (the actual v28 regression subject) is still
+# bare-"None" display guard (the actual regression subject) is still
 # exercised: `out != "None"` and no bare-"None" token in the printed line.
 _ABSTAINING_SMILES = (
     "CC(C)(C(=O)Nc1cccc(F)c1)N1CCC(c2nc(-c3cc4ccccc4o3)cs2)CC1"

@@ -1,6 +1,6 @@
 """The floor's spiro locant sort key must be LETTER-aware (P-14.5.2 / P-31.1.4).
 
-M4-L2 (`ab9c65ab`) admits a fused component's lettered ring-fusion locants
+M4-L2 () admits a fused component's lettered ring-fusion locants
 (`4a`, `8a`) into the combined locant map. The sort key that orders substituent
 citation must then distinguish:
   * a lettered locant from a primed one of the same number (`8a` != `8'`), and
@@ -9,7 +9,7 @@ and must not CRASH on the `_Locant` tuple form of a lettered locant
 (`('8a', "'")`). The old `(prime_count, number)` key collided `8a` with `8'` and
 raised ValueError on `('8a', "'")` -- a wrong substituent order that the
 full-InChIKey offer gate cannot see (FABLE review #17, the spelling-layer blind
-spot). Finding: .
+spot). Finding: internal notes.
 """
 from orthonym.assembly.universal_substituent import _locant_sort_key
 
@@ -20,7 +20,7 @@ def test_lettered_locant_distinct_from_primed():
 
 
 def test_letter_orders_after_bare_number_before_next():
-    # 4 < 4a < 5  (P-14.5.2: the fusion letter is a suffix of position 4)
+    # 4 < 4a < 5 (P-14.5.2: the fusion letter is a suffix of position 4)
     assert _locant_sort_key("4") < _locant_sort_key("4a") < _locant_sort_key("5")
 
 

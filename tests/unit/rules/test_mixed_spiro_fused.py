@@ -4,7 +4,7 @@ Wave-0 RED scaffold: tests target the NEW Plan 151-02 functions that
 must be added to ``src/orthonym/rules/spiro.py`` in Task 2:
 
 - ``is_mixed_spiro_fused(mol)``  (D-09 + D-13)
-- ``name_mixed_spiro_fused(mol)``  (D-13 + HERITAGE §4)
+- ``name_mixed_spiro_fused(mol)``  (D-13 + AUTONOM §4)
 - ``get_spiro_iupac_locants(mol)``  (D-21 partial)
 - ``get_mixed_spiro_fused_iupac_locants(mol)``  (D-21 partial)
 
@@ -12,7 +12,7 @@ Lazy-import pattern matches Plan 151-01's test scaffold so RED-state
 collection succeeds before Task 2 lands.
 
 Source: 151-02-PLAN.md tasks 1b/2; 151-AUDIT-B.md; 151-CONTEXT.md
-D-09/D-13/D-20/D-21/D-22(b); 151-RESEARCH.md Pitfall 3 + HERITAGE §4.
+D-09/D-13/D-20/D-21/D-22(b); 151-RESEARCH.md Pitfall 3 + AUTONOM §4.
 """
 from __future__ import annotations
 
@@ -130,8 +130,8 @@ _MIXED_BLUE_BOOK = _filter(_BLUE_BOOK, compound_class="spiro-mixed-fused")
 _PURE_CORPUS = _filter(_CORPUS, compound_class="spiro-pure")
 
 # Combined fixture set for the D-23 round-trip oracle: corpus mining
-# (mostly natural-product variants — many fail v18 due to HERITAGE §4 step 6
-# unsaturation recalc, logged to HERITAGE-followups) + Blue Book + HERITAGE-1990
+# (mostly natural-product variants — many fail v18 due to AUTONOM §4 step 6
+# unsaturation recalc, logged to AUTONOM-followups) + Blue Book + AUTONOM-1990
 # §4 examples (Q-05 NESTED_FORM_PARSEABLE-validated). The acceptance gate
 # (≥10 of N round-trip) measures the COMBINED set so v18 ships with a
 # verifiable correctness signal.
@@ -253,11 +253,11 @@ class TestPureSpiroContractPreserved:
 
 
 # ===========================================================================
-# Class: HERITAGE §4 separable-parts naming (D-13)
+# Class: AUTONOM §4 separable-parts naming (D-13)
 # ===========================================================================
 
 class TestSeparablePartsNaming:
-    """name_mixed_spiro_fused implements HERITAGE §4 separable-parts."""
+    """name_mixed_spiro_fused implements AUTONOM §4 separable-parts."""
 
     @pytest.mark.unit
     @pytest.mark.parametrize(
@@ -273,7 +273,7 @@ class TestSeparablePartsNaming:
             pytest.skip(f"SMILES invalid: {fixture['fixture_id']}")
         result = name_mixed_spiro_fused(mol)
         if result is None:
-            # Acceptable — Plan 151-02 D-24: failures log to HERITAGE-followups.
+            # Acceptable — Plan 151-02 D-24: failures log to AUTONOM-followups.
             return
         assert isinstance(result, tuple), fixture["fixture_id"]
         assert len(result) == 4, fixture["fixture_id"]
@@ -492,12 +492,12 @@ class TestRoundTripViaOPSIN:
         result = name_mixed_spiro_fused(mol)
         if result is None:
             pytest.skip(f"name_mixed_spiro_fused returned None for "
-                        f"{fixture['fixture_id']} — logged to HERITAGE-followups")
+                        f"{fixture['fixture_id']} — logged to AUTONOM-followups")
         name = result[0]
         parsed = _opsin_parse_one(name)
         if parsed is None:
             pytest.skip(f"OPSIN cannot parse {name!r} for "
-                        f"{fixture['fixture_id']} — logged to HERITAGE-followups")
+                        f"{fixture['fixture_id']} — logged to AUTONOM-followups")
         rt = Chem.MolFromSmiles(parsed)
         if rt is None:
             pytest.skip(f"OPSIN output not RDKit-parseable for "
@@ -507,23 +507,23 @@ class TestRoundTripViaOPSIN:
         if i_in is None or i_rt is None:
             pytest.skip(f"InChI extraction failed for "
                         f"{fixture['fixture_id']}")
-        # HERITAGE §4 step 6 unsaturation recalculation is a v19 follow-up
+        # AUTONOM §4 step 6 unsaturation recalculation is a v19 follow-up
         # per 151-AUDIT-B verdict. When the input has in-ring unsaturation
         # but the v18 fused-name handler emits a fully-saturated parent
         # (e.g., decahydroindene/octahydroindene), the formula layer
         # mismatches by 2H per double bond. Skip with a clear marker;
-        # the failure is logged in 
+        # the failure is logged in .planning/references/AUTONOM-followups.md.
         if i_in != i_rt:
             in_atoms = i_in.split("/")[1] if "/" in i_in else ""
             rt_atoms = i_rt.split("/")[1] if "/" in i_rt else ""
             if in_atoms and rt_atoms and in_atoms != rt_atoms:
                 # Different formulas — likely saturation mismatch.
-                # Allowed v19 deferral per HERITAGE §4 step 6.
+                # Allowed v19 deferral per AUTONOM §4 step 6.
                 pytest.skip(
-                    f"Ring-system formula mismatch (v19 HERITAGE §4 step 6 "
+                    f"Ring-system formula mismatch (v19 AUTONOM §4 step 6 "
                     f"unsaturation recalc) on {fixture['fixture_id']}: "
                     f"input={in_atoms} round-trip={rt_atoms} via "
-                    f"name={name!r} — logged to HERITAGE-followups"
+                    f"name={name!r} — logged to AUTONOM-followups"
                 )
         assert i_in == i_rt, (
             f"Ring-system InChI L1 mismatch on {fixture['fixture_id']}: "
@@ -533,7 +533,7 @@ class TestRoundTripViaOPSIN:
     @pytest.mark.roundtrip
     @pytest.mark.skipif(not _opsin_available(),
                         reason="OPSIN/Java not available")
-    def test_round_trip_heritage_indoline_cyclohexane(self):
+    def test_round_trip_autonom_indoline_cyclohexane(self):
         """Q-05 evidence: spiro[indoline-3,1'-cyclohexane] parses cleanly."""
         name = "spiro[indoline-3,1'-cyclohexane]"
         parsed = _opsin_parse_one(name)

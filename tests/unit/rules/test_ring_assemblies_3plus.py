@@ -1,33 +1,33 @@
-"""Phase 151-03 D-14..D-21 unit tests for ring assemblies size 3+.
+"""a phase-03.. unit tests for ring assemblies size 3+.
 
 Covers:
-- TestIdentity (D-14): n-way signature identity already structurally enforced
+- TestIdentity (): n-way signature identity already structurally enforced
   in detect_ring_assembly:185 (existing). New tests verify the contract for
   3+ component cases (terphenyl/quaterphenyl) and rejection cases
   (mixed phenyl-pyridyl chain).
-- TestTopology (D-15): NEW _check_path_topology helper rejects branched
+- TestTopology (): NEW _check_path_topology helper rejects branched
   arrangements (1,3,5-triphenylbenzene, central degree=3) and accepts
   linear chains (terphenyl, quaterphenyl). 4'-methylbiphenyl is the
   canary control (RESEARCH Pitfall 4).
-- TestPrimedLocants (D-16, D-18, D-19): primed-locant emission via
+- TestPrimedLocants (,,): primed-locant emission via
   _format_prime; Blue Book P-28.2.1 form is primary; carat is opt-in
   fallback only and never emitted by default.
-- TestMultiplierClosed (D-17): ASSEMBLY_MULTIPLIERS table closed at
+- TestMultiplierClosed (): ASSEMBLY_MULTIPLIERS table closed at
   deci(10); size-11 returns None.
-- TestConnectionLocant (D-18): per-ring own IUPAC numbering used for
+- TestConnectionLocant (): per-ring own IUPAC numbering used for
   connection locant; heterocycles via heteroatom priority; carbocyclics
   numbered relative to inter-ring bonds.
-- TestLowestLocantTiebreak (D-19): symmetric assemblies pick lowest set
+- TestLowestLocantTiebreak (): symmetric assemblies pick lowest set
   per first-point-of-difference using compare_locant_sets.
 - TestSupplierCoverageInvariant: cascade-step-6 supplier returns None
   on partial coverage (Pitfall 7); full coverage on complete cases.
-- TestNoParallelComparator (D-19/D-20): grep-style lock that no
+- TestNoParallelComparator (/): grep-style lock that no
   ``def _compare_locant*`` is introduced in ring_assemblies.py.
-- TestRoundTripViaOPSIN (D-23): OPSIN parses every Blue-Book/literature
+- TestRoundTripViaOPSIN (): OPSIN parses every Blue-Book/literature
   fixture name back to the expected SMILES with InChI L1 match.
 
-Source: 151-CONTEXT.md D-14, D-15, D-16, D-17, D-18, D-19, D-20, D-21,
-        D-23, D-24.
+Source: 151-CONTEXT.md,,,,,,,,
+        ,.
 Source: https://iupac.qmul.ac.uk/BlueBook/P2.html P-28.2.1.
 Source: 151-RESEARCH.md §"OPSIN Compatibility Evidence" (12 names).
 Source: 151-AUDIT-C.md (verdict: ENGINE_N3_PLUS_PARTIAL +
@@ -47,7 +47,7 @@ from rdkit import Chem
 
 # Lazy imports inside test bodies so test collection succeeds even when
 # new code (Task 2) hasn't landed yet. Same pattern used in 151-01 and
-# 151-02 Wave-0 scaffolds for audit-first cadence per CONTEXT D-02.
+# 151-02 Wave-0 scaffolds for audit-first cadence per CONTEXT.
 
 def _ra_import():
     """Return the ring_assemblies module symbols this test file uses."""
@@ -69,7 +69,7 @@ def _ra_topology_import():
     return _check_path_topology
 
 
-# OPSIN oracle (D-23). The jar lives at the worktree root via symlink to
+# OPSIN oracle (). The jar lives at the worktree root via symlink to
 # parent project's jar. Path resolution depth is parents[3] for tests/unit/rules/.
 _OPSIN_JAR = (
     Path(__file__).resolve().parents[3]
@@ -119,10 +119,10 @@ _LIT_FIXTURES = json.loads((_FIXTURE_DIR / "literature_validated.json").read_tex
 
 
 # ============================================================================
-# TestIdentity (D-14)
+# TestIdentity ()
 # ============================================================================
 class TestIdentity:
-    """D-14: n-way identity check rejects mixed-ring chains."""
+    """: n-way identity check rejects mixed-ring chains."""
 
     @pytest.mark.unit
     def test_homogeneous_terphenyl_accepted(self):
@@ -143,7 +143,7 @@ class TestIdentity:
         from orthonym.perception.rings import get_ring_systems
         rs = get_ring_systems(mol, include_spiro=False)
         info = ra.detect_ring_assembly(mol, rs)
-        assert info is None  # n-way signature mismatch (D-14 already structural)
+        assert info is None  # n-way signature mismatch (already structural)
 
     @pytest.mark.unit
     def test_2_phenyl_pyridine_rejected(self):
@@ -167,10 +167,10 @@ class TestIdentity:
 
 
 # ============================================================================
-# TestTopology (D-15)
+# TestTopology ()
 # ============================================================================
 class TestTopology:
-    """D-15: linear-path requirement; branched arrangements rejected."""
+    """: linear-path requirement; branched arrangements rejected."""
 
     @pytest.mark.unit
     def test_check_path_topology_linear_returns_true(self):
@@ -200,7 +200,7 @@ class TestTopology:
 
     @pytest.mark.unit
     def test_135_triphenylbenzene_rejected_by_detect(self):
-        """End-to-end D-15: 1,3,5-triphenylbenzene must NOT be a ring assembly."""
+        """End-to-end: 1,3,5-triphenylbenzene must NOT be a ring assembly."""
         ra = _ra_import()
         mol = Chem.MolFromSmiles("c1cc(-c2ccccc2)cc(-c2ccccc2)c1-c1ccccc1")
         from orthonym.perception.rings import get_ring_systems
@@ -231,10 +231,10 @@ class TestTopology:
 
 
 # ============================================================================
-# TestPrimedLocants (D-16, D-18, D-19)
+# TestPrimedLocants (,,)
 # ============================================================================
 class TestPrimedLocants:
-    """D-16: primed-locant primary; carat opt-in only."""
+    """: primed-locant primary; carat opt-in only."""
 
     @pytest.mark.unit
     def test_format_prime_zero_returns_empty(self):
@@ -253,12 +253,12 @@ class TestPrimedLocants:
 
     @pytest.mark.unit
     def test_terphenyl_emits_primed_locant_form(self):
-        """D-16: name_compound emits 1,1':4',1''-terphenyl, NOT carat."""
+        """: name_compound emits 1,1':4',1''-terphenyl, NOT carat."""
         from orthonym import name_compound
         name = name_compound("c1ccc(-c2ccc(-c3ccccc3)cc2)cc1")
         assert name is not None
         assert "terphenyl" in name
-        # Must NOT contain caret notation per D-16
+        # Must NOT contain caret notation per
         assert "^" not in name
 
     @pytest.mark.unit
@@ -270,17 +270,17 @@ class TestPrimedLocants:
 
     @pytest.mark.unit
     def test_terphenyl_para_emits_canonical_blue_book_form(self):
-        """D-16 + D-18 + D-19: middle ring gets locant 4 (para-attachment)."""
+        """ + +: middle ring gets locant 4 (para-attachment)."""
         from orthonym import name_compound
         name = name_compound("c1ccc(-c2ccc(-c3ccccc3)cc2)cc1")
         assert name == "1,1':4',1''-terphenyl"
 
 
 # ============================================================================
-# TestMultiplierClosed (D-17)
+# TestMultiplierClosed ()
 # ============================================================================
 class TestMultiplierClosed:
-    """D-17: multiplier table. Extended to dodeci(12) by P-28.5 (Wave2 P1CB
+    """: multiplier table. Extended to dodeci(12) by P-28.5 (Wave2 P1CB
     Task 8, OPSIN-RT verified for undeci); still closed above 12."""
 
     @pytest.mark.unit
@@ -298,7 +298,7 @@ class TestMultiplierClosed:
     @pytest.mark.unit
     def test_size_13_returns_none(self):
         """Table stops at dodeci(12); count 13+ has no OPSIN-verifiable affix
-        here -> .get->None decline (fail closed)."""
+        here ->.get->None decline (fail closed)."""
         ra = _ra_import()
         assert ra.ASSEMBLY_MULTIPLIERS.get(13) is None
 
@@ -325,10 +325,10 @@ class TestMultiplierClosed:
 
 
 # ============================================================================
-# TestConnectionLocant (D-18)
+# TestConnectionLocant ()
 # ============================================================================
 class TestConnectionLocant:
-    """D-18: per-ring own IUPAC numbering used for connection locant."""
+    """: per-ring own IUPAC numbering used for connection locant."""
 
     @pytest.mark.unit
     def test_pyridine_nitrogen_priority(self):
@@ -364,10 +364,10 @@ class TestConnectionLocant:
 
 
 # ============================================================================
-# TestLowestLocantTiebreak (D-19)
+# TestLowestLocantTiebreak ()
 # ============================================================================
 class TestLowestLocantTiebreak:
-    """D-19: lowest-locant tiebreak via compare_locant_sets (no parallel)."""
+    """: lowest-locant tiebreak via compare_locant_sets (no parallel)."""
 
     @pytest.mark.unit
     def test_compare_locant_sets_imported_in_supplier(self):
@@ -385,7 +385,7 @@ class TestLowestLocantTiebreak:
 
 
 # ============================================================================
-# TestSupplierCoverageInvariant (Pitfall 7 / D-21)
+# TestSupplierCoverageInvariant (Pitfall 7 /)
 # ============================================================================
 class TestSupplierCoverageInvariant:
     """Pitfall 7: cascade-step-6 supplier returns full coverage or None."""
@@ -419,7 +419,7 @@ class TestSupplierCoverageInvariant:
 
     @pytest.mark.unit
     def test_supplier_returns_none_on_135_triphenylbenzene(self):
-        """Branched arrangements MUST return None (D-15 + Pitfall 7)."""
+        """Branched arrangements MUST return None (+ Pitfall 7)."""
         get_ring_assembly_iupac_locants = _ra_supplier_import()
         mol = Chem.MolFromSmiles(
             "c1cc(-c2ccccc2)cc(-c2ccccc2)c1-c1ccccc1"
@@ -450,10 +450,10 @@ class TestSupplierCoverageInvariant:
 
 
 # ============================================================================
-# TestNoParallelComparator (D-19/D-20)
+# TestNoParallelComparator (/)
 # ============================================================================
 class TestNoParallelComparator:
-    """D-20: no SMARTS broadening; D-19: no parallel locant comparator."""
+    """: no SMARTS broadening;: no parallel locant comparator."""
 
     @pytest.mark.unit
     def test_no_parallel_compare_locant_function(self):
@@ -471,22 +471,22 @@ class TestNoParallelComparator:
 
 
 # ============================================================================
-# TestRoundTripViaOPSIN (D-23)
+# TestRoundTripViaOPSIN ()
 # ============================================================================
 @pytest.mark.skipif(not _opsin_available(), reason="OPSIN/Java not available")
 class TestRoundTripViaOPSIN:
-    """D-23: every named fixture must round-trip via OPSIN with InChI L1 match."""
+    """: every named fixture must round-trip via OPSIN with InChI L1 match."""
 
-    # Fixtures known to need v19 substituent-classification fix per
-    # 151-AUDIT-C.md "Out-of-scope follow-ups" + HERITAGE-followups.md.
+    # Fixtures known to need substituent-classification fix per
+    # 151-AUDIT-C.md "Out-of-scope follow-ups" + AUTONOM-followups.md.
     # Marked xfail so the suite stays GREEN while the upstream bug is
-    # tracked for v19.
+    # tracked for.
     _XFAIL_FIXTURES = {
         "ra_lit_terphenyl_dicarboxylic_acid": (
             "151-AUDIT-C.md out-of-scope: -CHO vs -COOH substituent "
             "classification bug emits 'diformyl' instead of "
             "'dicarboxylic acid'. Upstream substituent-detection issue "
-            "logged to HERITAGE-followups.md as v19 follow-up."
+            "logged to AUTONOM-followups.md as v19 follow-up."
         ),
     }
 
@@ -513,7 +513,7 @@ class TestRoundTripViaOPSIN:
         assert mol is not None, f"invalid SMILES {smi}"
 
         name = name_compound(smi)
-        # NOTE: This test checks D-23 round-trip, not strict expected-name
+        # NOTE: This test checks round-trip, not strict expected-name
         # match. Some non-canonical-but-equivalent forms emitted by the
         # current engine still round-trip via InChI L1.
         if name is None:
@@ -528,7 +528,7 @@ class TestRoundTripViaOPSIN:
             pytest.skip(f"OPSIN-emitted SMILES invalid: {parsed!r}")
 
         # Compare InChI L1 (formula + connectivity) only; stereo deferred
-        # to Phase 152/153.
+        # to a phase/153.
         input_inchi = Chem.MolToInchi(mol).split("/c")[0]
         round_inchi = Chem.MolToInchi(parsed_mol).split("/c")[0]
         assert input_inchi == round_inchi, (
@@ -541,7 +541,7 @@ class TestRoundTripViaOPSIN:
 
 
 class TestCyclicRejectionWR02:
-    """Phase 151-04 WR-02: a cyclic arrangement of 3+ ring systems where
+    """a phase-04 WR-02: a cyclic arrangement of 3+ ring systems where
     each system has degree 2 must be REJECTED — it is not a linear-path
     ring assembly per IUPAC P-28.2."""
 
@@ -558,7 +558,7 @@ class TestCyclicRejectionWR02:
         cyclic_connections = [
             (0, 6, 0, 1),   # system 0 - system 1
             (5, 12, 1, 2),  # system 1 - system 2
-            (11, 1, 2, 0),  # system 2 - system 0  (closes the cycle)
+            (11, 1, 2, 0),  # system 2 - system 0 (closes the cycle)
         ]
         assert _check_path_topology(3, cyclic_connections) is False
 

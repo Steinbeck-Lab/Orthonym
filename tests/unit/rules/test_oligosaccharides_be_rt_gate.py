@@ -1,6 +1,6 @@
-"""v33 Phase 1 Task 1.1 — RT-gate the best-effort glycan path fail-CLOSED.
+""" a phase Task 1.1 — RT-gate the best-effort glycan path fail-CLOSED.
 
-Census (PHASE0-GLYCAN-DECLINE-CENSUS.md,  pass B over
+Census (PHASE0-GLYCAN-DECLINE-CENSUS.md, `scratchpad/glycan_census.py` pass B over
 the 413-row glycan backlog): the best-effort tier shipped 44 WRONG + 46
 opsin_unparseable names because `_sugar_name_rt_ok`'s "cannot determine" branches
 (missing jar, or ANY exception during the OPSIN check) returned ``True`` -- i.e.
@@ -11,10 +11,10 @@ fail-open miss; the best-effort tier has NO such backstop (T4 emissions bypass i
 by design), so `_sugar_name_rt_ok`'s fail-open was the ONLY check standing between
 an unverified glycan name and best-effort output.
 
-⚠ SPY FINDING (invariant 8, "choke point off path" -- recorded here so the next
+⚠ a trace FINDING (a project rule, "choke point off path" -- recorded here so the next
 session does not re-open this): none of the 44 wrong / 46 unparseable census
 witnesses actually reach this function. Structural signal
-(, `oligo_cascade_name`) shows `name_disaccharide`
+(`scratchpad/pass_a_signals.json`, `oligo_cascade_name`) shows `name_disaccharide`
 returns ``None`` for ALL 413 backlog rows (`_classify_units` fails first, the
 documented root symptom) -- composing a name is a precondition for calling
 `_sugar_name_rt_ok`, so it is never invoked with a candidate for this corpus at
@@ -40,7 +40,7 @@ MALTOSE_SMILES = (
     "OC[C@H]1O[C@H](O[C@H]2[C@H](O)[C@@H](O)[C@H](O)O[C@@H]2CO)"
     "[C@H](O)[C@@H](O)[C@@H]1O"
 )
-MALTOSE_EXPECTED = "alpha-D-glucopyranosyl-(1->4)-beta-D-glucopyranose"
+MALTOSE_EXPECTED = "α-D-glucopyranosyl-(1->4)-β-D-glucopyranose"
 
 _MOD = "orthonym.validation.opsin_roundtrip"
 

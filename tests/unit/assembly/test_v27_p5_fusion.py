@@ -1,7 +1,7 @@
-"""v27 Phase 5 — general fusion-nomenclature PIN upgrade (P-25.3).
+""" a phase — general fusion-nomenclature PIN upgrade (P-25.3).
 
 The complete-tier engine ships a von-Baeyer POLYENE for mancude fused ring
-systems the default path abstains on; Phase 5 prefers a STRUCTURALLY-VERIFIED
+systems the default path abstains on; a phase prefers a STRUCTURALLY-VERIFIED
 fusion PIN (catalog exact-match, or a computed candidate that AFFIRMATIVELY
 round-trips) and falls back to the VB polyene otherwise (0-wrong, non-regressing).
 """
@@ -23,7 +23,7 @@ CYCLOPENTA_B_NAPHTHALENE = "C1C=CC=2C1=CC1=CC=CC=C1C2"
 # disables the OPSIN validity gate (conftest `_disable_opsin_validity_gate_for_tests`),
 # so the default path's UNGATED wrong candidate (benzo[f]) would preempt. The
 # Phase-5 producer is tested DIRECTLY (its own affirmative RT is gate-independent);
-# end-to-end is verified via  + the milestone gate.
+# end-to-end is verified via scripts/diagnose.py + the milestone gate.
 
 @pytest.mark.unit
 def test_affirmative_rt_rejects_wrong_orientation(opsin_available):

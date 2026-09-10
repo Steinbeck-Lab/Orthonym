@@ -1,5 +1,5 @@
 """P-15.3.2.2.1 (N primes) / P-15.3.2.2.2 (superscript-arabic N) conformance
-pins (Wave-2 P0c Task 9). BB BlueBookV2.md:6143/6149. Evidence rows verified
+pins (Wave-2 P0c Task 9). BB the Blue Book. Evidence rows verified
 OPSIN-RT 2026-07-09.
 """
 import pytest
@@ -40,6 +40,14 @@ class TestBuilderUnitLevel:
             [("N", "ethyl"), ("N'", "ethyl")], "urea") == "N,N'-diethylurea"
 
     def test_build_n_substituted_single(self):
+        # P-14.3.4.3 (the Blue Book): a monosubstituted urea omits the italic-N locant.
         from orthonym.assembly.composer import _build_n_substituted_name
         assert _build_n_substituted_name([("N", "methyl")], "urea") == \
-            "N-methylurea"
+            "methylurea"
+
+    def test_build_n_substituted_single_chalcogen_keeps_locant(self):
+        # The chalcogen analogue KEEPS its letter locant (P-66.1.6.1.3.1,:33451),
+        # so the `== 'urea'` scoping must not fire for thiourea.
+        from orthonym.assembly.composer import _build_n_substituted_name
+        assert _build_n_substituted_name([("N", "methyl")], "thiourea") == \
+            "N-methylthiourea"

@@ -1,4 +1,4 @@
-"""v33 charged breadth — the aromatic-carboxylate atom-drop 0-wrong fix + no
+""" charged breadth — the aromatic-carboxylate atom-drop 0-wrong fix + no
 regression on simple substituted aromatic carboxylates.
 
 Root cause: `_name_aromatic_carboxylate_with_substituents` named ring substituents
@@ -19,7 +19,7 @@ def _carbox_name(smi):
 
 
 def test_glycosyloxy_benzoate_never_drops_to_hydroxy():
-    # 4-(beta-D-glucosyloxy)benzoate: the aromatic handler must NOT emit the
+    # 4-(β-D-glucosyloxy)benzoate: the aromatic handler must NOT emit the
     # atom-dropped '4-hydroxybenzoate'. It either names it correctly (via the
     # fall-through neutralize path) or fails closed ('') -- never the wrong molecule.
     name = _carbox_name("[O-]C(=O)c1ccc(OC2OC(CO)C(O)C(O)C2O)cc1")

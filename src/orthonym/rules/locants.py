@@ -25,22 +25,22 @@ from typing import Dict, List, Optional, Set, Tuple, Union
 from .lambda_convention import nonstandard_bonding_number
 
 # ---------------------------------------------------------------------------
-# Element-seniority order for numbering tie-breaks (DD4 / v22 Phase E1).
+# Element-seniority order for numbering tie-breaks (DD4 / Phase E1).
 #
 # Single source of truth for the IUPAC 2013 element-seniority sequence used in
 # numbering decisions (P-15.4.1.2 / P-15.4.3.2.1 skeletal-replacement; P-44.3.3
 # senior-acyclic-heteroatom; P-25.3.3.1.2(b) fused-ring). Lower rank = SENIOR
 # (gets the lower locant when a positional set ties).
 #
-#   F < Cl < Br < I < At < O < S < Se < Te < Po < N < P < As < Sb < Bi
-#     < C < Si < Ge < Sn < Pb < B < Al < Ga < In < Tl
+# F < Cl < Br < I < At < O < S < Se < Te < Po < N < P < As < Sb < Bi
+# < C < Si < Ge < Sn < Pb < B < Al < Ga < In < Tl
 #
 # Before E1 there were 3+ divergent heteroatom-seniority tables
 # (ring_substituents._HETEROATOM_SENIORITY, ring_selection._HETEROATOM_SENIORITY,
 # fusion_descriptors.HETERO_PRIORITY). This constant is the canonical numbering
 # table; the numbering consumer (ring_substituents._HETEROATOM_SENIORITY) is
 # derived from it. ring_selection's table is a genuinely-different P-18
-# ring-selection order (D-04 lock) and is intentionally left separate.
+# ring-selection order (lock) and is intentionally left separate.
 # Source: https://iupac.qmul.ac.uk/BlueBook/P1.html P-15.4.1.2; DD4.
 # ---------------------------------------------------------------------------
 _ELEMENT_NUMBERING_ORDER: List[str] = [
@@ -66,18 +66,44 @@ def element_seniority_rank(symbol: str) -> int:
     """
     return ELEMENT_NUMBERING_SENIORITY.get(symbol, _ELEMENT_SENIORITY_DEFAULT)
 
-# Phase 147 D-01/D-02: locant type system extension.
+# a phase /: locant type system extension.
 # Locants may be plain ints (e.g. 4) or (int_base, str_suffix) tuples for
 # fusion atoms (e.g. '4a' -> (4, 'a')). The empty string '' sorts
 # lexicographically before any letter, so (4, '') < (4, 'a') < (5, ''),
 # matching the IUPAC convention that locant 4 is "lower" than 4a.
 _Locant = Union[int, Tuple[int, str]]
 
+# Bare-string fusion/prime locants ('4a', '10b', "2'") are the canonical form
+# stored in the fused-ring iupac_locants catalog tables (data/fused_heterocycles.py
+# et al.). They reach compare_locant_sets through the ring parent-selection pool
+# (p44_scorer._candidate_locants) UNCOERCED, and the fast-path sorted() below then
+# raises "'<' not supported between 'str' and 'int'" on a str/int-mixed set --
+# which crashed _classify and abstained N fused polycyclics (measured 2026-09-08).
+# _coerce_bare_locant normalizes them to the declared _Locant contract so the sort
+# is total AND P-14.5.2-correct ('4a' orders between 4 and 5).
+import re as _re
+_BARE_LOCANT_RE = _re.compile(r"^(\d+)([a-z]*'?)$")
+
+
+def _coerce_bare_locant(v: object) -> _Locant:
+    """Normalize a bare-string locant ('4a' -> (4, 'a'), '5' -> 5) to the
+    int / (int, str) contract form. Non-strings pass through unchanged. An
+    unparseable string maps to a deterministic sort-last sentinel so the
+    downstream sort can never raise (fusion locants are always parseable, so
+    that branch is defensive only)."""
+    if not isinstance(v, str):
+        return v  # already int or (int, str) tuple
+    m = _BARE_LOCANT_RE.match(v)
+    if m is None:
+        return (10 ** 9, v)  # unparseable -> sorts after all numeric locants
+    base, suffix = int(m.group(1)), m.group(2)
+    return (base, suffix) if suffix else base
+
 
 def _assert_homogeneous_locants(locants: List[_Locant]) -> None:
     """Raise ValueError if ``locants`` contains a mix of int and tuple types.
 
-    Per Phase 146 D-19: after coercion, a locant list must be uniformly
+    Per a phase: after coercion, a locant list must be uniformly
     int OR uniformly tuple. Mixed types indicate a caller bug (e.g.,
     ring_info populated only partially) and would cause Python's
     ``sorted()`` / ``min()`` to raise ``TypeError`` on mixed int/tuple
@@ -95,7 +121,7 @@ def _assert_homogeneous_locants(locants: List[_Locant]) -> None:
 
     Source: https://iupac.qmul.ac.uk/BlueBook/P1.html P-14.7
             (locant set comparison semantics)
-    Source: Phase 146 D-19 (locant type safety lock-in)
+    Source: a phase (locant type safety lock-in)
     """
     has_int = any(isinstance(x, int) for x in locants)
     has_tuple = any(isinstance(x, tuple) for x in locants)
@@ -151,7 +177,7 @@ def compare_locant_sets(
     If all compared elements are equal, the shorter set wins (fewer locants
     needed means simpler name). If completely identical, returns 0.
 
-    Phase 147 extension (D-01, D-02): also accepts ``List[Tuple[int, str]]``
+    a phase extension (,): also accepts ``List[Tuple[int, str]]``
     with first-point-of-difference semantics for fusion atoms. When one
     list contains tuples and the other contains ints, all ints are coerced
     to ``(n, '')`` tuples internally — empty string sorts before any
@@ -183,9 +209,18 @@ def compare_locant_sets(
         -1
 
     Source: https://iupac.qmul.ac.uk/BlueBook/P1.html P-14.5.2, P-14.7
-    Source: Phase 146 D-19 (locant type safety); Phase 147 D-01/D-02
+    Source: a phase (locant type safety); a phase /
     """
-    # Phase 147: tuple-coercion entry path. If either list contains a
+    # Normalize bare-string fusion/prime locants ('4a' -> (4, 'a'), '5' -> 5)
+    # to the int / (int, str) contract BEFORE the type dispatch below. Without
+    # this a str/int-mixed set (e.g. [1..7, '3a', '7a']) crashed the fast-path
+    # sorted(). Pure-int and pure-tuple lists contain no str and are untouched,
+    # so their ordering is byte-identical to before this coercion.
+    if any(isinstance(x, str) for x in set_a) or any(isinstance(x, str) for x in set_b):
+        set_a = [_coerce_bare_locant(x) for x in set_a]
+        set_b = [_coerce_bare_locant(x) for x in set_b]
+
+    # a phase: tuple-coercion entry path. If either list contains a
     # tuple locant, coerce all ints to (n, '') tuples in BOTH lists so
     # Python's sorted()/comparison operators stay type-safe. Pure-int
     # lists fall through to the back-compat fast path unchanged.
@@ -275,12 +310,12 @@ def compare_numbering(candidate_a: Dict, candidate_b: Dict) -> int:
     missing key means that tier is unconstrained (ties). Tiers, applied in the
     P-59.1.10 order:
 
-      'heteroatoms'  list of (locant, element) — positional set    (P-59.1.10(b)
-                     then element-seniority lowest-locant            / P-15.4.1.2)
-      'indicated_h'  indicated-hydrogen locant set                  (P-59.1.10(c))
-      'pcg'          principal-characteristic-group locant set      (P-59.1.10(d))
-      'substituents' detachable-prefix locant set                   (P-14.4(f))
-      'alpha'        sortable key giving the alphabetically-first    (P-14.4(g))
+      'heteroatoms' list of (locant, element) — positional set (P-59.1.10(b)
+                     then element-seniority lowest-locant / P-15.4.1.2)
+      'indicated_h' indicated-hydrogen locant set (P-59.1.10(c))
+      'pcg' principal-characteristic-group locant set (P-59.1.10(d))
+      'substituents' detachable-prefix locant set (P-14.4(f))
+      'alpha' sortable key giving the alphabetically-first (P-14.4(g))
                      prefix the lowest locant
 
     Returns -1 if ``candidate_a`` is preferred, +1 if ``candidate_b``, 0 if
@@ -452,7 +487,7 @@ def orient_chain(
     # --- Criterion (d.5): P-14.4(h) nonstandard-valence atom lower locant ---
     # When the substituent locant SETS tie, the chain position bearing a
     # substituent whose attachment atom is in a NONSTANDARD (λ) valence state
-    # takes the lower locant (BB P-14.4(h), BlueBookV2.md:3318,3334:
+    # takes the lower locant (BB P-14.4(h), the Blue Book,3334:
     # 'OC(C[PH4])CP' -> '1-(λ5-phosphanyl)-3-phosphanylpropan-2-ol'; the λ5 arm
     # is given C1). Runs BEFORE the alphanumerical criterion (e). Canonical:
     # driven by the perceived λ bonding number, not atom order.
@@ -494,7 +529,7 @@ def orient_chain(
     # --- Criterion (f): P-14.4(j) CIP-stereodescriptor lowest-locant tie-break ---
     # Reached only when (a)-(e) all tie: the two orientations differ only in the
     # locants their CIP stereodescriptors receive (meso-type / symmetric chains).
-    # BB P-14.4(j) (BlueBookV2.md:3346): the lower locant is assigned to the
+    # BB P-14.4(j) (the Blue Book): the lower locant is assigned to the
     # PREFERRED descriptor of each pair -- Z over E, R over S, M over P, and r
     # over s (pseudoasymmetry). This REUSES cip_descriptor_rank_key (via
     # _cip_numbering_key) so this numbering decision and the citation tie-break
@@ -548,7 +583,7 @@ def get_functional_group_locants(
 
     When an RDKit mol is provided, the function selects the on-chain
     carbon with the most bonds to heteroatoms (O, N, S, etc.) within the
-    match.  This correctly handles SMARTS patterns where a neighbor carbon
+    match. This correctly handles SMARTS patterns where a neighbor carbon
     appears before the key carbon in the match tuple (e.g. the ketone
     pattern ``[#6][CX3](=O)[#6]``).
 
@@ -559,7 +594,7 @@ def get_functional_group_locants(
         fg_atom_tuples: List of atom index tuples from SMARTS matching.
                         Each tuple contains indices of atoms in one FG instance.
         atom_to_locant: Mapping from atom index to locant (from build_atom_to_locant).
-        mol: Optional RDKit Mol object.  When provided, used to score
+        mol: Optional RDKit Mol object. When provided, used to score
              candidate carbon atoms by their heteroatom connectivity.
 
     Returns:
@@ -589,7 +624,7 @@ def _pick_locant_atom(
         1. Collect all carbon atoms in the match that lie on the chain.
         2. If *mol* is available, score each candidate by the number of
            bonds it has to heteroatoms (non-C, non-H) within the same
-           match tuple.  The atom with the highest score is the
+           match tuple. The atom with the highest score is the
            functional-group carbon.
         3. On tie (or when mol is unavailable), return the first
            candidate in match-tuple order.
@@ -618,7 +653,7 @@ def _pick_locant_atom(
         # SMARTS that deliberately exclude the attachment carbon from the match
         # arity and assert it only via a recursive environment -- e.g. the
         # sulfinic / sulfonic oxoacid patterns
-        #   '[SX3;$([SX3][#6])](=O)[OX2H1]' / '[SX4;$([SX4][#6])](=O)(=O)[OX2H1]'
+        # '[SX3;$([SX3][#6])](=O)[OX2H1]' / '[SX4;$([SX4][#6])](=O)(=O)[OX2H1]'
         # match only (S, O, O[, O]); the chain carbon that BEARS the group is a
         # NEIGHBOR of a match atom, not a member of the match (the recursive
         # $(...) keeps the inorganic-oxoacid distinction). Walk the match atoms'
@@ -676,7 +711,7 @@ def get_bond_locants(
 
     Examples:
         >>> chain = [0, 1, 2, 3]
-        >>> bonds = [(1, 2)]  # bond between atoms 1 and 2
+        >>> bonds = [(1, 2)] # bond between atoms 1 and 2
         >>> atom_to_locant = {0: 1, 1: 2, 2: 3, 3: 4}
         >>> get_bond_locants(chain, bonds, atom_to_locant)
         [2]
@@ -826,7 +861,7 @@ def _cip_numbering_key(chain: List[int], atom_to_locant: Dict[int, int],
     one function is deliberate: this numbering tie-break and the citation
     tie-break (``prefix_citation_sort_key`` tier 3) must never disagree -- and a
     plain string comparison silently gets Z-vs-E backwards, because 'Z' is senior
-    to 'E' although 'E' < 'Z' alphabetically (P-14.4(j) / :45363).
+    to 'E' although 'E' < 'Z' alphabetically (P-14.4(j) /:45363).
 
     Returns an empty tuple when the orientation cites no stereodescriptor, so
     achiral chains tie and fall through. Lower tuple sorts first, i.e. is cited

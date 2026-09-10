@@ -109,7 +109,7 @@ class TestHeterocycleSubstituents:
 
     def test_aminopyridine(self):
         """Aminopyridine: NH2 is the principal group -> -amine SUFFIX (P-33, PIN).
-        Phase 170 WS-4 / DEF-6 corrected the prior 'amino'-prefix defect;
+        a phase WS-4 / DEF-6 corrected the prior 'amino'-prefix defect;
         'pyridin-4-amine' OPSIN-round-trips."""
         name = name_compound('Nc1ccncc1')
         assert name == 'pyridin-4-amine', f"Expected 'pyridin-4-amine', got '{name}'"
@@ -122,7 +122,7 @@ class TestHeterocycleSubstituents:
 
     def test_aminooxane(self):
         """Aminooxane: NH2 is the principal group -> -amine SUFFIX (P-33, PIN).
-        Phase 170 WS-4 / DEF-6; 'oxan-4-amine' OPSIN-round-trips."""
+        a phase WS-4 / DEF-6; 'oxan-4-amine' OPSIN-round-trips."""
         name = name_compound('NC1CCOCC1')
         assert name == 'oxan-4-amine', f"Expected 'oxan-4-amine', got '{name}'"
 
@@ -155,7 +155,7 @@ class TestRingSubstituentEdgeCases:
 
     def test_hydroxypyridine(self):
         """Hydroxypyridine: OH is the principal group -> -ol SUFFIX (P-33, PIN).
-        Phase 170 WS-4 / DEF-6 corrected the prior 'hydroxy'-prefix defect;
+        a phase WS-4 / DEF-6 corrected the prior 'hydroxy'-prefix defect;
         'pyridin-4-ol' OPSIN-round-trips."""
         name = name_compound('Oc1ccncc1')
         assert name == 'pyridin-4-ol', f"Expected 'pyridin-4-ol', got '{name}'"
@@ -296,9 +296,11 @@ class TestCyclicThioetherRouting:
         assert 'sulfide' not in name, f"Should NOT have 'sulfide' in '{name}'"
 
     def test_acyclic_sulfide_still_works(self):
-        """Acyclic sulfides still use functional class naming."""
+        """Acyclic sulfides are named substitutively (P-63.2.5 method 1, the PIN):
+        the cyclic-thioether guard must not lose them. CSCC -> (methylsulfanyl)ethane
+        (was the functional-class "ethyl methyl sulfide", demoted per the Blue Book)."""
         name = name_compound('CSCC')
-        assert 'sulfide' in name, f"Expected 'sulfide' in '{name}'"
+        assert name == '(methylsulfanyl)ethane', f"Expected substitutive PIN, got '{name}'"
 
 
 # ---------------------------------------------------------------------------

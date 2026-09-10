@@ -1,9 +1,9 @@
-"""Phase 155.A integration tests: cyclophane corpus + Blue Book fixtures.
+"""a phase.A integration tests: cyclophane corpus + Blue Book fixtures.
 
-Per CONTEXT D-15 + 155-AUDIT-A.md S6: OPSIN 2.9.0 does NOT parse the
+Per CONTEXT + 155-AUDIT-A.md S6: OPSIN 2.9.0 does NOT parse the
 [m.n]paracyclophane semi-systematic name form (verified at audit time
 2026-05-04 -- every form returns 'is unparsable'). All cyclophane integration
-fixtures are therefore quarantined via pytest.skip with a Phase 156 grammar
+fixtures are therefore quarantined via pytest.skip with a a phase grammar
 pre-validation hand-off note.
 
 What this test DOES verify (without the OPSIN oracle):
@@ -15,7 +15,7 @@ What this test DOES verify (without the OPSIN oracle):
    ``is_cyclophane`` MUST still accept (topology gate works) but
    ``name_compound`` may return None or a non-cyclophane name (R3 deferred).
 
-Source: 155-CONTEXT.md D-15; 155-AUDIT-A.md S6 + S8 (R3); 155-PATTERNS.md.
+Source: internal notes; 155-AUDIT-A.md S6 + S8 (R3); 155-PATTERNS.md.
 """
 from __future__ import annotations
 
@@ -67,7 +67,7 @@ def _opsin_parse(name: str) -> str | None:
 def _inchi_l1(smiles: str) -> str:
     """Return InChI layer-1 (skeleton; strips connectivity onward).
 
-    Per CONTEXT D-15: the ``/c`` split isolates the formula portion of the
+    Per CONTEXT: the ``/c`` split isolates the formula portion of the
     InChI string -- the binding correctness oracle for skeletal nomenclature.
     Stereo / charge / isotope layers (everything after ``/c``) are
     intentionally dropped.
@@ -99,7 +99,7 @@ _ALL_FIXTURES = list(_BLUE_BOOK_FIXTURES) + list(_CORPUS_MINED_FIXTURES)
 def test_cyclophane_topology_gate(fixture):
     """is_cyclophane(SMILES) must accept every fixture in the audit catalog.
 
-    This validates the topology gate (D-03 corrected SSSR criterion) on the
+    This validates the topology gate (corrected SSSR criterion) on the
     full ≥ 13 audit-curated set without depending on the OPSIN oracle.
     """
     smi = fixture["smiles"]
@@ -123,7 +123,7 @@ def test_cyclophane_name_compound(fixture):
 
     Wave-8 P8: fixtures carrying an ``expected_pin`` field (monocyclic
     all-benzene-homophane class -- `build_phane_pin` verified BB-name-exact,
-    see  Task 8.7/8.12)
+    see docs/superpowers/plans/2026-07-16-wave8-p8-phane.md Task 8.7/8.12)
     now EMIT that P-26 simplified-skeletal PIN in production. Every other
     non-quarantined fixture (a topology `build_phane_pin` doesn't cover yet)
     still hits the T6c fail-closed refusal ('unknown organic compound') --
@@ -165,11 +165,11 @@ def test_cyclophane_name_compound(fixture):
     ids=[f["fixture_id"] for f in _ALL_FIXTURES],
 )
 def test_cyclophane_opsin_roundtrip_quarantine(fixture):
-    """D-15: name_compound -> OPSIN -> InChI L1 round-trip.
+    """: name_compound -> OPSIN -> InChI L1 round-trip.
 
     Per 155-AUDIT-A.md S6: OPSIN 2.9.0 does NOT parse cyclophane semi-systematic
-    names. Every fixture is expected to skip-and-cite per the D-15 fallback
-    policy. If OPSIN ever gains cyclophane support (Phase 156 grammar
+    names. Every fixture is expected to skip-and-cite per the fallback
+    policy. If OPSIN ever gains cyclophane support (a phase grammar
     pre-validation hand-off), this test starts asserting the round-trip.
     """
     if fixture.get("integration_quarantine"):

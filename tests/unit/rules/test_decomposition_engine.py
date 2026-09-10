@@ -106,7 +106,7 @@ class TestNameQualityGate:
     def test_quality_gate_chars_per_ha_rejects_low_ratio(self):
         """A name with chars/HA < 0.65 for a 23 HA molecule should be rejected.
 
-        D-04: chars/HA check for medium molecules (15-30 HA).
+        : chars/HA check for medium molecules (15-30 HA).
         "chloroethene" (12 chars) for a 23 HA molecule -> 12/23 = 0.52 < 0.65.
         Note: name must not be in _RETAINED_CORE_NAMES to test the new gate.
         Requires cleavable bonds to trigger rejection (Plan 03 calibration).
@@ -387,7 +387,7 @@ class TestSugarFragmentIntercept:
     def test_name_sugar_fragment_glucose(self):
         """Beta-D-glucose canonical SMILES returns glycosyloxy prefix."""
         result = _name_sugar_fragment("OC[C@H]1O[C@@H](O)[C@H](O)[C@@H](O)[C@@H]1O")
-        assert result == "beta-D-glucopyranosyloxy"
+        assert result == "β-D-glucopyranosyloxy"
 
     def test_name_sugar_fragment_unknown(self):
         """Non-sugar SMILES returns None."""
@@ -397,22 +397,22 @@ class TestSugarFragmentIntercept:
     def test_name_sugar_fragment_galactose_alpha(self):
         """Alpha-D-galactose returns correct glycosyloxy prefix."""
         result = _name_sugar_fragment("OC[C@H]1O[C@H](O)[C@H](O)[C@@H](O)[C@H]1O")
-        assert result == "alpha-D-galactopyranosyloxy"
+        assert result == "α-D-galactopyranosyloxy"
 
     def test_name_sugar_fragment_galactose_beta(self):
         """Beta-D-galactose returns correct glycosyloxy prefix."""
         result = _name_sugar_fragment("OC[C@H]1O[C@@H](O)[C@H](O)[C@@H](O)[C@H]1O")
-        assert result == "beta-D-galactopyranosyloxy"
+        assert result == "β-D-galactopyranosyloxy"
 
     def test_name_sugar_fragment_rhamnose_alpha(self):
         """Alpha-L-rhamnose returns correct glycosyloxy prefix."""
         result = _name_sugar_fragment("C[C@@H]1O[C@@H](O)[C@H](O)[C@H](O)[C@H]1O")
-        assert result == "alpha-L-rhamnopyranosyloxy"
+        assert result == "α-L-rhamnopyranosyloxy"
 
     def test_name_sugar_fragment_mannose_beta(self):
         """Beta-D-mannose returns correct glycosyloxy prefix."""
         result = _name_sugar_fragment("OC[C@H]1O[C@@H](O)[C@@H](O)[C@@H](O)[C@@H]1O")
-        assert result == "beta-D-mannopyranosyloxy"
+        assert result == "β-D-mannopyranosyloxy"
 
     def test_name_sugar_fragment_ethanol(self):
         """Ethanol is not a sugar -- returns None."""
@@ -426,7 +426,7 @@ class TestSugarFragmentIntercept:
 
 
 # ============================================================================
-# Coverage gate tests (Phase 87 Plan 02)
+# Coverage gate tests (a phase Plan 02)
 # ============================================================================
 
 
@@ -447,7 +447,7 @@ class TestCoverageGate:
     def test_large_molecule_adequate_name_passes(self):
         """A 30-atom molecule with a long descriptive name passes.
 
-        With tiered thresholds (Phase 099), default bond_type uses 0.8:
+        With tiered thresholds (a phase), default bond_type uses 0.8:
         30 * 0.8 = 24. Ester bond_type uses 0.6: 30 * 0.6 = 18.
         """
         large_mol = _mol("CCCCCCCCCCCCCCCCCCCCCCCCCCCCCC")  # triacontane, 30C
@@ -477,7 +477,7 @@ class TestCoverageGate:
     def test_medium_molecule_borderline(self):
         """A medium molecule (15 heavy atoms) with borderline name length.
 
-        With tiered thresholds (Phase 099):
+        With tiered thresholds (a phase):
         - Default (substitutive): 15 * 0.8 = 12 chars min
         - Ester (functional-class): 15 * 0.6 = 9 chars min
         """
@@ -510,7 +510,7 @@ class TestCoverageGate:
 
 
 # ============================================================================
-# Garbled pattern extension tests (Phase 87 Plan 02)
+# Garbled pattern extension tests (a phase Plan 02)
 # ============================================================================
 
 
@@ -604,7 +604,7 @@ class TestLeafFirstOrdering:
 
 
 # ============================================================================
-# _name_fragment_with_fallback tests (Phase 127)
+# _name_fragment_with_fallback tests (a phase)
 # ============================================================================
 
 
@@ -654,7 +654,7 @@ class TestPartialAssembly:
 
     def test_partial_assembly_two_of_three(self):
         """When 2/3 fragments name successfully, the engine must FAIL CLOSED
-        (v32 Phase 2 -- ).
+        (a phase -- internal notes).
 
         Mock scenario: 3 fragments from multi-bond ester cleavage, where the
         third fragment fails naming (even after the T4 rescue rung inside
@@ -709,7 +709,7 @@ class TestPartialAssembly:
                                return_value="ethyl acetate"):
                         result = _try_multi_bond_decompose(mol, bonds)
 
-        # v32 Phase 2: must be None -- never ship a name for 2/3 fragments
+        # a phase: must be None -- never ship a name for 2/3 fragments
         # when the third genuinely fails (atom-drop / smaller-molecule name).
         assert result is None, (
             "Partial assembly must FAIL CLOSED (return None) when 1/3 "
@@ -803,7 +803,7 @@ class TestPartialAssembly:
     def test_fragment_naming_rejects_poor_coverage(self):
         """Fragment name that covers < 60% of HA should be rejected by partial assembly.
 
-        D-05: fragment naming size validation in the partial assembly loop.
+        : fragment naming size validation in the partial assembly loop.
         A 15 HA fragment named with a name covering only ~6 HA should be skipped.
         """
         from unittest.mock import patch

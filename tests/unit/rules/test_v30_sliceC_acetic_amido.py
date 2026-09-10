@@ -1,8 +1,8 @@
-"""v30 Slice C (recursive-complete substituent naming) — first atomic slice.
+""" Slice C (recursive-complete substituent naming) — first atomic slice.
 
-Gap (measured, ): the acylamino
+Gap (measured, internal notes): the acylamino
 substituent ``-NHC(=O)R`` declines when R is a substituted acetyl (phenylacetyl,
-chloroacetyl, ...). Root cause: ``acid_name_to_amido_prefix`` covers ``-oic acid``,
+chloroacetyl,...). Root cause: ``acid_name_to_amido_prefix`` covers ``-oic acid``,
 ``carboxylic acid`` and a two-entry retained table, but NOT the retained
 ``acetic acid`` FAMILY, so ``phenylacetic acid`` -> None. The acid names +
 round-trips standalone (``2-phenylacetamidoacetic acid`` RT-verified), so the

@@ -1,18 +1,18 @@
 """P-67 organo-oxoacids of the heavier pnictogens (As, Sb).
 
 An arsonic acid is NOT an organometallic -- it is a P-67 oxoacid, the exact
-analogue of a phosphonic acid.  The Blue Book gives all four as *preselected
+analogue of a phosphonic acid. The Blue Book gives all four as *preselected
 names* (BB L36051-36054):
 
-    AsH(O)(OH)2  arsonic acid    AsH2(O)OH  arsinic acid
-    SbH(O)(OH)2  stibonic acid   SbH2(O)OH  stibinic acid
+    AsH(O)(OH)2 arsonic acid AsH2(O)OH arsinic acid
+    SbH(O)(OH)2 stibonic acid SbH2(O)OH stibinic acid
 
 and gives the substituent-prefix PIN forms verbatim:
 
-    CH3-P(O)(OH)2            methylphosphonic acid       (PIN)  BB L36062
-    CH3-CH2-SbH(O)OH         ethylstibinic acid          (PIN)  BB L36064
-    C6H5-As(CH3)(O)OH        methyl(phenyl)arsinic acid  (PIN)  BB L36066
-    (4-acetamido-3-methylphenyl)arsonic acid             (PIN)  BB L33010
+    CH3-P(O)(OH)2 methylphosphonic acid (PIN) BB L36062
+    CH3-CH2-SbH(O)OH ethylstibinic acid (PIN) BB L36064
+    C6H5-As(CH3)(O)OH methyl(phenyl)arsinic acid (PIN) BB L36066
+    (4-acetamido-3-methylphenyl)arsonic acid (PIN) BB L33010
 
 Bismuth has NO oxoacid analogue in the Blue Book (there is no "bismuthonic
 acid"), so the family is bounded to P / As / Sb -- matching the existing
@@ -39,12 +39,12 @@ def gated_namer(monkeypatch):
     """A namer with the SELF-01 OPSIN validity gate ON (production behaviour).
 
     ``tests/conftest.py`` has an autouse fixture that disables the gate for the
-    whole suite so tests can assert RAW producer output.  Every assertion in this
+    whole suite so tests can assert RAW producer output. Every assertion in this
     module about the CONTRACT -- what may and may not leave the engine -- is
     about what actually SHIPS, so it must re-enable the gate; otherwise the test
     asserts an ungated candidate string and proves nothing about production.
-    (Before v29 P3, without this, the benzyl case asserted against the raw
-    'methylbenzene' candidate rather than the abstention.)  Tests that must hold
+    (Before, without this, the benzyl case asserted against the raw
+    'methylbenzene' candidate rather than the abstention.) Tests that must hold
     even with no JRE take the opposite tack and disable the gate explicitly --
     see ``test_benzyl_case_names_correctly_even_without_the_opsin_gate``.
     """
@@ -74,7 +74,7 @@ def test_pnictogen_oxoacid_functional_group_detected(smiles, fg):
 
 # --------------------------------------------------------------------------
 # 2. The carbon guard: a FREE inorganic oxoacid must NOT be claimed
-#    (arsoric acid As(O)(OH)3 / stiboric acid are separate preselected names)
+# (arsoric acid As(O)(OH)3 / stiboric acid are separate preselected names)
 # --------------------------------------------------------------------------
 
 @pytest.mark.parametrize("smiles,fg", [
@@ -128,34 +128,70 @@ def test_phosphorus_oxoacid_names_unchanged(namer, smiles, expected):
 
 
 # --------------------------------------------------------------------------
+# 4b. DI-ARYL pnictogen -inic acids: the acid is SENIOR to the ring (P-41), so
+# the two identical carbocycles are cited as ``diphenyl``/``dicyclohexyl``
+# prefixes on the acid parent (P-67.1.2.x -inic acid). They must NOT be
+# named multiplicatively with the acid demoted to a ``(hydroxy...oryl)``
+# bridge (``1,1'-(hydroxyarsoryl)dibenzene``) — a right-molecule, wrong-PIN
+# regression that surfaced once the P-67.1.4.1.1 acyl-prefix bridge
+# generalised from phosphoryl to arsoryl/stiboryl (rules/multiplicative.py).
+# The multiplicative PIN is correctly retained ONLY when the ring units bear
+# a senior PCG of their own (4,4'-(hydroxyarsoryl)dibenzoic acid).
+# --------------------------------------------------------------------------
+
+@pytest.mark.parametrize("smiles,expected", [
+    ("c1ccccc1[As](=O)(O)c1ccccc1",         "diphenylarsinic acid"),
+    ("c1ccccc1[P](=O)(O)c1ccccc1",          "diphenylphosphinic acid"),
+    ("c1ccccc1[Sb](=O)(O)c1ccccc1",         "diphenylstibinic acid"),
+    # whole class: two identical SIMPLE carbocycles, not only benzene
+    ("C1CCCCC1[As](=O)(O)C1CCCCC1",         "dicyclohexylarsinic acid"),
+])
+def test_diaryl_pnictogen_inic_acid_is_parent_not_multiplicative(
+        namer, smiles, expected):
+    assert namer.name(smiles) == expected
+
+
+@pytest.mark.parametrize("smiles,expected", [
+    # ring units carry a senior CARBOXYLIC acid -> the acyl bridge is correct
+    ("O[As](=O)(C1=CC=C(C(=O)O)C=C1)C1=CC=C(C(=O)O)C=C1",
+     "4,4'-(hydroxyarsoryl)dibenzoic acid"),
+    ("COP(=O)(C1=CC=C(C(=O)O)C=C1)C1=CC=C(C(=O)O)C=C1",
+     "4,4'-(methoxyphosphoryl)dibenzoic acid"),
+])
+def test_pnictogen_acyl_bridge_multiplicative_retained_on_senior_ring_pcg(
+        namer, smiles, expected):
+    assert namer.name(smiles) == expected
+
+
+# --------------------------------------------------------------------------
 # 5. A complex organyl is NAMED, and named CORRECTLY.
 #
-#    v29 Phase 3 (2026-07-26) lifted the fail-closed contract this section used
-#    to encode.  The refusal was never a nomenclature rule: it was an artefact
-#    of the handler-private carbon-skeleton walker, which miscounts a ring or a
-#    branch as a linear chain (benzyl -> 'heptyl', cyclohexyl -> 'hexyl').  The
-#    guard was right to refuse ITS OWN walker's output; the walker was the
-#    defect.  The organyl now goes through the shared substituent chokepoint
-#    (``assembly.substituent_enumerator.name_substituent``), so these molecules
-#    are named instead of refused.
+# a phase (2026-07-26) lifted the fail-closed contract this section used
+# to encode. The refusal was never a nomenclature rule: it was an artefact
+# of the handler-private carbon-skeleton walker, which miscounts a ring or a
+# branch as a linear chain (benzyl -> 'heptyl', cyclohexyl -> 'hexyl'). The
+# guard was right to refuse ITS OWN walker's output; the walker was the
+# defect. The organyl now goes through the shared substituent chokepoint
+# (``assembly.substituent_enumerator.name_substituent``), so these molecules
+# are named instead of refused.
 #
-#    THE SAFETY PROPERTY IS UNCHANGED AND STILL ASSERTED BELOW: no emission may
-#    carry a fabricated constitution.  Only the mechanism moved, from "refuses"
-#    to "names correctly", and every assertion below therefore pins the EXACT
-#    string rather than merely "something was produced" -- a test that only
-#    checked for the absence of a failure marker would pass on a wrong name.
+# THE SAFETY PROPERTY IS UNCHANGED AND STILL ASSERTED BELOW: no emission may
+# carry a fabricated constitution. Only the mechanism moved, from "refuses"
+# to "names correctly", and every assertion below therefore pins the EXACT
+# string rather than merely "something was produced" -- a test that only
+# checked for the absence of a failure marker would pass on a wrong name.
 #
-#    Blue Book authority for the names asserted here:
-#      * P-29.6.1 (BB 16272): benzyl is a retained PREFERRED prefix, cited bare
-#        -- '2-benzylpyridine' (PIN), BB 16280.
-#      * P-29.6.1 (BB 16270/16286): 'tert-butyl' likewise, cited bare --
-#        '*tert*-butyldi(methyl)phosphane' (PIN); P-16.3.3(b)/P-16.2.4.1(d) 'N-tert-butyl' NOT
-#        the enclosed form (BB 3465 cites it bare).
-#      * P-16.5.1.3 / BB L36066: for a mononuclear parent the FIRST cited group
-#        takes no marks and each subsequent one is enclosed --
-#        'methyl(phenyl)arsinic acid' (PIN).
-#      * BB 35461: 'C2H5-P(O)(OH)2 ethylphosphonic acid (PIN) (not
-#        ethanephosphonic acid)' -- the organyl-prefix form IS the PIN.
+# Blue Book authority for the names asserted here:
+# * P-29.6.1 (BB 16272): benzyl is a retained PREFERRED prefix, cited bare
+# -- '2-benzylpyridine' (PIN), BB 16280.
+# * P-29.6.1 (BB 16270/16286): 'tert-butyl' likewise, cited bare --
+# '*tert*-butyldi(methyl)phosphane' (PIN); P-16.3.3(b)/P-16.2.4.1(d) 'N-tert-butyl' NOT
+# the enclosed form (BB 3465 cites it bare).
+# * P-16.5.1.3 / BB L36066: for a mononuclear parent the FIRST cited group
+# takes no marks and each subsequent one is enclosed --
+# 'methyl(phenyl)arsinic acid' (PIN).
+# * BB 35461: 'C2H5-P(O)(OH)2 ethylphosphonic acid (PIN) (not
+# ethanephosphonic acid)' -- the organyl-prefix form IS the PIN.
 # --------------------------------------------------------------------------
 
 @pytest.mark.parametrize("smiles,expected", [
@@ -166,7 +202,7 @@ def test_complex_organyl_is_named_correctly(gated_namer, smiles, expected):
     """The user-reported abstention, now named -- and named EXACTLY right.
 
     Asserting the exact string is the point: "a name was produced" would be
-    satisfied by a fabricated 'heptylarsonic acid' just as well.  Run with the
+    satisfied by a fabricated 'heptylarsonic acid' just as well. Run with the
     SELF-01 OPSIN gate ON, so this is what actually SHIPS.
     """
     from orthonym.errors import is_failure_name
@@ -194,7 +230,7 @@ def test_producer_itself_returns_the_exact_right_string(rules_fn, fg, smiles, ex
     Asserting only the shipped string is too weak: the SELF-01 OPSIN gate would
     mask a producer that fabricates a wrong name (a mutation that made the
     namer emit 'methylarsonic acid' for benzylarsonic acid survived a
-    shipped-output-only test).  The OPSIN gate also fails OPEN when no JRE is
+    shipped-output-only test). The OPSIN gate also fails OPEN when no JRE is
     present, so the producer level is where the real safety property lives.
 
     That rationale is why this test still exists after the fail-closed contract
@@ -232,10 +268,10 @@ def test_cyclic_substituent_is_never_renamed_as_a_linear_chain(
     CONSTITUTION: benzyl(methyl)phosphinic acid -> 'heptyl(methyl)phosphinic
     acid', cyclohexyl(methyl) -> 'hexyl(methyl)'.
 
-    Phase B stopped that by REFUSING.  v29 Phase 3 stops it by naming the ring
-    correctly through the shared chokepoint.  The guarantee is the same and is
+    Phase B stopped that by REFUSING. a phase stops it by naming the ring
+    correctly through the shared chokepoint. The guarantee is the same and is
     now checked from BOTH sides: the fabricated linear token must be absent AND
-    the correct name must be present.  Only the second half would let a
+    the correct name must be present. Only the second half would let a
     'heptyl'-free but still wrong name through; only the first half would be
     satisfied by an abstention.
 
@@ -266,13 +302,13 @@ def test_benzyl_case_names_correctly_even_without_the_opsin_gate(
     """Correctness here must not depend on Java being installed.
 
     The OPSIN validity gate fails OPEN when no JAR is present, so a guarantee
-    that only holds inside the gate is not a guarantee.  Before Phase B the
+    that only holds inside the gate is not a guarantee. Before Phase B the
     engine emitted the constitutionally-WRONG 'methylbenzene' for benzylarsonic
     acid and relied entirely on SELF-01 to suppress it.
 
     Naming CORRECTLY with the gate disabled is the strongest form of that
     contract -- stronger than the refusal this test used to assert, because a
-    refusal is also what a broken producer yields.  The historical wrong tokens
+    refusal is also what a broken producer yields. The historical wrong tokens
     stay asserted so the specific old leak cannot come back.
     """
     import orthonym.namer as _namer
@@ -305,7 +341,7 @@ def test_heteroatom_organyl_defers_to_the_generic_path_on_every_element(
     shipped behaviour on phosphorus, so this test pins that As/Sb behave the SAME
     as P rather than diverging in either direction.
 
-    NOT THE PIN -- caveat CONFIRMED against the Blue Book (v29 P3, 2026-07-26).
+    NOT THE PIN -- caveat CONFIRMED against the Blue Book (, 2026-07-26).
     The earlier version of this docstring asserted the PIN without a citation;
     the citations exist and are stronger than claimed:
 
@@ -323,24 +359,24 @@ def test_heteroatom_organyl_defers_to_the_generic_path_on_every_element(
         Orthonym already emits ``phosphonoacetic acid`` correctly by deferring,
         which is exactly why the guard must keep refusing that shape.
 
-    NOT ACHIEVABLE BY WIDENING THIS GUARD -- MEASURED, not assumed.  The obvious
+    NOT ACHIEVABLE BY WIDENING THIS GUARD -- MEASURED, not assumed. The obvious
     reading is that the C/H/halogen bound is what blocks the PIN, and it is
-    wrong.  Probed directly (v29 P3):
+    wrong. Probed directly ():
 
       * With ``_fragment_atoms`` widened to admit heteroatoms, the P-67 producer
         returns the PIN outright: ``name_phosphonic_acid`` -> '(2-hydroxyethyl)
         phosphonic acid', ``name_arsonic_acid`` -> '(2-hydroxyethyl)arsonic
-        acid'.  So the guard and the chokepoint are BOTH already capable.
+        acid'. So the guard and the chokepoint are BOTH already capable.
       * But for these molecules the P-67 producer is invoked **zero times** --
         the shipped '2-hydroxyethane-1-phosphonic acid' comes from a different
-        path entirely.  Widening the guard therefore changes nothing here; a
+        path entirely. Widening the guard therefore changes nothing here; a
         mutation test that widened it left this whole module green.
 
     The blocker is UPSTREAM, in which handler claims a polyfunctional oxoacid --
-    the secondary blocker recorded in the Phase 3 design §0.2 (``p44_scorer``
-    Pre-empt 2 / ``parent_selection.SKELETAL_SUFFIX_PGS``), assigned to Phase 5.
+    the secondary blocker recorded in the a phase design §0.2 (``p44_scorer``
+    Pre-empt 2 / ``parent_selection.SKELETAL_SUFFIX_PGS``), assigned to a phase.
     Closing it is a DISPATCH change, so it needs the full gate, not this
-    boundary.  The guard-side half is also still required and is specified: a
+    boundary. The guard-side half is also still required and is specified: a
     hub-seniority parameter admitting a heteroatom fragment iff every
     characteristic group lying ENTIRELY inside it is strictly junior to the hub's
     own acid (``rules.seniority.compare_seniority`` already ranks phosphonic 26 <
@@ -362,9 +398,9 @@ def test_heteroatom_organyl_defers_to_the_generic_path_on_every_element(
 
 
 @pytest.mark.parametrize("smiles", [
-    "CCP(=O)O",     # ethylphosphinic acid  (P sibling)
-    "CC[As](=O)O",  # ethylarsinic acid     (As)
-    "CC[Sb](=O)O",  # ethylstibinic acid    (Sb, BB L36064 PIN)
+    "CCP(=O)O",     # ethylphosphinic acid (P sibling)
+    "CC[As](=O)O",  # ethylarsinic acid (As)
+    "CC[Sb](=O)O",  # ethylstibinic acid (Sb, BB L36064 PIN)
 ])
 def test_monosubstituted_inic_acid_is_a_symmetric_shared_gap(gated_namer, smiles):
     """AUDITED PRE-EXISTING GAP, deliberately left symmetric.
@@ -373,7 +409,7 @@ def test_monosubstituted_inic_acid_is_a_symmetric_shared_gap(gated_namer, smiles
     -inic acid (one C + one H on the central atom) is a real class member.
     The shipped phosphorus path has never covered it -- ``CCP(=O)O`` perceives
     no functional group and fails closed -- and this phase mirrors that scope
-    rather than making As/Sb silently better than P.  Widening it must be done
+    rather than making As/Sb silently better than P. Widening it must be done
     for all three elements at once.
 
     This test exists to PIN the symmetry: if any one element starts naming
@@ -386,10 +422,10 @@ def test_monosubstituted_inic_acid_is_a_symmetric_shared_gap(gated_namer, smiles
 def test_complex_organyl_never_named_as_the_bare_parent(gated_namer):
     """The specific historical leak: dropping the ring and naming the rest.
 
-    Kept verbatim through the v29 P3 contract change -- the leak it guards
+    Kept verbatim through the contract change -- the leak it guards
     (emitting the benzyl fragment's own parent and silently discarding the
     arsonic acid) is an atom-dropping WRONG name whether the handler refuses or
-    names, so the guard is orthogonal to which of the two it does.  The exact
+    names, so the guard is orthogonal to which of the two it does. The exact
     name is pinned as well now that there is one.
     """
     name = gated_namer.name("C1=CC=C(C=C1)C[As](=O)(O)O")
@@ -400,7 +436,7 @@ def test_complex_organyl_never_named_as_the_bare_parent(gated_namer):
 
 # --------------------------------------------------------------------------
 # 6. Element routing: genuine organometallics and organo-pnictogen hydrides
-#    are NOT stolen by the new acid path
+# are NOT stolen by the new acid path
 # --------------------------------------------------------------------------
 
 @pytest.mark.parametrize("smiles,expected", [
@@ -442,20 +478,20 @@ def test_pnictogen_oxoacids_are_not_organometallic(smiles):
 
 # --------------------------------------------------------------------------
 # 7. Honesty of the descriptive fallback: a carbon-bearing arsenic compound
-#    is not "inorganic" -- and, since v29 P3, is not a fallback at all
+# is not "inorganic" -- and, since, is not a fallback at all
 # --------------------------------------------------------------------------
 
 def test_organo_arsenic_compound_is_named_not_labelled(gated_namer):
     """C7H9AsO3 bearing a benzyl group is an ORGANO-arsenic compound.
 
-    RE-DERIVED (v29 P3).  This test's premise -- that the molecule FAILS and
+    RE-DERIVED (). This test's premise -- that the molecule FAILS and
     therefore gets a descriptive label -- is gone: the P-67 producer now names
-    it.  Its guarantee is re-expressed at full strength.
+    it. Its guarantee is re-expressed at full strength.
 
     The dropped assertion was ``"arsenic" in name``, which asserted that the
     descriptive FALLBACK said 'arsenic compound' rather than 'inorganic
-    compound'.  It cannot be kept: there is no fallback string to inspect, and
-    the real name legitimately says 'arsonic', not 'arsenic'.  What the old
+    compound'. It cannot be kept: there is no fallback string to inspect, and
+    the real name legitimately says 'arsonic', not 'arsenic'. What the old
     assertion was protecting -- that a carbon-bearing arsenic compound is never
     mislabelled -- is now protected more strongly by pinning the actual name and
     by asserting no descriptive-label vocabulary appears at all.

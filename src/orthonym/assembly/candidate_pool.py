@@ -1,30 +1,30 @@
-"""CandidatePool — Phase 145.1 behavior-preserving extraction of composer.py
+"""CandidatePool — a phase.1 behavior-preserving extraction of composer.py
 handler-cascade dispatch.
 
 PURPOSE
 -------
-Phase 145.1 (this module): factors out the in-line handler cascade in
+a phase.1 (this module): factors out the in-line handler cascade in
 composer.assemble_name() into an explicit pool. Pool runs in
 selection_mode='first_applicable' which reproduces the current sequential
 'if applies: return' flow bit-for-bit. SHIP GATE: byte-identical generated
 name strings on baseline_v17_all_corpora.csv (7,500 rows).
 
-Phase 146 (downstream consumer) was DESIGNED to flip selection_mode to
+a phase (downstream consumer) was DESIGNED to flip selection_mode to
 'score_based', raise chain priority, set the three gate thresholds to None
 to delete the IUPAC-non-conformant ratio gates, and recalibrate
-FACTOR_WEIGHTS. NOTE (Phase 166 SCORE-04, audit §Stale-Comment Inventory):
+FACTOR_WEIGHTS. NOTE (a phase SCORE-04, audit §Stale-Comment Inventory):
 that production flip never landed — production stays 'first_applicable'.
 The RT-moving cutover is now the default-OFF 'score_based_per_substring'
-mode, deferred to a downstream documented-delta phase (D-01).
+mode, deferred to a downstream documented-delta phase ().
 All four 146 changes are 1-line edits to HANDLER_POLICIES + FACTOR_WEIGHTS.
 
-DESIGN CONTRACT (D-08, D-09 from 145.1-CONTEXT.md):
-- HandlerPolicy is a dataclass with declarative gate fields. Phase 145.1
-  populates them from current composer.py constants. Phase 146 sets gates
+DESIGN CONTRACT (, from 145.1-CONTEXT.md):
+- HandlerPolicy is a dataclass with declarative gate fields. a phase.1
+  populates them from current composer.py constants. a phase sets gates
   to None and flips chain priority.
 - HANDLER_POLICIES is a module-level dict, single source of truth for
   handler tier/priority/gate metadata. Pulls priorities from
-  coverage_scoring.HANDLER_PRIORITY to avoid divergence (ISS-002
+  coverage_scoring.HANDLER_PRIORITY to avoid divergence (
   remediation: Plan 02 Task 2 extends HANDLER_PRIORITY with n_oxide,
   amine, simple_molecule entries so EVERY priority pulls from a single
   source — no hardcoded literals in this dict).
@@ -46,7 +46,7 @@ BYTE-IDENTICAL RISK MITIGATIONS (RESEARCH §9.1):
   must be preserved at the new return site so name_with_confidence()
   keeps working (Plan 03 enforces this).
 
-PERFORMANCE (ISS-005 remediation):
+PERFORMANCE (remediation):
 - ParentCorrectnessScorer is bound at MODULE LOAD via try/except
   ImportError (single binding, not re-imported per call). pool.add()
   references the module-level binding directly. Eliminates the 7,500x
@@ -70,7 +70,7 @@ from .coverage_scoring import (
     compute_confidence,
 )
 
-# ISS-005 REMEDIATION: module-level lazy binding for ParentCorrectnessScorer.
+# REMEDIATION: module-level lazy binding for ParentCorrectnessScorer.
 # Originally the import lived inside pool.add() (try/except ImportError per
 # call) which would have cost ~7,500 try/except dispatches during full
 # byte-identical runs. Module-level binding pays the import cost ONCE at
@@ -85,7 +85,7 @@ except ImportError:
     # factor to 0.5 (no-decision; safe because FACTOR_WEIGHTS weight=0.0).
     ParentCorrectnessScorer = None  # type: ignore[assignment, misc]
 
-# Phase 166 SCORE-03: module-level PerNodeScorer binding (mirrors the
+# a phase SCORE-03: module-level PerNodeScorer binding (mirrors the
 # ParentCorrectnessScorer guard above — pay the import once at load, tolerate
 # the scorer module being absent in pre-Plan-02 isolated tests). The add()
 # attach below no-ops when this is None.
@@ -98,7 +98,7 @@ except ImportError:
 # is a leaf module (stdlib-only top-level imports), so this direct runtime import
 # introduces no cycle — never re-derive the predicate (it would drift from the
 # contract test).
-# v30 PE-1 candidate ledger. ``metrics.candidate_ledger`` is a leaf module
+# PE-1 candidate ledger. ``metrics.candidate_ledger`` is a leaf module
 # (threading + typing only), so this is cycle-free for the same reason the
 # ``name_tree`` import above is. The ledger is OFF unless a consumer calls
 # ``enable()``, so the cost on the production path is one boolean test per
@@ -113,7 +113,7 @@ logger = logging.getLogger(__name__)
 
 
 # ---------------------------------------------------------------------------
-# RATIO_REJECT_FLOOR — Phase 145.2 D-09-a.2 sanity gate
+# RATIO_REJECT_FLOOR — a phase.2 -a.2 sanity gate
 # ---------------------------------------------------------------------------
 # Minimum `ratio` factor required for a candidate to be added to the pool.
 # Catches obvious-garbage candidates (e.g., a 1-character name on a 30-HA
@@ -121,21 +121,21 @@ logger = logging.getLogger(__name__)
 #
 # This is DISTINCT from FACTOR_WEIGHTS['ratio'] (demoted to 0.0 in Plan 01
 # Task 1) and distinct from _MIN_RATIO_ACCEPT at composer.py:1520 (preserved
-# per D-10). See 145.2-CONTEXT.md §Plan 01 for the three-ratio disambiguation.
+# per). See 145.2-CONTEXT.md §Plan 01 for the three-ratio disambiguation.
 #
 # Floor value 0.10 chosen so the reject condition is rare in practice (no
 # real Tier A candidate on the 7,500-row baseline has ratio < 0.10) but
-# strong enough to catch adversarial / pathological garbage during Phase 146
+# strong enough to catch adversarial / pathological garbage during a phase
 # competitive selection.
 RATIO_REJECT_FLOOR: float = 0.10
 
 
 # ---------------------------------------------------------------------------
-# Phase 146 D-08: feature-flag-controlled default selection mode.
+# a phase: feature-flag-controlled default selection mode.
 # ORTHONYM_SELECTION_MODE env var read at module-import time.
-# Default 'first_applicable' (V17) during the post-148 soak per D-07.
+# Default 'first_applicable' (V17) during the post-148 soak per.
 # Rollback one-liner:
-#   ORTHONYM_USE_V18_WEIGHTS=false ORTHONYM_SELECTION_MODE=first_applicable pytest tests/
+# ORTHONYM_USE_V18_WEIGHTS=false ORTHONYM_SELECTION_MODE=first_applicable pytest tests/
 # Source: https://iupac.qmul.ac.uk/BlueBook/P4.html P-44.1
 # ---------------------------------------------------------------------------
 _DEFAULT_SELECTION_MODE: str = os.getenv(
@@ -150,7 +150,7 @@ assert _DEFAULT_SELECTION_MODE in (
 
 
 # ---------------------------------------------------------------------------
-# Phase 146 D-02: P-44.1.2 element seniority for parent-hydride selection.
+# a phase: P-44.1.2 element seniority for parent-hydride selection.
 # SEPARATE from rules/seniority.py SENIORITY_ORDER (which is principal-GROUP
 # seniority for P-41/P-42 acid/ester/amide ordering). Lower index = more senior.
 # Source: https://iupac.qmul.ac.uk/BlueBook/P4.html P-44.1.2
@@ -180,18 +180,18 @@ class HandlerPolicy:
     """Declarative policy for one handler's pool participation.
 
     Fields:
-        handler_id:    Handler name (matches HANDLER_PRIORITY keys).
-        tier:          'ring_a' | 'ring_b' | 'chain' | 'direct_return'.
-        priority:      Tiebreak priority (pulled from HANDLER_PRIORITY).
+        handler_id: Handler name (matches HANDLER_PRIORITY keys).
+        tier: 'ring_a' | 'ring_b' | 'chain' | 'direct_return'.
+        priority: Tiebreak priority (pulled from HANDLER_PRIORITY).
         direct_return: True for Tier B and direct-return handlers
                        (first-applicable wins); False for Tier A pool
                        handlers (compete via select_best_candidate)
                        and chain (now first-class peer of ring_a per
-                       Phase 146 SC-5).
+                       a phase SC-5).
 
-    Phase 146 SC-8: cascade_ratio_min, min_ratio_accept, gate_threshold
+    a phase SC-8: cascade_ratio_min, min_ratio_accept, gate_threshold
     fields REMOVED. Cascade competition is now handled by
-    `_best_two_tier` (D-01 two-tier selector) and the inline V17 gate at
+    `_best_two_tier` (two-tier selector) and the inline V17 gate at
     composer.py preserves byte-identical V17 soak behavior. Tier B
     handlers no longer carry a per-handler gate threshold; the
     confidence gate is enforced by the handler-internal call to
@@ -207,28 +207,28 @@ class HandlerPolicy:
 # HANDLER_POLICIES — single source of truth for per-handler pool metadata
 #
 # Populated VERBATIM from composer.py current constants (verified against
-# main HEAD per 145.1-RESEARCH.md §2.2). Phase 146 SC-8 cleanup:
+# main HEAD per 145.1-RESEARCH.md §2.2). a phase SC-8 cleanup:
 # - Removed cascade_ratio_min / min_ratio_accept / gate_threshold kwargs
-#   (fields deleted from HandlerPolicy). Cascade competition is now
-#   handled by _best_two_tier; Tier B gate enforcement stays inside
-#   each handler's call to _confidence_gate(CONFIDENCE_GATE_THRESHOLD).
+# (fields deleted from HandlerPolicy). Cascade competition is now
+# handled by _best_two_tier; Tier B gate enforcement stays inside
+# each handler's call to _confidence_gate(CONFIDENCE_GATE_THRESHOLD).
 # - Raised chain policy priority to 4 (ring_a-peer) per SC-5 so chain
-#   competes as a first-class pool candidate in V18 score_based mode.
-#   HANDLER_PRIORITY['chain'] remains 1 so V17 select_best_candidate
-#   tiebreak behavior is byte-identical (the policy-level priority is
-#   only consumed by the two-tier selector, not by V17's cascade).
+# competes as a first-class pool candidate in V18 score_based mode.
+# HANDLER_PRIORITY['chain'] remains 1 so V17 select_best_candidate
+# tiebreak behavior is byte-identical (the policy-level priority is
+# only consumed by the two-tier selector, not by V17's cascade).
 #
-# PRIORITY SOURCE (ISS-002 remediation): every entry pulls priority from
+# PRIORITY SOURCE (remediation): every entry pulls priority from
 # HANDLER_PRIORITY (the single source of truth). Plan 02 Task 2 extends
 # HANDLER_PRIORITY with the missing 'n_oxide', 'amine', 'simple_molecule'
 # entries (with priorities 5, 5, 1 respectively) so this dict can pull from
 # HANDLER_PRIORITY[*] without hardcoded literals. The sole intentional
 # exception is 'chain', whose policy-level priority is promoted to 4
-# (ring_a-peer) for Phase 146 SC-5 while HANDLER_PRIORITY['chain']
+# (ring_a-peer) for a phase SC-5 while HANDLER_PRIORITY['chain']
 # stays at 1 to preserve V17 byte-identical tiebreak semantics.
 #
 # SCOPE NOTE: salt / ion / radical / simple_molecule handlers are EXCLUDED
-# from this dict per 145.1-RESEARCH.md §9.2 item 3 + ISS-001 enumeration:
+# from this dict per 145.1-RESEARCH.md §9.2 item 3 + enumeration:
 # they route to assemble_ion_name() / _name_simple_molecule() directly at
 # composer.py:693-710 and composer.py:1389 with completely different
 # naming semantics (P-73 functional class, P-68 radicals, terminal
@@ -239,8 +239,8 @@ HANDLER_POLICIES: Dict[str, HandlerPolicy] = {
     # --- Tier B: 13 handlers using _confidence_gate (CONFIDENCE_GATE_THRESHOLD=0.40) ---
     # Each runs gate check before return; on gate-fail, falls through to
     # next handler. Pool reproduces by returning None from add() on
-    # gate-fail; caller checks `if cand is not None: return ...`.
-    # Phase 146 SC-8: gate_threshold kwarg removed from every entry; the
+    # gate-fail; caller checks `if cand is not None: return...`.
+    # a phase SC-8: gate_threshold kwarg removed from every entry; the
     # gate is enforced by the handler-internal _confidence_gate call.
     'oxime':           HandlerPolicy('oxime',           'ring_b', priority=HANDLER_PRIORITY['oxime'],           direct_return=True),
     'hydrazone':       HandlerPolicy('hydrazone',       'ring_b', priority=HANDLER_PRIORITY['hydrazone'],       direct_return=True),
@@ -253,7 +253,7 @@ HANDLER_POLICIES: Dict[str, HandlerPolicy] = {
     'cyanamide':       HandlerPolicy('cyanamide',       'ring_b', priority=HANDLER_PRIORITY['cyanamide'],       direct_return=True),
     'sulfoxide':       HandlerPolicy('sulfoxide',       'ring_b', priority=HANDLER_PRIORITY['sulfoxide'],       direct_return=True),
     'sulfone':         HandlerPolicy('sulfone',         'ring_b', priority=HANDLER_PRIORITY['sulfone'],         direct_return=True),
-    # P6-6I: Se/Te oxide handlers (mirror sulfoxide/sulfone).
+    # -6I: Se/Te oxide handlers (mirror sulfoxide/sulfone).
     'selenoxide':      HandlerPolicy('selenoxide',      'ring_b', priority=HANDLER_PRIORITY['selenoxide'],      direct_return=True),
     'selenone':        HandlerPolicy('selenone',        'ring_b', priority=HANDLER_PRIORITY['selenone'],        direct_return=True),
     'telluroxide':     HandlerPolicy('telluroxide',     'ring_b', priority=HANDLER_PRIORITY['telluroxide'],     direct_return=True),
@@ -264,7 +264,7 @@ HANDLER_POLICIES: Dict[str, HandlerPolicy] = {
 
     # --- Direct-return: 18 handlers, no gate ---
     # These return the first non-None name produced; no candidate competition.
-    # ISS-002 remediation: priorities for n_oxide, amine, polyfunctional all
+    # remediation: priorities for n_oxide, amine, polyfunctional all
     # pulled from HANDLER_PRIORITY (Plan 02 Task 2 added the missing entries).
     'n_oxide':         HandlerPolicy('n_oxide',         'direct_return', priority=HANDLER_PRIORITY['n_oxide'],         direct_return=True),
     'acid_halide':     HandlerPolicy('acid_halide',     'direct_return', priority=HANDLER_PRIORITY['acid_halide'],     direct_return=True),
@@ -286,18 +286,18 @@ HANDLER_POLICIES: Dict[str, HandlerPolicy] = {
     'amine':           HandlerPolicy('amine',           'direct_return', priority=HANDLER_PRIORITY['amine'],           direct_return=True),
 
     # --- Tier A: 3 ring handlers competing via select_best_candidate ---
-    # Phase 146 SC-8 cleanup: cascade_ratio_min and min_ratio_accept
+    # a phase SC-8 cleanup: cascade_ratio_min and min_ratio_accept
     # kwargs removed. Cascade competition between complex_ring,
     # heterocycle, and benzene is now decided by `_best_two_tier`
-    # (D-01 two-tier selector). V17 byte-identical preservation of
+    # (two-tier selector). V17 byte-identical preservation of
     # the 0.40 complex_ring short-circuit is enforced inline in
     # composer.py via a selection_mode-gated guard (see 146-05 SUMMARY).
     'complex_ring':    HandlerPolicy('complex_ring',    'ring_a', priority=HANDLER_PRIORITY['complex_ring'], direct_return=False),
     'heterocycle':     HandlerPolicy('heterocycle',     'ring_a', priority=HANDLER_PRIORITY['heterocycle'],  direct_return=False),
     'benzene':         HandlerPolicy('benzene',         'ring_a', priority=HANDLER_PRIORITY['benzene'],      direct_return=False),
 
-    # --- Chain: first-class peer of ring_a handlers (Phase 146 SC-5) ---
-    # Phase 146 SC-5 / SC-8: chain policy-level priority raised from
+    # --- Chain: first-class peer of ring_a handlers (a phase SC-5) ---
+    # a phase SC-5 / SC-8: chain policy-level priority raised from
     # HANDLER_PRIORITY['chain']=1 to 4 so chain competes as a first-
     # class candidate against ring_a handlers in the two-tier selector
     # (IUPAC P-44.1 cascade — chain length is criterion P-44.1.1/c).
@@ -311,7 +311,7 @@ HANDLER_POLICIES: Dict[str, HandlerPolicy] = {
 
 
 # ---------------------------------------------------------------------------
-# Phase 146 helper: PCG counter (CD-01 resolution per RESEARCH §2.3).
+# a phase helper: PCG counter (CD-01 resolution per RESEARCH §2.3).
 # ---------------------------------------------------------------------------
 
 def _count_pcgs_in_parent(
@@ -386,31 +386,31 @@ def _count_multiple_bonds_in_atom_set(mol: Any, atom_set: Set[int]) -> int:
 
 
 # ---------------------------------------------------------------------------
-# Phase 146 Tier-1 cascade filters (D-01, D-02).
+# a phase Tier-1 cascade filters (,).
 # Each filter has signature (List[CandidateName]) -> List[CandidateName].
 # NEVER returns empty list — if all candidates tie, all are returned.
 # ---------------------------------------------------------------------------
 
 # ============================================================================
-# UNREACHABLE IN PRODUCTION -- measured 2026-07-30 at d5f9ca96 (v30 Task 2)
+# UNREACHABLE IN PRODUCTION -- measured 2026-07-30 at d5f9ca96 ()
 #
 # This function and the rest of the P-44 criteria cascade below (through
 # _TIER1_FILTERS, _has_iupac_locants and _best_two_tier) CANNOT EXECUTE in the
 # shipped configuration. Three independent measured reasons, any one sufficient:
 #
-#   1. _DEFAULT_SELECTION_MODE is 'first_applicable', so best() returns early and
-#      never reaches its _best_two_tier call.
-#   2. The pool never holds more than ONE candidate. Spied over all 309 dev500
-#      failures: 517 best() calls, pool size == 1 in 517/517, _best_two_tier
-#      invoked 0 times, 0 rows with >1 candidate. Seniority filters over a set of
-#      one are a no-op by construction.
-#   3. dispatch_inner never consults the pool -- composer.py:1121 returns the
-#      winning handler's own NamingResult. Handlers RETURN rather than ADD (32 of
-#      36 HANDLER_POLICIES are direct_return=True), so nothing is ever ranked.
+# 1. _DEFAULT_SELECTION_MODE is 'first_applicable', so best() returns early and
+# never reaches its _best_two_tier call.
+# 2. The pool never holds more than ONE candidate. Spied over all 309 a dev split
+# failures: 517 best() calls, pool size == 1 in 517/517, _best_two_tier
+# invoked 0 times, 0 rows with >1 candidate. Seniority filters over a set of
+# one are a no-op by construction.
+# 3. dispatch_inner never consults the pool -- composer.py:1121 returns the
+# winning handler's own NamingResult. Handlers RETURN rather than ADD (32 of
+# 36 HANDLER_POLICIES are direct_return=True), so nothing is ever ranked.
 #
 # 'wins' (correct name available but not selected) = 1 of 309, and
 # that one was a fragment name from an abandoned nested pool, not a rival
-# whole-molecule candidate. Write-up: eval/LOG.md "v30 Task 2".
+# whole-molecule candidate. Write-up: eval/LOG.md "".
 #
 # DO NOT revive by flipping ORTHONYM_SELECTION_MODE=score_based -- measured, that
 # changes 0 of 300 names, because of reason 3. DO NOT calibrate FACTOR_WEIGHTS
@@ -439,7 +439,7 @@ def _filter_max_pcg_count(candidates: List['CandidateName']) -> List['CandidateN
 def _filter_senior_heteroatom_class(
     candidates: List['CandidateName'],
 ) -> List['CandidateName']:
-    """P-44.1.2: senior heteroatom class wins (N > P > ... > C).
+    """P-44.1.2: senior heteroatom class wins (N > P >... > C).
 
     For each candidate, the senior element in its parent atom set is the one
     with the LOWEST index in P_44_1_2_ELEMENT_SENIORITY. Empty parent atoms
@@ -549,7 +549,7 @@ def _filter_lowest_locants(
 ) -> List['CandidateName']:
     """P-44.4.1.4+: lowest locants for principal groups, then multiple bonds, then substituents.
 
-    Phase 147 implementation (replaces Phase 146 stub). For each candidate
+    a phase implementation (replaces a phase stub). For each candidate
     in the pool, extracts feature-specific locant lists (PG attachment
     positions, multiple-bond positions, substituent positions) using the
     same atom-walk patterns as ``parent_selection.py``:
@@ -563,7 +563,7 @@ def _filter_lowest_locants(
     ``parent_selection.py`` — the comparators there are chain-vs-ring
     framed and cannot be called directly on a candidate pool, but their
     locant-extraction patterns at lines ~327-340 / 402-417 / 466-482 are
-    reused inline. Per Phase 147 BL-3 / D-04: a parallel comparison
+    reused inline. Per a phase BL-3 /: a parallel comparison
     engine would violate "reuse > rebuild".
 
     Precondition: ``_has_iupac_locants(candidates)`` must return True
@@ -576,7 +576,7 @@ def _filter_lowest_locants(
     Source: ``src/orthonym/rules/parent_selection.py:292-490`` (canonical
         P-44.1(f)/(g)/(i) implementations whose locant-extraction patterns
         are reused).
-    Source: Phase 147 CONTEXT D-02, D-06, BL-3.
+    Source: a phase CONTEXT,, BL-3.
     """
     from rdkit import Chem
 
@@ -611,7 +611,7 @@ def _filter_lowest_locants(
             return None
 
         # PG attachment locants (pattern: parent_selection.py:327-340).
-        # IM-01: per-FG attachment indices via _pg_attachment_atoms; for
+        #: per-FG attachment indices via _pg_attachment_atoms; for
         # multi-atom PGs (disulfide), the per-instance locant is min over
         # the FG's attachment atoms (matches IUPAC P-31.1.4).
         pg_atoms_list = getattr(cand, '_principal_group_atoms', None) or []
@@ -697,15 +697,15 @@ def _filter_lowest_locants(
 
 
 def _has_iupac_locants(candidates: List['CandidateName']) -> bool:
-    """D-02 / D-19 safe probe: True iff ALL candidates have iupac_locants populated.
+    """ / safe probe: True iff ALL candidates have iupac_locants populated.
 
-    Phase 147: ring_info is now a first-class CandidateName field (no longer
+    a phase: ring_info is now a first-class CandidateName field (no longer
     getattr-defensive). Returns False when any candidate has ring_info=None
-    OR ring_info['iupac_locants'] is None/empty (spiro/VB stubs per D-06).
+    OR ring_info['iupac_locants'] is None/empty (spiro/VB stubs per).
 
-    Phase 146 mode: no candidate populates ring_info -> returns False ->
+    a phase mode: no candidate populates ring_info -> returns False ->
     Tier-1 step 6 is a no-op.
-    Phase 147 mode: benzene/simple-hetero/PAH/fused-hetero candidates populate
+    a phase mode: benzene/simple-hetero/PAH/fused-hetero candidates populate
     iupac_locants -> step 6 activates.
     """
     for cand in candidates:
@@ -717,7 +717,7 @@ def _has_iupac_locants(candidates: List['CandidateName']) -> bool:
 
 # Module-level cascade order (P-44.1 lexicographic).
 # Step 6 (locant criteria) is gated separately inside _best_two_tier
-# via _has_iupac_locants per D-02.
+# via _has_iupac_locants per.
 _TIER1_FILTERS: List[Callable[[List['CandidateName']], List['CandidateName']]] = [
     _filter_max_pcg_count,            # P-44.1.1
     _filter_senior_heteroatom_class,  # P-44.1.2
@@ -734,15 +734,15 @@ _TIER1_FILTERS: List[Callable[[List['CandidateName']], List['CandidateName']]] =
 class CandidatePool:
     """Holds scored candidate names from one assemble_name() invocation.
 
-    Phase 145.1 mode: 'first_applicable' (literal re-encoding of current
+    a phase.1 mode: 'first_applicable' (literal re-encoding of current
     handler-cascade in composer.py:assemble_name). Pool.best() returns
     self._candidates[0] (first-added wins). Equivalent to the sequential
     'if applies: return' cascade.
 
-    Phase 146 mode: 'score_based' (delegates to select_best_candidate over
+    a phase mode: 'score_based' (delegates to select_best_candidate over
     full pool). Enables real chain-vs-ring competition.
 
-    SCORING TIMING (D-10): parent_correctness factor is computed inline in
+    SCORING TIMING (): parent_correctness factor is computed inline in
     pool.add() via the module-level ParentCorrectnessScorer binding. In
     145.1, FACTOR_WEIGHTS['parent_correctness'] = 0.0 ensures the factor
     is recorded but does NOT influence cand.confidence (IEEE 754: x+0.0=x).
@@ -750,7 +750,7 @@ class CandidatePool:
     Tier B gate semantics (preserves _confidence_gate at composer.py:279):
       tier='ring_b' handlers → if cand.confidence < CONFIDENCE_GATE_THRESHOLD
       (0.40), pool.add() returns None (gate-rejected); caller falls
-      through to next handler. Post Phase 146 SC-8, the gate threshold
+      through to next handler. Post a phase SC-8, the gate threshold
       is read from module-level CONFIDENCE_GATE_THRESHOLD (not the
       deleted policy.gate_threshold field).
 
@@ -766,7 +766,7 @@ class CandidatePool:
         self.selection_mode = selection_mode
         self._candidates: List[CandidateName] = []
         self._direct_return_winner: Optional[CandidateName] = None
-        # Phase 168 BLOCKER #9 fix (reviews iter 1): __init__ takes NO features (push_pool builds the
+        # a phase BLOCKER #9 fix (reviews iter 1): __init__ takes NO features (push_pool builds the
         # pool with selection_mode only). Initialize the flag+oracle to safe defaults; the REAL
         # set-site is add() below, which lifts them off the per-call `features` argument (idempotent
         # on first call). _best_two_tier (Plan-04 Stage B) reads self._enable_triviality_controller.
@@ -775,7 +775,7 @@ class CandidatePool:
         self._triv_flag_initialized: bool = False
 
     def _bind_triviality_features(self, features: Any) -> None:
-        """Bind the Phase 168 controller flag/oracle off the authoritative per-call ``features``.
+        """Bind the a phase controller flag/oracle off the authoritative per-call ``features``.
 
         WR-06 (code review 2026-05-30): the flag is a per-``Orthonym()``-call constant (namer
         stashes it on ``features`` in ``_classify`` before ``assemble_name``), so it is bound at
@@ -831,7 +831,7 @@ class CandidatePool:
         policy = HANDLER_POLICIES.get(handler_id)
         # Compute confidence WITHOUT parent_atom_indices (Risk 1 mitigation)
         cand = compute_confidence(name, handler_id, features)
-        # RATIO_REJECT_FLOOR sanity gate (Phase 145.2 D-09-a.2). Rejects
+        # RATIO_REJECT_FLOOR sanity gate (a phase.2 -a.2). Rejects
         # obvious-garbage candidates regardless of handler tier. Missing
         # 'ratio' factor treated as "not garbage" (defensive default).
         ratio_val = cand.factors.get('ratio')
@@ -841,14 +841,14 @@ class CandidatePool:
                 "handler=%s name=%r ratio=%.3f < floor=%.3f",
                 handler_id, name, ratio_val, RATIO_REJECT_FLOOR,
             )
-            # v30 PE-1 ledger: a candidate WAS built and this floor threw it away.
+            # PE-1 ledger: a candidate WAS built and this floor threw it away.
             # Recorded after the decision so it cannot influence it.
             if _ledger_on():
                 _ledger_record(handler_id, _LedgerStage.GATE_REJECTED, name,
                                detail=f"ratio_reject_floor:{ratio_val:.3f}")
             return None
         # Tier B gate enforcement (preserves _confidence_gate behavior).
-        # Phase 146 SC-8: the gate threshold is read from the module-level
+        # a phase SC-8: the gate threshold is read from the module-level
         # CONFIDENCE_GATE_THRESHOLD (0.40) rather than the now-deleted
         # policy.gate_threshold field. Tier B membership is determined by
         # policy.tier == 'ring_b' (13 handlers: oxime/.../partial_sat).
@@ -861,25 +861,25 @@ class CandidatePool:
                 return None
         # Set parent_atom_indices POST-HOC (Risk 1)
         cand.parent_atom_indices = parent_atom_indices
-        # Phase 147 D-03: attach ring_info POST-HOC (Risk 1 pattern).
+        # a phase: attach ring_info POST-HOC (Risk 1 pattern).
         # NEVER passed into compute_confidence() — that would break the
-        # byte-identical guarantee per Phase 146 D-19.
+        # byte-identical guarantee per a phase.
         cand.ring_info = ring_info
-        # Phase 165 SCORE-01: attach the structured Name-Tree POST-HOC (Risk 1
+        # a phase SCORE-01: attach the structured Name-Tree POST-HOC (Risk 1
         # pattern). NEVER passed into compute_confidence() — byte-identical
-        # preserved (Phase 146 D-19). best() surfaces the winner's tree.
+        # preserved (a phase). best() surfaces the winner's tree.
         cand.tree = tree
-        # Phase 166 SCORE-03: attach per-node scores POST-HOC (Risk 1 pattern).
+        # a phase SCORE-03: attach per-node scores POST-HOC (Risk 1 pattern).
         # NEVER into compute_confidence(); score_tree returns {} in production
         # (no reference name set) and on coarse trees, so cand.confidence stays
-        # byte-identical (SCORE-05). Contrast the :810-823 multiple_bond_count
+        # byte-identical (SCORE-05). Contrast the:810-823 multiple_bond_count
         # recompute — that is the ANTI-model; node_scores never touches confidence.
         if (PerNodeScorer is not None and tree is not None
                 and not is_coarse_node(tree)):
             cand.node_scores = PerNodeScorer.score_tree(tree, features.mol)
-        # Phase 168 TRIV-01/02/03: attach the rewritten tree POST-HOC (Risk-1 pattern; SACRED per
-        # Phase 165 D-04 + 166 D-04). NEVER passed into compute_confidence(); byte-identical preserved
-        # at Stage A per CONTEXT D-09. Default (flag OFF): tree_rewritten == tree (no-op), the
+        # a phase TRIV-01/02/03: attach the rewritten tree POST-HOC (Risk-1 pattern; SACRED per
+        # a phase + 166). NEVER passed into compute_confidence(); byte-identical preserved
+        # at Stage A per CONTEXT. Default (flag OFF): tree_rewritten == tree (no-op), the
         # controller block is skipped, production reads cand.tree unchanged. Stage B (Plan-04) flips
         # the comparator/serializer to read tree_rewritten via self._enable_triviality_controller.
         cand.tree_rewritten = tree
@@ -903,7 +903,7 @@ class CandidatePool:
                     getattr(cand, 'name', '?'), exc,
                 )
                 cand.tree_rewritten = tree
-        # Phase 147 fallback: if ring_info wasn't passed explicitly, read
+        # a phase fallback: if ring_info wasn't passed explicitly, read
         # the transient attribute set by namer.py:_classify (allows existing
         # composer.py call sites to flow ring_info through without a
         # signature change at every site).
@@ -917,17 +917,17 @@ class CandidatePool:
         cand._principal_group_atoms = list(
             getattr(features, 'principal_group_atoms', None) or []
         )
-        # IM-01: stash FG name so the cascade can route through
+        #: stash FG name so the cascade can route through
         # ``_pg_attachment_atoms`` (per-FG attachment override). Without
         # this the disulfide bug (flanking-C as attachment) would persist
         # in the candidate-pool path even after parent_selection.py is fixed.
         cand._principal_group = getattr(features, 'principal_group', None)
-        # Phase 146 CD-01: populate parent_pcg_count POST-HOC.
+        # a phase CD-01: populate parent_pcg_count POST-HOC.
         # Same Risk 1 mitigation as parent_atom_indices: NEVER passed into
         # compute_confidence (would break byte-identical guarantees).
         # See _count_pcgs_in_parent above for the algorithm.
         cand.parent_pcg_count = _count_pcgs_in_parent(cand, features)
-        # Phase 146 D-06 + Risk 1 preservation: POST-HOC patch
+        # a phase + Risk 1 preservation: POST-HOC patch
         # multiple_bond_count factor in V18 mode. compute_confidence
         # was called with parent_atom_indices=None (Risk 1), so the
         # factor was 0.0. Now that parent_atom_indices is set, recompute.
@@ -953,8 +953,8 @@ class CandidatePool:
                 4,
             )
             cand.confidence = min(max(cand.confidence, 0.0), 1.0)
-        # Inline parent_correctness scoring (D-10).
-        # ISS-005 REMEDIATION: reference the MODULE-LEVEL ParentCorrectnessScorer
+        # Inline parent_correctness scoring ().
+        # REMEDIATION: reference the MODULE-LEVEL ParentCorrectnessScorer
         # binding (set at module load via try/except ImportError). Avoids
         # ~7,500 per-call try-import dispatches during full byte-identical runs.
         if ParentCorrectnessScorer is not None:
@@ -978,7 +978,7 @@ class CandidatePool:
     def best(self) -> Optional[CandidateName]:
         """Select winning candidate per selection_mode.
 
-        BYTE-IDENTICAL CONTRACT (Phase 145.1 drift fix, 2026-04-23):
+        BYTE-IDENTICAL CONTRACT (a phase.1 drift fix, 2026-04-23):
 
         In `selection_mode='first_applicable'`, the original (pre-Plan-01)
         composer.py used an `if X applies: return X` cascade where each
@@ -999,10 +999,10 @@ class CandidatePool:
         Otherwise, return the first added candidate (Tier A subset
         compete-by-position for first_applicable).
 
-        Phase 146's planned flip to 'score_based' as the production default
-        never landed (Phase 166 SCORE-04, audit §Stale-Comment Inventory):
+        a phase's planned flip to 'score_based' as the production default
+        never landed (a phase SCORE-04, audit §Stale-Comment Inventory):
         production stays 'first_applicable'. The default-OFF
-        'score_based_per_substring' mode (the D-01 deferred cutover) competes
+        'score_based_per_substring' mode (the deferred cutover) competes
         the full candidate set via _best_two_tier(per_substring=True) ->
         select_best_candidate().
         """
@@ -1015,14 +1015,14 @@ class CandidatePool:
             if self._direct_return_winner is not None:
                 return self._direct_return_winner
             return self._candidates[0]
-        # Phase 146 SC-6 (D-01): two-tier selector.
+        # a phase SC-6 (): two-tier selector.
         # Tier 1: Blue Book P-44.1 lexicographic cascade (5 immediate filters
-        #         + step 6 gated on iupac_locants per D-02).
+        # + step 6 gated on iupac_locants per).
         # Tier 2: weighted-sum tiebreak via select_best_candidate.
         # Source: https://iupac.qmul.ac.uk/BlueBook/P4.html P-44.1
-        # Phase 166 SCORE-04: the default-OFF 'score_based_per_substring' mode
+        # a phase SCORE-04: the default-OFF 'score_based_per_substring' mode
         # adds a lexicographic per-substring refinement (parent->locant->
-        # substituent, D-05) BEFORE the Tier-2 aggregate fallback. The existing
+        # substituent,) BEFORE the Tier-2 aggregate fallback. The existing
         # 'score_based' path is byte-identical (per_substring=False).
         return self._best_two_tier(
             per_substring=(self.selection_mode == 'score_based_per_substring')
@@ -1033,22 +1033,22 @@ class CandidatePool:
         return list(self._candidates)
 
     def _best_two_tier(self, *, per_substring: bool = False) -> Optional[CandidateName]:
-        """Phase 146 Tier-1 lexicographic cascade + Tier-2 weighted-sum tiebreak.
+        """a phase Tier-1 lexicographic cascade + Tier-2 weighted-sum tiebreak.
 
         Implements Blue Book P-44.1 per CONTEXT.md <domain>:
-          Step 1: P-44.1.1   max PCG suffix count
-          Step 2: P-44.1.2   senior heteroatom class (N > P > ... > C)
-          Step 3: P-52.2.8   ring-over-chain on tie
+          Step 1: P-44.1.1 max PCG suffix count
+          Step 2: P-44.1.2 senior heteroatom class (N > P >... > C)
+          Step 3: P-52.2.8 ring-over-chain on tie
           Step 4: P-44.4.1.1 max skeletal atoms
           Step 5: P-44.4.1.2 max multiple bonds
-          Step 6: P-44.4.1.4+ locant criteria (gated on iupac_locants per D-02)
+          Step 6: P-44.4.1.4+ locant criteria (gated on iupac_locants per)
 
         Tier 2: when Tier 1 leaves >1 candidate, defer to weighted-sum tiebreak
         via existing select_best_candidate() — which uses calibrated FACTOR_WEIGHTS,
         EPSILON=0.01 ties, and HANDLER_PRIORITY fallback.
 
         NOT YET WIRED INTO best() — Plan 05 replaces the score_based branch
-        in best() with a call to this method. In Phase 146 Wave 1, this method
+        in best() with a call to this method. In a phase Wave 1, this method
         is callable by unit tests but unreachable from production code paths.
 
         Source: https://iupac.qmul.ac.uk/BlueBook/P4.html P-44.1
@@ -1064,16 +1064,16 @@ class CandidatePool:
                 break
             candidates = filter_fn(candidates)
 
-        # Step 6 — gated on iupac_locants per D-02.
-        # Phase 146: _has_iupac_locants returns False -> step 6 is no-op.
-        # Phase 147: populates iupac_locants -> step 6 activates.
+        # Step 6 — gated on iupac_locants per.
+        # a phase: _has_iupac_locants returns False -> step 6 is no-op.
+        # a phase: populates iupac_locants -> step 6 activates.
         if len(candidates) > 1 and _has_iupac_locants(candidates):
             candidates = _filter_lowest_locants(candidates)
 
         if len(candidates) == 1:
             return candidates[0]
 
-        # Phase 166 SCORE-04: per-substring lexicographic refinement (D-05),
+        # a phase SCORE-04: per-substring lexicographic refinement (),
         # default-OFF — only 'score_based_per_substring' passes per_substring=True.
         # Reduce to the candidate(s) no other beats by parent->locant->
         # substituent first-point-of-difference; a remaining full tie (all
@@ -1081,7 +1081,7 @@ class CandidatePool:
         # (STRICT refinement). per_substring=False => byte-identical to today.
         if per_substring and len(candidates) > 1:
             from .per_substring_scoring import _candidate_scores, _scores_from, compare_scores
-            # PHASE 168 STAGE B CUTOVER (CONTEXT D-08; #1 + BLOCKER #4 fix, reviews iter 1):
+            # PHASE 168 STAGE B CUTOVER (CONTEXT; #1 + BLOCKER #4 fix, reviews iter 1):
             # read self._enable_triviality_controller from the pool's OWN state (set by add() per
             # Plan-02 2c-2; NOT a non-existent features_or_pool param). When ON, key each candidate
             # on (node_scores_rewritten, tree_rewritten) via the pure _scores_from helper — NEVER
@@ -1119,11 +1119,11 @@ class CandidatePool:
 # parent-selection cascade.
 #
 # assemble_name() is called recursively from at least 6 sites:
-#   - composer.py:766 (N-oxide handler)
-#   - composer.py:1691, 1834 (composition / decomposition handlers)
-#   - assembly/fragment_naming.py:323, 334 (substituent fragment naming)
-#   - assembly/substituent_enumerator.py:871, 1091 (nested substituents)
-#   - decomposition/engine.py:46 (decomposition fallback)
+# - composer.py:766 (N-oxide handler)
+# - composer.py:1691, 1834 (composition / decomposition handlers)
+# - assembly/fragment_naming.py:323, 334 (substituent fragment naming)
+# - assembly/substituent_enumerator.py:871, 1091 (nested substituents)
+# - decomposition/engine.py:46 (decomposition fallback)
 #
 # A single-slot thread-local pool would let a recursive substituent's cascade
 # pollute its outer molecule's cascade (the inner candidate becomes pool[0]
@@ -1158,12 +1158,12 @@ def push_pool(features: Any = None) -> CandidatePool:
     pop_pool() in a finally clause so the pool is popped on every exit path
     (normal return, exception, early return statements).
 
-    Phase 146 D-08: selection_mode defaults to the ORTHONYM_SELECTION_MODE
+    a phase: selection_mode defaults to the ORTHONYM_SELECTION_MODE
     env var (default 'first_applicable' for V17 byte-identical soak). Set
     ORTHONYM_SELECTION_MODE=score_based to activate the two-tier selector
     end-to-end without a code revert.
 
-    WR-06 (code review 2026-05-30): when ``features`` is provided, the Phase 168
+    WR-06 (code review 2026-05-30): when ``features`` is provided, the a phase
     controller flag/oracle are bound NOW (construction) off that authoritative
     per-call features object, instead of being lifted lazily off the first
     add() call. ``features=None`` (get_current_pool auto-push, tests) leaves the
@@ -1220,7 +1220,7 @@ def clear_pool(features: Any = None) -> None:
     lazy init); if non-empty, replace the top so the current cascade restarts
     cleanly without affecting outer cascades on the stack.
 
-    WR-06 (code review 2026-05-30): binds the Phase 168 controller flag/oracle
+    WR-06 (code review 2026-05-30): binds the a phase controller flag/oracle
     off ``features`` at construction (see push_pool) when provided.
     """
     stack = _ensure_stack()
@@ -1234,7 +1234,7 @@ def clear_pool(features: Any = None) -> None:
 
 
 # ---------------------------------------------------------------------------
-# Phase 146 SC-5: compute_chain_candidate for unconditional chain wiring.
+# a phase SC-5: compute_chain_candidate for unconditional chain wiring.
 # Wraps the existing chain naming pipeline so chain becomes a first-class
 # candidate alongside ring handlers. Idempotent: same features -> same output.
 # Returns None when no viable chain candidate exists (e.g., pure benzene
@@ -1244,7 +1244,7 @@ def clear_pool(features: Any = None) -> None:
 # Source: https://iupac.qmul.ac.uk/BlueBook/P4.html P-44.1
 # ---------------------------------------------------------------------------
 
-# UNREACHABLE IN PRODUCTION -- v30 Task 2, 2026-07-30. A permanent stub: both import
+# UNREACHABLE IN PRODUCTION --, 2026-07-30. A permanent stub: both import
 # targets (composer.name_chain, composer._name_chain) are ABSENT from composer.py,
 # verified in-process, so this returns None unconditionally even with the selection
 # mode flipped. The V18 chain-vs-ring competitor it was written for never existed.

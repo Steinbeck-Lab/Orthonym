@@ -1,4 +1,4 @@
-"""v33 Phase 3 enabler (P-74.1.3 / P-73): a pendant ONIUM cation branch off a
+""" a phase enabler (P-74.1.3 / P-73): a pendant ONIUM cation branch off a
 chain carbon must be nameable as a locanted substituent prefix.
 
 Root cause: ``_name_polyfunctional_acyclic_substituent``
@@ -34,7 +34,7 @@ def _terminal_attach(m):
 def test_cationic_branch_substituent():
     """C[N+](C)(C)CC rooted at the terminal ethyl carbon ->
     2-(trimethylazaniumyl)ethyl -- the exact RT-verified target in the spec
-    ()."""
+    (docs/superpowers/specs/2026-08-17--phase3-cationic-substituent-capability.md)."""
     m = Chem.MolFromSmiles("C[N+](C)(C)CC")
     attach = _terminal_attach(m)
     frag = frozenset(a.GetIdx() for a in m.GetAtoms())
@@ -112,7 +112,7 @@ def test_choline_sulfate_via_capability(namer):
 
 # ---------------------------------------------------------------------------
 # Regression: neutral compound substituents must be BYTE-IDENTICAL. This is
-# the hard constraint (the contributor guide invariant 1 / the task's #1 requirement) --
+# the hard constraint (CLAUDE.md a project rule / the task's #1 requirement) --
 # _name_polyfunctional_acyclic_substituent is a CORE namer and the new pass
 # must be a pure no-op whenever no atom in the fragment carries a positive
 # formal charge.

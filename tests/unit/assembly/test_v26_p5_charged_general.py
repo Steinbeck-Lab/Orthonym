@@ -1,14 +1,14 @@
-"""v26 P5: charged general path under ``complete`` (BB P-73 / P-74).
+""": charged general path under ``complete`` (BB P-73 / P-74).
 
 ``general_engine._common_refusal`` refuses any net-charged molecule ("net charge
 (G3 scope)"). P5 lifts that refusal ONLY under ``complete``
 (``allow_aromatic_general`` -> ``allow_charged``) and appends a charge suffix on
 the ALREADY-NUMBERED general parent:
 
-  * ``-ylium``  cation by loss of H- from a skeletal carbon      (P-73.2.2.1.1)
-  * ``-ium``    protonated / substituted skeletal heteroatom      (P-73.1)
-  * ``-ide``    anion by loss of H+ from a skeletal atom          (P-72.2.2.1)
-  * ``-uide``   anion by addition of H- to a skeletal atom        (P-72.3)
+  * ``-ylium`` cation by loss of H- from a skeletal carbon (P-73.2.2.1.1)
+  * ``-ium`` protonated / substituted skeletal heteroatom (P-73.1)
+  * ``-ide`` anion by loss of H+ from a skeletal atom (P-72.2.2.1)
+  * ``-uide`` anion by addition of H- to a skeletal atom (P-72.3)
 
 The charge suffix's locant is the ACTUAL charged atom's parent locant, so the
 descriptor is structurally faithful on its own; SELF-01 (OPSIN round-trip) is
@@ -48,29 +48,29 @@ pytestmark = pytest.mark.unit
 # Two expectation tables, split (RB-2) because the FULL NAMER and the
 # ENGINE-DIRECT (``name_general``) call paths legitimately produce different --
 # each individually correct -- strings for the fused-ring cation. See
-#  (§1 PIN status, §2 engine gap):
-#   * FULL_NAMER_CASES -- what ``Orthonym.name()`` actually ships. The three
-#     heteroarene-ammonium rows are PINs (P-73.1.1.2, whose own worked example is
-#     ``1-methylpyridin-1-ium (PIN)``; silyl/germyl are PIN-eligible preselected
-#     prefixes, P-68.2.2), so they EMIT at the default pin tier -- they do NOT
-#     abstain. For the fused-ring cation the production ``ions.py`` P-74 onium
-#     router supplies the retained ``isoquinolin-2-ium`` form (P-25.5 /
-#     P-52.2.4.4: a fusion name is preferred over a skeletal-replacement 'a'
-#     name) and wins at every tier.
-#   * ENGINE_DIRECT_CASES -- what ``name_general`` emits when called in
-#     isolation, bypassing the onium router. ``name_general_ring`` has no
-#     retained-fused-ring preference, so it emits the von-Baeyer /
-#     skeletal-replacement form for the fused-ring cation. That string is NEVER
-#     shipped by the full namer (the onium router intercepts first), so it is
-#     engine-isolation-only and 0-wrong-safe. Every other row is identical
-#     between the two tables.
+# internal notes (§1 PIN status, §2 engine gap):
+# * FULL_NAMER_CASES -- what ``Orthonym.name()`` actually ships. The three
+# heteroarene-ammonium rows are PINs (P-73.1.1.2, whose own worked example is
+# ``1-methylpyridin-1-ium (PIN)``; silyl/germyl are PIN-eligible preselected
+# prefixes, P-68.2.2), so they EMIT at the default pin tier -- they do NOT
+# abstain. For the fused-ring cation the production ``ions.py`` P-74 onium
+# router supplies the retained ``isoquinolin-2-ium`` form (P-25.5 /
+# P-52.2.4.4: a fusion name is preferred over a skeletal-replacement 'a'
+# name) and wins at every tier.
+# * ENGINE_DIRECT_CASES -- what ``name_general`` emits when called in
+# isolation, bypassing the onium router. ``name_general_ring`` has no
+# retained-fused-ring preference, so it emits the von-Baeyer /
+# skeletal-replacement form for the fused-ring cation. That string is NEVER
+# shipped by the full namer (the onium router intercepts first), so it is
+# engine-isolation-only and 0-wrong-safe. Every other row is identical
+# between the two tables.
 
 # Full-namer PIN-tier emissions: these ARE PINs and emit at the DEFAULT pin tier.
 PIN_EMIT_CASES = [
     ("[SiH3][n+]1ccccc1", "1-silylpyridin-1-ium"),
     ("[GeH3][n+]1ccccc1", "1-germylpyridin-1-ium"),
     # Fused-ring cation: the full namer ships the retained fusion name
-    # ``2-silylisoquinolin-2-ium`` (P-25.5 / P-52.2.4.4, worked example :42203),
+    # ``2-silylisoquinolin-2-ium`` (P-25.5 / P-52.2.4.4, worked example:42203),
     # via the ions.py P-74 onium router recursing on the neutral bare ring.
     ("[SiH3][n+]1ccc2ccccc2c1", "2-silylisoquinolin-2-ium"),
 ]
@@ -95,7 +95,7 @@ FULL_NAMER_CASES = PIN_EMIT_CASES + PIN_ABSTAIN_CASES
 ENGINE_DIRECT_CASES = [
     ("[SiH3][n+]1ccccc1", "1-silylpyridin-1-ium"),
     ("[GeH3][n+]1ccccc1", "1-germylpyridin-1-ium"),
-    # v31 change-asserted-value: the aza-cage heteroatom takes the LOWEST locant
+    # change-asserted-value: the aza-cage heteroatom takes the LOWEST locant
     # (P-31.1.4: among valid von-Baeyer numberings of the equal-bridge
     # bicyclo[4.4.0] cage, heteroatoms get lowest locants). N is separated from a
     # bridgehead by one carbon, so its lowest attainable locant is 3, NOT 4. The
@@ -194,7 +194,7 @@ def test_pin_engine_inert_without_flag(smiles, _name):
 
 @pytest.mark.parametrize("smiles,expected", ENGINE_DIRECT_CASES)
 def test_charge_claims_are_declared_in_the_binding_spine(smiles, expected):
-    """Phase 0c Task 2: the charge-suffix producer now threads
+    """a phase Task 2: the charge-suffix producer now threads
     ``charge_atom_ids`` through a role='charge' binding, so P3's
     charge-totality proof stops being a permanent ``CHARGE_UNVERIFIED`` warn
     for every net-charged emission. The emitted NAME is unchanged (asserted
@@ -223,7 +223,7 @@ def test_charge_claims_are_declared_in_the_binding_spine(smiles, expected):
 
 
 # --------------------------------------------------------------------------
-# Phase 0c Task 4 Part C: the T4 wiring now promotes P8's stereo axis and
+# a phase Task 4 Part C: the T4 wiring now promotes P8's stereo axis and
 # P3's CHARGE_UNVERIFIED to error severity (``escalate=STRICT_STEREO_CHARGE_AXES``,
 # ``mode`` stays "audit"). These two charge cases are the task's named charge
 # witnesses -- confirm the promotion does not touch them: their
@@ -305,7 +305,7 @@ def test_pin_emits(smiles, expected, production_gate):
     PIN-eligible preselected prefixes (P-68.2.2). The fused-ring cation ships
     the retained `2-silylisoquinolin-2-ium` (P-25.5 / P-52.2.4.4, worked example
     :42203) via the production ions.py P-74 onium router, NOT the P5 complete-tier
-    lever. See ."""
+    lever. See internal notes."""
     pin = Orthonym(style="pin")
     out = pin.name(Chem.CanonSmiles(smiles))
     assert out == expected, f"{smiles}: pin gave {out!r} != {expected!r}"

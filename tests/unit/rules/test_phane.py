@@ -163,7 +163,7 @@ class TestNameCyclophane:
     all-benzene-homophane class, RETIRING the semi-systematic bracket-prefix
     form for these cases (`[2.2]paracyclophane` -> P-26 PIN
     `1,4(1,4)-dibenzenacyclohexaphane`). See
-     Task 8.7 +
+    docs/superpowers/plans/2026-07-16-wave8-p8-phane.md Task 8.7 +
     tests/unit/rules/test_phane_pin.py for the full P-26 engine test suite;
     these 4 cases stay here (pre-existing fixture SMILES) purely so this
     file's own coverage of `name_cyclophane`'s public contract doesn't rot.

@@ -166,3 +166,97 @@ class TestConsumedAtomFiltering:
         filtered = _filter_consumed_fg_atoms(fgs)
         assert "bromo" not in filtered
         assert "acid_bromide" in filtered
+
+
+class TestImidoylThioylHalides:
+    """ a phase (P-65.5.1): acyl halides of the imido / chalcogeno analogues
+    of carboxylic acid. BB 31438 'cyclohexanecarboximidoyl chloride (PIN)',
+    31442 'cyclohexanecarbothioyl chloride (PIN)'."""
+
+    def test_cyclohexanecarboximidoyl_chloride(self):
+        # the Blue Book (PIN) -- R-C(=NH)-Cl on a cyclohexane ring.
+        assert name_compound("N=C(Cl)C1CCCCC1") == "cyclohexanecarboximidoyl chloride"
+
+    def test_cyclohexanecarbothioyl_chloride(self):
+        # the Blue Book (PIN) -- R-C(=S)-Cl on a cyclohexane ring.
+        assert name_compound("S=C(Cl)C1CCCCC1") == "cyclohexanecarbothioyl chloride"
+
+    def test_cyclohexanecarboximidoyl_bromide(self):
+        # P-65.5.1: halide word tracks the halogen element.
+        assert name_compound("N=C(Br)C1CCCCC1") == "cyclohexanecarboximidoyl bromide"
+
+    def test_cyclohexanecarboselenoyl_chloride(self):
+        # P-65.5.1: selenium analogue (=Se).
+        assert name_compound("[Se]=C(Cl)C1CCCCC1") == "cyclohexanecarboselenoyl chloride"
+
+    def test_cyclopentanecarbothioyl_chloride(self):
+        # P-65.5.1: ring size generalises.
+        assert name_compound("S=C(Cl)C1CCCC1") == "cyclopentanecarbothioyl chloride"
+
+    def test_ethanimidoyl_chloride(self):
+        # P-65.5.1: chain parent, imido (=NH); the alkane 'e' elides before 'imidoyl'.
+        assert name_compound("CC(=N)Cl") == "ethanimidoyl chloride"
+
+    def test_propanethioyl_chloride(self):
+        # P-65.5.1: chain parent, thio (=S).
+        assert name_compound("CCC(=S)Cl") == "propanethioyl chloride"
+
+    def test_nonprincipal_imidoyl_degrades_not_abstains(self):
+        # A senior carboxylic-acid parent + a non-principal imidoyl halide must
+        # DEGRADE to the substitutive 'chloro' + 'imino' prefixes, never abstain
+        # (governing priority: degrade to a systematic name, never silence). The
+        # new imidoyl_halide FG must not over-consume the =NH/Cl atoms.
+        assert name_compound("OC(=O)CCCC(=N)Cl") == "5-chloro-5-iminopentanoic acid"
+
+    def test_aromatic_ring_fails_closed(self):
+        # An aromatic-ring parent is not covered -> the producer returns None so
+        # the molecule degrades to a systematic name / abstention, never a guessed
+        # 'benzene...carboximidoyl' PIN. Tested at the producer (gate-independent).
+        from rdkit import Chem
+        from orthonym.namer import Orthonym
+        from orthonym.rules.acid_halides import name_imidoyl_thioyl_halide
+        namer = Orthonym()
+        smi = "N=C(Cl)c1ccccc1"
+        mol = Chem.MolFromSmiles(smi)
+        feats = namer._perceive(mol, smi, Chem.MolToSmiles(mol))
+        namer._classify(feats)
+        assert feats.principal_group == "imidoyl_halide"
+        assert name_imidoyl_thioyl_halide(feats) is None
+
+
+class TestRetainedDiacylAndCarbonicHalides:
+    """ a phase: retained 'oxalyl'/'oxamoyl' acyls and the mononuclear
+    carbonic dihalides (P-65.5.1 / P-65.5.3.1)."""
+
+    def test_oxalyl_dichloride(self):
+        # the Blue Book 'Cl-CO-CO-Cl oxalyl dichloride (PIN) ethanedioyl dichloride'.
+        assert name_compound("O=C(Cl)C(=O)Cl") == "oxalyl dichloride"
+
+    def test_oxamoyl_bromide(self):
+        # the Blue Book 'H2N-CO-CO-Br oxamoyl bromide (PIN)'.
+        assert name_compound("NC(=O)C(=O)Br") == "oxamoyl bromide"
+
+    def test_carbonyl_bromide_chloride(self):
+        # the Blue Book 'Br-CO-Cl carbonyl bromide chloride (PIN)'. Alphabetical order.
+        assert name_compound("O=C(Cl)Br") == "carbonyl bromide chloride"
+
+    def test_carbamoyl_isocyanate(self):
+        # the Blue Book 'H2N-CO-NCO carbamoyl isocyanate (PIN)'.
+        assert name_compound("NC(=O)N=C=O") == "carbamoyl isocyanate"
+
+    def test_carbamoyl_chloride(self):
+        # P-65.5.3.1: carbamoyl (retained acyl of carbamic acid) + halide class word.
+        assert name_compound("NC(=O)Cl") == "carbamoyl chloride"
+
+    def test_n_substituted_carbamoyl_fails_closed(self):
+        # An N-substituted amide is NOT bare carbamoyl -> stays systematic (no
+        # wrong 'carbamoyl' claim).
+        assert name_compound("CNC(=O)Cl") != "carbamoyl chloride"
+
+    def test_carbonyl_dichloride_unchanged(self):
+        # Regression: the same-halide carbonic dihalide keeps its retained name.
+        assert name_compound("O=C(Cl)Cl") == "carbonyl dichloride"
+
+    def test_longer_diacyl_stays_systematic(self):
+        # Regression: only the 2-carbon diacyl is 'oxalyl'; C4 stays 'butanedioyl'.
+        assert name_compound("ClC(=O)CCC(=O)Cl") == "butanedioyl dichloride"

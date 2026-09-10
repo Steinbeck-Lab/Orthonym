@@ -1,25 +1,25 @@
-"""Phase 160 unit tests for ``orthonym.assembly.inner_dispatch``.
+"""a phase unit tests for ``orthonym.assembly.inner_dispatch``.
 
-Per CONTEXT D-20 + Phase 158 D-17 mirror: tests for InnerDispatchEntry +
+Per CONTEXT + a phase mirror: tests for InnerDispatchEntry +
 INNER_DISPATCH_TABLE + _register_inner + dispatch_inner integrity.
 
 NOTE on table size: the original Plan-04 spec expected >= 38 entries, but
-Plan-02 + Plan-03 honest-fail (CONTEXT D-27) deferred 8 handlers
+Plan-02 + Plan-03 honest-fail (CONTEXT) deferred 8 handlers
 (polyfunctional, multi_ester, ester, benzene, heterocycle, complex_ring,
-chain, general_acyclic) to a future v19.x follow-up plan. The current
+chain, general_acyclic) to a future.x follow-up plan. The current
 table has 30 entries, and these tests assert >= 30 (with explicit
 documentation of the gap). The tests are STILL VALID for the substrate
 integrity — every PRESENT entry is verified.
 
 Test classes:
-- TestInnerDispatchTableIntegrity     - OrderedDict shape, frozen entries,
+- TestInnerDispatchTableIntegrity - OrderedDict shape, frozen entries,
                                         priority uniqueness, side_effect_inventory
-- TestInnerDispatchEntryRegistration  - parametrized over INNER_DISPATCH_TABLE
+- TestInnerDispatchEntryRegistration - parametrized over INNER_DISPATCH_TABLE
                                         entries (~ 30 entries × ~ 5 props = 150 tests)
-- TestRegistrationLock                - _register_inner raises after freezing
-- TestDispatchInnerBehavior           - dispatch_inner first-match-wins
-- TestInnerDispatchStats              - get/reset stats helpers
-- TestDeferredHandlerGap              - documents the 8-handler gap loudly
+- TestRegistrationLock - _register_inner raises after freezing
+- TestDispatchInnerBehavior - dispatch_inner first-match-wins
+- TestInnerDispatchStats - get/reset stats helpers
+- TestDeferredHandlerGap - documents the 8-handler gap loudly
 """
 from __future__ import annotations
 
@@ -45,22 +45,22 @@ from orthonym.assembly.inner_dispatch import (
 
 
 class TestInnerDispatchTableIntegrity:
-    """CONTEXT D-10: INNER_DISPATCH_TABLE structure."""
+    """CONTEXT: INNER_DISPATCH_TABLE structure."""
 
     def test_inner_dispatch_table_is_orderdict(self):
-        """CONTEXT D-10: INNER_DISPATCH_TABLE is an OrderedDict."""
+        """CONTEXT: INNER_DISPATCH_TABLE is an OrderedDict."""
         assert isinstance(INNER_DISPATCH_TABLE, OrderedDict)
 
     def test_count_at_least_30(self):
         """Plan-02 + Plan-03 honest-fail ship: 30 entries (not 38 as originally targeted).
 
-        Per CONTEXT D-27: the 8 deferred handlers (polyfunctional,
+        Per CONTEXT: the 8 deferred handlers (polyfunctional,
         multi_ester, ester, benzene, heterocycle, complex_ring, chain,
-        general_acyclic) require architectural changes beyond Phase 160
+        general_acyclic) require architectural changes beyond a phase
         scope (dispatch_inner multi-try-on-None semantic for ester family;
         Tier-A pool-compete semantic for benzene/heterocycle/complex_ring/
         chain; general_acyclic ~2000 LOC catch-all requires prior 7
-        extractions). Tracked in ADR-19-02 for v19.x follow-up.
+        extractions). Tracked in ADR-19-02 for.x follow-up.
         """
         assert len(INNER_DISPATCH_TABLE) >= 30, (
             f"Expected >= 30 entries; got {len(INNER_DISPATCH_TABLE)}. "
@@ -68,13 +68,13 @@ class TestInnerDispatchTableIntegrity:
         )
 
     def test_entries_are_frozen_dataclass(self):
-        """CONTEXT D-10: InnerDispatchEntry is frozen."""
+        """CONTEXT: InnerDispatchEntry is frozen."""
         entry = next(iter(INNER_DISPATCH_TABLE.values()))
         with pytest.raises(FrozenInstanceError):
             entry.priority = 999999  # type: ignore[misc]
 
     def test_priorities_unique(self):
-        """CONTEXT D-10: every priority is unique to enable deterministic sort."""
+        """CONTEXT: every priority is unique to enable deterministic sort."""
         priorities = [e.priority for e in INNER_DISPATCH_TABLE.values()]
         assert len(priorities) == len(set(priorities)), (
             f"Duplicate priority detected; D-10 violation. "
@@ -82,7 +82,7 @@ class TestInnerDispatchTableIntegrity:
         )
 
     def test_handler_ids_unique(self):
-        """handler_id uniqueness (per CONTEXT D-03 + AP-160-06)."""
+        """handler_id uniqueness (per CONTEXT + AP-160-06)."""
         ids = [e.handler_id for e in INNER_DISPATCH_TABLE.values()]
         assert len(ids) == len(set(ids))
 
@@ -140,19 +140,19 @@ class TestInnerDispatchEntryRegistration:
         )
 
     def test_iupac_section_non_empty(self, handler_id, entry):
-        """CONTEXT D-10: every entry must cite an IUPAC P-section for audit."""
+        """CONTEXT: every entry must cite an IUPAC P-section for audit."""
         assert entry.iupac_section, (
             f"{handler_id}: iupac_section is empty"
         )
 
     def test_description_non_empty(self, handler_id, entry):
-        """CONTEXT D-10: description for audit logging."""
+        """CONTEXT: description for audit logging."""
         assert entry.description, (
             f"{handler_id}: description is empty"
         )
 
     def test_side_effect_inventory_is_empty(self, handler_id, entry):
-        """CONTEXT D-25 hard invariant + AP-160-15: side_effect_inventory MUST be ()."""
+        """CONTEXT hard invariant + AP-160-15: side_effect_inventory MUST be ()."""
         assert entry.side_effect_inventory == (), (
             f"{handler_id}: side_effect_inventory={entry.side_effect_inventory!r} "
             f"violates D-25 hard invariant (must be ())"
@@ -174,7 +174,7 @@ def _unfrozen_table():
     """Temporarily un-freeze INNER_DISPATCH_TABLE so duplicate-check / side-effect-
     check tests can reach those code paths.
 
-    Phase 160.2 Plan-02-03: freeze_inner_table() now runs at module-import
+    a phase.2 Plan-02-03: freeze_inner_table() now runs at module-import
     bottom (WR-06 fix), so _register_inner returns "frozen" before reaching
     the duplicate / side-effect checks. Tests that target those checks must
     explicitly unfreeze the sentinel for the duration of the test.
@@ -189,10 +189,10 @@ def _unfrozen_table():
 
 
 class TestRegistrationLock:
-    """CONTEXT D-10: _register_inner raises on duplicate / frozen state."""
+    """CONTEXT: _register_inner raises on duplicate / frozen state."""
 
     def test_register_duplicate_handler_id_raises(self, _unfrozen_table):
-        """Duplicate handler_id is a RuntimeError (CONTEXT D-03 + AP-160-06)."""
+        """Duplicate handler_id is a RuntimeError (CONTEXT + AP-160-06)."""
         with pytest.raises(RuntimeError, match="Duplicate"):
             _register_inner(
                 handler_id="oxime",  # already registered
@@ -205,7 +205,7 @@ class TestRegistrationLock:
             )
 
     def test_register_duplicate_priority_raises(self, _unfrozen_table):
-        """Duplicate priority is a RuntimeError (CONTEXT D-10)."""
+        """Duplicate priority is a RuntimeError (CONTEXT)."""
         # Priority 100 = oxime
         with pytest.raises(RuntimeError, match="priority"):
             _register_inner(
@@ -219,7 +219,7 @@ class TestRegistrationLock:
             )
 
     def test_register_non_empty_side_effect_raises(self, _unfrozen_table):
-        """side_effect_inventory != () raises ValueError (CONTEXT D-25 hard invariant)."""
+        """side_effect_inventory != () raises ValueError (CONTEXT hard invariant)."""
         with pytest.raises(ValueError, match="side_effect_inventory"):
             _register_inner(
                 handler_id="unique_test_handler_id_with_side_effect",
@@ -228,13 +228,13 @@ class TestRegistrationLock:
                 handler=lambda f, m=None, s="pin": None,
                 iupac_section="P-TEST",
                 description="non-empty side effect test",
-                side_effect_inventory=("pool.add",),  # violates D-25
+                side_effect_inventory=("pool.add",),  # violates
             )
 
     def test_freeze_inner_table_locks_registration(self):
         """After freeze_inner_table(), _register_inner raises RuntimeError.
 
-        Phase 160.2 Plan-02-03 update: freeze now runs at module-import bottom
+        a phase.2 Plan-02-03 update: freeze now runs at module-import bottom
         (WR-06 fix). This test verifies the LIVE frozen state by attempting
         registration without the _unfrozen_table fixture — the frozen check
         fires first.
@@ -260,10 +260,10 @@ class TestRegistrationLock:
 
 
 class TestDispatchInnerBehavior:
-    """CONTEXT D-10 + Phase 160.1 D-18 / ADR-19-04: dispatch_inner first-
+    """CONTEXT + a phase.1 / ADR-19-04: dispatch_inner first-
     match-AND-succeeds-wins iteration.
 
-    Per Phase 160.1 D-18, ``dispatch_inner(features, mol, style)`` now
+    Per a phase.1, ``dispatch_inner(features, mol, style)`` now
     invokes the handler internally. Tests that previously relied on the
     "first-match-wins-no-handler-invoke" semantics are amended to either
     use mocked entries (via ``_replace_table_with``) or real molecules
@@ -306,7 +306,7 @@ class TestDispatchInnerBehavior:
         return restore
 
     def test_dispatch_inner_returns_result_on_match(self):
-        """Per D-18: dispatch_inner invokes handler internally; returns
+        """Per: dispatch_inner invokes handler internally; returns
         InnerDispatchResult on handler success."""
         from orthonym.assembly.name_tree import NamingResult
         sentinel = NamingResult(name="fake_name", tree=None,
@@ -410,9 +410,9 @@ class TestDispatchInnerBehavior:
 
 
 class TestInnerDispatchStats:
-    """CONTEXT D-18 + AP-160-13: per-handler dispatch counters.
+    """CONTEXT + AP-160-13: per-handler dispatch counters.
 
-    Per Phase 160.1 D-18: stats now count SUCCESSFUL handlers only (the
+    Per a phase.1: stats now count SUCCESSFUL handlers only (the
     handler that returned non-None), not every predicate match. Tests
     use table-replace pattern to isolate from real handler bodies.
     """
@@ -525,14 +525,14 @@ class TestInnerDispatchStats:
 class TestDeferredHandlerGap:
     """Documents the 8-handler gap loudly so future plans can close it.
 
-    Per Plan-02 + Plan-03 honest-fail (CONTEXT D-27), these handlers were
+    Per Plan-02 + Plan-03 honest-fail (CONTEXT), these handlers were
     NOT extracted to handlers/ + INNER_DISPATCH_TABLE because their byte-
     identical extraction requires architectural changes (dispatch_inner
     multi-try-on-None for ester family; Tier-A pool-compete semantic for
     benzene/heterocycle/complex_ring/chain; general_acyclic ~2000 LOC).
 
     These tests ASSERT the gap is real (handler_id NOT in INNER_DISPATCH_TABLE).
-    When the v19.x follow-up plan extracts each handler, the corresponding
+    When the.x follow-up plan extracts each handler, the corresponding
     test below will FAIL — a loud signal to update both the test pyramid
     and the ADR documentation.
     """
@@ -566,13 +566,13 @@ class TestDeferredHandlerGap:
         assert "chain" not in INNER_DISPATCH_TABLE
 
     def test_general_acyclic_extracted_in_phase_160_2(self):
-        """Phase 160.2 Plan-02-03 closure: general_acyclic@99999 NOW REGISTERED.
+        """a phase.2 Plan-02-03 closure: general_acyclic@99999 NOW REGISTERED.
 
-        Pre-amendment (Phase 160.1): this test asserted ``not in`` because the
-        ~2000 LOC catch-all extraction was deferred. Phase 160.2 Plan-02-02
+        Pre-amendment (a phase.1): this test asserted ``not in`` because the
+        ~2000 LOC catch-all extraction was deferred. a phase.2 Plan-02-02
         ships handlers/general_acyclic.py (verbatim lift of composer.py:951-1055
-        chain-fallback section); Phase 160.2 Plan-02-03 wires it via
-        ``_register_inner(handler_id='general_acyclic', priority=99999, ...)``
+        chain-fallback section); a phase.2 Plan-02-03 wires it via
+        ``_register_inner(handler_id='general_acyclic', priority=99999,...)``
         with the AP-160.2-06 CASE B predicate refinement (defers to inline
         amide / amine cascade branches in composer.py:917-931).
         """
@@ -580,11 +580,11 @@ class TestDeferredHandlerGap:
 
     def test_total_deferred_count_is_7(self):
         """Quantitative gap signal post-Phase-160.2 Plan-02-03: 7 of 38 target
-        handlers still deferred (general_acyclic closed in Phase 160.2 Plan-02)."""
+        handlers still deferred (general_acyclic closed in a phase.2 Plan-02)."""
         deferred = {
             "polyfunctional", "multi_ester", "ester", "benzene",
             "heterocycle", "complex_ring", "chain",
-            # general_acyclic: CLOSED in Phase 160.2 Plan-02-03.
+            # general_acyclic: CLOSED in a phase.2 Plan-02-03.
         }
         missing = deferred - set(INNER_DISPATCH_TABLE.keys())
         assert len(missing) == 7, (
@@ -614,7 +614,7 @@ class TestInnerDispatchTypeErrorWrapping:
         INNER_DISPATCH_TABLE[first_handler_id] = replace(
             first_entry, predicate=bad_predicate,
         )
-        ind._SORTED_ENTRIES_CACHE = None  # invalidate per-call cache (D-18 fix)
+        ind._SORTED_ENTRIES_CACHE = None  # invalidate per-call cache (fix)
         try:
             with pytest.raises(RuntimeError) as excinfo:
                 dispatch_inner(object())
@@ -639,7 +639,7 @@ class TestInnerDispatchTypeErrorWrapping:
         INNER_DISPATCH_TABLE[first_handler_id] = replace(
             first_entry, predicate=bad_predicate,
         )
-        ind._SORTED_ENTRIES_CACHE = None  # invalidate per-call cache (D-18 fix)
+        ind._SORTED_ENTRIES_CACHE = None  # invalidate per-call cache (fix)
         try:
             with pytest.raises(RuntimeError) as excinfo:
                 dispatch_inner(object())
@@ -651,7 +651,7 @@ class TestInnerDispatchTypeErrorWrapping:
     def test_predicate_returning_false_works_unchanged(self):
         """Regression: non-raising predicates returning False continue to work.
 
-        Per Phase 160.1 D-18: with the amendment, ALL handlers whose predicate
+        Per a phase.1: with the amendment, ALL handlers whose predicate
         matches are invoked. To exercise the false-predicate path in isolation,
         we use the table-replace pattern.
         """
@@ -683,7 +683,7 @@ class TestInnerDispatchTypeErrorWrapping:
 class TestInnerDispatchSortCache:
     """WR-01 regression: dispatch_inner uses cached sorted tuple, not per-call sort.
 
-    Per Phase 160.1 D-18: with the gate-fail-retry amendment, the WR-01
+    Per a phase.1: with the gate-fail-retry amendment, the WR-01
     cache behavior is preserved; tests use the table-replace pattern to
     isolate from real handlers.
     """
@@ -759,21 +759,21 @@ class TestInnerDispatchSortCache:
 
 
 # ---------------------------------------------------------------------------
-# Class 9 — Phase 160.1 D-18 / ADR-19-04 gate-fail-retry semantics (8 tests)
+# Class 9 — a phase.1 / ADR-19-04 gate-fail-retry semantics (8 tests)
 # ---------------------------------------------------------------------------
 
 
 class TestDispatchInnerGateFailRetry:
-    """Phase 160.1 D-18 + ADR-19-04: first-match-AND-succeeds-wins.
+    """a phase.1 + ADR-19-04: first-match-AND-succeeds-wins.
 
-    These tests verify the gate-fail-retry semantics that amend Phase 160
-    CONTEXT D-22 from "first-match-wins" to "first-match-AND-succeeds-wins."
+    These tests verify the gate-fail-retry semantics that amend a phase
+    CONTEXT from "first-match-wins" to "first-match-AND-succeeds-wins."
     Handler contract per ADR-19-04:
       * Return non-None NamingResult ⇒ "I succeeded; use this result."
       * Return None ⇒ "I gate-failed; defer to next-priority handler."
       * Raise Exception ⇒ surfaced as RuntimeError chained via __cause__.
 
-    Per CONTEXT D-25 preserved: predicate purity (predicates report
+    Per CONTEXT preserved: predicate purity (predicates report
     whether handler CAN POSSIBLY apply; handler's gate decides whether
     it SHOULD apply).
     """
@@ -921,8 +921,8 @@ class TestDispatchInnerGateFailRetry:
             restore()
 
     def test_handler_raises_Exception_surfaced_as_RuntimeError(self):
-        """New behavior per D-18: handler exception → RuntimeError chained
-        via __cause__ (no silent swallowing per CONTEXT D-27)."""
+        """New behavior per: handler exception → RuntimeError chained
+        via __cause__ (no silent swallowing per CONTEXT)."""
         original = ValueError("original handler bug")
 
         def bad_handler(_f, _m, style):
@@ -942,7 +942,7 @@ class TestDispatchInnerGateFailRetry:
             restore()
 
     def test_dispatch_inner_callable_with_mol_kwarg(self):
-        """New API per D-18: dispatch_inner(features, mol=mol, style='pin')
+        """New API per: dispatch_inner(features, mol=mol, style='pin')
         works; falls back to features.mol when mol kwarg omitted."""
         from orthonym.assembly.name_tree import NamingResult
 
@@ -975,7 +975,7 @@ class TestDispatchInnerGateFailRetry:
             restore()
 
     def test_canary_fixture_lactone_gate_fail_routes_via_ester_family(self):
-        """Integration: the Phase 160.1 regression-fixture SMILES from
+        """Integration: the a phase.1 regression-fixture SMILES from
         CONTEXT <specifics>. With the amendment, even when the inline
         ester cascade still exists, the regression fixture must continue
         to name correctly (the amendment is invariant on byte-identical
@@ -1002,12 +1002,12 @@ class TestDispatchInnerGateFailRetry:
 
 
 # =============================================================================
-# Phase 160.2 Plan-02-03: general_acyclic@99999 + freeze_inner_table() landed.
+# a phase.2 Plan-02-03: general_acyclic@99999 + freeze_inner_table() landed.
 # =============================================================================
 
 
 class TestPhase160_2_Registrations:
-    """Phase 160.2 Plan-02-03 verification: general_acyclic registered +
+    """a phase.2 Plan-02-03 verification: general_acyclic registered +
     INNER_DISPATCH_TABLE frozen + _SORTED_ENTRIES_CACHE eagerly populated."""
 
     def test_general_acyclic_registered(self):
@@ -1025,11 +1025,11 @@ class TestPhase160_2_Registrations:
 
     def test_inner_dispatch_table_size_38(self):
         from orthonym.assembly.inner_dispatch import INNER_DISPATCH_TABLE
-        # 33 through Phase 160.2 (general_acyclic@99999) + imidate@2900
-        # (Phase 163 AUDIT-FRN § 7) + chalcogen_ester@2950 (Phase 163.1 closure)
-        # + hydroxylamine@5250 (Phase 169.7 BBR-PERC — substituted-hydroxylamine
-        # handler, P-68.3.1.2.1) [35 → 36] + nitrite_ester@2960 (WSD-05 / Phase 175,
-        # P-67) [36 → 37] + phosphonic_acid@2350 (v23 Phase 9, P-67.1.1.2
+        # 33 through a phase.2 (general_acyclic@99999) + imidate@2900
+        # (a phase AUDIT-FRN § 7) + chalcogen_ester@2950 (a phase.1 closure)
+        # + hydroxylamine@5250 (a phase.7 BBR-PERC — substituted-hydroxylamine
+        # handler, P-68.3.1.2.1) [35 → 36] + nitrite_ester@2960 (WSD-05 / a phase,
+        # P-67) [36 → 37] + phosphonic_acid@2350 (a phase, P-67.1.1.2
         # substituent-prefix PIN) [37 → 38] + hydroxamic_acid@5210 (Wave 1 R8c,
         # P-66.1.1.3.2 — hydroxamic acid -> N-hydroxy...amide) [38 → 39]
         # + chain_diamide@1490 (D3, P-66.1.1.1.1 — acyclic diamide with
@@ -1048,19 +1048,23 @@ class TestPhase160_2_Registrations:
         # assertion (the phase gate does not run unit tests): hydroximic_acid@5211,
         # sulfonimidic_n_hydroxy@5212, noncarbon_ester@1495, sulfonyl_halide@1150.
         # Live count 48 + azine = 49.
-        # v31 reconciliation [49 -> 55]: six further handlers were registered
+        # reconciliation [49 -> 55]: six further handlers were registered
         # without updating this assertion (same phase-gate-doesn't-run-unit-tests
         # drift): the P-67.1.1.2 organo-oxoacids of As/Sb —
         # arsonic_acid@2352, arsinic_acid@2354, stibonic_acid@2356,
         # stibinic_acid@2358 — plus n_substituted_sulfonamide@2970 (P-66.1.1.3.1.1,
         # commit 89e69442). All are committed, intentionally-registered handlers;
         # this is benign registry growth, not a dispatch defect.
-        assert len(INNER_DISPATCH_TABLE) == 55
+        # a phase [55 -> 61]: + the six trivalent -ous organo-oxoacid
+        # handlers (P-67.1.1.2) — phosphonous/phosphinous/arsonous/arsinous/
+        # stibonous/stibinous_acid @2360-2370, generated by the same generic
+        # factory as the As/Sb -onic/-inic handlers. Benign registry growth.
+        assert len(INNER_DISPATCH_TABLE) == 61
 
     def test_table_frozen_after_import(self):
         """WR-06: freeze_inner_table() called at module-import bottom;
-        subsequent _register_inner raises RuntimeError per Phase 160 CONTEXT
-        D-10 contract + AP-160.2-04."""
+        subsequent _register_inner raises RuntimeError per a phase CONTEXT
+         contract + AP-160.2-04."""
         import pytest
         from orthonym.assembly.inner_dispatch import _register_inner
         from orthonym.assembly.name_tree import NamingResult
@@ -1081,10 +1085,10 @@ class TestPhase160_2_Registrations:
         """WR-06: _SORTED_ENTRIES_CACHE populated at module-import (no lazy-init race)."""
         from orthonym.assembly.inner_dispatch import _SORTED_ENTRIES_CACHE
         # Eagerly populated tuple per WR-06 + RESEARCH §5; size matches
-        # INNER_DISPATCH_TABLE which Phase 163 grew 33 → 34 (imidate@2900,
-        # AUDIT-FRN § 7), Phase 163.1 grew 34 → 35 (chalcogen_ester@2950),
-        # Phase 169.7 grew 35 → 36 (hydroxylamine@5250, BBR-PERC), WSD-05 /
-        # Phase 175 grew 36 → 37 (nitrite_ester@2960, P-67), v23 Phase 9
+        # INNER_DISPATCH_TABLE which a phase grew 33 → 34 (imidate@2900,
+        # AUDIT-FRN § 7), a phase.1 grew 34 → 35 (chalcogen_ester@2950),
+        # a phase.7 grew 35 → 36 (hydroxylamine@5250, BBR-PERC), WSD-05 /
+        # a phase grew 36 → 37 (nitrite_ester@2960, P-67), a phase
         # grew 37 → 38 (phosphonic_acid@2350, P-67.1.1.2), Wave 1 R8c
         # grew 38 → 39 (hydroxamic_acid@5210, P-66.1.1.3.2), D3
         # grew 39 → 40 (chain_diamide@1490, P-66.1.1.1.1), phosphinic_acid@2400
@@ -1095,10 +1099,12 @@ class TestPhase160_2_Registrations:
         # (hydroximic_acid@5211, sulfonimidic_n_hydroxy@5212, noncarbon_ester@1495,
         # sulfonyl_halide@1150) were added without updating this assertion; W3-P15
         # reconciles it and adds azine@5240 (P-68.3.1.2.3): 48 + 1 = 49.
-        # v31 [49 -> 55]: + arsonic/arsinic/stibonic/stibinic_acid (P-67.1.1.2 As/Sb
-        # oxoacids) + n_substituted_sulfonamide@2970 (89e69442). Benign registry growth.
+        # [49 -> 55]: + arsonic/arsinic/stibonic/stibinic_acid (P-67.1.1.2 As/Sb
+        # oxoacids) + n_substituted_sulfonamide@2970. Benign registry growth.
+        # a phase [55 -> 61]: + six trivalent -ous organo-oxoacid handlers
+        # (P-67.1.1.2, @2360-2370). Benign registry growth.
         assert _SORTED_ENTRIES_CACHE is not None
-        assert len(_SORTED_ENTRIES_CACHE) == 55
+        assert len(_SORTED_ENTRIES_CACHE) == 61
         # Priorities monotonically non-decreasing per sorted() contract
         priorities = [e.priority for e in _SORTED_ENTRIES_CACHE]
         assert priorities == sorted(priorities)
@@ -1129,12 +1135,12 @@ class TestPhase160_2_Registrations:
 
 
 # =============================================================================
-# Phase 160.2 Plan-04-02 WR-01: _INNER_DISPATCH_STATS ContextVar isolation.
+# a phase.2 Plan-04-02 WR-01: _INNER_DISPATCH_STATS ContextVar isolation.
 # =============================================================================
 
 
 class TestWR01InnerDispatchStatsContextVarIsolation:
-    """Phase 160.2 Plan-04-02 WR-01 closure: ``_INNER_DISPATCH_STATS`` is
+    """a phase.2 Plan-04-02 WR-01 closure: ``_INNER_DISPATCH_STATS`` is
     wrapped in ``contextvars.ContextVar`` so per-Orthonym-instance
     counters are isolated (matches the AP-160-13 documented contract +
     the ``namer.py:30`` ``_name_with_tree_capture`` precedent).

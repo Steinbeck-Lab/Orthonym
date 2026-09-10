@@ -147,7 +147,7 @@ class TestLactamNaming:
 
         CORRECTED 2026-08-02 (Task W). This asserted `N-methylazetidin-2-one`.
         A lactam's PIN is a heterocyclic pseudoketone -- P-66.1.5.1
-        (`BlueBookV2.md:33224`), decisive last sentence at `:33229` "Method (1)
+        (`the Blue Book`), decisive last sentence at `:33229` "Method (1)
         generates preferred IUPAC names." -- so the ring nitrogen is numbered and
         its substituent cites that numeral. P-66.1.3 "'Hidden' amides" (`:33125`)
         demotes the italic-N reading of a heterocyclic ring nitrogen to "general
@@ -198,19 +198,19 @@ class TestLactamEndToEnd:
     def test_epsilon_lactam_e2e(self):
         """Epsilon-lactam through name_compound.
 
-        v29 Task A: was the retained name `caprolactam`, withdrawn from the PIN
-        path as unlicensed (0 BlueBookV2.md hits). P-64.3.1 (BB:29314) -- "Cyclic
+        : was the retained name `caprolactam`, withdrawn from the PIN
+        path as unlicensed (0 the Blue Book hits). P-64.3.1 (the Blue Book) -- "Cyclic
         anhydrides, esters and amides are named as pseudoketones; the resulting
         names are preferred IUPAC names" -- and its example list prints
-        `azepan-2-one (PIN) hexano-6-lactam` at BB:29323.
+        `azepan-2-one (PIN) hexano-6-lactam` at the Blue Book.
         """
         assert name_compound("C1CCCCC(=O)N1") == "azepan-2-one"
 
     def test_succinimide_not_lactam_e2e(self):
-        """Succinimide does NOT produce a lactam name."""
+        """Succinimide is a cyclic imide -> the ring DIONE pseudoketone
+        pyrrolidine-2,5-dione (P-66.2.1, the Blue Book), NOT a mono-'one' lactam."""
         name = name_compound("O=C1CCC(=O)N1")
-        # Should be named as dioxopyrrolidine, NOT as a lactam
-        assert "one" not in name or "pyrrolidin" not in name
+        assert name == "pyrrolidine-2,5-dione"
 
     def test_lactone_still_works(self):
         """Lactone naming is not broken by lactam integration."""

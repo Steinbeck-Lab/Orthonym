@@ -1,7 +1,7 @@
-"""v33 giants Engine 3: best-effort von-Baeyer downgrade of a retained
+""" giants Engine 3: best-effort von-Baeyer downgrade of a retained
 natural-product parent hydride.
 
-The P-101.2.7 Table 10.1 stereoparents (`ursane`, `hopane`, `cevane`, ...) ARE
+The P-101.2.7 Table 10.1 stereoparents (`ursane`, `hopane`, `cevane`,...) ARE
 the PIN, and `namer._final_opsin_validity_gate` whitelists them (its
 `np_stereoparent` carve-out) because OPSIN 2.9.0 cannot parse a single one of
 them. Correct for the PIN tiers -- but on the best-effort path it costs a
@@ -40,10 +40,16 @@ _BY_NAME = {n: s for s, n in NATURAL_PRODUCT_DERIVATIVES.items()
 # Representative converters: two triterpenes, a pentacyclic triterpene pair, a
 # steroidal alkaloid (N in the cage), an indole alkaloid parent and a diterpene.
 CONVERTS = ["ursane", "hopane", "lupane", "oleanane", "cevane", "yohimban",
-            "gibbane"]
+            "gibbane", "corynoxan"]
 
-# The two skeletons with no round-tripping systematic form.
-KEEPS = ["germacrane", "corynoxan"]
+# The skeleton with no round-tripping systematic form. (: `corynoxan` now
+# converts — its stereo-composed systematic spiro name round-trips at 0-wrong, so
+# it moved to CONVERTS; `germacrane`'s systematic cyclodecane form still does not
+# round-trip, so best-effort keeps the retained PIN. The BE-STRICT-unparseable
+# gate used to DROP `germacrane` to the abstention sentinel at best-effort — a T4
+# defect fixed by exempting the construction-verified NAME_EXACT_NP_PARENTS from
+# best-effort suppression, since they are 0-wrong by exact table membership.)
+KEEPS = ["germacrane"]
 
 
 def _pin_namer():

@@ -1,29 +1,29 @@
-"""Phase 155.C D-11 unit tests: per-entry seniority catalog audit.
+"""a phase.C unit tests: per-entry seniority catalog audit.
 
 Parametrized over every entry in
 ``src/orthonym/data/fusion_components.py`` ``MONOCYCLIC_COMPONENTS``;
 each entry's ``seniority`` value is asserted to fall within the
 P-25.2.2.4 Jan 2022 errata expected tier range emitted by the audit
-script ``.
+script ``scripts/audit_benzo_fusion.py``.
 
-Tier ranges (ISS-008 STRICT — see 155-CONTEXT.md D-11):
+Tier ranges (STRICT — see internal notes):
 
   * 40-49: 6-membered N-heterocycles
   * 50-59: 5-membered N-heterocycles
   * 60-69: 5-membered N+O heterocycles
   * 70-79: O-heterocycles
   * 80-89: S-heterocycles + N+S
-  * 200:   carbocycles
+  * 200: carbocycles
 
 The fixture file ``tests/fixtures/benzo_fusion/audit_c_results.json`` is
 the machine-readable mirror of ``155-AUDIT-C.md``; if the catalog grows
 or shifts, regenerate via:
 
-    python  \\
-        --out  \\
+    python scripts/audit_benzo_fusion.py \\
+        --out internal notes \\
         --json tests/fixtures/benzo_fusion/audit_c_results.json
 
-Source: 155-CONTEXT.md D-11; 155-AUDIT-C.md.
+Source: internal notes; 155-AUDIT-C.md.
 """
 from __future__ import annotations
 
@@ -55,7 +55,7 @@ def test_component_seniority_in_tier(row):
     if row["classification"] == "NO-EXPECTED-TIER":
         pytest.skip(
             f"No P-25.2.2.4 expected tier defined for {row['name']!r} — "
-            f"add an entry to :EXPECTED_TIERS "
+            f"add an entry to scripts/audit_benzo_fusion.py:EXPECTED_TIERS "
             f"with a Blue Book citation if a tier becomes appropriate."
         )
     actual = MONOCYCLIC_COMPONENTS[row["name"]]["seniority"]
@@ -80,7 +80,7 @@ def test_no_wrong_tier_post_fix():
     assert wrong == [], (
         f"Phase 155.C D-11 invariant violated: {len(wrong)} WRONG-tier "
         f"entries remain in the audit JSON sidecar. Re-run "
-        f" and either correct the catalog "
+        f"scripts/audit_benzo_fusion.py and either correct the catalog "
         f"or update the EXPECTED_TIERS map with a Blue Book citation. "
         f"Offending entries: {[r['name'] for r in wrong]}"
     )
@@ -95,5 +95,5 @@ def test_audit_sidecar_is_complete():
     extra = sidecar_names - catalog_names
     assert not missing and not extra, (
         f"Audit sidecar drift: missing={missing!r} extra={extra!r}. "
-        f"Re-run "
+        f"Re-run scripts/audit_benzo_fusion.py."
     )

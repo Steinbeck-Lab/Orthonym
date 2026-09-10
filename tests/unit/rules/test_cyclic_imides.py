@@ -1,9 +1,18 @@
-"""Tests for cyclic imide retained names (IUPAC P-31.1.3.4).
+"""Tests for cyclic imides (IUPAC P-66.2.1).
 
-Succinimide and maleimide are retained names for common cyclic imides.
-They should be returned by the retained name lookup before systematic naming.
-Phthalimide (isoindoline-1,3-dione) already has a correct systematic name.
-Glutarimide (piperidine-2,6-dione) is a retained name for the 6-membered imide.
+P-66.2.1 (the Blue Book): "Cyclic imides are preferably named as heterocyclic
+pseudoketones." The PIN is therefore the ring-DIONE, and the trivial imide
+names are general-nomenclature only:
+  * succinimide -> pyrrolidine-2,5-dione (PIN, the Blue Book)
+  * glutarimide -> piperidine-2,6-dione (PIN, the 6-membered homologue)
+So succinimide and glutarimide are DEMOTED to GENERAL_RETAINED_NAMES (
+a phase, iupac_2013_pin_list.json pin:false rows) and the systematic dione is
+built by rules/heterocycles.py (the ring_imide_suffix pseudoketone branch).
+
+maleimide (-> 1H-pyrrole-2,5-dione, the Blue Book) and phthalimide
+(-> 1H-isoindole-1,3(2H)-dione) are NOT yet demoted: their mancude/fused rings
+need the added-hydrogen machinery the monocyclic branch does not build, so they
+keep their retained names for now (a project rule: don't unmask a worse spelling).
 """
 
 import pytest
@@ -11,6 +20,7 @@ from rdkit import Chem
 
 from orthonym.namer import name_compound
 from orthonym.data.retained_names import get_retained_name
+from orthonym.data import get_general_retained_name
 from orthonym.perception.functional_groups import detect_functional_groups
 
 
@@ -18,23 +28,28 @@ from orthonym.perception.functional_groups import detect_functional_groups
 class TestCyclicImideRetainedNames:
     """Retained name lookup tests for cyclic imides."""
 
-    def test_succinimide_retained_name_lookup(self):
-        """Canonical SMILES for succinimide should be in retained names."""
+    def test_succinimide_demoted_to_general(self):
+        """P-66.2.1: succinimide is general-only; the PIN retained lookup no
+        longer serves it (the systematic PIN pyrrolidine-2,5-dione wins), but it
+        stays reachable via GENERAL_RETAINED_NAMES / --trivial."""
         canonical = Chem.CanonSmiles("O=C1CCC(=O)N1")
-        assert get_retained_name(canonical) == "succinimide"
+        assert get_retained_name(canonical) is None
+        assert get_general_retained_name(canonical) == "succinimide"
 
     def test_maleimide_retained_name_lookup(self):
-        """Canonical SMILES for maleimide should be in retained names."""
+        """Maleimide is not yet demoted (mancude added-H deferred), so it is
+        still served by the PIN retained lookup."""
         canonical = Chem.CanonSmiles("O=C1C=CC(=O)N1")
         assert get_retained_name(canonical) == "maleimide"
 
-    def test_glutarimide_retained_name_lookup(self):
-        """Canonical SMILES for glutarimide should be in retained names."""
+    def test_glutarimide_demoted_to_general(self):
+        """P-66.2.1: glutarimide is general-only; PIN is piperidine-2,6-dione."""
         canonical = Chem.CanonSmiles("O=C1CCCC(=O)N1")
-        assert get_retained_name(canonical) == "glutarimide"
+        assert get_retained_name(canonical) is None
+        assert get_general_retained_name(canonical) == "glutarimide"
 
     def test_phthalimide_retained_name_lookup(self):
-        """Canonical SMILES for phthalimide should be in retained names."""
+        """Phthalimide not yet demoted (fused isoindole added-H deferred)."""
         canonical = Chem.CanonSmiles("O=C1NC(=O)c2ccccc21")
         assert get_retained_name(canonical) == "phthalimide"
 
@@ -44,19 +59,19 @@ class TestCyclicImideNaming:
     """End-to-end naming tests for cyclic imides."""
 
     def test_succinimide(self):
-        """O=C1CCC(=O)N1 -> succinimide."""
-        assert name_compound("O=C1CCC(=O)N1") == "succinimide"
+        """P-66.2.1: O=C1CCC(=O)N1 -> pyrrolidine-2,5-dione (PIN, the Blue Book)."""
+        assert name_compound("O=C1CCC(=O)N1") == "pyrrolidine-2,5-dione"
 
     def test_maleimide(self):
-        """O=C1C=CC(=O)N1 -> maleimide."""
+        """O=C1C=CC(=O)N1 -> maleimide (dione PIN deferred, see module docstring)."""
         assert name_compound("O=C1C=CC(=O)N1") == "maleimide"
 
     def test_glutarimide(self):
-        """O=C1CCCC(=O)N1 -> glutarimide."""
-        assert name_compound("O=C1CCCC(=O)N1") == "glutarimide"
+        """P-66.2.1: O=C1CCCC(=O)N1 -> piperidine-2,6-dione (PIN)."""
+        assert name_compound("O=C1CCCC(=O)N1") == "piperidine-2,6-dione"
 
     def test_phthalimide(self):
-        """Phthalimide via retained name."""
+        """Phthalimide via retained name (isoindole-dione PIN deferred)."""
         assert name_compound("O=C1NC(=O)c2ccccc21") == "phthalimide"
 
     def test_n_methyl_succinimide_not_retained(self):
@@ -76,9 +91,9 @@ class TestCyclicImideNaming:
         assert "methyl" in result.lower()
 
     def test_succinimide_alternate_input(self):
-        """Alternative SMILES input for succinimide should also work."""
+        """Alternative SMILES input for succinimide -> systematic dione PIN."""
         # Various equivalent representations
-        assert name_compound("C1CC(=O)NC1=O") == "succinimide"
+        assert name_compound("C1CC(=O)NC1=O") == "pyrrolidine-2,5-dione"
 
     def test_maleimide_alternate_input(self):
         """Alternative SMILES input for maleimide should also work."""

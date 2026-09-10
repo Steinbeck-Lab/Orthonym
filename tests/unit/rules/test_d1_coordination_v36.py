@@ -1,5 +1,5 @@
 """
-v36 Milestone D1 -- retained metalloporphyrin/corrinoid/chlorophyll table.
+ Milestone D1 -- retained metalloporphyrin/corrinoid/chlorophyll table.
 
 These are Fe/Mg/Co/Ni tetrapyrrole coordination complexes (heme, chlorophyll,
 cobalamin, siroheme, coenzyme F430). OPSIN 2.9.0 cannot parse any of their names, so
@@ -179,9 +179,9 @@ _FIXTURES_B64 = (
     "bGF0YXRvKDMtKS1rYXBwYSg0KU4oMjMpLE4oMjQpLE4oMjUpLE4oMjYpXW1hZ25lc2F0ZSgxLSkifV0="
 )
 
-# v37 SP5-D1 -- 13 cobyrinic/corrinoid-precursor rows (Co corrin/precorrin, no nucleotide
+# -D1 -- 13 cobyrinic/corrinoid-precursor rows (Co corrin/precorrin, no nucleotide
 # loop). SEPARATE blob so the 25-row blob above stays byte-identical (pure addition). Each
-# row's per-row provenance verdict (CLEAN):  SP5.1 addendum.
+# row's per-row provenance verdict (CLEAN): internal notes SP5.1 addendum.
 _FIXTURES_B64_SP5D1 = (
     "W3siY2hlYmkiOiAiQ0hFQkk6NjAwNTMiLCAic21pbGVzIjogIkNbQ0BAXTEoQ0MoPU8pW08tXSlDMj1DQzM9W04rXTRDKD1DYzVj"
     "KENDKD1PKVtPLV0pYyhDQ0MoPU8pW08tXSljNltuXTVbQ28tMl00NVtOXTJDKD1DQzI9W04rXTVDKD1DKENDQyg9TylbTy1dKUMy"
@@ -279,7 +279,7 @@ def _ikey(smiles: str) -> str:
 
 
 def test_table_nonempty_and_sized():
-    # 25 v36 canonical-parent + charge-variant entries, + 13 v37 SP5-D1 cobyrinic/
+    # 25 canonical-parent + charge-variant entries, + 13 -D1 cobyrinic/
     # corrinoid-precursor rows (see module docstring) = 38.
     assert len(COORDINATION_RETAINED) == 38
     assert len(COORDINATION_RETAINED) == len(FIXTURES)
@@ -346,7 +346,7 @@ CYANOCOBALAMIN = _BY_CHEBI["CHEBI:17439"]
 # (-J here vs the table's -L), so standard InChI keeps it a DISTINCT key that must miss the
 # exact-key table. It takes the SAME metal-sentinel fallback (with the validity gate OFF,
 # the test default), proving the hook fires on the FULL InChIKey -- charge layer included --
-# never on constitutional family resemblance. (The former control CHEBI:3789 became a v37
+# never on constitutional family resemblance. (The former control CHEBI:3789 became a
 # SP5-D1 CLEAN row and now names via the table.)
 NON_TABLE_METAL = 'C=CC1=C(C)C2=Cc3c(C=C)c(C)c4[n]3[Fe-2]35[n]6c(c(C)c(CCC(=O)[O-])c6=CC6=[N+]3C(=C4)C(C)=C6CCC(=O)[O-])=CC1=[N+]25'
 

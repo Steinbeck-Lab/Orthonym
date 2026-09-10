@@ -89,8 +89,8 @@ def _characterize_substituent(mol, start_idx: int, exclude: set) -> Optional[Tup
     # and the old walker followed C-C bonds ONLY, so every such fragment was
     # renamed as the straight chain of the same carbon count and any hanging
     # heteroatom was silently DROPPED:
-    #   isopropyl -> 'propyl', cyclohexyl -> 'hexyl', benzyl -> 'heptyl',
-    #   allyl -> 'propyl', -CH2CH2CH2OH -> 'propyl' (the -OH vanishes).
+    # isopropyl -> 'propyl', cyclohexyl -> 'hexyl', benzyl -> 'heptyl',
+    # allyl -> 'propyl', -CH2CH2CH2OH -> 'propyl' (the -OH vanishes).
     # Each produced a well-formed name for a DIFFERENT MOLECULE. Fail closed
     # instead; the callers all treat None as "cannot characterize".
     subtree = _prove_unbranched_terminal_alkyl(mol, start_idx, exclude)
@@ -223,14 +223,14 @@ def _build_substituent_string(names: List[str]) -> str:
 
     Note: IUPAC alphabetical ordering ignores multiplicative prefixes (di, tri).
 
-    v29 P3: two corrections that only became REACHABLE when the organyl guard
+    : two corrections that only became REACHABLE when the organyl guard
     started admitting compound prefixes (``benzyl``, ``cyclohexylmethyl``,
     ``(4-bromophenyl)methyl``):
 
     * the order is the P-14.5.2 alphanumerical one (letters only, sec-/tert-
       excluded), not raw string order -- raw order sorts ``(4-bromophenyl)methyl``
       on its leading ``(``;
-    * the enclosing marks escalate ( -> [ -> { for a name that already carries
+    * the enclosing marks escalate (-> [ -> { for a name that already carries
       brackets (P-16.5.4.1), and the FIRST cited group is enclosed too when it is
       itself a compound prefix (P-16.3.3), since P-16.5.1.3's "first group bare"
       only removes the marks that separate the groups from each other.
@@ -243,13 +243,13 @@ def _build_substituent_string(names: List[str]) -> str:
     )
 
     counts = Counter(names)
-    # v29 P3-CLOSEOUT Item A: the arity BOUND stays local (fail closed beyond
+    # -CLOSEOUT Item A: the arity BOUND stays local (fail closed beyond
     # it); the multiplier WORD comes from the shared primitive, which knows
     # P-16.3.5(a). This table could only say di/tri/tetra, so a SUBSTITUTED
     # organyl on a phosphane could never take bis/tris.
     _SUPPORTED_COUNTS = frozenset((1, 2, 3, 4))
 
-    # v29 P3-FIX Item 2: this held a THIRD private copy of the citation key --
+    # -FIX Item 2: this held a THIRD private copy of the citation key --
     # `_alnum_key = re.sub(r"[^a-z]", "", alpha_sort_key(name))` -- which is
     # exactly the shared key's letters-only TIER 1 and nothing else. With no
     # locant tier it could not tell `2-methylbutyl` from `3-methylbutyl`, and
@@ -258,7 +258,7 @@ def _build_substituent_string(names: List[str]) -> str:
     # names: `CCC(C)C[As](C)CCC(C)C` gave `methyl(2-methylbutyl)(3-methylbutyl)-
     # arsane` and its own re-spelling gave `methyl(3-methylbutyl)(2-methylbutyl)-
     # arsane`. The shared key keeps tier 1 byte-identical and adds the
-    # `**P-14.5.4**` locant tier (`BlueBookV2.md:3517`) plus a total-order
+    # `**P-14.5.4**` locant tier (`the Blue Book`) plus a total-order
     # backstop, so it can only change an order that was previously UNDEFINED.
     sorted_unique = sorted(counts.keys(), key=prefix_citation_sort_key)
 
@@ -267,7 +267,7 @@ def _build_substituent_string(names: List[str]) -> str:
         count = counts[name]
         if count not in _SUPPORTED_COUNTS:
             return None
-        # v29 P3: with the widened organyl class these three branches began
+        #: with the widened organyl class these three branches began
         # receiving locanted and italicized prefixes, exposing three defects that
         # BB 7272 (P-16.5.1.3.1) settles verbatim -- "the second and further
         # substituents are each enclosed with parentheses even for simple
@@ -377,7 +377,7 @@ def name_phosphine_oxide(mol, phosphine_oxide_atoms: Tuple[int, ...]) -> Optiona
 
 
 # P-67 organo-oxoacid stems for the pnictogens, keyed by central element:
-#   symbol -> (-onic stem, -inic stem)
+# symbol -> (-onic stem, -inic stem)
 # BB L36051-36054 gives all six as PRESELECTED names. Bismuth has no oxoacid
 # analogue in the Blue Book, so the family stops at Sb. This table is what makes
 # the two namers below element-generic instead of phosphorus-only -- an arsonic
@@ -388,8 +388,8 @@ _PNICTOGEN_OXOACID_STEMS = {
     'Sb': ('stibonic', 'stibinic'),
 }
 
-# Phase 1B: the TRIVALENT -ous analogues (no =O; HE(OH)2 / H2E(OH) parents).
-#   symbol -> (-onous full-word stem, -inous full-word stem)
+# a phase: the TRIVALENT -ous analogues (no =O; HE(OH)2 / H2E(OH) parents).
+# symbol -> (-onous full-word stem, -inous full-word stem)
 # BB gives all six as PRESELECTED preferred names (BB L35499-35507 phosphorus;
 # L35413-35443 arsenic/antimony). The whole word is stored (not just the base)
 # because the -ous namers append " acid" directly, exactly as the -onic/-inic
@@ -413,7 +413,7 @@ def _organyl_or_junior_prefix(mol, c_idx: int, central_idx: int) -> Optional[str
     """Name the organyl rooted at ``c_idx`` (parent-side neighbour ``central_idx``)
     as a detachable prefix for a pnictogen-oxoacid parent.
 
-    Primary path: the narrow, stereo-safe :func:`organyl_prefix_name`, which
+    Primary path: the narrow, stereo-safe:func:`organyl_prefix_name`, which
     admits only C/H/halogen prefixes and keeps every existing pnictogen-acid name
     BYTE-IDENTICAL (``4-methylphenyl``, ``benzyl``, ``diphenyl``…). When the
     substituent additionally carries a group JUNIOR to the pnictogen oxoacid, that
@@ -485,12 +485,12 @@ def _name_pnictogen_onic_acid(
 ) -> Optional[str]:
     """R-E(=O)(OH)2 -> ``{R-yl}{stem} acid`` for E in {P, As, Sb}.
 
-    The single shared implementation behind :func:`name_phosphonic_acid` and its
+    The single shared implementation behind:func:`name_phosphonic_acid` and its
     arsenic/antimony analogues. Fail-closed (``None``) unless the one organyl can
     be named as a detachable prefix, so an unprovable substituent defers to the
     generic path rather than risking a wrong name.
 
-    v29 P3: the organyl goes through :func:`organyl_prefix_name`, which routes to
+    : the organyl goes through:func:`organyl_prefix_name`, which routes to
     the shared substituent chokepoint, so a ring-bearing / branched / unsaturated
     organyl is NAMED instead of refused -- ``benzylphosphonic acid`` with the
     P-29.6.1 retained preferred prefix (BB ``2-benzylpyridine`` PIN), and
@@ -524,9 +524,9 @@ def _name_pnictogen_inic_acid(
 ) -> Optional[str]:
     """R2E(=O)OH -> ``{R-yl}{R-yl}{stem} acid`` for E in {P, As, Sb}.
 
-    Shared implementation behind :func:`name_phosphinic_acid` and its
+    Shared implementation behind:func:`name_phosphinic_acid` and its
     arsenic/antimony analogues. Mixed substituents get the P-16.5.1.3 enclosing
-    marks from :func:`_build_substituent_string`, which yields the BB L36066
+    marks from:func:`_build_substituent_string`, which yields the BB L36066
     verbatim PIN ``methyl(phenyl)arsinic acid`` for C6H5-As(CH3)(O)OH.
 
     ACCURACY FIX (Phase B): each substituent goes through the shared organyl
@@ -534,16 +534,16 @@ def _name_pnictogen_inic_acid(
     ``_characterize_substituent`` counts the carbons of a non-aromatic subtree
     as a LINEAR chain, so a cyclic substituent was silently renamed --
     benzyl(methyl)phosphinic acid came back as 'heptyl(methyl)phosphinic acid'
-    and cyclohexyl(methyl) as 'hexyl(methyl)', both a WRONG CONSTITUTION.  Those
+    and cyclohexyl(methyl) as 'hexyl(methyl)', both a WRONG CONSTITUTION. Those
     strings were caught downstream by the SELF-01 OPSIN check, but that gate
-    fails OPEN when no JRE is present, so the refusal has to happen here.  Fixed
+    fails OPEN when no JRE is present, so the refusal has to happen here. Fixed
     for P, As and Sb together since all three share this code path.
 
-    v29 P3: that guard is now :func:`organyl_prefix_name`, which routes to the
+    : that guard is now:func:`organyl_prefix_name`, which routes to the
     shared substituent chokepoint, so the cyclic substituent is NAMED rather than
     refused -- ``benzyl(methyl)phosphinic acid``.
 
-    review-fix: substituents are named through
+     11-FABLEFIX: substituents are named through
     :func:`_organyl_or_junior_prefix`, which falls back to the full-fragment
     enumerator for an aryl bearing a group JUNIOR to the acid, so
     ``bis(4-hydroxyphenyl)phosphinic acid`` / ``bis(4-aminophenyl)phosphinic
@@ -577,7 +577,7 @@ def _name_pnictogen_onous_acid(
 ) -> Optional[str]:
     """R-E(OH)2 -> ``{R-yl}{stem}ous acid`` for E in {P, As, Sb} (P-67.1.1.2).
 
-    The trivalent (NO =O) analogue of :func:`_name_pnictogen_onic_acid`, sharing
+    The trivalent (NO =O) analogue of:func:`_name_pnictogen_onic_acid`, sharing
     its organyl-prefix chokepoint and fail-closed contract. BB L35467 verbatim
     ``phenylstibonous acid`` for C6H5-Sb(OH)2; BB L35472 verbatim
     ``(naphthalene-2,6-diyl)bis(phosphonous acid)`` shows the same
@@ -609,7 +609,7 @@ def _name_pnictogen_inous_acid(
 ) -> Optional[str]:
     """R2E(OH) -> ``{R-yl}{R-yl}{stem}ous acid`` for E in {P, As, Sb} (P-67.1.1.2).
 
-    The trivalent (NO =O) analogue of :func:`_name_pnictogen_inic_acid`. Mixed
+    The trivalent (NO =O) analogue of:func:`_name_pnictogen_inic_acid`. Mixed
     substituents get the P-16.5.1.3 enclosing marks from
     :func:`_build_substituent_string`. BB L35465 verbatim ``diphenylarsinous
     acid`` for (C6H5)2As(OH).
@@ -698,11 +698,11 @@ def name_phosphonic_acid(mol, phosphonic_atoms: Tuple[int, ...]) -> Optional[str
     which the generic suffix assembler would otherwise emit (it correctly serves
     the genuine *suffix* acids like ``ethanesulfonic``).
 
-    Mirrors :func:`name_phosphinic_acid`. Returns ``None`` (fail-closed) when the
+    Mirrors:func:`name_phosphinic_acid`. Returns ``None`` (fail-closed) when the
     single organyl substituent is not a clean simple alkyl / aryl — the caller
     then defers to the generic path (no regression for complex parents).
 
-    Thin wrapper over the element-generic :func:`_name_pnictogen_onic_acid`,
+    Thin wrapper over the element-generic:func:`_name_pnictogen_onic_acid`,
     which the arsenic/antimony analogues share.
     """
     return _name_pnictogen_onic_acid(mol, phosphonic_atoms, 'P')
@@ -899,7 +899,7 @@ def name_phosphinic_acid(mol, phosphinic_atoms: Tuple[int, ...]) -> Optional[str
     Returns:
         Name like "dimethylphosphinic acid", or None if not simple
 
-    Thin wrapper over the element-generic :func:`_name_pnictogen_inic_acid`,
+    Thin wrapper over the element-generic:func:`_name_pnictogen_inic_acid`,
     which the arsenic/antimony analogues share.
     """
     return _name_pnictogen_inic_acid(mol, phosphinic_atoms, 'P')
@@ -915,7 +915,7 @@ def _p_ester_owner_group(mol, o_idx: int, p_idx: int) -> Optional[str]:
     from ..assembly.substituent_enumerator import name_substituent
     o_atom = mol.GetAtomWithIdx(o_idx)
     # The owner root is the O's single non-P heavy neighbour: a carbon (ordinary
-    # ester, -O-CR) or a sulfur (sulfenyl ester -O-S-R, v30 tail #16).
+    # ester, -O-CR) or a sulfur (sulfenyl ester -O-S-R, tail #16).
     r_neighbors = [n for n in o_atom.GetNeighbors()
                    if n.GetIdx() != p_idx and n.GetSymbol() in ('C', 'S')]
     if len(r_neighbors) != 1:
@@ -1003,7 +1003,7 @@ def _assemble_p_owner_text(owner_tokens: List[str]) -> str:
         k = counts[token]
         # A compound owner takes bis/tris with marks. The char scan catches
         # locanted/parenthesised owners; is_complex_substituent additionally
-        # catches a char-free compound prefix such as 'dodecylsulfanyl' (v30 #16
+        # catches a char-free compound prefix such as 'dodecylsulfanyl' (#16
         # tris(dodecylsulfanyl) phosphite), which 'tridodecylsulfanyl' would
         # otherwise render ambiguously.
         is_complex = (any(ch in token for ch in "()[]-, 0123456789")
@@ -1019,10 +1019,10 @@ def _assemble_p_owner_text(owner_tokens: List[str]) -> str:
 
 # P-oxo-acid stem by (has_P_double_O/S, number of C ligands). Phosphite = no =O.
 _P_ACID_STEM = {
-    (True, 0): "phosphate",     # (RO)nP(=O) ...            -> "... phosphate"
-    (True, 1): "phosphonate",   # R-P(=O)(OR')(OR'')        -> "... {R}phosphonate"
-    (True, 2): "phosphinate",   # R2-P(=O)(OR')             -> "... {R,R}phosphinate"
-    (False, 0): "phosphite",    # (RO)3P                    -> "... phosphite"
+    (True, 0): "phosphate",     # (RO)nP(=O)... -> "... phosphate"
+    (True, 1): "phosphonate",   # R-P(=O)(OR')(OR'') -> "... {R}phosphonate"
+    (True, 2): "phosphinate",   # R2-P(=O)(OR') -> "... {R,R}phosphinate"
+    (False, 0): "phosphite",    # (RO)3P -> "... phosphite"
 }
 _HYDROGEN_MULT = {0: "", 1: "hydrogen", 2: "dihydrogen"}
 
@@ -1170,7 +1170,7 @@ def name_phosphate_ester(mol, phosphorus_idx: int) -> Optional[str]:
             accounted.add(nb.GetIdx())
         elif len(others) == 1 and others[0].GetSymbol() in ('C', 'S'):
             # C: an ordinary ester owner (-O-CR). S: a sulfenyl-ester owner
-            # (-O-S-R, v30 tail #16 tris(dodecylsulfanyl) phosphite); both are
+            # (-O-S-R, tail #16 tris(dodecylsulfanyl) phosphite); both are
             # named as a substituent token by _p_ester_owner_group. A P-O-P
             # bridge (others[0]=='P') or O-N still defers.
             ester_oxygens.append(nb.GetIdx())
@@ -1221,7 +1221,7 @@ def name_phosphate_ester(mol, phosphorus_idx: int) -> Optional[str]:
                         stack.append(j)
             try:
                 # allow_mancude so a complex P-C ligand (a cyano/isocyano-bearing
-                # carbon, v30 tail #17) is spelled instead of falling to the
+                # carbon, tail #17) is spelled instead of falling to the
                 # 'substituent' sentinel; a plain alkyl ligand is byte-identical.
                 tok = name_substituent(mol, frozenset(frag), c_idx,
                                        allow_mancude=True)
@@ -1250,12 +1250,12 @@ def name_phosphate_ester(mol, phosphorus_idx: int) -> Optional[str]:
 def name_phosphate_ester_anion(mol, phosphorus_idx: int) -> Optional[str]:
     """Functional-class name for the ANION of a P-oxoacid acid-ester (P-72.2.2.2.1.2).
 
-    Sibling of :func:`name_phosphate_ester` for the deprotonated form. The
+    Sibling of:func:`name_phosphate_ester` for the deprotonated form. The
     protonation word is derived IN PLACE from the surviving free ``-OH`` count
     (``_HYDROGEN_MULT``): the ``[O-]`` carry the charge and are NOT counted as
     hydrogens, so a monoester dianion (0 OH) -> ``dodecyl phosphate``, a monoanion
     (1 OH) -> ``dodecyl hydrogen phosphate``, a diester monoanion (0 OH, 2 owners)
-    -> ``diethyl phosphate``. Never neutralize-then-rename (D-04). Requires at
+    -> ``diethyl phosphate``. Never neutralize-then-rename (). Requires at
     least one terminal ``[O-]`` (else -> ``None``, the NEUTRAL producer owns that
     shape) and that the molecule's only charges are those ``[O-]``. Fail-closed
     (``None``) off the clean single-P ester-anion shape (thio P=S/P-S, ring P,
@@ -1490,7 +1490,7 @@ def name_phosphanyl_substituent(mol, frag_atoms, attach_idx: int) -> Optional[st
     return None
 
 
-# --- Phase 3c (P-68.3.2.3.2.2 / P-67.1.4.1.1): a mononuclear P/As/Sb ACYL
+# --- a phase (P-68.3.2.3.2.2 / P-67.1.4.1.1): a mononuclear P/As/Sb ACYL
 # group cited as a SUBSTITUENT prefix on a senior parent -----------------------
 _ACYL_CHALCO_DOUBLE = {"O": "oxo", "S": "thio", "Se": "seleno", "Te": "telluro"}
 # alkyl root -> -oxy residual (P-67.1.4.1.1.5 ester residual on an acid position)
@@ -1570,7 +1570,7 @@ def name_acyl_prefix_substituent(mol, frag_atoms, attach_idx: int) -> Optional[s
 
     token = None                  # oxo / thio / imido / nitrido
     skeletal_c: List[int] = []    # in-frag single-bonded organyl carbons
-    residuals: List[str] = []     # residual prefix names (hydroxy / methoxy / ...)
+    residuals: List[str] = []     # residual prefix names (hydroxy / methoxy /...)
     for b in central.GetBonds():
         nb = b.GetOtherAtom(central)
         if nb.GetIdx() not in frag_set:
@@ -1664,11 +1664,11 @@ def name_phosphoanhydride_oxy_substituent(
     carry their own nomenclature.
 
     This is the valid SYSTEMATIC form the Blue Book lists as alternative (1) under
-    P-67.2.6 (`BlueBookV2/BlueBookV2.md:36937`); the PIN (method 2) uses the
+    P-67.2.6 (`the Blue Book Blue Book`); the PIN (method 2) uses the
     ``…diphosphoxan-1-yl`` skeletal-replacement parent and is a future PIN-tier
     build. Emitted only on the best-effort path, where a valid systematic name is
     preferred over silence. 0-wrong is preserved by the top-level SELF-01/OPSIN
-    round-trip gate. Full record: `.planning/audit-v33/PHOSPHOANHYDRIDE-SUBSTITUENT-P67.md`.
+    round-trip gate. Full record: internal notes.
     """
     if _depth > 12:
         return None
@@ -1800,7 +1800,7 @@ def name_phosphoxane_oxy_substituent(
     ``'(<subs>[n]phosphoxan-1-yl)oxy'``.
 
     ``diphosphoxane``/``triphosphoxane``/… are preselected parent hydrides (P-12.2,
-    `BlueBookV2/BlueBookV2.md:8050,2971`): a chain of n phosphorus atoms bridged by
+    `the Blue Book Blue Book,2971`): a chain of n phosphorus atoms bridged by
     (n-1) oxygens, numbered P at the odd locants 1,3,5,…,(2n-1). Each P carries its
     ``=O`` (``oxo``), its ``-OH`` (``hydroxy``), any ``-O-R`` ester (``{R}oxy``),
     and a ``λ⁵`` designator (all P are pentavalent). The attachment is at P-1.
@@ -1810,7 +1810,7 @@ def name_phosphoxane_oxy_substituent(
     (fail-closed) for any P outside the neutral mono-oxo phosphoryl anhydride class
     (P-C phosphonate, no-oxo phosphite, charged/oxido P, branched P-O-P), so the
     caller can fall back to method-1. RT-verified through OPSIN 2.9.0 for di/tri/
-    tetraphosphoxane. Record: `.planning/audit-v33/PHOSPHOANHYDRIDE-SUBSTITUENT-P67.md`.
+    tetraphosphoxane. Record: internal notes.
     """
     p_list = _walk_phosphoanhydride_chain(mol, o_idx, from_idx)
     if not p_list or len(p_list) < 2:
@@ -1936,7 +1936,7 @@ def carbon_free_phospho_prefix(mol, sub_atoms, attach_idx: int) -> Optional[str]
     its RETAINED detachable prefix.
 
     ``phosphono`` (P-67.1.4.1, the neutral di-hydroxy group) and ``phosphonato``
-    (P-72.6.1 preselected prefix for the ``-P(O)(O-)2`` di-anion, BB :41213).
+    (P-72.6.1 preselected prefix for the ``-P(O)(O-)2`` di-anion, BB:41213).
 
     Why this exists: the recursive substituent path (``name_substituent_fragment``
     Step 4) names a fragment by round-tripping it through the WHOLE-molecule

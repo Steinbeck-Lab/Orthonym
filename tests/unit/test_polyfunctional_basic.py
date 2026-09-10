@@ -285,6 +285,47 @@ class TestSUB05GluedAndDroppedPrefix:
 
 
 @pytest.mark.unit
+class TestAlphaChalcogenAceticAcids:
+    """P-65.1.5 substituted-acetic PINs (v42 Phase 11 task 11B4).
+
+    A 2-carbon monocarboxylic acid whose alpha-carbon bears a double-bonded
+    chalcogen PLUS a single-bonded chalcogen substituent is a SUBSTITUTED
+    retained functional parent 'acetic acid' (P-65.1.1.1) with the alpha locants
+    omitted (P-14.3.4.2). The plain FG loop used to mis-read the alpha C(=O)SH /
+    C(=S)OH / C(=O)SOH as one acyl prefix (sulfanylcarbonyl/carbothioyl/sulfeno),
+    double-counting the alpha carbon and building the wrong molecule.
+    """
+
+    def test_oxo_sulfanyl_acetic_acid(self):
+        # O=C(O)C(=O)S -> oxo(sulfanyl)acetic acid (PIN); BB def 65.1.5.1.
+        # Second SIMPLE prefix enclosed (P-16.5.1.3.2, boundary disambiguation).
+        assert name_compound("O=C(O)C(=O)S") == "oxo(sulfanyl)acetic acid"
+
+    def test_hydroxy_sulfanylidene_acetic_acid(self):
+        # HO-CS-COOH -> hydroxy(sulfanylidene)acetic acid (PIN); BlueBookV2.md:30305.
+        assert name_compound("O=C(O)C(O)=S") == "hydroxy(sulfanylidene)acetic acid"
+
+    def test_hydroxysulfanyl_oxo_acetic_acid(self):
+        # HOS-CO-COOH -> (hydroxysulfanyl)oxoacetic acid (PIN); BlueBookV2.md:30361.
+        # oxo stays BARE: the preceding compound prefix already closes with ')'.
+        assert name_compound("O=C(O)C(=O)SO") == "(hydroxysulfanyl)oxoacetic acid"
+
+    def test_dithiocarbonoperoxoyl_formic_acid(self):
+        # HOS2C-COOH -> (dithiocarbonoperoxoyl)formic acid (PIN); BlueBookV2.md:30357.
+        # 'dithiocarbonoperoxoyl' is off the P-65.1.8.1 forbidden list (P-65.1.8.2,
+        # BlueBookV2.md:30692), so the formic parent is a PIN (exact-SMILES entry).
+        assert name_compound("O=C(O)C(=S)OS") == "(dithiocarbonoperoxoyl)formic acid"
+
+    def test_plain_alpha_substituents_unaffected(self):
+        # Regression pins: single-substituent alpha carbons keep the existing
+        # retained-acetic PINs (they do not match the two-chalcogen signature).
+        assert name_compound("O=CC(=O)O") == "oxoacetic acid"        # =O only
+        assert name_compound("O=C(O)CO") == "hydroxyacetic acid"     # -OH only
+        assert name_compound("O=C(O)CS") == "sulfanylacetic acid"    # -SH only
+        assert name_compound("O=C(O)C(F)F") == "difluoroacetic acid"
+
+
+@pytest.mark.unit
 class TestSUB05NestedStereoEnclosing:
     """D-17: monosubstituted ring-substituent stereo must be enclosed — xfail (Plan 04)."""
 

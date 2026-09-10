@@ -1,4 +1,4 @@
-"""Contract tests for the v30 PE-1 candidate ledger.
+"""Contract tests for the PE-1 candidate ledger.
 
 The ledger's whole claim to be an *instrument* rather than a behaviour change rests
 on two properties, and both are asserted here rather than assumed:
@@ -7,7 +7,7 @@ on two properties, and both are asserted here rather than assumed:
      boolean test and nothing else.
   2. Naming is **byte-identical** with it on and off.
 
-Plus the measured design constraint from ``
+Plus the measured design constraint from `internal notes`
 §1: ``scope`` distinguishes a whole-molecule candidate from a fragment name, because
 a correct fragment name can never round-trip to the whole input and treating one as a
 molecule candidate manufactures a fake producer-correctness class.
@@ -218,7 +218,7 @@ def test_ledger_is_thread_local():
 
 # ------------------------------------------------- the load-bearing contract
 
-# Molecules chosen from dev500 run 20260804T170501Z so the expectations are
+# Molecules chosen from a dev split run 20260804T170501Z so the expectations are
 # measured, not invented: two rt_exact rows and one that abstains. The abstaining
 # row matters most -- it exercises the suppression path, which is where an
 # instrument is most likely to perturb behaviour.

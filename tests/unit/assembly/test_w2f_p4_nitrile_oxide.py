@@ -1,11 +1,11 @@
 """P-66.5.4.1/2 neutral nitrile-oxide functional-class suffix (W2F p4).
 
-BB P-66.5.4.1 (BlueBookV2.md:34864): R-C#NO 'nitrile oxides' are named by method
+BB P-66.5.4.1 (the Blue Book): R-C#NO 'nitrile oxides' are named by method
 (1) — the word 'oxide' appended to the nitrile name — which yields the PIN.
 Examples: 'benzonitrile oxide' (34876), 'acetonitrile oxide' (43285). Nitrile
 oxides are classed with zwitterions, so they are senior to esters/acids.
 
-v28 Cluster D: the BB ester PIN '4-(methoxycarbonyl)benzonitrile oxide' (34893)
+: the BB ester PIN '4-(methoxycarbonyl)benzonitrile oxide' (34893)
 is now BUILT — the aromatic-benzene forced-nitrile fix (_assemble_ring_nitrile_name
 delegates aromatic benzene rings to the benzonitrile assembler) plus the
 '(methoxycarbonyl)' enclosing marks (P-16.5.1.1) landed. The acid variant still
@@ -24,7 +24,7 @@ from orthonym.assembly.handlers.nitrile_oxide import (
 
 
 class _Feat:
-    """Minimal features stub carrying only .mol (all the handler's decline paths
+    """Minimal features stub carrying only.mol (all the handler's decline paths
     read on the ester/acid guards need)."""
     def __init__(self, mol):
         self.mol = mol
@@ -35,7 +35,7 @@ class TestNitrileOxide:
         assert orthonym.name_compound("c1ccccc1C#[N+][O-]", style="pin") == "benzonitrile oxide"
 
     def test_acetonitrile_oxide(self):
-        # aliphatic PIN (BlueBookV2.md:43285)
+        # aliphatic PIN (the Blue Book)
         assert orthonym.name_compound("CC#[N+][O-]", style="pin") == "acetonitrile oxide"
 
     def test_chloro_variant(self):
@@ -58,7 +58,7 @@ class TestNitrileOxide:
         assert orthonym.name_compound("c1ccc2cc(C#[N+][O-])ccc2c1", style="pin") == "naphthalene-2-carbonitrile oxide"
 
     def test_ester_names_correctly(self):
-        # v28 Cluster D: BB:34893 verbatim PIN. The senior nitrile oxide demotes
+        #: the Blue Book verbatim PIN. The senior nitrile oxide demotes
         # the ester to the '(methoxycarbonyl)' prefix (P-65.6.3, enclosed P-16.5.1.1);
         # the aromatic benzene ring is named as a benzonitrile, not cyclohexane.
         mol = Chem.MolFromSmiles("COC(=O)C1=CC=C(C#[N+][O-])C=C1")
@@ -85,3 +85,25 @@ class TestNitrileOxide:
         # a plain nitrile (no [O-]) is not a nitrile oxide
         mol = Chem.MolFromSmiles("c1ccccc1C#N")
         assert _is_nitrile_oxide(_Feat(mol)) is False
+
+
+class TestNitrileChalcogenides:
+    """P-74.2.2.2.1.2: the heavier-chalcogen analogues R-C#[N+]-[X-] (X = S/Se/Te)
+    are named the same way as the nitrile oxide, the chalcogen word replacing
+    'oxide' (verified RT-clean with the OPSIN gate ON)."""
+
+    def test_acetonitrile_sulfide(self):
+        assert orthonym.name_compound("CC#[N+][S-]", style="pin") == "acetonitrile sulfide"
+
+    def test_acetonitrile_selenide(self):
+        assert orthonym.name_compound("CC#[N+][Se-]", style="pin") == "acetonitrile selenide"
+
+    def test_acetonitrile_telluride(self):
+        assert orthonym.name_compound("CC#[N+][Te-]", style="pin") == "acetonitrile telluride"
+
+    def test_benzonitrile_sulfide(self):
+        assert orthonym.name_compound("c1ccccc1C#[N+][S-]", style="pin") == "benzonitrile sulfide"
+
+    def test_oxide_unchanged(self):
+        # the O sibling is byte-identical to the pre-generalisation output
+        assert orthonym.name_compound("CC#[N+][O-]", style="pin") == "acetonitrile oxide"

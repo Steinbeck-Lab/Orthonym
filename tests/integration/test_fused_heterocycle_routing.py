@@ -145,22 +145,28 @@ class TestClassifyComplexRingGuard:
 
 
 class TestThioetherGuardDoesNotAffectRealSulfides:
-    """Ensure the thioether guard only affects fused heterocycles, not real sulfides."""
+    """Ensure the thioether guard only affects fused heterocycles, not real sulfides.
+
+    A real acyclic sulfide must still be NAMED (not lost to the fused-heterocycle
+    guard). Since the v42 sulfanyl-vs-sulfide slice, the PIN is the SUBSTITUTIVE
+    "(R'-sulfanyl)RH" (P-63.2.5 method 1, BB:27817/27821), not the functional-class
+    "R R' sulfide" (method 2) — so these assert the substitutive PIN.
+    """
 
     @pytest.mark.integration
     def test_dimethyl_sulfide_still_works(self):
-        """Dimethyl sulfide must still be named as a sulfide."""
+        """CSC must still be named — now (methylsulfanyl)methane (PIN, BB:27821)."""
         result = name_compound('CSC')
-        assert 'sulfide' in result, (
-            f"Dimethyl sulfide lost sulfide naming: got '{result}'"
+        assert result == '(methylsulfanyl)methane', (
+            f"Dimethyl sulfide lost/mis-named: got '{result}'"
         )
 
     @pytest.mark.integration
     def test_diethyl_sulfide_still_works(self):
-        """Diethyl sulfide must still be named as a sulfide."""
+        """CCSCC must still be named — now (ethylsulfanyl)ethane (PIN, P-63.2.5)."""
         result = name_compound('CCSCC')
-        assert 'sulfide' in result, (
-            f"Diethyl sulfide lost sulfide naming: got '{result}'"
+        assert result == '(ethylsulfanyl)ethane', (
+            f"Diethyl sulfide lost/mis-named: got '{result}'"
         )
 
 

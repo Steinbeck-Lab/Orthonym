@@ -80,49 +80,49 @@ def net_formal_charge(mol: Chem.Mol) -> int:
 # Closes the P5-family leak class: a substituted / hypervalent-at-the-charged-
 # atom anion whose charge-bearing route fails internally and falls through to
 # a charge-blind naming path, silently dropping the formal charge:
-#   [I-](CCO)c1ccccc1  -> raw 'iodobenzenylethan-1-ol' (neutral; charge on a
-#                          substituted lambda3-iodanuide iodine, degree 2)
-#   C[Si-](C)(C)[H]    -> raw 'trimethylsilane' (neutral; charge on silicon)
-#   [B-](CCO)(C)(C)C   -> raw '2-(trimethylboryl)ethan-1-olate' (charge on
-#                          boron dropped, BUT the name coincidentally ends in a
-#                          real anion suffix '-olate' belonging to the terminal
-#                          CH2-OH -- so the NAME-shape check cannot catch it; it
-#                          stays a DOCUMENTED, intentional gap. See the phase
-#                          report and the unit test named
-#                          test_charge_dropped_known_limitation_boron_olate.)
+# [I-](CCO)c1ccccc1 -> raw 'iodobenzenylethan-1-ol' (neutral; charge on a
+# substituted lambda3-iodanuide iodine, degree 2)
+# C[Si-](C)(C)[H] -> raw 'trimethylsilane' (neutral; charge on silicon)
+# [B-](CCO)(C)(C)C -> raw '2-(trimethylboryl)ethan-1-olate' (charge on
+# boron dropped, BUT the name coincidentally ends in a
+# real anion suffix '-olate' belonging to the terminal
+# CH2-OH -- so the NAME-shape check cannot catch it; it
+# stays a DOCUMENTED, intentional gap. See the phase
+# report and the unit test named
+# test_charge_dropped_known_limitation_boron_olate.)
 #
 # TWO independent guards, both required to fire (precision over recall):
 #
 # 1. NAME-shape: the shipped name lacks any ionic suffix. This alone is a
-#    NAME check (NOT a dispatch-class check) because a live probe showed
-#    CORRECT charged names ship through EVERY class_id -- 'benzenediazonium',
-#    'ethylsulfanylium', 'ethane-1,2-bis(aminium)' are all class_id=GENERAL --
-#    so class-based gating would over-veto them.
+# NAME check (NOT a dispatch-class check) because a live probe showed
+# CORRECT charged names ship through EVERY class_id -- 'benzenediazonium',
+# 'ethylsulfanylium', 'ethane-1,2-bis(aminium)' are all class_id=GENERAL --
+# so class-based gating would over-veto them.
 #
 # 2. CHARGE-CENTRE atom scope: the veto fires only when a charge-bearing atom
-#    is a p-block MAIN-GROUP metalloid / heavy-p-block element (Groups 13-15
-#    excluding C and N) OR a HYPERVALENT/substituted halogen (degree >= 2).
-#    These are exactly the centres whose charged routing Orthonym does not yet
-#    fully cover, so a fall-through silently neutralizes them. The routine
-#    ionic centres are DELIBERATELY excluded, because they have dedicated
-#    charged routes that emit a correct ionic-suffixed name:
-#      - N+  (ammonium / choline / carnitine / aminium): would over-veto
-#        every quaternary-ammonium functional-class name -- CONFIRMED risk on
-#        a corpus probe (choline phospholipids named '...enol', charge on N+).
-#      - O-  (carboxylate / alkoxide / phenolate), C- (carbanide -> '...ide'),
-#        S/Se/Te (thiolate / sulfonium): all routine, all correctly suffixed.
-#    A correct main-group charged name (methylsilanuide, tetramethyl-
-#    phosphanuide, silylium, phosphanium, ...) always carries its ionic suffix,
-#    so guard 1 already spares it even though its centre is in-scope -- the two
-#    guards together fire ONLY on a genuine main-group charge drop.
-# v36 B3: added 'ite' (P-72.2.2/P-65.3.1's OTHER acid-anion suffix pair,
+# is a p-block MAIN-GROUP metalloid / heavy-p-block element (Groups 13-15
+# excluding C and N) OR a HYPERVALENT/substituted halogen (degree >= 2).
+# These are exactly the centres whose charged routing Orthonym does not yet
+# fully cover, so a fall-through silently neutralizes them. The routine
+# ionic centres are DELIBERATELY excluded, because they have dedicated
+# charged routes that emit a correct ionic-suffixed name:
+# - N+ (ammonium / choline / carnitine / aminium): would over-veto
+# every quaternary-ammonium functional-class name -- CONFIRMED risk on
+# a corpus probe (choline phospholipids named '...enol', charge on N+).
+# - O- (carboxylate / alkoxide / phenolate), C- (carbanide -> '...ide'),
+# S/Se/Te (thiolate / sulfonium): all routine, all correctly suffixed.
+# A correct main-group charged name (methylsilanuide, tetramethyl-
+# phosphanuide, silylium, phosphanium,...) always carries its ionic suffix,
+# so guard 1 already spares it even though its centre is in-scope -- the two
+# guards together fire ONLY on a genuine main-group charge drop.
+# B3: added 'ite' (P-72.2.2/P-65.3.1's OTHER acid-anion suffix pair,
 # '-ous acid' -> '-ite', sibling to '-ic acid' -> '-ate' -- chlorite,
-# nitrite, sulfite, phosphite, hypochlorite, ...). Missing it meant a
+# nitrite, sulfite, phosphite, hypochlorite,...). Missing it meant a
 # genuinely-ionic HALOGEN-centred retained name ending in '-ite' (chlorite,
 # for the hypervalent-Cl+ shape `_has_main_group_charge_centre` already
 # flags in-scope) read as "does not look ionic" and was wrongly suppressed
 # by `charge_dropped` as if the charge had been silently dropped, when it
-# had not (V36-SPY-B3's chlorite witness: verified live before this fix).
+# had not (V36-a trace-B3's chlorite witness: verified live before this fix).
 _IONIC_SUFFIX_RE = re.compile(r'(?:ate|ite|ide|ium)\)?$', re.IGNORECASE)
 
 # Charge-centre elements whose charged routing Orthonym does not fully cover.
@@ -145,13 +145,13 @@ def looks_like_ionic_name(name: str) -> bool:
     correctly-charged name this regex fails to recognise) only means a leak
     is missed -- safe, per precision-over-recall. Every currently-shipping
     net-charged PIN this task could enumerate -- the ~45 net-charged rows of
-    ``benchmarks/pin_oracle/gold_pins.json`` (azanylium, silylium, ...anium,
-    ...ide, ...ate, bis(...ide)/bis(...ate)/bis(...ium) forms) -- matches this
+    ``benchmarks/the gold set/gold_pins.json`` (azanylium, silylium,...anium,
+    ...ide,...ate, bis(...ide)/bis(...ate)/bis(...ium) forms) -- matches this
     pattern.
 
     Cation suffixes ('-ium', '-ylium', '-anium', '-onium') all end in the
     literal substring "ium". Anion suffixes ('-ide', '-uide', '-ate',
-    '-oate', '-olate', '-thiolate', '-aminide', ...) all end in "ide" or
+    '-oate', '-olate', '-thiolate', '-aminide',...) all end in "ide" or
     "ate". A trailing ``)`` is allowed for a multiplied bis(...)/tris(...)
     form (e.g. ``ethane-1,2-bis(aminium)``).
     """
@@ -197,7 +197,7 @@ def charge_dropped(mol: Chem.Mol, name: str) -> bool:
 
     Scope: NET charge only -- a genuinely charged single ion (or an ionic
     assembly whose charges do not cancel). A net-ZERO zwitterion (nitro,
-    N-oxide, amino-acid zwitterion, sulfonium/ammonium ylide, ...) never
+    N-oxide, amino-acid zwitterion, sulfonium/ammonium ylide,...) never
     reaches this check (``net_formal_charge(mol) == 0`` short-circuits), so
     the entire (large) neutral-by-charge-separation naming surface is
     untouched by construction. The main-group-centre guard further excludes
@@ -207,7 +207,7 @@ def charge_dropped(mol: Chem.Mol, name: str) -> bool:
 
     Callers MUST exclude an already-descriptive-fallback ``name`` (see
     ``errors.is_failure_name``) before calling this -- an honest abstention
-    ('unknown organic compound', '<metal> compound (not supported)', ...) is
+    ('unknown organic compound', '<metal> compound (not supported)',...) is
     not a "dropped charge" and must not be double-suppressed.
     """
     if not name:
@@ -263,7 +263,7 @@ def partial_sat_sp3_substituent_drop(mol: Chem.Mol, name: str) -> bool:
     broader version of this check (using ``sat_set`` alone, without this
     guard) FALSE-VETOED 17 of 25 real hits on a corpus sweep of
     ``benchmark_multi_corpus_results.csv`` -- all of them mixed alkene/hydro
-    systems (hexahydro-/octahydronaphthalene, hydroazulene, ...) whose
+    systems (hexahydro-/octahydronaphthalene, hydroazulene,...) whose
     substituents are, in fact, already correctly spelled by
     ``_partial_sat_substituent_prefix`` and which this function must not
     second-guess. Narrowing to the clean
@@ -430,8 +430,63 @@ def _oxo_locants(name: str) -> set:
     return out
 
 
+_CLOSE = {'(': ')', '[': ']', '{': '}'}
+
+
+def _match_close(s: str, i: int) -> int:
+    """Index just past the enclosing-mark group opening at ``s[i]`` (``len(s)``
+    if unbalanced). Depth counts every mark type together so mixed nesting
+    ``{5-[4-(...)]...}`` matches correctly."""
+    depth = 0
+    n = len(s)
+    for j in range(i, n):
+        c = s[j]
+        if c in '([{':
+            depth += 1
+        elif c in ')]}':
+            depth -= 1
+            if depth == 0:
+                return j + 1
+    return n
+
+
+def _scope_substrings(word: str) -> list:
+    """One substring per atom-numbering SCOPE in ``word``.
+
+    A five-valent carbon requires the SAME atom to be both a ring double-bond
+    terminus and an oxo/-one carbon, so its locants must be cited in ONE
+    numbering scope. A bracket group whose content contains a LETTER is a
+    substituent (its own numbering) and is pulled into its own scope; a purely
+    NUMERIC bracket -- a von-Baeyer descriptor ``[4.3.0]`` or a fusion locant
+    ``5(6)`` -- is kept INLINE so a parent ene fusion-locant is never corrupted.
+    """
+    scopes: list = []
+
+    def walk(s: str) -> None:
+        buf = []
+        i, n = 0, len(s)
+        while i < n:
+            ch = s[i]
+            if ch in '([{':
+                end = _match_close(s, i)
+                inner = s[i + 1:end - 1]
+                if any(c.isalpha() for c in inner):
+                    walk(inner)        # substituent -> its own scope
+                    buf.append(' ')    # break parent token adjacency
+                else:
+                    buf.append(s[i:end])  # numeric bracket -> keep inline
+                i = end
+            else:
+                buf.append(ch)
+                i += 1
+        scopes.append(''.join(buf))
+
+    walk(word)
+    return scopes
+
+
 def oxo_ene_valence_illegal(name: str) -> bool:
-    """v25 G5-A source-level (Java-free) valence guard.
+    """-A source-level (Java-free) valence guard.
 
     True iff a ring carbon is cited as BOTH a ring double-bond terminus AND an
     oxo/-one carbon -- a five-bond carbon (the caffeine-class
@@ -440,10 +495,22 @@ def oxo_ene_valence_illegal(name: str) -> bool:
     best-effort is safe even when the OPSIN RT gate is unavailable (no jar).
     Fail-closed on the cumulated-carbon edge (an oxo carbon truly cannot also
     hold a ring double bond).
+
+     M4: SCOPE-AWARE. The collision must be within ONE numbering scope --
+    the old whole-string union falsely flagged an oxo cited inside a substituent
+    (or in a different salt component) against a parent-ring ene, suppressing 33
+    valid salt/decorated names. Split into salt words then substituent scopes
+    (:func:`_scope_substrings`) and test each independently; the caffeine-class
+    parent-scope collision still fires, and every recovered name stays
+    OPSIN-round-trip gated downstream so 0-wrong is unchanged.
     """
     if not name or 'ene' not in name or ('oxo' not in name and 'one' not in name):
         return False
-    return bool(_ene_termini(name) & _oxo_locants(name))
+    for word in name.split():
+        for scope in _scope_substrings(word):
+            if _ene_termini(scope) & _oxo_locants(scope):
+                return True
+    return False
 
 
 __all__ = [

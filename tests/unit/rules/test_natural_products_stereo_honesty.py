@@ -31,10 +31,10 @@ def test_partially_defined_steroid_keeps_honest_name():
     stereocentre was undefined, which fabricated a fabrication-guard false positive on
     this partially-defined case -- the correct, measured criterion (all 25 fabrication
     witnesses have ZERO defined centres) is "zero defined AND >=1 undefined", never "any
-    undefined". OPSIN(5alpha-pregnane-3beta,20-diol) round-trips to the same molecule
+    undefined". OPSIN(5α-pregnane-3β,20-diol) round-trips to the same molecule
     (same full InChIKey), confirming the per-locant alpha/beta name that omits the
     undefined C-20 is honest, not a fabrication.
     """
     smi = "CC([C@H]1CC[C@H]2[C@@H]3CC[C@H]4C[C@H](CC[C@]4(C)[C@H]3CC[C@]12C)O)O"
     out = name_natural_product(_m(smi))
-    assert out == "5alpha-pregnane-3beta,20-diol"
+    assert out == "5α-pregnane-3β,20-diol"

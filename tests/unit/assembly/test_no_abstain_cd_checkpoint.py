@@ -1,11 +1,11 @@
 # tests/unit/assembly/test_no_abstain_cd_checkpoint.py
-"""v33 Phase C + Phase D close-out — lightweight checkpoint regressions.
+""" Phase C + Phase D close-out — lightweight checkpoint regressions.
 
- (read-only execution checkpoint,
+internal notes (read-only execution checkpoint,
 jar-PRESENT, default config) found:
 
 - Phase D ("decorated hetero-monocycle" witnesses) is ALREADY SUBSUMED: both
-  SPY-table witnesses emit and round-trip at T1 PIN via the existing small-
+  a trace-table witnesses emit and round-trip at T1 PIN via the existing small-
   ring/HW-nameable path, with no new code needed.
 - Phase C ("name_general returns ENGINE_NONE on a path B4 doesn't cover") is
   REDUNDANT: both of its own named live rescue classes (acyclic hetero-chain,
@@ -45,7 +45,7 @@ _PHASE_D_WITNESSES = [
 
 @pytest.mark.parametrize("smi", _PHASE_D_WITNESSES)
 def test_phase_d_hetero_monocycle_never_abstains(smi):
-    """Both Phase D SPY-table witnesses must EMIT a non-abstain name."""
+    """Both Phase D a trace-table witnesses must EMIT a non-abstain name."""
     out = _best_effort_name(smi)
     assert out is not None and not is_failure_name(out), (smi, out)
 

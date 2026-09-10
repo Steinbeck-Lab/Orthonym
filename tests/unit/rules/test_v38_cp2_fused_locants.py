@@ -1,4 +1,4 @@
-"""v38 CP2 -- fused-atom numbering in the spiro-fused composer.
+""" CP2 -- fused-atom numbering in the spiro-fused composer.
 
 Root-cause: ``spiro.py::_synthesize_fused_locants`` numbered a saturated
 ortho-fused bicyclic component with a plain sequential integer ``1..N``, so the
@@ -17,8 +17,8 @@ on a fusion carbon is VOIDed (fail closed), never emitted with a faked integer.
 
 Governing rules: P-31.1.4 (von Baeyer / fused parent hydride numbering),
 P-25.3.1.3 (lowest-locants orientation), P-24.5.1 (spiro-component citation +
-low locants to the spiro atoms), BlueBookV2.md:2855 (fusion-position letter
-locants), :3755 (``naphthalene-4a,8a-diol (PIN)``). OPSIN-verified targets in
+low locants to the spiro atoms), the Blue Book (fusion-position letter
+locants),:3755 (``naphthalene-4a,8a-diol (PIN)``). OPSIN-verified targets in
 the CP2 build-grounding doc.
 
 All emissions are round-trip gated (``general_fallback_unverified=False``), so an
@@ -84,7 +84,7 @@ def test_repro2_names_8a_methyl():
 def test_reproducers_deterministic_across_atom_orders(smiles, target):
     """Numbering must be canonical-rank driven, not atom-input-order driven.
 
-    v37 hit atom-order bugs 3x; the fix must yield the identical name from
+     hit atom-order bugs 3x; the fix must yield the identical name from
     several randomized SMILES writings of the same molecule.
     """
     m = Chem.MolFromSmiles(smiles)
@@ -99,7 +99,7 @@ def test_reproducers_deterministic_across_atom_orders(smiles, target):
 
 
 # --- PIN / no-regression controls: byte-identical to HEAD -------------------
-# Captured on HEAD 224cb242 before the fix ( cp2_baseline.py). The
+# Captured on HEAD 224cb242 before the fix (scratchpad cp2_baseline.py). The
 # undecorated core is the load-bearing control: it exercises the SAME synthetic
 # fused-locant path but carries no decoration, so it must stay byte-identical.
 

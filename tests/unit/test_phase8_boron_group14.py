@@ -1,4 +1,4 @@
-"""v23 Phase 8 — P-68.1/.2 boron + Group-14 depth.
+""" a phase — P-68.1/.2 boron + Group-14 depth.
 
 Covers (all OPSIN-RT-verified):
   * 8a boron parent acids (boric/boronic/borinic) + borono ring-propagation;
@@ -72,6 +72,28 @@ class TestMultiSuffixSpelling:
         ("C[Si](C)(O)O", "dimethylsilanediol"),    # di unaffected
     ])
     def test_group14_multi_suffix(self, st, smiles, expected):
+        assert st.name(smiles) == expected
+
+    # P-62.2.1.3 (BB 26221): the MONO-amine 'silanamine' is the one documented
+    # exception to P-14.3.4.2(a) (BB 2891, "the locant '1' is omitted in
+    # substituted mononuclear parent hydrides") -- (CH3)3Si-NH2 cites its
+    # substituent locants: '1,1,1-trimethylsilanamine' (PIN, corroborated at
+    # BB 37493/37495). Every sibling KEEPS the general omission: -ol/-thiol,
+    # the DI-/TRI-amine (methylsilanetriamine, BB 38180), etc.
+    @pytest.mark.parametrize("smiles,expected", [
+        ("C[Si](C)(C)N", "1,1,1-trimethylsilanamine"),   # mono-amine: LOCANTS
+        ("CC[Si](CC)(CC)N", "1,1,1-triethylsilanamine"),
+    ])
+    def test_mono_silanamine_cites_locants(self, st, smiles, expected):
+        assert st.name(smiles) == expected
+
+    @pytest.mark.parametrize("smiles,expected", [
+        # P-14.3.4.2(a) omission siblings that MUST NOT gain locants.
+        ("C[Si](C)(C)O", "trimethylsilanol"),   # mono-ol, BB 27234
+        ("C[Si](N)(N)N", "methylsilanetriamine"),  # tri-amine, BB 38180
+        ("C[Si](C)(N)N", "dimethylsilanediamine"),  # di-amine
+    ])
+    def test_group14_locant_omission_unregressed(self, st, smiles, expected):
         assert st.name(smiles) == expected
 
 

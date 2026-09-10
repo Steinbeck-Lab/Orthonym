@@ -110,7 +110,7 @@ class TestDispiro:
         assert result is not None
         name, _, _, _ = result
         # P-24.2.2 segment count tiebreak deferred to v19 (logged
-        # HERITAGE-followups). Connectivity correctness is what we
+        # AUTONOM-followups). Connectivity correctness is what we
         # verify here — name must contain 'dispiro' and a proper
         # '[a.b.c.d]' descriptor.
         assert name.startswith("dispiro[")

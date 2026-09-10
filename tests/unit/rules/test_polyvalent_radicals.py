@@ -2,7 +2,7 @@
 
 Names here are ASSERTED as raw strings straight off the rule functions (no OPSIN
 in the assertion path). Every expected string is OPSIN-2.9-`-r`-verified in
- §Item-1 §D (radical names need the -r
+internal notes §Item-1 §D (radical names need the -r
 OPSIN flag for name->structure round-trip; the phase gate scores by exact string,
 so these gate cleanly — research §E2).
 """

@@ -1,5 +1,5 @@
 """
-Integration tests for Phase 7: Fused Heterocycle Enhancement.
+Integration tests for a phase: Fused Heterocycle Enhancement.
 
 Tests the complete pipeline from SMILES to IUPAC name for:
 - Purine derivatives (adenine, purine, xanthine core)
@@ -8,7 +8,7 @@ Tests the complete pipeline from SMILES to IUPAC name for:
 - N-substituted fused heterocycles
 - Oxo and amino group handling
 
-Validates Phase 7 requirements (FUSED-01 through FUSED-07).
+Validates a phase requirements (FUSED-01 through FUSED-07).
 
 Reference: IUPAC 2013 Blue Book, Section P-25 (Fused Ring Systems)
 """
@@ -159,11 +159,11 @@ class TestSubstitutedQuinolines:
 
 
 # =============================================================================
-# Test Phase 7 Requirements (FUSED-01 through FUSED-07)
+# Test a phase Requirements (FUSED-01 through FUSED-07)
 # =============================================================================
 
 class TestPhase7Requirements:
-    """Test Phase 7 requirements from ROADMAP.md."""
+    """Test a phase requirements from ROADMAP.md."""
 
     @pytest.mark.integration
     def test_fused_01_correct_numbering(self):
@@ -243,7 +243,7 @@ class TestDataCoverage:
 
     @pytest.mark.integration
     def test_minimum_entry_count(self):
-        """Should have at least 35 fused heterocycle entries (Phase 7 target: 38)."""
+        """Should have at least 35 fused heterocycle entries (a phase target: 38)."""
         from orthonym.data.fused_heterocycles import FUSED_HETEROCYCLE_DATA
         assert len(FUSED_HETEROCYCLE_DATA) >= 35, f"Only {len(FUSED_HETEROCYCLE_DATA)} entries"
 
@@ -294,10 +294,11 @@ class TestFusedHeterocycleE2E:
         ('c1ccc2ncccc2c1', 'quinoline'),
         ('c1ccc2cnccc2c1', 'isoquinoline'),
         ('c1ccc2[nH]cnc2c1', '1H-benzimidazole'),
-        # Note: benzofuran/benzothiophene use retained names without "1-" prefix
-        # (RETAINED_NAMES takes precedence over FUSED_HETEROCYCLE_DATA)
-        ('c1ccc2occc2c1', 'benzofuran'),
-        ('c1ccc2sccc2c1', 'benzothiophene'),
+        #: the PIN carries the heteroatom locant (P-25.2.2.4,
+        # the Blue Book "1-benzofuran (PIN) benzofuran";:13443 for
+        # 1-benzothiophene). RETAINED_NAMES was corrected to the '1-' PIN form.
+        ('c1ccc2occc2c1', '1-benzofuran'),
+        ('c1ccc2sccc2c1', '1-benzothiophene'),
         ('c1ncc2nc[nH]c2n1', '9H-purine'),
     ])
     def test_unsubstituted_fused_heterocycles(self, smiles, expected):
@@ -328,28 +329,28 @@ class TestFusedHeterocycleE2E:
 
 
 # =============================================================================
-# Regression Tests (Ensure Phase 6 still works)
+# Regression Tests (Ensure a phase still works)
 # =============================================================================
 
 class TestPhase6Regression:
-    """Regression tests for Phase 6 fused system naming."""
+    """Regression tests for a phase fused system naming."""
 
     @pytest.mark.integration
     @pytest.mark.parametrize("smiles,expected", [
-        # Phase 6 fused heterocycle tests that should still pass
+        # a phase fused heterocycle tests that should still pass
         ('c1ccc2[nH]ccc2c1', '1H-indole'),
         ('c1ccc2ncccc2c1', 'quinoline'),
         ('c1ccc2[nH]cnc2c1', '1H-benzimidazole'),
     ])
     def test_phase6_fused_heterocycles_unchanged(self, smiles, expected):
-        """Phase 6 fused heterocycle naming should be unchanged."""
+        """a phase fused heterocycle naming should be unchanged."""
         result = name_compound(smiles)
         assert result == expected, f"Regression: {smiles} changed from '{expected}' to '{result}'"
 
     @pytest.mark.integration
     def test_simple_heterocycles_unchanged(self):
         """Simple (non-fused) heterocycle naming should be unchanged."""
-        # These are Phase 3 heterocycles, not fused
+        # These are a phase heterocycles, not fused
         assert name_compound('c1ccncc1') == 'pyridine'
         assert name_compound('c1ccoc1') == 'furan'
         assert name_compound('c1cc[nH]c1') == 'pyrrole'
@@ -391,17 +392,17 @@ class TestFusedRingsModule:
 # =============================================================================
 
 class TestPhaseSummaryCounts:
-    """Document test coverage summary for Phase 7."""
+    """Document test coverage summary for a phase."""
 
     @pytest.mark.integration
     def test_phase7_e2e_coverage(self):
-        """Document comprehensive Phase 7 E2E coverage.
+        """Document comprehensive a phase E2E coverage.
 
         TestPurineDerivatives: 4 tests
         - purine_base: 1
         - adenine: 1
         - hypoxanthine_like: 1
-        - caffeine_structure: 1 (resolved in Phase 8 plan 04)
+        - caffeine_structure: 1 (resolved in a phase plan 04)
 
         TestSubstitutedIndoles: 7 tests
         - unsubstituted_indole: 1

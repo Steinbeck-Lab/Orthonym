@@ -1,6 +1,6 @@
-"""v33 Phase 6: diacylglycerol-shape ester-vs-hydroxy parent-selection fix.
+""" a phase: diacylglycerol-shape ester-vs-hydroxy parent-selection fix.
 
-BlueBookV2.md P-41 Table 4.1 "General compound classes listed in decreasing
+the Blue Book P-41 Table 4.1 "General compound classes listed in decreasing
 order of seniority" (:18158+): class 9 Esters -- "functional class names are
 given to noncyclic esters" -- outranks class 17 Hydroxy compounds. A
 partially-esterified acyclic polyol carrying >=2 DIFFERENT noncyclic esters
@@ -9,7 +9,7 @@ ester (functional-class '<yl> <acid>oate'), with the junior ester demoted to
 an 'acyloxy' prefix and the free -OH to 'hydroxy' -- never by the junior
 '-ol' suffix with BOTH esters demoted.
 
-Bug + derivation: .
+Bug + derivation: internal notes.
 Fix site: `rules/esters.py::name_polyfunctional_diester_free_hydroxy`, wired
 into `rules/polyfunctional.py::name_polyfunctional` just before the legacy
 EL-02 ester-demotion fallback.

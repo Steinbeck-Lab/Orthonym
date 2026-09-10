@@ -61,15 +61,15 @@ _SINGLE_ATOM_BRIDGES: Dict[str, str] = {
 _TWO_ATOM_BRIDGES = [
     # (element1, element2, h_count1, h_count2, bridge_name)
     ("C", "C", 2, 2, "ethane-1,2-diyl"),  # CH2-CH2 (P-29.3.2.2 PIN; 'ethylene' is general-nomenclature only)
-    # v29 P3-FINAL I9: `vinylene` is a verbatim NON-PIN.  The Blue Book's own
+    # -FINAL I9: `vinylene` is a verbatim NON-PIN. The Blue Book's own
     # prefix table marks it so: `| ethene-1,2-diyl* (not<br>vinylene) | -CH=CH- |
-    # P-32.1.1 |` (`BlueBookV2.md:55998`), and the stilbene entry gives the PIN
+    # P-32.1.1 |` (`the Blue Book`), and the stilbene entry gives the PIN
     # outright: `stilbene (ring substitution only) 1,1'-(ethene-1,2-diyl)dibenzene
-    # (PIN)` (`:16615`).  The bridge carries locants, so the generic enclosure leg
+    # (PIN)` (`:16615`). The bridge carries locants, so the generic enclosure leg
     # in `_assemble_multiplicative_name` parenthesises it, reproducing that PIN
     # exactly.
     ("C", "C", 1, 1, "ethene-1,2-diyl"),   # CH=CH
-    # Phase 154.B D-09 audit-driven adds (154-AUDIT-B.md §3 ranks 1-2):
+    # a phase.B audit-driven adds (154-AUDIT-B.md §3 ranks 1-2):
     ("O", "O", 0, 0, "peroxy"),       # O-O; IUPAC P-29; OPSIN multiRadicalSubstituents.xml line 53; 154-AUDIT-B.md §3 #1
     ("S", "S", 0, 0, "disulfanediyl"),# S-S; IUPAC P-29; OPSIN multiRadicalSubstituents.xml; 154-AUDIT-B.md §3 #2
 ]
@@ -81,22 +81,22 @@ _MULTI_BRIDGE_NAMES: Dict[Tuple[str, int, int], str] = {
     ("N", 0, 3): "nitrilo",           # N connecting 3 rings (trivalent)
     ("C", 1, 3): "methylidyne",       # CH connecting 3 rings (trivalent)
     ("C", 0, 4): "methanetetrayl",    # C connecting 4 rings (tetravalent)
-    # Phase 154.B D-09 audit-driven add (154-AUDIT-B.md §3 rank 3):
+    # a phase.B audit-driven add (154-AUDIT-B.md §3 rank 3):
     ("P", 0, 3): "phosphinidyne",     # P connecting 3 rings (trivalent); IUPAC P-68; OPSIN multiRadicalSubstituents.xml line 47; 154-AUDIT-B.md §3 #3
 }
 
 
-# Phase 154.B D-10: _RETAINED_PARENT_NAMES (4-entry hardcoded dict) DELETED.
-# The registry-query layer below (_resolve_parent_name) replaces it.  The
+# a phase.B: _RETAINED_PARENT_NAMES (4-entry hardcoded dict) DELETED.
+# The registry-query layer below (_resolve_parent_name) replaces it. The
 # global ALL_RETAINED_NAMES registry in data/retained_names.py is the
-# single source of truth (Phase 151 D-21 reuse pattern).  See
+# single source of truth (a phase reuse pattern). See
 # 154-AUDIT-B.md §5 for the registry-coverage verification that confirms
 # all 4 previously-hardcoded SMILES are present in the registry when
 # accessed via Chem.CanonSmiles(...).
 
 
 def _resolve_parent_name(canon_smiles: str) -> Optional[Tuple[str, int]]:
-    """Phase 154.B D-10: registry-query layer for retained parent + locant.
+    """a phase.B: registry-query layer for retained parent + locant.
 
     Replaces the hardcoded _RETAINED_PARENT_NAMES dict (deleted) with a
     query against the global ALL_RETAINED_NAMES registry via
@@ -104,7 +104,7 @@ def _resolve_parent_name(canon_smiles: str) -> Optional[Tuple[str, int]]:
     with _extract_pg_locant_from_fragment for the principal-group locant.
 
     No SMILES strings hardcoded inline -- single source of truth is the
-    global registry per Phase 151 D-21 reuse pattern.
+    global registry per a phase reuse pattern.
 
     Args:
         canon_smiles: Canonical SMILES of the parent fragment.
@@ -113,7 +113,7 @@ def _resolve_parent_name(canon_smiles: str) -> Optional[Tuple[str, int]]:
         (parent_name, fg_locant) where fg_locant is the IUPAC position of the
         principal group on the fragment, or None if no parent name resolvable.
 
-    Source: 154-CONTEXT.md D-10; data/retained_names.py:get_retained_name:465.
+    Source: 154-CONTEXT.md; data/retained_names.py:get_retained_name:465.
     """
     from ..assembly.fragment_naming import name_fragment_recursively
     from ..data.retained_names import get_retained_name
@@ -136,8 +136,8 @@ def _extract_pg_locant_from_fragment(canon_smiles: str) -> Optional[int]:
     """Find the principal-group atom in the fragment and return its IUPAC locant.
 
     For benzene-derived parents (aniline, phenol, benzoic acid), the principal
-    group is at locant 1.  For other ring parents, the v18 scope returns 1 as
-    the safe default (the caller's `_get_bridge_locant` D-12 cascade computes
+    group is at locant 1. For other ring parents, the scope returns 1 as
+    the safe default (the caller's `_get_bridge_locant` cascade computes
     the bridge attachment locant relative to that PG-1 anchor).
 
     Args:
@@ -147,25 +147,25 @@ def _extract_pg_locant_from_fragment(canon_smiles: str) -> Optional[int]:
         1-indexed IUPAC locant of the principal group, or None if extraction
         fails.
 
-    Source: 154-CONTEXT.md D-10; 154-AUDIT-B.md §5.
+    Source: 154-CONTEXT.md; 154-AUDIT-B.md §5.
     """
     mol = Chem.MolFromSmiles(canon_smiles)
     if mol is None:
         return None
     # For all 4 hardcoded benzene-derived parents (aniline / phenol / benzoic
     # acid x2), the principal group sits at locant 1 by IUPAC convention.
-    # This is the safe default for the v18 multiplicative scope (which only
+    # This is the safe default for the multiplicative scope (which only
     # consumes benzene-derived retained parents per 154-AUDIT-B.md §5).
     return 1
 
 
 def _is_pure_single_bond_assembly(mol) -> bool:
-    """Phase 154.B D-11: detect single-bond-joined identical rings (ring_assemblies territory).
+    """a phase.B: detect single-bond-joined identical rings (ring_assemblies territory).
 
     True iff every inter-ring-system connection in the molecule is a single
-    bond directly between two ring atoms with NO bridge atom.  In that
+    bond directly between two ring atoms with NO bridge atom. In that
     case the multiplicative path returns None and the cascade falls
-    through to detect_ring_assembly (Phase 151's path).
+    through to detect_ring_assembly (a phase's path).
 
     The contract is symmetric: this guard is the multiplicative-side
     enforcer; ring_assemblies._find_inter_system_bonds (lines 77-124) is
@@ -176,7 +176,7 @@ def _is_pure_single_bond_assembly(mol) -> bool:
     Cross-handler regression test:
     tests/integration/test_assembly_vs_multiplicative_dispatch.py.
 
-    Source: 154-CONTEXT.md D-11; ring_assemblies.py:_find_inter_system_bonds:77.
+    Source: 154-CONTEXT.md; ring_assemblies.py:_find_inter_system_bonds:77.
     Source: 154-RESEARCH.md §4.5.
     """
     ring_info = mol.GetRingInfo()
@@ -232,26 +232,26 @@ def _is_pure_single_bond_assembly(mol) -> bool:
 
 
 # ---------------------------------------------------------------------------
-# Central-arene + acyclic identical arms  (P-15.3.1.1 (a)+(d) / P-15.3.1.3)
+# Central-arene + acyclic identical arms (P-15.3.1.1 (a)+(d) / P-15.3.1.3)
 # ---------------------------------------------------------------------------
 # A benzene ring bearing >=2 identical acyclic carboxylic-acid arms is a
 # multiplicative case where the ARM is the parent functional compound (acetic
 # acid, P-15.3.1.1(d)) and the benzene is the central di-/poly-valent group:
-#     OC(=O)Cc1cc(CC(=O)O)cc(CC(=O)O)c1
-#       -> 2,2',2''-(benzene-1,3,5-triyl)triacetic acid   (PIN, BB line 6757)
-#     OC(=O)Cc1ccc(CC(=O)O)cc1
-#       -> 2,2'-(1,4-phenylene)diacetic acid              (PIN, cf. BB line 25171)
+# OC(=O)Cc1cc(CC(=O)O)cc(CC(=O)O)c1
+# -> 2,2',2''-(benzene-1,3,5-triyl)triacetic acid (PIN, the Blue Book)
+# OC(=O)Cc1ccc(CC(=O)O)cc1
+# -> 2,2'-(1,4-phenylene)diacetic acid (PIN, cf. the Blue Book)
 # Without this path, parent selection takes ONE acid arm and the symmetric
 # others are DROPPED (a constitutional undercount, defect V-8).
 #
 # Scope (fail closed otherwise -- never a wrong name):
-#   * exactly one ring system, a bare benzene (6 aromatic carbons);
-#   * every exocyclic ring substituent is an UNBRANCHED aliphatic carboxylic
-#     acid -(CH2)k-COOH with k>=1 (the >=1 CH2 spacer is what distinguishes the
-#     multiplicative acetic-acid arm from a ring-attached -COOH / -CONH2, which
-#     stays the carbo* added-carbon suffix: benzene-1,3,5-tricarboxamide,
-#     benzene-1,2-dicarboxylic acid);
-#   * all arms identical; >=2 of them; no other substituents anywhere.
+# * exactly one ring system, a bare benzene (6 aromatic carbons);
+# * every exocyclic ring substituent is an UNBRANCHED aliphatic carboxylic
+# acid -(CH2)k-COOH with k>=1 (the >=1 CH2 spacer is what distinguishes the
+# multiplicative acetic-acid arm from a ring-attached -COOH / -CONH2, which
+# stays the carbo* added-carbon suffix: benzene-1,3,5-tricarboxamide,
+# benzene-1,2-dicarboxylic acid);
+# * all arms identical; >=2 of them; no other substituents anywhere.
 
 # yl-multiplier for a poly-valent benzene central group (n>=3; n==2 is phenylene)
 _BENZENE_YL_MULTIPLIER = {3: "triyl", 4: "tetrayl", 5: "pentayl", 6: "hexayl"}
@@ -259,7 +259,7 @@ _BENZENE_YL_MULTIPLIER = {3: "triyl", 4: "tetrayl", 5: "pentayl", 6: "hexayl"}
 
 def _lowest_locant_set(ring_cyclic: List[int], attach_set: set) -> List[int]:
     """Lowest locant set for the attachment ring atoms, over the 12 dihedral
-    numberings of a 6-ring.  Order-independent (deterministic) result."""
+    numberings of a 6-ring. Order-independent (deterministic) result."""
     n = len(ring_cyclic)
     best: Optional[List[int]] = None
     for start in range(n):
@@ -294,7 +294,7 @@ def _central_arene_substituent_name(
 def _try_central_arene_acyclic_arms(mol) -> Optional[str]:
     """Multiplicative naming for a bare benzene bearing >=2 identical acyclic
     functional-parent arms (defect V-8; Wave2 T5a extends the acid-only scope
-    to alcohol arms).  Returns the PIN or ``None`` (fail closed).
+    to alcohol arms). Returns the PIN or ``None`` (fail closed).
 
     2,2',2''-(benzene-1,3,5-triyl)triacetic acid (P-15.3.1.1(d));
     (benzene-1,3,5-triyl)trimethanol / (benzene-1,4-diyl)dimethanol
@@ -400,10 +400,10 @@ def _acyclic_arm_parent_and_locant(mol, attach_carbon: int, bridge_idx: int,
     Scope (fail-closed -> None otherwise): an unbranched carbon chain whose two
     ends are exactly {PCG carbon, bridge-attach carbon}; the only functional
     atoms are the single PCG (carboxylic acid -OH/=O, or alcohol -OH; with
-    ``allow_amine`` also a terminal -NH2).  The PCG carbon is numbered 1
-    (lowest locant), so the bridge attaches at C(chain length).  Examples:
-    HO-CH2-CH2-* -> ("ethan-1-ol", 2);  HOOC-CH2-* -> ("acetic acid", 2);
-    H2N-CH2-CH2-* -> ("ethan-1-amine", 2) [allow_amine only].  Tight by
+    ``allow_amine`` also a terminal -NH2). The PCG carbon is numbered 1
+    (lowest locant), so the bridge attaches at C(chain length). Examples:
+    HO-CH2-CH2-* -> ("ethan-1-ol", 2); HOOC-CH2-* -> ("acetic acid", 2);
+    H2N-CH2-CH2-* -> ("ethan-1-amine", 2) [allow_amine only]. Tight by
     design (Risk R1: MULTIPLICATIVE@900 fires before GENERAL@99999, so this
     must never claim an ordinary ester/ether).
 
@@ -437,7 +437,7 @@ def _acyclic_arm_parent_and_locant(mol, attach_carbon: int, bridge_idx: int,
         return None
     # Wave2 T5a hardening: the '{stem}anoic acid'/'{stem}an-1-ol' arm name
     # asserts a SATURATED, uncharged chain — any C=C/C#C or formal charge in
-    # the arm would be silently dropped by the name.  Fail closed instead.
+    # the arm would be silently dropped by the name. Fail closed instead.
     for a in arm:
         if mol.GetAtomWithIdx(a).GetFormalCharge() != 0:
             return None
@@ -520,11 +520,11 @@ def _acyclic_arm_parent_and_locant(mol, attach_carbon: int, bridge_idx: int,
         if pcg == 'acid':
             # A 1-carbon acid arm is the COOH carbon itself attached to the
             # bridge — carboxy-on-parent territory (benzoic/carbonic class),
-            # never a 'methanoic acid' multiplicative unit.  Fail closed.
+            # never a 'methanoic acid' multiplicative unit. Fail closed.
             return None
         # Mononuclear unit: locant omitted (P-14.3.4.2; BB
         # '[oxydi(pyridazine-4,3,5-triyl)]tetramethanol' carries no unit
-        # locants).  attach_locant=None signals the elision to the assembler.
+        # locants). attach_locant=None signals the elision to the assembler.
         return ("methanol" if pcg == 'ol' else "methanamine"), None
     else:
         # PCG at one terminus (C1), bridge attachment at the other (C n).
@@ -555,9 +555,9 @@ def _try_acyclic_heteroatom_bridge(mol) -> Optional[str]:
     Fail-closed (Risk R1): the bridge is a single non-ring O/S/NH with exactly
     two acyclic-carbon neighbours, the two arms are identical, and each arm is
     a linear chain with a single terminal PCG (handled by
-    _acyclic_arm_parent_and_locant).  Returns None for everything else (e.g.
+    _acyclic_arm_parent_and_locant). Returns None for everything else (e.g.
     diethyl ether has no PCG; 2-ethoxyethanol's arms differ) so the GENERAL
-    pipeline keeps ownership and no ester is ever stolen.  The arm namer's
+    pipeline keeps ownership and no ester is ever stolen. The arm namer's
     acid/ol-only scope keeps the NH bridge away from polyamine parents where
     substitutive names are the PINs (BB P-62.2.5.3: diethylenetriamine is a
     diamine parent, "not 2,2'-azanediyldi(ethan-1-amine)").
@@ -622,11 +622,11 @@ def _try_acyclic_nitrilo_bridge(mol) -> Optional[str]:
     nitrilo in _try_multi_atom_bridges):
 
     N(CH2COOH)3 -> 2,2',2''-nitrilotriacetic acid (BB P-15.3.1.2 Table 15.1);
-    N(CCO)3     -> 2,2',2''-nitrilotri(ethan-1-ol) (BB P-15.3.2.1, PIN).
+    N(CCO)3 -> 2,2',2''-nitrilotri(ethan-1-ol) (BB P-15.3.2.1, PIN).
 
     Fail-closed: bare uncharged non-ring N with exactly three acyclic-carbon
     neighbours; all three arms resolve to the SAME (parent, locant) via the
-    strict linear-arm namer.  Amine-arm cases never arrive here (the arm
+    strict linear-arm namer. Amine-arm cases never arrive here (the arm
     namer is acid/ol-only), so polyamine parents (P-44.1.1 max-suffix rule)
     are never stolen.
     """
@@ -712,13 +712,13 @@ _G14_CHAIN_MULT = {2: 'di', 3: 'tri', 4: 'tetra', 5: 'penta', 6: 'hexa',
                    7: 'hepta', 8: 'octa', 9: 'nona', 10: 'deca'}
 
 # Phase 7B4 (P-16.3.6(a)): a MONONUCLEAR Group-14 hydride cited as a
-# multiplicative parent unit ('silane', 'trimethylsilane', ...) takes bis/tris,
-# NOT di/tri.  P-16.3.6(a) Note lists Si/Ge/Sn/Pb explicitly: 'disilane' and
+# multiplicative parent unit ('silane', 'trimethylsilane',...) takes bis/tris,
+# NOT di/tri. P-16.3.6(a) Note lists Si/Ge/Sn/Pb explicitly: 'disilane' and
 # 'trisilane' already name the CATENATED polynuclear hydrides (H3Si-SiH3,
 # H3Si-SiH2-SiH3), so 'di(silane)'/'tri(silane)' would be ambiguous and the
-# complex prefix is mandatory -> bis(silane)/tris(silane) (BB:6168,
+# complex prefix is mandatory -> bis(silane)/tris(silane) (the Blue Book,
 # (benzene-1,3,5-triyl)tris(silane) (PIN)) and bis(trimethylsilane)
-# (BB:6297).  The methyl-substituted parents (P-15.3.1.2.1.2 substitution on
+# (the Blue Book). The methyl-substituted parents (P-15.3.1.2.1.2 substitution on
 # the silane parent hydride) are enumerated to the count the unit namer emits.
 _METHYL_UNIT_PREFIXES = ('', 'methyl', 'dimethyl', 'trimethyl')
 _G14_MONONUCLEAR_HYDRIDE_PARENTS = frozenset(
@@ -734,11 +734,11 @@ def name_free_homonuclear_group14_hydride(mol) -> Optional[str]:
     standard-valence chain -> di/tri/...+stem, with the P-68.2.3 ene/yne
     modification for a 2-atom unsaturated chain::
 
-        [SiH3][SiH3]        -> disilane
-        [SiH3][SiH2][SiH3]  -> trisilane
-        [GeH3][GeH3]        -> digermane
-        [GeH2]=[GeH2]       -> digermene       (P-68.2.3, BB 38147)
-        [SiH2]=[SiH2]       -> disilene
+        [SiH3][SiH3] -> disilane
+        [SiH3][SiH2][SiH3] -> trisilane
+        [GeH3][GeH3] -> digermane
+        [GeH2]=[GeH2] -> digermene (P-68.2.3, BB 38147)
+        [SiH2]=[SiH2] -> disilene
 
     Fail-closed (returns None) for any carbon / halide / stray heteroatom, a
     branch, a ring, a charge / radical, a non-standard valence, a single hub
@@ -985,7 +985,7 @@ def _try_triyl_two_atom_bridge(mol, ring_atoms: set) -> Optional[str]:
     (P-51.3.2.1 / P-45.1.2):
 
     (HOOC-C6H4-)2CH-CH2-C6H4-COOH -> 4,4',4''-(ethane-1,1,2-triyl)tribenzoic
-    acid;  (H2N-C6H4-)2C=CH-C6H4-NH2 -> 4,4',4''-(ethene-1,1,2-triyl)trianiline.
+    acid; (H2N-C6H4-)2C=CH-C6H4-NH2 -> 4,4',4''-(ethene-1,1,2-triyl)trianiline.
 
     Fail-closed: both bridge carbons non-ring/neutral, ring-attachment
     pattern (2,1), no other heavy substituents, all three fragments
@@ -1308,7 +1308,7 @@ def _try_ethylenedioxy_bridge(mol) -> Optional[str]:
 
     Fail-closed: the central unit is exactly an acyclic, uncharged
     CH2-CH2 flanked by two ether oxygens; each O's outer neighbour starts a
-    strict linear acid/ol arm; both arms resolve identically.  Longer
+    strict linear acid/ol arm; both arms resolve identically. Longer
     oxa-chains (tetraethylene glycol: the arm would contain a second ether O)
     decline via the arm namer's heteroatom coverage check.
     """
@@ -1376,12 +1376,12 @@ def _group14_mononuclear_hydride_unit(mol, x_idx: int, attach_idx: int):
     The unit is a single Si/Ge/Sn/Pb atom bearing, besides the one central
     attachment bond, only H and/or TERMINAL methyl groups::
 
-        -SiH3       -> ("silane",          {Si})
-        -Si(CH3)3   -> ("trimethylsilane", {Si, 3 x CH3})
+        -SiH3 -> ("silane", {Si})
+        -Si(CH3)3 -> ("trimethylsilane", {Si, 3 x CH3})
 
     Returns ``(unit_name, unit_atom_idxs)`` or ``None`` (fail closed) for a
     catenated hydride (Si-Si), any non-methyl substituent, a charge / radical,
-    a non-standard valence, or a ring atom.  Tight by design: only the
+    a non-standard valence, or a ring atom. Tight by design: only the
     methyl-decorated mononuclear parents the BB cites as PIN units are built.
     """
     x = mol.GetAtomWithIdx(x_idx)
@@ -1420,7 +1420,7 @@ def _group14_mononuclear_hydride_unit(mol, x_idx: int, attach_idx: int):
 
 def _lowest_chain_attach_locants(chain_order: List[int], attach_atoms: set) -> List[int]:
     """Lowest attachment-locant set (P-31.1.4) for the free valences of a
-    linear-chain central group, over the two numbering directions.  Returns the
+    linear-chain central group, over the two numbering directions. Returns the
     sorted list of locants (deterministic, order-independent)."""
     best: Optional[List[int]] = None
     for seq in (chain_order, list(reversed(chain_order))):
@@ -1434,18 +1434,18 @@ def _lowest_chain_attach_locants(chain_order: List[int], attach_atoms: set) -> L
 def _try_group14_hydride_substituted_chain(mol) -> Optional[str]:
     """A saturated carbon CHAIN central group bearing >=2 IDENTICAL mononuclear
     Group-14 hydride units on DISTINCT carbons (P-15.3.3.1 / P-15.3.2.3;
-    BB:6297 verbatim)::
+    the Blue Book verbatim)::
 
         CC(C[Si](C)(C)C)[Si](C)(C)C -> (propane-1,2-diyl)bis(trimethylsilane)
-        [SiH3]CC[SiH3]              -> (ethane-1,2-diyl)bis(silane)
+        [SiH3]CC[SiH3] -> (ethane-1,2-diyl)bis(silane)
 
     A carbon-only chain cannot be a multiplied parent (P-15.3.1.1(b)), so it is
-    the central group and the silanes are the identical parents.  Fail closed
+    the central group and the silanes are the identical parents. Fail closed
     (return None) unless: one acyclic fragment; every Group-14 atom is a clean
     mononuclear methyl/H unit (``_group14_mononuclear_hydride_unit``); >=2
     units, all identically named, on distinct carbons; the non-unit heavy atoms
     are all carbon and form a single unbranched chain; chain + units cover every
-    heavy atom.  Asymmetric traps (1-chloro-...bis(silane) at BB:6243) are
+    heavy atom. Asymmetric traps (1-chloro-...bis(silane) at the Blue Book) are
     excluded because chlorosilane is not a methyl/H unit and the units differ.
     """
     if mol is None or len(Chem.GetMolFrags(mol)) != 1:
@@ -1530,12 +1530,12 @@ def _try_group14_hydride_substituted_chain(mol) -> Optional[str]:
 
 def _try_central_arene_group14_arms(mol) -> Optional[str]:
     """A bare benzene central group bearing >=2 IDENTICAL mononuclear Group-14
-    hydride units (P-15.3.2.3; BB:6168 verbatim)::
+    hydride units (P-15.3.2.3; the Blue Book verbatim)::
 
         [SiH3]c1cc([SiH3])cc([SiH3])c1 -> (benzene-1,3,5-triyl)tris(silane)
 
     The single benzene ring is the central multiplicative group (one ring, so
-    it cannot be multiplied); the silanes are the identical parents.  Fail
+    it cannot be multiplied); the silanes are the identical parents. Fail
     closed unless: exactly one 6-membered all-carbon aromatic ring; >=2 ring
     carbons each bearing a clean mononuclear Group-14 hydride unit
     (``_group14_mononuclear_hydride_unit``); all units identically named; ring +
@@ -1614,7 +1614,7 @@ def name_multiplicative(mol) -> Optional[str]:
         return result
 
     # Acyclic identical functional parents bridged by a divalent heteroatom
-    # (P-15.3): OCCSCCO -> 2,2'-sulfanediyldi(ethan-1-ol).  Runs before the
+    # (P-15.3): OCCSCCO -> 2,2'-sulfanediyldi(ethan-1-ol). Runs before the
     # >=2-ring gate below (which only guards the ring-system bridge logic).
     # Tightly fail-closed so it never preempts an ester (Risk R1).
     result = _try_acyclic_heteroatom_bridge(mol)
@@ -1653,7 +1653,7 @@ def name_multiplicative(mol) -> Optional[str]:
 
     # Phase 7B4: an ACYCLIC carbon chain central group bearing >=2 identical
     # mononuclear Group-14 hydride units (P-15.3.3.1 / P-15.3.2.3): (propane-1,2-
-    # diyl)bis(trimethylsilane), (ethane-1,2-diyl)bis(silane).  Runs before the
+    # diyl)bis(trimethylsilane), (ethane-1,2-diyl)bis(silane). Runs before the
     # >=2-ring gate (the central chain is acyclic).
     result = _try_group14_hydride_substituted_chain(mol)
     if result is not None:
@@ -1661,7 +1661,7 @@ def name_multiplicative(mol) -> Optional[str]:
 
     # Phase 7B4: a SINGLE benzene ring central group bearing >=2 identical
     # mononuclear Group-14 hydride units (P-15.3.2.3): (benzene-1,3,5-triyl)tris-
-    # (silane).  Runs before the >=2-ring gate (benzene is a single ring acting
+    # (silane). Runs before the >=2-ring gate (benzene is a single ring acting
     # as the central multiplicative group, not a parent).
     result = _try_central_arene_group14_arms(mol)
     if result is not None:
@@ -1672,13 +1672,13 @@ def name_multiplicative(mol) -> Optional[str]:
     if ring_info.NumRings() < 2:
         return None
 
-    # Phase 154.B D-11: topology guard for ring-assembly mutual exclusion.
+    # a phase.B: topology guard for ring-assembly mutual exclusion.
     # If every inter-fragment connection is a single bond between two ring
     # atoms with NO bridge atom, return None and let the cascade fall
-    # through to detect_ring_assembly (Phase 151's path).  Cross-handler
+    # through to detect_ring_assembly (a phase's path). Cross-handler
     # regression test: tests/integration/test_assembly_vs_multiplicative_dispatch.py.
     #
-    # Source: 154-CONTEXT.md D-11; ring_assemblies.py:_find_inter_system_bonds:77.
+    # Source: 154-CONTEXT.md; ring_assemblies.py:_find_inter_system_bonds:77.
     if _is_pure_single_bond_assembly(mol):
         return None  # ring_assemblies.py owns this case
 
@@ -1846,7 +1846,7 @@ def _try_single_atom_bridges(mol, ring_atoms: set) -> Optional[str]:
             continue
 
         # Pnictogen-oxoacid / -ester-bridge PIN guard (mirrors the NH / carbonyl
-        # guards above; P-41 Table 4.1, BB:18162ff). A mononuclear P/As/Sb bridge
+        # guards above; P-41 Table 4.1, the Blue Bookff). A mononuclear P/As/Sb bridge
         # bearing a =E chalcogen AND a free -OH/-SH is an arsinic/phosphinic/
         # stibinic ACID (P-41 class 7c); the same centre bearing an -O-R ester
         # residual is an arsinate/phosphinate/stibinate ESTER (class 9). Both
@@ -1887,7 +1887,7 @@ def _try_single_atom_bridges(mol, ring_atoms: set) -> Optional[str]:
 def _unit_name_is_substituted(parent_name: str) -> bool:
     """A multiplied unit name beginning with a locant carries substituent
     prefixes ("2-chlorobenzoic acid", "4-bromobenzene") — the P-15.3.2.4.1
-    bis class.  Mid-name suffix locants ("ethan-1-ol") are NOT substituted."""
+    bis class. Mid-name suffix locants ("ethan-1-ol") are NOT substituted."""
     import re
     return re.match(r"^(?:\d|N[-,'0-9])", parent_name) is not None
 
@@ -1897,7 +1897,7 @@ def _ring_unit_direction_safe(frag_canon: str, attach_locant) -> bool:
     the bridge attachment locant: a para (locant 4) attachment on a benzene
     unit is self-mirror, so the fragment namer's direction choice for the
     substituents is consistent with attachment@4 (the BB P-15.3.2.4.1
-    witnesses 4,4'-oxybis(2-chloro/2-bromobenzoic acid)).  Any other shape
+    witnesses 4,4'-oxybis(2-chloro/2-bromobenzoic acid)). Any other shape
     fails closed."""
     if attach_locant != 4:
         return False
@@ -2290,7 +2290,7 @@ def _classify_single_atom_bridge_ext(
       * C with exactly one terminal single-bonded halogen, 1 H -> '{halo}methylene'
     """
     sym = atom.GetSymbol()
-    # Phase 1B (P-67.1.4.1.1): acyl-prefix bridge -E(=Y)(residual)- linking two
+    # a phase (P-67.1.4.1.1): acyl-prefix bridge -E(=Y)(residual)- linking two
     # identical ring parents (each a benzoic acid). The acyl base name comes from the
     # SHARED P-67.1.4.1.1 table (acyl_prefix_for), no longer a hardcoded string, so
     # the family generalises from phosphoryl to arsoryl/stiboryl/thio- siblings while
@@ -2307,7 +2307,7 @@ def _classify_single_atom_bridge_ext(
         dbl = None
         chalco_token = resid_prefix = None
         # residual atoms to strip when splitting: the =E' plus the residual
-        # ligand AND, for an -O-R ester (Phase 3c 'methoxyphosphoryl'), its
+        # ligand AND, for an -O-R ester (a phase 'methoxyphosphoryl'), its
         # whole R subtree.
         resid_extra: List[int] = []
         for s in sub_nbrs:
@@ -2371,7 +2371,7 @@ def _bridge_is_pnictogen_oxoacid(mol, atom) -> bool:
     group SENIOR to a ring (P-41). When it bridges two units carrying no senior
     PCG of their own, the acid (not the ring) is the parent, so the substitutive
     di-organyl pnictogen acid is the PIN, not the multiplicative name. This is
-    the recogniser behind the guard in :func:`_try_single_atom_bridges`.
+    the recogniser behind the guard in:func:`_try_single_atom_bridges`.
 
     Fail-closed (returns False) for the ESTER residual (-O-R, degree 2), for a
     charged / hydridic centre, and for any non-pnictogen atom: those keep their
@@ -2399,11 +2399,11 @@ def _bridge_is_pnictogen_oxoacid(mol, atom) -> bool:
 
 
 def _bridge_is_pnictogen_oxoacid_or_ester(mol, atom) -> bool:
-    """Like :func:`_bridge_is_pnictogen_oxoacid` but ALSO true for the ESTER
+    """Like:func:`_bridge_is_pnictogen_oxoacid` but ALSO true for the ESTER
     residual. The single-atom bridge is a mononuclear P/As/Sb centre — neutral,
     H-free — bearing a terminal =E chalcogen (=O / =S) AND either
 
-      * a free terminal -OH / -SH  (a phosphinic/arsinic/stibinic ACID, P-41
+      * a free terminal -OH / -SH (a phosphinic/arsinic/stibinic ACID, P-41
         class 7c), or
       * an ester -O-R / -S-R residual (an -O-/-S-bonded chalcogen of degree 2
         whose other neighbour is a carbon: a phosphinate/arsinate/stibinate
@@ -2411,8 +2411,8 @@ def _bridge_is_pnictogen_oxoacid_or_ester(mol, atom) -> bool:
 
     Both classes are senior to a ring bearing only class-≥17 groups, so the
     substitutive acid/ester is the parent, not the multiplicative bridge name
-    (P-41 Table 4.1, BB:18162ff). This is the recogniser behind the broadened
-    guard in :func:`_try_single_atom_bridges` — the acid-only sibling
+    (P-41 Table 4.1, the Blue Bookff). This is the recogniser behind the broadened
+    guard in:func:`_try_single_atom_bridges` — the acid-only sibling
     :func:`_bridge_is_pnictogen_oxoacid` stays for callers that must exclude the
     ester. Fail-closed (False) for a charged / hydridic centre and any
     non-pnictogen atom.
@@ -2434,18 +2434,18 @@ def _bridge_is_pnictogen_oxoacid_or_ester(mol, atom) -> bool:
                 and nbr.GetSymbol() in ("O", "S")
                 and nbr.GetFormalCharge() == 0):
             if nbr.GetDegree() == 1 and nbr.GetTotalNumHs() == 1:
-                has_acid_or_ester = True            # free -OH / -SH  (acid)
+                has_acid_or_ester = True            # free -OH / -SH (acid)
             elif nbr.GetDegree() == 2 and nbr.GetTotalNumHs() == 0:
                 others = [x for x in nbr.GetNeighbors()
                           if x.GetIdx() != atom.GetIdx()]
                 if len(others) == 1 and others[0].GetSymbol() == "C":
-                    has_acid_or_ester = True         # -O-R / -S-R  (ester)
+                    has_acid_or_ester = True         # -O-R / -S-R (ester)
     return has_dbl_chalco and has_acid_or_ester
 
 
 def _fragment_carries_senior_acid(frag) -> bool:
     """True when a split fragment carries an acid group SENIOR to a P/As/Sb
-    oxoacid (class 7c) in the P-41 Table 4.1 order (BB:18162ff): a carboxylic
+    oxoacid (class 7c) in the P-41 Table 4.1 order (the Blue Bookff): a carboxylic
     acid or its chalcogen analogue (class 7a, ``-C(=E)-E'H``) or an S/Se/Te
     oxoacid (class 7a, sulfonic/sulfinic/... ``-[S/Se/Te](=O)-OH``).
 
@@ -2481,7 +2481,7 @@ def _no_fragment_group_senior_to_pnictogen_oxoacid(
 ) -> bool:
     """True when NO fragment left after removing the P/As/Sb oxoacid (or ester)
     bridge carries a characteristic group SENIOR to that bridge's acid/ester in
-    the P-41 Table 4.1 class order (BB:18162ff).
+    the P-41 Table 4.1 class order (the Blue Bookff).
 
     The pnictogen-acid/ester guard declines the multiplicative name (→ acid/ester
     parent) exactly when this is True. A plain substituted arene, a phenol
@@ -2507,11 +2507,11 @@ def _no_fragment_group_senior_to_pnictogen_oxoacid(
 def _ethene_diyl_bridge_name(mol, atom1, atom2) -> str:
     """`ethene-1,2-diyl`, carrying its configuration when the input defines one.
 
-    v29 P3-FINAL I9.  Without this, (E)- and (Z)-stilbene emitted the SAME name:
-    two different compounds, one string.  The Blue Book puts the descriptor
+    -FINAL I9. Without this, (E)- and (Z)-stilbene emitted the SAME name:
+    two different compounds, one string. The Blue Book puts the descriptor
     INSIDE the multiplicative bracket, so there is a channel for it --
     `1,1'-[(1*E*)-1-(4-chlorophenyl)ethene-1,2-diyl]dibenzene (PIN, see P-93.6)`
-    (`BlueBookV2.md:47100`).  The bridge's own locant 1 is the atom cited first,
+    (`the Blue Book`). The bridge's own locant 1 is the atom cited first,
     hence `(1E)`/`(1Z)`.
 
     `_CIPCode` is the repo's single source of truth for E/Z
@@ -2570,7 +2570,7 @@ def _all_fragments_are_simple_carbocycles(
     fragments (rings with no principal characteristic group / no heteroatoms
     in the parent ring).
 
-    Phase 157 cleanup helper: the substitutive-PIN guard in
+    a phase cleanup helper: the substitutive-PIN guard in
     `_try_multi_atom_bridges` invokes this function to distinguish:
       - Plain benzene fragments (e.g., (Ph)3P -> triphenylphosphane PIN)
       - Phenol-like fragments with -OH (e.g., (HOPh)3P -> 4,4',4''-
@@ -2578,7 +2578,7 @@ def _all_fragments_are_simple_carbocycles(
 
     A fragment is "simple carbocyclic" if every atom is a ring carbon
     OR an explicit hydrogen — no heteroatoms (O/N/S/etc.) AND no
-    extra-ring substituent atoms. Plain benzene `c1ccccc1` qualifies;
+    extra-ring substituent atoms. Plain benzene qualifies;
     phenol `Oc1ccccc1` does NOT (has the hydroxyl O).
 
     Args:
@@ -2656,14 +2656,14 @@ def _try_multi_atom_bridges(mol, ring_atoms: set) -> Optional[str]:
         CH connecting 3 phenol rings -> methylidynetriphenol
         C connecting 4 phenol rings -> methanetetrayltetraphenol
 
-    Phase 157 cleanup substitutive-PIN guard:
+    a phase cleanup substitutive-PIN guard:
         For mononuclear parent hydrides (NH3, PH3, AsH3, SiH4, GeH4, SnH4,
         PbH4, BH3, plus the multivalent CH4 case) substituted with 3+
         IDENTICAL SIMPLE-RING groups, IUPAC P-66.6.1.1.3 / P-67.1.1.1 /
         P-68 mandate the SUBSTITUTIVE form (e.g., `triphenylphosphane`,
         `triphenylamine`, `triphenylmethane`) as PIN — not the
         multiplicative form (`1,1',1''-phosphinidynetribenzene` etc.).
-        See `cleanup-deferred-items.md` D-157-11 for the full bug
+        See `cleanup-deferred-items.md` -11 for the full bug
         provenance and IUPAC rule citations.
     """
     # Mononuclear-parent-hydride elements where the SUBSTITUTIVE form is
@@ -2701,7 +2701,7 @@ def _try_multi_atom_bridges(mol, ring_atoms: set) -> Optional[str]:
         if len(heavy_neighbors) != ring_nbr_count:
             continue
 
-        # Phase 157 cleanup substitutive-PIN guard: when the bridge atom
+        # a phase cleanup substitutive-PIN guard: when the bridge atom
         # is a mononuclear-parent-hydride element AND the substituent
         # rings are simple carbocycles with no principal characteristic
         # group, defer to substitutive nomenclature. This honors IUPAC
@@ -2859,14 +2859,14 @@ def _split_at_two_atom_bridge(
 
 
 def _name_parent(canon_smiles: str) -> Optional[str]:
-    """Backwards-compat wrapper around _resolve_parent_name (D-10).
+    """Backwards-compat wrapper around _resolve_parent_name ().
 
     Returns just the name string (drops the principal-group locant) so
-    existing callers in this module see no behavior change.  New callers
+    existing callers in this module see no behavior change. New callers
     should prefer _resolve_parent_name directly to get both the parent
     name and the principal-group locant.
 
-    Source: 154-CONTEXT.md D-10 (replaces hardcoded _RETAINED_PARENT_NAMES dict).
+    Source: 154-CONTEXT.md (replaces hardcoded _RETAINED_PARENT_NAMES dict).
     """
     result = _resolve_parent_name(canon_smiles)
     return result[0] if result else None
@@ -2875,12 +2875,12 @@ def _name_parent(canon_smiles: str) -> Optional[str]:
 def _get_bridge_locant(
     mol, bridge_idx: int, ring_conn_idx: int, ring_atoms: set
 ) -> int:
-    """Phase 154.B D-12: query Phase 151 cascade for IUPAC ring locants.
+    """a phase.B: query a phase cascade for IUPAC ring locants.
 
     Replaces the legacy "ring shortest-path from principal group"
     heuristic (which defaulted to 4 / para on failure -- the
     architectural debt this edit clears) with a query against the
-    existing handler's IUPAC locant map (Phase 151 cascade --
+    existing handler's IUPAC locant map (a phase cascade --
     heterocycle / fused / VB / spiro / ring-assembly locants).
 
     Falls back to the legacy shortest-path heuristic
@@ -2898,7 +2898,7 @@ def _get_bridge_locant(
     Returns:
         Locant number (1-indexed).
 
-    Source: 154-CONTEXT.md D-12; rules/parent_selection.py:_build_ring_pos:77;
+    Source: 154-CONTEXT.md; rules/parent_selection.py:_build_ring_pos:77;
             namer.py:_build_ring_info_for_parent_selection:372;
             rules/locants.py:compare_locant_sets:96.
     """
@@ -2913,14 +2913,14 @@ def _get_bridge_locant(
             break
     if target_ring is None:
         # No ring contains the connection atom -- fall back to legacy
-        # heuristic.  Defensive guard: should never hit because callers
+        # heuristic. Defensive guard: should never hit because callers
         # assert ring_conn_idx is in ring_atoms.
         return _shortest_path_heuristic_locant(
             mol, bridge_idx, ring_conn_idx, ring_atoms
         )
 
-    # 2. Build ring_info dict via Phase 151 cascade (fused-hetero, PAH,
-    #    benzene, heterocycle, spiro, mixed-spiro/fused, VB, ring-assembly).
+    # 2. Build ring_info dict via a phase cascade (fused-hetero, PAH,
+    # benzene, heterocycle, spiro, mixed-spiro/fused, VB, ring-assembly).
     handler_ring_info = None
     try:
         from ..namer import _build_ring_info_for_parent_selection, compute_features
@@ -2933,17 +2933,17 @@ def _get_bridge_locant(
             mol, bridge_idx, ring_conn_idx, ring_atoms
         )
 
-    # 3. Phase 151 cascade locants (authoritative IUPAC numbering when available)
+    # 3. a phase cascade locants (authoritative IUPAC numbering when available)
     #
     # IMPORTANT: only trust the cascade when handler_ring_info contains an
-    # `iupac_locants` dict covering EVERY atom of target_ring.  When the
+    # `iupac_locants` dict covering EVERY atom of target_ring. When the
     # cascade has no IUPAC numbering for this ring shape (e.g. functional-
     # group-anchored cyclohexane-1,3-dione where the locants come from the
     # PG positions, not from the ring-system handler), `_build_ring_pos`
     # falls back to atom-sorted positional integers -- which are NOT the
-    # IUPAC locants the caller needs.  Detect this case via the
+    # IUPAC locants the caller needs. Detect this case via the
     # `iupac_locants` presence + complete-coverage check and fall through
-    # to the heuristic, which IS PG-anchored.  This preserves the v17
+    # to the heuristic, which IS PG-anchored. This preserves the v17
     # heuristic correctness on functional-group-anchored rings while
     # adopting the cascade's authoritative numbering on Hantzsch-Widman /
     # fused / PAH / spiro / VB / ring-assembly handler-controlled rings.
@@ -2975,7 +2975,7 @@ def _get_bridge_locant(
             mol, bridge_idx, ring_conn_idx, ring_atoms
         )
 
-    # Tuple-coercion: tuple locants like (4, 'a') reduce to int (Phase 147 D-01)
+    # Tuple-coercion: tuple locants like (4, 'a') reduce to int (a phase)
     if isinstance(locant, tuple):
         return locant[0]
     return locant
@@ -2984,16 +2984,16 @@ def _get_bridge_locant(
 def _shortest_path_heuristic_locant(
     mol, bridge_idx: int, ring_conn_idx: int, ring_atoms: set
 ) -> int:
-    """Legacy ring-shortest-path-from-PG heuristic (D-12 fallback path).
+    """Legacy ring-shortest-path-from-PG heuristic (fallback path).
 
-    Preserved as the fallback when the Phase 151 cascade returns None for
-    the target ring.  The legacy "default to 4" branches at the previous
+    Preserved as the fallback when the a phase cascade returns None for
+    the target ring. The legacy "default to 4" branches at the previous
     lines 501 and 511 are GONE -- this function returns the heuristic
     distance + 1 even on edge cases; if the heuristic itself fails (no
     PG atom found), it returns 1 (top-of-ring) instead of silently
     emitting 4 / para.
 
-    Source: 154-CONTEXT.md D-12 (fallback path); legacy
+    Source: 154-CONTEXT.md (fallback path); legacy
             multiplicative.py:475-526 pre-Plan-02.
     """
     ring_info = mol.GetRingInfo()
@@ -3009,7 +3009,7 @@ def _shortest_path_heuristic_locant(
         mol, target_ring, ring_atoms, bridge_idx
     )
     if pg_atom_idx is None:
-        # NOT 4 anymore -- legacy default removed per D-12.  Returning 1
+        # NOT 4 anymore -- legacy default removed per. Returning 1
         # makes cascade misses observably wrong rather than silently
         # right-ish (since 1 is rarely the correct bridge locant).
         return 1
@@ -3089,16 +3089,16 @@ def _build_primed_locant_str(locant: int, unit_count: int) -> str:
 
 
 def _select_multiplier(parent_name: str, unit_count: int) -> Optional[str]:
-    r"""Phase 154.B D-08: select between SIMPLE_MULTIPLIERS (P-14.2.1) and COMPLEX_MULTIPLIERS (P-14.2.2).
+    r"""a phase.B: select between SIMPLE_MULTIPLIERS (P-14.2.1) and COMPLEX_MULTIPLIERS (P-14.2.2).
 
     Per IUPAC Blue Book:
       - P-14.2.1 (simple): di / tri / tetra default for clean parent names.
-      - P-14.2.2 (group):  bis / tris / tetrakis fire when the parent name
+      - P-14.2.2 (group): bis / tris / tetrakis fire when the parent name
         contains a comma-separated locant pattern that would make di+name
         parse ambiguously (e.g., "1,3-thiazole" -> "bis(1,3-thiazole)"
         instead of the unparseable "di-1,3-thiazole").
       - P-14.2.3 (ring-assembly): bi / ter / quater for identical rings
-        joined by single bonds -- Phase 151's territory
+        joined by single bonds -- a phase's territory
         (rules.ring_assemblies.ASSEMBLY_MULTIPLIERS); NOT touched here.
 
     Heuristic (R-154-NEW-7 refinement): trigger COMPLEX_MULTIPLIERS only
@@ -3108,13 +3108,13 @@ def _select_multiplier(parent_name: str, unit_count: int) -> Optional[str]:
 
     Args:
         parent_name: name of the parent fragment.
-        unit_count: number of identical parent units (2, 3, 4, ...).
+        unit_count: number of identical parent units (2, 3, 4,...).
 
     Returns:
         The multiplier prefix string (e.g., "di", "bis"), or None if
         unit_count is unsupported by both tables.
 
-    Source: 154-CONTEXT.md D-08; 154-AUDIT-B.md §4;
+    Source: 154-CONTEXT.md; 154-AUDIT-B.md §4;
             IUPAC Blue Book P-14.2.1, P-14.2.2;
             OPSIN multipliers.xml type="basic" / type="group".
     """
@@ -3125,7 +3125,7 @@ def _select_multiplier(parent_name: str, unit_count: int) -> Optional[str]:
     # P-15.3.2.4.1 / P-15.3.2.3 trigger (Wave2 T5a): the unit name BEGINS
     # with a locant — a SUBSTITUTED unit ("2-chlorobenzoic acid",
     # "4-bromobenzene") or a locant-led ring name ("1,3-thiazole",
-    # "1-azacyclododecane").  'di' would sit ambiguously against the leading
+    # "1-azacyclododecane"). 'di' would sit ambiguously against the leading
     # locant, and P-15.3.2.4.1 mandates bis/tris for substituted identical
     # units: 4,4'-oxybis(2-chlorobenzoic acid) (PIN, BB P-45.1.1 verbatim),
     # 1,1'-oxybis(4-bromobenzene) (PIN, P-15.3.2.4.1).
@@ -3247,7 +3247,7 @@ def _assemble_multiplicative_name(
     if any(parent_lower.startswith(p) for p in SATURATION_PREFIXES):
         return None
 
-    # Phase 154.B D-08: P-14.2.1 / P-14.2.2 three-way split (P-14.2.3
+    # a phase.B: P-14.2.1 / P-14.2.2 three-way split (P-14.2.3
     # belongs to ring_assemblies.py and is NOT touched here).
     multiplier = _select_multiplier(parent_name, unit_count)
     if not multiplier:
@@ -3266,10 +3266,10 @@ def _assemble_multiplicative_name(
     # characteristic-group suffix takes a ring locant is enclosed in parentheses
     # after the multiplier, with the suffix locant made explicit, and the bridge
     # is parenthesised too:
-    #   1,1'-(disulfanediyl)di(cyclohexane-1-carboxylic acid)
+    # 1,1'-(disulfanediyl)di(cyclohexane-1-carboxylic acid)
     # (This precedes the generic space/digit assembly below; it fires only when
-    #  the parent carries no substituent-prefix locant of its own, i.e. the PG
-    #  sits at ring position 1 — the multiplied attachment carbon.)
+    # the parent carries no substituent-prefix locant of its own, i.e. the PG
+    # sits at ring position 1 — the multiplied attachment carbon.)
     if (_needs_p1634_parens(parent_name)
             and not _unit_name_is_substituted(parent_name)
             and "(" not in bridge_name):
@@ -3286,7 +3286,7 @@ def _assemble_multiplicative_name(
     # Enclosure (P-16.5.1.1 / P-16.5): a BRIDGE name that itself contains
     # parentheses (composite bridge "ethane-1,2-diylbis(oxy)") moves up the
     # nesting order to SQUARE BRACKETS: "2,2'-[ethane-1,2-diylbis(oxy)]di..."
-    # (BB P-15.3.2.1 verbatim).  A bridge carrying bare locants
+    # (BB P-15.3.2.1 verbatim). A bridge carrying bare locants
     # ("ethane-1,2-diyl") is parenthesised -> "4,4'-(ethane-1,2-diyl)di...".
     # Locant-free bridges ("oxy", "sulfanediyl", "azanediyl", "nitrilo",
     # "methylene", "peroxy", "disulfanediyl") stay bare.
@@ -3294,8 +3294,8 @@ def _assemble_multiplicative_name(
     # "chloromethylene" = chloro + methylene) is also parenthesised even
     # though it carries no locant/digit — P-16.3.3 "4,4'-(chloromethylene)
     # diphenol" (Wave-2 completion).
-    # Phase 1B (P-16.3.3): a composite substituted-ACYL bridge
-    # ('hydroxyphosphoryl', 'hydroxyarsoryl', 'sulfanylphosphonoyl', ...) is a
+    # a phase (P-16.3.3): a composite substituted-ACYL bridge
+    # ('hydroxyphosphoryl', 'hydroxyarsoryl', 'sulfanylphosphonoyl',...) is a
     # compound prefix -> parenthesised (like the substituted-methylene case); a
     # BARE acyl base ('phosphoryl'/'arsoryl'/...) stays unenclosed. Generalised
     # from the old phosphoryl-only special case over the shared P-67.1.4.1.1 acyl
@@ -3307,10 +3307,10 @@ def _assemble_multiplicative_name(
     # Enclosure (P-15.3.2.1 / P-16.3.4): a parent name carrying locants (e.g.
     # "ethan-1-ol", "2-chlorobenzoic acid") is enclosed in parentheses so the
     # parent boundary is unambiguous -> "...di(ethan-1-ol)" /
-    # "...bis(2-chlorobenzoic acid)".  Names beginning with 'dec' are also
+    # "...bis(2-chlorobenzoic acid)". Names beginning with 'dec' are also
     # enclosed per P-16.3.4(d) ("di(decanoic acid)" vs "didecanoic acid").
     # Locant-free parents ("aniline", "acetic acid", "benzoic acid") are
-    # unaffected (no parentheses).  Whether the multiplier is di/tri
+    # unaffected (no parentheses). Whether the multiplier is di/tri
     # (P-15.3.2.1) or bis/tris (P-15.3.2.4.1 substituted units) is decided by
     # _select_multiplier on the leading-locant test.
     if any(ch.isdigit() for ch in parent_name) or parent_lower.startswith("dec"):

@@ -1,16 +1,16 @@
-"""Phase 165 Plan-01 Task-3: parametrized handler Name-Tree contract suite.
+"""a phase Plan-01 Task-3: parametrized handler Name-Tree contract suite.
 
 One param per reachable handler_id (loaded from
 ``tests/fixtures/handler_tree_probes.json``). Three contract checks per handler:
 
-- ``test_tree_non_null``   — SCORE-01: ``name_with_tree(smi).tree is not None``
-- ``test_tree_parity``     — SC-1: ``name_tree_to_string(tree) == name`` byte-identical
+- ``test_tree_non_null`` — SCORE-01: ``name_with_tree(smi).tree is not None``
+- ``test_tree_parity`` — SC-1: ``name_tree_to_string(tree) == name`` byte-identical
 - ``test_tree_well_formed``— SCORE-02: structured nodes carry their own fields;
-  coarse ``fragment_legacy`` nodes are recorded (D-03) and skipped, not failed.
+  coarse ``fragment_legacy`` nodes are recorded () and skipped, not failed.
 
 At Plan-01 ship this suite is RED for every handler except ``simple_molecule``
 (the one already-tree-emitting reference handler). Each handler green-flips when
-its tree is populated in Plans 02/03/04. Per the contributor guide / fix-methodology: NO
+its tree is populated in Plans 02/03/04. Per CLAUDE.md / fix-methodology: NO
 expected-failure or skip markers anywhere in this module — RED is the expected,
 recorded TDD starting state.
 
@@ -53,7 +53,7 @@ CONTRACT_IDS = [p["handler_id"] for p in CONTRACT_PROBES]
 STRUCTURED_PROBES = [p for p in CONTRACT_PROBES if p.get("structured")]
 STRUCTURED_IDS = [p["handler_id"] for p in STRUCTURED_PROBES]
 
-# Handlers whose tree is a counted coarse fragment_legacy node (D-03). Populated
+# Handlers whose tree is a counted coarse fragment_legacy node (). Populated
 # by test_tree_well_formed as handlers ship; read by the Plan-04 bucket report.
 COARSE_HANDLERS: set = set()
 
@@ -66,7 +66,7 @@ def namer():
 # WR-4: the coarse/structured classifier now lives once in
 # orthonym.assembly.name_tree.is_coarse_node (the provenance-based
 # parent_stem == fragment_legacy form), shared with
-#  so the contract test and the public
+# scripts/measure_coarse_fallback_bucket.py so the contract test and the public
 # headline metric count "coarse" identically. The previous local _is_coarse used
 # parent_stem == name, which is NOT equivalent in general and could drift from
 # the script's number.

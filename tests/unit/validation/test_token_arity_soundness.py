@@ -5,24 +5,24 @@ compares it against ``len(binding.atom_ids)`` and raises an ``error``-severity
 ``ARITY_MISMATCH`` on disagreement. A confidently WRONG answer therefore makes
 P6 reject a CORRECT name -- and it did. Reproduced before this suite existed:
 
-======================  ========  =======  =====================================
-token                   answered  truth    why
-======================  ========  =======  =====================================
-``benzoyl``             6         8        only tiling was the FUSION prefix
+====================== ======== ======= =====================================
+token answered truth why
+====================== ======== ======= =====================================
+``benzoyl`` 6 8 only tiling was the FUSION prefix
                                            ``benzo`` + ``yl``; no ``benz`` acyl
                                            stem exists to contradict it
-``diazenyl``            0         2        only tiling was ``di|az|en|yl`` -- a
+``diazenyl`` 0 2 only tiling was ``di|az|en|yl`` -- a
                                            replacement prefix qualifying nothing
-``diazenylidene``       0         2        same
-``benzoic acid``        8         9        ``benzo`` + ``ic acid``
-``benzoate``            8         9        ``benzo`` + ``ate``
-``oxalic acid``         3         6        ``ox`` + ``al`` + ``ic acid``
-``phosphate``           2         5        ``phosph`` + ``ate``
-``alanylalanine``       7         11       ``al`` (a SUFFIX) read token-initially
-======================  ========  =======  =====================================
+``diazenylidene`` 0 2 same
+``benzoic acid`` 8 9 ``benzo`` + ``ic acid``
+``benzoate`` 8 9 ``benzo`` + ``ate``
+``oxalic acid`` 3 6 ``ox`` + ``al`` + ``ic acid``
+``phosphate`` 2 5 ``phosph`` + ``ate``
+``alanylalanine`` 7 11 ``al`` (a SUFFIX) read token-initially
+====================== ======== ======= =====================================
 
 ``diazenyl`` is the one that bit: it is the prefix of three Blue Book PINs in
-``, so P6 failed
+``benchmarks/the gold set/packs/characteristic_groups.json``, so P6 failed
 ``3-diazenylpropanoic acid``, ``8-diazenyloctanoic acid`` and
 ``3-diazenyl-3-methylbutanoic acid`` with an ``error``. See
 ``test_p6_no_longer_rejects_the_diazenyl_gold_pins``.
@@ -192,13 +192,13 @@ _ROOT_CAUSE_REFUSALS = [
     ("diazenyl", BindingKind.PREFIX, "qualifies no skeleton"),
     ("phosphate", BindingKind.SUFFIX, "qualifies no skeleton"),
     ("azide", BindingKind.PREFIX, "qualifies no skeleton"),
-    # 'alanine' left ALL_RETAINED_NAMES with the v33 Phase-1 amino-acid
+    # 'alanine' left ALL_RETAINED_NAMES with the Phase-1 amino-acid
     # stereo-honesty change, so _parse_all now fails BEFORE _well_formed's
     # "is not final" check: the trailing 'ine' is an unparsed residue. The token
     # is still soundly (non-confidently) refused -- only the diagnostic reason
     # moved earlier in the pipeline.
     ("alanylalanine", BindingKind.SUFFIX, "unparsed residue"),
-    # ... and attaches to a parent hydride, not to a molecule that already
+    #... and attaches to a parent hydride, not to a molecule that already
     # carries the group ('phosphoramid' already holds the acid oxygens) nor to a
     # substituent prefix (where the accounting is functional REPLACEMENT).
     ("nitroformic acid", BindingKind.SUFFIX, "no parent hydride"),
@@ -346,7 +346,7 @@ def test_narrowing_the_lexicon_by_kind_cannot_hide_a_reading():
 
 #: (SMILES, PIN, bindings). Blue Book P-68.3.1.3.1 / P-35.2.2; gold rows
 #: W2-NPREF-DIAZENYL-P68, W2-NPREF-DIAZENYL, W2-NPREF-DIAZENYL-SORT in
-#: 
+#: benchmarks/the gold set/packs/characteristic_groups.json.
 _DIAZENYL_GOLD = [
     ("N=NCCC(=O)O", "3-diazenylpropanoic acid",
      [("diazenyl", BindingKind.PREFIX, [0, 1]),

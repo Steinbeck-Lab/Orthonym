@@ -13,7 +13,7 @@ All expected PINs OPSIN-RT verified. Covers:
 
 AM-2 (2-amino-N-(2,3-dihydroxypropyl)-N-methylacetamide) is DEFERRED — two
 central root causes (amide T5b off-chain acyl-substituent drop + a pool discard),
-documented in  It stays fail-closed.
+documented in internal notes It stays fail-closed.
 """
 
 import pytest
@@ -87,10 +87,13 @@ class TestAM1Cyanamide:
 
     @pytest.mark.parametrize("smiles,expected", [
         ("NC#N", "cyanamide"),  # bare retained name unchanged
-        # ring N-C#N stays a ring carbonitrile (SMARTS ;!R guard).
+        # ring N-C#N stays a ring carbonitrile (SMARTS;!R guard).
         ("N#CN1CCCCC1", "piperidine-1-carbonitrile"),
-        # S-C#N (no N-C) untouched by the N-anchored SMARTS.
-        ("CS(=O)(=O)C#N", "1-(methanesulfonyl)methanenitrile"),
+        # S-C#N (no N-C) untouched by the N-anchored cyanamide SMARTS. -3
+        # made this the functional-class PIN 'methanesulfonyl cyanide'
+        # (P-66.5.1.3.2, the Blue Book); it is still NOT a cyanamide name, so this
+        # protection still holds.
+        ("CS(=O)(=O)C#N", "methanesulfonyl cyanide"),
     ])
     def test_protected(self, smiles, expected):
         assert name_compound(smiles) == expected

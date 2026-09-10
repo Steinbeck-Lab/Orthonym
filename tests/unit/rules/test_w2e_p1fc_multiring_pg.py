@@ -1,7 +1,7 @@
 """W2E-P1FC Task 10 — P-59.2.1.5 (BB 25191): PG in more than one ring system
 selects the senior ring.
 "If the principal group occurs in more than one cyclic system, the cyclic
-system chosen as parent hydride ... in accordance with the criteria for
+system chosen as parent hydride... in accordance with the criteria for
 choosing a senior ring or ring system" -> 6-(4-carboxyphenyl)-9H-fluorene-
 2-carboxylic acid (PIN).
 
@@ -14,7 +14,7 @@ no longer converts to a carboxy-alkyl chain), so the wrong '6-carboxyhexyl'
 candidate is never built and the molecule fails closed (never a wrong name).
 The full (4-carboxyphenyl)-as-substituent rendering needs a substituted-aromatic
 ring-substituent namer (carboxy suffix-substituent) with determinism risk —
-W2E-P1FC follow-up (see ).
+W2E-P1FC follow-up (see internal notes).
 """
 import pytest
 

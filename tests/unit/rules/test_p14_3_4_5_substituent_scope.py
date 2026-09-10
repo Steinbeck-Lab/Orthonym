@@ -1,6 +1,6 @@
-"""P-14.3.4.5 inside a SUBSTITUENT (enclosing-mark) scope -- v29 Phase C Task 5a.
+"""P-14.3.4.5 inside a SUBSTITUENT (enclosing-mark) scope -- Phase C Task 5a.
 
-Governing rule chain, verbatim from ``BlueBookV2/BlueBookV2.md`` with headings.
+Governing rule chain, verbatim from ``the Blue Book Blue Book`` with headings.
 
 ``P-14.3.3`` "Citation of locants" (``:2869``) is the **DENY-DEFAULT**, and its
 scoping clause is the entire mechanism of this class --
@@ -44,7 +44,7 @@ the ONLY printed instance of any of ``pentafluoroethyl`` / ``pentachloroethyl`` 
 Book), so ``pentachloroethyl`` and ``pentabromoethyl`` below are DERIVED, not verbatim.
 A lookup keyed on the spelling would be wrong on its complement by construction.
 
-MEASURED CODE PATH (call-spy validated on 3 known positives + 2 known negatives --
+MEASURED CODE PATH (call-trace validated on 3 known positives + 2 known negatives --
 ``ethanol`` and ``benzene`` record ZERO calls at every candidate site). The two live
 sites sit on TWO ENTIRELY DIFFERENT cascades, which is why both must be wired:
   * ``substituent_naming._located_acyclic_alkyl_name`` -- the sole productive namer for
@@ -61,7 +61,7 @@ productive), ``_name_branched_polyfunctional_substituent`` (never called),
 .decorated_ring_substituent_name`` (never called -- a fully substituted ring resolves
 with the ring as PARENT, so it never becomes a substituent).
 
-Invariant 11: removing a locant can unmask something worse -- in v29 a fail-closed
+Invariant 11: removing a locant can unmask something worse -- in a fail-closed
 prefix turned a fabrication into a silent atom drop, four separate times. Every guard
 below asserts the FULL emitted name, never merely that a locant vanished.
 """
@@ -130,7 +130,7 @@ def _split_ring_and_branch(smiles):
 
 
 # --------------------------------------------------------------------------- #
-# 1. The licence fires -- whole emitted name asserted                          #
+# 1. The licence fires -- whole emitted name asserted #
 # --------------------------------------------------------------------------- #
 class TestLicensedOmission:
     def test_the_verbatim_pin_witness(self, namer):
@@ -147,7 +147,7 @@ class TestLicensedOmission:
             "(pentafluoroethyl)cyclohexane"
 
     @pytest.mark.parametrize("smiles,expected", [
-        # DERIVED from :3007 -- the class is OPEN, none of these is printed in the BB.
+        # DERIVED from:3007 -- the class is OPEN, none of these is printed in the BB.
         ("ClC(Cl)(Cl)C(Cl)(Cl)c1ccccc1", "(pentachloroethyl)benzene"),
         ("BrC(Br)(Br)C(Br)(Br)c1ccccc1", "(pentabromoethyl)benzene"),
         ("FC(F)(F)C(F)(F)C1CCC1", "(pentafluoroethyl)cyclobutane"),
@@ -179,7 +179,7 @@ class TestLicensedOmission:
 
 
 # --------------------------------------------------------------------------- #
-# 2. The deny-default holds -- every reachable Blue Book negative              #
+# 2. The deny-default holds -- every reachable Blue Book negative #
 # --------------------------------------------------------------------------- #
 class TestDenyByDefault:
     def test_flagship_parent_scope_tripwire(self, namer):
@@ -206,7 +206,7 @@ class TestDenyByDefault:
         assert _name(namer, "ClC(Cl)CC1CCCCC1") == "(2,2-dichloroethyl)cyclohexane"
 
     @pytest.mark.parametrize("smiles,expected", [
-        # :3529 '6-(1-chloroethyl)-5-(2-chloroethyl)-1H-indole (PIN)' -- 1 of 5 H.
+        #:3529 '6-(1-chloroethyl)-5-(2-chloroethyl)-1H-indole (PIN)' -- 1 of 5 H.
         ("CC(Cl)c1ccccc1", "(1-chloroethyl)benzene"),
         ("ClCCc1ccccc1", "(2-chloroethyl)benzene"),
         # 4 of 5 H -- the last hydrogen is what keeps every locant (:3009).
@@ -225,7 +225,7 @@ class TestDenyByDefault:
         completeness test is satisfied -- yet the scope must still cite them, because
         the free-valence locant ``2`` is itself essential (it distinguishes
         propan-2-yl from propan-1-yl) and P-14.3.3 (``:2869``) then requires *"all
-        locants ... for that structural unit"*. The Blue Book prints no
+        locants... for that structural unit"*. The Blue Book prints no
         fully-substituted substituent group with an internal free valence, so
         deny-by-default picks retention. If this ever elides to
         ``(heptafluoropropan-2-yl)benzene``, that boundary was crossed deliberately
@@ -271,7 +271,7 @@ class TestDenyByDefault:
         [
             # Reaches the licence via _located_acyclic_alkyl_name (the aryl cascade).
             ("ClC(Cl)(C(F)(F)F)c1ccccc1", "(1,1-dichloro-2,2,2-trifluoroethyl)benzene"),
-            # ...and via _name_saturated_substituted_chain (the generic cascade), so
+            #...and via _name_saturated_substituted_chain (the generic cascade), so
             # BOTH live sites are covered by this discriminator, not just one.
             ("FC(F)(F)C(Cl)(Cl)C1CCCCC1",
              "(1,1-dichloro-2,2,2-trifluoroethyl)cyclohexane"),
@@ -292,7 +292,7 @@ class TestDenyByDefault:
         ``pentadecafluorooctan-1-one`` (``:29619``) while citing P-14.3.4.5 by name.
 
         Measured 2026-07-29: the licence helper is called for both rows and correctly
-        returns ``None``. The whole name is asserted (invariant 11) because the
+        returns ``None``. The whole name is asserted (a project rule) because the
         failure mode here is not just a missing locant -- a mutation of the
         uniformity check was measured to emit ``pentachloro`` while **silently
         dropping the fluorines**.
@@ -303,7 +303,7 @@ class TestDenyByDefault:
         "smiles,expected,why",
         [
             # A formal charge on the scope: the helper's own GetFormalCharge() guard
-            # is load-bearing here (unlike the sibling no-op guards the contributor guide warns
+            # is load-bearing here (unlike the sibling no-op guards CLAUDE.md warns
             # about), because _name_saturated_substituted_chain has no charge check.
             ("[NH3+]CCC(F)(F)C(F)(F)c1ccccc1",
              "3,3,4,4-tetrafluoro-4-phenylbutan-1-aminium",
@@ -321,7 +321,7 @@ class TestDenyByDefault:
     ):
         """Charge coverage, added after review found it verified-but-untested.
 
-        the contributor guide records that on a sibling predicate **both** ``GetFormalCharge()``
+        CLAUDE.md records that on a sibling predicate **both** ``GetFormalCharge()``
         guards were measured to be **no-ops**, because the molecule arrives
         neutralised. These two rows pin the behaviour that was measured to be correct
         here, so that a future neutralisation change cannot silently make this
@@ -358,7 +358,8 @@ class TestDenyByDefault:
         ("Fc1c(F)c(F)c(F)c(F)c1F", "hexafluorobenzene"),
         ("Clc1c(Cl)c(Cl)c(Cl)c(Cl)c1Cl", "hexachlorobenzene"),
         ("Oc1c(O)c(O)c(O)c(O)c1O", "benzenehexol"),
-        ("CNC(=O)N", "N-methylurea"),
+        # Monosubstituted urea omits the italic-N locant (P-14.3.4.3,:2943).
+        ("CNC(=O)N", "methylurea"),
         ("CNC(=O)CC(=O)NC", "N1,N3-dimethylpropanediamide"),
         # Plain alkyl / branched substituents the licence must never touch.
         ("CC(CC)c1ccccc1", "(butan-2-yl)benzene"),
@@ -371,7 +372,7 @@ class TestDenyByDefault:
 
 
 # --------------------------------------------------------------------------- #
-# 3. The helper in isolation -- the C8 dummy-atom marshalling                  #
+# 3. The helper in isolation -- the C8 dummy-atom marshalling #
 # --------------------------------------------------------------------------- #
 class TestParentHydrideMarshalling:
     @pytest.mark.parametrize("chain_len,k,expected_h", [
@@ -446,7 +447,7 @@ class TestHelperPredicate:
         # sets of the same strings iterate identically within a process -- so both
         # positions pick the SAME kind, the global len(kinds) check passes, the counts
         # match, and the licence fires while silently DROPPING the other halogen
-        # (invariant 11: a locant decision became a structure drop). This witness
+        # (a project rule: a locant decision became a structure drop). This witness
         # therefore catches the mutation on EVERY hash seed.
         #
         # The naive witness ({"fluoro": [1,2,2,2], "chloro": [1]}) does NOT: only one
@@ -547,30 +548,34 @@ class TestIsotopeEndToEnd:
 
     @pytest.mark.parametrize("smiles,expected", [
         # ★ The regression this guard exists for: locants_are_forced() is False here.
+        # 13C count subscript omitted per P-82.2.1/FIX-A (a carbon position holds
+        # one carbon); the locant behaviour under test is unchanged.
         ("FC(F)(F)[13C](F)(F)C1CCCCC1",
-         "(1,1,2,2,2-pentafluoro(13C1)ethyl)cyclohexane"),
+         "(1,1,2,2,2-pentafluoro(13C)ethyl)cyclohexane"),
         ("FC(F)(F)[13C](F)(F)c1ccccc1",
-         "(1,1,2,2,2-pentafluoro(13C1)ethyl)benzene"),
+         "(1,1,2,2,2-pentafluoro(13C)ethyl)benzene"),
         # forced scope IS active here (the descriptor needed locant 2).
         ("Clc1ccccc1C(F)(F)[13C](F)(F)F",
-         "1-chloro-2-(1,1,2,2,2-pentafluoro(2-13C1)ethyl)benzene"),
-        # partial substitution: denied on its own merits, label or no label.
+         "1-chloro-2-(1,1,2,2,2-pentafluoro(2-13C)ethyl)benzene"),
+        # partial substitution: denied on its own merits, label or no label. The
+        # D keeps (2H1): its omitted (2H) spelling is not OPSIN-parseable in this
+        # nested substituent slot, so the placement search falls back (FIX-A).
         ("FC(F)(F)C(F)([2H])C1CCCCC1", "(1,2,2,2-tetrafluoro(2H1)ethyl)cyclohexane"),
         # P-82.6.1.3 omissions that must SURVIVE -- the weaker isotopic flag is
         # deliberately not consulted by rules/benzene.py.
-        ("Cc1c(C)c(C)c(C)c(C)[13c]1C", "hexamethyl(13C1)benzene"),
-        ("[13CH3]CO", "(2-13C1)ethan-1-ol"),
+        ("Cc1c(C)c(C)c(C)c(C)[13c]1C", "hexamethyl(13C)benzene"),
+        ("[13CH3]CO", "(2-13C)ethan-1-ol"),
     ])
     def test_labelled_scopes(self, namer, smiles, expected):
         assert _name(namer, smiles) == expected
 
 
 # --------------------------------------------------------------------------- #
-# 4. One test per MEASURED-LIVE site, so a refactor that drops one fails       #
+# 4. One test per MEASURED-LIVE site, so a refactor that drops one fails #
 # --------------------------------------------------------------------------- #
 class TestLiveSitesStayWired:
     def test_site_located_acyclic_alkyl_name(self):
-        """The benzene target's sole productive namer (spy-measured, reached from
+        """The benzene target's sole productive namer (trace-measured, reached from
         ``substituent_enumerator.py:1513``). ``_name_saturated_substituted_chain``
         is never called for this molecule."""
         mol, sub, attach, _ = _split_ring_and_branch("Clc1ccccc1C(F)(F)C(F)(F)F")
@@ -578,7 +583,7 @@ class TestLiveSitesStayWired:
             ("pentafluoroethyl", 1)
 
     def test_site_name_saturated_substituted_chain(self):
-        """The cyclohexane target's sole productive namer (spy-measured, reached
+        """The cyclohexane target's sole productive namer (trace-measured, reached
         from ``name_substituent_fragment`` Step 2c). For this molecule
         ``_located_acyclic_alkyl_name`` is called 10x and productive 0 times."""
         mol, sub, attach, parent = _split_ring_and_branch(

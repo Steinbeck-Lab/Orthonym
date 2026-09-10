@@ -1,4 +1,4 @@
-"""Phase 3C: aromatic N-oxide locant fix.
+"""a phase: aromatic N-oxide locant fix.
 
 ``assembly/composer.py::_name_aromatic_n_oxide`` used to emit
 ``f"{base_name} 1-oxide"`` with the locant HARDCODED to "1" and zero locant
@@ -12,8 +12,8 @@ at position 1, so the hardcoded "1" produced a name with a real locant
 mismatch -- caught downstream by SELF-01 (different molecule) and demoted to
 a total abstention, rather than degrading to a correct-but-uglier name.
 
-SPY: 
-Plan:  sec 3C
+a trace: internal notes
+Plan: docs/superpowers/plans/2026-08-12-phase3-correctness-tail-hardening.md sec 3C
 
 Every "was WRONG / now correct" case below was hand round-trip-verified
 (name -> OPSIN -> InChIKey == input) before being asserted here; see the
@@ -28,7 +28,7 @@ from orthonym.validation.opsin_roundtrip import opsin_parse
 # This module is directly ABOUT the OPSIN validity/SELF-01 gate's interaction
 # with the N-oxide handler (the old hardcoded-locant bug was rescued from
 # 0-wrong only by SELF-01 catching the wrong molecule downstream -- see the
-# SPY doc). Per tests/conftest.py's documented convention, the gate is
+# a trace doc). Per tests/conftest.py's documented convention, the gate is
 # suite-wide OFF by default and must be explicitly re-enabled here, or the
 # "abstains honestly" / "was rescued to abstain" claims below would be
 # green-but-blind.
@@ -111,7 +111,7 @@ class TestRegressionByteIdentical:
 # ---------------------------------------------------------------------------
 # The fix: asymmetric substituted ring N-oxides now NAME with the CORRECT
 # (non-"1") locant instead of abstaining (RED before the fix: both emitted
-# the sentinel "unknown organic compound", per the SPY table).
+# the sentinel "unknown organic compound", per the a trace table).
 # ---------------------------------------------------------------------------
 
 class TestAsymmetricRingNOxideNowNamesCorrectly:

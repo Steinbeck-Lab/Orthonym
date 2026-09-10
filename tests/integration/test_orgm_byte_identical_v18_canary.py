@@ -1,16 +1,16 @@
-"""Phase 161 integration: assert v18-substrate canary preserved byte-identical.
+"""a phase integration: assert -substrate canary preserved byte-identical.
 
-RESEARCH §6.2 + Q3 predicts ZERO flips. Per CONTEXT D-06 + ORGM-03 + D-11:
-- src/orthonym/rules/seniority.py is UNCHANGED (D-06 hard invariant)
+RESEARCH §6.2 + Q3 predicts ZERO flips. Per CONTEXT + ORGM-03 +:
+- src/orthonym/rules/seniority.py is UNCHANGED (hard invariant)
 - src/orthonym/assembly/composer.py is UNCHANGED (ORGM-03 enforcement)
 - src/orthonym/namer.py orchestration is UNCHANGED
 
-The exceptions file at 
+The exceptions file at internal notes
 161-AUDIT-ORGM-exceptions.csv MUST stay header-only — ANY non-header rows
 indicate a silent canary flip that was absorbed without an explicit
-audit-amendment commit. Per Phase 158 + Phase 160 cadence inheritance.
+audit-amendment commit. Per a phase + a phase cadence inheritance.
 
-NEVER uses @pytest.mark.xfail (CONTEXT D-29) — honest-fail-on-data.
+NEVER uses @pytest.mark.xfail (CONTEXT) — honest-fail-on-data.
 """
 import subprocess
 from pathlib import Path
@@ -19,23 +19,23 @@ import pytest
 
 PROJECT_ROOT = Path(__file__).parent.parent.parent
 EXCEPTIONS_FILE = (
-    PROJECT_ROOT / "" / "phases"
+    PROJECT_ROOT / ".planning" / "phases"
     / "161-p-69-organometallics-support" / "161-AUDIT-ORGM-exceptions.csv"
 )
 
 
 @pytest.mark.integration
 def test_v18_decomp_canary_byte_identical():
-    """CFR-04 inheritance: v18 substrate canary byte-identical post-ORGM landing.
+    """CFR-04 inheritance: substrate canary byte-identical post-ORGM landing.
 
-    Runs ` --mode delta`` with the
-    EMPTY (header-only) Phase 161 exceptions file. Per RESEARCH §6.2
+    Runs ``scripts/verify_decomp_byte_identical.py --mode delta`` with the
+    EMPTY (header-only) a phase exceptions file. Per RESEARCH §6.2
     ZERO-flip prediction: exit code 0 expected.
     """
     result = subprocess.run(
         [
             "python3",
-            str(PROJECT_ROOT / ""),
+            str(PROJECT_ROOT / "scripts/verify_decomp_byte_identical.py"),
             "--mode", "delta",
             "--exceptions-file", str(EXCEPTIONS_FILE),
         ],
@@ -50,7 +50,7 @@ def test_v18_decomp_canary_byte_identical():
 
 @pytest.mark.integration
 def test_v18_cfr_canary_byte_identical():
-    """CFR-04 inheritance: v18 CFR canary byte-identical post-ORGM landing.
+    """CFR-04 inheritance: CFR canary byte-identical post-ORGM landing.
 
     The full `verify_cfr_byte_identical.py --mode post` re-emit takes
     ~10 minutes (~ 1,282 OPSIN round-trip invocations). For the pytest
@@ -73,7 +73,7 @@ def test_v18_cfr_canary_byte_identical():
         f"v18 CFR canary BYTE-IDENTICAL violation:\n"
         f"  pre  md5: {pre_md5}\n"
         f"  post md5: {post_md5}\n"
-        f"Re-run `python3  --mode post "
+        f"Re-run `python3 scripts/verify_cfr_byte_identical.py --mode post "
         f"--exceptions-file {EXCEPTIONS_FILE}` to investigate."
     )
 
@@ -94,7 +94,7 @@ def test_exceptions_file_header_only():
 
 @pytest.mark.integration
 def test_seniority_py_unchanged():
-    """CONTEXT D-06 hard invariant: ZERO edits to src/orthonym/rules/seniority.py."""
+    """CONTEXT hard invariant: ZERO edits to src/orthonym/rules/seniority.py."""
     result = subprocess.run(
         ["git", "diff", "--quiet", "src/orthonym/rules/seniority.py"],
         cwd=str(PROJECT_ROOT), capture_output=True,

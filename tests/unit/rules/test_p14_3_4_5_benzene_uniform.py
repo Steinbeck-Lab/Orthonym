@@ -247,7 +247,7 @@ class TestBenzeneLicenceHelper:
         ``TestIsotopeEndToEnd::test_labelled_hexamethylbenzene_keeps_locants`` below.
         Mutation testing did not catch this: mutating the PREDICATE fails this test,
         which made it look load-bearing, but the predicate is not what is broken.
-        See ``.
+        See ``.planning/audit-v29/PHASEC-WORKFLOW-FINDINGS.md``.
         """
         assert self._lic("[13CH3]c1c(C)c(C)c(C)c(C)c1C",
                          {}, {"methyl": [1, 2, 3, 4, 5, 6]}) is False
@@ -287,21 +287,23 @@ class TestIsotopeEndToEnd:
 
     def test_labelled_cyclohexanol_keeps_its_locant(self):
         from orthonym.namer import Orthonym
-        assert Orthonym().name("OC1CCCC[13CH2]1") == "(2-13C1)cyclohexan-1-ol"
+        assert Orthonym().name("OC1CCCC[13CH2]1") == "(2-13C)cyclohexan-1-ol"
 
     def test_labelled_cyclohexanone_keeps_its_locant(self):
         """The ketone class too -- the defect spanned the whole licence allowlist."""
         from orthonym.namer import Orthonym
-        assert Orthonym().name("O=C1CCCC[13CH2]1") == "(2-13C1)cyclohexan-1-one"
+        assert Orthonym().name("O=C1CCCC[13CH2]1") == "(2-13C)cyclohexan-1-one"
 
     def test_deuterium_keeps_its_locant(self):
         from orthonym.namer import Orthonym
         assert Orthonym().name("[2H]C1CCCCC1O") == "(2-2H1)cyclohexan-1-ol"
 
     def test_chain_analogue_matches_the_bb_example(self):
-        """BB:44186 verbatim: ``13CH3-CH2-OH (2-13C)ethan-1-ol [not (2-13C)ethanol]``."""
+        """BB:44186 verbatim: ``13CH3-CH2-OH (2-13C)ethan-1-ol [not (2-13C)ethanol]``.
+        The count subscript is omitted per P-82.2.1 (FIX-A), matching the BB
+        verbatim ``(2-13C)`` exactly."""
         from orthonym.namer import Orthonym
-        assert Orthonym().name("[13CH3]CO") == "(2-13C1)ethan-1-ol"
+        assert Orthonym().name("[13CH3]CO") == "(2-13C)ethan-1-ol"
 
     # ---------------- CORRECT ALREADY: omission is right, sweep over-claimed -------- #
 
@@ -320,19 +322,19 @@ class TestIsotopeEndToEnd:
         carbons are NOT equivalent, so there the label does need a locant and the bromo
         locant is duly restored. That is the real discriminator."""
         from orthonym.namer import Orthonym
-        assert Orthonym().name("Cc1c(C)c(C)c(C)c(C)[13c]1C") == "hexamethyl(13C1)benzene"
+        assert Orthonym().name("Cc1c(C)c(C)c(C)c(C)[13c]1C") == "hexamethyl(13C)benzene"
 
     def test_hexafluorobenzene_correctly_omits(self):
         """Also reported by the sweep, also correct: hexafluorobenzene has exactly ONE
         carbon environment (fluorine is not carbon), so one 13C gives one isotopomer."""
         from orthonym.namer import Orthonym
-        assert Orthonym().name("Fc1c(F)c(F)c(F)c(F)[13c]1F") == "hexafluoro(13C1)benzene"
+        assert Orthonym().name("Fc1c(F)c(F)c(F)c(F)[13c]1F") == "hexafluoro(13C)benzene"
 
     def test_uniformly_equivalent_ring_correctly_omits(self):
         """P-82.6.1.3 (``:44202``) -- all six ring positions are one orbit, so labelling
         any of them gives the same compound. Must stay locant-free."""
         from orthonym.namer import Orthonym
-        assert Orthonym().name("O[13c]1c(O)c(O)c(O)c(O)c1O") == "(13C1)benzenehexol"
+        assert Orthonym().name("O[13c]1c(O)c(O)c(O)c(O)c1O") == "(13C)benzenehexol"
 
     def test_scoped_descriptor_on_an_ester_alkyl_is_correct(self):
         """★ THE WITNESS THAT REFUTED AN OVER-BROAD FIX. A whole-molecule
@@ -342,7 +344,7 @@ class TestIsotopeEndToEnd:
         whose scope is a single carbon, so the name is already unique (P-82.2.1). The
         over-broad test was withdrawn; this row guards against re-introducing it."""
         from orthonym.namer import Orthonym
-        assert Orthonym().name("[13CH3]OC(C)=O") == "(13C1)methyl acetate"
+        assert Orthonym().name("[13CH3]OC(C)=O") == "(13C)methyl acetate"
 
     # ---------------- STILL OPEN, with evidence ------------------------------------- #
 

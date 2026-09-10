@@ -1,15 +1,15 @@
-"""v30 Slice C slice-2 — amido prefix for a RING-heteroatom acyl on a chain parent.
+""" Slice C slice-2 — amido prefix for a RING-heteroatom acyl on a chain parent.
 
-Measured gap (Fable review + spy, ): the
+Measured gap (a review review + trace, internal notes): the
 acylamino path `-NHC(=O)R` where R is a ring bearing a heteroatom (proline's N-ring,
 oxolane's O-ring) LINEARIZED the acyl (carbon-only BFS) to 'pentanoic acid' and emitted
 the wrong '(pentanoylamino)' — suppressed to 'unknown' by SELF-01. Two root-cause fixes:
 
   (1) walk the WHOLE acyl fragment (ring heteroatoms included) so it is not linearized;
   (2) when the retained acid name does not convert to an amido ('proline' -> None), retry
-      with the SYSTEMATIC acid name ('pyrrolidine-2-carboxylic acid' -> ...carboxamido),
+      with the SYSTEMATIC acid name ('pyrrolidine-2-carboxylic acid' ->...carboxamido),
       threaded via name_fragment_recursively(style='systematic'). P-66.1.1.4.3 method (1);
-      the peptide 'prolyl' form implies L and breaks RT (BB:54717), so systematic is required.
+      the peptide 'prolyl' form implies L and breaks RT (the Blue Book), so systematic is required.
 """
 import pytest
 from rdkit import Chem
@@ -24,10 +24,10 @@ class TestSystematicStyleThreadedThroughFragmentNamer:
 
     def test_default_and_systematic_differ_for_amino_acid(self):
         # The default (pin) path returns the retained name; systematic bypasses
-        # it. Use DEFINED-stereo L-proline here: the v33 Phase-1 stereo-honesty
+        # it. Use DEFINED-stereo L-proline here: the Phase-1 stereo-honesty
         # fix now makes the default path DECLINE the retained name for a
         # stereo-UNSPECIFIED proline fragment too (bare 'proline' implies L, a
-        # different molecule -- BB:54717), so 'OC(=O)C1CCCN1' would return the
+        # different molecule -- the Blue Book), so 'OC(=O)C1CCCN1' would return the
         # systematic acid in BOTH styles and the contract would be untestable.
         # With defined stereo the default legitimately returns the retained
         # 'L-proline', which differs from the systematic acid -- the actual
@@ -57,7 +57,7 @@ class TestRingAcylAmidoPIN:
         # proline N-ring: tests ring-walk + systematic retry
         ("OC(=O)CNC(=O)C1CCCN1", "(pyrrolidine-2-carboxamido)acetic acid"),
         # P-16.5.4 nesting: a compound amido prefix that itself contains marks
-        # escalates ()->[]  (Fable review of cbb28539).
+        # escalates ()->[] (a review review of cbb28539).
         ("OC(=O)CNC(=O)Cc1ccncc1", "[2-(pyridin-4-yl)acetamido]acetic acid"),
         # regression: benzoyl (all-carbon ring) unchanged, bare (no marks)
         ("OC(=O)CNC(=O)c1ccccc1", "benzamidoacetic acid"),

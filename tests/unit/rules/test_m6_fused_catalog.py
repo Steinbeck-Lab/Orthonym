@@ -1,7 +1,7 @@
 """
 M6 Kind-C — 2-ring fused-heterocycle catalog expansion.
 
- and M6-KINDB-CONFIRM.md measured that the
+internal notes and M6-KINDB-CONFIRM.md measured that the
 composer's fused-ring routing (composer.py's ortho-fused branch calling
 ``name_fused_heterocycle``, and ``rules.spiro._name_fused_component`` for the
 spiro-mixed path) is ALREADY correct and gated only on
@@ -15,15 +15,15 @@ This module pins the four 2-ring cores added to close that gap, each of
 which was OPSIN-round-trip-validated (constitution-only InChI match to the
 exact bare core, never a hand-guessed name) before being added:
 
-  * 9H-fluorene                                          (tricyclic PAH)
-  * 3,4-dihydro-2H-1,4-benzoxazine                       (benzomorpholine)
-  * pyrazolo[1,5-a]pyrazine                              (bridgehead-N 5-6)
-  * 5,6-dihydro-[1,2,4]triazolo[3,4-b][1,3,4]thiadiazole  (5-5 heteroaromatic)
+  * 9H-fluorene (tricyclic PAH)
+  * 3,4-dihydro-2H-1,4-benzoxazine (benzomorpholine)
+  * pyrazolo[1,5-a]pyrazine (bridgehead-N 5-6)
+  * 5,6-dihydro-[1,2,4]triazolo[3,4-b][1,3,4]thiadiazole (5-5 heteroaromatic)
 
 Both the bare parents and small substituted derivatives are pinned, plus two
 of the real corpus witnesses that measurably converted from
 ``unknown organic compound`` to a full OPSIN-round-tripping name once the
-catalog held their core (see .superpowers/sdd/M1-PLAN/m6-kindc-report.md for
+catalog held their core (see.superpowers/sdd/M1-PLAN/m6-kindc-report.md for
 the full before/after and the two witnesses that still abstain for reasons
 unrelated to this catalog addition).
 """
@@ -97,7 +97,7 @@ def test_m6_kindc_catalog_entries_roundtrip(smiles):
 def test_m6_kindc_catalog_covers_the_four_new_cores():
     """Direct catalog-lookup check (bypasses the full naming pipeline) for
     the four cores this module adds -- the exact ``match_fused_heterocycle_core``
-    gate the M6 spy docs identify as the self-activating choke point."""
+    gate the M6 trace docs identify as the self-activating choke point."""
     cases = [
         ("C1c2ccccc2-c2ccccc21", "9H-fluorene"),
         ("C1COc2ccccc2N1", "3,4-dihydro-2H-1,4-benzoxazine"),
@@ -116,7 +116,7 @@ def test_m6_kindc_real_witnesses_reach_the_catalog():
     """The catalog match itself (deterministic, structural-only -- no
     substituent-name assembly) now succeeds directly on the WHOLE real
     corpus witness molecules, for the three non-spiro-mixed cores. This is
-    the specific ``match_fused_heterocycle_core`` gate the M6-FUSED-SPY /
+    the specific ``match_fused_heterocycle_core`` gate the M6-FUSED-a trace /
     M6-KINDB-CONFIRM docs identify as the self-activating choke point, and
     is the deterministic half of the claim (see
     test_m6_kindc_real_witnesses_convert for the full-pipeline half).
@@ -165,7 +165,7 @@ def test_m6_kindc_real_witnesses_reach_the_catalog():
 @pytest.mark.unit
 @pytest.mark.roundtrip
 def test_m6_kindc_real_witnesses_convert():
-    """A real M6-spy corpus witness (the spiro-mixed / Kind-B benzoxazine
+    """A real M6-trace corpus witness (the spiro-mixed / Kind-B benzoxazine
     case) that measurably converted from ``unknown organic compound`` to a
     full OPSIN-round-tripping name once its fused core was cataloged.
 

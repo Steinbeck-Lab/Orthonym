@@ -4,12 +4,12 @@
 'substituent', which `errors.py:227` names CASCADE_PLACEHOLDER and
 `is_refusal_sentinel` treats as a REFUSAL, not a name. These 11 rows are the
 whole `enumerator_last_resort` terminal class on the 500-row best-effort census
-(seed 42, ) -- measured at `3bc72907`, matching the
-census figure of 11 recorded in .
+(seed 42, `benchmarks/pubchem_2000.csv`) -- measured at, matching the
+census figure of 11 recorded in internal notes.
 
 These tests are RED ON PURPOSE. They pin the oracle for the follow-up build and
 deliberately contain no fix: the RING sibling of this gap turned out to already
-exist and merely be unreachable (v30 P3-T1), so the build must SPY the site
+exist and merely be unreachable (-T1), so the build must a trace the site
 before assuming a namer is missing.
 
 xfail(strict=True): when a fragment starts naming, the xfail becomes an XPASS and

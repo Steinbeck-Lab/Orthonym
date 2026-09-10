@@ -27,7 +27,7 @@ class TestDipeptidesAchiral:
         assert result == "(2-aminoacetamido)acetic acid"
 
     def test_glycylglycine_is_single_word(self):
-        """v38: Gly-Gly now emits the substitutive PIN (see test_glycylglycine
+        """: Gly-Gly now emits the substitutive PIN (see test_glycylglycine
         and V38-PEPTIDE-PIN-VERDICT.md); the old 'single word / no hyphen'
         property was a property of the retained name, no longer emitted."""
         result = name_compound("NCC(=O)NCC(=O)O")
@@ -168,13 +168,13 @@ class TestProlineNTerminus:
     """Peptides whose N-terminal residue is the cyclic imino acid proline."""
 
     def test_prolylglycine(self):
-        # v38: Pro-Gly PIN is substitutive (V38-PEPTIDE-PIN-VERDICT.md; the
+        #: Pro-Gly PIN is substitutive (V38-PEPTIDE-PIN-VERDICT.md; the
         # sliceC target). Full-InChIKey round-trip verified.
         result = name_compound("OC(=O)CNC(=O)[C@@H]1CCCN1")
         assert result == "2-[(2S)-pyrrolidine-2-carboxamido]ethanoic acid"
 
     def test_prolylalanine(self):
-        # v38: Pro-Ala PIN is substitutive (V38-PEPTIDE-PIN-VERDICT.md).
+        #: Pro-Ala PIN is substitutive (V38-PEPTIDE-PIN-VERDICT.md).
         # Full-InChIKey round-trip verified.
         result = name_compound("C[C@@H](C(=O)O)NC(=O)[C@@H]1CCCN1")
         assert result == "(2S)-2-[(2S)-pyrrolidine-2-carboxamido]propanoic acid"
@@ -194,12 +194,12 @@ class TestPeptideEdgeCases:
     def test_asparagine_not_misrouted(self):
         """Asparagine has a primary amide side chain but is a single amino acid.
 
-        v33 Phase 0 T5 (change-asserted-value, was `== "asparagine"`): the input
+         a phase T5 (change-asserted-value, was `== "asparagine"`): the input
         SMILES has NO wedge/parity at the alpha-carbon (CHI_UNSPECIFIED) -- a
         genuinely stereo-undefined structure. The bare retained name `asparagine`
         is Table 10.4's name for the DEFINED (L) configuration (`## **P-103.1.3.1**
-        The stereodescriptors 'D' and 'L'`, BlueBookV2.md:54291: "The
-        stereodescriptor 'xi' ... indicates unknown configuration"), and OPSIN's
+        The stereodescriptors 'D' and 'L'`, the Blue Book: "The
+        stereodescriptor 'xi'... indicates unknown configuration"), and OPSIN's
         grammar always resolves a bare amino-acid retained name to that ONE
         defined stereocentre -- so asserting it against this input is provably
         impossible to round-trip: input full InChIKey
@@ -208,10 +208,10 @@ class TestPeptideEdgeCases:
         same skeleton, different (missing-vs-present) stereo layer, so a
         byte-identical full round-trip is impossible by construction, not by
         chance. `2,4-diamino-4-oxobutanoic acid` is the Blue Book's OWN
-        systematic name for asparagine (Table 10.4, BlueBookV2.md:54196) and
+        systematic name for asparagine (Table 10.4, the Blue Book) and
         full-InChIKey RT-exacts to this exact input (`DCXYFEDJOCDNAF-
         UHFFFAOYSA-N` both sides, OPSIN-verified independently of this fix's
-        code). Mutation-tested:  with the pre-fix
+        code). Mutation-tested: `scripts/an A/B check` with the pre-fix
         (HEAD-committed-at-35d5e921) versions of `data/amino_acids.py` +
         `data/retained_names.py` + `rules/esters.py` swapped in makes this
         assertion FAIL (old code still emits bare 'asparagine'); the working
@@ -275,7 +275,7 @@ class TestStereoMapping:
     def test_s_config_maps_to_l(self):
         """S-configured alpha-carbon must be preserved as (2S) in the name.
 
-        v38: L-Ala-Gly now emits the substitutive PIN (V38-PEPTIDE-PIN-VERDICT.md;
+        : L-Ala-Gly now emits the substitutive PIN (V38-PEPTIDE-PIN-VERDICT.md;
         full-InChIKey round-trip verified). The N-terminal L-alanine's S centre
         surfaces as (2S) in the acyl amido prefix (a broken S mapping would emit
         (2R) and fail the round-trip gate -> fallback), and never a 'D-' prefix.
@@ -329,7 +329,7 @@ class TestCysteineStereoInversion:
         In a peptide the L is omitted (P-103.3.4), so the N-terminal residue must
         be a bare 'alanyl' with no 'D-' (a broken S->L mapping would tag it D-).
         """
-        # v38: L-Ala-Gly emits the substitutive PIN (V38-PEPTIDE-PIN-VERDICT.md);
+        #: L-Ala-Gly emits the substitutive PIN (V38-PEPTIDE-PIN-VERDICT.md);
         # the S centre is preserved as (2S) and never mis-tagged 'D-'.
         result_peptide = name_compound("N[C@@H](C)C(=O)NCC(=O)O")
         assert result_peptide == "2-[(2S)-2-aminopropanamido]ethanoic acid", \
@@ -357,8 +357,8 @@ class TestCysteineStereoInversion:
 
 
 # ── Stereo honesty: never fabricate an implicit L on stereo-UNSPECIFIED
-# residues (v33 Phase 0 L3-2e) ───────────────────────────────────────────
-# P-103.1.3.1 "The stereodescriptors 'D' and 'L'" (BlueBookV2.md:54291): a
+# residues (a phase L3-2e) ───────────────────────────────────────────
+# P-103.1.3.1 "The stereodescriptors 'D' and 'L'" (the Blue Book): a
 # bare retained amino-acid name asserts a SPECIFIC configuration -- "The
 # stereodescriptor 'xi' (Greek letter xi) indicates unknown configuration."
 # P-103.3.4 "Indication of configuration in peptides" (:54715): omitting 'L'
@@ -396,14 +396,14 @@ class TestStereoHonestyUndefinedResidues:
     def test_stereo_unspecified_glycine_only_dipeptide_still_names(self):
         """Gly-Gly has NO stereocentre at all (both residues achiral) -- the
         stereo-honesty guard must not affect it; must still name normally.
-        v38: names via the substitutive PIN (V38-PEPTIDE-PIN-VERDICT.md; RT
+        : names via the substitutive PIN (V38-PEPTIDE-PIN-VERDICT.md; RT
         verified), not the retained peptide name."""
         result = name_compound("NCC(=O)NCC(=O)O")
         assert result == "(2-aminoacetamido)acetic acid"
 
     def test_defined_stereo_dipeptide_unchanged(self):
         """CRITICAL guard: a normal DEFINED-stereo peptide (L-Ala-Gly) must
-        be completely unaffected by the stereo-honesty check. v38: names via
+        be completely unaffected by the stereo-honesty check.: names via
         the substitutive PIN (V38-PEPTIDE-PIN-VERDICT.md; RT verified)."""
         result = name_compound("N[C@@H](C)C(=O)NCC(=O)O")
         assert result == "2-[(2S)-2-aminopropanamido]ethanoic acid"

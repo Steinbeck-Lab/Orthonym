@@ -1,14 +1,14 @@
-"""v36 Milestone-C Wave A -- two small, pre-pinpointed, independent 0-wrong fixes.
+""" Milestone-C Wave A -- two small, pre-pinpointed, independent 0-wrong fixes.
 
 FIX 1 (rules/polycyclics.py:101): ``identify_polycyclic`` calls
 ``mol.GetSubstructMatches(pattern)`` with no ``maxMatches``/``uniquify`` cap, yet only
 ever consumes ``matches[0]``. On a highly-symmetric all-carbon giant cage (a fullerene,
 e.g. C70 with 37 SSSR rings) this enumerates a combinatorial number of automorphic
-matches and spins (measured 63.1s, `
+matches and spins (measured 63.1s, `internal notes
 hang.md``). Fix: bound the call (``maxMatches=1, uniquify=True`` -- behaviour-preserving,
 only ``matches[0]`` is ever read) AND add an all-carbon giant-ring-count scope guard so a
 fullerene declines FAST instead of spinning (fullerenes are explicitly out-of-scope,
-project the contributor guide). An in-scope mixed cage (aspidosperma-shaped,
+project CLAUDE.md). An in-scope mixed cage (aspidosperma-shaped,
 ``c1cc2c(c3c1CNC3)O[C@@]1(CCC[C@H]3CCCC[C@@H]31)C2``, VERIFIED 1.9s -> abstain) must keep
 naming/abstaining exactly as today, just fast.
 
@@ -33,7 +33,7 @@ import pytest
 # FIX 1 -- fullerene hang bound
 # ---------------------------------------------------------------------------
 
-# VERIFIED (fullerene_probe.py, prior session spy): C70, all-carbon, 37 SSSR rings.
+# VERIFIED (fullerene_probe.py, prior session trace): C70, all-carbon, 37 SSSR rings.
 FULLERENE_C70 = (
     "c12c3c4c5c1c1c6c7c2c2c8c3c3c9c4c4c%10c5c5c1c1c6c6c%11c%12c%13c%14c%15c%16"
     "c%17c%14c%14c%18c%13c%11c1c1c5c%10c5c(c%14c%10c%17c%11c%13c%16c%14c%16c%"

@@ -1,4 +1,4 @@
-"""Phase 163 FRN canary integration tests (FRN-02 + FRN-03 anchor).
+"""a phase FRN canary integration tests (FRN-02 + FRN-03 anchor).
 
 Parametrized over tests/canary/canary_functional_replacement.csv (36 rows).
 Each row produces:
@@ -7,17 +7,17 @@ Each row produces:
 
 FRN-03 anchor: Tier-B pass rate target is >= 90% of the parseable subset.
 
-Honest-fail-on-data per CONTEXT D-09: NO @pytest.mark.xfail; failures are
+Honest-fail-on-data per CONTEXT: NO @pytest.mark.xfail; failures are
 HONEST FAILURES that flip the verification doc to PASS-WITH-CAVEATS and
-enumerate the Phase 163.1 backlog per the Phase 161 ORGM precedent (frozenset
+enumerate the a phase.1 backlog per the a phase ORGM precedent (frozenset
 _PHASE_163_1_BACKLOG keeps failing fixtures in the canary; they produce
 honest-fail tests documented in 163-VERIFICATION.md § 3).
 
 References:
 - tests/canary/canary_functional_replacement.csv (Plan-01 frozen baseline; 36 rows)
 - 163-AUDIT-FRN.md § 1 (per-fixture expected PIN)
-- 163-VERIFICATION.md § 3 (Phase 163.1 backlog disposition)
--  (parallel three-tier harness)
+- 163-VERIFICATION.md § 3 (a phase.1 backlog disposition)
+- scripts/verify_frn_canary.py (parallel three-tier harness)
 """
 import csv
 import os
@@ -33,7 +33,7 @@ CANARY_PATH = _PROJECT_ROOT / "tests" / "canary" / "canary_functional_replacemen
 
 
 def _load_canary():
-    """Load 36-fixture canary from FROZEN CSV per CONTEXT D-10."""
+    """Load 36-fixture canary from FROZEN CSV per CONTEXT."""
     with CANARY_PATH.open(newline="", encoding="utf-8") as fh:
         return list(csv.DictReader(fh))
 
@@ -46,12 +46,12 @@ TIER_B_PARAMS = [
 ]
 
 
-# Phase 163.1 backlog: fixtures whose Tier-A naming does NOT round-trip at
-# Phase 163 ship time. These are HONEST FAILS per CONTEXT D-09 — the assembly
+# a phase.1 backlog: fixtures whose Tier-A naming does NOT round-trip at
+# a phase ship time. These are HONEST FAILS per CONTEXT — the assembly
 # layer cannot yet emit the expected PIN due to upstream composer.py /
 # chain-naming bugs documented in 163-VERIFICATION.md § 3 + § 7 followups.
 # The fixtures REMAIN in the canary so the failures are visible (no
-# @pytest.mark.xfail masking). Following the Phase 161 ORGM precedent
+# @pytest.mark.xfail masking). Following the a phase ORGM precedent
 # (_PHASE_161_1_BACKLOG in tests/integration/test_canary_organometallics.py).
 _PHASE_163_1_BACKLOG_TIER_A = frozenset({
     # FRN-A (all 8): composer locant-format bug — "propan-1-selenoic Se-acid"
@@ -80,7 +80,7 @@ _PHASE_163_1_BACKLOG_TIER_A = frozenset({
 # Tier-B backlog: subset of Tier-A backlog where the generated name does NOT
 # OPSIN-round-trip. By definition all Tier-A fails also Tier-B fail because
 # the name is wrong; the FRN-03 ≥ 90% gate is applied to the PASSING Tier-A
-# subset (8/36 = 22.2% at Phase 163 ship). Per CONTEXT D-09: NO band-aid
+# subset (8/36 = 22.2% at a phase ship). Per CONTEXT: NO band-aid
 # relaxation. PASS-WITH-CAVEATS posture documented in VERIFICATION.md § 1.
 _PHASE_163_1_BACKLOG_TIER_B = _PHASE_163_1_BACKLOG_TIER_A
 
@@ -90,9 +90,9 @@ _PHASE_163_1_BACKLOG_TIER_B = _PHASE_163_1_BACKLOG_TIER_A
 def test_tier_a_name_string_equality(row):
     """Tier-A: name_compound(smiles, style='pin') == expected_name_pin.
 
-    REQUIRED for ALL fixtures per CONTEXT D-05 + FRN-02 anchor.
+    REQUIRED for ALL fixtures per CONTEXT + FRN-02 anchor.
 
-    Per Phase 161 ORGM precedent: Phase-163.1-backlog fixtures produce
+    Per a phase ORGM precedent: Phase-163.1-backlog fixtures produce
     HONEST FAILING tests (not xfail-masked). Their failures are documented
     in 163-VERIFICATION.md § 3 + § 7 with cited root-cause investigation.
     """
@@ -117,7 +117,7 @@ def test_tier_a_name_string_equality(row):
 
 
 def _find_opsin_jar():
-    """Mirror  jar finder."""
+    """Mirror scripts/verify_orgm_canary.py jar finder."""
     candidates = list(_PROJECT_ROOT.glob("opsin/opsin-cli-*.jar"))
     if not candidates:
         # Symlinks resolve via Path.glob; if symlinks point to absent files,
@@ -176,7 +176,7 @@ def test_tier_b_opsin_round_trip(row):
     Honest-fail-on-data: a failure reports the fixture; aggregate Tier-B
     pass rate measured in 163-VERIFICATION.md § 3.
 
-    Per Phase 161 precedent: Phase-163.1-backlog fixtures produce honest
+    Per a phase precedent: Phase-163.1-backlog fixtures produce honest
     failures here too (their Tier-A name is wrong, so OPSIN-RT cannot match).
     """
     from orthonym import name_compound

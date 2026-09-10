@@ -27,7 +27,7 @@ GUARD = {
     "[NH-]CC[NH-]": "ethane-1,2-bis(aminide)",                        # P-72.2.2.2.3
     "[NH3+]CC[NH3+]": "ethane-1,2-bis(aminium)",                      # P-73.5 poly-aminium
     "C[N+](C)(C)C": "N,N,N-trimethylmethanaminium",                   # P-73.1.2.1
-    "[CH-]1CCCCC1": "cyclohexan-1-ide",                               # P-72.2.2.1 ring
+    "[CH-]1CCCCC1": "cyclohexanide",                                  # P-14.3.4.2(c) the Blue Book locant omitted
     "C[B-](C)(C)C": "tetramethylboranuide",                           # P-72.3
     "C[P-](C)(C)C": "tetramethylphosphanuide",                        # P-72.3
     "NC(=[OH+])N": "uronium",                                         # P-73.1.2.2
@@ -167,7 +167,7 @@ def test_uide_atom_drop_veto_boranuide():
     assert raw.name("[B-](CCO)(C)(C)C") != "ethyltrimethylboranuide"
 
 
-# === v28 Cluster A Fix 1: azido/diazo are NOT cumulative zwitterions =========
+# === Fix 1: azido/diazo are NOT cumulative zwitterions =========
 # P-61.7: the -N=[N+]=[N-] azide group is a NEUTRAL internal-charge (P-59
 # Table 5.1) prefix group named 'azido' by substitutive nomenclature — NOT a
 # P-74.1.1 same-parent '-ium…-ide' zwitterion. emit_cumulative_ium_ide must
@@ -209,11 +209,12 @@ class TestAzidoNotCumulativeZwitterion:
 
 
 class TestAlkylammoniumAminiumPIN:
-    """v28 Cluster C (P-73.1.2.1): protonated/alkylated amine cations take the
+    """ (P-73.1.2.1): protonated/alkylated amine cations take the
     substitutive '-aminium' PIN, NOT the general 'alkylammonium' retained name.
     BB: 'methanaminium chloride (PIN)' (26672), 'N,N,N-trimethylmethanaminium
-    (PIN)' over 'tetramethylammonium' (41354). NH4+ stays the retained PIN
-    'ammonium'."""
+    (PIN)' over 'tetramethylammonium' (41354). NH4+ is a DIFFERENT case: its PIN
+    is the mononuclear parent-hydride cation 'azanium' (P-73.1.1.2, the Blue Book --
+    "not those given in Table 7.3"), NOT the Table-7.3 'ammonium'."""
 
     @pytest.mark.parametrize("smi,expected", [
         ("C[NH3+]", "methanaminium"),
@@ -222,7 +223,39 @@ class TestAlkylammoniumAminiumPIN:
         ("C[NH2+]C", "N-methylmethanaminium"),
         ("C[NH+](C)C", "N,N-dimethylmethanaminium"),
         ("C[N+](C)(C)C", "N,N,N-trimethylmethanaminium"),
-        ("[NH4+]", "ammonium"),  # genuine retained PIN, not denied
+        ("[NH4+]", "azanium"),  # P-73.1.1.2 PIN (parent-hydride cation, was 'ammonium')
     ])
     def test_aminium_pin(self, smi, expected):
+        assert Orthonym().name(smi) == expected
+
+
+class TestP74AcyclicZwitterionReclaim8G:
+    """Task 8G — small P-74.2.2 acyclic-zwitterion reclaims (all RT-clean).
+
+    - RC-B (P-74.1.1 via P-29.2 '-ylidyne'): a triple-bond substituent on the
+      cumulative ium/ide chain is now cited ('ethylidyne'), so the nitrile imide
+      names instead of abstaining.
+    - RC-C (P-74.2.1.1 / P-72.2.2.2.3): the ylide anion parent may be a nitrogen
+      'aminide', carrying the onium prefix at the 'N' locant.
+    - RC-D (P-16.3.3 enclosing-mark nesting): a compound onium prefix already
+      containing '(...)' escalates the outer mark to square brackets.
+    """
+
+    @pytest.mark.parametrize("smi,expected", [
+        # RC-B: nitrile imide (triple attachment -> ethylidyne)
+        ("CC#[N+][N-]C", "2-ethylidyne-1-methylhydrazin-2-ium-1-ide"),
+        # RC-C: nitrogen aminide ylide
+        ("C[N-][O+]=C(C)C", "N-[(propan-2-ylidene)oxidaniumyl]methanaminide"),
+        # RC-D: enclosing-mark nesting round -> square
+        ("CC(C)=[O+][C-](C)C", "2-[(propan-2-ylidene)oxidaniumyl]propan-2-ide"),
+    ])
+    def test_reclaim_full_name(self, smi, expected):
+        assert Orthonym().name(smi) == expected
+
+    @pytest.mark.parametrize("smi,expected", [
+        # RC-D must NOT regress a SIMPLE onium prefix (no inner parens -> round)
+        ("C[N+](C)(C)[C-](C)C", "2-(trimethylazaniumyl)propan-2-ide"),
+        ("CC[C-](CC)[O+](C)C", "3-(dimethyloxidaniumyl)pentan-3-ide"),
+    ])
+    def test_simple_prefix_keeps_parentheses(self, smi, expected):
         assert Orthonym().name(smi) == expected

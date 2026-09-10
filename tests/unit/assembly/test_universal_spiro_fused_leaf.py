@@ -2,7 +2,7 @@
 universal core (`assembly/universal_substituent._name_ring_spine`).
 
 A spiro atom joining a FUSED ring component (indane / chromene / indoline /
-cyclopenta[b]pyridine ...) to a second ring is a P-24.5.1 separable
+cyclopenta[b]pyridine...) to a second ring is a P-24.5.1 separable
 ``spiro[<fused-comp>-x,y'-<comp2>]`` system. Before this wiring the
 unconditional universal FLOOR VOIDED on such a ring system (neither a
 von-Baeyer cage nor a plain von-Baeyer spiro), so the whole decorated
@@ -109,7 +109,7 @@ def test_floor_name_round_trips_to_input_constitution(smi, core_sub):
 
 
 # --- (c)-aliphatic: spiro-of-von-Baeyer-bicyclic degrades to the P-24.5.1
-#     separable form spiro[bicyclo[...]-x,y'-<comp2>] (floor-only) ------------
+# separable form spiro[bicyclo[...]-x,y'-<comp2>] (floor-only) ------------
 
 VONBAEYER_SPIRO = [
     # bicyclo[3.2.0]hept-2-ene spiro 1,3-dioxolane
@@ -228,7 +228,7 @@ def test_linear_polyspiro_declines_monospiro():
 
 
 # --- von-Baeyer retry: a fused-spiro whose SYSTEMATIC fusion name is wrong/
-#     unparseable ships the faithful von-Baeyer polyene form instead -----------
+# unparseable ships the faithful von-Baeyer polyene form instead -----------
 
 @pytest.mark.opsin_gate
 @pytest.mark.roundtrip

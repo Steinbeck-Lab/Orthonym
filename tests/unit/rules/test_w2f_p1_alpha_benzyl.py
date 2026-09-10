@@ -2,13 +2,13 @@
 P-16.5.2.4/P-16.5.4.1 citation-layer escalation both this class and the
 asymmetric benzylic ether (Task 7) require.
 
-BB P-29.6.2.1 (BlueBookV2.md:16322): 'bromo(4-methylphenyl)methyl (preferred
+BB P-29.6.2.1 (the Blue Book): 'bromo(4-methylphenyl)methyl (preferred
 prefix)'. The enclosing marks are STRUCTURE-BEARING: OPSIN parses the
 marks-dropped 'bromo(phenyl)methylbenzene' to a DIFFERENT molecule
 (Brc1ccccc1Cc1ccccc1 — research §3.A).
 
 All expected names OPSIN-2.9-verified in
- §3.D (and §2.D for Task-7 shapes).
+internal notes §3.D (and §2.D for Task-7 shapes).
 """
 import pytest
 from rdkit import Chem

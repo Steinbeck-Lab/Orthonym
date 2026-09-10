@@ -1,32 +1,32 @@
-"""Phase 157 regression-lock tests + new-errata tests + tracking-doc smoke.
+"""a phase regression-lock tests + new-errata tests + tracking-doc smoke.
 
-Each test asserts that a Phase 137 / 151 / 152 / 153 / 155.C errata fix
+Each test asserts that a a phase / 151 / 152 / 153 / 155.C errata fix
 remains intact after the post-Phase-156 codebase. A failing regression-lock
-is a BLOCKER (per CONTEXT D-13 mutual-exclusion contract): Phase 157 does
+is a BLOCKER (per CONTEXT mutual-exclusion contract): a phase does
 NOT silently re-apply the fix; the failing test triggers an audit of which
 upstream phase silently reverted.
 
-Test taxonomies (CONTEXT D-22):
-  1. Regression-lock (>= 11 tests, 1 per errata) -- assert Phase 137/155.C
+Test taxonomies (CONTEXT):
+  1. Regression-lock (>= 11 tests, 1 per errata) -- assert a phase/155.C
      deliverables intact. Suffix: _locked_157.
   2. Re-verification meta-tests (>= 2 tests) -- subprocess greps for NA-
      classified rules (P-31.2 dehydro, P-31.1.4.3 compound-locants) per
-     CONTEXT D-07. Suffix: _not_applicable_grep_157.
+     CONTEXT. Suffix: _not_applicable_grep_157.
   3. Net-new errata tests (>= 0 tests) -- per Plan-01 NO-OP-CONFIRMED on
      both P-25.8.1 (157-AUDIT.md S3.4) and P-25.4.3.2.2 (157-AUDIT.md S4.5),
      these tests run as smoke-only protective infrastructure, not FIX-SPEC
      assertions. The S3.5 FIX-SPEC payload remains preserved in the audit
-     doc for v19 follow-up.
+     doc for follow-up.
   4. Tracking-doc smoke tests (>= 3 tests) -- assert
-      exists, >= 250 LOC, contains all 14 PIN
+     docs/iupac_errata_applied.md exists, >= 250 LOC, contains all 14 PIN
      entries. Suffix: _doc_*_157.
 
 Reference: IUPAC 2013 Blue Book + BBerrors.html corrections through 31 Dec 2025.
-Source: 157-CONTEXT.md D-01..D-25; 157-AUDIT.md (Plan-01 atomic commit);
+Source: 157-CONTEXT.md..; 157-AUDIT.md (Plan-01 atomic commit);
         157-02-SUMMARY.md (Plan-03 inputs section).
 
-Per CONTEXT D-13 / D-12 / D-14 / D-25 (mutual-exclusion contracts): this
-test module ONLY IMPORTS from Phase 137 / 155.C / 151 / 137-02 deliverables;
+Per CONTEXT / / / (mutual-exclusion contracts): this
+test module ONLY IMPORTS from a phase / 155.C / 151 / 137-02 deliverables;
 it MUST NOT modify any of them.
 
 Per CONTEXT Pitfall 7: P-29.1.2 regression-lock does NOT invoke OPSIN
@@ -55,7 +55,7 @@ def _repo_root() -> Path:
 
 
 # ============================================================================
-# Taxonomy 1: Regression-lock for Phase 137 / 155.C / 151 deliverables
+# Taxonomy 1: Regression-lock for a phase / 155.C / 151 deliverables
 # Suffix: _locked_157
 # ============================================================================
 
@@ -63,9 +63,9 @@ def _repo_root() -> Path:
 class TestP18bSeniorityLock157:
     """P-18(b) regression: 20-element seniority dict preserved post-Phase-156.
 
-    Phase 137-01 ERRATA-01 expanded _HETEROATOM_SENIORITY from 10 to 20.
-    D-13 mutual-exclusion: NO edit on Phase 137 deliverables. Failure here
-    BLOCKS Phase 157 + triggers audit of which upstream phase reverted.
+    a phase-01 ERRATA-01 expanded _HETEROATOM_SENIORITY from 10 to 20.
+     mutual-exclusion: NO edit on a phase deliverables. Failure here
+    BLOCKS a phase + triggers audit of which upstream phase reverted.
 
     Source: BBerrors.html P-18(b) Jan 2019 errata.
     Source: 157-AUDIT.md row 1 + S1.1 row 1 grep transcript.
@@ -138,7 +138,7 @@ class TestP18bSeniorityLock157:
 class TestEZThresholdLock157:
     """P-31.1.3 regression: E/Z stereo threshold preserved at `< 8` (strict).
 
-    Phase 137-01 ERRATA-02 changed `min_ring_size <= 8` to `< 8` per
+    a phase-01 ERRATA-02 changed `min_ring_size <= 8` to `< 8` per
     BBerrors.html P-31.1.3 Sep 2024 errata + P-44.4.1. Plan listed
     line 91; live location is line 126 (drift recorded as non-blocking
     citation correction in 157-AUDIT.md row 2). The COMPARISON OPERATOR
@@ -169,7 +169,7 @@ class TestEZThresholdLock157:
 class TestFusionSeparatorLock157:
     """P-25.3.8.3 regression: fusion descriptor `:` for multi-edge fusion.
 
-    Phase 137 ERRATA-05 verified the multi-edge fusion branch returns
+    a phase ERRATA-05 verified the multi-edge fusion branch returns
     `[loc1,loc2-letter:loc3,loc4-letter']` with `:` separator (NOT `;`).
     The plan listed line 860; live location is line 866 (drift recorded
     in 157-AUDIT.md row 3 + S1.1 row 3). The multi-component branch at
@@ -200,7 +200,7 @@ class TestFusionSeparatorLock157:
 class TestHWCorrectionsLock157:
     """P-22.2.1 regression: Hantzsch-Widman name corrections preserved.
 
-    Phase 137-01 ERRATA-06 verified `thiazolidine` (NOT `thioxazolidine`)
+    a phase-01 ERRATA-06 verified `thiazolidine` (NOT `thioxazolidine`)
     in retained-names dict at retained_names.py:237. Multiple HW spellings
     were checked; the canonical `C1CSCN1 -> thiazolidine` is the regression-
     lock sentinel.
@@ -240,7 +240,7 @@ class TestHWCorrectionsLock157:
 class TestSymmetricAnhydrideLock157:
     """P-65.7 regression: symmetric anhydride uses bare `anhydride` (no `bis-`).
 
-    Phase 137-01 ERRATA-08 verified `anhydrides.py:109` returns
+    a phase-01 ERRATA-08 verified `anhydrides.py:109` returns
     `f"{acid1_name} anhydride"` (NOT `f"bis-{acid1_name}..."`) when
     acid1 == acid2. Source: BBerrors.html P-65.7.
     """
@@ -274,13 +274,13 @@ class TestSymmetricAnhydrideLock157:
         from orthonym.namer import name_compound
 
         # Canonical canary from anhydrides.py:10:
-        # CC(=O)OC(=O)C  -> ethanoic anhydride (or acetic anhydride retained name)
+        # CC(=O)OC(=O)C -> ethanoic anhydride (or acetic anhydride retained name)
         name = name_compound("CC(=O)OC(=O)C")
         assert name is not None, (
             "P-65.7 smoke: name_compound('CC(=O)OC(=O)C') returned None. "
             "AUDIT REQUIRED."
         )
-        # Per Phase 137 ERRATA-08: the symmetric form has no `bis-` prefix.
+        # Per a phase ERRATA-08: the symmetric form has no `bis-` prefix.
         # Either the systematic ('ethanoic anhydride') or the retained
         # ('acetic anhydride') form must NOT contain `bis-`:
         assert "bis-" not in name.lower(), (
@@ -302,7 +302,7 @@ class TestCarbonochloridoylLock157:
     CRITICAL per CONTEXT Pitfall 7: this test does NOT invoke OPSIN round-
     trip on `carbonochloridoyl` because OPSIN v2.9.0 does not parse it.
     The dict-import assertion is the canonical regression-lock; OPSIN-side
-    vocabulary closure is a v19 follow-up to OPSIN maintainers.
+    vocabulary closure is a follow-up to OPSIN maintainers.
 
     Source: 157-AUDIT.md row 6 + S1.1 row 6 grep transcript.
     """
@@ -340,7 +340,7 @@ class TestCarbonochloridoylLock157:
 
         source_path = Path(benzene.__file__)
         text = source_path.read_text(encoding="utf-8")
-        # Phase 137 ERRATA-09 also touched benzene.py at line 66; the form
+        # a phase ERRATA-09 also touched benzene.py at line 66; the form
         # is `'carbonyl chloride': 'carbonochloridoyl',`. Static check.
         assert "'carbonochloridoyl'" in text, (
             "P-29.1.2 regression: `'carbonochloridoyl'` missing from benzene.py. "
@@ -351,7 +351,7 @@ class TestCarbonochloridoylLock157:
 class TestBracketNestingSubsectionsLock157:
     """P-16.5.4.1 regression: 5 bracket-nesting subsections preserved.
 
-    Phase 137-02 ERRATA-07 implemented `compute_nesting_depth()` +
+    a phase-02 ERRATA-07 implemented `compute_nesting_depth()` +
     `apply_enclosing_marks()` per BBerrors.html P-16.5.4.1 Dec 2025 errata.
     Both functions must remain importable and exhibit the documented
     invariants (depth-0 fusion brackets, depth-1 stereo descriptors,
@@ -393,7 +393,7 @@ class TestBracketNestingSubsectionsLock157:
 class TestFirstSubstituentNoMarksLock157:
     """P-16.5.1.3 regression: first-substituent-no-marks for mononuclear hydrides.
 
-    Phase 137-02 ERRATA-10 implemented `_build_substituent_string()` for
+    a phase-02 ERRATA-10 implemented `_build_substituent_string()` for
     phosphane prefix assembly per BBerrors.html P-16.5.1.3 May 2021 errata.
     The first substituent gets NO enclosing marks; subsequent substituents
     do. Smoke-test on a typical phosphane prefix list.
@@ -425,16 +425,16 @@ class TestFirstSubstituentNoMarksLock157:
 class TestP25224SeniorityBandsLock157:
     """P-25.2.2.4 regression: 4 corrected benzo-heterocycle seniority bands.
 
-    Phase 155.C ERRATA-25224 corrected 4 entries in MONOCYCLIC_COMPONENTS
-    per BBerrors.html P-25.2.2.4 Jan 2022 errata. D-12 mutual-exclusion:
-    Phase 157 makes ZERO modifications to fusion_components.py; this test
+    a phase.C ERRATA-25224 corrected 4 entries in MONOCYCLIC_COMPONENTS
+    per BBerrors.html P-25.2.2.4 Jan 2022 errata. mutual-exclusion:
+    a phase makes ZERO modifications to fusion_components.py; this test
     is the regression-lock asserting the 4 corrected values stay at their
     post-155.C numbers.
 
     Sentinel values per 155-AUDIT-C.md + 157-AUDIT.md row 9 + S1.1 row 9:
-      imidazole = 50  (was 47 pre-155.C)
-      pyrazole  = 51  (was 48 pre-155.C)
-      thiazole  = 80  (was 77 pre-155.C)
+      imidazole = 50 (was 47 pre-155.C)
+      pyrazole = 51 (was 48 pre-155.C)
+      thiazole = 80 (was 77 pre-155.C)
       isothiazole = 81 (was 78 pre-155.C)
     """
 
@@ -463,20 +463,20 @@ class TestP25224SeniorityBandsLock157:
             )
 
     def test_p25224_seniority_invariants_locked_157(self) -> None:
-        """Phase 155.C invariants: imidazole < pyrazole < pyrrole; thiazole < thiophene."""
+        """a phase.C invariants: imidazole < pyrazole < pyrrole; thiazole < thiophene."""
         from orthonym.data.fusion_components import MONOCYCLIC_COMPONENTS
 
         # Per 155-AUDIT-C.md cite-blocks: lower seniority number = MORE senior
         # is FALSE in this catalog --- higher number = MORE senior.
-        # Invariants documented at fusion_components.py:110-112 + :123-126:
-        #   imidazole(50) < pyrrole(55) preserved (pyrrole more senior than imidazole)
-        #   pyrazole(51) < pyrrole(55) preserved
-        #   pyrazole(51) > imidazole(50) preserved (pyrazole more senior)
+        # Invariants documented at fusion_components.py:110-112 +:123-126:
+        # imidazole(50) < pyrrole(55) preserved (pyrrole more senior than imidazole)
+        # pyrazole(51) < pyrrole(55) preserved
+        # pyrazole(51) > imidazole(50) preserved (pyrazole more senior)
         # Per fusion_components.py:172-174:
-        #   isothiazole(81) < thiophene(85) preserved
-        #   isothiazole(81) > thiazole(80) preserved (... wait, isothiazole=81 > thiazole=80
-        #   so isothiazole is MORE senior; the comment claims "thiazole more senior"
-        #   --- this is the inverted-numeric convention where higher rank = more senior).
+        # isothiazole(81) < thiophene(85) preserved
+        # isothiazole(81) > thiazole(80) preserved (... wait, isothiazole=81 > thiazole=80
+        # so isothiazole is MORE senior; the comment claims "thiazole more senior"
+        # --- this is the inverted-numeric convention where higher rank = more senior).
         # Smoke: the 4 numbers form the expected ordering.
         comp = MONOCYCLIC_COMPONENTS
         # Pyrazole more senior than imidazole (51 > 50):
@@ -489,11 +489,10 @@ class TestP25224SeniorityBandsLock157:
 
 
 class TestP2543222BridgeNumberingLock157:
-    """P-25.4.3.2.2 regression: Phase 151 cite-line preserved.
+    """P-25.4.3.2.2 regression: a phase cite-line preserved.
 
-    Per 157-AUDIT.md S4.5 verdict NO-OP-CONFIRMED: Phase 151 already
-    complies with the Dec 2019 P-25.4.3.2.2 revised rule because Phase
-    151 shipped post-Dec-2019 and reads current Blue Book.
+    Per 157-AUDIT.md S4.5 verdict NO-OP-CONFIRMED: a phase already
+    complies with the Dec 2019 P-25.4.3.2.2 revised rule because a phase shipped post-Dec-2019 and reads current Blue Book.
 
     The protective regression-lock invariants are:
       (a) polycyclic.py:18 docstring cites "P-23, VB-1 through VB-9"
@@ -501,9 +500,9 @@ class TestP2543222BridgeNumberingLock157:
       (b) Bridge-numbering canary smoke: norbornane round-trips and the
           [2.2.1] bracket descriptor appears in substituted-bicyclic output.
 
-    Per CONTEXT D-14 mutual-exclusion: Phase 157 makes ZERO modifications
+    Per CONTEXT mutual-exclusion: a phase makes ZERO modifications
     to polycyclic.py / bicyclo.py / ring_assemblies.py. Failure of these
-    smoke assertions BLOCKS Phase 157 + triggers a Phase 151 audit.
+    smoke assertions BLOCKS a phase + triggers a a phase audit.
     """
 
     def test_p2543222_polycyclic_cite_locked_157(self) -> None:
@@ -553,18 +552,18 @@ class TestP2581QuinolizineLock157:
     """P-25.8.1 regression: NO-OP-CONFIRMED protective infrastructure.
 
     Per 157-AUDIT.md S3.4 verdict NO-OP-CONFIRMED: no comparison path in
-    the v18 codebase ever pits quinolizine vs quinoline / isoquinoline at
+    the codebase ever pits quinolizine vs quinoline / isoquinoline at
     the same selection level. P-25.8.1 (Aug 2021 errata) is NOT-APPLICABLE-
-    IN-CURRENT-SCOPE per CONTEXT D-08 + 157-02-SUMMARY.md "Conditional
+    IN-CURRENT-SCOPE per CONTEXT + 157-02-SUMMARY.md "Conditional
     code state".
 
     The protective regression-lock invariants are:
       (a) FUSED_HETEROCYCLE_DATA has NO `principal_seniority_rank` field
           on any of the 3 entries (quinoline, isoquinoline, 4H-quinolizine).
       (b) The S3.5 FIX-SPEC payload preserved in the audit doc remains the
-          spec for any v19 follow-up.
+          spec for any follow-up.
 
-    If a future v19 phase introduces multi-fused-system principal-ring
+    If a future phase introduces multi-fused-system principal-ring
     competition involving these three rings, this test fires the moment
     `principal_seniority_rank` appears on any entry --- at which point the
     rule MUST be applied per the FIX-SPEC, AND a regression-lock value
@@ -596,7 +595,7 @@ class TestP2581QuinolizineLock157:
             )
             rank = entry.get("principal_seniority_rank")
             # Per Plan-01 NO-OP-CONFIRMED: this field is intentionally absent.
-            # If a future v19 phase adds it, this test FIRES + the v19 phase
+            # If a future phase adds it, this test FIRES + the phase
             # MUST also add value-assertion tests (1/2/3 per FIX-SPEC S3.5).
             assert rank is None, (
                 f"P-25.8.1 regression: {name} entry has "
@@ -659,11 +658,11 @@ def test_dehydro_not_applicable_grep_157() -> None:
 
     If this test fails, dehydro-prefix generation has been introduced
     somewhere in src/orthonym/rules or src/orthonym/assembly. The P-31.2
-    NA classification no longer holds. Phase 157 audit doc and
-     MUST be updated to APPLY status with the
+    NA classification no longer holds. a phase audit doc and
+    docs/iupac_errata_applied.md MUST be updated to APPLY status with the
     dehydro-before-hydro ordering rule enforced at the prefix-assembly site.
 
-    Source: 157-CONTEXT.md D-07 + 157-AUDIT.md S5.1.
+    Source: 157-CONTEXT.md + 157-AUDIT.md S5.1.
     """
     src_dir = _repo_root() / "src" / "orthonym"
     result = subprocess.run(
@@ -686,7 +685,7 @@ def test_dehydro_not_applicable_grep_157() -> None:
             f"  {hit}\n"
             f"Dehydro-prefix generation may have been introduced.\n"
             f"P-31.2 ordering rule MUST now be applied; see CONTEXT D-07 + "
-            f" S P-31.2."
+            f"docs/iupac_errata_applied.md S P-31.2."
         )
 
 
@@ -695,7 +694,7 @@ def test_compound_locants_not_applicable_grep_157() -> None:
 
     Per 157-AUDIT.md S5.2: `grep -rn "compound.locant\\|compound_locant"
     src/orthonym/` returns 3 hits, all non-generation:
-      - validation/opsin_grammar.py:79 -- token-name STRING (Phase 156 grammar)
+      - validation/opsin_grammar.py:79 -- token-name STRING (a phase grammar)
       - assembly/naming_utils.py:417 -- DOC-STRING comment citing P-16.5.4.1.3
       - assembly/composer.py:3966 -- COMMENT line citing P-31.1.4.1
 
@@ -703,7 +702,7 @@ def test_compound_locants_not_applicable_grep_157() -> None:
     the P-31.1.4.3 priority rule MUST now be applied to the locant-comparison
     cascade.
 
-    Source: 157-CONTEXT.md D-07 + 157-AUDIT.md S5.2.
+    Source: 157-CONTEXT.md + 157-AUDIT.md S5.2.
     """
     src_dir = _repo_root() / "src" / "orthonym"
     result = subprocess.run(
@@ -715,7 +714,7 @@ def test_compound_locants_not_applicable_grep_157() -> None:
         if line and "__pycache__" not in line
     ]
     # Per 157-AUDIT.md S5.2: hits must be in validation/opsin_grammar.py
-    # (Phase 156 token-name string), composer.py:3966 (comment), or
+    # (a phase token-name string), composer.py:3966 (comment), or
     # naming_utils.py:417 (doc-string). NEVER in rules/ generation paths.
     for hit in hits:
         allowed = (
@@ -741,7 +740,7 @@ def test_compound_locants_not_applicable_grep_157() -> None:
 # ============================================================================
 
 
-# 14 expected rule names per CONTEXT D-09 line 300-315 + 157-AUDIT.md S6.3:
+# 14 expected rule names per CONTEXT line 300-315 + 157-AUDIT.md S6.3:
 EXPECTED_RULES_157 = [
     "P-18(b)", "P-31.1.3", "P-25.3.8.3", "P-22.2.1", "P-65.7",
     "P-29.1.2", "P-16.5.4.1", "P-16.5.1.3",
@@ -751,26 +750,26 @@ EXPECTED_RULES_157 = [
 
 
 def _doc_path_157() -> Path:
-    """Return the canonical path to """
+    """Return the canonical path to docs/iupac_errata_applied.md."""
     return _repo_root() / "docs" / "iupac_errata_applied.md"
 
 
 def test_iupac_errata_applied_doc_complete_157() -> None:
-    """G6 gate:  >= 250 LOC + 14 PIN rule entries."""
+    """G6 gate: docs/iupac_errata_applied.md >= 250 LOC + 14 PIN rule entries."""
     doc = _doc_path_157()
     assert doc.exists(), (
-        " missing -- Plan-02 incomplete. "
+        "docs/iupac_errata_applied.md missing -- Plan-02 incomplete. "
         "V18 S6 line 1374 milestone-blocking deliverable. AUDIT REQUIRED."
     )
     text = doc.read_text(encoding="utf-8")
     line_count = text.count("\n") + 1
     assert line_count >= 250, (
-        f" too short: {line_count} < 250 LOC. "
+        f"docs/iupac_errata_applied.md too short: {line_count} < 250 LOC. "
         f"G6 acceptance gate fails. AUDIT REQUIRED."
     )
     for rule in EXPECTED_RULES_157:
         assert rule in text, (
-            f" missing rule entry: {rule!r}. "
+            f"docs/iupac_errata_applied.md missing rule entry: {rule!r}. "
             f"G6 acceptance gate fails. AUDIT REQUIRED."
         )
 
@@ -786,11 +785,11 @@ def test_iupac_errata_applied_doc_section_headings_157() -> None:
     for heading in expected_headings:
         pos = text.find(heading)
         assert pos != -1, (
-            f" missing section heading "
+            f"docs/iupac_errata_applied.md missing section heading "
             f"{heading!r}. G6 gate sub-check fails."
         )
         assert pos > last_pos, (
-            f" section heading {heading!r} "
+            f"docs/iupac_errata_applied.md section heading {heading!r} "
             f"out of order at pos {pos} (previous heading ended at {last_pos}). "
             f"G6 gate sub-check fails."
         )
@@ -805,13 +804,13 @@ def test_iupac_errata_applied_doc_summary_table_consistent_157() -> None:
     """
     doc = _doc_path_157()
     text = doc.read_text(encoding="utf-8")
-    # Match summary-table rows like '| P-X.Y.Z | applied | ...':
+    # Match summary-table rows like '| P-X.Y.Z | applied |...':
     row_pattern = re.compile(
         r"^\|\s*(P-[A-Za-z0-9\.\(\)]+)\s*\|\s*([^|]+?)\s*\|", re.MULTILINE
     )
     rows = row_pattern.findall(text)
     assert len(rows) >= 14, (
-        f" S5 summary table has {len(rows)} rows; "
+        f"docs/iupac_errata_applied.md S5 summary table has {len(rows)} rows; "
         f">= 14 required per CONTEXT D-09 + 157-AUDIT.md S6.3. G6 fails."
     )
     # Per Pitfall 5: every §2 entry should appear in the table:
@@ -819,7 +818,7 @@ def test_iupac_errata_applied_doc_summary_table_consistent_157() -> None:
     for expected in EXPECTED_RULES_157:
         # The table may store P-18(b) as `P-18(b)`; we accept exact match.
         assert expected in found_rules, (
-            f" S5 summary table missing rule "
+            f"docs/iupac_errata_applied.md S5 summary table missing rule "
             f"{expected!r}. Found rules: {sorted(found_rules)}. G6 fails."
         )
 
@@ -840,7 +839,7 @@ def test_iupac_errata_applied_doc_status_consistency_157() -> None:
     """
     doc = _doc_path_157()
     text = doc.read_text(encoding="utf-8")
-    # Permitted Status keywords per CONTEXT D-09 + 157-AUDIT.md Audit Summary:
+    # Permitted Status keywords per CONTEXT + 157-AUDIT.md Audit Summary:
     status_keywords = {
         "applied", "re-verified", "already-correct",
         "not-applicable", "out-of-scope", "deferred-to-v19",
@@ -858,7 +857,7 @@ def test_iupac_errata_applied_doc_status_consistency_157() -> None:
         if heading_pos == -1:
             # Some entries (P-13.3.5 OUT-OF-SCOPE) may not have a full §2 entry
             # if the doc places them only in the summary table per CONTEXT
-            # D-09 line 315 ("(no test — out of scope)"). Skip those.
+            # line 315 ("(no test — out of scope)"). Skip those.
             continue
         # Slice the §2 block (until the next ### heading or EOF):
         block_end = text.find("\n### ", heading_pos + 1)
@@ -882,7 +881,7 @@ def test_iupac_errata_applied_doc_status_consistency_157() -> None:
         ]
         if table_keywords_present:
             assert found_match, (
-                f" status drift for {rule!r}: "
+                f"docs/iupac_errata_applied.md status drift for {rule!r}: "
                 f"S5 table says {status_in_table!r} (keyword(s) "
                 f"{table_keywords_present!r}); the corresponding S2 cite-block "
                 f"contains none of those keywords. Per Pitfall 5 this is a "

@@ -40,13 +40,13 @@ def test_benzene_amide_suffix(smiles, expected):
 
 @pytest.mark.unit
 @pytest.mark.parametrize("smiles, expected", [
-    # Basic sulfonamide -- MONOsubstituted ring, so no '1' (P-14.3.4.2(c) :2913).
+    # Basic sulfonamide -- MONOsubstituted ring, so no '1' (P-14.3.4.2(c):2913).
     ("NS(=O)(=O)c1ccccc1", "benzenesulfonamide"),
     # Substituted sulfonamide -- a RING substituent makes the ring DI-substituted,
     # so P-14.3.3 (:2869, deny-by-default) cites the suffix '1' (F-B, 2026-08-08).
     # Corrected from the non-PIN ' 4-methylbenzenesulfonamide' (locant omitted): the
-    # whole arenesulfon* family carries -1- in the Blue Book (e.g. :31174
-    # 4-aminobenzene-1-sulfonic acid; :33034 4-aminobenzene-1-sulfonamido), and the
+    # whole arenesulfon* family carries -1- in the Blue Book (e.g.:31174
+    # 4-aminobenzene-1-sulfonic acid;:33034 4-aminobenzene-1-sulfonamido), and the
     # sibling sulfonic-acid path already emits 4-methylbenzene-1-sulfonic acid.
     ("NS(=O)(=O)c1ccc(C)cc1", "4-methylbenzene-1-sulfonamide"),
 ])
@@ -109,8 +109,9 @@ def test_benzene_dicarboxylic_and_dialdehyde_suffix(smiles, expected):
     ("Nc1ccccc1", "aniline"),
     # Nitrobenzene (retained name)
     ("[O-][N+](=O)c1ccccc1", "nitrobenzene"),
-    # F-T9/DD6 RET-01: 'anisole' is general-only; the PIN is methoxybenzene (P-12.1).
-    ("COc1ccccc1", "methoxybenzene"),
+    # a review RISK 7: UNSUBSTITUTED anisole IS the PIN (the Blue Book 'anisole (PIN)';
+    # the Blue Book 'Substitution is allowed on all structures except anisole').
+    ("COc1ccccc1", "anisole"),
     # Ethoxybenzene
     ("CCOc1ccccc1", "ethoxybenzene"),
     # Halogens
@@ -163,16 +164,16 @@ def test_benzene_fg_not_dropped(smiles, desc):
     # Acid + dimethyl substituents
     ("OC(=O)c1cc(C)cc(C)c1", "3,5-dimethylbenzoic acid"),
     # Thiol + methyl.
-    # ⚠ CORRECTED 2026-07-28 (v29 Phase C tranche C). This row asserted
+    # ⚠ CORRECTED 2026-07-28 (Phase C tranche C). This row asserted
     # `1-methyl-4-sulfanylbenzene`, i.e. BOTH groups as prefixes on a bare benzene
     # parent. That is wrong: `-thiol` is a suffixable characteristic group, and with
-    # nothing senior present it MUST be the suffix (P-41) -- BB:6656 and BB:27292 both
+    # nothing senior present it MUST be the suffix (P-41) -- the Blue Book and the Blue Book both
     # print `C6H5-SH benzenethiol (PIN) (not thiophenol)`. A hydrocarbon parent carrying
     # only prefixes is correct only when no suffixable group exists. Benzene simply had
     # no `-thiol` suffix form, so the SH was demoted and this row froze that behaviour.
     # The true PIN also cites the suffix locant, because the 4-methyl locant is
-    # essential and P-14.3.3 (BB:2869) then restores every locant in the scope --
-    # cf. BB:31167 `4-methylbenzene-1,3-disulfonic acid (PIN)`. We now emit
+    # essential and P-14.3.3 (the Blue Book) then restores every locant in the scope --
+    # cf. the Blue Book `4-methylbenzene-1,3-disulfonic acid (PIN)`. We now emit
     # `4-methylbenzenethiol`, which fixes the suffix but still under-cites, so the row
     # keeps the TRUE PIN and is marked xfail rather than being re-frozen on the
     # intermediate form. Tracked by

@@ -628,6 +628,17 @@ def _acid_anion_from_neutral(neutral_name: str) -> str:
         return ''
     n = neutral_name.strip()
     low = n.lower()
+    # Enclosed acid form (P-65.1.5.1 / P-65.6.2.1): the neutral 'dithioic acid'/
+    # 'dithioate' suffix is now parenthesised at count 1 ('propane(dithioic acid)'),
+    # so the ending is INSIDE the enclosure and the plain endswith checks below miss
+    # it. Swap within the trailing '(...)' and keep the marks -> 'propane(dithioate)'
+    # (BB:31569). Recurses on the inner acid text; returns '' (no change) if the
+    # inner is not an acid, so a non-acid parenthesised name is untouched.
+    if n.endswith(')') and '(' in n:
+        head, _, tail = n.rpartition('(')
+        inner_swapped = _acid_anion_from_neutral(tail[:-1])
+        if inner_swapped:
+            return f"{head}({inner_swapped})"
     for desig in _CHALCOGEN_ACID_DESIGNATORS:
         if low.endswith(desig):
             base = n[:-len(desig)]           # e.g. 'ethanethioic'
@@ -1087,7 +1098,7 @@ def name_anion(mol, style: str = 'pin', _depth: int = 0, retained_only: bool = F
     # v33 charged Slice A fix-round: sibling of dispatch_table.py::_handle_poly_anion's
     # ester-anion branch, and the producer here is subject to the SAME failure modes
     # (mis-numbered identical-diacyl owner -> wrong constitution; cyclitol/inositol
-    # stereo OPSIN 2.9.0 cannot CIP-parse). Verified via an A/B check against 00180b23
+    # stereo OPSIN 2.9.0 cannot CIP-parse). Verified via head_ab against 00180b23
     # (pre-Slice-A): a cyclitol-phosphate dianion already reached exactly THIS call
     # site and shipped a stereo-unverified name before any Slice A code existed --
     # dispatch_table.py's own neutralize-then-name fallback bare-returns the neutral
@@ -2716,6 +2727,83 @@ def _emit_group13_uide(mol, center_idx: int) -> str:
     return f"{''.join(p[1] for p in parts)}{suffix}"
 
 
+# P-73.1.1.2 (BB:41362, 41368): the diorganyl halogen(III) CATION R2X+ named on the
+# halogen parent hydride with the '-ium' suffix — the SYSTEMATIC PIN (iodane+ium),
+# NOT the Table-7.3 retained '-onium' spelling: (C6H5)2I+ -> diphenyliodanium (PIN).
+# The cation mirror of _UIDE_STEMS on the anion side (diphenyliodanuide).
+_HALOGEN_ONIUM_STEMS = {'I': 'iodane', 'Br': 'bromane', 'Cl': 'chlorane'}
+
+
+def emit_halogen_onium(mol, center_idx: int) -> str:
+    """P-73.1.1.2 (BB:41362 "diphenyliodanium (PIN)", BB:41368 "…are the preferred
+    IUPAC names and not those given in Table 7.3"): name a disubstituted halogen(III)
+    cation R2X+ on the halogen parent hydride with the '-ium' suffix. The exact
+    CATION mirror of ``_emit_group13_uide`` (which builds ``diphenyliodanuide`` on the
+    anion side): ligands become prefixes on the '-ium' parent cation.
+
+        (C6H5)2I+  -> diphenyliodanium (PIN)                       [BB:41362]
+
+    Scope (fail closed, so a mono-coordinate halonium / a genuine radical cation /
+    any non-halogen never matches): the centre is a halogen in ``_HALOGEN_ONIUM_STEMS``
+    (I/Br/Cl), formal charge +1, and degree >= 2 (a hypervalent halonium — a
+    1-coordinate R-X+ is a distinct sulfanylium-style species and is excluded). Every
+    heavy atom must be covered by the emitted ligand set (atom-drop veto, identical to
+    the uide emitter — ``classify_substituent`` names carbon groups by carbon count and
+    silently drops a heteroatom in the branch, so a mismatch declines).
+
+    Named DIRECTLY: a drop-charge neutralize yields an invalid neutral halogen radical,
+    and an add-H neutralize yields the λ-parent whose '-ium' form (``…-λ3-iodanium``,
+    a 4-coordinate [IH2+]) is NOT the PIN. No λ-convention is used — ``diphenyliodanium``
+    (BB:41362) carries none, exactly as ``diphenyliodanuide`` (BB:41098) carries none.
+    Returns '' on any decline (the caller falls through)."""
+    center = mol.GetAtomWithIdx(center_idx)
+    stem = _HALOGEN_ONIUM_STEMS.get(center.GetSymbol())
+    if not stem:
+        return ''
+    if center.GetFormalCharge() != 1 or center.GetDegree() < 2:
+        return ''
+    from ..assembly.naming_utils import alpha_sort_key, enclose_if_compound, get_multiplier_prefix
+    from ..perception.chains import classify_substituent
+    _HALOGEN_PREFIX = {'F': 'fluoro', 'Cl': 'chloro', 'Br': 'bromo', 'I': 'iodo'}
+    parent_atoms = {center_idx}
+    name_to_count: Dict[str, int] = {}
+    covered_atoms = {center_idx}
+    for nb in center.GetNeighbors():
+        if nb.GetSymbol() == 'H':
+            continue
+        # A bare halogen ligand -> its simple prefix (classify_substituent only
+        # names carbon groups). Otherwise the carbon substituent, with the same
+        # heteroatom-drop veto _emit_group13_uide uses.
+        if nb.GetSymbol() in _HALOGEN_PREFIX and nb.GetDegree() == 1:
+            sub_name = _HALOGEN_PREFIX[nb.GetSymbol()]
+            covered_atoms.add(nb.GetIdx())
+        else:
+            sub_atoms = _collect_substituent_atoms(mol, center_idx, nb.GetIdx(), set())
+            if sub_atoms is None:
+                return ''
+            info = classify_substituent(mol, sorted(sub_atoms), parent_atoms)
+            sub_name = info.get('name')
+            if info.get('type') == 'alkyl' and any(
+                    mol.GetAtomWithIdx(i).GetSymbol() != 'C' for i in sub_atoms):
+                return ''
+            covered_atoms |= set(sub_atoms)
+        if not sub_name:
+            return ''
+        name_to_count[sub_name] = name_to_count.get(sub_name, 0) + 1
+    if len(covered_atoms) != mol.GetNumHeavyAtoms():
+        return ''
+    if not name_to_count:
+        return ''  # bare H2I+ is the retained 'iodanium' (handled by the table)
+    suffix = f"{_elide_terminal_e(stem)}ium"
+    parts = []
+    for sub_name, count in name_to_count.items():
+        mult = get_multiplier_prefix(count, sub_name)
+        body = f"{mult}{enclose_if_compound(sub_name)}"
+        parts.append((alpha_sort_key(sub_name), body))
+    parts.sort(key=lambda t: t[0])
+    return f"{''.join(p[1] for p in parts)}{suffix}"
+
+
 # P-73.2.3.4 (W4-I3): R-S+ / R-Se+ chalcogen ylium (sulfanylium / selanylium).
 _CHALCOGEN_YLIUM_STEMS = {'S': 'sulfanylium', 'Se': 'selanylium'}
 
@@ -3231,7 +3319,7 @@ def _emit_ring_cumulative_suffix(mol, center_idx: int, suffix: str) -> str:
             if re.match(r'^\d+[Hh]-', stem):
                 return ''
             return f"{_join_prefix_stem(sub_prefix, _elide_terminal_e(stem))}-{center_locant}-{suffix}"
-        # RC-C (Task 8F, P-72.2.2.1): when the deprotonated/charged centre IS the
+        # RC-C (v42 Task 8F, P-72.2.2.1): when the deprotonated/charged centre IS the
         # ring's indicated-hydrogen atom (the indicated-H locant equals the centre
         # locant), that intrinsic 'nH-' is CONSUMED by the -ide/-ium and must not be
         # cited: the neutral parent '1H-pyrrole' -> the anion 'pyrrol-1-ide', NOT
@@ -3243,7 +3331,7 @@ def _emit_ring_cumulative_suffix(mol, center_idx: int, suffix: str) -> str:
             parent = re.sub(r'^\d+[Hh]-', '', parent)
             indicated_h = None
         prefix = _indicated_hydrogen_prefix(indicated_h, parent, ring_system, mol)
-        # RC-D (Task 8F, P-14.3.4.2(c) BB:2919 'monosubstituted homogeneous
+        # RC-D (v42 Task 8F, P-14.3.4.2(c) BB:2919 'monosubstituted homogeneous
         # monocyclic rings' / P-14.3.4.3 BB:2931): the locant is OMITTED on a
         # monosubstituted HOMOGENEOUS (all-carbon) SYMMETRICAL ring where the single
         # -ide/-ium is the only feature and every substitutable position is

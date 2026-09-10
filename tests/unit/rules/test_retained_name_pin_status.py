@@ -1,22 +1,22 @@
-"""Retained trivial names that are NOT preferred IUPAC names (v29 Phase C, Task 10).
+"""Retained trivial names that are NOT preferred IUPAC names (Phase C, Task 10).
 
 Orthonym was emitting retained trivial names as if they were PINs. Origin: probing
-``OC(=O)c1ccncc1`` gave ``isonicotinic acid`` while ``BlueBookV2/BlueBookV2.md:29765``
+``OC(=O)c1ccncc1`` gave ``isonicotinic acid`` while ``the Blue Book Blue Book``
 reads verbatim ``isonicotinic acid pyridine-4-carboxylic acid (PIN)``.
 
 Most of these sit in ONE Blue Book example block under §**P-63.1.1** "Retained names"
 (``:26762``), which prints the non-preferred name immediately ABOVE the ``(PIN)``. Line
 numbers below were each verified individually with ``sed -n '<N>p'``:
 
-===========================  ===========  ==================================
-non-preferred (BB line)      PIN line     PIN
-===========================  ===========  ==================================
-``carvacrol`` ``:26790``     ``:26792``   ``2-methyl-5-(propan-2-yl)phenol``
-``thymol`` ``:26794``        ``:26796``   ``5-methyl-2-(propan-2-yl)phenol``
-``resorcinol`` ``:26802``    ``:26804``   ``benzene-1,3-diol``
-``hydroquinone`` ``:26806``  ``:26808``   ``benzene-1,4-diol``
-``1-naphthol`` ``:26818``    ``:26820``   ``naphthalen-1-ol``
-===========================  ===========  ==================================
+=========================== =========== ==================================
+non-preferred (BB line) PIN line PIN
+=========================== =========== ==================================
+``carvacrol`` ``:26790`` ``:26792`` ``2-methyl-5-(propan-2-yl)phenol``
+``thymol`` ``:26794`` ``:26796`` ``5-methyl-2-(propan-2-yl)phenol``
+``resorcinol`` ``:26802`` ``:26804`` ``benzene-1,3-diol``
+``hydroquinone`` ``:26806`` ``:26808`` ``benzene-1,4-diol``
+``1-naphthol`` ``:26818`` ``:26820`` ``naphthalen-1-ol``
+=========================== =========== ==================================
 
 ``2-naphthol``, ``pyrogallol`` and ``quinol`` are a DIFFERENT evidence class: they appear
 **nowhere** in the Blue Book (grep validated against the known positive ``1-naphthol``,
@@ -27,7 +27,7 @@ verbatim as non-preferred by **P-54.4.3.2** (``:24256``).
 ★ THREE MEASURED LESSONS, each of which changed the fix:
 
 1. **THE DENY ALONE WAS NOT SUFFICIENT for the naphthols.** Ablation showed it produced
-   ``1-hydroxynaphthalene`` — one non-PIN swapped for another (session invariant 11).
+   ``1-hydroxynaphthalene`` — one non-PIN swapped for another (session a project rule).
    Root cause: ``rules/polycyclics.py`` ``_SUFFIX_PRIORITY`` had no ``'ol'``, so a ring
    hydroxy was demoted to a ``hydroxy`` prefix. Both halves are required.
 2. **Denying ``hydroquinone`` UNMASKED ``quinol``**, a second non-PIN synonym for the
@@ -63,7 +63,7 @@ class TestPinsNowEmitted:
         # not in the BB at all -> no PIN standing, systematic governs
         ("Oc1ccc2ccccc2c1", "naphthalen-2-ol", "not in BB (was `2-naphthol`)"),
         ("Oc1cccc(O)c1O", "benzene-1,2,3-triol", "not in BB (was `pyrogallol`)"),
-        # P-54.4.3.2 partially saturated heterocycles, BB:24256 verbatim
+        # P-54.4.3.2 partially saturated heterocycles, the Blue Book verbatim
     ])
     def test_pin_is_emitted(self, namer, smiles, expected, authority):
         assert namer.name(smiles) == expected, authority
@@ -85,7 +85,7 @@ class TestTheSuffixPromotionHalf:
     alone and prove that half independently of any deny row."""
 
     def test_anthracen_9_ol(self, namer):
-        """Was `9-hydroxyanthracene`. BB:26822/:26824 print `9-anthrol` /
+        """Was `9-hydroxyanthracene`. the Blue Book print `9-anthrol` /
         `anthracen-9-ol (PIN)`. Records ZERO retained-name lookups (measured), so it is
         NOT a table defect and must not be given a deny row."""
         assert namer.name("Oc1c2ccccc2cc2ccccc12") == "anthracen-9-ol"
@@ -97,14 +97,14 @@ class TestTheSuffixPromotionHalf:
 
     def test_amino_plus_ol_now_renders(self, namer):
         """Before the promotion this failed closed to a double prefix. `-ol` is senior
-        to `-amine` (P-41 Table 4.1: hydroxy class 17 > amine class 19, BB:18190/:18192),
+        to `-amine` (P-41 Table 4.1: hydroxy class 17 > amine class 19, the Blue Book),
         which is why the ol promotion is ordered FIRST — the amine promotion is guarded
         by `not suffix_groups`.
 
         RB-1: the `-ol` is the principal characteristic group, so it must also claim the
         LOWER of the two symmetry-equivalent locants BEFORE the amino prefix is considered
-        (P-14.4(c) "principal characteristic groups ... (suffixes)", BB:3256; naphthalene
-        example `6-carboxynaphthalen-2-yl` :3262). Was `1-aminonaphthalen-4-ol` (ol on the
+        (P-14.4(c) "principal characteristic groups... (suffixes)", the Blue Book; naphthalene
+        example `6-carboxynaphthalen-2-yl`:3262). Was `1-aminonaphthalen-4-ol` (ol on the
         higher locant 4) — the PCG-anchor fix in `get_polycyclic_substituents` gives the
         `-ol` locant 1. Both forms round-trip identically via OPSIN; this is a RULE call."""
         assert namer.name("Nc1ccc(O)c2ccccc12") == "4-aminonaphthalen-1-ol"
@@ -117,7 +117,7 @@ class TestTheSuffixPromotionHalf:
 
 
 class TestDenyMechanismIsReached:
-    """★ the contributor guide invariant 13, applied to the deny table itself.
+    """★ CLAUDE.md a project rule, applied to the deny table itself.
 
     A ``pin: false`` row only suppresses a name on the surfaces the deny-set filters.
     ``indane`` proved this the hard way: it had a row AND still emitted ``indane``.
@@ -140,7 +140,7 @@ class TestDenyMechanismIsReached:
                 f"{nm}: P-54.4.3.2 (BB:24256) is the governing rule"
 
     def test_fused_heterocycle_table_now_holds_the_PINs(self):
-        """v29 Phase C: the indane-family rename has LANDED.
+        """ Phase C: the indane-family rename has LANDED.
 
         The first attempt was reverted because the ``name`` field doubles as the
         'spirobi' component (P-24.3.1); ``_name_spirobi_core`` now derives the hydro
@@ -149,7 +149,7 @@ class TestDenyMechanismIsReached:
 
         Asserted as DATA and in BOTH directions: the retained non-PINs must be GONE,
         not merely joined by the PINs, or a stray duplicate row would keep emitting
-        the non-preferred name (session invariant 13 -- presence in a table is not
+        the non-preferred name (session a project rule -- presence in a table is not
         evidence the table is reached, and absence must be checked explicitly)."""
         from orthonym.data.fused_heterocycles import FUSED_HETEROCYCLE_DATA
         names = {v.get("name") for v in FUSED_HETEROCYCLE_DATA.values()}
@@ -207,7 +207,7 @@ class TestSuffixPriorityOrder:
         return re.findall(r"'([^']+)'", body)
 
     def test_ol_sits_between_carbaldehyde_and_amine(self):
-        """P-41 seniority: ... > carbaldehyde > ol > amine."""
+        """P-41 seniority:... > carbaldehyde > ol > amine."""
         pr = self._priority()
         assert "ol" in pr, f"the -ol suffix guard was removed: {pr}"
         assert "carbaldehyde" in pr and "amine" in pr, pr
@@ -227,7 +227,7 @@ class TestUnchangedControls:
     @pytest.mark.parametrize("smiles,expected", [
         ("Oc1ccccc1O", "benzene-1,2-diol"),          # pyrocatechol, already denied
         ("Cc1cc(C)cc(C)c1", "1,3,5-trimethylbenzene"),  # mesitylene
-        ("COc1ccccc1", "methoxybenzene"),            # anisole
+        ("COc1ccccc1", "anisole"),                   # a review RISK 7: bare anisole IS the PIN (the Blue Book)
         ("Oc1ccccc1", "phenol"),                     # a genuine retained PIN
         ("OC(=O)c1cccnc1", "pyridine-3-carboxylic acid"),   # nicotinic, already denied
         ("Nc1ccccc1C(=O)O", "2-aminobenzoic acid"),  # anthranilic, already denied
@@ -279,9 +279,9 @@ class TestIndaneFamilyUnblocked:
     ⚠ AND THE SHORTCUT WOULD HAVE BEEN WORSE. Putting the mancude component in the
     bracket without hoisting the hydro prefixes gives ``1,2'-spirobi[1H-indene]`` -- the
     UNSATURATED molecule. That is a wrong STRUCTURE, not a wrong spelling (session
-    invariant 11). It was reverted rather than shipped.
+    a project rule). It was reverted rather than shipped.
 
-    ✅ UNBLOCKED (v29 Phase C) by deriving the saturation from the GRAPH instead:
+    ✅ UNBLOCKED (Phase C) by deriving the saturation from the GRAPH instead:
     ``_name_spirobi_core`` computes the maximum noncumulative double-bond assignment over
     the ASSEMBLED skeleton (the spiro atom excluded, since its four single ring bonds make
     it sp3 by construction) and hoists the hydro prefixes plus any indicated hydrogen in
@@ -303,7 +303,7 @@ class TestIndaneFamilyUnblocked:
         ("Cc1ccc2c(c1)CCN2", "5-methyl-2,3-dihydro-1H-indole"),
     ])
     def test_indane_family_pin(self, namer, smiles, pin):
-        """v29 Phase C: no longer xfail -- the spiro blocker below is fixed."""
+        """ Phase C: no longer xfail -- the spiro blocker below is fixed."""
         assert namer.name(smiles) == pin
 
     def test_the_spiro_form_that_used_to_block_it(self, namer):
@@ -321,3 +321,57 @@ class TestIndaneFamilyUnblocked:
         assert "spirobi[indane]" not in got, \
             f"'indane' is not a PIN (P-54.4.3.2, BB:24256): {got!r}"
         assert got == "1',2,3,3'-tetrahydro-1,2'-spirobi[indene]", got
+
+
+class TestChalcogenChromanePin:
+    """Chalcogen analogues of chromane / isochromane (a phase, Task 11B3).
+
+    **P-31.2.3.3.1, Table 3.1** ("Retained names of partially saturated polycyclic
+    parent hydrides") names each PIN verbatim, and its header (``:16980``) marks
+    every Table-3.1 name *"not used as preferred IUPAC names"*:
+
+    ================== ========== ==========================================
+    retained (non-PIN) BB line PIN
+    ================== ========== ==========================================
+    selenochromane ``:17008`` ``3,4-dihydro-2H-1-benzoselenopyran``
+    tellurochromane ``:17010`` ``3,4-dihydro-2H-1-benzotelluropyran``
+    isothiochromane ``:17018`` ``3,4-dihydro-1H-2-benzothiopyran``
+    isoselenochromane ``:17020`` ``3,4-dihydro-1H-2-benzoselenopyran``
+    isotellurochromane ``:17022`` ``3,4-dihydro-1H-2-benzotelluropyran``
+    ================== ========== ==========================================
+
+    Reinforced by **P-31.2.3.3.1** body (``:16509``: chromane, isochromane and
+    "their chalcogen analogues" are modified from the mancude parent by hydro
+    prefixes), **P-19(d)** (``:1736``) and **P-54.4.3.2** (``:24256``).
+
+    ★ THE FIX IS TWO-PART, mirroring the S/O siblings exactly (lesson 3 above).
+    The retained name is emitted from the OPSIN-import alias surface
+    (``data/opsin_imports/aryl_groups.py``) UNLESS the name sits in the PIN
+    deny-set (``iupac_2013_pin_list.json``). Adding the ``fused_heterocycles``
+    catalog entry ALONE was measured NOT to fire -- the alias still won -- so both
+    (a) the ``fused_heterocycles`` renamed catalog entry AND (b) the ``pin: false``
+    deny row are required, exactly as chromane/isochromane/thiochromane carry both.
+    """
+
+    @pytest.mark.parametrize("smiles,pin", [
+        ("c1ccc2c(c1)CCC[Se]2", "3,4-dihydro-2H-1-benzoselenopyran"),   # the Blue Book
+        ("c1ccc2c(c1)CCC[Te]2", "3,4-dihydro-2H-1-benzotelluropyran"),  # the Blue Book
+        ("c1ccc2c(c1)CCSC2", "3,4-dihydro-1H-2-benzothiopyran"),        # the Blue Book
+        ("c1ccc2c(c1)CC[Se]C2", "3,4-dihydro-1H-2-benzoselenopyran"),   # the Blue Book
+        ("c1ccc2c(c1)CC[Te]C2", "3,4-dihydro-1H-2-benzotelluropyran"),  # the Blue Book
+    ])
+    def test_chalcogen_chromane_pin(self, namer, smiles, pin):
+        assert namer.name(smiles) == pin
+
+    @pytest.mark.parametrize("smiles,pin", [
+        # O/S siblings must STAY the systematic PIN (only S/Se/Te chalcogens were
+        # added; the O/S rows were already correct and must not regress).
+        ("c1ccc2c(c1)CCCO2", "3,4-dihydro-2H-1-benzopyran"),     # chromane (O), the Blue Book
+        ("c1ccc2c(c1)CCCS2", "3,4-dihydro-2H-1-benzothiopyran"), # thiochromane (S), the Blue Book
+        ("c1ccc2c(c1)CCOC2", "3,4-dihydro-1H-2-benzopyran"),     # isochromane (O), the Blue Book
+        # mancude chalcogen-chromenes are a SEPARATE unsaturated class, unchanged.
+        ("C1=Cc2ccccc2OC1", "2H-1-benzopyran"),                  # 2H-chromene, the Blue Book
+        ("C1=Cc2ccccc2SC1", "2H-1-benzothiopyran"),              # 2H-thiochromene, the Blue Book
+    ])
+    def test_oxygen_sulfur_siblings_unchanged(self, namer, smiles, pin):
+        assert namer.name(smiles) == pin

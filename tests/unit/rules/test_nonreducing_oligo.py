@@ -1,7 +1,7 @@
-"""v33 glyco composer, slice 1 — NON-REDUCING oligosaccharides (3+ units).
+""" glyco composer, slice 1 — NON-REDUCING oligosaccharides (3+ units).
 
 Raffinose is the canonical witness: a non-reducing trisaccharide
-(alpha-D-Gal-(1->6)-alpha-D-Glc central-linked (1<->2) to beta-D-Fru) that the
+(α-D-Gal-(1->6)-α-D-Glc central-linked (1<->2) to β-D-Fru) that the
 reducing-chain assembler (`_oligo_topology`) and the binary assembler
 (`_count_sugar_rings>=3`) both fail closed on, so it currently emits `unknown`.
 
@@ -11,7 +11,7 @@ from rdkit import Chem
 from orthonym.rules import oligosaccharides as O
 
 RAFFINOSE = "OC[C@H]1O[C@H](OC[C@H]2O[C@H](O[C@]3(CO)O[C@H](CO)[C@@H](O)[C@@H]3O)[C@H](O)[C@@H](O)[C@@H]2O)[C@H](O)[C@@H](O)[C@H]1O"
-EXPECTED = "alpha-D-galactopyranosyl-(1->6)-alpha-D-glucopyranosyl beta-D-fructofuranoside"
+EXPECTED = "α-D-galactopyranosyl-(1->6)-α-D-glucopyranosyl β-D-fructofuranoside"
 
 
 def test_raffinose_nonreducing_trisaccharide():
@@ -30,7 +30,7 @@ def test_raffinose_via_public_entry():
 # --- slice 2: BRANCHED reducing oligosaccharides (P-102.7.3) ---
 # a unit accepting >1 glycosyl; both expected names are OPSIN-RT-verified to the input.
 BRANCHED_GLUCOTRIOSE = "OC[C@H]1O[C@H](OC[C@H]2OC(O)[C@H](O)[C@@H](O)[C@@H]2O[C@H]2O[C@H](CO)[C@@H](O)[C@H](O)[C@H]2O)[C@H](O)[C@@H](O)[C@@H]1O"
-BRANCHED_GLUCOTRIOSE_NAME = "alpha-D-glucopyranosyl-(1->6)-[alpha-D-glucopyranosyl-(1->4)]-D-glucopyranose"
+BRANCHED_GLUCOTRIOSE_NAME = "α-D-glucopyranosyl-(1->6)-[α-D-glucopyranosyl-(1->4)]-D-glucopyranose"
 
 
 def test_branched_glucotriose():
@@ -45,11 +45,11 @@ def test_branched_via_public_entry():
 
 
 def test_branched_lewis_type():
-    # beta-D-Gal-(1->3)-[alpha-L-Fuc-(1->4)]-D-Glc (a Lewis-a core) round-trips.
+    # β-D-Gal-(1->3)-[α-L-Fuc-(1->4)]-D-Glc (a Lewis-a core) round-trips.
     smi = "C[C@@H]1O[C@@H](O[C@H]2[C@H](O[C@@H]3O[C@H](CO)[C@H](O)[C@H](O)[C@H]3O)[C@@H](O)C(O)O[C@@H]2CO)[C@@H](O)[C@H](O)[C@@H]1O"
     mol = Chem.MolFromSmiles(smi)
     name = O.name_branched_oligosaccharide(mol)
-    assert name == "alpha-L-fucopyranosyl-(1->4)-[beta-D-galactopyranosyl-(1->3)]-D-glucopyranose", name
+    assert name == "α-L-fucopyranosyl-(1->4)-[β-D-galactopyranosyl-(1->3)]-D-glucopyranose", name
 
 
 def test_branched_declines_linear():
@@ -81,23 +81,23 @@ def test_nonreducing_declines_under_three_units():
     assert O.name_nonreducing_oligosaccharide(m) is None
 
 
-# --- v33 Task 1.3 (breadth-lever program, Phase 1) — glycan SCALE ---
+# ---.3 (breadth-lever program, a phase) — glycan SCALE ---
 #
-# SPY finding (measured,  family
+# a trace finding (measured, internal notes family
 # `sugar_glycan`, filtered to real >=3-linked-sugar-unit trees via this
 # module's own `_detect_sugar_units_links`): the single dominant, well-defined
 # scale cap on real >=3-ring backlog witnesses is that `name_branched_
 # oligosaccharide`'s reducing-terminus detection REQUIRED a free hemiacetal
 # -OH (`GetTotalNumHs() > 0`) with no relaxation at all -- `_oligo_topology`
 # (used only by the LINEAR namer) already had an alkyl/aryl-capped-terminus
-# relaxation (v33 Engine-2 fix (b)), but it was never generalized to the
+# relaxation (Engine-2 fix (b)), but it was never generalized to the
 # BRANCHED namer, so ANY branched tree sitting behind a capped root (the
 # common synthetic aminoethyl/aminopentyl glycoconjugate linker included) was
 # structurally unreachable regardless of how many residues it had -- 37/85
 # still-abstaining real oligo>=3 witnesses hit exactly this decline site
 # (`if len(reducing) != 1: return None`).
 #
-# A second, independent bug found by the same SPY: `_glycoside_cap_name`
+# A second, independent bug found by the same a trace: `_glycoside_cap_name`
 # always guessed `attach_locant=1` when converting the isolated cap fragment's
 # own free-molecule name into a substituent prefix (P-29.2) -- correct only
 # when the free valence happens to sit at the fragment's own C1, and silently
@@ -119,7 +119,7 @@ def test_nonreducing_declines_under_three_units():
 # file) -- all full-InChIKey OPSIN round-trip verified. Three are witnessed
 # here directly by SMILES (not by census index, which drifts as prior tasks
 # land); each was confirmed to return ``None`` from `name_branched_
-# oligosaccharide` against the pre-Task-1.3 code (git HEAD `3bd5d3b1`) before
+# oligosaccharide` against the pre-Task-1.3 code (git HEAD) before
 # this fix, and a real name after it.
 
 GIANT_AMINOETHYL_TRIDECASACCHARIDE = (
@@ -155,7 +155,7 @@ def _full_inchikey(smiles):
 
 
 def test_branched_with_capped_aminoethyl_root_giant_tree():
-    # v33 Task 1.3 SCALE witness: a 13-unit branched glucan tree behind a
+    #.3 SCALE witness: a 13-unit branched glucan tree behind a
     # simple aminoethyl-capped root -- unreachable before this fix regardless
     # of size (name_branched_oligosaccharide required a FREE reducing -OH).
     mol = Chem.MolFromSmiles(GIANT_AMINOETHYL_TRIDECASACCHARIDE)
@@ -172,7 +172,7 @@ def test_branched_with_capped_aminoethyl_root_giant_tree():
 
 
 def test_branched_with_capped_aminopentyl_root_uronic_branches():
-    # v33 Task 1.3 SCALE witness: an 8-unit tree (two glucuronic-acid
+    #.3 SCALE witness: an 8-unit tree (two glucuronic-acid
     # termini) behind an aminopentyl-capped root. Also the witness for the
     # `_glycoside_cap_name` attach-locant fix: the OLD converter guessed
     # `attach_locant=1` against "pentan-1-amine" (wrong end) and silently
@@ -191,7 +191,7 @@ def test_branched_with_capped_aminopentyl_root_uronic_branches():
 
 
 def test_branched_with_capped_ester_linker_root():
-    # v33 Task 1.3 SCALE witness: a simple branched hexasaccharide capped
+    #.3 SCALE witness: a simple branched hexasaccharide capped
     # with a methyl-ester-terminated hexyl linker (a non-amine functionalized
     # cap, exercising `_located_acyclic_alkyl_name`'s general FG path rather
     # than the amine-specific branch).

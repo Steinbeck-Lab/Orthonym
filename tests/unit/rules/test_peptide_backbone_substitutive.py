@@ -1,8 +1,8 @@
 """
-v33 Phase 2 Task 2.2 (breadth): backbone-substitutive peptide producer.
+ a phase Task 2.2 (breadth): backbone-substitutive peptide producer.
 
 After Task 2.0 (dispatch fix) + Task 2.1 (Lever C, capped termini), ~214 of
-the true-alpha-peptide backlog rows (
+the true-alpha-peptide backlog rows (internal notes
 family `peptide`) still abstain -- mostly giant / non-standard-residue
 peptides the residue-table/Lever-A/B/C path cannot name at all.
 
@@ -21,7 +21,7 @@ convention and Levers A/B/C have all declined:
     (prepend) or amido (splice) prefix via the SAME helpers Lever A/B
     already use (`_acid_to_acyl` / `acid_name_to_amido_prefix` /
     `_swap_amino_for_amido`).
-  - The **side-chain-acid trap** (the contributor guide; 57/226 backlog rows carry >=2
+  - The **side-chain-acid trap** (CLAUDE.md; 57/226 backlog rows carry >=2
     free -COOH): a Glu/Asp side-chain acid on any NON-parent residue is a
     genuine competing principal group this producer must never misplace --
     it ABSTAINS rather than guess. Likewise a capped (amide/ester/aldehyde)
@@ -153,7 +153,7 @@ class TestRegressionUnaffected:
     PIN byte-identical -- this producer is tried LAST, only on decline."""
 
     def test_glycylglycine_unchanged(self):
-        # v38: substitutive PIN (V38-PEPTIDE-PIN-VERDICT.md); RT verified.
+        #: substitutive PIN (V38-PEPTIDE-PIN-VERDICT.md); RT verified.
         assert name_compound("NCC(=O)NCC(=O)O") == "(2-aminoacetamido)acetic acid"
 
     def test_standard_tripeptide_unchanged(self):

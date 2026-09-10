@@ -1,10 +1,10 @@
 """P-74.2.1 semipolar (dative) charges are INTERNAL, not ionic centres.
 
-Blue Book, **P-74.2 "DIPOLAR COMPOUNDS"** (heading; ``BlueBookV2.md:42501``):
+Blue Book, **P-74.2 "DIPOLAR COMPOUNDS"** (heading; ``the Blue Book``):
 
     "Dipolar compounds are electrically neutral molecules carrying a negative
     and a positive charge in at least one of their major canonical resonance
-    structures. ... 1,2-Dipolar compounds have the opposite charges on adjacent
+    structures.... 1,2-Dipolar compounds have the opposite charges on adjacent
     atoms."
 
 **P-74.2.1.1 "'Ylides'"** (heading, ``:42509``) states the depiction rule that
@@ -18,7 +18,7 @@ decisive one:
 
 So a second-row cation (N) is *always* drawn charge-separated -- and the module's
 hard-coded P-59 SMARTS cover exactly that case (nitro, N-oxide, azide, diazo).
-A third/fourth-row cation (P, S, As, Se, Sb, Te, I ...) is *usually* drawn
+A third/fourth-row cation (P, S, As, Se, Sb, Te, I...) is *usually* drawn
 uncharged, which is precisely why nobody wrote a SMARTS for it -- but nothing
 stops an input from being drawn charge-separated, and when it is, the pair used
 to read as a genuine ionic centre.
@@ -29,12 +29,12 @@ settles what such a pair means:
     "Phosphine oxides have the generic formula R3P+ -O- <-> R3P=O. Chalcogen
     analogues are phosphine sulfides, phosphine selenides, and phosphine
     telluride (where O is replaced by S, Se, and Te, respectively)."
-    "Method (3) leads to preferred IUPAC names."   [(3) = l5-phosphanone]
+    "Method (3) leads to preferred IUPAC names." [(3) = l5-phosphanone]
 
 The Blue Book's own double-headed arrow says the two depictions are one
 compound, and it makes the NEUTRAL name (a l5-heterone) the PIN. Same verdict
 for amine/imine oxides, **P-74.2.1.2** (heading, ``:43008``): "Method (2) leads
-to preferred IUPAC names when one amine oxide is present. ... Hence,
+to preferred IUPAC names when one amine oxide is present.... Hence,
 zwitterionic compounds are never PINs".
 
 THE BOUNDARY -- the Blue Book draws it by the ANION, and both sides matter:
@@ -154,7 +154,7 @@ GENUINE = [
 
 @pytest.mark.parametrize("smiles,label", GENUINE, ids=[c[1] for c in GENUINE])
 def test_genuine_charges_are_not_masked(smiles, label):
-    """The mask must not swallow a real ionic centre (the contributor guide #9)."""
+    """The mask must not swallow a real ionic centre (CLAUDE.md #9)."""
     mol = Chem.MolFromSmiles(smiles)
     assert mol is not None, smiles
     internal = _get_internal_charge_atoms(mol)
@@ -206,7 +206,7 @@ def test_general_engine_reads_the_same_perception():
 
 
 def test_semipolar_pair_still_hidden_from_the_general_engine():
-    """...while the pair the workaround existed for stays hidden (the contributor guide #9:
+    """...while the pair the workaround existed for stays hidden (CLAUDE.md #9:
     removing a guard must not unmask what it was covering)."""
     from orthonym.assembly.general_engine import _genuine_ion_sites, _has_ionic_centres
 

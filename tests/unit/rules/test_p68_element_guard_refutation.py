@@ -1,6 +1,6 @@
 """`_ORGANIC_ELEMENTS` is NOT the gate that blocks the P-68 elements.
 
-v30 Phase A Task 1 planned to widen `errors._ORGANIC_ELEMENTS` by
+ Phase A Task 1 planned to widen `errors._ORGANIC_ELEMENTS` by
 {As, Sb, Bi, Ge, Sn, Pb, Te}, on the recorded premise that it is "the single
 scope gate consulted by `classify_scope_limit`" and that "9 of 9 target
 molecules name correctly the moment the guard is widened".
@@ -15,18 +15,18 @@ Both halves were refuted by measurement on 2026-08-04:
    substituent branch carrying an unnameable non-organic element.
 
 2. A paired two-arm run over the 90 P-68 rows of the Blue Book conformance
-   corpus (), one fresh process per arm so no cache
+   corpus (`benchmarks/bb_conformance/`), one fresh process per arm so no cache
    could serve one arm's answer to the other: **90 of 90 rows changed, and 0
    gained a name.** Every row moved from a specific refusal
    ("arsenic compound (not supported)") to the generic one
    ("unknown organic compound"). Emit was unchanged; the only effect was a less
    informative diagnostic plus the loss of the composer guard, whose own comment
    records that dropping such a branch shipped 'ethane' for CCS[Zn]SCC -- a
-   plausible wrong molecule that no failure predicate can flag (invariant 9).
+   plausible wrong molecule that no failure predicate can flag (a project rule).
 
-   The nine molecules cited as the spy's positives (`[AsH3]` .. `phenylarsonic
+   The nine molecules cited as the trace's positives (`[AsH3]`.. `phenylarsonic
    acid`) already name correctly at HEAD with the guard untouched, which is why
-   the spy looked green: they were never blocked.
+   the trace looked green: they were never blocked.
 
 The real blocker for the largest nameable slice of those rows was the
 Hantzsch-Widman six-membered-ring stem (P-22.2.2.1.6) -- see
@@ -82,7 +82,7 @@ def test_p68_elements_stay_out_of_the_organic_element_set():
 ])
 def test_p68_parent_hydrides_already_name_with_the_guard_untouched(
         smiles, expected):
-    """These are the nine "spy positives". They pass WITHOUT the widening.
+    """These are the nine "trace positives". They pass WITHOUT the widening.
 
     `rules/mononuclear_hydrides.py` implements the group-14/15/16 parent hydride
     family, so a green result here says nothing about the guard -- which is

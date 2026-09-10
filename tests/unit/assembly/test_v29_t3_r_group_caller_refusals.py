@@ -1,13 +1,13 @@
 """Task T3 -- a ``_name_r_group`` refusal must never be silently dropped.
 
 ``composer._name_r_group`` returns ``None`` when it cannot PROVE a fragment is
-describable. Since T2 (``56833b46``) removed the carbon-count fabrication that
+describable. Since T2 (``) removed the carbon-count fabrication that
 used to paper over those cases, that ``None`` is honest and load-bearing.
 
 Eight of the seventeen call sites consumed it as::
 
     sub_name = _name_r_group(mol, nidx, exclude_atoms=core)
-    if sub_name:                      # <-- the refusal vanishes here
+    if sub_name: # <-- the refusal vanishes here
         n_subs.append(sub_name)
 
 which is indistinguishable, downstream, from a nitrogen that never carried a
@@ -22,7 +22,7 @@ on the default path the OPSIN/SELF-01 validity gate suppresses all of these to
 the defect fully present. The gate must not be what saves us.
 
 Measured dispositions of all 17 call sites, and the before/after emissions, are
-recorded in ``.
+recorded in `internal notes`.
 """
 
 import pytest

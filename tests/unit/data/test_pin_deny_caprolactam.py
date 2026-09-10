@@ -1,22 +1,22 @@
 """``caprolactam`` is a non-PIN trivial name reaching the DEFAULT ``--style pin``
 path, and it is the only break in an otherwise systematic five-member series:
 
-    O=C1CCN1      azetidin-2-one     O=C1CCCCCN1   caprolactam   <-- the break
-    O=C1CCCN1     pyrrolidin-2-one   O=C1CCCCCCN1  azocan-2-one
-    O=C1CCCCN1    piperidin-2-one
+    O=C1CCN1 azetidin-2-one O=C1CCCCCN1 caprolactam <-- the break
+    O=C1CCCN1 pyrrolidin-2-one O=C1CCCCCCN1 azocan-2-one
+    O=C1CCCCN1 piperidin-2-one
 
 Blue Book basis (each anchor opened and quoted, not relayed):
 
-* P-64.3 "PSEUDOKETONES" (BlueBookV2.md:29310) -> **P-64.3.1** (:29314), verbatim:
+* P-64.3 "PSEUDOKETONES" (the Blue Book) -> **P-64.3.1** (:29314), verbatim:
   "Cyclic anhydrides, esters and amides are named as pseudoketones; the resulting
-  names are preferred IUPAC names."  Its own example list prints, at :29323:
+  names are preferred IUPAC names." Its own example list prints, at:29323:
   ``azepan-2-one (PIN) hexano-6-lactam (see P-66.1.5.1)``.
 * P-66.1.5.1 "Lactams and lactims" (:33219). Lactams "are named in two ways":
   (1) "as heterocyclic pseudoketones" (:33223); (2) the ``...o-N-lactam`` form
-  (:33224). The decisive sentence is the last one, :33226 -- "Method (1)
-  generates preferred IUPAC names."  So even ``hexano-6-lactam`` is only the
+  (:33224). The decisive sentence is the last one,:33226 -- "Method (1)
+  generates preferred IUPAC names." So even ``hexano-6-lactam`` is only the
   non-preferred alternative, and ``caprolactam`` is neither method.
-* ``caprolactam`` has **0** occurrences in BlueBookV2.md. The grep methodology
+* ``caprolactam`` has **0** occurrences in the Blue Book. The grep methodology
   was validated against known positives first (``succinimide`` 2, ``hexano-6-
   lactam`` 1, ``lactam`` 14, ``azepan`` 10), and all 14 ``lactam`` lines were
   enumerated by hand -- the name is in none of them. Fragment forms
@@ -27,14 +27,14 @@ Blue Book basis (each anchor opened and quoted, not relayed):
   the contracted form of epsilon-caprolactam.
 
 ⚠ The pre-existing inline comment at ``retained_names.py:579`` cited "P-31.1.4
-retained lactam name". P-31.1.4 (heading :16619) is "Bi- and polycyclic von
+retained lactam name". P-31.1.4 (heading:16619) is "Bi- and polycyclic von
 Baeyer parent hydrides" and says nothing about lactams or retained names; that
 citation was wrong and is corrected by this change.
 
 Producer-level assertions only. Whole-molecule assertions are unsound in this
 suite -- ``conftest`` disables the OPSIN gate suite-wide, so ``name_tiered`` can
 select a different producer than the CLI does. User-visible CLI behaviour is
-recorded in ``.superpowers/sdd/v29-residue/TaskAB-report.md``.
+recorded in ``.superpowers/sdd/-residue/TaskAB-report.md``.
 """
 
 import json
@@ -77,7 +77,7 @@ def test_caprolactam_is_withdrawn_from_the_pin_surface():
 
 
 def test_caprolactam_is_demoted_not_deleted():
-    """the contributor guide: deny rows are DEMOTED. The name must survive on the
+    """CLAUDE.md: deny rows are DEMOTED. The name must survive on the
     general-only companion surface, exactly as glycerol and catechol do."""
     import orthonym.data as data_pkg
 
@@ -85,7 +85,7 @@ def test_caprolactam_is_demoted_not_deleted():
 
 
 def test_systematic_producer_supplies_the_pin():
-    """the contributor guide invariant 9 -- removing a wrong output must not unmask a worse
+    """CLAUDE.md a project rule -- removing a wrong output must not unmask a worse
     generator. The seven-membered ring's PIN must come from the same producer
     that already serves its four siblings."""
     from orthonym.rules.lactams import name_lactam_ring
@@ -106,12 +106,12 @@ def test_sibling_ring_sizes_are_untouched(ring_size, expected):
 
 
 def test_no_ring_size_emits_the_non_preferred_lactam_suffix_form():
-    """P-66.1.5.1 method (2) (``hexano-6-lactam``) is NOT preferred -- :33226
+    """P-66.1.5.1 method (2) (``hexano-6-lactam``) is NOT preferred --:33226
     "Method (1) generates preferred IUPAC names." The producer must never build
     that form at ANY ring size.
 
     Asserted on OUTPUT, not on source text. ``data/opsin_imports/suffix_rules.py``
-    does register 'lactam' as a suffix morpheme at :81/:205/:371, but those are
+    does register 'lactam' as a suffix morpheme at:81/:205/:371, but those are
     mirrored OPSIN *parsing* tables (name -> structure) whose only consumer is
     ``validation/name_morphemes.py``; they generate nothing.
     """

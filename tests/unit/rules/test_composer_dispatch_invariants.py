@@ -1,4 +1,4 @@
-"""Phase 151-04 anti-regression locks for the composer dispatch.
+"""a phase-04 anti-regression locks for the composer dispatch.
 
 The 151-02 SUMMARY documented a git-stash incident that silently dropped
 the elif ring_type == 'mixed-spiro-fused' branch from
@@ -29,7 +29,7 @@ def _get_assemble_complex_ring_name_source() -> str:
 
 
 class TestComposerDispatchInvariants:
-    """Phase 151-04 BLK-01 anti-regression locks."""
+    """a phase-04 BLK-01 anti-regression locks."""
 
     @pytest.mark.unit
     def test_mixed_spiro_fused_elif_branch_present_in_function_body(self):
@@ -47,7 +47,7 @@ class TestComposerDispatchInvariants:
             "branch is missing from _assemble_complex_ring_name. The 151-02 "
             "SUMMARY noted a git-stash incident that dropped this same edit "
             "once before — please restore it from "
-            "*/151-04-PLAN.md Task 2."
+            ".planning/phases/151-*/151-04-PLAN.md Task 2."
         )
 
     @pytest.mark.unit

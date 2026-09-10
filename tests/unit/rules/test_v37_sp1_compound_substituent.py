@@ -1,7 +1,7 @@
-"""v37 SP1.1 — compound-substituent enumeration: fail closed, never drop.
+""" — compound-substituent enumeration: fail closed, never drop.
 
 Root-cause class: an N-substituent fragment that carries a non-carbon heavy atom
-(an ether O, a thioether S, a halogen, ...) was named purely by CARBON COUNT via
+(an ether O, a thioether S, a halogen,...) was named purely by CARBON COUNT via
 ``naming_utils.get_alkyl_name(cc)`` inside ``composer._walk_amine_n_substituents``,
 which SILENTLY DROPS the heteroatom. For ``COCCNCCC`` the N-substituent
 ``-CH2CH2-O-CH3`` (2-methoxyethyl) collapsed to ``propyl`` (O dropped, its two
@@ -15,9 +15,9 @@ element-agnostic recursive namer (``name_substituent_fragment``) and FAILS CLOSE
 the carbon-only ``get_alkyl_name`` that drops the heteroatom.
 
 Verified fresh (`.venv/bin/python -m orthonym`) 2026-08-25; grounding:
- (lever 1), spy-confirmed on-path site
+internal notes (lever 1), trace-confirmed on-path site
 `composer._walk_amine_n_substituents` (the named leads substituent_enumerator /
-composer:193/246/3947 were OFF-PATH, invariant 8).
+composer:193/246/3947 were OFF-PATH, a project rule).
 """
 import pytest
 
@@ -48,7 +48,7 @@ class TestProducerNoAtomDrop:
 class TestMixedEtherAmineProduction:
     @pytest.mark.opsin_gate
     def test_mixed_ether_amine_n_substituent_no_atom_drop(self):
-        # COCCNCCC = CH3-O-CH2CH2-NH-CH2CH2CH3 ; PIN N-(2-methoxyethyl)propan-1-amine
+        # COCCNCCC = CH3-O-CH2CH2-NH-CH2CH2CH3; PIN N-(2-methoxyethyl)propan-1-amine
         # (UDZCEFCJEGGQOJ-UHFFFAOYSA-N)
         name = name_compound('COCCNCCC')
         assert name != 'N-propylpropan-1-amine'

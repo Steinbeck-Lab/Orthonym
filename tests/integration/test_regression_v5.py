@@ -1,4 +1,4 @@
-"""Regression tests for v5.0 OPSIN parse regressions fixed in Phase 58.
+"""Regression tests for v5.0 OPSIN parse regressions fixed in a phase.
 
 Plan 01 tests cover regressions 5, 7, 8, and 9 (coverage gate whitelist,
 bracket hyphenation, substituent locant format).
@@ -13,7 +13,7 @@ from orthonym import name_compound
 class TestCoverageGateWhitelist:
     """Regressions 5 and 9: adenine coverage guard.
 
-    Phase 099-03: retained-name coverage guard rejects 'adenine' for molecules
+    a phase-03: retained-name coverage guard rejects 'adenine' for molecules
     with HA > 20 and ratio < 0.25. Decomposition now produces more complete
     names for these large adenine-containing molecules.
     """
@@ -28,7 +28,7 @@ class TestCoverageGateWhitelist:
         )
         name = name_compound(smiles)
         assert name != "unknown"
-        # Phase 099-03: 'adenine' (7 chars) for 38-HA molecule = ratio 0.18
+        # a phase-03: 'adenine' (7 chars) for 38-HA molecule = ratio 0.18
         # Below 0.25 threshold -> decomposition attempted
         assert name != "adenine", (
             "Coverage guard should reject 'adenine' for HA=38 (ratio 0.18)"
@@ -49,7 +49,7 @@ class TestCoverageGateWhitelist:
         )
         name = name_compound(smiles)
         assert name != "unknown"
-        # Phase 099-03: 'adenine' (7 chars) for 65-HA molecule = ratio 0.11
+        # a phase-03: 'adenine' (7 chars) for 65-HA molecule = ratio 0.11
         # Below 0.25 threshold -> decomposition attempted
         assert name != "adenine", (
             "Coverage guard should reject 'adenine' for HA=65 (ratio 0.11)"
@@ -80,7 +80,7 @@ class TestCoverageGateWhitelist:
         just '1H-indole' -- the coverage gate should reject it even though
         1H-indole is in the engine quality gate whitelist.
 
-        This guards against Pitfall 1 from the Phase 58 research:
+        This guards against Pitfall 1 from the a phase research:
         loosening coverage gates must not reintroduce oversimplification.
         """
         # Complex polycyclic with indole substructure
@@ -101,7 +101,7 @@ class TestCoverageGateWhitelist:
     def test_adenine_monophosphate_produces_adenine(self):
         """AMP-like molecule should produce 'adenine' via nucleobase bypass.
 
-        The .O (water) is a single-atom fragment which falls through to the
+        The.O (water) is a single-atom fragment which falls through to the
         normal pipeline rather than splitting via dot-disconnected handling.
         """
         smiles = "Nc1ncnc2c1ncn2[C@@H]1O[C@H](COP(=O)(O)O)[C@@H](O)[C@H]1O.O"
@@ -305,7 +305,7 @@ class TestFattyAcidIdentification:
         "and this test flips XFAIL->XPASS because of that fix. The marker is a "
         "candidate for removal, but it also XPASSes without J3 when this file is "
         "run alone, i.e. the outcome is test-ORDER dependent -- resolve that "
-        "before unmarking. See "
+        "before unmarking. See .planning/audit-v29/TaskJ3-acyl-prefix-pin.md."
     )
     def test_regression_3_phospholipid_opsin_parse(self):
         """Phospholipid fatty acid chains: correct IUPAC but OPSIN-unparseable.

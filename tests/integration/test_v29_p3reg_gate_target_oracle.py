@@ -1,8 +1,8 @@
-"""v29 P3-REGRESSION — end-to-end oracle for the four gold targets that regressed.
+"""-REGRESSION — end-to-end oracle for the four gold targets that regressed.
 
-These four are `category: target` rows in 
-characteristic_groups.json`. They passed the FULL gate at `b8cafa23` and at
-`8e6cc631`, then regressed at `64af6b2f` (`target_passes` 1641 -> 1637), because
+These four are `category: target` rows in `benchmarks/the gold set/packs/
+characteristic_groups.json`. They passed the FULL gate at and at
+, then regressed at (`target_passes` 1641 -> 1637), because
 `polyfunctional.format_fg_prefix` enclosed an already-enclosed prefix a second time.
 
 WHY THIS FILE LIVES IN `tests/integration/` AND RE-ENABLES THE GATE
@@ -43,7 +43,7 @@ REGRESSED_GOLD_TARGETS = [
      "5-hydroxy-5-(hydroxyimino)pentanoic acid"),
 ]
 
-# The four CRITICALs fixed by `064fefd5`. The regression fix must not undo them:
+# The four CRITICALs fixed by. The regression fix must not undo them:
 # it narrows only the ENCLOSURE question, never the multiplier question.
 MULTIPLIER_CRITICAL_CONTROLS = [
     ("O=Nc1ccc(N=O)cc1", "1,4-dinitrosobenzene"),

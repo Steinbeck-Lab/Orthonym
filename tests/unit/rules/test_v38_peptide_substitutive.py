@@ -1,8 +1,8 @@
 """
-v38 (backbone-substitutive peptide -- CIP-locanted splice + ester C-terminus).
+ (backbone-substitutive peptide -- CIP-locanted splice + ester C-terminus).
 
 This increment extends `rules.peptides._try_backbone_substitutive` (the
-last-resort, RT-gated peptide fallback added in v33 Phase 2) with two new
+last-resort, RT-gated peptide fallback added in a phase) with two new
 capabilities, plus the dispatch-gate broadening that makes the second one
 reachable end-to-end:
 
@@ -18,7 +18,7 @@ reachable end-to-end:
 
   * Site B -- ESTER C-terminus parent: a peptide whose C-terminal residue's
     alpha-carboxyl is esterified ('...oate', NO free -COOH) is now named with
-    a fully systematic 'methyl ...oate' parent via
+    a fully systematic 'methyl...oate' parent via
     `_name_ester_parent_systematic`, exposing the same '(stereo)-N-amino'
     splice point. So `COC(=O)[C@H](CC(C)C)NC(=O)[C@@H](N)CC(C)C` (Leu-Leu
     methyl ester) names
@@ -28,7 +28,7 @@ reachable end-to-end:
     alternative (`_TERMINAL_ESTER_ALPHA_SMARTS`) so an ester-C-terminus
     peptide (no free -COOH, no primary carboxamide) actually reaches
     `rules.peptides.name_peptide` instead of falling through to 'unknown
-    organic compound'. This is the exact structural analogue of the v33
+    organic compound'. This is the exact structural analogue of the
     primary-amide alternative already present. Scoped to an alpha-amino-acid
     ester + `count_peptide_bonds >= 1`, so ordinary esters are NOT re-routed.
 
@@ -151,7 +151,7 @@ class TestNonStandardLinearPeptides:
 @pytest.mark.unit
 class TestDeterminism:
     """The same molecule named from randomized SMILES atom orderings must give
-    byte-identical output (the contributor guide invariant 4: determinism)."""
+    byte-identical output (CLAUDE.md a project rule: determinism)."""
 
     @pytest.mark.parametrize(
         "smi,expected",

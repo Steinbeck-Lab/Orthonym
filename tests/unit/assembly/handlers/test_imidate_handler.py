@@ -1,19 +1,19 @@
-"""Phase 163 imidate handler unit tests.
+"""a phase imidate handler unit tests.
 
 Asserts handlers/imidate.py:
-- _is_imidate predicate (predicate-pure per D-07)
+- _is_imidate predicate (predicate-pure per)
 - name_imidate branch coverage (linear alkyl, aromatic, acyclic-only)
 - INNER_DISPATCH registration at priority 2900
 - side_effect_inventory == () invariant
 
-Test pyramid per CONTEXT D-12 + RESEARCH §8.3:
+Test pyramid per CONTEXT + RESEARCH §8.3:
 - Section A: predicate purity tests (5)
-- Section B: name_imidate branch coverage (6 fixtures FRN-D-01..06)
+- Section B: name_imidate branch coverage (6 fixtures FRN-..06)
 - Section C: INNER_DISPATCH integration (4)
 - Section D: _collect_subgraph BFS helper (2)
 - Section E: edge cases (3)
 
-Total: 20 tests (CONTEXT D-12 floor 15).
+Total: 20 tests (CONTEXT floor 15).
 
 References:
 - src/orthonym/assembly/handlers/imidate.py
@@ -67,7 +67,7 @@ class TestIsImidatePredicate:
         assert _is_imidate(features) is False
 
     def test_predicate_does_not_mutate_features(self):
-        """D-07 predicate purity: NO mutation of features.functional_groups."""
+        """ predicate purity: NO mutation of features.functional_groups."""
         features = _make_mock_features(
             functional_groups={'iminoester': [(0, 1, 2, 3)]}
         )
@@ -96,28 +96,28 @@ class TestNameImidateBranchCoverage:
         )
 
     def test_FRN_D_01_methyl_propanimidate(self):
-        """FRN-D-01: CCC(=N)OC -> methyl propanimidate."""
+        """FRN-: CCC(=N)OC -> methyl propanimidate."""
         self._run("CCC(=N)OC", "methyl propanimidate")
 
     def test_FRN_D_02_methyl_acetimidate(self):
-        """FRN-D-02: CC(=N)OC -> methyl ethanimidate (P-65.6.3.3.7.1 systematic PIN;
+        """FRN-: CC(=N)OC -> methyl ethanimidate (P-65.6.3.3.7.1 systematic PIN;
         acetimidate is general-only)."""
         self._run("CC(=N)OC", "methyl ethanimidate")
 
     def test_FRN_D_03_ethyl_propanimidate(self):
-        """FRN-D-03: CCC(=N)OCC -> ethyl propanimidate."""
+        """FRN-: CCC(=N)OCC -> ethyl propanimidate."""
         self._run("CCC(=N)OCC", "ethyl propanimidate")
 
     def test_FRN_D_04_methyl_benzimidate(self):
-        """FRN-D-04: C(=N)(c1ccccc1)OC -> methyl benzimidate."""
+        """FRN-: C(=N)OC -> methyl benzimidate."""
         self._run("C(=N)(c1ccccc1)OC", "methyl benzimidate")
 
     def test_FRN_D_05_methyl_pentanimidate(self):
-        """FRN-D-05: CCCCC(=N)OC -> methyl pentanimidate."""
+        """FRN-: CCCCC(=N)OC -> methyl pentanimidate."""
         self._run("CCCCC(=N)OC", "methyl pentanimidate")
 
     def test_FRN_D_06_ethyl_acetimidate(self):
-        """FRN-D-06: CC(=N)OCC -> ethyl ethanimidate (P-65.6.3.3.7.1 systematic PIN)."""
+        """FRN-: CC(=N)OCC -> ethyl ethanimidate (P-65.6.3.3.7.1 systematic PIN)."""
         self._run("CC(=N)OCC", "ethyl ethanimidate")
 
 
@@ -136,7 +136,7 @@ class TestImidateInnerDispatchIntegration:
         assert INNER_DISPATCH_TABLE['imidate'].priority == 2900
 
     def test_imidate_side_effect_inventory_is_empty_tuple(self):
-        """D-07 hard invariant (Phase 158 D-26 + 160 D-25 + 161 D-12 inheritance).
+        """ hard invariant (a phase + 160 + 161 inheritance).
 
         side_effect_inventory MUST be () — the empty tuple — so the
         inner-dispatch cascade can prove every handler is reentrant.
@@ -193,7 +193,7 @@ class TestImidateEdgeCases:
         assert result is None
 
     def test_cyclic_imidate_out_of_baseline_scope(self):
-        """RESEARCH §5.4: cyclic imidates deferred to Phase 163.1.
+        """RESEARCH §5.4: cyclic imidates deferred to a phase.1.
 
         SMARTS [CX3](=[NX2H1])[OX2][#6] should NOT match cyclic structures
         because the iminoester baseline is acyclic-only per AUDIT DECISION § 2.4.
@@ -211,19 +211,19 @@ class TestImidateEdgeCases:
         matches = mol.GetSubstructMatches(patt)
         # Document the empirical result: cyclic imidates in ring contexts
         # are tolerated by the SMARTS but the audit-baseline naming corpus
-        # (FRN-D-01..06) is acyclic-only. If SMARTS matches, the run-time
+        # (FRN-..06) is acyclic-only. If SMARTS matches, the run-time
         # naming pipeline still gates on the acyclic-only audit baseline.
         # This test simply documents the empirical behavior.
         assert isinstance(matches, tuple)  # passes regardless of match
 
 
 # =============================================================================
-# CR-fix coverage (Phase 163 post-merge): branched/substituted iminoesters.
+# CR-fix coverage (a phase post-merge): branched/substituted iminoesters.
 # These tests would have caught CR-01..CR-04 in code review:
-#   CR-01: _is_imidate failing to consult principal_group on mixed-PG inputs
-#   CR-02: _name_alkyl_fragment dropping branching/substitution on R' (R'-O-)
-#   CR-03: _name_chain_with_imidate_suffix dropping branching/substitution on R
-# Aligned with ./skills/fix-methodology.md "root cause, not band-aid".
+# CR-01: _is_imidate failing to consult principal_group on mixed-PG inputs
+# CR-02: _name_alkyl_fragment dropping branching/substitution on R' (R'-O-)
+# CR-03: _name_chain_with_imidate_suffix dropping branching/substitution on R
+# Aligned with.claude/skills/fix-methodology.md "root cause, not band-aid".
 # =============================================================================
 
 
@@ -337,7 +337,7 @@ class TestImidatePredicateDefersToHigherPG:
         )
 
     def test_acid_with_imidate_substituent_names_methoxycarbonimidoyl(self):
-        """v31 imidate producer: the imidate substituent is expressed as the
+        """ imidate producer: the imidate substituent is expressed as the
         IUPAC prefix ``C-methoxycarbonimidoyl`` on the senior benzoic-acid
         parent. The italic ``C-`` locant is REQUIRED (P-66.1.6.1.2.2, BB 33425:
         "to prevent possible ambiguity with N-substitution"); the parent form
@@ -362,7 +362,7 @@ class TestImidatePredicateDefersToHigherPG:
 
 
 class TestChainImidateSplit:
-    """v31 F-imidate-2: a CHAIN-parent imidate ``-C(=NH)-O-R`` (its carbon in the
+    """ F-imidate-2: a CHAIN-parent imidate ``-C(=NH)-O-R`` (its carbon in the
     acid chain) is named with the SIMPLE prefixes ``imino`` + ``{alkoxy}``, NOT
     the compound ``carbonimidoyl`` prefix — P-65.1.3.1.2(2), whose verbatim (PIN)
     hydroxy template is ``4-hydroxy-4-iminobutanoic acid`` (BB 30035). Previously

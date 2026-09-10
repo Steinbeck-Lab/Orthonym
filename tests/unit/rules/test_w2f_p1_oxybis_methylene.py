@@ -11,7 +11,7 @@ phenol (PCG) ring as parent; retained 'benzyloxy' is forbidden on a
 substituted ring in PINs (P-29.6.1, BB 16274).
 
 All expected names OPSIN-2.9-verified in
- §2.D.
+internal notes §2.D.
 """
 import pytest
 from rdkit import Chem
@@ -56,7 +56,7 @@ class TestOxybisMethyleneBridge:
     # --- regression anchors: shipped bridge family stays byte-identical ---
 
     def test_methylenebis_oxy_untouched(self):
-        # gold W2C-C-MA-02 (recognizer _try_methylenebis_oxy_bridge :862)
+        # gold W2C-C-MA-02 (recognizer _try_methylenebis_oxy_bridge:862)
         assert name_compound("Oc1ccc(OCOc2ccc(O)cc2)cc1") == \
             "4,4'-[methylenebis(oxy)]diphenol"
 

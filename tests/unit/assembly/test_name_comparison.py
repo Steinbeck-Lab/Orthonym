@@ -1,6 +1,6 @@
 """P-14.3.5 locant ordering + P-45.5 name comparison (Wave-2 P0c Tasks 1-2-4).
 
-BB P-14.3.5 (BlueBookV2.md:3191-3195): primes immediately after unprimed;
+BB P-14.3.5 (the Blue Book-3195): primes immediately after unprimed;
 number+letter after the bare number; superscripts after letters; italic
 Roman letters < Greek letters < numerals.
 """
@@ -26,7 +26,7 @@ class TestLocantSortKeyP1435:
         ("1^4", "2'"),      # base number decides first (BB: 1^4 < 2')
         ("3a", "3a^1"),     # superscript after letters
         ("N", "alpha"),     # italic Roman < Greek
-        ("alpha", "1"),     # Greek < numerals
+        ("α", "1"),     # Greek < numerals
         ("N", "1"),         # italic Roman < numerals
         ("N", "N'"),        # primed italic after unprimed
     ])
@@ -70,7 +70,7 @@ from orthonym.assembly.name_comparison import compare_names
 
 
 class TestCompareNamesP455:
-    """BB P-45.5 (BlueBookV2.md:22234ff) worked examples, string-level."""
+    """BB P-45.5 (the Blue Bookff) worked examples, string-level."""
 
     def test_bb_example_1_bromo_before_dibromo(self):
         # BB P-45.5 example (2): 'bromo' earlier alphabetically than 'dibromo'
@@ -86,7 +86,7 @@ class TestCompareNamesP455:
         assert compare_names(a, b) == -1
 
     def test_numeric_locants_in_order_of_appearance(self):
-        # BB line 6407: '1-chloroethoxy' precedes '2-chloroethoxy' when
+        # the Blue Book: '1-chloroethoxy' precedes '2-chloroethoxy' when
         # letters are identical — numerals compared in APPEARANCE order.
         a = "4-{2-[2-(4-carboxyphenyl)-1-chloroethoxy]-1-chloroethyl}benzoic acid"
         b = "4-{2-[2-(4-carboxyphenyl)-2-chloroethoxy]-2-chloroethyl}benzoic acid"
@@ -118,7 +118,7 @@ class TestLambdaLocantsP4532:
         assert parse_lambda_locant("4a") is None
 
     def test_bb_p4532_example(self):
-        # BB line 22204: '1λ5' ... is lower than '2λ5' — the 1λ5 candidate wins.
+        # the Blue Book: '1λ5'... is lower than '2λ5' — the 1λ5 candidate wins.
         assert compare_lambda_locant_sets(["1λ5"], ["2λ5"]) == -1
         assert compare_lambda_locant_sets(["2λ5"], ["1λ5"]) == 1
 

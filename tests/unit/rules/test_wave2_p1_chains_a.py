@@ -127,7 +127,8 @@ class TestP66CarboxamideSeniorToUrea:
 
     def test_pure_urea_unchanged(self):
         assert name_compound("NC(=O)N") == "urea"
-        assert name_compound("NC(=O)NCC") == "N-ethylurea"
+        # Monosubstituted urea omits the italic-N locant (P-14.3.4.3,:2943).
+        assert name_compound("NC(=O)NCC") == "ethylurea"
 
 
 @pytest.mark.unit

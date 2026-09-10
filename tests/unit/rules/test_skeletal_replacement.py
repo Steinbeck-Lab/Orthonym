@@ -69,18 +69,18 @@ class TestReplacementTerms:
 
 
 # ============================================================================
-# Phase 154.A D-03: PIN-trigger function (P-15.4.1.2)
+# a phase.A: PIN-trigger function (P-15.4.1.2)
 # ============================================================================
 
 @pytest.mark.unit
 class TestPinTrigger:
-    """D-03: strict IUPAC P-15.4.1.2 PIN trigger function tests.
+    """: strict IUPAC P-15.4.1.2 PIN trigger function tests.
 
     Tests `_qualifies_for_pin_skeletal_replacement(backbone, mol)` which
     replaces the legacy single-hetero chain-len < 6 inline reject with
     explicit branch labels per IUPAC Blue Book P-15.4.1.2.
 
-    Source: 154-CONTEXT.md D-03; 154-RESEARCH.md §3.2; 154-AUDIT-A.md §7.
+    Source: 154-CONTEXT.md; 154-RESEARCH.md §3.2; 154-AUDIT-A.md §7.
     Source: IUPAC Blue Book 2013 P-15.4.1.2.
     """
 
@@ -90,7 +90,7 @@ class TestPinTrigger:
         # Embedded (skip 0 and 8): O O O O at positions 1,3,5,7 -- 4 same-kind
         ("COCOCOCOC", [0, 1, 2, 3, 4, 5, 6, 7, 8], True, ">=4-same-kind"),
         # Branch (b): >= 3 mixed-kind heteroatoms
-        # CSCNCOC: 0=C, 1=S, 2=C, 3=N, 4=C, 5=O, 6=C  (S+N+O = 3 distinct)
+        # CSCNCOC: 0=C, 1=S, 2=C, 3=N, 4=C, 5=O, 6=C (S+N+O = 3 distinct)
         ("CSCNCOC", [0, 1, 2, 3, 4, 5, 6], True, ">=3-mixed-kind"),
         # Single hetero long chain (legacy gate-5 accept):
         # CCCOCCCC: 0..7, embedded O at index 3, len=8 >= 6
@@ -116,7 +116,7 @@ class TestPinTrigger:
 
 @pytest.mark.unit
 class TestPinTriggerEndToEnd:
-    """D-03 end-to-end: confirm helper is wired into try_skeletal_replacement_name.
+    """ end-to-end: confirm helper is wired into try_skeletal_replacement_name.
 
     Verifies the helper is called from the gate-5 position in
     `try_skeletal_replacement_name` (replacing the inline reject) and that
@@ -153,13 +153,13 @@ class TestPinTriggerEndToEnd:
 class TestUnsaturatedCyclicReplacement:
     """Test unsaturated large heterocyclic ring replacement naming.
 
-    P-22.2.3 (``BlueBookV2.md:8482``) fixes the boundary by RING SIZE, not by
+    P-22.2.3 (``the Blue Book``) fixes the boundary by RING SIZE, not by
     saturation: "Mancude and saturated heteromonocyclic compounds with up to
     and including ten ring members are named by the extended Hantzsch-Widman
     system (see P-22.2.2). For monocyclic rings with eleven and more ring
     members, skeletal replacement ('a') nomenclature (see P-15.4) is used".
 
-    These cases therefore use 11-membered rings.  The 7- and 8-membered
+    These cases therefore use 11-membered rings. The 7- and 8-membered
     versions they used to assert belong to Hantzsch-Widman and are covered by
     ``test_hw_vs_replacement_boundary.py``.
     """
@@ -225,6 +225,62 @@ class TestUnsaturatedCyclicReplacement:
         assert 'ae' not in result
 
 
+@pytest.mark.unit
+class TestMonocyclicSeniorHeteroatomAtLocantOne:
+    """P-22.2.3.2.3: senior heteroatom takes locant '1' (ring rule, not set-first).
+
+    Section P-22.2.3 "Heteromonocyclic hydrides named by skeletal replacement
+    ('a') nomenclature", subsection P-22.2.3.2 "Numbering", P-22.2.3.2.3
+    (``the Blue Book``): "the locant '1' is given to the heteroatom first
+    cited in the order of seniority... The direction of numbering is then
+    chosen to give lower locants to the heteroatoms as a set... and then, if
+    necessary, according to the order of seniority."
+
+    So for a MONOCYCLIC replacement ring, locant '1' to the most-senior
+    heteroatom is the PRIMARY criterion, senior to low-locants-as-a-set. (The
+    low-locants-as-a-set-first rule is the CHAIN rule P-15.4.3.2.1 and was being
+    mis-applied to rings, so a non-senior element sat at locant 1.)
+    """
+
+    @pytest.mark.parametrize("smiles,expected", [
+        # O senior over S and Sn: O must take locant 1, NOT the set-lowest S.
+        # (was 5,10-dioxa-1,3-dithia-2-stannacycloundecane)
+        ("O1CS[SnH2]SCOCCCC1",
+         "1,7-dioxa-3,5-dithia-4-stannacycloundecane"),
+        ("O1CCS[SnH2]SCCOCC1",
+         "1,9-dioxa-4,6-dithia-5-stannacycloundecane"),
+        # BB verbatim example, P-22.2.3.2.3 (``the Blue Book``). O senior
+        # over N and Si. (was 2-oxa-1-aza-6-silacyclotetradecane)
+        ("C1CCCC[SiH2]CCCONCCC1",
+         "1-oxa-2-aza-11-silacyclotetradecane"),
+        # BB verbatim example, P-22.2.3.2.3 (``the Blue Book``),
+        # unsaturated: O senior over Se and N; ene locants are the LAST
+        # criterion. (was 4-oxa-1-selena-7-azacyclotrideca-2,5,8,10,12-pentaene)
+        ("O1C=C[Se]C=CC=CC=CNC=C1",
+         "1-oxa-4-selena-11-azacyclotrideca-2,5,7,9,12-pentaene"),
+    ])
+    def test_senior_heteroatom_takes_locant_one(self, smiles, expected):
+        got = try_skeletal_replacement_name(Chem.MolFromSmiles(smiles))
+        assert got == expected
+
+    @pytest.mark.parametrize("smiles,expected", [
+        # Senior heteroatom ALREADY at locant 1 -> UNCHANGED by the fix.
+        # BB verbatim, P-22.2.3.2.3 (``the Blue Book``): S senior over Se.
+        ("S1CCC[Se]CCCCCCC1", "1-thia-5-selenacyclododecane"),
+        # Single kind of heteroatom (P-22.2.3.2.2): lowest set already puts an
+        # O at locant 1.
+        ("O1CCCCCCCOCCCCCCCC1", "1,9-dioxacycloheptadecane"),
+        # Multi-element saturated ring, O senior and already at locant 1.
+        ("O1CCNCCCNCCCNCC1", "1-oxa-4,8,12-triazacyclotetradecane"),
+        # SMILES starts at the NON-senior atom (Si), yet O (senior) still takes
+        # locant 1 -- the numbering, not the input order, decides.
+        ("[SiH2]1CCCCCCCCCCOC1", "1-oxa-3-silacyclotridecane"),
+    ])
+    def test_senior_already_at_one_is_unchanged(self, smiles, expected):
+        got = try_skeletal_replacement_name(Chem.MolFromSmiles(smiles))
+        assert got == expected
+
+
 # ============================================================================
 # Basic dioxa chains
 # ============================================================================
@@ -236,7 +292,7 @@ class TestDioxaChains:
     def test_dioxahexane(self):
         """R4 / P-12.1 / P-63.2.4: COCCOC has 2 embedded O-ethers, no terminal -ol.
         The substitutive PIN is '1,2-dimethoxyethane', so try_skeletal_replacement_name
-        returns None (hands off to the substitutive namer).  Updated from the old
+        returns None (hands off to the substitutive namer). Updated from the old
         '2,5-dioxahexane' assertion which was pre-R4 behaviour."""
         mol = Chem.MolFromSmiles('COCCOC')
         assert try_skeletal_replacement_name(mol) is None
@@ -244,7 +300,7 @@ class TestDioxaChains:
     def test_dioxaoctane(self):
         """R4 / P-12.1 / P-63.2.4: CCOCCOCC has 2 embedded O-ethers, no terminal -ol.
         The substitutive PIN is '1,2-diethoxyethane', so try_skeletal_replacement_name
-        returns None.  Updated from the old '3,6-dioxaoctane' assertion (pre-R4)."""
+        returns None. Updated from the old '3,6-dioxaoctane' assertion (pre-R4)."""
         mol = Chem.MolFromSmiles('CCOCCOCC')
         assert try_skeletal_replacement_name(mol) is None
 
@@ -437,7 +493,7 @@ class TestEndToEnd:
         N-(2-methoxyethyl)propan-1-amine. Amine Gate 2c correctly blocks the
         skeletal '2-oxa-5-azaoctane'; the substitutive handler names it.
 
-        v37 SP1.1 (2026-08-25) change-asserted-value: RESOLVED. The
+         (2026-08-25) change-asserted-value: RESOLVED. The
         compound-substituent atom-drop is fixed at its on-path source
         (composer._walk_amine_n_substituents no longer applies the carbon-only
         get_alkyl_name to a heteroatom-bearing N-substituent fragment; it routes
@@ -465,12 +521,12 @@ class TestEndToEnd:
 
 
 # ============================================================================
-# Phase 154.A D-07: cyclic skeletal replacement size-class regression tests
+# a phase.A: cyclic skeletal replacement size-class regression tests
 # ============================================================================
 
 @pytest.mark.unit
 class TestCyclicReplacement:
-    """D-07: confirm _try_cyclic_replacement_name covers >= 7-member hetero rings.
+    """: confirm _try_cyclic_replacement_name covers >= 7-member hetero rings.
 
     Pulls the audit-verified fixtures from 154-AUDIT-A.md §6 (4 corpus +
     2 Blue Book = 6 cyclic-large fixtures spanning ring sizes 9, 12, 14, 18).
@@ -482,7 +538,7 @@ class TestCyclicReplacement:
     test_hantzsch_widman.py); the 4 small-ring reject tests here confirm
     gate 1 at skeletal_replacement.py:115-117 keeps rejecting <7-member.
 
-    Source: 154-CONTEXT.md D-07; 154-RESEARCH.md §3.6; 154-AUDIT-A.md §6.
+    Source: 154-CONTEXT.md; 154-RESEARCH.md §3.6; 154-AUDIT-A.md §6.
     """
 
     @pytest.mark.parametrize("smiles,expected_name,ring_size", [
@@ -548,7 +604,7 @@ class TestCyclicReplacement:
 
 @pytest.mark.unit
 class TestTerminalGroup14Gate:
-    """v23 Phase 8 (P-68.2.1.1, E2-owned terminal-atom gate): a TERMINAL Group-14
+    """ a phase (P-68.2.1.1, E2-owned terminal-atom gate): a TERMINAL Group-14
     backbone atom (Si/Ge/Sn/Pb) is NOT a skeletal-replacement chain atom — it
     would be silently counted as a carbon of the alkane stem (structure loss).
     Fail-closed; INTERIOR Group-14 atoms and ether/replacement chains are
@@ -567,7 +623,7 @@ class TestTerminalGroup14Gate:
         # INTERIOR Group-14 stays a skeletal replacement (terminal atoms are C).
         ("C[SiH2]CC[SiH2]CC[SiH2]CC[SiH2]C", "2,5,8,11-tetrasiladodecane"),
         # R4 / P-63.2.4: 2-O diether without terminal -ol -> substitutive (None from skeletal).
-        # COCCOC -> None (substitutive gives '1,2-dimethoxyethane').  Updated pre-R4 '2,5-dioxahexane'.
+        # COCCOC -> None (substitutive gives '1,2-dimethoxyethane'). Updated pre-R4 '2,5-dioxahexane'.
         # 3-O triether stays skeletal (>= 3 O falls through R4 gate).
         ("COCCOCCOC", "2,5,8-trioxanonane"),
     ])

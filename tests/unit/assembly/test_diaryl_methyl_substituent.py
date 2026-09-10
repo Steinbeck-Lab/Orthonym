@@ -1,10 +1,10 @@
-"""Phase 167 (HYG-04) — diaryl-methyl-ether + diaryl-ether-amine class tests.
+"""a phase (HYG-04) — diaryl-methyl-ether + diaryl-ether-amine class tests.
 
-Two independent root-cause bugs from the HERITAGE head-to-head (§5.1B):
+Two independent root-cause bugs from the AUTONOM head-to-head (§5.1B):
 
   SITE #1 (Plan 167-03 turns these green): Ar2CH-O- (diphenylmethyl ether) is
   mis-named `benzyloxy` because three byte-duplicated code sites never count the
-  central carbon's aryl neighbours. PIN is `diphenylmethoxy` (D-07; NOT the
+  central carbon's aryl neighbours. PIN is `diphenylmethoxy` (; NOT the
   Beilstein `benzhydryloxy`). Fixed via ONE shared aryl-count helper.
 
   SITE #2 (Plan 167-04 turns these green): `_name_amino_branch` only handles a
@@ -101,7 +101,7 @@ class TestDiarylMethoxy:
     Plan 167-03 makes these green.
     """
 
-    # >=3 diphenylmethoxy analogs (D-08) spanning chain length.
+    # >=3 diphenylmethoxy analogs () spanning chain length.
     DIPHENYLMETHOXY = [
         "OCCOC(c1ccccc1)c1ccccc1",    # 2-(diphenylmethoxy)ethan-1-ol
         "OCCCOC(c1ccccc1)c1ccccc1",   # 3-(diphenylmethoxy)propan-1-ol
@@ -235,7 +235,7 @@ class TestPrincipalAmineGuard:
 
     @pytest.mark.unit
     def test_principal_dimethylamine_unchanged(self):
-        # v22 Phase B (DD1 Fix 4): the ethane amine-suffix locant is elided per
+        # Phase B (DD1 Fix 4): the ethane amine-suffix locant is elided per
         # P-14.3.4.4 -> 'N,N-dimethylethanamine' (PubChem-confirmed), not the
         # over-located 'N,N-dimethylethan-1-amine'.
         assert name_compound("CN(C)CC") == "N,N-dimethylethanamine"

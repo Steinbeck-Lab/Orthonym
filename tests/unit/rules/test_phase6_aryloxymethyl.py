@@ -40,7 +40,7 @@ def test_nitrophenoxymethyl_oxirane_names(namer):
     # The retained contraction changes the SPELLING of the atomic unit
     # ("phenoxy" vs "(phenyl)oxy"), not whether a decorated, LOCANTED version
     # of it needs its own marks as a sub-component. The outer citation on
-    # oxirane then escalates ( -> [ over the inner marks. The decision is
+    # oxirane then escalates (-> [ over the inner marks. The decision is
     # keyed on `starts_with_locant` (does the oxy prefix CITE a locant), not
     # on `is_complex_substituent`/`enclose_if_compound` -- those flag
     # 'benzyloxy'/'cyclohexyloxy' as compound two-morpheme prefixes even
@@ -76,7 +76,7 @@ def test_plain_aryloxymethyl_unchanged(namer, smi, expected):
     # PROTECT-ROW REGRESSION LOCK. A first fix used `enclose_if_compound`, which
     # flags 'benzyloxy'/'cyclohexyloxy' as compound two-morpheme prefixes and
     # over-nested these — regressing the gold PIN `4-(benzyloxymethyl)phenol`
-    # (, category characteristic_groups) to a wrong
+    # (benchmarks/the gold set, category characteristic_groups) to a wrong
     # `4-[(benzyloxy)methyl]phenol`. A retained oxy prefix that cites NO locant
     # of its own stays BARE (single parens, no inner nest) — the enclosure
     # decision is keyed on `starts_with_locant`, not on compound-ness.

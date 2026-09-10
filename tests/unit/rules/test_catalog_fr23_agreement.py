@@ -1,9 +1,9 @@
-"""Phase 149 SC-4: 153/153 catalog regression scaffold for FR-2.3 agreement.
+"""a phase SC-4: 153/153 catalog regression scaffold for FR-2.3 agreement.
 
-Per V18 plan §6 Phase 149 acceptance + 149-CONTEXT.md D-10 Tier 2:
+Per V18 plan §6 a phase acceptance + 149-CONTEXT.md Tier 2:
 parametrized over every entry in FUSED_HETEROCYCLE_DATA (live count 153,
 verified 2026-04-28; ROADMAP says 148 — live count is binding per
-149-CONTEXT D-10).
+149-CONTEXT).
 
 ## Test predicate scope (Plan 02 triage decision)
 
@@ -33,7 +33,7 @@ THREE categories per RESEARCH §551 triage taxonomy:
    places locant 1 on a peripheral carbocyclic ring atom. RESEARCH
    §548 anticipates this: "For 3-ring fused systems, the 'components'
    can be either (A) 3 SSSR rings, or (B) 2 macro-components... per
-   D-05 lock: SSSR rings only." The 3-SSSR-ring decomposition is
+    lock: SSSR rings only." The 3-SSSR-ring decomposition is
    correct; the locant-1 predicate is unreliable for 3+ ring systems.
 
 3. **Single-component catalog entries** (rare, mostly skipped by
@@ -41,7 +41,7 @@ THREE categories per RESEARCH §551 triage taxonomy:
 
 ## Scope adjustment
 
-Per RESEARCH §554 + D-14 (no band-aids; root-cause fixes), the correct
+Per RESEARCH §554 + (no band-aids; root-cause fixes), the correct
 remedy is to **scope the predicate** to systems where it is reliable —
 NOT to special-case individual SMILES via 58 inline `pytest.skip`s
 (which would constitute a band-aid). The reliable predicate scope is:
@@ -60,14 +60,14 @@ RESEARCH §551 + this docstring.
 
 Within the scoped subset (2-ring, 1-het 1-carbo), the predicate must
 pass at 100%. Outside-scope entries are skipped with documented
-rationale and tracked in the Plan 02 SUMMARY for Phase 149.x or
-Phase 155 follow-up (where peripheral-locant numbering for non-
+rationale and tracked in the Plan 02 SUMMARY for a phase.x or
+a phase follow-up (where peripheral-locant numbering for non-
 cataloged systems is implemented).
 
 Source: https://iupac.qmul.ac.uk/fusedring/FR23.html
 Source: https://iupac.qmul.ac.uk/BlueBook/P2.html P-25.3.2.4
-Source: HERITAGE-1990 §4.
-Source: 149-CONTEXT.md D-10 Tier 2; D-11 byte-identical lock; D-14 no
+Source: AUTONOM-1990 §4.
+Source: 149-CONTEXT.md Tier 2; byte-identical lock; no
         band-aids.
 Source: 149-RESEARCH.md "Tier 2 Catalog Regression Scaffold" lines
         481-557; "Edge cases / expected acceptance failures" §548-554.
@@ -126,7 +126,7 @@ def test_fr23_agrees_with_catalog(smiles, expected_name):
     RESEARCH §548-554 + module docstring "Scope adjustment".
 
     Source: https://iupac.qmul.ac.uk/fusedring/FR23.html
-    Source: 149-CONTEXT.md D-10 Tier 2; D-14 no band-aids.
+    Source: 149-CONTEXT.md Tier 2; no band-aids.
     Source: 149-RESEARCH.md §551 triage taxonomy.
     """
     entry = FUSED_HETEROCYCLE_DATA[smiles]
@@ -142,7 +142,7 @@ def test_fr23_agrees_with_catalog(smiles, expected_name):
     # FR-2.3 correctly selects the middle/heterocyclic ring as base, but
     # IUPAC peripheral numbering for 3+ ring systems places locant 1 on a
     # carbocyclic peripheral atom per FR-5.x lowest-locant rules. The
-    # locant-1 predicate is unreliable here. Phase 155 owns peripheral
+    # locant-1 predicate is unreliable here. a phase owns peripheral
     # numbering for these systems.
     if len(components) >= 3:
         pytest.skip(

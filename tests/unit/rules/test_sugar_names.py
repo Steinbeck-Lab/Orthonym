@@ -7,7 +7,7 @@ Tests cover:
 - Non-stereo fallback lookup
 - Glycosyloxy prefix formatting for various sugar types
 - Edge cases (unknown SMILES, empty inputs)
-- OPSIN carbohydrate integration (Phase 141 Plan 03)
+- OPSIN carbohydrate integration (a phase Plan 03)
 """
 
 import pytest
@@ -29,34 +29,34 @@ class TestSugarLookup:
     """Tests for lookup_sugar() -- canonical SMILES to retained name."""
 
     def test_alpha_d_glucose_lookup(self):
-        """alpha-D-glucopyranose lookup returns correct tuple."""
+        """α-D-glucopyranose lookup returns correct tuple."""
         result = lookup_sugar("OC[C@H]1O[C@H](O)[C@H](O)[C@@H](O)[C@@H]1O")
-        assert result == ("alpha", "D", "glucopyranose")
+        assert result == ("α", "D", "glucopyranose")
 
     def test_beta_d_glucose_lookup(self):
-        """beta-D-glucopyranose lookup returns correct tuple."""
+        """β-D-glucopyranose lookup returns correct tuple."""
         result = lookup_sugar("OC[C@H]1O[C@@H](O)[C@H](O)[C@@H](O)[C@@H]1O")
-        assert result == ("beta", "D", "glucopyranose")
+        assert result == ("β", "D", "glucopyranose")
 
     def test_alpha_d_galactose_lookup(self):
-        """alpha-D-galactopyranose lookup returns correct tuple."""
+        """α-D-galactopyranose lookup returns correct tuple."""
         result = lookup_sugar("OC[C@H]1O[C@H](O)[C@H](O)[C@@H](O)[C@H]1O")
-        assert result == ("alpha", "D", "galactopyranose")
+        assert result == ("α", "D", "galactopyranose")
 
     def test_beta_l_rhamnose_lookup(self):
-        """beta-L-rhamnopyranose lookup returns correct tuple."""
+        """β-L-rhamnopyranose lookup returns correct tuple."""
         result = lookup_sugar("C[C@@H]1O[C@H](O)[C@H](O)[C@H](O)[C@H]1O")
-        assert result == ("beta", "L", "rhamnopyranose")
+        assert result == ("β", "L", "rhamnopyranose")
 
     def test_alpha_l_fucose_lookup(self):
-        """alpha-L-fucopyranose lookup returns correct tuple."""
+        """α-L-fucopyranose lookup returns correct tuple."""
         result = lookup_sugar("C[C@@H]1O[C@@H](O)[C@@H](O)[C@H](O)[C@@H]1O")
-        assert result == ("alpha", "L", "fucopyranose")
+        assert result == ("α", "L", "fucopyranose")
 
     def test_beta_d_ribofuranose_lookup(self):
-        """beta-D-ribofuranose lookup returns correct tuple."""
+        """β-D-ribofuranose lookup returns correct tuple."""
         result = lookup_sugar("OC[C@H]1O[C@@H](O)[C@H](O)[C@@H]1O")
-        assert result == ("beta", "D", "ribofuranose")
+        assert result == ("β", "D", "ribofuranose")
 
     def test_unknown_smiles_returns_none(self):
         """Non-sugar SMILES returns None."""
@@ -64,20 +64,20 @@ class TestSugarLookup:
         assert result is None
 
     def test_nacetyl_glucosamine_lookup(self):
-        """alpha-D-GlcNAc lookup returns correct tuple."""
+        """α-D-GlcNAc lookup returns correct tuple."""
         result = lookup_sugar(
             "CC(=O)N[C@@H]1[C@@H](O)[C@H](O)[C@@H](CO)O[C@@H]1O"
         )
         assert result == (
-            "alpha", "D", "2-acetamido-2-deoxy-glucopyranose"
+            "α", "D", "2-acetamido-2-deoxy-glucopyranose"
         )
 
     def test_glucuronic_acid_lookup(self):
-        """beta-D-glucuronic acid lookup returns correct tuple."""
+        """β-D-glucuronic acid lookup returns correct tuple."""
         result = lookup_sugar(
             "O=C(O)[C@H]1O[C@@H](O)[C@H](O)[C@@H](O)[C@@H]1O"
         )
-        assert result == ("beta", "D", "glucuronopyranose")
+        assert result == ("β", "D", "glucuronopyranose")
 
     def test_nonstereo_fallback(self):
         """Sugar SMILES without @ characters returns base name only."""
@@ -106,26 +106,26 @@ class TestGlycosyloxyPrefix:
     """Tests for sugar_to_glycosyloxy_prefix() formatting."""
 
     def test_glucose_prefix(self):
-        """beta-D-glucopyranose -> beta-D-glucopyranosyloxy."""
-        result = sugar_to_glycosyloxy_prefix("beta", "D", "glucopyranose")
-        assert result == "beta-D-glucopyranosyloxy"
+        """β-D-glucopyranose -> β-D-glucopyranosyloxy."""
+        result = sugar_to_glycosyloxy_prefix("β", "D", "glucopyranose")
+        assert result == "β-D-glucopyranosyloxy"
 
     def test_rhamnose_prefix(self):
-        """alpha-L-rhamnopyranose -> alpha-L-rhamnopyranosyloxy."""
-        result = sugar_to_glycosyloxy_prefix("alpha", "L", "rhamnopyranose")
-        assert result == "alpha-L-rhamnopyranosyloxy"
+        """α-L-rhamnopyranose -> α-L-rhamnopyranosyloxy."""
+        result = sugar_to_glycosyloxy_prefix("α", "L", "rhamnopyranose")
+        assert result == "α-L-rhamnopyranosyloxy"
 
     def test_furanose_prefix(self):
-        """beta-D-ribofuranose -> beta-D-ribofuranosyloxy."""
-        result = sugar_to_glycosyloxy_prefix("beta", "D", "ribofuranose")
-        assert result == "beta-D-ribofuranosyloxy"
+        """β-D-ribofuranose -> β-D-ribofuranosyloxy."""
+        result = sugar_to_glycosyloxy_prefix("β", "D", "ribofuranose")
+        assert result == "β-D-ribofuranosyloxy"
 
     def test_nacetyl_prefix(self):
         """Modified sugar with deoxy prefix."""
         result = sugar_to_glycosyloxy_prefix(
-            "beta", "D", "2-acetamido-2-deoxy-glucopyranose"
+            "β", "D", "2-acetamido-2-deoxy-glucopyranose"
         )
-        assert result == "beta-D-2-acetamido-2-deoxy-glucopyranosyloxy"
+        assert result == "β-D-2-acetamido-2-deoxy-glucopyranosyloxy"
 
     def test_no_anomer_config_prefix(self):
         """Empty anomer/config gives prefix without leading hyphens."""
@@ -161,7 +161,7 @@ class TestDataCompleteness:
 
 
 # ============================================================================
-# OPSIN carbohydrate integration tests (Phase 141, Plan 03)
+# OPSIN carbohydrate integration tests (a phase, Plan 03)
 # ============================================================================
 
 class TestOpsinCarbohydrateIntegration:
@@ -232,12 +232,12 @@ class TestOpsinCarbohydrateIntegration:
         """All original 56 hand-curated sugar entries still return correct tuples."""
         from orthonym.data.sugar_names import ALL_SUGAR_NAMES
         originals = {
-            "OC[C@H]1O[C@H](O)[C@H](O)[C@@H](O)[C@@H]1O": ("alpha", "D", "glucopyranose"),
-            "OC[C@H]1O[C@@H](O)[C@H](O)[C@@H](O)[C@@H]1O": ("beta", "D", "glucopyranose"),
-            "OC[C@H]1O[C@H](O)[C@H](O)[C@@H](O)[C@H]1O": ("alpha", "D", "galactopyranose"),
-            "C[C@@H]1O[C@@H](O)[C@H](O)[C@H](O)[C@H]1O": ("alpha", "L", "rhamnopyranose"),
-            "C[C@@H]1O[C@@H](O)[C@@H](O)[C@H](O)[C@@H]1O": ("alpha", "L", "fucopyranose"),
-            "OC[C@H]1O[C@H](O)[C@@H](O)[C@@H](O)[C@@H]1O": ("alpha", "D", "mannopyranose"),
+            "OC[C@H]1O[C@H](O)[C@H](O)[C@@H](O)[C@@H]1O": ("α", "D", "glucopyranose"),
+            "OC[C@H]1O[C@@H](O)[C@H](O)[C@@H](O)[C@@H]1O": ("β", "D", "glucopyranose"),
+            "OC[C@H]1O[C@H](O)[C@H](O)[C@@H](O)[C@H]1O": ("α", "D", "galactopyranose"),
+            "C[C@@H]1O[C@@H](O)[C@H](O)[C@H](O)[C@H]1O": ("α", "L", "rhamnopyranose"),
+            "C[C@@H]1O[C@@H](O)[C@@H](O)[C@H](O)[C@@H]1O": ("α", "L", "fucopyranose"),
+            "OC[C@H]1O[C@H](O)[C@@H](O)[C@@H](O)[C@@H]1O": ("α", "D", "mannopyranose"),
         }
         for smi, expected in originals.items():
             result = ALL_SUGAR_NAMES.get(smi)
@@ -249,7 +249,7 @@ class TestOpsinCarbohydrateIntegration:
         assert len(ALL_SUGAR_NAMES) >= 70, f"Expected >= 70 sugar entries, got {len(ALL_SUGAR_NAMES)}"
 
     def test_sugar_main_cascade(self):
-        """name_compound() on beta-D-glucopyranose SMILES returns a sugar name."""
+        """name_compound() on β-D-glucopyranose SMILES returns a sugar name."""
         from orthonym import name_compound
         result = name_compound("OC[C@H]1O[C@@H](O)[C@H](O)[C@@H](O)[C@@H]1O")
         assert "glucopyranose" in result.lower(), f"Expected sugar name, got: {result}"
@@ -279,4 +279,4 @@ class TestOpsinCarbohydrateIntegration:
         smi = "N[C@@H]1[C@@H](O)[C@H](O)[C@@H](CO)O[C@@H]1O"
         result = ALL_SUGAR_NAMES.get(smi)
         assert result is not None
-        assert result == ("alpha", "D", "glucosamine")
+        assert result == ("α", "D", "glucosamine")

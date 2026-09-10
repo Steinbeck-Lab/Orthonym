@@ -350,7 +350,7 @@ class TestNameBicycloSystem:
 
     @pytest.mark.unit
     def test_norbornane_correct_carbon_count(self, norbornane):
-        """Norbornane has 7 carbons, so systematic name would be ...heptane."""
+        """Norbornane has 7 carbons, so systematic name would be...heptane."""
         # The formula: x + y + z + 2 = 2 + 2 + 1 + 2 = 7
         # Since it uses retained name, we verify the carbon count indirectly
         ring_atoms = get_bicyclo_ring_atoms(norbornane)
@@ -521,13 +521,13 @@ class TestBicycloNamingIntegration:
 
 
 # ============================================================================
-# Phase 169.5 SUB-02 — bridged-bicyclic bridgehead perception (Wave 0)
+# a phase.5 SUB-02 — bridged-bicyclic bridgehead perception (Wave 0)
 #
-# The NEGATIVE canaries are the #1 regression gate (C3/D-07): relaxing the
+# The NEGATIVE canaries are the #1 regression gate (C3/): relaxing the
 # bridgehead predicate makes naphthalene/decalin yield 2 bridgeheads identical
 # to camphor's, so they MUST stay correct — kept out of von Baeyer by the
 # is_bicyclo_system applicability guards, NOT the bridgehead count. adamantane/
-# cubane/bridged-tricyclic are the D-08 no-op proof (the already-correct
+# cubane/bridged-tricyclic are the no-op proof (the already-correct
 # VonBaeyerAnalyzer path must be byte-identical after consolidation).
 # Camphor is the xfail target (mis-named as a cyclopentanone until Plan 03).
 # ============================================================================
@@ -552,7 +552,7 @@ class TestSUB02NegativeCanary:
         assert name_compound("C1C2CC3CC1CC(C2)C3") == "adamantane"
 
     def test_negative_cubane_retained(self):
-        # v23 Phase 5: cubane is a retained name AND a PIN (Blue Book line 9881 /
+        # a phase: cubane is a retained name AND a PIN (Blue Book line 9881 /
         # P-23.2.5.1). The bicyclo_systems catalog key was previously the WRONG
         # (CH)8 cage isomer (InChIKey BOLISNSTKUABPW), so true cubane missed its
         # retained name and got the systematic von-Baeyer name. After the rekey to
@@ -560,11 +560,11 @@ class TestSUB02NegativeCanary:
         assert name_compound("C12C3C4C1C5C2C3C45") == "cubane"
 
     def test_negative_bridged_tricyclic_unchanged(self):
-        # 13B(d) + v41 M4#1: the P-23.2.1 main-ring fix selects the maximal
-        # (9-membered) main ring (branches 5,2), and the v41 P-23.2.4 main-bridge
+        # 13B(d) + M4#1: the P-23.2.1 main-ring fix selects the maximal
+        # (9-membered) main ring (branches 5,2), and the P-23.2.4 main-bridge
         # fix then selects the maximal (2-atom) main bridge -- giving
         # tricyclo[5.2.2.0^4,10]undecane, not the older tricyclo[5.2.1.1^4,10]
-        # (main bridge 1, secondary bridge 1). P-23.2.4 (BlueBookV2.md:9603): the
+        # (main bridge 1, secondary bridge 1). P-23.2.4 (the Blue Book): the
         # main bridge "includes as many of the atoms as possible that are not
         # included in the main ring", so 2 is preferred over 1. Both descriptors
         # round-trip to the same C11 cage via OPSIN; the new form is the more
@@ -594,7 +594,7 @@ class TestSUB02Camphor:
     # None for every name and `assert out is not None` was what failed. The
     # xfail therefore attributed a fixture bug to a nomenclature cause.
     # Measured now: camphor emits
-    #     '(1R,4R)-1,7,7-trimethylbicyclo[2.2.1]heptan-2-one'
+    # '(1R,4R)-1,7,7-trimethylbicyclo[2.2.1]heptan-2-one'
     # — locant 2, the PIN — and the stereo-free InChI round-trips exactly.
     def test_camphor_opsin_roundtrips(self, opsin_to_smiles):
         from rdkit import Chem
@@ -616,7 +616,7 @@ class TestBicycloDiketoneSuffix:
     def test_bicyclo_diketone_names_both_carbonyls(self):
         # Both carbonyls emitted with the 'di' multiplier; terminal 'e' RETAINED
         # before the consonant-initial '-dione' (IN-06 / P-16.7.1(a) elision rule).
-        # Phase 170 WS-6 (DEF-7): von Baeyer numbering now obeys P-14.4, giving the
+        # a phase WS-6 (DEF-7): von Baeyer numbering now obeys P-14.4, giving the
         # carbonyls the LOWEST locants {2,6} (compare_locant_sets([2,6],[3,8]) < 0).
         # The prior '3,8-dione' was the topology-only numbering the audit flagged
         # (RT-valid but non-PIN). Verified: 'bicyclo[2.2.2]octane-2,6-dione'
@@ -628,8 +628,8 @@ class TestBicycloDiketoneSuffix:
 
     def test_bicyclo_monoketone_elides_e(self):
         # A single ring ketone elides the 'e' before the vowel-initial '-one'.
-        # Phase 170 WS-6 (DEF-7): P-14.4 numbering gives the ketone the lowest
+        # a phase WS-6 (DEF-7): P-14.4 numbering gives the ketone the lowest
         # locant (2, not the prior topology-only 3). This is the DEF-7 gold target
-        # () — PIN 'bicyclo[2.2.1]heptan-2-one'.
+        # (benchmarks/the gold set/gold_pins.json) — PIN 'bicyclo[2.2.1]heptan-2-one'.
         name = name_compound("O=C1CC2CCC1C2")
         assert name == "bicyclo[2.2.1]heptan-2-one"

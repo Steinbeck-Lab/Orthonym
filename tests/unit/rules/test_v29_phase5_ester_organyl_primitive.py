@@ -1,4 +1,4 @@
-"""v29 Phase 5 — the ester organyl word comes from the centralized primitive.
+""" a phase — the ester organyl word comes from the centralized primitive.
 
 `rules/esters.py::get_alkyl_fragment_name` was a bespoke re-implementation of
 substituent naming that derived the organyl word from a CARBON COUNT. It
@@ -13,9 +13,9 @@ None of those shipped: SELF-01 re-perceived the name, saw a different molecule
 and suppressed it to the descriptive fallback. So the visible symptom was an
 ABSTENTION, and `assembly/general_engine.py:252` logged
 `REFUSE:unsupported suffix for pg='ester'` downstream — which is how this was
-found (the Phase 5 census, ).
+found (the a phase census, internal notes).
 
-The fix is the Phase 5 shape: stop re-deriving, call the total primitive
+The fix is the a phase shape: stop re-deriving, call the total primitive
 `assembly.substituent_naming.name_substituent_fragment` — the documented
 "centralized entry point for all substituent naming" — and keep the legacy
 path only for fragments the primitive declines.

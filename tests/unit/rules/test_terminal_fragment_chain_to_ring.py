@@ -1,7 +1,7 @@
 """terminal_fragment: a chain leading to a ring system (off-ring attachment) now
 names, instead of the documented `_composite_fragment_name` refusal
 ("attachment is acyclic but the fragment carries a ring; out of implemented
-scope"). v30 ring-branch breadth lever.
+scope"). ring-branch breadth lever.
 
 The acyl-with-ring branch-abort class -- benzoyl `-C(=O)Ph`, ring-carbonyl
 `-C(=O)-N(ring)`, and plain chain-to-ring alkyls -- is named by building the
@@ -13,7 +13,7 @@ carbonyl O becomes an `oxo`, so no acyl vocabulary is needed (the reference
 The tokens are the module's REPLACEMENT-nomenclature spelling (a ring via
 `terminal_ring` -> `cyclohexa-1,3,5-trien-1-yl` for benzene, the carbonyl O as a
 backbone `oxa`) -- ugly but RT-CORRECT, exactly the best-effort contract
-(the contributor guide invariant 1: a table miss degrades to an uglier name, never a
+(CLAUDE.md a project rule: a table miss degrades to an uglier name, never a
 refusal). Prettier RETAINED ring names (phenyl / piperidin-1-yl) would come from
 recursing the ring decoration through the full retained namer -- a follow-on.
 
@@ -72,7 +72,7 @@ def test_pure_acyclic_unchanged():
 
 # ---- 0-WRONG: a branch joined by a NON-single bond (ylidene) fails closed -----
 # Recursing it yields a `-yl` token asserting a SINGLE bond -> wrong constitution
-# (fable ring-review R1). No -ylidene constructor here, so refuse.
+# (a review ring-review R1). No -ylidene constructor here, so refuse.
 
 @pytest.mark.parametrize("smiles,attach", [
     ("CC=C1CCCCC1", 0),   # ring-ylidene: -CH2-CH=C<cyclohexylidene (this lever's surface)

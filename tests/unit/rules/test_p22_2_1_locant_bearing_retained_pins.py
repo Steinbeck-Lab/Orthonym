@@ -6,33 +6,33 @@ and the same root cause: a bare retained stem imported from
 and short-circuited the dispatch before any rule ran.
 
 Section **P-22.2.1 "Retained names of heteromonocycles"** (heading
-``BlueBookV2.md:8109``); its lead-in at ``:8117`` reads *"Retained names for
-saturated heteromonocycles are given in Table 2.3."*  The governing lines,
+``the Blue Book``); its lead-in at ``:8117`` reads *"Retained names for
+saturated heteromonocycles are given in Table 2.3."* The governing lines,
 verbatim::
 
-    :8137  isoxazole 1,2-oxazole (PIN) isothiazole (S instead of O)
+    :8137 isoxazole 1,2-oxazole (PIN) isothiazole (S instead of O)
            1,2-thiazole (PIN) isoselenazole (Se instead of O) 1,2-selenazole
            (PIN) isotellurazole (Te instead of O) 1,2-tellurazole (PIN)
-    :8165  selenophene (PIN)
-    :8170  tellurophene (PIN)
-    :8182  oxazolidine 1,3-oxazolidine (PIN) thiazolidine (S instead of O)
+    :8165 selenophene (PIN)
+    :8170 tellurophene (PIN)
+    :8182 oxazolidine 1,3-oxazolidine (PIN) thiazolidine (S instead of O)
            1,3-thiazolidine (PIN) selenazolidine (Se instead of O)
-    :8184  1,2-oxazolidine (PIN) isothiazolidine (S instead of O)
+    :8184 1,2-oxazolidine (PIN) isothiazolidine (S instead of O)
            1,2-thiazolidine (PIN) isoselenazolidine (Se instead of O)
            1,2-selenazolidine (PIN) isotellurazolidine (Te instead of O)
 
-Table 2.3 is OCR'd as interleaved two-column text.  Only two pairings there need
-reconstruction (``isoxazolidine`` at :8180 -> :8184, and ``isotellurazolidine``
-at :8184 -> :8188); both were cross-checked against
-<https://iupac.qmul.ac.uk/BlueBook/> and are independently forced by :8137, where
+Table 2.3 is OCR'd as interleaved two-column text. Only two pairings there need
+reconstruction (``isoxazolidine`` at:8180 ->:8184, and ``isotellurazolidine``
+at:8184 ->:8188); both were cross-checked against
+<https://iupac.qmul.ac.uk/BlueBook/> and are independently forced by:8137, where
 the identical iso-/1,2- mapping is printed for the mancude analogues on a single
-non-interleaved line.  Every other row asserted here sits on one line.
+non-interleaved line. Every other row asserted here sits on one line.
 
-⚠ **No round-trip oracle can protect this class.**  OPSIN 2.9.0 resolves the bare
+⚠ **No round-trip oracle can protect this class.** OPSIN 2.9.0 resolves the bare
 ``thiazolidine``, ``isothiazolidine`` and ``selenofuran`` to exactly the same
 structures as their locant-bearing PINs, so name -> structure -> InChIKey agrees
-for names the Blue Book prints as not-the-PIN.  These are *spelling* assertions,
-checked against the Blue Book by eye.  That is the point of the file.
+for names the Blue Book prints as not-the-PIN. These are *spelling* assertions,
+checked against the Blue Book by eye. That is the point of the file.
 """
 import pytest
 
@@ -45,15 +45,15 @@ from orthonym.namer import name_compound
 # --------------------------------------------------------------------------
 
 PARENTS = [
-    ("c1cc[se]c1", "selenophene"),           # :8165
-    ("c1cc[te]c1", "tellurophene"),          # :8170
-    ("c1cn[se]c1", "1,2-selenazole"),        # :8137
-    ("c1cn[te]c1", "1,2-tellurazole"),       # :8137
-    ("C1CSCN1", "1,3-thiazolidine"),         # :8182
-    ("C1CNOC1", "1,2-oxazolidine"),          # :8180 + :8184
-    ("C1CNSC1", "1,2-thiazolidine"),         # :8184
-    ("C1CN[Se]C1", "1,2-selenazolidine"),    # :8184
-    ("C1CN[Te]C1", "1,2-tellurazolidine"),   # :8184 + :8188
+    ("c1cc[se]c1", "selenophene"),           #:8165
+    ("c1cc[te]c1", "tellurophene"),          #:8170
+    ("c1cn[se]c1", "1,2-selenazole"),        #:8137
+    ("c1cn[te]c1", "1,2-tellurazole"),       #:8137
+    ("C1CSCN1", "1,3-thiazolidine"),         #:8182
+    ("C1CNOC1", "1,2-oxazolidine"),          #:8180 +:8184
+    ("C1CNSC1", "1,2-thiazolidine"),         #:8184
+    ("C1CN[Se]C1", "1,2-selenazolidine"),    #:8184
+    ("C1CN[Te]C1", "1,2-tellurazolidine"),   #:8184 +:8188
 ]
 
 
@@ -66,13 +66,13 @@ def test_parent_ring_emits_the_locant_bearing_pin(smiles, expected):
 # 2. Substituted derivatives -- the actual bulk of the defect
 # --------------------------------------------------------------------------
 
-# The parents are 9 molecules; the derivatives are unbounded.  They inherit the
+# The parents are 9 molecules; the derivatives are unbounded. They inherit the
 # defect through a DIFFERENT producer: the parent lookup for a substituted ring
 # is ``data/retained_names.py::get_retained_name`` (feeding
 # ``rules/heterocycles.py::name_heterocycle``), not the whole-molecule dict
 # lookup in ``routing/dispatch_table.py::_handle_retained_name`` that serves the
-# parents.  Both read ``ALL_RETAINED_NAMES``, which is why one deny row fixes
-# both -- verified by a cold spy, one fresh process per molecule.
+# parents. Both read ``ALL_RETAINED_NAMES``, which is why one deny row fixes
+# both -- verified by a cold trace, one fresh process per molecule.
 SUBSTITUTED = [
     ("C1CSCN1C", "3-methyl-1,3-thiazolidine"),
     ("CC1CSCN1", "4-methyl-1,3-thiazolidine"),
@@ -103,10 +103,10 @@ def test_substituted_derivative_inherits_the_pin(smiles, expected):
 # ``rules/heterocycles.py::_retained_heteroatom_locant_prefix`` (P-31.1.4.3.4)
 # already injected ``1,3-`` for a suffixed thiazolidine, which is why
 # ``1,3-thiazolidin-4-one`` has always been correct while ``3-methylthiazolidine``
-# was wrong.  That injector keys on the BARE stem and returns '' on a miss, so
-# after this deny it silently no-ops instead of producing ``1,3-1,3-``.  These
+# was wrong. That injector keys on the BARE stem and returns '' on a miss, so
+# after this deny it silently no-ops instead of producing ``1,3-1,3-``. These
 # three are the regression guard for that interaction; all three are also rows in
-# ``.
+# ``benchmarks/the gold set/packs/characteristic_groups.json``.
 ALREADY_CORRECT_SUFFIXED = [
     ("O=C1CSCN1", "1,3-thiazolidin-4-one"),
     ("OC1CSCN1", "1,3-thiazolidin-4-ol"),
@@ -130,8 +130,8 @@ def test_suffixed_form_is_not_double_locanted(smiles, expected):
 # ``ring_substituents.py::_bare_stem_was_withdrawn_as_non_pin`` repairs.
 # ``identify_ring_system`` has no branch for a two-heteroatom saturated
 # five-ring, so before Task AA5 the substituent path's ONLY answer for these
-# rings was the retained bare stem.  Withdrawing it turned ten correct names
-# into ``unknown organic compound`` -- textbook the contributor guide invariant 9.  Every
+# rings was the retained bare stem. Withdrawing it turned ten correct names
+# into ``unknown organic compound`` -- textbook CLAUDE.md a project rule. Every
 # expectation below was confirmed against OPSIN 2.9.0: each name round-trips to
 # exactly the input SMILES.
 RING_AS_SUBSTITUENT = [
@@ -159,7 +159,7 @@ def test_ring_as_substituent_keeps_a_name(smiles, expected):
     assert name == expected
 
 
-# The fallback must stay narrow.  Generalising it to "any heteromonocycle the
+# The fallback must stay narrow. Generalising it to "any heteromonocycle the
 # retained table misses" newly names 1660 substituent stems across the corpora
 # and is wrong on many -- macrocyclic free valences land on a ring oxygen.
 # These rings are NOT deny-listed, so the fallback must not fire for them and
@@ -173,7 +173,7 @@ def test_fallback_does_not_fire_for_rings_that_were_never_denied():
     for smi in ("C1CCCO1", "C1CCCN1", "c1ccsc1", "c1ccoc1", "C1COCCN1"):
         frag = Chem.MolToSmiles(Chem.MolFromSmiles(smi))
         assert not _bare_stem_was_withdrawn_as_non_pin(frag), smi
-    # ...and DOES fire for the ones this task withdrew (guards the guard: a
+    #...and DOES fire for the ones this task withdrew (guards the guard: a
     # predicate that always returns False would pass the loop above).
     for smi in ("C1CSCN1", "C1CNSC1", "C1CNOC1"):
         frag = Chem.MolToSmiles(Chem.MolFromSmiles(smi))
@@ -186,7 +186,7 @@ def test_fallback_does_not_fire_for_rings_that_were_never_denied():
 
 # ``aryl_groups.py`` is a generated OPSIN import: every row carries
 # ``is_pin: False`` as a hard-coded generator default, so a re-import can
-# silently re-add these rows.  Only the adjudicated deny list keeps them out.
+# silently re-add these rows. Only the adjudicated deny list keeps them out.
 # Note ``selenofuran``/``tellurofuran`` do not appear in the Blue Book at all --
 # they are OPSIN parser synonyms, and ``_select_primary_name`` takes ``names[0]``,
 # so for ``['selenofuran', 'selenophene']`` the synonym won and the PIN was
@@ -215,7 +215,7 @@ def test_denied_stems_remain_reachable_under_trivial_style():
 
     ``pin_policy.py``'s contract is that a denied name "leaves the PIN-path
     lookup and moves to the general-only companion dict, reachable via
-    ``--trivial``".  If a future change deletes the rows outright instead of
+    ``--trivial``". If a future change deletes the rows outright instead of
     denying them, this fails -- and the general-nomenclature names, which are
     perfectly legitimate, would be silently lost.
     """
@@ -233,9 +233,9 @@ def test_denied_stems_remain_reachable_under_trivial_style():
 # --------------------------------------------------------------------------
 
 # 2 of the 4 members of the 1,2-azole series and 3 of the 4 members of the
-# 1,3-azolidine series were already emitting the PIN before this change.  That
+# 1,3-azolidine series were already emitting the PIN before this change. That
 # is what makes the defect a data problem rather than a rule problem: the same
-# generic path serves all of them.  These must not move.
+# generic path serves all of them. These must not move.
 ALREADY_CORRECT_CONTROLS = [
     ("c1cnoc1", "1,2-oxazole"),
     ("c1cnsc1", "1,2-thiazole"),

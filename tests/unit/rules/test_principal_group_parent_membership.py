@@ -1,7 +1,7 @@
 """Principal-group occurrences must belong to the chosen parent (atom-partition invariant).
 
-Root cause of a 25/67 share of the costly atom-drop class (v30, 2026-08-05,
-): our perception
+Root cause of a 25/67 share of the costly atom-drop class (, 2026-08-05,
+internal notes): our perception
 gathers ALL senior-group occurrences molecule-wide into `principal_group_atoms` with no
 parent-membership filter, so a substituent's group (e.g. the OH of an isopropanol arm on a ring)
 is wrongly claimed as a parent suffix — double-assigning the atom and producing a wrong,

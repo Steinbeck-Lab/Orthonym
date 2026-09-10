@@ -185,7 +185,7 @@ def test_never_drops_the_n_substituent_carbon():
 # heteroatom has degree 1, so it read as an ordinary chain terminus and passed.
 #
 # Independent corroboration that the emitted form was not merely non-preferred
-# but malformed: the PubChem reference corpus ()
+# but malformed: the PubChem reference corpus (benchmarks/pubchem_raw/CID-IUPAC)
 # contains ZERO occurrences of 'N-methyl4-methyl' and ZERO of 'N-methyl2-chloro',
 # while the merged form 'N,4-dimethylbenzenesulfonamide' is present (CID 12543).
 # --------------------------------------------------------------------------
@@ -214,7 +214,7 @@ def test_heteroatom_in_acyclic_parent_fails_closed(smiles, was):
 # be merged and the N-prefix may simply precede the parent name.
 #
 # These previously returned None. The corpus writes this construction 33,160
-# times (grep -c "N.*propane-2-sulfonamide" ).
+# times (grep -c "N.*propane-2-sulfonamide" benchmarks/pubchem_raw/CID-IUPAC).
 # --------------------------------------------------------------------------
 @pytest.mark.parametrize("smiles,expected", [
     ("CC(C)S(=O)(=O)NC",  "N-methylpropane-2-sulfonamide"),

@@ -1,21 +1,21 @@
-"""Phase 151 D-04..D-08 unit tests for Von Baeyer ≥4-ring naming.
+"""a phase.. unit tests for Von Baeyer ≥4-ring naming.
 
 Covers:
  - Classification predicate (is_higher_polycyclo): ≥4-ring AND
    single-ring-system AND ≥2 bridgeheads AND no spiro AND no aromatic
    AND not a natural product backbone AND not bicyclic / tricyclic.
- - Retained-name passthrough (D-08): adamantane / norbornane / twistane
+ - Retained-name passthrough (): adamantane / norbornane / twistane
    served by tricyclo.get_retained_tricyclo_name; new module is fallback
    only.
- - Cascade-step-6 supplier coverage invariant (D-06 / Phase 147 SC-7):
+ - Cascade-step-6 supplier coverage invariant (/ a phase SC-7):
    get_higher_polycyclo_iupac_locants returns Optional[Dict[int, int]]
    with FULL ring-atom coverage (or None — never partial).
  - Anti-canary: bicyclo / tricyclo / steroid / aromatic inputs MUST
-   return None / False (D-04 lock — bicyclo.py + tricyclo.py +
+   return None / False (lock — bicyclo.py + tricyclo.py +
    polycyclics.py retain authority on their proven cases).
  - Blue Book examples round-trip via OPSIN to InChI L1 == input
-   (D-23 hard test gate).
- - No parallel locant comparator (D-07 / D-20): module imports
+   (hard test gate).
+ - No parallel locant comparator (/): module imports
    compare_locant_sets and contains zero local _compare_locant
    definitions.
 
@@ -28,7 +28,7 @@ state (this file committed BEFORE the module exists), all tests RED at
 import collection time. Task 2 commit flips them GREEN.
 
 Source:
- - 151-CONTEXT.md D-04 / D-05 / D-06 / D-07 / D-08 / D-23 / D-25
+ - 151-CONTEXT.md / / / / / /
  - 151-RESEARCH.md §"Existing Code Audit", §"OPSIN Compatibility Evidence"
  - 151-AUDIT-A.md verdict: THIN_WRAPPER
  - IUPAC 2013 Blue Book P-23.2.5 / P-23.3.
@@ -49,7 +49,7 @@ from rdkit import Chem
 # Plan 151-01 Task 2 implements it. We defer the import to test bodies
 # so pytest collection succeeds (≥30 tests collected) and individual
 # tests fail with a clear ModuleNotFoundError until Task 2 lands. This
-# matches the audit-first cadence per CONTEXT D-02.
+# matches the audit-first cadence per CONTEXT.
 
 def _vb_import():
     """Lazy import of the new module so pytest collection works in RED state."""
@@ -77,7 +77,7 @@ FIXTURES_DIR = Path(__file__).resolve().parents[2] / "fixtures" / "ring_systems"
 
 
 def load_fixtures(relpath: str) -> List[Dict[str, Any]]:
-    """Load Phase 151 ring-system fixtures (D-25 corpus_provenance shape).
+    """Load a phase ring-system fixtures (corpus_provenance shape).
 
     Skips entries with expected_name is None for tests that match against
     a name; fixtures keep null expected_name when only the structural
@@ -152,17 +152,17 @@ class TestRingCount:
 
     @pytest.mark.unit
     def test_norbornane_NOT_higher_polycyclo(self, norbornane):
-        # bicyclic anti-canary (D-04)
+        # bicyclic anti-canary ()
         assert is_higher_polycyclo(norbornane) is False
 
     @pytest.mark.unit
     def test_bicyclo222_NOT_higher_polycyclo(self, bicyclo_222_octane):
-        # bicyclic anti-canary (D-04)
+        # bicyclic anti-canary ()
         assert is_higher_polycyclo(bicyclo_222_octane) is False
 
     @pytest.mark.unit
     def test_adamantane_NOT_higher_polycyclo(self, adamantane):
-        # tricyclic anti-canary (D-04 lock — tricyclo.py retains authority)
+        # tricyclic anti-canary (lock — tricyclo.py retains authority)
         assert is_higher_polycyclo(adamantane) is False
 
     @pytest.mark.unit
@@ -187,14 +187,14 @@ class TestRingCount:
 
 
 # ============================================================================
-# TestRetainedNamePassthrough (D-08 + HERITAGE §4)
+# TestRetainedNamePassthrough (+ AUTONOM §4)
 # ============================================================================
 
 
 class TestRetainedNamePassthrough:
     @pytest.mark.unit
     def test_adamantane_returns_retained_name(self, adamantane):
-        # D-08: retained-name dict (tricyclo.get_retained_tricyclo_name)
+        #: retained-name dict (tricyclo.get_retained_tricyclo_name)
         # is consulted FIRST. Adamantane keeps "adamantane".
         assert name_higher_polycyclo(adamantane) == "adamantane"
 
@@ -213,12 +213,12 @@ class TestRetainedNamePassthrough:
         # bicyclic anti-canary — tricyclo.get_retained_tricyclo_name
         # only handles tricyclic retained names; bicyclo has its own
         # bicyclo.py path. Either way, name_higher_polycyclo returns None
-        # for a bicyclic input per D-04.
+        # for a bicyclic input per.
         assert name_higher_polycyclo(norbornane) is None
 
 
 # ============================================================================
-# TestSupplierCoverageInvariant (D-06 / Phase 147 cascade-step-6 gate)
+# TestSupplierCoverageInvariant (/ a phase cascade-step-6 gate)
 # ============================================================================
 
 
@@ -322,7 +322,7 @@ class TestBlueBookExamples:
 
 
 # ============================================================================
-# TestNoParallelComparator (D-07 / D-20 lock)
+# TestNoParallelComparator (/ lock)
 # ============================================================================
 
 
@@ -359,7 +359,7 @@ class TestNoParallelComparator:
 
 
 # ============================================================================
-# TestPublicAPI (D-06 — naming-collision-safe API)
+# TestPublicAPI (— naming-collision-safe API)
 # ============================================================================
 
 
@@ -394,7 +394,7 @@ class TestPublicAPI:
 
 
 # ============================================================================
-# TestRoundTripViaOPSIN (D-23 hard test gate)
+# TestRoundTripViaOPSIN (hard test gate)
 # ============================================================================
 
 
@@ -412,7 +412,7 @@ def _opsin_parse_one(name: str) -> str | None:
     """Single-name OPSIN parse → SMILES (or None on failure).
 
     Spawns a fresh JVM per call. For batch use, prefer the canary-suite
-    helper which uses one JVM for all names. Phase 151 Task 1b uses a
+    helper which uses one JVM for all names. a phase Task 1b uses a
     small fixture set (≤12), so per-call invocation is acceptable.
     """
     import subprocess
@@ -467,8 +467,8 @@ class TestRoundTripViaOPSIN:
 
 
 class TestNarrowExceptionsWR10:
-    """Phase 151-04 WR-10: bare except Exception eliminated per
-    the contributor guide / ./skills/fix-methodology.md no-band-aid policy."""
+    """a phase-04 WR-10: bare except Exception eliminated per
+    CLAUDE.md /.claude/skills/fix-methodology.md no-band-aid policy."""
 
     @pytest.mark.unit
     def test_no_bare_except_exception_in_module(self):
@@ -485,7 +485,7 @@ class TestNarrowExceptionsWR10:
         assert "except Exception:" not in non_comment, (
             "WR-10 regression: bare 'except Exception:' reintroduced in "
             "polycyclic_von_baeyer.py. Use narrow exceptions per "
-            "the contributor guide / ./skills/fix-methodology.md."
+            "CLAUDE.md / .claude/skills/fix-methodology.md."
         )
 
     @pytest.mark.unit

@@ -1,7 +1,7 @@
 """
-Phase 94: Data Table Completeness - Comprehensive Test Suite.
+a phase: Data Table Completeness - Comprehensive Test Suite.
 
-Tests all 25 new data entries added in Phase 94:
+Tests all 25 new data entries added in a phase:
 - 4 simple retained names (biphenyl, acetylene, anisole, caprolactam)
 - 8 nucleosides (adenosine, guanosine, cytidine, thymidine, uridine + 3 deoxy forms)
 - 5 disaccharides (sucrose, maltose, lactose, cellobiose, trehalose)
@@ -86,11 +86,11 @@ class TestSimpleRetainedNames:
         # the systematic 1,1'-biphenyl / methoxybenzene. acetylene stays (hc_override).
         ("c1ccc(-c2ccccc2)cc1", "1,1'-biphenyl"),
         ("C#C", "acetylene"),
-        ("COc1ccccc1", "methoxybenzene"),
-        # v29 Task A: same treatment as biphenyl/anisole above -- 'caprolactam'
-        # is general-only (0 BlueBookV2.md hits) and the PIN headline is the
-        # systematic pseudoketone, P-64.3.1 (BB:29314), printed `azepan-2-one
-        # (PIN)` at BB:29323. The raw hand-curated dict still carries the trivial
+        ("COc1ccccc1", "anisole"),  # a review RISK 7: bare anisole IS the PIN (the Blue Book / the Blue Book)
+        #: same treatment as biphenyl/anisole above -- 'caprolactam'
+        # is general-only (0 the Blue Book hits) and the PIN headline is the
+        # systematic pseudoketone, P-64.3.1 (the Blue Book), printed `azepan-2-one
+        # (PIN)` at the Blue Book. The raw hand-curated dict still carries the trivial
         # name, which is why the two tests above are unchanged.
         ("O=C1CCCCCN1", "azepan-2-one"),
     ], ids=["biphenyl-e2e", "acetylene-e2e", "anisole-e2e", "caprolactam-e2e"])
@@ -110,7 +110,7 @@ NUCLEOSIDE_ENTRIES = [
     ("Nc1ccn([C@@H]2O[C@H](CO)[C@@H](O)[C@H]2O)c(=O)n1", "cytidine"),
     ("Cc1cn([C@H]2C[C@H](O)[C@@H](CO)O2)c(=O)[nH]c1=O", "thymidine"),
     ("O=c1ccn([C@@H]2O[C@H](CO)[C@@H](O)[C@H]2O)c(=O)[nH]1", "uridine"),
-    # v23 Phase 14: renamed to the 2'-deoxy PIN (the prime is required).
+    # a phase: renamed to the 2'-deoxy PIN (the prime is required).
     ("Nc1ncnc2c1ncn2[C@H]1C[C@H](O)[C@@H](CO)O1", "2'-deoxyadenosine"),
     ("Nc1nc2c(ncn2[C@H]2C[C@H](O)[C@@H](CO)O2)c(=O)[nH]1", "2'-deoxyguanosine"),
     ("Nc1ccn([C@H]2C[C@H](O)[C@@H](CO)O2)c(=O)n1", "2'-deoxycytidine"),
@@ -211,12 +211,12 @@ class TestSialicAcidRetainedName:
 # ============================================================================
 
 AMINO_SUGAR_ENTRIES = [
-    ("N[C@@H]1[C@@H](O)[C@H](O)[C@@H](CO)O[C@@H]1O", "alpha", "D", "glucosamine"),
-    ("N[C@@H]1[C@@H](O)[C@H](O)[C@@H](CO)O[C@H]1O", "beta", "D", "glucosamine"),
-    ("N[C@@H]1[C@@H](O)[C@@H](O)[C@@H](CO)O[C@@H]1O", "alpha", "D", "galactosamine"),
-    ("N[C@@H]1[C@@H](O)[C@@H](O)[C@@H](CO)O[C@H]1O", "beta", "D", "galactosamine"),
-    ("N[C@H]1[C@@H](O)[C@H](O)[C@@H](CO)O[C@@H]1O", "alpha", "D", "mannosamine"),
-    ("N[C@H]1[C@@H](O)[C@H](O)[C@@H](CO)O[C@H]1O", "beta", "D", "mannosamine"),
+    ("N[C@@H]1[C@@H](O)[C@H](O)[C@@H](CO)O[C@@H]1O", "α", "D", "glucosamine"),
+    ("N[C@@H]1[C@@H](O)[C@H](O)[C@@H](CO)O[C@H]1O", "β", "D", "glucosamine"),
+    ("N[C@@H]1[C@@H](O)[C@@H](O)[C@@H](CO)O[C@@H]1O", "α", "D", "galactosamine"),
+    ("N[C@@H]1[C@@H](O)[C@@H](O)[C@@H](CO)O[C@H]1O", "β", "D", "galactosamine"),
+    ("N[C@H]1[C@@H](O)[C@H](O)[C@@H](CO)O[C@@H]1O", "α", "D", "mannosamine"),
+    ("N[C@H]1[C@@H](O)[C@H](O)[C@@H](CO)O[C@H]1O", "β", "D", "mannosamine"),
 ]
 
 

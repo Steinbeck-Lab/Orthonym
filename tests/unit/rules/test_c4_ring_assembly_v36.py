@@ -1,8 +1,8 @@
-"""v36 Milestone C4 -- glycan / multi-ring-system assembly (compose-across-linker).
+""" Milestone C4 -- glycan / multi-ring-system assembly (compose-across-linker).
 
 RED baseline + fresh-process round-trip harness for the 22 addressable
-"ring-assembly" witnesses the C4 grounding spy confirmed
-(): molecules made of two-or-more
+"ring-assembly" witnesses the C4 grounding trace confirmed
+(internal notes): molecules made of two-or-more
 individually-nameable ring systems joined by a linker (C-chain / ether /
 ester / glycosidic-O / thioether-sulfinyl). Every one currently emits
 ``unknown organic compound`` at the best-effort tier.
@@ -13,14 +13,14 @@ the ``isolated_naming_session`` warm-cache hazard (memory
 a witness can emit a correct name in a WARM process and abstain COLD. The RED
 baseline is only trustworthy measured in a fresh interpreter per witness, so
 ``_c4_rt`` shells out to a one-shot ``python -c`` child (its own JVM, its own
-empty cache) exactly as the contributor guide's "-m orthonym one-shot" guidance
+empty cache) exactly as CLAUDE.md's "-m orthonym one-shot" guidance
 prescribes. Result is memoised per SMILES so each witness spawns exactly one
 child regardless of how many tests read it.
 
 ⚠ IMPORTANT FINDING (this harness is a baseline, NOT a red-then-green TDD gate
 for the plan's Task 2 as written). The C4 plan's dominant lever -- "give
 ``decomposition/weave.py`` a ring-hub mode" -- was measured OFF-PATH before any
-code was written (invariant 8, ``feedback_choke_point_off_path``):
+code was written (a project rule, ``feedback_choke_point_off_path``):
 
   * ``weave.py`` is a carbon-only *core-and-arms* polyol composer
     (glycerophospholipid-shaped). With its ring guard (``weave.py:517-519``)
@@ -40,7 +40,7 @@ code was written (invariant 8, ``feedback_choke_point_off_path``):
     partial (0-wrong holds -> abstain). Forcing the von-Baeyer fallback does
     not rescue it: ``name_ortho_fused_bicyclic`` returns None for the
     substituted benzimidazole. No clean root-cause fix; a dedicated core-namer
-    effort. Full findings: the C4 session report + ``V36-SPY-C4.md``.
+    effort. Full findings: the C4 session report + ``V36-a trace-C4.md``.
 
 So the per-witness "target" tests below are marked xfail (the intended
 end-state -- name + full round-trip) and remain xfail at HEAD; the
@@ -59,7 +59,7 @@ import pytest
 _REPO_ROOT = Path(__file__).resolve().parents[3]
 
 # One-shot child: build a fresh best-effort Orthonym (the exact flags
-# gen_ost_full.py / the C4 spy used), name the SMILES, and OPSIN-round-trip the
+# gen_ost_full.py / the C4 trace used), name the SMILES, and OPSIN-round-trip the
 # result to a full InChI in the SAME child (one JVM). Prints a single status
 # token on the last stdout line: RT-OK | RT-MISMATCH | ABSTAIN | NO-PARSE | BAD.
 _CHILD = r'''
@@ -109,10 +109,10 @@ def _c4_rt(smiles: str) -> str:
     return lines[-1] if lines else ("NO-OUTPUT: " + proc.stderr[-200:])
 
 
-# The 22 C4-addressable witnesses (V36-SPY-C4.md; the 2 real-peptide rows
-# excluded per the spy's carve-out). Linker sub-class is descriptive only --
-# the spy flags its atom-symbol classifier as approximate, not a P-rule bond
-# typing (V36-SPY-C4.md "Caveats").
+# The 22 C4-addressable witnesses (V36-a trace-C4.md; the 2 real-peptide rows
+# excluded per the trace's carve-out). Linker sub-class is descriptive only --
+# the trace flags its atom-symbol classifier as approximate, not a P-rule bond
+# typing (V36-a trace-C4.md "Caveats").
 WITNESSES = [
     ("w00", "c_chain", "OCC[NH+]1CC[NH+](CC/C=C2/c3ccccc3Sc3ccc(C(F)(F)F)cc32)CC1"),
     ("w01", "glycosidic", "CC1CCC2(OC1)OC1CC3C4CCC5CC(OC6OC(CO)C(O)C(OC7OC(CO)C(O)C(O)C7O)C6O)CCC5(C)C4CCC3(C)C1C2C"),

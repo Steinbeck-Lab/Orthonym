@@ -1,4 +1,4 @@
-"""Unit tests for the polyazane parent-hydride namer (v23 Phase 7).
+"""Unit tests for the polyazane parent-hydride namer (a phase).
 
 P-68.3.1.1 / P-68.3.1.3 / P-21.2.2: chains of N atoms joined by N-N bonds.
 hydrazine / diazene are retained PINs; longer members systematic. Azo R-N=N-R is
@@ -8,7 +8,8 @@ hydrazones / azides / rings.
 import pytest
 from rdkit import Chem
 
-from orthonym.rules.polyazane import name_polyazane
+from orthonym import name_compound
+from orthonym.rules.polyazane import _parent_scope_has_numeral, name_polyazane
 
 
 def _name(smiles):
@@ -30,7 +31,12 @@ class TestBareSaturated:
 class TestBareUnsaturated:
     @pytest.mark.parametrize("smiles,expected", [
         ("N=N", "diazene"),
-        ("N=NN", "triaz-1-ene"),
+        # P-14.3.4.2(d) (the Blue Book; verbatim example `H2N-N=NH triazene`,:2937):
+        # an unsubstituted monounsaturated homogeneous di-/trinuclear chain omits
+        # the double-bond locant, so `triazene`, NOT `triaz-1-ene`.
+        ("N=NN", "triazene"),
+        # tetraazene keeps its locant: tetraaz-1-ene and tetraaz-2-ene are
+        # different compounds (n=4 > trinuclear), so the locant is essential.
         ("N=NNN", "tetraaz-1-ene"),
     ])
     def test_unsaturated(self, smiles, expected):
@@ -42,15 +48,105 @@ class TestSubstituted:
         ("CNN", "methylhydrazine"),              # mono -> no locant (BB phenylhydrazine precedent)
         ("CCNN", "ethylhydrazine"),
         ("c1ccccc1NN", "phenylhydrazine"),
+        # hydrazine (N-N) KEEPS its locants: each N takes 2 subs, so 1,1- vs 1,2-
+        # is a real distinction (P-14.3.3; P-68.3.1.2).
         ("CNNC", "1,2-dimethylhydrazine"),
         ("CN(C)N", "1,1-dimethylhydrazine"),
         ("CN=N", "methyldiazene"),               # mono diazene -> no locant
-        ("CN=NC", "1,2-dimethyldiazene"),
-        ("CCN=NCC", "1,2-diethyldiazene"),
-        ("c1ccccc1N=Nc1ccccc1", "1,2-diphenyldiazene"),  # azobenzene (NOT a PIN)
+        # diazene (N=N) OMITS its locants: each N is =N- with ONE substitutable
+        # valence, so two substituents are necessarily 1,2 -> unambiguous ->
+        # omitted (P-14.3.4). P-68.3.1.3.2.1 symmetric = di{R}diazene
+        # (BB `dimethyldiazene (PIN)`, `diphenyldiazene (PIN)`).
+        ("CN=NC", "dimethyldiazene"),
+        ("CCN=NCC", "diethyldiazene"),
+        ("c1ccccc1N=Nc1ccccc1", "diphenyldiazene"),  # BB PIN (azobenzene is the non-PIN)
+        # P-68.3.1.3.2.2 unsymmetric = alphabetical parenthesised prefixes, no
+        # locants (BB `ethenyl(methyl)diazene (PIN)`).
+        ("C=CN=NC", "ethenyl(methyl)diazene"),
     ])
     def test_substituted(self, smiles, expected):
         assert _name(smiles) == expected
+
+
+class TestDiazeneStereo:
+    """P-91.3 "NAMING OF STEREOISOMERS" (the Blue Book heading; decisive
+    sentence:44643): the lone skeletal N=N E/Z descriptor is cited with a locant
+    "when such locants are present". The 2-N diazene constitution cites no
+    numeral (P-68.3.1.3.2 omits the substituent locants; P-14.3.4.2(d) elides the
+    parent N=N locant), so the descriptor locant is OMITTED -> `(Z)-` /`(E)-`.
+    This is the P-93.4.2.1.3 bb_conformance target `(Z)-diphenyldiazene`, and it
+    mirrors STER-01 `(E)-cyclooctene` (_handler_shared.py:1532)."""
+
+    @pytest.mark.parametrize("smiles,expected", [
+        # THE bb_conformance target (P-93.4.2.1.3): symmetric diaryl diazene, no
+        # parent numeral -> descriptor locant omitted.
+        ("c1ccc(/N=N\\c2ccccc2)cc1", "(Z)-diphenyldiazene"),
+        # symmetric dialkyl, both geometries.
+        ("C/N=N/C", "(E)-dimethyldiazene"),
+        ("C/N=N\\C", "(Z)-dimethyldiazene"),
+        # unsymmetric: alphabetical parenthesised prefixes, still no parent
+        # numeral -> descriptor locant omitted.
+        ("C/N=N/c1ccccc1", "(E)-methyl(phenyl)diazene"),
+    ])
+    def test_ez_locant_omitted(self, smiles, expected):
+        assert _name(smiles) == expected
+
+    @pytest.mark.parametrize("smiles,expected", [
+        # No E/Z assigned in the input -> no descriptor injected (the
+        # constitution is unchanged; the injection is purely additive).
+        ("c1ccccc1N=Nc1ccccc1", "diphenyldiazene"),
+        ("CN=NC", "dimethyldiazene"),
+        # Saturated N-N (hydrazine): no chain double bond -> never a descriptor,
+        # and its cited 1,2- locants are untouched.
+        ("CNNC", "1,2-dimethylhydrazine"),
+    ])
+    def test_no_descriptor_when_no_ez(self, smiles, expected):
+        assert _name(smiles) == expected
+
+
+class TestParentScopeNumeral:
+    """P-14.3.3 "Citation of locants" (the Blue Book) scopes locants per
+    enclosing-mark unit, so the P-91.3 name-dependent test counts a numeral only
+    at PARENT scope. A digit inside `(...)`/`[...]` (e.g. the `2` of
+    `naphthalen-2-yl`) belongs to the substituent, not the parent."""
+
+    @pytest.mark.parametrize("name,has_numeral", [
+        # OMIT side: no parent numeral -> bare `(Z)-`/`(E)-`.
+        ("diphenyldiazene", False),
+        ("dimethyldiazene", False),
+        ("methyl(phenyl)diazene", False),
+        # P-14.3.3 scoping: the enclosed `2` is the substituent's, not the parent's.
+        ("(naphthalen-2-yl)(phenyl)diazene", False),
+        # KEEP side: the two ethene KEEP canaries carry cited 1,2- parent
+        # locants (P-93.4.2.1.1), so their single E/Z descriptor keeps its locant
+        # -> `(1Z)-1,2-dibromo-1-chloro-2-iodoethene`, `(1E)-1,2-difluoroethene`.
+        # (They never reach the diazene path, but the licence is identical.)
+        ("1,2-dibromo-1-chloro-2-iodoethene", True),
+        ("1,2-difluoroethene", True),
+        # A substituted triazene cites its ene locant -> keep (deferred here).
+        ("1,3-diphenyltriaz-1-ene", True),
+    ])
+    def test_parent_scope_numeral(self, name, has_numeral):
+        assert _parent_scope_has_numeral(name) is has_numeral
+
+
+class TestKeepCanariesUnchanged:
+    """The three Phase-10 KEEP canaries must be untouched by the diazene E/Z
+    injection: two carry cited parent locants (P-93.4.2.1.1) and the third has
+    four R/S descriptors (P-91.3 multiplicity, `len != 1`), so all three keep
+    their descriptor locants. None routes through the polyazane path, but pin the
+    full-engine output so a future numeral strip that DID reach them is caught."""
+
+    @pytest.mark.parametrize("smiles,expected", [
+        ("Cl/C(Br)=C(\\Br)I", "(1Z)-1,2-dibromo-1-chloro-2-iodoethene"),
+        ("F/C=C/F", "(1E)-1,2-difluoroethene"),
+        ("C1CC[C@H]2C[C@H]3CCCC[C@H]3C[C@H]2C1",
+         "(4aR,8aR,9aS,10aS)-tetradecahydroanthracene"),
+        # And the target it must NOT disturb, end to end:
+        ("c1ccc(/N=N\\c2ccccc2)cc1", "(Z)-diphenyldiazene"),
+    ])
+    def test_full_engine(self, smiles, expected):
+        assert name_compound(smiles) == expected
 
 
 class TestFailClosed:

@@ -53,11 +53,11 @@ def test_inorganic_salt_fails_closed():
     # name_salt used to silently drop the unnameable chlorosilanolate anion
     # and emit the partial 'beryllium strontium'. With _be()
     # (general_fallback=True), the correct abstain value is None, not a
-    # literal sentinel string: namer.py's documented "v28 Composer1 Task 5
+    # literal sentinel string: namer.py's documented " Composer1 Task 5
     # best-effort clean-abstain contract" (name_tiered, ~:2939-2949)
     # deliberately nulls out ANY failure name under general_fallback to avoid
-    # leaking a descriptive fallback as if it were a real name (the contributor guide
-    # invariant 16, the sentinel-leak defect class). Verified this molecule's
+    # leaking a descriptive fallback as if it were a real name (CLAUDE.md
+    # a project rule, the sentinel-leak defect class). Verified this molecule's
     # raw fallback text is actually 'beryllium compound (not supported)'
     # (errors.py::classify_failure_limit's UNSUPPORTED_ELEMENT branch), not
     # the generic 'unknown organic compound' literal this assertion

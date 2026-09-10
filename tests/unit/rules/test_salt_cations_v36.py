@@ -1,6 +1,6 @@
-"""v36 Milestone B1+B2 -- salt organic-cation producer + mixed/amine salts.
+""" Milestone B1+B2 -- salt organic-cation producer + mixed/amine salts.
 
-Grounding spies: `` (§6) and ``V36-SPY-B2.md``.
+Grounding spies: `internal notes` (§6) and ``V36-a trace-B2.md``.
 
 The 0-wrong core (Task 1) is an atom-coverage guard between ``route_charged``'s
 neutralize->re-enter step and the ionic-suffix step: the gate-DISABLED re-entry
@@ -14,7 +14,7 @@ systematic von Baeyer parent).
 Every emitted cation-salt name below is OPSIN-round-trip-verified (full InChI /
 InChIKey match) or the row abstains -- never a wrong / atom-dropped molecule, and
 never an unverified stereo descriptor (OPSIN 2.9.0 cannot parse a stereo
-descriptor cited at ring position 3 of an azabicyclo -- SPY-B1 §3).
+descriptor cited at ring position 3 of an azabicyclo -- a trace-B1 §3).
 """
 import pytest
 
@@ -55,7 +55,7 @@ def test_positive_controls_unchanged(namer, smi, expected):
 # Task 1 (B1 core): atom-coverage guard -- benzatropine cation salt (Category A)
 # ---------------------------------------------------------------------------
 
-# Stereo-flattened benzatropine mesylate: constitution only (the SPY-verified
+# Stereo-flattened benzatropine mesylate: constitution only (the a trace-verified
 # green case). Target: 3-(diphenylmethoxy)-8-methyl-8-azabicyclo[3.2.1]octan-8-ium
 # methanesulfonate -- OPSIN-RT exact to this flat input.
 BENZATROPINE_SALT_FLAT = "CS(=O)(=O)[O-].C[NH+]1C2CCC1CC(OC(c1ccccc1)c1ccccc1)C2"
@@ -77,7 +77,7 @@ def test_benzatropine_flat_no_atom_drop_and_round_trips(namer):
 @pytest.mark.opsin_gate
 def test_benzatropine_full_stereo_never_ships_unverified(namer):
     """The FULL-stereo salt: OPSIN 2.9.0 cannot parse a stereo descriptor at ring
-    position 3 of the azabicyclooctane (SPY-B1 §3), so a full-stereo name cannot
+    position 3 of the azabicyclooctane (a trace-B1 §3), so a full-stereo name cannot
     round-trip. It must abstain -- NEVER ship an unverified-stereo (or atom-dropped
     ``tropanium``) name."""
     out = namer.name(BENZATROPINE_SALT_STEREO)
@@ -180,7 +180,7 @@ def test_h_plus_base_hemisalt(namer, smi, expected):
 
 @pytest.mark.opsin_gate
 def test_h_plus_controls_unchanged(namer):
-    # halide hydroacid path still works (organic base . [H+] . [Cl-])
+    # halide hydroacid path still works (organic base. [H+]. [Cl-])
     assert namer.name("CCN.[H+].[Cl-]") == "ethanamine hydrochloride"
     # a bare proton + halide with NO base must still fail closed (0-wrong)
     assert is_failure_name(namer.name("[H+].[Cl-]"))

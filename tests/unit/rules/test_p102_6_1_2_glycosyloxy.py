@@ -1,6 +1,6 @@
 """P-102.6.1.2 *O*-Glycosyl compounds: the glycosidic oxygen is expressed ONCE.
 
-Blue Book **P-102.6.1.2 "*O*-Glycosyl compounds"** (``BlueBookV2/BlueBookV2.md:53915``):
+Blue Book **P-102.6.1.2 "*O*-Glycosyl compounds"** (``the Blue Book Blue Book``):
 
     "The substituent group formed by removal of a hydrogen atom from the anomeric
     -OH group is considered as a compound substituent group formed by the
@@ -8,8 +8,8 @@ Blue Book **P-102.6.1.2 "*O*-Glycosyl compounds"** (``BlueBookV2/BlueBookV2.md:5
 
 and its worked example (``:53927``)::
 
-    1-[4-(beta-D-glucopyranosyloxy)phenyl]ethan-1-one
-      (not 4-acetylphenyl beta-D-glucopyranoside;
+    1-[4-(β-D-glucopyranosyloxy)phenyl]ethan-1-one
+      (not 4-acetylphenyl β-D-glucopyranoside;
        a ketone is senior to a hydroxy compound)
 
 The aglycone is the PARENT, the sugar is a detachable prefix cited at the
@@ -37,7 +37,7 @@ def _name(smiles):
 
 @pytest.mark.unit
 class TestGlycosidicOxygenCountedOnce:
-    """The defect these guard: '(beta-D-glucopyranosyloxy)...-3,5,7-trihydroxy-'
+    """The defect these guard: '(β-D-glucopyranosyloxy)...-3,5,7-trihydroxy-'
     cited the 7-O both as a hydroxy on the aglycone and inside the prefix."""
 
     def test_flavan_glucoside_locanted_and_single_counted(self):
@@ -47,7 +47,7 @@ class TestGlycosidicOxygenCountedOnce:
             "[C@H](O)[C@@H](O)[C@@H]1O"
         )
         assert name == (
-            "(2S,3R)-7-(beta-D-glucopyranosyloxy)-3,5-dihydroxy-"
+            "(2S,3R)-7-(β-D-glucopyranosyloxy)-3,5-dihydroxy-"
             "2-(4-hydroxyphenyl)-3,4-dihydro-2H-1-benzopyran"
         )
         # The oxygen is not double-counted: 'trihydroxy' was the bug.
@@ -57,8 +57,8 @@ class TestGlycosidicOxygenCountedOnce:
         """A prefix with no attachment locant is what OPSIN either refuses or
         attaches wrongly; the BB cites '4-(...)' explicitly."""
         name = _name("O=Cc1ccc(O[C@@H]2O[C@H](CO)[C@@H](O)[C@H](O)[C@H]2O)cc1")
-        assert name == "4-(beta-D-glucopyranosyloxy)benzaldehyde"
-        assert not name.startswith("(beta-D-glucopyranosyloxy)")
+        assert name == "4-(β-D-glucopyranosyloxy)benzaldehyde"
+        assert not name.startswith("(β-D-glucopyranosyloxy)")
 
     def test_benzaldehyde_aglycone_keeps_all_sugar_oxygens(self):
         """The skeleton-only '(oxan-2-yl)oxy' fallback discarded the sugar's four
@@ -69,10 +69,10 @@ class TestGlycosidicOxygenCountedOnce:
         assert "oxolan-2-yl" not in name
 
     def test_bluebook_worked_example(self):
-        """BB :53927 verbatim. CHARACTERIZATION, not a regression guard for this
+        """BB:53927 verbatim. CHARACTERIZATION, not a regression guard for this
         change: measured to already hold before it (HEAD 62c77fa0)."""
         name = _name("CC(=O)c1ccc(O[C@@H]2O[C@H](CO)[C@@H](O)[C@H](O)[C@H]2O)cc1")
-        assert name == "1-[4-(beta-D-glucopyranosyloxy)phenyl]ethan-1-one"
+        assert name == "1-[4-(β-D-glucopyranosyloxy)phenyl]ethan-1-one"
 
 
 # --------------------------------------------------------------------------
@@ -141,7 +141,7 @@ class TestGlycosylSubstituentPrefix:
         mol, frag, o = _glyco_fragment(
             "O=Cc1ccc(O[C@@H]2O[C@H](CO)[C@@H](O)[C@H](O)[C@H]2O)cc1")
         assert glycosyl_substituent_prefix(mol, frag, o) == \
-            "beta-D-glucopyranosyloxy"
+            "β-D-glucopyranosyloxy"
 
     def test_anomer_and_configuration_are_preserved(self):
         """alpha/beta and D/L come from the fragment's own stereo, so a different
@@ -149,10 +149,10 @@ class TestGlycosylSubstituentPrefix:
         mol, frag, o = _glyco_fragment(
             "C[C@@H]1O[C@@H](Oc2ccccc2)[C@H](O)[C@H](O)[C@H]1O")
         assert glycosyl_substituent_prefix(mol, frag, o) == \
-            "alpha-L-rhamnopyranosyloxy"
+            "α-L-rhamnopyranosyloxy"
 
     def test_refuses_a_uronic_glycosyl(self):
-        """BB :53929 cites a uronic glycosyl as 'beta-D-glucopyranosyluronic
+        """BB:53929 cites a uronic glycosyl as 'β-D-glucopyranosyluronic
         acid', not as a '...osyloxy' token; the naive contraction
         'glucuronopyranosyloxy' is a fabricated morpheme OPSIN cannot parse."""
         mol, frag, o = _glyco_fragment(
@@ -182,7 +182,7 @@ class TestGlycosylSubstituentPrefix:
         ``('', '', 'glucuronopyranose')`` -- no anomer, no configuration -- so the
         anomer/config guard would refuse it even with the uronic guard removed
         (measured: that mutation SURVIVED). This stereo-defined glucuronide looks
-        up as ``('beta', 'D', 'glucuronopyranose')``, so the uronic guard is the
+        up as ``('β', 'D', 'glucuronopyranose')``, so the uronic guard is the
         only thing that can refuse it.
         """
         mol, frag, o = _glyco_fragment(
@@ -205,9 +205,9 @@ class TestGlycosylSubstituentPrefix:
         """Isolating witness for the decorated-base guard.
 
         N-acetylglucosamine looks up as
-        ``('beta', 'D', '2-acetamido-2-deoxy-glucopyranose')`` -- non-uronic, with
+        ``('β', 'D', '2-acetamido-2-deoxy-glucopyranose')`` -- non-uronic, with
         both descriptors -- so only the decorated-base guard can refuse it.
-        Concatenating would give 'beta-D-2-acetamido-2-deoxy-glucopyranosyloxy',
+        Concatenating would give 'β--acetamido-2-deoxy-glucopyranosyloxy',
         whereas P-102.6.1.2 (:53935) requires the decorated glycosyl inside its
         own enclosing marks before 'oxy'.
         """
@@ -285,13 +285,13 @@ class TestGlycosylSubstituentPrefix:
 @pytest.mark.parametrize("smiles,expected", [
     ("C[C@@H]1O[C@@H](O[C@@H]2[C@@H](O)[C@H](O)[C@@H](CO)O[C@@H]2O)"
      "[C@@H](O)[C@H](O)[C@@H]1O",
-     "alpha-L-fucopyranosyl-(1->2)-alpha-D-glucopyranose"),
+     "α-L-fucopyranosyl-(1->2)-α-D-glucopyranose"),
     ("OC[C@H]1O[C@H](O[C@@H]2C(O)O[C@H](CO)[C@@H](O)[C@@H]2O)"
      "[C@@H](O)[C@@H](O)[C@@H]1O",
-     "alpha-D-mannopyranosyl-(1->2)-D-mannopyranose"),
+     "α-D-mannopyranosyl-(1->2)-D-mannopyranose"),
     ("OC[C@H]1O[C@@H](O[C@@H]2[C@H](O)[C@@H](O)[C@H](O)O[C@@H]2CO)"
      "[C@@H](O)[C@@H](O)[C@@H]1O",
-     "beta-D-mannopyranosyl-(1->4)-beta-D-galactopyranose"),
+     "β-D-mannopyranosyl-(1->4)-β-D-galactopyranose"),
 ])
 def test_sugar_to_sugar_linkage_notation_unchanged(smiles, expected):
     """A glycosidic bond between two SUGARS keeps the P-102 (1->n) form. The

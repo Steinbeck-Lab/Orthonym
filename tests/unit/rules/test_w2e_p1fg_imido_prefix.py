@@ -14,7 +14,7 @@ dione as parent and produces a decomposition candidate BEFORE the
 naphthalene-carboxylic-acid + phthalimido-substituent candidate is formed,
 so candidate A never reaches the pool. Fail-closed at runtime (SELF-01
 suppresses the wrong 'complex_ring' name to unknown — verified via
-). Follow-up: make the PAH-carboxylic-acid parent path
+scripts/diagnose.py). Follow-up: make the PAH-carboxylic-acid parent path
 produce its candidate for this shape / de-rank complex_ring's decomposition.
 """
 import pytest

@@ -1,14 +1,14 @@
-"""Phase 154.B unit tests for src/orthonym/rules/multiplicative.py.
+"""a phase.B unit tests for src/orthonym/rules/multiplicative.py.
 
 Coverage matrix (per 154-02-PLAN.md success criteria):
 
-  TestRetainedParentLookup       (D-10) — _resolve_parent_name + _extract_pg_locant_from_fragment
-  TestTopologyGuard              (D-11) — _is_pure_single_bond_assembly entry-guard
-  TestComplexMultipliersBranch   (D-08) — _select_multiplier P-14.2.1 vs P-14.2.2 split
-  TestComplexMultipliersEndToEnd (D-08) — end-to-end SIMPLE multiplier preserved
-  TestLocantCascade              (D-12) — _get_bridge_locant via Phase 151 cascade
-  TestBridgeTables               (D-09) — bridge-table contents + audit cite
-  TestNoBandAids                 (D-13) — no postprocessor / band-aid in source
+  TestRetainedParentLookup () — _resolve_parent_name + _extract_pg_locant_from_fragment
+  TestTopologyGuard () — _is_pure_single_bond_assembly entry-guard
+  TestComplexMultipliersBranch () — _select_multiplier P-14.2.1 vs P-14.2.2 split
+  TestComplexMultipliersEndToEnd () — end-to-end SIMPLE multiplier preserved
+  TestLocantCascade () — _get_bridge_locant via a phase cascade
+  TestBridgeTables () — bridge-table contents + audit cite
+  TestNoBandAids () — no postprocessor / band-aid in source
 
 Each class is gated by @pytest.mark.unit so it is collected with the
 fast-only pytest profile.
@@ -21,13 +21,13 @@ import pytest
 
 
 # ---------------------------------------------------------------------------
-# Task 2.1 — D-10 retained-parent registry-query layer
+# Task 2.1 — retained-parent registry-query layer
 # ---------------------------------------------------------------------------
 
 
 @pytest.mark.unit
 class TestRetainedParentLookup:
-    """D-10: _resolve_parent_name queries ALL_RETAINED_NAMES; _RETAINED_PARENT_NAMES is gone."""
+    """: _resolve_parent_name queries ALL_RETAINED_NAMES; _RETAINED_PARENT_NAMES is gone."""
 
     def test_aniline(self):
         from orthonym.rules.multiplicative import _resolve_parent_name
@@ -49,7 +49,7 @@ class TestRetainedParentLookup:
         from orthonym.rules.multiplicative import _resolve_parent_name
 
         # RDKit canonicalizes both 'OC(=O)c1ccccc1' and 'O=C(O)c1ccccc1' to
-        # 'O=C(O)c1ccccc1' which IS the registry key.  D-10 routes through
+        # 'O=C(O)c1ccccc1' which IS the registry key. routes through
         # the registry, so the canonical form is what we test.
         result = _resolve_parent_name("O=C(O)c1ccccc1")
         assert result is not None
@@ -64,7 +64,7 @@ class TestRetainedParentLookup:
         assert result is None
 
     def test_legacy_dict_symbol_removed(self):
-        """The hardcoded _RETAINED_PARENT_NAMES dict MUST be deleted (D-10)."""
+        """The hardcoded _RETAINED_PARENT_NAMES dict MUST be deleted ()."""
         from orthonym.rules import multiplicative
 
         assert not hasattr(multiplicative, "_RETAINED_PARENT_NAMES"), (
@@ -81,7 +81,7 @@ class TestRetainedParentLookup:
         assert _name_parent("Oc1ccccc1") == "phenol"
 
     def test_canary_methylenedianiline_e2e(self):
-        """End-to-end canary: methylenedianiline still RTs after D-10."""
+        """End-to-end canary: methylenedianiline still RTs after."""
         from orthonym import name_compound
 
         assert (
@@ -91,13 +91,13 @@ class TestRetainedParentLookup:
 
 
 # ---------------------------------------------------------------------------
-# Task 2.2 — D-11 topology guard
+# Task 2.2 — topology guard
 # ---------------------------------------------------------------------------
 
 
 @pytest.mark.unit
 class TestTopologyGuard:
-    """D-11: _is_pure_single_bond_assembly + name_multiplicative entry-guard."""
+    """: _is_pure_single_bond_assembly + name_multiplicative entry-guard."""
 
     def test_biphenyl_is_pure_single_bond(self):
         from rdkit import Chem
@@ -131,7 +131,7 @@ class TestTopologyGuard:
         from rdkit import Chem
         from orthonym.rules.multiplicative import name_multiplicative
 
-        # D-11 guard: multiplicative MUST decline biphenyl.
+        # guard: multiplicative MUST decline biphenyl.
         mol = Chem.MolFromSmiles("c1ccc(-c2ccccc2)cc1")
         assert name_multiplicative(mol) is None
 
@@ -139,7 +139,7 @@ class TestTopologyGuard:
         from rdkit import Chem
         from orthonym.rules.multiplicative import name_multiplicative
 
-        # D-11 guard does NOT block atom-bridged cases.
+        # guard does NOT block atom-bridged cases.
         mol = Chem.MolFromSmiles("Nc1ccc(Cc2ccc(N)cc2)cc1")
         assert name_multiplicative(mol) == "4,4'-methylenedianiline"
 
@@ -147,7 +147,7 @@ class TestTopologyGuard:
         """End-to-end: biphenyl falls through to ring_assemblies."""
         from orthonym import name_compound
 
-        # Biphenyl returns 'biphenyl' via Phase 151 ring_assemblies path.
+        # Biphenyl returns 'biphenyl' via a phase ring_assemblies path.
         result = name_compound("c1ccc(-c2ccccc2)cc1")
         assert result is not None
         assert "biphenyl" in result.lower() or "1,1'-biphenyl" in result.lower()
@@ -162,13 +162,13 @@ class TestTopologyGuard:
 
 
 # ---------------------------------------------------------------------------
-# Task 2.3 — D-08 P-14.2.1 vs P-14.2.2 multiplier split
+# Task 2.3 — P-14.2.1 vs P-14.2.2 multiplier split
 # ---------------------------------------------------------------------------
 
 
 @pytest.mark.unit
 class TestComplexMultipliersBranch:
-    """D-08: P-14.2.1 (di/tri/tetra) vs P-14.2.2 (bis/tris/tetrakis) split."""
+    """: P-14.2.1 (di/tri/tetra) vs P-14.2.2 (bis/tris/tetrakis) split."""
 
     @pytest.mark.parametrize(
         "parent_name,unit_count,expected_prefix",
@@ -179,7 +179,7 @@ class TestComplexMultipliersBranch:
             ("1,3-thiazole", 2, "bis"),
             ("1,3,5-triazine", 3, "tris"),
             # R-154-NEW-7 heuristic refinement: digit alone WITHOUT a comma
-            # is NOT a P-14.2.2 trigger.  "but-2-ene" parses unambiguously
+            # is NOT a P-14.2.2 trigger. "but-2-ene" parses unambiguously
             # as "di(but-2-ene)" with SIMPLE_MULTIPLIERS.
             ("but-2-ene", 2, "di"),
             # Higher-arity COMPLEX_MULTIPLIERS coverage.
@@ -196,7 +196,7 @@ class TestComplexMultipliersBranch:
 
 @pytest.mark.unit
 class TestComplexMultipliersEndToEnd:
-    """D-08 end-to-end: canary SIMPLE multiplier path preserved."""
+    """ end-to-end: canary SIMPLE multiplier path preserved."""
 
     @pytest.mark.parametrize(
         "smiles,expected_name",
@@ -215,13 +215,13 @@ class TestComplexMultipliersEndToEnd:
 
 
 # ---------------------------------------------------------------------------
-# Task 2.4 — D-12 locant cascade
+# Task 2.4 — locant cascade
 # ---------------------------------------------------------------------------
 
 
 @pytest.mark.unit
 class TestLocantCascade:
-    """D-12: _get_bridge_locant queries Phase 151 cascade; legacy default-4 GONE."""
+    """: _get_bridge_locant queries a phase cascade; legacy default-4 GONE."""
 
     def test_methylenedianiline_locant_via_cascade(self):
         from rdkit import Chem
@@ -276,13 +276,13 @@ class TestLocantCascade:
         )
 
     def test_default_4_branch_removed(self):
-        """The legacy `return 4 # default` branches MUST be gone (D-12)."""
+        """The legacy `return 4 # default` branches MUST be gone ()."""
         import re
         from pathlib import Path
 
         src = Path("src/orthonym/rules/multiplicative.py").read_text()
         # Match `return 4 # default` (case-insensitive on Default) and
-        # `return 4  # default to 4 (most common para position)` style.
+        # `return 4 # default to 4 (most common para position)` style.
         legacy_pattern = re.compile(
             r"^\s*return\s+4\s*#\s*([Dd]efault|.*para)", re.MULTILINE
         )
@@ -308,21 +308,21 @@ class TestLocantCascade:
 
 
 # ---------------------------------------------------------------------------
-# Task 2.5 — D-09 bridge-table expansion
+# Task 2.5 — bridge-table expansion
 # ---------------------------------------------------------------------------
 
 
 @pytest.mark.unit
 class TestBridgeTables:
-    """D-09: bridge-table contents after audit-driven expansion."""
+    """: bridge-table contents after audit-driven expansion."""
 
     @pytest.mark.parametrize(
         "symbol,expected_name",
         [
             ("O", "oxy"),
-            # v22 F-T5 / MULT-01: the -S- multiplicative bridge is the modern
+            # F-T5 / MULT-01: the -S- multiplicative bridge is the modern
             # preselected prefix "sulfanediyl" (P-15.3.1.2.1.1); legacy "thio"
-            # is deprecated. PIN "1,1'-sulfanediyldibenzene" (BB line 27826).
+            # is deprecated. PIN "1,1'-sulfanediyldibenzene" (the Blue Book).
             ("S", "sulfanediyl"),
             # Wave2 P-35.2.2: divalent -NH- bridge PIN is "azanediyl"; "imino"
             # is deprecated for -NH- (mirrors the thio->sulfanediyl heal).
@@ -332,7 +332,7 @@ class TestBridgeTables:
     )
     def test_single_atom_bridges_baseline(self, symbol, expected_name):
         """Pre-existing single-atom bridges preserved after Plan 154-02
-        (S modernized thio->sulfanediyl in v22 F-T5)."""
+        (S modernized thio->sulfanediyl in F-T5)."""
         from orthonym.rules.multiplicative import _SINGLE_ATOM_BRIDGES
 
         assert _SINGLE_ATOM_BRIDGES.get(symbol) == expected_name
@@ -341,15 +341,15 @@ class TestBridgeTables:
         "atom_a,atom_b,h_a,h_b,expected_name",
         [
             ("C", "C", 2, 2, "ethane-1,2-diyl"),  # Wave2 P-29.3.2.2 PIN (was 'ethylene')
-            # v29 P3-FINAL I9: was "vinylene", which the Blue Book's own prefix
+            # -FINAL I9: was "vinylene", which the Blue Book's own prefix
             # table marks as NOT the preferred form -- `| ethene-1,2-diyl* (not
-            # <br>vinylene) | -CH=CH- | P-32.1.1 |` (BlueBookV2.md:55998) -- and
+            # <br>vinylene) | -CH=CH- | P-32.1.1 |` (the Blue Book) -- and
             # `:16615` gives the PIN outright: `stilbene (ring substitution only)
-            # 1,1'-(ethene-1,2-diyl)dibenzene (PIN)`.  E- and Z-stilbene shared
+            # 1,1'-(ethene-1,2-diyl)dibenzene (PIN)`. E- and Z-stilbene shared
             # the one string before the change; they now differ.
             ("C", "C", 1, 1, "ethene-1,2-diyl"),
-            ("O", "O", 0, 0, "peroxy"),  # D-09 add (154-AUDIT-B.md §3 #1)
-            ("S", "S", 0, 0, "disulfanediyl"),  # D-09 add (154-AUDIT-B.md §3 #2)
+            ("O", "O", 0, 0, "peroxy"),  # add (154-AUDIT-B.md §3 #1)
+            ("S", "S", 0, 0, "disulfanediyl"),  # add (154-AUDIT-B.md §3 #2)
         ],
     )
     def test_two_atom_bridges_present(self, atom_a, atom_b, h_a, h_b, expected_name):
@@ -378,7 +378,7 @@ class TestBridgeTables:
             (("N", 0, 3), "nitrilo"),
             (("C", 1, 3), "methylidyne"),
             (("C", 0, 4), "methanetetrayl"),
-            (("P", 0, 3), "phosphinidyne"),  # D-09 add (154-AUDIT-B.md §3 #3)
+            (("P", 0, 3), "phosphinidyne"),  # add (154-AUDIT-B.md §3 #3)
         ],
     )
     def test_multi_bridge_names_present(self, key, expected_name):
@@ -389,28 +389,28 @@ class TestBridgeTables:
         )
 
     def test_peroxy_e2e(self):
-        """D-09 bridge add (peroxy): 4,4'-peroxydibenzoic acid RTs."""
+        """ bridge add (peroxy): 4,4'-peroxydibenzoic acid RTs."""
         from orthonym import name_compound
 
         result = name_compound("OC(=O)c1ccc(OOc2ccc(C(=O)O)cc2)cc1")
         assert result == "4,4'-peroxydibenzoic acid", f"got {result!r}"
 
     def test_disulfanediyl_e2e(self):
-        """D-09 bridge add (disulfanediyl): 4,4'-disulfanediyldibenzoic acid."""
+        """ bridge add (disulfanediyl): 4,4'-disulfanediyldibenzoic acid."""
         from orthonym import name_compound
 
         result = name_compound("OC(=O)c1ccc(SSc2ccc(C(=O)O)cc2)cc1")
         assert result == "4,4'-disulfanediyldibenzoic acid", f"got {result!r}"
 
     def test_phosphinidyne_e2e(self):
-        """D-09 bridge add (phosphinidyne): 4,4',4''-phosphinidynetriphenol."""
+        """ bridge add (phosphinidyne): 4,4',4''-phosphinidynetriphenol."""
         from orthonym import name_compound
 
         result = name_compound("Oc1ccc(P(c2ccc(O)cc2)c2ccc(O)cc2)cc1")
         assert result == "4,4',4''-phosphinidynetriphenol", f"got {result!r}"
 
     def test_bridge_tables_have_audit_cites(self):
-        """Every NEW bridge entry (D-09) has an inline 154-AUDIT-B.md cite."""
+        """Every NEW bridge entry () has an inline 154-AUDIT-B.md cite."""
         from pathlib import Path
 
         src = Path("src/orthonym/rules/multiplicative.py").read_text()
@@ -434,13 +434,13 @@ class TestBridgeTables:
 
 
 # ---------------------------------------------------------------------------
-# D-13 anti-band-aid guard
+# anti-band-aid guard
 # ---------------------------------------------------------------------------
 
 
 @pytest.mark.unit
 class TestNoBandAids:
-    """D-13: no postprocessor / regex band-aid in multiplicative.py."""
+    """: no postprocessor / regex band-aid in multiplicative.py."""
 
     def test_no_postprocessor_keyword(self):
         from pathlib import Path
@@ -456,13 +456,13 @@ class TestNoBandAids:
 
 
 # ---------------------------------------------------------------------------
-# v22 F-T5 — MULT-01 central-arene multiplicative (V-8) + thio->sulfanediyl (V-17)
+# F-T5 — MULT-01 central-arene multiplicative (V-8) + thio->sulfanediyl (V-17)
 # ---------------------------------------------------------------------------
 
 
 @pytest.mark.unit
 class TestCentralAreneMultiplicative:
-    """v22 F-T5: a bare benzene + >=2 identical -(CH2)k-COOH arms is a P-15.3
+    """ F-T5: a bare benzene + >=2 identical -(CH2)k-COOH arms is a P-15.3
     multiplicative case (the arm is the parent acid, the benzene the central
     group). Must keep ALL arms; fail closed (None) outside the handled class."""
 
@@ -539,7 +539,7 @@ class TestCentralAreneMultiplicative:
     @pytest.mark.parametrize(
         "smiles,expected",
         [
-            # V-17: -S- bridge uses the modern preselected prefix (BB line 27826)
+            # V-17: -S- bridge uses the modern preselected prefix (the Blue Book)
             ("c1ccccc1Sc1ccccc1", "1,1'-sulfanediyldibenzene"),
             ("Nc1ccc(Sc2ccc(N)cc2)cc1", "4,4'-sulfanediyldianiline"),
             # unchanged O / O-O / S-S analogues (all PINs)
@@ -556,7 +556,7 @@ class TestCentralAreneMultiplicative:
 
 
 # ===========================================================================
-# v29 P3-FINAL I9 — (E)- and (Z)-stilbene must not share one name.
+# -FINAL I9 — (E)- and (Z)-stilbene must not share one name.
 # ===========================================================================
 
 class TestEtheneDiylBridgeI9:
@@ -564,19 +564,19 @@ class TestEtheneDiylBridgeI9:
 
     Authority, with headings:
 
-    *   `BlueBookV2.md:55998` -- the Blue Book's own detachable-prefix table
+    * `the Blue Book` -- the Blue Book's own detachable-prefix table
         (`## **Appendix 2** / DETACHABLE PREFIXES USED FOR SUBSTITUTIVE
         NOMENCLATURE`) reads `| ethene-1,2-diyl* (not<br>vinylene) | -CH=CH- |
-        P-32.1.1 |`.  The book marks the old spelling "not".
-    *   `:16615` gives the PIN outright: `stilbene (ring substitution only)
+        P-32.1.1 |`. The book marks the old spelling "not".
+    * `:16615` gives the PIN outright: `stilbene (ring substitution only)
         1,1'-(ethene-1,2-diyl)dibenzene (PIN)`.
-    *   `:47100` shows the configuration cited INSIDE the multiplicative bracket:
+    * `:47100` shows the configuration cited INSIDE the multiplicative bracket:
         `1,1'-[(1*E*)-1-(4-chlorophenyl)ethene-1,2-diyl]dibenzene (PIN, see
         P-93.6)` -- so the preferred form has a channel for the descriptor, and
         the two isomers can be told apart.
 
     Before this, `gold_pins.json`'s WSB-01 row pinned the shared string with the
-    note "descriptor-LESS output is EXPECTED, NOT a regression".  Two different
+    note "descriptor-LESS output is EXPECTED, NOT a regression". Two different
     compounds with one name is a regression by any reading; the row is re-based.
     """
 
@@ -597,7 +597,7 @@ class TestEtheneDiylBridgeI9:
         assert "vinylene" not in e_name and "vinylene" not in z_name
 
     def test_an_undefined_geometry_yields_the_bare_pin_prefix(self):
-        """No configuration to express -> no descriptor.  Inventing one would be
+        """No configuration to express -> no descriptor. Inventing one would be
         worse than omitting it ("missing beats wrong")."""
         from rdkit import Chem
         from orthonym.rules.multiplicative import _ethene_diyl_bridge_name
@@ -614,3 +614,104 @@ class TestEtheneDiylBridgeI9:
                 a, b = bond.GetBeginAtom(), bond.GetEndAtom()
         assert a is not None, "test fixture found no CH=CH bond"
         assert _ethene_diyl_bridge_name(mol, a, b) == "ethene-1,2-diyl"
+
+
+# ---------------------------------------------------------------------------
+# Phase 7B4 — Group-14 hydride multiplicative units
+# (propane-1,2-diyl)bis(trimethylsilane) (the Blue Book, P-15.3.3.1)
+# (benzene-1,3,5-triyl)tris(silane) (the Blue Book, P-15.3.2.3)
+# (ethane-1,2-diyl)bis(silane) (symmetric control)
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.unit
+class TestGroup14HydrideMultiplicative:
+    """P-16.3.6(a): mononuclear Group-14 hydride parents take bis/tris."""
+
+    def test_select_multiplier_silane_is_complex(self):
+        # P-16.3.6(a): 'silane'/'trimethylsilane' -> bis/tris (NOT di/tri),
+        # to avoid the catenated 'disilane'/'trisilane' ambiguity.
+        from orthonym.rules.multiplicative import _select_multiplier
+
+        assert _select_multiplier("silane", 3) == "tris"
+        assert _select_multiplier("silane", 2) == "bis"
+        assert _select_multiplier("trimethylsilane", 2) == "bis"
+        assert _select_multiplier("dimethylgermane", 2) == "bis"
+
+    def test_select_multiplier_count_from_occurrence_not_unit(self):
+        # The multiplier value derives from the OCCURRENCE count, not the unit.
+        from orthonym.rules.multiplicative import _select_multiplier
+
+        assert _select_multiplier("silane", 4) == "tetrakis"
+
+    def test_select_multiplier_unrelated_parents_unchanged(self):
+        # Invariant 9: existing parents keep di/tri; 'disilane' (catenated,
+        # never a mononuclear multiplicative parent) is NOT flagged complex.
+        from orthonym.rules.multiplicative import _select_multiplier
+
+        assert _select_multiplier("aniline", 2) == "di"
+        assert _select_multiplier("ethan-1-ol", 2) == "di"
+        assert _select_multiplier("disilane", 2) == "di"
+
+    def test_propane_bis_trimethylsilane(self):
+        from rdkit import Chem
+        from orthonym.rules.multiplicative import name_multiplicative
+
+        mol = Chem.MolFromSmiles("CC(C[Si](C)(C)C)[Si](C)(C)C")
+        assert name_multiplicative(mol) == "(propane-1,2-diyl)bis(trimethylsilane)"
+
+    def test_benzene_tris_silane(self):
+        from rdkit import Chem
+        from orthonym.rules.multiplicative import name_multiplicative
+
+        mol = Chem.MolFromSmiles("[SiH3]c1cc([SiH3])cc([SiH3])c1")
+        assert name_multiplicative(mol) == "(benzene-1,3,5-triyl)tris(silane)"
+
+    def test_ethane_bis_silane(self):
+        from rdkit import Chem
+        from orthonym.rules.multiplicative import name_multiplicative
+
+        mol = Chem.MolFromSmiles("[SiH3]CC[SiH3]")
+        assert name_multiplicative(mol) == "(ethane-1,2-diyl)bis(silane)"
+
+    def test_full_pipeline(self):
+        from orthonym import name_compound
+
+        assert (name_compound("CC(C[Si](C)(C)C)[Si](C)(C)C")
+                == "(propane-1,2-diyl)bis(trimethylsilane)")
+        assert (name_compound("[SiH3]c1cc([SiH3])cc([SiH3])c1")
+                == "(benzene-1,3,5-triyl)tris(silane)")
+        assert name_compound("[SiH3]CC[SiH3]") == "(ethane-1,2-diyl)bis(silane)"
+
+    @pytest.mark.parametrize("smiles", [
+        "Cl[SiH2]CC[SiH3]",              # the Blue Book trap: asymmetric, chlorosilane
+        "[SiH3]CC[Si](C)(C)C",          # differing units (silyl vs trimethylsilyl)
+        "[SiH3]CC",                      # only one unit
+        "[SiH3]C[SiH3]",                 # both units on one carbon (methanediyl)
+        "CC[Si](CC)(CC)CC[Si](CC)(CC)CC",  # ethyl (non-methyl) substituent
+        "[SiH3][SiH2]CC[SiH2][SiH3]",   # catenated disilane units
+        "Cc1cc([SiH3])cc([SiH3])c1",    # extra ring substituent -> coverage fail
+    ])
+    def test_fail_closed_traps(self, smiles):
+        # Multiplicative must fail closed here (asymmetric / out-of-scope) so the
+        # engine keeps the substitutive PIN — never a wrong silane bis/tris name.
+        from rdkit import Chem
+        from orthonym.rules.multiplicative import name_multiplicative
+
+        assert name_multiplicative(Chem.MolFromSmiles(smiles)) is None
+
+    @pytest.mark.parametrize("smiles,expected", [
+        ("CC(C[Si](C)(C)C)[Si](C)(C)C", "(propane-1,2-diyl)bis(trimethylsilane)"),
+        ("[SiH3]c1cc([SiH3])cc([SiH3])c1", "(benzene-1,3,5-triyl)tris(silane)"),
+        ("[SiH3]CC[SiH3]", "(ethane-1,2-diyl)bis(silane)"),
+    ])
+    def test_roundtrip_via_opsin(self, smiles, expected):
+        from rdkit import Chem
+        from orthonym.rules.multiplicative import name_multiplicative
+        from orthonym.validation.opsin_roundtrip import opsin_parse
+
+        assert name_multiplicative(Chem.MolFromSmiles(smiles)) == expected
+        out = opsin_parse(expected)
+        assert out, f"OPSIN could not parse {expected!r}"
+        assert (Chem.MolToInchiKey(Chem.MolFromSmiles(out))
+                == Chem.MolToInchiKey(Chem.MolFromSmiles(smiles)))

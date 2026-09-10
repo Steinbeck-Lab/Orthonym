@@ -76,7 +76,7 @@ class TestPhosphineNaming:
         carries ``methyldi(phenyl)phosphaniumyl`` inside a PIN.  The first cited
         group here is ``ethyl``/``methyl`` -- simple and locant-free -- so it is
         correctly BARE, satisfying the first-cited clause above.
-        The gold set already agrees (`
+        The gold set already agrees (``benchmarks/pin_oracle/packs/
         characteristic_groups.json`` ships ``tert-butyldi(methyl)(oxiranyl-
         methoxy)silane``), so these 7 unit assertions were the only stale copy.
         DO NOT "fix" these back to ``X(diY)``.
@@ -157,11 +157,18 @@ class TestPhosphonicAcidNaming:
         result = name_phosphonic_acid(mol, (3, 4, 5, 6))
         assert result == "propylphosphonic acid"
 
-    def test_complex_organyl_fails_closed(self):
-        """A heteroatom-bearing organyl is not a clean simple substituent -> None
-        (caller defers to the generic path; no wrong substituent-prefix name)."""
+    def test_junior_group_organyl_is_named(self):
+        """A JUNIOR-group-bearing organyl IS named as a detachable prefix.
+
+        v42 11-FABLEFIX: the phosphonic acid (P-41 Table 4.1 class 7c) is the
+        principal group, so a substituent hydroxy (class 17) is JUNIOR and a mere
+        detachable prefix. The narrow C/H/halogen ``organyl_prefix_name`` guard
+        fail-closes on it, so ``_organyl_or_junior_prefix`` falls back to the full
+        substituent enumerator: ``(2-hydroxyethyl)phosphonic acid`` (OPSIN
+        round-trips to the input, verified). The old conservative refusal (→ None)
+        is superseded — this is exactly the class the fallback exists to build."""
         mol = Chem.MolFromSmiles("OCCP(=O)(O)O")  # (2-hydroxyethyl)phosphonic acid
-        assert name_phosphonic_acid(mol, (3, 4, 5, 6)) is None
+        assert name_phosphonic_acid(mol, (3, 4, 5, 6)) == "(2-hydroxyethyl)phosphonic acid"
 
 
 class TestPhosphinicAcidNaming:

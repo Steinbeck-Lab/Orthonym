@@ -1,10 +1,10 @@
-"""v33 FG-capable re-rooted substituent namer (invariant-18 lever).
+""" FG-capable re-rooted substituent namer (invariant-18 lever).
 
 Names a complex FG-bearing fragment as a substituent rooted at an ARBITRARY
 attachment atom, with structural free-valence numbering (P-46.1.8/P-46.1.12) —
 the proper form the parent_to_prefix band-aid cannot produce. Best-effort-gated,
 so the default/PIN path is byte-identical. See
-
+internal notes
 """
 import pytest
 from rdkit import Chem

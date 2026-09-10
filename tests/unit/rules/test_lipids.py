@@ -1,7 +1,7 @@
-"""Unit tests for the P-107 lipid backbone-aware assembler (Phase 180, WSC-01).
+"""Unit tests for the P-107 lipid backbone-aware assembler (a phase, WSC-01).
 
 Target name form = Form B (systematic substitutive / P-68 functional-class),
-empirically OPSIN-round-trip-verified (180-CONTEXT.md D-01). Each test asserts
+empirically OPSIN-round-trip-verified (180-CONTEXT.md). Each test asserts
 the exact PIN the assembler must produce.
 
 WAVE 0 CONTRACT: these import the not-yet-built `name_lipid` symbol INSIDE each
@@ -92,28 +92,28 @@ class TestSphingolipids:
 
 class TestGlycoLipids:
     def test_glyco_ceramide(self):
-        """beta-D-galactosylceramide →
-        N-[(2S,3R,4E)-1-(beta-D-galactopyranosyloxy)-3-hydroxyoctadec-4-en-2-yl]hexadecanamide."""
+        """β-D-galactosylceramide →
+        N-[(2S,3R,4E)-1-(β-D-galactopyranosyloxy)-3-hydroxyoctadec-4-en-2-yl]hexadecanamide."""
         from orthonym.rules.lipids import name_lipid  # noqa: F401
         smiles = ("CCCCCCCCCCCCC/C=C/[C@@H](O)[C@H]("
                   "CO[C@@H]1O[C@H](CO)[C@H](O)[C@H](O)[C@H]1O)"
                   "NC(=O)CCCCCCCCCCCCCCC")
         assert name_compound(smiles) == (
-            "N-[(2S,3R,4E)-1-(beta-D-galactopyranosyloxy)-3-hydroxyoctadec-4-en-2-yl]"
+            "N-[(2S,3R,4E)-1-(β-D-galactopyranosyloxy)-3-hydroxyoctadec-4-en-2-yl]"
             "hexadecanamide")
 
     def test_glyco_glycerolipid(self):
-        """3-O-beta-D-galactopyranosyl-1,2-di-O-octadecanoyl-sn-glycerol →
-        (2S)-3-(beta-D-galactopyranosyloxy)propane-1,2-diyl dioctadecanoate (Blue Book P-107.4.2)."""
+        """3-O-β-D-galactopyranosyl-1,2-di-O-octadecanoyl-sn-glycerol →
+        (2S)-3-(β-D-galactopyranosyloxy)propane-1,2-diyl dioctadecanoate (Blue Book P-107.4.2)."""
         from orthonym.rules.lipids import name_lipid  # noqa: F401
         smiles = ("CCCCCCCCCCCCCCCCCC(=O)OC[C@@H](OC(=O)CCCCCCCCCCCCCCCCC)"
                   "CO[C@@H]1O[C@H](CO)[C@H](O)[C@H](O)[C@H]1O")
         assert name_compound(smiles) == (
-            "(2S)-3-(beta-D-galactopyranosyloxy)propane-1,2-diyl dioctadecanoate")
+            "(2S)-3-(β-D-galactopyranosyloxy)propane-1,2-diyl dioctadecanoate")
 
 
 # ---------------------------------------------------------------------------
-# Hard-gate negatives (D-06) — must NOT be claimed by the lipid path
+# Hard-gate negatives () — must NOT be claimed by the lipid path
 # ---------------------------------------------------------------------------
 
 class TestHardGateNegatives:

@@ -1,14 +1,14 @@
 """
-OPSIN Phase 17 validation regression tests.
+OPSIN a phase validation regression tests.
 
-Tests verify that Phase 17 fixes (locant collision, ion aspect composition,
+Tests verify that a phase fixes (locant collision, ion aspect composition,
 stereo locant filtering, multiplier reconciliation, species detection) remain
 intact and that overall validation metrics meet targets.
 
 Phase: 17-07 (Final Validation & Regression Suite)
 
 Test classes:
-1. TestPhase17Regressions - 40 fast tests exercising Phase 17 fixes
+1. TestPhase17Regressions - 40 fast tests exercising a phase fixes
 2. TestPhase17SuccessCriteria - @slow tests checking validation_results.json
 """
 
@@ -23,7 +23,7 @@ from orthonym import name_compound
 PROJECT_ROOT = Path(__file__).parent.parent.parent
 VALIDATION_RESULTS_PATH = (
     PROJECT_ROOT
-    / ""
+    / ".planning"
     / "phases"
     / "17-composer-routing-redesign"
     / "validation_results.json"
@@ -31,12 +31,12 @@ VALIDATION_RESULTS_PATH = (
 
 
 # ============================================================================
-# TestPhase17Regressions: Fast regression tests for Phase 17 fixes
+# TestPhase17Regressions: Fast regression tests for a phase fixes
 # ============================================================================
 
 
 class TestPhase17Regressions:
-    """Regression tests for specific Phase 17 fix categories.
+    """Regression tests for specific a phase fix categories.
 
     These tests are NOT marked slow -- they only call name_compound() and run
     in <1s each. They cover each fix category introduced in Plans 17-01 to
@@ -51,9 +51,9 @@ class TestPhase17Regressions:
         assert result == "acetate", f"Expected acetate, got: {result}"
 
     def test_ion_retained_ammonium(self):
-        """Ammonium retained name via ion fall-through routing."""
+        """NH4+ PIN is 'azanium' (P-73.1.1.2, the Blue Book; was 'ammonium')."""
         result = name_compound("[NH4+]")
-        assert result == "ammonium", f"Expected ammonium, got: {result}"
+        assert result == "azanium", f"Expected azanium, got: {result}"
 
     def test_ion_retained_methylammonium(self):
         """Methylammonium retained name via ion fall-through."""
@@ -277,7 +277,7 @@ class TestPhase17Regressions:
 
 @pytest.mark.slow
 class TestPhase17SuccessCriteria:
-    """Tests that verify Phase 17 success criteria from validation_results.json.
+    """Tests that verify a phase success criteria from validation_results.json.
 
     Marked @slow because they depend on pre-computed validation data.
     """

@@ -1,12 +1,12 @@
 """FR-2.3 base component selection tests (Phase 149 Tier 1).
 
-Per V18 plan §6 Phase 149 + HERITAGE-1990 §4 (hybrid catalog + algorithmic
+Per V18 plan §6 Phase 149 + AUTONOM-1990 §4 (hybrid catalog + algorithmic
 fallback architecture; 61% Beilstein-expert agreement validates the approach).
 
 Each test cites:
   - The QMUL FR-2.3 URL (https://iupac.qmul.ac.uk/fusedring/FR23.html)
   - The IUPAC rule code (P-25.3.2.4 / FR-2.3(letter))
-  - HERITAGE-1990 §4 reference
+  - AUTONOM-1990 §4 reference
   - The Phase 149 CONTEXT decision (D-XX) being verified
 
 Tests are organized into criterion-named classes per CD-03; ≥3 tests per
@@ -15,7 +15,7 @@ criterion (a)-(j) per V18 plan §6 acceptance + 149-CONTEXT D-10 Tier 1.
 Source: https://iupac.qmul.ac.uk/fusedring/FR23.html
 Source: https://iupac.qmul.ac.uk/BlueBook/P2.html P-25.3.2.4
 Source: https://iupac.qmul.ac.uk/BlueBook/P2.html P-25.3.1.3
-Source: HERITAGE-1990 §4 (Wisniewski J. Chem. Inf. Comput. Sci. 30, 324-332)
+Source: AUTONOM-1990 §4 (Wisniewski J. Chem. Inf. Comput. Sci. 30, 324-332)
         — hybrid catalog + algorithmic fallback validation; 61% agreement.
 Source: Phase 149 CONTEXT D-01..D-06, D-10.
 """
@@ -99,7 +99,7 @@ class TestCriterionAHeteroatomSeniority:
 
         Source: https://iupac.qmul.ac.uk/fusedring/FR23.html FR-2.3(a)
         Source: https://iupac.qmul.ac.uk/BlueBook/P2.html P-25.3.2.4
-        Source: HERITAGE-1990 §4.
+        Source: AUTONOM-1990 §4.
         Source: Phase 149 CONTEXT D-04 (REUSE _HETEROATOM_SENIORITY for FR-2.3(a)).
         """
         mol = Chem.MolFromSmiles("c1ccc2ncccc2c1")  # quinoline
@@ -127,7 +127,7 @@ class TestCriterionAHeteroatomSeniority:
 
         Source: https://iupac.qmul.ac.uk/fusedring/FR23.html FR-2.3(a)
         Source: https://iupac.qmul.ac.uk/BlueBook/P2.html P-25.3.2.4
-        Source: HERITAGE-1990 §4.
+        Source: AUTONOM-1990 §4.
         Source: Phase 149 CONTEXT D-04 (primary order N>F>Cl>...>O>...).
         """
         py = Chem.MolFromSmiles("c1ccncc1")
@@ -148,7 +148,7 @@ class TestCriterionAHeteroatomSeniority:
 
         Source: https://iupac.qmul.ac.uk/fusedring/FR23.html FR-2.3(a)
         Source: https://iupac.qmul.ac.uk/BlueBook/P2.html P-25.3.2.4
-        Source: HERITAGE-1990 §4.
+        Source: AUTONOM-1990 §4.
         Source: Phase 149 CONTEXT D-04 / D-15 (REUSE primary order from ring_selection).
         """
         fu = Chem.MolFromSmiles("c1ccoc1")
@@ -187,7 +187,7 @@ class TestCriterionBRingCount:
 
         Source: https://iupac.qmul.ac.uk/fusedring/FR23.html FR-2.3(b)
         Source: https://iupac.qmul.ac.uk/BlueBook/P2.html P-25.3.2.4
-        Source: HERITAGE-1990 §4.
+        Source: AUTONOM-1990 §4.
         Source: Phase 149 CONTEXT D-02 (ring_count_neg = -count).
         """
         mol = Chem.MolFromSmiles("c1ccc2cc3ccccc3cc2c1")  # anthracene
@@ -214,7 +214,7 @@ class TestCriterionBRingCount:
 
         Source: https://iupac.qmul.ac.uk/fusedring/FR23.html FR-2.3(b)
         Source: https://iupac.qmul.ac.uk/BlueBook/P2.html P-25.3.2.4
-        Source: HERITAGE-1990 §4.
+        Source: AUTONOM-1990 §4.
         Source: Phase 149 CONTEXT D-02 (ring_count_neg negation discipline).
         """
         mol = Chem.MolFromSmiles("c1ccc2ccc3ccccc3c2c1")  # phenanthrene
@@ -238,7 +238,7 @@ class TestCriterionBRingCount:
 
         Source: https://iupac.qmul.ac.uk/fusedring/FR23.html FR-2.3(b)
         Source: V18 Appendix A.6 line 2384.
-        Source: HERITAGE-1990 §4.
+        Source: AUTONOM-1990 §4.
         Source: Phase 149 CONTEXT D-02 (negation discipline).
         """
         mol = Chem.MolFromSmiles("c1ccc2ccccc2c1")  # naphthalene
@@ -272,7 +272,7 @@ class TestCriterionCRingSize:
 
         Source: https://iupac.qmul.ac.uk/fusedring/FR23.html FR-2.3(c)
         Source: https://iupac.qmul.ac.uk/BlueBook/P2.html P-25.3.2.4
-        Source: HERITAGE-1990 §4.
+        Source: AUTONOM-1990 §4.
         Source: Phase 149 CONTEXT D-02 (ring_sizes_neg descending+negated).
         """
         # 7+6 fused all-C
@@ -297,7 +297,7 @@ class TestCriterionCRingSize:
 
         Source: https://iupac.qmul.ac.uk/fusedring/FR23.html FR-2.3(c)
         Source: https://iupac.qmul.ac.uk/BlueBook/P2.html P-25.3.2.4
-        Source: HERITAGE-1990 §4.
+        Source: AUTONOM-1990 §4.
         Source: Phase 149 CONTEXT D-02.
         """
         mol7 = Chem.MolFromSmiles("C1CCCCCC1")  # cycloheptane
@@ -319,7 +319,7 @@ class TestCriterionCRingSize:
 
         Source: https://iupac.qmul.ac.uk/fusedring/FR23.html FR-2.3(c)
         Source: V18 Appendix A.6 line 2387.
-        Source: HERITAGE-1990 §4.
+        Source: AUTONOM-1990 §4.
         Source: Phase 149 CONTEXT D-02.
         """
         # 5+7 fused (azulene Kekulé form gives [5,7] in SSSR)
@@ -354,7 +354,7 @@ class TestCriterionDHeteroatomCount:
 
         Source: https://iupac.qmul.ac.uk/fusedring/FR23.html FR-2.3(d)
         Source: https://iupac.qmul.ac.uk/BlueBook/P2.html P-25.3.2.4
-        Source: HERITAGE-1990 §4.
+        Source: AUTONOM-1990 §4.
         Source: Phase 149 CONTEXT D-02 (het_count_neg = -count).
         """
         pyrazine = Chem.MolFromSmiles("c1cnccn1")
@@ -377,7 +377,7 @@ class TestCriterionDHeteroatomCount:
 
         Source: https://iupac.qmul.ac.uk/fusedring/FR23.html FR-2.3(d)
         Source: https://iupac.qmul.ac.uk/BlueBook/P2.html P-25.3.2.4
-        Source: HERITAGE-1990 §4.
+        Source: AUTONOM-1990 §4.
         Source: Phase 149 CONTEXT D-02.
         """
         # morpholine = saturated 1,4-oxazine; aromatic 1,4-oxazine: c1ccocn1?
@@ -401,7 +401,7 @@ class TestCriterionDHeteroatomCount:
 
         Source: https://iupac.qmul.ac.uk/fusedring/FR23.html FR-2.3(d)
         Source: V18 Appendix A.6 lines 2391-2394.
-        Source: HERITAGE-1990 §4.
+        Source: AUTONOM-1990 §4.
         Source: Phase 149 CONTEXT D-02.
         """
         # 1,3,5-triazine: 3 N
@@ -432,7 +432,7 @@ class TestCriterionEHeteroatomVariety:
 
         Source: https://iupac.qmul.ac.uk/fusedring/FR23.html FR-2.3(e)
         Source: https://iupac.qmul.ac.uk/BlueBook/P2.html P-25.3.2.4
-        Source: HERITAGE-1990 §4.
+        Source: AUTONOM-1990 §4.
         Source: Phase 149 CONTEXT D-02.
         """
         oxazole = Chem.MolFromSmiles("c1ocnc1")  # 1,3-oxazole: 1N + 1O
@@ -454,7 +454,7 @@ class TestCriterionEHeteroatomVariety:
 
         Source: https://iupac.qmul.ac.uk/fusedring/FR23.html FR-2.3(e)
         Source: https://iupac.qmul.ac.uk/BlueBook/P2.html P-25.3.2.4
-        Source: HERITAGE-1990 §4.
+        Source: AUTONOM-1990 §4.
         Source: Phase 149 CONTEXT D-02.
         """
         pyridazine = Chem.MolFromSmiles("c1ccnnc1")  # 2N
@@ -480,7 +480,7 @@ class TestCriterionEHeteroatomVariety:
 
         Source: https://iupac.qmul.ac.uk/fusedring/FR23.html FR-2.3(e)
         Source: V18 Appendix A.6 lines 2396-2402.
-        Source: HERITAGE-1990 §4.
+        Source: AUTONOM-1990 §4.
         Source: Phase 149 CONTEXT D-15 (variety is set cardinality).
         """
         triazine = Chem.MolFromSmiles("c1ncncn1")  # 1,3,5-triazine: 3 N's
@@ -517,7 +517,7 @@ class TestCriterionFAltOrder:
 
         Source: https://iupac.qmul.ac.uk/fusedring/FR23.html FR-2.3(f)
         Source: V18 Appendix A.6 lines 2406-2412.
-        Source: HERITAGE-1990 §4.
+        Source: AUTONOM-1990 §4.
         Source: Phase 149 CONTEXT D-04 (alt order is genuinely different from primary).
         """
         py = Chem.MolFromSmiles("c1ccncc1")
@@ -551,7 +551,7 @@ class TestCriterionFAltOrder:
 
         Source: https://iupac.qmul.ac.uk/fusedring/FR23.html FR-2.3(f)
         Source: V18 Appendix A.6 lines 2406-2412.
-        Source: HERITAGE-1990 §4.
+        Source: AUTONOM-1990 §4.
         Source: Phase 149 CONTEXT D-04 (alt is the (f) tail-tiebreaker, not the (a) primary).
         """
         # Build two atom sets in the same RDKit mol for fair _rank comparison.
@@ -584,7 +584,7 @@ class TestCriterionFAltOrder:
 
         Source: https://iupac.qmul.ac.uk/fusedring/FR23.html FR-2.3(f)
         Source: V18 Appendix A.6 lines 2319-2325.
-        Source: HERITAGE-1990 §4.
+        Source: AUTONOM-1990 §4.
         Source: Phase 149 CONTEXT D-04 (alt is a SEPARATE constant; Hg present, Al/Ga absent).
         """
         assert 'Al' not in _FR23_HETEROATOM_ALT, (
@@ -784,7 +784,7 @@ class TestComponentRankTotalOrder:
         """Any two distinct ranks compare deterministically via lexicographic order.
 
         Source: https://iupac.qmul.ac.uk/fusedring/FR23.html
-        Source: HERITAGE-1990 §4.
+        Source: AUTONOM-1990 §4.
         Source: Phase 149 CONTEXT D-02 (sortable dataclass total-order).
         """
         # Higher senior het — wins
@@ -804,7 +804,7 @@ class TestComponentRankTotalOrder:
         """Two ComponentRank instances with all 10 fields equal compare equal.
 
         Source: https://iupac.qmul.ac.uk/fusedring/FR23.html
-        Source: HERITAGE-1990 §4.
+        Source: AUTONOM-1990 §4.
         Source: Phase 149 CONTEXT D-02 (frozen dataclass).
         """
         a = ComponentRank(
@@ -839,7 +839,7 @@ class TestSelectBaseComponentAPI:
 
         Source: V18_MILESTONE_PLAN §6 Phase 149 SC #1.
         Source: https://iupac.qmul.ac.uk/fusedring/FR23.html
-        Source: HERITAGE-1990 §4.
+        Source: AUTONOM-1990 §4.
         Source: Phase 149 CONTEXT D-06 (signature lock).
         """
         sig = inspect.signature(select_base_component)
@@ -853,7 +853,7 @@ class TestSelectBaseComponentAPI:
 
         Source: V18_MILESTONE_PLAN §6 Phase 149 SC #1 ValueError lock.
         Source: https://iupac.qmul.ac.uk/fusedring/FR23.html
-        Source: HERITAGE-1990 §4.
+        Source: AUTONOM-1990 §4.
         Source: Phase 149 CONTEXT D-06.
         """
         mol = Chem.MolFromSmiles("c1ccccc1")
@@ -864,7 +864,7 @@ class TestSelectBaseComponentAPI:
         """Edge case: empty list also raises ValueError (D-06).
 
         Source: https://iupac.qmul.ac.uk/fusedring/FR23.html P-25.3.2.4
-        Source: HERITAGE-1990 §4.
+        Source: AUTONOM-1990 §4.
         Source: Phase 149 CONTEXT D-06.
         """
         mol = Chem.MolFromSmiles("CCO")
@@ -888,7 +888,7 @@ class TestEnumerateComponents:
         """_enumerate_components returns List[FrozenSet[int]] per CD-04.
 
         Source: https://iupac.qmul.ac.uk/fusedring/FR23.html
-        Source: HERITAGE-1990 §4.
+        Source: AUTONOM-1990 §4.
         Source: Phase 149 CONTEXT CD-04 (frozenset for hashability).
         """
         mol = Chem.MolFromSmiles("c1ccc2ncccc2c1")  # quinoline
@@ -902,7 +902,7 @@ class TestEnumerateComponents:
         """Quinoline (2 SSSR rings) → 2 components.
 
         Source: https://iupac.qmul.ac.uk/fusedring/FR23.html
-        Source: HERITAGE-1990 §4.
+        Source: AUTONOM-1990 §4.
         Source: Phase 149 CONTEXT D-05.
         """
         mol = Chem.MolFromSmiles("c1ccc2ncccc2c1")
@@ -915,7 +915,7 @@ class TestEnumerateComponents:
         """Acyclic molecule → empty component list (caller raises ValueError).
 
         Source: https://iupac.qmul.ac.uk/fusedring/FR23.html
-        Source: HERITAGE-1990 §4.
+        Source: AUTONOM-1990 §4.
         Source: Phase 149 CONTEXT D-05.
         """
         mol = Chem.MolFromSmiles("CCO")  # ethanol

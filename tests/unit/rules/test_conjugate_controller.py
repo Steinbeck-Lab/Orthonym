@@ -1,9 +1,9 @@
-"""Unit tests for the class-agnostic conjugate classifier (Phase 182, WSC-03).
+"""Unit tests for the class-agnostic conjugate classifier (a phase, WSC-03).
 
-The conjugate controller (`rules/conjugate_controller.py`, D-02) is a NEW standalone,
+The conjugate controller (`rules/conjugate_controller.py`,) is a NEW standalone,
 class-agnostic primitive: it classifies a sulfate / phosphate / glycosyl(uronyl)
 fragment reached through a scaffold heteroatom linker and emits the functional-class
-word/head, deriving the charge→word in place (D-04, never neutralize-then-rename).
+word/head, deriving the charge→word in place (, never neutralize-then-rename).
 
 WAVE 0 CONTRACT: imports of the not-yet-built `conjugate_controller` symbols go
 INSIDE each test body (NOT at module level) so `pytest --collect-only` succeeds while
@@ -12,7 +12,7 @@ Task 2 lands the module. `uronic_glycoside_head` is added to `data/sugar_names.p
 Task 2, so `test_uronic_head` / `test_glucuronide_fragment_caps_to_catalog` flip GREEN
 after Task 2.
 
-Root-cause-only (the contributor guide): the asserted behaviour is structural — charge counting,
+Root-cause-only (CLAUDE.md): the asserted behaviour is structural — charge counting,
 atom-level glycosidic-bond capping (no string surgery), explicit uronic head map.
 """
 
@@ -28,15 +28,15 @@ RDLogger.DisableLog("rdApp.*")
 CHEBI_136579 = (
     "CC(C)CCC[C@@H](C)[C@H]1CC[C@H]2[C@@H]3CC=C4C[C@@H]"
     "(OS(=O)(=O)[O-])CC[C@]4(C)[C@H]3CC[C@]12C"
-)  # cholest-5-en-3beta-yl sulfate (anion -OSO2[O-])
+)  # cholest-5-en-3β-yl sulfate (anion -OSO2[O-])
 CHEBI_133103 = (
     "C[C@]12CC[C@@H](O)C[C@@H]1CC[C@@H]1[C@@H]2CC[C@]2(C)"
     "[C@@H](OS(=O)(=O)O)CC[C@@H]12"
-)  # 3alpha-hydroxy-5alpha-androstan-17beta-yl hydrogen sulfate (neutral -OSO2OH)
+)  # 3α-hydroxy-5α-androstan-17β-yl hydrogen sulfate (neutral -OSO2OH)
 CHEBI_133504 = (
     "C[C@]12CC[C@H](O[C@@H]3O[C@H](C(=O)O)[C@@H](O)[C@H](O)[C@H]3O)"
     "C[C@H]1CC[C@@H]1[C@@H]2CC[C@]2(C)C(=O)CC[C@@H]12"
-)  # 17-oxo-5beta-androstan-3beta-yl beta-D-glucopyranosiduronic acid
+)  # 17-oxo-5β-androstan-3β-yl β-D-glucopyranosiduronic acid
 
 
 def _build(smiles):
@@ -80,7 +80,7 @@ def test_find_sulfate():
 
 
 # ---------------------------------------------------------------------------
-# Charge -> word (the load-bearing detail, D-04)
+# Charge -> word (the load-bearing detail,)
 # ---------------------------------------------------------------------------
 def test_sulfate_word():
     """Anion -OSO2[O-] -> 'sulfate'; neutral -OSO2OH -> 'hydrogen sulfate'.
@@ -104,7 +104,7 @@ def test_sulfate_word():
 
 
 def test_phosphate_word():
-    """Phosphate three ionisation states (D-04):
+    """Phosphate three ionisation states ():
     -OPO(OH)2 -> 'dihydrogen phosphate'; mono-anion -> 'hydrogen phosphate';
     di-anion -> 'phosphate'.
     """
@@ -130,20 +130,20 @@ def test_phosphate_word():
 
 
 # ---------------------------------------------------------------------------
-# Uronic glycoside head (the real gap, D-06)
+# Uronic glycoside head (the real gap,)
 # ---------------------------------------------------------------------------
 def test_uronic_head():
-    """uronic_glycoside_head('beta','D','glucuronopyranose')
-    == 'beta-D-glucopyranosiduronic acid' (NOT '...glucuronopyranoside').
+    """uronic_glycoside_head('β','D','glucuronopyranose')
+    == 'β-D-glucopyranosiduronic acid' (NOT '...glucuronopyranoside').
     Unknown base -> None.
     """
     from orthonym.data.sugar_names import uronic_glycoside_head
 
     assert (
-        uronic_glycoside_head("beta", "D", "glucuronopyranose")
-        == "beta-D-glucopyranosiduronic acid"
+        uronic_glycoside_head("β", "D", "glucuronopyranose")
+        == "β-D-glucopyranosiduronic acid"
     )
-    assert uronic_glycoside_head("alpha", "D", "xyz") is None
+    assert uronic_glycoside_head("α", "D", "xyz") is None
 
 
 # ---------------------------------------------------------------------------
@@ -153,7 +153,7 @@ def test_completeness_honest_fail():
     """classify_conjugate is importable and fails closed for a non-conjugate
     fragment (a plain hydroxyl / methyl substituent returns None).
 
-    The full no-silent-drop completeness invariant (D-08) lands in 182-02; here we
+    The full no-silent-drop completeness invariant () lands in 182-02; here we
     assert the thin contract: the classifier returns None rather than guessing.
     """
     from orthonym.rules.conjugate_controller import classify_conjugate
@@ -169,7 +169,7 @@ def test_completeness_honest_fail():
 
 def test_rt_fallback():
     """The Phase-181 OPSIN RT gate `_alpha_beta_rt_ok` is the reused RT-check
-    fallback (D-10). Contract only here; full behaviour wired in 182-02.
+    fallback (). Contract only here; full behaviour wired in 182-02.
     """
     from orthonym.rules.natural_products import _alpha_beta_rt_ok  # noqa: F401
 
@@ -186,8 +186,8 @@ def test_glucuronide_fragment_caps_to_catalog():
     Proves the root-cause capping resolution end-to-end:
       Chem.FragmentOnBonds + restore anomeric -OH + Chem.CanonSmiles
         -> URONIC_ACID_NAMES key
-        -> lookup_sugar == ('beta','D','glucuronopyranose')
-        -> uronic_glycoside_head == 'beta-D-glucopyranosiduronic acid'
+        -> lookup_sugar == ('β','D','glucuronopyranose')
+        -> uronic_glycoside_head == 'β-D-glucopyranosiduronic acid'
     """
     from orthonym.rules.conjugate_controller import classify_conjugate  # noqa: F401
     from orthonym.data.sugar_names import (
@@ -253,5 +253,5 @@ def test_glucuronide_fragment_caps_to_catalog():
 
     assert canon in URONIC_ACID_NAMES, canon
     tup = lookup_sugar(canon)
-    assert tup == ("beta", "D", "glucuronopyranose"), tup
-    assert uronic_glycoside_head(*tup) == "beta-D-glucopyranosiduronic acid"
+    assert tup == ("β", "D", "glucuronopyranose"), tup
+    assert uronic_glycoside_head(*tup) == "β-D-glucopyranosiduronic acid"

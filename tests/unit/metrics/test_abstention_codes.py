@@ -1,4 +1,4 @@
-"""v25 P0 Task 0.1 — typed abstention limit-codes (measurement instrumentation).
+""" Task 0.1 — typed abstention limit-codes (measurement instrumentation).
 
 Every fail-closed abstention path tags a typed ``AbstentionCode`` into a
 per-top-level-naming-session telemetry slot (first-writer-wins = closest to
@@ -131,29 +131,58 @@ def namer():
     return Orthonym()
 
 
+@pytest.fixture()
+def be_namer():
+    # The max-breadth (best-effort) config — the one the abstention census /
+    # frozen sample is built with, and the tier under which the generation-stage
+    # blocker codes are meaningfully recorded. Fixtures updated 2026-09-03 (
+    # P2): the older default-namer molecules now NAME (the engine improved) or
+    # changed code; these fixtures were re-verified to abstain with the asserted
+    # code under this config.
+    return Orthonym(general_fallback=True, general_fallback_unverified=True,
+                     allow_aromatic_general=True)
+
+
+# abstaining fixtures re-verified 2026-09-03 under the max-breadth namer
+_BRANCH_UNNAMEABLE_SMI = "[B](C1=CC=NN1)C2=CC=NN2"   # bis(pyrazolyl)borane; ring branch declined
+_GATE_SUPPRESSED_SMI = "C1=CC=C(C=C1)O[13C](=O)OC2=CC=CC=C2"  # P-10 oxoacid/anhydride veto
+_NO_PARENT_SMI = ("C1CC12[C@@H]3C=C([C@@H]([C@H]2[C@H]4[C@@H]3[C@@H]5"
+                  "[C@@H](C46CC6)C5(Cl)Cl)Cl)Cl")     # unsupported polycyclic parent
+
+
 class TestEndToEndCodes:
-    def test_branch_unnameable_fixture(self, namer):
-        # N-methylpiperidinyl branch on an acetic-acid parent: the ring-
-        # substituent machinery declines -> 'unknown' marker glued into the
-        # candidate -> failure sentinel. Root cause = the unnameable BRANCH.
-        result = namer.name("OC(=O)CC1CCN(C)CC1")
+    def test_branch_unnameable_fixture(self, be_namer):
+        # A ring-bearing branch the whole best-effort substituent ladder declines
+        # -> the enumerator_ring_fallback census record fires at the ladder's TRUE
+        # exhaustion (fix) -> BRANCH_UNNAMEABLE.
+        result = be_namer.name(_BRANCH_UNNAMEABLE_SMI)
         assert is_failure_name(result), f"fixture must abstain, got {result!r}"
         assert abstention_code_for(result) is AbstentionCode.BRANCH_UNNAMEABLE
 
-    def test_gate_suppressed_charge_dropped_fixture(self, namer):
-        # Documented P10 charge-conservation veto (Java-free, runs with the
-        # OPSIN gate disabled): a generated charge-blind name is suppressed.
-        result = namer.name("[I-](CCO)c1ccccc1")
+    def test_gate_suppressed_fixture(self, be_namer):
+        # P-10 structure-conservation veto (Java-free, runs with the OPSIN gate
+        # disabled): a generated name whose oxoacid/anhydride motif is illegal is
+        # suppressed post-generation -> GATE_SUPPRESSED.
+        result = be_namer.name(_GATE_SUPPRESSED_SMI)
         assert is_failure_name(result), f"fixture must abstain, got {result!r}"
         assert abstention_code_for(result) is AbstentionCode.GATE_SUPPRESSED
 
-    def test_no_parent_unsupported_ring_fixture(self, namer):
-        # W8-P6 Cluster-E stereo-differing-bis veto: the parent structure is
-        # refused at the top level (UNSUPPORTED_RING_SYSTEM) -> NO_PARENT.
-        result = namer.name(
-            "C[C@H]1CC[C@@H](C[C@@H](O)C[C@@H]2CC[C@H](C)CC2)CC1")
+    def test_no_parent_unsupported_ring_fixture(self, be_namer):
+        # An unsupported polycyclic parent is refused at the top level
+        # (UNSUPPORTED_RING_SYSTEM) -> NO_PARENT.
+        result = be_namer.name(_NO_PARENT_SMI)
         assert is_failure_name(result), f"fixture must abstain, got {result!r}"
         assert abstention_code_for(result) is AbstentionCode.NO_PARENT
+
+    def test_ring_fallback_recorded_from_best_effort_exhaustion(self, be_namer):
+        # census-attribution fix: the enumerator_ring_fallback DETAIL is
+        # recorded only when the best-effort substituent ladder is fully exhausted
+        # (moved out of _descriptive_fallback, which the PIN Tier-5 path also
+        # reaches). A genuinely ring-fallback branch still records it.
+        result = be_namer.name(_BRANCH_UNNAMEABLE_SMI)
+        assert is_failure_name(result)
+        rec = peek_abstention()
+        assert rec is not None and rec.detail == "enumerator_ring_fallback"
 
     def test_coverage_downgrade_path_records_code(self, namer, monkeypatch):
         """The >15-HA GENERAL quality/atom-coverage downgrade gates tag
@@ -188,20 +217,19 @@ class TestEndToEndCodes:
         assert result == "ethanol"
         assert abstention_code_for(result) is None
 
-    def test_slot_resets_between_top_level_calls(self, namer):
+    def test_slot_resets_between_top_level_calls(self, be_namer):
         # Failure first, then success: the success call clears the slot at
         # its top-level start, so no stale code leaks across molecules.
-        first = namer.name("OC(=O)CC1CCN(C)CC1")
+        first = be_namer.name(_BRANCH_UNNAMEABLE_SMI)
         assert is_failure_name(first)
         assert abstention_code_for(first) is AbstentionCode.BRANCH_UNNAMEABLE
 
-        second = namer.name("CCO")
+        second = be_namer.name("CCO")
         assert second == "ethanol"
         assert peek_abstention() is None
 
         # And a different failure class next records ITS code, not the old one.
-        third = namer.name(
-            "C[C@H]1CC[C@@H](C[C@@H](O)C[C@@H]2CC[C@H](C)CC2)CC1")
+        third = be_namer.name(_NO_PARENT_SMI)
         assert is_failure_name(third)
         assert abstention_code_for(third) is AbstentionCode.NO_PARENT
 
@@ -212,7 +240,10 @@ class TestEndToEndCodes:
 
 class TestConfidenceSurface:
     def test_confidence_dict_carries_abstention_on_failure(self):
-        meta = Orthonym().name_with_confidence("OC(=O)CC1CCN(C)CC1")
+        meta = Orthonym(
+            general_fallback=True, general_fallback_unverified=True,
+            allow_aromatic_general=True).name_with_confidence(
+                _BRANCH_UNNAMEABLE_SMI)
         assert is_failure_name(meta["name"])
         assert meta.get("abstention") == "BRANCH_UNNAMEABLE"
 

@@ -1,5 +1,5 @@
 """
-Tests for retained names dictionary expansion (Phase 109, DATA-06).
+Tests for retained names dictionary expansion (a phase, DATA-06).
 
 Verifies:
 - Dictionary has at least 290 entries (240 original + 50+ new)
@@ -18,7 +18,7 @@ class TestRetainedNamesCount:
     """Verify dictionary size meets expansion target."""
 
     def test_minimum_entry_count(self):
-        """Dictionary must have at least 283 entries (290 original - 7 non-PIN removals in Phase 133)."""
+        """Dictionary must have at least 283 entries (290 original - 7 non-PIN removals in a phase)."""
         assert len(RETAINED_NAMES) >= 283, (
             f"Expected >= 283 entries, got {len(RETAINED_NAMES)}"
         )
@@ -57,7 +57,7 @@ class TestCanonicalSMILESKeys:
         }
 
         # Also allow known non-canonical acid keys (pre-existing, tracked as
-        # deferred fix item -- not in scope for Phase 109 Task 1)
+        # deferred fix item -- not in scope for a phase Task 1)
         known_noncanonical_acids = {
             "OC(=O)C(O)=O",      # oxalic acid
             "OC(=O)CC(=O)O",     # malonic acid
@@ -118,11 +118,11 @@ class TestValueQuality:
         # stereodescriptors (R/S/E/Z), indicated hydrogen (1H- 7H-), configurational
         # L-/D- prefixes. Indicated hydrogen can appear mid-name ("3,4-dihydro-2H-pyran").
         #
-        # ⚠ FIXED 2026-07-28 (v29 Phase C). This test had been failing since `13a74917`
+        # ⚠ FIXED 2026-07-28 (Phase C). This test had been failing since
         # on `[C-]#[N+]O` -> `N-hydroxy-λ2-methanamine`, and THE TEST WAS WRONG, not the
         # data. The old pattern was `[NOPS],` — it required a COMMA after the element
         # symbol, so it accepted `N,N-dimethylformamide` but rejected a SINGLE `N-`
-        # locant, which is the commonest form there is (`N-methylurea`, `N-hydroxy…`).
+        # locant, which is the commonest form there is (`N-methylthiourea`, `N-hydroxy…`).
         # The giveaway was the hard-coded `N-acetyl` alternative: a special case standing
         # in for the general rule that was missing.
         #
@@ -153,7 +153,7 @@ class TestValueQuality:
 
 
 class TestNewEntries:
-    """Spot-check specific new entries from Phase 109 expansion."""
+    """Spot-check specific new entries from a phase expansion."""
 
     @pytest.mark.parametrize("smiles,expected_name", [
         # Polycyclic aromatics
@@ -165,7 +165,7 @@ class TestNewEntries:
         ("Nc1ccc(C(=O)O)cc1", "4-aminobenzoic acid"),
         ("Nc1ccccc1C(=O)O", "anthranilic acid"),
         ("COc1cc(C(=O)O)ccc1O", "vanillic acid"),
-        # Cyclic anhydrides -> heterocyclic-pseudoketone dione PINs (v23 D-FOLLOWON
+        # Cyclic anhydrides -> heterocyclic-pseudoketone dione PINs (D-FOLLOWON
         # item 6, P-65.7.7.1 method 1): retargeted from the non-PIN 'maleic/phthalic
         # anhydride' to the preferred dione names.
         ("O=C1C=CC(=O)O1", "furan-2,5-dione"),
@@ -235,11 +235,11 @@ class TestNewEntries:
 
     @pytest.mark.parametrize("smiles,expected_name", [
         # Verify via get_retained_name function
-        # v23 D-FOLLOWON item 2: 'isophthalic acid' (O=C(O)c1cccc(C(=O)O)c1) de-headlined
+        # D-FOLLOWON item 2: 'isophthalic acid' (O=C(O)c1cccc(C(=O)O)c1) de-headlined
         # (pin:false) — PIN is the systematic ring di-acid benzene-1,3-dicarboxylic acid
         # (P-65.1.1), so get_retained_name -> None (stays in the RAW retained_names alias;
         # see test_new_entry_exists line 149). Parallel to coumarin/putrescine below.
-        # v23 IH-01f: 'coumarin' (O=c1ccc2ccccc2o1) de-headlined (pin:false) — PIN is
+        # IH-01f: 'coumarin' (O=c1ccc2ccccc2o1) de-headlined (pin:false) — PIN is
         # 2H-1-benzopyran-2-one (P-19(d)), so get_retained_name -> None (stays in the
         # RAW retained_names alias; see test_new_entry_exists). Parallel to putrescine.
         # F-T9/DD6 RET-01: 'putrescine' (NCCCCN) is general-only — denied from the
@@ -271,7 +271,7 @@ class TestNoRegressions:
         ("c1ccncc1", "pyridine"),
         ("C1CCCCC1", "cyclohexane"),
         ("O=Cc1ccccc1", "benzaldehyde"),
-        # NOTE: CC(C)=O (acetone) removed from retained names in Phase 133 -- PIN is propan-2-one
+        # NOTE: CC(C)=O (acetone) removed from retained names in a phase -- PIN is propan-2-one
         ("NC(N)=O", "urea"),
         ("c1ccc(-c2ccccc2)cc1", "biphenyl"),
         ("C#C", "acetylene"),

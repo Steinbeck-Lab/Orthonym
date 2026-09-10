@@ -20,33 +20,33 @@ class TestBasicGlycosideNaming:
     """Simple O-glycosides where the sugar matches the lookup table."""
 
     def test_phenyl_beta_d_glucoside(self):
-        """Phenyl beta-D-glucopyranoside: functional-class form (WSD-08 flip).
+        """Phenyl β-D-glucopyranoside: functional-class form (WSD-08 flip).
 
         Phase 176 re-baseline: the simple phenol aglycone flips from the
-        legacy substitutive ``(beta-D-glucopyranosyloxy)...`` form to the
-        Blue-Book functional-class two-word form ``phenyl beta-D-glucopyranoside``
+        legacy substitutive ``(β-D-glucopyranosyloxy)...`` form to the
+        Blue-Book functional-class two-word form ``phenyl β-D-glucopyranoside``
         (P-102.5.6.2.2). OPSIN-RT-verified.
         """
-        # Phenol + beta-D-glucose via O-glycosidic bond at anomeric position
+        # Phenol + β-D-glucose via O-glycosidic bond at anomeric position
         name = name_compound("OC[C@H]1O[C@@H](Oc2ccccc2)[C@H](O)[C@@H](O)[C@@H]1O")
         assert name is not None
         assert name != "unknown"
-        assert name == "phenyl beta-D-glucopyranoside"
+        assert name == "phenyl β-D-glucopyranoside"
 
     def test_methyl_alpha_d_glucoside(self):
-        """Methyl alpha-D-glucopyranoside: functional-class form (WSD-08 flip)."""
+        """Methyl α-D-glucopyranoside: functional-class form (WSD-08 flip)."""
         name = name_compound("OC[C@H]1O[C@H](OC)[C@H](O)[C@@H](O)[C@@H]1O")
         assert name is not None
         assert name != "unknown"
-        assert name == "methyl alpha-D-glucopyranoside"
+        assert name == "methyl α-D-glucopyranoside"
 
     def test_galactoside(self):
-        """4-Hydroxyphenyl beta-D-galactopyranoside stays legacy (diol aglycone).
+        """4-Hydroxyphenyl β-D-galactopyranoside stays legacy (diol aglycone).
 
         The aglycone here is hydroquinone (a diol), which is NOT a clean
         monovalent substituent (``_alcohol_to_alkyl`` cannot produce a -yl
         prefix), so the D-10 triad fails closed to the legacy substitutive
-        ``(beta-D-galactopyranosyloxy)hydroquinone`` form (zero regression).
+        ``(β-D-galactopyranosyloxy)hydroquinone`` form (zero regression).
         """
         name = name_compound(
             "OC[C@H]1O[C@@H](Oc2ccc(O)cc2)[C@H](O)[C@@H](O)[C@H]1O"
@@ -56,7 +56,7 @@ class TestBasicGlycosideNaming:
         assert "galactopyranosyloxy" in name.lower()
 
     def test_rhamnoside(self):
-        """Phenyl alpha-L-rhamnopyranoside: functional-class form (WSD-08 flip).
+        """Phenyl α-L-rhamnopyranoside: functional-class form (WSD-08 flip).
 
         Phase 176: deoxy-L rhamnose is catalog-only (the structure deriver
         returns None on it), but the ``lookup_sugar`` fast-path resolves the
@@ -66,23 +66,23 @@ class TestBasicGlycosideNaming:
         name = name_compound("C[C@@H]1O[C@@H](Oc2ccccc2)[C@H](O)[C@H](O)[C@H]1O")
         assert name is not None
         assert name != "unknown"
-        assert name == "phenyl alpha-L-rhamnopyranoside"
+        assert name == "phenyl α-L-rhamnopyranoside"
 
     def test_ethyl_glucoside(self):
-        """Ethyl beta-D-glucopyranoside: functional-class form (WSD-08 flip)."""
+        """Ethyl β-D-glucopyranoside: functional-class form (WSD-08 flip)."""
         name = name_compound("OC[C@H]1O[C@@H](OCC)[C@H](O)[C@@H](O)[C@@H]1O")
         assert name is not None
         assert name != "unknown"
-        assert name == "ethyl beta-D-glucopyranoside"
+        assert name == "ethyl β-D-glucopyranoside"
 
     def test_naphthyl_glucoside(self):
-        """2-Naphthyl beta-D-glucopyranoside: functional-class form (WSD-08 flip)."""
+        """2-Naphthyl β-D-glucopyranoside: functional-class form (WSD-08 flip)."""
         name = name_compound(
             "OC[C@H]1O[C@@H](Oc2ccc3ccccc3c2)[C@H](O)[C@@H](O)[C@@H]1O"
         )
         assert name is not None
         assert name != "unknown"
-        assert name == "2-naphthyl beta-D-glucopyranoside"
+        assert name == "2-naphthyl β-D-glucopyranoside"
 
 
 # ============================================================================
@@ -98,14 +98,14 @@ class TestGlycosideNameFormat:
         """Phenyl glucoside emits the functional-class two-word form (WSD-08).
 
         Phase 176 re-baseline: was a parenthesized substitutive prefix
-        ``(beta-D-glucopyranosyloxy)...``; now the Blue-Book functional-class
-        form ``phenyl beta-D-glucopyranoside`` (aglycone substituent as a
+        ``(β-D-glucopyranosyloxy)...``; now the Blue-Book functional-class
+        form ``phenyl β-D-glucopyranoside`` (aglycone substituent as a
         separate preceding word, sugar -ose -> -oside). OPSIN-RT-verified.
         """
         name = name_compound("OC[C@H]1O[C@@H](Oc2ccccc2)[C@H](O)[C@@H](O)[C@@H]1O")
-        assert name == "phenyl beta-D-glucopyranoside"
+        assert name == "phenyl β-D-glucopyranoside"
         # The alpha/beta + D/L descriptors are never dropped (D-11)
-        assert "beta-D-glucopyranoside" in name
+        assert "β-D-glucopyranoside" in name
         # Aglycone is cited as a separate preceding substituent word
         assert name.startswith("phenyl ")
 
@@ -126,12 +126,12 @@ class TestGlycosideNameFormat:
         name = name_compound(
             "OC[C@H]1O[C@@H](Oc2ccc(O)cc2)[C@H](O)[C@@H](O)[C@H]1O"
         )
-        assert "beta-D-" in name
+        assert "β-D-" in name
 
     def test_rhamnoside_has_l_config(self):
         """Rhamnoside name should include L-configuration descriptor."""
         name = name_compound("C[C@@H]1O[C@@H](Oc2ccccc2)[C@H](O)[C@H](O)[C@H]1O")
-        assert "alpha-L-" in name
+        assert "α-L-" in name
 
 
 # ============================================================================
@@ -148,7 +148,7 @@ class TestGlycosideSeniorAglyconeProtect:
     fails closed for ketone/acid/aldehyde aglycones (D-09)."""
 
     def test_aldehyde_aglycone_stays_legacy(self):
-        """4-Formylphenyl beta-D-glucoside (aldehyde aglycone) keeps legacy form.
+        """4-Formylphenyl β-D-glucoside (aldehyde aglycone) keeps legacy form.
 
         The aglycone (4-hydroxybenzaldehyde) has a principal aldehyde group,
         senior to hydroxy, so the D-09 guard fails closed and the name retains
@@ -233,15 +233,15 @@ class TestGlycosideBenchmarkCoverage:
 
     # Benchmark glycoside SMILES with known sugar moieties
     BENCHMARK_GLYCOSIDES = [
-        # 1. Phenyl beta-D-glucoside (stereo, hexopyranose)
+        # 1. Phenyl β-D-glucoside (stereo, hexopyranose)
         "OC[C@H]1O[C@@H](Oc2ccccc2)[C@H](O)[C@@H](O)[C@@H]1O",
-        # 2. Methyl alpha-D-glucoside (stereo, hexopyranose)
+        # 2. Methyl α-D-glucoside (stereo, hexopyranose)
         "OC[C@H]1O[C@H](OC)[C@H](O)[C@@H](O)[C@@H]1O",
-        # 3. 4-hydroxyphenyl beta-D-galactoside (stereo, galactose)
+        # 3. 4-hydroxyphenyl β-D-galactoside (stereo, galactose)
         "OC[C@H]1O[C@@H](Oc2ccc(O)cc2)[C@H](O)[C@@H](O)[C@H]1O",
-        # 4. Phenyl alpha-L-rhamnoside (stereo, deoxy-L-sugar)
+        # 4. Phenyl α-L-rhamnoside (stereo, deoxy-L-sugar)
         "C[C@@H]1O[C@@H](Oc2ccccc2)[C@H](O)[C@H](O)[C@H]1O",
-        # 5. Ethyl beta-D-glucoside (stereo, hexopyranose + small aglycone)
+        # 5. Ethyl β-D-glucoside (stereo, hexopyranose + small aglycone)
         "OC[C@H]1O[C@@H](OCC)[C@H](O)[C@@H](O)[C@@H]1O",
         # 6. Non-stereo diglucosylchromane from CI benchmark
         "OCC1OC(Oc2cc(O)c3c(c2)OC(c2ccc(O)c(OC4OC(CO)C(O)C(O)C4O)c2)"
@@ -249,11 +249,11 @@ class TestGlycosideBenchmarkCoverage:
     ]
 
     @pytest.mark.parametrize("smiles", BENCHMARK_GLYCOSIDES, ids=[
-        "phenyl-beta-D-glucoside",
-        "methyl-alpha-D-glucoside",
-        "hydroxyphenyl-beta-D-galactoside",
-        "phenyl-alpha-L-rhamnoside",
-        "ethyl-beta-D-glucoside",
+        "phenyl-β-D-glucoside",
+        "methyl-α-D-glucoside",
+        "hydroxyphenyl-β-D-galactoside",
+        "phenyl-α-L-rhamnoside",
+        "ethyl-β-D-glucoside",
         "diglucosyl-chromane",
     ])
     def test_benchmark_glycoside_produces_name(self, smiles):
@@ -264,11 +264,11 @@ class TestGlycosideBenchmarkCoverage:
         assert len(name) > 15, f"Name too short ({len(name)}): {name}"
 
     @pytest.mark.parametrize("smiles", BENCHMARK_GLYCOSIDES, ids=[
-        "phenyl-beta-D-glucoside",
-        "methyl-alpha-D-glucoside",
-        "hydroxyphenyl-beta-D-galactoside",
-        "phenyl-alpha-L-rhamnoside",
-        "ethyl-beta-D-glucoside",
+        "phenyl-β-D-glucoside",
+        "methyl-α-D-glucoside",
+        "hydroxyphenyl-β-D-galactoside",
+        "phenyl-α-L-rhamnoside",
+        "ethyl-β-D-glucoside",
         "diglucosyl-chromane",
     ])
     def test_benchmark_glycoside_has_sugar_name(self, smiles):
@@ -322,12 +322,12 @@ class TestSystematicCarbohydrateDispatch:
 
     def test_uronic_free_acid_d10(self):
         """A free glucuronic acid emits the OPSIN-parseable free-acid form
-        ``beta-D-glucopyranuronic acid`` (D-10 / WSC-04 SC#1), NOT the
-        unparseable ``beta-D-glucuronopyranose`` (-> 'unknown')."""
+        ``β-D-glucopyranuronic acid`` (D-10 / WSC-04 SC#1), NOT the
+        unparseable ``β-D-glucuronopyranose`` (-> 'unknown')."""
         name = name_compound(
             "O=C(O)[C@H]1O[C@@H](O)[C@H](O)[C@@H](O)[C@@H]1O"
         )
-        assert name == "beta-D-glucopyranuronic acid"
+        assert name == "β-D-glucopyranuronic acid"
         assert "glucuronopyranose" not in (name or "")
         assert name != "unknown organic compound"
 
@@ -336,7 +336,7 @@ class TestSystematicCarbohydrateDispatch:
         name = name_compound(
             "C[C@H]1O[C@@H](O)[C@H](O)[C@@H](O)[C@@H]1O"
         )
-        assert name == "6-deoxy-beta-D-glucopyranose"
+        assert name == "6-deoxy-β-D-glucopyranose"
         assert "oxan" not in name.lower()
 
     def test_amino_systematic_not_oxane(self):
@@ -344,7 +344,7 @@ class TestSystematicCarbohydrateDispatch:
         name = name_compound(
             "N[C@@H]1[C@@H](O)[C@H](O)O[C@H](CO)[C@H]1O"
         )
-        assert name == "3-amino-3-deoxy-beta-D-glucopyranose"
+        assert name == "3-amino-3-deoxy-β-D-glucopyranose"
         assert "oxan" not in name.lower()
 
     def test_maltose_glycosylglycose(self):
@@ -354,7 +354,7 @@ class TestSystematicCarbohydrateDispatch:
             "OC[C@H]1O[C@H](O[C@H]2[C@H](O)[C@@H](O)[C@@H](O)O[C@@H]2CO)"
             "[C@H](O)[C@@H](O)[C@@H]1O"
         )
-        assert name == "alpha-D-glucopyranosyl-(1->4)-alpha-D-glucopyranose"
+        assert name == "α-D-glucopyranosyl-(1->4)-α-D-glucopyranose"
 
     def test_sucrose_glycosyl_glycoside(self):
         """Sucrose (no free hemiacetal) -> P-102.7.1.1 glycosyl glycoside."""
@@ -362,27 +362,27 @@ class TestSystematicCarbohydrateDispatch:
             "O([C@@H]1[C@H](O)[C@@H](O)[C@H](O)[C@H](O1)CO)"
             "[C@@]1(CO)[C@@H](O)[C@H](O)[C@H](O1)CO"
         )
-        assert name == "beta-D-fructofuranosyl alpha-D-glucopyranoside"
+        assert name == "β-D-fructofuranosyl α-D-glucopyranoside"
 
     # --- PROTECT: byte-identical to the pre-183 behaviour ------------------
 
     def test_protect_cataloged_glucose_byte_identical(self):
         """A cataloged clean sugar stays on the lookup fast-path (D-05)."""
         name = name_compound("OC[C@H]1O[C@@H](O)[C@H](O)[C@@H](O)[C@@H]1O")
-        assert name == "beta-D-glucopyranose"
+        assert name == "β-D-glucopyranose"
 
     def test_protect_simple_glycoside_byte_identical(self):
-        """A Phase-176 simple glycoside (methyl beta-D-glucopyranoside) is
+        """A Phase-176 simple glycoside (methyl β-D-glucopyranoside) is
         NOT pulled into the disaccharide engine (Pitfall 4) and stays
         byte-identical to its functional-class form."""
         name = name_compound("CO[C@@H]1O[C@H](CO)[C@@H](O)[C@H](O)[C@H]1O")
-        assert name == "methyl beta-D-glucopyranoside"
+        assert name == "methyl β-D-glucopyranoside"
 
     def test_protect_cataloged_amino_sugar_byte_identical(self):
-        """A cataloged amino sugar (beta-D-glucosamine) stays on the catalog
+        """A cataloged amino sugar (β-D-glucosamine) stays on the catalog
         fast-path -- the uronic interception fires only on a uronic base."""
         name = name_compound("N[C@@H]1[C@@H](O)[C@H](O)[C@@H](CO)O[C@H]1O")
-        assert name == "beta-D-glucosamine"
+        assert name == "β-D-glucosamine"
 
     def test_protect_glucuronide_glycoside_byte_identical(self):
         """The Phase-182 steroid glucuronide glycoside still emits the
@@ -393,5 +393,5 @@ class TestSystematicCarbohydrateDispatch:
             "C[C@H]1CC[C@@H]1[C@@H]2CC[C@]2(C)C(=O)CC[C@@H]12"
         )
         assert name == (
-            "17-oxo-5beta-androstan-3beta-yl beta-D-glucopyranosiduronic acid"
+            "17-oxo-5β-androstan-3β-yl β-D-glucopyranosiduronic acid"
         )

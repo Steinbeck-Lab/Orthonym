@@ -238,21 +238,24 @@ class TestNSubstitutedCarbamateBranchB:
     PIN forms via the existing ``get_n_alkyl_carbamoyl_prefix`` /
     ``get_n_n_dialkyl_carbamoyl_prefix`` conventions then appends ``oxy``.
 
-      * ``O=C(NC)OCCCC(=O)O``        → ``4-(N-methylcarbamoyl)oxybutanoic acid``
-      * ``O=C(NCC)OCCCC(=O)O``       → ``4-(N-ethylcarbamoyl)oxybutanoic acid``
-      * ``O=C(N(C)C)OCCCC(=O)O``     → ``4-(N,N-dimethylcarbamoyl)oxybutanoic acid``
-      * ``O=C(N(C)CC)OCCCC(=O)O``    → ``4-(N-ethyl-N-methylcarbamoyl)oxybutanoic acid``
+      * ``O=C(NC)OCCCC(=O)O``        → ``4-[(methylcarbamoyl)oxy]butanoic acid``
+      * ``O=C(NCC)OCCCC(=O)O``       → ``4-[(ethylcarbamoyl)oxy]butanoic acid``
+      * ``O=C(N(C)C)OCCCC(=O)O``     → ``4-[(dimethylcarbamoyl)oxy]butanoic acid``
+      * ``O=C(N(C)CC)OCCCC(=O)O``    → ``4-{[ethyl(methyl)carbamoyl]oxy}butanoic acid``
 
-    Each name OPSIN-round-trips to the input InChI L1 (formula + connectivity).
+    The carbamoyl N-locant is omitted (P-66.1.1.4.1.1) and the carbamoyl unit is
+    enclosed and mark-escalated per P-16.5.4 (parens -> brackets -> braces as the
+    attachment locant and inner marks stack up). Each name OPSIN-round-trips to the
+    input InChI L1 (formula + connectivity).
     """
 
     _CASES = [
-        ("O=C(NC)OCCCC(=O)O", "4-(N-methylcarbamoyl)oxybutanoic acid"),
-        ("O=C(NCC)OCCCC(=O)O", "4-(N-ethylcarbamoyl)oxybutanoic acid"),
-        ("O=C(N(C)C)OCCCC(=O)O", "4-(N,N-dimethylcarbamoyl)oxybutanoic acid"),
+        ("O=C(NC)OCCCC(=O)O", "4-[(methylcarbamoyl)oxy]butanoic acid"),
+        ("O=C(NCC)OCCCC(=O)O", "4-[(ethylcarbamoyl)oxy]butanoic acid"),
+        ("O=C(N(C)C)OCCCC(=O)O", "4-[(dimethylcarbamoyl)oxy]butanoic acid"),
         (
             "O=C(N(C)CC)OCCCC(=O)O",
-            "4-(N-ethyl-N-methylcarbamoyl)oxybutanoic acid",
+            "4-{[ethyl(methyl)carbamoyl]oxy}butanoic acid",
         ),
     ]
 

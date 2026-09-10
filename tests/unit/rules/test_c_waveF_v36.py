@@ -1,4 +1,4 @@
-"""v36 Milestone-C Wave F -- spelling quality + skeletal-namer correctness.
+""" Milestone-C Wave F -- spelling quality + skeletal-namer correctness.
 
 Task 1 (spelling quality, core-namer item 3): the best-effort recursive
 substituent namer must PREFER the substitutive/retained spelling
@@ -157,7 +157,7 @@ class TestCanariesUnchanged:
     @pytest.mark.parametrize("smiles,expected", [
         ("c1ccccc1", "benzene"),
         ("Cc1ccccc1", "toluene"),
-        ("COc1ccccc1", "methoxybenzene"),
+        ("COc1ccccc1", "anisole"),  # a review RISK 7: bare anisole IS the PIN (the Blue Book / the Blue Book)
         ("c1ccncc1", "pyridine"),
         ("CS(=O)c1ccccc1", "(methanesulfinyl)benzene"),
         ("c1ccc2ccccc2c1", "naphthalene"),

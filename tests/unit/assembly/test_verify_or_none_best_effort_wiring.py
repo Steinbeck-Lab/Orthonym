@@ -1,4 +1,4 @@
-"""v33 no-abstain Phase A: wire `validation.reconstruct.verify_or_none` onto
+""" no-abstain Phase A: wire `validation.reconstruct.verify_or_none` onto
 the best-effort/T4 UNVERIFIED emission path (`namer.py`
 ``Orthonym._try_general_engine_recovery``, ~:3696-3745).
 
@@ -6,11 +6,11 @@ Before this task, when the general engine's OWN certified name (NOT the T4
 producer -- ``_cand_from_t4`` is False) was OPSIN-UNPARSEABLE and
 ``general_fallback_unverified`` was on, the recovery ladder shipped it
 COMPLETELY UNVERIFIED (`opsin_status` stayed ``"unverified"`` with zero
-proof of any kind). Measured live on dev500 (task-A-report.md A.1): 3
+proof of any kind). Measured live on a dev split (task-A-report.md A.1): 3
 witnesses shipped this way, e.g.
 
     O=C1C=CC(=O)[C@@]23O[C@@]12C(=O)C(Cl)=CC31Oc2cccc3cccc(c23)O1
-    -> (1S,6R)-8-chloro-2,5,7-trioxospiro[...pentaene]  (OPSIN cannot parse it)
+    -> (1S,6R)-8-chloro-2,5,7-trioxospiro[...pentaene] (OPSIN cannot parse it)
 
 The fix routes this exact branch through ``verify_or_none`` before shipping:
 non-None -> ship (opsin_status="verified" -- fix-round-1 Finding 3 corrected
@@ -22,7 +22,7 @@ so with the real ``verify_or_none`` this branch always abstains today; most
 tests here monkeypatch ``verify_or_none`` itself to prove the WIRING (call +
 ship/abstain contract) fast and deterministically, independent of that scope
 limit. One test (``test_real_dev500_witness_now_abstains``) uses the REAL,
-unmocked oracle against an actual dev500 witness for end-to-end confirmation.
+unmocked oracle against an actual a dev split witness for end-to-end confirmation.
 """
 from unittest import mock
 
@@ -137,7 +137,7 @@ def test_engine_name_that_opsin_can_parse_still_ships_unaffected(monkeypatch):
 
 @pytest.mark.opsin_gate
 def test_real_dev500_witness_now_abstains():
-    """End-to-end, UNMOCKED confirmation using a real dev500 witness (measured
+    """End-to-end, UNMOCKED confirmation using a real a dev split witness (measured
     in task-A-report.md A.1): before this task this exact SMILES shipped
 
         (1S,6R)-8-chloro-2,5,7-trioxospiro[11-oxatricyclo[4.4.0.1^1,6]undeca-
@@ -145,7 +145,7 @@ def test_real_dev500_witness_now_abstains():
         10-pentaene]
 
     at tier=T4/source=general_engine despite being genuinely OPSIN-unparseable
-    (measured via  --tier best-effort, outcome=opsin_parse_fail).
+    (measured via eval/harness.py --tier best-effort, outcome=opsin_parse_fail).
     With the real verify_or_none wired (name_facts=None, no extractor for this
     shape), it must now abstain rather than ship it bare."""
     smi = "O=C1C=CC(=O)[C@@]23O[C@@]12C(=O)C(Cl)=CC31Oc2cccc3cccc(c23)O1"

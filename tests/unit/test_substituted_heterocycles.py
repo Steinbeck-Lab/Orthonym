@@ -13,10 +13,10 @@ CORRECTED 2026-08-02 (Task W). This file previously asserted the italic form for
 all seven saturated rings below -- "N-substitution uses N-locant format" -- and
 those 8 assertions had been RED since the ring-N producer was corrected. The
 italic 'N' is for a nitrogen that receives NO numeral; a ring nitrogen inside the
-ring numbering takes its numeral. P-65.2.3.1.4 (`BlueBookV2.md:31107`): italic
+ring numbering takes its numeral. P-65.2.3.1.4 (`the Blue Book`): italic
 letter locants "are used to designate substitution on nitrogen atoms that are not
-amide linkages for which numerical locants are used."  Per-name citations are on
-each row. Two committed gold PIN-oracle rows (,
+amide linkages for which numerical locants are used." Per-name citations are on
+each row. Two committed gold PIN-oracle rows (`benchmarks/the gold set/gold_pins.json`,
 `bluebook_ref: P-73.4`, `category: target`) independently assert the same thing and
 were curated without this code path: `1,1-dimethylpiperidin-1-ium` ("both methyls
 at the N locant") and `4,4-dimethylmorpholin-4-ium` ("O=1 senior, N=4; 4,4-dimethyl
@@ -44,23 +44,23 @@ class TestNSubstitution:
 
     @pytest.mark.unit
     @pytest.mark.parametrize("smiles,expected", [
-        # Pyrrolidine ring N is locant 1. BB:4679 prints the exact string in
-        # nicotine: `3-[(2S)-1-methylpyrrolidin-2-yl]pyridine`. BB:33847
+        # Pyrrolidine ring N is locant 1. the Blue Book prints the exact string in
+        # nicotine: `3-[(2S)-1-methylpyrrolidin-2-yl]pyridine`. the Blue Book
         # `1-bromopyrrolidine-2,5-dione (PIN) (not N-bromosuccinimide)` marks
-        # the italic form "not"; BB:27249 `pyrrolidine-1,2-diol (PIN)
+        # the italic form "not"; the Blue Book `pyrrolidine-1,2-diol (PIN)
         # 1-hydroxypyrrolidin-2-ol` over `N-hydroxypyrrolidin-2-ol`.
         ("CN1CCCC1", "1-methylpyrrolidine"),
         ("CCN1CCCC1", "1-ethylpyrrolidine"),
-        # Piperidine ring N is locant 1: BB:56630 `piperidin-1-yl*`,
-        # BB:33129 `1-(piperidin-1-yl)ethan-1-one (PIN)`.
+        # Piperidine ring N is locant 1: the Blue Book `piperidin-1-yl*`,
+        # the Blue Book `1-(piperidin-1-yl)ethan-1-one (PIN)`.
         ("CN1CCCCC1", "1-methylpiperidine"),
         ("CCN1CCCCC1", "1-ethylpiperidine"),
         # Morpholine ring N is locant 4 (O=1 is the senior heteroatom):
-        # BB:56400 `morpholin-4-yl* (not morpholino)`. The old expectation's own
-        # comment conceded "N is at position 4 ... but uses N-locant" -- that
+        # the Blue Book `morpholin-4-yl* (not morpholino)`. The old expectation's own
+        # comment conceded "N is at position 4... but uses N-locant" -- that
         # concession was the defect.
         ("CN1CCOCC1", "4-methylmorpholine"),
-        # Azetidine / aziridine ring N is locant 1 (BB:8402 `azetidine (PIN)`).
+        # Azetidine / aziridine ring N is locant 1 (the Blue Book `azetidine (PIN)`).
         ("CN1CCC1", "1-methylazetidine"),
         ("CN1CC1", "1-methylaziridine"),
     ])
@@ -217,7 +217,7 @@ class TestSubstituentFunctions:
         result = name_substituted_heterocycle(
             mol, ring, parent, subs, atom_to_locant
         )
-        # Ring N is locant 1 -- see the module docstring and BB:4679
+        # Ring N is locant 1 -- see the module docstring and the Blue Book
         # (`1-methylpyrrolidin-2-yl` in nicotine). Not `N-methylpyrrolidine`.
         assert result == "1-methylpyrrolidine"
 
@@ -300,7 +300,7 @@ class TestSubstitutedHeterocycleRegression:
         """Test that adding substituent support doesn't break unsubstituted naming."""
         # 5-membered
         assert name_compound("c1ccoc1") == "furan"
-        assert name_compound("c1cc[nH]c1") == "1H-pyrrole"  # v23 IH-01: leading indicated-H
+        assert name_compound("c1cc[nH]c1") == "1H-pyrrole"  # IH-01: leading indicated-H
         assert name_compound("c1ccsc1") == "thiophene"
         assert name_compound("C1CCOC1") == "oxolane"
         assert name_compound("C1CCNC1") == "pyrrolidine"
@@ -353,7 +353,7 @@ class TestEdgeCases:
     def test_substituent_on_multiple_rings_not_yet_supported(self):
         """Test behavior with potentially complex multi-ring systems."""
         # For now, just test single ring case works
-        # Multi-ring heterocycles are Phase 6+
+        # Multi-ring heterocycles are a phase+
         mol = Chem.MolFromSmiles("CN1CCCC1")
         ring = mol.GetRingInfo().AtomRings()[0]
         assert len(ring) == 5  # Single 5-membered ring

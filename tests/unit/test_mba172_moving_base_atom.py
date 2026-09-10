@@ -1,15 +1,15 @@
-"""Phase 172 — Moving-Base-Atom Migration Audit (MBA-01 / MBA-02).
+"""a phase — Moving-Base-Atom Migration Audit (MBA-01 / MBA-02).
 
 Executable form of 172-CONTEXT + the PIN-strict gold MBA rows
-(``). Exact-string equality against the
+(``benchmarks/the gold set/gold_pins.json``). Exact-string equality against the
 Blue-Book-cited PIN — NO string post-processing; the fixes are upstream
 (parent_to_prefix aldehyde branch + benzene functionalized-chain emitter).
 
-MBA pattern (HERITAGE §8 / BlueBookV2.md):
-  * suffix side  — a terminal C-FG named as a suffix absorbs its central carbon
+MBA pattern (AUTONOM §8 / the Blue Book):
+  * suffix side — a terminal C-FG named as a suffix absorbs its central carbon
     INTO the chain (`-dioic`/`-dial`/`-dinitrile` chain-length math). Already
     correct (whole-graph perception); locked here against regression.
-  * prefix side  — `-CHO` on a substituent chain is absorbed -> `oxo` at the
+  * prefix side — `-CHO` on a substituent chain is absorbed -> `oxo` at the
     terminal locant (P-66.6.1; `1-oxo...yl` acyl form is NON-PIN per the
     Table-28.1 note); `formyl` ONLY when on a ring (P-66.6.1.1.3, not absorbable).
 """
@@ -50,7 +50,7 @@ def test_mba02_formyl_on_ring_preserved(namer):
     assert namer.name("OC(=O)c1ccc(C=O)cc1") == "4-formylbenzoic acid"
 
 
-# v29 residue Task A: MBA-02's rule ("the former -CHO carbon sits at the chain
+# residue Task A: MBA-02's rule ("the former -CHO carbon sits at the chain
 # terminus opposite the attachment") is CORRECT, but `chain_length` is a whole-
 # fragment carbon COUNT, and a count is not a proof of chain length. On the
 # branched '2-methylpropanal' (count 4, principal chain 3) it spliced locant 4
@@ -66,7 +66,7 @@ def test_mba02_formyl_on_ring_preserved(namer):
 ])
 def test_mba02_oxo_locant_end_to_end(namer, smiles, expected):
     # The oxo locant is the terminus opposite the attachment, NOT C1 (the
-    # disfavoured acyl position, BlueBookV2.md Table-28.1 note m).
+    # disfavoured acyl position, the Blue Book Table-28.1 note m).
     assert namer.name(smiles) == expected
 
 

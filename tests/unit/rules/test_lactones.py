@@ -335,3 +335,50 @@ class TestSubstitutedLactones:
         result = name_monocyclic_lactone(mol)
         assert result == "oxan-2-one", f"Got '{result}' instead of 'oxan-2-one'"
         assert "oxolan" not in result, "6-membered must not use 5-membered name"
+
+
+class TestLactoneSeniority:
+    """P-65.6.3.5.1 (the Blue Book): a lactone is a pseudoketone and ranks LOWER in
+    the seniority of classes than an acid or an ester (Table 4.1, the Blue Book:
+    Acids/esters > ketones/pseudoketones), but HIGHER than an alcohol, amine or
+    imine. These are end-to-end (name_compound) assertions because the seniority
+    decision lives in the assembly layer, not in name_monocyclic_lactone.
+    """
+
+    def test_acid_beats_lactone(self):
+        """Carboxylic acid + lactone: the ACID owns the suffix, the ring C=O
+        degrades to an 'oxo' prefix (BB PIN anchor the Blue Book)."""
+        from orthonym import name_compound
+        assert (
+            name_compound("O=C1CCC(C(=O)O)O1")
+            == "5-oxooxolane-2-carboxylic acid"
+        )
+
+    def test_ester_beats_lactone(self):
+        """Acyclic ester + lactone: the ester ranks above the pseudoketone
+        lactone; the ring C=O becomes 'oxo'."""
+        from orthonym import name_compound
+        assert (
+            name_compound("O=C1CCC(C(=O)OC)O1")
+            == "methyl 5-oxooxolane-2-carboxylate"
+        )
+
+    def test_lactone_beats_alcohol(self):
+        """Alcohol ranks BELOW the lactone; the lactone keeps the '-one'
+        suffix and the OH is a 'hydroxy' prefix."""
+        from orthonym import name_compound
+        assert name_compound("O=C1CCC(O)O1") == "5-hydroxyoxolan-2-one"
+
+    def test_lactone_beats_amine(self):
+        """Amine ranks BELOW the lactone; the lactone keeps the '-one'
+        suffix and the NH2 is an 'amino' prefix."""
+        from orthonym import name_compound
+        assert name_compound("O=C1CCC(N)O1") == "5-aminooxolan-2-one"
+
+    def test_plain_lactone_unchanged(self):
+        """A plain lactone (no senior group) keeps its '-one' name — the
+        seniority guard must not fire when the only 'ester' detected is the
+        lactone's own ring motif."""
+        from orthonym import name_compound
+        assert name_compound("O=C1CCCO1") == "oxolan-2-one"
+        assert name_compound("O=C1CCCCO1") == "oxan-2-one"

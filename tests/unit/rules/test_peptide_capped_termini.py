@@ -1,9 +1,9 @@
 """
-v33 Phase 2 Task 2.1 (breadth): capped-termini peptides.
+ a phase Task 2.1 (breadth): capped-termini peptides.
 
 `rules/peptides.py`'s ordinary flat acylamino-chain convention assumes a
-FREE N-terminal amine and a FREE C-terminal carboxylic acid. Phase-0's SPY
-( sec.3) measured that a
+FREE N-terminal amine and a FREE C-terminal carboxylic acid. Phase-0's a trace
+(internal notes sec.3) measured that a
 capped terminus is the DOMINANT decline site over the true-peptide backlog
 (153/215 = 71.2% of all `name_peptide()` declines are `_is_valid_peptide`
 False; the largest single sub-shape, 85/215 = 40%, is BOTH termini capped
@@ -14,7 +14,7 @@ ADDITIVE fallback, tried only when the ordinary convention declines, that
 accepts:
   - a C-terminal PRIMARY CARBOXAMIDE (``-C(=O)NH2``) instead of the free
     acid, rendered with the standard amino-acid-amide suffix
-    (``glycinamide``, ``phenylalaninamide``, ...).
+    (``glycinamide``, ``phenylalaninamide``,...).
   - a mono-N-METHYLATED (free, non-acylated) N-terminus, rendered as an
     "N-methyl" prefix on the whole assembled name (the ``N-methyl-D-
     aspartic acid`` convention).
@@ -72,7 +72,7 @@ def _full_rt(smiles: str, name: str) -> bool:
 @pytest.mark.unit
 class TestCTerminalAmide:
     """Real true-peptide backlog witnesses
-    (, `peptide` bucket) whose
+    (internal notes, `peptide` bucket) whose
     C-terminus is a primary carboxamide instead of the free acid. Both were
     ABSTAIN ('unknown organic compound') before this change."""
 
@@ -117,7 +117,7 @@ class TestCTerminalAmide:
 
     def test_giant_30_residue_lysinamide_cterm_and_perf(self):
         """The exact HA=342, ~30-residue giant-peptide witness from
-         sec.1 -- flagged there
+        internal notes sec.1 -- flagged there
         as "the PERF/hang witness" (77.6s under the pre-Task-2.1 code path,
         which fell through to the slow general/composer engine before
         abstaining). Lever C now names it directly via the fast peptide
@@ -162,7 +162,7 @@ class TestNMethylNTerminus:
     established 'N-methyl-D-aspartic acid' convention)."""
 
     def test_simple_hand_built_n_methylalanylglycine(self):
-        # v38: N-methyl-Ala-Gly PIN is the substitutive form
+        #: N-methyl-Ala-Gly PIN is the substitutive form
         # (V38-PEPTIDE-PIN-VERDICT.md; peptide names are non-PIN). RT verified.
         smi = "CN[C@@H](C)C(=O)NCC(=O)O"
         result = name_compound(smi)
@@ -185,7 +185,7 @@ class TestNMethylNTerminus:
             "N[C@@H](C)C(=O)N[C@@H](CO)C(=O)N[C@@H](CC(C)C)C(=O)"
             "N[C@H](C(N)=O)C(C)C"
         )
-        # v38: reroutes through the substitutive PIN path
+        #: reroutes through the substitutive PIN path
         # (V38-PEPTIDE-PIN-VERDICT.md); the general/composer path emits a valid,
         # RT-verified name that carries a leading (2S) descriptor, so it no
         # longer literally STARTS with 'N-methyl' (it contains it). Exact
@@ -205,7 +205,7 @@ class TestNMethylNTerminus:
 
 @pytest.mark.unit
 class TestSideChainTrapAbstains:
-    """the contributor guide-flagged risk: a Glu/Asp side-chain acid, or an Asn/Gln
+    """CLAUDE.md-flagged risk: a Glu/Asp side-chain acid, or an Asn/Gln
     side-chain amide, sitting alongside a genuine C-terminal amide cap must
     never be misread as (or compete with) that cap. Both must ABSTAIN
     rather than emit a guessed/misplaced name."""
@@ -262,11 +262,11 @@ class TestRegressionUnaffected:
     Lever-A single-residue exclusion are unchanged (PIN byte-identical)."""
 
     def test_glycylglycine_unchanged(self):
-        # v38: substitutive PIN (V38-PEPTIDE-PIN-VERDICT.md); RT verified.
+        #: substitutive PIN (V38-PEPTIDE-PIN-VERDICT.md); RT verified.
         assert name_compound("NCC(=O)NCC(=O)O") == "(2-aminoacetamido)acetic acid"
 
     def test_alanylglycine_unchanged(self):
-        # v38: substitutive PIN (V38-PEPTIDE-PIN-VERDICT.md); RT verified.
+        #: substitutive PIN (V38-PEPTIDE-PIN-VERDICT.md); RT verified.
         assert (name_compound("N[C@@H](C)C(=O)NCC(=O)O")
                 == "2-[(2S)-2-aminopropanamido]ethanoic acid")
 

@@ -1,7 +1,7 @@
-"""v37 ST.1 — route the general-engine stereo-injection sites through the
+""" ST.1 — route the general-engine stereo-injection sites through the
 RT-gated reanchor (SC-1, the dominant stereo-omission abstain sub-cause).
 
-Grounding: . The general engine was the
+Grounding: internal notes. The general engine was the
 one ring-stereo producer that injected parent-scope stereo via a plain
 `_stereo_prefix` with NO RT-gate, so `general_engine_stereo_complete` certified
 an OPSIN-unparseable stereo layer (e.g. `(1s,4s)-bicyclo[2.2.1]heptane`) as
@@ -132,7 +132,7 @@ class TestST1NeverWrongAndPinPreserved:
     def test_completable_spiro_full_stereo_non_regression(self):
         # A completable spiro whose FULL stereo round-trips must keep shipping it
         # (the reanchor's candidate-A path is byte-identical for a currently-RT
-        # name — the v36 Wave-E non-regression argument).
+        # name — the Wave-E non-regression argument).
         smi = ("CC(=O)OC[C@]12C[C@H](OC(=O)CC(C)C)C(C)=C[C@H]1O[C@@H]1"
                "[C@H](O)[C@@H](O)[C@@]2(C)[C@]12CO2")
         name = _be_name(smi)

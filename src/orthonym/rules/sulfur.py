@@ -3,7 +3,12 @@ Sulfur compound naming rules per IUPAC 2013.
 
 IUPAC P-63.6: Sulfur-containing functional groups:
 - Thiols (-SH): suffix -thiol, prefix sulfanyl- (P-63.6.1.1)
-- Sulfides (R-S-R'): functional class naming (P-63.6.2.1)
+- Sulfides (R-S-R'): the PIN is SUBSTITUTIVE — (R'-sulfanyl)RH, P-63.2.5 method (1)
+  (the Blue Book "Method (1), substitutive nomenclature, gives preferred IUPAC names";
+  the Blue Book "(methylsulfanyl)methane (PIN)... dimethyl sulfide"). The functional-class
+  "R R' sulfide" (method 2) below is retained for GENERAL nomenclature only; on the PIN
+  path the thioether handler (assembly/handlers/thioether.py) declines the neutral case
+  so the substitutive producer names it, and name_sulfide only serves the charged degrade.
 - Sulfoxides (R-SO-R'): functional class naming (P-63.6.3.1)
 - Sulfones (R-SO2-R'): functional class naming (P-63.6.3.2)
 - Sulfonic acids (-SO3H): suffix -sulfonic acid, prefix sulfo- (P-65.3.1.2)
@@ -43,9 +48,17 @@ def name_thiol(mol, thiol_atoms: Tuple[int, ...], parent_name: str, locant: Opti
 
 def name_sulfide(mol, sulfur_idx: int) -> Optional[str]:
     """
-    Name a sulfide (thioether) using functional class nomenclature.
+    Build the functional-class (method 2) name of a sulfide (thioether).
 
-    IUPAC P-63.6.2.1 prefers functional class for simple sulfides:
+    ⚠ This is NOT the PIN. Per P-63.2.5 (the Blue Book) the preferred IUPAC name of a
+    chalcogen analogue of an ether is the SUBSTITUTIVE form "(R'-sulfanyl)RH"
+    (method 1); the functional-class "R R' sulfide" is retained for general
+    nomenclature only. The thioether handler declines the neutral acyclic case so
+    the substitutive producer emits the PIN, and calls this only for the CHARGED
+    degrade (a dithiocarbamate ammonium, a nitrile-sulfide ylide) where the
+    substitutive route would misroute — keeping a valid, non-PIN name (0-wrong).
+
+    Functional-class grammar (P-63.2.5 method 2):
     - Symmetric: "dimethyl sulfide", "diethyl sulfide"
     - Asymmetric: "ethyl methyl sulfide" (alphabetical order, P-14.4)
 
@@ -60,7 +73,7 @@ def name_sulfide(mol, sulfur_idx: int) -> Optional[str]:
 
     # A RING sulfur is never an acyclic functional-class sulfide ("R R' sulfide",
     # P-63.6.2.1) — it is a skeletal heteroatom named by the ring system (thiophene,
-    # thiane, the epithio bridge of a bridged-fused parent, ...). Characterising its
+    # thiane, the epithio bridge of a bridged-fused parent,...). Characterising its
     # two ring branches as substituent groups LINEARISES the ring into a phantom
     # chain (e.g. the S-bridged 1,4-epithio-1,4-dihydronaphthalene -> "didecyl
     # sulfide" for some SMILES spellings — an order-dependent WRONG name). Decline so
@@ -107,7 +120,7 @@ def name_sulfoxide(mol, sulfoxide_atoms: Tuple[int, ...]) -> Optional[str]:
     Returns:
         Functional class name, or None if not a simple sulfoxide
     """
-    # Find the chalcogen atom (has =O and 2 C neighbors). P6-6I: accept
+    # Find the chalcogen atom (has =O and 2 C neighbors). -6I: accept
     # Se/Te; a S molecule still finds S and keeps the 'sulfoxide' class word
     # (byte-identical to HEAD).
     sulfur_idx = None
@@ -162,7 +175,7 @@ def name_sulfone(mol, sulfone_atoms: Tuple[int, ...]) -> Optional[str]:
     Returns:
         Functional class name, or None if not a simple sulfone
     """
-    # Find the chalcogen atom. P6-6I: accept Se/Te; a S molecule still finds
+    # Find the chalcogen atom. -6I: accept Se/Te; a S molecule still finds
     # S and keeps the 'sulfone' class word (byte-identical to HEAD).
     sulfur_idx = None
     for idx in sulfone_atoms:
@@ -247,11 +260,11 @@ def name_sulfonyl_halide(features, style: str = "pin") -> Optional[str]:
     match = matches[0]
 
     # Cap the S-bonded leaving group -> -OH, forming the parent sulfonic/sulfinic
-    # acid; ``halide_word`` is the functional-class word ('chloride' ... or
+    # acid; ``halide_word`` is the functional-class word ('chloride'... or
     # 'cyanide' for the P-66.5.1.3.2 sulfonyl cyanide).
     rw = Chem.RWMol(mol)
     if pg == "sulfonyl_cyanide":
-        # P4-3 (P-66.5.1.3.2, BB:34811 'CH3-SO2-CN methanesulfonyl cyanide
+        # -3 (P-66.5.1.3.2, the Blue Book 'CH3-SO2-CN methanesulfonyl cyanide
         # (PIN)'). Match tuple (S, =O, =O, cyanide-C, N): drop the -C#N and cap S
         # with -OH by converting the cyanide carbon to O and deleting the N.
         halide_word = "cyanide"
@@ -364,7 +377,7 @@ def _acid_stem_unsaturated_oxide_prefix(
     # of S is the amide N, not a carbon) can have its R-sulfonyl stem built: cap S
     # with -OH after detaching the N and the arm names as the R-sulfonic acid
     # (`4-aminobenzene-1-sulfonic acid`), rewritten to `...sulfonyl` (task #28,
-    # unblocks the substituted-arene `{Ar}sulfonamido` PIN, BB P-66.1.1.4.3 :33034).
+    # unblocks the substituted-arene `{Ar}sulfonamido` PIN, BB P-66.1.1.4.3:33034).
     # Purely additive: sulfone/sulfoxide callers require two-carbon S (SMARTS), so
     # this branch only fires where the old carbon-only filter returned None. The
     # cap-name-rewrite is fail-closed (a non-clean `... sulfonic/sulfinic acid`
@@ -388,7 +401,7 @@ def _acid_stem_unsaturated_oxide_prefix(
     # Isolate the fragment bearing the CAPPED SULFONYL S. Selecting the first piece
     # that contains ANY sulfur mis-picks the detached PARENT when that parent itself
     # holds a ring sulfur (a thiazole / thiophene host): the wrong piece has _acid_s=0
-    # so guard 1 spuriously fires. v30 #29 gap-a: `2-(4-aminobenzene-1-sulfonamido)-
+    # so guard 1 spuriously fires. #29 gap-a: `2-(4-aminobenzene-1-sulfonamido)-
     # 1,3-thiazole-5-carboxylic acid` abstained because the thiazole piece `Nc1nccs1`
     # was chosen over the arene sulfonic acid `Nc1ccc(S(=O)(=O)O)cc1`. RWMol.AddAtom
     # appends and RemoveBond does not reindex, so ``sulfur_idx`` is still valid in
@@ -408,10 +421,10 @@ def _acid_stem_unsaturated_oxide_prefix(
     if acid_smiles is None:
         return None
     # Two soundness guards on the acid-stem -> acyl rewrite. That rewrite trusts a
-    # gate-DISABLED acid sub-namer, which a fable review of 7c621b84 showed could emit a
+    # gate-DISABLED acid sub-namer, which a a review review of 7c621b84 showed could emit a
     # wrong constitution for the N-parent (sulfonamido) case. 8afa533c added the guards
     # but scoped them to the N-parent branch to avoid a gold-risk on a path it had not
-    # itself broken. v30 F6 confirmed the CARBON-parent sulfone/sulfoxide-prefix path
+    # itself broken. F6 confirmed the CARBON-parent sulfone/sulfoxide-prefix path
     # has the SAME false friends (`CS(=O)(=O)CCS(O)(=O)=O` -> `ethane-1,2-disulfonyl`),
     # so both guards now fire for either parent element (C or N). Failing closed here
     # returns the caller to its own fail-closed handling; the corrupted stem never ships.
@@ -424,13 +437,13 @@ def _acid_stem_unsaturated_oxide_prefix(
     # OPSIN-unparseable). Fail closed unless exactly ONE S bears an -OH/-O- (the one we
     # just capped) -- an RT-invisible defect, so a structural guard, not a round-trip.
     #
-    # ⚠ Guard 1 and guard 2 are COMPLEMENTARY, not redundant (fable review of F6): guard 2
+    # ⚠ Guard 1 and guard 2 are COMPLEMENTARY, not redundant (a review review of F6): guard 2
     # CANNOT catch the multiplied-acid case, because 'ethane-1,2-disulfonic acid' is the
     # CORRECT name of the capped fragment and re-anchors skeleton-EXACT -- the corruption
     # lives entirely in the suffix->acyl STRIP, which guard 2 never inspects. Do NOT delete
     # guard 1 as "redundant with guard 2".
     #
-    # NOTE (fable review of F6): this counts ANY S bearing a single-bonded O, so it also
+    # NOTE (a review review of F6): this counts ANY S bearing a single-bonded O, so it also
     # vetoes a sulfonate/sulfinate ESTER arm, a mesyloxy arm, and a charge-separated
     # sulfoxide arm -- broader than "competing acid". Today that is pure gain: the
     # gate-disabled acid sub-namer mis-names every one of those (silent atom drop / SO3H
@@ -473,15 +486,15 @@ def _acid_stem_unsaturated_oxide_prefix(
     _sk_frag = _self_consistency_skeleton(acid_smiles)
     if _sk_name is None or _sk_frag is None or _sk_name != _sk_frag:
         return None
-    # v30 #36 (fable F6 finding 3): the skeleton block above is the InChIKey first
+    # #36 (a review F6 finding 3): the skeleton block above is the InChIKey first
     # block, which EXCLUDES stereo (ADR-18-07), so a WRONG CIP descriptor (E/Z, R/S)
     # from the gate-disabled acid sub-namer would re-anchor skeleton-exact and ship a
     # wrong-stereo `...sulfinyl/sulfonyl` prefix. Also require the C6 RegistrationHash
     # stereo layer (stereo-bearing, tautomer-canonical) to match — gate-INDEPENDENT,
     # fail-closed on mismatch/unhashable. No live witness today (the sub-namer routes
     # stereo through the standard CIP path, so its descriptors are correct), so this is
-    # defence-in-depth closing the gap invariant 2 requires: honest WITHOUT the gate,
-    # for both the N-parent (8afa533c) and carbon-parent (F6) paths.
+    # defence-in-depth closing the gap a project rule requires: honest WITHOUT the gate,
+    # for both the N-parent and carbon-parent (F6) paths.
     _st_name = _registration_stereo_layer(_reparsed)
     _st_frag = _registration_stereo_layer(acid_smiles)
     if _st_name is None or _st_frag is None or _st_name != _st_frag:
@@ -594,9 +607,9 @@ def name_chalcogen_oxide_substitutive(
     """
     from ..assembly.naming_utils import should_omit_locant_one
 
-    # P6-6I: accept Se/Te (chalcogen) as well as S. The match_atoms come
+    # -6I: accept Se/Te (chalcogen) as well as S. The match_atoms come
     # from an element-specific SMARTS (sulfoxide -> S only; selenoxide -> Se
-    # only; ...), so the first chalcogen found is the intended central atom;
+    # only;...), so the first chalcogen found is the intended central atom;
     # the body below is already element-generic (it only walks C neighbours).
     sulfur_idx = None
     for idx in match_atoms:
@@ -673,7 +686,7 @@ def chalcogen_oxide_fc_covers_molecule(
     dropping -S-CH3 (a different molecule). On False the handler declines
     and the polyfunctional path names the whole structure.
     """
-    # P6-6I: accept Se/Te as well as S (see name_chalcogen_oxide_substitutive).
+    # -6I: accept Se/Te as well as S (see name_chalcogen_oxide_substitutive).
     sulfur_idx = None
     for idx in match_atoms:
         if mol.GetAtomWithIdx(idx).GetSymbol() in ('S', 'Se', 'Te'):

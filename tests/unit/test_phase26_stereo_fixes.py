@@ -1,4 +1,4 @@
-"""Tests for Phase 26-02: Stereodescriptors in natural product (steroid) naming.
+"""Tests for a phase-02: Stereodescriptors in natural product (steroid) naming.
 
 Verifies that:
 1. Steroid names with defined stereocenters include R/S stereo prefixes
@@ -73,8 +73,8 @@ class TestSteroidStereoPresence:
     def test_androstandiol_has_stereo_prefix(self):
         """Androstan-3,17-diol with stereocenters carries stereo descriptors.
 
-        Phase 181 (WSC-02): steroid ring stereocentres now emit ring-face α/β
-        (`5beta-androstan-3alpha,17alpha-diol`) rather than a whole-graph (R/S) block.
+        a phase (WSC-02): steroid ring stereocentres now emit ring-face α/β
+        (`5β-androstan-3α,17α-diol`) rather than a whole-graph (R/S) block.
         """
         name = name_compound(ANDROSTANDIOL_SMILES)
         assert re.search(r"\d+(alpha|beta)", name) or re.search(r"\(\d+[RS]", name), (
@@ -118,9 +118,9 @@ class TestSteroidStereoPresence:
 class TestSteroidStereoFormat:
     """Test that steroid ring-face α/β descriptors follow the P-101.2.6 format.
 
-    Phase 181 (WSC-02): a steroid whose ring stereocentres resolve emits Latin α/β
-    descriptors INLINE — on the stem (`5beta-`) and at each substituent/suffix locant
-    (`3alpha`, `17alpha`) — NOT a leading whole-graph `(R/S)-` parenthesised block.
+    a phase (WSC-02): a steroid whose ring stereocentres resolve emits Latin α/β
+    descriptors INLINE — on the stem (`5β-`) and at each substituent/suffix locant
+    (`3α`, `17α`) — NOT a leading whole-graph `(R/S)-` parenthesised block.
     """
 
     def test_alpha_beta_descriptors_lowercase_latin(self):
@@ -132,7 +132,7 @@ class TestSteroidStereoFormat:
     def test_inline_alpha_beta_format(self):
         """α/β attach inline as '{locant}{greek}' with no hyphen between locant and greek."""
         name = name_compound(ANDROSTANDIOL_SMILES)
-        # e.g. "5beta-androstan-3alpha,17alpha-diol"
+        # e.g. "5β-androstan-3α,17α-diol"
         assert re.search(r"\d+(alpha|beta)", name), f"No inline α/β in: {name}"
         # NEVER a leading parenthesised greek block (the OPSIN-unparseable anti-pattern)
         assert not re.match(r"^\(\d+(alpha|beta)", name), (
@@ -140,9 +140,9 @@ class TestSteroidStereoFormat:
         )
 
     def test_stem_prefix_starts_name(self):
-        """A free ring-face descriptor (e.g. 5beta-) is prepended to the stem, name-initial."""
+        """A free ring-face descriptor (e.g. 5β-) is prepended to the stem, name-initial."""
         name = name_compound(ANDROSTANDIOL_SMILES)
-        # "5beta-androstan-..." — starts with a locant+greek stem prefix
+        # "5β-androstan-..." — starts with a locant+greek stem prefix
         assert re.match(r"\d+(alpha|beta)-[a-z]", name), (
             f"Expected a '{{locant}}{{greek}}-' stem prefix, got: {name}"
         )
@@ -201,12 +201,14 @@ class TestSteroidStereoOPSIN:
     def test_androstandiol_opsin_roundtrip(self):
         """OPSIN parses the α/β-annotated androstan-3,17-diol and matches (WSC-02).
 
-        Phase 181: the name is now `5beta-androstan-3alpha,17alpha-diol`; OPSIN parses the
+        a phase: the name is now `5β-androstan-3α,17α-diol`; OPSIN parses the
         ring-face descriptors and returns SMILES that canonicalizes to the input structure.
         """
         name = name_compound(ANDROSTANDIOL_SMILES)
         assert "androstan" in name
-        assert re.search(r"\d+(alpha|beta)", name), f"expected ring-face α/β in {name}"
+        #: the ring-face descriptors are the Blue-Book GREEK α/β (P-101.2.6),
+        # not the ASCII words (commit 94b00800b). Accept either spelling.
+        assert re.search(r"\d+(alpha|beta|α|β)", name), f"expected ring-face α/β in {name}"
 
     # Stigmast-5-en-3,7-diol: OPSIN cannot parse stereo-annotated cholest-5-en-3,7-diol
     # (OPSIN returns empty output for cholestane stereo prefixes with >8 descriptors).

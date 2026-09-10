@@ -1,15 +1,15 @@
-"""Phase 148: parity tests for _classify cyclic branch refactor.
+"""a phase: parity tests for _classify cyclic branch refactor.
 
-Per V18_MILESTONE_PLAN §6 Phase 148 + Appendix A.5: when the cyclic
+Per V18_MILESTONE_PLAN §6 a phase + Appendix A.5: when the cyclic
 branch finds a meaningful chain (chain_len >= 2), select_parent() runs
 end-to-end and features.parent_selection_result is populated. The
 is_known_fused_heterocycle short-circuit at namer.py:1126-1141
-(pre-148) is collapsed; cascade entry is the only gate per D-03.
+(pre-148) is collapsed; cascade entry is the only gate per.
 
-Source: https://iupac.qmul.ac.uk/BlueBook/P4.html  P-44.1 cascade
-Source: V18_MILESTONE_PLAN §6 Phase 148 + Appendix A.5
-Source: Phase 148 CONTEXT D-02, D-03, D-09.
-Source: HERITAGE 1990 §4 (Wisniewski J. Chem. Inf. Comput. Sci. 30, 324-332)
+Source: https://iupac.qmul.ac.uk/BlueBook/P4.html P-44.1 cascade
+Source: V18_MILESTONE_PLAN §6 a phase + Appendix A.5
+Source: a phase CONTEXT,,.
+Source: AUTONOM 1990 §4 (Wisniewski J. Chem. Inf. Comput. Sci. 30, 324-332)
         — full seniority cascade on ALL structures, no bypass.
 """
 import pytest
@@ -36,7 +36,7 @@ def _classify_full(smiles: str):
 
 @pytest.mark.unit
 def test_parent_selection_result_wired():
-    """Phase 148 D-02 / V18 Appendix A.5: features.parent_selection_result
+    """a phase / V18 Appendix A.5: features.parent_selection_result
     is populated when _classify cyclic branch fires select_parent().
 
     Indole + C11 acid is the canonical cascade-fires case (chain_len=11
@@ -44,10 +44,10 @@ def test_parent_selection_result_wired():
     short-circuited this case; post-148 the cascade runs end-to-end and
     populates parent_selection_result.
 
-    Source: V18_MILESTONE_PLAN §6 Phase 148 Appendix A.5
-    Source: Phase 148 CONTEXT D-02, D-09.
+    Source: V18_MILESTONE_PLAN §6 a phase Appendix A.5
+    Source: a phase CONTEXT,.
     Source: https://iupac.qmul.ac.uk/BlueBook/P4.html P-44.1
-    Source: HERITAGE 1990 §4.
+    Source: AUTONOM 1990 §4.
     """
     # indole + 11C acid → cascade fires (chain_len >= 2)
     feats = _classify_full('c1ccc2[nH]ccc2c1CCCCCCCCCCC(=O)O')
@@ -55,7 +55,7 @@ def test_parent_selection_result_wired():
         "features.parent_selection_result should be populated by _classify "
         "when select_parent() runs (Phase 148 D-02 wiring)."
     )
-    # ParentSelectionResult is a NamedTuple/dataclass with .parent_type
+    # ParentSelectionResult is a NamedTuple/dataclass with.parent_type
     assert feats.parent_selection_result.parent_type in ('ring', 'chain'), (
         f"parent_type must be 'ring' or 'chain'; got "
         f"{feats.parent_selection_result.parent_type!r}"
@@ -64,7 +64,7 @@ def test_parent_selection_result_wired():
 
 @pytest.mark.unit
 def test_classify_no_known_fused_heterocycle_short_circuit():
-    """Phase 148 SC-2 / D-03: cascade entry condition is the only gate.
+    """a phase SC-2 /: cascade entry condition is the only gate.
 
     The is_known_fused_heterocycle short-circuit at namer.py:1126-1141
     (pre-148) is collapsed; cascade fires whenever (is_cyclic AND
@@ -76,9 +76,9 @@ def test_classify_no_known_fused_heterocycle_short_circuit():
     re-introduced the band-aid memory/root-cause-fixes.md identifies
     as the canonical pattern this triple is deleting.
 
-    Source: Phase 148 CONTEXT D-03; V18 Appendix A.5.
+    Source: a phase CONTEXT; V18 Appendix A.5.
     Source: https://iupac.qmul.ac.uk/BlueBook/P4.html P-44.1
-    Source: HERITAGE 1990 §4 — full seniority cascade on ALL structures.
+    Source: AUTONOM 1990 §4 — full seniority cascade on ALL structures.
     Source: memory/root-cause-fixes.md (band-aid pattern reference).
     """
     feats = _classify_full('c1ccc2[nH]ccc2c1CCCCCCCCCCC(=O)O')

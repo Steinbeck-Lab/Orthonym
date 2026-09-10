@@ -3,8 +3,8 @@
 Exact analogues of ``handlers.phosphonic_acid`` / ``handlers.phosphinic_acid``.
 The Blue Book gives all four as PRESELECTED names (BB L36051-36054)::
 
-    AsH(O)(OH)2  arsonic acid    AsH2(O)OH  arsinic acid
-    SbH(O)(OH)2  stibonic acid   SbH2(O)OH  stibinic acid
+    AsH(O)(OH)2 arsonic acid AsH2(O)OH arsinic acid
+    SbH(O)(OH)2 stibonic acid SbH2(O)OH stibinic acid
 
 and the substituent-prefix PIN forms verbatim -- ``ethylstibinic acid``
 (BB L36064), ``methyl(phenyl)arsinic acid`` (BB L36066),
@@ -30,7 +30,7 @@ from ..name_tree import NameTreeNode, NamingResult
 logger = logging.getLogger(__name__)
 
 # functional-group key -> (rules.phosphorus function name, IUPAC cite)
-# Phase 1B adds the six TRIVALENT -ous organo-oxoacids (P, As, Sb) — the same
+# a phase adds the six TRIVALENT -ous organo-oxoacids (P, As, Sb) — the same
 # factory, the same fail-closed direct-return contract, delegating to the
 # element-generic -ous namers in rules.phosphorus. Including phosphonous/phosphinous
 # here (not in the P-only handlers.phosphonic_acid) keeps all six -ous siblings in

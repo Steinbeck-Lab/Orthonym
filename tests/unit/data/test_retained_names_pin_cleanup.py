@@ -1,5 +1,5 @@
 """
-Tests for IUPAC 2013 PIN cleanup of retained names (Phase 133-01).
+Tests for IUPAC 2013 PIN cleanup of retained names (a phase-01).
 
 Verifies:
 - Acetone removed from RETAINED_NAMES (PIN is propan-2-one per P-31.1.3)
@@ -186,7 +186,7 @@ class TestCubaneAdded:
     def test_cubane_in_bicyclo_retained_names(self):
         """Cubane canonical SMILES should be a key in BICYCLO_RETAINED_NAMES.
 
-        v23 Phase 5: rekeyed from the stale C12C3C4C1C1C3C2C41 (InChIKey
+         a phase: rekeyed from the stale C12C3C4C1C1C3C2C41 (InChIKey
         BOLISNSTKUABPW, a DIFFERENT (CH)8 cage, NOT cubane) to the true cubane
         canonical (InChIKey TXWRERCHRDBNLG)."""
         assert "C12C3C4C1C1C2C3C41" in BICYCLO_RETAINED_NAMES
@@ -198,12 +198,12 @@ class TestCubaneAdded:
 
 
 # ============================================================================
-# Phase 167 (HYG-03) — RED tests: retained-name PIN corrections.
+# a phase (HYG-03) — RED tests: retained-name PIN corrections.
 # These FAIL now and are made green by Plan 167-02 (deny-based exclusion of the
 # audited corrections). Membership/value/!=archaic asserts are the RED drivers;
-# the structural-RT assert (D-03) is a correctness check (green now AND after,
+# the structural-RT assert () is a correctness check (green now AND after,
 # since OPSIN recognises both the archaic name and the systematic PIN).
-# Audit + targets:  § "Phase 167".
+# Audit + targets: docs/retained_name_conflicts.md § "a phase".
 # ============================================================================
 
 
@@ -211,7 +211,7 @@ class TestErythreneRemoved:
     """C=CC=C must NOT emit 'erythrene' (archaic/incorrect) — PIN is buta-1,3-diene.
 
     'erythrene' is an OPSIN-imported synonym leaking into the output path; Plan
-    167-02 adds it to _PIN_DENY. Audit:  § Phase 167.
+    167-02 adds it to _PIN_DENY. Audit: docs/retained_name_conflicts.md § a phase.
     """
 
     SMILES = "C=CC=C"
@@ -233,7 +233,7 @@ class TestErythreneRemoved:
     @pytest.mark.unit
     @pytest.mark.roundtrip
     def test_emitted_name_roundtrips(self):
-        """Whatever is emitted (target: buta-1,3-diene) must round-trip (D-03)."""
+        """Whatever is emitted (target: buta-1,3-diene) must round-trip ()."""
         if not _OPSIN_AVAILABLE:
             pytest.skip("OPSIN/Java not available")
         emitted = name_compound(self.SMILES)
@@ -264,7 +264,7 @@ class TestTrimethyleneGlycolRemoved:
     @pytest.mark.unit
     @pytest.mark.roundtrip
     def test_emitted_name_roundtrips(self):
-        """Target: propane-1,3-diol (D-03 structural round-trip)."""
+        """Target: propane-1,3-diol (structural round-trip)."""
         if not _OPSIN_AVAILABLE:
             pytest.skip("OPSIN/Java not available")
         emitted = name_compound(self.SMILES)
@@ -295,7 +295,7 @@ class TestAspirinRemoved:
     @pytest.mark.unit
     @pytest.mark.roundtrip
     def test_emitted_name_roundtrips(self):
-        """Target: 2-acetyloxybenzoic acid (D-03 structural round-trip)."""
+        """Target: 2-acetyloxybenzoic acid (structural round-trip)."""
         if not _OPSIN_AVAILABLE:
             pytest.skip("OPSIN/Java not available")
         emitted = name_compound(self.SMILES)

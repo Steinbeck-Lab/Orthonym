@@ -265,7 +265,7 @@ class TestHigherMultipliers:
 
         P-28.5 (Wave2 P1CB Task 8): extended past the old deci(10) cap with
         undeci(11)/dodeci(12) so ring assemblies of >6 (and >10) identical
-        systems name correctly. Counts above 12 keep the .get->None decline.
+        systems name correctly. Counts above 12 keep the.get->None decline.
         """
         from orthonym.rules.ring_assemblies import ASSEMBLY_MULTIPLIERS
         assert len(ASSEMBLY_MULTIPLIERS) == 11
@@ -307,7 +307,7 @@ class TestHigherMultipliers:
     @pytest.mark.unit
     def test_count_11_12_supported_13_unsupported(self):
         """P-28.5 (Wave2 P1CB Task 8): undeci(11)/dodeci(12) supported (OPSIN-RT
-        verified); count 13 and above keep the .get->None decline (no
+        verified); count 13 and above keep the.get->None decline (no
         OPSIN-verifiable affix -> fail closed)."""
         from orthonym.rules.ring_assemblies import ASSEMBLY_MULTIPLIERS
         assert ASSEMBLY_MULTIPLIERS[11] == "undeci"
@@ -400,7 +400,7 @@ class TestFusedRingAssemblyUnits:
 
 
 # ---------------------------------------------------------------------------
-# G3 / COV-03: P-28.2.1 enclosing marks (von Baeyer confusion)
+# G3 /: P-28.2.1 enclosing marks (von Baeyer confusion)
 # ---------------------------------------------------------------------------
 
 class TestP28EnclosingMarks:
@@ -437,7 +437,7 @@ class TestP28EnclosingMarks:
 
 
 # ---------------------------------------------------------------------------
-# G3 / COV-03: P-28.2.2 double-bond junction (ylidene)
+# G3 /: P-28.2.2 double-bond junction (ylidene)
 # ---------------------------------------------------------------------------
 
 class TestP28DoubleBondJunction:
@@ -486,11 +486,11 @@ class TestP28DoubleBondJunction:
 
 
 # ---------------------------------------------------------------------------
-# G3 / COV-03: P-28.2.1 + P-28.3.1 citation-order locant determinism
+# G3 /: P-28.2.1 + P-28.3.1 citation-order locant determinism
 # ---------------------------------------------------------------------------
 
 class TestP28CitationOrderDeterminism:
-    """IUPAC P-28.2.1 ("lowest possible locants ... for the positions of
+    """IUPAC P-28.2.1 ("lowest possible locants... for the positions of
     attachment") + P-28.3.1 erratum (8 Oct 2025, "lowest locant set, then order
     of citation"): for a 2-component assembly of identical rings, the unprimed
     (first-cited) ring must carry the lower attachment locant. The name must be
@@ -513,3 +513,130 @@ class TestP28CitationOrderDeterminism:
         """Every SMILES spelling of bifuran yields the lowest-locant PIN
         (the unprimed ring takes locant 2, not 3)."""
         assert name_compound(smiles) == "2,3'-bifuran"
+
+
+# ---------------------------------------------------------------------------
+# Task 9-B3a: P-28.2.3 per-ring indicated hydrogen for single-ring assemblies
+# ---------------------------------------------------------------------------
+
+class TestP2823PerRingIndicatedHydrogen:
+    """IUPAC P-28.2.3 "Indicated hydrogen" (the Blue Book): in a ring assembly the
+    indicated hydrogen is cited at the position REQUIRED IN EACH COMPONENT RING,
+    per-ring in the assembly numbering, NOT front-replicated from the first
+    ring. The old front-replicate path copied component 0's descriptor across
+    every ring (correct only for the symmetric case). This exercises the
+    per-ring recompute (``_compute_per_ring_ih_locants`` /
+    ``_ring_indicated_h_atoms``) for the three single-ring cases it fixes.
+    All names are OPSIN round-trip verified (0-wrong) — see the task report.
+    """
+
+    @pytest.mark.unit
+    def test_bipyran_indicated_h_at_attachment_offset(self):
+        """The sp3 CH2 (indicated-H atom) is NOT the attachment carbon; in the
+        assembly numbering it lands at 6, so the descriptor is 6H,6'H (the
+        isolated-ring standalone name is 2H-pyran — front-replicate would have
+        emitted the wrong 2H,2'H)."""
+        assert (name_compound("C1=CCOC(C2=CC=CCO2)=C1")
+                == "6H,6'H-2,2'-bipyran")
+
+    @pytest.mark.unit
+    def test_bipyrrole_drops_spurious_indicated_h(self):
+        """P-31.1.4: the isolated component is 1H-pyrrole, but in 1,1'-bipyrrole
+        the N is aromatic with its hydrogen displaced by the ring–ring bond, so
+        the ring is fully mancude with no saturated position — NO indicated
+        hydrogen is cited. Front-replicate wrongly emitted 1H,1'H."""
+        assert name_compound("c1ccn(-n2cccc2)c1") == "1,1'-bipyrrole"
+
+    @pytest.mark.unit
+    def test_biazepine_asymmetric_indicated_h(self):
+        """The decisive asymmetric case: the two azepine rings carry the
+        indicated hydrogen at DIFFERENT positions (1 and 3), so no single
+        front-replicated descriptor can be right. The indicated-H priming
+        tiebreak (P-14.4(b), senior to substituent prefixes) puts the lower
+        locant on the unprimed ring -> 1H,3'H, not 3H,1'H."""
+        assert (name_compound("C1=CN=CCC(C2=CC=CNC=C2)=C1")
+                == "1H,3'H-4,4'-biazepine")
+
+    @pytest.mark.unit
+    def test_symmetric_sp3_attachment_keeps_indicated_h(self):
+        """Regression guard for the sp3-attachment case: when the indicated-H
+        atom IS the attachment carbon (an sp3 CH), the indicated hydrogen is
+        KEPT — a genuine saturated position is not removed by substitution.
+        2H,2'H-2,2'-bipyran attaches at the 2H carbon and still cites it."""
+        assert (name_compound("C1=COC(C2C=CC=CO2)C=C1")
+                == "2H,2'H-2,2'-bipyran")
+
+    @pytest.mark.unit
+    def test_symmetric_biazepine_unchanged(self):
+        """Symmetric heterocyclic assembly: per-ring recompute agrees with the
+        old front-replicate (both rings' indicated H at 1) -> 1H,1'H."""
+        assert (name_compound("C1=CC=C(C2=CC=CC=CN2)NC=C1")
+                == "1H,1'H-2,2'-biazepine")
+
+    @pytest.mark.unit
+    def test_fused_biindene_keeps_front_replicate(self):
+        """Scope guard (hazard c): FUSED components (n_rings > 1 per system) are
+        NOT single-ring, so ``_compute_per_ring_ih_locants`` returns None for
+        them and the assembly falls back to the front-replicate descriptor,
+        which stays correct for the symmetric biindene/biindole class.
+        1H,1'H-1,1'-biindene must be untouched by this task."""
+        assert (name_compound("C1(C=Cc2ccccc21)C1C=Cc2ccccc21")
+                == "1H,1'H-1,1'-biindene")
+
+
+@pytest.mark.unit
+class TestP2822YlideneAndReplacementAssemblies:
+    """Task 9-B3b: P-28.2.2 double-bond (ylidene) junctions on heterocyclic
+    mancude rings, and P-28.4.1 skeletal-replacement ('a') ring assemblies
+    (identical rings, ``di``-combined heteroatoms; single- and double-bond
+    junctions)."""
+
+    def test_heterocyclic_ylidene_bifuranylidene(self):
+        """P-28.2.2 / P-28.2.3: a double-bond junction between two mancude
+        furan rings is named on the MANCUDE parent stem 'furan' with per-ring
+        indicated hydrogen at each component's saturated (CH2) position, not on
+        the '2,3-dihydrofuran' component name. The two rings attach at different
+        positions (2 vs 3'), so the indicated H is asymmetric (2'H,3H)."""
+        assert (name_compound("C1=COC(=C2C=COC2)C1")
+                == "2'H,3H-2,3'-bifuranylidene")
+
+    def test_replacement_dithia_ylidene_double_bond(self):
+        """P-28.4.1 + P-28.2.2: two identical 12-membered 1-thia rings joined by
+        a DOUBLE bond -> skeletal-replacement assembly named as
+        'bi(cyclododecylidene)' (ylidene skeleton) with the two ring sulfurs
+        cited once, ``di``-combined: 2,2'-dithia."""
+        assert (name_compound("C1CCCCCC(=C2CCCCCCCCCCS2)SCCCC1")
+                == "2,2'-dithia-1,1'-bi(cyclododecylidene)")
+
+    def test_replacement_dioxa_single_bond_identical_rings(self):
+        """P-28.4.1: two IDENTICAL 14-membered 1-oxa rings joined by a single
+        bond take skeletal-replacement nomenclature over the cycloalkane
+        skeleton (not 'bioxacyclotetradecane'), with both ring oxygens cited once
+        and ``di``-combined: 3,3'-dioxa-1,1'-bi(cyclotetradecane)."""
+        assert (name_compound("C1CCCCCOCC(C2CCCCCCCCCCCOC2)CCCCC1")
+                == "3,3'-dioxa-1,1'-bi(cyclotetradecane)")
+
+    def test_regression_mixed_replacement_single_bond(self):
+        """Regression pin: the mixed O/S single-bond replacement assembly keeps
+        its distinct-element citation (no ``di`` combination), unchanged by the
+        di-combination logic: 3'-oxa-2-thia-1,1'-bi(cyclotetradecane) (P-28.4.2)."""
+        assert (name_compound("C1CCCCCCC(C2CCCCCCCCCCCOC2)SCCCCC1")
+                == "3'-oxa-2-thia-1,1'-bi(cyclotetradecane)")
+
+    def test_regression_carbocyclic_ylidene_cyclopentylidene(self):
+        """Regression pin: the saturated-carbocycle ylidene path (P-28.2.2)
+        stays FIRST and unchanged -> 1,1'-bi(cyclopentylidene)."""
+        assert (name_compound("C1CCC(=C2CCCC2)C1")
+                == "1,1'-bi(cyclopentylidene)")
+
+    def test_regression_carbocyclic_ylidene_cyclohexylidene(self):
+        """Regression pin: carbocyclic ylidene, six-membered rings ->
+        1,1'-bi(cyclohexylidene) (P-28.2.2)."""
+        assert (name_compound("C1CCC(=C2CCCCC2)CC1")
+                == "1,1'-bi(cyclohexylidene)")
+
+    def test_regression_single_bond_bifuran_unchanged(self):
+        """Regression pin: a SINGLE-bond aromatic bifuran is not a ylidene and
+        must keep its plain assembly name 2,3'-bifuran (P-28.2.1), unaffected by
+        the exocyclic-double indicated-H exclusion."""
+        assert (name_compound("c1coc(-c2ccoc2)c1") == "2,3'-bifuran")

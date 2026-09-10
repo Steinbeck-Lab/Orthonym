@@ -16,8 +16,10 @@ def test_lambda4_benzothiophene_pin():
 
 @pytest.mark.unit
 def test_standard_fused_unchanged():
-    # protect — recorded at HEAD, OPSIN-RT clean
-    assert name_compound("c1ccc2sccc2c1") == "benzothiophene"
+    # protect — standard-valence fused system untouched by the lambda guard.
+    #: PIN carries the S locant (P-25.2.2.4, the Blue Book
+    # cites '1-benzothiophene' as the PIN reference name). OPSIN-RT clean.
+    assert name_compound("c1ccc2sccc2c1") == "1-benzothiophene"
 
 
 @pytest.mark.unit

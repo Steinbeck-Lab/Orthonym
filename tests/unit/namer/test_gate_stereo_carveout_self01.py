@@ -12,7 +12,7 @@ THE DEFECT this file pins: that branch used to ``return name`` without ever
 running SELF-01, so ANY constitutional defect rode out free as long as the name
 happened to carry a stereo prefix OPSIN rejects. Verification was strongest on
 well-formed names and ABSENT on malformed ones -- exactly backwards. Measured
-blast radius on  (gates ON): 107 names shipped
+blast radius on `benchmarks/pubchem_2000.csv` (gates ON): 107 names shipped
 through the carve-out, 98 of them constitutionally WRONG; 0 gold regressions.
 
 The fix keeps the carve-out doing what it exists for -- not requiring OPSIN to
@@ -152,7 +152,7 @@ def test_carveout_suppresses_when_constitution_differs(monkeypatch):
 
 # ---------------------------------------------------------------------------
 # 4. `inconclusive` still fails OPEN -- never suppress on a comparison you
-#    could not make.
+# could not make.
 # ---------------------------------------------------------------------------
 @pytest.mark.unit
 @pytest.mark.parametrize("input_smiles,opsin_smiles,why", [
@@ -194,7 +194,7 @@ def test_transient_unavailable_still_fails_open(monkeypatch):
 
 @pytest.mark.unit
 def test_no_jar_still_fails_open(monkeypatch):
-    """JAR absent -> the gate is a no-op for a stereo name too (D-13).
+    """JAR absent -> the gate is a no-op for a stereo name too ().
 
     The oracle underneath is stubbed HOSTILE (everything rejected, no SMILES) so
     the JAR guard is the ONLY thing that can save the name. Without this the test
@@ -213,8 +213,8 @@ def test_no_jar_still_fails_open(monkeypatch):
 
 # ---------------------------------------------------------------------------
 # 6. The D5 decision: OPSIN PARSED the stripped name but emitted SMILES RDKit
-#    cannot canonicalise -> UNVERIFIABLE -> suppressed, matching the precedent
-#    the same function already set for the non-stereo path (namer.py:650-661).
+# cannot canonicalise -> UNVERIFIABLE -> suppressed, matching the precedent
+# the same function already set for the non-stereo path (namer.py:650-661).
 # ---------------------------------------------------------------------------
 @pytest.mark.unit
 def test_d5_parsed_but_uncanonicalisable_is_suppressed(monkeypatch):
@@ -239,9 +239,9 @@ def test_d5_parsed_but_uncanonicalisable_is_suppressed(monkeypatch):
 
 # ---------------------------------------------------------------------------
 # 7. Tripwire: the carve-out must still be REACHED, i.e. the fix must not have
-#    quietly become "suppress every OPSIN-rejected stereo name". If SELF-01 is
-#    OFF (the historical mode, and what test_bbr_gate_stereo.py pins) the
-#    carve-out must remain a pure pass-through.
+# quietly become "suppress every OPSIN-rejected stereo name". If SELF-01 is
+# OFF (the historical mode, and what test_bbr_gate_stereo.py pins) the
+# carve-out must remain a pure pass-through.
 # ---------------------------------------------------------------------------
 @pytest.mark.unit
 def test_carveout_is_passthrough_when_self01_off(monkeypatch):
@@ -270,17 +270,17 @@ def test_constitutional_defect_without_stereo_still_suppressed(monkeypatch):
 
 # ---------------------------------------------------------------------------
 # 8. ARCH-2-FOLLOWUP: the STRIPPED probe is three-valued too. `unavailable`
-#    means OPSIN could not be consulted -- it is NOT evidence against the name,
-#    so it must fail OPEN exactly as the primary probe already does
-#    (namer.py:660-661, CR-01). Lumping it with `rejected` suppressed a name the
-#    carve-out exists to rescue, on nothing but a subprocess hiccup.
+# means OPSIN could not be consulted -- it is NOT evidence against the name,
+# so it must fail OPEN exactly as the primary probe already does
+# (namer.py:660-661, CR-01). Lumping it with `rejected` suppressed a name the
+# carve-out exists to rescue, on nothing but a subprocess hiccup.
 #
-#    WHY THE EXISTING `test_transient_unavailable_still_fails_open` DOES NOT
-#    COVER THIS: it stubs `_validity_gate_status` to "unavailable" for EVERY
-#    name, so the PRIMARY probe's fail-OPEN at namer.py:660 returns first and the
-#    stripped probe is never reached. The stub below is asymmetric on purpose --
-#    the primary name is DEFINITIVELY rejected (as real OPSIN rejects these
-#    stereo forms) and only the STRIPPED probe hiccups.
+# WHY THE EXISTING `test_transient_unavailable_still_fails_open` DOES NOT
+# COVER THIS: it stubs `_validity_gate_status` to "unavailable" for EVERY
+# name, so the PRIMARY probe's fail-OPEN at namer.py:660 returns first and the
+# stripped probe is never reached. The stub below is asymmetric on purpose --
+# the primary name is DEFINITIVELY rejected (as real OPSIN rejects these
+# stereo forms) and only the STRIPPED probe hiccups.
 # ---------------------------------------------------------------------------
 def _stub_opsin_3valued(monkeypatch, status_map, smiles_map=None):
     """Enable the gate with SELF-01 ON and a HOSTILE THREE-VALUED OPSIN stub.

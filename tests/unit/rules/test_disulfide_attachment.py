@@ -1,4 +1,4 @@
-"""IM-01 regression suite: disulfide attachment-point bug.
+""" regression suite: disulfide attachment-point bug.
 
 The disulfide SMARTS is ``[#6][SX2][SX2][#6]``; SMARTS atom 0 is a flanking
 carbon, not one of the disulfide sulfurs. The parent-selection helpers
@@ -9,12 +9,12 @@ exocyclic alkyl chain of equal size (e.g. CHEBI:174033 trithiolane), this
 caused the P-44.1(f) cascade to flip ring->chain incorrectly and silently
 drop the ring sulfurs from the generated name.
 
-Phase 147 surfaced this latent bug by switching ring numbering to true IUPAC
+a phase surfaced this latent bug by switching ring numbering to true IUPAC
 locants (sulfurs at locants 1,2,4 instead of sorted-fallback). The fix
 introduces ``PG_ATTACHMENT_INDICES`` in ``rules/seniority.py`` and a
 ``_pg_attachment_atoms()`` helper used by every PG-locant comparison.
 
-Evidence: ``
+Evidence: `internal notes`
 """
 
 import pytest
@@ -24,12 +24,12 @@ from orthonym.namer import name_compound
 
 @pytest.mark.unit
 class TestDisulfideAttachmentRegression:
-    """Reproducer cases that were broken before IM-01."""
+    """Reproducer cases that were broken before."""
 
     def test_chebi_174033_trithiolane_pentyl_methyl(self):
         """CHEBI:174033 ``CCCCCC1SSC(C)S1`` must keep the trithiolane ring.
 
-        Pre-IM-01 (post-147): ``1-cyclopentylpentane`` -- ring sulfurs vanish.
+        Pre- (post-147): ``1-cyclopentylpentane`` -- ring sulfurs vanish.
         Pre-Phase-147 (v17 baseline): ``3-methyl-5-pentyl-1,2,4-trithiolane``.
         """
         result = name_compound("CCCCCC1SSC(C)S1")
@@ -48,7 +48,7 @@ class TestDisulfideRingCanaries:
 
     These are simple cases that bypass the buggy P-44.1(f) cascade today
     (chain length 0 or 1 -> ring is parent automatically). They serve as
-    regression guards: the IM-01 fix must keep them naming correctly.
+    regression guards: the fix must keep them naming correctly.
     """
 
     def test_dithiane_unsubstituted(self):
@@ -106,7 +106,7 @@ class TestPgAttachmentIndicesTable:
 
     def test_default_is_zero_for_back_compat(self):
         """A FG name not present in the table must default to ``[0]``
-        (preserves pre-IM-01 behaviour for every other FG)."""
+        (preserves pre- behaviour for every other FG)."""
         from orthonym.rules.parent_selection import _pg_attachment_atoms
         # Synthetic match tuple; FG name not in dict.
         atoms = _pg_attachment_atoms("not_a_real_fg", (10, 20, 30))

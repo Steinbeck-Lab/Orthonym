@@ -1,13 +1,13 @@
-"""Phase 145.1 SC-4 regression: prove pool state does NOT leak across
+"""a phase.1 SC-4 regression: prove pool state does NOT leak across
 consecutive orthonym.name() calls. Mitigates T-145.1-02 (cross-call
 state leak in _pool_store thread-local).
 
 POST-DRIFT-FIX (2026-04-23): also covers recursive assemble_name() calls.
-The original Plan 01 D-09 single-slot pool was corrupted by recursive
+The original Plan 01 single-slot pool was corrupted by recursive
 substituent naming (N-oxide handler, fragment_naming, substituent_enumerator,
 decomposition). The fix converts _pool_store to a stack with push_pool /
 pop_pool around each assemble_name() invocation. See:
-
+internal notes
 """
 
 from orthonym import Orthonym
@@ -30,7 +30,7 @@ class TestPoolStateIsolation:
         clear_pool()
 
     def test_pool_cleared_between_calls(self):
-        """Each orthonym.name() call starts with a fresh pool (D-09)."""
+        """Each orthonym.name() call starts with a fresh pool ()."""
         namer = Orthonym()
         n1 = namer.name("CCO")             # ethanol
         n2 = namer.name("c1ccccc1")        # benzene
@@ -56,7 +56,7 @@ class TestPoolStateIsolation:
     def test_name_with_confidence_after_pool_refactor(self):
         """Risk 3: store_confidence(pool.best()) preserved at the new return site.
 
-        v29 C4 -- THIS TEST WAS PASSING FOR A FABRICATED REASON, and that is
+         C4 -- THIS TEST WAS PASSING FOR A FABRICATED REASON, and that is
         the interesting part. It asserted a non-empty `factors` dict and
         `handler != 'unknown'` as its detector for a Risk-3 violation (the
         pool's best candidate not being stored). It was green. But the
@@ -69,7 +69,7 @@ class TestPoolStateIsolation:
         So the fabrication was masking this test's own detector: for this
         molecule the Risk-3 property has not actually been verified for some
         time. The quinoline's routing drift is PRE-EXISTING (confirmed by
-        head_ab.sh: this file's other failure, test_drift_aryl_*, fails at
+        an A/B check: this file's other failure, test_drift_aryl_*, fails at
         HEAD too) and is out of scope here.
 
         Re-derived so the detector works again: assert the Risk-3 property on
@@ -125,7 +125,7 @@ class TestPoolStateIsolation:
 
 
 class TestPoolStateIsolationUnderRecursion:
-    """Phase 145.1 DRIFT FIX (2026-04-23): regression coverage for the
+    """a phase.1 DRIFT FIX (2026-04-23): regression coverage for the
     pool-stack architecture. Each assemble_name() call must have an
     independent cascade scope per IUPAC P-44.0 (per-molecule parent
     selection). Recursive name_compound() invocations from substituent

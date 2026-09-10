@@ -1,4 +1,4 @@
-"""v24 W8 P2 Tasks 2.2/2.3 — biphenyl ring-assembly PCG parent (P-44.2.1.5).
+""" W8 P2 Tasks 2.2/2.3 — biphenyl ring-assembly PCG parent (P-44.2.1.5).
 
 A ring assembly of two benzene rings (2 rings) is senior to a single benzene ring
 for parent selection (P-44.2.1.5 "greater number of rings"), so the PCG is a
@@ -43,6 +43,33 @@ def test_biphenyl_assembly_siblings_unregressed(smiles, expected):
     assert name_compound(smiles, style="pin") == expected
 
 
+# P-16.7.1(c) (BB 7623/7625): the terminal 'a' of a numerical multiplying prefix
+# is elided before a vowel-initial suffix -- 'tetra'+'ol' -> 'tetrol',
+# 'tetra'+'amine' -> 'tetramine' ([1,1'-biphenyl]-3,3',4,4'-tetramine, PIN;
+# benzenehexol, not benzenehexaol). 'di'/'tri' carry no terminal 'a', and
+# '-carboxylic acid'/'-carbaldehyde'/'-carbonitrile' are consonant-initial, so
+# those suffixes take NO elision. All RT-verified against OPSIN 2.9.
+@pytest.mark.parametrize("smiles,expected", [
+    # tetra -> tetrol / tetramine (the a-elision gains)
+    ("Oc1ccc(-c2c(O)cc(O)cc2O)cc1", "[1,1'-biphenyl]-2,4,4',6-tetrol"),
+    ("Nc1ccc(-c2ccc(N)c(N)c2)cc1N", "[1,1'-biphenyl]-3,3',4,4'-tetramine"),
+    ("Oc1cccc(O)c1-c1c(O)cccc1O", "[1,1'-biphenyl]-2,2',6,6'-tetrol"),
+])
+def test_biphenyl_multiplier_a_elision(smiles, expected):
+    assert name_compound(smiles, style="pin") == expected
+
+
+@pytest.mark.parametrize("smiles,expected", [
+    # Must NOT elide: di/tri (no terminal 'a') and consonant-initial suffixes.
+    ("Oc1ccc(-c2ccc(O)cc2)cc1", "[1,1'-biphenyl]-4,4'-diol"),
+    ("Nc1ccc(-c2ccc(N)cc2)cc1", "[1,1'-biphenyl]-4,4'-diamine"),
+    ("OC(=O)c1ccc(-c2ccc(C(=O)O)cc2)cc1",
+     "[1,1'-biphenyl]-4,4'-dicarboxylic acid"),
+])
+def test_biphenyl_multiplier_no_over_elision(smiles, expected):
+    assert name_compound(smiles, style="pin") == expected
+
+
 # ---------------------------------------------------------------------------
 # Task 2.4 — mixed prefix+suffix ring-assembly builder (P-28.2.1 + P-66).
 #
@@ -81,9 +108,9 @@ def test_biphenyl_assembly_siblings_unregressed(smiles, expected):
      "4'-nitro[1,1'-biphenyl]-4-carboxylic acid"),
 ])
 def test_mixed_prefix_suffix_biaryl(smiles, expected):
-    # Gated public API (confirms OPSIN accepts the PIN) ...
+    # Gated public API (confirms OPSIN accepts the PIN)...
     assert name_compound(smiles, style="pin") == expected
-    # ... and the gate-off raw emitter builds the exact string (leak-proof).
+    #... and the gate-off raw emitter builds the exact string (leak-proof).
     assert RAW.name(smiles) == expected
 
 
@@ -99,9 +126,9 @@ def test_mixed_builder_no_overreach_without_pcg(smiles, expected):
 
 
 # ---------------------------------------------------------------------------
-# v29 P7 gate regression (introduced b0ec23eb, fixed here).
+# gate regression (introduced b0ec23eb, fixed here).
 #
-# b0ec23eb hoisted ``if any(s['name'] is None ...): return None`` to the top of
+# b0ec23eb hoisted ``if any(s['name'] is None...): return None`` to the top of
 # ``name_ring_assembly``. But ``s['name']`` is ONE producer's opinion
 # (``_name_substituent``); ``_mixed_ring_assembly_prefix_name`` names a whole
 # further set. Nitro gets None from the first and 'nitro' from the second, so
@@ -110,7 +137,7 @@ def test_mixed_builder_no_overreach_without_pcg(smiles, expected):
 # 'unknown organic compound'. The abstention belongs at the veto loop,
 # immediately before ``s['name']`` is spelled into the prefix string.
 #
-# P-61.5.1 "Nitro and nitroso compounds" (BB:25933): "Compounds containing the
+# P-61.5.1 "Nitro and nitroso compounds" (the Blue Book): "Compounds containing the
 # -NO2 or -NO group are named by means of the prefixes 'nitro' and 'nitroso',
 # respectively, unless these groups can be named on the basis of the parent
 # structures nitric and nitrous acids, NO2-OH and NO-OH, respectively, or their
@@ -118,7 +145,7 @@ def test_mixed_builder_no_overreach_without_pcg(smiles, expected):
 # assembly therefore always HAS a preferred prefix form; abstaining was never
 # nomenclaturally correct.
 #
-# P-28.2.1 "Ring assemblies with a single bond junction" (BB:15560): "Each
+# P-28.2.1 "Ring assemblies with a single bond junction" (the Blue Book): "Each
 # cyclic system is numbered in the traditional way, one with unprimed locants,
 # the other with primed locants. Lowest possible locants must be used to denote
 # the positions of attachment. These locants must be cited in preferred IUPAC
@@ -144,9 +171,9 @@ def test_name_substituent_none_does_not_veto_a_group_another_producer_names():
     attach = match[0]  # the nitrogen carries the bond to the ring
     assert mol.GetAtomWithIdx(attach).GetSymbol() == 'N'
 
-    # Producer A cannot name it ...
+    # Producer A cannot name it...
     assert RA._name_substituent(mol, list(match), attach) is None
-    # ... producer B can, which is exactly why the assembly must not abort.
+    #... producer B can, which is exactly why the assembly must not abort.
     assert RA._mixed_ring_assembly_prefix_name(
         mol, list(match), attach, None) == 'nitro'
 

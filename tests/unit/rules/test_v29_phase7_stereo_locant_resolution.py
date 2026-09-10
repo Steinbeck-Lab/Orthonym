@@ -1,11 +1,11 @@
-"""v29 Phase 7 Task 2 — a parent-scope stereodescriptor must cite the PARENT's numbering.
+""" a phase Task 2 — a parent-scope stereodescriptor must cite the PARENT's numbering.
 
-Defect class C1 ( §3): two default-PIN-path
+Defect class C1 (internal notes §3): two default-PIN-path
 emissions carried a stereodescriptor whose locant does not exist in the name it decorates,
 which OPSIN rejects with `Could not find atom/bond that: <stereoChemistry …> appeared to be
 referring to`. That is a statement about OUR name, not about OPSIN's coverage.
 
-Governing rule — **P-91.3 "NAMING OF STEREOISOMERS"** (`BlueBookV2/BlueBookV2.md:44639`):
+Governing rule — **P-91.3 "NAMING OF STEREOISOMERS"** (`the Blue Book Blue Book`):
 
     "In preferred IUPAC names, stereodescriptors are placed immediately at the front of the
      part of the name to which they relate. They are placed at the front of the complete
@@ -24,8 +24,8 @@ Read with **P-14.3.3 "Citation of locants"** (`:2869`), whose own worked example
 scoping explicit: "locants are not used for the structural units defined by the parentheses
 even though locants are used for these substituents of the parent structure ethanone."
 
-ROOT CAUSE (one, shared by both defects — spy evidence in
-): the descriptor block was built
+ROOT CAUSE (one, shared by both defects — trace evidence in
+internal notes): the descriptor block was built
 from a locant map chosen by a priority chain in which `features.oriented_ring` OVERRODE the
 principal-chain map. When the selected parent is the chain and the ring is only a
 SUBSTITUENT, that map is the substituent's numbering, so every locant it produces is
@@ -44,7 +44,7 @@ from orthonym import Orthonym
 # --------------------------------------------------------------------------
 
 # 2a: parent is `methanol` — ONE carbon. P-14.3.4.2(a) ("The locant '1' is omitted:
-# (a) in substituted mononuclear parent hydrides", BB:2895) means the parent scope has no
+# (a) in substituted mononuclear parent hydrides", the Blue Book) means the parent scope has no
 # cited locant at all, so a parent-level `(1R,2R)-` cannot resolve. The two stereocentres
 # both live in the cyclopropyl SUBSTITUENT and are already cited inside its brackets.
 SMILES_2A = "C[C@@H]1C[C@H]1CO"
@@ -53,7 +53,7 @@ EXPECTED_2A = "[(1R,2R)-2-methylcyclopropyl]methanol"
 # 2b: parent is `prop-2-enoic acid` — three carbons, stereogenic double bond C2=C3, so the
 # descriptor locant is 2 (the lower locant of the bond). The emitted `5` was an index from
 # the cyclopentadienyl substituent's ring numbering. The descriptor VALUE is E, taken from
-# `rdCIPLabeler.AssignCIPLabels` (never the legacy labeller — the contributor guide).
+# `rdCIPLabeler.AssignCIPLabels` (never the legacy labeller — CLAUDE.md).
 SMILES_2B = "C/C(=C\\C1C=CC=C1)/C(=O)O"
 EXPECTED_2B = "(2E)-3-(cyclopenta-2,4-dien-1-yl)-2-methylprop-2-enoic acid"
 
@@ -88,7 +88,7 @@ def test_2b_full_name(namer):
 
 
 def test_2b_descriptor_value_matches_the_cip_labeller():
-    """E vs Z is DERIVED, not assumed: rdCIPLabeler is the authority (the contributor guide)."""
+    """E vs Z is DERIVED, not assumed: rdCIPLabeler is the authority (CLAUDE.md)."""
     from rdkit import Chem
     from rdkit.Chem import rdCIPLabeler
 
@@ -129,7 +129,7 @@ UNCHANGED = [
 
 
 def test_negative_control_set_is_non_empty():
-    """Guard against the vacuous-loop failure mode (a Phase 6 review finding)."""
+    """Guard against the vacuous-loop failure mode (a a phase review finding)."""
     assert len(UNCHANGED) >= 8
 
 
@@ -178,7 +178,7 @@ def test_fails_closed_rather_than_citing_an_unresolvable_locant(namer):
     at parent scope, which OPSIN parsed as a DIFFERENT stereoisomer. There is no parent
     locant these bonds can legitimately take (P-91.3 puts them on the prefix), so the
     parent block is dropped: the constitution stays right and the stereo is simply not
-    asserted. Per the contributor guide #9 this is pinned so the fallback cannot silently drift into
+    asserted. Per CLAUDE.md #9 this is pinned so the fallback cannot silently drift into
     a fabricated descriptor.
     """
     smiles = "C1CCC/C=C(\\CCCC1)/CC(C(=O)[O-])(/C/2=C/CCCCCCCC2)/C/3=C/CCCCCCCC3"
@@ -194,7 +194,7 @@ def test_fails_closed_rather_than_citing_an_unresolvable_locant(namer):
 def test_descriptor_block_is_decided_by_the_map_it_is_given():
     """The map IS the defect: the same molecule yields a block or nothing, per scope.
 
-    Both maps below were measured by a spy on the live call (report §"Spy evidence"):
+    Both maps below were measured by a trace on the live call (report §"Spy evidence"):
     `oriented_ring` describes the cyclopropyl SUBSTITUENT, while the parent selected by
     the handler is the one-carbon `methanol` chain. Only the substituent map contains the
     stereocentres, so only it may carry the `(1R,2R)` block — at substituent scope.
@@ -235,7 +235,7 @@ def test_descriptor_block_is_decided_by_the_map_it_is_given():
 # `prop-2-enamide` has THREE carbons; the emitted `(1R,2R)` came from the cyclopropyl
 # substituent's own numbering. The parent genuinely does have a stereogenic C2=C3 bond, so
 # the correct parent block is `(2E)` — the fix ADDS a right descriptor, it does not merely
-# delete a wrong one (the contributor guide #9).
+# delete a wrong one (CLAUDE.md #9).
 SMILES_CE1 = "C[C@@H]1C[C@H]1/C=C/C(N)=O"
 EXPECTED_CE1 = "(2E)-3-[(1R,2R)-2-methylcyclopropyl]prop-2-enamide"
 
@@ -246,7 +246,7 @@ COUNTEREXAMPLES = [(SMILES_CE1, EXPECTED_CE1), (SMILES_CE2, EXPECTED_CE2)]
 
 
 def test_counterexample_set_is_non_empty():
-    """No vacuous parametrised loop (a Phase 6 review finding)."""
+    """No vacuous parametrised loop (a a phase review finding)."""
     assert len(COUNTEREXAMPLES) == 2
 
 
@@ -268,7 +268,7 @@ def test_counterexample_block_cites_a_locant_the_parent_actually_has(namer, smil
 
 
 def _ce1_features(principal_chain):
-    """CE-1's real molecule and the real maps the spy recorded at `composer.py:5564`.
+    """CE-1's real molecule and the real maps the trace recorded at `composer.py:5564`.
 
     A stub rather than `compute_features`, deliberately: `principal_chain` and
     `oriented_ring` are populated LATER in `namer.py` during parent selection (`:4684`,
@@ -281,7 +281,7 @@ def _ce1_features(principal_chain):
     from rdkit.Chem import rdCIPLabeler
 
     mol = Chem.MolFromSmiles(SMILES_CE1)
-    rdCIPLabeler.AssignCIPLabels(mol)       # never the legacy labeller (the contributor guide)
+    rdCIPLabeler.AssignCIPLabels(mol)       # never the legacy labeller (CLAUDE.md)
     return SimpleNamespace(
         mol=mol,
         stereocenters=[1, 3],
@@ -308,7 +308,7 @@ MAP_SELECTION_TABLE = [
 
 
 def test_map_selection_table_is_non_empty():
-    """No vacuous parametrised loop (a Phase 6 review finding)."""
+    """No vacuous parametrised loop (a a phase review finding)."""
     assert len(MAP_SELECTION_TABLE) == 4
 
 
@@ -348,7 +348,7 @@ def _opsin_smiles(jar: str, name: str):
 
     NOTE: the shared `opsin_to_smiles` fixture passes the name as a trailing CLI
     argument, which the OPSIN CLI interprets as an input FILE, so it returns None for
-    every name including valid ones (the contributor guide: a harness that always fails is as
+    every name including valid ones (CLAUDE.md: a harness that always fails is as
     useless as one that always passes). Stdin is the working interface.
     """
     import subprocess
@@ -395,20 +395,20 @@ def test_corrected_names_round_trip_through_opsin(opsin_jar, smiles, name):
 #
 # Measured over 661 live calls / 176 molecules / 21 distinct call sites
 # (pubchem_2000 + chebi_5000 stereo rows, census in
-# ):
-#   * 429 calls pass an explicit `atom_to_locant` -> immune, 0 differ.
-#   * 66 calls / 16 molecules resolve DIFFERENTLY under the two candidate scopes.
-#   * 14 of those 16 abstain; 2 emit, and in both the LEGACY answer is correct.
-#     0 leak a wrong emission, so the 0-wrong invariant held -- it was a coverage
-#     loss, not a wrong name.
+# internal notes):
+# * 429 calls pass an explicit `atom_to_locant` -> immune, 0 differ.
+# * 66 calls / 16 molecules resolve DIFFERENTLY under the two candidate scopes.
+# * 14 of those 16 abstain; 2 emit, and in both the LEGACY answer is correct.
+# 0 leak a wrong emission, so the 0-wrong invariant held -- it was a coverage
+# loss, not a wrong name.
 #
 # Two inference attempts were measured and REFUTED, and these tests pin both so
 # neither can be reinstated:
-#   * `features.principal_chain` truthy => chain parent -- false, it is a stale
-#     1-2 atom fragment on the two ring-parent rows below.
-#   * `features.chain_is_parent` (parent selection's own verdict, namer.py:1447)
-#     => chain parent -- false, it is True on 48/48 differing pubchem calls
-#     INCLUDING both ring-parent rows.
+# * `features.principal_chain` truthy => chain parent -- false, it is a stale
+# 1-2 atom fragment on the two ring-parent rows below.
+# * `features.chain_is_parent` (parent selection's own verdict, namer.py:1447)
+# => chain parent -- false, it is True on 48/48 differing pubchem calls
+# INCLUDING both ring-parent rows.
 # So the scope is DECLARED by the producer that chose the parent.
 # ==========================================================================
 
@@ -506,7 +506,7 @@ def test_ring_parent_rows_defeat_both_refuted_inferences(namer):
             "premise gone: principal_chain is falsy, so it could not mislead")
         assert getattr(features, "chain_is_parent", False), (
             "premise gone: chain_is_parent is False, so it could not mislead")
-        # ... and yet the chain it points at is a 1-2 atom fragment, not the parent.
+        #... and yet the chain it points at is a 1-2 atom fragment, not the parent.
         assert len(features.principal_chain) <= 2, features.principal_chain
         checked += 1
     assert checked == len(RING_PARENT_ROWS)
@@ -516,7 +516,7 @@ def test_undeclared_scope_fails_closed_when_the_two_scopes_disagree(namer):
     """`parent_scope=None` and the ring/chain resolutions differ -> no block.
 
     Better a missing stereo block than a locant that may not resolve
-    (P-14.3.3, BB:2867 "Citation of locants", :2869) -- the same D-09 posture
+    (P-14.3.3, the Blue Book "Citation of locants",:2869) -- the same posture
     `_ring_handler_parent_atom_indices` already documents.
     """
     from orthonym.assembly.composer import _inject_stereo_if_missing
@@ -592,7 +592,7 @@ def test_ring_ester_declares_ring_only_when_the_alcohol_is_the_ring():
 
 
 # --------------------------------------------------------------------------
-# Collateral, found by verifying WHAT IS EMITTED after the fix (the contributor guide #9):
+# Collateral, found by verifying WHAT IS EMITTED after the fix (CLAUDE.md #9):
 # `_build_acyl_name`'s `unsaturation` parameter had NO caller, so every acyl
 # halide was spelled saturated and its C=C silently dropped.
 # --------------------------------------------------------------------------

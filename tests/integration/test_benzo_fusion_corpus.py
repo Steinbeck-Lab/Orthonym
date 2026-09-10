@@ -1,25 +1,25 @@
-"""Phase 155.C integration tests: benzo-fusion corpus fixtures with OPSIN
+"""a phase.C integration tests: benzo-fusion corpus fixtures with OPSIN
 layer-1 InChI round-trip.
 
-Per CONTEXT D-15: every fixture pipes through OPSIN
+Per CONTEXT: every fixture pipes through OPSIN
 (``opsin-cli-2.9.0-jar-with-dependencies.jar``) and asserts InChI layer-1
 (skeleton, stereo-stripped) match against the input SMILES. Stereo-layer
-mismatches do not fail the test (Phase 152/153 owns stereo).
+mismatches do not fail the test (a phase/153 owns stereo).
 
 Fixtures: ``tests/fixtures/benzo_fusion/corpus_mined.json`` (>=10 entries
 spanning >=5 benzo-fusion sub-classes; mined from chebi_5000 +
 pubchem_2000 + opsin_selftest_500 + Blue Book P-25.2.2.4 canonical
-examples per D-25 corpus-shortfall protocol).
+examples per corpus-shortfall protocol).
 
-Skip-vs-fail policy per D-20 (no band-aids):
+Skip-vs-fail policy per (no band-aids):
   * ``name_compound(smi) is None`` for an in-scope fixture: SKIP with
     155-AUDIT-C.md row cite (audit-acknowledged out-of-scope gap).
-  * OPSIN cannot parse Orthonym-emitted name: SKIP with Phase 156
+  * OPSIN cannot parse Orthonym-emitted name: SKIP with a phase
     quarantine note (the parent / cascade-other-than-benzo-fusion is
     where the bug lives).
   * OPSIN parses but InChI L1 mismatches: ASSERT FAIL (wrong-name bug).
 
-Source: 155-CONTEXT.md D-14, D-15, D-22, D-25;
+Source: internal notes,,,;
         tests/integration/test_skeletal_replacement_corpus.py:1-100
         (substrate copied verbatim).
 """
@@ -96,21 +96,21 @@ _CORPUS_FIXTURES = json.loads(_FIXTURE_PATH.read_text())
 
 
 # Fixtures known to fail L1 round-trip due to handler bugs unrelated to
-# Phase 155.C D-11 catalog corrections (e.g. Orthonym emits a different
+# a phase.C catalog corrections (e.g. Orthonym emits a different
 # but still-valid PIN form, or the parent fused-ring handler drops a
 # substituent on a complex corpus structure). These are xfail-quarantined
-# here per D-20 (root-cause-only — no band-aid in this phase).
+# here per (root-cause-only — no band-aid in this phase).
 _QUARANTINED_FIXTURES: dict[str, str] = {
     # Fused-ring composer cannot decompose furo[3,2-c]pyran ortho-fused
     # bicyclic into its two 5+6 components — falls back to single-ring
     # `5-oxooxole` emission. The composer warning "Fused ring naming
     # failed for ortho-fused system" is logged at composer.py:3452 and
-    # is verified PRE-EXISTING (independent of Phase 155.C D-11 catalog
+    # is verified PRE-EXISTING (independent of a phase.C catalog
     # corrections — same `5-oxooxole` output observed at HEAD~2 before
     # any seniority edits per Task 2 stash-and-re-run protocol).
     # This is a fused-ring decomposition bug in the composer, NOT a
     # benzo-fusion seniority bug. Out-of-scope for sub-phase 155.C
-    # (D-11/D-13 catalog hygiene). Hand-off to Phase 156 for the
+    # (/ catalog hygiene). Hand-off to a phase for the
     # composer fused-ring decomposition fix.
     "chebi_5000_furo_3_2_c_pyran": (
         "Pre-existing fused-ring composer bug: cannot decompose "
@@ -133,10 +133,10 @@ _QUARANTINED_FIXTURES: dict[str, str] = {
     ids=[f["fixture_id"] for f in _CORPUS_FIXTURES],
 )
 def test_benzo_fusion_corpus_opsin_roundtrip(fixture):
-    """D-15 mandatory: name_compound(smi) -> OPSIN -> InChI L1 == input InChI L1.
+    """ mandatory: name_compound(smi) -> OPSIN -> InChI L1 == input InChI L1.
 
     Stereo-layer differences are tolerated (constitutional skeleton match
-    only, per Phase 151 D-23 oracle).
+    only, per a phase oracle).
     """
     fid = fixture["fixture_id"]
     if fid in _QUARANTINED_FIXTURES:
@@ -172,7 +172,7 @@ def test_benzo_fusion_corpus_opsin_roundtrip(fixture):
 
 @pytest.mark.integration
 def test_corpus_fixture_count_meets_d15_minimum():
-    """D-15 floor: >= 10 corpus-mined fixtures per V18-155-AC-3."""
+    """ floor: >= 10 corpus-mined fixtures per V18-155-AC-3."""
     assert len(_CORPUS_FIXTURES) >= 10, (
         f"D-15 corpus floor breach: only {len(_CORPUS_FIXTURES)} fixtures "
         f"in tests/fixtures/benzo_fusion/corpus_mined.json; minimum is 10."
@@ -184,7 +184,7 @@ def test_corpus_fixtures_opsin_pre_validated():
     """Every fixture's `opsin_rt_verified` flag is True at audit time.
 
     Acts as a sanity check that the JSON sidecar was emitted by the
-    audit script's pre-validation pipeline (D-25 corpus-mining
+    audit script's pre-validation pipeline (corpus-mining
     methodology).
     """
     unverified = [
@@ -194,5 +194,5 @@ def test_corpus_fixtures_opsin_pre_validated():
     assert not unverified, (
         f"D-25 corpus-shortfall protocol breach: fixtures "
         f"{unverified!r} were committed without OPSIN-RT pre-validation; "
-        f"re-run  corpus-mining stage."
+        f"re-run scripts/audit_benzo_fusion.py corpus-mining stage."
     )

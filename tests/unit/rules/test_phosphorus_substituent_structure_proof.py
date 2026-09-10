@@ -6,12 +6,12 @@ walked ONLY the carbon skeleton and returned ``get_alkyl_name(count)``, so every
 fragment that is not an unbranched saturated acyclic chain attached at a terminus
 was renamed as the straight chain of the same carbon count:
 
-    CP(C)C(C)C        isopropyl  -> 'dimethyl(propyl)phosphane'          WRONG MOLECULE
-    CP(C)CC(C)C       isobutyl   -> 'butyldi(methyl)phosphane'           WRONG MOLECULE
-    CP(C)Cc1ccccc1    benzyl     -> 'heptyl(methyl)phosphanylmethane'    WRONG MOLECULE
-    CP(C)C1CCCCC1     cyclohexyl -> 'cyclohexane'                        WRONG MOLECULE
-    CP(C)CC=C         allyl      -> 'dimethyl(propyl)phosphane'          WRONG MOLECULE
-    CP(C)CCCO         3-hydroxypropyl -> the -OH is not counted and is DROPPED
+    CP(C)C(C)C isopropyl -> 'dimethyl(propyl)phosphane' WRONG MOLECULE
+    CP(C)CC(C)C isobutyl -> 'butyldi(methyl)phosphane' WRONG MOLECULE
+    CP(C)Cc1ccccc1 benzyl -> 'heptyl(methyl)phosphanylmethane' WRONG MOLECULE
+    CP(C)C1CCCCC1 cyclohexyl -> 'cyclohexane' WRONG MOLECULE
+    CP(C)CC=C allyl -> 'dimethyl(propyl)phosphane' WRONG MOLECULE
+    CP(C)CCCO 3-hydroxypropyl -> the -OH is not counted and is DROPPED
 
 Each of those was produced and then suppressed by the SELF-01 OPSIN gate, so the
 molecule abstained rather than shipping. The gate is the margin, not the producer:
@@ -69,7 +69,7 @@ def test_refuses_every_shape_a_count_cannot_express(smiles, label, forbidden):
 
 
 # --------------------------------------------------------------------------
-# the contributor guide #9 -- the honest cases must KEEP working. A refusal that also
+# CLAUDE.md #9 -- the honest cases must KEEP working. A refusal that also
 # refuses the shapes the count DOES determine is an over-correction.
 # --------------------------------------------------------------------------
 @pytest.mark.parametrize(

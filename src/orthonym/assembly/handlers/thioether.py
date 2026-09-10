@@ -1,4 +1,4 @@
-"""Phase 160 thioether handler — Tier B shim (gate 0.40).
+"""a phase thioether handler — Tier B shim (gate 0.40).
 
 Verbatim move of composer.py:970-992 dispatch logic. Wraps
 ``rules.sulfur.name_sulfide`` with the cyclic-thioether + fused-heterocycle
@@ -54,30 +54,36 @@ def name_thioether(
     if not matches:
         return None
 
-    # DD5 SEN-02 (P-41 cls 40 > 41/42): the functional-class `R R' sulfide` silently
-    # DROPS any co-substituent the substituent characteriser can't express — e.g. the
-    # ether of COCSC -> "dimethyl sulfide". DECLINE for such LOSSY cases so the
-    # substitutive carbon-parent path names it (COCSC -> methoxy(methylsulfanyl)methane,
-    # via the carbon-over-ether skeletal-replacement guard + the (R)sulfanyl producer).
-    #
-    # SCOPED (to keep this surgical and avoid the broad sulfide -> substitutive PIN
-    # migration, which is a separate follow-on with a large test/corpus surface):
-    #   - NEUTRAL only — a charged species (dithiocarbamate ammonium) would route to a
-    #     wrong partial substitutive name; keep the legacy path (byte-identical to HEAD);
-    #   - only when the molecule carries a non-C/H/S heteroatom (an ether O, etc.) that
-    #     the functional-class sulfide name would DROP. A pure C/H/S sulfide
-    #     (dimethyl sulfide, methyl phenyl sulfide) keeps its established functional-class
-    #     name — unchanged from HEAD.
-    _neutral = all(a.GetFormalCharge() == 0 for a in features.mol.GetAtoms())
-    _has_dropped_heteroatom = any(
-        a.GetSymbol() not in ('C', 'H', 'S') for a in features.mol.GetAtoms()
-    )
-    if _neutral and _has_dropped_heteroatom:
-        return None
-
     sulfur_idx = matches[0][0]
     name = name_sulfide(features.mol, sulfur_idx)
     if not name:
+        return None
+
+    # P-63.2.5 (the Blue Book verbatim, section heading "P-63.2.5 Names of chalcogen
+    # analogues of ethers, i.e., sulfides, selenides and tellurides": "Method (1),
+    # substitutive nomenclature, gives preferred IUPAC names"): the functional-class
+    # "R R' sulfide" (method 2) is NOT the PIN for a chalcogen analogue of an ether.
+    # The PIN is substitutive — (R'-sulfanyl)RH, on the senior parent hydride RH
+    # (the Blue Book "(methylsulfanyl)methane (PIN)... dimethyl sulfide"; the Blue Book
+    # "(methylsulfanyl)benzene (PIN) (not thioanisole)"). DECLINE for the neutral
+    # acyclic case so the substitutive (R)sulfanyl producer names it — the same path
+    # selenium/tellurium already use (they have no functional-class handler, so
+    # C[Se]C -> (methylselanyl)methane today).
+    #
+    # This SUBSUMES the DD5 SEN-02 lossy-heteroatom decline (the old
+    # `_neutral and _has_dropped_heteroatom` guard, e.g. COCSC -> methoxy-
+    # (methylsulfanyl)methane): those molecules are neutral, so they decline here too.
+    #
+    # SCOPE / degrade (0-wrong ABSOLUTE, P-63.2.5 degrade policy):
+    # - NEUTRAL only. A charged species (a dithiocarbamate ammonium, a nitrile-
+    # sulfide ylide) would route to a wrong partial substitutive name; it keeps
+    # the legacy functional-class path (byte-identical to HEAD). name_sulfide
+    # already returns None for a ring S, so on reaching here the S is acyclic.
+    # - The symmetric-diaryl multiplicative PIN (P-63.2.5 method 3,
+    # 1,1'-sulfanediyldibenzene) and the skeletal-replacement chains are produced
+    # by OTHER paths that win before this handler; declining does not disturb them.
+    _neutral = all(a.GetFormalCharge() == 0 for a in features.mol.GetAtoms())
+    if _neutral:
         return None
 
     name = _enrich_handler_name(features, name, "thioether")

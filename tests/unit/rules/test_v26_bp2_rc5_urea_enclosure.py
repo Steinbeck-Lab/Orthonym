@@ -1,4 +1,4 @@
-"""v26 BP-2 RC-5 — enclose compound N-substituents on urea / guanidine.
+""" BP-2 RC-5 — enclose compound N-substituents on urea / guanidine.
 
 ``_build_n_substituted_name`` built ``f"{locant}-{name}"`` with the RAW
 substituent name, never enclosing a COMPOUND N-substituent (one bearing its own
@@ -11,7 +11,9 @@ the PIN; P-66.1.6.1.1.2 N-substituted derivatives are substitution products; BB
 33336 ``N-[1-cyano-3-(methylsulfanyl)propyl]-N'-methylurea (PIN)`` witnesses the
 bracketed compound N-substituent), so the fix belongs on the PIN-default path.
 
-Simple N-substituents (methyl, phenyl) stay byte-identical.
+Simple N-substituents stay unenclosed; a MONOsubstituted urea additionally omits
+the italic-N locant (P-14.3.4.3, the Blue Book `methylurea`), so `phenylurea`, while
+DIsubstituted forms keep their letter locants (`N,N-dimethylurea`).
 """
 from orthonym.assembly.composer import _build_n_substituted_name
 from orthonym.namer import name_compound
@@ -30,8 +32,9 @@ def test_compound_n_substituent_enclosed():
 
 
 def test_simple_n_substituents_unchanged():
-    # regression: simple names never enclosed, byte-identical
-    assert _build_n_substituted_name([("N", "phenyl")], "urea") == "N-phenylurea"
+    # regression: simple names never enclosed. A MONOsubstituted urea also omits
+    # the italic-N locant (P-14.3.4.3,:2943); the DIsubstituted form keeps both.
+    assert _build_n_substituted_name([("N", "phenyl")], "urea") == "phenylurea"
     assert _build_n_substituted_name(
         [("N", "methyl"), ("N", "methyl")], "urea") == "N,N-dimethylurea"
     assert _build_n_substituted_name(
@@ -46,5 +49,6 @@ def test_full_name_urea_compound_aryl():
 
 
 def test_full_name_urea_simple_regression():
-    assert name_compound("NC(=O)Nc1ccccc1") == "N-phenylurea"
+    # Monosubstituted urea omits the italic-N locant (P-14.3.4.3,:2943).
+    assert name_compound("NC(=O)Nc1ccccc1") == "phenylurea"
     assert name_compound("CN(C)C(=O)N") == "N,N-dimethylurea"

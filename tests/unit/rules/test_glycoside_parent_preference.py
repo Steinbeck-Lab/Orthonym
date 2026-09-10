@@ -1,4 +1,4 @@
-"""Best-effort glycoside-parent preference (v30 tail #11/#12/#13).
+"""Best-effort glycoside-parent preference (tail #11/#12/#13).
 
 A glycosylated large carbon fused core (triterpene / steroid, >=3 fused carbon
 rings, strictly the largest ring system, with >=1 monosaccharide ring attached)
@@ -78,4 +78,4 @@ def test_plain_polycycle_and_steroid_unchanged():
         "decahydronaphthalene"
     assert n.name_tiered(
         "C[C@]12CC[C@H]3[C@@H](CC[C@H]4CC(=O)CC[C@]34C)[C@@H]1CC[C@@H]2O"
-    ).get("name") == "17beta-hydroxy-5alpha-androstan-3-one"
+    ).get("name") == "17β-hydroxy-5α-androstan-3-one"

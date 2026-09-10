@@ -59,14 +59,14 @@ class TestPolyfunctionalAcidStemPrefix:
         # `ethan-1-amine` siblings above. Acetic acid does NOT behave like
         # ethanol here: it is a RETAINED name that keeps its retained form
         # under substitution AND drops the locant.
-        #   BB:2010  `CH3-COOH acetic acid (PIN) ethanoic acid`
-        #            -- `ethanoic acid` is the non-PIN alternative.
-        #   BB:3037  `difluoroacetic acid (PIN) (not 2,2-difluoroacetic acid)`
-        #            -- the substituted form keeps `acetic acid` and the
-        #            locant is explicitly marked "not".
-        #   BB:4967  `sulfanylacetic acid (PIN)` -- a SULFUR substituent on
-        #            acetic acid, the direct analogue of this row.
-        #   BB:2039  `(1H-indol-1-yl)acetic acid (PIN)`, P-13.1.
+        # the Blue Book `CH3-COOH acetic acid (PIN) ethanoic acid`
+        # -- `ethanoic acid` is the non-PIN alternative.
+        # the Blue Book `difluoroacetic acid (PIN) (not 2,2-difluoroacetic acid)`
+        # -- the substituted form keeps `acetic acid` and the
+        # locant is explicitly marked "not".
+        # the Blue Book `sulfanylacetic acid (PIN)` -- a SULFUR substituent on
+        # acetic acid, the direct analogue of this row.
+        # the Blue Book `(1H-indol-1-yl)acetic acid (PIN)`, P-13.1.
         # The old value was thus non-PIN on both counts. Both spellings parse
         # to the same molecule under OPSIN, so this is a spelling correction,
         # not a structural one.
@@ -102,7 +102,7 @@ class TestConservation:
 
         CORRECTED 2026-08-02: that deferral has since closed and the producer
         now emits exactly the PIN the comment named. Verified verbatim at
-        ``BlueBookV2.md:18284``::
+        ``the Blue Book``::
 
             CH3-S-CH2-CH2-SO-CH3
             1-(methanesulfinyl)-2-(methylsulfanyl)ethane (PIN)
@@ -111,7 +111,7 @@ class TestConservation:
         The conservation intent is unchanged and is now asserted POSITIVELY —
         naming every atom is a strictly stronger guarantee than declining to
         name any. Confirmed pre-existing (identical at the session-start commit
-        `6de1a105`), so this is a stale expectation, not a regression.
+        ), so this is a stale expectation, not a regression.
         """
         assert name_compound("CSCCS(=O)C") == (
             "1-(methanesulfinyl)-2-(methylsulfanyl)ethane"
@@ -123,7 +123,7 @@ class TestConservation:
         # namer (deferred)". That deferral has since closed: the benzene parent
         # now names the -CH2-S(=O)(=O)-CH3 substituent substitutively as
         # ``[(methanesulfonyl)methyl]benzene``. Confirmed pre-existing (identical
-        # at HEAD via ), so this is a stale expectation, not a
+        # at HEAD via scripts/an A/B check), so this is a stale expectation, not a
         # regression. OPSIN round-trips to the input InChIKey (change-asserted-
         # value verified).
         name = name_compound("CS(=O)(=O)Cc1ccccc1")
@@ -191,7 +191,7 @@ class TestConservation:
 
 @pytest.mark.unit
 class TestCarbonPathMultipliedAcidGuard:
-    """F6 (v30): the carbon-path sulfone/sulfoxide PREFIX builder must NOT emit a
+    """F6 (): the carbon-path sulfone/sulfoxide PREFIX builder must NOT emit a
     corrupted 'multiplied acid' stem when the R' arm itself carries a SECOND
     S-oxo-acid group. For CS(=O)(=O)CCS(O)(=O)=O (CH3-SO2-CH2CH2-SO3H), capping
     the sulfone S with -OH forms 'ethane-1,2-disulfonic acid'; stripping the
@@ -228,12 +228,60 @@ class TestCarbonPathMultipliedAcidGuard:
 
 @pytest.mark.unit
 class TestTrivialAndControls:
-    def test_sulfide_functional_class_unchanged(self):
-        assert name_compound("CSC") == "dimethyl sulfide"
-        assert name_compound("CSCC") == "ethyl methyl sulfide"
+    def test_sulfide_substitutive_pin(self):
+        # P-63.2.5 (the Blue Book method 1 = PIN; the Blue Book): a sulfide's PIN is the
+        # substitutive "(R'-sulfanyl)RH", not the functional-class "R R' sulfide".
+        # (Migrated from the method-2 forms in the sulfanyl-vs-sulfide slice.)
+        assert name_compound("CSC") == "(methylsulfanyl)methane"
+        assert name_compound("CSCC") == "(methylsulfanyl)ethane"
 
     def test_sulfonic_acid_unchanged(self):
         assert name_compound("CS(=O)(=O)O") == "methanesulfonic acid"
 
     def test_sulfonamide_unchanged(self):
         assert name_compound("CCS(N)(=O)=O") == "ethanesulfonamide"
+
+
+@pytest.mark.unit
+class TestSeleniumTelluriumOxide:
+    """-6I — P-63.6 Se/Te oxide analogues (the Blue Book "selenium and
+    tellurium... named in the same way"; class names selenoxide/selenone,
+    telluroxide/tellurone). The chemical-logic body is the SHARED, element-
+    generic name_chalcogen_oxide_substitutive; only the prefix stem differs
+    (seleninyl/selenonyl, tellurinyl/telluronyl)."""
+
+    @pytest.mark.parametrize("smiles,expected", [
+        # the Blue Book verbatim (diaryl multiplicative).
+        ("O=[Se](=O)(c1ccccc1)c1ccccc1", "1,1'-selenonyldibenzene"),
+        # the Blue Book verbatim (ring + chain).
+        ("CC[Se](=O)c1ccccc1", "(ethaneseleninyl)benzene"),
+        # symmetric dialkyl via the substitutive two-chain branch.
+        ("C[Se](=O)C", "(methaneseleninyl)methane"),
+        ("C[Se](=O)(=O)C", "(methaneselenonyl)methane"),
+    ])
+    def test_selenium(self, smiles, expected):
+        assert name_compound(smiles) == expected
+
+    @pytest.mark.parametrize("smiles,expected", [
+        # Te parses in OPSIN 2.9.0 and round-trips, so these emit (bonus breadth).
+        ("O=[Te](=O)(c1ccccc1)c1ccccc1", "1,1'-telluronyldibenzene"),
+        ("CC[Te](=O)c1ccccc1", "(ethanetellurinyl)benzene"),
+        ("C[Te](=O)C", "(methanetellurinyl)methane"),
+    ])
+    def test_tellurium(self, smiles, expected):
+        assert name_compound(smiles) == expected
+
+    def test_selenium_roundtrips(self):
+        """The emitted Se PIN parses back to the input structure under OPSIN."""
+        from orthonym.validation.opsin_roundtrip import opsin_parse
+        for smiles in ("O=[Se](=O)(c1ccccc1)c1ccccc1", "CC[Se](=O)c1ccccc1"):
+            name = name_compound(smiles)
+            got = opsin_parse(name)
+            assert got and (inchi.MolToInchiKey(Chem.MolFromSmiles(got))
+                            == inchi.MolToInchiKey(Chem.MolFromSmiles(smiles)))
+
+    def test_sulfur_analogue_unchanged(self):
+        """Invariant 9: the S handlers are byte-identical after the Se/Te add."""
+        assert name_compound("O=S(=O)(c1ccccc1)c1ccccc1") == "1,1'-sulfonyldibenzene"
+        assert name_compound("CS(=O)c1ccccc1") == "(methanesulfinyl)benzene"
+        assert name_compound("CS(=O)C") == "(methanesulfinyl)methane"

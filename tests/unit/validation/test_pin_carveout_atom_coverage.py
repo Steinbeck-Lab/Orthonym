@@ -1,4 +1,4 @@
-"""v32 Phase 4B — PIN carve-out decoration-mutation atom-coverage certificate.
+""" a phase — PIN carve-out decoration-mutation atom-coverage certificate.
 
 ``namer._final_opsin_validity_gate`` (:1081-1353) has 9 hard-gated ``return name``
 carve-outs (:1152-1237) that ship a PIN WITHOUT the SELF-01/OPSIN round-trip,
@@ -9,7 +9,7 @@ because the correct PIN for each class is OPSIN-unparseable by construction
 ``phane``, ``halogen_uide``. Each is commented as "emitted ONLY by a hard-gated /
 atom-conservation-vetoed" internal producer, i.e. the atom-coverage claim for
 these classes rests entirely on trusting that producer, with no external check
-of any kind — see `` Gap 2.
+of any kind — see `internal notes` Gap 2.
 
 The historical failure mode this guards against (fixed for cholesteryl sulfate
 -> ``cholest-5-ene``, but never adversarially re-probed): a recogniser fires on
@@ -25,7 +25,7 @@ changes the molecular formula -- and proves the decoration is never silently
 dropped: the decorated molecule must never reproduce the bare-core name.
 
 Three honest outcomes for the decorated mutant, all acceptable:
-  (a) SELF-01 VERIFIED  -- the decoration broke the carve-out's own hard gate
+  (a) SELF-01 VERIFIED -- the decoration broke the carve-out's own hard gate
       (regex / exact-SMILES / exact-atom-count match), the molecule routed to
       an ordinary producer, and OPSIN's SELF-01 round-trip independently
       proved the emitted name's skeleton matches the input -- the strongest

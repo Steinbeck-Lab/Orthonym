@@ -1,4 +1,4 @@
-"""v22 Phase G0 — fail-closed safety (DD7 S1 + P-69 crash).
+""" Phase G0 — fail-closed safety (DD7 S1 + P-69 crash).
 
 G0 makes Orthonym REFUSE (return the 'unknown organic compound' descriptive
 fallback in the default path, raise ``OrthonymLimitError`` on the opt-in path)
@@ -11,7 +11,7 @@ correctly:
     the fused ring system, so the leftover fused ring is mis-named as an acyclic
     substituent (difuropyridine -> '7-ethoxyfuro[3,2-b]pyridine');
   * and the P-69 two-metal species that CRASHED with
-    'NoneType object has no attribute name' through the direct .name() /
+    'NoneType object has no attribute name' through the direct.name() /
     raise_on_limit API.
 
 Per guardrail A8 these test the OUTPUT/behaviour for the rule FAMILY (any
@@ -29,14 +29,14 @@ from orthonym.rules.polycyclic import vonbaeyer_cage_has_aromaticity
 
 
 def _is_refused(smiles: str) -> bool:
-    """Default-path fail-closed signal: the descriptive 'unknown ...' fallback."""
+    """Default-path fail-closed signal: the descriptive 'unknown...' fallback."""
     return is_failure_name(name_compound(smiles))
 
 
 # --------------------------------------------------------------------------- #
-# Family 1 — von-Baeyer / bicyclo cage that would drop aromaticity            #
+# Family 1 — von-Baeyer / bicyclo cage that would drop aromaticity #
 # --------------------------------------------------------------------------- #
-# NOTE (v22 Phase G1, DD7 COV-01): the three single-bridge naphthalene systems
+# NOTE (Phase G1, DD7): the three single-bridge naphthalene systems
 # G0 refused (benzonorbornadiene / 1,4-epoxy- / 1,4-ethano-) are now named
 # CORRECTLY by the P-25.4 constructor (see tests/unit/test_g1_bridged_fused.py),
 # so they left the fail-closed family. The polyspiro spirobi-indane stays refused
@@ -61,7 +61,7 @@ def test_aromatic_in_cage_raises_named_limit(smiles):
     with pytest.raises(OrthonymLimitError) as ei:
         Orthonym().name(smiles, raise_on_limit=True)
     assert ei.value.code == "UNSUPPORTED_RING_SYSTEM"
-    assert ei.value.design_note_ref  # cites the HERITAGE analog
+    assert ei.value.design_note_ref  # cites the AUTONOM analog
 
 
 @pytest.mark.parametrize("smiles", AROMATIC_IN_CAGE)
@@ -80,16 +80,16 @@ def test_aromatic_in_cage_is_deterministic(smiles):
 
 # --------------------------------------------------------------------------- #
 # Family 2 — polycomponent fused: matched core covers only PART of the system. #
-# G0 (2026-06-18) made these fail closed to kill the phantom 'ethoxy'. v22      #
+# G0 (2026-06-18) made these fail closed to kill the phantom 'ethoxy'. #
 # Phase G1b (2026-06-20) SUPERSEDES the outcome for the *unsubstituted* parents:#
-# the polycomponent ortho-fusion constructor now names them CORRECTLY. The G0   #
-# coverage veto remains the backstop for partial-core systems G1b cannot name   #
-# (SUBSTITUTED variants — G1b refuses substituted -> still fail closed).        #
+# the polycomponent ortho-fusion constructor now names them CORRECTLY. The G0 #
+# coverage veto remains the backstop for partial-core systems G1b cannot name #
+# (SUBSTITUTED variants — G1b refuses substituted -> still fail closed). #
 # --------------------------------------------------------------------------- #
 PARTIAL_FUSED_CORE_NAMED = [
     ("c1cc2nc3ccoc3cc2o1", "difuro[3,2-b:2',3'-e]pyridine"),     # gold DD7-S1-safety-2
     ("c1cc2nc3ccsc3cc2o1", "furo[3,2-b]thieno[2,3-e]pyridine"),  # DD7-fusion-2
-    # v26 BP-4 Phase 2 SUPERSEDES the substituted fail-closed: the polycomponent
+    # BP-4 a phase SUPERSEDES the substituted fail-closed: the polycomponent
     # constructor now decorates the star parent against the canonical P-25.3.3
     # numbering (verified OPSIN round-trip). Previously these produced the phantom
     # sub-fragment '5-methylfuran'/'5-chlorofuran' (suppressed only by SELF-01 in
@@ -99,7 +99,7 @@ PARTIAL_FUSED_CORE_NAMED = [
 ]
 
 # Partial-core systems the fusion path still CANNOT name -> the G0 veto fires.
-# BP-4 Phase 2 fails closed at SOURCE when a substituent branch is unnameable
+# BP-4 a phase fails closed at SOURCE when a substituent branch is unnameable
 # (exotic element), so the emitted name can never silently omit a substituent.
 PARTIAL_FUSED_CORE_STILL_CLOSED = [
     "[Si](C)(C)c1cc2nc3ccoc3cc2o1",  # silyl-difuropyridine: unnameable branch
@@ -108,7 +108,7 @@ PARTIAL_FUSED_CORE_STILL_CLOSED = [
 
 @pytest.mark.parametrize("smiles,expected", PARTIAL_FUSED_CORE_NAMED)
 def test_partial_fused_core_now_named_by_g1b(smiles, expected):
-    # v22 G1b supersedes the G0 fail-closed for the unsubstituted parent: the
+    # b supersedes the G0 fail-closed for the unsubstituted parent: the
     # polycomponent constructor names it correctly (and still emits no phantom).
     out = name_compound(smiles)
     assert out == expected, f"{smiles} -> {out!r}, expected {expected!r}"
@@ -129,13 +129,13 @@ def test_partial_fused_core_raises_named_limit(smiles):
         Orthonym().name(smiles, raise_on_limit=True)
     # A classified fail-closed refusal (not a crash). The silyl-difuropyridine
     # example fails via UNNAMEABLE (its substituent branch is unnameable —
-    # BP-4 Phase 2's source-level completeness check), a sibling of the
+    # BP-4 a phase's source-level completeness check), a sibling of the
     # ring-coverage UNSUPPORTED_RING_SYSTEM veto; both are honest refusals.
     assert ei.value.code in {"UNSUPPORTED_RING_SYSTEM", "UNNAMEABLE"}
 
 
 # --------------------------------------------------------------------------- #
-# Family 3 — P-69 NoneType crash: unnameable two-metal / acyclic species      #
+# Family 3 — P-69 NoneType crash: unnameable two-metal / acyclic species #
 # --------------------------------------------------------------------------- #
 NO_CRASH_METAL = [
     "c1ccc(cc1)[Hg]c1ccc(cc1)[Sb](c1ccccc1)c1ccccc1",  # gold P-69 (Hg + Sb)
@@ -159,7 +159,7 @@ def test_metal_species_do_not_crash(smiles):
 
 
 def test_general_acyclic_empty_pool_returns_none_not_crash():
-    """The direct .name() API must not raise a raw AttributeError when the
+    """The direct.name() API must not raise a raw AttributeError when the
     general_acyclic catch-all builds no candidate (the masked P-69 crash).
 
     .name() returns the bare failure signal (empty string) — the descriptive
@@ -174,7 +174,7 @@ def test_general_acyclic_empty_pool_returns_none_not_crash():
 
 
 # --------------------------------------------------------------------------- #
-# Protect — fixes must NOT over-fire on correctly-nameable systems            #
+# Protect — fixes must NOT over-fire on correctly-nameable systems #
 # --------------------------------------------------------------------------- #
 PROTECT = {
     "C1C2CC3CC1CC(C2)C3": "adamantane",
@@ -220,7 +220,7 @@ def test_pendant_aromatic_larger_than_cage_not_refused():
 
 
 # --------------------------------------------------------------------------- #
-# Helper unit — aromaticity checked over the EXACT cage atom set (WR-01)       #
+# Helper unit — aromaticity checked over the EXACT cage atom set (WR-01) #
 # --------------------------------------------------------------------------- #
 def test_helper_checks_exact_cage_atoms():
     # An aromatic atom in the passed cage set -> True (benzo carbons are aromatic)

@@ -7,7 +7,7 @@ Task Z2 (2026-08-02) removed the tests for ``estimate_name_coverage_heuristic``
 along with the function itself: it had zero callers and measured a name's
 character count. Its tests did not protect anything -- they PINNED the defect,
 one of them asserting outright that "longer names should give higher coverage".
-See 
+See internal notes
 
 Tests NP scaffold gating:
 - Large molecule + small NP scaffold -> name_natural_product returns None
@@ -101,7 +101,7 @@ class TestNPScaffoldCoverageGate:
 
         CN1C2CCCC1CC2 is detected as tropane scaffold (9 heavy atoms).
         Adding a C16 chain yields 25 heavy atoms, coverage = 9/25 = 0.36.
-        With tropane numbering map (Phase 118-02), the NP pipeline can enumerate
+        With tropane numbering map (a phase-02), the NP pipeline can enumerate
         substituents instead of falling through the coverage gate.
         """
         from orthonym.rules.natural_products import name_natural_product

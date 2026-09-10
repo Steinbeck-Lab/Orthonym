@@ -1,15 +1,15 @@
-"""P6-6I selenoxide / selenone / telluroxide / tellurone handlers.
+"""-6I selenoxide / selenone / telluroxide / tellurone handlers.
 
-Se/Te analogues of the sulfoxide/sulfone handlers (P-63.6, BB:28080/28090:
-"selenium and tellurium ... named in the same way"). The chemical-logic body
+Se/Te analogues of the sulfoxide/sulfone handlers (P-63.6, the Blue Book:
+"selenium and tellurium... named in the same way"). The chemical-logic body
 is the SHARED, element-generic ``rules.sulfur.name_chalcogen_oxide_substitutive``
 (diaryl multiplicative / ring+chain / two-chain substitutive PINs) with the
 matching functional-class fallback (``dimethyl selenoxide`` style) for shapes
 the substitutive builder declines.
 
 BB-verbatim PIN targets:
-- BB:28098  ``(ethaneseleninyl)benzene``   (CC[Se](=O)c1ccccc1)
-- BB:28114  ``1,1'-selenonyldibenzene``    (O=[Se](=O)(c1ccccc1)c1ccccc1)
+- the Blue Book ``(ethaneseleninyl)benzene`` (CC[Se](=O)c1ccccc1)
+- the Blue Book ``1,1'-selenonyldibenzene`` (O=[Se](=O)c1ccccc1)
 
 References:
 - handlers/sulfoxide.py + handlers/sulfone.py — the S sibling shims cloned here.
@@ -28,12 +28,12 @@ def _make_chalcogen_oxide_handler(
     """Build (predicate, handler) for one Se/Te oxide FG, mirroring the S shims.
 
     Args:
-        fg_key: functional-group key ('selenoxide', 'selenone', ...).
+        fg_key: functional-group key ('selenoxide', 'selenone',...).
         oxide_kind: substitutive prefix stem ('seleninyl'/'selenonyl'/...).
         class_id: handler/pool class id (== fg_key).
         n_oxo: 1 (seleninyl-type, one =O) or 2 (selenonyl-type, two =O), which
             selects the functional-class fallback (name_sulfoxide / name_sulfone,
-            both element-generic since P6-6I).
+            both element-generic since -6I).
     """
 
     def _predicate(features: Any) -> bool:

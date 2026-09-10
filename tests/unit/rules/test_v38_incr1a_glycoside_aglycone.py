@@ -1,8 +1,8 @@
-"""v38 Composition Increment 1a -- O-glycoside of a COMPLEX/retained-named aglycone.
+""" Composition Increment 1a -- O-glycoside of a COMPLEX/retained-named aglycone.
 
 The glycoside namer builds the functional-class ``<aglycone-yl> <sugar>oside`` form
 (P-102.5.6.2.2) and already names simple aglycones (``cyclohexyl``/``menthyl``/
-``phenyl`` beta-D-glucopyranoside). It USED to decline when the aglycone's ``-yl``
+``phenyl`` β-D-glucopyranoside). It USED to decline when the aglycone's ``-yl``
 prefix could only be produced by the string rule ``_alcohol_to_alkyl`` and that rule
 FABRICATED an OPSIN-unparseable token -- e.g. the retained alcohol ``borneol`` ->
 ``borneyl`` (not an OPSIN substituent), which the OPSIN validity gate then suppressed
@@ -25,7 +25,7 @@ from orthonym.namer import name_compound
 from orthonym.errors import is_failure_name
 from orthonym.validation.opsin_roundtrip import opsin_roundtrip_check
 
-# v38 whole-branch review (minor 2): every test here asserts an OPSIN round-trip,
+# whole-branch review (minor 2): every test here asserts an OPSIN round-trip,
 # so mark the whole module opsin_gate — a Java-free run SKIPS these rather than
 # reporting them as failures (parity with the CP2 / salt / DROP-23 test files).
 pytestmark = pytest.mark.opsin_gate
@@ -47,7 +47,7 @@ def _best_effort(smiles: str) -> str:
 # because the RT gate proves the constitution+stereo (spelling-layer numbering
 # is a separate, out-of-scope concern). Each expected name RT-verifies.
 BORNYL_GLUCOSIDE = "CC1(C)C2CCC1(C)C(O[C@@H]1O[C@H](CO)[C@@H](O)[C@H](O)[C@H]1O)C2"
-BORNYL_EXPECTED = "(4,7,7-trimethylbicyclo[2.2.1]heptan-5-yl) beta-D-glucopyranoside"
+BORNYL_EXPECTED = "(4,7,7-trimethylbicyclo[2.2.1]heptan-5-yl) β-D-glucopyranoside"
 
 TERPINEOL_GLUCOSIDE = (
     "CC1=CCC(CC1)C(C)(C)O[C@@H]1O[C@H](CO)[C@@H](O)[C@H](O)[C@H]1O"
@@ -70,7 +70,7 @@ class TestComplexAglyconeGlycosideNames:
         assert not is_failure_name(name), f"still abstains: {name!r}"
         # 0-wrong: the emitted name must describe the input structure.
         assert opsin_roundtrip_check(BORNYL_GLUCOSIDE, name)["passed"], name
-        assert name.endswith("beta-D-glucopyranoside")
+        assert name.endswith("β-D-glucopyranoside")
         # Regression pin (structural, RT-verified). If the ring-substituent
         # numbering later improves to the preferred `1,7,7-...-2-yl`, update
         # this string -- the RT assertion above is the load-bearing check.
@@ -129,7 +129,7 @@ class TestComplexAglyconeGlycosideDeterminism:
         variants = self._reordered_smiles(smiles)
         assert len(variants) >= 5  # canonical + 4 deterministic reorderings
         names = [name_compound(v) for v in variants]
-        # Every atom ordering yields the identical name (invariant 4).
+        # Every atom ordering yields the identical name (a project rule).
         assert len(set(names)) == 1, dict(zip(variants, names))
         assert not is_failure_name(names[0]), names[0]
         # And that name round-trips (0-wrong holds under every ordering).
@@ -142,7 +142,7 @@ class TestComplexAglyconeGlycosideDeterminism:
 class TestGlycosideByteIdentityControls:
     """The already-working glycosides + trivial names MUST NOT change.
 
-    Checked at BOTH the default and best-effort tiers (invariant 16 / PIN
+    Checked at BOTH the default and best-effort tiers (a project rule / PIN
     never regresses). The structural fallback fires ONLY when the string
     aglycone token is OPSIN-unparseable, so every parseable retained form
     (menthyl/cyclohexyl/phenyl/...) is untouched.
@@ -150,17 +150,17 @@ class TestGlycosideByteIdentityControls:
 
     CONTROLS = {
         "OC[C@H]1O[C@@H](OC2CCCCC2)[C@H](O)[C@@H](O)[C@@H]1O":
-            "cyclohexyl beta-D-glucopyranoside",
+            "cyclohexyl β-D-glucopyranoside",
         "OC[C@H]1O[C@@H](Oc2ccccc2)[C@H](O)[C@@H](O)[C@@H]1O":
-            "phenyl beta-D-glucopyranoside",
+            "phenyl β-D-glucopyranoside",
         "CC(C)C1CCC(C)CC1O[C@@H]1O[C@H](CO)[C@@H](O)[C@H](O)[C@H]1O":
-            "menthyl beta-D-glucopyranoside",
+            "menthyl β-D-glucopyranoside",
         "OC[C@H]1O[C@@H](OC2CCCC3CCCCC23)[C@H](O)[C@@H](O)[C@@H]1O":
-            "decahydronaphthalenyl beta-D-glucopyranoside",
+            "decahydronaphthalenyl β-D-glucopyranoside",
         "OC[C@H]1O[C@@H](OC23CC4CC(CC(C4)C2)C3)[C@H](O)[C@@H](O)[C@@H]1O":
-            "tricyclo[3.3.1.1^3,7]decyl beta-D-glucopyranoside",
+            "tricyclo[3.3.1.1^3,7]decyl β-D-glucopyranoside",
         "OC[C@H]1O[C@@H](OC2CCC3(CCCO3)CC2)[C@H](O)[C@@H](O)[C@@H]1O":
-            "1-oxaspiro[4.5]decan-8-yl beta-D-glucopyranoside",
+            "1-oxaspiro[4.5]decan-8-yl β-D-glucopyranoside",
         "CCO": "ethanol",
         "c1ccccc1": "benzene",
     }

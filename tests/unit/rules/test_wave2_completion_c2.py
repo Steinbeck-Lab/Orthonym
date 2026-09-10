@@ -42,7 +42,7 @@ class TestSilaneLigands:
     @pytest.mark.parametrize("smiles,expected", [
         ("CC[Si](C)(C)C", "ethyltrimethylsilane"),
         ("C[Si](C)(C)C", "tetramethylsilane"),
-        ("C[Si](C)(C)O", "trimethylsilanol"),   # G2 COV-02 suffix diversion
+        ("C[Si](C)(C)O", "trimethylsilanol"),   # G2 suffix diversion
         ("CC[Sn](CC)(CC)CC", "tetraethylstannane"),
     ])
     def test_protections(self, smiles, expected):
@@ -61,7 +61,7 @@ class TestAryloxyAndEtherJoins:
         assert name_compound("N#Cc1ccccc1OC") == "2-methoxybenzonitrile"
 
     @pytest.mark.parametrize("smiles,expected", [
-        ("COc1ccccc1", "methoxybenzene"),     # RET-01 policy gold path
+        ("COc1ccccc1", "anisole"),     # a review RISK 7: bare anisole IS the PIN (the Blue Book)
         ("CCOc1ccccc1", "ethoxybenzene"),
         ("COC1CCCCC1", "methoxycyclohexane"),  # position-invariant cycloalkane
     ])
@@ -144,7 +144,9 @@ class TestNitrosoUrea:
 
     @pytest.mark.parametrize("smiles,expected", [
         ("NC(N)=O", "urea"),
-        ("CNC(N)=O", "N-methylurea"),
+        # Monosubstituted urea omits the italic-N locant (P-14.3.4.3,:2943);
+        # the disubstituted form keeps both (:33327).
+        ("CNC(N)=O", "methylurea"),
         ("CNC(=O)NC", "N,N'-dimethylurea"),
     ])
     def test_urea_protections(self, smiles, expected):
@@ -154,9 +156,15 @@ class TestNitrosoUrea:
 @pytest.mark.unit
 class TestMixedDiamines:
     @pytest.mark.parametrize("smiles,expected", [
-        ("CNCCCN", "N-methylpropane-1,3-diamine"),
-        ("CNCCN", "N-methylethane-1,2-diamine"),
-        ("CN(C)CCN", "N,N-dimethylethane-1,2-diamine"),
+        # a phase Thread A (P-62.2.4.1.2, the Blue Book) + the low-locant
+        # tie-break (P-31.1.4.3.4 / P-14.5.2): a single N-substituent on a
+        # symmetric terminal diamine takes numeric-superscript N1 (the reversal
+        # is a legal tie-break that gives the cited prefix the lowest locant),
+        # not the non-lowest N2/N3 the old numbering left. Each still OPSIN
+        # round-trips to the same molecule (N1 == N2 by symmetry).
+        ("CNCCCN", "N1-methylpropane-1,3-diamine"),
+        ("CNCCN", "N1-methylethane-1,2-diamine"),
+        ("CN(C)CCN", "N1,N1-dimethylethane-1,2-diamine"),
     ])
     def test_heals(self, smiles, expected):
         assert name_compound(smiles) == expected
@@ -164,9 +172,11 @@ class TestMixedDiamines:
     @pytest.mark.parametrize("smiles,expected", [
         ("NCCCN", "propane-1,3-diamine"),
         ("NCCN", "ethane-1,2-diamine"),
-        ("CNCCNC", "N,N'-dimethylethane-1,2-diamine"),
-        ("CCNCCCNC", "N-ethyl-N'-methylpropane-1,3-diamine"),
-        ("CN(C)CCN(C)C", "N,N,N',N'-tetramethylethane-1,2-diamine"),
+        # a phase Thread A (P-62.2.4.1.2, the Blue Book): simple
+        # polyamines use numeric-superscript italic-N locants, not bare primes.
+        ("CNCCNC", "N1,N2-dimethylethane-1,2-diamine"),
+        ("CCNCCCNC", "N1-ethyl-N3-methylpropane-1,3-diamine"),
+        ("CN(C)CCN(C)C", "N1,N1,N2,N2-tetramethylethane-1,2-diamine"),
         ("CCN", "ethanamine"),
         ("CNC", "N-methylmethanamine"),
         ("NCCO", "2-aminoethan-1-ol"),

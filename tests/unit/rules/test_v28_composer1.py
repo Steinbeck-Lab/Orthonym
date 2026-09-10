@@ -1,4 +1,4 @@
-"""v28 Composer1 Task 1: detach-and-name ring-substituent primitive.
+""" Composer1 Task 1: detach-and-name ring-substituent primitive.
 
 Fragment-level unit test for
 ``orthonym.assembly.substituent_enumerator._detach_and_name_ring_substituent``
@@ -8,7 +8,7 @@ atom, it detaches the ring core and names it via the existing general
 (von-Baeyer/spiro/cage) ring engine, returning a ``-yl``/``-ylidene`` token.
 
 No ``source=='general_engine'`` provenance assertion here -- that applies to
-the end-to-end tests in later v28 composer tasks. This test calls the
+the end-to-end tests in later composer tasks. This test calls the
 fragment-level primitive directly, offline.
 """
 import pytest
@@ -51,7 +51,7 @@ def test_detach_and_name_isolated_cage_fragment():
 
 
 # ============================================================================
-# v28 Composer1 Task 2: recursive decoration composition (end-to-end via engine)
+# Composer1 Task 2: recursive decoration composition (end-to-end via engine)
 # ============================================================================
 
 
@@ -62,10 +62,10 @@ def test_detach_and_name_isolated_cage_fragment():
 def test_decorated_ring_substituent_emits_via_engine(smi):
     """A decorated ring substituent must EMIT — that is what this test protects.
 
-    v29 Phase 6 relaxed the provenance assertion from `== "general_engine"` to
+     a phase relaxed the provenance assertion from `== "general_engine"` to
     "engine or better". The tert-butylsulfanyl case now resolves on the PIN path
     as `2-[4-(tert-butylsulfanyl)phenyl]quinazolin-4(3H)-one` (T1, round-trips to
-    the input) because the decorated-CARBOCYCLIC producer added in Phase 6 can
+    the input) because the decorated-CARBOCYCLIC producer added in a phase can
     now supply `4-(tert-butylsulfanyl)phenyl`, letting the PIN path complete
     instead of falling through to the best-effort engine.
 
@@ -80,7 +80,7 @@ def test_decorated_ring_substituent_emits_via_engine(smi):
 
 
 # ============================================================================
-# v28 Composer1 Task 2b: polycyclic (fused / bridged) decorated-core composition
+# Composer1 Task 2b: polycyclic (fused / bridged) decorated-core composition
 # ============================================================================
 
 
@@ -94,10 +94,10 @@ def test_polycyclic_decorated_substituent_is_named(smi, expected):
     """A decorated polycyclic ring substituent must be NAMED, and named
     correctly.
 
-    v30 P3-T1c: this test used to assert ``row["source"] == "general_engine"``.
+    -T1c: this test used to assert ``row["source"] == "general_engine"``.
     That pinned an internal ROUTE, and the route changed when the composer's
     ring-substituent path gained access to the general tier -- these molecules are
-    now named earlier, by the composer. The PROVENANCE NOTE at :101-104 of this
+    now named earlier, by the composer. The PROVENANCE NOTE at:101-104 of this
     file already documented route assertions as fragile for exactly this reason,
     so the assertion is now on the NAME, which is the property that matters.
 
@@ -105,8 +105,8 @@ def test_polycyclic_decorated_substituent_is_named(smi, expected):
     named from the start, and neither route ever produced the second one before:
 
     * ``acetic acid`` is the PIN, not ``ethanoic acid``. **P-21.1.1 / Table 28.1
-      context, stated at ``BlueBookV2/BlueBookV2.md:2004``**: *"A special class of
-      parent structures having retained names ... is called functional parent
+      context, stated at ``the Blue Book Blue Book``**: *"A special class of
+      parent structures having retained names... is called functional parent
       compounds, for example, phenol and acetic acid. These two names are
       preferred IUPAC names; the corresponding systematic alternatives, benzenol
       and ethanoic acid, may be used in general IUPAC nomenclature."*
@@ -125,7 +125,7 @@ def test_polycyclic_decorated_substituent_is_named(smi, expected):
 
 
 # ============================================================================
-# v28 Composer1 Task 2c: fused-HETEROCYCLE decorated-core composition
+# Composer1 Task 2c: fused-HETEROCYCLE decorated-core composition
 # ============================================================================
 #
 # PROVENANCE NOTE. The whole-molecule PIN path ALREADY names decorated
@@ -204,7 +204,7 @@ def test_fused_heterocycle_decorated_substituent_emits_via_engine(smi):
 
 
 # ============================================================================
-# v28 Composer1 Task 3: heteroatom carrier in the RING-ON-CHAIN branch
+# Composer1 Task 3: heteroatom carrier in the RING-ON-CHAIN branch
 # ============================================================================
 #
 # PROVENANCE NOTE (mirrors Task 2c above). This T0 case-4 molecule's PIN path
@@ -314,7 +314,7 @@ def test_ring_on_chain_amino_carrier_direct_composer():
 
 
 # ============================================================================
-# v28 Composer1 Task 4: wire the composer into name_substituent + de-mask
+# Composer1 Task 4: wire the composer into name_substituent + de-mask
 # ============================================================================
 #
 # The core wiring (Task 2, commit bcbb6745) already routes a ring-bearing
@@ -355,9 +355,9 @@ def test_general_substituent_never_returns_sentinel_when_decomposable():
     # a space-bearing token.
     name = name_substituent(mol, ring_atoms, attach, allow_mancude=True)
     assert name is None or (name != "substituent" and " " not in name)
-    # v30 P3-T1c: was ``tricyclo[3.3.1.1^3,7]decan-3-yl``. The retained name is
+    # -T1c: was ``tricyclo[3.3.1.1^3,7]decan-3-yl``. The retained name is
     # the PIN -- **P-23.7 "RETAINED NAMES FOR VON BAEYER PARENT HYDRIDES"**
-    # (``BlueBookV2/BlueBookV2.md:9879``): *"The retained names adamantane and
+    # (``the Blue Book Blue Book``): *"The retained names adamantane and
     # cubane are used in general nomenclature and as preferred IUPAC names."*
     # Table 2.6 (``:9885``) prints *"adamantane (PIN) tricyclo[3.3.1.1^3,7]
     # decane"*, i.e. the descriptor is the ALTERNATIVE. The locant also drops
@@ -375,7 +375,7 @@ def test_general_substituent_never_returns_sentinel_when_decomposable():
 
 
 # ============================================================================
-# v28 Composer1 Task 5: discover_substituents partition robustness
+# Composer1 Task 5: discover_substituents partition robustness
 # (substituents off suffix/FG atoms)
 # ============================================================================
 #
@@ -394,7 +394,7 @@ def test_substituent_off_amide_nitrogen_is_partitioned():
     smi = "CC(C)(C(=O)Nc1cccc(F)c1)N1CCC(c2nc(-c3cc4ccccc4o3)cs2)CC1"
     row = _be().name_tiered(smi)     # must NOT raise
     assert row is not None
-    # v30 P3-T1c: was ``(row["source"] == "general_engine") or (not
+    # -T1c: was ``(row["source"] == "general_engine") or (not
     # row.get("name"))`` -- a route assertion with an abstain escape hatch. The
     # molecule is no longer multi-blocked (the composer's ring path reaches the
     # general tier now), so it NAMES, and the property this test exists to
@@ -410,10 +410,10 @@ def test_substituent_off_amide_nitrogen_is_partitioned():
 
 
 # ============================================================================
-# v28 Composer1 Task C1-T6: assembly-robustness instrument smoke test
+# Composer1 Task C1-T6: assembly-robustness instrument smoke test
 # ============================================================================
 #
-# TINY shape-only smoke test for `` -- the
+# TINY shape-only smoke test for ``scratchpad/asm_robustness.py`` -- the
 # offline, hang-safe per-fragment naming-success measurement instrument (NOT
 # gated production; see the module docstring there for the decomposition
 # method + success criterion). This test only asserts the returned dict's
@@ -431,7 +431,7 @@ def test_asm_robustness_instrument_smoke():
 
     project_root = Path(__file__).parent.parent.parent.parent
     spec = importlib.util.spec_from_file_location(
-        "asm_robustness", str(project_root / "" / "asm_robustness.py"))
+        "asm_robustness", str(project_root / "scratchpad" / "asm_robustness.py"))
     mod = importlib.util.module_from_spec(spec)
     sys.modules[spec.name] = mod  # dataclass decorator needs the module registered
     spec.loader.exec_module(mod)

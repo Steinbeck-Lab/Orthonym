@@ -1,17 +1,17 @@
-"""Phase 1 B1: the P-29.2 / BB(:1703) nitrogen ylidene substituent form.
+"""a phase B1: the P-29.2 / BB(:1703) nitrogen ylidene substituent form.
 
 A nitrogen attached to its parent by a DOUBLE bond is an ``ylidene`` free
-valence, not a ``-yl``: ``=N-N<`` -> ``hydrazin-1-ylidene`` (the deprecated
-``hydrazono`` is never emitted, BB :1703), ``=N-R`` -> ``{R}imino``. Before this
+valence, not a ``-yl``: ``=N-N<`` -> ``hydrazinylidene`` (the deprecated
+``hydrazono`` is never emitted, BB:1703), ``=N-R`` -> ``{R}imino``. Before this
 the cascade built ``...hydrazinyl`` and the P-29.2 guard refused it, so the
 whole branch abstained -- the measured decorated-steroid / hydrazone class.
 
 Asserted at the SUBSTITUENT-PREFIX level (deterministic, OPSIN-free). The
 whole-molecule round-trip is verified in a fresh subprocess by
-`` (the in-pytest SELF-01/OPSIN path is unreliable
+``scripts/measure_breadth.py`` (the in-pytest SELF-01/OPSIN path is unreliable
 across process warm-up -- the reason that harness uses subprocesses); each
 prefix below is confirmed to round-trip embedded in a parent, e.g.
-``(2,2-dimethylhydrazin-1-ylidene)cyclohexane`` -> ``CN(C)N=C1CCCCC1``.
+``(dimethylhydrazinylidene)cyclohexane`` -> ``CN(C)N=C1CCCCC1``.
 """
 import pytest
 from rdkit import Chem
@@ -43,9 +43,13 @@ def _frag_and_attach(smi):
 
 
 @pytest.mark.parametrize("smi,expected", [
-    ("C1CCC(=NN(C)C)CC1", "2,2-dimethylhydrazin-1-ylidene"),  # N,N-dimethylhydrazone
-    ("C1CCC(=NN)CC1",     "hydrazin-1-ylidene"),              # bare hydrazone
-    ("C1CCC(=NNC)CC1",    "2-methylhydrazin-1-ylidene"),      # methylhydrazone
+    # a phase (P-14.3.4 / the Blue Book "(dimethylcarbamoyl)hydrazinylidene",
+    # the Blue Book): the hydrazinylidene free valence is at the valence-FULL N1, so
+    # every substituent must sit on N2 -- the '1'/'2' locants are unambiguous and
+    # are OMITTED.
+    ("C1CCC(=NN(C)C)CC1", "dimethylhydrazinylidene"),  # N,N-dimethylhydrazone
+    ("C1CCC(=NN)CC1",     "hydrazinylidene"),          # bare hydrazone
+    ("C1CCC(=NNC)CC1",    "methylhydrazinylidene"),    # methylhydrazone
     ("C1CCC(=NC)CC1",     "methylimino"),                     # N-methylimine
     ("C1CCC(=N)CC1",      "imino"),                           # imine =NH
 ])
@@ -55,7 +59,7 @@ def test_nitrogen_ylidene_prefix(smi, expected):
 
 
 def test_deprecated_hydrazono_never_emitted():
-    """BB :1703 discontinued 'hydrazono' even for general nomenclature; the
+    """BB:1703 discontinued 'hydrazono' even for general nomenclature; the
     systematic 'hydrazinylidene' is emitted instead."""
     mol, frag, na = _frag_and_attach("C1CCC(=NN)CC1")
     assert "hydrazono" not in name_substituent(mol, frag, na)

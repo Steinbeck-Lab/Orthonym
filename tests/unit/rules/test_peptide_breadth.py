@@ -1,5 +1,5 @@
 """
-v32 Phase 2 (breadth): peptide naming levers.
+ a phase (breadth): peptide naming levers.
 
 Two ADDITIVE fallbacks in rules/peptides.py, tried only when the ordinary
 flat acylamino chain convention declines, both gated by an OPSIN round-trip
@@ -14,8 +14,8 @@ atom-dropping name (0-wrong ABSOLUTE):
   systematic substitutive acyl/amido construction rather than the flat
   acylamino-chain shorthand.
 
-Derivation, SPY citations and OPSIN-hand-verification for every target name
-below: 
+Derivation, a trace citations and OPSIN-hand-verification for every target name
+below: internal notes
 """
 
 import pytest
@@ -59,12 +59,12 @@ def _heavy_atoms(smiles: str) -> int:
 
 @pytest.mark.unit
 class TestLeverBGammaLink:
-    """SPY §2: chebi 494 (gamma-Glu-ACC) + hand-RT-verified gamma-glutamyl
+    """a trace §2: chebi 494 (gamma-Glu-ACC) + hand-RT-verified gamma-glutamyl
     targets. Was ABSTAIN ('unknown organic compound') before this change."""
 
     def test_chebi494_gamma_glu_acc(self):
         """chebi 494: gamma-Glu amide-bonded to 1-aminocyclopropane-1-
-        carboxylic acid (ACC, non-standard). SPY-derived, OPSIN-hand-
+        carboxylic acid (ACC, non-standard). a trace-derived, OPSIN-hand-
         verified (no stereo imposed, matches the input's undefined stereo):
         '1-(4-amino-4-carboxybutanamido)cyclopropane-1-carboxylic acid'.
         """
@@ -116,11 +116,11 @@ class TestLeverBGammaLink:
 
 @pytest.mark.unit
 class TestLeverANAcylCap:
-    """SPY §3a: a fatty/simple-acyl N-terminal cap. Was ABSTAIN before this
+    """a trace §3a: a fatty/simple-acyl N-terminal cap. Was ABSTAIN before this
     change for a chain length >= 2 residues behind the cap."""
 
     def test_synthetic_fatty_acyl_dipeptide(self):
-        """SPY's own cited RT-verified target name, forward-parsed via OPSIN
+        """a trace's own cited RT-verified target name, forward-parsed via OPSIN
         to get the input SMILES (name -> SMILES -> name round-trip):
         '3-hydroxy-11-methyltridecanoylglycylglycine'."""
         smi = "OC(CC(=O)NCC(=O)NCC(=O)O)CCCCCCCC(CC)C"
@@ -131,7 +131,7 @@ class TestLeverANAcylCap:
 
     def test_simple_fatty_acyl_dipeptide(self):
         """A plainer synthetic case: dodecanoyl (lauroyl) cap on Gly-Gly.
-        v38 (V38-PEPTIDE-PIN-VERDICT.md): the peptide PIN is the SUBSTITUTIVE
+         (V38-PEPTIDE-PIN-VERDICT.md): the peptide PIN is the SUBSTITUTIVE
         form, so this reroutes off the Lever-A retained name
         'dodecanoylglycylglycine' to '(2-dodecanamidoacetamido)acetic acid'.
         Full-InChIKey round-trip verified."""
@@ -159,9 +159,9 @@ class TestLeverANAcylCap:
 
 @pytest.mark.unit
 class TestFailClosedMidChainNonStandard:
-    """SPY §2 (chebi 371): OPSIN itself mis-parses a non-retained acyl word
+    """a trace §2 (chebi 371): OPSIN itself mis-parses a non-retained acyl word
     used as a CONTINUING chain link (verified via 3 independent controls in
-    the SPY), so no phrasing of this molecule via the peptide-chain
+    the a trace), so no phrasing of this molecule via the peptide-chain
     convention can round-trip. Must abstain (a failure-name sentinel),
     never emit a wrong or atom-dropping name."""
 
@@ -233,11 +233,11 @@ class TestRegressionUnaffected:
     path) and the pre-existing isopeptide fail-closed guards are unchanged."""
 
     def test_glycylglycine_unchanged(self):
-        # v38: substitutive PIN (V38-PEPTIDE-PIN-VERDICT.md); RT verified.
+        #: substitutive PIN (V38-PEPTIDE-PIN-VERDICT.md); RT verified.
         assert name_compound("NCC(=O)NCC(=O)O") == "(2-aminoacetamido)acetic acid"
 
     def test_alanylglycine_unchanged(self):
-        # v38: substitutive PIN (V38-PEPTIDE-PIN-VERDICT.md); RT verified.
+        #: substitutive PIN (V38-PEPTIDE-PIN-VERDICT.md); RT verified.
         assert (name_compound("N[C@@H](C)C(=O)NCC(=O)O")
                 == "2-[(2S)-2-aminopropanamido]ethanoic acid")
 

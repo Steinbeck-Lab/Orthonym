@@ -39,8 +39,8 @@ class TestCationNaming:
     """Test cation naming through main API."""
 
     def test_ammonium(self):
-        """Test ammonium cation naming."""
-        assert name_compound('[NH4+]') == 'ammonium'
+        """NH4+ PIN is 'azanium' (P-73.1.1.2, the Blue Book; was 'ammonium')."""
+        assert name_compound('[NH4+]') == 'azanium'
 
     def test_methylammonium(self):
         """Test methylammonium cation naming."""

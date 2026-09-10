@@ -1,4 +1,4 @@
-"""M4 (v40): the best-effort floor must COMPLETE ring stereochemistry.
+"""M4 (): the best-effort floor must COMPLETE ring stereochemistry.
 
 A saturated ring stereocentre needs a relative descriptor (cis/trans, P-31.1.4) or
 an OPSIN-numbering-anchored absolute descriptor — NOT the bare `(1r,3R)-` absolute
@@ -9,7 +9,7 @@ abstains (offer full-InChIKey gate voids the stereo-incomplete name).
 The floor now runs candidate competition: it offers ring relative-stereo (cis/trans)
 composed with the branch/chain absolute R/S, and the offer full-InChIKey gate keeps
 whichever round-trips (0-wrong by construction). Finding:
-.
+internal notes.
 """
 import ast
 import subprocess

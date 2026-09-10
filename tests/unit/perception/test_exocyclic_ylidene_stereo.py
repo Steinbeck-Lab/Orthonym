@@ -1,4 +1,4 @@
-"""M3 (v40): the canonical CIP path must label exocyclic ylidene double bonds.
+"""M3 (): the canonical CIP path must label exocyclic ylidene double bonds.
 
 The vendored `centres` engine (default CIP source) does not emit an E/Z label for
 an exocyclic double bond to an aromatic-flagged ring atom (o-/p-quinoid / fulvenoid
@@ -8,14 +8,14 @@ systems), so `assign_stereochemistry` left those bonds' `_CIPCode` empty and
 
 rdCIPLabeler labels these bonds correctly. The fix is a complementary rdCIP pass in
 `assign_stereochemistry` that FILLS double-bond `_CIPCode` centres left empty, never
-overwriting centres' labels. Finding: .
+overwriting centres' labels. Finding: internal notes.
 """
 from rdkit import Chem
 from orthonym.perception.stereo import assign_stereochemistry
 
 
 def _exocyclic_double_bond_cips(mol):
-    """{ (begin,end) : _CIPCode-or-None } for every exocyclic, stereogenic C=C."""
+    """{ (begin,end): _CIPCode-or-None } for every exocyclic, stereogenic C=C."""
     out = {}
     for b in mol.GetBonds():
         if b.GetBondType() != Chem.BondType.DOUBLE or b.IsInRing():

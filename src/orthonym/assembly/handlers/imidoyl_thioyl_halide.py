@@ -1,4 +1,4 @@
-"""Phase 2E imidoyl / carbothioyl / carboselenoyl halide handler.
+""" a phase imidoyl / carbothioyl / carboselenoyl halide handler.
 
 Direct-return shim around ``rules.acid_halides.name_imidoyl_thioyl_halide``
 (mirrors the sulfonyl_halide / acid_halide shim discipline). The acid halide of

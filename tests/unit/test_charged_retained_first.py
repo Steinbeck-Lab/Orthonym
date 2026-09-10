@@ -1,4 +1,4 @@
-"""Phase 169.7 BBR-CHG-169.6-caveats — retained-name-first charged routing (D-12).
+"""a phase.7 BBR-CHG-169.6-caveats — retained-name-first charged routing ().
 
 route_charged (the 169.6 chokepoint) neutralized-then-renamed sanctioned retained
 charged species, producing OPSIN-unparseable systematic forms the SUB-03 gate then
@@ -19,7 +19,7 @@ def namer():
 
 @pytest.mark.unit
 @pytest.mark.parametrize("smiles,expected", [
-    ("[SH3+]", "sulfonium"),                                            # was -> unknown
+    ("[SH3+]", "sulfanium"),        # P-73.1.1.2 PIN (was 'sulfonium'; earlier -> unknown)
     ("N[O-]", "aminoxide"),                                             # was -> unknown
     ("O=S(=O)([N-]S(=O)(=O)C(F)(F)F)C(F)(F)F", "bistriflimide"),        # was -> triflimidic acid
 ])
@@ -30,8 +30,8 @@ def test_charged_retained_recovered(namer, smiles, expected):
 @pytest.mark.unit
 @pytest.mark.parametrize("smiles,expected", [
     ("CC(=O)[O-]", "acetate"),                  # carboxylate (deferred path) unchanged
-    ("C[S+](C)C", "trimethylsulfonium"),        # existing sulfonium retained unchanged
-    ("[NH4+]", "ammonium"),                     # ammonium unchanged
+    ("C[S+](C)C", "trimethylsulfanium"),        # P-73.1.1.2 PIN (was 'trimethylsulfonium')
+    ("[NH4+]", "azanium"),                       # P-73.1.1.2 PIN (was 'ammonium')
 ])
 def test_existing_charged_unchanged(namer, smiles, expected):
     assert namer.name(smiles) == expected
@@ -40,5 +40,5 @@ def test_existing_charged_unchanged(namer, smiles, expected):
 @pytest.mark.unit
 def test_retained_recovered_round_trip():
     from orthonym.validation.opsin_roundtrip import opsin_roundtrip_check
-    for smi, name in [("[SH3+]", "sulfonium"), ("N[O-]", "aminoxide")]:
+    for smi, name in [("[SH3+]", "sulfanium"), ("N[O-]", "aminoxide")]:
         assert opsin_roundtrip_check(smi, name)["passed"]

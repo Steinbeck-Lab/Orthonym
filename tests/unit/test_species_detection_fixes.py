@@ -128,13 +128,13 @@ class TestNoSuitableAtomGuard:
         assert isinstance(result, str)
 
     def test_valid_amine_cation_returns_aminium(self):
-        """Ammonium should return 'ammonium'."""
+        """NH4+ PIN is 'azanium' (P-73.1.1.2, the Blue Book; was 'ammonium')."""
         mol = Chem.MolFromSmiles('[NH4+]')
         result = name_cation(mol)
-        assert 'ammonium' in result
+        assert result == 'azanium'
 
     def test_methylammonium_cation(self):
-        """Methylamine cation names successfully. v28 Cluster C: the PIN is the
+        """Methylamine cation names successfully.: the PIN is the
         substitutive 'methanaminium' (P-73.1.2.1); the 'ammonium' retained form
         is general/common style only."""
         mol = Chem.MolFromSmiles('C[NH3+]')
@@ -237,9 +237,9 @@ class TestNamerRoutingIntegration:
         assert name == 'acetate'
 
     def test_ammonium_retained_name(self):
-        """Ammonium should return 'ammonium'."""
+        """NH4+ PIN is 'azanium' (P-73.1.1.2, the Blue Book; was 'ammonium')."""
         name = name_compound('[NH4+]')
-        assert name == 'ammonium'
+        assert name == 'azanium'
 
     def test_simple_ion_without_retained_falls_through(self):
         """Simple ion without retained name should fall through to

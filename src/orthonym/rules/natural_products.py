@@ -396,7 +396,7 @@ def name_natural_product(mol) -> Optional[str]:
 
                 name_ab = _assemble_unsat(stereo_prefix, ring_ab)
                 # Phase 181 D-08: ship α/β only if it OPSIN-round-trips, else whole-graph R/S --
-                # but ONLY if THAT round-trips too (review BLOCKER, 2026-08-12): an unverified
+                # but ONLY if THAT round-trips too (Fable BLOCKER, 2026-08-12): an unverified
                 # whole-graph fallback can OVER-specify an undefined centre (SELF-01 tolerates
                 # nb>na, namer.py:992) and ship a wrong stereoisomer. If neither candidate
                 # round-trips, honest-fail (None) so the systematic pipeline gets a chance
@@ -441,7 +441,7 @@ def name_natural_product(mol) -> Optional[str]:
                     if _alpha_beta_rt_ok(mol, name_ab):
                         return name_ab
                     # α/β did not round-trip -> try the whole-graph R/S fallback, but ONLY ship
-                    # IT if it round-trips too (review BLOCKER, 2026-08-12): an unverified
+                    # IT if it round-trips too (Fable BLOCKER, 2026-08-12): an unverified
                     # whole-graph name can OVER-specify an undefined centre (SELF-01 tolerates
                     # nb>na, namer.py:992) and ship a wrong stereoisomer -- the exact bug this
                     # branch was built to fix, reproduced on

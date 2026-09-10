@@ -38,13 +38,13 @@ MAX_NAMING_DEPTH = 7
 # to prevent unbounded decomposition chains where every fragment SMILES
 # is different. Generous limit (20 vs old limit of 7) to allow deep
 # but finite naming chains.
-_MAX_VISITED_SIZE = 50  # Phase 127: raised from 30 for deeper decomposition; fallback at limit
-# NOTE (v33): raising this to 200 was measured INERT for the acyl-CoA giant (its
+_MAX_VISITED_SIZE = 50  # a phase: raised from 30 for deeper decomposition; fallback at limit
+# NOTE (): raising this to 200 was measured INERT for the acyl-CoA giant (its
 # pantetheine-thioester substituent fails for a different reason, not this net) and is a
 # global change with gate/perf risk, so it is NOT raised. Revisit as a measured breadth lever
 # once the per-top-level work budget is proven a sufficient anti-runaway guard corpus-wide.
 
-# v33 giant-molecule hang fix: negative-cache sentinel. Stored in the runtime
+# giant-molecule hang fix: negative-cache sentinel. Stored in the runtime
 # fragment cache to mark a fragment that is CONTEXT-INDEPENDENTLY unnameable (the
 # recursive namer refused it / it produced a refusal sentinel / it raised) so the
 # combinatorial partition search never re-descends the same dead fragment (e.g.
@@ -188,19 +188,19 @@ FRAGMENT_NAME_CACHE: Dict[str, str] = {
     "CCCCCCO": "hexan-1-ol",
     # --- Branched fatty acids ---
     "CC(C)CCCCCCCCCCCC(=O)O": "13-methyltetradecanoic acid",
-    # --- Branched alkanes (verified 2026-03-28, Phase 125-03) ---
+    # --- Branched alkanes (verified 2026-03-28, a phase-03) ---
     "CC(C)C": "2-methylpropane",
     "CCC(C)C": "2-methylbutane",
     "CC(C)(C)C": "2,2-dimethylpropane",
     "CCCC(C)C": "2-methylpentane",
     "CCC(C)CC": "3-methylpentane",
-    # --- Cycloalkanes (verified 2026-03-28, Phase 125-03) ---
+    # --- Cycloalkanes (verified 2026-03-28, a phase-03) ---
     "C1CC1": "cyclopropane",
     "C1CCC1": "cyclobutane",
     "C1CCCC1": "cyclopentane",
     "C1CCCCC1": "cyclohexane",
     "C1CCCCCC1": "cycloheptane",
-    # --- Substituted aromatics (verified 2026-03-28, Phase 125-03) ---
+    # --- Substituted aromatics (verified 2026-03-28, a phase-03) ---
     "Cc1ccccc1": "toluene",
     "CCc1ccccc1": "ethylbenzene",
     "CC(C)c1ccccc1": "cumene",
@@ -209,15 +209,18 @@ FRAGMENT_NAME_CACHE: Dict[str, str] = {
     "Fc1ccccc1": "fluorobenzene",
     "Brc1ccccc1": "bromobenzene",
     "O=[N+]([O-])c1ccccc1": "nitrobenzene",
-    # --- Substituted heterocycles (verified 2026-03-28, Phase 125-03) ---
+    # --- Substituted heterocycles (verified 2026-03-28, a phase-03) ---
     "Cc1ccncc1": "4-methylpyridine",
     "Cc1ccccn1": "2-methylpyridine",
     "Cc1cccnc1": "3-methylpyridine",
-    # --- Ethers and sulfides (verified 2026-03-28, Phase 125-03) ---
+    # --- Ethers and sulfides (verified 2026-03-28, a phase-03) ---
     "COC": "methoxymethane",
     "CCOCC": "ethoxyethane",
-    "CSC": "dimethyl sulfide",
-    # --- Dicarboxylic acids (verified 2026-03-28, Phase 125-03) ---
+    # NB: no "CSC" entry. Per P-63.2.5 (the Blue Book) the PIN for a sulfide is the
+    # substitutive "(methylsulfanyl)methane", NOT the functional-class "dimethyl
+    # sulfide"; this cache holds PIN names (see the comment at the FRAGMENT_NAME_CACHE
+    # lookup site), so the sulfide is emitted by the substitutive path, not here.
+    # --- Dicarboxylic acids (verified 2026-03-28, a phase-03) ---
     "O=C(O)CO": "2-hydroxyethanoic acid",
     "O=C(O)CC(=O)O": "propanedioic acid",
     "O=C(O)CCC(=O)O": "butanedioic acid",
@@ -258,7 +261,7 @@ def start_naming_session():
     if depth == 1:
         # Only allocate a fresh cache when there is none. ``isolated_naming_session``
         # deliberately keeps the outer molecule's fragment cache alive across its
-        # depth reset (v33 giant-molecule hang fix): a fragment's name is a pure
+        # depth reset (giant-molecule hang fix): a fragment's name is a pure
         # function of its canonical SMILES, so reusing a cached name is always
         # correct AND stops a giant molecule from re-naming the same fragment on
         # every nested recovery entry. A GENUINE top-level call arrives with
@@ -281,7 +284,7 @@ def end_naming_session():
     if depth <= 0:
         _fragment_guard.session_depth = 0
         _fragment_guard.visited = set()
-        # v33 giant-molecule hang fix: the fragment memo cache is owned by the
+        # giant-molecule hang fix: the fragment memo cache is owned by the
         # NAME SCOPE (enter/exit_name_scope, keyed to the true outermost name()),
         # NOT by the session. Inside an ``isolated_naming_session`` the session
         # depth is reset to 0, so the FIRST nested ``name_compound`` would drive
@@ -295,7 +298,7 @@ def end_naming_session():
         _fragment_guard.session_depth = depth
 
 
-# --- Per-top-level-call fragment work budget (v33 giant-molecule hang fix) ---
+# --- Per-top-level-call fragment work budget (giant-molecule hang fix) ---
 #
 # A hard ceiling on how many recursive fragment-naming ATTEMPTS one top-level
 # ``name()`` call may make. It guarantees that EVERY molecule terminates (name or
@@ -321,15 +324,15 @@ _WORK_BUDGET = 6000
 # witnesses vs the nameable porphyrin/chlorophyll controls, M2-5-HANG-LIVESPY /
 # -TASK2A-REFUTED) found TWO ORTHOGONAL explosion modes, needing two budgets:
 #
-#   1. INNER-OP explosion (metallo-corrins): millions of iterations of the
-#      ``polycyclic`` von-Baeyer main-ring path DFS + the ``_best_disjoint_pair``
-#      O(paths^2) pairing loop, spread over only a MODEST number of analysis
-#      CALLS (a call-count budget cannot see it). Bounded by ``_PERF_BUDGET``.
-#   2. CALL-COUNT explosion (cob(III)yrinate; vancomycin; the thiopeptide): the
-#      substituent recursion re-invokes the expensive analyses THOUSANDS of times
-#      (von-Baeyer ``analyze`` / the fused-heterocycle core matcher), each call
-#      individually cheap so the inner-op budget barely moves. Bounded by
-#      ``_ANALYSIS_CALL_BUDGET``.
+# 1. INNER-OP explosion (metallo-corrins): millions of iterations of the
+# ``polycyclic`` von-Baeyer main-ring path DFS + the ``_best_disjoint_pair``
+# O(paths^2) pairing loop, spread over only a MODEST number of analysis
+# CALLS (a call-count budget cannot see it). Bounded by ``_PERF_BUDGET``.
+# 2. CALL-COUNT explosion (cob(III)yrinate; vancomycin; the thiopeptide): the
+# substituent recursion re-invokes the expensive analyses THOUSANDS of times
+# (von-Baeyer ``analyze`` / the fused-heterocycle core matcher), each call
+# individually cheap so the inner-op budget barely moves. Bounded by
+# ``_ANALYSIS_CALL_BUDGET``.
 #
 # No size / aromatic / path-count prefilter separates the hangs from the nameable
 # controls: the corrins are SMALLER and have FEWER paths per pair than the
@@ -353,7 +356,7 @@ _WORK_BUDGET = 6000
 # to the SAME clean abstain the engine already emits for an unnameable input
 # (inv 9: a clean abstain, never a partial / atom-dropped / wrong name). A
 # molecule that never approaches either budget is byte-identical.
-import os as _os  # noqa: E402  (used for the budget-tuning env overrides below)
+import os as _os  # noqa: E402 (used for the budget-tuning env overrides below)
 
 # Constants are env-overridable (tuning / an OFF switch, mirroring
 # ORTHONYM_JVM_BUDGET): set to 0 to DISABLE that budget (never raises).
@@ -438,6 +441,22 @@ def disarm_hang_budgets() -> None:
     re-trigger ``PerfBudgetExceeded`` and escape the boundary."""
     _fragment_guard.perf_budget = None
     _fragment_guard.analysis_budget = None
+
+
+def rearm_hang_budgets() -> None:
+    """Re-arm both macrocycle-hang budgets to a FRESH ceiling.
+
+    Used by the outermost ``PerfBudgetExceeded`` boundary to BOUND a single
+    last-resort whole-molecule T4 rescue attempt made AFTER the main-path budget
+    was exhausted (the ``_try_perf_budget_t4_rescue`` recovery). A fresh ceiling
+    guarantees the rescue itself terminates: if the rescue's own analysis
+    re-explodes it re-raises ``PerfBudgetExceeded`` (caught by the rescue -> clean
+    abstain) rather than hanging. Mirrors the arming ``enter_name_scope`` does on
+    the 0->1 transition; a constant of 0 (env OFF switch) leaves the budget
+    unarmed (None) so the corresponding ``spend_*`` stays a permanent no-op."""
+    _fragment_guard.perf_budget = _PERF_BUDGET if _PERF_BUDGET > 0 else None
+    _fragment_guard.analysis_budget = (
+        _ANALYSIS_CALL_BUDGET if _ANALYSIS_CALL_BUDGET > 0 else None)
 
 
 def enter_name_scope():
@@ -540,7 +559,7 @@ def isolated_naming_session(reset_cache: bool = False):
     """
     saved_depth = getattr(_fragment_guard, 'session_depth', 0)
     saved_visited = getattr(_fragment_guard, 'visited', None)
-    # v33 giant-molecule hang fix: the fragment CACHE is deliberately NOT reset or
+    # giant-molecule hang fix: the fragment CACHE is deliberately NOT reset or
     # restored here (unless ``reset_cache``). It memoizes (canonical SMILES -> name),
     # a context-free pure function, so keeping it live across the isolation boundary
     # is always correct and prevents a >60-heavy-atom molecule from re-naming the
@@ -625,7 +644,7 @@ def name_fragment_recursively(smiles: str, style: str = 'pin',
     # (or vice versa). For the default 'pin' style the key IS ``canonical`` and
     # every cache read/write below is byte-identical to the pre-style behaviour;
     # the static FRAGMENT_NAME_CACHE holds pin names, so a 'systematic' key never
-    # hits it and the systematic path falls through to name_compound. (v30 Slice C
+    # hits it and the systematic path falls through to name_compound. (Slice C
     # slice-2: the amido converter needs the systematic acid name for amino-acid
     # rings — 'pyrrolidine-2-carboxylic acid', not the retained 'proline'.)
     cache_key = canonical if style == 'pin' else f"{canonical}\x00{style}"
@@ -642,7 +661,7 @@ def name_fragment_recursively(smiles: str, style: str = 'pin',
         if dynamic is not None:
             return dynamic if dynamic is not _NEG_CACHE else None
 
-    # v33 giant-molecule hang fix: charge the per-top-level work budget for every
+    # giant-molecule hang fix: charge the per-top-level work budget for every
     # genuine naming ATTEMPT (a cache hit above is free and already returned). This
     # counts the cheap-but-unbounded outcomes too -- the depth-net and cycle
     # fallbacks below are exactly the hot loop a giant molecule spins in, so the
@@ -668,7 +687,7 @@ def name_fragment_recursively(smiles: str, style: str = 'pin',
             "CYCLE detected: smiles=%s already in visited set (size=%d)",
             smiles[:60], len(visited),
         )
-        # v25 P0 Task 0.1: fragment could not be named (cycle guard).
+        # Task 0.1: fragment could not be named (cycle guard).
         from ..metrics.abstention import AbstentionCode, record_abstention
         record_abstention(AbstentionCode.BRANCH_UNNAMEABLE,
                           detail='fragment_cycle')
@@ -687,14 +706,14 @@ def name_fragment_recursively(smiles: str, style: str = 'pin',
         # name_pipeline_only has no `style` parameter, so it can only honour the
         # default 'pin' request; for a 'systematic' request skip it (returning a
         # pin fallback would answer the wrong question) and fall through to the
-        # abstention below. Cache under the style-aware key. (review NIT 9.)
+        # abstention below. Cache under the style-aware key. (a review review NIT 9.)
         fallback_name = (name_pipeline_only(canonical) if style == 'pin'
                          else None)
         if fallback_name is not None and not is_refusal_sentinel(fallback_name):
             if runtime_cache is not None:
                 runtime_cache[cache_key] = fallback_name
             return fallback_name
-        # v25 P0 Task 0.1: fragment could not be named (depth safety net).
+        # Task 0.1: fragment could not be named (depth safety net).
         from ..metrics.abstention import AbstentionCode, record_abstention
         record_abstention(AbstentionCode.BRANCH_UNNAMEABLE,
                           detail='fragment_depth_limit')
@@ -709,7 +728,7 @@ def name_fragment_recursively(smiles: str, style: str = 'pin',
         # THE chokepoint where a WHOLE-MOLECULE naming becomes a NAME COMPONENT.
         # `name_compound` is always-emit: when it cannot name the input it returns
         # a refusal sentinel STRING ('zinc compound (not supported)',
-        # 'unknown organic compound', ...), not None. Returning that string to a
+        # 'unknown organic compound',...), not None. Returning that string to a
         # caller that only asks "is it non-empty?" is how a sentinel got welded
         # into a name -- CCS[Zn]SCC -> 'zinc compound (not supported)ylethane'.
         # Every one of this function's ~40 call sites consumes the result as a
@@ -719,7 +738,7 @@ def name_fragment_recursively(smiles: str, style: str = 'pin',
             from ..metrics.abstention import AbstentionCode, record_abstention
             record_abstention(AbstentionCode.BRANCH_UNNAMEABLE,
                               detail='fragment_refusal_sentinel')
-            # v33: this fragment is context-independently unnameable (the namer
+            #: this fragment is context-independently unnameable (the namer
             # refused it standalone). Negative-cache it so the partition search
             # never re-descends this dead end (giant-molecule hang fix).
             if runtime_cache is not None:
@@ -730,7 +749,7 @@ def name_fragment_recursively(smiles: str, style: str = 'pin',
             if runtime_cache is not None:
                 runtime_cache[cache_key] = result
             return result
-        # v25 P0 Task 0.1: fragment could not be named (empty result).
+        # Task 0.1: fragment could not be named (empty result).
         # NOT negative-cached: an empty result can be depth-INDUCED (name_compound's
         # own substituent recursion hit the depth net), so it may succeed at a
         # shallower depth -- caching it would cost breadth. Only the explicit
@@ -744,7 +763,7 @@ def name_fragment_recursively(smiles: str, style: str = 'pin',
             "Fragment naming exception: smiles=%s error=%s",
             smiles[:60], e,
         )
-        # v25 P0 Task 0.1: fragment could not be named (exception).
+        # Task 0.1: fragment could not be named (exception).
         from ..metrics.abstention import AbstentionCode, record_abstention
         record_abstention(AbstentionCode.BRANCH_UNNAMEABLE,
                           detail='fragment_exception')

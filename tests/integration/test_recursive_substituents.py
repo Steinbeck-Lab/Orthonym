@@ -1,4 +1,4 @@
-"""Integration tests for recursive substituent naming (Phase 38-02).
+"""Integration tests for recursive substituent naming (a phase-02).
 
 Tests end-to-end naming of molecules with complex (branched/functionalized)
 substituents through the full pipeline, plus unit-level checks on the
@@ -231,7 +231,7 @@ class TestCompoundSubstituentFormatting:
     @pytest.mark.integration
     def test_sec_butyl_parens(self):
         """sec-butyl is a SIMPLE substituent -> NO enclosing marks (P-16.3.3(b);
-        cf. the contributor guide '3-tert-butyl-...'). The old parens-for-any-hyphen rule
+        cf. CLAUDE.md '3-tert-butyl-...'). The old parens-for-any-hyphen rule
         was stale."""
         result = format_substituent_prefix("sec-butyl", [3], 1)
         assert result == "3-sec-butyl"
@@ -281,7 +281,7 @@ class TestIsComplexSubstituent:
 
     @pytest.mark.integration
     def test_complex_tert_butyl(self):
-        # P-16.3.3(b): tert-butyl is SIMPLE (cf. the contributor guide '3-tert-butyl-...').
+        # P-16.3.3(b): tert-butyl is SIMPLE (cf. CLAUDE.md '3-tert-butyl-...').
         assert is_complex_substituent("tert-butyl") is False
 
 
@@ -306,10 +306,10 @@ class TestParentToPrefix:
 
     @pytest.mark.integration
     def test_locanted_alcohol_to_hydroxy(self):
-        # v29 residue Task A: (name, count) is not injective over fragments --
+        # residue Task A: (name, count) is not injective over fragments --
         # '-CH2CH2CH2OH' and '-CH(OH)CH2CH3' both cap to 'propan-1-ol' with
         # count 3, and OPSIN 2.9.0 makes the single old answer EXACT for one
-        # and a DIFFERENT MOLECULE for the other. P-46.1.8 (BB:22718) can only
+        # and a DIFFERENT MOLECULE for the other. P-46.1.8 (the Blue Book) can only
         # be honoured by a caller holding the molecule, so this declines; the
         # structural namers still give the right whole-molecule name.
         assert parent_to_prefix("propan-2-ol", 3, attach_locant=ATTACH_LOCANT_UNKNOWN) is None
@@ -320,9 +320,9 @@ class TestParentToPrefix:
 
     @pytest.mark.integration
     def test_aldehyde_to_oxo(self):
-        # Phase 172 MBA-02: the absorbed -CHO carbon sits at the terminus opposite
+        # a phase MBA-02: the absorbed -CHO carbon sits at the terminus opposite
         # the attachment (= chain_length), so oxo is at C3, not the acyl C1.
-        # '1-oxopropyl' is NOT a preferred IUPAC prefix (BlueBookV2.md Table-28.1 note m).
+        # '1-oxopropyl' is NOT a preferred IUPAC prefix (the Blue Book Table-28.1 note m).
         # Task A: `chain_length` is a COUNT, not a proof of chain length -- on
         # '2-methylpropanal' (count 4, stem 'prop') it spliced locant 4 onto a
         # three-position stem. Declines; the end-to-end name is unaffected.

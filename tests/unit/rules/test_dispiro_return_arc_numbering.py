@@ -1,7 +1,7 @@
 """Dispiro return-arc (segment ``d``) numbering direction — QM9 Class B fix.
 
 P-24.2.2 "Linear polyspiro alicyclic ring systems"
-(``BlueBookV2/BlueBookV2.md:9977``): the von Baeyer spiro descriptor is cited
+(``the Blue Book Blue Book``): the von Baeyer spiro descriptor is cited
 "...proceeding consecutively, always by the shorter path, to the other terminal
 ring through each spiro atom **and then back to the first spiro atom**." The
 first middle-ring arc (descriptor segment ``b``) is numbered forward from the

@@ -1,7 +1,7 @@
 """
-End-to-end tests for Phase 13: Radicals, Ions, Salts.
+End-to-end tests for a phase: Radicals, Ions, Salts.
 
-Tests verify all Phase 13 requirements:
+Tests verify all a phase requirements:
 - ION-01: Anion naming (carboxylate, alkoxide, phenolate, aminide, carbanion)
 - ION-02: Cation naming (aminium, ylium, diazonium, quaternary ammonium)
 - RAD-01: Radical naming (monovalent -yl, divalent -ylidene, trivalent -ylidyne)
@@ -118,7 +118,7 @@ class TestION02AminiumCations:
     """Test aminium cation naming (R-NH3+, R4N+)."""
 
     @pytest.mark.parametrize("smiles,expected", [
-        ('[NH4+]', 'ammonium'),
+        ('[NH4+]', 'azanium'),  # P-73.1.1.2 PIN (was 'ammonium', Table-7.3 retained)
         ('C[NH3+]', 'methylammonium'),
         ('CC[NH3+]', 'ethylammonium'),
         ('CCC[NH3+]', 'propylammonium'),
@@ -175,29 +175,29 @@ class TestION02OniumCations:
     """Test onium cation naming (oxonium, sulfonium, phosphonium)."""
 
     def test_oxonium(self):
-        """Oxonium (H3O+)."""
+        """Oxidanium (H3O+): P-73.1.1.2 PIN (was 'oxonium', Table-7.3 retained)."""
         result = name_compound('[OH3+]')
-        assert result == 'oxonium', f'Got: {result}'
+        assert result == 'oxidanium', f'Got: {result}'
 
     def test_methyloxonium(self):
-        """Methyloxonium."""
+        """Methyloxidanium: P-73.1.1.2 PIN (was 'methyloxonium')."""
         result = name_compound('C[OH2+]')
-        assert result == 'methyloxonium', f'Got: {result}'
+        assert result == 'methyloxidanium', f'Got: {result}'
 
     def test_dimethyloxonium(self):
-        """Dimethyloxonium."""
+        """Dimethyloxidanium: P-73.1.1.2 PIN (was 'dimethyloxonium')."""
         result = name_compound('C[OH+]C')
-        assert result == 'dimethyloxonium', f'Got: {result}'
+        assert result == 'dimethyloxidanium', f'Got: {result}'
 
     def test_phosphonium(self):
-        """Phosphonium (PH4+)."""
+        """Phosphanium (PH4+): P-73.1.1.2 PIN (was 'phosphonium')."""
         result = name_compound('[PH4+]')
-        assert result == 'phosphonium', f'Got: {result}'
+        assert result == 'phosphanium', f'Got: {result}'
 
     def test_trimethylsulfonium(self):
-        """Trimethylsulfonium."""
+        """Trimethylsulfanium: P-73.1.1.2 PIN (was 'trimethylsulfonium')."""
         result = name_compound('C[S+](C)C')
-        assert result == 'trimethylsulfonium', f'Got: {result}'
+        assert result == 'trimethylsulfanium', f'Got: {result}'
 
 
 # =============================================================================
@@ -425,7 +425,7 @@ class TestSALT01TransitionMetalSalts:
 # =============================================================================
 
 class TestNeutralMoleculeRegression:
-    """Ensure neutral molecules still named correctly after Phase 13."""
+    """Ensure neutral molecules still named correctly after a phase."""
 
     @pytest.mark.parametrize("smiles,expected", [
         ('CCO', 'ethanol'),
@@ -463,7 +463,7 @@ class TestNeutralMoleculeRegression:
 
 
 class TestNoRegressionOnExistingTests:
-    """Ensure all Phase 13 modules can be imported."""
+    """Ensure all a phase modules can be imported."""
 
     def test_can_import_all_naming_modules(self):
         """Verify all naming modules import without error."""
@@ -520,8 +520,8 @@ class TestEdgeCases:
         """Single ion (not salt) naming."""
         # Single cation only
         result = name_compound('[NH4+]')
-        assert result == 'ammonium', f'Got: {result}'
-        # Not 'ammonium something' - just the cation
+        assert result == 'azanium', f'Got: {result}'  # P-73.1.1.2 PIN (was 'ammonium')
+        # Not 'azanium something' - just the cation
 
     def test_multiple_charges_same_atom(self):
         """Handle divalent ions correctly."""
@@ -554,9 +554,9 @@ class TestRetainedNamesConsistency:
         assert result == 'formate', f'Got: {result}'
 
     def test_ammonium_retained(self):
-        """Ammonium should use retained name."""
+        """NH4+ PIN is 'azanium' (P-73.1.1.2, the Blue Book; was 'ammonium')."""
         result = name_compound('[NH4+]')
-        assert result == 'ammonium', f'Got: {result}'
+        assert result == 'azanium', f'Got: {result}'
 
     def test_methyl_radical_retained(self):
         """Methyl radical should use retained name."""
@@ -570,7 +570,7 @@ class TestRetainedNamesConsistency:
 
 class TestRequirementsVerification:
     """
-    Explicit verification that each Phase 13 requirement is met.
+    Explicit verification that each a phase requirement is met.
 
     Requirements:
     - ION-01: Anion naming for carboxylate, alkoxide, phenolate, carbanion

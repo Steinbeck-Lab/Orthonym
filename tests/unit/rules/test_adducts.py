@@ -53,11 +53,14 @@ class TestNameComponent:
         assert _name_component("[Fe]", "pin") is None
 
     def test_unnameable_fragment_fails_closed(self):
-        # NCC(=O)Nc1ccc(OCC)cc1 is unnameable at HEAD (probe 2026-07-09:
-        # 'unknown organic compound') -> component naming must refuse,
-        # never emit/propagate an unknown placeholder.
+        # A fragment the PIN namer cannot build -> component naming must refuse,
+        # never emit/propagate an unknown placeholder. (Fixture updated 2026-09-03:
+        # the old NCC(=O)Nc1ccc(OCC)cc1 now names as the engine improved; this
+        # silabicyclic ring still abstains at PIN. Do NOT re-pin to the old name --
+        # its emitted spelling 'ethanamide' is itself a spelling-layer defect,
+        # should be 'acetamide' per BB P-66.1.1.1.)
         from orthonym.rules.adducts import _name_component
-        assert _name_component("NCC(=O)Nc1ccc(OCC)cc1", "pin") is None
+        assert _name_component("c1ccc2c(c1)[SiH2]cc2", "pin") is None
 
 
 class TestComponentOrdering:
@@ -71,12 +74,12 @@ class TestComponentOrdering:
         return sorted(canon, key=component_sort_key)
 
     def test_alcohol_before_no_pcg_ring(self):
-        # BB line 4661: 'ethanol—pyridine (1/1) (PIN)'
+        # the Blue Book: 'ethanol—pyridine (1/1) (PIN)'
         assert self._ordered(["c1ccncc1", "CCO"]) == [
             Chem.CanonSmiles("CCO"), Chem.CanonSmiles("c1ccncc1")]
 
     def test_acid_before_amine(self):
-        # BB line 4686: 'oxalic acid—ethane-1,2-diamine—water (2/2/3)'
+        # the Blue Book: 'oxalic acid—ethane-1,2-diamine—water (2/2/3)'
         assert self._ordered(["NCCN", "OC(=O)C(=O)O"]) == [
             Chem.CanonSmiles("OC(=O)C(=O)O"), Chem.CanonSmiles("NCCN")]
 
@@ -86,14 +89,14 @@ class TestComponentOrdering:
             Chem.CanonSmiles("c1ccccc1"), Chem.CanonSmiles("c1ccncc1")]
 
     def test_organic_before_inorganic_acid(self):
-        # BB line 4675: '...pentane-1,4-diamine—phosphoric acid (1/2)':
+        # the Blue Book: '...pentane-1,4-diamine—phosphoric acid (1/2)':
         # phosphoric acid carries a PCG rank (idx 23 < amine 84) but has NO
         # carbon -> inorganic bucket, cited AFTER every organic component.
         assert self._ordered(["OP(=O)(O)O", "NCCN"]) == [
             Chem.CanonSmiles("NCCN"), Chem.CanonSmiles("OP(=O)(O)O")]
 
     def test_organic_before_hydrogen_chloride(self):
-        # BB line 4677 nicotine—hydrogen chloride pattern
+        # the Blue Book nicotine—hydrogen chloride pattern
         assert self._ordered(["Cl", "CN1CCCC1c1cccnc1"]) == [
             Chem.CanonSmiles("CN1CCCC1c1cccnc1"), Chem.CanonSmiles("Cl")]
 
@@ -127,18 +130,19 @@ class TestNameAdduct:
         assert "—" in name and " (1/1)" in name
 
     def test_bb_ethanol_pyridine(self):
-        # BB line 4661 worked example
+        # the Blue Book worked example
         assert self._name("CCO.c1ccncc1") == "ethanol—pyridine (1/1)"
 
     def test_bb_2_2_3_proportions(self):
-        # BB line 4686: 'oxalic acid—ethane-1,2-diamine—water (2/2/3)'
+        # the Blue Book: 'oxalic acid—ethane-1,2-diamine—water (2/2/3)'
         smi = "OC(=O)C(=O)O.OC(=O)C(=O)O.NCCN.NCCN.O.O.O"
         assert self._name(smi) == (
             "oxalic acid—ethane-1,2-diamine—water (2/2/3)")
 
     def test_any_unnameable_fragment_fails_closed(self):
-        # glycinamide-aryl fragment unnameable at HEAD (probe 2026-07-09)
-        assert self._name("O.NCC(=O)Nc1ccc(OCC)cc1") is None
+        # a fragment the PIN namer cannot build -> whole adduct fails closed
+        # (fixture updated 2026-09-03; see test_unnameable_fragment_fails_closed)
+        assert self._name("O.c1ccc2c(c1)[SiH2]cc2") is None
 
     def test_all_identical_fragments_decline(self):
         # >=2 DISTINCT components required (adducts are combinations of
@@ -167,7 +171,7 @@ class TestAdductDispatch:
     '[Ni].C=CC.C=CC' names to the OPSIN-unparseable 'bis(η3-...)nickel' which
     the gate turns into 'nickel compound (not supported)'. So we re-enable the
     gate here exactly as test_opsin_validity_gate.py does — this is the true
-    production path that  exercises."""
+    production path that scripts/diagnose.py exercises."""
 
     @pytest.fixture(autouse=True)
     def _force_enable_gate(self, monkeypatch):
@@ -189,7 +193,7 @@ class TestAdductDispatch:
         assert self._nc("c1ccccc1.c1ccncc1") == "benzene—pyridine (1/1)"
 
     def test_mixed_hydrochloride(self):
-        # P-14.8.2 pattern (BB line 4677). DIVERGENCE from the plan's stale
+        # P-14.8.2 pattern (the Blue Book). DIVERGENCE from the plan's stale
         # expected: at this HEAD the organic fragment names to the RETAINED
         # name 'nicotine' (not '3-(1-methylpyrrolidin-2-yl)pyridine'); the
         # resulting 'nicotine—hydrogen chloride (1/1)' OPSIN-RTs cleanly to
@@ -198,7 +202,7 @@ class TestAdductDispatch:
             "nicotine—hydrogen chloride (1/1)")
 
     def test_mixed_phosphoric_1_2(self):
-        # P-14.8.2 -a/-b (BB line 4675 pattern; OPSIN verified)
+        # P-14.8.2 -a/-b (the Blue Book pattern; OPSIN verified)
         assert self._nc("OP(=O)(O)O.OP(=O)(O)O.NCCN") == (
             "ethane-1,2-diamine—phosphoric acid (1/2)")
 
@@ -212,8 +216,15 @@ class TestAdductDispatch:
         assert self._nc("[Na+].[Cl-]") == "sodium chloride"
 
     def test_organometallic_not_swallowed(self):
-        # ORGANOMETALLIC@50 owns bare-metal dot-SMILES; the adduct
-        # predicate must also decline ([Ni] not in the single-atom table)
+        # (item 4, FABLE -P1 review I3): the ORGANOMETALLIC handler used to
+        # name [Ni].C=CC.C=CC as bis(η³-prop-2-en-1-yl)nickel (C6H10Ni) for a
+        # C6H12Ni input -- data/organometallics.py maps neutral propene 'C=CC' to
+        # the η³-allyl ligand (C3H5, drops 1 H per ligand) and the carve-out
+        # (_ORGANOMETALLIC_ADDITIVE_PIN_RE) shipped it bypassing OPSIN. The
+        # atom-conservation veto (rules.organometallics._organometallic_conserves)
+        # now declines it -> the cascade abstains (organometallics are out of
+        # scope, P-69). ORGANOMETALLIC@50 owns bare-metal dot-SMILES; the adduct
+        # predicate also declines ([Ni] not in the single-atom table).
         assert self._nc("[Ni].C=CC.C=CC") == "nickel compound (not supported)"
 
     def test_identical_fragments_keep_frozen_space_join(self):
@@ -223,8 +234,9 @@ class TestAdductDispatch:
 
     def test_unnameable_distinct_set_fails_closed(self):
         # was a structure-dropping hazard: the legacy handler skipped
-        # unnameable fragments and joined the rest
-        assert self._nc("O.NCC(=O)Nc1ccc(OCC)cc1") == "unknown organic compound"
+        # unnameable fragments and joined the rest (fixture updated 2026-09-03;
+        # see test_unnameable_fragment_fails_closed)
+        assert self._nc("O.c1ccc2c(c1)[SiH2]cc2") == "unknown organic compound"
 
 
 class TestHydrateWordForms:
@@ -251,7 +263,7 @@ class TestHydrateWordForms:
             "oxalic acid hemihydrate")
 
     def test_sesquihydrate_multi_parent(self):
-        # BB line 4686: 'oxalic acid—ethane-1,2-diamine sesquihydrate'
+        # the Blue Book: 'oxalic acid—ethane-1,2-diamine sesquihydrate'
         # (2/2/3): non-water components em-dash joined WITHOUT proportions
         smi = "OC(=O)C(=O)O.OC(=O)C(=O)O.NCCN.NCCN.O.O.O"
         assert self._nc(smi) == (

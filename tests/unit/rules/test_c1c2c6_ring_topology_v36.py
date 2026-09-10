@@ -1,24 +1,24 @@
-"""v36 Milestone C1/C2/C6 — ring-topology construction gap.
+""" Milestone C1/C2/C6 — ring-topology construction gap.
 
-Grounding spy: `` (197 witnesses, 4 decline
+Grounding trace: `internal notes` (197 witnesses, 4 decline
 patterns). Witnesses here are BARE RING CORES whose topology currently abstains
 (the true ring-topology-construction population — not the C3 substituent/assembly
 gap). Every emitted ring name must OPSIN-round-trip to the input's full InChIKey
 (``opsin_roundtrip_check``) or the molecule abstains; a wrong-but-parseable name is
 a 0-wrong break and must never occur.
 
-Patterns (spy, VERIFIED):
-  A1  spiro-von-Baeyer with a BICYCLO cage: the ``-ene`` unsaturation suffix is
+Patterns (trace, VERIFIED):
+  A1 spiro-von-Baeyer with a BICYCLO cage: the ``-ene`` unsaturation suffix is
       emitted OUTSIDE the spiro brackets (``...octane-6,2'-oxolane]-3-ene``), which
       is OPSIN-grammar-invalid. VERIFIED fix: splice it INSIDE the cage component
       (``...oct-3-ene-6,2'-oxolane]``). Task 2. -> GREEN.
-  A2  spiro-von-Baeyer that builds a name with a SELF-01 wrong-numbering / other
+  A2 spiro-von-Baeyer that builds a name with a SELF-01 wrong-numbering / other
       construction bug (no trailing-ene). Task 3 triage. -> abstain today.
-  B   mixed-spiro-fused (spiro joining two fused/bridged sub-systems);
+  B mixed-spiro-fused (spiro joining two fused/bridged sub-systems);
       ``name_mixed_spiro_fused`` has no construction path. Task 5. -> abstain today.
-  C   3+-component ortho/ortho-peri-fused mancude; ``name_ortho_fused_bicyclic`` is
+  C 3+-component ortho/ortho-peri-fused mancude; ``name_ortho_fused_bicyclic`` is
       2-component-only. Task 4. -> abstain today.
-  D   bridged-fused whole-molecule; upstream parent-selection bypass (small ring
+  D bridged-fused whole-molecule; upstream parent-selection bypass (small ring
       claims parent, ``sub_count=0``). Task 5. -> abstain today.
 """
 from __future__ import annotations
@@ -28,7 +28,7 @@ from collections import namedtuple
 
 import pytest
 
-# --- witness sets (spy V36-SPY-C1C2C6.md; bare ring cores) --------------------
+# --- witness sets (trace V36-a trace-C1C2C6.md; bare ring cores) --------------------
 
 # Pattern A1: spiro-von-Baeyer, bicyclo cage, unsaturation suffix appended OUTSIDE
 # the brackets today (OPSIN-grammar-invalid). VERIFIED closeable by in-bracket
@@ -47,7 +47,7 @@ A1_WITNESSES = [
 ]
 
 # Pattern A2: spiro-von-Baeyer builds a name that SELF-01 rejects. MEASURED (Task 3,
-# V36-C1C2C6-TASK3-A2-FINDING.md): the spy's "wrong-numbering" premise is REFUTED --
+# V36-C1C2C6-TASK3-A2-FINDING.md): the trace's "wrong-numbering" premise is REFUTED --
 # 67/85 spiro-VB fails are STEREO-OMISSION (right constitution + numbering, missing P-91
 # descriptors), only 16 are real constitutional defects. A re-anchored stereo injection
 # closes a measured 40/85 (RT-gated, 0-wrong), but the clean wiring touches the SHARED
@@ -56,18 +56,18 @@ A1_WITNESSES = [
 A2_WITNESSES = [
     "c1cc2c(c3c1CNC3)O[C@@]1(CCC[C@H]3CCCC[C@@H]31)C2",   # stereo-omission (primed component)
     # The second A2 witness (C1=C[C@H]2C[C@H]3CC[C@]4(CCCO4)[C@@H]3CCC=C2C1) was
-    # RESOLVED by v38 CP2 (fused-atom numbering): it now names a determinate,
+    # RESOLVED by CP2 (fused-atom numbering): it now names a determinate,
     # full-InChIKey-RT-verified spiro-VB name (0-wrong). Promoted to
     # RESOLVED_BY_V38_CP2 below.
 ]
 
 # The A2 stereo-closeable witness was measured to RT-pass once its P-91 stereo
-# block is completed (finding doc). v38 CP2's fused-component numbering fix
+# block is completed (finding doc). CP2's fused-component numbering fix
 # delivered exactly that as a side effect, so it now RT-passes (see
 # ``test_a2_stereo_completion_target``, no longer xfail).
 A2_STEREO_CLOSEABLE = ["C1=C[C@H]2C[C@H]3CC[C@]4(CCCO4)[C@@H]3CCC=C2C1"]
 
-# v38 CP2 (fused-atom numbering, P-31.1.4 '4a'/'8a' fusion locants) RESOLVED two
+# CP2 (fused-atom numbering, P-31.1.4 '4a'/'8a' fusion locants) RESOLVED two
 # witnesses that abstained here: a mixed-spiro-fused decalin, and a spiro-VB whose
 # fused sub-component numbering was the blocker. Each now emits a determinate name
 # (identical across randomized atom orders) that OPSIN-round-trips to the input's
@@ -85,7 +85,7 @@ B_WITNESSES = [
     "C1=CCC2(C1)COc1ccccc12",
     "C1=CC2(C=CC1)Cc1ccccc1O2",
     # The third B witness (C1CC[C@@H]2C[C@]3(CC[C@H]2C1)CO3) built an unparseable
-    # spiro[decahydronaphthalene-7,2'-oxirane] at HEAD; v38 CP2 (correct 4a/8a
+    # spiro[decahydronaphthalene-7,2'-oxirane] at HEAD; CP2 (correct 4a/8a
     # fusion locants + completed stereo) RESOLVED it -> RESOLVED_BY_V38_CP2 below.
 ]
 
@@ -115,8 +115,8 @@ C_RESOLVED_BY_MASKED_SPIRO = [
 ]
 
 # MEASUREMENT (best-effort tier, this session): the von-Baeyer best-effort FLOOR
-# already RT-covers many 3+-component fused-mancude cores that the spy recorded as
-# PIN-tier abstentions (24/41 ortho-fused witnesses RT-pass). For those the v36
+# already RT-covers many 3+-component fused-mancude cores that the trace recorded as
+# PIN-tier abstentions (24/41 ortho-fused witnesses RT-pass). For those the
 # breadth win is ALREADY delivered (a 0-wrong non-PIN name); the remaining gap is
 # PIN-QUALITY (emitting the proper fusion name, e.g. pyrimido[4,5-b]quinoline,
 # instead of a triaza-von-Baeyer name) -- a separate, larger fusion-nomenclature
@@ -127,7 +127,7 @@ C_COVERED_BY_FLOOR = [
 ]
 
 # Pattern D: bridged-fused whole molecule. DEFERRED (V36-C1C2C6-TASK45-BCD-FINDING.md):
-# measurement REFUTES the spy's "pure routing bypass" premise -- detect_bridged_fused
+# measurement REFUTES the trace's "pure routing bypass" premise -- detect_bridged_fused
 # returns False and name_bridged_fused_system returns None for this macrocyclic-bridge
 # topology, so it is a detector+construction gap, not a routing patch. Abstains (0-wrong).
 D_WITNESSES = [
@@ -169,7 +169,7 @@ class _Timeout(Exception):
 def _ring_rt(smiles: str, timeout_s: int = 60) -> RT:
     """Best-effort name the molecule, then OPSIN-round-trip it to the input's
     full InChIKey. ``passed`` is True only when a non-empty name round-trips.
-    SKIPs (via _Timeout) if naming does not return within ``timeout_s`` (the spy's
+    SKIPs (via _Timeout) if naming does not return within ``timeout_s`` (the trace's
     single hang was an out-of-scope C70 fullerene; in-scope cores did not hang)."""
     from orthonym.namer import Orthonym
     from orthonym.validation.opsin_roundtrip import opsin_roundtrip_check
@@ -227,7 +227,7 @@ def test_a1_witness_names_and_rt(smiles):
 def test_a2_stereo_completion_target(smiles):
     """Task-3 target, now GREEN: this spiro-von-Baeyer core was constitution-correct
     but abstained because its P-91 stereo block was missing (V36-C1C2C6-TASK3-A2-FINDING.md).
-    v38 CP2's fused-component numbering fix delivered the closing behaviour as a
+     CP2's fused-component numbering fix delivered the closing behaviour as a
     side effect -- it now names and OPSIN-round-trips to the input's full InChIKey."""
     try:
         r = _ring_rt(smiles)
@@ -238,7 +238,7 @@ def test_a2_stereo_completion_target(smiles):
 
 @pytest.mark.parametrize("smiles", RESOLVED_BY_V38_CP2)
 def test_v38_cp2_resolved_witness_names_and_rt(smiles):
-    """v38 CP2 (fused-atom numbering, P-31.1.4) resolved these two previously-
+    """ CP2 (fused-atom numbering, P-31.1.4) resolved these two previously-
     abstaining witnesses: each now emits a determinate name that OPSIN-round-trips
     to the input's full InChIKey (0-wrong). A positive canary against re-breaking."""
     try:
@@ -265,7 +265,7 @@ def test_masked_spiro_core_names_and_rt(smiles):
 
 @pytest.mark.parametrize("smiles", C_COVERED_BY_FLOOR)
 def test_pattern_c_breadth_already_delivered_by_floor(smiles):
-    """Measurement: several 3+-component fused-mancude cores the spy logged as
+    """Measurement: several 3+-component fused-mancude cores the trace logged as
     PIN-tier abstentions already RT-pass at the best-effort tier (von-Baeyer floor
     or retained fused name). Breadth is delivered (0-wrong, non-PIN); the residual
     Task-4 gap is PIN-quality fusion naming, deferred."""

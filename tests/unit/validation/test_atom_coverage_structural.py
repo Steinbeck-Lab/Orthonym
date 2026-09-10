@@ -1,6 +1,6 @@
 """The atom-coverage validator must prove STRUCTURE, not compare counts.
 
-v29 residue, Task X.  ``validation/atom_coverage.py`` scored a name by
+ residue, Task X. ``validation/atom_coverage.py`` scored a name by
 ``min(parsed_heavy / total_heavy, 1.0)`` and called it complete at >= 0.80.
 Three independent failures followed, and each has a test here:
 
@@ -12,7 +12,7 @@ Three independent failures followed, and each has a test here:
      (alanine) passed on an identical element multiset.
 
 Every expectation below is grounded in observed OPSIN 2.9.0 output, recorded
-in the case docstrings -- none is a guess.  Asserted at the producer
+in the case docstrings -- none is a guess. Asserted at the producer
 (``validate_atom_coverage``), never through a consumer.
 """
 
@@ -50,7 +50,7 @@ def test_dropped_carbon_is_not_complete():
     """``CS(=O)(=O)NC`` -> ``methanesulfonamide`` drops the N-methyl carbon.
 
     OPSIN parses the name to ``CS(N)(=O)=O`` -- 5 heavy atoms against the
-    input's 6, i.e. ratio 0.833.  The old 0.80 threshold shipped this as
+    input's 6, i.e. ratio 0.833. The old 0.80 threshold shipped this as
     ``is_complete=True``.
     """
     r = _cov("CS(=O)(=O)NC", "methanesulfonamide")
@@ -71,7 +71,7 @@ def test_invented_nitrogen_is_visible_and_not_complete():
     """``CNCC(=O)N`` -> ``2-amino-2-(methylamino)acetamide`` invents an N.
 
     OPSIN parses to ``CNC(N)C(N)=O``: C3 N3 O1 (7 heavy) against the input's
-    C3 N2 O1 (6 heavy).  Every input atom has a counterpart, so any
+    C3 N2 O1 (6 heavy). Every input atom has a counterpart, so any
     coverage ratio is 1.0 -- the excess is only visible as ``extra_atoms``.
     Under the clamp this case scored a clean 1.000 / ``is_complete=True``.
     """
@@ -88,7 +88,7 @@ def test_gain_is_recoverable_from_the_result_not_hidden_by_a_clamp():
     """``parsed_heavy_atoms`` records the raw parse-back count, unclamped.
 
     The defect was that ``min(..., 1.0)`` destroyed the information before
-    the caller ever saw it.  A caller must be able to reconstruct the
+    the caller ever saw it. A caller must be able to reconstruct the
     unclamped count ratio from the result.
     """
     r = _cov("CNCC(=O)N", "2-amino-2-(methylamino)acetamide")
@@ -107,10 +107,10 @@ def test_same_formula_different_constitution_is_rejected():
 
     These are different molecules with the SAME molecular formula and the
     SAME heavy-atom element multiset (C3 N1 O2, 6 heavy atoms):
-      input  InChIKey FSYKKLYZXJSNPZ-UHFFFAOYSA-N
+      input InChIKey FSYKKLYZXJSNPZ-UHFFFAOYSA-N
       parsed InChIKey QNAYBMKLOCPYGJ-UHFFFAOYSA-N
     No count-based and no formula-based check can separate them; only
-    constitution can.  This is the test that a formula comparison fails.
+    constitution can. This is the test that a formula comparison fails.
     """
     r = _cov("CNCC(=O)O", "2-aminopropanoic acid")
     assert r.method == "parse_back"
@@ -147,7 +147,7 @@ def test_completeness_is_not_a_function_of_the_ratio():
 def test_element_substitution_is_not_covered():
     """``CCO`` named ``ethylamine``: 3 heavy atoms on both sides, 2 shared.
 
-    OPSIN parses ``ethylamine`` to ``CCN``.  A bare count says 3 of 3 and
+    OPSIN parses ``ethylamine`` to ``CCN``. A bare count says 3 of 3 and
     calls the oxygen covered by the nitrogen; only a per-ELEMENT multiset
     intersection sees that the O is unaccounted for and the N is invented.
     Added after mutation testing: mutants that restored the bare count, and
@@ -176,7 +176,7 @@ def test_inchi_failure_is_fail_closed(monkeypatch):
     """If InChI cannot be generated, the verdict must be 'not complete'.
 
     The hazard is specific: a helper that returned some CONSTANT on failure
-    would make both sides compare equal and pass everything.  Added after
+    would make both sides compare equal and pass everything. Added after
     mutation testing -- a mutant doing exactly that survived, as did one
     that reported the no-InChI exit as complete.
     """
@@ -197,7 +197,7 @@ def test_inchi_failure_is_fail_closed(monkeypatch):
 
 
 # ---------------------------------------------------------------------------
-# 4. the exact case must keep working (the contributor guide #9 -- do not unmask worse)
+# 4. the exact case must keep working (CLAUDE.md #9 -- do not unmask worse)
 # ---------------------------------------------------------------------------
 
 
@@ -232,9 +232,9 @@ def test_stereo_omission_is_out_of_scope_and_still_complete():
 
     ``C[C@H](N)C(=O)O`` -> ``2-aminopropanoic acid`` parses to the same
     constitution (QNAYBMKLOCPYGJ) and differs only in the stereo block
-    (REOHCLBHSA vs UHFFFAOYSA).  This validator answers "are these the same
+    (REOHCLBHSA vs UHFFFAOYSA). This validator answers "are these the same
     atoms, bonded the same way"; stereo is a different channel and is
-    deliberately not judged here.  Both full keys are exposed so a stricter
+    deliberately not judged here. Both full keys are exposed so a stricter
     caller can compare them.
     """
     r = _cov("C[C@H](N)C(=O)O", "2-aminopropanoic acid")

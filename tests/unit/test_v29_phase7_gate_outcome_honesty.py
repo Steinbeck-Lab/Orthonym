@@ -1,4 +1,4 @@
-"""v29 Phase 7 Task 1: ``gates_passed`` must report what the GATE DID.
+""" a phase Task 1: ``gates_passed`` must report what the GATE DID.
 
 Before this task ``name_tiered`` computed
 
@@ -14,7 +14,7 @@ passed anything, so every PIN-path emission on a machine with a jar was stamped
 is ever called, and the BBR-GATE stereo carve-out, which ships the full name
 after SELF-01 judged only the stereo-STRIPPED parse.
 
-Measured at ``a6cf6157`` (`` §2):
+Measured at `` (`internal notes` §2):
 three names OPSIN cannot parse at all reported ``gates_passed: ['SELF-01']``.
 
 These tests pin the honest report. **No emitted name changes** — only the label.
@@ -28,11 +28,11 @@ from orthonym.metrics import provenance as pv
 
 
 # The three T1 leaks from FINDINGS.md §2, with the exit each one takes in
-# `_final_opsin_validity_gate` (established by the Task 1 spy: a sys.settrace
+# `_final_opsin_validity_gate` (established by the Task 1 trace: a sys.settrace
 # line tracer scoped to the function's code object).
-#   CC=C.C=C.[Ti+2]        -> exit line 1030, _ORGANOMETALLIC_ADDITIVE_PIN_RE
-#   C[C@@H]1C[C@H]1CO      -> exit line 1110, BBR-GATE stereo carve-out
-#   C/C(=C\\C1C=CC=C1)/C(=O)O -> exit line 1110, BBR-GATE stereo carve-out
+# CC=C.C=C.[Ti+2] -> exit line 1030, _ORGANOMETALLIC_ADDITIVE_PIN_RE
+# C[C@@H]1C[C@H]1CO -> exit line 1110, BBR-GATE stereo carve-out
+# C/C(=C\\C1C=CC=C1)/C(=O)O -> exit line 1110, BBR-GATE stereo carve-out
 T1_LEAKS = {
     "CC=C.C=C.[Ti+2]": "carveout:organometallic_additive",
     "C[C@@H]1C[C@H]1CO": "self_consistency_constitution_only",
@@ -63,7 +63,7 @@ def test_genuinely_verified_name_still_reports_self01():
 def test_t1_leaks_do_not_claim_bare_self01():
     """Each measured leak reports the specific outcome its exit path took, and
     none of them contributes a bare ``SELF-01`` token."""
-    # Guard against the Phase 6 vacuous-test defect: an empty iterable makes
+    # Guard against the a phase vacuous-test defect: an empty iterable makes
     # the loop below pass without testing anything.
     assert len(T1_LEAKS) == 3, "the measured T1 leak set must not be empty"
     checked = 0
@@ -126,15 +126,15 @@ def test_gate_disabled_never_reports_verified():
 # 5. the ContextVar is reset per molecule (a stale outcome must not leak)
 # --------------------------------------------------------------------------
 
-# The leak-sensitive probe PAIR, measured at `8d0cd594`. Both ship the exact
+# The leak-sensitive probe PAIR, measured at. Both ship the exact
 # same string, and that collision is the point — see the test below.
-#   `[C-]#[O+]`  the gate SUPPRESSES the candidate to the descriptive fallback
-#                and records `suppressed` FOR 'unknown organic compound'.
-#   the C16H8 PAH ships 'unknown organic compound' having reached NO
-#                gate-recording branch at all, so its honest outcome is
-#                `not_run`. (5 of 60 pubchem_2000 rows land here; no EMITTED
-#                row does — a descriptive-fallback abstain is the realistic
-#                shape of "the gate was never invoked".)
+# `[C-]#[O+]` the gate SUPPRESSES the candidate to the descriptive fallback
+# and records `suppressed` FOR 'unknown organic compound'.
+# the C16H8 PAH ships 'unknown organic compound' having reached NO
+# gate-recording branch at all, so its honest outcome is
+# `not_run`. (5 of 60 pubchem_2000 rows land here; no EMITTED
+# row does — a descriptive-fallback abstain is the realistic
+# shape of "the gate was never invoked".)
 LEAK_PROBE_RECORDS = "[C-]#[O+]"
 LEAK_PROBE_NO_GATE = "C1=CC2=CC3=CC4=CC=CC5=C4C3=C2C1=C5"
 
@@ -187,9 +187,9 @@ def test_stale_outcome_cannot_leak_onto_a_molecule_the_gate_never_saw():
     nm = Orthonym()
 
     # (a) The recorder molecule records an outcome, and records it FOR the
-    #     string it ships. Asserted, not assumed: if a future change breaks
-    #     the collision the failure lands HERE with a clear message rather
-    #     than silently turning this test back into a tautology.
+    # string it ships. Asserted, not assumed: if a future change breaks
+    # the collision the failure lands HERE with a clear message rather
+    # than silently turning this test back into a tautology.
     recorder = nm.name_tiered(LEAK_PROBE_RECORDS)
     live = pv.get_provenance()
     assert live["gate_outcome"] == pv.GATE_OUTCOME_SUPPRESSED, (
@@ -201,7 +201,7 @@ def test_stale_outcome_cannot_leak_onto_a_molecule_the_gate_never_saw():
         "the leak")
 
     # (b) The second molecule reaches NO gate-recording branch, and ships the
-    #     SAME string, so the name guard cannot fire.
+    # SAME string, so the name guard cannot fire.
     ungated = nm.name_tiered(LEAK_PROBE_NO_GATE)
     assert ungated["name"] == recorder["name"], (
         f"probe pair broken: {LEAK_PROBE_NO_GATE} must ship the same string "
@@ -209,7 +209,7 @@ def test_stale_outcome_cannot_leak_onto_a_molecule_the_gate_never_saw():
         f"neutralised; got {ungated['name']!r} — pick a new pair")
 
     # (c) THE LEAK-SENSITIVE ASSERTION. Fails as `suppressed != not_run` if
-    #     the reset is removed.
+    # the reset is removed.
     assert ungated["gate_outcome"] == pv.GATE_OUTCOME_NOT_RUN, (
         f"stale gate outcome leaked onto the next molecule: expected "
         f"{pv.GATE_OUTCOME_NOT_RUN!r}, got {ungated['gate_outcome']!r} — "
@@ -217,7 +217,7 @@ def test_stale_outcome_cannot_leak_onto_a_molecule_the_gate_never_saw():
     assert "self_consistency" not in ungated["gates_passed"]
 
     # (d) The reverse order must not leak either: the recorder still reports
-    #     its own outcome after the ungated molecule left `not_run` behind.
+    # its own outcome after the ungated molecule left `not_run` behind.
     again = nm.name_tiered(LEAK_PROBE_RECORDS)
     assert again["gate_outcome"] == pv.GATE_OUTCOME_SUPPRESSED
 

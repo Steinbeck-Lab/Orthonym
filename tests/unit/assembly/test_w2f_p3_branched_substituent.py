@@ -2,7 +2,7 @@
 substituent on a ring principal-characteristic-group parent. Task 3.
 
 Expected PINs OPSIN-verified (opsin-cli-2.9.0 -> RDKit canonical == input) at
-plan-authoring time; see  §A/§D.
+plan-authoring time; see internal notes §A/§D.
 """
 import pytest
 from rdkit import Chem

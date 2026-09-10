@@ -1,4 +1,4 @@
-"""v26 BP-4 Phase 1 — substituent support for the algorithmic 2-component
+""" BP-4 a phase — substituent support for the algorithmic 2-component
 ortho-fused mancude heterocycle path.
 
 Root cause fixed: ``_try_algorithmic_fusion_name`` previously hard-refused the
@@ -10,16 +10,16 @@ applies the P-59.2.3 lowest-substituent-locant tie-break over the ring-system
 automorphisms, and fails closed at source when any exocyclic branch is
 unnameable.
 
-Blue Book grounding (BlueBookV2/BlueBookV2.md):
+Blue Book grounding (the Blue Book Blue Book):
 - P-25.3.3.1.2(a)/(b): ring numbering fixed by heteroatoms (set, then element
-  order O > S > Se > Te > N ...); substituents are NOT in that list.
+  order O > S > Se > Te > N...); substituents are NOT in that list.
 - P-59.2.3.1 / line 25503: when a choice remains, low locants to detachable
   prefixes, then alphanumerical — the symmetric-parent tie-break.
 
 These assert the NAME contract directly (via ``_try_algorithmic_fusion_name``)
 rather than through the full namer's SELF-01 gate, which fails OPEN under OPSIN
 subprocess contention (see NEXT-SESSION hazards). Each target PIN was verified
-this session to OPSIN-round-trip to the input SMILES via ``.
+this session to OPSIN-round-trip to the input SMILES via ``scripts/diagnose.py``.
 """
 import pytest
 from rdkit import Chem
@@ -116,10 +116,10 @@ class TestBP4Phase1FailClosed:
 
 
 class TestBP4Phase2Polycomponent:
-    """Phase 2: substituent support for the 3+-component cata-fused star class
+    """a phase: substituent support for the 3+-component cata-fused star class
     (single heteroring base + >=2 monocyclic children), reusing the identical
     numbering + assembler machinery. Each PIN verified this session to OPSIN
-    round-trip via """
+    round-trip via scripts/diagnose.py."""
 
     @pytest.mark.parametrize("smiles,expected", [
         ("Cc1cc2nc3ccoc3cc2o1", "2-methyldifuro[3,2-b:2',3'-e]pyridine"),
@@ -146,7 +146,7 @@ class TestBP4Phase2Polycomponent:
 
 
 class TestBP4Phase3PartialSaturation:
-    """Phase 3 (full): partially-saturated 2-component ortho-fused pairs named as
+    """a phase (full): partially-saturated 2-component ortho-fused pairs named as
     '<hydro>-<indicatedH>-<mancude parent>' (P-25.7.1.1 / P-14.4 / P-58.2). The
     maximum number of noncumulative double bonds is placed into the saturated
     region (a maximum matching of the saturated-carbon subgraph); unmatched
@@ -223,10 +223,10 @@ class TestBP4Phase3PartialSaturation:
 
 
 class TestBP3ClusterRDecoratedRingSubstituent:
-    """v26 BP-3 cluster R: a ring substituent that carries its OWN decorations
+    """ BP-3 cluster R: a ring substituent that carries its OWN decorations
     (rooted at a ring atom) now names via free-valence numbering + decoration
     placement, and the pyrazole/imidazole R-bug is fixed on the substituent path.
-    Each PIN OPSIN round-trip verified this session via """
+    Each PIN OPSIN round-trip verified this session via scripts/diagnose.py."""
 
     @pytest.mark.parametrize("smiles,expected", [
         # bare pyrazolyl — R-bug fix (was mis-id'd as imidazolyl -> unknown)
@@ -250,8 +250,11 @@ class TestBP3ClusterRDecoratedRingSubstituent:
         # to the chokepoint). Was `unknown`.
         ("O=C(c1ccccc1)c1cc(C)n(C)n1",
          "(1,5-dimethylpyrazol-3-yl)phenylmethanone"),
+        # (item 2): P-14.3.4 — a one-carbon `methanone` has a single
+        # position, so the `-1-` locant is omitted (matches the sibling rows
+        # above; RT-verified 2026-09-04, ITEM2-VERIFICATION.md).
         ("Cc1nn(C)c(O)c1C(=O)c1ccc(Cl)cc1Cl",
-         "(2,4-dichlorophenyl)(5-hydroxy-1,3-dimethylpyrazol-4-yl)methan-1-one"),
+         "(2,4-dichlorophenyl)(5-hydroxy-1,3-dimethylpyrazol-4-yl)methanone"),
         # bare heteroaryl methanones unchanged (regression guard)
         ("O=C(c1ccccc1)c1ccncc1", "phenyl(pyridin-4-yl)methanone"),
         ("O=C(c1ccccc1)c1cccnc1", "phenyl(pyridin-3-yl)methanone"),

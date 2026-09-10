@@ -4,7 +4,7 @@ Every OPSIN-RT-verified row is a passing gold; INTERNAL-ORACLE rows verify the
 structure round-trips (OPSIN 2.9 cannot parse the BB PIN); FAIL-CLOSED rows
 prove Orthonym declines (never emits a wrong bridged name).
 
-Plan: 
+Plan: docs/superpowers/plans/2026-07-09-wave2-p5_bridged.md
 """
 import pytest
 from rdkit import Chem

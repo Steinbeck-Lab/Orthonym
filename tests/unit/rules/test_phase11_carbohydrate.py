@@ -1,4 +1,4 @@
-"""v23 Phase 11 (CARB-01) — carbohydrate sugar-ring-oxygen-drop root-cause + determinism.
+""" a phase (CARB-01) — carbohydrate sugar-ring-oxygen-drop root-cause + determinism.
 
 These lock in the root-cause fix (the PIN gate does NOT run the unit suite, so a
 regression in the shared ring-substituent numbering path would otherwise slip
@@ -39,7 +39,7 @@ from orthonym.namer import name_compound
     # 1,5-anhydro-D-glucitol (oxane ring; NOT a catalog anhydro sugar -> fallback)
     ("C1[C@H](O)[C@@H](O)[C@H](O)[C@H](O1)CO",
      "(2R,3S,4R,5S)-2-(hydroxymethyl)oxane-3,4,5-triol"),
-    # (W6B-T4) the 2-deoxy-beta-D-erythro-pentofuranose that USED to hit this
+    # (W6B-T4) the 2-deoxy-β-D-erythro-pentofuranose that USED to hit this
     # fallback now catalogs to its sugar PIN -- see TestW6bDeoxyHeptoseCatalog.
 ])
 def test_foxane_drop_hydroxymethyl_lowest_locant(smiles, expected):
@@ -59,10 +59,10 @@ def test_foxane_drop_no_bare_methyl_for_ch2oh():
 
 @pytest.mark.parametrize("smiles, expected", [
     # W6-P4: thio + anhydro sugars now catalog to their PIN (S / bridge preserved).
-    ("O[C@H]1[C@H](O)[C@@H](O)[C@H](O)[C@H](S1)CO", "5-thio-beta-D-glucopyranose"),
-    ("O[C@@H]1[C@H](O)[C@@H](O)[C@H](O)[C@H](S1)CO", "5-thio-alpha-D-glucopyranose"),
-    ("OC[C@H]1S[C@@H](O)[C@@H](O)[C@@H](O)[C@@H]1O", "5-thio-beta-D-mannopyranose"),
-    ("[C@H]12[C@H](O)[C@@H](O)[C@H](O)[C@H](O1)CO2", "1,6-anhydro-beta-D-glucopyranose"),
+    ("O[C@H]1[C@H](O)[C@@H](O)[C@H](O)[C@H](S1)CO", "5-thio-β-D-glucopyranose"),
+    ("O[C@@H]1[C@H](O)[C@@H](O)[C@H](O)[C@H](S1)CO", "5-thio-α-D-glucopyranose"),
+    ("OC[C@H]1S[C@@H](O)[C@@H](O)[C@@H](O)[C@@H]1O", "5-thio-β-D-mannopyranose"),
+    ("[C@H]12[C@H](O)[C@@H](O)[C@H](O)[C@H](O1)CO2", "1,6-anhydro-β-D-glucopyranose"),
 ])
 def test_thio_anhydro_catalog_pin(smiles, expected):
     assert name_compound(smiles) == expected
@@ -84,8 +84,8 @@ def test_foxane_drop_numbering_is_deterministic(smiles):
 def test_foxane_drop_failclosed_drops_no_heteroatoms():
     """A sugar sulfate ester never emits a sulfate-dropping structure-loss name.
 
-    alpha-D-glucopyranose 2-sulfate: W6-P1 now names it properly as the ester PIN
-    'alpha-D-glucopyranose 2-(hydrogen sulfate)' (previously it declined/failed
+    α-D-glucopyranose 2-sulfate: W6-P1 now names it properly as the ester PIN
+    'α-D-glucopyranose 2-(hydrogen sulfate)' (previously it declined/failed
     closed). Either way it must NEVER emit a sulfate-dropping '…methyloxane…' name.
     """
     name = name_compound("S(=O)(=O)(O)O[C@H]1[C@@H](O)O[C@@H]([C@H]([C@@H]1O)O)CO")
@@ -95,8 +95,8 @@ def test_foxane_drop_failclosed_drops_no_heteroatoms():
 # --- Regression guards: catalog sugars + ordinary heterocycles unchanged ----
 
 @pytest.mark.parametrize("smiles, expected", [
-    ("OC[C@H]1O[C@@H](O)[C@H](O)[C@@H](O)[C@@H]1O", "beta-D-glucopyranose"),
-    ("OC[C@H]1O[C@H](O)[C@H](O)[C@@H](O)[C@@H]1O", "alpha-D-glucopyranose"),
+    ("OC[C@H]1O[C@@H](O)[C@H](O)[C@@H](O)[C@@H]1O", "β-D-glucopyranose"),
+    ("OC[C@H]1O[C@H](O)[C@H](O)[C@@H](O)[C@@H]1O", "α-D-glucopyranose"),
     ("Cc1ccccn1", "2-methylpyridine"),
     ("CC1CCCCO1", "2-methyloxane"),
     ("OC1CCOCC1", "oxan-4-ol"),

@@ -1,7 +1,7 @@
 """
-Comprehensive End-to-End Integration Tests for Phase 6: Complex Ring Systems.
+Comprehensive End-to-End Integration Tests for a phase: Complex Ring Systems.
 
-Validates all Phase 6 requirements (COMPLEX-01 through COMPLEX-06 + VALID):
+Validates all a phase requirements (COMPLEX-01 through COMPLEX-06 + VALID):
 - COMPLEX-01: Bicyclo compound naming (bicyclo[x.y.z] format)
 - COMPLEX-02: Spiro compound naming (spiro[a.b] format)
 - COMPLEX-03: Ortho-fused bicyclics (decalin, tetralin, naphthalene)
@@ -9,7 +9,7 @@ Validates all Phase 6 requirements (COMPLEX-01 through COMPLEX-06 + VALID):
 - COMPLEX-05: Heterocyclic fused systems (indole, quinoline, carbazole)
 - COMPLEX-06: Complex PAHs (pyrene, perylene, coronene, etc.)
 
-This test file provides comprehensive E2E coverage for Phase 6 Final Validation.
+This test file provides comprehensive E2E coverage for a phase Final Validation.
 
 Reference: IUPAC 2013 Blue Book, Sections P-23, P-24, P-25, P-26
 """
@@ -269,9 +269,12 @@ class TestCOMPLEX05_FusedHeterocycles:
         # Benzimidazole
         ("c1ccc2[nH]cnc2c1", "1H-benzimidazole"),
         # Benzofuran
-        ("c1ccc2occc2c1", "benzofuran"),
+        #: PIN carries the O locant (P-25.2.2.4, the Blue Book
+        # "1-benzofuran (PIN) benzofuran")
+        ("c1ccc2occc2c1", "1-benzofuran"),
         # Benzothiophene
-        ("c1ccc2sccc2c1", "benzothiophene"),
+        #: PIN carries the S locant (P-25.2.2.4, the Blue Book)
+        ("c1ccc2sccc2c1", "1-benzothiophene"),
     ])
     def test_fused_heterocycle_retained_names(self, smiles, expected):
         """Test fused heterocycle retained names."""
@@ -383,11 +386,11 @@ class TestCOMPLEX06_PAHLookup:
 
 
 # =============================================================================
-# Phase 1-5 Regression Tests
+# a phase-5 Regression Tests
 # =============================================================================
 
 class TestPhase1Regression:
-    """Regression tests for Phase 1 (Foundation)."""
+    """Regression tests for a phase (Foundation)."""
 
     @pytest.mark.integration
     @pytest.mark.parametrize("smiles,expected", [
@@ -414,12 +417,12 @@ class TestPhase1Regression:
         ("CCC(O)C", "butan-2-ol"),
     ])
     def test_phase1_simple_compounds(self, smiles, expected):
-        """Phase 1 simple compound naming unchanged."""
+        """a phase simple compound naming unchanged."""
         assert name_compound(smiles) == expected
 
 
 class TestPhase2Regression:
-    """Regression tests for Phase 2 (Ring Foundation)."""
+    """Regression tests for a phase (Ring Foundation)."""
 
     @pytest.mark.integration
     @pytest.mark.parametrize("smiles,expected", [
@@ -435,12 +438,12 @@ class TestPhase2Regression:
         ("Cc1ccccc1", "toluene"),
     ])
     def test_phase2_ring_compounds(self, smiles, expected):
-        """Phase 2 ring compound naming unchanged."""
+        """a phase ring compound naming unchanged."""
         assert name_compound(smiles) == expected
 
 
 class TestPhase3Regression:
-    """Regression tests for Phase 3 (Heterocycles)."""
+    """Regression tests for a phase (Heterocycles)."""
 
     @pytest.mark.integration
     @pytest.mark.parametrize("smiles,expected", [
@@ -470,12 +473,12 @@ class TestPhase3Regression:
         ("c1cnccn1", "pyrazine"),
     ])
     def test_phase3_heterocycle_compounds(self, smiles, expected):
-        """Phase 3 heterocycle naming unchanged."""
+        """a phase heterocycle naming unchanged."""
         assert name_compound(smiles) == expected
 
 
 class TestPhase4Regression:
-    """Regression tests for Phase 4 (Polyfunctional)."""
+    """Regression tests for a phase (Polyfunctional)."""
 
     @pytest.mark.integration
     @pytest.mark.parametrize("smiles,expected", [
@@ -496,12 +499,12 @@ class TestPhase4Regression:
         ("CC#CC", "but-2-yne"),
     ])
     def test_phase4_functional_compounds(self, smiles, expected):
-        """Phase 4 polyfunctional naming unchanged."""
+        """a phase polyfunctional naming unchanged."""
         assert name_compound(smiles) == expected
 
 
 class TestPhase5Regression:
-    """Regression tests for Phase 5 (Stereochemistry)."""
+    """Regression tests for a phase (Stereochemistry)."""
 
     @pytest.mark.integration
     def test_stereochemistry_preserved(self):
@@ -623,7 +626,7 @@ class TestKnownLimitations:
     def test_dispiro_not_supported(self):
         """Dispiro systems are documented as unsupported."""
         # This would be something like dispiro[2.1.2.1]octane
-        # Not implemented in Phase 6
+        # Not implemented in a phase
         result = name_compound("C1CC2(C1)CC3(CC2)CC3")
         assert "dispiro" in result
 
@@ -644,7 +647,7 @@ class TestPhaseSummaryCounts:
 
     @pytest.mark.integration
     def test_phase6_e2e_coverage(self):
-        """Document comprehensive Phase 6 E2E coverage.
+        """Document comprehensive a phase E2E coverage.
 
         COMPLEX-01 (Bicyclo): 8 tests
         - Systematic naming: 4 parametrized
@@ -680,11 +683,11 @@ class TestPhaseSummaryCounts:
         - Data lookup: 2
 
         Regression (Phases 1-5): 60+ tests
-        - Phase 1: 20 parametrized
-        - Phase 2: 10 parametrized
-        - Phase 3: 19 parametrized
-        - Phase 4: 12 parametrized
-        - Phase 5: 2
+        - a phase: 20 parametrized
+        - a phase: 10 parametrized
+        - a phase: 19 parametrized
+        - a phase: 12 parametrized
+        - a phase: 2
 
         Routing/Classification: 6 tests
         Boundary conditions: 5 tests

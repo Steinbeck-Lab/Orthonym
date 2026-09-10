@@ -1,6 +1,6 @@
-"""v37 SP1.1b — recursive-fragment cap + best-effort flag propagation (SP4 addendum).
+""" — recursive-fragment cap + best-effort flag propagation (SP4 addendum).
 
-Two VERIFIED defects (grounding: , re-confirmed
+Two VERIFIED defects (grounding: internal notes, re-confirmed
 fresh on HEAD c59a7522 2026-08-25):
 
 1. **25-atom compound-substituent cap.** `substituent_enumerator._name_compound_substituent`
@@ -30,7 +30,7 @@ from orthonym.namer import name_compound
 from orthonym.validation.opsin_roundtrip import opsin_roundtrip_check
 
 
-# --- SP4 witnesses (V37-SPY-SP4.md) -----------------------------------------
+# --- SP4 witnesses (V37-a trace-SP4.md) -----------------------------------------
 # g1: steroidal sapogenin diglycoside — cap + flag-propagation blocked (this task).
 G1 = "CC1CCC2(OC1)OC1CC3C4CCC5CC(OC6OC(CO)C(O)C(OC7OC(CO)C(O)C(O)C7O)C6O)CCC5(C)C4CCC3(C)C1C2C"
 # g2: macrolide monoglycoside — aglycone is mixed-spiro-fused (SP3-owned, NOT this task).
@@ -116,8 +116,8 @@ class TestLargeCompoundSubstituentDelivered:
 # (names RT-exact OR abstains — never atom-dropped). g1/g3 additionally hit a
 # von-Baeyer AGLYCONE ring-construction blocker (parent + complex substituent:
 # `vonbaeyer_universal: descriptor edge-audit failed`) that is DOWNSTREAM of and
-# distinct from this task's two defects — an SP3/SP1.5-owned lever. The SP4 spy
-# (V37-SPY-SP4.md Claim 3) traced only the first (cap) warning and its premise
+# distinct from this task's two defects — an SP3/SP1.5-owned lever. The SP4 trace
+# (V37-a trace-SP4.md Claim 3) traced only the first (cap) warning and its premise
 # that g1/g3 reduce ENTIRELY to SP1's cap+flag is incomplete: the compound
 # substituent IS now nameable (proven above + by the aglycone-alone RT), but the
 # whole molecule still abstains on the aglycone parent. g2 is SP3-owned

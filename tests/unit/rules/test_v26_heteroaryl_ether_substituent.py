@@ -1,4 +1,4 @@
-"""v26 — heteroatom-rooted ether substituent on an N-heteroarene ring.
+""" — heteroatom-rooted ether substituent on an N-heteroarene ring.
 
 -O-R / -S-R / -Se-R / -Te-R substituents on a heteroarene ring were NOT named:
 classify_substituent counted the arm carbons and DROPPED the O/S/Se root, so the
@@ -37,7 +37,8 @@ def test_triazine_flagship():
     ("Cc1ccccn1", "2-methylpyridine"),
     ("Clc1ccccn1", "2-chloropyridine"),
     # O-ether on benzene (different handler) unaffected
-    ("COc1ccccc1", "methoxybenzene"),
+    # a review RISK 7: bare anisole IS the PIN (the Blue Book / the Blue Book)
+    ("COc1ccccc1", "anisole"),
 ])
 def test_regression_guards(smi, pin):
     assert name_compound(smi) == pin

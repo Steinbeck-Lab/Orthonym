@@ -130,3 +130,35 @@ def test_c4b_pure_primary_diamine_unchanged():
     yields 'benzene-1,4-diamine') — both are OPSIN-valid PINs/synonyms for the
     same molecule; the C4b fix must not touch it."""
     assert _pin("Nc1ccc(N)cc1") in {"benzene-1,4-diamine", "1,4-phenylenediamine"}
+
+
+# ---------------------------------------------------------------------------
+# P-16.5.1.1 — a COMPOUND N-substituent on the aniline parent takes its own
+# enclosing marks before the italic 'N-' locant (the Blue Book,
+# 4-(2-methylbutyl)-N-(3-methylbutyl)aniline). _name_substituted_aniline used
+# _wrap_n_substituent alone (escalate-only), so a mark-free compound prefix
+# emitted bare: 'N-3-methylbutylaniline'. The fix routes it through
+# enclose_if_compound first (the same base-enclosure step the polyfunctional
+# N-substituent path already applies). Simple prefixes stay bare.
+# ---------------------------------------------------------------------------
+
+@pytest.mark.parametrize("smiles,expected", [
+    # the Blue Book (P-14.5.4) worked example.
+    ("CCC(C)Cc1ccc(NCCC(C)C)cc1",
+     "4-(2-methylbutyl)-N-(3-methylbutyl)aniline"),
+    # A compound N-substituent with no ring locant still needs its marks.
+    ("CC(C)CNc1ccccc1", "N-(2-methylpropyl)aniline"),
+])
+def test_compound_n_substituent_encloses(smiles, expected):
+    assert _pin(smiles) == expected
+
+
+@pytest.mark.parametrize("smiles,expected", [
+    # Invariant 9: a SIMPLE N-substituent stays bare (no enclosure needed).
+    ("CNc1ccccc1", "N-methylaniline"),
+    ("CN(C)c1ccccc1", "N,N-dimethylaniline"),
+    ("c1ccc(Nc2ccccc2)cc1", "N-phenylaniline"),
+    ("CCNc1ccc(Cl)cc1", "4-chloro-N-ethylaniline"),
+])
+def test_simple_n_substituent_stays_bare(smiles, expected):
+    assert _pin(smiles) == expected

@@ -1,13 +1,13 @@
-"""Phase 165 Plan-01 Task-2 unit tests for ``name_tree_builder.fragments_to_tree``.
+"""a phase Plan-01 Task-2 unit tests for ``name_tree_builder.fragments_to_tree``.
 
 The deriver is a PURE transform: ``List[NameFragment] -> NameTreeNode``. It
 mirrors the ``_assemble_fragments`` classification loop
 (``_handler_shared.py:779-787``) and unsaturation unpacking (``:877-880``),
-populating the structured ``NameTreeNode`` fields for SCORE-02 / Phase 166
+populating the structured ``NameTreeNode`` fields for SCORE-02 / a phase
 while ALSO carrying ``fragment_legacy`` (the pre-assembled final string) so
-``name_tree_to_string`` round-trips byte-identically (D-02 dual-carry).
+``name_tree_to_string`` round-trips byte-identically (dual-carry).
 
-Per the contributor guide / fix-methodology: NO ``@pytest.mark.xfail`` in this module.
+Per CLAUDE.md / fix-methodology: NO ``@pytest.mark.xfail`` in this module.
 """
 from __future__ import annotations
 
@@ -99,7 +99,7 @@ class TestFieldMapping:
 
 
 class TestPurity:
-    """AP-160-15 / D-25: no mutation of inputs."""
+    """AP-160-15 /: no mutation of inputs."""
 
     def test_purity_inputs_unchanged(self):
         frags = [

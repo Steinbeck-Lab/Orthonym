@@ -2,7 +2,7 @@
 Wave2 Tier 4 — fused-name catalog extensions.
 
 Reproduce-first (see the Tier-4 research) reframed the master-plan Tier 4:
-the "coverage-veto" was a no-op (SELF-01 + the v23-13B(a) guard already fail
+the "coverage-veto" was a no-op (SELF-01 + the -13B(a) guard already fail
 these closed) and the general benzo-heterocycle CONSTRUCTOR + indicated-H
 via the algorithmic path both need a deep fusion-numbering-engine fix
 (heteroatom lowest-locant, O>N) that is deferred. The tractable, correct wins
@@ -86,13 +86,13 @@ def test_tier4_substituted_numbering(smiles, expected):
 # dibenzo[c,g]phenanthrene, which is its PREFERRED IUPAC NAME. "Pentahelicene"/
 # "[5]helicene" is NOT a retained name: P-25.1.2.6 "Polyhelicenes" begins the
 # helicene series at SIX rings ("The series begins with six rings and not five
-# rings ...", BlueBookV2.md:11477/11479), so a five-ring helix has no helicene
+# rings...", the Blue Book), so a five-ring helix has no helicene
 # name and degrades to the fusion PIN. dibenzo[c,g]phenanthrene is marked (PIN)
-# verbatim at BlueBookV2.md:6914 [P-25.3.4.2.1 (c) — phenanthrene base, two benzo
+# verbatim at the Blue Book [P-25.3.4.2.1 (c) — phenanthrene base, two benzo
 # first-order attached components preferred to one naphtho]. The engine now
 # BUILDS this correctly (earlier it over-matched a 4-ring benzo[c]phenanthrene
 # core and had to fail closed); OPSIN round-trips the emitted name to the input
-# InChIKey (0-wrong, machine-confirmed via ). The suite
+# InChIKey (0-wrong, machine-confirmed via scripts/diagnose.py). The suite
 # autouse-DISABLES the validity gate, so re-enable it to assert production output.
 # ---------------------------------------------------------------------------
 
@@ -125,7 +125,8 @@ def test_pentahelicene_names_as_fusion_pin(_validity_gate_on):
         ("c1ccc2cc3cc4cc5ccccc5cc4cc3cc2c1", "pentacene"),
         ("C1=CC=C2C=CC3=CC=CC4=CC=C1C2=C34", "pyrene"),
         ("c1ccc2cocc2c1", "2-benzofuran"),
-        ("c1ccc2occc2c1", "benzofuran"),
+        #: 1-benzofuran is the PIN (P-25.2.2.4, the Blue Book)
+        ("c1ccc2occc2c1", "1-benzofuran"),
         ("c1ccc2[nH]ccc2c1", "1H-indole"),
         ("c1ccc2ncccc2c1", "quinoline"),
         ("Cc1ccc2ccccc2c1", "2-methylnaphthalene"),

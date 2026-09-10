@@ -3,16 +3,16 @@
 THE DEFECT
 ----------
 ``Cn1cccc1`` was named ``1-methylazole`` and ``Cn1ccnc1`` ``1-methyl-1,3-diazole``.
-``azole`` is the Hantzsch-Widman systematic form; ``1,3-diazole`` likewise.  Both rings
+``azole`` is the Hantzsch-Widman systematic form; ``1,3-diazole`` likewise. Both rings
 have *retained* names that are PINs, and substituting the ring nitrogen does not demote
 them.
 
 THE RULE
 --------
 * **P-15.1.8.1** "Substitution rules for Type 1 retained names"
-  (``BlueBookV2/BlueBookV2.md:4916``), sentence ``:4918``: "Type 1 retained names of parent
+  (``the Blue Book Blue Book``), sentence ``:4918``: "Type 1 retained names of parent
   hydrides described in Chapters P-2 and P-3 have **unlimited substitution** by substituent
-  groups cited either as suffixes or prefixes."  Substitution never demotes a retained
+  groups cited either as suffixes or prefixes." Substitution never demotes a retained
   parent hydride to its systematic form.
 * **P-22.2.1** "Retained names of heteromonocycles" (``:8109``) prints, verbatim:
   ``pyrrole (1H-isomer shown; the PIN is 1H-pyrrole)`` (``:8163``),
@@ -34,18 +34,18 @@ THE RULE
 THE ROOT CAUSE
 --------------
 ``get_ring_canonical_smiles`` extracts the ring with ``Chem.MolFragmentToSmiles`` and looks
-the string up in an exact-SMILES table.  An N-substituted aromatic azole's ring nitrogen
+the string up in an exact-SMILES table. An N-substituted aromatic azole's ring nitrogen
 carries **zero** hydrogens, so the fragment comes back with a bare aromatic ``n``
-(``c1ccnc1``), which is not a kekulisable molecule at all.  It can never equal the table key
+(``c1ccnc1``), which is not a kekulisable molecule at all. It can never equal the table key
 ``c1cc[nH]c1``, and the lookup falls through to ``build_hw_name``.
 
 The substituent had displaced the ring's *indicated hydrogen*; the extraction has to put it
-back.  Two properties of the repair are load-bearing and are asserted below:
+back. Two properties of the repair are load-bearing and are asserted below:
 
-1. **Strictly additive.**  It only runs when the plain fragment is not a parseable molecule
-   -- i.e. only for keys that match nothing today.  Every ring whose fragment already
+1. **Strictly additive.** It only runs when the plain fragment is not a parseable molecule
+   -- i.e. only for keys that match nothing today. Every ring whose fragment already
    parses keeps its exact current key (``test_additive_*``).
-2. **Never crosses a fusion bond.**  Indole contains a pyrrole ring but is its own retained
+2. **Never crosses a fusion bond.** Indole contains a pyrrole ring but is its own retained
    name; ``1-methyl-1H-indole`` must not become a substituted pyrrole
    (``test_fused_*``).
 """
@@ -109,9 +109,9 @@ def test_end_to_end_name(smiles, expected):
 
 
 @pytest.mark.parametrize("smiles,historical_wrong_name", [
-    # Measured at fa9e4687, the commit this fix is based on.  ``azole`` is not a
+    # Measured at fa9e4687, the commit this fix is based on. ``azole`` is not a
     # name at all; ``1,2,3,4-tetrazole`` is the form P-14.3.4.2 (``:2989``)
-    # prints as ``(not ...)``; the diazoles are the HW forms of retained PINs.
+    # prints as ``(not...)``; the diazoles are the HW forms of retained PINs.
     ("Cn1cccc1", "1-methylazole"),
     ("Cn1ccnc1", "1-methyl-1,3-diazole"),
     ("Cn1cccn1", "1-methyl-1,2-diazole"),
@@ -129,15 +129,15 @@ def test_the_hw_systematic_form_is_gone(smiles, historical_wrong_name):
 #
 # ``orient_heterocycle_with_substituents`` decided which ring atom carries the
 # indicated hydrogen with ``GetTotalNumHs() >= 1`` -- an atom count the
-# substituent has already consumed.  An N-substituted azole nitrogen therefore
+# substituent has already consumed. An N-substituted azole nitrogen therefore
 # read as pyridine-type, lost its claim on locant 1, and the suffix took it
 # instead: ``Cn1nccc1C(=O)O`` came out ``2-methyl-1H-pyrazole-3-carboxylic
 # acid``, whose ``1H`` and whose ``2-methyl`` contradict each other.
 #
-# P-14.4 "NUMBERING" (``BlueBookV2.md:3219``) assigns low locants "in the
+# P-14.4 "NUMBERING" (``the Blue Book``) assigns low locants "in the
 # following decreasing order of seniority", and prints
 # **(b) indicated hydrogen** ahead of **(c) principal characteristic groups and
-# free valences (suffixes)**.  (b)'s own caveat -- "a higher locant may be
+# free valences (suffixes)**. (b)'s own caveat -- "a higher locant may be
 # needed at another position to accommodate a substituent suffix in accordance
 # with structural feature (d)" -- points at (d) *added* indicated hydrogen
 # (``3,4-dihydronaphthalen-1(2H)-one``), not at ordinary substitution.
@@ -156,20 +156,20 @@ def test_indicated_hydrogen_outranks_the_suffix_in_numbering(smiles, expected):
 
 # --------------------------------------------------------------------------
 # 2c. An isotopic descriptor has to be able to land in front of an
-#     indicated-hydrogen prefix.
+# indicated-hydrogen prefix.
 #
 # The P-82 decorator enumerates insertion offsets with ``skel[i].isalpha()``, so
-# the slot before ``1H-`` -- a digit -- was never offered.  With a bare parent
+# the slot before ``1H-`` -- a digit -- was never offered. With a bare parent
 # the front offset (0) covers it, but once substituent prefixes are present the
 # descriptor has to sit between them and the parent, and the molecule failed
 # closed instead.
 #
 # P-82 prints this construction four times, every one a PIN
-# (``BlueBookV2.md:43790``-``:43796``)::
+# (``the Blue Book``-``:43796``)::
 #
-#     (15N)-1H-indole (PIN)
-#     2,3-dihydro(15N)-1H-indole (PIN)
-#     2,3-dihydro(2,3-2H2,15N)-1H-indole (PIN)
+# (15N)-1H-indole (PIN)
+# 2,3-dihydro(15N)-1H-indole (PIN)
+# 2,3-dihydro(2,3-2H2,15N)-1H-indole (PIN)
 #
 # -- descriptor, then a hyphen, then the indicated-hydrogen prefix.
 # --------------------------------------------------------------------------
@@ -177,14 +177,15 @@ def test_indicated_hydrogen_outranks_the_suffix_in_numbering(smiles, expected):
 def test_isotopic_descriptor_reaches_an_indicated_hydrogen_parent():
     """The descriptor sits between the prefixes and the ``1H-`` parent.
 
-    The UNLOCANTED descriptor form ``(2H1)`` is this module's own pre-existing
-    P-45.4.1 preference -- the no-locant form is tried first and kept when it
-    round-trips -- and is not affected by this fix: before it, the same molecule
-    was named ``1-methyl-2-nitro(2H1)azole``, carrying the identical ``(2H1)``
-    against the (wrong) Hantzsch-Widman parent.  Only the parent moved.
+     (item 3, P-82.6.1.1): the descriptor carries its REQUIRED locant
+    ``(3-2H1)``. The old locant-free ``(2H1)`` was Blue-Book-wrong -- it only
+    round-tripped because OPSIN's default placement of an unlocanted single
+    label lands on position 3; locants 4/5 parse to genuinely different real
+    structures, so the position is not unique and the locant cannot be omitted
+    (RT-verified, internal notes).
     """
     assert name_compound("[2H]C1=C(N(C=C1)C)[N+](=O)[O-]") == \
-        "1-methyl-2-nitro(2H1)-1H-pyrrole"
+        "1-methyl-2-nitro(3-2H1)-1H-pyrrole"
 
 
 def test_isotopic_front_placement_unchanged():
@@ -194,7 +195,7 @@ def test_isotopic_front_placement_unchanged():
 
 # --------------------------------------------------------------------------
 # 3. Fused controls -- a ring that merely CONTAINS the pattern is a different
-#    ring system.  The repair must not cross a fusion bond.
+# ring system. The repair must not cross a fusion bond.
 # --------------------------------------------------------------------------
 
 @pytest.mark.parametrize("smiles", [
@@ -214,7 +215,7 @@ def test_fused_five_ring_never_acquires_a_monocycle_retained_name(smiles):
 @pytest.mark.parametrize("smiles,expected", [
     ("c1ccc2[nH]ccc2c1", "1H-indole"),
     ("Cn1ccc2ccccc21", "1-methyl-1H-indole"),
-    ("c1ccc2occc2c1", "benzofuran"),
+    ("c1ccc2occc2c1", "1-benzofuran"),  #: PIN locant (P-25.2.2.4, the Blue Book)
     ("c1ccc2[nH]c3ccccc3c2c1", "9H-carbazole"),
     ("c1ccc2[nH]cnc2c1", "1H-benzimidazole"),
     ("Cn1cnc2ccccc21", "1-methyl-1H-benzimidazole"),
@@ -226,7 +227,7 @@ def test_fused_names_unchanged(smiles, expected):
 
 # --------------------------------------------------------------------------
 # 4. Additivity -- every ring whose plain fragment already parses keeps its
-#    exact current key, and every ring the repair cannot prove stays unmatched.
+# exact current key, and every ring the repair cannot prove stays unmatched.
 # --------------------------------------------------------------------------
 
 @pytest.mark.parametrize("smiles,size,expected_key", [

@@ -1,9 +1,9 @@
-"""P-14.3.4 locant-omission licence primitives (v29 Phase C tranche B, Task 1).
+"""P-14.3.4 locant-omission licence primitives (Phase C tranche B, Task 1).
 
 ``orthonym.assembly.locant_omission`` is the ONE place the Blue Book's omission
 licences are decided. It is pure: RDKit mols in, booleans out.
 
-Governing rule chain, verbatim from ``BlueBookV2/BlueBookV2.md``:
+Governing rule chain, verbatim from ``the Blue Book Blue Book``:
 
 ``P-14.3.3`` "Citation of locants" (``:2869``) is **DENY BY DEFAULT** —
 
@@ -35,14 +35,14 @@ with the counter-clause (``:3009``)
 ``P-14.3.4.6`` (``:3031``)
 
     "All locants are omitted for parent compounds when all substitutable hydrogen atoms
-     have the same locant."   [example ``:3037`` ``difluoroacetic acid (PIN)``]
+     have the same locant." [example ``:3037`` ``difluoroacetic acid (PIN)``]
 
 ★ THE SELF-VALIDATING BOUNDARY PAIR — the reason these primitives count HYDROGENS and
 not positions:
 
-    ``:7625``   ``benzenehexol (PIN, P-63.1.2) (not benzenehexaol)``        -> OMITS
-    ``:54823``  "Inositols, cyclohexane-1,2,3,4,5,6-hexols, are a specific
-                 group of cyclitols."                                      -> RETAINS
+    ``:7625`` ``benzenehexol (PIN, P-63.1.2) (not benzenehexaol)`` -> OMITS
+    ``:54823`` "Inositols, cyclohexane-1,2,3,4,5,6-hexols, are a specific
+                 group of cyclitols." -> RETAINS
 
 Same six OH, same ring size. A benzene ring carbon has ONE substitutable H, so six OH
 completely substitute it (L5 fires). A cyclohexane ring carbon has TWO, so six OH is
@@ -72,7 +72,7 @@ def _mol(smiles):
 
 
 # --------------------------------------------------------------------------- #
-# 1. substitutable_h_count -- the ':3007' carve-outs, verbatim                 #
+# 1. substitutable_h_count -- the ':3007' carve-outs, verbatim #
 # --------------------------------------------------------------------------- #
 class TestSubstitutableHCount:
     def test_benzene_ring_carbon_has_one(self):
@@ -154,7 +154,7 @@ class TestSubstitutablePositions:
 
 
 # --------------------------------------------------------------------------- #
-# 2. l5_uniform_complete -- P-14.3.4.5 + the ':3009' counter-clause            #
+# 2. l5_uniform_complete -- P-14.3.4.5 + the ':3009' counter-clause #
 # --------------------------------------------------------------------------- #
 class TestL5UniformComplete:
     def test_benzene_six_identical_is_licensed(self):
@@ -230,7 +230,7 @@ class TestL5UniformComplete:
 
 
 # --------------------------------------------------------------------------- #
-# 3. l3_one_kind_of_substitutable_h -- P-14.3.4.3 (':2939')                    #
+# 3. l3_one_kind_of_substitutable_h -- P-14.3.4.3 (':2939') #
 # --------------------------------------------------------------------------- #
 class TestL3OneKind:
     @pytest.mark.parametrize("smiles,expected,why", [
@@ -254,7 +254,7 @@ class TestL3OneKind:
 
 
 # --------------------------------------------------------------------------- #
-# 4. l6_all_substitutable_h_share_one_locant -- P-14.3.4.6 (':3031')           #
+# 4. l6_all_substitutable_h_share_one_locant -- P-14.3.4.6 (':3031') #
 # --------------------------------------------------------------------------- #
 class TestL6OneLocant:
     def test_acetic_acid_is_licensed(self):
@@ -287,7 +287,7 @@ class TestL6OneLocant:
 
 
 # --------------------------------------------------------------------------- #
-# 5. scope_forces_locants -- P-14.3.3 (':2869'), the deny-default itself       #
+# 5. scope_forces_locants -- P-14.3.3 (':2869'), the deny-default itself #
 # --------------------------------------------------------------------------- #
 _CLEAN = dict(
     prefix_locants=(), suffix_locants=(), stereo_text="",
@@ -318,7 +318,10 @@ class TestScopeForcesLocants:
 
     @pytest.mark.parametrize("loc", ["N", "N1", "1'", "O"])
     def test_letter_locant_forces(self, loc):
-        """A letter locant is essential and cannot be omitted -- 'N-methylurea'."""
+        """A letter locant in scope is essential and cannot be omitted by this
+        generic path -- 'N-methylthiourea', 'N,N'-dimethylurea'. (The MONO urea
+        omission is a separate composer-level rule, P-14.3.4.3, that never lets a
+        letter locant reach this scope.)"""
         assert scope_forces_locants(**{**_CLEAN, "prefix_locants": (loc,)}) is True
         assert scope_forces_locants(**{**_CLEAN, "suffix_locants": (loc,)}) is True
 
@@ -329,14 +332,14 @@ class TestScopeForcesLocants:
 
 
 # --------------------------------------------------------------------------- #
-# 6. l4_no_isomer_by_relocation -- P-14.3.4.4 (':2953'), the ISOMER-COUNT      #
-#    licence.  v29 Phase C Task 11.                                            #
+# 6. l4_no_isomer_by_relocation -- P-14.3.4.4 (':2953'), the ISOMER-COUNT #
+# licence. Phase C Task 11. #
 # --------------------------------------------------------------------------- #
 # §**P-14.3.4.4** (``:2953``), verbatim:
 #
-#     "Locants are omitted when no isomer can be generated by moving suffixes
-#      and/or prefixes (if any) from their position to another or by interchanging
-#      them between two different positions."
+# "Locants are omitted when no isomer can be generated by moving suffixes
+# and/or prefixes (if any) from their position to another or by interchanging
+# them between two different positions."
 #
 # Every row below is an example the Blue Book PRINTS for this rule (or, for the
 # polysulfanes, in §**P-68.4.1.1** "Compounds with three or more contiguous
@@ -480,9 +483,9 @@ class TestL4IsAFunctionOfTheStructureNotTheSPELLING:
     after the relocation surgery its hydrogens are no longer recomputed from valence.
     Without the freeze the mutant measured::
 
-        CSSS       -> True         (implicit hydrogens, recomputed correctly)
-        CSS[SH]    -> False        SAME MOLECULE, bracket spelling
-        C[SH0]SS   -> False        SAME MOLECULE, bracket spelling
+        CSSS -> True (implicit hydrogens, recomputed correctly)
+        CSS[SH] -> False SAME MOLECULE, bracket spelling
+        C[SH0]SS -> False SAME MOLECULE, bracket spelling
 
     -- three spellings of one compound, two different licence answers, i.e. the name
     would depend on how the input SMILES was written. It fails in the safe direction

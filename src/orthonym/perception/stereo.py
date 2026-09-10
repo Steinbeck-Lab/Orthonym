@@ -18,7 +18,7 @@ logger = logging.getLogger(__name__)
 
 _CIP_ASSIGNED_PROP = '_Orthonym_CIPAssigned'
 
-# WSB-03 (Phase 177, D-13): centres CIP engine. Read once at import time
+# WSB-03 (a phase,): centres CIP engine. Read once at import time
 # (same idiom as namer.ORTHONYM_ENABLE_TRIVIALITY_CONTROLLER).
 #
 # STER-02 (Phase H, 2026-06-21): the default is now ON. The vendored `centres`
@@ -27,7 +27,7 @@ _CIP_ASSIGNED_PROP = '_Orthonym_CIPAssigned'
 # regressions vs RDKit** (centres remains a strict superset of RDKit on the
 # suite; the gain is exotic CIP rule cases RDKit mis-ranks). When centres is
 # unavailable (jar or Java absent) the code falls through to rdCIPLabeler
-# UNCHANGED -- a missing JVM never hard-fails a name (D-13). Set
+# UNCHANGED -- a missing JVM never hard-fails a name (). Set
 # ORTHONYM_USE_CENTRES_CIP=0/off to force the legacy RDKit-only path.
 #
 # CIP-UPDATE (2026-09-07): engine reverted 1.5-SNAPSHOT -> 1.2.1 (the tagged
@@ -77,7 +77,7 @@ def _fill_missing_bond_cip_from_rdkit(mol) -> None:
         # propagate. A narrower clause let an unlisted exception escape to
         # assign_stereochemistry's outer ``except Exception``, which re-ran the
         # RDKit-only labeller on a mol centres had ALREADY labelled -- silently
-        # downgrading it from the 281/290 engine to 235/290 (REVIEW review #3).
+        # downgrading it from the 281/290 engine to 235/290 (FABLE review #3).
         return
 
 
@@ -86,14 +86,14 @@ def assign_stereochemistry(mol) -> None:
     Assign CIP stereochemistry labels to a molecule (idempotent guard).
 
     Uses a private marker property to track whether rdCIPLabeler has
-    already been called on this mol object.  This is more reliable than
+    already been called on this mol object. This is more reliable than
     checking for _CIPCode because RDKit's MolFromSmiles() automatically
     sets atom _CIPCode from @/@@ notation, but does NOT set bond _CIPCode
     for E/Z -- so an atom-based check would short-circuit and skip the
     bond labels.
 
     The authoritative call site in namer.py:_perceive() sets the marker
-    after calling rdCIPLabeler.  Handler modules call this function for
+    after calling rdCIPLabeler. Handler modules call this function for
     safety (e.g., natural_products runs BEFORE _perceive()).
 
     Args:
@@ -102,7 +102,7 @@ def assign_stereochemistry(mol) -> None:
     if mol.HasProp(_CIP_ASSIGNED_PROP):
         return
 
-    # WSB-03 (D-13): when the centres gate is ON AND the engine is available,
+    # WSB-03 (): when the centres gate is ON AND the engine is available,
     # centres is the CIP source-of-truth (it sets the same _CIPCode props the
     # downstream consumers read). If the gate is OFF (default) or centres is
     # unavailable (jar/Java absent), this branch is skipped and the path below
@@ -114,6 +114,7 @@ def assign_stereochemistry(mol) -> None:
                 # centres owns atoms + the bonds it labelled; fill only the
                 # exocyclic-ylidene double bonds it leaves unlabelled (M3).
                 _fill_missing_bond_cip_from_rdkit(mol)
+                _clear_nonexpressible_amine_n_cip(mol)
                 mol.SetProp(_CIP_ASSIGNED_PROP, '1')
                 return
         except Exception as exc:  # pragma: no cover - defensive; fall back to RDKit
@@ -131,7 +132,53 @@ def assign_stereochemistry(mol) -> None:
         )
         Chem.AssignStereochemistry(mol, cleanIt=True, force=True)
 
+    _clear_nonexpressible_amine_n_cip(mol)
     mol.SetProp(_CIP_ASSIGNED_PROP, '1')
+
+
+def _clear_nonexpressible_amine_n_cip(mol) -> None:
+    """Drop the CIP label on a neutral trivalent amine nitrogen whose
+    configuration standard InChI does NOT retain (a quinuclidine-type
+    bridgehead/cage amine, or any pyramidal-inverting amine N).
+
+    Such an N is not a configurationally citable stereogenic unit in a PIN:
+    both InChI (the round-trip oracle) and OPSIN treat a neutral trivalent
+    amine as non-stereogenic (pyramidal inversion). Keeping its ``_CIPCode``
+    makes the PIN path emit a stereodescriptor at a locant OPSIN cannot parse
+    (e.g. ``1R`` on the bridgehead N of 1-azabicyclo[2.2.2]octane -> the whole
+    name is voided by the OPSIN validity gate), and makes the best-effort path
+    over-count defined stereo and abstain -- so quinine written with an explicit
+    ``[N@]`` fails to name at all though the tag-free form names fine.
+
+    0-WRONG by construction: the label is cleared ONLY when clearing that atom's
+    chiral tag leaves ``MolToInchi`` byte-identical -- i.e. only when standard
+    InChI (the exact oracle the round-trip metric uses) does not distinguish the
+    two configurations, so nothing InChI can tell apart is ever lost. Charged /
+    quaternary N+ and amine N-oxides (degree 4 or non-zero charge) ARE citable
+    and ARE retained by InChI, and are excluded by the degree/charge pre-filter.
+    """
+    cand = [a for a in mol.GetAtoms()
+            if a.GetSymbol() == 'N' and a.HasProp('_CIPCode')
+            and a.GetFormalCharge() == 0 and a.GetDegree() == 3
+            and not a.GetIsAromatic()]
+    if not cand:
+        return
+    from rdkit.Chem import inchi as _inchi
+    try:
+        base = _inchi.MolToInchi(mol)
+    except Exception:
+        return
+    if not base:
+        return
+    for a in cand:
+        probe = Chem.Mol(mol)
+        probe.GetAtomWithIdx(a.GetIdx()).SetChiralTag(
+            Chem.ChiralType.CHI_UNSPECIFIED)
+        try:
+            if _inchi.MolToInchi(probe) == base:
+                a.ClearProp('_CIPCode')  # InChI ignores it -> non-expressible
+        except Exception:
+            continue
 
 
 def get_stereocenters(mol) -> List[Dict]:
@@ -172,7 +219,7 @@ def get_double_bond_stereo(mol) -> List[Dict]:
     Get E/Z configuration of double bonds.
 
     Uses the _CIPCode property set by rdCIPLabeler as the sole source
-    of E/Z labels. BondStereo fallback was removed in Phase 92-03.
+    of E/Z labels. BondStereo fallback was removed in a phase-03.
 
     Args:
         mol: RDKit Mol object (stereochemistry should be assigned via
@@ -329,7 +376,7 @@ def input_stereo_undefined(mol, atom_indices: Optional[Iterable[int]] = None) ->
     stereogenic double bond left undirected. When ``atom_indices`` is given, the
     tetrahedral check is restricted to those atoms (bond check is unrestricted).
 
-    The shared stereo-honesty predicate for v33 Phase 1: a config-implying
+    The shared stereo-honesty predicate for a phase: a config-implying
     retained name (steroid ``cholest-``/``androst-``, amino acid
     ``S-methylcysteine``) asserts a specific configuration, so it must not be
     emitted when this returns True -- that would fabricate stereo the input
@@ -363,7 +410,7 @@ def input_stereo_undefined(mol, atom_indices: Optional[Iterable[int]] = None) ->
 
 #: The axial descriptor in GENERAL nomenclature, keyed by the PIN (helicity)
 #: descriptor. P-91.2.1.1 "Cahn-Ingold-Prelog (CIP) stereodescriptors"
-#: (BlueBookV2.md:44582) lists under *"The following stereodescriptors are used
+#: (the Blue Book) lists under *"The following stereodescriptors are used
 #: as preferred stereodescriptors"* clause (c) (:44588) *"'M' and 'P', to specify
 #: the absolute configuration of an axial or planar entity using the helicity
 #: rule"*; 'Ra'/'Sa' appear only under *"The following stereodescriptors are
@@ -388,7 +435,7 @@ def detect_axial_chirality(mol, style: str = "pin") -> List[Dict]:
     representation. Does NOT attempt to infer chirality where the input
     is silent.
 
-    Descriptor (P-91.2.1.1, :44582 -- see ``AXIAL_GENERAL_FORM``): the helicity
+    Descriptor (P-91.2.1.1,:44582 -- see ``AXIAL_GENERAL_FORM``): the helicity
     letters 'M'/'P' are the PREFERRED (PIN) stereodescriptors for an axial
     entity, so they are what this returns by default. 'Ra'/'Sa' are recommended
     for GENERAL nomenclature only and are produced with ``style="general"``.
@@ -420,7 +467,7 @@ def detect_axial_chirality(mol, style: str = "pin") -> List[Dict]:
         if stereo in (Chem.BondStereo.STEREOATROPCW,
                       Chem.BondStereo.STEREOATROPCCW):
             # RDKit already reports the helicity letter for an atropisomeric
-            # bond, which IS the PIN descriptor (P-91.2.1.1(c), :44588) -- it is
+            # bond, which IS the PIN descriptor (P-91.2.1.1(c),:44588) -- it is
             # passed through rather than re-lettered to Ra/Sa.
             cip = None
             if bond.HasProp('_CIPCode'):
@@ -485,12 +532,12 @@ def _manual_allene_cip(mol, central_idx: int) -> Optional[str]:
     For an allene C1=C=C2, view along the C=C=C axis. The allene is treated
     as an elongated tetrahedron with 4 substituents (2 on each terminal carbon).
     P-92.1.2.2 "The helicity rule: stereodescriptors 'M' and 'P'"
-    (BlueBookV2.md:44812): *"Looking along the chirality axis the ligands are
+    (the Blue Book): *"Looking along the chirality axis the ligands are
     arranged in pairs. When proceeding from the nearer ligand having priority in
     the pair to the further away atom or group having priority in the pair, the
     chirality is described by the symbols 'M' if the path is anticlockwise; the
-    symbol is 'P' if the path is clockwise."*  So clockwise -> P, anticlockwise
-    -> M; these are the PIN descriptors (P-91.2.1.1(c), :44588). The general
+    symbol is 'P' if the path is clockwise."* So clockwise -> P, anticlockwise
+    -> M; these are the PIN descriptors (P-91.2.1.1(c),:44588). The general
     forms Ra/Sa are derived by the caller via ``AXIAL_GENERAL_FORM``.
 
     Uses true CIP priority based on atomic number (primary) and neighbor

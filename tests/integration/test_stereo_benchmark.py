@@ -1,35 +1,35 @@
 """
-Phase 63 Stereo Benchmark: CIP audit and stereo-mismatch tracking.
+a phase Stereo Benchmark: CIP audit and stereo-mismatch tracking.
 
 This test suite tracks all small+medium (<=40 HA) benchmark compounds that have
 stereo in the molecule but did NOT achieve InChI round-trip in v6.0 baseline.
 
-=== Phase 63 CIP Audit Results ===
+=== a phase CIP Audit Results ===
 Total benchmark compounds with stereo: 309 (of 500)
   Correct stereo labels emitted: 244 (79%)
   Missing stereo (wrong parent): 65 (21%)
   WRONG_LABEL (incorrect CIP): 0
   WRONG_LOCANT (count mismatch): 0
 
-=== Phase 63 Stereo Accounting ===
+=== a phase Stereo Accounting ===
 Small (<=20 HA):
   Already RT in v6.0: 27
-  Newly RT after Phase 63: 8 (7 from stereo integration, 1 from Phase 62)
+  Newly RT after a phase: 8 (7 from stereo integration, 1 from a phase)
   Still failing: 50 (all due to wrong parent, NOT stereo)
 
 Medium (21-40 HA):
   Already RT in v6.0: 23
-  Newly RT after Phase 63: 1
+  Newly RT after a phase: 1
   Still failing: 138 (all due to wrong parent, NOT stereo)
 
 === Key Finding ===
 After Plans 01-03, ZERO compounds have stereo-only InChI mismatch. Every remaining
 failure has connectivity/parent differences. The stereo integration is complete for
 all naming paths that produce correct parent structures. Remaining stereo improvements
-require Phase 64+ parent selection fixes first.
+require a phase+ parent selection fixes first.
 
 Tests use current names as baselines. When a compound's name improves (e.g., via
-Phase 64+ parent fixes), update the expected name here.
+a phase+ parent fixes), update the expected name here.
 """
 
 import re
@@ -44,12 +44,12 @@ from orthonym import name_compound
 # ---------------------------------------------------------------------------
 SMALL_STEREO_COMPOUNDS = [
     ('C[C@@H]([NH3+])P(=O)([O-])[O-]', 'unknown organic compound'),  # MISSING_STEREO - wrong parent
-    ('O=C([O-])/C=C/C(=O)O.[Na+]', 'sodium hydrogen (2E)-but-2-enedioate'),  # Phase 64: partial salt hydrogen prefix
-    ('CC[C@H](C)[C@H](N)C(=O)[O-]', '(2S,3S)-2-aminohexanoate'),  # Phase 130: STER-09 amino acid stereo injection
+    ('O=C([O-])/C=C/C(=O)O.[Na+]', 'sodium hydrogen (2E)-but-2-enedioate'),  # a phase: partial salt hydrogen prefix
+    ('CC[C@H](C)[C@H](N)C(=O)[O-]', '(2S,3S)-2-aminohexanoate'),  # a phase: STER-09 amino acid stereo injection
     ('N[C@H](C[13C](=O)O)[13C](=O)O', '(2R)-2-aminobutanedioic acid'),  # AMAC-01 fix: dioic acid via polyfunctional pipeline
     ('C/N=C(\\N)NCCCCN', '4-guanidino-4-(methylamino)butan-1-amine'),  # MISSING_STEREO - wrong parent; alpha order fixed P80
     ('C=C1C=C[C@H](C(C)C)CC1', '(3S)-3-isopropyl-6-methylidenecyclohexene'),
-    ('O=C1N[C@H]2NC(=O)N[C@H]2N1', "(4s,5s)-N,N'-dipropylurea"),  # Phase 92-02: stereo injection for urea handler
+    ('O=C1N[C@H]2NC(=O)N[C@H]2N1', "(4s,5s)-N,N'-dipropylurea"),  # a phase-02: stereo injection for urea handler
     ('NC(=O)N/C=C\\C(=O)OO', '(2Z)-3-carbamoylamino-3-(methanoylamino)prop-2-en-1-peroxol'),  # alpha order fixed P80
     ('C=CC/C=C/CCC(=O)OC', 'methyl (4E)-octa-4,7-dienoate'),  # NEWLY_RT
     ('O=C([O-])C(=O)C[C@H](O)C(=O)[O-]', '(2S)-2-hydroxy-4-oxopentanedioate'),  # NEWLY_RT
@@ -69,11 +69,11 @@ SMALL_STEREO_COMPOUNDS = [
     ('CC(=N)NCCCC[C@H](N)C(=O)O.Cl.Cl', '(2S)-2-amino-6-(ethylamino)-iminohexanoic acid'),  # alpha order fixed P80
     ('C/C=C/CC(O)CCC(=O)NCC(=O)O', 'hydroxy-2-(octanoylamino)ethanoic acid'),  # alpha order fixed P80
     ('CCC[C@@H]1OCc2c(O)cccc2[C@H]1O', '(3S,4R)-4,8-dihydroxy-3-propylisochromane'),  # NEWLY_RT
-    # Phase 157 cleanup: stereo descriptor `(1S,4R,5R)-` rebaselined per
-    # Phase 153 D-22 spiro stereo injection + IUPAC P-91 mandatory rules
+    # a phase cleanup: stereo descriptor `(1S,4R,5R)-` rebaselined per
+    # a phase spiro stereo injection + IUPAC P-91 mandatory rules
     # for stereodefined sp3 centers. The pre-Phase-153 expectation lacked
-    # the descriptor; v18 stereo pipeline correctly emits it.
-    ('C=C(C)[C@@H]1CC[C@@H](C)[C@@]12CC=C(C)CC2', '(1S,4R,5R)-4,8-dimethyl-1-prop-1-en-2-ylspiro[4.5]decane'),  # P119-02: subs discovered; Phase 153 stereo
+    # the descriptor; stereo pipeline correctly emits it.
+    ('C=C(C)[C@@H]1CC[C@@H](C)[C@@]12CC=C(C)CC2', '(1S,4R,5R)-4,8-dimethyl-1-prop-1-en-2-ylspiro[4.5]decane'),  # P119-02: subs discovered; a phase stereo
     ('NC(C(=O)O)C(CC[C@H](N)C(=O)O)C(=O)O', '(6S)-2,6-diamino-3-(hydroxymethyl)heptanetrioic acid'),
     ('COc1c(O)c(O)cc2c1CO[C@@H](C)C2=O', '(3S)-6,7-dihydroxy-8-methoxy-3-methylisochroman-4-one'),  # NEWLY_RT
     ('O=C(O)/C=C/c1ccc(OS(=O)(=O)O)cc1', '(2E)-3-(4-(sulfooxy)phenyl)prop-2-enoic acid'),  # NEWLY_RT
@@ -82,28 +82,28 @@ SMALL_STEREO_COMPOUNDS = [
     ('CCC(C)C1=C2C(=O)OC[C@H]2[C@@H](C)[C@H](C)O1', '(2S,3R,4S)-6-(sec-butyl)-2,3-dimethyl-3,4-dihydro-2H-pyran'),  # Fixed: fabricated diethyl from ring boundary leak
     ('COc1c(Cl)c2c(c(C(=O)O)c1Cl)C[C@H](C)O2', '(7aS)-2,3a-dichloro-3-methoxy-7a-methyl-2,3-dihydro-1-benzofuran-6-carboxylic acid'),  # MISSING_STEREO - wrong parent
     ('C/C=C/C=C/C(=O)C1=C(O)C(=C(C)C)NC1=O', '3-hexyl-4-hydroxy-5-isopropyl-2-oxoazole'),  # MISSING_STEREO - wrong parent
-    ('CCCCCCC(=O)NC1=CC(=O)[C@@H]2CCCN12', 'N-heptanoyl(2S)-5-amino-3-oxoazole'),  # Phase 139 improved: was heptanamide (MISSING_STEREO - wrong parent)
+    ('CCCCCCC(=O)NC1=CC(=O)[C@@H]2CCCN12', 'N-heptanoyl(2S)-5-amino-3-oxoazole'),  # a phase improved: was heptanamide (MISSING_STEREO - wrong parent)
     ('C/C=C1\\[C@H]2C=C(C)C[C@]1([NH3+])c1ccc(=O)[nH]c1C2', '(2R,6R,13E)-4-methyl-9-aza-tricyclo[6.4.0.1(2,6)]tridec-4-en-10-one'),
     ('CO[C@@H]1[C@H](O)[C@@H](CO)O[C@H]1n1ccc(=O)[nH]c1=O', '(2R,3R,4R,5R)-4-hydroxy-3,5-dimethyl-2-pyrimidinyloxolane'),
     ('CCCCC[C@@H](O)[C@@H](O)c1cc(OC)cc(=O)o1', '(1R,2R)-1-cyclohexylheptane-1,2-diol'),
     ('C[C@H]1C[C@H](O)[C@@H]2[C@H]1[C@@H]1[C@H](CC[C@]2(C)O)[C@@]1(C)CO', '(1S,2S,5S,6R,7R,8R,9S,11S)-2,6,6,9-tetramethyl-tricyclo[6.3.0.0(5,7)]undecan-2,11-diol'),
-    ('C[C@H](NC(=O)[C@H](C)NC(=O)[C@@H]1CCCN1)C(=O)O', 'N-[(2S)-2-(pentanoylamino)propanoyl](2S)-2-aminopropanoic acid'),  # Phase 130: STER-09 stereo on parent chain
+    ('C[C@H](NC(=O)[C@H](C)NC(=O)[C@@H]1CCCN1)C(=O)O', 'N-[(2S)-2-(pentanoylamino)propanoyl](2S)-2-aminopropanoic acid'),  # a phase: STER-09 stereo on parent chain
     ('CCCCCC=CC1=C(CO)C(=O)C[C@H](O)[C@@H]1O', '(4R,5S)-3-(hept-1-en-1-yl)-4,5-dihydroxy-2-hydroxymethylcyclohex-2-en-1-one'),
     ('CC(=O)[C@@]1(C)C(C)=C[C@H](O)[C@H]2C[C@](C)(O)CC[C@@H]21', '1-cyclodecanylethan-1-one'),  # MISSING_STEREO - wrong parent
-    # Phase 157 cleanup: stereo descriptor `(5S,6R,9R,10R)-` rebaselined
-    # per Phase 153 D-22 spiro stereo injection (same rationale as the
+    # a phase cleanup: stereo descriptor `(5S,6R,9R,10R)-` rebaselined
+    # per a phase spiro stereo injection (same rationale as the
     # spiro entry above).
-    ('CC1=C[C@]2(CC1=O)[C@H](C)CC[C@@H](C(C)(C)O)[C@H]2O', '(5S,6R,9R,10R)-10-hydroxy-9-isopropyl-3,6-dimethyl-2-oxospiro[4.5]decane'),  # P119-02: subs discovered; Phase 153 stereo
+    ('CC1=C[C@]2(CC1=O)[C@H](C)CC[C@@H](C(C)(C)O)[C@H]2O', '(5S,6R,9R,10R)-10-hydroxy-9-isopropyl-3,6-dimethyl-2-oxospiro[4.5]decane'),  # P119-02: subs discovered; a phase stereo
     ('COCC1=C2[C@@H]3CC(C)(C)C[C@@H]3C[C@@]2(O)CC1=O', '(2R,6R,8R)-11-ethyl-8-hydroxy-4,4-dimethyl-tricyclo[6.3.0.0(2,6)]undec-1-en-10-one'),
     ('O=C([O-])C(=O)C[C@@H](O)[C@H](O)[C@H](O)COP(=O)([O-])[O-]', '(4R,5S,6R)-4,5,6-trihydroxy-2-oxophosphono-7-phosphonooxyheptanoate'),  # P80-01 phosphonooxy prefix now generated
     ('CCC(O)CC(=O)O[C@H](CC(=O)[O-])C[N+](C)(C)C', 'ammonium dodecanoate'),  # MISSING_STEREO - wrong parent
     ('NC(N)=NCCC[C@H](NC(=O)[C@@H](N)CO)C(=O)O', '(2S)-5-guanidino-5-(methylamino)-2-(propanoylamino)pentanoic acid'),  # alpha order fixed P80
-    ('CCCC/C=C\\CCCCCCCCCOC(C)=O', '(10Z)-pentadec-10-en-1-yl acetate'),  # NEWLY_RT (Phase 62)
-    ('CC(C)[C@H]1CC[C@@H](CO)c2c(O)cc(C(=O)O)cc21', '3-butyl-4-hydroxymethyl-1-isopropyl(1R,4R)-1,2,3,4-tetrahydronaphthalene'),  # Phase 139: enrichment adds substituents
+    ('CCCC/C=C\\CCCCCCCCCOC(C)=O', '(10Z)-pentadec-10-en-1-yl acetate'),  # NEWLY_RT (a phase)
+    ('CC(C)[C@H]1CC[C@@H](CO)c2c(O)cc(C(=O)O)cc21', '3-butyl-4-hydroxymethyl-1-isopropyl(1R,4R)-1,2,3,4-tetrahydronaphthalene'),  # a phase: enrichment adds substituents
     ('CCOC(=O)C[C@@H](SP(=O)(OC)OC)C(=O)OCC', 'diethyl butanedioate'),  # MISSING_STEREO - wrong parent
-    ('CC1C/C(=C\\CC(CC(N)=O)CC(=O)O)C(=O)C(C)C1', '3-(2-aminoethyl)-5-(3,5-dimethylcyclohexyl)pentanoic acid'),  # Phase 103-01: chain exclusion changes path
+    ('CC1C/C(=C\\CC(CC(N)=O)CC(=O)O)C(=O)C(C)C1', '3-(2-aminoethyl)-5-(3,5-dimethylcyclohexyl)pentanoic acid'),  # a phase-01: chain exclusion changes path
     ('CC(C)=CCc1ccc(O)c2c1C=C[C@H]1O[C@@H]2O[C@H]1C', '(2S,4S,5R)-4-methyl-9-2-methylbut-2-enyl-3,13-dioxa-tricyclo[6.4.0.1(2,5)]tridec-6-en-12-ol'),
-    ('COc1cccc2c1CO[C@@H]2C[C@@H](O)[C@@H](O)[C@@H]1O[C@@H]1C', '(2R,3R)-1-cyclononyl-3-oxiranylpropane-2,3-diol'),  # Phase 110: alphabetical tiebreaker (cyclononyl < oxiranyl)
+    ('COc1cccc2c1CO[C@@H]2C[C@@H](O)[C@@H](O)[C@@H]1O[C@@H]1C', '(2R,3R)-1-cyclononyl-3-oxiranylpropane-2,3-diol'),  # a phase: alphabetical tiebreaker (cyclononyl < oxiranyl)
     ('C[C@H]1C[C@@H](O)[C@H]2C(=O)c3c(O)cccc3O[C@]2(C)[C@@H]1O', '(1R,10S,11R,12S,14R)-4,11,14-trihydroxy-10,12-dimethyl-9-oxa-tricyclo[8.4.0.0(3,8)]tetradecan-2-one'),
     ('C[C@H]1CCC/C=C/[C@@H]2CC[C@H](O)[C@H]2[C@H](O)/C=C/C(=O)O1', '(3E,5R,6S,7S,8E,13S)-5-hydroxy-13-methyl-2-oxo-1-oxacyclotridecene'),  # Fixed: fabricated dipropyl from ring boundary leak
     ('CC(C)=CCc1ccc(O)c2c1[C@H](CC(=O)O)OC2=O', '2-cyclononylethanoic acid'),  # MISSING_STEREO - wrong parent
@@ -117,9 +117,9 @@ SMALL_STEREO_COMPOUNDS = [
 # ---------------------------------------------------------------------------
 MEDIUM_STEREO_COMPOUNDS = [
     ('Oc1ccc2c(c1)O[C@H](c1ccc(O)c(O)c1)[C@@H](O)[C@@H]2O', '(2R,3S,4R)-3,4,7-trihydroxychromane'),
-    # Phase 148 Plan 02 Task 03: estra ring locant correction 1,2,4 → 1,3,5
+    # a phase Plan 02 Task 03: estra ring locant correction 1,2,4 → 1,3,5
     # (canonical estra-1,3,5-triene numbering for aromatic A-ring per
-    # P-31.1.5; per Plan 01 SUMMARY this is "unrelated to Phase 148"
+    # P-31.1.5; per Plan 01 SUMMARY this is "unrelated to a phase"
     # incidental locant correction). Acceptable churn.
     ('C[C@]12CC[C@@H]3c4ccc(O)cc4CC[C@H]3[C@@H]1[C@@H](O)[C@@H](O)[C@@H]2O', '(8R,9S,13S,14S,15R,16R,17R)-estra-1,3,5-trien-3,15,16,17-tetraol'),
     ('COc1cc(O)c2c(c1)C(=O)C1=C(C2=O)[C@@H](O)C[C@@](C)(O)C1', '(4S,6S)-4,6,14-trihydroxy-12-methoxy-6-methyl-tricyclo[8.4.0.0(3,8)]tetradec-3-en-2,9-dione'),
@@ -132,38 +132,38 @@ MEDIUM_STEREO_COMPOUNDS = [
     ('C=C(C)[C@H]1CC[C@]2(C)[C@@H]1CC[C@]1(C)C/C=C(\\C)CC/C=C(\\C)CC[C@H]12', '(1R,3E,7E,11R,12R,15S,16R)-1,4,8,12-tetramethyl-15-prop-1-en-2-yl-tricyclo[9.7.0.0(12,16)]octadeca-3,7-diene'),
     ('C/C(=C\\CC/C(C)=C/C/C=C(/CC(=O)c1cc(O)ccc1O)C(=O)O)CO', '(2Z,5E,9E)-2-(1-oxo1-(2,5-dihydroxyphenyl)ethyl)-11-hydroxy-6,10-dimethylundeca-2,5,9-trienoic acid'),  # NEWLY_RT
     ('CC(C)(O)[C@@H]1CC[C@@](C)([C@H]2CC[C@]3(C)[C@@H]2CC[C@@H]2[C@@]4(C)CCC(=O)C(C)(C)[C@@H]4CC[C@]23C)O1', '(5R,8R,9R,10R,13R,14R,17S)-4,4,8,10,14-pentamethylgonan-3-one'),
-    ('C/C1=C/C[C@H](O[C@@H]2O[C@H](CO)[C@@H](O)[C@H](O)[C@H]2O)/C(C)=C/[C@H]2OC(=O)[C@H](C)[C@@H]2CC1', '(beta-D-glucopyranosyloxy)(1S,2E,4S,6Z,10S)-4-hydroxy-3,7-dimethylcyclodeca-2,6-dien-1-carboxylate'),
+    ('C/C1=C/C[C@H](O[C@@H]2O[C@H](CO)[C@@H](O)[C@H](O)[C@H]2O)/C(C)=C/[C@H]2OC(=O)[C@H](C)[C@@H]2CC1', '(β-D-glucopyranosyloxy)(1S,2E,4S,6Z,10S)-4-hydroxy-3,7-dimethylcyclodeca-2,6-dien-1-carboxylate'),
     ('CC1(C)OC[C@]2(C)[C@@H](CC[C@@]3(C)[C@H]2[C@@H](O)C[C@H]2C[C@@H]4C[C@@]23CC[C@]4(O)CO)O1', '(1S,2S,5R,6R,8R,10S,11R,12R,17R)-1,5,12,15,15-pentamethyl-14,16-dioxa-pentacyclo[9.8.0.1(2,6).0(2,8).0(12,17)]icosan-5,10-diol'),  # Updated P72: IUPAC VB-6 citation order
     ('COC(=O)[C@@H]1CC23CCCN4CC[C@@]5(c6ccccc6N(C)C15CC2)[C@@H]43', '(1R,10R,21S)-10-ethyl-12-methyl-4,12-diaza-hexacyclo[9.7.0.2(8,11).1(4,8).0(13,18).0(1,21)]henicosane'),  # Updated P72: IUPAC VB-6 citation order
-    ('COc1cc2c(cc1OC)[C@H]1Cc3ccc(OC)c(OC)c3CN1CC2', 'berberine'),  # Updated Phase 141: alkaloid scaffold match
+    ('COc1cc2c(cc1OC)[C@H]1Cc3ccc(OC)c(OC)c3CN1CC2', 'berberine'),  # Updated a phase: alkaloid scaffold match
     ('COC(=O)CC[C@@H](C)[C@H]1C[C@@H](O)[C@H]2[C@@H]3[C@H](O)C[C@@H]4C[C@H](O)CC[C@]4(C)[C@H]3CC[C@@]21C', '(3R,5S,7R,8R,9S,10S,13R,14S,15R,17R,20R)-3,7,15-trihydroxycholan-24-one'),
     ('C/C=C(/CC[C@@H](C)[C@H]1CC[C@H]2C3=CC[C@H]4C[C@@H](O)CC[C@]4(C)[C@H]3CC[C@]12C)C(C)C', '(3S,5S,9R,10S,13R,14R,17R,20R,24Z)-stigmasta-7,24-dien-3-ol'),
     ('C=C(CC[C@@H](C)[C@H]1CC[C@@]2(C)C3=C(CC[C@]12C)[C@@]1(C)CC[C@H](O)C(C)(C)[C@@H]1CC3)C(C)C', '(3S,5R,10S,13R,14R,17R,20R)-4,4,14-trimethylergosta-8,24-dien-3-ol'),
     ('C=C(CC[C@@H](C)[C@H]1CC[C@H]2C3=CC[C@H]4[C@H](C)C(=O)CC[C@]4(C)C3=C[C@@H](O)[C@]12C)C(C)C', '(4S,5S,10S,11R,13R,14S,17R,20R)-11-hydroxy-4-methylergosta-7,9,24-trien-3-one'),
     ('CC(C)C[C@H](N)C(=O)N[C@@H](CC(=O)O)C(=O)N[C@@H](CCCN=C(N)N)C(=O)O', '(2S)-amino-2-(butanoylamino)-5-guanidino-5-(methylamino)pentanedioic acid'),  # alpha order fixed P80
-    ('CC(=O)N[C@@H]1[C@@H](O[C@@H]2O[C@H](CO)[C@@H](O)[C@H](O)[C@H]2NC(C)=O)[C@@H](O)[C@@H](CO)O[C@@H]1O', '(beta-D-2-(acetylamino)-2-deoxy-glucopyranosyloxy)alpha-D-2-(acetylamino)-2-deoxy-galactopyranose'),  # Updated Phase 141: sugar routing returns retained sugar name
+    ('CC(=O)N[C@@H]1[C@@H](O[C@@H]2O[C@H](CO)[C@@H](O)[C@H](O)[C@H]2NC(C)=O)[C@@H](O)[C@@H](CO)O[C@@H]1O', '(β-D-2-(acetylamino)-2-deoxy-glucopyranosyloxy)α-D-2-(acetylamino)-2-deoxy-galactopyranose'),  # Updated a phase: sugar routing returns retained sugar name
     ('CC(=O)N[C@H]1C(OP(=O)(O)OP(=O)(O)OC[C@H]2O[C@@H](n3ccc(=O)[nH]c3=O)[C@H](O)[C@@H]2O)O[C@H](CO)[C@H](O)[C@@H]1O', 'N-acetyl(3R,4R,5R,6R)-3-amino-4,5-dihydroxy-6-methyl-2-oxolanyloxane'),
     ('CC(C)[C@@H](C)[C@@H](O)[C@H]1CC[C@@H]([C@@]2(C)CCC(=O)[C@@]3(C)CC[C@H](O)C[C@]34C=C[C@@](O)(O4)C2=O)[C@@H]1C', '(1S,5R,7R,10S,12S)-5-dodecyl-7,12-dihydroxy-1,5-dimethyl-15-oxa-tricyclo[8.4.0.1(7,10)]pentadec-8-en-2,6-dione'),
     ('CC(=CCC(O)C(C)[C@H]1CC(=O)[C@@]2(C)C3=C(C(=O)[C@@H](O)[C@]12C)[C@@]1(C)CCC(=O)[C@](C)(CO)[C@@H]1CC3=O)C(=O)O', '(4S,5R,10S,12S,13R,14R,17R)-12,22,27-trihydroxy-4,14-dimethylcholesta-8,24-dien-3,7,11,15,27-pentaone'),
     ('C=C(CC[C@@H](C(=O)O)[C@H]1[C@H](O)[C@H](O)[C@@]2(C)C3=CC[C@H]4C(C)(C)C(=O)CC[C@]4(C)C3=CC[C@]12C)C(C)C', '(5R,10S,13R,14R,15R,16S,17R,20R)-15,16,21-trihydroxy-4,4,14-trimethylergosta-7,9,24-trien-3,21-dione'),
     ('CC(CCCC(C)(O)COS(=O)(=O)O)[C@H]1CC[C@H]2[C@@H]3[C@H](O)C[C@@H]4C[C@H](O)CCC4(C)[C@H]3C[C@H](O)C12C', '(3R,5S,7R,8R,9S,12S,14S,17R)-cholestan-3,7,12,25-tetraol'),
     ('CC(=O)O[C@H]1CC[C@]2(C)C3=C(CC[C@H]2C1(C)C)[C@]1(C)C[C@@H](O)[C@H]([C@@H](C/C=C/C(C)(C)O)C(=O)O)[C@@]1(C)CC3', '(3S,5R,10S,13R,14R,16R,17R,20R,23E)-16,21,25-trihydroxy-4,4,14-trimethyl-21-oxocholest-8,23-dien-3-yl acetate'),
-    ('O=C1c2c(O)cc(O)cc2O[C@@H](c2ccc(O)c(O)c2)[C@@H]1O[C@@H]1OC[C@@H](O)[C@H](O)[C@H]1O', '(beta-D-xylopyranosyloxy)(2S,3S)-3,5,7-trihydroxychroman-4-one'),
+    ('O=C1c2c(O)cc(O)cc2O[C@@H](c2ccc(O)c(O)c2)[C@@H]1O[C@@H]1OC[C@@H](O)[C@H](O)[C@H]1O', '(β-D-xylopyranosyloxy)(2S,3S)-3,5,7-trihydroxychroman-4-one'),
     ('CC1=C[C@]2(C)C[C@@H](C)CC[C@@H]2[C@H](C(=O)[C@@H]2C(=O)N3CC[C@@H]4C(=O)O[C@H]2[C@@]43O)[C@@H]1C', '(3R,4R,5R,6S)-3-[(S)-2-methylbutyl]hydroxy-1,3,6-trimethyl-5-oxocyclohex-1-enecarboxylate'),
-    ('CC(=O)O[C@H]1[C@@H](OC(C)=O)C(C)(C)[C@]2(O)CC[C@H]3C(=O)c4ccoc4C[C@@H]3[C@@]2(C)[C@H]1OC(C)=O', 'bis(acetyloxy)ethanone acetate'),  # Phase 099-05: pre-existing regression from Plan 04, garbled multi-ester path; correct name requires Phase 100 parent selection fixes
-    ('OC[C@H]1O[C@@H](O)[C@H](O)[C@@H](O)[C@@H]1O[C@@H]1OC[C@@H](O)[C@H](O)[C@H]1O', '(beta-D-xylopyranosyloxy)beta-D-glucopyranose'),  # Updated Phase 141: sugar routing returns retained sugar name
-    ('OC[C@H]1O[C@H](O)[C@H](O[C@H]2O[C@H](CO)[C@@H](O)[C@H](O)[C@@H]2O)[C@@H](O)[C@H]1O', '(alpha-D-mannopyranosyloxy)alpha-D-galactopyranose'),  # Updated Phase 141: sugar routing returns retained sugar name
-    ('OC[C@H](O)[C@@H](O)[C@@H](O)[C@H](O)CO[C@H]1O[C@H](CO)[C@@H](O)[C@H](O)[C@H]1O', '(alpha-D-glucopyranosyloxy)(2S,3R,4S,5R)-2,3,4,5-tetrahydroxyhexane-1,6-diol'),
-    ('CC(=O)OC[C@H]1O[C@@H](N2CCC(=O)NC2=O)[C@H](OC(C)=O)[C@@H]1OC(C)=O', '(2R,3R,4R,5R)-1,2-bis(acetyloxy)oxolane'),  # Phase 139: stereo now included
+    ('CC(=O)O[C@H]1[C@@H](OC(C)=O)C(C)(C)[C@]2(O)CC[C@H]3C(=O)c4ccoc4C[C@@H]3[C@@]2(C)[C@H]1OC(C)=O', 'bis(acetyloxy)ethanone acetate'),  # a phase-05: pre-existing regression from Plan 04, garbled multi-ester path; correct name requires a phase parent selection fixes
+    ('OC[C@H]1O[C@@H](O)[C@H](O)[C@@H](O)[C@@H]1O[C@@H]1OC[C@@H](O)[C@H](O)[C@H]1O', '(β-D-xylopyranosyloxy)β-D-glucopyranose'),  # Updated a phase: sugar routing returns retained sugar name
+    ('OC[C@H]1O[C@H](O)[C@H](O[C@H]2O[C@H](CO)[C@@H](O)[C@H](O)[C@@H]2O)[C@@H](O)[C@H]1O', '(α-D-mannopyranosyloxy)α-D-galactopyranose'),  # Updated a phase: sugar routing returns retained sugar name
+    ('OC[C@H](O)[C@@H](O)[C@@H](O)[C@H](O)CO[C@H]1O[C@H](CO)[C@@H](O)[C@H](O)[C@H]1O', '(α-D-glucopyranosyloxy)(2S,3R,4S,5R)-2,3,4,5-tetrahydroxyhexane-1,6-diol'),
+    ('CC(=O)OC[C@H]1O[C@@H](N2CCC(=O)NC2=O)[C@H](OC(C)=O)[C@@H]1OC(C)=O', '(2R,3R,4R,5R)-1,2-bis(acetyloxy)oxolane'),  # a phase: stereo now included
     ('C=C1NC(=O)[C@H]([C@@H](C)[C@]2(O)C(=O)N(C)c3ccccc32)NC1=O', '(2R)-2-hydroxy-N-methylindolin-1-one'),
     ('C[C@H]1C=C[C@H]2C[C@@H](O)CC[C@H]2[C@@H]1c1cc(N)c(C=O)c(=O)o1', '(3S,4R,5R,6R)-6-[(S)-2-hydroxy(2R)-butyl]amino-6-hydroxy-3-methylcyclohex-1-enecarbaldehyde'),  # Fixed: ring boundary fix changed substituent/locant assignment
     ('CC(C)=CCC/C(C)=C/CC[C@]1(C)Cc2c(c(O)cc3c2CN([C@H]2CCCNC2=O)C3=O)C[C@@H]1O', '(11S,12R)-12-(6E)-2,6-dimethylnona-2,6-dienyl-8,11-dihydroxy-12-methyl-4-pentyl-4-aza-tricyclo[7.4.0.0(2,6)]tridecan-5-one'),
     ('CC(C)[C@@H](C)[C@@H](O)[C@H]1CC[C@@H]([C@@]2(C)CCC(=O)[C@@]3(C)CC[C@H](O)C[C@]34C=C[C@@](O)(O4)C2=O)[C@@H]1C', '(1S,5R,7R,10S,12S)-5-dodecyl-7,12-dihydroxy-1,5-dimethyl-15-oxa-tricyclo[8.4.0.1(7,10)]pentadec-8-en-2,6-dione'),
-    # Phase 148 Plan 02 Task 03: indole+peptide chain. Pre-148 ring-as-parent
+    # a phase Plan 02 Task 03: indole+peptide chain. Pre-148 ring-as-parent
     # (`-3-(2-aminoethyl)-1H-indole` suffix); post-148 cascade per P-44.1(a)
     # selects propanamide chain as parent with indole as `1H-indol-3-yl`
     # substituent. Acceptable churn (cascade decision IUPAC-correct).
-    ('CC(=O)N[C@@H](CC(C)C)C(=O)N(C)[C@@H](Cc1ccccc1)C(=O)N/C=C\\c1c[nH]c2ccccc12', 'N-acetyl(2S)-1-(amino(4Z)-2-(1H-indol-3-yl)eth-1-en-1-yl)-2-(hexanoylamino)-3-phenylpropanamide'),  # Phase 148 cascade unblock; depth-independent naming v11; N-bracket fix v15
+    ('CC(=O)N[C@@H](CC(C)C)C(=O)N(C)[C@@H](Cc1ccccc1)C(=O)N/C=C\\c1c[nH]c2ccccc12', 'N-acetyl(2S)-1-(amino(4Z)-2-(1H-indol-3-yl)eth-1-en-1-yl)-2-(hexanoylamino)-3-phenylpropanamide'),  # a phase cascade unblock; depth-independent naming v11; N-bracket fix v15
     ('O=C1N[C@@H](C[C@@]2(O)c3ccccc3N3C(=O)[C@@H]4CCCCN4[C@@H]32)C(=O)N[C@H]1Cc1ccccc1', '(8R,9S,15S)-8-dodecyl-8-hydroxy-1,10-diaza-tetracyclo[7.7.0.0(2,7).0(10,15)]hexadecan-16-one'),
     ('CC(C)[C@@H](C)[C@@H](O)[C@H]1CC[C@@H]([C@@]2(C)CCC(=O)[C@@]3(C)CC[C@H](O)C[C@]34C=C[C@@](O)(O4)C2=O)[C@@H]1C', '(1S,5R,7R,10S,12S)-5-dodecyl-7,12-dihydroxy-1,5-dimethyl-15-oxa-tricyclo[8.4.0.1(7,10)]pentadec-8-en-2,6-dione'),
     ('COc1c(Cl)c(C)cc2cc(O)c3c(c12)C(=O)c1cc2c(c(O)c1C3=O)[C@H](C)OC2=O', '(6S)-4,21-dihydroxy-15-methoxy-6,17-dimethyl-7-oxa-pentacyclo[11.8.0.0(3,11).0(5,9).0(14,19)]henicosan-2,8,12-trione'),  # Updated P72: IUPAC VB-6 citation order
@@ -200,7 +200,7 @@ def test_small_stereo_baseline(smiles, expected_name):
 
     These compounds had stereo in the molecule but did not round-trip in
     v6.0 baseline. The expected names are current baselines, NOT necessarily
-    correct IUPAC names. When a compound's naming improves (e.g., from Phase 64+
+    correct IUPAC names. When a compound's naming improves (e.g., from a phase+
     parent fixes), update the expected value.
     """
     result = name_compound(smiles)
@@ -228,7 +228,7 @@ def test_medium_stereo_baseline(smiles, expected_name):
 def test_cip_audit_no_wrong_labels():
     """Verify CIP audit: all emitted stereo labels match rdCIPLabeler.
 
-    Phase 63 CIP audit confirmed 0 WRONG_LABEL and 0 WRONG_LOCANT across
+    a phase CIP audit confirmed 0 WRONG_LABEL and 0 WRONG_LOCANT across
     all 500 benchmark compounds. This test verifies the invariant holds.
     """
     import re

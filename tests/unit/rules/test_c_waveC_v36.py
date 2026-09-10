@@ -1,4 +1,4 @@
-"""v36 Milestone-C Wave C — ring-CONSTRUCTION builds (spy: V36-SPY-C1C2C6.md).
+""" Milestone-C Wave C — ring-CONSTRUCTION builds (trace: V36-a trace-C1C2C6.md).
 
 BUILD 1 — Pattern-A stereo/numbering + invariant-18 RT-gated re-anchor
     (mixed-spiro-fused, the leak sub-mode).
@@ -6,35 +6,35 @@ BUILD 1 — Pattern-A stereo/numbering + invariant-18 RT-gated re-anchor
     ``name_mixed_spiro_fused``) builds the correct FLAT descriptor, but the
     ``combined_locants`` map it hands to the complex_ring stereo injector is
     numbered by a DIFFERENT (and collision-bearing) system than the printed
-    spiro descriptor.  The injected stereo descriptor lands on the WRONG locant
+    spiro descriptor. The injected stereo descriptor lands on the WRONG locant
     (``(3R)-spiro[1,3-dihydro-2-benzofuran-1,1'-2,3-dihydro-1H-indene]`` — locant
     3 is the O-CH2, not the spiro stereocentre), so the FULL name is
-    OPSIN-unparseable.  It used to SHIP anyway via the SELF-01 stereo carve-out
+    OPSIN-unparseable. It used to SHIP anyway via the SELF-01 stereo carve-out
     (constitution verified on the stereo-stripped parse) — a live 0-wrong leak:
     an emitted name that does not round-trip.
 
-    ROOT CAUSE (this session's spy): ``_name_spiro_vonbaeyer_core`` /
+    ROOT CAUSE (this session's trace): ``_name_spiro_vonbaeyer_core`` /
     ``_name_fused_component`` produce a non-bijective atom->locant map for these
     fused components; ``_canonical_spiro_locant`` renumbers only the spiro atom
     for the NAME, leaving the map inconsistent with the descriptor.
 
-    FIX (invariant 18 — offer many, keep the RT-passing one): at the complex_ring
+    FIX (a project rule — offer many, keep the RT-passing one): at the complex_ring
     stereo-injection site the injected candidate is RT-gated; when it does NOT
     full-round-trip, the atom->locant map is RE-ANCHORED to OPSIN's OWN numbering
     of the built parent name (``-o extendedsmi`` $_AV locants, mapped back onto
     the input graph), stereo is re-injected on that authoritative numbering, and
-    the re-anchored candidate is kept ONLY if it full-round-trips.  Otherwise the
+    the re-anchored candidate is kept ONLY if it full-round-trips. Otherwise the
     original candidate is returned unchanged (current behaviour preserved — the
     change is purely additive, so a legitimate OPSIN-can't-parse-the-stereo-layer
     carve-out PIN is untouched because its re-anchored form also fails full-RT).
 
 BUILD 2 — general N-component ortho/ortho-peri-fused mancude construction
-    (pure-fused, spy Pattern C).  ``name_ortho_fused_bicyclic`` is 2-component
+    (pure-fused, trace Pattern C). ``name_ortho_fused_bicyclic`` is 2-component
     only; a genuine 3+-component novel mancude skeleton (e.g. the target that
     OPSIN names ``pyrimido[4,5-b]quinoline``) had NO construction path -> abstain.
     See the BUILD 2 section below for the reached component count + named blocker.
 
-Fresh process per witness (warm-cache hazard, the contributor guide).  Run ONLY this file:
+Fresh process per witness (warm-cache hazard, CLAUDE.md). Run ONLY this file:
     ``.venv/bin/python -m pytest tests/unit/rules/test_c_waveC_v36.py -q``
 (the whole suite deadlocks on an OPSIN pipe).
 """
@@ -50,7 +50,7 @@ import pytest
 # ---------------------------------------------------------------------------
 
 # The 9 mixed-spiro-fused witnesses that BUILT a spiro name (7 unique) from the
-# V36-SPY-C1C2C6 classified set.  Every one emitted an OPSIN-UNPARSEABLE name at
+# V36-a trace-C1C2C6 classified set. Every one emitted an OPSIN-UNPARSEABLE name at
 # T1 with a wrong-locant stereo descriptor and shipped via the stereo carve-out.
 PATTERN_A_WITNESSES = [
     "c1ccc2c(c1)CC[C@@]21OCc2ccccc21",
@@ -94,7 +94,7 @@ def test_pattern_a_spiro_stereo_names_and_round_trips(smiles):
 
 def test_pattern_a_no_wrong_locant_stereo_leak():
     """The canonical witness must cite the spiro stereocentre at its spiro locant
-    (1 / 1'), never at the O-CH2 locant 3.  RED at HEAD ((3R)-...)."""
+    (1 / 1'), never at the O-CH2 locant 3. RED at HEAD ((3R)-...)."""
     res = _cn_rt("c1ccc2c(c1)CC[C@@]21OCc2ccccc21")
     name = res.get("name") or ""
     assert res.get("rt") is True and name, f"expected a round-tripping name: {res}"
@@ -104,7 +104,7 @@ def test_pattern_a_no_wrong_locant_stereo_leak():
 
 # ---------------------------------------------------------------------------
 # CANARIES — shared ring dispatch (spiro/tier_a_ring/fused_rings/composer) must
-# stay byte-identical.  Pinned pre-change (HEAD 3fa69a42).  The stereo-bearing
+# stay byte-identical. Pinned pre-change (HEAD 3fa69a42). The stereo-bearing
 # complex_ring names (steroid, von-Baeyer androstanedione) exercise the exact
 # injection path BUILD 1 modifies and MUST be unchanged (RT-gate returns the
 # original candidate untouched because it already full-round-trips).
@@ -122,7 +122,7 @@ CANARIES = {
     "C1C[C@]2(CCCC2)CC1": "spiro[4.4]nonane",
     "C1C2CC3CC1CC(C2)C3": "adamantane",
     "C[C@]12CC[C@H]3[C@@H](CC[C@H]4CC(=O)CC[C@]34C)[C@@H]1CC[C@@H]2O":
-        "17beta-hydroxy-5alpha-androstan-3-one",
+        "17β-hydroxy-5α-androstan-3-one",
     "O=C1CC[C@]2(C)[C@H]3CC[C@@H]4CC(=O)CC[C@]4(C)[C@H]3CC[C@]12C":
         "(5R,8S,9S,10S,13S,14R)-14-methylandrostane-3,17-dione",
 }
@@ -146,7 +146,7 @@ def test_shared_ring_dispatch_canaries_unchanged(smiles, expected):
 # bicyclic is 2-component-only; _try_polycomponent_fusion_name builds only
 # star-of-monocycles bases) -> abstained / von-Baeyer.
 BUILD2_3COMP_WITNESSES = [
-    "c1ccc2nc3ncncc3cc2c1",   # -> pyrimido[4,5-b]quinoline (SPY-verified)
+    "c1ccc2nc3ncncc3cc2c1",   # -> pyrimido[4,5-b]quinoline (a trace-verified)
     "c1ccc2nc3ncncc3nc2c1",   # a 3-ring diaza/tetraaza fused mancude
 ]
 
@@ -163,8 +163,8 @@ def test_three_component_fused_mancude_names_and_round_trips(smiles):
 
 
 def test_pyrimido_quinoline_exact_pin():
-    """The SPY-verified 3-component target must build exactly the OPSIN-feasible
-    fusion PIN ``pyrimido[4,5-b]quinoline``.  RED at HEAD (abstained)."""
+    """The a trace-verified 3-component target must build exactly the OPSIN-feasible
+    fusion PIN ``pyrimido[4,5-b]quinoline``. RED at HEAD (abstained)."""
     res = _cn_rt("c1ccc2nc3ncncc3cc2c1")
     assert res.get("name") == "pyrimido[4,5-b]quinoline", (
         f"expected pyrimido[4,5-b]quinoline, got {res.get('name')!r}")

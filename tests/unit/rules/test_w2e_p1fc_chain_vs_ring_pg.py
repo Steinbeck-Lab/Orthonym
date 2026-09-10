@@ -11,7 +11,7 @@ molecule fails closed (never a wrong name). The correct build — chain-vs-ring
 PG-count parent selection (ring 2 diones beats chain 1 ketone) plus expressing
 the chain ketone as the '2-oxobutyl' substituent prefix — requires broad
 parent-selection changes with determinism risk, so it is a documented follow-up
-(). NEVER ship the trione absorption.
+(internal notes). NEVER ship the trione absorption.
 The working saturated-dione precedent (4-methylcyclopentane-1,2-dione) is pinned
 below so the base capability cannot regress.
 """
