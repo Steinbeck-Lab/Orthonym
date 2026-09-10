@@ -47,15 +47,16 @@ dependencies = [
 
 [project.optional-dependencies]
 dev = [
-    "pytest>=7.0",
-    "pytest-benchmark>=5.0",  # NEW per Phase 156 D-16 < 50ms p99 hard gate
-    "pytest-cov>=4.0",
-    "pytest-xdist>=3.0",
-    "black>=23.0",
-    "ruff>=0.1.0",
-    "mypy>=1.0",
-    "rapidfuzz>=3.14.0",  # eval-only: Damerau-Levenshtein secondary metric (eval/harness.py); not used on the naming path
-    "requests>=2.25",  # optional PubChem PUG-REST lookup (validation/pubchem_validator.py)
+    # Pinned to the exact versions in use.
+    "pytest==9.0.3",
+    "pytest-benchmark==5.2.3",  # p99 latency gate
+    "pytest-cov==7.1.0",
+    "pytest-xdist==3.8.0",
+    "black==26.3.1",
+    "ruff==0.15.12",
+    "mypy==1.20.2",
+    "rapidfuzz==3.14.5",  # eval-only: Damerau-Levenshtein secondary metric (eval/harness.py); not used on the naming path
+    "requests==2.33.1",  # optional PubChem PUG-REST lookup (validation/pubchem_validator.py)
 ]
 # Phase 162 ML Fallback Gate (MLF-01 + CONTEXT D-02 optional extra).
 # Per 162-AUDIT-MLF.md § 1.2 R-01 AUTO-PICK resolution (b):
@@ -82,7 +83,7 @@ ml = [
 # against the real CLI (217 names x 2 OPSIN configs, 508 centres SMILES, 0
 # mismatches). Set ORTHONYM_DISABLE_JPYPE=1 to force the subprocess path.
 jvm = [
-    "jpype1>=1.5",  # kept as an alias; jpype1 is a core dependency since 2026-09-03
+    "jpype1==1.7.1",  # kept as an alias; jpype1 is a core dependency since 2026-09-03
 ]
 
 [project.scripts]
