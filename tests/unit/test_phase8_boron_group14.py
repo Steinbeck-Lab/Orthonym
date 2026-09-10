@@ -1,4 +1,4 @@
-""" a phase — P-68.1/.2 boron + Group-14 depth.
+""" a phase — /.2 boron + Group-14 depth.
 
 Covers (all OPSIN-RT-verified):
   * 8a boron parent acids (boric/boronic/borinic) + borono ring-propagation;
@@ -11,7 +11,7 @@ Covers (all OPSIN-RT-verified):
 The aliphatic-chain silyl-on-senior-carbon case is DEFERRED (the carboxylic-acid
 chain handler uses its own substituent path, not the universal pipeline; the
 silyl substituent IS correctly named by both substituent namers but dropped by
-that handler — production stays a safe 'unknown' via SELF-01). The benzene/ring
+that handler — production stays a safe 'unknown' via). The benzene/ring
 silyl path IS fixed here.
 """
 import pytest
@@ -66,7 +66,7 @@ class TestGroup14Halides:
 
 class TestMultiSuffixSpelling:
     @pytest.mark.parametrize("smiles,expected", [
-        ("N[Si](N)(N)N", "silanetetramine"),     # BB P-68.2.4: not silanetetraamine
+        ("N[Si](N)(N)N", "silanetetramine"),     # BB: not silanetetraamine
         ("N[Ge](N)(N)N", "germanetetramine"),
         ("C[Si](N)(N)N", "methylsilanetriamine"),  # tri unaffected
         ("C[Si](C)(O)O", "dimethylsilanediol"),    # di unaffected
@@ -74,8 +74,8 @@ class TestMultiSuffixSpelling:
     def test_group14_multi_suffix(self, st, smiles, expected):
         assert st.name(smiles) == expected
 
-    # P-62.2.1.3 (BB 26221): the MONO-amine 'silanamine' is the one documented
-    # exception to P-14.3.4.2(a) (BB 2891, "the locant '1' is omitted in
+    # (BB 26221): the MONO-amine 'silanamine' is the one documented
+    # exception to (a) (BB 2891, "the locant '1' is omitted in
     # substituted mononuclear parent hydrides") -- (CH3)3Si-NH2 cites its
     # substituent locants: '1,1,1-trimethylsilanamine' (PIN, corroborated at
     # BB 37493/37495). Every sibling KEEPS the general omission: -ol/-thiol,
@@ -88,7 +88,7 @@ class TestMultiSuffixSpelling:
         assert st.name(smiles) == expected
 
     @pytest.mark.parametrize("smiles,expected", [
-        # P-14.3.4.2(a) omission siblings that MUST NOT gain locants.
+        # (a) omission siblings that MUST NOT gain locants.
         ("C[Si](C)(C)O", "trimethylsilanol"),   # mono-ol, BB 27234
         ("C[Si](N)(N)N", "methylsilanetriamine"),  # tri-amine, BB 38180
         ("C[Si](C)(N)N", "dimethylsilanediamine"),  # di-amine

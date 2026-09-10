@@ -1,4 +1,4 @@
-"""Tests for STER-09: Amino acid stereo injection.
+"""Tests for: Amino acid stereo injection.
 
 Verifies that amino acid names include CIP stereodescriptors
 when stereocenters are present, and no stereo for achiral amino acids.
@@ -12,8 +12,8 @@ from orthonym.namer import name_compound
 class TestAminoAcidSystematicStereo:
     """Systematic amino acid names include CIP stereo prefix."""
 
-    # WSD-07 (Phase 175): a stereo-tagged free STANDARD amino acid now resolves to
-    # its retained PIN with the configurational descriptor (P-103.1.1.1: L implicit,
+    # -07 (a phase): a stereo-tagged free STANDARD amino acid now resolves to
+    # its retained PIN with the configurational descriptor: L implicit,
     # D explicit), not the old wrong-parent systematic '(2S)-2-aminopropanoic acid'.
     # Both retained forms are OPSIN-round-trip-verified.
     def test_alanine_enantiomers_resolve_to_retained_pin(self):
@@ -55,14 +55,14 @@ class TestAminoAcidTrivialStereo:
         """A genuinely stereo-UNDEFINED alpha-carbon must NOT get the bare
         (implicit-L) trivial name -- it defers to the systematic name.
 
-        v33 Phase 0 T5 (change-asserted-value, was
+         a phase (change-asserted-value, was
         ``result == "alanine" or "alanine" in result``): this test's own name
         and original intent ("no stereo in input means no stereo in output")
         already correctly predicted a stereo-free OUTPUT for this stereo-free
         INPUT -- the old assertion just implemented that as the bare retained
         name, which silently asserts the implicit-L configuration this input
         does not define (see `test_amino_acids.py`'s module docstring for the
-        full P-103.1.3.1 / InChIKey / mutation-test evidence). The systematic
+        full / InChIKey / mutation-test evidence). The systematic
         name is the true "no stereo in, no stereo out" answer.
         """
         from orthonym.rules.amino_acids import name_amino_acid, _build_amino_acid_locant_map
@@ -91,8 +91,8 @@ class TestAminoAcidTrivialStereo:
 
 
 class TestWSD07RetainedStereo:
-    """WSD-07 (Phase 175): a stereo-tagged free STANDARD amino acid resolves to its
-    retained PIN with the configurational descriptor (P-103.1.1.1), not a
+    """-07 (a phase): a stereo-tagged free STANDARD amino acid resolves to its
+    retained PIN with the configurational descriptor, not a
     wrong-parent systematic name; a diastereomer the bare name cannot represent
     DEFERS to the systematic namer."""
 
@@ -106,7 +106,7 @@ class TestWSD07RetainedStereo:
         assert name_compound("C[C@H](N)C(=O)O") == "alanine"
 
     def test_allo_isoleucine_named(self):
-        # v24 W8 P3 Task 3.1 (P-103.1.3.2.2): the 2-centre allo diastereomers of
+        # W8 P3 Task 3.1: the 2-centre allo diastereomers of
         # threonine/isoleucine now emit their retained-name PIN. This SMILES is
         # (2R,3S) = D-allo-isoleucine (CIP + OPSIN-RT verified). Previously this
         # deferred to the systematic name (test formerly `test_allo_isoleucine_defers`).
@@ -117,12 +117,12 @@ class TestWSD07RetainedStereo:
 
     def test_peptide_not_regressed(self):
         # get_amino_acid_name is shared by name_peptide; the default (no-descriptor)
-        # path must keep peptides intact. v38: the peptide PIN is now the
+        # path must keep peptides intact.: the peptide PIN is now the
         # SUBSTITUTIVE form (V38-PEPTIDE-PIN-VERDICT.md); RT verified.
         assert name_compound("NCC(=O)NCC(=O)O") == "(2-aminoacetamido)acetic acid"
 
     def test_nonstandard_aa_keeps_systematic(self):
-        # A non-standard AA (D-2-aminobutanoic acid) keeps the systematic name —
+        # A non-standard AA (-aminobutanoic acid) keeps the systematic name —
         # 'D-butyrine' is not OPSIN-parseable, so the descriptor path is restricted
         # to STANDARD amino acids.
         assert name_compound("CC[C@@H](N)C(=O)O") == "(2R)-2-aminobutanoic acid"

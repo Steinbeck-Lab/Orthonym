@@ -1,13 +1,13 @@
-"""Phase 147 Plan 02 Task 4: tests for _filter_lowest_locants P-44.4.1.4+ cascade.
+"""a phase Plan 02 Task 4: tests for _filter_lowest_locants + cascade.
 
-Replaces the Phase 146 stub. Cascade order:
-  1. P-44.4.1.4 / P-44.1(f) — lowest principal-group locants
-  2. P-44.1(g)            — lowest multiple-bond locants
-  3. P-44.1(i)            — lowest substituent locants
+Replaces the a phase stub. Cascade order:
+  1. / (f) — lowest principal-group locants
+  2. (g) — lowest multiple-bond locants
+  3. (i) — lowest substituent locants
 
-Source: https://iupac.qmul.ac.uk/BlueBook/P4.html P-44.4.1.4 - P-44.4.1.12
-Source: Phase 147 CONTEXT D-02 (cascade gate), D-06 (stub semantics),
-        BL-3 (reuse parent_selection.py extraction patterns).
+Source: https://iupac.qmul.ac.uk/BlueBook/P4.html -
+Source: a phase internal notes (cascade gate), (stub semantics),
+         (reuse parent_selection.py extraction patterns).
 """
 
 import pytest
@@ -19,7 +19,7 @@ def _make_candidate(
     handler='benzene',
 ):
     """Construct a CandidateName with all the fields _filter_lowest_locants
-    expects (POST-HOC pattern matching what pool.add() does).
+    expects (POST-HOC pattern matching what pool.add does).
     """
     from orthonym.assembly.coverage_scoring import CandidateName
     cand = CandidateName(name=name, handler=handler)
@@ -31,12 +31,12 @@ def _make_candidate(
 
 
 def test_pg_locants_decisive():
-    """Step 1 (P-44.4.1.4): lower PG locant wins decisively.
+    """Step 1: lower PG locant wins decisively.
 
     Two candidates on the same molecule but different orientations: A
     places the PG attachment at locant 1; B at locant 2. A wins.
 
-    Source: https://iupac.qmul.ac.uk/BlueBook/P4.html P-44.4.1.4
+    Source: https://iupac.qmul.ac.uk/BlueBook/P4.html
     """
     from orthonym.assembly.candidate_pool import _filter_lowest_locants
     mol = Chem.MolFromSmiles('Oc1ccccc1')  # phenol
@@ -59,7 +59,7 @@ def test_full_tie_returns_both():
     """All cascade steps tie -> both candidates returned (caller drops
     to Tier-2 weighted-sum).
 
-    Source: https://iupac.qmul.ac.uk/BlueBook/P4.html P-44.4.1.4
+    Source: https://iupac.qmul.ac.uk/BlueBook/P4.html
     """
     from orthonym.assembly.candidate_pool import _filter_lowest_locants
     mol = Chem.MolFromSmiles('c1ccccc1')  # benzene
@@ -78,7 +78,7 @@ def test_full_tie_returns_both():
 def test_single_candidate_short_circuit():
     """Single candidate -> returned unchanged (cascade no-op).
 
-    Source: https://iupac.qmul.ac.uk/BlueBook/P4.html P-44.4.1.4
+    Source: https://iupac.qmul.ac.uk/BlueBook/P4.html
     """
     from orthonym.assembly.candidate_pool import _filter_lowest_locants
     from orthonym.assembly.coverage_scoring import CandidateName
@@ -90,7 +90,7 @@ def test_single_candidate_short_circuit():
 def test_empty_input_returns_empty():
     """Empty input -> empty output (cascade no-op).
 
-    Source: https://iupac.qmul.ac.uk/BlueBook/P4.html P-44.4.1.4
+    Source: https://iupac.qmul.ac.uk/BlueBook/P4.html
     """
     from orthonym.assembly.candidate_pool import _filter_lowest_locants
     assert _filter_lowest_locants([]) == []
@@ -100,8 +100,8 @@ def test_defensive_bailout_on_missing_parent_atom_indices():
     """If any candidate lacks parent_atom_indices, return all candidates
     unchanged (defensive fall-through; Tier-2 takes over).
 
-    Source: https://iupac.qmul.ac.uk/BlueBook/P4.html P-44.4.1.4
-    Source: Phase 147 D-06 conservative gate.
+    Source: https://iupac.qmul.ac.uk/BlueBook/P4.html
+    Source: a phase conservative gate.
     """
     from orthonym.assembly.candidate_pool import _filter_lowest_locants
     from orthonym.assembly.coverage_scoring import CandidateName
@@ -118,8 +118,8 @@ def test_tuple_locant_fusion_atom_wins():
     """Tuple-locant comparison: PG attached at fusion atom (4, 'a') wins
     over PG at peripheral 5 because (4, '') < (4, 'a') < (5, '').
 
-    Source: https://iupac.qmul.ac.uk/BlueBook/P1.html P-14.5.2 first-point-of-difference
-    Source: Phase 147 CONTEXT D-01 tuple encoding (Plan 01 enables comparison).
+    Source: https://iupac.qmul.ac.uk/BlueBook/P1.html first-point-of-difference
+    Source: a phase internal notes tuple encoding (Plan 01 enables comparison).
     """
     from orthonym.assembly.candidate_pool import _filter_lowest_locants
     # Synthetic: just construct two candidates with hand-built ring_info

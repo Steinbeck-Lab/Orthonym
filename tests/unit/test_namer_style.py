@@ -1,5 +1,5 @@
 """
-Tests for the style parameter in name_compound().
+Tests for the style parameter in name_compound.
 
 The style parameter controls whether retained names or systematic names are returned:
 - style="pin" (default): Use retained names when available (IUPAC 2013 preferred)
@@ -11,17 +11,17 @@ from orthonym import name_compound
 
 
 class TestStyleParameter:
-    """Test the style parameter in name_compound()."""
+    """Test the style parameter in name_compound."""
 
     @pytest.mark.unit
     def test_default_style_uses_retained_names(self):
         """Default style 'pin' should return retained names when available."""
         assert name_compound("c1ccccc1") == "benzene"
         assert name_compound("CCO") == "ethanol"
-        # Wave-1 1.10: "allyl alcohol" is general-only (P-63.2.3) — demoted
+        # Wave-1 1.10: "allyl alcohol" is general-only — demoted
         # from the default headline; the PIN is the systematic name.
         assert name_compound("C=CCO") == "prop-2-en-1-ol"
-        # Phase 167 HYG-03: "ethylene glycol" was a deprecated (non-PIN) name and
+        # a phase: "ethylene glycol" was a deprecated (non-PIN) name and
         # is now corrected to ethane-1,2-diol; use a genuine retained PIN instead.
         assert name_compound("Cc1ccccc1") == "toluene"
 

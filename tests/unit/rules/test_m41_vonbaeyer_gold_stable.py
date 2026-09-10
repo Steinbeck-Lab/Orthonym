@@ -1,4 +1,4 @@
-""" M4 subpart #1 (P-23.2.4 main-bridge selection) -- the decisive
+""" M4 subpart #1 main-bridge selection) -- the decisive
 no-regression guard.
 
 The main-bridge fix (``_find_main_ring`` Case 3 + ``_find_main_bridge``
@@ -81,15 +81,15 @@ def test_there_are_von_baeyer_gold_rows_to_guard():
     ids=[f"{f}:{s}" for f, s, _ in _VB_GOLD])
 def test_von_baeyer_gold_row_is_stable(fname, smiles, pin):
     """Every von-Baeyer gold row must name byte-identically to its gold PIN,
-    unchanged by the P-23.2.4 main-bridge fix."""
+    unchanged by the main-bridge fix."""
     got = name_compound(smiles)
     assert got == pin, (
         f"{fname}: {smiles}\n  expected {pin!r}\n  got      {got!r}")
 
 
-# The three subpart-#1 PIN wins: the P-23.2.4 fix makes these emit the exact
+# The three subpart-#1 PIN wins: the fix makes these emit the exact
 # Blue Book PIN (the Blue Book / 9721 / 9761). Also added to the gold oracle
-# (packs/rings_numbering.json, V41-M41-VBMB-01..03).
+# (packs/rings_numbering.json, V41-M41-..03).
 _PIN_WINS = [
     ("C123CCCCCCCCCC(CCC1)(CCC2)C3", "tricyclo[9.3.3.1^1,11]octadecane"),
     ("C12C3CCC(C(C4CCC1CC4)CC2)CC3", "tetracyclo[4.4.2.2^2,5.2^7,10]hexadecane"),

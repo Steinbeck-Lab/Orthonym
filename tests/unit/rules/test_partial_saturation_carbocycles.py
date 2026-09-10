@@ -2,14 +2,14 @@
 Tests for carbocyclic partial saturation and heterocycle stereochemistry.
 
 This module tests:
-1. detect_carbocyclic_partial_saturation() function
+1. detect_carbocyclic_partial_saturation function
 2. Tetrahydronaphthalene naming (E2E)
 3. Dihydronaphthalene naming
 4. Substituted partially saturated carbocycles
 5. Heterocycle stereochemistry integration
 6. No regression for existing functionality
 
-IUPAC 2013 Blue Book P-31.1.1:
+IUPAC 2013 Blue Book:
 - tetrahydronaphthalene: 4 positions saturated = tetrahydro prefix
 - dihydronaphthalene: 2 positions saturated = dihydro prefix
 - perhydronaphthalene (decalin): all saturated = perhydro/decahydro

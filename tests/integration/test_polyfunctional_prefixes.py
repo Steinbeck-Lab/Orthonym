@@ -100,7 +100,7 @@ class TestSulfoxideAsNonPrincipal:
     def test_methylsulfinyl_benzoic_acid(self):
         """OC(=O)c1ccc(S(=O)C)cc1 -> 4-(methanesulfinyl)benzoic acid.
 
-        P-65.3.1 PIN: a ring-attached sulfoxide substituent is the acid-stem oxide
+         PIN: a ring-attached sulfoxide substituent is the acid-stem oxide
         form ``methanesulfinyl``, not the ``methyl``+``sulfinyl`` concatenation.
         Value corrected (was ``methylsulfinyl``): OPSIN round-trips the new form to
         the input structure, and it matches the benzene-parent path's own output.
@@ -139,7 +139,7 @@ class TestSulfoneAsNonPrincipal:
     def test_methylsulfonyl_benzoic_acid(self):
         """OC(=O)c1ccc(S(=O)(=O)C)cc1 -> 4-(methanesulfonyl)benzoic acid.
 
-        P-65.3.1 PIN: a ring-attached sulfone substituent is the acid-stem oxide
+         PIN: a ring-attached sulfone substituent is the acid-stem oxide
         form ``methanesulfonyl``, not the ``methyl``+``sulfonyl`` concatenation.
         Value corrected (was ``methylsulfonyl``): OPSIN round-trips the new form to
         the input structure, and it matches the benzene-parent path's own output.
@@ -169,7 +169,7 @@ class TestThioetherAsNonPrincipal:
 
 
 # ============================================================================
-# TestThreePlusFGAlphabetization (PFUN-01, PFUN-03)
+# TestThreePlusFGAlphabetization (,)
 # ============================================================================
 
 class TestThreePlusFGAlphabetization:
@@ -200,11 +200,11 @@ class TestThreePlusFGAlphabetization:
 
 
 # ============================================================================
-# TestCompoundPrefixParenthesization (OFMT-01)
+# TestCompoundPrefixParenthesization
 # ============================================================================
 
 class TestCompoundPrefixParenthesization:
-    """Verify compound prefixes are correctly parenthesized per IUPAC P-16.5.1.1."""
+    """Verify compound prefixes are correctly parenthesized per IUPAC."""
 
     @pytest.mark.integration
     def test_methylsulfinyl_parenthesized(self):
@@ -253,7 +253,7 @@ class TestCompoundPrefixParenthesization:
 
 
 # ============================================================================
-# TestOPSINRoundTrip (QUAL-04)
+# TestOPSINRoundTrip
 # ============================================================================
 
 class TestOPSINRoundTrip:

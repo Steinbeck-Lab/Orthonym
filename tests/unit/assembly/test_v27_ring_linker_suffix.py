@@ -1,14 +1,14 @@
-"""v27 Phase 2 — linker & ring-suffix nomenclature (general ring engine).
+""" a phase — linker & ring-suffix nomenclature (general ring engine).
 
 Widens ``general_engine._RING_SUFFIX_STYLES`` and its emit logic so the
 complete-tier ring engine expresses the high-enrichment linker/suffix groups
 that previously forced abstention: sulfonamide (∞ blind spot), amidine, imine,
 N-substituted amide/sulfonamide, sulfinyl/sulfonyl branch, ester (functional
-class), urea/carbamate. Every emission is verified by SELF-01 round-trip
+class), urea/carbamate. Every emission is verified by round-trip
 downstream; these tests assert the engine (a) emits a name and (b) that name
 round-trips to the input via OPSIN — the actual complete-tier contract
 (RT-valid breadth, NOT PIN-string exactness; PIN-quality fused-ring names are
-Phase 5). The PIN default (``allow_aromatic_general=False``) must stay
+a phase). The PIN default (``allow_aromatic_general=False``) must stay
 byte-identical — pinned in ``test_pin_default_unchanged``.
 """
 import pytest
@@ -127,7 +127,7 @@ def _s_branch(smiles, allow_mancude):
 ])
 def test_sulfinyl_sulfonyl_branch_complete_tier(smiles, expected):
     """Complete tier: the S-attached sulfone/sulfoxide branch is named
-    (R)sulfonyl/(R)sulfinyl -- never dropping the S or its =O (CR-01)."""
+    (R)sulfonyl/(R)sulfinyl -- never dropping the S or its =O ."""
     assert _s_branch(smiles, allow_mancude=True) == expected
 
 
@@ -163,7 +163,7 @@ def test_n_substituted_amide_sulfonamide(smiles, n_block):
 
 
 def test_n_substituent_interleaves_with_ring_substituent():
-    """Ring & N-substituents share one alphanumeric order (P-14.5.2): chloro (c)
+    """Ring & N-substituents share one alphanumeric order: chloro (c)
     before N-methyl (m)."""
     name = _assert_covers("O=C(NC)c1ccc(Cl)c2ccccc12")
     assert "chloro" in name and "N-methyl" in name
@@ -207,7 +207,7 @@ def test_lactone_and_polyester_fail_closed():
 
 def test_pin_default_unchanged():
     """With ``allow_aromatic_general=False`` (PIN default) the ring engine still
-    abstains on these fused-linker inputs exactly as before Phase 2."""
+    abstains on these fused-linker inputs exactly as before a phase."""
     for smi in ("NS(=O)(=O)c1ccc2ccccc2c1", "NC(=N)c1ccc2ccccc2c1",
                 "N=C1CCc2ccccc21"):
         assert _engine_name(smi, allow=False) is None, smi

@@ -8,7 +8,7 @@ chloroacetyl,...). Root cause: ``acid_name_to_amido_prefix`` covers ``-oic acid`
 round-trips standalone (``2-phenylacetamidoacetic acid`` RT-verified), so the
 substituent is reachable once the amido converter covers this family.
 
-P-66.1.1.4.3 method (1): amido prefix = amide name with final 'e' -> 'o'.
+ method (1): amido prefix = amide name with final 'e' -> 'o'.
 ``acetamide`` is a retained amide PIN, so a substituted acetamide's amido prefix
 is ``<subst>acetamido`` (``phenylacetamido``, ``chloroacetamido``).
 """
@@ -25,7 +25,7 @@ class TestAceticAcidFamilyAmido:
 
     @pytest.mark.parametrize("acid,expected", [
         ("acetic acid", "acetamido"),                 # retained (regression guard)
-        # P-66.1.1.4.3 method (1): the prefix is the AMIDE name e->o. Acetamide has
+        # method (1): the prefix is the AMIDE name e->o. Acetamide has
         # two substitutable sites (N, C2), so the C2 locant is REQUIRED
         # ('N-phenylacetamide' = acetanilide, a DIFFERENT molecule) -> '2-...amido'.
         ("phenylacetic acid", "2-phenylacetamido"),   # THE gap (locant required)
@@ -52,15 +52,15 @@ class TestPhenylacetylAcylaminoPIN:
     """Whole-molecule: N-(substituted-acetyl) amino substituents name to the exact PIN.
 
     Asserts the EXACT string (not just round-trip): the amido prefix carries its
-    required C2 locant and is enclosed (P-66.1.1.4.3 method (1) + P-16.5.1.2), the
+    required C2 locant and is enclosed method (1) +, the
     spelling-layer contract the round-trip check alone cannot see.
     """
 
     @pytest.mark.parametrize("smiles,expected", [
-        # acetic-acid parent: parent locant omitted (P-14.3.4.6, one substitutable C),
+        # acetic-acid parent: parent locant omitted, one substitutable C),
         # substituted amido enclosed with its own C2 locant.
         ("OC(=O)CNC(=O)Cc1ccccc1", "(2-phenylacetamido)acetic acid"),
-        # propanoic/pentanoic parents: parent locant cited (P-16.5.1.2).
+        # propanoic/pentanoic parents: parent locant cited.
         ("CC(NC(=O)Cc1ccccc1)C(=O)O", "2-(2-phenylacetamido)propanoic acid"),
         ("CC(C)C[C@H](NC(=O)Cc1ccccc1)C(=O)O",
          "(2S)-4-methyl-2-(2-phenylacetamido)pentanoic acid"),

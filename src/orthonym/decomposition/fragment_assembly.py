@@ -37,7 +37,7 @@ from ..errors import is_refusal_sentinel
 from ..perception.functional_groups import detect_functional_groups
 from ..rules.seniority import SENIORITY_ORDER, get_principal_group
 
-# The top of the hydroxy band (P-44.1). primary_alcohol (== 54) admits
+# The top of the hydroxy band. primary_alcohol (== 54) admits
 # methanol/ethanol/2-aminoethanol/phenol; everything senior to hydroxy (ketone,
 # aldehyde, acid,...) has a strictly smaller rank and is gated out (Pitfall 5:
 # this is primary_alcohol, NOT phenol/57 -- 57 would wrongly block ethanol).
@@ -56,7 +56,7 @@ def _join_components(left: str, right: str) -> str:
     - Left ends with letter/')' and right starts with uppercase letter
       (N-substitution, L/D/R/S stereodescriptors)
 
-    This matches the logic in composer.py _join_prefix_to_name().
+    This matches the logic in composer.py _join_prefix_to_name.
 
     Args:
         left: Left name component.
@@ -80,7 +80,7 @@ def _join_components(left: str, right: str) -> str:
 
 
 # ============================================================================
-# Ring parent -> substituent prefix conversion (IUPAC P-31.1.3.4)
+# Ring parent -> substituent prefix conversion (IUPAC
 # ============================================================================
 
 # When a fragment name is used as a substituent prefix (e.g., wrapped in
@@ -96,7 +96,7 @@ _RING_PARENT_TO_SUBSTITUENT = {
 
 
 def _parent_to_substituent_prefix(name: str) -> str:
-    """Convert ring parent names to substituent prefix form per IUPAC P-31.1.3.4.
+    """Convert ring parent names to substituent prefix form per IUPAC.
 
     When a fragment name ending in a ring parent name (e.g., "methoxybenzene")
     is used as a substituent prefix, the ring name must be converted to its
@@ -143,7 +143,7 @@ _TRIVIAL_ACID_TO_ACYL = {
 }
 
 # ---------------------------------------------------------------------------
-# OPSIN-expanded acid transformation tables (DECO-26)
+# OPSIN-expanded acid transformation tables
 # ---------------------------------------------------------------------------
 
 def _build_opsin_acid_lookups():
@@ -206,7 +206,7 @@ _TRIVIAL_ALCOHOL_TO_ALKYL = {
     "cyclohexanol": "cyclohexyl",
 }
 
-# Alcohol/parent -> alkoxy prefix (retained alkoxy names per IUPAC P-63.2.3.1)
+# Alcohol/parent -> alkoxy prefix (retained alkoxy names per IUPAC
 _RETAINED_ALKOXY = {
     "methanol": "methoxy",
     "ethanol": "ethoxy",
@@ -228,7 +228,7 @@ _TRIVIAL_AMINE_TO_PREFIX = {
     "aniline": "phenyl",
     "cyclohexanamine": "cyclohexyl",
     "cyclohexylamine": "cyclohexyl",
-    # P-68.3.1: hydroxylamine (HO-NH2) as an N-substituent on an amide/sulfonamide
+    #: hydroxylamine (HO-NH2) as an N-substituent on an amide/sulfonamide
     # contributes the -OH prefix 'hydroxy', NOT 'hydroxyl'. Stripping the retained
     # name to 'hydroxyl' (its systematic-looking '...yl' tail) mis-spells the -OH
     # prefix -- 'hydroxyl' is not a prefix form. Gives N-hydroxymethanesulfonamide.
@@ -322,7 +322,7 @@ def _assemble_by_bond_type(
 
     Routes each fragment pair through the appropriate assembler based on
     the bond type that connected them. This replaces the naive space-join
-    in _try_iterative_mixed_decompose().
+    in _try_iterative_mixed_decompose.
 
     Args:
         named_fragments: List of (frag_dict, name_str) tuples.
@@ -412,7 +412,7 @@ def _assemble_by_bond_type(
 
 
 # ============================================================================
-# N-substituent grouping (IUPAC P-16.3.4)
+# N-substituent grouping (IUPAC
 # ============================================================================
 
 def _group_n_substituents(name: str) -> str:
@@ -420,7 +420,7 @@ def _group_n_substituents(name: str) -> str:
 
     Detects patterns like "N-acetyl-N-acetyltetrahydropyranamine" and
     collapses them to "N,N-diacetyltetrahydropyranamine" using IUPAC
-    P-16.3.4 multiplicative prefixes (di/tri for simple substituents,
+     multiplicative prefixes (di/tri for simple substituents,
     bis/tris for complex ones).
 
     This operates WITHIN the decomposition assembly pipeline, not as a
@@ -602,7 +602,7 @@ def _assemble_ester(fragment_names: Dict[str, str], style: str) -> Optional[str]
     if not acid_name or not alkyl_name:
         return None
 
-    # BP-2 RC-2b (P-41 seniority / P-65.6.3.5): a mono-ester of a POLY-acid is
+    # seniority /: a mono-ester of a POLY-acid is
     # a PARTIAL ester — the un-esterified free -COOH is the senior principal group
     # (carboxylic acid > ester), so the ester functional-class 'alkyl...dicarboxylate'
     # is NOT the PIN. It also silently drops the 'hydrogen' the free acid needs, and
@@ -636,7 +636,7 @@ def _expand_n_locant_for_multiplier(prefix: str) -> str:
       "triethyl" -> "N,N,N-" (three ethyls on N)
       "methyl" -> "N-" (one methyl on N)
 
-    IUPAC P-16.3.4: When identical substituents on nitrogen, use N,N- prefix
+    IUPAC: When identical substituents on nitrogen, use N,N- prefix
     with multiplying prefix.
 
     Args:
@@ -672,9 +672,9 @@ def _assemble_amide(fragment_names: Dict[str, str], style: str,
     For simple amines, uses amide suffix: "N-methylacetamide".
     For complex amines, uses acyl prefix: "N-acetylcyclohexanamine".
 
-    After assembly, passes the result through _group_n_substituents() to
+    After assembly, passes the result through _group_n_substituents to
     collapse any repeated N-prefix patterns (e.g., "N-acetyl-N-acetyl..."
-    becomes "N,N-diacetyl...") per IUPAC P-16.3.4.
+    becomes "N,N-diacetyl...") per IUPAC.
 
     Args:
         fragment_names: {"acid": acid_name, "amine": amine_name}
@@ -737,7 +737,7 @@ def _assemble_amide(fragment_names: Dict[str, str], style: str,
                 # so _group_n_substituents can properly merge identical ones.
                 result = f"N-{_wrap_n_substituent(enclose_if_compound(acyl_prefix))}-{amine_name}"
             else:
-                # P-16.5.1.4: a parent-hydride-derived acyl prefix (furan-2-carbonyl,
+                #: a parent-hydride-derived acyl prefix (furan-2-carbonyl,
                 # cyclohexanecarbonyl) must be parenthesised so two parent hydrides
                 # are not read as one -- 'N-(furan-2-carbonyl)furan-2-carboxamide',
                 # not 'N-furan-2-carbonylfuran-2-carboxamide'. _wrap_n_substituent
@@ -756,7 +756,7 @@ def _assemble_amide(fragment_names: Dict[str, str], style: str,
     while result.startswith("N-N-"):
         result = result[2:]  # strip one "N-"
 
-    # Group repeated N-prefix patterns (IUPAC P-16.3.4)
+    # Group repeated N-prefix patterns (IUPAC
     # This handles cases where recursive fragment naming already produced
     # an "N-acetyl..." prefix, and our assembly adds another "N-acetyl",
     # resulting in "N-acetyl-N-acetyl..." which should be "N,N-diacetyl...".
@@ -788,7 +788,7 @@ def _aglycone_to_substituent(
     glycoside form it must be cited as a preceding monovalent substituent word
     (``methyl``, ``ethyl``, ``2-aminoethyl``, ``phenyl``).
 
-    Structural seniority guard (, P-102.5.6.1.1): if the aglycone bears a
+    Structural seniority guard (,: if the aglycone bears a
     characteristic group *senior to hydroxy* (ketone, aldehyde, acid,...), the
     functional-class glycoside form is NOT used -- the ``-ose`` ending is
     retained and the aglycone is cited as an O-substituent instead. We detect
@@ -810,7 +810,7 @@ def _aglycone_to_substituent(
     if not aglycone_name:
         return None
 
-    # Structural seniority guard (). Without the SMILES we cannot make the
+    # Structural seniority guard . Without the SMILES we cannot make the
     # structural decision, so fail closed to the legacy form.
     if not aglycone_smiles:
         return None
@@ -858,14 +858,14 @@ def _aglycone_structural_substituent(aglycone_smiles: Optional[str]) -> Optional
     ``borneyl``, not an OPSIN substituent). The aglycone arrives from the glycoside
     cleavage as an alcohol (the glycosidic O reattached as -OH); we take the carbon
     that bears that single -OH as the free valence and name the remaining skeleton
-    through the ring-substituent chokepoint ``name_ring_system_substituent`` (P-29.2),
+    through the ring-substituent chokepoint ``name_ring_system_substituent``,
     yielding e.g. ``4,7,7-trimethylbicyclo[2.2.1]heptan-5-yl``.
 
     Determinism (a project rule): the aglycone is re-parsed through its CANONICAL SMILES
     first, so the von-Baeyer / ring numbering the chokepoint assigns is independent of
     the incoming atom order (that numbering is otherwise order-dependent).
 
-    Structural seniority guard (, P-102.5.6.1.1): a group senior to hydroxy keeps
+    Structural seniority guard (,: a group senior to hydroxy keeps
     the substitutive form -> return None. Fail closed (None) on a multi-hydroxy,
     purely acyclic, or unnameable aglycone -- the caller then keeps its legacy path.
     """
@@ -904,7 +904,7 @@ def _aglycone_structural_substituent(aglycone_smiles: Optional[str]) -> Optional
         prefix = name_ring_system_substituent(mol, frag, c_idx, allow_mancude=True)
     except Exception:
         return None
-    # Reject the unnameable sentinel and any non-substituent token; a real P-29.2
+    # Reject the unnameable sentinel and any non-substituent token; a real
     # monovalent prefix ends in "-yl".
     if not prefix or prefix == "substituent" or not prefix.endswith("yl"):
         return None
@@ -917,11 +917,11 @@ def _assemble_glycoside(
     fragment_smiles: Optional[Dict[str, str]] = None,
     parent_smiles: Optional[str] = None,
 ) -> Optional[str]:
-    """Assemble glycoside name (a phase / WSD-08: functional-class form).
+    """Assemble glycoside name (a phase / -08: functional-class form).
 
     Emits the Blue-Book functional-class two-word form
-    ``<aglycone-substituent> <sugar>oside`` (P-102.5.6.2.2), e.g.
-    ``methyl beta-D-glucopyranoside``, when the self-gating triad () holds:
+    ``<aglycone-substituent> <sugar>oside``, e.g.
+    ``methyl beta-D-glucopyranoside``, when the self-gating triad  holds:
 
       1. the sugar skeleton is recognized (lookup_sugar catalog fast-path FIRST
          per, then the structure-derived recognize_sugar_skeleton); AND
@@ -943,7 +943,7 @@ def _assemble_glycoside(
         fragment_names: Fragment name dict with sugar/aglycone info.
         style: Naming style.
         fragment_smiles: Optional dict of fragment SMILES keyed by side
-            (). Required for the functional-class flip; when None the
+            . Required for the functional-class flip; when None the
             legacy form is emitted (back-compat).
 
     Returns:
@@ -959,7 +959,7 @@ def _assemble_glycoside(
         return None
 
     # --- Functional-class flip attempt (//) -------------------
-    # Only attempted when the fragment SMILES were threaded (). Every gate
+    # Only attempted when the fragment SMILES were threaded . Every gate
     # failure falls through to the legacy logic below (zero regression).
     if fragment_smiles:
         sugar_smiles = fragment_smiles.get("sugar") or fragment_smiles.get("acid")
@@ -967,7 +967,7 @@ def _assemble_glycoside(
             fragment_smiles.get("aglycone") or fragment_smiles.get("alkyl")
         )
 
-        # SUGAR gate (): catalog fast-path FIRST, then the deriver on miss.
+        # SUGAR gate : catalog fast-path FIRST, then the deriver on miss.
         sugar_tuple = None
         if sugar_smiles:
             sugar_mol = _Chem.MolFromSmiles(sugar_smiles)
@@ -984,7 +984,7 @@ def _assemble_glycoside(
         # AGLYCONE gate (/): substituent prefix + structural seniority.
         aglycone_prefix = _aglycone_to_substituent(aglycone_name, aglycone_smiles)
 
-        # SINGLE-SUGAR gate (): this assembler is only reached for the
+        # SINGLE-SUGAR gate : this assembler is only reached for the
         # single-glycosidic-bond path (>=2 -> _assemble_multi_glycoside, which
         # is untouched). Defensive guard: a multi-sugar prefix would carry the
         # glycosyloxy stem more than once.
@@ -996,7 +996,7 @@ def _assemble_glycoside(
 
         if sugar_tuple is not None and single_sugar:
             anomer, config, base = sugar_tuple
-            # W6-P1: a uronic sugar core must use the P-102.5.6.6.4.2 head form
+            # W6-P1: a uronic sugar core must use the head form
             # "glucopyranosiduronic acid" (NOT the wrong "glucuronopyranoside"
             # sugar_to_glycoside_class_name would build) -> methyl
             # beta-D-glucopyranosiduronic acid. Fail-closed if the base is an
@@ -1007,9 +1007,9 @@ def _assemble_glycoside(
             else:
                 head = sugar_to_glycoside_class_name(anomer, config, base)
             if head:
-                # Functional-class form "<substituent> <sugar>oside" (P-102.5.6.2.2);
+                # Functional-class form "<substituent> <sugar>oside";
                 # the alpha/beta + D/L descriptors come from the sugar tuple and are
-                # never dropped (). Two aglycone-substituent sources:
+                # never dropped . Two aglycone-substituent sources:
                 # - the string rule (`aglycone_prefix`), byte-identical for every
                 # already-working glycoside (menthyl/cyclohexyl/phenyl/...);
                 # - Incr-1a: the aglycone '-yl' derived from STRUCTURE, which
@@ -1029,7 +1029,7 @@ def _assemble_glycoside(
                 structural_form = None
                 if structural_prefix:
                     # Enclose a complex substituent (locants/brackets) per
-                    # P-16.3.3; a bare 'cyclohexyl'/'phenyl' stays unenclosed.
+                    #; a bare 'cyclohexyl'/'phenyl' stays unenclosed.
                     wrapped = (
                         structural_prefix
                         if _re.fullmatch(r"[a-z]+yl", structural_prefix)
@@ -1111,7 +1111,7 @@ def _assemble_glycoside(
     # gates reject them), so no shipped name is lost by refusing here.
     #
     # Failing closed lets the dispatcher fall through to the GENERAL pipeline,
-    # where the sugar is named as the P-102.6.1.2 compound prefix by
+    # where the sugar is named as the compound prefix by
     # ``sugar_names.glycosyl_substituent_prefix`` (substituent cascade Tier
     # 1.75) and the ordinary parent+prefix machinery assigns the attachment
     # locant and cites only the remaining hydroxy groups -- the oxygen is then
@@ -1152,14 +1152,14 @@ def _assemble_carbamate(fragment_names: Dict[str, str], style: str) -> Optional[
 
 _POSITION_INVARIANT_PARENTS = frozenset({
     # every substitutable position equivalent — an unlocanted prefix join is
-    # unambiguous (Wave-2 C2; the methoxybenzene RET-01 policy gold lives here)
+    # unambiguous (Wave-2 C2; the methoxybenzene policy gold lives here)
     'benzene', 'methane', 'ethane',
 })
 
 
 def _parent_is_position_invariant(parent_name: str) -> bool:
     """True when *parent_name* is a bare parent whose substitutable positions
-    are all equivalent (P-14.3.2: no locant needed). Unsubstituted
+    are all equivalent: no locant needed). Unsubstituted
     monocycloalkanes qualify; anything carrying locants, substituents or a
     positional suffix (benzonitrile, phenol, naphthalene) does not."""
     import re as _re
@@ -1169,7 +1169,7 @@ def _parent_is_position_invariant(parent_name: str) -> bool:
 
 
 def _assemble_ether(fragment_names: Dict[str, str], style: str) -> Optional[str]:
-    """Assemble ether name as 'alkoxy + parent' (IUPAC P-63.2.3).
+    """Assemble ether name as 'alkoxy + parent' (IUPAC.
 
     The smaller fragment (alkyl side, which retains the ether oxygen as an
     alcohol) is converted to an alkoxy prefix. The larger fragment (acid side)
@@ -1193,10 +1193,10 @@ def _assemble_ether(fragment_names: Dict[str, str], style: str) -> Optional[str]
     if not alkoxy:
         return None
 
-    # Wave-2 C2 (P-14.3.2): this join carries NO attachment locant, so it is
+    # Wave-2 C2: this join carries NO attachment locant, so it is
     # only correct when every position of the parent is equivalent. Joining
     # onto a positional parent silently mis-placed the ether
-    # ('phenoxybenzonitrile' for the 2-isomer; meta/para SELF-01-suppressed).
+    # ('phenoxybenzonitrile' for the 2-isomer; meta/para -suppressed).
     # Decline otherwise — the cascade falls to the benzene handler, which
     # emits the locanted form.
     if not _parent_is_position_invariant(parent_name):
@@ -1206,7 +1206,7 @@ def _assemble_ether(fragment_names: Dict[str, str], style: str) -> Optional[str]
 
 
 def _assemble_thioether(fragment_names: Dict[str, str], style: str) -> Optional[str]:
-    """Assemble thioether name as 'alkylthio + parent' (IUPAC P-63.6.2).
+    """Assemble thioether name as 'alkylthio + parent' (IUPAC.
 
     The smaller fragment (alkyl side, retaining the sulfur as a thiol)
     is converted to an alkylthio prefix. The larger fragment (acid side)
@@ -1238,7 +1238,7 @@ def _assemble_thioether(fragment_names: Dict[str, str], style: str) -> Optional[
 
 
 def _assemble_sec_amine(fragment_names: Dict[str, str], style: str) -> Optional[str]:
-    """Assemble secondary amine name as 'alkylamino + parent' (IUPAC P-62.2.3).
+    """Assemble secondary amine name as 'alkylamino + parent' (IUPAC.
 
     The smaller fragment (amine side) is converted to an alkylamino prefix.
     The larger fragment (acid side) is the parent compound.
@@ -1265,7 +1265,7 @@ def _assemble_sec_amine(fragment_names: Dict[str, str], style: str) -> Optional[
 
 
 def _assemble_thioester(fragment_names: Dict[str, str], style: str) -> Optional[str]:
-    """Assemble thioester name as 'S-alkyl alkanethioate' per IUPAC P-65.6.3.3.
+    """Assemble thioester name as 'S-alkyl alkanethioate' per IUPAC.
 
     Thioic S-acid esters are named as functional class names where sulfur
     replaces oxygen on the ester side. The acid fragment converts to the
@@ -1298,7 +1298,7 @@ def _assemble_thioester(fragment_names: Dict[str, str], style: str) -> Optional[
 
 
 def _assemble_phosphodiester(fragment_names: Dict[str, str], style: str) -> Optional[str]:
-    """Assemble phosphodiester name per IUPAC P-67.1.3 compositional nomenclature.
+    """Assemble phosphodiester name per IUPAC compositional nomenclature.
 
     The acid fragment is a phosphoric acid monoester (named by phosphorus.py
     after capping). The alkyl fragment name identifies the other ester group.
@@ -1327,7 +1327,7 @@ def _assemble_phosphodiester(fragment_names: Dict[str, str], style: str) -> Opti
 
 
 def _assemble_sulfonamide(fragment_names: Dict[str, str], style: str) -> Optional[str]:
-    """Assemble sulfonamide as 'N-substituent (parent)sulfonamide' per P-66.6.4.2.2.
+    """Assemble sulfonamide as 'N-substituent (parent)sulfonamide' per.
 
     The acid fragment is a sulfonic acid (named after capping). The amine
     fragment provides the N-substituent prefix. For unsubstituted sulfonamides
@@ -1371,7 +1371,7 @@ def _assemble_multi_ester(
     named_fragments: List[Tuple[Dict, str]],
     style: str = "pin",
 ) -> Optional[str]:
-    """Assemble name for polyesters (triglycerides, etc.) per IUPAC P-65.6.3.4.
+    """Assemble name for polyesters (triglycerides, etc.) per IUPAC.
 
     For polyol + multiple acids:
     - Identical acids: "glycerol triacetate" with multiplicative prefix
@@ -1379,7 +1379,7 @@ def _assemble_multi_ester(
 
     The core fragment is identified by role label preference:
     1. Fragments with side="middle" (backbone between cleavage points)
-    2. Fall back to score_fragment_seniority() (existing behavior)
+    2. Fall back to score_fragment_seniority (existing behavior)
 
     Args:
         named_fragments: List of (fragment_dict, name_str) tuples. Each
@@ -1458,7 +1458,7 @@ def _assemble_multi_glycoside(
 ) -> Optional[str]:
     """Assemble names for molecules with 2+ glycosidic bonds.
 
-    Pattern: (sugar1-oxy)(sugar2-oxy)aglycone per IUPAC P-68.
+    Pattern: (sugar1-oxy)(sugar2-oxy)aglycone per IUPAC.
     Each sugar fragment should resolve to a retained glycosyloxy prefix.
     If NO sugar fragment gets a retained name (all end up as systematic
     oxanyloxane), fall back to None to prevent garbled names.
@@ -1591,7 +1591,7 @@ def _assemble_multi_amide(
 ) -> Optional[str]:
     """Assemble names for molecules with 3+ amide bonds.
 
-    Pattern: N-acyl1,N-acyl2-amine per IUPAC P-66.6.3.
+    Pattern: N-acyl1,N-acyl2-amine per IUPAC.
     Each acyl group as N- prefix on the amine core.
 
     The core fragment is identified by role label preference:
@@ -1696,8 +1696,8 @@ def _assemble_multi_amide(
 def _alcohol_to_alkoxy(name: str) -> Optional[str]:
     """Convert an alcohol or fragment name to its alkoxy form.
 
-    Uses retained alkoxy names first (IUPAC P-63.2.3.1), then falls back
-    to converting via _alcohol_to_alkyl() + replacing -yl with -oxy.
+    Uses retained alkoxy names first (IUPAC, then falls back
+    to converting via _alcohol_to_alkyl + replacing -yl with -oxy.
 
     Args:
         name: Alcohol or fragment name (e.g., "methanol", "ethanol",
@@ -1904,7 +1904,7 @@ def _acid_to_ate(acid_name: str) -> Optional[str]:
     if stem.lower() in TRIVIAL_ACID_TO_ACYLATE:
         return TRIVIAL_ACID_TO_ACYLATE[stem.lower()]
 
-    # OPSIN expanded lookup (DECO-26)
+    # OPSIN expanded lookup
     if name.lower() in _OPSIN_ATE:
         return _OPSIN_ATE[name.lower()]
 
@@ -1958,7 +1958,7 @@ def _acid_to_amide(acid_name: str) -> Optional[str]:
     if name.lower() in _TRIVIAL_ACID_TO_AMIDE:
         return _TRIVIAL_ACID_TO_AMIDE[name.lower()]
 
-    # OPSIN expanded lookup (DECO-26)
+    # OPSIN expanded lookup
     if name.lower() in _OPSIN_AMIDE:
         return _OPSIN_AMIDE[name.lower()]
 
@@ -2023,7 +2023,7 @@ def _acid_to_acyl(acid_name: str) -> Optional[str]:
     if name.lower() in _TRIVIAL_ACID_TO_ACYL:
         return _TRIVIAL_ACID_TO_ACYL[name.lower()]
 
-    # OPSIN expanded lookup (DECO-26)
+    # OPSIN expanded lookup
     if name.lower() in _OPSIN_ACYL:
         return _OPSIN_ACYL[name.lower()]
 
@@ -2109,7 +2109,7 @@ def _acid_to_acyl(acid_name: str) -> Optional[str]:
 
 
 def _acid_to_thioate(acid_name: str) -> Optional[str]:
-    """Convert acid name to thioate form per IUPAC P-65.6.3.3.
+    """Convert acid name to thioate form per IUPAC.
 
     The "-thioate" suffix replaces "-oate" in ester naming when sulfur
     replaces the ester oxygen.
@@ -2129,7 +2129,7 @@ def _acid_to_thioate(acid_name: str) -> Optional[str]:
     name = acid_name.strip()
 
     # For thioester naming, always use systematic form (not trivial)
-    # because thio- derivatives use systematic nomenclature per IUPAC P-65.6.3.3
+    # because thio- derivatives use systematic nomenclature per IUPAC
 
     # Handle "carboxylic acid" -> "carbothioate"
     if name.endswith("carboxylic acid"):
@@ -2174,7 +2174,7 @@ def _acid_to_thioate(acid_name: str) -> Optional[str]:
 def _thiol_to_s_prefix(thiol_name: str) -> Optional[str]:
     """Convert thiol name to S-alkyl prefix for thioester naming.
 
-    Per IUPAC P-65.6.3.3, the sulfur-bearing fragment is designated
+    Per IUPAC, the sulfur-bearing fragment is designated
     with an "S-" locant prefix followed by the alkyl name.
 
     Args:
@@ -2228,7 +2228,7 @@ def _thiol_to_s_prefix(thiol_name: str) -> Optional[str]:
 
 
 def _acid_to_sulfonamide(acid_name: str) -> Optional[str]:
-    """Convert sulfonic acid name to sulfonamide form per IUPAC P-66.6.4.
+    """Convert sulfonic acid name to sulfonamide form per IUPAC.
 
     Replaces 'sulfonic acid' with 'sulfonamide' in the acid name.
 

@@ -1,11 +1,11 @@
-"""P-16.5.1.4 — a substituent prefix that includes a parent-hydride name is enclosed.
+""" — a substituent prefix that includes a parent-hydride name is enclosed.
 
 "Parentheses are placed around substituent groups including the name of a parent
 hydride in order to avoid any confusion from having two parent hydrides in a
-substitutive name" (P-16.5.1.4, the Blue Book; the rule's own example is
+substitutive name", the Blue Book; the rule's own example is
 cyclohexanecarbonyl). Two independent producers missed it:
 
-  * needs_brackets() had no parent-hydride + acyl-suffix branch (Site A):
+  * needs_brackets had no parent-hydride + acyl-suffix branch (Site A):
       hydrazinecarbonyl -> (hydrazinecarbonyl), 2-(hydrazinecarbonyl)benzene-1-
       sulfonic acid (the Blue Book); hydrazinecarbohydrazonoyl likewise (the Blue Book).
   * decomposition/fragment_assembly.py wrapped the acyl N-substituent with

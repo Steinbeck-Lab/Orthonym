@@ -1,15 +1,15 @@
 """
-Integration tests for N-substituent grouping in decomposition (DEC-03).
+Integration tests for N-substituent grouping in decomposition .
 
-Tests that the _group_n_substituents() function correctly collapses
-repeated N-prefix patterns using IUPAC P-16.3.4 multiplicative prefixes:
+Tests that the _group_n_substituents function correctly collapses
+repeated N-prefix patterns using IUPAC multiplicative prefixes:
   - N-acetyl-N-acetyl -> N,N-diacetyl
   - N-formyl-N-acetyl-N-acetyl -> N,N-diacetyl-N-formyl (alphabetical)
 
 Also tests end-to-end that multi-amide decomposition names use grouped
 N-prefixes rather than repeated individual ones.
 
-Phase 50, Plan 03 -- N-prefix grouping validation.
+a phase, Plan 03 -- N-prefix grouping validation.
 """
 
 import pytest
@@ -18,7 +18,7 @@ from orthonym.decomposition.fragment_assembly import _group_n_substituents
 
 
 class TestGroupNSubstituentsDirect:
-    """Unit tests of _group_n_substituents() function directly."""
+    """Unit tests of _group_n_substituents function directly."""
 
     @pytest.mark.integration
     def test_two_identical_n_prefixes_grouped(self):

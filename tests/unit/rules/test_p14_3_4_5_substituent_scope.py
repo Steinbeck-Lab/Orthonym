@@ -1,8 +1,8 @@
-"""P-14.3.4.5 inside a SUBSTITUENT (enclosing-mark) scope -- Phase C Task 5a.
+""" inside a SUBSTITUENT (enclosing-mark) scope -- Phase C Task 5a.
 
 Governing rule chain, verbatim from ``the Blue Book Blue Book`` with headings.
 
-``P-14.3.3`` "Citation of locants" (``:2869``) is the **DENY-DEFAULT**, and its
+```` "Citation of locants" (``:2869``) is the **DENY-DEFAULT**, and its
 scoping clause is the entire mechanism of this class --
 
     "In preferred IUPAC names, if any locants are essential for defining the structure
@@ -10,7 +10,7 @@ scoping clause is the entire mechanism of this class --
      enclosing marks**, then all locants must be cited for the parent structure or
      that structural unit."
 
-``P-14.3.4.5`` (``:3007``), under ``P-14.3.4`` "Omission of locants", grants the
+```` (``:3007``), under ```` "Omission of locants", grants the
 licence -- and is the ONLY one of the six sub-licences whose text says *"compounds or
 **substituent groups**"* --
 
@@ -29,10 +29,10 @@ and its counter-clause ``:3009`` is the tripwire --
 ``:3023`` ``1-chloro-2-(pentafluoroethyl)benzene (PIN)``: inside the parentheses the
 ethyl group is completely and uniformly substituted and omits, while outside the
 benzene ring is only partially substituted and keeps ``1,2``. (NOT ``:3027`` -- that
-line is an OCR image placeholder, ``![](_page_73_Picture_8.jpeg)``.)
+line is an OCR image placeholder, ``!(_page_73_Picture_8.jpeg)``.)
 
 ★ THE ARITHMETIC that makes the licence count HYDROGENS, not positions: ethyl has FIVE
-substitutable hydrogens after the free valence is formed -- 2 at C1, 3 at C2 (P-29.2,
+substitutable hydrogens after the free valence is formed -- 2 at C1, 3 at C2,
 ``:15813``: *"the atom with the free valence terminates a chain and always has the
 locant '1', which is omitted from the name"*). That is why the Blue Book prints
 ``penta``fluoro. Measured here as ``*CC -> {1: 2, 2: 3}``.
@@ -221,10 +221,10 @@ class TestDenyByDefault:
     def test_internal_free_valence_keeps_locants_end_to_end(self, namer):
         """★ The k != 1 boundary, asserted on the EMITTED name.
 
-        All seven substitutable hydrogens ARE uniformly replaced, so P-14.3.4.5's
+        All seven substitutable hydrogens ARE uniformly replaced, so 's
         completeness test is satisfied -- yet the scope must still cite them, because
         the free-valence locant ``2`` is itself essential (it distinguishes
-        propan-2-yl from propan-1-yl) and P-14.3.3 (``:2869``) then requires *"all
+        propan-2-yl from propan-1-yl) and (``:2869``) then requires *"all
         locants... for that structural unit"*. The Blue Book prints no
         fully-substituted substituent group with an internal free valence, so
         deny-by-default picks retention. If this ever elides to
@@ -235,7 +235,7 @@ class TestDenyByDefault:
             "(1,1,1,2,3,3,3-heptafluoropropan-2-yl)benzene"
 
     def test_zero_h_everywhere_but_not_by_the_same_group(self, namer):
-        """★ ``:29619`` -- the Blue Book cites P-14.3.4.5 BY NAME to explain a
+        """★ ``:29619`` -- the Blue Book cites BY NAME to explain a
         NEGATIVE: every carbon has 0 H, yet the locants are required, because C1 is
         substituted by something other than fluoro. Guards against a
         'zero-H-everywhere' predicate instead of 'zero-H-everywhere BY THE SAME
@@ -289,7 +289,7 @@ class TestDenyByDefault:
         replacements are **two different kinds** (chloro and fluoro), so
         ``:3007``'s *"in the same way"* is violated and every locant must be cited.
         That is exactly why the Blue Book keeps the locants in
-        ``pentadecafluorooctan-1-one`` (``:29619``) while citing P-14.3.4.5 by name.
+        ``pentadecafluorooctan-1-one`` (``:29619``) while citing by name.
 
         Measured 2026-07-29: the licence helper is called for both rows and correctly
         returns ``None``. The whole name is asserted (a project rule) because the
@@ -302,7 +302,7 @@ class TestDenyByDefault:
     @pytest.mark.parametrize(
         "smiles,expected,why",
         [
-            # A formal charge on the scope: the helper's own GetFormalCharge() guard
+            # A formal charge on the scope: the helper's own GetFormalCharge guard
             # is load-bearing here (unlike the sibling no-op guards CLAUDE.md warns
             # about), because _name_saturated_substituted_chain has no charge check.
             ("[NH3+]CCC(F)(F)C(F)(F)c1ccccc1",
@@ -321,7 +321,7 @@ class TestDenyByDefault:
     ):
         """Charge coverage, added after review found it verified-but-untested.
 
-        CLAUDE.md records that on a sibling predicate **both** ``GetFormalCharge()``
+        CLAUDE.md records that on a sibling predicate **both** ``GetFormalCharge``
         guards were measured to be **no-ops**, because the molecule arrives
         neutralised. These two rows pin the behaviour that was measured to be correct
         here, so that a future neutralisation change cannot silently make this
@@ -358,7 +358,7 @@ class TestDenyByDefault:
         ("Fc1c(F)c(F)c(F)c(F)c1F", "hexafluorobenzene"),
         ("Clc1c(Cl)c(Cl)c(Cl)c(Cl)c1Cl", "hexachlorobenzene"),
         ("Oc1c(O)c(O)c(O)c(O)c1O", "benzenehexol"),
-        # Monosubstituted urea omits the italic-N locant (P-14.3.4.3,:2943).
+        # Monosubstituted urea omits the italic-N locant,:2943).
         ("CNC(=O)N", "methylurea"),
         ("CNC(=O)CC(=O)NC", "N1,N3-dimethylpropanediamide"),
         # Plain alkyl / branched substituents the licence must never touch.
@@ -421,7 +421,7 @@ class TestHelperPredicate:
         assert _l5_substituent_prefix(mol, sub, chain, 2, groups) is None
 
     def test_internal_free_valence_is_denied_even_when_complete(self):
-        """k >= 2 cites the free-valence locant, which is essential; P-14.3.3
+        """k >= 2 cites the free-valence locant, which is essential;
         (``:2869``) then requires every locant in that structural unit."""
         mol, sub, attach, _ = _split_ring_and_branch(
             "FC(F)(F)C(F)(C(F)(F)F)c1ccccc1")
@@ -498,11 +498,11 @@ class TestHelperPredicate:
 
 class TestForcedLocantScope:
     def test_helper_declines_inside_a_forced_scope(self):
-        """P-14.3.3 as an ambient scope. The isotope path names an isotope-STRIPPED
+        """ as an ambient scope. The isotope path names an isotope-STRIPPED
         molecule, so a structural ``has_isotope`` test at this depth is blind by
-        construction (measured: ``GetIsotope()`` reads 0 for every scope atom even
+        construction (measured: ``GetIsotope`` reads 0 for every scope atom even
         for a 13C input). This ContextVar is the ONLY live guard, and neither
-        SELF-01 (which ``namer.py`` states verbatim *"ignores isotopes"*) nor the
+         (which ``namer.py`` states verbatim *"ignores isotopes"*) nor the
         gold set can see a failure here -- gold exposure for this class is zero.
         """
         mol, sub, attach, _ = _split_ring_and_branch("FC(F)(F)C(F)(F)C1CCCCC1")
@@ -524,10 +524,10 @@ class TestForcedLocantScope:
         ``rules/isotopes.py`` enters the FORCED scope only once ``_enumerate`` has
         established that the descriptor needs a locant. For
         ``FC(F)(F)[13C](F)(F)C1CCCCC1`` it never does, so at this depth
-        ``locants_are_forced()`` is False AND every ``GetIsotope()`` reads 0 -- both
+        ``locants_are_forced`` is False AND every ``GetIsotope`` reads 0 -- both
         signals negative, while the finished name still carries ``(13C1)``. Keying
         the licence on the forced flag alone emptied that scope of all its locants,
-        which P-82.6.1.1 (``:44180``) forbids because the ethyl group's two carbons
+        which (``:44180``) forbids because the ethyl group's two carbons
         are inequivalent.
         """
         mol, sub, attach, _ = _split_ring_and_branch("FC(F)(F)C(F)(F)C1CCCCC1")
@@ -547,8 +547,8 @@ class TestIsotopeEndToEnd:
     not disturb the labelled omissions that are already correct."""
 
     @pytest.mark.parametrize("smiles,expected", [
-        # ★ The regression this guard exists for: locants_are_forced() is False here.
-        # 13C count subscript omitted per P-82.2.1/FIX-A (a carbon position holds
+        # ★ The regression this guard exists for: locants_are_forced is False here.
+        # 13C count subscript omitted per /FIX-A (a carbon position holds
         # one carbon); the locant behaviour under test is unchanged.
         ("FC(F)(F)[13C](F)(F)C1CCCCC1",
          "(1,1,2,2,2-pentafluoro(13C)ethyl)cyclohexane"),
@@ -561,7 +561,7 @@ class TestIsotopeEndToEnd:
         # D keeps (2H1): its omitted (2H) spelling is not OPSIN-parseable in this
         # nested substituent slot, so the placement search falls back (FIX-A).
         ("FC(F)(F)C(F)([2H])C1CCCCC1", "(1,2,2,2-tetrafluoro(2H1)ethyl)cyclohexane"),
-        # P-82.6.1.3 omissions that must SURVIVE -- the weaker isotopic flag is
+        # omissions that must SURVIVE -- the weaker isotopic flag is
         # deliberately not consulted by rules/benzene.py.
         ("Cc1c(C)c(C)c(C)c(C)[13c]1C", "hexamethyl(13C)benzene"),
         ("[13CH3]CO", "(2-13C)ethan-1-ol"),

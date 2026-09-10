@@ -1,17 +1,17 @@
-"""P-74.1.2 — ring zwitterions carrying an anionic characteristic group.
+""" — ring zwitterions carrying an anionic characteristic group.
 
 Task G2 (residue). `rules/ions.py::emit_zwitterion_ring_carboxylate` used to
 splice a cation-substituent prefix built in ONE ring numbering onto a *substituted*
 ring name carrying its own, DIFFERENT numbering. On the default path that emitted
 malformed and mis-numbered names — and every one of them round-tripped cleanly
-through OPSIN, so neither the round-trip metric nor SELF-01 could see them. The
+through OPSIN, so neither the round-trip metric nor could see them. The
 report with the full measurement is
 internal notes.
 
 Blue Book, `the Blue Book Blue Book` (every pointer re-opened with `sed -n '<N>p'`
 at write time):
 
-* **P-74.1.2 "Zwitterionic compounds with at least one ionic center on a
+* ** "Zwitterionic compounds with at least one ionic center on a
   characteristic group"** — heading `:42445`. Sentence `:42447`, quoted whole
   because the decisive clause is the last one: *"Zwitterionic compounds with at
   least one ionic center on a characteristic group may be named by adding the
@@ -21,7 +21,7 @@ at write time):
   the locants for positions of attachment of characteristic groups denoted by
   ionic suffixes."*
 * Worked (PIN) example `:42456`: `1-methyl-4,6-diphenylpyridin-1-ium-2-carboxylate`.
-* Where detachable prefixes rank: **P-14.4 "NUMBERING"** heading `:3219`,
+* Where detachable prefixes rank: ** "NUMBERING"** heading `:3219`,
   clause (c) `:3256` *"principal characteristic groups and free valences
   (suffixes);"* vs clause (f) `:3301` *"detachable alphabetized prefixes, all
   considered together in a series of increasing numerical order;"*.
@@ -69,7 +69,7 @@ def _emit(smiles):
 # --------------------------------------------------------------------------
 
 BB_PIN_ROWS = [
-    # BB:42456 — the P-74.1.2 worked (PIN) example. Abstained before Task G2.
+    # BB:42456 — the worked (PIN) example. Abstained before Task G2.
     ("C[n+]1c(C(=O)[O-])cc(-c2ccccc2)cc1-c1ccccc1",
      "1-methyl-4,6-diphenylpyridin-1-ium-2-carboxylate",
      "BB :42456 (PIN)"),
@@ -98,12 +98,12 @@ REPAIRED_ROWS = [
     ("C[n+]1c(C(=O)[O-])cc(C)cc1", "1,4-dimethylpyridin-1-ium-2-carboxylate"),
     # HEAD: 1-methyl3-methylpyridin-1-ium-2-carboxylate
     ("C[n+]1c(C(=O)[O-])c(C)ccc1", "1,3-dimethylpyridin-1-ium-2-carboxylate"),
-    # HEAD: 1-methyl4-bromopyridin-1-ium-2-carboxylate (P-14.5.2: bromo < methyl)
+    # HEAD: 1-methyl4-bromopyridin-1-ium-2-carboxylate: bromo < methyl)
     ("C[n+]1ccc(Br)cc1C(=O)[O-]", "4-bromo-1-methylpyridin-1-ium-2-carboxylate"),
     ("C[n+]1ccc(Cl)cc1C(=O)[O-]", "4-chloro-1-methylpyridin-1-ium-2-carboxylate"),
     ("C[n+]1ccc(F)cc1C(=O)[O-]", "4-fluoro-1-methylpyridin-1-ium-2-carboxylate"),
     # HEAD: 1-methyl2,4-dimethylpyridin-1-ium-6-carboxylate
-    # — carboxylate numbered 6 where P-74.1.2:42447 requires 2
+    # — carboxylate numbered 6 where:42447 requires 2
     ("C[n+]1c(C(=O)[O-])cc(C)cc1C", "1,4,6-trimethylpyridin-1-ium-2-carboxylate"),
     # HEAD: 1-methyl2-ethyl-4-methylpyridin-1-ium-6-carboxylate
     ("C[n+]1c(C(=O)[O-])cc(C)cc1CC",
@@ -118,7 +118,7 @@ REPAIRED_ROWS = [
 # Rows HEAD abstained on. The isopropyl row is the important one: HEAD produced
 # `1-propylpyridin-1-ium-2-carboxylate` — a DIFFERENT molecule — because the old
 # branch named substituents with the carbon-counting `classify_substituent`, and
-# only SELF-01 stopped it shipping.
+# only stopped it shipping.
 NEWLY_NAMED_ROWS = [
     ("C[n+]1c(C(=O)[O-])ccc(C)c1", "1,5-dimethylpyridin-1-ium-2-carboxylate"),
     ("C[n+]1ccc(O)cc1C(=O)[O-]", "4-hydroxy-1-methylpyridin-1-ium-2-carboxylate"),
@@ -183,7 +183,7 @@ def test_no_emitted_name_welds_a_locant_onto_a_prefix(namer):
 
 
 def test_every_emitted_name_cites_cation_before_anion(namer):
-    """P-74.1.2:42447 'In names, cationic suffixes are cited before anionic
+    """:42447 'In names, cationic suffixes are cited before anionic
     suffixes.' Spelling-independent: the '-ium' must precede the '-carboxylate'."""
     checked = 0
     for smiles, _expected in ALL_NAMED_ROWS:
@@ -195,7 +195,7 @@ def test_every_emitted_name_cites_cation_before_anion(namer):
 
 
 # --------------------------------------------------------------------------
-# 3. The P-74.1.2 numbering criterion is LOAD-BEARING, not decorative
+# 3. The numbering criterion is LOAD-BEARING, not decorative
 # --------------------------------------------------------------------------
 
 def test_substituent_set_cannot_decide_the_bb_example():
@@ -231,7 +231,7 @@ def test_substituent_set_cannot_decide_the_bb_example():
 
 def test_dropping_the_anion_criterion_changes_the_name():
     """Mutation check: with `anion_attach_idx` withheld, the numbering is no longer
-    forced by P-74.1.2. Proves the criterion is on the execution path for the Blue
+    forced by. Proves the criterion is on the execution path for the Blue
     Book example rather than merely present."""
     smiles = "C[n+]1c(C(=O)[O-])cc(C)cc1C"   # -> 1,4,6-trimethyl...-2-carboxylate
     mol = Chem.MolFromSmiles(smiles)
@@ -273,6 +273,6 @@ def test_uncorroborated_substituents_fail_closed(smiles, why):
 
 
 def test_emitter_declines_when_the_cation_is_not_in_a_ring():
-    """A quaternary-ammonium acetate is P-74.1.3 (centres on DIFFERENT parent
+    """A quaternary-ammonium acetate is (centres on DIFFERENT parent
     structures), not this emitter's case."""
     assert _emit("C[N+](C)(C)CC(=O)[O-]") == ""

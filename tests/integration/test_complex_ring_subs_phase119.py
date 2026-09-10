@@ -1,11 +1,11 @@
 """
-Integration tests for Phase 119: Complex Ring Substituent Integration.
+Integration tests for a phase: Complex Ring Substituent Integration.
 
-Verifies RING-03 (universal pipeline discovers ring substituents) and
-RING-04 (locants use ring system's IUPAC numbering).
+Verifies (universal pipeline discovers ring substituents) and
+ (locants use ring system's IUPAC numbering).
 
-Reference: IUPAC 2013 Blue Book P-31.1 (Detachable prefixes),
-           P-23.2 (Von Baeyer), P-24.2 (Spiro), P-25 (Fused).
+Reference: IUPAC 2013 Blue Book (Detachable prefixes),
+            (Von Baeyer), (Spiro), (Fused).
 """
 
 import re
@@ -15,7 +15,7 @@ from orthonym import name_compound
 
 
 class TestSpiroSubstituents:
-    """RING-03: Spiro systems include substituent prefixes."""
+    """: Spiro systems include substituent prefixes."""
 
     @pytest.mark.integration
     def test_spiro_methyl(self):
@@ -47,7 +47,7 @@ class TestSpiroSubstituents:
 
 
 class TestFusedHeterocycleNoDoubleCount:
-    """RING-03: Fused heterocycles with substituents_included=True are NOT
+    """: Fused heterocycles with substituents_included=True are NOT
     processed by the universal pipeline (no double-counting)."""
 
     @pytest.mark.integration
@@ -81,7 +81,7 @@ class TestFusedHeterocycleNoDoubleCount:
 
 
 class TestBicycloPolycyclicPreserved:
-    """RING-03: Bicyclo and polycyclic handlers already include subs
+    """: Bicyclo and polycyclic handlers already include subs
     (substituents_included=True), verify no regression."""
 
     @pytest.mark.integration
@@ -100,7 +100,7 @@ class TestBicycloPolycyclicPreserved:
 
 
 class TestRingSubLocants:
-    """RING-04: Substituent locants use ring system's IUPAC numbering."""
+    """: Substituent locants use ring system's IUPAC numbering."""
 
     @pytest.mark.integration
     def test_spiro_locant_is_integer(self):

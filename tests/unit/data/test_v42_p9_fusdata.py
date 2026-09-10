@@ -10,13 +10,13 @@ fusion-path indicated hydrogen). They are named by an exact canonical-SMILES ent
 
 Blue Book citations (``the Blue Book Blue Book``; the ``expected`` column of
 ``benchmarks/bb_conformance/bb_measure_rows.baseline.jsonl`` IS the verbatim PIN):
-  * 2H-furo[2,3-d][1,3]dioxole P-25.3.2.4, the Blue Book (PIN)
-  * 5H-pyrido[2,3-d][1,2]oxazine P-25.3.3.1.2, the Blue Book (PIN)
+  * 2H-furo[2,3-d][1,3]dioxole, the Blue Book (PIN)
+  * 5H-pyrido[2,3-d][1,2]oxazine, the Blue Book (PIN)
   * 2H,4H-[1,3]oxathiolo[5,4-b]pyrrole the Blue Book (PIN)
-  * imidazo[1,2-b][1,2,4]triazine P-25.3.3.1.2(c), the Blue Book (PIN)
+  * imidazo[1,2-b][1,2,4]triazine (c), the Blue Book (PIN)
   * 3H,5H-[1,3,2]oxathiazolo[4,5-d][1,2,3]oxathiazole the Blue Book (PIN)
-  * [1,3]selenazolo[5,4-d][1,3]thiazole P-25.3.2.4(f), the Blue Book (PIN)
-  * 1H-thieno[2,3-d]imidazole P-25.3.3.1.2, the Blue Book (PIN)
+  * [1,3]selenazolo[5,4-d][1,3]thiazole (f), the Blue Book (PIN)
+  * 1H-thieno[2,3-d]imidazole, the Blue Book (PIN)
 """
 import shutil
 from pathlib import Path
@@ -112,7 +112,7 @@ def test_pin_roundtrips_to_input(smiles, expected, taut, natoms):
 
 
 # --------------------------------------------------------------------------- #
-# RISK-5 — the catalog substructure matcher must not name the WRONG #
+# — the catalog substructure matcher must not name the WRONG #
 # indicated-hydrogen tautomer. #
 # #
 # `match_fused_heterocycle_core` accepts a hit by heavy-atom skeleton and #
@@ -121,7 +121,7 @@ def test_pin_roundtrips_to_input(smiles, expected, taut, natoms):
 # canonical SMILES, so the exact-match entry misses it, but the substructure #
 # matcher used to accept it and emit `1H-thieno[2,3-d]imidazole` — a name that #
 # states an indicated H the molecule does not have (RT-MISMATCH on canonical #
-# SMILES; a wrong PIN). P-25.7.1.3 (the Blue Book): "In preferred IUPAC names, all #
+# SMILES; a wrong PIN). (the Blue Book): "In preferred IUPAC names, all #
 # indicated hydrogen atoms must be cited when the names are constructed in #
 # accordance with the principles of fusion nomenclature." The guard verifies #
 # the input's real indicated-H locant and re-anchors the descriptor #
@@ -139,7 +139,7 @@ class TestRisk5IndicatedHydrogenTautomerGuard:
 
     @pytest.mark.unit
     def test_correct_tautomer_and_substituted_unchanged(self):
-        # P-25.3.3.1.2 / the Blue Book: the 1H tautomer and its 2-methyl derivative
+        # / the Blue Book: the 1H tautomer and its 2-methyl derivative
         # keep `1H-` (the guard only fires on a genuine locant mismatch).
         assert name_compound("c1nc2sccc2[nH]1") == "1H-thieno[2,3-d]imidazole"
         assert (name_compound("Cc1nc2sccc2[nH]1")

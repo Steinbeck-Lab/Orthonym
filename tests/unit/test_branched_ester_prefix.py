@@ -1,4 +1,4 @@
-"""Tests for branched acid ester acyloxy prefix naming (IUPAC P-65.6.3.2.2).
+"""Tests for branched acid ester acyloxy prefix naming (IUPAC.
 
 Ensures that esters with branched acid fragments use the principal chain
 length (not total carbon count) for the acid stem, and include branch
@@ -22,7 +22,7 @@ def _get_acyloxy_prefix(smiles: str) -> str:
 
 
 class TestBranchedAcidAcyloxy:
-    """IUPAC P-65.6.3.2.2: branched acid -> branched acyloxy prefix."""
+    """IUPAC: branched acid -> branched acyloxy prefix."""
 
     def test_isobutyrate_uses_principal_chain(self):
         """Isobutyric acid: 3C principal chain + 1 methyl branch.
@@ -60,16 +60,16 @@ class TestBranchedAcidAcyloxy:
         show up as a methyl/shorter-chain stem here.
 
         Asserted word changed from 'palmitoyloxy' to the PIN in Task J3.
-        P-65.6.3.2.3 "Esters cited as prefixes" (BlueBookV2.md:31696) prints the
+         "Esters cited as prefixes" (the Blue Book) prints the
         trivial-derived acyloxy prefix as the NON-preferred alternative when the
         acid is retained for general nomenclature only -- ':31723
-        3-[(pyridine-3-carbonyl)oxy]propanoic acid (PIN)   3-(nicotinoyloxy)-
-        propanoic acid'.  Palmitic acid is in that same general-only list
-        (P-65.1.1.2.2 heading :29745; row :29787 'palmitic acid  hexadecanoic
-        acid (PIN)').  Appendix 2, whose legend at :55416 reads "The symbol *
+        3-[(pyridine-3-carbonyl)oxy]propanoic acid (PIN) 3-(nicotinoyloxy)-
+        propanoic acid'. Palmitic acid is in that same general-only list
+         heading:29745; row:29787 'palmitic acid hexadecanoic
+        acid (PIN)'). Appendix 2, whose legend at:55416 reads "The symbol *
         designates the preferred prefix", prints 'hexadecanoyl* = palmitoyl'
-        (:56482, :56511).  'palmitoyloxy' occurs 0 times in the Blue Book;
-        'hexadecanoyloxy' occurs at :31846, :55170, :55199.
+        (:56482,:56511). 'palmitoyloxy' occurs 0 times in the Blue Book;
+        'hexadecanoyloxy' occurs at:31846,:55170,:55199.
         """
         result = _get_acyloxy_prefix("CCCCCCCCCCCCCCCC(=O)OC")
         assert result is not None

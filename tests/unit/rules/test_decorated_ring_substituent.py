@@ -1,13 +1,13 @@
-"""WS-A.2 — decorated-ring substituent namer (the S2 co-delivery emitter).
+""".2 — decorated-ring substituent namer (the S2 co-delivery emitter).
 
 A ring demoted to a substituent must carry its OWN substituent prefixes:
 ``2-(2-nitrothiophen-3-yl)pyrimidine``, ``5-(2-oxocyclohexyl)pyridine-3-
 carboxylic acid`` — not the bare ``2-thienyl`` / ``5-cyclohexyl`` forms that
 drop the decoration (the rt75_0582 RT regression and the P2/P3 producer gaps).
 
-Numbering per P-14.4 (BlueBookV2.md:3221): (a) ring heteroatoms (fixed/lowest)
+Numbering per (the Blue Book): (a) ring heteroatoms (fixed/lowest)
 -> (b) indicated hydrogen -> (c) FREE VALENCE (attachment; suffix rank — see
-the '6-carboxynaphthalen-2-yl' example at :3262 where the free valence locant
+the '6-carboxynaphthalen-2-yl' example at:3262 where the free valence locant
 beats the carboxy prefix) -> (f) detachable-prefix set -> (g) first-cited
 alphabetical. The primitive is GUARDED: returns None (caller keeps its legacy
 form, zero regression) for fused rings, NH-azoles, unsupported substituent
@@ -59,7 +59,7 @@ def _is_pyridine(mol, ring):
 class TestPrimitive:
     def test_nitrothiophene(self):
         # The rt75_0582 blocker: S=1, attachment beats nitro for low locant
-        # (P-14.4(c) before (f)) -> attachment 3, nitro 2.
+        # (c) before (f)) -> attachment 3, nitro 2.
         mol, ring, att = _ring_and_attachment(
             "O=[N+]([O-])c1sccc1-c1ncccn1", _is_thiophene, _is_pyrimidine)
         assert decorated_ring_substituent_name(mol, ring, att) == \
@@ -114,7 +114,7 @@ class TestPrimitive:
         assert decorated_ring_substituent_name(mol, pyrrole, att) is None
 
     def test_chloro_methyl_phenyl_prefix_set(self):
-        # Two prefixes on phenyl: P-14.4(f) lowest prefix SET decides the
+        # Two prefixes on phenyl: (f) lowest prefix SET decides the
         # direction (methyl ortho -> {2,3} beats {5,6}); citation order stays
         # alphabetical: chloro-3, methyl-2.
         mol, ring, att = _ring_and_attachment(
@@ -126,7 +126,7 @@ class TestPrimitive:
 
     def test_alpha_tiebreak_ortho_ortho(self):
         # Cl and CH3 on the two ortho positions: both directions give {2,6};
-        # P-14.4(g) gives the first-cited alphabetical prefix (chloro) the
+        # (g) gives the first-cited alphabetical prefix (chloro) the
         # lower locant -> 2-chloro-6-methylphenyl.
         mol, ring, att = _ring_and_attachment(
             "Cc1cccc(Cl)c1-c1ccncc1",

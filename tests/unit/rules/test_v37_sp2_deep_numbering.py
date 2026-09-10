@@ -1,8 +1,8 @@
-"""v37 SP2.1 — deep component-numbering: spiro-priority-atom criterion (P-24.5.2)
+""" — deep component-numbering: spiro-priority-atom criterion
 for tricyclic+ von-Baeyer spiro cages.
 
 PART 2 of the SP2 PIN-spelling pair. Built for PIN-spelling correctness only:
-the SP2.0 gate (`V37-SPY-SP2.md` addendum) REFUTED the breadth premise (0/38 of
+the SP2.0 gate (`V37-a trace-SP2.md` addendum) REFUTED the breadth premise (0/38 of
 the spiro-VB abstainer bucket is blocked by deep VB numbering) but CONFIRMED the
 structural gap — the tricyclo+ spiro path
 (`_tricyclo_plus_spiro_component` -> `analyze_cage_universal` ->
@@ -12,15 +12,15 @@ junction lands at the heteroatom-optimal locant instead of the lowest.
 
 SUCCESS BAR: PIN-spelling correctness + no regression (NOT new emits).
 
-STEP-1 (invariant 8) re-VERIFIED on HEAD in fresh processes:
+ (a project rule) re-VERIFIED on HEAD in fresh processes:
   * Witness 1's tricyclo cage `3-oxatricyclo[8.3.0.0^2,6]tridecane` numbers the
     spiro junction (orig atom 23) at locant 13 (the MAX in a 13-membered cage);
     the O sits at locant 3.
   * The same-descriptor candidate set offers spiro locants {3, 13}: the
     (spiro=3, O=13) candidate exists but the pre-fix criterion (heteroatom-set
     FIRST) picks (spiro=13, O=3).
-P-24.5.2 (BlueBookV2 :10289, PIN `2',12'-dioxaspiro[bicyclo[2.2.1]heptane-2,1'-
-cyclododecane]`, "the spiro atom ... is given preference for low locant") and
+ (the Blue Book:10289, PIN `2',12'-dioxaspiro[bicyclo[2.2.1]heptane-2,1'-
+cyclododecane]`, "the spiro atom... is given preference for low locant") and
 :10186 ("low locants are given to the spiro atom, THEN to the heteroatoms")
 mandate the (spiro=3, O=13) numbering -> `13-oxatricyclo[8.3.0.0^2,6]tridecane`.
 
@@ -54,14 +54,14 @@ class TestWholeMoleculeUnaffectedControl:
 
 class TestSpiroPriorityNumbering:
     """The tricyclo+ spiro cage numbers the spiro junction at the LOWEST locant
-    among same-descriptor candidates (P-24.5.2), not the heteroatom-optimal one."""
+    among same-descriptor candidates, not the heteroatom-optimal one."""
 
     def test_spiro_atom_gets_lowest_locant(self):
         mol = Chem.MolFromSmiles(W1)
         res = _name_spiro_component(mol, set(W1_CAGE), W1_SPIRO)
         assert res is not None, "tricyclo+ spiro component should still name"
         name, a2l = res
-        # P-24.5.2: spiro atom at the lowest achievable locant (3), NOT 13.
+        #: spiro atom at the lowest achievable locant (3), NOT 13.
         assert a2l[W1_SPIRO] == 3, (name, a2l[W1_SPIRO])
         # descriptor unchanged; only the numbering (hence 'a'-prefix locant) moves
         assert name == "13-oxatricyclo[8.3.0.0^2,6]tridecane", name

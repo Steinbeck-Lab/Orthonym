@@ -1,4 +1,4 @@
-"""P-73.1.1.2 / P-73.4 — SUBSTITUTED aromatic-N+ ring cations (v33 Phase 3).
+""" / — SUBSTITUTED aromatic-N+ ring cations (a phase).
 
 `rules/ions.py::_emit_ring_cumulative_suffix`'s DEMOTE branch (a 0-H ring
 cation whose centre cannot be neutralized in place, e.g. an N-substituted
@@ -10,13 +10,13 @@ abstained (``unknown organic compound``) even though the bare-ring case
 (``C[n+]1ccccc1`` -> ``1-methylpyridin-1-ium``) and the fused bare case
 (``C[n+]1cccc2ccccc21`` -> ``1-methylquinolin-1-ium``) both worked.
 
-Fix: reuse the ALREADY-SHIPPED P-74.1.2 charged-ring locant/prefix/stem trio
+Fix: reuse the ALREADY-SHIPPED charged-ring locant/prefix/stem trio
 built for ``emit_zwitterion_ring_carboxylate`` (``ions.py:3058``) --
 ``_charged_ring_locants`` + ``_p74_ring_substituent_prefix`` +
 ``_p74_bare_ring_stem`` -- instead of the old severed-fragment naming. ONE
 numbering, taken over the untouched original mol/ring_system, now covers
 BOTH the centre's own exocyclic substituent(s) and any OTHER ring
-substituent (phenyl / halo / ...), each cited as an ordinary ring-substituent
+substituent (phenyl / halo /...), each cited as an ordinary ring-substituent
 prefix at its own locant. No new locant assembler was written.
 
 Scope: substituents ``name_substituent``/``_p74_ring_substituent_prefix`` CAN
@@ -32,7 +32,7 @@ import pytest
 from orthonym.errors import is_failure_name
 from orthonym.namer import Orthonym
 
-# The whole module needs the REAL OPSIN validity / SELF-01 gate switched on:
+# The whole module needs the REAL OPSIN validity / gate switched on:
 # the test suite disables it by default (most tests assert raw generator
 # output), but every assertion here -- the RT-verified rows, the regressions,
 # and the fail-closed abstentions -- depends on the production gate actually
@@ -80,7 +80,7 @@ def test_substituted_aromatic_ring_cation_rt_verified(namer, smiles, expected):
     # The bare N-substituted monocycle (no other ring substituent).
     ("C[n+]1ccccc1", "1-methylpyridin-1-ium"),
     # A quaternary ring N+ carrying TWO of its own substituents (no other
-    # ring substituent) -- P-73.4, gold-oracle row.
+    # ring substituent) --, gold-oracle row.
     ("C[N+]1(C)CCCCC1", "1,1-dimethylpiperidin-1-ium"),
     # The bare fused-ring cation (quinolinium) -- proves the
     # `_ring_iupac_locants` fallback path is unchanged for the ALREADY-working
@@ -107,7 +107,7 @@ def test_regressions_unchanged(namer, smiles, expected):
     "C[n+]1ccc(C=NO)cc1",
     # An N-glycoside pyridinium carrying a phosphate group (the NAD+/NMN
     # nucleotide shape, deferred): the raw candidate silently drops the
-    # phosphate group entirely, so SELF-01 catches the wrong-molecule mismatch
+    # phosphate group entirely, so catches the wrong-molecule mismatch
     # and suppresses it.
     "NC(=O)c1ccc[n+](c1)C1OC(COP(=O)(O)O)C(O)C1O",
 ])

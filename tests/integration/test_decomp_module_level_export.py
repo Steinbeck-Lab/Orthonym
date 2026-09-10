@@ -1,6 +1,6 @@
-"""CR-04 part A regression: name_with_tree is exported at module level.
+""" part A regression: name_with_tree is exported at module level.
 
-Per 160-REVIEW.md CR-04: callers expect ``from orthonym import name_with_tree``
+Per internal notes: callers expect ``from orthonym import name_with_tree``
 to work analogously to ``from orthonym import name_compound``. Until Plan-05
 this import raised ImportError because the symbol existed only on
 ``Orthonym.name_with_tree`` (instance method).
@@ -29,7 +29,7 @@ def test_name_with_tree_module_level_in_all():
 
 
 def test_verify_decomp_error_format_escapes_commas_and_newlines():
-    """WR-04 regression: exception messages with commas/newlines do not
+    """ regression: exception messages with commas/newlines do not
     corrupt CSV output. The verifier formats exceptions with !r which
     escapes literal newlines and commas.
     """

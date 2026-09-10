@@ -31,7 +31,7 @@ from orthonym.namer import name_compound
 
 
 # ============================================================================
-# Tests for get_bicyclo_numbering()
+# Tests for get_bicyclo_numbering
 # ============================================================================
 
 class TestBicycloNumbering:
@@ -109,7 +109,7 @@ class TestBicycloNumbering:
 
 
 # ============================================================================
-# Tests for get_bicyclo_substituents()
+# Tests for get_bicyclo_substituents
 # ============================================================================
 
 class TestBicycloSubstituents:
@@ -178,7 +178,7 @@ class TestBicycloSubstituents:
 
 
 # ============================================================================
-# Tests for detect_bicyclo_unsaturation()
+# Tests for detect_bicyclo_unsaturation
 # ============================================================================
 
 class TestBicycloUnsaturation:
@@ -225,7 +225,7 @@ class TestBicycloUnsaturation:
 
 
 # ============================================================================
-# Tests for Complete Bicyclo Naming via name_compound()
+# Tests for Complete Bicyclo Naming via name_compound
 # ============================================================================
 
 class TestCompleteBicycloNaming:
@@ -423,9 +423,9 @@ class TestBicycloNameFormat:
 
 
 class TestWSD01VonBaeyerFGSuffix:
-    """WSD-01 (Phase 175): a COOH/CN/CHO/amine on a von Baeyer cage emits the
-    correct FG suffix at the correct locant, not a phantom 'methyl' (RING-01),
-    and the alcohol/amine are suffixes not prefixes (RING-02/RING-09)."""
+    """-01 (a phase): a COOH/CN/CHO/amine on a von Baeyer cage emits the
+    correct FG suffix at the correct locant, not a phantom 'methyl' ,
+    and the alcohol/amine are suffixes not prefixes (/)."""
 
     @pytest.mark.unit
     def test_carboxylic_acid_suffix(self):
@@ -441,7 +441,7 @@ class TestWSD01VonBaeyerFGSuffix:
 
     @pytest.mark.unit
     def test_tricyclo_amine_suffix(self):
-        # RING-09: amine on adamantane cage, was dropped entirely.
+        #: amine on adamantane cage, was dropped entirely.
         # 13B(d): secondary-bridge locants now in PIN superscript form (1^3,7).
         assert name_compound('NC1C2CC3CC(C2)CC1C3') in {
             'tricyclo[3.3.1.1^3,7]decan-2-amine',
@@ -450,7 +450,7 @@ class TestWSD01VonBaeyerFGSuffix:
 
     @pytest.mark.unit
     def test_bicyclo_alcohol_is_suffix(self):
-        # RING-02: -ol suffix, not 2-hydroxy- prefix.
+        #: -ol suffix, not 2-hydroxy- prefix.
         assert name_compound('OC1CC2CCC1C2') == 'bicyclo[2.2.1]heptan-2-ol'
 
     @pytest.mark.unit
@@ -460,13 +460,13 @@ class TestWSD01VonBaeyerFGSuffix:
 
     @pytest.mark.unit
     def test_camphor_is_named_von_baeyer_not_retained(self):
-        """v29 Task E2: renamed from test_protect_camphor_retained, which asserted
+        """: renamed from test_protect_camphor_retained, which asserted
         'camphor'. Camphor is a KETONE and the retained-ketone rule is a closed list
-        that excludes it: P-64.2.1.1 (BlueBookV2.md:28297) makes chalcone "the only
-        retained name as a preferred IUPAC name", and P-64.2.1.2 (:28307) closes with
+        that excludes it: (the Blue Book) makes chalcone "the only
+        retained name as a preferred IUPAC name", and (:28307) closes with
         "Substitutive names, systematically constructed, are the preferred IUPAC
         names for ketones". So the von Baeyer name this class builds IS the PIN --
-        and the Blue Book prints it verbatim at :52648,
+        and the Blue Book prints it verbatim at:52648,
         "(1R,4R)-1,7,7-trimethylbicyclo[2.2.1]heptan-2-one".
         """
         assert (name_compound('CC1(C)C2CCC1(C)C(=O)C2')

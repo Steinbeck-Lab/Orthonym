@@ -34,9 +34,9 @@ def _name_fragment_with_fallback(smiles: str):
     """Name a fragment: recursive naming first, pipeline-only fallback, then
     a T4/general-engine best-effort rescue (a phase).
 
-    Per: When name_fragment_recursively() returns None (depth/cycle limit hit),
-    fall back to name_pipeline_only() instead of aborting the entire decomposition.
-    name_pipeline_only() uses the full IUPAC pipeline without triggering decomposition
+    Per: When name_fragment_recursively returns None (depth/cycle limit hit),
+    fall back to name_pipeline_only instead of aborting the entire decomposition.
+    name_pipeline_only uses the full IUPAC pipeline without triggering decomposition
     recursion, preserving all substituents.
 
      a phase (internal notes): when BOTH
@@ -61,7 +61,7 @@ def _name_fragment_with_fallback(smiles: str):
     if name and "unknown" not in name.lower():
         return name
 
-    # Fallback: full systematic pipeline without decomposition ()
+    # Fallback: full systematic pipeline without decomposition
     name = name_pipeline_only(smiles)
     if name and "unknown" not in name.lower():
         return name
@@ -84,37 +84,37 @@ def _name_fragment_t4_rescue(smiles: str) -> Optional[str]:
     ``general_fallback=False`` (``namer.py:2047``) -- so the T4/general-engine
     best-effort assist never fired for a fragment, even when the enclosing
     molecule was itself being named at a best-effort tier. A fragment
-    unnameable at PIN tier but completable by T4 (an unusual branched acyl
+    unnameable at PIN tier but completable by (an unusual branched acyl
     chain, a decorated sugar ring) spuriously inflated ``failed_count`` in the
     multi-fragment assemblers, feeding the partial-ship defect this phase
     fixes.
 
     Calls ``Orthonym._try_general_engine_recovery`` DIRECTLY (not a fresh
-    ``.name()``/``_name_impl`` pass) inside ``isolated_naming_session()`` --
-    the SAME mechanism ``namer.py``'s own T4 recovery lane uses (see
+    ``.name``/``_name_impl`` pass) inside ``isolated_naming_session`` --
+    the SAME mechanism ``namer.py``'s own recovery lane uses (see
     ``fragment_naming.isolated_naming_session``'s own docstring) to give the
     call the full depth-0 recursion budget AND to satisfy
-    ``is_top_level_naming()``, which gates that recovery lane -- without the
+    ``is_top_level_naming``, which gates that recovery lane -- without the
     isolated session this fragment is nested (non-zero fragment-naming depth),
-    so the T4 lane declines unconditionally regardless of these flags.
+    so the lane declines unconditionally regardless of these flags.
 
     Calling ``_try_general_engine_recovery`` directly (per its own docstring:
     "Re-perceives, runs the general engine, and re-applies the SAME E1 +
-    SELF-01 gates to the emission. Returns a verified name or None") is
+     gates to the emission. Returns a verified name or None") is
     deliberate rather than re-running the fragment through a fresh
-    ``Orthonym.name()``: that method is ALSO the entry point for PIN naming
-    AND decomposition, so a plain ``.name()`` call would redundantly redo the
+    ``Orthonym.name``: that method is ALSO the entry point for PIN naming
+    AND decomposition, so a plain ``.name`` call would redundantly redo the
     PIN attempt this function's callers already made, and -- because
     decomposition is not skipped on that path -- risks re-decomposing the
     fragment into its own sub-fragments, each of which could again fail and
     recurse into this same rescue. Measured: this caused multi-minute
     slowdowns on real multi-residue fragments during phase development.
-    ``_try_general_engine_recovery`` is self-contained (own E1 + SELF-01
+    ``_try_general_engine_recovery`` is self-contained (own E1 +
     gates, no decomposition reentry), so this rescue is a single bounded
     best-effort attempt, not a recursive one.
 
-    Every T4 emission still passes through the SAME E1 atom-coverage
-    certificate and SELF-01 OPSIN round-trip gates as any other T4 name
+    Every emission still passes through the SAME E1 atom-coverage
+    certificate and OPSIN round-trip gates as any other name
     (the shared ladder in ``namer.py``) -- this rescue adds no new bypass of
     either, so it can turn a fragment failure into a best-effort success but
     can never ship a name the existing 0-wrong net would otherwise reject.
@@ -175,7 +175,7 @@ _FUNCTIONAL_CLASS_TYPES = frozenset({"ester", "amide", "glycosidic", "carbamate"
 # Ester/amide: threshold 3 (2-bond molecules better handled by single-bond).
 # a phase-02 confirmed count>=2 causes regressions on 2-ester phospholipids.
 _MULTI_BOND_THRESHOLD = {
-    "ester": 2,       # Lowered from 3 per DECO-22/: enables diester decomposition
+    "ester": 2,       # Lowered from 3 per /: enables diester decomposition
     "glycosidic": 2,
     "amide": 3,
 }
@@ -214,7 +214,7 @@ _RETAINED_CORE_NAMES = frozenset({
 
 # Recognized ring-system name tokens. Names containing any of these tokens
 # are considered structurally informative even without digits/hyphens.
-# Used to bypass the no-digits/no-hyphens rejection in _name_quality_is_acceptable().
+# Used to bypass the no-digits/no-hyphens rejection in _name_quality_is_acceptable.
 _RING_SYSTEM_TOKENS = frozenset({
     'pyridine', 'pyrimidine', 'pyrazine', 'pyridazine',
     'benzene', 'toluene', 'naphthalene', 'anthracene', 'phenanthrene',
@@ -230,13 +230,13 @@ _RING_SYSTEM_TOKENS = frozenset({
 
 
 # ---------------------------------------------------------------------------
-# Bond-type token matching for quality gate (a phase - DECO-20)
+# Bond-type token matching for quality gate (a phase -)
 # ---------------------------------------------------------------------------
 
 # Token mapping: what name tokens indicate each bond type.
 # Amide tokens include acyl prefixes (anoyl, enoyl, oyl)
-# since N-acyl naming IS amide naming (IUPAC P-66.6.3).
-# Moved to module level from _name_quality_is_acceptable() for testability.
+# since N-acyl naming IS amide naming (IUPAC.
+# Moved to module level from _name_quality_is_acceptable for testability.
 _BOND_TYPE_TOKENS = {
     "ester": {"ester", "oate", "ate", "oyloxy",
               "acetyloxy", "benzoyloxy", "acetyl",
@@ -539,7 +539,7 @@ def _amine_acyl_ambiguous(amine_smiles: str) -> bool:
     name denotes >=2 distinct molecules -- OPSIN resolves it to one by its own rule, so
     the float ships an ambiguous name (and, with the OPSIN jar absent, ships it
     unverified). Refuse the float in that case. Fail-open (False) on an unparseable
-    fragment -- the caller then relies on its existing quality/SELF-01 gates, exactly as
+    fragment -- the caller then relies on its existing quality/ gates, exactly as
     before this guard existed.
     """
     try:
@@ -622,7 +622,7 @@ def _name_quality_is_acceptable(name: str, mol) -> bool:
     if heavy_atoms > 15 and len(name) < heavy_atoms // 2:
         # Task Z3: this character count refuses CORRECT names in bulk. Asked
         # directly, it rejects `pyrene` (PIN, 16 HA), `coronene` (PIN, 24 HA),
-        # `picene` (PIN, 22 HA) -- Blue Book P-25.1.1 "Retained names for
+        # `picene` (PIN, 22 HA) -- Blue Book "Retained names for
         # hydrocarbons used for parent ring components", Table 2.7, each marked
         # (PIN) -- and the systematic `henicosane`, `docosane`, `hexacosane`,
         # `icosanoic acid`. A retained or systematic name for a big skeleton is
@@ -703,7 +703,7 @@ def _name_quality_is_acceptable(name: str, mol) -> bool:
                 return True
             return False
 
-    # Multi-amide under-naming detection (PEP-01)
+    # Multi-amide under-naming detection
     # If molecule has multiple DISTINCT amide carbonyls but the name only
     # references one, the name is partial and decomposition should be attempted.
     # We count distinct carbonyl C atoms (acid_atom) rather than raw amide
@@ -727,7 +727,7 @@ def _name_quality_is_acceptable(name: str, mol) -> bool:
             # indicate multiple groups, so count them accordingly.
             _MULT_MAP = {'di': 2, 'tri': 3, 'tetra': 4, 'penta': 5}
             amide_refs = 0
-            # C1 fix (P-66.3.1.1): find_cleavable_bonds labels each hydrazide
+            # C1 fix: find_cleavable_bonds labels each hydrazide
             # C(=O)-N bond as type 'amide', so a dihydrazide has
             # distinct_amide_carbonyls==2. The name token 'hydrazide' contains
             # no amide/amido token, so without counting it the complete GENERAL
@@ -791,7 +791,7 @@ def _name_quality_is_acceptable(name: str, mol) -> bool:
                     bond_idx = bond_info.get("bond_idx")
                     if bond_idx is None:
                         continue
-                    # C4 (P-62.2.2): an amine bridge between two ring systems is
+                    # C4: an amine bridge between two ring systems is
                     # named SUBSTITUTIVELY (aniline parent + N-aryl prefix, e.g.
                     # diphenylamine -> 'N-phenylaniline'), NOT by decomposition.
                     # The substitutive name is legitimately compact (ratio ~1.15
@@ -1193,7 +1193,7 @@ def _select_best_bond(mol, bonds: List[Dict]) -> Dict:
 
     Args:
         mol: RDKit Mol object.
-        bonds: List of bond info dicts from find_cleavable_bonds().
+        bonds: List of bond info dicts from find_cleavable_bonds.
 
     Returns:
         The single best bond dict to cleave.
@@ -1265,14 +1265,14 @@ def _select_best_bond(mol, bonds: List[Dict]) -> Dict:
         key=lambda b: (_BOND_TYPE_PRIORITY.get(b["type"], 99), _balance_score(b)),
     )
 
-    # P-66.1.2.1 (Diacylamines): (R-CO)2NH is named as the N-acyl derivative of the
+    # (Diacylamines): (R-CO)2NH is named as the N-acyl derivative of the
     # SENIOR primary amide -- 'N-acetylbenzamide (PIN)', NOT 'N-benzoylacetamide'. The
-    # balance heuristic above has no seniority (P-41/P-44) awareness and can pick the
+    # balance heuristic above has no seniority / awareness and can pick the
     # MORE senior acid as the cleaved (-> N-acyl prefix) side, inverting the parent.
     # When the balance winner is itself one of two amide bonds sharing the same amine
     # nitrogen (a true diacylamide sibling pair), re-pick to cleave the LESS senior
     # acid so the senior acid stays the retained '-amide' parent (benzoic > acetic by
-    # P-44.1.2.2 ring>chain). Scoped to the balance winner's own sibling group, so it
+    # ring>chain). Scoped to the balance winner's own sibling group, so it
     # never overrides a higher-priority bond type or a non-sibling global winner; a
     # genuine seniority tie (identical acyls) falls through unchanged, keeping
     # N-formylformamide / N-acetyl-N-cyclopentylacetamide correct.
@@ -1306,14 +1306,14 @@ def _select_best_bond(mol, bonds: List[Dict]) -> Dict:
 def _try_single_bond_decompose(mol, bond: Dict, style: str = "pin") -> Optional[str]:
     """Attempt decomposition using a single bond.
 
-    Extracted from try_decompose() Steps 4-8. Contains the full
+    Extracted from try_decompose Steps 4-8. Contains the full
     cleave-cap-name-assemble pipeline for one bond. Handles all 8
     bond types: ester, amide, phosphodiester, thioester, glycosidic,
     sulfonamide, carbamate, ether.
 
     Args:
         mol: RDKit Mol object to decompose.
-        bond: Bond info dict from find_cleavable_bonds().
+        bond: Bond info dict from find_cleavable_bonds.
         style: Naming style ("pin" for preferred IUPAC names).
 
     Returns:
@@ -1340,7 +1340,7 @@ def _try_single_bond_decompose(mol, bond: Dict, style: str = "pin") -> Optional[
 
     # Sort fragments smallest-first (by heavy atom count) so smaller
     # fragments populate the runtime cache before larger ones that may
-    # contain similar structural motifs (IUPAC P-51 reuse principle).
+    # contain similar structural motifs (IUPAC reuse principle).
     def _frag_sort_key(frag):
         frag_mol = Chem.MolFromSmiles(frag["smiles"])
         return frag_mol.GetNumHeavyAtoms() if frag_mol else 999
@@ -1371,7 +1371,7 @@ def _try_single_bond_decompose(mol, bond: Dict, style: str = "pin") -> Optional[
         fragment_smiles[frag["side"]] = frag["smiles"]
 
     # --- Seniority-based substitutive assembly for swapped-role bonds ---
-    # When _maybe_swap_parent_roles() detected that the non-acid fragment
+    # When _maybe_swap_parent_roles detected that the non-acid fragment
     # is the correct parent (roles_swapped=True), attempt substitutive
     # naming: acid fragment becomes a prefix on the larger parent fragment.
     # The acid_atom/alkyl_atom in the bond dict are NOT swapped -- only the
@@ -1441,7 +1441,7 @@ def _try_single_bond_decompose(mol, bond: Dict, style: str = "pin") -> Optional[
                         return substitutive_name
 
     # Amide seniority-based assembly: when amine fragment has higher
-    # P-44.1.1 seniority than acid fragment, use substitutive naming
+    # seniority than acid fragment, use substitutive naming
     # (amine becomes parent, acid becomes acyl prefix).
     # Guard: skip if roles_swapped is already True (detection-time swap
     # already handled the seniority assignment -- swapping again would
@@ -1501,7 +1501,7 @@ def _try_multi_bond_decompose(
 
     Cleaves all provided bonds at once, names each fragment, and assembles
     a multi-component name. Currently supports ester bonds (polyester naming
-    per IUPAC P-65.6.3.4). Other bond types fall through to None.
+    per IUPAC. Other bond types fall through to None.
 
     Args:
         mol: RDKit Mol object to decompose.
@@ -1546,8 +1546,8 @@ def _try_multi_bond_decompose(
     fragments.sort(key=_frag_sort_key)
 
     # Name each fragment (sugar intercept for glycosidic)
-    # DECO-17: use list-of-tuples to preserve identical SMILES duplicates
-    # DECO-25: partial assembly -- collect successful fragments, track failures
+    #: use list-of-tuples to preserve identical SMILES duplicates
+    #: partial assembly -- collect successful fragments, track failures
     import logging
     logger = logging.getLogger(__name__)
 
@@ -1564,7 +1564,7 @@ def _try_multi_bond_decompose(
             frag_name = _name_fragment_with_fallback(frag["smiles"])
 
         if not frag_name or "unknown" in frag_name.lower():
-            # DECO-25: track failure but don't abort yet
+            #: track failure but don't abort yet
             failed_count += 1
             logger.debug("Fragment naming failed for %s (side=%s)",
                          frag["smiles"], frag.get("side", "?"))
@@ -1594,7 +1594,7 @@ def _try_multi_bond_decompose(
     # `_name_fragment_with_fallback`'s T4/general-engine rescue rung is a
     # genuinely unnameable residue. Shipping a name built from `named_fragments`
     # alone would describe a SMALLER molecule than the input -- exactly the
-    # SELF-01-suppressed-partial shape `phase2-shared-mechanism-trace.md`
+    # -suppressed-partial shape `phase2-shared-mechanism-trace.md`
     # identified (a complete, well-formed name for the WRONG, smaller
     # molecule). Decline the whole assembly instead of ever silently dropping
     # atoms; the molecule then either abstains honestly or a different
@@ -1606,7 +1606,7 @@ def _try_multi_bond_decompose(
             len(named_fragments), len(fragments), failed_count)
         return None
 
-    # DECO-25: require at least 2 named fragments for assembly
+    #: require at least 2 named fragments for assembly
     if len(named_fragments) < 2:
         return None  # Not enough fragments to assemble
 
@@ -1645,7 +1645,7 @@ def _try_iterative_mixed_decompose(
     glycoside-ester hybrids.
 
     Algorithm:
-    1. Initial cleavage with _select_best_bond()
+    1. Initial cleavage with _select_best_bond
     2. For each fragment with HA > 30 that still contains cleavable bonds
        of a DIFFERENT type, cleave the best sub-bond
     3. Maximum MAX_DECOMP_LEVELS levels (iterative, not recursive)
@@ -1682,7 +1682,7 @@ def _try_iterative_mixed_decompose(
 
     used_bond_types = {best_bond["type"]}
 
-    # Track bond type metadata on fragments (DECO-23)
+    # Track bond type metadata on fragments
     all_fragments = []
     for frag in initial_frags:
         frag['parent_bond_type'] = best_bond['type']
@@ -1721,7 +1721,7 @@ def _try_iterative_mixed_decompose(
                     for sf in sub_frags
                 )
                 if all_smaller:
-                    # Tag new fragments with their bond type (DECO-23)
+                    # Tag new fragments with their bond type
                     for sf in sub_frags:
                         sf['parent_bond_type'] = sub_best['type']
                     new_fragments.extend(sub_frags)
@@ -1736,8 +1736,8 @@ def _try_iterative_mixed_decompose(
             break
 
     # Name each fragment (a phase: fallback)
-    # DECO-17/Pitfall 5: use list-of-tuples to preserve identical SMILES duplicates
-    # DECO-25: partial assembly -- collect successful fragments, track failures
+    # /Pitfall 5: use list-of-tuples to preserve identical SMILES duplicates
+    #: partial assembly -- collect successful fragments, track failures
     named_fragments = []
     failed_count = 0
     for frag in all_fragments:
@@ -1745,7 +1745,7 @@ def _try_iterative_mixed_decompose(
         if not frag_name:
             frag_name = _name_fragment_with_fallback(frag["smiles"])
         if not frag_name or "unknown" in frag_name.lower():
-            # DECO-25: track failure but don't abort yet
+            #: track failure but don't abort yet
             failed_count += 1
             logger.debug("Mixed-decomp fragment naming failed for %s", frag["smiles"])
             continue
@@ -1767,11 +1767,11 @@ def _try_iterative_mixed_decompose(
 
     # a phase (fail-closed, invariants 1/9 -- never partial-ship): same
     # discipline as `_try_multi_bond_decompose` above -- a fragment that still
-    # could not be named/covered after the T4 rescue rung is genuinely
+    # could not be named/covered after the rescue rung is genuinely
     # unnameable, and shipping a name for `named_fragments` alone would
     # describe a SMALLER molecule than the input (the exact
     # "Mixed-decomp partial assembly" shape `phase2-shared-mechanism-trace.md`
-    # traced live: GPI-mannoside -> 3/4 named -> SELF-01-suppressed). Decline
+    # traced live: GPI-mannoside -> 3/4 named -> -suppressed). Decline
     # rather than silently drop atoms.
     if failed_count > 0:
         logger.info(
@@ -1781,11 +1781,11 @@ def _try_iterative_mixed_decompose(
             len(named_fragments), len(all_fragments), failed_count)
         return None
 
-    # DECO-25: require at least 2 named fragments for assembly
+    #: require at least 2 named fragments for assembly
     if len(named_fragments) < 2:
         return None  # Not enough fragments to assemble
 
-    # Bond-type-aware assembly (DECO-23): route fragment pairs through
+    # Bond-type-aware assembly : route fragment pairs through
     # bond-type-specific assemblers instead of naive space-join
     from .fragment_assembly import _assemble_by_bond_type
 
@@ -1803,7 +1803,7 @@ def _try_iterative_mixed_decompose(
         parts = [name for _, name in sorted_named]
         assembled = " ".join(parts)
 
-    # Token validation (DECO-27): reject if assembly lost a fragment
+    # Token validation : reject if assembly lost a fragment
     fragment_names = [name for _, name in named_fragments]
     if not _validate_assembly_tokens(assembled, fragment_names):
         # Bond-type assembly lost a fragment -- try space-join fallback
@@ -1871,8 +1871,8 @@ def try_decompose(mol, style: str = "pin") -> Optional[str]:
         return None  # Performance guard: too complex for decomposition
 
     # Step 2: Get existing pipeline name via systematic-only path.
-    # name_pipeline_only() skips decomposition, so it cannot recurse back
-    # into try_decompose(). No cache isolation needed.
+    # name_pipeline_only skips decomposition, so it cannot recurse back
+    # into try_decompose. No cache isolation needed.
     # If this SMILES is already in the visited set (being named up the
     # call stack), skip the probe — the caller already determined the
     # assembled name was inadequate, so proceed directly to decomposition.
@@ -1913,7 +1913,7 @@ def try_decompose(mol, style: str = "pin") -> Optional[str]:
         # heuristic `_name_quality_is_acceptable` uses to decide "good
         # enough, skip decomposition" can be FOOLED by a wrong whole-molecule
         # PARENT choice that happens to be long enough to look complete --
-        # measured on the phosphatidylcholine-family SELF-01-suppressed
+        # measured on the phosphatidylcholine-family -suppressed
         # cluster: `name_pipeline_only` picks the cut choline nitrogen as the
         # whole molecule's own '...aminium' PARENT (ignoring the glycerol
         # backbone and both fatty/phospho arms entirely), and
@@ -1949,7 +1949,7 @@ def try_decompose(mol, style: str = "pin") -> Optional[str]:
     if single_result and not _coverage_is_adequate(single_result, mol, bond_type=best_bond["type"]):
         single_result = None  # Coverage inadequate, discard this result
 
-    # DECP-05: single-bond path returns result directly (backward compat).
+    #: single-bond path returns result directly (backward compat).
     # Quality comparison: if decomposition produced a worse name than the
     # existing pipeline (garbled tokens, bracket mismatches), prefer the
     # existing name to avoid replacing a parseable name with garbage.
@@ -1964,7 +1964,7 @@ def try_decompose(mol, style: str = "pin") -> Optional[str]:
         if not (existing_name and _decomposition_is_worse(single_result, existing_name, mol)):
             return single_result
 
-    # MULTI-BOND RETRY (DECP-01): try alternative bonds
+    # MULTI-BOND RETRY : try alternative bonds
     tried_indices = {best_bond["bond_idx"]}
     for bond in bonds:
         if bond["bond_idx"] in tried_indices:
@@ -1995,7 +1995,7 @@ def try_decompose(mol, style: str = "pin") -> Optional[str]:
 
     # MULTI-BOND SAME-TYPE cleavage (a phase): if N+ bonds of the same
     # type exist, try cleaving all same-type bonds simultaneously
-    # (IUPAC P-65.6.3.4 polyesters / triglycerides, P-68 glycosides).
+    # (IUPAC polyesters / triglycerides, glycosides).
     # Bond-type-specific thresholds (a phase-04):
     # - glycosidic: 2 (disaccharide + aglycone)
     # - ester/amide: 3 (2-bond molecules better handled by single-bond)
@@ -2048,7 +2048,7 @@ def try_decompose(mol, style: str = "pin") -> Optional[str]:
     # relatives) that none of the flat assemblers above could weave into ONE
     # connected name (each fragment named fine on its own, but the suffix-
     # string role converters have nothing to match on a T4-rescued/seniority-
-    # demoted fragment, so the molecule either space-joins -- SELF-01 sees
+    # demoted fragment, so the molecule either space-joins -- sees
     # disconnected OPSIN components -- or silently drops the fragment).
     #
     # Gating (PIN byte-identity + 0-wrong, a project rule): reached only here,

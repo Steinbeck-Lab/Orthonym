@@ -1,15 +1,15 @@
-"""Phase 169.7 BBR-CHG-169.6-caveats — salt cation Stock oxidation state (D-13).
+"""a phase BBR-.6-caveats — salt cation Stock oxidation state .
 
 The salt path dropped the Stock oxidation-state numeral from variable-valence metal
 salt cations ('gold(I) chloride' -> 'gold chloride', the 169.6 regression). 169.7
-appends the Stock numeral (IR-5.4.2.2 / P-65.6.2.1) for VARIABLE-valence metals
-ONLY; FIXED-valence metals (group 1/2, Al, Zn, Ag, ...) carry no numeral. For a
+appends the Stock numeral (.4.2.2 / for VARIABLE-valence metals
+ONLY; FIXED-valence metals (group 1/2, Al, Zn, Ag,...) carry no numeral. For a
 monatomic metal cation the oxidation state == the formal charge. All RT-verified.
 
 NOTE (documented residual, deferred): quaternary-ammonium salt cations still drop
 their cation WORD (name_cation('') -> only the anion ships, e.g.
 CCCCCC[N+](C)(C)C.[Cl-] -> 'chloride'). That is a deeper name_cation gap (the
-cation-as-parent '-aminium' naming), tracked as a follow-on — NOT this D-13 fix.
+cation-as-parent '-aminium' naming), tracked as a follow-on — NOT this fix.
 """
 import pytest
 

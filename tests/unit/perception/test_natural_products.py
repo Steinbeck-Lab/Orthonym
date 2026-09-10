@@ -50,7 +50,7 @@ MORPHINE_SMILES = (
 # ===========================================================================
 
 class TestDetectNaturalProduct:
-    """Test the main detect_natural_product() function."""
+    """Test the main detect_natural_product function."""
 
     @pytest.mark.unit
     def test_detect_androstane(self):
@@ -260,7 +260,7 @@ class TestNonScaffoldAtoms:
 # ===========================================================================
 
 class TestConvenienceFunctions:
-    """Test is_steroid() and is_alkaloid() convenience functions."""
+    """Test is_steroid and is_alkaloid convenience functions."""
 
     @pytest.mark.unit
     def test_is_steroid_true(self):

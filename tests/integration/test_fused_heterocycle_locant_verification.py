@@ -1,13 +1,13 @@
 """
-Integration tests for Phase 57 Plan 02: Fused Heterocycle Locant Verification.
+Integration tests for a phase Plan 02: Fused Heterocycle Locant Verification.
 
 Verifies iupac_locants correctness for 4 newly activated fused heterocycles
 (xanthene, phenothiazine, phenoxazine, thianthrene) through substituted naming
-tests. Catches locant shift bugs (like the isoindoline bug from Phase 27).
+tests. Catches locant shift bugs (like the isoindoline bug from a phase).
 
 Requirements tested:
-- PRNT-05: Strip-and-match substructure approach works for substituted forms
-- PRNT-06: iupac_locants data integrity for all 4 compounds
+-: Strip-and-match substructure approach works for substituted forms
+-: iupac_locants data integrity for all 4 compounds
 """
 
 import pytest
@@ -141,7 +141,7 @@ class TestThianthreneLocants:
 
 
 # =============================================================================
-# Substructure core matching tests (PRNT-05)
+# Substructure core matching tests
 # =============================================================================
 
 
@@ -189,7 +189,7 @@ class TestSubstructureCoreMatching:
 
 
 # =============================================================================
-# Locant data integrity tests (PRNT-06)
+# Locant data integrity tests
 # =============================================================================
 
 
@@ -238,9 +238,9 @@ class TestLocantDataIntegrity:
 
         9H-xanthene has anthracene-type "special numbering" (Blue Book Table 2.8):
         the two meso atoms (O and the 9H carbon) take the highest locants 10 and 9,
-        with fusion carbons 4a/8a/9a/10a — NOT a spurious '4b'.  Positions:
-        1,2,3,4,4a,5,6,7,8,8a,9,9a,10,10a = 14.  (v23 13B(a) S2a corrected the
-        DATA-01-flagged wrong stored numbering; re-derived from the deterministic
+        with fusion carbons 4a/8a/9a/10a — NOT a spurious '4b'. Positions:
+        1,2,3,4,4a,5,6,7,8,8a,9,9a,10,10a = 14. (13B(a) S2a corrected the
+        -flagged wrong stored numbering; re-derived from the deterministic
         fusion engine, OPSIN-verified.)
         """
         data = FUSED_HETEROCYCLE_DATA['c1ccc2c(c1)Cc1ccccc1O2']

@@ -1,6 +1,6 @@
-"""P-66.1.6.1.2.1 - N-substituted carbamimidate perception (W2F p6 Task 4).
+""" - N-substituted carbamimidate perception (W2F p6 Task 4).
 
-BB P-66.1.6.1.2.1 (BlueBookV2.md:33408): dedicated carbamimidate SMARTS
+BB (the Blue Book): dedicated carbamimidate SMARTS
 [CX3](=[NX2])([NX3])[OX2][#6] (imino-N substitution allowed + a required amino
 N). The restricted iminoester [NX2H1] pattern is left untouched so the
 AUDIT-FRN 2.4 =NH guard on plain iminoesters holds.

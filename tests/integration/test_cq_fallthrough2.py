@@ -2,12 +2,12 @@
 
 Task A wired ``_try_besteffort_clean_general_fallthrough`` at the ship-a-failure
 path (namer.py ~3388) and reset the propagation contextvars + session depth, but
-MISSED the third piece of state a fresh top-level ``name()`` gets: a fresh
+MISSED the third piece of state a fresh top-level ``name`` gets: a fresh
 whole-molecule fragment MEMO cache. ``isolated_naming_session`` deliberately keeps
 that cache live (the giant-hang fix), so the primary pass's
 ``recursion_depth_fallback`` SKIP entries for the deep substituents it could not
 name (poisoned by the elevated session-depth floor) were still in the cache the
-clean fall-through reused -- and the good name was never produced. The a review RISK-4
+clean fall-through reused -- and the good name was never produced. The a review
 witness ``COP(=O)(C=C(F)F)C=C(F)F`` reached namer.py:3388, the fall-through fired,
 and it STILL returned None, so the molecule abstained even though a fresh top-level
 call names it and OPSIN-round-trips it.
@@ -44,7 +44,7 @@ pytestmark = [pytest.mark.integration, pytest.mark.roundtrip,
 # heteroatom/replacement-nomenclature substituent whose primary-pass naming poisoned
 # the memo cache with a depth-limited SKIP.
 WITNESSES = [
-    # The a review RISK-4 witness.
+    # The a review witness.
     ("COP(=O)(C=C(F)F)C=C(F)F",
      "1-[1-(2,2-difluoroeth-1-en-1-yl)-1-oxo-2-oxa-1-phosphapropyl]-"
      "2,2-difluoroeth-1-ene"),

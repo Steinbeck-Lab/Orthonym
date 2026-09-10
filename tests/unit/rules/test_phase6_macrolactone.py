@@ -29,7 +29,7 @@ def test_saturated_lactone_unchanged(namer):
     assert _rt("O=C1CCCCCCCCCCCO1", namer.name("O=C1CCCCCCCCCCCO1"))
 
 # Review fix: the dione decline must route to the -one/-dione SUFFIX form
-# (P-66.6.3 suffix seniority), not a lateral oxo/dioxo PREFIX form.
+# suffix seniority), not a lateral oxo/dioxo PREFIX form.
 @pytest.mark.opsin_gate
 @pytest.mark.parametrize("smi,expected", [
     ("O=C1CC(=O)CO1", "oxolane-2,4-dione"),

@@ -1,6 +1,6 @@
-"""Phase 160 Plan-04 per-handler unit tests for ``amide``.
+"""a phase Plan-04 per-handler unit tests for ``amide``.
 
-Per CONTEXT D-20 + Phase 158 D-17 mirror: >= 5 tests per extracted handler
+Per internal notes + a phase mirror: >= 5 tests per extracted handler
 covering:
   - Signature: name_amide(features, mol=None, style='pin') signature.
   - Predicate: _is_amide(features) signature + purity.
@@ -11,7 +11,7 @@ covering:
   - INNER_DISPATCH_TABLE registration (handler is registered at the
     expected handler_id key).
 
-Representative SMILES (from audit § 1): 'CC(=O)N'
+Representative SMILES (from the audit): 'CC(=O)N'
 """
 from __future__ import annotations
 
@@ -47,7 +47,7 @@ class TestNameAmide:
         assert "features" in sig.parameters
 
     def test_predicate_purity_returns_bool(self):
-        """Predicate returns a bool / falsy value (CONTEXT D-25 purity hint)."""
+        """Predicate returns a bool / falsy value (internal notes purity hint)."""
         class EmptyFeatures:
             principal_group = None
             is_cyclic = False
@@ -83,7 +83,7 @@ class TestNameAmide:
         assert entry.handler is name_amide
 
     def test_byte_identical_name_via_namer(self):
-        """Pipeline-level: Orthonym().name(rep_smi) is reachable and deterministic.
+        """Pipeline-level: Orthonym.name(rep_smi) is reachable and deterministic.
 
         We don't assert a specific name string because canary baselines
         are the authoritative byte-identical contract. Here we just
@@ -100,7 +100,7 @@ class TestNameAmide:
         assert isinstance(name, str) and name
 
     def test_pipeline_idempotent(self):
-        """Two name() calls on same SMILES produce same name."""
+        """Two name calls on same SMILES produce same name."""
         if REPRESENTATIVE_SMILES is None:
             pytest.skip("no representative SMILES for this handler in audit § 1")
         namer = Orthonym()
@@ -113,12 +113,12 @@ class TestNameAmide:
 
 
 # ---------------------------------------------------------------------------
-# CR-02 regression: name_amide guards None before pool.add
+# regression: name_amide guards None before pool.add
 # ---------------------------------------------------------------------------
 
 
 def test_amide_returns_none_on_assembler_failure():
-    """CR-02 regression: name_amide does not call pool.add(None, ...) when
+    """ regression: name_amide does not call pool.add(None,...) when
     _assemble_amide_name returns None."""
     from unittest.mock import MagicMock, patch
 
@@ -164,7 +164,7 @@ def test_amide_routes_through_pool_on_success():
         def best(self):
             class B:
                 name = "acetamide"
-                tree = None  # Phase 165: handler reads best().tree
+                tree = None  # a phase: handler reads best.tree
             return B()
 
     with patch("orthonym.assembly.composer._assemble_amide_name", return_value="acetamide"), \

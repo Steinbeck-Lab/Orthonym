@@ -1,12 +1,12 @@
 """
-Integration tests for chain substituent completeness (Phase 34, Plan 01).
+Integration tests for chain substituent completeness (a phase, Plan 01).
 
 Tests that heteroatom-containing substituent branches on acyclic chain systems
 are correctly named, not dropped, and not double-counted. Covers bugs A-F:
-  SC-07: Haloalkyl substituent naming
-  SC-05: FG-on-branch double-counting
-  SC-08: Aminomethyl/hydroxyalkyl locant correctness
-  SC-06: Unrecognized heteroatom fallback
+  : Haloalkyl substituent naming
+  : FG-on-branch double-counting
+  : Aminomethyl/hydroxyalkyl locant correctness
+  : Unrecognized heteroatom fallback
 
 These tests assert that the generated name CONTAINS the expected fragment,
 rather than matching an exact name, to be robust against minor locant or
@@ -18,7 +18,7 @@ from orthonym import name_compound
 
 
 # ---------------------------------------------------------------------------
-# SC-07 / BUG-A: Haloalkyl substituent naming
+# / BUG-A: Haloalkyl substituent naming
 # Previously: halogens on branches were named as standalone fluoro/chloro
 # prefixes with wrong locants, instead of compound substituent names like
 # (trifluoromethyl) or (fluoromethyl).
@@ -79,7 +79,7 @@ class TestHaloalkylChainSubstituents:
 
 
 # ---------------------------------------------------------------------------
-# SC-07 / BUG-E: Haloalkyl names get parentheses
+# / BUG-E: Haloalkyl names get parentheses
 # Previously: compound haloalkyl names were not recognized as needing brackets.
 # ---------------------------------------------------------------------------
 
@@ -100,7 +100,7 @@ class TestHaloalkylBrackets:
 
 
 # ---------------------------------------------------------------------------
-# SC-05 / BUG-B: No double-counted FG prefixes for branch-located FGs
+# / BUG-B: No double-counted FG prefixes for branch-located FGs
 # Previously: a hydroxymethyl branch produced both "(hydroxymethyl)" and a
 # standalone "hydroxy" prefix, doubling the count.
 # ---------------------------------------------------------------------------
@@ -134,7 +134,7 @@ class TestNoDoubleFGPrefix:
 
 
 # ---------------------------------------------------------------------------
-# SC-08 / BUG-C: Aminomethyl locant correctness
+# / BUG-C: Aminomethyl locant correctness
 # Previously: aminomethyl had incorrect "1-amino" locant on 1-carbon chains.
 # ---------------------------------------------------------------------------
 
@@ -157,7 +157,7 @@ class TestAminomethylLocant:
 
 
 # ---------------------------------------------------------------------------
-# SC-08 / BUG-D: Hydroxyalkyl locant correctness
+# / BUG-D: Hydroxyalkyl locant correctness
 # Previously: 2-hydroxyethyl was missing the locant (just 'hydroxyethyl').
 # ---------------------------------------------------------------------------
 
@@ -185,7 +185,7 @@ class TestHydroxyalkylLocant:
 
 
 # ---------------------------------------------------------------------------
-# SC-06 / BUG-F: Generic fallback for unrecognized heteroatom substituents
+# / BUG-F: Generic fallback for unrecognized heteroatom substituents
 # Previously: unrecognized heteroatom branches were silently dropped.
 # Now: logged warning + fallback to carbon-count-based alkyl name.
 # ---------------------------------------------------------------------------
@@ -199,7 +199,7 @@ class TestGenericFallback:
         name = name_compound('CCCC(CS)CC(=O)O')
         assert name and len(name) > 0, "Expected non-empty name for thiol branch compound"
         assert 'hexanoic acid' in name, f"Expected 'hexanoic acid' base in '{name}'"
-        # Phase 48: sulfanyl substituent is now present (was previously dropped)
+        # a phase: sulfanyl substituent is now present (was previously dropped)
         assert 'sulfanyl' in name, f"Expected 'sulfanyl' in '{name}'"
 
     @pytest.mark.integration

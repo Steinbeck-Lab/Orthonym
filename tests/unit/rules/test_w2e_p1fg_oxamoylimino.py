@@ -1,4 +1,4 @@
-"""P-66.1.1.4.5.1 (BB 33071): "The preferred prefix for the group
+""" (BB 33071): "The preferred prefix for the group
 H2N-CO-CO-N= is 'oxamoylimino'." Table row BB 55479 confirms
 oxamoylimino* as the preferred prefix. Target (DEFERRED doc, OPSIN-RT
 verified): NC(=O)C(=O)N=CCC(=O)O -> 3-(oxamoylimino)propanoic acid.

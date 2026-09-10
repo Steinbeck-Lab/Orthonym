@@ -1,11 +1,11 @@
-"""Phase 146 Plan 01 Task 3: verify thread-local auto-clear fixture works.
+"""a phase Plan 01 Task 3: verify thread-local auto-clear fixture works.
 
 The autouse fixture ``_phase146_clear_thread_locals`` in ``tests/conftest.py``
 runs after every test, clearing the three thread-local stores. These three
 sanity tests confirm that a fresh test sees a clean state (no leakage from
 the previous test's molecule-naming work).
 
-Reference: 146-RESEARCH.md §8.4.
+Reference: internal notes
 """
 import pytest
 
@@ -14,7 +14,7 @@ def test_pool_store_cleared_between_tests():
     """If conftest fixture is active, _pool_store.stack contains at most
     a single fresh pool at test start (no leaked candidates from prior runs).
 
-    Note: clear_pool() replaces the top of the stack with a fresh pool
+    Note: clear_pool replaces the top of the stack with a fresh pool
     (or pushes one if empty), so the stack should hold 0 or 1 pools at
     test start — never more.
     """
@@ -42,7 +42,7 @@ def test_confidence_store_cleared_between_tests():
     """
     from orthonym.assembly.coverage_scoring import retrieve_confidence
     info = retrieve_confidence()
-    # After clear_confidence(), retrieve returns the empty default dict
+    # After clear_confidence, retrieve returns the empty default dict
     assert info.get('name') == '', (
         f"Stale confidence: {info!r}; cleanup failed"
     )

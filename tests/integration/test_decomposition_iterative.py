@@ -1,18 +1,18 @@
 """
-Integration tests for iterative mixed-type decomposition (Phase 107, Plan 01).
+Integration tests for iterative mixed-type decomposition (a phase, Plan 01).
 
-Tests the new _try_iterative_mixed_decompose() function and related
+Tests the new _try_iterative_mixed_decompose function and related
 enhancements: retained-name coverage bonus, mixed-bond threshold
 relaxation, amino acid fragment matching, and CIP stereo on fragments.
 
 Coverage:
 - Iterative decomposition of molecules with mixed bond types
 - MAX_DECOMP_LEVELS cap enforcement
-- Retained-name coverage bonus in _coverage_is_adequate()
+- Retained-name coverage bonus in _coverage_is_adequate
 - Mixed bond threshold relaxation for 2-ester + glycosidic
 - Quality gate comparison at each decomposition level
 - Non-zwitterion amino acid fragment matching
-- CIP stereo labels assigned on fragment mols (STER-07)
+- CIP stereo labels assigned on fragment mols
 """
 
 import pytest
@@ -187,7 +187,7 @@ class TestIterativeMixedDecomposition:
 
     @pytest.mark.integration
     def test_cip_stereo_on_fragments(self):
-        """CIP stereo labels assigned on fragment mols before naming (STER-07).
+        """CIP stereo labels assigned on fragment mols before naming .
 
         Fragment mols parsed from SMILES should have CIP labels assigned
         so stereo descriptors are preserved through decomposition.
@@ -205,7 +205,7 @@ class TestIterativeMixedDecomposition:
 
 @pytest.mark.integration
 class TestMixedAssemblyBondType:
-    """Test bond-type-aware iterative mixed assembly (DECO-23)."""
+    """Test bond-type-aware iterative mixed assembly ."""
 
     def test_mixed_assembly_uses_bond_type(self):
         """Verify that a molecule with both ester and amide bonds produces

@@ -1,8 +1,8 @@
-"""Phase 169.7 BBR-PERC / DEF-1 — charged characteristic groups + shared accessor.
+"""a phase BBR-PERC / — charged characteristic groups + shared accessor.
 
 The neutral FG layer previously contained ZERO ionic patterns, so a charged
-molecule reaching it (the D-1 mis-route exposure) silently lost its group.
-169.7 adds the charged FG SMARTS (P-41 classes 4/6) and a single shared
+molecule reaching it (the mis-route exposure) silently lost its group.
+169.7 adds the charged FG SMARTS classes 4/6) and a single shared
 ``detect_features`` accessor. Every charged pattern requires a formal charge,
 so NEUTRAL molecules never match (the false-positive guard).
 """

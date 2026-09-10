@@ -9,7 +9,7 @@ instead of two. The single secondary-amine nitrogen was spelled twice at one loc
     `seniority.get_prefix` maps `secondary_amine`/`tertiary_amine` to the bare
     string `"amino"`.
 
-Bare `amino` is not a legal spelling for a substituted nitrogen. P-62.2.3 "The
+Bare `amino` is not a legal spelling for a substituted nitrogen. "The
 prefix 'amino'": *"Preferred IUPAC names for prefixes corresponding to -NHR,
 -NRR', or -NR2 are formed by prefixing the names of the groups R and R' to the
 prefix 'amino'"* (PIN example `4,4-bis(methylamino)butanoic acid`). So the bare
@@ -31,7 +31,7 @@ from orthonym import Orthonym
 
 @pytest.fixture(scope="module")
 def namer():
-    # The defect lives with the validity gate OFF: with it on, SELF-01 merely
+    # The defect lives with the validity gate OFF: with it on, merely
     # suppresses the wrong name. Judge the generator, not the gate.
     _namer._DISABLE_VALIDITY_GATE = True
     return Orthonym(style="pin")

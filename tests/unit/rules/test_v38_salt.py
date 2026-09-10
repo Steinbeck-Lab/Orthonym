@@ -1,8 +1,8 @@
-"""v38 SALT increment — two sited salt-naming sub-gaps.
+""" SALT increment — two sited salt-naming sub-gaps.
 
 Sub-gap 1 — ROUTE_MISSES: `name_salt` produces a correct, RT-verified salt
 name for a STEREO-bearing ionic salt (drug.[H+].[X-]), but `name_compound`
-discarded it. Root cause: the SELF-01 self-consistency verdict
+discarded it. Root cause: the self-consistency verdict
 (`namer._self_consistency_verdict`) reached its RegistrationHash-tautomer
 fallback for stereo inputs (na>0, so the `na==0 -> ok` short-circuit did not
 apply) and there the ionic input form (`...[Cl-].[H+]`) and the neutral
@@ -20,7 +20,7 @@ oxoanion written ionically with bare protons and NO neutral base
 cations are `[H+]`, there is no neutral base, and every anion is an organic
 oxoanion (a deprotonated -O(-) acid site), REATTACH the protons to the acid
 sites (reconstruct the neutral free acid) and name THAT via the ordinary namer;
-the top-level SELF-01 gate RT-verifies it (identical full InChIKey), so a wrong
+the top-level gate RT-verifies it (identical full InChIKey), so a wrong
 reconstruction fails closed. The halide `[H+].[Cl-]` guard is untouched.
 
 Determinism on `CanonicalRankAtoms`. 0-wrong ABSOLUTE (RT-verify or abstain).

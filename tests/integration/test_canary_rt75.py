@@ -14,7 +14,7 @@ These tests run as part of the normal test suite (no @pytest.mark.slow) so that
 regressions are caught immediately during development.
 
 Original 75: internal notes
-a phase additions: 10 compounds from missing compound classes (CLS-01 to CLS-05)
+a phase additions: 10 compounds from missing compound classes (to)
 a phase additions: 3 compounds from decomposition format fixes (ether/alkoxy)
 a phase additions: 19 compounds from v9.0 canary expansion (coverage-based + anchors)
 a phase additions: 2 compounds newly RT-matching in v10.0 (steroid + epoxycyclohexane)
@@ -92,7 +92,7 @@ CANARY_COMPOUNDS = [
     ),
     (
         "CC1=CC[C@]23O[C@@]2(C)CC[C@@H]2[C@H](OC(=O)[C@H]2C)[C@@H]13",
-        "(1R,3S,6S,7S,10S,11R)-3,7,12-trimethyl-2,9-dioxa-tetracyclo[9.3.0.0(1,3).0(6,10)]tetradec-12-en-8-one",  # Updated P72: IUPAC VB-6 citation order
+        "(1R,3S,6S,7S,10S,11R)-3,7,12-trimethyl-2,9-dioxa-tetracyclo[9.3.0.0(1,3).0(6,10)]tetradec-12-en-8-one",  # Updated P72: IUPAC citation order
     ),
     (
         "C=CC(=O)CCCC",
@@ -124,9 +124,9 @@ CANARY_COMPOUNDS = [
     ),
     (
         "O=CC1=CC(O)C(O)C(O)C1O",
-        # Re-baselined WS-A.1 S4: the appended-suffix anchor now routes
+        # Re-baselined.1 S4: the appended-suffix anchor now routes
         # through orient_cycloalkene Path A and the suffix locant is cited
-        # explicitly (P-31.1.4.3.4). OPSIN RT-verifies True; same structure,
+        # explicitly. OPSIN RT-verifies True; same structure,
         # same numbering as the old form.
         "3,4,5,6-tetrahydroxycyclohex-1-ene-1-carbaldehyde",
     ),
@@ -136,7 +136,7 @@ CANARY_COMPOUNDS = [
     ),
     (
         "C[C@H]1C/C=C\\[C@H]2[C@@H]3O[C@]3(C)[C@@H](C)[C@H]3[C@H](Cc4ccccc4)NC(=O)[C@@]32OC(=O)/C=C\\[C@@](C)(O)C1=O",
-        "(1S,2Z,5S,7R,8Z,12R,15S,16S,17S,18R,20S)-15-benzyl-7-hydroxy-5,7,17,18-tetramethyl-11,19-dioxa-14-aza-tetracyclo[10.8.0.0(12,16).0(18,20)]icosa-2,8-dien-6,10,13-trione",  # Updated P72: IUPAC VB-6 citation order
+        "(1S,2Z,5S,7R,8Z,12R,15S,16S,17S,18R,20S)-15-benzyl-7-hydroxy-5,7,17,18-tetramethyl-11,19-dioxa-14-aza-tetracyclo[10.8.0.0(12,16).0(18,20)]icosa-2,8-dien-6,10,13-trione",  # Updated P72: IUPAC citation order
     ),
     (
         "CC1=C[C@@H]2/C=C(\\C)CCC[C@H](O)/C=C/C(=O)O[C@]23C(=O)N[C@@H](CC(C)C)[C@@H]3[C@@H]1C",
@@ -160,7 +160,7 @@ CANARY_COMPOUNDS = [
     ),
     (
         "Cc1ccc(O)cc1C",
-        "3,4-dimethylphenol",  # ASML-13: phenol suffix routing
+        "3,4-dimethylphenol",  #: phenol suffix routing
     ),
     (
         "C[C@H](NC(=O)[C@@H](N)CC(=O)O)C(=O)N[C@@H](CCCCN)C(=O)O",
@@ -264,7 +264,7 @@ CANARY_COMPOUNDS = [
     ),
     (
         "OC[C@H](O)c1ccccc1",
-        "(2R)-2-phenylethan-1-ol",  # PERC-06: diol no longer polyfunctional (same parent class)
+        "(2R)-2-phenylethan-1-ol",  #: diol no longer polyfunctional (same parent class)
     ),
     (
         "O=[N+]([O-])OO",
@@ -328,7 +328,7 @@ CANARY_COMPOUNDS = [
     ),
     (
         "O=C(O)C[C@H](O)CCCCCCO",
-        "(3R)-3,9-dihydroxynonanoic acid",  # ASML-12: locant-aware prefix merge
+        "(3R)-3,9-dihydroxynonanoic acid",  #: locant-aware prefix merge
     ),
     (
         "COc1c(-c2ccccc2)c2ccc(O)cc2[nH]c1=O",
@@ -348,14 +348,14 @@ CANARY_COMPOUNDS = [
     ),
     (
         "N[C@H](Cc1ccc(O)cc1)C(=O)O",
-        # WSD-07 (a phase) re-baseline: a top-level free amino acid now resolves
+        # -07 (a phase) re-baseline: a top-level free amino acid now resolves
         # to its retained PIN with the configurational descriptor (D-tyrosine,
-        # P-103.1.1.1) instead of the systematic substitutive name. RT-verified
+        # instead of the systematic substitutive name. RT-verified
         # (OPSIN parses 'D-tyrosine' to the input, InChI-L1 match).
         "D-tyrosine",
     ),
-    # --- a phase: Missing Compound Classes (CLS-01 to CLS-05) ---
-    # CLS-01: Acetals
+    # --- a phase: Missing Compound Classes (to) ---
+    #: Acetals
     (
         "C1OCCO1",
         "1,3-dioxolane",
@@ -364,9 +364,9 @@ CANARY_COMPOUNDS = [
         "COC(C)OC",
         "1,1-dimethoxyethane",
     ),
-    # CLS-02: Disulfides
+    #: Disulfides
     (
-        # DD2 (Phase D, P-63.3.1(1)): dialkyl disulfide is a substitutive PIN,
+        # DD2 (Phase D, (1)): dialkyl disulfide is a substitutive PIN,
         # not the 'dithia' skeletal-replacement chain (the old '2,3-dithiabutane'
         # consumed the S-S as two skeletal thia atoms — the catalog C3 defect).
         "CSSC",
@@ -376,9 +376,9 @@ CANARY_COMPOUNDS = [
         "CCSSSCC",
         "3,4,5-trithiaheptane",
     ),
-    # CLS-03: Cyclic Imides
+    #: Cyclic Imides
     (
-        # (P-66.2.1, the Blue Book): cyclic imide -> ring-dione pseudoketone
+        #, the Blue Book): cyclic imide -> ring-dione pseudoketone
         # PIN; succinimide demoted to general-only.
         "O=C1CCC(=O)N1",
         "pyrrolidine-2,5-dione",
@@ -387,7 +387,7 @@ CANARY_COMPOUNDS = [
         "O=C1NC(=O)c2ccccc21",
         "phthalimide",
     ),
-    # CLS-04: Thiocarboxylic Acids
+    #: Thiocarboxylic Acids
     (
         "CC(=O)S",
         "ethanethioic S-acid",
@@ -396,7 +396,7 @@ CANARY_COMPOUNDS = [
         "CC(=S)S",
         "ethanedithioic acid",
     ),
-    # CLS-05: Carbamic Acid
+    #: Carbamic Acid
     (
         "NC(=O)O",
         "carbamic acid",
@@ -405,9 +405,9 @@ CANARY_COMPOUNDS = [
         "CN(C)C(=O)O",
         "N,N-dimethylcarbamic acid",
     ),
-    # --- a phase: Decomposition Format Fixes (DEC-01/DEC-02) ---
-    # Alkoxy naming on benzene (DEC-02: bare oxy elimination)
-    # Now returns "anisole" (retained name, P-34.1.1.4 PIN)
+    # --- a phase: Decomposition Format Fixes (/) ---
+    # Alkoxy naming on benzene (: bare oxy elimination)
+    # Now returns "anisole" (retained name, PIN)
     (
         "c1ccc(OC)cc1",
         "anisole",
@@ -416,7 +416,7 @@ CANARY_COMPOUNDS = [
         "c1ccc(OCC)cc1",
         "ethoxybenzene",
     ),
-    # Ring ether guard (DEC-01: oxane not decomposed)
+    # Ring ether guard (: oxane not decomposed)
     (
         "C1CCOCC1",
         "oxane",
@@ -482,15 +482,15 @@ CANARY_COMPOUNDS = [
     ),
     (
         "CC(C)Cc1cccc(CC(C)C)c1O",
-        "2,6-diisobutylphenol",  # ASML-13: phenol suffix routing
+        "2,6-diisobutylphenol",  #: phenol suffix routing
     ),
     (
         "CCCCCCCCCCCCCCCCCCCC(=O)OC1CCCCC1",
         #: was "cyclohexyl arachidate". Per this file's own rule --
         # "check whether the NEW name is also valid IUPAC nomenclature... only
         # revert if the new name is wrong" -- the new name is not merely valid,
-        # it is the PIN and the old one is not. P-65.1.1.1 (the Blue Book)
-        # retains only formic/oxalic/acetic/benzoic/oxamic AS PINs; P-65.1.2
+        # it is the PIN and the old one is not. (the Blue Book)
+        # retains only formic/oxalic/acetic/benzoic/oxamic AS PINs;
         # (:29860) makes systematic names preferred for every other acid. C20 is
         # "icosane (PIN)" (:10043). Round-trip re-verified: OPSIN returns the
         # input structure.
@@ -574,7 +574,7 @@ CANARY_COMPOUNDS = [
     ),
     (
         "CC(C)(C)c1ccc(CC(=O)O)cc1",
-        "2-(4-tert-butylphenyl)ethanoic acid",  # P-16.3.3(b)/P-16.2.4.1(d) (a phase): tert-butyl is simple, no enclosing marks
+        "2-(4-tert-butylphenyl)ethanoic acid",  # (b)/(d) (a phase): tert-butyl is simple, no enclosing marks
     ),
     (
         r"CCCCC/C=C\C/C=C\C/C=C\CCCCCCCC(=O)O",
@@ -780,8 +780,8 @@ CANARY_COMPOUNDS = [
     ),
     (
         "CC(C)=CCOc1ccc(C2=C(CC(C)C)C(=O)NC2=O)cc1",  # Sentinel: substituent_loss - phenoxy maleimide
-        # WS-A.1 S2: the senior N-heterocycle (maleimide) is now the
-        # parent per P-44.2.1(b) (old form named only the benzene side and
+        #.1 S2: the senior N-heterocycle (maleimide) is now the
+        # parent per (b) (old form named only the benzene side and
         # ignored the imide ring entirely). Both forms RT-False (multi-defect:
         # the prenyloxyphenyl decoration is still dropped) -- the sentinel
         # tracks the substituent_loss class either way.
@@ -795,8 +795,8 @@ CANARY_COMPOUNDS = [
     (
         r"CC1C/C(=C\CC(CC(N)=O)CC(=O)O)C(=O)C(C)C1",  # Sentinel: parent_mismatch - cyclohexanone chain
         # a phase-03: chain tiebreaker refinements change parent chain selection
-        # WS-D.1: the demoted ring's ketone is now emitted as the prefix
-        # 2-oxo (P-66.6.1) instead of being silently dropped. The new name is
+        #.1: the demoted ring's ketone is now emitted as the prefix
+        # 2-oxo instead of being silently dropped. The new name is
         # strictly closer to the true structure (adds O3, matching the ring
         # ketone; the remaining exocyclic-alkene defect is pre-existing and
         # orthogonal). Re-baselined per the changed-row RT-verify discipline.
@@ -824,13 +824,13 @@ CANARY_COMPOUNDS = [
         "2-(3-hydroxyphenyl)ethanoic acid",
     ),
     (
-        "CCCCCCCCCc1ccc(OCCO)cc1",  # was fragment_loss ('2-phenoxyethan-1-ol', nonyl dropped); aryloxy decorator now carries the ring (P-45.6)
+        "CCCCCCCCCc1ccc(OCCO)cc1",  # was fragment_loss ('2-phenoxyethan-1-ol', nonyl dropped); aryloxy decorator now carries the ring
         "2-(4-nonylphenoxy)ethan-1-ol",
     ),
     (
         r"CCCCCCC(=O)NC1=CC(=O)[C@@H]2CCCN12",  # Sentinel: fragment_loss - heptanoyl pyrrolidinone
-        # a phase.1-01: decomposition now produces more complete fragment name
-        # a phase WS-4 (DEF-6): ring ketone -> -one suffix (this sentinel name
+        # a phase-01: decomposition now produces more complete fragment name
+        # a phase : ring ketone -> -one suffix (this sentinel name
         # is malformed both before & after — RT=False unchanged, no RT regression).
         "N-heptanoyl(2S)-5-aminoazol-3-one",
     ),
@@ -860,19 +860,19 @@ CANARY_COMPOUNDS = [
     # 1 from a phase (multi-ring substituent expression)
     # 2 benchmark regression anchors (newly passing in v9.0 benchmark)
     # a phase: Fused heterocycle prefix generation
-    # a phase / P-44.1(a) cascade unblock: chain has principal
+    # a phase / (a) cascade unblock: chain has principal
     # characteristic group (carboxylic acid / ketone) — chain wins as parent
-    # per https://iupac.qmul.ac.uk/BlueBook/P4.html P-44.1(a). Pre-148 the
+    # per https://iupac.qmul.ac.uk/BlueBook/P4.html (a). Pre-148 the
     # deleted `_should_bypass_fused_guard` short-circuited fused heterocycles
     # to ring-as-parent producing IUPAC-incorrect prefix names. Both new
     # names OPSIN-roundtrip-verified (commit 148-02-03).
     (
         "OC(=O)CCc1cccc2cccnc12",
-        "3-(quinolin-8-yl)propanoic acid",  # P-44.1(a) chain wins (acid PG)
+        "3-(quinolin-8-yl)propanoic acid",  # (a) chain wins (acid PG)
     ),
     (
         "CC(=O)c1ccc2[nH]ccc2c1",
-        "1-(1H-indol-5-yl)ethan-1-one",  # P-44.1(a) chain wins (ketone PG)
+        "1-(1H-indol-5-yl)ethan-1-one",  # (a) chain wins (ketone PG)
     ),
     (
         "OC(=O)c1cc2ccccc2[nH]1",
@@ -889,15 +889,15 @@ CANARY_COMPOUNDS = [
     ),
     (
         "OC(=O)CC1CCCC1",
-        "cyclopentylacetic acid",  # P-65.1.1.1 retained acetic + P-14.3.4.6 (no locant)
+        "cyclopentylacetic acid",  # retained acetic + (no locant)
     ),
     (
         "OC(=O)CC1CCC1",
-        "cyclobutylacetic acid",  # P-65.1.1.1 retained acetic + P-14.3.4.6 (no locant)
+        "cyclobutylacetic acid",  # retained acetic + (no locant)
     ),
     (
         "OC(=O)CC1CCCCC1",
-        "cyclohexylacetic acid",  # P-65.1.1.1 retained acetic + P-14.3.4.6 (no locant)
+        "cyclohexylacetic acid",  # retained acetic + (no locant)
     ),
     (
         "CC(=O)C1CCCCC1",
@@ -954,8 +954,8 @@ CANARY_COMPOUNDS = [
     ),
     (
         "O[C@H]1[C@H](O)[C@@H](O)[C@@H]2O[C@@H]2[C@@H]1O",
-        # WSD-01 (a phase) re-baseline: the four -OH are now the principal
-        # characteristic group expressed as the '-tetraol' SUFFIX (P-14.4 c),
+        # -01 (a phase) re-baseline: the four -OH are now the principal
+        # characteristic group expressed as the '-tetraol' SUFFIX c),
         # not a 'tetrahydroxy' prefix. RT-neutral (both forms OPSIN-L1-match).
         "(1R,2R,3S,4S,5R,6S)-7-oxa-bicyclo[4.1.0]heptane-2,3,4,5-tetraol",
     ),
@@ -1002,7 +1002,7 @@ CANARY_COMPOUNDS = [
     ),
     (
         "OCCCO",
-        # a phase HYG-03: was "trimethylene glycol" (deprecated glycol name);
+        # a phase: was "trimethylene glycol" (deprecated glycol name);
         # PIN is propane-1,3-diol. Intentional, OPSIN-RT-verified correction.
         "propane-1,3-diol",
     ),
@@ -1244,7 +1244,7 @@ CANARY_COMPOUNDS = [
     ),
     (
         "C[C@@H]1CC(=O)CC(C)(C)C1=O",
-        # Re-baselined WS-A.1 S3 (P-31.1.4(c) suffix-locant priority):
+        # Re-baselined.1 S3 (c) suffix-locant priority):
         # dione anchors must take {1,4}, not {2,5}. Both forms OPSIN
         # RT-verify True; the new form is the PIN numbering.
         "(6R)-2,2,6-trimethylcyclohexane-1,4-dione",
@@ -1286,42 +1286,42 @@ CANARY_COMPOUNDS = [
         "(2S)-1-(decanoyloxy)-3-(docosanoyloxy)propan-2-ol",
     ),
     # --- a phase-02 RT canary compounds ---
-    # FIX-10: fused ring dictionary (dibenzo[b,d]furan) - RT validated
+    #: fused ring dictionary (dibenzo[b,d]furan) - RT validated
     (
         "c1ccc2c(c1)oc1ccccc12",
         "dibenzo[b,d]furan",
     ),
-    # FIX-10: fused ring dictionary (dibenzo[b,d]thiophene) - RT validated
+    #: fused ring dictionary (dibenzo[b,d]thiophene) - RT validated
     (
         "c1ccc2c(c1)sc1ccccc12",
         "dibenzo[b,d]thiophene",
     ),
-    # FIX-10: fused ring dictionary (9H-carbazole) - RT validated
+    #: fused ring dictionary (9H-carbazole) - RT validated
     (
         "c1ccc2c(c1)[nH]c1ccccc12",
         "9H-carbazole",
     ),
-    # FIX-14: ylidene naming (methylidenecyclohexane) - RT validated
+    #: ylidene naming (methylidenecyclohexane) - RT validated
     (
         "C=C1CCCCC1",
         "methylidenecyclohexane",
     ),
-    # FIX-14: ylidene on chain (3-methylidenepentane) - RT validated
+    #: ylidene on chain (3-methylidenepentane) - RT validated
     (
         "CCC(=C)CC",
         "3-methylidenepentane",
     ),
-    # FIX-15: skeletal replacement large ring - RT validated
+    #: skeletal replacement large ring - RT validated
     (
         "C1CCOCCO1",
         "1,4-dioxacycloheptane",
     ),
-    # FIX-15: mixed heteroatom large ring - RT validated
+    #: mixed heteroatom large ring - RT validated
     (
         "C1CCNCCOC1",
         "1-oxa-4-azacyclooctane",
     ),
-    # FIX-15: zwitterion beta-alanine - RT validated
+    #: zwitterion beta-alanine - RT validated
     (
         "[NH3+]CCC(=O)[O-]",
         "beta-alanine",
@@ -1586,8 +1586,8 @@ CANARY_COMPOUNDS = [
     ),
     (
         "C[C@H]1O[C@@H](O)[C@H](O)[C@H](O)[C@@H]1O",  # heterocycle,small,carbohydrate
-        # a phase WS-4 (DEF-6): the 4 ring -OH are the principal group -> -tetraol
-        # SUFFIX (P-33), not hydroxy prefixes. OPSIN-RT verified.
+        # a phase : the 4 ring -OH are the principal group -> -tetraol
+        # SUFFIX, not hydroxy prefixes. OPSIN-RT verified.
         "(2R,3S,4R,5R,6R)-2-methyloxane-3,4,5,6-tetraol",
     ),
     (
@@ -1640,10 +1640,10 @@ CANARY_COMPOUNDS = [
     ),
     (
         "CC1=CC[C@@H]2C[C@H]1C2(C)C",  # fused-ring,small
-        # SUB-02 (169.5): substituent prefix glues to the descriptor
+        # (169.5): substituent prefix glues to the descriptor
         # (IUPAC-standard 'trimethylbicyclo', was the non-standard
         # 'trimethyl-bicyclo'); both OPSIN-RT, the no-hyphen form is correct.
-        # a phase WS-6 (DEF-7): P-14.4 von Baeyer numbering gives the ene + gem-
+        # a phase : von Baeyer numbering gives the ene + gem-
         # dimethyl the lowest locants -> the actual alpha-pinene PIN. OPSIN-RT verified.
         "(1R,5R)-2,6,6-trimethylbicyclo[3.1.1]hept-2-ene",
     ),
@@ -1725,7 +1725,7 @@ CANARY_COMPOUNDS = [
     ),
     (
         "C=C[C@@]1(C)CCC(=O)C[C@H]1C(=C)C",  # small
-        # Re-baselined WS-A.1 S3 (P-31.1.4(c) suffix-locant priority):
+        # Re-baselined.1 S3 (c) suffix-locant priority):
         # the ketone suffix must take locant 1, not 4. Both forms OPSIN
         # RT-verify True; stereo descriptors track the renumbering.
         "(3S,4R)-4-ethenyl-4-methyl-3-(prop-1-en-2-yl)cyclohexan-1-one",
@@ -1856,8 +1856,8 @@ CANARY_COMPOUNDS = [
     ),
     (
         "CC1CC(S)C(C)O1",  # heterocycle,small
-        # a phase WS-4 (DEF-6): ring -SH is the principal group -> -thiol SUFFIX
-        # (P-33), not a sulfanyl prefix. OPSIN-RT verified.
+        # a phase : ring -SH is the principal group -> -thiol SUFFIX
+        #, not a sulfanyl prefix. OPSIN-RT verified.
         "2,5-dimethyloxolane-3-thiol",
     ),
     (
@@ -1982,7 +1982,7 @@ CANARY_COMPOUNDS = [
     ),
     (
         "CCCc1cc(O)c(CC)c(=O)o1",  # aromatic,heterocycle,small
-        # a phase WS-4 (DEF-6): ring -OH expressed as the -ol SUFFIX (P-33).
+        # a phase : ring -OH expressed as the -ol SUFFIX.
         # OPSIN-RT verified (the 2-oxo remains a prefix as before).
         "3-ethyl-2-oxo-6-propyl-2H-pyran-4-ol",
     ),
@@ -2040,7 +2040,7 @@ CANARY_COMPOUNDS = [
     ),
     (
         "CCCCCCCCCC(C)CI",  # acyclic,small
-        "1-iodo-2-methylundecane",  # P-14.3.4 (a phase DEF-4): locant-1 cited on multi-substituent parent
+        "1-iodo-2-methylundecane",  # (a phase): locant-1 cited on multi-substituent parent
     ),
     (
         "CC[C@H](C)[C@H](NC(=O)[C@H](CS)NC(=O)[C@@H](N)Cc1c[nH]c2ccccc12)C(=O)O",  # aromatic,heterocycle,fused-ring,polyfunctional,medium
@@ -2108,7 +2108,7 @@ CANARY_COMPOUNDS = [
     ),
     (
         "NC(=O)Nc1ccccc1",  # aromatic,small
-        #: monosubstituted urea omits the italic-N locant (P-14.3.4.3,
+        #: monosubstituted urea omits the italic-N locant,
         # the Blue Book `methylurea`); was "N-phenylurea".
         "phenylurea",
     ),
@@ -2369,7 +2369,7 @@ CANARY_COMPOUNDS = [
         "(2E)-undec-2-en-1-yl acetate",
     ),
     (
-        # (P-66.2.1 / P-66.6.3): the cyclic-imide ring carbonyls are the
+        # /: the cyclic-imide ring carbonyls are the
         # -trione pseudoketone SUFFIX, not detachable trioxo- prefixes.
         "CC1C(=O)NC(=O)NC1=O",  # heterocycle,small
         "5-methyl-1,3-diazinane-2,4,6-trione",
@@ -2476,7 +2476,7 @@ CANARY_COMPOUNDS = [
     ),
     (
         "C#N",  # acyclic,small
-        # a phase: PIN is 'formonitrile' (P-66.5.1.2.1, the Blue Book
+        # a phase: PIN is 'formonitrile', the Blue Book
         # "HCN formonitrile(PIN)... hydrogen cyanide"), not the retained
         # functional-class 'hydrogen cyanide'.
         "formonitrile",
@@ -2511,8 +2511,8 @@ CANARY_COMPOUNDS = [
     ),
     (
         "O=[N+]([O-])c1sccc1-c1ncccn1",  # aromatic,heterocycle,small
-        # WS-A.1 S2 + WS-A.2: pyrimidine is the senior parent
-        # (P-44.2.1(b)) and the demoted thiophene keeps its nitro. This IS
+        #.1 S2 +.2: pyrimidine is the senior parent
+        # (b)) and the demoted thiophene keeps its nitro. This IS
         # the OPSIN-verified PIN (RT True before and after); also a target
         # row in benchmarks/the gold set/among_rings_gold.json.
         "2-(2-nitrothiophen-3-yl)pyrimidine",
@@ -2607,8 +2607,8 @@ CANARY_COMPOUNDS = [
     ),
     (
         "Cc1cnc(N)c(C)n1",  # aromatic,heterocycle,small
-        # a phase WS-4 (DEF-6): ring -NH2 is the principal group -> -amine SUFFIX
-        # (P-33), not an amino prefix. OPSIN-RT verified.
+        # a phase : ring -NH2 is the principal group -> -amine SUFFIX
+        #, not an amino prefix. OPSIN-RT verified.
         "2,6-dimethylpyrazin-3-amine",
     ),
     (
@@ -2744,7 +2744,7 @@ CANARY_COMPOUNDS = [
         "L-tyrosine",
     ),
     (
-        "Oc1cc(O)cc(-c2ccccc2)c1",  # aromatic,small; OH is PCG -> -diol suffix on assembly parent (P-28.2.1)
+        "Oc1cc(O)cc(-c2ccccc2)c1",  # aromatic,small; OH is PCG -> -diol suffix on assembly parent
         "[1,1'-biphenyl]-3,5-diol",
     ),
     (
@@ -2897,7 +2897,7 @@ CANARY_COMPOUNDS = [
     ),
     (
         "CCCCOc1ccc(CC(=O)NO)cc1",  # aromatic,medium
-        # a phase.1 closure: e-preservation corrected per IUPAC P-16.3.3
+        # a phase closure: e-preservation corrected per IUPAC
         # (suffix "-hydroxamic acid" starts with consonant 'h' -> keep terminal e).
         "2-(4-(butyloxy)phenyl)ethane-1-hydroxamic acid",
     ),
@@ -2979,7 +2979,7 @@ CANARY_COMPOUNDS = [
     ),
     (
         "O=c1cc(-c2ccccc2)c2cc(O)c(O)cc2o1",  # aromatic,heterocycle,fused-ring,medium
-        # IH-01f: coumarin -> PIN 2H-1-benzopyran-2-one (P-19(d)); OPSIN-RT verified
+        #: coumarin -> PIN 2H-1-benzopyran-2-one (d)); OPSIN-RT verified
         "6,7-dihydroxy-4-phenyl-2H-1-benzopyran-2-one",
     ),
     (
@@ -2990,7 +2990,7 @@ CANARY_COMPOUNDS = [
         "C[C@H](NC(=O)[C@@H](N)CCC(=O)O)C(=O)N[C@@H](Cc1c[nH]c2ccccc12)C(=O)O",  # aromatic,heterocycle,fused-ring,polyfunctional,medium
         "L-glutamyl-L-alanyl-L-tryptophan",
     ),
-    # --- a phase.2 -a.3: HA=7 Tier A canaries ---
+    # --- a phase -a.3: HA=7 Tier A canaries ---
     # Cover the _MIN_RATIO_ACCEPT/1.5 coverage fallback at composer.py:1526
     # (hard preservation). One canary per Tier A handler. HA=7 is the
     # minimum geometrically feasible for complex_ring + benzene + heterocycle
@@ -3057,7 +3057,7 @@ def _opsin_parse_batch(names: list[str]) -> dict[str, str | None]:
         tmp_path = tmp.name
 
     try:
-        # WR-01: wrap stdin in `with open(...)` so the fd closes deterministically
+        #: wrap stdin in `with open(...)` so the fd closes deterministically
         # on all paths (including subprocess.run raising). `subprocess.run` does
         # not take ownership of file objects passed as stdin.
         with open(tmp_path) as stdin_f:
@@ -3068,7 +3068,7 @@ def _opsin_parse_batch(names: list[str]) -> dict[str, str | None]:
                 text=True,
                 timeout=120,
             )
-        # WR-03: fail loudly if OPSIN exits non-zero (JVM crash, classpath
+        #: fail loudly if OPSIN exits non-zero (JVM crash, classpath
         # error, OOM) so regressions are distinguishable from parse failures.
         # Mirrors the peer helper at test_deterministic_output.py:263.
         if result.returncode != 0:

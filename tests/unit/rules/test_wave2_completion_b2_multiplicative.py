@@ -1,17 +1,17 @@
 """Wave-2 completion batch B2 — multiplicative bridge extensions.
 
 Covers (all expected names OPSIN-RT verified against the evidence SMILES):
-  * P-16.5.1.1    heterocyclic multiplied units: attachment locant from the
+  * heterocyclic multiplied units: attachment locant from the
                   UNIT's own numbering (4,4'-oxybis(1,3-thiazole)).
-  * P-15.3.2.4.1  PG-free SUBSTITUTED benzene units renamed with locants
+  * PG-free SUBSTITUTED benzene units renamed with locants
                   anchored at the attachment — the root fix for the
                   structure-dropping '1,1'-oxydibromobenzene' class.
-  * P-29.4.2      composite CH2-SiH2-CH2 bridge (silanediylbis(methylene)).
-  * P-51.3.2.1 /  two-carbon triyl central unit over three identical ring
-    P-45.1.2      parents (ethane/ethene-1,1,2-triyl).
-  * P-15.3.1.1    methylenebis(disilane) + phosphanetriyltriacetic acid
+  * composite CH2-SiH2-CH2 bridge (silanediylbis(methylene)).
+  * / two-carbon triyl central unit over three identical ring
+          parents (ethane/ethene-1,1,2-triyl).
+  * methylenebis(disilane) + phosphanetriyltriacetic acid
                   (BB verbatim).
-  * P-15.3.1.2.2.1 [azanediylbis(methylene)]bis(phosphonic acid) (BB verbatim).
+  * [azanediylbis(methylene)]bis(phosphonic acid) (BB verbatim).
 """
 
 import pytest
@@ -32,7 +32,7 @@ class TestHeterocycleUnits:
 
 @pytest.mark.unit
 class TestAttachmentAnchoredUnits:
-    """P-15.3.2.4.1: units without a PG anchor are renumbered relative to the
+    """: units without a PG anchor are renumbered relative to the
     bridge attachment; the free-fragment name silently dropped the
     substituent position before (wrong-name class, RT-gate-masked)."""
 
@@ -105,13 +105,13 @@ class TestAcyclicBridges:
 @pytest.mark.unit
 class TestDeclineRowsStayClosed:
     def test_stereo_differing_units_decline(self):
-        # P-45.6.2: units differing in R/S are NOT identical -> multiplicative
+        #: units differing in R/S are NOT identical -> multiplicative
         # must decline (canonical SMILES carry the stereo tags).
         assert _mult(
             "C[C@@H](CC)c1ccc(Sc2ccc(cc2)[C@H](C)CC)cc1") is None
 
     def test_asymmetric_bridge_positions_decline(self):
-        # P-51.3.3: 1,3- vs 1,2-attachment fragments differ -> decline.
+        #: 1,3- vs 1,2-attachment fragments differ -> decline.
         assert _mult("OC(=O)C1CCCC(CC2CCCCC2C(=O)O)C1") is None
 
 

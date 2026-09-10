@@ -1,6 +1,6 @@
 """Tests for confidence-based quality gate rejection in namer.py.
 
-The quality gate in namer._name_impl() uses the coverage_scoring confidence
+The quality gate in namer._name_impl uses the coverage_scoring confidence
 score to reject truncated/incomplete names and fall back to decomposition.
 
 Tests verify:
@@ -21,7 +21,7 @@ from unittest.mock import patch, MagicMock
 # ---------------------------------------------------------------------------
 
 def _make_confidence_dict(confidence: float, name: str = "testname") -> dict:
-    """Build a dict matching retrieve_confidence() return format."""
+    """Build a dict matching retrieve_confidence return format."""
     return {
         'name': name,
         'confidence': confidence,

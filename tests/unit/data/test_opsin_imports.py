@@ -2,7 +2,7 @@
 Tests for OPSIN XML data imports.
 
 Comprehensive spot-check tests for all generated data modules.
-Verifies DATA-10 through DATA-19 requirements.
+Verifies through requirements.
 """
 
 import json
@@ -13,7 +13,7 @@ import pytest
 from rdkit import Chem
 
 # ============================================================================
-# Module existence and minimum counts (DATA-10 through DATA-19)
+# Module existence and minimum counts (through)
 # ============================================================================
 
 
@@ -22,7 +22,7 @@ class TestModuleCounts:
     """Verify minimum entry counts for each generated data module."""
 
     def test_aryl_groups_count(self):
-        """DATA-10/DATA-11: arylGroups.xml yields 350+ unique entries."""
+        """/: arylGroups.xml yields 350+ unique entries."""
         from orthonym.data.opsin_imports.aryl_groups import OPSIN_ARYL_GROUPS
 
         assert len(OPSIN_ARYL_GROUPS) >= 350, (
@@ -30,7 +30,7 @@ class TestModuleCounts:
         )
 
     def test_simple_groups_count(self):
-        """DATA-10/DATA-11: simpleGroups.xml yields 400+ unique entries."""
+        """/: simpleGroups.xml yields 400+ unique entries."""
         from orthonym.data.opsin_imports.simple_groups import OPSIN_SIMPLE_GROUPS
 
         assert len(OPSIN_SIMPLE_GROUPS) >= 400, (
@@ -38,7 +38,7 @@ class TestModuleCounts:
         )
 
     def test_acid_stems_count(self):
-        """DATA-12: carboxylicAcids.xml yields 240+ unique entries."""
+        """: carboxylicAcids.xml yields 240+ unique entries."""
         from orthonym.data.opsin_imports.carboxylic_acids_opsin import OPSIN_ACID_STEMS
 
         assert len(OPSIN_ACID_STEMS) >= 240, (
@@ -46,7 +46,7 @@ class TestModuleCounts:
         )
 
     def test_substituent_names_count(self):
-        """DATA-13: simpleSubstituents.xml + substituents.xml yields 400+ entries."""
+        """: simpleSubstituents.xml + substituents.xml yields 400+ entries."""
         from orthonym.data.opsin_imports.substituent_names_opsin import (
             OPSIN_SUBSTITUENT_NAMES,
         )
@@ -56,7 +56,7 @@ class TestModuleCounts:
         )
 
     def test_amino_acids_count(self):
-        """DATA-14: aminoAcids.xml yields 230+ unique entries."""
+        """: aminoAcids.xml yields 230+ unique entries."""
         from orthonym.data.opsin_imports.amino_acids_opsin import OPSIN_AMINO_ACIDS
 
         assert len(OPSIN_AMINO_ACIDS) >= 230, (
@@ -64,7 +64,7 @@ class TestModuleCounts:
         )
 
     def test_carbohydrates_count(self):
-        """DATA-15: carbohydrates.xml yields 100+ unique entries."""
+        """: carbohydrates.xml yields 100+ unique entries."""
         from orthonym.data.opsin_imports.carbohydrates_opsin import OPSIN_CARBOHYDRATES
 
         assert len(OPSIN_CARBOHYDRATES) >= 100, (
@@ -72,7 +72,7 @@ class TestModuleCounts:
         )
 
     def test_natural_products_count(self):
-        """DATA-16: naturalProducts.xml yields 100+ unique entries."""
+        """: naturalProducts.xml yields 100+ unique entries."""
         from orthonym.data.opsin_imports.natural_products_opsin import (
             OPSIN_NATURAL_PRODUCTS,
         )
@@ -82,7 +82,7 @@ class TestModuleCounts:
         )
 
     def test_suffix_rules_count(self):
-        """DATA-17: suffixRules.xml yields 140+ rule entries."""
+        """: suffixRules.xml yields 140+ rule entries."""
         from orthonym.data.opsin_imports.suffix_rules import OPSIN_SUFFIX_RULES
 
         assert len(OPSIN_SUFFIX_RULES) >= 140, (
@@ -90,7 +90,7 @@ class TestModuleCounts:
         )
 
     def test_suffix_applicability_exists(self):
-        """DATA-18: suffixApplicability.xml yields 250+ entries."""
+        """: suffixApplicability.xml yields 250+ entries."""
         from orthonym.data.opsin_imports.suffix_rules import OPSIN_SUFFIX_APPLICABILITY
 
         assert len(OPSIN_SUFFIX_APPLICABILITY) >= 250, (
@@ -98,7 +98,7 @@ class TestModuleCounts:
         )
 
     def test_word_rules_count(self):
-        """DATA-19: wordRules.xml yields 55+ rule entries."""
+        """: wordRules.xml yields 55+ rule entries."""
         from orthonym.data.opsin_imports.word_rules import OPSIN_WORD_RULES
 
         assert len(OPSIN_WORD_RULES) >= 55, (
@@ -221,7 +221,7 @@ class TestKnownEntries:
 
 
 # ============================================================================
-# SMILES canonicality checks (D-05)
+# SMILES canonicality checks
 # ============================================================================
 
 
@@ -358,7 +358,7 @@ class TestMetadataStructure:
 
 
 # ============================================================================
-# Consolidated export check (D-04)
+# Consolidated export check
 # ============================================================================
 
 
@@ -400,7 +400,7 @@ class TestConsolidatedExport:
 
 
 # ============================================================================
-# Validation report check (D-06)
+# Validation report check
 # ============================================================================
 
 

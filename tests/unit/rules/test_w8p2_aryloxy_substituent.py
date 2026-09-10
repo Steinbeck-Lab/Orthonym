@@ -1,11 +1,11 @@
-"""v24 W8 P2 Task 2.1 — heteroaryl / fused-aryl aryloxy substituent namer.
+""" W8 P2 Task 2.1 — heteroaryl / fused-aryl aryloxy substituent namer.
 
 Before this fix, an ether O attached to a BARE heteroaryl or fused-aryl ring made
 `get_alkoxy_prefix` return None (it only handled bare benzene -> phenoxy and
 *decorated* aryloxy), and the polyfunctional caller then SILENTLY DROPPED the whole
 substituent: `OC(=O)COc1ccccn1` -> gate-off `ethanoic acid` (a different molecule;
 the OPSIN self-consistency gate hid it only WITH Java). Now the bare aromatic ring
-SYSTEM is named as `<ring>-yloxy` with an atom-drop veto. P-63.2.2.2 / P-29.3.1.
+SYSTEM is named as `<ring>-yloxy` with an atom-drop veto. /.
 
 Every SMILES is OPSIN-authoritative and every expected name RT-verified 2026-07-17.
 Tests run gate-off (RAW) to exercise the source path, not the OPSIN gate.
@@ -19,9 +19,9 @@ RAW = Orthonym(_disable_opsin_validity_gate=True)  # gate-off: proves the raw na
 
 
 # No `2-` locant: acetic acid has ONE substitutable position, so the substituent
-# locant is omitted in the PIN (P-16.5.1.3.2; cf. `(1H-indol-1-yl)acetic acid (PIN)`
-# BB line 2039). The locant-bearing heteroaryl/fused '-yl' keeps its OWN enclosing
-# marks (P-63.2.2.2, BB:27641 '(pyridin-2-yl)oxy (preferred prefix)'; BB:22098
+# locant is omitted in the PIN; cf. `(1H-indol-1-yl)acetic acid (PIN)`
+# the Blue Book). The locant-bearing heteroaryl/fused '-yl' keeps its OWN enclosing
+# marks, the Blue Book '(pyridin-2-yl)oxy (preferred prefix)'; the Blue Book
 # '(naphthalen-2-yl)oxy'), so the citation escalates to `[(...)oxy]acetic acid`
 # (F-spell-oxy 2026-08-08: was the non-PIN unenclosed `(pyridin-2-yloxy)…`).
 @pytest.mark.parametrize("smiles,expected", [
@@ -49,7 +49,7 @@ def test_decorated_aryloxy_unregressed():
 # mis-numbered by get_ring_substituent_name (wrong locant = a different molecule) —
 # a broad PRE-EXISTING shared-namer bug this aryloxy path newly reaches. The SHIPPED
 # (gated) namer stays SAFE for them: the full-coverage wrong-locant name is caught by
-# SELF-01 and abstains to 'unknown' (verified out-of-band: this suite runs gate-OFF via
+# and abstains to 'unknown' (verified out-of-band: this suite runs gate-OFF via
 # conftest, so a gated assertion is not expressible here). Do NOT add a source-side veto
 # in get_alkoxy_prefix that returns None for these: that reroutes them to the ester-family
 # handler whose DROP escapes the gate (ships 'ethanoic acid' even gated) — strictly worse

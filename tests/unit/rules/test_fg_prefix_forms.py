@@ -1,6 +1,6 @@
 """Unit tests for PREFIX_FORMS completeness against SENIORITY_ORDER.
 
-Verifies IUPAC P-59.1 compliance:
+Verifies IUPAC compliance:
 - Every FG type in SENIORITY_ORDER has a corresponding key in PREFIX_FORMS.
 - Entries with None prefix form are genuinely functional-class-only (IUPAC has
   no substitutive prefix for these groups).
@@ -16,61 +16,61 @@ from orthonym.rules.seniority import SENIORITY_ORDER, PREFIX_FORMS, SUFFIX_FORMS
 # They use functional class naming, decomposition pathways, or heterocyclic naming.
 # Each entry is justified by an IUPAC rule reference.
 KNOWN_NONE_PREFIX_FGS = frozenset({
-    'ester',             # P-65.1: functional class (alkyl alkanoate) or alkoxycarbonyl
-    'ether',             # P-63.2: named by substitution (methoxy, ethoxy)
-    'thioether',         # P-63.2: functional class (dialkyl sulfide)
-    'thioester',         # P-65.3.1: functional class (S-alkyl alkanethioate)
-    'carbamate',         # P-65.2.3: functional class naming
-    'n_oxide_aromatic',  # P-62.5: functional class only
-    'n_oxide_aliphatic', # P-62.5: functional class only
-    'anhydride',         # P-65.1: functional class naming only
+    'ester',             #: functional class (alkyl alkanoate) or alkoxycarbonyl
+    'ether',             #: named by substitution (methoxy, ethoxy)
+    'thioether',         #: functional class (dialkyl sulfide)
+    'thioester',         #: functional class (S-alkyl alkanethioate)
+    'carbamate',         #: functional class naming
+    'n_oxide_aromatic',  #: functional class only
+    'n_oxide_aliphatic', #: functional class only
+    'anhydride',         #: functional class naming only
     'secondary_amide',   # Named via acylamino pathway in universal pipeline
     'tertiary_amide',    # Named via acylamino pathway in universal pipeline
     'imide',             # Named as heterocyclic ring substituent
-    'phosphine_oxide',   # P-68.3: functional class naming
-    'phosphate_triester',  # P-68: functional class naming
-    'phosphate_diester',   # P-68: functional class naming
-    'tertiary_phosphine',  # P-68.3: parent hydride naming (phosphane)
-    'secondary_phosphine', # P-68.3: parent hydride naming
-    'primary_phosphine',   # P-68.3: parent hydride naming
-    # Phase 163 P-25.3 functional replacement nomenclature (additive seniority extension,
-    # ADR-19-09). Each entry mirrors its non-chalcogen ester counterpart's functional-class
+    'phosphine_oxide',   #: functional class naming
+    'phosphate_triester',  #: functional class naming
+    'phosphate_diester',   #: functional class naming
+    'tertiary_phosphine',  #: parent hydride naming (phosphane)
+    'secondary_phosphine', #: parent hydride naming
+    'primary_phosphine',   #: parent hydride naming
+    # a phase functional replacement nomenclature (additive seniority extension,
+    # -09). Each entry mirrors its non-chalcogen ester counterpart's functional-class
     # PIN rule. Substituent rendering is handled by acyl-derived prefixes (alkanimidoyl,
     # alkaneselenoyl, alkanetelluroyl) where needed; none is the principal-group prefix.
     # Wave2 completion B4 (fail-closed demotions, no BB-attested prefix):
-    'peroxy_acid',       # P-43.1: demoted case fails closed (no PIN acid prefix)
-    'imidic_acid',       # P-65.1.3.1: demoted case fails closed
-    # W3-P02 (P-65.1.3.2): hydrazonic acid has no SINGLE static prefix — when
+    'peroxy_acid',       #: demoted case fails closed (no PIN acid prefix)
+    'imidic_acid',       #: demoted case fails closed
+    # W3-P02: hydrazonic acid has no SINGLE static prefix — when
     # demoted at a chain end it splits into 'hydroxy' + 'hydrazinylidene'
-    # (P-65.1.3.2.2), emitted by name_polyfunctional's chain-end block.
+    #, emitted by name_polyfunctional's chain-end block.
     'hydrazonic_acid',
-    # W3-P02 (P-65.1.3.3): hydroximic acid — suffix is the N-hydroxy imidic acid
+    # W3-P02: hydroximic acid — suffix is the N-hydroxy imidic acid
     # (dedicated handler, no static suffix); demoted it splits into 'hydroxy' +
-    # 'hydroxyimino' (P-65.1.3.3.2), emitted by name_polyfunctional's chain-end block.
+    # 'hydroxyimino', emitted by name_polyfunctional's chain-end block.
     'hydroximic_acid',
-    'sulfinohydrazonohydrazide',  # P-66.4.3.2: demoted case fails closed
-    'iminoester',        # P-65.1.7: functional class (alkyl alkanimidate); imidate handler @ INNER_DISPATCH 2900
-    'selenoester',       # P-65.3: functional class (Se-alkyl alkaneselenoate); chalcogen analog of ester
-    'telluroester',      # P-65.3: functional class (Te-alkyl alkanetelluroate); chalcogen analog of ester
+    'sulfinohydrazonohydrazide',  #: demoted case fails closed
+    'iminoester',        #: functional class (alkyl alkanimidate); imidate handler @ INNER_DISPATCH 2900
+    'selenoester',       #: functional class (Se-alkyl alkaneselenoate); chalcogen analog of ester
+    'telluroester',      #: functional class (Te-alkyl alkanetelluroate); chalcogen analog of ester
     # W3-P07: non-carbon esters — functional-class only, named by the shared
     # esters.name_noncarbon_ester handler (no principal-group substituent prefix).
-    'pseudoester',       # P-65.6.3.1.2/P-65.6.3.4: functional class (Zyl acylate)
-    'sulfonic_ester',    # P-65.6.3.2.1: functional class (alkyl alkanesulfonate)
-    'sulfinic_ester',    # P-65.6.3.2.1: functional class (alkyl alkanesulfinate)
-    # BBR-PERC (Phase 169.7): functional parents (P-67/P-68.3) + Se/Te ethers (P-63.6).
-    'hydroxylamine',     # P-68.3: parent hydride "hydroxylamine"; named via the hydroxylamine handler
-    'phosphoric_acid',   # P-67: free inorganic oxoacid functional parent
-    'sulfuric_acid',     # P-67: free inorganic oxoacid functional parent
-    'nitric_acid',       # P-67: free inorganic oxoacid functional parent
-    'carbonic_acid',     # P-65.2.1: functional parent (HO-C(=O)-OH)
-    'selenoether',       # P-63.6: functional class / substitutive (alkyl)selanyl
-    'telluroether',      # P-63.6: functional class / substitutive (alkyl)tellanyl
-    # DD2 (Phase D, P-63.3.1(1)): R-OO-R' substituent prefix is (R)peroxy, generated
+    'pseudoester',       # /: functional class (Zyl acylate)
+    'sulfonic_ester',    #: functional class (alkyl alkanesulfonate)
+    'sulfinic_ester',    #: functional class (alkyl alkanesulfinate)
+    # BBR-PERC (a phase): functional parents / + Se/Te ethers.
+    'hydroxylamine',     #: parent hydride "hydroxylamine"; named via the hydroxylamine handler
+    'phosphoric_acid',   #: free inorganic oxoacid functional parent
+    'sulfuric_acid',     #: free inorganic oxoacid functional parent
+    'nitric_acid',       #: free inorganic oxoacid functional parent
+    'carbonic_acid',     #: functional parent (HO-C(=O)-OH)
+    'selenoether',       #: functional class / substitutive (alkyl)selanyl
+    'telluroether',      #: functional class / substitutive (alkyl)tellanyl
+    # DD2 (Phase D, (1)): R-OO-R' substituent prefix is (R)peroxy, generated
     # dynamically by substituent_prefix_forms.get_peroxy_prefix (exactly like ether/ester
     # above — no static principal-group prefix form).
-    'peroxide',          # P-63.3.1(1): substitutive (R)peroxy via get_peroxy_prefix
+    'peroxide',          # (1): substitutive (R)peroxy via get_peroxy_prefix
     # ------------------------------------------------------------------
-    # v29 P3-CLEANUP: these nine were added to SENIORITY_ORDER by later waves
+    # -CLEANUP: these nine were added to SENIORITY_ORDER by later waves
     # WITHOUT being justified here, so both tests in this class had been FAILING.
     # That is the audit working as designed — the tripwire fired and nobody
     # answered it. Each already carries an explicit, rule-cited "demoted case
@@ -80,29 +80,29 @@ KNOWN_NONE_PREFIX_FGS = frozenset({
     # All nine are DELIBERATE fail-closed, not oversights: `PREFIX_FORMS[fg] is
     # None` means a molecule where the group is DEMOTED (a senior group is
     # co-present) abstains instead of emitting an unattested prefix. Per
-    # invariant 11 that is the right trade only because abstention here is not
+    # a project rule that is the right trade only because abstention here is not
     # masking a worse generator — the alternative is inventing a prefix string.
     #
     # The two halides are a DIFFERENT case from the other seven and are noted as
     # such: a Blue Book prefix genuinely EXISTS for them, but it is
     # HALOGEN-DEPENDENT, so no single static string can express it.
     'sulfonyl_halide',   # -SO2-X. A BB preselected prefix EXISTS but varies with
-                         # the halogen: `chlorosulfonyl` (BlueBookV2.md:36472,
+                         # the halogen: `chlorosulfonyl` (the Blue Book,
                          # `--SO2-Cl chlorosulfonyl (preselected prefix)`,
-                         # P-65.3.2.3 / P-67.1.4.4.1), `fluorosulfonyl`, etc.,
+                         # /, `fluorosulfonyl`, etc.,
                          # cf. the PIN `3-[(chlorosulfonyl)oxy]propanoic acid`
                          # (:36492). A static PREFIX_FORMS string cannot carry
                          # the halogen, so this stays None and the demoted case
                          # fails closed rather than guess one.
     'sulfinyl_halide',   # -S(=O)-X, same shape: `chlorosulfinyl` (:36482,
                          # `--S(=O)-Cl chlorosulfinyl (preselected prefix)`).
-    'sulfonoperoxoic_acid',   # W3-P04 (P-65.3.1.2): demoted prefix fails closed
-    'sulfonothioic_S_acid',   # W3-P04 (P-65.3.1.3): demoted prefix fails closed
-    'sulfonimidic_acid',      # W3-P04 (P-65.3.1.4): demoted prefix fails closed
-    'sulfinimidic_acid',      # W3-P04 (P-65.3.1.4): demoted prefix fails closed
-    'selenonimidamide',       # P-66.4.1.1: demoted prefix fails closed
-    'seleninimidamide',       # P-66.4.1.1: demoted prefix fails closed
-    'imidohydrazide',         # P-66.4.2.3.6 ring prefix not built; the chain-end
+    'sulfonoperoxoic_acid',   # W3-P04: demoted prefix fails closed
+    'sulfonothioic_S_acid',   # W3-P04: demoted prefix fails closed
+    'sulfonimidic_acid',      # W3-P04: demoted prefix fails closed
+    'sulfinimidic_acid',      # W3-P04: demoted prefix fails closed
+    'selenonimidamide',       #: demoted prefix fails closed
+    'seleninimidamide',       #: demoted prefix fails closed
+    'imidohydrazide',         # ring prefix not built; the chain-end
                               # split is owned elsewhere -> fail closed
 })
 

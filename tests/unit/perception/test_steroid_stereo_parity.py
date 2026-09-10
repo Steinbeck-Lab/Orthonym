@@ -1,8 +1,8 @@
-"""Inverse-parity sign-convention tripwire for steroid α/β derivation (Phase 181, WSC-02).
+"""Inverse-parity sign-convention tripwire for steroid α/β derivation (a phase, -02).
 
 Asserts `alpha_beta_at` returns the expected ring-face descriptor for the 6 pinned
-gold structures (181-RESEARCH Pattern 1 evidence). This is the empirical sign-convention
-tripwire (D-02): the `+1 → beta, -1 → alpha` mapping is pinned against this RDKit build;
+gold structures (internal notes Pattern 1 evidence). This is the empirical sign-convention
+tripwire : the `+1 → beta, -1 → alpha` mapping is pinned against this RDKit build;
 if a future RDKit upgrade flips neighbour-ordering semantics, these assertions fail loudly
 and `_SIGN` is flipped ONCE globally — never per-molecule.
 

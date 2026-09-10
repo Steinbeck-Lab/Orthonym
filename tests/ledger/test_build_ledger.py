@@ -26,7 +26,7 @@ from scripts.ledger.build_ledger import build_ledger, REQUIRED_KEYS, _canonicali
         "P-65.1.2 (dioic)",
         [],
     ),
-    # Space-containing qualifier kept but truncated at 30 chars (distinct from bare P-65.1.2)
+    # Space-containing qualifier kept but truncated at 30 chars (distinct from bare
     (
         "P-65.1.2 (skeletal-replacement chain acid)",
         "P-65.1.2 (skeletal-replacement chain)",
@@ -58,11 +58,11 @@ def test_canonicalise_bb_ref(raw, expected_key, expected_alts):
 
 
 # ---------------------------------------------------------------------------
-# Integration test: P-44.2.1.8 findable by base ref (replaces exact-once test)
+# Integration test: findable by base ref (replaces exact-once test)
 # ---------------------------------------------------------------------------
 
 def test_p44_2_1_8_findable_by_base():
-    """P-44.2.1.8 rows must be findable by base_ref() lookup (>=1 row)."""
+    """ rows must be findable by base_ref lookup (>=1 row)."""
     rows = build_ledger(
         matrix_path=".planning/audit-bluebook-v21/CONFORMANCE-MATRIX.md",
         cluster_dir=".planning/audit-bluebook-v23",

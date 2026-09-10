@@ -1,5 +1,5 @@
 """Generic (stereo-undefined and stereo-defined) glycosyloxy / nested-ring
-substituent naming (v30 tail #13 infrastructure).
+substituent naming (tail #13 infrastructure).
 
 Two capabilities, both fail-closed and additive:
   1. ``ring_substituents._ring_atom_simple_substituents`` names a ring atom

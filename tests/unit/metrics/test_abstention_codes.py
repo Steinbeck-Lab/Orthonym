@@ -2,7 +2,7 @@
 
 Every fail-closed abstention path tags a typed ``AbstentionCode`` into a
 per-top-level-naming-session telemetry slot (first-writer-wins = closest to
-the root cause; the downstream OPSIN/SELF-01 gate only claims molecules no
+the root cause; the downstream OPSIN/ gate only claims molecules no
 earlier site already classified). The instrumentation is side-effect-only:
 no emitted name changes (HEAD-A/B byte-identity is part of the task gate).
 
@@ -145,7 +145,7 @@ def be_namer():
 
 # abstaining fixtures re-verified 2026-09-03 under the max-breadth namer
 _BRANCH_UNNAMEABLE_SMI = "[B](C1=CC=NN1)C2=CC=NN2"   # bis(pyrazolyl)borane; ring branch declined
-_GATE_SUPPRESSED_SMI = "C1=CC=C(C=C1)O[13C](=O)OC2=CC=CC=C2"  # P-10 oxoacid/anhydride veto
+_GATE_SUPPRESSED_SMI = "C1=CC=C(C=C1)O[13C](=O)OC2=CC=CC=C2"  # oxoacid/anhydride veto
 _NO_PARENT_SMI = ("C1CC12[C@@H]3C=C([C@@H]([C@H]2[C@H]4[C@@H]3[C@@H]5"
                   "[C@@H](C46CC6)C5(Cl)Cl)Cl)Cl")     # unsupported polycyclic parent
 
@@ -160,7 +160,7 @@ class TestEndToEndCodes:
         assert abstention_code_for(result) is AbstentionCode.BRANCH_UNNAMEABLE
 
     def test_gate_suppressed_fixture(self, be_namer):
-        # P-10 structure-conservation veto (Java-free, runs with the OPSIN gate
+        # structure-conservation veto (Java-free, runs with the OPSIN gate
         # disabled): a generated name whose oxoacid/anhydride motif is illegal is
         # suppressed post-generation -> GATE_SUPPRESSED.
         result = be_namer.name(_GATE_SUPPRESSED_SMI)

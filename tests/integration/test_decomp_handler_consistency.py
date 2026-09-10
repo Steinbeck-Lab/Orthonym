@@ -1,6 +1,6 @@
-"""Phase 160 Plan-04 integration tests: per-handler byte-identical vs baseline.
+"""a phase Plan-04 integration tests: per-handler byte-identical vs baseline.
 
-Per CONTEXT D-20 + DECOMP-03: one parametrized test per handler_id (all
+Per internal notes + DECOMP-03: one parametrized test per handler_id (all
 30 extracted + 8 deferred = 38) asserting Orthonym.name(rep_smi) produces
 byte-identical output post-extraction vs the Plan-01 frozen canary
 baseline (tests/canary/canary_pre_decomp_160.csv).
@@ -8,7 +8,7 @@ baseline (tests/canary/canary_pre_decomp_160.csv).
 For the 30 EXTRACTED handlers, the test runs and asserts byte-identical name.
 For the 8 DEFERRED handlers (polyfunctional, multi_ester, ester, benzene,
 heterocycle, complex_ring, chain, general_acyclic), the test is skipped
-with a loud signal (see ADR-19-02 for the architectural blocker).
+with a loud signal (see -02 for the architectural blocker).
 """
 from __future__ import annotations
 
@@ -20,7 +20,7 @@ import pytest
 from orthonym import Orthonym
 
 
-# Map from handler_id to representative (smiles, expected_name) per audit § 1.
+# Map from handler_id to representative (smiles, expected_name) per the audit
 HANDLER_REPRESENTATIVES = {
     "oxime":           ("CC(=NO)C", None),  # baseline derived at test time
     "hydrazone":       ("CC(=NN)C", None),
@@ -131,8 +131,8 @@ def test_extracted_handler_byte_identical_pipeline(
     ids=DEFERRED_HANDLERS,
 )
 def test_deferred_handler_documented(handler_id):
-    """The 8 deferred handlers are documented in ADR-19-02 as not yet
-    extracted. This test SKIPS to signal the gap loudly. When the v19.x
+    """The 8 deferred handlers are documented in -02 as not yet
+    extracted. This test SKIPS to signal the gap loudly. When the.x
     follow-up plan extracts each handler, update HANDLER_REPRESENTATIVES
     + remove from DEFERRED_HANDLERS to convert these skip stubs into
     byte-identical assertions.

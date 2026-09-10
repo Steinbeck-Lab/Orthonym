@@ -1,6 +1,6 @@
 """Tests for imine suffix naming, oxime and hydrazone functional class naming.
 
-Phase 21 Plan 01: Missing Functional Groups (imines, oximes, hydrazones).
+a phase Plan 01: Missing Functional Groups (imines, oximes, hydrazones).
 """
 
 import pytest
@@ -11,7 +11,7 @@ class TestImineSuffixNaming:
     """Imine uses suffix naming: chain/ring + locant + 'imine'."""
 
     def test_simple_imine(self):
-        """CC=N -> ethanimine (C2 -> locant elided, P-14.3.4.2)."""
+        """CC=N -> ethanimine (C2 -> locant elided,."""
         result = name_compound("CC=N")
         assert "imine" in result
         assert result == "ethanimine"
@@ -31,7 +31,7 @@ class TestImineSuffixNaming:
 
 class TestOximeFunctionalClassNaming:
     """Oxime PINs are formed SUBSTITUTIVELY as N-hydroxy derivatives of imines
-    (P-66.6.5(f) / P-68.3.1.1.2), NOT by functional-class nomenclature (the
+    (f) /, NOT by functional-class nomenclature (the
     retired '[carbonyl] oxime'). The substitutive form has been the shipped PIN
     since Wave2 T2a; these assertions were reconciled to it in W3-P15."""
 
@@ -91,7 +91,7 @@ class TestOximeEZStereoPreservation:
 
 class TestHydrazoneFunctionalClassNaming:
     """Hydrazone PINs are formed SUBSTITUTIVELY as 'ylidene' derivatives of
-    hydrazine (P-68.3.1.2.2 method (1) = PIN), NOT by functional-class
+    hydrazine method (1) = PIN), NOT by functional-class
     nomenclature (the retired '[carbonyl] hydrazone'). Reconciled to the
     substitutive PIN in W3-P15 (idx 1927)."""
 
@@ -219,7 +219,7 @@ class TestSeniorityData:
             "isothiocyanate": "isothiocyanato",
             "urea": "carbamoylamino",
             "guanidine": "guanidino",
-            "boronic_acid": "borono",  # v22 G2 COV-02 (P-68.1.4.2 preselected prefix)
+            "boronic_acid": "borono",  # preselected prefix)
             "hydrazone": "hydrazinylidene",
         }
         for fg, prefix in expected.items():

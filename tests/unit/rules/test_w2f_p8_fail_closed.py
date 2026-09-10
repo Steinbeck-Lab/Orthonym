@@ -4,8 +4,8 @@ Accuracy #1 / fail-closed: an input outside the built envelope must refuse, neve
 emit a structure-dropping or stereo-lossy name.
 
 NOTE on the test environment: conftest disables the OPSIN validity gate in pytest
-(SUB-03/), so the WHOLE-MOLECULE 'unknown organic compound' suppression (which
-in production is enforced by the SELF-01 / OPSIN-parse gate) is NOT observable
+(/), so the WHOLE-MOLECULE 'unknown organic compound' suppression (which
+in production is enforced by the / OPSIN-parse gate) is NOT observable
 here. These unit tests therefore assert the GATE-INDEPENDENT source refusals my
 code owns; the production fail-closed result ('unknown organic compound') for the
 whole molecules is verified by the the gold set PROTECT rows and by scripts/diagnose

@@ -1,28 +1,28 @@
-"""v26 P1: general LONE-monocycle aromatic/hetero ring engine.
+""": general LONE-monocycle aromatic/hetero ring engine.
 
 Tests ``general_engine.name_general_monocycle`` and its wiring into the
 ``--emit-tier complete`` full namer (``Orthonym(general_fallback=True,
 allow_aromatic_general=True)``).
 
-Root cause fixed: a bare monocyclic ring (benzene, pyridine, thiophene, ...)
+Root cause fixed: a bare monocyclic ring (benzene, pyridine, thiophene,...)
 names fine, but the substituted form often abstains under the default composer
 because its per-class substituent identifier has a finite hand-built
 vocabulary. P1 routes the substituents through the never-None universal
 recursion (``substituent_enumerator.name_substituent``) instead. The
-demonstrated NEWCOV win is benzene aryl-ethers (``-OCF3`` / ``-OCH2CF3`` / ...),
-which the ``benzene.py`` vocab drops but the recursion + SELF-01 name faithfully.
+demonstrated NEWCOV win is benzene aryl-ethers (``-OCF3`` / ``-OCH2CF3`` /...),
+which the ``benzene.py`` vocab drops but the recursion + name faithfully.
 
 Reproduce-first (confirmed 2026-07-20, production OPSIN gate on): under the
 DEFAULT pin path every NEWCOV SMILES below returns ``is_failure_name``
 (``unknown organic compound``); under ``complete`` they emit an
 OPSIN-round-tripping name.
 
-Every emission is fail-closed: E1 atom partition + SELF-01 OPSIN round-trip.
+Every emission is fail-closed: E1 atom partition + OPSIN round-trip.
 The engine returns None on anything outside scope (charged / fused-cage parent /
 tier-5-unnameable substituent), never a wrong name.
 
 NOTE on the harness: ``conftest._disable_opsin_validity_gate_for_tests``
-force-disables the production SELF-01 gate for the whole suite (tests assert
+force-disables the production gate for the whole suite (tests assert
 raw output). The full-namer cases here re-enable it via the ``production_gate``
 fixture (skipped when Java/OPSIN are unavailable), so they exercise real
 production semantics. The direct-engine cases are deterministic and
@@ -47,10 +47,10 @@ pytestmark = pytest.mark.unit
 # (SMILES, expected complete-tier name) — pin ABSTAINS, complete EMITS, RT-OK.
 # All are benzene aryl-ethers: the concrete P1 coverage win (benzene vocab miss).
 NEWCOV_CASES = [
-    # v31 change-asserted-value (P-16.3.3): a fluoro-substituted alkoxy is a
+    # change-asserted-value: a fluoro-substituted alkoxy is a
     # COMPOUND substituent and takes enclosing marks (the Blue Book encloses
     # (trifluoromethyl)/(pentafluoroethyl) verbatim). The multiplied-fluoro
-    # locants are omitted when unambiguous (P-14.3.4.5, all positions substituted:
+    # locants are omitted when unambiguous, all positions substituted:
     # 'pentafluoroethoxy' not '1,1,2,2,2-pentafluoroethoxy'). All RT-exact.
     ("FC(F)(F)Oc1ccccc1", "1-(trifluoromethoxy)benzene"),
     ("FC(F)(F)COc1ccccc1", "1-(2,2,2-trifluoroethoxy)benzene"),
@@ -92,12 +92,12 @@ ALL_RT_CASES = NEWCOV_CASES + DIRECT_ENGINE_CASES
 FAIL_CLOSED = {
     "charged (pyridin-1-ium)": "C[n+]1ccccc1",
     "fused cage (naphthalene)": "c1ccc2ccccc2c1",
-    # v31: the "tier-5 ring-on-ring" entry was REMOVED — the ring-assembly
+    #: the "tier-5 ring-on-ring" entry was REMOVED — the ring-assembly
     # substituent namer (task #39) now names c1ccc(cc1)C1CCC(CC1)C1CCCCC1 as
     # `1-([1,1'-bi(cyclohexan)]-4-yl)benzene` (RT-verified, E1-clean), exactly as
-    # test_complete_tier_names_spiro_acid was updated when v27 P3 gained spiro
+    # test_complete_tier_names_spiro_acid was updated when gained spiro
     # naming. See test_complete_tier_names_ring_assembly_substituent below.
-    # v26 P1 critical-defect fix: a spiro co-ring is perceived as a
+    # critical-defect fix: a spiro co-ring is perceived as a
     # substituent that attaches to the parent ring's spiro atom at TWO
     # points; naming it via name_substituent's single-attachment recursion
     # silently drops the ring-closure bond and mis-names it as a linear
@@ -132,7 +132,7 @@ def _find_opsin_jar():
 
 @pytest.fixture
 def production_gate(monkeypatch):
-    """Re-enable the production SELF-01 OPSIN validity gate for the full-namer
+    """Re-enable the production OPSIN validity gate for the full-namer
     tests (the suite autouse-fixture disables it). Skips when Java/OPSIN are
     unavailable -- without the gate, the default path ships unverified names
     and the reproduce/emit semantics do not hold."""
@@ -188,7 +188,7 @@ def test_engine_exact_string_and_e1(smiles, expected):
 
 
 # --------------------------------------------------------------------------
-# SELF-01: every emitted name OPSIN-parses back to the input structure.
+#: every emitted name OPSIN-parses back to the input structure.
 # --------------------------------------------------------------------------
 @pytest.mark.parametrize("smiles,expected", ALL_RT_CASES)
 def test_names_opsin_roundtrip(smiles, expected, opsin_roundtrip):
@@ -230,11 +230,11 @@ def test_monocycle_fail_closed(desc, smiles):
 
 
 def test_complete_tier_names_ring_assembly_substituent(production_gate):
-    """v31 change-asserted-value (was test_complete_tier_abstains_on_tier5_...):
+    """ change-asserted-value (was test_complete_tier_abstains_on_tier5_...):
     a ring-on-ring substituent that once fell to tier-5 abstention is now named by
     the ring-assembly substituent namer (task #39). The emission is RT-valid and
     E1-clean, so complete NAMES it rather than abstaining -- mirroring
-    test_complete_tier_names_spiro_acid, updated when v27 P3 gained spiro naming."""
+    test_complete_tier_names_spiro_acid, updated when gained spiro naming."""
     comp = Orthonym(style="pin", general_fallback=True,
                      allow_aromatic_general=True)
     out = comp.name(Chem.CanonSmiles("c1ccc(cc1)C1CCC(CC1)C1CCCCC1"))
@@ -243,9 +243,9 @@ def test_complete_tier_names_ring_assembly_substituent(production_gate):
 
 
 def test_complete_tier_names_spiro_acid(production_gate):
-    """v26 P1 critical-defect regression, UPDATED by v27 P3: a substituted spiro
+    """ critical-defect regression, UPDATED by: a substituted spiro
     compound must NEVER be the wrong linear-alkyl mis-name (was:
-    '1-pentylcyclohexane-4-carboxylic acid'). v26 P1 kept it abstaining; v27 P3's
+    '1-pentylcyclohexane-4-carboxylic acid'). kept it abstaining; 's
     general spiro engine now names it CORRECTLY -- assert the round-tripping PIN
     (the intent 'never the mis-name' is satisfied even better)."""
     comp = Orthonym(style="pin", general_fallback=True,

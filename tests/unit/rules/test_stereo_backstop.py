@@ -1,12 +1,12 @@
 """Tests for the universal stereo backstop function in namer.py.
 
-a phase Plan 01: STER-16 -- ensure every naming path includes stereodescriptors.
+a phase Plan 01: -- ensure every naming path includes stereodescriptors.
 The _final_stereo_check function is a safety net that DETECTS gaps in
 handler-specific stereo injection and logs them for targeted fixes.
 
 Design choice: the backstop does NOT inject stereo with raw atom-index locants
 because they don't correspond to IUPAC numbering. It logs a WARNING to
-identify handler gaps. Handler-specific _inject_stereo_if_missing() remains
+identify handler gaps. Handler-specific _inject_stereo_if_missing remains
 the primary stereo injection mechanism.
 """
 
@@ -147,7 +147,7 @@ class TestFinalStereoCheck:
     # ------------------------------------------------------------------
 
     def test_predicate_backstop_parity(self, caplog):
-        """SC-3 /: needs_stereo_injection(mol, name) must agree with
+        """ /: needs_stereo_injection(mol, name) must agree with
         whether _final_stereo_check would log a 'Stereo backstop' WARNING
         for the same (mol, name) pair. Panel of 6 cases covering all
         regex branches + bond stereo + empty/unknown name guards."""
@@ -211,7 +211,7 @@ class TestFinalStereoCheck:
         assert "Fix handler to include stereo natively." in msg
 
     def test_warning_still_fires_for_unwired_handlers(self, caplog):
-        """SC-3: backstop must continue to flag handlers that are NOT
+        """: backstop must continue to flag handlers that are NOT
         wired in a phase (complex_ring, polycyclic, retained-name fallback,
         decomposition fragments). The refactor must not gate WARNING on
         handler name -- predicate is a function of (mol, name) only."""
@@ -237,7 +237,7 @@ class TestFinalStereoCheck:
             )
 
     def test_warning_suppressed_after_injection(self, caplog):
-        """SC-3: if a handler successfully injected stereo (name now
+        """: if a handler successfully injected stereo (name now
         starts with `(...)`-), the backstop predicate is False and no
         WARNING fires. This is what a phase commits 3/4/5 will
         produce."""

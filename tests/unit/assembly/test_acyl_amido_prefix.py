@@ -1,4 +1,4 @@
-"""Wave2 T1c — acyl-nitrogen prefix subsystem (IUPAC P-66.1.1.4.3).
+"""Wave2 — acyl-nitrogen prefix subsystem (IUPAC.
 
 For R-CO-NH- on a parent with a senior characteristic group, method (1)
 generates the PIN: the amide name with its final 'e' changed to 'o'
@@ -66,7 +66,7 @@ class TestAmidoBuilders:
     def test_linear_builder_rejects_branched_acyl(self):
         """Isobutyryl (branched) must NOT get a linear amido name."""
         mol = Chem.MolFromSmiles("CC(C)C(=O)NCC(=O)O")
-        # atoms: 0=C,1=C,2=C,3=C(=O),4=O,5=N ... acyl branch = {0,1,2,3,4}
+        # atoms: 0=C,1=C,2=C,3=C(=O),4=O,5=N... acyl branch = {0,1,2,3,4}
         sub = [5, 3, 4, 0, 1, 2]
         assert linear_acyl_amido_prefix(mol, 3, 5, sub) is None
 
@@ -113,21 +113,21 @@ class TestAmidoEndToEnd:
         # ring acyl on a chain parent (fragment path).
         #
         # Expectations corrected (were `2-...ethanoic acid`). `acetic acid` is a
-        # RETAINED FUNCTIONAL PARENT and the PIN: BlueBookV2.md:2010 prints
-        # "CH3-COOH acetic acid (PIN) ethanoic acid", and :2004 says outright
+        # RETAINED FUNCTIONAL PARENT and the PIN: the Blue Book prints
+        # "CH3-COOH acetic acid (PIN) ethanoic acid", and:2004 says outright
         # that "the corresponding systematic alternatives, benzenol and ethanoic
         # acid, may be used in GENERAL IUPAC nomenclature" -- i.e. ethanoic acid
         # is not the preferred form. Substituted acetic acid stays the PIN:
-        # :2039/:2048 `(1H-indol-1-yl)acetic acid (PIN)` and :1868
+        #:2039/:2048 `(1H-indol-1-yl)acetic acid (PIN)` and:1868
         # `disilylacetic acid`.
         #
         # No locant, either: acetic acid has exactly one substitutable carbon,
-        # so P-14.3.4.3 withdraws it -- and :2039's own PIN carries none.
+        # so withdraws it -- and:2039's own PIN carries none.
         ("OC(=O)CNC(=O)c1ccccc1", "benzamidoacetic acid"),
         ("OC(=O)CNC(=O)c1ccc(C)cc1", "(4-methylbenzamido)acetic acid"),
         ("OC(=O)CNC(=O)c1cccc2ccccc12",
          "(naphthalene-1-carboxamido)acetic acid"),
-        # benzene ring parent (P-66.1.1.4.3 Blue Book example verbatim)
+        # benzene ring parent Blue Book example verbatim)
         ("O=CNc1ccc(C(=O)O)cc1", "4-formamidobenzoic acid"),
         ("CC(=O)Nc1ccc(C(=O)O)cc1", "4-acetamidobenzoic acid"),
         ("CCC(=O)Nc1ccc(C(=O)O)cc1", "4-propanamidobenzoic acid"),
@@ -136,17 +136,17 @@ class TestAmidoEndToEnd:
         assert name_compound(smiles) == expected
 
     def test_alpha_order_hydroxy_before_octadecanamido(self):
-        """P-14.5.2: hydroxy ('h') cites before octadecanamido ('o')."""
+        """: hydroxy ('h') cites before octadecanamido ('o')."""
         name = name_compound("CCCCCCCCCCCCCCCCCC(=O)N[C@@H](CO)C(=O)O")
         assert name == "(2S)-3-hydroxy-2-octadecanamidopropanoic acid", (
             f"Got '{name}'"
         )
 
     @pytest.mark.parametrize("smiles,expected", [
-        # ureido is a SEPARATE preferred prefix (P-66.1.1.4.5.1) — untouched
+        # ureido is a SEPARATE preferred prefix — untouched
         ("NC(=O)NCCC(=O)O", "3-(carbamoylamino)propanoic acid"),
         ("NC(=O)NCCCC(N)C(=O)O", "2-amino-5-(carbamoylamino)pentanoic acid"),
-        # amide as the principal group stays a suffix parent (P-66.1.1.4.3
+        # amide as the principal group stays a suffix parent
         # closing note: never a ring substituent when it is principal)
         ("CC(=O)Nc1ccccc1", "N-phenylacetamide"),
     ])
@@ -172,14 +172,14 @@ class TestAlphaSortChainStemGuard:
         ("triethyl", "ethyl"),
         ("tetrachloro", "chloro"),
         # Expectation corrected. `di` + an acylamido prefix is a form the Blue
-        # Book REJECTS: BlueBookV2.md:33107 prints "*N*-acetylacetamido
+        # Book REJECTS: the Blue Book prints "*N*-acetylacetamido
         # (preferred prefix) diacetylamino (not diacetylazanyl) (not
-        # diacetamido)", and :55811 indexes "diacetamido: see
-        # N-acetylacetamido". An acylamido prefix is compound, so P-16.3.5(a)
+        # diacetamido)", and:55811 indexes "diacetamido: see
+        # N-acetylacetamido". An acylamido prefix is compound, so (a)
         # multiplies it with `bis(...)`, and this engine emits exactly that --
         # `get_multiplier_prefix(2, 'octadecanamido')` is 'bis'. The string
         # `dioctadecanamido` is therefore never produced; when it IS handed to
-        # the key, P-14.5.2's complete-name rule applies and it keys at 'd'.
+        # the key, 's complete-name rule applies and it keys at 'd'.
         ("dioctadecanamido", "dioctadecanamido"),
     ])
     def test_sort_key(self, name, key):

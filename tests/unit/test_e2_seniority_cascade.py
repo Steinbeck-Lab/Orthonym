@@ -1,12 +1,12 @@
 """ Phase E2 (DD5) — parent/chain seniority cascade, rule-family coverage (A8).
 
-Tests the OUTPUT of the SEN-01 (P-44.3/P-45 chain cascade + deterministic
-comparator) and SEN-04 (P-46 located-substituent re-basing) fixes as RULE FAMILIES,
+Tests the OUTPUT of the / chain cascade + deterministic
+comparator) and located-substituent re-basing) fixes as RULE FAMILIES,
 not literal canary rows: secondary vs branched-terminal attachments, the terminal
 fast-path invariant, retained-prefix non-regression, stereo preservation, and the
-P-45 tie/determinism behaviour.
+ tie/determinism behaviour.
 
-SEN-02 (carbon-over-ether) and SEN-03 (PCG union) are documented A9 masking pairs,
+ (carbon-over-ether) and (PCG union) are documented A9 masking pairs,
 deferred (see E2-SUMMARY); their non-regression invariants are asserted here.
 """
 import pytest
@@ -25,7 +25,7 @@ def namer():
 
 
 # ---------------------------------------------------------------------------
-# SEN-04 — located acyclic-alkyl substituent (P-46), as a rule family
+# — located acyclic-alkyl substituent, as a rule family
 # ---------------------------------------------------------------------------
 
 # Secondary / internal attachment -> alkan-k-yl (free-valence locant cited).
@@ -49,9 +49,9 @@ SEN04_TERMINAL_PLAIN = [
     ("CCc1ccccc1", "ethylbenzene"),
 ]
 
-# F-T9/DD6 RET-02 (supersedes the original E2 invariant): these deprecated retained
+# F-T9/DD6 (supersedes the original E2 invariant): these deprecated retained
 # substituent prefixes are no longer emitted — they are de-headlined to the located /
-# systematic PIN. (cumene/isopropyl P-29.6.2.2; isobutyl/sec-butyl P-29.6.3.)
+# systematic PIN. (cumene/isopropyl; isobutyl/sec-butyl.)
 SEN04_RETAINED = [
     ("CC(C)c1ccccc1", "(propan-2-yl)benzene"),
     ("CC(C)Cc1ccccc1", "(2-methylpropyl)benzene"),
@@ -76,7 +76,7 @@ def test_sen04_terminal_unbranched_unchanged(namer, smiles, expected):
 
 @pytest.mark.parametrize("smiles,expected", SEN04_RETAINED)
 def test_sen04_deprecated_prefixes_deheadlined_to_pin(namer, smiles, expected):
-    # F-T9/DD6 RET-02: the deprecated retained substituent prefixes are de-headlined
+    # F-T9/DD6: the deprecated retained substituent prefixes are de-headlined
     # to the located/systematic PIN (the E2 located producer is now the headline).
     assert namer.name(smiles) == expected
 
@@ -106,7 +106,7 @@ def test_located_deriver_secondary_returns_alkan_k_yl():
 
 def test_located_deriver_branched_secondary_keeps_branch():
     # Tertiary attachment with a methyl branch: 2-methylhexan-2-yl (NOT hexan-2-yl —
-    # the substituent's own methyl is kept, P-46.1.12).
+    # the substituent's own methyl is kept,.
     mol = Chem.MolFromSmiles("CC(C)CCCC")  # 7 carbons; atom 1 bears two methyls + butyl
     sub = list(range(mol.GetNumAtoms()))
     res = _located_acyclic_alkyl_name(mol, sub, 1)
@@ -154,11 +154,11 @@ def test_attach_terminus_classification():
 
 
 # ---------------------------------------------------------------------------
-# SEN-01 — P-44.3/P-45 chain cascade + deterministic comparator
+# — / chain cascade + deterministic comparator
 # ---------------------------------------------------------------------------
 
 def test_sen01_p45_citation_order_tiebreak(namer):
-    # {2,4} locant tie decided by alphanumerical citation order (P-45.2.3).
+    # {2,4} locant tie decided by alphanumerical citation order.
     assert namer.name("OCC(CCBr)CCCl") == "2-(2-bromoethyl)-4-chlorobutan-1-ol"
 
 
@@ -171,7 +171,7 @@ def test_sen01_tie_is_order_independent(namer, smiles):
 def test_sen01_diene_substituent_locant_set(namer):
     # Orientation-consistent sub-locant scoring: {4,5} beats {4,6}; the chain
     # selection (5-methyl-4-(...)hepta-1,5-diene) is correct (substituent
-    # EXPRESSION prop-1-enyl vs prop-1-en-1-yl is a separate P-31.1.3 follow-on).
+    # EXPRESSION prop-1-enyl vs prop-1-en-1-yl is a separate follow-on).
     name = namer.name("C=CCC(C=C(C)C)C(C)=CC")
     assert name.startswith("5-methyl-4-") and name.endswith("hepta-1,5-diene")
 
@@ -196,9 +196,9 @@ def test_sen01_invariant_no_regression(namer, smiles, expected):
 
 
 # ---------------------------------------------------------------------------
-# SEN-02 / SEN-03 deferred — non-regression invariants
+# / deferred — non-regression invariants
 # ---------------------------------------------------------------------------
-# SEN-03 (PCG-atom union, P-44.1.1) — alcohol class: mixed primary+secondary OH
+# (PCG-atom union, — alcohol class: mixed primary+secondary OH
 # is a diol/triol/pentaol, not N-hydroxy-...-ol.
 # ---------------------------------------------------------------------------
 
@@ -231,7 +231,7 @@ def test_sen03_invariant(namer, smiles, expected):
 
 
 # ---------------------------------------------------------------------------
-# SEN-02 (carbon-over-ether/sulfide, P-41 cls 40 > 41/42) — scoped to the mixed
+# (carbon-over-ether/sulfide, cls 40 > 41/42) — scoped to the mixed
 # ether+sulfide class (the broad sulfide/sulfoxide/diether -> substitutive PIN
 # migration is a documented follow-on, so simple sulfides/diethers/sulfoxides
 # keep their established names).
@@ -245,15 +245,15 @@ SEN02_CARBON_OVER_ETHER = [
 # Invariants: homogeneous dithioethers + simple sulfides/sulfoxides keep
 # their established (skeletal / functional-class) names — NOT migrated here.
 # NOTE: COCCOC (homogeneous 2-O diether) was previously listed here as
-# "2,5-dioxahexane" but R4 (P-12.1/P-63.2.4) now routes it substitutive ->
+# "2,5-dioxahexane" but R4 / now routes it substitutive ->
 # '1,2-dimethoxyethane'. Removed from this invariant set.
 SEN02_INVARIANT = [
     ("CSCSC", "2,4-dithiapentane"),      # homogeneous dithioether -> skeletal kept
-    # P-63.2.5 (the Blue Book method 1 = PIN; the Blue Book): a simple sulfide's PIN is the
+    # (the Blue Book method 1 = PIN; the Blue Book): a simple sulfide's PIN is the
     # substitutive form, not the functional-class "R R' sulfide" (sulfanyl slice).
     ("CSC", "(methylsulfanyl)methane"),   # was 'dimethyl sulfide' (the Blue Book)
     ("CSCC", "(methylsulfanyl)ethane"),   # was 'ethyl methyl sulfide'
-    ("CS(=O)C", "(methanesulfinyl)methane"),   # Wave2 T3b: substitutive P-63.6 PIN (was functional-class 'dimethyl sulfoxide', now --trivial)
+    ("CS(=O)C", "(methanesulfinyl)methane"),   # Wave2 T3b: substitutive PIN (was functional-class 'dimethyl sulfoxide', now --trivial)
     ("OCCOCCOCCOC", "3,6,9-trioxadecan-1-ol"),  # terminal-OH polyether -> skeletal kept
 ]
 

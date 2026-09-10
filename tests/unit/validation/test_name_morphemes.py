@@ -1,4 +1,4 @@
-"""v29 Phase 1: the independent morpheme-arity oracle.
+""" a phase: the independent morpheme-arity oracle.
 
 Soundness first: a CONFIDENT answer must be right; anything unrecognised must
 come back unconfident rather than guessed.
@@ -128,7 +128,7 @@ def test_multiplier_scope_is_never_confidently_wrong(token, truth):
 
 
 @pytest.mark.parametrize("token,truth", [
-    # Phase 0c Task 2b: a multiplier ("di") directly in front of a zero-atom
+    # a phase Task 2b: a multiplier ("di") directly in front of a zero-atom
     # skeletal REPLACEMENT prefix ("oxa", "aza", "phospha") must contribute NO
     # extra atoms, exactly like the pre-existing "dihydro"/"tetrahydro" AFFIX
     # case -- REPL is 0 net atoms BY DEFINITION regardless of how many
@@ -139,22 +139,22 @@ def test_multiplier_scope_is_never_confidently_wrong(token, truth):
     ("1,3-dioxa-6-aza-2-phosphaheptyl", 7),
     ("2,4-dioxabutyl", 4),
     ("2,4-dioxabut-3-en-1-yl", 4),
-    # ... but a SUBST prefix (hydroxy/oxo/methyl) EARLIER in the SAME
+    #... but a SUBST prefix (hydroxy/oxo/methyl) EARLIER in the SAME
     # composite token used to flip the multiplier into the "internal" branch
     # and multiply the replacement chain's atom count as if `di` were
     # multiplying a real substituent group -- the exact false ARITY_MISMATCH
-    # that voided 3 correct, OPSIN-round-tripping dev500 rows (Phase 0c
+    # that voided 3 correct, OPSIN-round-tripping a dev split rows (a phase
     # Task 2 measurement) via P6. The real correct counts, verified
     # atom-by-atom against the molecule graph in that measurement:
-    #   O-P(=O)(OH)-O-C-C-N-C (7-atom "1,3-dioxa-6-aza-2-phosphaheptyl"
-    #   skeleton + hydroxy-O + oxo-O = 9), and a 4-atom "2,4-dioxabutyl"
-    #   skeleton + one methyl branch = 5.
+    # O-P(=O)(OH)-O-C-C-N-C (7-atom "1,3-dioxa-6-aza-2-phosphaheptyl"
+    # skeleton + hydroxy-O + oxo-O = 9), and a 4-atom "2,4-dioxabutyl"
+    # skeleton + one methyl branch = 5.
     ("2-hydroxy-2-oxo-1,3-dioxa-6-aza-2-phosphaheptyl", 9),
     ("3-hydroxy-3-oxo-2,4-dioxa-3-phosphabutyl", 6),
     ("3-methyl-2,4-dioxabut-3-en-1-yl", 5),
 ])
 def test_multiplier_before_a_replacement_prefix_adds_no_atoms(token, truth):
-    """The false-positive this fix repairs (Phase 0c Task 2b): see
+    """The false-positive this fix repairs (a phase Task 2b): see
     ``.superpowers/sdd/2026-08-12-phase0c-coverage-certificate-and-locant/task-2-report.md``.
     """
     est = token_arity(token, BindingKind.PREFIX)

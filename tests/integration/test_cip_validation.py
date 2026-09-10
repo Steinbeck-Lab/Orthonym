@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """CIP Validation Suite integration test.
 
-Tests RDKit rdCIPLabeler.AssignCIPLabels() against 300 molecules from
+Tests RDKit rdCIPLabeler.AssignCIPLabels against 300 molecules from
 Hanson et al. 2018 (CIP Validation Suite). Results document known
 RDKit CIP limitations for a phase stereo pipeline planning.
 
@@ -107,7 +107,7 @@ def load_cip_data() -> List[Dict]:
       0: SMILES
       1: ID (VS001-VS300)
       2: Expected labels (e.g., "2R 5S 13S") -- may be empty
-      3: IUPAC reference (e.g., "P-93.5.3.3") -- may be empty
+      3: IUPAC reference (e.g., "") -- may be empty
       4: Stereo type (TH, CT, AT, HE, TH3, CT4, TH5) -- may be empty
       5: CIP rules required (e.g., "4c,6") -- may be empty
 
@@ -446,7 +446,7 @@ class TestCIPValidationSuite:
         if len(failure_details) > 50:
             print(f"  ... and {len(failure_details) - 50} more")
 
-        # Write results file for a phase reference (CIP-03)
+        # Write results file for a phase reference
         write_results_file(
             total=total,
             pass_count=pass_count,
@@ -500,7 +500,7 @@ class TestCIPValidationSuite:
         and Orthonym does NOT consume centres' cumulene/allene M/P (it computes
         axial CIP independently in perception.stereo.detect_axial_chirality +
         _manual_allene_cip), so production naming is unchanged by the revert
-        (verified: 0/300 stereo names differ). 1.2.1 is also cleanly BSD-2-Clause
+        (verified: 0/300 stereo names differ). 1.2.1 is also cleanly -Clause
         and SHA-pinnable. centres remains a strict superset of RDKit on the suite
         (fair-keyed RDKit baseline 235).
 

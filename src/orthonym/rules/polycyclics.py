@@ -10,7 +10,7 @@ Handles identification and naming of common polycyclic aromatics:
 
 Also coordinates with fused_rings module for fused heterocyclic systems.
 
-IUPAC 2013 Rules (Blue Book Section P-25):
+IUPAC 2013 Rules (Blue Book Section:
 - PAH numbering is FIXED by IUPAC standard
 - Use retained names as parent
 - Substituents are named with their IUPAC locant position
@@ -49,12 +49,12 @@ from ..data.polycyclic_data import (
 from ..perception.rings import (
     is_aromatic_ring,
 )
-from .locants import compare_locant_sets as _compare_locant_sets  # IM-02
+from .locants import compare_locant_sets as _compare_locant_sets  #
 
-# v36 C5 giant-cage scope guard (identify_polycyclic): no entry in POLYCYCLIC_DATA
+# C5 giant-cage scope guard (identify_polycyclic): no entry in POLYCYCLIC_DATA
 # exceeds ~10 fused rings (max cataloged num_atoms is 40, a cata-fused chain -- see
-# `.planning/audit-v33/V36-RESEARCH-C5-mixed-cage-and-hang.md`). A fullerene (C60/C70/
-# ...) is an all-carbon mancude cage with 20-40+ SSSR rings and an automorphism group
+# internal notes). A fullerene (C60/C70/
+#...) is an all-carbon mancude cage with 20-40+ SSSR rings and an automorphism group
 # so large that matching a cataloged PAH SMARTS against it enumerates a combinatorial
 # number of automorphic matches (measured 63.1s on C70). Fullerenes are explicitly
 # out-of-scope (project CLAUDE.md Scope section); decline fast rather than spin. The
@@ -107,14 +107,14 @@ def _identify_polycyclic_impl(mol) -> Optional[str]:
         PAH name if identified, None otherwise
 
     Examples:
-        >>> mol = Chem.MolFromSmiles('c1ccc2ccccc2c1')  # naphthalene
+        >>> mol = Chem.MolFromSmiles('c1ccc2ccccc2c1') # naphthalene
         >>> identify_polycyclic(mol)
         'naphthalene'
-        >>> mol = Chem.MolFromSmiles('Cc1ccc2ccccc2c1')  # 2-methylnaphthalene
+        >>> mol = Chem.MolFromSmiles('Cc1ccc2ccccc2c1') # 2-methylnaphthalene
         >>> identify_polycyclic(mol)
         'naphthalene'
     """
-    # v36 C5: an all-carbon giant cage (fullerene) is out-of-scope and would spin
+    # C5: an all-carbon giant cage (fullerene) is out-of-scope and would spin
     # in the substructure-matching loop below -- decline fast (see module docstring
     # on _GIANT_CAGE_RING_THRESHOLD above).
     if mol.GetRingInfo().NumRings() >= _GIANT_CAGE_RING_THRESHOLD and all(
@@ -133,7 +133,7 @@ def _identify_polycyclic_impl(mol) -> Optional[str]:
     # and pre-sorted largest-first at import (see _COMPILED_PAH); this loop used to
     # re-sort + Chem.MolFromSmarts all ~34 patterns on every call.
     for pah_name, pah_data, pattern in _COMPILED_PAH:
-        # v36 C5: only matches[0] is ever read below -- bound the search so a
+        # C5: only matches[0] is ever read below -- bound the search so a
         # highly-symmetric giant cage cannot enumerate a combinatorial number of
         # automorphic matches (measured 63.1s on a C70 fullerene before the scope
         # guard above; this cap is behaviour-preserving for every other call site).
@@ -159,7 +159,7 @@ def _identify_polycyclic_impl(mol) -> Optional[str]:
                 # extra ring atoms (a wrong name the RT gate had to suppress).
                 # Ring systems connected only by single bonds
                 # (1-phenylnaphthalene) are separate components and pass.
-                # IUPAC P-44.2.1(e): greater number of skeletal ring atoms.
+                # IUPAC (e): greater number of skeletal ring atoms.
                 components = []
                 for ring in mol.GetRingInfo().AtomRings():
                     rs = set(ring)
@@ -206,18 +206,18 @@ def get_polycyclic_core_atoms(mol, pah_name: str) -> Optional[Set[int]]:
     return None
 
 
-# v28 Cluster A Fix 2: FG keys for which a primary amine (-NH2) on a PAH is the
+# Fix 2: FG keys for which a primary amine (-NH2) on a PAH is the
 # molecule-level principal characteristic group. When the seniority layer has
 # already chosen one of these as features.principal_group, no group senior to
 # the amine is present, so the amine is expressed as the '-amine' SUFFIX
 # (anthracen-2-amine) and its ring carbon claims the lowest locant via the PCG
-# tier (P-62.2.1.2 / P-14.4(c)). Using the authoritative principal_group avoids
+# tier / (c)). Using the authoritative principal_group avoids
 # re-deriving seniority here and is fail-safe: any senior group (acid/-ol/...)
 # makes principal_group != amine, so the amine stays the 'amino' prefix.
 #
 # `secondary_amine`/`tertiary_amine` added 2026-07-31: an N-SUBSTITUTED amine is
-# still an amine and P-41 still requires it as the suffix
-# (`N-phenylnaphthalen-1-amine`, on the model of :21610
+# still an amine and still requires it as the suffix
+# (`N-phenylnaphthalen-1-amine`, on the model of:21610
 # `4-methoxy-N-phenylaniline (PIN)`). Excluding them left the PAH path shipping
 # `1-anilinonaphthalene` -- a parent hydride with NO suffix for the senior
 # characteristic group -- and abstaining outright on `CNc1cccc2ccccc12`. The
@@ -227,9 +227,9 @@ _PAH_AMINE_PRINCIPAL_KEYS = frozenset({
     'aromatic_amine', 'primary_amine', 'secondary_amine', 'tertiary_amine',
 })
 
-# v29 Phase C Task 10 (P-14.3.4 / P-41): the principal-group keys under which a ring
+# Phase C Task 10 /: the principal-group keys under which a ring
 # hydroxy on a polycyclic parent must be expressed as the `-ol` SUFFIX rather than a
-# `hydroxy` PREFIX. MEASURED with a call-spy validated on two known positives
+# `hydroxy` PREFIX. MEASURED with a call-trace validated on two known positives
 # (`Nc1cccc2ccccc12` -> naphthalen-1-amine, `OC(=O)c1cccc2ccccc12` ->
 # naphthalene-1-carboxylic acid): a ring-OH PAH arrives with
 # `principal_group == 'phenol'` and the substituent named `'hydroxy'`.
@@ -284,10 +284,10 @@ def get_polycyclic_substituents(mol, pah_name: str,
 
     # Identify the substituent attachment atoms (core atoms bearing a non-core
     # neighbour) so the numbering can be resolved by the automorphism that gives
-    # THEM the lowest locants (P-14.3.5). The subset whose substituent is a
+    # THEM the lowest locants. The subset whose substituent is a
     # principal-characteristic-group suffix (carboxylic acid/aldehyde/amide/
     # nitrile) is tracked separately so it can claim the lowest locant FIRST
-    # (P-14.4(c)) — the WR-01 PCG-anchor.
+    # (c)) — the PCG-anchor.
     _amine_pcg = principal_group in _PAH_AMINE_PRINCIPAL_KEYS
     _ol_pcg = principal_group in _PAH_OL_PRINCIPAL_KEYS
     attach_atoms = set()
@@ -303,15 +303,15 @@ def get_polycyclic_substituents(mol, pah_name: str,
             if sub and sub.get('is_suffix'):
                 is_pcg = True
             # Fix 2: a bare -NH2 that IS the molecular principal group is the
-            # PCG -> its ring carbon takes the lowest locant (P-14.4(c)) even
+            # PCG -> its ring carbon takes the lowest locant (c)) even
             # though it is not tagged is_suffix (kept a prefix candidate so the
             # senior-group cases stay byte-identical).
             elif _amine_pcg and sub and sub.get('name') == 'amino':
                 is_pcg = True
-            # RB-1: a ring -OH that IS the molecular principal group (phenol,
-            # P-41 class 17 -- senior to amine class 19, BB:18190/18192) is the
-            # PCG, so its ring carbon must claim the lowest locant (P-14.4(c),
-            # BB:3256; naphthalene example :3262) BEFORE a junior prefix (amino)
+            #: a ring -OH that IS the molecular principal group (phenol,
+            # class 17 -- senior to amine class 19, the Blue Book) is the
+            # PCG, so its ring carbon must claim the lowest locant (c),
+            # the Blue Book; naphthalene example:3262) BEFORE a junior prefix (amino)
             # is considered. `hydroxy` is not tagged is_suffix here (the `-ol`
             # suffix-word promotion runs later, ~:1266), so anchor it explicitly
             # -- mirrors the Fix 2 amine carve-out. Whole-class: any senior ring
@@ -323,12 +323,12 @@ def get_polycyclic_substituents(mol, pah_name: str,
         if is_pcg:
             suffix_atoms.add(idx)
 
-    # v22 Phase E1 / DD4 (H1): use the authoritative stored ``iupac_numbering``
+    # Phase E1 / DD4 (H1): use the authoritative stored ``iupac_numbering``
     # with automorphism-minimization (covers naphthalene/anthracene/phenanthrene/
     # pyrene/azulene). The naphthalene-only alpha/beta heuristic
     # (``_map_pah_atoms_to_iupac``) is kept ONLY as the fallback for cataloged
     # PAHs that still lack a populated ``iupac_numbering`` map (fluorene,
-    # acenaphthene, ...). A regression test asserts the populated PAHs never
+    # acenaphthene,...). A regression test asserts the populated PAHs never
     # reach the heuristic.
     atom_to_position = get_polycyclic_iupac_locants(
         mol, pah_name, substituent_atoms=attach_atoms, pcg_atoms=suffix_atoms,
@@ -376,13 +376,13 @@ def _map_pah_atoms_to_iupac(mol, pah_name: str, match_atoms: List[int]) -> Dict[
     Map PAH atom indices to IUPAC position numbers.
 
     For naphthalene, IUPAC numbering is:
-        8  1
-       /  \ /
-      7    2
-      |    |
-      6    3
-       \  / \
-        5  4
+        8 1
+       / \ /
+      7 2
+      | |
+      6 3
+       \ / \
+        5 4
 
     Positions 1, 4, 5, 8 are "alpha" (adjacent to fusion carbons 4a/8a).
     Positions 2, 3, 6, 7 are "beta" (NOT adjacent to fusion carbons).
@@ -475,7 +475,7 @@ def _map_pah_atoms_to_iupac(mol, pah_name: str, match_atoms: List[int]) -> Dict[
     #
     # So in the traversal order, if we start from an alpha atom:
     # alpha - beta - beta - alpha - alpha - beta - beta - alpha
-    #   1      2      3      4       5      6      7       8
+    # 1 2 3 4 5 6 7 8
 
     # Find the best starting point to minimize locants
     n = len(peripheral_order)
@@ -526,7 +526,7 @@ def _engine_canonical_numbering(canonical_mol) -> Dict[int, Any]:
 
     Used by ``get_polycyclic_iupac_locants`` to supply a numbering for cataloged
     PAH entries whose ``iupac_numbering`` was never tabulated (tetracene,
-    chrysene, triphenylene, benz[a]anthracene, ...).  Returns the numbering keyed
+    chrysene, triphenylene, benz[a]anthracene,...). Returns the numbering keyed
     by the canonical-mol atom index, in the SAME storage form as the tabulated
     maps (plain ``int`` for peripheral atoms, ``'4a'`` strings for fusion
     carbons) so the existing automorphism-minimization downstream is reused
@@ -536,7 +536,7 @@ def _engine_canonical_numbering(canonical_mol) -> Dict[int, Any]:
     helicene, non-all-six, or heterocyclic systems) — the caller then falls back
     to its existing path, so this is strictly fail-closed (never a regression).
 
-    Source: IUPAC 2013 P-25.3.2.3.3 / P-25.3.3.1 (rules/fusion_numbering.py).
+    Source: IUPAC 2013 / (rules/fusion_numbering.py).
     """
     from .fusion_numbering import compute_fused_numbering
 
@@ -556,13 +556,13 @@ def get_polycyclic_iupac_locants(
     substituent_atoms: Optional[Set[int]] = None,
     pcg_atoms: Optional[Set[int]] = None,
 ) -> Optional[Dict[int, Any]]:
-    """Phase 147: return authoritative IUPAC locants for a cataloged PAH.
+    """a phase: return authoritative IUPAC locants for a cataloged PAH.
 
     Reads ``POLYCYCLIC_DATA[pah_name]['iupac_numbering']`` (canonical-SMILES
     keyed) and translates canonical-atom indices to mol-atom indices via
-    RDKit substructure match. String fusion locants ('4a', '10b', ...)
-    are converted to ``(int, str)`` tuples at this boundary per Phase 147
-    Decision D-01 (compare_locant_sets tuple-aware after Plan 01).
+    RDKit substructure match. String fusion locants ('4a', '10b',...)
+    are converted to ``(int, str)`` tuples at this boundary per a phase
+    Decision (compare_locant_sets tuple-aware after Plan 01).
 
     Returns a dict covering ALL ring atoms of the PAH, mixing plain int
     locants (peripheral) with ``(int, str)`` tuple locants (fusion atoms).
@@ -571,7 +571,7 @@ def get_polycyclic_iupac_locants(
     The 4 populated PAHs in v17 are: naphthalene (10 keys, 2 fusion tuples),
     anthracene (14 keys, 4 fusion tuples), phenanthrene (14 keys, 4 fusion
     tuples), pyrene (16 keys, 6 fusion tuples). Other entries with empty
-    ``iupac_numbering`` (fluorene, acenaphthene, ...) return None — Phase 151
+    ``iupac_numbering`` (fluorene, acenaphthene,...) return None — a phase
     audit candidates.
 
     Args:
@@ -583,9 +583,9 @@ def get_polycyclic_iupac_locants(
         ``None`` when ``pah_name`` is not in POLYCYCLIC_DATA, its
         ``iupac_numbering`` is empty, or the substructure match fails.
 
-    Source: https://iupac.qmul.ac.uk/BlueBook/P2.html P-25 (PAH numbering
+    Source: https://iupac.qmul.ac.uk/BlueBook/P2.html (PAH numbering
         is FIXED, not reoriented per substituents — match data directly).
-    Source: Phase 147 CONTEXT D-01 (tuple encoding); CD-03 (function form).
+    Source: a phase internal notes (tuple encoding); (function form).
     """
     import re
 
@@ -602,9 +602,9 @@ def get_polycyclic_iupac_locants(
 
     canonical_numbering = entry.get('iupac_numbering') or {}
     if not canonical_numbering:
-        # v23 13B(a) S1: a real PAH entry whose IUPAC numbering was never
+        # 13B(a) S1: a real PAH entry whose IUPAC numbering was never
         # tabulated (tetracene, chrysene, triphenylene, benz[a]anthracene,
-        # picene, pentacene, ...).  Derive it deterministically from the bare
+        # picene, pentacene,...). Derive it deterministically from the bare
         # skeleton with the fusion-numbering engine; the SAME automorphism-
         # minimization below then assigns the lowest substituent locants.
         # Fail-closed: the engine returns {} for peri-fused / helicene /
@@ -639,10 +639,10 @@ def get_polycyclic_iupac_locants(
             # Any other type silently skipped (defensive).
         return result
 
-    # v22 Phase E1 / DD4 (H1): when the caller passes the substituent-bearing
+    # Phase E1 / DD4 (H1): when the caller passes the substituent-bearing
     # core atoms, enumerate ALL automorphic substructure matches of the fixed
     # canonical numbering and choose the one giving the substituents the lowest
-    # locant set (P-25.3.3.1.2(a) + P-14.3.5). This replaces the
+    # locant set (a) +. This replaces the
     # naphthalene-only alpha/beta heuristic for cataloged PAHs and is what makes
     # 2-methylanthracene / anthracen-2-amine / phenanthren-3-amine come out as
     # the PIN instead of an input-order-dependent first match. When
@@ -653,7 +653,7 @@ def get_polycyclic_iupac_locants(
 
         matches = mol.GetSubstructMatches(canonical_mol, uniquify=False)
         sub_set = set(substituent_atoms)
-        # P-14.4(c) (WR-01 fix): the principal-characteristic-group atoms (the
+        # (c) (fix): the principal-characteristic-group atoms (the
         # suffix-bearing carbons) get the lowest locant BEFORE detachable prefix
         # substituents — via compare_numbering's 'pcg' tier, ahead of the
         # kind-agnostic substituent set. When pcg_atoms is None/empty the tier is
@@ -762,8 +762,8 @@ def _identify_pah_substituent(mol, start_idx: int, core_atoms: Set[int]) -> Opti
             'atoms': [start_idx]
         }
 
-    # WS-A task 9: ring-system substituents (phenyl, pyridin-2-yl,
-    # naphthalen-2-yl, ...) must NEVER reach the chain identifiers below —
+    # task 9: ring-system substituents (phenyl, pyridin-2-yl,
+    # naphthalen-2-yl,...) must NEVER reach the chain identifiers below —
     # the alkyl namer counted an all-C/H RING as a chain (phenyl -> 'hexyl',
     # a DIFFERENT molecule) and silently dropped heteroaryl fragments.
     # Collect the fragment; if it contains ring atoms, delegate to the
@@ -810,8 +810,8 @@ def _identify_pah_substituent(mol, start_idx: int, core_atoms: Set[int]) -> Opti
     if symbol == 'O':
         return _identify_pah_oxygen_group(mol, start_idx, core_atoms)
 
-    # Sulfur oxoacids attached directly to the ring (P-15.1.8.2 Type 2 /
-    # P-65.3.1): -S(=O)(=O)OH -> 'sulfonic acid' suffix (naphthalene-1-sulfonic
+    # Sulfur oxoacids attached directly to the ring Type 2 /
+    #: -S(=O)(=O)OH -> 'sulfonic acid' suffix (naphthalene-1-sulfonic
     # acid). The S is bonded to the ring carbon + two =O + one -OH; nothing else.
     if symbol == 'S':
         _o_double = 0
@@ -920,7 +920,7 @@ def _identify_pah_nitrogen_group(mol, n_idx: int, core_atoms: Set[int]) -> Optio
         return {'name': 'amino', 'atoms': [n_idx]}
 
     # An N-SUBSTITUTED amine is named here in its honest PREFIX form
-    # (`methylamino`, `dimethylamino`) -- P-62.5's `bis(dimethylamino)` shows the
+    # (`methylamino`, `dimethylamino`) -- 's `bis(dimethylamino)` shows the
     # construction. Whether it may instead become the `-amine` SUFFIX depends on
     # the molecule's principal group and on no senior suffix being present, and
     # neither is known here; the collector decides that in a second pass.
@@ -948,13 +948,13 @@ def _identify_pah_nitrogen_group(mol, n_idx: int, core_atoms: Set[int]) -> Optio
             return {'name': f"{''.join(_parts)}amino",
                     'atoms': [n_idx] + _atoms}
 
-    # W2F-P6 (P-66.1.6.1.1.3): N-substituted urea substituent on the PAH core.
+    # W2F-P6: N-substituted urea substituent on the PAH core.
     # The PROXIMAL N (-NH-) is bonded to the core + a carbonyl C that bears one
     # =O and a second (DISTAL) N: core-NH-C(=O)-NR2 -> '(R-carbamoyl)amino'.
     # Reuse the shared dynamic urea prefix builder; pass the core atoms as the
     # parent hint so proximal/distal detection is robust (the DISTAL-N
     # substituents decorate the carbamoyl acyl). Fail closed (None) on any
-    # un-nameable distal substituent -> the group drops and SELF-01 suppresses.
+    # un-nameable distal substituent -> the group drops and suppresses.
     if h_count >= 1 and len(neighbors) == 1 and neighbors[0].GetSymbol() == 'C':
         _cN = neighbors[0]
         _o_dbl = None
@@ -981,7 +981,7 @@ def _identify_pah_nitrogen_group(mol, n_idx: int, core_atoms: Set[int]) -> Optio
             )
             if _prefix:
                 # Collect every consumed atom (urea core + distal substituents)
-                # so downstream atom-accounting/SELF-01 sees the full fragment.
+                # so downstream atom-accounting/ sees the full fragment.
                 _frag = []
                 _seen = {n_idx}
                 _stack = [n_idx]
@@ -1216,9 +1216,9 @@ def name_substituted_polycyclic(
         if matches:
             match_atoms = list(matches[0])
             core_set = set(match_atoms)
-            # Mirror get_polycyclic_substituents EXACTLY (incl. the WR-01 PCG
+            # Mirror get_polycyclic_substituents EXACTLY (incl. the PCG
             # subset) so the stereodescriptor numbering cannot desync from the
-            # substituent numbering (WR-03).
+            # substituent numbering .
             _amine_pcg = principal_group in _PAH_AMINE_PRINCIPAL_KEYS
             _ol_pcg = principal_group in _PAH_OL_PRINCIPAL_KEYS
             attach_atoms = set()
@@ -1234,9 +1234,9 @@ def name_substituted_polycyclic(
                     if sub and sub.get('is_suffix'):
                         is_pcg = True
                     elif _amine_pcg and sub and sub.get('name') == 'amino':
-                        is_pcg = True  # Fix 2: amine-as-principal PCG anchor (WR-03 mirror)
+                        is_pcg = True  # Fix 2: amine-as-principal PCG anchor (mirror)
                     elif _ol_pcg and sub and sub.get('name') == 'hydroxy':
-                        is_pcg = True  # RB-1: phenol-as-principal PCG anchor (WR-03 mirror)
+                        is_pcg = True  #: phenol-as-principal PCG anchor (mirror)
                 if is_attach:
                     attach_atoms.add(idx)
                 if is_pcg:
@@ -1268,7 +1268,7 @@ def name_substituted_polycyclic(
                     _amine_candidates.append(
                         (position, sub_info['name'], _atoms[0]))
 
-    # P-41, SECOND PASS: an N-substituted amine cited as a prefix
+    #, SECOND PASS: an N-substituted amine cited as a prefix
     # (`anilino`, `methylamino`) becomes the `-amine` SUFFIX with italic-N
     # prefixes -- `N-phenylnaphthalen-1-amine`, not the suffix-less
     # `1-anilinonaphthalene`. `4-methoxy-N-phenylaniline (PIN)` (:21610) is the
@@ -1293,34 +1293,34 @@ def name_substituted_polycyclic(
             prefix_substituent_groups['amino'].append(_pos)
             amine_n_substituents.extend(_subs)
 
-    # v28 Cluster A Fix 2 (P-62.2.1.1.1 / P-41, mirror of benzene.py C4): when a
+    # Fix 2 /, mirror of benzene.py C4): when a
     # primary amine IS the molecule-level principal group (no senior suffix, no
     # -OH -> principal_group is an amine key), reclassify it from the 'amino'
     # PREFIX to the '-amine' SUFFIX. Guarded by `not suffix_groups` so any senior
     # suffix keeps the amine as a prefix (aminonaphthalenecarboxylic acid); the
     # authoritative principal_group already encodes "-OH senior to amine", so an
     # amino+ol PAH is not promoted (fails closed to the prior double-prefix).
-    # v29 Phase C Task 10 (P-14.3.4 / P-41): the same promotion for the ALCOHOL suffix,
+    # Phase C Task 10 /: the same promotion for the ALCOHOL suffix,
     # which was missing entirely — so a ring hydroxy was demoted to a `hydroxy` prefix
     # and we shipped `9-hydroxyanthracene` for `anthracen-9-ol` and
     # `1,4-dihydroxynaphthalene` for `naphthalene-1,4-diol`.
     #
-    # BB authority, verified verbatim under §P-63.1.1 "Retained names" (`:26762`), whose
+    # BB authority, verified verbatim under § "Retained names" (`:26762`), whose
     # example block prints the non-preferred trivial name immediately ABOVE the (PIN):
-    #   `:26817`/`:26819`  1-naphthol      / naphthalen-1-ol (PIN)
-    #   `:26805`/`:26807`  hydroquinone    / benzene-1,4-diol (PIN)
-    # P-14.3.3 (`:2869`) then requires the locant, hence `naphthalen-1-ol`, and the
-    # existing P-16.7.1(a) `e`-elision below handles `naphthalene` + vowel-initial `ol`.
+    # `:26817`/`:26819` 1-naphthol / naphthalen-1-ol (PIN)
+    # `:26805`/`:26807` hydroquinone / benzene-1,4-diol (PIN)
+    # (`:2869`) then requires the locant, hence `naphthalen-1-ol`, and the
+    # existing (a) `e`-elision below handles `naphthalene` + vowel-initial `ol`.
     #
     # ★ THIS ALONE DOES NOT FIX THE TWO NAPHTHOLS. Measured with the same validated
-    # spy: `Oc1cccc2ccccc12` and `Oc1ccc2ccccc2c1` record ZERO calls into this function
+    # trace: `Oc1cccc2ccccc12` and `Oc1ccc2ccccc2c1` record ZERO calls into this function
     # — the retained-name table intercepts them upstream — so they also need their
     # `pin: false` deny rows. It DOES fix `anthracen-9-ol` and `naphthalene-1,4-diol`,
     # which do reach here. Conversely the deny rows alone would have emitted
-    # `1-hydroxynaphthalene`: one non-PIN swapped for another (session invariant 11).
+    # `1-hydroxynaphthalene`: one non-PIN swapped for another (session a project rule).
     # Both halves are required; neither is sufficient.
     #
-    # Ordered BEFORE the amine promotion on purpose: `-ol` is senior to `-amine` (P-41),
+    # Ordered BEFORE the amine promotion on purpose: `-ol` is senior to `-amine`,
     # and the amine promotion is guarded by `not suffix_groups`, so promoting the ol
     # first makes an amino+ol PAH correctly render as `x-aminonaphthalen-y-ol` instead
     # of the previous double-prefix fail-closed.
@@ -1341,9 +1341,9 @@ def name_substituted_polycyclic(
         suffix_groups[name].sort()
 
     # ------------------------------------------------------------------ #
-    # P-14.3.4.3 (BB:2947) "Omission of locants" -- the fused-PAH PREFIX. #
+    # (the Blue Book) "Omission of locants" -- the fused-PAH PREFIX. #
     # ------------------------------------------------------------------ #
-    # chlorocoronene (PIN, BB:2947): a monosubstituted symmetrical fused
+    # chlorocoronene (PIN, the Blue Book): a monosubstituted symmetrical fused
     # carbocycle whose single substituent prefix cites no locant. Same shape
     # as `chloropyrazine`, and the SIBLING of the ring-PREFIX branch in
     # heterocycles.py. `chloronaphthalene` KEEPS its locant -- naphthalene's
@@ -1353,18 +1353,18 @@ def name_substituted_polycyclic(
     # those orbits over ALL the fused-ring carbons (the parent hydride). Measured:
     # coronene -> True, 2-chloronaphthalene/1-methylnaphthalene -> False.
     #
-    # ⚠ NOT "symmetric PAH => omit". P-14.3.3 (BB:2869) is deny-by-default, so
+    # ⚠ NOT "symmetric PAH => omit". (the Blue Book) is deny-by-default, so
     # every locant that could share the scope is excluded FIRST and anything not
     # positively established retains its locant:
-    #   * exactly ONE prefix substituent group, ONE numeric locant
-    #   * no suffix FG (a suffix cites its own locant; the suffix branch above
-    #     owns that case, and a scope with both is not the single omissible locant)
-    #   * no promoted N-substituent amine -- its ESSENTIAL italic-N restores all
-    #   * a pah_name that is not purely alphabetic, or one carrying an indicated
-    #     hydrogen, already cites a locant (`9H-fluorene`)
-    #   * no stereodescriptors
-    #   * the scope's boundary IS the whole molecule being named -- this licence
-    #     empties the name of ALL locants, so it must not fire inside a fragment
+    # * exactly ONE prefix substituent group, ONE numeric locant
+    # * no suffix FG (a suffix cites its own locant; the suffix branch above
+    # owns that case, and a scope with both is not the single omissible locant)
+    # * no promoted N-substituent amine -- its ESSENTIAL italic-N restores all
+    # * a pah_name that is not purely alphabetic, or one carrying an indicated
+    # hydrogen, already cites a locant (`9H-fluorene`)
+    # * no stereodescriptors
+    # * the scope's boundary IS the whole molecule being named -- this licence
+    # empties the name of ALL locants, so it must not fire inside a fragment
     _l3_omit_prefix_locant = False
     if (not suffix_groups and not amine_n_substituents
             and len(prefix_substituent_groups) == 1
@@ -1402,10 +1402,10 @@ def name_substituted_polycyclic(
     # The italic-N prefixes of a promoted N-substituted amine. Cited only when
     # the amine actually became the suffix -- `suffix_groups.get('amine')` is the
     # promotion's own record, so an amine left as a prefix by a senior group
-    # never reaches here. P-14.3.2: the amine nitrogen has no numeric locant, so
+    # never reaches here.: the amine nitrogen has no numeric locant, so
     # italic N is correct here (unlike a RING nitrogen, which takes its number).
     if amine_n_substituents and suffix_groups.get('amine'):
-        # Aliased on import: a later function-local `from ... import
+        # Aliased on import: a later function-local `from... import
         # get_multiplier_prefix` in this same function makes the module-level
         # binding a local, so referring to the bare name here raises
         # UnboundLocalError before that import executes.
@@ -1429,13 +1429,13 @@ def name_substituted_polycyclic(
 
     # Handle suffix-type functional groups
     if suffix_groups:
-        # Pick the highest-priority suffix (P-41: carboxylic acid > S-oxoacid >
-        # amide > nitrile > aldehyde ...).
+        # Pick the highest-priority suffix: carboxylic acid > S-oxoacid >
+        # amide > nitrile > aldehyde...).
         _SUFFIX_PRIORITY = [
             'carboxylic acid', 'sulfonic acid', 'carboxamide', 'carbonitrile',
             'carbaldehyde',
-            # v29 Phase C Task 10: `-ol` sits between the aldehyde and the amine in the
-            # P-41 seniority order.
+            # Phase C Task 10: `-ol` sits between the aldehyde and the amine in the
+            # seniority order.
             #
             # ⚠ CORRECTED BY MUTATION TESTING. An earlier version of this comment claimed
             # "its absence from this list is why a ring hydroxy was never expressible as a
@@ -1454,7 +1454,7 @@ def name_substituted_polycyclic(
             # test_retained_name_pin_status.py::TestSuffixPriorityOrder, because no
             # end-to-end test can reach it.
             'ol',
-            'amine',  # Fix 2: amine is the lowest suffix (P-41); only chosen when
+            'amine',  # Fix 2: amine is the lowest suffix; only chosen when
                       # promoted (i.e. no senior suffix present).
         ]
         chosen_suffix = None
@@ -1495,13 +1495,13 @@ def name_substituted_polycyclic(
             prefixes.append(prefix_str)
             prefix_part = _join_pah_prefixes(sorted(prefixes, key=lambda s: alpha_sort_key(s.lstrip('0123456789,-'))))
 
-        # P-31.1.4.3.4 (Wave-2 completion): the indicated hydrogen attaches
+        # (Wave-2 completion): the indicated hydrogen attaches
         # to the parent stem, after any substituent prefixes -- 9H-fluorene-
         # 9-carboxylic acid / 9-methyl-9H-fluorene. The bare-parent early
         # return keeps the retained short form ('fluorene').
         _ih = POLYCYCLIC_DATA.get(pah_name, {}).get('indicated_h')
         _stem = f"{_ih}-{pah_name}" if _ih else pah_name
-        # P-16.7.1(a): elide the parent stem's terminal 'e' before a suffix that
+        # (a): elide the parent stem's terminal 'e' before a suffix that
         # begins with a vowel. The suffix as written is '-<locant>-<mult><suffix>',
         # so the decisive letter is the first of (multiplier + chosen_suffix):
         # 'amine' (vowel) -> anthracene -> 'anthracen-2-amine'; 'diamine'/'carboxylic
@@ -1511,7 +1511,7 @@ def name_substituted_polycyclic(
         if _stem.endswith('e') and _suffix_head in 'aeiouy':
             _stem = _stem[:-1]
         # A locant (digit) starting the parent stem must be set off from a
-        # letter-ending substituent prefix by a hyphen (P-16.3.3): '9-methyl-9H-
+        # letter-ending substituent prefix by a hyphen: '9-methyl-9H-
         # fluorene', '2-methyl-9,10-dihydroanthracene', '1-methyl-12,19:13,18-
         # di(metheno)dinaphtho[...]pentaphene'. _ih stems always start with the
         # indicated-H digit, so this generalizes (and fixes) the prior _ih-only
@@ -1524,7 +1524,7 @@ def name_substituted_polycyclic(
     # Build final name (prefix-only, no suffix FGs)
     _ih = POLYCYCLIC_DATA.get(pah_name, {}).get('indicated_h')
     _stem = f"{_ih}-{pah_name}" if _ih else pah_name
-    # P-16.3.3: hyphen sets a digit-initial parent stem off from a letter-ending
+    #: hyphen sets a digit-initial parent stem off from a letter-ending
     # substituent prefix (same rule as the suffix branch above); _ih stems begin
     # with the indicated-H digit so this subsumes the prior _ih-only guard.
     _sep = '-' if (prefix_part and not prefix_part.endswith('-')
@@ -1585,7 +1585,7 @@ def get_pah_substituent_locants(
 
     Example:
         >>> from rdkit import Chem
-        >>> mol = Chem.MolFromSmiles('Cc1ccc2ccccc2c1')  # 2-methylnaphthalene
+        >>> mol = Chem.MolFromSmiles('Cc1ccc2ccccc2c1') # 2-methylnaphthalene
         >>> from src.orthonym.data.polycyclic_data import match_polycyclic_core
         >>> _, core_match = match_polycyclic_core(mol)
         >>> get_pah_substituent_locants(mol, core_match)
@@ -1627,13 +1627,13 @@ def is_peri_condensed(mol) -> bool:
 
     Examples:
         >>> from rdkit import Chem
-        >>> mol = Chem.MolFromSmiles('c1ccc2ccccc2c1')  # naphthalene
+        >>> mol = Chem.MolFromSmiles('c1ccc2ccccc2c1') # naphthalene
         >>> is_peri_condensed(mol)
         False
-        >>> mol = Chem.MolFromSmiles('c1cc2ccc3cccc4ccc(c1)c2c34')  # pyrene
+        >>> mol = Chem.MolFromSmiles('c1cc2ccc3cccc4ccc(c1)c2c34') # pyrene
         >>> is_peri_condensed(mol)
         True
-        >>> mol = Chem.MolFromSmiles('c1cc2ccc3ccc4ccc5ccc6ccc1c1c2c3c4c5c61')  # coronene
+        >>> mol = Chem.MolFromSmiles('c1cc2ccc3ccc4ccc5ccc6ccc1c1c2c3c4c5c61') # coronene
         >>> is_peri_condensed(mol)
         True
     """
@@ -1674,10 +1674,10 @@ def get_pah_type(mol) -> str:
 
     Examples:
         >>> from rdkit import Chem
-        >>> mol = Chem.MolFromSmiles('c1ccc2ccccc2c1')  # naphthalene
+        >>> mol = Chem.MolFromSmiles('c1ccc2ccccc2c1') # naphthalene
         >>> get_pah_type(mol)
         'ortho-fused'
-        >>> mol = Chem.MolFromSmiles('c1cc2ccc3cccc4ccc(c1)c2c34')  # pyrene
+        >>> mol = Chem.MolFromSmiles('c1cc2ccc3cccc4ccc(c1)c2c34') # pyrene
         >>> get_pah_type(mol)
         'peri-condensed'
     """
@@ -1719,10 +1719,10 @@ def name_polycyclic(mol) -> Optional[str]:
         >>> mol = Chem.MolFromSmiles('Cc1ccc2ccccc2c1')
         >>> name_polycyclic(mol)
         '2-methylnaphthalene'
-        >>> mol = Chem.MolFromSmiles('c1cc2ccc3cccc4ccc(c1)c2c34')  # pyrene
+        >>> mol = Chem.MolFromSmiles('c1cc2ccc3cccc4ccc(c1)c2c34') # pyrene
         >>> name_polycyclic(mol)
         'pyrene'
-        >>> mol = Chem.MolFromSmiles('c1ccc2c(c1)CCCC2')  # tetrahydronaphthalene
+        >>> mol = Chem.MolFromSmiles('c1ccc2c(c1)CCCC2') # tetrahydronaphthalene
         >>> name_polycyclic(mol)
         '1,2,3,4-tetrahydronaphthalene'
     """
@@ -1744,7 +1744,7 @@ def name_partially_saturated_carbocycle(mol) -> Optional[str]:
     """
     Generate IUPAC name for a partially saturated carbocyclic fused system.
 
-    Thin wrapper over :func:`name_partially_saturated_carbocycle_with_locants`
+    Thin wrapper over:func:`name_partially_saturated_carbocycle_with_locants`
     that discards the numbering. Prefer the sibling whenever the caller has to
     place its own locants — re-deriving a second numbering for the same name is
     a defect class, not an implementation detail (see that function's
@@ -1779,7 +1779,7 @@ class PartialSatName(NamedTuple):
     prefixes needs the numbering the name was spelled from AND the set of atoms
     the name already spells. Withholding either one produced a wrong name --
     the first gave `1-methyl-` for a 2-substituted tetralin, the second gave
-    `6-methyl-6-methyl-...`. Both were caught by SELF-01, i.e. both cost a
+    `6-methyl-6-methyl-...`. Both were caught by, i.e. both cost a
     correct name rather than shipping a wrong one.
     """
     name: str
@@ -1797,7 +1797,7 @@ def name_partially_saturated_carbocycle_with_locants(
     ``atom_to_locant`` map it was spelled from and the off-ring atoms it
     already spells.
 
-    The map is the one :func:`detect_carbocyclic_partial_saturation` chose (ORIGINAL
+    The map is the one:func:`detect_carbocyclic_partial_saturation` chose (ORIGINAL
     atom idx -> IUPAC ring locant, including the lettered fusion locants ``'4a'``
     / ``'8a'``), never a re-derivation. A consumer that has to place its own
     substituent or suffix locants MUST inherit this map: the hydro locants, the
@@ -1811,7 +1811,7 @@ def name_partially_saturated_carbocycle_with_locants(
         mol: RDKit Mol object
 
     Returns:
-        A :class:`PartialSatName`, or ``None`` when this is not a partially
+        A:class:`PartialSatName`, or ``None`` when this is not a partially
         saturated fused carbocycle this path can name correctly (fail closed).
 
     Examples:
@@ -1840,12 +1840,12 @@ def name_partially_saturated_carbocycle_with_locants(
     if sat_info is None:
         return None
 
-    # Atom-conservation veto (R12, P-58.2.2.3): this path names aromatic-ring
+    # Atom-conservation veto (R12,: this path names aromatic-ring
     # substituents itself and relies on enrichment for NON-fusion sp3-ring
     # substituents, but NEITHER can place a substituent on a ring-FUSION atom.
     # A fusion atom bearing an off-ring heavy neighbour (e.g. the two 4a,8a-OH of
     # naphthalene-4a,8a-diol, or a 4a-methyl) would therefore be silently dropped,
-    # naming a different molecule. Gated, SELF-01 catches it; gate-off (no Java)
+    # naming a different molecule. Gated, catches it; gate-off (no Java)
     # it would ship the atom-dropped name. Fail closed at the source. (General:
     # any fusion-atom substituent declines, not a diol special-case.)
     ri = mol.GetRingInfo()
@@ -1912,7 +1912,7 @@ def _assemble_partially_saturated_carbocycle_name(
     if is_perhydro:
         # Fully saturated: cite the COUNT-form prefix with NO per-position hydro
         # locants -> `decahydronaphthalene`. NOT the literal 'perhydro': the
-        # string `perhydro` occurs **0 times** in BlueBookV2.md while
+        # string `perhydro` occurs **0 times** in the Blue Book while
         # `decahydronaphthalene` occurs 6, so `perhydronaphthalene` is a
         # general-nomenclature form and must not ship on the PIN path.
         # `ring_substituents.py:1265` already takes exactly this decision for
@@ -1929,7 +1929,7 @@ def _assemble_partially_saturated_carbocycle_name(
         formatted_prefix = format_saturation_prefix(prefix, locants)
 
     # The ring principal-characteristic-group suffix at its lowest locants.
-    # P-58.2.5 (BlueBookV2.md:24890), on the PIN `5,8-dioxo-5,6,7,8-tetrahydro-
+    # (the Blue Book), on the PIN `5,8-dioxo-5,6,7,8-tetrahydro-
     # naphthalene-2-carboxylic acid`: "detachable but nonalphabetized hydro
     # prefixes do not have precedence over the principal characteristic group
     # for low numbering, but has precedence over other detachable prefixes."
@@ -1939,8 +1939,8 @@ def _assemble_partially_saturated_carbocycle_name(
     #
     # The suffix's exocyclic atoms must be EXCLUDED from the detachable-prefix
     # discovery below (otherwise they are mis-flagged un-nameable prefixes and
-    # the whole candidate declines). Scoped to the ring-COOH (P-65.1.1.1) and
-    # ring-OH (P-63.1) PCGs + named-carbocycle-table parents; fail closed
+    # the whole candidate declines). Scoped to the ring-COOH and
+    # ring-OH PCGs + named-carbocycle-table parents; fail closed
     # otherwise.
     from .partial_saturation import (
         _PARTIAL_SAT_PCG_SUFFIX,
@@ -1973,17 +1973,17 @@ def _assemble_partially_saturated_carbocycle_name(
         _stem, _elides = _PARTIAL_SAT_PCG_SUFFIX[pcg_kind]
         _loc_str = ",".join(_locant_display(l) for l in pcg_locants)
         pcg_suffix = f"-{_loc_str}-{_mult}{_stem}"
-        # P-16.7.1(a): elide the parent's terminal 'e' before a vowel-initial
+        # (a): elide the parent's terminal 'e' before a vowel-initial
         # suffix. A multiplying prefix ('di', 'tri', 'tetra') is
         # consonant-initial, so it keeps the 'e' -- `naphthalen-2-ol` but
         # `naphthalene-1,3-diol`.
         if _elides and not _mult:
             parent_name = _elide_terminal_e(parent_name)
 
-    # P-15.1.5.3: the detachable substituent prefixes of the whole fused ring
+    #: the detachable substituent prefixes of the whole fused ring
     # system, cited (alphanumerically) BEFORE the nonalphabetised 'hydro'
     # prefix. ALL of them are built here, aromatic ring and saturated ring
-    # alike, by ONE formatter: P-16.3.3 makes multiplicity a property of the
+    # alike, by ONE formatter: makes multiplicity a property of the
     # substituent NAME, so a methyl on each ring is one group of two
     # (`2,6-dimethyl-`), which two formatters splitting the set by ring can
     # never produce. This also leaves exactly one numbering in play.
@@ -2005,10 +2005,10 @@ def _assemble_partially_saturated_carbocycle_name(
         spelled_out |= pcg_exclude
         spelled_out |= _sub_spelled
 
-    # Assemble final name. P-16.3.3 (L2): the hyphen between the substituent
+    # Assemble final name. (L2): the hyphen between the substituent
     # prefixes and the hydro prefix is required only when the hydro prefix leads
     # with a LOCANT (`2,6-dimethyl-1,2,3,4-tetrahydronaphthalene`, cf. the PIN
-    # `5,6,7,8-tetrabromo-1,2,3,4-tetrahydronaphthalene`, BlueBookV2.md:25856)
+    # `5,6,7,8-tetrabromo-1,2,3,4-tetrahydronaphthalene`, the Blue Book)
     # and must be absent when it does not (`2,3-dimethyldecahydronaphthalene`).
     # Route it through the shared primitive instead of concatenating, which
     # emitted the spurious `2,3-dimethyl-decahydronaphthalene`.
@@ -2056,18 +2056,18 @@ def _partial_sat_substituent_prefix(
     """Build the alphanumerically-sorted detachable-substituent prefix string
     (with trailing hyphen) for EVERY substituent on a partially-saturated fused
     carbocycle, or None if there are none / any cannot be named (fail-closed).
-    P-15.1.5.3 / P-14.5.2.
+     /.
 
     This used to skip the SATURATED (sp3) ring, leaving those substituents to
     the composer's enrichment pass. That split could not be made correct:
     multiplicity is a property of the substituent NAME, not of which ring atom
-    carries it (**P-16.3.3** ``:7038`` clause (b) ``:7067`` — "the basic
+    carries it (**** ``:7038`` clause (b) ``:7067`` — "the basic
     numerical prefixes 'di', 'tri', 'tetra', etc. are used to indicate a
-    multiplicity of: ... simple substituent prefixes"), so a methyl on each ring
+    multiplicity of:... simple substituent prefixes"), so a methyl on each ring
     is ONE group of two and must be cited ``2,6-dimethyl-``. Two independent
     prefix formatters, each holding half the set, can only ever concatenate
     (``2-methyl-6-methyl-``). One formatter over the whole ring system is the
-    only construction that can obey P-16.3.3, and it also removes the second
+    only construction that can obey, and it also removes the second
     numbering that the enrichment hand-off was deriving.
 
     ``exclude_atoms`` are off-ring atoms already accounted for elsewhere (e.g.
@@ -2096,7 +2096,7 @@ def _partial_sat_substituent_prefix(
             found_any = True
             # A bare halogen (single-atom substituent) — name_substituent_fragment
             # mis-names it ('hydrobromic acidyl'), so map it directly to its
-            # detachable prefix (P-31.1.2.1).
+            # detachable prefix.
             _HALO = {'F': 'fluoro', 'Cl': 'chloro', 'Br': 'bromo', 'I': 'iodo'}
             if n.GetSymbol() in _HALO and n.GetDegree() == 1:
                 grouped[_HALO[n.GetSymbol()]].append(atom_to_locant[idx])
@@ -2155,13 +2155,13 @@ def is_fused_aromatic_system(mol) -> bool:
         True if fused aromatic system detected
 
     Examples:
-        >>> mol = Chem.MolFromSmiles('c1ccc2ccccc2c1')  # naphthalene
+        >>> mol = Chem.MolFromSmiles('c1ccc2ccccc2c1') # naphthalene
         >>> is_fused_aromatic_system(mol)
         True
-        >>> mol = Chem.MolFromSmiles('c1ccc2[nH]ccc2c1')  # indole
+        >>> mol = Chem.MolFromSmiles('c1ccc2[nH]ccc2c1') # indole
         >>> is_fused_aromatic_system(mol)
         True
-        >>> mol = Chem.MolFromSmiles('c1ccccc1')  # benzene
+        >>> mol = Chem.MolFromSmiles('c1ccccc1') # benzene
         >>> is_fused_aromatic_system(mol)
         False
     """
@@ -2244,7 +2244,7 @@ def name_substituted_fused_aromatic(
         Complete IUPAC name with substituent prefixes
 
     Examples:
-        >>> mol = Chem.MolFromSmiles('Cc1ccc2ccccc2c1')  # 2-methylnaphthalene
+        >>> mol = Chem.MolFromSmiles('Cc1ccc2ccccc2c1') # 2-methylnaphthalene
         >>> name_substituted_fused_aromatic(mol, 'naphthalene')
         '2-methylnaphthalene'
     """

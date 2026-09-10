@@ -1,14 +1,14 @@
 """
-Phase 4 Integration Tests - Polyfunctional Compounds
+a phase Integration Tests - Polyfunctional Compounds
 
-Verifies all POLY requirements and Phase 4 success criteria.
+Verifies all POLY requirements and a phase success criteria.
 """
 import pytest
 from orthonym import name_compound
 
 
 class TestPOLY01_MultipleFunctionalGroups:
-    """POLY-01: Name compounds with multiple FGs using seniority."""
+    """: Name compounds with multiple FGs using seniority."""
 
     def test_hydroxy_acid_seniority(self):
         """Acid > alcohol, so acid is suffix, alcohol is prefix."""
@@ -33,7 +33,7 @@ class TestPOLY01_MultipleFunctionalGroups:
 
 
 class TestPOLY02_Esters:
-    """POLY-02: Name esters."""
+    """: Name esters."""
 
     def test_methyl_acetate(self):
         """Simple ester: methyl acetate."""
@@ -57,7 +57,7 @@ class TestPOLY02_Esters:
 
 
 class TestPOLY03_Amides:
-    """POLY-03: Name amides."""
+    """: Name amides."""
 
     def test_acetamide(self):
         """Primary amide from acetic acid."""
@@ -81,7 +81,7 @@ class TestPOLY03_Amides:
 
 
 class TestPOLY04_Nitriles:
-    """POLY-04: Name nitriles."""
+    """: Name nitriles."""
 
     def test_acetonitrile(self):
         """2-carbon nitrile (common solvent)."""
@@ -105,7 +105,7 @@ class TestPOLY04_Nitriles:
 
 
 class TestPOLY05_Ethers:
-    """POLY-05: Name ethers (substitutive naming)."""
+    """: Name ethers (substitutive naming)."""
 
     def test_methoxyethane(self):
         """Simple ether: methyl group as methoxy."""
@@ -124,14 +124,14 @@ class TestPOLY05_Ethers:
 
 
 class TestPOLY06_HydroxyAcids:
-    """POLY-06: Name hydroxy acids."""
+    """: Name hydroxy acids."""
 
     def test_2_hydroxyacetic_acid(self):
         """HO-CH2-COOH -> 'hydroxyacetic acid' (PIN, NO locant).
 
-        BlueBookV2.md:29854 verbatim: `HO-CH2-COOH hydroxyacetic acid (PIN)
+        the Blue Book verbatim: `HO-CH2-COOH hydroxyacetic acid (PIN)
         (not glycolic acid)`. Acetic acid has a single substitutable carbon
-        (C2), so its locant is omitted (P-16.5.1.3.2 / P-14.3.4.6)."""
+        (C2), so its locant is omitted /."""
         result = name_compound("OCC(=O)O")
         assert result == "hydroxyacetic acid"
 
@@ -147,7 +147,7 @@ class TestPOLY06_HydroxyAcids:
 
 
 class TestPOLY07_AminoAcids:
-    """POLY-07: Name amino acids."""
+    """: Name amino acids."""
 
     def test_glycine(self):
         """Simplest amino acid."""
@@ -156,8 +156,8 @@ class TestPOLY07_AminoAcids:
     def test_alanine(self):
         """3-carbon amino acid, UNDEFINED stereo -> systematic.
 
-        v33 Phase-1 stereo honesty: bare 'alanine' implies L, so an
-        undefined-stereo input declines it (P-101.2.6/P-103.1.3.1)."""
+         Phase-1 stereo honesty: bare 'alanine' implies L, so an
+        undefined-stereo input declines it /."""
         assert name_compound("CC(N)C(=O)O") == "2-aminopropanoic acid"
 
     def test_phenylalanine(self):
@@ -171,7 +171,7 @@ class TestPOLY07_AminoAcids:
 
 
 class TestPOLY08_KetoAcids:
-    """POLY-08: Name keto acids."""
+    """: Name keto acids."""
 
     def test_2_oxopropanoic_acid(self):
         """Pyruvic acid - systematic name."""
@@ -185,12 +185,12 @@ class TestPOLY08_KetoAcids:
 
 
 class TestPhase4SuccessCriteria:
-    """Verify Phase 4 success criteria from roadmap."""
+    """Verify a phase success criteria from roadmap."""
 
     def test_criterion_1_hydroxy_acid(self):
         """User can input 'OCC(=O)O' and receive a hydroxy acid name.
 
-        PIN is `hydroxyacetic acid` (BlueBookV2.md:29854, no locant)."""
+        PIN is `hydroxyacetic acid` (the Blue Book, no locant)."""
         result = name_compound("OCC(=O)O")
         assert result == "hydroxyacetic acid"
 
@@ -248,40 +248,40 @@ class TestNoRegressions:
     """Verify previous phases still work."""
 
     def test_simple_alkane(self):
-        """Phase 1: Basic alkane naming."""
+        """a phase: Basic alkane naming."""
         assert name_compound("CCCC") == "butane"
 
     def test_simple_alcohol(self):
-        """Phase 1: Functional group naming."""
+        """a phase: Functional group naming."""
         assert name_compound("CCCO") == "propan-1-ol"
 
     def test_benzene(self):
-        """Phase 2: Aromatic ring naming."""
+        """a phase: Aromatic ring naming."""
         assert name_compound("c1ccccc1") == "benzene"
 
     def test_pyridine(self):
-        """Phase 3: Heterocycle naming."""
+        """a phase: Heterocycle naming."""
         assert name_compound("c1ccncc1") == "pyridine"
 
     def test_cyclohexane(self):
-        """Phase 2: Cycloalkane naming."""
+        """a phase: Cycloalkane naming."""
         assert name_compound("C1CCCCC1") == "cyclohexane"
 
     def test_methylcyclohexane(self):
-        """Phase 2: Substituted cycloalkane."""
+        """a phase: Substituted cycloalkane."""
         result = name_compound("CC1CCCCC1")
         assert result == "methylcyclohexane"
 
     def test_toluene(self):
-        """Phase 2: Substituted benzene (retained)."""
+        """a phase: Substituted benzene (retained)."""
         assert name_compound("Cc1ccccc1") == "toluene"
 
     def test_furan(self):
-        """Phase 3: Aromatic heterocycle."""
+        """a phase: Aromatic heterocycle."""
         assert name_compound("c1ccoc1") == "furan"
 
     def test_morpholine(self):
-        """Phase 3: Saturated heterocycle."""
+        """a phase: Saturated heterocycle."""
         assert name_compound("C1COCCN1") == "morpholine"
 
 
@@ -318,7 +318,7 @@ class TestRetainedNamesPriority:
     def test_alanine_over_aminopropanoic(self):
         """UNDEFINED-stereo alanine names systematically.
 
-        The pre-v33 assertion (retained 'alanine' preferred) is inverted by the
+        The pre- assertion (retained 'alanine' preferred) is inverted by the
         Phase-1 stereo-honesty change: bare 'alanine' implies L, so an
         undefined-stereo input must decline it and use the systematic name."""
         assert name_compound("CC(N)C(=O)O") == "2-aminopropanoic acid"

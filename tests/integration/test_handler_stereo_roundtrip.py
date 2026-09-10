@@ -1,11 +1,11 @@
-"""Phase 152: Handler-level stereo injection - OPSIN round-trip integration tests.
+"""a phase: Handler-level stereo injection - OPSIN round-trip integration tests.
 
-Per D-16 / D-22, every test compound is round-tripped through OPSIN
+Per /, every test compound is round-tripped through OPSIN
 (name -> SMILES -> canonicalize) and compared with the original canonical
 SMILES INCLUDING the stereo layer. The four handler classes
 (TestHeterocycle, TestBenzene, TestCycloalkane, TestCycloalkene) are
 populated from JSON fixtures under tests/data/stereo_handlers/. Every
-fixture entry is sourced per D-23 (no hand-curated SMILES).
+fixture entry is sourced per (no hand-curated SMILES).
 
 Skipped if Java or OPSIN JAR is unavailable.
 """
@@ -57,7 +57,7 @@ _FIXTURES_DIR = Path(__file__).parent.parent / "data" / "stereo_handlers"
 def _load_cases(handler: str):
     """Load fixture cases for *handler* from the JSON file under
     tests/data/stereo_handlers/<handler>/cases.json. Each entry MUST have
-    smiles, expected_stereo_prefix_pattern, source_corpus, source_id (D-23).
+    smiles, expected_stereo_prefix_pattern, source_corpus, source_id .
     """
     path = _FIXTURES_DIR / handler / "cases.json"
     if not path.is_file():
@@ -69,25 +69,25 @@ def _load_cases(handler: str):
 def _assert_handler_roundtrip(case: dict, handler: str):
     """Assert handler stereo correctness in two stages.
 
-    BL-04 FIX (2026-05-03 — see 152-VERIFICATION.md + 152-REVIEW.md):
-    Previously this function called pytest.xfail() before ANY assertion,
+     FIX (2026-05-03 — see internal notes + internal notes):
+    Previously this function called pytest.xfail before ANY assertion,
     making xfail-marked fixtures execute zero asserts. Now the assertion
     pipeline is split:
-      (1) ALWAYS-RUN GATES: name_compound() returns non-empty AND
-          P-91 prefix matches `expected_stereo_prefix_pattern`. These run
+      (1) ALWAYS-RUN GATES: name_compound returns non-empty AND
+           prefix matches `expected_stereo_prefix_pattern`. These run
           for every fixture, regardless of xfail_reason. They detect
-          regressions in the Phase 152 wiring contract independently of
+          regressions in the a phase wiring contract independently of
           OPSIN's parsing capability.
       (2) CONDITIONAL OPSIN ROUND-TRIP: name -> OPSIN -> canonical SMILES
           -> compare. Only THIS step is xfail-able when the fixture's
           `xfail_reason` indicates a known OPSIN-side or
-          handler-output-format issue tracked outside Phase 152.
+          handler-output-format issue tracked outside a phase.
     """
     import re as _re
     smiles = case["smiles"]
     name = name_compound(smiles)
 
-    # ---- ALWAYS-RUN GATES (BL-04 fix) ----
+    # ---- ALWAYS-RUN GATES (fix) ----
     assert name and name != "unknown", (
         f"name_compound returned empty/unknown for {smiles} "
         f"(handler={handler}, source={case.get('source_corpus')}/{case.get('source_id')})"
@@ -183,7 +183,7 @@ class TestCycloalkene:
 
 
 # ----------------------------------------------------------------------
-# Phase 153: ComplexRing (commit 3 -- D-01 / D-02 / D-05 / D-06 wiring + D-23 fixtures)
+# a phase: ComplexRing (commit 3 -- / / / wiring + fixtures)
 # ----------------------------------------------------------------------
 
 _COMPLEX_RING_CASES = _load_cases("complex_ring")
@@ -200,7 +200,7 @@ class TestComplexRing:
 
 
 # ----------------------------------------------------------------------
-# Phase 153: Cycloalkene >= 8 mandatory E/Z (commit 4 -- P-31.1.3 errata)
+# a phase: Cycloalkene >= 8 mandatory E/Z (commit 4 -- errata)
 # ----------------------------------------------------------------------
 
 _CYCLOALKENE_8PLUS_CASES = _load_cases("cycloalkene_8plus")
@@ -213,11 +213,11 @@ _CYCLOALKENE_8PLUS_CASES = _load_cases("cycloalkene_8plus")
 )
 class TestCycloalkene8PlusMandatory:
     def test_cycloalkene_8plus_emits_ez_block(self, case):
-        # First the standard 2-stage gates (name + P-91 prefix + OPSIN
-        # round-trip per BL-04 split-stage assertion).
+        # First the standard 2-stage gates (name + prefix + OPSIN
+        # round-trip per split-stage assertion).
         _assert_handler_roundtrip(case, "cycloalkene_8plus")
-        # Phase 153 D-07 / D-15: in addition, the prefix MUST contain
-        # an [EZ] descriptor, located anywhere in the leading P-91 block
+        # a phase /: in addition, the prefix MUST contain
+        # an [EZ] descriptor, located anywhere in the leading block
         # (the regex tolerates names like '(4S,7Z,...)' where R/S
         # descriptors precede the E/Z one).
         import re as _re

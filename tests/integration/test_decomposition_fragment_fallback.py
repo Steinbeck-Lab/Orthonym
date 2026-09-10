@@ -1,7 +1,7 @@
-"""Integration tests for decomposition fragment fallback naming (Phase 127).
+"""Integration tests for decomposition fragment fallback naming (a phase).
 
-Tests DECO-15 (fragments through name_pipeline_only()) and
-DECO-16 (HA > 30 coverage >= 70%).
+Tests (fragments through name_pipeline_only) and
+ (HA > 30 coverage >= 70%).
 """
 import pytest
 from rdkit import Chem
@@ -61,7 +61,7 @@ FRAGMENT_LOSS_SMILES = [
 
 @pytest.mark.integration
 class TestNameFragmentWithFallback:
-    """Tests for _name_fragment_with_fallback() helper function."""
+    """Tests for _name_fragment_with_fallback helper function."""
 
     def test_fallback_returns_name_for_simple_smiles(self):
         """Recursive naming succeeds for simple molecules, no fallback needed."""
@@ -89,7 +89,7 @@ class TestNameFragmentWithFallback:
 
 @pytest.mark.integration
 class TestMaxDecompLevels:
-    """Tests for _get_max_decomp_levels() function."""
+    """Tests for _get_max_decomp_levels function."""
 
     def test_returns_4_for_large_molecule(self):
         """HA > 50 molecules get 4 decomposition levels."""
@@ -113,7 +113,7 @@ class TestDepthLimitConfig:
     """Tests for depth limit configuration."""
 
     def test_max_visited_size_is_50(self):
-        """_MAX_VISITED_SIZE should be 50 (raised from 30 in Phase 127)."""
+        """_MAX_VISITED_SIZE should be 50 (raised from 30 in a phase)."""
         assert _MAX_VISITED_SIZE == 50
 
 

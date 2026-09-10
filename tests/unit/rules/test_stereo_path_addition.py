@@ -10,7 +10,7 @@ Verifies that:
 5. Acyclic E/Z bonds still work correctly
 6. Macrocyclic (>8 member) ring E/Z bonds are preserved
 
-Phase 63 Plan 01 - Stereochemistry Accuracy
+a phase Plan 01 - Stereochemistry Accuracy
 """
 
 import pytest
@@ -150,7 +150,7 @@ class TestRingEZFilter:
         assert 'cyclohex' not in name.lower() or 'E' not in name.split('-')[0]
 
     def test_8_member_ring_gets_ez(self):
-        """8-membered ring double bond SHOULD get E/Z per P-31.1.3 errata (Sep 2024).
+        """8-membered ring double bond SHOULD get E/Z per errata (Sep 2024).
 
         Previously filtered at <= 8 threshold. Errata corrects to < 8,
         so 8-member rings (cyclooctene) now get E/Z descriptors.
@@ -241,7 +241,7 @@ class TestCollectStereodescriptorsFilter:
         atom_to_locant = {i: i + 1 for i in range(mol.GetNumAtoms())}
         descs = collect_stereodescriptors(mol, atom_to_locant)
 
-        # Include lowercase r/s for pseudoasymmetric centers (IUPAC P-92.1.4.2)
+        # Include lowercase r/s for pseudoasymmetric centers (IUPAC
         rs_descs = [(loc, cip) for loc, cip in descs if cip in ('R', 'S', 'r', 's')]
         # Should have at least 1 R/S/r/s descriptor
         assert len(rs_descs) >= 1, (

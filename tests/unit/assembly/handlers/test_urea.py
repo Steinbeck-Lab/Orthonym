@@ -1,6 +1,6 @@
-"""Phase 160 Plan-04 per-handler unit tests for ``urea``.
+"""a phase Plan-04 per-handler unit tests for ``urea``.
 
-Per CONTEXT D-20 + Phase 158 D-17 mirror: >= 5 tests per extracted handler
+Per internal notes + a phase mirror: >= 5 tests per extracted handler
 covering:
   - Signature: name_urea(features, mol=None, style='pin') signature.
   - Predicate: _is_urea(features) signature + purity.
@@ -11,7 +11,7 @@ covering:
   - INNER_DISPATCH_TABLE registration (handler is registered at the
     expected handler_id key).
 
-Representative SMILES (from audit § 1): 'NC(=O)N'
+Representative SMILES (from the audit): 'NC(=O)N'
 """
 from __future__ import annotations
 
@@ -47,7 +47,7 @@ class TestNameUrea:
         assert "features" in sig.parameters
 
     def test_predicate_purity_returns_bool(self):
-        """Predicate returns a bool / falsy value (CONTEXT D-25 purity hint)."""
+        """Predicate returns a bool / falsy value (internal notes purity hint)."""
         class EmptyFeatures:
             principal_group = None
             is_cyclic = False
@@ -83,7 +83,7 @@ class TestNameUrea:
         assert entry.handler is name_urea
 
     def test_byte_identical_name_via_namer(self):
-        """Pipeline-level: Orthonym().name(rep_smi) is reachable and deterministic.
+        """Pipeline-level: Orthonym.name(rep_smi) is reachable and deterministic.
 
         We don't assert a specific name string because canary baselines
         are the authoritative byte-identical contract. Here we just
@@ -100,7 +100,7 @@ class TestNameUrea:
         assert isinstance(name, str) and name
 
     def test_pipeline_idempotent(self):
-        """Two name() calls on same SMILES produce same name."""
+        """Two name calls on same SMILES produce same name."""
         if REPRESENTATIVE_SMILES is None:
             pytest.skip("no representative SMILES for this handler in audit § 1")
         namer = Orthonym()
@@ -113,16 +113,16 @@ class TestNameUrea:
 
 
 class TestHalogenSubstitutedUrea:
-    """v23 Phase 7 (7d): halogen N-substituent citation (P-66.1.6.1.1).
+    """ a phase (7d): halogen N-substituent citation.
 
     The carbon R-group namer dropped lone halogens -> a halogenated urea was
     mis-named 'urea' (structure loss). The new halogen-only branch cites them
     with the Blue Book locant-omission rule. The autouse conftest disables the
-    OPSIN validity gate, so name() returns the raw handler output here.
+    OPSIN validity gate, so name returns the raw handler output here.
     """
 
     @pytest.mark.parametrize("smiles,expected", [
-        ("O=C(N(F)F)N(F)F", "tetrafluorourea"),       # BB P-66.1.6.1 PIN
+        ("O=C(N(F)F)N(F)F", "tetrafluorourea"),       # BB PIN
         ("O=C(N(Cl)Cl)N(Cl)Cl", "tetrachlorourea"),
         ("O=C(NF)N", "fluorourea"),                    # mono -> no locant
         ("O=C(NCl)N", "chlorourea"),
@@ -145,7 +145,7 @@ class TestHalogenSubstitutedUrea:
         """The scoped halogen branch claims ONLY the unambiguous mono/tetra cases.
 
         An ambiguous partial pattern must NOT be named by dropping the halogens (a
-        structure loss = wrong molecule). In PRODUCTION (SELF-01 gate ON, forced
+        structure loss = wrong molecule). In PRODUCTION (gate ON, forced
         here by ``opsin_gate``) the carbon-path fall-through — whatever raw
         halogen-dropping string it builds ('urea' historically, now
         'carbamoylaminomethane') — is suppressed to an honest abstention. That

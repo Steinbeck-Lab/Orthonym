@@ -97,7 +97,7 @@ def test_looks_like_ionic_name_rejects_neutral_shapes(name):
     # test_overcoordinated_silicon_has_no_uide). charge_dropped is narrowed to
     # hypervalent HALOGENS (a wrong-CONNECTIVITY drop), so it does not fire on
     # a metalloid charge-NORMALIZATION; that stays a gated-safe residual
-    # (production is already 'unknown' via SELF-01).
+    # (production is already 'unknown' via).
 ])
 def test_charge_dropped_true_for_documented_leaks(smiles, name):
     mol = Chem.MolFromSmiles(smiles)
@@ -181,7 +181,7 @@ def test_charge_dropped_false_for_empty_name():
 @pytest.mark.unit
 @pytest.mark.parametrize("smiles,bad_name", [
     # Still a leak: no producer can name a 2-aminotetralin (the amine wants a
-    # SUFFIX, `1,2,3,4-tetrahydronaphthalen-2-amine`, BlueBookV2.md:26489 shows
+    # SUFFIX, `1,2,3,4-tetrahydronaphthalen-2-amine`, the Blue Book shows
     # the 1-isomer as PIN), so the hydro-fused producer fails closed and this
     # veto is what keeps the Java-free path from shipping a substitute.
     ("NC1CCc2ccccc2C1", "1,2,3,4-tetrahydronaphthalene"),
@@ -196,14 +196,14 @@ def test_partial_sat_drop_true_for_documented_leaks(smiles, bad_name):
     # WAS asserted as leaks that this veto had to SUPPRESS. Both are now named
     # correctly at the source, which is strictly better than being vetoed: the
     # hydro-fused producer became the single speller of every ring substituent
-    # prefix (P-16.3.3 multiplicity cannot be split across two formatters) and
-    # grew the P-63.1 ring '-ol' suffix. A veto that still fired here would be
+    # prefix multiplicity cannot be split across two formatters) and
+    # grew the ring '-ol' suffix. A veto that still fired here would be
     # suppressing the correct answer.
     #
     # Independent check (OPSIN 2.9.0, not the code under test) -- each name
     # parses back to its own input:
-    #   '2,7-dimethyl-1,2,3,4-tetrahydronaphthalene' -> Cc1ccc2c(c1)CC(C)CC2
-    #   '1,2,3,4-tetrahydronaphthalen-2-ol'          -> OC1CCc2ccccc2C1
+    # '2,7-dimethyl-1,2,3,4-tetrahydronaphthalene' -> Cc1ccc2c(c1)CC(C)CC2
+    # '1,2,3,4-tetrahydronaphthalen-2-ol' -> OC1CCc2ccccc2C1
     # The old expectations asserted an ABSTENTION, so they cannot have been
     # encoding these molecules' correct names.
     ("Cc1ccc2c(c1)CC(C)CC2", "2,7-dimethyl-1,2,3,4-tetrahydronaphthalene"),

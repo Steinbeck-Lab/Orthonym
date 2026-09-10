@@ -21,8 +21,8 @@ def _full_rt(smiles: str, name: str) -> bool:
 
 
 def test_build_bicyclo_substituent_prefix_isopropyl_not_n_propyl():
-    # Function-level fail-first oracle (ledger ruling R3): namer.name() abstains
-    # at HEAD (SELF-01 hides the wrong candidate), so a name-level test alone is
+    # Function-level fail-first oracle (ledger ruling R3): namer.name abstains
+    # at HEAD (hides the wrong candidate), so a name-level test alone is
     # not fail-first. Call the composer helper directly on the isopropyl
     # fragment and assert it never returns the n-propyl ('2-propyl') form.
     smi = "CC(C)C1CC2CCC1C2"

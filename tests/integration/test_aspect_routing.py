@@ -51,7 +51,7 @@ class TestIonFallThrough:
         assert result == 'ethoxide', f'Expected ethoxide, got: {result}'
 
     def test_retained_cation_ammonium(self):
-        """NH4+ PIN is 'azanium' (P-73.1.1.2, the Blue Book; was 'ammonium')."""
+        """NH4+ PIN is 'azanium', the Blue Book; was 'ammonium')."""
         result = name_compound('[NH4+]')
         assert result == 'azanium', f'Expected azanium, got: {result}'
 

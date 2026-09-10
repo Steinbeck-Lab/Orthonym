@@ -7,7 +7,7 @@ Tests cover:
 3. Stereodescriptor formatting with VB locants
 4. Complete name assembly combining all features
 
-Reference: IUPAC 2013 Blue Book P-23 and P-31.
+Reference: IUPAC 2013 Blue Book and.
 """
 
 import pytest

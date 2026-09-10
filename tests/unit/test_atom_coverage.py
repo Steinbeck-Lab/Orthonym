@@ -50,9 +50,9 @@ class TestCoverageResult:
         """The dataclass stores is_complete=True as given.
 
         NOTE: this asserts only the value passed in -- it does NOT exercise
-        any completeness RULE.  It used to be named for a "0.80 ratio
+        any completeness RULE. It used to be named for a "0.80 ratio
         threshold" that no longer exists: completeness is now decided by
-        constitution, in validate_atom_coverage.  The real rule is tested in
+        constitution, in validate_atom_coverage. The real rule is tested in
         tests/unit/validation/test_atom_coverage_structural.py.
         """
         result = CoverageResult(
@@ -68,7 +68,7 @@ class TestCoverageResult:
     def test_is_complete_field_roundtrips_false(self):
         """The dataclass stores is_complete=False as given.
 
-        As above: a field round-trip, not a rule.  See
+        As above: a field round-trip, not a rule. See
         tests/unit/validation/test_atom_coverage_structural.py.
         """
         result = CoverageResult(

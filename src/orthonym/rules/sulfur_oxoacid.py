@@ -1,38 +1,38 @@
-"""P-67.1.4.4.2: sulfur-oxoacid acyl-oxy / -amino substituent prefixes.
+""": sulfur-oxoacid acyl-oxy / -amino substituent prefixes.
 
 When a sulfur oxoacid group is attached BY OXYGEN (chalcogen) OR NITROGEN to a
 compound that also carries a characteristic group senior to the sulfur acid for
 citation as principal group (e.g. a carboxylic acid), the sulfur group is cited
 as a substituent PREFIX, not as the parent
-(P-67.1.4.4.2, ``BlueBookV2/BlueBookV2.md:36484``):
+, ``the Blue Book Blue Book``):
 
-    3-(sulfooxy)propanoic acid                (PIN)  :36488
-    3-[(methoxysulfinyl)oxy]propanoic acid    (PIN)  :36490
-    3-[(chlorosulfonyl)oxy]propanoic acid     (PIN)  :36492
-    3-(sulfamoyloxy)propanoic acid            (PIN)  :36494
-    3-[(aminosulfinyl)oxy]propanoic acid      (PIN)  :36500   (NOT sulfinamoyloxy)
-    3-[(methoxysulfonyl)amino]propanoic acid  (PIN)  :36502
+    3-(sulfooxy)propanoic acid (PIN):36488
+    3-[(methoxysulfinyl)oxy]propanoic acid (PIN):36490
+    3-[(chlorosulfonyl)oxy]propanoic acid (PIN):36492
+    3-(sulfamoyloxy)propanoic acid (PIN):36494
+    3-[(aminosulfinyl)oxy]propanoic acid (PIN):36500 (NOT sulfinamoyloxy)
+    3-[(methoxysulfonyl)amino]propanoic acid (PIN):36502
 
 The generic path names this tail by skeletal ("a") replacement
 (``…-1,3-dioxa-2λ6-thiapropyl``) — a valid, round-tripping, but NON-PIN form.
 
 The S-oxoacid acyl group is ``{X}sulfonyl`` (n S=O double bonds = 2) or
 ``{X}sulfinyl`` (n = 1), where X is the single S ligand that is neither the
-linking O/N nor an oxo. Two Blue Book contractions apply (P-65.3.1 / the
-substituent-prefix tables at :56857, :56859): ``hydroxysulfonyl`` -> ``sulfo``
+linking O/N nor an oxo. Two Blue Book contractions apply / the
+substituent-prefix tables at:56857,:56859): ``hydroxysulfonyl`` -> ``sulfo``
 and ``aminosulfonyl`` -> ``sulfamoyl``. ``aminosulfinyl`` is NOT contracted
-(explicitly ``[not …sulfinamoyloxy…]`` at :36500).
+(explicitly ``[not …sulfinamoyloxy…]`` at:36500).
 
 Every function fails closed (returns ``None``) on any S outside the neutral
 mono/di-oxo acyl class (charged/radical S, ring S, an unexpected ligand set,
-a carbon-R sulfonyl, a plain thioether); the top-level SELF-01/OPSIN round-trip
+a carbon-R sulfonyl, a plain thioether); the top-level /OPSIN round-trip
 gate keeps 0-wrong on whatever is emitted.
 """
 from typing import List, Optional
 
 from rdkit import Chem
 
-# X ligand -> substituent-prefix stem (P-67.1.4.4.2 ligand set)
+# X ligand -> substituent-prefix stem ligand set)
 _HALOGEN = {9: "fluoro", 17: "chloro", 35: "bromo", 53: "iodo"}
 
 
@@ -57,7 +57,7 @@ def _ligand_prefix(mol, x_idx: int, s_idx: int) -> Optional[str]:
     ``-OH`` -> ``hydroxy``, ``-Cl`` -> ``chloro``, ``-O-CH3`` -> ``methoxy``
     (alkoxy via the ordinary substituent cascade), ``-NH2`` -> ``amino``.
     Returns ``None`` (fail closed) for anything else (a carbon-R sulfonyl, a
-    substituted amino, a charged ligand, ...).
+    substituted amino, a charged ligand,...).
     """
     a = mol.GetAtomWithIdx(x_idx)
     if a.GetFormalCharge() != 0 or a.GetNumRadicalElectrons():
@@ -122,7 +122,7 @@ def _sulfur_oxoacid_acyl(mol, s_idx: int, link_idx: int) -> Optional[str]:
     if xp is None:
         return None
     acyl = xp + ("sulfonyl" if n_oxo == 2 else "sulfinyl")
-    # P-65.3.1 contractions (the -sulfinyl forms are NOT contracted: :36500).
+    # contractions (the -sulfinyl forms are NOT contracted::36500).
     if acyl == "hydroxysulfonyl":
         return "sulfo"
     if acyl == "aminosulfonyl":
@@ -132,11 +132,11 @@ def _sulfur_oxoacid_acyl(mol, s_idx: int, link_idx: int) -> Optional[str]:
 
 def name_sulfur_oxoacid_oxy_substituent(
         mol, o_idx: int, from_idx: int) -> Optional[str]:
-    """O-linked ``-O-S(oxoacid)`` as an oxy substituent prefix (P-67.1.4.4.2).
+    """O-linked ``-O-S(oxoacid)`` as an oxy substituent prefix.
 
     ``o_idx`` is the ester/bridging oxygen (the fragment attach atom);
     ``from_idx`` is its parent-side neighbour. Returns ``sulfooxy`` /
-    ``sulfamoyloxy`` (single compound tokens, P-16.3.3) or ``(chlorosulfonyl)oxy``
+    ``sulfamoyloxy`` (single compound tokens, or ``(chlorosulfonyl)oxy``
     / ``(aminosulfinyl)oxy`` / ``(methoxysulfinyl)oxy`` (an internal paren the
     caller's enclosure escalates to brackets), or ``None`` (fail closed).
     """

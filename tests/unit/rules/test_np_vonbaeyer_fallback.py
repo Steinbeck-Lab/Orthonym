@@ -1,7 +1,7 @@
 """ giants Engine 3: best-effort von-Baeyer downgrade of a retained
 natural-product parent hydride.
 
-The P-101.2.7 Table 10.1 stereoparents (`ursane`, `hopane`, `cevane`,...) ARE
+The stereoparents (`ursane`, `hopane`, `cevane`,...) ARE
 the PIN, and `namer._final_opsin_validity_gate` whitelists them (its
 `np_stereoparent` carve-out) because OPSIN 2.9.0 cannot parse a single one of
 them. Correct for the PIN tiers -- but on the best-effort path it costs a
@@ -98,7 +98,7 @@ def test_best_effort_keeps_the_retained_name_when_systematic_does_not_rt(retaine
 
 @pytest.mark.parametrize("retained", KEEPS)
 def test_kept_row_provenance_is_not_mislabelled_general_engine(retained):
-    """FABLE RISK-1 regression: the RT-probe runs the general-engine recovery,
+    """FABLE regression: the RT-probe runs the general-engine recovery,
     which stamps `source="general_engine"` before the RT gate can decline it. A
     KEPT retained name must NOT inherit that label (it would skew the cohort /
     refusal-census attribution the project ranks levers by).

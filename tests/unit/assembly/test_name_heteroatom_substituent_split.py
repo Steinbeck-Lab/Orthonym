@@ -1,17 +1,17 @@
-"""Unit tests for the Phase 160.2 Plan-03 _name_heteroatom_substituent 3-way split.
+"""Unit tests for the a phase Plan-03 _name_heteroatom_substituent 3-way split.
 
-Per CONTEXT D-05 + AUDIT §4: the 512-LOC `_name_heteroatom_substituent` was split
+Per internal notes + AUDIT: the internal notes `_name_heteroatom_substituent` was split
 into a thin orchestrator (Tier-0.5 + attach_atom + symbol dispatch) plus three
 IUPAC-taxonomy helpers (N-attached / C-attached-ring / C-attached-chain) all
-staying in composer.py per CONTEXT D-13 boundary preservation.
+staying in composer.py per internal notes boundary preservation.
 
 This test module verifies:
   - Orchestrator dispatches correctly by attach-atom symbol + structural class.
-  - Each helper preserves the verbatim mechanical-lift behavior (Phase 145.1 D-09).
+  - Each helper preserves the verbatim mechanical-lift behavior (a phase).
   - All 4 functions are importable from composer module.
   - DECOMP-05 closure: NO function in composer.py exceeds 500 LOC.
 
-Per Phase 145.1 D-09 mechanical-lift discipline: ZERO behavioral change is the
+Per a phase mechanical-lift discipline: ZERO behavioral change is the
 contract; canary --mode delta verifies byte-identical naming end-to-end.
 """
 from typing import List
@@ -49,7 +49,7 @@ def _find_substituent_atoms(mol, parent_atom_idx: int, exclude_atoms: set) -> Li
 
 
 # ====================================================================
-# §1 — Orchestrator dispatch tests
+# — Orchestrator dispatch tests
 # ====================================================================
 
 
@@ -58,7 +58,7 @@ class TestOrchestratorDispatch:
 
     def test_orchestrator_dispatches_to_n_helper_for_amino_substituent(self):
         """N-attached substituent (e.g., N-ethylpropylamine N-branch) dispatches
-        to _name_n_attached_substituent_fallback per CONTEXT D-05."""
+        to _name_n_attached_substituent_fallback per internal notes."""
         # Construct N-ethyl-propanamine: parent = propyl chain, substituent = N(H)(C2H5)
         # Use a structure where N substituent's attachment is via N
         # SMILES: CCCNC -> N-methylpropan-1-amine
@@ -78,7 +78,7 @@ class TestOrchestratorDispatch:
         assert "amino" in result, f"expected amino-containing prefix; got {result!r}"
 
     def test_orchestrator_returns_none_for_o_attached_substituent(self):
-        """O-attached substituent returns None inline (CONTEXT D-05; FG-prefix path
+        """O-attached substituent returns None inline (internal notes; FG-prefix path
         handled elsewhere). This is the O-branch returning None directly from
         the orchestrator (not delegated to a helper)."""
         # 4-hydroxybutanoic acid: O bonded to C of chain; pure -OH
@@ -88,12 +88,12 @@ class TestOrchestratorDispatch:
         principal_chain = [1, 2, 3, 4]  # 4-carbon chain
         sub_atoms = [0]  # just the OH-O
         result = _name_heteroatom_substituent(mol, sub_atoms, principal_chain)
-        # Per CONTEXT D-05, O-branch returns None inline in orchestrator
+        # Per internal notes, O-branch returns None inline in orchestrator
         assert result is None, f"expected None for O-branch; got {result!r}"
 
     def test_orchestrator_dispatches_to_c_chain_helper_for_alkyl_substituent(self):
         """C-attached chain-only substituent dispatches to
-        _name_c_attached_chain_substituent_fallback per CONTEXT D-05."""
+        _name_c_attached_chain_substituent_fallback per internal notes."""
         # 4-methylpentanoic acid: substituent = methyl (single C, no ring)
         # SMILES: CC(C)CCC(=O)O -> 4-methylpentanoic acid (parent 5-chain + methyl sub)
         mol = Chem.MolFromSmiles("CC(C)CCC(=O)O")
@@ -111,7 +111,7 @@ class TestOrchestratorDispatch:
         # Use a simpler structure that exercises C-chain fallback:
         # bromomethyl-substituted pentanoic acid via complex structure
         # Simplest: just verify the orchestrator path itself by calling helper directly
-        # — handled in §2 tests below.
+        # — handled in tests below.
         # For orchestrator test: use cyclohexylacetic acid substituent route
         # Actually the simplest is to verify orchestrator returns the SAME result
         # as the helper for a synthetic case. Skip via parametric path.
@@ -132,7 +132,7 @@ class TestOrchestratorDispatch:
 
     def test_orchestrator_dispatches_to_c_ring_helper_for_phenyl_substituent(self):
         """C-attached ring-containing substituent dispatches to
-        _name_c_attached_ring_substituent_fallback per CONTEXT D-05."""
+        _name_c_attached_ring_substituent_fallback per internal notes."""
         # 3-phenylpropanoic acid: substituent = phenyl
         # SMILES: c1ccccc1CCC(=O)O
         mol = Chem.MolFromSmiles("c1ccccc1CCC(=O)O")
@@ -142,7 +142,7 @@ class TestOrchestratorDispatch:
         principal_chain = [6, 7, 8]
         sub_atoms = [0, 1, 2, 3, 4, 5]
         result = _name_heteroatom_substituent(mol, sub_atoms, principal_chain)
-        # The C-ring helper returns "phenyl" (Phase 79-01 direct ring identification path)
+        # The C-ring helper returns "phenyl" (a phase-01 direct ring identification path)
         # or some ring-name prefix. Must be NOT None.
         # Note: SMILES atom indexing puts benzene ring atoms at 0-5
         # but the attach_atom must be the C that bonds to chain.
@@ -155,7 +155,7 @@ class TestOrchestratorDispatch:
 
 
 # ====================================================================
-# §2 — N-attached helper tests
+# — N-attached helper tests
 # ====================================================================
 
 
@@ -201,7 +201,7 @@ class TestNAttachedHelper:
 
     def test_n_helper_returns_anilino_for_aniline_substituent(self):
         """N-attached substituent with phenyl ring (aniline) returns 'anilino'
-        per the Phase 79-01 isolated-benzene check."""
+        per the a phase-01 isolated-benzene check."""
         # 4-anilinobutan-1-ol: c1ccc(NCCCCO)cc1 - phenyl-N-butanol
         # Parent = butanol (4 carbons + OH)
         # Substituent at C4 = -NH-phenyl
@@ -234,7 +234,7 @@ class TestNAttachedHelper:
 
 
 # ====================================================================
-# §3 — C-attached ring helper tests
+# — C-attached ring helper tests
 # ====================================================================
 
 
@@ -243,7 +243,7 @@ class TestCAttachedRingHelper:
 
     def test_c_ring_helper_handles_phenyl_substituent(self):
         """C-attached substituent that contains a phenyl ring should return
-        a ring-naming prefix (phenyl or similar) per Phase 79-01 direct ring path."""
+        a ring-naming prefix (phenyl or similar) per a phase-01 direct ring path."""
         # 3-phenylpropanoic acid: c1ccccc1CCC(=O)O
         mol = Chem.MolFromSmiles("c1ccccc1CCC(=O)O")
         # Find ring atoms + the C bonded to ring
@@ -269,8 +269,8 @@ class TestCAttachedRingHelper:
         result = _name_c_attached_ring_substituent_fallback(
             mol, sub_atoms, sub_set, chain_set, attach_atom
         )
-        # The Phase 79-01 direct-ring path should return "phenyl"
-        # If Phase 79-02 fused-het returns None (no fused het present), and
+        # The a phase-01 direct-ring path should return "phenyl"
+        # If a phase-02 fused-het returns None (no fused het present), and
         # direct-ring returns "phenyl", the helper returns "phenyl".
         # Allow either "phenyl" or fall-through behaviors.
         assert result is None or "phenyl" in result or result == "phenyl", (
@@ -332,9 +332,9 @@ class TestCAttachedRingHelper:
                     mol, sub_atoms, sub_set, chain_set, attach_atom
                 )
                 # The recursive paths are guarded by len(sub_atoms) <= 25; either:
-                #   - Phase 79-02 returns None (no fused het matches)
-                #   - Phase 79-01 direct-ring guard returns None (full sub atoms not all-ring)
-                #   - Recursive paths skipped (size guard)
+                # - a phase-02 returns None (no fused het matches)
+                # - a phase-01 direct-ring guard returns None (full sub atoms not all-ring)
+                # - Recursive paths skipped (size guard)
                 # → final result: None
                 assert result is None, f"expected None for >25 atom sub; got {result!r}"
             except Exception:
@@ -343,7 +343,7 @@ class TestCAttachedRingHelper:
 
 
 # ====================================================================
-# §4 — C-attached chain helper tests
+# — C-attached chain helper tests
 # ====================================================================
 
 
@@ -415,7 +415,7 @@ class TestCAttachedChainHelper:
 
 
 # ====================================================================
-# §5 — DECOMP-05 closure structural assertions
+# — DECOMP-05 closure structural assertions
 # ====================================================================
 
 
@@ -438,7 +438,7 @@ class TestDecomp05Closure:
         assert not outliers, f"DECOMP-05 outliers still present: {outliers}"
 
     def test_four_split_functions_all_present_in_composer(self):
-        """4 split functions exist in composer.py per CONTEXT D-13 in-place spec."""
+        """4 split functions exist in composer.py per internal notes in-place spec."""
         import ast
         from pathlib import Path
         composer_path = (Path(__file__).resolve().parents[3]
@@ -455,7 +455,7 @@ class TestDecomp05Closure:
         assert not missing, f"missing split functions: {missing}"
 
     def test_all_four_helpers_importable_from_composer(self):
-        """All 4 helpers are importable per CONTEXT D-13 (composer.py module surface)."""
+        """All 4 helpers are importable per internal notes (composer.py module surface)."""
         from orthonym.assembly.composer import (
             _name_heteroatom_substituent,
             _name_n_attached_substituent_fallback,

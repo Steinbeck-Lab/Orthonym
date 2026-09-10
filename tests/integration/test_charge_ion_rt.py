@@ -1,7 +1,7 @@
 """
-Phase 64: Charge and Ion Naming - Regression Tests
+a phase: Charge and Ion Naming - Regression Tests
 
-Phase 64 Accounting:
+a phase Accounting:
   Total compounds addressed: 31 of 39
   Categories fixed:
     A1 (single anions): 6 compounds -- -oate suffix via neutralize-then-name
@@ -15,7 +15,7 @@ Phase 64 Accounting:
   InChI RT: 4 (full round-trip match from Plan 01 fixes)
   Still failing: 8 (steroid vocabulary, large molecule naming, metal complexes)
 
-Tests for compounds fixed in Phase 64:
+Tests for compounds fixed in a phase:
 - Plan 01: A1 single anions, A3 salts (guanidinium, hydrogen prefix, etc.)
 - Plan 02: A4 phosphate dianions, B1 phospholipid zwitterions, amino acid zwitterions
 
@@ -239,7 +239,7 @@ class TestAminoAcidZwitterionNaming:
         assert result == 'L-alanine', f"Expected L-alanine, got: {result}"
 
     def test_d_valine_zwitterion(self):
-        """v33 charged B1: this SMILES is the R (D) enantiomer, not L -- the
+        """ charged B1: this SMILES is the R (D) enantiomer, not L -- the
         table used to mislabel it 'L-valine'. VERIFIED via OPSIN: the input's
         InChIKey (KZSNJWFQEVHDMF-SCSAIBSYSA-N) matches opsin_parse('D-valine'),
         not opsin_parse('L-valine') (KZSNJWFQEVHDMF-BYPYZUCNSA-N)."""
@@ -247,8 +247,8 @@ class TestAminoAcidZwitterionNaming:
         assert result == 'D-valine', f"Expected D-valine, got: {result}"
 
     def test_d_leucine_zwitterion(self):
-        """v33 charged B1: this SMILES is the R (D) enantiomer, not L -- the
-        table used to mislabel it 'L-leucine' (the original SPY finding).
+        """ charged B1: this SMILES is the R (D) enantiomer, not L -- the
+        table used to mislabel it 'L-leucine' (the original a trace finding).
         VERIFIED via OPSIN: the input's InChIKey
         (ROHFNLRQFUQHCH-RXMQYKEDSA-N) matches opsin_parse('D-leucine')."""
         result = name_compound('CC(C)C[C@@H]([NH3+])C([O-])=O')
@@ -295,7 +295,7 @@ class TestAminoAcidZwitterionNaming:
 
 
 # ===================================================================
-# Phase 71: Internal Charge Filtering Tests
+# a phase: Internal Charge Filtering Tests
 # ===================================================================
 
 class TestInternalChargeFiltering:
@@ -443,7 +443,7 @@ class TestGetIonSitesFiltering:
         assert len(sites['anions']) == 0
 
     def test_p74_anionic_center_precedence(self):
-        """IUPAC P-74: anionic center takes precedence for parent selection."""
+        """IUPAC: anionic center takes precedence for parent selection."""
         from orthonym.perception.ions import get_ion_sites
         mol = Chem.MolFromSmiles('O=C([O-])c1ccccc1[N+](=O)[O-]')
         sites = get_ion_sites(mol)

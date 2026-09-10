@@ -10,7 +10,7 @@ Tests the complete pipeline from SMILES to IUPAC name for:
 
 Validates a phase requirements (FUSED-01 through FUSED-07).
 
-Reference: IUPAC 2013 Blue Book, Section P-25 (Fused Ring Systems)
+Reference: IUPAC 2013 Blue Book, Section (Fused Ring Systems)
 """
 
 import pytest
@@ -294,7 +294,7 @@ class TestFusedHeterocycleE2E:
         ('c1ccc2ncccc2c1', 'quinoline'),
         ('c1ccc2cnccc2c1', 'isoquinoline'),
         ('c1ccc2[nH]cnc2c1', '1H-benzimidazole'),
-        #: the PIN carries the heteroatom locant (P-25.2.2.4,
+        #: the PIN carries the heteroatom locant,
         # the Blue Book "1-benzofuran (PIN) benzofuran";:13443 for
         # 1-benzothiophene). RETAINED_NAMES was corrected to the '1-' PIN form.
         ('c1ccc2occc2c1', '1-benzofuran'),

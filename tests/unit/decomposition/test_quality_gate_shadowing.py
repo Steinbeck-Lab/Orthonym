@@ -3,7 +3,7 @@
 `_name_quality_is_acceptable` rejects on a character count in several places.
 The FIRST of them,
 
-    if heavy_atoms > 15 and len(name) < heavy_atoms // 2:   # chars/HA < ~0.5
+    if heavy_atoms > 15 and len(name) < heavy_atoms // 2: # chars/HA < ~0.5
 
 is the strictest, and it is written without a division -- so a grep for
 `len(name) /` does not find it, and an audit that greps for the formula
@@ -102,7 +102,7 @@ def test_retained_core_name_on_a_large_molecule_still_falls_through():
     """`adenine` naming a 48-heavy-atom cofactor is not accepted.
 
     Exercises the retained-name ratio branch (0.146 < 0.25 -> fall through),
-    which the 40-molecule pipeline spy never reached. Kept so that branch has
+    which the 40-molecule pipeline trace never reached. Kept so that branch has
     at least one executable witness.
     """
     mol = Chem.MolFromSmiles(COA_FRAGMENT)
@@ -126,7 +126,7 @@ def test_name_covers_molecule_accepts_cholesterol():
     # The one chars/HA guard measured to reject on the naming path. Z2 recorded
     # it rejecting this name for being 14 characters long (0.636 < 0.65).
     #
-    # ⚠ `ethyl stearate` is NOT the preferred name: BlueBookV2.md:29791 puts
+    # ⚠ `ethyl stearate` is NOT the preferred name: the Blue Book puts
     # `(PIN)` on `octadecanoic acid`, making `stearic` the non-PIN alternative.
     # It is used here ONLY as a constitution witness -- it denotes exactly this
     # molecule, so a COVERAGE predicate must not call it partial. Do not read

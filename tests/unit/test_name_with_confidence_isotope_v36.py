@@ -1,13 +1,13 @@
-"""v36-A3: name_with_confidence must honour the isotope decorator hook.
+"""-A3: name_with_confidence must honour the isotope decorator hook.
 
-FABLE cross-model review #1 found a 0-wrong hole: name() / name_tiered are
+FABLE cross-model review #1 found a 0-wrong hole: name / name_tiered are
 protected by an isotope hook (namer.py:2938) that routes an isotope-labeled
 mol through the fail-closed decorator BEFORE _name_impl strips the label, but
 name_with_confidence (namer.py) called _name_impl directly and skipped it.
 Result: name_with_confidence('[2H]C(Cl)(Cl)Cl') -> 'trichloromethane', silently
 dropping the D3 label and shipping the UNLABELED skeleton = a wrong molecule.
 
-SELF-01 cannot catch this: the isotope layer is InChIKey block 2, which the
+ cannot catch this: the isotope layer is InChIKey block 2, which the
 skeleton compare ignores; the OPSIN validity gate passes because the label-
 dropped name parses to the (real, unlabeled) structure. The decorator's own RT
 gate is the only protection, and name_with_confidence bypassed it.

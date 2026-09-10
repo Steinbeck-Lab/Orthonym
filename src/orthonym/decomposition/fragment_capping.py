@@ -4,7 +4,7 @@ Fragment capping for decomposition engine.
 After bond cleavage, replaces dummy atoms with H or OH to produce
 valid molecule fragments for recursive naming.
 
-IUPAC P-44.1: Principal characteristic group determines which side of a
+IUPAC: Principal characteristic group determines which side of a
 cleavage retains the parent suffix. Acid-side fragments are capped with OH
 to reconstruct the parent acid; alkyl/amine-side fragments are capped with H.
 """
@@ -20,7 +20,7 @@ def cleave_and_cap(mol, bond_infos: List[Dict], acid_side_oh: bool = True) -> Li
 
     Uses RDKit FragmentOnBonds to cleave, then replaces dummy atoms:
     - Acid-side fragments: cap with OH (produces carboxylic acid) if acid_side_oh=True
-      per IUPAC P-44.1 principal characteristic group preservation
+      per IUPAC principal characteristic group preservation
     - Alkyl/amine-side fragments: cap with H
 
     Fragment side labeling uses dummyLabels to track which dummy came from
@@ -28,7 +28,7 @@ def cleave_and_cap(mol, bond_infos: List[Dict], acid_side_oh: bool = True) -> Li
 
     Args:
         mol: RDKit Mol object
-        bond_infos: List of bond info dicts from find_cleavable_bonds()
+        bond_infos: List of bond info dicts from find_cleavable_bonds
         acid_side_oh: If True, cap acid-side fragments with OH
 
     Returns:
@@ -152,7 +152,7 @@ def cleave_and_cap(mol, bond_infos: List[Dict], acid_side_oh: bool = True) -> Li
 
                 # Alkyl-side dummy (label 2) on acid or middle fragment -> cap with OH or H
                 # Middle fragments (between two cleavage points) get OH on label-2
-                # to reconstruct the acid-side functional group (DECO-21).
+                # to reconstruct the acid-side functional group .
                 if iso == 2 and acid_side_oh and side in ("acid", "middle"):
                     atom.SetAtomicNum(8)  # Oxygen
                     atom.SetIsotope(0)

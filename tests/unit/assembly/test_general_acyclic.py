@@ -1,12 +1,12 @@
-"""Unit tests for Phase 160.2 Plan-02-02: general_acyclic catch-all handler.
+"""Unit tests for a phase Plan-02-02: general_acyclic catch-all handler.
 
-Per CONTEXT D-08 + ADR-19-02 §3.1: explicit catch-all (priority 99999,
+Per internal notes + -02: explicit catch-all (priority 99999,
 predicate=lambda *_: True) closing the Plan-02 fallthrough gap so
 dispatch_inner first-match-AND-succeeds-wins ALWAYS returns a non-None
 InnerDispatchResult.
 
-Per CONTEXT D-10 + RESEARCH §7: first-wave NamingResult emits tree=None.
-Full tree IR population deferred to v19+ phases.
+Per internal notes + RESEARCH: first-wave NamingResult emits tree=None.
+Full tree IR population deferred to + phases.
 """
 import pytest
 from rdkit import Chem
@@ -30,7 +30,7 @@ def test_is_general_acyclic_true_for_alkane():
 
 
 def test_is_general_acyclic_false_for_simple_amide():
-    """AP-160.2-06 CASE B refinement: predicate defers to inline amide branch
+    """.2-06 CASE B refinement: predicate defers to inline amide branch
     for single-amide cases (composer.py:917-919 inline guard mirror)."""
 
     class FakeFeatures:
@@ -41,7 +41,7 @@ def test_is_general_acyclic_false_for_simple_amide():
 
 
 def test_is_general_acyclic_false_for_amine():
-    """AP-160.2-06 CASE B refinement: predicate defers to inline amine branch
+    """.2-06 CASE B refinement: predicate defers to inline amine branch
     for secondary/tertiary amine cases (composer.py:919 inline guard mirror)."""
 
     class FakeFeatures:
@@ -78,7 +78,7 @@ def _features_for(smi: str):
     """Build fully-classified features for a SMILES via Orthonym pipeline.
 
     Mirrors the full perception + classification pipeline used by
-    Orthonym.name() so handler tests run against features in the exact
+    Orthonym.name so handler tests run against features in the exact
     shape they would receive during dispatch_inner invocation.
     """
     from orthonym.namer import Orthonym
@@ -93,14 +93,14 @@ def _features_for(smi: str):
 
 
 def test_name_general_acyclic_returns_naming_result():
-    """Handler returns NamingResult instance per CONTEXT D-10 contract."""
+    """Handler returns NamingResult instance per internal notes contract."""
     features = _features_for("CCCC")
     result = name_general_acyclic(features, mol=features.mol, style="pin")
     assert isinstance(result, NamingResult)
 
 
 def test_name_general_acyclic_emits_structured_tree():
-    """Phase 165 SCORE-01: general_acyclic now emits a STRUCTURED NameTreeNode
+    """a phase SCORE-01: general_acyclic now emits a STRUCTURED NameTreeNode
     (superseding the Phase-160 first-wave tree=None). The tree round-trips
     byte-identically to the returned name."""
     from orthonym.assembly.name_tree import NameTreeNode
@@ -115,7 +115,7 @@ def test_name_general_acyclic_emits_structured_tree():
 
 
 def test_name_general_acyclic_butane():
-    """Catch-all names simple butane as 'butane' per IUPAC P-14 + P-23 + P-44."""
+    """Catch-all names simple butane as 'butane' per IUPAC + +."""
     features = _features_for("CCCC")
     result = name_general_acyclic(features, mol=features.mol, style="pin")
     assert result.name == "butane"

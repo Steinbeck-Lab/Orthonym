@@ -102,7 +102,7 @@ class TestWrongIsomerRegressionLocks:
                 )
 
     def test_quinuclidine_is_not_a_pin_headline(self):
-        """BB:9881 / BB:9893 (P-23.7): general nomenclature only."""
+        """the Blue Book / the Blue Book: general nomenclature only."""
         from orthonym.data import ALL_RETAINED_NAMES, GENERAL_RETAINED_NAMES
 
         canon = Chem.CanonSmiles(REF["quinuclidine"])
@@ -201,7 +201,7 @@ class TestBicycloTableInvariants:
             seen[k] = name
 
     def test_cubane_entry_is_real_cubane(self):
-        """BB:9881/9889 (P-23.7): cubane is retained AND a PIN."""
+        """the Blue Book: cubane is retained AND a PIN."""
         keys = [k for k, v in BICYCLO_RETAINED_NAMES.items() if v == "cubane"]
         assert len(keys) == 1, f"expected exactly one cubane key, got {keys}"
         assert skeleton(keys[0]) == skeleton(REF["cubane"])

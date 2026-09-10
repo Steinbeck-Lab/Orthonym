@@ -1,14 +1,14 @@
-"""TDD RED tests for name_substituent() five-tier cascade and parent_to_prefix(, attach_locant=ATTACH_LOCANT_UNKNOWN) extensions.
+"""TDD RED tests for name_substituent five-tier cascade and parent_to_prefix(, attach_locant=ATTACH_LOCANT_UNKNOWN) extensions.
 
-Tests the Phase 85 deliverables:
+Tests the a phase deliverables:
 - name_substituent(mol, frag_atoms, attach_idx) -> str (never None)
 - parent_to_prefix(, attach_locant=ATTACH_LOCANT_UNKNOWN) extended for ester, amide, nitrile, cyclic parent names
 
 References:
-    IUPAC 2013 P-31.1.3 (substituent prefix naming)
-    IUPAC 2013 P-65.6.3 (ester prefixes)
-    IUPAC 2013 P-66.1.1.4 (amide prefixes)
-    IUPAC 2013 P-66.1.4.1 (nitrile prefixes)
+    IUPAC 2013 (substituent prefix naming)
+    IUPAC 2013 (ester prefixes)
+    IUPAC 2013 (amide prefixes)
+    IUPAC 2013 (nitrile prefixes)
 """
 
 import pytest
@@ -31,11 +31,11 @@ def _make_mol(smiles):
 
 
 # ============================================================================
-# TestNeverNone: name_substituent() returns non-None string for all inputs
+# TestNeverNone: name_substituent returns non-None string for all inputs
 # ============================================================================
 
 class TestNeverNone:
-    """Verify name_substituent() never returns None for any valid fragment."""
+    """Verify name_substituent never returns None for any valid fragment."""
 
     def test_simple_methyl(self):
         """Single carbon fragment -> 'methyl'."""
@@ -159,8 +159,8 @@ class TestTierOrdering:
     """Verify that the correct tier is selected in the cascade."""
 
     def test_retained_isopropyl(self):
-        """Branched 3C at the centre -> 'propan-2-yl' (F-T9/DD6 RET-02: the PIN is the
-        located form; 'isopropyl' is P-29.6.2.2 general-only and no longer emitted)."""
+        """Branched 3C at the centre -> 'propan-2-yl' (F-T9/DD6: the PIN is the
+        located form; 'isopropyl' is general-only and no longer emitted)."""
         mol = _make_mol("CC(C)C")  # isobutane: C0-C1(-C2)-C3
         # Fragment = {0, 1, 2}, attached at C1 (bonded to parent C3)
         result = name_substituent(mol, {0, 1, 2}, attach_idx=1)
@@ -237,7 +237,7 @@ class TestAttachIdx:
         assert result == "propyl"
 
     def test_propyl_attached_at_middle(self):
-        """3-carbon fragment attached at middle -> 'propan-2-yl' (F-T9/DD6 RET-02)."""
+        """3-carbon fragment attached at middle -> 'propan-2-yl' (F-T9/DD6)."""
         mol = _make_mol("CC(C)C")  # 2-methylpropane
         # Fragment {0, 1, 2} with attach at atom 1 (the branching center)
         result = name_substituent(mol, {0, 1, 2}, attach_idx=1)
@@ -260,14 +260,14 @@ class TestParentToPrefixEster:
     """Verify parent_to_prefix handles ester (-oate) names."""
 
     def test_ethanoate_ester_one_position_stem(self):
-        """P-65.6.3 + P-14.3.4.6: a one-position stem needs no locant, so the
+        """ +: a one-position stem needs no locant, so the
         carbon count cannot mis-place one. 'ethanoate' -> 'carboxymethyl'."""
         result = parent_to_prefix("ethanoate", 2, attach_locant=ATTACH_LOCANT_UNKNOWN)
         assert result == "carboxymethyl"
 
     @pytest.mark.parametrize("parent,clen", [("propanoate", 3), ("butanoate", 4)])
     def test_longer_esters_decline_the_count_derived_locant(self, parent, clen):
-        """v29 residue Task A: the carboxy locant was read off the whole-fragment
+        """ residue Task A: the carboxy locant was read off the whole-fragment
         carbon COUNT, which is not a proof of the fragment's shape."""
         assert parent_to_prefix(
             parent, clen, attach_locant=ATTACH_LOCANT_UNKNOWN) is None
@@ -281,7 +281,7 @@ class TestParentToPrefixAmide:
     """Verify parent_to_prefix handles amide names."""
 
     def test_propanamide_declines_the_count_derived_locant(self):
-        """v29 residue Task A -- see test_longer_esters_decline... above.
+        """ residue Task A -- see test_longer_esters_decline... above.
         The whole-molecule name is unaffected where the chain is proven."""
         assert parent_to_prefix(
             "propanamide", 3, attach_locant=ATTACH_LOCANT_UNKNOWN) is None
@@ -308,7 +308,7 @@ class TestParentToPrefixNitrile:
     """Verify parent_to_prefix handles nitrile names."""
 
     def test_propanenitrile_declines_the_count_derived_locant(self):
-        """v29 residue Task A -- see test_longer_esters_decline... above."""
+        """ residue Task A -- see test_longer_esters_decline... above."""
         assert parent_to_prefix(
             "propanenitrile", 3, attach_locant=ATTACH_LOCANT_UNKNOWN) is None
 
@@ -360,7 +360,7 @@ class TestParentToPrefixCyclic:
 # ============================================================================
 
 class TestFusedRingSubstituentFallback:
-    """Verify _identify_fused_substituent() no longer returns None for simple C subs."""
+    """Verify _identify_fused_substituent no longer returns None for simple C subs."""
 
     def test_bfs_collect_all_basic(self):
         """_bfs_collect_all collects all reachable atoms excluding excluded set."""
@@ -447,7 +447,7 @@ class TestRingNameTokensReplacement:
 
 
 class TestWR06MultiStereocenterSubstituentLocants:
-    """WR-06 (code review 2026-06-02) — TRACKING xfail for the known
+    """ (code review 2026-06-02) — TRACKING xfail for the known
     multi-stereocenter substituent locant defect.
 
     A substituent that itself carries >=2 stereocenters currently gets a
@@ -455,7 +455,7 @@ class TestWR06MultiStereocenterSubstituentLocants:
     '(2R,3R)-(2R)-2-bromochloropropyl'. The proper fix threads the substituent's
     OWN IUPAC numbering out of name_fragment_recursively and de-duplicates the
     recursive stereo descriptor — high blast radius, ~0 corpus reach, and the
-    malformed output is already OPSIN-gated by SUB-03 in production. This xfail
+    malformed output is already OPSIN-gated by in production. This xfail
     pins the defect; it flips green when the root-cause fix lands.
     """
 

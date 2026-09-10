@@ -1,10 +1,10 @@
-"""v27 Phase S Task 2 — native ring-parent R/S on the general engine.
+""" Phase S Task 2 — native ring-parent R/S on the general engine.
 
 Empirical REFRAME (probed 2026-07-22): the von-Baeyer polyene path ALREADY
 expresses ring-parent R/S completely — tetrahedral R/S, pseudoasymmetric r/s,
 and partial-saturation fused-aromatic (mancude) parents (every ring atom carries
 an ``atom_to_locant`` entry, so ``_stereo_prefix`` covers them). These tests
-LOCK that behaviour and verify the one hardening PS-2 adds: the fusion-PIN
+LOCK that behaviour and verify the one hardening adds: the fusion-PIN
 early-return no longer ships a stereo-dropping bare fusion word — a stereo-
 bearing mancude parent falls through to the stereo-expressing polyene form.
 """
@@ -52,7 +52,7 @@ def test_vonbaeyer_cage_diol_rs_complete():
 
 
 def test_pseudoasymmetric_lowercase_rs():
-    """Pseudoasymmetric centres emit lowercase r/s (P-92.1.4.2/.4.4)."""
+    """Pseudoasymmetric centres emit lowercase r/s /.4.4)."""
     _, name = _name_via_engine("C[C@H]1CC2CCC(C1)[C@@H]2C")
     assert name
     assert ("r" in name or "s" in name)  # (3s,8s)-... form
@@ -77,7 +77,7 @@ def test_carboxylic_acid_cage_three_centres_complete():
 
 
 def test_achiral_mancude_parent_still_bare_fusion_or_polyene():
-    """The PS-2 guard is byte-identical for an achiral mancude parent
+    """The guard is byte-identical for an achiral mancude parent
     (nd == 0 -> guard passes): naphthalene names without any stereo token."""
     mol, name = _name_via_engine("c1ccc2ccccc2c1")
     assert name

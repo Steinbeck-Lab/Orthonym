@@ -1,21 +1,21 @@
-"""WS-A among-rings gate: corpus integrity + the Phase-171 regression guard.
+""" among-rings gate: corpus integrity + the Phase-171 regression guard.
 
 The among-rings PIN gold corpus (benchmarks/the gold set/among_rings_gold.json)
-is the authoritative gate for the WS-A parent-selection chokepoint — it is
+is the authoritative gate for the parent-selection chokepoint — it is
 scored by scripts/pin_strict_eval.py. This module is the *fast* (OPSIN-free)
 companion: it locks the corpus schema, asserts every current PROTECT row
 stays correct, and encodes the one regression that the corpus rows alone
 cannot express — the Phase-171 CHEBI:59269 stereo-drop.
 
-Phase-171 finding (reproduced this session in an isolated worktree): the P-1
-trial that made the P-44.2 among-rings winner authoritative flipped
+Phase-171 finding (reproduced this session in an isolated worktree): the
+trial that made the among-rings winner authoritative flipped
 4-cyclohexylpyridine and 2-phenylfuran correctly but regressed the
 OPSIN-self-test-500 by exactly one row — CHEBI:59269. The root cause is NOT
 the parent decision itself; it is a DOWNSTREAM coupling: the molecule's true
 parent is the propan-1-amine CHAIN (amine is the PCG, both rings are mere
 substituents), but flipping features.principal_ring from the benzene to the
 pyridine ring perturbed handler dispatch on a chain-parented molecule and the
-(3S) stereodescriptor was dropped. The WS-A S2 step (deleting size_diff>=3)
+(3S) stereodescriptor was dropped. The S2 step (deleting size_diff>=3)
 must therefore NOT reassign principal_ring when the chain is the parent, and
 must leave the chain handler's stereo emission intact.
 """
@@ -59,7 +59,7 @@ class TestCorpusIntegrity:
 
 class TestProtectRowsStayCorrect:
     """Fast (OPSIN-free) regression tripwire: every PROTECT row must keep
-    producing its expected PIN (or an accept_also spelling). The WS-A
+    producing its expected PIN (or an accept_also spelling). The
     chokepoint must not regress any of these."""
 
     @pytest.mark.parametrize("row", [
@@ -78,7 +78,7 @@ class TestPhase171StereoGuard:
 
     def test_stereodescriptor_survives(self):
         # The (3S) configuration MUST appear. The Phase-171 trial dropped it;
-        # any WS-A parent change that perturbs chain-parented stereo emission
+        # any parent change that perturbs chain-parented stereo emission
         # will fail here. Spelling-robust: only the descriptor is asserted.
         out = name_compound(self.SMILES).lower()
         assert "3s" in out.replace("(", "").replace(")", ""), (

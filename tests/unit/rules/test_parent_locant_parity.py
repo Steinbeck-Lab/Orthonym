@@ -4,21 +4,21 @@ Six ring-type parity tests proving that ``_build_ring_pos(ring_set, ring_info)``
 returns locants byte-equivalent to what the corresponding ring-type handler
 orient function (or stored authoritative numbering) produces.
 
-Source: https://iupac.qmul.ac.uk/BlueBook/P4.html P-44.1
-Source: https://iupac.qmul.ac.uk/BlueBook/P1.html P-14.4(g), P-14.5.2
-Source: https://iupac.qmul.ac.uk/BlueBook/P2.html P-25, P-25.3
-Source: AUTONOM-1990 §3 (Wisniewski et al., J. Chem. Inf. Comput. Sci. 30, 324-332)
+Source: https://iupac.qmul.ac.uk/BlueBook/P4.html
+Source: https://iupac.qmul.ac.uk/BlueBook/P1.html (g),
+Source: https://iupac.qmul.ac.uk/BlueBook/P2.html,
+Source: AUTONOM-1990 (Wisniewski et al., J. Chem. Inf. Comput. Sci. 30, 324-332)
         — criterion order (a)-(f) for symmetric-ring numbering.
-Source: a phase CONTEXT,,,.
+Source: a phase internal notes,,,.
 
 Per a phase the criterion order applied within each handler orient
-function matches AUTONOM §3 (a)-(f) AND IUPAC P-14.5 / P-14.4:
-  (a) lowest locants for principal characteristic group (P-14.3.5)
-  (b) lowest locants for indicated hydrogens (P-31.1.4 / P-25.7.1)
-  (c) lowest locants for multiple bonds (P-14.3.5 / P-31.1.4)
-  (d) maximum number of substituents (P-14.5.2 secondary)
-  (e) lowest locants for substituents (P-14.3.5)
-  (f) lowest locants for substituents in alphabetical citation order (P-14.4(g))
+function matches AUTONOM (a)-(f) AND IUPAC /:
+  (a) lowest locants for principal characteristic group
+  (b) lowest locants for indicated hydrogens /
+  (c) lowest locants for multiple bonds /
+  (d) maximum number of substituents secondary)
+  (e) lowest locants for substituents
+  (f) lowest locants for substituents in alphabetical citation order (g))
 """
 import pytest
 from rdkit import Chem
@@ -38,16 +38,16 @@ from orthonym.namer import (
 def test_benzene_toluene_substituent_locant_1():
     """Toluene (Cc1ccccc1): the methyl-bearing ring C gets locant 1.
 
-    Criterion: AUTONOM §3 (e) lowest substituent locants; P-14.4(g) lowest
+    Criterion: AUTONOM (e) lowest substituent locants; (g) lowest
     locants for substituents in alphabetical citation order. With a single
     substituent the only constraint is "place it at C1" — orient_benzene
     gives the substituent-bearing aromatic C the locant 1 and the dispatch
     helper consumes that result via _build_ring_info_for_parent_selection
-    branch 3 (BL-2 fix).
+    branch 3 (fix).
 
-    Source: https://iupac.qmul.ac.uk/BlueBook/P1.html P-14.4(g)
-    Source: AUTONOM-1990 §3 (e)-(f).
-    Source: a phase CONTEXT branch 3, (a)-(f), Plan 02 BL-2.
+    Source: https://iupac.qmul.ac.uk/BlueBook/P1.html (g)
+    Source: AUTONOM-1990 (e)-(f).
+    Source: a phase internal notes branch 3, (a)-(f), Plan 02.
     """
     mol = Chem.MolFromSmiles('Cc1ccccc1')
     features = compute_features(mol)
@@ -81,16 +81,16 @@ def test_benzene_toluene_substituent_locant_1():
 # ============================================================================
 
 def test_pyridine_nitrogen_locant_1():
-    """Pyridine: N gets locant 1 per P-25.3 heteroatom seniority.
+    """Pyridine: N gets locant 1 per heteroatom seniority.
 
-    Criterion: AUTONOM §3 — heteroatom seniority anchor, then (e) lowest
+    Criterion: AUTONOM — heteroatom seniority anchor, then (e) lowest
     substituent locants. orient_heterocycle_with_substituents (branch 4 of
     the dispatch helper) places N at position 1 for pyridine.
 
-    Source: https://iupac.qmul.ac.uk/BlueBook/P2.html P-25.3
-    Source: https://iupac.qmul.ac.uk/BlueBook/P4.html P-44.1
-    Source: AUTONOM-1990 §3 (heteroatom anchor, then (e)).
-    Source: a phase CONTEXT branch 4,.
+    Source: https://iupac.qmul.ac.uk/BlueBook/P2.html
+    Source: https://iupac.qmul.ac.uk/BlueBook/P4.html
+    Source: AUTONOM-1990 (heteroatom anchor, then (e)).
+    Source: a phase internal notes branch 4,.
     """
     mol = Chem.MolFromSmiles('c1ccncc1')
     features = compute_features(mol)
@@ -121,18 +121,18 @@ def test_pyridine_nitrogen_locant_1():
 def test_morpholine_heteroatom_locants_1_and_4():
     """Morpholine (C1COCCN1): O=1, N=4. Lowest heteroatom locant set {1, 4}.
 
-    Criterion: AUTONOM §3 — heteroatom seniority/anchor + lowest heteroatom
-    locant set. P-25.3.1.3 heteroatom seniority for ring numbering ranks
+    Criterion: AUTONOM — heteroatom seniority/anchor + lowest heteroatom
+    locant set. heteroatom seniority for ring numbering ranks
     O > N (the order is F, Cl, Br, I, O, S, Se, Te, N, P,...), so when
     both O and N are present in the same ring the higher-priority O gets
     locant 1. The locant set {1, 4} is the lowest possible for a six-
     membered ring with two heteroatoms separated by two carbons.
 
-    Source: https://iupac.qmul.ac.uk/BlueBook/P2.html P-25.3.1.3
+    Source: https://iupac.qmul.ac.uk/BlueBook/P2.html
         (heteroatom seniority order for monocyclic Hantzsch-Widman names).
-    Source: https://iupac.qmul.ac.uk/BlueBook/P4.html P-44.1
-    Source: AUTONOM-1990 §3 (lowest heteroatom locants).
-    Source: a phase CONTEXT branch 4, (a)-(f).
+    Source: https://iupac.qmul.ac.uk/BlueBook/P4.html
+    Source: AUTONOM-1990 (lowest heteroatom locants).
+    Source: a phase internal notes branch 4, (a)-(f).
     """
     mol = Chem.MolFromSmiles('C1COCCN1')
     features = compute_features(mol)
@@ -149,7 +149,7 @@ def test_morpholine_heteroatom_locants_1_and_4():
     o_idx = next(
         a.GetIdx() for a in mol.GetAtoms() if a.GetSymbol() == 'O'
     )
-    # Per P-25.3.1.3 heteroatom seniority: O > N -> O at locant 1.
+    # Per heteroatom seniority: O > N -> O at locant 1.
     assert ring_pos[o_idx] == 1, (
         f"morpholine O (idx {o_idx}) must have locant 1 (P-25.3.1.3 "
         f"heteroatom seniority O > N), got {ring_pos[o_idx]}; full map: "
@@ -170,17 +170,17 @@ def test_morpholine_heteroatom_locants_1_and_4():
 def test_naphthalene_fusion_tuples_present():
     """Naphthalene: 8 peripheral int locants + 2 fusion tuples.
 
-    Criterion: AUTONOM §3 (b) lowest locants for indicated hydrogens / fused-
-    system rule. Per P-25 PAH numbering is FIXED, not reoriented per
+    Criterion: AUTONOM (b) lowest locants for indicated hydrogens / fused-
+    system rule. Per PAH numbering is FIXED, not reoriented per
     substituents. Per Plan 01 homogeneity coercion, the ring_pos dict
     is fully (int, str) tuples when ANY fusion atom appears — peripheral
-    locants are coerced from int N to (N, '') so downstream min()/sort()
-    operations stay type-safe (RESEARCH §3 Risk 3).
+    locants are coerced from int N to (N, '') so downstream min/sort
+    operations stay type-safe (RESEARCH Risk 3).
 
-    Source: https://iupac.qmul.ac.uk/BlueBook/P2.html P-25
-    Source: https://iupac.qmul.ac.uk/BlueBook/P4.html P-44.1
-    Source: AUTONOM-1990 §3 (b) — fused-system fixed numbering.
-    Source: a phase CONTEXT (tuple encoding), branch 2.
+    Source: https://iupac.qmul.ac.uk/BlueBook/P2.html
+    Source: https://iupac.qmul.ac.uk/BlueBook/P4.html
+    Source: AUTONOM-1990 (b) — fused-system fixed numbering.
+    Source: a phase internal notes (tuple encoding), branch 2.
     """
     mol = Chem.MolFromSmiles('c1ccc2ccccc2c1')
     features = compute_features(mol)
@@ -220,17 +220,17 @@ def test_naphthalene_fusion_tuples_present():
 def test_cyclohexane_sorted_fallback():
     """Cyclohexane (C1CCCCC1): no authoritative numbering — sorted fallback OK.
 
-    Criterion: AUTONOM §3 — pure-carbon monocycle has no criterion-
-    differentiated winner. P-14.5.2 ring symmetry makes any consistent
+    Criterion: AUTONOM — pure-carbon monocycle has no criterion-
+    differentiated winner. ring symmetry makes any consistent
     numbering equivalent for a homocyclic carbocycle with no substituents.
     Per a phase back-compat, _build_ring_info_for_parent_selection
     branch 7 returns None, and _build_ring_pos falls through to the sorted
     1-indexed mapping.
 
-    Source: https://iupac.qmul.ac.uk/BlueBook/P1.html P-14.5.2
-    Source: AUTONOM-1990 §3 (no criterion-differentiated winner for symmetric
+    Source: https://iupac.qmul.ac.uk/BlueBook/P1.html
+    Source: AUTONOM-1990 (no criterion-differentiated winner for symmetric
         homocyclic carbocycle).
-    Source: a phase CONTEXT branch 7,.
+    Source: a phase internal notes branch 7,.
     """
     mol = Chem.MolFromSmiles('C1CCCCC1')
     features = compute_features(mol)
@@ -255,16 +255,16 @@ def test_cyclohexane_sorted_fallback():
 def test_indole_fused_hetero_atom_mapping():
     """Indole (c1ccc2[nH]ccc2c1): byte-identical to match_fused_heterocycle_core.
 
-    Criterion: AUTONOM §3 — stored arrangement for cataloged fused systems
+    Criterion: AUTONOM — stored arrangement for cataloged fused systems
     (functionally equivalent: the FUSED_HETEROCYCLES registry stores the
     canonical IUPAC numbering, and branch 1 of the dispatch helper preserves
     that mapping byte-identical to honor (back-compat with the existing
     fused-heterocycle path that ships in pre-147 Orthonym).
 
-    Source: https://iupac.qmul.ac.uk/BlueBook/P2.html P-25
-    Source: https://iupac.qmul.ac.uk/BlueBook/P4.html P-44.1
-    Source: AUTONOM-1990 §3 — stored arrangement for cataloged systems.
-    Source: a phase CONTEXT branch 1, byte-identical.
+    Source: https://iupac.qmul.ac.uk/BlueBook/P2.html
+    Source: https://iupac.qmul.ac.uk/BlueBook/P4.html
+    Source: AUTONOM-1990 — stored arrangement for cataloged systems.
+    Source: a phase internal notes branch 1, byte-identical.
     """
     mol = Chem.MolFromSmiles('c1ccc2[nH]ccc2c1')
     features = compute_features(mol)
@@ -293,7 +293,7 @@ class TestVB:
     that the cascade-step-6 gate (`candidate_pool._has_iupac_locants`)
     consumes the resulting locants with FULL atom coverage.
 
-    Source: 151-CONTEXT.md / /; 151-AUDIT-A.md verdict
+    Source: 151-internal notes / /; internal notes-A.md verdict
     THIN_WRAPPER; a phase cascade-step-6 gate.
     """
 
@@ -394,7 +394,7 @@ class TestSpiro:
     that the cascade-step-6 gate consumes the resulting locants with
     FULL atom coverage.
 
-    Source: 151-CONTEXT.md /; 151-02-PLAN.md task 3.
+    Source: 151-internal notes /; 151-02-PLAN.md task 3.
     """
 
     @pytest.mark.unit
@@ -449,9 +449,9 @@ class TestSpiro:
 
 class TestMixedSpiroFused:
     """a phase-02 / /: cascade-step-6 fires for mixed
-    spiro/fused inputs that the AUTONOM §4 separable-parts builder names.
+    spiro/fused inputs that the AUTONOM separable-parts builder names.
 
-    Source: 151-CONTEXT.md / /; 151-02-PLAN.md task 3.
+    Source: 151-internal notes / /; 151-02-PLAN.md task 3.
     """
 
     @pytest.mark.unit
@@ -534,7 +534,7 @@ class TestRingAssembly:
     """a phase-03 /: cascade-step-6 fires for ring assemblies
     of size 3+ via Branch 7 in _build_ring_info_for_parent_selection.
 
-    Source: 151-CONTEXT.md /; 151-03-PLAN.md task 2.
+    Source: 151-internal notes /; 151-03-PLAN.md task 2.
     """
 
     @pytest.mark.unit

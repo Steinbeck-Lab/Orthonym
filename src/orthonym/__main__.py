@@ -2,8 +2,8 @@
 Entry point for `python -m orthonym`.
 
 Supports two modes:
-  python -m orthonym "CCO"          -> name a SMILES (existing CLI)
-  python -m orthonym validate "name" -> OPSIN round-trip validation (FMT-06)
+  python -m orthonym "CCO" -> name a SMILES (existing CLI)
+  python -m orthonym validate "name" -> OPSIN round-trip validation
 """
 
 import sys

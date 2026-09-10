@@ -562,10 +562,10 @@ def test_format_stereodescriptor_parametrized(descriptors, expected):
 # =============================================================================
 
 class TestAssignStereochemistryIdempotent:
-    """Tests for the marker-based idempotent guard in assign_stereochemistry()."""
+    """Tests for the marker-based idempotent guard in assign_stereochemistry."""
 
     def test_assign_stereochemistry_sets_marker(self):
-        """assign_stereochemistry() sets the marker property after first call."""
+        """assign_stereochemistry sets the marker property after first call."""
         from orthonym.perception.stereo import assign_stereochemistry, _CIP_ASSIGNED_PROP
 
         mol = Chem.MolFromSmiles('C[C@@H](O)CC')
@@ -583,11 +583,11 @@ class TestAssignStereochemistryIdempotent:
         assert mol.GetProp(_CIP_ASSIGNED_PROP) == '1'
 
     def test_assign_stereochemistry_idempotent_with_marker(self):
-        """assign_stereochemistry() skips re-assignment when marker already set."""
+        """assign_stereochemistry skips re-assignment when marker already set."""
         from orthonym.perception.stereo import assign_stereochemistry, _CIP_ASSIGNED_PROP
 
         mol = Chem.MolFromSmiles('C[C@@H](O)CC')
-        # Simulate the authoritative call in namer.py _perceive()
+        # Simulate the authoritative call in namer.py _perceive
         rdCIPLabeler.AssignCIPLabels(mol)
         mol.SetProp(_CIP_ASSIGNED_PROP, '1')
 
@@ -609,7 +609,7 @@ class TestAssignStereochemistryIdempotent:
             assert atom.GetProp('_CIPCode') == code
 
     def test_assign_stereochemistry_idempotent_bonds_with_marker(self):
-        """assign_stereochemistry() preserves E/Z bond codes when marker set."""
+        """assign_stereochemistry preserves E/Z bond codes when marker set."""
         from orthonym.perception.stereo import assign_stereochemistry, _CIP_ASSIGNED_PROP
 
         mol = Chem.MolFromSmiles('C/C=C/C')  # (E)-but-2-ene
@@ -634,7 +634,7 @@ class TestAssignStereochemistryIdempotent:
             assert bond.GetProp('_CIPCode') == code
 
     def test_assign_stereochemistry_assigns_if_no_marker(self):
-        """assign_stereochemistry() assigns CIP labels when no marker is present."""
+        """assign_stereochemistry assigns CIP labels when no marker is present."""
         from orthonym.perception.stereo import assign_stereochemistry, _CIP_ASSIGNED_PROP
 
         mol = Chem.MolFromSmiles('C[C@@H](O)CC')
@@ -749,7 +749,7 @@ class TestClusterFPseudoasymmetricSignResolution:
 
     @pytest.mark.unit
     def test_cyclobutane_diol_trans_matches_bb_verbatim_pin(self):
-        """BlueBookV2.md:45793 verbatim (PIN): '(1r,3r)-cyclobutane-1,3-diol'."""
+        """the Blue Book verbatim (PIN): '(1r,3r)-cyclobutane-1,3-diol'."""
         from orthonym import Orthonym
         o = Orthonym(_disable_opsin_validity_gate=True)
         assert o.name("O[C@@H]1C[C@@H](O)C1") == "(1r,3r)-cyclobutane-1,3-diol"
@@ -768,7 +768,7 @@ class TestClusterBSpiroCipCeiling:
     """Wave-8 P6 Cluster B reproduce-first (D-B1, load-bearing): does the CIP
     engine (centres OR rdCIPLabeler) assign R/S to the ring CH-Cl carbons of
     `Cl[C@H]1C[C@]2(C1)C[C@@H](Cl)C2` (2,6-dichlorospiro[3.3]heptane, BB
-    P-93.5.3.5 / BB L49267)?
+     / BB L49267)?
 
     Reproduced: NEITHER engine assigns a `_CIPCode` to either CH-Cl carbon
     (both show a defined chiral tag / RDKit's ``FindMolChiralCenters``

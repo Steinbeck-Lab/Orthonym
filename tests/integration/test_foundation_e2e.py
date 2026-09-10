@@ -1,7 +1,7 @@
 """
-End-to-end integration tests for Phase 1 Foundation.
+End-to-end integration tests for a phase Foundation.
 
-This file validates ALL Phase 1 success criteria and requirements.
+This file validates ALL a phase success criteria and requirements.
 """
 
 import pytest
@@ -9,7 +9,7 @@ from orthonym import name_compound
 
 
 class TestPhase1SuccessCriteria:
-    """Validate all 5 Phase 1 success criteria."""
+    """Validate all 5 a phase success criteria."""
 
     @pytest.mark.integration
     def test_sc1_simple_alkane(self):

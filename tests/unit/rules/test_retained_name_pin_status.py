@@ -4,7 +4,7 @@ Orthonym was emitting retained trivial names as if they were PINs. Origin: probi
 ``OC(=O)c1ccncc1`` gave ``isonicotinic acid`` while ``the Blue Book Blue Book``
 reads verbatim ``isonicotinic acid pyridine-4-carboxylic acid (PIN)``.
 
-Most of these sit in ONE Blue Book example block under §**P-63.1.1** "Retained names"
+Most of these sit in ONE Blue Book example block under §**** "Retained names"
 (``:26762``), which prints the non-preferred name immediately ABOVE the ``(PIN)``. Line
 numbers below were each verified individually with ``sed -n '<N>p'``:
 
@@ -22,7 +22,7 @@ non-preferred (BB line) PIN line PIN
 **nowhere** in the Blue Book (grep validated against the known positive ``1-naphthol``,
 found at ``:26818``), so they have no standing as PINs at all and the systematic form
 governs by default. ``indane`` / ``indoline`` / ``isoindoline`` are a third class, named
-verbatim as non-preferred by **P-54.4.3.2** (``:24256``).
+verbatim as non-preferred by **** (``:24256``).
 
 ★ THREE MEASURED LESSONS, each of which changed the fix:
 
@@ -50,7 +50,7 @@ def namer():
 
 class TestPinsNowEmitted:
     @pytest.mark.parametrize("smiles,expected,authority", [
-        # P-63.1.1 retained-name block: BB prints the PIN beside the trivial name
+        # retained-name block: BB prints the PIN beside the trivial name
         ("Oc1ccc(O)cc1", "benzene-1,4-diol", "BB:26806/:26808 (was `hydroquinone`)"),
         ("Oc1cccc(O)c1", "benzene-1,3-diol", "BB:26802/:26804 (was `resorcinol`)"),
         ("Oc1cccc2ccccc12", "naphthalen-1-ol", "BB:26818/:26820 (was `1-naphthol`)"),
@@ -63,7 +63,7 @@ class TestPinsNowEmitted:
         # not in the BB at all -> no PIN standing, systematic governs
         ("Oc1ccc2ccccc2c1", "naphthalen-2-ol", "not in BB (was `2-naphthol`)"),
         ("Oc1cccc(O)c1O", "benzene-1,2,3-triol", "not in BB (was `pyrogallol`)"),
-        # P-54.4.3.2 partially saturated heterocycles, the Blue Book verbatim
+        # partially saturated heterocycles, the Blue Book verbatim
     ])
     def test_pin_is_emitted(self, namer, smiles, expected, authority):
         assert namer.name(smiles) == expected, authority
@@ -97,13 +97,13 @@ class TestTheSuffixPromotionHalf:
 
     def test_amino_plus_ol_now_renders(self, namer):
         """Before the promotion this failed closed to a double prefix. `-ol` is senior
-        to `-amine` (P-41 Table 4.1: hydroxy class 17 > amine class 19, the Blue Book),
+        to `-amine`: hydroxy class 17 > amine class 19, the Blue Book),
         which is why the ol promotion is ordered FIRST — the amine promotion is guarded
         by `not suffix_groups`.
 
-        RB-1: the `-ol` is the principal characteristic group, so it must also claim the
+        : the `-ol` is the principal characteristic group, so it must also claim the
         LOWER of the two symmetry-equivalent locants BEFORE the amino prefix is considered
-        (P-14.4(c) "principal characteristic groups... (suffixes)", the Blue Book; naphthalene
+        (c) "principal characteristic groups... (suffixes)", the Blue Book; naphthalene
         example `6-carboxynaphthalen-2-yl`:3262). Was `1-aminonaphthalen-4-ol` (ol on the
         higher locant 4) — the PCG-anchor fix in `get_polycyclic_substituents` gives the
         `-ol` locant 1. Both forms round-trip identically via OPSIN; this is a RULE call."""
@@ -143,7 +143,7 @@ class TestDenyMechanismIsReached:
         """ Phase C: the indane-family rename has LANDED.
 
         The first attempt was reverted because the ``name`` field doubles as the
-        'spirobi' component (P-24.3.1); ``_name_spirobi_core`` now derives the hydro
+        'spirobi' component; ``_name_spirobi_core`` now derives the hydro
         prefixes from the graph and hoists them outside the bracket, so the two
         consumers no longer conflict. See ``test_spirobi_hydro_hoisting.py``.
 
@@ -207,7 +207,7 @@ class TestSuffixPriorityOrder:
         return re.findall(r"'([^']+)'", body)
 
     def test_ol_sits_between_carbaldehyde_and_amine(self):
-        """P-41 seniority:... > carbaldehyde > ol > amine."""
+        """ seniority:... > carbaldehyde > ol > amine."""
         pr = self._priority()
         assert "ol" in pr, f"the -ol suffix guard was removed: {pr}"
         assert "carbaldehyde" in pr and "amine" in pr, pr
@@ -235,7 +235,7 @@ class TestUnchangedControls:
         ("Nc1cccc2ccccc12", "naphthalen-1-amine"),   # the amine promotion still works
         ("OC(=O)c1cccc2ccccc12", "naphthalene-1-carboxylic acid"),
         ("Cc1cccc2ccccc12", "1-methylnaphthalene"),
-        # P-54.4.3.2's other list-mates and near neighbours: all already correct,
+        # 's other list-mates and near neighbours: all already correct,
         # which is what sized this cluster at exactly three stale rows
         ("C1CCc2ccccc2O1", "3,4-dihydro-2H-1-benzopyran"),
         ("C1CCc2ccccc2N1", "1,2,3,4-tetrahydroquinoline"),
@@ -261,7 +261,7 @@ class TestKnownAdjacentDefect:
 class TestIndaneFamilyUnblocked:
     """indane / indoline / isoindoline -- derived, attempted, reverted, then SHIPPED.
 
-    **P-54.4.3.2** (``:24256``) names all three verbatim as non-preferred: *"The retained
+    **** (``:24256``) names all three verbatim as non-preferred: *"The retained
     names for the partially saturated heterocycles, indane, indoline, isoindoline, and
     chromane, isochromane and their chalcogen analogues are not used as preferred IUPAC
     names…"*, and ``:16988``/``:16992``/``:16999`` print the PINs. The diagnosis was never
@@ -270,7 +270,7 @@ class TestIndaneFamilyUnblocked:
     ★ THE FIRST RENAME WAS REJECTED BY THE GATE -- 1 protect + 3 target regressions.
     Root cause: ``fused_heterocycles``'s ``name`` field feeds TWO consumers. Standalone
     naming wants the saturated PIN, but ``rules/spiro.py:_name_spirobi_core`` embedded it
-    as the SPIRO COMPONENT, and **P-24.3.1** (``:10146``) requires the bracket to hold the
+    as the SPIRO COMPONENT, and **** (``:10146``) requires the bracket to hold the
     *component ring system*, with hydrogen cited OUTSIDE it. Every worked example is
     mancude -- ``1,1'-spirobi[indene] (PIN)`` (``:10164``),
     ``1H,1'H-2,2'-spirobi[naphthalene] (PIN)`` (``:10158``). The bare rename produced
@@ -285,7 +285,7 @@ class TestIndaneFamilyUnblocked:
     ``_name_spirobi_core`` computes the maximum noncumulative double-bond assignment over
     the ASSEMBLED skeleton (the spiro atom excluded, since its four single ring bonds make
     it sp3 by construction) and hoists the hydro prefixes plus any indicated hydrogen in
-    front of the spiro locants, per P-24.3.2 (``:10152``) and the ``:46336`` template. The
+    front of the spiro locants, per (``:10152``) and the ``:46336`` template. The
     derivation and its five Blue-Book-PIN validations live in
     ``tests/unit/rules/test_spirobi_hydro_hoisting.py``.
 
@@ -310,7 +310,7 @@ class TestIndaneFamilyUnblocked:
         """The row the first rename attempt regressed.
 
         Kept as the tripwire it always was: hydro must never appear INSIDE the
-        spirobi bracket (P-24.3.1 / P-24.3.2). Now also asserts the WHOLE name, so
+        spirobi bracket /. Now also asserts the WHOLE name, so
         a regression to the retained ``spirobi[indane]`` form -- or to the
         unsaturated ``spirobi[1H-indene]`` shortcut -- fails here too.
         """
@@ -326,7 +326,7 @@ class TestIndaneFamilyUnblocked:
 class TestChalcogenChromanePin:
     """Chalcogen analogues of chromane / isochromane (a phase, Task 11B3).
 
-    **P-31.2.3.3.1, Table 3.1** ("Retained names of partially saturated polycyclic
+    **, Table 3.1** ("Retained names of partially saturated polycyclic
     parent hydrides") names each PIN verbatim, and its header (``:16980``) marks
     every Table-3.1 name *"not used as preferred IUPAC names"*:
 
@@ -340,9 +340,9 @@ class TestChalcogenChromanePin:
     isotellurochromane ``:17022`` ``3,4-dihydro-1H-2-benzotelluropyran``
     ================== ========== ==========================================
 
-    Reinforced by **P-31.2.3.3.1** body (``:16509``: chromane, isochromane and
+    Reinforced by **** body (``:16509``: chromane, isochromane and
     "their chalcogen analogues" are modified from the mancude parent by hydro
-    prefixes), **P-19(d)** (``:1736``) and **P-54.4.3.2** (``:24256``).
+    prefixes), **(d)** (``:1736``) and **** (``:24256``).
 
     ★ THE FIX IS TWO-PART, mirroring the S/O siblings exactly (lesson 3 above).
     The retained name is emitted from the OPSIN-import alias surface

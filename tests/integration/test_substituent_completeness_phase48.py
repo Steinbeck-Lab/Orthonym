@@ -1,5 +1,5 @@
 """
-Integration tests for Phase 48 substituent completeness.
+Integration tests for a phase substituent completeness.
 
 Tests that the substituent enumerator architecture (Plans 01-02) correctly
 handles ALL substituent types (nitrogen, oxygen/carbonyl, sulfur, phosphorus,
@@ -289,11 +289,11 @@ class TestCanaryRegression:
 # ---------------------------------------------------------------------------
 
 class TestImpactMeasurement:
-    """Quantify Phase 48 impact on substituent completeness."""
+    """Quantify a phase impact on substituent completeness."""
 
     @pytest.mark.integration
     def test_impact_measurement(self):
-        """Measure and report Phase 48 impact on substituent coverage."""
+        """Measure and report a phase impact on substituent coverage."""
 
         # Measurement 1: Ring parent heteroatom substituent coverage (20 compounds)
         ring_compounds = [

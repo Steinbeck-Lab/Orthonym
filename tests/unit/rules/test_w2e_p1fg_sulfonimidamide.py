@@ -1,6 +1,6 @@
-"""P-66.4.1.3.4 (BB 34346): "-S(O)(=NH)-NH2 S-aminosulfonimidoyl
+""" (BB 34346): "-S(O)(=NH)-NH2 S-aminosulfonimidoyl
 (preselected prefix)"; table BB 55487. Aryl parent per seniority.py
-comment (benzenesulfonimidamide) and P-66.4.1.1 family.
+comment (benzenesulfonimidamide) and family.
 
 HEAD divergence: the benzene SUFFIX_FG + SMARTS for sulfonimidamide were
 already shipped (plan P1AM), so benzenesulfonimidamide works at HEAD; this

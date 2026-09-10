@@ -15,14 +15,14 @@ locant abutting the N-locant, which is what the enclosure exists to prevent.
 
 Blue Book, opened with ``sed`` at write time:
 
-* **P-16.5 "ENCLOSING MARKS"** (``BlueBookV2.md:7216``), **P-16.5.1.1**
-  (``:7232``): *"Parentheses are used around compound (see P-29.1.2) and complex
-  (see P-29.1.3) prefixes; after the multiplicative prefixes 'bis', 'tris',
-  etc.; ..."*
-* **P-29.1.2** (``:15762``): *"A compound substituent group consists of a simple
+* ** "ENCLOSING MARKS"** (``the Blue Book``), ****
+  (``:7232``): *"Parentheses are used around compound (see and complex
+  (see prefixes; after the multiplicative prefixes 'bis', 'tris',
+  etc.;..."*
+* **** (``:15762``): *"A compound substituent group consists of a simple
   substituent group (the parent substituent group) to which is attached one or
   more simple substituent groups."* ``2-methoxyethyl`` is ``ethyl`` bearing
-  ``methoxy``, so it is compound and P-16.5.1.1 applies.
+  ``methoxy``, so it is compound and applies.
 * PIN exemplar (``:33336``):
   ``N-[1-cyano-3-(methylsulfanyl)propyl]-N'-methylurea (PIN)`` -- the compound
   N-substituent is enclosed, the simple ``methyl`` is not.
@@ -41,7 +41,7 @@ import pytest
         # The malformed shipper, and its ethyl ester twin.
         ("COC(=O)NCCOC", "methyl N-(2-methoxyethyl)carbamate"),
         ("CCOC(=O)NCCOC", "ethyl N-(2-methoxyethyl)carbamate"),
-        # A located branched prefix is compound too (P-29.1.2 via its locant).
+        # A located branched prefix is compound too via its locant).
         ("COC(=O)NC(C)C", "methyl N-(propan-2-yl)carbamate"),
         # SIMPLE substituents must stay bare -- byte-identical to before.
         ("COC(=O)NC", "methyl N-methylcarbamate"),

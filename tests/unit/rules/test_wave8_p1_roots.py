@@ -1,10 +1,10 @@
-"""v24 W8 P1 cross-cutting-root fixes — unit tests.
+""" W8 P1 cross-cutting-root fixes — unit tests.
 
-R12 (P-58.2.2.3): ring-fusion diol on a mancude fused carbocycle. The bare
+R12: ring-fusion diol on a mancude fused carbocycle. The bare
 hydro-parent emitter `name_hydrogenated_fused_carbocycle` counts sp3 ring atoms
 as "hydro" positions and emits `<locants>-dihydro<parent>` with NO substituent
 slot, so for `naphthalene-4a,8a-diol` it dropped both OH and emitted
-`4a,8a-dihydronaphthalene` — a DIFFERENT molecule. Gated, SELF-01 caught it; but
+`4a,8a-dihydronaphthalene` — a DIFFERENT molecule. Gated, caught it; but
 gate-off (no Java) it shipped the atom-dropped name. Task 1.3 = source-level
 atom-conservation veto (fail closed); Task 1.4 = actually name the diol.
 """
@@ -39,11 +39,11 @@ def test_r12_unsubstituted_hydrofused_unregressed(smiles, expected):
 
 
 def test_r7_benzene_carbothioamide():
-    """R7 (P-66.1.4.1.1, BB 18762): a ring-attached -C(=S)NH2 on benzene is named
+    """R7, BB 18762): a ring-attached -C(=S)NH2 on benzene is named
     with the -carbothioamide suffix. PIN uses the no-locant `benzenecarbo...` form
     (BB 6666 benzenecarbodithioic acid, 30000 benzenecarboximidic acid), matching
     the existing benzenecarboximidamide / benzenecarbothiohydrazide siblings.
-    Was abstaining (fell to substituent naming -> mangled -> SELF-01 unknown)."""
+    Was abstaining (fell to substituent naming -> mangled -> unknown)."""
     from orthonym.namer import name_compound
     assert name_compound("NC(=S)c1ccccc1", style="pin") == "benzenecarbothioamide"
 
@@ -68,7 +68,7 @@ def test_r7_n_substituted_thioamide_no_atom_drop(smiles, label):
 
 
 def test_r6_benzophenone_demoted_to_diphenylmethanone():
-    """R6 (P-64.2.1.2, BB 28326/28378): benzophenone is retained for GENERAL
+    """R6, BB 28326/28378): benzophenone is retained for GENERAL
     nomenclature only; the PIN is the systematic diphenylmethanone. Mirror of the
     already-demoted acetophenone -> 1-phenylethan-1-one."""
     from orthonym.namer import name_compound

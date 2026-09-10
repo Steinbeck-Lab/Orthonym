@@ -1,4 +1,4 @@
-"""P-14.4 / P-64.2.1.2 -- the principal characteristic group must win ring
+""" / -- the principal characteristic group must win ring
 numbering in ``name_general_monocycle``.
 
 ``pg_ring_atoms`` was collected from the RAW SMARTS match::
@@ -10,19 +10,19 @@ That is not the locant-bearing atom, and it broke both ring-suffix styles:
 * **inline** suffixes (``one``/``ol``/``amine``/``thiol``/``imine``) -- the
   ketone SMARTS ``[#6][CX3](=O)[#6]`` matches *both flanking ring carbons plus
   the carbonyl carbon*, so a ring monoketone contributed three ring atoms and a
-  para-dione contributed all six.  ``pg`` was then identical for every candidate
+  para-dione contributed all six. ``pg`` was then identical for every candidate
   orientation inside ``_orient_carbocycle`` (key ``(pg, uns, sub, canon)``), the
   principal-group criterion was silently neutered, and the tie-break fell
   through to ring unsaturation -- ``cyclohexa-1,4-diene-3,6-dione``.
-* **appended** suffixes (carboxylic acid, carbaldehyde, carbonitrile, ...) --
+* **appended** suffixes (carboxylic acid, carbaldehyde, carbonitrile,...) --
   the anchor atom is exocyclic by construction, so ``match & ring_set`` was
   *empty*, the criterion was absent altogether and the ring numbered
   arbitrarily: ``cyclohexane-4-carboxylic acid``.
 
-Blue Book, **P-64.2.1.2** (``BlueBookV2/BlueBookV2.md:28307``), example at
+Blue Book, **** (``the Blue Book Blue Book``), example at
 ``:28320``::
 
-    1,4-benzoquinone   cyclohexa-2,5-diene-1,4-dione (PIN) (not benzoquinone)
+    1,4-benzoquinone cyclohexa-2,5-diene-1,4-dione (PIN) (not benzoquinone)
 
 The dione takes 1,4 and the diene takes 2,5 -- not the other way round.
 
@@ -30,10 +30,10 @@ The fix routes through the declared anchor primitive
 (``seniority.PG_ATTACHMENT_INDICES`` via
 ``parent_selection._pg_attachment_atoms``) and then answers one question
 uniformly for both styles: *which ring atom bears the principal characteristic
-group?*  The anchor itself when it is on the ring, otherwise the ring
+group?* The anchor itself when it is on the ring, otherwise the ring
 neighbour(s) it hangs from.
 
-These tests drive the producer directly.  ``tests/conftest.py`` disables the
+These tests drive the producer directly. ``tests/conftest.py`` disables the
 OPSIN validity gate by default, so whole-molecule assertions through
 ``Orthonym.name_tiered`` measure a *different* pipeline than the CLI does --
 they are not a sound oracle for this layer.
@@ -66,7 +66,7 @@ class TestInlineRingSuffixGetsLowestLocant:
 
     @pytest.mark.unit
     @pytest.mark.parametrize("smiles,expected", [
-        # The Blue Book PIN itself (P-64.2.1.2, :28320).
+        # The Blue Book PIN itself,:28320).
         ("O=C1C=CC(=O)C=C1", "cyclohexa-2,5-diene-1,4-dione"),
         # ortho-dione: suffix still outranks the diene.
         ("O=C1C=CC=CC1=O", "cyclohexa-3,5-diene-1,2-dione"),
@@ -136,7 +136,7 @@ class TestAlreadyCorrectFamiliesUnchanged:
         ("SC1CCCCC1", "cyclohexane-1-thiol"),
         ("c1ccccc1", "benzene"),
         # No principal group at all -- the anchor logic must not fire.
-        # (The absent '1' locant is a separate P-14.3.4 question, out of scope
+        # (The absent '1' locant is a separate question, out of scope
         # here; recorded as the measured baseline so a change trips this test.)
         ("CC1CCCCC1", "1-methylcyclohexane"),
     ])
@@ -150,12 +150,12 @@ class TestAlreadyCorrectFamiliesUnchanged:
 
 class TestAnchorTableCoversEveryRingPathFG:
     """``_pg_attachment_atoms`` silently falls back to SMARTS index 0 for any FG
-    missing from ``PG_ATTACHMENT_INDICES``.  For three ``-ol``/``-amine`` FGs
+    missing from ``PG_ATTACHMENT_INDICES``. For three ``-ol``/``-amine`` FGs
     index 0 is the HETEROATOM, and that table gap once became a live regression.
 
     Every FG that can reach this ring path must therefore be *declared*: either
     it has an explicit entry, or it is on the audited no-entry allowlist whose
-    SMARTS provably lead with the locant-bearing atom.  A new ring suffix, or a
+    SMARTS provably lead with the locant-bearing atom. A new ring suffix, or a
     reordered SMARTS, must fail here rather than silently take index 0.
     """
 

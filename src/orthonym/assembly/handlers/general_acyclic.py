@@ -1,29 +1,29 @@
-"""Phase 160.2 general_acyclic catch-all handler (DECOMP-01 closure).
+"""a phase general_acyclic catch-all handler (DECOMP-01 closure).
 
-Per CONTEXT D-08 + ADR-19-02 §3.1 + CONTEXT D-12 RESEARCH §10: explicit
+Per internal notes + -02 + internal notes RESEARCH: explicit
 catch-all (priority 99999, predicate=lambda *_: True) closing the
 Plan-02 fallthrough gap so dispatch_inner first-match-AND-succeeds-wins
-(ADR-19-04) ALWAYS returns a non-None InnerDispatchResult.
+(-04) ALWAYS returns a non-None InnerDispatchResult.
 
 LIFT SOURCE: composer.py:951-1055 chain-fallback section (verbatim, with
 helper calls re-routed from local composer scope to
-``from ._handler_shared import _generate_chain_parent, _generate_ring_parent,
+``from._handler_shared import _generate_chain_parent, _generate_ring_parent,
 _generate_suffix, _generate_prefixes, _generate_stereodescriptors,
 _assemble_fragments``; final ``return candidate_name`` replaced by a
-pool-carried ``NamingResult(name=best.name, tree=best.tree, ...)``).
+pool-carried ``NamingResult(name=best.name, tree=best.tree,...)``).
 
-IUPAC cite: P-14 + P-23 + P-44 (catch-all substitutive nomenclature).
+IUPAC cite: + + (catch-all substitutive nomenclature).
 
-Phase 165 SCORE-01: emits a STRUCTURED NameTreeNode derived from its own
+a phase SCORE-01: emits a STRUCTURED NameTreeNode derived from its own
 fragment list via ``fragments_to_tree`` (Path A), attached through the
 CandidatePool ``tree=`` carry. The returned tree is read off the winning
-candidate (``best().tree``) so a higher-priority handler's win is never
+candidate (``best.tree``) so a higher-priority handler's win is never
 mislabelled with a general_acyclic tree.
 
 CRITICAL: this handler lifts ONLY the chain-fallback section. The
 cycloalkane stereo backstop at composer.py:1057-1097 STAYS in
 _assemble_name_impl (orchestrator applies it AFTER dispatch_inner returns)
-per CONTEXT D-04.
+per internal notes.
 """
 from __future__ import annotations
 
@@ -36,9 +36,9 @@ logger = logging.getLogger(__name__)
 
 
 def _is_general_acyclic(features: Any) -> bool:
-    """Catch-all predicate per CONTEXT D-08 + AP-160-08.
+    """Catch-all predicate per internal notes + -08.
 
-    AP-160.2-06 CASE B refinement (Phase 160.2 Plan-02-03 honest-fail-on-data):
+    .2-06 CASE B refinement (a phase Plan-02-03 honest-fail-on-data):
     the catch-all MUST mirror the chain-fallback section's effective domain
     in composer.py:_assemble_name_impl. The inline cascade still contains
     amide+amine branches (composer.py:917-931) that the handler-side
@@ -47,7 +47,7 @@ def _is_general_acyclic(features: Any) -> bool:
     True-always catch-all would preempt those inline branches and break
     byte-identical for polyfunctional amide / amine cases.
 
-    Pure read-only per CONTEXT D-25 + AP-160-26.
+    Pure read-only per internal notes + -26.
 
     Inline-cascade-order mirror — returns False (defer to inline cascade) when:
     1. principal_group is amide AND pg_count == 1
@@ -59,7 +59,7 @@ def _is_general_acyclic(features: Any) -> bool:
     Refinement REVERTS automatically when Plan-02-04 ships in CASE A
     (predicate parity verified for amide / amine handlers); at that point
     the inline cascade is deleted and this predicate can collapse back to
-    `return True` per the original CONTEXT D-08 catch-all spec.
+    `return True` per the original internal notes catch-all spec.
     """
     pg = getattr(features, 'principal_group', None)
     # Mirror composer.py:917-919 inline amide branch guard.
@@ -77,7 +77,7 @@ def _is_general_acyclic(features: Any) -> bool:
 def name_general_acyclic(
     features: Any, mol: Any = None, style: str = "pin",
 ) -> Optional[NamingResult]:
-    """General catch-all chain/ring fallback (DECOMP-01 closure; Phase 160.2).
+    """General catch-all chain/ring fallback (DECOMP-01 closure; a phase).
 
     Verbatim lift of composer.py:951-1055 (chain-fallback section). Helper
     calls re-routed from composer.py local scope to ``_handler_shared``
@@ -85,7 +85,7 @@ def name_general_acyclic(
 
     Returns NamingResult(name=..., tree=<structured NameTreeNode>,
     atom_to_locant_hint=None); the tree is read off the winning pool candidate
-    (Phase 165 SCORE-01).
+    (a phase SCORE-01).
     """
     # Lazy imports per PATTERNS § Lazy Import — break the
     # composer.py <-> general_acyclic.py cycle that the inner_dispatch
@@ -117,10 +117,10 @@ def name_general_acyclic(
     else:
         parent = NameFragment(text="", fragment_type="parent")
 
-    # Wave2 T3a conservation: an EMPTY parent stem cannot describe any
+    # Wave2 conservation: an EMPTY parent stem cannot describe any
     # molecule — the assembler would glue suffixes onto the bare 'ane'
     # filler ('anedicarboxylic acid' for the Si-bridge witness once the
-    # benzene handler learned to decline it). Per the ADR-19-04 handler
+    # benzene handler learned to decline it). Per the -04 handler
     # contract, return None to cascade (-> honest unknown) instead.
     if not parent.text:
         logger.debug(
@@ -159,7 +159,7 @@ def name_general_acyclic(
     prefixes = _generate_prefixes(features)
     fragments.extend(prefixes)
 
-    # Stereodescriptors. P-91.3 (BB:44639): a parent-scope descriptor's locant is read in
+    # Stereodescriptors. (the Blue Book): a parent-scope descriptor's locant is read in
     # the PARENT's numbering. That rule now lives in _generate_stereodescriptors itself
     # (it guards both ring maps on `principal_chain`), so the per-caller override this
     # site used to pass is redundant and was removed -- see the shared function.
@@ -168,9 +168,9 @@ def name_general_acyclic(
         if stereo:
             fragments.append(stereo)
 
-    # P-14.3.4.5 (BB:3007) at PARENT scope -- `heptafluorobutanoic acid` (BB:3017,
+    # (the Blue Book) at PARENT scope -- `heptafluorobutanoic acid` (the Blue Book,
     # verbatim (PIN)). Decided HERE for the same reason as the mononuclear rule and
-    # the P-14.3.4.3 licence below: the rule counts the PARENT COMPOUND's
+    # the licence below: the rule counts the PARENT COMPOUND's
     # substitutable hydrogens and only `features` carries the structure. The licence is
     # applied by REBUILDING THE PREFIX FRAGMENTS WITHOUT LOCANTS rather than by a
     # print-time flag, so every renderer downstream agrees -- see the helper's
@@ -183,21 +183,21 @@ def name_general_acyclic(
         fragments = _prefix_fragments_without_locants(fragments)
 
     # Assemble in correct order.
-    # P-16.5.1.3.1 mononuclear enclosing rule is keyed on a STRUCTURAL property:
+    # mononuclear enclosing rule is keyed on a STRUCTURAL property:
     # the perceived parent skeleton has exactly ONE heavy atom (parent atom count
     # == 1), of ANY element. Detect it here — where `features` is available — and
     # thread the boolean into the assembler. This replaces the former
     # stem-string (`parent_frag.text == "meth"`) + no-suffix gate, which was a
     # molecule-class band-aid.
     is_mononuclear_parent = (_get_parent_atom_count(features) == 1)
-    # P-14.3.4.3 (BB:2939) is decided HERE for the same reason as the mononuclear
+    # (the Blue Book) is decided HERE for the same reason as the mononuclear
     # rule above: the licence needs the STRUCTURE (the parent compound's
     # substitutable-hydrogen orbits), and `_assemble_fragments` receives only name
     # fragments. `_l3_prefix_locant_omitted` delegates the rule itself to
     # `assembly.locant_omission`; deny-by-default, so False whenever the licence
     # cannot be positively established.
     #
-    # Applied by REBUILDING THE PREFIX FRAGMENTS, exactly like P-14.3.4.5 above and
+    # Applied by REBUILDING THE PREFIX FRAGMENTS, exactly like above and
     # for the same measured reason: it used to be a print-time flag threaded into
     # `_assemble_fragments` only, which the name-tree serializer -- the production
     # composition site for this class -- never saw, so the two renderers disagreed
@@ -207,8 +207,8 @@ def name_general_acyclic(
     if _l3_prefix_locant_omitted(features, fragments):
         fragments = _prefix_fragments_without_locants(fragments)
 
-    # P-14.3.4.4 (BB:2953) at PARENT scope -- `diphenylethanedione` (BB:28338,
-    # verbatim (PIN)) and `di(naphthalen-2-yl)ethanedione` (BB:28380). Decided HERE
+    # (the Blue Book) at PARENT scope -- `diphenylethanedione` (the Blue Book,
+    # verbatim (PIN)) and `di(naphthalen-2-yl)ethanedione` (the Blue Book). Decided HERE
     # for the same reason as the two licences above: the ISOMER-COUNT test needs the
     # STRUCTURE (the parent hydride's positions and the decorations' bond orders),
     # and `_assemble_fragments` receives only name fragments. `_l4_locants_omitted`
@@ -225,7 +225,7 @@ def name_general_acyclic(
         fragments, style, is_mononuclear_parent=is_mononuclear_parent,
     )
 
-    # Observational coverage logging for fallback chain/ring path (ARCH-06)
+    # Observational coverage logging for fallback chain/ring path
     if logger.isEnabledFor(logging.DEBUG):
         _fb_total_ha = features.mol.GetNumHeavyAtoms()
         _fb_parent = set(features.principal_chain or []) | set(getattr(features, 'principal_ring', None) or [])
@@ -278,16 +278,16 @@ def name_general_acyclic(
     if _w2_atom_coverage_declines(features, fragments, assembled):
         return None  # task-W2 Witness-B: name silently DROPPED atoms → decline
 
-    # Phase 145.1: route chain-naming through pool.
-    # In first_applicable mode, pool.best() returns the FIRST added
+    # a phase: route chain-naming through pool.
+    # In first_applicable mode, pool.best returns the FIRST added
     # candidate. If a higher-priority handler already added one above,
-    # pool.best() is that one (chain naming computed but not returned).
-    # If no other handler fired (this is the only candidate), pool.best()
-    # is the chain candidate. D-02: chain has priority=fallback in 145.1
-    # (preserves byte-identical); Phase 146 raises priority for competition.
+    # pool.best is that one (chain naming computed but not returned).
+    # If no other handler fired (this is the only candidate), pool.best
+    # is the chain candidate.: chain has priority=fallback in 145.1
+    # (preserves byte-identical); a phase raises priority for competition.
     pool = get_current_pool()
-    # Phase 165 SCORE-01: derive a structured tree from the SAME fragment list
-    # built above and attach it to the chain candidate. Reading best().tree
+    # a phase SCORE-01: derive a structured tree from the SAME fragment list
+    # built above and attach it to the chain candidate. Reading best.tree
     # (NOT the local `tree`) guarantees the returned tree corresponds to the
     # RETURNED name: if a higher-priority handler's candidate wins, best.tree is
     # that handler's tree (or None -> coarse-bucket counted in Plan 04), never a
@@ -300,14 +300,14 @@ def name_general_acyclic(
     pool.add(assembled, "chain", features, tree=tree)
     best = pool.best()
 
-    # G0 fail-closed safety (DD7): general_acyclic is the @99999 catch-all, but
+    # G0 fail-closed safety (DD7): general_acyclic is the catch-all, but
     # the pool can still be empty when NO candidate could be built (e.g. an
-    # all-aromatic-ring + two-metal species like the P-69 gold
-    # c1ccc(cc1)[Hg]c1ccc(cc1)[Sb](c1ccccc1)c1ccccc1, which has no nameable
-    # acyclic parent). Per the ADR-19-04 handler contract ("return None on
+    # all-aromatic-ring + two-metal species like the gold
+    # c1ccc(cc1)[Hg]c1ccc(cc1)[Sb]c1ccccc1, which has no nameable
+    # acyclic parent). Per the -04 handler contract ("return None on
     # gate-fail, never raise"), return None to cascade rather than crash on
     # ``best.name`` — that AttributeError was masked by name_compound's broad
-    # except but propagated raw (NoneType .name) through the direct .name() /
+    # except but propagated raw (NoneType.name) through the direct.name /
     # raise_on_limit API.
     if best is None:
         return None

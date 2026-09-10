@@ -1,5 +1,5 @@
-"""Systematic substituted-purine naming (P-25 retained purine parent; fixed
-purine numbering; indicated H derived from the graph; P-62/P-66 amine suffix).
+"""Systematic substituted-purine naming retained purine parent; fixed
+purine numbering; indicated H derived from the graph; / amine suffix).
 
 Names a SUBSTITUTED purine ring system -- the adenine/hypoxanthine/purine
 skeleton carrying ring-N substituents and/or exocyclic characteristic groups --
@@ -14,7 +14,7 @@ from the actually-saturated ring nitrogen (NOT hardcoded, so it can never
 contradict the input tautomer on round-trip), fail-closed substituent
 collection, and reuse of the existing fused-heterocycle assembler.
 
-Accuracy-first, fail-closed: returns None (caller falls through; the SELF-01 /
+Accuracy-first, fail-closed: returns None (caller falls through; the /
 OPSIN gate is the final backstop) unless the whole purine ring system is
 accounted for and every substituent is identifiable.
 """
@@ -24,7 +24,7 @@ from typing import Optional
 from rdkit import Chem
 
 # Bare purine skeleton, IUPAC locants encoded as atom-map numbers.
-#   6-ring: N1-C2-N3-C4 ... C5-C6-N1   5-ring: C4-N9-C8-N7-C5 (fused C4-C5)
+# 6-ring: N1-C2-N3-C4... C5-C6-N1 5-ring: C4-N9-C8-N7-C5 (fused C4-C5)
 # ``~`` (any bond) makes the match Kekule/aromatic independent. The carbon
 # skeleton is asymmetric (N1 neighbours the degree-2 C6; N3 neighbours the
 # degree-3 fusion C4), so the match orientation -- hence the numbering -- is
@@ -93,7 +93,7 @@ def name_substituted_purine(mol) -> Optional[str]:
         # substituent -- i.e. denote a DIFFERENT molecule. Fail closed at the
         # source rather than trust an incomplete collection -- UNLESS best-effort
         # is on, in which case retry any unidentified/incomplete branch with the
-        # general recursive substituent namer (v33 Defect B): this is what lets a
+        # general recursive substituent namer (Defect B): this is what lets a
         # giant arm -- e.g. a nucleotide's ribose-diphosphate-pantetheine chain on
         # a purine N9, as in acetyl-CoA -- be named as an ordinary ring substituent
         # instead of silently dropping the whole molecule to a malformed von
@@ -515,7 +515,7 @@ def name_oxo_purine(mol) -> Optional[str]:
       - any substituent the shared identifier can't type as plain
         alkyl/halogen/bare-amino (fail-closed).
 
-    This engine owns the MONO-6-oxo case (hypoxanthine/guanine family) only.
+    This engine owns the -oxo case (hypoxanthine/guanine family) only.
     The purine-2,6-DIONE case (xanthine/caffeine family) lives in
     ``rules/purine_oxo.py::name_purine_26_dione``.
     """

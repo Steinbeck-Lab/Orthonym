@@ -1,15 +1,15 @@
-"""Phase 160 sulfone handler — Tier B shim (gate 0.40).
+"""a phase sulfone handler — Tier B shim (gate 0.40).
 
 1-line wrapper around ``rules.sulfur.name_sulfone``. Verbatim move
 of composer.py:966-978 dispatch logic (sulfone branch parallel to
 sulfoxide).
 
-IUPAC cite: P-66.5.2.4 (sulfones; functional class naming).
+IUPAC cite: (sulfones; functional class naming).
 
 References:
 - composer.py:966-978 (inline sulfone branch; REMOVED at this commit).
 - rules.sulfur.name_sulfone — chemical-logic body.
-- 160-AUDIT-DECOMP.md § 1 row 'sulfone' + § 2.20 purity proof.
+- internal notes-DECOMP.md row 'sulfone' + purity proof.
 """
 from __future__ import annotations
 
@@ -45,13 +45,13 @@ def name_sulfone(
     if not matches:
         return None
 
-    # Wave2 T3b conservation: decline when the R-SO2-R' unit does not cover
+    # Wave2 conservation: decline when the R-SO2-R' unit does not cover
     # the whole molecule (parallel to the sulfoxide handler; the functional-
     # class alkyl walk silently dropped atoms beyond a heteroatom).
     if not chalcogen_oxide_fc_covers_molecule(features.mol, matches[0]):
         return None
 
-    # Wave2 T3b (P-63.6): substitutive PIN — '(ethanesulfonyl)ethane'
+    # Wave2: substitutive PIN — '(ethanesulfonyl)ethane'
     # (BB 28115), "1,1'-sulfonyldibenzene". Functional class stays for
     # --trivial / builder-declined shapes.
     name = None

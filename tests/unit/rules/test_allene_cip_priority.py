@@ -1,12 +1,12 @@
 """
-Unit tests for STER-14: allene CIP priority using true CIP priority
+Unit tests for: allene CIP priority using true CIP priority
 instead of CanonicalRankAtoms proxy.
 
 Tests that _cip_priority_key returns (atomic_number, neighbor_sum) tuples,
 that _terminal_is_achiral correctly compares priority tuples, and that
 _manual_allene_cip produces correct Ra/Sa assignments.
 
-IUPAC Reference: P-92.1.3 (CIP sequence rules for allene axial chirality)
+IUPAC Reference: (CIP sequence rules for allene axial chirality)
 """
 
 import pytest
@@ -128,7 +128,7 @@ class TestCipPriorityKey:
         assert result == (1, 0)
 
     def test_chlorine_distinguished_from_carbon_by_atomic_number(self):
-        """Test 3: Cl (17, ...) is distinguished from C (6, ...) by primary key."""
+        """Test 3: Cl (17,...) is distinguished from C (6,...) by primary key."""
         mol_h, central_idx = _make_allene_mol_h('ClC=C=CC')
         central_atom = mol_h.GetAtomWithIdx(central_idx)
 

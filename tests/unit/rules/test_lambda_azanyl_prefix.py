@@ -1,6 +1,6 @@
-"""P-62.5(2): oxo-λ5-azanyl prefixes for an N-oxide on a substituent N.
+"""(2): oxo-λ5-azanyl prefixes for an N-oxide on a substituent N.
 
-The full-molecule expected PIN is the Blue Book P-62.5 example verbatim;
+The full-molecule expected PIN is the Blue Book example verbatim;
 OPSIN-2.9.0 parses the Greek-λ spelling back to the input structure
 (verified 2026-08-16; ASCII 'lambda' also parses, byte-identical structure).
 """
@@ -26,7 +26,7 @@ def test_dimethyl_oxo_azanyl_methyl_fragment():
 
 @pytest.mark.unit
 def test_bare_oxo_azanyl_ethyl_fragment():
-    # BB P-62.5 substituent example: -CH2-CH2-NH2(O) -> 2-(oxo-λ5-azanyl)ethyl
+    # BB substituent example: -CH2-CH2-NH2(O) -> 2-(oxo-λ5-azanyl)ethyl
     mol = Chem.MolFromSmiles("[O-][NH2+]CCOC(=O)c1ccccc1")
     patt = Chem.MolFromSmarts("[O-][NH2+][CH2][CH2]O")
     o, n, c2, c1, o_ester = mol.GetSubstructMatch(patt)

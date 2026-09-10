@@ -1,16 +1,16 @@
-"""Substitutive N-nitro / nitramide naming (v36 Milestone B3, Task 4).
+"""Substitutive N-nitro / nitramide naming (Milestone B3, Task 4).
 
 BLUE BOOK AUTHORITY
 -------------------
 ``nitramide`` (H2N-NO2) exists in this tree ONLY as an exact-whole-molecule
 RETAINED name (``data/opsin_imports/simple_groups.py:5679``, merged into
 ``ALL_RETAINED_NAMES``). Substitution of its amide nitrogen's hydrogens is
-the SAME **P-66.1.1.3.1.1 "N-Substitution"** pattern already built for
+the SAME ** "N-Substitution"** pattern already built for
 sulfonamides (``rules/sulfonamides.py``) and thioimides
 (``rules/thioimides.py``):
 
     "Substituted primary amides, with general structures such as R-CO-NHR'
-    and R-CO-NR'R'' ... are named by citing the substituents R' and R'' as
+    and R-CO-NR'R''... are named by citing the substituents R' and R'' as
     prefixes preceded by the locant *N* when one amide group is present."
 
 THE DEFECT THIS CLOSES
@@ -20,9 +20,9 @@ retained-table key and misses that table entirely -- nothing downstream ever
 built the substitutive parent, so every N-substituted nitramide fell through
 to GENERAL/decomposition (which named a *fragment*, e.g. ``methanol`` for
 ``O=[N+]([O-])NCO``, dropping the nitro-amide unit) and was suppressed by
-SELF-01 to the ``unknown organic compound`` sentinel.
+ to the ``unknown organic compound`` sentinel.
 
-V36-SPY-B3 section 2 ("N-nitro" rows) verified every target form below
+V36-a trace-B3 section 2 ("N-nitro" rows) verified every target form below
 OPSIN-round-trip-exact (full InChIKey match, constitution + charge).
 
 TWO SHAPES BUILT HERE (fails closed on everything else -- never a
@@ -34,8 +34,8 @@ per-molecule special case)
    guard: an N-heteroatom substituent is a different construction and is
    refused)::
 
-       O=[N+]([O-])NCO      -> N-(hydroxymethyl)nitramide
-       O=[N+]([O-])N(CO)CO  -> N,N-bis(hydroxymethyl)nitramide
+       O=[N+]([O-])NCO -> N-(hydroxymethyl)nitramide
+       O=[N+]([O-])N(CO)CO -> N,N-bis(hydroxymethyl)nitramide
 
 2. **``N,N'-dinitro<diamine>``.** EXACTLY two nitro-bearing amide nitrogens,
    each with NO other substituent, both attached to the SAME bridging heavy
@@ -51,7 +51,7 @@ per-molecule special case)
    ANY gem-diamine parent, a separate pre-existing gap out of scope here;
    see ``_name_dinitro_diamine``). Scoped NARROWLY to this one shape: a
    numeric-locant diamine (``propane-1,3-diamine``) would need
-   superscripted ``N^1``/``N^3`` dinitro locants (P-66.1.1.3.1.1) that are
+   superscripted ``N^1``/``N^3`` dinitro locants that are
    not built here -- fails closed rather than guess.
 """
 from __future__ import annotations
@@ -138,15 +138,15 @@ def _name_single_nitramide(mol, amide_n: int, nitro_n: int, style: str) -> Optio
     if any(is_refusal_sentinel(n) for n in names):
         return None
 
-    # P-67.1.2 (BB:35886, "(chloromethyl)(methyl)nitramide (PIN)"): the amide N
+    # (the Blue Book, "(chloromethyl)(methyl)nitramide (PIN)"): the amide N
     # of the `nitramide` functional parent is its ONLY substitutable position, so
-    # the substituent locants are OMITTED (P-14.3.4.2) -- the PIN is
+    # the substituent locants are OMITTED -- the PIN is
     # '(chloromethyl)(methyl)nitramide', NOT 'N-(chloromethyl)-N-methylnitramide'
     # (that spelling is the alternative *methanamine*-parent name, where 'N'
     # locants ARE needed). The prefixes are cited without the 'N-' locant, in
-    # P-14.5.2 alphanumerical order, enclosed per the mononuclear single-
-    # attachment rule P-16.5.1.3.1 (BB:7272): the first cited substituent is bare
-    # (unless compound/complex, P-16.5.1.1), the second and further are each
+    # alphanumerical order, enclosed per the mononuclear single-
+    # attachment rule (the Blue Book): the first cited substituent is bare
+    # (unless compound/complex,, the second and further are each
     # parenthesised even when simple -> 'methyl(nitro)nitramide'. Multiplied
     # identical simple substituents keep the multiplier outside the marks.
     from collections import Counter
@@ -157,8 +157,8 @@ def _name_single_nitramide(mol, amide_n: int, nitro_n: int, style: str) -> Optio
     counts = Counter(names)
     parts = []
     for i, nm in enumerate(sorted(counts, key=prefix_citation_sort_key)):
-        marked = enclose_if_compound(nm)          # P-16.5.1.1 compound/complex
-        if i > 0 and marked == nm:                # P-16.5.1.3.1 second+ simple
+        marked = enclose_if_compound(nm)          # compound/complex
+        if i > 0 and marked == nm:                # second+ simple
             marked = apply_enclosing_marks(nm, -1)
         parts.append(multiplied_component(counts[nm], nm, marked))
     prefix = ''.join(parts)
@@ -204,7 +204,7 @@ def _name_dinitro_diamine(mol, units: List[Dict[str, int]], style: str) -> Optio
     # the two amide N's, carbon, non-aromatic, ring-free) -- and it sidesteps
     # a SEPARATE, pre-existing, out-of-scope gap: `name_compound('NCN')`
     # (bare methanediamine, no nitro at all) itself currently mis-names to
-    # 'methanamine' and is suppressed by SELF-01 to the sentinel, because
+    # 'methanamine' and is suppressed by to the sentinel, because
     # this tree's general amine producer does not yet build a gem-diamine
     # (two -NH2 on the SAME carbon) parent. Fixing that general gap is out
     # of scope for a nitro/nitramide task; the graph proof above lets this
@@ -213,7 +213,7 @@ def _name_dinitro_diamine(mol, units: List[Dict[str, int]], style: str) -> Optio
 
 
 def name_substituted_nitramide(mol, style: str = 'pin') -> Optional[str]:
-    """Return the P-66.1.1.3.1.1 substitutive nitramide/N-nitro PIN, else None.
+    """Return the substitutive nitramide/N-nitro PIN, else None.
 
     ``N-(hydroxymethyl)nitramide``, ``N,N-bis(hydroxymethyl)nitramide``,
     ``N,N'-dinitromethanediamine``. Fails closed on every shape outside the

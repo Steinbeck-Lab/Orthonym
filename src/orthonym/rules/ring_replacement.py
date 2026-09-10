@@ -1,6 +1,6 @@
 """Total skeletal ('a') replacement-prefix construction for RING systems.
 
-P-23.3 / P-31.1.4.3.4 (von Baeyer) and P-24.2.4 (spiro): a skeletal non-carbon
+ / (von Baeyer) and (spiro): a skeletal non-carbon
 ring atom is expressed by a replacement ('a') prefix carrying its locant --
 ``3-oxabicyclo[2.2.1]heptane``, ``2-oxa-6-thiaspiro[4.5]decane``.
 
@@ -12,7 +12,7 @@ each ring atom on ``symbol in HETEROATOM_PREFIXES`` and skipped everything else,
 so an off-table skeletal element contributed **no** morpheme -- while the ring
 stem still counted it (``total_atoms = len(ring_atoms)``). ``C1CC2CC[Hg]C2C1``
 therefore came back as ``bicyclo[3.3.0]octane``: a hydrocarbon name for a
-mercury ring. SELF-01 (name -> structure round trip) fails OPEN when the OPSIN
+mercury ring. (name -> structure round trip) fails OPEN when the OPSIN
 jar is absent -- a supported mode -- so nothing downstream caught it.
 
 The primitive below returns the prefix *together with* the information a caller
@@ -29,13 +29,13 @@ analyzers (``vonbaeyer_universal.analyze_cage_universal`` and
 ``analyze_spiro_universal``) apply exactly this rule, so the two siblings no
 longer disagree: before this module, the cage path *dropped* the atom and the
 spiro path *invented* a morpheme for it (``polycyclic_bridged``'s
-``get_heteroatom_prefix`` falls back to ``symbol.lower() + 'a'``, spelling
+``get_heteroatom_prefix`` falls back to ``symbol.lower + 'a'``, spelling
 ``3-znaspiro[5.5]undecane``).
 
 The table is CLOSED, so fail-closed is the only sound design
 -----------------------------------------------------------
-The Blue Book's replacement-prefix set is Table 1.5 (P-15.4.1.1, [BBv2:6436-6443])
-and it is a fixed list, not a generative rule. P-15.4.1.1 verbatim: *"Nondetachable
+The Blue Book's replacement-prefix set is Table 1.5, [BBv2:6436-6443])
+and it is a fixed list, not a generative rule. verbatim: *"Nondetachable
 prefixes, called 'a' prefixes, are used to designate the replacing skeletal atoms
 with their standard bonding number. Those related to these recommendations are
 listed in Table 1.5."* The wording is restrictive, so there is no way to derive a
@@ -43,12 +43,12 @@ prefix for an arbitrary element: "element-blind" replacement is genuinely
 unachievable and refusing off-table elements is the correct end state rather than a
 temporary limitation.
 
-(Earlier revisions of this docstring cited "P-22.2.1 / Table 2.8" for the
+(Earlier revisions of this docstring cited " / Table 2.8" for the
 replacement set. Table 2.8 is *"Retained names of heterocyclic parent ring
 components"* [BBv2:11511] -- an unrelated table. Corrected against the book.)
 
 In particular **Zn, Cd and Hg appear in NO replacement table** -- mercury was
-explicitly DELETED by P-22.2.2 -- and such rings are named by P-69 organometallic
+explicitly DELETED by -- and such rings are named by organometallic
 nomenclature instead. So the mercury cage refusing here is right; do NOT add a
 ``mercura`` prefix to make it name. (``data/organometallics.METALLACYCLE_A_PREFIX``
 is the legitimate home of Hg/Zn/Cd.)
@@ -59,34 +59,34 @@ This is the trap that governs which of Table 1.5's 25 rows this module may emit.
 The Blue Book gives three seniority orders over 'a'-prefix elements and they do
 NOT cover the same elements:
 
-===============  ===========================================  ========  ==========
-rule             governs                                      elements  citation
-===============  ===========================================  ========  ==========
-P-15.4.1.2       general / chains, "naming and numbering"      **25**   [BBv2:6446]
-P-23.3.1         citation order INSIDE a von Baeyer name       **22**   [BBv2:9765]
-P-23.3.2.2       numbering seniority when there is a CHOICE    **18**   [BBv2:9789]
-===============  ===========================================  ========  ==========
+=============== =========================================== ======== ==========
+rule governs elements citation
+=============== =========================================== ======== ==========
+       general / chains, "naming and numbering" **25** [BBv2:6446]
+         citation order INSIDE a von Baeyer name **22** [BBv2:9765]
+       numbering seniority when there is a CHOICE **18** [BBv2:9789]
+=============== =========================================== ======== ==========
 
-P-23.3.1 drops ``At``, ``Po`` and ``C``; P-23.3.2.2 drops those three **and** the
+ drops ``At``, ``Po`` and ``C``; drops those three **and** the
 four halogens. Emitting a replacement prefix needs BOTH a citation position and a
 numbering rank, so the set this module may spell is the intersection --
-P-23.3.2.2's 18 elements, which is exactly ``HETEROATOM_PREFIXES`` below. The
+'s 18 elements, which is exactly ``HETEROATOM_PREFIXES`` below. The
 remaining seven rows of Table 1.5 stay in ``TABLE_1_5`` (the book's table is
 recorded whole) but are listed in ``VB_INADMISSIBLE`` with the reason, and they
-fail closed through the ordinary ``unexpressed`` contract. Borrowing a P-15.4.1.2
+fail closed through the ordinary ``unexpressed`` contract. Borrowing a
 position for an element the von Baeyer rules never rank would be inventing a rule.
 
 Relationship to ``rules/skeletal_replacement.py``: that module is the ACYCLIC
-P-15.4 chain namer (``2,5,8-trioxanonane``). Same nomenclature family, different
+ chain namer (``2,5,8-trioxanonane``). Same nomenclature family, different
 parent class and a different numbering source; they share no state. Its own
 element table is deliberately NOT extended alongside this one: whether skeletal
 replacement or the substitutive parent hydride (``alumane`` / ``gallane`` /
 ``indigane`` / ``thallane``, Table 2.1 [BBv2:7924-7930]) is the PIN for a
-Group-13 atom embedded in a CHAIN is a P-51.4 selection question this module does
+Group-13 atom embedded in a CHAIN is a selection question this module does
 not answer, and the chain path fails closed until it is answered.
 
 Relationship to ``data/hw_heteroatoms.py``: that is **Table 2.4**
-(P-22.2.2.1.1), the Hantzsch-Widman monocycle context, which spells two of the
+, the Hantzsch-Widman monocycle context, which spells two of the
 same elements DIFFERENTLY on purpose -- ``aluma`` "(not alumina)" [BBv2:8245] and
 ``indiga`` "(not inda)", under a footnote reading "Compare with Table 1.5"
 [BBv2:8250]. A prefix is therefore a function of *(element, nomenclature
@@ -105,10 +105,10 @@ from .lambda_convention import format_lambda_token, nonstandard_bonding_number
 # Transcribed verbatim from [BBv2:6436-6443]. The table is printed as a 5x5 grid
 # whose column headers ARE the standard bonding numbers, so each row below carries
 # the number from its own column -- the second value is Blue Book data, never a
-# periodic-table default. P-15.4.1.1: 'a' prefixes designate the replacing
+# periodic-table default.: 'a' prefixes designate the replacing
 # skeletal atoms "with their standard bonding number", which is what makes an
 # atom whose actual bonding number differs need the lambda convention
-# (P-15.4.1.3, e.g. the PIN ``6lambda5-phosphaspiro[4.5]decane`` [BBv2:6452]).
+#, e.g. the PIN ``6lambda5-phosphaspiro[4.5]decane`` [BBv2:6452]).
 #
 # This constant is the BOOK'S TABLE, not the set this module may emit -- see
 # ``HETEROATOM_PREFIXES``. It exists so every one of the 25 rows has an explicit,
@@ -131,7 +131,7 @@ TABLE_1_5: Dict[str, Tuple[str, int]] = {
     'In': ('inda', 3), 'Tl': ('thalla', 3),
 }
 
-# P-23.3.1 [BBv2:9765], verbatim: the replacement prefixes are "cited in the
+# [BBv2:9765], verbatim: the replacement prefixes are "cited in the
 # order: F > Cl > Br > I > O > S > Se > Te > N > P > As > Sb > Bi > Si > Ge > Sn >
 # Pb > B > Al > Ga > In > Tl". TWENTY-TWO elements -- At, Po and C have no von
 # Baeyer citation position at all. (Cross-check: Table 2.4, the Hantzsch-Widman
@@ -146,10 +146,10 @@ VB_CITATION_ORDER: Tuple[str, ...] = (
     'B', 'Al', 'Ga', 'In', 'Tl',
 )
 
-# P-23.3.2.2 [BBv2:9789], verbatim: "If there is still a choice, low locants are
+# [BBv2:9789], verbatim: "If there is still a choice, low locants are
 # assigned in accord with the decreasing seniority order of heteroatoms O > S >
 # Se > Te > N > P > As > Sb > Bi > Si > Ge > Sn > Pb > B > Al > Ga > In > Tl."
-# EIGHTEEN elements: the four halogens are absent here even though P-23.3.1 ranks
+# EIGHTEEN elements: the four halogens are absent here even though ranks
 # them for citation, so a halogen replacement has no sanctioned numbering rank.
 # This sequence is ``VB_CITATION_ORDER`` minus the halogens, so ONE integer key
 # can serve both the citation order and the numbering rank.
@@ -180,18 +180,18 @@ VB_INADMISSIBLE: Dict[str, str] = {
 }
 
 # NOT ESTABLISHED (do not paper over): the four halogens are a genuine PARTIAL
-# gap, not an absence. We know WHERE to cite them (P-23.3.1 ranks them ahead of
+# gap, not an absence. We know WHERE to cite them ranks them ahead of
 # O, and ``VB_CITATION_ORDER`` records that) but not how to number them against
 # another heteroatom, and we cannot currently spell their mandatory lambda. The
 # Blue Book's only skeletal-halogen replacement examples are lambda-convention
-# monocycles and fused systems -- ``lambda3-iodane`` [BBv2:7968, :23561] and
+# monocycles and fused systems -- ``lambda3-iodane`` [BBv2:7968,:23561] and
 # ``3H-3lambda3,2,4-benziodadioxepine`` (PIN) [BBv2:14557] -- both outside this
 # builder. Closing this needs (a) a sanctioned numbering rule for halogens and
 # (b) the ring lambda question resolved; until then they fail closed like any
 # off-table element, through ``unexpressed``.
 
-# The elements this module MAY spell: P-23.3.1 (citation) INTERSECT P-23.3.2.2
-# (numbering) = P-23.3.2.2's eighteen. The integer is a relative sort key that
+# The elements this module MAY spell: (citation) INTERSECT
+# (numbering) = 's eighteen. The integer is a relative sort key that
 # doubles as both orders (see ``VB_NUMBERING_SENIORITY``); the strings come from
 # ``TABLE_1_5`` so a spelling cannot drift from the book. The O..B rows keep the
 # keys 1..14 they have always had, so extending the table did not renumber -- and
@@ -208,14 +208,14 @@ HETEROATOM_PREFIXES: Dict[str, Tuple[str, int]] = {
 class ReplacementPrefix:
     """Result of ``build_replacement_prefix``.
 
-    ``prefix``      the replacement block exactly as it is concatenated onto the
+    ``prefix`` the replacement block exactly as it is concatenated onto the
                     ring descriptor -- ``"3-oxa"``, ``"2,4-dioxa"``,
                     ``"5-oxa-3-sila"``, ``""`` when nothing is expressed. NO
-                    trailing hyphen (P-23.3.1: the 'a'-prefix attaches directly
+                    trailing hyphen: the 'a'-prefix attaches directly
                     to the descriptor, ``2-oxabicyclo[2.2.2]octane``). Always
                     byte-identical to the legacy inline builder, INCLUDING its
                     malformed >20 multiplier fallback -- see ``unexpressed``.
-    ``per_atom``    ``(atom_idx, morpheme)`` for every heteroatom the prefix
+    ``per_atom`` ``(atom_idx, morpheme)`` for every heteroatom the prefix
                     spells CORRECTLY, ascending by atom index. One entry per
                     atom, so a consumer can bind each spelled morpheme to the
                     single atom it claims.
@@ -232,17 +232,17 @@ class ReplacementPrefix:
 
 
 def vb_lambda_for_atom(mol, atom_idx: int) -> Optional[int]:
-    """λ bonding number (P-14.1.2 / P-14.1.3; placement P-15.4.1.3; per-topology
-    P-21.2.4 / P-22.2.7 / P-23.6 / P-24.8) for a ring 'a'-prefix atom, or None.
+    """λ bonding number /; placement; per-topology
+     / / / for a ring 'a'-prefix atom, or None.
 
-    Correction: earlier comments in this fix's history cited P-31.1.4.2 for the
+    Correction: earlier comments in this fix's history cited for the
     λ-convention itself. That section heading is "If there is a choice of names
-    and numbering..." (BB:16633) -- it governs CHOICE, not the λ symbol. The
-    nonstandard-bonding-number concept is P-14.1.2 (standard) / P-14.1.3
+    and numbering..." (the Blue Book) -- it governs CHOICE, not the λ symbol. The
+    nonstandard-bonding-number concept is (standard) /
     (nonstandard); the symbol's placement (immediately after the locant, no
-    hyphen) is P-15.4.1.3; and each parent-hydride topology has its own
-    governing subsection: P-21.2.4 (acyclic), P-22.2.7 (monocyclic), P-23.6
-    (von Baeyer ring 'a'-prefix -- the context THIS function serves), P-24.8
+    hyphen) is; and each parent-hydride topology has its own
+    governing subsection: (acyclic), (monocyclic),
+    (von Baeyer ring 'a'-prefix -- the context THIS function serves),
     (spiro).
 
     Refines the shared ``nonstandard_bonding_number`` with the SKELETAL-DEGREE
@@ -328,7 +328,7 @@ def build_replacement_prefix(
 
     parts: List[str] = []
     per_atom: List[Tuple[int, str]] = []
-    # Cite elements in P-23.3.1 seniority order, NOT ascending locant order
+    # Cite elements in seniority order, NOT ascending locant order
     # (``5-oxa-3-sila``: oxa precedes sila although sila holds the lower locant).
     for element in sorted(by_element, key=lambda s: HETEROATOM_PREFIXES[s][1]):
         entries = sorted(by_element[element], key=lambda e: e[0])

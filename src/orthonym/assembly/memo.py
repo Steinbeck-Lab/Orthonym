@@ -102,7 +102,7 @@ def cache_or_compute(namespace, key, compute_fn):
     """Return the memoized value for ``(namespace, key)``, computing it via
     ``compute_fn`` on a miss.
 
-    * ``ORTHONYM_MEMO=off`` OR no active scope -> always ``compute_fn()``
+    * ``ORTHONYM_MEMO=off`` OR no active scope -> always ``compute_fn``
       (fail-open; never caches).
     * ``on`` -> return the cached value if present, else compute + store + return.
     * ``verify`` -> ALWAYS recompute; if a value is already stored for the key and

@@ -1,13 +1,13 @@
 """
-End-to-end integration tests for multi-bond decomposition (Phase 56, Plan 03).
+End-to-end integration tests for multi-bond decomposition (a phase, Plan 03).
 
 Tests real molecules with 2+ cleavable bonds through the full pipeline
-(SMILES -> name_compound() -> IUPAC name) to verify:
+(SMILES -> name_compound -> IUPAC name) to verify:
 
 1. Triglycerides (3 ester bonds) produce decomposition names
 2. Phospholipids (2 ester + phosphate) produce non-duplicate names
 3. Performance guard prevents timeouts on highly-cleavable molecules
-4. DECP-02 recursive fragment decomposition works on 3-bond molecules
+4. recursive fragment decomposition works on 3-bond molecules
 5. Mixed bond types (ester + amide, ester + glycosidic) don't crash
 
 Backward compat cases (triacetin, tripropionin) assert EXACT names.
@@ -67,7 +67,7 @@ class TestTriglycerides:
     @pytest.mark.integration
     def test_triacetin_exact_name_backward_compat(self):
         """Triacetin: backward compat -- polyfunctional path should produce
-        the same name as before Phase 56."""
+        the same name as before a phase."""
         name = name_compound("CC(=O)OCC(COC(C)=O)OC(C)=O")
         assert name == "1,2,3-tris(acetyloxy)propane", (
             f"Triacetin backward compat failure: {name}"
@@ -123,7 +123,7 @@ class TestPerformanceGuard:
 
     @pytest.mark.integration
     def test_hexaester_completes_within_2s(self):
-        """Hexaacetyl sorbitol (6 ester bonds): name_compound() must complete
+        """Hexaacetyl sorbitol (6 ester bonds): name_compound must complete
         within 2 seconds without hang or timeout."""
         smi = "CC(=O)OCC(OC(C)=O)C(OC(C)=O)C(OC(C)=O)C(OC(C)=O)COC(C)=O"
         t0 = time.time()
@@ -152,11 +152,11 @@ class TestPerformanceGuard:
 
 
 # ---------------------------------------------------------------------------
-# Section 4: DECP-02 recursive fragment decomposition tests
+# Section 4: recursive fragment decomposition tests
 # ---------------------------------------------------------------------------
 
 class TestRecursiveFragmentDecomposition:
-    """Verify DECP-02: recursive fragment naming on multi-bond molecules.
+    """Verify: recursive fragment naming on multi-bond molecules.
 
     A molecule with 3 cleavable bonds triggers decomposition at depth 0.
     The resulting fragment still has 2 cleavable bonds and is recursively
@@ -169,7 +169,7 @@ class TestRecursiveFragmentDecomposition:
         """3-bond molecule (2 ester + 1 amide): decomposition at depth 0
         produces a fragment that still has 2 cleavable bonds.
 
-        # DECP-02: This 3-bond molecule triggers decomposition at depth 0.
+        #: This 3-bond molecule triggers decomposition at depth 0.
         # The resulting fragment still has 2 cleavable bonds and is
         # recursively decomposed at depth 1. A non-None result with no
         # duplicate words proves recursive fragment naming works.

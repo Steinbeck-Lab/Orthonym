@@ -1,12 +1,12 @@
 """
 Wave2 Tier 5c — acyl branch as prefix on a senior benzene parent
-(P-66.6.3: ketones expressed as acyl prefixes when a senior characteristic
-group takes the suffix; retained acyl prefixes P-66.6.1).
+: ketones expressed as acyl prefixes when a senior characteristic
+group takes the suffix; retained acyl prefixes.
 
 Reproduce-first: 4-acetylbenzoic acid & co. were fail-closed 'unknown' at
 HEAD (the benzene path's `_identify_substituent` had amido and acyloxy
 recognizers but no ketone-acyl branch, and the generic fallback's carbonyl
-guard correctly blocks carbonyl carbons).  benzanilide -> N-phenylbenzamide
+guard correctly blocks carbonyl carbons). benzanilide -> N-phenylbenzamide
 was ALREADY CORRECT (stale plan claim).
 
 Fix (scoped, fail-closed): a new acyl-branch recognizer in benzene's
@@ -66,7 +66,7 @@ def test_tier5c_fail_closed(_validity_gate_on, smiles, why):
 @pytest.mark.parametrize(
     "smiles,expected",
     [
-        # the PCG-ketone class must keep its chain-parent PIN (T1d gold)
+        # the PCG-ketone class must keep its chain-parent PIN (gold)
         ("CC(=O)c1ccccc1", "1-phenylethan-1-one"),
         # keto-acid chain controls (oxo prefix, not acetyl)
         ("CC(=O)CC(=O)O", "3-oxobutanoic acid"),

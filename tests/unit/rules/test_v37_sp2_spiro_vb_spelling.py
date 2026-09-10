@@ -1,4 +1,4 @@
-"""v37 SP2.3 — spiro-VB 'a'-replacement prefix hyphen joiner.
+""" — spiro-VB 'a'-replacement prefix hyphen joiner.
 
 PART 1 of the SP2 PIN-spelling pair. ``_spiro_vb_a_prefix`` (spiro.py) is the
 THIRD spiro-context skeletal-replacement speller. It built each element's
@@ -8,7 +8,7 @@ of the PIN ``2-oxa-6-aza``. The two sibling spellers
 (``_build_hetero_prefix`` at spiro.py, ``build_replacement_prefix`` in
 ring_replacement.py) both join with ``'-'``; this one had diverged.
 
-STEP-1 (invariant 8) VERIFIED on HEAD in a fresh process: a spy on
+ (a project rule) VERIFIED on HEAD in a fresh process: a trace on
 ``_spiro_vb_a_prefix`` returned ``'2-oxa6-aza'`` for ``O1CC2CNC1C23CCC3``, and
 that string is prepended directly before ``spiro[`` in
 ``_name_spiro_vonbaeyer_core`` -> the emitted name. Both the pre-fix and

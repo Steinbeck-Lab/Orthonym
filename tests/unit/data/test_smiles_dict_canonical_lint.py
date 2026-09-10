@@ -1,8 +1,8 @@
-"""a phase.7 BBR-HYG / — anti-drift lint for hard-coded SMILES dicts.
+"""a phase BBR-HYG / — anti-drift lint for hard-coded SMILES dicts.
 
 The data layer keys several lookups by SMILES. If a key is NOT the RDKit canonical
 SMILES, the canonical-SMILES lookup silently MISSES it — a dead/mis-routed entry
-(audit Dim-02 §4; the mislabel class). This lint re-canonicalizes every
+(audit Dim-02; the mislabel class). This lint re-canonicalizes every
 hard-coded SMILES-keyed dict against live RDKit so the drift surfaces on every CI
 run and NEW non-canonical keys are rejected.
 
@@ -86,7 +86,7 @@ def test_lint_detects_a_planted_bad_key():
 
 
 # ===========================================================================
-# WSD-03 (a phase) — NAME<->STRUCTURE integrity lint.
+# -03 (a phase) — NAME<->STRUCTURE integrity lint.
 #
 # A SUPERSET of the canonical-key check: a key can be canonical yet map to the
 # WRONG molecule for its `name` (the 1,5-naphthyridine / pyrido[3,4-b]pyridine
@@ -113,7 +113,7 @@ _KEEP_NAME_STRUCTURE_MISMATCH = frozenset({
     # --- KEEP-tautomer: intentional Phase-142 purine tautomer entries. Standard
     # InChI normalizes the mobile ring N-H, so OPSIN emits a different (but
     # equivalent) tautomer's canonical SMILES for the trivial name — same
-    # molecule, NOT a mislabel. After the DATA-01 fused-heterocycle
+    # molecule, NOT a mislabel. After the fused-heterocycle
     # data-integrity sweep (46 mislabeled entries corrected + heptalene key
     # fixed), these five are the ONLY remaining name<->structure mismatches.
     # The earlier KEEP-deferred block (the 43 isomer mislabels) and the
@@ -146,7 +146,7 @@ def _name_structure_drift(expected_canon):
 
 @pytest.mark.unit
 def test_fused_heterocycle_name_structure_lint():
-    """GATE (): no fused-heterocycle entry's key may drift from its committed
+    """GATE : no fused-heterocycle entry's key may drift from its committed
     name-structure unless it is in the documented FIX/KEEP allowlist. Catches the
     silent wrong-molecule label-swap class (e.g. the naphthyridine bug, now fixed)."""
     expected_canon = _json.load(open(_EXPECTED_CANON_PATH))["expected_canon"]

@@ -1,4 +1,4 @@
-"""Phase 160 Plan-06 unit tests for ``handlers/ester_family.py``.
+"""a phase Plan-06 unit tests for ``handlers/ester_family.py``.
 
 Composite handler tests covering signature shape, sub-path fallthrough,
 and byte-identical proof vs the inline composer.py cascade.
@@ -134,7 +134,7 @@ def test_all_subpaths_fallthrough_returns_none():
 def test_byte_identical_simple_ester_via_inline_cascade():
     """Byte-identical: composer.py inline cascade produces the same name
     as the composite for a representative simple-ester SMILES."""
-    # composer.py inline path is what Orthonym().name(...) goes through today.
+    # composer.py inline path is what Orthonym.name(...) goes through today.
     namer = Orthonym()
     try:
         inline_name = namer.name("CCOC(=O)C")  # ethyl acetate
@@ -149,16 +149,16 @@ def test_byte_identical_simple_ester_via_inline_cascade():
 
 
 def test_predicate_rejects_ring_assembly_dominant_polyfunctional():
-    """Plan-07 IUPAC P-44.1 root-cause fix: the predicate MUST NOT match
+    """Plan-07 IUPAC root-cause fix: the predicate MUST NOT match
     ring-assembly-dominant polyfunctional molecules (e.g. terphenyl polyhydroxy).
-    For those, ring_assembly@2500 is the correct dispatch target, not
-    ester_family@1500.
+    For those, ring_assembly is the correct dispatch target, not
+    ester_family.
 
     Verified against canary regression: 'COc1cc(-c2ccc(O)c(CC=C(C)C)c2)c(OC)
     c(O)c1-c1ccc(O)c(O)c1' is is_polyfunctional=True but has principal_chain=
     None and aromatic rings. name_polyfunctional returns None for it; the
     predicate must therefore return False so dispatch_inner reaches
-    ring_assembly@2500.
+    ring_assembly.
     """
     from orthonym.namer import compute_features
     from rdkit import Chem

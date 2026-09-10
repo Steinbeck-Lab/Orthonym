@@ -1,20 +1,20 @@
-"""Phase 160.1 regression fixture + audit §3 spot-check tests.
+"""a phase regression fixture + the audit spot-check tests.
 
-Plan-02-07 per CONTEXT D-16 honest-fail-on-data + RESEARCH §7 acceptance
-test. The regression fixture is the canonical Phase 160.1 fix target —
+Plan-02-07 per internal notes honest-fail-on-data + RESEARCH acceptance
+test. The regression fixture is the canonical a phase fix target —
 pre-fix it names with spurious "hydroxymethyl"; post-fix with
-"methoxycarbonyl" per IUPAC P-65.6.3.
+"methoxycarbonyl" per IUPAC.
 
-Audit §3 spot-checks confirm the canary re-baseline policy:
+Audit spot-checks confirm the canary re-baseline policy:
 * `name_stability_373` is the FIX (hydroxymethyl → methoxycarbonyl).
 * `name_stability_265` is a documented pre-existing environmental drift
-  (per 160.1-01-SUMMARY.md §3); NOT introduced by Phase 160.1.
+  (per 160.1-01-SUMMARY.md); NOT introduced by a phase.
 """
 from orthonym import name_compound
 
 
 # ====================================================================
-# Regression fixture — THE Phase 160.1 fix target
+# Regression fixture — THE a phase fix target
 # ====================================================================
 
 
@@ -22,13 +22,13 @@ class TestRegressionFixture:
     """The canonical Phase 160.1 regression fixture from CONTEXT + RESEARCH §3."""
 
     def test_regression_fixture_methoxycarbonyl_present(self):
-        """Phase 160.1 regression fixture names with methoxycarbonyl."""
+        """a phase regression fixture names with methoxycarbonyl."""
         smi = (
             "COC(=O)/C(CC(=O)O)=C(\\CCCCCCCCCCCCCCCCC1=C(C)C(=O)OC1=O)C(=O)O"
         )
         n = name_compound(smi)
         # The 3-position methyl-ester substituent must be named with the
-        # IUPAC-canonical alkoxycarbonyl prefix form per P-65.6.3.
+        # IUPAC-canonical alkoxycarbonyl prefix form per.
         assert "methoxycarbonyl" in n, (
             f"expected 'methoxycarbonyl' in name, got: {n!r}"
         )
@@ -42,7 +42,7 @@ class TestRegressionFixture:
 
 
 # ====================================================================
-# Audit §3 spot-checks (per 160.1-AUDIT-SUBENUM.md §3 4-row table)
+# Audit spot-checks (per 160.1-AUDIT-SUBENUM.md 4-row table)
 # ====================================================================
 
 
@@ -58,7 +58,7 @@ class TestAuditSection3SpotChecks:
         assert "methoxycarbonyl" in n
 
     def test_audit_row2_name_stability_4_no_regression(self):
-        """Audit §3 row 2: tricarboxylic acid with spurious hydroxymethyl.
+        """Audit row 2: tricarboxylic acid with spurious hydroxymethyl.
 
         This row was a candidate for re-baselining but the 14-row closed
         set does not include carboxylic_acid. The fix does NOT change the
@@ -89,7 +89,7 @@ class TestAuditSection3SpotChecks:
 
 # ====================================================================
 # Hydroxymethyl preservation — confirms bona-fide -CH2OH substituents
-# are NOT broken by the Phase 160.1 fix
+# are NOT broken by the a phase fix
 # ====================================================================
 
 
@@ -123,7 +123,7 @@ class TestHydroxymethylPreservation:
 
 
 # ====================================================================
-# IUPAC canonical form preference (per audit §1 OPSIN cross-reference)
+# IUPAC canonical form preference (per the audit OPSIN cross-reference)
 # ====================================================================
 
 
@@ -149,30 +149,30 @@ class TestCanonicalForms:
 
 
 # ====================================================================
-# Phase 160.2 Plan-04-01 — CR-01 BLOCKER regression fixture
+# a phase Plan-04-01 — BLOCKER regression fixture
 # ====================================================================
 
 
 class TestOxygenAttachedCarbamateBranchB:
-    """Phase 160.2 Plan-04-01 CR-01 regression: oxygen-attached carbamate
-    must use ``carbamoyloxy`` (IUPAC P-66.6.4 Branch B), not Branch A
+    """a phase Plan-04-01 regression: oxygen-attached carbamate
+    must use ``carbamoyloxy`` (IUPAC Branch B), not Branch A
     fall-through.
 
     SMILES: ``O=C(N)OCCCC(=O)O``
     Structure: ``NH2-C(=O)-O-CH2-CH2-CH2-C(=O)-OH``
     Parent: butanoic acid (4C including carboxyl)
-    Substituent at C4: ``carbamoyloxy`` (P-66.6.4 Branch B)
+    Substituent at C4: ``carbamoyloxy`` Branch B)
     Expected: ``4-(carbamoyloxy)butanoic acid``
 
     Pre-fix (160.1 ship at HEAD): emitted ``4-(methanoyloxy)butanoic acid``;
     OPSIN round-trip dropped the N+H atoms producing the wrong molecule
-    (InChI=1S/C5H8O4 instead of input C5H9NO4) per RESEARCH §2.
+    (InChI=1S/C5H8O4 instead of input C5H9NO4) per RESEARCH
     Post-fix (160.2 Plan-04-01): emits ``4-(carbamoyloxy)butanoic acid``;
     OPSIN round-trip matches input InChI L1.
     """
 
     def test_oxygen_attached_carbamate_branch_b(self):
-        """name_compound emits Branch B carbamoyloxy per IUPAC P-66.6.4."""
+        """name_compound emits Branch B carbamoyloxy per IUPAC."""
         smiles = "O=C(N)OCCCC(=O)O"
         expected = "4-(carbamoyloxy)butanoic acid"
         actual = name_compound(smiles, style="pin")
@@ -194,7 +194,7 @@ class TestOxygenAttachedCarbamateBranchB:
 
         # Locate the OPSIN jar shipping in the repo opsin/ tree (relative
         # path; opsin/opsin-cli-2.9.0-jar-with-dependencies.jar per
-        # Phase 138 D-22 pinned version).
+        # a phase pinned version).
         opsin_jar_candidates = [
             "opsin/opsin-cli-2.9.0-jar-with-dependencies.jar",
             os.path.join(
@@ -231,20 +231,20 @@ class TestOxygenAttachedCarbamateBranchB:
 
 
 class TestNSubstitutedCarbamateBranchB:
-    """Phase 160.2 post-merge: N-substituted Branch B carbamate per IUPAC
-    P-66.6.4. The original Plan-04-01 guard hard-coded ``carbamoyloxy`` and
+    """a phase post-merge: N-substituted Branch B carbamate per IUPAC
+    . The original Plan-04-01 guard hard-coded ``carbamoyloxy`` and
     silently dropped N-substituents; the follow-up fix routes through
     ``_compute_branch_b_carbamoyloxy_name`` which produces explicit-N-locant
     PIN forms via the existing ``get_n_alkyl_carbamoyl_prefix`` /
     ``get_n_n_dialkyl_carbamoyl_prefix`` conventions then appends ``oxy``.
 
-      * ``O=C(NC)OCCCC(=O)O``        → ``4-[(methylcarbamoyl)oxy]butanoic acid``
-      * ``O=C(NCC)OCCCC(=O)O``       → ``4-[(ethylcarbamoyl)oxy]butanoic acid``
-      * ``O=C(N(C)C)OCCCC(=O)O``     → ``4-[(dimethylcarbamoyl)oxy]butanoic acid``
-      * ``O=C(N(C)CC)OCCCC(=O)O``    → ``4-{[ethyl(methyl)carbamoyl]oxy}butanoic acid``
+      * ``O=C(NC)OCCCC(=O)O`` → ``4-[(methylcarbamoyl)oxy]butanoic acid``
+      * ``O=C(NCC)OCCCC(=O)O`` → ``4-[(ethylcarbamoyl)oxy]butanoic acid``
+      * ``O=C(N(C)C)OCCCC(=O)O`` → ``4-[(dimethylcarbamoyl)oxy]butanoic acid``
+      * ``O=C(N(C)CC)OCCCC(=O)O`` → ``4-{[ethyl(methyl)carbamoyl]oxy}butanoic acid``
 
-    The carbamoyl N-locant is omitted (P-66.1.1.4.1.1) and the carbamoyl unit is
-    enclosed and mark-escalated per P-16.5.4 (parens -> brackets -> braces as the
+    The carbamoyl N-locant is omitted and the carbamoyl unit is
+    enclosed and mark-escalated per (parens -> brackets -> braces as the
     attachment locant and inner marks stack up). Each name OPSIN-round-trips to the
     input InChI L1 (formula + connectivity).
     """

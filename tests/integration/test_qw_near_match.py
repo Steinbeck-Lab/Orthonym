@@ -1,7 +1,7 @@
 """
-Integration tests for Phase 45 Plan 03 near-match quick-win fixes.
+Integration tests for a phase Plan 03 near-match quick-win fixes.
 
-Tests the 15 non-stereo near-match compounds from the Phase 44 benchmark
+Tests the 15 non-stereo near-match compounds from the a phase benchmark
 (Tanimoto >= 0.7, category: substituent_loss). Compounds are grouped by
 root-cause category.
 
@@ -16,7 +16,7 @@ from orthonym import name_compound
 
 # ============================================================================
 # LIPID_SATURATION_FIXES (5 compounds)
-# Root cause: get_acid_fragment_name() and get_alkyl_fragment_name() in
+# Root cause: get_acid_fragment_name and get_alkyl_fragment_name in
 # esters.py returned saturated systematic stems (octadecanoic -> stearoyloxy)
 # for unsaturated fatty acid chains. Fixed by detecting (carbon_count,
 # double_bond_count) and using trivial unsaturated names or extracting the
@@ -49,7 +49,7 @@ LIPID_SATURATION_FIXES = [
     ),
     pytest.param(
         "O=C([O-])/C=C/C(=O)O.[Na+]",
-        "sodium hydrogen (2E)-but-2-enedioate",  # Phase 64: partial salt hydrogen prefix
+        "sodium hydrogen (2E)-but-2-enedioate",  # a phase: partial salt hydrogen prefix
         id="lipid-C14-sodium-fumarate",
     ),
 ]
@@ -57,7 +57,7 @@ LIPID_SATURATION_FIXES = [
 
 # ============================================================================
 # METHOXY_FIXES (2 compounds)
-# Root cause: get_polycyclic_substituents() in polycyclic.py did not detect
+# Root cause: get_polycyclic_substituents in polycyclic.py did not detect
 # alkoxy substituents (-OCH3) on ring atoms. Added alkoxy detection that
 # names these as "methoxy", "ethoxy", etc.
 # ============================================================================
@@ -90,7 +90,7 @@ VB_COUNTING_FIXES = [
         "CC1(C)OC[C@]2(C)[C@@H](CC[C@@]3(C)[C@H]2[C@@H](O)C[C@H]2C[C@@H]4C"
         "[C@@]23CC[C@]4(O)CO)O1",
         "(1S,2S,5R,6R,8R,10S,11R,12R,17R)-1,5,12,15,15-pentamethyl-14,16-dioxa-"
-        "pentacyclo[9.8.0.1(2,6).0(2,8).0(12,17)]icosan-5,10-diol",  # Updated P72: IUPAC VB-6 citation order
+        "pentacyclo[9.8.0.1(2,6).0(2,8).0(12,17)]icosan-5,10-diol",  # Updated P72: IUPAC citation order
         id="vb-C8-pentacyclo",
     ),
     pytest.param(
@@ -105,9 +105,9 @@ VB_COUNTING_FIXES = [
 
 # ============================================================================
 # MACROCYCLIC_ESTER_FIXES (1 compound)
-# Root cause: get_alkyl_fragment_name() in esters.py counted only carbons
+# Root cause: get_alkyl_fragment_name in esters.py counted only carbons
 # (ignoring double bonds), producing "pentadecyl" instead of
-# "pentadec-10-en-1-yl". Fixed with _name_alkyl_fragment_with_unsaturation().
+# "pentadec-10-en-1-yl". Fixed with _name_alkyl_fragment_with_unsaturation.
 # ============================================================================
 
 MACROCYCLIC_ESTER_FIXES = [
@@ -121,10 +121,10 @@ MACROCYCLIC_ESTER_FIXES = [
 
 # ============================================================================
 # DEFERRED_COMPOUNDS: Steroid side chain (3) and Glycoceramide (2)
-# These require architectural changes beyond Phase 45:
+# These require architectural changes beyond a phase:
 # - Steroid side chains: sulfate ester naming, complex substituent enumeration
 # - Glycoceramide: sugar-lipid junction naming, alpha-CH2OH handling
-# Deferred to Phase 48 (substituent completeness).
+# Deferred to a phase (substituent completeness).
 # ============================================================================
 
 DEFERRED_COMPOUNDS = [

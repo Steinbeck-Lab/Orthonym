@@ -1,6 +1,6 @@
-"""W2F-P7 Task 5 (P-14.4(h)): the nonstandard-valence atom gets the lower locant.
+"""W2F-P7 Task 5 (h)): the nonstandard-valence atom gets the lower locant.
 
-BB P-14.4(h) (BlueBookV2.md:3318,3334): when a numbering choice remains, the
+BB (h) (the Blue Book,3334): when a numbering choice remains, the
 substituent whose attachment atom is in a NONSTANDARD (λ) valence state is
 assigned the lower locant. 'OC(C[PH4])CP' -> the λ5-phosphanyl arm takes C1.
 """

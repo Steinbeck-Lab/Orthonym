@@ -1,10 +1,10 @@
 """W3-P04 N-hydroxy-sulfonimidic-acid handler — PIN = 'N-hydroxy<sulfonimidic acid>'
-(P-65.3.1.5).
+.
 
 A hydroximic acid derived from a sulfonic acid, R-S(=O)(=N-OH)-OH, is named per
-P-65.3.1.5 as the *N-hydroxy derivative of the corresponding sulfonimidic acid*
-(P-65.3.1.5 example: 'N-hydroxymethanesulfonimidic acid (PIN)'). This mirrors the
-hydroximic-acid handler ('N-hydroxy<imidic acid>', P-65.1.3.3.1) exactly one
+ as the *N-hydroxy derivative of the corresponding sulfonimidic acid*
+ example: 'N-hydroxymethanesulfonimidic acid (PIN)'). This mirrors the
+hydroximic-acid handler ('N-hydroxy<imidic acid>', exactly one
 sulfur-acid class over.
 
 Example:
@@ -20,7 +20,7 @@ terminal -OH on its imino nitrogen (the hydroximic / N-hydroxy case). The plain
 =NH parent (CS(=O)(=N)O -> 'methanesulfonimidic acid') has no such -OH, so the
 predicate returns False and the ordinary suffix path names it.
 
-IUPAC cite: P-65.3.1.5.
+IUPAC cite:.
 """
 from __future__ import annotations
 
@@ -61,7 +61,7 @@ def _imino_n_oh_oxygen(mol: Any, pg_atoms: Any) -> Optional[int]:
 
 def _is_sulfonimidic_n_hydroxy(features: Any) -> bool:
     """Gate: principal_group == 'sulfonimidic_acid' AND the imino N bears a
-    terminal -OH (the P-65.3.1.5 N-hydroxy / hydroximic case)."""
+    terminal -OH (the N-hydroxy / hydroximic case)."""
     if getattr(features, 'principal_group', None) != 'sulfonimidic_acid':
         return False
     mol = getattr(features, 'mol', None)
@@ -73,7 +73,7 @@ def _is_sulfonimidic_n_hydroxy(features: Any) -> bool:
 def name_sulfonimidic_n_hydroxy(
     features: Any, mol: Any = None, style: str = "pin",
 ) -> Optional[NamingResult]:
-    """Direct-return N-hydroxy-sulfonimidic-acid handler (W3-P04, P-65.3.1.5).
+    """Direct-return N-hydroxy-sulfonimidic-acid handler (W3-P04,.
 
     Names the sulfonimidic-acid core (=N-OH stripped to =NH) via the full
     pipeline, then prepends 'N-hydroxy'. Returns None on any failure so the

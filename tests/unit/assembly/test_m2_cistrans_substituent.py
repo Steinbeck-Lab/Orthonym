@@ -1,4 +1,4 @@
-"""v41 M2.3 — best-effort relative cis/trans on a ring-as-SUBSTITUENT.
+""" M2.3 — best-effort relative cis/trans on a ring-as-SUBSTITUENT.
 
 When the general-engine best-effort floor names a molecule whose ring appears
 AS A SUBSTITUENT with exactly two same-ring stereocentres (>=1 pseudoasymmetric,
@@ -13,10 +13,10 @@ These tests pin the six Task-1 witnesses (``_m2_witnesses.WITNESSES``) plus the
 BLOCKER-2 PIN gold row (a default-path regression guard that travels with this
 task): the override MUST NOT change the PIN path.
 
-Governing rule: P-31.1.4 (relative configuration ``cis``/``trans`` of two ring
+Governing rule: (relative configuration ``cis``/``trans`` of two ring
 substituents); the descriptor is the RELATION of two substituents on ONE ring,
 so it is emitted only for a saturated 3-6-ring with exactly two same-ring
-stereocentres (3+ -> P-93.5.1.3 r/c/t, out of scope).
+stereocentres (3+ -> r/c/t, out of scope).
 """
 from __future__ import annotations
 

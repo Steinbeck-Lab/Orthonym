@@ -10,11 +10,11 @@ names is verified through the CLI, recorded in
 Blue Book basis (each row also carries its citation in
 ``data/iupac_2013_pin_list.json``):
 
-* P-100 "INTRODUCTION" (the Blue Book), sentence:50943 -- "Preferred
+* "INTRODUCTION" (the Blue Book), sentence:50943 -- "Preferred
   IUPAC names (PINs) are not identified for the compounds in this Chapter."
   So Chapter 10 names are *prescribed retained names*, never PINs, and a name
-  absent from the P-103 tables is licensed by nothing.
-* P-103.1.1.3 "Systematic substitutive names" (:54247), sentence:54251 --
+  absent from the tables is licensed by nothing.
+* "Systematic substitutive names" (:54247), sentence:54251 --
   "When not denoted by a retained name, amino acids receive systematic
   substitutive names constructed by applying the principles, rules and
   conventions of substitutive nomenclature." Precedent at:54253: the names
@@ -102,7 +102,7 @@ class TestBlueBookRetainedAminoAcidsSurvive:
     ``scripts/import_opsin_xml.py`` hard-codes ``"is_pin": False`` (lines 268,
     742, 847), so all 232 entries in ``amino_acids_opsin.py`` carry False. Gating
     on it would withdraw all 88 integrated names, including ``cystine`` -- a Blue
-    Book Table 10.5 retained name (P-103.1.1.2). This test pins that trap shut.
+    Book Table 10.5 retained name. This test pins that trap shut.
     """
 
     @pytest.mark.parametrize("name", [
@@ -227,7 +227,7 @@ class TestNotOverGated:
                               # renderings (the Blue Book, the Blue Book) both use
                               # '7,8-didehydromorphinan' -- replacement unverified
         "glycocyamine",       # fallback 'guanidinoacetic acid' uses a prefix the
-                              # BB deprecates for PINs (P-66.4.1.2.1.3)
+                              # BB deprecates for PINs
     ])
     def test_no_verified_replacement_means_not_gated(self, name):
         """data/__init__.py:263 -- a deny row needs 'a Blue Book citation AND a
@@ -243,11 +243,11 @@ class TestNotOverGated:
     def test_guanidino_is_not_a_preferred_prefix(self):
         """Answers the audit's open question, and explains the glycocyamine row.
 
-        P-66.4.1.2.1.3 (the Blue Book): 'In the presence of a characteristic group
-        having seniority over guanidine (see item 11 in P-41), the following
+         (the Blue Book): 'In the presence of a characteristic group
+        having seniority over guanidine (see item 11 in, the following
         prefixes are used. The prefix guanidino may be used in general
         nomenclature.' the Blue Book marks 'carbamimidoylamino (preferred prefix)'.
-        The P-66 introduction is blunter still, item (g) at the Blue Book: "The prefix
+        The introduction is blunter still, item (g) at the Blue Book: "The prefix
         'guanidino' is no longer acceptable in preferred IUPAC names but may be
         used in general nomenclature; the preferred prefix is
         'carbamimidoylamino'."
@@ -256,7 +256,7 @@ class TestNotOverGated:
         'guanidino'. That is a SEPARATE live defect, deliberately left to its own
         task: its sibling was already corrected in place (the same dict maps
         amidine -> 'carbamimidoyl' with the note '(was "amidino" - wrong per BB
-        P-66.4.1.3.1)'), so the fix is in-class but out of scope here. This test
+        '), so the fix is in-class but out of scope here. This test
         pins the fact so the next session does not have to re-derive it.
         """
         from orthonym.rules.seniority import PREFIX_FORMS
@@ -273,29 +273,29 @@ class TestFattyAcidEsterStemsAreOutOfDenyListReach:
     THE BLUE BOOK EXCLUSION IS POSITIVE, not an absence argument. The retained
     carboxylic-acid names are FOUR closed lists and 'lauric' is in none of them:
 
-    * P-65.1.1.1 "Retained names as preferred IUPAC names" (the Blue Book)
+    * "Retained names as preferred IUPAC names" (the Blue Book)
       -- "Only the following five carboxylic acids retained names and are also
       preferred IUPAC names": formic, oxalic, acetic, benzoic, oxamic.
-    * P-65.1.1.2.1 (:29733) -- general nomenclature WITH substitution: 2-furoic,
+    * (:29733) -- general nomenclature WITH substitution: 2-furoic,
       isophthalic, phthalic, terephthalic.
-    * P-65.1.1.2.2 (:29745) -- "retained for general nomenclature with
+    * (:29745) -- "retained for general nomenclature with
       functionalization but no substitution is allowed": acrylic, adipic,
       butyric, cinnamic, fumaric, glutaric, malonic, methacrylic, isonicotinic,
       maleic, 2-naphthoic, nicotinic, oleic, PALMITIC, propionic, STEARIC,
       succinic, peracetic, perbenzoic, performic, EDTA.
-    * P-65.1.1.2.3 (:29811) -- citric, lactic, glyceric, pyruvic, tartaric.
+    * (:29811) -- citric, lactic, glyceric, pyruvic, tartaric.
 
-    P-65.1.2 "Systematic names" (heading:29858) then states the disposal rule
+     "Systematic names" (heading:29858) then states the disposal rule
     outright, at:29860: "Except for formic acid, acetic acid, oxalic acid (see
-    P-65.1.1.1), and oxamic acid (see P-65.1.1.1), systematically formed names
-    are preferred IUPAC names; the names given in P-65.1.1.2 are retained names
+    , and oxamic acid (see, systematically formed names
+    are preferred IUPAC names; the names given in are retained names
     for use in general nomenclature."
 
     The omission is deliberate, not accidental: palmitic (C16) and stearic (C18)
     ARE listed and lauric (C12) is NOT, so this is a closed list excluding it
     rather than a gap in the book. 'lauric'/'laurate' return 0 hits book-wide
     (grep validated against known positives: toluene 17, mesitylene 6,
-    morphine 1). And P-65.1.1.2.2 states the ester pattern itself -- "the
+    morphine 1). And states the ester pattern itself -- "the
     formation of esters leads to names such as methyl butyrate" -- which makes
     'methyl <trivial>ate' a GENERAL-nomenclature device that presupposes a
     retained acid. Lauric is not retained at any level, so 'methyl laurate' has
@@ -321,10 +321,10 @@ class TestFattyAcidEsterStemsAreOutOfDenyListReach:
     had to go. See internal notes
 
     The UNSATURATED rows (oleic, linoleic, linolenic, arachidonic) are non-PIN
-    under the same P-65.1.2 disposal rule and are still present in the map. They
+    under the same disposal rule and are still present in the map. They
     were left deliberately: a saturated row that falls through lands on the
     correct systematic stem, but an unsaturated row that fell through would land
-    on the SATURATED get_acid_stem() and name a different molecule. Withdrawing
+    on the SATURATED get_acid_stem and name a different molecule. Withdrawing
     them therefore needs the unsaturated producer proven first, which is a
     separate task with a wrong-molecule risk rather than a spelling risk.
     """
@@ -340,9 +340,9 @@ class TestFattyAcidEsterStemsAreOutOfDenyListReach:
     def test_saturated_fatty_stems_are_gone_from_the_count_map(self):
         """The count map must not hand a non-PIN stem to the ester acyl word.
 
-        P-65.1.2 (the Blue Book): "Except for formic acid, acetic acid,
+         (the Blue Book): "Except for formic acid, acetic acid,
         oxalic acid..., and oxamic acid..., systematically formed names are
-        preferred IUPAC names; the names given in P-65.1.1.2 are retained names
+        preferred IUPAC names; the names given in are retained names
         for use in general nomenclature."
         """
         from pathlib import Path
@@ -369,7 +369,7 @@ class TestFattyAcidEsterStemsAreOutOfDenyListReach:
                 "not, silently reverting the Task J2 fix.")
 
     def test_the_five_retained_pin_acids_are_untouched(self):
-        """P-65.1.1.1 (:29715): exactly five acids are retained AS PINs."""
+        """ (:29715): exactly five acids are retained AS PINs."""
         from orthonym.data.trivial_acids import get_acylate_name
         assert get_acylate_name("acetic") == "acetate"
         assert get_acylate_name("benzoic") == "benzoate"

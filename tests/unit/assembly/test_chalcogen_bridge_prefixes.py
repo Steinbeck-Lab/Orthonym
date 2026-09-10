@@ -1,16 +1,16 @@
-"""P-63.3.1 / P-63.3.2 divalent-chalcogen bridge substituent prefixes.
+""" / divalent-chalcogen bridge substituent prefixes.
 
 The defect these tests lock down was a SILENT ATOM DROP, the worst failure mode
 this system has: a branch that no producer could name was skipped and the rest of
 the molecule was named anyway, so the emitted name described fewer atoms than
 were drawn.
 
-  CC(C)(C)OOCCO   9 heavy atoms  ->  'ethan-1-ol'   (3 heavy; SIX atoms gone)
-  CC(C)OOCCO      8 heavy atoms  ->  'ethan-1-ol'   (a DIFFERENT molecule, SAME name)
-  CC(C)(C)SSCCO                  ->  '2-disulfanediyl-2-(tert-butyldisulfanyl)ethan-1-ol'
+  CC(C)(C)OOCCO 9 heavy atoms -> 'ethan-1-ol' (3 heavy; SIX atoms gone)
+  CC(C)OOCCO 8 heavy atoms -> 'ethan-1-ol' (a DIFFERENT molecule, SAME name)
+  CC(C)(C)SSCCO -> '2-disulfanediyl-2-(tert-butyldisulfanyl)ethan-1-ol'
                                      (the S-S counted TWICE, and 'disulfanediyl' is
-                                      the MULTIPLICATIVE divalent bridge, P-63.3.1(3))
-  CC(C)(C)OSCCO                  ->  '2-[(2-hydroxy-2-methylpropyl)sulfanyl]ethan-1-ol'
+                                      the MULTIPLICATIVE divalent bridge, (3))
+  CC(C)(C)OSCCO -> '2-[(2-hydroxy-2-methylpropyl)sulfanyl]ethan-1-ol'
                                      (the O-S bridge REARRANGED into a C-S bond)
 
 The central test here is an INVARIANT over a generated family, not a check of
@@ -26,29 +26,29 @@ at all when no OPSIN jar is present, which is a supported mode, so a producer th
 is wrong-but-gate-rescued still ships wrong names to some users. Everything below
 therefore holds the producers themselves to the Blue Book.
 
-Blue Book authority (verified on disk in BlueBookV2/BlueBookV2.md and against the
+Blue Book authority (verified on disk in the Blue Book Blue Book and against the
 online edition at https://iupac.qmul.ac.uk/BlueBook/):
-  * P-15.3.1.2.1.1 (BB 5194)  -OO- 'peroxy' preselected; 'dioxy' abolished.
-  * P-63.3.1 (BB 27858-27860) method (1) is substitutive and gives the PIN:
+  * (BB 5194) -OO- 'peroxy' preselected; 'dioxy' abolished.
+  * (BB 27858-27860) method (1) is substitutive and gives the PIN:
     R'-peroxy / R'-disulfanyl. 'disulfanediyl' is method (3), the MULTIPLICATIVE
     divalent bridge -SS-, licensed only when both ends are parent structures.
-  * P-51.4.1.1 (BB 23389)  '(tert-butylperoxy)dimethylsilyl propanoate (PIN)'
+  * (BB 23389) '(tert-butylperoxy)dimethylsilyl propanoate (PIN)'
     -- 'tert-butyl' is cited BARE inside the compound prefix, no inner marks.
-  * P-63.2.2.2 (BB 27665-27691)  retained R-O- contractions: 'tert-butoxy
+  * (BB 27665-27691) retained R-O- contractions: 'tert-butoxy
     (preferred prefix) (no substitution)', explicitly not 'tert-butyloxy';
     '(propan-2-yl)oxy' is the preferred prefix, 'isopropoxy' general-only.
-  * P-57.1.3 (BB 24426)  'isopropyl' is barred from preferred IUPAC names.
-  * P-63.3.2 (BB 27914)  '(methoxysulfanyl)cyclohexane (PIN)' for C6H11-S-O-CH3
+  * (BB 24426) 'isopropyl' is barred from preferred IUPAC names.
+  * (BB 27914) '(methoxysulfanyl)cyclohexane (PIN)' for C6H11-S-O-CH3
     and '[(methylsulfanyl)oxy]ethane (PIN)' for CH3-CH2-O-S-CH3: the LAST-cited
     chalcogen is the atom bonded to the parent.
-  * P-71.3 (BB 40737)  'tert-butyldisulfanyl (PIN)'.
-  * P-71.2.1.2  'tert-butoxytri(phenyl)-λ5-phosphanyl (PIN)' -- tert-butoxy
+  * (BB 40737) 'tert-butyldisulfanyl (PIN)'.
+  * 'tert-butoxytri(phenyl)-λ5-phosphanyl (PIN)' -- tert-butoxy
     concatenated BARE inside a compound prefix of a PIN, with the bracketed
     '[(2-methylpropan-2-yl)oxy]...' variant listed as NOT preferred. This is what
     establishes 'tert-butoxysulfanyl' rather than leaving it a guess.
-  * P-41 Table 4.1 (BB 18190/18218)  hydroxy = class 17, peroxides = class 42, so
-    P-44.1.1 (BB 18875) picks the ethanol parent in every case below.
-  * P-14.3.4.2(b) + P-14.3.3  the locant '1' may be elided only for a
+  * (BB 18190/18218) hydroxy = class 17, peroxides = class 42, so
+     (BB 18875) picks the ethanol parent in every case below.
+  * (b) + the locant '1' may be elided only for a
     MONOsubstituted two-atom chain, so these disubstituted C2 parents are
     'ethan-1-ol', never 'ethanol'.
 """
@@ -82,12 +82,12 @@ _R_GROUPS = (
     "C",             # methyl
     "CC",            # ethyl
     "CCC",           # propyl
-    "CC(C)",         # propan-2-yl  (isopropyl is barred from PINs, P-57.1.3)
+    "CC(C)",         # propan-2-yl (isopropyl is barred from PINs,
     "CC(C)(C)",      # tert-butyl
     "OCC",           # 2-hydroxyethyl
 )
 
-# ARYL organyl roots are left out of the -SS-/-OS- family on purpose. P-63.3.1 draws
+# ARYL organyl roots are left out of the -SS-/-OS- family on purpose. draws
 # no distinction between an alkyl and an aryl R, and '<aryl>disulfanyl' IS a compound
 # prefix that must be enclosed (bare, '2-phenyldisulfanylethan-1-ol' re-parses as
 # '2-phenyl' + 'disulfanyl' -> a different molecule). But that enclosure is decided
@@ -96,11 +96,11 @@ _R_GROUPS = (
 # through this one. The aryl root IS exercised below via the -OO- bridge, whose
 # 'peroxy' clause in that predicate is long-standing and independent.
 
-# Divalent-chalcogen bridges. P-63.3.1 homo bridges and P-63.3.2 mixed ones.
+# Divalent-chalcogen bridges. homo bridges and mixed ones.
 _BRIDGES = ("OO", "SS", "OS", "SO")
 
 # Parents whose principal characteristic group outranks the bridge class, so the
-# bridge is always expressed as a PREFIX (P-41 Table 4.1: 17 and 12 beat 42).
+# bridge is always expressed as a PREFIX: 17 and 12 beat 42).
 _PARENTS = (
     "CCO",           # ethan-1-ol
     "CCC(=O)O",      # propanoic acid
@@ -293,15 +293,15 @@ def test_distinct_molecules_never_share_one_name():
 @pytest.mark.parametrize(
     "smiles,expected,cite",
     [
-        # P-63.3.1(1) + the bare 'tert-butyl' of BB 23389.
+        # (1) + the bare 'tert-butyl' of BB 23389.
         ("CC(C)(C)OOCCO", "2-(tert-butylperoxy)ethan-1-ol", "P-63.3.1 / BB 23389"),
-        # P-57.1.3 bars 'isopropyl'; '(propan-2-yl)' keeps its own marks, which
+        # bars 'isopropyl'; '(propan-2-yl)' keeps its own marks, which
         # forces square brackets outside -- BB 27876 '1-[(propan-2-yl)diselanyl]propane'.
         ("CC(C)OOCCO", "2-[(propan-2-yl)peroxy]ethan-1-ol", "P-63.3.1 / BB 27876"),
-        # P-71.3 (BB 40737) spells 'tert-butyldisulfanyl' verbatim.
+        # (BB 40737) spells 'tert-butyldisulfanyl' verbatim.
         ("CC(C)(C)SSCCO", "2-(tert-butyldisulfanyl)ethan-1-ol", "P-71.3 / BB 40737"),
-        # P-63.3.2 (BB 27914) template '(methoxysulfanyl)cyclohexane', with
-        # 'tert-butoxy' licensed bare in a concatenated PIN prefix by P-71.2.1.2.
+        # (BB 27914) template '(methoxysulfanyl)cyclohexane', with
+        # 'tert-butoxy' licensed bare in a concatenated PIN prefix by.
         ("CC(C)(C)OSCCO", "2-(tert-butoxysulfanyl)ethan-1-ol", "P-63.3.2 / P-71.2.1.2"),
         # The exact BB 27914 morphology, with methyl.
         ("COSCCO", "2-(methoxysulfanyl)ethan-1-ol", "P-63.3.2 / BB 27914"),
@@ -315,7 +315,7 @@ def test_bluebook_cited_pin_strings(smiles, expected, cite):
 
 
 def test_disulfanediyl_is_never_emitted_for_a_monovalent_branch():
-    """'disulfanediyl' is P-63.3.1 method (3): the MULTIPLICATIVE divalent bridge
+    """'disulfanediyl' is method (3): the MULTIPLICATIVE divalent bridge
     -SS-. It is not a monovalent substituent prefix, so no branch disulfide may
     cite it. Verified across the whole family rather than on one molecule."""
     offenders = []
@@ -330,7 +330,7 @@ def test_disulfanediyl_is_never_emitted_for_a_monovalent_branch():
 
 
 def test_tert_butoxy_is_never_spelled_tert_butyloxy():
-    """P-63.2.2.2 (BB 27679): (CH3)3C-O- is 'tert-butoxy', explicitly NOT
+    """ (BB 27679): (CH3)3C-O- is 'tert-butoxy', explicitly NOT
     'tert-butyloxy'. Guards the ether-ownership handoff that a too-broad
     fail-closed conversion broke once already."""
     for smiles in ("CC(C)(C)OCCO", "CC(C)(C)OCCC(=O)O"):
@@ -349,7 +349,7 @@ def test_tert_butoxy_is_never_spelled_tert_butyloxy():
 @pytest.mark.parametrize(
     "smiles,frag,chalcogen,expected",
     [
-        # -O-R: the CONTRACTED P-63.2.2.2 morphology.
+        # -O-R: the CONTRACTED morphology.
         ("COSCCO", [0, 1], 1, "methoxy"),
         ("CCOSCCO", [0, 1, 2], 2, "ethoxy"),
         ("CCCOSCCO", [0, 1, 2, 3], 3, "propoxy"),
@@ -367,7 +367,7 @@ def test_composed_chalcogen_group_prefix(smiles, frag, chalcogen, expected):
 
 
 def test_composed_chalcogen_group_prefix_defers_on_a_second_chalcogen():
-    """A di-chalcogen continuation is the P-63.3.1 peroxy/disulfanyl class, which
+    """A di-chalcogen continuation is the peroxy/disulfanyl class, which
     the shared cascade already names whole. The primitive must decline there so
     that working path is never displaced."""
     mol = Chem.MolFromSmiles("COOCCO")  # C0 O1 O2 C3 C4 O5
@@ -423,7 +423,7 @@ def test_is_dichalcogen_bridge_attach(
     "smiles,frag,attach,parent,expected",
     [
         # Attached through S with an inner O -> the contracted alkoxy + 'sulfanyl',
-        # enclosed per P-16.5.1.1 (BB 27914 '(methoxysulfanyl)cyclohexane').
+        # enclosed per (BB 27914 '(methoxysulfanyl)cyclohexane').
         ("CC(C)(C)OSCCO", [0, 1, 2, 3, 4, 5], 5, {6}, "(tert-butoxysulfanyl)"),
         ("COSCCO", [0, 1, 2], 2, {3}, "(methoxysulfanyl)"),
         ("CC(C)OSCCO", [0, 1, 2, 3, 4], 4, {5}, "[(propan-2-yl)oxysulfanyl]"),

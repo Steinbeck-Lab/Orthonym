@@ -10,7 +10,7 @@ IUPAC 2013 convention:
 - Position-variable groups use explicit locants:
     butane-1,4-diol, pentane-2,4-dione, hexane-1,6-diamine
 
-Reference: IUPAC 2013 Blue Book, P-31.1, P-65.1
+Reference: IUPAC 2013 Blue Book,,
 """
 
 import pytest
@@ -19,7 +19,7 @@ from orthonym import name_compound
 
 
 # ---------------------------------------------------------------------------
-# Diacids (FIX-01): terminal -oic acid at both ends
+# Diacids : terminal -oic acid at both ends
 # ---------------------------------------------------------------------------
 
 class TestDiacids:
@@ -51,7 +51,7 @@ class TestDiacids:
 
 
 # ---------------------------------------------------------------------------
-# Dialdehydes (FIX-02): terminal -al at both ends
+# Dialdehydes : terminal -al at both ends
 # ---------------------------------------------------------------------------
 
 class TestDialdehydes:
@@ -75,7 +75,7 @@ class TestDialdehydes:
 
 
 # ---------------------------------------------------------------------------
-# Dinitriles (FIX-02): terminal -nitrile at both ends
+# Dinitriles : terminal -nitrile at both ends
 # ---------------------------------------------------------------------------
 
 class TestDinitriles:
@@ -99,7 +99,7 @@ class TestDinitriles:
 
 
 # ---------------------------------------------------------------------------
-# Diamides (FIX-02): terminal -amide at both ends
+# Diamides : terminal -amide at both ends
 # ---------------------------------------------------------------------------
 
 class TestDiamides:

@@ -1,13 +1,13 @@
-"""v27 Phase S Task 4 — substituent-chain & C=N E/Z.
+""" Phase S Task 4 — substituent-chain & C=N E/Z.
 
 Design (per the plan's "express with AUTHORITATIVE substituent-local locants;
 ABSTAIN if a bond's descriptor cannot be anchored to a locant" + the LOCKED
 PIN-default-byte-identical constraint):
 
   BUILT (authoritative locant available -> expressed):
-    * parent-chain E/Z            -> (3E)-pent-3-enoic acid
-    * near-parent one-hop subst.  -> (4E)-4-(prop-1-en-1-yl)benzoic acid
-    * functional-class oxime C=N  -> (E)-acetophenone oxime
+    * parent-chain E/Z -> (3E)-pent-3-enoic acid
+    * near-parent one-hop subst. -> (4E)-4-(prop-1-en-1-yl)benzoic acid
+    * functional-class oxime C=N -> (E)-acetophenone oxime
     * ring-substituent in-map E/Z -> via collect_stereodescriptors bond handling
 
   FAIL-CLOSED (no authoritative substituent-local numbering threaded — naming
@@ -15,7 +15,7 @@ PIN-default-byte-identical constraint):
     * fully-internal acyclic-substituent C=C beyond one hop (but-2-en-1-yl)
     * prefix-form C=N (hydroxyimino / imine / hydrazone)
   These ship an underspecified CONSTITUTION-superset name (valid, never a wrong
-  stereoisomer -> 0-wrong intact). On the general-engine path PS-1's completeness
+  stereoisomer -> 0-wrong intact). On the general-engine path 's completeness
   gate routes them to best-effort-flagged / complete-abstain.
 """
 from rdkit import Chem
@@ -54,12 +54,12 @@ def test_functional_class_oxime_ez_expressed():
     assert name.startswith("(E)") or name.startswith("(Z)")
 
 
-# --- Internal acyclic-substituent E/Z now FULLY expressed (v31) --------------
+# --- Internal acyclic-substituent E/Z now FULLY expressed  --------------
 
 def test_internal_acyclic_subst_ez_now_fully_expressed():
-    """but-2-en-1-yl on a ring: the substituent-local E/Z anchoring (v31) now
+    """but-2-en-1-yl on a ring: the substituent-local E/Z anchoring  now
     expresses the descriptor with its own locant -> `(2E)-but-2-en-1-yl`, an
-    isomeric-EXACT name (no longer the E/Z-dropped superset the v27-era design
+    isomeric-EXACT name (no longer the E/Z-dropped superset the -era design
     fell back to). This was change-asserted-value'd from the old
     `count_expressed < count_defined` superset assertion: the engine improved to
     full expression, verified RT-exact below."""

@@ -1,24 +1,24 @@
-"""Phase 160 unit tests for ``orthonym.assembly.name_tree_to_string``.
+"""a phase unit tests for ``orthonym.assembly.name_tree_to_string``.
 
-Per CONTEXT D-20 + Phase 158 D-17 mirror: >= 30 Pass-2 serializer tests
+Per internal notes + a phase mirror: >= 30 Pass-2 serializer tests
 covering the byte-identical-vs-legacy-_assemble_fragments contract for
 the substrate-only paths AND the explicit-field path (exercised by
-Plan-04 --dump-tree + v19+ tree-emitting handlers).
+Plan-04 --dump-tree + + tree-emitting handlers).
 
-Note on CONTEXT D-05 first-wave migration:
+Note on internal notes first-wave migration:
 - For the 30 currently-extracted handlers (Plans 02-03 ship) the tree
   is None; the legacy path (composer.py:_assemble_fragments) produces
   the byte-identical name. This serializer's first-wave compatibility
   mode (node.fragment_legacy is not None) re-routes to the legacy path.
-- For tree-populated nodes (v19+1), the explicit-field branch assembles
+- For tree-populated nodes (+1), the explicit-field branch assembles
   the name from the 12-field schema directly.
 
 Test classes:
-- TestSerializerContract           - top-level dispatch (legacy vs explicit)
-- TestExplicitFieldAssembly        - explicit-field branch (parent + locants
+- TestSerializerContract - top-level dispatch (legacy vs explicit)
+- TestExplicitFieldAssembly - explicit-field branch (parent + locants
                                      + suffix + stereo + prefixes)
-- TestUnsaturationInfix            - en / yn / enyn infix rules per P-31.1
-- TestSerializerErrorHandling      - DECOMP-02 honest-fail behavior
+- TestUnsaturationInfix - en / yn / enyn infix rules per
+- TestSerializerErrorHandling - DECOMP-02 honest-fail behavior
 - TestNormalizeAndAlphaIntegration - integration with name_tree helpers
 """
 from __future__ import annotations
@@ -42,7 +42,7 @@ class TestSerializerContract:
 
     def test_explicit_field_simple_parent_only(self):
         """Minimal explicit-field call: a bare hydride stem -> the saturated
-        hydrocarbon (Phase 179: a general_acyclic root carries the BARE stem,
+        hydrocarbon (a phase: a general_acyclic root carries the BARE stem,
         e.g. 'eth', and assembles to stem+'ane' via the shared grammar)."""
         n = NameTreeNode(parent_stem="eth", class_id="general_acyclic")
         out = name_tree_to_string(n)
@@ -57,10 +57,10 @@ class TestSerializerContract:
         assert "ol" in out
 
     def test_explicit_field_parent_with_unsaturation(self):
-        """Parent + unsaturation bond locant (Phase 179: on a chain, bond
+        """Parent + unsaturation bond locant (a phase: on a chain, bond
         locants live in `unsaturation_locants`, NOT the generic `locants`
         field, which carries SUFFIX locants — byte-identical to the legacy
-        assembler). Wave2 T6a (P-14.3.4.2(d)): an unsubstituted prop node
+        assembler). Wave2 (d)): an unsubstituted prop node
         omits the bond locant -> propene."""
         n = NameTreeNode(parent_stem="prop", class_id="general_acyclic",
                          unsaturation_locants=((1,), ()))
@@ -100,7 +100,7 @@ class TestExplicitFieldAssembly:
 
     def test_stereo_prepended(self):
         """stereo is prepended before everything, with NO extra hyphen — the
-        descriptor carries its own trailing hyphen (Phase 179 gap #8;
+        descriptor carries its own trailing hyphen (a phase gap #8;
         production stereo is e.g. '(2R)-')."""
         n = NameTreeNode(parent_stem="eth", stereo="(2R)-")
         out = name_tree_to_string(n)
@@ -108,7 +108,7 @@ class TestExplicitFieldAssembly:
         assert "(2R)--" not in out
 
     def test_indicated_h_prepended_to_parent(self):
-        """indicated_h is prepended to parent_stem per P-25.7."""
+        """indicated_h is prepended to parent_stem per."""
         n = NameTreeNode(parent_stem="pyrrol", indicated_h=(1,))
         out = name_tree_to_string(n)
         # '1H' prepended to 'pyrrol'.
@@ -123,7 +123,7 @@ class TestExplicitFieldAssembly:
         assert "3H" in out
 
     def test_prefixes_alphabetized(self):
-        """Multiple prefixes are alphabetized per P-13."""
+        """Multiple prefixes are alphabetized per."""
         methyl = NameTreeNode(parent_stem="methyl")
         ethyl = NameTreeNode(parent_stem="ethyl")
         n = NameTreeNode(parent_stem="butan", prefixes=(methyl, ethyl))
@@ -160,8 +160,7 @@ class TestExplicitFieldAssembly:
         assert "(methylethyl)" in out
 
     def test_locants_formatted_comma_separated(self):
-        """Suffix locants print as comma-separated ascending integers (Phase
-        179: locants render through the suffix grammar). prop + 'ol' (1,2)
+        """Suffix locants print as comma-separated ascending integers (a phase: locants render through the suffix grammar). prop + 'ol' (1,2)
         -> propane-1,2-diol."""
         n = NameTreeNode(parent_stem="prop", class_id="general_acyclic",
                          suffix="ol", locants=(1, 2))
@@ -196,20 +195,20 @@ class TestExplicitFieldAssembly:
 
 
 class TestUnsaturationInfix:
-    """IUPAC P-31.1 unsaturation infix on a general_acyclic hydride parent
-    (Phase 179: bare stem + unsaturation_locants -> full -ene/-yne grammar via
+    """IUPAC unsaturation infix on a general_acyclic hydride parent
+    (a phase: bare stem + unsaturation_locants -> full -ene/-yne grammar via
     the shared composition_primitives._build_hydrocarbon_name)."""
 
     def test_no_unsaturation_passthrough(self):
-        """eth + ((), ()) -> ethane (saturated)."""
+        """eth + (, ) -> ethane (saturated)."""
         n = NameTreeNode(parent_stem="eth", class_id="general_acyclic",
                          unsaturation_locants=((), ()))
         out = name_tree_to_string(n)
         assert out == "ethane"
 
     def test_single_double_bond(self):
-        """prop + ((1,), ()) unsubstituted -> propene (P-14.3.4.2(d));
-        but + ((1,), ()) keeps the locant."""
+        """prop + ((1,), ) unsubstituted -> propene (d));
+        but + ((1,), ) keeps the locant."""
         n = NameTreeNode(parent_stem="prop", class_id="general_acyclic",
                          unsaturation_locants=((1,), ()))
         out = name_tree_to_string(n)
@@ -219,14 +218,14 @@ class TestUnsaturationInfix:
         assert name_tree_to_string(n4) == "but-1-ene"
 
     def test_single_triple_bond(self):
-        """prop + ((), (1,)) unsubstituted -> propyne (P-14.3.4.2(d))."""
+        """prop + (, (1,)) unsubstituted -> propyne (d))."""
         n = NameTreeNode(parent_stem="prop", class_id="general_acyclic",
                          unsaturation_locants=((), (1,)))
         out = name_tree_to_string(n)
         assert out == "propyne"
 
     def test_two_double_bonds_dien(self):
-        """prop + ((1, 2), ()) -> propa-1,2-diene."""
+        """prop + ((1, 2), ) -> propa-1,2-diene."""
         n = NameTreeNode(parent_stem="prop", class_id="general_acyclic",
                          unsaturation_locants=((1, 2), ()))
         out = name_tree_to_string(n)
@@ -240,7 +239,7 @@ class TestUnsaturationInfix:
         assert out == "prop-1-en-3-yne"
 
     def test_three_double_bonds_trien(self):
-        """hex + ((1, 3, 5), ()) -> hexa-1,3,5-triene."""
+        """hex + ((1, 3, 5), ) -> hexa-1,3,5-triene."""
         n = NameTreeNode(parent_stem="hex", class_id="general_acyclic",
                          unsaturation_locants=((1, 3, 5), ()))
         out = name_tree_to_string(n)
@@ -253,7 +252,7 @@ class TestUnsaturationInfix:
 
 
 class TestSerializerErrorHandling:
-    """DECOMP-02 + CONTEXT D-27: honest-fail-on-data behavior."""
+    """DECOMP-02 + internal notes: honest-fail-on-data behavior."""
 
     def test_empty_parent_no_legacy_raises(self):
         """Malformed tree (empty parent_stem + no fragment_legacy) raises."""

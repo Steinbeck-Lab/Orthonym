@@ -1,4 +1,4 @@
-"""v30 vB-engine Piece 1: the general ring engine must pass the P-44.1
+""" vB-engine Piece 1: the general ring engine must pass the
 principal-group hint into ring-system selection under the best-effort tier ONLY,
 so PIN stays byte-identical by construction.
 
@@ -14,7 +14,7 @@ from orthonym.rules import ring_selection
 
 # A ring-assembly whose principal group (carboxamide) sits on a LESS senior ring
 # (a benzene) than the more-senior N-heterocycle (quinoline). Selection must
-# honour P-44.1 under best-effort.
+# honour under best-effort.
 SMILES = "COc1ccc(C(=O)Nc2nc3ccccc3c(NCc3ccccc3)c2C#N)cc1"
 
 
@@ -60,7 +60,7 @@ def test_bridging_group_does_not_trigger_the_override():
     """Regression-safety: the carboxamide here BRIDGES two rings (C to the
     benzene, N to the quinoline), so BOTH ring systems 'bear' it. The override
     fires only on EXACTLY ONE bearing ring, so this falls through to the
-    unchanged P-44.2 scoring (the quinoline) rather than guessing -- exactly the
+    unchanged scoring (the quinoline) rather than guessing -- exactly the
     positive-evidence discipline that keeps the change from regressing.
     """
     mol, features = _features()

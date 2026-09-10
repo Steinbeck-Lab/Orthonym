@@ -1,9 +1,9 @@
-"""v26 BP-4 Phase 4 — flavonoid parents de-headlined to their systematic PIN.
+""" a phase — flavonoid parents de-headlined to their systematic PIN.
 
 flavone/flavanone/isoflavone are retained GENERAL-nomenclature trivial names, not
-PINs: P-102.6.1.4 (BB L53955) prints '…flavone' in the general column while the PIN
+PINs: (BB L53955) prints '…flavone' in the general column while the PIN
 column is '…-4H-1-benzopyran-4-one' (1-benzopyran is the PIN ring parent per
-P-19(d) L1736; the ketone substitutes the 4H >CH2 per P-64.2.2.2.2 L28410).
+(d) L1736; the ketone substitutes the 4H >CH2 per L28410).
 
 Fix (established chromone/chromanone precedent): removed from
 NATURAL_PRODUCT_DERIVATIVES + added pin:false to iupac_2013_pin_list.json, so the

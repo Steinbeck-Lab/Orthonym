@@ -1,21 +1,21 @@
 """
-Phase 154.B integration tests: corpus + Blue Book multiplicative fixtures
+a phase.B integration tests: corpus + Blue Book multiplicative fixtures
 with mandatory OPSIN layer-1 InChI round-trip.
 
-Per CONTEXT D-15 (Phase 151 D-23 carry-forward): every fixture pipes through
+Per internal notes (a phase carry-forward): every fixture pipes through
 OPSIN (opsin-cli-2.9.0-jar-with-dependencies.jar) and asserts InChI layer-1
-(skeleton) match against the input SMILES.  Stereo-layer mismatches don't
-fail the test (Phase 152/153 owns stereo).
+(skeleton) match against the input SMILES. Stereo-layer mismatches don't
+fail the test (a phase/153 owns stereo).
 
-Skip-vs-fail policy per D-13 (no band-aids):
+Skip-vs-fail policy per (no band-aids):
   - `name_compound(smi) is None` for an in-scope fixture: SKIP with
-    154-AUDIT-B.md §2 row cite (audit-acknowledged out-of-scope gap).
+    internal notes-B.md row cite (audit-acknowledged out-of-scope gap).
   - OPSIN cannot parse Orthonym-emitted name: SKIP (out-of-scope; tracked).
   - OPSIN parses but InChI L1 mismatches: SKIP (out-of-scope; tracked).
-  - `compound_class == "blue-book-uncertain"`: SKIP per Phase 154 plan-checker
-    WN-05 (Blue Book citation unverified at fixture-creation time).
+  - `compound_class == "blue-book-uncertain"`: SKIP per a phase plan-checker
+     (Blue Book citation unverified at fixture-creation time).
 
-Source: 154-CONTEXT.md D-14 / D-15; 154-RESEARCH.md §7; 154-PATTERNS.md S-4.
+Source: 154-internal notes /; internal notes; internal notes S-4.
 Source: tests/integration/test_skeletal_replacement_corpus.py (Plan 01 sibling).
 """
 from __future__ import annotations
@@ -74,7 +74,7 @@ _CORPUS_FIXTURES = json.loads((_FIXTURE_DIR / "corpus_mined.json").read_text())
 _BB_FIXTURES = json.loads((_FIXTURE_DIR / "blue_book_examples.json").read_text())
 
 # Sub-stratum for unit_count {3, 4, 5} -- regression-locks the 3+ unit
-# code path per SC-154.B.1 (≥10 fixtures at unit_count {3,4,5}).
+# code path per.B.1 (≥10 fixtures at unit_count {3,4,5}).
 _UNIT_3_4_5_FIXTURES = [
     f for f in _CORPUS_FIXTURES if f.get("unit_count") in (3, 4, 5)
 ]
@@ -83,9 +83,9 @@ _UNIT_3_4_5_FIXTURES = [
 def _inchi_l1(smiles: str) -> str:
     """Return InChI layer-1 (skeleton; strips connectivity onward).
 
-    Per Phase 151 D-23: the `/c` split isolates the formula portion of the
+    Per a phase: the `/c` split isolates the formula portion of the
     InChI string, which is the binding correctness oracle for skeletal
-    nomenclature.  Stereo / charge / isotope layers (everything after
+    nomenclature. Stereo / charge / isotope layers (everything after
     `/c`) are intentionally dropped.
     """
     mol = Chem.MolFromSmiles(smiles)
@@ -108,7 +108,7 @@ def _inchi_l1(smiles: str) -> str:
     ids=[f["fixture_id"] for f in _BB_FIXTURES],
 )
 def test_blue_book_opsin_roundtrip(fixture):
-    """Blue Book P-14.5 / P-51.3 fixtures: OPSIN layer-1 InChI round-trip."""
+    """Blue Book / fixtures: OPSIN layer-1 InChI round-trip."""
     if fixture.get("compound_class") == "blue-book-uncertain":
         pytest.skip(
             f"WN-05 BB-uncertain fixture {fixture['fixture_id']}: "
@@ -155,9 +155,9 @@ def test_corpus_opsin_roundtrip(fixture):
     """Corpus-mined fixtures: OPSIN layer-1 InChI round-trip.
 
     The corpus mining cast a wide net (637 candidates) so most rows fall
-    OUTSIDE the v18 multiplicative sweet spot (steroids, glycosides,
+    OUTSIDE the multiplicative sweet spot (steroids, glycosides,
     vitamin-D, dyes, oligosaccharides) -- those are skipped with
-    audit-acknowledgement per D-13 (no band-aids; fall-through to other
+    audit-acknowledgement per (no band-aids; fall-through to other
     handlers is correct behavior).
     """
     if fixture.get("compound_class") == "blue-book-uncertain":
@@ -189,7 +189,7 @@ def test_corpus_opsin_roundtrip(fixture):
 
 
 # ---------------------------------------------------------------------------
-# 3+ unit stratum (SC-154.B.1) -- ≥10 fixtures at unit_count {3,4,5}
+# 3+ unit stratum (.B.1) -- ≥10 fixtures at unit_count {3,4,5}
 # ---------------------------------------------------------------------------
 
 
@@ -201,7 +201,7 @@ def test_corpus_opsin_roundtrip(fixture):
     ids=[f["fixture_id"] for f in _UNIT_3_4_5_FIXTURES],
 )
 def test_multiplicative_3plus_unit_count(fixture):
-    """D-15 + SC-154.B.1: ≥10 fixtures at unit_count {3,4,5} round-trip via OPSIN.
+    """ +.B.1: ≥10 fixtures at unit_count {3,4,5} round-trip via OPSIN.
 
     Stratum-specific test class: regression-locks the 3+ unit code path
     (which is the harder corner of the multiplicative surface).

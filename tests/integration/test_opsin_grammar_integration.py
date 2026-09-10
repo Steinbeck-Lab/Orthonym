@@ -1,27 +1,27 @@
-"""Integration tests for Phase 156 OPSIN grammar pre-validation layer.
+"""Integration tests for a phase OPSIN grammar pre-validation layer.
 
-Pipes through `Orthonym.name()` (NOT the validator directly) per
-156-PATTERNS.md to assert the chokepoint wires correctly and the
+Pipes through `Orthonym.name` (NOT the validator directly) per
+internal notes to assert the chokepoint wires correctly and the
 round-trip gate is enforced.
 
 Plan-03 Task 2 deliverable. Test classes:
-    - TestChokepointWraps          (>= 5 tests)   SC-2a
-    - TestKwargDisablesLayer       (>= 3 tests)   SC-2e
-    - TestWarningOnRepair          (>= 4 tests)   SC-2c
-    - TestWarningOnUnrepairable    (>= 3 tests)   SC-2b
-    - TestRoundTripGate            (>= 5 tests)   SC-2d
-    - TestPerfBenchmark            (=  2 tests)   SC-4 hard gate
-    - TestTelemetry                (>= 2 tests)   D-17
+    - TestChokepointWraps (>= 5 tests)
+    - TestKwargDisablesLayer (>= 3 tests)
+    - TestWarningOnRepair (>= 4 tests)
+    - TestWarningOnUnrepairable (>= 3 tests)
+    - TestRoundTripGate (>= 5 tests)
+    - TestPerfBenchmark (= 2 tests) hard gate
+    - TestTelemetry (>= 2 tests)
 
 Total: >= 24 tests + perf-2 = >= 26.
 
 Anti-patterns avoided:
-    AP-8:  every opsin_roundtrip_check call has SMILES first.
-    AP-9:  every check on the return reads `result['passed']`.
-    AP-15: no fictitious "fast OPSIN call" timing claims (cost is ~1269ms mean per 156-AUDIT.md CF-1).
-    AP-16: JAR candidate list contains current version ONLY.
-    AP-17: zero xfail markers.
-    AP-21: an RT=1 -> RT=0 flip on canary is a phase-blocker.
+    : every opsin_roundtrip_check call has SMILES first.
+    : every check on the return reads `result['passed']`.
+    : no fictitious "fast OPSIN call" timing claims (cost is ~1269ms mean per internal notes).
+    : JAR candidate list contains current version ONLY.
+    : zero xfail markers.
+    : an RT=1 -> RT=0 flip on canary is a phase-blocker.
 """
 
 import logging
@@ -51,7 +51,7 @@ def _java_available() -> bool:
 
 
 def _opsin_jar_path():
-    # AP-16: v2.9.0 ONLY (older JAR absent on this host per 156-AUDIT.md CF-2).
+    #: v2.9.0 ONLY (older JAR absent on this host per internal notes).
     candidates = [
         "opsin-cli-2.9.0-jar-with-dependencies.jar",
         "opsin/opsin-cli-2.9.0-jar-with-dependencies.jar",
@@ -69,15 +69,15 @@ _SKIP = pytest.mark.skipif(
 
 
 # ---------------------------------------------------------------------------
-# Chokepoint wiring (SC-2a)
+# Chokepoint wiring
 # ---------------------------------------------------------------------------
 
 
 class TestChokepointWraps:
-    """Assert Orthonym.name() chokepoint wires to the grammar layer.
+    """Assert Orthonym.name chokepoint wires to the grammar layer.
 
-    Per CONTEXT.md D-13 the chokepoint is the single write-site;
-    AP-6 forbids per-handler instrumentation. These tests prove
+    Per internal notes the chokepoint is the single write-site;
+     forbids per-handler instrumentation. These tests prove
     the chokepoint is reached.
     """
 
@@ -97,7 +97,7 @@ class TestChokepointWraps:
 
     @_SKIP
     def test_chokepoint_wraps_name_with_confidence(self):
-        # SC-2a: name_with_confidence funnels through the same chokepoint.
+        #: name_with_confidence funnels through the same chokepoint.
         namer = Orthonym()
         result = namer.name_with_confidence("CCO")
         assert result["name"] == "ethanol"
@@ -117,7 +117,7 @@ class TestChokepointWraps:
 
     @_SKIP
     def test_chokepoint_stats_persist_across_calls(self):
-        # Per-instance stats persist across name() invocations (D-17).
+        # Per-instance stats persist across name invocations .
         namer = Orthonym()
         before = namer.get_validation_stats()
         namer.name("CCO")
@@ -128,27 +128,27 @@ class TestChokepointWraps:
 
     @_SKIP
     def test_chokepoint_grammar_instance_exists(self):
-        # The Orthonym instance carries an OpsinGrammar reference per D-13.
+        # The Orthonym instance carries an OpsinGrammar reference per.
         namer = Orthonym()
         assert isinstance(namer._grammar, OpsinGrammar)
-        # Stats dict is shared by reference (per AP-19 / D-17 ref-pass).
+        # Stats dict is shared by reference (per / ref-pass).
         assert namer._grammar._stats is namer._grammar_stats
 
 
 # ---------------------------------------------------------------------------
-# Kwarg disable (SC-2e)
+# Kwarg disable
 # ---------------------------------------------------------------------------
 
 
 class TestKwargDisablesLayer:
     """The `_disable_grammar_validation=True` kwarg disables the layer.
 
-    Per CONTEXT.md D-14 this is the test-only escape hatch. ON by
+    Per internal notes this is the test-only escape hatch. ON by
     default in production.
     """
 
     def test_kwarg_disables_grammar_attribute(self):
-        # _grammar is None when disabled (D-14).
+        # _grammar is None when disabled .
         namer = Orthonym(_disable_grammar_validation=True)
         assert namer._grammar is None
 
@@ -165,17 +165,17 @@ class TestKwargDisablesLayer:
         namer = Orthonym(_disable_grammar_validation=True)
         namer.name("CCO")
         stats = namer.get_validation_stats()
-        # All seven buckets remain at 0 (D-17 + AP-19).
+        # All seven buckets remain at 0 (+).
         assert all(v == 0 for v in stats.values()), stats
 
 
 # ---------------------------------------------------------------------------
-# Warning on repair (SC-2c)
+# Warning on repair
 # ---------------------------------------------------------------------------
 
 
 class TestWarningOnRepair:
-    """A repair fires a WARNING with the D-11 LOCKED format string.
+    """A repair fires a WARNING with the LOCKED format string.
 
     Format: 'OPSIN grammar repair: handler=%s class=%s original=%r repaired=%r'.
 
@@ -187,7 +187,7 @@ class TestWarningOnRepair:
     """
 
     def test_warning_on_repair_bracket(self, caplog):
-        # 156-AUDIT.md § 4.A BR-1: bracket-renest repair WARNING.
+        # internal notes A: bracket-renest repair WARNING.
         from orthonym.namer import _final_grammar_check
         grammar = OpsinGrammar()
         stats = {k: 0 for k in OpsinGrammar.STAT_KEYS}
@@ -210,7 +210,7 @@ class TestWarningOnRepair:
         assert result == "[(2-methylpropyl)]methylheptane"
 
     def test_warning_on_repair_stereo(self, caplog):
-        # 156-AUDIT.md § 4.B ST-2.fix: stereo-relocate repair WARNING.
+        # internal notes B.fix: stereo-relocate repair WARNING.
         from orthonym.namer import _final_grammar_check
         grammar = OpsinGrammar()
         stats = {k: 0 for k in OpsinGrammar.STAT_KEYS}
@@ -229,7 +229,7 @@ class TestWarningOnRepair:
         assert result == "(2R,3S)-2,3-dibromobutane"
 
     def test_warning_on_repair_hyphen(self, caplog):
-        # 156-AUDIT.md § 4.C HY-3.fix: hyphen-normalize repair WARNING.
+        # internal notes C.fix: hyphen-normalize repair WARNING.
         from orthonym.namer import _final_grammar_check
         grammar = OpsinGrammar()
         stats = {k: 0 for k in OpsinGrammar.STAT_KEYS}
@@ -248,7 +248,7 @@ class TestWarningOnRepair:
         assert result == "2,4-dichlorobenzene"
 
     def test_warning_on_repair_handler_field_populated(self, caplog):
-        # D-11 mandates handler attribution in the WARNING.
+        # mandates handler attribution in the WARNING.
         from orthonym.namer import _final_grammar_check
         grammar = OpsinGrammar()
         stats = {k: 0 for k in OpsinGrammar.STAT_KEYS}
@@ -266,17 +266,17 @@ class TestWarningOnRepair:
 
 
 # ---------------------------------------------------------------------------
-# Warning on unrepairable (SC-2b)
+# Warning on unrepairable
 # ---------------------------------------------------------------------------
 
 
 class TestWarningOnUnrepairable:
     """A validate-fail with no repair fires a fallback WARNING and
-    returns the ORIGINAL name (D-11 + D-15: never silently mutate).
+    returns the ORIGINAL name (+: never silently mutate).
     """
 
     def test_warning_on_unrepairable_returns_original(self, caplog):
-        # Construct a name that fails validate AND has no audit-§ 4 repair.
+        # Construct a name that fails validate AND has no audit- repair.
         # `[[methyl]propyl]benzene` passes _check_bracket_hierarchy_strict
         # (fusion-stripper consumes `[methyl]`) — so we need a different
         # synthetic shape. Use a name whose pre-screen multiword fires
@@ -294,7 +294,7 @@ class TestWarningOnUnrepairable:
                 grammar,
                 stats,
             )
-        # Original returned (D-15: never silently mutate).
+        # Original returned (: never silently mutate).
         assert result == original_name
         msgs = [r.message for r in caplog.records]
         assert any(
@@ -302,7 +302,7 @@ class TestWarningOnUnrepairable:
         ), msgs
 
     def test_warning_on_unrepairable_handler_field(self, caplog):
-        # D-11 unrepairable WARNING also carries handler attribution.
+        # unrepairable WARNING also carries handler attribution.
         from orthonym.namer import _final_grammar_check
         grammar = OpsinGrammar()
         stats = {k: 0 for k in OpsinGrammar.STAT_KEYS}
@@ -344,32 +344,32 @@ class TestWarningOnUnrepairable:
 
 
 # ---------------------------------------------------------------------------
-# Round-trip gate (SC-2d)
+# Round-trip gate
 # ---------------------------------------------------------------------------
 
 
 class TestRoundTripGate:
-    """The round-trip gate (D-09) ensures every repair candidate
+    """The round-trip gate  ensures every repair candidate
     OPSIN-parses back to the source SMILES (InChI L1 match).
 
-    Per CONTEXT.md AP-8 the oracle signature is `(smiles, name)` —
-    SMILES first. Per AP-9 the return value is a dict; read
+    Per internal notes the oracle signature is `(smiles, name)` —
+    SMILES first. Per the return value is a dict; read
     `result['passed']`, never truthy-check the dict.
     """
 
     @_SKIP
     def test_RT_1_ethanol_round_trips(self):
-        # RT-1: trivial happy-path round-trip.
+        #: trivial happy-path round-trip.
         namer = Orthonym()
         name = namer.name("CCO")
-        # AP-8: SMILES first.
+        #: SMILES first.
         result = opsin_roundtrip_check("CCO", name)
-        # AP-9: read result['passed'].
+        #: read result['passed'].
         assert result.get("passed", False) is True
 
     @_SKIP
     def test_RT_2_acetic_acid_round_trips(self):
-        # RT-2: simple acid round-trip.
+        #: simple acid round-trip.
         namer = Orthonym()
         name = namer.name("CC(=O)O")
         result = opsin_roundtrip_check("CC(=O)O", name)
@@ -377,7 +377,7 @@ class TestRoundTripGate:
 
     @_SKIP
     def test_RT_3_butan_2_ol_round_trips(self):
-        # RT-3: secondary alcohol round-trip.
+        #: secondary alcohol round-trip.
         namer = Orthonym()
         name = namer.name("CCC(C)O")
         result = opsin_roundtrip_check("CCC(C)O", name)
@@ -385,7 +385,7 @@ class TestRoundTripGate:
 
     @_SKIP
     def test_RT_4_benzene_round_trips(self):
-        # RT-4: aromatic round-trip.
+        #: aromatic round-trip.
         namer = Orthonym()
         name = namer.name("c1ccccc1")
         result = opsin_roundtrip_check("c1ccccc1", name)
@@ -393,7 +393,7 @@ class TestRoundTripGate:
 
     @_SKIP
     def test_RT_5_dichlorophenol_round_trips(self):
-        # RT-5: substituted aromatic round-trip.
+        #: substituted aromatic round-trip.
         namer = Orthonym()
         name = namer.name("Oc1cc(Cl)cc(Cl)c1")
         result = opsin_roundtrip_check("Oc1cc(Cl)cc(Cl)c1", name)
@@ -401,7 +401,7 @@ class TestRoundTripGate:
 
     @_SKIP
     def test_RT_negative_repair_failing_oracle_returns_none(self):
-        # SC-2d: when a `_suggest_*` produces a candidate but the
+        #: when a `_suggest_*` produces a candidate but the
         # candidate fails opsin_roundtrip_check, suggest_fix returns
         # `(None, None)` — NOT the bad candidate.
         # Construct a synthetic case: a name that would repair via the
@@ -419,12 +419,12 @@ class TestRoundTripGate:
 
 
 # ---------------------------------------------------------------------------
-# Performance benchmark (SC-4 / D-16 hard gate)
+# Performance benchmark (/ hard gate)
 # ---------------------------------------------------------------------------
 
 
 class TestPerfBenchmark:
-    """SC-4 / D-16 hard gate: < 50ms TRUE p99 for the grammar layer.
+    """ / hard gate: < 50ms TRUE p99 for the grammar layer.
 
     Per WARNING #4 + #5 fix in 156-03-PLAN.md: the benchmarks measure
     the GRAMMAR LAYER cost in ISOLATION — NOT the whole pipeline.
@@ -436,9 +436,9 @@ class TestPerfBenchmark:
         2. test_perf_suggest_fix_p99_under_50ms — `g.suggest_fix(name, None)`.
 
     The `source_smiles=None` arg on suggest_fix forces the validate-only
-    degraded path (no OPSIN JAR cost; CF-1 ~1269ms is on the slow path
+    degraded path (no OPSIN JAR cost; ~1269ms is on the slow path
     by design). Plan-03's perf gate is on validate AND suggest_fix
-    in their grammar-layer-isolated form per CONTEXT.md D-16.
+    in their grammar-layer-isolated form per internal notes.
     """
 
     def test_perf_validate_p99_under_50ms(self, benchmark):
@@ -462,9 +462,9 @@ class TestPerfBenchmark:
 
     def test_perf_suggest_fix_p99_under_50ms(self, benchmark):
         g = OpsinGrammar()
-        # Use a representative invalid name from 156-AUDIT.md § 4 BR-1.
+        # Use a representative invalid name from internal notes.
         # source_smiles=None forces validate-only path (no OPSIN JAR
-        # cost; CF-1 ~1269ms only fires on the round-trip-gated path).
+        # cost; ~1269ms only fires on the round-trip-gated path).
         invalid_name = "((2-methylpropyl))methylheptane"
         result = benchmark(g.suggest_fix, invalid_name, None)
         # Confirm the repair fired.
@@ -484,15 +484,15 @@ class TestPerfBenchmark:
 
 
 # ---------------------------------------------------------------------------
-# Telemetry (D-17)
+# Telemetry
 # ---------------------------------------------------------------------------
 
 
 class TestTelemetry:
-    """Per-instance counter histogram per CONTEXT.md D-17 + AP-19."""
+    """Per-instance counter histogram per internal notes +."""
 
     def test_get_validation_stats_returns_defensive_copy(self):
-        # D-17: get_validation_stats() returns a defensive copy.
+        #: get_validation_stats returns a defensive copy.
         # Mutating the returned dict does NOT affect future reads.
         namer = Orthonym()
         snapshot = namer.get_validation_stats()
@@ -502,7 +502,7 @@ class TestTelemetry:
         assert actual["validate_passed"] != 999_999
 
     def test_get_validation_stats_seven_buckets_present(self):
-        # D-17: all seven STAT_KEYS pre-seeded at construction time.
+        #: all seven STAT_KEYS pre-seeded at construction time.
         namer = Orthonym()
         stats = namer.get_validation_stats()
         expected = {

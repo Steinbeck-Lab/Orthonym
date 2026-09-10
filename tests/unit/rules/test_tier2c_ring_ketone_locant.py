@@ -1,4 +1,4 @@
-"""Wave2 T2c — ring-parent suffix locant from the FG CENTER atom (P-64.7.1).
+"""Wave2 — ring-parent suffix locant from the FG CENTER atom.
 
 The polyfunctional ring path derived the suffix locant from the FIRST match
 atom present in the locant map. The ketone SMARTS match is
@@ -33,8 +33,8 @@ class TestRingKetoneSuffixLocant:
         assert name_compound(smiles) == expected
 
     @pytest.mark.parametrize("smiles,expected", [
-        # v29 Phase C tranche A: MONOsubstituted homogeneous monocycles omit the
-        # locant '1' per P-14.3.4.2(c) (``BlueBookV2.md:2913``), worked verbatim as
+        # Phase C tranche A: MONOsubstituted homogeneous monocycles omit the
+        # locant '1' per (c) (``the Blue Book``), worked verbatim as
         # ``cyclohexanethiol`` at ``:2917``, ``cyclopentanone`` at ``:28394`` and
         # ``'cyclohexanone' (PIN)`` at ``:14916``. Updated from the ``-1-`` forms,
         # which that licence makes non-PINs.
@@ -43,7 +43,7 @@ class TestRingKetoneSuffixLocant:
         ("NC1CCCCC1", "cyclohexanamine"),
         # ★ THE BOUNDARY, and why the rows above are not a blanket strip: add ANY
         # second substituent and the ring is no longer monosubstituted, so
-        # P-14.3.3's deny-default restores every locant. These two must NOT change.
+        # 's deny-default restores every locant. These two must NOT change.
         ("OC1CCC(N)CC1", "4-aminocyclohexan-1-ol"),
         ("O=C1CCC(C)CC1", "4-methylcyclohexan-1-one"),
     ])
@@ -64,10 +64,10 @@ class TestSingleHeteroatomDirectionNonDefect:
         # the amino-C is ADJACENT to the ring N, so 7- is the correct PIN
         # (the '3-amino' expectation belonged to a different structure)
         ("O=C1C[Se]CCCCCCCCCC1", "1-selenacyclotridecan-3-one"),
-        # v29 Task A: was "caprolactam" -- a non-PIN trivial name (0 BlueBookV2.md
-        # hits) now withdrawn from the PIN path. P-64.3.1 (BB:29314) makes cyclic
+        #: was "caprolactam" -- a non-PIN trivial name (0 the Blue Book
+        # hits) now withdrawn from the PIN path. (the Blue Book) makes cyclic
         # amides pseudoketones and its own example prints `azepan-2-one (PIN)`
-        # (BB:29323). Note the two rows above already assert `...azepan-2-one` as
+        # (the Blue Book). Note the two rows above already assert `...azepan-2-one` as
         # the SUBSTITUTED parent, so this row was internally inconsistent.
         ("O=C1CCCCCN1", "azepan-2-one"),
         ("O=C1CCCCN1", "piperidin-2-one"),

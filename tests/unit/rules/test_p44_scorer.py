@@ -1,5 +1,5 @@
 # tests/unit/rules/test_p44_scorer.py
-"""v25 G1: unified P-44 parent scorer (pool + comparator + selector)."""
+""": unified parent scorer (pool + comparator + selector)."""
 import pytest
 from rdkit import Chem
 
@@ -81,12 +81,12 @@ def _best(mol, pool, pg=None, matches=None):
 
 class TestComparatorBlueBook:
     def test_p44_1_2_2_ring_senior_to_longer_chain(self):
-        # BB line 19348: heptylbenzene (PIN) - ring senior regardless of size
+        # the Blue Book: heptylbenzene (PIN) - ring senior regardless of size
         mol, pool, _ = _pool("CCCCCCCc1ccccc1", list(range(7)))
         assert _best(mol, pool).kind == "ring"
 
     def test_p44_1_2_2_ring_senior_despite_unsaturation(self):
-        # BB line 19354: ethenylcyclohexane (PIN)
+        # the Blue Book: ethenylcyclohexane (PIN)
         mol, pool, _ = _pool("C=CC1CCCCC1", [0, 1])
         assert _best(mol, pool).kind == "ring"
 
@@ -97,20 +97,20 @@ class TestComparatorBlueBook:
         assert _best(mol, pool, "alcohol", m).kind == "chain"
 
     def test_p44_1_2_hetero_chain_class_beats_carbocycle(self):
-        # P-51.4-admitted tetraoxa chain (senior atom O, 4 bridging O)
-        # vs all-C ring: P-44.1.2 class O > C -> chain parent.
+        # -admitted tetraoxa chain (senior atom O, 4 bridging O)
+        # vs all-C ring: class O > C -> chain parent.
         mol, pool, _ = _pool("COCCOCCOCCOCC1CCCCC1", [])
         assert _best(mol, pool).kind == "chain"
 
     def test_p44_1_2_heterocycle_still_beats_hetero_chain(self):
-        # Ring contains N (rank above chain's O) -> P-44.1.2 keeps the
-        # morpholine ring senior even against a P-51.4-admitted O-chain.
+        # Ring contains N (rank above chain's O) -> keeps the
+        # morpholine ring senior even against a -admitted O-chain.
         mol = Chem.MolFromSmiles("COCCOCCOCCOCCN1CCOCC1")
         pool = pool_candidates(mol, _ring_systems(mol), [], None, [])
         assert _best(mol, pool).kind == "ring"
 
     def test_p44_2_1_ring_vs_ring_nitrogen_wins(self):
-        # among rings, has-N (P-44.2.1.3) after heterocycle tie ->
+        # among rings, has-N after heterocycle tie ->
         # pyridine ring senior to benzene ring.
         mol, pool, _ = _pool("c1ccc(-c2cccnc2)cc1", [])
         best = _best(mol, pool)
@@ -118,7 +118,7 @@ class TestComparatorBlueBook:
         assert "N" in best_syms
 
     def test_p44_2_1_more_rings_wins(self):
-        # naphthalene vs benzene: both carbocycles -> P-44.2.1.5 more rings.
+        # naphthalene vs benzene: both carbocycles -> more rings.
         mol, pool, _ = _pool("c1ccc(-c2ccc3ccccc3c2)cc1", [])
         assert len(_best(mol, pool).atoms) == 10
 
@@ -131,7 +131,7 @@ class TestComparatorBlueBook:
     def test_p44_4_1_1_more_multiple_bonds_wins(self):
         # 3-ethylhexa-1,5-diene skeleton: two same-length 6-chains through
         # C2; the one through both vinyls has 2 C=C, the ethyl-path has 1.
-        # P-44.3 ties (same length, no heteroatoms) -> P-44.4.1.1 decides.
+        # ties (same length, no heteroatoms) -> decides.
         mol = Chem.MolFromSmiles("C=CC(CC)CC=C")
         a = ParentCandidate("chain", (0, 1, 2, 5, 6, 7), 0)
         b = ParentCandidate("chain", (4, 3, 2, 5, 6, 7), 0)
@@ -191,10 +191,10 @@ class TestSelectParentUnified:
 
 
 class TestCandidateLocantsMixedTuple:
-    """v30 #40: _candidate_locants must not TypeError on mixed int/tuple
+    """ #40: _candidate_locants must not TypeError on mixed int/tuple
     fusion locants (Tier-5 non-crash). Naphthalene ring_info carries int
     locants (1-8) and (int,str) fusion tuples ((4,'a'),(8,'a')); the raw
-    fast-path fed sorted() a mixed list -> '<' not supported tuple vs int."""
+    fast-path fed sorted a mixed list -> '<' not supported tuple vs int."""
 
     def test_mixed_int_tuple_locants_no_typeerror(self):
         from orthonym.rules.p44_scorer import _candidate_locants, ParentCandidate
@@ -210,7 +210,7 @@ class TestCandidateLocantsMixedTuple:
         assert out == [(4, ''), (4, 'a'), (5, ''), (8, 'a')]
 
     def test_fused_ring_assembly_names_without_crash(self):
-        """Integration: the fable-found molecule names or abstains cleanly,
+        """Integration: the a review-found molecule names or abstains cleanly,
         never raises. best-effort tier exercises the general engine."""
         from orthonym import Orthonym
         nm = Orthonym(style="pin", general_fallback=True,
@@ -222,20 +222,20 @@ class TestCandidateLocantsMixedTuple:
 
 
 class TestCandidateLocantsMixedStrInt:
-    """v33 Phase 0 cleanup T3: `_candidate_locants` must not TypeError on
+    """ a phase cleanup T3: `_candidate_locants` must not TypeError on
     MIXED str/int locants either -- a distinct crash from the mixed
-    int/tuple one above (`TestCandidateLocantsMixedTuple`, v30 #40).
+    int/tuple one above (`TestCandidateLocantsMixedTuple`, #40).
 
     Root cause: the fast path at `_candidate_locants` reads
     ``ring_info['iupac_locants']`` DIRECTLY (``pos = iupac``), bypassing
     `_build_ring_pos`'s legacy-string filter (`parent_selection.py:172`,
     ``isinstance(locant, (int, tuple))``) that would otherwise drop a bare
-    string locant like ``'3a'`` before it ever reaches `sorted()`. Because
+    string locant like ``'3a'`` before it ever reaches `sorted`. Because
     the pre-existing homogenisation guard only tests
     ``any(isinstance(v, tuple) for v in locs)``, a str-and-int mix with NO
     tuple present at all skips that guard entirely and reaches plain
     ``sorted([2, '3a', 5])`` -- `'<' not supported between instances of
-    'str' and 'int'` (measured, L3-2/L3-3 SPY).
+    'str' and 'int'` (measured, L3-2/L3-3 a trace).
     """
 
     def test_mixed_str_int_locants_no_typeerror(self):
@@ -252,7 +252,7 @@ class TestCandidateLocantsMixedStrInt:
         out = _candidate_locants(mol, cand, [3, 4, 5, 9], ring_info=ring_info)
         # Must not raise, and must be a DETERMINISTIC total order: every
         # int-typed locant sorts before every (uncoerced) string locant,
-        # each bucket internally sorted the same way plain sorted() always
+        # each bucket internally sorted the same way plain sorted always
         # gave it (ints numerically, strings lexicographically).
         assert out == [4, 5, '4a', '8a']
 
@@ -268,14 +268,14 @@ class TestCandidateLocantsMixedStrInt:
 
     def test_homogeneous_int_list_byte_identical(self):
         """Guard: a plain-int list (the common case) sorts EXACTLY as
-        bare `sorted()` always did -- the fix must not perturb it."""
+        bare `sorted` always did -- the fix must not perturb it."""
         from orthonym.rules.p44_scorer import _locant_sort_key
         locs = [5, 1, 3, 2, 4]
         assert sorted(locs, key=_locant_sort_key) == sorted(locs) == [1, 2, 3, 4, 5]
 
     def test_homogeneous_tuple_list_byte_identical(self):
         """Guard: a plain (int, str)-tuple list also sorts EXACTLY as
-        bare `sorted()` always did."""
+        bare `sorted` always did."""
         from orthonym.rules.p44_scorer import _locant_sort_key
         locs = [(4, 'a'), (4, ''), (8, 'a'), (5, '')]
         assert (sorted(locs, key=_locant_sort_key) == sorted(locs)

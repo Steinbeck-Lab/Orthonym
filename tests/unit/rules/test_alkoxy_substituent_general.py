@@ -1,12 +1,12 @@
-"""v30 breadth — the general-engine substituent namer must name an O-rooted alkoxy substituent
+""" breadth — the general-engine substituent namer must name an O-rooted alkoxy substituent
 `-O-R` as `Roxy` (methoxy/ethoxy/phenoxy), NOT `hydroxy(alkyl)`.
 
 Root cause (L1spy L5): `name_substituent` normalizes the attach atom to the ether O, then
 `carbon_free_valence_prefix` declines (non-carbon root) and the cascade names the fragment as a
 carbon-rooted `hydroxymethyl` — a DIFFERENT molecule (`-CH2OH` vs `-O-CH3`). The PIN path is
 correct (`methoxybenzene`); only the general-engine `name_substituent` path swapped it. Wrong
-connectivity → SELF-01 abstains → breadth loss + latent wrong-molecule. Fix: O-rooted ether ->
-`get_alkoxy_prefix` (P-63.2.2.2). O-rooted ether routes through the alkoxy prefix builder.
+connectivity → abstains → breadth loss + latent wrong-molecule. Fix: O-rooted ether ->
+`get_alkoxy_prefix`. O-rooted ether routes through the alkoxy prefix builder.
 """
 from rdkit import Chem
 from orthonym.assembly.substituent_enumerator import name_substituent

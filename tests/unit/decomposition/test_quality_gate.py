@@ -31,7 +31,7 @@ class TestNamePipelineOnly:
     @pytest.mark.unit
     def test_pipeline_only_complex_molecule(self):
         """name_pipeline_only should handle complex molecules without depth waste."""
-        # Phospholipid-like SMILES that previously hit DROP-13
+        # Phospholipid-like SMILES that previously hit
         smiles = "CCCCCCCCCC(=O)OCC(COP(=O)([O-])OCC[N+](C)(C)C)OC(=O)CCCCCCCCC"
         depth_before = get_naming_depth()
         result = name_pipeline_only(smiles)
@@ -257,7 +257,7 @@ class TestConservativeQualityGate:
 
 
 class TestRetainedNameCoverageGuard:
-    """Tests for retained-name coverage guard in _name_quality_is_acceptable().
+    """Tests for retained-name coverage guard in _name_quality_is_acceptable.
 
     Retained names in _RETAINED_CORE_NAMES should only bypass the quality gate
     when they plausibly describe the whole molecule. For molecules with HA > 20,
@@ -326,7 +326,7 @@ class TestRetainedNameCoverageGuard:
 
 
 class TestMultiBondUnderCoverage:
-    """Tests for multi-bond under-coverage detection in _name_quality_is_acceptable().
+    """Tests for multi-bond under-coverage detection in _name_quality_is_acceptable.
 
     When a molecule has multiple distinct cleavable bond types but the pipeline
     name references fewer than half of them, the name likely describes only one
@@ -429,10 +429,10 @@ class TestMultiBondUnderCoverage:
 
 
 class TestProbeIntegration:
-    """Integration tests verifying the probe replacement in try_decompose().
+    """Integration tests verifying the probe replacement in try_decompose.
 
-    After Phase 097, the decomposition engine probe uses name_pipeline_only()
-    instead of name_fragment_recursively(), eliminating the cache-disable hack
+    After a phase, the decomposition engine probe uses name_pipeline_only
+    instead of name_fragment_recursively, eliminating the cache-disable hack
     and _fragment_guard dependency.
     """
 
@@ -473,7 +473,7 @@ class TestProbeIntegration:
 
 
 class TestNameSizeCoverage:
-    """Tests for _name_covers_molecule() heuristic in quality gate.
+    """Tests for _name_covers_molecule heuristic in quality gate.
 
     The name-size coverage heuristic rejects pipeline names that describe
     less than ~45% of the molecule's heavy atoms when cleavable bonds
@@ -593,15 +593,15 @@ class TestNameSizeCoverage:
 class TestBoundaryAwareTokenMatching:
     """Tests for IUPAC morpheme-aware boundary token matching in quality gate.
 
-    Per D-13/D-14: tokens should match at IUPAC nomenclature boundaries
+    Per /: tokens should match at IUPAC nomenclature boundaries
     (after hyphen, after paren, at start/end of name), not as arbitrary
-    substrings. Per D-16: known polymer names like "polyester" must NOT
+    substrings. Per: known polymer names like "polyester" must NOT
     match bond-type tokens.
     """
 
     @pytest.mark.unit
     def test_polyester_does_not_match_ester(self):
-        """'polyester' must NOT trigger ester bond type token (D-16)."""
+        """'polyester' must NOT trigger ester bond type token ."""
         from orthonym.decomposition.engine import (
             _compile_token_patterns, _token_matches_name, _BOND_TYPE_TOKENS,
         )
@@ -610,7 +610,7 @@ class TestBoundaryAwareTokenMatching:
 
     @pytest.mark.unit
     def test_polyamide_does_not_match_amide(self):
-        """'polyamide' must NOT trigger amide bond type token (D-16)."""
+        """'polyamide' must NOT trigger amide bond type token ."""
         from orthonym.decomposition.engine import (
             _compile_token_patterns, _token_matches_name, _BOND_TYPE_TOKENS,
         )
@@ -691,7 +691,7 @@ class TestBoundaryAwareTokenMatching:
 
     @pytest.mark.unit
     def test_polycarbonate_does_not_match_carbamate(self):
-        """'polycarbonate' must NOT trigger carbamate token (D-16)."""
+        """'polycarbonate' must NOT trigger carbamate token ."""
         from orthonym.decomposition.engine import (
             _compile_token_patterns, _token_matches_name, _BOND_TYPE_TOKENS,
         )
@@ -700,7 +700,7 @@ class TestBoundaryAwareTokenMatching:
 
     @pytest.mark.unit
     def test_polyurethane_does_not_match(self):
-        """'polyurethane' must NOT trigger carbamate token (D-16)."""
+        """'polyurethane' must NOT trigger carbamate token ."""
         from orthonym.decomposition.engine import (
             _compile_token_patterns, _token_matches_name, _BOND_TYPE_TOKENS,
         )
@@ -709,7 +709,7 @@ class TestBoundaryAwareTokenMatching:
 
     @pytest.mark.unit
     def test_unusual_input_no_crash(self):
-        """Token matching never raises an exception even with unusual input (D-17)."""
+        """Token matching never raises an exception even with unusual input ."""
         from orthonym.decomposition.engine import (
             _compile_token_patterns, _token_matches_name, _BOND_TYPE_TOKENS,
         )

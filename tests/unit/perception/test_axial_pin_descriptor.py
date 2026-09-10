@@ -1,20 +1,20 @@
 """M/P is the PIN axial stereodescriptor; Ra/Sa is general nomenclature.
 
-**P-91.2.1.1 "Cahn-Ingold-Prelog (CIP) stereodescriptors"**
-(BlueBookV2.md:44582) -- *"The following stereodescriptors are used as
-**preferred** stereodescriptors (see P-92.1.2):"* ... clause **(c)** (:44588)
+** "Cahn-Ingold-Prelog (CIP) stereodescriptors"**
+(the Blue Book) -- *"The following stereodescriptors are used as
+**preferred** stereodescriptors (see:"*... clause **(c)** (:44588)
 *"'M' and 'P', to specify the absolute configuration of an axial or planar
-entity using the helicity rule"*.  ``Ra``/``Sa`` appear only under *"The
+entity using the helicity rule"*. ``Ra``/``Sa`` appear only under *"The
 following stereodescriptors are recommended for **general** nomenclature"*
 (:44594).
 
 The two spell the same sense, so the general form is derivable rather than
-separately computed: **P-92.1.2.2 "The helicity rule: stereodescriptors 'M' and
+separately computed: ** "The helicity rule: stereodescriptors 'M' and
 'P'"** (:44812) -- *"When proceeding from the nearer ligand having priority in
 the pair to the further away atom or group having priority in the pair, the
 chirality is described by the symbols 'M' if the path is anticlockwise; the
 symbol is 'P' if the path is clockwise. Stereodescriptors 'M' and 'P' are used
-in preferred IUPAC names."*  That is the same clockwise/anticlockwise test the
+in preferred IUPAC names."* That is the same clockwise/anticlockwise test the
 Ra/Sa elongated-tetrahedron model applies, hence Ra == P and Sa == M.
 
 ⚠ **This path is DORMANT.** Measured over 7000 corpus rows
@@ -76,7 +76,7 @@ def _allene():
 
 
 def test_atropisomer_pin_descriptor_is_the_helicity_letter():
-    """P-91.2.1.1(c): the PIN descriptor is 'M'/'P', not 'Sa'/'Ra'."""
+    """(c): the PIN descriptor is 'M'/'P', not 'Sa'/'Ra'."""
     for stereo in (Chem.BondStereo.STEREOATROPCW,
                    Chem.BondStereo.STEREOATROPCCW):
         got = detect_axial_chirality(_biaryl(stereo))
@@ -85,7 +85,7 @@ def test_atropisomer_pin_descriptor_is_the_helicity_letter():
 
 
 def test_atropisomer_general_style_is_the_ra_sa_form():
-    """P-91.2.1.1 (:44594): Ra/Sa remain available for general nomenclature."""
+    """ (:44594): Ra/Sa remain available for general nomenclature."""
     for stereo in (Chem.BondStereo.STEREOATROPCW,
                    Chem.BondStereo.STEREOATROPCCW):
         mol = _biaryl(stereo)
@@ -96,7 +96,7 @@ def test_atropisomer_general_style_is_the_ra_sa_form():
 
 
 def test_allene_helicity_is_computed_as_m_or_p():
-    """P-92.1.2.2 (:44812): clockwise -> 'P', anticlockwise -> 'M'."""
+    """ (:44812): clockwise -> 'P', anticlockwise -> 'M'."""
     mol, central = _allene()
     assert _manual_allene_cip(mol, central) in ("M", "P")
 
@@ -111,7 +111,7 @@ def test_allene_general_style_maps_through_the_same_table():
 
 
 def test_general_form_table_is_the_verified_equivalence():
-    """Ra == P and Sa == M (P-92.1.2.2 :44812 vs P-91.2.1.1 :44594)."""
+    """Ra == P and Sa == M:44812 vs:44594)."""
     assert AXIAL_GENERAL_FORM == {"P": "Ra", "M": "Sa"}
 
 

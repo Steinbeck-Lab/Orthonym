@@ -1,4 +1,4 @@
-"""a phase.1 byte-identical integration tests (SC-4).
+"""a phase byte-identical integration tests .
 
 Two tiers:
   - test_byte_identical_subset (default tier): 300-row subset, ~3 min
@@ -12,22 +12,22 @@ Per: subset is per-commit gate; full is per-merge gate.
 PHASE 148 NOTE: Both tests are marked @pytest.mark.xfail because the
 architectural triple 146+147+148 intentionally diverges from the v17
 baseline by deleting `_should_bypass_fused_guard` (a phase)
-and wiring the P-44.1 cascade end-to-end for fused heterocycles. The
+and wiring the cascade end-to-end for fused heterocycles. The
 byte-identical-to-v17 invariant cannot hold once a phase has shipped.
 
 The 5/300 subset drifts observed at a phase commit time include
 CHEBI:33070 (`3-(3-carboxypropyl)-1H-indole` → `4-(1H-indol-3-yl)butanoic
-acid`) — this is exactly the V18-plan-predicted P-44.1(a) cascade unblock
+acid`) — this is exactly the V18-plan-predicted (a) cascade unblock
 (carboxylic acid PG on chain, ring has zero PG → chain wins per IUPAC
-P-44.1(a) at https://iupac.qmul.ac.uk/BlueBook/P4.html).
+(a) at https://iupac.qmul.ac.uk/BlueBook/P4.html).
 
 The cascade-divergence baseline will be REFRESHED in a phase Plan 03
-(148-VERIFICATION.md) once the full 7,500-corpus G3/G5 cumulative verdict
+(internal notes) once the full 7,500-corpus G3/G5 cumulative verdict
 is computed. At that point this test will be unmarked and re-locked to
 the post-148 baseline (which becomes the new byte-identical anchor).
 
-Source: V18_MILESTONE_PLAN §6 a phase (cascade unblock for fused
-heterocycles); a phase CONTEXT,,; AUTONOM 1990 §4
+Source: V18_MILESTONE_PLAN a phase (cascade unblock for fused
+heterocycles); a phase internal notes,,; AUTONOM 1990
 (full seniority cascade on ALL structures, no bypass).
 """
 from __future__ import annotations
@@ -73,10 +73,10 @@ def _run_check(subset: bool, timeout: int):
     strict=False,
 )
 def test_byte_identical_subset():
-    """a phase.1 SC-4 fast tier: 100/corpus subset must be byte-identical
+    """a phase fast tier: 100/corpus subset must be byte-identical
     to baseline_v17_all_corpora.csv. Per per-commit gate.
 
-    a phase: xfailed pending baseline refresh in 148-VERIFICATION.md
+    a phase: xfailed pending baseline refresh in internal notes
     (architectural triple 146+147+148 cascade-unblock divergence)."""
     result = _run_check(subset=True, timeout=600)
     assert result.returncode == 0, (
@@ -98,11 +98,11 @@ def test_byte_identical_subset():
     strict=False,
 )
 def test_byte_identical_full():
-    """a phase.1 SC-4 ship gate: all 7,500 rows must be byte-identical.
+    """a phase ship gate: all 7,500 rows must be byte-identical.
     Per per-merge gate. Marked @pytest.mark.slow — opt-in via
     `pytest -m slow`.
 
-    a phase: xfailed pending baseline refresh in 148-VERIFICATION.md
+    a phase: xfailed pending baseline refresh in internal notes
     (architectural triple 146+147+148 cascade-unblock divergence)."""
     result = _run_check(subset=False, timeout=3600)
     assert result.returncode == 0, (

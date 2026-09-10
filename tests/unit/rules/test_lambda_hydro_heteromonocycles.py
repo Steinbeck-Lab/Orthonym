@@ -1,15 +1,15 @@
-"""P-22.2.7 lambda heteromonocycles: mancude parents with indicated hydrogen on
+""" lambda heteromonocycles: mancude parents with indicated hydrogen on
 a CARBON, and hydro forms.
 
-Task AA2.  Both classes used to abstain at producer level -- 707 rings out of
+Task AA2. Both classes used to abstain at producer level -- 707 rings out of
 an enumeration of 27,687 bare heteromonocycles (sizes 3-14 x N/O/S/O+N/S+N/N+N
 at every heteroatom position x every independent edge set of the ring), all 707
-falling on a single ``is any saturated ring atom a carbon?`` test.  That one
+falling on a single ``is any saturated ring atom a carbon?`` test. That one
 code branch merged two different nomenclature classes; the Blue Book marks both
 (PIN).
 
 Every expected value here is derived from the cited rule FIRST and only then
-compared with output.  Where a name is checkable by round-trip it has been
+compared with output. Where a name is checkable by round-trip it has been
 checked (OPSIN 2.9.0, 707/707 on the full class), but a round-trip cannot
 choose between two numberings of the same molecule, so the locant-bearing
 assertions carry their derivation in the docstring.
@@ -36,14 +36,14 @@ def _ring_name(smiles):
 # 1. The Blue Book's own (PIN) examples for the class
 # --------------------------------------------------------------------------
 
-# P-22.2.7 "Heteromonocyclic hydrides having heteroatoms with nonstandard
-# bonding numbers." (BlueBookV2.md:9156); P-22.2.7.1 at :9158.
+# "Heteromonocyclic hydrides having heteroatoms with nonstandard
+# bonding numbers." (the Blue Book); at:9158.
 BB_PIN_MANCUDE = [
-    # 3H- puts the indicated hydrogen on a CARBON.  This is the case the old
+    # 3H- puts the indicated hydrogen on a CARBON. This is the case the old
     # guard refused, while emitting its 1H- companion perfectly well.
-    ("[SH]1=CCC=C1", "3H-1λ4-thiophene"),    # :9171
-    ("[SH2]1C=CC=C1", "1H-1λ4-thiophene"),   # :9167
-    ("[SH2]1C=CC=CC=C1", "1H-1λ4-thiepine"),  # :9496
+    ("[SH]1=CCC=C1", "3H-1λ4-thiophene"),    #:9171
+    ("[SH2]1C=CC=C1", "1H-1λ4-thiophene"),   #:9167
+    ("[SH2]1C=CC=CC=C1", "1H-1λ4-thiepine"),  #:9496
 ]
 
 
@@ -57,7 +57,7 @@ def test_mancude_lambda_parent_pin(smiles, expected):
 @pytest.mark.unit
 def test_hydro_lambda_ring_matches_the_bluebook_parent_hydride():
     """The ring skeleton of ``3,4,5,6-tetrahydro-1lambda4,2-thiazin-1-ol
-    (PIN)``, P-66.1.5.2.3 (BlueBookV2.md:33282), example at :33292.
+    (PIN)``, (the Blue Book), example at:33292.
 
     Stripping the 1-ol leaves the parent hydride, whose hydro locants, lambda
     citation and heteroatom locants must be spelled exactly as the Blue Book
@@ -67,13 +67,13 @@ def test_hydro_lambda_ring_matches_the_bluebook_parent_hydride():
 
 
 # --------------------------------------------------------------------------
-# 2. P-14.4(b): indicated hydrogen takes the LOWEST locant
+# 2. (b): indicated hydrogen takes the LOWEST locant
 # --------------------------------------------------------------------------
 
 # The mancude lambda branch used to inherit orient_heterocycle's numbering,
 # which ranks heteroatoms but not indicated hydrogen, so where the heteroatom
-# criteria tied it chose arbitrarily.  5 of the 60 mancude lambda rings in the
-# enumeration came out non-minimal.  Neither OPSIN nor an InChIKey can see
+# criteria tied it chose arbitrarily. 5 of the 60 mancude lambda rings in the
+# enumeration came out non-minimal. Neither OPSIN nor an InChIKey can see
 # this: the two numberings describe the same molecule, and the whole class
 # round-tripped 707/707 while these were still wrong.
 P14_4B_MINIMAL_IH = [
@@ -88,8 +88,8 @@ P14_4B_MINIMAL_IH = [
 @pytest.mark.unit
 @pytest.mark.parametrize("smiles,expected", P14_4B_MINIMAL_IH)
 def test_indicated_hydrogen_takes_lowest_locant(smiles, expected):
-    # P-14.4 "NUMBERING" (BlueBookV2.md:3219): "low locants are assigned to
-    # them in the following decreasing order of seniority ... (b) indicated
+    # "NUMBERING" (the Blue Book): "low locants are assigned to
+    # them in the following decreasing order of seniority... (b) indicated
     # hydrogen for unsubstituted compounds" (:3246).
     assert _ring_name(smiles) == expected
 
@@ -102,9 +102,9 @@ def test_indicated_hydrogen_takes_lowest_locant(smiles, expected):
 def test_retained_stem_is_whole_stem_not_suffix():
     """A suffix match would rewrite the Blue Book's own names.
 
-    ``1lambda4,3-dithiole (PIN)`` is at BlueBookV2.md:9527 and must survive;
+    ``1lambda4,3-dithiole (PIN)`` is at the Blue Book and must survive;
     an ``endswith('thiole')`` test -- which the lambda producer used to carry
-    -- turns it into the non-existent '...dithiophene'.  ``1,3-oxazole``
+    -- turns it into the non-existent '...dithiophene'. ``1,3-oxazole``
     (:8134) would likewise become '1,3-furan'.
     """
     assert _apply_retained_stem("1,2-dithiole") == "1,2-dithiole"
@@ -117,8 +117,8 @@ def test_retained_stem_is_whole_stem_not_suffix():
 @pytest.mark.unit
 def test_retained_stem_applies_to_every_row_of_the_one_table():
     # The table had drifted into three partial hand-copies; these are the rows
-    # the copies were missing.  P-22.2.1 Table 2.2: pyran/thiopyran/
-    # selenopyran/telluropyran :8141, pyrrole :8163, pyridine :8157.
+    # the copies were missing.: pyran/thiopyran/
+    # selenopyran/telluropyran:8141, pyrrole:8163, pyridine:8157.
     assert _apply_retained_stem("azole") == "pyrrole"
     assert _apply_retained_stem("2H-azole") == "2H-pyrrole"
     assert _apply_retained_stem("1λ4-thiine") == "1λ4-thiopyran"
@@ -141,7 +141,7 @@ def test_mancude_five_and_six_ring_stems_are_retained_names():
 
 @pytest.mark.unit
 def test_lambda_sulfur_is_double_bond_eligible_but_standard_sulfur_is_not():
-    """P-22.2.7.1 (:9158) + the 1lambda6-thiopyran note at :9513 -- "this
+    """ (:9158) + the 1lambda6-thiopyran note at:9513 -- "this
     heteromonocycle has the maximum number of double bonds and one double bond
     at every position; hence, no indicated hydrogen is cited for the sulfur".
     A divalent sulfur can hold no ring double bond; a lambda-4 sulfur can.
@@ -185,10 +185,10 @@ def test_eligibility_unchanged_without_a_lambda_atom(smiles):
     "[SH]1=CCCCS1",
 ])
 def test_two_same_element_heteroatoms_still_fail_closed(smiles):
-    """P-22.2.7.2 (BlueBookV2.md:9515) -- "If a further choice is needed
+    """ (the Blue Book) -- "If a further choice is needed
     between two or more of the same skeletal atom with different bonding
     numbers, the lower locant is assigned in order of the decreasing value of
-    the bonding number" -- is not implemented, so these must refuse.  The new
+    the bonding number" -- is not implemented, so these must refuse. The new
     delegation to the hydro namer must not open a hole here, which is why the
     guard sits ahead of it AND is repeated inside _mancude_hydro_name.
     """
@@ -215,7 +215,7 @@ def test_hydro_and_indicated_hydrogen_locants_are_disjoint():
 
 @pytest.mark.unit
 def test_lambda_ring_never_loses_its_lambda():
-    """The hydro namer must carry the lambda through to the stem.  Dropping it
+    """The hydro namer must carry the lambda through to the stem. Dropping it
     names a different molecule -- the standard-valence parent -- which is the
     failure mode the whole lambda branch exists to prevent.
     """

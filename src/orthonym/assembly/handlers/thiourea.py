@@ -3,19 +3,18 @@
 Residue R3. Mirrors ``handlers/urea.py`` exactly; the body lives in
 ``composer._try_name_thiourea`` for the same reason urea's does.
 
-IUPAC cite: P-66.1.6.1.3 "Chalcogen analogues of urea and isourea"
-(``BlueBookV2/BlueBookV2.md:33437``), subsection P-66.1.6.1.3.1 (``:33439``):
+IUPAC cite: "Chalcogen analogues of urea and isourea"
+(``the Blue Book Blue Book``), subsection (``:33439``):
 *"Chalcogen analogues of urea are named by functional replacement nomenclature
 using the prefixes 'thio', 'seleno', and 'telluro'. Preferred IUPAC names use
-the letter locants N, and N'."*  Worked ``(PIN)`` examples: ``thiourea (PIN)``
+the letter locants N, and N'."* Worked ``(PIN)`` examples: ``thiourea (PIN)``
 (``:33444``) and ``N-(butan-2-yl)selenourea (PIN)`` (``:33451``).
 
 Why the parent is the thiourea and not the ring the molecule also carries:
-P-66.1.6.1.1.2 (``:33320``) ranks urea *"as an amide of carbonic acid"*; P-41
-Table 4.1 puts amides at class 11 (``:18184``) against carbon rings at class 40
-(``:18216``); P-44.1.1 (``:18875``) selects on that order; and the
+ (``:33320``) ranks urea *"as an amide of carbonic acid"*; puts amides at class 11 (``:18184``) against carbon rings at class 40
+(``:18216``); (``:18875``) selects on that order; and the
 "ring outranks chain" licence is gated on *"Within the same heteroatom class"*
-(P-52.2.8, ``:24096``), which a class-40 ring does not share with an amide.
+, ``:24096``), which a class-40 ring does not share with an amide.
 """
 from __future__ import annotations
 
@@ -29,7 +28,7 @@ def _is_thiourea(features: Any) -> bool:
 
     Mirrors ``_is_urea``. The ``principal_group is None`` clause is what keeps
     this handler off acid-bearing molecules such as
-    ``CNC(=S)NCCC(=O)O`` — there the carboxylic acid is senior (P-41 Table 4.1
+    ``CNC(=S)NCCC(=O)O`` — there the carboxylic acid is senior
     class 5 vs the amide class 11), so the thiourea is demoted to the
     ``(methylcarbamothioyl)amino`` PREFIX built by
     ``substituent_prefix_forms.get_n_substituted_carbamothioylamino_prefix``.
@@ -65,7 +64,7 @@ def name_thiourea(
         return None
 
     # The retained chalcogen-urea parent has NO numbered skeleton -- its only
-    # locants are the italic letters N / N' (P-66.1.6.1.3.1, BB:33439; :33446
+    # locants are the italic letters N / N', the Blue Book;:33446
     # "Numerical locants are no longer used for thiourea in the IUPAC preferred
     # name"). Declaring that scope stops a numeric front-of-name stereo block
     # being prepended: `(1S,3R,5S)-N-[1-(bicyclo[2.2.1]heptan-2-yl)ethyl]-N'-

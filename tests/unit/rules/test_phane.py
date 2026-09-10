@@ -1,18 +1,18 @@
-"""Phase 155.A unit tests for src/orthonym/rules/phane.py.
+"""a phase.A unit tests for src/orthonym/rules/phane.py.
 
-Per CONTEXT D-15 + 155-AUDIT-A.md §6: OPSIN 2.9.0 does NOT parse
+Per internal notes + internal notes-A.md: OPSIN 2.9.0 does NOT parse
 [m.n]paracyclophane semi-systematic names, so the unit tier asserts
 direct string equality against Blue Book reference; the integration
 tier (test_cyclophane_corpus.py) skip-quarantines the OPSIN-RT step.
 
 Test classes:
-- TestIsCyclophane           : topology gate (D-03 corrected SSSR criterion)
-- TestClassifyPhaneTopology  : sub-class enum dispatch (D-04)
-- TestBuildCompositeLocant   : composite-locant emitter (D-05)
-- TestNameCyclophane         : top-level handler emission
+- TestIsCyclophane: topology gate (corrected SSSR criterion)
+- TestClassifyPhaneTopology: sub-class enum dispatch
+- TestBuildCompositeLocant: composite-locant emitter
+- TestNameCyclophane: top-level handler emission
 
-Source: 155-CONTEXT.md D-03/D-04/D-05/D-16/D-22; 155-AUDIT-A.md
-Critical Finding 0 (corrected SSSR-based criterion); 155-PATTERNS.md.
+Source: 155-internal notes ////; internal notes-A.md
+Critical Finding 0 (corrected SSSR-based criterion); internal notes.
 """
 from __future__ import annotations
 
@@ -31,7 +31,7 @@ from orthonym.rules.phane import (
 def test_phane_module_exports_public_api() -> None:
     """Smoke test: phane.py exports the six public symbols.
 
-    Source: 155-CONTEXT.md D-03/D-04/D-05; D-22; 155-PATTERNS.md.
+    Source: 155-internal notes //;; internal notes.
     """
     assert callable(is_cyclophane)
     assert callable(name_cyclophane)
@@ -44,19 +44,19 @@ def test_phane_module_exports_public_api() -> None:
 
 
 # ---------------------------------------------------------------------------
-# TestIsCyclophane (D-03 corrected SSSR criterion)
+# TestIsCyclophane (corrected SSSR criterion)
 # ---------------------------------------------------------------------------
 
 
 @pytest.mark.unit
 class TestIsCyclophane:
-    """Topology gate per 155-CONTEXT.md D-03 + 155-AUDIT-A.md Critical Finding 0.
+    """Topology gate per 155-internal notes + internal notes-A.md Critical Finding 0.
 
     Cyclophane criterion (audit-corrected SSSR-based):
     1. >= 2 disjoint SSSR rings of size <= 8 (small rings).
     2. >= 1 macrocyclic SSSR ring of size > 8.
     3. Shortest atom-disjoint chain between two small rings has
-       >= 2 intermediate atoms (P-26.4 minimum bridge length).
+       >= 2 intermediate atoms minimum bridge length).
     4. Chain shares atoms with at least one macrocyclic SSSR ring.
     5. Mutually exclusive with ring-assembly / spiro / fused / multiplicative.
     """
@@ -64,7 +64,7 @@ class TestIsCyclophane:
     @pytest.mark.parametrize(
         "smiles,expected,label",
         [
-            # Positive cases: cyclophanes per Blue Book P-26.4
+            # Positive cases: cyclophanes per Blue Book
             ("c1cc2ccc1CCc1ccc(cc1)CC2", True, "[2.2]paracyclophane"),
             ("c1cc2cc(c1)CCc1cccc(c1)CC2", True, "[2.2]metacyclophane"),
             ("c1cc2ccc1CCCc1ccc(cc1)CCC2", True, "[3.3]paracyclophane"),
@@ -94,7 +94,7 @@ class TestIsCyclophane:
 
 
 # ---------------------------------------------------------------------------
-# TestClassifyPhaneTopology (D-04)
+# TestClassifyPhaneTopology
 # ---------------------------------------------------------------------------
 
 
@@ -124,7 +124,7 @@ class TestClassifyPhaneTopology:
 
 
 # ---------------------------------------------------------------------------
-# TestBuildCompositeLocant (D-05)
+# TestBuildCompositeLocant
 # ---------------------------------------------------------------------------
 
 
@@ -150,21 +150,21 @@ class TestBuildCompositeLocant:
 
 
 # ---------------------------------------------------------------------------
-# TestNameCyclophane (D-04 + D-05)
+# TestNameCyclophane (+)
 # ---------------------------------------------------------------------------
 
 
 @pytest.mark.unit
 class TestNameCyclophane:
-    """Top-level handler per 155-CONTEXT.md D-04 + D-05 + 155-AUDIT-A.md §3.
+    """Top-level handler per 155-internal notes + + internal notes-A.md
 
     Wave-8 P8: `name_cyclophane` now delegates to `build_phane_pin` (the
-    P-26.2/.3 simplified-skeletal PIN engine) for the monocyclic
+    /.3 simplified-skeletal PIN engine) for the monocyclic
     all-benzene-homophane class, RETIRING the semi-systematic bracket-prefix
-    form for these cases (`[2.2]paracyclophane` -> P-26 PIN
+    form for these cases (`[2.2]paracyclophane` -> PIN
     `1,4(1,4)-dibenzenacyclohexaphane`). See
     docs/superpowers/plans/2026-07-16-wave8-p8-phane.md Task 8.7 +
-    tests/unit/rules/test_phane_pin.py for the full P-26 engine test suite;
+    tests/unit/rules/test_phane_pin.py for the full engine test suite;
     these 4 cases stay here (pre-existing fixture SMILES) purely so this
     file's own coverage of `name_cyclophane`'s public contract doesn't rot.
     """

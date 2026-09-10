@@ -32,7 +32,7 @@ class TestExtractSmiles:
         assert result == "CCO"
 
     def test_back_reference_same_as(self):
-        """'same as P-24.6' resolves to last_valid_smiles."""
+        """'same as ' resolves to last_valid_smiles."""
         result = extract_smiles("same as P-24.6", last_valid_smiles="C1CCCC1")
         assert result == "C1CCCC1"
 

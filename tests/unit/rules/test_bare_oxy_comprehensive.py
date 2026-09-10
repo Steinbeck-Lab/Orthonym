@@ -3,7 +3,7 @@
 Tests that ether substituents always produce qualified prefixes (methoxy, ethoxy,
 propoxy, etc.) and never produce a bare standalone "oxy" prefix.
 
-IUPAC Reference: P-63.2.3 (ether substituent naming)
+IUPAC Reference: (ether substituent naming)
 Phase: 90-02 Task 1
 """
 import pytest
@@ -19,7 +19,7 @@ def _has_bare_oxy(name: str) -> bool:
     """Return True if *name* contains a bare standalone 'oxy' prefix.
 
     Legitimate compound words (methoxy, ethoxy, propoxy, carboxyloxy,
-    oxybis, oxydi, anoxy, etc.) are NOT flagged.  Only a standalone
+    oxybis, oxydi, anoxy, etc.) are NOT flagged. Only a standalone
     'oxy' token that appears as a hyphen-separated or space-separated
     word *and* is NOT part of a larger word is flagged.
     """
@@ -57,7 +57,7 @@ class TestSimpleEtherQualifiedPrefixes:
 
 
 # ---------------------------------------------------------------------------
-# 2. Multiplicative oxy bridge names must be preserved (IUPAC P-31.1.2.1)
+# 2. Multiplicative oxy bridge names must be preserved (IUPAC
 # ---------------------------------------------------------------------------
 
 class TestMultiplicativeOxyBridge:

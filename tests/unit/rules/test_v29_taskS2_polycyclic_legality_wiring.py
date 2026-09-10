@@ -1,4 +1,4 @@
-"""v29 Task S2 — the von Baeyer legality proof, wired into the paths that SPELL.
+""" — the von Baeyer legality proof, wired into the paths that SPELL.
 
 Task S built a correct Java-free legality audit
 (``vonbaeyer_universal.audit_von_baeyer_descriptor``) and left it consulted by
@@ -40,9 +40,9 @@ from orthonym.rules.polycyclic import (
 # A cage whose emitted descriptor does NOT rebuild the cage bond set, so the
 # legality audit must reject it and every producer must refuse. From the
 # systematic N<=12 enumeration
-# (.planning/audit-v29/TaskS-vonbaeyer-legality.md). The specific descriptor
+# (internal notes). The specific descriptor
 # string, and whether it fails on the atom-count arithmetic or on the bond-set
-# edge-audit, are implementation details the v41 P-23.2.4 main-bridge selection
+# edge-audit, are implementation details the main-bridge selection
 # legitimately changed (it now emits ``tetracyclo[4.2.2.1^1,9.1^3,5]``, whose
 # bracket sum matches the atom count but whose bonds still do not rebuild the
 # cage) -- so this pins only the DURABLE invariant: legality=False + refusal.
@@ -89,13 +89,13 @@ def test_analyze_marks_an_unrebuildable_descriptor_illegal(smiles, n_cage):
     assert desc is not None
     # The descriptor+numbering does not rebuild the cage bond set, so the
     # Java-free legality audit refuses to certify it -- whether it trips on the
-    # P-23.2.6.1.4 atom-count arithmetic (BlueBookV2.md:9651) or on the
+    # atom-count arithmetic (the Blue Book) or on the
     # bond-set edge-audit. Either way nothing correct can be spelled from it.
     assert desc.legality is False
 
 
 def test_main_bridge_fix_rescues_a_previously_refused_cage():
-    """v41 M4 subpart #1 side effect (verified 0-wrong improvement): the P-23.2.4
+    """ M4 subpart #1 side effect (verified 0-wrong improvement): the
     largest-main-bridge selection turns a cage HEAD refused -- its shortest-bridge
     descriptor ``tetracyclo[3.1.1.2^1,4]`` dropped an atom (9 bracketed, 10 in the
     cage) -- into one that names with a LEGAL descriptor. The name OPSIN-round-
@@ -136,7 +136,7 @@ def test_name_polycyclic_with_heteroatoms_refuses(smiles, _n):
 
 
 # --------------------------------------------------------------------------
-# ... and keep naming everything that IS legal
+#... and keep naming everything that IS legal
 # --------------------------------------------------------------------------
 @pytest.mark.parametrize("smiles,descriptor", LEGAL_CAGES)
 def test_legal_cages_still_name(smiles, descriptor):
@@ -179,7 +179,7 @@ def test_legality_verified_rejects_a_tampered_numbering():
 
 
 def test_legality_verified_rejects_a_tampered_descriptor_string():
-    """The ring-count word is part of the name (P-23.2.6.1.1, :9645), so a cage
+    """The ring-count word is part of the name,:9645), so a cage
     spelled `tetracyclo` when its circuit rank is 3 denotes a different system
     even though every bracket number is right."""
     mol, ring = _cage("C1C2CC3CC1CC(C2)C3")

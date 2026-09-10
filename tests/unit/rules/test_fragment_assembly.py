@@ -97,7 +97,7 @@ class TestEsterAssembly:
 # ============================================================================
 
 class TestAcidToAte:
-    """Tests for _acid_to_ate() helper."""
+    """Tests for _acid_to_ate helper."""
 
     def test_acetic_acid(self):
         assert _acid_to_ate("acetic acid") == "acetate"
@@ -129,7 +129,7 @@ class TestAcidToAte:
 # ============================================================================
 
 class TestAlcoholToAlkyl:
-    """Tests for _alcohol_to_alkyl() helper."""
+    """Tests for _alcohol_to_alkyl helper."""
 
     def test_methanol(self):
         assert _alcohol_to_alkyl("methanol") == "methyl"
@@ -204,7 +204,7 @@ class TestAmideAssembly:
 # ============================================================================
 
 class TestAcidToAmide:
-    """Tests for _acid_to_amide() helper."""
+    """Tests for _acid_to_amide helper."""
 
     def test_acetic_acid(self):
         assert _acid_to_amide("acetic acid") == "acetamide"
@@ -230,7 +230,7 @@ class TestAcidToAmide:
 # ============================================================================
 
 class TestAcidToAcyl:
-    """Tests for _acid_to_acyl() helper."""
+    """Tests for _acid_to_acyl helper."""
 
     def test_acetic_acid(self):
         assert _acid_to_acyl("acetic acid") == "acetyl"
@@ -253,7 +253,7 @@ class TestAcidToAcyl:
 # ============================================================================
 
 class TestAmineToPrefix:
-    """Tests for _amine_to_prefix() helper."""
+    """Tests for _amine_to_prefix helper."""
 
     def test_methylamine(self):
         assert _amine_to_prefix("methylamine") == "methyl"
@@ -366,7 +366,7 @@ class TestEdgeCases:
 # ============================================================================
 
 class TestJoinComponents:
-    """Tests for _join_components() hyphenation helper."""
+    """Tests for _join_components hyphenation helper."""
 
     def test_letter_digit_boundary(self):
         assert _join_components("carbonyl", "2-amino") == "carbonyl-2-amino"
@@ -418,7 +418,7 @@ class TestJoinComponents:
 # ============================================================================
 
 class TestDoubleSuffixGuardAte:
-    """Tests for double-suffix prevention in _acid_to_ate()."""
+    """Tests for double-suffix prevention in _acid_to_ate."""
 
     def test_already_ate_returns_unchanged(self):
         assert _acid_to_ate("propanoate") == "propanoate"
@@ -446,7 +446,7 @@ class TestDoubleSuffixGuardAte:
 
 
 class TestDoubleSuffixGuardAmide:
-    """Tests for double-suffix prevention in _acid_to_amide()."""
+    """Tests for double-suffix prevention in _acid_to_amide."""
 
     def test_already_amide_returns_unchanged(self):
         assert _acid_to_amide("propanamide") == "propanamide"
@@ -528,7 +528,7 @@ class TestGlycosideAssemblyHyphenation:
 # ============================================================================
 
 class TestLooksLikeAcidName:
-    """Tests for _looks_like_acid_name() shared pre-validator."""
+    """Tests for _looks_like_acid_name shared pre-validator."""
 
     def test_propanoic_acid_returns_true(self):
         assert _looks_like_acid_name("propanoic acid") is True
@@ -565,7 +565,7 @@ class TestLooksLikeAcidName:
 
 
 class TestLooksLikeConvertibleName:
-    """Tests for _looks_like_convertible_name() broader validator."""
+    """Tests for _looks_like_convertible_name broader validator."""
 
     def test_acid_name_returns_true(self):
         assert _looks_like_convertible_name("propanoic acid") is True
@@ -686,7 +686,7 @@ class TestTransformationFallbackSafety:
 
 
 # ============================================================================
-# OPSIN expanded acid stem transformation tests (DECO-26)
+# OPSIN expanded acid stem transformation tests
 # ============================================================================
 
 
@@ -739,7 +739,7 @@ class TestOpsinAcidStemAcylConversion:
 
 
 class TestAssemblyTokenValidation:
-    """Tests for _validate_assembly_tokens (DECO-27)."""
+    """Tests for _validate_assembly_tokens ."""
 
     def test_all_fragments_represented(self):
         """Assembly containing tokens from all fragments passes validation."""

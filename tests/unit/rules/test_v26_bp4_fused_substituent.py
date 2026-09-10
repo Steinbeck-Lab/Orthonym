@@ -1,23 +1,23 @@
-""" BP-4 a phase — substituent support for the algorithmic 2-component
+""" a phase — substituent support for the algorithmic 2-component
 ortho-fused mancude heterocycle path.
 
 Root cause fixed: ``_try_algorithmic_fusion_name`` previously hard-refused the
 moment any exocyclic heavy atom was present, so a 2-component ortho-fused
 mancude heterocycle whose core is NOT in the retained catalog lost its name as
 soon as it carried a substituent. The fix discovers substituents against the
-deterministic P-25.3.3 peripheral numbering (``compute_fused_numbering``),
-applies the P-59.2.3 lowest-substituent-locant tie-break over the ring-system
+deterministic peripheral numbering (``compute_fused_numbering``),
+applies the lowest-substituent-locant tie-break over the ring-system
 automorphisms, and fails closed at source when any exocyclic branch is
 unnameable.
 
 Blue Book grounding (the Blue Book Blue Book):
-- P-25.3.3.1.2(a)/(b): ring numbering fixed by heteroatoms (set, then element
+- (a)/(b): ring numbering fixed by heteroatoms (set, then element
   order O > S > Se > Te > N...); substituents are NOT in that list.
-- P-59.2.3.1 / line 25503: when a choice remains, low locants to detachable
+- / line 25503: when a choice remains, low locants to detachable
   prefixes, then alphanumerical — the symmetric-parent tie-break.
 
 These assert the NAME contract directly (via ``_try_algorithmic_fusion_name``)
-rather than through the full namer's SELF-01 gate, which fails OPEN under OPSIN
+rather than through the full namer's gate, which fails OPEN under OPSIN
 subprocess contention (see NEXT-SESSION hazards). Each target PIN was verified
 this session to OPSIN-round-trip to the input SMILES via ``scripts/diagnose.py``.
 """
@@ -147,7 +147,7 @@ class TestBP4Phase2Polycomponent:
 
 class TestBP4Phase3PartialSaturation:
     """a phase (full): partially-saturated 2-component ortho-fused pairs named as
-    '<hydro>-<indicatedH>-<mancude parent>' (P-25.7.1.1 / P-14.4 / P-58.2). The
+    '<hydro>-<indicatedH>-<mancude parent>' / /. The
     maximum number of noncumulative double bonds is placed into the saturated
     region (a maximum matching of the saturated-carbon subgraph); unmatched
     carbons are indicated hydrogen, each matched pair is one unit of hydro. Covers
@@ -168,7 +168,7 @@ class TestBP4Phase3PartialSaturation:
         assert _try_algorithmic_fusion_name(mol) == expected
 
     @pytest.mark.parametrize("smiles,expected", [
-        # case (a): ODD sp3 count = indicated-H (lowest locant, P-58.2.1.2) + hydro
+        # case (a): ODD sp3 count = indicated-H (lowest locant, + hydro
         ("C1CCc2ccoc2O1", "5,6-dihydro-4H-furo[2,3-b]pyran"),
         ("C1CCOc2ccoc21", "6,7-dihydro-5H-furo[3,2-b]pyran"),
         ("O1CCCc2ccoc21", "5,6-dihydro-4H-furo[2,3-b]pyran"),
@@ -200,7 +200,7 @@ class TestBP4Phase3PartialSaturation:
         "O1CCCc2cc(C(=O)O)oc21",   # carboxylic-acid suffix
     ])
     def test_suffix_group_fails_closed(self, smiles):
-        """A suffix-forming group needs P-58.2.2 added indicated H (out of scope):
+        """A suffix-forming group needs added indicated H (out of scope):
         _try_partial_saturation_name declines (the legacy path then owns it)."""
         from orthonym.rules.fused_rings import (
             _try_partial_saturation_name, get_shared_atoms,
@@ -223,7 +223,7 @@ class TestBP4Phase3PartialSaturation:
 
 
 class TestBP3ClusterRDecoratedRingSubstituent:
-    """ BP-3 cluster R: a ring substituent that carries its OWN decorations
+    """ cluster R: a ring substituent that carries its OWN decorations
     (rooted at a ring atom) now names via free-valence numbering + decoration
     placement, and the pyrazole/imidazole R-bug is fixed on the substituent path.
     Each PIN OPSIN round-trip verified this session via scripts/diagnose.py."""
@@ -250,7 +250,7 @@ class TestBP3ClusterRDecoratedRingSubstituent:
         # to the chokepoint). Was `unknown`.
         ("O=C(c1ccccc1)c1cc(C)n(C)n1",
          "(1,5-dimethylpyrazol-3-yl)phenylmethanone"),
-        # (item 2): P-14.3.4 — a one-carbon `methanone` has a single
+        # (item 2): — a one-carbon `methanone` has a single
         # position, so the `-1-` locant is omitted (matches the sibling rows
         # above; RT-verified 2026-09-04, ITEM2-VERIFICATION.md).
         ("Cc1nn(C)c(O)c1C(=O)c1ccc(Cl)cc1Cl",

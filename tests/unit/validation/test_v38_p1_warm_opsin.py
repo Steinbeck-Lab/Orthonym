@@ -1,4 +1,4 @@
-"""v38 Perf Phase P, lever P1 — warm in-process OPSIN in atom-coverage.
+""" Perf Phase P, lever P1 — warm in-process OPSIN in atom-coverage.
 
 ``_parse_name_with_opsin_uncached`` used to spawn a fresh cold `java -jar` per
 name (~0.82 s). It now prefers the ONE lazily-started in-process JVM
@@ -84,7 +84,7 @@ def test_warm_equals_cold(name):
 
 
 def test_warm_path_is_actually_taken(monkeypatch):
-    """Prove the warm JVM is the route by default (a spy on opsin_stdout).
+    """Prove the warm JVM is the route by default (a trace on opsin_stdout).
 
     If the warm path were silently skipped, this optimization would be a no-op
     and the byte-identity above would prove nothing.

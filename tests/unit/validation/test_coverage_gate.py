@@ -1,4 +1,4 @@
-"""Phase 1 Part A: the shared best-effort certification gate.
+"""a phase Part A: the shared best-effort certification gate.
 
 Proves ``certify_general_result`` is STRICTLY STRONGER than E1 alone -- it
 rejects the swap-witness class E1 misses (a name whose bindings partition the
@@ -62,14 +62,14 @@ def test_none_result_is_not_certified():
     assert certify_general_result(ETHANOL, None) is False
 
 
-# --- Phase 1 B4: P3 nitro FP fix + structural_only broad-lane policy ---------
+# --- a phase B4: P3 nitro FP fix + structural_only broad-lane policy ---------
 
 NITROCYCLOHEXANE = Chem.MolFromSmiles("C1CCC(CC1)[N+](=O)[O-]")  # 6 ring C, N, 2 O
 
 
 def test_internal_nitro_charge_not_falsely_voided():
     """A nitro group's charge-separated [N+][O-] is a NEUTRAL named group
-    (P-59), not a skeletal charge -- the P3 charge axis must not require a
+    , not a skeletal charge -- the P3 charge axis must not require a
     charge claim for it (was a false void of correct 'nitro' names)."""
     res = GeneralEngineResult(name="nitrocyclohexane", bindings=(
         TokenBinding((0, 1, 2, 3, 4, 5), "cyclohexane", "parent"),

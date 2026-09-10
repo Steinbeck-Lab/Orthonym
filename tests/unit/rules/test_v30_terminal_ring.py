@@ -1,4 +1,4 @@
-"""v30 P3-T1b: the terminal ring namer and its reconstruction audit.
+"""-T1b: the terminal ring namer and its reconstruction audit.
 
 One test per primitive the task specifies (descriptor, replacement prefix + λ,
 unsaturation locants, the audit rejecting a wrong descriptor), plus the two
@@ -79,7 +79,7 @@ def test_monocycle_branch_is_total_where_von_baeyer_cannot_reach():
 
 def test_replacement_prefix_cites_every_heteroatom_with_a_locant_and_lambda():
     """A locant per non-carbon skeletal atom, and λ for hypervalence
-    (P-15.4.1.3 places it immediately after the locant, no hyphen).
+     places it immediately after the locant, no hyphen).
 
     MUTATION: in ``ring_replacement.build_replacement_prefix``, pass ``None``
     instead of ``vb_lambda_for_atom(...)`` -> the λ4 disappears and the name
@@ -91,7 +91,7 @@ def test_replacement_prefix_cites_every_heteroatom_with_a_locant_and_lambda():
     assert res is not None
     assert res.name == '1λ4-thiacyclopenta-2,4-diene'
 
-    # two heteroatoms -> two locants, multiplied, in P-23.3.1 element order
+    # two heteroatoms -> two locants, multiplied, in element order
     mol, ring = _ring('C1COCCS1')
     res = terminal_ring_name(mol, ring, None)
     assert res is not None
@@ -99,7 +99,7 @@ def test_replacement_prefix_cites_every_heteroatom_with_a_locant_and_lambda():
 
 
 def test_off_table_skeletal_element_refuses_rather_than_dropping_the_atom():
-    """Table 1.5 is CLOSED (P-15.4.1.1). Hg has no ring 'a' prefix, so the ring
+    """Table 1.5 is CLOSED. Hg has no ring 'a' prefix, so the ring
     stem would count an atom no morpheme spells -- the documented
     ``bicyclo[3.3.0]octane``-for-a-mercury-ring failure.
 
@@ -118,7 +118,7 @@ def test_off_table_skeletal_element_refuses_rather_than_dropping_the_atom():
 
 
 def test_charged_skeletal_ring_atom_is_out_of_scope_and_refuses():
-    """A ring cation is P-73, not replacement nomenclature; a neutral
+    """A ring cation is, not replacement nomenclature; a neutral
     'a'-prefix name would denote a DIFFERENT species.
 
     MUTATION: delete the formal-charge loop in ``terminal_ring_name`` ->
@@ -155,7 +155,7 @@ def test_every_ring_multiple_bond_gets_a_locant_over_a_kekulized_graph():
     assert res is not None
     assert res.name == '1-thiacyclopenta-2,4-diene'
 
-    # a single ene elides the stem's 'a' (P-16.3.3); a multiplied one keeps it
+    # a single ene elides the stem's 'a'; a multiplied one keeps it
     mol, ring = _ring('C1=CCOC1')                    # 2,5-dihydrofuran
     res = terminal_ring_name(mol, ring, None)
     assert res is not None
@@ -301,7 +301,7 @@ def test_pin_default_is_untouched(smiles):
 
 
 def test_general_ring_prefix_emission_is_not_labelled_a_pin():
-    """v30 P3-T1c: the composer stamps every emission ``source='pin_path'`` ->
+    """-T1c: the composer stamps every emission ``source='pin_path'`` ->
     ``T1``, ``is_pin=True`` (``namer.py:2728``). A ring substituent prefix only
     the GENERAL tier could build is a valid but NOT preferred form -- the ring PIN
     here is the retained name *adamantane*, not ``tricyclo[3.3.1.1^3,7]decane`` --
@@ -312,7 +312,7 @@ def test_general_ring_prefix_emission_is_not_labelled_a_pin():
     the first two assertions fail.
 
     The assertion is on the DEMOTION, not on the shape of the name: this test
-    originally required ``tricyclo[3.3.1.1^3,7]`` in the name, and the P-23.7
+    originally required ``tricyclo[3.3.1.1^3,7]`` in the name, and the
     retained-stem fix in the same session turned that molecule into the PIN
     ``(3-hydroxyadamantan-1-yl)acetic acid``. A name-shape assertion here was
     testing the wrong thing -- the flag records *which tier produced the prefix*,
@@ -342,10 +342,10 @@ def test_general_ring_prefix_emission_is_not_labelled_a_pin():
     ('OC(=O)CC12C3C4C1C1C4C3C21', 'cuban-1-yl'),
 ])
 def test_retained_pin_stem_beats_the_von_baeyer_descriptor(smiles, expected):
-    """P-23.7: a cage with a RETAINED PIN name must use it, not the descriptor.
+    """: a cage with a RETAINED PIN name must use it, not the descriptor.
 
-    **P-23.7 "RETAINED NAMES FOR VON BAEYER PARENT HYDRIDES"**
-    (``BlueBookV2/BlueBookV2.md:9879``): *"The retained names adamantane and
+    ** "RETAINED NAMES FOR VON BAEYER PARENT HYDRIDES"**
+    (``the Blue Book Blue Book``): *"The retained names adamantane and
     cubane are used in general nomenclature and as preferred IUPAC names."*
     Table 2.6 (``:9885``) prints *"adamantane (PIN) tricyclo[3.3.1.1^3,7]decane"*
     and *"cubane (PIN) pentacyclo[4.2.0.0^2,5.0^3,8.0^4,7]octane"* -- the retained

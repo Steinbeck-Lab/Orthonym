@@ -2,21 +2,21 @@
 
 Verify retained-name + multiplier transitions stay IUPAC-compliant after
 a phase's retained-name expansion. Each test cites:
-  - The QMUL P-section URL (P-14.2.1, P-14.2.2, P-14.5.1, P-14.5.2)
+  - The QMUL P-section URL,,,
   - AUTONOM-1990 section 10 (Wisniewski 1990, J. Chem. Inf. Comput. Sci. 30, 324-332)
   - V18 plan section 6 line 1031 (triviality controller scope-extension mandate)
-  - a phase CONTEXT + SC-5
+  - a phase internal notes +
 
-Per CONTEXT + RESEARCH section 7.2: tests VERIFY pre-existing composer.py /
+Per internal notes + RESEARCH section 7.2: tests VERIFY pre-existing composer.py /
 prefixes.py behavior is correct after retained-name expansion. They do NOT
 modify the assembly layer. Failures filed as a phase IM (multiplicative.py
 completion); xfail with link to a phase IM is acceptable for known gaps
 with documented attribution.
 
-Source: https://iupac.qmul.ac.uk/BlueBook/P1.html#P-14.2
-Source: https://iupac.qmul.ac.uk/BlueBook/P1.html#P-14.5
+Source: https://iupac.qmul.ac.uk/BlueBook/P1.html#
+Source: https://iupac.qmul.ac.uk/BlueBook/P1.html#
 Source: AUTONOM-1990-insights.md section 10
-Source: 150-CONTEXT.md + SC-5 + V18 plan section 6 line 1031
+Source: 150-internal notes + + V18 plan section 6 line 1031
 """
 
 import pytest
@@ -43,11 +43,11 @@ class TestRetainedNameMultiplierTransitions:
 
     Each parametrized case verifies that when a retained name is substituted
     for a systematic-name fragment during assembly, the multiplier choice
-    (di- for retained simple substituents per P-14.2.1, bis- for substituents
-    with internal locants per P-14.2.2) and the alphabetization first-letter
-    citation order (P-14.5.1 + P-14.5.2) stay IUPAC-compliant.
+    (di- for retained simple substituents per, bis- for substituents
+    with internal locants per and the alphabetization first-letter
+    citation order + stay IUPAC-compliant.
 
-    Per CONTEXT: tests verify pre-existing assembly behavior; failures
+    Per internal notes: tests verify pre-existing assembly behavior; failures
     filed as a phase IM (multiplicative.py completion).
     """
 
@@ -59,7 +59,7 @@ class TestRetainedNameMultiplierTransitions:
             # 1,3-bis(acetoxy)benzene = resorcinol diacetate; expect 'diacetoxy' or 'diacetate'
             # a phase -T1: composer.py emits 'bis(acetyloxy)' not 'diacetoxy';
             # the substituent renderer for ester-O-acyl chains hasn't been wired through
-            # the retained-substituent table. Multiplicative.py P-14.2.1 'simple
+            # the retained-substituent table. Multiplicative.py 'simple
             # substituent' path keeps the systematic form.
             pytest.param(
                 "CC(=O)Oc1cccc(OC(C)=O)c1",
@@ -86,7 +86,7 @@ class TestRetainedNameMultiplierTransitions:
             # 1,4-dicarbamoylbenzene; expect 'carbamoyl' multiplier transition
             # a phase -T2: composer.py emits 'benzene-1,4-dicarboxamide'
             # via the carboxamide handler; the retained 'carbamoyl' substituent
-            # form is not selected when both groups are PG-equivalent (P-66.6
+            # form is not selected when both groups are PG-equivalent
             # carboxamide-as-suffix path wins over carbamoyl-as-prefix retained
             # substitution). a phase multiplicative.py + carbamoyl-prefix path.
             pytest.param(
@@ -117,7 +117,7 @@ class TestRetainedNameMultiplierTransitions:
             # connectivity-walk handler picks ONE furan as parent and makes the
             # OTHER furan into a 'thienylfuran' compound substituent). The
             # 2,5-bis(furan-2-yl)thiophene name requires multiplicative.py
-            # P-14.5 path (3+ identical parent structures with primed locants).
+            # path (3+ identical parent structures with primed locants).
             pytest.param(
                 "c1cc(-c2ccc(-c3ccco3)s2)oc1",
                 "bis",
@@ -140,7 +140,7 @@ class TestRetainedNameMultiplierTransitions:
             ),
             # T-4: alphabetization first-letter shift - acetoxy ('a') before bromo ('b')
             # 1-bromo-3,5-bis(acetoxy)benzene; expect 'diacetoxy' substring + acetoxy
-            # citation order. Same a phase -T1 root cause as T-1.
+            # citation order. Same a phase - root cause as T-1.
             pytest.param(
                 "Brc1cc(OC(C)=O)cc(OC(C)=O)c1",
                 "diacet",
@@ -179,10 +179,10 @@ class TestRetainedNameMultiplierTransitions:
         """V18 section 6 line 1031 + AUTONOM-1990 section 10 - multiplier transition.
 
         Verifies pre-existing composer.py / prefixes.py behavior is IUPAC-compliant
-        after retained-name expansion. Failures filed as a phase IM per CONTEXT.
+        after retained-name expansion. Failures filed as a phase IM per internal notes.
 
         Source: AUTONOM-1990-insights.md section 10
-        Source: https://iupac.qmul.ac.uk/BlueBook/P1.html#P-14.2
+        Source: https://iupac.qmul.ac.uk/BlueBook/P1.html#
         """
         name = name_compound(smiles)
         assert name is not None, f"name_compound returned None for {smiles!r}"
@@ -196,37 +196,37 @@ class TestRetainedNameMultiplierTransitions:
 
 
 class TestMultiplierAlphabetization:
-    """V18 section 6 line 1031 - alphabetization first-letter rule (P-14.5.1 + P-14.5.2).
+    """V18 section 6 line 1031 - alphabetization first-letter rule +.
 
     Multiplicative prefixes (di-, tri-, tetra-, bis-, tris-, tetrakis-) are
-    IGNORED for alphabetical citation order per P-14.5.1; the first letter of
-    the substituent stem governs citation order per P-14.5.2.
+    IGNORED for alphabetical citation order per; the first letter of
+    the substituent stem governs citation order per.
     """
 
     @pytest.mark.integration
     def test_di_prefix_does_not_affect_alphabetization(self):
-        """P-14.5.1: multiplicative prefixes do NOT alter alphabetical order.
+        """: multiplicative prefixes do NOT alter alphabetical order.
 
         For 1-bromo-3,5-diacetoxybenzene (or its IUPAC PIN equivalent), the
         citation order should be acetoxy < bromo (acetoxy starts with 'a',
         bromo starts with 'b'). The current pipeline emits
         '1,5-bis(acetyloxy)-3-bromobenzene' which already cites the acet-
         prefix before the brom- prefix; the 'acet' < 'brom' first-letter
-        order P-14.5 mandates is satisfied even without the diacetoxy
+        order mandates is satisfied even without the diacetoxy
         retained form (T-4 of the parametrized case above).
 
-        Per CONTEXT + RESEARCH section 7.2: pre-existing prefixes.py
+        Per internal notes + RESEARCH section 7.2: pre-existing prefixes.py
         first-letter alphabetization MUST stay correct after retained-name
         expansion.
 
-        Source: https://iupac.qmul.ac.uk/BlueBook/P1.html#P-14.5
-        Source: 150-CONTEXT.md + V18 plan section 6 line 1031
+        Source: https://iupac.qmul.ac.uk/BlueBook/P1.html#
+        Source: 150-internal notes + V18 plan section 6 line 1031
         """
         smiles = "Brc1cc(OC(C)=O)cc(OC(C)=O)c1"
         name = name_compound(smiles)
         assert name is not None, f"name_compound returned None for {smiles!r}"
         lower = name.lower()
-        # a phase REVIEW WR-03 root-cause fix: previously this test
+        # a phase REVIEW root-cause fix: previously this test
         # silently passed when the output omitted either substring
         # (e.g., a pipeline regression returning 'unknown' or an
         # unrelated retained name would no-op the alphabetization
@@ -246,7 +246,7 @@ class TestMultiplierAlphabetization:
 # ============================================================================
 # a phase Plan-03 controller corpus (appended; Phase-150 content above preserved).
 #
-# HONEST REACH-BOUND (CONTEXT honest-RT-framing #1; confirmed at Plan-03 execution): the
+# HONEST REACH-BOUND (internal notes honest-RT-framing #1; confirmed at Plan-03 execution): the
 # controller fires 0 times end-to-end on the current IR — the structured IR fraction is aliphatic
 # chains while the seed targets aromatic rings/acids that route through COARSE handlers (
 # passthrough). So for seed-covered bare molecules the ON output EQUALS the OFF output (the existing
@@ -354,7 +354,7 @@ class TestType2bBranch:
     @pytest.mark.parametrize("smiles", TYPE_2B_NEGATIVE_SMILES)
     def test_negative_carbon_substituent_not_emitted(self, smiles):
         # #7 REAL boundary: never emit a carbon-substituted formic/methanoic-acid form (carbon is
-        # out of the P-15.1.8.2.2 closed list). Systematic 'propanoic acid' is expected.
+        # out of the closed list). Systematic 'propanoic acid' is expected.
         actual = name_compound(smiles, enable_triviality_controller=True).lower()
         assert not re.search(r"\w+formic acid", actual), f"carbon-formic leak: {actual!r}"
 
@@ -398,7 +398,7 @@ class TestType3Branch:
     def test_xylene_no_italic_locant_reach_bound(self, smiles):
         # HONEST reach-bound: the dimethylbenzene node is COARSE, so the swap to "1,2-xylene" does
         # NOT fire end-to-end (the swap LOGIC is proven by TestXyleneStemAssembly). Invariant: the
-        # controller NEVER emits an italic o-/m-/p- locant (), fired or not.
+        # controller NEVER emits an italic o-/m-/p- locant , fired or not.
         out = name_compound(smiles, enable_triviality_controller=True).lower()
         assert not any(t in out for t in ("o-xylene", "m-xylene", "p-xylene"))
 
@@ -430,7 +430,7 @@ class TestMidNameSwapBeforeAlpha:
         child_ethyl = NameTreeNode(parent_stem="ethyl", locants=(2,), fragment_legacy=None)
         parent = NameTreeNode(parent_stem="benzene",
                               prefixes=(child_amine, child_ethyl), fragment_legacy=None)
-        # CR-04: aniline's real principal_group is "aromatic_amine" (NOT "primary_amine").
+        #: aniline's real principal_group is "aromatic_amine" (NOT "primary_amine").
         out = apply_triviality_controller(parent, Chem.MolFromSmiles("Nc1ccc(CC)cc1"),
                                           "aromatic_amine", enabled=True)
         assert out.prefixes == _alphabetize_prefixes(out.prefixes)
@@ -462,11 +462,11 @@ class TestType2aNonPrincipalSubstituent:
 
 
 class TestXyleneStemAssembly:
-    """CR-01 regression (code review 2026-05-30). The swap output for a xylene is built by
+    """ regression (code review 2026-05-30). The swap output for a xylene is built by
     ``_build_rewrite``, NOT a hand-assembled ``NameTreeNode(parent_stem="xylene",...)`` the
     controller never produces. ``_build_rewrite`` sets ``parent_stem`` to the FULL seed name
     ("1,2-xylene") and — because the retained name already embeds the locant cluster — RESETS
-    ``node.locants`` to () so the serializer does NOT prepend a second cluster. The pre-fix code
+    ``node.locants`` to  so the serializer does NOT prepend a second cluster. The pre-fix code
     kept ``locants=(1,2)`` AND ``parent_stem="1,2-xylene"`` and emitted the malformed
     "1,2-1,2-xylene". This test exercises the REAL swap path so the bug cannot hide again."""
 
@@ -491,13 +491,13 @@ class TestXyleneStemAssembly:
 
 
 class TestControllerPositiveSwapFires:
-    """WR-03 (code review 2026-05-30): the end-to-end TestType1Branch / TestType2aBranch tests
+    """ (code review 2026-05-30): the end-to-end TestType1Branch / TestType2aBranch tests
     above pass via the PRE-EXISTING retained-name machinery (OFF == ON, the controller is the
     0-fire reach-bound) — they would stay green even if ``apply_triviality_controller`` were a
     ``return tree`` stub. These drive the controller's FULL positive path (recovery -> seed match
     -> type dispatch -> ``_build_rewrite`` -> RT-gate) on a synthetic STRUCTURED node and assert
     the swap actually FIRED via fingerprints a stub/no-fire cannot leave: ``iupac_section_cite``
-    stamped from the seed and ``fragment_legacy`` reset to None. Jar-gated because CR-03 makes the
+    stamped from the seed and ``fragment_legacy`` reset to None. Jar-gated because makes the
     RT-gate fail closed without OPSIN."""
 
     @pytest.mark.integration
@@ -529,7 +529,7 @@ class TestControllerPositiveSwapFires:
 
     @pytest.mark.integration
     def test_swap_rejected_when_rt_unverifiable(self):
-        # CR-03 differential: with NO oracle the post-swap round-trip cannot be verified, so the
+        # differential: with NO oracle the post-swap round-trip cannot be verified, so the
         # controller MUST keep the systematic form (fail closed) — the swap fingerprints are NOT
         # stamped even though recovery (Path B) + seed match + Type-1 check all succeed.
         from orthonym.assembly.retained_substitution import apply_triviality_controller

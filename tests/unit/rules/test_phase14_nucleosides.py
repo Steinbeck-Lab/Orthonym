@@ -1,7 +1,7 @@
-"""v23 Phase 14 — nucleoside/nucleotide decoration + NP-parent catalog + lipid PA.
+""" a phase — nucleoside/nucleotide decoration + NP-parent catalog + lipid PA.
 
 All names are OPSIN-RT (verified at gold-authoring time). These unit tests lock
-the production behaviour (name_compound, full dispatch + SELF-01 gate) and the
+the production behaviour (name_compound, full dispatch + gate) and the
 fail-closed boundaries of the strip-and-recognise nucleoside engine.
 """
 import pytest
@@ -12,7 +12,7 @@ from orthonym.rules.nucleosides import name_nucleoside
 
 
 # --------------------------------------------------------------------------- #
-# Batch 1 — nucleoside / nucleotide decoration (P-105.2 / P-106)
+# Batch 1 — nucleoside / nucleotide decoration /
 # --------------------------------------------------------------------------- #
 @pytest.mark.parametrize("smiles,expected", [
     # 5'-phosphate chain: di / tri across bases
@@ -59,7 +59,7 @@ def test_bare_nucleoside_unaffected():
 
 
 def test_retained_monophosphate_unaffected():
-    # AMP MUST stay the retained '5'-adenylic acid' (RETAINED_NAME@1300 before NUCLEOSIDE@1800)
+    # AMP MUST stay the retained '5'-adenylic acid' (RETAINED_NAME before NUCLEOSIDE)
     assert name_compound("Nc1ncnc2c1ncn2[C@@H]1O[C@H](COP(=O)(O)O)[C@@H](O)[C@H]1O") == "5'-adenylic acid"
 
 
@@ -81,7 +81,7 @@ def test_determinism_across_spellings():
 
 
 # --------------------------------------------------------------------------- #
-# Batch 3 — NP parent catalog growth (P-101.2.7 Table 10.1)
+# Batch 3 — NP parent catalog growth
 # --------------------------------------------------------------------------- #
 @pytest.mark.parametrize("smiles,expected", [
     ("C1=Cc2cc3ccc(cc4nc(cc5ccc(cc1n2)[nH]5)C=C4)[nH]3", "porphyrin"),
@@ -97,7 +97,7 @@ def test_np_parents(smiles, expected):
 
 
 def test_poriferastane_distinct_from_stigmastane():
-    # the C-24 epimer must NOT collapse to stigmastane (SELF-01 cannot catch a same-skeleton stereo error)
+    # the C-24 epimer must NOT collapse to stigmastane (cannot catch a same-skeleton stereo error)
     poriferastane = "CC[C@@H](CC[C@@H](C)[C@H]1CC[C@H]2[C@@H]3CCC4CCCC[C@]4(C)[C@H]3CC[C@]12C)C(C)C"
     stigmastane = "CC[C@H](CC[C@@H](C)[C@H]1CC[C@H]2[C@@H]3CCC4CCCC[C@]4(C)[C@H]3CC[C@]12C)C(C)C"
     assert name_compound(poriferastane) == "poriferastane"
@@ -105,7 +105,7 @@ def test_poriferastane_distinct_from_stigmastane():
 
 
 # --------------------------------------------------------------------------- #
-# Batch 2 — free phosphatidic acid (P-107.3.1)
+# Batch 2 — free phosphatidic acid
 # --------------------------------------------------------------------------- #
 def test_free_phosphatidic_acid():
     pa = "CCCCCCCCCCCCCCCC(=O)OCC(COP(O)(O)=O)OC(=O)CCCCCCCCCCCCCCC"
@@ -124,7 +124,7 @@ def test_lipid_regression(smiles, expected):
 
 
 # --------------------------------------------------------------------------- #
-# CONTINUATION C2 — base-substituted nucleosides (P-105.2.1), tautomer-robust
+# CONTINUATION C2 — base-substituted nucleosides, tautomer-robust
 # --------------------------------------------------------------------------- #
 @pytest.mark.parametrize("smiles,expected", [
     ("Cn1cnc2c(ncn2[C@@H]2O[C@H](CO)[C@@H](O)[C@H]2O)c1=N", "1-methyladenosine"),
@@ -147,7 +147,7 @@ def test_5_methylcytidine_deterministic():
 
 
 # --------------------------------------------------------------------------- #
-# CONTINUATION C1 — name-exact NP stereoparent catalog (P-101.2.7 Table 10.1)
+# CONTINUATION C1 — name-exact NP stereoparent catalog
 # --------------------------------------------------------------------------- #
 @pytest.mark.parametrize("smiles,expected", [
     ("CC(C)[C@H]1CC[C@H]2[C@@H](CC[C@H]3C(C)(C)CCC[C@]23C)C1", "abietane"),

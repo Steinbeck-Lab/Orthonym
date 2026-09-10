@@ -2,7 +2,7 @@
 Tests for IUPAC 2013 PIN cleanup of retained names (a phase-01).
 
 Verifies:
-- Acetone removed from RETAINED_NAMES (PIN is propan-2-one per P-31.1.3)
+- Acetone removed from RETAINED_NAMES (PIN is propan-2-one per
 - Cresol isomers removed (PINs are 2/3/4-methylphenol)
 - Isobutyric/isovaleric/pivalic acid removed (PINs are systematic names)
 - Adamantane added to BICYCLO_RETAINED_NAMES
@@ -198,10 +198,10 @@ class TestCubaneAdded:
 
 
 # ============================================================================
-# a phase (HYG-03) — RED tests: retained-name PIN corrections.
+# a phase  — RED tests: retained-name PIN corrections.
 # These FAIL now and are made green by Plan 167-02 (deny-based exclusion of the
 # audited corrections). Membership/value/!=archaic asserts are the RED drivers;
-# the structural-RT assert () is a correctness check (green now AND after,
+# the structural-RT assert  is a correctness check (green now AND after,
 # since OPSIN recognises both the archaic name and the systematic PIN).
 # Audit + targets: docs/retained_name_conflicts.md § "a phase".
 # ============================================================================
@@ -233,7 +233,7 @@ class TestErythreneRemoved:
     @pytest.mark.unit
     @pytest.mark.roundtrip
     def test_emitted_name_roundtrips(self):
-        """Whatever is emitted (target: buta-1,3-diene) must round-trip ()."""
+        """Whatever is emitted (target: buta-1,3-diene) must round-trip ."""
         if not _OPSIN_AVAILABLE:
             pytest.skip("OPSIN/Java not available")
         emitted = name_compound(self.SMILES)

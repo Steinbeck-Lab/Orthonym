@@ -3,10 +3,10 @@
 Parametrized over every entry in
 ``src/orthonym/data/fusion_components.py`` ``MONOCYCLIC_COMPONENTS``;
 each entry's ``seniority`` value is asserted to fall within the
-P-25.2.2.4 Jan 2022 errata expected tier range emitted by the audit
+ Jan 2022 errata expected tier range emitted by the audit
 script ``scripts/audit_benzo_fusion.py``.
 
-Tier ranges (STRICT — see internal notes):
+Tier ranges (STRICT — see 155-internal notes):
 
   * 40-49: 6-membered N-heterocycles
   * 50-59: 5-membered N-heterocycles
@@ -16,14 +16,14 @@ Tier ranges (STRICT — see internal notes):
   * 200: carbocycles
 
 The fixture file ``tests/fixtures/benzo_fusion/audit_c_results.json`` is
-the machine-readable mirror of ``155-AUDIT-C.md``; if the catalog grows
+the machine-readable mirror of ``internal notes-C.md``; if the catalog grows
 or shifts, regenerate via:
 
     python scripts/audit_benzo_fusion.py \\
         --out internal notes \\
         --json tests/fixtures/benzo_fusion/audit_c_results.json
 
-Source: internal notes; 155-AUDIT-C.md.
+Source: 155-internal notes; internal notes-C.md.
 """
 from __future__ import annotations
 
@@ -51,7 +51,7 @@ _AUDIT_TIERS = json.loads(_AUDIT_TIERS_PATH.read_text())
     ids=[r["name"] for r in _AUDIT_TIERS],
 )
 def test_component_seniority_in_tier(row):
-    """Every catalog entry's seniority falls within its P-25.2.2.4 tier."""
+    """Every catalog entry's seniority falls within its tier."""
     if row["classification"] == "NO-EXPECTED-TIER":
         pytest.skip(
             f"No P-25.2.2.4 expected tier defined for {row['name']!r} — "
@@ -68,9 +68,9 @@ def test_component_seniority_in_tier(row):
 
 @pytest.mark.unit
 def test_no_wrong_tier_post_fix():
-    """V18-155-AC-3 acceptance gate: zero WRONG-tier entries post-fix.
+    """V18-155- acceptance gate: zero WRONG-tier entries post-fix.
 
-    Cross-references 155-AUDIT-C.md Classification Summary; this test
+    Cross-references internal notes-C.md Classification Summary; this test
     pre-existing as a sentinel to detect future regressions or
     catalog growth that introduces band drift.
     """

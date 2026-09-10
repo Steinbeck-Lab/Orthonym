@@ -1,12 +1,12 @@
-"""Unit tests for Phase 146 _count_pcgs_in_parent (CD-01 resolution).
+"""Unit tests for a phase _count_pcgs_in_parent (resolution).
 
-Tests the PCG counting algorithm that resolves CD-01 per RESEARCH §2.3.
+Tests the PCG counting algorithm that resolves per RESEARCH
 A PCG counts when its attachment atom is inside parent_atom_indices OR
 bonded to an atom inside parent_atom_indices. Substituent PCGs (attachment
 neither inside parent nor bonded to parent atom) do NOT count.
 
-Source for algorithm: 146-RESEARCH.md §2.3 / 146-CONTEXT.md CD-01.
-Source for IUPAC rule: https://iupac.qmul.ac.uk/BlueBook/P4.html P-44.1.1
+Source for algorithm: internal notes / 146-internal notes.
+Source for IUPAC rule: https://iupac.qmul.ac.uk/BlueBook/P4.html
 """
 from types import SimpleNamespace
 
@@ -41,18 +41,18 @@ def _make_cand(parent_atom_indices):
 
 
 # ---------------------------------------------------------------------------
-# Test scenarios per CD-01 resolution
+# Test scenarios per resolution
 # ---------------------------------------------------------------------------
 
 class TestCountPCGsInParent:
-    """CD-01 algorithm: count PCGs whose attachment atom is INSIDE parent
+    """ algorithm: count PCGs whose attachment atom is INSIDE parent
     OR whose attachment atom has a NEIGHBOR inside parent.
 
-    Source: https://iupac.qmul.ac.uk/BlueBook/P4.html P-44.1.1
+    Source: https://iupac.qmul.ac.uk/BlueBook/P4.html
     """
 
     def test_implicit_pcg_attached_to_chain_parent(self):
-        """CD-01 case 1: butanoic acid CCCC(=O)O.
+        """ case 1: butanoic acid CCCC(=O)O.
         principal_group_atoms=[(3, 4, 5)] — attach=atom 3 (carbonyl C).
         parent_atom_indices={0,1,2,3} (4-carbon chain).
         Attach atom 3 IS in parent_set -> direct attachment -> count=1.
@@ -68,7 +68,7 @@ class TestCountPCGsInParent:
         )
 
     def test_explicit_pcg_neighbor_attachment(self):
-        """CD-01 case 2: nitrile substituent CC(C#N)CC.
+        """ case 2: nitrile substituent CC(C#N)CC.
         Atom indices: 0=C, 1=C, 2=C(of CN), 3=N, 4=C, 5=C.
         principal_group_atoms=[(2, 3)] — attach=atom 2 (the nitrile C).
         parent_atom_indices={0, 1, 4, 5} (excludes the nitrile C+N).
@@ -86,7 +86,7 @@ class TestCountPCGsInParent:
         )
 
     def test_pcg_on_substituent_not_attached_to_parent(self):
-        """CD-01 case 3: methyl propanoate CC(C)CC(=O)OC.
+        """ case 3: methyl propanoate CC(C)CC(=O)OC.
         Atom indices: 0=C, 1=C, 2=C, 3=C, 4=C(carbonyl), 5=O(=O), 6=O, 7=C.
         principal_group_atoms=[(4, 5, 6)] — attach=atom 4.
         parent_atom_indices={6, 7} (HYPOTHETICAL methoxy-side parent).
@@ -107,7 +107,7 @@ class TestCountPCGsInParent:
         )
 
     def test_pcg_truly_disconnected_from_parent(self):
-        """CD-01 case 3 alternate: PCG attach atom NEITHER in parent NOR
+        """ case 3 alternate: PCG attach atom NEITHER in parent NOR
         bonded to parent atom.
         Use methyl propanoate atoms but parent_atom_indices={0, 1, 2}
         (the isopropyl arm only). Attach atom 4 not in parent; atom 4's
@@ -125,7 +125,7 @@ class TestCountPCGsInParent:
         )
 
     def test_no_principal_group_returns_zero(self):
-        """CD-01 case 4: features.principal_group is None -> count=0."""
+        """ case 4: features.principal_group is None -> count=0."""
         features = _make_features(
             "CCCC(=O)O",
             principal_group=None,
@@ -137,7 +137,7 @@ class TestCountPCGsInParent:
         )
 
     def test_empty_principal_group_atoms_returns_zero(self):
-        """CD-01 case 5: principal_group_atoms=[] -> count=0."""
+        """ case 5: principal_group_atoms= -> count=0."""
         features = _make_features(
             "CCCC(=O)O",
             principal_group="carboxylic_acid",
@@ -149,7 +149,7 @@ class TestCountPCGsInParent:
         )
 
     def test_none_parent_atom_indices_returns_zero(self):
-        """CD-01 case 6: candidate.parent_atom_indices=None -> 0
+        """ case 6: candidate.parent_atom_indices=None -> 0
         (no-decision sentinel)."""
         features = _make_features(
             "CCCC(=O)O",
@@ -162,7 +162,7 @@ class TestCountPCGsInParent:
         )
 
     def test_multiple_pcgs_all_in_parent(self):
-        """CD-01 case 7: hexanedioic acid OC(=O)CCCCC(=O)O.
+        """ case 7: hexanedioic acid OC(=O)CCCCC(=O)O.
         Atom indices: 0=O, 1=C(carbonyl), 2=O, 3-6=C, 7=C(carbonyl), 8=O, 9=O.
         principal_group_atoms=[(1, 0, 2), (7, 8, 9)] — attach atoms 1 and 7.
         parent_atom_indices={1, 3, 4, 5, 6, 7} (the 6-carbon chain).
@@ -179,7 +179,7 @@ class TestCountPCGsInParent:
         )
 
     def test_multiple_pcgs_only_one_attaches(self):
-        """CD-01 case 8: multiple PCGs but only one attaches to parent.
+        """ case 8: multiple PCGs but only one attaches to parent.
         Use hexanedioic acid atoms but parent_atom_indices={1, 3, 4} only.
         Attach atom 1 IN parent -> +1.
         Attach atom 7 NOT in parent; its neighbors are {6, 8, 9} — none
@@ -197,7 +197,7 @@ class TestCountPCGsInParent:
         )
 
     def test_mol_attribute_missing_returns_zero(self):
-        """CD-01 case 9: features.mol is None -> count=0 (no exception)."""
+        """ case 9: features.mol is None -> count=0 (no exception)."""
         features = SimpleNamespace(
             mol=None,
             principal_group="carboxylic_acid",
@@ -209,7 +209,7 @@ class TestCountPCGsInParent:
         )
 
     def test_principal_group_atoms_contains_empty_tuple(self):
-        """CD-01 case 10: principal_group_atoms=[(), (3,4,5)] — empty
+        """ case 10: principal_group_atoms=[, (3,4,5)] — empty
         tuple skipped, only second tuple counted -> count=1."""
         features = _make_features(
             "CCCC(=O)O",
@@ -222,7 +222,7 @@ class TestCountPCGsInParent:
         )
 
     def test_indirect_attachment_via_carbonyl_oxygen(self):
-        """CD-01 algorithm coverage: attach atom NOT in parent but neighbor
+        """ algorithm coverage: attach atom NOT in parent but neighbor
         oxygen IS in parent. Tests that the neighbor check correctly walks
         through the PCG attach atom to the parent set.
 
@@ -243,7 +243,7 @@ class TestCountPCGsInParent:
         )
 
     def test_invalid_attach_atom_index_handled_gracefully(self):
-        """CD-01 defensive: attach atom index out of range for the mol
+        """ defensive: attach atom index out of range for the mol
         should be caught by the try/except and not raise."""
         features = _make_features(
             "CCCC(=O)O",

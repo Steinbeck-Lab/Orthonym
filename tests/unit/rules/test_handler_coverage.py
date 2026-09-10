@@ -1,4 +1,4 @@
-"""Tests for HandlerResult coverage metric (Phase 139 ARCH-06).
+"""Tests for HandlerResult coverage metric (a phase).
 
 Verifies the HandlerResult dataclass computes coverage correctly
 and is importable from the public API.

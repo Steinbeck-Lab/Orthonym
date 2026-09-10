@@ -1,7 +1,7 @@
-"""Wave-8 P8 unit tests: the P-26 phane PIN subsystem.
+"""Wave-8 P8 unit tests: the phane PIN subsystem.
 
 Per docs/superpowers/plans/2026-07-16-wave8-p8-phane.md: OPSIN 2.9 cannot
-parse ANY phane name (verified 2026-07-16 -- neither the P-26.2/.3
+parse ANY phane name (verified 2026-07-16 -- neither the /.3
 simplified-skeletal PIN nor the legacy bracket-prefix
 '[2.2]paracyclophane'), so there is no round-trip oracle for this
 subsystem. Verification is BB-name-exact (the verbatim `(PIN)` string quoted
@@ -49,7 +49,7 @@ from orthonym.rules.phane import (
 
 
 # ---------------------------------------------------------------------------
-# Task 8.2 -- amplification-prefix transform (P-26.2.2.1)
+# Task 8.2 -- amplification-prefix transform
 # ---------------------------------------------------------------------------
 
 
@@ -62,14 +62,14 @@ from orthonym.rules.phane import (
     ("furan", "furana"),      # no final 'e' -> add 'a'
     ("pyran", "pyrana"),
     ("pyridine", "pyridina"),
-    ("[1,2]oxazole", "[1,2]oxazola"),  # bracketed locants retained (P-26.4.2.2 note)
+    ("[1,2]oxazole", "[1,2]oxazola"),  # bracketed locants retained note)
 ])
 def test_amplification_prefix_transform(parent, expected):
     assert _amplification_prefix(parent) == expected
 
 
 # ---------------------------------------------------------------------------
-# Task 8.3 -- simplified skeletal-name builder (P-26.2.1)
+# Task 8.3 -- simplified skeletal-name builder
 # ---------------------------------------------------------------------------
 
 
@@ -93,7 +93,7 @@ def test_simplified_skeletal_name_fails_closed_for_von_baeyer_and_spiro():
 
 
 # ---------------------------------------------------------------------------
-# Task 8.4 -- multiplicative amplificant term di/bis (P-26.2.3)
+# Task 8.4 -- multiplicative amplificant term di/bis
 # ---------------------------------------------------------------------------
 
 
@@ -237,8 +237,8 @@ class TestAttachmentLocants:
 @pytest.mark.unit
 class TestBuildPhanePin:
     """BB-name-exact fixtures. `[2.2]paracyclophane` / `[2.2]metacyclophane`
-    are BB P-26.3.2.1 (:14947) / P-26.4.1.4 (:15024) `(PIN)` verbatim. The
-    [3.3]/[3.2] homologs apply the SAME cited rules (P-26.2.1/.3.1/.3.2/.3.2.1)
+    are BB (:14947) / (:15024) `(PIN)` verbatim. The
+    [3.3]/[3.2] homologs apply the SAME cited rules /.3.1/.3.2/.3.2.1)
     to already-topology-verified fixtures from
     tests/fixtures/cyclophane/{blue_book_examples,corpus_mined}.json --
     not independently BB-cited with these exact node counts, but derived by
@@ -279,7 +279,7 @@ class TestBuildPhanePin:
 
 @pytest.mark.unit
 def test_composite_locant_sort_key_matches_bb_heptachloro_order():
-    """BB P-26.4.3.3 (:15101) verbatim citation order:
+    """BB (:15101) verbatim citation order:
     '1(4),1(5),1(6),3,3,4(2),4(3)-heptachloro-...' (ASCII form of the
     superscript original `1⁴,1⁵,1⁶,3,3,4²,4³`). Sorting via
     `_composite_locant_sort_key` must reproduce this exact order: primary
@@ -303,7 +303,7 @@ def test_composite_locant_sort_key_rejects_malformed_input():
 
 @pytest.mark.unit
 def test_apply_skeletal_replacement_matches_bb_trithia_example():
-    """BB P-26.5.1 (:15155) `(PIN)`:
+    """BB (:15155) `(PIN)`:
     '2,4,6-trithia-1,7(1),3,5(1,4)-tetrabenzenaheptaphane'."""
     base_name = "1,7(1),3,5(1,4)-tetrabenzenaheptaphane"
     result = _apply_skeletal_replacement({2: "S", 4: "S", 6: "S"}, base_name)
@@ -311,7 +311,7 @@ def test_apply_skeletal_replacement_matches_bb_trithia_example():
 
 
 def test_apply_skeletal_replacement_orders_mixed_elements_by_bb_seniority():
-    """BB P-26.5.4.2 element seniority O>S>Se>Te>N>...; ledger example
+    """BB element seniority O>S>Se>Te>N>...; ledger example
     '2-thia-6-aza-1,4(1,4)-dibenzenacyclohexaphane' cites thia (S) before
     aza (N)."""
     base_name = "1,4(1,4)-dibenzenacyclohexaphane"
@@ -326,12 +326,12 @@ def test_apply_skeletal_replacement_orders_mixed_elements_by_bb_seniority():
 
 @pytest.mark.unit
 def test_phane_amplificant_seniority_key_matches_bb_worked_example_order():
-    """BB P-26.4.1.3 (:14998) worked example:
+    """BB (:14998) worked example:
     `1(8,5)-quinolina-4(1,4)-phenanthrena-7(1,4)-naphthalenacyclononaphane`
     -- quinoline (N-heterocycle) is senior to phenanthrene (3 all-carbon
-    rings), senior to naphthalene (2 all-carbon rings) on P-44.2.1; the most
+    rings), senior to naphthalene (2 all-carbon rings) on; the most
     senior amplificant gets the LOWEST superatom locant. Reuses the existing
-    P-44.2 `ring_system_score` (no reimplementation) to derive each
+     `ring_system_score` (no reimplementation) to derive each
     amplificant's seniority rank, then verifies `_phane_amplificant_seniority_key`
     sorts them into exactly the BB citation order."""
     from orthonym.rules.ring_selection import ring_system_score
@@ -385,7 +385,7 @@ def test_phane_formula_veto_rejects_none():
 @pytest.mark.unit
 def test_dispatch_emits_phane_pin():
     """Task 8.12 Step 1 acceptance test: production (gate-ON) now EMITS the
-    P-26 PIN for the anchor instead of 'unknown organic compound'."""
+     PIN for the anchor instead of 'unknown organic compound'."""
     from orthonym import Orthonym
 
     namer_on = Orthonym(style="pin")

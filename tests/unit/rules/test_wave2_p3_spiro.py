@@ -8,7 +8,7 @@ class TestWave2P3SpiroVerify:
     the engine + scorer edits in this plan."""
 
     @pytest.mark.parametrize("smiles,expected", [
-        ("C1CCC2(CC1)CC=CC2", "spiro[4.5]dec-2-ene"),   # P-31.1.5.1
+        ("C1CCC2(CC1)CC=CC2", "spiro[4.5]dec-2-ene"),   #
         ("O1CCCC12CCCCC2", "1-oxaspiro[4.5]decane"),    # heterospiro control
     ])
     def test_already_correct(self, smiles, expected):
@@ -18,8 +18,8 @@ class TestWave2P3SpiroVerify:
 @pytest.mark.unit
 class TestP24BranchedPolyspiro:
     def test_trispiro_superscript(self):
-        # P-24.2.3: superscript revisit locants are essential; without them the
-        # name is ambiguous (BB note at :10018).
+        #: superscript revisit locants are essential; without them the
+        # name is ambiguous (BB note at:10018).
         assert name_compound("C1CC12CCC1(CC1)CCC1(CC1)CC2") == \
             "trispiro[2.2.2^6.2.2^11.2^3]pentadecane"
 
@@ -31,7 +31,7 @@ class TestP24BranchedPolyspiro:
 @pytest.mark.unit
 class TestP24Dispiroter:
     def test_dispiroter_bicyclohexane(self):
-        # P-24.4.1: three identical bicyclo[3.1.0]hexane components, 2 spiro atoms.
+        #: three identical bicyclo[3.1.0]hexane components, 2 spiro atoms.
         assert name_compound("C12CC3(CC2C1)CC1C2(C1C3)C3CCCC32") == \
             "3,3':6',6''-dispiroter[bicyclo[3.1.0]hexane]"
 
@@ -39,7 +39,7 @@ class TestP24Dispiroter:
 @pytest.mark.unit
 class TestP24ThiaSpiroVonBaeyer:
     def test_thiaspiro_bicyclooctane_fluorene(self):
-        # P-24.5.2: 'a'-replacement prefix cited before spiro.
+        #: 'a'-replacement prefix cited before spiro.
         assert name_compound("C1=CC=CC=2C3=CC=CC=C3C3(C12)C1CCC(S3)CC1") == \
             "3-thiaspiro[bicyclo[2.2.2]octane-2,9'-fluorene]"
 
@@ -47,14 +47,14 @@ class TestP24ThiaSpiroVonBaeyer:
 @pytest.mark.unit
 class TestP24UnbranchedPolyspiroDifferent:
     def test_fluorene_cyclohexane_indene(self):
-        # P-24.6: unbranched polyspiro, three different components.
+        #: unbranched polyspiro, three different components.
         assert name_compound("C1=CC2(CCC3(CC2)c2ccccc2-c2ccccc23)c2ccccc21") == \
             "dispiro[fluorene-9,1'-cyclohexane-4',1''-indene]"
 
 
 @pytest.mark.unit
 class TestP24BranchedPolyspiroDifferent:
-    # P-24.7.2: branched polyspiro with different terminals around a central
+    #: branched polyspiro with different terminals around a central
     # component that carries >=3 spiro junctions. This target's central
     # component is the HETEROMONOCYCLE [1,5]dithiocane (a Hantzsch-Widman ring
     # name now emitted by _name_hw_monocycle_component), assembled by the
@@ -92,14 +92,14 @@ class TestP24BranchedPolyspiroDifferent:
 @pytest.mark.unit
 class TestP31SpiroVonBaeyerUnsaturation:
     def test_spirobi_bicyclononane_diene(self):
-        # P-31.1.5.2.1: ring 'ene'/'diene' cited AFTER the last bracket.
+        #: ring 'ene'/'diene' cited AFTER the last bracket.
         assert name_compound("C12CC3(CC(C=CC1)C2)CC2CC=CC(C3)C2") == \
             "3,3'-spirobi[bicyclo[3.3.1]nonane]-6,6'-diene"
 
 
 @pytest.mark.unit
 class TestP24LambdaMonocyclicTripleSpiro:
-    # P-24.8.1.3: three monocyclic rings sharing ONE nonstandard (lambda6 S)
+    #: three monocyclic rings sharing ONE nonstandard (lambda6 S)
     # spiro atom. Once the monocyclic-HW spiro-component namer landed (Wave2 D5a)
     # this resolves to the spiroter multiplicative form
     # ``1lambda6,1',1''-spiroter[thietane]`` (OPSIN-round-trippable, verified),
@@ -132,7 +132,7 @@ class TestP24LambdaSpirobiSpiroter:
 
 @pytest.mark.unit
 class TestP24LambdaSpiroDifferent:
-    # P-24.8.4.1: monospiro, DIFFERENT polycyclic components, >=1 with a λ spiro
+    #: monospiro, DIFFERENT polycyclic components, >=1 with a λ spiro
     # atom. BUILT (Wave2 D5a): _name_spiro_component names both the
     # [1,3,2]benzoxazaphosphole fused catalog component and the monocyclic-HW
     # [1,3,5,2]triazaphosphinine, and the spiro-VB core assembles the indicated-H
@@ -167,7 +167,7 @@ class TestP24LambdaSpiroDifferent:
 
 @pytest.mark.unit
 class TestP24LambdaUnbranchedPolyspiro:
-    # P-24.8.5: unbranched polyspiro, DIFFERENT components, >=1 λ spiro atom.
+    #: unbranched polyspiro, DIFFERENT components, >=1 λ spiro atom.
     # Terminals are heteromonocycles (thiane, thiolane) and the central is
     # benzo[1,2-c:4,5-c']dithiophene. BUILT (Wave2 D5a): the heteromonocycle
     # spiro-component namer names thiane/thiolane, the benzo[1,2-c:4,5-c']-

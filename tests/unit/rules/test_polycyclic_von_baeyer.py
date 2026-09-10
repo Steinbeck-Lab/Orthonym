@@ -4,10 +4,10 @@ Covers:
  - Classification predicate (is_higher_polycyclo): ≥4-ring AND
    single-ring-system AND ≥2 bridgeheads AND no spiro AND no aromatic
    AND not a natural product backbone AND not bicyclic / tricyclic.
- - Retained-name passthrough (): adamantane / norbornane / twistane
+ - Retained-name passthrough : adamantane / norbornane / twistane
    served by tricyclo.get_retained_tricyclo_name; new module is fallback
    only.
- - Cascade-step-6 supplier coverage invariant (/ a phase SC-7):
+ - Cascade-step-6 supplier coverage invariant (/ a phase):
    get_higher_polycyclo_iupac_locants returns Optional[Dict[int, int]]
    with FULL ring-atom coverage (or None — never partial).
  - Anti-canary: bicyclo / tricyclo / steroid / aromatic inputs MUST
@@ -28,10 +28,10 @@ state (this file committed BEFORE the module exists), all tests RED at
 import collection time. Task 2 commit flips them GREEN.
 
 Source:
- - 151-CONTEXT.md / / / / / /
- - 151-RESEARCH.md §"Existing Code Audit", §"OPSIN Compatibility Evidence"
- - 151-AUDIT-A.md verdict: THIN_WRAPPER
- - IUPAC 2013 Blue Book P-23.2.5 / P-23.3.
+ - 151-internal notes / / / / / /
+ - internal notes §"Existing Code Audit", §"OPSIN Compatibility Evidence"
+ - internal notes-A.md verdict: THIN_WRAPPER
+ - IUPAC 2013 Blue Book /.
 """
 from __future__ import annotations
 
@@ -49,7 +49,7 @@ from rdkit import Chem
 # Plan 151-01 Task 2 implements it. We defer the import to test bodies
 # so pytest collection succeeds (≥30 tests collected) and individual
 # tests fail with a clear ModuleNotFoundError until Task 2 lands. This
-# matches the audit-first cadence per CONTEXT.
+# matches the audit-first cadence per internal notes.
 
 def _vb_import():
     """Lazy import of the new module so pytest collection works in RED state."""
@@ -152,12 +152,12 @@ class TestRingCount:
 
     @pytest.mark.unit
     def test_norbornane_NOT_higher_polycyclo(self, norbornane):
-        # bicyclic anti-canary ()
+        # bicyclic anti-canary
         assert is_higher_polycyclo(norbornane) is False
 
     @pytest.mark.unit
     def test_bicyclo222_NOT_higher_polycyclo(self, bicyclo_222_octane):
-        # bicyclic anti-canary ()
+        # bicyclic anti-canary
         assert is_higher_polycyclo(bicyclo_222_octane) is False
 
     @pytest.mark.unit
@@ -187,7 +187,7 @@ class TestRingCount:
 
 
 # ============================================================================
-# TestRetainedNamePassthrough (+ AUTONOM §4)
+# TestRetainedNamePassthrough (+ AUTONOM)
 # ============================================================================
 
 
@@ -308,7 +308,7 @@ class TestBlueBookExamples:
         # Cardinality-only check: every named Blue Book example must yield
         # a non-empty descriptor that contains the cyclo-prefix matching
         # the ring count. Exact byte match is NOT required because the
-        # analyzer may legitimately emit an alternate P-23.2.5 form
+        # analyzer may legitimately emit an alternate form
         # (constitutionally identical, all valid IUPAC) per audit row 1
         # and row 4. OPSIN round-trip is the binding correctness oracle
         # (see TestRoundTripViaOPSIN below).
@@ -467,7 +467,7 @@ class TestRoundTripViaOPSIN:
 
 
 class TestNarrowExceptionsWR10:
-    """a phase-04 WR-10: bare except Exception eliminated per
+    """a phase-04: bare except Exception eliminated per
     CLAUDE.md /.claude/skills/fix-methodology.md no-band-aid policy."""
 
     @pytest.mark.unit
@@ -481,7 +481,7 @@ class TestNarrowExceptionsWR10:
         non_comment = "\n".join(
             L for L in src.split("\n") if not L.strip().startswith("#")
         )
-        # WR-10 lock — bare except Exception is forbidden
+        # lock — bare except Exception is forbidden
         assert "except Exception:" not in non_comment, (
             "WR-10 regression: bare 'except Exception:' reintroduced in "
             "polycyclic_von_baeyer.py. Use narrow exceptions per "

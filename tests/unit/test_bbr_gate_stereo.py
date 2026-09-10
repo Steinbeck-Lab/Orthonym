@@ -1,12 +1,12 @@
-"""Phase 169.7 BBR-GATE — RED gold-target tripwire (DEF-9) + gate-policy tests.
+"""a phase BBR-GATE — RED gold-target tripwire  + gate-policy tests.
 
-CONTEXT D-15/D-05/D-06/D-07. The SUB-03 OPSIN-parse validity gate currently
+internal notes ///. The OPSIN-parse validity gate currently
 suppresses IUPAC-correct stereo names that OPSIN's generation-side grammar
 cannot parse — a correctness inversion (audit Dim-08 §C). The verbatim Blue Book
 PIN ``(1s,4s)-cyclohexane-1,4-diol`` (lines 48111-48113) is produced correctly by
 the formatter but the gate turns it into ``unknown`` (GATE_SUPPRESSED).
 
-This RED tripwire is the executable form of the DEF-9 gold row. It is
+This RED tripwire is the executable form of the gold row. It is
 ``xfail(strict=True)`` so the moment Plan 04 makes the gate stereo-aware it
 XPASSES → hard error → the implementing plan removes the marker. Plan 04 ADDS the
 ``strip_stereo`` + constitutional-still-suppressed + radical-carve-out assertions
@@ -24,7 +24,7 @@ against the real OPSIN oracle in audit Dim-08 §C). Plan 04's fix is precisely:
 NO band-aids: the SHIPPED name keeps its stereo; the fix is a gate POLICY change
 (decide on WHERE OPSIN fails), not string post-processing.
 
-Gold row: DEF-9  O[C@H]1CC[C@@H](O)CC1 -> (1s,4s)-cyclohexane-1,4-diol  (P-93.5 / P-91)
+Gold row: O[C@H]1CC[C@@H](O)CC1 -> (1s,4s)-cyclohexane-1,4-diol /
 """
 
 import pytest
@@ -52,12 +52,12 @@ def gate_enabled_real_policy(monkeypatch):
     import orthonym.namer as namer
 
     monkeypatch.setattr(namer, "_DISABLE_VALIDITY_GATE", False, raising=False)
-    # Isolate the parseability + stereo-carve-out POLICY under test from the SELF-01
+    # Isolate the parseability + stereo-carve-out POLICY under test from the
     # constitutional layer (a separate gate, exercised by test_self_consistency_gate.py).
     monkeypatch.setattr(namer, "_SC_MODE", "off", raising=False)
     monkeypatch.setattr(namer, "_validity_gate_jar_present", lambda: True, raising=False)
     monkeypatch.setattr(namer, "_validity_gate_status", _simulated_opsin_status, raising=False)
-    # SELF-01 reorder: the gate consults name_to_smiles first. Mirror the simulated
+    # reorder: the gate consults name_to_smiles first. Mirror the simulated
     # verdict — None when OPSIN rejects (the stereo-block names), a SMILES otherwise.
     monkeypatch.setattr(
         namer, "_validity_gate_name_to_smiles",
@@ -67,7 +67,7 @@ def gate_enabled_real_policy(monkeypatch):
 
 @pytest.mark.unit
 def test_cyclohexanediol_not_gate_suppressed(gate_enabled_real_policy):
-    # DEF-9: the raw name is already correct; with the gate ENABLED and OPSIN
+    #: the raw name is already correct; with the gate ENABLED and OPSIN
     # rejecting the stereo block but PARSING the stereo-stripped form, Plan 04's
     # where-it-fails logic ships the full name. FIXED — permanent green tripwire.
     assert Orthonym().name("O[C@H]1CC[C@@H](O)CC1") == "(1s,4s)-cyclohexane-1,4-diol"

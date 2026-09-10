@@ -1,4 +1,4 @@
-"""v29 Task S — a von Baeyer descriptor is legal only if it REBUILDS the cage.
+""" — a von Baeyer descriptor is legal only if it REBUILDS the cage.
 
 The audit these tests cover used to reconstruct from
 ``PolycyclicDescriptor.bridge_info_list`` (internal bookkeeping) instead of from
@@ -7,7 +7,7 @@ cages (N<=12) and 1,623 corpus cages, that was wrong in both directions:
 
 * it refused **556** enumerated / **14** corpus cages whose emitted name was
   correct (``BridgeInfo.atoms`` for a secondary bridge is stored in the opposite
-  order to the bond path, because P-23.2.6.3 numbers it from the *higher*
+  order to the bond path, because numbers it from the *higher*
   bridgehead), and
 * it could pass a descriptor that does not describe the cage at all.
 
@@ -53,16 +53,16 @@ def _rebuild_smiles(descriptor):
 # The reconstructor is the oracle -- it must rebuild the Blue Book's own PINs.
 # --------------------------------------------------------------------------
 @pytest.mark.parametrize("descriptor,smiles", [
-    # P-23.2.3 example (:9589)
+    # example (:9589)
     ("bicyclo[2.2.1]", "C1CC2CCC1C2"),                        # norbornane
     ("bicyclo[3.2.1]", "C1CC2CCC(C1)C2"),
     ("bicyclo[4.4.0]", "C1CCC2CCCCC2C1"),                     # decalin
-    # P-23.2.5.1 / P-23.2.6 -- secondary bridges
+    # / -- secondary bridges
     ("tricyclo[3.3.1.1^3,7]", "C1C2CC3CC1CC(C2)C3"),          # adamantane
     ("tricyclo[2.2.1.0^2,6]", "C1C2CC3C1C3C2"),               # nortricyclene
     ("tricyclo[4.4.0.0^3,8]", "C1CC2CC3CCC2CC13"),            # twistane
     ("pentacyclo[4.2.0.0^2,5.0^3,8.0^4,7]", "C12C3C4C1C1C2C3C41"),   # cubane
-    # secondary bridge attached AT a main bridgehead (P-23.2.5.2 example :9635)
+    # secondary bridge attached AT a main bridgehead example:9635)
     ("tricyclo[9.3.3.1^1,11]", "C1CCCCC23CCCC(CCCC1)(CCC2)C3"),
 ])
 def test_reconstructor_rebuilds_blue_book_pins(descriptor, smiles):
@@ -71,9 +71,9 @@ def test_reconstructor_rebuilds_blue_book_pins(descriptor, smiles):
 
 
 def test_reconstructor_atom_and_bond_counts():
-    """Sizes are fixed by P-23.2.6.1.4 (bracket sum + 2 = skeletal atoms).
+    """Sizes are fixed by (bracket sum + 2 = skeletal atoms).
 
-    Cited as P-23.2.6.1.1 until v29 Task S2; that rule (``:9645``) fixes the
+    Cited as until; that rule (``:9645``) fixes the
     ring-count WORD, not the atom count. The atom count is ``:9651``.
     """
     assert reconstruct_von_baeyer_skeleton("bicyclo[2.2.1]")[0] == 7
@@ -99,7 +99,7 @@ def test_parse_accepts_both_secondary_typographies():
 
 @pytest.mark.parametrize("descriptor", [
     "bicyclo[2.2]",              # fewer than three primary numbers
-    "bicyclo[1.2.3]",            # not in descending order (P-23.2.2)
+    "bicyclo[1.2.3]",            # not in descending order
     "tricyclo[3.3.1.x^3,7]",     # non-numeric bridge length
     "tricyclo[3.3.1.1^3]",       # secondary bridge missing an attachment
     "adamantane",                # not a descriptor at all
@@ -129,9 +129,9 @@ def test_audit_accepts_correct_analysis(smiles, expected_descriptor):
 def test_audit_accepts_secondary_bridge_numbered_from_higher_bridgehead():
     """REGRESSION for the 556/14 false rejections.
 
-    P-23.2.6.3 (``BlueBookV2.md:9711``) "Numbering of secondary bridges":
+     (``the Blue Book``) "Numbering of secondary bridges":
     *"Each atom of a secondary bridge is numbered starting with the atom next to
-    the higher numbered bridgehead."*  The analyzer numbers it that way, but its
+    the higher numbered bridgehead."* The analyzer numbers it that way, but its
     ``BridgeInfo.atoms`` records the reverse order, so the previous audit walked
     a non-bonded pair and refused this perfectly correct cage.
     """
@@ -147,12 +147,12 @@ def test_audit_accepts_secondary_bridge_numbered_from_higher_bridgehead():
 def test_audit_rejects_bridge_dropping_descriptor():
     """The live defect this floor exists for.
 
-    ``_analyze_impl`` detects the P-23.2.6.1.4 violation (``:9651`` -- the
+    ``_analyze_impl`` detects the violation (``:9651`` -- the
     bracket sum + 2 must equal the alkane stem) and used to only ``logger.error``
     it, while ``analyze``'s fallback branch ran no validity check at all. The
     result is a name whose brackets account for 11 atoms while its own stem says
     12 -- and with both OPSIN gates off (their documented no-Java state) it
-    shipped. v29 Task S2 wired this audit into ``analyze`` and the three
+    shipped. wired this audit into ``analyze`` and the three
     name-producers, so that molecule now abstains; the audit's own verdict,
     asserted here, is unchanged.
     """
@@ -180,8 +180,8 @@ def test_audit_rejects_wrong_size_descriptor():
 def test_audit_rejects_wrong_ring_count_word(wrong_word):
     """The ring-count word is part of the name and must match the skeleton.
 
-    P-23.1.9, under P-23.1 "DEFINITIONS AND TERMINOLOGY"
-    (``BlueBookV2.md:9558``): *"A 'polycyclic system' contains a number of rings
+    , under "DEFINITIONS AND TERMINOLOGY"
+    (``the Blue Book``): *"A 'polycyclic system' contains a number of rings
     equal to the minimum number of scissions required to convert the system into
     an acyclic skeleton. The number of rings is indicated by the nondetachable
     prefix 'bicyclo' (not dicyclo), 'tricyclo', 'tetracyclo', etc."*

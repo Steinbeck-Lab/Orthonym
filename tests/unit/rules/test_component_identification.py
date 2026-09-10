@@ -1,7 +1,7 @@
 """
 Unit tests for monocyclic component identification in fusion naming.
 
-Tests that _identify_ring_name() correctly distinguishes:
+Tests that _identify_ring_name correctly distinguishes:
 - Carbocyclic rings (benzene, cyclopentadiene)
 - Single-heteroatom rings (furan, thiophene, pyrrole, pyridine)
 - 2-heteroatom 5-membered positional isomers (imidazole/pyrazole, oxazole/isoxazole, thiazole/isothiazole)
@@ -301,7 +301,7 @@ class TestParentChildSeniority:
 # ============================================================================
 
 class TestPatternMatching:
-    """Tests for get_component_by_pattern() lookup."""
+    """Tests for get_component_by_pattern lookup."""
 
     def test_benzene_pattern(self):
         """6-membered no-heteroatom -> benzene."""

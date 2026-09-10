@@ -26,7 +26,7 @@ from orthonym.data.sugar_names import (
 # ============================================================================
 
 class TestSugarLookup:
-    """Tests for lookup_sugar() -- canonical SMILES to retained name."""
+    """Tests for lookup_sugar -- canonical SMILES to retained name."""
 
     def test_alpha_d_glucose_lookup(self):
         """α-D-glucopyranose lookup returns correct tuple."""
@@ -103,7 +103,7 @@ class TestSugarLookup:
 # ============================================================================
 
 class TestGlycosyloxyPrefix:
-    """Tests for sugar_to_glycosyloxy_prefix() formatting."""
+    """Tests for sugar_to_glycosyloxy_prefix formatting."""
 
     def test_glucose_prefix(self):
         """β-D-glucopyranose -> β-D-glucopyranosyloxy."""
@@ -188,7 +188,7 @@ class TestOpsinCarbohydrateIntegration:
     def test_opsin_carbohydrate_integration_sorbitol(self):
         """The sorbitol structure resolves to its PIN retained name D-glucitol.
 
-        W5-A1 (P-102.5.6.5): the hand-curated ACYCLIC_PIN_SUGAR_NAMES entry
+        W5-A1: the hand-curated ACYCLIC_PIN_SUGAR_NAMES entry
         pre-empts the OPSIN 'sorbitol' simpleGroup synonym, so lookup_sugar now
         returns the alditol PIN ('D', 'glucitol') rather than the deprecated
         'sorbitol'. The structure is still lookupable (the point of the OPSIN

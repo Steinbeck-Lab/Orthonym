@@ -15,7 +15,7 @@ the stem and the spiro carbon lands on a valid carbon locant; the all-carbon
 case keeps the legacy walk (which matches the name-builder's carbocyclic hydro
 numbering, whereas compute_fused_numbering can pick a desyncing automorphism).
 
-Governing rules: IUPAC 2013 P-25.3.1.3 (fused-ring numbering), P-24.5.1.
+Governing rules: IUPAC 2013 (fused-ring numbering),.
 """
 import pytest
 from rdkit import Chem

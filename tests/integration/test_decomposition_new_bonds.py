@@ -1,9 +1,9 @@
-"""Integration tests for new bond type decomposition (Phase 87).
+"""Integration tests for new bond type decomposition (a phase).
 
 Tests the three new assembler functions (thioester, phosphodiester, sulfonamide)
 both at the unit level (direct function calls) and end-to-end (try_decompose).
 
-Phase 87 Plan 03 additions:
+a phase Plan 03 additions:
 - Thioester end-to-end tests
 - Sulfonamide end-to-end tests
 - Phosphodiester end-to-end tests
@@ -200,7 +200,7 @@ class TestSulfonamideAssembly:
 
 @pytest.mark.integration
 class TestEndToEndDecomposition:
-    """End-to-end tests calling try_decompose() on representative molecules."""
+    """End-to-end tests calling try_decompose on representative molecules."""
 
     def setup_method(self):
         _fragment_guard.visited = set()
@@ -236,7 +236,7 @@ class TestEndToEndDecomposition:
 
 
 # ============================================================================
-# Phase 87 Plan 03: Comprehensive end-to-end tests
+# a phase Plan 03: Comprehensive end-to-end tests
 # ============================================================================
 
 
@@ -337,7 +337,7 @@ class TestPhosphodiesterEndToEnd:
 
 
 # ============================================================================
-# Combined multi-bond decomposition (SC-8 validation)
+# Combined multi-bond decomposition (validation)
 # ============================================================================
 
 
@@ -384,8 +384,8 @@ class TestCombinedMultiBondDecomposition:
         )
 
         # 2. Decomposition may return None due to depth limit on fragment naming.
-        #    The key validation is that bond detection works correctly (above).
-        #    If decomposition succeeds, the result should be a real name.
+        # The key validation is that bond detection works correctly (above).
+        # If decomposition succeeds, the result should be a real name.
         result = try_decompose(mol)
         if result is not None:
             assert result != "unknown", (
@@ -449,7 +449,7 @@ class TestCoverageGate:
 
         This was the key insight from Plan 02: functional class names are
         inherently compact (0.6-0.8 chars/HA). With tiered thresholds
-        (Phase 099), ester bond type uses 0.6 threshold.
+        (a phase), ester bond type uses 0.6 threshold.
         """
         mol = _mol("CCCCCCCCCCCCCCCC(=O)Oc1ccccc1")  # phenyl palmitate, 24 HA
         # "phenyl palmitate" = 16 chars for 24 HA = 0.67 chars/HA > 0.6
@@ -463,7 +463,7 @@ class TestCoverageGate:
 
 @pytest.mark.integration
 class TestDecompositionRegressionGuard:
-    """Verify existing decomposition capabilities still work after Phase 87."""
+    """Verify existing decomposition capabilities still work after a phase."""
 
     def setup_method(self):
         _fragment_guard.visited = set()
@@ -505,7 +505,7 @@ class TestDecompositionRegressionGuard:
 
 
 # ============================================================================
-# Thioether and secondary amine bond detection tests (DECO-27 / D-03)
+# Thioether and secondary amine bond detection tests (/)
 # ============================================================================
 
 

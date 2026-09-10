@@ -1,4 +1,4 @@
-"""Phase 0c Task 3: P8 -- atom-indexed stereo completeness/correctness.
+"""a phase Task 3: P8 -- atom-indexed stereo completeness/correctness.
 
 Every fixture here is atom-indexed on purpose: the molecule's real CIP labels
 are computed once (via ``collect_stereodescriptors``/``terminal_fragment_name``,
@@ -121,7 +121,7 @@ def test_no_leading_block_and_no_map_is_silent():
 
 # ---------------------------------------------------------------------------
 # (d) Second check: a PREFIX binding's own embedded (nE)/(nZ) block, using a
-# REAL embedded-E/Z witness (the shipped v30 internal-C=C acyl lever):
+# REAL embedded-E/Z witness (the shipped internal-C=C acyl lever):
 # C/C=C/C(=O)N -> terminal_fragment_name -> "(3E)-2-oxo-1-azapent-3-en-1-yl".
 # ---------------------------------------------------------------------------
 _EZ_MOL = Chem.MolFromSmiles("C/C=C/C(=O)N")
@@ -171,7 +171,7 @@ def test_d_fabricated_descriptor_with_no_real_bond_is_mismatch():
 def test_p8_findings_are_warn_severity_in_audit_mode():
     """Part C: audit-only this task -- P8 findings must never flip ``ok`` to
     False under mode='audit' (the mode every production call site uses), or
-    T4 emissions would change this round."""
+     emissions would change this round."""
     name = "3-bromo-2-chlorobutane"  # descriptor dropped -> real P8 finding
     p = bs.verify_spine(_MOL, _parent_scope_spine(name), name, mode="audit")
     stereo_findings = [f for f in p.findings if f.code.startswith("STEREO")]
@@ -190,14 +190,14 @@ def test_p8_findings_escalate_to_error_in_strict_mode():
 
 
 # ---------------------------------------------------------------------------
-# Phase 0c Task 4: the 8 dev500 false positives Task 3's diagnostic found,
+# a phase Task 4: the 8 a dev split false positives Task 3's diagnostic found,
 # root-caused to 3 bugs in P8's OWN parser (never a molecule defect). Each
 # fixture below reproduces the BUG SHAPE via a hand-built minimal molecule
 # (the file's own established convention -- ground truth computed via
 # ``collect_stereodescriptors``/``terminal_fragment_name``, never hand-
-# guessed), with the real dev500 witness (SMILES + emitted name) quoted for
+# guessed), with the real a dev split witness (SMILES + emitted name) quoted for
 # traceability. All 8 witnesses were re-verified directly against these fixes
-# by a dev500 best-effort diagnostic sweep before landing (0 confident P8
+# by a a dev split best-effort diagnostic sweep before landing (0 confident P8
 # findings, down from 8; see the Task 4 report).
 # ---------------------------------------------------------------------------
 
@@ -246,7 +246,7 @@ def test_p8b_finds_embedded_ez_mid_token_not_only_at_index_zero():
 
 def test_p8a_finds_leading_block_after_functional_class_word():
     """Root cause 3 (1 of the 8): a functional-class TWO-WORD ester name
-    (P-65.6.3.2.1) puts the ester alkyl group's own word before the parent's
+     puts the ester alkyl group's own word before the parent's
     leading descriptor block, so the position-0 anchor finds nothing and
     P8a misreported every real centre as MISSING.
 
@@ -280,7 +280,7 @@ def test_p8a_selects_parent_block_when_first_word_has_its_own_stereo():
     mistaken for the parent's block. "First non-empty block found" used to
     return the alkyl word's own descriptor and never reach the parent's
     real block, reporting all 3 real parent centres MISSING and (once
-    escalated) voiding a fully correct T4 candidate.
+    escalated) voiding a fully correct candidate.
 
     Real witness:
     ``CC[C@]12C=CCN3CC[C@]4(C(=C(C(=O)O[C@@H](C)CC)C1)Nc1ccccc14)[C@@H]32``
@@ -358,7 +358,7 @@ def test_p8a_no_false_mismatch_when_achiral_parent_precedes_by_foreign_word():
     (``butanoate``, achiral -- ``expected_set`` is empty) has no leading
     block of its own; the ONLY block anywhere in the string is the pentyl
     word's own ``(2S)``. ADJACENCY selection must recognise this block does
-    NOT sit at the parent's own word boundary and return ``[]`` for the
+    NOT sit at the parent's own word boundary and return ```` for the
     parent -- an empty ``emitted`` against an empty ``expected_set`` is a
     clean pass, not a fabricated mismatch.
     """
@@ -375,7 +375,7 @@ def test_p8a_no_false_mismatch_when_achiral_parent_precedes_by_foreign_word():
 
 
 def test_p8a_still_flags_genuine_missing_when_parent_has_centres_but_no_block():
-    """Negative control: ``[]`` for "no block at the parent's own word" must
+    """Negative control: ```` for "no block at the parent's own word" must
     NOT become a blanket pass when the parent DOES have real centres --
     only when it genuinely has none. Real centres are
     ``{(2,'S'),(3,'R')}``; the name has a foreign ``(5R)-pentyl`` word but
@@ -427,7 +427,7 @@ def test_p8b_still_flags_genuine_mismatch_after_the_ez_only_fix():
 
 
 # ---------------------------------------------------------------------------
-# Task 3 review Minor: a single-centre P-14.3.4 locant-omitted descriptor
+# Task 3 review Minor: a single-centre locant-omitted descriptor
 # (``(R)-...`` instead of ``(2R)-...``) must resolve correctly, not read as
 # BOTH a missing real pair and a mismatched fabricated one. Latent today
 # (the formatter always emits the locant) but must not be a landmine for the
@@ -480,9 +480,9 @@ def test_p8_locant_omitted_wrong_letter_still_mismatches():
 
 
 # ---------------------------------------------------------------------------
-# Phase 0c Task 4 Part C: the stereo+charge axis promotion mechanism.
+# a phase Task 4 Part C: the stereo+charge axis promotion mechanism.
 # ``escalate=STRICT_STEREO_CHARGE_AXES`` must force P8's codes to "error"
-# under ``mode="audit"`` (the mode the T4 wiring actually keeps), without
+# under ``mode="audit"`` (the mode the wiring actually keeps), without
 # needing a full ``mode="strict"`` flip.
 # ---------------------------------------------------------------------------
 

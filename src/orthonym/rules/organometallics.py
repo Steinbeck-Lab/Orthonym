@@ -1,9 +1,9 @@
 """
-IUPAC P-69 organometallic seniority + naming rules (a phase).
+IUPAC organometallic seniority + naming rules (a phase).
 
 This module defines ORGM-specific seniority cascade SEPARATE from the
-P-43 carbon-organic seniority in src/orthonym/rules/seniority.py per
-CONTEXT hard invariant (ZERO edits to seniority.py).
+ carbon-organic seniority in src/orthonym/rules/seniority.py per
+internal notes hard invariant (ZERO edits to seniority.py).
 
 The two cascades NEVER share data structures; the only common file is
 src/orthonym/data/organometallics.py (NEW; ORGM-exclusive).
@@ -11,7 +11,7 @@ src/orthonym/data/organometallics.py (NEW; ORGM-exclusive).
 Anti-patterns to avoid (PATTERNS lines 256-259):
 - forbids any import path pointing at rules/seniority (relative
   ..rules dot-seniority or absolute orthonym dot rules dot seniority);
-  this enforces ZERO cross-contamination with the P-43 carbon-organic
+  this enforces ZERO cross-contamination with the carbon-organic
   seniority cascade. The grep gate in Plan-02 task 02-03 asserts neither
   import line exists in this module.
 - NEVER add ORGM entries to the existing SENIORITY_ORDER list in
@@ -20,7 +20,7 @@ Anti-patterns to avoid (PATTERNS lines 256-259):
   assemble_organometallic_name(...) — recursion path is
   OUTER CFR → handler → rules → data; no upward call.
 
-a phase (first scope-expansion phase per ADR-19-07).
+a phase (first scope-expansion phase per -07).
 """
 
 from __future__ import annotations
@@ -30,7 +30,7 @@ from typing import Any, Dict, List, Optional, Tuple
 from ..assembly.name_tree import NameTreeNode
 
 # Import from data layer only; forbids cross-contamination with
-# the P-43 seniority cascade (no import of rules dot seniority).
+# the seniority cascade (no import of rules dot seniority).
 from ..data.organometallics import (
     LIGAND_ETA_DEFAULTS,
     LIGAND_NAMES,
@@ -38,7 +38,7 @@ from ..data.organometallics import (
 )
 from ..data.organometallics import RETAINED_METALLOCENES  # noqa: F401 re-exported: imported FROM this module by assembly/handlers/organometallic.py, scripts/verify_orgm_canary.py
 
-# a phase Stock-notation Roman numerals (scope -3.. +8 per CONTEXT)
+# a phase Stock-notation Roman numerals (scope -3.. +8 per internal notes)
 _ROMAN_NUMERALS: Dict[int, str] = {
     0: '0', 1: 'I', 2: 'II', 3: 'III', 4: 'IV',
     5: 'V', 6: 'VI', 7: 'VII', 8: 'VIII',
@@ -49,8 +49,8 @@ _ROMAN_NUMERALS: Dict[int, str] = {
 def _to_roman(n: int) -> str:
     """Stock-notation oxidation state in Roman numerals.
 
-    Per CONTEXT: a phase scope is -3..+8. Raises ValueError outside
-    that range (caller catches per CONTEXT honest-fail-on-data).
+    Per internal notes: a phase scope is -3..+8. Raises ValueError outside
+    that range (caller catches per internal notes honest-fail-on-data).
     """
     if n not in _ROMAN_NUMERALS:
         raise ValueError(
@@ -59,7 +59,7 @@ def _to_roman(n: int) -> str:
     return _ROMAN_NUMERALS[n]
 
 
-# Multiplicative prefixes for simple ligand counts per Salzer §5.2.
+# Multiplicative prefixes for simple ligand counts per Salzer
 _SIMPLE_MULTIPLICATIVE_PREFIXES: Dict[int, str] = {
     1: '',
     2: 'di',
@@ -91,7 +91,7 @@ _HALIDE_LIGAND_TO_HALIDE_WORD: Dict[str, str] = {
 def _ligand_name_from_atoms(mol: Any, atom_indices: Tuple[int, ...]) -> Optional[str]:
     """Identify the IUPAC name of an alkyl/aryl ligand from its atom indices.
 
-    Recognised ligands (a phase scope; per LIGAND_NAMES + AUDIT § 2):
+    Recognised ligands (a phase scope; per LIGAND_NAMES + AUDIT):
     - methyl (1 C, all sp³)
     - ethyl (2 C, all sp³)
     - propyl / n-propyl (3 C, all sp³, linear)
@@ -119,11 +119,11 @@ def _ligand_name_from_atoms(mol: Any, atom_indices: Tuple[int, ...]) -> Optional
         return 'phenyl'
 
     # Ethenyl (CH2=CH-): a clean 2-carbon σ-ligand joined by a C=C double
-    # bond. P-31.1.4.3.4 — 'ethenyl' is the PIN substituent prefix ('vinyl'
+    # bond. — 'ethenyl' is the PIN substituent prefix ('vinyl'
     # is retained, general-nomenclature only; both OPSIN-RT). This case was
     # listed in the docstring but the body never implemented it, so C=C[M]
     # silently collapsed to 'ethyl' — a structure-loss bug that dropped the
-    # double bond (→ a different molecule, SELF-01-suppressed in production).
+    # double bond (→ a different molecule, -suppressed in production).
     # Scope is the clean 2-carbon terminal vinyl ONLY; any larger / branched /
     # internal unsaturated ligand stays None (fail-closed) — not yet
     # confidently nameable.
@@ -159,7 +159,7 @@ def _ligand_name_from_atoms(mol: Any, atom_indices: Tuple[int, ...]) -> Optional
     return None
 
 
-# (P-68.2): a bare -OH/-NH2/-SH bonded DIRECTLY to a Group-14
+#: a bare -OH/-NH2/-SH bonded DIRECTLY to a Group-14
 # parent-hydride centre (Si/Ge/Sn/Pb) is a principal characteristic group, named
 # with a substitutive suffix on the hydride stem (silanol/silanamine/silanethiol)
 # — NOT a ligand. element-Z + H-count -> the suffix word.
@@ -171,23 +171,23 @@ _GROUP14_PRINCIPAL_SUFFIX: Dict[Tuple[int, int], str] = {
 
 #: the substitutive -ol/-amine/-thiol suffix mode is Group-14 ONLY
 # (Si/Ge/Sn/Pb). Boron is ALSO a 'hydride_parent' naming system but its hydroxy
-# acid is named with the boronic/borinic-acid characteristic group (P-68.1/P-68.3,
+# acid is named with the boronic/borinic-acid characteristic group /,
 # e.g. phenylboronic acid), NOT 'phenylboranediol' — so B must be EXCLUDED from
 # the principal-group diversion and left to cascade to the boronic-acid handler.
 _GROUP14_SUFFIX_ELEMENTS = frozenset({'Si', 'Ge', 'Sn', 'Pb'})
 
-# Simple contracted alkoxy prefixes (P-29.3.1): named -oxy substituents that are
+# Simple contracted alkoxy prefixes: named -oxy substituents that are
 # NOT complex and take NO enclosing marks (methoxysilanetriol, not
 # '(methoxy)silanetriol'). Compound -oxy prefixes (acyloxy/aryloxy/cyclyl-oxy such
 # as 'acetyloxy'/'phenoxy'/'oxiranylmethoxy') stay complex -> parenthesized. The
 # ligand namer's older ``name.endswith('oxy')`` blanket-wrapped these simple
-# alkoxy names too; this whitelist restores P-16.5.1.1 (simple alkoxy = no marks).
+# alkoxy names too; this whitelist restores (simple alkoxy = no marks).
 _SIMPLE_ALKOXY_PREFIXES = frozenset({'methoxy', 'ethoxy', 'propoxy', 'butoxy'})
 
 
 def _is_complex_ligand_oxy(name: str) -> bool:
     """True iff a ligand name is a COMPOUND -oxy prefix that needs enclosing marks
-    (P-16.3.3): ends in 'oxy' but is not one of the simple contracted alkoxy names
+    : ends in 'oxy' but is not one of the simple contracted alkoxy names
     (methoxy/ethoxy/propoxy/butoxy). 'acetyloxy'/'phenoxy'/'oxiranylmethoxy' ->
     True; 'methoxy'/'ethoxy' -> False."""
     return name.endswith('oxy') and name.lower() not in _SIMPLE_ALKOXY_PREFIXES
@@ -213,16 +213,16 @@ def _principal_suffix_for_ligand(mol: Any, lg: Any) -> Optional[str]:
     return _GROUP14_PRINCIPAL_SUFFIX.get((atom.GetAtomicNum(), atom.GetTotalNumHs()))
 
 
-# === ORGM_LIGAND_ORDER (Salzer 1999 §5.2 alphabetic with multiplicatives ignored) ===
-# This is NOT the carbon-organic seniority of P-43 — that stays UNTOUCHED
-# in src/orthonym/rules/seniority.py per CONTEXT.
+# === ORGM_LIGAND_ORDER (Salzer 1999 alphabetic with multiplicatives ignored) ===
+# This is NOT the carbon-organic seniority of — that stays UNTOUCHED
+# in src/orthonym/rules/seniority.py per internal notes.
 #
-# Used for alphabetizing ligands in coordination names per RESEARCH §1.3.
+# Used for alphabetizing ligands in coordination names per RESEARCH
 # Multiplicative prefixes (di-, tri-, tetra-, bis-, tris-, tetrakis-)
 # are IGNORED for alphabetization; structural prefixes (cyclo-, η, κ, μ)
 # are INCLUDED.
 ORGM_LIGAND_ORDER: List[str] = [
-    # Alphabetical ligand names per Salzer 1999 §5.2
+    # Alphabetical ligand names per Salzer 1999
     'allyl',
     'benzene',
     'bromido',
@@ -244,9 +244,9 @@ ORGM_LIGAND_ORDER: List[str] = [
 ]
 
 
-# === METAL_OXIDATION_STATE_HINTS (per CONTEXT + AUDIT § 6) ===
+# === METAL_OXIDATION_STATE_HINTS (per internal notes + AUDIT) ===
 # (metal_symbol, ligand_class) → {default_state, stock_required, iupac_cite}
-# Stock notation rule per Salzer 1999 §3.2 + Red Book IR-10.
+# Stock notation rule per Salzer 1999 + Red Book.
 METAL_OXIDATION_STATE_HINTS: Dict[Tuple[str, str], Dict[str, Any]] = {
     # Tier 1 metallocenes (Cp2 ligand class; Stock required in systematic ONLY)
     ('Fe', 'Cp2'): {'default_state': 2, 'stock_required_systematic': True,
@@ -267,7 +267,7 @@ METAL_OXIDATION_STATE_HINTS: Dict[Tuple[str, str], Dict[str, Any]] = {
                     'stock_required_pin': False, 'iupac_cite': 'Salzer §5.4'},
     ('Fe', 'Cp2_cation'): {'default_state': 3, 'stock_required_systematic': True,
                             'stock_required_pin': False, 'iupac_cite': 'Salzer §5.4'},
-    # Tier 2 metal carbonyls (always include Stock per Salzer §6)
+    # Tier 2 metal carbonyls (always include Stock per Salzer)
     ('Fe', 'CO5'): {'default_state': 0, 'stock_required_systematic': True,
                     'stock_required_pin': False, 'iupac_cite': 'Salzer §6'},
     ('Ni', 'CO4'): {'default_state': 0, 'stock_required_systematic': True,
@@ -318,16 +318,16 @@ METAL_OXIDATION_STATE_HINTS: Dict[Tuple[str, str], Dict[str, Any]] = {
                        'stock_required_pin': False, 'iupac_cite': 'Salzer §5+§6'},
     ('Mn', 'Cp_CO3'): {'default_state': 1, 'stock_required_systematic': True,
                        'stock_required_pin': False, 'iupac_cite': 'Salzer §5+§6'},
-    # Cycloheptatrienyl-Mn(CO)3 — Mn in +1 oxidation state per Salzer §5+§6
+    # Cycloheptatrienyl-Mn(CO)3 — Mn in +1 oxidation state per Salzer +
     ('Mn', 'CHT_CO3'): {'default_state': 1, 'stock_required_systematic': True,
                         'stock_required_pin': False, 'iupac_cite': 'Salzer §5+§6'},
 }
 
 
-# === METAL_RANKING_FOR_PARENT_SELECTION (per CONTEXT) ===
+# === METAL_RANKING_FOR_PARENT_SELECTION (per internal notes) ===
 # When multiple metals present, which becomes the central-atom parent:
 # defaults to highest-oxidation-state metal; ties broken by atomic number.
-# a phase defers polynuclear bridges to a phase.3 — this constant
+# a phase defers polynuclear bridges to a phase — this constant
 # is present for forward compatibility; multinuclear compounds return None
 # from name_organometallic per Risk R-08 mitigation.
 METAL_RANKING_FOR_PARENT_SELECTION: Dict[str, int] = {
@@ -340,7 +340,7 @@ METAL_RANKING_FOR_PARENT_SELECTION: Dict[str, int] = {
     'Ru': 44, 'Rh': 45, 'Pd': 46, 'Os': 76, 'Ir': 77, 'Pt': 78,
 }
 
-# W8-P9 Task 9.4 (P-69.2.3): transition metals (Groups 3-12, per METAL_NAMES
+# W8-P9 Task 9.4: transition metals (Groups 3-12, per METAL_NAMES
 # naming_system=='metal_direct') that get the NEW additive sigma-coordination
 # branch when bearing both anionic and organic ligands. Deliberately EXCLUDES
 # Zn/Cd/Hg (Group 12) -- those already have an established 'alkyl2' ligand
@@ -359,7 +359,7 @@ def select_ligand_naming(ligand_group: Any, hapticity: int,
     """Generate the IUPAC name for a single ligand with η-notation.
 
     STUB BODY (Plan-02): returns empty string. Plan-03 implements per
-    RESEARCH §1.3 + AUDIT § 2 SMARTS catalog.
+    RESEARCH + AUDIT SMARTS catalog.
 
     Algorithm (Plan-03 implementation):
     1. Look up ligand_group.ligand_canonical_smiles in LIGAND_NAMES.
@@ -381,7 +381,7 @@ def select_ligand_naming(ligand_group: Any, hapticity: int,
 # A ligand whose fragment formula ≠ its name's reference formula fails the veto,
 # so the assembler declines and the cascade abstains ("<metal> compound (not
 # supported)") rather than ship a name for atoms it does not describe —
-# organometallics are out of scope (P-69). Only the π-ligand names can mismatch
+# organometallics are out of scope. Only the π-ligand names can mismatch
 # (σ-ligands are named from the fragment itself and conserve by construction, and
 # the metal + charge partition is a tautology of metal_complex.formal_charges).
 _PI_LIGAND_REFERENCE_FORMULA: Dict[str, Dict[str, int]] = {
@@ -441,20 +441,20 @@ def _organometallic_conserves(metal_complex: Any, mol: Any) -> bool:
 def assemble_organometallic_name(metal_complex: Any, mol: Any,
                                   style: str = "pin"
                                   ) -> Optional[Tuple[str, str, List[Any]]]:
-    """Assemble systematic IUPAC name for a metal complex per Salzer 1999 §5.
+    """Assemble systematic IUPAC name for a metal complex per Salzer 1999
 
     Plan-03 implementation: Tier-1 Cp2 metallocene branch (commit 03-01).
     Subsequent commits 03-02/03/04 add Tier-3/2/4 branches.
 
     Returns: (full_name, metal_name_part, ligand_tree_nodes) per
-    RESEARCH §4.3 lines 799-815. The handler wraps this in NameTreeNode.
+    RESEARCH lines 799-815. The handler wraps this in NameTreeNode.
 
     Returns None to signal cascade-continuation when:
-    - metal_complex.is_multimetal (a phase.3 deferred per Risk R-08)
+    - metal_complex.is_multimetal (a phase deferred per Risk R-08)
     - Stock-notation lookup fails for the (metal, ligand_class) tuple
     - The compound's topology doesn't match any tier branch yet
     """
-    # Risk R-08: defer multinuclear bridges to a phase.3
+    # Risk R-08: defer multinuclear bridges to a phase
     if metal_complex.is_multimetal:
         return None
 
@@ -470,7 +470,7 @@ def assemble_organometallic_name(metal_complex: Any, mol: Any,
     metal_charge = metal_complex.formal_charges[0]
     ligand_groups = metal_complex.ligand_groups
 
-    # === TIER-2 dispatch: mononuclear metal carbonyls ===
+    # === dispatch: mononuclear metal carbonyls ===
     if (ligand_groups
             and all(lg.ligand_smarts_key == '[C-]#[O+]' for lg in ligand_groups)):
         n_co = len(ligand_groups)
@@ -496,7 +496,7 @@ def assemble_organometallic_name(metal_complex: Any, mol: Any,
             else hints['stock_required_pin']
         )
 
-        # Stock notation per CONTEXT:
+        # Stock notation per internal notes:
         # - Systematic: always Roman (e.g., (0), (-I))
         # - PIN with anionic metals: Ewens-Bassett charge form (e.g., (1-))
         # - PIN with neutral metals: omit
@@ -511,7 +511,7 @@ def assemble_organometallic_name(metal_complex: Any, mol: Any,
         else:
             stock_str = ""
 
-        # Salzer §5: ligand-first composition order — carbonyl prefix before metal
+        # Salzer: ligand-first composition order — carbonyl prefix before metal
         full_name = f"{co_prefix}carbonyl{metal_name}{stock_str}"
         metal_name_part = f"{metal_name}{stock_str}"
         co_node = NameTreeNode(
@@ -521,7 +521,7 @@ def assemble_organometallic_name(metal_complex: Any, mol: Any,
         )
         return (full_name, metal_name_part, [co_node])
 
-    # === TIER-1 dispatch: bis(η⁵-Cp-class)M sandwich complexes ===
+    # === dispatch: bis(η⁵-Cp-class)M sandwich complexes ===
     # Match 2 identical Cp-class ligand groups (hapticity 5, both same key).
     if (len(ligand_groups) == 2
             and all(lg.hapticity_n == 5 for lg in ligand_groups)
@@ -551,7 +551,7 @@ def assemble_organometallic_name(metal_complex: Any, mol: Any,
         oxidation_state = metal_charge if metal_charge != 0 else hints['default_state']
         stock_str = f"({_to_roman(oxidation_state)})" if include_stock else ""
 
-        # Salzer 1999 §5.4: bis(η⁵-<cp_name>)<metal>(<Stock>)
+        # Salzer 1999: bis(η⁵-<cp_name>)<metal>(<Stock>)
         full_name = f"bis(η⁵-{cp_name}){metal_name}{stock_str}"
         metal_name_part = f"{metal_name}{stock_str}"
 
@@ -562,7 +562,7 @@ def assemble_organometallic_name(metal_complex: Any, mol: Any,
         )
         return (full_name, metal_name_part, [ligand_node])
 
-    # === TIER-3 dispatch: σ-bonded main-group organometallics ===
+    # === dispatch: σ-bonded main-group organometallics ===
     if all(lg.hapticity_n == 1 for lg in ligand_groups):
         metal_name_info = METAL_NAMES.get(metal_symbol)
         if metal_name_info is None:
@@ -634,7 +634,7 @@ def assemble_organometallic_name(metal_complex: Any, mol: Any,
             # a ligand carrying a heteroatom senior group (e.g. -CH2-COOH on Si)
             # must NOT be claimed here — the senior carboxylic acid parent wins
             # (protect: (trimethylsilyl)acetic acid, NOT carboxymethyl...silane).
-            # - Group-12 metal-direct (Zn/Cd/Hg): the P-69.5.2 mixed-class ligand
+            # - Group-12 metal-direct (Zn/Cd/Hg): the mixed-class ligand
             # may contain a WALKED-THROUGH class-2 metalloid (the Sb of a
             # 4-(diphenylstibanyl)phenyl ligand), so allow non-carbon atoms ONLY
             # when every one is itself a metal/metalloid (never an O/N/S senior
@@ -672,7 +672,7 @@ def assemble_organometallic_name(metal_complex: Any, mol: Any,
             # Group identical ligands
             grouped = _group_ligand_counts(organic_names)
             sorted_groups = _alphabetize_simple_ligands(grouped)
-            # Wave-2 C2 (P-16.3.3): a COMPOUND ligand name (compound R-oxy,
+            # Wave-2 C2: a COMPOUND ligand name (compound R-oxy,
             # tert-, or ring-yl forms) takes enclosing marks at the join so
             # the boundary is unambiguous ('tert-butyl(dimethyl)[(oxiran-2-
             # yl)methoxy]silane' BB-style); simple methyl/ethyl stay bare
@@ -684,7 +684,7 @@ def assemble_organometallic_name(metal_complex: Any, mol: Any,
                     needs_p1634_marks,
                 )
                 mult = _multiplicative_prefix(count)
-                # P-16.3.4, SECOND leg of the same rule: a simple multiplier
+                #, SECOND leg of the same rule: a simple multiplier
                 # joined to an italicized-prefix-led name keeps the hyphen
                 # boundary — 'di-tert-butyl', never the malformed 'ditert-butyl'
                 # this site shipped ('ditert-butylmethylsilane' for
@@ -694,7 +694,7 @@ def assemble_organometallic_name(metal_complex: Any, mol: Any,
                 # primitive (multiplier_needs_hyphen).
                 if mult and multiplier_needs_hyphen(name):
                     mult = f'{mult}-'
-                # W3-P03-7 (P-16.3.4(c)/(d), BB 38222): a multiplied alkyl ligand
+                # W3-P03-7 (c)/(d), BB 38222): a multiplied alkyl ligand
                 # whose NAME begins with a numeric-multiplier syllable (decyl /
                 # dodecyl..nonadecyl) takes enclosing marks so the multiplier is
                 # not folded into the stem -- 'di(dodecyl)silane' (PIN) -- while
@@ -702,15 +702,15 @@ def assemble_organometallic_name(metal_complex: Any, mol: Any,
                 # complex, so it is NOT switched to bis). Gated on count > 1.
                 if count > 1 and needs_p1634_marks(name):
                     return f'{mult}({name})'
-                # (P-16.3.4 / P-29.6.1): the hyphen test is the SHARED
+                # /: the hyphen test is the SHARED
                 # has_structural_hyphen, not a raw `'-' in name`. A leading
                 # italicized 'tert-'/'sec-' is part of a SIMPLE retained prefix and
                 # takes NO marks -- BB 16286 '*tert*-butyldi(methyl)phosphane' (PIN)
                 # cites tert-butyl bare, as does BB 3465
                 # `4-butyl-4-*tert*-butylcyclohexan-1-ol` (PIN) directly after a
                 # locant. (An earlier comment here attributed an 'N-tert-butyl'
-                # example to P-16.3.4; that string does not occur in the Blue Book
-                # and P-16.3.4 is the parentheses rule.) The raw hyphen test made this site the FOURTH
+                # example to; that string does not occur in the Blue Book
+                # and is the parentheses rule.) The raw hyphen test made this site the FOURTH
                 # divergent copy of the compound predicate and emitted the non-PIN
                 # '(tert-butyl)di(methyl)(oxiranylmethoxy)silane' -- the very form
                 # the comment above quotes the Blue Book as writing bare.
@@ -731,7 +731,7 @@ def assemble_organometallic_name(metal_complex: Any, mol: Any,
                 (count, name, _ligand_token(count, name))
                 for count, name in sorted_groups
             ]
-            # P-16.5.1.3.1: on a mononuclear parent hydride with 2+ DIFFERENT simple
+            #: on a mononuclear parent hydride with 2+ DIFFERENT simple
             # ligands, the first cited is bare and each subsequent one is enclosed --
             # 'methyl(propyl)silanol', mirroring 'ethyl(methyl)(propyl)phosphane (PIN)'
             # (:7282). Only when every ligand is a single (count 1), non-compound
@@ -756,7 +756,7 @@ def assemble_organometallic_name(metal_complex: Any, mol: Any,
             ]
 
             if pg_ligs:
-                # (P-68.2): emit the bare -OH/-NH2/-SH on the
+                #: emit the bare -OH/-NH2/-SH on the
                 # Group-14 centre as a substitutive suffix on the hydride stem
                 # (trimethylsilanol, dimethylsilanediol, trimethylsilanamine,
                 # trimethylsilanethiol). Every principal group must be the same
@@ -774,12 +774,12 @@ def assemble_organometallic_name(metal_complex: Any, mol: Any,
                 mult = _multiplicative_prefix(len(pg_ligs))  # '', 'di', 'tri'
                 full_suffix = _join_multiplied_suffix(mult, suffix)
                 parent_with_suffix = apply_vowel_elision(parent_name, full_suffix)
-                # P-62.2.1.3 (BB 26221): the MONO-amine 'silanamine' is the one
+                # (BB 26221): the MONO-amine 'silanamine' is the one
                 # documented exception to the general locant-omission rule for
                 # substituted mononuclear parent hydrides -- (CH3)3Si-NH2 is
                 # '1,1,1-trimethylsilanamine' (PIN), corroborated at BB 37493/37495,
                 # citing every substituent's locant '1' on the sole skeletal atom.
-                # The scope is DELIBERATELY narrow -- P-14.3.4.2(a) (BB 2891) omits
+                # The scope is DELIBERATELY narrow -- (a) (BB 2891) omits
                 # '1' "in substituted mononuclear parent hydrides", which is why
                 # every sibling omits its locants: 'trimethylsilanol' (BB 27234),
                 # 'dimethylsilanediol', and crucially 'methylsilanetriamine'
@@ -806,16 +806,16 @@ def assemble_organometallic_name(metal_complex: Any, mol: Any,
         if naming_system == 'metal_direct':
             metal_name = metal_name_info['direct']
 
-            # W8-P9 Task 9.4 (P-69.2.3): additive sigma-coordination branch for
+            # W8-P9 Task 9.4: additive sigma-coordination branch for
             # a TRANSITION metal (Groups 3-12, excluding Zn/Cd/Hg which already
             # have their own established alkyl2 form) bearing both anionic
             # ('-ido') ligands and organic ligands directly sigma-bonded.
-            # BB verbatim (P6a.pdf P-69.2.3): "[Ti(CH3)Cl3] trichlorido
+            # BB verbatim (P6a.pdf: "[Ti(CH3)Cl3] trichlorido
             # (methanido)titanium trichlorido(methyl)titanium" -- ligands
             # (including 'hydrido' for M-H) cited in alphanumerical order,
             # then the metal name; PIN column uses the substitutive organic
             # ligand name ('methyl'), always parenthesized (coordination-
-            # nomenclature convention -- every example in P-69.2.3 parenthesizes
+            # nomenclature convention -- every example in parenthesizes
             # the organic/substitutive ligand, even the simple 'methyl'/'ethyl').
             # No Stock number for a neutral complex (the BB Ti(IV) example
             # shows none; Ti(CH3)Cl3 is neutral in SMILES).
@@ -886,13 +886,13 @@ def assemble_organometallic_name(metal_complex: Any, mol: Any,
                 ]
                 return (full_name, metal_name_part, ligand_tree_nodes)
 
-            # P-69.5.2 mixed / complex σ-organic ligands (e.g.
+            # mixed / complex σ-organic ligands (e.g.
             # [4-(diphenylstibanyl)phenyl](phenyl)mercury). The simple multiplied
             # form (diphenylmercury / dimethylzinc) applies only when the ligands
             # are ALL identical AND simple. Otherwise cite each ligand separately
             # in alphanumerical order, each enclosed — parentheses upgraded to
             # square brackets when the ligand name already contains enclosing
-            # marks (P-16.5.4 nesting ORDER (BB 7444; escalation P-16.5.4.1.5, BB 7509) under the P-16.5.1.1 marks requirement (BB 7232)). Neutral Group-12 metal -> no Stock number.
+            # marks nesting ORDER (BB 7444; escalation, BB 7509) under the marks requirement (BB 7232)). Neutral Group-12 metal -> no Stock number.
             from ..assembly.naming_utils import (
                 alpha_sort_key as _ask,
             )
@@ -908,18 +908,18 @@ def assemble_organometallic_name(metal_complex: Any, mol: Any,
             # sibling `_compound_ligand` above was fixed for: 'tert-butyl' matched
             # `-`, so two IDENTICAL SIMPLE ligands were routed away from the
             # multiplied form and came back as '(tert-butyl)(tert-butyl)zinc'
-            # instead of P-16.3.3(b)/P-16.2.4.1(d)'s 'di-tert-butylzinc'. `_is_cx` already carries
+            # instead of (b)/(d)'s 'di-tert-butylzinc'. `_is_cx` already carries
             # the correct hyphen semantics (it calls has_structural_hyphen), so the
             # raw leg is dropped and only the enclosing-mark characters remain.
             _any_complex = any(
                 _is_cx(nm) or any(c in nm for c in '()[]') for nm in organic_names)
             if (len(_distinct) > 1 or _any_complex) and not include_stock:
                 def _enclose_ligand(nm: str) -> str:
-                    # P-16.5.4 nesting ORDER (BB 7444; escalation P-16.5.4.1.5, BB 7509) under the P-16.5.1.1 marks requirement (BB 7232): a ligand name that ALREADY
+                    # nesting ORDER (BB 7444; escalation, BB 7509) under the marks requirement (BB 7232): a ligand name that ALREADY
                     # contains enclosing marks must be wrapped at the next level
                     # up (depth 1 = square brackets), e.g.
                     # '4-(diphenylstibanyl)phenyl' -> '[4-(diphenylstibanyl)phenyl]'.
-                    # apply_enclosing_marks(depth=0) gives '()', depth=1 '[]'.
+                    # apply_enclosing_marks(depth=0) gives '', depth=1 ''.
                     if any(c in nm for c in '()[]'):
                         return _encl(nm, 1)       # nested -> bracket upgrade
                     return f"({nm})"
@@ -935,7 +935,7 @@ def assemble_organometallic_name(metal_complex: Any, mol: Any,
             # Single-component multi-alkyl (dimethylzinc, trimethylaluminum, etc.)
             grouped = _group_ligand_counts(organic_names)
             sorted_groups = _alphabetize_simple_ligands(grouped)
-            # P-16.3.4 second leg, the THIRD multiplier-join site in this file:
+            # second leg, the THIRD multiplier-join site in this file:
             # 'di-tert-butylzinc', never the malformed 'ditert-butylzinc'. All three
             # call the one primitive (multiplier_needs_hyphen) so they cannot
             # disagree — fixing only _ligand_token would have left this path
@@ -971,7 +971,7 @@ def assemble_organometallic_name(metal_complex: Any, mol: Any,
             ]
             return (full_name, metal_name_part, ligand_tree_nodes)
 
-    # === TIER-4 dispatch: mixed π-ligand sandwich / half-sandwich ===
+    # === dispatch: mixed π-ligand sandwich / half-sandwich ===
     # Fires AFTER Tier-1/2/3 (which handle specific topologies). Detected
     # when any ligand has hapticity > 1 (η-bonded).
     if any(lg.hapticity_n > 1 for lg in ligand_groups):
@@ -981,7 +981,7 @@ def assemble_organometallic_name(metal_complex: Any, mol: Any,
     return None
 
 
-# === Metallacycle skeletal-replacement namer (W8-P9 Task 9.5, P-69.4) =======
+# === Metallacycle skeletal-replacement namer (W8-P9 Task 9.5, =======
 
 _METALLACYCLE_RING_STEM: Dict[int, str] = {
     3: 'cycloprop', 4: 'cyclobut', 5: 'cyclopent',
@@ -1124,12 +1124,12 @@ def _build_metallacycle_candidate(
 
 def _assemble_metallacycle(info: Any, mol: Any, style: str = "pin"
                             ) -> Optional[Tuple[str, str, List[Any]]]:
-    """P-69.4 skeletal-replacement metallacycle namer (W8-P9 Task 9.5, BUILT).
+    """ skeletal-replacement metallacycle namer (W8-P9 Task 9.5, BUILT).
 
-    BB verbatim (P6a.pdf P-69.4): two acceptable names are given for a
+    BB verbatim (P6a.pdf: two acceptable names are given for a
     metallacycle — Hantzsch-Widman-type ('...platinole') and skeletal-
     replacement ('...-1-platinacyclopenta-2,4-diene'). Neither is labelled
-    (PIN) — P-69.0 explicitly states that PINs for transition-metal
+    (PIN) — explicitly states that PINs for transition-metal
     organometallics await consideration by a future task group. Orthonym
     ships the skeletal-replacement form as the systematic/preferred style,
     consistent with the rest of this project's PIN-style target.
@@ -1173,7 +1173,7 @@ def _assemble_metallacycle(info: Any, mol: Any, style: str = "pin"
     if not candidates:
         return None
 
-    # P-31.1.4 lowest-locants tie-break: unsaturation locants first, then
+    # lowest-locants tie-break: unsaturation locants first, then
     # substituent locants.
     candidates.sort(key=lambda c: (c[3], c[4]))
     full_name, metal_name_part, ligand_tree_nodes, _db, _sub = candidates[0]
@@ -1184,7 +1184,7 @@ def _assemble_tier4(metal_complex: Any, mol: Any,
                      style: str = "pin") -> Optional[Tuple[str, str, List[Any]]]:
     """Tier-4 assembly for mixed η-bonded / half-sandwich complexes.
 
-    Per Salzer 1999 §5 + audit § 1 lock: CO (carbonyl) ligands are emitted
+    Per Salzer 1999 + the audit lock: CO (carbonyl) ligands are emitted
     BEFORE η-bonded ligands in the prefix sequence, even though strict
     Salzer alphabetic order would place benzene (b) before carbonyl (c).
     The audit-locked output convention reflects established IUPAC practice
@@ -1214,7 +1214,7 @@ def _assemble_tier4(metal_complex: Any, mol: Any,
         pi_names.append((lg.hapticity_n, name))
 
     # Style-aware ligand name overrides (PIN uses different names than systematic
-    # for some ligands; per IUPAC P-69 + Salzer §5).
+    # for some ligands; per IUPAC + Salzer).
     if style == 'systematic':
         pi_names = [(hap, _SYSTEMATIC_LIGAND_NAME_OVERRIDES.get(name, name))
                     for hap, name in pi_names]
@@ -1266,7 +1266,7 @@ def _assemble_tier4(metal_complex: Any, mol: Any,
     # For neutral metals bound to anionic ligands (Cp anion), the metal's
     # SMILES form would carry the corresponding positive charge already.
     # For cymantrene CpMn(CO)3 specifically: Mn is neutral in SMILES but the
-    # complex has Mn(I); audit § 6 lock applies via METAL_OXIDATION_STATE_HINTS.
+    # complex has Mn(I); the audit lock applies via METAL_OXIDATION_STATE_HINTS.
     # We use the empirical charge if non-zero; otherwise look up hints.
     hints = None
     # Pick a ligand_class hint key based on the ligand mix
@@ -1315,7 +1315,7 @@ def _superscript_int(n: int) -> str:
     return ''.join(digits[c] for c in str(n))
 
 
-# Complex-ligand multiplicative prefixes per Salzer §5.2 (used when ligand
+# Complex-ligand multiplicative prefixes per Salzer (used when ligand
 # contains parens / locants / η-prefix).
 _COMPLEX_MULTIPLICATIVE_PREFIXES: Dict[int, str] = {
     2: 'bis', 3: 'tris', 4: 'tetrakis', 5: 'pentakis',
@@ -1325,7 +1325,7 @@ _COMPLEX_MULTIPLICATIVE_PREFIXES: Dict[int, str] = {
 
 # Style-aware ligand name overrides for systematic forms.
 # PIN uses the strict IUPAC-2013 substitutive name; systematic uses the
-# traditional Salzer 1999 / Red Book IR-10 organometallic-specific name.
+# traditional Salzer 1999 / Red Book organometallic-specific name.
 _SYSTEMATIC_LIGAND_NAME_OVERRIDES: Dict[str, str] = {
     'prop-2-en-1-yl': 'allyl',  # T4-06 systematic: bis(η³-allyl)nickel(0)
 }
@@ -1344,13 +1344,13 @@ def _group_ligand_counts(ligand_names: List[Optional[str]]) -> List[Tuple[int, s
 def _alphabetize_simple_ligands(
     grouped: List[Tuple[int, str]],
 ) -> List[Tuple[int, str]]:
-    """Sort ligand entries alphabetically per Salzer §5.2.
+    """Sort ligand entries alphabetically per Salzer
 
     Multiplicative prefixes (di-, tri-, tetra-) are IGNORED — alphabetize
     by the ligand name itself (the input here is already stripped).
     """
     # Wave-2 C2: alphabetize on the real first letter — the italicized structural
-    # prefix is ignored (P-14.5.2: tert-butyl sorts at 'b').: this open-coded
+    # prefix is ignored: tert-butyl sorts at 'b').: this open-coded
     # `name[5:] if name.startswith('tert-')`, which handled 'tert-' and silently
     # MISSED 'sec-' (sec-butyl sorted at 's'), so it shares the one primitive.
     from ..assembly.naming_utils import strip_italicized_structural_prefix

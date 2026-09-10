@@ -1,15 +1,15 @@
-"""W2F-P1 Tasks 1-3 — P-35.4.1 decorated N-branch amino prefixes on CHAIN parents.
+"""W2F-P1 Tasks 1-3 — decorated N-branch amino prefixes on CHAIN parents.
 
-BB P-35.4.1 (the Blue Book): "-NH-CH2Cl (chloromethyl)amino (preferred
+BB (the Blue Book): "-NH-CH2Cl (chloromethyl)amino (preferred
 prefix)". The ring-parent path already implements this (rules/benzene.py:1421,
 gold W2E-P1FC-10); the chain-parent path has TWO carbon-count-only sites in
 assembly/composer.py (_check_for_acylamino no-carbonyl fallback and
 _name_n_attached_substituent_fallback) that silently drop the decoration
 ('(methylamino)' for -NH-CH2Cl = a DIFFERENT molecule) and are then
-SELF-01-suppressed to 'unknown organic compound'.
+-suppressed to 'unknown organic compound'.
 
 Every expected name is OPSIN-2.9-verified (RDKit-canonical round-trip MATCH)
-in internal notes §1.D.
+in internal notes D.
 """
 import pytest
 from rdkit import Chem
@@ -21,9 +21,9 @@ UNKNOWN = "unknown organic compound"
 
 @pytest.fixture
 def gated(monkeypatch):
-    """Re-enable the production OPSIN-validity + SELF-01 gate for the
-    end-to-end fail-closed rows (research §1.C/§1.D design the 'unknown'
-    end state via the SELF-01/validity backstop: helper-None on the
+    """Re-enable the production OPSIN-validity + gate for the
+    end-to-end fail-closed rows (research C/D design the 'unknown'
+    end state via the /validity backstop: helper-None on the
     DECORATED path plus the constitutional gate on the non-decorated
     fallback paths — which are pre-existing/out-of-scope here). The autouse
     conftest fixture disables the gate for speed, so those boundary molecules
@@ -47,7 +47,7 @@ class TestDecoratedAminoChainParent:
             "8-[(chloromethyl)amino]octanoic acid"
 
     def test_hydroxymethyl_amino_structure_driven_parens(self):
-        # is_complex_substituent('hydroxymethyl') is False (research §1.C
+        # is_complex_substituent('hydroxymethyl') is False (research C
         # trap): inner parens must be STRUCTURE-driven (non-C heavy atom in
         # the branch), never is_complex-driven.
         assert name_compound("OCNCCCCCCCC(=O)O") == \
@@ -108,7 +108,7 @@ class TestHelperContracts:
 
     def test_assembly_mixed_alphanumerical_not_ascii(self):
         # '2-hydroxyethyl' sorts at 'h' (letters-only key), AFTER
-        # 'chloromethyl' — raw sorted() would put '2-...' first (WRONG).
+        # 'chloromethyl' — raw sorted would put '2-...' first (WRONG).
         from orthonym.assembly.composer import _assemble_decorated_amino_prefix
         assert _assemble_decorated_amino_prefix(
             [("2-hydroxyethyl", True), ("chloromethyl", True)]
@@ -124,7 +124,7 @@ class TestNNDecoratedAminoEndToEnd:
             "8-[bis(chloromethyl)amino]octanoic acid"
 
     def test_mixed_decorated_alphanumerical(self):
-        # citation c < h by the letters-only key (research §1.D)
+        # citation c < h by the letters-only key (research D)
         assert name_compound("ClCN(CCO)CCCCCCCC(=O)O") == \
             "8-[(chloromethyl)(2-hydroxyethyl)amino]octanoic acid"
 
@@ -170,7 +170,7 @@ class TestSite2FallbackDirect:
             _name_n_attached_substituent_fallback,
         )
         mol = Chem.MolFromSmiles("CN(C)CCCCCCCC(=O)O")
-        # 0=CH3 1=N 2=CH3 3..10=chain — legacy HYG-04 form preserved
+        # 0=CH3 1=N 2=CH3 3..10=chain — legacy form preserved
         assert _name_n_attached_substituent_fallback(
             mol, [1, 0, 2], {1, 0, 2}, set(range(3, 11)), 1
         ) == "(dimethylamino)"
@@ -179,10 +179,10 @@ class TestSite2FallbackDirect:
 @pytest.mark.unit
 @pytest.mark.usefixtures("gated")
 class TestFailClosedBoundary:
-    """Task 3: research §1.D fail-closed rows — refuse, never truncate.
+    """Task 3: research D fail-closed rows — refuse, never truncate.
 
     Gate-inclusive: the 'unknown'/'inorganic' end state is produced by the
-    SELF-01/validity backstop (research §1.C/§1.D). Run with the production
+    /validity backstop (research C/D). Run with the production
     gate re-enabled (see the ``gated`` fixture) rather than the autouse
     gate-off default, so these assert TRUE production fail-closed behavior."""
 
@@ -199,7 +199,7 @@ class TestFailClosedBoundary:
     def test_arsanyl_branch_stays_refused(self):
         # refused upstream at dispatch (never reaches the new code) — pins
         # that name_substituent_fragment's atom-dropping 'propynyl' can
-        # never surface (research §1.D row 3).
+        # never surface (research D row 3).
         # Phase B: the fallback label is now 'arsenic compound (not supported)'.
         # This molecule is a carbon-bearing ORGANOarsenic compound, so the old
         # 'inorganic' wording was factually wrong; 'As' was the only p-block
@@ -239,11 +239,11 @@ class TestRegressionGuards:
 
     @pytest.mark.usefixtures("gated")
     def test_pure_branched_n_branch_stays_out_of_scope(self):
-        # research §1.F latent-wrong adjacency: pure-carbon BRANCHED branch
+        # research F latent-wrong adjacency: pure-carbon BRANCHED branch
         # (isopropyl) stays gated OUT of the helper; assert we did not start
         # emitting the linearized wrong name. Gate-inclusive: the legacy
         # pure-carbon path (unchanged by this plan) emits the wrong
-        # '(propylamino)' which the SELF-01 backstop suppresses to 'unknown'
+        # '(propylamino)' which the backstop suppresses to 'unknown'
         # (A/B: byte-identical HEAD vs current — pre-existing, out of scope).
         out = name_compound("CC(C)NCCCCCCCC(=O)O")
         assert out != "8-(propylamino)octanoic acid"
@@ -254,7 +254,7 @@ class TestMixedSimpleDecorated:
     """Task 3 decision rule (FIRST arm): the mixed simple+decorated surface
     is OPSIN-RT-verified at implementation time, so the grammar-derived name
     is kept (decorated always parenthesized; second-cited simple parenthesized
-    per P-16.5.1.3.1). Not added to golds (not in the research's table)."""
+    per. Not added to golds (not in the research's table)."""
 
     def test_mixed_simple_decorated_verified(self):
         # OPSIN-RT re-verified at implementation time (diagnose OK)

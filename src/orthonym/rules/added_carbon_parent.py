@@ -1,5 +1,5 @@
-"""Added-carbon multi-suffix parent naming (DD1 Fix 2, Blue Book P-65.1.1.1 /
-P-66.1.1.1.1.2 / P-66.5.1.1.2).
+"""Added-carbon multi-suffix parent naming (DD1 Fix 2, Blue Book /
+ /.
 
 When **three or more** carboxylic-acid / carboxamide / carbonitrile groups are
 present on an acyclic skeleton they cannot all be expressed as chain-terminal
@@ -15,9 +15,9 @@ locant per attachment atom::
 Why ``n >= 3`` and NOT geminal-2: two such groups can ALWAYS be routed as the two
 termini of a single chain (``HOOC-CH2-COOH`` -> propanedioic acid, the carbonyl
 carbons + the bridging carbon form a 3-atom chain), so the chain-suffix form wins
-for n<=2 (P-65.1.1.2). Only at n>=3 does the chain run out of ends, forcing the
+for n<=2. Only at n>=3 does the chain run out of ends, forcing the
 added-carbon form that expresses the maximum number of groups as the suffix
-(P-65.1.1.1: maximum number of skeletal/principal groups expressed as suffix).
+: maximum number of skeletal/principal groups expressed as suffix).
 
 The namer is deliberately SCOPED to a clean acyclic carbon parent (every parent
 carbon's only non-chain heavy neighbours are the added carbons). A decorated
@@ -124,7 +124,7 @@ def _substituent_constitution_ok(mol, frag_atoms, attach_idx, sub_name: str) -> 
     heavy-COUNT check) is insufficient. OPSIN-parse ``<sub_name>benzene`` and require
     its InChIKey skeleton to equal that of the REAL fragment-on-benzene; fail CLOSED
     on any parse failure / missing jar / mismatch. Fixes the a review BLOCKER 1 (a
-    nitrite shipping as a nitro compound gate-off) without depending on SELF-01."""
+    nitrite shipping as a nitro compound gate-off) without depending on."""
     from ..namer import _self_consistency_skeleton, _validity_gate_name_to_smiles
 
     probe = _validity_gate_name_to_smiles(f"{sub_name}benzene")
@@ -142,7 +142,7 @@ def _whole_name_stereo_ok(mol, name: str) -> bool:
     """Gate-INDEPENDENT stereo-aware re-anchor for the UNSATURATED added-carbon
     branch (aconitic family). The ene locant and the E/Z descriptor are spelled by
     this namer, so a spelling slip could ship a wrong constitution/geometry gate-off
-    (T4 producers must re-anchor or fail closed -- ed52fa98 / 8afa533c). OPSIN-parse
+    (producers must re-anchor or fail closed -- ed52fa98 / 8afa533c). OPSIN-parse
     the WHOLE name and require its InChIKey (constitution AND stereo, full key) to
     equal the input's; fail CLOSED on no-jar / parse-fail / mismatch."""
     from rdkit import Chem
@@ -273,11 +273,11 @@ def name_added_carbon_parent(features: Any, style: str = "pin") -> Optional[str]
                 return None
             named_subs.append((chain_atom, sub_name))
 
-    # P-14.4 NUMBERING (L3219): lowest locants to (c) the added-carbon (suffix)
+    # NUMBERING (L3219): lowest locants to (c) the added-carbon (suffix)
     # attachments, then (f) all substituents as a set, then (g) the substituent cited
-    # FIRST in alphanumerical order (P-14.4(g), BB: "1-methyl-4-nitronaphthalene, not
+    # FIRST in alphanumerical order (g), BB: "1-methyl-4-nitronaphthalene, not
     # 4-methyl-1-nitro..."). Without (g) the PIN depended on SMILES atom order.
-    # (Not P-31.1.4 -- that section is von Baeyer parent hydrides, L16619.)
+    # (Not -- that section is von Baeyer parent hydrides, L16619.)
     pos = {atom_idx: i for i, atom_idx in enumerate(chain)}
 
     def loc(atom_idx: int, reverse: bool) -> int:
@@ -286,7 +286,7 @@ def name_added_carbon_parent(features: Any, style: str = "pin") -> Optional[str]
 
     subs_alpha = sorted(named_subs, key=lambda t: alpha_sort_key(t[1]))
 
-    # Stereo — computed BEFORE numbering so P-14.4(j) can break a locant tie (a review
+    # Stereo — computed BEFORE numbering so (j) can break a locant tie (a review
     # review of a4240802). The core is saturated (unsaturation rejected above), so this
     # is R/S CHAIN stereocentres. Fail CLOSED if any DEFINED stereocentre is off the
     # parent chain (would live inside a substituent), is unassignable, is pseudo-
@@ -331,8 +331,8 @@ def name_added_carbon_parent(features: Any, style: str = "pin") -> Optional[str]
             return None  # pseudo-asymmetric (r/s) / axial (M/P) -> fail closed
         chain_cip[aidx] = cip
 
-    _CIP_RANK = {"R": 0, "S": 1}  # P-14.4(j): R preferred (lower) over S
-    _EZ_RANK = {"Z": 0, "E": 1}   # P-14.4(j): Z preferred (lower) over E
+    _CIP_RANK = {"R": 0, "S": 1}  # (j): R preferred (lower) over S
+    _EZ_RANK = {"Z": 0, "E": 1}   # (j): Z preferred (lower) over E
 
     def _db_loc(a_idx, b_idx, reverse):
         return min(loc(a_idx, reverse), loc(b_idx, reverse))
@@ -342,10 +342,10 @@ def name_added_carbon_parent(features: Any, style: str = "pin") -> Optional[str]
 
     def key_for(reverse: bool):
         suf = sorted(loc(attach[ac], reverse) for ac in added)
-        ene = ene_locants(reverse)          # P-14.4(e)(i): ene after suffix P-14.4(c)
+        ene = ene_locants(reverse)          # (e)(i): ene after suffix (c)
         sub = sorted(loc(ca, reverse) for ca, _ in named_subs)
-        alpha = [loc(ca, reverse) for ca, _ in subs_alpha]  # P-14.4(g)
-        # P-14.4(j): lowest locants to the preferred stereodescriptor; R/S and E/Z
+        alpha = [loc(ca, reverse) for ca, _ in subs_alpha]  # (g)
+        # (j): lowest locants to the preferred stereodescriptor; R/S and E/Z
         # descriptors ordered together by locant.
         st_items = [(loc(x, reverse), _CIP_RANK[chain_cip[x]]) for x in chain_cip]
         st_items += [(_db_loc(a, b, reverse), _EZ_RANK[db_cip[(a, b)]])
@@ -366,8 +366,8 @@ def name_added_carbon_parent(features: Any, style: str = "pin") -> Optional[str]
         st_bits.sort()
         stereo_prefix = "(" + ",".join(f"{lc}{d}" for lc, d in st_bits) + ")-"
 
-    # Assemble the substituent-prefix string (P-16.3.3 enclosure, P-14.5.2 alpha
-    # order, P-16.3.4 multipliers). P-14.3.4.2(a): the locant '1' is omitted for a
+    # Assemble the substituent-prefix string enclosure, alpha
+    # order, multipliers). (a): the locant '1' is omitted for a
     # substituted MONONUCLEAR (methane) parent hydride.
     prefix_str = ""
     if named_subs:
@@ -387,7 +387,7 @@ def name_added_carbon_parent(features: Any, style: str = "pin") -> Optional[str]
             else:
                 locstr = ",".join(str(x) for x in locs)
                 parts.append(f"{locstr}-{mult}{disp}")
-        # P-16.3.4: hyphen-join the ordered prefix fragments.
+        #: hyphen-join the ordered prefix fragments.
         prefix_str = "-".join(parts) if len(parts) > 1 else parts[0]
         # the parent stem starts with a letter, so no hyphen needed after prefix_str.
 
@@ -402,7 +402,7 @@ def name_added_carbon_parent(features: Any, style: str = "pin") -> Optional[str]
         eloc_str = ",".join(str(x) for x in elocs)
         if length == 2:
             # Dinuclear chain: the double bond can only be 1-2, so its locant is
-            # structurally redundant (deny-by-default P-14.3.3 omits an unnecessary
+            # structurally redundant (deny-by-default omits an unnecessary
             # locant). BB writes ethene-1,1,2-triyl / ethene-1,2-diyl even when
             # substituted, and `eth-1-ene` 0 times -> "ethene" (never "eth-1-ene").
             # A stereogenic dinuclear C=C keeps its DESCRIPTOR locant, e.g. BB

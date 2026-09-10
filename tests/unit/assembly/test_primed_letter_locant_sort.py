@@ -4,7 +4,7 @@ locant is an int. A fused component's letter locant arrives as ``('8a', "'")``
 and the key raised ``TypeError: '<' not supported between 'str' and 'int'``;
 the molecule then abstained inside a broad except.
 
-Blue Book P-14.3.5 (the Blue Book): "Primed locants are placed
+Blue Book (the Blue Book): "Primed locants are placed
 immediately after the corresponding unprimed locants in a set arranged in
 ascending order; locants consisting of a number and a lower-case letter with
 or without primes as 4a and 4′a..." and (:3207) "4a is lower than 4′a".
@@ -25,7 +25,7 @@ def test_letter_locant_inside_a_primed_tuple_sorts_without_error():
 
 
 def test_ascending_set_with_primed_right_after_its_unprimed_twin():
-    # P-14.3.5: one ascending set; a primed locant follows its unprimed twin.
+    #: one ascending set; a primed locant follows its unprimed twin.
     locs = [(6, "'"), 3, (2, "'"), 5, (5, "'"), ("8a", "'"), "8a", 8]
     assert sorted(locs, key=composer._primed_locant_sort_key) == [
         (2, "'"), 3, 5, (5, "'"), (6, "'"), 8, "8a", ("8a", "'")]

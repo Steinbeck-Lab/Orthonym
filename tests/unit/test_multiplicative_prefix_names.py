@@ -1,6 +1,6 @@
-"""Tests for multiplicative naming with prefix-derived parent names (PEP-03).
+"""Tests for multiplicative naming with prefix-derived parent names .
 
-Validates that _assemble_multiplicative_name() does not produce unparseable
+Validates that _assemble_multiplicative_name does not produce unparseable
 "di" + saturation prefix concatenation (e.g., "dioxane") when the
 parent name starts with a modification prefix like tetrahydro, dihydro, etc.
 

@@ -1,13 +1,13 @@
-"""v30 (task 24) — the decomposition engine must NOT float a bare `N-acyl-` prefix onto an amine
+""" (task 24) — the decomposition engine must NOT float a bare `N-acyl-` prefix onto an amine
 parent that has >=2 acylatable nitrogens, because the bare `N-` does not say WHICH nitrogen bears
 the acyl -> the name is AMBIGUOUS (denotes >=2 molecules) and, with the OPSIN jar absent, ships
 unverified (latent wrong-molecule on the DEFAULT PIN path).
 
 acylspy proof: `OC(=O)c1cc(CN(C)C(C)=O)c(CNC)o1` (ORIG) and its 4/5-mirror produce the IDENTICAL
 name `N-acetyl-4,5-bis(methylamino)methylfuran-2-carboxylic acid`; OPSIN resolves it to ORIG, so
-ORIG shipped (SELF-01 ok) and the mirror abstained. The fix refuses to float when the amine
+ORIG shipped (ok) and the mirror abstained. The fix refuses to float when the amine
 fragment has >=2 acylatable N (N with >=1 H), so ORIG fails closed to an honest abstention rather
-than shipping an ambiguous T1 name. Single-acylatable-N amides are unaffected.
+than shipping an ambiguous name. Single-acylatable-N amides are unaffected.
 
 The gate is disabled suite-wide; this behaviour is about which candidate the engine BUILDS (the
 float vs abstain decision at the producer), independent of the OPSIN validity gate, so no
@@ -39,7 +39,7 @@ def test_simple_amide_unchanged():
 
 
 def test_heteroaromatic_ring_n_acyl_float_is_ambiguous():
-    """v30 #29-fable-BLOCKER: a heteroaromatic amine parent (thiazole) with a ring N
+    """ #29-a review-BLOCKER: a heteroaromatic amine parent (thiazole) with a ring N
     PLUS an exocyclic amino makes a bare N-<acyl> float ambiguous — OPSIN dearomatizes
     the ring N to host the acyl. The H-only acylatable count missed the 0-H aromatic
     ring N; #29's route (which now names the 2-(methylamino) leftover) then unmasked a

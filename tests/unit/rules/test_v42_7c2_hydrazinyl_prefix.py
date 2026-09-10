@@ -1,21 +1,21 @@
 """ — hydrazinyl retained substituent prefix on an N-heterocycle.
 
-``H2N-NH-`` is the retained PREFERRED substituent prefix **hydrazinyl** (P-62.4).
+``H2N-NH-`` is the retained PREFERRED substituent prefix **hydrazinyl**.
 The ring-substituent collector (``rules/heterocycles.py::_identify_hetero_substituent``)
 used to flag a ring-borne ``-NH-NH2`` as *unnameable*, so the whole heterocycle
 candidate declined and the molecule abstained. BB 19376 ``2-hydrazinylpyridine``
 (PIN) is the target.
 
-## Seniority scope (P-44.1) — the load-bearing guard
+## Seniority scope — the load-bearing guard
 
-Hydrazine's senior skeletal element is **N** (top of the P-44.1.2 order
+Hydrazine's senior skeletal element is **N** (top of the order
 ``N >... > O > S >... > C``). A ring is the senior parent over the 2-N hydrazine
-chain ONLY when it also holds N -- then P-44.1.2.2's ring-senior-to-chain tie-break
+chain ONLY when it also holds N -- then 's ring-senior-to-chain tie-break
 fires (pyridine / pyrimidine / pyrrole / dihydroimidazole -> ``2-hydrazinyl<ring>``).
 A ring whose senior element is JUNIOR to N is junior to the hydrazine chain, so
 hydrazine stays the PARENT and the PIN is ``<ring-yl>hydrazine``:
 
-  * all-carbon benzene -> ``phenylhydrazine`` (retained PIN, P-68.3.1.2), and
+  * all-carbon benzene -> ``phenylhydrazine`` (retained PIN,, and
   * BB 18950 ``1-(2H-pyran-3-yl)-2-(silolan-2-yl)hydrazine`` (PIN) keeps hydrazine
     the parent even against two O/Si heterocyclic ring substituents.
 
@@ -23,7 +23,7 @@ So the fix is gated on a nitrogen in the parent ring system; an S/O heterocycle
 (thiophene / furan) is NOT named ``2-hydrazinyl<ring>`` (rules/polyazane owns the
 hydrazine-parent spelling for those). This gate is the invariant-9 unmask guard:
 without it a naive hydrazinyl producer would ship the WRONG PIN on those rings
-(clean round-trip, SELF-01-invisible).
+(clean round-trip, -invisible).
 """
 
 import pytest
@@ -64,7 +64,7 @@ class TestHydrazineParentUnchanged:
     re-asserted AFTER the fix."""
 
     def test_phenylhydrazine_unchanged(self):
-        # All-carbon ring -> hydrazine parent (retained PIN, P-68.3.1.2). The
+        # All-carbon ring -> hydrazine parent (retained PIN,. The
         # risk the brief flagged: a naive producer would ship `hydrazinylbenzene`.
         assert name_compound("NNc1ccccc1") == "phenylhydrazine"
 
@@ -78,7 +78,7 @@ class TestHydrazineParentUnchanged:
 
 @pytest.mark.unit
 class TestSeniorityScopeGuard:
-    """P-44.1 seniority: an S/O heterocycle is JUNIOR to the hydrazine chain, so it
+    """ seniority: an S/O heterocycle is JUNIOR to the hydrazine chain, so it
     must NOT be spelled `2-hydrazinyl<ring>` (hydrazine is the parent). The gate
     keys on a nitrogen in the ring; without it these ship the wrong PIN."""
 

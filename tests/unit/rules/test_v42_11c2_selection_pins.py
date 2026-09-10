@@ -6,7 +6,7 @@ classes / a likely gold-integrity issue — see task-11C2-report.md):
 #6 demote non-PIN trivial names to the systematic PIN (deny in
     ``iupac_2013_pin_list.json``):
       * 2,4,6-trinitrotoluene -> 2-methyl-1,3,5-trinitrobenzene
-        P-22.1.3 (the Blue Book) "toluene (PIN) (no substitution...)": toluene is not
+         (the Blue Book) "toluene (PIN) (no substitution...)": toluene is not
         substitutable in a PIN, so a ring-substituted toluene is named on benzene.
         BOTH the hand-curated '2,4,6-trinitrotoluene' AND the OPSIN alias
         'trinitrotoluene' are denied (denying only the first UNMASKS the second,
@@ -15,15 +15,15 @@ classes / a likely gold-integrity issue — see task-11C2-report.md):
         the Blue Book "No retained quinone names are used as preferred IUPAC names";
         the Blue Book "anthracene-1,2-dione (PIN) 1,2-anthraquinone".
 
-#31 retained ``piperidine`` (P-31.1.4.2), not the Hantzsch-Widman systematic
-    ``azinane``, for a saturated heteromonocyclic SPIRO component (P-24.5.1 names
+#31 retained ``piperidine``, not the Hantzsch-Widman systematic
+    ``azinane``, for a saturated heteromonocyclic SPIRO component names
     each component by its own PIN). Real site: ``spiro.py::
     _name_hw_monocycle_component`` saturated branch (the brief's ``name_heterocycle``
     at spiro.py:2262 was OFF-PATH — it already returns 'piperidine'). Numbering is
     shared with the HW stem, so only the ring word swaps; extends to
     pyrrolidine/morpholine/piperazine.
 
-#17 retained ``hydrazinyl`` prefix (P-68.3.1.2) for a bare terminal -NH-NH2
+#17 retained ``hydrazinyl`` prefix for a bare terminal -NH-NH2
     substituent leaf, not the compositional ``aminoamino``. Real site:
     ``substituent_enumerator.py::name_substituent`` N-rooted amino branch. Only the
     clean single-token-swap row ships; the nested ``hydrazinylmethylidene`` row
@@ -73,7 +73,7 @@ def _name_general_fallback(smiles: str) -> str:
 # #6 — demotion of non-PIN trivial names (default PIN path)
 # ---------------------------------------------------------------------------
 @pytest.mark.parametrize("smiles,expected", [
-    # P-22.1.3 (the Blue Book): toluene not substitutable in a PIN.
+    # (the Blue Book): toluene not substitutable in a PIN.
     ("Cc1c([N+](=O)[O-])cc([N+](=O)[O-])cc1[N+](=O)[O-]",
      "2-methyl-1,3,5-trinitrobenzene"),
     # the Blue Book / the Blue Book: no retained quinone name is a PIN.
@@ -103,7 +103,7 @@ def test_trinitrobenzene_component_unaffected():
 # #31 — retained piperidine (not azinane) in a spiro component (default PIN path)
 # ---------------------------------------------------------------------------
 @pytest.mark.parametrize("smiles,expected", [
-    # P-31.1.4.2 / P-24.5.1 — the target row (bb 24.5.1).
+    # / — the target row (bb 24.5.1).
     ("c1ccc2c(c1)Oc1ccccc1C21CCNCC1", "spiro[piperidine-4,9'-xanthene]"),
     # class extension: pyrrolidine (retained) not azolidine.
     ("c1ccc2c(c1)Oc1ccccc1C21CCNC1", "spiro[pyrrolidine-3,9'-xanthene]"),

@@ -1,6 +1,6 @@
 """Tests for handler-level stereo injection (a phase predicate-first wiring).
 
-a phase Plan 01 / Commit 1: STER-15 / STER-16 -- pure-function infrastructure
+a phase Plan 01 / Commit 1: / -- pure-function infrastructure
 for handler-level stereo injection. Tests cover:
 
   - needs_stereo_injection(mol, name): predicate identical to namer.py:62-83
@@ -8,7 +8,7 @@ for handler-level stereo injection. Tests cover:
   - inject_stereo_from_locant_map(name, mol, atom_to_locant): pure injector
     per / / (no atom-index fallback).
   - _ring_atom_to_locant_from_oriented(oriented_ring): shared helper per.
-  - P-91 format compliance: (2R)-, (2R,3S)-, (2E,3R,5Z)-, (2r,3s)-.
+  - format compliance: (2R)-, (2R,3S)-, (2E,3R,5Z)-, (2r,3s)-.
 
 All tests written BEFORE the implementation (TDD discipline per). RED
 phase: every test fails on ImportError until the three functions ship in
@@ -134,7 +134,7 @@ class TestInjectStereoFromLocantMap:
         )
         assert re.match(r"^\(2[RS],3[RS]\)-pentane-2,3-diol$", result), result
 
-    # Test I-03 -- ascending locant ordering verification (P-91.1,)
+    # Test I-03 -- ascending locant ordering verification,)
     def test_descriptors_emitted_in_ascending_locant_order(self):
         # 2,3-dihydroxypentane (atoms in canonical order)
         mol = Chem.MolFromSmiles("C[C@H](O)[C@@H](O)CC")
@@ -153,7 +153,7 @@ class TestInjectStereoFromLocantMap:
             f"descriptors not ascending: {locants} in {result!r}"
         )
 
-    # Test I-04 -- pseudoasymmetric centers (P-92.1.4.2 / lowercase r/s)
+    # Test I-04 -- pseudoasymmetric centers / lowercase r/s)
     def test_lowercase_r_s_preserved_for_pseudoasymmetric(self):
         # Pseudoasymmetric meso compound: 2,3,4-trihydroxypentane.
         # The middle (3) carbon is pseudoasymmetric and rdCIPLabeler should
@@ -192,7 +192,7 @@ class TestInjectStereoFromLocantMap:
         result = inject_stereo_from_locant_map("propane", mol, atom_to_locant)
         assert result == "propane"
 
-    # Test I-07 -- no-op when atom_to_locant is None, with DEBUG log ()
+    # Test I-07 -- no-op when atom_to_locant is None, with DEBUG log
     def test_no_op_when_locant_map_none_emits_debug(self, caplog):
         mol = Chem.MolFromSmiles("C[C@@H](O)CC")
         rdCIPLabeler.AssignCIPLabels(mol)
@@ -216,7 +216,7 @@ class TestInjectStereoFromLocantMap:
         assert result == "butan-2-ol"
 
     # Test I-09 -- locants all zero is a degenerate map (parent_size=0).
-    # a phase-02 WR-02 fix: all-zero locants are now a no-op (-- a
+    # a phase-02 fix: all-zero locants are now a no-op (-- a
     # missing stereo block is preferred to a malformed '(0R)-' garbage one).
     # Real handlers (benzene/heterocycle/cycloalkane/cycloalkene) NEVER
     # emit a zero locant -- this test pins the new no-op contract.
@@ -225,7 +225,7 @@ class TestInjectStereoFromLocantMap:
         rdCIPLabeler.AssignCIPLabels(mol)
         atom_to_locant = {0: 0, 1: 0, 3: 0, 4: 0}
         result = inject_stereo_from_locant_map("butan-2-ol", mol, atom_to_locant)
-        # a phase-02 WR-02 fix: all-zero locant map is now a no-op ().
+        # a phase-02 fix: all-zero locant map is now a no-op .
         assert result == "butan-2-ol", (
             f"WR-02 fix expects all-zero locant map to be a no-op, got {result!r}"
         )
@@ -291,7 +291,7 @@ class TestInjectStereoFromLocantMap:
             "butan-2-ol", mol, atom_to_locant
         )
         # The output must include the supplied locant (50) verbatim -- no
-        # atom-index fallback, no silent re-numbering ().
+        # atom-index fallback, no silent re-numbering .
         assert re.match(r"^\(50[RS]\)-butan-2-ol$", result), (
             f"injector must use supplied locant verbatim: {result!r}"
         )
@@ -299,7 +299,7 @@ class TestInjectStereoFromLocantMap:
 
 @pytest.mark.unit
 class TestRingAtomToLocantFromOriented:
-    """Tests for the shared {idx: pos+1} helper ()."""
+    """Tests for the shared {idx: pos+1} helper ."""
 
     # Test R-01
     def test_empty_ring_returns_empty_dict(self):
@@ -325,7 +325,7 @@ class TestRingAtomToLocantFromOriented:
 
 @pytest.mark.unit
 class TestP91FormatCompliance:
-    """P-91 explicit format-compliance gate (/ SC-5)."""
+    """ explicit format-compliance gate (/)."""
 
     def test_emits_paren_R_paren_dash_form(self):
         # (R)-butan-2-ol type prefix: starts with `(`, contains `R)-`
@@ -366,7 +366,7 @@ class TestP91FormatCompliance:
         block = block_match.group(1)
         # Should contain at least one R/S letter
         assert re.search(r"[RS]", block), result
-        # Should contain at least one E/Z letter (near-parent E/Z, P-93.5.2)
+        # Should contain at least one E/Z letter (near-parent E/Z,
         assert re.search(r"[EZ]", block), result
 
     def test_emits_lowercase_r_s_for_pseudoasymmetric(self):
@@ -390,11 +390,11 @@ class TestP91FormatCompliance:
 
 
 # ----------------------------------------------------------------------
-# a phase-02 BL-01 gap closure -- real-coverage gate tests
+# a phase-02 gap closure -- real-coverage gate tests
 # ----------------------------------------------------------------------
 
 def test_gate_real_coverage_blocks_partial_fragment():
-    """G-01 (BL-01): The Tier-A injection guard MUST measure REAL atom
+    """G-01 : The Tier-A injection guard MUST measure REAL atom
     coverage from CandidateName.parent_atom_indices (POST-HOC contract,
     candidate_pool.py:759), NOT the ratio_score fallback in
     coverage_scoring.py:434-437.
@@ -403,11 +403,11 @@ def test_gate_real_coverage_blocks_partial_fragment():
     covering only PART of the molecule's heavy atoms (real coverage < 0.99),
     the gate expression as inlined at composer.py:1593-1610 must evaluate to
     False. This test pins the gate MECHANISM. The complementary G-02 below
-    pins the full-coverage allow path end-to-end via name_compound().
+    pins the full-coverage allow path end-to-end via name_compound.
 
     Note: pre-fix, the gate used ``best.factors['atom_coverage']`` which fell
     back to ratio_score (a name-length proxy) per coverage_scoring.py:434-437
-    because pool.add() never forwarded parent_atom_indices into
+    because pool.add never forwarded parent_atom_indices into
     compute_confidence. Therefore short candidate names trivially passed even
     when real coverage was poor. We verify the new gate is decoupled from
     factors['atom_coverage'] and instead reads parent_atom_indices.
@@ -476,7 +476,7 @@ def test_gate_real_coverage_blocks_partial_fragment():
 
 
 def test_cycloalkane_no_exocyclic_ez_misattribution():
-    """G-03 (BL-02): The cycloalkane / cycloalkene Tier-A wiring at
+    """G-03 : The cycloalkane / cycloalkene Tier-A wiring at
     composer.py:1808-1825 must pass include_near_parent_ez=False when the
     molecule has heavy atoms outside the named ring.
 
@@ -542,14 +542,14 @@ def test_cycloalkane_no_exocyclic_ez_misattribution():
 
 
 def test_cycloalkene_ring_only_stereo_still_injects():
-    """G-06 (BL-02 regression check): a fully-ring cycloalkene with R/S on
+    """G-06 (regression check): a fully-ring cycloalkene with R/S on
     every ring atom (e.g. CHEBI:67226 cyclohex-5-ene-1,2,3,4-tetraol -- 10
     heavy atoms = 6 ring + 4 OH; every atom is named via the ring +
-    substituents path so the BL-02 gate must allow R/S injection).
+    substituents path so the gate must allow R/S injection).
 
     Soft-failure design: if the cycloalkene handler does NOT win the
     candidate-pool selection for this molecule, the test passes silently
-    (no injection attempted). The point is to PIN that the BL-02 fix does
+    (no injection attempted). The point is to PIN that the fix does
     NOT regress the ring-only injection case.
     """
     from orthonym import name_compound
@@ -567,10 +567,10 @@ def test_cycloalkene_ring_only_stereo_still_injects():
 def test_gate_real_coverage_allows_full_name():
     """G-02: When the chosen Tier-A candidate covers all heavy atoms of the
     molecule (oxolane-2-carboxylic acid, 8 heavy atoms, all covered by ring +
-    carboxylic-acid substituent), the BL-01 real-coverage gate must allow the
+    carboxylic-acid substituent), the real-coverage gate must allow the
     predicate-first injector to run and emit the (2R/S)- prefix.
 
-    WSD-07 (a phase): the original vehicle was D-proline, but proline is a
+    -07 (a phase): the original vehicle was D-proline, but proline is a
     STANDARD amino acid and now correctly resolves to its retained PIN
     'D-proline' (OPSIN-RT-verified) instead of the systematic
     'pyrrolidine-2-carboxylic acid'. Switched to oxolane-2-carboxylic acid — a
@@ -588,11 +588,11 @@ def test_gate_real_coverage_allows_full_name():
 
 
 # ----------------------------------------------------------------------
-# a phase-02 WR-02 + WR-03 quick-hit defensive predicates
+# a phase-02 + quick-hit defensive predicates
 # ----------------------------------------------------------------------
 
 def test_inject_stereo_skip_on_all_zero_locants():
-    """W-02 (WR-02 fix): an atom_to_locant map of all-zero locants is
+    """W-02 (fix): an atom_to_locant map of all-zero locants is
     degenerate (locants are 1-indexed in IUPAC) and must be a no-op per
      ("better a missing stereo block than a wrong one"). Pre-fix
     behaviour was to silently emit '(0R)-name' garbage."""
@@ -607,7 +607,7 @@ def test_inject_stereo_skip_on_all_zero_locants():
 
 
 def test_inject_stereo_skip_on_negative_locants():
-    """W-02 (WR-02 fix, complement): a locant map with non-positive values
+    """W-02 (fix, complement): a locant map with non-positive values
     (negative or zero) must also be a no-op. Locants <= 0 are not valid
     IUPAC locants and indicate caller bugs."""
     mol = Chem.MolFromSmiles("C[C@@H](O)CC")
@@ -622,7 +622,7 @@ def test_inject_stereo_skip_on_negative_locants():
 
 
 def test_inject_stereo_runs_when_at_least_one_positive_locant(caplog):
-    """W-02 (WR-02 fix, sanity): the predicate accepts maps where AT
+    """W-02 (fix, sanity): the predicate accepts maps where AT
     LEAST ONE locant is positive, even if others are zero. This preserves
     the contract that downstream filtering (validate_stereo_locants) handles
     individual bad locants."""
@@ -636,7 +636,7 @@ def test_inject_stereo_runs_when_at_least_one_positive_locant(caplog):
     )
     # The result will either be the unchanged name (if validate filters
     # everything) or a (2R/S)-prefixed name. Either is acceptable; the
-    # critical contract is that the WR-02 short-circuit did NOT fire.
+    # critical contract is that the short-circuit did NOT fire.
     assert result == "butan-2-ol" or re.match(r"^\(2[RS]\)-", result), (
         f"WR-02 over-blocked: at least one positive locant must NOT short-"
         f"circuit, got {result!r}"
@@ -644,7 +644,7 @@ def test_inject_stereo_runs_when_at_least_one_positive_locant(caplog):
 
 
 def test_ring_atom_to_locant_warns_on_duplicates(caplog):
-    """W-03 (WR-03 fix): duplicate atom indices in oriented_ring should
+    """W-03 (fix): duplicate atom indices in oriented_ring should
     emit a WARNING log so upstream orientator bugs don't silently
     propagate. Behaviour preserved: last-occurrence wins (matches the
     pre-existing dict semantics from composer.py:7184)."""
@@ -663,8 +663,8 @@ def test_ring_atom_to_locant_warns_on_duplicates(caplog):
 
 
 def test_ring_atom_to_locant_no_warn_on_unique(caplog):
-    """W-03 (WR-03 fix, complement): unique-index oriented_ring must NOT
-    emit any WARNING (the WR-03 fix must be a true precondition guard,
+    """W-03 (fix, complement): unique-index oriented_ring must NOT
+    emit any WARNING (the fix must be a true precondition guard,
     not noisy false-positive logging on the happy path)."""
     import logging
     with caplog.at_level(logging.WARNING, logger="orthonym.rules.stereochemistry"):
@@ -680,7 +680,7 @@ def test_ring_atom_to_locant_no_warn_on_unique(caplog):
 
 
 # ============================================================================
-# a phase commit 1/5: composite-locant sort key ()
+# a phase commit 1/5: composite-locant sort key
 # ============================================================================
 
 
@@ -688,7 +688,7 @@ def test_ring_atom_to_locant_no_warn_on_unique(caplog):
 class TestCompositeLocantSortKey:
     """a phase: _composite_locant_sort_key replaces the line-163
     lambda in collect_stereodescriptors. Mixed int/'<int><letter>' locants
-    must sort per IUPAC P-91.1 (composite '3a' BETWEEN integer 3 and 4).
+    must sort per IUPAC (composite '3a' BETWEEN integer 3 and 4).
 
     Per Pitfall 2, the helper must dispatch on isinstance(locant, int) FIRST
     so int input does not fall into the int(str[:-1]) ValueError trap.
@@ -708,7 +708,7 @@ class TestCompositeLocantSortKey:
             ('3a', 'R'), ('7a', 'S')
         ]
 
-    # Test C-01c -- mixed int/str sort per IUPAC P-91.1: 3 < '3a' < 4.
+    # Test C-01c -- mixed int/str sort per IUPAC: 3 < '3a' < 4.
     def test_sort_mixed_int_and_composite(self):
         items = [(4, 'S'), ('3a', 'R'), (3, 'R')]
         assert sorted(items, key=_composite_locant_sort_key) == [
@@ -728,7 +728,7 @@ class TestCompositeLocantSortKey:
     # Test C-03 -- two-letter suffix corner case locks ValueError raising.
     def test_str_locant_with_two_letter_suffix_raises(self):
         # '12bb' has TWO trailing alpha chars. The current parse pattern
-        # consumes only the LAST char via locant[-1].isalpha() / locant[:-1].
+        # consumes only the LAST char via locant[-1].isalpha / locant[:-1].
         # int('12b'[:-1]) is well-defined ONLY if the residue is purely
         # numeric, so '12bb' will raise ValueError on int('12b') because
         # '12b' is not a pure integer. We lock that ValueError so a future
@@ -763,7 +763,7 @@ class TestRingJunctionInjection:
         result = inject_stereo_from_locant_map(
             "decahydronaphthalene", mol, atom_to_locant,
         )
-        # The result must carry a P-91 composite-locant prefix block. Lock
+        # The result must carry a composite-locant prefix block. Lock
         # only the regex shape: leading '(' + at least one '3a'/'8a' or
         # bare integer then R/S, and a trailing ')-' prefix.
         assert re.match(r"^\([0-9aRSrsEZ,]+\)-", result), (
@@ -817,7 +817,7 @@ class TestStereoBackstopRegressionInvariant:
 @pytest.mark.unit
 class TestComplexRingHelpers:
     """a phase /: two pure helpers in composer.py mirror the
-    a phase BL-01 / BL-02 patterns for the complex_ring handler.
+    a phase / patterns for the complex_ring handler.
     """
 
     def test_complex_ring_parent_atom_indices_returns_set_of_ring_atoms(self):
@@ -900,7 +900,7 @@ from orthonym.rules.stereochemistry import collect_stereodescriptors
 class TestRingStrainFilter:
     """a phase: parametrized verification of the existing E/Z
     ring-strain filter at rules/stereochemistry.py:85-95. The filter
-    REJECTS ring sizes < 8 and ACCEPTS ring sizes >= 8 (P-31.1.3 Sep 2024
+    REJECTS ring sizes < 8 and ACCEPTS ring sizes >= 8 Sep 2024
     errata makes E/Z mandatory for >= 8). a phase ships TESTS, not new
     filter code (-- the existing filter is correct).
     """

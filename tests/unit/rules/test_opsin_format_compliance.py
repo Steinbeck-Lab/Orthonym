@@ -1,9 +1,9 @@
 """
-Tests for OPSIN format compliance fixes (Phase 54, Plan 01).
+Tests for OPSIN format compliance fixes (a phase, Plan 01).
 
 Covers:
-  OPFX-01: Acylamino bracket format -- OPSIN requires brackets around acylamino prefixes
-  OPFX-02: phenylamino -> anilino -- OPSIN recognizes "anilino" as a simple substituent
+  : Acylamino bracket format -- OPSIN requires brackets around acylamino prefixes
+  : phenylamino -> anilino -- OPSIN recognizes "anilino" as a simple substituent
 
 These are root-cause fixes at the point of name generation, not postprocessors.
 """
@@ -38,7 +38,7 @@ def opsin_parses(name: str) -> bool:
 
 
 # ---------------------------------------------------------------------------
-# Section 1: Anilino prefix tests (OPFX-02)
+# Section 1: Anilino prefix tests
 # ---------------------------------------------------------------------------
 
 
@@ -78,7 +78,7 @@ class TestAnilinoPrefix:
         """anilino should NOT have outer parentheses (OPSIN simple substituent).
 
         Uses 4-anilinobenzoic acid: the senior CO2H keeps the -NHPh amine
-        demoted to the 'anilino' PREFIX (P-62.2.2 seniority), so this still
+        demoted to the 'anilino' PREFIX seniority), so this still
         exercises the anilino-prefix path. (The bare NH2/NHPh diamine now names
         as the PIN N-phenylbenzene-1,4-diamine — see test_anilino_prefix_on_chain.)
         """
@@ -99,12 +99,12 @@ class TestAnilinoPrefix:
 
 
 # ---------------------------------------------------------------------------
-# Section 2: Acylamino bracket format tests (OPFX-01)
+# Section 2: Acylamino bracket format tests
 # ---------------------------------------------------------------------------
 
 
 class TestAcylaminoBrackets:
-    """N-acyl prefixes use the amido form (P-66.1.1.4.3 method (1) = PIN).
+    """N-acyl prefixes use the amido form method (1) = PIN).
 
     Wave2 T1c: the method-(2) '(pentanoylamino)' bracketed forms were
     replaced by the preferred amido family — formamido/acetamido/

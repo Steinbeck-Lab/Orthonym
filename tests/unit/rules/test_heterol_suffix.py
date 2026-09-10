@@ -1,11 +1,11 @@
-"""P-63.1.3 (Heterols) / P-63.4.1 (Hydroperoxides): -OH/-OOH on a ring heteroatom
+""" (Heterols) / (Hydroperoxides): -OH/-OOH on a ring heteroatom
 takes the -ol / -peroxol suffix, not a hydroxy/hydroperoxy prefix.
 
 BB verbatim: piperidin-1-ol (PIN), pyrrolidine-1,2-diol (PIN), pyrrolidine-1-peroxol
 (PIN), 3,4,5,6-tetrahydro-1λ4,2-thiazin-1-ol. On a ring heteroatom the hydroxylamine /
 sulfinimidic-acid functional parent cannot exist (its valences are ring bonds), so the
 OH is reclassified into the ordinary alcohol/hydroperoxide suffix machinery and the
-P-41 demotion cascade handles it (demoting to hydroxy when a senior group is present).
+ demotion cascade handles it (demoting to hydroxy when a senior group is present).
 
 Each naming case uses a fresh engine and does NOT interleave a module-level opsin
 import (see test_composite_oxy_enclosure for the JVM-init-order hazard). Round-trips
@@ -24,10 +24,10 @@ def _inchikey(smiles):
 
 
 @pytest.mark.parametrize("smiles,expected", [
-    ("ON1CCCCC1", "piperidin-1-ol"),                          # P-63.1.3
-    ("OC1CCCN1O", "pyrrolidine-1,2-diol"),                    # P-63.1.3
-    ("OON1CCCC1", "pyrrolidine-1-peroxol"),                   # P-63.4.1
-    ("OS1=NCCCC1", "3,4,5,6-tetrahydro-1λ4,2-thiazin-1-ol"),  # P-63.1.3 (λ4-S)
+    ("ON1CCCCC1", "piperidin-1-ol"),                          #
+    ("OC1CCCN1O", "pyrrolidine-1,2-diol"),                    #
+    ("OON1CCCC1", "pyrrolidine-1-peroxol"),                   #
+    ("OS1=NCCCC1", "3,4,5,6-tetrahydro-1λ4,2-thiazin-1-ol"),  # (λ4-S)
 ])
 def test_ring_heteroatom_oh_takes_suffix(smiles, expected):
     from orthonym import Orthonym
@@ -50,7 +50,7 @@ def test_heterol_pins_round_trip(smiles, expected):
 
 
 @pytest.mark.parametrize("smiles,expected", [
-    # senior group present -> OH stays a hydroxy prefix (P-63.1.4 demotion)
+    # senior group present -> OH stays a hydroxy prefix demotion)
     ("N#CC1CCCN(O)C1", "1-hydroxypiperidine-3-carbonitrile"),  # nitrile senior
     ("ONc1ccc(O)cc1", "4-(hydroxyamino)phenol"),               # phenol senior, N not in ring
     # acyclic hydroxylamine / sulfinimidic acid -> untouched (not ring heteroatoms)

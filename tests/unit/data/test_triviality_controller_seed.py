@@ -1,13 +1,13 @@
-"""Phase 168 Plan-01: seed-table integrity unit tests.
+"""a phase Plan-01: seed-table integrity unit tests.
 
 Mirrors the class-per-archaic discipline of tests/unit/data/test_retained_names_pin_cleanup.py
-(PATTERNS.md analog). Asserts the locked seed table honors CONTEXT D-03 (shape +
-Type coverage), D-11 (deny-list-by-data + P-29.6.3 + italic-locant ban), and D-13
+(PATTERNS.md analog). Asserts the locked seed table honors internal notes (shape +
+Type coverage), (deny-list-by-data + + italic-locant ban), and
 (canonicalization idempotence).
 
-Class names are binding per 168-VALIDATION.md per-task verification map.
+Class names are binding per internal notes per-task verification map.
 
-Source: 168-CONTEXT.md D-03/D-11/D-13; 168-PATTERNS.md class-per-archaic analog.
+Source: 168-internal notes //; internal notes class-per-archaic analog.
 """
 
 import pytest
@@ -20,7 +20,7 @@ from orthonym.data.triviality_controller_seed import (
     SubstitutionType,
 )
 
-# P-29.6.3 "no longer recommended" prefixes (Phase 167 HYG-04 inheritance).
+# "no longer recommended" prefixes (a phase inheritance).
 P29_6_3_DEPRECATED = frozenset(
     {"benzhydryl", "phenethyl", "isobutyl", "sec-butyl",
      "isopentyl", "tert-pentyl", "neopentyl"}
@@ -28,7 +28,7 @@ P29_6_3_DEPRECATED = frozenset(
 
 
 class TestSeedTableShape:
-    """The seed table is non-empty, typed, and fully P-section cited (D-03)."""
+    """The seed table is non-empty, typed, and fully P-section cited ."""
 
     @pytest.mark.unit
     def test_seed_table_non_empty(self):
@@ -45,7 +45,7 @@ class TestSeedTableShape:
 
 
 class TestSubstitutionTypeCoverage:
-    """Type distribution matches the D-02 / D-03 seed enumeration."""
+    """Type distribution matches the / seed enumeration."""
 
     @pytest.mark.unit
     def test_type_1_count(self):
@@ -64,7 +64,7 @@ class TestSubstitutionTypeCoverage:
 
 
 class TestType2aPrincipalGroupRequired:
-    """Every Type 2a entry carries a principal_group_required (D-02)."""
+    """Every Type 2a entry carries a principal_group_required ."""
 
     @pytest.mark.unit
     def test_type_2a_entries_have_principal_group(self):
@@ -77,7 +77,7 @@ class TestType2aPrincipalGroupRequired:
 
 
 class TestType3LocantContext:
-    """Every xylene Type 3 entry carries a locant_context of length >= 2 (D-02)."""
+    """Every xylene Type 3 entry carries a locant_context of length >= 2 ."""
 
     @pytest.mark.unit
     def test_xylene_entries_have_locant_context(self):
@@ -89,7 +89,7 @@ class TestType3LocantContext:
 
 
 class TestPINDenyGate:
-    """No _PIN_DENY name reaches the seed table -- D-11 deny-list-by-data."""
+    """No _PIN_DENY name reaches the seed table -- deny-list-by-data."""
 
     @pytest.mark.unit
     def test_no_deny_listed_name_in_seed(self):
@@ -101,7 +101,7 @@ class TestPINDenyGate:
 
 
 class TestP29_6_3DeprecatedNotInSeed:
-    """The 7 P-29.6.3 deprecated prefixes never appear -- Phase 167 HYG-04 inheritance."""
+    """The 7 deprecated prefixes never appear -- a phase inheritance."""
 
     @pytest.mark.unit
     def test_no_p29_6_3_deprecated_prefix_in_seed(self):
@@ -111,7 +111,7 @@ class TestP29_6_3DeprecatedNotInSeed:
 
 
 class TestNoItalicLocants:
-    """No o-/m-/p- italic-letter locant in any retained_pin_name (P-14.3.1 + P-16.6.1)."""
+    """No o-/m-/p- italic-letter locant in any retained_pin_name +."""
 
     @pytest.mark.unit
     def test_no_italic_locants(self):
@@ -126,7 +126,7 @@ class TestNoItalicLocants:
 
 
 class TestCanonicalSMILESForm:
-    """Every canonical_smiles is Chem.CanonSmiles-stable (D-13 idempotence)."""
+    """Every canonical_smiles is Chem.CanonSmiles-stable (idempotence)."""
 
     @pytest.mark.unit
     def test_all_keys_canonical_idempotent(self):

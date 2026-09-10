@@ -1,8 +1,8 @@
-"""Phase 160 amide handler — Tier-2 mid-tier direct-return (fast-path).
+"""a phase amide handler — Tier-2 mid-tier direct-return (fast-path).
 
 Verbatim lift of composer.py:1343-1356 (inline dispatch branch). Body
 ``_assemble_amide_name`` at composer.py:4154-4295 (142 LOC) STAYS until
-Plan-03 commit 03-10 (composer.py thinning) per CONTEXT D-24.
+Plan-03 commit 03-10 (composer.py thinning) per internal notes.
 
 Predicate gates on:
 1. ``principal_group in {primary_amide, secondary_amide, tertiary_amide}``
@@ -17,11 +17,11 @@ Predicate gates on:
    inline cascade where Tier-A ring competition runs first, then the inline
    amide block at composer.py:1343 picks up the post-Tier-A-rejection fallback.
 
-Byte-identical contract per CONTEXT D-21 (DECOMP-03): predicate gates capture
+Byte-identical contract per internal notes (DECOMP-03): predicate gates capture
 the inline cascade-order semantics so dispatch_inner reaches this handler
 only when the inline amide branch at composer.py:1343 would have fired.
 
-IUPAC cite: P-66.5.3 (amides).
+IUPAC cite: (amides).
 
 References:
 - composer.py:1343-1356 (inline dispatch branch; RETAINED as Tier-A-rejection
@@ -30,7 +30,7 @@ References:
   inline cascade order; predicate `not is_polyfunctional` mirrors this).
 - composer.py:4154-4295 (``_assemble_amide_name`` body; STAYS until 03-10).
 - handlers/partial_sat.py (same Tier-A mutex pattern).
-- 160-AUDIT-DECOMP.md § 1 row 'amide' + § 3 Tier-2 row.
+- internal notes-DECOMP.md row 'amide' + Tier-2 row.
 """
 from __future__ import annotations
 
@@ -43,7 +43,7 @@ logger = logging.getLogger(__name__)
 
 _AMIDE_PRINCIPAL_GROUPS = (
     'primary_amide', 'secondary_amide', 'tertiary_amide',
-    # Phase 163 chalcogen amides (single-permissive [NX3] per AUDIT § 2.2;
+    # a phase chalcogen amides (single-permissive [NX3] per AUDIT;
     # no 3-way primary/secondary/tertiary split). Same _assemble_amide_name
     # pipeline; per-PG suffix lookup happens inside via _CHALCOGEN_AMIDE_SUFFIX_FORMS.
     'thioamide', 'selenoamide', 'telluroamide',
@@ -56,7 +56,7 @@ def _is_amide(features: Any) -> bool:
     Gates on: principal_group is amide AND pg_count == 1 AND not is_polyfunctional
     AND (not is_cyclic OR chain_is_parent).
 
-    Pure read-only per CONTEXT D-25.
+    Pure read-only per internal notes.
     """
     if getattr(features, 'principal_group', None) not in _AMIDE_PRINCIPAL_GROUPS:
         return False
@@ -74,7 +74,7 @@ def _is_amide(features: Any) -> bool:
     # dispatch_inner preempts the polyfunctional path for amide-bearing
     # polyfunctional molecules.
     #
-    # AM-2 ROOT-2 (plan P1AM Task 11, P-66.1.1.3 / P-41): EXCEPTION for a
+    # (plan P1AM Task 11, /: EXCEPTION for a
     # single acyclic amide whose only junior group is an amine (the amide's
     # own N or a chain amino). The polyfunctional chain-parent path renders no
     # amide N-substituents — it wrongly expresses the amide N as a
@@ -91,7 +91,7 @@ def _is_amide(features: Any) -> bool:
 
 
 def _amide_only_junior_is_amine(features: Any) -> bool:
-    """AM-2 ROOT-2 (P-66.1.1.3 / P-41): True when a single acyclic amide is
+    """ /: True when a single acyclic amide is
     the principal group and every OTHER perceived functional group is an
     amine class (primary/secondary/tertiary/aromatic amine). In that case the
     amide handler (with acyl-chain-substituent enumeration, plan Task 10) is
@@ -122,7 +122,7 @@ def name_amide(
 
     Verbatim semantics of composer.py:1343-1356. Returns
     ``NamingResult(name=best.name, tree=best.tree, atom_to_locant_hint=None)``
-    after ``pool.add(name, 'amide', features, tree=...)`` (Phase 165 SCORE-01:
+    after ``pool.add(name, 'amide', features, tree=...)`` (a phase SCORE-01:
     structured tree from the chain-fragment path, else a coarse node).
     No ``_inject_stereo_if_missing``
     wrap per the inline branch behavior at composer.py:1356.
@@ -132,8 +132,8 @@ def name_amide(
 
     _amide_name = _assemble_amide_name(features, style)
     if not _amide_name:
-        # CR-02: matches sibling name_amine pattern. pool.add(None, ...)
-        # would violate the `name: str` contract per CONTEXT D-05 and
+        #: matches sibling name_amine pattern. pool.add(None,...)
+        # would violate the `name: str` contract per internal notes and
         # silently produce wrong output (the inline equivalent at
         # composer.py:1334 has implicit truthiness check via the if-block).
         return None
@@ -144,11 +144,11 @@ def name_amide(
             "amide", _ha, (_amide_name or "")[:60],
         )
 
-    # Phase 165 SCORE-01: prefer the structured tree stashed by
+    # a phase SCORE-01: prefer the structured tree stashed by
     # _assemble_amide_name (unsaturated chain-fragment path); else a counted
-    # coarse node (D-03) for the name_amide() string paths (saturated/ring
+    # coarse node  for the name_amide string paths (saturated/ring
     # amides) that build no fragment list. fragment_legacy=name guarantees a
-    # byte-identical round-trip. Read best().tree so the tree matches the
+    # byte-identical round-trip. Read best.tree so the tree matches the
     # RETURNED candidate (winner-guard).
     tree = getattr(features, "_amide_tree", None)
     if tree is None:
@@ -156,7 +156,7 @@ def name_amide(
             parent_stem=_amide_name, fragment_legacy=_amide_name,
             class_id="amide", iupac_section_cite="P-66.1",
         )
-    # Phase 145.1: route through pool.add() — direct_return handler.
+    # a phase: route through pool.add — direct_return handler.
     pool = get_current_pool()
     pool.add(_amide_name, "amide", features, tree=tree)
     best = pool.best()

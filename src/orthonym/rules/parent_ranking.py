@@ -1,90 +1,90 @@
-"""v29 Phase 4 (P4-b): the Blue-Book-ranked parent-candidate SET.
+""" a phase (P4-b): the Blue-Book-ranked parent-candidate SET.
 
 WHY THIS MODULE EXISTS
 ======================
 Production is **early parent commit**: each handler selects its own parent
 internally and adds exactly ONE candidate to the pool, and the pool's *ranking*
 path is dead (``selection_mode='first_applicable'``,
-``assembly/candidate_pool.py:135``, and the module says so at ``:953-955``).  So
+``assembly/candidate_pool.py:135``, and the module says so at ``:953-955``). So
 there was never a candidate set to filter — building the ranked set is the work.
-See ``.planning/audit-v29/PHASE4-rule-derivation.md`` Part A1/A3 and Part G.
+See `internal notes` Part A1/A3 and Part G.
 
-WHAT THE BLUE BOOK ACTUALLY LICENSES  (derivation Part B1 + B1a)
+WHAT THE BLUE BOOK ACTUALLY LICENSES (derivation Part B1 + B1a)
 ===============================================================
 There is **no** escape clause conditioning the choice of parent on whether a
-name for it can be constructed.  Every P-44/P-45 criterion is a property of the
+name for it can be constructed. Every / criterion is a property of the
 structure or of the candidate name string; nameability is never among them:
 
-    BB:18873 — P-44.1 SENIORITY ORDER FOR PARENT STRUCTURES — "When there is a
+    the Blue Book — SENIORITY ORDER FOR PARENT STRUCTURES — "When there is a
     choice, the senior parent structure is chosen by applying the following
-    criteria, in order, until a decision is reached.  These criteria must always
-    be applied before those applicable to rings and ring systems (see P-44.2)
-    and to chains (see P-44.3)."
+    criteria, in order, until a decision is reached. These criteria must always
+    be applied before those applicable to rings and ring systems (see
+    and to chains (see."
 
-    BB:24096 — P-52.2.8 Selection between a ring and a chain as parent hydride —
+    the Blue Book — Selection between a ring and a chain as parent hydride —
     "Within the same heteroatom class and for the same number of characteristic
     groups cited as the principal characteristic group, **a ring is always
-    selected as the parent hydride to construct a preferred IUPAC name.  In
+    selected as the parent hydride to construct a preferred IUPAC name. In
     general nomenclature, a ring or a chain can be the parent hydride.**"
 
-Consequently a fall-through to a lower-ranked parent is **never** a PIN.  Its
+Consequently a fall-through to a lower-ranked parent is **never** a PIN. Its
 correct status is fixed by:
 
-    BB:24623 — P-58.1 INTRODUCTION — "… **Preferred IUPAC names are generated
+    the Blue Book — INTRODUCTION — "… **Preferred IUPAC names are generated
     under the condition that the name of the parent structure and the names of
-    all or part of components are preferred IUPAC names.  When this condition is
+    all or part of components are preferred IUPAC names. When this condition is
     not fulfilled** and when the names of components are acceptable for general
     nomenclature, **the resulting names of the compounds are acceptable only for
     general nomenclature.**"
 
-PIN status is therefore *conditional and compositional*.  A rank>0 emission is a
-**general IUPAC name** (BB:1938) — T3/T4, never ``is_pin: True``.  ``namer.
+PIN status is therefore *conditional and compositional*. A rank>0 emission is a
+**general IUPAC name** (the Blue Book) — T3/T4, never ``is_pin: True``. ``namer.
 name_tiered`` already enforces that for every ``source == 'general_engine'``
 emission; ``record_parent_fallthrough`` makes the reason auditable rather than
 merely correct.
 
-But tier 2 is not the floor.  BB:1982 marks discarded names ``not``, and those
+But tier 2 is not the floor. the Blue Book marks discarded names ``not``, and those
 are "no longer recommended" — emitting one is an **accuracy defect, not a
-label**.  ``is_bluebook_discarded_name`` is the fail-closed veto for that.
+label**. ``is_bluebook_discarded_name`` is the fail-closed veto for that.
 
-CASCADE SHAPE, AND WHY P-44.4 IS NOT A CROSS-CLASS TERM HERE
+CASCADE SHAPE, AND WHY IS NOT A CROSS-CLASS TERM HERE
 ============================================================
-P-44.4 applies only "If the criteria of P-44.1 through P-44.3 … do not effect a
-choice" (BB:21016).  For a ring-vs-chain pair P-44.1.2.2 **always** effects a
-choice (ring wins, BB:24096 "always"), so the cross-class P-44.4.1(a)–(l) list
+ applies only "If the criteria of through … do not effect a
+choice" (the Blue Book). For a ring-vs-chain pair **always** effects a
+choice (ring wins, the Blue Book "always"), so the cross-class (a)–(l) list
 can only ever fire *within* a class — where both existing scorers already
 implement it (``ring_system_score`` [27]/[28]; ``chain_score`` elements 3/4).
-That is why this module needs no new P-44.4 comparator, and it is a derivation
+That is why this module needs no new comparator, and it is a derivation
 result, not an omission.
 
 Ranking key (all terms "lower is senior", so ``sorted`` ⇒ most senior first):
 
-    k0  -pcg_count             P-44.1.1 (BB:18875) max principal-characteristic
+    k0 -pcg_count (the Blue Book) max principal-characteristic
                                groups — precedes everything, ring or chain
-    k1  -senior_atom_rank      P-44.1.2 (BB:18917) senior skeletal atom, in
-                               P-44.1.2's OWN element order (N>P>…>O>S>…>C)
-    k2  0 ring / 1 chain       P-44.1.2.2 + P-52.2.8 (BB:24096) ring always wins
-    k3  within-class score     rings: P-44.2.1(a)–(g) then P-44.2.2 type then
-                               P-44.4.1(a),(b) — ``ring_system_score``, verified
+    k1 -senior_atom_rank (the Blue Book) senior skeletal atom, in
+                               's OWN element order (N>P>…>O>S>…>C)
+    k2 0 ring / 1 chain + (the Blue Book) ring always wins
+    k3 within-class score rings: (a)–(g) then type then
+                               (a),(b) — ``ring_system_score``, verified
                                BB-faithful (derivation Part H1).
                                chains: ``chain_score``'s order (Part H2).
-    k4  structural tiebreak    P-45.5 alphanumerical order is the Blue Book's own
-                               last resort (BB:22234/22250); the chain scorer
+    k4 structural tiebreak alphanumerical order is the Blue Book's own
+                               last resort (the Blue Book); the chain scorer
                                already applies it (``chains._p45_alpha_key``).
                                This final term makes the order TOTAL using
                                RDKit **canonical ranks**, which are invariant to
                                SMILES spelling — never atom-input or set/dict
                                iteration order (``determinism_new`` must stay 0).
 
-⚠ FOUR DISTINCT ELEMENT SEQUENCES (derivation Part B8).  P-44.1.2, P-44.2.1(c),
-P-44.2.1(g)/P-44.4.1(f) and P-44.3(c) are four *different* orders; sharing one
-table is a correctness bug.  This module uses ``P_44_1_2_ELEMENT_RANK`` for k1
-**only** — that table implements P-44.1.2 and nothing else.
+⚠ FOUR DISTINCT ELEMENT SEQUENCES (derivation Part B8)., (c),
+(g)/(f) and (c) are four *different* orders; sharing one
+table is a correctness bug. This module uses ``P_44_1_2_ELEMENT_RANK`` for k1
+**only** — that table implements and nothing else.
 
 RANK 1 IS THE INCUMBENT, BY CONSTRUCTION
 ========================================
 Rank 0 of the returned list is always the parent production already committed to
-(``select_principal_ring_system`` / ``features.principal_chain``).  That makes
+(``select_principal_ring_system`` / ``features.principal_chain``). That makes
 the fall-through *purely additive*: it can only ever try parents that today's
 code never reaches, so best-effort output is byte-identical whenever rank 0
 still passes its gates, and the PIN path never runs this code at all
@@ -100,9 +100,9 @@ from rdkit import Chem
 
 logger = logging.getLogger(__name__)
 
-# Enumeration guard.  NOT a nameability pre-filter (the derivation forbids
+# Enumeration guard. NOT a nameability pre-filter (the derivation forbids
 # those) — a combinatorial one: chain DFS enumerates every simple path, which is
-# exponential in branching.  Exceeding it is LOGGED with the drop count so a cap
+# exponential in branching. Exceeding it is LOGGED with the drop count so a cap
 # can never read as "covered everything" (see ``rank_parent_candidates``).
 MAX_CHAIN_CANDIDATES: int = 400
 MAX_CHAIN_ENUM: int = 4000
@@ -125,13 +125,13 @@ class ParentCandidate:
 
 
 # --------------------------------------------------------------------------- #
-# BB:1982 tier-3 veto                                                         #
+# the Blue Book tier-3 veto #
 # --------------------------------------------------------------------------- #
 def is_bluebook_discarded_name(name: Optional[str]) -> bool:
-    """True if ``name`` is one the Blue Book marks ``not`` (BB:1982).
+    """True if ``name`` is one the Blue Book marks ``not`` (the Blue Book).
 
     Exact match over the lowercase/whitespace-collapsed name, against the corpus
-    extracted by ``scripts/extract_bluebook_not_corpus.py``.  Exact-only is
+    extracted by ``scripts/extract_bluebook_not_corpus.py``. Exact-only is
     deliberate: this predicate may only ever *suppress* an emission, so a
     substring or prefix rule (which could veto a correct name) is unacceptable
     while a miss (the veto not firing) is merely a known limitation.
@@ -143,10 +143,10 @@ def is_bluebook_discarded_name(name: Optional[str]) -> bool:
 
 
 # --------------------------------------------------------------------------- #
-# Ranking terms                                                               #
+# Ranking terms #
 # --------------------------------------------------------------------------- #
 def _pcg_count(mol, features, atoms: Set[int]) -> int:
-    """P-44.1.1 (BB:18875): principal-characteristic-group instances borne.
+    """ (the Blue Book): principal-characteristic-group instances borne.
 
     An instance counts for a candidate when any of its match atoms lies on the
     candidate — the same "legacy whole-match" semantics
@@ -167,12 +167,12 @@ def _pcg_count(mol, features, atoms: Set[int]) -> int:
 
 
 def _senior_atom_rank(mol, atoms: Set[int]) -> int:
-    """P-44.1.2 (BB:18917): rank of the most senior skeletal atom present.
+    """ (the Blue Book): rank of the most senior skeletal atom present.
 
-    Returns a value where HIGHER is more senior, so the key negates it.  Uses
-    P-44.1.2's own element order (N > P > As > … > O > S > Se > Te > C) via
+    Returns a value where HIGHER is more senior, so the key negates it. Uses
+    's own element order (N > P > As > … > O > S > Se > Te > C) via
     ``candidate_pool.P_44_1_2_ELEMENT_RANK`` — the table that implements exactly
-    this rule.  Per derivation Part B8 it must NOT be reused for the ring or
+    this rule. Per derivation Part B8 it must NOT be reused for the ring or
     chain cascades, which have their own, different sequences.
     """
     from ..assembly.candidate_pool import (
@@ -195,14 +195,14 @@ def _structural_key(canon_ranks: Sequence[int],
 
     RDKit canonical ranks are a function of the molecular graph, so this key is
     stable across respellings of the same structure — unlike atom indices, set
-    iteration order, or enumeration order.  Required by the ``determinism_new``
+    iteration order, or enumeration order. Required by the ``determinism_new``
     invariant (derivation Part D item 6).
     """
     return tuple(sorted(canon_ranks[i] for i in atoms))
 
 
 # --------------------------------------------------------------------------- #
-# Enumeration                                                                 #
+# Enumeration #
 # --------------------------------------------------------------------------- #
 def _dedupe_chains(chains: List[List[int]]) -> List[List[int]]:
     """Collapse a chain and its reverse, and repeated atom sets, keeping the
@@ -223,7 +223,7 @@ def enumerate_parent_candidates(mol, features) -> Tuple[List[Set[int]],
                                                         List[List[int]], int]:
     """All ring systems and all skeletal chains — NO nameability pre-filter.
 
-    Returns ``(ring_systems, chains, n_chains_dropped)``.  The Blue Book's
+    Returns ``(ring_systems, chains, n_chains_dropped)``. The Blue Book's
     cascade never consults nameability (derivation Part B1), so a candidate is
     dropped here only for combinatorial reasons, and the count is returned so
     the caller can log it rather than let a silent cap read as full coverage.
@@ -246,9 +246,9 @@ def enumerate_parent_candidates(mol, features) -> Tuple[List[Set[int]],
     chains = _dedupe_chains(raw)
     dropped = 0
     if len(chains) > MAX_CHAIN_CANDIDATES:
-        # Keep the LONGEST chains: P-44.3(b) skeletal-atom count is the only
-        # P-44.3 term that can be evaluated before scoring, and a shorter chain
-        # can outrank a longer one only via P-44.3(a)/(c) heteroatom counts,
+        # Keep the LONGEST chains: (b) skeletal-atom count is the only
+        # term that can be evaluated before scoring, and a shorter chain
+        # can outrank a longer one only via (a)/(c) heteroatom counts,
         # which the truncation preserves by sorting on (hetero, length).
         chains.sort(key=lambda c: (
             -sum(1 for i in c if mol.GetAtomWithIdx(i).GetSymbol() != 'C'),
@@ -259,14 +259,14 @@ def enumerate_parent_candidates(mol, features) -> Tuple[List[Set[int]],
 
 
 # --------------------------------------------------------------------------- #
-# The ranked set                                                              #
+# The ranked set #
 # --------------------------------------------------------------------------- #
 def rank_parent_candidates(mol, features) -> List[ParentCandidate]:
     """The Blue-Book-ranked parent-candidate set, most senior first.
 
     Rank 0 is the parent production already committed to (see the module
     docstring); ranks 1..N are the candidates today's code never reaches,
-    ordered by the P-44 cascade with a spelling-invariant final tiebreak.
+    ordered by the cascade with a spelling-invariant final tiebreak.
     """
     from ..perception.chains import find_principal_chain
     from .ring_selection import ring_system_score, select_principal_ring_system
@@ -314,7 +314,7 @@ def rank_parent_candidates(mol, features) -> List[ParentCandidate]:
         scored.append((
             (-_pcg_count(mol, features, rs),
              -_senior_atom_rank(mol, rs),
-             0,                                  # P-44.1.2.2: ring
+             0,                                  #: ring
              ring_system_score(mol, rs),
              _structural_key(canon_ranks, atoms)),
             'ring', atoms))
@@ -324,7 +324,7 @@ def rank_parent_candidates(mol, features) -> List[ParentCandidate]:
         scored.append((
             (-_pcg_count(mol, features, cset),
              -_senior_atom_rank(mol, cset),
-             1,                                  # P-44.1.2.2: chain
+             1,                                  #: chain
              (chain_order.get(frozenset(c), len(chain_order)),),
              _structural_key(canon_ranks, atoms)),
             'chain', atoms))
@@ -356,7 +356,7 @@ def _ring_atoms_of(ring_systems: Sequence[Set[int]]) -> Set[int]:
 
 
 # --------------------------------------------------------------------------- #
-# Applying a candidate                                                        #
+# Applying a candidate #
 # --------------------------------------------------------------------------- #
 def features_for_candidate(features, candidate: ParentCandidate):
     """A shallow features copy whose parent is ``candidate``.
@@ -365,7 +365,7 @@ def features_for_candidate(features, candidate: ParentCandidate):
     ``select_principal_ring_system(mol, features.ring_systems)``, which returns
     its single element verbatim when the list has length 1
     (``ring_selection.py:785-786``) — so restricting ``ring_systems`` is enough
-    to steer them, with no producer change at all.  The chain producer reads
+    to steer them, with no producer change at all. The chain producer reads
     ``principal_chain`` / ``chain_is_parent`` / ``atom_to_locant``.
 
     Returns ``features`` itself for the incumbent, so rank 0 is byte-identical.

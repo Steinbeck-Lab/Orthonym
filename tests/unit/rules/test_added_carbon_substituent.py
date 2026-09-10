@@ -1,4 +1,4 @@
-"""v30 — an added-carbon multi-suffix parent (>=3 -carboxylic acid on an acyclic core,
+""" — an added-carbon multi-suffix parent (>=3 -carboxylic acid on an acyclic core,
 `propane-1,2,3-tricarboxylic acid`) must also carry SIMPLE substituents on the core as
 prefixes, so citric-acid-family metabolites name at PIN. Previously `name_added_carbon_parent`
 failed closed on ANY extra substituent (`return None`), and the molecule fell to a wrong
@@ -45,13 +45,13 @@ def test_added_carbon_substituent_path_declines_complex_substituents():
     """The added-carbon substituent path names ONLY hetero substituents name_substituent
     handles (hydroxy/amino/halo); it DECLINES a substituent with carbons (rejected by the
     skeleton==chain check) or one name_substituent cannot name (phosphonooxy). At PIN these
-    abstain (my path declines; SELF-01 suppresses the pre-existing pentane-path candidate) —
+    abstain (my path declines; suppresses the pre-existing pentane-path candidate) —
     production 0-wrong. (The pentane path's gate-off `...pentanetrioic acid` is the pre-existing
     #37-class defect, A/B-identical with/without this change, tracked separately.)"""
     # Isolate MY path: it must NOT emit a `...tricarboxylic acid` name for these (it
-    # declined). The pytest env runs SELF-01 off, so the FULL pipeline may still show the
+    # declined). The pytest env runs off, so the FULL pipeline may still show the
     # pre-existing pentane-path `...pentanetrioic acid` — that is NOT this path and is
-    # A/B-identical with/without this change (verified). In a real process (SELF-01 on)
+    # A/B-identical with/without this change (verified). In a real process (on)
     # both abstain.
     for smi in ("OC(=O)CC(OP(=O)(O)O)(CC(=O)O)C(=O)O",
                 "OC(=O)CC(NS(=O)(=O)c1ccc(N)cc1)(CC(=O)O)C(=O)O"):
@@ -59,7 +59,7 @@ def test_added_carbon_substituent_path_declines_complex_substituents():
         assert "tricarboxylic" not in n, f"my added-carbon path must decline, got {n}"
 
 
-# ---- fable review 7daf8b68 findings, now fixed ----
+# ---- a review review 7daf8b68 findings, now fixed ----
 
 def test_fable_b1_isomer_constitution_guard():
     """BLOCKER 1: name_substituent's symbols-only fallback mis-named a nitrite
@@ -71,7 +71,7 @@ def test_fable_b1_isomer_constitution_guard():
 
 
 def test_fable_b2_p14_4_g_tiebreak_deterministic():
-    """BLOCKER 2: P-14.4(g) — lowest locant to the alphabetically-first substituent;
+    """BLOCKER 2: (g) — lowest locant to the alphabetically-first substituent;
     the same molecule must get ONE name regardless of SMILES atom order."""
     a = _pin().name("NC(C(=O)O)C(C(=O)O)C(O)C(=O)O")
     b = _pin().name("OC(C(=O)O)C(C(=O)O)C(N)C(=O)O")
@@ -98,14 +98,14 @@ def test_off_chain_stereo_fails_closed():
 
 
 def test_fable_r6_mononuclear_locant_omitted():
-    """RISK 6 / P-14.3.4.2(a): locant '1' omitted on a substituted mononuclear core."""
+    """RISK 6 / (a): locant '1' omitted on a substituted mononuclear core."""
     assert _pin().name("OC(C(=O)O)(C(=O)O)C(=O)O") == "hydroxymethanetricarboxylic acid"
 
 
-# ---- stereo fable review (a4240802) findings, now fixed ----
+# ---- stereo a review review findings, now fixed ----
 
 def test_stereo_fable_b1_p14_4_j_tiebreak():
-    """BLOCKER: P-14.4(j) — when suffix/substituent locants tie, the lower locant goes
+    """BLOCKER: (j) — when suffix/substituent locants tie, the lower locant goes
     to the preferred CIP descriptor (R over S). A meso molecule must get ONE PIN name
     regardless of input atom order (was nondeterministic (2S,3R) vs (2R,3S))."""
     a = _pin().name("OC(=O)C[C@H](C(O)=O)[C@H](C(O)=O)CC(O)=O")
@@ -120,7 +120,7 @@ def test_stereo_pseudoasymmetric_fails_closed():
     assert "carboxylic" not in n, n
 
 
-# ---- aconitic family: UNSATURATED added-carbon polycarboxylic core (v30 breadth) ----
+# ---- aconitic family: UNSATURATED added-carbon polycarboxylic core (breadth) ----
 
 @pytest.mark.parametrize("smi,expected", [
     # flat (no defined geometry) -> constitutional name, no descriptor
@@ -137,7 +137,7 @@ def test_aconitic_unsaturated_added_carbon(smi, expected):
 
 
 def test_aconitic_numbering_deterministic_by_atom_order():
-    # ene gets the lowest locant (P-31.1.4, after the tied 1,2,3 suffixes); the name
+    # ene gets the lowest locant, after the tied 1,2,3 suffixes); the name
     # must not depend on SMILES atom order.
     a = _pin().name("OC(=O)C/C(=C\\C(=O)O)C(=O)O")
     b = _pin().name("OC(=O)/C=C(\\CC(=O)O)C(=O)O")
@@ -151,9 +151,9 @@ def test_saturated_added_carbon_unchanged_by_unsaturated_branch():
 
 
 def test_dinuclear_ethene_core_omits_ene_locant():
-    """Fable BLOCKER: a 2-carbon (dinuclear) unsaturated core must be `ethene-...`,
+    """a review BLOCKER: a 2-carbon (dinuclear) unsaturated core must be `ethene-...`,
     NOT `eth-1-ene-...`. For a dinuclear chain the double-bond locant is structurally
-    redundant (P-14.3.3 deny-by-default; BB `ethene-1,1,2-triyl`, `eth-1-ene` 0x).
+    redundant deny-by-default; BB `ethene-1,1,2-triyl`, `eth-1-ene` 0x).
     The OPSIN re-anchor cannot catch it (both spellings parse to one InChIKey), so it
     is fixed at the emitter."""
     assert _pin().name("OC(=O)C(C(=O)O)=CC(=O)O") == "ethene-1,1,2-tricarboxylic acid"

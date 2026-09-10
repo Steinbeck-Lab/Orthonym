@@ -4,7 +4,7 @@ The defect this suite locks down
 -------------------------------
 ``rules/polycyclic_bridged.get_heteroatom_prefix`` ended in::
 
-    return prefixes.get(symbol, symbol.lower() + 'a')
+    return prefixes.get(symbol, symbol.lower + 'a')
 
 a *generator* for a table the Blue Book makes CLOSED. Off-table skeletal
 elements got an invented morpheme that looks like nomenclature but is not:
@@ -35,10 +35,10 @@ interception is not a fix, and it is not stable under refactoring.
 
 The two tables are deliberately DIFFERENT -- do not unify them
 -------------------------------------------------------------
-* **Table 1.5** (P-15.4.1.1, 25 elements) governs GENERAL skeletal replacement:
-  heteroacyclic chains, von Baeyer (P-23.3), spiro (P-24.2.4), rings > 10.
+* **Table 1.5**, 25 elements) governs GENERAL skeletal replacement:
+  heteroacyclic chains, von Baeyer, spiro, rings > 10.
   Aluminium is ``alumina``; indium is ``inda``.
-* **Table 2.4** (P-22.2.2.1.1, 22 elements) governs Hantzsch-Widman monocycles
+* **Table 2.4**, 22 elements) governs Hantzsch-Widman monocycles
   (3-10 members) ONLY. Aluminium is ``aluma``; indium is ``indiga``.
   [BBv2:8245] prints ``aluminium | 3 | aluma`` with the parenthetical
   ``(not alumina)``, and [BBv2:8250] footnote 1 says "Compare with Table 1.5".
@@ -46,7 +46,7 @@ The two tables are deliberately DIFFERENT -- do not unify them
 So the prefix is a function of *(element, nomenclature context)*, never of the
 element alone. A prefix source is therefore correct only relative to its
 context, and a von Baeyer/spiro path that reaches into the HW table is a latent
-context bug even when today's spellings happen to coincide. Since v29 P2-T2b the
+context bug even when today's spellings happen to coincide. Since - the
 divergence is LIVE, not merely latent: both tables now carry Al and In, so the HW
 table really does answer ``aluma``/``indiga`` where the Table-1.5 source answers
 ``alumina``/``inda``. (Of the 18 elements the emitting Table-1.5 set and the
@@ -54,14 +54,14 @@ table really does answer ``aluma``/``indiga`` where the Table-1.5 source answers
 
 Mercury is not merely absent, it is DELETED
 -------------------------------------------
-[BBv2:8218] **P-22.2.2**: "The elements aluminium, gallium, indium, and thallium
+[BBv2:8218] ****: "The elements aluminium, gallium, indium, and thallium
 are now included in the recommended Hantzsch-Widman system and mercury has been
 deleted." Zn/Cd/Hg appear in NEITHER Table 1.5 nor Table 2.4 (only in the
 Appendix 1 *seniority* list), so ``mercura`` must not be offered by a
-replacement-prefix accessor at all; organomercury is named by P-69
+replacement-prefix accessor at all; organomercury is named by
 organometallic nomenclature, which keeps its own ``METALLACYCLE_A_PREFIX``.
 
-Every assertion here runs with the OPSIN jar effectively absent, because SELF-01
+Every assertion here runs with the OPSIN jar effectively absent, because
 fails OPEN in that mode and that is exactly where these wrong names shipped.
 """
 from __future__ import annotations
@@ -95,12 +95,12 @@ TABLE_2_4_ONLY = {'Al': 'aluma', 'In': 'indiga'}
 LEGAL_A_MORPHEMES = set(TABLE_1_5.values()) | set(TABLE_2_4_ONLY.values())
 
 # Elements confirmed to have been given an invented morpheme by the retired
-# ``symbol.lower() + 'a'`` fallback, with the Blue-Book-correct Table 1.5 form.
+# ``symbol.lower + 'a'`` fallback, with the Blue-Book-correct Table 1.5 form.
 CONFIRMED_FABRICATIONS = {
     'Al': ('ala', 'alumina'),
     'Zn': ('zna', None),          # in NO replacement table
     'Cd': ('cda', None),          # in NO replacement table
-    'Hg': ('hga', None),          # DELETED from HW by P-22.2.2
+    'Hg': ('hga', None),          # DELETED from HW by
     'As': ('asa', 'arsa'),
     'Sb': ('sba', 'stiba'),
     'Bi': ('bia', 'bisma'),
@@ -116,7 +116,7 @@ CONFIRMED_FABRICATIONS = {
 def namer(monkeypatch):
     """A namer with the OPSIN jar made UNAVAILABLE.
 
-    SELF-01 (name -> structure round trip) fails OPEN with no jar -- a supported
+     (name -> structure round trip) fails OPEN with no jar -- a supported
     mode -- and that is exactly the mode in which these wrong names shipped. A
     fix verified only with the jar present is not verified.
     """
@@ -193,9 +193,9 @@ REPRODUCER = 'C1C[AlH]CC2(C1)CCCCC2'
 def test_reproducer_does_not_ship_the_fabricated_ala_prefix(namer):
     """``2-alaspiro[5.5]undecane`` -- ``ala`` is not a Blue Book term.
 
-    When T2a landed, the correct behaviour here was a REFUSAL: aluminium is in
+    When landed, the correct behaviour here was a REFUSAL: aluminium is in
     Table 1.5 (``alumina``) and Table 2.4 (``aluma``), but the Table-1.5 source
-    carried only its 14 verified rows. v29 P2-T2b added the four Group-13 rows
+    carried only its 14 verified rows. - added the four Group-13 rows
     against their citations, so the correct behaviour is now the Table-1.5
     SPELLING. Either way the invariant this test exists for is unchanged: never
     the fabricated ``ala``, and never a silent drop.
@@ -204,11 +204,11 @@ def test_reproducer_does_not_ship_the_fabricated_ala_prefix(namer):
     assert not cites_morpheme(name, 'ala'), (
         f"fabricated morpheme 'ala' still shipped: {name!r}"
     )
-    # Post-T2b this is a NAME, and it must be the Table-1.5 spelling: reading
+    # Post- this is a NAME, and it must be the Table-1.5 spelling: reading
     # ``aluma`` from the Hantzsch-Widman table in a spiro (Table 1.5) context is
     # the latent context bug this suite also guards.
     # Byte-exact: this simultaneously pins the spelling (``alumina``, not the HW
-    # ``aluma``), the locant, and the absence of a stray hyphen (P-23.3.1).
+    # ``aluma``), the locant, and the absence of a stray hyphen.
     assert name == '2-aluminaspiro[5.5]undecane', name
 
 
@@ -233,12 +233,12 @@ def test_root_fabricator_returns_none_off_table(symbol):
 
 
 # Elements ``get_heteroatom_prefix`` must refuse, for TWO different reasons:
-#   * Fe/U/Xx/Zn/Cd/Hg -- in NO replacement table at all.
-#   * At/Po/C/F/Cl/Br/I -- Table 1.5 rows that P-23.3.1 and/or P-23.3.2.2 do not
-#     rank, so there is no sanctioned von Baeyer citation position or numbering
-#     rank for them (v29 P2-T2b; see ``ring_replacement.VB_INADMISSIBLE``).
+# * Fe/U/Xx/Zn/Cd/Hg -- in NO replacement table at all.
+# * At/Po/C/F/Cl/Br/I -- Table 1.5 rows that and/or do not
+# rank, so there is no sanctioned von Baeyer citation position or numbering
+# rank for them (-T2b; see ``ring_replacement.VB_INADMISSIBLE``).
 # ``Al`` was in this list until T2b: it is now spelled (``alumina``), because
-# P-23.3.1 AND P-23.3.2.2 both rank it.
+# AND both rank it.
 @pytest.mark.parametrize('symbol', ['Fe', 'U', 'Xx', 'Zn', 'Cd', 'Hg',
                                     'At', 'Po', 'C', 'F', 'Cl', 'Br', 'I'])
 def test_root_fabricator_fails_closed_for_everything_off_table(symbol):
@@ -250,10 +250,10 @@ def test_root_fabricator_fails_closed_for_everything_off_table(symbol):
     ('Al', 'alumina'), ('Ga', 'galla'), ('In', 'inda'), ('Tl', 'thalla'),
 ])
 def test_root_fabricator_spells_the_group_13_rows_t2b_added(symbol, expected):
-    """The four Table 1.5 rows T2b made emittable, in their TABLE 1.5 spelling.
+    """The four Table 1.5 rows made emittable, in their TABLE 1.5 spelling.
 
-    P-22.2.2 [BBv2:8218] added Al/Ga/In/Tl to Hantzsch-Widman in the same
-    sentence that deleted mercury, and P-23.3.1/P-23.3.2.2 both rank all four, so
+     [BBv2:8218] added Al/Ga/In/Tl to Hantzsch-Widman in the same
+    sentence that deleted mercury, and / both rank all four, so
     they have a citation position AND a numbering rank -- unlike the halogens.
     ``alumina``/``inda`` here and NOT ``aluma``/``indiga``: this accessor serves
     the Table-1.5 (von Baeyer / spiro) context.
@@ -269,7 +269,7 @@ def test_root_fabricator_still_spells_every_in_table_element(symbol, expected):
     """Byte-identity floor: every emittable Table-1.5 row keeps its exact spelling.
 
     Parametrized off ``HETEROATOM_PREFIXES`` itself, so it grew from 14 rows to 18
-    when v29 P2-T2b added Al/Ga/In/Tl and will track any future row.
+    when - added Al/Ga/In/Tl and will track any future row.
 
     The retired 7-entry local dict (O N S Se P Si B) is a strict subset of the
     canonical table with identical spellings, so routing through the canonical
@@ -351,7 +351,7 @@ def test_spiro_prefix_builder_fails_closed_at_function_level():
     """
     from orthonym.rules.spiro import _build_hetero_prefix
     from orthonym.perception.rings import get_spiro_atoms
-    # ``Al`` was here until v29 P2-T2b made it emittable (``alumina``). Replaced
+    # ``Al`` was here until - made it emittable (``alumina``). Replaced
     # by elements that are still unspellable for BOTH reasons: Zn/Hg/Fe are in no
     # replacement table, while I/At/Po are Table 1.5 rows the von Baeyer rules do
     # not rank (``ring_replacement.VB_INADMISSIBLE``).
@@ -405,16 +405,16 @@ def test_spiro_prefix_builder_refuses_unlocated_heteroatom():
 def test_spiro_vonbaeyer_a_prefix_fails_closed_off_table():
     """``spiro.py::_spiro_vb_a_prefix`` is a THIRD spiro-context speller.
 
-    P-24.5.2, so a Table 1.5 context. It carried the same
+    , so a Table 1.5 context. It carried the same
     ``get_hw_prefix(...) or get_heteroatom_prefix(...)`` line and no totality
     guard. Its fabrication was latent (the surrounding path refuses these cages
     for other reasons today), which is precisely why it needs a test: latent is
     not safe, it is undetected.
     """
     from orthonym.rules.spiro import _spiro_vb_a_prefix
-    # Was ``[AlH]``; Al became emittable in v29 P2-T2b. ``[PoH]`` keeps the test's
+    # Was ``[AlH]``; Al became emittable in -T2b. ``[PoH]`` keeps the test's
     # intent exactly: polonium HAS a Table 1.5 morpheme (``polona``) yet no
-    # P-23.3.1 citation position, so spelling it would be inventing a rule --
+    # citation position, so spelling it would be inventing a rule --
     # the same shape of defect as the retired fabrication, one table row over.
     mol = Chem.MolFromSmiles('C1CC2([PoH]C1)CCCCC2')
     assert mol is not None
@@ -429,9 +429,9 @@ def test_spiro_vonbaeyer_a_prefix_fails_closed_off_table():
 # 5. Hantzsch-Widman: mercury is DELETED (Table 2.4 context).
 # ---------------------------------------------------------------------------
 def test_hw_does_not_offer_mercura():
-    """P-22.2.2: "mercury has been deleted" [BBv2:8218].
+    """: "mercury has been deleted" [BBv2:8218].
 
-    Hg is in neither Table 1.5 nor Table 2.4. Organomercury routes via P-69,
+    Hg is in neither Table 1.5 nor Table 2.4. Organomercury routes via,
     whose own ``METALLACYCLE_A_PREFIX`` still carries ``mercura`` -- that path is
     untouched, so nothing legitimate is lost by removing it here.
     """
@@ -537,7 +537,7 @@ def test_polycyclic_wrapper_returns_empty_string_for_a_carbocycle():
 # ---------------------------------------------------------------------------
 # 8. The higher-polycyclo (von Baeyer) speller, site 3.
 # ---------------------------------------------------------------------------
-# ``Al`` moved out of this list in v29 P2-T2b (now spelled ``alumina``); I/At/Po
+# ``Al`` moved out of this list in - (now spelled ``alumina``); I/At/Po
 # replace it and additionally cover the new "has a morpheme, has no von Baeyer
 # rank" refusal class.
 @pytest.mark.parametrize('symbol', ['Zn', 'Hg', 'Fe', 'I', 'At', 'Po'])
@@ -585,7 +585,7 @@ def test_both_universal_analyzers_honour_the_unexpressed_contract():
     )
     cage = Chem.MolFromSmiles('C1CC2CC[Hg]C2C1')
     assert analyze_cage_universal(cage) is None
-    # Was ``[AlH]`` (emittable since v29 P2-T2b); ``[PoH]`` is the inadmissible
+    # Was ``[AlH]`` (emittable since -T2b); ``[PoH]`` is the inadmissible
     # Table 1.5 row, so the pair still covers both siblings AND both refusal
     # reasons -- no morpheme at all (Hg) vs no von Baeyer rank (Po).
     spiro = Chem.MolFromSmiles('C1C[PoH]CC2(C1)CCCCC2')
@@ -593,7 +593,7 @@ def test_both_universal_analyzers_honour_the_unexpressed_contract():
 
 
 # ---------------------------------------------------------------------------
-# 9b. The ACYCLIC / macrocyclic P-15.4 sibling (rules/skeletal_replacement.py).
+# 9b. The ACYCLIC / macrocyclic sibling (rules/skeletal_replacement.py).
 #
 # Same class, different parent: its collect loops filtered on
 # ``symbol in REPLACEMENT_TERMS`` and SKIPPED anything else, while
@@ -645,7 +645,7 @@ def test_skeletal_replacement_still_names_in_table_backbones(smiles, expected):
 
 
 def test_skeletal_totality_predicate_is_element_keyed_not_terminal_keyed():
-    """The old terminator gate (P-51.4.1.4) inspected only the two chain ENDS.
+    """The old terminator gate inspected only the two chain ENDS.
 
     An off-table atom in the MIDDLE therefore passed. This asserts the predicate
     covers interior atoms, which is the whole difference.
@@ -667,13 +667,13 @@ def test_skeletal_totality_predicate_is_element_keyed_not_terminal_keyed():
 # ---------------------------------------------------------------------------
 SRC_ROOT = Path(__file__).resolve().parents[3] / 'src' / 'orthonym'
 
-# ``symbol.lower() + 'a'`` and its spelling variants, in code (not comments).
+# ``symbol.lower + 'a'`` and its spelling variants, in code (not comments).
 FABRICATION_PATTERNS = [
-    # .lower() + 'a'   /   .lower()+"a"
+    #.lower + 'a' /.lower+"a"
     re.compile(r"\.lower\(\)\s*\+\s*['\"]a['\"]"),
-    # f"{sym.lower()}a"
+    # f"{sym.lower}a"
     re.compile(r"\{[^{}]*\.lower\(\)\}a['\"]"),
-    # '%sa' % symbol.lower()
+    # '%sa' % symbol.lower
     re.compile(r"['\"]%sa['\"]\s*%"),
 ]
 
@@ -690,7 +690,7 @@ def _code_lines(path: Path):
     Only COMMENT tokens and TRIPLE-QUOTED strings are masked -- deliberately NOT
     every ``STRING`` token. Masking all strings by line is what the first version
     of this helper did, and it made the tripwire incapable of ever firing: the
-    fabrication being hunted is ``symbol.lower() + 'a'``, whose own ``'a'``
+    fabrication being hunted is ``symbol.lower + 'a'``, whose own ``'a'``
     literal is a STRING token on that very line, so every offending line masked
     itself. The mutation test (plant a fabrication, expect a failure) is what
     exposed that; without it this tripwire would have been decorative.
@@ -721,7 +721,7 @@ def test_the_tripwire_scanner_can_actually_see_code():
     """Meta-test: the scanner must NOT mask a line just because it has a string.
 
     Guards the exact defect described in ``_code_lines``. A tripwire that cannot
-    see ``x.lower() + 'a'`` is worse than no tripwire, because it reports safety.
+    see ``x.lower + 'a'`` is worse than no tripwire, because it reports safety.
     """
     import tempfile
     src = (
@@ -799,12 +799,12 @@ def test_the_table_1_5_replacement_source_lives_in_exactly_one_place():
                     f"(declares {len(hits)} 'a' morphemes)")
     allowed = {
         # Table 2.4 -- the Hantzsch-Widman context, deliberately a SEPARATE
-        # table with different spellings (aluma/indiga). See P-22.2.2.1.1.
+        # table with different spellings (aluma/indiga). See.
         'data/hw_heteroatoms.py',
-        # P-15.4 ACYCLIC chain replacement (2,5,8-trioxanonane): same
+        # ACYCLIC chain replacement (2,5,8-trioxanonane): same
         # nomenclature family, different parent class and numbering source.
         'rules/skeletal_replacement.py',
-        # P-69.4 organometallic metallacycles -- a different nomenclature
+        # organometallic metallacycles -- a different nomenclature
         # system entirely, and the legitimate home of Hg/Zn/Cd.
         'data/organometallics.py',
     }

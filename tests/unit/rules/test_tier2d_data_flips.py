@@ -1,8 +1,8 @@
-"""Wave2 T2d — retained alkoxides, bare parents, HW indicated-H, irine stem.
+"""Wave2 — retained alkoxides, bare parents, HW indicated-H, irine stem.
 
-Four data-level fixes (P-63.8.1 / P-34.1.1.5 / P-22.2.2.1.4 / P-22.2.2.1.5.1):
+Four data-level fixes / / /:
 
-1. RETAINED ALKOXIDES (P-63.8.1, BB verbatim): methoxide/ethoxide/propoxide/
+1. RETAINED ALKOXIDES, BB verbatim): methoxide/ethoxide/propoxide/
    butoxide/phenoxide/tert-butoxide are the PINs — the salt path must hit
    them before the systematic -olate chokepoint. isopropoxide is general
    nomenclature only (PIN = propan-2-olate) and is demoted.
@@ -11,13 +11,13 @@ Four data-level fixes (P-63.8.1 / P-34.1.1.5 / P-22.2.2.1.4 / P-22.2.2.1.5.1):
    (retained PINs; the perception SMARTS needs a C so the bare forms fell
    through to unknown / a functional-class hydrazone name).
 
-3. MONOCYCLIC HW INDICATED HYDROGEN (P-22.2.2.1.4): a mancude monocycle
+3. MONOCYCLIC HW INDICATED HYDROGEN: a mancude monocycle
    with exactly one sp3 H-bearing eligible atom cites it (2H-1,3-dioxole,
    2H-/4H-pyran, 4H-thiopyran); the old hardcoded 'oxine'->'2H-pyran' map
    mislabelled 4H tautomers. Fail-closed for hydro forms and
    multi-indicated-H rings.
 
-4. IRINE STEM (P-22.2.2.1.5.1): 3-membered mancude N-only rings use
+4. IRINE STEM: 3-membered mancude N-only rings use
    'irine' (1H-/2H-azirine), not 'irene'. Direction tie-break gives the
    indicated H the lowest locant (2H-azirine, not 3H-azirine).
 """
@@ -29,7 +29,7 @@ from orthonym import name_compound
 
 @pytest.mark.unit
 class TestRetainedAlkoxides:
-    """P-63.8.1: retained alkoxide PINs win over systematic -olate in salts."""
+    """: retained alkoxide PINs win over systematic -olate in salts."""
 
     @pytest.mark.parametrize("smiles,expected", [
         ("[Na+].[O-]C", "sodium methoxide"),
@@ -57,7 +57,7 @@ class TestRetainedAlkoxides:
 
 @pytest.mark.unit
 class TestBareParents:
-    """P-34.1.1.5: bare retained parents previously unreachable."""
+    """: bare retained parents previously unreachable."""
 
     def test_hydroxylamine(self):
         assert name_compound("NO") == "hydroxylamine"
@@ -78,7 +78,7 @@ class TestBareParents:
 
 @pytest.mark.unit
 class TestIndicatedHydrogen:
-    """P-22.2.2.1.4: mancude-monocycle indicated H, fail-closed scope."""
+    """: mancude-monocycle indicated H, fail-closed scope."""
 
     @pytest.mark.parametrize("smiles,expected", [
         ("O1C=COC1", "2H-1,3-dioxole"),
@@ -109,7 +109,7 @@ class TestIndicatedHydrogen:
 
 @pytest.mark.unit
 class TestIrineStem:
-    """P-22.2.2.1.5.1: N-only 3-ring mancude stem is 'irine'."""
+    """: N-only 3-ring mancude stem is 'irine'."""
 
     def test_1h_azirine(self):
         # C=C double bond, N-H sp3 -> indicated H on N1

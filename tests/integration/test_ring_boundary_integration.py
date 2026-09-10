@@ -1,5 +1,5 @@
 """
-Integration tests for ring boundary fix (Phase 89.2).
+Integration tests for ring boundary fix (a phase).
 
 Tests that the complete ring system boundary prevents fabricated substituents
 on fused/bridged/spiro systems, while preserving ring-as-substituent detection

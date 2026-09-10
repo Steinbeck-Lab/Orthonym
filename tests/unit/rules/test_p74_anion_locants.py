@@ -1,14 +1,14 @@
-"""P-74.1.1 — the anionic centre outranks the cationic centre for LOW LOCANTS.
+""" — the anionic centre outranks the cationic centre for LOW LOCANTS.
 
-v29 residue Task G. The residue item recorded "P-74 anion locants" as an
+ residue Task G. The residue item recorded " anion locants" as an
 unbuilt gap in the general engine. **The premise is refuted**: the rule is
 implemented, it is byte-correct on every Blue-Book-documented example of the
 class, and the general engine is not even on the path — the producer is
 ``rules/ions.py::emit_cumulative_ium_ide`` (its ``_score`` helper), reached via
-``routing/dispatch_table.py``'s ``CUMULATIVE_ZWITTERION`` entry. A runtime spy
+``routing/dispatch_table.py``'s ``CUMULATIVE_ZWITTERION`` entry. A runtime trace
 on ``assembly/general_engine.py``'s three charge sites
 (``_charge_suffix_text`` / ``_append_charge_suffix`` / ``_zwitterion_suffix_plan``)
-recorded ZERO calls for every molecule below, with the spy validated against a
+recorded ZERO calls for every molecule below, with the trace validated against a
 known positive (``C[n+]1ccccc1C(=O)[O-]`` routes through
 ``rules/charged_router.py::_route_zwitterion``) and a negative control
 (``CCO`` -> 0 calls).
@@ -16,16 +16,16 @@ known positive (``C[n+]1ccccc1C(=O)[O-]`` routes through
 This file exists so the refutation cannot silently rot: these names are the
 evidence, and they are currently pinned nowhere else except one gold row.
 
-Blue Book, ``BlueBookV2/BlueBookV2.md`` (every pointer re-opened with
+Blue Book, ``the Blue Book Blue Book`` (every pointer re-opened with
 ``sed -n '<N>p'`` at write time):
 
-* **P-74.0 "INTRODUCTION"**, sentence ``:42411``: *"According to the seniority
+* ** "INTRODUCTION"**, sentence ``:42411``: *"According to the seniority
   of classes, an anionic center has priority over a cationic center in
-  zwitterions.  Thus, in zwitterionic compounds anionic centers are preferred
+  zwitterions. Thus, in zwitterionic compounds anionic centers are preferred
   for lower locants and become the parent structure, into which the cationic
-  part is substituted.  CAS gives cationic centers priority over anionic
+  part is substituted. CAS gives cationic centers priority over anionic
   centers."*
-* **P-74.1.1 "Ionic centers in the same parent structure"** (heading
+* ** "Ionic centers in the same parent structure"** (heading
   ``:42415``), sentence ``:42417``: *"…anionic suffixes are cited after
   cationic suffixes in the name, and are given seniority for low locants. …
   Where there is a choice, lowest locants are given to the ionic centers in the
@@ -53,7 +53,7 @@ def namer():
 #
 # The first four are the Blue Book's own worked (PIN) examples for the
 # cumulative same-parent zwitterion. The last two are DISCRIMINATORS
-# constructed for this test: on each, the P-74.1.1 anion-low numbering is the
+# constructed for this test: on each, the anion-low numbering is the
 # one that does NOT minimise the substituent locant set, so a producer that
 # ranked substituents first would emit the other name.
 P74_CUMULATIVE_ZWITTERIONS = [
@@ -107,12 +107,12 @@ P74_CUMULATIVE_ZWITTERIONS = [
     ids=[s for s, _, _ in P74_CUMULATIVE_ZWITTERIONS],
 )
 def test_anion_takes_the_low_locant(namer, smiles, expected, provenance):
-    """P-74.1.1 :42417 -- the '-ide' locant is minimised before the '-ium'."""
+    """:42417 -- the '-ide' locant is minimised before the '-ium'."""
     assert namer.name(smiles) == expected, provenance
 
 
 def test_the_ide_locant_is_lower_than_the_ium_locant(namer):
-    """P-74.0 :42411 -- 'anionic centers are preferred for lower locants'.
+    """:42411 -- 'anionic centers are preferred for lower locants'.
 
     A structural restatement of the rule that does not depend on any single
     spelling: across the whole class, the ``-ide`` locant must never exceed the
@@ -140,8 +140,8 @@ def test_the_ide_locant_is_lower_than_the_ium_locant(namer):
 
 
 def test_internal_charge_groups_are_not_read_as_zwitterions(namer):
-    """P-61.7 / P-59 -- nitro and azido carry formal +/- that are BONDING
-    features, not P-74 ionic centres.
+    """ / -- nitro and azido carry formal +/- that are BONDING
+    features, not ionic centres.
 
     The negative half of the class. Without this boundary the azide's central
     N+ / terminal N- are mis-read as a triazene zwitterion and azidobenzene is

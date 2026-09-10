@@ -1,6 +1,6 @@
 """Integration tests for end-to-end glycoside naming.
 
-Tests the full pipeline from SMILES to glycoside name using name_compound()
+Tests the full pipeline from SMILES to glycoside name using name_compound
 from orthonym.namer. Validates that known sugar moieties produce glycosyloxy
 prefixes, format is correct, no systematic oxane names appear, and non-glycoside
 molecules are unaffected.
@@ -20,12 +20,12 @@ class TestBasicGlycosideNaming:
     """Simple O-glycosides where the sugar matches the lookup table."""
 
     def test_phenyl_beta_d_glucoside(self):
-        """Phenyl β-D-glucopyranoside: functional-class form (WSD-08 flip).
+        """Phenyl β-D-glucopyranoside: functional-class form (-08 flip).
 
-        Phase 176 re-baseline: the simple phenol aglycone flips from the
+        a phase re-baseline: the simple phenol aglycone flips from the
         legacy substitutive ``(β-D-glucopyranosyloxy)...`` form to the
         Blue-Book functional-class two-word form ``phenyl β-D-glucopyranoside``
-        (P-102.5.6.2.2). OPSIN-RT-verified.
+        . OPSIN-RT-verified.
         """
         # Phenol + β-D-glucose via O-glycosidic bond at anomeric position
         name = name_compound("OC[C@H]1O[C@@H](Oc2ccccc2)[C@H](O)[C@@H](O)[C@@H]1O")
@@ -45,7 +45,7 @@ class TestBasicGlycosideNaming:
 
         The aglycone here is hydroquinone (a diol), which is NOT a clean
         monovalent substituent (``_alcohol_to_alkyl`` cannot produce a -yl
-        prefix), so the D-10 triad fails closed to the legacy substitutive
+        prefix), so the triad fails closed to the legacy substitutive
         ``(β-D-galactopyranosyloxy)hydroquinone`` form (zero regression).
         """
         name = name_compound(
@@ -56,9 +56,9 @@ class TestBasicGlycosideNaming:
         assert "galactopyranosyloxy" in name.lower()
 
     def test_rhamnoside(self):
-        """Phenyl α-L-rhamnopyranoside: functional-class form (WSD-08 flip).
+        """Phenyl α-L-rhamnopyranoside: functional-class form (-08 flip).
 
-        Phase 176: deoxy-L rhamnose is catalog-only (the structure deriver
+        a phase: deoxy-L rhamnose is catalog-only (the structure deriver
         returns None on it), but the ``lookup_sugar`` fast-path resolves the
         full ``(alpha, L, rhamnopyranose)`` tuple, so the inversion still fires
         (descriptor source = catalog). OPSIN-RT-verified.
@@ -95,16 +95,16 @@ class TestGlycosideNameFormat:
     """Verify the assembled glycoside name format is correct."""
 
     def test_glycoside_functional_class_form(self):
-        """Phenyl glucoside emits the functional-class two-word form (WSD-08).
+        """Phenyl glucoside emits the functional-class two-word form (-08).
 
-        Phase 176 re-baseline: was a parenthesized substitutive prefix
+        a phase re-baseline: was a parenthesized substitutive prefix
         ``(β-D-glucopyranosyloxy)...``; now the Blue-Book functional-class
         form ``phenyl β-D-glucopyranoside`` (aglycone substituent as a
         separate preceding word, sugar -ose -> -oside). OPSIN-RT-verified.
         """
         name = name_compound("OC[C@H]1O[C@@H](Oc2ccccc2)[C@H](O)[C@@H](O)[C@@H]1O")
         assert name == "phenyl β-D-glucopyranoside"
-        # The alpha/beta + D/L descriptors are never dropped (D-11)
+        # The alpha/beta + D/L descriptors are never dropped
         assert "β-D-glucopyranoside" in name
         # Aglycone is cited as a separate preceding substituent word
         assert name.startswith("phenyl ")
@@ -135,23 +135,23 @@ class TestGlycosideNameFormat:
 
 
 # ============================================================================
-# Senior-aglycone PROTECT: must NOT flip to functional-class form (D-09/D-14)
+# Senior-aglycone PROTECT: must NOT flip to functional-class form (/)
 # ============================================================================
 
 
 @pytest.mark.integration
 class TestGlycosideSeniorAglyconeProtect:
     """A glycoside whose aglycone bears a group senior to hydroxy must stay
-    on the legacy substitutive ``(glycosyloxy)R`` form (P-102.5.6.1.1): the
+    on the legacy substitutive ``(glycosyloxy)R`` form: the
     ``-ose`` ending is retained and the aglycone is cited as an O-substituent
     prefix. The structural seniority guard (rank >= primary_alcohol == 54)
-    fails closed for ketone/acid/aldehyde aglycones (D-09)."""
+    fails closed for ketone/acid/aldehyde aglycones ."""
 
     def test_aldehyde_aglycone_stays_legacy(self):
         """4-Formylphenyl β-D-glucoside (aldehyde aglycone) keeps legacy form.
 
         The aglycone (4-hydroxybenzaldehyde) has a principal aldehyde group,
-        senior to hydroxy, so the D-09 guard fails closed and the name retains
+        senior to hydroxy, so the guard fails closed and the name retains
         the substitutive ``...glucopyranosyloxy...`` (NOT a -glucopyranoside
         functional-class form).
         """
@@ -166,7 +166,7 @@ class TestGlycosideSeniorAglyconeProtect:
         assert "glucopyranoside" not in lower
 
     def test_aglycone_to_substituent_guard_blocks_senior_groups(self):
-        """Unit-level D-09 PROTECT: _aglycone_to_substituent returns None for
+        """Unit-level PROTECT: _aglycone_to_substituent returns None for
         ketone / carboxylic-acid / aldehyde aglycones, and a -yl prefix for
         the in-scope hydroxy-class aglycones."""
         from orthonym.decomposition.fragment_assembly import (
@@ -183,7 +183,7 @@ class TestGlycosideSeniorAglyconeProtect:
         assert (
             _aglycone_to_substituent("2-aminoethanol", "NCCO") == "2-aminoethyl"
         )
-        # Diol aglycone (no clean -yl prefix) -> None (D-10 fail-closed)
+        # Diol aglycone (no clean -yl prefix) -> None (fail-closed)
         assert _aglycone_to_substituent("hydroquinone", "Oc1ccc(O)cc1") is None
 
 
@@ -274,7 +274,7 @@ class TestGlycosideBenchmarkCoverage:
     def test_benchmark_glycoside_has_sugar_name(self, smiles):
         """Benchmark glycoside name contains a sugar-related substring.
 
-        Phase 176: the accepted set now includes the functional-class
+        a phase: the accepted set now includes the functional-class
         ``-pyranoside``/``-furanoside`` forms (the flipped simple-aglycone
         glycosides) alongside the legacy ``...pyranosyloxy`` substitutive
         forms (gated-out / multi-sugar rows).
@@ -306,8 +306,8 @@ class TestGlycosideBenchmarkCoverage:
 
 
 # ============================================================================
-# Phase 183 (WSC-04): systematic monosaccharide + free uronic (D-10) +
-# P-102.7 disaccharide, end-to-end via the carbohydrate dispatch tier (D-03)
+# a phase (-04): systematic monosaccharide + free uronic  +
+# disaccharide, end-to-end via the carbohydrate dispatch tier
 # ============================================================================
 
 
@@ -315,8 +315,8 @@ class TestGlycosideBenchmarkCoverage:
 class TestSystematicCarbohydrateDispatch:
     """The broadened CARBOHYDRATE_LOOKUP tier (priority 1000) now routes a
     non-cataloged decorated single sugar ring to the systematic-mono engine, a
-    cataloged uronic free acid to the D-10 free-acid emitter, and >=2 linked
-    sugar rings to the P-102.7 disaccharide assembler -- all through the public
+    cataloged uronic free acid to the free-acid emitter, and >=2 linked
+    sugar rings to the disaccharide assembler -- all through the public
     ``name_compound``. Cataloged sugars / simple glycosides / cataloged amino
     sugars stay byte-identical (PROTECT)."""
 
@@ -340,7 +340,7 @@ class TestSystematicCarbohydrateDispatch:
         assert "oxan" not in name.lower()
 
     def test_amino_systematic_not_oxane(self):
-        """A non-cataloged amino sugar names systematically (P-102.5.4)."""
+        """A non-cataloged amino sugar names systematically."""
         name = name_compound(
             "N[C@@H]1[C@@H](O)[C@H](O)O[C@H](CO)[C@H]1O"
         )
@@ -348,8 +348,8 @@ class TestSystematicCarbohydrateDispatch:
         assert "oxan" not in name.lower()
 
     def test_maltose_glycosylglycose(self):
-        """alpha-Maltose -> P-102.7.1.2 glycosylglycose, ASCII (1->4) arrow;
-        the DEFINED reducing-end anomer is cited (W6B-T10, P-102.7.1.2)."""
+        """alpha-Maltose -> glycosylglycose, ASCII (1->4) arrow;
+        the DEFINED reducing-end anomer is cited (W6B-T10,."""
         name = name_compound(
             "OC[C@H]1O[C@H](O[C@H]2[C@H](O)[C@@H](O)[C@@H](O)O[C@@H]2CO)"
             "[C@H](O)[C@@H](O)[C@@H]1O"
@@ -357,7 +357,7 @@ class TestSystematicCarbohydrateDispatch:
         assert name == "α-D-glucopyranosyl-(1->4)-α-D-glucopyranose"
 
     def test_sucrose_glycosyl_glycoside(self):
-        """Sucrose (no free hemiacetal) -> P-102.7.1.1 glycosyl glycoside."""
+        """Sucrose (no free hemiacetal) -> glycosyl glycoside."""
         name = name_compound(
             "O([C@@H]1[C@H](O)[C@@H](O)[C@H](O)[C@H](O1)CO)"
             "[C@@]1(CO)[C@@H](O)[C@H](O)[C@H](O1)CO"
@@ -367,7 +367,7 @@ class TestSystematicCarbohydrateDispatch:
     # --- PROTECT: byte-identical to the pre-183 behaviour ------------------
 
     def test_protect_cataloged_glucose_byte_identical(self):
-        """A cataloged clean sugar stays on the lookup fast-path (D-05)."""
+        """A cataloged clean sugar stays on the lookup fast-path ."""
         name = name_compound("OC[C@H]1O[C@@H](O)[C@H](O)[C@@H](O)[C@@H]1O")
         assert name == "β-D-glucopyranose"
 
@@ -386,7 +386,7 @@ class TestSystematicCarbohydrateDispatch:
 
     def test_protect_glucuronide_glycoside_byte_identical(self):
         """The Phase-182 steroid glucuronide glycoside still emits the
-        ``-osiduronic acid`` head (D-10 coupling held: the free-acid emitter
+        ``-osiduronic acid`` head (coupling held: the free-acid emitter
         does not regress ``uronic_glycoside_head``)."""
         name = name_compound(
             "C[C@]12CC[C@H](O[C@@H]3O[C@H](C(=O)O)[C@@H](O)[C@H](O)[C@H]3O)"

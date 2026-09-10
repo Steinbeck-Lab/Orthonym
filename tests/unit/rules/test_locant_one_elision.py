@@ -1,9 +1,9 @@
 """
 Unit tests for centralized locant-1 elision logic.
 
-Tests the should_omit_locant_one() function from naming_utils.py,
+Tests the should_omit_locant_one function from naming_utils.py,
 which is the single source of truth for all locant-1 omission
-decisions per IUPAC P-14.3.4.
+decisions per IUPAC.
 """
 
 import pytest
@@ -114,7 +114,7 @@ class TestPrefixContext:
     def test_monosubstituted_ethane_at_pos1_omits(self):
         """Monosubstituted ETHANE (chain_length==2): omit locant — both carbons are
         equivalent so there is a single monosubstitution product (chloroethane).
-        P-14.3.4 (Phase 171 DEF-4)."""
+         (a phase)."""
         assert should_omit_locant_one(
             context="prefix",
             is_ring=False,
@@ -166,7 +166,7 @@ class TestBondContext:
         assert should_omit_locant_one(context="bond", chain_length=2) is True
 
     def test_three_carbon_chain_omits_bond_locant(self):
-        """Wave2 T6a (P-14.3.4.2(d)): callers pass chain_length=3 ONLY for an
+        """Wave2 (d)): callers pass chain_length=3 ONLY for an
         unsubstituted trinuclear parent, which omits the bond locant
         (propene/propyne PINs). Substituted propene never reaches here with
         chain_length=3 (composition_primitives gates on
@@ -222,13 +222,13 @@ class TestTerminalFGTypes:
     def test_contains_all_terminal_groups(self):
         """TERMINAL_FG_TYPES must contain all terminal group types.
 
-        Pre-Phase-163: 13 entries. Phase 163 + 163.1 added 9 chalcogen-replacement
-        terminal groups per IUPAC P-66.6.3 + P-66.1.4.1.1:
+        Pre-Phase-163: 13 entries. a phase + 163.1 added 9 chalcogen-replacement
+        terminal groups per IUPAC +:
           - chalcogen acids (6): selenoic_Se_acid, selenoic_O_acid, diselenoic_acid,
             telluroic_Te_acid, telluroic_O_acid, ditelluroic_acid
           - chalcogen amides (3): thioamide, selenoamide, telluroamide
           - chalcogen aldehydes (3): thioaldehyde, selenoaldehyde, telluroaldehyde
-        v23 D-FOLLOWON item 8 added 'amidine' (P-66.4.1: imidamide C is terminal).
+         D-FOLLOWON item 8 added 'amidine': imidamide C is terminal).
         Total: 13 + 12 + 1 = 26 entries.
         """
         expected = {
@@ -237,31 +237,31 @@ class TestTerminalFGTypes:
             "acid_chloride", "acid_bromide", "acid_fluoride",
             "thioic_S_acid", "thioic_O_acid", "dithioic_acid",
             "carbamic_acid",
-            # Phase 163 FRN-A chalcogen acids
+            # a phase FRN-A chalcogen acids
             "selenoic_Se_acid", "selenoic_O_acid", "diselenoic_acid",
             "telluroic_Te_acid", "telluroic_O_acid", "ditelluroic_acid",
-            # Phase 163 FRN-B chalcogen amides
+            # a phase FRN-B chalcogen amides
             "thioamide", "selenoamide", "telluroamide",
-            # Phase 163 FRN-C chalcogen aldehydes
+            # a phase FRN-C chalcogen aldehydes
             "thioaldehyde", "selenoaldehyde", "telluroaldehyde",
-            # v23 D-FOLLOWON item 8: amidine (imidamide / carboximidamide)
+            # D-FOLLOWON item 8: amidine (imidamide / carboximidamide)
             "amidine",
-            # Wave 1 R8a (P-66.3.1.1): hydrazide is a terminal group (locant-1
+            # Wave 1 R8a: hydrazide is a terminal group (locant-1
             # elided, e.g. pentanehydrazide) — added with the hydrazide-suffix fix.
             "hydrazide",
             # Wave2 T3d: the amidrazone (hydrazonamide) / hydrazidine
             # (hydrazonohydrazide) / thiohydrazide characteristic carbon is
-            # likewise always chain-terminal (P-66.4.2 / P-66.4.3 / P-66.3.4).
+            # likewise always chain-terminal / /.
             "hydrazonamide", "hydrazidine", "thiohydrazide",
-            # Wave2 completion B4: peroxy acid (P-43.1, propaneperoxoic acid)
-            # + imidic acid (P-65.1.3.1, ethanimidic acid) -- the acid carbon
+            # Wave2 completion B4: peroxy acid, propaneperoxoic acid)
+            # + imidic acid, ethanimidic acid) -- the acid carbon
             # is always chain-terminal.
             "peroxy_acid", "imidic_acid",
-            # W3-P02-3 (P-65.1.3.2): hydrazonic acid, the =N-NH2 analogue of
+            # W3-P02-3: hydrazonic acid, the =N-NH2 analogue of
             # imidic acid — the acid carbon is always chain-terminal
             # (methanehydrazonic acid).
             "hydrazonic_acid",
-            # v42 Phase 11 (P-66.4.2.1): imidohydrazide (amidrazone) — the
+            # a phase: imidohydrazide (amidrazone) — the
             # characteristic carbon is always chain-terminal, so the ring/chain-di
             # suffix locant elides (cyclohexanecarboximidohydrazide,
             # ethanediimidohydrazide).
@@ -274,20 +274,20 @@ class TestTerminalFGTypes:
         assert isinstance(TERMINAL_FG_TYPES, frozenset)
 
     def test_terminal_count_after_phase_163(self):
-        """TERMINAL_FG_TYPES count: 13 baseline + 12 chalcogen (Phase 163) + 1 amidine
-        (v23 D-FOLLOWON item 8) + 1 hydrazide (Wave 1 R8a, P-66.3.1.1) + 3 Wave2 T3d
+        """TERMINAL_FG_TYPES count: 13 baseline + 12 chalcogen (a phase) + 1 amidine
+        (D-FOLLOWON item 8) + 1 hydrazide (Wave 1 R8a, + 3 Wave2 T3d
         (hydrazonamide/hydrazidine/thiohydrazide) + 2 Wave2-completion-B4
-        (peroxy_acid/imidic_acid, P-43.1/P-65.1.3.1) + 1 W3-P02
-        (hydrazonic_acid, P-65.1.3.2) + 1 v42-Phase-11
-        (imidohydrazide, P-66.4.2.1) = 34 entries."""
+        (peroxy_acid/imidic_acid, / + 1 W3-P02
+        (hydrazonic_acid, + 1 -Phase-11
+        (imidohydrazide, = 34 entries."""
         assert len(TERMINAL_FG_TYPES) == 34
 
 
 # ============================================================================
 # End-to-end: mononuclear (single-carbon 'methane') parent locant omission in
-# the polyfunctional path.  P-14.3.4.2(a) / P-14.3.4.4: on a one-carbon parent
+# the polyfunctional path. (a) /: on a one-carbon parent
 # every position is trivially locant '1', so BOTH prefix and suffix locants are
-# omitted.  BB verbatim: 'chloromethanol' (Cl-CH2-OH, line 5110) — a methane
+# omitted. BB verbatim: 'chloromethanol' (Cl-CH2-OH, line 5110) — a methane
 # parent with a chloro prefix AND an -ol suffix, neither carrying a '1'.
 # ============================================================================
 
@@ -311,7 +311,7 @@ class TestMononuclearPolyfunctionalNaming:
         assert name_compound("OCN", style="pin") == "aminomethanol"
 
     @pytest.mark.parametrize("smiles,expected", [
-        ("OCCl", "chloromethanol"),       # BB line 5110 — must stay correct
+        ("OCCl", "chloromethanol"),       # the Blue Book — must stay correct
         ("ClCCl", "dichloromethane"),     # simple-halide path, must not regress
         ("CN", "methanamine"),            # single suffix, already correct
         ("CO", "methanol"),               # single suffix, already correct

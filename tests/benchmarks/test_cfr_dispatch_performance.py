@@ -1,13 +1,13 @@
 """a phase CFR dispatch performance benchmark (HARD gate).
 
-Per CONTEXT: p99 < 1ms per dispatch call (HARD gate; phase fails if violated).
-Per RESEARCH § 5.2 interpretation (b) + Pitfall 8: measure DISPATCH OVERHEAD ONLY
+Per internal notes: p99 < 1ms per dispatch call (HARD gate; phase fails if violated).
+Per RESEARCH interpretation (b) + Pitfall 8: measure DISPATCH OVERHEAD ONLY
 on cheap-path Tier-1 dispatch (retained-name lookup). DO NOT measure end-to-end
-``name_compound()`` — that exceeds 1ms regardless of CFR (because
+``name_compound`` — that exceeds 1ms regardless of CFR (because
 ``name_multiplicative`` SMARTS or ``name_natural_product`` scaffold-detection
-dominates per RESEARCH § 5.1).
+dominates per RESEARCH).
 
-Median target: < 100µs per CONTEXT (informational; not a HARD gate).
+Median target: < 100µs per internal notes (informational; not a HARD gate).
 
 The benchmark uses ``pytest-benchmark`` for percentile distribution recording.
 Per pytest-benchmark 5.x API: ``benchmark.stats.stats.<key>`` is the verified
@@ -27,7 +27,7 @@ from orthonym.routing.dispatcher import ClassFirstRouter
 def test_dispatch_p99_lt_1ms_cheap_path(benchmark):
     """ HARD gate: dispatch p99 < 1ms on cheap-path Tier-1 (retained-name).
 
-    Measurement scope per RESEARCH § 5.2 interpretation (b):
+    Measurement scope per RESEARCH interpretation (b):
     - Pure dispatch overhead = predicate iteration + first-match return.
     - Cheap-path = Tier-1 retained-name (CCO → ethanol; <1µs predicate cost).
     - Excluded: SMARTS-heavy predicates (name_multiplicative,
@@ -38,9 +38,9 @@ def test_dispatch_p99_lt_1ms_cheap_path(benchmark):
     Module-load cost (StoutClass construction + DISPATCH_TABLE registration)
     is amortized by the test fixture; per-call cost is what's measured.
 
-    Per CONTEXT honest-fail-on-data: if p99 exceeds the HARD gate,
+    Per internal notes honest-fail-on-data: if p99 exceeds the HARD gate,
     investigate cheap-path predicate cost. NO band-aid relaxation of the
-    1ms threshold per AP-17 + AP-18 + AP-19.
+    1ms threshold per + +.
     """
     router = ClassFirstRouter()
     # Pre-build the cheap-path mol — Chem.MolFromSmiles cost is OUT of the
@@ -87,7 +87,7 @@ def test_dispatch_p99_lt_1ms_cheap_path(benchmark):
         except (KeyError, TypeError):
             median_seconds = getattr(stats_obj, "mean", None)
 
-    # Print for the verification report (Task 158-03-10 § 3)
+    # Print for the verification report (Task 158-03-10)
     if median_seconds is not None:
         print(
             f"\nCFR dispatch median: {median_seconds * 1e6:.1f}us "

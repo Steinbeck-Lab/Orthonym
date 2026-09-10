@@ -1,12 +1,12 @@
-"""WS-A.1 S3 — cycloalkane suffix-locant priority (P-31.1.4).
+""".1 S3 — cycloalkane suffix-locant priority.
 
 The principal characteristic group expressed as a suffix gets the lowest ring
-locant FIRST (P-31.1.4.2.4 tier (c)), before detachable prefixes. The legacy
+locant FIRST tier (c)), before detachable prefixes. The legacy
 `orient_cycloalkane` only knew substituted positions, so the alphabetic
 tie-break handed locant 1 to the alkyl prefix: `1-octylcyclohexan-2-ol`
 instead of the PIN `2-octylcyclohexan-1-ol`.
 
-Tier order under test (V21-ALGORITHM-FIX-PLAN.md §3 WS-A.1 step 3):
+Tier order under test (V21-ALGORITHM-FIX-PLAN.md.1 step 3):
   (c) lowest locants to the suffix anchor(s) FIRST,
   (f) then lowest locants to the prefix-only set (EXCLUDING the suffix
       position) — NOT the combined set,

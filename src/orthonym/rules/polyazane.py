@@ -1,18 +1,18 @@
-"""Polyazane parent-hydride family (P-68.3.1.1 / P-68.3.1.3 / P-21.2.2).
+"""Polyazane parent-hydride family / /.
 
 Acyclic chains of nitrogen atoms joined by N-N bonds:
 
-    saturated    : NN -> hydrazine, NNN -> triazane, NNNN -> tetraazane, ...
-    unsaturated  : N=N -> diazene, N=NN -> triazene, N=NNN -> tetraaz-1-ene
-                   (di-/trinuclear omit the ene locant, P-14.3.4.2(d) :2937;
+    saturated: NN -> hydrazine, NNN -> triazane, NNNN -> tetraazane,...
+    unsaturated: N=N -> diazene, N=NN -> triazene, N=NNN -> tetraaz-1-ene
+                   (di-/trinuclear omit the ene locant, (d):2937;
                     tetraazene on keep it -- tetraaz-1-ene vs -2-ene differ)
-    azo (P-68.3.1.3.2): R-N=N-R -> dimethyldiazene / diphenyldiazene
-                        (diazene omits locants — each N is =N-; P-14.3.4)
+    azo: R-N=N-R -> dimethyldiazene / diphenyldiazene
+                        (diazene omits locants — each N is =N-;
     substituted hydrazine: CNN -> methylhydrazine (N-N keeps 1,1-/1,2- locants)
 
 ``hydrazine`` and ``diazene`` are retained / preselected PINs (NOT "diazane" /
 "diimide"); the longer members are systematic ``<multiplier>azane`` / ``…az-n-ene``
-(P-21.2.2: no elision of the multiplier vowel -> "tetraazane").
+: no elision of the multiplier vowel -> "tetraazane").
 
 Graph classifier (NOT SMARTS — feedback_smarts_and_seniority). Fail-closed: an
 amine (no N-N bond), a diamine (N-C-C-N), hydroxylamine (N-O), a hydrazone
@@ -26,7 +26,7 @@ from rdkit import Chem
 from ..perception.molcache import atoms_of  # audit 2026-09-03 (S2): per-call atom/bond tuples
 from .substituent_purity import organyl_prefix_name
 
-# Saturated homogeneous N-chain PINs (P-21.2.2). n=2 is the retained "hydrazine".
+# Saturated homogeneous N-chain PINs. n=2 is the retained "hydrazine".
 _SAT_MULT = {3: 'tri', 4: 'tetra', 5: 'penta', 6: 'hexa', 7: 'hepta', 8: 'octa'}
 _SUB_MULTIPLIER = {1: '', 2: 'di', 3: 'tri', 4: 'tetra'}
 
@@ -46,13 +46,13 @@ def _ene_parent(n: int, locant: Optional[int]) -> Optional[str]:
         return None
     stem = sat[:-3]                           # strip 'ane' -> 'triazane' -> 'triaz'
     if locant is None:
-        # P-14.3.4.2(d): the omitted-locant form -> 'triaz' + 'ene' = 'triazene'.
+        # (d): the omitted-locant form -> 'triaz' + 'ene' = 'triazene'.
         return f"{stem}ene"
     return f"{stem}-{locant}-ene"             # 'triaz' -> 'triaz-1-ene'
 
 
 def _ene_locant_is_unambiguous(n: int) -> bool:
-    """P-14.3.4.2(d) (``BlueBookV2.md:2921``; example ``H2N-N=NH triazene``,
+    """(d) (``the Blue Book``; example ``H2N-N=NH triazene``,
     ``:2937``): the double-bond locant of an UNSUBSTITUTED monounsaturated
     homogeneous chain is omitted when only ONE double-bond isomer exists up to the
     chain's end-to-end symmetry -- the rule's *"dinuclear and trinuclear"* bound.
@@ -61,7 +61,7 @@ def _ene_locant_is_unambiguous(n: int) -> bool:
     end maps bond ``b`` to ``n-b``, so the distinct positions are
     ``{min(b, n-b)}``. That set has size 1 exactly for ``n <= 3`` (diazene,
     triazene) and grows from tetraazene on (``tetraaz-1-ene`` vs ``tetraaz-2-ene``
-    are different compounds, so the locant is essential -- P-14.3.3).
+    are different compounds, so the locant is essential --.
     """
     if n < 2:
         return False
@@ -141,9 +141,9 @@ def _format_n2_substituents(subs: List[Tuple[int, str]],
                             is_diazene: bool = False) -> Optional[str]:
     """Cite substituents on a 2-N parent (hydrazine or diazene).
 
-    A SINGLE substituent omits the locant (P-14.3.4.2 — its position on the
+    A SINGLE substituent omits the locant — its position on the
     2-N parent is unambiguous): ``methylhydrazine`` / ``phenylhydrazine`` /
-    ``methyldiazene`` (BB PINs, P-68.3.1.2 / P-68.3.1.3.2), NOT
+    ``methyldiazene`` (BB PINs, /, NOT
     ``1-methylhydrazine``.
 
     TWO substituents diverge by parent:
@@ -151,20 +151,20 @@ def _format_n2_substituents(subs: List[Tuple[int, str]],
     * **hydrazine** (H2N-NH2, N–N single bond): each N carries TWO substitutable
       valences, so 1,1- and 1,2- are DIFFERENT compounds — the locants are
       essential and are cited (``1,1-`` vs ``1,2-dimethylhydrazine``). The lowest
-      locant set is chosen, then the P-14.4(g) prefix-cited-first tie-break.
+      locant set is chosen, then the (g) prefix-cited-first tie-break.
     * **diazene** (HN=NH, N=N double bond): each N carries exactly ONE
       substitutable valence (the double bond consumes the rest), so two
       substituents are NECESSARILY at {1,2} — the arrangement is unambiguous and
-      the locants are OMITTED (P-14.3.4). **P-68.3.1.3.2.1 "Symmetrical monoazo
-      compounds"** (``BlueBookV2.md:38759``) names the symmetric case "by
+      the locants are OMITTED. ** "Symmetrical monoazo
+      compounds"** (``the Blue Book``) names the symmetric case "by
       substituting the parent diazene, HN=NH, by the appropriate substituent
       groups" → ``dimethyldiazene`` (PIN), ``diphenyldiazene`` (PIN).
-      **P-68.3.1.3.2.2 "Unsymmetrical monoazo compounds"** (``:38778``) names the
+      ** "Unsymmetrical monoazo compounds"** (``:38778``) names the
       unsymmetric case "substitutively, by prefixing the names of the appropriate
       substituent groups, in alphabetical order, before the parent hydride name
       diazene" → ``ethenyl(methyl)diazene`` (PIN),
       ``(naphthalen-2-yl)(phenyl)diazene`` (PIN); a prefix is enclosed when it is
-      compound (P-16.3.3) or, being simple, is not cited first and must be set off
+      compound or, being simple, is not cited first and must be set off
       from the prefix before it.
 
     Returns None (fail-closed) if a required multiplier is unavailable."""
@@ -177,8 +177,8 @@ def _format_n2_substituents(subs: List[Tuple[int, str]],
         return enclose_if_compound(subs[0][1])
 
     if is_diazene:
-        # P-68.3.1.3.2: locants OMITTED — each N is =N-, so the two substituents
-        # are necessarily 1,2 (unambiguous, P-14.3.4). A symmetric pair becomes
+        #: locants OMITTED — each N is =N-, so the two substituents
+        # are necessarily 1,2 (unambiguous,. A symmetric pair becomes
         # ``di{R}``; distinct names are cited alphabetically without locants.
         counts: Dict[str, int] = {}
         for _, name in subs:
@@ -198,7 +198,7 @@ def _format_n2_substituents(subs: List[Tuple[int, str]],
         return ''.join(parts)
 
     # hydrazine (N–N): 1,1- vs 1,2- is a real distinction -> cite locants.
-    # Lowest locant set, then the P-14.4 (g) tie-break (BB 3307): "lowest locants
+    # Lowest locant set, then the (g) tie-break (BB 3307): "lowest locants
     # for the substituent cited first as a prefix in the name" -- BB 29956
     # `1-hydroxy-3-oxopropane-1,2,3-tricarboxylic acid` (PIN). On the symmetric
     # 2-N parent the set is {1,2} either way, so without the tie-break the
@@ -216,14 +216,14 @@ def _format_n2_substituents(subs: List[Tuple[int, str]],
     by_name: Dict[str, List[int]] = {}
     for loc, name in placed:
         by_name.setdefault(name, []).append(loc)
-    # P-14.5.2 citation order; P-16.5.1.1 marks; P-16.3.3(b)/P-16.2.4.1(d) italicized carve-out; and
+    # citation order; marks; (b)/(d) italicized carve-out; and
     # a HYPHEN between segments -- the old code joined with '' and shipped
     # `1-ethyl2-methylhydrazine` (BB 21649 `3-ethyl-2-methylhexane` (PIN)).
     parts = []
     for name in sorted(by_name, key=prefix_citation_sort_key):
         locs = sorted(by_name[name])
-        # v29 P3-CLOSEOUT Item A: multiplier word from the shared primitive
-        # (P-16.3.5(a) bis/tris for a SUBSTITUTED prefix); the local table
+        # -CLOSEOUT Item A: multiplier word from the shared primitive
+        # (a) bis/tris for a SUBSTITUTED prefix); the local table
         # could only say di/tri, so `1,2-di(cyclohexylmethyl)hydrazine`
         # shipped where `1,2-bis(...)` is required.
         if len(locs) not in _SUB_MULTIPLIER:
@@ -237,15 +237,15 @@ def _format_n2_substituents(subs: List[Tuple[int, str]],
 
 def _format_substituted_polyazane(n: int, dbpos: int,
                                   subs: List[Tuple[int, str]]) -> Optional[str]:
-    """P-68.3.1.4 / P-31.1.4: substituted polyazane (>=3 N) or polyazene PIN.
+    """ /: substituted polyazane (>=3 N) or polyazene PIN.
 
     Numbers the homogeneous N-chain in the direction giving (1) the lowest
     locant to the skeletal double bond (the 'ene'), then (2) the lowest locants
     to the detachable substituent prefixes; cites organyl substituents with
     N-chain locants. Returns the full substituted name, or None (fail-closed).
 
-        Ph-N=N-NH-Ph  ->  1,3-diphenyltriaz-1-ene   (P-68.3.1.4.2)
-        CH3-NH-NH-NH2 ->  1-methyltriazane          (P-68.3.1.4.1)
+        Ph-N=N-NH-Ph -> 1,3-diphenyltriaz-1-ene
+        CH3-NH-NH-NH2 -> 1-methyltriazane
 
     A locant-bearing / substituted substituent name is enclosed in parentheses
     and multiplied with the SIMPLE multiplier ('di', not 'bis' — BB verbatim
@@ -261,7 +261,7 @@ def _format_substituted_polyazane(n: int, dbpos: int,
             return (n - p) if rev else (p + 1)
         ene = None if dbpos < 0 else min(loc(dbpos), loc(dbpos + 1))
         sub_locs = sorted(loc(p) for p, _ in subs)
-        # P-14.4 (g) (BB 3307) tie-break: once the 'ene' locant and the
+        # (g) (BB 3307) tie-break: once the 'ene' locant and the
         # substituent locant SET have tied, the lowest locant goes to the prefix
         # cited first alphanumerically -- otherwise the direction fell through to
         # atom order (BB 29956 is the verbatim witness).
@@ -290,10 +290,10 @@ def _format_substituted_polyazane(n: int, dbpos: int,
     by_name: Dict[str, List[int]] = {}
     for p, name in subs:
         by_name.setdefault(name, []).append(loc(p))
-    # Cite prefixes in P-14.5 alphanumerical order, each with its locant set;
+    # Cite prefixes in alphanumerical order, each with its locant set;
     # join with a hyphen between a letter and a following locant digit.
     #
-    # v29 P3-FIX Item 8: this used `alpha_sort_key`, while the ORIENTATION
+    # -FIX Item 8: this used `alpha_sort_key`, while the ORIENTATION
     # tie-break 25 lines up (`_analyse`) uses `prefix_citation_sort_key`. Two
     # different orders in one code path: the direction was chosen to give the
     # lowest locant to the prefix cited first under one rule, and then the
@@ -302,20 +302,20 @@ def _format_substituted_polyazane(n: int, dbpos: int,
     # dict insertion = RDKit atom order, which re-spelling then flipped
     # (`1-(2-methylbutyl)-3-(3-methylbutyl)triazane` vs
     # `3-(3-methylbutyl)-1-(2-methylbutyl)triazane` for ONE molecule).
-    # `**P-14.5.4**` (`BlueBookV2.md:3517`) is the rule that separates them, and
+    # `****` (`the Blue Book`) is the rule that separates them, and
     # it must be the SAME key on both sides or the name contradicts the locants
     # that were assigned to justify it.
     parts: List[str] = []
     for name in sorted(by_name, key=prefix_citation_sort_key):
         locs = sorted(by_name[name])
-        # v29 P3-CLOSEOUT Item A: arity bound stays local (fail closed); the
+        # -CLOSEOUT Item A: arity bound stays local (fail closed); the
         # multiplier WORD comes from the shared primitive so a SUBSTITUTED
-        # prefix here can take bis/tris (P-16.3.5(a)).
+        # prefix here can take bis/tris (a)).
         if len(locs) not in _SUB_MULTIPLIER:
             return None
         # `enclose_if_compound` ESCALATES the marks over an inner pair
-        # (P-16.5.4.1) and carries the italicized carve-out, so `tert-butyl`
-        # stays bare; `multiplied_component` then keeps its P-16.2.4.1(d) hyphen
+        # and carries the italicized carve-out, so `tert-butyl`
+        # stays bare; `multiplied_component` then keeps its (d) hyphen
         # ('1,2-di-tert-butyl', never '1,2-ditert-butyl').
         enclosed = enclose_if_compound(name)
         parts.append(
@@ -326,17 +326,17 @@ def _format_substituted_polyazane(n: int, dbpos: int,
 
 
 def _name_azoxy(mol) -> Optional[str]:
-    """P-68.3.1.3.3.1 azoxy compound R-N=N(O)-R' -> '{diazene base} oxide'
+    """ azoxy compound R-N=N(O)-R' -> '{diazene base} oxide'
     (method (1) = PIN). The N-oxide of an azo compound is a zwitterion
     ([O-]-[N+]=N-): one chain nitrogen is a degree-3 [N+] bearing an -O(-), the
     other a degree-2 neutral =N; each nitrogen bears one organyl group.
 
-        C6H5-N=N(O)-C6H5  ->  diphenyldiazene oxide   (BB 38857)
+        C6H5-N=N(O)-C6H5 -> diphenyldiazene oxide (BB 38857)
 
     SCOPE (fail-closed -> None): only the SYMMETRIC diaryl/dialkyl case
     (R == R'), which per the BB example omits the oxide locant
     ('diphenyldiazene oxide', not '...1-oxide'). The unsymmetric case needs the
-    NNO/ONN oxide-locant machinery (P-68.3.1.3.3.1 method (2)) and is left
+    NNO/ONN oxide-locant machinery method (2)) and is left
     unbuilt (returns None) rather than emitting a locant-ambiguous name. Also
     fail-closed for a non-organyl R, a ring N, or any extra charge. Pure."""
     from rdkit import Chem
@@ -393,7 +393,7 @@ def _name_azoxy(mol) -> Optional[str]:
     from ..assembly.naming_utils import enclose_if_compound, multiplier_needs_hyphen
     enclosed = enclose_if_compound(ra)
     if enclosed == ra and multiplier_needs_hyphen(ra):
-        return f"di-{enclosed}diazene oxide"      # P-16.3.3(b)/P-16.2.4.1(d) di-tert-butyl...
+        return f"di-{enclosed}diazene oxide"      # (b)/(d) di-tert-butyl...
     return f"di{enclosed}diazene oxide"
 
 
@@ -437,13 +437,13 @@ def _formazan_substituent(mol, atom_idx, skeleton):
 
 
 def name_formazan(mol) -> Optional[str]:
-    """P-68.3.1.3.5: substituted formazan named on the retained parent hydride
+    """: substituted formazan named on the retained parent hydride
     'formazan' (H2N-N=CH-N=NH) with its special fixed numbering — N1 the
     diazenyl-terminal N (C3-N2=N1), C3 the central carbon, N5 the
     hydrazinyl-terminal N (C3=N4-N5). Organyl substituents on N1/C3/N5 are cited
     by those locants:
 
-        Ph-NH-N=CH-N=N-Ph  ->  1,5-diphenylformazan   (BB 38938)
+        Ph-NH-N=CH-N=N-Ph -> 1,5-diphenylformazan (BB 38938)
 
     Fail-closed (returns None): the UNSUBSTITUTED parent (kept on the retained
     RETAINED_NAME table), any charge/radical, a ring skeleton atom, a
@@ -492,20 +492,20 @@ def name_formazan(mol) -> Optional[str]:
         placed = [(loc, nm) for loc, nm in ((1, s1), (3, s3), (5, s5)) if nm]
         if not placed:
             return None                    # bare formazan -> retained table
-        # v29 P3-FIX Item 5: this site was WIDENED by the Phase 3 organyl
+        # -FIX Item 5: this site was WIDENED by the a phase organyl
         # migration but its composer was left on pre-migration raw code, so the
         # newly-admitted compound prefixes were mis-spelled three ways at once:
-        # a local `_SUB_MULTIPLIER` table that knows neither the P-16.3.5(a)
-        # bis/tris rule nor the P-16.2.4.1(d) hyphen; a bare `f"({nm})"` instead
-        # of the escalating `enclose_if_compound` (P-16.5.4.1.5 requires brackets
+        # a local `_SUB_MULTIPLIER` table that knows neither the (a)
+        # bis/tris rule nor the (d) hyphen; a bare `f"({nm})"` instead
+        # of the escalating `enclose_if_compound` requires brackets
         # once parentheses are already used inside -- `grep -c 'bis((' ` over the
         # Blue Book is 0 against 7 hits for `bis[(...)...]`); and `alpha_sort_key`,
         # which ties on identical letters. It shipped `1,5-ditert-butylformazan`
         # and `1,5-di((3-methylphenyl)methyl)formazan`, both OPSIN-clean so
-        # SELF-01 passed them.
+        # passed them.
         #
         # `formazan` is a retained PIN "fully substitutable by suffixes and
-        # prefixes" (`BlueBookV2.md:16521`), and `## **P-68.3.1.3.5.1** Derivatives
+        # prefixes" (`the Blue Book`), and `## **** Derivatives
         # of formazan` (`:38930`) gives `1,3-diphenylformazan (PIN)`, so the
         # locant+multiplier+marks block is an ordinary substituent prefix block
         # and belongs to the canonical builder rather than to a local copy.
@@ -528,12 +528,12 @@ def name_formazan(mol) -> Optional[str]:
 
 
 def _name_azane_carboxylic_acid(mol) -> Optional[str]:
-    """P-58.3.2 (BB 24896): H2N-(NH)k-COOH -> '<azane>-1-carboxylic acid'.
+    """ (BB 24896): H2N-(NH)k-COOH -> '<azane>-1-carboxylic acid'.
 
     Peels a single terminal bare carboxyl -C(=O)OH bonded to a chain-terminal N,
     verifies the remainder is a PURE homogeneous saturated N-chain of length
     >= 3, and returns '<parent>-1-carboxylic acid' (the acid-bearing N is locant
-    1 per P-31.1.4, lowest locant to the suffix). Returns None (fail-closed) for
+    1 per, lowest locant to the suffix). Returns None (fail-closed) for
     the 2-N member (retained hydrazinecarboxylic acid path), any other
     decoration, an interior attachment, unsaturation, ring/charge, or a
     non-nameable parent. Pure: no mol mutation of the input.
@@ -610,11 +610,11 @@ def _parent_scope_has_numeral(name: str) -> bool:
     """True iff ``name`` cites a digit at PARENT scope — outside any substituent
     enclosing marks.
 
-    **P-14.3.3 "Citation of locants"** (``BlueBookV2.md:2869``) scopes locants
+    ** "Citation of locants"** (``the Blue Book``) scopes locants
     per enclosing-mark unit, so a digit inside ``(...)``/``[...]``/``{...}`` (e.g.
     the ``2`` of ``naphthalen-2-yl``) belongs to that substituent, not to the
     parent, and does not make the parent's stereodescriptor locant essential.
-    Used by ``_ez_stereo_prefix`` to apply the P-91.3 name-dependent test."""
+    Used by ``_ez_stereo_prefix`` to apply the name-dependent test."""
     depth = 0
     for ch in name:
         if ch in '([{':
@@ -630,24 +630,24 @@ def _ez_stereo_prefix(mol, chain: List[int], dbpos: int,
                       constitution: str) -> str:
     """The E/Z stereodescriptor prefix for a single skeletal N=N double bond.
 
-    **P-91.3 "NAMING OF STEREOISOMERS"** (``BlueBookV2.md:44637`` heading;
+    ** "NAMING OF STEREOISOMERS"** (``the Blue Book`` heading;
     decisive sentence ``:44643``): the descriptors "are preceded by a numerical
     or letter locant to describe the position of the stereogenic unit **when
     such locants are present**". So the lone N=N E/Z descriptor carries a locant
     IFF the assembled constitution cites a numeral in the PARENT scope — a
     NAME-DEPENDENT test, not an atom count.
 
-    The 2-N diazene constitution cites no numeral (P-68.3.1.3.2 omits the
+    The 2-N diazene constitution cites no numeral omits the
     substituent locants because each ``=N-`` carries one substitutable valence;
-    P-14.3.4.2(d) ``:2929-2931`` elides the parent N=N locant, ``NH=NH ->
+    (d) ``:2929-2931`` elides the parent N=N locant, ``NH=NH ->
     diazene``), so the descriptor's locant is omitted too:
 
-        c1ccc(/N=N\\c2ccccc2)cc1  ->  (Z)-diphenyldiazene   (P-93.4.2.1.3)
+        c1ccc(/N=N\\c2ccccc2)cc1 -> (Z)-diphenyldiazene
 
-    This mirrors STER-01 (``_handler_shared.py:1532``, ``(E)-cyclooctene``,
-    P-91.2.2) and its ethene counter-example, which KEEPS the locant because the
+    This mirrors (``_handler_shared.py:1532``, ``(E)-cyclooctene``,
+     and its ethene counter-example, which KEEPS the locant because the
     ``1,2-`` substituent locants ARE cited
-    (``(1Z)-1,2-dibromo-1-chloro-2-iodoethene``, P-93.4.2.1.1).
+    (``(1Z)-1,2-dibromo-1-chloro-2-iodoethene``,.
 
     Returns ``''`` (no descriptor -> the constitution stands, or the stereo-less
     name is rejected downstream, fail-closed) for a saturated chain, no assigned
@@ -666,7 +666,7 @@ def _ez_stereo_prefix(mol, chain: List[int], dbpos: int,
         # the ene locant): the descriptor locant must equal the parent's cited
         # double-bond position, which this clause does not recompute -> defer.
         return ''
-    return f"({cip})-"                            # P-91.3 omission (BB:44643)
+    return f"({cip})-"                            # omission (the Blue Book)
 
 
 def name_polyazane(mol) -> Optional[str]:
@@ -676,14 +676,14 @@ def name_polyazane(mol) -> Optional[str]:
         return None
     if len(Chem.GetMolFrags(mol)) != 1:
         return None
-    # W3-P15 (P-68.3.1.3.3): azoxy R-N=N(O)-R' is the zwitterionic N-oxide of a
+    # W3-P15: azoxy R-N=N(O)-R' is the zwitterionic N-oxide of a
     # diazene ([N+]=N with an [O-]); it must be recognised BEFORE the general
     # neutral-only charge guard below, which would otherwise decline it. Method
     # (1) gives the PIN ('diphenyldiazene oxide'). Fail-closed -> the guard.
     _azoxy = _name_azoxy(mol)
     if _azoxy is not None:
         return _azoxy
-    # W3-P15 (P-68.3.1.3.5): a SUBSTITUTED formazan (R-N=N-C(R')=N-NH-R'') is
+    # W3-P15: a SUBSTITUTED formazan (R-N=N-C(R')=N-NH-R'') is
     # named on the retained parent 'formazan' with its special numbering. The
     # unsubstituted parent keeps its RETAINED_NAME table entry (name_formazan
     # returns None for it). Detected here (the N-N chain is broken by the central
@@ -695,7 +695,7 @@ def name_polyazane(mol) -> Optional[str]:
         if atom.GetFormalCharge() != 0 or atom.GetNumRadicalElectrons() != 0:
             return None
 
-    # P-58.3.2 (BB 24896): a homogeneous heteroatom (N-N-N…) chain may be BROKEN
+    # (BB 24896): a homogeneous heteroatom (N-N-N…) chain may be BROKEN
     # to express a senior characteristic group. H2N-(NH)k-COOH -> the carboxylic
     # acid is senior to the carbonic-acid derivative, so the N-chain is the
     # 'azane' parent and -COOH is the '-carboxylic acid' suffix at the N bearing
@@ -735,11 +735,11 @@ def name_polyazane(mol) -> Optional[str]:
     else:
         # lowest-locant numbering for the single double bond.
         loc = min(dbpos + 1, n - dbpos - 1)
-        # P-14.3.4.2(d) (BB:2921; example `H2N-N=NH triazene`, :2937): an
+        # (d) (the Blue Book; example `H2N-N=NH triazene`,:2937): an
         # UNSUBSTITUTED monounsaturated homogeneous chain omits the double-bond
         # locant when only one such isomer exists -- the rule's `dinuclear and
         # trinuclear` bound -> `triazene`, not `triaz-1-ene`. A SUBSTITUTED chain
-        # KEEPS the locant (P-14.3.3: the substituent locants share the scope, so
+        # KEEPS the locant: the substituent locants share the scope, so
         # e.g. `1,3-diphenyltriaz-1-ene`), which is why this is gated on `not subs`;
         # the substituted >=3-N path in `_format_substituted_polyazane` computes
         # its own locanted parent and never reaches here.
@@ -751,9 +751,9 @@ def name_polyazane(mol) -> Optional[str]:
     if not subs:
         constitution = parent
     # The 2-N parents (hydrazine/diazene) keep the special single-substituent
-    # locant-omission rule (methylhydrazine, not 1-methylhydrazine, P-14.3.4.2).
+    # locant-omission rule (methylhydrazine, not 1-methylhydrazine,.
     # For TWO substituents the parents diverge: hydrazine (N–N, saturated) cites
-    # 1,1-/1,2- locants; diazene (N=N) omits them (P-68.3.1.3.2 — see
+    # 1,1-/1,2- locants; diazene (N=N) omits them — see
     # _format_n2_substituents). ``saturated`` is False iff a chain double bond
     # was found, which on a 2-N chain is exactly the diazene case.
     elif n == 2:
@@ -762,17 +762,17 @@ def name_polyazane(mol) -> Optional[str]:
             return None
         constitution = f"{formatted}{parent}"
     else:
-        # W3-P15 (P-68.3.1.4.2 / P-31.1.4): substituted polyazanes/polyazenes with
+        # W3-P15 /: substituted polyazanes/polyazenes with
         # >=3 N are numbered for lowest ene-then-substituent locants and cite
         # organyl substituents with N-chain locants (1,3-diphenyltriaz-1-ene).
         constitution = _format_substituted_polyazane(n, dbpos, subs)
         if constitution is None:
             return None                            # fail-closed
 
-    # P-91.3 (BB:44643): a single skeletal N=N double bond carrying an E/Z
+    # (the Blue Book): a single skeletal N=N double bond carrying an E/Z
     # configuration takes its stereodescriptor at the front of the name. On the
     # 2-N diazene the parent cites no locant, so the descriptor's locant is
-    # omitted too -> `(Z)-diphenyldiazene` (P-93.4.2.1.3). See _ez_stereo_prefix.
+    # omitted too -> `(Z)-diphenyldiazene`. See _ez_stereo_prefix.
     prefix = _ez_stereo_prefix(mol, chain, dbpos, constitution)
     return f"{prefix}{constitution}" if prefix else constitution
 

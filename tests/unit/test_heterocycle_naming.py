@@ -10,7 +10,7 @@ Tests retained names and Hantzsch-Widman systematic naming for:
 - HETERO-06: HW systematic naming (fallback)
 - HETERO-07: 4-membered heterocycles
 
-Reference: IUPAC 2013 Blue Book, Section P-22 (Heterocycles)
+Reference: IUPAC 2013 Blue Book, Section (Heterocycles)
 """
 
 import pytest
@@ -92,7 +92,7 @@ class TestFiveMemberedSaturatedHeterocycles:
         ("C1CCOC1", "oxolane"),
         # Nitrogen - pyrrolidine
         ("C1CCNC1", "pyrrolidine"),
-        # Sulfur - Wave2 T1d: HW name 'thiolane' is the PIN (mirrors oxolane; P-63.5)
+        # Sulfur - Wave2 T1d: HW name 'thiolane' is the PIN (mirrors oxolane;
         ("C1CCSC1", "thiolane"),
     ])
     def test_retained_names(self, smiles, expected):
@@ -132,12 +132,12 @@ class TestFiveMemberedAromaticHeterocycles:
     @pytest.mark.parametrize("smiles,expected", [
         # Single heteroatom
         ("c1ccoc1", "furan"),
-        # v23 IH-01: N-H azoles carry the leading indicated hydrogen in the PIN.
+        #: N-H azoles carry the leading indicated hydrogen in the PIN.
         ("c1cc[nH]c1", "1H-pyrrole"),
         ("c1ccsc1", "thiophene"),
         # Two heteroatoms - 1,3 arrangement
         ("c1c[nH]cn1", "1H-imidazole"),  # N at 1,3
-        ("c1cnco1", "1,3-oxazole"),   # Wave2 P-52.2.2.2 HW-locant PIN (was 'oxazole')
+        ("c1cnco1", "1,3-oxazole"),   # Wave2 HW-locant PIN (was 'oxazole')
         ("c1cncs1", "1,3-thiazole"),  # PIN (was 'thiazole')
         # Two heteroatoms - 1,2 arrangement
         ("c1cc[nH]n1", "1H-pyrazole"),   # N at 1,2
@@ -359,7 +359,7 @@ class TestHWSystematicNaming:
     def test_hw_name_multiple_different_heteroatoms(self):
         """Test HW naming with multiple different heteroatoms."""
         # O has higher priority than N, so oxa comes first. N present -> -inane
-        # stem (P-22.2.2.1.2). Locants are collected once at the front (C6b).
+        # stem. Locants are collected once at the front (C6b).
         # Morpholine-like connectivity but the HW form: O at 1, N at 4.
         result = build_hw_name([(1, 'O'), (4, 'N')], 6, True, False)
         assert result == "1,4-oxazinane"
@@ -440,7 +440,7 @@ class TestMultipleSameHeteroatoms:
     @pytest.mark.unit
     @pytest.mark.parametrize("smiles,expected", [
         # Tetrazole - 4 nitrogens in 5-membered aromatic ring.
-        # v23 IH-01: this tautomer is the 1H- form (OPSIN-RT verified).
+        #: this tautomer is the 1H- form (OPSIN-RT verified).
         ("c1nnn[nH]1", "1H-tetrazole"),
     ])
     def test_multiple_nitrogen_aromatics(self, smiles, expected):
@@ -497,7 +497,7 @@ class TestEdgeCases:
             "c1cnc[nH]1",  # Different starting position
         ]
         for smiles in smiles_variants:
-            assert name_compound(smiles) == "1H-imidazole"  # v23 IH-01: leading indicated-H
+            assert name_compound(smiles) == "1H-imidazole"  #: leading indicated-H
 
 
 # =============================================================================
@@ -521,12 +521,12 @@ class TestPipelineIntegration:
         ("C1CCOC1", "oxolane"),
         ("C1CCNC1", "pyrrolidine"),
         ("C1CCSC1", "thiolane"),  # Wave2 T1d: HW PIN (was tetrahydrothiophene)
-        # 5-membered aromatic (v23 IH-01: N-H azoles carry leading 1H-)
+        # 5-membered aromatic (: N-H azoles carry leading 1H-)
         ("c1ccoc1", "furan"),
         ("c1cc[nH]c1", "1H-pyrrole"),
         ("c1ccsc1", "thiophene"),
         ("c1c[nH]cn1", "1H-imidazole"),
-        ("c1cnco1", "1,3-oxazole"),   # Wave2 P-52.2.2.2 PIN
+        ("c1cnco1", "1,3-oxazole"),   # Wave2 PIN
         ("c1cncs1", "1,3-thiazole"),
         ("c1cc[nH]n1", "1H-pyrazole"),
         ("c1ccno1", "1,2-oxazole"),
@@ -641,7 +641,7 @@ class TestNameHeterocycleFunction:
 
 # =============================================================================
 # C6b: Hantzsch-Widman PINs for 2-heteroatom medium rings (task 1.7 completion)
-# Blue Book P-22.2.2.1 — mixed-heteroatom saturated 3-10 rings get HW names,
+# Blue Book — mixed-heteroatom saturated 3-10 rings get HW names,
 # NOT skeletal replacement. Locants are MANDATORY and load-bearing (bare
 # "oxazepane" round-trips to the 1,2-isomer, a different molecule).
 # =============================================================================
@@ -651,7 +651,7 @@ class TestC6bMediumRingHWNames:
 
     @pytest.mark.unit
     @pytest.mark.parametrize("smiles,expected", [
-        # 7-membered, O/S/Se/Te/N + N  -> {1,4} set
+        # 7-membered, O/S/Se/Te/N + N -> {1,4} set
         ("C1CNCCOC1", "1,4-oxazepane"),
         ("C1CNCCNC1", "1,4-diazepane"),
         ("C1CNCCSC1", "1,4-thiazepane"),
@@ -669,9 +669,9 @@ class TestC6bMediumRingHWNames:
         # Retained names MUST be untouched.
         ("C1COCCN1", "morpholine"),
         ("C1CNCCN1", "piperazine"),
-        # Task AA5: was "thiazolidine".  P-22.2.1 Table 2.3, BlueBookV2.md:8182,
+        # Task AA5: was "thiazolidine"., the Blue Book,
         # one non-interleaved line: "oxazolidine 1,3-oxazolidine (PIN)
-        # thiazolidine (S instead of O) 1,3-thiazolidine (PIN) ...".  Note this
+        # thiazolidine (S instead of O) 1,3-thiazolidine (PIN)...". Note this
         # very class already asserted the locant-bearing form for the OXYGEN
         # analogue two blocks up ("C1NCCO1" -> "1,3-oxazolidine"); the sulfur row
         # asserting the bare stem was the inconsistency, not the fix.
@@ -718,10 +718,10 @@ class TestC6bBuildHWNameLocants:
 
 
 class TestHeteroarenePCGLowestLocant:
-    """v28 Cluster A Fix 5 (P-14.4(c)): on a monocyclic heteroarene whose single
+    """ Fix 5 (c)): on a monocyclic heteroarene whose single
     heteroatom fixes locant 1 but leaves a CW/CCW choice, the principal
     characteristic group expressed as a WHOLLY-EXOCYCLIC appended suffix
-    (-carboxylic acid, -carbaldehyde, -carbonitrile, ...) must receive the
+    (-carboxylic acid, -carbaldehyde, -carbonitrile,...) must receive the
     lowest locant BEFORE detachable substituent prefixes. Previously the
     heterocyclic pg-anchor extraction handled only ring-C-bonded heteroatom
     suffixes (-ol/-one/-amine), never the appended suffix, so the tie was broken

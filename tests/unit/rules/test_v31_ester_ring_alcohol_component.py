@@ -1,12 +1,12 @@
-"""v31 breadth (coverage-by-construction, class 1): an ester whose ALCOHOL
+""" breadth (coverage-by-construction, class 1): an ester whose ALCOHOL
 component is a ring must name the cyclic component correctly, not linearise it.
 
 Root cause: `esters.get_alkyl_fragment_name` derives the alcohol-component word
 from a CARBON COUNT when the centralized `name_substituent_fragment` primitive
-declines it (its DROP-24 guard declines ring-bearing fragments). The count path
+declines it (its guard declines ring-bearing fragments). The count path
 then linearises the ring and drops the ring's own substituents --
 `CC(=O)O[C@H]1CCCCC[C@@H]1O` came out `(1S,2S)-heptyl acetate` (cycloheptane ->
-7 chain carbons, -OH dropped): a WRONG molecule that SELF-01 suppressed into a
+7 chain carbons, -OH dropped): a WRONG molecule that suppressed into a
 silent abstention. Fix: route a declined ring alcohol component through the
 recursive substituent namer (`name_substituent`, the C4 keystone), which names a
 decorated ring at PIN. Fail-closed: only runs after the old primitive declined,

@@ -7,11 +7,11 @@ path, and it is the only break in an otherwise systematic five-member series:
 
 Blue Book basis (each anchor opened and quoted, not relayed):
 
-* P-64.3 "PSEUDOKETONES" (the Blue Book) -> **P-64.3.1** (:29314), verbatim:
+* "PSEUDOKETONES" (the Blue Book) -> **** (:29314), verbatim:
   "Cyclic anhydrides, esters and amides are named as pseudoketones; the resulting
   names are preferred IUPAC names." Its own example list prints, at:29323:
-  ``azepan-2-one (PIN) hexano-6-lactam (see P-66.1.5.1)``.
-* P-66.1.5.1 "Lactams and lactims" (:33219). Lactams "are named in two ways":
+  ``azepan-2-one (PIN) hexano-6-lactam (see ``.
+* "Lactams and lactims" (:33219). Lactams "are named in two ways":
   (1) "as heterocyclic pseudoketones" (:33223); (2) the ``...o-N-lactam`` form
   (:33224). The decisive sentence is the last one,:33226 -- "Method (1)
   generates preferred IUPAC names." So even ``hexano-6-lactam`` is only the
@@ -22,12 +22,12 @@ Blue Book basis (each anchor opened and quoted, not relayed):
   enumerated by hand -- the name is in none of them. Fragment forms
   (``capro``, ``caprol``, ``prolactam``, ``aprolactam``) are 0 too, so OCR
   splitting and italic markup are excluded as false-negative sources.
-* Supporting, P-102.5.6.6.2.2 (:53745): "The use of Greek letters to indicate
+* Supporting, (:53745): "The use of Greek letters to indicate
   the size of a lactone or lactam ring is not recommended." ``caprolactam`` is
   the contracted form of epsilon-caprolactam.
 
-⚠ The pre-existing inline comment at ``retained_names.py:579`` cited "P-31.1.4
-retained lactam name". P-31.1.4 (heading:16619) is "Bi- and polycyclic von
+⚠ The pre-existing inline comment at ``retained_names.py:579`` cited "
+retained lactam name". (heading:16619) is "Bi- and polycyclic von
 Baeyer parent hydrides" and says nothing about lactams or retained names; that
 citation was wrong and is corrected by this change.
 
@@ -106,7 +106,7 @@ def test_sibling_ring_sizes_are_untouched(ring_size, expected):
 
 
 def test_no_ring_size_emits_the_non_preferred_lactam_suffix_form():
-    """P-66.1.5.1 method (2) (``hexano-6-lactam``) is NOT preferred --:33226
+    """ method (2) (``hexano-6-lactam``) is NOT preferred --:33226
     "Method (1) generates preferred IUPAC names." The producer must never build
     that form at ANY ring size.
 

@@ -1,8 +1,8 @@
 """
-Unit tests for ring merge determinism (PERC-08).
+Unit tests for ring merge determinism .
 
-Ensures that get_ring_systems() produces identical groupings regardless of
-SSSR iteration order.  Tests run each merge operation 20 times to catch
+Ensures that get_ring_systems produces identical groupings regardless of
+SSSR iteration order. Tests run each merge operation 20 times to catch
 non-deterministic behavior.
 """
 
@@ -12,7 +12,7 @@ from orthonym.perception.rings import get_ring_systems
 
 
 class TestRingMergeDeterminism:
-    """PERC-08: Ring merge produces identical groupings regardless of iteration order."""
+    """: Ring merge produces identical groupings regardless of iteration order."""
 
     def test_naphthalene_single_system(self):
         """Naphthalene: 2 fused rings -> 1 ring system, always."""

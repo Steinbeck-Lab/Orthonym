@@ -9,7 +9,7 @@ Tests all pure naming utility functions:
 - Multiplier prefix selection
 - Vowel elision
 - Suffix with locants formatting (PIN style)
-- Enclosing marks depth cycling (P-16.5.1.1)
+- Enclosing marks depth cycling
 """
 
 import pytest
@@ -130,7 +130,7 @@ class TestFormatSubstituentPrefix:
         assert result == "2,4,7-tris(1-methylethyl)"
 
     def test_complex_single_with_parentheses(self):
-        """Single complex substituent with numeric locants gets parentheses (IUPAC P-16.5.1.1)."""
+        """Single complex substituent with numeric locants gets parentheses (IUPAC."""
         result = format_substituent_prefix("1-methylethyl", [4], 1)
         assert result == "4-(1-methylethyl)"
 
@@ -256,11 +256,11 @@ class TestIsComplexSubstituent:
         assert is_complex_substituent("2-propyl") is True
 
     def test_internal_hyphen_is_complex(self):
-        """A genuine compound substituent (locant + hyphen) is complex (P-16.3.3)."""
+        """A genuine compound substituent (locant + hyphen) is complex."""
         assert is_complex_substituent("1-methylpropyl") is True
 
     def test_sec_tert_retained_names_are_simple(self):
-        """Phase 171 BBR-ASM (P-16.3.3(b)/P-16.2.4.1(d)): the leading italic sec-/tert- prefix on an
+        """a phase BBR-ASM (b)/(d)): the leading italic sec-/tert- prefix on an
         otherwise-simple retained name does NOT make it complex — di-tert-butyl /
         the bare N-substituent, NOT bis(tert-butyl) (BB 3465 / BB 7070). The earlier blanket
         'any hyphen -> complex' rule over-parenthesised these."""
@@ -474,7 +474,7 @@ class TestFormatSuffixWithLocants:
 
 @pytest.mark.unit
 class TestEnclosingMarksDepthCycling:
-    """Tests for IUPAC P-16.5.1.1 enclosing marks cycling through all 7 depths."""
+    """Tests for IUPAC enclosing marks cycling through all 7 depths."""
 
     @pytest.mark.parametrize("depth,expected", [
         (0, "(x)"),
@@ -486,7 +486,7 @@ class TestEnclosingMarksDepthCycling:
         (6, "(x)"),
     ])
     def test_enclosing_marks_depth_0_through_6(self, depth, expected):
-        """Enclosing marks cycle () -> [] -> {} -> () at each depth level."""
+        """Enclosing marks cycle  ->  -> {} ->  at each depth level."""
         assert apply_enclosing_marks("x", depth) == expected
 
     def test_enclosing_marks_preserves_content(self):
@@ -519,7 +519,7 @@ class TestC11PlusAlkylRootCoverage:
     """Tests for C11-C20 alkyl root recognition in utility functions.
 
     These test edge cases where alkyl roots beyond C10 (undecyl through icosyl)
-    must be recognized by needs_brackets(), is_complex_substituent(), and the
+    must be recognized by needs_brackets, is_complex_substituent, and the
     regex patterns _HALOALKYL_RE and _ALKYLAMINO_RE.
     """
 
@@ -535,7 +535,7 @@ class TestC11PlusAlkylRootCoverage:
     def test_alkyl_roots_full_contains_icosyl(self):
         assert "icosyl" in _ALKYL_ROOTS_FULL
 
-    # --- needs_brackets() C11+ tests ---
+    # --- needs_brackets C11+ tests ---
 
     def test_needs_brackets_hydroxyundecyl(self):
         """C11: hydroxy + undecyl is a compound substituent."""
@@ -561,7 +561,7 @@ class TestC11PlusAlkylRootCoverage:
         """C11: undecyl + sulfinyl is a compound substituent."""
         assert needs_brackets("undecylsulfinyl") is True
 
-    # --- is_complex_substituent() C11+ tests ---
+    # --- is_complex_substituent C11+ tests ---
 
     def test_is_complex_undecylsulfinyl(self):
         """C11: undecylsulfinyl is a complex substituent."""
@@ -598,8 +598,8 @@ class TestC11PlusAlkylRootCoverage:
         It exists only because the regexes compile at import time, ahead of the
         table. If the two drift apart, a whole band of multipliers silently stops
         being recognised as a compound haloalkyl prefix -- which is exactly the bug
-        v29 Phase C Task 5a hit: the alternation stopped at ``hexa``, so
-        ``heptafluoropropyl`` lost its enclosing marks the moment P-14.3.4.5
+         Phase C Task 5a hit: the alternation stopped at ``hexa``, so
+        ``heptafluoropropyl`` lost its enclosing marks the moment
         (``:3007``) removed its locants.
         """
         from orthonym.assembly.naming_utils import (
@@ -612,7 +612,7 @@ class TestC11PlusAlkylRootCoverage:
         "undecafluoropentyl", "pentadecafluorooctyl", "tridecafluorohexyl",
     ])
     def test_haloalkyl_re_covers_multipliers_above_hexa(self, name):
-        """P-14.3.4.5 emits locant-free names, so this regex -- not the digit check
+        """ emits locant-free names, so this regex -- not the digit check
         in is_complex_substituent -- becomes the load-bearing enclosing-mark gate."""
         from orthonym.assembly.naming_utils import _HALOALKYL_RE
         assert _HALOALKYL_RE.match(name) is not None, name
@@ -638,10 +638,10 @@ class TestC11PlusAlkylRootCoverage:
         from orthonym.assembly.naming_utils import _ALKYLAMINO_RE
         assert _ALKYLAMINO_RE.match("methylamino") is not None
 
-    # --- alpha_sort_key("trioxo") IUPAC P-14.4 behavior ---
+    # --- alpha_sort_key("trioxo") IUPAC behavior ---
 
     def test_alpha_sort_key_trioxo_returns_oxo(self):
-        """Per IUPAC P-14.4, 'tri' is a multiplicative prefix stripped for
+        """Per IUPAC, 'tri' is a multiplicative prefix stripped for
         alphabetization. alpha_sort_key('trioxo') correctly returns 'oxo'.
         This is used ONLY as a sort key, never for text reconstruction."""
         assert alpha_sort_key("trioxo") == "oxo"
@@ -653,8 +653,8 @@ class TestC11PlusAlkylRootCoverage:
 
 @pytest.mark.unit
 class TestPhase8MultipliedSuffixAndSilyl:
-    """v23 Phase 8: amine-suffix elision (BB P-62.2.4.1.2: 'tetramine', not
-    'tetraamine') + silyl/germyl-with-prefix complexity (P-16.3.3)."""
+    """ a phase: amine-suffix elision (BB: 'tetramine', not
+    'tetraamine') + silyl/germyl-with-prefix complexity."""
 
     def test_join_multiplied_suffix_amine_elision(self):
         from orthonym.assembly.naming_utils import _join_multiplied_suffix
@@ -663,7 +663,7 @@ class TestPhase8MultipliedSuffixAndSilyl:
         assert _join_multiplied_suffix("penta", "amine") == "pentamine"
         assert _join_multiplied_suffix("di", "amine") == "diamine"
         assert _join_multiplied_suffix("tri", "amine") == "triamine"
-        # -ol elision preserved; -one elides its 'a' too (Blue Book P-64.2.2.1(1):
+        # -ol elision preserved; -one elides its 'a' too (Blue Book (1):
         # 'tetrone', e.g. pentacosane-7,9,17,19-tetrone (PIN)). Wave2 T1b.
         assert _join_multiplied_suffix("tetra", "ol") == "tetrol"
         assert _join_multiplied_suffix("tetra", "one") == "tetrone"

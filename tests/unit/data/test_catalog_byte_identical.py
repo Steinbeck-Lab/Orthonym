@@ -1,6 +1,6 @@
-"""a phase SC-6: catalog byte-identical lock verification.
+"""a phase: catalog byte-identical lock verification.
 
-Per 149-CONTEXT.md: when match_fused_heterocycle_core() returns
+Per 149-internal notes: when match_fused_heterocycle_core returns
 non-None, NOTHING in the call graph changes. Cataloged compounds flow
 through namer._build_ring_info_for_parent_selection Branch 1 (existing);
 their iupac_locants come from the catalog's iupac_locants dict; a phase's
@@ -8,13 +8,13 @@ Branch 6.5 never fires for cataloged compounds.
 
 This test parametrizes over every entry in FUSED_HETEROCYCLE_DATA and
 asserts name_compound(smiles) == post-148.2-baseline-name byte-identical.
-The baseline name table is FROZEN at Plan 02 capture time per a phase.2
+The baseline name table is FROZEN at Plan 02 capture time per a phase
 determinism doctrine (captured by Task 02-00 BEFORE any Plan 02 source
 modifications landed).
 
-Source: 149-CONTEXT.md (additive, byte-identical-on-catalog).
-Source: 148-CONTEXT.md / byte-identical preservation precedent.
-Source: SC-6 acceptance gate (G6 in 149-VERIFICATION.md).
+Source: 149-internal notes (additive, byte-identical-on-catalog).
+Source: 148-internal notes / byte-identical preservation precedent.
+Source: acceptance gate (G6 in internal notes).
 """
 import pytest
 
@@ -93,7 +93,7 @@ POST_148_2_BASELINE_NAMES = {
     'c1ccc2[nH]nnc2c1': '1H-benzotriazole',
     'c1ccc2[se]cnc2c1': '1,3-benzoselenazole',
     'c1ccc2c(c1)-c1ccccc1-2': 'biphenylene',
-    # Phase C: P-54.4.3.2 (the Blue Book) names the retained forms 'indane' /
+    # Phase C: (the Blue Book) names the retained forms 'indane' /
     # 'indoline' / 'isoindoline' verbatim as NOT preferred IUPAC names; the Blue Book /
     #:16992 /:16999 print the PINs. The baseline is re-frozen on the PIN spelling.
     'c1ccc2c(c1)CCC2': '2,3-dihydro-1H-indene',
@@ -113,7 +113,7 @@ POST_148_2_BASELINE_NAMES = {
     'c1ccc2c(c1)Nc1ccccc1O2': '10H-phenoxazine',
     'c1ccc2c(c1)Nc1ccccc1S2': '10H-phenothiazine',
     'c1ccc2c(c1)OCCO2': '2,3-dihydro-1,4-benzodioxine',
-    'c1ccc2c(c1)Oc1ccccc1S2': 'phenoxathiine',  #: PIN keeps terminal 'e' (P-25.2.2.3, the Blue Book)
+    'c1ccc2c(c1)Oc1ccccc1S2': 'phenoxathiine',  #: PIN keeps terminal 'e', the Blue Book)
     'c1ccc2c(c1)Sc1ccccc1S2': 'thianthrene',
     'c1ccc2c(c1)[nH]c1ccccc12': '9H-carbazole',
     'c1ccc2c(c1)[nH]c1cnccc12': '9H-beta-carboline',
@@ -148,10 +148,10 @@ POST_148_2_BASELINE_NAMES = {
     'c1ccc2nonc2c1': '2,1,3-benzoxadiazole',
     'c1ccc2nscc2c1': '2,1-benzothiazole',
     'c1ccc2nsnc2c1': '2,1,3-benzothiadiazole',
-    'c1ccc2occc2c1': '1-benzofuran',  #: PIN locant (P-25.2.2.4, the Blue Book)
+    'c1ccc2occc2c1': '1-benzofuran',  #: PIN locant, the Blue Book)
     'c1ccc2ocnc2c1': '1,3-benzoxazole',
     'c1ccc2oncc2c1': '1,2-benzisoxazole',
-    'c1ccc2sccc2c1': '1-benzothiophene',  #: PIN locant (P-25.2.2.4, the Blue Book)
+    'c1ccc2sccc2c1': '1-benzothiophene',  #: PIN locant, the Blue Book)
     'c1ccc2scnc2c1': '1,3-benzothiazole',
     'c1ccn2cccc2c1': 'indolizine',
     'c1ccn2ccnc2c1': 'imidazo[1,2-a]pyridine',
@@ -203,10 +203,10 @@ POST_148_2_BASELINE_NAMES = {
     ids=list(POST_148_2_BASELINE_NAMES.keys()),
 )
 def test_catalog_byte_identical(smiles, expected_name):
-    """SC-6: cataloged-path output byte-identical post-149.
+    """: cataloged-path output byte-identical post-149.
 
-    Source: 149-CONTEXT.md.
-    Source: SC-6 / G6 acceptance gate.
+    Source: 149-internal notes.
+    Source: / G6 acceptance gate.
     """
     actual = name_compound(smiles)
     assert actual == expected_name, (

@@ -3,7 +3,7 @@
 Ensures that N-substituted amide names never contain "N-N-" duplication
 and that legitimate "N,N-" prefixes for di-substituted amides are preserved.
 
-IUPAC Reference: P-66.6.3.2.2 (N-substituted amide naming)
+IUPAC Reference: (N-substituted amide naming)
 Phase: 90-02 Task 2
 """
 import pytest

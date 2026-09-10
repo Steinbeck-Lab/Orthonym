@@ -1,13 +1,13 @@
 """
-End-to-end tests for Phase 14.6 accuracy fixes.
+End-to-end tests for a phase accuracy fixes.
 
 Tests the 6 bugs fixed in this phase:
-- BUG-1: Aromatic ring as alkyl chain in ion naming
-- BUG-2: Nitrile on benzene not named
-- BUG-3: Fused heterocycle substituent dropping
-- BUG-4: Chromene/coumarin naming failure
-- BUG-5: Carboxylate anion with aromatic parent (same as BUG-1)
-- BUG-6: Thiazolidine/saturated heterocycle misidentification
+-: Aromatic ring as alkyl chain in ion naming
+-: Nitrile on benzene not named
+-: Fused heterocycle substituent dropping
+-: Chromene/coumarin naming failure
+-: Carboxylate anion with aromatic parent (same as)
+-: Thiazolidine/saturated heterocycle misidentification
 """
 
 import pytest
@@ -15,10 +15,10 @@ from orthonym import name_compound
 
 
 class TestBug1And5AromaticCarboxylate:
-    """BUG-1 & BUG-5: Aromatic ring counted as alkyl chain in carboxylate naming."""
+    """ &: Aromatic ring counted as alkyl chain in carboxylate naming."""
 
     def test_4_chlorobenzoate(self):
-        """Critical success criteria #1 from CONTEXT.md"""
+        """Critical success criteria #1 from internal notes"""
         result = name_compound('O=C([O-])c1ccc(Cl)cc1')
         assert result == '4-chlorobenzoate', f"Got {result}"
 
@@ -50,10 +50,10 @@ class TestBug1And5AromaticCarboxylate:
 
 
 class TestBug2BenzeneNitrile:
-    """BUG-2: Nitrile on benzene not named as benzonitrile."""
+    """: Nitrile on benzene not named as benzonitrile."""
 
     def test_benzonitrile(self):
-        """Critical success criteria #2 from CONTEXT.md"""
+        """Critical success criteria #2 from internal notes"""
         result = name_compound('c1ccccc1C#N')
         assert result == 'benzonitrile', f"Got {result}"
 
@@ -71,15 +71,15 @@ class TestBug2BenzeneNitrile:
 
 
 class TestBug3FusedHeterocycleSubstituents:
-    """BUG-3: Fused heterocycle substituent dropping."""
+    """: Fused heterocycle substituent dropping."""
 
     def test_indole_acetonitrile(self):
-        """Critical success criteria #3 from CONTEXT.md.
+        """Critical success criteria #3 from internal notes.
 
-        Phase 148 Plan 02 Task 03: post-148 P-44.1(a) chain-as-parent yields
+        a phase Plan 02 Task 03: post-148 (a) chain-as-parent yields
         `2-(1H-indol-3-yl)ethanenitrile` (suffix form) instead of v17
         ring-as-parent `cyanomethyl/acetonitrile` prefix. Both are
-        IUPAC-acceptable; v18 is correct per P-44.1(a).
+        IUPAC-acceptable; is correct per (a).
         """
         result = name_compound('N#CCc1c[nH]c2ccccc12')
         # Should contain indol AND cyanomethyl/acetonitrile/ethanenitrile in some form
@@ -88,14 +88,14 @@ class TestBug3FusedHeterocycleSubstituents:
         has_nitrile_token = (
             'cyanomethyl' in result_lower
             or 'acetonitrile' in result_lower
-            or 'ethanenitrile' in result_lower  # Phase 148 P-44.1(a) chain-as-parent
+            or 'ethanenitrile' in result_lower  # a phase (a) chain-as-parent
         )
         assert has_indol and has_nitrile_token, (
             f"Expected indol and nitrile token (cyanomethyl/acetonitrile/ethanenitrile), got {result}"
         )
 
     def test_indole_acetic_acid(self):
-        """Phase 148 Plan 02 Task 03: post-148 chain-as-parent suffix
+        """a phase Plan 02 Task 03: post-148 chain-as-parent suffix
         `ethanoic acid` accepted alongside v17 `carboxymethyl/acetic` prefix.
         """
         result = name_compound('OC(=O)Cc1c[nH]c2ccccc12')
@@ -104,7 +104,7 @@ class TestBug3FusedHeterocycleSubstituents:
         has_acid_token = (
             'carboxymethyl' in result_lower
             or 'acetic' in result_lower
-            or 'ethanoic' in result_lower  # Phase 148 P-44.1(a) chain-as-parent
+            or 'ethanoic' in result_lower  # a phase (a) chain-as-parent
         )
         assert has_indol and has_acid_token, (
             f"Expected indol and acid token (carboxymethyl/acetic/ethanoic), got {result}"
@@ -117,11 +117,11 @@ class TestBug3FusedHeterocycleSubstituents:
 
 
 class TestBug4ChromeneCoumarin:
-    """BUG-4: Chromene/benzopyran naming failure."""
+    """: Chromene/benzopyran naming failure."""
 
     def test_coumarin(self):
-        """v23 IH-01f: PIN is 2H-1-benzopyran-2-one (1-benzopyran is the PIN ring
-        parent per P-19(d); coumarin/chromene are general-nomenclature only)."""
+        """: PIN is 2H-1-benzopyran-2-one (1-benzopyran is the PIN ring
+        parent per (d); coumarin/chromene are general-nomenclature only)."""
         result = name_compound('O=c1ccc2ccccc2o1')
         assert result == '2H-1-benzopyran-2-one', f"Got {result}"
 
@@ -131,13 +131,13 @@ class TestBug4ChromeneCoumarin:
         assert 'benzofuran' in result_lower or 'dihydro' in result_lower, f"Got {result}"
 
     def test_chromane(self):
-        """v23 IH-01h: chromane PIN is 3,4-dihydro-2H-1-benzopyran (P-54.4.3.2)."""
+        """: chromane PIN is 3,4-dihydro-2H-1-benzopyran."""
         result = name_compound('c1ccc2OCCCc2c1')
         assert result == '3,4-dihydro-2H-1-benzopyran', f"Got {result}"
 
 
 class TestBug6Thiazolidine:
-    """BUG-6: Thiazolidine/saturated heterocycle misidentification."""
+    """: Thiazolidine/saturated heterocycle misidentification."""
 
     def test_thiazolidine(self):
         """Thiazolidine: 5-membered ring with N and S not adjacent."""
@@ -151,7 +151,7 @@ class TestBug6Thiazolidine:
 
 
 class TestRegressionExistingFunctionality:
-    """Ensure existing functionality still works after Phase 14.6 changes."""
+    """Ensure existing functionality still works after a phase changes."""
 
     def test_benzene(self):
         assert name_compound('c1ccccc1') == 'benzene'
@@ -182,27 +182,27 @@ class TestRegressionExistingFunctionality:
 
 class TestAllSuccessCriteria:
     """
-    Explicit test class for all CONTEXT.md success criteria.
-    These tests are the primary validation for Phase 14.6 completion.
+    Explicit test class for all internal notes success criteria.
+    These tests are the primary validation for a phase completion.
     """
 
     def test_success_criteria_1_aromatic_carboxylate(self):
-        """SC-1: 4-chlorobenzoate names correctly."""
+        """: 4-chlorobenzoate names correctly."""
         result = name_compound('O=C([O-])c1ccc(Cl)cc1')
         assert result == '4-chlorobenzoate'
 
     def test_success_criteria_2_benzonitrile(self):
-        """SC-2: benzonitrile names correctly."""
+        """: benzonitrile names correctly."""
         result = name_compound('c1ccccc1C#N')
         assert result == 'benzonitrile'
 
     def test_success_criteria_3_indole_acetonitrile(self):
-        """SC-3: indole-3-acetonitrile contains indol and a nitrile token.
+        """: indole-3-acetonitrile contains indol and a nitrile token.
 
-        Phase 148 Plan 02 Task 03: post-148 P-44.1(a) chain-as-parent yields
+        a phase Plan 02 Task 03: post-148 (a) chain-as-parent yields
         `2-(1H-indol-3-yl)ethanenitrile` (suffix form). Accepting all three
-        renderings (v17 cyanomethyl/acetonitrile prefix + v18 ethanenitrile
-        suffix) preserves the spirit of SC-3 while accommodating the
+        renderings (v17 cyanomethyl/acetonitrile prefix + ethanenitrile
+        suffix) preserves the spirit of while accommodating the
         IUPAC-correct cascade.
         """
         result = name_compound('N#CCc1c[nH]c2ccccc12')
@@ -211,17 +211,17 @@ class TestAllSuccessCriteria:
         assert (
             'cyanomethyl' in result_lower
             or 'acetonitrile' in result_lower
-            or 'ethanenitrile' in result_lower  # Phase 148 P-44.1(a) chain-as-parent
+            or 'ethanenitrile' in result_lower  # a phase (a) chain-as-parent
         )
 
     def test_success_criteria_4_coumarin(self):
-        """SC-4: coumarin names as the PIN 2H-1-benzopyran-2-one (v23 IH-01f, P-19(d))."""
+        """: coumarin names as the PIN 2H-1-benzopyran-2-one (, (d))."""
         result = name_compound('O=c1ccc2ccccc2o1')
         assert result == '2H-1-benzopyran-2-one', f"Got {result}"
 
 
 class TestAdditionalCoverage:
-    """Additional E2E tests for Phase 14.6 coverage."""
+    """Additional E2E tests for a phase coverage."""
 
     def test_multiple_substituents_on_benzoate(self):
         """Test benzoate with multiple substituents."""

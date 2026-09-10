@@ -1,10 +1,10 @@
 """
-End-to-end integration tests for Phase 3: Heterocycles.
+End-to-end integration tests for a phase: Heterocycles.
 
 Verifies all HETERO requirements (HETERO-01 through HETERO-09) are met.
 Tests the complete naming pipeline from SMILES to final IUPAC name.
 
-Reference: IUPAC 2013 Blue Book, Section P-22 (Heterocycles)
+Reference: IUPAC 2013 Blue Book, Section (Heterocycles)
 """
 
 import pytest
@@ -58,9 +58,9 @@ class TestHETERO03:
     @pytest.mark.parametrize("smiles,expected", [
         # Single heteroatom
         ("c1ccoc1", "furan"),
-        ("c1cc[nH]c1", "1H-pyrrole"),  # Wave2 T1d hygiene: IH-01 1H- azole PIN
+        ("c1cc[nH]c1", "1H-pyrrole"),  # Wave2 hygiene: 1H- azole PIN
         ("c1ccsc1", "thiophene"),
-        # Two heteroatoms - 1,3 arrangement (Wave2 T1d hygiene: PINs — IH-01 1H- azoles
+        # Two heteroatoms - 1,3 arrangement (Wave2 hygiene: PINs — 1H- azoles
         # + batch-A HW-locant oxa/thia-azoles; this integration file lagged the gate)
         ("c1c[nH]cn1", "1H-imidazole"),
         ("c1cnco1", "1,3-oxazole"),
@@ -215,15 +215,15 @@ class TestHETERO09:
 
 
 # =============================================================================
-# Full Phase 3 regression tests
+# Full a phase regression tests
 # =============================================================================
 
 class TestPhase3Regression:
-    """Regression tests for all Phase 3 functionality."""
+    """Regression tests for all a phase functionality."""
 
     @pytest.mark.integration
     def test_phase1_still_works(self):
-        """Test that Phase 1 (foundation) functionality still works."""
+        """Test that a phase (foundation) functionality still works."""
         # Simple alkanes
         assert name_compound("C") == "methane"
         assert name_compound("CC") == "ethane"
@@ -238,7 +238,7 @@ class TestPhase3Regression:
 
     @pytest.mark.integration
     def test_phase2_still_works(self):
-        """Test that Phase 2 (ring foundation) functionality still works."""
+        """Test that a phase (ring foundation) functionality still works."""
         # Cycloalkanes
         assert name_compound("C1CCC1") == "cyclobutane"
         assert name_compound("C1CCCCC1") == "cyclohexane"
@@ -265,7 +265,7 @@ class TestPhase3Regression:
             ("C1CCSC1", "thiolane"),  # Wave2 T1d: HW PIN (was tetrahydrothiophene)
             # 5-membered aromatic
             ("c1ccoc1", "furan"),
-            ("c1cc[nH]c1", "1H-pyrrole"),  # Wave2 T1d hygiene: IH-01 1H- azole PINs
+            ("c1cc[nH]c1", "1H-pyrrole"),  # Wave2 hygiene: 1H- azole PINs
             ("c1ccsc1", "thiophene"),
             ("c1c[nH]cn1", "1H-imidazole"),
             ("c1cc[nH]n1", "1H-pyrazole"),
@@ -320,9 +320,9 @@ class TestCounts:
 
     @pytest.mark.integration
     def test_sufficient_test_coverage(self):
-        """Verify we have comprehensive test coverage for Phase 3.
+        """Verify we have comprehensive test coverage for a phase.
 
-        This test documents the scope of Phase 3 testing.
+        This test documents the scope of a phase testing.
         """
         # This is a documentation test - it always passes
         # but documents what we're testing
@@ -337,7 +337,7 @@ class TestCounts:
         # HETERO-08: 2 compounds tested (THF, THP as retained names)
         # HETERO-09: 13 compounds tested (N-methyl variants, methylpyridines, methylfurans)
 
-        # Total Phase 3 coverage: ~45 unique compounds
-        # Plus regression tests for Phase 1 and 2
+        # Total a phase coverage: ~45 unique compounds
+        # Plus regression tests for a phase and 2
 
         assert True  # This test documents coverage

@@ -1,8 +1,8 @@
 """N-aryl amide with a JUNIOR characteristic group on the N-aryl ring.
 
 When an amide is the principal characteristic group and the ONLY other
-characteristic group (a phenol / hydroxy, an amine, ...) lives entirely on an
-N-substituent, the amide stays PCG (P-41) and the junior group is a prefix on
+characteristic group (a phenol / hydroxy, an amine,...) lives entirely on an
+N-substituent, the amide stays PCG and the junior group is a prefix on
 that N-substituent: paracetamol CC(=O)Nc1ccc(O)cc1 -> N-(4-hydroxyphenyl)acetamide.
 
 Regression: the polyfunctional handler used to delegate to rules.amides.name_amide
@@ -66,7 +66,7 @@ class TestAcylBranchUnsatHonesty:
     """The amide-delegation must only hand a SIMPLE unbranched/saturated acyl to
     name_amide (whose count-based parent naming drops branches + unsaturation).
     A branched / unsaturated acyl must fall through (correct chain name) or
-    abstain — NEVER the straight-chain saturated false friend. Fable review of
+    abstain — NEVER the straight-chain saturated false friend. a review review of
     5fbe266c found the broadened delegation both (1) pre-empted a correct
     chain-machinery name with a truthy-wrong name and (2) emitted 9 gate-off
     wrong constitutions; the acyl-simplicity guard fixes both.
@@ -87,7 +87,7 @@ class TestAcylBranchUnsatHonesty:
 
     def test_unsat_and_branched_acyls_honest(self):
         """A spread of branched / unsaturated acyls: every one either round-trips
-        or abstains (0-wrong), independent of the SELF-01 gate."""
+        or abstains (0-wrong), independent of the gate."""
         for smi in (
             "C=CC(=O)Nc1ccc(O)cc1",   # acryloyl
             "CC(C)C(=O)NCCO",         # isobutyryl

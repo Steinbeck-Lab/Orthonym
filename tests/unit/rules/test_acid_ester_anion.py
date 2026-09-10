@@ -162,7 +162,7 @@ def test_integration_failclosed_never_wrong_inorganic(namer):
     # this assertion was updated deliberately, not because the old string
     # "looked wrong": the input has zero carbon atoms (verified: no 'C' in
     # "OP(=O)([O-])OP(=O)([O-])[O-]"), and the project's own stated policy
-    # (CLAUDE.md a project rule / V36-a trace-B3 §4a) is that a carbon-free
+    # (CLAUDE.md a project rule / V36-a trace-B3 a) is that a carbon-free
     # fragment must never surface the organic sentinel. 0-wrong is
     # unaffected either way (both strings are abstentions, never a shipped
     # name); only the honesty of the abstention message changed.

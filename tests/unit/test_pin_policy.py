@@ -143,13 +143,13 @@ class TestDemoteNonPinTrivials:
         NON-PIN names; each demotes to its systematic PIN (invariant-9: the
         EXACT PIN, not abstain / von Baeyer / another retained variant).
 
-        - veratrol -> 1,2-dimethoxybenzene: P-63.2.2.2 'Retained names'
+        - veratrol -> 1,2-dimethoxybenzene: 'Retained names'
           (the Blue Book '1,2-dimethoxybenzene (PIN; no substitution on anisole
           for PINs)').
-        - o-benzoquinone -> cyclohexa-3,5-diene-1,2-dione: P-64.2.2.2.3
+        - o-benzoquinone -> cyclohexa-3,5-diene-1,2-dione:
           'Quinones' (the Blue Book 'No retained quinone names are used as
           preferred IUPAC names'; the Blue Book '(PIN) (not 1,2-benzoquinone)').
-        - barbituric acid -> 1,3-diazinane-2,4,6-trione: P-64.3.1 pseudoketones
+        - barbituric acid -> 1,3-diazinane-2,4,6-trione: pseudoketones
           (the Blue Book '1,3-diazinane-2,4,6-trione (PIN)').
         """
         cases = {
@@ -198,12 +198,12 @@ class TestDemoteNonPinTrivials:
 
     def test_phosgene_is_carbonyl_dichloride_pin(self):
         """phosgene SMILES emits the functional-class retained PIN
-        carbonyl dichloride (P-65.5.5.1)."""
+        carbonyl dichloride."""
         assert name_compound("ClC(=O)Cl", style="pin") == "carbonyl dichloride"
 
     def test_picric_acid_is_trinitrophenol_pin(self):
         """'picric acid' is retained for general nomenclature only and only when
-        unsubstituted (P-63.1.1.2); the PIN is the systematic 2,4,6-trinitrophenol.
+        unsubstituted; the PIN is the systematic 2,4,6-trinitrophenol.
         styphnic acid (a different structure) is unaffected by the name-keyed deny."""
         assert (name_compound("Oc1c([N+](=O)[O-])cc([N+](=O)[O-])cc1[N+](=O)[O-]",
                               style="pin") == "2,4,6-trinitrophenol")
@@ -221,7 +221,7 @@ class TestDemotedTrivialsAreDenied:
             "glycerol", "allyl alcohol", "chloroform", "phosgene",
             "catechol", "nicotinic acid", "dihydroxalate",
             "dihydrotartrate", "glyoxal",
-            "picric acid",  # (P-63.1.1.2): PIN is 2,4,6-trinitrophenol
+            "picric acid",  #: PIN is 2,4,6-trinitrophenol
         }
         present = {v for v in ALL_RETAINED_NAMES.values()
                    if v.lower() in demoted}
@@ -266,8 +266,8 @@ class TestDemoteRegressionGuards:
 class TestC6HomoRingDemotions:
     """C6-medring-leaks: six non-PIN 'homo-' ring-expansion trivial names must
     be demoted to pin:false so the systematic Hantzsch-Widman PIN is returned.
-    BB refs: P-22.2.2.1, P-22.2.2.1.2, P-22.2.2.1.3, P-15.1.8.1,
-    P-22.2.1 Table 2.3.
+    BB refs:,,,,
+    
     """
 
     def test_homopiperidine_demoted_to_azepane(self):
@@ -286,8 +286,8 @@ class TestC6HomoRingDemotions:
 
     def test_homomorpholine_demoted_fail_closed(self):
         """C1CNCCOC1 must NOT yield homomorpholine; PIN is 1,4-oxazepane.
-        The HW locant-elision bug (P-22.2.2.1.2 STILL_WRONG) means the
-        systematic builder currently emits a wrong-isomer name and SELF-01
+        The HW locant-elision bug STILL_WRONG) means the
+        systematic builder currently emits a wrong-isomer name and
         catches it as unknown. Either 'unknown organic compound' or
         '1,4-oxazepane' are acceptable (fail-closed better than wrong name)."""
         result = name_compound("C1CNCCOC1", style="pin")
@@ -297,7 +297,7 @@ class TestC6HomoRingDemotions:
 
     def test_thiahomomorpholine_demoted_fail_closed(self):
         """C1CNCCSC1 must NOT yield thiahomomorpholine; PIN is 1,4-thiazepane.
-        May be unknown (fail-closed) until P-22.2.2.1.2 locant fix."""
+        May be unknown (fail-closed) until locant fix."""
         result = name_compound("C1CNCCSC1", style="pin")
         assert result != "thiahomomorpholine", (
             f"thiahomomorpholine leaked into PIN headline: got {result!r}"
@@ -320,15 +320,15 @@ class TestC6HomoRingDemotions:
     # --- control cases: 6-membered retained-PIN rings must be UNCHANGED ---
 
     def test_piperidine_unchanged(self):
-        """C1CCNCC1 must still yield piperidine (retained PIN per P-22.2.1 Table 2.3)."""
+        """C1CCNCC1 must still yield piperidine (retained PIN per."""
         assert name_compound("C1CCNCC1", style="pin") == "piperidine"
 
     def test_morpholine_unchanged(self):
-        """C1COCCN1 must still yield morpholine (retained PIN per P-22.2.1 Table 2.3)."""
+        """C1COCCN1 must still yield morpholine (retained PIN per."""
         assert name_compound("C1COCCN1", style="pin") == "morpholine"
 
     def test_piperazine_unchanged(self):
-        """C1CNCCN1 must still yield piperazine (retained PIN per P-22.2.1 Table 2.3)."""
+        """C1CNCCN1 must still yield piperazine (retained PIN per."""
         assert name_compound("C1CNCCN1", style="pin") == "piperazine"
 
     def test_azocane_unchanged(self):

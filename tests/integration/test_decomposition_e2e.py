@@ -235,8 +235,8 @@ class TestPipelineIntegrity:
         """Long-chain ester that the existing pipeline names correctly.
 
         : the expectation was 'methyl palmitate'. The acyl word must
-        follow the PIN acid stem -- P-65.1.1.1 (the Blue Book) retains
-        only formic/oxalic/acetic/benzoic/oxamic as PINs and P-65.1.2 (:29860)
+        follow the PIN acid stem -- (the Blue Book) retains
+        only formic/oxalic/acetic/benzoic/oxamic as PINs and (:29860)
         makes systematic names preferred for the rest;:29787 prints '(PIN)' on
         'hexadecanoic acid'. What this test guards -- that decomposition leaves
         the pipeline name untouched -- is unaffected by the spelling.

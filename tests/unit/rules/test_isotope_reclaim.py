@@ -1,4 +1,4 @@
-""" a phase — isotope P-82 best-effort reclaim (0-wrong).
+""" a phase — isotope best-effort reclaim (0-wrong).
 
 The isotope decorator named the isotope-STRIPPED skeleton with a FLAG-LESS
 ``Orthonym(style="systematic")`` (``rules/isotopes.py``), so a skeleton the general
@@ -30,7 +30,7 @@ def _best_effort():
 RECLAIM_CASES = [
     # p4-trace witness: a deuterated oxatricyclic skeleton the general engine names
     # only at the best-effort tier (PIN abstains on the fused tricycle).
-    # (item 3, P-82.6.1.1): the descriptor carries its REQUIRED locant and is
+    # (item 3,: the descriptor carries its REQUIRED locant and is
     # front-placed. The old locant-free `3-(2H1)oxatricyclo…` was Blue-Book-wrong
     # (it only round-tripped via OPSIN's default placement on this asymmetric cage);
     # positions 2 and 4 are inequivalent so the locant cannot be omitted.

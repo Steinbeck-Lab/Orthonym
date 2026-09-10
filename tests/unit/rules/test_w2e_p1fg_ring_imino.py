@@ -1,4 +1,4 @@
-"""P-62.3.1.2 (BB 26540): "The prefix 'imino' for =NH is used in presence
+""" (BB 26540): "The prefix 'imino' for =NH is used in presence
 of characteristic groups having seniority over imines."
 Target: quinone-imine O=C1C=CC(=N)C=C1 -> 4-iminocyclohexa-2,5-dien-1-one
 (OPSIN-parse verified). N-substituted =N-R fails closed.
@@ -10,7 +10,7 @@ fallback_chain_ring pool candidate, whose FG-only ring-substituent
 detector composer.py::_detect_fg_only_prefix returned 'amino' for ANY
 single-atom nitrogen without checking bond order (unlike the parallel
 oxygen branch, which distinguishes oxo/hydroxy). The =NH was silently
-turned into 'amino' (-NH2), a DIFFERENT molecule, so SELF-01 suppressed it.
+turned into 'amino' (-NH2), a DIFFERENT molecule, so suppressed it.
 Fix: mirror the oxygen branch — double-bonded degree-1 neutral N -> 'imino';
 substituted =N-R -> None (fail closed).
 """

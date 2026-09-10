@@ -1,6 +1,6 @@
 """Tests for naming cascade quality improvements.
 
-Phase 125-03 Tasks 2-4: Verify cycloalkyl retained names, FRAGMENT_NAME_CACHE
+a phase-03 Tasks 2-4: Verify cycloalkyl retained names, FRAGMENT_NAME_CACHE
 entries, and Tier 5 descriptive fallback for compound substituents.
 """
 
@@ -37,7 +37,7 @@ class TestCycloalkylRetainedNames:
 
 
 class TestCycloalkylRetainedNameUnit:
-    """Unit tests for _check_retained_substituent() cycloalkyl detection."""
+    """Unit tests for _check_retained_substituent cycloalkyl detection."""
 
     def test_cyclopentyl_direct(self):
         """Cyclopentyl ring fragment should be detected by retained name check."""

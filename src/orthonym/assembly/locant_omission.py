@@ -1,23 +1,23 @@
-"""P-14.3.4 -- omission of locants. The ONE place the licences are decided.
+""" -- omission of locants. The ONE place the licences are decided.
 
-v29 Phase C tranche B. Pure module: RDKit mols in, booleans out. No I/O, no naming.
+ Phase C tranche B. Pure module: RDKit mols in, booleans out. No I/O, no naming.
 
-⚠ **DENY BY DEFAULT.** ``P-14.3.3`` "Citation of locants"
-(``BlueBookV2/BlueBookV2.md:2869``) is the rule:
+⚠ **DENY BY DEFAULT.** ```` "Citation of locants"
+(``the Blue Book Blue Book``) is the rule:
 
     "In preferred IUPAC names, if any locants are essential for defining the structure
      of the parent structure or of a unit of structure as defined by its appropriate
      enclosing marks, then all locants must be cited for the parent structure or that
      structural unit."
 
-``P-14.3.4`` (``:2871``) then grants narrow *licences*, and its own preamble says
+```` (``:2871``) then grants narrow *licences*, and its own preamble says
 *"for absolute clarity in preferred IUPAC names it is necessary to be prescriptive
 about when omission of locants is permissible."* So:
 
 * **never** write a locant-stripping pass -- every omission is a positively-licensed
   structural predicate;
 * **fail toward retaining the locant** -- anything this module cannot positively
-  establish returns ``False`` (or ``True`` from :func:`scope_forces_locants`, which is
+  establish returns ``False`` (or ``True`` from:func:`scope_forces_locants`, which is
   the same direction);
 * a licence is evaluated **per enclosing-mark scope**. One essential locant anywhere in
   a scope restores *every* locant in that scope -- which is why
@@ -27,12 +27,12 @@ about when omission of locants is permissible."* So:
 ★ **THE SELF-VALIDATING BOUNDARY PAIR** -- the reason these predicates count
 HYDROGENS, never positions::
 
-    :7625    benzenehexol (PIN, P-63.1.2) (not benzenehexaol)            -> OMITS
-    :54823   "Inositols, cyclohexane-1,2,3,4,5,6-hexols, are a specific
-              group of cyclitols."                                       -> RETAINS
+    :7625 benzenehexol (PIN, (not benzenehexaol) -> OMITS
+    :54823 "Inositols, cyclohexane-1,2,3,4,5,6-hexols, are a specific
+              group of cyclitols." -> RETAINS
 
 Same six OH, same ring size. A benzene ring carbon has ONE substitutable H, so six OH
-*completely* substitutes the ring and ``P-14.3.4.5`` fires. A cyclohexane ring carbon
+*completely* substitutes the ring and ```` fires. A cyclohexane ring carbon
 has TWO, so six OH is *partial* substitution and the ``:3009`` counter-clause restores
 every locant. A predicate that counts positions gets this pair wrong.
 
@@ -68,7 +68,7 @@ __all__ = [
 ]
 
 #: ``:3007`` -- "Except for hydrogen atoms attached to chalcogen atoms, such as in
-#: acids, alcohols, ...". Group 16: O, S, Se, Te (Po is not a nomenclature case).
+#: acids, alcohols,...". Group 16: O, S, Se, Te (Po is not a nomenclature case).
 CHALCOGENS = frozenset({"O", "S", "Se", "Te"})
 
 
@@ -136,7 +136,7 @@ def l5_uniform_complete(
     decoration_of: Optional[Mapping[int, Optional[str]]],
     counts: Optional[Mapping[int, int]] = None,
 ) -> bool:
-    """``P-14.3.4.5`` (``:3007``) plus its counter-clause (``:3009``).
+    """```` (``:3007``) plus its counter-clause (``:3009``).
 
         "All locants are omitted in compounds or substituent groups in which all
          substitutable positions are completely substituted or modified, for example,
@@ -189,10 +189,10 @@ def l5_uniform_complete(
 
     for idx in positions:
         if idx not in decoration_of:
-            return False                       # partial -> :3009
+            return False                       # partial ->:3009
         n_dec = 1 if counts is None else counts.get(idx, 1)
         if not isinstance(n_dec, int) or n_dec != substitutable_h_count(mol, idx):
-            return False                       # partial AT this position -> :3009
+            return False                       # partial AT this position ->:3009
     return True
 
 
@@ -209,7 +209,7 @@ def _orbits(mol) -> Optional[list]:
 
 
 def l3_one_kind_of_substitutable_h(mol) -> bool:
-    """``P-14.3.4.3`` (``:2939``).
+    """```` (``:2939``).
 
         "The locant is omitted in monosubstituted symmetrical parent hydrides or parent
          compounds where there is only one kind of substitutable hydrogen."
@@ -232,7 +232,7 @@ def l3_one_kind_of_substitutable_h(mol) -> bool:
 
 
 # --------------------------------------------------------------------------------- #
-# P-14.3.4.4 -- the ISOMER-COUNT licence                                            #
+# -- the ISOMER-COUNT licence #
 # --------------------------------------------------------------------------------- #
 _BOND_ORDER_TO_TYPE = {
     1: Chem.BondType.SINGLE,
@@ -355,7 +355,7 @@ def l4_no_isomer_by_relocation(
     is_ring_assembly: bool = False,
     has_skeletal_replacement: bool = False,
 ) -> bool:
-    """§**P-14.3.4.4** (``:2953``) -- the ISOMER-COUNT licence.
+    """§**** (``:2953``) -- the ISOMER-COUNT licence.
 
         "Locants are omitted when no isomer can be generated by moving suffixes
          and/or prefixes (if any) from their position to another or by
@@ -372,52 +372,52 @@ def l4_no_isomer_by_relocation(
     every way the positions' hydrogen counts allow, and compare the resulting
     constitutions. One distinct constitution => no isomer can be generated => omit.
 
-    ⚠⚠ **``substitutable_positions()`` IS DELIBERATELY NOT REUSED HERE**, and that
+    ⚠⚠ **``substitutable_positions`` IS DELIBERATELY NOT REUSED HERE**, and that
     is the single most important line of this function. That helper implements
     ``:3007``'s carve-out (*"Except for hydrogen atoms attached to chalcogen atoms,
     such as in acids, alcohols, and to the carbon atoms of formyl groups"*), which
-    is a sentence of **P-14.3.4.5** and has no counterpart in P-14.3.4.4 -- this
+    is a sentence of **** and has no counterpart in -- this
     rule counts ISOMERS, and says nothing whatever about which hydrogens are
     "substitutable". Routing through it would make the whole polysulfane family
     deny by construction: trisulfane is ``HS-S-SH``, so EVERY hydrogen it has is on
     a chalcogen, ``substitutable_positions`` is **empty**, and
-    ``l3_one_kind_of_substitutable_h`` / :func:`l5_uniform_complete` /
+    ``l3_one_kind_of_substitutable_h`` /:func:`l5_uniform_complete` /
     :func:`l6_all_substitutable_h_share_one_locant` therefore all deny -- yet
-    ``:39335`` prints ``CH3-S-S-SH methyltrisulfane (PIN)`` under §**P-68.4.1.1**
+    ``:39335`` prints ``CH3-S-S-SH methyltrisulfane (PIN)`` under §****
     *"Compounds with three or more contiguous identical chalcogen atoms are treated
     as parent hydrides in substitutive nomenclature"*. Positions here are those
     bearing a hydrogen in the ORDINARY sense, and the reason no isomer exists for
     methyltrisulfane is a hydrogen COUNT, not a carve-out: the middle sulfur bears
     **zero** hydrogens, so S1/S3 are the only placements and they are one orbit.
     (⚠ And the ``:3007`` carve-out must NOT be loosened to make this work: it is
-    load-bearing for P-14.3.4.3, where propanedioic acid's two acid O-H must not
+    load-bearing for, where propanedioic acid's two acid O-H must not
     count or ``chloropropanedioic acid`` (``:2951``) loses its licence.)
 
     Derived against **every** example printed in the rule's own block, positives
     and negatives, which is what fixes the two design points a simpler reading
     misses:
 
-    ==========================================  ====================================
-    ``:39335`` ``methyltrisulfane``              S2 has no H => S1/S3 only, one orbit
-    ``:39339`` ``dimethyltrisulfane``            both placements forced, one result
-    ``:39341`` ``methyl(phenyl)triselane``       ★ HETEROGENEOUS: interchange gives
+    ========================================== ====================================
+    ``:39335`` ``methyltrisulfane`` S2 has no H => S1/S3 only, one orbit
+    ``:39339`` ``dimethyltrisulfane`` both placements forced, one result
+    ``:39341`` ``methyl(phenyl)triselane`` ★ HETEROGENEOUS: interchange gives
                                                 the same molecule
-    ``:2979``  ``not 1-bromo-2-methyldisulfane`` heterogeneous disulfane, likewise
-    ``:2959``  ``ethylidenehydrazinyl``          ethylidene needs 2 H => only N2 can
+    ``:2979`` ``not 1-bromo-2-methyldisulfane`` heterogeneous disulfane, likewise
+    ``:2959`` ``ethylidenehydrazinyl`` ethylidene needs 2 H => only N2 can
                                                 host it: ONE placement
-    ``:2983``  ``oxoethenyl``                    same, oxo needs 2 H
-    ``:2975``  ``chloro(silylidene)hydrazine``   2+1 > N's 2 H, so no co-location;
+    ``:2983`` ``oxoethenyl`` same, oxo needs 2 H
+    ``:2975`` ``chloro(silylidene)hydrazine`` 2+1 > N's 2 H, so no co-location;
                                                 the two swaps agree
-    ``:2995``  ``1-ethylidene-2-propylidene-     ★ interchange DOES give an isomer
-               disilan-1-yl`` (locants needed)   -- a single-orbit test would have
+    ``:2995`` ``1-ethylidene-2-propylidene- ★ interchange DOES give an isomer
+               disilan-1-yl`` (locants needed) -- a single-orbit test would have
                                                 wrongly omitted here
-    ``:2999``  ``1-chloro-2-ethylidenedisilane`` ★ the BB's reason is *"moving the
-               (locants needed)                  Cl atom to the other Si atom"*, and
+    ``:2999`` ``1-chloro-2-ethylidenedisilane`` ★ the BB's reason is *"moving the
+               (locants needed) Cl atom to the other Si atom"*, and
                                                 Si has 3 H, so CO-LOCATION on one
                                                 position is a legal placement and
                                                 must be enumerated
-    ``:3003``  ``2-chloroethen-1-yl``            C1 and C2 both have H and differ
-    ==========================================  ====================================
+    ``:3003`` ``2-chloroethen-1-yl`` C1 and C2 both have H and differ
+    ========================================== ====================================
 
     So single-orbit equivalence is NOT the test on either flank: it is too weak for
     a heterogeneous multiset (``:2995``) and too narrow to notice co-location
@@ -426,7 +426,7 @@ def l4_no_isomer_by_relocation(
     ⚠ The four spellings of ``:3005`` -- *"As an exception the locant is not omitted
     from propan-2-one, butan-2-one, prop-2-enoic acid and prop-2-ynoic acid although
     unambiguous without a locant"* -- are exceptions to THIS licence (that sentence
-    closes P-14.3.4.4's block). They are NOT enumerated here, deliberately: the set
+    closes 's block). They are NOT enumerated here, deliberately: the set
     is demonstrably OPEN -- ``prop-2-enamide (PIN)`` (``:32724``),
     ``...prop-2-enenitrile (PIN)`` (``:46790``) and ``prop-2-enoyl (preferred
     prefix)`` (``:30570``) are all equally unambiguous without a locant and all
@@ -440,14 +440,14 @@ def l4_no_isomer_by_relocation(
 
     **Deny-by-default**, per this module's docstring. It declines on all THREE of
     the things ``ARCH-a-licence-can-be-evaluated-on-the-wrong-molecule.md`` requires
-    of a P-14.3.4 licence: :func:`locants_are_forced` and
+    of a licence::func:`locants_are_forced` and
     :func:`scope_has_isotopic_modification` here, and the fragment-boundary
     observation at its call site (kept in ``handlers/_handler_shared.py`` so this
     module stays a pure leaf). It also denies on any defined stereochemistry, since
     relocating a bond cannot be shown to preserve a descriptor.
     """
     # ARCH-a, the two AMBIENT declarations. This licence empties its scope of ALL
-    # locants, which is precisely what P-82.6.1.1 (``:44180``) forbids while an
+    # locants, which is precisely what (``:44180``) forbids while an
     # isotopic modification is being spliced in -- and the isotope path names an
     # isotope-STRIPPED skeleton, so no structural test here can see the label.
     if locants_are_forced():
@@ -523,7 +523,7 @@ def l4_no_isomer_by_relocation(
 def l6_all_substitutable_h_share_one_locant(
     mol, atom_to_locant: Optional[Mapping[int, object]]
 ) -> bool:
-    """``P-14.3.4.6`` (``:3031``).
+    """```` (``:3031``).
 
         "All locants are omitted for parent compounds when all substitutable hydrogen
          atoms have the same locant."
@@ -557,7 +557,7 @@ def _has_letter_locant(locants: Iterable) -> bool:
     ``N,N'-dimethylurea`` and ``N-methylthiourea`` keep their italic-``N`` locants,
     and a primed locant belongs to a ring assembly or multiplicative name, both of
     which always cite. (The MONOsubstituted urea ``methylurea`` omits its locant, but
-    by the separate composer-level P-14.3.4.3 rule (``:2943``) that never lets a
+    by the separate composer-level rule (``:2943``) that never lets a
     letter locant reach this scope, not by this predicate.)
     """
     for loc in locants:
@@ -573,19 +573,19 @@ def _has_letter_locant(locants: Iterable) -> bool:
 
 
 # --------------------------------------------------------------------------------- #
-# P-14.3.3 as an AMBIENT SCOPE                                                        #
+# as an AMBIENT SCOPE #
 # --------------------------------------------------------------------------------- #
 # Some essential-locant facts are known only OUTSIDE the naming call that has to honour
 # them. The isotope path is the measured case: ``rules/isotopes.py`` strips every label,
 # names the isotope-FREE skeleton, then splices the descriptor into the finished string.
 # The licences run deep inside that skeleton naming and receive a molecule with
-# ``GetIsotope() == 0`` everywhere, so every ``has_isotope`` argument they compute is
-# structurally False. Measured with a spy validated on 2 known positives + 1 negative:
+# ``GetIsotope == 0`` everywhere, so every ``has_isotope`` argument they compute is
+# structurally False. Measured with a trace validated on 2 known positives + 1 negative:
 # ``scope_forces_locants`` IS reached for a labelled benzene and receives
 # ``has_isotope=False``.
 #
 # So we shipped ``hexamethyl(13C1)benzene`` and ``(2-13C1)cyclohexanol`` against
-# **P-82.6.1.1** (``:44180``): *"In preferred IUPAC names, locants are omitted if no
+# **** (``:44180``): *"In preferred IUPAC names, locants are omitted if no
 # locants are necessary in unmodified names. However, if isotopic modification requires a
 # locant to specify its position, then all locants must be specified and none are
 # omitted."* -- whose own example prints the elided form as the rejected one:
@@ -594,13 +594,13 @@ def _has_letter_locant(locants: Iterable) -> bool:
 # Patching each guard cannot work: by the time a licence runs, the isotope is gone. The
 # fact has to be carried DOWN from where it is known. A ContextVar is the mechanism --
 # it is exactly "this whole naming scope contains an essential locant", which is the
-# sentence P-14.3.3 is made of, and it is async/thread-safe so concurrent naming cannot
+# sentence is made of, and it is async/thread-safe so concurrent naming cannot
 # leak state between callers.
 #
-# ⚠ IT IS DELIBERATELY CONDITIONAL, NOT A BLANKET "isotope => cite". P-82.6.1.1 fires
+# ⚠ IT IS DELIBERATELY CONDITIONAL, NOT A BLANKET "isotope => cite". fires
 # only when the modification *requires a locant to specify its position*. When every
 # candidate position is equivalent, no locant is needed and the parent keeps its licensed
-# omission -- **P-82.6.1.3** (``:44202``) prints ``(2H6)benzene (PIN)``, and
+# omission -- **** (``:44202``) prints ``(2H6)benzene (PIN)``, and
 # ``(13C1)benzenehexol`` is correct today for exactly that reason (all six ring positions
 # are one orbit, so there is only one isotopomer). ``rules/isotopes.py`` therefore enters
 # this scope only after its own descriptor enumeration has *established* that a locant is
@@ -612,9 +612,9 @@ _FORCED_LOCANT_REASON: "contextvars.ContextVar[Optional[str]]" = contextvars.Con
 
 @contextlib.contextmanager
 def forced_locant_scope(reason: str):
-    """Declare that this naming scope contains an essential locant (``P-14.3.3``).
+    """Declare that this naming scope contains an essential locant (````).
 
-    Every P-14.3.4 licence must consult :func:`locants_are_forced` and decline while
+    Every licence must consult:func:`locants_are_forced` and decline while
     this is active. ``reason`` is free text for debugging (e.g. ``"isotope"``); it is
     never parsed.
     """
@@ -626,10 +626,10 @@ def forced_locant_scope(reason: str):
 
 
 def locants_are_forced() -> bool:
-    """True when an enclosing :func:`forced_locant_scope` is active.
+    """True when an enclosing:func:`forced_locant_scope` is active.
 
     A licence that does not consult this will silently elide a locant the Blue Book
-    requires, and neither SELF-01 (``namer.py`` states verbatim that it *"ignores
+    requires, and neither (``namer.py`` states verbatim that it *"ignores
     isotopes"*) nor the gold set can see it.
     """
     return _FORCED_LOCANT_REASON.get() is not None
@@ -641,28 +641,28 @@ def forced_locant_reason() -> "Optional[str]":
 
 
 # --------------------------------------------------------------------------------- #
-# "THIS NAMING SCOPE IS ISOTOPICALLY MODIFIED" -- weaker than forced_locant_scope     #
+# "THIS NAMING SCOPE IS ISOTOPICALLY MODIFIED" -- weaker than forced_locant_scope #
 # --------------------------------------------------------------------------------- #
-# ⚠ MEASURED 2026-07-29 (v29 Phase C Task 5a). ``forced_locant_scope`` above is NOT
+# ⚠ MEASURED 2026-07-29 (Phase C Task 5a). ``forced_locant_scope`` above is NOT
 # sufficient for every licence, because ``rules/isotopes.py`` enters it *conditionally*
 # -- only once ``_enumerate`` has established that the descriptor needs a locant
-# (``loc_rank >= 1``). A validated spy at the two live substituent sites recorded, for
+# (``loc_rank >= 1``). A validated trace at the two live substituent sites recorded, for
 # ``FC(F)(F)[13C](F)(F)C1CCCCC1``:
 #
-#     locants_are_forced() == False   and   every GetIsotope() in the scope == 0
+# locants_are_forced == False and every GetIsotope in the scope == 0
 #
 # i.e. BOTH signals a licence could consult are negative, yet the finished name really
-# does carry ``(13C1)``. Wiring P-14.3.4.5 on ``locants_are_forced()`` alone therefore
+# does carry ``(13C1)``. Wiring on ``locants_are_forced`` alone therefore
 # turned ``(1,1,2,2,2-pentafluoro(13C1)ethyl)cyclohexane`` into
 # ``(pentafluoro(13C1)ethyl)cyclohexane`` -- stripping the only locants left in a scope
-# that carries an isotopic modification, which is what **P-82.6.1.1** (``:44180``)
+# that carries an isotopic modification, which is what **** (``:44180``)
 # forbids: *"if isotopic modification requires a locant to specify its position, then
 # all locants must be specified and none are omitted."* The ethyl group's two carbons
 # are NOT equivalent, so the position does have to be stated, and the Blue Book's own
 # locant-free precedent ``(2H6)benzene (PIN)`` (``:44202``) is licensed precisely
 # because all six positions ARE equivalent.
 #
-# Nothing could catch this: SELF-01 "ignores isotopes" (``namer.py`` verbatim), the
+# Nothing could catch this: "ignores isotopes" (``namer.py`` verbatim), the
 # name round-trips cleanly through OPSIN either way, and gold exposure for the whole
 # class is zero.
 #
@@ -670,9 +670,9 @@ def forced_locant_reason() -> "Optional[str]":
 # into this scope"*, made unconditionally by the isotope decorator. A licence consults
 # it when it is about to empty a scope of ALL its locants. It is deliberately NOT
 # folded into ``forced_locant_scope``, because that would also gag the licences whose
-# locant-free form is CORRECT under P-82.6.1.3 -- ``(13C1)benzenehexol`` and
+# locant-free form is CORRECT under -- ``(13C1)benzenehexol`` and
 # ``(2H6)benzene`` -- which is why ``rules/benzene.py`` still consults only
-# ``locants_are_forced()``.
+# ``locants_are_forced``.
 _ISOTOPIC_NAMING_SCOPE: "contextvars.ContextVar[Optional[str]]" = contextvars.ContextVar(
     "orthonym_isotopic_naming_scope", default=None
 )
@@ -694,12 +694,12 @@ def isotopic_naming_scope(reason: str = "isotope"):
 
 
 def scope_has_isotopic_modification() -> bool:
-    """True when an enclosing :func:`isotopic_naming_scope` is active.
+    """True when an enclosing:func:`isotopic_naming_scope` is active.
 
     A licence that would leave a scope with ZERO locants must decline on this
-    (P-82.6.1.1, ``:44180``). A licence whose locant-free form stays correct under
-    P-82.6.1.3 (all candidate positions in one orbit) must NOT -- see the comment
-    above for why this is separate from :func:`locants_are_forced`.
+    , ``:44180``). A licence whose locant-free form stays correct under
+     (all candidate positions in one orbit) must NOT -- see the comment
+    above for why this is separate from:func:`locants_are_forced`.
     """
     return _ISOTOPIC_NAMING_SCOPE.get() is not None
 
@@ -715,20 +715,20 @@ def scope_forces_locants(
     is_ring_assembly,
     has_skeletal_replacement,
 ) -> bool:
-    """``P-14.3.3`` (``:2869``) -- the deny-default itself.
+    """```` (``:2869``) -- the deny-default itself.
 
     True => cite EVERY locant in this scope, licence or not.
 
-    Plain numeric locants alone never force: those are exactly what a ``P-14.3.4``
+    Plain numeric locants alone never force: those are exactly what a ````
     licence is permitted to omit. What forces is anything *essential* in the same
     scope -- a letter or primed locant, a stereodescriptor that needs a locant, or one
     of the hard overrides of derivation Part C (indicated/added hydrogen; isotopic
-    labels -- ``:44180`` §"P-82.6.1.1" *"if isotopic modification requires a locant to
+    labels -- ``:44180`` §"" *"if isotopic modification requires a locant to
     specify its position"*; multiplicative names; ring assemblies; skeletal
-    replacement -- ``:6446`` §"P-15.4.1.2", whose sentence *"Once a structure modified
+    replacement -- ``:6446`` §"", whose sentence *"Once a structure modified
     by skeletal replacement ('a') prefixes has been named and numbered, it is
     considered to be a new parent hydride. As locants assigned to heteroatoms are
-    essential, all locants must be cited as defined in P-14.3.3"* is the override;
+    essential, all locants must be cited as defined in "* is the override;
     the same line *opens* with the unrelated element-seniority order, ``F > Cl > Br >
     ...``, but that is not the clause being cited here).
 
@@ -765,29 +765,29 @@ def l3_monosubstituted_locant_omitted(
     is_ring_assembly: bool = False,
     has_skeletal_replacement: bool = False,
 ) -> bool:
-    """§**P-14.3.4.3** (``:2939``) -- the WHOLE licence, for ONE substitution.
+    """§**** (``:2939``) -- the WHOLE licence, for ONE substitution.
 
         "The locant is omitted in monosubstituted symmetrical parent hydrides or
          parent compounds where there is only one kind of substitutable hydrogen."
 
     True => that single locant is omitted. The orbit test itself is NOT re-derived
-    here: it is :func:`l3_one_kind_of_substitutable_h`, the one place the licence
+    here: it is:func:`l3_one_kind_of_substitutable_h`, the one place the licence
     lives. This function adds the three things the orbit test deliberately leaves to
     its caller (its own docstring says so): that the substitution really is *mono*,
-    that nothing else in the scope forces locants, and the two ambient P-14.3.3
+    that nothing else in the scope forces locants, and the two ambient
     scopes.
 
     ``parent`` is the **parent hydride or parent compound** -- the molecule with the
     ONE substitution REMOVED -- because that is what the rule's own examples measure:
 
-    ==========================  ==================================  =============
-    printed PIN                 ``parent``                          orbit test
-    ==========================  ==================================  =============
-    ``pyrazinecarboxylic acid`` pyrazine (parent **hydride**)       4 CH, 1 orbit
-    ``chloropropanedioic acid`` propanedioic acid (parent **cpd**)  C2 only
-    ``chlorobutanedioic acid``  butanedioic acid                    C2/C3, 1 orbit
-    ``methylurea``              urea                                2 NH2, 1 orbit
-    ==========================  ==================================  =============
+    ========================== ================================== =============
+    printed PIN ``parent`` orbit test
+    ========================== ================================== =============
+    ``pyrazinecarboxylic acid`` pyrazine (parent **hydride**) 4 CH, 1 orbit
+    ``chloropropanedioic acid`` propanedioic acid (parent **cpd**) C2 only
+    ``chlorobutanedioic acid`` butanedioic acid C2/C3, 1 orbit
+    ``methylurea`` urea 2 NH2, 1 orbit
+    ========================== ================================== =============
 
     ★ **The boundary the whole task turns on**, and it falls out of ``:3007`` with no
     special case: propanedioic acid's two acid O-H are on a chalcogen and are NOT
@@ -797,10 +797,10 @@ def l3_monosubstituted_locant_omitted(
     its locant. ``:2889`` ``N1,N3-dimethylpropanediamide (PIN)`` proves independently
     that an amide N-H is substitutable. ⚠ Do NOT "fix" the chalcogen exclusion to make
     trisulfane work: it is load-bearing HERE, and ``methyltrisulfane`` is licensed by a
-    different sub-rule (P-14.3.4.4, unimplemented) -- see
-    ``.planning/audit-v29/PHASEC-P14-3-4-4-L4-derivation.md``.
+    different sub-rule, unimplemented) -- see
+    `internal notes`.
 
-    ⚠ **This licence is orthogonal to P-14.3.4.2(c)** (``_ring_suffix_locant_is_trivial``),
+    ⚠ **This licence is orthogonal to (c)** (``_ring_suffix_locant_is_trivial``),
     which is restricted to saturated all-carbon monocycles and therefore cannot reach a
     heteroarene. L3 is what licenses ``pyrazinecarboxylic acid`` while
     ``piperidine-1-carbonitrile`` (``:34730``) correctly keeps its locant -- piperidine's
@@ -818,23 +818,23 @@ def l3_monosubstituted_locant_omitted(
         suffix_locants: locants of suffixes in this scope.
         parent_cites_locants: True when the parent name itself already cites a
             locant -- a heteroatom locant set (``1,4-dioxane``), an added/indicated
-            hydrogen, or an unsaturation locant. ``P-14.3.3`` (``:2869``) then
+            hydrogen, or an unsaturation locant. ```` (``:2869``) then
             restores every locant in the scope, so the licence declines. Every one of
             the Blue Book's five printed L3 positives has a locant-free parent name
             (pyrazine, urea, disiloxane, coronene, propanedioic acid), so this is the
             deny-by-default side of a boundary the source does not print, and it is
             recorded as such rather than as a verified rule.
     """
-    # P-14.3.3 (``:2869``) as an AMBIENT scope -- ``rules/isotopes.py`` names an
+    # (``:2869``) as an AMBIENT scope -- ``rules/isotopes.py`` names an
     # isotope-STRIPPED skeleton, so every structural isotope test further down reads
     # 0 even for a labelled input and cannot be the guard.
     if locants_are_forced():
         return False
     # ⚠ AND the weaker declaration. Measured 2026-07-29 (Task 5a): the isotope
     # decorator enters ``forced_locant_scope`` only CONDITIONALLY, so
-    # ``locants_are_forced()`` alone is False for a labelled molecule whose finished
+    # ``locants_are_forced`` alone is False for a labelled molecule whose finished
     # name still carries ``(13C1)``. This licence empties its scope of ALL locants,
-    # which is exactly what **P-82.6.1.1** (``:44180``) forbids when an isotopic
+    # which is exactly what **** (``:44180``) forbids when an isotopic
     # modification needs a locant, so it must decline on the weaker flag too.
     if scope_has_isotopic_modification():
         return False
@@ -849,7 +849,7 @@ def l3_monosubstituted_locant_omitted(
     prefix_locants = list(prefix_locants or [])
     suffix_locants = list(suffix_locants or [])
     # Exactly ONE cited locant in the scope -- the one this licence would omit.
-    # Emptying a scope that cites two locants is not what :2939 licenses.
+    # Emptying a scope that cites two locants is not what:2939 licenses.
     if len(prefix_locants) + len(suffix_locants) != 1:
         return False
 
@@ -872,7 +872,7 @@ def l3_monosubstituted_locant_omitted(
 
 
 def _one_substituent_removed(mol, parent_atoms: FrozenSet[int]) -> bool:
-    """Structural proof of *"monosubstituted"* for ``P-14.3.4.3``.
+    """Structural proof of *"monosubstituted"* for ````.
 
     True iff the atoms OUTSIDE ``parent_atoms`` form exactly **one** connected
     component joined to the parent by exactly **one** bond -- i.e. the parent bears
@@ -903,7 +903,7 @@ def _one_substituent_removed(mol, parent_atoms: FrozenSet[int]) -> bool:
     if attachments != 1:
         return False
 
-    # ...and the outside atoms are ONE connected component.
+    #...and the outside atoms are ONE connected component.
     seen = {outside[0]}
     stack = [outside[0]]
     while stack:
@@ -928,14 +928,14 @@ def l3_locant_omitted_for_parent_atoms(
     is_ring_assembly: bool = False,
     has_skeletal_replacement: bool = False,
 ) -> bool:
-    """§**P-14.3.4.3** (``:2939``) where the parent is given as an ATOM SET.
+    """§**** (``:2939``) where the parent is given as an ATOM SET.
 
     The one entry point both live call sites use. It performs the parent surgery --
     delete every atom outside ``parent_atoms``, letting RDKit restore the implicit
     hydrogens that the substituent had displaced -- and derives the two arguments a
     caller must not be trusted with:
 
-    * ``n_substitutions``, proven by :func:`_one_substituent_removed`;
+    * ``n_substitutions``, proven by:func:`_one_substituent_removed`;
     * ``has_isotope``, read off the real (undeleted) molecule, because the parent
       copy may not carry the label.
 

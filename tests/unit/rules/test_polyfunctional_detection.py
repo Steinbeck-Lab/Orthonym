@@ -5,7 +5,7 @@ from orthonym.rules.polyfunctional import detect_polyfunctional, PARENT_CLASS_MA
 
 
 class TestPolyfunctionalNormalization:
-    """PERC-06: Polyfunctional detection normalizes subtypes to parent classes."""
+    """: Polyfunctional detection normalizes subtypes to parent classes."""
 
     def test_parent_class_map_exists(self):
         """PARENT_CLASS_MAP maps all alcohol and amine subtypes."""

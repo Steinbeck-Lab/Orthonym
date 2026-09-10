@@ -1,4 +1,4 @@
-"""Shared best-effort rt_exact assertions for the v31 composition-completeness lever.
+"""Shared best-effort rt_exact assertions for the composition-completeness lever.
 
 The acceptance bar for the best-effort tier is FULL isomeric round-trip: the emitted
 name, parsed by OPSIN, must canonicalise to the same molecule as the input (constitution

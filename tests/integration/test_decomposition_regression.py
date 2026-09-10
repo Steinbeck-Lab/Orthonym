@@ -1,5 +1,5 @@
 """
-Decomposition regression canary tests (Phase 39, Plan 04).
+Decomposition regression canary tests (a phase, Plan 04).
 
 Verifies that molecules previously producing correct IUPAC names
 continue to produce the EXACT same names after the decomposition
@@ -41,7 +41,7 @@ BASIC_CANARIES = [
     ("CCC(=O)O", "propanoic acid"),
     ("CCCC(=O)O", "butanoic acid"),
     ("C=C", "ethene"),
-    ("C#C", "acetylene"),  # retained name (P-31.1.2.1 PIN)
+    ("C#C", "acetylene"),  # retained name PIN)
     ("c1ccccc1", "benzene"),
     ("Cc1ccccc1", "toluene"),
     ("Oc1ccccc1", "phenol"),
@@ -96,10 +96,10 @@ ESTER_CANARIES = [
     ("CC(=O)OCCCC", "butyl acetate"),
     ("CCCCCCCC(=O)OC", "methyl octanoate"),
     ("CC(=O)OC(C)C", "propan-2-yl acetate"),
-    # v29 Task J2: was "methyl palmitate". P-65.1.1.1 (BlueBookV2.md:29715)
-    # retains only formic/oxalic/acetic/benzoic/oxamic AS PINs; P-65.1.2
+    #: was "methyl palmitate". (the Blue Book)
+    # retains only formic/oxalic/acetic/benzoic/oxamic AS PINs;
     # (:29860) makes systematic names preferred for all other acids, and
-    # :29787 prints "(PIN)" on "hexadecanoic acid". Note the neighbouring
+    #:29787 prints "(PIN)" on "hexadecanoic acid". Note the neighbouring
     # acetate/benzoate/formate rows are correct AS-IS -- those three acids
     # ARE retained as PINs, which is exactly the distinction that matters.
     ("CCCCCCCCCCCCCCCC(=O)OC", "methyl hexadecanoate"),
@@ -151,10 +151,10 @@ AMIDE_CANARIES = [
     ("CC(=O)NCCC", "N-propylacetamide"),
     # Amino acids (contain amide-like bonds). Glycine is achiral so its
     # retained name stands; undefined-stereo alanine declines the L-implying
-    # retained name and uses the systematic form (v33 Phase-1 stereo honesty).
+    # retained name and uses the systematic form (Phase-1 stereo honesty).
     ("NCC(=O)O", "glycine"),
     ("CC(N)C(=O)O", "2-aminopropanoic acid"),
-    # Peptides (contain amide bonds, handled by peptide route). v38: the peptide
+    # Peptides (contain amide bonds, handled by peptide route).: the peptide
     # PIN is the SUBSTITUTIVE form (V38-PEPTIDE-PIN-VERDICT.md); RT verified.
     ("NCC(=O)NCC(=O)O", "(2-aminoacetamido)acetic acid"),
 ]
@@ -186,7 +186,7 @@ class TestAmideCanaries:
 # ---------------------------------------------------------------------------
 
 ROUNDTRIP_CANARIES = [
-    # v22 Phase B (DD1 Fix 4): PIN is the substitutive N,N-diethylethanamine.
+    # Phase B (DD1 Fix 4): PIN is the substitutive N,N-diethylethanamine.
     ("CCN(CC)CC", "N,N-diethylethanamine"),
     ("CCCCCCCCCCCC/C=C/C(=O)O", "(2E)-pentadec-2-enoic acid"),
     ("CCCCCCC#CCCCC(=O)O", "dodec-5-ynoic acid"),
@@ -194,7 +194,7 @@ ROUNDTRIP_CANARIES = [
     ("CCCCCCCCCCCCCC(O)CC", "hexadecan-3-ol"),
     ("C/C=C/CCCCCCCCC", "(2E)-dodec-2-ene"),
     ("Cc1ccc(N)cc1N", "2,4-diamino-1-methylbenzene"),
-    ("OCc1ccc(O)cc1", "4-(hydroxymethyl)phenol"),  # ASML-13: phenol suffix routing
+    ("OCc1ccc(O)cc1", "4-(hydroxymethyl)phenol"),  #: phenol suffix routing
     ("c1ccc2ccccc2c1", "naphthalene"),
     # Fatty acid with Z geometry
     ("CCCCCCCC/C=C\\CCCCCCCC(=O)O", "(9Z)-octadec-9-enoic acid"),
@@ -220,13 +220,13 @@ class TestRoundTripCanaries:
 
 
 # ---------------------------------------------------------------------------
-# Section 5: Phase 139.1 Plan 03 -- recovered compounds via DECO-22/25
+# Section 5: a phase Plan 03 -- recovered compounds via /25
 # Ester threshold lowered to 2 (enables diester decomposition) and
 # partial assembly (recovers names when 2/3+ fragments succeed).
 # ---------------------------------------------------------------------------
 
 DECO_22_25_CANARIES = [
-    # Diester decomposition (DECO-22: ester threshold 2)
+    # Diester decomposition (: ester threshold 2)
     ("COC(=O)CC(=O)OC", "dimethyl propanedioate"),
     ("CCOC(=O)CCC(=O)OCC", "diethyl butanedioate"),
     ("COC(=O)CCCCC(=O)OC", "dimethyl hexanedioate"),
@@ -238,7 +238,7 @@ DECO_22_25_CANARIES = [
 
 
 class TestDeco22And25Canaries:
-    """Compounds recovered by DECO-22 (ester threshold 2) and DECO-25 (partial assembly).
+    """Compounds recovered by (ester threshold 2) and (partial assembly).
     These must not regress in future phases."""
 
     @pytest.mark.integration

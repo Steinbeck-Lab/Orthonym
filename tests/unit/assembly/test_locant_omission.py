@@ -1,20 +1,20 @@
-"""P-14.3.4 locant-omission licence primitives (Phase C tranche B, Task 1).
+""" locant-omission licence primitives (Phase C tranche B, Task 1).
 
 ``orthonym.assembly.locant_omission`` is the ONE place the Blue Book's omission
 licences are decided. It is pure: RDKit mols in, booleans out.
 
 Governing rule chain, verbatim from ``the Blue Book Blue Book``:
 
-``P-14.3.3`` "Citation of locants" (``:2869``) is **DENY BY DEFAULT** —
+```` "Citation of locants" (``:2869``) is **DENY BY DEFAULT** —
 
     "In preferred IUPAC names, if any locants are essential for defining the structure
      of the parent structure or of a unit of structure as defined by its appropriate
      enclosing marks, then all locants must be cited for the parent structure or that
      structural unit."
 
-``P-14.3.4`` then grants narrow licences. The three modelled here:
+```` then grants narrow licences. The three modelled here:
 
-``P-14.3.4.5`` (``:3007``)
+```` (``:3007``)
 
     "All locants are omitted in compounds or substituent groups in which all
      substitutable positions are completely substituted or modified, for example, by
@@ -27,12 +27,12 @@ with the counter-clause (``:3009``)
     "In case of partial substitution or modification, all numerical prefixes must be
      indicated. The prefix 'per-' is no longer recommended."
 
-``P-14.3.4.3`` (``:2939``)
+```` (``:2939``)
 
     "The locant is omitted in monosubstituted symmetrical parent hydrides or parent
      compounds where there is only one kind of substitutable hydrogen."
 
-``P-14.3.4.6`` (``:3031``)
+```` (``:3031``)
 
     "All locants are omitted for parent compounds when all substitutable hydrogen atoms
      have the same locant." [example ``:3037`` ``difluoroacetic acid (PIN)``]
@@ -40,7 +40,7 @@ with the counter-clause (``:3009``)
 ★ THE SELF-VALIDATING BOUNDARY PAIR — the reason these primitives count HYDROGENS and
 not positions:
 
-    ``:7625`` ``benzenehexol (PIN, P-63.1.2) (not benzenehexaol)`` -> OMITS
+    ``:7625`` ``benzenehexol (PIN, (not benzenehexaol)`` -> OMITS
     ``:54823`` "Inositols, cyclohexane-1,2,3,4,5,6-hexols, are a specific
                  group of cyclitols." -> RETAINS
 
@@ -154,7 +154,7 @@ class TestSubstitutablePositions:
 
 
 # --------------------------------------------------------------------------- #
-# 2. l5_uniform_complete -- P-14.3.4.5 + the ':3009' counter-clause #
+# 2. l5_uniform_complete -- + the ':3009' counter-clause #
 # --------------------------------------------------------------------------- #
 class TestL5UniformComplete:
     def test_benzene_six_identical_is_licensed(self):
@@ -230,7 +230,7 @@ class TestL5UniformComplete:
 
 
 # --------------------------------------------------------------------------- #
-# 3. l3_one_kind_of_substitutable_h -- P-14.3.4.3 (':2939') #
+# 3. l3_one_kind_of_substitutable_h -- (':2939') #
 # --------------------------------------------------------------------------- #
 class TestL3OneKind:
     @pytest.mark.parametrize("smiles,expected,why", [
@@ -254,7 +254,7 @@ class TestL3OneKind:
 
 
 # --------------------------------------------------------------------------- #
-# 4. l6_all_substitutable_h_share_one_locant -- P-14.3.4.6 (':3031') #
+# 4. l6_all_substitutable_h_share_one_locant -- (':3031') #
 # --------------------------------------------------------------------------- #
 class TestL6OneLocant:
     def test_acetic_acid_is_licensed(self):
@@ -287,7 +287,7 @@ class TestL6OneLocant:
 
 
 # --------------------------------------------------------------------------- #
-# 5. scope_forces_locants -- P-14.3.3 (':2869'), the deny-default itself #
+# 5. scope_forces_locants -- (':2869'), the deny-default itself #
 # --------------------------------------------------------------------------- #
 _CLEAN = dict(
     prefix_locants=(), suffix_locants=(), stereo_text="",
@@ -320,7 +320,7 @@ class TestScopeForcesLocants:
     def test_letter_locant_forces(self, loc):
         """A letter locant in scope is essential and cannot be omitted by this
         generic path -- 'N-methylthiourea', 'N,N'-dimethylurea'. (The MONO urea
-        omission is a separate composer-level rule, P-14.3.4.3, that never lets a
+        omission is a separate composer-level rule,, that never lets a
         letter locant reach this scope.)"""
         assert scope_forces_locants(**{**_CLEAN, "prefix_locants": (loc,)}) is True
         assert scope_forces_locants(**{**_CLEAN, "suffix_locants": (loc,)}) is True
@@ -332,17 +332,17 @@ class TestScopeForcesLocants:
 
 
 # --------------------------------------------------------------------------- #
-# 6. l4_no_isomer_by_relocation -- P-14.3.4.4 (':2953'), the ISOMER-COUNT #
+# 6. l4_no_isomer_by_relocation -- (':2953'), the ISOMER-COUNT #
 # licence. Phase C Task 11. #
 # --------------------------------------------------------------------------- #
-# §**P-14.3.4.4** (``:2953``), verbatim:
+# §**** (``:2953``), verbatim:
 #
 # "Locants are omitted when no isomer can be generated by moving suffixes
 # and/or prefixes (if any) from their position to another or by interchanging
 # them between two different positions."
 #
 # Every row below is an example the Blue Book PRINTS for this rule (or, for the
-# polysulfanes, in §**P-68.4.1.1** "Compounds with three or more contiguous
+# polysulfanes, in §**** "Compounds with three or more contiguous
 # identical chalcogen atoms are treated as parent hydrides in substitutive
 # nomenclature", whose whole example block BB 39333-39343 is locant-free).
 #
@@ -446,9 +446,9 @@ class TestL4TheHydrogenCountBoundary:
 class TestL4DoesNotReuseSubstitutablePositions:
     """⚠ The single most important design point of the predicate.
 
-    ``substitutable_positions()`` applies ``:3007``'s carve-out (*"Except for
+    ``substitutable_positions`` applies ``:3007``'s carve-out (*"Except for
     hydrogen atoms attached to chalcogen atoms..."*), which is a sentence of
-    P-14.3.4.5 and has no counterpart in P-14.3.4.4. Every hydrogen a polysulfane
+     and has no counterpart in. Every hydrogen a polysulfane
     has is on a sulfur, so routing L4 through that helper would make the entire
     family deny by construction. These two assertions pin the divergence, so a
     later "simplification" that reuses the sibling helper fails here loudly
@@ -516,12 +516,12 @@ class TestL4DeniesByDefault:
     """Deny-by-default, per the module docstring and ARCH-a."""
 
     def test_forced_locant_scope_declines(self):
-        """ARCH-a ambient declaration 1 (P-14.3.3, ``:2869``)."""
+        """ARCH-a ambient declaration 1, ``:2869``)."""
         with forced_locant_scope("test"):
             assert _l4("CSSS", {"S"}, 1) is False
 
     def test_isotopic_naming_scope_declines(self):
-        """ARCH-a ambient declaration 2 -- P-82.6.1.1 (``:44180``).
+        """ARCH-a ambient declaration 2 -- (``:44180``).
 
         The isotope path names an isotope-STRIPPED skeleton, so no structural test
         inside can see the label; this ambient flag is the only signal left.

@@ -1,7 +1,7 @@
 """ a phase — PIN carve-out decoration-mutation atom-coverage certificate.
 
 ``namer._final_opsin_validity_gate`` (:1081-1353) has 9 hard-gated ``return name``
-carve-outs (:1152-1237) that ship a PIN WITHOUT the SELF-01/OPSIN round-trip,
+carve-outs (:1152-1237) that ship a PIN WITHOUT the /OPSIN round-trip,
 because the correct PIN for each class is OPSIN-unparseable by construction
 (OPSIN's *generation* grammar has no rule for these suffix/class-word families):
 ``thioperoxol``, ``inositol``, ``np_stereoparent``, ``dianhydride``,
@@ -15,7 +15,7 @@ The historical failure mode this guards against (fixed for cholesteryl sulfate
 -> ``cholest-5-ene``, but never adversarially re-probed): a recogniser fires on
 a molecule that CONTAINS its recognised core plus extra decoration atoms, and
 names only the bare core -> a silent atom-drop that the carve-out would wave
-through unexamined (no SELF-01 ever runs on that branch).
+through unexamined (no ever runs on that branch).
 
 This module is a REGRESSION CERTIFICATE, not a source change: for each of the
 9 classes it (1) locks a representative PIN molecule shipping via that exact
@@ -25,9 +25,9 @@ changes the molecular formula -- and proves the decoration is never silently
 dropped: the decorated molecule must never reproduce the bare-core name.
 
 Three honest outcomes for the decorated mutant, all acceptable:
-  (a) SELF-01 VERIFIED -- the decoration broke the carve-out's own hard gate
+  (a) VERIFIED -- the decoration broke the carve-out's own hard gate
       (regex / exact-SMILES / exact-atom-count match), the molecule routed to
-      an ordinary producer, and OPSIN's SELF-01 round-trip independently
+      an ordinary producer, and OPSIN's round-trip independently
       proved the emitted name's skeleton matches the input -- the strongest
       possible proof, and observed for inositol + dianhydride below.
   (b) HONEST ABSTAIN -- the decorated molecule correctly fails closed
@@ -90,7 +90,7 @@ CASES = [
         carveout="thioperoxol",
         bare_smiles="CSO",
         bare_name="methane-SO-thioperoxol",
-        # BB P-56.2 verbatim: CH3-S-OH -> methane-SO-thioperoxol (PIN).
+        # BB verbatim: CH3-S-OH -> methane-SO-thioperoxol (PIN).
         decorated_smiles="ClCCSO",  # Cl-CH2-CH2-S-OH: same -S-OH core, +Cl +C.
         outcome_kind="carveout_marker",
         decoration_marker="chloro",
@@ -129,7 +129,7 @@ CASES = [
         # tail; a chloro substituent on the central succinic chain breaks
         # _name_dianhydride's own pattern, so the molecule falls through to
         # the ordinary mixed-anhydride/acyloxy substitutive namer -- a
-        # DIFFERENT, OPSIN-parseable name that SELF-01 verifies directly.
+        # DIFFERENT, OPSIN-parseable name that verifies directly.
         decorated_smiles="CC(=O)OC(=O)C(Cl)CC(=O)OC(C)=O",
         outcome_kind="self01",
     ),
@@ -163,7 +163,7 @@ CASES = [
         bare_smiles="C[Ti](Cl)(Cl)Cl",
         bare_name="trichlorido(methyl)titanium",
         # Swapping the methyl ligand for 2-chloroethyl exceeds the additive
-        # ligand namer's substituent-recursion depth (observed: "DROP-12
+        # ligand namer's substituent-recursion depth (observed: "
         # substituent_skip: reason=recursion_depth_fallback") -> honest
         # generic-metal descriptive fallback, never the bare methyl name.
         decorated_smiles="ClCC[Ti](Cl)(Cl)Cl",
@@ -252,7 +252,7 @@ def test_carveout_decoration_mutation_no_atom_drop(namer, case):
         return
 
     if kind == "self01":
-        # Strongest proof available: SELF-01 (InChIKey-skeleton compare
+        # Strongest proof available: (InChIKey-skeleton compare
         # against the ORIGINAL input) already ran and passed -- this is
         # exactly E1's atom-coverage guarantee, just derived from (mol, name)
         # instead of a TokenBinding partition (see module docstring/audit).

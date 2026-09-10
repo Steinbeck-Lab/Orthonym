@@ -13,7 +13,7 @@ This module pins the routing to ``assembly.substituent_enumerator.name_substitue
 -- the audited 5-tier chokepoint that every general-engine locus already uses --
 and the two Blue Book rules that make the routing correct:
 
-* **P-29.6.1** (BB ``the Blue Book``): "The traditional prefixes benzyl,
+* **** (BB ``the Blue Book``): "The traditional prefixes benzyl,
   benzylidene, benzylidyne are retained preferred prefixes, but are not to be
   substituted". Verbatim PIN pair (``:16280``)::
 
@@ -21,12 +21,12 @@ and the two Blue Book rules that make the routing correct:
 
   so an UNsubstituted benzyl keeps the retained prefix, and a substituted one
   must become ``(...phenyl)methyl`` in square brackets.
-* **P-67.1.1.2 / BB L36051-L36066** the ``-onic``/``-inic`` oxoacid stems, with
+* ** / BB L36051-L36066** the ``-onic``/``-inic`` oxoacid stems, with
   ``methyl(phenyl)arsinic acid`` (PIN) verbatim for the two-organyl form.
 
 The class this phase opens is deliberately bounded to fragments built ONLY from
 carbon, hydrogen and halogen -- see
-``test_heteroatom_organyl_is_still_refused`` for the P-41 seniority reason a
+``test_heteroatom_organyl_is_still_refused`` for the seniority reason a
 heteroatom-bearing organyl must keep failing closed.
 """
 
@@ -59,7 +59,7 @@ def _hub_and_start(smiles, hub_symbol='P'):
 
 @pytest.fixture
 def ungated_namer(monkeypatch):
-    """A namer with the SELF-01 OPSIN validity gate explicitly DISABLED.
+    """A namer with the OPSIN validity gate explicitly DISABLED.
 
     The gate fails OPEN when no JRE is present, so every safety property in this
     module is asserted in the mode where nothing downstream can rescue a wrong
@@ -90,9 +90,9 @@ def ungated_namer(monkeypatch):
     ("C=CP(=O)(O)O",             "ethenyl"),
     # a chain longer than the private walker's table
     ("CCCCCCCCCCCCP(=O)(O)O",    "dodecyl"),
-    # halogen: prefix-only per P-59 Table 28, so it cannot demand a suffix
+    # halogen: prefix-only per, so it cannot demand a suffix
     ("BrCP(=O)(O)O",             "bromomethyl"),
-    # P-29.6.1: a SUBSTITUTED benzyl must lose the retained prefix
+    #: a SUBSTITUTED benzyl must lose the retained prefix
     ("Brc1ccc(CP(=O)(O)O)cc1",   "(4-bromophenyl)methyl"),
     ("Cc1ccc(CP(=O)(O)O)cc1",    "(4-methylphenyl)methyl"),
 ])
@@ -129,7 +129,7 @@ def test_naphthyl_is_upgraded_to_the_pin_locanted_form():
 
     ``_characterize_substituent`` returned the bare ``naphthyl`` for any
     10-carbon aromatic system. ``naphthyl`` is not a preferred prefix and it is
-    positionally AMBIGUOUS: P-25.3.1 numbers the fused system, so C10H7- is
+    positionally AMBIGUOUS: numbers the fused system, so C10H7- is
     ``naphthalen-1-yl`` or ``naphthalen-2-yl``. The chokepoint spells the
     locant, which is the PIN.
     """
@@ -150,18 +150,18 @@ def test_naphthyl_is_upgraded_to_the_pin_locanted_form():
 def test_heteroatom_organyl_is_still_refused(smiles):
     """A heteroatom in the organyl can carry a SUFFIXABLE characteristic group.
 
-    P-41 makes the principal characteristic group -- not the hub -- decide the
+     makes the principal characteristic group -- not the hub -- decide the
     parent, so a heteroatom-bearing organyl is not freely a prefix:
 
     * ``HO-CH2CH2-NH-NH2``: the alcohol is senior to the amine class, so the PIN
       is ``2-hydrazinylethan-1-ol``, NOT ``(2-hydroxyethyl)hydrazine``.
-    * ``HOOC-CH2-P(=O)(OH)2``: within P-41 class 7 a carboxylic acid outranks a
+    * ``HOOC-CH2-P(=O)(OH)2``: within class 7 a carboxylic acid outranks a
       phosphonic acid, so the carboxy group takes the suffix -- NOT
       ``(carboxymethyl)phosphonic acid``.
 
     Deciding that per family needs a seniority comparison this primitive does
     not have, so the whole heteroatom class fails closed here. Hydrocarbon and
-    halogen fragments carry NO suffixable characteristic group (P-59 Table 28
+    halogen fragments carry NO suffixable characteristic group
     lists the halogens among the groups cited only as prefixes), which is
     exactly why the widened class is bounded to them.
     """
@@ -170,7 +170,7 @@ def test_heteroatom_organyl_is_still_refused(smiles):
 
 
 @pytest.mark.parametrize("smiles", [
-    "[CH2-]P(=O)(O)O",      # carbanion: an ion is a SENIOR class (P-41)
+    "[CH2-]P(=O)(O)O",      # carbanion: an ion is a SENIOR class
 ])
 def test_charged_organyl_is_refused(smiles):
     mol, start, hub = _hub_and_start(smiles)
@@ -223,7 +223,7 @@ def test_is_simple_unbranched_organyl_keeps_the_old_narrow_semantics(smiles, nar
     ("C1=CC=C(C=C1)C[Sb](=O)(O)O", "benzylstibonic acid"),
 ])
 def test_benzyl_oxoacid_acceptance(ungated_namer, smiles, expected):
-    """P-29.6.1 retained preferred prefix ``benzyl`` + the P-67 oxoacid stems
+    """ retained preferred prefix ``benzyl`` + the oxoacid stems
     (BB L36051-L36054). ``2-benzylpyridine (PIN)`` (BB ``:16280``) is the
     verbatim precedent for citing the unsubstituted benzyl bare, with no
     enclosing marks.
@@ -240,7 +240,7 @@ def test_benzyl_oxoacid_acceptance(ungated_namer, smiles, expected):
      "cyclohexyl(methyl)phosphinic acid"),
 ])
 def test_inic_acid_two_organyl_form(smiles, fg, producer, expected):
-    """P-16.5.1.3 mononuclear enclosing marks, exactly as BB L36066 writes
+    """ mononuclear enclosing marks, exactly as BB L36066 writes
     ``methyl(phenyl)arsinic acid`` (PIN): first cited group bare, each
     subsequent one enclosed.
     """
@@ -252,7 +252,7 @@ def test_inic_acid_two_organyl_form(smiles, fg, producer, expected):
 
 
 # --------------------------------------------------------------------------
-# 6. The substitution restriction must survive the routing (P-29.6.1)
+# 6. The substitution restriction must survive the routing
 # --------------------------------------------------------------------------
 
 @pytest.mark.parametrize("smiles,forbidden", [
@@ -266,7 +266,7 @@ def test_substituted_benzyl_never_keeps_the_retained_prefix(
     nomenclature; ``2-[(4-bromophenyl)methyl]pyridine`` is the PIN. A
     substituted benzyl must therefore be spelled ``(...phenyl)methyl``, and the
     compound prefix takes enclosing marks that escalate to SQUARE brackets
-    because the name already contains parentheses (P-16.5.1.1 / P-16.5.4.1).
+    because the name already contains parentheses /.
     """
     name = ungated_namer.name(smiles)
     assert "(4-" in name and ")methyl" in name, name
@@ -348,18 +348,18 @@ def test_provenance_benzylphosphonic_comes_from_the_routed_handler(monkeypatch):
 
 
 # --------------------------------------------------------------------------
-# 9. P-16.3.3(b)/P-16.2.4.1(d) / P-29.6.1: a retained ITALICIZED-PREFIX name is cited BARE
+# 9. (b)/(d) /: a retained ITALICIZED-PREFIX name is cited BARE
 #
 # The routing above made `tert-butyl` reachable as a prefix for the first time
 # and exposed an over-enclosure defect: '(tert-butyl)arsonic acid'. The Blue
 # Book cites the retained preferred prefix bare, hyphen and all:
 #
 # BB 16286 ***tert*-butyldi(methyl)phosphane (PIN) <- no marks
-# BB 16270 P-29.6.1 "Retained prefixes that ARE preferred prefixes"
+# BB 16270 "Retained prefixes that ARE preferred prefixes"
 # BB 16282 "The retained name '*tert*-butyl' has never been recommended for
 # further substitution... Acceptable locants have never been
 # adopted for this name." -> its hyphen is not a compound boundary
-# P-16.3.3(b)/P-16.2.4.1(d) 'di-tert-butyl' (NOT 'bis(tert-butyl)'), 'N-tert-butyl'
+# (b)/(d) 'di-tert-butyl' (NOT 'bis(tert-butyl)'), 'N-tert-butyl'
 # (cited bare per BB 3465)
 #
 # Root cause: the carve-out was open-coded in three divergent places and MISSING
@@ -369,7 +369,7 @@ def test_provenance_benzylphosphonic_comes_from_the_routed_handler(monkeypatch):
 
 @pytest.mark.parametrize("name", ["tert-butyl", "sec-butyl"])
 def test_retained_italicized_prefix_is_not_compound(name):
-    """P-16.3.3(b)/P-16.2.4.1(d): the leading italicized prefix's hyphen does not make the name
+    """(b)/(d): the leading italicized prefix's hyphen does not make the name
     compound, so no enclosing marks and the SIMPLE di/tri multiplier."""
     from orthonym.assembly.naming_utils import (
         enclose_if_compound, get_multiplier_prefix, has_structural_hyphen,
@@ -379,16 +379,16 @@ def test_retained_italicized_prefix_is_not_compound(name):
     assert needs_brackets(name) is False
     assert is_complex_substituent(name) is False
     assert enclose_if_compound(name) == name      # cited BARE (BB 16286)
-    # -FIX Item 4: the P-16.2.4.1(d) hyphen is now part of the multiplied
+    # -FIX Item 4: the (d) hyphen is now part of the multiplied
     # TOKEN and is produced by this one primitive, so the multiplier comes back
     # as `di-`. The assertion's point is unchanged: the SIMPLE `di` and not the
-    # derived `bis` (P-16.3.2(a), the Blue Book).
+    # derived `bis` (a), the Blue Book).
     assert get_multiplier_prefix(2, name) == "di-"
     assert not get_multiplier_prefix(2, name).startswith("bis")
 
 
 @pytest.mark.parametrize("name,expected", [
-    # P-16.3.4: multiplied retained prefix keeps the hyphen boundary and the
+    #: multiplied retained prefix keeps the hyphen boundary and the
     # SIMPLE multiplier -- BB '1,2-di-tert-butylbenzene' (PIN) is the witness.
     ("tert-butyl", "2,6-di-tert-butyl"),
     ("sec-butyl", "2,6-di-sec-butyl"),
@@ -399,7 +399,7 @@ def test_di_tert_butyl_multiplication(name, expected):
 
 
 @pytest.mark.parametrize("name", [
-    "tert-butylsulfanyl",        # compound chalcogen prefix (P-16.3.3)
+    "tert-butylsulfanyl",        # compound chalcogen prefix
     "tert-butyl-dimethylsilyl",  # a SECOND, structural hyphen
     "2-tert-butyl",              # a locant
 ])
@@ -408,7 +408,7 @@ def test_the_carve_out_does_not_swallow_a_genuinely_compound_name(name):
 
     Stripping 'tert-' and re-deciding on the remainder is what keeps this
     narrow: 'tert-butyl' -> 'butyl' (simple), but 'tert-butylsulfanyl' ->
-    'butylsulfanyl', still compound under the P-16.3.3 chalcogen rule and still
+    'butylsulfanyl', still compound under the chalcogen rule and still
     enclosed, exactly as '(methylsulfanyl)' is.
     """
     from orthonym.assembly.naming_utils import needs_brackets
@@ -456,17 +456,17 @@ def test_the_italicized_prefix_carve_out_lives_in_exactly_one_place():
 
 
 @pytest.mark.parametrize("smiles,expected", [
-    # P-67 oxoacid stems (BB L36051-L36054) + the bare retained prefix.
+    # oxoacid stems (BB L36051-L36054) + the bare retained prefix.
     ("CC(C)(C)P(=O)(O)O",    "tert-butylphosphonic acid"),
     ("CC(C)(C)[As](=O)(O)O", "tert-butylarsonic acid"),
     ("CC(C)(C)[Sb](=O)(O)O", "tert-butylstibonic acid"),
-    # P-16.5.1.3: FIRST cited group bare (and here it needs no marks anyway),
+    #: FIRST cited group bare (and here it needs no marks anyway),
     # each subsequent one enclosed -- BB L36066 'methyl(phenyl)arsinic acid'.
     ("CC(C)(C)P(C)(=O)O",    "tert-butyl(methyl)phosphinic acid"),
 ])
 def test_tert_butyl_oxoacid_cites_the_retained_prefix_bare(ungated_namer, smiles, expected):
     """BB 16286 '*tert*-butyldi(methyl)phosphane' (PIN) cites tert-butyl BARE;
-    the prefix is cited BARE (BB 3465 / BB 16286). (NB: 'N-tert-butyl' is NOT a Blue Book string -- verified absent in 4 encodings against 30 hits for `*tert*-butyl`; the bare form follows from BB 3465 and the rules are P-16.3.3(b)/BB 7070 + P-16.2.4.1(d)/BB 6964, not P-16.3.4.) All four names are
+    the prefix is cited BARE (BB 3465 / BB 16286). (NB: 'N-tert-butyl' is NOT a Blue Book string -- verified absent in 4 encodings against 30 hits for `*tert*-butyl`; the bare form follows from BB 3465 and the rules are (b)/BB 7070 + (d)/BB 6964, not.) All four names are
     OPSIN-exact against the input structure."""
     assert ungated_namer.name(smiles) == expected
 
@@ -491,7 +491,7 @@ def test_organometallic_ligand_join_cites_the_retained_prefix_bare(ungated_namer
     ("CC(C)(C)c1cccc(C(C)(C)C)c1O",   "2,6-di-tert-butylphenol"),
 ])
 def test_already_correct_tert_butyl_names_are_unchanged(ungated_namer, smiles, expected):
-    """`2,6-di-tert-butylphenol` is the P-16.3.3(b)/P-16.2.4.1(d) multiplication witness (BB
+    """`2,6-di-tert-butylphenol` is the (b)/(d) multiplication witness (BB
     '1,2-di-tert-butylbenzene' (PIN)); both were correct before the carve-out
     moved and must stay byte-identical."""
     assert ungated_namer.name(smiles) == expected
@@ -500,7 +500,7 @@ def test_already_correct_tert_butyl_names_are_unchanged(ungated_namer, smiles, e
 # ==========================================================================
 # FAMILY 2 -- rules/catenated_hydrides.name_heterochalcogen_aba (1 site)
 #
-# The a[ba]n pure-chalcogen parent hydride (P-68.4.2.1 / P-21.2.3.1):
+# The a[ba]n pure-chalcogen parent hydride /:
 # HS-O-SH -> `dithioxane`, and a terminal chalcogen may bear ONE organyl.
 # The organyl guard was the narrow walker, so every branched / unsaturated /
 # long terminal organyl was refused (`unknown organic compound`).
@@ -514,9 +514,9 @@ def test_already_correct_tert_butyl_names_are_unchanged(ungated_namer, smiles, e
 # BB 25719 `1,4-di(propan-2-yl)cyclohexane` (PIN) -> the compound prefix is
 # enclosed and the SIMPLE multiplier sits OUTSIDE the marks
 # BB 16286 `*tert*-butyldi(methyl)phosphane` (PIN) -> a retained italicized
-# prefix is cited BARE, and P-16.3.4 keeps its hyphen under a
+# prefix is cited BARE, and keeps its hyphen under a
 # multiplier (`di-tert-butyl`, never `ditert-butyl`)
-# P-14.5.2 alphanumerical order ignores the italicized prefix and the marks
+# alphanumerical order ignores the italicized prefix and the marks
 # ==========================================================================
 
 def _aba(smiles):
@@ -536,10 +536,10 @@ def _aba(smiles):
     ("CCCCCCCCCCCCSOS",      "dodecyldithioxane"),
     # two identical compound organyls -> di OUTSIDE the marks (BB 25719)
     ("CC(C)SOSC(C)C",        "di(propan-2-yl)dithioxane"),
-    # P-16.3.3(b)/P-16.2.4.1(d): the italicized prefix keeps its hyphen under the multiplier
+    # (b)/(d): the italicized prefix keeps its hyphen under the multiplier
     ("CC(C)(C)SOSC(C)(C)C",  "di-tert-butyldithioxane"),
-    # two DIFFERENT organyls: P-14.5.2 order ('methyl' < 'propanyl'), and
-    # P-16.5.1.3 encloses the second cited group
+    # two DIFFERENT organyls: order ('methyl' < 'propanyl'), and
+    # encloses the second cited group
     ("CSOSC(C)C",            "methyl(propan-2-yl)dithioxane"),
 ])
 def test_f2_catenated_aba_previously_refused_organyl_is_now_named(smiles, expected):
@@ -559,7 +559,7 @@ def test_f2_catenated_aba_previously_refused_organyl_is_now_named(smiles, expect
 def test_f2_catenated_aba_existing_names_are_byte_identical(smiles, expected):
     """PROTECT rows. Every name this handler already emitted must be unchanged:
     the widening must add emissions, never re-spell one. ``ethyl(methyl)``
-    also pins that the switch from raw string order to P-14.5.2 alphanumerical
+    also pins that the switch from raw string order to alphanumerical
     order is a no-op on the letters-only class the narrow walker allowed."""
     assert _aba(smiles) == expected
 
@@ -575,7 +575,7 @@ def test_f2_catenated_aba_other_guards_still_fail_closed(smiles, why):
     """TRIPWIRE. The migration widens ONE guard, not the handler's scope.
 
     ``name_heterochalcogen_aba`` carries two further whole-molecule guards --
-    ``NumRings() > 0`` and "every heavy atom is a chalcogen or a carbon" -- that
+    ``NumRings > 0`` and "every heavy atom is a chalcogen or a carbon" -- that
     independently refuse ring-bearing and halogenated organyls. They are NOT in
     this task's scope, so those classes must still fail closed here; if one of
     them starts emitting, the migration reached further than the call site.
@@ -592,12 +592,12 @@ def test_f2_catenated_aba_other_guards_still_fail_closed(smiles, why):
 # unsaturated or long organyl on the hub refused the WHOLE handler.
 #
 # Widening it also puts compound prefixes through this handler's own hub-prefix
-# composition for the first time, which was raw `sorted()` + bare concatenation
+# composition for the first time, which was raw `sorted` + bare concatenation
 # + an unconditional `f"({hubyl})"`. Two Blue Book rules govern that block and
 # BOTH are quoted with their headings, because one of them makes a
 # previously-emitted name change:
 #
-# BB 7272 **P-16.5.1.3.1** "For mononuclear parent hydrides with two or more
+# BB 7272 **** "For mononuclear parent hydrides with two or more
 # substituents the first cited substituent never has enclosing marks
 # unless it includes a locant. The second and further substituents
 # are each enclosed with parentheses EVEN FOR SIMPLE SUBSTITUENTS.
@@ -608,11 +608,11 @@ def test_f2_catenated_aba_other_guards_still_fail_closed(smiles, why):
 # BB 39228 `4-[ethyl(methyl)phosphanyl]-1*H*-imidazole` (PIN)
 # -> the rule holds for the SUBSTITUENT-PREFIX form too, which is the
 # shape this handler emits, and the outer marks ESCALATE to square
-# brackets over the inner parentheses (P-16.5.4.1).
+# brackets over the inner parentheses.
 # The silyl analogue is `3-[amino(methyl)silyl]...` (PIN), BB 3545.
 #
 # So `1-(ethylmethylphosphanyl)propan-1-one` was NON-PIN: it dropped the
-# P-16.5.1.3.1 marks. Its correction is a wrong-name -> better-name change, not
+# marks. Its correction is a wrong-name -> better-name change, not
 # a refusal -> emission, and it is pinned separately below so the gate can
 # attribute it.
 # ==========================================================================
@@ -628,14 +628,14 @@ def _pk(smiles):
     # branched -- the narrow walker refused an internal attachment
     ("CCC(=O)P(C(C)C)C(C)C",       "1-[di(propan-2-yl)phosphanyl]propan-1-one"),
     ("CCC(=O)P(C(C)C)C",           "1-[methyl(propan-2-yl)phosphanyl]propan-1-one"),
-    # P-16.3.3(b)/P-16.2.4.1(d) retained italicized prefix: bare, hyphen kept under 'di'
+    # (b)/(d) retained italicized prefix: bare, hyphen kept under 'di'
     ("CCC(=O)P(C(C)(C)C)C(C)(C)C", "1-(di-tert-butylphosphanyl)propan-1-one"),
     # ring-bearing -- the walker miscounted these as linear chains
     ("CCC(=O)P(C1CCCCC1)C1CCCCC1", "1-(dicyclohexylphosphanyl)propan-1-one"),
     ("CCC(=O)P(Cc1ccccc1)Cc1ccccc1", "1-(dibenzylphosphanyl)propan-1-one"),
     # unsaturated
     ("CCC(=O)P(C=C)C=C",           "1-(diethenylphosphanyl)propan-1-one"),
-    # longer than the private walker's chain table, + P-16.5.1.3.1 marks
+    # longer than the private walker's chain table, + marks
     ("CCC(=O)P(CCCCCCCCCCCC)C",    "1-[dodecyl(methyl)phosphanyl]propan-1-one"),
     # the As hub shares the code path
     ("CCC(=O)[As](C(C)C)C",        "1-[methyl(propan-2-yl)arsanyl]propan-1-one"),
@@ -661,7 +661,7 @@ def test_f3_pseudoketone_two_different_organyls_gain_the_p1651331_marks(
     exactly this substituent-prefix shape. The bare-concatenated form was
     reachable before this migration (two SIMPLE organyls pass the narrow walker),
     so it is called out separately from the refusal -> emission rows: the gate
-    must attribute this one string move to P-16.5.1.3.1 and not to the widening.
+    must attribute this one string move to and not to the widening.
     """
     assert _pk(smiles) == after
     assert _pk(smiles) != before
@@ -722,7 +722,7 @@ def test_f3_pseudoketone_other_guards_still_fail_closed(smiles, why):
 # sibling Group-14 producer that fabricates a linear chain from the carbon
 # skeleton, so `CC(C)[Si](C)(C)CC(=O)O` shipped as
 # `(dimethylpropylsilyl)acetic acid` -- propan-2-yl spelled `propyl`, a WRONG
-# CONSTITUTION. It was masked only by the SELF-01 OPSIN gate, which fails OPEN
+# CONSTITUTION. It was masked only by the OPSIN gate, which fails OPEN
 # when no JRE is present, so these assertions run ungated. This is a project rule
 # in its original direction: the refusal was already unmasking a worse generator.
 # ==========================================================================
@@ -751,11 +751,11 @@ def _g14_name(smiles):
     ("CC(C)[Si](C)(C)CC(=O)O",     "dimethyl(propan-2-yl)silyl"),
     # -CLOSEOUT Item A re-baseline: was `methylbis(propan-2-yl)silyl`.
     # `propan-2-yl` is an UNSUBSTITUTED simple prefix that merely carries a
-    # locant, so P-16.3.4(a) parenthesises it while P-16.3.2(a) multiplies it
+    # locant, so (a) parenthesises it while (a) multiplies it
     # with the SIMPLE `di`. The Blue Book gives this exact shape verbatim on a
     # silane: `ethyldi(propanG2Gyl)silane!(PIN)` at the Blue Book, and
     # `di(propanG2Gyl)!(preferred!prefix)` at:7087. `bis` is reserved by
-    # `**P-16.3.5**`(a) (:7104) for a SUBSTITUTED prefix -- contrast the BB's own
+    # `****`(a) (:7104) for a SUBSTITUTED prefix -- contrast the BB's own
     # `1,4-bis(2-chloropropan-2-yl)benzene (PIN)` (:25793) against
     # `1,4-di(propan-2-yl)cyclohexane (PIN)` (:25721), one chloro apart.
     ("CC(C)[Si](C(C)C)(C)CC(=O)O", "methyldi(propan-2-yl)silyl"),
@@ -798,7 +798,7 @@ def test_f4_wrong_constitution_no_longer_ships(ungated_namer, smiles, wrong, rig
 def test_f4_prefix_citation_order_follows_p1452(ungated_namer, smiles, before, after):
     """Two names are RE-ORDERED, from non-preferred to preferred.
 
-    P-14.5.2 orders prefixes alphanumerically, so `methyl` is cited before
+     orders prefixes alphanumerically, so `methyl` is cited before
     `methylphenyl` (a shorter name that is a prefix of a longer one comes first).
     BB 3545/28174 shows the comparison running over the full prefix string
     INCLUDING its marks, with a letter preferred to an open parenthesis:
@@ -829,9 +829,9 @@ def test_f4_group14_existing_prefixes_are_byte_identical(smiles, expected):
     """PROTECT rows.
 
     `tert-butyldimethylsilyl` is the one that pins the ORDER primitive: raw
-    `sorted()` keys `tert-butyl` on its 't' and would emit
+    `sorted` keys `tert-butyl` on its 't' and would emit
     `dimethyltert-butylsilyl`. `chlorodimethylsilyl` and `hydroxydimethylsilyl`
-    pin that the P-16.5.1.3.1 leg was deliberately NOT applied here -- this
+    pin that the leg was deliberately NOT applied here -- this
     producer competes with a sibling that emits the bare form for that shape.
     """
     assert _g14_name(smiles) == expected
@@ -859,7 +859,7 @@ def _o_neighbour_prefix(smiles):
 ])
 def test_f4_predicate_still_admits_the_simple_alkoxy(smiles, expected):
     """The contracted alkoxy producer keeps the cases it already handled
-    (P-68.2.6.2, BB 38245 `-Ge(OEt)3` -> `triethoxygermyl`)."""
+    , BB 38245 `-Ge(OEt)3` -> `triethoxygermyl`)."""
     assert _o_neighbour_prefix(smiles) == expected
 
 
@@ -911,7 +911,7 @@ def test_f4_predicate_refusal_leaves_the_whole_group14_namer_closed(smiles):
 # italic-N locant IS enclosed.
 # BB 3465 `4-butyl-4-*tert*-butylcyclohexan-1-ol` (PIN) -> the retained
 # italicized prefix is cited BARE even directly after a locant
-# (P-16.3.3(b) + P-16.2.4.1(d)), so the N-substituent is cited bare per BB 3465.
+# (b) + (d)), so the N-substituent is cited bare per BB 3465.
 # ==========================================================================
 
 def _f5(smiles):
@@ -942,17 +942,17 @@ def test_f5_frn_organyl_previously_refused_is_now_named(smiles, expected):
     ("CC(C)(C)NP(=O)(O)O",  "N-tert-butylphosphoramidic acid"),
     ("C1CCCCC1NP(=O)(O)O",  "N-cyclohexylphosphoramidic acid"),
     ("C=CNP(=O)(O)O",       "N-ethenylphosphoramidic acid"),
-    # P-16.3.3(b)/P-16.2.4.1(d): the multiplier keeps the italicized prefix's hyphen
+    # (b)/(d): the multiplier keeps the italicized prefix's hyphen
     ("CC(C)(C)N(C(C)(C)C)P(=O)(O)O", "N,N-di-tert-butylphosphoramidic acid"),
     # BB 25719 `1,4-di(propan-2-yl)cyclohexane` (PIN): SIMPLE multiplier OUTSIDE
     # the marks of a compound prefix
     ("CC(C)N(C(C)C)P(=O)(O)O",       "N,N-di(propan-2-yl)phosphoramidic acid"),
-    # P-14.5.2 order across a simple and a compound prefix ('methyl' < 'propanyl')
+    # order across a simple and a compound prefix ('methyl' < 'propanyl')
     ("CC(C)N(C)P(=O)(O)O",  "N-methyl-N-(propan-2-yl)phosphoramidic acid"),
 ])
 def test_f5_amido_n_substituent_previously_refused_is_now_named(smiles, expected):
     """BB 32784 `*N*-(propan-2-yl)acetamide` (PIN) for the enclosed locanted
-    prefix; BB 3465 for `tert-butyl` cited bare after a locant (P-16.3.3(b)/P-16.2.4.1(d))."""
+    prefix; BB 3465 for `tert-butyl` cited bare after a locant (b)/(d))."""
     assert _f5(smiles) == expected
 
 
@@ -969,7 +969,7 @@ def test_f5_amido_n_substituent_previously_refused_is_now_named(smiles, expected
     ("CN(C)P(=O)(Cl)O",    "N,N-dimethylphosphoramidochloridic acid"),
 ])
 def test_f5_existing_names_are_byte_identical(smiles, expected):
-    """PROTECT rows. `N-ethyl-N-methyl` pins that the P-14.5.2 citation order is
+    """PROTECT rows. `N-ethyl-N-methyl` pins that the citation order is
     unchanged, and every simple prefix must stay BARE -- `enclose_if_compound` is
     a no-op on the letters-only class the narrow walker allowed."""
     assert _f5(smiles) == expected
@@ -994,7 +994,7 @@ def test_f5_other_guards_still_fail_closed(smiles, why):
 # FAMILY 6 -- rules/polychalcogen (3 sites, all NAMING)
 #
 # line 105 `_terminal_substituents` -> the chain-parent prefix block
-# line 259 the P-68.4.2.2/.3 parent+suffix layer (`methyldisulfanol`)
+# line 259 the /.3 parent+suffix layer (`methyldisulfanol`)
 # line 445 `name_polysulfoxide_sulfone` -> the lambda/oxo prefix block
 #
 # Both locanted prefix blocks were open-coded and are now ONE helper,
@@ -1005,8 +1005,8 @@ def test_f5_other_guards_still_fail_closed(smiles, why):
 # and for citing alphanumerically even when the locants then DESCEND, which
 # the old "ascending first-locant order (matches alpha here)" only got right
 # for the letters-only class the narrow walker could return.
-# 2. no P-16.5.1.1 marks, so a locanted prefix ran into the stem.
-# 3. no P-16.3.3(b)/P-16.2.4.1(d) carve-out, so `tert-butyl` lost its multiplier hyphen.
+# 2. no marks, so a locanted prefix ran into the stem.
+# 3. no (b)/(d) carve-out, so `tert-butyl` lost its multiplier hyphen.
 #
 # The widening also changes WHICH nomenclature claims two molecules, and the Blue
 # Book says the new one is preferred -- BB 23385, verbatim:
@@ -1030,9 +1030,9 @@ def test_f5_other_guards_still_fail_closed(smiles, why):
 
 @pytest.mark.parametrize("smiles,expected", [
     # site 105 -- chain parent. ⚠ The three chain-parent rows lost their locants
-    # on 2026-07-30 (Phase C Task 11) to P-14.3.4.4 (BB 2953); BB 39339
+    # on 2026-07-30 (Phase C Task 11) to (BB 2953); BB 39339
     # `dimethyltrisulfane (PIN)` and BB 39341 `methyl(phenyl)triselane (PIN)` are
-    # the verbatim witnesses, and BB 7272 (P-16.5.1.3.1) supplies the enclosing
+    # the verbatim witnesses, and BB 7272 supplies the enclosing
     # marks on the second cited prefix. The ORDER these rows exist to pin is
     # still fully observable in the string.
     ("CC(C)SSSC(C)C",           "di(propan-2-yl)trisulfane"),
@@ -1054,7 +1054,7 @@ def test_f6_polychalcogen_previously_refused_organyl_is_now_named(
 
 
 @pytest.mark.parametrize("smiles,expected", [
-    # ⚠ The two chain-parent rows lost their locants to P-14.3.4.4 on 2026-07-30
+    # ⚠ The two chain-parent rows lost their locants to on 2026-07-30
     # (Task 11), but they still discriminate: `tert-butyl` is cited FIRST, so a
     # raw sort (which orders it under 't') would emit `ethyl(tert-butyl)...` and
     # `methyl(tert-butyl)...`. BB 16286 `tert-butyldi(methyl)phosphane` (PIN)
@@ -1067,12 +1067,12 @@ def test_f6_polychalcogen_previously_refused_organyl_is_now_named(
 def test_f6_citation_order_ignores_the_italicized_prefix(
     ungated_namer, smiles, expected,
 ):
-    """P-14.5.2 keys on the LETTERS, so `tert-butyl` sorts under 'butyl'.
+    """ keys on the LETTERS, so `tert-butyl` sorts under 'butyl'.
 
     These are the rows that distinguish the shared citation key from a raw string
     sort: raw order puts 'methyl'/'ethyl' before 'tert-butyl' (on 'm'/'e' < 't'),
-    while P-14.5.2 compares 'butyl' < 'ethyl' < 'methyl' and cites tert-butyl
-    FIRST -- which then also takes locant 1 under P-14.4 (g). Without a row like
+    while compares 'butyl' < 'ethyl' < 'methyl' and cites tert-butyl
+    FIRST -- which then also takes locant 1 under (g). Without a row like
     this the raw-sort mutant survives, because every other witness here happens to
     sort identically both ways.
     """
@@ -1081,14 +1081,14 @@ def test_f6_citation_order_ignores_the_italicized_prefix(
 
 @pytest.mark.parametrize("smiles,before,after", [
     # ⚠ RE-POINTED 2026-07-30 (Phase C Task 11). These rows used to be
-    # `CSSSCC` / `CSSSSSCC`, which P-14.3.4.4 now names `ethyl(methyl)trisulfane`
+    # `CSSSCC` / `CSSSSSCC`, which now names `ethyl(methyl)trisulfane`
     # and `ethyl(methyl)pentasulfane` -- i.e. the locanted join this test exists to
     # protect is no longer REACHED for them, so keeping them here would have left a
     # test that passes however the separator behaves (global constraint 5:
     # tautological by architecture). An isotopic label makes the licence decline
-    # (`isotopic_naming_scope`, P-82.6.1.1 / BB 44180), which is the one live route
+    # (`isotopic_naming_scope`, / BB 44180), which is the one live route
     # back to the locanted join in this producer -- measured, not assumed.
-    # (13C count subscript omitted per P-82.2.1/FIX-A; the hyphen-separation
+    # (13C count subscript omitted per /FIX-A; the hyphen-separation
     # behaviour under test is unchanged.)
     ("[13CH3]SSSCC",   "1-ethyl3-(13C)methyltrisulfane",
                        "1-ethyl-3-(13C)methyltrisulfane"),
@@ -1110,7 +1110,7 @@ def test_f6_prefix_segments_are_hyphen_separated(ungated_namer, smiles, before, 
 
 
 @pytest.mark.parametrize("smiles,before,after", [
-    # Locants dropped 2026-07-30 by P-14.3.4.4 (Task 11); the point of these rows
+    # Locants dropped 2026-07-30 by (Task 11); the point of these rows
     # -- WHICH nomenclature claims the molecule -- is untouched, and the `trithia`
     # forms are still the rejected ones.
     ("CCCCCCCCCCCCSSSC", "2,3,4-trithiahexadecane",
@@ -1139,7 +1139,7 @@ def test_f6_polysulfane_parent_beats_skeletal_replacement(
 
 @pytest.mark.parametrize("smiles,expected", [
     ("SSS",               "trisulfane"),
-    # ⚠ The four substituted rows are P-14.3.4.4 (BB 2953) omissions as of
+    # ⚠ The four substituted rows are (BB 2953) omissions as of
     # 2026-07-30 (Task 11), not the locanted forms this list first recorded.
     # BB 39335 `methyltrisulfane (PIN)` and BB 39339 `dimethyltrisulfane (PIN)`
     # are verbatim; the tetra/penta homologues follow the same licence.
@@ -1182,13 +1182,13 @@ def test_f6_two_chalcogen_chains_are_still_not_named_as_disulfane(
     "CC(C)S(=O)S(=O)C", "CS(=O)S(=O)C",
 ])
 def test_f6_locants_do_not_depend_on_smiles_atom_order(ungated_namer, smiles):
-    """P-14.4 (g) (BB 3307) makes the chain orientation DETERMINISTIC.
+    """ (g) (BB 3307) makes the chain orientation DETERMINISTIC.
 
     Both prefix blocks chose the orientation by comparing only the locant
     multiset; on a tie (the common case for a symmetric chain, e.g. {1,3} either
     way) the choice fell through to RDKit atom order, so the same compound got
     `1-ethyl-3-methyltrisulfane` or `3-ethyl-1-methyltrisulfane` depending on how
-    its SMILES happened to be written. BB 3307 P-14.4 (g) supplies the missing
+    its SMILES happened to be written. BB 3307 (g) supplies the missing
     criterion -- "lowest locants for the substituent cited first as a prefix in
     the name" -- witnessed verbatim by BB 29956
     `1-hydroxy-3-oxopropane-1,2,3-tricarboxylic acid` (PIN) [not
@@ -1207,26 +1207,26 @@ def test_f6_locants_do_not_depend_on_smiles_atom_order(ungated_namer, smiles):
 # line 298 `_formazan_substituent` -> one organyl on a formazan skeleton
 #
 # `_format_n2_substituents` carried the same three defects as polychalcogen's
-# blocks (no hyphen separator -> `1-ethyl2-methylhydrazine` SHIPPED; no P-16.3.3
-# marks; raw sort), plus the missing P-14.4 (g) orientation tie-break, and
+# blocks (no hyphen separator -> `1-ethyl2-methylhydrazine` SHIPPED; no
+# marks; raw sort), plus the missing (g) orientation tie-break, and
 # `_format_substituted_polyazane`/`_name_azoxy` open-coded `f"({name})"` which
-# cannot escalate marks and has no P-16.3.4 carve-out.
+# cannot escalate marks and has no carve-out.
 #
 # The widening also moves five names from a CARBON parent to the HYDRAZINE
 # parent, which is the preferred direction:
 #
-# P-44.1.2 (BB 18917) class seniority order `N > P > As >... > O > S > Se > Te > C`
+# (BB 18917) class seniority order `N > P > As >... > O > S > Se > Te > C`
 # -- nitrogen before carbon.
 # BB 18950 `1-(2H-pyran-3-yl)-2-(silolan-2-yl)hydrazine` (PIN) `(N > Si > O)`
 # -- hydrazine is the parent even against two RING substituents.
 #
-# and `methylhydrazine` / `phenylhydrazine` (BB PINs, P-68.3.1.2) were already
+# and `methylhydrazine` / `phenylhydrazine` (BB PINs, were already
 # emitted, so before this migration the class split purely on whether the narrow
 # walker accepted the substituent. (BB 19376 `2-hydrazinylpyridine` (PIN) is not
-# a counterexample: P-44.1.2.2 criterion (1) (BB 19336/19340) makes the RING
+# a counterexample: criterion (1) (BB 19336/19340) makes the RING
     # senior to the chain when both hold the same senior element -- BB 19378
     # says exactly "(ring is senior to chain)", not anything about heterocycles.
-    # P-44.2.1 is ring-vs-RING and does not govern this. [-FIX Item 9])
+    # is ring-vs-RING and does not govern this. [-FIX Item 9])
 # ==========================================================================
 
 @pytest.mark.parametrize("smiles,expected", [
@@ -1235,13 +1235,13 @@ def test_f6_locants_do_not_depend_on_smiles_atom_order(ungated_namer, smiles):
     ("CC(C)NNC",             "1-methyl-2-(propan-2-yl)hydrazine"),
     ("CC(C)(C)NNC(C)(C)C",   "1,2-di-tert-butylhydrazine"),
     ("CC(C)NNN",             "1-(propan-2-yl)triazane"),
-    # diazene (N=N) omits locants (P-68.3.1.3.2.1); hydrazine above keeps them.
+    # diazene (N=N) omits locants; hydrazine above keeps them.
     ("CC(C)N=NC(C)C",        "di(propan-2-yl)diazene"),
     # >=3-N chain with two DIFFERENT prefixes: exercises that composer's own
-    # P-14.4 (g) tie-break (methyl is cited first, so it takes locant 1)
+    # (g) tie-break (methyl is cited first, so it takes locant 1)
     ("CC(C)NNNC",            "1-methyl-3-(propan-2-yl)triazane"),
     ("CNNNCC",               "1-ethyl-3-methyltriazane"),
-    # MULTIPLIED prefixes on the >=3-N composer: P-16.3.4 hyphen + BB 25719
+    # MULTIPLIED prefixes on the >=3-N composer: hyphen + BB 25719
     # SIMPLE multiplier outside the marks of a compound prefix
     ("CC(C)(C)NNNC(C)(C)C",  "1,3-di-tert-butyltriazane"),
     ("CC(C)NNNC(C)C",        "1,3-di(propan-2-yl)triazane"),
@@ -1258,19 +1258,19 @@ def test_f7_polyazane_previously_refused_organyl_is_now_named(
 @pytest.mark.parametrize("smiles,expected", [
     ("CC(C)(C)NNC",  "1-tert-butyl-2-methylhydrazine"),
     ("CC(C)(C)NNCC", "1-tert-butyl-2-ethylhydrazine"),
-    # diazene omits locants (P-68.3.1.3.2.2, unsymmetric alphabetical prefixes);
+    # diazene omits locants, unsymmetric alphabetical prefixes);
     # 'tert-' is still ignored for order, so butyl is cited before methyl.
     ("CC(C)(C)N=NC", "tert-butyl(methyl)diazene"),
     ("CC(C)(C)NNN",  "1-tert-butyltriazane"),
     # the >=3-N block is a SEPARATE composer and needs its own rows
     ("CC(C)(C)NNNC", "1-tert-butyl-3-methyltriazane"),
-    # P-16.3.4 under a multiplier, on the azoxy composer
+    # under a multiplier, on the azoxy composer
     ("CC(C)(C)N=[N+]([O-])C(C)(C)C", "di-tert-butyldiazene oxide"),
 ])
 def test_f7_citation_order_ignores_the_italicized_prefix(
     ungated_namer, smiles, expected,
 ):
-    """P-14.5.2 keys on the LETTERS, so `tert-butyl` sorts under 'butyl'.
+    """ keys on the LETTERS, so `tert-butyl` sorts under 'butyl'.
 
     These rows distinguish the shared citation key from a raw string sort, which
     would put 'methyl'/'ethyl' first (on 'm'/'e' < 't'). Every other witness in
@@ -1305,11 +1305,11 @@ def test_f7_hydrazine_is_the_senior_parent_over_carbon(
 ):
     """Five names move from a CARBON parent to the HYDRAZINE parent.
 
-    P-44.1.2 (BB 18917) gives the class seniority order `N > P > As >... > O > S > Se > Te >
+     (BB 18917) gives the class seniority order `N > P > As >... > O > S > Se > Te >
     C` -- nitrogen BEFORE carbon -- and BB 18950
     `1-(2H-pyran-3-yl)-2-(silolan-2-yl)hydrazine` (PIN) `(N > Si > O)` keeps
     hydrazine as the parent even against two ring substituents. `methylhydrazine`
-    and `phenylhydrazine` (BB PINs, P-68.3.1.2) were already emitted, so the old
+    and `phenylhydrazine` (BB PINs, were already emitted, so the old
     behaviour split one class on nothing but whether the narrow walker accepted
     the substituent. All five new names are OPSIN-exact.
     """
@@ -1327,8 +1327,8 @@ def test_f7_hydrazine_is_the_senior_parent_over_carbon(
     ("NNN",                         "triazane"),
     ("CNNN",                        "1-methyltriazane"),
     ("CNNNC",                       "1,3-dimethyltriazane"),
-    ("CN=NC",                       "dimethyldiazene"),        # P-68.3.1.3.2.1: no locants
-    ("c1ccccc1N=Nc1ccccc1",         "diphenyldiazene"),        # P-68.3.1.3.2.1: no locants
+    ("CN=NC",                       "dimethyldiazene"),        #: no locants
+    ("c1ccccc1N=Nc1ccccc1",         "diphenyldiazene"),        #: no locants
     ("c1ccccc1N=[N+]([O-])c1ccccc1", "diphenyldiazene oxide"),
     ("CN=[N+]([O-])C",              "dimethyldiazene oxide"),
 ])
@@ -1348,7 +1348,7 @@ def test_f7_polyazane_existing_names_are_byte_identical(
     "CC(C)NNNC", "CNNNCC", "CC(C)(C)NNNC",
 ])
 def test_f7_locants_do_not_depend_on_smiles_atom_order(ungated_namer, smiles):
-    """P-14.4 (g) (BB 3307) makes the N-chain direction DETERMINISTIC.
+    """ (g) (BB 3307) makes the N-chain direction DETERMINISTIC.
 
     Both `_format_n2_substituents` and `_format_substituted_polyazane` compared
     only the locant SET; on the symmetric 2-N parent that is {1,2} either way, so
@@ -1384,7 +1384,7 @@ def test_f7_other_guards_still_fail_closed(smiles, why):
 #
 # ** What the refusal was actually doing (a project rule, ungated probe) **
 # A `None` here does not fail closed -- it hands the molecule to generators that
-# DROP the heteroatom. With the SELF-01 gate disabled the producers emitted
+# DROP the heteroatom. With the gate disabled the producers emitted
 # `propane` for CC(C)[AsH2] (the arsenic simply gone), `cyclohexane` for
 # C1CCCCC1[AsH2], `(methylmethyl)methane` for C[Si](C)(C)N=P, and `propylsilane`
 # / `tetrapropylsilane` (propan-2-yl spelled propyl) for the silanes.
@@ -1398,7 +1398,7 @@ def test_f7_other_guards_still_fail_closed(smiles, why):
 # `_compose_io_prefixes`, the phosphanimine `_block`, and `name_heteroimine`'s
 # single-organyl join -- plus `phosphorus._build_substituent_string`, which family
 # 8 feeds and which produced `dipropan-2-yl`, `ditert-butyl` and
-# `tert-butyl(dimethyl)`. BB 7272 (P-16.5.1.3.1) is verbatim on the last one:
+# `tert-butyl(dimethyl)`. BB 7272 is verbatim on the last one:
 # "When the simple substituent groups are accompanied by multiplicative prefixes
 # such as 'di' and 'tri', the multiplicative prefixes are NOT included in the
 # parentheses" -- BB 16286 `tert-butyldi(methyl)phosphane` (PIN) is the shape.
@@ -1425,9 +1425,9 @@ def test_f7_other_guards_still_fail_closed(smiles, why):
     # phosphane with a silyl co-substituent
     ("CC(C)P([SiH3])C",   "methyl(propan-2-yl)(silyl)phosphane"),
     # mixed halo+organyl with the COMPOUND prefix in the FIRST (unmarked) slot:
-    # P-14.5.2 puts 'cyclohexylmethyl'/'butanyl' before 'fluoro', and
-    # P-16.5.1.3.1 withholds only the SEPARATING marks, so the compound prefix
-    # still takes its own P-16.5.1.1 marks there.
+    # puts 'cyclohexylmethyl'/'butanyl' before 'fluoro', and
+    # withholds only the SEPARATING marks, so the compound prefix
+    # still takes its own marks there.
     ("C1CCCCC1C[Si](F)(F)F", "(cyclohexylmethyl)tri(fluoro)silane"),
     ("CCC(C)[Si](F)(F)F",    "(butan-2-yl)tri(fluoro)silane"),
     ("CC(C)[Si](F)(F)F",     "trifluoro(propan-2-yl)silane"),
@@ -1464,7 +1464,7 @@ def test_f8_the_hub_element_is_never_dropped_from_the_name(
 
 
 @pytest.mark.parametrize("smiles,before,after", [
-    # P-44.1.2 (BB 18917) class seniority: Si is senior to C, so the SILANE is the parent
+    # (BB 18917) class seniority: Si is senior to C, so the SILANE is the parent
     ("Cl[Si](C)(C)C(C)C",    "2-(chlorodimethylsilyl)propane",
                              "chlorodi(methyl)(propan-2-yl)silane"),
     ("Cl[Si](C)(C)C(C)(C)C", "2-(chlorodimethylsilyl)-2-methylpropane",
@@ -1479,7 +1479,7 @@ def test_f8_silicon_is_the_senior_parent_over_carbon(
 ):
     """Four names move from a CARBON parent to the SILANE parent, toward the PIN.
 
-    P-44.1.2 (BB 18917) gives the class seniority order `N > P > As > Sb > Bi > Si > Ge > Sn >
+     (BB 18917) gives the class seniority order `N > P > As > Sb > Bi > Si > Ge > Sn >
     Pb > B >... > O > S > Se > Te > C` -- silicon BEFORE carbon. The codebase
     already emitted `methylsilane`, `cyclohexylsilane`, `trichloro(methyl)silane`
     and `chlorotri(methyl)silane` on the silane parent, so the old behaviour split
@@ -1531,7 +1531,7 @@ def test_f8_mononuclear_existing_names_are_byte_identical(
     `chlorotri(methyl)silane` / `dichlorodi(methyl)silane` /
     `trichloro(methyl)silane` are the BB-cited mixed halo+organyl forms (BB 35754 /
     39668 / 25866) and pin that the multiplier stayed outside the marks and the
-    first group unmarked. `tert-butylsilane` pins the P-14.5.2 letters-only key.
+    first group unmarked. `tert-butylsilane` pins the letters-only key.
     """
     assert ungated_namer.name(smiles) == expected
 
@@ -1542,7 +1542,7 @@ def test_f8_shared_phosphorus_composer_matches_the_bb_shapes():
 
     * BB 25719 `1,4-di(propan-2-yl)cyclohexane` (PIN) -- marks kept, SIMPLE
       multiplier outside (was `dipropan-2-yl`)
-    * P-16.3.3(b)/P-16.2.4.1(d) -- the italicized hyphen survives multiplication
+    * (b)/(d) -- the italicized hyphen survives multiplication
       (was `ditert-butyl`)
     * BB 16286 `tert-butyldi(methyl)phosphane` (PIN) -- multiplier OUTSIDE the
       marks of the SECOND cited group (was `tert-butyl(dimethyl)`)

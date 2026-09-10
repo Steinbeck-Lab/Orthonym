@@ -4,7 +4,7 @@ Unit tests for substituted cycloalkane naming.
 Tests cover:
 - Monosubstituted cycloalkanes (locant omission)
 - Disubstituted cycloalkanes (locants required)
-- Ring vs chain parent selection (RING-04)
+- Ring vs chain parent selection
 - Substituted cycloalkenes
 - Ring orientation for lowest locants
 """
@@ -115,7 +115,7 @@ class TestDisubstitutedCycloalkanes:
 
 
 # ============================================================================
-# Ring vs Chain Parent Selection Tests (RING-04)
+# Ring vs Chain Parent Selection Tests
 # ============================================================================
 
 class TestRingVsChainSelection:

@@ -7,13 +7,13 @@ exactly one constitution:
 
 ...an unbranched, fully saturated carbon backbone, one terminal NH2 on C2, and no
 other heteroatom anywhere. Historically the stem came from a whole-molecule carbon
-count (`sum(1 for atom in mol.GetAtoms() if atom.GetSymbol() == 'C')`) guarded by a
+count (`sum(1 for atom in mol.GetAtoms if atom.GetSymbol == 'C')`) guarded by a
 growing DENY-LIST of SMARTS. A deny-list can only ever exclude the holes somebody
 already found, and every hole it misses emits a name for a DIFFERENT MOLECULE:
 
-  * an in-chain secondary N   (`CNCC(=O)O`, sarcosine)  -> `2-aminopropanoic acid` (alanine)
-  * an in-chain ether O       (`COCC(N)C(=O)O`)         -> `2-aminobutanoic acid`
-  * a C=C / C#C in the chain  (`C=CCC(N)C(=O)O`)        -> `2-aminopentanoic acid`
+  * an in-chain secondary N (`CNCC(=O)O`, sarcosine) -> `2-aminopropanoic acid` (alanine)
+  * an in-chain ether O (`COCC(N)C(=O)O`) -> `2-aminobutanoic acid`
+  * a C=C / C#C in the chain (`C=CCC(N)C(=O)O`) -> `2-aminopentanoic acid`
 
 Each of those heteroatoms/unsaturations is silently CONTRACTED: its flanking carbons
 are counted into the backbone and the heteroatom vanishes from the name.
@@ -107,11 +107,11 @@ def test_stereodescriptor_still_injected():
 @pytest.mark.parametrize(
     "smiles",
     [
-        "CSCCC(N)C(=O)O",        # methionine: thioether (v23 Phase 12 F-THIOETHER-DROP)
-        "C[Se]CC(N)C(=O)O",      # selenoether (v26 BP-3 C1)
-        "CC[C@H](C)[C@@H](N)C(=O)O",  # isoleucine: branched (v23 Phase 12)
-        "OCC(N)C(=O)O",          # serine: hydroxy (PEP-02)
-        "OC(=O)CCC(N)C(=O)O",    # glutamic acid: dicarboxylic (AMAC-01)
+        "CSCCC(N)C(=O)O",        # methionine: thioether (a phase F-THIOETHER-DROP)
+        "C[Se]CC(N)C(=O)O",      # selenoether (C1)
+        "CC[C@H](C)[C@@H](N)C(=O)O",  # isoleucine: branched (a phase)
+        "OCC(N)C(=O)O",          # serine: hydroxy
+        "OC(=O)CCC(N)C(=O)O",    # glutamic acid: dicarboxylic
         "NCCCCC(N)C(=O)O",       # lysine: two primary amines
         "OC(=O)C1CCCN1",         # proline: ring
     ],

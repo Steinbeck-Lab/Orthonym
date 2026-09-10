@@ -1,18 +1,18 @@
 """F-B — N,ring-locant merging for N-substituted arenesulfonamides + the
-P-14.3.4.2 ``-1-`` locant on a ring-substituted (di-substituted) benzenesulfonamide.
+ ``-1-`` locant on a ring-substituted (di-substituted) benzenesulfonamide.
 
 Blue Book authority (verified verbatim 2026-08-08)
 --------------------------------------------------
-**P-14.3.4.2(c)** (``BlueBookV2/BlueBookV2.md:2913``): the locant ``1`` is omitted
+**(c)** (``the Blue Book Blue Book``): the locant ``1`` is omitted
 "in monosubstituted homogeneous monocyclic rings" — example ``cyclohexanethiol
 (PIN)``. A benzene ring bearing BOTH the sulfonamide suffix AND a ring substituent
-is DI-substituted, so P-14.3.3 (``:2869``, deny-by-default) cites the ``1``.
+is DI-substituted, so (``:2869``, deny-by-default) cites the ``1``.
 The whole arenesulfon* family carries it: ``4-aminobenzene-1-sulfonic acid (PIN)``
 (``:31174``), ``2-(4-aminobenzene-1-sulfonamido)-1,3-thiazole-5-carboxylic acid
 (PIN)`` (``:33034``). Zero no-``-1-`` di-substituted ``methylbenzenesulfon*`` PINs
 exist in the Blue Book.
 
-**P-66.1.1.3.1.1** N-substitution + **P-14.3.2 / P-14.5.2** alphanumerical order:
+**** N-substitution + ** / ** alphanumerical order:
 the italic-``N`` locants and the ring numerals form ONE merged, alphabetised
 prefix list. ``N,4-dimethyl-N-(3-methylphenyl)benzamide (PIN)`` (``:32879``) and
 ``3-chloro-N-(2-chlorophenyl)naphthalene-2-sulfonamide (PIN)`` (``:32881``) fix the
@@ -55,7 +55,7 @@ def test_part1_ring_substituted_primary_cites_locant_one(smiles, expected):
 
 
 @pytest.mark.parametrize("smiles,expected", [
-    # mono benzenesulfonamide stays WITHOUT -1- (monosubstituted ring, P-14.3.4.2(c))
+    # mono benzenesulfonamide stays WITHOUT -1- (monosubstituted ring, (c))
     ("NS(=O)(=O)c1ccccc1", "benzenesulfonamide"),
     # sulfonic-acid sibling was already correct — a regression witness
     ("OS(=O)(=O)c1ccc(C)cc1", "4-methylbenzene-1-sulfonic acid"),
@@ -102,11 +102,11 @@ def test_part2_bare_ring_n_substituted_unchanged(smiles, expected):
 
 
 # ----------------------------------------------------------------------------
-# RISK-7 (P-66.1.1.4.2, BB:32982 `2-(dimethylsulfamoyl)benzene-1-sulfonic acid`,
-# :32985 `phenylsulfamoyl`): a demoted N-substituted sulfonamide is the ENCLOSED
+#, the Blue Book `2-(dimethylsulfamoyl)benzene-1-sulfonic acid`,
+#:32985 `phenylsulfamoyl`): a demoted N-substituted sulfonamide is the ENCLOSED
 # `{N-substituents}sulfamoyl` prefix, the N-substituents cited WITHOUT the italic N.
 # (Supersedes F-B's earlier fail-closed stopgap for this class -- building the whole
-# class per invariant 1. Each expected string is OPSIN round-trip InChIKey-verified.)
+# class per a project rule. Each expected string is OPSIN round-trip InChIKey-verified.)
 # ----------------------------------------------------------------------------
 @pytest.mark.parametrize("smiles,expected", [
     ("OC(=O)c1ccc(S(=O)(=O)NC)cc1",       "4-(methylsulfamoyl)benzoic acid"),
@@ -143,7 +143,7 @@ def test_primary_disulfonamide_names():
     assert name_compound("NS(=O)(=O)c1ccc(S(=O)(=O)N)cc1") == "benzene-1,4-disulfonamide"
 
 
-# 0-WRONG regression guard (fable-caught): a MULTI-instance sulfonamide carrying
+# 0-WRONG regression guard (a review-caught): a MULTI-instance sulfonamide carrying
 # N-substituents needs the N^1/N^3 superscript locants (not built) — the benzene
 # producer must FAIL CLOSED, never emit `benzene-1,4-disulfonamide` (which silently
 # drops the N-methyls, a wrong constitution).
@@ -157,7 +157,7 @@ def test_multi_instance_n_substituted_sulfonamide_fails_closed(smiles):
     assert out is None or "disulfonamide" not in out or "N" in out
 
 
-# Adversarial N-substituent shapes (fable pre-empt) — each must name RT-exact
+# Adversarial N-substituent shapes (a review pre-empt) — each must name RT-exact
 # end-to-end (some route through the F-B benzene producer, some through a sibling
 # handler; the end-to-end contract is what matters). Each string is OPSIN-verified,
 # and the F-B producer that cannot claim one (e.g. N-acyl, where the acyl competes

@@ -2,7 +2,7 @@
 
 Covers:
 - Retained names: urea, guanidine
-- substituted derivatives: methylurea (mono omits the locant, P-14.3.4.3),
+- substituted derivatives: methylurea (mono omits the locant,,
   N,N-dimethylurea, N,N'-dimethylurea (disubstituted keep both)
 - FG collision avoidance: urea NOT amide, guanidine NOT imine
 - OPSIN round-trip validation for generated names
@@ -15,7 +15,7 @@ from orthonym.perception.functional_groups import detect_functional_groups
 
 
 # ---------------------------------------------------------------------------
-# Urea retained name tests (FG-07)
+# Urea retained name tests
 # ---------------------------------------------------------------------------
 
 class TestUreaRetainedName:
@@ -26,13 +26,13 @@ class TestUreaRetainedName:
         assert name_compound("NC(=O)N") == "urea"
 
     def test_urea_n_methyl(self):
-        """Monosubstituted urea -> 'methylurea' (P-14.3.4.3, the Blue Book verbatim
+        """Monosubstituted urea -> 'methylurea', the Blue Book verbatim
         `CH3-NH-CO-NH2 methylurea (PIN)`: urea's four N-H are one orbit, so the
         italic-N locant is omitted). NOT 'N-methylurea'."""
         assert name_compound("CNC(=O)N") == "methylurea"
 
     def test_urea_n_ethyl(self):
-        """Monosubstituted urea -> 'ethylurea' (P-14.3.4.3, same licence)."""
+        """Monosubstituted urea -> 'ethylurea', same licence)."""
         assert name_compound("CCNC(=O)N") == "ethylurea"
 
     def test_urea_nn_dimethyl_same_nitrogen(self):
@@ -44,7 +44,7 @@ class TestUreaRetainedName:
         assert name_compound("CNC(=O)NC") == "N,N'-dimethylurea"
 
     def test_urea_n_phenyl(self):
-        """Monosubstituted (aryl) urea -> 'phenylurea' (P-14.3.4.3, same licence)."""
+        """Monosubstituted (aryl) urea -> 'phenylurea', same licence)."""
         assert name_compound("NC(=O)Nc1ccccc1") == "phenylurea"
 
     def test_urea_tetrasubstituted(self):
@@ -57,7 +57,7 @@ class TestUreaRetainedName:
 
 
 # ---------------------------------------------------------------------------
-# Guanidine retained name tests (FG-08)
+# Guanidine retained name tests
 # ---------------------------------------------------------------------------
 
 class TestGuanidineRetainedName:
@@ -135,7 +135,7 @@ class TestFGCollisionAvoidance:
 
 @pytest.mark.parametrize("smiles,expected_name", [
     ("NC(=O)N", "urea"),
-    # Monosubstituted urea OMITS the italic-N locant (P-14.3.4.3, the Blue Book methylurea).
+    # Monosubstituted urea OMITS the italic-N locant, the Blue Book methylurea).
     ("CNC(=O)N", "methylurea"),
     ("CCNC(=O)N", "ethylurea"),
     ("CNC(=O)NC", "N,N'-dimethylurea"),
@@ -176,11 +176,11 @@ class TestPrefixForms:
 
 
 # ---------------------------------------------------------------------------
-# a phase task 2 (P-66.4.1.2.1.2): guanidine N/N'/N'' LOCANT ASSIGNMENT uses a
+# a phase task 2: guanidine N/N'/N'' LOCANT ASSIGNMENT uses a
 # "minimum number of primes" -> the nitrogen bearing the MOST substituents takes
 # the lowest-primed locants (the Blue Book, 34258, 34262 'N,N'-dimethylguanidine' NOT
 # 'N,N''-' at the Blue Book). Citation order among distinct names is alphanumerical
-# (P-14.5.2). All rows are OPSIN-RT gold PINs.
+#. All rows are OPSIN-RT gold PINs.
 # ---------------------------------------------------------------------------
 class TestGuanidineMinimumPrimes:
     def test_NNNprime_trimethylguanidine(self):
@@ -203,7 +203,7 @@ class TestGuanidineMinimumPrimes:
         assert name_compound("CNC(=N)N", style="pin") == "N-methylguanidine"
 
     def test_count_tie_locant_assignment_deterministic_and_bb_correct(self):
-        # Determinism regression (P-14.5.2): both amino N's tie on count(2) AND
+        # Determinism regression: both amino N's tie on count(2) AND
         # earliest substituent (ethyl); the NEXT substituent decides -- methyl <
         # propyl, so the methyl-bearing N takes the lower (unprimed) locant. The
         # assignment must NOT depend on SMILES atom order (a project rule).

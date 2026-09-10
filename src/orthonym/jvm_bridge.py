@@ -2,10 +2,10 @@
 
 WHY
 ---
-Both JVM bridges shelled out ``java -jar ...`` **per call**. Measured 2026-07-30 by
+Both JVM bridges shelled out ``java -jar...`` **per call**. Measured 2026-07-30 by
 counting ``subprocess`` invocations whose argv contains ``java`` over 15 molecules
 spanning all naming classes: 65 spawns (4.33/molecule) before any fix, 37 (2.47/molecule)
-after the ``_java_available`` probe was cached in ``91a1a51b``. Of those 37, **30 came
+after the ``_java_available`` probe was cached in ``. Of those 37, **30 came
 from ``centres_label_batch``** — a function named "batch" that production calls twice per
 molecule with ONE molecule each, so its batching never amortised anything. Each spawn is
 ~130 ms of pure process launch.
@@ -21,7 +21,7 @@ module does **not** reimplement either tool — it drives the *same* code the CL
 and it reproduces the CLI's own input/output framing exactly:
 
 * **OPSIN** — ``opsin/opsin-cli/.../Cli.java:interactiveSmilesOutput`` calls
-  ``nts.parseChemicalName(name, cfg)`` and writes ``result.getSmiles()`` (nothing at all
+  ``nts.parseChemicalName(name, cfg)`` and writes ``result.getSmiles`` (nothing at all
   when it is null) followed by a newline. ``generateOpsinConfigObjectFromCmd`` sets all
   five config flags explicitly from ``cmd.hasOption(...)``, so with no flags every one is
   ``false`` and with ``-r`` only ``allowRadicals`` is ``true``. We set all five explicitly
@@ -32,7 +32,7 @@ and it reproduces the CLI's own input/output framing exactly:
     - the CLI reads **line by line**, so a name containing a newline is two inputs to it
       and one to us. Those are NOT equivalent, so such names are refused here and the
       caller's subprocess path handles them.
-* **centres** — ``com.simolecule.centres.LabelCip`` exposes *only* ``main(String[])``
+* **centres** — ``com.simolecule.centres.LabelCip`` exposes *only* ``main(String)``
   (verified with ``javap``); there is no programmatic API to call, and reimplementing its
   logic would risk changing labels. So we invoke ``LabelCip.main`` with the identical argv
   and the identical temp file, capturing ``System.out`` into a ``ByteArrayOutputStream``.
@@ -56,10 +56,10 @@ SAFETY
   provenance — and centres 1.2.1).
 * **Fallback, never failure.** Every entry point returns a sentinel meaning "I could not
   do this; use your subprocess path" when jpype is absent, the jars are missing, or the
-  JVM will not start. A missing JVM must never hard-fail a name (``centres_bridge`` D-13).
-* **fork-safe.** A JVM does not survive ``fork()``, and ``eval/harness.py`` uses
+  JVM will not start. A missing JVM must never hard-fail a name (``centres_bridge``).
+* **fork-safe.** A JVM does not survive ``fork``, and ``eval/harness.py`` uses
   ``mp.Pool`` (processes). A child that inherited a parent's JVM would see
-  ``isJVMStarted() == True`` while the JVM's threads no longer exist — and a JNI call into
+  ``isJVMStarted == True`` while the JVM's threads no longer exist — and a JNI call into
   that is liable to crash the worker outright rather than raise something catchable. So we
   record the pid that actually called ``startJVM`` and refuse to touch a JVM started by any
   other pid. In the normal flow this never triggers (laziness means the parent starts no
@@ -96,7 +96,7 @@ _LOGGED_UNAVAILABLE = False
 
 # Live Java handles (populated by _start).
 _N2S_CLS = None        # uk.ac.cam.ch.wwmm.opsin.NameToStructure (the class)
-_N2S = None            # ...and its singleton, built on FIRST OPSIN call (see _n2s)
+_N2S = None            #...and its singleton, built on FIRST OPSIN call (see _n2s)
 _CFG_CLS = None        # uk.ac.cam.ch.wwmm.opsin.NameToStructureConfig
 _CFG_BY_RADICALS: dict = {}
 _LABELCIP = None       # com.simolecule.centres.LabelCip
@@ -160,7 +160,7 @@ def _start(pid: int) -> bool:
         return False
 
     if jpype.isJVMStarted():
-        # Started by someone else, or inherited across fork() -- see "fork-safe".
+        # Started by someone else, or inherited across fork -- see "fork-safe".
         # We cannot change a running JVM's classpath and cannot verify a
         # post-fork JVM without risking a crash, so refuse.
         if _STARTED_PID != pid:
@@ -176,7 +176,7 @@ def _start(pid: int) -> bool:
         # /tmp/hsperfdata_<user>/<pid> file, which is what lets a later JVM print
         # a warning onto stdout. See orthonym/jvm_flags.py for the mechanism.
         base = [f"-Xmx{xmx}", *JVM_HYGIENE_FLAGS]
-        # JDK 24+ prints a 4-line "restricted method ... System::load" warning to
+        # JDK 24+ prints a 4-line "restricted method... System::load" warning to
         # stderr for JPype's own native load. Harmless, but every worker process
         # would emit it, so silence it where supported. The flag is UNKNOWN to
         # JDK < 24 and would abort start-up there, hence the retry without it --
@@ -196,8 +196,8 @@ def _start(pid: int) -> bool:
 
     try:
         if opsin_jar:
-            # Bind the CLASS only. `getInstance()` builds OPSIN's parse automaton
-            # (~0.8 s) and is deferred to the first OPSIN call by `_n2s()`, so a
+            # Bind the CLASS only. `getInstance` builds OPSIN's parse automaton
+            # (~0.8 s) and is deferred to the first OPSIN call by `_n2s`, so a
             # molecule that only needs centres never pays for it. This is worth
             # doing because the worker model is processes with
             # maxtasksperchild=25: every worker recycle re-pays whatever start-up

@@ -1,14 +1,14 @@
-"""Phase 160 polycyclic handler — direct-return shim (LIFT body alongside).
+"""a phase polycyclic handler — direct-return shim (LIFT body alongside).
 
 Verbatim move of composer.py:1100-1114 dispatch logic. Wraps the inline
-``_assemble_polycyclic_name(features, style)`` call + ``pool.add()`` +
-``pool.best().name`` return.
+``_assemble_polycyclic_name(features, style)`` call + ``pool.add`` +
+``pool.best.name`` return.
 
-Per CONTEXT D-24 incremental migration: the underlying
+Per internal notes incremental migration: the underlying
 ``_assemble_polycyclic_name`` body STAYS in composer.py during Plan-02 and
 moves to this module in Plan-03 commit 03-10 (composer.py thinning).
 
-IUPAC cite: P-25 (polycyclic aromatics + retained names).
+IUPAC cite: (polycyclic aromatics + retained names).
 
 Byte-identical contract: this handler fires only when ``polycyclic_name``
 is set AND complex_ring would NOT take the dispatch — encoded as
@@ -21,7 +21,7 @@ References:
 - composer.py:1100-1114 (inline polycyclic branch; REMOVED at this commit).
 - composer.py:_assemble_polycyclic_name (STAYS until 03-10).
 - composer.py:_is_complex_ring_system (mutex helper for the predicate).
-- 160-AUDIT-DECOMP.md § 1 row 'polycyclic' + § 2.26 purity proof.
+- internal notes-DECOMP.md row 'polycyclic' + purity proof.
 """
 from __future__ import annotations
 
@@ -57,7 +57,7 @@ def _is_polycyclic(features: Any) -> bool:
     mol = getattr(features, 'mol', None)
     if mol is None:
         return False
-    # WR-02: shared memoization with partial_sat / ring_ester predicates.
+    #: shared memoization with partial_sat / ring_ester predicates.
     if cached_is_complex_ring_system(features):
         return False
     return True
@@ -84,7 +84,7 @@ def name_polycyclic(
     poly_assembled = _assemble_polycyclic_name(features, style)
     pool = get_current_pool()
     pool.add(poly_assembled, "polycyclic", features)
-    # composer.py:1114 inline: return pool.best().name (NO _inject_stereo wrap)
+    # composer.py:1114 inline: return pool.best.name (NO _inject_stereo wrap)
     _nm = pool.best().name
     return NamingResult(
         name=_nm,

@@ -1,12 +1,12 @@
-"""a phase.1 SC-4 regression: prove pool state does NOT leak across
-consecutive orthonym.name() calls. Mitigates T-145.1-02 (cross-call
+"""a phase regression: prove pool state does NOT leak across
+consecutive orthonym.name calls. Mitigates T-145.1-02 (cross-call
 state leak in _pool_store thread-local).
 
-POST-DRIFT-FIX (2026-04-23): also covers recursive assemble_name() calls.
+POST-DRIFT-FIX (2026-04-23): also covers recursive assemble_name calls.
 The original Plan 01 single-slot pool was corrupted by recursive
 substituent naming (N-oxide handler, fragment_naming, substituent_enumerator,
 decomposition). The fix converts _pool_store to a stack with push_pool /
-pop_pool around each assemble_name() invocation. See:
+pop_pool around each assemble_name invocation. See:
 internal notes
 """
 
@@ -30,7 +30,7 @@ class TestPoolStateIsolation:
         clear_pool()
 
     def test_pool_cleared_between_calls(self):
-        """Each orthonym.name() call starts with a fresh pool ()."""
+        """Each orthonym.name call starts with a fresh pool ."""
         namer = Orthonym()
         n1 = namer.name("CCO")             # ethanol
         n2 = namer.name("c1ccccc1")        # benzene
@@ -54,7 +54,7 @@ class TestPoolStateIsolation:
         )
 
     def test_name_with_confidence_after_pool_refactor(self):
-        """Risk 3: store_confidence(pool.best()) preserved at the new return site.
+        """Risk 3: store_confidence(pool.best) preserved at the new return site.
 
          C4 -- THIS TEST WAS PASSING FOR A FABRICATED REASON, and that is
         the interesting part. It asserted a non-empty `factors` dict and
@@ -105,7 +105,7 @@ class TestPoolStateIsolation:
             assert result['factors'] == {}
 
     def test_no_pool_state_leak_across_many_calls(self):
-        """Hammer test: 100 sequential name() calls, no growth."""
+        """Hammer test: 100 sequential name calls, no growth."""
         namer = Orthonym()
         molecules = ["CCO", "CCC", "c1ccccc1", "CC(=O)O", "CCN", "CCS", "CC=O"]
         for _ in range(15):  # ~100 calls total
@@ -125,10 +125,10 @@ class TestPoolStateIsolation:
 
 
 class TestPoolStateIsolationUnderRecursion:
-    """a phase.1 DRIFT FIX (2026-04-23): regression coverage for the
-    pool-stack architecture. Each assemble_name() call must have an
-    independent cascade scope per IUPAC P-44.0 (per-molecule parent
-    selection). Recursive name_compound() invocations from substituent
+    """a phase DRIFT FIX (2026-04-23): regression coverage for the
+    pool-stack architecture. Each assemble_name call must have an
+    independent cascade scope per IUPAC (per-molecule parent
+    selection). Recursive name_compound invocations from substituent
     handlers must NOT corrupt the outer molecule's pool.
     """
 
@@ -205,7 +205,7 @@ class TestPoolStateIsolationUnderRecursion:
 
     def test_pool_stack_lifo_order(self):
         """Synthetic test: push/pop semantics are LIFO and isolate
-        cascades. Bypasses pool.add() (which needs real features) by
+        cascades. Bypasses pool.add (which needs real features) by
         manipulating pool._candidates directly to test stack semantics
         in isolation."""
         from orthonym.assembly.coverage_scoring import CandidateName
@@ -244,8 +244,8 @@ class TestPoolStateIsolationUnderRecursion:
             )
 
     def test_concurrent_threads_have_independent_stacks(self):
-        """threading.local() isolates per-thread stacks. Two threads
-        concurrently invoking name_compound() must not interfere."""
+        """threading.local isolates per-thread stacks. Two threads
+        concurrently invoking name_compound must not interfere."""
         import threading
         results = {}
         errors = []

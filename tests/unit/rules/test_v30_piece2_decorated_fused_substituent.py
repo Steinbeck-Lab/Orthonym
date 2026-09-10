@@ -5,12 +5,12 @@ ring-substituent (`5-hydroxy-1,3-dimethylpyrazol-4-yl`, `4-methoxyphenyl`) but
 returns None the moment the ring system is FUSED (`ring_substituents.py:574`,
 "fusion / spiro / not a simple monocycle"). So a decorated fused ring hanging
 off a parent — e.g. a methoxynaphthalene on an acetic-acid chain — had no
-producer and fell straight through to a silent atom drop / DROP-24, even though
+producer and fell straight through to a silent atom drop /, even though
 the BARE fused substituent (`naphthalen-2-yl`) already names.
 
 Piece 2 reuses the fused-ring PARENT numbering (`compute_fused_numbering` +
 `_ring_system_automorphisms`) and selects the symmetry-equivalent numbering that
-gives the FREE VALENCE the lowest locant (P-31.1.4.3.4 free-valence priority),
+gives the FREE VALENCE the lowest locant free-valence priority),
 then reads each decoration's locant off that same one numbering.
 
 Target verified by OPSIN round-trip (`scratchpad/piece2_spy_verify.py`):
@@ -60,7 +60,7 @@ def _names_at_every_ring_attachment(smiles, allow_mancude=True):
 
 def test_decorated_fused_naphthalene_substituent_now_names():
     """6-methoxynaphthalene as a ring-substituent -> 6-methoxynaphthalen-2-yl
-    (free valence at 2 by P-31.1.4.3.4; the methoxy then takes 6)."""
+    (free valence at 2 by; the methoxy then takes 6)."""
     got = _names_at_every_ring_attachment("COc1ccc2ccccc2c1")
     assert "6-methoxynaphthalen-2-yl" in got, got
 

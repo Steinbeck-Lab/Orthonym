@@ -188,7 +188,7 @@ _ROOT_CAUSE_REFUSALS = [
     ("benzoyl", BindingKind.PREFIX, "fusion prefix"),
     ("benzopyran", BindingKind.PARENT, "fusion prefix"),
     # A skeletal replacement prefix contributes 0 only because a stem beside it
-    # already counted the atom it replaces (P-15.4).
+    # already counted the atom it replaces.
     ("diazenyl", BindingKind.PREFIX, "qualifies no skeleton"),
     ("phosphate", BindingKind.SUFFIX, "qualifies no skeleton"),
     ("azide", BindingKind.PREFIX, "qualifies no skeleton"),
@@ -204,7 +204,7 @@ _ROOT_CAUSE_REFUSALS = [
     ("nitroformic acid", BindingKind.SUFFIX, "no parent hydride"),
     ("ethanimidohydrazide", BindingKind.SUFFIX, "no parent hydride"),
     # The bare chain form of an acid suffix needs a CHAIN parent; a ring takes
-    # the carb- form (P-65.1.1).
+    # the carb- form.
     ("ethylideneazinic acid", BindingKind.SUFFIX, "no chain parent hydride"),
     # Two skeletons cannot be juxtaposed with no attachment affix between them.
     ("methylcyclohexanecarbohydrazide", BindingKind.PREFIX, "juxtaposed"),
@@ -263,7 +263,7 @@ _NEWLY_CORRECT = [
     # on a methanone = 14 (was 8, the multiplier swallowing the whole tail).
     ("diphenylmethanone", 14),
     ("diphenylethenone", 15),
-    # Terminal-'e' elision of a named ring (P-16.7.1(a)).
+    # Terminal-'e' elision of a named ring (a)).
     ("pyridinyl", 6),
     ("cyclohexanol", 7),
     ("propanoic acid", 5),
@@ -344,7 +344,7 @@ def test_narrowing_the_lexicon_by_kind_cannot_hide_a_reading():
 # P6 on the three Blue Book PINs the defect broke
 # ---------------------------------------------------------------------------
 
-#: (SMILES, PIN, bindings). Blue Book P-68.3.1.3.1 / P-35.2.2; gold rows
+#: (SMILES, PIN, bindings). Blue Book /; gold rows
 #: W2-NPREF-DIAZENYL-P68, W2-NPREF-DIAZENYL, W2-NPREF-DIAZENYL-SORT in
 #: benchmarks/the gold set/packs/characteristic_groups.json.
 _DIAZENYL_GOLD = [

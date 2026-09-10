@@ -1,10 +1,10 @@
 """
 Unit tests for ring system type classification, scoring, and selection.
 
-Tests the IUPAC P-44.2 ring system hierarchy and selection logic
+Tests the IUPAC ring system hierarchy and selection logic
 from orthonym.rules.ring_selection.
 
-Reference: IUPAC 2013 Blue Book, P-44.2 (Ring System Selection)
+Reference: IUPAC 2013 Blue Book, (Ring System Selection)
 """
 
 import pytest
@@ -20,22 +20,22 @@ from orthonym.perception.rings import get_ring_systems
 
 
 # ============================================================================
-# P-44.1 principal-group priority in ring-system selection (v30 vB engine Piece 1)
+# principal-group priority in ring-system selection (vB engine Piece 1)
 # ============================================================================
 
 
 class TestPrincipalGroupBearingRing:
-    """P-44.1: the senior parent bears the principal characteristic group,
-    BEFORE the P-44.2 ring-type hierarchy is applied as a tiebreaker.
+    """: the senior parent bears the principal characteristic group,
+    BEFORE the ring-type hierarchy is applied as a tiebreaker.
 
-    ``ring_system_score`` sees only the ring atoms, so it cannot honour P-44.1.
+    ``ring_system_score`` sees only the ring atoms, so it cannot honour.
     ``select_principal_ring_system`` takes an optional ``principal_group_atoms``
     hint: when exactly one ring system bears the group, that system wins.
     """
 
     # 4-(pyridin-2-yl)benzoic acid: the benzene bears -COOH (the principal
     # characteristic group); the pyridine is more senior by ring score (an
-    # N-heterocycle). Per P-44.1 the COOH-bearing benzene must be the parent.
+    # N-heterocycle). Per the COOH-bearing benzene must be the parent.
     SMILES = "OC(=O)c1ccc(-c2ccccn2)cc1"
 
     def _rings(self):
@@ -58,7 +58,7 @@ class TestPrincipalGroupBearingRing:
         assert picked == benzene
 
     def test_without_hint_behaviour_is_unchanged(self):
-        """No hint -> current P-44.2 scoring (the N-heterocycle) -- byte-identical.
+        """No hint -> current scoring (the N-heterocycle) -- byte-identical.
 
         Guards against the hint silently changing the default: without it the
         pyridine still wins, proving the hint (not some side effect) drives the
@@ -75,7 +75,7 @@ class TestPrincipalGroupBearingRing:
 
 
 class TestClassifyRingSystemType:
-    """Tests for classify_ring_system_type() -- P-44.2.2 type hierarchy."""
+    """Tests for classify_ring_system_type -- type hierarchy."""
 
     def test_spiro_undecane(self):
         """Spiro[5.5]undecane should be classified as SPIRO."""
@@ -159,7 +159,7 @@ class TestClassifyRingSystemType:
 
 
 class TestRingSystemScore:
-    """Tests for ring_system_score() -- P-44.2.1 general criteria."""
+    """Tests for ring_system_score -- general criteria."""
 
     def test_heterocyclic_over_carbocyclic(self):
         """Heterocyclic ring system should score more senior than carbocyclic
@@ -170,7 +170,7 @@ class TestRingSystemScore:
         rs_benzene = get_ring_systems(mol_benzene)
         score_pyridine = ring_system_score(mol_pyridine, rs_pyridine[0])
         score_benzene = ring_system_score(mol_benzene, rs_benzene[0])
-        # Lower score = more senior (min() selects most senior)
+        # Lower score = more senior (min selects most senior)
         assert score_pyridine < score_benzene
 
     def test_nitrogen_over_oxygen_heterocycle(self):
@@ -220,7 +220,7 @@ class TestRingSystemScore:
         assert score_pyridine < score_benzene
 
     def test_monocyclic_heterocycle_beats_fused_carbocycle(self):
-        """P-44.2.1(a): A monocyclic heterocycle (pyridine) should beat a fused
+        """(a): A monocyclic heterocycle (pyridine) should beat a fused
         carbocycle (naphthalene). General criteria (heterocyclic preferred)
         must dominate over type hierarchy (fused > monocyclic)."""
         mol_pyridine = Chem.MolFromSmiles("c1ccncc1")
@@ -237,7 +237,7 @@ class TestRingSystemScore:
         )
 
     def test_two_monocyclic_same_type_larger_wins(self):
-        """P-44.2.1(e): Among same-type carbocycles, larger one wins."""
+        """(e): Among same-type carbocycles, larger one wins."""
         mol_7 = Chem.MolFromSmiles("C1CCCCCC1")  # cycloheptane
         mol_5 = Chem.MolFromSmiles("C1CCCC1")    # cyclopentane
         rs_7 = get_ring_systems(mol_7)
@@ -247,7 +247,7 @@ class TestRingSystemScore:
         assert score_7 < score_5
 
     def test_n_containing_beats_o_containing_same_type(self):
-        """P-44.2.1(b): N-containing heterocycle beats O-containing."""
+        """(b): N-containing heterocycle beats O-containing."""
         mol_n = Chem.MolFromSmiles("C1CCNCC1")  # piperidine
         mol_o = Chem.MolFromSmiles("C1CCOCC1")  # oxane
         rs_n = get_ring_systems(mol_n)
@@ -271,7 +271,7 @@ class TestRingSystemScore:
 
 
 class TestSelectPrincipalRingSystem:
-    """Tests for select_principal_ring_system()."""
+    """Tests for select_principal_ring_system."""
 
     def test_single_ring_system(self):
         """Molecule with one ring system returns that system's atoms."""

@@ -1,15 +1,15 @@
-"""v35 Track A: recursive branch-stereo emission on the universal floor.
+""" Track A: recursive branch-stereo emission on the universal floor.
 
 A stereocentre that sits INSIDE a substituent branch (not on the top-level
 parent spine) must be expressed so the emitted best-effort name round-trips to
 the FULL input InChIKey (constitution AND stereo), not merely block-1. Before
-v35 the floor prepended a stereodescriptor block for the top spine only, so a
+ the floor prepended a stereodescriptor block for the top spine only, so a
 branch stereocentre was silently dropped and the name failed full-InChIKey RT.
 
 Each test asserts the 0-wrong-safe outcome directly: the floor's own emitted
 name, parsed by OPSIN, yields the SAME full InChIKey as the input -- i.e.
 ``verify_or_none`` (the exact gate the producer uses) returns non-None. The
-production change that makes these fail before v35: nothing downstream of the
+production change that makes these fail before: nothing downstream of the
 per-branch recursion ever emits the branch's own stereodescriptors.
 """
 from rdkit import Chem

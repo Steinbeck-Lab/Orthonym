@@ -6,9 +6,9 @@ Handles naming of:
 - Zwitterions: Internal ion pairs with combined suffixes
 
 IUPAC 2013 References:
-- P-72: Anion nomenclature
-- P-73: Cation nomenclature
-- P-74: Zwitterion nomenclature
+-: Anion nomenclature
+-: Cation nomenclature
+-: Zwitterion nomenclature
 
 Key naming patterns:
 - Salts: "cation anion" format (sodium acetate, ammonium chloride)
@@ -39,7 +39,7 @@ _BASIC_AMINE_N = Chem.MolFromSmarts(
 
 # === VARIABLE-VALENCE METALS (charged-species fix, 169.6 caveat /) ===
 # Metals that exhibit more than one common oxidation state and therefore carry a
-# Stock oxidation-state numeral in their salt cation word (IR-5.4.2.2 / P-65.6.2.1):
+# Stock oxidation-state numeral in their salt cation word (.4.2.2 /:
 # e.g. gold(I) chloride, iron(II/III). FIXED-valence metals (group 1/2, Al, Zn, Ag,
 # Sc, Ge,...) do NOT carry a Stock numeral (sodium chloride, calcium dichloride).
 # This restores the 169.6-pre 'gold(I) chloride' that the salt path regressed to
@@ -53,7 +53,7 @@ _VARIABLE_VALENCE_METALS = frozenset({
 
 def _with_stock_if_variable_valence(frag_mol, word: str) -> str:
     """Append the Stock oxidation-state numeral to a salt cation word IFF the cation
-    is a MONATOMIC variable-valence metal (IR-5.4.2.2). For a monatomic metal cation
+    is a MONATOMIC variable-valence metal (.4.2.2). For a monatomic metal cation
     the oxidation state equals the formal charge. Fixed-valence metals are unchanged."""
     if frag_mol.GetNumHeavyAtoms() != 1:
         return word
@@ -85,7 +85,7 @@ STOICHIOMETRIC_PREFIXES = {
 }
 
 
-# P-72.2.2.2.2 (:41013) / P-73.1.2.1 (:41431): a COMPOSITE ion is multiplied
+# (:41013) / (:41431): a COMPOSITE ion is multiplied
 # with the enclosing multipliers bis/tris/tetrakis (name wrapped in parens),
 # NOT the simple di/tri/tetra (which are glued directly onto the name).
 COMPLEX_STOICHIOMETRIC_PREFIXES: Dict[int, str] = {
@@ -94,13 +94,13 @@ COMPLEX_STOICHIOMETRIC_PREFIXES: Dict[int, str] = {
 }
 
 
-# P-72.2.2.2.2 / P-16.3.4 (avoid-ambiguity): a bare mononuclear-oxoanion word W
+# / (avoid-ambiguity): a bare mononuclear-oxoanion word W
 # whose SIMPLE-multiplied form ``di<W>`` is ITSELF a real OPSIN word for a
 # DIFFERENT, condensed poly species (pyro/di-nuclear). For those the ``di``/``tri``
 # multiplier collides — ``diphosphate`` = P2O7 (pyrophosphate), not 2×PO4;
 # ``disulfate`` = S2O7; ``dicarbonate`` = C2O5; ``dihydrogensulfate`` = neutral
 # H2SO4 — so a count≥2 salt of W MUST take the enclosing multiplier bis(W)/tris(W).
-# Emitting ``di<W>`` names the wrong molecule (SELF-01 then suppresses it, so the
+# Emitting ``di<W>`` names the wrong molecule (then suppresses it, so the
 # salt needlessly ABSTAINS even though ``bis(W)`` round-trips).
 #
 # COMPLETE + EXACT-MATCH set — every entry VERIFIED 2026-08-23 by
@@ -194,7 +194,7 @@ RETAINED_AMINO_ACID_ZWITTERIONS = {
     'C[C@@H]([NH3+])C(=O)[O-]': 'D-alanine',
     # NOTE (charged B1): the achiral (stereo-UNDEFINED) 'CC([NH3+])C(=O)[O-]'
     # entry mapping to bare 'alanine' was DELETED. Per the Blue Book
-    # (P-103.1.3.1 "The stereodescriptors 'D' and 'L'"), a bare retained
+    # "The stereodescriptors 'D' and 'L'"), a bare retained
     # amino-acid name denotes ONLY the defined (L) configuration -- OPSIN's
     # grammar always resolves 'alanine' to the L stereocentre (verified:
     # opsin_parse('alanine') -> InChIKey QNAYBMKLOCPYGJ-REOHCLBHSA-N), which
@@ -243,7 +243,7 @@ RETAINED_AMINO_ACID_ZWITTERIONS = {
     # NOTE (169.6-04): the hardcoded betaine literal entry was DELETED. 'betaine'
     # is NOT OPSIN-parseable (the validity gate suppressed it to 'unknown organic
     # compound'); the route_charged GUARD-4 structured producer now emits the
-    # RT-correct (trimethylazaniumyl)acetate (P-74.1.3). No per-molecule literal.
+    # RT-correct (trimethylazaniumyl)acetate. No per-molecule literal.
     # L-Carnitine zwitterion
     'C[N+](C)(C)C[C@H](O)CC(=O)[O-]': 'L-carnitine',
     # DL-Carnitine (racemic)
@@ -272,7 +272,7 @@ _HYDROGEN_PREFIXES = {
 def _count_protonated_acid_sites(frag_mol) -> int:
     """Count the number of still-protonated acid -OH sites in a partially
     deprotonated anion — used to insert the ``hydrogen`` / ``dihydrogen`` word in
-    an acid-salt name (IUPAC P-72.2.1 / P-67.2.5.1.2).
+    an acid-salt name (IUPAC /.
 
     Counts protonated carboxylic acid groups (-COOH) PLUS residual oxoacid -OH on
     a P/S/Se acid centre (a P/S/Se bearing at least one ``=O``) — the latter for
@@ -295,7 +295,7 @@ def _count_protonated_acid_sites(frag_mol) -> int:
 
 
 def normalize_imbalanced_acid_salt(smiles: str) -> Optional[str]:
-    """P-65.6.2.3.2: normalize a charge-imbalanced acid-salt NOTATION to its
+    """: normalize a charge-imbalanced acid-salt NOTATION to its
     chemically-valid balanced salt.
 
     A metal cation + a NEUTRAL polybasic INORGANIC oxoacid, written without the
@@ -436,7 +436,7 @@ def _reattach_protons_to_acids(mol):
     is +1 and every acid-oxygen site is -1, so ``#[H+] == #[O-]`` and each proton
     returns to one oxygen. There is no site to choose, so the result is deterministic
     and spelling-invariant. The reconstruction is only a CANDIDATE: the caller names
-    it and the top-level SELF-01 validity gate RT-verifies the reconstructed parent
+    it and the top-level validity gate RT-verifies the reconstructed parent
     against the ionic input, so a wrong reconstruction fails closed (0-wrong preserved).
     The oxygen filter admits ANY ``[O-]`` (carboxylate/sulfonate/phosphate, but also an
     alkoxide/phenoxide/enolate), NOT only genuine acid oxygens — the safety is the GATE
@@ -487,9 +487,9 @@ def _reattach_protons_to_acids(mol):
 
 
 # -1b: alkali + alkaline-earth (Groups 1-2). A net-0 salt of one of these
-# with an organic ion is a P-12 binary salt (in scope, name_salt's domain). Any
-# OTHER true metal is out of scope by default (P-69 coordination complex), and any
-# true metal co-present with a carbanion/hydride is P-69 organometallic. The
+# with an organic ion is a binary salt (in scope, name_salt's domain). Any
+# OTHER true metal is out of scope by default coordination complex), and any
+# true metal co-present with a carbanion/hydride is organometallic. The
 # census OUT predicate (internal notes _review_census5.py) — the 1b
 # widening is scoped to exactly the in-scope set.
 def _name_organic_ion_best_effort(ion_smiles: str, *,
@@ -589,7 +589,7 @@ def name_salt(mol, style: str = 'pin', *,
     # -1b (0-wrong): the best-effort ion widening is scoped to non-metal +
     # alkali/alkaline-earth salts. If the assembly carries an out-of-scope true
     # metal (a bare transition/other metal, or any true metal with a carbanion/
-    # hydride = P-69 organometallic), clear the best-effort flags so the metal
+    # hydride = organometallic), clear the best-effort flags so the metal
     # salt keeps today's behavior and never renders as a compositional salt via a
     # best-effort-named organic ion (the platinum(II)-carbanide 0-wrong hazard).
     if ((general_fallback or general_fallback_unverified or allow_aromatic_general)
@@ -604,13 +604,13 @@ def name_salt(mol, style: str = 'pin', *,
     # (e.g. ``CC(=O)[O-].[Pd+2]``, net +1: one acetate anion + a bare Pd2+
     # cation) is NOT a neutral salt -- it is an unbalanced ionic assembly / a
     # charged coordination complex (out of CLAUDE.md's declared scope,
-    # organometallics P-69). Naming it with the ordinary "cation anion" salt
+    # organometallics. Naming it with the ordinary "cation anion" salt
     # grammar silently implies balanced stoichiometry the input does not have:
     # measured, this shipped ``palladium(II) acetate``, which OPSIN round-trips
     # to the BALANCED diacetate Pd(OAc)2, not the 1:1 input (a different
-    # molecule). Decline structurally here rather than rely on the SELF-01
+    # molecule). Decline structurally here rather than rely on the
     # OPSIN backstop to catch it after the fact (a project rule: that backstop
-    # fails OPEN without a JVM). Mirrors the FIND-2 fail-closed guards below
+    # fails OPEN without a JVM). Mirrors the fail-closed guards below
     # (honest '' -> abstain, never a generic literal).
     if Chem.GetFormalCharge(mol) != 0:
         return ''
@@ -682,7 +682,7 @@ def name_salt(mol, style: str = 'pin', *,
     # needs a neutral base (absent here), so the protons are still orphaned and the
     # guard below would abstain. REATTACH each proton to its acid oxygen,
     # reconstructing the neutral free acid, and name THAT via the ordinary namer.
-    # The top-level SELF-01 gate RT-verifies the emitted name's full InChIKey
+    # The top-level gate RT-verifies the emitted name's full InChIKey
     # against the ionic input (identical key), so a wrong reconstruction fails
     # closed. Scoped (in _reattach_protons_to_acids) to all-[H+] cations +
     # all-oxygen anions + single organic parent, so it never touches the halide
@@ -714,7 +714,7 @@ def name_salt(mol, style: str = 'pin', *,
     anion_names = []
 
     # Process cations (excluding H+ fragments already handled above).
-    # P-65.6.2.1: the cation word is the element name (metal) or 'ammonium'
+    #: the cation word is the element name (metal) or 'ammonium'
     # (NH4+). The CATION_WORDS table (data/cation_words.py) is the single source
     # of truth, reusing namer._METAL_NAMES; fall back to the INORGANIC_CATIONS
     # retained-name table and then to organic cation naming for substituted
@@ -742,7 +742,7 @@ def name_salt(mol, style: str = 'pin', *,
             # azatetracyclo cage cation -> 'tropan-1-ium', a different, smaller
             # ring system). Being non-empty, that wrong name shadowed the
             # best-effort fallback below (its `if not name:` guard never fired),
-            # so ONLY the top-level SELF-01 joined-salt gate caught it and the
+            # so ONLY the top-level joined-salt gate caught it and the
             # WHOLE salt abstained -- even though the cation names correctly via
             # the full per-component namer. Under a best-effort flag, verify the
             # ordinary cation name round-trips to THIS fragment; if it does not,
@@ -770,7 +770,7 @@ def name_salt(mol, style: str = 'pin', *,
                 cation_names.append(name)
             # Skip unnamed cations rather than using generic 'cation'
 
-    # FIND-2 fail-closed (0-wrong): every cation fragment IN SCOPE for this loop
+    # fail-closed (0-wrong): every cation fragment IN SCOPE for this loop
     # must have produced a name. `cation_list` already excludes H+ fragments
     # that were merged/attempted above (:287-330), so this cannot fire on the
     # legitimate hydroacid-salt H+ merge -- only on a cation this loop itself
@@ -779,7 +779,7 @@ def name_salt(mol, style: str = 'pin', *,
     if len(cation_names) != len(cation_list):
         return ''
 
-    # Process anions. P-65.6.2.1 / P-63.8.1: name the ORGANIC anion via the
+    # Process anions. /: name the ORGANIC anion via the
     # route_charged chokepoint (it owns the parent decision: -oate / -olate /
     # -sulfonate / -ide), falling back to name_anion and the INORGANIC_ANIONS
     # retained table (chloride / sulfate / phosphate — which route_charged does
@@ -792,7 +792,7 @@ def name_salt(mol, style: str = 'pin', *,
         if smiles in INORGANIC_ANIONS:
             anion_names.append(INORGANIC_ANIONS[smiles])
             continue
-        # W3-P10 (P-67.2.5.1.1): di-/polynuclear oxoacid anion word ('diphosphate')
+        # W3-P10: di-/polynuclear oxoacid anion word ('diphosphate')
         # BEFORE the generic name_anion, which would otherwise emit the neutral acid
         # name ('diphosphoric acid') and collapse the salt to the unsupported fallback.
         from .inorganic_acids import name_polyacid_anion
@@ -829,7 +829,7 @@ def name_salt(mol, style: str = 'pin', *,
             anion_names.append(name)
         # Skip unnamed anions rather than using generic 'anion'
 
-    # FIND-2 fail-closed (0-wrong): every anion fragment must have produced a
+    # fail-closed (0-wrong): every anion fragment must have produced a
     # name. Silently dropping an unnameable anion (e.g. a chlorosilanolate) and
     # joining only the subset that DID name is a silent atom-drop -- abstain
     # (return '') instead, mirroring the cation-loop guard above (abort-whole
@@ -852,7 +852,7 @@ def name_salt(mol, style: str = 'pin', *,
     # above, an abort-whole guard) -- but that
     # made a recognized water of crystallization (e.g. cetylpyridinium
     # chloride monohydrate, CHEBI:3566) abstain even though the ionic part
-    # names cleanly. P-14.8.2 general nomenclature explicitly allows a
+    # names cleanly. general nomenclature explicitly allows a
     # water solvate to be folded as a "<name> <mult>hydrate" suffix (BB
     # line 4657/4685: "...monohydrate"), so fold a WATER-ONLY neutral set
     # into that suffix and keep the fail-closed abstain for any OTHER
@@ -873,7 +873,7 @@ def name_salt(mol, style: str = 'pin', *,
             return ''  # water count outside the mono..deca table -> fail closed
         solvate_suffix = ' ' + hydrate_prefix + 'hydrate'
 
-    # --- Hydrogen prefix for partial salts (IUPAC P-72.2.1) ---
+    # --- Hydrogen prefix for partial salts (IUPAC ---
     # When an anion fragment still has protonated carboxylic acid groups
     # (-COOH), it is only partially deprotonated. Insert "hydrogen"
     # between cation and anion names.
@@ -884,9 +884,9 @@ def name_salt(mol, style: str = 'pin', *,
         protonated_acids = _count_protonated_acid_sites(anion_frag['mol'])
         # Do NOT insert the method-(2) 'hydrogen' word when the anion name already
         # expresses the acidic hydrogen(s): method (1) organic salts carry a
-        # 'carboxy' prefix ('potassium 6-carboxyhexanoate', P-65.6.2.3.1), and the
+        # 'carboxy' prefix ('potassium 6-carboxyhexanoate',, and the
         # inorganic acid-anion words already embed 'hydrogen' ('hydrogen carbonate',
-        # 'dihydrogen phosphate', P-65.6.2.3.2). Only a fully-systematic organic
+        # 'dihydrogen phosphate',. Only a fully-systematic organic
         # '-oate/-dioate' anion takes the separate 'hydrogen' (method 2 general
         # form, e.g. 'sodium hydrogen but-2-enedioate').
         acid_h_expressed = any(('carboxy' in a) or ('hydrogen' in a)
@@ -958,7 +958,7 @@ def name_zwitterion(mol, style: str = 'pin') -> str:
     """
     Name a zwitterionic compound.
 
-    IUPAC P-74 rules:
+    IUPAC rules:
     - Anionic centers get lower locants (higher seniority)
     - Cationic suffixes cited BEFORE anionic suffixes
     - Format: base-name-cation_suffix-anion_suffix
@@ -983,14 +983,14 @@ def name_zwitterion(mol, style: str = 'pin') -> str:
 
     # Check for retained amino acid names first (: amino-acid zwitterions +
     # betaines sequenced first). These (glycine / L-alanine /...) are valid
-    # OPSIN-parseable retained names per P-74 (which allows retained names).
+    # OPSIN-parseable retained names per (which allows retained names).
     if style != 'systematic':
         canonical = Chem.MolToSmiles(mol, canonical=True)
         if canonical in RETAINED_AMINO_ACID_ZWITTERIONS:
             return RETAINED_AMINO_ACID_ZWITTERIONS[canonical]
 
-    # GUARD 4 (P-74.0): the route_charged chokepoint owns the anion-is-parent
-    # override + the structured (…azaniumyl) cation prefix (P-74.1.3). This
+    # GUARD 4: the route_charged chokepoint owns the anion-is-parent
+    # override + the structured (…azaniumyl) cation prefix. This
     # REPLACES the deleted hardcoded "2-azaniumyl{base}" / "betaine" / "ammonium
     # {base}" f-string band-aids (fix-methodology.md: structured, not literal).
     from .charged_router import route_charged
@@ -998,8 +998,8 @@ def name_zwitterion(mol, style: str = 'pin') -> str:
     if routed:
         return routed
 
-    # charged Slice B (P-74.2.1.2, correcting the 4782742f over-reach): the
-    # NEUTRAL-form name of a zwitterion is NOT its PIN. P-74.2.1.2 (the Blue Book
+    # charged Slice B, correcting the 4782742f over-reach): the
+    # NEUTRAL-form name of a zwitterion is NOT its PIN. (the Blue Book
     #:1779 item (e)) makes the IONIC form the PIN — the anion is the parent and
     # each protonated-amine cation is an ``azaniumyl`` prefix — and that form is
     # built by ``route_charged`` GUARD 4 (called just above:
@@ -1019,7 +1019,7 @@ def name_zwitterion(mol, style: str = 'pin') -> str:
     # --- BEST-EFFORT tier only: non-PIN neutral-form fallback ----------------
     # A net-zero amino-acid-shaped zwitterion neutralizes IN PLACE to the SAME
     # full InChIKey (InChI's mobile-H tautomer perception), so the neutral name
-    # still round-trips; it still faces the caller's E1/SELF-01 gate. This
+    # still round-trips; it still faces the caller's E1/ gate. This
     # degrades a table/PIN miss to an uglier systematic name rather than to
     # silence (T4: an abstention is a defect), but only above the PIN tier.
     if _is_amino_acid_zwitterion(mol):
@@ -1034,7 +1034,7 @@ def _is_amino_acid_zwitterion(mol) -> bool:
     Check if molecule is amino acid zwitterion [NH3+]-Cn-[COO-].
 
     Detects alpha, beta, and gamma amino acid zwitterion patterns
-    per IUPAC P-74.1.1.
+    per IUPAC.
 
     Args:
         mol: RDKit Mol object
@@ -1063,12 +1063,12 @@ def _name_amino_acid_zwitterion(mol, style: str) -> str:
     """
     Name amino acid zwitterion (e.g., glycine zwitterion).
 
-    Per IUPAC P-74 recommendation, amino acid zwitterions may be named as their
+    Per IUPAC recommendation, amino acid zwitterions may be named as their
     neutral form (e.g., "2-aminoacetic acid" for glycine zwitterion). OPSIN
     parses these neutral-form names correctly, and they are RT-correct at
     connectivity (InChI-L1 ignores charge).
 
-    The structured P-74.1.3 ionic form ((azaniumyl)…oate) is produced UPSTREAM
+    The structured ionic form ((azaniumyl)…oate) is produced UPSTREAM
     by route_charged GUARD 4 (called first in name_zwitterion); this function is
     only reached when the chokepoint declined, so it returns the neutral form or
     '' (honest-fail) — the carbon-counting "2-azaniumyl{base}" f-string band-aid
@@ -1081,16 +1081,16 @@ def _name_amino_acid_zwitterion(mol, style: str) -> str:
     Returns:
         Neutral amino acid name, or '' on failure (NO carbon-counting fallback).
     """
-    # Neutralize and name the neutral form (the P-74 neutral-form recommendation).
+    # Neutralize and name the neutral form (the neutral-form recommendation).
     neutral_mol = _neutralize_zwitterion(mol)
     if neutral_mol is not None:
         try:
             neutral_smiles = Chem.MolToSmiles(neutral_mol, canonical=True)
             if neutral_smiles:
-                # W8 P3 (P-103.2.4.4) fail-closed veto: the P-103.2.4.1
+                # W8 P3 fail-closed veto: the
                 # "convenient neutral form" dispensation is licensed ONLY for the
                 # monoamino monocarboxylic acids RETAINED IN TABLE 10.4 (the 20
-                # canonical STANDARD_AMINO_ACIDS). BB's own P-103.2.4.4 example
+                # canonical STANDARD_AMINO_ACIDS). BB's own example
                 # (S-methyl-L-cysteine zwitterion) shows a non-standard /
                 # substituted amino acid's zwitterion PIN is the Method-1 ionic
                 # form '(2S)-2-azaniumyl-3-(methylsulfanyl)propanoate', NOT the
@@ -1100,7 +1100,7 @@ def _name_amino_acid_zwitterion(mol, style: str) -> str:
                 # Method-1 engine is a later phase; fail closed rather than emit
                 # that wrong-structure leak. Standard AAs (glycine/alanine/...)
                 # are unaffected -- their neutral skeleton IS the bare Table 10.4
-                # retained name, which P-103.2.4.1 explicitly sanctions.
+                # retained name, which explicitly sanctions.
                 from ..data.amino_acids import is_standard_amino_acid
                 nostereo_smi = Chem.MolToSmiles(
                     neutral_mol, isomericSmiles=False, canonical=True
@@ -1275,11 +1275,11 @@ def _infer_zwitterion_name(
 
     169.6-04: the hardcoded ``betaine`` SMARTS literal and the carbon-counting
     ``ammonium {base}`` f-string band-aids were DELETED. The structured
-    P-74.1.3 form is produced UPSTREAM by route_charged GUARD 4 (called first in
+     form is produced UPSTREAM by route_charged GUARD 4 (called first in
     name_zwitterion); this function is only reached when the chokepoint declined,
     so it returns the neutral-form name or '' (honest-fail, fix-methodology.md).
     """
-    # Neutralize and name the parent amino compound (the P-74 neutral-form
+    # Neutralize and name the parent amino compound (the neutral-form
     # recommendation for amino-acid-shaped zwitterions). No literal, no
     # carbon-counting fallback.
     neutral_name = _name_as_neutral(mol, 'pin')

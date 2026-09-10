@@ -1,7 +1,7 @@
-"""v29 Phase 7 Task 3 — invented ``-yl`` substituent prefixes (defect class C3).
+""" a phase Task 3 — invented ``-yl`` substituent prefixes (defect class C3).
 
 ``parent_to_prefix`` converted a *functional parent* name into a substituent
-prefix by string surgery, with two failures measured at ``d475f8c6``:
+prefix by string surgery, with two failures measured at ``:
 
 1. Three branches (``-ol``, ``-amine``, ``-one``) ended in a permissive
    ``else: stem = base`` catch-all, so a name that merely *ended in those
@@ -10,16 +10,16 @@ prefix by string surgery, with two failures measured at ``d475f8c6``:
    ``methanethiol`` -> ``hydroxymethanethiyl`` (an -OH asserted where the
    molecule has -SH), ``O-methylhydroxylamine`` -> ``aminoO-methylhydroxylyl``.
 2. The multi-FG branches elided a stem ending ``an``/``a`` but not ``ane``,
-   against P-29.2 (BB:15811) "with elision of the final letter 'e' of parent
+   against (the Blue Book) "with elision of the final letter 'e' of parent
    hydrides, when present" -> ``ethane`` + ``yl`` = ``ethaneyl``.
 
 and the terminal fallback appended ``yl`` to aldehyde functional parents that
-have a *defined* prefix instead: P-66.6.1.3 (BB:35000) "a -CHO group is
+have a *defined* prefix instead: (the Blue Book) "a -CHO group is
 expressed by the preferred prefix 'oxo' if located at an end of a carbon
 chain, or, otherwise, by the preferred prefix 'formyl'".
 
 None of ``formaldehydyl``, ``acetaldehydyl``, ``ethaneyl``, ``ethaneperoxyl``
-or ``hydroxylylidene`` occurs anywhere in ``BlueBookV2/BlueBookV2.md``.
+or ``hydroxylylidene`` occurs anywhere in ``the Blue Book Blue Book``.
 """
 
 import pytest
@@ -37,10 +37,10 @@ from orthonym.assembly.substituent_naming import (
 # --------------------------------------------------------------------------
 
 def test_formaldehyde_yields_formyl_not_formaldehydyl():
-    """P-66.6.1.3 (BB:35000): a -CHO not at a chain end is 'formyl'.
+    """ (the Blue Book): a -CHO not at a chain end is 'formyl'.
 
     Formaldehyde has ONE carbon, so the only substituent derivable from it is
-    -CHO; the conversion is unambiguous.  P-65.1.8.3 (BB:30702) confirms the
+    -CHO; the conversion is unambiguous. (the Blue Book) confirms the
     group is spelled 'formyl' and that its H is substitutable.
     """
     assert parent_to_prefix("formaldehyde", 1, attach_locant=ATTACH_LOCANT_UNKNOWN) == "formyl"
@@ -52,10 +52,10 @@ def test_formyl_from_formic_acid_still_works():
 
 
 def test_hydrogen_cyanide_yields_cyano_not_hydrogen_cyanidyl():
-    """P-66.5.1.1.4 (BB:34734): the -CN group's preferred prefix is 'cyano'.
+    """ (the Blue Book): the -CN group's preferred prefix is 'cyano'.
 
     The sibling defect named verbatim in rules/ring_assemblies.py's veto
-    comment. BB:34687 derives nitriles "from hydrocyanic acid, H-C=N"; HCN has
+    comment. the Blue Book derives nitriles "from hydrocyanic acid, H-C=N"; HCN has
     one removable H on carbon, so the conversion is unambiguous.
     """
     assert parent_to_prefix("hydrogen cyanide", 1, attach_locant=ATTACH_LOCANT_UNKNOWN) == "cyano"
@@ -65,7 +65,7 @@ def test_hydrogen_cyanide_yields_cyano_not_hydrogen_cyanidyl():
     "water", "ammonia", "carbon dioxide", "hydrogen peroxide",
 ])
 def test_inorganic_parents_fail_closed(name):
-    """Not parent hydrides -> no '-yl' form (was 'wateryl', 'ammoniayl', ...)."""
+    """Not parent hydrides -> no '-yl' form (was 'wateryl', 'ammoniayl',...)."""
     assert parent_to_prefix(name, 1, attach_locant=ATTACH_LOCANT_UNKNOWN) is None
 
 
@@ -76,7 +76,7 @@ def test_inorganic_parents_fail_closed(name):
 def test_space_bearing_parent_still_converts(parent, clen, expected):
     """Guard against over-reach: a "contains a space" rule would break these.
 
-    v29 residue Task A re-pointed this from 'henicosyl prop-2-enoate' ->
+     residue Task A re-pointed this from 'henicosyl prop-2-enoate' ->
     '23-carboxytricosyl'. That output is no longer emitted, but NOT because of
     the space: the carboxy locant 23 was read off the whole-fragment carbon
     COUNT, which is not a proof of the fragment's shape. The multi-word parents
@@ -95,12 +95,12 @@ FAIL_CLOSED_CASES = [
     # ambiguous attachment: -C(=O)CH3 is 'acetyl', -CH2-CHO is '2-oxoethyl',
     # and parent_to_prefix receives no attachment context to choose between them
     ("acetaldehyde", 2, "acetyl / 2-oxoethyl -- attachment unknown"),
-    # P-63.4.1 (BB:27944): the prefix for -OOH is 'hydroperoxy'
+    # (the Blue Book): the prefix for -OOH is 'hydroperoxy'
     ("ethaneperoxol", 2, "hydroperoxy (P-63.4.1)"),
     # -SH is 'sulfanyl'; the old code asserted 'hydroxy', the wrong element
     ("methanethiol", 1, "sulfanyl"),
     ("2-methylundecane-2-thiol", 12, "sulfanyl"),
-    # P-68.3.1.1.2 (BB:38460): =N-OH is 'hydroxyimino', =N-OR '(alkoxyimino)'
+    # (the Blue Book): =N-OH is 'hydroxyimino', =N-OR '(alkoxyimino)'
     ("hydroxylamine", 0, "hydroxyimino (P-68.3.1.1.2)"),
     ("O-methylhydroxylamine", 1, "methoxyimino (P-68.3.1.1.2)"),
     ("N-methylhydroxylamine", 1, "hydroxyimino family"),
@@ -130,12 +130,12 @@ def test_caller_propagates_none_rather_than_emitting_a_word():
 
 
 # --------------------------------------------------------------------------
-# 3. P-29.2 (BB:15811) elision of the final 'e' -- no `...aneyl`
+# 3. (the Blue Book) elision of the final 'e' -- no `...aneyl`
 # --------------------------------------------------------------------------
 
-# v29 residue Task A: the multi-FG branches that used to drive these cases now
+# residue Task A: the multi-FG branches that used to drive these cases now
 # decline -- every locant in 'ethane-1,2-diol' belongs to the CAPPED molecule's
-# numbering (P-46.1.8, BB:22718), and the count/name pair is not injective over
+# numbering, the Blue Book), and the count/name pair is not injective over
 # fragments. The ELISION rule itself is unchanged and still live, so the cases
 # are re-pointed at `_elide_parent_hydride_ending`, which performs it.
 ELISION_CASES = [
@@ -148,7 +148,7 @@ ELISION_CASES = [
 
 @pytest.mark.parametrize("stem,expected", ELISION_CASES)
 def test_final_e_is_elided_before_yl(stem, expected):
-    """P-29.2 method (1) (BB:15813): 'yl' REPLACES the ending 'ane'."""
+    """ method (1) (the Blue Book): 'yl' REPLACES the ending 'ane'."""
     assert _elide_parent_hydride_ending(stem) == expected
 
 
@@ -196,11 +196,11 @@ def test_unaffected_conversions_are_unchanged(name, clen, expected):
     assert parent_to_prefix(name, clen, attach_locant=ATTACH_LOCANT_UNKNOWN) == expected
 
 
-# v29 residue Task A: four rows moved out of UNCHANGED. Each borrowed its locant
+# residue Task A: four rows moved out of UNCHANGED. Each borrowed its locant
 # from the CAPPED molecule's numbering, and (name, count) is not injective over
 # fragments -- '-CH2CH2CH2OH' and '-CH(OH)CH2CH3' both cap to 'propan-1-ol' with
 # count 3, and OPSIN 2.9.0 makes the single old answer EXACT for one and a
-# DIFFERENT MOLECULE for the other. P-46.1.8 (BB:22718) requires the free valence
+# DIFFERENT MOLECULE for the other. (the Blue Book) requires the free valence
 # to take the lowest locant, which only a caller holding the molecule can honour.
 BORROWED_LOCANT = [
     ("propan-2-ol", 3, "was '2-hydroxypropyl'"),

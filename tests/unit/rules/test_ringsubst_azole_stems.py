@@ -1,4 +1,4 @@
-"""v28 ring-substituent tranche T2 — 5-membered heteroarene substituent stems
+""" ring-substituent tranche — 5-membered heteroarene substituent stems
 with three heteroatoms (oxadiazole / thiadiazole).
 
 Root cause (reproduced): these rings returned None from the bare narrow producer

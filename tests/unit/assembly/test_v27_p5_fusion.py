@@ -1,4 +1,4 @@
-""" a phase — general fusion-nomenclature PIN upgrade (P-25.3).
+""" a phase — general fusion-nomenclature PIN upgrade.
 
 The complete-tier engine ships a von-Baeyer POLYENE for mancude fused ring
 systems the default path abstains on; a phase prefers a STRUCTURALLY-VERIFIED

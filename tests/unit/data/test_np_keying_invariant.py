@@ -1,4 +1,4 @@
-"""v33 Phase 1 Task 6 (C4): NP keying invariant — the class C3 cannot see.
+""" a phase Task 6 (C4): NP keying invariant — the class C3 cannot see.
 
 C3 (namer.py::_self_consistency_verdict, "nb>na -> mismatch") is a GATE-time check:
 it re-parses the emitted name via OPSIN and compares specified-stereocentre counts.
@@ -20,7 +20,7 @@ it means a new NAME_EXACT_NP_PARENTS entry was added with a flat (stereo-undefin
 SMILES key -- a real latent 0-wrong hole (a flat input could dict-match and emit a
 config-implying, OPSIN-unparseable name that C3 can never catch).
 
-Reference: .superpowers/sdd/2026-08-16-v33-phase1-stereo-honesty/task-6-brief.md
+Reference:.superpowers/sdd/2026-08-16--phase1-stereo-honesty/task-6-brief.md
 """
 from orthonym.data.natural_products import (
     NATURAL_PRODUCT_DERIVATIVES,

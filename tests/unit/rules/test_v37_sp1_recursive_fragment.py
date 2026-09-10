@@ -64,7 +64,7 @@ def _best_effort() -> Orthonym:
 
 # ---------------------------------------------------------------------------
 # Defect 2 — the recursive re-entry point must inherit the FULL best-effort tier
-# from contextvars, exactly as Orthonym.name() publishes them at a best-effort
+# from contextvars, exactly as Orthonym.name publishes them at a best-effort
 # top-level entry. This is the isolated flag-propagation test.
 # ---------------------------------------------------------------------------
 class TestRecursiveReentryTierInheritance:
@@ -72,7 +72,7 @@ class TestRecursiveReentryTierInheritance:
     def test_name_compound_inherits_general_fallback_unverified_from_ctx(self):
         from orthonym.metrics.provenance import (
             general_fallback_ctx, best_effort_ctx)
-        # publish what a best-effort Orthonym.name() would publish, then re-enter
+        # publish what a best-effort Orthonym.name would publish, then re-enter
         # name_compound with NO explicit flags (the fragment_naming.py:544 call shape).
         t1 = general_fallback_ctx.set(True)
         t2 = best_effort_ctx.set(True)

@@ -21,7 +21,7 @@ totality P2, token spans P4/P5, token arity P6, plus the atom-indexed stereo
 axis P8 and P3 charge promoted to error). It is VOID-ONLY: a failure degrades
 the caller to its next rung / abstain, NEVER to a wrong name. It is the
 hardening layer on top of -- not a replacement for -- the load-bearing 0-wrong
-net, which remains ``_rt_match``'s isomeric OPSIN round-trip (SELF-01).
+net, which remains ``_rt_match``'s isomeric OPSIN round-trip .
 """
 from __future__ import annotations
 
@@ -47,20 +47,20 @@ logger = logging.getLogger(__name__)
 #: The NAME-SPELLING axes (P4 token spans, P5 residue, P6 token arity) are
 #: DELIBERATELY EXCLUDED for the ``structural_only`` broad-lane gate: they are
 #: about whether the name STRING spells the bindings, which on the best-effort
-#: lanes the downstream SELF-01 OPSIN round-trip already proves (an ill-formed
+#: lanes the downstream OPSIN round-trip already proves (an ill-formed
 #: name does not parse / does not round-trip). They also carry two measured
 #: false-positive classes on legitimate general-engine output -- P6
 #: MULTIPLICITY/ARITY_MISMATCH on the engine's one-binding-per-multiplied-group
 #: convention (``carbonitrile`` claiming both C#N of a ``dicarbonitrile``), and
 #: the P5 residue on the same -- so blocking on them regressed correct names to
-#: uglier T4 fallbacks. t4_coverage keeps the FULL proof (``structural_only``
+#: uglier fallbacks. t4_coverage keeps the FULL proof (``structural_only``
 #: False) -- its certified Phase-0c behaviour is unchanged.
 #: Only PROVABLE structural disagreements block -- the name demonstrably denotes
 #: a different graph. The "unproven, not disproven" codes (``CHARGE_UNVERIFIED``,
 #: the ``*_UNVERIFIED`` arity/valence/stereo codes, ``PROOF_UNSUBSTANTIATED``)
 #: are EXCLUDED: they fire because a legacy binding producer never threads the
 #: evidence (e.g. the charge-suffix path names a zwitterion's ``-ium``/``-olate``
-#: correctly but does not populate ``charge_atom_ids``), and SELF-01's isomeric
+#: correctly but does not populate ``charge_atom_ids``), and 's isomeric
 #: round-trip already verifies charge/stereo on these lanes, so blocking on them
 #: false-voids correct names (measured: a mesoionic zwitterion) with no 0-wrong
 #: benefit.
@@ -91,7 +91,7 @@ _STEREO_PROOF_GAP_CODES = frozenset({_bs.STEREO_PARENT_BLOCK_AMBIGUOUS})
 def _full_inchikey_roundtrips(mol, name: str) -> bool:
     """True iff *name* OPSIN-round-trips to *mol*'s FULL isomeric InChIKey.
 
-    The ground-truth 0-wrong oracle (SELF-01's own round-trip), computed here so
+    The ground-truth 0-wrong oracle ('s own round-trip), computed here so
     a stereo PROOF-GAP void (``STEREO_PARENT_BLOCK_AMBIGUOUS``) can be overridden
     ONLY when the whole name -- every atom, bond, charge AND stereodescriptor --
     is positively verified. Strictly stronger than the binding-spine
@@ -133,7 +133,7 @@ def certify_general_result(mol, result: "GeneralEngineResult", *,
     structural axes (``_STRUCTURAL_BLOCKING_CODES``: atom partition / bond
     totality / charge / stereo -- the swap-witness class) and treats the
     name-spelling axes (P4/P5/P6) as advisory, because on the best-effort lanes
-    the downstream SELF-01 round-trip already proves the name is well-formed,
+    the downstream round-trip already proves the name is well-formed,
     and P5/P6 carry measured false positives on the engine's multiplied-group
     binding convention. E1 (the flat atom partition) is ALWAYS required either
     way -- it is itself structural. Default ``False`` reproduces the full-proof

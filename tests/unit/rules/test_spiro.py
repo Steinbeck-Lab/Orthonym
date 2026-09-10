@@ -34,7 +34,7 @@ from orthonym.perception.rings import get_spiro_atoms
 
 
 class TestIsSpiroSystem:
-    """Tests for is_spiro_system() function."""
+    """Tests for is_spiro_system function."""
 
     @pytest.mark.unit
     def test_spiro_4_5_decane(self):
@@ -75,7 +75,7 @@ class TestIsSpiroSystem:
 
 
 class TestGetSpiroRingSizes:
-    """Tests for get_spiro_ring_sizes() function."""
+    """Tests for get_spiro_ring_sizes function."""
 
     @pytest.mark.unit
     def test_spiro_4_5_ring_sizes(self):
@@ -126,7 +126,7 @@ class TestGetSpiroRingSizes:
 
 
 class TestGenerateSpiroDescriptor:
-    """Tests for generate_spiro_descriptor() function."""
+    """Tests for generate_spiro_descriptor function."""
 
     @pytest.mark.unit
     def test_spiro_4_5_descriptor(self):
@@ -183,7 +183,7 @@ class TestGenerateSpiroDescriptor:
 
 
 class TestNameSpiroSystem:
-    """Tests for name_spiro_system() function."""
+    """Tests for name_spiro_system function."""
 
     @pytest.mark.unit
     def test_spiro_4_5_decane(self):
@@ -227,7 +227,7 @@ class TestNameSpiroSystem:
 
 
 class TestGetSpiroNumbering:
-    """Tests for get_spiro_numbering() function."""
+    """Tests for get_spiro_numbering function."""
 
     @pytest.mark.unit
     def test_numbering_covers_all_atoms(self):
@@ -308,7 +308,7 @@ class TestEdgeCases:
 
 
 class TestGetRingsFromSpiroCenter:
-    """Tests for get_rings_from_spiro_center() function."""
+    """Tests for get_rings_from_spiro_center function."""
 
     @pytest.mark.unit
     def test_returns_two_rings(self):
@@ -331,7 +331,7 @@ class TestGetRingsFromSpiroCenter:
 
 
 class TestGetSpiroSubstituents:
-    """Tests for get_spiro_substituents() function."""
+    """Tests for get_spiro_substituents function."""
 
     @pytest.mark.unit
     def test_unsubstituted_empty(self):
@@ -408,7 +408,7 @@ class TestDispiroRouting:
 
 
 class TestDispiroNaming:
-    """Tests for dispiro compound naming per IUPAC P-24.2.2."""
+    """Tests for dispiro compound naming per IUPAC."""
 
     @pytest.mark.unit
     def test_dispiro_2_1_2_1_octane(self):
@@ -461,7 +461,7 @@ class TestDispiroNaming:
 
 
 class TestHeterospiroNaming:
-    """Tests for heterospiro naming per IUPAC P-24.2.4.1."""
+    """Tests for heterospiro naming per IUPAC."""
 
     @pytest.mark.unit
     def test_1_oxa_spiro_4_5_decane(self):

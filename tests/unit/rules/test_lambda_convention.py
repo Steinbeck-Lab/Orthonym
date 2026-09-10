@@ -1,6 +1,6 @@
 """Unit tests for the shared λ-convention module (a phase).
 
-P-31.1.4.2 / Table 2.8 standard bonding numbers + the fail-closed
+ / Table 2.8 standard bonding numbers + the fail-closed
 "is this valence non-standard?" decision, promoted from spiro.py so spiro,
 acyclic skeletal-replacement and the mononuclear-hydride namers share one
 implementation.

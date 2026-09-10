@@ -1,18 +1,18 @@
 """Wave-2 completion batch B4 — investigation-driven fixes across subsystems.
 
 Every expected name OPSIN-RT verified against its evidence SMILES. Rows:
-  * ring_chalcogen_oxide.py (NEW, dispatch 49.5) — P-25.6/P-74.3.1.3 additive
+  * ring_chalcogen_oxide.py (NEW, dispatch 49.5) — / additive
     oxide on the intact ring parent (dibenzothiophene 5-oxide/5,5-dioxide).
-  * PREFIX_FORMS sulfinimidamide → 'S-aminosulfinimidoyl' (P-66.4.1.3.4).
-  * NEW peroxy_acid + imidic_acid FG classes (P-43.1 / P-65.1.3.1).
-  * benzenesulfinohydrazonohydrazide (P-66.4.3.2, benzene + chain wiring).
-  * selenazolo fusion coverage (P-25.3.2.4(f)).
-  * 1,6-dihydropyrrolo[2,3-b]pyrrole catalog row (P-25.7.1.3.2, corrected
+  * PREFIX_FORMS sulfinimidamide → 'S-aminosulfinimidoyl'.
+  * NEW peroxy_acid + imidic_acid FG classes /.
+  * benzenesulfinohydrazonohydrazide, benzene + chain wiring).
+  * selenazolo fusion coverage (f)).
+  * 1,6-dihydropyrrolo[2,3-b]pyrrole catalog row, corrected
     PIN — the bare mancude name is a different molecule).
-  * fluorene cata-fused skip + 9H indicated-H (P-25.7.1.3.1/P-31.1.4.3.4).
-  * didehydrobenzene (P-31.2.4.1, benzyne).
-  * internal-charge zwitterion mask (P-61.11.1, azido+nitro coexistence).
-  * ring-assembly acid suffix (P-16.5.2.1, [1,1'-biphenyl]-4,4'-dicarboxylic).
+  * fluorene cata-fused skip + 9H indicated-H /.
+  * didehydrobenzene, benzyne).
+  * internal-charge zwitterion mask, azido+nitro coexistence).
+  * ring-assembly acid suffix, [1,1'-biphenyl]-4,4'-dicarboxylic).
 """
 
 import pytest
@@ -179,7 +179,7 @@ class TestRingAssemblyAcidSuffix:
 
     def test_biphenyl_diol_suffix(self):
         # OH is the PCG -> cited as the -diol suffix on the enclosed assembly
-        # parent (P-28.2.1 + P-66/P-63.1), never as a 'dihydroxy' prefix.
+        # parent + /, never as a 'dihydroxy' prefix.
         assert (name_compound("Oc1ccc(-c2ccc(O)cc2)cc1")
                 == "[1,1'-biphenyl]-4,4'-diol")
 

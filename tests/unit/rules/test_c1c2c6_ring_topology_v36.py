@@ -12,7 +12,7 @@ Patterns (trace, VERIFIED):
       emitted OUTSIDE the spiro brackets (``...octane-6,2'-oxolane]-3-ene``), which
       is OPSIN-grammar-invalid. VERIFIED fix: splice it INSIDE the cage component
       (``...oct-3-ene-6,2'-oxolane]``). Task 2. -> GREEN.
-  A2 spiro-von-Baeyer that builds a name with a SELF-01 wrong-numbering / other
+  A2 spiro-von-Baeyer that builds a name with a wrong-numbering / other
       construction bug (no trailing-ene). Task 3 triage. -> abstain today.
   B mixed-spiro-fused (spiro joining two fused/bridged sub-systems);
       ``name_mixed_spiro_fused`` has no construction path. Task 5. -> abstain today.
@@ -46,9 +46,9 @@ A1_WITNESSES = [
     "C1=C\\CCCCCCCCCCCC/C=C\\COC2CC(CCC\\C=C/1)OC1(CCCCO1)C2",           # bicyclo[23.3.1] triene
 ]
 
-# Pattern A2: spiro-von-Baeyer builds a name that SELF-01 rejects. MEASURED (Task 3,
+# Pattern A2: spiro-von-Baeyer builds a name that rejects. MEASURED (Task 3,
 # V36-C1C2C6-TASK3-A2-FINDING.md): the trace's "wrong-numbering" premise is REFUTED --
-# 67/85 spiro-VB fails are STEREO-OMISSION (right constitution + numbering, missing P-91
+# 67/85 spiro-VB fails are STEREO-OMISSION (right constitution + numbering, missing
 # descriptors), only 16 are real constitutional defects. A re-anchored stereo injection
 # closes a measured 40/85 (RT-gated, 0-wrong), but the clean wiring touches the SHARED
 # stereo primitive (format_stereodescriptor_string tuple rendering + _STEREO_PREFIX_RE
@@ -61,13 +61,13 @@ A2_WITNESSES = [
     # RESOLVED_BY_V38_CP2 below.
 ]
 
-# The A2 stereo-closeable witness was measured to RT-pass once its P-91 stereo
+# The A2 stereo-closeable witness was measured to RT-pass once its stereo
 # block is completed (finding doc). CP2's fused-component numbering fix
 # delivered exactly that as a side effect, so it now RT-passes (see
 # ``test_a2_stereo_completion_target``, no longer xfail).
 A2_STEREO_CLOSEABLE = ["C1=C[C@H]2C[C@H]3CC[C@]4(CCCO4)[C@@H]3CCC=C2C1"]
 
-# CP2 (fused-atom numbering, P-31.1.4 '4a'/'8a' fusion locants) RESOLVED two
+# CP2 (fused-atom numbering, '4a'/'8a' fusion locants) RESOLVED two
 # witnesses that abstained here: a mixed-spiro-fused decalin, and a spiro-VB whose
 # fused sub-component numbering was the blocker. Each now emits a determinate name
 # (identical across randomized atom orders) that OPSIN-round-trips to the input's
@@ -92,7 +92,7 @@ B_WITNESSES = [
 # Pattern C: multi-component ortho / ortho-peri-fused mancude that genuinely abstains
 # (rt-fails) at the best-effort tier. DEFERRED (V36-C1C2C6-TASK45-BCD-FINDING.md): general
 # N-component fusion nomenclature is a documented large build (name_ortho_fused_bicyclic is
-# 2-ring-only, DEFR-07); the recommended path is an offline OPSIN-validated
+# 2-ring-only,); the recommended path is an offline OPSIN-validated
 # fused-template index. Breadth already floor-delivered for 24/41 ortho-fused (see below).
 C_WITNESSES = [
     "c1ccc2c(c1)CO[C@H]2[C@H]1OCc2ccccc21",
@@ -107,7 +107,7 @@ C_WITNESSES = [
 # M4 L1a (masked-spiro floor lever): a monospiro whose spiro atom is ALSO a
 # von-Baeyer bridgehead (>=3 SSSR-ring membership) is invisible to get_spiro_atoms,
 # so every spiro namer used to bail and the core VOIDED. The lever detects the true
-# spiro cut-vertex, splits at it and assembles the P-24.5.1 separable name. This
+# spiro cut-vertex, splits at it and assembles the separable name. This
 # core now emits a determinate name that OPSIN-round-trips to the input's full
 # InChIKey (0-wrong). Positive canary against re-breaking.
 C_RESOLVED_BY_MASKED_SPIRO = [
@@ -226,7 +226,7 @@ def test_a1_witness_names_and_rt(smiles):
 @pytest.mark.parametrize("smiles", A2_STEREO_CLOSEABLE)
 def test_a2_stereo_completion_target(smiles):
     """Task-3 target, now GREEN: this spiro-von-Baeyer core was constitution-correct
-    but abstained because its P-91 stereo block was missing (V36-C1C2C6-TASK3-A2-FINDING.md).
+    but abstained because its stereo block was missing (V36-C1C2C6-TASK3-A2-FINDING.md).
      CP2's fused-component numbering fix delivered the closing behaviour as a
     side effect -- it now names and OPSIN-round-trips to the input's full InChIKey."""
     try:
@@ -238,7 +238,7 @@ def test_a2_stereo_completion_target(smiles):
 
 @pytest.mark.parametrize("smiles", RESOLVED_BY_V38_CP2)
 def test_v38_cp2_resolved_witness_names_and_rt(smiles):
-    """ CP2 (fused-atom numbering, P-31.1.4) resolved these two previously-
+    """ CP2 (fused-atom numbering, resolved these two previously-
     abstaining witnesses: each now emits a determinate name that OPSIN-round-trips
     to the input's full InChIKey (0-wrong). A positive canary against re-breaking."""
     try:
@@ -254,7 +254,7 @@ def test_v38_cp2_resolved_witness_names_and_rt(smiles):
 def test_masked_spiro_core_names_and_rt(smiles):
     """M4 L1a: a masked-spiro core (spiro atom that is also a von-Baeyer
     bridgehead, >=3 SSSR rings, invisible to get_spiro_atoms) used to VOID; the
-    masked-spiro floor lever now emits a P-24.5.1 separable name that
+    masked-spiro floor lever now emits a separable name that
     OPSIN-round-trips to the input's full InChIKey (0-wrong)."""
     try:
         r = _ring_rt(smiles)

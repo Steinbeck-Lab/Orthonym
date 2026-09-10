@@ -1,4 +1,4 @@
-"""v25 P0 Task 0.3 — three-metric coverage instrument (dual matcher).
+""" Task 0.3 — three-metric coverage instrument (dual matcher).
 
 No Java: OPSIN is a dict-backed fake injected as ``name_to_smiles``. Every
 branch of the classifier and both matchers are exercised on hand-built

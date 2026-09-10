@@ -1,4 +1,4 @@
-"""v30 T4 degrade-floor slice 1 — ring-substituted phosphane parent.
+""" degrade-floor slice 1 — ring-substituted phosphane parent.
 
 The phosphane parent namer handles simple alkyl phosphanes (triethylphosphane, PIN) but
 ring-substituted phosphanes (tricyclododecylphosphane) fell through: `name_phosphine` is never
@@ -8,7 +8,7 @@ already yields the ring substituents, so best-effort (T4) emits the substitutive
 
 T4-SCOPED: guarded by `best_effort_ctx`, so the PIN path is byte-identical (unit test below drives
 the contextvar directly, independent of the OPSIN gate which behaves differently under pytest).
-0-wrong: RT identity below + SELF-01 in production.
+0-wrong: RT identity below + in production.
 """
 from rdkit import Chem
 from rdkit.Chem import inchi
@@ -56,7 +56,7 @@ def test_ring_phosphane_t4_only(smi, expected):
 
 
 def test_simple_phosphane_unchanged_pin():
-    # name_phosphine owns acyclic phosphanes; T4 branch must not shadow it in PIN.
+    # name_phosphine owns acyclic phosphanes; branch must not shadow it in PIN.
     from orthonym import Orthonym
     assert Orthonym().name("CCP(CC)CC") == "triethylphosphane"
     assert Orthonym().name("CCCP(CCC)CCC") == "tripropylphosphane"

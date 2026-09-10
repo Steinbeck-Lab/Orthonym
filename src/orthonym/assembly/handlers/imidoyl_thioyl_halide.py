@@ -6,7 +6,7 @@ the imido / chalcogeno analogue of a carboxylic acid is a two-word functional-
 class name '{parent}carbo{imidoyl|thioyl|selenoyl} {halide}' (ring parent) or
 '{chain-stem}{imidoyl|thioyl|selenoyl} {halide}' (chain parent).
 
-IUPAC cite: P-65.5.1 (BB 31438 'cyclohexanecarboximidoyl chloride (PIN)',
+IUPAC cite: (BB 31438 'cyclohexanecarboximidoyl chloride (PIN)',
 31442 'cyclohexanecarbothioyl chloride (PIN)').
 """
 from __future__ import annotations

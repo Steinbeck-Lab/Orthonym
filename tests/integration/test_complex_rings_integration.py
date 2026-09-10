@@ -9,8 +9,8 @@ Verifies complex ring naming requirements (COMPLEX-01 through COMPLEX-05):
 
 Tests the complete naming pipeline from SMILES to final IUPAC name.
 
-Reference: IUPAC 2013 Blue Book, Sections P-23 (Bridged Systems),
-           P-24 (Spiro Systems), P-25 (Fused Systems)
+Reference: IUPAC 2013 Blue Book, Sections (Bridged Systems),
+            (Spiro Systems), (Fused Systems)
 """
 
 import pytest
@@ -168,10 +168,10 @@ class TestCOMPLEX03:
         # Benzimidazole
         ("c1ccc2[nH]cnc2c1", "1H-benzimidazole"),
         # Benzofuran (no indicated H needed)
-        #: 1-benzofuran is the PIN (P-25.2.2.4, the Blue Book)
+        #: 1-benzofuran is the PIN, the Blue Book)
         ("c1ccc2occc2c1", "1-benzofuran"),
         # Benzothiophene (no indicated H needed)
-        #: 1-benzothiophene is the PIN (P-25.2.2.4, the Blue Book)
+        #: 1-benzothiophene is the PIN, the Blue Book)
         ("c1ccc2sccc2c1", "1-benzothiophene"),
     ])
     def test_fused_heterocycle_retained_names(self, smiles, expected):

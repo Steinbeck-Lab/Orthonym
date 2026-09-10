@@ -57,14 +57,14 @@ class TestHWPrefixes:
 
     @pytest.mark.unit
     def test_mercury_is_deleted_from_hantzsch_widman(self):
-        """P-22.2.2 [BBv2:8218]: "... and mercury has been deleted."
+        """ [BBv2:8218]: "... and mercury has been deleted."
 
         This case used to assert ``get_hw_prefix('Hg') == 'mercura'``. The Blue
         Book removed mercury from the Hantzsch-Widman system, and Hg is in
         neither Table 1.5 nor Table 2.4 -- it appears only in the Appendix 1
         *seniority* list, which is not a source of 'a' prefixes. Offering
         ``mercura`` here let a mercury ring be named by replacement nomenclature,
-        which P-22.2.2 forbids; organomercury is named by P-69 organometallic
+        which forbids; organomercury is named by organometallic
         nomenclature, whose own ``data/organometallics.METALLACYCLE_A_PREFIX``
         retains ``mercura`` for that purpose.
         """
@@ -106,9 +106,9 @@ class TestHeteroatomPriority:
         ('Sn', 12),
         ('Pb', 13),
         ('B', 14),
-        ('Al', 15),   # ERRATA-01: added per P-18(b) expansion
-        ('Ga', 16),   # ERRATA-01: added per P-18(b) expansion
-        # v29 P2-T2b: In and Tl complete Table 2.4's own seniority order, whose
+        ('Al', 15),   # ERRATA-01: added per (b) expansion
+        ('Ga', 16),   # ERRATA-01: added per (b) expansion
+        # -T2b: In and Tl complete Table 2.4's own seniority order, whose
         # last four entries are Al > Ga > In > Tl [BBv2:8244-8248]. They were
         # missing while B..Ga were present, so both fell through to 999 and TIED
         # with each other -- and ``sort_heteroatoms_by_priority`` is a stable sort
@@ -118,9 +118,9 @@ class TestHeteroatomPriority:
         ('In', 17),
         ('Tl', 18),
         # Hg moved 17 -> 19 to free In/Tl's real Table 2.4 positions. This is NOT
-        # a replacement-seniority position: P-22.2.2 deleted mercury, so Hg has
+        # a replacement-seniority position: deleted mercury, so Hg has
         # no prefix in Table 1.5 or Table 2.4 and no name can cite it from here.
-        # The value stays defined only for the P-69 organometallic consumers.
+        # The value stays defined only for the organometallic consumers.
         ('Hg', 19),
     ])
     def test_heteroatom_priority_lookup(self, element, expected_priority):
@@ -270,7 +270,7 @@ class TestHWStemsHelpers:
     def test_heteroatoms_use_inane_set(self):
         """Test HETEROATOMS_USE_INANE set contents.
 
-        P-22.2.2.1.3 / Table 2.7: the SATURATED 6-ring '-inane' ending applies
+         / Table 2.7: the SATURATED 6-ring '-inane' ending applies
         to class 6B (N, Si, Ge, Sn, Pb) AND class 6C (P, As, Sb, B, Al, Ga, In,
         Tl, and the halogens). Wave-2 P5 fused Task 9 corrected the set: the
         earlier pin omitted the halogens and Al/Ga/In/Tl (6C atoms whose
@@ -284,7 +284,7 @@ class TestHWStemsHelpers:
     def test_heteroatoms_use_inine_set(self):
         """Test HETEROATOMS_USE_ININE (class 6C) set contents.
 
-        P-22.2.2.1.3 / Table 2.7 class 6C (F, Cl, Br, I, P, As, Sb, B, Al, Ga,
+         / Table 2.7 class 6C (F, Cl, Br, I, P, As, Sb, B, Al, Ga,
         In, Tl): an UNSATURATED 6-ring bearing any of these takes the '-inine'
         ending (1,4-oxaphosphinine, 1,3,5-triphosphinine). Added Wave-2 P5
         fused Task 9."""

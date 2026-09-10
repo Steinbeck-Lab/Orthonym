@@ -1,10 +1,10 @@
-"""v26 BP-2 RC-2b (accuracy) — poly-acid mono-ester is acid-senior, not an ester.
+""" (accuracy) — poly-acid mono-ester is acid-senior, not an ester.
 
-The decomposition ester assembler (_assemble_ester) blindly built 'alkyl ...ate'
+The decomposition ester assembler (_assemble_ester) blindly built 'alkyl...ate'
 from fragment names. For a mono-ester of a di-acid (e.g. ethyl hydrogen phthalate
 CCOC(=O)c1ccccc1C(=O)O) it produced 'ethyl benzene-1,2-dicarboxylate' — which
 drops the 'hydrogen' the free -COOH needs, so OPSIN reads it as an anion
-(RT-MISMATCH). Per P-41 (carboxylic acid > ester) / P-65.6.3.5, the un-esterified
+(RT-MISMATCH). Per (carboxylic acid > ester) /, the un-esterified
 free acid is the senior principal group, so the ester functional-class name is not
 the PIN.
 

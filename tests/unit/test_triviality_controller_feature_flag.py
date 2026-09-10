@@ -1,12 +1,12 @@
-"""Phase 168 Plan-02: triviality-controller feature-flag unit tests.
+"""a phase Plan-02: triviality-controller feature-flag unit tests.
 
-Mirrors the Phase 162 feature-flag env-var-override pattern. Verifies the Stage A SACRED
+Mirrors the a phase feature-flag env-var-override pattern. Verifies the Stage A SACRED
 default-OFF invariant at the ctor + pool + CLI surfaces, and the env-var override.
 
 The env-var test runs in a SUBPROCESS (not importlib.reload) so it cannot pollute the parent
 test process's already-imported ``orthonym.namer`` module.
 
-Source: 168-CONTEXT.md D-07/D-08; 168-PATTERNS.md feature-flag analog.
+Source: 168-internal notes /; internal notes feature-flag analog.
 """
 
 import os
@@ -33,7 +33,7 @@ class TestDefaultOff:
 
     @pytest.mark.unit
     def test_ctor_on_instantiates_oracle(self):
-        # WARNING #9: flag ON MUST instantiate the OpsinOracle for the TRIV-03 T2 RT-safety gate.
+        # WARNING #9: flag ON MUST instantiate the OpsinOracle for the RT-safety gate.
         assert Orthonym(enable_triviality_controller=True)._triv_oracle is not None
 
 

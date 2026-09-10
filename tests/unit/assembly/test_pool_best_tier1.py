@@ -1,15 +1,15 @@
-"""Unit tests for Phase 146 Tier-1 cascade filters.
+"""Unit tests for a phase Tier-1 cascade filters.
 
-Tests each filter (P-44.1.1, P-44.1.2, P-52.2.8, P-44.4.1.1, P-44.4.1.2)
+Tests each filter,,,,
 in isolation, plus the cascade short-circuit behavior of
-CandidatePool._best_two_tier().
+CandidatePool._best_two_tier.
 
 All filter functions have signature (List[CandidateName]) -> List[CandidateName]
 and NEVER return empty list — if all candidates tie, all are returned.
 
 Source for IUPAC rules:
-  https://iupac.qmul.ac.uk/BlueBook/P4.html (P-44.1 cascade)
-  https://iupac.qmul.ac.uk/BlueBook/P5.html (P-52.2.8 ring-on-tie)
+  https://iupac.qmul.ac.uk/BlueBook/P4.html cascade)
+  https://iupac.qmul.ac.uk/BlueBook/P5.html ring-on-tie)
 """
 import pytest
 from rdkit import Chem
@@ -69,14 +69,14 @@ def _mol(smi):
 
 
 # ---------------------------------------------------------------------------
-# TestFilterMaxPCGCount — P-44.1.1
+# TestFilterMaxPCGCount —
 # ---------------------------------------------------------------------------
 
 class TestFilterMaxPCGCount:
-    """P-44.1.1: max principal characteristic group count wins."""
+    """: max principal characteristic group count wins."""
 
     def test_single_winner(self):
-        """P-44.1.1: candidate with strictly higher PCG count wins alone."""
+        """: candidate with strictly higher PCG count wins alone."""
         cands = [
             _make_cand(name="a", parent_pcg_count=2),
             _make_cand(name="b", parent_pcg_count=1),
@@ -89,7 +89,7 @@ class TestFilterMaxPCGCount:
         assert result[0].name == "a"
 
     def test_tie_returns_all_tied(self):
-        """P-44.1.1: candidates tied at max are all returned."""
+        """: candidates tied at max are all returned."""
         cands = [
             _make_cand(name="a", parent_pcg_count=1),
             _make_cand(name="b", parent_pcg_count=1),
@@ -101,7 +101,7 @@ class TestFilterMaxPCGCount:
         )
 
     def test_zero_count_returns_all(self):
-        """P-44.1.1: None counts as 0; all-None means all-tied at 0."""
+        """: None counts as 0; all-None means all-tied at 0."""
         cands = [
             _make_cand(name="a", parent_pcg_count=None),
             _make_cand(name="b", parent_pcg_count=None),
@@ -112,19 +112,19 @@ class TestFilterMaxPCGCount:
         )
 
     def test_empty_input_returns_empty(self):
-        """P-44.1.1: empty input returns empty (degenerate case)."""
+        """: empty input returns empty (degenerate case)."""
         assert _filter_max_pcg_count([]) == []
 
 
 # ---------------------------------------------------------------------------
-# TestFilterSeniorHeteroatomClass — P-44.1.2
+# TestFilterSeniorHeteroatomClass —
 # ---------------------------------------------------------------------------
 
 class TestFilterSeniorHeteroatomClass:
-    """P-44.1.2: senior heteroatom class wins (N > P > ... > C)."""
+    """: senior heteroatom class wins (N > P >... > C)."""
 
     def test_n_beats_c(self):
-        """P-44.1.2: pyridine (N in ring) beats benzene (C-only ring)."""
+        """: pyridine (N in ring) beats benzene (C-only ring)."""
         # Pyridine: c1ccncc1 — atom indices 0,1,2,3(N),4,5
         pyr_mol = _mol("c1ccncc1")
         # Benzene: c1ccccc1 — all C
@@ -150,7 +150,7 @@ class TestFilterSeniorHeteroatomClass:
         assert result[0].name == "pyridine"
 
     def test_p_beats_o(self):
-        """P-44.1.2: P (rank=1) beats O (rank=14)."""
+        """: P (rank=1) beats O (rank=14)."""
         # PH3: just to give P-bearing parent (atoms = {0})
         p_mol = _mol("P")
         # H2O: just O
@@ -198,7 +198,7 @@ class TestFilterSeniorHeteroatomClass:
         )
 
     def test_unknown_element_treated_as_least_senior(self):
-        """P-44.1.2: F not in P_44_1_2_ELEMENT_SENIORITY -> sentinel rank;
+        """: F not in P_44_1_2_ELEMENT_SENIORITY -> sentinel rank;
         a candidate with C (in the table at rank=18) beats fluorine-only.
         """
         c_mol = _mol("C")
@@ -227,7 +227,7 @@ class TestFilterSeniorHeteroatomClass:
         assert result[0].name == "methane"
 
     def test_empty_parent_treated_as_C(self):
-        """P-44.1.2: candidate with empty parent_atom_indices ranks as
+        """: candidate with empty parent_atom_indices ranks as
         sentinel (least senior); a candidate with C beats it."""
         c_mol = _mol("C")
         cands = [
@@ -253,15 +253,15 @@ class TestFilterSeniorHeteroatomClass:
 
 
 # ---------------------------------------------------------------------------
-# TestFilterRingOverChainOnTie — P-52.2.8 / P-44.1.2.2
+# TestFilterRingOverChainOnTie — /
 # ---------------------------------------------------------------------------
 
 class TestFilterRingOverChainOnTie:
-    """P-52.2.8: ring beats chain on tie. If any ring candidate exists,
+    """: ring beats chain on tie. If any ring candidate exists,
     drop chain candidates."""
 
     def test_drop_chain_when_ring_present(self):
-        """P-52.2.8: chain + ring_a mix -> only ring kept."""
+        """: chain + ring_a mix -> only ring kept."""
         cands = [
             _make_cand(name="chain", handler="chain"),
             _make_cand(name="ring", handler="benzene"),
@@ -273,7 +273,7 @@ class TestFilterRingOverChainOnTie:
         assert result[0].name == "ring"
 
     def test_all_ring_returns_all(self):
-        """P-52.2.8: all-ring input returns all (identity)."""
+        """: all-ring input returns all (identity)."""
         cands = [
             _make_cand(name="ring1", handler="benzene"),
             _make_cand(name="ring2", handler="heterocycle"),
@@ -282,7 +282,7 @@ class TestFilterRingOverChainOnTie:
         assert len(result) == 2, "P-52.2.8: all-ring returns all"
 
     def test_all_chain_returns_all(self):
-        """P-52.2.8: all-chain input returns all (identity)."""
+        """: all-chain input returns all (identity)."""
         cands = [
             _make_cand(name="chainA", handler="chain"),
             _make_cand(name="chainB", handler="chain"),
@@ -291,7 +291,7 @@ class TestFilterRingOverChainOnTie:
         assert len(result) == 2, "P-52.2.8: all-chain returns all"
 
     def test_unknown_handler_treated_as_non_chain(self):
-        """P-52.2.8: handler not in HANDLER_POLICIES -> treated as
+        """: handler not in HANDLER_POLICIES -> treated as
         non-chain (defensive default; kept in result)."""
         cands = [
             _make_cand(name="chain", handler="chain"),
@@ -306,14 +306,14 @@ class TestFilterRingOverChainOnTie:
 
 
 # ---------------------------------------------------------------------------
-# TestFilterMaxSkeletalAtoms — P-44.4.1.1
+# TestFilterMaxSkeletalAtoms —
 # ---------------------------------------------------------------------------
 
 class TestFilterMaxSkeletalAtoms:
-    """P-44.4.1.1: max number of skeletal atoms in the parent wins."""
+    """: max number of skeletal atoms in the parent wins."""
 
     def test_max_size_wins(self):
-        """P-44.4.1.1: largest parent wins alone."""
+        """: largest parent wins alone."""
         cands = [
             _make_cand(name="ten", parent_atom_indices=set(range(10))),
             _make_cand(name="five", parent_atom_indices=set(range(5))),
@@ -326,7 +326,7 @@ class TestFilterMaxSkeletalAtoms:
         assert result[0].name == "ten"
 
     def test_tie_returns_all_tied(self):
-        """P-44.4.1.1: candidates tied at max size all returned."""
+        """: candidates tied at max size all returned."""
         cands = [
             _make_cand(name="fiveA", parent_atom_indices=set(range(5))),
             _make_cand(name="fiveB", parent_atom_indices=set(range(5, 10))),
@@ -338,7 +338,7 @@ class TestFilterMaxSkeletalAtoms:
         )
 
     def test_none_parent_counts_as_zero(self):
-        """P-44.4.1.1: parent_atom_indices=None -> size 0; loses to size-1."""
+        """: parent_atom_indices=None -> size 0; loses to size-1."""
         cands = [
             _make_cand(name="none", parent_atom_indices=None),
             _make_cand(name="one", parent_atom_indices={0}),
@@ -351,14 +351,14 @@ class TestFilterMaxSkeletalAtoms:
 
 
 # ---------------------------------------------------------------------------
-# TestFilterMaxMultipleBonds — P-44.4.1.2
+# TestFilterMaxMultipleBonds —
 # ---------------------------------------------------------------------------
 
 class TestFilterMaxMultipleBonds:
-    """P-44.4.1.2: max (double + triple bonds in parent) wins."""
+    """: max (double + triple bonds in parent) wins."""
 
     def test_max_count_wins(self):
-        """P-44.4.1.2: highest multiple_bond_count wins alone."""
+        """: highest multiple_bond_count wins alone."""
         cands = [
             _make_cand(name="three", factors={'multiple_bond_count': 3}),
             _make_cand(name="one",   factors={'multiple_bond_count': 1}),
@@ -371,7 +371,7 @@ class TestFilterMaxMultipleBonds:
         assert result[0].name == "three"
 
     def test_tie_returns_all_tied(self):
-        """P-44.4.1.2: candidates tied at max count all returned."""
+        """: candidates tied at max count all returned."""
         cands = [
             _make_cand(name="twoA", factors={'multiple_bond_count': 2}),
             _make_cand(name="twoB", factors={'multiple_bond_count': 2}),
@@ -383,7 +383,7 @@ class TestFilterMaxMultipleBonds:
         )
 
     def test_missing_factor_treated_as_zero(self):
-        """P-44.4.1.2: missing 'multiple_bond_count' key -> 0."""
+        """: missing 'multiple_bond_count' key -> 0."""
         cands = [
             _make_cand(name="missing", factors={}),
             _make_cand(name="one", factors={'multiple_bond_count': 1}),
@@ -403,7 +403,7 @@ class TestTier1Cascade:
     """Cascade short-circuit behavior + Tier-2 fall-through."""
 
     def test_cascade_short_circuits_on_single_winner(self):
-        """P-44.1: when filter 1 produces single winner, later filters
+        """: when filter 1 produces single winner, later filters
         should NOT be invoked (short-circuit on len <= 1)."""
         pool = CandidatePool(selection_mode='score_based')
         # Build candidates where filter 1 (PCG count) produces a single winner.
@@ -435,7 +435,7 @@ class TestTier1Cascade:
         )
 
     def test_cascade_falls_through_to_tier2_on_full_tie(self):
-        """P-44.1 + Tier 2: when all 5 filters tie, defer to
+        """ + Tier 2: when all 5 filters tie, defer to
         select_best_candidate. With identical confidences and same handler,
         select_best_candidate falls back to first-added or HANDLER_PRIORITY.
         Either way, a valid winner is returned (not None)."""
@@ -468,8 +468,8 @@ class TestTier1Cascade:
         )
 
     def test_step6_skipped_when_no_iupac_locants(self):
-        """D-02: step 6 (lowest locants) is gated on iupac_locants being
-        populated. In Phase 146, no candidate has iupac_locants -> step 6
+        """: step 6 (lowest locants) is gated on iupac_locants being
+        populated. In a phase, no candidate has iupac_locants -> step 6
         is a no-op; cascade falls through to Tier 2."""
         pool = CandidatePool(selection_mode='score_based')
         cand_a = _make_cand(
@@ -505,14 +505,14 @@ class TestTier1Cascade:
 
 
 # ---------------------------------------------------------------------------
-# TestHasIupacLocants — D-02 / D-19 safe probe
+# TestHasIupacLocants — / safe probe
 # ---------------------------------------------------------------------------
 
 class TestHasIupacLocants:
-    """D-02: Safe probe for whether step 6 (lowest locants) can run."""
+    """: Safe probe for whether step 6 (lowest locants) can run."""
 
     def test_returns_false_when_all_missing(self):
-        """D-02: no candidate has ring_info['iupac_locants'] -> False."""
+        """: no candidate has ring_info['iupac_locants'] -> False."""
         cands = [
             _make_cand(name="a"),
             _make_cand(name="b"),
@@ -522,7 +522,7 @@ class TestHasIupacLocants:
         )
 
     def test_returns_false_when_one_missing(self):
-        """D-02: ALL candidates must have iupac_locants for True."""
+        """: ALL candidates must have iupac_locants for True."""
         cands = [
             _make_cand(name="a", ring_info={'iupac_locants': {0: 1, 1: 2}}),
             _make_cand(name="b", ring_info={'iupac_locants': {0: 1, 1: 2}}),
@@ -533,7 +533,7 @@ class TestHasIupacLocants:
         )
 
     def test_returns_true_when_all_present(self):
-        """D-02: ALL candidates have non-empty iupac_locants -> True."""
+        """: ALL candidates have non-empty iupac_locants -> True."""
         cands = [
             _make_cand(name="a", ring_info={'iupac_locants': {0: 1, 1: 2}}),
             _make_cand(name="b", ring_info={'iupac_locants': {3: 1, 4: 2}}),
@@ -544,7 +544,7 @@ class TestHasIupacLocants:
         )
 
     def test_empty_dict_is_treated_as_missing(self):
-        """D-02: empty iupac_locants dict is falsy -> False."""
+        """: empty iupac_locants dict is falsy -> False."""
         cands = [
             _make_cand(name="a", ring_info={'iupac_locants': {}}),
             _make_cand(name="b", ring_info={'iupac_locants': {}}),

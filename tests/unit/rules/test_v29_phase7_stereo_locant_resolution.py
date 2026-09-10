@@ -1,11 +1,11 @@
 """ a phase Task 2 — a parent-scope stereodescriptor must cite the PARENT's numbering.
 
-Defect class C1 (internal notes §3): two default-PIN-path
+Defect class C1 (internal notes): two default-PIN-path
 emissions carried a stereodescriptor whose locant does not exist in the name it decorates,
 which OPSIN rejects with `Could not find atom/bond that: <stereoChemistry …> appeared to be
 referring to`. That is a statement about OUR name, not about OPSIN's coverage.
 
-Governing rule — **P-91.3 "NAMING OF STEREOISOMERS"** (`the Blue Book Blue Book`):
+Governing rule — ** "NAMING OF STEREOISOMERS"** (`the Blue Book Blue Book`):
 
     "In preferred IUPAC names, stereodescriptors are placed immediately at the front of the
      part of the name to which they relate. They are placed at the front of the complete
@@ -13,14 +13,14 @@ Governing rule — **P-91.3 "NAMING OF STEREOISOMERS"** (`the Blue Book Blue Boo
      hyphen. When they relate to substituent groups, they are cited at the front of the
      corresponding prefix. They are preceded by a numerical or letter locant to describe the
      position of the stereogenic unit when such locants are present; general rules of
-     numbering are applied (see P-14.4)."
+     numbering are applied (see."
 
 with the section's own boundary PINs `[(1R)-1-chloropropyl]benzene` (descriptor inside the
 enclosing marks, substituent numbering, NOT duplicated at the front) and
 `(5Z)-4-[(1E)-prop-1-en-1-yl]hepta-1,5-diene` (parent block in the PARENT's numbering,
 substituent block in the substituent's — two independent scopes).
 
-Read with **P-14.3.3 "Citation of locants"** (`:2869`), whose own worked example makes the
+Read with ** "Citation of locants"** (`:2869`), whose own worked example makes the
 scoping explicit: "locants are not used for the structural units defined by the parentheses
 even though locants are used for these substituents of the parent structure ethanone."
 
@@ -40,10 +40,10 @@ from orthonym import Orthonym
 
 
 # --------------------------------------------------------------------------
-# The two defect molecules (FINDINGS.md §3 "The two C1 generator defects")
+# The two defect molecules (FINDINGS.md "The two C1 generator defects")
 # --------------------------------------------------------------------------
 
-# 2a: parent is `methanol` — ONE carbon. P-14.3.4.2(a) ("The locant '1' is omitted:
+# 2a: parent is `methanol` — ONE carbon. (a) ("The locant '1' is omitted:
 # (a) in substituted mononuclear parent hydrides", the Blue Book) means the parent scope has no
 # cited locant at all, so a parent-level `(1R,2R)-` cannot resolve. The two stereocentres
 # both live in the cyclopropyl SUBSTITUENT and are already cited inside its brackets.
@@ -64,7 +64,7 @@ def namer():
 
 
 def test_2a_parent_block_not_duplicated_from_substituent_numbering(namer):
-    """P-91.3: the cyclopropyl centres belong to the SUBSTITUENT scope only."""
+    """: the cyclopropyl centres belong to the SUBSTITUENT scope only."""
     assert namer.name(SMILES_2A) == EXPECTED_2A
 
 
@@ -176,7 +176,7 @@ def test_fails_closed_rather_than_citing_an_unresolvable_locant(namer):
 
     Every stereogenic bond here lies inside a cyclodecene SUBSTITUENT. HEAD cited `(1E)`
     at parent scope, which OPSIN parsed as a DIFFERENT stereoisomer. There is no parent
-    locant these bonds can legitimately take (P-91.3 puts them on the prefix), so the
+    locant these bonds can legitimately take puts them on the prefix), so the
     parent block is dropped: the constitution stays right and the stereo is simply not
     asserted. Per CLAUDE.md #9 this is pinned so the fallback cannot silently drift into
     a fabricated descriptor.
@@ -263,12 +263,12 @@ def test_counterexample_block_cites_a_locant_the_parent_actually_has(namer, smil
     block = re.search(r"\((\d+)([EZRS])\)-", name)
     assert block is not None, f"expected a parent-scope block, got: {name}"
     assert block.group(1) == "2", f"locant {block.group(1)!r} is not the parent's: {name}"
-    # the substituent block keeps its OWN numbering, inside the brackets (P-91.3)
+    # the substituent block keeps its OWN numbering, inside the brackets
     assert "[(1R,2R)-2-methylcyclopropyl]" in name, name
 
 
 def _ce1_features(principal_chain):
-    """CE-1's real molecule and the real maps the trace recorded at `composer.py:5564`.
+    """'s real molecule and the real maps the trace recorded at `composer.py:5564`.
 
     A stub rather than `compute_features`, deliberately: `principal_chain` and
     `oriented_ring` are populated LATER in `namer.py` during parent selection (`:4684`,
@@ -429,7 +429,7 @@ def test_residual_acid_halide_cites_the_parents_own_numbering(namer):
 
 
 def test_residual_parent_block_is_not_the_substituent_block(namer):
-    """The `(1R,2R)` belongs inside the brackets and nowhere else (P-91.3)."""
+    """The `(1R,2R)` belongs inside the brackets and nowhere else."""
     name = namer.name(SMILES_C1R)
     assert name.startswith("(2E)-"), name
     assert name.count("(1R,2R)") == 1, f"substituent block duplicated: {name}"
@@ -516,7 +516,7 @@ def test_undeclared_scope_fails_closed_when_the_two_scopes_disagree(namer):
     """`parent_scope=None` and the ring/chain resolutions differ -> no block.
 
     Better a missing stereo block than a locant that may not resolve
-    (P-14.3.3, the Blue Book "Citation of locants",:2869) -- the same posture
+    , the Blue Book "Citation of locants",:2869) -- the same posture
     `_ring_handler_parent_atom_indices` already documents.
     """
     from orthonym.assembly.composer import _inject_stereo_if_missing

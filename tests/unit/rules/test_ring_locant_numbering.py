@@ -1,5 +1,5 @@
 """
-Tests for ASML-19: Ring locant comparison uses actual IUPAC ring numbering.
+Tests for: Ring locant comparison uses actual IUPAC ring numbering.
 
 The three parent selection comparison functions (_compare_pg_locants,
 _compare_multiple_bond_locants, _compare_substituent_locants) must use
@@ -15,7 +15,7 @@ from orthonym.rules.parent_selection import _build_ring_pos
 
 
 class TestBuildRingPos:
-    """ASML-19: Ring locant comparison uses actual IUPAC ring numbering."""
+    """: Ring locant comparison uses actual IUPAC ring numbering."""
 
     def test_with_iupac_locants(self):
         """When iupac_locants provided, use them instead of sorted indices."""

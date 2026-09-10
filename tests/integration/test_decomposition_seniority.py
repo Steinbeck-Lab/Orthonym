@@ -1,6 +1,6 @@
 """Integration tests for seniority-based fragment selection in decomposition.
 
-Tests that P-44.1.1 seniority ranking correctly influences which fragment
+Tests that seniority ranking correctly influences which fragment
 becomes parent in ester, amide, and ether decomposition, and that the
 quality gate detects dropped fragments.
 """

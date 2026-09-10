@@ -1,4 +1,4 @@
-"""Wave2 T3c + T3d — aryl-vinyl/styryl + substituted-ring + sulfonimidamide.
+"""Wave2 + — aryl-vinyl/styryl + substituted-ring + sulfonimidamide.
 
 T3c: the styryl -CH=CH-C6H5 arm once counted carbons THROUGH the far ring
 (8 C -> '(4E)-4-octylbenzoic acid', a wrong-structure leak). The Wave2 T3a
@@ -8,7 +8,7 @@ conservation guard first killed the leak (fail-closed); the FULL-Tier-3 build
 plus the both-ends-branched free-valence tie-break ((2-methylpentan-3-yl)benzene)
 and the benzenyl->phenyl guard.
 
-T3d (additive coverage): sulfonimidamide -S(=O)(=NH)-NH2 is a preselected
+ (additive coverage): sulfonimidamide -S(=O)(=NH)-NH2 is a preselected
 suffix (BB Table 6.1 item 20, ranked just below sulfonamide). SX4 on sulfur,
 disjoint from the carbon C=N families. (The composite-N CARBON families now
 live in test_tier3d_composite_n.py.)
@@ -81,7 +81,7 @@ class TestSulfonimidamide:
         ("CS(=O)(=O)N", "methanesulfonamide"),
         ("CCS(N)(=O)=O", "ethanesulfonamide"),
         ("NNC(C)=O", "acetohydrazide"),
-        # Wave-3: substitutive ylidene-hydrazine is PIN (P-68.3.1.2.2);
+        # Wave-3: substitutive ylidene-hydrazine is PIN;
         # 'acetophenone hydrazone' is functional-class / general-only.
         ("CC(=NN)c1ccccc1", "(1-phenylethylidene)hydrazine"),
         ("CC=NO", "N-hydroxyethanimine"),

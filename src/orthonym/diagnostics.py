@@ -3,7 +3,7 @@
 Why this exists (audit 2026-09-03): between Aug 30 and Sep 2 the batch runs left
 72 ``hs_err_pid*.log`` files. Every one was a SIGSEGV in native code (RDKit's
 boost.python layer, ``_jpype.so`` or libc) on the Python main thread, and none
-named a Python line, because nothing had enabled :mod:`faulthandler`. With it on,
+named a Python line, because nothing had enabled:mod:`faulthandler`. With it on,
 the interpreter prints the Python stack of every thread to stderr on SIGSEGV,
 SIGFPE, SIGABRT and SIGBUS before the process dies, so the molecule and the
 call site are recoverable from the log.
@@ -38,8 +38,8 @@ def enable_crash_traceback() -> None:
 
 def strict_mode() -> bool:
     """``ORTHONYM_STRICT=1``: re-raise an exception that escaped a producer
-    instead of degrading to an abstention at the top of ``name()`` /
-    ``name_tiered()``. Read on every call so a test or harness can flip it
+    instead of degrading to an abstention at the top of ``name`` /
+    ``name_tiered``. Read on every call so a test or harness can flip it
     without restarting the process. Default off: the always-emit contract holds.
     """
     import os

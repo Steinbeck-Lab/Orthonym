@@ -1,4 +1,4 @@
-"""Phase 146 feature flag tests (D-07, D-08).
+"""a phase feature flag tests (,).
 
 Verifies env-var-controlled FACTOR_WEIGHTS dispatch:
 
@@ -7,7 +7,7 @@ Verifies env-var-controlled FACTOR_WEIGHTS dispatch:
 - 'true' (case-insensitive, whitespace-tolerant) → V18 weights active
 - FACTOR_WEIGHTS_V17 has 5 keys (no multiple_bond_count)
 - FACTOR_WEIGHTS_V18 has 6 keys, with multiple_bond_count APPENDED LAST
-  per D-14 IEEE 754 byte-identical invariant
+  per IEEE 754 byte-identical invariant
 
 **Test strategy note:** Some tests exercise the env-var parsing by running
 a fresh Python subprocess with the env var set (via ``sys.executable``
@@ -19,7 +19,7 @@ object as the originally-imported reference). Tests that only inspect
 module-level dict shape don't need subprocess isolation and can be run
 in-process.
 
-Source: https://iupac.qmul.ac.uk/BlueBook/P4.html P-44.1
+Source: https://iupac.qmul.ac.uk/BlueBook/P4.html
 """
 
 import subprocess
@@ -92,7 +92,7 @@ class TestEnvVarDefault:
         assert out == "True"
 
     def test_whitespace_tolerant(self):
-        """Surrounding whitespace should be stripped by .strip().lower()."""
+        """Surrounding whitespace should be stripped by.strip.lower."""
         out = _run_with_env({"ORTHONYM_USE_V18_WEIGHTS": "  true  "}, """
             import orthonym.assembly.coverage_scoring as cs
             print(cs.FACTOR_WEIGHTS is cs.FACTOR_WEIGHTS_V18)
@@ -109,7 +109,7 @@ class TestEnvVarDefault:
 
 
 class TestV17V18DictShape:
-    """D-14 invariants on dict structure — no env-var manipulation needed.
+    """ invariants on dict structure — no env-var manipulation needed.
 
     These tests inspect the module-level dict constants directly; no reload
     required, so they run safely in-process.
@@ -136,7 +136,7 @@ class TestV17V18DictShape:
         )
 
     def test_v18_multiple_bond_count_is_last(self):
-        """D-14 IEEE 754 invariant: multiple_bond_count must be APPENDED LAST.
+        """ IEEE 754 invariant: multiple_bond_count must be APPENDED LAST.
 
         Python 3.7+ dict iteration is insertion-order-deterministic.
         compute_confidence iterates FACTOR_WEIGHTS keys in insertion order.
@@ -148,31 +148,31 @@ class TestV17V18DictShape:
         assert list(FACTOR_WEIGHTS_V18.keys())[-1] == 'multiple_bond_count'
 
     def test_v17_ratio_is_zero(self):
-        """Phase 145.2 D-09-a.1: ratio is permanently demoted to 0.0 in V17."""
+        """a phase -a.1: ratio is permanently demoted to 0.0 in V17."""
         from orthonym.assembly.coverage_scoring import FACTOR_WEIGHTS_V17
         assert FACTOR_WEIGHTS_V17['ratio'] == 0.0
 
     def test_v18_ratio_is_zero(self):
-        """Permanent demotion carries forward to V18 (D-09-a.1)."""
+        """Permanent demotion carries forward to V18 (-a.1)."""
         from orthonym.assembly.coverage_scoring import FACTOR_WEIGHTS_V18
         assert FACTOR_WEIGHTS_V18['ratio'] == 0.0
 
     def test_v18_parent_correctness_calibrated(self):
-        """V18 parent_correctness holds the Phase 148.2 boundary-extended value.
+        """V18 parent_correctness holds the a phase boundary-extended value.
 
         History:
-          - Plan 03 (Phase 148): PLACEHOLDER 0.35 shipped initially.
-          - Plan 04 (Phase 148): grid search dropped to 0.0 per CD-03
+          - Plan 03 (a phase): PLACEHOLDER 0.35 shipped initially.
+          - Plan 04 (a phase): grid search dropped to 0.0 per
             (ParentCorrectnessScorer short-circuits to 0.5 with no reference).
-          - Phase 148 D-12: locked weight at 0.00 pending Phase 149 / IM-11.
-          - **Phase 148.2 (2026-04-24, per STATE.md "Phase 148.2 | PC=0.35
+          - a phase: locked weight at 0.00 pending a phase /.
+          - **a phase (2026-04-24, per STATE.md "a phase | PC=0.35
             INTERIOR"):** calibration boundary extended; PC=0.35 chosen as
-            an interior-of-grid value; Phase 149 cumulative G3 G2 HARD CLEAN
+            an interior-of-grid value; a phase cumulative G3 G2 HARD CLEAN
             preserved.
 
-        Live invariant locked at 0.35 since Phase 148.2 boundary extension.
-        Phase 157 cleanup rebaselines test expectation from the stale 0.0
-        (Phase 148 D-12 era) to the post-148.2 production value 0.35 — zero
+        Live invariant locked at 0.35 since a phase boundary extension.
+        a phase cleanup rebaselines test expectation from the stale 0.0
+        (a phase era) to the post-148.2 production value 0.35 — zero
         code change to `coverage_scoring.py`; only the test assertion updated
         to track the shipped weight.
         """
@@ -183,7 +183,7 @@ class TestV17V18DictShape:
         """Plan 03 placeholder for multiple_bond_count weight is > 0.
 
         Plan 06 drops the factor entirely if grid search converges to 0 per
-        D-20. Until then, the placeholder must be non-zero so the factor
+        . Until then, the placeholder must be non-zero so the factor
         actually contributes to V18 weighted sums.
         """
         from orthonym.assembly.coverage_scoring import FACTOR_WEIGHTS_V18
@@ -191,7 +191,7 @@ class TestV17V18DictShape:
 
 
 class TestRollbackOneLiner:
-    """D-08: rollback one-liner must produce sensible output.
+    """: rollback one-liner must produce sensible output.
 
     Runs under a subprocess so the V17-mode interpreter state doesn't
     contaminate other tests in the suite.

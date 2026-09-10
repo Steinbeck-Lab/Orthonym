@@ -1,15 +1,15 @@
-"""P-14.3.4.5 at PARENT scope -- Phase C Task 5b.
+""" at PARENT scope -- Phase C Task 5b.
 
 Governing rule chain, verbatim from ``the Blue Book Blue Book`` with headings.
 
-``P-14.3.3`` "Citation of locants" (``:2869``) is the **DENY-DEFAULT** --
+```` "Citation of locants" (``:2869``) is the **DENY-DEFAULT** --
 
     "In preferred IUPAC names, if any locants are essential for defining the structure
      of the parent structure or of a unit of structure as defined by its appropriate
      enclosing marks, then all locants must be cited for the parent structure or that
      structural unit."
 
-``P-14.3.4.5`` (``:3007``), under ``P-14.3.4`` "Omission of locants", grants the
+```` (``:3007``), under ```` "Omission of locants", grants the
 licence --
 
     "All locants are omitted in compounds or substituent groups in which all
@@ -40,7 +40,7 @@ amide N-H(2H)**; an amide N-H is neither a chalcogen H nor a formyl H, so it cou
 is unsubstituted, the substitution is *partial*, and ``:3009`` restores every locant.
 That an amide N-H is substitutable is proven independently by ``:2889``
 ``N1,N3-dimethylpropanediamide (PIN)``. A wiring that moves the amide row has
-implemented "fluorines everywhere => drop locants", not P-14.3.4.5.
+implemented "fluorines everywhere => drop locants", not.
 
 THE CLASS IS OPEN. ``:3009`` retires the ``per-`` contraction, which *was* exactly a
 closed-list mechanism, and the 2013 recommendations replaced it with counting. ``:3017``
@@ -51,7 +51,7 @@ acid`` below are DERIVED from the predicate, not verbatim rows. A table keyed on
 spelling would be wrong on its complement by construction.
 
 MEASURED CODE PATH (call-trace validated on 2 known positives -- ``chloropropanedioic
-acid`` and ``chlorobutanedioic acid``, whose P-14.3.4.3 sibling licence is wired at the
+acid`` and ``chlorobutanedioic acid``, whose sibling licence is wired at the
 same site -- and 2 known negatives, ``ethanol`` and ``benzene``, which record ZERO
 calls at EVERY candidate site):
   * LIVE: ``handlers/_handler_shared._assemble_fragments``, 1 call, productive (its
@@ -254,7 +254,7 @@ class TestAmideNitrogenHydrogenIsSubstitutable:
         # ``:2889`` proves the N-H substitutable; this row must stay put.
         ("CNC(=O)CC(=O)NC", "N1,N3-dimethylpropanediamide"),
         # ⚠ urea is the ONE member here that OMITS: its four N-H are a single orbit
-        # (one kind of substitutable H), so P-14.3.4.3 (:2943 `methylurea (PIN)`)
+        # (one kind of substitutable H), so (:2943 `methylurea (PIN)`)
         # fires -- unlike the diamides above, whose C-H + N-H give two kinds.
         ("CNC(=O)N", "methylurea"),
     ])
@@ -271,7 +271,7 @@ class TestAmideNitrogenHydrogenIsSubstitutable:
         "NC(=N)C(F)(F)C(F)(F)F",
     ])
     def test_the_gold_row_amidine_keeps(self, namer, smiles):
-        """Gold row ``D8-AMIDINE-LOCANT`` (P-66.4.1): 5 of 8 substitutable H, because
+        """Gold row ``D8-AMIDINE-LOCANT``: 5 of 8 substitutable H, because
         the three amidine N-H are unsubstituted => partial => ``:3009`` retains."""
         assert namer.name(smiles) == "2,2,3,3,3-pentafluoropropanimidamide"
 
@@ -325,9 +325,9 @@ class TestPartialSubstitutionRetains:
 # --------------------------------------------------------------------------- #
 class TestUniformity:
     def test_the_29619_failure_mode(self, namer):
-        """``:29619`` is the Blue Book CITING P-14.3.4.5 to explain a NEGATIVE:
+        """``:29619`` is the Blue Book CITING to explain a NEGATIVE:
         ``...-pentadecafluorooctan-1-one (PIN, the locants for the fluoro substituents
-        are required, see P-14.3.4.5)``. Every carbon there has zero hydrogens, but C1
+        are required, see ``. Every carbon there has zero hydrogens, but C1
         is substituted by something that is NOT fluorine.
 
         Same shape here: the chain is exhausted, but not "in the same way".
@@ -352,7 +352,7 @@ class TestUniformity:
 
 
 # --------------------------------------------------------------------------- #
-# 5. P-14.3.3 -- another cited locant in the scope restores them all #
+# 5. -- another cited locant in the scope restores them all #
 # --------------------------------------------------------------------------- #
 class TestOtherCitedLocantsRestoreEverything:
     def test_a_cited_suffix_locant_keeps_a_COMPLETELY_substituted_chain(self, namer):
@@ -361,7 +361,7 @@ class TestOtherCitedLocantsRestoreEverything:
         anyway.
 
         ``propan-1-ol``'s ``1`` is essential (it distinguishes propan-2-ol), so
-        P-14.3.3's *"then all locants must be cited"* restores the prefix locants.
+        's *"then all locants must be cited"* restores the prefix locants.
         """
         assert namer.name("FC(F)(F)C(F)(F)C(F)(F)O") == \
             "1,1,2,2,3,3,3-heptafluoropropan-1-ol"
@@ -383,10 +383,10 @@ class TestOtherCitedLocantsRestoreEverything:
 
     def test_an_unsaturation_locant_in_the_parent_keeps(self, namer):
         """RECORDED BOUNDARY, taken on the deny-by-default side. Ethene's own name
-        cites no locant (``P-14.3.4.2(d)`` omits it for unsubstituted dinuclear
+        cites no locant (``(d)`` omits it for unsubstituted dinuclear
         alkenes), so the elided ``tetrafluoroethene`` is arguably licensed -- but the
         Blue Book prints no example either way, and the parent fragment DOES carry an
-        unsaturation locant, so P-14.3.3 is applied."""
+        unsaturation locant, so is applied."""
         assert namer.name("FC(F)=C(F)F") == "1,1,2,2-tetrafluoroethene"
 
     def test_a_stereodescriptor_in_the_scope_denies(self):
@@ -409,30 +409,30 @@ class TestOtherCitedLocantsRestoreEverything:
 
 
 # --------------------------------------------------------------------------- #
-# 6. ★ The two AMBIENT P-14.3.3 scopes (P-82.6.1.1) #
+# 6. ★ The two AMBIENT scopes #
 # --------------------------------------------------------------------------- #
 class TestAmbientScopes:
     def test_an_isotopic_label_keeps_every_locant_end_to_end(self, namer):
-        """★ **P-82.6.1.1** (``:44180``): "In preferred IUPAC names, locants are
+        """★ **** (``:44180``): "In preferred IUPAC names, locants are
         omitted if no locants are necessary in unmodified names. However, if isotopic
         modification requires a locant to specify its position, then all locants must
         be specified and none are omitted."
 
         The two propanoic-acid carbons C2/C3 are inequivalent, so the ``(2-13C)``
         position must be stated -- and then every locant in the scope must be.
-        (The count subscript is omitted per P-82.2.1, FIX-A: a carbon position
+        (The count subscript is omitted per, FIX-A: a carbon position
         holds one carbon.)
         """
         assert namer.name("FC(F)(F)[13C](F)(F)C(=O)O") == \
             "2,2,3,3,3-pentafluoro(2-13C)propanoic acid"
 
     def test_the_WEAKER_declaration_is_the_one_that_fires(self):
-        """★ MEASURED, and it is why ``locants_are_forced()`` alone is insufficient.
+        """★ MEASURED, and it is why ``locants_are_forced`` alone is insufficient.
 
         ``rules/isotopes.py`` strips the labels before naming and enters
         ``forced_locant_scope`` only CONDITIONALLY, so at the live site the labelled
-        acid above presents with ``locants_are_forced() == False`` and every
-        ``GetIsotope()`` reading 0 -- BOTH structural signals negative. Only the
+        acid above presents with ``locants_are_forced == False`` and every
+        ``GetIsotope`` reading 0 -- BOTH structural signals negative. Only the
         unconditional ``isotopic_naming_scope`` denies. Asserted here directly so a
         future refactor that drops the weaker consult fails.
         """
@@ -453,9 +453,9 @@ class TestAmbientScopes:
         # Task 5a's isotope witness, substituent scope -- must stay fixed.
         ("FC(F)(F)[13C](F)(F)C1CCCCC1",
          "(1,1,2,2,2-pentafluoro(13C)ethyl)cyclohexane"),
-        # P-82.6.1.3 (``:44202``) ``(2H6)benzene (PIN)``: when every candidate
+        # (``:44202``) ``(2H6)benzene (PIN)``: when every candidate
         # position is ONE orbit no locant is needed, so these keep their omission.
-        # The count subscript is omitted per P-82.2.1 (FIX-A: a carbon position
+        # The count subscript is omitted per (FIX-A: a carbon position
         # holds one carbon); the locant behaviour under test is unchanged.
         ("Cc1c(C)c(C)c(C)c(C)[13c]1C", "hexamethyl(13C)benzene"),
         ("Oc1c(O)c(O)c(O)c(O)[13c]1O", "(13C)benzenehexol"),
@@ -472,7 +472,7 @@ class TestAmbientScopes:
 class TestTheScopeBoundaryMustBeTheWholeMolecule:
     """★ INVARIANT 11 FIRED HERE during implementation, and this is the whole story.
 
-    ``P-14.3.3`` scopes citation to a unit *"as defined by its appropriate enclosing
+    ```` scopes citation to a unit *"as defined by its appropriate enclosing
     marks"*. For ``F(CF2)7-CO-N(piperidine)`` the decomposition engine cuts the acyl
     bond, CAPS the fragment as the free acid, and asks for a whole-molecule name of
     ``pentadecafluorooctanoic acid`` -- for which this licence genuinely fires, 15 of 15
@@ -480,7 +480,7 @@ class TestTheScopeBoundaryMustBeTheWholeMolecule:
     cites ``N``, an essential letter locant, so every locant must be cited.
 
     ``:29619`` says exactly that about this molecule: *"(PIN, the locants for the fluoro
-    substituents are required, see P-14.3.4.5)"* -- the Blue Book citing the very rule
+    substituents are required, see "* -- the Blue Book citing the very rule
     being implemented, to explain a NEGATIVE. Before the guard, the licence emitted
     ``N-pentadecafluorooctanoylpiperidine``.
     """
@@ -593,7 +593,7 @@ class TestScopePreconditions:
         SURVIVES because it is unreachable: no heteroatom-chain parent reaches this
         handler at all. Recorded as a measurement so that the day one does, the boundary
         is revisited rather than silently crossed -- ``hexafluorodisilane`` WOULD be
-        licensed by P-14.3.4.5, but the hydrogen count would have to be re-derived for a
+        licensed by, but the hydrogen count would have to be re-derived for a
         chain whose atoms are not all tetravalent.
 
         ⚠ The end-to-end half asserts ``is_refusal_sentinel``, NOT a sentinel STRING:
@@ -738,7 +738,7 @@ class TestPhaseCTripwires:
         ("OC(=O)C1CCCCC1", "cyclohexanecarboxylic acid"),
         ("[O-]C(=O)CN", "glycinate"),
         ("CCO", "ethanol"),
-        # Blue Book P-14.3.4.5 worked examples that were ALREADY correct
+        # Blue Book worked examples that were ALREADY correct
         ("C1CCC2CCCCC2C1", "decahydronaphthalene"),
         ("FN(F)C(=O)N(F)F", "tetrafluorourea"),
     ])

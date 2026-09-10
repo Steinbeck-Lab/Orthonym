@@ -1,4 +1,4 @@
-"""v29 C4 -- the atom-coverage HONESTY contract.
+""" C4 -- the atom-coverage HONESTY contract.
 
 Project invariant, applied to atom coverage:
 
@@ -10,7 +10,7 @@ The defect these tests lock out: ``name_with_confidence('CC(C)(C)OOCCO')``
 dropped) and used to report ``confidence=1.0`` with
 ``factors['atom_coverage']=1.0`` and ``handler='direct'``, i.e. the PUBLIC API
 certified PERFECT atom coverage for a name that describes a third of the
-molecule. With a JRE the SELF-01 round-trip suppresses that name; without the
+molecule. With a JRE the round-trip suppresses that name; without the
 jar -- a supported mode -- it ships, and every Java-free defence failed.
 
 These tests do NOT assert that coverage is measured (it is not: see
@@ -195,7 +195,7 @@ def test_retained_name_boost_is_not_a_coverage_measurement():
 def test_atom_coverage_is_never_measured_in_the_production_path():
     """No production caller supplies parent_atom_indices -- so nothing is measured.
 
-    ``CandidatePool.add()`` withholds it deliberately ("Risk 1": passing it
+    ``CandidatePool.add`` withholds it deliberately ("Risk 1": passing it
     would change atom_coverage and break the byte-identical guarantee) and
     attaches it to the CandidateName POST-HOC instead. This test pins that
     fact so it cannot be forgotten while reading ``atom_coverage``.
@@ -253,7 +253,7 @@ def test_retained_name_boost_overrides_even_a_real_measurement():
 
     When the boost applies, it sets atom_coverage to 1.0 unconditionally --
     discarding a real measurement if one was supplied. It is a second,
-    independent way the number can overstate coverage, and it is why the D-01
+    independent way the number can overstate coverage, and it is why the
     gate excludes handler='retained_name'.
 
     The boost is itself size-limited (`is_core or (is_retained and
@@ -316,7 +316,7 @@ def test_empty_store_is_unverified_not_a_zero_verdict():
     assert rec['confidence'] is None, '0.0 is a fabricated FAIL'
     assert rec['verification'] == VERIFICATION_UNVERIFIED
     assert rec['factors'] == {}
-    # Preserved on purpose: the name() quality gates use handler != 'unknown'
+    # Preserved on purpose: the name quality gates use handler != 'unknown'
     # as their "was anything scored?" guard, and the store's never-written
     # state is exactly that.
     assert rec['handler'] == 'unknown'
@@ -360,10 +360,10 @@ def test_calibration_script_does_not_fabricate_factor_records():
     text = (SCRIPTS / 'calibrate_coverage_gate.py').read_text()
     # The fabricated literal block is gone...
     assert "'handler': 'direct'," not in text
-    # ...replaced by explicit exclusion of unmeasured records...
+    #...replaced by explicit exclusion of unmeasured records...
     assert "result.get('verification') == 'unverified'" in text
     assert 'n_unmeasured += 1' in text
-    # ...and a refusal floor that is actually COMPARED, not merely defined.
+    #...and a refusal floor that is actually COMPARED, not merely defined.
     # (Asserting only that the constant name appears would pass even if the
     # comparison were deleted -- that weakness was found by mutation M9.)
     assert 'MIN_CALIBRATION_POPULATION = ' in text

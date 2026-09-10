@@ -2,12 +2,12 @@
 
 A substituted N-aryl ring is cited as `N-(2-chlorophenyl)` (via the shared
 decorated-ring core namer), promoting the current benzene ring to the retained
-`aniline` parent (P-62.2.1.1 / P-45.5). The symmetric case isolates the builder
+`aniline` parent /. The symmetric case isolates the builder
 from the parent choice and anchors determinism.
 
 Also: the azanediyl MULTIPLICATIVE name must NOT win when the amine bridges two
 prefix-only carbocycles — the amine is then the principal characteristic group,
-so the substitutive aniline is the PIN (BlueBookV2.md P-62.2.1.1).
+so the substitutive aniline is the PIN (the Blue Book.
 """
 import orthonym
 from rdkit import Chem

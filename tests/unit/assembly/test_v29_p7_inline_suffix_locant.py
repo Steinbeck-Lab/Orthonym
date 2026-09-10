@@ -1,14 +1,14 @@
 # tests/unit/assembly/test_v29_p7_inline_suffix_locant.py
-"""v29 P7 Task 5: an inline suffix locant designates the atom it CONVERTS.
+""" Task 5: an inline suffix locant designates the atom it CONVERTS.
 
-P-64.2.2.2 "Cyclic ketones" (BlueBookV2/BlueBookV2.md:28384 heading; sentence
-at :28386) -- "As the formation of ketones is achieved by the conversion of a
+ "Cyclic ketones" (the Blue Book Blue Book heading; sentence
+at:28386) -- "As the formation of ketones is achieved by the conversion of a
 methylene, >CH2, group into a >C=O group, the suffix 'one' with appropriate
 locants can be added to the name of parent hydrides having such groups."
 
 The shipped ketone SMARTS is ``[#6][CX3](=O)[#6]``
 (perception/functional_groups.py:342), so a match carries BOTH flanking
-carbons.  The general engine used to take ``min()`` over every match atom on
+carbons. The general engine used to take ``min`` over every match atom on
 the parent, which cited a NEIGHBOUR of the carbonyl carbon.
 """
 import pytest
@@ -50,7 +50,7 @@ class TestInlineSuffixLocantHelper:
         assert len(match) == 4
         parent = {0, 1, 3}                            # the three carbons
         a2l = {0: 1, 1: 2, 3: 3}
-        # min() over the whole match would give 1 (a flanking carbon).
+        # min over the whole match would give 1 (a flanking carbon).
         assert _inline_suffix_locant("ketone", match, parent, a2l) == 2
 
     def test_returns_none_when_characteristic_atom_is_off_parent(self):
@@ -105,7 +105,7 @@ class TestRingSuffixLocant:
 
 class TestOffChainCarbonylFailsClosed:
     def test_general_chain_engine_names_acyl_off_chain_completely(self):
-        """C2-2, v31 change-asserted-value: an acetyl off the chosen chain must
+        """C2-2, change-asserted-value: an acetyl off the chosen chain must
         never become a bare '-one' suffix that DROPS the acyl carbon+methyl (the
         old C19 name for a C21 molecule). The general chain engine used to
         fail-closed (return None) on this shape; it now names the WHOLE molecule

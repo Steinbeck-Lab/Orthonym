@@ -1,4 +1,4 @@
-"""v30 sub-lever A: S-rooted thioether substituent with a RING-bearing R.
+""" sub-lever A: S-rooted thioether substituent with a RING-bearing R.
 
 The chalcogen-rooted sulfanyl cascade tier declines a saturated-ring / ring-on-chain
 R, so -S-cyclohexyl / -S-CH2Ar fell through to the ugly replacement name. Under the
@@ -7,7 +7,7 @@ O-rooted alkoxy (cyclohexyloxy) and N-rooted amino (cyclohexylamino) ring paths.
 Gate-independent probe re-anchor rejects a yl-less ring-assembly R (the ed52fa98 /
 8afa533c F1 class).
 
-v33 Phase 6 Task 10 (E2a, DROP-24 ring-branch ownership) GRADUATED this from
+ a phase Task 10 (E2a, ring-branch ownership) GRADUATED this from
 best-effort-only to the PIN default too: `name_substituent_fragment`'s Step 1b
 (chalcogen-ether substituent, `assembly/substituent_naming.py`) was widened from
 ``('Se', 'Te')`` to include plain ``'S'``, so a direct ``-S-Ar``/``-S-cycloalkyl``
@@ -83,7 +83,7 @@ def test_best_effort_names_s_rooted_ring_sulfanyl(mol_smi, expected):
 
 @pytest.mark.parametrize("mol_smi,expected", BEST_EFFORT)
 def test_pin_default_byte_identical(mol_smi, expected):
-    # v33 Phase 6 Task 10: PIN default now matches best-effort byte-for-byte
+    # a phase Task 10: PIN default now matches best-effort byte-for-byte
     # -- the ring-branch-ownership fix lives in `name_substituent_fragment`
     # itself (Step 1b, gate-agnostic), so `allow_mancude` no longer changes
     # the answer for this shape. See the module docstring for the full
@@ -95,7 +95,7 @@ def test_pin_default_byte_identical(mol_smi, expected):
 # A ring-ASSEMBLY-bearing R (-CH2-[1,1'-biphenyl]-4-yl) is named as the proper
 # `([1,1'-biphenyl]-4-yl)methyl` (WITH the free-valence -yl), so its -S- form
 # `[([1,1'-biphenyl]-4-yl)methyl]sulfanyl` ROUND-TRIPS and the probe re-anchor
-# accepts it. (v30 tail: the re-anchor previously rejected EVERY ring R because
+# accepts it. (tail: the re-anchor previously rejected EVERY ring R because
 # the probe thioether was built with a trivalent `C[SH]...` sulfur -- the S-parent
 # bond was cut and RDKit filled the freed valence with an H, so no divalent-S
 # name could ever match. The probe now detaches the parent bond first, giving a
@@ -111,7 +111,7 @@ def test_ring_assembly_R_names_when_it_round_trips():
             == "[([1,1'-biphenyl]-4-yl)methyl]sulfanyl")
 
 
-# --- v30 tail #23: the -S-X sulfenyl-halide substituent -> {halo}sulfanyl. ---
+# --- tail #23: the -S-X sulfenyl-halide substituent -> {halo}sulfanyl. ---
 # Tier 1.97 named -S-R only when the S continuation was carbon; a halogen fell
 # through, so decalin-SCl abstained. Extend to a terminal-halogen continuation.
 def _schalide_frag(mol_smi):

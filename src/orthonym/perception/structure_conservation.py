@@ -3,10 +3,10 @@ certificate" from the cross-tool audit).
 
 Java-free, source-level structural checks that close leaks where the winning
 naming path emits a name for a DIFFERENT molecule than the input (atom-drop,
-charge-drop) and only OPSIN's SELF-01 constitutional gate
+charge-drop) and only OPSIN's constitutional gate
 (``namer._final_opsin_validity_gate`` / ``_self_consistency_decision``) would
-otherwise have caught it. SELF-01 FAILS OPEN when no JAR is present
-(``_validity_gate_jar_present()`` returns False), so in a no-Java deployment
+otherwise have caught it. FAILS OPEN when no JAR is present
+(``_validity_gate_jar_present`` returns False), so in a no-Java deployment
 these leaks ship as confidently-wrong names. The functions here are called
 UNCONDITIONALLY from ``namer.py::Orthonym._name_impl`` -- i.e. NOT gated by
 ``self._disable_opsin_validity_gate`` -- so they protect the raw path too.
@@ -37,14 +37,14 @@ def input_invariants(mol: Chem.Mol) -> Tuple[int, int, int]:
 
     Returns ``(heavy_atom_count, dou, bond_order_sum)``:
 
-    - ``heavy_atom_count``: ``mol.GetNumHeavyAtoms()`` (authoritative).
+    - ``heavy_atom_count``: ``mol.GetNumHeavyAtoms`` (authoritative).
     - ``dou``: rings + sum(bond_order - 1) over heavy-heavy bonds. A pure
       GRAPH invariant, deliberately NOT the classical H-count
       degree-of-unsaturation formula (which conflates formal charges/
       radicals and would misfire on ions/radicals). Using the SUM of
       (order - 1) rather than a discrete count of "multiple bonds" is what
       makes this exact for aromatic rings too: RDKit reports an aromatic
-      bond's order as 1.5 (``GetBondTypeAsDouble()``), so each contributes
+      bond's order as 1.5 (``GetBondTypeAsDouble``), so each contributes
       0.5 -- benzene's 6 aromatic C-C bonds contribute 6*0.5=3, plus 1 ring,
       for the expected DoU of 4 (matching the Kekule double-bond count).
     - ``bond_order_sum``: rounded sum of heavy-heavy bond orders -- a coarse
@@ -115,7 +115,7 @@ def net_formal_charge(mol: Chem.Mol) -> int:
 # phosphanuide, silylium, phosphanium,...) always carries its ionic suffix,
 # so guard 1 already spares it even though its centre is in-scope -- the two
 # guards together fire ONLY on a genuine main-group charge drop.
-# B3: added 'ite' (P-72.2.2/P-65.3.1's OTHER acid-anion suffix pair,
+# B3: added 'ite' /'s OTHER acid-anion suffix pair,
 # '-ous acid' -> '-ite', sibling to '-ic acid' -> '-ate' -- chlorite,
 # nitrite, sulfite, phosphite, hypochlorite,...). Missing it meant a
 # genuinely-ionic HALOGEN-centred retained name ending in '-ite' (chlorite,
@@ -139,7 +139,7 @@ _HALOGENS = frozenset({9, 17, 35, 53, 85})  # F, Cl, Br, I, At
 
 def looks_like_ionic_name(name: str) -> bool:
     """Coarse recognizer: does ``name`` textually encode ionic character via
-    a recognised P-72/P-73 charge suffix?
+    a recognised / charge suffix?
 
     Deliberately LENIENT (broad match), because a false NEGATIVE here (a
     correctly-charged name this regex fails to recognise) only means a leak
@@ -240,7 +240,7 @@ def partial_sat_sp3_substituent_drop(mol: Chem.Mol, name: str) -> bool:
     The hand-off that premise described was itself the defect. It derived a
     SECOND numbering (placing tetralin's 2-methyl at locant 1) and it split one
     substituent set across two prefix formatters (``2-methyl-6-methyl-`` where
-    P-16.3.3 requires ``2,6-dimethyl-``). Both faults are fixed by making the
+     requires ``2,6-dimethyl-``). Both faults are fixed by making the
     producer the single speller of every ring substituent prefix, so ``bare``
     NOW encodes sp3-ring substituents, and the old test would false-veto every
     correct name in the class.
@@ -272,7 +272,7 @@ def partial_sat_sp3_substituent_drop(mol: Chem.Mol, name: str) -> bool:
     catching the 3 documented target leaks plus 2 additional real-corpus
     leaks the narrower check newly surfaced.
 
-    IUPAC cite: P-25.3.1 / P-58.2.2.3 (partially saturated carbocycles;
+    IUPAC cite: / (partially saturated carbocycles;
     detachable-prefix placement); mirrors the existing R12 fusion-atom veto
     inside ``name_partially_saturated_carbocycle`` itself (ring-FUSION atom
     substituents), which this function does NOT duplicate (that path already

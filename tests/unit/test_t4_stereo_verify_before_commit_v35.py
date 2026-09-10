@@ -1,10 +1,10 @@
-"""v35 Track A #2: verify-before-commit in the T4 best-effort cascade.
+""" Track A #2: verify-before-commit in the best-effort cascade.
 
 `_best_effort_candidate` rung 0 (`_run_general_e1`) is E1-complete but
 STEREO-BLIND -- it proves atom coverage, not stereo. For a molecule with
 defined stereo it can emit a stereo-OMITTED name that E1-passes and so
 short-circuits the cascade at `return candidate`, never reaching the final
-`name_universal_substitutive` rung whose v35 branch-stereo produces a
+`name_universal_substitutive` rung whose branch-stereo produces a
 FULL-InChIKey-round-tripping name. The stereo-blind name then wins the whole
 pipeline (it full-RT-FAILS, but so does every other offer, so the pool falls
 back to it) -- shadowing the correct floor name.

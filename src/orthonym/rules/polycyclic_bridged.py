@@ -6,7 +6,7 @@ Handles classification and analysis of bridged polycyclic systems beyond simple 
 - Tetracyclo (4 rings)
 - Pentacyclo+ (5+ rings)
 
-IUPAC Reference: Blue Book 2013, P-23.3 (Tricyclic and polycyclic ring systems)
+IUPAC Reference: Blue Book 2013, (Tricyclic and polycyclic ring systems)
 
 The von Baeyer system uses:
 - Prefix: bicyclo-, tricyclo-, tetracyclo-, etc.
@@ -64,10 +64,10 @@ def get_ring_count(mol) -> int:
         Number of rings (cycle rank)
         
     Examples:
-        >>> mol = Chem.MolFromSmiles('C1CC2CCC1C2')  # norbornane
+        >>> mol = Chem.MolFromSmiles('C1CC2CCC1C2') # norbornane
         >>> get_ring_count(mol)
         2
-        >>> mol = Chem.MolFromSmiles('C1C2CC3CC1CC(C2)C3')  # adamantane
+        >>> mol = Chem.MolFromSmiles('C1C2CC3CC1CC(C2)C3') # adamantane
         >>> get_ring_count(mol)
         3
     """
@@ -129,10 +129,10 @@ def classify_bridged_system(mol) -> Optional[str]:
         Classification string, or None if not a bridged polycyclic
         
     Examples:
-        >>> mol = Chem.MolFromSmiles('C1CC2CCC1C2')  # norbornane
+        >>> mol = Chem.MolFromSmiles('C1CC2CCC1C2') # norbornane
         >>> classify_bridged_system(mol)
         'bicyclo'
-        >>> mol = Chem.MolFromSmiles('C1C2CC3CC1CC(C2)C3')  # adamantane
+        >>> mol = Chem.MolFromSmiles('C1C2CC3CC1CC(C2)C3') # adamantane
         >>> classify_bridged_system(mol)
         'tricyclo'
     """
@@ -147,7 +147,7 @@ def classify_bridged_system(mol) -> Optional[str]:
         return None
 
     # Sibling of ``polycyclic.py:_build_descriptor``: the ring-count word is one
-    # rule (P-23.1.9), so it has one implementation. The local table this
+    # rule, so it has one implementation. The local table this
     # replaced stopped at 10 and then fell through to ``f'{ring_count}cyclo'``,
     # so an 11-ring system was classified as the non-word ``'11cyclo'``.
     # ``None`` (this function's existing fail-closed channel, already returned
@@ -168,7 +168,7 @@ def is_tricyclo_system(mol) -> bool:
         True if molecule has exactly 3 rings in bridged configuration
         
     Examples:
-        >>> mol = Chem.MolFromSmiles('C1C2CC3CC1CC(C2)C3')  # adamantane
+        >>> mol = Chem.MolFromSmiles('C1C2CC3CC1CC(C2)C3') # adamantane
         >>> is_tricyclo_system(mol)
         True
     """
@@ -224,14 +224,14 @@ def find_all_bridgeheads(mol) -> Set[int]:
         Set of atom indices that are bridgeheads
         
     Examples:
-        >>> mol = Chem.MolFromSmiles('C1CC2CCC1C2')  # norbornane
+        >>> mol = Chem.MolFromSmiles('C1CC2CCC1C2') # norbornane
         >>> len(find_all_bridgeheads(mol))
         2
-        >>> mol = Chem.MolFromSmiles('C1C2CC3CC1CC(C2)C3')  # adamantane
-        >>> len(find_all_bridgeheads(mol))  
+        >>> mol = Chem.MolFromSmiles('C1C2CC3CC1CC(C2)C3') # adamantane
+        >>> len(find_all_bridgeheads(mol))
         4
     """
-    # SUB-02/D-08: delegate to the SINGLE consolidated predicate. The former
+    # /: delegate to the SINGLE consolidated predicate. The former
     # body's extra filters (atom_ring_count>=2, total-neighbours>=3) are
     # redundant given ring_neighbours>=3 (an atom with >=3 ring neighbours is
     # necessarily in >=2 rings and has >=3 total neighbours), so this is a
@@ -446,7 +446,7 @@ def analyze_polycyclic_system(mol) -> Optional[PolycyclicInfo]:
         PolycyclicInfo namedtuple or None if not a valid polycyclic
         
     Examples:
-        >>> mol = Chem.MolFromSmiles('C1C2CC3CC1CC(C2)C3')  # adamantane
+        >>> mol = Chem.MolFromSmiles('C1C2CC3CC1CC(C2)C3') # adamantane
         >>> info = analyze_polycyclic_system(mol)
         >>> info.system_type
         'tricyclo'
@@ -529,9 +529,9 @@ def get_heteroatom_prefix(symbol: str) -> Optional[str]:
 
     Why there is no fallback
     -----------------------
-    This function used to end ``return prefixes.get(symbol, symbol.lower()+'a')``
+    This function used to end ``return prefixes.get(symbol, symbol.lower+'a')``
     over a local 7-entry dict, i.e. it *generated* a prefix for every element it
-    did not know. The Blue Book's 'a'-prefix set is a CLOSED list (P-15.4.1.1:
+    did not know. The Blue Book's 'a'-prefix set is a CLOSED list:
     "Those related to these recommendations are listed in Table 1.5"), not a
     derivation rule, so a generated prefix is fabricated nomenclature. It is not
     even close for the elements that matter: the fallback spelled ``asa``,
@@ -554,10 +554,10 @@ def get_heteroatom_prefix(symbol: str) -> Optional[str]:
     Do not merge the two.
 
     Args:
-        symbol: Element symbol (O, N, S, ...)
+        symbol: Element symbol (O, N, S,...)
 
     Returns:
-        The IUPAC replacement prefix (oxa, aza, thia, ...), or ``None`` when the
+        The IUPAC replacement prefix (oxa, aza, thia,...), or ``None`` when the
         element is off-table and the caller must refuse.
     """
     from .ring_replacement import HETEROATOM_PREFIXES

@@ -1,4 +1,4 @@
-"""v30 breadth — peptides with PROLINE (or any cyclic imino acid) as the AMINE
+""" breadth — peptides with PROLINE (or any cyclic imino acid) as the AMINE
 component of a peptide bond (X-Pro, X-Pro-Y).
 
 Root cause: the peptide-bond SMARTS `[CX3](=O)[NX3;H1][CX4]` required 1 H on the
@@ -9,7 +9,7 @@ TWO ring-carbon `[CX4]` neighbours, the SMARTS then matches the SAME C(=O)-N bon
 twice; the duplicate bond index crashed RDKit's FragmentOnBonds (segfault), so the
 pairs are deduplicated before cleaving. The existing `_is_alpha_carboxyl_bond` guard
 + standard-amino-acid residue identification keep non-peptide tertiary amides failing
-closed. 0-wrong holds (SELF-01 gates every emission).
+closed. 0-wrong holds (gates every emission).
 """
 import pytest
 

@@ -1,7 +1,7 @@
-"""v36 Milestone C3 — substituent/assembly gap on WORKING ring cores.
+""" Milestone C3 — substituent/assembly gap on WORKING ring cores.
 
-RED baseline + RT harness for the C3 witnesses (grounding spy
-``.planning/audit-v33/V36-SPY-C3.md``). The C3 charter is: name molecules
+RED baseline + RT harness for the C3 witnesses (grounding trace
+`internal notes`). The C3 charter is: name molecules
 whose ring system ALREADY names but which abstain because a ring-bearing
 SUBSTITUENT (or a spiro-linked partner ring) can't be rendered — by letting
 the working whole-molecule ring namer serve the substituent role too, all
@@ -10,11 +10,11 @@ OPSIN-round-trip-verified, ZERO ring-engine change (touch only ``assembly/``).
 ================================================================================
 MEASURED at the milestone tier (``general_fallback=True,
 general_fallback_unverified=True`` — the exact tier ``gen_ost_full.py`` used to
-build ``chebi_full_ost.jsonl``, from which the spy drew its 2,147 abstainers):
-the plan's Task-2 premise (a fail-closed DROP-24 guard in
+build ``chebi_full_ost.jsonl``, from which the trace drew its 2,147 abstainers):
+the plan's Task-2 premise (a fail-closed guard in
 ``assembly/substituent_naming.py`` is THE dominant decline site and re-anchoring
 the whole-molecule ring namer ahead of it closes the category-(a) witnesses)
-is OFF-PATH for every named flagship witness. This is CLAUDE.md invariant 8
+is OFF-PATH for every named flagship witness. This is CLAUDE.md a project rule
 ("the named choke point is off the path") holding again.
 
 The re-anchor mechanism the plan asks for ALREADY EXISTS and already works at the
@@ -23,13 +23,13 @@ allow_mancude=True)`` re-anchors von-Baeyer / spiro / fused / cage ring systems
 into the ``-yl`` substituent role (verified control: ``adamantyl_benzoic`` below
 names ``4-(adamantan-1-yl)benzoic acid`` at gfu). Step 1c already passes
 ``allow_mancude=best_effort_ctx``, which is True at the gfu milestone tier, so no
-DROP-24-rescue gap remains there.
+-rescue gap remains there.
 
 Per-witness VERIFIED root cause (why each abstains at gfu), and the engine that
-owns the real fix — NONE is a DROP-24 re-anchor gap in ``assembly/``:
+owns the real fix — NONE is a re-anchor gap in ``assembly/``:
 
   * estramustine — the steroid ESTER engine builds a near-correct candidate
-    ``(...)-17-hydroxyestr-1,3,5(10)-trien-3-yl pentanoate`` that SELF-01
+    ``(...)-17-hydroxyestr-1,3,5(10)-trien-3-yl pentanoate`` that
     suppresses for TWO bugs, both in ``rules/natural_products.py``
     (a scaffold engine, out of C3's assembly-only charter):
       (a) euphonic 'a' dropped: ``_assemble_np_ester_name`` concatenates
@@ -50,7 +50,7 @@ owns the real fix — NONE is a DROP-24 re-anchor gap in ``assembly/``:
     fixed.)
 
   * w0, w13 — the spiro ring engine DOES attach every FG (the candidate carries
-    ``diformyl``/``hydroxy``/``oxo``/etc. on the correct spiro core); SELF-01
+    ``diformyl``/``hydroxy``/``oxo``/etc. on the correct spiro core);
     suppresses it only because a stereodescriptor is OMITTED (the OPSIN
     round-trip SMILES is the RIGHT constitution with a dropped ``@``). This is
     stereo OMISSION, not a substituent gap and not a wrong molecule
@@ -60,14 +60,14 @@ owns the real fix — NONE is a DROP-24 re-anchor gap in ``assembly/``:
   * w16 — the composer picks the ketone 6-ring as parent and the spiro-attached
     naphtho-dioxole partner (16 atoms) is dropped; the candidate is
     ``8-hydroxy-3,4-dihydronaphthalen-1(2H)-one`` (the tetralone alone), which
-    SELF-01 correctly vetoes as an atom-drop → the molecule abstains (NO silent
-    wrong emission; 0-wrong already holds via SELF-01/atom-coverage). Naming it
+     correctly vetoes as an atom-drop → the molecule abstains (NO silent
+    wrong emission; 0-wrong already holds via /atom-coverage). Naming it
     requires routing the WHOLE spiro system through the complex_ring/spiro namer
     WITH a ketone principal group + phenol — a ring-engine capability no tier
     currently has. → RE-BUCKET to C1/C2 (ring program). The plan's Site-3 site
     (``composer.py`` ~:966-993) is only the ASSEMBLY_DISPATCH log line; the
     parent/substituent decision is upstream in perception
-    (``namer.py``'s NAMING_DECISION at :6414-6424).
+    (``namer.py``'s NAMING_DECISION at:6414-6424).
 
   * catb3 — genuine category-(b): two independently-nameable ring systems joined
     by an ester/carbamate linker. Overlaps C4's charter (see Task 6). Abstains
@@ -79,7 +79,7 @@ RT-verified TARGET names that flip to GREEN as the re-bucketed
 ring/scaffold-engine fixes land — actionable regression scaffolding for the
 re-plan, not dead code.
 
-UPDATE (v36-C3 Task 2', LANDED): the estramustine steroid-ester bugs were fixed
+UPDATE (-C3 Task 2', LANDED): the estramustine steroid-ester bugs were fixed
 in ``rules/natural_products.py`` — the ester acid word now routes through the
 GENERAL ester namer (carbamate named as ``N,N-bis(2-chloroethyl)carbamate``, no
 longer carbon-counted to ``pentanoate``) and the euphonic 'a' is restored
@@ -88,8 +88,8 @@ OPSIN-round-trip; see ``test_c3_estramustine_names_GREEN`` and
 ``test_c3_steroid_ester_class_names_and_round_trips`` below. w0/w13/w16 remain
 RED, re-bucketed to spiro-stereo / ring-program milestones.
 
-Regenerate the witness data in minutes via the spy's method
-(``.planning/audit-v33/V36-SPY-C3.md`` "Method").
+Regenerate the witness data in minutes via the trace's method
+(`internal notes` "Method").
 """
 import pytest
 
@@ -98,7 +98,7 @@ from orthonym.namer import name_compound
 from orthonym.validation.opsin_roundtrip import opsin_roundtrip_check
 
 
-# --- witnesses (spy representatives, spanning categories a / d / b) ----------
+# --- witnesses (trace representatives, spanning categories a / d / b) ----------
 ESTRAMUSTINE = (
     "C[C@]12CC[C@H]3[C@@H](CCc4cc(OC(=O)N(CCCl)CCCl)ccc34)[C@@H]1CC[C@@H]2O"
 )
@@ -116,7 +116,7 @@ CATB6 = "O=C1OC2(c3ccc(O)cc3Oc3cc(Oc4ccc(O)cc4)ccc32)c2ccccc21"
 C3_CATEGORY_B_WITNESSES = {"catb3": CATB3, "catb6": CATB6}
 
 # The category-(a)/(d) witnesses the plan's Task-2 was meant to close.
-# estramustine GRADUATED to GREEN (v36-C3 Task 2', see the steroid-ester tests
+# estramustine GRADUATED to GREEN (-C3 Task 2', see the steroid-ester tests
 # below) — it is named + round-trips today via the rules/natural_products.py
 # steroid-ester fix, so it is no longer part of the RED baseline. w0/w13/w16
 # remain RED, re-bucketed to spiro-stereo / ring-program milestones.
@@ -135,7 +135,7 @@ ADAMANTYL_BENZOIC = "OC(=O)c1ccc(cc1)C12CC3CC(CC(C3)C1)C2"
 
 def _c3_name(smiles: str) -> str:
     """Best-effort name at the C3 MILESTONE tier (the exact tier gen_ost_full.py
-    used to build the abstain corpus the spy sampled)."""
+    used to build the abstain corpus the trace sampled)."""
     return name_compound(
         smiles, general_fallback=True, general_fallback_unverified=True
     )
@@ -157,7 +157,7 @@ def _c3_rt(smiles: str):
 
 # --- RED baseline: no C3 target witness produces a 0-wrong name TODAY ---------
 # Definition of RED is gate-INDEPENDENT: OST produces no name that OPSIN-round-
-# trips. That is exactly the C3 gap, and it holds whether or not the SELF-01/
+# trips. That is exactly the C3 gap, and it holds whether or not the /
 # OPSIN naming gate is active in the test process (at the milestone tier the
 # gate suppresses the near-miss candidate → abstain; with the gate off the namer
 # emits a candidate that fails OPSIN-RT here — either way, no 0-wrong name).
@@ -178,8 +178,8 @@ def test_c3_reanchor_mechanism_already_works_at_milestone_tier():
     """The plan's Task-2 lever ('re-anchor the working ring namer into the
     substituent role') ALREADY EXISTS: a complex cage ring in the substituent
     role names + round-trips at the milestone tier via allow_mancude. This is
-    the evidence that a fresh DROP-24 re-anchor in assembly/ would be dead code
-    (CLAUDE.md invariant 17)."""
+    the evidence that a fresh re-anchor in assembly/ would be dead code
+    (CLAUDE.md a project rule)."""
     name, passed = _c3_rt(ADAMANTYL_BENZOIC)
     assert not is_failure_name(name), f"cage substituent regressed: {name!r}"
     assert passed, f"cage substituent no longer round-trips: {name!r}"
@@ -210,13 +210,13 @@ def test_c3_target_name_round_trips(key, smiles, target):
 
 
 def test_c3_estramustine_names_GREEN():
-    """v36-C3 Task 2' (GREEN): estramustine now names + OPSIN-round-trips via the
+    """-C3 Task 2' (GREEN): estramustine now names + OPSIN-round-trips via the
     two rules/natural_products.py steroid-ester fixes:
       (1) the ester ACID word is built by the GENERAL ester namer instead of
           naive carbon-counting, so the carbamate is 'N,N-bis(2-chloroethyl)-
           carbamate', NOT the wrong 'pentanoate' (a 5-carbon guess that dropped
           the N and both Cl → a different molecule);
-      (2) the euphonic 'a' is restored (IUPAC P-31.1.3.4) so the stem is
+      (2) the euphonic 'a' is restored (IUPAC so the stem is
           'estra-1,3,5(10)-trien', not the malformed 'estr-1,3,5(10)-trien'."""
     name, passed = _c3_rt(ESTRAMUSTINE)
     assert passed, f"estramustine did not name+round-trip: {name!r}"
@@ -230,11 +230,11 @@ def test_c3_estramustine_names_GREEN():
     )
 
 
-# --- v36-C3 Task 2': the steroid-ESTER CLASS names + round-trips ---------------
+# --- -C3 Task 2': the steroid-ESTER CLASS names + round-trips ---------------
 # Proves the fix is the CLASS (any steroid ester), not a per-molecule patch: a
 # steroid acetate, a simple acyl ester, and steroid carbamates all name + RT.
 # Includes both the single-ene stem (cholest-5-en-, NO euphonic 'a') and the
-# multi-ene stem (estra-1,3,5(10)-trien-, euphonic 'a') so the P-31.1.3.4 rule
+# multi-ene stem (estra-1,3,5(10)-trien-, euphonic 'a') so the rule
 # is exercised in both directions.
 C3_STEROID_ESTER_WITNESSES = {
     # 3-O-carbamate estradiol (the flagship): N,N-bis(2-chloroethyl)carbamate.

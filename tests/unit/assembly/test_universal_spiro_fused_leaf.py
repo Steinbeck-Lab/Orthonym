@@ -2,7 +2,7 @@
 universal core (`assembly/universal_substituent._name_ring_spine`).
 
 A spiro atom joining a FUSED ring component (indane / chromene / indoline /
-cyclopenta[b]pyridine...) to a second ring is a P-24.5.1 separable
+cyclopenta[b]pyridine...) to a second ring is a separable
 ``spiro[<fused-comp>-x,y'-<comp2>]`` system. Before this wiring the
 unconditional universal FLOOR VOIDED on such a ring system (neither a
 von-Baeyer cage nor a plain von-Baeyer spiro), so the whole decorated
@@ -13,7 +13,7 @@ pin (a) the no-abstain conversion, (b) that the primed ``_Locant`` tuple is
 rendered ``"5'"`` and never leaks ``(5, "'")`` into the name, and (c) that the
 governing helpers order/print primed locants correctly.
 
-Governing rule: IUPAC 2013 P-24.5.1 (spiro ring systems, separable form).
+Governing rule: IUPAC 2013 (spiro ring systems, separable form).
 """
 import pytest
 from rdkit import Chem
@@ -108,7 +108,7 @@ def test_floor_name_round_trips_to_input_constitution(smi, core_sub):
     )
 
 
-# --- (c)-aliphatic: spiro-of-von-Baeyer-bicyclic degrades to the P-24.5.1
+# --- (c)-aliphatic: spiro-of-von-Baeyer-bicyclic degrades to the
 # separable form spiro[bicyclo[...]-x,y'-<comp2>] (floor-only) ------------
 
 VONBAEYER_SPIRO = [
@@ -162,7 +162,7 @@ BOTH_SIDES_FUSED = [
 @pytest.mark.parametrize("core_smi,sub", BOTH_SIDES_FUSED)
 def test_both_sides_fused_monospiro_round_trips(core_smi, sub):
     """The both-sides-fused (c)-bucket: a spiro atom joining two fused/bridged
-    ring systems now names each side independently and joins the P-24.5.1
+    ring systems now names each side independently and joins the
     separable form (was None -> abstain), RT-correct to the CORE constitution."""
     from orthonym.rules.spiro import _name_general_monospiro_fused
     from orthonym.validation.opsin_roundtrip import opsin_parse
@@ -190,7 +190,7 @@ POLYSPIRO = [
 @pytest.mark.parametrize("core_smi,mult", POLYSPIRO)
 def test_linear_polyspiro_round_trips(core_smi, mult):
     """The polyspiro (c)-bucket with a POLYCYCLIC component: a linear
-    dispiro/trispiro chain assembles the P-24.4 separable form (was None ->
+    dispiro/trispiro chain assembles the separable form (was None ->
     abstain), RT-correct to the CORE."""
     from orthonym.rules.spiro import _name_linear_polyspiro_fused
     from orthonym.validation.opsin_roundtrip import opsin_parse

@@ -1,4 +1,4 @@
-"""v33 giants engine 1 — acyl-CoA / nucleotide-lipid re-rooted FG substituent walk.
+""" giants engine 1 — acyl-CoA / nucleotide-lipid re-rooted FG substituent walk.
 
 The interior amide / thioester / phosphate-ester bonds of a CoA spine used to route
 through ``parent_to_prefix`` and fail closed, collapsing the whole giant to
@@ -21,7 +21,7 @@ pytestmark = pytest.mark.opsin_gate
 
 _JAR = str(__import__("pathlib").Path(__file__).resolve().parents[3] / "opsin-cli-2.9.0-jar-with-dependencies.jar")
 
-# best-effort breadth tier (the documented v33 RT-full tier — name_general all-or-none).
+# best-effort breadth tier (the documented RT-full tier — name_general all-or-none).
 # 0-wrong is delivered by applying the OPSIN full-InChIKey RT gate to its output: a
 # candidate that does not round-trip is a non-conversion, never an accepted name.
 _BE = Orthonym(style="pin", general_fallback=True,

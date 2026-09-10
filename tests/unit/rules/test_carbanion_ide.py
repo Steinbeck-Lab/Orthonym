@@ -1,4 +1,4 @@
-"""Wave-0 RED unit suite for the carbanion ``-ide`` emitter (a phase WS-E.2).
+"""Wave-0 RED unit suite for the carbanion ``-ide`` emitter (a phase.2).
 
 These tests are written BEFORE the implementation (the Nyquist gate): they
 assert the IUPAC-2013 Preferred IUPAC Names (PINs) for carbanions and MUST FAIL
@@ -6,8 +6,8 @@ assert the IUPAC-2013 Preferred IUPAC Names (PINs) for carbanions and MUST FAIL
 GREEN as Plan 184-01 builds ``emit_parent_hydride_cumulative_suffix`` and wires
 it into the carbanion path.
 
-Decisions: 184-CONTEXT (new numbering call, P-72.2.2.1 lowest locant for
-the ``-ide`` centre competing with unsaturation/substituents per P-31/P-14.4)
+Decisions: 184-internal notes (new numbering call, lowest locant for
+the ``-ide`` centre competing with unsaturation/substituents per /
 and (the gold targets + the ``methanide`` subsumption equivalence anchor).
 
 Every assertion docstring cites the verbatim Blue Book P-number that governs it
@@ -16,10 +16,10 @@ Blue Book rule, with the citation in the test).
 
 Blue Book sources (the Blue Book Blue Book):
   - Table 3.4 (line 17597): anion, loss of H+ -> suffix ``-ide``.
-  - P-72.2.2.1 (lines 40900-40902): "locants identify positions of the negative
+  - (lines 40900-40902): "locants identify positions of the negative
     charges"; the ``-ide`` centre takes the lowest locant.
   - line 42517: ``propan-2-ide`` worked example.
-  - P-31.1.4: locant numbering; the suffix-type anion centre competes with the
+  -: locant numbering; the suffix-type anion centre competes with the
     double bond for the low locant.
 
 RED-by-design on HEAD (verified): ``CCC[CH-]CC`` -> ``hexane`` (charge dropped),
@@ -36,22 +36,22 @@ from orthonym.namer import Orthonym
 
 @pytest.mark.unit
 class TestCarbanionIde:
-    """WS-E.2 carbanion ``-ide`` PIN targets (). RED on HEAD by design."""
+    """.2 carbanion ``-ide`` PIN targets . RED on HEAD by design."""
 
     def test_hexan_3_ide(self):
-        """P-72.2.2.1: the carbanion centre takes the lowest locant over the
+        """: the carbanion centre takes the lowest locant over the
         re-found chain. CCC[CH-]CC is the hexan-3-ide carbanion (the negative
         carbon is C3; numbering from either end gives 3)."""
         assert Orthonym().name("CCC[CH-]CC") == "hexan-3-ide"
 
     def test_3_methylbutan_2_ide(self):
-        """P-72.2.2.1 + P-31: the ``-ide`` centre wins the low locant (C2) and
+        """ +: the ``-ide`` centre wins the low locant (C2) and
         the methyl substituent is numbered consistently (C3). CC(C)[CH-]C is
         3-methylbutan-2-ide."""
         assert Orthonym().name("CC(C)[CH-]C") == "3-methylbutan-2-ide"
 
     def test_propan_2_ide(self):
-        """BlueBookV2 line 42517: ``propan-2-ide`` is the worked example; the
+        """the Blue Book: ``propan-2-ide`` is the worked example; the
         carbanion on the central carbon of propane takes locant 2.
 
         SMILES CORRECTED in Plan 184-01 (root-cause, not band-aid): the Wave-0
@@ -68,7 +68,7 @@ class TestCarbanionIde:
         assert Orthonym().name("C[CH-]C") == "propan-2-ide"
 
     def test_2_methylbutan_2_ide(self):
-        """P-72.2.2.1: charge + methyl on the SAME carbon (). The SMILES
+        """: charge + methyl on the SAME carbon . The SMILES
         C[C-](C)CC is 2-methylbutan-2-ide: the anionic carbon bears a methyl and
         is part of a 4-carbon (butane) chain, charge at C2."""
         smi = "C[C-](C)CC"
@@ -86,7 +86,7 @@ class TestCarbanionIde:
         assert Orthonym().name(smi) == "2-methylbutan-2-ide"
 
     def test_but_3_en_2_ide(self):
-        """P-31.1.4: the suffix-type ``-ide`` centre is senior to the double bond
+        """: the suffix-type ``-ide`` centre is senior to the double bond
         for the low locant, and the ``-en`` ending precedes the cumulative
         ``-ide`` ending (Table 3.4). The carbanion at C2, double bond at C3 ->
         ``but-3-en-2-ide``.
@@ -105,21 +105,20 @@ class TestCarbanionIde:
     def test_methanide_subsumption_anchor(self):
         """ subsumption equivalence anchor (NOT RED): [CH3-] -> ``methanide``
         (single carbon, no locant). PASSES today via the retained-name lookup;
-        the new primitive must reproduce it byte-identically. BlueBookV2 line
-        41309: ``H3C- methanide (PIN)``."""
+        the new primitive must reproduce it byte-identically. the Blue Book: ``H3C- methanide (PIN)``."""
         assert Orthonym().name("[CH3-]") == "methanide"
 
     @pytest.mark.parametrize("smiles,expected", [
-        ("[CH-]1CCCCC1", "cyclohexanide"),   # ring-member centre; locant omitted P-14.3.4.2(c) the Blue Book
-        ("[CH-]1CCCC1", "cyclopentanide"),   # ring-member centre; locant omitted P-14.3.4.2(c) the Blue Book
+        ("[CH-]1CCCCC1", "cyclohexanide"),   # ring-member centre; locant omitted (c) the Blue Book
+        ("[CH-]1CCCC1", "cyclopentanide"),   # ring-member centre; locant omitted (c) the Blue Book
     ])
     def test_ring_member_carbanion_named_not_linearized(self, smiles, expected):
-        """F-T6 (DD3) UPDATE of the Phase-184 CR-01 guard. A RING-MEMBER carbanion
-        used to be DECLINED by the acyclic primitive (``center.IsInRing()`` bail)
+        """F- (DD3) UPDATE of the Phase-184 guard. A RING-MEMBER carbanion
+        used to be DECLINED by the acyclic primitive (``center.IsInRing`` bail)
         and fall through to legacy, DROPPING the charge (``cyclohexane``). F-T6
         added a ring branch to ``emit_parent_hydride_cumulative_suffix``
         (``_emit_ring_cumulative_suffix``) that names it with the ring ``-ide`` and
-        the cationic/anionic-centre locant: ``cyclohexan-1-ide``. The CR-01 intent
+        the cationic/anionic-centre locant: ``cyclohexan-1-ide``. The intent
         — the ring is NEVER linearized to an ACYCLIC chain (``hexan-1-ide``) — still
         holds: the emitter uses the ring numbering, not ``find_principal_chain``.
         The name is the cyclic stem, so it must start with ``cyclo`` and must NOT be
@@ -134,7 +133,7 @@ class TestCarbanionIde:
         "[CH-]C1CCCCC1",   # exocyclic centre adjacent to a ring
     ])
     def test_exocyclic_carbanion_not_linearized(self, smiles):
-        """CR-01 regression guard (a phase deep code review), still active for an
+        """ regression guard (a phase deep code review), still active for an
         EXOCYCLIC carbanion centre: the acyclic primitive must DECLINE when a ring
         would be absorbed into the returned chain (``[CH-]CC1CCCCC1`` -> the bogus
         acyclic ``octan-1-yl``), via the all-chain-atoms-acyclic guard, and fall

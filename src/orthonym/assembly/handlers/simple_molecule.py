@@ -1,11 +1,11 @@
-"""Phase 160 simple_molecule handler — LIFT (single-atom / very simple).
+"""a phase simple_molecule handler — LIFT (single-atom / very simple).
 
 Verbatim move of composer.py:1388-1392 dispatch logic. The underlying
 ``_name_simple_molecule`` body STAYS in composer.py during Plan-02 and
 moves to this module in Plan-03 commit 03-10 (composer.py thinning) per
-CONTEXT D-24 incremental migration.
+internal notes incremental migration.
 
-IUPAC cite: P-14 (simple molecules; noble gases / single-atom symbols).
+IUPAC cite: (simple molecules; noble gases / single-atom symbols).
 
 Byte-identical contract: the predicate matches molecules with neither a
 principal chain nor a ring system (atoms / noble gases / very simple
@@ -16,7 +16,7 @@ does NOT change behavior — the molecule routes identically.
 References:
 - composer.py:1388-1392 (inline simple-molecule branch).
 - composer.py:_name_simple_molecule body at ~ line 2545 (STAYS until 03-10).
-- 160-AUDIT-DECOMP.md § 1 row 'simple_molecule' + § 2.34 purity proof.
+- internal notes-DECOMP.md row 'simple_molecule' + purity proof.
 """
 from __future__ import annotations
 

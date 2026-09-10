@@ -1,15 +1,15 @@
-"""Missing benzene suffix forms: `-thiol` and `-carboperoxoic acid` (v29 Phase C).
+"""Missing benzene suffix forms: `-thiol` and `-carboperoxoic acid` (Phase C).
 
 Both were absent from ``rules/benzene.py``'s ``_SUFFIX_PRIORITY`` and from its
 suffix-FG detector, so each group was demoted to a prefix (or fell through to a trivial
 name) and we shipped a non-PIN:
 
-======================  =========================  =====================================
-SMILES                  was                        PIN
-======================  =========================  =====================================
-``Sc1ccccc1``           ``sulfanylbenzene``        ``benzenethiol``
-``OOC(=O)c1ccccc1``     ``perbenzoic acid``        ``benzenecarboperoxoic acid``
-======================  =========================  =====================================
+====================== ========================= =====================================
+SMILES was PIN
+====================== ========================= =====================================
+``Sc1ccccc1`` ``sulfanylbenzene`` ``benzenethiol``
+``OOC(=O)c1ccccc1`` ``perbenzoic acid`` ``benzenecarboperoxoic acid``
+====================== ========================= =====================================
 
 AUTHORITY, verified verbatim:
 
@@ -22,12 +22,12 @@ AUTHORITY, verified verbatim:
 * Existing grain proving benzene DOES take locant-free suffixes: ``:31163``
   ``benzenesulfonic acid (PIN)`` and ``:7625`` ``benzenehexol (PIN)``.
 
-★ NEITHER WAS A LOCANT DEFECT, which is why the P-14.3.4.2(c) licence could never have
+★ NEITHER WAS A LOCANT DEFECT, which is why the (c) licence could never have
 produced the right name: the group was not being chosen as a suffix at all.
 
 ★ AND DENYING THE TRIVIAL NAME WAS NOT ENOUGH. Adding a ``pin: false`` row for
 ``perbenzoic acid`` alone produced ``unknown organic compound`` -- an abstention, not the
-PIN -- because no systematic aryl peroxy-acid path existed. Session invariant 11: removing
+PIN -- because no systematic aryl peroxy-acid path existed. Session a project rule: removing
 a wrong output can unmask something worse. The suffix form had to be BUILT.
 """
 import pytest
@@ -53,7 +53,7 @@ class TestNewSuffixForms:
         ("Sc1ccc(S)cc1", "benzene-1,4-dithiol"),
     ])
     def test_multiplied_thiol_keeps_locants(self, namer, smiles, expected):
-        """Two suffixes => no P-14.3.4 licence => locants cited (P-14.3.3, :2869)."""
+        """Two suffixes => no licence => locants cited,:2869)."""
         assert namer.name(smiles) == expected
 
 
@@ -83,7 +83,7 @@ class TestSeniorityGuard:
 
     def test_demoted_thiol_becomes_sulfanyl_not_dropped(self, namer):
         """When -thiol loses the slot it must demote to its PREFIX, not vanish --
-        invariant 11 again: a dropped group is a wrong structure, far worse than a
+        a project rule again: a dropped group is a wrong structure, far worse than a
         non-preferred spelling. ``_SUFFIX_TO_PREFIX['thiol'] == 'sulfanyl'``."""
         got = namer.name("Sc1ccccc1O")
         assert "sulfanyl" in got, f"the SH must survive as a prefix: {got!r}"

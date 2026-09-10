@@ -26,8 +26,8 @@ Thiourea never got that upgrade.
 Blue Book (quotations verified in ``the Blue Book Blue Book``, cross-checked
 online at <https://iupac.qmul.ac.uk/BlueBook/>):
 
-* **P-66.1.6.1.3 "Chalcogen analogues of urea and isourea"** (:33437), section
-  **P-66.1.6.1.3.1** (:33439): *"Chalcogen analogues of urea are named by
+* ** "Chalcogen analogues of urea and isourea"** (:33437), section
+  **** (:33439): *"Chalcogen analogues of urea are named by
   functional replacement nomenclature using the prefixes 'thio', 'seleno', and
   'telluro'. Preferred IUPAC names use the letter locants N, and N'. Numerical
   locants may be used for thiourea in general nomenclature."* And (:33446)
@@ -35,21 +35,21 @@ online at <https://iupac.qmul.ac.uk/BlueBook/>):
   name."* So a `1,3-...thiourea` spelling is general nomenclature, NOT the PIN.
 * The class exemplar, a `(PIN)` example of an N-substituted chalcogen urea
   named on the RETAINED PARENT (:33451): **`N-(butan-2-yl)selenourea (PIN)`**.
-* **P-41 "Seniority order for classes"**, Table 4.1: amides are class **11**
+* ** "Seniority order for classes"**, Table 4.1: amides are class **11**
   (:18184), diazenes/azanes class **21** (:18197), carbon rings and chains
-  class **40** (:18216). **P-44.1.1** (:18875) selects the parent by that
+  class **40** (:18216). **** (:18875) selects the parent by that
   order. The "a ring outranks a chain" licence is gated on sameness of class
-  -- **P-52.2.8** (:24096) *"Within the same heteroatom class... a ring is
+  -- **** (:24096) *"Within the same heteroatom class... a ring is
   always selected as the parent hydride"* -- so it cannot promote cyclohexane
-  over the thiourea. **P-66.1.6.1.1.2** (:33320) ranks urea *"as an amide of
-  carbonic acid"*, and P-66.1.6.1.3.1 makes thiourea its retained chalcogen
+  over the thiourea. **** (:33320) ranks urea *"as an amide of
+  carbonic acid"*, and makes thiourea its retained chalcogen
   analogue. => **the thiourea is the parent; the ring is a substituent.**
-* **P-66.1.6.1.3.3** (:33487) enumerates only the UNSUBSTITUTED prefix
+* **** (:33487) enumerates only the UNSUBSTITUTED prefix
   ``carbamothioylamino`` (:33489) with the example
   ``3-(carbamothioylamino)propanoic acid (PIN)`` (:33501). No substituted-
   distal-N row exists anywhere in the book (grep proven against known
   positives). The substituted form is therefore derived across the
-  P-66.1.6.1.3.1 chalcogen-replacement relationship from the oxo `(PIN)`
+   chalcogen-replacement relationship from the oxo `(PIN)`
   example ``2-[(methylcarbamoyl)amino]naphthalene-1-carboxylic acid`` (:33354).
 
 Every expected name below was round-tripped through OPSIN 2.9.0 to an
@@ -68,7 +68,7 @@ R3_SMILES = "CC(C)(C)NC(=S)NC1(CCCCC1)N=NC(C)(C)C"
 
 @pytest.fixture(scope="module")
 def namer():
-    # Judge the GENERATOR, not the gate: with the validity gate on, SELF-01
+    # Judge the GENERATOR, not the gate: with the validity gate on,
     # merely suppresses the wrong name instead of preventing its construction.
     _namer._DISABLE_VALIDITY_GATE = True
     return Orthonym(style="pin")
@@ -259,7 +259,7 @@ def test_bridging_core_has_two_exits_and_must_not_get_a_monovalent_prefix():
 
 
 def test_terminal_core_with_one_exit_still_gets_carbamothioylamino():
-    """The Blue Book's own example must keep working (P-66.1.6.1.3.3:33501)."""
+    """The Blue Book's own example must keep working:33501)."""
     from orthonym.assembly.substituent_prefix_forms import (
         _check_substituent_prefix_form,
     )
@@ -277,7 +277,7 @@ def test_terminal_core_with_one_exit_still_gets_carbamothioylamino():
 
 # ---------------------------------------------------------------------------
 # 3. The class: thiourea prefix with a SUBSTITUTED distal nitrogen.
-# Derived across P-66.1.6.1.3.1 from the oxo (PIN) example at:33354.
+# Derived across from the oxo (PIN) example at:33354.
 # ---------------------------------------------------------------------------
 
 @pytest.mark.parametrize("smiles,expected", [
@@ -332,7 +332,7 @@ def test_thiourea_prefix_generator_fails_closed_on_a_bridging_core():
 
 
 def test_selenium_and_tellurium_prefixes_fail_closed():
-    """P-66.1.6.1.3.3 (:33487) enumerates only the SULFUR prefix.
+    """ (:33487) enumerates only the SULFUR prefix.
 
     No ``carbamoselenoyl``/``carbamotelluroyl`` spelling exists anywhere in the
     Blue Book, so the prefix path refuses rather than inventing one; the Se/Te
@@ -364,7 +364,7 @@ def test_thiourea_parent_family(namer, smiles, expected):
 
 
 def test_selenourea_pin_example_from_the_blue_book(namer):
-    """P-66.1.6.1.3.1 (:33451): ``N-(butan-2-yl)selenourea (PIN)``."""
+    """ (:33451): ``N-(butan-2-yl)selenourea (PIN)``."""
     assert _name(namer, "CCC(C)NC(=[Se])N") == "N-(butan-2-yl)selenourea"
 
 
@@ -383,7 +383,7 @@ def test_chalcogen_urea_retained_parents(namer, smiles, expected):
 
 @pytest.mark.parametrize("smiles,expected", [
     ("NC(=O)N", "urea"),
-    # Monosubstituted urea omits the italic-N locant (P-14.3.4.3,:2943);
+    # Monosubstituted urea omits the italic-N locant,:2943);
     # disubstituted forms keep both letter locants.
     ("CNC(=O)N", "methylurea"),
     ("CC(C)(C)NC(=O)N", "tert-butylurea"),

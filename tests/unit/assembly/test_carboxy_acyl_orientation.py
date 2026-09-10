@@ -1,8 +1,8 @@
 """a review review 2026-09-08: a bare carboxyl -C(=O)OH attached at its OWN carbon
 is the 'carboxy' prefix, NOT 'formyl'. The Step-4/5 recursion named the capped
-fragment 'formic acid' and parent_to_prefix() applied the acid->acyl table
+fragment 'formic acid' and parent_to_prefix applied the acid->acyl table
 ('formic acid'->'formyl'), which has no free-valence orientation and DROPS the
--OH -- a wrong constitution (-CHO). Cite: the Blue Book P-65.1.1 (carboxy prefix).
+-OH -- a wrong constitution (-CHO). Cite: the Blue Book (carboxy prefix).
 """
 import pytest
 from rdkit import Chem

@@ -2,7 +2,7 @@
 
 Tests that steroid esters (e.g., testosterone acetate) produce names
 containing the acylate fragment ('acetate'), using functional class format
-('parent-yl acylate') per IUPAC P-65.6.
+('parent-yl acylate') per IUPAC.
 
 RED phase: ester tests should FAIL initially (NP naming currently drops esters).
 Regression tests should PASS (bare steroid naming must not break).

@@ -1,7 +1,7 @@
 """
 Batch regression tests for medium molecule (21-40 HA) parent selection fixes.
 
-Phase 66 Plans 01-02: Tests grouped by compound class to verify parent selection
+a phase Plans 01-02: Tests grouped by compound class to verify parent selection
 improvements for medium-sized molecules. Each test verifies that the generated
 name contains expected structural features (substring matching for robustness).
 
@@ -16,7 +16,7 @@ Test groups (Plan 01):
 Test groups (Plan 02):
   7. VB polycyclic format verification (VB names are complete)
   8. Macrocyclic compound naming
-  9. STER-04 small-molecule stereo compounds (baseline documentation)
+  9. small-molecule stereo compounds (baseline documentation)
   10. Steroid decoration completeness
 """
 
@@ -27,7 +27,7 @@ from orthonym import name_compound
 # ---------------------------------------------------------------------------
 # Group 1: Steroid parent selection
 # Verifies that steroid NP scaffolds are detected and decorated with
-# explicit methyl groups (IUPAC P-31 retained names with substitution)
+# explicit methyl groups (IUPAC retained names with substitution)
 # ---------------------------------------------------------------------------
 STEROID_PARENT_FIXES = [
     pytest.param(
@@ -245,7 +245,7 @@ def test_charged_species_naming(smiles, expected_substr):
 ALKALOID_FIXES = [
     pytest.param(
         "CN1[C@@H]2CC[C@H]1C[C@@H](OC(=O)c1c[nH]c3ccccc13)C2.Cl",
-        "tropan",  # Phase 118-02: tropane NP naming correctly identifies tropane scaffold
+        "tropan",  # a phase-02: tropane NP naming correctly identifies tropane scaffold
         id="tropane-indole-ester",
     ),
 ]
@@ -261,7 +261,7 @@ def test_alkaloid_parent_selection(smiles, expected_substr):
 
 
 # ===========================================================================
-# Plan 02 Groups (Phase 66-02)
+# Plan 02 Groups (a phase-02)
 # ===========================================================================
 
 # ---------------------------------------------------------------------------
@@ -335,8 +335,8 @@ def test_macrocyclic_naming(smiles, expected_substr):
 
 
 # ---------------------------------------------------------------------------
-# Group 9: STER-04 small-molecule wrong-parent stereo baseline
-# Documents current naming status of 14 small stereo compounds from Phase 63.
+# Group 9: small-molecule wrong-parent stereo baseline
+# Documents current naming status of 14 small stereo compounds from a phase.
 # All are blocked by wrong parent selection, not stereo labeling errors.
 # Tests verify the name is non-None (structural description produced).
 # ---------------------------------------------------------------------------
@@ -363,7 +363,7 @@ SMALL_STEREO_PARENT_BASELINE = [
     ),
     pytest.param(
         "CCCCCCC(=O)NC1=CC(=O)[C@@H]2CCCN12",
-        # Phase 139.1-01: decomposition now produces acyl prefix form
+        # a phase-01: decomposition now produces acyl prefix form
         "heptanoyl",
         id="ster04-pyrrolizinone-amide",
     ),
@@ -378,7 +378,7 @@ SMALL_STEREO_PARENT_BASELINE = [
 @pytest.mark.integration
 @pytest.mark.parametrize("smiles,expected_substr", SMALL_STEREO_PARENT_BASELINE)
 def test_small_stereo_parent_baseline(smiles, expected_substr):
-    """STER-04 small stereo compounds must produce non-None names with structural content."""
+    """ small stereo compounds must produce non-None names with structural content."""
     name = name_compound(smiles)
     assert name is not None, "name_compound returned None"
     assert expected_substr in name, f"Expected '{expected_substr}' in name: {name}"

@@ -1,12 +1,12 @@
-""" a phase (P-68.3.2.3.2.2 / P-67.1.4.1.1): a mononuclear P/As/Sb ACYL group
+""" a phase /: a mononuclear P/As/Sb ACYL group
 cited as a SUBSTITUENT prefix on a senior parent.
 
 The senior characteristic group (a carboxylic acid, here) owns the suffix; the
-=E'-bearing P/As/Sb group is demoted to the P-67.1.4.1.1 acyl PREFIX, consumed
+=E'-bearing P/As/Sb group is demoted to the acyl PREFIX, consumed
 from the shared ``functional_replacement.acyl_prefix_for`` table (never
 re-spelled). BB L39255 verbatim: ``4-(dimethylphosphinothioyl)benzoic acid``
 (PIN). The recognizer must NOT poach the trivalent ``phosphanyl``/``arsanyl``
-substituents (no =E') nor the P-67.1.4.1.1.1 retained ``phosphono``/``arsono``
+substituents (no =E') nor the retained ``phosphono``/``arsono``
 prefixes (skeletal-0, all -OH).
 """
 
@@ -19,7 +19,7 @@ from orthonym.rules.phosphorus import name_acyl_prefix_substituent
 
 class TestAcylPrefixSubstituentIntegration:
     def test_dimethylphosphinothioyl_benzoic_acid(self):
-        # P-68.3.2.3.2.2, BB L39255: (CH3)2P(=S)- is 'dimethylphosphinothioyl'
+        #, BB L39255: (CH3)2P(=S)- is 'dimethylphosphinothioyl'
         # (phosphinothioic acid = skeletal-2 =S acid), NOT 'dimethylphosphanyl'
         # (which silently drops the =S).
         assert orthonym.name_compound(
@@ -34,7 +34,7 @@ class TestAcylPrefixSubstituentIntegration:
             "4-(dimethylphosphinoyl)benzoic acid"
 
     def test_methoxyphosphoryl_dibenzoic_acid(self):
-        # P-68.3.2.3.2.2, BB L39246: the multiplicative >P(=O)(OCH3)< bridge with
+        #, BB L39246: the multiplicative >P(=O)(OCH3)< bridge with
         # an -O-methyl (ester) residual -> 'methoxyphosphoryl' (skeletal-0
         # phosphoryl + methoxy). Extends the bridge residual beyond terminal -OH.
         assert orthonym.name_compound(
@@ -67,7 +67,7 @@ class TestAcylPrefixSubstituentUnit:
         assert name_acyl_prefix_substituent(mol, frag, c) is None
 
     def test_recognizer_declines_retained_phosphono(self):
-        # -P(=O)(OH)2 is the P-67.1.4.1.1.1 retained 'phosphono' prefix (skeletal-0,
+        # -P(=O)(OH)2 is the retained 'phosphono' prefix (skeletal-0,
         # all -OH); the recognizer must decline so the retained path owns it.
         mol, frag, c = self._frag("OC(=O)c1ccc(P(=O)(O)O)cc1", "P")
         assert name_acyl_prefix_substituent(mol, frag, c) is None

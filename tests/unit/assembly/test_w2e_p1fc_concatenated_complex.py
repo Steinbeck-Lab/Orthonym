@@ -1,5 +1,5 @@
-"""W2E-P1FC Task 8 — P-29.5.2 (BB 16250): concatenated complex substituent
-groups (3+ components) with enclosing-mark escalation (P-16.5).
+"""W2E-P1FC Task 8 — (BB 16250): concatenated complex substituent
+groups (3+ components) with enclosing-mark escalation.
 Expected PIN OPSIN-RT verified at authoring time (2026-07-09):
 4-[(benzylsulfanyl)methyl]benzoic acid -> C(C1=CC=CC=C1)SCC1=CC=C(C(=O)O)C=C1
 (canon-equal to OC(=O)c1ccc(CSCc2ccccc2)cc1)."""

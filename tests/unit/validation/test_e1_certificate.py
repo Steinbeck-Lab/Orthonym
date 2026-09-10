@@ -111,7 +111,7 @@ def test_confidently_all_carbon_classifier(token, expected):
 # Phase E (no-abstain universal namer): the shared shape-agnostic core
 # ``_verify_partition`` -- ``verify_certificate`` is now a thin wrapper over it,
 # and the universal recursive namer certifies its output through the SAME core
-# (invariant 12: extend, don't duplicate). These tests exercise the core on
+# (a project rule: extend, don't duplicate). These tests exercise the core on
 # plain ``(token, atom_ids)`` tuples (the ``UniversalResult.bindings`` shape),
 # the branch-restricted ``atoms=`` reference set, and ``allow_charged``.
 # ---------------------------------------------------------------------------
@@ -155,7 +155,7 @@ def test_verify_partition_token_in_name_fails():
 
 
 def test_verify_partition_token_in_name_tolerates_terminal_e_elision():
-    # P-16.7.1(a)/P-74.1.1: a parent-hydride token's terminal 'e' is elided
+    # (a)/: a parent-hydride token's terminal 'e' is elided
     # before a vowel-initial ionic suffix, so the FULL token ('ethane') is
     # absent but its stem ('ethan') is present -> accepted on token-in-name.
     v = _verify_partition(ETHANOL, "ethan-1-ol",

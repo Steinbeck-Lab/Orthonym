@@ -1,20 +1,20 @@
-"""Phase 160.1 D-22 + Phase 145.2 D-09 inheritance: PYTHONHASHSEED
+"""a phase + a phase inheritance: PYTHONHASHSEED
 determinism gate for aromatic-NP-scaffold canary rows.
 
 This harness asserts that name_compound produces byte-identical output
 across PYTHONHASHSEED ∈ {0, 1, 2, 3, 42} for the canary rows whose
 scaffold_class is in _NP_AROMATIC_RING_LOCANTS (i.e., the aromatic-NP-
-scaffold subset). Pre-D-20 fix, Chem.Kekulize-based detection produced
-different Kekulé forms across processes; post-D-20 fix, the canonical-
+scaffold subset). Pre- fix, Chem.Kekulize-based detection produced
+different Kekulé forms across processes; post- fix, the canonical-
 locant table produces deterministic output.
 
-Per CONTEXT D-22: budget < 2 minutes for 5 seeds × ≥ 11 fixtures = 55
-parameterized tests. Any cross-seed drift is a HARD pytest.fail().
+Per internal notes: budget < 2 minutes for 5 seeds × ≥ 11 fixtures = 55
+parameterized tests. Any cross-seed drift is a HARD pytest.fail.
 
-For Phase 160.1 Plan-03-00b shipping, the harness covers ONLY the
+For a phase Plan-03-00b shipping, the harness covers ONLY the
 estradiol-derivative canary fixture (name_stability_265) because that is
 the only aromatic-NP-scaffold row in the canary set whose scaffold_class
-is in _NP_AROMATIC_RING_LOCANTS. Phase 161+ additions to the table will
+is in _NP_AROMATIC_RING_LOCANTS. a phase+ additions to the table will
 expand the fixture list (morphinan, ergoline, etc.).
 """
 from __future__ import annotations
@@ -32,7 +32,7 @@ import pytest
 #
 # Each tuple: (fixture_id, smiles, expected_name_substring)
 # The expected_name_substring is the IUPAC-canonical form that ALL
-# PYTHONHASHSEED values MUST produce (the determinism contract per D-22).
+# PYTHONHASHSEED values MUST produce (the determinism contract per).
 AROMATIC_NP_FIXTURES = [
     # Estradiol-derivative — the canary row at which Blocker B surfaced
     (
@@ -111,7 +111,7 @@ AROMATIC_NP_FIXTURES = [
 def test_aromatic_np_scaffold_deterministic_across_pythonhashseed(
     seed, fixture_id, smi, expected_substring,
 ):
-    """Per CONTEXT D-22: ALL aromatic-NP-scaffold canary rows produce
+    """Per internal notes: ALL aromatic-NP-scaffold canary rows produce
     byte-identical output across PYTHONHASHSEED ∈ {0, 1, 2, 3, 42}.
 
     The harness runs name_compound in a subprocess with the given
@@ -152,13 +152,13 @@ def test_aromatic_np_scaffold_deterministic_across_pythonhashseed(
 def test_aromatic_np_scaffold_byte_identical_across_seeds(
     fixture_id, smi, expected_substring,
 ):
-    """Per CONTEXT D-22 strict determinism: across all 5 PYTHONHASHSEED
+    """Per internal notes strict determinism: across all 5 PYTHONHASHSEED
     values {0, 1, 2, 3, 42}, the name_compound output for an aromatic-NP-
     scaffold fixture MUST be byte-identical.
 
-    This is the strongest determinism assertion. Pre-D-20 fix, RDKit's
+    This is the strongest determinism assertion. Pre- fix, RDKit's
     Chem.Kekulize varied based on PYTHONHASHSEED-amplified atom-iteration
-    order, producing different equally-valid Kekulé forms. Post-D-20 fix,
+    order, producing different equally-valid Kekulé forms. Post- fix,
     the canonical-locant table bypasses Kekulize for scaffold-aromatic
     atoms, producing deterministic output.
     """

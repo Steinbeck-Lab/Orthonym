@@ -3,11 +3,11 @@
   - F3 ureido: -NH-C(=O)-NH2 substituent was double-prefixed
                 (carbamoylamino + phantom methanoylamino). Now a single
                 (carbamoylamino). Fixes every ureido-acid, not just citrulline.
-  - F2 cystine: both enantiomers get their P-103.1.3.1 descriptor
+  - F2 cystine: both enantiomers get their descriptor
                 (L-cystine / D-cystine); meso defers. NOTE the original line here
                 read "L-cystine -> 'cystine' (was always fine)" -- it was not
                 fine, it was a stereo loss, corrected in -CLEANUP Item 1.
-  - F1 inositol: the 7 meso inositols get their P-104.2.1 retained PIN
+  - F1 inositol: the 7 meso inositols get their retained PIN
                 (name-exact, OPSIN-unparseable). The chiral D/L-chiro pair is
                 DETERMINISTICALLY refused (RDKit perceives it non-deterministically).
 """
@@ -31,10 +31,10 @@ class TestUreido:
         assert name_compound(smiles) == expected
 
     @pytest.mark.parametrize("smiles,expected", [
-        ("O=CNCCCC(=O)O", "4-formamidobutanoic acid"),    # real formamido — P-66.1.1.4.3(1)
-        ("CC(=O)NCCC(=O)O", "3-acetamidopropanoic acid"),  # real acetamido — P-66.1.1.4.3(1)
+        ("O=CNCCCC(=O)O", "4-formamidobutanoic acid"),    # real formamido — (1)
+        ("CC(=O)NCCC(=O)O", "3-acetamidopropanoic acid"),  # real acetamido — (1)
         ("NCCC(=O)O", "3-aminopropanoic acid"),            # plain amino — unaffected
-        ("CNC(N)=O", "methylurea"),                        # terminal urea — mono omits locant (P-14.3.4.3,:2943)
+        ("CNC(N)=O", "methylurea"),                        # terminal urea — mono omits locant,:2943)
     ])
     def test_acylamino_regressions(self, smiles, expected):
         assert name_compound(smiles) == expected
@@ -49,9 +49,9 @@ class TestCystine:
     ])
     def test_cystine(self, smiles, expected):
         """-CLEANUP Item 1: the L form used to ship BARE while the D form
-        kept its descriptor. `## **P-103.1.3.1** The stereodescriptors 'D' and 'L'`
+        kept its descriptor. `## **** The stereodescriptors 'D' and 'L'`
         (the Blue Book) applies to "*the alpha-amino carboxylic acids*" and
-        at:54301 names cystine explicitly; cystine is Table 10.5 / P-103.1.1.2."""
+        at:54301 names cystine explicitly; cystine is Table 10.5 /."""
         assert name_compound(smiles) == expected
 
     def test_L_and_D_are_symmetric(self):
@@ -90,7 +90,7 @@ class TestCystine:
     def test_meso_cystine_has_no_retained_form(self):
         """meso-cystine (2R,2'S) must DEFER, not borrow a descriptor.
 
-        P-103.1.3.1 (:54305) reserves 'DL' for "*a mixture of equimolar amounts of
+         (:54305) reserves 'DL' for "*a mixture of equimolar amounts of
         'D' and 'L' compounds*" -- a racemate. meso-cystine is a single achiral
         compound, so no D/L/DL retained form applies and the retained lookup must
         return None (the systematic namer then owns it).
@@ -120,8 +120,8 @@ class TestCystine:
 class TestDopa:
     """-CLEANUP Item 1: the OTHER Table 10.5 member losing its descriptor.
 
-    `dopa` is `P-103.1.1.2` Table 10.5 (the Blue Book, systematic
-    `3-hydroxytyrosine`), so `## **P-103.1.3.1** The stereodescriptors 'D' and 'L'`
+    `dopa` is `` Table 10.5 (the Blue Book, systematic
+    `3-hydroxytyrosine`), so `## **** The stereodescriptors 'D' and 'L'`
     (:54291) designates its alpha-carbon exactly as it does cystine's. The OPSIN
     import supplied only the L key, so L shipped BARE and D had no retained name
     at all."""
@@ -177,7 +177,7 @@ class TestNonBlueBookAminoAcidsStayBare:
 
 
 class TestInositol:
-    """F1: the seven meso inositols (P-104.2.1); chiro deterministically refused."""
+    """F1: the seven meso inositols; chiro deterministically refused."""
 
     # InChIKey -> (representative SMILES, retained name) for the 7 meso inositols.
     MESO = {

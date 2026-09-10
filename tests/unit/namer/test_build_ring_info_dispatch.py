@@ -1,11 +1,11 @@
-"""Phase 147 Plan 02 Task 3: tests for _build_ring_info_for_parent_selection
+"""a phase Plan 02 Task 3: tests for _build_ring_info_for_parent_selection
 + compute_features module-level helper.
 
-Source: https://iupac.qmul.ac.uk/BlueBook/P4.html P-44.1
-Source: Phase 147 CONTEXT D-03 (7-branch dispatch order),
-        D-04 (reuse handler orient functions),
-        D-06 (spiro/VB stubs),
-        D-09 (preserve fused-hetero byte-identical path).
+Source: https://iupac.qmul.ac.uk/BlueBook/P4.html
+Source: a phase internal notes (7-branch dispatch order),
+         (reuse handler orient functions),
+         (spiro/VB stubs),
+         (preserve fused-hetero byte-identical path).
 """
 
 import pytest
@@ -13,9 +13,9 @@ from rdkit import Chem
 
 
 def test_compute_features_returns_molecularfeatures():
-    """compute_features(mol) wraps Orthonym()._perceive (BL-1 fix).
+    """compute_features(mol) wraps Orthonym._perceive (fix).
 
-    Source: Phase 147 BL-1.
+    Source: a phase.
     """
     from orthonym.namer import compute_features, MolecularFeatures
     mol = Chem.MolFromSmiles('CCO')
@@ -27,7 +27,7 @@ def test_compute_features_returns_molecularfeatures():
 def test_compute_features_accepts_explicit_smiles():
     """compute_features(mol, smiles='CCO') accepts an explicit SMILES.
 
-    Source: Phase 147 BL-1.
+    Source: a phase.
     """
     from orthonym.namer import compute_features
     mol = Chem.MolFromSmiles('CCO')
@@ -38,8 +38,8 @@ def test_compute_features_accepts_explicit_smiles():
 def test_acyclic_returns_none():
     """Acyclic molecules: helper returns None (no ring_info needed).
 
-    Source: https://iupac.qmul.ac.uk/BlueBook/P4.html P-44.1
-    Source: Phase 147 D-03 branch 7.
+    Source: https://iupac.qmul.ac.uk/BlueBook/P4.html
+    Source: a phase branch 7.
     """
     from orthonym.namer import (
         compute_features, _build_ring_info_for_parent_selection,
@@ -50,12 +50,12 @@ def test_acyclic_returns_none():
 
 
 def test_fused_heterocycle_branch_byte_identical():
-    """Branch 1 (D-09 byte-identical): 2-methylindole returns the same
+    """Branch 1 (byte-identical): 2-methylindole returns the same
     atom_mapping as match_fused_heterocycle_core (preserves the existing
     fused-hetero path bit-for-bit).
 
-    Source: https://iupac.qmul.ac.uk/BlueBook/P4.html P-44.1
-    Source: Phase 147 CONTEXT D-09.
+    Source: https://iupac.qmul.ac.uk/BlueBook/P4.html
+    Source: a phase internal notes.
     """
     from orthonym.namer import (
         compute_features, _build_ring_info_for_parent_selection,
@@ -73,8 +73,8 @@ def test_fused_heterocycle_branch_byte_identical():
 def test_pah_naphthalene_branch():
     """Branch 2: naphthalene returns the wrapper output directly.
 
-    Source: https://iupac.qmul.ac.uk/BlueBook/P4.html P-44.1
-    Source: Phase 147 CONTEXT D-03.
+    Source: https://iupac.qmul.ac.uk/BlueBook/P4.html
+    Source: a phase internal notes.
     """
     from orthonym.namer import (
         compute_features, _build_ring_info_for_parent_selection,
@@ -92,8 +92,8 @@ def test_pah_pyrene_w1_regression():
     """Branch 2 W-1 fix regression: pyrene is ortho-peri-fused but PAH
     detection MUST run for it (not gated on the fused-only block).
 
-    Source: https://iupac.qmul.ac.uk/BlueBook/P4.html P-44.1
-    Source: Phase 147 CONTEXT D-03 W-1 fix.
+    Source: https://iupac.qmul.ac.uk/BlueBook/P4.html
+    Source: a phase internal notes W-1 fix.
     """
     from orthonym.namer import (
         compute_features, _build_ring_info_for_parent_selection,
@@ -111,12 +111,12 @@ def test_pah_pyrene_w1_regression():
 
 
 def test_benzene_only_toluene_bl2_regression():
-    """Branch 3 BL-2 fix regression: toluene's methyl-bearing aromatic
+    """Branch 3 fix regression: toluene's methyl-bearing aromatic
     carbon (mol idx 1) gets locant 1 because get_benzene_substituents is
-    used (not a {idx: []} placeholder).
+    used (not a {idx: } placeholder).
 
-    Source: https://iupac.qmul.ac.uk/BlueBook/P4.html P-14.4(g)
-    Source: Phase 147 CONTEXT D-03 BL-2 fix.
+    Source: https://iupac.qmul.ac.uk/BlueBook/P4.html (g)
+    Source: a phase internal notes fix.
     """
     from orthonym.namer import (
         compute_features, _build_ring_info_for_parent_selection,
@@ -140,8 +140,8 @@ def test_benzene_only_toluene_bl2_regression():
 def test_simple_heterocycle_pyridine_branch():
     """Branch 4: pyridine returns 6 keys; the N atom gets locant 1.
 
-    Source: https://iupac.qmul.ac.uk/BlueBook/P4.html P-25.3
-    Source: Phase 147 CONTEXT D-03 branch 4.
+    Source: https://iupac.qmul.ac.uk/BlueBook/P4.html
+    Source: a phase internal notes branch 4.
     """
     from orthonym.namer import (
         compute_features, _build_ring_info_for_parent_selection,
@@ -165,17 +165,17 @@ def test_simple_heterocycle_pyridine_branch():
 def test_spiro_branch_post_phase151():
     """Branch 5: spiro[4.4]nonane returns a populated ``iupac_locants`` map.
 
-    Source: https://iupac.qmul.ac.uk/BlueBook/P2.html P-24.2
-    Source: Phase 147 CONTEXT D-06 (originally a stub; **Phase 151 shipped
-            the real spiro numbering** per Phase 151 D-15 + the live
+    Source: https://iupac.qmul.ac.uk/BlueBook/P2.html
+    Source: a phase internal notes (originally a stub; **a phase shipped
+            the real spiro numbering** per a phase + the live
             spiro registry).
 
-    Phase 157 cleanup: rebaselines the assertion from the stale "stub
-    returns None" expectation (Phase 147 era) to the post-Phase-151
+    a phase cleanup: rebaselines the assertion from the stale "stub
+    returns None" expectation (a phase era) to the post-Phase-151
     behavior where `_build_ring_info_for_parent_selection` returns the
     canonical spiro IUPAC locant map. The map starts at locant 1 on a
     ring atom adjacent to the spiro atom and proceeds around both
-    rings per P-24.2.4.
+    rings per.
     """
     from orthonym.namer import (
         compute_features, _build_ring_info_for_parent_selection,
@@ -184,9 +184,9 @@ def test_spiro_branch_post_phase151():
     feats = compute_features(mol)
     actual = _build_ring_info_for_parent_selection(feats)
     assert actual is not None
-    # Phase 151 populates iupac_locants for spiro systems. The locants
+    # a phase populates iupac_locants for spiro systems. The locants
     # must be a {atom_idx: int} mapping covering all 9 atoms with the
-    # contiguous 1..9 range required by P-24.2.
+    # contiguous 1..9 range required by.
     locants = actual["iupac_locants"]
     assert isinstance(locants, dict), (
         f"Phase 151 should populate iupac_locants for spiro; got {locants!r}"
@@ -203,8 +203,8 @@ def test_else_cyclohexane_branch():
     """Branch 7: cyclohexane (carbocyclic monocycle, no FG) returns None
     so _build_ring_pos falls through to sorted fallback.
 
-    Source: https://iupac.qmul.ac.uk/BlueBook/P4.html P-44.1
-    Source: Phase 147 CONTEXT D-03 branch 7.
+    Source: https://iupac.qmul.ac.uk/BlueBook/P4.html
+    Source: a phase internal notes branch 7.
     """
     from orthonym.namer import (
         compute_features, _build_ring_info_for_parent_selection,
@@ -218,11 +218,11 @@ def test_else_cyclohexane_branch():
 
 
 def test_branch_6_5_non_cataloged_fused_emits_base_component_atoms():
-    """Branch 6.5 (Phase 149 D-09): non-cataloged ortho-fused system
+    """Branch 6.5 (a phase): non-cataloged ortho-fused system
     emits {'base_component_atoms': frozenset(...)} NOT 'iupac_locants'.
 
     Source: https://iupac.qmul.ac.uk/fusedring/FR23.html
-    Source: 149-CONTEXT.md D-09; SC-2; SC-7.
+    Source: 149-internal notes;;.
     """
     from orthonym.namer import (
         compute_features, _build_ring_info_for_parent_selection,
@@ -235,7 +235,7 @@ def test_branch_6_5_non_cataloged_fused_emits_base_component_atoms():
     # Alternates: any 2-ring system that matches NEITHER catalog AND
     # doesn't otherwise resolve via Branches 1-4 (single-ring helpers).
     # Plan 02 triage: Branch 6.5 is restricted to 2-component fused
-    # systems where FR-2.3 base selection is reliable; 3+ component
+    # systems where.3 base selection is reliable; 3+ component
     # systems fall through to Branch 7 to avoid disrupting downstream
     # parent selection for systems whose IUPAC name requires the full
     # ring system as parent (e.g., steroids).
@@ -265,9 +265,9 @@ def test_branch_6_5_non_cataloged_fused_emits_base_component_atoms():
 
 
 def test_branch_6_5_skipped_for_cataloged_compounds():
-    """D-11: cataloged compounds (indole) flow through Branch 1.
+    """: cataloged compounds (indole) flow through Branch 1.
 
-    Source: 149-CONTEXT.md D-11; SC-9.
+    Source: 149-internal notes;.
     """
     from orthonym.namer import (
         compute_features, _build_ring_info_for_parent_selection,

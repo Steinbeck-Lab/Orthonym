@@ -3,8 +3,8 @@
 Every structure here is OPSIN-authoritative (canonical SMILES obtained by parsing
 the accepted name through OPSIN), and every expected PIN round-trips to that
 structure (verified 2026-07-17). The engine names N-/C8-substituted
-purine-2,6-diones systematically (P-25.2.1 retained purine parent + fixed
-numbering P-31.1.4.3.4 + P-66 dione), and FAILS CLOSED (returns None) on
+purine-2,6-diones systematically retained purine parent + fixed
+numbering + dione), and FAILS CLOSED (returns None) on
 anything outside that scope so a wrong name is never emitted.
 """
 import pytest

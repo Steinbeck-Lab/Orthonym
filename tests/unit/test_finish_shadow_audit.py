@@ -1,5 +1,5 @@
 # tests/unit/test_finish_shadow_audit.py
-"""v33 Phase 0 Task L0.3: SHADOW coverage audit wired at `_finish`.
+""" a phase Task L0.3: SHADOW coverage audit wired at `_finish`.
 
 Telemetry only -- the returned name must be BYTE-IDENTICAL to the pre-L0.3
 behaviour in every mode. Guarded by `ORTHONYM_COVERAGE_AUDIT`
@@ -43,7 +43,7 @@ class TestShadowAuditDoesNotChangeName:
 
     def test_shadow_audit_does_not_leak_across_molecules(self, opsin_gate):
         # A per-top-level-molecule reset is required, mirroring the existing
-        # confidence/pool/proof-ledger resets at the top of name() -- else a
+        # confidence/pool/proof-ledger resets at the top of name -- else a
         # bare-str winner after a GeneralEngineResult winner would incorrectly
         # inherit the previous molecule's result_obj. Needs the REAL gate on
         # (the `opsin_gate` fixture, not the suite's gate-off default) --
@@ -74,11 +74,11 @@ class TestShadowAuditDoesNotChangeName:
 
 
 class TestSelf01ReuseFiresEndToEnd:
-    """v33 Phase 0 L0 review fix (I2): a `_finish`-INTEGRATION-level proof that
+    """ a phase L0 review fix (I2): a `_finish`-INTEGRATION-level proof that
     the CARRIED-RULING reuse actually fires on the real path -- the gap that
     let review finding C1 through (the unit tests on `audit_coverage` alone
     could not see whether `namer._self01_lookup` was ever actually WIRED to a
-    real SELF-01 outcome end-to-end)."""
+    real outcome end-to-end)."""
 
     def test_bare_str_pin_winner_reuses_self01_with_gate_on(self, opsin_gate):
         nm = Orthonym()
@@ -90,7 +90,7 @@ class TestSelf01ReuseFiresEndToEnd:
 
 
 class TestSkipReanchorNeverSpawnsOpsin:
-    """v33 Phase 0 L0 review fix (C1/C2 + I2): a resolved gate outcome that
+    """ a phase L0 review fix (C1/C2 + I2): a resolved gate outcome that
     guarantees a reanchor is useless (a `carveout:*` PIN family, or a
     disabled/unavailable/not-run gate) must skip `validate_atom_coverage`
     ENTIRELY at `_finish` -- no OPSIN subprocess spawned, and FAST.

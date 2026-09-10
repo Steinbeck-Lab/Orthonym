@@ -1,7 +1,7 @@
-"""W3-P08 thiocyanate-ester handler — P-65.6.3.3.7.2 functional-class naming.
+"""W3-P08 thiocyanate-ester handler — functional-class naming.
 
 A thiocyanate ester R-S-C#N is named in the two-word functional-class form
-``<R> thiocyanate`` (P-65.6.3.3.7.2; e.g. ``propan-2-yl thiocyanate``).
+``<R> thiocyanate``; e.g. ``propan-2-yl thiocyanate``).
 Thiocyanic acid (HS-C#N) is a retained PIN (BBv2 L30987) and its esters are
 functional-class PINs (BBv2 L32033 '(CH3)2CH-S-CN propan-2-yl thiocyanate
 (PIN)').
@@ -12,13 +12,13 @@ emitter — R-S-C#N reads as 'unknown' (the substitutive 'thiocyanato' prefix
 path mis-builds and is self-consistency-suppressed).
 
 CRITICAL — distinct from isothiocyanate: the isothiocyanate ester C-N=C=S has
-its PIN as the substitutive ``isothiocyanato`` prefix (P-61.8) and is NOT
+its PIN as the substitutive ``isothiocyanato`` prefix and is NOT
 handled here (different SMARTS/connectivity; ``fg['thiocyanate']`` never matches
 it). Only S-C#N connectivity fires this handler.
 
 Modeled on handlers/nitrite_ester.py (two-word functional-class, predicate-pure
 + pool.add + stereo injection) and registered in inner_dispatch at the specialty
-tier (priority 2965, after nitrite_ester@2960, before tier_a_ring@4500).
+tier (priority 2965, after nitrite_ester, before tier_a_ring).
 """
 from __future__ import annotations
 
@@ -28,7 +28,7 @@ from ..name_tree import NameTreeNode, NamingResult
 
 
 def _is_thiocyanate(features: Any) -> bool:
-    """Predicate (D-07 pure): the thiocyanate ester R-S-C#N is the sole
+    """Predicate (pure): the thiocyanate ester R-S-C#N is the sole
     characteristic group. Fires ONLY when principal_group is None so a
     polyfunctional molecule carrying a senior group (where thiocyanate is a
     plain prefix) is never hijacked. NO mol/features mutation; NO module state.
@@ -43,13 +43,13 @@ def _is_thiocyanate(features: Any) -> bool:
 def name_thiocyanate(
     features: Any, mol: Any = None, style: str = "pin",
 ) -> Optional[NamingResult]:
-    """Emit ``<R> thiocyanate`` (P-65.6.3.3.7.2) for a thiocyanate ester R-S-C#N.
+    """Emit ``<R> thiocyanate`` for a thiocyanate ester R-S-C#N.
 
     Algorithm: from the ``thiocyanate`` SMARTS match (S, C, N), take the S's
     carbon neighbour that is NOT the nitrile carbon (the organyl R), name that
     R fragment via the universal substituent pipeline, and join as
     ``"<R> thiocyanate"``. Returns None (defer / fail-closed) if the R cannot
-    be named. Style is ignored (single PIN per compound, CONTEXT D-04); the
+    be named. Style is ignored (single PIN per compound, internal notes); the
     thiocyanate ester PIN IS functional-class, so it is NOT declined under 'pin'.
     """
     from ..candidate_pool import get_current_pool

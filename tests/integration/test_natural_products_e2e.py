@@ -9,7 +9,7 @@ Tests the complete SMILES -> name pipeline for natural products:
 - Carotenoids (beta-carotene, lycopene)
 - Beta-lactam scaffolds (penam, cepham)
 - Regression checks (benzene, ethanol, etc. still named correctly)
-- a phase success criteria from CONTEXT.md
+- a phase success criteria from internal notes
 """
 
 import pytest
@@ -33,7 +33,7 @@ def canonical(smiles: str) -> str:
 # ---------------------------------------------------------------------------
 
 class TestSteroidE2E:
-    """Test steroid scaffold and derivative naming via name_compound()."""
+    """Test steroid scaffold and derivative naming via name_compound."""
 
     @pytest.mark.integration
     def test_androstane(self):
@@ -137,7 +137,7 @@ class TestSteroidE2E:
 # ---------------------------------------------------------------------------
 
 class TestAlkaloidE2E:
-    """Test alkaloid scaffold and derivative naming via name_compound()."""
+    """Test alkaloid scaffold and derivative naming via name_compound."""
 
     @pytest.mark.integration
     def test_morphinan(self):
@@ -217,7 +217,7 @@ class TestAlkaloidE2E:
 # ---------------------------------------------------------------------------
 
 class TestTerpenoidE2E:
-    """Test terpenoid derivative naming via name_compound()."""
+    """Test terpenoid derivative naming via name_compound."""
 
     @pytest.mark.integration
     def test_camphor(self):
@@ -283,7 +283,7 @@ class TestTerpenoidE2E:
 # ---------------------------------------------------------------------------
 
 class TestCarotenoidE2E:
-    """Test carotenoid naming via name_compound()."""
+    """Test carotenoid naming via name_compound."""
 
     @pytest.mark.integration
     def test_beta_carotene(self):
@@ -401,11 +401,11 @@ class TestNoRegression:
 
 
 # ---------------------------------------------------------------------------
-# a phase success criteria tests (from CONTEXT.md)
+# a phase success criteria tests (from internal notes)
 # ---------------------------------------------------------------------------
 
 class TestSuccessCriteria:
-    """Validate success criteria from 14-CONTEXT.md."""
+    """Validate success criteria from 14-internal notes."""
 
     @pytest.mark.integration
     def test_sc1_cholesterol_recognition(self):

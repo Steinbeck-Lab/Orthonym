@@ -1,4 +1,4 @@
-"""P-66.4.1.4.2 / P-16.9.1 AM-3 geminal-diimidamide contract.
+""" / geminal-diimidamide contract.
 
 W2E-D4 (2026-07-10): the per-group primed-N superscript locant subsystem
 (N''1-ethyl-N1,N1-dimethylcyclohexane-1,1-dicarboximidamide, BB 34236) is
@@ -19,8 +19,8 @@ class TestAM3GeminalAmidineFailClosed:
     def test_geminal_diimidamide_named(self):
         # W2E-D4 BUILT: the N-ethyl (imino, group-2 -> N'') / N,N-dimethyl
         # (amino, group-1 -> N) decorations get per-group primed+superscript
-        # italic-N locants (lowest-locant group assignment P-14.3.2 +
-        # alphanumerical citation P-14.5.2). OPSIN-RT verified.
+        # italic-N locants (lowest-locant group assignment +
+        # alphanumerical citation. OPSIN-RT verified.
         n = name_compound("CCNC(=N)C1(C(=N)N(C)C)CCCCC1", style="pin")
         assert n == "N''1-ethyl-N1,N1-dimethylcyclohexane-1,1-dicarboximidamide"
 

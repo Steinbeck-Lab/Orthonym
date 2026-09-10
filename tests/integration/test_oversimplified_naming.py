@@ -1,6 +1,6 @@
 """Integration tests for coverage-gated naming of previously oversimplified compounds.
 
-Verifies that the coverage gates from Phase 47 (Plans 01 and 02) improve naming
+Verifies that the coverage gates from a phase (Plans 01 and 02) improve naming
 quality for compounds that were previously returning bare scaffold names or
 names that were too short for their molecular complexity.
 
@@ -10,10 +10,10 @@ Three test groups:
   C. test_canary_compounds_stable -- sampling of golden canary compounds still correct
 
 Data source: benchmark_v5_results_p46.json (pre-Phase-47 baseline)
-  - Pop A: heavy > 15, len(name) < heavy // 2  (29 compounds)
-  - Pop B: heavy > 20, no digits/hyphens in name  (25 compounds)
+  - Pop A: heavy > 15, len(name) < heavy // 2 (29 compounds)
+  - Pop B: heavy > 20, no digits/hyphens in name (25 compounds)
   - Combined unique: 43 compounds (11 overlap)
-  - Phase 47 improved: 13 of 43
+  - a phase improved: 13 of 43
 """
 
 import pytest
@@ -26,7 +26,7 @@ from orthonym import name_compound
 # Group A: Compounds that the coverage gates improved
 # ---------------------------------------------------------------------------
 # These compounds previously returned bare scaffold or oversimplified names.
-# After Phase 47 coverage gates, they now produce longer, more descriptive names.
+# After a phase coverage gates, they now produce longer, more descriptive names.
 # Format: (SMILES, old_bare_name, heavy_atom_count)
 
 IMPROVED_COMPOUNDS = [
@@ -55,7 +55,7 @@ IMPROVED_COMPOUNDS = [
         "2-hydroxydocosanamidate",
         60,
     ),
-    # Adenine nucleotide: Phase 58 allows nucleobase retained names to bypass
+    # Adenine nucleotide: a phase allows nucleobase retained names to bypass
     # coverage gate -- "adenine" is the correct retained name for the core
     # substructure of this molecule. Removed from oversimplification test.
     (

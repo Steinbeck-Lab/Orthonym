@@ -1,11 +1,11 @@
-"""Phase 151-02 D-10: multi-spiro tests for dispiro/trispiro/tetra/penta.
+"""a phase-02: multi-spiro tests for dispiro/trispiro/tetra/penta.
 
 Wave-0 RED scaffold: tests target the existing ``name_spiro_system``
 helper for multi-spiro coverage. They exercise the polyspiro descriptor
 build path AND the cascade-step-6 supplier wrapper added in Plan 151-02
 (``get_spiro_iupac_locants``).
 
-Source: 151-02-PLAN.md tasks 1b/2; 151-AUDIT-B.md; IUPAC P-24.2.2.
+Source: 151-02-PLAN.md tasks 1b/2; internal notes-B.md; IUPAC.
 """
 from __future__ import annotations
 
@@ -102,14 +102,14 @@ class TestDispiro:
 
     @pytest.mark.unit
     def test_dispiro_canonical_blue_book(self):
-        """dispiro[5.1.5.2]heptadecane (Blue Book P-24.2.2 example)."""
+        """dispiro[5.1.5.2]heptadecane (Blue Book example)."""
         mol = Chem.MolFromSmiles("C1CCC2(CC1)CC1(CCC2)CCCCCC1")
         assert is_spiro_system(mol) is True
         assert len(get_spiro_atoms(mol)) == 2
         result = name_spiro_system(mol)
         assert result is not None
         name, _, _, _ = result
-        # P-24.2.2 segment count tiebreak deferred to v19 (logged
+        # segment count tiebreak deferred to (logged
         # AUTONOM-followups). Connectivity correctness is what we
         # verify here — name must contain 'dispiro' and a proper
         # '[a.b.c.d]' descriptor.
@@ -209,10 +209,10 @@ class TestDispiro:
             pytest.skip(f"corpus fixture not pure spiro at SSSR layer: "
                         f"{fixture['fixture_id']}")
         result = name_spiro_system(mol)
-        # Wave2 T6a (P-24.2.0/P-31.1.5.1): a POLYSPIRO system with a ring
+        # Wave2 /: a POLYSPIRO system with a ring
         # multiple bond now fails closed — the unsaturation splice is
         # monospiro-only, and the old '-ane' core silently dropped the ring
-        # double bond (the exact defect T6a fixes). Assert that contract.
+        # double bond (the exact defect fixes). Assert that contract.
         _has_ring_unsat = any(
             b.IsInRing()
             and b.GetBondType() in (Chem.BondType.DOUBLE, Chem.BondType.TRIPLE)
@@ -259,14 +259,14 @@ class TestTrispiro:
         mol = Chem.MolFromSmiles(f["smiles"])
         result = name_spiro_system(mol)
         assert result is not None
-        # Trispiro/tetraspiro/pentaspiro all acceptable per D-10.
+        # Trispiro/tetraspiro/pentaspiro all acceptable per.
         assert ("trispiro[" in result[0]
                 or "tetraspiro[" in result[0]
                 or "pentaspiro[" in result[0])
 
 
 class TestPolyspiroPrefixesTable:
-    """Plan 151-02 D-10: _POLYSPIRO_PREFIXES already covers up to penta."""
+    """Plan 151-02: _POLYSPIRO_PREFIXES already covers up to penta."""
 
     @pytest.mark.unit
     def test_prefixes_cover_through_pentaspiro(self):
@@ -279,7 +279,7 @@ class TestPolyspiroPrefixesTable:
 
 
 class TestRoundTripViaOPSIN:
-    """OPSIN round-trip InChI L1 (D-23) on Blue Book pure-spiro fixtures."""
+    """OPSIN round-trip InChI L1  on Blue Book pure-spiro fixtures."""
 
     @pytest.mark.roundtrip
     @pytest.mark.skipif(not _opsin_available(),

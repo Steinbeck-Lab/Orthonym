@@ -1,4 +1,4 @@
-"""v29 P3-REGRESSION I12 — a free amino acid must carry its L configuration.
+"""-REGRESSION I12 — a free amino acid must carry its L configuration.
 
 THE DEFECT
 ----------
@@ -19,35 +19,35 @@ descriptors").
 
 THE AUTHORITY — and the honest limit of it
 ------------------------------------------
-* `## **P-103.1.3.1** The stereodescriptors 'D' and 'L'` (BlueBookV2.md:54291), at
+* `## **** The stereodescriptors 'D' and 'L'` (the Blue Book), at
   :54293: "*The absolute configuration at the α-carbon atom of the α-amino
   carboxylic acids is designated by the stereodescriptor 'D' or 'L' to indicate a
-  formal relationship to 'D- or L-glyceraldehyde'.*"  NOTE: this sentence is
+  formal relationship to 'D- or L-glyceraldehyde'.*" NOTE: this sentence is
   INDICATIVE — it establishes that D/L are what designate the α-carbon, not an
   imperative "must be cited". The requirement is carried by the next two items.
-* `### **P-103.3.4** Indication of configuration in peptides` (:54715), at :54717:
+* `### **** Indication of configuration in peptides` (:54715), at:54717:
   "*The stereodescriptor 'L' is not indicated in the names nor in the symbolic
   representation of peptides composed of amino acids listed in Table 10.4. In
   contrast, the stereodescriptor 'D' is indicated at the front of the acyl group or
-  name of each component having that configuration.*"  The omission licence is
+  name of each component having that configuration.*" The omission licence is
   scoped to PEPTIDES (and, within them, to Table-10.4 members). A free amino acid
   is outside it — which is exactly what `rules/peptides.py` already says in its own
   docstring: "*the L-omission is a display rule applied here, so a standalone amino
-  acid (P-103.1) still shows L*". This module violated that stated invariant.
-* `## **P-103.1.3.2.2** Use of the prefix 'allo'` (:54320), the four worked
-  examples at :54324-54330 — every one carries the descriptor, and each is offered
+  acid still shows L*". This module violated that stated invariant.
+* `## **** Use of the prefix 'allo'` (:54320), the four worked
+  examples at:54324-54330 — every one carries the descriptor, and each is offered
   in exactly two forms, neither of them bare:
-      L-isoleucine ... (2S,3S)-2-amino-3-methylpentanoic acid
-      L-alloisoleucine ... (2S,3R)-2-amino-3-methylpentanoic acid
-      L-threonine ... (2S,3R)-2-amino-3-hydroxybutanoic acid
-      L-allothreonine ... (2S,3S)-2-amino-3-hydroxybutanoic acid
+      L-isoleucine... (2S,3S)-2-amino-3-methylpentanoic acid
+      L-alloisoleucine... (2S,3R)-2-amino-3-methylpentanoic acid
+      L-threonine... (2S,3R)-2-amino-3-hydroxybutanoic acid
+      L-allothreonine... (2S,3S)-2-amino-3-hydroxybutanoic acid
   The code cited THIS section for emitting `allo-` with no `L-`; the section
   refutes it.
 
-⚠ NOT A PIN CLAIM. `### **P-100 INTRODUCTION**` (:50939), at :50943: "*Preferred
-IUPAC names (PINs) are not identified for the compounds in this Chapter.*"  So
+⚠ NOT A PIN CLAIM. `### ** INTRODUCTION**` (:50939), at:50943: "*Preferred
+IUPAC names (PINs) are not identified for the compounds in this Chapter.*" So
 `L-alanine` is the Blue Book's prescribed retained name for the free acid, NOT its
-PIN — Chapter P-10 identifies no PINs at all. Nothing here should be described as
+PIN — Chapter identifies no PINs at all. Nothing here should be described as
 a PIN correction.
 
 The peptide path must be untouched: `D-alanylglycine` (gold W5-A4) is a live
@@ -63,8 +63,8 @@ pytestmark = pytest.mark.unit
 
 # SMILES taken verbatim from the gold rows that pin these molecules, so the test
 # and the gate are talking about the same structures.
-#   gold_pins.json #58/#59, stereo_config.json #13/#14/#15,
-#   amino_acid_derivatives.json #0..#7
+# gold_pins.json #58/#59, stereo_config.json #13/#14/#15,
+# amino_acid_derivatives.json #0..#7
 FREE_AMINO_ACIDS = [
     # (SMILES, expected name, gold row it comes from)
     ("C[C@H](N)C(=O)O", "L-alanine", "gold_pins #59"),
@@ -162,7 +162,7 @@ class TestFreeAminoAcidCarriesItsConfiguration:
 
 
 class TestPeptideSuppressionIsUntouched:
-    """P-103.3.4 is a PEPTIDE display rule and must keep working — the fix narrows
+    """ is a PEPTIDE display rule and must keep working — the fix narrows
     where the rule applies, it does not delete the rule."""
 
     @pytest.mark.parametrize("smiles,expected", [
@@ -194,7 +194,7 @@ class TestPeptideSuppressionIsUntouched:
         Two halves, both documented at `get_amino_acid_name`: the stereo-FREE key
         returns the BARE retained name, and a stereo-TAGGED key returns ``None``
         because the strip fallback is deliberately gated to the descriptor path
-        ("the DEFAULT path stays byte-identical ... so name_peptide ... is
+        ("the DEFAULT path stays byte-identical... so name_peptide... is
         completely unaffected"). `name_peptide` relies on that ``None``.
         """
         from rdkit import Chem

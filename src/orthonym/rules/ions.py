@@ -6,8 +6,8 @@ Handles naming of:
 - Cations: aminium (-aminium), carbenium/ylium (-ylium), onium, diazonium
 
 IUPAC 2013 References:
-- P-72: Anion nomenclature
-- P-73: Cation nomenclature
+-: Anion nomenclature
+-: Cation nomenclature
 
 Key naming patterns:
 - Carboxylate anions: acetic acid -> acetate
@@ -30,13 +30,13 @@ from ..data.ion_retained_names import (
 from ..perception.ions import get_ion_sites
 from ..perception.molcache import atoms_of  # audit 2026-09-03 (S2): per-call atom/bond tuples
 
-# F-T6 (DD3, P-72.2.2.1): skeletal heteroatom-hydride anions named with the
+# F- (DD3,: skeletal heteroatom-hydride anions named with the
 # -anide ending on the parent hydride. element -> the neutral parent-hydride
 # stem the re-entered neutral name MUST end in (else fail-closed, so an
 # un-nameable heterane like 'methylmethylmethyl' for arsane never produces
 # garbage). Chalcogens (S/Se/Te) are EXCLUDED — they take -thiolate/-selenolate/
 # -tellurolate via the existing suffix map. B is EXCLUDED — its anion is -uide
-# (P-72.3, hydride addition), a separate staged family. N/O handled separately.
+#, hydride addition), a separate staged family. N/O handled separately.
 _HETEROATOM_HYDRIDE_IDE_STEMS = {
     'P': 'phosphane',
     'As': 'arsane',
@@ -48,9 +48,9 @@ _HETEROATOM_HYDRIDE_IDE_STEMS = {
 }
 
 # Standard valence of each heteroatom-hydride-anion element, for the
-# classify_anion VALENCE GATE (code-review CR-03): a parent-hydride -ide anion
+# classify_anion VALENCE GATE (code-review): a parent-hydride -ide anion
 # satisfies degree + H + 1 == valence (re-adding the lost H+ gives the
-# standard-valence neutral hydride). An over-coordinated centre (the P-72.3
+# standard-valence neutral hydride). An over-coordinated centre (the
 # -uide family) fails the gate and stays on the neutral organometallic/legacy
 # path instead of being charge-dropped to ''.
 _HETEROATOM_HYDRIDE_IDE_VALENCE = {
@@ -58,15 +58,15 @@ _HETEROATOM_HYDRIDE_IDE_VALENCE = {
     'Si': 4, 'Ge': 4, 'Sn': 4, 'Pb': 4,
 }
 
-# P-72.3 / P-72.8 (W4-I2): the -uide (hydride-ADDITION) family, GENERALIZED beyond
+# / (W4-I2): the -uide (hydride-ADDITION) family, GENERALIZED beyond
 # Group 13. A centre at one bond ABOVE its standard bonding number carrying the -1
 # charge is the ate-complex / -uide anion. Method (1) — the 'uide' suffix on the
 # neutral parent hydride — gives the PIN (BB 41098), avoiding the λ-convention that
 # the alternative 'ide'-on-a-λ-parent form needs. element -> parent-hydride stem
 # (the '-uide' is appended after eliding the final 'e'). Examples (BB 41100-41116):
-#   BH3 + H-  -> boranuide (BH4-); B(CH3)4- -> tetramethylboranuide
-#   CH3-SiH4- -> methylsilanuide;  (CH3)4P- -> tetramethylphosphanuide
-#   (C6H5)2I- -> diphenyliodanuide
+# BH3 + H- -> boranuide (BH4-); B(CH3)4- -> tetramethylboranuide
+# CH3-SiH4- -> methylsilanuide; (CH3)4P- -> tetramethylphosphanuide
+# (C6H5)2I- -> diphenyliodanuide
 _UIDE_STEMS = {
     # Group 13 (standard bonding number 3 -> -uide centre has degree+H == 4)
     'B': 'borane', 'Al': 'alumane', 'Ga': 'gallane', 'In': 'indigane', 'Tl': 'thallane',
@@ -162,7 +162,7 @@ def classify_anion(mol, anion_site: Dict[str, Any]) -> str:
                 if neighbor.GetIsAromatic():
                     return 'phenolate'
 
-        # SUB-01/D-02: heteroatom-oxoacid anion (S/P-bound [O-]) recognition,
+        # /: heteroatom-oxoacid anion (S/P-bound [O-]) recognition,
         # BEFORE the alkoxide fallthrough. Previously these fell to 'alkoxide'
         # -> the heptanolate carbon-counting stub. Recognized here ONLY for
         # routing (name_anion sends them to the general parent-selection
@@ -175,7 +175,7 @@ def classify_anion(mol, anion_site: Dict[str, Any]) -> str:
             # bond on the heteroatom). Sulfate / phosphate ESTERS (R-O-S /
             # R-O-P, no carbon on the heteroatom) are a SEPARATE class — leave
             # them on the existing path so the sulfated-glycolipid / phospho-
-            # lipid canaries do not regress. SUB-01/D-02.
+            # lipid canaries do not regress. /.
             nb_has_carbon = any(nn.GetSymbol() == 'C' for nn in nb.GetNeighbors())
             if nb.GetSymbol() == 'S' and nb_has_carbon:
                 double_o = sum(
@@ -191,7 +191,7 @@ def classify_anion(mol, anion_site: Dict[str, Any]) -> str:
             elif nb.GetSymbol() == 'P' and nb_has_carbon:
                 return 'phosphonate'
 
-            # P-72.2.2.2.1.1 (peroxy-acid anion): [O-]-O-C(=O)R (the acyl peroxo
+            # (peroxy-acid anion): [O-]-O-C(=O)R (the acyl peroxo
             # anion, e.g. CH3-CH2-CO-O-O- -> propaneperoxoate). The anionic O's
             # single heavy neighbour is a peroxy O whose OTHER neighbour is an acyl
             # carbon (a C bearing a double-bonded chalcogen). Distinct from a
@@ -210,9 +210,9 @@ def classify_anion(mol, anion_site: Dict[str, Any]) -> str:
         return 'alkoxide'
 
     elif element == 'N':
-        # P-72.2.2.2.4: an amide-type anion (N- on an acyl carbon, R-CO-NH-) is
+        #: an amide-type anion (N- on an acyl carbon, R-CO-NH-) is
         # named on the preselected azanide parent with the acyl group as a prefix
-        # (acetylazanide, BB 41079), NOT the amine 'aminide' suffix (P-72.2.2.2.3,
+        # (acetylazanide, BB 41079), NOT the amine 'aminide' suffix,
         # which is for an amine N- whose carbon is NOT acyl). Fires only for an N-
         # with exactly one heavy neighbour that is an acyl carbon (C=O/C=S/C=Se).
         heavy_n = [nb for nb in atom.GetNeighbors() if nb.GetSymbol() != 'H']
@@ -222,12 +222,12 @@ def classify_anion(mol, anion_site: Dict[str, Any]) -> str:
                 for b in heavy_n[0].GetBonds()):
             return 'acyl_azanide'
 
-        # P-72.2.2.2.3 (BB:41047/41049): "Amines and imines having one negative
+        # (the Blue Book): "Amines and imines having one negative
         # charge on each nitrogen atom are named by using the suffixes 'aminide'
         # and 'iminide', formed by the addition of the suffix 'ide' to the suffix
         # 'amine' or 'imine', respectively." An IMINE anion (=N-, the nitrogen
         # DOUBLY bonded to its skeletal neighbour and bearing the -1 charge) takes
-        # 'iminide' (BB:41061 butaniminide, :41063 trimethyl-lambda5-
+        # 'iminide' (the Blue Book butaniminide,:41063 trimethyl-lambda5-
         # phosphaniminide); a single-bonded amine anion (-N-) takes 'aminide'.
         # Discriminator: a double bond on the anionic nitrogen. This is checked
         # AFTER the acyl-azanide branch (whose N is single-bonded to an acyl C, so
@@ -243,7 +243,7 @@ def classify_anion(mol, anion_site: Dict[str, Any]) -> str:
         return 'carbanion'
 
     elif element == 'S':
-        # P-65.6.1 (dithioate anion): an [S-] bonded to a carbon that itself bears
+        # (dithioate anion): an [S-] bonded to a carbon that itself bears
         # a DOUBLE-bonded chalcogen (=O/=S/=Se) — a carbo(di)thioate acid carbon
         # R-C(=S)-S(-) / R-C(=O)-S(-) — is the CARBOXYLATE-ANALOG acid anion, NOT a
         # thiolate (R-S(-)). Its neutral form is a (di)thioic acid ending in
@@ -265,19 +265,19 @@ def classify_anion(mol, anion_site: Dict[str, Any]) -> str:
         # Sulfur anion (thiolate)
         return 'thiolate'
 
-    # F-T6 (DD3, P-72.2.2.1): a skeletal Group-14/15 heteroatom anion (loss of H+
+    # F- (DD3,: a skeletal Group-14/15 heteroatom anion (loss of H+
     # from a parent hydride) — P, As, Sb (phosphane/arsane/stibane), Si, Ge
     # (silane/germane). Named on the parent-hydride form with the -anide ending by
     # the emit_parent_hydride_cumulative_suffix heteroatom branch. NOT the
     # chalcogens (Se/Te ride the existing -ol/-selenol -> -olate/-selenolate
     # suffix map, since selenol/tellurol end in "ol"); NOT B (its anion is the
-    # P-72.3 -uide hydride-addition family, staged); N -> 'aminide' and O ->
+    # -uide hydride-addition family, staged); N -> 'aminide' and O ->
     # alkoxide/phenolate are handled above.
     #
-    # VALENCE GATE (code-review CR-03): a parent-hydride -ide anion is formed by
+    # VALENCE GATE (code-review): a parent-hydride -ide anion is formed by
     # H+ LOSS, so re-adding one H must restore the element's STANDARD-valence
     # neutral hydride: degree + H + 1 == valence. This EXCLUDES an over-coordinated
-    # centre — e.g. 4-coordinate (CH3)4Si- / (CH3)4Sn-, the P-72.3 -uide
+    # centre — e.g. 4-coordinate (CH3)4Si- / (CH3)4Sn-, the -uide
     # (hydride-ADDITION) family, which would over-valence on the +1 H and the
     # emitter cannot name. Those must stay 'unknown' so the neutral organometallic
     # / legacy path keeps naming them (tetramethylsilane), NOT get pulled out by
@@ -285,16 +285,16 @@ def classify_anion(mol, anion_site: Dict[str, Any]) -> str:
     # a 3-coordinate P (not a clean phosphanide — no P-H was lost).
     elif element in _HETEROATOM_HYDRIDE_IDE_VALENCE:
         dh = atom.GetDegree() + atom.GetTotalNumHs()
-        # P-72.2.2.1: -ide (H+ LOSS) — one bond BELOW standard valence.
+        #: -ide (H+ LOSS) — one bond BELOW standard valence.
         if dh + 1 == _HETEROATOM_HYDRIDE_IDE_VALENCE[element]:
             return 'heteroatom_hydride_anion'
-        # P-72.3 / P-72.8 (W4-I2): -uide (H- ADDITION) — one bond ABOVE standard
+        # / (W4-I2): -uide (H- ADDITION) — one bond ABOVE standard
         # valence. Generalizes the old Group-13-only -uide detection to Group-14/15
         # metalloids: (CH3)4P- -> tetramethylphosphanuide, C[SiH4-] -> methylsilanuide.
         if element in _UIDE_STD_VALENCE and dh == _UIDE_STD_VALENCE[element] + 1:
             return 'uide_anion'
 
-    # P-72.3 / P-72.8: the -uide (hydride-ADDITION) anion for elements NOT in the
+    # /: the -uide (hydride-ADDITION) anion for elements NOT in the
     # -ide (H+ loss) table — Group 13 (B/Al/Ga/In/Tl, the ate-complex / borate:
     # B(CH3)4- -> tetramethylboranuide) and the halogens (diphenyliodanuide). A
     # centre ONE bond above its standard bonding number carrying the -1 charge.
@@ -337,7 +337,7 @@ def classify_cation(mol, cation_site: Dict[str, Any]) -> str:
     atom = mol.GetAtomWithIdx(atom_idx)
 
     if element == 'N':
-        # Check for diazonium (P-73.2.2.3: the terminal -N2+ group, R-N+#N / R-N+=N).
+        # Check for diazonium: the terminal -N2+ group, R-N+#N / R-N+=N).
         # The diazo/diazonium linkage is ALWAYS a DOUBLE or TRIPLE N=N/N#N bond — NOT
         # a single or AROMATIC N-N. The prior check fired for ANY N neighbour, so it
         # mis-classified an adjacent-N AROMATIC ring cation (pyrazolium, pyridazinium,
@@ -352,7 +352,7 @@ def classify_cation(mol, cation_site: Dict[str, Any]) -> str:
                         Chem.BondType.DOUBLE, Chem.BondType.TRIPLE):
                     return 'diazonium'
 
-        # Phase 184 WS-E.1 (P-73.1.2.1): a QUATERNARY ammonium N (formal charge
+        # a phase.1: a QUATERNARY ammonium N (formal charge
         # +1, NO hydrogens to remove, degree >= 4) cannot be neutralized by the
         # proton-removal path the protonated-amine cascade uses — removing a
         # non-existent H leaves an over-valent neutral N and SanitizeMol raises
@@ -370,15 +370,15 @@ def classify_cation(mol, cation_site: Dict[str, Any]) -> str:
         return 'aminium'
 
     elif element == 'C':
-        # P-73.2.3.1 (BB 41623, PIN 'acetylium'/'cyclohexanecarbonylium'): an
+        # (BB 41623, PIN 'acetylium'/'cyclohexanecarbonylium'): an
         # acyl cation R-C(+)=O (formally -OH removed AS HYDROXIDE from a
         # carboxylic/-carboxylic acid) is 'acylium', NOT a carbenium 'ylium'.
         # It must be neutralized by RECONSTRUCTING THE ACID (add -OH back),
         # never the generic hydride-loss ('add H' -> aldehyde) path used for
         # plain carbenium ylium -- emit_acylium (charged_router.py) owns it.
         # SCOPE (deliberately narrow): only a DOUBLE bond to O. BB's rarer
-        # thio-/seleno-acid acylium variants (P-73.2.3.1 'pentanethioylium')
-        # and the DISTINCT P-73.2.3.2 N-ylium family (hydride loss from an
+        # thio-/seleno-acid acylium variants 'pentanethioylium')
+        # and the DISTINCT N-ylium family (hydride loss from an
         # amide/amine/imine NITROGEN, not this carbon-cation pattern) are a
         # separate, unverified family this phase does not build -- they stay
         # on the general 'ylium' path (which fails closed, never wrong).
@@ -531,7 +531,7 @@ def name_aminium_cation(parent_name: str) -> str:
         # Handle alkane-based names
         return name[:-1] + 'ium'
     else:
-        # F-T6 (DD3, P-73.1.2 elision): both branches above elide the final 'e'
+        # F- (DD3, elision): both branches above elide the final 'e'
         # before '-ium' (methanamine->methanaminium, methane->methylium-via-ane).
         # The else branch must ALSO elide a trailing 'e' for the same reason —
         # otherwise an aryl/retained amine parent ending in 'e' is mis-glued
@@ -584,7 +584,7 @@ def get_anion_suffix(anion_type: str) -> str:
     Get the appropriate suffix for an anion type.
 
     Args:
-        anion_type: Type from classify_anion()
+        anion_type: Type from classify_anion
 
     Returns:
         Suffix string (e.g., 'ate', 'olate', 'ide')
@@ -597,7 +597,7 @@ def get_cation_suffix(cation_type: str) -> str:
     Get the appropriate suffix for a cation type.
 
     Args:
-        cation_type: Type from classify_cation()
+        cation_type: Type from classify_cation
 
     Returns:
         Suffix string (e.g., 'ium', 'ylium', 'aminium')
@@ -605,10 +605,10 @@ def get_cation_suffix(cation_type: str) -> str:
     return CATION_SUFFIXES.get(cation_type, 'ium')
 
 
-# === ACID / AZANIDE ANION HELPERS (P-72.2.2.2.1 / P-72.2.2.2.4) ===
+# === ACID / AZANIDE ANION HELPERS / ===
 
 # Chalcogen-designated acid endings ("...thioic S-acid", "...thioic O-acid",
-# "...selenoic Se-acid", ...). For the ANION the italic chalcogen designator is
+# "...selenoic Se-acid",...). For the ANION the italic chalcogen designator is
 # dropped — both tautomers (CH3-CO-S- <-> CH3-CS-O-) name one delocalized -ate
 # (BB 40969/40971: ethanethioate / propanethioate). Longest first so " se-acid"
 # / " te-acid" win over " s-acid" / " o-acid".
@@ -616,7 +616,7 @@ _CHALCOGEN_ACID_DESIGNATORS = (' se-acid', ' te-acid', ' s-acid', ' o-acid')
 
 
 def _acid_anion_from_neutral(neutral_name: str) -> str:
-    """P-72.2.2.2.1.1 (BB 40953): the PIN of an anion formed by removing a hydron
+    """ (BB 40953): the PIN of an anion formed by removing a hydron
     from the chalcogen atom of an acid or PEROXYACID characteristic group is the
     neutral acid name with the 'ic acid'/'ous acid' ending replaced by 'ate'/'ite'.
     A chalcogen designator (S-/O-/Se-/Te-acid) is dropped first (the delocalized
@@ -628,11 +628,11 @@ def _acid_anion_from_neutral(neutral_name: str) -> str:
         return ''
     n = neutral_name.strip()
     low = n.lower()
-    # Enclosed acid form (P-65.1.5.1 / P-65.6.2.1): the neutral 'dithioic acid'/
+    # Enclosed acid form /: the neutral 'dithioic acid'/
     # 'dithioate' suffix is now parenthesised at count 1 ('propane(dithioic acid)'),
     # so the ending is INSIDE the enclosure and the plain endswith checks below miss
     # it. Swap within the trailing '(...)' and keep the marks -> 'propane(dithioate)'
-    # (BB:31569). Recurses on the inner acid text; returns '' (no change) if the
+    # (the Blue Book). Recurses on the inner acid text; returns '' (no change) if the
     # inner is not an acid, so a non-acid parenthesised name is untouched.
     if n.endswith(')') and '(' in n:
         head, _, tail = n.rpartition('(')
@@ -658,7 +658,7 @@ def _acid_anion_from_neutral(neutral_name: str) -> str:
 
 
 def _name_acid_chalcogen_anion(mol) -> str:
-    """P-72.2.2.2.1.1: name a peroxy-/thio-acid anion by re-protonating to the
+    """: name a peroxy-/thio-acid anion by re-protonating to the
     neutral acid, naming it, and applying the acid -> -ate/-ite transform. Covers
     the 'peroxy_acid_anion' and 'carbodithioate' classes (mono-thioate and
     dithioate). Returns '' on any decline (caller falls through)."""
@@ -666,7 +666,7 @@ def _name_acid_chalcogen_anion(mol) -> str:
     return _acid_anion_from_neutral(neutral) if neutral else ''
 
 
-# P-70.3.2 / P-72.2.2.2.2 / P-72.2.2.2.3: a COMPOUND suffix (olate/thiolate/
+# / /: a COMPOUND suffix (olate/thiolate/
 # peroxolate/aminide) takes the multiplying prefixes 'bis'/'tris'/... (NOT the
 # basic di/tri) — "to avoid any ambiguity" (BB 28180/41011). Maps the neutral
 # poly-parent's di/tri/... multiplier to the bis-series.
@@ -707,11 +707,11 @@ def _poly_to_bis_compound_suffix(neutral_name: str) -> str:
     return ''
 
 
-# P-73.5 (W4-I3): the CATION mirror of _poly_to_bis_compound_suffix. A homogeneous
+# (W4-I3): the CATION mirror of _poly_to_bis_compound_suffix. A homogeneous
 # poly-aminium (a +1 on each of >=2 amine N atoms of one parent) uses the 'aminium'
-# compound suffix multiplied by 'bis'/'tris' (NOT 'di'/'tri', P-70.3.2): the neutral
+# compound suffix multiplied by 'bis'/'tris' (NOT 'di'/'tri',: the neutral
 # poly-parent 'ethane-1,2-diamine' -> 'ethane-1,2-bis(aminium)' (BB 42340).
-# P-73.5.1.2 adds the nitrile mirror: a homogeneous poly-NITRILIUM (a protonated
+# adds the nitrile mirror: a homogeneous poly-NITRILIUM (a protonated
 # nitrile N on >=2 -C#[NH+] termini of one parent) maps the neutral poly-nitrile
 # name to the 'nitrilium' compound suffix, again bis/tris ('butanedinitrile' ->
 # 'butanebis(nitrilium)', [NH+]#CCCC#[NH+]). classify_cation returns 'aminium' for
@@ -725,8 +725,8 @@ _BIS_CATION_SUFFIXES = (
 
 
 def _poly_to_bis_cation_suffix(neutral_name: str) -> str:
-    """P-73.5 (BB 42340): a poly-amine cation (>= 2 protonated amine N) uses the
-    compound suffix 'aminium' multiplied by 'bis'/'tris' (P-70.3.2). Transforms the
+    """ (BB 42340): a poly-amine cation (>= 2 protonated amine N) uses the
+    compound suffix 'aminium' multiplied by 'bis'/'tris'. Transforms the
     re-entered NEUTRAL poly-parent name ('ethane-1,2-diamine' -> 'ethane-1,2-
     bis(aminium)'). Returns '' if the neutral is not a '...<di/tri>amine' poly form
     (a substituent-form / retained name falls through -> fail-closed)."""
@@ -747,7 +747,7 @@ def _walk_linear_carbon_bridge(mol, n1_idx: int, n2_idx: int) -> Optional[List[i
     bonded directly to ``n1_idx`` and whose last atom is bonded directly to
     ``n2_idx`` -- or ``None`` (fail closed) if no such simple path exists.
 
-    Used by ``emit_bis_quaternary_ammonium`` (P-73.5.1.1) to isolate the
+    Used by ``emit_bis_quaternary_ammonium`` to isolate the
     polymethylene linker of a symmetric bis-onium dication
     (``C[N+](C)(C)CCCCCC[N+](C)(C)C`` -> the 6-carbon bridge). Fails closed
     on:
@@ -801,7 +801,7 @@ def _walk_linear_carbon_bridge(mol, n1_idx: int, n2_idx: int) -> Optional[List[i
 
 
 def emit_bis_quaternary_ammonium(mol, cation_sites: List[Dict[str, Any]]) -> str:
-    """P-73.5.1.1 / P-73.5.1.2 (v33 Phase 3): a SYMMETRIC dication with
+    """ / (a phase): a SYMMETRIC dication with
     exactly two IDENTICAL quaternary-ammonium centres joined by a straight,
     saturated, unbranched, unsubstituted all-carbon bridge is named as a
     multiplicative assembly of parent cations::
@@ -811,7 +811,7 @@ def emit_bis_quaternary_ammonium(mol, cation_sites: List[Dict[str, Any]]) -> str
         C[N+](C)(C)CCCCCC[N+](C)(C)C
             -> hexane-1,6-diylbis(trimethylazanium)
 
-    (BB P-73.5.1.1, cf. the PIN example '(1,4-phenylene)bis(phosphanium)' and
+    (BB, cf. the PIN example '(1,4-phenylene)bis(phosphanium)' and
     '4,4′-(ethane-1,2-diyl)bis(1-methylpyridin-1-ium)'.)
 
     SCOPE (fail closed, i.e. return '', on anything else — asymmetric onium
@@ -820,7 +820,7 @@ def emit_bis_quaternary_ammonium(mol, cation_sites: List[Dict[str, Any]]) -> str
     fallback then owns the molecule unchanged):
 
       - exactly 2 cation sites, each N, formal charge +1, 0 attached H,
-        degree 4 (quaternary, P-73.1.2.1), NOT in a ring.
+        degree 4 (quaternary,, NOT in a ring.
       - the two nitrogens are joined by a SINGLE simple, unbranched,
         saturated, acyclic, all-carbon bridge (``_walk_linear_carbon_bridge``)
         of length >= 2 -- this both bounds scope and guarantees the bridge is
@@ -867,7 +867,7 @@ def emit_bis_quaternary_ammonium(mol, cation_sites: List[Dict[str, Any]]) -> str
 
 
 def _name_acyl_azanide(mol, anion_idx: int) -> str:
-    """P-72.2.2.2.4 (BB 41069/41079): an amide-type anion R-CO-NH- is named on the
+    """ (BB 41069/41079): an amide-type anion R-CO-NH- is named on the
     preselected 'azanide' parent with the acyl group cited as a prefix
     (CH3-CO-NH- -> acetylazanide). Build the neutral parent acid R-COOH (transmute
     the anionic N -> an -OH oxygen), name it, convert the acid name to the acyl
@@ -942,7 +942,7 @@ def name_anion(mol, style: str = 'pin', _depth: int = 0, retained_only: bool = F
 
     # Check retained names first (unless systematic requested). PIN style skips
     # general-only dicarboxylate retained names (malonate/succinate) so they fall
-    # through to the systematic '-dioate' PIN (P-65.6.2.1 / P-65.6.1.1).
+    # through to the systematic '-dioate' PIN /.
     if style != 'systematic':
         retained = get_anion_name(canonical, pin=(style == 'pin'))
         if retained:
@@ -952,13 +952,13 @@ def name_anion(mol, style: str = 'pin', _depth: int = 0, retained_only: bool = F
     if retained_only:
         return None
 
-    # WS-E.3-dianion (D-13, P-12.2 / P-34.1.4): a BARE carbon-free inorganic
+    #.3-dianion (, /: a BARE carbon-free inorganic
     # oxoacid anion ([O-]S(=O)(=O)[O-], [O-]P(=O)([O-])[O-], [O-]C(=O)[O-]) is
     # its preselected functional-parent anion word. Run BEFORE classify_anion,
     # which mis-routes both sulfate [O-] to 'alkoxide' (ions.py:114 needs
     # nb_has_carbon) -> _try_neutralize_and_name -> carbon-free 'unknown'.
     # Carbon-free guard => cannot intercept a sulfate/phosphate ESTER or the
-    # NP-conjugate path (steroid sulfate, gold WSC-03).
+    # NP-conjugate path (steroid sulfate, gold -03).
     inorganic = _name_inorganic_oxoacid_anion(mol)
     if inorganic:
         return _validate_anion_name(mol, inorganic)
@@ -985,7 +985,7 @@ def name_anion(mol, style: str = 'pin', _depth: int = 0, retained_only: bool = F
             return _validate_anion_name(
                 mol, _name_carboxylate_systematic(mol, anion_site))
 
-        # P-72.2.2.2.1.1 (W4-I2): peroxy-/thio-acid anions are named on the neutral
+        # (W4-I2): peroxy-/thio-acid anions are named on the neutral
         # acid name with 'ic acid'/'ous acid' -> 'ate'/'ite' (dropping the chalcogen
         # designator). This covers propaneperoxoate, ethanethioate and the
         # (di)thioate acid anions uniformly — the generic route_charged suffix seam
@@ -995,20 +995,20 @@ def name_anion(mol, style: str = 'pin', _depth: int = 0, retained_only: bool = F
             if acid_anion:
                 return _validate_anion_name(mol, acid_anion)
 
-        # P-72.2.2.2.4 (W4-I2): an amide-type anion (R-CO-NH-) is named on the
+        # (W4-I2): an amide-type anion (R-CO-NH-) is named on the
         # azanide parent with the acyl group as a prefix (acetylazanide, BB 41079).
         if anion_type == 'acyl_azanide':
             azanide = _name_acyl_azanide(mol, anion_site['atom_idx'])
             if azanide:
                 return _validate_anion_name(mol, azanide)
 
-        # P-72.2.2.2.1.2: acid-ester anion (phosphate/sulfate ester [O-]). Derive
+        #: acid-ester anion (phosphate/sulfate ester [O-]). Derive
         # the anion word in place (surviving -OH count); route_charged below
         # DECLINES this shape (charged_router.py:471/:475) and the neutralize
         # paths would emit the NEUTRAL word (a different molecule). Placed before
         # route_charged so a monoester monoanion / sulfate ester anion is named.
         #
-        # v33 charged Slice A fix-round 2 (class closure): this is the ester-anion
+        # charged Slice A fix-round 2 (class closure): this is the ester-anion
         # producer's 0-wrong gate. name_acid_ester_anion is NOT fail-closed at the
         # producer -- a cyclitol/inositol owner whose stereo OPSIN 2.9.0 cannot
         # CIP-verify (e.g. the phosphate/sulfate MONOanion of a hexahydroxycyclohexane)
@@ -1040,16 +1040,16 @@ def name_anion(mol, style: str = 'pin', _depth: int = 0, retained_only: bool = F
         if routed:
             return _validate_anion_name(mol, routed)
 
-        # Phase 182 (WSC-03, D-04/D-09/D-10): natural-product conjugate ANION. route_charged
+        # a phase (-03, //): natural-product conjugate ANION. route_charged
         # deliberately declines a sulfate/phosphate ESTER [O-] (charged_router.py:386-389:
         # "out of scope -> neutral-form names it"), and the neutralize-recurse below would
         # strip the charge BEFORE the NP path sees it, emitting the free-acid word
         # ("hydrogen sulfate") which does NOT OPSIN-round-trip to the anion. To derive the
-        # correct anion word ("sulfate") per D-04 (classify the protonation state IN PLACE,
+        # correct anion word ("sulfate") per (classify the protonation state IN PLACE,
         # never neutralize-then-rename), let the NP conjugate path see the CHARGED mol here.
-        # NARROW gate (D-09): only when an unclaimed sulfate/phosphate/glycosyl conjugate is
+        # NARROW gate : only when an unclaimed sulfate/phosphate/glycosyl conjugate is
         # present on a recognized NP scaffold; the NP path internally RT-gates the conjugate
-        # name (D-10), so a returned name has already round-tripped. Non-conjugate anions are
+        # name , so a returned name has already round-tripped. Non-conjugate anions are
         # untouched. The NP path returns None (honest-fail) for anything it cannot name.
         np_conj = _name_np_conjugate_anion(mol)
         if np_conj:
@@ -1060,7 +1060,7 @@ def name_anion(mol, style: str = 'pin', _depth: int = 0, retained_only: bool = F
             result = _name_oxoacid_anion(mol, style)
             return _validate_anion_name(mol, result)
 
-        # v32 Phase 3A-c (0-wrong): _try_neutralize_and_name NEVER re-applies
+        # a phase-c (0-wrong): _try_neutralize_and_name NEVER re-applies
         # an ionic suffix -- its own docstring is "Neutralize a multi-charged
         # ion and name the organic skeleton". Accepting its bare neutral name
         # as the FINAL name for a genuine single anion silently drops the
@@ -1070,13 +1070,13 @@ def name_anion(mol, style: str = 'pin', _depth: int = 0, retained_only: bool = F
         # has no dedicated boron-oxoacid-anion category and buckets it as
         # 'alkoxide', which does not apply) and shipped ``boric acid``, which
         # OPSIN round-trips to the NEUTRAL ``OB(O)O``, not the charged input
-        # (SELF-01 caught this only via the JVM backstop). Decline structurally
-        # here instead (invariant 16: that backstop fails OPEN without a JVM)
+        # (caught this only via the JVM backstop). Decline structurally
+        # here instead (a project rule: that backstop fails OPEN without a JVM)
         # -- never emit a name for a different molecule.
         return ''
 
     # Multiple anions - try neutralize-then-name approach.
-    # CR-02 (code review 2026-06-02): a fully-deprotonated S/P-oxoacid (e.g. the
+    # (code review 2026-06-02): a fully-deprotonated S/P-oxoacid (e.g. the
     # methylphosphonate DIANION, CP(=O)([O-])[O-]) reaches this branch with
     # len(anions) >= 2 and MUST NOT ship the neutral acid name. _name_oxoacid_anion
     # already neutralizes ALL non-internal [O-] and applies the canonical ionic
@@ -1090,19 +1090,19 @@ def name_anion(mol, style: str = 'pin', _depth: int = 0, retained_only: bool = F
         if oxo_name:
             return _validate_anion_name(mol, oxo_name)
 
-    # P-72.2.2.2.1.2: a multi-[O-] acid-ester anion (a phosphate monoester
+    #: a multi-[O-] acid-ester anion (a phosphate monoester
     # DIANION reaches here with len(anions) == 2). Derive the anion word in
     # place; _try_neutralize_and_name below would emit the NEUTRAL word which
     # OPSIN round-trips to a different (neutral) molecule -> gate rejects.
     #
-    # v33 charged Slice A fix-round: sibling of dispatch_table.py::_handle_poly_anion's
+    # charged Slice A fix-round: sibling of dispatch_table.py::_handle_poly_anion's
     # ester-anion branch, and the producer here is subject to the SAME failure modes
     # (mis-numbered identical-diacyl owner -> wrong constitution; cyclitol/inositol
-    # stereo OPSIN 2.9.0 cannot CIP-parse). Verified via head_ab against 00180b23
+    # stereo OPSIN 2.9.0 cannot CIP-parse). Verified via an A/B check against 00180b23
     # (pre-Slice-A): a cyclitol-phosphate dianion already reached exactly THIS call
     # site and shipped a stereo-unverified name before any Slice A code existed --
     # dispatch_table.py's own neutralize-then-name fallback bare-returns the neutral
-    # (charge-dropping) name for a non-carboxylate anion, SELF-01 correctly suppresses
+    # (charge-dropping) name for a non-carboxylate anion, correctly suppresses
     # THAT wrong-molecule candidate, and the cascade falls through to here, which had
     # no gate. Require the SAME strict full-InChIKey round-trip (constitution + stereo
     # + charge) so an unverifiable name ABSTAINS instead of shipping.
@@ -1119,20 +1119,20 @@ def name_anion(mol, style: str = 'pin', _depth: int = 0, retained_only: bool = F
                     return validated
         # strict RT could not confirm the name -> fall through (abstain / other paths)
 
-    # v36 A1 Task 5 (defect C): sibling of the single-anion branch's identical
+    # A1 Task 5 (defect C): sibling of the single-anion branch's identical
     # call above (:1019) -- a natural-product scaffold carrying an unclaimed
     # sulfate/phosphate/glycosyl conjugate that is FULLY deprotonated (a
     # mono-phosphate-ester DIANION, e.g. disodium dexamethasone-21-phosphate)
     # reaches this multi-anion branch (len(anions) == 2) and used to fall
     # straight through to `_try_neutralize_and_name`, which re-protonates both
     # acid oxygens and names the resulting NEUTRAL diester -- a 'dihydrogen
-    # phosphate' word for a molecule that has no free acid -OH at all (D-04
+    # phosphate' word for a molecule that has no free acid -OH at all (
     # violation: the neutral word denotes a DIFFERENT, uncharged molecule).
     # `_name_np_conjugate_anion` already derives the anion word IN PLACE from
     # the CHARGED mol (conjugate_controller.PHOSPHATE_WORD keyed on the
     # PROTONATED oxygen count, which is 0 here -> 'phosphate', no
     # hydrogen/dihydrogen token) and internally RT-gates its own result
-    # (D-10), so wiring it in here needs no additional verification -- it is
+    # , so wiring it in here needs no additional verification -- it is
     # the same producer the single-anion branch already trusts, reached one
     # branch later. '' (no NP scaffold / no conjugate / NP path declined) ->
     # fall through unchanged.
@@ -1143,18 +1143,18 @@ def name_anion(mol, style: str = 'pin', _depth: int = 0, retained_only: bool = F
     neutral_name = _try_neutralize_and_name(mol)
     if neutral_name:
         # Convert acid suffixes to carboxylate suffixes for deprotonated
-        # carboxylate sites (IUPAC P-72.2.1: -oic acid -> -oate)
+        # carboxylate sites (IUPAC: -oic acid -> -oate)
         carboxylate_count = sum(
             1 for a in anions if classify_anion(mol, a) == 'carboxylate'
         )
         if carboxylate_count > 0:
             anion_name = _acid_name_to_carboxylate(neutral_name, carboxylate_count)
             if anion_name:
-                # P-72.6: cite any JUNIOR anionic group (not in the parent) by its
+                #: cite any JUNIOR anionic group (not in the parent) by its
                 # anionic prefix (carboxylato/oxido) instead of the neutral carboxy/hydroxy.
                 anion_name = _apply_anionic_substituent_prefixes(mol, anions, anion_name)
                 return _validate_anion_name(mol, anion_name)
-            # FIX 3b (v33 charged C1, cysteinate multi-anion stack): the
+            # FIX 3b (charged C1, cysteinate multi-anion stack): the
             # retained neutral name (e.g. an amino-acid word like
             # 'L-cysteine') has no convertible '-oic acid'/'-ic acid'
             # suffix, so a second anionic centre (a thiolate riding
@@ -1174,7 +1174,7 @@ def name_anion(mol, style: str = 'pin', _depth: int = 0, retained_only: bool = F
                     validated = _validate_anion_name(mol, sys_anion_name)
                     if validated:
                         # 0-wrong: this candidate is derived from a
-                        # constructed systematic name the top-level SELF-01
+                        # constructed systematic name the top-level
                         # gate has not yet seen -- strictly RT-gate it here
                         # (full InChIKey: charges + stereo) before shipping,
                         # matching the ester-anion RT pattern elsewhere in
@@ -1236,9 +1236,9 @@ def name_cation(mol, style: str = 'pin', _depth: int = 0, retained_only: bool = 
     # Get canonical SMILES for lookup
     canonical = Chem.MolToSmiles(mol, canonical=True)
 
-    # Check retained names first (unless systematic requested). v28 Cluster C
-    # (P-73.1.2.1): on the PIN path skip the general-only alkylammonium retained
-    # names so the systematic aminium PIN (methanaminium, ...) from route_charged
+    # Check retained names first (unless systematic requested).
+    #: on the PIN path skip the general-only alkylammonium retained
+    # names so the systematic aminium PIN (methanaminium,...) from route_charged
     # wins; they stay available for general/common style. 'ammonium' (NH4+) is a
     # genuine retained PIN and is not in PIN_NONPREFERRED_CATIONS.
     if style != 'systematic':
@@ -1283,7 +1283,7 @@ def name_cation(mol, style: str = 'pin', _depth: int = 0, retained_only: bool = 
 
         return _validate_cation_name(mol, result)
 
-    # Multiple cations - route through the chokepoint FIRST (W4-I3, P-73.5): a
+    # Multiple cations - route through the chokepoint FIRST (W4-I3,: a
     # homogeneous poly-aminium becomes the bis/tris(aminium) compound-suffix PIN
     # ([NH3+]CC[NH3+] -> ethane-1,2-bis(aminium)). route_charged returns '' for
     # every OTHER multi-cation shape (fail-closed), so the existing
@@ -1309,12 +1309,12 @@ def name_cation(mol, style: str = 'pin', _depth: int = 0, retained_only: bool = 
 # === NAME VALIDATION GUARDS ===
 
 def _name_np_conjugate_anion(mol) -> str:
-    """Name a natural-product conjugate ANION via the NP conjugate path (Phase 182, WSC-03).
+    """Name a natural-product conjugate ANION via the NP conjugate path (a phase, -03).
 
     Fires ONLY when the charged molecule is a recognized NP scaffold carrying an unclaimed
-    sulfate / mono-phosphate / glycosyl conjugate (D-09 narrow gate). Naming the CHARGED mol
-    lets the conjugate controller derive the anion word IN PLACE (D-04 — `sulfate`, not
-    `hydrogen sulfate`), and the NP path internally RT-gates the conjugate name (D-10). Returns
+    sulfate / mono-phosphate / glycosyl conjugate (narrow gate). Naming the CHARGED mol
+    lets the conjugate controller derive the anion word IN PLACE (— `sulfate`, not
+    `hydrogen sulfate`), and the NP path internally RT-gates the conjugate name . Returns
     '' (no match / not a conjugate / NP path declined) so the caller falls through to the
     legacy neutralize-recurse cascade unchanged.
 
@@ -1353,12 +1353,12 @@ def _is_bare_methylidene_leak(result: str) -> bool:
     """True if 'methylidene' is the BARE, suffix-less TERMINAL token of an ion
     name -- the actual radical-leak shape a name-validation guard must reject
     -- as opposed to a legitimate one-carbon ylidene-OWNER substituent
-    embedded in a larger construction (e.g. '...methylideneamino ...',
+    embedded in a larger construction (e.g. '...methylideneamino...',
     '...methylidenehydrazin...-ium-...-ide'), which always has more text
     after 'methylidene' because it names a substituent attached to something
     else, never the standalone charged species itself.
 
-    SPY (2026-08-17, v33 Phase 3 review follow-up): Plan 17-06 (2026-02-05)
+    a trace (2026-08-17, a phase review follow-up): Plan 17-06 (2026-02-05)
     added a blind ``'methylidene' in result`` substring guard against a
     "radical name leaking into ion naming" but recorded no reproducing
     molecule -- none of its own 5 canary SMILES ever produced the substring
@@ -1411,7 +1411,7 @@ def _validate_anion_name(mol, result: str) -> str:
     if _is_bare_methylidene_leak(result):
         return ''
 
-    # D-10 (Table 3.4 / P-72.2.2.1): a carbanion '-ide' name is a valid anion
+    # (Table 3.4 /: a carbanion '-ide' name is a valid anion
     # ending. Explicitly accept it (it passes today via no rejecting guard, but a
     # future guard must not silently suppress it). The single existing risk is the
     # bare-methylidene radical-leak guard above — '-ide' (preceded by 'an-N-') is a
@@ -1446,7 +1446,7 @@ def _validate_cation_name(mol, result: str) -> str:
     if 'aminium' in result:
         from rdkit.Chem import MolFromSmarts
         # Match protonated or neutral amines: NH3+, NH2+R, NH+R2, N+R3, NH2, NHR, NR2
-        # Phase 184 WS-E.1 D-10: the H0 term of [NX4;H1,H2,H3,H0] ALREADY matches a
+        # a phase.1: the H0 term of [NX4;H1,H2,H3,H0] ALREADY matches a
         # QUATERNARY [NX4;H0] N+, so a systematic quaternary '-aminium' PIN (e.g.
         # 'N,N,N-trimethylmethanaminium' from name_quaternary_aminium) is accepted
         # here unchanged. This comment is defense-in-depth: a future tightening of
@@ -1464,7 +1464,7 @@ def _validate_cation_name(mol, result: str) -> str:
     if _is_bare_methylidene_leak(result):
         return ''
 
-    # 0-wrong (v33 Phase 4 Lever B): a cation name MUST preserve the input's
+    # 0-wrong (a phase Lever B): a cation name MUST preserve the input's
     # net positive charge. The multi-cation neutralize-and-name fallback
     # (name_cation ~:1170) can return a bare NEUTRAL skeleton name, which
     # name_salt then pairs with a halide into a WRONG molecule (CHEBI:53452
@@ -1577,14 +1577,14 @@ def _try_neutralize_and_name_systematic(mol) -> str:
     """Sibling of ``_try_neutralize_and_name`` that requests the SYSTEMATIC
     (non-retained) name for the fully-neutralized skeleton.
 
-    FIX 3b (v33 charged C1, cysteinate multi-anion stack): the multi-anion
+    FIX 3b (charged C1, cysteinate multi-anion stack): the multi-anion
     branch neutralizes ALL charges and names the skeleton via the default
     (retained-name-preferring) pipeline, e.g. cysteinate's fully-neutral form
     ([O-] AND [S-] both re-protonated) resolves to the retained amino-acid
     word ``'L-cysteine'``. That word has NO morpheme for a SECOND anionic
     centre (the thiolate) -- re-ionizing only its carboxyl ('L-cysteinate')
     round-trips to the WRONG molecule (thiol intact, only the carboxylate
-    charged; SELF-01 correctly rejects it). The SYSTEMATIC acid name
+    charged; correctly rejects it). The SYSTEMATIC acid name
     (``'(2R)-2-amino-3-sulfanylpropanoic acid'``) DOES carry a convertible
     '-oic acid' suffix and a substituent prefix (``sulfanyl``) that
     ``_apply_anionic_substituent_prefixes`` can re-ionize to ``sulfido``.
@@ -1632,7 +1632,7 @@ def _try_neutralize_and_name_systematic(mol) -> str:
     return ''
 
 
-# WR-05 (code review 2026-06-02): the exact set of neutral-acid suffixes a
+# (code review 2026-06-02): the exact set of neutral-acid suffixes a
 # routed S/P-oxoacid anion can carry. Passed by _name_oxoacid_anion to restrict
 # _ionize_acid_name's trailing-suffix match to GENUINE oxoacid suffixes, so the
 # short bare entries of _ANION_SUFFIX_MAP ("ol", "amine", "thiol", "amide") can
@@ -1644,51 +1644,51 @@ _OXOACID_NEUTRAL_SUFFIXES = frozenset({
 
 
 # =============================================================================
-# 169.6-02 (CHOKE-02, D-10/D-11): class-keyed cation re-application transforms.
+# 169.6-02 (CHOKE-02, /): class-keyed cation re-application transforms.
 #
 # Three cation classes are NOT plain neutral->ionic suffix swaps (they cannot be
 # expressed in the flat _CATION_SUFFIX_MAP because the transform depends on the
 # CATION CLASS, and on WHICH neutral form was neutralized to — acid vs hydride;
-# CONTEXT D-02). They are encoded here as a STRUCTURED, declarative, class-keyed
+# internal notes). They are encoded here as a STRUCTURED, declarative, class-keyed
 # table (the same single-source-of-truth pattern as _CATION_SUFFIX_MAP, NOT a
-# growing list of molecule-specific .replace calls — fix-methodology.md). Each
+# growing list of molecule-specific.replace calls — fix-methodology.md). Each
 # row carries its verbatim Blue Book authority; the longest matching neutral
 # suffix wins so 'carboxylic acid' is tried before 'ic acid'.
 #
-#   ylium     (carbenium)  parent-hydride 'ane'->'ylium'  methane->methylium
-#                          [P-73.2.2.1.1] — methylium is the PIN; "carbenium" is
-#                          NOT a substitutive PIN. Empty->'ium' is WRONG here.
-#   acylium                operates on the ACID name: 'oic acid'->'oylium',
-#                          'carboxylic acid'->'carbonylium'  [P-73.2.3.1]
-#   diazonium              append 'diazonium' to the hydride name (no elision,
-#                          consonant-initial)  [P-73.2.2.3]
+# ylium (carbenium) parent-hydride 'ane'->'ylium' methane->methylium
+#  — methylium is the PIN; "carbenium" is
+# NOT a substitutive PIN. Empty->'ium' is WRONG here.
+# acylium operates on the ACID name: 'oic acid'->'oylium',
+# 'carboxylic acid'->'carbonylium'
+# diazonium append 'diazonium' to the hydride name (no elision,
+# consonant-initial)
 #
 # A trailing ('', suffix) row means "append <suffix> to the whole name" (no stem
 # removal) — used by diazonium, which never strips a neutral ending.
 _CLASS_KEYED_CATION_TRANSFORMS = {
-    # P-73.2.2.1.1: 'ane'->'ylium' (methane->methylium, ethane->ethylium,
+    #: 'ane'->'ylium' (methane->methylium, ethane->ethylium,
     # propane->propylium, cyclobutane->cyclobutylium). The general 'append ylium
     # eliding final e' case is reached via the ('e','ylium') / ('','ylium') rows.
     'ylium': (
-        ('ane', 'ylium'),     # P-73.2.2.1.1 (saturated terminal / Group-14)
-        ('ene', 'enylium'),   # P-73.2.2.1 general: keep unsaturation, append ylium with e-elision
-        ('yne', 'ynylium'),   # P-73.2.2.1 general
-        ('e', 'ylium'),       # P-73.2.2.1 general: elide a trailing 'e' then append ylium
-        ('', 'ylium'),        # P-73.2.2.1 general: no final 'e' -> append ylium
+        ('ane', 'ylium'),     # (saturated terminal / Group-14)
+        ('ene', 'enylium'),   # general: keep unsaturation, append ylium with e-elision
+        ('yne', 'ynylium'),   # general
+        ('e', 'ylium'),       # general: elide a trailing 'e' then append ylium
+        ('', 'ylium'),        # general: no final 'e' -> append ylium
     ),
-    # P-73.2.3.1: acid name -> acylium. 'oic acid'->'oylium',
+    #: acid name -> acylium. 'oic acid'->'oylium',
     # 'carboxylic acid'->'carbonylium' (butanoic acid->butanoylium,
     # cyclohexanecarboxylic acid->cyclohexanecarbonylium).
     'acylium': (
-        ('carboxylic acid', 'carbonylium'),  # P-73.2.3.1
-        ('oic acid', 'oylium'),              # P-73.2.3.1
-        ('ic acid', 'ylium'),                # P-73.2.3.1
+        ('carboxylic acid', 'carbonylium'),  #
+        ('oic acid', 'oylium'),              #
+        ('ic acid', 'ylium'),                #
     ),
-    # P-73.2.2.3: append 'diazonium' to the hydride name (no e-elision; the
+    #: append 'diazonium' to the hydride name (no e-elision; the
     # suffix is consonant-initial). benzene->benzenediazonium,
     # methane->methanediazonium.
     'diazonium': (
-        ('', 'diazonium'),  # P-73.2.2.3
+        ('', 'diazonium'),  #
     ),
 }
 
@@ -1709,12 +1709,12 @@ def apply_ion_suffix_to_name(name: str, total_charge: int,
 
     1. ``cation_class`` in {ylium, acylium, diazonium} -> the class-keyed
        transform table ``_CLASS_KEYED_CATION_TRANSFORMS`` (these are NOT plain
-       suffix swaps and depend on the neutralized form, CONTEXT D-02):
+       suffix swaps and depend on the neutralized form, internal notes):
          - ylium (carbenium): parent-hydride ``ane``->``ylium``
-           (``methane``->``methylium``; P-73.2.2.1.1; ``methylium`` is the PIN).
+           (``methane``->``methylium``;; ``methylium`` is the PIN).
          - acylium: on the ACID name, ``oic acid``->``oylium`` /
-           ``carboxylic acid``->``carbonylium`` (P-73.2.3.1).
-         - diazonium: append ``diazonium`` to the hydride name (P-73.2.2.3).
+           ``carboxylic acid``->``carbonylium``.
+         - diazonium: append ``diazonium`` to the hydride name.
 
     2. Otherwise the generic map-driven path (anion/protonated-amine etc.):
        longest trailing neutral suffix in the relevant SUFFIX_MAP wins.
@@ -1727,7 +1727,7 @@ def apply_ion_suffix_to_name(name: str, total_charge: int,
     (map) path only; the class-keyed cation path is already class-gated.
 
     Returns the ionized name, or '' if no canonical transform applies (the caller
-    then falls through to the existing cascade — v18 byte-identical contract).
+    then falls through to the existing cascade — byte-identical contract).
     """
     if not name:
         return ''
@@ -1742,7 +1742,7 @@ def apply_ion_suffix_to_name(name: str, total_charge: int,
                 return name[:-len(neutral_suffix)] + ionic_suffix
         return ''
 
-    # --- Path 2: generic structured-seam map (anion / protonated amine / ...) -
+    # --- Path 2: generic structured-seam map (anion / protonated amine /...) -
     from ..assembly.resolvers import (
         _ANION_SUFFIX_MAP,
         _CATION_SUFFIX_MAP,
@@ -1767,21 +1767,21 @@ def apply_ion_suffix_to_name(name: str, total_charge: int,
 
 # === CUMULATIVE PARENT-HYDRIDE SUFFIX (anion -ide / cation -ium / radical -yl) ==
 
-# P-72.2.2.1 (anion, loss of H+ -> -ide) / P-71 + Table 3.4 (radical, loss of
-# H. -> -yl/-ylidene/-ylidyne) / P-73.1.2 (cation -ium): the number of hydrogens
+# (anion, loss of H+ -> -ide) / + Table 3.4 (radical, loss of
+# H. -> -yl/-ylidene/-ylidyne) / (cation -ium): the number of hydrogens
 # the centre gains (anion) or loses (radical/cation) to recover the SATURATED
 # neutral parent hydride. For an anion centre (e.g. [CH-]) the parent gains 1 H
 # back ([CH2]); for a monovalent radical it gains 1 H, divalent 2, trivalent 3;
 # for a cation it has 1 H too few, so the parent gains... no: a -ium centre is
-# protonated, so the parent loses 1 H. (BlueBookV2/BlueBookV2.md Table 3.4,
+# protonated, so the parent loses 1 H. (the Blue Book Blue Book Table 3.4,
 # lines 17580-17608.)
 _CUMULATIVE_SUFFIX_H_DELTA = {
-    'ide': +1,        # P-72.2.2.1: anion gained an electron pair losing H+; parent re-adds 1 H
-    'yl': +1,         # P-71 / Table 3.4: monovalent radical; parent re-adds 1 H
-    'ylidene': +2,    # P-71: divalent radical; parent re-adds 2 H
-    'ylidyne': +3,    # P-71: trivalent radical; parent re-adds 3 H
-    'ium': -1,        # P-73.1.2: cation is protonated; parent removes 1 H
-    'ylium': +1,      # P-73.2.2.1.1: carbenium lost H- (hydride); parent re-adds 1 H
+    'ide': +1,        #: anion gained an electron pair losing H+; parent re-adds 1 H
+    'yl': +1,         # / Table 3.4: monovalent radical; parent re-adds 1 H
+    'ylidene': +2,    #: divalent radical; parent re-adds 2 H
+    'ylidyne': +3,    #: trivalent radical; parent re-adds 3 H
+    'ium': -1,        #: cation is protonated; parent removes 1 H
+    'ylium': +1,      #: carbenium lost H- (hydride); parent re-adds 1 H
 }
 
 
@@ -1790,17 +1790,17 @@ def emit_parent_hydride_cumulative_suffix(mol, center_idx: int, suffix: str) -> 
     on a single carbon centre, with a FIRST-CLASS locant.
 
     suffix in {'ide', 'ium', 'yl', 'ylidene', 'ylidyne'}.
-      'ide'      -> P-72.2.2.1 / Table 3.4 (anion, loss of H+)
-      'yl'/'ylidene'/'ylidyne' -> P-71 / Table 3.4 (radical, loss of H.)
-      'ium'      -> P-73.1.2 (cation; reserved for later reuse)
+      'ide' -> / Table 3.4 (anion, loss of H+)
+      'yl'/'ylidene'/'ylidyne' -> / Table 3.4 (radical, loss of H.)
+      'ium' -> (cation; reserved for later reuse)
 
     center_idx is the atom index OF THE CHARGED/RADICAL CARBON ON ``mol`` (the
     index-preserving mol passed in — NOT a freshly canonicalized copy; canonical
     SMILES reorders atoms, RESEARCH Pitfall 1). The centre gets the LOWEST locant
     over the re-found chain, competing with unsaturation and substituents per
-    P-31.1.4 / P-14.4 (``orient_chain`` criterion (a), principal_group_atoms =
-    {center_idx}). This is a NEW P-72.2.2.1 numbering call ("locants identify
-    positions of the negative charges", BlueBookV2 lines 40876-40902), NOT a
+     / (``orient_chain`` criterion (a), principal_group_atoms =
+    {center_idx}). This is a NEW numbering call ("locants identify
+    positions of the negative charges", the Blue Book lines 40876-40902), NOT a
     reused -ol / FG anchor and NOT a hand-rolled carbon-counting scan.
 
     Returns '' on any failure (caller falls through to legacy).
@@ -1813,17 +1813,17 @@ def emit_parent_hydride_cumulative_suffix(mol, center_idx: int, suffix: str) -> 
     except (RuntimeError, IndexError, OverflowError):
         return ''
 
-    # --- 1b. Dispatch by centre type (F-T6 / DD3) -----------------------------
+    # --- 1b. Dispatch by centre type (F- / DD3) -----------------------------
     # The body below is the ORIGINAL acyclic-carbon parent-hydride path (carbanion
     # -ide, radical -yl/-ylidene/-ylidyne) — kept byte-identical. Two generalized
     # branches are split out so the charge is never dropped for the families the
     # carbon-chain path cannot reach:
-    #   (a) RING-MEMBER centre (ring carbanion -ide / ring-N -ium): use the ring
-    #       numbering, not find_principal_chain (which would LINEARIZE the ring —
-    #       cyclohexanide `[CH-]1CCCCC1` -> `hexan-1-ide`, a different molecule).
-    #   (b) ACYCLIC non-carbon heteroatom centre (P/As/Sb/Si/Ge -ide): name the
-    #       parent hydride (phosphane/silane/...) and add the -anide ending.
-    # Each branch fail-closes ('' -> legacy), preserving the v18 no-crash contract.
+    # (a) RING-MEMBER centre (ring carbanion -ide / ring-N -ium): use the ring
+    # numbering, not find_principal_chain (which would LINEARIZE the ring —
+    # cyclohexanide `[CH-]1CCCCC1` -> `hexan-1-ide`, a different molecule).
+    # (b) ACYCLIC non-carbon heteroatom centre (P/As/Sb/Si/Ge -ide): name the
+    # parent hydride (phosphane/silane/...) and add the -anide ending.
+    # Each branch fail-closes ('' -> legacy), preserving the no-crash contract.
     if center.IsInRing():
         return _emit_ring_cumulative_suffix(mol, center_idx, suffix)
     if center.GetSymbol() != 'C':
@@ -1856,7 +1856,7 @@ def emit_parent_hydride_cumulative_suffix(mol, center_idx: int, suffix: str) -> 
     try:
         fgs = detect_functional_groups(work_mol)
         # A bare parent hydride has NO principal characteristic group; the centre
-        # is located via the NEW P-72.2.2.1 numbering call below, not an FG.
+        # is located via the NEW numbering call below, not an FG.
         chain = find_principal_chain(work_mol, fgs, principal_group=None)
     except (RuntimeError, ValueError, KeyError):
         return ''
@@ -1869,13 +1869,13 @@ def emit_parent_hydride_cumulative_suffix(mol, center_idx: int, suffix: str) -> 
     # ring-bearing molecule with an EXOCYCLIC centre would still be mis-named as a
     # straight chain — e.g. `[CH-]CC1CCCCC1` -> `octan-1-yl` (the 6 ring carbons
     # absorbed into an 8-carbon chain), a structurally DIFFERENT molecule. The
-    # early `center.IsInRing()` guard only catches a centre that is ITSELF a ring
+    # early `center.IsInRing` guard only catches a centre that is ITSELF a ring
     # atom; this catches the ring-absorbed-into-chain case. If ANY chain atom is a
     # ring member, this acyclic parent-hydride primitive is out of scope -> legacy.
     if any(work_mol.GetAtomWithIdx(i).IsInRing() for i in chain):
         return ''
 
-    # --- 4. Orient the chain so the centre gets the lowest locant (P-72.2.2.1) -
+    # --- 4. Orient the chain so the centre gets the lowest locant -
     from .locants import build_atom_to_locant, orient_chain
     chain_set = set(chain)
     double_bonds: List[tuple] = []
@@ -1918,8 +1918,8 @@ def emit_parent_hydride_cumulative_suffix(mol, center_idx: int, suffix: str) -> 
 
     # 5a. Substituent prefixes with their ORIENTED locants. Each substituent is
     # named via the shared classify_substituent (alkyl/ring), grouped by name,
-    # given its chain-carbon locant, alphabetized (P-14.5.2) and multiplied
-    # (P-16.3.3) — the same machinery the neutral acyclic namer uses.
+    # given its chain-carbon locant, alphabetized and multiplied
+    # — the same machinery the neutral acyclic namer uses.
     # subs_by_position keys are 1-based positions on the ORIGINAL ``chain`` order;
     # map each back to its atom index, then to its oriented locant via loc_map.
     parent_atoms = chain_set
@@ -1947,7 +1947,7 @@ def emit_parent_hydride_cumulative_suffix(mol, center_idx: int, suffix: str) -> 
         prefix_parts.append((alpha_sort_key(sub_name), locants_sorted[0],
                              f"{loc_str}-{body}"))
     prefix_parts.sort(key=lambda t: (t[0], t[1]))
-    # P-14.5.2: detachable prefixes join one another and the parent stem directly
+    #: detachable prefixes join one another and the parent stem directly
     # (the locant-hyphen is INTERNAL to each prefix block); '3-methyl' + 'butan-2-ide'
     # -> '3-methylbutan-2-ide', NEVER '3-methyl-butan-2-ide'.
     prefix_str = ''.join(p[2] for p in prefix_parts)
@@ -1971,10 +1971,10 @@ def emit_parent_hydride_cumulative_suffix(mol, center_idx: int, suffix: str) -> 
             unsat_endings += f"{joiner}-{','.join(map(str, t_locs))}-{tmult}yn"
 
     # 5c. Stem + 'an' + (unsaturation) + cumulative-suffix locant + suffix.
-    # Single-carbon special case (D-09 methanide): one-atom chain -> NO locant
+    # Single-carbon special case (methanide): one-atom chain -> NO locant
     # ('methane' -> 'methanide'). Otherwise the centre locant is first-class.
     if chain_len == 1:
-        # methane -> methanide / methyl / methylidene ...
+        # methane -> methanide / methyl / methylidene...
         core = f"{stem}an{suffix}"
     elif unsat_endings:
         # 'but-3-en' already carries its own trailing locant on the unsaturation;
@@ -1987,9 +1987,9 @@ def emit_parent_hydride_cumulative_suffix(mol, center_idx: int, suffix: str) -> 
     return f"{prefix_str}{core}"
 
 
-# P-77.1.2 / P-77.2.2 (P-73.1.2.1 / P-72.2.2.2.2): a fragment with ONE ionized
+# / /: a fragment with ONE ionized
 # heteroatom centre but SEVERAL equivalent characteristic groups — a mono-
-# protonated polyAMINE or a mono-deprotonated polyOL / polythiol. Per P-72/P-73
+# protonated polyAMINE or a mono-deprotonated polyOL / polythiol. Per /
 # the CHARGED group is the principal characteristic group (the -aminium / -olate /
 # -thiolate suffix); the identical NEUTRAL sibling groups differ only by not
 # bearing the charge, so they are demoted to hydroxy / sulfanyl / amino PREFIXES
@@ -1997,7 +1997,7 @@ def emit_parent_hydride_cumulative_suffix(mol, center_idx: int, suffix: str) -> 
 # this the neutralize-all path re-enters a symmetric di-ol / di-amine and applies
 # the ionic suffix to BOTH groups (`ethane-1,2-diolate` / `ethane-1,2-diaminium`),
 # a name that encodes TWO charges — the validity gate then correctly suppresses it.
-#   kind -> (element, sibling total-H, sibling prefix, elide-'e', ionic ending)
+# kind -> (element, sibling total-H, sibling prefix, elide-'e', ionic ending)
 _MONO_IONIZED_SPEC = {
     'olate':    ('O', 1, 'hydroxy',  True,  'olate'),      # ethan-1-olate
     'thiolate': ('S', 1, 'sulfanyl', False, 'thiolate'),   # ethane-1-thiolate
@@ -2007,7 +2007,7 @@ _MONO_IONIZED_SPEC = {
 
 def emit_mono_ionized_polyfunctional(mol, ion_idx: int, kind: str) -> str:
     """Name a mono-ionized ACYCLIC polyfunctional chain, demoting the identical
-    NEUTRAL sibling groups to prefixes (see _MONO_IONIZED_SPEC / P-77.1.2 / P-77.2.2).
+    NEUTRAL sibling groups to prefixes (see _MONO_IONIZED_SPEC / /.
 
     ``ion_idx`` is the charged heteroatom index on the index-preserving ``mol``.
     Fail-closed ('' -> caller keeps the legacy single-group path) for any shape
@@ -2051,14 +2051,14 @@ def emit_mono_ionized_polyfunctional(mol, ion_idx: int, kind: str) -> str:
     }
 
     # --- Build the neutral parent on an INDEX-PRESERVING copy (neutralize the ion;
-    #     the siblings are already neutral) and find the principal CARBON chain.
+    # the siblings are already neutral) and find the principal CARBON chain.
     work = Chem.RWMol(mol)
     try:
         a = work.GetAtomWithIdx(ion_idx)
         a.SetFormalCharge(0)
         a.SetNumRadicalElectrons(0)
         a.SetNoImplicit(True)
-        delta = 1 if kind in ('olate', 'thiolate') else -1   # O-/S- +H ; N+ -H
+        delta = 1 if kind in ('olate', 'thiolate') else -1   # O-/S- +H; N+ -H
         new_h = a.GetTotalNumHs() + delta
         if new_h < 0:
             return ''
@@ -2102,7 +2102,7 @@ def emit_mono_ionized_polyfunctional(mol, ion_idx: int, kind: str) -> str:
             return ''
 
     # --- Orient: the principal group's carbon (c0) gets the lowest locant
-    #     (P-31.1.4 criterion (a)); the sibling carbons drive the tiebreak.
+    # criterion (a)); the sibling carbons drive the tiebreak.
     from .locants import build_atom_to_locant, orient_chain
     substituent_positions: Dict[int, list] = {}
     for s in siblings:
@@ -2136,7 +2136,7 @@ def emit_mono_ionized_polyfunctional(mol, ion_idx: int, kind: str) -> str:
 
 
 def emit_parent_hydride_polyvalent_suffixes(mol, centers: List[Tuple[int, int]]) -> str:
-    """P-71.2.3 / P-29.3.2.2 multi-site free-valence (polyradical) PIN on ONE
+    """ / multi-site free-valence (polyradical) PIN on ONE
     acyclic all-carbon parent hydride.
 
     ``centers`` = ``[(atom_idx, n_electrons)]`` with ``n_electrons in {1, 2, 3}``
@@ -2148,10 +2148,10 @@ def emit_parent_hydride_polyvalent_suffixes(mol, centers: List[Tuple[int, int]])
 
     Generalizes the single-center primitive above to N carbon free-valence
     centers: saturate every centre on one index-preserving RWMol, choose the
-    longest carbon chain carrying ALL centers (P-71.7(a): the parent must retain
+    longest carbon chain carrying ALL centers (a): the parent must retain
     the maximum radical centers — demoting a centre to an off-parent prefix is
     out of v1 scope, so refuse rather than drop), then number by
-    P-29.3.2.2 — "low locants to the free valences as a SET, then in the order
+     — "low locants to the free valences as a SET, then in the order
     'yl', 'ylidene', 'ylidyne'". Substituents/unsaturation reuse the same
     machinery as the single-center primitive. '' on any unnameable piece.
     """
@@ -2215,7 +2215,7 @@ def emit_parent_hydride_polyvalent_suffixes(mol, centers: List[Tuple[int, int]])
     maxlen = max(len(c) for c in cand)
     cand_longest = [c for c in cand if len(c) == maxlen]
 
-    # --- 4. Orientation + chain choice (P-29.3.2.2 typed free-valence key) ----
+    # --- 4. Orientation + chain choice typed free-valence key) ----
     from ..assembly.naming_utils import (
         alpha_sort_key,
         get_multiplier_prefix,
@@ -2302,9 +2302,9 @@ def emit_parent_hydride_polyvalent_suffixes(mol, centers: List[Tuple[int, int]])
             unsat_endings += f"{joiner}-{','.join(map(str, t_locs))}-{tmult}yn"
 
     # --- 6. Free-valence suffix synthesis (yl -> ylidene -> ylidyne) ---------
-    # Citation order is ALWAYS yl -> ylidene -> ylidyne (P-29.3.2.2), each with
+    # Citation order is ALWAYS yl -> ylidene -> ylidyne, each with
     # its own locant list; a type present once carries no multiplier, >= 2 gets
-    # di/tri/... (P-71.2.3). Task 1: homogeneous, so exactly one type is present;
+    # di/tri/.... Task 1: homogeneous, so exactly one type is present;
     # Task 3 reuses this loop verbatim for the mixed case.
     ending = ''
     for word, ne in (('yl', 1), ('ylidene', 2), ('ylidyne', 3)):
@@ -2315,7 +2315,7 @@ def emit_parent_hydride_polyvalent_suffixes(mol, centers: List[Tuple[int, int]])
         loc_str = ','.join(str(l) for l in locs)
         ending += f"-{loc_str}-{mult}{word}"
 
-    # --- 7. Base + P-71.2.3 elision + assemble -------------------------------
+    # --- 7. Base + elision + assemble -------------------------------
     # base ends in 'e' (saturated 'ethane' / unsaturated 'but-2-ene'); elide the
     # terminal 'e' IFF the first alphabetic char of the ending is 'y'
     # (ethan-1-yl-2-ylidene) — but NOT before 'd'/'t' (ethane-1,2-diyl,
@@ -2331,9 +2331,9 @@ def emit_parent_hydride_polyvalent_suffixes(mol, centers: List[Tuple[int, int]])
 
 
 def emit_poly_carbanion_ide(mol, centers: List[int]) -> str:
-    """P-72.2.2.1 (BB 40902): a MULTI-carbanion on one acyclic all-carbon parent
+    """ (BB 40902): a MULTI-carbanion on one acyclic all-carbon parent
     hydride — >= 2 carbon -ide centres — named with the '-ide' suffix and the
-    numerical multiplier 'di'/'tri' (P-70.3.2: 'ide' takes basic multipliers).
+    numerical multiplier 'di'/'tri': 'ide' takes basic multipliers).
     ``centers`` = the carbanion atom indices. Returns e.g. ethynediide
     ([C-]#[C-], BB 40918), methanediide ([CH2-2]), butane-1,4-diide, or '' on any
     out-of-scope shape (fail closed).
@@ -2341,7 +2341,7 @@ def emit_poly_carbanion_ide(mol, centers: List[int]) -> str:
     Mirrors emit_parent_hydride_polyvalent_suffixes (saturate every centre on one
     index-preserving RWMol -> longest chain carrying ALL centres -> orient for
     lowest locants to the -ide set), but the ending is '-<locs>-<mult>ide'.
-    Locant elision (P-14.3.4.4, 'no ambiguity'): the anionic locants are OMITTED
+    Locant elision, 'no ambiguity'): the anionic locants are OMITTED
     when they occupy EVERY carbon of the chain (a single unambiguous placement:
     ethyne->ethynediide, methane->methanediide); the unsaturation locant is
     likewise omitted for a 2-carbon parent (ethyne/ethene carry none)."""
@@ -2442,7 +2442,7 @@ def emit_poly_carbanion_ide(mol, centers: List[int]) -> str:
     # The parent-hydride terminal 'e' is KEPT here: the ending begins with a
     # locant-hyphen or the consonant-initial multiplier 'di'/'tri', never a vowel
     # (BB 40918 'ethynediide', not 'ethyndiide'; 'butane-1,4-diide'). Elision
-    # (P-72.2.2.1) applies only to the locant-less mono '-ide', handled by the
+    # applies only to the locant-less mono '-ide', handled by the
     # single-centre emitter (hexan-3-ide).
     base = f"{stem}{unsat}e" if unsat else f"{stem}ane"
     if cover_all:
@@ -2451,11 +2451,11 @@ def emit_poly_carbanion_ide(mol, centers: List[int]) -> str:
 
 
 def emit_poly_cation_ylium(mol, centers: List[int]) -> str:
-    """P-73.2.2.1.1 (BB:7114): a MULTI-carbenium on one acyclic all-carbon parent
+    """ (the Blue Book): a MULTI-carbenium on one acyclic all-carbon parent
     hydride — >= 2 carbon -ylium centres (each a ring-free carbon that lost a
     hydride H-) — named with the '-ylium' compound suffix multiplied by
-    'bis'/'tris' (BB:7114 note: 'bis(ylium)' NOT 'diylium', so the COMPLEX
-    multiplier series, mirroring the poly-aminium 'bis(aminium)' P-70.3.2 rule,
+    'bis'/'tris' (the Blue Book note: 'bis(ylium)' NOT 'diylium', so the COMPLEX
+    multiplier series, mirroring the poly-aminium 'bis(aminium)' rule,
     not the basic 'di' the -ide anion uses). ``centers`` = the carbenium atom
     indices. Returns e.g. ``ethane-1,2-bis(ylium)`` ([CH2+][CH2+]),
     ``propane-1,3-bis(ylium)`` ([CH2+]C[CH2+]), or '' on any out-of-scope shape
@@ -2465,7 +2465,7 @@ def emit_poly_cation_ylium(mol, centers: List[int]) -> str:
     index-preserving RWMol -> longest chain carrying ALL centres -> orient for
     lowest locants to the -ylium set), but the ending is
     '-<locs>-<bis/tris>(ylium)'. Unlike the -ide anion, the ylium locants are
-    ALWAYS cited (never elided): the P-73.2.2.1.1 examples keep them even when the
+    ALWAYS cited (never elided): the examples keep them even when the
     set covers every carbon (``ethane-1,2-bis(ylium)``, not ``ethanebis(ylium)``)."""
     if mol is None or len(centers) < 2 or len(set(centers)) != len(centers):
         return ''
@@ -2559,13 +2559,13 @@ def emit_poly_cation_ylium(mol, centers: List[int]) -> str:
     if not mult:
         return ''
     # The parent-hydride terminal 'e' is KEPT: the ending begins with a locant-
-    # hyphen (BB:7114 'ethane-1,2-bis(ylium)', 'propane-1,3-bis(ylium)').
+    # hyphen (the Blue Book 'ethane-1,2-bis(ylium)', 'propane-1,3-bis(ylium)').
     base = f"{stem}{unsat}e" if unsat else f"{stem}ane"
     return f"{base}-{','.join(map(str, yl_locs))}-{mult}(ylium)"
 
 
 def _elide_terminal_e(name: str) -> str:
-    """P-72/P-73 elision: drop a single trailing 'e' before a vowel-initial
+    """/ elision: drop a single trailing 'e' before a vowel-initial
     cumulative suffix ('pyridine' -> 'pyridin', 'cyclohexane' -> 'cyclohexan',
     'dimethylphosphane' -> 'dimethylphosphan'). Names not ending in 'e' are
     returned unchanged ('cyclopenta-2,4-dien' keeps its tail)."""
@@ -2573,7 +2573,7 @@ def _elide_terminal_e(name: str) -> str:
 
 
 def _join_prefix_stem(prefix: str, stem: str) -> str:
-    """P-14.5.2 (BB:3477) / P-14.3.4: a detachable substituent-prefix block joins
+    """ (the Blue Book) /: a detachable substituent-prefix block joins
     the parent stem DIRECTLY when the stem begins with a letter ('1-methyl' +
     'pyridin' -> '1-methylpyridin'), but a hyphen separates the prefix from a stem
     that begins with a LOCANT digit — a name-part is always separated from a
@@ -2587,7 +2587,7 @@ def _join_prefix_stem(prefix: str, stem: str) -> str:
 
 def _heteroatom_ide_name(neutral_name: str, symbol: str) -> str:
     """Form the heteroatom-hydride -ide name from the re-entered NEUTRAL parent
-    hydride name (P-72.2.2.1). The neutral name MUST end in the element's parent-
+    hydride name. The neutral name MUST end in the element's parent-
     hydride stem (phosphane/arsane/stibane/silane/germane/stannane/plumbane) — a
     GUARD that fail-closes when the pipeline could not name the heterane (e.g.
     methylarsane currently re-enters as the garbled 'methylmethylmethyl'); we then
@@ -2600,7 +2600,7 @@ def _heteroatom_ide_name(neutral_name: str, symbol: str) -> str:
 
 
 def _emit_heteroatom_cumulative_suffix(mol, center_idx: int, suffix: str) -> str:
-    """F-T6 (DD3, P-72.2.2.1): a skeletal Group-14/15 heteroatom anion (loss of
+    """F- (DD3,: a skeletal Group-14/15 heteroatom anion (loss of
     H+ from a parent hydride) — P/As/Sb/Si/Ge. The carbon chain-finder cannot
     name a heterane parent, so we (1) neutralize the centre on an INDEX-PRESERVING
     RWMol with the correct H-delta (+1 H to recover the saturated hydride — NOT
@@ -2667,7 +2667,7 @@ def _emit_group13_uide(mol, center_idx: int) -> str:
     # W8-P5 Task 2 (source-level atom-drop veto): the RT-gate fails OPEN for
     # the substituted-halogen-uide carve-out (OPSIN 2.9 cannot parse ANY
     # substituted iodanuide/bromanuide/chloranuide token at all — see
-    # namer._HALOGEN_UIDE_PIN_RE — so SELF-01 never gets a chance to run for
+    # namer._HALOGEN_UIDE_PIN_RE — so never gets a chance to run for
     # that family), and classify_substituent's 'alkyl' branch names a
     # substituent by CARBON COUNT ONLY (perception/chains.py), silently
     # ignoring any heteroatom in the branch — reproduced 2026-07-18:
@@ -2710,7 +2710,7 @@ def _emit_group13_uide(mol, center_idx: int) -> str:
     parts = []
     for sub_name, count in name_to_count.items():
         mult = get_multiplier_prefix(count, sub_name)
-        # P-16.3.4 / P-16.3.5(a): a compound prefix takes enclosing marks
+        # / (a): a compound prefix takes enclosing marks
         # whatever its COUNT.
         # This used to wrap only when count > 1, so a single composite ligand
         # was concatenated bare and ran straight into the preceding prefix:
@@ -2719,15 +2719,15 @@ def _emit_group13_uide(mol, center_idx: int) -> str:
         # with no separator. OPSIN happens to parse it to the right molecule, so
         # no gate catches it; it is a spelling defect, and the PIN is
         # `trifluoro[3-(methylsulfanyl)phenyl]boranuide`.
-        # `enclose_if_compound` also escalates ( -> [ so the mark nests correctly
-        # around a ligand that already carries parentheses (P-16.3.1).
+        # `enclose_if_compound` also escalates (-> [ so the mark nests correctly
+        # around a ligand that already carries parentheses.
         body = f"{mult}{enclose_if_compound(sub_name)}"
         parts.append((alpha_sort_key(sub_name), body))
     parts.sort(key=lambda t: t[0])
     return f"{''.join(p[1] for p in parts)}{suffix}"
 
 
-# P-73.1.1.2 (BB:41362, 41368): the diorganyl halogen(III) CATION R2X+ named on the
+# (the Blue Book, 41368): the diorganyl halogen(III) CATION R2X+ named on the
 # halogen parent hydride with the '-ium' suffix — the SYSTEMATIC PIN (iodane+ium),
 # NOT the Table-7.3 retained '-onium' spelling: (C6H5)2I+ -> diphenyliodanium (PIN).
 # The cation mirror of _UIDE_STEMS on the anion side (diphenyliodanuide).
@@ -2735,13 +2735,13 @@ _HALOGEN_ONIUM_STEMS = {'I': 'iodane', 'Br': 'bromane', 'Cl': 'chlorane'}
 
 
 def emit_halogen_onium(mol, center_idx: int) -> str:
-    """P-73.1.1.2 (BB:41362 "diphenyliodanium (PIN)", BB:41368 "…are the preferred
+    """ (the Blue Book "diphenyliodanium (PIN)", the Blue Book "…are the preferred
     IUPAC names and not those given in Table 7.3"): name a disubstituted halogen(III)
     cation R2X+ on the halogen parent hydride with the '-ium' suffix. The exact
     CATION mirror of ``_emit_group13_uide`` (which builds ``diphenyliodanuide`` on the
     anion side): ligands become prefixes on the '-ium' parent cation.
 
-        (C6H5)2I+  -> diphenyliodanium (PIN)                       [BB:41362]
+        (C6H5)2I+ -> diphenyliodanium (PIN) [the Blue Book]
 
     Scope (fail closed, so a mono-coordinate halonium / a genuine radical cation /
     any non-halogen never matches): the centre is a halogen in ``_HALOGEN_ONIUM_STEMS``
@@ -2754,7 +2754,7 @@ def emit_halogen_onium(mol, center_idx: int) -> str:
     Named DIRECTLY: a drop-charge neutralize yields an invalid neutral halogen radical,
     and an add-H neutralize yields the λ-parent whose '-ium' form (``…-λ3-iodanium``,
     a 4-coordinate [IH2+]) is NOT the PIN. No λ-convention is used — ``diphenyliodanium``
-    (BB:41362) carries none, exactly as ``diphenyliodanuide`` (BB:41098) carries none.
+    (the Blue Book) carries none, exactly as ``diphenyliodanuide`` (the Blue Book) carries none.
     Returns '' on any decline (the caller falls through)."""
     center = mol.GetAtomWithIdx(center_idx)
     stem = _HALOGEN_ONIUM_STEMS.get(center.GetSymbol())
@@ -2804,18 +2804,18 @@ def emit_halogen_onium(mol, center_idx: int) -> str:
     return f"{''.join(p[1] for p in parts)}{suffix}"
 
 
-# P-73.2.3.4 (W4-I3): R-S+ / R-Se+ chalcogen ylium (sulfanylium / selanylium).
+# (W4-I3): R-S+ / R-Se+ chalcogen ylium (sulfanylium / selanylium).
 _CHALCOGEN_YLIUM_STEMS = {'S': 'sulfanylium', 'Se': 'selanylium'}
 
 
 def emit_chalcogen_ylium(mol, center_idx: int) -> str:
-    """P-73.2.3.4 (BB 41565 phenylsulfanylium PIN): name a 1-coordinate chalcogen
+    """ (BB 41565 phenylsulfanylium PIN): name a 1-coordinate chalcogen
     cation R-S+ / R-Se+ as ``<R-prefix>sulfanylium`` / ``<R-prefix>selanylium``.
 
     Scope (tight, so oxonium/sulfonium/phosphonium are never disturbed — they
     return '' here): the centre is S or Se, formal charge +1, ZERO hydrogens, and
     exactly ONE heavy neighbour which is a CARBON substituent R (alkyl/aryl). R is
-    named via classify_substituent; a complex R gets enclosing marks (P-16.5.1.1:
+    named via classify_substituent; a complex R gets enclosing marks:
     (2,2-dichloroethyl)sulfanylium). Acyl R (R-CO-S+) and R-S-S+ (disulfanylium)
     are out of scope -> ''. Returns '' on any decline (caller falls through)."""
     center = mol.GetAtomWithIdx(center_idx)
@@ -2901,31 +2901,31 @@ def _order_ring_cycle(mol, ring_system):
 
 def _charged_ring_locants(mol, ring_system, center_idx, anion_attach_idx=None):
     """Full single-ring IUPAC numbering for a charged ring centre, choosing the
-    orientation that gives lowest locants in P-31.1.4.3 / P-73.1.2 order:
+    orientation that gives lowest locants in / order:
       (a) all heteroatoms as a set;
-      (b) the senior heteroatom (O > S > … > N > P …) — P-31.1.4.3.3;
+      (b) the senior heteroatom (O > S > … > N > P …) —;
       (c) the indicated hydrogen (pyrrole-type aromatic ring atom bearing H) —
-          P-31.1.4.3.4;
+          ;
       (d) the charged centre (the principal characteristic group, the -ium/-ide) —
-          P-73.1.2.4 / P-31.1.4.3.4 — so a symmetric di-N azinium gets the cation
+           / — so a symmetric di-N azinium gets the cation
           at the LOWEST locant (pyridazin-1-ium, not -2-ium);
       (d2) OPTIONAL, only when ``anion_attach_idx`` is given: the ring position
           bearing an ANIONIC-SUFFIX characteristic group (a ``-carboxylate``).
-          **P-74.1.2 "Zwitterionic compounds with at least one ionic center on a
-          characteristic group"** (heading ``BlueBookV2.md:42445``), sentence
+          ** "Zwitterionic compounds with at least one ionic center on a
+          characteristic group"** (heading ``the Blue Book``), sentence
           ``:42447``, final clause: *"For assignment of lower locants, ionic
           centers on skeletal atoms of the parent hydride are preferred to the
           locants for positions of attachment of characteristic groups denoted by
-          ionic suffixes."*  So it ranks AFTER (d) and — being a suffix —
-          BEFORE (e): **P-14.4 "NUMBERING"** (heading ``:3219``) clause (c)
+          ionic suffixes."* So it ranks AFTER (d) and — being a suffix —
+          BEFORE (e): ** "NUMBERING"** (heading ``:3219``) clause (c)
           ``:3256`` *"principal characteristic groups and free valences
           (suffixes);"* outranks clause (f) ``:3301`` *"detachable alphabetized
-          prefixes …"*.  Without this criterion the substituted case is decided
+          prefixes …"*. Without this criterion the substituted case is decided
           by the canonical-rank tiebreak instead of by the rule, because the
           substituted-position SET (e) is direction-symmetric in exactly the
           Blue Book's own worked example (``:42456``
           ``1-methyl-4,6-diphenylpyridin-1-ium-2-carboxylate``: both directions
-          give substituents at {1,2,4,6}).  Default ``None`` leaves the key, and
+          give substituents at {1,2,4,6}). Default ``None`` leaves the key, and
           therefore every pre-existing caller, byte-identical.
       (e) other substituents; with a canonical-rank final deterministic tiebreak.
     Returns ``(atom_to_locant, indicated_h_locant)`` keyed by the SAME atom indices
@@ -2987,15 +2987,15 @@ def _charged_ring_locants(mol, ring_system, center_idx, anion_attach_idx=None):
 
 def _ring_locants_lowest_to_set(mol, ring_system, suffix_atoms):
     """Full single-ring IUPAC numbering giving lowest locants to a SET of ring
-    positions that carry a principal-characteristic-group SUFFIX (P-14.4(c)).
+    positions that carry a principal-characteristic-group SUFFIX (c)).
 
     The set generalization of ``_charged_ring_locants``'s single-``center_idx``
     criterion — used for a poly-suffix ring parent (a ``benzene-1,4-bis(diazonium)``
     where the two attachment carbons both carry a ``-diazonium`` suffix). Ordering:
-      (a) heteroatoms as a set (P-31.1.4.3.2) — keeps the numbering consistent with
+      (a) heteroatoms as a set — keeps the numbering consistent with
           the neutral-ring parent name (pyridine's N stays locant 1);
-      (b) the senior heteroatom (P-31.1.4.3.3);
-      (c) the suffix-attachment SET as low locants (P-14.4(c): suffixes outrank
+      (b) the senior heteroatom;
+      (c) the suffix-attachment SET as low locants (c): suffixes outrank
           the canonical-rank tiebreak);
       (d) a canonical-rank final deterministic tiebreak.
     Returns the ``atom_idx -> locant`` dict (index-preserving to ``mol``) or
@@ -3034,9 +3034,9 @@ def _ring_locants_lowest_to_set(mol, ring_system, suffix_atoms):
 def _is_saturated_carbocycle(mol, ring_system) -> bool:
     """True iff ``ring_system`` is a MONOCYCLIC SATURATED HYDROCARBON ring (a
     cycloalkane): a single ring, every member carbon, every ring bond single.
-    P-71.2.1.1 gives such a ring's radical the contracted, locant-free name
+     gives such a ring's radical the contracted, locant-free name
     (cyclohexane -> cyclohexyl); every other ring shape (heterocyclic, unsaturated,
-    or polycyclic) takes the general P-71.2.1.2 elide-'e' + locant form."""
+    or polycyclic) takes the general elide-'e' + locant form."""
     ring = set(ring_system)
     for i in ring:
         a = mol.GetAtomWithIdx(i)
@@ -3054,11 +3054,11 @@ def _is_saturated_carbocycle(mol, ring_system) -> bool:
 
 def _emit_conjugated_carbocycle_radical_ion(mol, center_idx: int, ring_system,
                                             suffix: str) -> str:
-    """P-76 (BB 40457/40896/40918): the LOCALIZED PIN for a DELOCALIZED radical/anion
+    """ (BB 40457/40896/40918): the LOCALIZED PIN for a DELOCALIZED radical/anion
     on a BARE conjugated carbocyclic MONOCYCLE. The radical/anion carbon is locant 1
     and the ring double bonds take the lowest locants — `cyclopentadienyl` ->
     `cyclopenta-2,4-dien-1-yl` (PIN); `cyclopentadienide` -> `cyclopenta-2,4-dien-1-ide`
-    (PIN) — the locant-free `cyclopentadienyl`/`-ide` being the P-76 general/alt form.
+    (PIN) — the locant-free `cyclopentadienyl`/`-ide` being the general/alt form.
 
     DETERMINISM (the determinism-gate hazard the general in-place path hits): the
     centre is neutralized to the SINGLE sp3 ring carbon, which forces a UNIQUE
@@ -3068,7 +3068,7 @@ def _emit_conjugated_carbocycle_radical_ion(mol, center_idx: int, ring_system,
     order; otherwise the localization is ambiguous and we FAIL CLOSED ('').
 
     The delocalized carbenium `-ylium` (RC-A) uses the identical machinery:
-    `C1=C[CH+]C=C1` -> `cyclopenta-2,4-dien-1-ylium` (P-73.2.2.1.1, hydride loss;
+    `C1=C[CH+]C=C1` -> `cyclopenta-2,4-dien-1-ylium`, hydride loss;
     centre neutralizes to the single sp3 ring carbon just as `-yl`/`-ide` do).
 
     Returns '' for -ium, a hetero / substituted / polycyclic ring, or an ambiguous
@@ -3156,7 +3156,7 @@ def _emit_conjugated_carbocycle_radical_ion(mol, center_idx: int, ring_system,
         return ''
     mult = get_suffix_multiplier_prefix(n_double, 'ene') or ''
     loc_str = ','.join(str(l) for l in dbl_locs)
-    # P-16.3.3: the linking 'a' precedes a consonant-initial multiplied suffix
+    #: the linking 'a' precedes a consonant-initial multiplied suffix
     # (…a-2,4-dien…); a single vowel-initial 'ene' takes no 'a' (…-2-en…).
     if mult:
         ending = f"a-{loc_str}-{mult}en"
@@ -3166,8 +3166,8 @@ def _emit_conjugated_carbocycle_radical_ion(mol, center_idx: int, ring_system,
 
 
 def _emit_ring_cumulative_suffix(mol, center_idx: int, suffix: str) -> str:
-    """F-T6 (DD3): name a RING centre bearing a cumulative -ide (ring carbanion,
-    P-72.2.2.1) or -ium (ring cation, P-73.1.1.2) suffix, with 'e' elision and a
+    """F- (DD3): name a RING centre bearing a cumulative -ide (ring carbanion,
+     or -ium (ring cation, suffix, with 'e' elision and a
     first-class ring locant read from the neutral-ring numbering.
 
     Two modes, by how the centre neutralizes:
@@ -3178,7 +3178,7 @@ def _emit_ring_cumulative_suffix(mol, center_idx: int, suffix: str) -> str:
         `O1CC[NH2+]CC1`->morpholin-4-ium, `c1c[nH]c[nH+]1`->imidazol-3-ium.
       * DEMOTE (a 0-H ring cation, e.g. an N-substituted aromatic `C[n+]1ccccc1`):
         the centre cannot be neutralized in place (over-valent). Reuses the
-        P-74.1.2 charged-ring locant/prefix/stem trio (`_charged_ring_locants` +
+         charged-ring locant/prefix/stem trio (`_charged_ring_locants` +
         `_p74_ring_substituent_prefix` + `_p74_bare_ring_stem`, ions.py:3058) to
         cite the centre's own exocyclic substituent(s) AND any other ring
         substituent as ordinary prefixes in ONE numbering, with the neutral bare
@@ -3186,14 +3186,14 @@ def _emit_ring_cumulative_suffix(mol, center_idx: int, suffix: str) -> str:
         1-methyl-4-phenylpyridin-1-ium, 7-bromo-1-methylquinolin-1-ium.
 
     RADICAL centres (-yl/-ylidene/-ylidyne) reuse the SAME in-place machinery
-    (P-71.2.1.2 / P-71.2.2.2 general method: elide the parent-hydride's final 'e'
+     / general method: elide the parent-hydride's final 'e'
     and cite a first-class free-valence locant), e.g. `[C]1C=CSC=C1` ->
     4H-thiopyran-4-ylidene. As an exception, a MONOCYCLIC SATURATED HYDROCARBON
     ring radical keeps the contracted, locant-free 'cyclohexyl'-style name
-    (P-71.2.1.1) produced by the legacy `_apply_radical_suffix` textual path, so
+     produced by the legacy `_apply_radical_suffix` textual path, so
     this primitive fails-closed ('') for it (W4-I0/W4-I1).
 
-    RC-A (P-73.2.2.1.1): a ring CARBENIUM `-ylium` (hydride loss from a ring
+    RC-A: a ring CARBENIUM `-ylium` (hydride loss from a ring
     carbon) reuses the SAME in-place machinery — the centre neutralizes with
     h_delta=+1 (re-add the lost hydride), the neutral ring is named, and the
     -ylium is cited at the charged-centre ring locant (`[C+]1=CC=CO1` ->
@@ -3215,19 +3215,19 @@ def _emit_ring_cumulative_suffix(mol, center_idx: int, suffix: str) -> str:
     if ring_system is None:
         return ''
 
-    # P-71.2.1.1 / P-71.2.2.1 (radical) and P-73.2.2.1.1 SPECIFIC method (ylium):
+    # / (radical) and SPECIFIC method (ylium):
     # a radical OR carbenium on a monocyclic saturated hydrocarbon ring keeps the
     # contracted, locant-free form (cyclohexane -> cyclohexyl / cyclohexylium,
-    # cyclobutane -> cyclobutylium (PIN, BB:41557)) via the legacy textual
+    # cyclobutane -> cyclobutylium (PIN, the Blue Book)) via the legacy textual
     # 'ane'->'yl'/'ylium' path; only the GENERAL ring cases (heterocyclic /
-    # unsaturated / polycyclic, P-71.2.1.2 / P-71.2.2.2 / P-73.2.2.1.1 general)
+    # unsaturated / polycyclic, / / general)
     # take the locant form here. -ide / -ium (protonation) always use the locant
     # form (no such contraction rule applies).
     if (suffix in ('yl', 'ylidene', 'ylidyne', 'ylium')
             and _is_saturated_carbocycle(mol, ring_system)):
         return ''
 
-    # P-76 (BB 40457/40896): a delocalized radical/anion on a bare conjugated
+    # (BB 40457/40896): a delocalized radical/anion on a bare conjugated
     # carbocyclic monocycle (cyclopentadienyl / cyclopentadienide) is named as the
     # LOCALIZED PIN with a UNIFIED, deterministic numbering (centre = 1, double
     # bonds 2,4). The general in-place path below names the neutral ring separately
@@ -3255,11 +3255,11 @@ def _emit_ring_cumulative_suffix(mol, center_idx: int, suffix: str) -> str:
             Chem.SanitizeMol(ring_mol)
         except (RuntimeError, ValueError):
             return ''
-        # Fail-closed (code-review WR-01) when the neutral ring carries a
+        # Fail-closed (code-review) when the neutral ring carries a
         # principal characteristic group (-ol / -al / -one / -oic acid / -amine
         # / -nitrile …): the `<ring-stem>-<locant>-<suffix>` append is only
         # well-formed for a BARE ring parent (stem + detachable PREFIXES); an FG
-        # suffix corrupts it (`pyridin-3-ol-1-ium`). Those are P-73.1.1/P-74
+        # suffix corrupts it (`pyridin-3-ol-1-ium`). Those are /
         # territory -> legacy (on HEAD they are 'unknown' too, so no regression).
         if _ring_bears_principal_group(ring_mol):
             return ''
@@ -3293,7 +3293,7 @@ def _emit_ring_cumulative_suffix(mol, center_idx: int, suffix: str) -> str:
         # locant then collides with the centre locant read from
         # `_charged_ring_locants` -- `[C+]1=CC=C(C)O1` (5-methylfuran-2-ylium)
         # came out `2-methylfuran-2-ylium` (both cited at 2, from two numberings).
-        # Build it in ONE unified numbering via the P-74.1.2 trio (the DEMOTE
+        # Build it in ONE unified numbering via the trio (the DEMOTE
         # branch below proves this shape on the identical single-ring supplier),
         # so the substituent prefix and the -ylium share the charged numbering.
         # Scoped to -ylium: -ide/-ium keep the byte-identical parent path (their
@@ -3319,7 +3319,7 @@ def _emit_ring_cumulative_suffix(mol, center_idx: int, suffix: str) -> str:
             if re.match(r'^\d+[Hh]-', stem):
                 return ''
             return f"{_join_prefix_stem(sub_prefix, _elide_terminal_e(stem))}-{center_locant}-{suffix}"
-        # RC-C (v42 Task 8F, P-72.2.2.1): when the deprotonated/charged centre IS the
+        # RC-C (,: when the deprotonated/charged centre IS the
         # ring's indicated-hydrogen atom (the indicated-H locant equals the centre
         # locant), that intrinsic 'nH-' is CONSUMED by the -ide/-ium and must not be
         # cited: the neutral parent '1H-pyrrole' -> the anion 'pyrrol-1-ide', NOT
@@ -3331,14 +3331,14 @@ def _emit_ring_cumulative_suffix(mol, center_idx: int, suffix: str) -> str:
             parent = re.sub(r'^\d+[Hh]-', '', parent)
             indicated_h = None
         prefix = _indicated_hydrogen_prefix(indicated_h, parent, ring_system, mol)
-        # RC-D (v42 Task 8F, P-14.3.4.2(c) BB:2919 'monosubstituted homogeneous
-        # monocyclic rings' / P-14.3.4.3 BB:2931): the locant is OMITTED on a
+        # RC-D (, (c) the Blue Book 'monosubstituted homogeneous
+        # monocyclic rings' / the Blue Book): the locant is OMITTED on a
         # monosubstituted HOMOGENEOUS (all-carbon) SYMMETRICAL ring where the single
         # -ide/-ium is the only feature and every substitutable position is
-        # equivalent -> 'cyclohexanide' / 'benzenide' (BB:40916), not
+        # equivalent -> 'cyclohexanide' / 'benzenide' (the Blue Book), not
         # 'cyclohexan-1-ide' / 'benzen-1-ide'. A heterocycle (pyrrol-1-ide) or an
         # asymmetric / further-substituted ring KEEPS its locant. Decided by the
-        # P-14.3.4 licence checker (should_omit_locant_one Rule 4) over the NEUTRAL
+        # licence checker (should_omit_locant_one Rule 4) over the NEUTRAL
         # ring's topological symmetry, never a blind locant strip.
         from ..assembly.naming_utils import (
             is_only_one_substitutable_position, should_omit_locant_one)
@@ -3359,10 +3359,10 @@ def _emit_ring_cumulative_suffix(mol, center_idx: int, suffix: str) -> str:
     # Scope: >=1 exocyclic substituent on the charged ring centre. A single
     # N-substituted aromatic (C[n+]1ccccc1 -> 1-methylpyridin-1-ium), a
     # QUATERNARY ring N+ carrying >=2 substituents (C[N+]1(C)CCCCC1 ->
-    # 1,1-dimethylpiperidin-1-ium, P-73.1.1.2/P-73.4; C[N+]1(C)CCOCC1 ->
-    # 4,4-dimethylmorpholin-4-ium), AND now (v33 Phase 3) a ring that ALSO
+    # 1,1-dimethylpiperidin-1-ium, /; C[N+]1(C)CCOCC1 ->
+    # 4,4-dimethylmorpholin-4-ium), AND now (a phase) a ring that ALSO
     # carries an unrelated substituent elsewhere (C[n+]1ccc(-c2ccccc2)cc1 ->
-    # 1-methyl-4-phenylpyridin-1-ium) are all in scope: reuse the SAME P-74.1.2
+    # 1-methyl-4-phenylpyridin-1-ium) are all in scope: reuse the SAME
     # charged-ring locant/prefix/stem trio `emit_zwitterion_ring_carboxylate`
     # (ions.py:3058) already ships -- `_charged_ring_locants` +
     # `_p74_ring_substituent_prefix` + `_p74_bare_ring_stem` -- rather than the
@@ -3455,10 +3455,10 @@ def _ring_has_off_ring_substituent(mol, ring_system):
 def _ring_bears_principal_group(ring_mol):
     """True if the neutral ring carries a principal characteristic group (a
     suffix-taking FG: -ol / -al / -one / -oic acid / -amine / -nitrile / …).
-    Code-review WR-01: the ring -ium/-ide append `<ring-stem>-<locant>-<suffix>`
+    Code-review: the ring -ium/-ide append `<ring-stem>-<locant>-<suffix>`
     is well-formed ONLY for a BARE ring parent (ring stem + detachable
     substituent PREFIXES); a principal-group SUFFIX corrupts the composition
-    (`pyridin-3-ol-1-ium`). Used to fail-closed so the legacy / P-73.1.1 / P-74
+    (`pyridin-3-ol-1-ium`). Used to fail-closed so the legacy / /
     path handles those. On perception failure return False (don't block a clean
     ring — a residual malformed FG-ring name is caught by the OPSIN gate anyway,
     so the safe-against-regression default is to proceed)."""
@@ -3503,15 +3503,15 @@ def _p74_ring_substituent_prefix(mol, ring_system, locants, skip_atoms):
 
     Assembly is delegated, not reinvented: ``format_substituent_prefix`` is
     documented as "the ONE correct substituent-prefix + needs-parens reference"
-    (P-16.3.5 / P-16.3.3) and ``alpha_sort_key`` is the P-14.5 alphanumerical key.
+     / and ``alpha_sort_key`` is the alphanumerical key.
 
     The substituent token comes from ``name_substituent`` — the authoritative
-    P-29.2 namer, and the SAME primitive ``emit_cumulative_ium_ide`` already uses
+     namer, and the SAME primitive ``emit_cumulative_ium_ide`` already uses
     in this module. It is deliberately preferred over
     ``perception.chains.classify_substituent``, which counts carbons: that one
     returns 'propyl' for isopropyl and 'methyl' for -C#N, and it is how HEAD came
     to emit '1-propylpyridin-1-ium-2-carboxylate' for an isopropyl group — a
-    DIFFERENT molecule, intercepted only by SELF-01.
+    DIFFERENT molecule, intercepted only by.
 
     ``name_substituent`` is corroborated here for carbon-attached fragments and
     for a LONE heteroatom (halogen / -OH / -NH2 -> bromo / hydroxy / amino, via
@@ -3520,7 +3520,7 @@ def _p74_ring_substituent_prefix(mol, ring_system, locants, skip_atoms):
     'hydroxymethyl' and -S-CH3 'thiomethyl', both of which name a different
     group. That is a defect in the shared primitive, not something to paper over
     here, so such substituents FAIL CLOSED and are recorded in
-    ``.planning/audit-v29/TaskG2-p74-holes.md``."""
+    `internal notes`."""
     from ..assembly.naming_utils import alpha_sort_key, format_substituent_prefix
     from ..assembly.substituent_enumerator import name_substituent
     ring = set(ring_system)
@@ -3562,12 +3562,12 @@ def _p74_bare_ring_stem(mol, ring_system, cation_idx):
     Stripping ALL substituents is the point: the predecessor named a ring that
     still carried them, so the stem came back as '2,4-diphenylpyridine' — a name
     whose locants belong to the neutral ring's own numbering and therefore
-    disagree with the P-74.1.2 numbering the suffixes are cited in.
+    disagree with the numbering the suffixes are cited in.
 
-    WS-NOABSTAIN class 5 (name QUALITY, not an abstain -- WS7's floor already
+    NOABSTAIN class 5 (name QUALITY, not an abstain -- 's floor already
     masked this with a valid block1 name): ``RWMol.RemoveAtom`` does NOT
     recompute a REMAINING ring atom's implicit-H bookkeeping when one of its
-    heavy neighbours is deleted -- a bracket atom like the P-74.1.2
+    heavy neighbours is deleted -- a bracket atom like the
     carboxylate-bearing ring carbon's own ``[C@H]`` keeps its ORIGINAL
     ``noImplicit=True`` / explicit-H=1 from when it had 4 connections (2 ring
     bonds + the now-deleted carboxyl branch + 1 H). After deletion it has only
@@ -3597,7 +3597,7 @@ def _p74_bare_ring_stem(mol, ring_system, cation_idx):
         ca.SetFormalCharge(0)
         ca.SetNumExplicitHs(0)
         ca.SetNoImplicit(False)
-        # WS-NOABSTAIN class 5: see the docstring above -- every ring atom,
+        # NOABSTAIN class 5: see the docstring above -- every ring atom,
         # not just the cation, may have lost an exocyclic neighbour above.
         for a in work.GetAtoms():
             a.SetNoImplicit(False)
@@ -3615,52 +3615,52 @@ def _p74_bare_ring_stem(mol, ring_system, cation_idx):
 
 
 def emit_zwitterion_ring_carboxylate(mol, cation_idx: int, anion_idx: int) -> str:
-    """F-T6 (DD3, P-74.1.2): a zwitterion whose cationic centre is a RING atom of
+    """F- (DD3,: a zwitterion whose cationic centre is a RING atom of
     the same ring that bears a carboxylate anion -> the cumulative
     ``<prefixes><ring>-<cation-locant>-ium-<carboxyl-locant>-carboxylate`` name,
     the cationic suffix cited before the anionic one.
 
-        [O-]C(=O)c1ccc[nH+]c1                        -> pyridin-1-ium-3-carboxylate
-        C[n+]1ccccc1C(=O)[O-]                        -> 1-methylpyridin-1-ium-2-carboxylate
-        C[n+]1c(C(=O)[O-])cc(-c2ccccc2)cc1-c1ccccc1  -> 1-methyl-4,6-diphenylpyridin-1-ium-2-carboxylate
+        [O-]C(=O)c1ccc[nH+]c1 -> pyridin-1-ium-3-carboxylate
+        C[n+]1ccccc1C(=O)[O-] -> 1-methylpyridin-1-ium-2-carboxylate
+        C[n+]1c(C(=O)[O-])cc(-c2ccccc2)cc1-c1ccccc1 -> 1-methyl-4,6-diphenylpyridin-1-ium-2-carboxylate
 
     the last being the Blue Book's own worked (PIN) example, ``:42456``, under
-    **P-74.1.2 "Zwitterionic compounds with at least one ionic center on a
+    ** "Zwitterionic compounds with at least one ionic center on a
     characteristic group"** (heading ``:42445``).
 
-    **ONE numbering for the whole name.**  This emitter previously ran two
+    **ONE numbering for the whole name.** This emitter previously ran two
     branches that each took the ring numbering from the namer's *neutral*-ring
     supplier and then concatenated a separately-built cation-substituent prefix
-    onto the resulting *substituted* ring name.  Two different numberings met in
-    one string.  Measured consequences on the DEFAULT path, all of which
+    onto the resulting *substituted* ring name. Two different numberings met in
+    one string. Measured consequences on the DEFAULT path, all of which
     round-trip cleanly through OPSIN — the molecule is right and only the spelling
-    is wrong, so neither the round-trip metric nor SELF-01 could see them:
+    is wrong, so neither the round-trip metric nor could see them:
 
       * ``1-methyl4-methylpyridin-1-ium-2-carboxylate`` — no hyphen, and
         ``1-methyl`` + ``4-methyl`` never merged to ``1,4-dimethyl``;
       * ``1-methyl4-bromopyridin-1-ium-2-carboxylate`` — 'bromo' must precede
-        'methyl' (P-14.5.2 alphanumerical order);
+        'methyl' alphanumerical order);
       * ``1-methyl2,4-dimethylpyridin-1-ium-6-carboxylate`` — the carboxylate
-        numbered 6 where P-74.1.2 ``:42447`` requires 2.
+        numbered 6 where ``:42447`` requires 2.
 
-    and one that SELF-01 did catch, turning it into an abstention rather than a
+    and one that did catch, turning it into an abstention rather than a
     wrong molecule: ``1-propylpyridin-1-ium-2-carboxylate`` for an **isopropyl**
     group, because the old branch named substituents with the carbon-counting
     ``classify_substituent``.
 
     So the numbering is now derived ONCE over the ORIGINAL charged mol, with the
-    P-74.1.2 anion-attachment criterion
+     anion-attachment criterion
     (``_charged_ring_locants(..., anion_attach_idx=...)``); every ring substituent
     is located in THAT numbering by ``_p74_ring_substituent_prefix``; and the stem
     comes from a ring stripped of all of them.
 
     Fails closed ('') whenever a part is uncorroborated — a fused/bridged ring (no
-    simple cycle, so no P-74.1.2 numbering), a substituent the authoritative namer
-    cannot spell, or a formal charge anywhere outside the cation/anion pair.  The
+    simple cycle, so no numbering), a substituent the authoritative namer
+    cannot spell, or a formal charge anywhere outside the cation/anion pair. The
     caller then falls through to the legacy path."""
     from ..perception.rings import get_ring_systems
     # Only the cation/anion pair may carry charge. A third charged atom means a
-    # further ionic centre, which P-74 requires to be expressed as its own suffix
+    # further ionic centre, which requires to be expressed as its own suffix
     # rather than swept into a prefix -- and a charged substituent is exactly what
     # `name_substituent` would silently spell as its neutral form.
     charged = [a.GetIdx() for a in mol.GetAtoms() if a.GetFormalCharge()]
@@ -3715,39 +3715,39 @@ def _ionize_acid_name(neutral_name: str, total_charge: int,
     byte-identical. The anion/generic map path is unchanged; this wrapper simply
     forwards to the generalized primitive with no ``cation_class``.
 
-    SUB-01/D-01: single source of truth = the canonical
+    /: single source of truth = the canonical
     ``_ANION_SUFFIX_MAP``/``_CATION_SUFFIX_MAP`` driven through the actual
     ``_apply_anion_modification``/``_apply_cation_modification`` seam — NOT a
-    per-molecule ``.replace`` band-aid. ``allowed_suffixes`` (WR-05) restricts the
+    per-molecule ``.replace`` band-aid. ``allowed_suffixes``  restricts the
     trailing match to the caller's known chemical class.
     """
     return apply_ion_suffix_to_name(neutral_name, total_charge,
                                     allowed_suffixes=allowed_suffixes)
 
 
-# WR-01 (code review 2026-06-02): a leading unsaturation marker (ane/ene/yne)
+# (code review 2026-06-02): a leading unsaturation marker (ane/ene/yne)
 # with NO chain/ring stem in front, glued directly to an oxoacid suffix stem
 # (sulf/phosph/arso/boro) or a locant ('-'/digit/'('). This is the degenerate
-# fused-ring-parent failure shape (D-10), NOT a legitimate parent — a real
+# fused-ring-parent failure shape , NOT a legitimate parent — a real
 # parent always carries a stem (meth/eth/.../benzene/cyclo...) before ane/ene/yne.
 _DEGENERATE_OXOACID_PARENT_RE = re.compile(r'^(?:ane|ene|yne)(?:sulf|phosph|arso|boro|[0-9(-])')
 
 
 def _name_inorganic_oxoacid_anion(mol) -> str:
-    """WS-E.3-dianion (D-13): name a BARE (carbon-free) inorganic oxoacid anion as
-    its preselected functional-parent anion word (P-12.2 / P-34.1.4):
+    """.3-dianion : name a BARE (carbon-free) inorganic oxoacid anion as
+    its preselected functional-parent anion word /:
     sulfate/sulfite/phosphate/hydrogenphosphate/nitrate/carbonate. There is no
     carbon to name, so this is a DIRECT functional-parent lookup, NOT a
-    substitutive parent (BlueBookV2.md:2076 phosphoric acid; 35449 sulfuric acid).
+    substitutive parent (the Blue Book phosphoric acid; 35449 sulfuric acid).
 
-    CONSERVATIVE GUARD (D-13 risk): fires ONLY on a CARBON-FREE, non-metal fragment
+    CONSERVATIVE GUARD (risk): fires ONLY on a CARBON-FREE, non-metal fragment
     matched by EXACT canonical SMILES in INORGANIC_ANIONS. A sulfate/phosphate
     ESTER (R-O-SO3-, R-O-PO3-) has carbon -> declined here (and at
-    charged_router.py:382-389), so the steroid-sulfate NP-conjugate (gold WSC-03
+    charged_router.py:382-389), so the steroid-sulfate NP-conjugate (gold -03
     'cholest-5-en-3beta-yl sulfate', '...yl hydrogen sulfate') is NEVER intercepted.
     The mono-anion (OS(=O)(=O)[O-] -> 'hydrogensulfate') stays DISTINCT from the
     dianion ('sulfate') because the table keys on protonation state
-    (BlueBookV2.md:7150). Returns '' if not a bare inorganic anion (caller falls
+    (the Blue Book). Returns '' if not a bare inorganic anion (caller falls
     through to the existing cascade -- byte-identical contract).
     """
     if mol is None or _has_metal(mol):
@@ -3761,7 +3761,7 @@ def _name_inorganic_oxoacid_anion(mol) -> str:
 
 
 def _name_oxoacid_anion(mol, style: str) -> str:
-    """SUB-01/D-01: name an S/P-oxoacid anion (sulfonate/sulfinate/phosphonate/
+    """/: name an S/P-oxoacid anion (sulfonate/sulfinate/phosphonate/
     phosphate) via the GENERAL parent-selection pipeline (the chokepoint) plus
     the structured ionic suffix.
 
@@ -3770,7 +3770,7 @@ def _name_oxoacid_anion(mol, style: str) -> str:
     ``_classify`` -> ``select_parent``, naming e.g. ``propane-1-sulfonic acid``),
     then apply the canonical ionic suffix via ``_ionize_acid_name``
     (``sulfonic acid`` -> ``sulfonate``). Returns '' on any failure (caller
-    falls through to the existing cascade — v18 byte-identical contract).
+    falls through to the existing cascade — byte-identical contract).
     """
     if mol is None or _has_metal(mol):
         return ''
@@ -3793,29 +3793,29 @@ def _name_oxoacid_anion(mol, style: str) -> str:
             return ''
         from ..namer import Orthonym
         # _disable_opsin_validity_gate: the neutral acid name is an INTERMEDIATE
-        # (ionized below), not a final output — it must NOT be SUB-03-gated, else
+        # (ionized below), not a final output — it must NOT be -gated, else
         # a malformed fused-ring parent ('anesulfonic acid') would be suppressed
-        # to a descriptive string and break the ionize step (169.5 SUB-01/SUB-03
+        # to a descriptive string and break the ionize step (169.5 /
         # interaction).
         neutral_name = Orthonym(style=style, _disable_opsin_validity_gate=True).name(neutral_smi)
         if not neutral_name:
             return ''
         # Robustness: refuse to propagate a MALFORMED upstream parent name.
-        # A failed fused-ring parent (the deferred P-25 limitation, D-10) drops
+        # A failed fused-ring parent (the deferred limitation,) drops
         # the chain/ring stem, leaving the bare unsaturation marker glued onto
         # the oxoacid suffix or a locant — "anesulfonic acid", "ene-1-phosphonic
-        # acid". WR-01 (code review 2026-06-02): anchor on EXACTLY that shape (a
+        # acid". (code review 2026-06-02): anchor on EXACTLY that shape (a
         # leading ane/ene/yne immediately followed by an oxoacid-suffix stem or a
         # locant) instead of a bare startswith(("ane","ene","yne")), which would
         # also discard any legitimate parent merely beginning with those three
         # letters. A descriptive fallback is likewise not a valid parent. Fall
-        # through to the existing path rather than emit garbage; SUB-03 gates
+        # through to the existing path rather than emit garbage; gates
         # residual malformed outputs globally.
         low = neutral_name.lstrip().lower()
         if (_DEGENERATE_OXOACID_PARENT_RE.match(low)
                 or 'unknown' in low or 'not supported' in low):
             return ''
-        # WR-05: restrict the suffix match to genuine oxoacid suffixes — this
+        #: restrict the suffix match to genuine oxoacid suffixes — this
         # path only ever sees a re-entered S/P oxoacid parent, so the bare
         # "ol"/"amine"/"thiol" entries must not be eligible to mis-fire.
         return _ionize_acid_name(neutral_name, total_charge=-1,
@@ -4002,7 +4002,7 @@ def _name_aromatic_carboxylate_with_substituents(mol, carboxyl_carbon_idx: int, 
     ring_set = set(benzene_ring)
     carboxyl_attachment_idx = aromatic_ring_atom.GetIdx()
 
-    # v33 (0-wrong): this handler names ring substituents by ATOM TYPE alone
+    # (0-wrong): this handler names ring substituents by ATOM TYPE alone
     # (O -> 'hydroxy', N -> 'amino', C -> alkyl). That silently DROPS anything more
     # than a terminal group -- an ether/ester O (e.g. a glycosyloxy), a substituted
     # N, a hetero-bearing or aromatic C-branch -- producing a wrong, atom-incomplete
@@ -4036,7 +4036,7 @@ def _name_aromatic_carboxylate_with_substituents(mol, carboxyl_carbon_idx: int, 
                 if not _branch_all_carbon(mol, _ni, ring_set | {carboxyl_carbon_idx}):
                     return ''  # hetero-bearing C-branch -> alkyl namer would drop atoms
             else:
-                return ''  # aromatic-C (biaryl) / S / P / ... -> out of scope here
+                return ''  # aromatic-C (biaryl) / S / P /... -> out of scope here
 
     # Map substituent type to name
     SUBSTITUENT_NAMES = {
@@ -4044,7 +4044,7 @@ def _name_aromatic_carboxylate_with_substituents(mol, carboxyl_carbon_idx: int, 
         'N': 'amino', 'O': 'hydroxy'
     }
 
-    # Collect substituents: {position: [(name, sort_key), ...]}
+    # Collect substituents: {position: [(name, sort_key),...]}
     # Position 1 is the carboxyl attachment point
     substituents_by_position = {}
 
@@ -4149,10 +4149,10 @@ def _name_aromatic_carboxylate_with_substituents(mol, carboxyl_carbon_idx: int, 
 def _compare_locant_lists(a: list, b: list) -> int:
     """Compare two locant lists by first-point-of-difference (-1/0/1).
 
-    IN-04 (code review 2026-06-02): delegates to the canonical
+     (code review 2026-06-02): delegates to the canonical
     ``rules.locants.compare_locant_sets`` so the first-point-of-difference
     semantics have ONE source and cannot desync. The sole caller passes
-    ``sorted(subs.keys())`` for both lists (always sorted, and same length
+    ``sorted(subs.keys)`` for both lists (always sorted, and same length
     across ring orientations), for which the two are provably equivalent
     (verified exhaustively over small sorted equal-length int lists).
     """
@@ -4164,11 +4164,11 @@ def _amino_acid_carboxylate(mol, anion_site: Dict) -> str:
     """Name the carboxylate of an amino acid whose neutral form has a RETAINED
     name lacking a convertible '-oic acid' suffix (e.g. glycine -> glycinate).
 
-    v23 Phase 12 (F4, BB P-103 audit): a deprotonated amino acid such as glycine
+     a phase (F4, BB audit): a deprotonated amino acid such as glycine
     (``[O-]C(=O)CN``) neutralizes to ``glycine`` — a retained name carrying NO
     '-oic acid' suffix — so the neutralize->name->convert path above returns ''
     and the carbon-count fallback below LINEARIZES the chain, dropping the amino
-    substituent (-> 'acetate', a different molecule). P-103.2.4.2 forms the anion
+    substituent (-> 'acetate', a different molecule). forms the anion
     by replacing the retained amino-acid name's final 'e' (or '-ic acid') with
     '-ate' (glycine -> glycinate; all 20 verified OPSIN-RT). Chiral amino acids
     never reach here (their fragment name is the systematic '...-oic acid', which
@@ -4201,7 +4201,7 @@ def _amino_acid_carboxylate(mol, anion_site: Dict) -> str:
     aa = get_amino_acid_name(neutral_smi, mol=nmol, with_descriptor=True)
     if not aa:
         return ''
-    # P-103.2.4.2 retained-name -> anion, preserving any leading D-/L- descriptor.
+    # retained-name -> anion, preserving any leading D-/L- descriptor.
     prefix, stem = '', aa
     for d in ('DL-', 'D-', 'L-'):
         if stem.startswith(d):
@@ -4218,7 +4218,7 @@ def _build_partial_acid_salt_chain_name(
         prefix: str, parent_len: int,
         unsaturations: List[Tuple[int, int]],
         substituents: List[Tuple[int, str]]) -> str:
-    """FIX C2 (v33 charged completion) builder: assemble the widened
+    """FIX C2 (charged completion) builder: assemble the widened
     partial-acid-salt CHAIN anion name -- ``<stereo>-<subs><stem>oate`` -- from
     a 'carboxy' substituent riding on the last parent locant (the
     still-protonated carboxyl carbon), any hydroxy/amino BACKBONE substituents
@@ -4255,7 +4255,7 @@ def _build_partial_acid_salt_chain_name(
 
     # Substituent prefixes: 'carboxy' (always, at parent_len) plus any
     # hydroxy/amino backbone substituents -- grouped by name, multiplied,
-    # and cited in alphanumerical order (P-14.5.2: ignore multiplying
+    # and cited in alphanumerical order: ignore multiplying
     # prefixes, so 'carboxy' < 'hydroxy' regardless of a later 'di-').
     from collections import defaultdict
     groups: Dict[str, List[int]] = defaultdict(list)
@@ -4276,7 +4276,7 @@ def _build_partial_acid_salt_chain_name(
 
 
 def _name_partial_acid_salt_anion(mol, anion_site: Dict) -> str:
-    """Method (1) P-65.6.2.3.1 — PIN for acid salts of polybasic ORGANIC acids.
+    """Method (1) — PIN for acid salts of polybasic ORGANIC acids.
 
     A partially-ionized polybasic acid anion expresses the ionized carboxyl as the
     ``-oate`` principal characteristic group (C1) and each still-protonated ``-COOH``
@@ -4289,7 +4289,7 @@ def _name_partial_acid_salt_anion(mol, anion_site: Dict) -> str:
     SEPARATE, out-of-scope constructor -- follow-up), where the whole
     molecule is ``HO2C-[chain]-CO2(-)`` and ``[chain]`` is carbon-only apart
     from a plain terminal ``-OH``/``-NH2`` riding on a PARENT-chain carbon
-    (FIX C2, v33 charged completion: widened from all-carbon-only) and any
+    (FIX C2, charged completion: widened from all-carbon-only) and any
     backbone unsaturation strictly BETWEEN parent-chain carbons (FIX C2:
     widened from fully-saturated-only; the bond INTO the still-protonated
     carboxyl carbon must stay single -- that shape needs a different,
@@ -4353,7 +4353,7 @@ def _name_partial_acid_salt_anion(mol, anion_site: Dict) -> str:
             if nb.GetSymbol() == 'O':
                 carboxyl_os.add(nb.GetIdx())
 
-    # FIX C2 (v33 charged completion): widen the all-carbon skeleton guard to
+    # FIX C2 (charged completion): widen the all-carbon skeleton guard to
     # admit a plain terminal HYDROXY (-OH) or primary AMINO (-NH2) substituent
     # on a PARENT-chain carbon (never on cp itself -- an extra substituent on
     # the still-protonated carboxyl carbon is a shape this linear, numbered
@@ -4400,7 +4400,7 @@ def _name_partial_acid_salt_anion(mol, anion_site: Dict) -> str:
                 return ''
             substituents.append((path.index(owner.GetIdx()) + 1, 'amino'))
             continue
-        # any other element (S, halogen, P, ...) -> out of scope, fail closed
+        # any other element (S, halogen, P,...) -> out of scope, fail closed
         return ''
 
     # FIX C2: widen the fully-saturated-only guard to admit backbone
@@ -4437,7 +4437,7 @@ def _name_partial_acid_salt_anion(mol, anion_site: Dict) -> str:
         return ''
 
     # Stereodescriptor block over the numbered PARENT-chain atoms only (cp is
-    # not numbered -- P-91.3 cites a descriptor at the locant of the parent
+    # not numbered -- cites a descriptor at the locant of the parent
     # atom it belongs to).
     if any(mol.GetAtomWithIdx(a).GetChiralTag() != Chem.ChiralType.CHI_UNSPECIFIED
            for a in path[:parent_len]):
@@ -4457,9 +4457,9 @@ def _name_carboxylate_systematic(mol, anion_site: Dict) -> str:
     substituents, stereo, unsaturation), then convert '-oic acid' to '-oate'.
     This ensures all substituents are properly detected and included.
     """
-    # Method (1) P-65.6.2.3.1 (PIN): a partially-ionized polybasic ORGANIC acid
+    # Method (1): a partially-ionized polybasic ORGANIC acid
     # expresses the un-ionized -COOH as a 'carboxy' prefix (6-carboxyhexanoate),
-    # NOT the general-only method (2) 'hydrogen ...' form. Fail-closed -> the
+    # NOT the general-only method (2) 'hydrogen...' form. Fail-closed -> the
     # existing neutralize->-oate path below handles the plain mono-carboxylate.
     partial = _name_partial_acid_salt_anion(mol, anion_site)
     if partial:
@@ -4474,7 +4474,7 @@ def _name_carboxylate_systematic(mol, anion_site: Dict) -> str:
                 mol, carboxyl_carbon, aromatic_name)
             if arom:
                 return arom
-            # v33: the aromatic handler FAILED CLOSED on a complex ring substituent
+            #: the aromatic handler FAILED CLOSED on a complex ring substituent
             # (ether/ester/hetero-alkyl it would otherwise drop). Fall through to the
             # substituent-complete neutralize->name->-oate path below rather than
             # returning its empty decline.
@@ -4486,7 +4486,7 @@ def _name_carboxylate_systematic(mol, anion_site: Dict) -> str:
         if oate_name:
             return oate_name
 
-    # v23 Phase 12 (F4): the carboxylate of an amino acid whose neutral form has
+    # a phase (F4): the carboxylate of an amino acid whose neutral form has
     # a retained name (glycine) — the acid path returns '' (no '-oic acid'), and
     # the carbon-count fallback below would DROP the amino group ('acetate').
     aa_anion = _amino_acid_carboxylate(mol, anion_site)
@@ -4494,7 +4494,7 @@ def _name_carboxylate_systematic(mol, anion_site: Dict) -> str:
         return aa_anion
 
     # Fallback: simple chain naming (no substituent detection). FAIL-CLOSED
-    # (v23 Phase 12, F4 root cause): this carbon-count namer drops every
+    # (a phase, F4 root cause): this carbon-count namer drops every
     # non-carbon, non-carboxylate substituent (it is the source of the
     # structure-destroying 'acetate' for glycinate). Only use it when the linear
     # carbon chain actually covers the whole molecule; otherwise return '' so the
@@ -4554,10 +4554,10 @@ def _neutralize_carboxylate_to_acid(mol, anion_site: Dict) -> str:
         acid_name = name_fragment_recursively(neutral_smiles)
         if acid_name and ('oic acid' in acid_name or 'ic acid' in acid_name):
             return acid_name
-        # v33 breadth: in best-effort mode, name the neutral acid via the FULL
+        # breadth: in best-effort mode, name the neutral acid via the FULL
         # best-effort pipeline -- it names complex substituents (a glycosyloxy /
         # ether / ring arm) that name_fragment_recursively declines PIN-only. The
-        # caller converts to -oate and the outer SELF-01/E1 gate RT-checks the whole
+        # caller converts to -oate and the outer /E1 gate RT-checks the whole
         # anion, so 0-wrong holds. PIN/default tier (ctx False) is untouched.
         from ..metrics.provenance import best_effort_ctx
         if best_effort_ctx.get():
@@ -4615,7 +4615,7 @@ def _acid_name_to_carboxylate(acid_name: str, carboxylate_count: int) -> str:
     - 'propanoic acid' (1 COO-) -> 'propanoate'
     - 'glutamic acid' -> 'glutamate' (retained)
 
-    IUPAC P-72.2.1: Replace '-ic acid' with '-ate' for full deprotonation.
+    IUPAC: Replace '-ic acid' with '-ate' for full deprotonation.
     """
     if not acid_name:
         return ''
@@ -4644,7 +4644,7 @@ _ACID_SUFFIX_MULTIPLIER_WORDS = {
 
 def _parent_acid_suffix_multiplicity(anion_name: str) -> int:
     """How many carboxylate SITES the PARENT suffix of ``anion_name`` already
-    accounts for: 1 for a mono-acid '-oate'/'-carboxylate' tail (P-65.6.1),
+    accounts for: 1 for a mono-acid '-oate'/'-carboxylate' tail,
     2 for a '-dioate'/'-dicarboxylate' tail, 3 for '-trioate'/'-tricarboxylate',
     etc. Reads the multiplying prefix already embedded in the SUFFIX's own
     ending (produced by ``_acid_to_oate``/``_acid_name_to_carboxylate``), never
@@ -4652,7 +4652,7 @@ def _parent_acid_suffix_multiplicity(anion_name: str) -> int:
     functions, same root-cause-transform pattern as
     ``_apply_anionic_substituent_prefixes`` itself.
 
-    v34 (WS1/WS6): this is the piece that was MISSING before -- the caller
+     (/): this is the piece that was MISSING before -- the caller
     used to assume the parent always consumed exactly one carboxylate site
     (''junior = n_carb - 1''), which undercounts a genuine polyacid parent
     ('-dioate'/'-trioate') and misclassifies its remaining junior sites as an
@@ -4664,18 +4664,18 @@ def _parent_acid_suffix_multiplicity(anion_name: str) -> int:
 
 
 def _apply_anionic_substituent_prefixes(mol, anions, name: str) -> str:
-    """P-72.6 (BB :41195, "ANIONIC CENTERS IN BOTH PARENT COMPOUNDS AND
+    """ (BB:41195, "ANIONIC CENTERS IN BOTH PARENT COMPOUNDS AND
     SUBSTITUENT GROUPS"): an anionic characteristic group that is NOT in the
     parent structure is cited by its ANIONIC substituent prefix — carboxylato
-    for -CO-O- (P-72.6.1), oxido for -O- (P-72.6.2), sulfonato for -SO2-O- and
-    phosphonato for -P(O)(O-)2 (both P-72.6.1, BB :41211/:41213: "–SO2-O–
-    sulfonato (preselected prefix)" / "–P(O)(O– )2 phosphonato (preselected
+    for -CO-O-, oxido for -O-, sulfonato for -SO2-O- and
+    phosphonato for -P(O)(O-)2 (both, BB:41211/:41213: "–SO2-O–
+    sulfonato (preselected prefix)" / "–P(O)(O–)2 phosphonato (preselected
     prefix)") — NEVER the neutral prefix (carboxy/hydroxy/sulfo/phosphono),
     which silently drops the charge and denotes a DIFFERENT (less-anionic)
     molecule. The parent anion consumed the senior anionic centre(s) (carboxylate
-    senior to sulfonate/olate — P-72.7e: general seniority order of classes,
-    P-41, generalizing the BB's own "3-oxidonaphthalene-2-carboxylate (PIN)
-    (carboxylate senior to olate)" example, :41288-41290); every OTHER anionic
+    senior to sulfonate/olate —: general seniority order of classes,
+    , generalizing the BB's own "3-oxidonaphthalene-2-carboxylate (PIN)
+    (carboxylate senior to olate)" example,:41288-41290); every OTHER anionic
     group is a junior prefix.
 
     Root-cause transform on the multi-anion name (the parent-suffix conversion
@@ -4683,7 +4683,7 @@ def _apply_anionic_substituent_prefixes(mol, anions, name: str) -> str:
     step). Count-matched to the ACTUAL anionic sites so a genuine NEUTRAL -OH/-COOH/
     -SO3H/-PO3H2 substituent is never converted.
 
-    v34 (WS1/WS6): widened from "exactly 1 junior site" to "any number of
+     (/): widened from "exactly 1 junior site" to "any number of
     junior sites, PROVIDED they are all the SAME class" (``_parent_acid_suffix_
     multiplicity`` correctly attributes a polyacid parent's OWN sites first, so
     e.g. a tricarboxylate anion with a '-dioate' parent now correctly resolves
@@ -4693,8 +4693,8 @@ def _apply_anionic_substituent_prefixes(mol, anions, name: str) -> str:
     words risks re-ordering the alphabetized prefix list, which this producer
     does not attempt.
     Examples (all verbatim BB PINs/preselected prefixes): 2-(carboxylatomethyl)benzoate
-    (BB :41293), 3-oxidonaphthalene-2-carboxylate (BB :41295),
-    4-sulfonatobenzoate (P-72.6.1 + P-72.7e, RT-verified 2026-08-17)."""
+    (BB:41293), 3-oxidonaphthalene-2-carboxylate (BB:41295),
+    4-sulfonatobenzoate +, RT-verified 2026-08-17)."""
     if not name:
         return name
     classes = [classify_anion(mol, a) for a in anions]
@@ -4704,20 +4704,20 @@ def _apply_anionic_substituent_prefixes(mol, anions, name: str) -> str:
     n_sulfinate = sum(1 for c in classes if c == 'sulfinate')
     n_phosphonate = sum(1 for c in classes if c == 'phosphonate')
     n_thiolate = sum(1 for c in classes if c == 'thiolate')
-    # Parent = the senior anionic class present (P-72.7e: carboxylate senior to
+    # Parent = the senior anionic class present: carboxylate senior to
     # olate/sulfonate/sulfinate/phosphonate). The caller only reaches this
     # function when n_carb >= 1 (carboxylate_count > 0 guard at the call site),
     # so the elif branch below is a defensive fallback, not a live path today.
     #
-    # v34 (WS1/WS6): the OLD ``n_carb - 1`` assumed the PARENT suffix always
+    # (/): the OLD ``n_carb - 1`` assumed the PARENT suffix always
     # consumes exactly ONE carboxylate site. That is wrong for a polyacid
     # parent (a '-dioate'/'-dicarboxylate' name already accounts for TWO
-    # sites, a '-trioate'/'-tricarboxylate' for THREE, ...), so a genuine
+    # sites, a '-trioate'/'-tricarboxylate' for THREE,...), so a genuine
     # tricarboxylate anion (one parent '-dioate' + one JUNIOR 'carboxy' arm)
     # was undercounted as TWO junior sites and fell into the (uncomputable,
     # fail-closed) multi-junior branch below, silently leaving the junior
     # '-COO-' as the neutral 'carboxy' prefix -- a charge-dropping name a
-    # different molecule -- SELF-01 correctly suppressed it, but as an
+    # different molecule -- correctly suppressed it, but as an
     # avoidable abstention. ``_parent_acid_suffix_multiplicity`` reads the
     # multiplying prefix already embedded in the converted suffix
     # ('-dioate' -> 2, '-tricarboxylate' -> 3, plain '-oate'/'-carboxylate'
@@ -4732,12 +4732,12 @@ def _apply_anionic_substituent_prefixes(mol, anions, name: str) -> str:
         return name
     # Every S/P-oxoacid anionic centre present is junior to the chosen parent
     # (carboxylate/olate) in every reachable case today. A terminal C-bonded
-    # thiolate ([S-]) is likewise junior (P-72.7e: carboxylate senior to
-    # thiolate) -- FIX 3a (v33 charged C1): mirror the sulfinato/sulfonato
+    # thiolate ([S-]) is likewise junior: carboxylate senior to
+    # thiolate) -- FIX 3a (charged C1): mirror the sulfinato/sulfonato
     # blocks below with a 'sulfido' swap so a junior thiolate site is cited
-    # by its ANIONIC prefix (P-72.6.2 pattern) rather than the neutral
+    # by its ANIONIC prefix pattern) rather than the neutral
     # 'sulfanyl' (-SH), which silently drops the charge and denotes a
-    # different (neutral-thiol) molecule -- SELF-01 caught this live
+    # different (neutral-thiol) molecule -- caught this live
     # (measured: 'sulfanylacetate' for [S-]CC(=O)[O-] parses back to neutral
     # -SH and is suppressed as a different molecule).
     junior_sulfonate, junior_sulfinate, junior_phosphonate, junior_thiolate = (
@@ -4751,7 +4751,7 @@ def _apply_anionic_substituent_prefixes(mol, anions, name: str) -> str:
     total_junior = sum(junior_by_class.values())
     if total_junior == 0:
         return name
-    # v34 (WS1/WS6): widen single-junior (total_junior == 1) to HOMOGENEOUS
+    # (/): widen single-junior (total_junior == 1) to HOMOGENEOUS
     # multi-junior (>= 2 junior sites, but ALL of the SAME class, e.g. a
     # tetracarboxylate anion with a '-dioate' parent leaving TWO junior
     # 'carboxy' arms). A MIXED set of junior classes (e.g. one junior
@@ -4850,7 +4850,7 @@ def _find_carboxylate_chain(mol, anion_site: Dict):
     return chain, double_bond_locs
 
 
-# 169.6-03 (CHOKE-01, kill-list §2.1): the four carbon-counting ANION naming
+# 169.6-03 (CHOKE-01, kill-list): the four carbon-counting ANION naming
 # stubs (alkoxide = the canonical `heptanolate` bug; phenolate = hardcoded
 # `return 'phenolate'`; carbanion; thiolate) were DELETED. They counted carbons
 # -> prefix+suffix and dropped connectivity / substituents / unsaturation /
@@ -4864,7 +4864,7 @@ def _find_carboxylate_chain(mol, anion_site: Dict):
 def _name_aminium_systematic(mol, cation_site: Dict) -> str:
     """Generate systematic name for aminium cation.
 
-    IUPAC P-73.1.2: Protonated amines use '-aminium' suffix.
+    IUPAC: Protonated amines use '-aminium' suffix.
     - NH4+ -> 'ammonium' (retained)
     - R-NH3+ -> neutralize to R-NH2, name as amine, convert amine -> aminium
     - R2NH2+ -> neutralize, name, convert
@@ -4879,7 +4879,7 @@ def _name_aminium_systematic(mol, cation_site: Dict) -> str:
         return 'ammonium'
 
     # Strategy: neutralize N+ to N, name the neutral amine, then convert
-    # amine -> aminium (IUPAC P-73.1.2)
+    # amine -> aminium (IUPAC
     try:
         rw = Chem.RWMol(mol)
         n_atom = rw.GetAtomWithIdx(cation_site['atom_idx'])
@@ -4908,21 +4908,21 @@ def _name_aminium_systematic(mol, cation_site: Dict) -> str:
     except (RecursionError, ValueError, RuntimeError):
         pass
 
-    # 169.6-03 (CHOKE-01, kill-list §2.1): the carbon-counting FALLBACK ("old
+    # 169.6-03 (CHOKE-01, kill-list): the carbon-counting FALLBACK ("old
     # approach using simple alkyl counting") was DELETED. Only the neutralize ->
     # name_fragment_recursively -> name_aminium_cation PRIMARY path above is kept
     # (it handles substituents/rings correctly: methylamine->methylaminium,
     # pyrrolidine->pyrrolidineium). On failure return '' so the caller falls
-    # through to the legacy cascade (v18 byte-identical no-crash contract) —
+    # through to the legacy cascade (byte-identical no-crash contract) —
     # NOT a carbon-counted aminium misname.
     return ''
 
 
 def _name_arylamine_quaternary_aminium(mol, cation_site: Dict) -> str:
-    """P-73.1.2.1 (BB:41455) ``-aminium`` PIN for a quaternary N on an AROMATIC ring.
+    """ (the Blue Book) ``-aminium`` PIN for a quaternary N on an AROMATIC ring.
 
     Task 8B RC2: a quaternary N bonded directly to an (hetero)aromatic ring parent
-    (aniline, naphthalen-2-amine, pyridin-4-amine, ...) is the ring-amine analogue of
+    (aniline, naphthalen-2-amine, pyridin-4-amine,...) is the ring-amine analogue of
     the alkyl chain case ``C[N+](C)(C)C -> N,N,N-trimethylmethanaminium``. The chain
     path (``name_quaternary_aminium`` -> ``_assemble_amine_name``) CANNOT name an
     aromatic/heterocyclic ring parent: ``_generate_ring_parent`` returns ``''`` for
@@ -4937,7 +4937,7 @@ def _name_arylamine_quaternary_aminium(mol, cation_site: Dict) -> str:
     block (``N,N,N-trimethyl``) and append ``-ium`` through ``name_aminium_cation``
     (``aniline`` -> ``anilinium``, ``pyridin-4-amine`` -> ``pyridin-4-aminium``).
 
-    Scope (build-the-class-or-degrade, P-73.1.2.1): fires only when
+    Scope (build-the-class-or-degrade,: fires only when
       * the cation is a genuine quaternary N (0 H, degree >= 4, +1),
       * exactly ONE N-neighbour is a ring atom and it is aromatic,
       * the parent ring system is UNSUBSTITUTED apart from the amine N.
@@ -5060,22 +5060,22 @@ def _name_arylamine_quaternary_aminium(mol, cation_site: Dict) -> str:
 
 
 def emit_uronium(mol, sites) -> str:
-    """P-73.1.2.2 (BB:41505) substituted URONIUM / THIOURONIUM cation.
+    """ (the Blue Book) substituted URONIUM / THIOURONIUM cation.
 
     Task 8B RC3. A cation formed by adding a hydron to (iso)urea — a carbon bonded
     to exactly two N and one O (uronium) or one S (thiouronium), one C=heteroatom
     double bond, net +1 on the skeleton — is named on the retained parent cation
-    ``uronium`` / ``thiouronium`` (P-73.1.2.2: numerical locants are dropped in the
+    ``uronium`` / ``thiouronium``: numerical locants are dropped in the
     PIN; the N/N'/O/S locants follow urea/isourea). ->
 
-      CNC(=[NH+]C)Oc1ccccc1        -> N,N'-dimethyl-O-phenyluronium   (BB:41505)
-      CNC(=[NH+]c1ccccc1)SC        -> N,S-dimethyl-N'-phenylthiouronium (BB:41521)
+      CNC(=[NH+]C)Oc1ccccc1 -> N,N'-dimethyl-O-phenyluronium (the Blue Book)
+      CNC(=[NH+]c1ccccc1)SC -> N,S-dimethyl-N'-phenylthiouronium (the Blue Book)
 
     The neutralize -> re-name -> re-suffix path CANNOT reach this class: the neutral
     isourea names as a carbamimidate ESTER (``phenyl N,N'-dimethylcarbamimidate``),
     not a uronium-convertible amine. So this is a bespoke skeleton producer.
 
-    Locant priming (P-14.5.2): the two nitrogens are N / N'; the nitrogen bearing the
+    Locant priming: the two nitrogens are N / N'; the nitrogen bearing the
     alphabetically-earliest substituent takes the unprimed N (lowest locant to the
     prefix cited first). The chalcogen is O or S. Identical substituents group under
     one multiplier (``N,N'-dimethyl``); the C-substituent prefixes alphabetise.
@@ -5134,7 +5134,7 @@ def emit_uronium(mol, sites) -> str:
     if not (chal_subs or n_subs[0] or n_subs[1]):
         return ''   # unsubstituted parent -> existing retained-name routing owns it
     # Prime the two nitrogens: substituted-before-unsubstituted, then the
-    # alphabetically-earliest substituent set takes the unprimed N (P-14.5.2).
+    # alphabetically-earliest substituent set takes the unprimed N.
     def _nkey(subs):
         return (len(subs) == 0, tuple(sorted(subs)))
     order = sorted(range(2), key=lambda i: _nkey(n_subs[i]))
@@ -5166,17 +5166,17 @@ def emit_uronium(mol, sites) -> str:
 def name_quaternary_aminium(mol, cation_site: Dict) -> str:
     """Systematic ``-aminium`` PIN for a STANDALONE quaternary ammonium cation.
 
-    Phase 184 WS-E.1 (P-73.1.2.1 method (1) + Table 7.4; BlueBookV2:41354,
+    a phase.1 method (1) + Table 7.4; the Blue Book:41354,
     41429-41438): a quaternary N (formal charge +1, 0 H, degree >= 4) is named by
     treating the SENIOR carbon chain through N as the amine parent (``-amine``
     suffix), the other three N-branches as ``N,N,N-``/``N,N-``/``N-`` substituent
     prefixes, then appending ``-ium`` (``methanamine`` -> ``methanaminium``):
 
-      C[N+](C)(C)C   -> 'N,N,N-trimethylmethanaminium'
+      C[N+](C)(C)C -> 'N,N,N-trimethylmethanaminium'
       OCC[N+](C)(C)C -> '2-hydroxy-N,N,N-trimethylethan-1-aminium'
       CC[N+](C)(C)CC -> 'N-ethyl-N,N-dimethylethanaminium'
 
-    Mechanism (D-05): the quaternary N CANNOT be neutralized — removing a
+    Mechanism : the quaternary N CANNOT be neutralized — removing a
     (non-existent) proton leaves an over-valent neutral N and SanitizeMol raises
     (RESEARCH Pitfall 2). Instead the N is DEMOTED to a neutral carbon-context
     amine parent: a ``tertiary_amine`` functional-group match is injected on the
@@ -5185,11 +5185,11 @@ def name_quaternary_aminium(mol, cation_site: Dict) -> str:
     the remaining N-branches become N-locant prefixes (NOT ``select_parent``, NOT
     the ``azaniumyl`` prefix). The well-formed neutral amine name is then converted
     to ``-aminium`` via ``name_aminium_cation`` (the existing amine->aminium text
-    transform). NO postprocessor, NO regex band-aid, NO per-molecule .replace.
+    transform). NO postprocessor, NO regex band-aid, NO per-molecule.replace.
 
     Returns '' (fail-closed) when the cation is NOT a quaternary N or any step
     fails, so callers fall through to the proven aminium / legacy cascade
-    (the v18 no-crash byte-identical contract).
+    (the no-crash byte-identical contract).
     """
     if mol is None:
         return ''
@@ -5212,7 +5212,7 @@ def name_quaternary_aminium(mol, cation_site: Dict) -> str:
     if not carbon_neighbors:
         return ''
 
-    # Task 8B RC2 (P-73.1.2.1, BB:41455): a quaternary N on an AROMATIC ring parent
+    # Task 8B RC2, the Blue Book): a quaternary N on an AROMATIC ring parent
     # (aniline -> N,N,N-trimethylanilinium) is named on a neutral ring-amine proxy;
     # the chain path below cannot name an aromatic ring parent. Declines ('') for
     # alkyl/cycloalkyl parents, which the chain path owns (byte-identical to HEAD).
@@ -5224,7 +5224,7 @@ def name_quaternary_aminium(mol, cation_site: Dict) -> str:
         from ..assembly.composer import _assemble_amine_name
         from ..namer import Orthonym
 
-        # v33 Phase 3 (P-44.1.1 PG-count tie, WS-Q.2): PG_ATTACHMENT_INDICES['tertiary_amine']
+        # a phase PG-count tie,.2): PG_ATTACHMENT_INDICES['tertiary_amine']
         # == [1, 2, 3] assumes the canonical 3-carbon tertiary-amine SMARTS shape (N + 3 C).
         # Our injected match below is a QUATERNARY N with 4 carbon branches (N + 4 C, a
         # 5-tuple), so `_pg_attachment_atoms` (rules/parent_selection.py) silently drops
@@ -5232,14 +5232,14 @@ def name_quaternary_aminium(mol, cation_site: Dict) -> str:
         # not IUPAC seniority. When the dropped branch is the ONE that actually reaches a
         # competing ring (e.g. a phenol several atoms down the chain), both
         # `_count_pg_on_chain`/`_count_pg_on_ring` read 0 (the 3 surviving branches are bare
-        # terminal methyls touching neither ring nor chain), the P-44.1.1 tie falls through
-        # to the ring-senior-to-chain default (P-44.1.2.2), and the ring wins parent
+        # terminal methyls touching neither ring nor chain), the tie falls through
+        # to the ring-senior-to-chain default, and the ring wins parent
         # selection -- emptying `features.principal_chain` and losing the amine parent
         # entirely (a phenol ring elsewhere in the molecule "beats" the forced amine
         # override). Fix: order the injected carbon branches so any branch reaching MORE
         # than the bare N-C bond (i.e. anything but a lone terminal methyl) is listed FIRST
         # -- deterministically, by descending reachable-atom count, ties by atom index --
-        # so it always lands within PG_ATTACHMENT_INDICES' first-3 window and the P-44
+        # so it always lands within PG_ATTACHMENT_INDICES' first-3 window and the
         # tie-break sees the amine's true competing branch instead of only its methyls.
         def _branch_size(start_idx: int) -> int:
             seen = {n_idx}
@@ -5262,7 +5262,7 @@ def name_quaternary_aminium(mol, cation_site: Dict) -> str:
         # enumeration sees all branches; inject a tertiary_amine FG so the amine N
         # becomes the principal group and find_principal_chain orients the parent
         # chain with the N-bearing carbon as C1 (any senior neutral group such as
-        # an -OH is demoted to a detachable prefix per P-73.1.2.1).
+        # an -OH is demoted to a detachable prefix per.
         namer = Orthonym(
             style='pin', _disable_opsin_validity_gate=True,
             _principal_group_override='tertiary_amine',
@@ -5278,7 +5278,7 @@ def name_quaternary_aminium(mol, cation_site: Dict) -> str:
         features.functional_groups.pop('ammonium', None)
         namer._classify(features)
 
-        # v31 (P-31.1.4.2.4): the amine is the principal characteristic group, so
+        #: the amine is the principal characteristic group, so
         # the N-attached carbon must be position 1 of the parent chain (lowest
         # locant to the PG). find_principal_chain can orient a symmetric-length
         # parent from the WRONG end when equal-length N-branches compete — e.g.
@@ -5293,13 +5293,13 @@ def name_quaternary_aminium(mol, cation_site: Dict) -> str:
         if len(_n_positions) == 1 and _n_positions[0] == len(_pc) - 1 and len(_pc) >= 2:
             _pc.reverse()
             features.principal_chain = _pc
-            # v33 Phase 3 (WS-Q.1): `features.atom_to_locant` was built by
-            # `namer._classify()` from the PRE-reversal chain order and is not
+            # a phase (.1): `features.atom_to_locant` was built by
+            # `namer._classify` from the PRE-reversal chain order and is not
             # recomputed here, so every downstream locant lookup (the aminium
             # suffix locant in particular) kept numbering from the OLD orientation
             # while `principal_chain` now numbers from the new one -- e.g. for
             # '3-carboxy-...propan-{N}-aminium' the suffix locant came out '3'
-            # (the pre-reversal C1) instead of '1' (RT-mismatch -> SELF-01
+            # (the pre-reversal C1) instead of '1' (RT-mismatch ->
             # abstain). Recompute from the reversed chain so every consumer of
             # `atom_to_locant` (suffix, prefixes, bond locants) agrees with the
             # chain it is now walking.
@@ -5307,7 +5307,7 @@ def name_quaternary_aminium(mol, cation_site: Dict) -> str:
             features.atom_to_locant = build_atom_to_locant(_pc)
         # Re-point the principal-group N-substituent set to EXCLUDE the carbon that
         # find_principal_chain chose as the parent chain anchor, so the N-prefix
-        # multiplier counts exactly the off-chain branches (P-73.1.2.1 N-locants).
+        # multiplier counts exactly the off-chain branches N-locants).
         chain_set = set(features.principal_chain or [])
         nsub_carbons = [c for c in carbon_neighbors if c not in chain_set]
         features.principal_group_atoms = [tuple([n_idx] + nsub_carbons)]
@@ -5315,7 +5315,7 @@ def name_quaternary_aminium(mol, cation_site: Dict) -> str:
         amine_name = _assemble_amine_name(features, 'pin')
         if not amine_name:
             return ''
-        # amine -> aminium (P-73.1.2.1): methanamine -> methanaminium,
+        # amine -> aminium: methanamine -> methanaminium,
         # ethan-1-amine -> ethan-1-aminium.
         aminium = name_aminium_cation(amine_name)
         if not aminium or 'aminium' not in aminium:
@@ -5325,13 +5325,13 @@ def name_quaternary_aminium(mol, cation_site: Dict) -> str:
         return ''
 
 
-# 169.6-03 (CHOKE-01, kill-list §2.1): the three carbon-counting CATION naming
+# 169.6-03 (CHOKE-01, kill-list): the three carbon-counting CATION naming
 # stubs (carbenium = carbon-count -> ylium; onium = carbon-count + hardcoded
 # 'tri'; diazonium = literal 'benzenediazonium') were DELETED. Their single
 # caller (name_cation's single-cation dispatch) now delegates to route_charged,
 # which neutralizes -> re-enters -> re-applies the class-keyed cation suffix
 # (carbenium ane->ylium via the parent hydride; diazonium append;
-# P-73.2.2.1.1/.3). fix-methodology.md: the stubs ARE the band-aids; deletion IS
+# /.3). fix-methodology.md: the stubs ARE the band-aids; deletion IS
 # the fix.
 
 
@@ -5362,12 +5362,12 @@ def _count_alkyl_carbons(mol, start_idx: int, exclude: set) -> int:
 
 
 # =============================================================================
-# W4-I4 (P-74.1.1 / P-74.2.1.3 / P-74.2.2.1.1 / P-74.2.2.1.2 / P-74.2.2.1.6):
+# W4-I4 / / / /:
 # cumulative same-parent '-ium-...-ide' zwitterion on a HOMOGENEOUS heteroatom
 # chain parent hydride (hydrazine / triazane->triazene / dioxidane). The single
 # cationic and single anionic skeletal centres sit on the SAME chain, so both
 # are expressed as cumulative suffixes ('-ium' cited first, '-ide' given low
-# locant) rather than the P-74.1.3 cation-as-prefix construction.
+# locant) rather than the cation-as-prefix construction.
 # =============================================================================
 
 _HETEROCHAIN_NUM_PREFIX = {1: '', 2: 'di', 3: 'tri', 4: 'tetra', 5: 'penta', 6: 'hexa'}
@@ -5377,7 +5377,7 @@ _HETEROCHAIN_ELEMENTS = frozenset({'N', 'O', 'S'})
 def _cumulative_chain_hydride_base(element, length, db_locants):
     """Neutral parent-hydride base name for a homogeneous acyclic chain of
     ``length`` atoms of ``element`` with in-chain double bonds at ``db_locants``
-    (P-21.2 / P-31.1.4). N: azane / hydrazine(2, PIN) / triazane ...; unsaturated
+     /. N: azane / hydrazine(2, PIN) / triazane...; unsaturated
     N-chain -> 'triaz-<locs>-ene'. O: oxidane/dioxidane/trioxidane. S:
     sulfane/disulfane/trisulfane. Returns the base name or None (out of scope)."""
     mult = _HETEROCHAIN_NUM_PREFIX.get(length)
@@ -5402,17 +5402,17 @@ def _cumulative_chain_hydride_base(element, length, db_locants):
 
 
 def emit_cumulative_ium_ide(mol) -> Optional[str]:
-    """P-74.1.1 cumulative same-parent zwitterion: one cationic ('-ium') and one
+    """ cumulative same-parent zwitterion: one cationic ('-ium') and one
     anionic ('-ide') skeletal centre on the SAME homogeneous heteroatom chain
-    parent hydride. Covers amine imides (P-74.2.1.3), azo/azomethine imides
-    (P-74.2.2.1.1/.2) and carbonyl oxides (P-74.2.2.1.6)::
+    parent hydride. Covers amine imides, azo/azomethine imides
+    /.2) and carbonyl oxides::
 
-        C[N-][N+](C)(C)C -> 1,2,2,2-tetramethylhydrazin-2-ium-1-ide       (BB 42423)
-        C[N+]([N-]C)=NC  -> 1,2,3-trimethyltriaz-2-en-2-ium-1-ide         (BB 43121)
-        C[N-][N+](=C)C   -> 1,2-dimethyl-2-methylidenehydrazin-2-ium-1-ide (BB 43143)
-        CC(C)=[O+][O-]   -> 2-(propan-2-ylidene)dioxidan-2-ium-1-ide      (BB 43187)
+        C[N-][N+](C)(C)C -> 1,2,2,2-tetramethylhydrazin-2-ium-1-ide (BB 42423)
+        C[N+]([N-]C)=NC -> 1,2,3-trimethyltriaz-2-en-2-ium-1-ide (BB 43121)
+        C[N-][N+](=C)C -> 1,2-dimethyl-2-methylidenehydrazin-2-ium-1-ide (BB 43143)
+        CC(C)=[O+][O-] -> 2-(propan-2-ylidene)dioxidan-2-ium-1-ide (BB 43187)
 
-    Numbering (P-74.1.1): anionic suffixes get seniority for low locants (so the
+    Numbering: anionic suffixes get seniority for low locants (so the
     '-ide' locant is minimised before the '-ium' locant); the cationic suffix is
     cited FIRST in the name ('<stem>-<ium>-ium-<ide>-ide'). Fail-closed (None)."""
     if mol is None or len(Chem.GetMolFrags(mol)) != 1:
@@ -5430,9 +5430,9 @@ def emit_cumulative_ium_ide(mol) -> Optional[str]:
     if element != an.GetSymbol() or element not in _HETEROCHAIN_ELEMENTS:
         return None
 
-    # P-61.7 / P-59 Table 5.1: when the +/- pair belongs to a NEUTRAL
+    # /: when the +/- pair belongs to a NEUTRAL
     # internal-charge prefix group (azide -N=[N+]=[N-], diazo, nitro, N-oxide),
-    # the charges are bonding features, NOT a P-74.1.1 cumulative same-parent
+    # the charges are bonding features, NOT a cumulative same-parent
     # zwitterion. Decline so dispatch cascades to the neutral substitutive path
     # (azido prefix / acyl-azide functional-class). Without this, an azide's
     # central N+ / terminal N- were mis-read as a triaz-…-ium-…-ide zwitterion
@@ -5508,7 +5508,7 @@ def emit_cumulative_ium_ide(mol) -> Optional[str]:
                         sst.append(kj)
             if bt == Chem.BondType.DOUBLE:
                 # The substituent pipeline reads the attachment bond order and
-                # emits the P-29.2 '-ylidene' itself; rebuilding it here from a
+                # emits the '-ylidene' itself; rebuilding it here from a
                 # '-yl' token would decide the free valence a second time.
                 from ..assembly.substituent_enumerator import name_ylidene_substituent
                 ylidene = name_ylidene_substituent(mol, frag, j)
@@ -5516,7 +5516,7 @@ def emit_cumulative_ium_ide(mol) -> Optional[str]:
                     return None
                 atom_subs[i].append(ylidene)
             elif bt == Chem.BondType.TRIPLE:
-                # Triple attachment -> P-29.2 '-ylidyne' (three free valences),
+                # Triple attachment -> '-ylidyne' (three free valences),
                 # e.g. the CH3-C# of a nitrile imide -> 'ethylidyne'. Same
                 # producer-owns-morphology contract as the ylidene branch.
                 from ..assembly.substituent_enumerator import name_ylidyne_substituent
@@ -5538,7 +5538,7 @@ def emit_cumulative_ium_ide(mol) -> Optional[str]:
             chain_double_pairs.append((order[a_idx], order[a_idx + 1]))
 
     # --- Choose the orientation (forward / reverse) giving lowest locants in the
-    # P-74.1.1 order: (a) -ide centre, (b) -ium centre, (c) double bonds,
+    # order: (a) -ide centre, (b) -ium centre, (c) double bonds,
     # (d) substituents. ---
     def _score(seq):
         loc = {atom: pos + 1 for pos, atom in enumerate(seq)}
@@ -5557,7 +5557,7 @@ def emit_cumulative_ium_ide(mol) -> Optional[str]:
     stem = base[:-1] if base.endswith('e') else base
     core = f"{stem}-{ium_loc}-ium-{ide_loc}-ide"
 
-    # --- Substituent prefixes: group by name, cite locants, alphabetise (P-14.5),
+    # --- Substituent prefixes: group by name, cite locants, alphabetise,
     # multiply (di/tri or bis/tris for complex). ---
     from ..assembly.naming_utils import (
         alpha_sort_key,
@@ -5590,9 +5590,9 @@ def emit_cumulative_ium_ide(mol) -> Optional[str]:
 
 
 # =============================================================================
-# W4-I4 (P-74.2.1.1): 'ylides' — an onium cation (N+/P+/O+/S+, no free H) bonded
+# W4-I4: 'ylides' — an onium cation (N+/P+/O+/S+, no free H) bonded
 # directly to a carbanion. The carbanion is the '-ide' parent (propan-2-ide); the
-# onium cation is a substituent prefix on it (trimethylazaniumyl / ...phosphaniumyl
+# onium cation is a substituent prefix on it (trimethylazaniumyl /...phosphaniumyl
 # / dimethyloxidaniumyl / dimethylsulfaniumyl). Method (1) = PIN.
 # =============================================================================
 
@@ -5637,7 +5637,7 @@ def _sever_and_name_carbanion(mol, carbanion_idx, cation_idx):
 
 def _sever_and_name_aminide(mol, aminide_idx, cation_idx):
     """Sever the aminide<->cation bond and name the nitrogen anion as an 'aminide'
-    parent (P-72.2.2.2.3, e.g. ``methanaminide``). Returns (parent_name, 'N') --
+    parent, e.g. ``methanaminide``). Returns (parent_name, 'N') --
     the amine nitrogen carries the 'N' substituent locant for the cation prefix --
     or (None, None) on any decline.
 
@@ -5645,7 +5645,7 @@ def _sever_and_name_aminide(mol, aminide_idx, cation_idx):
     H gives the neutral-parent aminide (``CH3-N(-)-`` -> ``CH3-NH-``) whose N then
     bears the cation prefix at the 'N' locant. The isolated fragment is named by
     re-entering the top namer (the ``name_nitrile_oxide`` precedent), which owns
-    the aminide morphology; the outer SELF-01 gate is the accuracy backstop for the
+    the aminide morphology; the outer gate is the accuracy backstop for the
     full composed name."""
     rw = Chem.RWMol(mol)
     if rw.GetBondBetweenAtoms(aminide_idx, cation_idx) is None:
@@ -5684,23 +5684,23 @@ def _sever_and_name_aminide(mol, aminide_idx, cation_idx):
 
 
 # W4-I4: elements whose closed-shell onium cation (no free H) forms an ylide with
-# an adjacent carbanion (P-74.2.1.1: usually N, P, S, Se, Te; also O oxonium).
+# an adjacent carbanion: usually N, P, S, Se, Te; also O oxonium).
 _YLIDE_ONIUM_ELEMENTS = frozenset({'N', 'P', 'As', 'Sb', 'O', 'S', 'Se', 'Te'})
 
 
 def emit_ylide(mol) -> Optional[str]:
-    """P-74.2.1.1 'ylide': a closed-shell onium cation X+ (X = N/P/O/S/..., no free
+    """ 'ylide': a closed-shell onium cation X+ (X = N/P/O/S/..., no free
     H) bonded directly to a carbanion Y-. Named (method 1 = PIN) as the carbanion
     '-ide' parent hydride with the onium cation as an '<...>-aniumyl' prefix::
 
-        C[N+](C)(C)[C-](C)C  -> 2-(trimethylazaniumyl)propan-2-ide      (P-74.2.1.1.1)
-        C[P+](C)(C)[C-](C)C  -> 2-(trimethylphosphaniumyl)propan-2-ide  (BB 42526)
-        CC[C-](CC)[O+](C)C   -> 3-(dimethyloxidaniumyl)pentan-3-ide      (P-74.2.1.1.3)
-        CC[C-](CC)[S+](C)C   -> 3-(dimethylsulfaniumyl)pentan-3-ide      (P-74.2.1.1.4)
-        C[N-][O+]=C(C)C -> N-[(propan-2-ylidene)oxidaniumyl]methanaminide (P-74.2.2)
+        C[N+](C)(C)[C-](C)C -> 2-(trimethylazaniumyl)propan-2-ide
+        C[P+](C)(C)[C-](C)C -> 2-(trimethylphosphaniumyl)propan-2-ide (BB 42526)
+        CC[C-](CC)[O+](C)C -> 3-(dimethyloxidaniumyl)pentan-3-ide
+        CC[C-](CC)[S+](C)C -> 3-(dimethylsulfaniumyl)pentan-3-ide
+        C[N-][O+]=C(C)C -> N-[(propan-2-ylidene)oxidaniumyl]methanaminide
 
     The anion parent is a carbanion ('-ide') OR a nitrogen aminide ('-aminide',
-    P-72.2.2.2.3); the latter carries the cation prefix at the 'N' locant.
+    ; the latter carries the cation prefix at the 'N' locant.
 
     The nitrogen PIN is the amine-based '2-(N,N-dimethylmethanaminiumyl)propan-2-
     ide', but that form is OPSIN-unparseable; the azane-based 'trimethylazaniumyl'
@@ -5739,7 +5739,7 @@ def emit_ylide(mol) -> Optional[str]:
     if not parent_name:
         return None
     locant_prefix = f"{anion_loc}-" if anion_loc is not None else ''
-    # P-16.3.3 enclosing-mark nesting: the onium prefix is ALWAYS enclosed, but the
+    # enclosing-mark nesting: the onium prefix is ALWAYS enclosed, but the
     # mark ESCALATES to square brackets when the prefix already contains parentheses
     # (a compound '(propan-2-ylidene)oxidaniumyl' -> '[(propan-2-ylidene)oxidaniumyl]').
     # Route through the shared primitive instead of hardcoding '(...)'.

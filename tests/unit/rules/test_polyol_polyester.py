@@ -1,5 +1,5 @@
-"""Unit tests for the acyclic polyol / polyether / polyester T4 producer
-(v30 tail #21). Each emitted name is asserted to round-trip to the full
+"""Unit tests for the acyclic polyol / polyether / polyester producer
+(tail #21). Each emitted name is asserted to round-trip to the full
 InChIKey via OPSIN (the 0-wrong contract); every out-of-scope shape declines.
 """
 from rdkit import Chem

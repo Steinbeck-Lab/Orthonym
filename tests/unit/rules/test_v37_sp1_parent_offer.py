@@ -1,10 +1,10 @@
-"""v37 SP1.3 — parent-selection OFFER-not-return (invariant 18).
+""" — parent-selection OFFER-not-return (a project rule).
 
-VERIFIED on HEAD 030cc1dd (fresh process, STEP-1 spy re-confirm 2026-08-25):
-`p44_scorer.select_parent_unified` builds a real >=2 P-44 parent pool for these
+VERIFIED on HEAD 030cc1dd (fresh process, trace re-confirm 2026-08-25):
+`p44_scorer.select_parent_unified` builds a real >=2 parent pool for these
 molecules (`[('ring',6),('chain',4)]`, size 2) but historically hard-committed
 `ranked[0]` and discarded `ranked[1:]` (p44_scorer.py:543-545); the gate-reject
-retry (`namer._retry_cascade_on_gate_rejection`, :2740) only swaps the DISPATCH
+retry (`namer._retry_cascade_on_gate_rejection`,:2740) only swaps the DISPATCH
 CLASS, so it re-picks the SAME parent every pass. When the senior parent
 (`ranked[0]`, the benzene ring) leads to an un-nameable remainder, the molecule
 abstained even though the junior parent (`ranked[1]`, the chloro-butynyl chain)
@@ -13,7 +13,7 @@ names + round-trips.
 The fix OFFERS the ranked pool: on the ship-a-failure BEST-EFFORT path only,
 `_try_alternate_parent_rescue` re-names on a fresh instance with
 `_forced_parent_rank=k` (k=1..pool-1) and adopts the FIRST junior candidate
-whose full name round-trips. `ranked[0]` and the P-44 ranking are NEVER changed;
+whose full name round-trips. `ranked[0]` and the ranking are NEVER changed;
 the RT gate keeps it 0-wrong.
 
 TIER NOTE (measured): the rescued names are best-effort systematic/mancude forms
@@ -89,7 +89,7 @@ class TestJuniorParentRescue:
 class TestPinNoRegress:
     @pytest.mark.opsin_gate  # production gate ON — else the pre-gate wrong
     # carbamate candidate ships unsuppressed (a test-env artifact, not a real
-    # deployment: STEP-1 in a fresh process with the gate on abstains).
+    # deployment: in a fresh process with the gate on abstains).
     @pytest.mark.parametrize("smi", WITNESSES)
     def test_pin_tier_still_fails_closed(self, smi):
         """At the PIN/default tier the offer-retry never fires (it is

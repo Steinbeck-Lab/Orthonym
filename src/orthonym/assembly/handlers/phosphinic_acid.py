@@ -1,14 +1,14 @@
-"""Phase 160 phosphinic_acid handler — direct-return shim.
+"""a phase phosphinic_acid handler — direct-return shim.
 
 1-line wrapper around ``rules.phosphorus.name_phosphinic_acid``. Verbatim
 move of composer.py:1064-1079 dispatch logic.
 
-IUPAC cite: P-68.3.1.2.2 (phosphinic acids).
+IUPAC cite: (phosphinic acids).
 
 References:
 - composer.py:1064-1079 (inline phosphinic_acid branch; REMOVED at this commit).
 - rules.phosphorus.name_phosphinic_acid — chemical-logic body.
-- 160-AUDIT-DECOMP.md § 1 row 'phosphinic_acid' + § 2.25 purity proof.
+- internal notes-DECOMP.md row 'phosphinic_acid' + purity proof.
 """
 from __future__ import annotations
 
@@ -50,7 +50,7 @@ def name_phosphinic_acid(
 
     pool = get_current_pool()
     pool.add(name, "phosphinic_acid", features)
-    # composer.py:1079 inline: _inject_stereo_if_missing(features, pool.best().name)
+    # composer.py:1079 inline: _inject_stereo_if_missing(features, pool.best.name)
     final_name = _inject_stereo_if_missing(features, pool.best().name)
     return NamingResult(
         name=final_name,

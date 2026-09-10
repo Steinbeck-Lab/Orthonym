@@ -1,6 +1,6 @@
 """Unit tests for compound class pre-routing infrastructure.
 
-Tests classify_compound_class() which routes molecules to class-specific
+Tests classify_compound_class which routes molecules to class-specific
 handlers before the 33-handler cascade. The function returns a class label
 (steroid, alkaloid, terpene, carbohydrate) or None for general routing.
 
@@ -10,7 +10,7 @@ Test classes:
 - TestClassifyTerpene: Terpene molecules classified as 'terpene'
 - TestClassifyCarbohydrate: Carbohydrate molecules classified as 'carbohydrate'
 - TestClassifyGeneral: Non-NP molecules return None
-- TestSugarInMainCascade: Sugar detection wired into name_compound()
+- TestSugarInMainCascade: Sugar detection wired into name_compound
 - TestExistingNPPreserved: Existing NP detection order preserved
 """
 
@@ -192,7 +192,7 @@ class TestClassifyGeneral:
 
 @pytest.mark.unit
 class TestSugarInMainCascade:
-    """Sugar detection wired into name_compound() returns sugar name."""
+    """Sugar detection wired into name_compound returns sugar name."""
 
     def test_glucose_nonstereo_returns_sugar_name(self):
         """Non-stereo glucose should return a sugar name, not systematic oxane."""

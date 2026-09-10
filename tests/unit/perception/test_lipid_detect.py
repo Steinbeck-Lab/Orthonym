@@ -1,9 +1,9 @@
-"""Unit tests for the lipid backbone detector (Phase 180, WSC-01).
+"""Unit tests for the lipid backbone detector (a phase, -01).
 
 `detect_lipid_backbone(mol)` returns a structured BackboneMatch (family in
 {"glyceride","phospholipid","sphingolipid"}, acyl/phospho sites, head group,
 free-OH set, backbone_atom_to_locant map) or None on any dirty/unrecognized
-decoration (D-06 hard gate / fail-safe).
+decoration (hard gate / fail-safe).
 
 WAVE 0 CONTRACT: imports the not-yet-built `detect_lipid_backbone` INSIDE each
 test body so `pytest --collect-only` succeeds; RED at run time until Wave 1.

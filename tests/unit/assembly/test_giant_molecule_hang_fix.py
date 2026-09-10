@@ -1,4 +1,4 @@
-"""v33 giant-molecule hang fix — regression locks.
+""" giant-molecule hang fix — regression locks.
 
 The best-effort namer used to HANG on >60-heavy-atom molecules (acyl-CoA,
 peptide-glycan bioconjugates): its recursive per-fragment naming re-explored the
@@ -10,7 +10,7 @@ subprocess (up to 30 s).
 These tests lock the three coordinated fixes at the unit level (no JVM):
   A. the fragment cache PERSISTS across ``isolated_naming_session``;
   B. the per-top-level work budget SURVIVES ``isolated_naming_session`` and is
-     armed once at the true outermost ``name()`` scope;
+     armed once at the true outermost ``name`` scope;
   C. OPSIN parse results are memoized (successes AND failures).
 """
 import pytest
@@ -85,7 +85,7 @@ def test_spend_returns_false_when_exhausted():
 
 
 def test_spend_is_noop_without_a_scope():
-    # A direct producer call outside any name() scope must behave exactly as
+    # A direct producer call outside any name scope must behave exactly as
     # before: no budget armed -> spend always allows.
     assert getattr(fn._fragment_guard, 'work_budget', None) is None
     assert fn.spend_fragment_work() is True

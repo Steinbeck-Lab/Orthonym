@@ -1,6 +1,6 @@
-"""A `-C(=O)OH` substituent is `carboxy`, not `formyl` (P-65.1.1.2).
+"""A `-C(=O)OH` substituent is `carboxy`, not `formyl`.
 
-Measured defect, found while pre-validating the v30 assembly target: composing
+Measured defect, found while pre-validating the assembly target: composing
 `terminal_ring_name` parents with `name_substituent` prefixes produced
 `5,7-diformyl-…` for an input whose only such group is `C(=O)O`, i.e. a name denoting
 a molecule two oxygens short. 34 of 71 composed rows came out as a wrong molecule and
@@ -24,7 +24,7 @@ mapping as it stands: `rules/acid_halides.py:16` documents *"formic acid -> form
 `decomposition/fragment_assembly.py:136` holds its own copy; and
 `tests/unit/rules/test_v29_phase7_prefix_vocabulary.py:51` asserts the current return
 value directly. So the fix is a graph-shape guard at the substituent caller, exactly as
-`rules/ring_assemblies.py:1526` already does for the ring-assembly path — *"P-65.1.1.2:
+`rules/ring_assemblies.py:1526` already does for the ring-assembly path — *":
 the prefix for -COOH is 'carboxy'"*.
 """
 
@@ -67,7 +67,7 @@ def test_bare_carboxy_is_carboxy_not_formyl():
 def test_bare_carboxy_via_parent_side_attachment():
     """THE test that matters -- this is the convention production uses.
 
-    Measured on a real dev500 row
+    Measured on a real a dev split row
     (`C[C@@H]1C[C@H](O)[C@H]2C(C)(C)C[C@](C)(C(=O)O)[C@@]2(O)[C@@H]1O`):
     `discover_substituents` yields `frag_atoms={12,13,14}` with
     `attach_mol_idx=10`, the RING carbon -- outside the fragment. With the raw index
@@ -100,7 +100,7 @@ def test_carboxy_on_other_parents(smiles, frag, attach):
 
 
 def test_charged_carboxylate_is_not_called_carboxy():
-    """A deprotonated -C(=O)O- is a P-73 anion, not the neutral `carboxy` prefix.
+    """A deprotonated -C(=O)O- is a anion, not the neutral `carboxy` prefix.
     Naming it `carboxy` would assert a proton the input does not have."""
     tok = _tok("CC(=O)[O-]", [1, 2, 3], 1)
     assert tok != "carboxy", (

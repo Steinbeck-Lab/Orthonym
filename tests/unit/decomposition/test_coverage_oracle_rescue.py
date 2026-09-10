@@ -2,10 +2,10 @@
 covers a molecule.
 
 `decomposition/engine.py` decided "is this name good enough to skip
-decomposition?" with several tests on the LENGTH OF THE NAME STRING.  A
+decomposition?" with several tests on the LENGTH OF THE NAME STRING. A
 character count is anti-correlated with coverage: the correct `cholesterol`
 scores 0.393 chars/HA while `2-amino-2-(methylamino)acetamide` -- a name that
-INVENTS atoms -- scores 5.333.  Measured before the fix, the predicates refused
+INVENTS atoms -- scores 5.333. Measured before the fix, the predicates refused
 29 names that were each exactly right for the molecule they were asked about,
 including PINs marked `(PIN)` in Blue Book Table 2.7.
 
@@ -13,7 +13,7 @@ Those counts are now PRE-FILTERS: a name that fails one is measured against the
 real oracle (`validation/atom_coverage.py`, constitution by InChIKey skeleton)
 and kept only if the measurement proves it denotes the molecule exactly.
 
-The two halves of this file are equally load-bearing.  Rescuing correct names
+The two halves of this file are equally load-bearing. Rescuing correct names
 is worthless if partial names are rescued too, so every positive here is paired
 with a NEGATIVE CONTROL lifted from the repo's own pre-existing fixtures.
 """
@@ -38,18 +38,18 @@ pytestmark = pytest.mark.skipif(
 
 
 # --------------------------------------------------------------------------
-# Correct names that a character count refused.  SMILES are OPSIN's own parse
+# Correct names that a character count refused. SMILES are OPSIN's own parse
 # of the name, so the (name, molecule) pairing is correct by construction.
 # --------------------------------------------------------------------------
 
 # (name, SMILES, heavy atoms, why the name is right)
 CORRECT_BUT_SHORT = [
-    # Blue Book P-25.1.1 "Retained names for hydrocarbons used for parent ring
+    # Blue Book "Retained names for hydrocarbons used for parent ring
     # components and as attached ring components", Table 2.7 "Retained names
     # for hydrocarbon parent ring components in descending order of
     # seniority" -- each of these is marked (PIN) there.
     # SMILES are OPSIN's own parse of the name, canonicalised by RDKit, so the
-    # pairing cannot be a hand-transcription error.  (It was: a hand-written
+    # pairing cannot be a hand-transcription error. (It was: a hand-written
     # `chrysene` SMILES was a different C18H12 isomer, and
     # test_correct_short_name_is_proven_complete caught it.)
     ("pyrene", "c1cc2ccc3cccc4ccc(c1)c2c34", 16),
@@ -57,7 +57,7 @@ CORRECT_BUT_SHORT = [
     ("perylene", "c1cc2cccc3c4cccc5cccc(c(c1)c23)c54", 20),
     ("coronene", "c1cc2ccc3ccc4ccc5ccc6ccc1c1c2c3c4c5c61", 24),
     ("picene", "c1ccc2c(c1)ccc1c2ccc2c3ccccc3ccc21", 22),
-    # Systematic PINs.  An unbranched parent hydride or acid carries NO
+    # Systematic PINs. An unbranched parent hydride or acid carries NO
     # locants, which is what the no-digits/no-hyphens guard punished.
     ("henicosane", "CCCCCCCCCCCCCCCCCCCCC", 21),
     ("docosane", "CCCCCCCCCCCCCCCCCCCCCC", 22),
@@ -100,15 +100,15 @@ def test_correct_short_name_counts_as_adequate_coverage(name, smiles, ha):
     """`_coverage_is_adequate` compares `len(name) * bonus` with
     `int(heavy_atoms * threshold)` -- a character count written WITHOUT a
     division, which is why greps for `len(name) /` and for `heavy_atoms //`
-    both miss it.  It gets the same treatment as its siblings.
+    both miss it. It gets the same treatment as its siblings.
     """
     assert _coverage_is_adequate(name, _mol(smiles, ha)) is True
 
 
 # --------------------------------------------------------------------------
-# NEGATIVE CONTROLS.  Every one of these is a partial name the guards were
+# NEGATIVE CONTROLS. Every one of these is a partial name the guards were
 # built to catch, taken from the pre-existing fixtures in
-# tests/unit/decomposition/test_quality_gate.py.  Rescuing any of them would
+# tests/unit/decomposition/test_quality_gate.py. Rescuing any of them would
 # mean the oracle had become a rubber stamp.
 # --------------------------------------------------------------------------
 
@@ -121,7 +121,7 @@ PARTIAL_NAMES = [
     ("hexadecan-3-ol",
      "CCCCCCCCCC(=O)NCCCC(=O)OCC(NC(=O)CCCCC)CC(=O)OCCCCCCCCCC", 42),
     # The guard's own stated target: a retained ring name for a much larger
-    # ester.  Named in the no-digits/no-hyphens comment as the thing it exists
+    # ester. Named in the no-digits/no-hyphens comment as the thing it exists
     # to catch, so it must stay caught.
     ("benzene", "CCCCCCCCCCCCC(=O)Oc1ccc(Cl)c2ncccc12", 26),
 ]

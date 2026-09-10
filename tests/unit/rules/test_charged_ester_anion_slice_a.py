@@ -10,7 +10,7 @@ def _be():
 # --- current-correct poly-anion shapes that route_charged/oxoacid own: must stay byte-identical
 @pytest.mark.parametrize("smi,expected", [
     ("[O-]C(=O)CC(=O)[O-]", "propanedioate"),          # dicarboxylate dianion (GUARD 2)
-    ("CP(=O)([O-])[O-]", "methylphosphonate"),          # phosphonate dianion (CR-02)
+    ("CP(=O)([O-])[O-]", "methylphosphonate"),          # phosphonate dianion
 ])
 def test_nonester_dianion_unchanged(smi, expected):
     assert _be().name(smi) == expected
@@ -51,9 +51,9 @@ def test_ester_anion_sweep_roundtrips_or_declines(smi):
                f"{smi} -> {name} did NOT round-trip (0-wrong violation)"
 
 # --- cyclitol/inositol phosphate/sulfate ester anions: the ester-anion PRODUCER
-# still emits a name whose stereo OPSIN 2.9.0 cannot CIP-parse, and SELF-01 still
+# still emits a name whose stereo OPSIN 2.9.0 cannot CIP-parse, and still
 # correctly suppresses THAT stereo-bearing name (never-wrong preserved). What
-# CHANGED at WS7 (v34 composed-charge): the universal coverage FLOOR now BACKSTOPS
+# CHANGED at (composed-charge): the universal coverage FLOOR now BACKSTOPS
 # these with a CONSTITUTION-ONLY name (stereo omitted) instead of a silent
 # abstain -- a safe stereo-OMISSION superset (feedback:
 # stereo-omission is not a wrong molecule; best-effort ships the superset, never
@@ -109,8 +109,8 @@ def test_plain_ester_monoanion_still_ships_and_roundtrips(smi):
            Chem.MolToInchiKey(Chem.MolFromSmiles(smi)), \
            f"{smi} -> {name} did NOT round-trip (0-wrong violation)"
 
-# --- cyclitol/inositol phosphate/sulfate MONOanion: same WS7 change as the
-# dianion above -- the producer's stereo name is still SELF-01-suppressed, and
+# --- cyclitol/inositol phosphate/sulfate MONOanion: same change as the
+# dianion above -- the producer's stereo name is still -suppressed, and
 # the coverage floor now backstops with a constitution-only stereo-omission
 # (0-wrong), instead of a silent abstain.
 @pytest.mark.parametrize("smi", [

@@ -1,10 +1,10 @@
-"""v27 Phase S Task 3 — ring-substituent internal R/S (+ nested-block
+""" Phase S Task 3 — ring-substituent internal R/S (+ nested-block
 double-apply fix).
 
 Empirical REFRAME (probed 2026-07-22): ring-MEMBER stereocentres inside a
 ring-system substituent are ALREADY expressed with substituent-local locants
 (``ring_substituents.py`` threads the ring's own numbering through
-``collect_stereodescriptors``). These tests LOCK that, and verify the PS-3
+``collect_stereodescriptors``). These tests LOCK that, and verify the
 correctness fix: ``_add_substituent_stereo`` no longer double-applies a spurious
 bare ``(R)-`` when a stereocentre is already expressed inside a NESTED
 sub-substituent block. The exocyclic-only residual fails CLOSED (0-wrong).
@@ -46,7 +46,7 @@ def test_ring_member_stereo_with_principal_group():
 
 
 def test_nested_block_no_spurious_double_descriptor():
-    """The PS-3 double-apply fix: a stereocentre expressed in a NESTED
+    """The double-apply fix: a stereocentre expressed in a NESTED
     sub-substituent block must NOT also get a spurious leading (R)-.
 
     Molecule has exactly ONE defined stereocentre (the exocyclic hydroxyethyl

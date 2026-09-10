@@ -1,8 +1,8 @@
-"""Pinned witness set for v41 M2.3 — best-effort relative cis/trans on a
+"""Pinned witness set for M2.3 — best-effort relative cis/trans on a
 ring-as-substituent.
 
 These six molecules all ABSTAIN at best-effort today (2026-09-01, HEAD
-``9a67b52``): the general engine reaches a valid *constitution* but the
+``): the general engine reaches a valid *constitution* but the
 stereo-composition emits an OPSIN-unparseable PSEUDOASYMMETRIC descriptor
 (e.g. ``(1r,4R)-`` / ``(1s,3R)-``) on the 1,3-cyclobutane or 1,4-cyclohexane
 ring substituent, so the whole candidate fails round-trip and is suppressed.
@@ -25,9 +25,9 @@ in a fresh process:
       needing composition-reach beyond stereo).
 
 Full method + the liveness call-counts proving the wiring sites are on-path:
-``.planning/audit-v41/M2-3-LIVENESS.md``.
+`internal notes`.
 
-Provenance of the SMILES: v41 ZINC-500k best-effort-abstain cohort; the six are
+Provenance of the SMILES: best-effort-abstain cohort; the six are
 inlined as literals here (NIT 8 — never import the volatile /tmp reclaim file).
 This is a FIXTURE module (imported by M2.3 tests); it asserts only that every
 SMILES parses.
@@ -106,8 +106,8 @@ WITNESSES: List[Witness] = [
 
 # Verified SPARE (pre-verify PASSED but strip->UNNAMEABLE, so NOT a clean M2.3
 # target — recorded for the audit trail, not part of the six):
-#   CC[C@@H](CC(=O)N[C@H]1C[C@H](CNC(=O)[C@@H]2C[C@H](F)CN2C)C1)CC(F)(F)F
-#   -> (3S)-3-ethyl-5,5,5-trifluoro-N-(trans-3-(((2S,4S)-4-fluoro-1-methylpyrrolidine-2-carboxamido)methyl)cyclobutyl)pentanamide
+# CC[C@@H](CC(=O)N[C@H]1C[C@H](CNC(=O)[C@@H]2C[C@H](F)CN2C)C1)CC(F)(F)F
+# -> (3S)-3-ethyl-5,5,5-trifluoro-N-(trans-3-(((2S,4S)-4-fluoro-1-methylpyrrolidine-2-carboxamido)methyl)cyclobutyl)pentanamide
 
 
 def test_witnesses_parse():

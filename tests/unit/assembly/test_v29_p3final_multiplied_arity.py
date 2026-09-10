@@ -1,7 +1,7 @@
-"""v29 P3-FINAL Item 6 — the `multiplied_component` arity boundary, per site.
+"""-FINAL Item 6 — the `multiplied_component` arity boundary, per site.
 
 The closeout commit claimed "*arity bounds stay local so every site still fails
-closed beyond its supported count*".  The review could not verify it at any of
+closed beyond its supported count*". The review could not verify it at any of
 the 6 call sites and recorded the opposite risk: `multiplied_component` itself has
 NO cap, and returns `decakis(hydroxymethyl)` at count 10.
 
@@ -12,18 +12,18 @@ MEASURED, and it REFUTES the reachability half of the concern: every one of the
 six call sites carries an explicit local arity guard that returns ``None`` (fails
 closed) before `multiplied_component` is reached.
 
-    src/orthonym/rules/mononuclear_hydrides.py:341  `counts[name] not in _SUPPORTED_COUNTS`
-    src/orthonym/rules/phosphorus.py:207            `count not in _SUPPORTED_COUNTS`  (:189 = {1,2,3,4})
-    src/orthonym/rules/polyazane.py:161             `len(locs) not in _SUB_MULTIPLIER`
-    src/orthonym/rules/polyazane.py:248             (same table)
-    src/orthonym/rules/polychalcogen.py:180         `len(locs) not in _SUB_MULTIPLIER`
-    src/orthonym/rules/pseudoketones.py:378         `counts[nm] not in _SUPPORTED_COUNTS` ({1,2,3})
+    src/orthonym/rules/mononuclear_hydrides.py:341 `counts[name] not in _SUPPORTED_COUNTS`
+    src/orthonym/rules/phosphorus.py:207 `count not in _SUPPORTED_COUNTS` (:189 = {1,2,3,4})
+    src/orthonym/rules/polyazane.py:161 `len(locs) not in _SUB_MULTIPLIER`
+    src/orthonym/rules/polyazane.py:248 (same table)
+    src/orthonym/rules/polychalcogen.py:180 `len(locs) not in _SUB_MULTIPLIER`
+    src/orthonym/rules/pseudoketones.py:378 `counts[nm] not in _SUPPORTED_COUNTS` ({1,2,3})
 
 So `decakis` is unreachable through the producers and needs no cap; it is
 reachable only by calling the primitive directly, where the composite multiplying
-prefix is CORRECT IUPAC anyway (`**P-14.2.2**` composite multiplying prefixes).
+prefix is CORRECT IUPAC anyway (`****` composite multiplying prefixes).
 Capping the primitive would therefore remove a correct capability to guard
-against a path that does not exist.  What was missing was the evidence, not a cap.
+against a path that does not exist. What was missing was the evidence, not a cap.
 """
 
 import pytest
@@ -66,14 +66,14 @@ def test_every_multiplied_component_caller_has_a_local_arity_guard(
         f"{module_name} calls multiplied_component with no local arity bound; "
         f"the primitive has no cap, so the site must fail closed itself"
     )
-    # ...and the bound must actually gate a `return None`, not merely exist.
+    #...and the bound must actually gate a `return None`, not merely exist.
     assert "return None" in src, module_name
 
 
 def test_the_primitive_itself_is_uncapped_and_that_is_deliberate():
     """Documents the measured behaviour so it is never mistaken for a bug.
 
-    `**P-14.2.2**` composite multiplying prefixes make `decakis`/`icosakis`
+    `****` composite multiplying prefixes make `decakis`/`icosakis`
     well-formed IUPAC, so the primitive is right to form them; the SITES are
     where a structurally impossible count must be refused, and all six do.
     """
@@ -91,7 +91,7 @@ def test_a_count_below_two_never_gets_a_multiplier():
 
 
 def test_the_hyphen_is_dropped_once_the_component_is_enclosed():
-    """P-16.2.4.2 (`BlueBookV2.md:6968`): "*No hyphen is placed after a numerical
+    """ (`the Blue Book`): "*No hyphen is placed after a numerical
     prefix cited in front of a compound substituent enclosed by parentheses*"."""
     assert multiplied_component(2, "tert-butyl", "tert-butyl") == "di-tert-butyl"
     assert multiplied_component(2, "tert-butyl", "(tert-butyl)") == "di(tert-butyl)"

@@ -1,7 +1,7 @@
 """
 CI Benchmark Test Suite -- 100 compounds from ChEBI 500-sample (seed=123).
 
-Deterministic regression test: verifies that name_compound() produces
+Deterministic regression test: verifies that name_compound produces
 the exact same IUPAC name for 100 representative ChEBI compounds.
 Any change in output indicates a naming regression.
 
@@ -32,7 +32,7 @@ CI_BENCHMARK = [
     ),
     # a phase Plan 02 Task 03: estra ring system locant correction
     # 1,2,4-trien → 1,3,5-trien (canonical estra-1,3,5-triene numbering for
-    # the aromatic A-ring per IUPAC P-31.1.5). Per Plan 01 SUMMARY this is
+    # the aromatic A-ring per IUPAC. Per Plan 01 SUMMARY this is
     # "unrelated to a phase" (incidental locant correction, not a cascade
     # decision). Acceptable churn.
     (
@@ -58,7 +58,7 @@ CI_BENCHMARK = [
     (
         "Cc1cc([C@@]2(C)CCCC2(C)C)c(O)c(O)c1-c1c(C)cc([C@@]2(C)CCCC2"
         "(C)C)c(O)c1O",
-        "1-[(S)-1,2,2-trimethylcyclopentyl]5-methylbenzene-2,3-diol",  # ASML-13: benzene-diol suffix routing
+        "1-[(S)-1,2,2-trimethylcyclopentyl]5-methylbenzene-2,3-diol",  #: benzene-diol suffix routing
     ),
     (
         "CC(C)CCC1O[C@H]2C[C@H]3[C@@H]4CCC5CCCC[C@]5(C)[C@H]4CC[C@]3"
@@ -237,7 +237,7 @@ CI_BENCHMARK = [
     ("OCCCO", "trimethylene glycol"),
     (
         "O=C([O-])[C@@](O)(CO)C(=O)CO",
-        "(2R)-2,4-dihydroxy-2-(hydroxymethyl)-3-oxobutanoate",  # ASML-12: locant-aware prefix merge
+        "(2R)-2,4-dihydroxy-2-(hydroxymethyl)-3-oxobutanoate",  #: locant-aware prefix merge
     ),
     ("CCC1CC=C(N2CCCC2)C1=O", "5-ethyl-2-pyrrolidinylcyclopent-2-en-1-one"),
     (
@@ -339,10 +339,10 @@ CI_BENCHMARK = [
     (
         "CN1CCCN=C1/C=C/c1cccs1",
         # a phase cleanup: stereo descriptor rebaselined per ERRATA-02
-        # (P-31.1.3 / P-91 mandatory E/Z for stereodefined acyclic
+        # / mandatory E/Z for stereodefined acyclic
         # double bonds). The SMILES specifies (2E) trans-double-bond
         # stereo via /C=C/, and the stereo pipeline correctly emits
-        # `(2E)-` per IUPAC P-91 rules. Live behavior verified at
+        # `(2E)-` per IUPAC rules. Live behavior verified at
         # src/orthonym/rules/stereochemistry.py (a phase ERRATA-02
         # deliverable preserved).
         "(2E)-N-methyl-2-thienyl-1,3-diazine",
@@ -392,7 +392,7 @@ CI_BENCHMARK = [
         "(1S,7S,9R,12R,17R,20S,21R,22S,25R)-21-docosyl-9-ethyl-26"
         "-hydroxy-1,12,18-trimethyl-22-nonyl-2,5-dioxo-3,6-dioxa"
         "-pentacyclo[15.8.0.1(4,7).0(7,12).0(20,25)]hexacosa-4,10,18"
-        "-triene-10-carboxylic acid",  # Updated P72: IUPAC VB-6 citation order
+        "-triene-10-carboxylic acid",  # Updated P72: IUPAC citation order
     ),
     (
         "CC(C)=CCC[C@@H](C(=O)O)[C@H]1C(=O)C[C@@]2(C)C3=C(CC"
@@ -452,7 +452,7 @@ CI_BENCHMARK = [
     (
         "CC(C)C1=C[C@@]23CC[C@H]4C(C)(C)CCC[C@]4(C(=O)O2)C3=CC1=O",
         "(1R,4S,9R)-13-isopropyl-5,5-dimethyl-16-oxa-tetracyclo"
-        "[8.4.0.2(1,9).0(4,9)]hexadeca-10,13-dien-12,15-dione",  # Updated P72: IUPAC VB-7 bridge atom orientation
+        "[8.4.0.2(1,9).0(4,9)]hexadeca-10,13-dien-12,15-dione",  # Updated P72: IUPAC bridge atom orientation
     ),
     (
         "COC1=C(N[C@H](C(=O)O)[C@@H](C)O[C@@H]2O[C@H](CO)[C@H](O)"
@@ -474,7 +474,7 @@ CI_BENCHMARK = [
     ),
     (
         "COc1cc2c(c(O)c1C/C=C(\\C)CCC=C(C)C)CN(CCc1c[nH]c3ccccc13)C2=O",
-        "2-[(6E)-2,6-dimethylocta-2,6-dienyl]3-methoxyphenol",  # ASML-13: phenol suffix routing (was hydroxybenzene)
+        "2-[(6E)-2,6-dimethylocta-2,6-dienyl]3-methoxyphenol",  #: phenol suffix routing (was hydroxybenzene)
     ),
     (
         "Nc1ncnc2c1ncn2[C@@H]1O[C@H](COP(=O)(O)O)[C@@H](OC(=O)"
@@ -499,7 +499,7 @@ CI_BENCHMARK = [
     (
         "CC(C)=CCc1c(O)ccc(C(=O)C2C(c3c(O)cc(/C=C/c4cc(O)c(O)cc4O)"
         "cc3O)C=C(C)CC2c2ccc(OC3OC(C(=O)O)C(O)C(O)C3O)cc2O)c1O",
-        "(glucuronopyranosyloxy)-2-(2-methylbut-2-enyl)benzene-1,3-diol",  # ASML-13: benzene-diol suffix routing
+        "(glucuronopyranosyloxy)-2-(2-methylbut-2-enyl)benzene-1,3-diol",  #: benzene-diol suffix routing
     ),
     (
         "COC(=O)c1ccccc1OC1OC(COC2OC(C)C(O)C(O)C2O)C(O)C(O)C1O",

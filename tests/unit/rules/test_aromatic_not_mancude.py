@@ -1,37 +1,37 @@
 """RDKit aromaticity is not evidence that a ring is MANCUDE (Task AA4).
 
-``GetIsAromatic()`` answers "does this ring satisfy RDKit's aromaticity
-model?".  Three sites in ``rules/heterocycles.py`` read it as "this ring
+``GetIsAromatic`` answers "does this ring satisfy RDKit's aromaticity
+model?". Three sites in ``rules/heterocycles.py`` read it as "this ring
 carries the maximum number of noncumulative double bonds", and the two come
 apart whenever a ring atom contributes a LONE PAIR to the pi system instead of
-a double bond.  Two or more pyrrole-type heteroatoms do exactly that, so
+a double bond. Two or more pyrrole-type heteroatoms do exactly that, so
 
-    c1c[nH][nH]1        is RDKit-aromatic with 1 ring double bond, max 2
-    c1cc[nH]cc[nH]c1    is RDKit-aromatic with 3 ring double bonds, max 4
+    c1c[nH][nH]1 is RDKit-aromatic with 1 ring double bond, max 2
+    c1cc[nH]cc[nH]c1 is RDKit-aromatic with 3 ring double bonds, max 4
 
 and both used to be named as their mancude parent -- ``1,2-diazete`` and
-``1,4-diazocine`` -- which P-22.2.2.1.1 (``BlueBookV2.md:8222``) defines as a
+``1,4-diazocine`` -- which (``the Blue Book``) defines as a
 DIFFERENT molecule: "Unsaturated compounds are those having the maximum number
 of noncumulative double bonds (mancude compounds) and at least one double
 bond."
 
 The governing rules, each opened at write time with its section heading:
 
-* **P-22.2.2.1.1** (``:8222``) -- the definition quoted above.
-* **P-54.4.1 "Hantzsch-Widman heteromonocycles"** (``:24169``), sentence
+* **** (``:8222``) -- the definition quoted above.
+* ** "Hantzsch-Widman heteromonocycles"** (``:24169``), sentence
   ``:24171`` -- "'Hydro' prefixes added to names of fully unsaturated
   Hantzsch-Widman rings lead to preferred IUPAC names for partially
   unsaturated rings."
-* **P-31.2.2 "General methodology"** (``:16878``), sentence ``:16880`` --
+* ** "General methodology"** (``:16878``), sentence ``:16880`` --
   "Indicated hydrogen atoms have priority over 'hydro' prefixes for low
-  locants.  If indicated hydrogen atoms are present in a name, the 'hydro'
+  locants. If indicated hydrogen atoms are present in a name, the 'hydro'
   prefixes precede them."
-* **P-31.2.3.2 "Names of saturated heteromonocyclic compounds"** (``:16926``),
+* ** "Names of saturated heteromonocyclic compounds"** (``:16926``),
   sentence ``:16928`` -- "Preferred IUPAC names of saturated heteromonocyclic
-  compounds are either Hantzsch-Widman names described in P-22.2.2.1.1 or
+  compounds are either Hantzsch-Widman names described in or
   retained names described in Table 2.3."
-* **P-22.2.2.1.3** (``:8284``) -- the heteroatom numbering cascade and the
-  citation sequence F, Cl, Br, I, O, S, Se, Te, N, P, As, ...
+* **** (``:8284``) -- the heteroatom numbering cascade and the
+  citation sequence F, Cl, Br, I, O, S, Se, Te, N, P, As,...
 
 Measured over 397,371 enumerated bare heteromonocycles (sizes 3-10, up to
 three heteroatoms from N/O/S/P/Se/Te/As, every independent ring-edge set):
@@ -72,7 +72,7 @@ def _name(smiles):
     ("c1c[pH][nH]1", "1,2-dihydro-1,2-azaphosphete"),
     ("c1c[pH][pH]1", "1,2-dihydro-1,2-diphosphete"),
     # seven-membered: ih_count == 1, so an indicated hydrogen is REQUIRED and
-    # P-31.2.2 (:16880) puts the hydro prefixes in front of it
+    # (:16880) puts the hydro prefixes in front of it
     ("c1c[nH][nH]cc[nH]1", "2,5-dihydro-1H-1,2,5-triazepine"),
     ("c1cc[nH][nH][nH]c1", "2,3-dihydro-1H-1,2,3-triazepine"),
     # seven-membered with a divalent chalcogen: n_eligible is 6, so
@@ -87,8 +87,8 @@ def test_aromatic_hydro_form_gets_hydro_prefixes(smiles, expected):
 
 
 # --------------------------------------------------------------------------
-# Family B -- fully SATURATED rings that RDKit calls aromatic.  These take the
-# saturated Hantzsch-Widman stem (P-31.2.3.2, :16928), never the unsaturated
+# Family B -- fully SATURATED rings that RDKit calls aromatic. These take the
+# saturated Hantzsch-Widman stem,:16928), never the unsaturated
 # one and never a hydro prefix.
 # --------------------------------------------------------------------------
 @pytest.mark.parametrize("smiles,expected", [
@@ -172,12 +172,12 @@ def test_ring_double_bond_count(smiles, expected_d):
 # --------------------------------------------------------------------------
 # The invariant, as a property over an enumerated sample rather than a list of
 # molecules: an emitted Hantzsch-Widman name may assert full unsaturation only
-# when the ring really carries the mancude maximum.  Fail closed otherwise --
+# when the ring really carries the mancude maximum. Fail closed otherwise --
 # an abstention is recoverable, a wrong molecule is not.
 # --------------------------------------------------------------------------
 def _sample_rings():
     """Bare heteromonocycles of sizes 4-8, one or two N/O/S heteroatoms, every
-    independent ring-edge set.  Small enough to stay a unit test."""
+    independent ring-edge set. Small enough to stay a unit test."""
     out = {}
     for n in range(4, 9):
         edge_sets = []

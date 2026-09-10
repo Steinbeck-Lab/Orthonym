@@ -3,7 +3,7 @@ Tricyclo compound naming according to IUPAC 2013 nomenclature.
 
 Implements tricyclo[x.y.z.a^b,c] descriptor generation for bridged tricyclic hydrocarbons.
 
-IUPAC Reference: Blue Book 2013, P-23.3 (Tricyclic bridged ring systems)
+IUPAC Reference: Blue Book 2013, (Tricyclic bridged ring systems)
 
 The tricyclo descriptor format is:
 - tricyclo[a.b.c.d^e,f]alkane
@@ -251,7 +251,7 @@ def generate_tricyclo_descriptor(mol) -> Optional[str]:
         Descriptor string like "tricyclo[3.3.1.1^3,7]", or None
         
     Examples:
-        >>> mol = Chem.MolFromSmiles('C1C2CC3CC1CC(C2)C3')  # adamantane
+        >>> mol = Chem.MolFromSmiles('C1C2CC3CC1CC(C2)C3') # adamantane
         >>> generate_tricyclo_descriptor(mol)
         'tricyclo[3.3.1.1^3,7]'
     """
@@ -445,7 +445,7 @@ def name_tricyclo_system(mol) -> Optional[str]:
         Full IUPAC name like "tricyclo[3.3.1.1^3,7]decane", or None
         
     Examples:
-        >>> mol = Chem.MolFromSmiles('C1C2CC3CC1CC(C2)C3')  # adamantane
+        >>> mol = Chem.MolFromSmiles('C1C2CC3CC1CC(C2)C3') # adamantane
         >>> name_tricyclo_system(mol)
         'tricyclo[3.3.1.1^3,7]decane'
     """
@@ -557,7 +557,7 @@ def _generate_higher_polycyclo_descriptor(mol, classification: str) -> Optional[
     Generate descriptor for tetracyclo and higher systems.
 
     Delegates to VonBaeyerAnalyzer (polycyclic.py) which implements
-    the full IUPAC VB-1 through VB-7 algorithm with proper main ring
+    the full IUPAC through algorithm with proper main ring
     finding, independent/dependent bridge classification, and locant assignment.
     """
     from .polycyclic import VonBaeyerAnalyzer
@@ -625,10 +625,10 @@ def name_polycyclo_system(mol) -> Optional[str]:
     if classification == 'tricyclo':
         return name_tricyclo_system(mol)
 
-    # Phase 151 D-04 routing: ≥4-ring (tetracyclo / pentacyclo / higher)
+    # a phase routing: ≥4-ring (tetracyclo / pentacyclo / higher)
     # systems delegate to the dedicated polycyclic_von_baeyer module which
     # owns is_higher_polycyclo + name_higher_polycyclo + the
-    # cascade-step-6 supplier. See 151-AUDIT-A.md verdict THIN_WRAPPER.
+    # cascade-step-6 supplier. See internal notes-A.md verdict THIN_WRAPPER.
     # Lazy import avoids circular-import risk with the new module.
     if classification not in (None, 'bicyclo', 'tricyclo'):
         from .polycyclic_von_baeyer import name_higher_polycyclo
@@ -706,7 +706,7 @@ def _generate_heteroatom_prefix(
     """
     Generate the IUPAC heteroatom replacement prefix for a higher-polycyclo cage.
 
-    Format: "2,5-dioxa-8-aza" (no trailing hyphen -- P-23.3.1 attaches the
+    Format: "2,5-dioxa-8-aza" (no trailing hyphen -- attaches the
     'a' prefix directly to the descriptor).
 
     Returns ``None`` -- fail closed -- when any skeletal non-carbon atom cannot be
@@ -723,7 +723,7 @@ def _generate_heteroatom_prefix(
       Sn/Pb fell through to a trailing "remaining elements" loop and were cited
       OUT of Table-1.5 seniority order;
     * that loop called ``get_heteroatom_prefix`` when it still fabricated
-      ``symbol.lower() + 'a'``, so a Te cage produced ``7-tea...`` rather than
+      ``symbol.lower + 'a'``, so a Te cage produced ``7-tea...`` rather than
       ``tellura``;
     * ``numbering.get(idx, idx + 1)`` INVENTED a locant when the numbering did
       not reach the atom;
@@ -836,7 +836,7 @@ def name_polycyclo_with_functional_groups(mol) -> Optional[str]:
             return f"{base_name}ol"
         else:
             # Use proper multiplier: diol, triol, tetrol, pentol, etc.
-            # P-63.1.2 elides the multiplier-final 'a' before '-ol'
+            # elides the multiplier-final 'a' before '-ol'
             # (tetra+ol -> tetrol) via the shared naming_utils helper.
             from ..assembly.naming_utils import _join_multiplied_suffix
             _OH_MULTIPLIERS = {

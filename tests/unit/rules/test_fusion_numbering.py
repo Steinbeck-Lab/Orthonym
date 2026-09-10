@@ -119,9 +119,9 @@ class TestSystematicNumbering:
 class TestAngularBranchedNumbering:
     """Angular / branched cata-fused PAH match OPSIN up to automorphism.
 
-    These are the cases the start-atom (P-25.3.3.1.1) and contiguous-row
-    (P-25.3.2.3.3a) fixes added — the engine previously mis-numbered every one
-    (fusion-carbon locants one position too low).  Compared up to the molecule's
+    These are the cases the start-atom and contiguous-row
+     fixes added — the engine previously mis-numbered every one
+    (fusion-carbon locants one position too low). Compared up to the molecule's
     own automorphism because symmetric systems (D3h triphenylene) have several
     equivalent atom assignments with the same locant set.
     """
@@ -179,7 +179,7 @@ class TestFailClosed:
         assert compute_fused_numbering(m, _ring_atoms(m)) is None
 
     def test_seven_membered_ring_returns_none(self):
-        # v23 13B(a) S2b admits 5/6-membered mixed rings (indole etc.), but a
+        # 13B(a) S2b admits 5/6-membered mixed rings (indole etc.), but a
         # system containing a 7- (or 8-) membered ring still fails closed
         # (mixed >6-ring geometry = S2b.3).
         m = Chem.MolFromSmiles("C1=CC=CC2=CC=CC=CC2=C1")  # heptalene (7,7)
@@ -191,7 +191,7 @@ class TestFailClosed:
         assert compute_fused_numbering(m, _ring_atoms(m)) is None
 
     @pytest.mark.parametrize("name,smi", [
-        # Helicenes are a Blue-Book special class (P-25.3.3.1.1 note) and cannot
+        # Helicenes are a Blue-Book special class note) and cannot
         # embed planar -> the overcrowding/planarity gate declines them.
         ("pentahelicene", "C1=CC=CC2=CC=C3C=CC4=CC=C5C=CC=CC5=C4C3=C12"),
         ("hexahelicene",
@@ -207,15 +207,15 @@ class TestFailClosed:
 
 @pytest.mark.unit
 class TestHeterocycleNumbering:
-    """v23 13B(a) S2a — all-6 fused HETEROCYCLES are numbered via the relaxed
-    gate + heteroatom-lowest-locant cascade (P-25.3.3.1.2) and the Table-2.8
-    anthracene-type "special numbering" fixed maps.  Locants verified against
+    """ 13B(a) S2a — all-6 fused HETEROCYCLES are numbered via the relaxed
+    gate + heteroatom-lowest-locant cascade and the Table-2.8
+    anthracene-type "special numbering" fixed maps. Locants verified against
     OPSIN ``-o extendedsmi``."""
 
     @pytest.mark.parametrize("smi,sym,expected", [
-        ("c1ccc2ncccc2c1", "N", 1),    # quinoline    — N is position 1
+        ("c1ccc2ncccc2c1", "N", 1),    # quinoline — N is position 1
         ("c1ccc2cnccc2c1", "N", 2),    # isoquinoline — N is position 2
-        ("c1ccc2nc3ccccc3cc2c1", "N", 10),    # acridine  — meso N is 10
+        ("c1ccc2nc3ccccc3cc2c1", "N", 10),    # acridine — meso N is 10
         ("c1ccc2c(c1)Cc1ccccc1O2", "O", 10),  # 9H-xanthene — meso O is 10
         ("c1ccc2c(c1)Cc1ccccc1S2", "S", 10),  # 9H-thioxanthene — meso S is 10
     ])
@@ -227,13 +227,13 @@ class TestHeterocycleNumbering:
         assert het == [expected], f"{smi}: {sym} locants {het} != [{expected}]"
 
     @pytest.mark.parametrize("smi,sym,expected", [
-        ("c1ccc2[nH]ccc2c1", "N", 1),       # 1H-indole       — NH is 1
-        ("c1ccc2occc2c1", "O", 1),          # 1-benzofuran    — O is 1
+        ("c1ccc2[nH]ccc2c1", "N", 1),       # 1H-indole — NH is 1
+        ("c1ccc2occc2c1", "O", 1),          # 1-benzofuran — O is 1
         ("c1ccc2[nH]cnc2c1", "N", [1, 3]),  # 1H-benzimidazole — NH=1, N=3
-        ("c1ccn2cccc2c1", "N", 4),          # indolizine      — bridgehead N is 4
+        ("c1ccn2cccc2c1", "N", 4),          # indolizine — bridgehead N is 4
     ])
     def test_56_bicyclic_heteroatom(self, smi, sym, expected):
-        # v23 13B(a) S2b — (5,6) bicyclic mixed-ring numbering via the general
+        # 13B(a) S2b — (5,6) bicyclic mixed-ring numbering via the general
         # regular-polygon embedding + cascade (incl. indicated-H tier).
         m = Chem.MolFromSmiles(smi)
         nb = compute_fused_numbering(m, _ring_atoms(m))
@@ -253,7 +253,7 @@ class TestHeterocycleNumbering:
         assert nloc == [9], f"carbazole NH locant {nloc} != [9]"
 
     def test_pteridine_nitrogen_set_is_1_3_5_8(self):
-        # The DATA-01 follow-on bug: stored had N-set {2,4,5,8}; correct is
+        # The follow-on bug: stored had N-set {2,4,5,8}; correct is
         # {1,3,5,8} (Blue Book Table 2.8 entry 7).
         m = Chem.MolFromSmiles("c1cnc2ncncc2n1")
         nb = compute_fused_numbering(m, _ring_atoms(m))

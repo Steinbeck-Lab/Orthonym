@@ -1,7 +1,7 @@
 """a phase.B integration tests: indicated-H corpus fixtures with OPSIN
 layer-1 InChI round-trip.
 
-Per CONTEXT: every fixture pipes through OPSIN
+Per internal notes: every fixture pipes through OPSIN
 (``opsin-cli-2.9.0-jar-with-dependencies.jar``) and asserts InChI layer-1
 (skeleton, stereo-stripped) match against the input SMILES. Stereo-layer
 mismatches do not fail the test (a phase/153 owns stereo).
@@ -13,13 +13,13 @@ spanning >=5 indicated-H subclasses; mined from chebi_5000 + pubchem_2000
 
 Skip-vs-fail policy per (no band-aids):
   * ``name_compound(smi) is None`` for an in-scope fixture: SKIP with
-    155-AUDIT-B.md row cite (audit-acknowledged out-of-scope gap).
+    internal notes-B.md row cite (audit-acknowledged out-of-scope gap).
   * OPSIN cannot parse Orthonym-emitted name: SKIP with a phase
     quarantine note (the parent / cascade-other-than-indicated-H is
     where the bug lives).
   * OPSIN parses but InChI L1 mismatches: ASSERT FAIL (wrong-name bug).
 
-Source: internal notes,,,;
+Source: 155-internal notes,,,;
         tests/integration/test_skeletal_replacement_corpus.py:1-100
         (substrate copied verbatim).
 """
@@ -175,7 +175,7 @@ def test_indicated_h_corpus_opsin_roundtrip(fixture):
 
 @pytest.mark.integration
 def test_corpus_count_and_subclass_coverage():
-    """Acceptance criterion: >= 15 fixtures across >= 5 subclasses ()."""
+    """Acceptance criterion: >= 15 fixtures across >= 5 subclasses ."""
     assert len(_CORPUS_FIXTURES) >= 15, (
         f"Corpus has only {len(_CORPUS_FIXTURES)} fixtures; "
         f"D-25 requires >= 15."

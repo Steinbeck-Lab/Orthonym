@@ -1,4 +1,4 @@
-"""v23 Phase 13B(a) S1 — fusion-numbering engine wired into the PAH consumer.
+""" a phase(a) S1 — fusion-numbering engine wired into the PAH consumer.
 
 Covers:
 * ``get_polycyclic_iupac_locants`` derives numbering from the deterministic
@@ -48,7 +48,7 @@ class TestEngineWiringIntoConsumer:
         assert any(isinstance(v, tuple) for v in locants.values())
 
     def test_fluorene_numbered_via_fixed_special_numbering(self):
-        # v23 13B(a) S2b: fluorene (5,6,6, sp3 C9) is now numbered by the engine
+        # 13B(a) S2b: fluorene (5,6,6, sp3 C9) is now numbered by the engine
         # via _FIXED_NUMBERING_SYSTEMS (the carbazole-shape special numbering,
         # CH2 at position 9). Was a fail-closed None pre-S2b.
         entry = POLYCYCLIC_DATA["fluorene"]
@@ -95,7 +95,7 @@ class TestFusedCatalogCoverageGuard:
 
 @pytest.mark.unit
 class TestSubstitutedPahNaming:
-    """End-to-end PINs for the S1 wins (SELF-01 gate disabled in the suite)."""
+    """End-to-end PINs for the S1 wins (gate disabled in the suite)."""
 
     @pytest.mark.parametrize("smi,expected", [
         # angular / branched cata-fused (numbering engine)

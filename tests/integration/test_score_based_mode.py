@@ -1,7 +1,7 @@
-"""Phase 146 integration test: 50+ molecules across handler tiers under V17/V18.
+"""a phase integration test: 50+ molecules across handler tiers under V17/V18.
 
-Per CONTEXT.md SC-6: two-tier selector tested end-to-end.
-Per RESEARCH §5.3 + §7 Dimension 2.
+Per internal notes: two-tier selector tested end-to-end.
+Per RESEARCH + Dimension 2.
 
 Each test runs twice via the `feature_flag_mode` parametrized fixture —
 once under V17 (default soak) and once under V18 (two-tier cascade
@@ -9,7 +9,7 @@ active). V17 invariants assert the expected name contains the retained
 substring; V18 invariants allow substring match OR defensible variation
 (calibration may move some names).
 
-Source: https://iupac.qmul.ac.uk/BlueBook/P4.html P-44.1
+Source: https://iupac.qmul.ac.uk/BlueBook/P4.html
 """
 
 import importlib
@@ -21,8 +21,8 @@ import pytest
 
 
 @pytest.fixture(params=[
-    ("false", "first_applicable"),  # V17 (default soak per D-07)
-    ("true",  "score_based"),        # V18 (two-tier active per D-01)
+    ("false", "first_applicable"),  # V17 (default soak per)
+    ("true",  "score_based"),        # V18 (two-tier active per)
 ], ids=["v17", "v18"])
 def feature_flag_mode(request, monkeypatch):
     """Parametrized fixture: each test runs under both V17 and V18.
@@ -121,7 +121,7 @@ class TestTierBSpecial:
 
 @pytest.mark.integration
 class TestDirectReturn:
-    """Direct-return handlers — first-applicable short-circuits pool.best().
+    """Direct-return handlers — first-applicable short-circuits pool.best.
     Expected: produce non-empty names in both modes.
     """
 
@@ -147,13 +147,13 @@ class TestDirectReturn:
 
 
 # ---------------------------------------------------------------------------
-# Chain handler — V18 first-class competition per SC-5
+# Chain handler — V18 first-class competition per
 # ---------------------------------------------------------------------------
 
 @pytest.mark.integration
 class TestChain:
     """Chain handler — V18 wires chain as a first-class pool candidate
-    (SC-5). V17 falls back to chain only when ring handlers fail. Expected:
+    . V17 falls back to chain only when ring handlers fail. Expected:
     both modes produce the expected chain name.
     """
 
@@ -190,19 +190,19 @@ class TestChain:
 
 
 # ---------------------------------------------------------------------------
-# Canonical P-44.1.1 chain-wins case: phenyl-hexanoic acid
-# Source: https://iupac.qmul.ac.uk/BlueBook/P4.html P-44.1.1
+# Canonical chain-wins case: phenyl-hexanoic acid
+# Source: https://iupac.qmul.ac.uk/BlueBook/P4.html
 # ---------------------------------------------------------------------------
 
 @pytest.mark.integration
 class TestPhenylHexanoicAcid:
-    """The canonical P-44.1.1 chain-wins test (RESEARCH §7 Dimension 2).
+    """The canonical chain-wins test (RESEARCH Dimension 2).
 
     SMILES: c1ccc(CCCCCC(=O)O)cc1
       - Chain: hexanoic acid (6 carbons + 1 PCG = COOH)
       - Ring: benzene (6 carbons + 0 PCGs)
 
-    Per P-44.1.1: max PCG count wins → chain (hexanoic acid) wins.
+    Per: max PCG count wins → chain (hexanoic acid) wins.
     """
 
     def test_v18_picks_chain_parent(self):

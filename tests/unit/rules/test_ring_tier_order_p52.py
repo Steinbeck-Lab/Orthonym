@@ -1,31 +1,31 @@
 """Lock the ring-naming tier order, with von Baeyer as the RESIDUAL tier.
 
-Order under test:  retained/catalog -> PIN systematic -> fusion constructor
+Order under test: retained/catalog -> PIN systematic -> fusion constructor
                    -> von Baeyer polyene LAST
 
 BLUE BOOK AUTHORITY
 -------------------
-* **P-52.2.4.1** (heading BB:23708, sentence BB:23710) -- "Fusion nomenclature
+* **** (heading the Blue Book, sentence the Blue Book) -- "Fusion nomenclature
   gives preferred IUPAC names only to compounds having at least two rings of at
   least five or more members. This requirement is not necessarily applied in
   general nomenclature, in which names such as cyclopropabenzene and
   cyclobutabenzene can be used. *When fusion names are not allowed, unsaturated
-  von Baeyer ring system names are preferred IUPAC names* (see P-31.1.4.2)."
+  von Baeyer ring system names are preferred IUPAC names* (see."
   So von Baeyer is what you fall back TO, not what you reach for.
-* **P-44.2.2.2** (BB:19532, list BB:19536-19542) -- the senior polycyclic ring
+* **** (the Blue Book, list the Blue Book-19542) -- the senior polycyclic ring
   system occurs first in: (a) spiro, (b) cyclic phane, (c) fused, (d) bridged
   fused, (e) nonfused bridged ring system, (f) linear phane, (g) ring assembly.
   von Baeyer is item (e), 5th of 7 -- below fused. The list body says "nonfused
   bridged ring system"; the equivalence to von Baeyer is fixed by the subsection
-  heading at BB:19968 and the contents row at BB:551.
-* Structurally, P-52.2 has PIN-selection subsections for fusion, phane, fullerene
+  heading at the Blue Book and the contents row at the Blue Book.
+* Structurally, has PIN-selection subsections for fusion, phane, fullerene
   and ring assemblies, and **none for von Baeyer** -- consistent with it being
   residual rather than selected.
 
-CAVEAT deliberately encoded below: P-44.2.2.2 is NOT the top-level tiebreaker.
-BB:19473 and BB:19483 both state that the skeletal-atom-count criterion
-"supersedes P-44.2.2.2, which prefers a fused ring to a bridged fused ring", so
-the P-44.2.1 criteria run FIRST. This test therefore locks the tier order for
+CAVEAT deliberately encoded below: is NOT the top-level tiebreaker.
+the Blue Book and the Blue Book both state that the skeletal-atom-count criterion
+"supersedes, which prefers a fused ring to a bridged fused ring", so
+the criteria run FIRST. This test therefore locks the tier order for
 ring-NAMING of a single ring system, and does not assert the 7-class list as a
 parent-selection tiebreaker.
 
@@ -34,7 +34,7 @@ THE TRAP THIS TEST EXISTS TO CATCH
 adamantane and cubane are retained AND are PINs, so they MUST keep their retained
 names. quinuclidine and prismane are retained for general nomenclature only / no
 longer recommended, so they MUST NOT. All four live in the same Blue Book table
-(Table 2.6, P-23.7), so a change that treats "retained von Baeyer name" as one
+(Table 2.6,, so a change that treats "retained von Baeyer name" as one
 undifferentiated bucket breaks two of the four in one direction or the other.
 """
 
@@ -51,17 +51,17 @@ from rdkit import Chem
 
 from orthonym import name_compound
 
-#: A von Baeyer descriptor: "bicyclo[", "tetracyclo[", ... but NOT "cyclohexane"
+#: A von Baeyer descriptor: "bicyclo[", "tetracyclo[",... but NOT "cyclohexane"
 #: and NOT "spiro[".
 VON_BAEYER = re.compile(
     r"\b(?:bi|tri|tetra|penta|hexa|hepta|octa|nona|deca)cyclo\[", re.I
 )
 
 # --- one representative per tier, so the ORDER itself is exercised ------------
-CUBANE = "C12C3C4C1C1C2C3C41"            # retained AND a PIN (BB:9889)
-ADAMANTANE = "C1C2CC3CC1CC(C2)C3"        # retained AND a PIN (BB:9885)
-QUINUCLIDINE = "C1CN2CCC1CC2"            # retained, general only (BB:9881/9893)
-PRISMANE = "C12C3C1C1C3C21"              # no longer recommended (BB:9881/9897)
+CUBANE = "C12C3C4C1C1C2C3C41"            # retained AND a PIN (the Blue Book)
+ADAMANTANE = "C1C2CC3CC1CC(C2)C3"        # retained AND a PIN (the Blue Book)
+QUINUCLIDINE = "C1CN2CCC1CC2"            # retained, general only (the Blue Book)
+PRISMANE = "C12C3C1C1C3C21"              # no longer recommended (the Blue Book)
 
 
 def name(smiles):
@@ -77,7 +77,7 @@ class TestTier1RetainedNamesThatArePins:
         (CUBANE, "cubane"),
     ])
     def test_retained_pin_beats_von_baeyer(self, smiles, expected):
-        """BB:9881 -- 'adamantane and cubane are used in general nomenclature
+        """the Blue Book -- 'adamantane and cubane are used in general nomenclature
         AND as preferred IUPAC names'."""
         got = name(smiles)
         assert got == expected, (
@@ -97,15 +97,15 @@ class TestTier2NonPinRetainedNamesAreOverridden:
     """
 
     def test_quinuclidine_is_systematised(self):
-        """BB:9881 'retained for general nomenclature only';
-        BB:9893 'quinuclidine  1-azabicyclo[2.2.2]octane (PIN)'."""
+        """the Blue Book 'retained for general nomenclature only';
+        the Blue Book 'quinuclidine 1-azabicyclo[2.2.2]octane (PIN)'."""
         got = name(QUINUCLIDINE)
         assert got == "1-azabicyclo[2.2.2]octane", got
         assert "quinuclidin" not in got.lower()
 
     def test_prismane_is_systematised(self):
-        """BB:9881 'The name prismane is no longer recommended.'
-        BB:9897 gives the systematic name (superscripts OCR-flattened on disk;
+        """the Blue Book 'The name prismane is no longer recommended.'
+        the Blue Book gives the systematic name (superscripts OCR-flattened on disk;
         the correct form is tetracyclo[2.2.0.0^2,6.0^3,5]hexane)."""
         got = name(PRISMANE)
         assert "prismane" not in got.lower(), (
@@ -130,7 +130,7 @@ class TestTier2NonPinRetainedNamesAreOverridden:
 class TestTier3FusionOutranksVonBaeyer:
     """Tier 3: a fusion-nameable system must NEVER receive a von Baeyer name.
 
-    P-44.2.2.2 ranks fused (c) above nonfused bridged / von Baeyer (e).
+     ranks fused (c) above nonfused bridged / von Baeyer (e).
     """
 
     @pytest.mark.parametrize("smiles,label", [

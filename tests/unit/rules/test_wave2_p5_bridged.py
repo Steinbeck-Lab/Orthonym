@@ -32,7 +32,7 @@ class TestP25UnsaturatedAcyclicBridges:
 
 @pytest.mark.unit
 class TestP25CyclicBridges:
-    """P-25.4.2.1.2/.1.3 cyclic (ring) bridges. OPSIN 2.9 cannot parse the
+    """/.1.3 cyclic (ring) bridges. OPSIN 2.9 cannot parse the
     BB PIN (9,10-[1,2]benzenoanthracene), so we verify with an INTERNAL
     ORACLE: the constructor either emits the correct BB PIN (carrying the
     '[1,2]benzeno' bridge prefix) or fails closed. A wrong name is never
@@ -56,7 +56,7 @@ class TestP25CyclicBridges:
 
 @pytest.mark.unit
 class TestP25HeterocyclicBridgesFailClosed:
-    """P-25.4.2.1.5 — heterocyclic bridges. OPSIN 2.9 cannot parse any PIN in
+    """ — heterocyclic bridges. OPSIN 2.9 cannot parse any PIN in
     this class ([2,3]furanobenzo[g]quinoline / epipyrroloacridine both fail),
     so there is NO verifiable oracle. Orthonym MUST fail closed (never emit a
     wrong name). Follow-up: build + verify when a parseable oracle exists."""
@@ -65,7 +65,7 @@ class TestP25HeterocyclicBridgesFailClosed:
         "c1ccc2c(c1)C1C=COC1c1ccccc21",   # furano-type ring bridge across a fused core
     ])
     def test_heterocyclic_bridge_declines(self, smiles, monkeypatch):
-        # Production fail-closed via the SUB-03 gate (suite disables it by default;
+        # Production fail-closed via the gate (suite disables it by default;
         # re-enable). Wave-close: p8's benzene chokepoint made this emit a raw
         # 'benzene' pre-gate — documented handler follow-up; production is correct.
         import orthonym.namer as _nm
@@ -75,7 +75,7 @@ class TestP25HeterocyclicBridgesFailClosed:
 
 @pytest.mark.unit
 class TestP15CompositeBridges:
-    """P-15.3.1.2.2.1/.2.2.4 concatenated composite bridges on a fused parent."""
+    """/.2.2.4 concatenated composite bridges on a fused parent."""
 
     def test_epoxymethano_naphthalene(self):
         # OPSIN-RT-verified: 1,4-(epoxymethano)naphthalene -> C12=CC=C(C3=CC=CC=C13)CO2
@@ -92,13 +92,13 @@ class TestP15CompositeBridges:
 
 @pytest.mark.unit
 class TestP25CompositeBridgeOrdering:
-    """P-25.4.2.3.1/.3.2 composite bridge on a fused-heterocycle parent."""
+    """/.3.2 composite bridge on a fused-heterocycle parent."""
 
     def test_epoxymethano_furopyran_bb_pin(self):
         # BB-verbatim PIN, OPSIN-RT-verified: 2H-3,5-(epoxymethano)furo[3,4-b]pyran.
-        # P-25.4.2.3.1 composite epoxymethano bridge on a fused-heterocycle parent.
+        # composite epoxymethano bridge on a fused-heterocycle parent.
         # The bare residual furo[3,4-b]pyran is not yet nameable by the algorithmic
-        # fusion engine (it emits a wrong [4,3-b] descriptor, SELF-01-suppressed), so
+        # fusion engine (it emits a wrong [4,3-b] descriptor, -suppressed), so
         # the closed bridged structure is cataloged verbatim (mirrors the shipped
         # 2,3,9-trioxa-5,8-methanocyclopenta[cd]azulene precedent in
         # fused_heterocycles.py). Wave-2 D6.
@@ -117,7 +117,7 @@ class TestP25CompositeBridgeOrdering:
     def test_bis_epoxymethano_anthracene_internal_oracle(self, monkeypatch):
         # BB PIN 1,4:8,5-bis(epoxymethano)anthracene — OPSIN 2.9 UNPARSEABLE.
         # INTERNAL ORACLE: either the BB-conformant name or fail closed. Production
-        # fail-closes via the SUB-03 gate (suite disables it; re-enable). Wave-close:
+        # fail-closes via the gate (suite disables it; re-enable). Wave-close:
         # p8's benzene chokepoint made this emit a raw 'benzene' pre-gate — documented
         # handler follow-up; production is correct.
         import orthonym.namer as _nm
@@ -130,7 +130,7 @@ class TestP25CompositeBridgeOrdering:
 
 @pytest.mark.unit
 class TestP25PolyvalentBridgesFailClosed:
-    """P-25.4.1.7/.2.2.1/.2.2.2 — polyvalent (tripodal) bridges. OPSIN 2.9
+    """/.2.2.1/.2.2.2 — polyvalent (tripodal) bridges. OPSIN 2.9
     cannot parse the polyvalent PINs (metheno==methano for the monocyclic
     case; [1,1,2]triyl forms unparseable), so genuine tripodal bridges have
     no oracle and MUST fail closed."""
@@ -174,7 +174,7 @@ class TestP25BridgeLocantSeniority:
 
 @pytest.mark.unit
 class TestP23SecondaryBridgesFailClosed:
-    """P-23.2.6.2.3/.2.4/.2.5 — secondary (dependent) bridges are von Baeyer
+    """/.2.4/.2.5 — secondary (dependent) bridges are von Baeyer
     territory (superscript locants, tetracyclo[...0^2,7]). The bridged-fused
     constructor MUST decline them (return None) so it never emits a wrong
     partial name; the von Baeyer engine owns them downstream."""
@@ -192,7 +192,7 @@ class TestP23SecondaryBridgesFailClosed:
 
 @pytest.mark.unit
 class TestP31TripleBondBridge:
-    """P-31.1.4.3 — triple-bond ('ethyno') bridges. No OPSIN-parseable
+    """ — triple-bond ('ethyno') bridges. No OPSIN-parseable
     bridged-fused PIN; the constructor MUST detect the triple bond and fail
     closed rather than mis-name it as ethano/etheno (which would drop a bond
     = a wrong structure)."""
@@ -209,7 +209,7 @@ class TestP25MultiParentFallbacks:
     """P-25.5.1.2/.5.2/.5.3 — multi-parent fused fallbacks."""
 
     def test_trioxa_methano_cyclopentaazulene(self):
-        # P-25.5.1.2: skeletal-replacement 'a'-heteroatoms + methano bridge.
+        #: skeletal-replacement 'a'-heteroatoms + methano bridge.
         # OPSIN-RT-verified PIN. Was xfail'd here pending the fused catalog;
         # p5_fused (Task 8) built it as a FUSED_HETEROCYCLE_DATA exact-match
         # closed-structure entry (reachable via the composer's early
@@ -218,7 +218,7 @@ class TestP25MultiParentFallbacks:
             "2,3,9-trioxa-5,8-methanocyclopenta[cd]azulene"
 
     def test_indeno_naphthalene_is_fusion_not_bridged(self):
-        # P-25.5.2: pure fusion (NO bridge). The bridged constructor must decline;
+        #: pure fusion (NO bridge). The bridged constructor must decline;
         # the correct PIN (cyclobuta[1,7]indeno[5,6-b]naphthalene) comes from the
         # fusion engine (p5_fused), not the bridged constructor.
         from orthonym.rules.bridged_fused import name_bridged_fused_pin
@@ -228,7 +228,7 @@ class TestP25MultiParentFallbacks:
 
 @pytest.mark.unit
 class TestP51MultiCarbonBridgeMultiplicative:
-    """P-51.3.2.1 — multi-carbon bridges in multiplicative parent enumeration.
+    """ — multi-carbon bridges in multiplicative parent enumeration.
     The bridged constructor names the genuine bridged case (9,10-ethanoanthracene)
     and must NOT hijack a structure whose PIN is a multiplicative parent
     enumeration (that is the multiplicative engine's job)."""

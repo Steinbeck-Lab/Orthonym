@@ -1,9 +1,9 @@
-"""-FIX Item 2 — the P-14.5.4 citation tie-break must be a TOTAL order.
+"""-FIX Item 2 — the citation tie-break must be a TOTAL order.
 
-a phase replaced several raw ``sorted()`` calls with ``prefix_citation_sort_key``
+a phase replaced several raw ``sorted`` calls with ``prefix_citation_sort_key``
 to get Blue Book citation order. The key was right about the letters and wrong
 about the locants, and — decisively — it was **non-injective**: two prefixes that
-differ only in their own internal locant compared EQUAL, so ``sorted()`` (stable)
+differ only in their own internal locant compared EQUAL, so ``sorted`` (stable)
 fell back to Counter/dict insertion order, which is RDKit neighbour order, which
 is how the SMILES happened to be written. One molecule, two spellings, two names.
 
@@ -12,8 +12,8 @@ Measured before the fix, all three the same molecule::
     CCC(C)CSSSCCC(C)C -> 1-(2-methylbutyl)-3-(3-methylbutyl)trisulfane
     CC(C)CCSSSCC(CC)C -> 1-(3-methylbutyl)-3-(2-methylbutyl)trisulfane
 
-The nomenclature rule, with its heading — ``### **P-14.5** ALPHANUMERICAL ORDER``
-→ ``**P-14.5.4**`` (``the Blue Book``): "*When two or more prefixes consist
+The nomenclature rule, with its heading — ``### **** ALPHANUMERICAL ORDER``
+→ ``****`` (``the Blue Book``): "*When two or more prefixes consist
 of identical Roman letters, priority for order of citation is given to the group
 that contains the lowest locant(s) at the first point of difference.*" Its own
 first example is exactly this pair (``the Blue Book``):
@@ -30,14 +30,14 @@ appearance rather than on a sorted set:
 
 Root cause of the non-injectivity: ``prefix_citation_sort_key`` was stripping the
 prefix's LEADING locant set before collecting locants, so ``2-methylbutyl`` and
-``3-methylbutyl`` both keyed to ``('methylbutyl', ())``. That strip is correct for
+``3-methylbutyl`` both keyed to ``('methylbutyl', )``. That strip is correct for
 the OTHER convention this one function is called with — a fully rendered prefix
 string like ``3,5-dichloro``, whose leading locants are PARENT locants assigned BY
 citation order and so may not decide it — and wrong for a bare substituent name,
 whose leading locant is its own. The two conventions are now explicit, and a final
 full-string tier makes the order total so no tie can ever reach atom order again.
 The full-string tier is an ENGINEERING requirement (determinism), never a
-nomenclature claim: it is only ever consulted after P-14.5 has been exhausted.
+nomenclature claim: it is only ever consulted after has been exhausted.
 """
 
 import pytest
@@ -47,7 +47,7 @@ from orthonym.assembly.naming_utils import prefix_citation_sort_key
 
 
 # --------------------------------------------------------------------------
-# 1. the key itself: injective, and ordered the way P-14.5.4 says
+# 1. the key itself: injective, and ordered the way says
 # --------------------------------------------------------------------------
 
 # Every one of these is a DISTINCT substituent prefix, so no two may share a key.
@@ -95,7 +95,7 @@ def test_identical_letters_resolve_by_lowest_internal_locant(pair, expected):
 
 
 def test_a_double_digit_locant_is_compared_as_a_NUMBER_not_a_string():
-    """The total-order tier must never be allowed to decide a P-14.5.4 question:
+    """The total-order tier must never be allowed to decide a question:
     as strings '10-' sorts before '2-', but locant 2 is lower than locant 10."""
     got = sorted(['10-methylundecyl', '2-methylundecyl'],
                  key=prefix_citation_sort_key)
@@ -103,8 +103,8 @@ def test_a_double_digit_locant_is_compared_as_a_NUMBER_not_a_string():
 
 
 def test_letters_still_win_over_locants():
-    """P-14.5.4 only applies once the Roman letters are IDENTICAL; it must not
-    reorder prefixes that differ in letters (``### **P-14.5** ALPHANUMERICAL
+    """ only applies once the Roman letters are IDENTICAL; it must not
+    reorder prefixes that differ in letters (``### **** ALPHANUMERICAL
     ORDER`` preamble, ``the Blue Book``)."""
     got = sorted(['2-methylbutyl', 'ethyl'], key=prefix_citation_sort_key)
     assert got == ['ethyl', '2-methylbutyl'], got
@@ -183,7 +183,7 @@ def test_the_locant_tier_is_in_order_of_appearance_not_sorted():
 
 
 def test_the_aniline_site_cites_by_the_groups_own_locant_not_the_parent_one():
-    """``**P-14.5.4**``'s own first example (``the Blue Book``) is an aniline:
+    """``****``'s own first example (``the Blue Book``) is an aniline:
 
         4-(2-methylbutyl)-N-(3-methylbutyl)aniline (PIN)
         "(for ordering the substituents '2' is lower than '3'; the fact that 'N'

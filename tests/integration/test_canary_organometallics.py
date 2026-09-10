@@ -1,16 +1,16 @@
-"""Phase 161 integration canary: ORGM 53-fixture per-tier validation.
+"""a phase integration canary: ORGM 53-fixture per-tier validation.
 
-ORGM-04 acceptance: 50/53 Tier-A on the in-Phase-161-scope subset
+ acceptance: 50/53 Tier-A on the in-Phase-161-scope subset
 (53 total minus 3 Phase-161.1-deferred fixtures: T4-07, T4-15, T4-22).
-v23 Phase 10 resolved T4-12 (ethenyllithium); it is now in-scope/passing.
+ a phase resolved T4-12 (ethenyllithium); it is now in-scope/passing.
 
-Per CONTEXT D-09 + project memory rule #4 (no band-aids): the 3 deferred
+Per internal notes + project memory rule #4 (no band-aids): the 3 deferred
 fixtures remain in the canary and produce HONEST FAILING tests per
 honest-fail-on-data. They are NOT @pytest.mark.xfail-masked — VERIFICATION.md
-§ 3 documents each disposition.
+ documents each disposition.
 
 Audit amendments applied at Plan-04 (documented in VERIFICATION.md):
-- T4-13: PIN updated to 'trimethylphenylsilane' (IUPAC P-29.2 alphabetic)
+- T4-13: PIN updated to 'trimethylphenylsilane' (IUPAC alphabetic)
 - T4-14: PIN/SYS updated to 'butyllithium' (SMILES is n-butyl, not sec-butyl)
 """
 import csv
@@ -24,12 +24,12 @@ _CANARY_CSV = Path(__file__).parent.parent / "canary" / "canary_organometallics.
 
 
 def _load_orgm_canary():
-    """Load 53-fixture canary from FROZEN CSV per CONTEXT D-10.
+    """Load 53-fixture canary from FROZEN CSV per internal notes.
 
-    Per CONTEXT D-29 + Phase 161 Plan-04: the CSV is loaded as-is; the 4
+    Per internal notes + a phase Plan-04: the CSV is loaded as-is; the 4
     Phase-161.1-deferred fixtures (T4-07, T4-12, T4-15, T4-22) are NOT
     filtered out — they produce HONEST FAILING tests documented in
-    161-VERIFICATION.md.
+    internal notes.
     """
     fixtures = []
     with _CANARY_CSV.open(newline="", encoding="utf-8") as fh:
@@ -42,29 +42,29 @@ def _load_orgm_canary():
 ORGM_CANARY = _load_orgm_canary()
 _ORGM_IDS = [row['id'] for row in ORGM_CANARY]
 
-# Phase-161.1 backlog (3 fixtures): honest failures documented in 161-VERIFICATION.md § 3
-# These fixtures remain in the canary; the tests fail; the failures are scope-deferred per CONTEXT D-01.
-# v23 Phase 10 RESOLVED ORG-T4-12 ([Li]C=C): the σ-unsaturated ligand recogniser now
+# Phase-161.1 backlog (3 fixtures): honest failures documented in internal notes
+# These fixtures remain in the canary; the tests fail; the failures are scope-deferred per internal notes.
+# a phase RESOLVED ORG-T4-12 ([Li]C=C): the σ-unsaturated ligand recogniser now
 # emits 'ethenyl' (root-cause fix in _ligand_name_from_atoms). Its CSV expected_name_pin
 # was also corrected from the mislabeled 'vinyllithium' to the true PIN 'ethenyllithium'
-# (P-31.1.4.3.4 — vinyl is retained, general-nomenclature only).
+# — vinyl is retained, general-nomenclature only).
 _PHASE_161_1_BACKLOG = frozenset({'ORG-T4-07', 'ORG-T4-15', 'ORG-T4-22'})
 
 
 @pytest.mark.integration
 @pytest.mark.parametrize("row", ORGM_CANARY, ids=_ORGM_IDS)
 def test_canary_organometallic_pin(row):
-    """ORGM-04 Tier-A name-string equality per fixture (style='pin').
+    """ Tier-A name-string equality per fixture (style='pin').
 
     Per Plan-04 acceptance reformulation: 49/49 in-scope fixtures must pass.
     The 4 Phase-161.1-deferred fixtures (T4-07/12/15/22) honestly fail;
-    failures are scope-deferred per CONTEXT D-01.
+    failures are scope-deferred per internal notes.
     """
     smiles = row['smiles']
     expected = row['expected_name_pin']
     result = name_compound(smiles, style='pin')
     if row['id'] in _PHASE_161_1_BACKLOG and result != expected:
-        # Honest fail — Phase-161.1-deferred fixture; per VERIFICATION.md § 3
+        # Honest fail — Phase-161.1-deferred fixture; per VERIFICATION.md
         # the test surface is preserved (no xfail) so the fail is visible.
         pytest.fail(
             f"ORGM CANARY (PIN) — Phase-161.1-deferred fixture {row['id']} "
@@ -81,7 +81,7 @@ def test_canary_organometallic_pin(row):
 @pytest.mark.integration
 @pytest.mark.parametrize("row", ORGM_CANARY, ids=_ORGM_IDS)
 def test_canary_organometallic_systematic(row):
-    """ORGM-04 Tier-A name-string equality per fixture (style='systematic')."""
+    """ Tier-A name-string equality per fixture (style='systematic')."""
     smiles = row['smiles']
     expected = row['expected_name_systematic']
     result = name_compound(smiles, style='systematic')
@@ -159,7 +159,7 @@ def test_tier4_eta_bonded(row):
 def test_canary_in_scope_count():
     """Audit invariant: exactly 50 in-scope fixtures + 3 Phase-161.1 backlog = 53 total.
 
-    v23 Phase 10 moved ORG-T4-12 (ethenyllithium) from backlog → in-scope
+     a phase moved ORG-T4-12 (ethenyllithium) from backlog → in-scope
     (the σ-unsaturated ligand recogniser fix resolved it): 49→50 in-scope, 4→3 backlog.
     """
     in_scope = [r for r in ORGM_CANARY if r['id'] not in _PHASE_161_1_BACKLOG]

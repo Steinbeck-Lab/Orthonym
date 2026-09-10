@@ -6,7 +6,7 @@ into the dispatch handlers, so ``_handle_multi_component_neutral`` -> ``name_add
 names a multi-fragment input whose only unnameable component needs the general engine
 tier. PIN tier (all three flags default ``False``) forwards ``False`` -> byte-identical
 output (a trace: `internal notes`). Rule for the adduct spelling:
-P-14.8.1 (components joined by an em dash, proportion ``(n/m)`` appended after a space).
+ (components joined by an em dash, proportion ``(n/m)`` appended after a space).
 """
 import pytest
 
@@ -22,7 +22,7 @@ def _best_effort():
 
 def test_1c_neutral_composer_under_best_effort():
     """A neutral 2-fragment mixture whose one hard component names only under the
-    general engine now composes (lever 1c). P-14.8.1."""
+    general engine now composes (lever 1c).."""
     with jvm_slots(1, purpose="p1-task2-test"):
         name = _best_effort().name("CCO.c1ccc2c(c1)[SiH2]cc2")
     assert name == "ethanol—7-silabicyclo[4.3.0]nona-1,3,5,8-tetraene (1/1)"
@@ -38,14 +38,14 @@ def test_pin_tier_adduct_unchanged():
 
 def test_1a_single_atom_methane_adduct():
     """Lever 1a (shipped): a bare-carbon co-component names as ``methane`` in the
-    adduct. P-14.8.1."""
+    adduct.."""
     with jvm_slots(1, purpose="p1-task2-test"):
         name = _best_effort().name("C.CCO")
     assert name == "ethanol—methane (1/1)"
 
 
 # 0-wrong tripwire: a best-effort fragment must NEVER bypass the metal sentinel and
-# emit a real organometallic name. Each of these out-of-scope P-69 metal mixtures
+# emit a real organometallic name. Each of these out-of-scope metal mixtures
 # (from the frozen abstain sample) MUST still abstain to a failure/non-name.
 @pytest.mark.parametrize("smi", [
     # bare tungsten metal + two neutral organics
@@ -69,7 +69,7 @@ def test_metal_mixture_still_abstains(smi):
 def test_1b_salt_complex_organic_cation_best_effort():
     """A net-0 salt whose organic cation the ordinary namer cannot build now names
     via the best-effort fresh-instance route; the anion word is appended as a
-    separate word (P-65.6.2.1). OPSIN round-trips this to the input full InChIKey."""
+    separate word. OPSIN round-trips this to the input full InChIKey."""
     with jvm_slots(1, purpose="p1-task2-test"):
         name = _best_effort().name("C1=CC=C2C(=C1)[Se]N=[Se+]2.[Cl-]")
     assert name == ("7,9-diselena-8-azabicyclo[4.3.0]nona-1,3,5,7-tetraen-7-ium "
@@ -127,7 +127,7 @@ def test_1e_trivial_identical_unchanged():
 # ---- lever 1d: net-charged multi assembly (best-effort charged em-dash adduct) ----
 
 def test_1d_net_charged_adduct_best_effort():
-    """A net-charged multi-fragment ionic assembly composes as a P-14.8.1 em-dash
+    """A net-charged multi-fragment ionic assembly composes as a em-dash
     '(1/1)' adduct of its ion components under best-effort; OPSIN preserves the net
     charge and it round-trips to the input full InChIKey."""
     with jvm_slots(1, purpose="p1-task2-test"):

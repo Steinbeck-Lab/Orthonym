@@ -1,7 +1,7 @@
 """CQ1 Task B — make name_general produce correct whole-graph names, not abstain.
 
 Bucket B1 (S-rooted sulfonyl/sulfinyl substituent). MEASURED root cause at HEAD
-(spy-confirmed, invariant 8): the plan's named leaf
+(trace-confirmed, a project rule): the plan's named leaf
 ``substituent_naming.py::name_substituent_fragment`` records ZERO None-returns for
 these; the on-path leaf is ``substituent_enumerator.py::name_substituent``. Its
 Tier-1.85 sulfinyl/sulfonyl intercept already existed but its guard required the
@@ -12,8 +12,8 @@ constitution-WRONG ``1-oxo-2-oxa-1λ6-thiaeth-1-en-1-yl`` token (an extra in-cha
 oxa + one dropped =O) that the whole-graph OPSIN RT gate then voided -> abstain.
 
 Fix (offer-not-return, best-effort only): allow the parent-side atom to be C or N,
-so the substituent names as ``{R}sulfonyl`` / ``{R}sulfinyl`` (P-63.6), which OPSIN
-round-trips. 0-wrong via the existing RT gate (invariant 9); PIN byte-identical
+so the substituent names as ``{R}sulfonyl`` / ``{R}sulfinyl``, which OPSIN
+round-trips. 0-wrong via the existing RT gate (a project rule); PIN byte-identical
 (gated on ``allow_mancude``).
 """
 import random

@@ -1,17 +1,17 @@
-"""v23 DATA-01 — permanent OPSIN round-trip integrity guard over FUSED_HETEROCYCLE_DATA.
+""" — permanent OPSIN round-trip integrity guard over FUSED_HETEROCYCLE_DATA.
 
 Every catalog entry's ``name`` must parse (via OPSIN) back to the SAME ring system as
 its SMILES key. This is the LIVE counterpart to the offline ``expected_canon.json``
 lint in ``test_smiles_dict_canonical_lint.py``: it needs Java/OPSIN at run time but
 catches a name change the instant it lands — there is no committed snapshot to go
-stale. It is the permanent promotion of the v23 DATA-01 whole-table audit harness that
-found 44 mislabeled + 2 OPSIN-unparseable entries (all corrected in the DATA-01 sweep).
+stale. It is the permanent promotion of the whole-table audit harness that
+found 44 mislabeled + 2 OPSIN-unparseable entries (all corrected in the sweep).
 
 Comparison is at the CONSTITUTIONAL (connectivity) level — the skeleton block of the
 standard InChIKey, which normalizes the mobile ring N-H. This passes the five
 intentional purine tautomers (adenine / guanine / hypoxanthine / xanthine)
 automatically, while still catching every different-ring-system mislabel — the exact
-"names a different molecule" class the v23 Phase-0 self-consistency gate also targets.
+"names a different molecule" class the Phase-0 self-consistency gate also targets.
 """
 import subprocess
 from pathlib import Path

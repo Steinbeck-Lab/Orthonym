@@ -264,7 +264,7 @@ def test_benzene_close_declines_on_incomplete_coverage(monkeypatch):
 def test_benzene_close_declines_on_incomplete_coverage_jar_absent(monkeypatch):
     """Same wiring proof, jar forced absent -- isolates the OPSIN-free close
     from the terminal self-consistency backstop (proves THIS close, not
-    SELF-01, is what declines)."""
+    , is what declines)."""
     from orthonym.assembly import composer as C
 
     _force_jar_absent(monkeypatch)
@@ -324,7 +324,7 @@ def test_witness_still_ships_wrong_name_documented_gap(monkeypatch):
 # drops -> ``ok=False`` with the correct unaccounted indices (the historical
 # captopril exemplar pinned below, plus a second real witness with multiple
 # genuine declines). NO false pass of the shape Task 3 Step 1 describes ("a
-# dropped substituent's atoms wrongly included in substituents.values()")
+# dropped substituent's atoms wrongly included in substituents.values")
 # reproduced on this population -- the ordinary chain/amide-substituent
 # family is sound.
 #
@@ -357,7 +357,7 @@ def test_witness_still_ships_wrong_name_documented_gap(monkeypatch):
 # 2 real, complete, correct heterocycle names voided jar-absent in an 8-row
 # guard sample (``2-(methoxymethyl)thiophene``, ``4-(chloromethyl)pyridine``),
 # violating the M3 "0 complete names voided" bar. No net benefit either:
-# jar-PRESENT the terminal self-consistency (SELF-01) round-trip already
+# jar-PRESENT the terminal self-consistency  round-trip already
 # catches this exact witness without any change, so the fix only ever helps
 # jar-absent -- exactly the one mode it breaks. Reverted; not shipped.
 #
@@ -387,7 +387,7 @@ def test_heterocycle_close_declines_genuine_drop_jar_absent(monkeypatch):
     """Regression anchor: the heterocycle close (composer.py ``:5117-5140``)
     correctly declines the historical captopril exemplar -- a ring
     nitrogen's acyl substituent that ``get_heterocycle_substituents`` skips
-    outright (``rules/heterocycles.py`` WS-A task 9), so the close's
+    outright (``rules/heterocycles.py`` task 9), so the close's
     ``_cov_groups`` union is genuinely short and the whole heterocycle
     candidate must decline (falling through to a different, complete
     producer), jar-absent, even at the plain PIN tier."""
@@ -434,7 +434,7 @@ def test_heterocycle_carbon_anchor_guard_jar_absent(monkeypatch, smiles, expecte
 # ===========================================================================
 #
 # THE INVARIANT (general, across all three M3 producer closes above): a
-# default-tier (``Orthonym()`` == ``Orthonym(style="pin")``, jar-present)
+# default-tier (``Orthonym`` == ``Orthonym(style="pin")``, jar-present)
 # emitted name may never OPSIN-round-trip to FEWER heavy atoms than its
 # input -- "no atom-drop name ships". Task 1 (chain/suffix), Task 2
 # (benzene) and Task 3 (heterocycle, audited-not-fixed) each close one

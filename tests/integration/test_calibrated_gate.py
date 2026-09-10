@@ -18,17 +18,17 @@ from orthonym.assembly.coverage_scoring import FACTOR_WEIGHTS
 def test_weights_sum_to_one():
     """FACTOR_WEIGHTS must sum to the remaining-calibration target.
 
-    Phase 145.2 D-09-a.1 update: 'ratio' is demoted to 0.0 (zero IUPAC
+    a phase -a.1 update: 'ratio' is demoted to 0.0 (zero IUPAC
     Blue Book justification). Remaining four active weights sum to 0.80.
-    Phase 146 SC-4 recalibrates; byte-identical preserved until then via
-    position-based pool.best() selection (candidate_pool.py:329-335).
-    Phase 145.1 carried a 1.0 target under the original 4-factor
+    a phase recalibrates; byte-identical preserved until then via
+    position-based pool.best selection (candidate_pool.py:329-335).
+    a phase carried a 1.0 target under the original 4-factor
     calibration; after ratio demotion, the expected value is the sum of
     the surviving non-zero weights.
     """
     total = sum(FACTOR_WEIGHTS.values())
     # 0.0 (ratio) + 0.20 (atom_cov) + 0.35 (fg_rec) + 0.25 (sub_comp)
-    # + 0.0 (parent_correctness, Phase 145.1 scaffolding) = 0.80
+    # + 0.0 (parent_correctness, a phase scaffolding) = 0.80
     expected = 0.80
     assert abs(total - expected) < 0.01, (
         f"FACTOR_WEIGHTS sum to {total}, expected {expected} "
@@ -40,27 +40,27 @@ def test_weights_sum_to_one():
 def test_weights_all_positive():
     """All calibrated factor weights must be >= 0 (with documented zeros).
 
-    Phase 145.1 ISS-004 update: 'parent_correctness' is the 5th factor
-    (scaffolded with weight=0.0 for byte-identical safety per D-14;
-    Phase 146 raises it to ~0.35 after train/test calibration).
-    Phase 145.2 D-09-a.1 update: 'ratio' is demoted to 0.0 because the
+    a phase update: 'parent_correctness' is the 5th factor
+    (scaffolded with weight=0.0 for byte-identical safety per;
+    a phase raises it to ~0.35 after train/test calibration).
+    a phase -a.1 update: 'ratio' is demoted to 0.0 because the
     name-length/HA heuristic has zero IUPAC Blue Book justification.
     Both zero-weight keys are documented exceptions; all other weights
-    remain strictly positive until Phase 146 SC-4 recalibrates.
+    remain strictly positive until a phase recalibrates.
     """
     for key, val in FACTOR_WEIGHTS.items():
         if key == 'parent_correctness':
-            # Phase 145.1 scaffolding key (weight=0.0 by D-14 byte-identical
-            # contract). Phase 146 calibrates and removes this exception.
+            # a phase scaffolding key (weight=0.0 by byte-identical
+            # contract). a phase calibrates and removes this exception.
             assert val == 0.0, (
                 f"parent_correctness must be exactly 0.0 in Phase 145.1 "
                 f"scaffolding (D-14 byte-identical proof); got {val}"
             )
             continue
         if key == 'ratio':
-            # Phase 145.2 D-09-a.1 demotion (zero IUPAC justification).
-            # Position-based pool.best() keeps byte-identical. Phase 146
-            # SC-4 may recalibrate or permanently remove.
+            # a phase -a.1 demotion (zero IUPAC justification).
+            # Position-based pool.best keeps byte-identical. a phase
+            # may recalibrate or permanently remove.
             assert val == 0.0, (
                 f"ratio must be exactly 0.0 per Phase 145.2 D-09-a.1 "
                 f"demotion; got {val}"
@@ -81,12 +81,12 @@ def test_weights_have_derivation_comment():
 
 @pytest.mark.integration
 def test_weights_have_five_keys():
-    """FACTOR_WEIGHTS must have exactly 5 keys after Phase 145.1 scaffolding.
+    """FACTOR_WEIGHTS must have exactly 5 keys after a phase scaffolding.
 
-    Phase 145.1 ISS-004 update: 5th key 'parent_correctness' added at LAST
+    a phase update: 5th key 'parent_correctness' added at LAST
     position (Risk 2 mitigation -- preserves dict iteration order in
     compute_confidence's sum-loop; weight=0.0 keeps confidence values
-    byte-identical per D-14).
+    byte-identical per).
     """
     expected = {
         'ratio', 'atom_coverage', 'fg_recognition',
@@ -127,7 +127,7 @@ DIVERSE_SMILES = [
 def test_confidence_range_diverse_molecules():
     """Confidence is either an in-range float or an explicit 'unverified'.
 
-    v29 C4: previously `0.0 <= conf <= 1.0`, which TypeErrors on the honest
+     C4: previously `0.0 <= conf <= 1.0`, which TypeErrors on the honest
     None and — more importantly — could never fail, because every molecule
     that took an early return reported a fabricated 1.0 from
     namer.py:2693-2699. Out-of-range floats are still rejected.
@@ -147,7 +147,7 @@ def test_confidence_range_diverse_molecules():
 
 @pytest.mark.integration
 def test_simple_molecules_report_unmeasured_not_a_high_score():
-    """v29 C4 re-derivation: this test used to ENCODE THE DEFECT.
+    """ C4 re-derivation: this test used to ENCODE THE DEFECT.
 
     It asserted `conf >= 0.7` for CC / CCC / CCO / CC(=O)O. All four take an
     early return, so nothing scores them; the >= 0.7 was satisfied purely by
@@ -246,14 +246,14 @@ CANARY_SUBSET = [
     ("CC12CCC3C(CCC4CC(=O)CCC43C)C1CCC2O", "17-hydroxyandrostan-3-one"),
     ("OC(=O)c1ccc(N)cc1", "4-aminobenzoic acid"),
     ("CC(=O)Nc1ccc(O)cc1", "1-anilinoethanamide"),
-    # Phase 125: old expected name "1-(N,N-diethylamino)-4-phenylbenzene" was
+    # a phase: old expected name "1-(N,N-diethylamino)-4-phenylbenzene" was
     # incorrect -- it dropped the N=N azo linkage because _check_retained_substituent
-    # wrongly returned "phenyl" for the N=N-phenyl fragment.  The fix (counting all
+    # wrongly returned "phenyl" for the N=N-phenyl fragment. The fix (counting all
     # non-ring heavy atoms, not just carbons) correctly rejects that shortcut.
     # Proper azo naming support is deferred.
     ("CCN(CC)c1ccc(N=Nc2ccccc2)cc1", "unknown organic compound"),
     ("CC(=O)O", "acetic acid"),
-    ("Cc1ccc(O)c(C(C)C)c1", "2-isopropyl-4-methylphenol"),  # ASML-13: phenol suffix routing
+    ("Cc1ccc(O)c(C(C)C)c1", "2-isopropyl-4-methylphenol"),  #: phenol suffix routing
     ("OC(=O)/C=C\\C(=O)O", "(2Z)-but-2-enedioic acid"),
     ("OC(=O)c1ccccc1O", "2-hydroxybenzoic acid"),
     ("c1ccc2c(c1)cc1ccc3ccccc3c1c2", "benz[a]anthracene"),
@@ -282,7 +282,7 @@ def test_canary_subset_stable(smiles, expected):
 # No empty names test
 # ---------------------------------------------------------------------------
 
-# Molecules that historically triggered DROP-20 (coverage gate reject)
+# Molecules that historically triggered (coverage gate reject)
 DROP20_MOLECULES = [
     "OC(=O)c1cc(O)c(O)c(O)c1",            # gallic acid
     "CC(=O)Oc1ccccc1C(=O)O",               # aspirin
@@ -321,7 +321,7 @@ DROP20_MOLECULES = [
 @pytest.mark.parametrize("smiles", DROP20_MOLECULES,
                          ids=[f"drop20_{i}" for i in range(len(DROP20_MOLECULES))])
 def test_no_empty_names_from_gate(smiles):
-    """Molecules that previously triggered DROP-20 must return a non-empty name."""
+    """Molecules that previously triggered must return a non-empty name."""
     name = name_compound(smiles)
     assert name, f"name_compound returned empty/None for {smiles}"
     assert len(name.strip()) > 0, f"name_compound returned whitespace-only for {smiles}"

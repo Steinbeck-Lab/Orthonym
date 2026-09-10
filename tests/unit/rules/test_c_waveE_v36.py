@@ -1,4 +1,4 @@
-"""v36 Milestone-C Wave E — three independent tasks.
+""" Milestone-C Wave E — three independent tasks.
 
 Task 1: 0-wrong hardening of the stereo fail-path. A stereo descriptor that cannot
         be verified (full name does not OPSIN-round-trip) must be OMITTED (ship the
@@ -156,7 +156,7 @@ def test_task1_polycyclic_leak_no_unverifiable_stereo_ships(smiles, head_leak):
 
 def test_task2b_detect_bridged_fused_correctly_false():
     """The (b) macrocycle's two 6-rings are NOT ortho-fused to each other, so it is
-    not a P-25.4 bridged-FUSED system: detect_bridged_fused must return False, and
+    not a bridged-FUSED system: detect_bridged_fused must return False, and
     name_bridged_fused_system must decline (None) — a detector fix would deliver zero
     breadth (routing there still abstains)."""
     from rdkit import Chem
@@ -172,7 +172,7 @@ def test_task2b_detect_bridged_fused_correctly_false():
     # (b) bridged-fused / macrocyclic-bridged witness
     "C1=NC2CCCCCCCCOC3C=NC(CCCCCCCCOC1CC2)CC3",
     # (a) in-scope force-add-branch witnesses (aromatic-fused-bridged alkaloid cage,
-    #     macrocyclic cyclophane) — genuinely out of von-Baeyer reach
+    # macrocyclic cyclophane) — genuinely out of von-Baeyer reach
     "CN1CC[C@]23C(=O)C[C@H]4C(=CCO[C@H]5CC(=O)N(c6cc(O)ccc62)[C@H]3[C@H]54)C1",
     "c1cc2cc(c1)Oc1ccc(cc1)C[C@@H]1NCCc3ccc(cc31)Oc1cccc3c1[C@@H](C2)NCC3",
 ])
@@ -186,7 +186,7 @@ def test_task2_zero_wrong_abstain_or_roundtrip(smiles):
 
 # =====================================================================
 # TASK 3 — spiro-von-Baeyer constitutional defects (NAMED BLOCKER, bounded follow-on)
-# The built names are OPSIN-unparseable / wrong-constitution; SELF-01 abstains on them
+# The built names are OPSIN-unparseable / wrong-constitution; abstains on them
 # (0-wrong holds). None is a bounded von-Baeyer numbering/bridge fix — each needs a full
 # spiro-component reconstruction. These guards lock 0-wrong. See V36-WAVEE-TASK3-FINDING.md.
 # =====================================================================

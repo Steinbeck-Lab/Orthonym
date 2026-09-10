@@ -1,13 +1,13 @@
 """
-Adduct / solvate / hydrate nomenclature — Blue Book P-14.8 (Wave-2 P0A).
+Adduct / solvate / hydrate nomenclature — Blue Book (Wave-2 P0A).
 
-P-14.8.1: "Names are formed by citing the names of individual compounds in
+: "Names are formed by citing the names of individual compounds in
 the order of the formula connected by long (em) dashes (—). The
 proportions of components are indicated after the name by an arabic number
 separated by a solidus from other numbers; arabic numbers and the solidus
 are placed in parentheses, separated from the name by a space."
 
-P-14.8.2: "organic components in order as described in P-14.8.1, inorganic
+: "organic components in order as described in, inorganic
 components...; water (if present), is cited last." General nomenclature:
 "hydrates may be named by adding the word 'hydrate' to the name preceded by
 an appropriate numerical prefix... Terms such as 'hemi' and 'sesqui' are
@@ -26,18 +26,18 @@ from rdkit import Chem
 
 EM_DASH = "—"
 
-# Single-heavy-atom NEUTRAL molecular components of a P-14.8 adduct, keyed by
+# Single-heavy-atom NEUTRAL molecular components of a adduct, keyed by
 # the fragment's element symbol and mapped to the component's own name. Water
 # is cited last; the hydracids use the binary names the Blue Book's own
-# P-14.8.2 examples use ("3-[(2S)-1-methylpyrrolidin-2-yl]pyridine—hydrogen
-# chloride (1/1)", BlueBookV2.md line 4677).
+# examples use ("3-[(2S)-1-methylpyrrolidin-2-yl]pyridine—hydrogen
+# chloride (1/1)", the Blue Book line 4677).
 #
 # The nonmetal hydrides below (methane/hydrogen sulfide/phosphane) are genuine
 # neutral molecular species that occur as adduct partners in the corpus; each
 # name was verified OPSIN-parseable in em-dash adduct notation
 # ("benzene—methane (1/1)" etc.). Without them a row whose only single-atom
 # component is a bare C/S/P declined outright -- a table-miss-degrades-to-
-# refusal defect that abstained instead of naming the P-14.8 adduct.
+# refusal defect that abstained instead of naming the adduct.
 #
 # STILL excluded (fail-closed): bare metals (organometallic routing owns them,
 # never swallowed here) and bare N/ammonia (a bare nitrogen fragment is more
@@ -49,9 +49,9 @@ SINGLE_ATOM_COMPONENT_NAMES: Dict[str, str] = {
     "Cl": "hydrogen chloride",
     "Br": "hydrogen bromide",
     "I": "hydrogen iodide",
-    "C": "methane",           # v43 P1-1a: CH4, the dominant nonmetal co-component
-    "S": "hydrogen sulfide",  # v43 P1-1a: H2S
-    "P": "phosphane",         # v43 P1-1a: PH3 (phosphane is the P-21 PIN, not phosphine)
+    "C": "methane",           # -1a: CH4, the dominant nonmetal co-component
+    "S": "hydrogen sulfide",  # -1a: H2S
+    "P": "phosphane",         # -1a: PH3 (phosphane is the PIN, not phosphine)
 }
 
 
@@ -87,13 +87,13 @@ def _name_component(frag_smi: str, style: str, *,
                     charged_ok: bool = False) -> Optional[str]:
     """Name ONE component fragment, or None (fail-closed).
 
-    Single-heavy-atom fragments come ONLY from the P-14.8.2 table above.
+    Single-heavy-atom fragments come ONLY from the table above.
     Multi-atom fragments go through the full single-component pipeline via
-    a FRESH Orthonym instance (audit §3.3 RL-4 fresh-instance pattern,
+    a FRESH Orthonym instance (the audit fresh-instance pattern,
     same as routing/dispatch_table._handle_multi_component_neutral), so the
     per-fragment OPSIN validity gate stays ON in production.
 
-    v26 P4: ``general_fallback`` / ``allow_aromatic_general`` (default False ->
+    : ``general_fallback`` / ``allow_aromatic_general`` (default False ->
     byte-identical PIN behaviour) select the ``complete`` tier for the
     per-component namer, so a component nameable only by the general engine
     (e.g. a silyl-heteroarene, a von-Baeyer polyene cage) is named rather than
@@ -106,10 +106,10 @@ def _name_component(frag_smi: str, style: str, *,
     is_charged = Chem.GetFormalCharge(frag_mol) != 0
     if is_charged and not charged_ok:
         return None  # charged fragments belong to the salt/ion router
-    # v43 P1-1d: a multi-atom charged ion (charged_ok) is named as a substitutive
+    # -1d: a multi-atom charged ion (charged_ok) is named as a substitutive
     # ion word (…-ium / …-ide) by the fresh best-effort instance below, exactly as
     # a neutral multi-atom fragment. A single charged atom (a bare ion) stays out
-    # of the P-14.8.2 single-atom table and refuses.
+    # of the single-atom table and refuses.
     if frag_mol.GetNumHeavyAtoms() == 1:
         return None if is_charged else SINGLE_ATOM_COMPONENT_NAMES.get(
             Chem.MolToSmiles(frag_mol, canonical=True))
@@ -143,24 +143,24 @@ def _name_component(frag_smi: str, style: str, *,
 
 
 def _component_bucket(frag_mol, frag_smi: str) -> int:
-    """P-14.8.1/P-14.8.2 citation buckets: 0 organic, 1 inorganic, 2 water."""
+    """/ citation buckets: 0 organic, 1 inorganic, 2 water."""
     if frag_smi == "O":
-        return 2  # "water (if present), is cited last" (P-14.8.2)
+        return 2  # "water (if present), is cited last"
     if any(a.GetAtomicNum() == 6 for a in frag_mol.GetAtoms()):
-        return 0  # "organic compounds precede inorganic compounds" (P-14.8.1)
+        return 0  # "organic compounds precede inorganic compounds"
     return 1
 
 
 def component_sort_key(frag_smi: str) -> Tuple[int, int, int, str]:
-    """Deterministic P-14.8 citation order for one component.
+    """Deterministic citation order for one component.
 
-    (bucket, P-41 seniority index, -heavy_atoms, canonical_smiles):
+    (bucket, seniority index, -heavy_atoms, canonical_smiles):
     organic components ordered by the seniority of the class of their
-    principal characteristic group (P-14.8.1: "cited in the order of
-    seniority of classes (see P-41)"); components without a suffix-capable
+    principal characteristic group: "cited in the order of
+    seniority of classes (see "); components without a suffix-capable
     PCG (hydrocarbons, N-heterocycles-as-π-bases) rank after all
     PCG-bearing organics; ties by descending size then canonical SMILES —
-    reproduces every P-14.8 Blue Book example (coronene—trinitrobenzene
+    reproduces every Blue Book example (coronene—trinitrobenzene
     big-first; benzene—pyridine resolved form).
     """
     frag_mol = Chem.MolFromSmiles(frag_smi)
@@ -180,7 +180,7 @@ def component_sort_key(frag_smi: str) -> Tuple[int, int, int, str]:
     return (bucket, seniority, -frag_mol.GetNumHeavyAtoms(), frag_smi)
 
 
-# P-14.8.2: "an appropriate numerical prefix, such as 'mono','di', 'tri'"
+#: "an appropriate numerical prefix, such as 'mono','di', 'tri'"
 _HYDRATE_MULTIPLIERS = {
     1: "mono", 2: "di", 3: "tri", 4: "tetra", 5: "penta",
     6: "hexa", 7: "hepta", 8: "octa", 9: "nona", 10: "deca",
@@ -193,7 +193,7 @@ def _hydrate_word_form(named: List[Tuple[str, int]],
 
     Defined ONLY when every non-water component shares one count p; the
     prefix encodes the reduced water:parent ratio w/p — n/1 -> mono/di/
-    tri/... , 1/2 -> hemi, 3/2 -> sesqui (P-14.8.2 line 4657; BB line 4686
+    tri/..., 1/2 -> hemi, 3/2 -> sesqui line 4657; the Blue Book
     pairs (2/2/3) with 'sesquihydrate'). Anything else returns None and
     the caller emits the always-valid proportion notation instead.
     """
@@ -236,7 +236,7 @@ def name_adduct(mol, canonical_smiles: Optional[str] = None,
                 general_fallback: bool = False,
                 allow_aromatic_general: bool = False,
                 general_fallback_unverified: bool = False) -> Optional[str]:
-    """Name an all-neutral multi-component input per P-14.8, or None.
+    """Name an all-neutral multi-component input per, or None.
 
     Fail-closed refusals (return None; the dispatch cascade then falls
     through to the honest 'unknown organic compound'):
@@ -248,13 +248,13 @@ def name_adduct(mol, canonical_smiles: Optional[str] = None,
       * any charged fragment (salt/ion routing owns charged input);
       * ANY component the single-component pipeline cannot name.
 
-    v26 P4: ``general_fallback`` / ``allow_aromatic_general`` (default False ->
+    : ``general_fallback`` / ``allow_aromatic_general`` (default False ->
     byte-identical PIN output) select the ``complete`` tier for the
-    per-component namer (see :func:`_name_component`), so a multi-fragment
+    per-component namer (see:func:`_name_component`), so a multi-fragment
     input whose only unnameable part was a general-engine-only component
-    (silyl-heteroarene, von-Baeyer polyene cage, ...) is named under
+    (silyl-heteroarene, von-Baeyer polyene cage,...) is named under
     ``complete`` instead of abstaining. All other scope (charge / single-atom /
-    proportion assembly / P-14.8 ordering) is unchanged.
+    proportion assembly / ordering) is unchanged.
     """
     components = split_components(mol)
     if components is None or len(components) < 2:
@@ -264,12 +264,12 @@ def name_adduct(mol, canonical_smiles: Optional[str] = None,
         return None
     if not any(fm.GetNumHeavyAtoms() >= 2 for fm in frag_mols.values()):
         return None
-    # v43 P1-1d: under best-effort, a net-charged multi-fragment assembly composes
-    # as a P-14.8.1-notation adduct of its (charged) ion components -- 'cation—anion
+    # -1d: under best-effort, a net-charged multi-fragment assembly composes
+    # as a -notation adduct of its (charged) ion components -- 'cation—anion
     # (1/1)' (measured 65% RT_FULL, 0 wrong). OPSIN preserves the net charge when a
     # cation IS present, but it PROTONATES a lone anion (e.g. 'acetate—water (1/1)'
     # -> neutral acetic acid), so 0-wrong is delivered by the full-InChIKey
-    # SELF-01/general-fallback gate (namer.py), NOT by OPSIN or this producer -- the
+    # /general-fallback gate (namer.py), NOT by OPSIN or this producer -- the
     # charge-mismatch cases are emitted here and SUPPRESSED downstream. PIN tier
     # keeps the charge refusal. Out-of-scope metal assemblies are EXCLUDED (0-wrong:
     # never render a coordination complex / organometallic).

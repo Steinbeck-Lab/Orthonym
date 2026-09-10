@@ -1,4 +1,4 @@
-"""W2E-P1FC Task 4 — P-29.6.2.1 (BB 16304): ring-substituted benzyl is the
+"""W2E-P1FC Task 4 — (BB 16304): ring-substituted benzyl is the
 systematic (substituted-phenyl)methyl in PINs, not (n-halobenzyl).
 BB example: 2-[(4-bromophenyl)methyl]pyridine (PIN)."""
 import pytest

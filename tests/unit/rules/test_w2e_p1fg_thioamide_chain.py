@@ -1,7 +1,7 @@
-"""P-66.1.4.4 (BB 33196): thioamide junior to acid is expressed
+""" (BB 33196): thioamide junior to acid is expressed
 "(2) by the appropriate prefixes, such as amino, in conjunction with
 sulfanylidene"; BB verbatim PIN: 3-amino-3-sulfanylidenepropanoic acid.
-Mechanism mirrors AM-4 (P-66.4.1.3.2): the chain-terminal thioamide C
+Mechanism mirrors: the chain-terminal thioamide C
 stays IN the chain (it is NOT in chains._TERMINAL_C_FGS) and its N/=S
 are cited as amino + sulfanylidene at the C's locant.
 """

@@ -1,7 +1,7 @@
-"""P-15.2.2 (BB 5074ff): "the preferred IUPAC names are substitutive
-names for ... semicarbazones ...: (CH3)2C=N-NH-CO-NH2 acetone
+""" (BB 5074ff): "the preferred IUPAC names are substitutive
+names for... semicarbazones...: (CH3)2C=N-NH-CO-NH2 acetone
 semicarbazone -> 2-(propan-2-ylidene)hydrazine-1-carboxamide (PIN)".
-Covers both P-15.2.2 rows (PIN form + OPSIN-RT validation).
+Covers both rows (PIN form + OPSIN-RT validation).
 
 Investigation: compute_features gives principal_group=None with a 'urea'
 FG present, so _try_name_semicarbazone is hooked into the urea handler

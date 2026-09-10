@@ -1,8 +1,8 @@
-"""Typed abstention limit-codes (v25 P0 Task 0.1).
+"""Typed abstention limit-codes (Task 0.1).
 
 Orthonym's fail-closed paths all collapse into one descriptive fallback
 string, which is right for the naming contract but blind for measurement:
-the v25 coverage program needs to know *which* mechanism abstained so the
+the coverage program needs to know *which* mechanism abstained so the
 recoverable buckets can be counted before any coverage engine is scoped
 (the census in ``scripts/abstention_census.py``, Task 0.2).
 
@@ -61,7 +61,7 @@ class AbstentionCode(str, Enum):
     #: could (the presumptive recursive-substituent-namer bucket).
     BRANCH_UNNAMEABLE = "BRANCH_UNNAMEABLE"
     #: A fully generated candidate name was suppressed by a correctness
-    #: gate (SELF-01 OPSIN validity, P10 structure-conservation, the
+    #: gate (OPSIN validity, P10 structure-conservation, the
     #: organometallic/oxoacid source vetoes).
     GATE_SUPPRESSED = "GATE_SUPPRESSED"
     #: The >15-HA GENERAL quality/atom-coverage downgrade machinery
@@ -119,13 +119,13 @@ def record_suppression(code: AbstentionCode, detail: Optional[str] = None,
     overridden (first-wins among themselves). Never raises.
     """
     try:
-        # v30 PE-1: mirror into the candidate ledger BEFORE the first-writer-wins
+        #: mirror into the candidate ledger BEFORE the first-writer-wins
         # logic below discards this event. That precedence rule is right for "which
         # site declined" and wrong for "what was thrown away" -- a suppression that
         # loses the race here still destroyed a candidate, and the ledger must see
         # it. Off unless a consumer enabled it.
         if candidate and candidate_ledger.is_enabled():
-            # Scope/depth come from candidate_ledger.resolve_scope() (the one
+            # Scope/depth come from candidate_ledger.resolve_scope (the one
             # place that answers it), so a gate suppressing a nested fragment
             # naming is not scored against the whole input.
             candidate_ledger.record_candidate(

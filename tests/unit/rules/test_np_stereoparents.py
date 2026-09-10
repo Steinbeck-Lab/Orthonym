@@ -89,12 +89,12 @@ def test_homolog_skeleton_namer_emits_no_steroid_retained_name():
         assert retained not in out, f"leaked '{retained}' in: {out!r}"
 
 
-# 7a.2 — complex polycyclic diterpene/triterpene stereoparents (P-101.2.7 Table
+# 7a.2 — complex polycyclic diterpene/triterpene stereoparents Table
 # 10.1c). OPSIN-unparseable -> name-exact carve-out. Structures two-source
 # verified (PubChem + NCI CACTUS full InChIKey agreement). These are direct
 # structural analogs of the shipped abietane/lanostane-class name-exact PINs
 # (unwieldy systematic von-Baeyer name -> the semisystematic Table-10.1 name is
-# the PIN per P-101.2 BB:50985 "more complicated structure -> semisystematic").
+# the PIN per the Blue Book "more complicated structure -> semisystematic").
 @pytest.mark.parametrize("smi,expected", [
     # podocarpane — tricyclic diterpane (abietane class); was 'unknown'.
     ("CC1(C)CCC[C@]2(C)[C@H]3CCCC[C@@H]3CC[C@@H]12", "podocarpane"),
@@ -111,10 +111,10 @@ def test_name_exact_diterpene_triterpene_parents(smi, expected):
     assert RAW.name(can) == expected   # gate-off raw namer (name-exact path)
 
 
-# 7a.2b — complex polycyclic alkaloid stereoparents (P-101.2.7 Table 10.1a).
+# 7a.2b — complex polycyclic alkaloid stereoparents a).
 # Clean CHN-only saturated parent hydrides, OPSIN-unparseable -> name-exact, two-
 # source verified (PubChem + NCI CACTUS full InChIKey). Direct analogs of the
-# shipped yohimban/aspidospermidine/vincane class (semisystematic PIN, P-101.2).
+# shipped yohimban/aspidospermidine/vincane class (semisystematic PIN,.
 # Several currently ship WRONG atom-dropped names (cevane->methylpiperidine,
 # corynan->diethylpiperidine, emetan->tetrahydroisoquinoline) -> this also closes
 # those structural leaks.
@@ -137,7 +137,7 @@ def test_name_exact_alkaloid_parents(smi, expected):
     assert RAW.name(can) == expected
 
 
-# 7a.2c — bicyclic+ sesqui/di/sesterterpene parents (P-101.2.7 Table 10.1c).
+# 7a.2c — bicyclic+ sesqui/di/sesterterpene parents c).
 # Complex polycyclic (2-4 rings), analogs of the shipped cadinane/guaiane/eudesmane
 # (bicyclic sesquiterpane) class -> semisystematic PIN. Two-source verified,
 # OPSIN-unparseable -> name-exact. himachalane/ophiobolane were mis-named

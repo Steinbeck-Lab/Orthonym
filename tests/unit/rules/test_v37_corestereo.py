@@ -71,7 +71,7 @@ def _alarm(seconds=90):
 
 def _complete(smi):
     """The verified best-effort ('complete') tier: RT-verified engine names,
-    NO T4 unverified opt-in (gf=T, gfu=F, aag=T). This is the 0-wrong shipping
+    NO unverified opt-in (gf=T, gfu=F, aag=T). This is the 0-wrong shipping
     tier for systematic ring names."""
     _alarm()
     try:
@@ -175,7 +175,7 @@ class TestConstitutionDefectNeverShipsWrong:
 
     # cephalosporin: the complex_ring candidate drops the S-CH2-C#N thioether and
     # renames the amide substituent, so the constitution does not round-trip ->
-    # SELF-01 suppresses at the PIN tier -> abstain (never a wrong-molecule ship).
+    # suppresses at the PIN tier -> abstain (never a wrong-molecule ship).
     SMI = "CO[C@@]1(NC(=O)CSCC#N)C(=O)N2C(C(=O)[O-])=C(CSc3nnnn3C)CS[C@@H]21"
 
     def test_pin_tier_abstains_never_wrong(self, _oracle):

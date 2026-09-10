@@ -1,11 +1,11 @@
-"""Phase 161 integration tests directly anchored to ROADMAP success criterion 1.
+"""a phase integration tests directly anchored to ROADMAP success criterion 1.
 
 These tests verify that Orthonym names the most prominent organometallic
 compounds (ferrocene, ruthenocene, cobaltocene, etc.) correctly per IUPAC
-P-69 + Salzer 1999 + IR-10. Provides a quick smoke-test surface for the
-ORGM-01 (sandwich complexes) + ORGM-02 (seniority cascade) requirements.
+ + Salzer 1999 +. Provides a quick smoke-test surface for the
+ (sandwich complexes) + (seniority cascade) requirements.
 
-NEVER uses @pytest.mark.xfail (CONTEXT D-29) — honest-fail-on-data.
+NEVER uses @pytest.mark.xfail (internal notes) — honest-fail-on-data.
 """
 import pytest
 
@@ -16,22 +16,22 @@ from orthonym import name_compound
 class TestRoadmapOrgm01:
     """Direct verification of ROADMAP success criterion 1 anchors.
 
-    ROADMAP SC-1: 'Orthonym correctly names ferrocene as
+    ROADMAP: 'Orthonym correctly names ferrocene as
     bis(η⁵-cyclopentadienyl)iron' (systematic) and 'ferrocene' (retained PIN).
     """
 
     def test_ferrocene_pin(self):
-        """ROADMAP SC-1: ferrocene retained PIN."""
+        """ROADMAP: ferrocene retained PIN."""
         assert name_compound(
             '[Fe+2].c1cc[cH-]c1.c1cc[cH-]c1', style='pin'
         ) == 'ferrocene'
 
     def test_ferrocene_systematic_matches_roadmap(self):
-        """ROADMAP SC-1 verbatim: bis(η⁵-cyclopentadienyl)iron(II).
+        """ROADMAP verbatim: bis(η⁵-cyclopentadienyl)iron(II).
 
-        Note: ROADMAP says "bis(η⁵-cyclopentadienyl)iron"; per Salzer §3.2 + D-07
+        Note: ROADMAP says "bis(η⁵-cyclopentadienyl)iron"; per Salzer +
         the systematic form INCLUDES Stock (II): "bis(η⁵-cyclopentadienyl)iron(II)"
-        Both forms are acceptable per IUPAC PIN practice; CONTEXT D-03 locks the
+        Both forms are acceptable per IUPAC PIN practice; internal notes locks the
         Stock-inclusive form as default systematic emission.
         """
         result = name_compound(

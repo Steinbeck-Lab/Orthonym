@@ -1,12 +1,12 @@
-"""v30 B2 — unsaturated hydroxy-alkenyl substituent prefix (lignin monomers).
+""" B2 — unsaturated hydroxy-alkenyl substituent prefix (lignin monomers).
 
 Two coupled fixes let a phenol-parent ring carry an unsaturated hydroxy-alkenyl
 substituent at PIN:
 
-  bug 1  ``substituent_naming._name_polyfunctional_acyclic_substituent`` now builds
+  bug 1 ``substituent_naming._name_polyfunctional_acyclic_substituent`` now builds
          an unsaturated chain substituent (``(1E)-3-hydroxyprop-1-en-1-yl``),
-         numbered from the free valence (P-29.2), ene locant + E/Z from structure.
-  bug 2  ``benzene._identify_alkyl_group`` no longer mislabels a vinyl-STARTED
+         numbered from the free valence, ene locant + E/Z from structure.
+  bug 2 ``benzene._identify_alkyl_group`` no longer mislabels a vinyl-STARTED
          hetero-bearing fragment (``-CH=CH-CH2OH``) as ``ethenyl`` (which dropped
          the CH2OH tail -> ``4-ethenylphenol``); it declines so the recursive
          ``name_substituent`` fallback names it correctly.
@@ -37,7 +37,7 @@ def test_lignin_monomer_alkenyl_ol_substituent(smi, expected):
 
 def test_alkenyl_ol_substituent_unit():
     """The recursive substituent namer builds the unsaturated hydroxy-alkenyl
-    prefix from structure, numbered from the free valence (P-29.2)."""
+    prefix from structure, numbered from the free valence."""
     from rdkit import Chem
     from orthonym.assembly.substituent_enumerator import name_substituent
     m = Chem.MolFromSmiles("OC/C=C/c1ccccc1")  # -CH=CH-CH2OH on benzene
@@ -76,7 +76,7 @@ def test_no_regression_vinyl_and_alkyl(smi, expected):
     assert _pin().name(smi) == expected
 
 
-# ---- fable-b2 review findings (all resolved) ----
+# ---- a review-b2 review findings (all resolved) ----
 
 @pytest.mark.parametrize("smi", [
     "CO/C=C/c1ccc(O)cc1",             # enol ether -CH=CH-OMe
@@ -113,7 +113,7 @@ def test_blocker1_stereo_completeness_never_drops_ez(smi):
 @pytest.mark.opsin_gate
 def test_blocker1_nitrovinyl_now_names_with_stereo():
     """The nitrovinyl witness specifically now names to the exact stereo-complete
-    PIN (v33 Phase 6 E3 stereo-wipe fix)."""
+    PIN (a phase E3 stereo-wipe fix)."""
     from rdkit import Chem
     from rdkit.Chem import inchi
     from orthonym.validation.opsin_roundtrip import opsin_parse
@@ -126,8 +126,8 @@ def test_blocker1_nitrovinyl_now_names_with_stereo():
 
 
 def test_blocker2_benzonitrile_brackets_complex_substituent():
-    """fable-b2 BLOCKER 2: a monosubstituted benzonitrile must bracket a complex
-    substituent (P-16.5.2.4), not ship the markless `4-(1E)-...ylbenzonitrile`."""
+    """a review-b2 BLOCKER 2: a monosubstituted benzonitrile must bracket a complex
+    substituent, not ship the markless `4-(1E)-...ylbenzonitrile`."""
     assert _pin().name("N#Cc1ccc(/C=C/CO)cc1") == "4-[(1E)-3-hydroxyprop-1-en-1-yl]benzonitrile"
     # simple substituents unchanged
     assert _pin().name("N#Cc1ccc(Cl)cc1") == "4-chlorobenzonitrile"
@@ -135,7 +135,7 @@ def test_blocker2_benzonitrile_brackets_complex_substituent():
 
 
 @pytest.mark.parametrize("smi,expected", [
-    # fable-b2 RISK 3: a chain R/S centre with an UNDEFINED-geometry core C=C names
+    # a review-b2 RISK 3: a chain R/S centre with an UNDEFINED-geometry core C=C names
     # (the descriptor-less name lets _stereo_route add the R/S).
     ("C[C@H](O)C=Cc1ccc(O)cc1", "4-[(S)-3-hydroxybut-1-en-1-yl]phenol"),
 ])
@@ -150,7 +150,7 @@ def test_risk3_ez_plus_rs_still_abstains():
     assert "but-1-en" not in n, n  # abstains rather than ship stereo-incomplete
 
 
-# ---- polyene substituent extension (v30 B2 follow-on) ----
+# ---- polyene substituent extension (B2 follow-on) ----
 
 @pytest.mark.parametrize("smi,expected", [
     # dienyl-ol arm on phenol: euphonic-'a' multiplied ene stem + merged (nE,nE) block
@@ -172,10 +172,10 @@ def test_polyene_rt_exact():
         (r["smiles"], r.get("verdict"), r.get("name")) for r in rows]
 
 
-# ---- fable-polyene review (bfc960f7) BLOCKERs, resolved ----
+# ---- a review-polyene review BLOCKERs, resolved ----
 
 def test_polyene_blocker2_two_stereocentres_fail_closed():
-    """fable-polyene BLOCKER 2 / invariant 9: >=2 chain R/S centres + undefined C=C
+    """a review-polyene BLOCKER 2 / a project rule: >=2 chain R/S centres + undefined C=C
     geometry would ship a stereo-DROPPED wrong molecule (_stereo_route drops multi-
     centre R/S). Must fail closed (abstain), not emit the stereo-bare name."""
     import sys
@@ -192,10 +192,10 @@ def test_polyene_blocker2_two_stereocentres_fail_closed():
 
 
 @pytest.mark.parametrize("name,count,want", [
-    # fable-polyene BLOCKER 1 / P-16.3.5(a): a SUBSTITUTED polyene prefix takes bis
+    # a review-polyene BLOCKER 1 / (a): a SUBSTITUTED polyene prefix takes bis
     ("5-hydroxypenta-1,3-dien-1-yl", 2, "bis"),
     ("6-hydroxyhexa-2,4-dien-1-yl", 2, "bis"),
-    # P-16.3.4(b): the UNSUBSTITUTED polyene keeps di (the trap — must not flip)
+    # (b): the UNSUBSTITUTED polyene keeps di (the trap — must not flip)
     ("penta-1,3-dien-1-yl", 2, "di"),
     ("hexa-2,4-dien-1-yl", 2, "di"),
     # controls unchanged
@@ -208,8 +208,8 @@ def test_polyene_blocker1_di_vs_bis(name, count, want):
 
 
 def test_polyene_blocker1_full_molecule_bis():
-    """The symmetric bis-dienol arene names with bis (P-16.3.5(a)); the bare-polyene
-    analogue keeps di (P-16.3.4(b))."""
+    """The symmetric bis-dienol arene names with bis (a)); the bare-polyene
+    analogue keeps di (b))."""
     assert _pin().name("OC(=O)c1cc(C=CC=CCO)cc(C=CC=CCO)c1") == \
         "3,5-bis(5-hydroxypenta-1,3-dien-1-yl)benzoic acid"
     assert _pin().name("OC(=O)c1cc(/C=C/C=C/C)cc(/C=C/C=C/C)c1") == \

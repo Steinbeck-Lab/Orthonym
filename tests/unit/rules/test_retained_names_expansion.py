@@ -1,5 +1,5 @@
 """
-Tests for retained names dictionary expansion (a phase, DATA-06).
+Tests for retained names dictionary expansion (a phase,).
 
 Verifies:
 - Dictionary has at least 290 entries (240 original + 50+ new)
@@ -28,7 +28,7 @@ class TestCanonicalSMILESKeys:
     """Verify all dictionary keys are canonical SMILES."""
 
     def test_all_keys_are_canonical(self):
-        """Every key must equal its own Chem.CanonSmiles() result."""
+        """Every key must equal its own Chem.CanonSmiles result."""
         non_canonical = []
         for key in RETAINED_NAMES:
             try:
@@ -126,7 +126,7 @@ class TestValueQuality:
         # The giveaway was the hard-coded `N-acetyl` alternative: a special case standing
         # in for the general rule that was missing.
         #
-        # Replaced with the actual Blue Book rule (P-14.3.2 / P-16.3): an italic element
+        # Replaced with the actual Blue Book rule /: an italic element
         # locant is an element symbol, optionally primed, followed by `-` or `,`, at the
         # name start or after a separator. Validated empirically both ways — it accepts
         # every legitimate name in the table (0 unexplained rows, down from 1) and still
@@ -166,7 +166,7 @@ class TestNewEntries:
         ("Nc1ccccc1C(=O)O", "anthranilic acid"),
         ("COc1cc(C(=O)O)ccc1O", "vanillic acid"),
         # Cyclic anhydrides -> heterocyclic-pseudoketone dione PINs (D-FOLLOWON
-        # item 6, P-65.7.7.1 method 1): retargeted from the non-PIN 'maleic/phthalic
+        # item 6, method 1): retargeted from the non-PIN 'maleic/phthalic
         # anhydride' to the preferred dione names.
         ("O=C1C=CC(=O)O1", "furan-2,5-dione"),
         ("O=C1OC(=O)c2ccccc21", "2-benzofuran-1,3-dione"),
@@ -213,7 +213,7 @@ class TestNewEntries:
         ("O=C(O)c1ccco1", "furan-2-carboxylic acid"),
         # (Wave-2 completion) c1ccc(-c2ccncc2)nc1 was REMOVED: that canonical
         # SMILES is 2,4'-bipyridine, wrongly keyed to "2,2'-bipyridine" —
-        # ring_assemblies now names all bipyridines systematically (P-28.2.1).
+        # ring_assemblies now names all bipyridines systematically.
         ("Oc1cc(O)cc(O)c1", "phloroglucinol"),
         ("Oc1ccc2c(c1)OCO2", "sesamol"),
         ("O=Cc1ccc2c(c1)OCO2", "piperonal"),
@@ -237,19 +237,19 @@ class TestNewEntries:
         # Verify via get_retained_name function
         # D-FOLLOWON item 2: 'isophthalic acid' (O=C(O)c1cccc(C(=O)O)c1) de-headlined
         # (pin:false) — PIN is the systematic ring di-acid benzene-1,3-dicarboxylic acid
-        # (P-65.1.1), so get_retained_name -> None (stays in the RAW retained_names alias;
+        #, so get_retained_name -> None (stays in the RAW retained_names alias;
         # see test_new_entry_exists line 149). Parallel to coumarin/putrescine below.
-        # IH-01f: 'coumarin' (O=c1ccc2ccccc2o1) de-headlined (pin:false) — PIN is
-        # 2H-1-benzopyran-2-one (P-19(d)), so get_retained_name -> None (stays in the
+        #: 'coumarin' (O=c1ccc2ccccc2o1) de-headlined (pin:false) — PIN is
+        # 2H-1-benzopyran-2-one (d)), so get_retained_name -> None (stays in the
         # RAW retained_names alias; see test_new_entry_exists). Parallel to putrescine.
-        # F-T9/DD6 RET-01: 'putrescine' (NCCCCN) is general-only — denied from the
+        # F-T9/DD6: 'putrescine' (NCCCCN) is general-only — denied from the
         # gated headline path (PIN butane-1,4-diamine), so get_retained_name -> None.
         # (It stays in the RAW retained_names.RETAINED_NAMES alias; see test_new_entry_exists.)
         ("Nc1ncnc2[nH]cnc12", "adenine"),
         ("c1ccc(Cc2ccccc2)cc1", "diphenylmethane"),
     ])
     def test_get_retained_name_function(self, smiles, expected_name):
-        """get_retained_name() must return correct name for new entries."""
+        """get_retained_name must return correct name for new entries."""
         canonical = Chem.CanonSmiles(smiles)
         result = get_retained_name(canonical)
         assert result == expected_name, (

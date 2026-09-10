@@ -2,18 +2,18 @@
 End-to-end tests for a phase: Radicals, Ions, Salts.
 
 Tests verify all a phase requirements:
-- ION-01: Anion naming (carboxylate, alkoxide, phenolate, aminide, carbanion)
-- ION-02: Cation naming (aminium, ylium, diazonium, quaternary ammonium)
-- RAD-01: Radical naming (monovalent -yl, divalent -ylidene, trivalent -ylidyne)
-- ZWIT-01: Zwitterion naming (amino acid zwitterionic forms)
-- SALT-01: Salt naming (compositional nomenclature)
+-: Anion naming (carboxylate, alkoxide, phenolate, aminide, carbanion)
+-: Cation naming (aminium, ylium, diazonium, quaternary ammonium)
+-: Radical naming (monovalent -yl, divalent -ylidene, trivalent -ylidyne)
+-: Zwitterion naming (amino acid zwitterionic forms)
+-: Salt naming (compositional nomenclature)
 """
 import pytest
 from orthonym.namer import name_compound
 
 
 # =============================================================================
-# ION-01: Anion Naming
+#: Anion Naming
 # =============================================================================
 
 class TestION01CarboxylateAnions:
@@ -111,14 +111,14 @@ class TestION01CarbanionAnions:
 
 
 # =============================================================================
-# ION-02: Cation Naming
+#: Cation Naming
 # =============================================================================
 
 class TestION02AminiumCations:
     """Test aminium cation naming (R-NH3+, R4N+)."""
 
     @pytest.mark.parametrize("smiles,expected", [
-        ('[NH4+]', 'azanium'),  # P-73.1.1.2 PIN (was 'ammonium', Table-7.3 retained)
+        ('[NH4+]', 'azanium'),  # PIN (was 'ammonium', Table-7.3 retained)
         ('C[NH3+]', 'methylammonium'),
         ('CC[NH3+]', 'ethylammonium'),
         ('CCC[NH3+]', 'propylammonium'),
@@ -175,33 +175,33 @@ class TestION02OniumCations:
     """Test onium cation naming (oxonium, sulfonium, phosphonium)."""
 
     def test_oxonium(self):
-        """Oxidanium (H3O+): P-73.1.1.2 PIN (was 'oxonium', Table-7.3 retained)."""
+        """Oxidanium (H3O+): PIN (was 'oxonium', Table-7.3 retained)."""
         result = name_compound('[OH3+]')
         assert result == 'oxidanium', f'Got: {result}'
 
     def test_methyloxonium(self):
-        """Methyloxidanium: P-73.1.1.2 PIN (was 'methyloxonium')."""
+        """Methyloxidanium: PIN (was 'methyloxonium')."""
         result = name_compound('C[OH2+]')
         assert result == 'methyloxidanium', f'Got: {result}'
 
     def test_dimethyloxonium(self):
-        """Dimethyloxidanium: P-73.1.1.2 PIN (was 'dimethyloxonium')."""
+        """Dimethyloxidanium: PIN (was 'dimethyloxonium')."""
         result = name_compound('C[OH+]C')
         assert result == 'dimethyloxidanium', f'Got: {result}'
 
     def test_phosphonium(self):
-        """Phosphanium (PH4+): P-73.1.1.2 PIN (was 'phosphonium')."""
+        """Phosphanium (PH4+): PIN (was 'phosphonium')."""
         result = name_compound('[PH4+]')
         assert result == 'phosphanium', f'Got: {result}'
 
     def test_trimethylsulfonium(self):
-        """Trimethylsulfanium: P-73.1.1.2 PIN (was 'trimethylsulfonium')."""
+        """Trimethylsulfanium: PIN (was 'trimethylsulfonium')."""
         result = name_compound('C[S+](C)C')
         assert result == 'trimethylsulfanium', f'Got: {result}'
 
 
 # =============================================================================
-# RAD-01: Radical Naming
+#: Radical Naming
 # =============================================================================
 
 class TestRAD01MonovalentRadicals:
@@ -283,7 +283,7 @@ class TestRAD01OxylRadicals:
 
 
 # =============================================================================
-# ZWIT-01: Zwitterion Naming
+#: Zwitterion Naming
 # =============================================================================
 
 class TestZWIT01AminoAcidZwitterions:
@@ -315,7 +315,7 @@ class TestZWIT01AminoAcidZwitterions:
 
 
 # =============================================================================
-# SALT-01: Salt Naming (Compositional Nomenclature)
+#: Salt Naming (Compositional Nomenclature)
 # =============================================================================
 
 class TestSALT01SimpleOrganicSalts:
@@ -408,8 +408,8 @@ class TestSALT01TransitionMetalSalts:
     @pytest.mark.skip(reason="Cu+2 misdetected as radical in species_type - known limitation")
     def test_copper_ii_acetate(self):
         """Copper(II) acetate - KNOWN LIMITATION: Cu+2 species detection issue."""
-        # Note: name_salt() works correctly when called directly
-        # Issue is in detect_species_type() for Cu+2
+        # Note: name_salt works correctly when called directly
+        # Issue is in detect_species_type for Cu+2
         result = name_compound('[Cu+2].[O-]C(C)=O.[O-]C(C)=O')
         assert 'copper' in result.lower(), f'Got: {result}'
         assert 'acetate' in result, f'Got: {result}'
@@ -520,7 +520,7 @@ class TestEdgeCases:
         """Single ion (not salt) naming."""
         # Single cation only
         result = name_compound('[NH4+]')
-        assert result == 'azanium', f'Got: {result}'  # P-73.1.1.2 PIN (was 'ammonium')
+        assert result == 'azanium', f'Got: {result}'  # PIN (was 'ammonium')
         # Not 'azanium something' - just the cation
 
     def test_multiple_charges_same_atom(self):
@@ -554,7 +554,7 @@ class TestRetainedNamesConsistency:
         assert result == 'formate', f'Got: {result}'
 
     def test_ammonium_retained(self):
-        """NH4+ PIN is 'azanium' (P-73.1.1.2, the Blue Book; was 'ammonium')."""
+        """NH4+ PIN is 'azanium', the Blue Book; was 'ammonium')."""
         result = name_compound('[NH4+]')
         assert result == 'azanium', f'Got: {result}'
 
@@ -573,59 +573,59 @@ class TestRequirementsVerification:
     Explicit verification that each a phase requirement is met.
 
     Requirements:
-    - ION-01: Anion naming for carboxylate, alkoxide, phenolate, carbanion
-    - ION-02: Cation naming for aminium, ylium types
-    - RAD-01: Radical naming for monovalent, divalent, trivalent
-    - ZWIT-01: Zwitterion naming for amino acid zwitterions
-    - SALT-01: Compositional nomenclature for salts
+    -: Anion naming for carboxylate, alkoxide, phenolate, carbanion
+    -: Cation naming for aminium, ylium types
+    -: Radical naming for monovalent, divalent, trivalent
+    -: Zwitterion naming for amino acid zwitterions
+    -: Compositional nomenclature for salts
     """
 
     def test_ion01_carboxylate(self):
-        """ION-01: Carboxylate anions work."""
+        """: Carboxylate anions work."""
         assert name_compound('CC(=O)[O-]') == 'acetate'
 
     def test_ion01_alkoxide(self):
-        """ION-01: Alkoxide anions work."""
+        """: Alkoxide anions work."""
         assert name_compound('C[O-]') == 'methoxide'
 
     def test_ion01_phenolate(self):
-        """ION-01: Phenolate anions work."""
+        """: Phenolate anions work."""
         result = name_compound('[O-]c1ccccc1')
         assert 'phen' in result.lower() and ('olate' in result or 'oxide' in result)
 
     def test_ion01_carbanion(self):
-        """ION-01: Carbanions work."""
+        """: Carbanions work."""
         assert name_compound('[CH3-]') == 'methanide'
 
     def test_ion02_aminium(self):
-        """ION-02: Aminium cations work."""
+        """: Aminium cations work."""
         assert name_compound('[NH4+]') == 'ammonium'
         assert name_compound('C[NH3+]') == 'methylammonium'
 
     def test_ion02_ylium(self):
-        """ION-02: Ylium cations work."""
+        """: Ylium cations work."""
         assert name_compound('[CH3+]') == 'methylium'
 
     def test_rad01_monovalent(self):
-        """RAD-01: Monovalent radicals work."""
+        """: Monovalent radicals work."""
         assert name_compound('[CH3]') == 'methyl'
         assert name_compound('C[CH2]') == 'ethyl'
 
     def test_rad01_divalent(self):
-        """RAD-01: Divalent radicals work."""
+        """: Divalent radicals work."""
         assert name_compound('[CH2]') == 'methylidene'
 
     def test_rad01_trivalent(self):
-        """RAD-01: Trivalent radicals work."""
+        """: Trivalent radicals work."""
         assert name_compound('[CH]') == 'methylidyne'
 
     def test_zwit01_zwitterion(self):
-        """ZWIT-01: Zwitterion naming works."""
+        """: Zwitterion naming works."""
         result = name_compound('[NH3+]CC([O-])=O')
         assert 'azaniumyl' in result.lower() or 'glycine' in result.lower()
 
     def test_salt01_compositional(self):
-        """SALT-01: Salt naming uses compositional format."""
+        """: Salt naming uses compositional format."""
         result = name_compound('[Na+].[O-]C(C)=O')
         assert result == 'sodium acetate'
         # Check format: cation + space + anion

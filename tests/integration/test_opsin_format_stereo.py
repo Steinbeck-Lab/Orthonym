@@ -7,7 +7,7 @@ names against OPSIN 2.9.0 with and without stereo descriptors.
 
 Results Summary:
 - 49 stereo_fixable compounds investigated
-- 0 fixable via format change (our stereo format is IUPAC P-93.1 correct)
+- 0 fixable via format change (our stereo format is IUPAC correct)
 - 49 classified as OPSIN parser limitations
 - Root causes: OPSIN has limited support for multi-center stereo
   descriptors, pseudoasymmetric r/s codes, and stereo on retained-name
@@ -15,7 +15,7 @@ Results Summary:
 
 OPSIN Limitation Categories:
 1. Pseudoasymmetric r/s (3 compounds): OPSIN does not support lowercase
-   r/s descriptors per IUPAC P-92.1.4.2.
+   r/s descriptors per IUPAC.
 2. Multi-center stereo on retained names (7 compounds): OPSIN cannot
    parse stereo descriptors on chromane, gonan, stigmasta etc.
 3. Multi-center stereo 2-3 centers (11 compounds): OPSIN fails on many
@@ -25,7 +25,7 @@ OPSIN Limitation Categories:
 5. Stereo on specific name patterns (11 compounds): OPSIN fails on
    stereo with ester names, VB parents, sugar-prefixed names, etc.
 
-All names are IUPAC 2013 P-93.1 correct. The stereo descriptor format
+All names are IUPAC 2013 correct. The stereo descriptor format
 "(2R,3S)-" is the standard IUPAC format and must not be changed to
 accommodate OPSIN parser limitations.
 """
@@ -101,7 +101,7 @@ def strip_stereo(name: str) -> str:
 @pytest.mark.skipif(not CAN_RUN, reason=SKIP_REASON)
 @pytest.mark.integration
 class TestStereoFormatPseudoasymmetric:
-    """OPSIN limitation: lowercase r/s (pseudoasymmetric, IUPAC P-92.1.4.2)
+    """OPSIN limitation: lowercase r/s (pseudoasymmetric, IUPAC
     are not supported by OPSIN's parser.
 
     These are IUPAC-correct descriptors that OPSIN cannot parse.
@@ -168,7 +168,7 @@ class TestStereoFormatRetainedNames:
     (chromane, gonan, stigmasta, etc.) is not supported.
 
     Verified: single-center stereo works on some retained names in OPSIN,
-    but multi-center always fails. Our format is IUPAC P-93.1 correct.
+    but multi-center always fails. Our format is IUPAC correct.
     """
 
     @pytest.mark.xfail(reason="OPSIN limitation: multi-center stereo on chromane")
@@ -509,14 +509,14 @@ class TestStereoFormatAllCompounds:
 
 @pytest.mark.integration
 class TestStereoFormatCorrectness:
-    """Verify that stereo format is IUPAC P-93.1 compliant.
+    """Verify that stereo format is IUPAC compliant.
 
     These tests do NOT require OPSIN -- they verify our stereo descriptor
     format is structurally correct regardless of OPSIN compatibility.
     """
 
     def test_stereo_prefix_format(self):
-        """Stereo descriptors must be in '(NX,...)-' format per P-93.1."""
+        """Stereo descriptors must be in '(NX,...)-' format per."""
         from orthonym.rules.stereochemistry import format_stereodescriptor_string
 
         assert format_stereodescriptor_string([]) == ""

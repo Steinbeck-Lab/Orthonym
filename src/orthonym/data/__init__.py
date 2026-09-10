@@ -77,10 +77,10 @@ _COMPLETE_NAME_ENDINGS = (
     "thiin", "oxathiin", "dithiin",
     # Specific complete retained names that don't fit patterns
     "urea", "thiourea",
-    # Phase 150 RESEARCH section 4.2: complete-form endings produced by
+    # a phase RESEARCH section 4.2: complete-form endings produced by
     # _STEM_TO_COMPLETE_SUFFIX in scripts/import_opsin_xml.py
     "ocene", "hrene",
-    # Phase 150 Plan 02 deviation (Signal 1 extension per CONTEXT D-02
+    # a phase Plan 02 deviation (Signal 1 extension per internal notes
     # "Extended with additional complete-form endings discovered during
     # round-trip validation"): additional IUPAC retained-name endings
     # surfaced by the validator's pass_smiles set. Each entry below
@@ -88,20 +88,20 @@ _COMPLETE_NAME_ENDINGS = (
     # (Signal 3) and is therefore an empirically-verified complete-form
     # retained name. The (S1 OR S2) AND S3 promotion rule still applies;
     # extending S1 here is a refinement, not a relaxation.
-    "illin",     # vanillin, isovanillin, homovanillin, o-vanillin family (P-66.6.3 retained)
+    "illin",     # vanillin, isovanillin, homovanillin, o-vanillin family retained)
     "genin",     # saligenin, naringenin, apigenin, rhapontigenin (flavonoid retained)
-    "pterin",    # pterin, methanopterin, dihydropterin, tetrahydropterin (P-29 natural product)
+    "pterin",    # pterin, methanopterin, dihydropterin, tetrahydropterin natural product)
     # NOTE: 'oform' / 'fluoroform' / 'iodoform' / 'bromoform' deliberately NOT
     # added — `chloroform` is already in HC (HC line ~), and adding the OPSIN
     # entries for FC(F)F / IC(I)I / BrC(Br)Br causes the substituent renderer
     # to emit `(fluoroform-yl)` instead of `(trifluoromethyl)` for compounds
-    # like FC(F)CC. Phase 150 Plan 02 leaves these to systematic naming;
-    # Phase 154 substituent-pipeline work owns the trihalomethane substituent
-    # form. CONTEXT D-12 (out-of-scope guard for substituent pipeline).
+    # like FC(F)CC. a phase Plan 02 leaves these to systematic naming;
+    # a phase substituent-pipeline work owns the trihalomethane substituent
+    # form. internal notes (out-of-scope guard for substituent pipeline).
     # NOTE: 'thranil' / 'anthranil' deliberately NOT added — anthranil is OPSIN
-    # data for c1ccc2nocc2c1, which Phase 149 D-11 byte-identical lock requires
+    # data for c1ccc2nocc2c1, which a phase byte-identical lock requires
     # to render as '1,2-benzisoxazole'. Adding the ending would violate the lock.
-    "phthalid",  # phthalid, isophthalid (P-25.4 retained lactone)
+    "phthalid",  # phthalid, isophthalid retained lactone)
 )
 
 
@@ -127,15 +127,15 @@ def _is_complete_name(name: str) -> bool:
     return any(name_lower.endswith(ending) for ending in _COMPLETE_NAME_ENDINGS)
 
 
-# Phase 150 D-06: load IUPAC 2013 PIN allow-list (single source of truth).
+# a phase: load IUPAC 2013 PIN allow-list (single source of truth).
 # Single canonical store: src/orthonym/data/iupac_2013_pin_list.json.
 # Replaces the previous hard-coded _OPSIN_NON_PIN_EXCLUSIONS frozenset
-# (CD-02 promotion to JSON allow-list with citation per entry).
+# (promotion to JSON allow-list with citation per entry).
 import json
 from pathlib import Path
 
 _PIN_LIST_PATH = Path(__file__).parent / "iupac_2013_pin_list.json"
-# Phase 150 REVIEW WR-06: standardise on a broad except clause for both
+# a phase REVIEW: standardise on a broad except clause for both
 # JSON loaders. Previously the PIN list loader caught only
 # FileNotFoundError, while the round-trip cache loader caught
 # (json.JSONDecodeError, KeyError) -- same JSON, two different failure
@@ -143,7 +143,7 @@ _PIN_LIST_PATH = Path(__file__).parent / "iupac_2013_pin_list.json"
 # frozenset-of-non-hashables was uncaught in either path). Standardise
 # on (FileNotFoundError, json.JSONDecodeError, KeyError, TypeError) so
 # any malformed file degrades gracefully rather than crashing import.
-# Source: 150-REVIEW.md WR-06.
+# Source: internal notes.
 # Task E: the loader moved to data/pin_policy.py so the amino-acid,
 # natural-product and trivial-acid surfaces read the SAME adjudicated sets
 # instead of not reading them at all. Values are unchanged; the try/except
@@ -158,7 +158,7 @@ from .pin_policy import (
     PIN_DENY_HC as _PIN_DENY_HC,
 )
 
-# Phase 150 D-04: load round-trip cache (Plan 02 produces this)
+# a phase: load round-trip cache (Plan 02 produces this)
 _ROUNDTRIP_CACHE_PATH = (
     Path(__file__).parent / "opsin_imports" / "_phase150_validation.json"
 )
@@ -181,7 +181,7 @@ else:
 
 
 def _is_promotable(smiles: str, name: str) -> bool:
-    """3-signal AND gate per Phase 150 CONTEXT D-02 - pure function.
+    """3-signal AND gate per a phase internal notes - pure function.
 
     Signal 1: _is_complete_name heuristic.
     Signal 2: data/iupac_2013_pin_list.json allow-list (PIN authority).
@@ -191,8 +191,8 @@ def _is_promotable(smiles: str, name: str) -> bool:
     Special case: explicit DENY in Signal 2 always REJECTS (overrides S1, S3).
     Provisional mode (Plan 01 before validator runs): (S1 OR S2) only.
 
-    Source: 150-CONTEXT.md D-02 + D-06.
-    Source: 150-RESEARCH.md section 4.1.
+    Source: 150-internal notes +.
+    Source: internal notes section 4.1.
     """
     name_lower = name.lower().strip()
     if name_lower in _PIN_DENY:
@@ -205,7 +205,7 @@ def _is_promotable(smiles: str, name: str) -> bool:
     return (s1 or s2) and s3
 
 
-# Phase 150 CD-02: _OPSIN_NON_PIN_EXCLUSIONS DERIVED from JSON allow-list
+# a phase: _OPSIN_NON_PIN_EXCLUSIONS DERIVED from JSON allow-list
 # (single source of truth). Preserved as frozenset alias for backward-compat
 # with downstream readers.
 _OPSIN_NON_PIN_EXCLUSIONS = _PIN_DENY
@@ -227,19 +227,19 @@ _OPSIN_NON_PIN_EXCLUSIONS = _PIN_DENY
 # gated behind ORTHONYM_GOVERN_OPSIN_SIMPLE_GROUPS=1.
 #
 # MEASURED BLAST RADIUS (why it ships OFF).
-#   * Withdraws 272 headline keys: ALL_RETAINED_NAMES 867 -> 595, with all 272
-#     demoted to --trivial (GENERAL_RETAINED_NAMES 117 -> 403), not deleted.
-#   * benchmarks/pubchem_2000.csv, exact whole-molecule hits: 0 of 2000. No
-#     molecule in that corpus IS one of the withdrawn entries.
-#   * A/B naming run, 300-molecule random sample (seed 1234) of the same corpus:
-#     1 of 300 emitted names changed (0.33%), 0 became "unknown".
+# * Withdraws 272 headline keys: ALL_RETAINED_NAMES 867 -> 595, with all 272
+# demoted to --trivial (GENERAL_RETAINED_NAMES 117 -> 403), not deleted.
+# * benchmarks/pubchem_2000.csv, exact whole-molecule hits: 0 of 2000. No
+# molecule in that corpus IS one of the withdrawn entries.
+# * A/B naming run, 300-molecule random sample (seed 1234) of the same corpus:
+# 1 of 300 emitted names changed (0.33%), 0 became "unknown".
 #
 # The blast radius is therefore SMALL -- but the single change is a REGRESSION,
 # which is the actual reason this is off:
-#     cid 5313963, withdrawing the trivial "choline"
-#       OFF: choline 3-[(hexadec-1-en-1-yl)oxy]1-phosphonooxypropan-2-yl oleate
-#       ON : 3-[(hexadec-1-en-1-yl)oxy]propane-1,2-diyl oleate ethyl phosphatium
-#     The ON name silently loses the trimethylammonium group entirely.
+# cid 5313963, withdrawing the trivial "choline"
+# OFF: choline 3-[(hexadec-1-en-1-yl)oxy]1-phosphonooxypropan-2-yl oleate
+# ON: 3-[(hexadec-1-en-1-yl)oxy]propane-1,2-diyl oleate ethyl phosphatium
+# The ON name silently loses the trimethylammonium group entirely.
 #
 # That is the same failure mode the PA1 R2/R3 tranche measured 8 times over:
 # withdrawing a trivial name only helps when the systematic engine derives the
@@ -279,7 +279,7 @@ def _governed_out(smiles: str, name: str) -> bool:
     return name.lower().strip() not in _PIN_ALLOW
 
 
-# Phase 150 D-02: REFACTORED _OPSIN_NAMES filter (single-signal -> 3-signal AND).
+# a phase: REFACTORED _OPSIN_NAMES filter (single-signal -> 3-signal AND).
 _OPSIN_NAMES: Dict[str, str] = {
     smi: name for smi, name in _OPSIN_NAMES_RAW.items()
     if _is_promotable(smi, name) and not _governed_out(smi, name)
@@ -293,12 +293,12 @@ if _stem_count > 0:
         len(_OPSIN_NAMES), _stem_count, _PROVISIONAL_MODE
     )
 
-# Merge: OPSIN first, then hand-curated overwrites (D-11: hand-curated wins)
-# Phase 167 HYG-03: gate the hand-curated dict against _PIN_DENY_HC (the unified
+# Merge: OPSIN first, then hand-curated overwrites (: hand-curated wins)
+# a phase: gate the hand-curated dict against _PIN_DENY_HC (the unified
 # deny set, hc_override-exempt) BEFORE the merge — eliminating the two-path
 # asymmetry where HC was merged RAW while OPSIN imports passed _is_promotable.
 # This is DENY-based exclusion, NOT the full (S1 OR S2) AND S3 promotion gate:
-# the Phase 167 A1 audit proved full-gate routing of the curated dict drops 217
+# the a phase A1 audit proved full-gate routing of the curated dict drops 217
 # genuine names whose canonical SMILES are absent from the OPSIN round-trip cache
 # (Signal 3). _OPSIN_NAMES already applied _is_promotable (deny included); this
 # extends the same explicit-DENY enforcement to the hand-curated side.
@@ -308,7 +308,7 @@ _HAND_CURATED_GATED: Dict[str, str] = {
 }
 ALL_RETAINED_NAMES: Dict[str, str] = {**_OPSIN_NAMES, **_HAND_CURATED_GATED}
 
-# Backward-compatible alias (D-12)
+# Backward-compatible alias
 RETAINED_NAMES = ALL_RETAINED_NAMES
 
 
@@ -318,13 +318,13 @@ RETAINED_NAMES = ALL_RETAINED_NAMES
 # ``Orthonym(trivial_fallback=True)`` / CLI ``--trivial`` path falls back to it
 # by canonical SMILES ONLY when the systematic pipeline produced no derivable
 # PIN. Two contributing sources, mirroring the two deny surfaces:
-#   (a) hand-curated entries filtered out by ``_PIN_DENY_HC`` (e.g. glycerol,
-#       allyl alcohol, chloroform, catechol, nicotinic acid), and
-#   (b) OPSIN-import candidates blocked SOLELY by ``_PIN_DENY`` membership —
-#       i.e. names that WOULD have promoted (S1 or S2, and S3 in non-provisional
-#       mode) but for the explicit deny (e.g. dihydroxalate, dihydrotartrate,
-#       glyoxal, phosgene). Candidates that fail promotion for OTHER reasons
-#       (stem heuristic, absent round-trip) are NOT re-admitted here.
+# (a) hand-curated entries filtered out by ``_PIN_DENY_HC`` (e.g. glycerol,
+# allyl alcohol, chloroform, catechol, nicotinic acid), and
+# (b) OPSIN-import candidates blocked SOLELY by ``_PIN_DENY`` membership —
+# i.e. names that WOULD have promoted (S1 or S2, and S3 in non-provisional
+# mode) but for the explicit deny (e.g. dihydroxalate, dihydrotartrate,
+# glyoxal, phosgene). Candidates that fail promotion for OTHER reasons
+# (stem heuristic, absent round-trip) are NOT re-admitted here.
 # Hand-curated wins key collisions (same precedence as ALL_RETAINED_NAMES).
 def _opsin_blocked_solely_by_deny(smiles: str, name: str) -> bool:
     """True iff the OPSIN candidate would have promoted but for the deny gate.
@@ -385,12 +385,12 @@ def has_retained_name(canonical_smiles: str) -> bool:
 def register_retained_name(canonical_smiles: str, name: str):
     """Register a retained name at runtime (for testing/dynamic use).
 
-    Phase 150 REVIEW WR-04: this is the CANONICAL runtime registration
+    a phase REVIEW: this is the CANONICAL runtime registration
     API. The legacy ``data.retained_names.add_retained_name`` is a
-    deprecated alias that now delegates here (per CR-01 fix) so both
+    deprecated alias that now delegates here (per fix) so both
     APIs keep ``ALL_RETAINED_NAMES`` and the HC dict in sync.
 
-    Source: 150-REVIEW.md WR-04 + CR-01.
+    Source: internal notes +.
     """
     ALL_RETAINED_NAMES[canonical_smiles] = name
 

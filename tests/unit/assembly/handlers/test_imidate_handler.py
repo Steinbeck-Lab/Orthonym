@@ -4,21 +4,21 @@ Asserts handlers/imidate.py:
 - _is_imidate predicate (predicate-pure per)
 - name_imidate branch coverage (linear alkyl, aromatic, acyclic-only)
 - INNER_DISPATCH registration at priority 2900
-- side_effect_inventory == () invariant
+- side_effect_inventory ==  invariant
 
-Test pyramid per CONTEXT + RESEARCH §8.3:
+Test pyramid per internal notes + RESEARCH:
 - Section A: predicate purity tests (5)
 - Section B: name_imidate branch coverage (6 fixtures FRN-..06)
 - Section C: INNER_DISPATCH integration (4)
 - Section D: _collect_subgraph BFS helper (2)
 - Section E: edge cases (3)
 
-Total: 20 tests (CONTEXT floor 15).
+Total: 20 tests (internal notes floor 15).
 
 References:
 - src/orthonym/assembly/handlers/imidate.py
-- 163-AUDIT-FRN.md § 6 handler spec
-- 163-AUDIT-FRN.md § 7 INNER_DISPATCH priority 2900 LOCK
+- internal notes-FRN.md handler spec
+- internal notes-FRN.md INNER_DISPATCH priority 2900 LOCK
 """
 import pytest
 from rdkit import Chem
@@ -81,14 +81,14 @@ class TestIsImidatePredicate:
 
 @pytest.mark.unit
 class TestNameImidateBranchCoverage:
-    """name_imidate per-fixture branch coverage from AUDIT § 6 (6 tests).
+    """name_imidate per-fixture branch coverage from AUDIT (6 tests).
 
     Each test runs the full orthonym.name_compound pipeline end-to-end
-    and asserts the canonical PIN per AUDIT § 6.5 fixture row.
+    and asserts the canonical PIN per AUDIT fixture row.
     """
 
     def _run(self, smiles, expected_pin):
-        """Helper: run Orthonym().name() end-to-end + assert PIN."""
+        """Helper: run Orthonym.name end-to-end + assert PIN."""
         from orthonym import name_compound
         actual = name_compound(smiles, style="pin")
         assert actual == expected_pin, (
@@ -100,7 +100,7 @@ class TestNameImidateBranchCoverage:
         self._run("CCC(=N)OC", "methyl propanimidate")
 
     def test_FRN_D_02_methyl_acetimidate(self):
-        """FRN-: CC(=N)OC -> methyl ethanimidate (P-65.6.3.3.7.1 systematic PIN;
+        """FRN-: CC(=N)OC -> methyl ethanimidate systematic PIN;
         acetimidate is general-only)."""
         self._run("CC(=N)OC", "methyl ethanimidate")
 
@@ -117,7 +117,7 @@ class TestNameImidateBranchCoverage:
         self._run("CCCCC(=N)OC", "methyl pentanimidate")
 
     def test_FRN_D_06_ethyl_acetimidate(self):
-        """FRN-: CC(=N)OCC -> ethyl ethanimidate (P-65.6.3.3.7.1 systematic PIN)."""
+        """FRN-: CC(=N)OCC -> ethyl ethanimidate systematic PIN)."""
         self._run("CC(=N)OCC", "ethyl ethanimidate")
 
 
@@ -138,7 +138,7 @@ class TestImidateInnerDispatchIntegration:
     def test_imidate_side_effect_inventory_is_empty_tuple(self):
         """ hard invariant (a phase + 160 + 161 inheritance).
 
-        side_effect_inventory MUST be () — the empty tuple — so the
+        side_effect_inventory MUST be  — the empty tuple — so the
         inner-dispatch cascade can prove every handler is reentrant.
         """
         from orthonym.assembly.inner_dispatch import INNER_DISPATCH_TABLE
@@ -178,7 +178,7 @@ class TestImidateEdgeCases:
     """Edge cases per RESEARCH §5.4 (3 tests)."""
 
     def test_name_imidate_returns_none_when_no_iminoester_match(self):
-        """No iminoester match -> None (gate-fail per ADR-19-04 contract)."""
+        """No iminoester match -> None (gate-fail per -04 contract)."""
         features = _make_mock_features(functional_groups={})
         result = name_imidate(features, mol=None)
         assert result is None
@@ -193,10 +193,10 @@ class TestImidateEdgeCases:
         assert result is None
 
     def test_cyclic_imidate_out_of_baseline_scope(self):
-        """RESEARCH §5.4: cyclic imidates deferred to a phase.1.
+        """RESEARCH: cyclic imidates deferred to a phase.
 
         SMARTS [CX3](=[NX2H1])[OX2][#6] should NOT match cyclic structures
-        because the iminoester baseline is acyclic-only per AUDIT DECISION § 2.4.
+        because the iminoester baseline is acyclic-only per AUDIT DECISION
         """
         from orthonym.perception.functional_groups import (
             FUNCTIONAL_GROUP_SMARTS,
@@ -206,7 +206,7 @@ class TestImidateEdgeCases:
             pytest.skip("cyclic imidate SMILES did not parse")
         patt = Chem.MolFromSmarts(FUNCTIONAL_GROUP_SMARTS['iminoester'])
         # The SMARTS may technically match if =N is on a ring atom — this is
-        # an empirical check that the AUDIT § 2.4 acyclic-only contract is
+        # an empirical check that the AUDIT acyclic-only contract is
         # honored by the SMARTS at run-time.
         matches = mol.GetSubstructMatches(patt)
         # Document the empirical result: cyclic imidates in ring contexts
@@ -219,17 +219,17 @@ class TestImidateEdgeCases:
 
 # =============================================================================
 # CR-fix coverage (a phase post-merge): branched/substituted iminoesters.
-# These tests would have caught CR-01..CR-04 in code review:
-# CR-01: _is_imidate failing to consult principal_group on mixed-PG inputs
-# CR-02: _name_alkyl_fragment dropping branching/substitution on R' (R'-O-)
-# CR-03: _name_chain_with_imidate_suffix dropping branching/substitution on R
+# These tests would have caught.. in code review:
+#: _is_imidate failing to consult principal_group on mixed-PG inputs
+#: _name_alkyl_fragment dropping branching/substitution on R' (R'-O-)
+#: _name_chain_with_imidate_suffix dropping branching/substitution on R
 # Aligned with.claude/skills/fix-methodology.md "root cause, not band-aid".
 # =============================================================================
 
 
 @pytest.mark.unit
 class TestImidateBranchedAndSubstituted:
-    """CR-02/03 fixes: branched + substituted iminoesters render correctly."""
+    """/03 fixes: branched + substituted iminoesters render correctly."""
 
     def _run(self, smiles, expected_pin):
         from orthonym import name_compound
@@ -239,8 +239,8 @@ class TestImidateBranchedAndSubstituted:
         )
 
     def test_isopropyl_acetimidate(self):
-        """CR-02: branched alkyl side -> propan-2-yl (PIN) + ethanimidate stem
-        (P-65.6.3.3.7.1 systematic + P-29 PIN alkyl)."""
+        """: branched alkyl side -> propan-2-yl (PIN) + ethanimidate stem
+         systematic + PIN alkyl)."""
         self._run("CC(=N)OC(C)C", "propan-2-yl ethanimidate")
 
     def test_alpha_methyl_propanimidate(self):
@@ -248,7 +248,7 @@ class TestImidateBranchedAndSubstituted:
         self._run("CC(C)C(=N)OC", "methyl 2-methylpropanimidate")
 
     def test_pivalimidate_stem(self):
-        """CR-03: tert-butyl-branched stem -> 2,2-dimethylpropanimidate.
+        """: tert-butyl-branched stem -> 2,2-dimethylpropanimidate.
         Reviewer's specific case: previously rendered as 'methyl pentanimidate'.
         """
         self._run("CC(C)(C)C(=N)OC", "methyl 2,2-dimethylpropanimidate")
@@ -258,14 +258,14 @@ class TestImidateBranchedAndSubstituted:
         self._run("CC(Cl)C(=N)OC", "methyl 2-chloropropanimidate")
 
     def test_benzyl_acetimidate(self):
-        """CR-02: benzyl alkyl side (retained substituent) + ethanimidate stem
-        (P-65.6.3.3.7.1 systematic PIN)."""
+        """: benzyl alkyl side (retained substituent) + ethanimidate stem
+         systematic PIN)."""
         self._run("CC(=N)OCc1ccccc1", "benzyl ethanimidate")
 
 
 @pytest.mark.unit
 class TestImidatePredicateDefersToHigherPG:
-    """CR-01 fix: _is_imidate consults principal_group and defers when a
+    """ fix: _is_imidate consults principal_group and defers when a
     higher-seniority group (acid/ester/amide/...) wins the seniority cascade.
 
     Without the fix the handler claimed dispatch slot 2900 whenever any
@@ -316,7 +316,7 @@ class TestImidatePredicateDefersToHigherPG:
         assert _is_imidate(features) is True
 
     def test_acid_with_imidate_substituent_drops_to_acid_naming(self):
-        """End-to-end CR-01 case from reviewer: acid wins, no silent acid drop.
+        """End-to-end case from reviewer: acid wins, no silent acid drop.
 
         Pre-fix: OC(=O)c1ccc(C(=N)OC)cc1 -> 'methyl octanimidate' (acid lost,
         chain inflated to 8 aromatic carbons). Post-fix: handler defers to
@@ -326,7 +326,7 @@ class TestImidatePredicateDefersToHigherPG:
         actual = name_compound("OC(=O)c1ccc(C(=N)OC)cc1", style="pin")
         # The exact name depends on the acid pipeline; the regression-defining
         # assertion is that the acid is NOT silently dropped (i.e. the name
-        # is NOT the bogus 'methyl octanimidate' from CR-01).
+        # is NOT the bogus 'methyl octanimidate' from).
         assert actual is not None
         assert "octanimidate" not in actual.lower(), (
             f"CR-01 regression: acid silently dropped; got {actual!r}"
@@ -339,7 +339,7 @@ class TestImidatePredicateDefersToHigherPG:
     def test_acid_with_imidate_substituent_names_methoxycarbonimidoyl(self):
         """ imidate producer: the imidate substituent is expressed as the
         IUPAC prefix ``C-methoxycarbonimidoyl`` on the senior benzoic-acid
-        parent. The italic ``C-`` locant is REQUIRED (P-66.1.6.1.2.2, BB 33425:
+        parent. The italic ``C-`` locant is REQUIRED, BB 33425:
         "to prevent possible ambiguity with N-substitution"); the parent form
         ``4-(C-hydroxycarbonimidoyl)benzoic acid`` is a verbatim (PIN) example
         at BB 30033. RT-verified.
@@ -364,7 +364,7 @@ class TestImidatePredicateDefersToHigherPG:
 class TestChainImidateSplit:
     """ F-imidate-2: a CHAIN-parent imidate ``-C(=NH)-O-R`` (its carbon in the
     acid chain) is named with the SIMPLE prefixes ``imino`` + ``{alkoxy}``, NOT
-    the compound ``carbonimidoyl`` prefix — P-65.1.3.1.2(2), whose verbatim (PIN)
+    the compound ``carbonimidoyl`` prefix — (2), whose verbatim (PIN)
     hydroxy template is ``4-hydroxy-4-iminobutanoic acid`` (BB 30035). Previously
     the imidate decorations were dropped (``butanoic acid``). Fixed by adding an
     ``iminoester -> imino + alkoxy`` row to the group-splitting table (gated by

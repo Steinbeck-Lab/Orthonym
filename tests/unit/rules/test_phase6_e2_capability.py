@@ -10,16 +10,16 @@ independently verified against RDKit before use.
 
 - Task 7 (E2d, attachment locant): a non-terminal free valence on an ether-bearing
   chain (`1,1-dimethoxypropan-2-yl`) used to be numbered as if it were terminal
-  (`1,1-dimethoxypropyl`, a P-29.2 locant-omission bug -- the locant distinguishes
+  (`1,1-dimethoxypropyl`, a locant-omission bug -- the locant distinguishes
   propan-2-yl from propan-1-yl). Fixed in `_name_ether_substituted_chain`: the
   terminal-only restriction is lifted, the backbone is now oriented from whichever
-  end gives the free valence the lowest locant (P-46.1.8, mirroring
+  end gives the free valence the lowest locant, mirroring
   `_located_acyclic_alkyl_name._orient`), and `_ether_chain_locants_omitted` takes
   the real attach locant (forcing citation whenever it is not 1, matching the
   existing sibling licence `_l5_substituent_prefix`'s k>=2 reading).
 - Task 8 (E2b, amide inside a substituent): a secondary/tertiary amide
   `-C(=O)-N(H)(R)-` IN A CHAIN branch used to hard-decline the WHOLE fragment
-  (DROP-09: Pass 2's plain-N branch requires a bare -NH2). New Pass 1e in
+  (: Pass 2's plain-N branch requires a bare -NH2). New Pass 1e in
   `_name_polyfunctional_acyclic_substituent` consumes the amide N + its own R
   branch, leaving the oxo unchanged for Pass 2, and assembles
   '{R}amino'/'[(R)amino]' via the shared `composer._assemble_decorated_amino_prefix`.
@@ -38,16 +38,16 @@ independently verified against RDKit before use.
   guard in `parent_to_prefix` refuses the generic '-amide' transform for any
   name ending 'sulfonamide'/'sulfinamide', so even an UNCOVERED sulfonyl shape
   can never fall back to the wrong 'carbamoyl' spelling.
-- Task 10 (E2a, ring-branch ownership, DROP-24): a substituent whose only
+- Task 10 (E2a, ring-branch ownership,): a substituent whose only
   free-standing structure is a ring reachable through a chalcogen link
   (`-S-Ar`) was declined by the generic ring chokepoint (attach_idx is the S,
-  not a ring atom) and fell through to the fail-closed DROP-24 guard. Fixed by
+  not a ring atom) and fell through to the fail-closed guard. Fixed by
   widening Step 1b's chalcogen-ether handler from `('Se', 'Te')` to include
   plain `'S'` -- `get_sulfanyl_prefix` already recurses the R side through
   `name_substituent_fragment` itself (the SAME trustworthy ring chokepoint this
   function's own Step 1c uses), so a ring-bearing R is now named correctly.
   A second, related bug surfaced and was fixed in the same edit: `parent_chain`
-  is `[]` at one call site (`substituent_enumerator._name_substituent_cascade`
+  is `` at one call site (`substituent_enumerator._name_substituent_cascade`
   Tier 4), which left `get_sulfanyl_prefix`'s "neither side is on the chain"
   same-size tie-break to guess -- and it guessed WRONG for `-S-CH2-C6H5` vs a
   tolyl parent (7 heavy atoms each side, 'benzylsulfanyl' vs the WRONG
@@ -61,17 +61,17 @@ independently verified against RDKit before use.
   the parent's own nitrogen) only ever holds the OTHER two -- the bare imino N
   plus the remaining amino N's own R. The recursive Tier-4 path silently
   DROPPED the nitroso and reported 'methanimidamide' (2 atoms short of the
-  5-atom fragment), which SELF-01's atom-count mismatch already caught (0-wrong
+  5-atom fragment), which 's atom-count mismatch already caught (0-wrong
   held; only breadth was missing). Fixed with two additions: a general 'nitroso'
-  fragment detector (a bare -N=O substituent, P-61.5 -- was previously
+  fragment detector (a bare -N=O substituent, -- was previously
   unsupported inside `name_substituent_fragment` even though the sibling
   `name_substituent` wrapper already had it), and a new carbamimidoyl-N-
   substituent detector (W3-P02-8) that builds 'N-{R}carbamimidoyl' structurally.
-  The full ornithine `.name()` integration is blocked by a SEPARATE,
+  The full ornithine `.name` integration is blocked by a SEPARATE,
   pre-existing "guanidino FG-prefix-loop double-counts a decorated amidine
   branch" bug in `rules/polyfunctional.py` (confirmed pre-existing: the SAME
   duplication appears on a plain dimethylamino-substituted analogue that never
-  reaches any of this batch's new code) -- SELF-01 continues to catch it and
+  reaches any of this batch's new code) -- continues to catch it and
   safely abstain (0-wrong preserved). Documented as a partial per this batch's
   explicit licence.
 
@@ -172,7 +172,7 @@ def test_task8_fragment_level_pantetheine_arm():
 @pytest.mark.opsin_gate
 def test_task8_name_integration_and_rt(namer):
     """CHOKE-POINT-OFF-PATH guard: a witness where the SAME amide-in-substituent
-    shape is reached end-to-end via `.name()` (benzoic acid is senior to the
+    shape is reached end-to-end via `.name` (benzoic acid is senior to the
     amide, so the amide arm MUST be expressed as a chain substituent, exactly
     exercising the new Pass 1e -- unlike pantetheine, where a separate,
     pre-existing composer bug intervenes before this capability's output is
@@ -232,14 +232,14 @@ def test_task9_name_integration_no_carbamoyl_and_rt(namer):
 
 
 # ===========================================================================
-# Task 10 (E2a) -- ring-branch ownership (DROP-24)
+# Task 10 (E2a) -- ring-branch ownership
 # ===========================================================================
 
 def test_task10_fragment_level_ring_branch():
-    """A SOLE-DROP-24 witness (constructed + self-verified, no CHEBI id given
+    """A SOLE- witness (constructed + self-verified, no CHEBI id given
     in the brief for this task): -S-(2,4-dihydroxyphenyl) attached to an
     ethyl chain. Before this fix the ring chokepoint declined (attach_idx is
-    the S, not a ring atom) and the blanket ring-fragment guard (DROP-24)
+    the S, not a ring atom) and the blanket ring-fragment guard
     fired -> None."""
     smi = "CCSc1ccc(O)cc1O"
     mol = Chem.MolFromSmiles(smi)
@@ -254,7 +254,7 @@ def test_task10_fragment_level_ring_branch():
 def test_task10_name_integration_and_rt(namer):
     """The acid is senior to the thioether, forcing the ring-bearing
     sulfanyl arm to be a chain substituent -- exercising ring-branch
-    ownership end-to-end via `.name()`."""
+    ownership end-to-end via `.name`."""
     smi = "OC(=O)CCSc1ccc(O)cc1O"
     assert _key14(smi) == "RWVORULKTLJCIE"
     name = namer.name(smi)
@@ -283,7 +283,7 @@ def test_task11_fragment_level_n_nitrosocarbamimidoyl():
 
 def test_task11_bare_nitroso_fragment():
     """The new general nitroso-fragment detector: a bare -N=O substituent
-    (P-61.5) fed directly to `name_substituent_fragment` (not via the sibling
+     fed directly to `name_substituent_fragment` (not via the sibling
     `name_substituent` wrapper, which already had this -- see
     `assembly/test_nitroso_substituent.py`)."""
     mol = Chem.MolFromSmiles("N=C(NCCC[C@H](N)C(=O)O)NN=O")
@@ -292,7 +292,7 @@ def test_task11_bare_nitroso_fragment():
 
 @pytest.mark.opsin_gate
 def test_task11_ornithine_still_abstains_safely(namer):
-    """0-wrong guard for the real ornithine witness. The full `.name()`
+    """0-wrong guard for the real ornithine witness. The full `.name`
     integration is blocked by a SEPARATE, pre-existing composer bug: the
     'guanidino' FG-prefix loop in `rules/polyfunctional.py` double-counts a
     decorated amidine branch (duplicating 'guanidino' alongside the correct

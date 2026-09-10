@@ -1,8 +1,8 @@
-"""Phase 1 B5 general lever: isolated_naming_session gives a nested naming a
+"""a phase B5 general lever: isolated_naming_session gives a nested naming a
 fresh depth-0 recursion budget, then restores the enclosing session.
 
-Root cause it fixes: the recovery-lane T4 producer (name_t4_complete) is a fresh
-whole-molecule naming, but the lane invokes it mid-name() at session_depth >= 1,
+Root cause it fixes: the recovery-lane producer (name_t4_complete) is a fresh
+whole-molecule naming, but the lane invokes it mid-name at session_depth >= 1,
 so its recursion hits MAX_NAMING_DEPTH prematurely and degrades to an abstention
 (measured: it names 8 in-scope suppressed rows from a clean depth-0 session but
 abstains at depth >= 1).
@@ -15,7 +15,7 @@ pytestmark = pytest.mark.unit
 
 
 def test_isolated_session_zeroes_depth_inside_and_restores_after():
-    # v33 giant-molecule hang fix updated this contract: isolation still zeroes and
+    # giant-molecule hang fix updated this contract: isolation still zeroes and
     # restores the DEPTH budget (session_depth + visited), but the fragment memo
     # CACHE now PERSISTS across the boundary (it is a context-free pure function and
     # is owned by the whole-molecule name scope). Resetting/restoring the cache was
@@ -29,13 +29,13 @@ def test_isolated_session_zeroes_depth_inside_and_restores_after():
             assert fn._session_depth() == 0
             # the live cache is still visible inside (not zeroed)...
             assert fn._fragment_guard.cache == {"parent": "value"}
-            # ...and a name discovered inside is added to that same live cache.
+            #...and a name discovered inside is added to that same live cache.
             fn._fragment_guard.session_depth = 2
             fn._fragment_guard.cache["nested"] = "x"
         # depth budget restored exactly...
         assert fn._fragment_guard.session_depth == 3
         assert fn._fragment_guard.visited == {"SMILES"}
-        # ...but the cache PERSISTS with both entries (memo survives the molecule).
+        #...but the cache PERSISTS with both entries (memo survives the molecule).
         assert fn._fragment_guard.cache == {"parent": "value", "nested": "x"}
     finally:
         fn._fragment_guard.session_depth = 0

@@ -85,7 +85,7 @@ class TestZwitterionLiteral:
     def test_betaine(self):
         """169.6-04: the hardcoded 'betaine' literal was DELETED (it is NOT
         OPSIN-parseable -> the validity gate suppressed it to 'unknown organic
-        compound'). route_charged GUARD 4 now emits the structured P-74.1.3
+        compound'). route_charged GUARD 4 now emits the structured
         (trimethylazaniumyl)acetate, which round-trips in OPSIN to
         C[N+](C)(C)CC(=O)[O-] (RT=1, a strict improvement over RT=0)."""
         result = self.namer.name('C[N+](C)(C)CC([O-])=O')
@@ -213,7 +213,7 @@ class TestIonNamingRegression:
         self.namer = Orthonym()
 
     def test_ammonium(self):
-        # NH4+ PIN is 'azanium' (P-73.1.1.2, the Blue Book; was 'ammonium')
+        # NH4+ PIN is 'azanium', the Blue Book; was 'ammonium')
         assert self.namer.name('[NH4+]') == 'azanium'
 
     def test_acetate(self):

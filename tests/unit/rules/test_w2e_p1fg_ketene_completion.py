@@ -1,7 +1,7 @@
-"""P-64.5 / P-64.2.2.4 ketene completion.
+""" / ketene completion.
 
-BB 29446 (P-64.5(3)): "the group =C=O is named in substitutive
-nomenclature as 'oxomethylidene'". BB 29292 (P-64.2.2.4): derivatives of
+BB 29446 (3)): "the group =C=O is named in substitutive
+nomenclature as 'oxomethylidene'". BB 29292: derivatives of
 ketene "are named by using the principles for naming ketones".
 Scope-decision #4 OPSIN-verified PINs: diphenylethenone,
 cyclohexylidenemethanone.
@@ -30,7 +30,7 @@ class TestKeteneCompletion:
 
     def test_alkyl_ketene_still_declines(self):
         # 2-butylhex-1-en-1-one belongs to the general ketone numbering
-        # path (P-64.2.2.4), NOT this namer — must stay None here.
+        # path, NOT this namer — must stay None here.
         assert name_ketene(Chem.MolFromSmiles("C(CCC)C(=C=O)CCCC")) is None
 
     def test_mixed_aryl_h_declines(self):

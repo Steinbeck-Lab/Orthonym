@@ -2,10 +2,10 @@
 Tests for E/Z stereodescriptors in chain amide naming.
 
 Covers requirements:
-- STER-01: E/Z descriptors preserved with locants in chain amides
-- STER-02: Correct unsaturation markers (-en-, -dien-)
-- STER-03: Multiple E/Z descriptors formatted correctly
-- STER-04: No R/S vs E/Z collision (coexistence)
+-: E/Z descriptors preserved with locants in chain amides
+-: Correct unsaturation markers (-en-, -dien-)
+-: Multiple E/Z descriptors formatted correctly
+-: No R/S vs E/Z collision (coexistence)
 
 Also includes regression guards for ring-attached and saturated amides.
 """
@@ -15,7 +15,7 @@ from orthonym import name_compound
 
 
 class TestAmideEZStereo:
-    """STER-01 + STER-02: E/Z descriptors preserved with locants in chain amides."""
+    """ +: E/Z descriptors preserved with locants in chain amides."""
 
     def test_pent_2_enamide_z(self):
         """CC/C=C\\C(=O)N -> (2Z)-pent-2-enamide"""
@@ -34,7 +34,7 @@ class TestAmideEZStereo:
 
 
 class TestAmideEZWithNSubstitution:
-    """STER-01: E/Z preserved through N-substitution prefix."""
+    """: E/Z preserved through N-substitution prefix."""
 
     def test_n_methyl_oleamide(self):
         """N-methyl oleamide has N-prefix, Z descriptor, and enamide suffix."""
@@ -49,7 +49,7 @@ class TestAmideEZWithNSubstitution:
 
 
 class TestAmideMultipleEZ:
-    """STER-03: Multiple E/Z descriptors formatted correctly."""
+    """: Multiple E/Z descriptors formatted correctly."""
 
     def test_linoleamide_9z_12z(self):
         """Linoleamide has two Z double bonds: (9Z,12Z)-octadeca-9,12-dienamide"""
@@ -58,7 +58,7 @@ class TestAmideMultipleEZ:
 
 
 class TestAmideEZNoCollisionWithRS:
-    """STER-04: R/S and E/Z descriptors can coexist in amide names."""
+    """: R/S and E/Z descriptors can coexist in amide names."""
 
     def test_stereo_amide_with_rs_and_ez(self):
         """Amide with both a stereocenter and E/Z bond should contain both descriptors."""

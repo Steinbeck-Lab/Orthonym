@@ -1,8 +1,8 @@
-"""v29 Phase 1: the recursion-safe name<->graph binding spine.
+""" a phase: the recursion-safe name<->graph binding spine.
 
 WHY this module exists
 ----------------------
-v29 pushes best-effort naming breadth far past the ``general_engine``'s
+ pushes best-effort naming breadth far past the ``general_engine``'s
 flat, chain-shaped emissions, and that is only safe if an emitted name can
 be PROVEN to spell exactly the input graph -- cheaply, in-process, with no
 Java. The existing E1 certificate (``e1_certificate.py``) proves a flat
@@ -18,13 +18,13 @@ The spine closes that hole with one invariant:
     **EXCLUSIVE CLAIM** -- a binding's ``atom_ids`` are the atoms that this
     token *itself* spells, and never include an atom spelled by one of its
     ``children``. Nesting in the name is nesting in the spine, so
-    ``subtree_atoms() == atom_ids | union(child.subtree_atoms())``.
+    ``subtree_atoms == atom_ids | union(child.subtree_atoms)``.
 
 Consequence: a composite token can no longer claim a subgraph it does not
 say. Every atom in the molecule must be claimed by exactly one binding
 *somewhere* in the tree, at the depth whose morpheme actually spells it.
 
-Scope and status (Phase 1)
+Scope and status (a phase)
 --------------------------
 AUDIT-ONLY and PURE. This module is wired into no naming path, gates
 nothing, and changes no emitted name. ``verify_spine`` runs proofs **P1**
@@ -150,7 +150,7 @@ ARITY_UNVERIFIED = "ARITY_UNVERIFIED"
 # P7 -- free-valence morphology vs the real linkage bond order
 FREE_VALENCE_MISMATCH = "FREE_VALENCE_MISMATCH"
 FREE_VALENCE_UNVERIFIED = "FREE_VALENCE_UNVERIFIED"
-# P8 -- atom-indexed stereo completeness/correctness (Phase 0c Task 3)
+# P8 -- atom-indexed stereo completeness/correctness (a phase Task 3)
 STEREO_UNVERIFIED = "STEREO_UNVERIFIED"
 STEREO_DESCRIPTOR_MISSING = "STEREO_DESCRIPTOR_MISSING"
 STEREO_DESCRIPTOR_MISMATCH = "STEREO_DESCRIPTOR_MISMATCH"
@@ -169,7 +169,7 @@ STEREO_PARENT_BLOCK_AMBIGUOUS = "STEREO_PARENT_BLOCK_AMBIGUOUS"
 # established nothing about what the name spells.
 PROOF_UNSUBSTANTIATED = "PROOF_UNSUBSTANTIATED"
 
-# Phase 0c Task 4: the P8 stereo axis and P3's CHARGE_UNVERIFIED, as a named
+# a phase Task 4: the P8 stereo axis and P3's CHARGE_UNVERIFIED, as a named
 # set a caller can force to "error" via ``verify_spine(..., escalate=...)``
 # WITHOUT flipping the global ``mode`` (which also governs P2's bond-linkage
 # inference policy and P5/P6's UNBOUND_MORPHEME/ARITY_UNVERIFIED severity --
@@ -214,9 +214,9 @@ class BindingKind(str, Enum):
 # (the only role a substituent-shaped token can safely be assumed to play)
 # and is recorded, never silently absorbed.
 #
-# v29 Phase 2 T5: ``replacement`` joined the map when the ring producer began
-# emitting one binding per skeletal-replacement morpheme ('oxa', 'aza', ...).
-# Phase 0c Task 2: ``charge`` joined the map when the charge-suffix producer
+# a phase T5: ``replacement`` joined the map when the ring producer began
+# emitting one binding per skeletal-replacement morpheme ('oxa', 'aza',...).
+# a phase Task 2: ``charge`` joined the map when the charge-suffix producer
 # (``general_engine._append_charge_suffix``) began emitting a charge-claim
 # binding -- see ``from_token_bindings`` below for why its ``atom_ids`` route
 # to ``charge_atom_ids`` instead of the ordinary exclusive-claim slot. Only
@@ -278,7 +278,7 @@ class BindingSpine:
     report them in ``stats`` instead of the adapter having to log out of
     band. It defaults to empty for hand-built spines.
 
-    ``stereo_atom_to_locant`` (Phase 0c Task 3) is the atom->locant map the
+    ``stereo_atom_to_locant`` (a phase Task 3) is the atom->locant map the
     PARENT-scope stereodescriptor block (if any) was spelled from -- the SAME
     dict ``general_engine._stereo_prefix`` was called with, threaded here so
     P8 can resolve the block to real atom/bond identity. Empty for every
@@ -304,24 +304,24 @@ class BindingSpine:
         The legacy producers claim a substituent's WHOLE branch subtree
         under a single composed token string, so no nesting can be
         recovered without re-deriving the sub-name: every adapted binding
-        is therefore a root with ``children=()``. That is a faithful
+        is therefore a root with ``children=``. That is a faithful
         widening -- the flat spine proves exactly what the flat E1
         certificate proved, no more -- and it is deliberately NOT an
         attempt to infer structure the legacy binding never recorded.
 
-        Phase 0c Task 2: a ``role='charge'`` legacy binding
+        a phase Task 2: a ``role='charge'`` legacy binding
         (``general_engine.TokenBinding``) carries the charged atom indices in
         its OWN ``charge_atom_ids`` field, not in ``atom_ids`` -- E1
         (``e1_certificate.verify_certificate``) treats every binding's
         ``atom_ids`` uniformly for its double-bind/phantom checks, so putting
         the already-parent-owned charged atom there would manufacture a false
         ``ATOM_DOUBLE_BOUND``. This adapter therefore reads
-        ``getattr(binding, "charge_atom_ids", ())`` for every binding (empty
+        ``getattr(binding, "charge_atom_ids", )`` for every binding (empty
         for the 12 legacy producers that have no such field/value, so their
         behaviour is unchanged) and threads it onto ``SpineBinding``, which
         already has that exact slot.
 
-        Phase 0c Task 3: ``stereo_atom_to_locant`` is NOT carried per-binding
+        a phase Task 3: ``stereo_atom_to_locant`` is NOT carried per-binding
         (unlike ``charge_atom_ids``) -- ``general_engine.GeneralEngineResult``
         threads ONE map for the whole result (the map its single
         ``_stereo_prefix`` call used), so the caller passes it here rather
@@ -425,7 +425,7 @@ class _Node(NamedTuple):
 def _flatten(spine: BindingSpine) -> List[_Node]:
     """Every binding with its depth, owning root index and subtree atoms.
 
-    ``subtree_atoms()`` is recursive, so it is evaluated once per node here
+    ``subtree_atoms`` is recursive, so it is evaluated once per node here
     rather than once per (node, bond) pair inside P2's loop.
     """
     nodes: List[_Node] = []
@@ -720,12 +720,12 @@ def _p3_charge_totality(mol, spine, mode, allow_charged, findings, stats):
     # A charged heavy atom whose charge is cancelled by a DIRECTLY BONDED heavy
     # neighbour of exactly opposite charge is a charge-SEPARATED representation
     # of a NEUTRAL named functional group -- nitro [N+](=O)[O-], N-oxide, azide,
-    # diazo, an ylide -- named by the group's own morpheme (P-59), NOT by a
-    # charge suffix (P-73/P-74). Requiring a charge_atom_ids claim for it was a
+    # diazo, an ylide -- named by the group's own morpheme, NOT by a
+    # charge suffix /. Requiring a charge_atom_ids claim for it was a
     # false positive (measured: nitro / N-oxide correct names voided when the
     # spine gates a broad best-effort lane). A genuine zwitterion (betaine) has
     # its opposite charges NON-adjacent, so it is NOT exempted and still requires
-    # a claim. SELF-01 (isomeric round-trip) independently verifies the whole
+    # a claim. (isomeric round-trip) independently verifies the whole
     # constitution, so exempting an internal-FG charge here can never ship a
     # wrong charge state.
     def _internally_balanced(atom) -> bool:
@@ -814,7 +814,7 @@ _MULTIPLIER_WORDS = {"di": 2, "tri": 3, "tetra": 4, "penta": 5, "hexa": 6,
                      "undeca": 11, "dodeca": 12,
                      "bis": 2, "tris": 3, "tetrakis": 4, "pentakis": 5,
                      "hexakis": 6}
-# P-16.7.1(a): a multiplying prefix drops its terminal vowel before a
+# (a): a multiplying prefix drops its terminal vowel before a
 # vowel-initial suffix -- "butane-1,2,3,4-tetraol" is written "...-tetrol",
 # "...-pentaol" is written "...-pentol". The elided spelling is the SAME
 # morpheme with the same value, so it is DERIVED here rather than listed:
@@ -825,7 +825,7 @@ _MULTIPLIERS = {**_MULTIPLIER_WORDS,
                    if word.endswith("a")}}
 # Morphemes that may legitimately PRECEDE a token (consulted by _left_ok).
 # The multipliers are here in BOTH spellings: the elided form is what sits
-# against a vowel-initial suffix, "...-tetr|ol" (P-16.7.1(a)), and dropping it
+# against a vowel-initial suffix, "...-tetr|ol" (a)), and dropping it
 # was the last false TOKEN_SUBSTRING_ONLY left on real data.
 _LEFT_GLUE = frozenset(_MULTIPLIERS) | {
     # Ring-assembly and retained-shape prefixes: "bicyclo|hexane", "iso|butyl".
@@ -954,7 +954,7 @@ def _occurrence_weight(lowered: str, i: int) -> int:
 
     Enclosing marks are stepped over first because that is where the
     COMPLEX multiplicative prefixes live: ``bis``/``tris``/``tetrakis`` are
-    by convention (P-16.3.2) always followed by enclosing marks, so the
+    by convention always followed by enclosing marks, so the
     alphabetic run immediately against the token is empty and a naive scan
     scores every ``bis(...)`` prefix as a single occurrence -- measured as a
     false ``MULTIPLICITY_MISMATCH`` on real emissions.
@@ -1172,7 +1172,7 @@ def _p6_arity(spine, mode, findings, stats) -> None:
     disagreement means the name does not say what the spine claims it says.
 
     The comparison is against ``atom_ids``, the EXCLUSIVE claim, never
-    ``subtree_atoms()``: a token's morphemes spell its own atoms, and its
+    ``subtree_atoms``: a token's morphemes spell its own atoms, and its
     children's morphemes spell theirs. That is precisely how "``phenyl``
     claiming eight atoms" is caught while "``benzene`` with two nested
     ``methyl`` children" passes.
@@ -1275,7 +1275,7 @@ def _p7_free_valence(mol, spine, findings, stats) -> None:
     matches. It is still a wrong STRUCTURE, and it is the exact defect the
     carbon-ylidene phase exists to stop, so the proof has to be able to see it.
 
-    IUPAC P-29.2 makes that visible in the TEXT: ``-yl`` asserts one free
+    IUPAC makes that visible in the TEXT: ``-yl`` asserts one free
     valence, ``-ylidene`` two on the same atom, ``-ylidyne`` three. So the
     check is a comparison between two independent things -- the morphology the
     token's own morphemes assert, read by ``free_valence_morphology``, and the
@@ -1291,10 +1291,10 @@ def _p7_free_valence(mol, spine, findings, stats) -> None:
     confident verdict must be correct, because this one can BLOCK a name. Three
     things are therefore reported ``"info"`` and never as errors:
 
-      * the token spells no P-29.2 ending (``oxo``, ``hydroxy``, ``chloro`` are
+      * the token spells no ending (``oxo``, ``hydroxy``, ``chloro`` are
         correct prefixes for their attachments and simply say nothing here);
       * the subtree touches the rest of the molecule through more than one
-        bond -- a bridge or spiro shape (P-25), where the single-attachment
+        bond -- a bridge or spiro shape, where the single-attachment
         reading does not apply whatever the token says;
       * the linkage is aromatic or dative, so it has no integer order.
 
@@ -1366,7 +1366,7 @@ _STEREO_TOKEN_RE = re.compile(r'^(\d*[a-z]?)([RSrsEZez])$')
 
 def _parse_stereo_block_pairs(block: str) -> List[Tuple[Any, str]]:
     """Parse ONE already-matched ``(...)`` stereodescriptor block's
-    comma-separated pieces into ``[(locant, cip), ...]`` -- ``locant`` is
+    comma-separated pieces into ``[(locant, cip),...]`` -- ``locant`` is
     ``int`` for a plain numeral, the composite STRING for a lettered one
     (``'3a'``), or ``None`` for a bare unlocanted descriptor (``(R)``, a
     single-stereocentre molecule). ``block`` is the full matched span
@@ -1396,7 +1396,7 @@ def _parse_stereo_block_pairs(block: str) -> List[Tuple[Any, str]]:
 
 def _parse_leading_stereo_block(text: str) -> List[Tuple[Any, str]]:
     """The leading ``(...)-``/``(...)`` stereodescriptor block of ``text``,
-    as ``[(locant, cip), ...]`` (see ``_parse_stereo_block_pairs``).
+    as ``[(locant, cip),...]`` (see ``_parse_stereo_block_pairs``).
 
     Uses ``_STEREO_PREFIX_RE`` (REUSED VERBATIM, not reimplemented) only to
     find the block; every pair is then parsed here so a caller can compare
@@ -1413,7 +1413,7 @@ def _parse_leading_stereo_block(text: str) -> List[Tuple[Any, str]]:
     return _parse_stereo_block_pairs(m.group(0))
 
 
-# Task 4 fix (root cause 3): a functional-class TWO-WORD name (P-65.6.3.2.1
+# Task 4 fix (root cause 3): a functional-class TWO-WORD name
 # ester, "methyl (1R,12R,19S)-...-3-carboxylate") puts the ester alkyl word
 # before the parent's leading descriptor block, so `_parse_leading_stereo_block`
 # anchored at index 0 finds nothing and P8a misreports every real centre as
@@ -1427,7 +1427,7 @@ def _parse_leading_stereo_block(text: str) -> List[Tuple[Any, str]]:
 # position-0 match "succeeds" against the ALKYL word's descriptor and used
 # to return immediately, never reaching the parent's real block -- P8a then
 # read the parent's 3 real centres as MISSING and, once escalated to error,
-# VOIDED a fully correct T4 candidate.
+# VOIDED a fully correct candidate.
 #
 # Task 4 FIX-ROUND 2 (reviewer-found, MORE SEVERE): round 1's fix selected
 # the candidate with the largest OVERLAP against ``expected_set``. That is
@@ -1463,7 +1463,7 @@ def _parse_leading_stereo_block(text: str) -> List[Tuple[Any, str]]:
 # ester shape).
 #
 # The fix requires ADJACENCY, not "somewhere at or before": a name is a
-# sequence of WORDS (P-65.6.3.2.1's grammar; ``_leading_word_boundaries``
+# sequence of WORDS 's grammar; ``_leading_word_boundaries``
 # enumerates every word-start position), and the parent's own block, if it
 # has one, sits at EXACTLY the word-boundary where the parent's own word
 # begins -- never at an earlier word's boundary, however close. So the
@@ -1471,7 +1471,7 @@ def _parse_leading_stereo_block(text: str) -> List[Tuple[Any, str]]:
 # region the parent binding's real span sits inside (the largest boundary
 # not exceeding ``parent_span_start``), then look up a block AT THAT EXACT
 # boundary, never at any other. If that specific word has no block, the
-# parent has none -- P8a's forward check then correctly compares ``[]``
+# parent has none -- P8a's forward check then correctly compares ````
 # against ``expected_set``: empty (achiral parent) -> no finding; non-empty
 # (parent has real centres but emitted none) -> a genuine
 # ``STEREO_DESCRIPTOR_MISSING``, exactly the case P8a exists to catch.
@@ -1480,7 +1480,7 @@ def _parse_leading_stereo_block(text: str) -> List[Tuple[Any, str]]:
 
 def _leading_word_boundaries(name: str) -> List[int]:
     """Every position in ``name`` where a NEW word begins: 0, plus the
-    position right after every space. P-65.6.3.2.1's functional-class
+    position right after every space. 's functional-class
     grammar (and any other multi-word grammar this codebase emits) puts no
     space anywhere else -- a compound substituent name is always one
     hyphen-joined token with no space of its own -- so these are the ONLY
@@ -1498,7 +1498,7 @@ def _leading_word_boundaries(name: str) -> List[int]:
 def _iter_leading_stereo_candidates(
         name: str) -> List[Tuple[int, List[Tuple[Any, str]]]]:
     """Every CANDIDATE stereo-block position in ``name`` that actually
-    parsed to a non-empty block, as ``[(start, pairs), ...]`` in ascending
+    parsed to a non-empty block, as ``[(start, pairs),...]`` in ascending
     ``start`` order. ``start`` is always one of ``_leading_word_boundaries``'
     positions -- a word that has no block of its own is simply absent here,
     never guessed at.
@@ -1542,7 +1542,7 @@ def _parent_binding_span(
 # Sentinel: at least one candidate block exists SOMEWHERE in the name, but
 # the parent binding's own span could not be resolved, so there is no
 # positional evidence for whether any of them is the parent's -- distinct
-# from "no block belongs to the parent" ([]), which IS a confident (empty)
+# from "no block belongs to the parent" (), which IS a confident (empty)
 # answer reached by actually checking the parent's own word boundary. Never
 # guessed past; see _p8_stereo's handling.
 _STEREO_BLOCK_AMBIGUOUS = object()
@@ -1560,7 +1560,7 @@ def _find_leading_stereo_pairs(name: str, parent_span_start: Optional[int]):
     parent's own block, if it has one, is the candidate anchored at EXACTLY
     that boundary -- never at any earlier one, however close, and never
     chosen by identity/overlap. If no candidate exists at that exact
-    boundary, the parent has NO leading block: returns ``[]``, which
+    boundary, the parent has NO leading block: returns ````, which
     ``_p8_stereo`` then compares (correctly) against ``expected_set`` --
     empty means an achiral parent (clean), non-empty means a genuine
     dropped descriptor (``STEREO_DESCRIPTOR_MISSING``).
@@ -1571,7 +1571,7 @@ def _find_leading_stereo_pairs(name: str, parent_span_start: Optional[int]):
     evidence for whether it is the parent's: returns the
     ``_STEREO_BLOCK_AMBIGUOUS`` sentinel rather than guessing. With zero
     candidates the answer is unambiguous regardless (nothing to attribute
-    either way), so that case returns ``[]`` even then.
+    either way), so that case returns ```` even then.
     """
     candidates = dict(_iter_leading_stereo_candidates(name))
     if not candidates:
@@ -1621,7 +1621,7 @@ def _iter_embedded_ez_pairs(text: str) -> List[Tuple[Any, str]]:
 def _p8_stereo(mol, spine: BindingSpine, name: str, mode: str,
               spans: Sequence[Tuple[int, int, str]],
               findings: list, stats: Dict[str, Any]) -> None:
-    """P8: atom-indexed stereo completeness/correctness (Phase 0c Task 3).
+    """P8: atom-indexed stereo completeness/correctness (a phase Task 3).
 
     Two checks, both resolving a descriptor to real atom/bond identity via
     ``spine.stereo_atom_to_locant`` -- NEVER a name-string cardinality count
@@ -1663,8 +1663,8 @@ def _p8_stereo(mol, spine: BindingSpine, name: str, mode: str,
 
     Severity is mode-conditional (``"warn"`` in ``"audit"``, ``"error"`` in
     ``"strict"``) for every P8 code, deliberately matching P3/P5/P6 rather
-    than P1/P2/P4's unconditional errors -- Phase 0c Task 3 shipped this
-    AUDIT-ONLY; Task 4 promotes it to ``"strict"`` on the T4 wiring once the
+    than P1/P2/P4's unconditional errors -- a phase Task 3 shipped this
+    AUDIT-ONLY; Task 4 promotes it to ``"strict"`` on the wiring once the
     diagnostic scan this task also produces shows it is clean.
 
     Task 4 fix: the forward parse uses ``_find_leading_stereo_pairs``, not
@@ -1698,7 +1698,7 @@ def _p8_stereo(mol, spine: BindingSpine, name: str, mode: str,
     ``STEREO_PARENT_BLOCK_AMBIGUOUS`` (same unproven-not-disproven
     discipline as ``STEREO_UNVERIFIED``) instead of guessing.
 
-    Task 4 fix (locant-omission guard, from the Task 3 review Minor): P-14.3.4
+    Task 4 fix (locant-omission guard, from the Task 3 review Minor):
     licenses dropping a stereocentre's locant when the molecule has exactly
     one (``(R)-...`` rather than ``(2R)-...``). Today's formatter always
     emits the locant, so ``emitted``/``expected`` never actually disagree
@@ -1757,7 +1757,7 @@ def _p8_stereo(mol, spine: BindingSpine, name: str, mode: str,
         return
     stats["stereo_emitted_leading"] = len(emitted)
 
-    # Locant-omission normalisation (P-14.3.4): a lone bare descriptor
+    # Locant-omission normalisation: a lone bare descriptor
     # resolves to the molecule's one real centre when there IS exactly one,
     # rather than being compared literally against its (real) locant.
     if len(expected_set) == 1 and len(emitted) == 1:
@@ -1891,9 +1891,9 @@ def verify_spine(mol, spine: BindingSpine, name: str, *,
     producers actually emit) and warns on the unproven, ``"strict"`` requires
     every bond to be declared or internal and leaves nothing unproven.
 
-    ``escalate`` (Phase 0c Task 4) force-promotes any listed finding CODE from
+    ``escalate`` (a phase Task 4) force-promotes any listed finding CODE from
     ``"warn"`` to ``"error"`` after every proof has run, independent of
-    ``mode`` -- the mechanism the T4 wiring uses to enforce JUST the P8
+    ``mode`` -- the mechanism the wiring uses to enforce JUST the P8
     stereo axis and P3's ``CHARGE_UNVERIFIED`` (``STRICT_STEREO_CHARGE_AXES``)
     without also flipping P2's bond-linkage inference policy or P5/P6's
     unrelated unproven-codes, which a blanket ``mode="strict"`` would do too.
@@ -1948,7 +1948,7 @@ def verify_spine(mol, spine: BindingSpine, name: str, *,
     _p7_free_valence(mol, spine, findings, stats)
     proofs.append("P7")
 
-    # P8 (Phase 0c Task 3): atom-indexed stereo, both halves. Like P4/P6/P7 it
+    # P8 (a phase Task 3): atom-indexed stereo, both halves. Like P4/P6/P7 it
     # needs nothing from the global atom partition (it reads the mol's real
     # stereo properties and the threaded locant map directly), so it still
     # runs when P1 has failed. P8a additionally reuses P4's already-computed

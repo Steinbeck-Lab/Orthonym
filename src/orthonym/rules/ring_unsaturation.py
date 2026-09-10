@@ -20,13 +20,13 @@ shared with the PIN von-Baeyer stack, whose emitted strings are gold-locked, and
 that stack consumes bare ints. The soundness fix belongs where the general tier
 consumes the locants.
 
-The compound locant is a DOUBLE-BOND rule (P-31.1.4.2(1))
+The compound locant is a DOUBLE-BOND rule (1))
 ---------------------------------------------------------
-P-31.1.4.2(1) is worded for double bonds only: "A compound locant is used for *a
+(1) is worded for double bonds only: "A compound locant is used for *a
 double bond* if the locants of the atoms at each end of the bond do not differ by
 a value of one. When a compound locant is required, the higher locant is cited in
-parentheses." The same double-bond-only wording appears in P-31.1.6.1(3) and
-P-31.1.7.2. Every ``-yne`` example in the Blue Book carries a PLAIN locant --
+parentheses." The same double-bond-only wording appears in (3) and
+. Every ``-yne`` example in the Blue Book carries a PLAIN locant --
 ``bicyclo[14.3.1]icosa-11,13,18-trien-2-yne``,
 ``bicyclo[11.3.1]heptadec-2-en-11-yne`` -- with the parentheses in those very
 names appearing only on the ``-ene`` component. So the bare lower locant is
@@ -36,9 +36,9 @@ no sanctioned ``x(y)`` form to fall back on.
 Why the non-consecutive branch refuses instead of citing the bare locant
 ------------------------------------------------------------------------
 A non-consecutively-numbered triple bond is *provably unreachable* for standard
-bonding numbers: P-23.1.2 (a bridge connects two bridgeheads) makes von Baeyer
+bonding numbers: (a bridge connects two bridgeheads) makes von Baeyer
 numbering a concatenation of runs each ending at a bridgehead, so every
-non-consecutively-numbered bond is incident to a bridgehead; P-23.1.1 defines a
+non-consecutively-numbered bond is incident to a bridgehead; defines a
 bridgehead as having >= 3 skeletal neighbours; a C(triple)C carbon has exactly 2
 sigma bonds. A bridgehead therefore can never be a triple-bond terminus.
 
@@ -63,7 +63,7 @@ from typing import Dict, List, Optional, Tuple
 from rdkit import Chem
 
 #: Whether a non-consecutively-numbered triple bond may be cited with the compound
-#: ``x(y)`` locant. Must stay False: P-31.1.4.2(1) grants the compound locant to
+#: ``x(y)`` locant. Must stay False: (1) grants the compound locant to
 #: DOUBLE bonds only and no compound ``-yne`` locant exists in the Blue Book, so
 #: emitting one would be the first such name in existence. Kept as a named flag
 #: only because it is the single line to change if the NOT-ESTABLISHED lambda-n
@@ -91,7 +91,7 @@ class RingUnsaturation:
 
 
 def _locant(lo: int, hi: int) -> str:
-    """P-31.1.4.2(1): a ring DOUBLE bond whose end locants do not differ by one is
+    """(1): a ring DOUBLE bond whose end locants do not differ by one is
     cited with the compound locant ``lo(hi)`` -- the higher locant in parentheses
     (octalin ``1(6)``); otherwise the lower locant alone."""
     return str(lo) if hi == lo + 1 else f"{lo}({hi})"

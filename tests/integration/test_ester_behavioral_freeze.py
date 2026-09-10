@@ -1,9 +1,9 @@
 """
-Behavioral freeze test: verify name_compound() output has not changed
+Behavioral freeze test: verify name_compound output has not changed
 for ester SMILES compared to a committed fixture.
 
 The fixture at tests/fixtures/ester_freeze.json was generated before
-the Phase 22 fragment-aware naming changes. This test ensures zero
+the a phase fragment-aware naming changes. This test ensures zero
 behavioral regression from ester/amide routing modifications.
 
 Marked as @pytest.mark.integration since 53 RDKit calls are fast (<5s).
@@ -21,7 +21,7 @@ FIXTURE_PATH = pathlib.Path(__file__).parents[1] / "fixtures" / "ester_freeze.js
 
 @pytest.mark.integration
 class TestEsterBehavioralFreeze:
-    """Validate name_compound() produces identical output to pre-change fixture."""
+    """Validate name_compound produces identical output to pre-change fixture."""
 
     @classmethod
     def setup_class(cls):

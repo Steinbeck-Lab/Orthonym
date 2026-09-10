@@ -76,7 +76,7 @@ def _make_rows(n: int = 100, handlers=("chain", "ring_a", "ring_b")):
 
 
 class TestGenerateSplits:
-    """Invariants of the 80/10/10 partitioning ()."""
+    """Invariants of the 80/10/10 partitioning ."""
 
     def test_sum_equals_total(self) -> None:
         rows = _make_rows(100)

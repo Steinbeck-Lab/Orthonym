@@ -1,11 +1,11 @@
-"""Phase 166 SCORE-04: curated near-tie selection proof set.
+"""a phase SCORE-04: curated near-tie selection proof set.
 
 Each fixture is a structurally-equal candidate PAIR differing in exactly one
 substring; the selector (the default-OFF ``score_based_per_substring`` mode, or
 the comparator directly) must pick the OPSIN-RT-correct member. PRODUCTION stays
 ``first_applicable`` — this is a demonstrated, non-production path.
 
-Comparator order (D-05, lexicographic first-point-of-difference):
+Comparator order (, lexicographic first-point-of-difference):
     parent_score -> locant_score -> substituent_score -> aggregate fallback.
 A full per-substring tie defers to ``select_best_candidate`` (the aggregate) —
 a STRICT refinement: no behaviour change on a tie.
@@ -51,7 +51,7 @@ class TestNearTieSelection:
 
         Exercises the REAL pipeline end-to-end: ``CandidatePool`` in the new mode,
         ``pool.add`` (which attaches node_scores via the real OPSIN-driven
-        ``PerNodeScorer``), and ``best()`` -> ``_best_two_tier(per_substring=True)``.
+        ``PerNodeScorer``), and ``best`` -> ``_best_two_tier(per_substring=True)``.
 
         OPSIN-RT verify (A5, 2026-05-26): name_compound('CC(C)CC') == '2-methylbutane';
         both '2-methylbutane' and '3-methylbutane' OPSIN-round-trip to the CC(C)CC
@@ -82,7 +82,7 @@ class TestNearTieSelection:
         """Parent near-tie (the aggregate-blindness kill): a parent-CORRECT /
         substituent-WRONG candidate must beat a parent-WRONG / substituent-RIGHT
         candidate — EVEN when the parent-wrong candidate is added first AND has
-        the higher aggregate confidence. ``parent_score`` breaks FIRST (D-05), so
+        the higher aggregate confidence. ``parent_score`` breaks FIRST , so
         a wrong parent can never win on a lucky substituent match: the exact
         failure this phase exists to kill.
 

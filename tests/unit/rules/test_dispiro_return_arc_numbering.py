@@ -1,6 +1,6 @@
 """Dispiro return-arc (segment ``d``) numbering direction — QM9 Class B fix.
 
-P-24.2.2 "Linear polyspiro alicyclic ring systems"
+ "Linear polyspiro alicyclic ring systems"
 (``the Blue Book Blue Book``): the von Baeyer spiro descriptor is cited
 "...proceeding consecutively, always by the shorter path, to the other terminal
 ring through each spiro atom **and then back to the first spiro atom**." The
@@ -67,7 +67,7 @@ def _besteffort(smi):
 @pytest.mark.parametrize("smi", WITNESSES)
 def test_class_b_dispiro_cage_roundtrips(smi):
     """Best-effort must EMIT (not abstain) and the name must round-trip to the
-    input by full standard InChIKey. P-24.2.2 return-arc numbering."""
+    input by full standard InChIKey. return-arc numbering."""
     name = _besteffort(smi)
     assert name and name != "unknown organic compound", (
         f"{smi}: best-effort abstained (return-arc numbering must let it emit)")
@@ -83,7 +83,7 @@ def test_bare_dispiro_descriptor_consistent_locant():
     """The bare (no exocyclic group) witness pins the exact defect: the O must
     take the descriptor-consistent locant 8, not the old 9 (a different
     molecule). ``[2.0.3.2]`` is the Blue Book descriptor (smaller terminal ring
-    first, P-24.2.2; low spiro locants, P-24.2.2.1)."""
+    first,; low spiro locants,."""
     smi = "C1CC11COC11CCC1"
     name = _besteffort(smi)
     assert name == "8-oxadispiro[2.0.3.2]nonane", name

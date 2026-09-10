@@ -1,13 +1,13 @@
-"""v29 P1 (fix wave 1): EVERY exit of ``Orthonym.name()`` is audited.
+""" (fix wave 1): EVERY exit of ``Orthonym.name`` is audited.
 
-``name()`` has eight ``return`` statements (five originally + two added in v30
-Phase 1 for producer-exception resilience: the generic ``except Exception``
+``name`` has eight ``return`` statements (five originally + two added in
+a phase for producer-exception resilience: the generic ``except Exception``
 routes to recovery success / descriptive fallback so a raising producer degrades
-instead of crashing out of ``name()``; + one added in Wave 0 Task 1 (D1) for the
+instead of crashing out of ``name``; + one added in Wave 0 Task 1 (D1) for the
 unconditional wildcard fail-close -- a dummy atom made the input InChIKey
-uncomputable, so the SELF-01 oracle failed open and ``CC*`` shipped ``"ethane"``;
-the new exit routes through ``self._finish`` like every other). Before v30
-Phase 1 only two were hooked to the binding-proof step, and two of the three
+uncomputable, so the oracle failed open and ``CC*`` shipped ``"ethane"``;
+the new exit routes through ``self._finish`` like every other). Before
+a phase only two were hooked to the binding-proof step, and two of the three
 then-unhooked ones ship a real (non-failure) name:
 
 * the isotope-decorator exit -- the entire isotope-labeled compound class
@@ -19,7 +19,7 @@ then-unhooked ones ship a real (non-failure) name:
   string" (pinned by ``test_trivial_fallback_exit_ships_a_real_name`` below).
 
 Today ``enforce`` is wired to no default path, so an unaudited exit changes
-no name. From Phase 3 onward it is a hole in the fail-closed guarantee the
+no name. From a phase onward it is a hole in the fail-closed guarantee the
 ledger exists to provide -- hence the AST guard, which is the test that stops
 a future edit from silently reopening the whole class.
 """
@@ -85,7 +85,7 @@ def _returns_in_name():
 
     def _visit(node):
         for child in ast.iter_child_nodes(node):
-            # A nested def/lambda has its OWN exits; they are not name()'s.
+            # A nested def/lambda has its OWN exits; they are not name's.
             if isinstance(child, (ast.FunctionDef, ast.AsyncFunctionDef,
                                   ast.Lambda)):
                 continue
@@ -108,7 +108,7 @@ def _is_finish_call(value) -> bool:
 def test_every_return_in_name_is_routed_through_finish():
     """THE regression guard for the whole class.
 
-    A bare ``return <something>`` added to ``name()`` in a future edit ships a
+    A bare ``return <something>`` added to ``name`` in a future edit ships a
     name that the binding proof never sees. Counting them at the AST level is
     the only check that scales past the exits that exist today.
     """
@@ -130,14 +130,14 @@ def test_every_return_in_name_is_routed_through_finish():
 
 
 def test_the_guard_sees_all_known_exits():
-    """Pins the guard's own reach: if a refactor collapsed ``name()`` so the
+    """Pins the guard's own reach: if a refactor collapsed ``name`` so the
     walker found (say) one return, the guard above would pass vacuously.
 
     Count is 8 as of Wave 0 Task 1 (D1): the original 5, plus the two
     producer-exception resilience exits (recovery success + descriptive
-    fallback) added in v30 Phase 1 to the generic ``except Exception`` handler
+    fallback) added in a phase to the generic ``except Exception`` handler
     so a producer that raises degrades to recovery/abstain instead of crashing
-    out of ``name()``, plus the wildcard fail-close exit added in Wave 0 Task 1
+    out of ``name``, plus the wildcard fail-close exit added in Wave 0 Task 1
     (the unconditional ``classify_scope_limit`` pre-check's default-path
     return). All route through ``self._finish`` (checked by the guard
     above)."""
@@ -325,7 +325,7 @@ def test_record_helper_is_a_no_op_when_the_flag_is_off():
 
 def test_record_helper_never_raises_on_a_bad_producer():
     """Recording is observation; a malformed producer object must not break
-    naming. ``object()`` has no ``.bindings``."""
+    naming. ``object`` has no ``.bindings``."""
     namer = _best_effort(binding_proof="audit")
     pl.clear_ledger()
     namer._record_binding_proof(Chem.MolFromSmiles("CCO"), object(),

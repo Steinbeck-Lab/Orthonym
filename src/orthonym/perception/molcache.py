@@ -1,19 +1,19 @@
 """Per-naming-call cache of a molecule's atom and bond tuples (audit 2026-09-03, S2).
 
-Why: ``for a in mol.GetAtoms()`` runs through RDKit's Python sequence wrapper
+Why: ``for a in mol.GetAtoms`` runs through RDKit's Python sequence wrapper
 (``rdkit/Chem/__init__.py``: ``__iter__`` -> ``__getitem__`` -> ``_sizeCalc`` per
 step). A 58-atom walk costs about 88 us that way, 53 us through
 ``GetAtomWithIdx`` and 14 us over a materialised tuple. The engine walks the
 same input molecule hundreds of times per name -- every dispatch predicate
-scans the atoms once -- so on dev500 this wrapper was 24% of engine CPU.
+scans the atoms once -- so on a dev split this wrapper was 24% of engine CPU.
 
 What ``atoms_of(mol)`` / ``bonds_of(mol)`` promise:
 
-* **Same atoms, same order** as ``mol.GetAtoms()`` / ``mol.GetBonds()``. The
+* **Same atoms, same order** as ``mol.GetAtoms`` / ``mol.GetBonds``. The
   tuple is built from ``GetAtomWithIdx(i)`` for ``i`` in index order, which is
   exactly the wrapper's iteration order.
 * **Scope = one top-level naming call.** The tuple lives in the memo scope that
-  ``assembly.memo`` opens around ``name()``; with no open scope nothing is cached
+  ``assembly.memo`` opens around ``name``; with no open scope nothing is cached
   and every call rebuilds. Cross-molecule staleness is structurally impossible.
 * **Never a stale tuple.** Only immutable-by-convention ``Chem.Mol`` objects are
   cached; a ``Chem.RWMol`` (the only type on which atoms can be removed,
@@ -27,7 +27,7 @@ What ``atoms_of(mol)`` / ``bonds_of(mol)`` promise:
 
 Atom and bond wrappers reference the live C++ objects, so property edits made
 in place on a ``Chem.Mol`` (aromaticity, charges, isotopes) are visible through
-the cached tuple exactly as through a fresh ``GetAtoms()``.
+the cached tuple exactly as through a fresh ``GetAtoms``.
 """
 from __future__ import annotations
 
@@ -88,10 +88,10 @@ def _cached(mol, ns, fresh, count, sig):
 
 
 def atoms_of(mol) -> Tuple[Chem.Atom, ...]:
-    """``tuple(mol.GetAtoms())`` in index order, cached per naming call."""
+    """``tuple(mol.GetAtoms)`` in index order, cached per naming call."""
     return _cached(mol, _NS_ATOMS, _fresh_atoms, Chem.Mol.GetNumAtoms, _atom_sig)
 
 
 def bonds_of(mol) -> Tuple[Chem.Bond, ...]:
-    """``tuple(mol.GetBonds())`` in index order, cached per naming call."""
+    """``tuple(mol.GetBonds)`` in index order, cached per naming call."""
     return _cached(mol, _NS_BONDS, _fresh_bonds, Chem.Mol.GetNumBonds, _bond_sig)

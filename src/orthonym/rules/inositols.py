@@ -1,11 +1,11 @@
-"""Inositol (cyclitol) retained names — P-104.2.1.
+"""Inositol (cyclitol) retained names —.
 
-v23 Phase 12 follow-on (Blue Book audit unit p104-106, finding F1).
+ a phase follow-on (Blue Book audit unit p104-106, finding F1).
 
 The nine stereoisomers of cyclohexane-1,2,3,4,5,6-hexol each have a retained
 italic-prefix name (``myo-``, ``scyllo-``, ``cis-``, ``epi-``, ``neo-``,
 ``allo-``, ``muco-``, ``D-chiro-``, ``L-chiro-``) that is the PREFERRED IUPAC
-name (P-104.2.1).
+name.
 
 These names are **OPSIN-unparseable** (verified: ``OpsinOracle.name_to_smiles``
 returns ``None`` for every ``<prefix>-inositol``), so there is NO round-trip
@@ -35,7 +35,7 @@ from typing import Optional
 
 from rdkit.Chem import inchi
 
-# Standard-InChIKey -> retained PIN (P-104.2.1). The shared skeleton block is
+# Standard-InChIKey -> retained PIN. The shared skeleton block is
 # CDAISMWEOUEBRE; the nine distinct stereo blocks are the nine inositols.
 _INOSITOL_BY_INCHIKEY = {
     # The seven ACHIRAL (meso) inositols — RDKit perceives their stereochemistry
@@ -112,7 +112,7 @@ def is_inositol_skeleton(mol) -> bool:
 
 
 def name_inositol(mol) -> Optional[str]:
-    """Return the retained inositol PIN (P-104.2.1) for a fully-stereodefined
+    """Return the retained inositol PIN for a fully-stereodefined
     cyclohexanehexol matching one of the seven deterministically-perceived meso
     inositols, else ``None``.
 

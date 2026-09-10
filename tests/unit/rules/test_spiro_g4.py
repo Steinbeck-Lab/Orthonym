@@ -1,10 +1,10 @@
-"""v22 Phase G4 — spiro polycyclic cluster (COV-04, P-24.2 / P-24.5).
+""" Phase G4 — spiro polycyclic cluster (, /.
 
 Rule-family (A8) tests for the three shipped G4 sub-classes:
 
-  Build 1  heteroatom multiplier cap   -> `hexaoxa` not the malformed `6-oxa`
-  Build 2  lambda-convention (P-31.1.4.2) for non-standard-valence ring atoms
-  Build 3  P-24.5.1 alphanumerical component order for mixed spiro-fused
+  Build 1 heteroatom multiplier cap -> `hexaoxa` not the malformed `6-oxa`
+  Build 2 lambda-convention for non-standard-valence ring atoms
+  Build 3 alphanumerical component order for mixed spiro-fused
 
 plus the A10 honest-deferral guard: the spirobi polycyclic-component case
 (DD7-spiro-1) must stay FAIL-CLOSED (`unknown`), never a wrong name.
@@ -75,7 +75,7 @@ class TestSpiroHeteroMultiplier:
 @pytest.mark.unit
 class TestSpiroLambda:
     """Build 2: a ring skeletal atom whose valence differs from its IUPAC
-    standard bonding number carries the lambda convention (P-31.1.4.2);
+    standard bonding number carries the lambda convention;
     standard-valence atoms get NO lambda (fail-closed)."""
 
     @pytest.mark.parametrize(
@@ -104,7 +104,7 @@ class TestSpiroLambda:
 
 @pytest.mark.unit
 class TestSpiroFusedAlphanumerical:
-    """Build 3: P-24.5.1 cites the two ring components in ALPHANUMERICAL order
+    """Build 3: cites the two ring components in ALPHANUMERICAL order
     of the component name (Note: NOT by seniority, NOT fused-first), priming
     the second; indicated H at the spiro locant is dropped."""
 
@@ -131,7 +131,7 @@ class TestSpiroFusedAlphanumerical:
 
 @pytest.mark.unit
 class TestSpirobiBuiltP24_3:
-    """v23 Phase 13: the spirobi polycyclic-component class (P-24.3.1) is now
+    """ a phase: the spirobi polycyclic-component class is now
     BUILT (`name_spirobi`). Two identical polycyclic components at one spiro
     atom -> ``<lo>,<hi>'-spirobi[component]``, RT-verified. (Previously this
     class was A10 honest-deferral / fail-closed; the build supersedes it.)"""
@@ -144,12 +144,12 @@ class TestSpirobiBuiltP24_3:
         """Spiro is benzylic (locant 1) in one half, the middle carbon (2') in the
         other -> 1,2' (NOT 1,1').
 
-        v29 Phase C: the bracket now holds the MANCUDE component and the
-        saturation is hoisted outside it (P-24.3.2, BB:10152) -- the retained
-        ``spirobi[indane]`` form is not a PIN because P-54.4.3.2 (BB:24256)
+         Phase C: the bracket now holds the MANCUDE component and the
+        saturation is hoisted outside it, the Blue Book) -- the retained
+        ``spirobi[indane]`` form is not a PIN because (the Blue Book)
         excludes 'indane'. Hydro locants are derived against the ASSEMBLED
-        mancude skeleton, so they are 2,3 / 1',3' and are cited in P-14.3.5
-        (BB:3193) order, primed immediately after the corresponding unprimed.
+        mancude skeleton, so they are 2,3 / 1',3' and are cited in
+        (the Blue Book) order, primed immediately after the corresponding unprimed.
         """
         assert (name_compound("C1Cc2ccccc2C13Cc1ccccc1C3")
                 == "1',2,3,3'-tetrahydro-1,2'-spirobi[indene]")
@@ -161,7 +161,7 @@ class TestSpirobiBuiltP24_3:
         mol = Chem.MolFromSmiles("C1Cc2ccccc2C13Cc1ccccc1C3")
         # The legacy detectors still decline (is_spiro_system requires
         # n_rings == n_spiro + 1; this is 4 rings / 1 spiro; mixed-spiro-fused
-        # requires a single side ring). The NEW P-24.3 detector claims it.
+        # requires a single side ring). The NEW detector claims it.
         assert is_spiro_system(mol) is False
         assert is_mixed_spiro_fused(mol) is False
         assert is_spirobi(mol) is True
@@ -169,8 +169,8 @@ class TestSpirobiBuiltP24_3:
 
 @pytest.mark.unit
 class TestSpiroVonBaeyerP24_5:
-    """v23 Phase 13B(c): monospiro systems with >=1 von Baeyer (bridged) cage
-    component (P-24.5 component-name form, or P-24.3.1 spirobi for two identical
+    """ a phase(c): monospiro systems with >=1 von Baeyer (bridged) cage
+    component component-name form, or spirobi for two identical
     cages). Built by ``name_spiro_vonbaeyer`` via a robust atom-based
     separation-atom finder that handles a cage-bridge spiro atom sitting in >2
     SSSR rings (where ``get_spiro_atoms`` fails). The von Baeyer component is
@@ -189,7 +189,7 @@ class TestSpiroVonBaeyerP24_5:
             # Spiro at the 1-atom bridge (cage position 7, in BOTH cage SSSR rings).
             ("C1CCC2(CC1)C1CCC2CC1",
              "spiro[bicyclo[2.2.1]heptane-7,1'-cyclohexane]"),
-            # Two identical cages -> spirobi (P-24.3.1).
+            # Two identical cages -> spirobi.
             ("C1CC2CC1CC21CC2CCC1C2", "2,2'-spirobi[bicyclo[2.2.1]heptane]"),
             ("C1CC2CCC1CC21CC2CCC1CC2", "2,2'-spirobi[bicyclo[2.2.2]octane]"),
         ],
@@ -246,7 +246,7 @@ class TestSpiroVonBaeyerP24_5:
 
 @pytest.mark.unit
 class TestSpiroPAHFluoreneP24_5:
-    """v23 Phase 13B(b): spiro systems with a fused CARBOCYCLIC-PAH component
+    """ a phase(b): spiro systems with a fused CARBOCYCLIC-PAH component
     (fluorene), named via a numbered template. Headlined by 9,9'-spirobifluorene
     (the spiro-OLED core). The fluorene component is cited by its retained PAH
     name with the indicated H consumed by the C9 spiro atom."""
@@ -309,7 +309,7 @@ class TestSpiroNumberingDeterminism:
     def test_atom_order_independent(self, smiles, expected):
         mol = Chem.MolFromSmiles(smiles)
         # Re-spell the molecule rooted at every atom (deterministic, no RNG)
-        # and re-parse — the same way the v22 determinism eval probes for
+        # and re-parse — the same way the determinism eval probes for
         # SMILES-order dependence — then assert one stable, correct name.
         names = set()
         for root in range(mol.GetNumAtoms()):

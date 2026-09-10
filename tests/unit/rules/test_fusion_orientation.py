@@ -1,7 +1,7 @@
 """Unit tests for the deterministic fusion-orientation engine (Stage 0/1).
 
 Covers the coordinate-free hex-lattice embedding, the cata-fused all-6
-carbocyclic classification gate, and the P-25.3.2.3.3 orientation scoring.
+carbocyclic classification gate, and the orientation scoring.
 """
 
 import random
@@ -92,8 +92,8 @@ class TestEmbedding:
     def test_helicene_embedding_rejected_overcrowded(self):
         # A [5]+ helicene cannot embed planar; the overcrowding/planarity gate in
         # ``embed_atoms_on_hex_lattice`` returns None (non-bonded atoms crammed
-        # below 3*d^2 = 12).  [6]+ overlaps atoms outright; [5] crams to bond
-        # distance.  Both decline -> best_orientations is None.
+        # below 3*d^2 = 12). [6]+ overlaps atoms outright; [5] crams to bond
+        # distance. Both decline -> best_orientations is None.
         for smi in (
             "C1=CC=CC2=CC=C3C=CC4=CC=C5C=CC=CC5=C4C3=C12",  # pentahelicene
             "C1=CC=CC2=CC=C3C=CC4=CC=C5C=CC6=CC=CC=C6C5=C4C3=C12",  # hexahelicene
@@ -136,7 +136,7 @@ class TestOrientationScoring:
 
     def test_triphenylene_row_is_contiguous_not_spurious(self):
         # Branched D3h system: the main row is only 2 ortho-fused rings joined by
-        # a vertical bond.  A naive "all rings at one y" count would wrongly find
+        # a vertical bond. A naive "all rings at one y" count would wrongly find
         # 3 (a same-y ring is disconnected); the contiguous-run fix keeps it 2.
         m = Chem.MolFromSmiles("c1ccc2c(c1)c1ccccc1c1ccccc21")
         info = classify_ring_system(m, _ring_atoms(m))

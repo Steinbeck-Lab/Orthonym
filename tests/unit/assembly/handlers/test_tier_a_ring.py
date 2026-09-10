@@ -1,4 +1,4 @@
-"""Phase 160 Plan-06 unit tests for ``handlers/tier_a_ring.py``.
+"""a phase Plan-06 unit tests for ``handlers/tier_a_ring.py``.
 
 Composite handler tests covering signature shape, predicate purity, and
 byte-identical proof vs the inline composer.py Tier-A cascade.
@@ -48,7 +48,7 @@ def test_predicate_purity_returns_bool():
 
 
 def test_complex_ring_smiles_via_inline_oracle():
-    """For an indole-like complex ring SMILES, Orthonym().name produces
+    """For an indole-like complex ring SMILES, Orthonym.name produces
     a sensible non-empty name via the inline Tier-A cascade. Byte-identical
     proof is asserted at Plan-07 production wiring time via canary --mode
     delta zero-diff."""
@@ -64,7 +64,7 @@ def test_complex_ring_smiles_via_inline_oracle():
 
 
 def test_pyridine_via_inline_oracle():
-    """For pyridine ('c1ccncc1'), Orthonym().name produces a non-empty
+    """For pyridine ('c1ccncc1'), Orthonym.name produces a non-empty
     name. The Tier-A composite must produce the same string at production
     wiring time."""
     namer = Orthonym()

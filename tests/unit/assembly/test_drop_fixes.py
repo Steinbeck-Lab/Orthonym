@@ -8,7 +8,7 @@ using oriented_ring locants, not be silently skipped to the global FG loop
 
 Key symptom: monosubstituted halocycloalkanes get a spurious "1-" locant
 (e.g., "1-fluorocyclohexane" instead of "fluorocyclohexane") because the
-global FG loop does not apply should_omit_locant_one().
+global FG loop does not apply should_omit_locant_one.
 
 substituent_all_candidates_filtered: When BUG-B overfilter removes all FG
 matches, at least one match should be restored to prevent total FG loss.

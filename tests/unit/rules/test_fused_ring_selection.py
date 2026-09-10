@@ -1,23 +1,23 @@
-"""FR-2.3 base component selection tests (Phase 149 Tier 1).
+""".3 base component selection tests (a phase Tier 1).
 
-Per V18 plan §6 Phase 149 + AUTONOM-1990 §4 (hybrid catalog + algorithmic
+Per V18 plan a phase + AUTONOM-1990 (hybrid catalog + algorithmic
 fallback architecture; 61% Beilstein-expert agreement validates the approach).
 
 Each test cites:
-  - The QMUL FR-2.3 URL (https://iupac.qmul.ac.uk/fusedring/FR23.html)
-  - The IUPAC rule code (P-25.3.2.4 / FR-2.3(letter))
-  - AUTONOM-1990 §4 reference
-  - The Phase 149 CONTEXT decision (D-XX) being verified
+  - The QMUL.3 URL (https://iupac.qmul.ac.uk/fusedring/FR23.html)
+  - The IUPAC rule code /.3(letter))
+  - AUTONOM-1990 reference
+  - The a phase internal notes decision (D-XX) being verified
 
-Tests are organized into criterion-named classes per CD-03; ≥3 tests per
-criterion (a)-(j) per V18 plan §6 acceptance + 149-CONTEXT D-10 Tier 1.
+Tests are organized into criterion-named classes per; ≥3 tests per
+criterion (a)-(j) per V18 plan acceptance + 149-internal notes Tier 1.
 
 Source: https://iupac.qmul.ac.uk/fusedring/FR23.html
-Source: https://iupac.qmul.ac.uk/BlueBook/P2.html P-25.3.2.4
-Source: https://iupac.qmul.ac.uk/BlueBook/P2.html P-25.3.1.3
-Source: AUTONOM-1990 §4 (Wisniewski J. Chem. Inf. Comput. Sci. 30, 324-332)
+Source: https://iupac.qmul.ac.uk/BlueBook/P2.html
+Source: https://iupac.qmul.ac.uk/BlueBook/P2.html
+Source: AUTONOM-1990 (Wisniewski J. Chem. Inf. Comput. Sci. 30, 324-332)
         — hybrid catalog + algorithmic fallback validation; 61% agreement.
-Source: Phase 149 CONTEXT D-01..D-06, D-10.
+Source: a phase internal notes..,.
 """
 import inspect
 
@@ -84,23 +84,23 @@ def _ring_of_size(n: int):
 
 
 class TestCriterionAHeteroatomSeniority:
-    """FR-2.3(a) — heteroatom precedence per primary order N>F>...>Hg.
+    """.3(a) — heteroatom precedence per primary order N>F>...>Hg.
 
-    Source: https://iupac.qmul.ac.uk/fusedring/FR23.html FR-2.3(a)
-    Source: https://iupac.qmul.ac.uk/BlueBook/P2.html P-25.3.2.4
+    Source: https://iupac.qmul.ac.uk/fusedring/FR23.html.3(a)
+    Source: https://iupac.qmul.ac.uk/BlueBook/P2.html
     """
 
     def test_a_pyridine_vs_benzene_pyridine_wins(self):
         """N senior to C; pyridine ring is base in pyridine-benzene fusion (quinoline).
 
-        Per FR-2.3(a) the heterocyclic component containing the heteroatom
+        Per.3(a) the heterocyclic component containing the heteroatom
         occurring earliest in the order N>F>...>Hg is preferred. Pyridine
         contains N (rank 20); benzene is all-C (rank 0). Pyridine wins.
 
-        Source: https://iupac.qmul.ac.uk/fusedring/FR23.html FR-2.3(a)
-        Source: https://iupac.qmul.ac.uk/BlueBook/P2.html P-25.3.2.4
-        Source: AUTONOM-1990 §4.
-        Source: Phase 149 CONTEXT D-04 (REUSE _HETEROATOM_SENIORITY for FR-2.3(a)).
+        Source: https://iupac.qmul.ac.uk/fusedring/FR23.html.3(a)
+        Source: https://iupac.qmul.ac.uk/BlueBook/P2.html
+        Source: AUTONOM-1990
+        Source: a phase internal notes (REUSE _HETEROATOM_SENIORITY for.3(a)).
         """
         mol = Chem.MolFromSmiles("c1ccc2ncccc2c1")  # quinoline
         components = _enumerate_components(mol)
@@ -115,9 +115,9 @@ class TestCriterionAHeteroatomSeniority:
         )
 
     def test_a_pyridine_vs_furan_pyridine_wins(self):
-        """N senior to O; pyridine ring beats furan ring under FR-2.3(a).
+        """N senior to O; pyridine ring beats furan ring under.3(a).
 
-        Per V18 plan §6 line 949: explicit pyridine-vs-furan example.
+        Per V18 plan line 949: explicit pyridine-vs-furan example.
         Pyridine N rank = 20; furan O rank = 15. Pyridine wins.
 
         We compose the comparison via direct _rank calls (a 2-component
@@ -125,10 +125,10 @@ class TestCriterionAHeteroatomSeniority:
         furo-pyridine — uncommon in test data). Direct _rank with
         constructed atom sets is sufficient for criterion isolation.
 
-        Source: https://iupac.qmul.ac.uk/fusedring/FR23.html FR-2.3(a)
-        Source: https://iupac.qmul.ac.uk/BlueBook/P2.html P-25.3.2.4
-        Source: AUTONOM-1990 §4.
-        Source: Phase 149 CONTEXT D-04 (primary order N>F>Cl>...>O>...).
+        Source: https://iupac.qmul.ac.uk/fusedring/FR23.html.3(a)
+        Source: https://iupac.qmul.ac.uk/BlueBook/P2.html
+        Source: AUTONOM-1990
+        Source: a phase internal notes (primary order N>F>Cl>...>O>...).
         """
         py = Chem.MolFromSmiles("c1ccncc1")
         fu = Chem.MolFromSmiles("c1ccoc1")
@@ -142,14 +142,14 @@ class TestCriterionAHeteroatomSeniority:
         )
 
     def test_a_furan_vs_thiophene_furan_wins(self):
-        """O senior to S; furan ring beats thiophene under FR-2.3(a) primary order.
+        """O senior to S; furan ring beats thiophene under.3(a) primary order.
 
         _HETEROATOM_SENIORITY['O']=15 > _HETEROATOM_SENIORITY['S']=14.
 
-        Source: https://iupac.qmul.ac.uk/fusedring/FR23.html FR-2.3(a)
-        Source: https://iupac.qmul.ac.uk/BlueBook/P2.html P-25.3.2.4
-        Source: AUTONOM-1990 §4.
-        Source: Phase 149 CONTEXT D-04 / D-15 (REUSE primary order from ring_selection).
+        Source: https://iupac.qmul.ac.uk/fusedring/FR23.html.3(a)
+        Source: https://iupac.qmul.ac.uk/BlueBook/P2.html
+        Source: AUTONOM-1990
+        Source: a phase internal notes / (REUSE primary order from ring_selection).
         """
         fu = Chem.MolFromSmiles("c1ccoc1")
         th = Chem.MolFromSmiles("c1ccsc1")
@@ -169,26 +169,26 @@ class TestCriterionAHeteroatomSeniority:
 
 
 class TestCriterionBRingCount:
-    """FR-2.3(b) — Greater number of rings in the component.
+    """.3(b) — Greater number of rings in the component.
 
-    Source: https://iupac.qmul.ac.uk/fusedring/FR23.html FR-2.3(b)
-    Source: https://iupac.qmul.ac.uk/BlueBook/P2.html P-25.3.2.4
+    Source: https://iupac.qmul.ac.uk/fusedring/FR23.html.3(b)
+    Source: https://iupac.qmul.ac.uk/BlueBook/P2.html
     """
 
     def test_b_3ring_vs_2ring_3ring_wins(self):
-        """When (a) ties, FR-2.3(b) prefers the component with more rings.
+        """When (a) ties,.3(b) prefers the component with more rings.
 
-        Per V18 plan §6 line 950: 3-ring beats 2-ring.
+        Per V18 plan line 950: 3-ring beats 2-ring.
 
         We use anthracene (3-ring all-C) and compare a constructed
         atom set spanning all 3 SSSR rings vs an atom set spanning
         only one ring. Both are all-C so (a) ties at senior_het_neg=0;
         (b) breaks the tie via -3 < -1.
 
-        Source: https://iupac.qmul.ac.uk/fusedring/FR23.html FR-2.3(b)
-        Source: https://iupac.qmul.ac.uk/BlueBook/P2.html P-25.3.2.4
-        Source: AUTONOM-1990 §4.
-        Source: Phase 149 CONTEXT D-02 (ring_count_neg = -count).
+        Source: https://iupac.qmul.ac.uk/fusedring/FR23.html.3(b)
+        Source: https://iupac.qmul.ac.uk/BlueBook/P2.html
+        Source: AUTONOM-1990
+        Source: a phase internal notes (ring_count_neg = -count).
         """
         mol = Chem.MolFromSmiles("c1ccc2cc3ccccc3cc2c1")  # anthracene
         all_atoms = _all_ring_atoms(mol)
@@ -206,16 +206,16 @@ class TestCriterionBRingCount:
         )
 
     def test_b_2ring_component_beats_1ring_component_when_a_ties(self):
-        """When (a) ties, more rings wins under FR-2.3(b) regardless of (c)+ ties.
+        """When (a) ties, more rings wins under.3(b) regardless of (c)+ ties.
 
         Use phenanthrene (3-ring all-C) and compare 2-ring atom subset vs
         1-ring atom subset. Both subsets are all-C → (a) ties at 0;
         2-ring subset beats 1-ring at (b).
 
-        Source: https://iupac.qmul.ac.uk/fusedring/FR23.html FR-2.3(b)
-        Source: https://iupac.qmul.ac.uk/BlueBook/P2.html P-25.3.2.4
-        Source: AUTONOM-1990 §4.
-        Source: Phase 149 CONTEXT D-02 (ring_count_neg negation discipline).
+        Source: https://iupac.qmul.ac.uk/fusedring/FR23.html.3(b)
+        Source: https://iupac.qmul.ac.uk/BlueBook/P2.html
+        Source: AUTONOM-1990
+        Source: a phase internal notes (ring_count_neg negation discipline).
         """
         mol = Chem.MolFromSmiles("c1ccc2ccc3ccccc3c2c1")  # phenanthrene
         rings = mol.GetRingInfo().AtomRings()
@@ -231,15 +231,15 @@ class TestCriterionBRingCount:
         assert rank_two < rank_one
 
     def test_b_ring_count_negation_correct(self):
-        """FR-2.3(b) negation: ring_count_neg = -ring_count so min-sort picks more rings.
+        """.3(b) negation: ring_count_neg = -ring_count so min-sort picks more rings.
 
         Verifies the dataclass field convention from V18 Appendix A.6
         line 2384 (ring_count_neg=-ring_count).
 
-        Source: https://iupac.qmul.ac.uk/fusedring/FR23.html FR-2.3(b)
+        Source: https://iupac.qmul.ac.uk/fusedring/FR23.html.3(b)
         Source: V18 Appendix A.6 line 2384.
-        Source: AUTONOM-1990 §4.
-        Source: Phase 149 CONTEXT D-02 (negation discipline).
+        Source: AUTONOM-1990
+        Source: a phase internal notes (negation discipline).
         """
         mol = Chem.MolFromSmiles("c1ccc2ccccc2c1")  # naphthalene
         all_atoms = _all_ring_atoms(mol)
@@ -257,23 +257,23 @@ class TestCriterionBRingCount:
 
 
 class TestCriterionCRingSize:
-    """FR-2.3(c) — Larger ring at first point of difference (descending sizes).
+    """.3(c) — Larger ring at first point of difference (descending sizes).
 
-    Source: https://iupac.qmul.ac.uk/fusedring/FR23.html FR-2.3(c)
-    Source: https://iupac.qmul.ac.uk/BlueBook/P2.html P-25.3.2.4
+    Source: https://iupac.qmul.ac.uk/fusedring/FR23.html.3(c)
+    Source: https://iupac.qmul.ac.uk/BlueBook/P2.html
     """
 
     def test_c_75_vs_66_75_wins(self):
-        """Per V18 plan §6 line 951: at first difference 7 > 6.
+        """Per V18 plan line 951: at first difference 7 > 6.
 
         Compare ring_sizes_neg of (7,6) vs (6,6): -7 < -6 at index 0,
         so 7+6 wins. (Variant of "7+5 vs 6+6" — RDKit kekulization of
         azulene gives 7+6 in some conformers; the principle is identical.)
 
-        Source: https://iupac.qmul.ac.uk/fusedring/FR23.html FR-2.3(c)
-        Source: https://iupac.qmul.ac.uk/BlueBook/P2.html P-25.3.2.4
-        Source: AUTONOM-1990 §4.
-        Source: Phase 149 CONTEXT D-02 (ring_sizes_neg descending+negated).
+        Source: https://iupac.qmul.ac.uk/fusedring/FR23.html.3(c)
+        Source: https://iupac.qmul.ac.uk/BlueBook/P2.html
+        Source: AUTONOM-1990
+        Source: a phase internal notes (ring_sizes_neg descending+negated).
         """
         # 7+6 fused all-C
         mol_76 = Chem.MolFromSmiles("C1CCC2CCCCCC2C1")  # bicyclo[5.4.0]undecane → 7+6
@@ -291,14 +291,14 @@ class TestCriterionCRingSize:
         assert rank_76 < rank_66
 
     def test_c_single_7_beats_single_6(self):
-        """Single 7-membered ring beats single 6-membered ring at FR-2.3(c).
+        """Single 7-membered ring beats single 6-membered ring at.3(c).
 
         Cycloheptane vs cyclohexane: ring_sizes_neg=(-7,) < (-6,).
 
-        Source: https://iupac.qmul.ac.uk/fusedring/FR23.html FR-2.3(c)
-        Source: https://iupac.qmul.ac.uk/BlueBook/P2.html P-25.3.2.4
-        Source: AUTONOM-1990 §4.
-        Source: Phase 149 CONTEXT D-02.
+        Source: https://iupac.qmul.ac.uk/fusedring/FR23.html.3(c)
+        Source: https://iupac.qmul.ac.uk/BlueBook/P2.html
+        Source: AUTONOM-1990
+        Source: a phase internal notes.
         """
         mol7 = Chem.MolFromSmiles("C1CCCCCC1")  # cycloheptane
         mol6 = Chem.MolFromSmiles("C1CCCCC1")  # cyclohexane
@@ -317,10 +317,10 @@ class TestCriterionCRingSize:
 
         For mol with rings of sizes 5, 7, 6: descending=[7,6,5], negated=(-7,-6,-5).
 
-        Source: https://iupac.qmul.ac.uk/fusedring/FR23.html FR-2.3(c)
+        Source: https://iupac.qmul.ac.uk/fusedring/FR23.html.3(c)
         Source: V18 Appendix A.6 line 2387.
-        Source: AUTONOM-1990 §4.
-        Source: Phase 149 CONTEXT D-02.
+        Source: AUTONOM-1990
+        Source: a phase internal notes.
         """
         # 5+7 fused (azulene Kekulé form gives [5,7] in SSSR)
         mol = Chem.MolFromSmiles("C1=CC2=CC=CC=CC2=C1")
@@ -339,23 +339,23 @@ class TestCriterionCRingSize:
 
 
 class TestCriterionDHeteroatomCount:
-    """FR-2.3(d) — Greater total heteroatom count.
+    """.3(d) — Greater total heteroatom count.
 
-    Source: https://iupac.qmul.ac.uk/fusedring/FR23.html FR-2.3(d)
-    Source: https://iupac.qmul.ac.uk/BlueBook/P2.html P-25.3.2.4
+    Source: https://iupac.qmul.ac.uk/fusedring/FR23.html.3(d)
+    Source: https://iupac.qmul.ac.uk/BlueBook/P2.html
     """
 
     def test_d_2N_vs_1N_2N_wins(self):
-        """Per V18 plan §6 line 952: pyrazine (2N) beats pyridine (1N).
+        """Per V18 plan line 952: pyrazine (2N) beats pyridine (1N).
 
         Both rings contain N, so (a) ties at senior_het_neg=-20.
         Both are 6-membered single rings, so (b) and (c) tie.
         (d) breaks the tie: pyrazine het_count_neg=-2 < pyridine -1.
 
-        Source: https://iupac.qmul.ac.uk/fusedring/FR23.html FR-2.3(d)
-        Source: https://iupac.qmul.ac.uk/BlueBook/P2.html P-25.3.2.4
-        Source: AUTONOM-1990 §4.
-        Source: Phase 149 CONTEXT D-02 (het_count_neg = -count).
+        Source: https://iupac.qmul.ac.uk/fusedring/FR23.html.3(d)
+        Source: https://iupac.qmul.ac.uk/BlueBook/P2.html
+        Source: AUTONOM-1990
+        Source: a phase internal notes (het_count_neg = -count).
         """
         pyrazine = Chem.MolFromSmiles("c1cnccn1")
         pyridine = Chem.MolFromSmiles("c1ccncc1")
@@ -375,10 +375,10 @@ class TestCriterionDHeteroatomCount:
         Both rings have N (senior heteroatom), so (a) ties. Both 6-rings.
         (d) prefers more total heteroatoms: oxazine 2 > pyridine 1.
 
-        Source: https://iupac.qmul.ac.uk/fusedring/FR23.html FR-2.3(d)
-        Source: https://iupac.qmul.ac.uk/BlueBook/P2.html P-25.3.2.4
-        Source: AUTONOM-1990 §4.
-        Source: Phase 149 CONTEXT D-02.
+        Source: https://iupac.qmul.ac.uk/fusedring/FR23.html.3(d)
+        Source: https://iupac.qmul.ac.uk/BlueBook/P2.html
+        Source: AUTONOM-1990
+        Source: a phase internal notes.
         """
         # morpholine = saturated 1,4-oxazine; aromatic 1,4-oxazine: c1ccocn1?
         # Use morpholine (saturated, no aromaticity ambiguity); criterion (d)
@@ -395,14 +395,14 @@ class TestCriterionDHeteroatomCount:
         assert r_ox < r_py
 
     def test_d_negation_correct(self):
-        """FR-2.3(d) negation: het_count_neg = -het_count.
+        """.3(d) negation: het_count_neg = -het_count.
 
         Verifies V18 Appendix A.6 line 2391-2394 negation discipline.
 
-        Source: https://iupac.qmul.ac.uk/fusedring/FR23.html FR-2.3(d)
+        Source: https://iupac.qmul.ac.uk/fusedring/FR23.html.3(d)
         Source: V18 Appendix A.6 lines 2391-2394.
-        Source: AUTONOM-1990 §4.
-        Source: Phase 149 CONTEXT D-02.
+        Source: AUTONOM-1990
+        Source: a phase internal notes.
         """
         # 1,3,5-triazine: 3 N
         triazine = Chem.MolFromSmiles("c1ncncn1")
@@ -418,22 +418,22 @@ class TestCriterionDHeteroatomCount:
 
 
 class TestCriterionEHeteroatomVariety:
-    """FR-2.3(e) — Greater heteroatom variety (set cardinality of heteroatom species).
+    """.3(e) — Greater heteroatom variety (set cardinality of heteroatom species).
 
-    Source: https://iupac.qmul.ac.uk/fusedring/FR23.html FR-2.3(e)
-    Source: https://iupac.qmul.ac.uk/BlueBook/P2.html P-25.3.2.4
+    Source: https://iupac.qmul.ac.uk/fusedring/FR23.html.3(e)
+    Source: https://iupac.qmul.ac.uk/BlueBook/P2.html
     """
 
     def test_e_NO_vs_N_NO_wins(self):
-        """Per V18 plan §6 line 953: variety {N,O}=2 beats variety {N}=1.
+        """Per V18 plan line 953: variety {N,O}=2 beats variety {N}=1.
 
         Oxazole (1N+1O, variety=2) vs imidazole (2N, variety=1). Both 5-ring.
         Total het count (d) ties at -2; (e) breaks: -2 < -1.
 
-        Source: https://iupac.qmul.ac.uk/fusedring/FR23.html FR-2.3(e)
-        Source: https://iupac.qmul.ac.uk/BlueBook/P2.html P-25.3.2.4
-        Source: AUTONOM-1990 §4.
-        Source: Phase 149 CONTEXT D-02.
+        Source: https://iupac.qmul.ac.uk/fusedring/FR23.html.3(e)
+        Source: https://iupac.qmul.ac.uk/BlueBook/P2.html
+        Source: AUTONOM-1990
+        Source: a phase internal notes.
         """
         oxazole = Chem.MolFromSmiles("c1ocnc1")  # 1,3-oxazole: 1N + 1O
         imidazole = Chem.MolFromSmiles("c1[nH]cnc1")  # 1H-imidazole: 2N
@@ -452,10 +452,10 @@ class TestCriterionEHeteroatomVariety:
         Pyridazine (2N, variety 1) vs 1,2-oxazine (1N+1O, variety 2).
         Both 6-rings; (a) ties at N, (d) ties at 2 het. (e) breaks.
 
-        Source: https://iupac.qmul.ac.uk/fusedring/FR23.html FR-2.3(e)
-        Source: https://iupac.qmul.ac.uk/BlueBook/P2.html P-25.3.2.4
-        Source: AUTONOM-1990 §4.
-        Source: Phase 149 CONTEXT D-02.
+        Source: https://iupac.qmul.ac.uk/fusedring/FR23.html.3(e)
+        Source: https://iupac.qmul.ac.uk/BlueBook/P2.html
+        Source: AUTONOM-1990
+        Source: a phase internal notes.
         """
         pyridazine = Chem.MolFromSmiles("c1ccnnc1")  # 2N
         oxazine_12 = Chem.MolFromSmiles("C1CCNOC1")  # 1,2-oxazinane: 1N + 1O
@@ -472,16 +472,16 @@ class TestCriterionEHeteroatomVariety:
     def test_e_variety_is_set_cardinality_not_count(self):
         """Variety = set cardinality of distinct heteroatom species.
 
-        Per CONTEXT D-15 audit: FR-2.3(e) is set cardinality, not the
-        per-element-count vector (which is P-44.2.1(g), a different clause).
+        Per internal notes audit:.3(e) is set cardinality, not the
+        per-element-count vector (which is (g), a different clause).
 
         For 1,3,5-triazine (3 N atoms), variety is 1 (single species
         {N}), NOT 3.
 
-        Source: https://iupac.qmul.ac.uk/fusedring/FR23.html FR-2.3(e)
+        Source: https://iupac.qmul.ac.uk/fusedring/FR23.html.3(e)
         Source: V18 Appendix A.6 lines 2396-2402.
-        Source: AUTONOM-1990 §4.
-        Source: Phase 149 CONTEXT D-15 (variety is set cardinality).
+        Source: AUTONOM-1990
+        Source: a phase internal notes (variety is set cardinality).
         """
         triazine = Chem.MolFromSmiles("c1ncncn1")  # 1,3,5-triazine: 3 N's
         r = _rank(triazine, _all_ring_atoms(triazine))
@@ -498,13 +498,13 @@ class TestCriterionEHeteroatomVariety:
 
 
 class TestCriterionFAltOrder:
-    """FR-2.3(f) — Heteroatoms by alt priority (F > Cl > Br > I > O > ... > Hg).
+    """.3(f) — Heteroatoms by alt priority (F > Cl > Br > I > O >... > Hg).
 
     Per V18 Appendix A.6 line 2319-2325 the alt order DIFFERS from primary:
     F at rank 20 (not N); N at rank 12 (not 20). Hg present, Al/Ga absent.
 
-    Source: https://iupac.qmul.ac.uk/fusedring/FR23.html FR-2.3(f)
-    Source: https://iupac.qmul.ac.uk/BlueBook/P2.html P-25.3.2.4
+    Source: https://iupac.qmul.ac.uk/fusedring/FR23.html.3(f)
+    Source: https://iupac.qmul.ac.uk/BlueBook/P2.html
     """
 
     def test_f_alt_het_tuple_uses_alt_order_not_primary(self):
@@ -512,13 +512,13 @@ class TestCriterionFAltOrder:
 
         For pyridine (1 N), alt_het_tuple has -1 at the index of 'N' in
         _FR23_ALT_ORDER and 0 elsewhere. Per V18 Appendix A.6 line 2406-2407
-        the alt order is ('F', 'Cl', 'Br', 'I', 'O', 'S', 'Se', 'Te', 'N', ...);
+        the alt order is ('F', 'Cl', 'Br', 'I', 'O', 'S', 'Se', 'Te', 'N',...);
         N is at index 8.
 
-        Source: https://iupac.qmul.ac.uk/fusedring/FR23.html FR-2.3(f)
+        Source: https://iupac.qmul.ac.uk/fusedring/FR23.html.3(f)
         Source: V18 Appendix A.6 lines 2406-2412.
-        Source: AUTONOM-1990 §4.
-        Source: Phase 149 CONTEXT D-04 (alt order is genuinely different from primary).
+        Source: AUTONOM-1990
+        Source: a phase internal notes (alt order is genuinely different from primary).
         """
         py = Chem.MolFromSmiles("c1ccncc1")
         rank = _rank(py, _all_ring_atoms(py))
@@ -539,8 +539,8 @@ class TestCriterionFAltOrder:
         """In the alt tuple, F (index 0) beats N (index 8) at first non-zero index.
 
         Construct two ranks with everything tied (a)-(e) except (f):
-        - ring with F: alt_het_tuple = (-1, 0, ..., 0)  (F at index 0)
-        - ring with N: alt_het_tuple = (0, 0, ..., 0, -1, 0, ...)  (N at index 8)
+        - ring with F: alt_het_tuple = (-1, 0,..., 0) (F at index 0)
+        - ring with N: alt_het_tuple = (0, 0,..., 0, -1, 0,...) (N at index 8)
 
         At index 0, the F-tuple has -1 vs N-tuple's 0 → F-tuple < N-tuple.
 
@@ -549,10 +549,10 @@ class TestCriterionFAltOrder:
         rank 19). This test isolates (f) by directly comparing alt_het_tuples,
         which is the documented purpose of (f) as a tail tiebreaker.
 
-        Source: https://iupac.qmul.ac.uk/fusedring/FR23.html FR-2.3(f)
+        Source: https://iupac.qmul.ac.uk/fusedring/FR23.html.3(f)
         Source: V18 Appendix A.6 lines 2406-2412.
-        Source: AUTONOM-1990 §4.
-        Source: Phase 149 CONTEXT D-04 (alt is the (f) tail-tiebreaker, not the (a) primary).
+        Source: AUTONOM-1990
+        Source: a phase internal notes (alt is the (f) tail-tiebreaker, not the (a) primary).
         """
         # Build two atom sets in the same RDKit mol for fair _rank comparison.
         # Use a synthetic molecule containing both an F-substituted ring and
@@ -579,13 +579,13 @@ class TestCriterionFAltOrder:
         """_FR23_HETEROATOM_ALT excludes Al and Ga but includes Hg per V18 Appendix A.6.
 
         Differs from _HETEROATOM_SENIORITY (which has Al + Ga, no Hg) by design
-        per CONTEXT D-04. The two constants are genuinely different; FR-2.3(a)
-        uses primary order, FR-2.3(f) uses alt order.
+        per internal notes. The two constants are genuinely different;.3(a)
+        uses primary order,.3(f) uses alt order.
 
-        Source: https://iupac.qmul.ac.uk/fusedring/FR23.html FR-2.3(f)
+        Source: https://iupac.qmul.ac.uk/fusedring/FR23.html.3(f)
         Source: V18 Appendix A.6 lines 2319-2325.
-        Source: AUTONOM-1990 §4.
-        Source: Phase 149 CONTEXT D-04 (alt is a SEPARATE constant; Hg present, Al/Ga absent).
+        Source: AUTONOM-1990
+        Source: a phase internal notes (alt is a SEPARATE constant; Hg present, Al/Ga absent).
         """
         assert 'Al' not in _FR23_HETEROATOM_ALT, (
             "Al must NOT be in _FR23_HETEROATOM_ALT (V18 Appendix A.6 lock)"
@@ -609,20 +609,20 @@ class TestCriterionFAltOrder:
 
 
 # ============================================================================
-# Criterion (g) — Preferred Orientation (deterministic stub per D-03)
+# Criterion (g) — Preferred Orientation (deterministic stub per)
 # ============================================================================
 
 
 class TestCriterionGOrientStub:
-    """FR-2.3(g) — Preferred orientation. FILLED (Wave-2 P5 fused, Task 6).
+    """.3(g) — Preferred orientation. FILLED (Wave-2 P5 fused, Task 6).
 
-    P-25.3.2.4(g): greatest number of rings in a horizontal row. The field is
+    (g): greatest number of rings in a horizontal row. The field is
     now a COMPUTED per-component structural descriptor (negated horizontal-row
-    count) instead of the deferred D-03 constant 0. It is deterministic and
+    count) instead of the deferred constant 0. It is deterministic and
     spelling-invariant, and only decides when (a)-(f) tie.
 
-    Source: https://iupac.qmul.ac.uk/fusedring/FR23.html FR-2.3(g)
-    Source: BlueBookV2.md:12317 P-25.3.2.4(g)
+    Source: https://iupac.qmul.ac.uk/fusedring/FR23.html.3(g)
+    Source: the Blue Book (g)
     """
 
     def test_orient_computed_from_ring_span(self):
@@ -653,19 +653,19 @@ class TestCriterionGOrientStub:
 
 
 # ============================================================================
-# Criterion (h) — Lower Locants for Heteroatoms (deterministic stub per D-03)
+# Criterion (h) — Lower Locants for Heteroatoms (deterministic stub per)
 # ============================================================================
 
 
 class TestCriterionHHetLocantsStub:
-    """FR-2.3(h) — Lower heteroatom locants. FILLED (Wave-2 P5 fused, Task 6).
+    """.3(h) — Lower heteroatom locants. FILLED (Wave-2 P5 fused, Task 6).
 
-    P-25.3.2.4(h): a component with lower locants for heteroatoms. The field is
+    (h): a component with lower locants for heteroatoms. The field is
     now the ascending tuple of heteroatom locants under a spelling-invariant
     per-component canonical numbering (empty for a carbocycle).
 
-    Source: https://iupac.qmul.ac.uk/fusedring/FR23.html FR-2.3(h)
-    Source: BlueBookV2.md:12392 P-25.3.2.4(h)
+    Source: https://iupac.qmul.ac.uk/fusedring/FR23.html.3(h)
+    Source: the Blue Book (h)
     """
 
     def test_het_locants_populated_for_het_component(self):
@@ -677,7 +677,7 @@ class TestCriterionHHetLocantsStub:
         assert list(rank.het_locants_stub) == sorted(rank.het_locants_stub)
 
     def test_het_locants_empty_for_carbocycle(self):
-        """Carbocyclic component -> empty tuple (non-regressing, per D-03 default
+        """Carbocyclic component -> empty tuple (non-regressing, per default
         semantics preserved for all-carbon rings)."""
         mol = Chem.MolFromSmiles("c1ccc2ccccc2c1")  # naphthalene
         rank = _rank(mol, _all_ring_atoms(mol))
@@ -692,19 +692,19 @@ class TestCriterionHHetLocantsStub:
 
 
 # ============================================================================
-# Criterion (i) — Locant Ordering by Heteroatom Type (deterministic stub per D-03)
+# Criterion (i) — Locant Ordering by Heteroatom Type (deterministic stub per)
 # ============================================================================
 
 
 class TestCriterionIHetTypeLocantsStub:
-    """FR-2.3(i) — Locant ordering by heteroatom type. FILLED (Wave-2 P5, Task 6).
+    """.3(i) — Locant ordering by heteroatom type. FILLED (Wave-2 P5, Task 6).
 
-    P-25.3.2.4(i): lower locants for heteroatoms in seniority order. The field is
+    (i): lower locants for heteroatoms in seniority order. The field is
     now a computed tuple (senior element's locants first). Deterministic,
     spelling-invariant, empty for a carbocycle.
 
-    Source: https://iupac.qmul.ac.uk/fusedring/FR23.html FR-2.3(i)
-    Source: BlueBookV2.md:12407 P-25.3.2.4(i)
+    Source: https://iupac.qmul.ac.uk/fusedring/FR23.html.3(i)
+    Source: the Blue Book (i)
     """
 
     def test_het_type_locants_populated_for_het_component(self):
@@ -729,20 +729,20 @@ class TestCriterionIHetTypeLocantsStub:
 
 
 # ============================================================================
-# Criterion (j) — Lower Bridgehead Carbon Locants (deterministic stub per D-03)
+# Criterion (j) — Lower Bridgehead Carbon Locants (deterministic stub per)
 # ============================================================================
 
 
 class TestCriterionJBridgeheadStub:
-    """FR-2.3(j) — Lower peripheral fusion-carbon locants. FILLED (Wave-2 P5, Task 6).
+    """.3(j) — Lower peripheral fusion-carbon locants. FILLED (Wave-2 P5, Task 6).
 
-    P-25.3.2.4(j): lower locants for peripheral fusion carbon atoms. The field is
+    (j): lower locants for peripheral fusion carbon atoms. The field is
     now the ascending tuple of fusion-carbon locants (carbons shared by >=2 rings
     of the component), computed under the spelling-invariant per-component
     numbering. Empty for a monocycle (no fusion carbons).
 
-    Source: https://iupac.qmul.ac.uk/fusedring/FR23.html FR-2.3(j)
-    Source: BlueBookV2.md:12418 P-25.3.2.4(j)
+    Source: https://iupac.qmul.ac.uk/fusedring/FR23.html.3(j)
+    Source: the Blue Book (j)
     """
 
     def test_bridgehead_locants_populated_for_fused_component(self):
@@ -776,16 +776,16 @@ class TestComponentRankTotalOrder:
     """ComponentRank dataclass(frozen=True, order=True) total-order properties.
 
     Source: V18_MILESTONE_PLAN Appendix A.6 lines 2328-2341.
-    Source: 149-CONTEXT.md D-02 (sortable dataclass).
-    Source: 149-RESEARCH.md "Stable total-order proof sketch" line 248.
+    Source: 149-internal notes (sortable dataclass).
+    Source: internal notes "Stable total-order proof sketch" line 248.
     """
 
     def test_componentrank_total_order_distinct_ranks_compare(self):
         """Any two distinct ranks compare deterministically via lexicographic order.
 
         Source: https://iupac.qmul.ac.uk/fusedring/FR23.html
-        Source: AUTONOM-1990 §4.
-        Source: Phase 149 CONTEXT D-02 (sortable dataclass total-order).
+        Source: AUTONOM-1990
+        Source: a phase internal notes (sortable dataclass total-order).
         """
         # Higher senior het — wins
         r1 = ComponentRank(
@@ -804,8 +804,8 @@ class TestComponentRankTotalOrder:
         """Two ComponentRank instances with all 10 fields equal compare equal.
 
         Source: https://iupac.qmul.ac.uk/fusedring/FR23.html
-        Source: AUTONOM-1990 §4.
-        Source: Phase 149 CONTEXT D-02 (frozen dataclass).
+        Source: AUTONOM-1990
+        Source: a phase internal notes (frozen dataclass).
         """
         a = ComponentRank(
             senior_het_neg=-20, ring_count_neg=-1, ring_sizes_neg=(-6,),
@@ -828,19 +828,19 @@ class TestComponentRankTotalOrder:
 
 
 class TestSelectBaseComponentAPI:
-    """Public API contract per V18 plan §6 SC #1 (D-06 signature lock).
+    """Public API contract per V18 plan SC #1 (signature lock).
 
-    Source: V18_MILESTONE_PLAN §6 Phase 149 SC #1.
-    Source: 149-CONTEXT.md D-06.
+    Source: V18_MILESTONE_PLAN a phase SC #1.
+    Source: 149-internal notes.
     """
 
     def test_signature_matches_v18_plan(self):
-        """select_base_component(mol, fused_components) per D-06 lock.
+        """select_base_component(mol, fused_components) per lock.
 
-        Source: V18_MILESTONE_PLAN §6 Phase 149 SC #1.
+        Source: V18_MILESTONE_PLAN a phase SC #1.
         Source: https://iupac.qmul.ac.uk/fusedring/FR23.html
-        Source: AUTONOM-1990 §4.
-        Source: Phase 149 CONTEXT D-06 (signature lock).
+        Source: AUTONOM-1990
+        Source: a phase internal notes (signature lock).
         """
         sig = inspect.signature(select_base_component)
         params = list(sig.parameters)
@@ -849,23 +849,23 @@ class TestSelectBaseComponentAPI:
         )
 
     def test_raises_on_single_component(self):
-        """Edge case: fusion naming undefined for single component (D-06).
+        """Edge case: fusion naming undefined for single component .
 
-        Source: V18_MILESTONE_PLAN §6 Phase 149 SC #1 ValueError lock.
+        Source: V18_MILESTONE_PLAN a phase SC #1 ValueError lock.
         Source: https://iupac.qmul.ac.uk/fusedring/FR23.html
-        Source: AUTONOM-1990 §4.
-        Source: Phase 149 CONTEXT D-06.
+        Source: AUTONOM-1990
+        Source: a phase internal notes.
         """
         mol = Chem.MolFromSmiles("c1ccccc1")
         with pytest.raises(ValueError, match="Need >=2"):
             select_base_component(mol, [{0, 1, 2, 3, 4, 5}])
 
     def test_raises_on_zero_components(self):
-        """Edge case: empty list also raises ValueError (D-06).
+        """Edge case: empty list also raises ValueError .
 
-        Source: https://iupac.qmul.ac.uk/fusedring/FR23.html P-25.3.2.4
-        Source: AUTONOM-1990 §4.
-        Source: Phase 149 CONTEXT D-06.
+        Source: https://iupac.qmul.ac.uk/fusedring/FR23.html
+        Source: AUTONOM-1990
+        Source: a phase internal notes.
         """
         mol = Chem.MolFromSmiles("CCO")
         with pytest.raises(ValueError, match="Need >=2"):
@@ -878,18 +878,18 @@ class TestSelectBaseComponentAPI:
 
 
 class TestEnumerateComponents:
-    """_enumerate_components SSSR-based decomposition per D-05 + CD-04.
+    """_enumerate_components SSSR-based decomposition per +.
 
-    Source: https://iupac.qmul.ac.uk/BlueBook/P2.html P-25.3.1.3
-    Source: 149-CONTEXT.md D-05 (SSSR base), CD-04 (frozenset return).
+    Source: https://iupac.qmul.ac.uk/BlueBook/P2.html
+    Source: 149-internal notes (SSSR base), (frozenset return).
     """
 
     def test_returns_frozensets_per_cd_04(self):
-        """_enumerate_components returns List[FrozenSet[int]] per CD-04.
+        """_enumerate_components returns List[FrozenSet[int]] per.
 
         Source: https://iupac.qmul.ac.uk/fusedring/FR23.html
-        Source: AUTONOM-1990 §4.
-        Source: Phase 149 CONTEXT CD-04 (frozenset for hashability).
+        Source: AUTONOM-1990
+        Source: a phase internal notes (frozenset for hashability).
         """
         mol = Chem.MolFromSmiles("c1ccc2ncccc2c1")  # quinoline
         components = _enumerate_components(mol)
@@ -902,8 +902,8 @@ class TestEnumerateComponents:
         """Quinoline (2 SSSR rings) → 2 components.
 
         Source: https://iupac.qmul.ac.uk/fusedring/FR23.html
-        Source: AUTONOM-1990 §4.
-        Source: Phase 149 CONTEXT D-05.
+        Source: AUTONOM-1990
+        Source: a phase internal notes.
         """
         mol = Chem.MolFromSmiles("c1ccc2ncccc2c1")
         components = _enumerate_components(mol)
@@ -915,8 +915,8 @@ class TestEnumerateComponents:
         """Acyclic molecule → empty component list (caller raises ValueError).
 
         Source: https://iupac.qmul.ac.uk/fusedring/FR23.html
-        Source: AUTONOM-1990 §4.
-        Source: Phase 149 CONTEXT D-05.
+        Source: AUTONOM-1990
+        Source: a phase internal notes.
         """
         mol = Chem.MolFromSmiles("CCO")  # ethanol
         components = _enumerate_components(mol)
@@ -926,7 +926,7 @@ class TestEnumerateComponents:
 
 
 # ============================================================================
-# Phase 155.C — P-25.2.2.4 Benzo-Fusion Regression Cases (D-13)
+# a phase.C — Benzo-Fusion Regression Cases
 # ============================================================================
 
 
@@ -947,23 +947,23 @@ def _ring_is_pure_carbocycle():
 
 
 class TestP25224BenzoFusion:
-    """Phase 155.C D-13 regression: P-25.2.2.4 Jan 2022 errata benzo-fusion
+    """a phase.C regression: Jan 2022 errata benzo-fusion
     base-selection cases.
 
-    Eight canonical regression cases verify that Phase 149's FR-2.3 cascade
+    Eight canonical regression cases verify that a phase's.3 cascade
     ((a)-(f) live, (g)-(j) deterministic stubs) selects the IUPAC-preferred
     base component WITHOUT consulting MONOCYCLIC_COMPONENTS.seniority (the
     last-resort numeric tiebreaker).
 
-    Per 155-AUDIT-C.md §"D-13 Activation Verdict": every case below picks the
+    Per internal notes-C.md §" Activation Verdict": every case below picks the
     HETEROCYCLIC ring (or in the homo-N pyrido-pyrido case the lower-locant
-    pyridine ring), never the pure-carbocyclic benzene ring. Phase 149's
-    FR-2.3 cascade is therefore sufficient — no `fused_ring_selection.py`
+    pyridine ring), never the pure-carbocyclic benzene ring. a phase's
+    .3 cascade is therefore sufficient — no `fused_ring_selection.py`
     edit ships in sub-phase 155.C.
 
-    Source: 155-CONTEXT.md D-13.
-    Source: 155-AUDIT-C.md "P-25.2.2.4 Regression Cases (D-13 cross-check)".
-    Source: IUPAC P-25.2.2.4 Jan 2022 errata.
+    Source: 155-internal notes.
+    Source: internal notes-C.md " Regression Cases (cross-check)".
+    Source: IUPAC Jan 2022 errata.
     """
 
     @pytest.mark.parametrize(
@@ -981,20 +981,20 @@ class TestP25224BenzoFusion:
             # 1H-benzimidazole — base must be imidazole (5-ring containing N).
             ("c1ccc2[nH]cnc2c1", _ring_contains_symbol("N"), "1H-benzimidazole", 5),
             # 1,3-benzothiazole — base must be thiazole (5-ring containing N
-            # — N is more senior than S in FR-2.3 (a)).
+            # — N is more senior than S in.3 (a)).
             ("c1ccc2scnc2c1", _ring_contains_symbol("N"), "1,3-benzothiazole", 5),
-            # pyrido[2,3-b]pyridine — both 6-rings contain N; FR-2.3 still
+            # pyrido[2,3-b]pyridine — both 6-rings contain N;.3 still
             # picks one canonical ring (verified deterministic).
             ("c1cnc2cccnc2c1", _ring_contains_symbol("N"), "pyrido[2,3-b]pyridine", 6),
-            # pyrido[3,2-b]pyridine — homo-N case; FR-2.3 picks one ring.
+            # pyrido[3,2-b]pyridine — homo-N case;.3 picks one ring.
             ("c1cnc2ncccc2c1", _ring_contains_symbol("N"), "pyrido[3,2-b]pyridine", 6),
         ],
     )
     def test_benzo_fusion_base_is_heterocyclic(
         self, smiles, base_predicate, case_label, expected_size
     ):
-        """FR-2.3 cascade selects the heterocyclic base for every benzo-fusion
-        regression case in 155-AUDIT-C.md (8 canonical P-25.2.2.4 examples)."""
+        """.3 cascade selects the heterocyclic base for every benzo-fusion
+        regression case in internal notes-C.md (8 canonical examples)."""
         mol = Chem.MolFromSmiles(smiles)
         assert mol is not None, f"RDKit failed to parse {smiles!r}"
         components = [set(c) for c in _enumerate_components(mol)]
@@ -1015,7 +1015,7 @@ class TestP25224BenzoFusion:
         )
 
     def test_benzo_b_furan_base_is_NOT_benzene(self):
-        """Explicit anti-regression: for benzo[b]furan, FR-2.3 must NEVER pick
+        """Explicit anti-regression: for benzo[b]furan,.3 must NEVER pick
         the pure-carbocyclic 6-ring as the base (would yield wrong PIN)."""
         mol = Chem.MolFromSmiles("c1ccc2occc2c1")
         components = [set(c) for c in _enumerate_components(mol)]

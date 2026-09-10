@@ -1,4 +1,4 @@
-""" a phase Task 4 -- the P-16.2.4.1(a) hyphen before a locant.
+""" a phase Task 4 -- the (a) hyphen before a locant.
 
 Defect class C4: `parent_to_prefix` glued a prefix word fragment straight onto a
 stem that itself begins with a locant, producing OPSIN-unparseable fragments
@@ -6,21 +6,21 @@ such as `3-amino2,12-dimethyltetradecyl`.
 
 Governing rule, quoted with its section heading:
 
-  the Blue Book, heading "P-16.2.4 Hyphens" --
-    "P-16.2.4.1 Hyphens are used in substitutive names:
+  the Blue Book, heading " Hyphens" --
+    " Hyphens are used in substitutive names:
      (a) to separate locants from words or word fragments;
-     Example: 2-chloro-2-methylpropane (PIN, P-61.3.1)"
+     Example: 2-chloro-2-methylpropane (PIN, "
 
-  the Blue Book, heading "P-14.3.1 Types of locants" --
+  the Blue Book, heading " Types of locants" --
     "Traditional types of locants are arabic numbers, for example, 1, 2, 3;
      primed locants, for example, 1', 1''', 2''; locants including a lower case
      Roman letter, for example, 3a, 3b; italicized Roman letters, for example,
      O, N, P;..."
   -- so an italic element locant takes the hyphen exactly as an arabic one does.
-  Confirmed verbatim by the PIN example under P-16.2.4.1(b), the Blue Book:
-    "N1-(2-aminoethyl)-N1,N2,N2-trimethylethane-1,2-diamine (PIN, P-62.2.4.1.3)"
+  Confirmed verbatim by the PIN example under (b), the Blue Book:
+    "N1-(2-aminoethyl)-N1,N2,N2-trimethylethane-1,2-diamine (PIN, "
 
-  The bounding counter-rule, the Blue Book "P-16.2.4.2": "No hyphen is placed after a
+  The bounding counter-rule, the Blue Book "": "No hyphen is placed after a
   numerical prefix cited in front of a compound substituent enclosed by
   parentheses, even if that substituent begins with locants" -- example
   "N,1-bis(4-chlorophenyl)methanimine (PIN)". A '(' is not a locant, so the
@@ -45,11 +45,11 @@ pytestmark = pytest.mark.unit
 
 
 class TestStartsWithLocant:
-    """P-14.3.1 -- which heads count as a cited locant set."""
+    """ -- which heads count as a cited locant set."""
 
     # (text, expected). Arabic and italic-element positives, then the
     # word-fragment / configurational-descriptor negatives that must NOT be
-    # split (P-16.2.4.1(a) separates *locants*, not any leading letter).
+    # split (a) separates *locants*, not any leading letter).
     CASES = [
         ("2-methyl", True),
         ("2,12-dimethyltetradec", True),
@@ -104,7 +104,7 @@ class TestPrefixStemYl:
         assert _prefix_stem_yl("2,5-di", "methylhex") == "2,5-dimethylhexyl"
 
     def test_p16_2_4_2_no_hyphen_before_an_enclosing_mark(self):
-        # P-16.2.4.2: '(' is not a locant, so 'bis(' is never split.
+        #: '(' is not a locant, so 'bis(' is never split.
         assert _prefix_stem_yl("bis", "(4-chlorophenyl)meth") == "bis(4-chlorophenyl)methyl"
 
 
@@ -121,7 +121,7 @@ class TestParentToPrefixWitnesses:
     # is the same failure: OPSIN round-trips ``(3-amino-2,12-dimethyltetradecyl)
     # benzene`` to a different molecule, while the structurally numbered
     # ``(12-amino-3,13-dimethyltetradecan-3-yl)benzene`` is EXACT
-    # (P-46.1.8, the Blue Book: "The principal substituent chain has the lowest
+    #, the Blue Book: "The principal substituent chain has the lowest
     # locants for free valences of any kind").
     #
     # The C4 HYPHEN behaviour they were written to guard is preserved by pinning
@@ -147,7 +147,7 @@ class TestParentToPrefixWitnesses:
 
     def test_witness_three_fails_closed(self):
         # 'aminoO-methylhydroxyl' came from the unlocanted-amine branch on the
-        # parent 'O-methylhydroxylamine'. P-29.2 (the Blue Book) licenses '-yl' only
+        # parent 'O-methylhydroxylamine'. (the Blue Book) licenses '-yl' only
         # for a PARENT HYDRIDE, and a hydroxylamine is not one, so Task 3's
         # guard now declines the whole conversion -- the C4 hyphen is moot here
         # and the emitter abstains instead. Pinned so a later change to that

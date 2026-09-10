@@ -1,11 +1,11 @@
-"""P-65.1.5.1 / P-65.6.2.1 — 'dithioic acid'/'dithioate' are enclosed even at count 1.
+""" / — 'dithioic acid'/'dithioate' are enclosed even at count 1.
 
 The 'di' of 'dithio-' is visually a multiplicative 'di' on the suffix, so the Blue
 Book parenthesises these two suffixes even for a single group (unlike plain 'thioic
 acid', which stays bare):
 
-    ...prop-2-ene(dithioic acid) (P-65.1.5.1, the Blue Book)
-    sodium propane(dithioate) (P-65.6.2.1, the Blue Book)
+    ...prop-2-ene(dithioic acid), the Blue Book)
+    sodium propane(dithioate), the Blue Book)
 
 Two coupled sites: format_suffix_with_locants adds the count=1 wrap on the neutral
 acid; _acid_anion_from_neutral swaps the ending INSIDE the parens so the salt keeps

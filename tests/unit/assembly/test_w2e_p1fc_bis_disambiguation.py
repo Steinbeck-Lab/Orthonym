@@ -1,5 +1,5 @@
-"""W2E-P1FC Task 2 — P-16.3.6 (a) (BB 7134): bis/tris before ambiguous
-mononuclear prefixes. "bis(sulfanyl) ... defines two -SH groups ... whereas
+"""W2E-P1FC Task 2 — (a) (BB 7134): bis/tris before ambiguous
+mononuclear prefixes. "bis(sulfanyl)... defines two -SH groups... whereas
 disulfanyl defines the -SSH group".
 
 STALE-SPEC NOTE (2026-07-09): the plan recorded HEAD as emitting the WRONG
@@ -24,7 +24,7 @@ from orthonym.rules.polyfunctional import format_fg_prefix
 @pytest.mark.unit
 class TestP1636BisDisambiguation:
     def test_frozenset_covers_the_p1636a_class(self):
-        # P-16.3.6 (a) note: the S, Se, Te, N, P, As, Sb analogues whose
+        # (a) note: the S, Se, Te, N, P, As, Sb analogues whose
         # di-form collides with a catenated-hydride prefix, plus -OOH (dioxidanyl
         # vs peroxy). CATENATION_AMBIGUOUS_PREFIXES is the existing owner.
         required = {
@@ -53,7 +53,7 @@ class TestP1636BisDisambiguation:
         assert name_compound(smiles) == expected
 
     @pytest.mark.parametrize("smiles,expected", [
-        # genuine catenated -SSH keeps 'disulfanyl' (P-63.4.2.2)
+        # genuine catenated -SSH keeps 'disulfanyl'
         ("SSCCC(=O)O", "3-disulfanylpropanoic acid"),
         ("SCCC(=O)O", "3-sulfanylpropanoic acid"),
     ])

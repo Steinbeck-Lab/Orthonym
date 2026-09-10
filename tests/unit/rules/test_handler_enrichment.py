@@ -1,6 +1,6 @@
-"""Tests for Tier B handler enrichment via _enrich_handler_name().
+"""Tests for Tier B handler enrichment via _enrich_handler_name.
 
-Phase 139 Plan 02 ARCH-03/04: Verify that Tier B handlers enrich their
+a phase Plan 02 /04: Verify that Tier B handlers enrich their
 base names with non-principal substituents via the universal pipeline.
 """
 
@@ -75,7 +75,7 @@ class TestCarbamicAcidEnrichment:
 
         OC(=O)NCCCC(=O)C = N-(4-oxopentyl)carbamic acid
         The ketone (=O) within the N-substituent chain must NOT be silently dropped.
-        Phase 139 gap closure: SC4.
+        a phase gap closure: SC4.
         """
         from orthonym import name_compound
         result = name_compound("OC(=O)NCCCC(=O)C")
@@ -89,7 +89,7 @@ class TestCarbamicAcidEnrichment:
 
         OC(=O)NCC(O)C = N-(2-hydroxypropyl)carbamic acid
         The alcohol (-OH) within the N-substituent chain must NOT be silently dropped.
-        Phase 139 gap closure: SC4.
+        a phase gap closure: SC4.
         """
         from orthonym import name_compound
         result = name_compound("OC(=O)NCC(O)C")
@@ -134,7 +134,7 @@ class TestBoronicAcidEnrichment:
 # Test 5: _enrich_handler_name helper function unit tests
 # ---------------------------------------------------------------------------
 class TestEnrichHandlerNameFunction:
-    """Unit tests for the _enrich_handler_name() helper function."""
+    """Unit tests for the _enrich_handler_name helper function."""
 
     def test_enrich_handler_name_exists(self):
         """_enrich_handler_name function is importable."""

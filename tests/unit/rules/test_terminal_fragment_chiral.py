@@ -1,11 +1,11 @@
-"""Phase 1 B3: terminal_fragment emits R/S for backbone stereocentres.
+"""a phase B3: terminal_fragment emits R/S for backbone stereocentres.
 
 Before this, `_terminal_fragment_name` refused ANY defined atom stereo (no R/S
 descriptor). Now the ACYCLIC path cites backbone R/S centres (merged with any
 backbone C=C E/Z) in one leading (...) block; the COMPOSITE (ring-parent) path
 still refuses (it emits no descriptor). This unblocked the peptide class + chiral
 composite substituents (measured: +9 in-scope rows, 0-wrong intact -- constitution
-verified by SELF-01, so a wrong CIP/locant abstains rather than ships).
+verified by, so a wrong CIP/locant abstains rather than ships).
 """
 import re
 

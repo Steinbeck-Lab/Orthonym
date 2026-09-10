@@ -45,7 +45,7 @@ the three witnesses, confirmed via producer tracing):
   double-bond descriptor is dropped by a DIFFERENT, deeper namer-capability
   gap in `assembly/substituent_naming.py::name_substituent_fragment` (a
   second, PARALLEL substituent chokepoint that has no stereo-injection path
-  at all) -- out of scope for an assembly-only fix; SELF-01 correctly
+  at all) -- out of scope for an assembly-only fix; correctly
   suppresses the resulting name rather than shipping it, so 0-wrong holds
   and the molecule FALLS THROUGH to abstain, per this batch's explicit
   license for an unresolved residual.
@@ -86,7 +86,7 @@ def test_saccharopine_names_and_full_rt(namer):
     # with a bare "(S)" stereo descriptor on the substituent -- denotes the
     # IDENTICAL molecule (RT-verified below, full InChIKey incl. the stereo
     # layer). Before this fix the whole molecule abstained: the N-branch was
-    # never enumerated at all (SELF-01 suppressed the atom-incomplete
+    # never enumerated at all (suppressed the atom-incomplete
     # '(2S)-aminopentanedioic acid' candidate).
     smi = "N[C@@H](CCCCN[C@@H](CCC(=O)O)C(=O)O)C(=O)O"
     name = namer.name(smi)
@@ -97,7 +97,7 @@ def test_saccharopine_names_and_full_rt(namer):
 @pytest.mark.opsin_gate
 def test_saccharopine_integration_via_name_tiered(namer):
     # CHOKE-POINT-OFF-PATH guard: assert through the SAME integration surface
-    # a caller actually uses, not only namer.name(), since a direct-helper
+    # a caller actually uses, not only namer.name, since a direct-helper
     # test can pass while the real dispatch path never reaches the fix.
     smi = "N[C@@H](CCCCN[C@@H](CCC(=O)O)C(=O)O)C(=O)O"
     result = namer.name_tiered(smi)
@@ -171,7 +171,7 @@ def test_168479_no_longer_ships_a_duplicate_carbonyl(namer):
     # deeper namer-capability gap (`substituent_naming.py::
     # name_substituent_fragment` has no stereo-injection path at all, unlike
     # the sibling `substituent_enumerator.py::name_substituent` cascade) --
-    # out of scope for an assembly fix. SELF-01 correctly refuses to ship the
+    # out of scope for an assembly fix. correctly refuses to ship the
     # now-stereo-incomplete name, so the molecule FALLS THROUGH to abstain
     # (0-wrong holds; this is the explicitly-licensed residual for Task 6).
     smi = "C/C=C(\\C=O)C(CC(=O)O)CC(=O)O"
@@ -188,7 +188,7 @@ def test_aldehyde_branch_duplicate_oxo_fixed_same_shape_no_stereo(namer):
     # branch, so the fix reaches a full, RT-exact win end to end (proves the
     # duplicate-oxo assembly fix itself, isolated from Task 6's separate
     # residual stereo gap). Before the fix: 'oxo-2-(2-oxoethyl)pentanoic
-    # acid' (duplicate carbonyl, SELF-01-suppressed). After: clean and
+    # acid' (duplicate carbonyl, -suppressed). After: clean and
     # RT-exact.
     smi = "OC(=O)C(CC=O)CCC"
     name = namer.name(smi)

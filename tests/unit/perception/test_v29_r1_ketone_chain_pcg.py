@@ -1,40 +1,40 @@
-"""v29 R1: the principal chain must contain the ketone's CARBONYL CARBON.
+""" R1: the principal chain must contain the ketone's CARBONYL CARBON.
 
 The defect (a SILENT ATOM DROP -- a wrong-molecule emission, the one outcome
 this project treats as unacceptable):
 
-    CCCCCCCCC(CCCC)C(C)(CC(C)C)C(=O)C          C21H42O
-      emitted  5-butyl-2,4-dimethyltridecan-4-one    C19H38O   <-- 2 carbons gone
-      correct  4-butyl-3-methyl-3-(2-methylpropyl)dodecan-2-one
+    CCCCCCCCC(CCCC)C(C)(CC(C)C)C(=O)C C21H42O
+      emitted 5-butyl-2,4-dimethyltridecan-4-one C19H38O <-- 2 carbons gone
+      correct 4-butyl-3-methyl-3-(2-methylpropyl)dodecan-2-one
 
 ``perception.chains.find_principal_chain`` built ``fg_atoms`` /
-``fg_bearing_carbons`` from the WHOLE SMARTS match.  The ketone pattern
+``fg_bearing_carbons`` from the WHOLE SMARTS match. The ketone pattern
 ``[#6][CX3](=O)[#6]`` (``perception/functional_groups.py``) carries BOTH
 flanking carbons, so a chain running through a mere NEIGHBOUR of the carbonyl
-scored ``contains_fg=1`` / ``fg_count=1``.  Criterion 3 (chain length) then
+scored ``contains_fg=1`` / ``fg_count=1``. Criterion 3 (chain length) then
 handed the win to a longer carbonyl-FREE chain; the acyl carbons were dropped as
-an unnameable substituent (``DROP-09``) and the ``=O`` was re-expressed as a
+an unnameable substituent (````) and the ``=O`` was re-expressed as a
 ``-one`` suffix on the attachment atom.
 
 Blue Book authority (heading + deciding sentence, both opened and read):
 
-  P-64.2.2.1 "Acyclic ketones" (BlueBookV2/BlueBookV2.md:28346) -- "Unsubstituted
+   "Acyclic ketones" (the Blue Book Blue Book) -- "Unsubstituted
   acyclic ketones are systematically named in two ways: (1) substitutively, using
-  the suffix 'one' ... Method (1) generates preferred IUPAC names."  Its own PIN
+  the suffix 'one'... Method (1) generates preferred IUPAC names." Its own PIN
   examples -- ``butan-2-one (PIN)``, ``heptan-3-one (PIN)``,
   ``5-methylhexan-2-one (PIN)`` -- all number the CARBONYL CARBON as a skeletal
-  atom of the parent chain.  A flanking carbon never bears the 'one' locant.
+  atom of the parent chain. A flanking carbon never bears the 'one' locant.
 
-  P-44.1.1 (:18875) -- "The senior parent structure has the maximum number of
+   (:18875) -- "The senior parent structure has the maximum number of
   substituents corresponding to the principal characteristic group (suffix) or
-  senior parent hydride in accord with the seniority of classes (P-41) and the
-  seniority of suffixes (P-43)."
+  senior parent hydride in accord with the seniority of classes and the
+  seniority of suffixes."
 
-  P-44.1 (:18873) -- these criteria "must always be applied before those
-  applicable to rings and ring systems (see P-44.2) and to chains (see P-44.3)".
+   (:18873) -- these criteria "must always be applied before those
+  applicable to rings and ring systems (see and to chains (see ".
 
 Together: a chain omitting the carbonyl carbon bears ZERO ketones, so it loses at
-P-44.1.1 before chain length (P-44.3) is ever consulted.
+ before chain length is ever consulted.
 
 The fix reuses ``SKELETAL_SUFFIX_PGS`` + ``_pg_attachment_atoms``, the primitives
 that already encode exactly this for RINGS (``parent_selection.py:265`` -- "the
@@ -70,7 +70,7 @@ DROPPING_POSITIVES = [
 ]
 
 # Straight ketones whose longest chain already contains the carbonyl. These must
-# be byte-identical; the last is the Blue Book's own P-64.2.2.1 PIN example.
+# be byte-identical; the last is the Blue Book's own PIN example.
 UNCHANGED_CONTROLS = [
     ("CCC(C)=O", "butan-2-one"),
     ("CCCCCCC(C)=O", "octan-2-one"),

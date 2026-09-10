@@ -3,19 +3,19 @@
 Before this task ``name_tiered`` computed
 
     gate_active = (not self._disable_opsin_validity_gate
-                   and _validity_gate_jar_present())
+                   and _validity_gate_jar_present)
     opsin = "verified" if gate_active else "unverified"
-    if opsin == "verified": gates.append("SELF-01")
+    if opsin == "verified": gates.append("")
 
 ``gate_active`` means *"the JAR exists"*. It is not evidence that **this** name
 passed anything, so every PIN-path emission on a machine with a jar was stamped
-``SELF-01`` — including the ten ``return name`` carve-outs in
+```` — including the ten ``return name`` carve-outs in
 ``_final_opsin_validity_gate``, which return **before** ``_self_consistency_decision``
 is ever called, and the BBR-GATE stereo carve-out, which ships the full name
-after SELF-01 judged only the stereo-STRIPPED parse.
+after judged only the stereo-STRIPPED parse.
 
-Measured at `` (`internal notes` §2):
-three names OPSIN cannot parse at all reported ``gates_passed: ['SELF-01']``.
+Measured at `` (`internal notes`):
+three names OPSIN cannot parse at all reported ``gates_passed: ['']``.
 
 These tests pin the honest report. **No emitted name changes** — only the label.
 """
@@ -27,7 +27,7 @@ from orthonym.namer import Orthonym
 from orthonym.metrics import provenance as pv
 
 
-# The three T1 leaks from FINDINGS.md §2, with the exit each one takes in
+# The three leaks from FINDINGS.md, with the exit each one takes in
 # `_final_opsin_validity_gate` (established by the Task 1 trace: a sys.settrace
 # line tracer scoped to the function's code object).
 # CC=C.C=C.[Ti+2] -> exit line 1030, _ORGANOMETALLIC_ADDITIVE_PIN_RE
@@ -41,13 +41,13 @@ T1_LEAKS = {
 
 
 # --------------------------------------------------------------------------
-# 1. a name that genuinely round-trips still reports SELF-01
+# 1. a name that genuinely round-trips still reports
 # --------------------------------------------------------------------------
 
 @pytest.mark.opsin_gate
 def test_genuinely_verified_name_still_reports_self01():
     """`CCO` -> `ethanol` exits the gate through `_self_consistency_decision`
-    with verdict "ok". That is the ONE state that may claim SELF-01."""
+    with verdict "ok". That is the ONE state that may claim."""
     row = Orthonym().name_tiered("CCO")
     assert row["name"] == "ethanol"
     assert row["gate_outcome"] == pv.GATE_OUTCOME_SELF01
@@ -56,13 +56,13 @@ def test_genuinely_verified_name_still_reports_self01():
 
 
 # --------------------------------------------------------------------------
-# 2. the three measured T1 leaks must NOT claim a bare SELF-01
+# 2. the three measured leaks must NOT claim a bare
 # --------------------------------------------------------------------------
 
 @pytest.mark.opsin_gate
 def test_t1_leaks_do_not_claim_bare_self01():
     """Each measured leak reports the specific outcome its exit path took, and
-    none of them contributes a bare ``SELF-01`` token."""
+    none of them contributes a bare ```` token."""
     # Guard against the a phase vacuous-test defect: an empty iterable makes
     # the loop below pass without testing anything.
     assert len(T1_LEAKS) == 3, "the measured T1 leak set must not be empty"
@@ -84,7 +84,7 @@ def test_t1_leaks_do_not_claim_bare_self01():
 def test_stereo_carveout_is_labelled_constitution_only():
     """The BBR-GATE carve-out checked the CONSTITUTION on the stereo-stripped
     parse and never checked the stereo layer. It says so, and it says so with a
-    token distinct from a full SELF-01."""
+    token distinct from a full."""
     row = Orthonym().name_tiered("C[C@@H]1C[C@H]1CO")
     assert row["gate_outcome"] == pv.GATE_OUTCOME_SELF01_CONSTITUTION_ONLY
     assert row["opsin"] == "verified_constitution_only"
@@ -93,12 +93,12 @@ def test_stereo_carveout_is_labelled_constitution_only():
 
 
 # --------------------------------------------------------------------------
-# 3. a carve-out reports its slug and no bare SELF-01
+# 3. a carve-out reports its slug and no bare
 # --------------------------------------------------------------------------
 
 @pytest.mark.opsin_gate
 def test_carveout_reports_its_slug():
-    """`CC=C.C=C.[Ti+2]` hits the P-69.2.3 organometallic-additive carve-out
+    """`CC=C.C=C.[Ti+2]` hits the organometallic-additive carve-out
     (`_ORGANOMETALLIC_ADDITIVE_PIN_RE`), which returns the name BEFORE
     `_self_consistency_decision` is called. The name still ships — only the
     label changes."""

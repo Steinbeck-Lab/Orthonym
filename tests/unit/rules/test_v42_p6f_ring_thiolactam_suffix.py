@@ -1,6 +1,6 @@
-""" a phase — SATURATED ring chalcogen ketone-analogue SUFFIX (P-64.6.1).
+""" a phase — SATURATED ring chalcogen ketone-analogue SUFFIX.
 
-## **P-64.6** CHALCOGEN ANALOGUES... P-64.6.1 (the Blue Book): a C=S / C=Se / C=Te on
+## **** CHALCOGEN ANALOGUES... (the Blue Book): a C=S / C=Se / C=Te on
 a ring (or chain) carbon is the ketone analogue expressed with the SUFFIX
 ``-thione`` / ``-selone`` / ``-tellone`` (multiplied -> ``-dithione``...), NOT the
 ``sulfanylidene`` / ``selanylidene`` / ``tellanylidene`` substitutive PREFIX.
@@ -26,12 +26,12 @@ from orthonym.namer import name_compound
 
 @pytest.mark.unit
 class TestRingThiolactamSuffix:
-    """P-64.6.1: a saturated ring carbon's C=S/C=Se/C=Te becomes the
+    """: a saturated ring carbon's C=S/C=Se/C=Te becomes the
     -thione/-selone/-tellone SUFFIX (di- -> -dithione), not a *ylidene prefix."""
 
     def test_azepane_2_thione(self):
         # S=C1CCCCCN1 -- single-N monocyclic thiolactam. Was the non-PIN
-        # 2-sulfanylideneazepane; PIN is the -thione suffix (P-64.6.1). NB the
+        # 2-sulfanylideneazepane; PIN is the -thione suffix. NB the
         # parent 'e' is kept (thione begins with a consonant), unlike azepan-2-one.
         assert name_compound("S=C1CCCCCN1") == "azepane-2-thione"
 

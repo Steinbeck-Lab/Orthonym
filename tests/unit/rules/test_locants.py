@@ -70,7 +70,7 @@ class TestBuildAtomToLocant:
             assert atom_idx in result
 
     def test_locants_are_consecutive(self):
-        """Locants are 1, 2, 3, ... regardless of atom index gaps."""
+        """Locants are 1, 2, 3,... regardless of atom index gaps."""
         chain = [100, 5, 42, 0]
         result = build_atom_to_locant(chain)
         assert list(result.values()) == [1, 2, 3, 4]
@@ -491,7 +491,7 @@ class TestNamerAtomToLocant:
         assert chain_set == locant_keys
 
     def test_locant_values_are_consecutive(self):
-        """Locant values are 1, 2, 3, ..., n."""
+        """Locant values are 1, 2, 3,..., n."""
         from orthonym.namer import Orthonym
 
         namer = Orthonym()

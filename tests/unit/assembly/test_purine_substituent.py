@@ -9,7 +9,7 @@ def _frag(smi):
 
 
 def test_adenin_9_yl_substituent():
-    # 2-(6-amino-9H-purin-9-yl)acetic acid: OC(=O)C[N9]... ; the CH2 carbon is
+    # 2-(6-amino-9H-purin-9-yl)acetic acid: OC(=O)C[N9]...; the CH2 carbon is
     # the parent-side attach; the fragment is the purine ring.
     mol = Chem.MolFromSmiles("OC(=O)Cn1cnc2c(N)ncnc21")
     ring = mol.GetSubstructMatch(Chem.MolFromSmarts(
@@ -61,7 +61,7 @@ def test_purine_substituent_end_to_end_pipeline():
     # NOT just the 9 bare ring atoms -- unlike the hand-built frag_set in
     # test_purine_substituent_via_dispatch above, which excludes the amino atom
     # and so cannot catch a frag_set/frag_ring_atoms mismatch. This test goes
-    # through the full Orthonym().name() pipeline (real dispatch call shape)
+    # through the full Orthonym.name pipeline (real dispatch call shape)
     # and round-trips the emitted name through OPSIN, so it is what actually
     # proves the purine tier fires on real input.
     from orthonym import Orthonym

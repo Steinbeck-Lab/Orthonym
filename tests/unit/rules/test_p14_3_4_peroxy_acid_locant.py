@@ -1,21 +1,21 @@
-"""P-14.3.4 — the ring peroxy-acid suffix locant (v29 Phase C tranche B, Task 2).
+""" — the ring peroxy-acid suffix locant (Phase C tranche B, Task 2).
 
 We shipped ``cyclohexane-1-carboperoxoic acid`` against the verbatim Blue Book PIN.
 
-AUTHORITY, all verified verbatim in ``BlueBookV2/BlueBookV2.md``:
+AUTHORITY, all verified verbatim in ``the Blue Book Blue Book``:
 
 * ``:30184`` — ``cyclohexanecarboperoxoic acid (PIN)``
 * ``:30178`` — ``C6H5-CO-OOH benzenecarboperoxoic acid (PIN) peroxybenzoic acid
   perbenzoic acid`` (and ``:29797`` prints the same pair the other way round)
 * ``:30174`` ``ethaneperoxoic acid (PIN)``, ``:30176`` ``hexaneperoxoic acid (PIN)``
-* the licence is **P-14.3.4.2(c)**, ``:2891`` *"The locant '1' is omitted:"* + ``:2913``
+* the licence is **(c)**, ``:2891`` *"The locant '1' is omitted:"* + ``:2913``
   *"(c) in monosubstituted homogeneous monocyclic rings;"*
-* the answer to "but the suffix spans several heavy atoms" is **P-14.3.4.3**, ``:2939``
+* the answer to "but the suffix spans several heavy atoms" is ****, ``:2939``
   *"The locant is omitted in monosubstituted symmetrical parent hydrides or parent
   compounds where there is only one kind of substitutable hydrogen."* — whose own
   example block contains ``:2949`` ``pyrazinecarboxylic acid (PIN)``, a multi-atom acid
   suffix on a monocycle with the locant omitted.
-* it is **NOT** P-14.3.4.1 (``:2877``), which is scoped to *"mono- and dicarboxylic acids
+* it is **NOT** (``:2877``), which is scoped to *"mono- and dicarboxylic acids
   derived from ACYCLIC hydrocarbons"* and enumerates its derivative classes — cyclohexane
   is not acyclic and peroxy acids are not in the list.
 
@@ -70,7 +70,7 @@ class TestTheTwoTablesAgree:
 
 class TestLicensedOmission:
     def test_cyclohexanecarboperoxoic_acid(self, namer):
-        """BB:30184 verbatim `cyclohexanecarboperoxoic acid (PIN)`."""
+        """the Blue Book verbatim `cyclohexanecarboperoxoic acid (PIN)`."""
         assert namer.name("OOC(=O)C1CCCCC1") == "cyclohexanecarboperoxoic acid"
 
     @pytest.mark.parametrize("smiles,expected", [
@@ -85,8 +85,8 @@ class TestLicensedOmission:
 
 
 class TestDenyByDefault:
-    """P-14.3.3 (:2869) is deny-by-default: one essential locant in a scope restores
-    every locant in that scope. Each row asserts the WHOLE name (invariant 11)."""
+    """ (:2869) is deny-by-default: one essential locant in a scope restores
+    every locant in that scope. Each row asserts the WHOLE name (a project rule)."""
 
     def test_ring_substituent_restores_the_locant(self, namer):
         assert namer.name("OOC(=O)C1CCC(C)CC1") == \
@@ -117,7 +117,7 @@ class TestDenyByDefault:
 class TestKnownAdjacentDefects:
     """Found by this task's own control rows, recorded rather than silently left.
 
-    Both are the INVERSE of Phase C — a locant that P-14.3.3 makes essential is being
+    Both are the INVERSE of Phase C — a locant that makes essential is being
     OMITTED — and both are pre-existing (measured identical before and after the
     ``peroxy_acid`` fix, so this task did not cause them).
     """
@@ -130,17 +130,17 @@ class TestKnownAdjacentDefects:
         visible: once the aryl suffix form was built the test XPASSed and failed the
         suite, instead of quietly turning green unnoticed.
 
-        BB:30178 verbatim: `C6H5-CO-OOH benzenecarboperoxoic acid (PIN) peroxybenzoic
-        acid perbenzoic acid`; BB:29797 prints the same pair reversed; BB:3009 states
+        the Blue Book verbatim: `C6H5-CO-OOH benzenecarboperoxoic acid (PIN) peroxybenzoic
+        acid perbenzoic acid`; the Blue Book prints the same pair reversed; the Blue Book states
         "The prefix 'per-' is no longer recommended". Note the deny row alone gave an
-        ABSTENTION -- the systematic aryl path had to be built (invariant 11)."""
+        ABSTENTION -- the systematic aryl path had to be built (a project rule)."""
         assert namer.name("OOC(=O)c1ccccc1") == "benzenecarboperoxoic acid"
 
     def test_substituted_ring_carbonitrile_cites_its_locant(self, namer):
-        """FIXED in the same session. P-14.3.3 (BB:2869): the essential 4-methyl locant
+        """FIXED in the same session. (the Blue Book): the essential 4-methyl locant
         restores the suffix locant.
 
-        ★ SIXTH off-path site of the phase. A call-spy validated on two known positives
+        ★ SIXTH off-path site of the phase. A call-trace validated on two known positives
         (the ring acid and the ring aldehyde, which BOTH record a call and BOTH cite
         correctly) recorded ZERO ``_generate_suffix`` calls for the ring nitrile and the
         ring carboxamide -- they are named in ``composer.py``'s own ring-nitrile and
@@ -148,7 +148,7 @@ class TestKnownAdjacentDefects:
         ``_generate_suffix``'s terminal ring branch already implements. So this was a
         CONSISTENCY fix across four sibling suffix classes, not new policy.
 
-        BB corroboration for a substituted ring acid citing its 1: BB:5822 and BB:23198,
+        BB corroboration for a substituted ring acid citing its 1: the Blue Book and the Blue Book,
         ``4,4'-oxydi(cyclohexane-1-carboxylic acid) (PIN)``."""
         assert namer.name("N#CC1CCC(C)CC1") == "4-methylcyclohexane-1-carbonitrile"
 
@@ -175,7 +175,7 @@ class TestKnownAdjacentDefects:
          "the peroxy sibling, correct via TERMINAL_GROUPS"),
     ])
     def test_the_four_sibling_classes_now_agree(self, namer, smiles, expected, why):
-        """All four ring `carb-` suffix classes must answer P-14.3.3 the same way. The
+        """All four ring `carb-` suffix classes must answer the same way. The
         defect was that two of them did not."""
         assert namer.name(smiles) == expected, why
 

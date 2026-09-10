@@ -1,5 +1,5 @@
 """ ST.1 — route the general-engine stereo-injection sites through the
-RT-gated reanchor (SC-1, the dominant stereo-omission abstain sub-cause).
+RT-gated reanchor (, the dominant stereo-omission abstain sub-cause).
 
 Grounding: internal notes. The general engine was the
 one ring-stereo producer that injected parent-scope stereo via a plain
@@ -105,14 +105,14 @@ class TestST1FlatDegradationRescue:
         assert name == "bicyclo[2.2.1]heptane"           # stereo omitted (constitution)
 
     def test_sesquiterpene_cage_ships_flat_not_abstain(self):
-        # genuine R/S cage candidate-B cannot place -> flat constitution (SC-3
+        # genuine R/S cage candidate-B cannot place -> flat constitution (
         # residual after ST.1: flat, never abstain).
         smi = "CC(C)=CCC[C@]1(C)[C@H]2C[C@@H]3[C@H](C2)[C@@]31C"
         ok, why = _ships_flat_constitution(smi, _be_name(smi))
         assert ok, why
 
     def test_endoperoxide_substituent_stereo_ships_flat_not_abstain(self):
-        # SC-4: pseudoasym stereo in a ring substituent on a chain parent;
+        #: pseudoasym stereo in a ring substituent on a chain parent;
         # subsumed by ST.1's top-level reanchor -> flat constitution.
         smi = "C[C@]12OO[C@](CCC(=O)O)(c3ccccc31)c1ccccc12"
         ok, why = _ships_flat_constitution(smi, _be_name(smi))
@@ -141,7 +141,7 @@ class TestST1NeverWrongAndPinPreserved:
 
     def test_pseudoasym_named_blocker_pin_tier_still_abstains(self):
         # gold V36-VB-PSEUDOASYM-01: PIN tier must NOT ship a non-RT (1r,5s);
-        # default tier abstains (SELF-01 suppresses the flat form at PIN).
+        # default tier abstains (suppresses the flat form at PIN).
         _alarm()
         try:
             name = name_compound("C1C[C@H]2C[C@H](C2)O1")
@@ -275,7 +275,7 @@ class TestST1KnownFollowOn:
         # full-stereo name that RT-verifies, but certify_general_result used to
         # reject the spiro-vonbaeyer component fallback with
         # STEREO_PARENT_BLOCK_AMBIGUOUS (binding-spine parent-stereo-block proof
-        # gap — stereo_atom_to_locant is int-locant-only), routing to T4 ->
+        # gap — stereo_atom_to_locant is int-locant-only), routing to ->
         # abstain. ST.3's RT-gated proof-gap rescue in certify_general_result now
         # accepts it because the full name round-trips to the input's isomeric
         # InChIKey. So it ships FULL stereo instead of abstaining.

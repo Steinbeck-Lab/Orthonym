@@ -1,9 +1,9 @@
 """
-Integration tests for complex multi-ester scenarios: DECO-08 and DECO-09.
+Integration tests for complex multi-ester scenarios: and.
 
-DECO-08: Large molecules (HA > 30) with multiple ester groups produce names
+: Large molecules (HA > 30) with multiple ester groups produce names
          covering >= 70% of heavy atoms.
-DECO-09: Molecules with 3+ ester bonds produce valid names through the
+: Molecules with 3+ ester bonds produce valid names through the
          quality gate (non-empty, non-garbled).
 
 These are regression tests ensuring the multi-ester naming pipeline handles
@@ -34,7 +34,7 @@ def _is_valid_name(name):
 
 
 # ============================================================================
-# DECO-09: 3+ ester bonds produce valid names through quality gate
+#: 3+ ester bonds produce valid names through quality gate
 # ============================================================================
 
 class TestDECO09_MultiEsterBonds:
@@ -60,7 +60,7 @@ class TestDECO09_MultiEsterBonds:
 
 
 # ============================================================================
-# DECO-08: Large molecules (HA > 30) with multiple esters
+#: Large molecules (HA > 30) with multiple esters
 # ============================================================================
 
 class TestDECO08_LargeMultiEster:
@@ -86,7 +86,7 @@ class TestDECO08_LargeMultiEster:
 
 
 # ============================================================================
-# DECO-08 + DECO-09 combined: Large molecule with 3+ ester bonds
+# + combined: Large molecule with 3+ ester bonds
 # ============================================================================
 
 class TestDECO08_09_Combined:

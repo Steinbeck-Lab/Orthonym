@@ -2,7 +2,7 @@
 
 Four groups, all named by an exact canonical-SMILES entry in ``ALL_RETAINED_NAMES``
 consumed on the PIN path at ``routing/dispatch_table.py:1488``
-(``_handle_retained_name``, RETAINED_NAME@1300). The hand-curated entries in
+(``_handle_retained_name``, RETAINED_NAME). The hand-curated entries in
 ``data/retained_names.py`` win the merge over the OPSIN aryl-group import
 (``_HAND_CURATED`` overrides ``_OPSIN_NAMES``), which supplies the As/P stems
 WITHOUT the terminal ``e``.
@@ -15,22 +15,22 @@ indicated hydrogen, corrected in the report + baseline, ZERO engine change):
   * 2H-isoindole the Blue Book "(2H-isomer shown; the PIN is 2H-isoindole)"
   * 4H-quinolizine the Blue Book "(4H-isomer shown; the PIN is 4H-quinolizine)"
 
-Group 2 — terminal-``e`` retained-name spelling (P-25.2.1 Table 2.9):
+Group 2 — terminal-``e`` retained-name spelling:
   * arsindole the Blue Book "arsindole (PIN)"
   * isoarsindole the Blue Book "isoarsindole (PIN)"
   * phosphindole the Blue Book "phosphindole (PIN)"
   * isophosphindole the Blue Book "isophosphindole (PIN)"
 
 Group 3 — catalog adds for von-Baeyer-emitting retained parents:
-  * octalene the Blue Book "pentalene (PIN) octalene (PIN)" (P-25.1.2.3 / P-25.3)
-  * arsindolizine the Blue Book "arsindolizine (PIN)" (P-25.2.1 Table 2.9)
-  * phosphindolizine the Blue Book "phosphindolizine (PIN)" (P-25.2.1 Table 2.9)
+  * octalene the Blue Book "pentalene (PIN) octalene (PIN)" /
+  * arsindolizine the Blue Book "arsindolizine (PIN)"
+  * phosphindolizine the Blue Book "phosphindolizine (PIN)"
   * 4H-phosphinolizine the Blue Book Table 2.9 shorthand "phosphinolizine (PIN)"; the
                        6+6 QUINOLIZINE analogue carries indicated H like its N
-                       parent (the Blue Book "the PIN is 4H-quinolizine"; P-14.7.1
-                       the Blue Book + P-25.7.1.3.1 the Blue Book). 11-FABLEFIX.
+                       parent (the Blue Book "the PIN is 4H-quinolizine";
+                       the Blue Book + the Blue Book). 11-FABLEFIX.
 
-Group 4 — retained nitrile names (P-66.5.1.2.1):
+Group 4 — retained nitrile names:
   * formonitrile the Blue Book "HCN formonitrile(PIN)... hydrogen cyanide"
   * oxalonitrile the Blue Book "NC-CN oxalonitrile (PIN) ethanedinitrile"
 """
@@ -94,9 +94,9 @@ def test_name_compound_emits_pin(smiles, expected):
 
 @pytest.mark.unit
 def test_neighbor_nitriles_unchanged():
-    """P-66 substituted/dinitrile neighbors keep their systematic/retained names;
+    """ substituted/dinitrile neighbors keep their systematic/retained names;
     the bare-parent ``C#N`` -> formonitrile fix must not touch composed forms."""
-    assert name_compound("CC#N") == "acetonitrile"          # P-66 substituted
+    assert name_compound("CC#N") == "acetonitrile"          # substituted
     assert name_compound("c1ccccc1C#N") == "benzonitrile"    # retained aromatic
     assert name_compound("N#CC(=O)C#N") == "carbonyl dicyanide"
 

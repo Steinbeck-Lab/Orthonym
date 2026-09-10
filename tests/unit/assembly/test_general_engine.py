@@ -31,7 +31,7 @@ class TestRefusals:
         assert name_general_chain(mol, feats) is None
 
     def test_refuses_ring_parent(self):
-        mol, feats = _features("c1ccccc1CC")  # ring is parent (P-44.1.2.2)
+        mol, feats = _features("c1ccccc1CC")  # ring is parent
         assert name_general_chain(mol, feats) is None
 
     def test_refuses_single_carbon_chain(self):
@@ -87,7 +87,7 @@ from orthonym.assembly.general_engine import name_general, name_general_ring
 
 
 class TestRingNaming:
-    # v25 G5-A: mancude/aromatic ring systems fail-close (von-Baeyer is non-PIN
+    # -A: mancude/aromatic ring systems fail-close (von-Baeyer is non-PIN
     # for them; their PIN is a fused/retained parent + added/indicated H). This
     # includes caffeine, whose von-Baeyer form was the OPSIN-invalid oxo/ene
     # valence-clash name. Their real names come from the PIN path.

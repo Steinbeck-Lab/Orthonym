@@ -1,7 +1,7 @@
 """
-Phase 62 Small Molecule Accuracy Sprint - Comprehensive Regression Tests
+a phase Small Molecule Accuracy Sprint - Comprehensive Regression Tests
 
-# Phase 62 Small Molecule Accuracy Sprint - Final Accounting
+# a phase Small Molecule Accuracy Sprint - Final Accounting
 #
 # Total compounds investigated: 94
 # Fully fixed (InChI RT): 44 (target: 40+)
@@ -11,19 +11,19 @@ Phase 62 Small Molecule Accuracy Sprint - Comprehensive Regression Tests
 # Unfixable (wildcard, isotope): 2
 #
 # By category:
-#   WRONG_PARENT:      17/18 fixed (RT)
-#   MISSING_SUBSTITUENT: 13/32 fixed (RT)
-#   STEREO:             9/19 fixed (RT)
-#   CHARGE/CHARGE_FMT:  0/10 fixed (OPSIN parses all but RT fails on charge)
-#   OTHER:              2/ 7 fixed (RT)
-#   LOCANT_MINOR:       3/ 6 fixed (RT)
-#   SKIP:               0/ 2 (wildcard/isotope, unfixable)
+# WRONG_PARENT: 17/18 fixed (RT)
+# MISSING_SUBSTITUENT: 13/32 fixed (RT)
+# STEREO: 9/19 fixed (RT)
+# CHARGE/CHARGE_FMT: 0/10 fixed (OPSIN parses all but RT fails on charge)
+# OTHER: 2/ 7 fixed (RT)
+# LOCANT_MINOR: 3/ 6 fixed (RT)
+# SKIP: 0/ 2 (wildcard/isotope, unfixable)
 #
 # Key fixes by plan:
-#   Plan 01 (Wave 1): EASY compounds - oate suffix, aminium, oxazole, unknown msgs
-#   Plan 02 (Wave 2): WRONG_PARENT - coverage gate, lactam guard
-#   Plan 03 (Wave 2): MISSING_SUB - aminoalkyl, acyl, ester, oxy-prefix detection
-#   Plan 04 (Wave 3): STEREO - E/Z ester fragment preservation, isochromane locants
+# Plan 01 (Wave 1): EASY compounds - oate suffix, aminium, oxazole, unknown msgs
+# Plan 02 (Wave 2): WRONG_PARENT - coverage gate, lactam guard
+# Plan 03 (Wave 2): MISSING_SUB - aminoalkyl, acyl, ester, oxy-prefix detection
+# Plan 04 (Wave 3): STEREO - E/Z ester fragment preservation, isochromane locants
 #
 # RT progression: baseline 10 -> Plan 01: +0 -> Plan 02-03: +33 -> Plan 04: +1 = 44
 
@@ -179,16 +179,16 @@ class TestMissingSubstituent:
 
     def test_035_disubstituted_phenol(self):
         """#35: CC(C)Cc1cccc(CC(C)C)c1O -> 2,6-diisobutylphenol [RT]."""
-        assert name_compound("CC(C)Cc1cccc(CC(C)C)c1O") == "2,6-diisobutylphenol"  # ASML-13: phenol suffix routing
+        assert name_compound("CC(C)Cc1cccc(CC(C)C)c1O") == "2,6-diisobutylphenol"  #: phenol suffix routing
 
     def test_036_cyclohexyl_icosanoate(self):
         """#36: CCCCCCCCCCCCCCCCCCCC(=O)OC1CCCCC1 -> cyclohexyl icosanoate [RT].
 
-        v29 Task J2: was 'cyclohexyl arachidate'. Arachidic acid is not among
-        the five acids retained AS PINs -- P-65.1.1.1 (BlueBookV2.md:29715),
+        : was 'cyclohexyl arachidate'. Arachidic acid is not among
+        the five acids retained AS PINs -- (the Blue Book),
         "Only the following five carboxylic acids retained names and are also
         preferred IUPAC names" (formic, oxalic, acetic, benzoic, oxamic) -- and
-        P-65.1.2 (:29860) makes the systematic name the PIN for everything else.
+         (:29860) makes the systematic name the PIN for everything else.
         C20 is 'icosane (PIN)' (:10043), not 'eicosane'.
         """
         assert name_compound("CCCCCCCCCCCCCCCCCCCC(=O)OC1CCCCC1") == "cyclohexyl icosanoate"
@@ -223,7 +223,7 @@ class TestMissingSubstituent:
         assert name is not None and len(name) > 3
 
     def test_057_dimethylchromanone(self):
-        """#57: chromanone -> PIN 2,3-dihydro-4H-1-benzopyran-4-one (v23 IH-01h, P-64.2.2.2.2) [RT]."""
+        """#57: chromanone -> PIN 2,3-dihydro-4H-1-benzopyran-4-one (, [RT]."""
         assert name_compound("CC1(C)CC(=O)c2c(O)cc(O)cc2O1") == "5,7-dihydroxy-2,2-dimethyl-2,3-dihydro-4H-1-benzopyran-4-one"
 
     def test_060_hydroxybiphenyl_diacid_2(self):
@@ -313,7 +313,7 @@ class TestStereo:
         assert name_compound("C=CC/C=C/CCC(=O)OC") == "methyl (4E)-octa-4,7-dienoate"
 
     def test_028_dihydroxy_methylisochromane(self):
-        """#28: isochromane -> PIN 3,4-dihydro-1H-2-benzopyran (v23 IH-01h, P-54.4.3.2)."""
+        """#28: isochromane -> PIN 3,4-dihydro-1H-2-benzopyran (,."""
         name = name_compound("C[C@@H]1Cc2cc(O)cc(O)c2CO1")
         assert "3,4-dihydro-1H-2-benzopyran" in name
         assert "dihydroxy" in name
@@ -335,13 +335,13 @@ class TestStereo:
         assert "amino" in name or "glyc" in name or "amide" in name or name is not None
 
     def test_046_propylisochromane(self):
-        """#46: isochromane -> PIN 3,4-dihydro-1H-2-benzopyran (v23 IH-01h, P-54.4.3.2)."""
+        """#46: isochromane -> PIN 3,4-dihydro-1H-2-benzopyran (,."""
         name = name_compound("CCC[C@@H]1OCc2c(O)cccc2[C@H]1O")
         assert "3,4-dihydro-1H-2-benzopyran" in name
         assert "propyl" in name
 
     def test_050_methoxyisochromanone(self):
-        """#50: isochroman-4-one -> PIN 3,4-dihydro-1H-2-benzopyran-4-one (v23 IH-01h, P-64.2.2.2.2)."""
+        """#50: isochroman-4-one -> PIN 3,4-dihydro-1H-2-benzopyran-4-one (,."""
         name = name_compound("COc1c(O)c(O)cc2c1CO[C@@H](C)C2=O")
         assert "3,4-dihydro-1H-2-benzopyran" in name
         assert "methoxy" in name
@@ -530,7 +530,7 @@ class TestOther:
     def test_082_tert_butylphenylacetic_acid(self):
         """#82: CC(C)(C)c1ccc(CC(=O)O)cc1 -> 2-(4-tert-butylphenyl)ethanoic acid [RT].
 
-        Phase 171 P-16.3.3(b)/P-16.2.4.1(d): tert-butyl is a simple substituent — no enclosing marks.
+        a phase (b)/(d): tert-butyl is a simple substituent — no enclosing marks.
         """
         assert name_compound(
             "CC(C)(C)c1ccc(CC(=O)O)cc1"
@@ -572,7 +572,7 @@ class TestOxazoleElision:
 
 
 class TestAminiumCation:
-    """Protonated amine -> aminium suffix (P-73.1.2)."""
+    """Protonated amine -> aminium suffix."""
 
     def test_aminium_suffix(self):
         """CC(C)(C)[NH3+] must use aminium suffix, not ammonium."""
@@ -581,7 +581,7 @@ class TestAminiumCation:
 
 
 class TestCarboxylateAnion:
-    """[O-] carboxylates use -oate suffix (P-72.2.1)."""
+    """[O-] carboxylates use -oate suffix."""
 
     def test_dioate(self):
         """O=C([O-])CC=CC(=O)C(=O)[O-] must use -oate suffix."""

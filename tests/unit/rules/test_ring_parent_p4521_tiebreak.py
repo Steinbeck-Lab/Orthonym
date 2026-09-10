@@ -1,12 +1,12 @@
-""" A1 — P-45.2.1 ring-parent tiebreak for TIED non-aromatic carbocyclic rings.
+""" A1 — ring-parent tiebreak for TIED non-aromatic carbocyclic rings.
 
-When >=2 candidate parent ring systems tie on the P-44.2 ring_system_score, the
+When >=2 candidate parent ring systems tie on the ring_system_score, the
 senior parent is the one carrying the MAXIMUM number of substituents cited as
-prefixes (the Blue Book, P-45.2.1). Before this, select_principal_ring_system
+prefixes (the Blue Book,. Before this, select_principal_ring_system
 broke the tie by list order (ring_systems[0]).
 
 NARROWED to non-aromatic ALL-CARBON tied rings: the aromatic path already applies
-P-45.2.1, and rings with skeletal heteroatoms (e.g. a glycoside's pyranose) are
+, and rings with skeletal heteroatoms (e.g. a glycoside's pyranose) are
 owned by other conventions where an exocyclic-bond count is not the prefix count.
 
 All tests run with the OPSIN gate disabled (no JVM) so they are deterministic and
@@ -31,7 +31,7 @@ def _exo(mol, atoms):
 @pytest.mark.unit
 def test_tied_carbocycles_pick_max_substituent_ring():
     # two cyclohexene rings joined by a chain, asymmetric methylation:
-    # 3-substituent ring vs 4-substituent ring -> P-45.2.1 picks the 4-substituent.
+    # 3-substituent ring vs 4-substituent ring -> picks the 4-substituent.
     smi = ("CC1CCC/C(C)=C1/C=C/C(C)=C/C=C/C(C)=C/C=C/C=C(C)"
            "/C=C/C=C(C)/C=C/C2=C(C)/CCCC2(C)C")
     mol = Chem.MolFromSmiles(smi)

@@ -1,5 +1,5 @@
 """
-Regression tests for name formatting cleanup (Phase 15, Plan 03).
+Regression tests for name formatting cleanup (a phase, Plan 03).
 
 Tests for:
 1. No 'functionalized_chain' debug string in generated names

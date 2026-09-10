@@ -28,7 +28,7 @@ PROJECT_ROOT = Path(__file__).resolve().parents[2]
 
 # The canary. Its first-matching naming class produces `(5-carbamoylpentyl)-
 # oxirane`, which OPSIN parses to NC(=O)CCCCCC1CO1 — a DIFFERENT molecule than
-# the input. Only SELF-01 catches that; no other gate in the stack does. So this
+# the input. Only catches that; no other gate in the stack does. So this
 # molecule's output is a direct readout of whether the gate is live.
 CANARY = "CC(=O)N(CC1CO1)C(C)C"
 CANARY_UNGATED_NAME = "(5-carbamoylpentyl)oxirane"
@@ -97,7 +97,7 @@ def test_the_canary_is_suppressed_when_the_gate_is_on():
 # ---------------------------------------------------------------------------
 
 def test_a_gate_test_without_a_jar_is_skipped_not_passed():
-    """`_final_opsin_validity_gate` fails OPEN on a missing jar (D-13), so
+    """`_final_opsin_validity_gate` fails OPEN on a missing jar , so
     "gate on, no jar" is green-but-blind by a second route — and it is the
     realistic one: a worktree checkout has no jar, the `opsin` gitlink has no
     .gitmodules to fetch from, and CI may not build it.

@@ -1,22 +1,22 @@
-"""a phase FRN canary integration tests (FRN-02 + FRN-03 anchor).
+"""a phase FRN canary integration tests (+ anchor).
 
 Parametrized over tests/canary/canary_functional_replacement.csv (36 rows).
 Each row produces:
 - Tier-A test: name_compound(smiles, style='pin') == expected_name_pin
 - Tier-B test: OPSIN parse + InChI L1 connectivity match (when opsin_parse_status == 'parse_ok')
 
-FRN-03 anchor: Tier-B pass rate target is >= 90% of the parseable subset.
+ anchor: Tier-B pass rate target is >= 90% of the parseable subset.
 
-Honest-fail-on-data per CONTEXT: NO @pytest.mark.xfail; failures are
+Honest-fail-on-data per internal notes: NO @pytest.mark.xfail; failures are
 HONEST FAILURES that flip the verification doc to PASS-WITH-CAVEATS and
-enumerate the a phase.1 backlog per the a phase ORGM precedent (frozenset
+enumerate the a phase backlog per the a phase ORGM precedent (frozenset
 _PHASE_163_1_BACKLOG keeps failing fixtures in the canary; they produce
-honest-fail tests documented in 163-VERIFICATION.md § 3).
+honest-fail tests documented in internal notes).
 
 References:
 - tests/canary/canary_functional_replacement.csv (Plan-01 frozen baseline; 36 rows)
-- 163-AUDIT-FRN.md § 1 (per-fixture expected PIN)
-- 163-VERIFICATION.md § 3 (a phase.1 backlog disposition)
+- internal notes-FRN.md (per-fixture expected PIN)
+- internal notes (a phase backlog disposition)
 - scripts/verify_frn_canary.py (parallel three-tier harness)
 """
 import csv
@@ -33,7 +33,7 @@ CANARY_PATH = _PROJECT_ROOT / "tests" / "canary" / "canary_functional_replacemen
 
 
 def _load_canary():
-    """Load 36-fixture canary from FROZEN CSV per CONTEXT."""
+    """Load 36-fixture canary from FROZEN CSV per internal notes."""
     with CANARY_PATH.open(newline="", encoding="utf-8") as fh:
         return list(csv.DictReader(fh))
 
@@ -46,17 +46,17 @@ TIER_B_PARAMS = [
 ]
 
 
-# a phase.1 backlog: fixtures whose Tier-A naming does NOT round-trip at
-# a phase ship time. These are HONEST FAILS per CONTEXT — the assembly
+# a phase backlog: fixtures whose Tier-A naming does NOT round-trip at
+# a phase ship time. These are HONEST FAILS per internal notes — the assembly
 # layer cannot yet emit the expected PIN due to upstream composer.py /
-# chain-naming bugs documented in 163-VERIFICATION.md § 3 + § 7 followups.
+# chain-naming bugs documented in internal notes + followups.
 # The fixtures REMAIN in the canary so the failures are visible (no
 # @pytest.mark.xfail masking). Following the a phase ORGM precedent
 # (_PHASE_161_1_BACKLOG in tests/integration/test_canary_organometallics.py).
 _PHASE_163_1_BACKLOG_TIER_A = frozenset({
     # FRN-A (all 8): composer locant-format bug — "propan-1-selenoic Se-acid"
     # instead of "propaneselenoic Se-acid". Root cause: chain-FG terminal-locant
-    # injection appending "-1-" before the FRN suffix. Audit § 5 LOCK suffix
+    # injection appending "-1-" before the FRN suffix. Audit LOCK suffix
     # forms are correct; the composer rendering layer below.
     'FRN-A-01', 'FRN-A-02', 'FRN-A-03', 'FRN-A-04',
     'FRN-A-05', 'FRN-A-06', 'FRN-A-07', 'FRN-A-08',
@@ -79,9 +79,9 @@ _PHASE_163_1_BACKLOG_TIER_A = frozenset({
 
 # Tier-B backlog: subset of Tier-A backlog where the generated name does NOT
 # OPSIN-round-trip. By definition all Tier-A fails also Tier-B fail because
-# the name is wrong; the FRN-03 ≥ 90% gate is applied to the PASSING Tier-A
-# subset (8/36 = 22.2% at a phase ship). Per CONTEXT: NO band-aid
-# relaxation. PASS-WITH-CAVEATS posture documented in VERIFICATION.md § 1.
+# the name is wrong; the ≥ 90% gate is applied to the PASSING Tier-A
+# subset (8/36 = 22.2% at a phase ship). Per internal notes: NO band-aid
+# relaxation. PASS-WITH-CAVEATS posture documented in VERIFICATION.md
 _PHASE_163_1_BACKLOG_TIER_B = _PHASE_163_1_BACKLOG_TIER_A
 
 
@@ -90,17 +90,17 @@ _PHASE_163_1_BACKLOG_TIER_B = _PHASE_163_1_BACKLOG_TIER_A
 def test_tier_a_name_string_equality(row):
     """Tier-A: name_compound(smiles, style='pin') == expected_name_pin.
 
-    REQUIRED for ALL fixtures per CONTEXT + FRN-02 anchor.
+    REQUIRED for ALL fixtures per internal notes + anchor.
 
     Per a phase ORGM precedent: Phase-163.1-backlog fixtures produce
     HONEST FAILING tests (not xfail-masked). Their failures are documented
-    in 163-VERIFICATION.md § 3 + § 7 with cited root-cause investigation.
+    in internal notes + with cited root-cause investigation.
     """
     from orthonym import name_compound
     actual = name_compound(row['smiles'], style="pin")
     expected = row['expected_name_pin']
     if row['id'] in _PHASE_163_1_BACKLOG_TIER_A and actual != expected:
-        # Honest fail — Phase-163.1-deferred fixture; per VERIFICATION.md § 3
+        # Honest fail — Phase-163.1-deferred fixture; per VERIFICATION.md
         # the test surface is preserved (no xfail) so the failure is visible.
         pytest.fail(
             f"FRN CANARY (PIN) — Phase-163.1-deferred fixture {row['id']} "
@@ -171,10 +171,10 @@ def _inchi_l1_connectivity(smiles):
 def test_tier_b_opsin_round_trip(row):
     """Tier-B: OPSIN parse(actual_pin) -> InChI L1 == InChI L1(canonical_smiles).
 
-    FRN-03 anchor: this test parametrized over parse_ok subset.
+     anchor: this test parametrized over parse_ok subset.
 
     Honest-fail-on-data: a failure reports the fixture; aggregate Tier-B
-    pass rate measured in 163-VERIFICATION.md § 3.
+    pass rate measured in internal notes
 
     Per a phase precedent: Phase-163.1-backlog fixtures produce honest
     failures here too (their Tier-A name is wrong, so OPSIN-RT cannot match).

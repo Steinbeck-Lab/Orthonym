@@ -1,6 +1,6 @@
 """``--trivial`` is a LIVE flag, not an inert one — and it can only ever ADD.
 
-v29 residue Task K. The residue item recorded "``--trivial`` unreachable".
+ residue Task K. The residue item recorded "``--trivial`` unreachable".
 **The premise is refuted twice over**: the flag is registered in the CLI
 (``cli.py:159``), threaded through to ``Orthonym(trivial_fallback=...)``
 (``cli.py:388``), and it demonstrably changes the emitted name. Enumerating the
@@ -43,7 +43,7 @@ from orthonym.namer import Orthonym
 # to have produced a FAILURE name, and for four of the five measured molecules
 # the thing that produces that failure is the OPSIN gate suppressing a name the
 # generator did emit. With the gate off, ``[C-]#[N+]O`` emits
-# ``N-hydroxy-λ2-methanamine`` (which SELF-01 rejects as a DIFFERENT molecule)
+# ``N-hydroxy-λ2-methanamine`` (which rejects as a DIFFERENT molecule)
 # and ``CC(=O)Nc1ccc(O)cc1`` emits a name too, so the fallback never fires and
 # every assertion below inverts. The reachability of ``--trivial`` is therefore
 # a property of the GATED configuration, not of the generator.

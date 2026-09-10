@@ -1,13 +1,13 @@
-"""v26 P2: aromatic fused-cage von-Baeyer polyene + descriptor edge-audit.
+""": aromatic fused-cage von-Baeyer polyene + descriptor edge-audit.
 
 Tests two changes in ``rules/vonbaeyer_universal.py``:
 
 1. **Lifted mancude refusal** (behind ``allow_mancude`` / the ``--emit-tier
    complete`` ``allow_aromatic_general`` flag): a fused cage carrying aromatic
    ring atoms is kekulized and emitted as an explicit von-Baeyer polyene
-   (P-23 unsaturation) instead of being refused. The DEFAULT / PIN path
+    unsaturation) instead of being refused. The DEFAULT / PIN path
    (``allow_mancude=False``) still refuses -> byte-identical. PIN retained /
-   fusion names (quinoline, indole, ...) name via the PIN path first and are
+   fusion names (quinoline, indole,...) name via the PIN path first and are
    UNCHANGED under both ``pin`` and ``complete`` (P2 only fires on abstention).
 
 2. **Descriptor edge-audit** (``audit_von_baeyer_descriptor``): a Java-free
@@ -16,11 +16,11 @@ Tests two changes in ``rules/vonbaeyer_universal.py``:
    is independent of OPSIN, which fails OPEN without Java.
 
 Harness (mirrors ``tests/unit/assembly/test_v26_p1_monocycle_engine.py``):
-the conftest force-disables the production SELF-01 gate suite-wide and its
+the conftest force-disables the production gate suite-wide and its
 ``opsin_to_smiles`` fixture is broken, so (a) direct-engine tests call
 ``name_general_ring`` / ``analyze_cage_universal`` and assert exact descriptor
 strings + a complete E1 atom partition (deterministic, gate-independent);
-(b) full-namer RT tests re-enable SELF-01 via ``production_gate`` (skips
+(b) full-namer RT tests re-enable via ``production_gate`` (skips
 without Java) and round-trip via a private stdin-batch OPSIN helper.
 """
 import glob
@@ -51,10 +51,10 @@ AROMATIC_FUSED_CASES = [
      "bicyclo[6.4.0]dodeca-1,3,5,7,9,11-hexaene"),
     ("C1=Cc2cc3ccccc3cc2C1",            # as-indacene
      "tricyclo[7.4.0.0^3,7]trideca-1(13),2,5,7,9,11-hexaene"),
-    # v29 Task S: was asserted as '8-oxa...-1(13),2,4,6,9,11-hexaene'. Both
+    #: was asserted as '8-oxa...-1(13),2,4,6,9,11-hexaene'. Both
     # numberings are legal bicyclo[7.4.0] hydrocarbon numberings (either fusion
-    # carbon may be locant 1), so P-23.3.2 "When there is a choice for numbering"
-    # decides -- P-23.3.2.1 (BlueBookV2.md:9777): "Low locants are assigned to
+    # carbon may be locant 1), so "When there is a choice for numbering"
+    # decides -- (the Blue Book): "Low locants are assigned to
     # the heteroatoms considered together as a set compared in increasing
     # numerical order." 2 < 8, so the heteroatom takes locant 2 and the ene set
     # follows it. The old expectation was the higher-locant form.
@@ -65,7 +65,7 @@ AROMATIC_FUSED_CASES = [
     ("C1CCCc2ccccc2C1",                 # benzosuberane (benzene + saturated 7-ring)
      "bicyclo[5.4.0]undeca-1(11),7,9-triene"),
     ("S1C=CC=CC=Cc2ccccc21",            # 1-benzothionine (S fused to benzene)
-     # v29 Task S: same P-23.3.2.1 (:9777) low-locant-to-heteroatom correction
+     #: same (:9777) low-locant-to-heteroatom correction
      # as the oxa sibling above.
      "2-thiabicyclo[7.4.0]trideca-1(13),3,5,7,9,11-hexaene"),
     ("C1=CC=CC=Cc2ccccc2C1",            # benzocyclooctene
@@ -97,23 +97,23 @@ FAIL_CLOSED_ENGINE = {
     "charged aromatic fused (acridinium)": "C[n+]1c2ccccc2cc2ccccc21",
     "spiro co-ring (1,4-dioxaspiro[4.4]nonane)": "C1CC2(CC1)OCCO2",
     "lone monocycle (benzene, not a cage)": "c1ccccc1",
-    # v29 Phase 2 T3b re-derived these two. Both expectations stand -- the engine
+    # a phase re-derived these two. Both expectations stand -- the engine
     # must refuse -- but the reasons recorded here were wrong on the numbers:
     # coronene is 24 cage atoms / 7 rings and ovalene 34 cage atoms / 10 rings,
     # so NEITHER exceeds MAX_CAGE_ATOMS = 40 and coronene does not exceed
     # MAX_CAGE_RINGS = 8 either. The Blue Book reason they must refuse is that
-    # both are RETAINED fused-ring hydrocarbon parent components -- P-25.1
+    # both are RETAINED fused-ring hydrocarbon parent components --
     # Table 2.7 "Retained names for hydrocarbon parent ring components", with
-    # "coronene (PIN)" at BlueBookV2.md:11346 and both listed at P-25.8.2
+    # "coronene (PIN)" at the Blue Book and both listed at
     # (":14776") -- so the retained fusion name IS the PIN and a von-Baeyer
     # polyene construction can never be preferred for them.
-    # v29 Task S CORRECTION: the note above said the operative cause was the
+    # CORRECTION: the note above said the operative cause was the
     # structural floor. For coronene that was true but it was a BUG -- the old
     # audit reconstructed from ``bridge_info_list`` (internal bookkeeping whose
     # secondary-bridge atom order is reversed relative to the bond path), so it
     # false-rejected 556/8201 enumerated cages, coronene among them. Coronene's
     # descriptor is perfectly legal; the retained name wins on PREFERENCE
-    # (P-25.1 Table 2.7, "coronene (PIN)" at BlueBookV2.md:11346), not because
+    #, "coronene (PIN)" at the Blue Book), not because
     # the cage is unbuildable. With the audit fixed the engine no longer refuses
     # coronene -- it emits the RETAINED PIN, which is the correct outcome and is
     # asserted in ``test_engine_emits_retained_pin_for_coronene`` below.
@@ -137,7 +137,7 @@ def _find_opsin_jar():
 
 @pytest.fixture
 def production_gate(monkeypatch):
-    """Re-enable the production SELF-01 OPSIN validity gate (the suite autouse
+    """Re-enable the production OPSIN validity gate (the suite autouse
     fixture disables it). Skips when Java/OPSIN are unavailable."""
     if not shutil.which("java") or _find_opsin_jar() is None:
         pytest.skip("OPSIN/Java not available for production-gate semantics")
@@ -253,9 +253,9 @@ def test_engine_fail_closed(desc, smiles):
 def test_engine_emits_retained_pin_for_coronene():
     """A retained fused-ring parent must come out as its retained name.
 
-    P-25.1 Table 2.7 "Retained names for hydrocarbon parent ring components"
-    lists *"coronene (PIN)"* (``BlueBookV2.md:11346``), so no von-Baeyer polyene
-    construction can ever be preferred for it. Before v29 Task S this molecule
+     "Retained names for hydrocarbon parent ring components"
+    lists *"coronene (PIN)"* (``the Blue Book``), so no von-Baeyer polyene
+    construction can ever be preferred for it. Before this molecule
     was merely REFUSED, and only because the descriptor edge-audit was
     mis-implemented; the guarantee that actually matters is that the retained
     PIN is what gets emitted.
@@ -275,7 +275,7 @@ def test_engine_flag_off_inert(smiles, _expected):
 
 
 # --------------------------------------------------------------------------
-# SELF-01: every emitted von-Baeyer polyene OPSIN-parses back to the input.
+#: every emitted von-Baeyer polyene OPSIN-parses back to the input.
 # --------------------------------------------------------------------------
 @pytest.mark.parametrize("smiles,expected", AROMATIC_FUSED_CASES)
 def test_names_opsin_roundtrip(smiles, expected, opsin_roundtrip):

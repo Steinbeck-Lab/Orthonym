@@ -1,11 +1,11 @@
-"""Task L3-0 (v33 Phase 0, class-b fix): ``parent_to_prefix``'s locanted-ketone
+"""Task L3-0 (a phase, class-b fix): ``parent_to_prefix``'s locanted-ketone
 and locanted-amine detectors were anchored too narrowly and silently corrupted
 connectivity for any unsaturated chain (an enone/enamine) whose locant sits
 behind an ``-en-``/``-yn-`` infix.
 
 Root cause (``src/orthonym/assembly/substituent_naming.py``):
 
-* ``m_one``   (the "Locanted ketone: -an-N-one" branch) used
+* ``m_one`` (the "Locanted ketone: -an-N-one" branch) used
   ``re.search(r'an?-(\\d+)-one$', name)`` -- it only fires when a literal
   ``a`` (+ optional ``n``) sits immediately before the locant digit
   (``butan-2-one``). For an unsaturated chain like ``hept-2-en-4-one`` the
@@ -15,21 +15,21 @@ Root cause (``src/orthonym/assembly/substituent_naming.py``):
   ``an?-(\\d+)-amine$`` anchor and the identical blind spot.
 
 When the narrow regex misses, execution falls through to the sibling
-"Unlocanted" branch, which assumes NO locant is present (a P-14.3.4.6
+"Unlocanted" branch, which assumes NO locant is present (a
 single-position stem) and silently splices ``oxo``/``amino`` onto the stem
 with **no locant at all** -- dropping a real, load-bearing locant rather than
-declining. Measured (``.venv/bin/python``, HEAD ``baa5f061``)::
+declining. Measured (``.venv/bin/python``, HEAD ``)::
 
     parent_to_prefix("2-methylhept-2-en-4-one", chain_length=7,
                       attach_locant=ATTACH_LOCANT_UNKNOWN)
-    -> 'oxo-2-methylhept-2-en-4-yl'          # the '4' locant silently dropped
+    -> 'oxo-2-methylhept-2-en-4-yl' # the '4' locant silently dropped
 
 This is not a cosmetic omission: OPSIN re-parses an un-cited oxo at the
 lowest available position, which is a DIFFERENT molecule. Structural proof
 (the ``TestCorruptionIsAReal WrongMolecule`` class below) uses the actual
-composed name captured from a SPY trace of
-``name_t4_complete("CC(C)=CC(=O)CC(C)C1CCC2C3C[C@H](O)[C@H]4C[C@@H](O)CCC4(C)C3=CCC12C", ...)``,
-which builds this exact fragment via the ``DROP-18/19`` recursive fallback at
+composed name captured from a a trace trace of
+``name_t4_complete("CC(C)=CC(=O)CC(C)C1CCC2C3C[C@H](O)[C@H]4C[C@@H](O)CCC4(C)C3=CCC12C",...)``,
+which builds this exact fragment via the ``/19`` recursive fallback at
 ``substituent_enumerator.py`` (the ``_name_compound_substituent`` "Fallback:
 recursive naming for ring-containing compound fragments" block, which calls
 ``parent_to_prefix(frag_name, chain_length=carbon_count,
@@ -57,7 +57,7 @@ from orthonym.namer import Orthonym
 
 
 # ---------------------------------------------------------------------------
-# Repro molecule from the SPY trace: an enone side chain
+# Repro molecule from the a trace trace: an enone side chain
 # (-CH(CH3)-CH2-C(=O)-CH=C(CH3)-CH3) hanging off a decorated cyclopentanone
 # ring. The whole molecule currently abstains for unrelated fused-ring
 # reasons (measured), so this file targets the fragment-conversion PRIMITIVE
@@ -70,7 +70,7 @@ _ENONE_MOLECULE_SMILES = (
 
 
 def _classified(smi):
-    """Build ``(mol, features)`` exactly as ``namer.py``'s T4 dispatch does
+    """Build ``(mol, features)`` exactly as ``namer.py``'s dispatch does
     (mirrors ``test_t4_coverage.py::_classified``)."""
     nm = Orthonym()
     mol = Chem.MolFromSmiles(smi)
@@ -89,7 +89,7 @@ class TestEnoneAttachLocantFailsClosed:
     behind an ``-en-`` infix, never fabricate a locant-free prefix."""
 
     def test_direct_repro_declines_rather_than_fabricates(self):
-        """The exact fragment name observed corrupting the SPY's repro
+        """The exact fragment name observed corrupting the a trace's repro
         molecule. Before the fix this returned
         ``'oxo-2-methylhept-2-en-4-yl'`` -- the '4' silently dropped."""
         result = parent_to_prefix(
@@ -164,7 +164,7 @@ class TestUnaffectedFormsUnchanged:
     @pytest.mark.parametrize("parent,n,expected", [
         ("propane", 3, "propyl"),
         ("pyridine", 0, "pyridinyl"),
-        ("methanal", 1, "oxomethyl"),               # P-14.3.4.6, one position
+        ("methanal", 1, "oxomethyl"),               #, one position
         ("acetamide", 2, "carbamoylmethyl"),
     ])
     def test_genuinely_unlocated_forms_still_emit(self, parent, n, expected):
@@ -175,7 +175,7 @@ class TestUnaffectedFormsUnchanged:
 
 # ===========================================================================
 # 3. Structural proof the defect is a REAL wrong-molecule risk, not merely a
-#    cosmetic locant omission.
+# cosmetic locant omission.
 # ===========================================================================
 @pytest.mark.opsin_gate
 @pytest.mark.slow
@@ -183,7 +183,7 @@ class TestCorruptionIsARealWrongMolecule:
     """OPSIN re-parses the pre-fix fabrication at the WRONG position."""
 
     def test_uncited_oxo_reparses_to_a_different_molecule(self, opsin_gate):
-        """The composed name a SPY trace captured for the repro molecule
+        """The composed name a a trace trace captured for the repro molecule
         (before this fix): the enone fragment's oxo locant is missing, and
         OPSIN places it at the lowest available position (an aldehyde
         terminus) instead of the true internal C4 ketone -- a different
@@ -214,7 +214,7 @@ class TestCorruptionIsARealWrongMolecule:
 
 # ===========================================================================
 # 4. End-to-end safety: the full pipeline on the repro molecule must never
-#    emit a wrong-connectivity name -- abstain or round-trip, nothing between.
+# emit a wrong-connectivity name -- abstain or round-trip, nothing between.
 # ===========================================================================
 @pytest.mark.opsin_gate
 @pytest.mark.slow

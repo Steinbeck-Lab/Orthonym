@@ -1,6 +1,6 @@
-"""a phase (WSA-03 / CONTEXT) — shared name-composition primitives.
+"""a phase (-03 / internal notes) — shared name-composition primitives.
 
-Single source of truth for the IUPAC P-14.5 / P-16 / P-31.1 string-composition
+Single source of truth for the IUPAC / / string-composition
 grammar, called by BOTH the legacy fragment assembler
 (``handlers/_handler_shared.py:_assemble_fragments``) and the Name-Tree
 serializer (``name_tree_to_string._assemble_explicit_fields``). There is ONE
@@ -100,7 +100,7 @@ def _build_unsaturation_infix(
     The infix is assembled structurally so that hyphens are inserted only
     where needed -- no post-hoc band-aid cleanup required.
 
-    IUPAC P-31.1.3.4: when total unsaturation locant count >= 2, prefix
+    IUPAC: when total unsaturation locant count >= 2, prefix
     with 'a' for euphony (e.g., 'a-1,3-dien' not '-1,3-dien').
 
     Args:
@@ -111,15 +111,15 @@ def _build_unsaturation_infix(
         Unsaturation infix string (may be empty for saturated).
 
     Examples:
-        >>> _build_unsaturation_infix([], [])
+        >>> _build_unsaturation_infix(, )
         'an'
-        >>> _build_unsaturation_infix([1], [])
+        >>> _build_unsaturation_infix([1], )
         '-1-en'
         >>> _build_unsaturation_infix([1], [4])
         '-1-en-4-yn'
-        >>> _build_unsaturation_infix([1, 3], [])
+        >>> _build_unsaturation_infix([1, 3], )
         'a-1,3-dien'
-        >>> _build_unsaturation_infix([], [1, 3])
+        >>> _build_unsaturation_infix(, [1, 3])
         'a-1,3-diyn'
         >>> _build_unsaturation_infix([1, 3], [5])
         'a-1,3-dien-5-yn'
@@ -130,7 +130,7 @@ def _build_unsaturation_infix(
     if num_double == 0 and num_triple == 0:
         return "an"  # Saturated
 
-    # Determine if the 'a' euphonic connector is needed (IUPAC P-31.1.3.4):
+    # Determine if the 'a' euphonic connector is needed (IUPAC:
     # used when total unsaturation locants >= 2 (diene, diyne, enyne etc.)
     total_locants = num_double + num_triple
     needs_a = (total_locants >= 2) and (num_double > 1 or num_triple > 1)
@@ -201,21 +201,21 @@ def _build_hydrocarbon_name(
         Complete hydrocarbon name.
 
     Examples:
-        >>> _build_hydrocarbon_name("but", [], [])
+        >>> _build_hydrocarbon_name("but", , )
         'butane'
-        >>> _build_hydrocarbon_name("eth", [1], [])
+        >>> _build_hydrocarbon_name("eth", [1], )
         'ethene'
-        >>> _build_hydrocarbon_name("but", [1], [])
+        >>> _build_hydrocarbon_name("but", [1], )
         'but-1-ene'
-        >>> _build_hydrocarbon_name("but", [2], [])
+        >>> _build_hydrocarbon_name("but", [2], )
         'but-2-ene'
         >>> _build_hydrocarbon_name("pent", [1], [4])
         'pent-1-en-4-yne'
-        >>> _build_hydrocarbon_name("cyclohex", [], [])
+        >>> _build_hydrocarbon_name("cyclohex", , )
         'cyclohexane'
-        >>> _build_hydrocarbon_name("cyclohex", [1], [])
+        >>> _build_hydrocarbon_name("cyclohex", [1], )
         'cyclohexene'
-        >>> _build_hydrocarbon_name("cyclohex", [1, 3], [])
+        >>> _build_hydrocarbon_name("cyclohex", [1, 3], )
         'cyclohexa-1,3-diene'
     """
     num_double = len(double_locants)
@@ -229,13 +229,13 @@ def _build_hydrocarbon_name(
         return f"{stem}ane"
 
     # Centralized bond locant elision: ethene/ethyne (2-carbon) and mono-cycloalkenes.
-    # WSD-06 (NUM-01): the ring ene-locant is omitted only for an UNSUBSTITUTED
-    # cycloalkene (P-14.3.4.2(d)); a substituent makes the double-bond position
+    # -06 : the ring ene-locant is omitted only for an UNSUBSTITUTED
+    # cycloalkene (d)); a substituent makes the double-bond position
     # distinctive, so it must be cited (`3-bromocyclohex-1-ene`, not
     # `bromocyclohexene`). The caller passes ``ring_bond_locant_omittable`` (False
     # when the ring carries a substituent); the old ``num_double==1`` count proxy is
     # the fallback for callers that don't supply it.
-    # P-14.3.4.2(d): dinuclear ethene/ethyne always omit the bond locant.
+    # (d): dinuclear ethene/ethyne always omit the bond locant.
     # TRInuclear propene/propyne (Wave2 T6a) omit it ONLY when the caller
     # certifies the parent is unsubstituted via chain_bond_locant_omittable —
     # a substituent makes the position distinctive (3-chloroprop-1-ene). A
@@ -262,7 +262,7 @@ def _build_hydrocarbon_name(
         is_monosubstituted=_ring_mono,
     )
 
-    # Determine if the 'a' euphonic connector is needed (IUPAC P-31.1.3.4):
+    # Determine if the 'a' euphonic connector is needed (IUPAC:
     # used when multiple bonds have multiplied locants (diene, diyne, etc.)
     needs_a = (num_double > 1) or (num_triple > 1 and num_double == 0)
 
@@ -330,7 +330,7 @@ def _join_prefixes(prefix_texts: List[str]) -> str:
         '3-ethyl-4-methyl'
         >>> _join_prefixes(["2,2-dimethyl"])
         '2,2-dimethyl'
-        >>> _join_prefixes([])
+        >>> _join_prefixes()
         ''
     """
     if not prefix_texts:
@@ -351,8 +351,8 @@ def _join_prefixes(prefix_texts: List[str]) -> str:
             # so this copy dropped the separator after a brace-enclosed prefix
             # ('2-{[(methylcarbamoyl)amino]methyl}4-methyl') while the
             # `polyfunctional._join_prefixes` copy already hyphenated it. A closing
-            # brace ends an enclosure exactly as `)` and `]` do — P-16.5.4's nesting
-            # cycle `{[({[()]})]}` makes all three the same kind of boundary — and
+            # brace ends an enclosure exactly as `)` and `]` do — 's nesting
+            # cycle `{[({})]}` makes all three the same kind of boundary — and
             # 24 `}`-bearing gold rows route through THIS copy, so the two must
             # agree. (No current gold pairs a `}` with a following locant, which is
             # why the asymmetry survived; see the tests added alongside.)
@@ -406,11 +406,11 @@ def retained_acetic_from_prefixes(
     enclose_subsequent: bool = False,
 ) -> str:
     """Assemble a SUBSTITUTED retained-functional-parent PIN from already-formatted
-    substituent prefix strings (P-65.1.1.1 / P-66.6.1.2.1 retained functional parent
-    + P-14.3.4.6 locant omission).
+    substituent prefix strings / retained functional parent
+    + locant omission).
 
     The retained parent (``acetic acid``; or ``acetaldehyde`` via ``parent=``, per
-    P-66.6.1.2.1) has a single substitutable position (the alpha carbon), so ALL
+     has a single substitutable position (the alpha carbon), so ALL
     substituent locants are omitted while multipliers and any INTERNAL locants of
     a complex substituent are preserved::
 
@@ -421,7 +421,7 @@ def retained_acetic_from_prefixes(
         ['2-phenoxy'], parent='acetaldehyde'
                                   -> 'phenoxyacetaldehyde' (BB 35076)
 
-    ``enclose_subsequent`` (P-16.3.3 worked examples ``cyclopropyl(hydroxy)-
+    ``enclose_subsequent`` worked examples ``cyclopropyl(hydroxy)-
     acetaldehyde`` BB 45259, ``cyclobutyl(cyclopropyl)methanol`` BB 45247):
     when 2+ substituent prefixes are cited with their locants omitted, the FIRST
     prefix is bare and each SUBSEQUENT prefix is set off by enclosing marks::
@@ -431,16 +431,16 @@ def retained_acetic_from_prefixes(
 
     The caller must gate ``enclose_subsequent`` to a context where every prefix is a
     simple, single-alpha-locant token (the multiplied ``di(phenyl)`` shape of BB
-    29852 is a DIFFERENT P-16.3.3 rule and must not be routed here) -- see the
+    29852 is a DIFFERENT rule and must not be routed here) -- see the
     aldehyde arm in ``rules/polyfunctional.py``. The caller is likewise responsible
     for gating the whole assembly to the substituted-2-carbon-mono-FG context; this
     function only performs the retained-name assembly.
     """
     unlocanted = [_ALPHA_LOCANT_RE.sub('', t) for t in prefix_texts]
-    # (P-16.3.3): stripping the alpha locant can leave a COMPLEX substituent
+    #: stripping the alpha locant can leave a COMPLEX substituent
     # whose own enclosure no longer wraps the whole prefix -- e.g.
     # '[(methylsulfanyl)carbonyl]amino' (the [...] wraps only the acyl, 'amino'
-    # trails outside). Joined bare it welds into '...aminoacetic acid'; P-16.3.3
+    # trails outside). Joined bare it welds into '...aminoacetic acid';
     # requires the whole prefix enclosed -> '{[(methylsulfanyl)carbonyl]amino}'.
     # Wrap each unlocanted prefix that carries marks but is not already fully
     # enclosed; a fully-enclosed prefix ('(4-chlorophenoxy)') and a mark-free one
@@ -450,7 +450,7 @@ def retained_acetic_from_prefixes(
 
     def _mult_self_enclosed(tok: str) -> bool:
         # A 'bis(...)'/'tris(...)'/'tetrakis(...)'-shaped token is ALREADY fully
-        # enclosed by its own multiplicative parentheses (P-16.5.1.1: parentheses
+        # enclosed by its own multiplicative parentheses: parentheses
         # are used after 'bis','tris', etc.) -- the closing ')' is the last char
         # with nothing trailing -- so it must NOT be re-escalated to '[bis(...)]'.
         # _is_fully_enclosed only inspects the FIRST char, so it misses this (the
@@ -467,7 +467,7 @@ def retained_acetic_from_prefixes(
             and not _mult_self_enclosed(t)) else t
         for t in unlocanted
     ]
-    # P-16.5.1.3.1/.3.2 (locant-omitted multi-prefix on a single-substitutable
+    # /.3.2 (locant-omitted multi-prefix on a single-substitutable
     # retained parent): the FIRST cited substituent is bare, each SUBSEQUENT one is
     # set off by enclosing marks -- 'anilino(oxo)acetic acid' (the Blue Book),
     # 'bromo(chloro)acetic acid' (the Blue Book). A multiplicative prefix stays OUTSIDE the
@@ -488,7 +488,7 @@ def retained_acetic_from_prefixes(
 
 
 # ---------------------------------------------------------------------------
-# Lifted P-16.5.1.3.1 mononuclear enclosing-marks block (from
+# Lifted mononuclear enclosing-marks block (from
 # _handler_shared.py:1037-1078) as a named function; the serializer calls this
 # and the legacy assembler keeps its byte-identical inline copy (to be thinned
 # to a call in a later phase).
@@ -496,7 +496,7 @@ def retained_acetic_from_prefixes(
 
 # Mononuclear parent stems (one heavy atom of any element), keyed by the bare
 # parent-hydride stem. Drives the serializer's structural `is_mononuclear`
-# derivation (CONTEXT — DERIVE, no NameTreeNode field add). For
+# derivation (internal notes — DERIVE, no NameTreeNode field add). For
 # `general_acyclic` only "meth" is reachable; the rest keep parity with the
 # legacy structural flag for non-carbon mononuclear parents.
 _MONONUCLEAR_STEMS = frozenset(
@@ -511,7 +511,7 @@ _MULTIPLIER_PREFIXES = (
 def apply_mononuclear_enclosing(
     prefix_texts: List[str], is_mononuclear: bool
 ) -> List[str]:
-    """Apply the P-16.5.1.3.1 mononuclear enclosing rule (BlueBookV2 7272).
+    """Apply the mononuclear enclosing rule (the Blue Book).
 
     For a mononuclear parent hydride with >= 2 substituents: the FIRST cited
     substituent is bare; the SECOND AND FURTHER are EACH enclosed in
@@ -536,13 +536,13 @@ def apply_mononuclear_enclosing(
         # Blue Book exempts only the locant-bearing first prefix from this rule).
         #
         # The italicized-prefix carve-out is the SHARED primitive, never a raw
-        # `'-' in t`: P-16.3.3(b)/P-16.2.4.1(d) / P-29.6.1 make the hyphen of a leading italicized
+        # `'-' in t`: (b)/(d) / make the hyphen of a leading italicized
         # structural prefix part of a SIMPLE retained name (BB 16286 cites
         # '*tert*-butyldi(methyl)phosphane' (PIN) with the group BARE). A raw test
         # classed 'tert-butyl' as compound, which flipped `all(...)` below to False
         # and so silently switched OFF the first-bare/rest-enclosed transform for
         # EVERY prefix in the name, not merely the tert- one.
-        _ital_bare = italicized_prefix_is_bare(t)     # GUARD: P-16.3.3(b)/P-16.2.4.1(d) carve-out
+        _ital_bare = italicized_prefix_is_bare(t)     # GUARD: (b)/(d) carve-out
         if (re.match(r'^\d', t) or '(' in t or '[' in t
                 or ('-' in t and not _ital_bare)):
             return False
@@ -551,13 +551,13 @@ def apply_mononuclear_enclosing(
         return True
 
     if all(_is_simple_prefix(t) for t in prefix_texts):
-        # FIRST cited bare; SECOND AND FURTHER each enclosed (P-16.5.1.3.1).
+        # FIRST cited bare; SECOND AND FURTHER each enclosed.
         return [prefix_texts[0]] + [f"({t})" for t in prefix_texts[1:]]
     return prefix_texts
 
 
 # ---------------------------------------------------------------------------
-# Lifted P-14.7 suffix<->prefix locant-collision resolver (from
+# Lifted suffix<->prefix locant-collision resolver (from
 # _handler_shared.py:963-1015), refactored to operate on neutral
 # (text, locants) tuples instead of NameFragment. Chains return the input
 # unchanged early (no-op for general_acyclic); it exists so the serializer
@@ -571,7 +571,7 @@ def resolve_suffix_prefix_collision(
     is_ring: bool,
     parent_size: int,
 ) -> List[Tuple[str, tuple]]:
-    """Remove prefix locants that collide with a suffix locant (P-14.7, suffix wins).
+    """Remove prefix locants that collide with a suffix locant, suffix wins).
 
     Mirrors ``_assemble_fragments:963-1015``. Returns ``prefix_pairs`` unchanged
     when the parent is not a ring, there is no suffix locant, or no collision is
@@ -608,7 +608,7 @@ def resolve_suffix_prefix_collision(
 
 
 def is_ring_parent_name(parent_text: str) -> bool:
-    """True when the parent stem names a ring system (the P-14.7 collision gate).
+    """True when the parent stem names a ring system (the collision gate).
 
     Same keyword scan the legacy ``_assemble_fragments`` uses inline at
     ``_handler_shared.py:966-974`` — extracted so the serializer applies the

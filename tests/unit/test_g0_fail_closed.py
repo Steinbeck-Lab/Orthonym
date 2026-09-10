@@ -1,4 +1,4 @@
-""" Phase G0 — fail-closed safety (DD7 S1 + P-69 crash).
+""" Phase G0 — fail-closed safety (DD7 S1 + crash).
 
 G0 makes Orthonym REFUSE (return the 'unknown organic compound' descriptive
 fallback in the default path, raise ``OrthonymLimitError`` on the opt-in path)
@@ -10,14 +10,14 @@ correctly:
   * a polycomponent fused system whose matched catalog core covers only PART of
     the fused ring system, so the leftover fused ring is mis-named as an acyclic
     substituent (difuropyridine -> '7-ethoxyfuro[3,2-b]pyridine');
-  * and the P-69 two-metal species that CRASHED with
-    'NoneType object has no attribute name' through the direct.name() /
+  * and the two-metal species that CRASHED with
+    'NoneType object has no attribute name' through the direct.name /
     raise_on_limit API.
 
 Per guardrail A8 these test the OUTPUT/behaviour for the rule FAMILY (any
 aromatic-in-cage / partial-fused-core / unnameable-acyclic molecule), not literal
-canary rows. The correct PINs (bridged-fused P-25.4, polycomponent fusion
-P-25.3.4, spirobi P-24.3) are Phase-G1+ builds; until then refusal is the
+canary rows. The correct PINs (bridged-fused, polycomponent fusion
+, spirobi are Phase-G1+ builds; until then refusal is the
 correct, honest behaviour.
 """
 import pytest
@@ -38,7 +38,7 @@ def _is_refused(smiles: str) -> bool:
 # --------------------------------------------------------------------------- #
 # NOTE (Phase G1, DD7): the three single-bridge naphthalene systems
 # G0 refused (benzonorbornadiene / 1,4-epoxy- / 1,4-ethano-) are now named
-# CORRECTLY by the P-25.4 constructor (see tests/unit/test_g1_bridged_fused.py),
+# CORRECTLY by the constructor (see tests/unit/test_g1_bridged_fused.py),
 # so they left the fail-closed family. The polyspiro spirobi-indane stays refused
 # (its spirobi[indane] PIN is a Phase-G4 build; is_spiro_system rejects
 # polycyclic-component spiro, so it still routes to von Baeyer and the aromaticity
@@ -89,17 +89,17 @@ def test_aromatic_in_cage_is_deterministic(smiles):
 PARTIAL_FUSED_CORE_NAMED = [
     ("c1cc2nc3ccoc3cc2o1", "difuro[3,2-b:2',3'-e]pyridine"),     # gold DD7-S1-safety-2
     ("c1cc2nc3ccsc3cc2o1", "furo[3,2-b]thieno[2,3-e]pyridine"),  # DD7-fusion-2
-    # BP-4 a phase SUPERSEDES the substituted fail-closed: the polycomponent
-    # constructor now decorates the star parent against the canonical P-25.3.3
+    # a phase SUPERSEDES the substituted fail-closed: the polycomponent
+    # constructor now decorates the star parent against the canonical
     # numbering (verified OPSIN round-trip). Previously these produced the phantom
-    # sub-fragment '5-methylfuran'/'5-chlorofuran' (suppressed only by SELF-01 in
+    # sub-fragment '5-methylfuran'/'5-chlorofuran' (suppressed only by in
     # production) — now the correct PIN, which is a strict accuracy improvement.
     ("Cc1cc2nc3ccoc3cc2o1", "2-methyldifuro[3,2-b:2',3'-e]pyridine"),
     ("Clc1cc2nc3ccoc3cc2o1", "2-chlorodifuro[3,2-b:2',3'-e]pyridine"),
 ]
 
 # Partial-core systems the fusion path still CANNOT name -> the G0 veto fires.
-# BP-4 a phase fails closed at SOURCE when a substituent branch is unnameable
+# a phase fails closed at SOURCE when a substituent branch is unnameable
 # (exotic element), so the emitted name can never silently omit a substituent.
 PARTIAL_FUSED_CORE_STILL_CLOSED = [
     "[Si](C)(C)c1cc2nc3ccoc3cc2o1",  # silyl-difuropyridine: unnameable branch
@@ -129,16 +129,16 @@ def test_partial_fused_core_raises_named_limit(smiles):
         Orthonym().name(smiles, raise_on_limit=True)
     # A classified fail-closed refusal (not a crash). The silyl-difuropyridine
     # example fails via UNNAMEABLE (its substituent branch is unnameable —
-    # BP-4 a phase's source-level completeness check), a sibling of the
+    # a phase's source-level completeness check), a sibling of the
     # ring-coverage UNSUPPORTED_RING_SYSTEM veto; both are honest refusals.
     assert ei.value.code in {"UNSUPPORTED_RING_SYSTEM", "UNNAMEABLE"}
 
 
 # --------------------------------------------------------------------------- #
-# Family 3 — P-69 NoneType crash: unnameable two-metal / acyclic species #
+# Family 3 — NoneType crash: unnameable two-metal / acyclic species #
 # --------------------------------------------------------------------------- #
 NO_CRASH_METAL = [
-    "c1ccc(cc1)[Hg]c1ccc(cc1)[Sb](c1ccccc1)c1ccccc1",  # gold P-69 (Hg + Sb)
+    "c1ccc(cc1)[Hg]c1ccc(cc1)[Sb](c1ccccc1)c1ccccc1",  # gold (Hg + Sb)
     "[Hg]([Hg]C)C",                                      # two covalent Hg
     "c1ccccc1[Hg][Hg]c1ccccc1",
 ]
@@ -159,10 +159,10 @@ def test_metal_species_do_not_crash(smiles):
 
 
 def test_general_acyclic_empty_pool_returns_none_not_crash():
-    """The direct.name() API must not raise a raw AttributeError when the
-    general_acyclic catch-all builds no candidate (the masked P-69 crash).
+    """The direct.name API must not raise a raw AttributeError when the
+    general_acyclic catch-all builds no candidate (the masked crash).
 
-    .name() returns the bare failure signal (empty string) — the descriptive
+    .name returns the bare failure signal (empty string) — the descriptive
     'mercury compound (not supported)' wrapper is applied by name_compound;
     what matters here is that no exception escapes."""
     smiles = "c1ccc(cc1)[Hg]c1ccc(cc1)[Sb](c1ccccc1)c1ccccc1"
@@ -210,7 +210,7 @@ def test_2_phenylquinoline_not_refused_by_core_coverage():
 
 
 def test_pendant_aromatic_larger_than_cage_not_refused():
-    """WR-01 regression guard: a saturated cage (norbornane, 7 atoms) carrying a
+    """ regression guard: a saturated cage (norbornane, 7 atoms) carrying a
     pendant aromatic ring system STRICTLY LARGER than the cage (2-naphthyl, 10
     atoms) must NOT be refused — the aromaticity guard keys off the EXACT cage
     atoms the namer numbers, not the largest ring component, so the pendant
@@ -220,7 +220,7 @@ def test_pendant_aromatic_larger_than_cage_not_refused():
 
 
 # --------------------------------------------------------------------------- #
-# Helper unit — aromaticity checked over the EXACT cage atom set (WR-01) #
+# Helper unit — aromaticity checked over the EXACT cage atom set  #
 # --------------------------------------------------------------------------- #
 def test_helper_checks_exact_cage_atoms():
     # An aromatic atom in the passed cage set -> True (benzo carbons are aromatic)
@@ -230,7 +230,7 @@ def test_helper_checks_exact_cage_atoms():
     assert aromatic_idx and saturated_idx
     assert vonbaeyer_cage_has_aromaticity(mol, aromatic_idx) is True
     # A cage set containing ONLY the saturated (bridge) atoms -> False, even
-    # though the molecule has aromatic atoms elsewhere (the WR-01 invariant:
+    # though the molecule has aromatic atoms elsewhere (the invariant:
     # only the cage being numbered counts).
     assert vonbaeyer_cage_has_aromaticity(mol, saturated_idx) is False
     # Empty cage -> False (no atoms to be aromatic)

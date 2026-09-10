@@ -1,8 +1,8 @@
 """
 Stereochemistry perception and CIP assignment.
 
-CRITICAL: Always use rdCIPLabeler.AssignCIPLabels(), not the legacy
-Chem.AssignStereochemistry() which fails on complex molecules.
+CRITICAL: Always use rdCIPLabeler.AssignCIPLabels, not the legacy
+Chem.AssignStereochemistry which fails on complex molecules.
 """
 
 import logging
@@ -18,16 +18,16 @@ logger = logging.getLogger(__name__)
 
 _CIP_ASSIGNED_PROP = '_Orthonym_CIPAssigned'
 
-# WSB-03 (a phase,): centres CIP engine. Read once at import time
+# -03 (a phase,): centres CIP engine. Read once at import time
 # (same idiom as namer.ORTHONYM_ENABLE_TRIVIALITY_CONTROLLER).
 #
-# STER-02 (Phase H, 2026-06-21): the default is now ON. The vendored `centres`
+# (Phase H, 2026-06-21): the default is now ON. The vendored `centres`
 # scores 281/290 on the Hanson 2018 CIP Validation Suite vs
 # rdCIPLabeler's 235/290 -- a net +46 CORRECT labels with **0 per-compound
 # regressions vs RDKit** (centres remains a strict superset of RDKit on the
 # suite; the gain is exotic CIP rule cases RDKit mis-ranks). When centres is
 # unavailable (jar or Java absent) the code falls through to rdCIPLabeler
-# UNCHANGED -- a missing JVM never hard-fails a name (). Set
+# UNCHANGED -- a missing JVM never hard-fails a name . Set
 # ORTHONYM_USE_CENTRES_CIP=0/off to force the legacy RDKit-only path.
 #
 # CIP-UPDATE (2026-09-07): engine reverted 1.5-SNAPSHOT -> 1.2.1 (the tagged
@@ -87,14 +87,14 @@ def assign_stereochemistry(mol) -> None:
 
     Uses a private marker property to track whether rdCIPLabeler has
     already been called on this mol object. This is more reliable than
-    checking for _CIPCode because RDKit's MolFromSmiles() automatically
+    checking for _CIPCode because RDKit's MolFromSmiles automatically
     sets atom _CIPCode from @/@@ notation, but does NOT set bond _CIPCode
     for E/Z -- so an atom-based check would short-circuit and skip the
     bond labels.
 
-    The authoritative call site in namer.py:_perceive() sets the marker
+    The authoritative call site in namer.py:_perceive sets the marker
     after calling rdCIPLabeler. Handler modules call this function for
-    safety (e.g., natural_products runs BEFORE _perceive()).
+    safety (e.g., natural_products runs BEFORE _perceive).
 
     Args:
         mol: RDKit Mol object (modified in place)
@@ -102,7 +102,7 @@ def assign_stereochemistry(mol) -> None:
     if mol.HasProp(_CIP_ASSIGNED_PROP):
         return
 
-    # WSB-03 (): when the centres gate is ON AND the engine is available,
+    # -03 : when the centres gate is ON AND the engine is available,
     # centres is the CIP source-of-truth (it sets the same _CIPCode props the
     # downstream consumers read). If the gate is OFF (default) or centres is
     # unavailable (jar/Java absent), this branch is skipped and the path below
@@ -203,7 +203,7 @@ def get_stereocenters(mol) -> List[Dict]:
         if atom.HasProp('_CIPCode'):
             cip_code = atom.GetProp('_CIPCode')
             # Preserve CIP code as-is: uppercase R/S for normal stereocenters,
-            # lowercase r/s for pseudoasymmetric centers per IUPAC P-92.1.4.2.
+            # lowercase r/s for pseudoasymmetric centers per IUPAC.
             centers.append({
                 'idx': atom.GetIdx(),
                 'cip': cip_code,
@@ -279,7 +279,7 @@ def get_stereodescriptor_string(
     """
     Generate stereodescriptor string for name prefix.
 
-    DEPRECATED: Prefer collect_stereodescriptors() + format_stereodescriptor_string()
+    DEPRECATED: Prefer collect_stereodescriptors + format_stereodescriptor_string
     from orthonym.rules.stereochemistry directly.
 
     Delegates to the production pipeline. When locant_map is None, uses an identity
@@ -380,7 +380,7 @@ def input_stereo_undefined(mol, atom_indices: Optional[Iterable[int]] = None) ->
     retained name (steroid ``cholest-``/``androst-``, amino acid
     ``S-methylcysteine``) asserts a specific configuration, so it must not be
     emitted when this returns True -- that would fabricate stereo the input
-    never defined (P-103.1.3.1 / P-92). Fail-CLOSED: any failure returns True,
+    never defined /. Fail-CLOSED: any failure returns True,
     so an uncomputable case never lets a fabrication through.
     """
     if mol is None:
@@ -405,17 +405,17 @@ def input_stereo_undefined(mol, atom_indices: Optional[Iterable[int]] = None) ->
 
 
 # =============================================================================
-# Axial Chirality Detection (IUPAC P-93.5)
+# Axial Chirality Detection (IUPAC
 # =============================================================================
 
 #: The axial descriptor in GENERAL nomenclature, keyed by the PIN (helicity)
-#: descriptor. P-91.2.1.1 "Cahn-Ingold-Prelog (CIP) stereodescriptors"
+#: descriptor. "Cahn-Ingold-Prelog (CIP) stereodescriptors"
 #: (the Blue Book) lists under *"The following stereodescriptors are used
 #: as preferred stereodescriptors"* clause (c) (:44588) *"'M' and 'P', to specify
 #: the absolute configuration of an axial or planar entity using the helicity
 #: rule"*; 'Ra'/'Sa' appear only under *"The following stereodescriptors are
 #: recommended for general nomenclature"* (:44594). The two describe the same
-#: sense: P-92.1.2.2 "The helicity rule: stereodescriptors 'M' and 'P'" (:44812)
+#: sense: "The helicity rule: stereodescriptors 'M' and 'P'" (:44812)
 #: -- *"the chirality is described by the symbols 'M' if the path is
 #: anticlockwise; the symbol is 'P' if the path is clockwise"* -- is the same
 #: clockwise/anticlockwise test the Ra/Sa elongated-tetrahedron model applies,
@@ -435,7 +435,7 @@ def detect_axial_chirality(mol, style: str = "pin") -> List[Dict]:
     representation. Does NOT attempt to infer chirality where the input
     is silent.
 
-    Descriptor (P-91.2.1.1,:44582 -- see ``AXIAL_GENERAL_FORM``): the helicity
+    Descriptor,:44582 -- see ``AXIAL_GENERAL_FORM``): the helicity
     letters 'M'/'P' are the PREFERRED (PIN) stereodescriptors for an axial
     entity, so they are what this returns by default. 'Ra'/'Sa' are recommended
     for GENERAL nomenclature only and are produced with ``style="general"``.
@@ -467,7 +467,7 @@ def detect_axial_chirality(mol, style: str = "pin") -> List[Dict]:
         if stereo in (Chem.BondStereo.STEREOATROPCW,
                       Chem.BondStereo.STEREOATROPCCW):
             # RDKit already reports the helicity letter for an atropisomeric
-            # bond, which IS the PIN descriptor (P-91.2.1.1(c),:44588) -- it is
+            # bond, which IS the PIN descriptor (c),:44588) -- it is
             # passed through rather than re-lettered to Ra/Sa.
             cip = None
             if bond.HasProp('_CIPCode'):
@@ -500,7 +500,7 @@ def detect_axial_chirality(mol, style: str = "pin") -> List[Dict]:
 def _cip_priority_key(mol_h, atom_idx: int, exclude_idx: int) -> tuple:
     """CIP priority key for allene terminal substituent.
 
-    Uses IUPAC P-92.1.3 sequence rules (simplified):
+    Uses IUPAC sequence rules (simplified):
     (1) Higher atomic number > lower
     (2) Sum of neighbor atomic numbers (excluding connection to terminal C)
 
@@ -531,17 +531,17 @@ def _manual_allene_cip(mol, central_idx: int) -> Optional[str]:
 
     For an allene C1=C=C2, view along the C=C=C axis. The allene is treated
     as an elongated tetrahedron with 4 substituents (2 on each terminal carbon).
-    P-92.1.2.2 "The helicity rule: stereodescriptors 'M' and 'P'"
+     "The helicity rule: stereodescriptors 'M' and 'P'"
     (the Blue Book): *"Looking along the chirality axis the ligands are
     arranged in pairs. When proceeding from the nearer ligand having priority in
     the pair to the further away atom or group having priority in the pair, the
     chirality is described by the symbols 'M' if the path is anticlockwise; the
     symbol is 'P' if the path is clockwise."* So clockwise -> P, anticlockwise
-    -> M; these are the PIN descriptors (P-91.2.1.1(c),:44588). The general
+    -> M; these are the PIN descriptors (c),:44588). The general
     forms Ra/Sa are derived by the caller via ``AXIAL_GENERAL_FORM``.
 
     Uses true CIP priority based on atomic number (primary) and neighbor
-    atomic number sums (secondary), per IUPAC P-92.1.3.
+    atomic number sums (secondary), per IUPAC.
 
     Args:
         mol: RDKit Mol object
@@ -643,7 +643,7 @@ def _manual_allene_cip(mol, central_idx: int) -> Optional[str]:
 
     # Determine sense based on the elongated tetrahedron model:
     # View along the allene axis from the near terminal to the far terminal.
-    # P-92.1.2.2 (:44812): clockwise -> 'P', anticlockwise -> 'M'.
+    # (:44812): clockwise -> 'P', anticlockwise -> 'M'.
     if near_high_priority > far_high_priority:
         return 'P'
     elif near_high_priority < far_high_priority:

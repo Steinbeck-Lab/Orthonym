@@ -1,9 +1,9 @@
 """Class A -- charged aromatic zwitterions (best-effort tier).
 
 An aromatic heterocycle with a DEPROTONATED ring nitrogen (a skeletal ``-ide``
-azolide/azinide anion, P-72.2.2.1) conjugated to an exocyclic amidinium /
-guanidinium / iminium CATION (P-73.1). The whole species is net-neutral
-(P-74.1.1 / P-74.1.2 zwitterion).
+azolide/azinide anion, conjugated to an exocyclic amidinium /
+guanidinium / iminium CATION. The whole species is net-neutral
+ / zwitterion).
 
 Before this class the general monocycle producer expressed a charge only when the
 NET molecular charge was non-zero; a zwitterion (net 0) hit the ``_has_ionic_
@@ -15,8 +15,8 @@ every charged atom so the P3 charge-totality proof passes.
 These are BEST-EFFORT names (the ring is the parent, not the exocyclic iminium),
 so the pin is the full-standard-InChIKey ROUND-TRIP, not a byte string: the
 best-effort tier is accurate-or-abstain and 0-wrong is delivered by the
-whole-name OPSIN round-trip gate. References: IUPAC 2013 P-72.2.2.1 (skeletal
-anion ``-ide``), P-73.1 (skeletal cation ``-ium``), P-74.1.1 / P-74.1.2
+whole-name OPSIN round-trip gate. References: IUPAC 2013 (skeletal
+anion ``-ide``), (skeletal cation ``-ium``), /
 (zwitterion cumulative suffixes).
 """
 import pytest

@@ -1,4 +1,4 @@
-"""End-to-end regression locks for the v33 substituted-purine build.
+"""End-to-end regression locks for the substituted-purine build.
 
 adenosine (the largest purine-bearing substructure) now names RT-exact — the
 load-bearing proof the purine ring-substituent path is closed. acetyl-CoA still

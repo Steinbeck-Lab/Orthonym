@@ -1,28 +1,28 @@
-"""Phase 161 organometallic handler — P-69 + IR-10 + Salzer 1999.
+"""a phase organometallic handler — + + Salzer 1999.
 
 SECOND tree-emitting handler in Orthonym (first was simple_molecule.py
-from Phase 160.2 Plan-10). Mirrors that file's shape per CONTEXT D-04 +
-D-11 + 161-AUDIT-ORGM.md § 5.
+from a phase Plan-10). Mirrors that file's shape per internal notes +
+ + internal notes-ORGM.md
 
-The handler is OUTER-CFR-only (per ORGM-03 + Phase 158 CFR-02): it does
+The handler is OUTER-CFR-only (per + a phase): it does
 NOT add an inner-dispatch entry; the CFR-level ORGANOMETALLIC entry at
 priority 50 routes here BEFORE SALT@100.
 
-Byte-identical contract per CONTEXT D-11: name_tree_to_string(result.tree)
+Byte-identical contract per internal notes: name_tree_to_string(result.tree)
 == result.name for ALL non-None returns.
 
-Cascade-continuation on None preserved per CONTEXT D-02: any failure
+Cascade-continuation on None preserved per internal notes: any failure
 (mol is None; metal_complex is None; multimetal compound; ValueError
 from hapticity; result is None) returns None so CFR cascade falls
-through to SALT@100 → ... → GENERAL@99999.
+through to SALT@100 →... → GENERAL.
 
 Anti-patterns to avoid (PATTERNS lines 499-503):
 - NEVER mutate features or mol inside the handler — predicate + handler
-  purity (D-12 hard invariant).
+  purity (hard invariant).
 - NEVER catch ALL exceptions; only catch ValueError from compute_hapticity
-  per RESEARCH §3.2 lines 540-544 to signal cascade-continuation.
+  per RESEARCH lines 540-544 to signal cascade-continuation.
 - NEVER emit a tree whose name_tree_to_string(tree) does NOT byte-equal
-  result.name — CONTEXT D-11 + RESEARCH §4.3 line 757 byte-identical contract.
+  result.name — internal notes + RESEARCH line 757 byte-identical contract.
 """
 
 from __future__ import annotations
@@ -35,9 +35,9 @@ from ..name_tree import NameTreeNode, NamingResult
 def name_organometallic(
     features: Any, mol: Any = None, style: str = "pin",
 ) -> Optional[NamingResult]:
-    """Phase 161 ORGM handler; CFR-routed at priority 50.
+    """a phase ORGM handler; CFR-routed at priority 50.
 
-    Per CONTEXT D-11: returns Optional[NamingResult] with tree populated
+    Per internal notes: returns Optional[NamingResult] with tree populated
     when result is non-None. The CFR shim _handle_organometallic in
     routing/dispatch_table.py extracts result.name as Optional[str].
 
@@ -45,10 +45,10 @@ def name_organometallic(
     ruthenocene, etc. Tier-1 systematic + Tier-2/3/4 forms go through
     the systematic-assembly path.
 
-    Cascade-continuation on None per CONTEXT D-02: any failure (mol is
+    Cascade-continuation on None per internal notes: any failure (mol is
     None; metal_complex is None; multimetal; ValueError from hapticity;
     result is None) returns None so CFR cascade falls through to
-    SALT@100 → ... → GENERAL@99999.
+    SALT@100 →... → GENERAL.
     """
     from rdkit import Chem
 
@@ -63,7 +63,7 @@ def name_organometallic(
         assemble_organometallic_name,
     )
 
-    # W8-P9 Task 9.5 (P-69.4): a metal RING atom (metallacycle) is checked
+    # W8-P9 Task 9.5: a metal RING atom (metallacycle) is checked
     # FIRST — detect_metal_complex's Tier-3 sigma-ligand walker would
     # otherwise try to fold the whole ring backbone into one "ligand"
     # fragment (a topology _ligand_name_from_atoms cannot name), returning
@@ -91,7 +91,7 @@ def name_organometallic(
     if metal_complex is None:
         return None
     if metal_complex.is_multimetal:
-        return None  # Risk R-08: Phase 161.3 territory
+        return None  # Risk R-08: a phase territory
 
     # Tier-1 fast path: retained PIN lookup for style="pin"
     canon_smi = Chem.MolToSmiles(mol)
@@ -109,7 +109,7 @@ def name_organometallic(
     try:
         result = assemble_organometallic_name(metal_complex, mol, style=style)
     except ValueError:
-        # Per CONTEXT D-12 honest-fail-on-data: hapticity/naming failure
+        # Per internal notes honest-fail-on-data: hapticity/naming failure
         # cascades to next CFR entry.
         return None
 
@@ -119,9 +119,9 @@ def name_organometallic(
     full_name, _metal_name_part, _ligand_tree_nodes = result
     # Use flat tree with full name as parent_stem to satisfy the byte-identical
     # round-trip contract (name_tree_to_string(tree) == result.name).
-    # CONTEXT D-11 allows the metal_name_part + prefixes structure too; the
+    # internal notes allows the metal_name_part + prefixes structure too; the
     # flat representation is the minimal compliant form. Sub-tree structure
-    # can be refined in Phase 161.1+ if downstream consumers need it.
+    # can be refined in a phase+ if downstream consumers need it.
     tree = NameTreeNode(
         parent_stem=full_name,
         class_id='organometallic',

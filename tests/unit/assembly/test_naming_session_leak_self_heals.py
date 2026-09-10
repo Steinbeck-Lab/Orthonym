@@ -2,22 +2,22 @@
 
 The defect, found while landing the enrichment-vocabulary change:
 
-`namer.name()` publishes `general_fallback_ctx` and `best_effort_ctx` only inside
-`if is_top_level_naming():`, and `is_top_level_naming()` is
+`namer.name` publishes `general_fallback_ctx` and `best_effort_ctx` only inside
+`if is_top_level_naming:`, and `is_top_level_naming` is
 `len(_fragment_guard.visited) == 0`. But `end_naming_session`
 (`fragment_naming.py:232-241`) clears `visited` **only when it is already empty**:
 
     visited = getattr(_fragment_guard, 'visited', None)
     if visited is None or len(visited) == 0:
         _fragment_guard.cache = None
-        _fragment_guard.visited = set()
+        _fragment_guard.visited = set
 
 So if an exception ever escapes a fragment naming without discarding its SMILES, the set
-stays non-empty **for the rest of the thread**, `is_top_level_naming()` never returns True
+stays non-empty **for the rest of the thread**, `is_top_level_naming` never returns True
 again, and **the tier flags are never published again — best-effort silently reverts to the
 PIN vocabulary, with no error anywhere.**
 
-⚠ **`general_fallback_ctx` has shipped under that guard since v25**, so the exposure is five
+⚠ **`general_fallback_ctx` has shipped under that guard since **, so the exposure is five
 milestones wide and is not specific to the flag added this session.
 
 Not theoretical: it first appeared as a test that passed alone and failed inside a 17-file
@@ -51,7 +51,7 @@ def _clean_guard():
 
 def test_the_premise_is_still_live():
     """Pin the SYMPTOM the fix has to defeat: a polluted visited set still makes
-    `is_top_level_naming()` False, so the flag-publication guard is still the thing at
+    `is_top_level_naming` False, so the flag-publication guard is still the thing at
     risk. Deliberately does NOT assert on source text — the first draft of this test
     grepped `end_naming_session` for "len(visited) == 0", which the fix removes, so it
     would have inverted into a failure the moment the defect was repaired."""
@@ -81,7 +81,7 @@ def test_the_outermost_teardown_now_clears_unconditionally():
 
 def test_a_top_level_naming_heals_a_leaked_guard():
     """THE regression. After a polluted guard, one top-level naming must leave the
-    thread usable: `visited` empty and `is_top_level_naming()` True again.
+    thread usable: `visited` empty and `is_top_level_naming` True again.
 
     Before the fix this failed — the naming ran with the guard already non-empty, so it
     never took the top-level branch, never published a ctx token, and never reset.

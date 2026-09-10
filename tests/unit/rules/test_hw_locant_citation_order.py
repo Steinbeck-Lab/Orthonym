@@ -1,11 +1,11 @@
-"""P-22.2.2.1.3 -- Hantzsch-Widman heteroatom locant CITATION ORDER.
+""" -- Hantzsch-Widman heteroatom locant CITATION ORDER.
 
 ``build_hw_name`` used to join every heteroatom locant as one globally ascending
-run, which discards which locant belongs to which 'a' prefix.  For an O-Si-O
+run, which discards which locant belongs to which 'a' prefix. For an O-Si-O
 ring that spells ``1,2,3-dioxasilolane`` -- asserting an O-O bond that does not
 exist (OPSIN: "Atom is in unphysical valency state! Element: O valency: 4").
 
-**P-22.2.2.1.3** (``BlueBookV2/BlueBookV2.md:8284``), last sentence of the rule:
+**** (``the Blue Book Blue Book``), last sentence of the rule:
 
     "Locants are cited at the front of the name, in the order of citation of the
     skeletal replacement ('a') prefixes."
@@ -14,7 +14,7 @@ The rule's own example block settles it beyond a degenerate reading -- the locan
 SET is chosen for lowness, but the CITATION is grouped per element in prefix
 order:
 
-    1,6,2-dioxazepane (PIN)   (:8300)  -- dioxa takes 1 and 6, aza takes 2
+    1,6,2-dioxazepane (PIN) (:8300) -- dioxa takes 1 and 6, aza takes 2
     1,3,2-dioxaboretane (PIN) (:37178) -- dioxa takes 1 and 3, bora takes 2
 
 Both are non-degenerate: a global ascending sort spells them ``1,2,6-`` and
@@ -34,17 +34,17 @@ class TestLocantsFollowPrefixCitationOrder:
 
     @pytest.mark.unit
     def test_dioxaboretane_is_a_verbatim_blue_book_pin(self):
-        """1,3,2-dioxaboretane (PIN) -- BlueBookV2.md:37178.
+        """1,3,2-dioxaboretane (PIN) -- the Blue Book.
 
-        O-B-O in a 4-ring.  ``dioxa`` is cited first and owns locants 1 and 3;
-        ``bora`` owns 2.  A global sort would spell ``1,2,3-``.
+        O-B-O in a 4-ring. ``dioxa`` is cited first and owns locants 1 and 3;
+        ``bora`` owns 2. A global sort would spell ``1,2,3-``.
         """
         assert build_hw_name([(1, 'O'), (2, 'B'), (3, 'O')], 4, True, False) == \
             "1,3,2-dioxaboretane"
 
     @pytest.mark.unit
     def test_dioxazepane_is_a_verbatim_blue_book_pin(self):
-        """1,6,2-dioxazepane (PIN) -- BlueBookV2.md:8300.
+        """1,6,2-dioxazepane (PIN) -- the Blue Book.
 
         The Blue Book prints the "not" list as locant SETS ('1,2,6' is lower
         than '1,3,4') while the PIN itself is CITED '1,6,2' -- the clearest
@@ -82,7 +82,7 @@ class TestCitationOrderIsANoOpWhenAlreadyGrouped:
 
     @pytest.mark.unit
     @pytest.mark.parametrize("heteroatoms,ring_size,saturated,aromatic,expected", [
-        # Blue Book PIN, P-22.2.2.1.3 example block (:8296) -- oxa owns 1,
+        # Blue Book PIN, example block (:8296) -- oxa owns 1,
         # dithia owns 2 and 6; prefix order and ascending order agree here.
         ([(1, 'O'), (2, 'S'), (6, 'S')], 7, True, False, "1,2,6-oxadithiepane"),
         # Blue Book PIN (:8312) -- one locant per element, order agrees.

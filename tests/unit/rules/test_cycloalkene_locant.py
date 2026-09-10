@@ -1,13 +1,13 @@
-"""WSD-06 (NUM-01) — substituted cycloalkene keeps its ring double-bond +
+"""-06  — substituted cycloalkene keeps its ring double-bond +
 substituent locants (no over-elision).
 
-Wave-0 scaffold (Phase 175). TARGET + de-collision assertions are xfail until the
-WSD-06 code plan (175-07) replaces the `num_double==1` count proxy in
+Wave-0 scaffold (a phase). TARGET + de-collision assertions are xfail until the
+-06 code plan (175-07) replaces the `num_double==1` count proxy in
 `should_omit_locant_one` with one real `is_only_one_substitutable_position`
 topological-symmetry predicate (shared by Rules 4/5/6). The SYMMETRY CONTROLS are
 non-xfail regression guards (genuinely symmetric rings must keep eliding locant 1).
 
-Blue Book P-14.3.4.2(d)/P-14.4(e): the ene-locant is omitted ONLY for unsubstituted
+Blue Book (d)/(e): the ene-locant is omitted ONLY for unsubstituted
 cycloalkenes; the verbatim PIN for the substituted case is `3-bromocyclohex-1-ene`.
 """
 

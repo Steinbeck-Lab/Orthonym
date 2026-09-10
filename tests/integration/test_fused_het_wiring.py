@@ -1,8 +1,8 @@
 """
 Integration tests for fused heterocycle prefix wiring into substituent pipeline.
 
-Phase 78 Plan 02 — Verifies that fused heterocycle ring fragments on chain parents
-produce correct IUPAC prefix names via get_fused_heterocycle_prefix() routing.
+a phase Plan 02 — Verifies that fused heterocycle ring fragments on chain parents
+produce correct IUPAC prefix names via get_fused_heterocycle_prefix routing.
 """
 
 import pytest

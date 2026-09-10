@@ -6,7 +6,7 @@ Root-cause class: an N-substituent fragment that carries a non-carbon heavy atom
 which SILENTLY DROPS the heteroatom. For ``COCCNCCC`` the N-substituent
 ``-CH2CH2-O-CH3`` (2-methoxyethyl) collapsed to ``propyl`` (O dropped, its two
 flanking carbons walked as one 3-carbon chain), yielding the WRONG molecule
-``N-propylpropan-1-amine`` (dipropylamine) — a different InChIKey that SELF-01
+``N-propylpropan-1-amine`` (dipropylamine) — a different InChIKey that
 then suppressed to an abstain (breadth lost; a latent wrong-molecule producer).
 
 The fix routes any N-substituent fragment carrying a non-carbon heavy atom to the
@@ -28,7 +28,7 @@ from orthonym import errors
 # ---------------------------------------------------------------------------
 # Producer-level (OPSIN validity gate OFF by default in this suite): proves the
 # PRODUCER itself no longer emits the O-dropped wrong molecule — not merely that
-# SELF-01 catches it downstream.
+# catches it downstream.
 # ---------------------------------------------------------------------------
 class TestProducerNoAtomDrop:
     def test_producer_no_longer_drops_ether_o(self):

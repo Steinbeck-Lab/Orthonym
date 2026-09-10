@@ -1,5 +1,5 @@
 """
-Tests for STER-12: Ester alkyl-side (alcohol fragment) stereo injection.
+Tests for: Ester alkyl-side (alcohol fragment) stereo injection.
 
 Verifies that ester naming collects and injects CIP stereodescriptors
 for the alkyl (alcohol-side) fragment, mirroring the existing acid-side
@@ -77,22 +77,22 @@ class TestAlkylSideStereoAbsent:
 
 
 class TestRingAlcoholEster:
-    """WSC-02 (P-65.6.3): esters whose ALCOHOL component is a NON-benzene ring
-    (cyclohexyl, oxolanyl, a bicyclic tropane, ...) must name the ring fragment,
+    """-02: esters whose ALCOHOL component is a NON-benzene ring
+    (cyclohexyl, oxolanyl, a bicyclic tropane,...) must name the ring fragment,
     not linearize it. Before: get_alkyl_fragment_name's has_ring branch handled
     only benzene, then fell through to the carbon-count chain namer -> a
     constitutionally-wrong chain (dropping the ring/heteroatoms). For the tropine
     tropate ester that meant 'tropane' with the whole ester dropped, which the
-    SELF-01 gate correctly suppressed to 'unknown'."""
+     gate correctly suppressed to 'unknown'."""
 
     def test_tropine_tropate_ester_names_bicyclic_ring_alcohol(self, monkeypatch):
-        # WSC-02 (BUILT v28): tropine (8-methyl-8-azabicyclo[3.2.1]octan-3-ol)
+        # -02 (BUILT): tropine (8-methyl-8-azabicyclo[3.2.1]octan-3-ol)
         # ester of tropic acid. The natural-products handler claims the tropane
-        # scaffold and emits bare 'tropane' (drops the ester); SELF-01 suppresses
+        # scaffold and emits bare 'tropane' (drops the ester); suppresses
         # that structure-dropping name to the failure sentinel. A last-resort
         # decomposition pass (namer.py, before abstaining) then names it via the
         # engine that already produces the correct acid + '-yl' alcohol component,
-        # routed through the SAME SELF-01 gate -- which ships it via the
+        # routed through the SAME gate -- which ships it via the
         # stereo-strip carve-out (raw stereo name evades OPSIN, but the
         # stereo-stripped constitution 'tropan-3-yl 3-hydroxy-2-phenylpropanoate'
         # round-trips). Target = the accept_also form.
@@ -131,14 +131,14 @@ class TestAcidSideStereoRegression:
 
 
 class TestClusterDPolyfunctionalEsterAlkylStereo:
-    """Wave-8 P6 Cluster D (P-93.4.1.3): the alkyl-side stereo descriptor was
+    """Wave-8 P6 Cluster D: the alkyl-side stereo descriptor was
     dropped specifically on the POLYFUNCTIONAL-routed ester path (when the
     acid side carries a JUNIOR functional group, e.g. -OH, alongside the
     ester -- routing through name_polyfunctional_ester_via_acid instead of
-    the plain name_ester). The plain-ester STER-12 collector
+    the plain name_ester). The plain-ester collector
     (_collect_alkyl_fragment_stereo) already worked correctly (verified by
     calling name_ester directly); the polyfunctional path simply never
-    called it. BB P-93.4.1.3: a stereodescriptor for a component cited as a
+    called it. BB: a stereodescriptor for a component cited as a
     separate word/prefix is placed immediately before that component, not
     hoisted to the front of the whole name.
     """

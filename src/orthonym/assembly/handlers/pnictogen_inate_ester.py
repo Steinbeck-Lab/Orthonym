@@ -6,7 +6,7 @@ bridge shape the multiplicative pnictogen guard declines (two identical/aryl C-E
 bonds, one =O, one -O-R ester), so declining that multiplicative name
 (``1,1'-(methoxyphosphoryl)dibenzene``) hands the molecule here.
 
-IUPAC cite: P-41 Table 4.1 class 9 (esters) / P-65.6.3.2 (functional-class ester).
+IUPAC cite: class 9 (esters) / (functional-class ester).
 
 References:
 - perception.functional_groups — the three ``*inate_ester`` SMARTS.

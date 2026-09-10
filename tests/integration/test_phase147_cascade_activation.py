@@ -1,6 +1,6 @@
 """a phase Tier-3 integration: cascade-step-6 activation on 20 stratified compounds.
 
-Tier-3 evidence per 147 CONTEXT (three-tier test surface). The 20
+Tier-3 evidence per 147 internal notes (three-tier test surface). The 20
 compounds are drawn from
 `internal notes`
 filtered for ``parent_score==0 AND locant_score==0 AND
@@ -13,7 +13,7 @@ Tests:
   * ``test_cascade_step6_fires_on_at_least_8_of_20`` — instrumented
     invocation counter on ``_filter_lowest_locants`` proves cascade
     step 6 actually activates on at least 8 of 20 compounds.
-  * ``test_no_rt_regression`` (parametrized) — name_compound() produces
+  * ``test_no_rt_regression`` (parametrized) — name_compound produces
     a non-empty name for each of the 20 compounds.
   * ``test_at_least_8_compounds_change_parent_decision_vs_baseline`` —
     captures ``CandidateName.parent_atom_indices`` (W-4 fix: structural
@@ -22,8 +22,8 @@ Tests:
   * ``test_ci_subset_name_nonempty`` (5 non-slow CI smokes) — one
     compound per bucket plus a representative for fast-feedback.
 
-Source: a phase CONTEXT (three-tier test surface).
-Source: https://iupac.qmul.ac.uk/BlueBook/P4.html P-44.1
+Source: a phase internal notes (three-tier test surface).
+Source: https://iupac.qmul.ac.uk/BlueBook/P4.html
 Source: a phase triple-ship gate G2 (zero RT=1 -> RT=0 regressions).
 Baseline: internal notes
 """
@@ -35,11 +35,11 @@ import pytest
 # parent_score==0 AND locant_score==0 AND reference_opsin_parseable==1
 # Sort: corpus_row_id ascending; first 5 per bucket. Extracted at
 # 2026-04-25 from baseline_v17_all_corpora.csv (a phase baseline).
-# Determinism guarantee per a phase.2: this list is FROZEN as a literal,
+# Determinism guarantee per a phase: this list is FROZEN as a literal,
 # not re-sampled at test-run time. baseline_parent_atoms is recorded as
 # the empty frozenset because the v17 baseline did not capture
 # parent_atom_indices in the CSV; the test compares the post-147
-# captured set against frozenset() (any non-empty captured set counts
+# captured set against frozenset (any non-empty captured set counts
 # as a "change", which is the correct W-4 cascade-effect signal here
 # because v17 had no concept of a captured candidate-pool winner set).
 PHASE147_TIER3_COMPOUNDS = [
@@ -215,15 +215,15 @@ def score_based_mode(monkeypatch):
     The cascade-step-6 path lives behind ``selection_mode='score_based'``
     in ``CandidatePool.best`` (a phase). The default soak mode is
     ``'first_applicable'`` (V17 byte-identical), under which step 6 NEVER
-    fires regardless of populated iupac_locants. a phase SC-4 evidence
+    fires regardless of populated iupac_locants. a phase evidence
     therefore REQUIRES forcing score-based mode for these tests.
 
     Patches the module-level ``_DEFAULT_SELECTION_MODE`` constant so each
-    fresh ``push_pool()`` (called by ``assemble_name``) initializes pools
+    fresh ``push_pool`` (called by ``assemble_name``) initializes pools
     in the correct mode for cascade activation.
 
     Source: a phase (env-var soak gate).
-    Source: a phase CONTEXT, (cascade step 6 evidence
+    Source: a phase internal notes, (cascade step 6 evidence
         requires score_based mode).
     """
     from orthonym.assembly import candidate_pool as cp_mod
@@ -240,7 +240,7 @@ def step6_counter(monkeypatch, score_based_mode):
     at ``candidate_pool.py:904`` resolves through globals so this patch
     intercepts every invocation.
 
-    Source: a phase CONTEXT Tier-3 evidence (cascade activation
+    Source: a phase internal notes Tier-3 evidence (cascade activation
     must be observable, not just inferred from output names).
     """
     from orthonym.assembly import candidate_pool as cp_mod
@@ -263,16 +263,16 @@ def test_cascade_step6_fires_on_tier3_corpus(step6_counter):
     Counts how many times ``_filter_lowest_locants`` is invoked across the
     20-compound stratified Tier-3 corpus under
     ``selection_mode='score_based'``. The raw count is the diagnostic
-    signal; the SC-4 gate is enforced separately by
+    signal; the gate is enforced separately by
     ``scripts/phase147_locant_score_delta.py`` against the multi-corpus
     benchmark CSV (which is the authoritative measurement surface per
-    a phase CONTEXT SC-4: "measured on the OPSIN-parseable non-RT
+    a phase internal notes: "measured on the OPSIN-parseable non-RT
     subset of the multi-corpus benchmark", NOT a 20-compound microsuite).
 
     The ≥8/20 cascade-fire heuristic from the plan was a planning-time
     estimate. Reality: many compounds in this corpus go through dedicated
     handlers (complex_ring for xanthine, polycyclic for naphthoquinone,
-    etc.) that produce single-candidate pools where ``best()`` short-
+    etc.) that produce single-candidate pools where ``best`` short-
     circuits via ``_direct_return_winner`` BEFORE the cascade runs (per
     candidate_pool.py:854). Cascade step 6 therefore fires on
     multi-candidate pools only — a smaller subset than the full 20.
@@ -280,11 +280,11 @@ def test_cascade_step6_fires_on_tier3_corpus(step6_counter):
     This test ASSERTS that the cascade is at least *reachable* (count
     ≥ 0 is trivially true; we record non-negative as a sanity check)
     and emits the count via assertion message for VERIFICATION.md
-    consumption. The hard SC-4 ratchet lives in the benchmark CSV diff.
+    consumption. The hard ratchet lives in the benchmark CSV diff.
 
-    Source: https://iupac.qmul.ac.uk/BlueBook/P4.html P-44.4.1.4+
-    Source: a phase CONTEXT SC-4 (multi-corpus CSV is authoritative).
-    Source: a phase CONTEXT, (Tier-3 evidence collection).
+    Source: https://iupac.qmul.ac.uk/BlueBook/P4.html +
+    Source: a phase internal notes (multi-corpus CSV is authoritative).
+    Source: a phase internal notes, (Tier-3 evidence collection).
     """
     from orthonym.namer import name_compound
 
@@ -299,7 +299,7 @@ def test_cascade_step6_fires_on_tier3_corpus(step6_counter):
 
     # Diagnostic: emit the count in the assertion-success message so
     # pytest -v output documents the cascade-activation rate. The actual
-    # SC-4 gate is the multi-corpus CSV diff, NOT this 20-compound count.
+    # gate is the multi-corpus CSV diff, NOT this 20-compound count.
     assert step6_counter["count"] >= 0, (
         f"cascade step 6 fired {step6_counter['count']} times across 20 "
         f"Tier-3 compounds (diagnostic — SC-4 gate lives in "
@@ -313,7 +313,7 @@ def test_cascade_step6_fires_on_tier3_corpus(step6_counter):
     ids=[c["smiles"] for c in PHASE147_TIER3_COMPOUNDS],
 )
 def test_no_rt_regression(compound):
-    """SC-5 / G2 HARD: name_compound produces a non-empty name for each
+    """ / G2 HARD: name_compound produces a non-empty name for each
     compound — surrogate for "no catastrophic regression" on the 20-compound
     corpus. Full RT regression analysis lives in
     ``scripts/phase147_rt_regressions.py`` against the multi-corpus CSV.
@@ -324,7 +324,7 @@ def test_no_rt_regression(compound):
 
     Source: a phase triple-ship gate G2 (zero RT=1 -> RT=0
         regressions on OPSIN self-test 500).
-    Source: a phase CONTEXT SC-5.
+    Source: a phase internal notes.
     """
     from orthonym.namer import name_compound
 
@@ -347,7 +347,7 @@ def test_parent_decision_capture_on_tier3_corpus(score_based_mode):
     via a monkey-patch on ``CandidatePool.best`` that records the winning
     candidate's ``parent_atom_indices`` after each name_compound call.
 
-    The baseline parent set is recorded as ``frozenset()`` in
+    The baseline parent set is recorded as ``frozenset`` in
     PHASE147_TIER3_COMPOUNDS — the v17 baseline CSV did not capture
     parent_atom_indices, so any non-empty captured set post-147 counts as
     a "changed" decision (the post-147 cascade DID select a definite
@@ -360,18 +360,18 @@ def test_parent_decision_capture_on_tier3_corpus(score_based_mode):
     direct-return handlers regardless of mode, so even score_based
     yields single-candidate pools where ``parent_atom_indices`` may be
     None on the winning candidate. The diagnostic ratio is recorded in
-    the assertion-success message; the SC-4 gate is the multi-corpus
+    the assertion-success message; the gate is the multi-corpus
     CSV diff, NOT this micro-suite.
 
-    Source: a phase CONTEXT Tier-3 evidence.
+    Source: a phase internal notes Tier-3 evidence.
     Source: a phase (env-var selection-mode soak).
     Source: Plan 03 W-4 (cascade-effect signal isolation).
     """
     from orthonym.namer import name_compound
     from orthonym.assembly import candidate_pool as cp_mod
 
-    # Per-call capture; the most recent name_compound() invocation
-    # populates "__last__" via the patched best() method.
+    # Per-call capture; the most recent name_compound invocation
+    # populates "__last__" via the patched best method.
     captured = {}
 
     real_best = cp_mod.CandidatePool.best
@@ -401,7 +401,7 @@ def test_parent_decision_capture_on_tier3_corpus(score_based_mode):
         cp_mod.CandidatePool.best = real_best
 
     # Diagnostic: emit the changed-decision ratio in the assertion-success
-    # message. The hard SC-4 gate lives in the multi-corpus CSV diff
+    # message. The hard gate lives in the multi-corpus CSV diff
     # (scripts/phase147_locant_score_delta.py), NOT this micro-suite —
     # most compounds here go through direct-return handlers that produce
     # single-candidate pools regardless of selection_mode.
@@ -426,7 +426,7 @@ def test_ci_subset_name_nonempty(compound):
     Runs by default in pre-merge CI for fast feedback; the full 20-compound
     Tier-3 suite is gated by ``@pytest.mark.slow``.
 
-    Source: a phase CONTEXT Tier-3 CI subset.
+    Source: a phase internal notes Tier-3 CI subset.
     """
     from orthonym.namer import name_compound
 

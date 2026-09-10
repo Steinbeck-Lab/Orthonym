@@ -1,7 +1,7 @@
-"""v31 lever A — deeper amide: a polyfunctional secondary amide whose ACYL
+""" lever A — deeper amide: a polyfunctional secondary amide whose ACYL
 chain is branched / unsaturated and whose junior FG lives inside the
 N-substituent now EMITS (was abstaining), via the acyl-aware composer namer
-``_assemble_amide_name`` (P-66.1.1 / P-41). Also covers two honesty/spelling
+``_assemble_amide_name`` /. Also covers two honesty/spelling
 fixes surfaced by the gate-OFF honesty sweep:
 
 * the ``_enrich_ring_n_substituent`` aromatic double-count
@@ -18,7 +18,7 @@ acyl-aware ``_assemble_amide_name`` under the SAME coverage guards.
 
 NOTE on prefix ORDER: these names follow Orthonym's existing uniform amide
 convention (C-substituent before N-substituent for the saturated branch). The
-P-14.5.2 / P-16.3.3 alphanumerical N/C merge-and-order is a SEPARATE conformance
+ / alphanumerical N/C merge-and-order is a SEPARATE conformance
 lever, tracked by
 ``test_amide_merged_prefix_p16_3_3::test_chain_amide_merges_too`` (still xfail).
 Every name below is RT-exact (correct constitution), which is what this lever
@@ -47,7 +47,7 @@ from orthonym.namer import name_compound
     ("C=C(C)C(=O)Nc1ccc(O)cc1",  "N-(4-hydroxyphenyl)-2-methylprop-2-enamide"),
     # carbocyclic substituent on the acyl (phenylacetyl / cyclohexylacetyl)
     ("c1ccccc1CC(=O)Nc1ccc(O)cc1",  "2-phenyl-N-(4-hydroxyphenyl)acetamide"),
-    # junior FG = amine (also junior to amide, P-41), and other ring positions
+    # junior FG = amine (also junior to amide,, and other ring positions
     ("CC(C)C(=O)Nc1ccc(N)cc1",  "2-methyl-N-(4-aminophenyl)propanamide"),
     ("CC(C)C(=O)Nc1ccccc1O",    "2-methyl-N-(2-hydroxyphenyl)propanamide"),
     # N-alkyl carrying the junior FG (hydroxyethyl)
@@ -60,7 +60,7 @@ def test_polyfunctional_branched_or_unsaturated_amide_now_names(smiles, expected
 @pytest.mark.parametrize("smiles,expected", [
     # _enrich_ring_n_substituent no longer double-counts an aromatic ring-FG.
     # (branched acyl -> new route; acetyl -> pre-existing name_amide route: BOTH
-    #  used to double-count the hydroxy and abstain.)
+    # used to double-count the hydroxy and abstain.)
     ("CC(C)C(=O)NCc1ccc(O)cc1", "2-methyl-N-[(4-hydroxyphenyl)methyl]propanamide"),
     ("CC(=O)NCc1ccc(O)cc1",     "N-[(4-hydroxyphenyl)methyl]acetamide"),
 ])

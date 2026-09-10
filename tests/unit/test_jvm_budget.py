@@ -211,7 +211,7 @@ _STRESS_WORKER = textwrap.dedent(
 def _peak_overlap(slots_dir, budget_env: str) -> tuple[int, int]:
     """Run 12 contending workers over a 3-slot budget; return (peak_held, n_records).
 
-    ``time.monotonic()`` is CLOCK_MONOTONIC on Linux, which is system-wide, so
+    ``time.monotonic`` is CLOCK_MONOTONIC on Linux, which is system-wide, so
     timestamps from separate processes are directly comparable.
     """
     src = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(jb.__file__))))

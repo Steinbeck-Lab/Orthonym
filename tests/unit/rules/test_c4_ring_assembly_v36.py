@@ -36,7 +36,7 @@ code was written (a project rule, ``feedback_choke_point_off_path``):
     ``5-(difluoromethoxy)-1H-benzimidazole`` -- it names the benzimidazole
     parent and SILENTLY DROPS the whole C2 sulfinyl-pyridyl half
     (``_enrich_complex_ring_with_subs`` ``continue``s past a substituent it
-    cannot render, composer.py:3947-3957). SELF-01 correctly suppresses the
+    cannot render, composer.py:3947-3957). correctly suppresses the
     partial (0-wrong holds -> abstain). Forcing the von-Baeyer fallback does
     not rescue it: ``name_ortho_fused_bicyclic`` returns None for the
     substituted benzimidazole. No clean root-cause fix; a dedicated core-namer

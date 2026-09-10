@@ -26,7 +26,7 @@ from ..rules.lambda_convention import nonstandard_bonding_number
 # lookup in find_principal_chain (below) stayed None for them, so its "het not
 # found" legacy fallback registered only the S/P/O atoms into fg_atoms and
 # NEVER the bearing carbon (the carbon directly bonded to S/P). Criterion 1
-# ("chain contains the principal characteristic group", P-44.1) was then False
+# ("chain contains the principal characteristic group", was then False
 # for every candidate carbon chain -- tying at 0 -- so criterion 3 (max chain
 # length) handed the parent to a longer chain that does not carry the acid at
 # all (e.g. the acyl chain of a taurine amide: CCC(=O)NCCS(=O)(=O)O wrongly
@@ -178,10 +178,10 @@ def find_longest_carbon_chain(
 
 
 # ============================================================================
-# Skeletal Chain Finding (C, O, N, S) — IUPAC P-44.3 / P-15.4
+# Skeletal Chain Finding (C, O, N, S) — IUPAC /
 # ============================================================================
 
-# Per IUPAC P-15.4, skeletal replacement nomenclature considers
+# Per IUPAC, skeletal replacement nomenclature considers
 # O, N, S as part of the principal chain backbone.
 _SKELETAL_ATOMS = {6, 7, 8, 16}  # C, N, O, S
 
@@ -194,11 +194,11 @@ def find_all_skeletal_chains(
 ) -> List[List[int]]:
     """Find all skeletal chains following C, O, N, S atoms.
 
-    Per IUPAC P-44.3 and P-15.4, skeletal replacement nomenclature
+    Per IUPAC and, skeletal replacement nomenclature
     considers O, N, S as part of the principal chain backbone.
 
     This function is used specifically for parent selection chain-vs-ring
-    comparison. It does NOT replace find_all_carbon_chains() which is
+    comparison. It does NOT replace find_all_carbon_chains which is
     used for standard chain-based naming.
 
     Scope: Chain FINDING only. Oxa/aza/thia prefix generation is
@@ -227,7 +227,7 @@ def find_all_skeletal_chains(
 
         atom = mol.GetAtomWithIdx(atom_idx)
 
-        # P-15.4: Follow C, N, O, S atoms only
+        #: Follow C, N, O, S atoms only
         if atom.GetAtomicNum() not in _SKELETAL_ATOMS:
             return
 
@@ -268,7 +268,7 @@ def find_longest_skeletal_chain(
 ) -> List[int]:
     """Find the longest continuous skeletal chain (C, O, N, S).
 
-    Convenience function parallel to find_longest_carbon_chain().
+    Convenience function parallel to find_longest_carbon_chain.
     Used for parent selection comparison when heteroatom chains
     may be longer than carbon-only chains.
 
@@ -325,7 +325,7 @@ def _get_non_principal_terminal_carbons(
     - carbonochloridoyl (-C(=O)Cl): prefix includes C
     - cyano (-C#N): the nitrile carbon belongs to the cyano prefix, NOT the parent
       chain, whenever the nitrile is non-principal (a senior group is present).
-      Per P-66.5.1.1.4 the cyano carbon is excluded from the parent (e.g.
+      Per the cyano carbon is excluded from the parent (e.g.
       N#CCCC(=O)O -> 3-cyanopropanoic acid, not 4-cyanobutanoic acid). When the
       nitrile IS the principal group its carbon stays in the chain via the
       `fg_name == principal_group` skip below (-nitrile suffix counts that C).
@@ -333,13 +333,13 @@ def _get_non_principal_terminal_carbons(
     FGs where the prefix represents only the heteroatom attachment are NOT excluded:
     - oxo (=O on chain C): the aldehyde/keto carbon IS a chain member and is
       expressed as 'oxo' in-chain (e.g. O=CCC(=O)O -> 3-oxopropanoic acid, the
-      PIN per P-66.6.1); it is NOT excised to a 'formyl' prefix on acyclic chains.
+      PIN per; it is NOT excised to a 'formyl' prefix on acyclic chains.
 
-    Per IUPAC 2013 P-66.1(c), P-65.1.1.1, P-66.5.1.1.4.
+    Per IUPAC 2013 (c),,.
 
     Args:
         mol: RDKit Mol object
-        functional_groups: Dict from detect_functional_groups()
+        functional_groups: Dict from detect_functional_groups
         principal_group: Name of principal functional group (or None)
 
     Returns:
@@ -347,7 +347,7 @@ def _get_non_principal_terminal_carbons(
     """
     # NOTE: acid_chloride/bromide/fluoride are deliberately NOT in this set.
     # On a CHAIN parent a non-principal acyl halide keeps its carbon IN the
-    # chain, expressed as 'oxo' (=O) + 'halo' (X): Blue Book P-65.5.4 worked
+    # chain, expressed as 'oxo' (=O) + 'halo' (X): Blue Book worked
     # examples — "methyl 4-chloro-4-oxobutanoate" (PIN, line 5108),
     # "3-chloro-3-oxopropanoic acid" (PIN, line 31531) — NOT the longer-prefix
     # "...carbonochloridoyl...". (The 'carbonochloridoyl'/'chlorocarbonyl'
@@ -356,7 +356,7 @@ def _get_non_principal_terminal_carbons(
     # path does not use chain enumeration so it is unaffected.)
     _TERMINAL_C_FGS = {
         'carboxylic_acid': 0,
-        # W3-P03-5 (P-65.1.6.1, BB 30384): primary_amide is DELIBERATELY NOT in
+        # W3-P03-5, BB 30384): primary_amide is DELIBERATELY NOT in
         # this set. On a CHAIN parent a non-principal -CO-NH2 at a chain end keeps
         # its carbon IN the chain, expressed as 'oxo' (=O) + 'amino' (-NH2):
         # "4-amino-4-oxobutanoic acid" (PIN) -- NOT the longer 'carbamoyl' prefix
@@ -366,11 +366,11 @@ def _get_non_principal_terminal_carbons(
         # enumeration so they are unaffected). Mirrors the acid-halide (oxo+halo)
         # and amidine (amino+imino) decisions above/below; the chain-end oxo+amino
         # split is emitted in rules/polyfunctional.py.
-        # P-66.5.1.1.4: a non-principal nitrile is the 'cyano' prefix whose carbon
+        #: a non-principal nitrile is the 'cyano' prefix whose carbon
         # is excluded from the parent chain. SMARTS '[CX2]#[NX1]' -> index 0 = C.
         # Skipped automatically when nitrile IS the principal group (suffix path).
         'nitrile': 0,
-        # AM-4 (P-66.4.1.3.2, BB 34338): amidine is DELIBERATELY NOT in this set.
+        #, BB 34338): amidine is DELIBERATELY NOT in this set.
         # "When the carbon atom of the H2N-C(=NH)- group terminates a chain,
         # -NH2 and =NH are designated amino and imino" — so on a CHAIN parent the
         # amidine carbon stays IN the chain and is expressed via 'amino' + 'imino'
@@ -378,13 +378,13 @@ def _get_non_principal_terminal_carbons(
         # the acid-halide note above. The 'carbamimidoyl' prefix is the PIN only
         # for RING parents / genuinely off-chain amidine carbons (BB 34332);
         # those never use chain enumeration so they are unaffected.
-        # P-66.4.2.3.2 (BB 34498, plan P1AM Task 6): the amidrazone
+        # (BB 34498, plan P1AM Task 6): the amidrazone
         # (hydrazonamide) carbon at a chain end stays IN the chain and is
         # expressed via 'amino' + 'hydrazinylidene' prefixes, mirroring the
-        # AM-4 amidine note above. 'carbamohydrazonoyl' remains the PIN
+        # amidine note above. 'carbamohydrazonoyl' remains the PIN
         # prefix only for ring/off-chain amidrazone carbons.
         # ('hydrazidine' stays excluded: its chain-end split form
-        # (P-66.4.3.4.1 hydrazinyl+hydrazinylidene) is Task 7 scope-checked
+        # hydrazinyl+hydrazinylidene) is Task 7 scope-checked
         # and currently fails closed.)
         'hydrazidine': 0,
     }
@@ -443,11 +443,11 @@ def find_principal_chain(
 
     Non-principal suffix-capable FG terminal carbons (e.g., the C in -C(=O)NH2
     when amide is not the principal group) are excluded from chain enumeration
-    to prevent chain length inflation (IUPAC P-44.3).
+    to prevent chain length inflation (IUPAC.
 
     Args:
         mol: RDKit Mol object
-        functional_groups: Dict from detect_functional_groups()
+        functional_groups: Dict from detect_functional_groups
         principal_group: Name of principal functional group (or None)
         exclude_atoms: Optional set of atom indices to skip (e.g., ring atoms)
 
@@ -470,7 +470,7 @@ def find_principal_chain(
 
     # Get atoms belonging to principal functional group.
     # Keep both the flat atom set (for contains-check) and the match
-    # tuples list (for correct instance counting per P-44.1(b)).
+    # tuples list (for correct instance counting per (b)).
     fg_atoms = set()
     fg_matches: List[tuple] = []
     # Characteristic heteroatom set for the principal-group class (N for amine,
@@ -478,7 +478,7 @@ def find_principal_chain(
     # class; used by criterion 8 (max prefix substituents) to count the
     # N-substituents on a suffix amine nitrogen — see _count_substituents.
     fg_hetero_atoms: Set[int] = set()
-    # P-44.1(b) counting support: one entry per PCG INSTANCE, each the SET of
+    # (b) counting support: one entry per PCG INSTANCE, each the SET of
     # carbons DIRECTLY bonded to that instance's characteristic heteroatom (its
     # true bearing carbons). fg_count(chain) counts an instance iff the chain
     # contains ANY of its bearing carbons. This is the IUPAC-correct semantics:
@@ -491,7 +491,7 @@ def find_principal_chain(
     # let a 1-carbon "chain" out-score the genuine ethane-1,2-diamine backbone.
     fg_bearing_carbons: List[Set[int]] = []
     if principal_group and principal_group in functional_groups:
-        # DD5 RC-4 (P-44.1.1): count the principal characteristic group over its
+        # DD5: count the principal characteristic group over its
         # WHOLE equal-seniority class (e.g. primary + secondary OH = two hydroxy
         # PCGs), so the chain bearing all of them wins on PCG count (the di-OH
         # chain -> 3-(4-chlorobutyl)pentane-1,4-diol, not the longer 1-OH chain).
@@ -528,7 +528,7 @@ def find_principal_chain(
                 _normalize_pcg_match(mol, m, _het_z)
                 for sub in _members for m in functional_groups.get(sub, [])
             ]
-        # R1 (P-44.1.1): a SKELETAL-suffix PCG -- the '-one' family -- puts
+        # R1: a SKELETAL-suffix PCG -- the '-one' family -- puts
         # the characteristic group's OWN atom into the parent hydride, so only
         # that atom may satisfy "this chain bears the PCG". The ketone SMARTS
         # '[#6][CX3](=O)[#6]' carries BOTH FLANKING carbons, and the whole-match
@@ -540,17 +540,17 @@ def find_principal_chain(
         # CCCCCCCCC(CCCC)C(C)(CC(C)C)C(=O)C (C21H42O)
         # -> '5-butyl-2,4-dimethyltridecan-4-one' (C19H38O, 2 C GONE)
         #
-        # P-64.2.2.1 "Acyclic ketones" (the Blue Book Blue Book) -- "(1)
+        # "Acyclic ketones" (the Blue Book Blue Book) -- "(1)
         # substitutively, using the suffix 'one'... Method (1) generates
         # preferred IUPAC names"; its examples `butan-2-one (PIN)`,
         # `heptan-3-one (PIN)` and `5-methylhexan-2-one (PIN)` all number the
         # CARBONYL CARBON as a skeletal atom of the parent chain.
-        # P-44.1.1 (:18875) -- "The senior parent structure has the maximum
+        # (:18875) -- "The senior parent structure has the maximum
         # number of substituents corresponding to the principal characteristic
-        # group (suffix)"; P-44.1 (:18873) -- these criteria "must always be
-        # applied before those applicable to... chains (see P-44.3)". A chain
+        # group (suffix)"; (:18873) -- these criteria "must always be
+        # applied before those applicable to... chains (see ". A chain
         # without the carbonyl carbon bears ZERO ketones, so it loses at
-        # P-44.1.1 before chain length is ever consulted.
+        # before chain length is ever consulted.
         #
         # This is the same correction ``_pg_is_on_ring`` already applies to
         # RINGS via SKELETAL_SUFFIX_PGS (parent_selection.py:265, "the
@@ -589,7 +589,7 @@ def find_principal_chain(
         # Bearing carbons = carbons DIRECTLY bonded to the characteristic
         # heteroatom (never flanking carbons). When the heteroatom cannot be
         # located (het_z is None, e.g. carbonyl/acid classes) the instance keeps
-        # the legacy whole-match semantics so their P-44.1(b) count is unchanged.
+        # the legacy whole-match semantics so their (b) count is unchanged.
         _seen_het: Set[int] = set()
         for match in fg_matches:
             het = None
@@ -602,7 +602,7 @@ def find_principal_chain(
             if het is None:
                 # Legacy fallback: count where any match atom is on the chain --
                 # narrowed by R1 to the PCG's own skeletal atom for the
-                # SKELETAL_SUFFIX_PGS families (see the P-44.1.1 note above), so
+                # SKELETAL_SUFFIX_PGS families (see the note above), so
                 # a chain through a flanking carbon no longer counts the group.
                 fg_bearing_carbons.append(_pcg_anchor_atoms(match))
                 continue
@@ -646,7 +646,7 @@ def find_principal_chain(
     exclude = exclude_atoms or set()
 
     def _compute_fg_locant_score(chain: List[int]) -> tuple:
-        """Criterion 6 (P-44.4h): Lowest locants for principal group."""
+        """Criterion 6: Lowest locants for principal group."""
         chain_set = set(chain)
         on_chain = fg_atoms & chain_set
         if not on_chain:
@@ -659,7 +659,7 @@ def find_principal_chain(
         return max(fwd_score, rev_score)
 
     def _compute_bond_locant_score(chain: List[int]) -> tuple:
-        """Criterion 7 (P-44.4j): Lowest locants for multiple bonds."""
+        """Criterion 7: Lowest locants for multiple bonds."""
         positions = []
         for i in range(len(chain) - 1):
             bond = mol.GetBondBetweenAtoms(chain[i], chain[i + 1])
@@ -677,7 +677,7 @@ def find_principal_chain(
         return max(fwd_score, rev_score)
 
     def _count_substituents(chain: List[int]) -> int:
-        """Criterion 8 (P-44.4.1.1): Maximum number of substituents cited as
+        """Criterion 8: Maximum number of substituents cited as
         prefixes on the chain.
 
         Counts every heavy chain-carbon neighbour off the chain (as before) AND,
@@ -687,7 +687,7 @@ def find_principal_chain(
         strictly additive to the previous count (the heteroatom is still counted
         once as before), so it only ever changes the RESULT of a tie between two
         equal-length equal-PCG chains — never a chain that was already uniquely
-        best. It breaks the P-44.4.1.1 tie for ``CN(C)CCN(C)CCN``: the middle
+        best. It breaks the tie for ``CN(C)CCN(C)CCN``: the middle
         ethane-1,2-diamine (N's carry 3 methyls + a 2-aminoethyl -> +4) beats the
         terminal one (1 methyl + a 2-(dimethylamino)ethyl -> +2) deterministically
         and spelling-independently. The old counter saw only the two amine N's
@@ -705,7 +705,7 @@ def find_principal_chain(
                         if nbr_idx in fg_hetero_atoms:
                             # Suffix heteroatom: also count the prefix
                             # substituents ON it (its heavy neighbours other
-                            # than this chain carbon). P-44.4.1.1.
+                            # than this chain carbon)..
                             for sub in nbr.GetNeighbors():
                                 si = sub.GetIdx()
                                 if si == atom_idx or si in exclude:
@@ -717,7 +717,7 @@ def find_principal_chain(
     def _cascade_reverse(chain: List[int]) -> bool:
         """True if the REVERSED chain gives lower locants by the orientation
         cascade PCG -> multiple bonds -> double bonds -> substituents
-        (P-31.1.4 numbering order).
+         numbering order).
 
         Used so the substituent-locant criterion (idx 9) is read in the SAME
         orientation the higher-priority criteria fix, instead of independently
@@ -768,7 +768,7 @@ def find_principal_chain(
         return False
 
     def _compute_sub_locant_score(chain: List[int]) -> tuple:
-        """Criterion 9 (P-44.4 / P-45.2.2): lowest substituent locants, read in the
+        """Criterion 9 /: lowest substituent locants, read in the
         orientation fixed by the higher-priority criteria (PCG -> multiple bonds ->
         double bonds), NOT independently minimized.
 
@@ -795,7 +795,7 @@ def find_principal_chain(
         return tuple(-p for p in sorted(positions))
 
     def _compute_double_bond_locant_score(chain: List[int]) -> tuple:
-        """Criterion 7.5 (P-44.1(h)): Lowest locants for double bonds only.
+        """Criterion 7.5 (h)): Lowest locants for double bonds only.
 
         When two chains have the same combined multiple-bond locant set,
         the chain with lower double-bond-only locants is preferred.
@@ -818,19 +818,19 @@ def find_principal_chain(
         """
         Calculate selection score for a chain.
         Returns 10-element tuple for comparison (higher = better).
-        Implements all IUPAC 2013 P-44 criteria.
+        Implements all IUPAC 2013 criteria.
 
         Tuple elements:
           0: contains_fg (bool as int)
-          1: fg_count (FG instances, not atoms -- P-44.1(b))
-          2: length (chain length -- P-44.1(a))
-          3: multiple_bonds (double + triple count -- P-44.1(c))
-          4: double_bonds (double bond count -- P-44.1(d))
-          5: fg_locants_score (lowest FG locants -- P-44.1(f))
-          6: bond_locants_score (lowest multiple bond locants -- P-44.1(g))
-          7: double_bond_locants_score (lowest double bond locants -- P-44.1(h))
-          8: sub_count (substituent count -- P-44.1(i))
-          9: sub_locants_score (lowest substituent locants -- P-44.1(j))
+          1: fg_count (FG instances, not atoms -- (b))
+          2: length (chain length -- (a))
+          3: multiple_bonds (double + triple count -- (c))
+          4: double_bonds (double bond count -- (d))
+          5: fg_locants_score (lowest FG locants -- (f))
+          6: bond_locants_score (lowest multiple bond locants -- (g))
+          7: double_bond_locants_score (lowest double bond locants -- (h))
+          8: sub_count (substituent count -- (i))
+          9: sub_locants_score (lowest substituent locants -- (j))
         """
         chain_set = set(chain)
 
@@ -838,7 +838,7 @@ def find_principal_chain(
         contains_fg = 1 if (fg_atoms & chain_set) else 0
 
         # Criterion 2: Count of principal group INSTANCES in chain.
-        # P-44.1(b): count how many PCG INSTANCES are borne by this chain — an
+        # (b): count how many PCG INSTANCES are borne by this chain — an
         # instance counts iff a carbon DIRECTLY bearing its characteristic
         # heteroatom is on the chain (fg_bearing_carbons). This counts instances
         # (e.g. 2 for two COOH) rather than atoms, AND correctly counts a
@@ -862,7 +862,7 @@ def find_principal_chain(
         # Criterion 7: Lowest locants for multiple bonds (combined)
         bond_locants_score = _compute_bond_locant_score(chain)
 
-        # Criterion 7.5 (P-44.1(h)): Lowest locants for double bonds only.
+        # Criterion 7.5 (h)): Lowest locants for double bonds only.
         # Breaks ties when combined bond locants are equal but double bond
         # positions differ (e.g., en-yne orientation).
         double_bond_locants_score = _compute_double_bond_locant_score(chain)
@@ -878,10 +878,10 @@ def find_principal_chain(
                 sub_count, sub_locants_score)
 
     def _p45_alpha_key(chain: List[int]) -> tuple:
-        """DD5 RC-1 (P-45.2.3 / P-45.2.2 / P-45.5): deterministic candidate
+        """DD5 / /: deterministic candidate
         comparator for chains that TIE on every chain_score term.
 
-        Replaces the arbitrary ``max()`` fall-through (which returned whichever
+        Replaces the arbitrary ``max`` fall-through (which returned whichever
         chain ``find_all_carbon_chains`` happened to enumerate first). The key is
         ``(full_substituent_locant_set, locants_in_alphanumerical_citation_order)``,
         both read in the chain's PCG-/substituent-lowest orientation, so the chain
@@ -893,7 +893,7 @@ def find_principal_chain(
         from ..assembly.naming_utils import alpha_sort_key
         from ..assembly.substituent_enumerator import name_substituent
 
-        # WR-05: orient via the SAME full cascade `_compute_sub_locant_score` uses
+        #: orient via the SAME full cascade `_compute_sub_locant_score` uses
         # (PCG -> multiple-bonds -> double-bonds -> substituents), not just the PCG,
         # so the citation-order tie-break is read in one consistent orientation; and
         # use the chain-enumeration boundary `combined_exclude` (chain set + the
@@ -920,7 +920,7 @@ def find_principal_chain(
                 entries.append((alpha_sort_key(nm or "zzz"), pos[chain_atom]))
                 sub_locants.append(pos[chain_atom])
         entries.sort()
-        # P-45.6.1: when every structural criterion ties, the PIN is the name
+        #: when every structural criterion ties, the PIN is the name
         # that comes first in alphanumerical order. The locant tuple alone
         # cannot express that -- two candidate chains through the SAME molecule
         # can carry the same locant set and the same locants-in-citation-order
@@ -940,7 +940,7 @@ def find_principal_chain(
                 tuple(a for a, _loc in entries))
 
     def _lambda_direct_key(chain: List[int]) -> tuple:
-        """P-45.3.1 (BB 22172-22182): among chains tying on every P-44 term,
+        """ (BB 22172-22182): among chains tying on every term,
         the PIN parent bears the substituent group of the HIGHEST bonding number
         directly connected to it (λ5 > λ3). Score = the multiset of nonstandard
         (λ) bonding numbers of the DIRECTLY-attached substituent atoms, sorted
@@ -948,7 +948,7 @@ def find_principal_chain(
 
         For ``OC(=O)C(CP)C[PH4]`` the chain through the -CH2-PH4 arm makes λ5-P a
         direct substituent (key ``(5,)``); the chain through the -CH2-PH2 arm has
-        no directly-attached λ atom (key ``()``) — so the former is the parent,
+        no directly-attached λ atom (key ````) — so the former is the parent,
         giving ``3-(λ5-phosphanyl)-2-(phosphanylmethyl)propanoic acid`` (PIN), not
         the ``[not] 3-phosphanyl-2-(λ5-phosphanylmethyl)…`` alternative.
         """
@@ -971,7 +971,7 @@ def find_principal_chain(
     # 3-5 count length/bonds (both orientation-free), 6-8 take a fwd/rev `max`,
     # and criterion 9 (`_compute_sub_locant_score`) returns the same tuple for a
     # chain and its reverse — it only differs between the two orientations when
-    # they do NOT tie the P-44 cascade, and in that case both orientations pick
+    # they do NOT tie the cascade, and in that case both orientations pick
     # the SAME canonical orientation; when they DO tie, the substituent-position
     # pattern is palindromic so `sorted(positions)` is identical either way.
     # `find_all_carbon_chains` emits every chain in BOTH orientations (~47% of
@@ -999,15 +999,15 @@ def find_principal_chain(
             assert fresh == cached, (chain, fresh, cached)
         return cached
 
-    # Find chain with highest score; break exact ties deterministically (P-45).
+    # Find chain with highest score; break exact ties deterministically.
     scored = [(_chain_score_cached(c), c) for c in chains]
     best_score = max(s for s, _ in scored)
     top = [c for s, c in scored if s == best_score]
     if len(top) == 1:
         best_chain = top[0]
     else:
-        # P-45.3.1 nonstandard-bonding-number criterion runs BEFORE the
-        # alphanumerical comparator (all P-44 terms already tied within `top`).
+        # nonstandard-bonding-number criterion runs BEFORE the
+        # alphanumerical comparator (all terms already tied within `top`).
         best_lambda = max(_lambda_direct_key(c) for c in top)
         top = [c for c in top if _lambda_direct_key(c) == best_lambda]
         best_chain = top[0] if len(top) == 1 else min(top, key=_p45_alpha_key)
@@ -1159,7 +1159,7 @@ def is_ring_substituent(mol, sub_atoms: List[int], parent_atoms: Set[int]) -> bo
         >>> is_ring_substituent(mol, [0, 1, 2, 3, 4, 5], {6})
         True
         >>> mol2 = Chem.MolFromSmiles('CCCCC') # pentane
-        >>> is_ring_substituent(mol2, [0, 1, 2], set())
+        >>> is_ring_substituent(mol2, [0, 1, 2], set)
         False
     """
     if not sub_atoms:
@@ -1222,11 +1222,11 @@ def classify_substituent(mol, sub_atoms: List[int], parent_atoms: Set[int]) -> D
             break
 
     if contained_ring:
-        # This is a ring substituent. WS-A task 9: name the WHOLE fragment
+        # This is a ring substituent. task 9: name the WHOLE fragment
         # through the single ring-substituent chokepoint with its attachment
         # atom — the old per-first-SSSR-ring lookup truncated a fused system
         # to its first ring (naphthalenyl -> 'phenyl', a DIFFERENT group) and
-        # never carried the P-29.2 free-valence locant.
+        # never carried the free-valence locant.
         attach_idx = next(
             (a for a in sub_atoms
              for nbr in mol.GetAtomWithIdx(a).GetNeighbors()

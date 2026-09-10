@@ -1,4 +1,4 @@
-"""Tests for ESTR-01/ESTR-02: Ring-acid substituent discovery in ester handler.
+"""Tests for /: Ring-acid substituent discovery in ester handler.
 
 Verifies that substituted aromatic esters (e.g., ethyl 4-aminobenzoate)
 include ring substituents in the generated name, and that unsubstituted
@@ -10,7 +10,7 @@ from orthonym import name_compound
 
 @pytest.mark.unit
 class TestSubstitutedAromaticEsters:
-    """ESTR-01/ESTR-02: Ring-acid substituents must appear in ester names."""
+    """/: Ring-acid substituents must appear in ester names."""
 
     def test_ethyl_4_aminobenzoate(self):
         """Ethyl 4-aminobenzoate: amino substituent on ring acid."""

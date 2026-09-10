@@ -1,17 +1,17 @@
 """Wave-0 unit coverage for Pattern D (D/L + peptide-acyl) stereo suppression.
 
-Phase 177 Plan 01 / WS-B.0 (D-01/D-02/D-03).
+a phase Plan 01 /.0 (//).
 
 `needs_stereo_injection` (src/orthonym/rules/stereochemistry.py) is the SHARED
 suppression predicate consumed by the top-level injection seams (the namer
-backstop and ``inject_stereo_from_locant_map``).  Phase 177 extends it with
+backstop and ``inject_stereo_from_locant_map``). a phase extends it with
 Pattern D: a leading/embedded ``D-``/``L-`` configurational token, OR a peptide
 acyl chain (``L-…yl-`` / ``D-…yl-``), is treated as "stereo-already-present"
 (return ``False``) so the Plan-02 backstop flip from detect-only to inject does
 NOT double-encode the conformant amino-acid / peptide subsystem.
 
 These tests are written BEFORE Pattern D lands (Task 2) — they are RED on
-HEAD until the predicate extension ships, then GREEN.  Per the fix-methodology
+HEAD until the predicate extension ships, then GREEN. Per the fix-methodology
 mandate the suppression is at the predicate source, never a postprocessor.
 
 The two configurational tests assert Pattern D does NOT over-suppress:
@@ -31,7 +31,7 @@ from orthonym.rules.stereochemistry import needs_stereo_injection
 
 @pytest.mark.unit
 class TestPatternDSuppression:
-    """D/L configurational token + peptide-acyl recognition (D-01/D-02/D-03)."""
+    """D/L configurational token + peptide-acyl recognition (//)."""
 
     # --- D/L configurational token suppression ---------------------------
 
@@ -82,7 +82,7 @@ class TestPatternDSuppression:
     def test_injectable_stereo_chain_without_dl_token_still_true(self):
         # A genuinely-injectable stereo chain name WITHOUT a D/L token must
         # still return True -- Pattern D must NOT over-suppress real injection
-        # targets.  (2R)-butan-2-ol's bare descriptor-free form 'butan-2-ol'
+        # targets. (2R)-butan-2-ol's bare descriptor-free form 'butan-2-ol'
         # carries no Pattern A/B/C/D match but the mol has CIP stereo.
         mol = Chem.MolFromSmiles("C[C@@H](O)CC")
         rdCIPLabeler.AssignCIPLabels(mol)

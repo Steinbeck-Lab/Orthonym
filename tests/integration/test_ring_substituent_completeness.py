@@ -1,8 +1,8 @@
 """
-Integration tests for ring substituent completeness (Phase 33, Plan 01).
+Integration tests for ring substituent completeness (a phase, Plan 01).
 
 Tests that substituents on cycloalkanes, bicyclics, and PAH systems are NOT
-dropped or merged during name assembly. Covers requirements SC-01 through SC-04.
+dropped or merged during name assembly. Covers requirements through.
 
 These tests assert that the generated name CONTAINS the expected substituent
 prefix, rather than matching an exact name, to be robust against minor
@@ -14,7 +14,7 @@ from orthonym import name_compound
 
 
 # ---------------------------------------------------------------------------
-# SC-01: Mixed alkyl + halogen substituents on cycloalkanes
+#: Mixed alkyl + halogen substituents on cycloalkanes
 # Previously: prefixes merged (e.g., "chloromethylcyclohexane" instead of
 # separate "chloro" and "methyl" prefixes)
 # ---------------------------------------------------------------------------
@@ -68,7 +68,7 @@ class TestCycloalkaneHalogenSubstituents:
 
 
 # ---------------------------------------------------------------------------
-# SC-02: Halogen substituents on bicyclic systems
+#: Halogen substituents on bicyclic systems
 # Previously: non-carbon substituents silently dropped from bicyclic names
 # ---------------------------------------------------------------------------
 
@@ -113,7 +113,7 @@ class TestBicyclicNonCarbonSubstituents:
 
 
 # ---------------------------------------------------------------------------
-# SC-03: Hydroxy/amino substituents on bicyclic systems
+#: Hydroxy/amino substituents on bicyclic systems
 # Previously: zero-carbon substituents dropped from bicyclic naming path
 # ---------------------------------------------------------------------------
 
@@ -147,7 +147,7 @@ class TestBicyclicHydroxyAminoSubstituents:
 
 
 # ---------------------------------------------------------------------------
-# SC-03 (cycloalkane path): Hydroxy/amino as prefixes on cycloalkanes
+# (cycloalkane path): Hydroxy/amino as prefixes on cycloalkanes
 # When OH/NH2 is not the principal group, it appears as a prefix
 # ---------------------------------------------------------------------------
 

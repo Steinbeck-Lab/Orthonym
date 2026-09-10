@@ -1,5 +1,5 @@
 """
-Integration tests for miscellaneous format fixes (Phase 32).
+Integration tests for miscellaneous format fixes (a phase).
 
 Tests oxolane substituent naming and cycloenone numbering fixes.
 """
@@ -36,7 +36,7 @@ class TestOxolaneSubstituentNaming:
 
 
 class TestCycloenoneNumbering:
-    """Cyclohexenone numbering: ketone at C-1, double bond higher (P-31.1.3.4)."""
+    """Cyclohexenone numbering: ketone at C-1, double bond higher."""
 
     def test_cyclohexenone_ketone_at_c1(self):
         """Cyclohex-2-en-1-one: ketone gets lowest locant."""

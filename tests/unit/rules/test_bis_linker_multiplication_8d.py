@@ -1,5 +1,5 @@
 """ — a phase Item 3 Case B: multiplicative LINKER for >= 2 identical
-parent-ion units on ONE di/polyvalent linker (P-72.5.1.1 / P-73.5.1.1).
+parent-ion units on ONE di/polyvalent linker /.
 
 Case B is a MULTIPLICATIVE parent (a different mechanism from Case A's suffix
 multiplication): the charged unit hangs off a shared di/polyvalent LINKER ->
@@ -47,9 +47,9 @@ def _abstains(name: str) -> bool:
 
 SHIPPED = {
     # required targets (task-8D brief)
-    "[PH-]c1ccc([PH-])cc1": "(1,4-phenylene)bis(phosphanide)",   # P-72.5.1.1 the Blue Book
-    "[PH3+]c1ccc([PH3+])cc1": "(1,4-phenylene)bis(phosphanium)",  # P-73.5.1.1 the Blue Book
-    "[NH-]C(=O)CCC([NH-])=O": "butanedioylbis(azanide)",          # P-72.5.1.1
+    "[PH-]c1ccc([PH-])cc1": "(1,4-phenylene)bis(phosphanide)",   # the Blue Book
+    "[PH3+]c1ccc([PH3+])cc1": "(1,4-phenylene)bis(phosphanium)",  # the Blue Book
+    "[NH-]C(=O)CCC([NH-])=O": "butanedioylbis(azanide)",          #
     # phenylene isomers (lowest ring locants to the ion set)
     "[PH-]c1ccccc1[PH-]": "(1,2-phenylene)bis(phosphanide)",      # ortho
     "[PH3+]c1cccc([PH3+])c1": "(1,3-phenylene)bis(phosphanium)",  # meta
@@ -111,7 +111,7 @@ def test_emitter_declines_non_acyl_azanide():
 
 # === Fail-closed end-to-end: production (gate ON) abstains, never a wrong ship =
 # With the OPSIN validity gate ON (as in production / the CLI), the best-effort
-# charge-dropped fallthrough for these out-of-scope shapes is SELF-01-suppressed,
+# charge-dropped fallthrough for these out-of-scope shapes is -suppressed,
 # so the molecule abstains rather than shipping a different-molecule name.
 
 FAIL_CLOSED = [
@@ -156,5 +156,5 @@ def test_target4_abstains():
     PIN 3-(azaniumylmethyl)pentane-1,5-bis(aminium)), NOT a multiplicative linker.
     It is blocked by an upstream neutral polyamine parent-selection defect
     (NCCC(CN)CCN is itself mis-named 3-(aminomethyl)pentane-1,3,5-triamine), so in
-    production it stays 0-wrong (SELF-01 suppresses the wrong best-effort name)."""
+    production it stays 0-wrong (suppresses the wrong best-effort name)."""
     assert _abstains(_name("[NH3+]CCC(C[NH3+])CC[NH3+]"))

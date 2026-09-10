@@ -9,7 +9,7 @@ cited ``8a-methyl…`` and the molecule names. The CATALOG branch
 (``'9a' -> 9``), so a catalog-matched fused heterocycle (quinolizidine,
 indolizidine, quinoline, …) used as a spiro component with a substituent on its
 ring-fusion atom got a WRONG integer locant, OPSIN rejected it, and the molecule
-abstained (SELF-01 suppressed the wrong-molecule candidate -> ``unknown organic
+abstained (suppressed the wrong-molecule candidate -> ``unknown organic
 compound``).
 
 The fix mirrors CP2's systematic-branch treatment: the catalog branch carries
@@ -19,8 +19,8 @@ that can only be numbered as a ring-fusion atom is VOIDed (fail-closed) by the
 existing guard in ``name_mixed_spiro_fused`` (OPSIN rejects a lettered locant in
 the spiro slot). 0-wrong is absolute; every emission is round-trip gated.
 
-Governing rules: P-31.1.4 / P-25.3.1.3 (fusion-position letter locants),
-P-24.5.1 (spiro-component citation + low locants to the spiro atoms),
+Governing rules: / (fusion-position letter locants),
+ (spiro-component citation + low locants to the spiro atoms),
 the Blue Book (fusion-position letter locants). OPSIN 2.9.0-verified.
 
 VERIFIED witness: ``CC12CCCCN2CC2(CC1)OC2`` (quinolizidine spiro-oxirane, methyl

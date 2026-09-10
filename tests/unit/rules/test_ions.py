@@ -1,7 +1,7 @@
 """
 Unit tests for ion naming rules.
 
-Tests ion classification and naming functions per IUPAC 2013 P-72/P-73.
+Tests ion classification and naming functions per IUPAC 2013 /.
 """
 
 import pytest
@@ -109,7 +109,7 @@ class TestClassifyAnion:
     def test_iminide(self):
         """Imine anion (=N-) should be classified as iminide, NOT aminide.
 
-        P-72.2.2.2.3 (the Blue Book): an imine bearing a negative charge on the
+         (the Blue Book): an imine bearing a negative charge on the
         nitrogen takes the 'iminide' suffix. The discriminator vs. 'aminide' is a
         double bond on the anionic nitrogen (the Blue Book butaniminide CCCC=[N-]).
         """
@@ -147,7 +147,7 @@ class TestClassifyCation:
 
     def test_aminium_quaternary(self):
         """Tetramethylammonium (a quaternary N: +1, 0 H, degree 4) classifies as
-        'quaternary' (a phase WS-E.1 /). The dedicated class routes it to
+        'quaternary' (a phase.1 /). The dedicated class routes it to
         the systematic ``-aminium`` PIN (N,N,N-trimethylmethanaminium) via the
         CATION_QUATERNARY dispatch — a quaternary N cannot take the protonated-amine
         ('aminium') neutralize path (over-valent neutral N), so it is split out from
@@ -257,7 +257,7 @@ class TestNameCation:
     """Test cation naming."""
 
     def test_ammonium_retained(self):
-        """NH4+ PIN is 'azanium' (P-73.1.1.2, the Blue Book -- the mononuclear
+        """NH4+ PIN is 'azanium', the Blue Book -- the mononuclear
         parent-hydride cation, "not those given in Table 7.3"); mirrors
         [PH4+]->phosphanium. Was 'ammonium' (Table-7.3 retained)."""
         mol = Chem.MolFromSmiles('[NH4+]')
@@ -265,7 +265,7 @@ class TestNameCation:
         assert name == 'azanium'
 
     def test_methylammonium_pin_is_methanaminium(self):
-        """ (P-73.1.2.1): 'methylammonium' is general nomenclature
+        """: 'methylammonium' is general nomenclature
         only; the PIN is the substitutive 'methanaminium' (the Blue Book). The
         retained name stays available for general/common style."""
         mol = Chem.MolFromSmiles('C[NH3+]')
@@ -281,14 +281,14 @@ class TestNameCation:
 
     def test_ammonium_pin_is_azanium(self):
         """NH4+ PIN is the parent-hydride cation 'azanium', NOT the Table-7.3
-        'ammonium' (P-73.1.1.2, the Blue Book: "the preferred IUPAC names and not
+        'ammonium', the Blue Book: "the preferred IUPAC names and not
         those given in Table 7.3"). 'ammonium' is general/common only."""
         assert name_cation(Chem.MolFromSmiles('[NH4+]')) == 'azanium'
         assert name_cation(Chem.MolFromSmiles('[NH4+]'),
                            style='common') == 'azanium'
 
     def test_ethylammonium_pin_is_ethanaminium(self):
-        """: PIN is 'ethanaminium' (P-73.1.2.1); the general
+        """: PIN is 'ethanaminium'; the general
         'ethylammonium' retained name stays for common style."""
         mol = Chem.MolFromSmiles('CC[NH3+]')
         assert name_cation(mol) == 'ethanaminium'
@@ -301,7 +301,7 @@ class TestNameCation:
         assert name == 'methylium'
 
     def test_oxonium_retained(self):
-        """OH3+ PIN is 'oxidanium' (P-73.1.1.2, the Blue Book -- mononuclear
+        """OH3+ PIN is 'oxidanium', the Blue Book -- mononuclear
         parent-hydride cation, "not those given in Table 7.3"); mirrors
         [PH4+]->phosphanium. Was 'oxonium' (Table-7.3 retained)."""
         mol = Chem.MolFromSmiles('[OH3+]')
@@ -479,13 +479,13 @@ class TestMultipleCharges:
 
 class TestAromaticCarboxylateNaming:
     """
-    Test aromatic carboxylate naming (BUG-1 and BUG-5 fixes).
+    Test aromatic carboxylate naming (and fixes).
 
     Previously, aromatic carboxylates like 4-chlorobenzoate were incorrectly
     named as "heptanoate" because the code counted all 7 carbons (benzene + COOH).
     This test class verifies the fix.
 
-    IUPAC 2013 Reference: P-72.1.1 (anions from acids), P-14.6 (aromatic precedence)
+    IUPAC 2013 Reference: (anions from acids), (aromatic precedence)
     """
 
     def test_simple_benzoate(self):
@@ -498,7 +498,7 @@ class TestAromaticCarboxylateNaming:
         """
         4-chlorobenzoate should NOT be named 'heptanoate'.
 
-        This was the canonical BUG-1 case: O=C([O-])c1ccc(Cl)cc1 returned
+        This was the canonical case: O=C([O-])c1ccc(Cl)cc1 returned
         "heptanoate" by counting 7 carbons. Should return "4-chlorobenzoate".
         """
         mol = Chem.MolFromSmiles('O=C([O-])c1ccc(Cl)cc1')
@@ -682,10 +682,10 @@ class TestAromaticCarboxylateHelpers:
 
 
 # ============================================================================
-# a phase.5 SUB-01 — charge-aware naming (Wave 0 fixtures)
+# a phase — charge-aware naming (Wave 0 fixtures)
 #
 # Negative canaries assert NOW (the currently-correct charged paths that the
-# SUB-01 routing change MUST NOT regress). The charge-aware targets are
+# routing change MUST NOT regress). The charge-aware targets are
 # xfail until Plan 02 lands (they currently hit the carbon-counting
 # _name_alkoxide_systematic stub: heptanolate/propanolate/methanolate/heptylium).
 # ============================================================================
@@ -695,7 +695,7 @@ from orthonym import name_compound  # noqa: E402
 
 @pytest.mark.unit
 class TestSUB01NegativeCanary:
-    """Currently-correct charged names that SUB-01 routing MUST preserve."""
+    """Currently-correct charged names that routing MUST preserve."""
 
     def test_acetate_unchanged(self):
         assert name_compound("CC(=O)[O-]") == "acetate"
@@ -705,7 +705,7 @@ class TestSUB01NegativeCanary:
 
     def test_propanolate_unchanged(self):
         # 169.6-03 named this 'propan-1-olate' (systematic, locant mandated).
-        # Wave2 T2d supersedes it: BB P-63.8.1 VERBATIM retains 'propoxide'
+        # Wave2 supersedes it: BB VERBATIM retains 'propoxide'
         # as the PIN ("sodium propoxide (PIN) sodium propan-1-olate"), so the
         # retained table now resolves the bare skeleton first. Substituted
         # alkoxides still take the systematic -olate route this canary was
@@ -722,18 +722,18 @@ class TestSUB01NegativeCanary:
 
 @pytest.mark.unit
 class TestSUB01ChargeAwareNaming:
-    """SUB-01 charge-aware targets — xfail until Plan 02 routes charged
+    """ charge-aware targets — xfail until Plan 02 routes charged
     species through the general pipeline + the ionic-suffix seam."""
 
     def test_propanesulfonate(self):
-        # SUB-01 Plan 02: routed through general pipeline + structured suffix.
+        # Plan 02: routed through general pipeline + structured suffix.
         name = name_compound("CCCS(=O)(=O)[O-]")
         assert "sulfonate" in name and "olate" not in name
 
     def test_formylbenzenesulfonate_parent_and_suffix(self):
         name = name_compound("O=Cc1ccc(S(=O)(=O)[O-])cc1")
         #: assert correct parent + -sulfonate; the missing 4- locant is a
-        # SEPARATE pre-existing ring-substituent-locant defect, out of SUB-01 scope.
+        # SEPARATE pre-existing ring-substituent-locant defect, out of scope.
         assert "sulfonate" in name and "heptanolate" not in name
 
     def test_methylphosphonate(self):
@@ -741,7 +741,7 @@ class TestSUB01ChargeAwareNaming:
         assert "phosphonate" in name
 
     def test_methylphosphonate_dianion_keeps_charge(self):
-        # CR-02 (code review 2026-06-02): the FULLY-deprotonated S/P-oxoacid
+        # (code review 2026-06-02): the FULLY-deprotonated S/P-oxoacid
         # DIANION must ship the anion name ("methanephosphonate", which OPSIN
         # round-trips to the -2 dianion), NOT the neutral acid. Before the fix
         # the poly-anion path neutralized both [O-] and returned
@@ -758,14 +758,14 @@ class TestSUB01ChargeAwareNaming:
         assert "phosphonate" in out and "acid" not in out
 
     def test_carboxylate_dianion_not_misrouted(self):
-        # Regression guard for the CR-02 fix: a pure CARBOXYLATE dianion must
-        # NOT enter the oxoacid branch. W3-P09 (P-65.6.2.1/P-65.6.1.1): the PIN
+        # Regression guard for the fix: a pure CARBOXYLATE dianion must
+        # NOT enter the oxoacid branch. W3-P09 /: the PIN
         # is the systematic 'butanedioate' ('succinate' is retained for general
         # nomenclature only), reached via the now-PIN-aware retained lookup.
         assert name_compound("[O-]C(=O)CCC(=O)[O-]") == "butanedioate"
 
     def test_wr05_oxoacid_ionize_ignores_bare_ol_amine(self):
-        # WR-05 (code review 2026-06-02): when _ionize_acid_name is restricted to
+        # (code review 2026-06-02): when _ionize_acid_name is restricted to
         # the oxoacid suffix set, a parent that merely ENDS in "ol"/"amine" must
         # NOT be transformed (no spurious "...olate"); only genuine oxoacid
         # suffixes ionize.
@@ -780,7 +780,7 @@ class TestSUB01ChargeAwareNaming:
         assert _ionize_acid_name("ethanol", -1) == "ethanolate"
 
     def test_wr01_degenerate_parent_guard_is_precise(self):
-        # WR-01 (code review 2026-06-02): the malformed-parent guard must reject
+        # (code review 2026-06-02): the malformed-parent guard must reject
         # ONLY the degenerate stem-less form (ane/ene/yne glued to an oxoacid
         # suffix or locant), never a legitimate parent that merely begins with
         # those three letters.
@@ -800,12 +800,12 @@ class TestSUB01ChargeAwareNaming:
 
     def test_methanaminium(self):
         # RESOLVED (was xfail): the general-only 'methylammonium'
-        # retained name is denied on the PIN path (P-73.1.2.1) so the systematic
+        # retained name is denied on the PIN path so the systematic
         # aminium PIN 'methanaminium' is emitted. 'methylammonium' stays for
         # general/common style.
         assert name_compound("C[NH3+]") == "methanaminium"
 
     def test_azide_keeps_azido_prefix(self):
-        # SUB-01/C2 Plan 02: azido SMARTS fixed -> the azide is no longer dropped.
+        # /C2 Plan 02: azido SMARTS fixed -> the azide is no longer dropped.
         name = name_compound("[N-]=[N+]=NCCCNC(=O)CCCC(=O)O")
         assert "azido" in name

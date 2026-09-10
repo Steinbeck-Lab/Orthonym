@@ -1,4 +1,4 @@
-"""P-66.1.6.1.2.1 (BB 33398): "The imidic acid tautomer of urea,
+""" (BB 33398): "The imidic acid tautomer of urea,
 H2N-C(OH)=NH, is named 'carbamimidic acid'... derivatives of carbamimidic
 acid are named using the locants N and N'."
 Ester: 'carbamimidic acid' -> 'carbamimidate' + alkyl word ->

@@ -1,6 +1,6 @@
-"""W2F-P7 Task 4 (P-45.3.1): the evidence PIN, end-to-end.
+"""W2F-P7 Task 4: the evidence PIN, end-to-end.
 
-BB P-45.3.1 verbatim (BlueBookV2.md:22182): the PIN parent contains the
+BB verbatim (the Blue Book): the PIN parent contains the
 substituent with the highest bonding number (λ5 > λ3), and citation order is
 'phosphanyl' < 'phosphanylmethyl' (shorter is a prefix of the longer) so
 '3-(λ5-phosphanyl)' is cited FIRST despite the higher locant.

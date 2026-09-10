@@ -1,10 +1,10 @@
-"""P-14.5 alphanumerical order: what may enter the primary key, and what decides ties.
+""" alphanumerical order: what may enter the primary key, and what decides ties.
 
 Four defects, one interlocking fix. Each was independently masking the next, so any
 one of them landing alone made a name WORSE -- the reason this shipped as a unit.
 
 1. **Stereochemical / isotopic / Greek descriptors were in the primary key.**
-   `### **P-14.5** ALPHANUMERICAL ORDER` closes its preamble (``the Blue Book``):
+   `### **** ALPHANUMERICAL ORDER` closes its preamble (``the Blue Book``):
 
        In these subsections the principles of alphanumerical order do not include
        Greek letters (except in conjunctive names) or isotopic or stereochemical
@@ -14,18 +14,18 @@ one of them landing alone made a name WORSE -- the reason this shipped as a unit
    italics to indicate that they are not involved in the primary stage of
    alphanumerical order". So `[(E)-2-phenylethenyl]` alphabetizes at `p`, not `e`.
 
-2. **Nothing implemented the tie that removing them creates.** ``**P-14.4**`` clause
+2. **Nothing implemented the tie that removing them creates.** ``****`` clause
    (j) (``:3346``) assigns the lower locant to *Z*, *R*, *M*, *r* over *E*, *S*, *P*,
-   *s*, over the non-CIP *cis*/*trans*; ``**P-45.6.3**`` (``:22606``) is the
+   *s*, over the non-CIP *cis*/*trans*; ``****`` (``:22606``) is the
    citation-order half. ``:22589`` gives the tier order outright: "*since the
    alphabetic characters and locants (ignoring the configuration symbols) are
    identical the configurational symbols are compared and 'R' precedes 'S'*".
 
 3. **Enclosing marks leaked into the key.** `4-[(1R)-1-chloroethyl]phenoxy` keyed as
    `[1-chloroethyl]phenoxy`; `[` is ASCII 91, below every lowercase letter, so it was
-   cited ahead of `chloroethyl` and -- through P-14.4(g) -- took locant 1.
+   cited ahead of `chloroethyl` and -- through (g) -- took locant 1.
 
-4. **Letters and locants were compared as one string.** P-14.5's preamble (``:3442``)
+4. **Letters and locants were compared as one string.** 's preamble (``:3442``)
    compares "*Nonitalic Roman letters... first*" and only "*When all the Roman letters
    are identical*" the locants. A single key string conflates the stages, so a leading
    digit decided comparisons that letters should have.
@@ -46,11 +46,11 @@ from orthonym.assembly.naming_utils import (
 
 
 class TestPrimaryKeyExcludesDescriptors:
-    """P-14.5:3446 -- the descriptor is not part of the primary key."""
+    """:3446 -- the descriptor is not part of the primary key."""
 
     @pytest.mark.parametrize("raw,expected", [
         # only the DESCRIPTOR goes here; the locant is stripped later, by
-        # alpha_sort_key's own P-14.5.2 leading-locant step
+        # alpha_sort_key's own leading-locant step
         ("(E)-3-phenylprop-2-en-1-yl", "3-phenylprop-2-en-1-yl"),
         ("(1E,3E,5E)-hepta-1,3,5-trien-1-yl", "hepta-1,3,5-trien-1-yl"),
         ("β-D-glucopyranosyloxy", "glucopyranosyloxy"),   # Greek + configurational
@@ -79,11 +79,11 @@ class TestPrimaryKeyExcludesDescriptors:
 
 
 class TestEnclosingMarksAreNotAlphanumerical:
-    """Defect 3: marks are P-16.5 typography, never sort-key content."""
+    """Defect 3: marks are typography, never sort-key content."""
 
     @pytest.mark.parametrize("raw,expected", [
         ("4-[(1R)-1-chloroethyl]phenoxy", "1-chloroethylphenoxy"),
-        # fully enclosed: the P-14.5.2 branch also drops the INNER locant, since
+        # fully enclosed: the branch also drops the INNER locant, since
         # a locant is not a letter -- so this reduces past the marks to 'chloroethyl'
         ("(2-chloroethyl)", "chloroethyl"),
         ("methyl", "methyl"),
@@ -94,7 +94,7 @@ class TestEnclosingMarksAreNotAlphanumerical:
 
 
 class TestCipTieBreak:
-    """P-14.4(j):3346 / P-45.6.3:22606."""
+    """(j):3346 /:22606."""
 
     @pytest.mark.parametrize("raw,rank", [
         ("(1R)-1-chloroethyl", (0,)),
@@ -140,12 +140,12 @@ class TestP1451VersusP1452:
     whether the caller happened to add enclosing marks."""
 
     @pytest.mark.parametrize("raw,expected", [
-        # P-14.5.1 -- multiplies SEPARATE simple prefixes, ignored
+        # -- multiplies SEPARATE simple prefixes, ignored
         ("dimethyl", "methyl"),
         ("trioxo", "oxo"),
         ("dihydroxy", "hydroxy"),
         ("tetrachloro", "chloro"),
-        # P-14.5.2 -- internal to ONE compound substituent, counts.:3477's
+        # -- internal to ONE compound substituent, counts.:3477's
         # `7-(1,2-difluorobutyl)-5-ethyltridecane (PIN)` alphabetizes at 'd'.
         ("(R)-4,5-dihydroxypentyl", "dihydroxypentyl"),
         ("(2E,6E)-3,7,11-trimethyldodeca-2,6,10-trien-1-yl",
@@ -173,7 +173,7 @@ class TestGoldRowsEndToEnd:
 
     def test_w2e_p0cf_01_parent_chain_chosen_by_name(self):
         """Two 7-carbon chains describe this molecule -- through the nitro branch
-        or the fluoro branch -- with the SAME locant set 4,5,6. P-45.6.1 picks the
+        or the fluoro branch -- with the SAME locant set 4,5,6. picks the
         alphanumerically-first name: 'difluoropropyl' < 'dinitropropyl'."""
         assert name_compound(
             "OC(=O)CCC(C(F)C(F)C)C([N+](=O)[O-])C([N+](=O)[O-])C") == \

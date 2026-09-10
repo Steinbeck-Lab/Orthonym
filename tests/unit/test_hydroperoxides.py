@@ -5,11 +5,11 @@ Hydroperoxides (R-OOH) use the suffix "-peroxol" as principal group
 and the prefix "hydroperoxy" when subordinate.
 
 IUPAC 2013 Blue Book:
-- P-68.3.1.3.2: Hydroperoxides named substitutively with -peroxol suffix
-- P-68.3.1.3.3: Hydroperoxy prefix when subordinate
+-: Hydroperoxides named substitutively with -peroxol suffix
+-: Hydroperoxy prefix when subordinate
 
 Examples:
-- COO  -> methan-1-peroxol (methyl hydroperoxide)
+- COO -> methan-1-peroxol (methyl hydroperoxide)
 - CCOO -> ethan-1-peroxol (ethyl hydroperoxide)
 """
 

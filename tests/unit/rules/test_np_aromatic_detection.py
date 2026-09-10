@@ -1,8 +1,8 @@
-"""Unit tests for AROMATIC bond detection in _find_scaffold_unsaturation().
+"""Unit tests for AROMATIC bond detection in _find_scaffold_unsaturation.
 
-Phase 89 Task 2 / Phase 101 Plan 02: The function detects DOUBLE, TRIPLE,
+a phase Task 2 / a phase Plan 02: The function detects DOUBLE, TRIPLE,
 and AROMATIC bond types. AROMATIC C-C bonds are treated as ene positions
-per IUPAC Blue Book P-31.1.3.4 (e.g., estra-1,3,5(10)-triene).
+per IUPAC Blue Book (e.g., estra-1,3,5(10)-triene).
 
 The AROMATIC detection uses read-only bond type flags set during RDKit
 sanitization -- no Kekulization mutation is needed.
@@ -81,8 +81,8 @@ class TestAromaticBondDetection:
 
 
 class TestFlavonoidScaffolds:
-    """RING-03: flavonoid scaffolds. v26 BP-4 Ph4: flavone/flavanone are general-
-    nomenclature-only trivial names (P-102.6.1.4); the PIN is systematic."""
+    """: flavonoid scaffolds. Ph4: flavone/flavanone are general-
+    nomenclature-only trivial names; the PIN is systematic."""
 
     def test_flavone_pin(self):
         """Flavone -> systematic PIN 2-phenyl-4H-1-benzopyran-4-one."""

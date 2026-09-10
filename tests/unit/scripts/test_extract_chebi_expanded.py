@@ -12,7 +12,7 @@ cells:
 - CHEBI:185681 / O=C(O)NCO / hydroxymethylcarbamic acid -> (polyfunctional, small)
 - CHEBI:64451 /...diazoniophenyl arsonate -> (aromatic, small)
 
-Classifications verified by running classify_compound() from
+Classifications verified by running classify_compound from
 scripts/benchmark_chebi500.py at phase 145-01 execution time (policy).
 """
 import csv

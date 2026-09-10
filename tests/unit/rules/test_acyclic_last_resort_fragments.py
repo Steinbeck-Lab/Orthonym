@@ -31,11 +31,11 @@ from orthonym.namer import Orthonym
 # `tests/conftest.py:302-317` disables the OPSIN validity gate suite-wide and
 # documents the trap: with the gate OFF these fragments emit a plausible name for
 # a DIFFERENT molecule instead of a sentinel. Measured here -- without this
-# marker 7 of the 11 XPASS while `DROP-09 substituent_skip` fires, i.e. the
+# marker 7 of the 11 XPASS while ` substituent_skip` fires, i.e. the
 # "success" is a silent atom drop; in a fresh gated process all 11 refuse.
 #
 # With the gate ON the oracle is sound in both directions: escaping the sentinel
-# requires a name SELF-01 accepts, and SELF-01 suppresses on a verified
+# requires a name accepts, and suppresses on a verified
 # constitutional mismatch (`namer.py:920-924`). So an XPASS here means the
 # fragment named AND kept its atoms -- it cannot be won by dropping them.
 pytestmark = pytest.mark.opsin_gate
@@ -43,7 +43,7 @@ pytestmark = pytest.mark.opsin_gate
 FRAGMENTS = [
     # acylurea on a tetrahydroisoquinolinium
     "C[C@H]([C@H]1C2=CC(=C(C=C2CC[NH+]1CC3=CC(=CC=C3)F)OC)OC)NC(=O)NC(C)C",
-    # hexakis(diethyldithiocarbamate) + Mo -- organometallic, P-69 territory
+    # hexakis(diethyldithiocarbamate) + Mo -- organometallic, territory
     "CCN(CC)C(=S)[S-].CCN(CC)C(=S)[S-].CCN(CC)C(=S)[S-].CCN(CC)C(=S)[S-]."
     "CCN(CC)C(=S)[S-].CCN(CC)C(=S)[S-].[Mo]",
     # hydroperoxide on a 2H-pyran-2-one

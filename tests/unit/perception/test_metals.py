@@ -1,8 +1,8 @@
-"""Phase 161 unit tests for organometallic perception (P-69 + Salzer 1999).
+"""a phase unit tests for organometallic perception + Salzer 1999).
 
 Mirrors tests/unit/perception/test_ions.py class-per-concern pattern.
-Tests the public API of orthonym.perception.metals + CONTEXT D-12 purity
-invariants. NEVER uses @pytest.mark.xfail (CONTEXT D-29) — failures are
+Tests the public API of orthonym.perception.metals + internal notes purity
+invariants. NEVER uses @pytest.mark.xfail (internal notes) — failures are
 honest-fail-on-data per project memory rule #4.
 """
 import pytest
@@ -76,7 +76,7 @@ class TestIsMetalElement:
 
 # ---------------------------------------------------------------------------
 # Class 2 — TestDetectMetalComplex (≥ 10 tests; one per Tier-1 metallocene
-#  + negative cases)
+# + negative cases)
 # ---------------------------------------------------------------------------
 
 
@@ -127,13 +127,13 @@ class TestDetectMetalComplex:
         assert detect_metal_complex(mol) is None
 
     def test_ferric_chloride_returns_none(self):
-        """FeCl3 has metal but no M-C bond; no ORGM detection per CONTEXT D-04.
+        """FeCl3 has metal but no M-C bond; no ORGM detection per internal notes.
 
         Note: detect_metal_complex returns None here because the topology
         doesn't match any tier-1/2/3/4 branch (3 halides, no organic ligand).
         """
         mol = Chem.MolFromSmiles('Cl[Fe](Cl)Cl')
-        # Phase 161 perception walks via Tier-3 σ-bonded branch; halide-only
+        # a phase perception walks via Tier-3 σ-bonded branch; halide-only
         # mol with no organic ligand → all-halides, no σ-organic match → cascades.
         result = detect_metal_complex(mol)
         # The current impl may detect this as Tier-3 (3 halides); rules layer
@@ -174,7 +174,7 @@ class TestDetectMetalComplex:
     def test_empty_mol_returns_none(self):
         """Empty mol returns None."""
         mol = Chem.RWMol()
-        # RWMol with 0 atoms; SanitizeMol skipped per CONTEXT D-12
+        # RWMol with 0 atoms; SanitizeMol skipped per internal notes
         assert detect_metal_complex(mol) is None
 
     def test_dibenzene_chromium_returns_metal_complex(self):
@@ -247,7 +247,7 @@ class TestComputeHapticity:
         assert LIGAND_ETA_DEFAULTS['C1=CC=CC=CC=1'] == (7, 'cycloheptatrienyl')
 
     def test_empty_atom_indices_raises_value_error(self):
-        """Empty ligand_atom_indices is honest-fail per D-12."""
+        """Empty ligand_atom_indices is honest-fail per."""
         mol = Chem.MolFromSmiles('[Fe+2].c1cc[cH-]c1.c1cc[cH-]c1')
         with pytest.raises(ValueError):
             compute_hapticity(mol, 0, ())
@@ -260,11 +260,11 @@ class TestComputeHapticity:
 
 @pytest.mark.unit
 class TestEnumerateMetalLigandGroups:
-    """Test enumerate_metal_ligand_groups partitioning (Plan-02 stub: returns ()).
+    """Test enumerate_metal_ligand_groups partitioning (Plan-02 stub: returns ).
 
-    Per Plan-03 SUMMARY, enumerate_metal_ligand_groups is still a stub returning ().
+    Per Plan-03 SUMMARY, enumerate_metal_ligand_groups is still a stub returning .
     The actual ligand-group enumeration happens inside detect_metal_complex.
-    These tests verify the stub contract; Phase 161.1+ may flesh out the helper.
+    These tests verify the stub contract; a phase+ may flesh out the helper.
     """
 
     def test_stub_returns_empty_tuple_for_ferrocene(self):
@@ -280,14 +280,14 @@ class TestEnumerateMetalLigandGroups:
         assert groups == ()
 
     def test_stub_returns_tuple_type(self):
-        """Stub returns Tuple[LigandGroup, ...] type (immutable)."""
+        """Stub returns Tuple[LigandGroup,...] type (immutable)."""
         mol = Chem.MolFromSmiles('[Li][CH3]')
         groups = enumerate_metal_ligand_groups(mol)
         assert isinstance(groups, tuple)
 
     def test_stub_does_not_raise_on_none(self):
         """enumerate_metal_ligand_groups(None) — defensive guard, returns ()."""
-        # Phase 161 stub: it may raise AttributeError on None; document either.
+        # a phase stub: it may raise AttributeError on None; document either.
         try:
             result = enumerate_metal_ligand_groups(None)
             assert result == ()
@@ -300,20 +300,20 @@ class TestEnumerateMetalLigandGroups:
 
 
 # ---------------------------------------------------------------------------
-# Class 5 — TestPurityInvariants (≥ 7 tests — CONTEXT D-12 hard invariant)
+# Class 5 — TestPurityInvariants (≥ 7 tests — internal notes hard invariant)
 # ---------------------------------------------------------------------------
 
 
 @pytest.mark.unit
 class TestPurityInvariants:
-    """CONTEXT D-12 hard invariant: predicate-pure functions."""
+    """internal notes hard invariant: predicate-pure functions."""
 
     def test_detect_metal_complex_none_input(self):
         """detect_metal_complex(None) returns None per defensive guard."""
         assert detect_metal_complex(None) is None
 
     def test_mol_unchanged_after_detect(self):
-        """detect_metal_complex MUST NOT mutate mol per CONTEXT D-12."""
+        """detect_metal_complex MUST NOT mutate mol per internal notes."""
         mol = Chem.MolFromSmiles('[Fe+2].c1cc[cH-]c1.c1cc[cH-]c1')
         atom_count_pre = mol.GetNumAtoms()
         bond_count_pre = mol.GetNumBonds()
@@ -322,17 +322,17 @@ class TestPurityInvariants:
         assert mol.GetNumBonds() == bond_count_pre
 
     def test_dataclasses_are_frozen_ligand_group(self):
-        """LigandGroup is a frozen dataclass per D-12."""
+        """LigandGroup is a frozen dataclass per."""
         lg = LigandGroup(
             metal_atom_idx=0,
             ligand_atom_indices=(1, 2),
             hapticity_n=2,
         )
         with pytest.raises(Exception):
-            lg.hapticity_n = 5  # type: ignore[misc]  # frozen → cannot mutate
+            lg.hapticity_n = 5  # type: ignore[misc] # frozen → cannot mutate
 
     def test_dataclasses_are_frozen_metal_complex(self):
-        """MetalComplex is a frozen dataclass per D-12."""
+        """MetalComplex is a frozen dataclass per."""
         mc = MetalComplex(
             metal_atom_indices=(0,),
             ligand_groups=(),
@@ -340,7 +340,7 @@ class TestPurityInvariants:
             is_multimetal=False,
         )
         with pytest.raises(Exception):
-            mc.is_multimetal = True  # type: ignore[misc]  # frozen
+            mc.is_multimetal = True  # type: ignore[misc] # frozen
 
     def test_metal_element_symbols_is_frozenset(self):
         """METAL_ELEMENT_SYMBOLS is a frozenset (immutable)."""
@@ -371,9 +371,9 @@ class TestPurityInvariants:
         assert mol.GetNumBonds() == bond_count_pre
 
     def test_no_xfail_decorator_in_module(self):
-        """CONTEXT D-29 + AP-17 enforcement: this module must NEVER use xfail.
+        """internal notes + enforcement: this module must NEVER use xfail.
 
-        Checks for the literal decorator line ``    @pytest.mark.xfail``
+        Checks for the literal decorator line `` @pytest.mark.xfail``
         (with leading whitespace) so the assertion string in this
         test's own body does not self-trigger.
         """

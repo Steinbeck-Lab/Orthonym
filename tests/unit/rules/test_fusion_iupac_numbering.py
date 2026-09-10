@@ -1,7 +1,7 @@
 """
 Unit tests for IUPAC ring numbering in fusion naming context.
 
-Tests that _get_iupac_ring_order() correctly maps RDKit atom indices
+Tests that _get_iupac_ring_order correctly maps RDKit atom indices
 to IUPAC positions for monocyclic components:
 - Heterocyclic rings start at highest-priority heteroatom (O > S > N)
 - Direction chosen to give lowest locants to remaining heteroatoms

@@ -1,4 +1,4 @@
-"""Tests for carbamic acid detection and naming (IUPAC P-65.2.3).
+"""Tests for carbamic acid detection and naming (IUPAC.
 
 Carbamic acid (H2N-COOH) is a retained name for aminoformic acid.
 It should be detected as its own principal group, NOT as carboxylic acid.

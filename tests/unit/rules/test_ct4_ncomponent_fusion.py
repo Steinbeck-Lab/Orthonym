@@ -1,6 +1,6 @@
-"""v37 CT.4 — general N-component fusion (carbocyclic-child naphtho case).
+""" CT.4 — general N-component fusion (carbocyclic-child naphtho case).
 
-Extends the existing P-25.3.4 polycomponent constructor's deferred topology:
+Extends the existing polycomponent constructor's deferred topology:
 a senior heterocyclic 2-ring BASE (quinoxaline/quinoline/...) ortho-fused to a
 naphthalene 2-ring carbocyclic PREFIX -> naphtho[2,3-g]quinoxaline. This UPGRADES
 the RT-true von-Baeyer degradation (valid T3) to the fusion PIN; a case that

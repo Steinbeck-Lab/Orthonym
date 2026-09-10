@@ -1,6 +1,6 @@
-"""Unit tests for steroid ring-face α/β stereoparent emission (Phase 181, WSC-02).
+"""Unit tests for steroid ring-face α/β stereoparent emission (a phase, -02).
 
-IUPAC P-101.2.6 ring-face descriptors (`3β`, `5α`) replace whole-graph CIP
+IUPAC ring-face descriptors (`3β`, `5α`) replace whole-graph CIP
 R/S on steroid scaffolds. Latin spelling is the canonical output form locked for
 this phase (OPSIN parses both Greek and Latin; Latin is ASCII-safe and matches the
 dominant corpus reference spelling).
@@ -25,7 +25,7 @@ class TestAlphaBetaAssembly:
     def test_cholestane_3b_ol(self):
         """Row 1: 5α-cholestan-3β-ol (ring α/β; undecorated C-20 implied by cholestane).
 
-        Phase 182 (WSC-03) correction: the canonical cholestane stem IMPLIES the natural
+        a phase (-03) correction: the canonical cholestane stem IMPLIES the natural
         C-20 R config (ChEBI convention — `cholest-5-en-3β-yl sulfate` omits it), so an
         UNDECORATED side-chain stereocentre that matches the stereoparent reference is
         suppressed. Both `(20R)-…` and `…` round-trip; the suppressed form is the IUPAC/ChEBI
@@ -109,7 +109,7 @@ class TestProtect:
             assert f"{b}alpha" not in n and f"{b}beta" not in n, f"bridgehead {b} leaked: {n}"
 
     def test_no_mix_fallback(self):
-        """D-08: a steroid name must NEVER mix ring α/β tokens with a whole-graph ring R/S block.
+        """: a steroid name must NEVER mix ring α/β tokens with a whole-graph ring R/S block.
 
         Either the molecule resolves fully to α/β (no ring R/S block at all) or it falls back to
         the whole-graph R/S leading block (no α/β tokens). A side-chain `(22R)-` single-centre block

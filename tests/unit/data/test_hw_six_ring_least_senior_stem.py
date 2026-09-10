@@ -1,6 +1,6 @@
-"""P-22.2.2.1.6: a six-membered HW stem follows the LEAST SENIOR heteroatom.
+""": a six-membered HW stem follows the LEAST SENIOR heteroatom.
 
-Verbatim, `BlueBookV2/BlueBookV2.md:8411`, section heading "P-22.2.2.1.6
+Verbatim, `the Blue Book Blue Book`, section heading "
 Selecting Hantzsch-Widman names for six-membered rings":
 
     "The stem for six-membered rings depends on the least senior heteroatom in
@@ -12,11 +12,11 @@ Selecting Hantzsch-Widman names for six-membered rings":
 
 Table 2.5 (`:8259-8261`) -- note Bi is group 6A, not 6C:
 
-    6A (O, S, Se, Te, Bi)                          ine    / ane
-    6B (N, Si, Ge, Sn, Pb)                         ine    / inane
+    6A (O, S, Se, Te, Bi) ine / ane
+    6B (N, Si, Ge, Sn, Pb) ine / inane
     6C (F, Cl, Br, I, P, As, Sb, B, Al, Ga, In, Tl) inine / inane
 
-Seniority for citation, P-22.2.2.1.3 (`:8284`): "their order of citation follows
+Seniority for citation, (`:8284`): "their order of citation follows
 the sequence: F, Cl, Br, I, O, S, Se, Te, N, P, As, Sb, Bi, Si, Ge, Sn, Pb, B,
 Al, Ga, In, Tl." The LEAST senior heteroatom is the one occurring LAST in it.
 
@@ -24,7 +24,7 @@ What was wrong: `hw_stems.get_hw_stem` chose the saturated 6-ring stem from the
 single `heteroatom` argument -- the MOST senior heteroatom -- and its caller
 (`rules/heterocycles.py:811-813`) passed `'N'` whenever nitrogen was present,
 else the most senior element. That is verbatim correct for 3-, 4- and 5-membered
-rings (P-22.2.2.1.5.2, `:8394`: "The stems 'iridine', 'etidine', and 'olidine'
+rings, `:8394`: "The stems 'iridine', 'etidine', and 'olidine'
 are used when nitrogen atoms are present in the ring") and it coincides with the
 six-ring rule whenever the least senior heteroatom happens to share a group with
 the most senior one -- which is why `1,3-oxazinane` and `1,3-oxaselenane` were
@@ -39,7 +39,7 @@ import pytest
 
 from orthonym.data.hw_stems import get_hw_stem
 
-# P-22.2.2.1.3 (:8284) -- the citation sequence, most senior first.
+# (:8284) -- the citation sequence, most senior first.
 BB_SENIORITY = ["F", "Cl", "Br", "I", "O", "S", "Se", "Te", "N", "P", "As",
                 "Sb", "Bi", "Si", "Ge", "Sn", "Pb", "B", "Al", "Ga", "In", "Tl"]
 
@@ -87,7 +87,7 @@ def test_the_most_senior_heteroatom_must_not_drive_the_stem():
 def test_as_plus_bi_takes_the_group_a_stem_because_bi_is_least_senior():
     """The reverse direction: a 6C atom present does NOT force a 6C stem.
 
-    As (6C) is more senior than Bi (6A) in the P-22.2.2.1.3 sequence, so Bi is
+    As (6C) is more senior than Bi (6A) in the sequence, so Bi is
     the least senior and Table 2.5 group A applies. The old "any 6C atom present
     wins" heuristic returned 'inane'/'inine' here.
     """
@@ -104,7 +104,7 @@ def test_single_heteroatom_backwards_compatible_without_the_set():
 
 
 def test_smaller_rings_still_use_the_nitrogen_rule():
-    """P-22.2.2.1.5.2 (:8394) is a DIFFERENT rule and must not be disturbed:
+    """ (:8394) is a DIFFERENT rule and must not be disturbed:
     "The stems 'iridine', 'etidine', and 'olidine' are used when nitrogen atoms
     are present in the ring; otherwise the 'ane' stems are used."
     """

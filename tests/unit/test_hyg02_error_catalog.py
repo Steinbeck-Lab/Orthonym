@@ -1,4 +1,4 @@
-"""HYG-02 (a phase) — named OrthonymLimitError catalog.
+""" (a phase) — named OrthonymLimitError catalog.
 
 Verifies: out-of-scope inputs raise a named error (opt-in); the default path is
 byte-identical to legacy descriptive fallbacks; the catalog never fires on
@@ -48,7 +48,7 @@ def test_isolated_atom_raises():
 # ---- default path is byte-identical (no raise, legacy strings) ----
 
 def test_default_path_no_raise_and_legacy_strings():
-    # name() default: wildcard does NOT raise; returns whatever it returned before.
+    # name default: wildcard does NOT raise; returns whatever it returned before.
     n = Orthonym()
     out = n.name("CC*")  # must not raise
     assert isinstance(out, str)
@@ -169,7 +169,7 @@ def test_default_mode_never_raises_limit_on_canary_sample():
         except Exception:
             # Pre-existing pipeline exceptions (ValueError on invalid SMILES, and
             # the AttributeError/KeyError/etc. that name_compound already catches)
-            # are out of scope for this test — it only asserts the HYG-02 limit
+            # are out of scope for this test — it only asserts the limit
             # is never raised in default mode. Unchanged by a phase.
             pass
 

@@ -19,7 +19,7 @@ shipped, and Task E does not introduce a second, differently-behaving mechanism.
 hard-codes ``"is_pin": False`` (lines 268, 742, 847), so all 232 entries in
 ``amino_acids_opsin.py`` and all 423 in ``simple_groups.py`` carry False. The
 flag is a generator default with zero per-entry information; gating on it would
-withdraw ``cystine`` (Blue Book Table 10.5, P-103.1.1.2) along with the junk.
+withdraw ``cystine`` (Blue Book Table 10.5, along with the junk.
 Adjudication happens per row in the JSON, with a citation.
 """
 
@@ -56,7 +56,7 @@ PIN_DENY: FrozenSet[str] = frozenset(
 
 #: Deny subset that ALSO filters the hand-curated dicts. Excludes ``hc_override``
 #: rows (cumene/quinuclidine/acetylene), whose deny applies only to OPSIN-side
-#: promotion (Phase 150 D-11 / Phase 167 HYG-03).
+#: promotion (a phase / a phase).
 PIN_DENY_HC: FrozenSet[str] = frozenset(
     e["name"].lower() for e in ENTRIES
     if e.get("pin") is False and not e.get("hc_override")

@@ -1,12 +1,12 @@
-"""WSD-05 (PERC-03) — nitroso (C-N=O) vs nitrite ester (R-O-N=O) disambiguation.
+"""-05  — nitroso (C-N=O) vs nitrite ester (R-O-N=O) disambiguation.
 
-Wave-0 scaffold (Phase 175). The TARGET assertions are xfail until the WSD-05
+Wave-0 scaffold (a phase). The TARGET assertions are xfail until the -05
 code plan (175-05) lands the `[#6]` C-attachment guard on the `nitroso` SMARTS
-+ the collision-suppression rule + the P-67 nitrite-ester emitter. The C-nitroso
++ the collision-suppression rule + the nitrite-ester emitter. The C-nitroso
 CONTROL is a non-xfail regression guard (must stay nitroso, never a nitrite).
 
-Blue Book P-67: R-O-N=O is an ester of nitrous acid ("<alkyl> nitrite"); the
-`nitroso` prefix (P-66.5.2) applies only to C-N=O.
+Blue Book: R-O-N=O is an ester of nitrous acid ("<alkyl> nitrite"); the
+`nitroso` prefix applies only to C-N=O.
 """
 
 import pytest

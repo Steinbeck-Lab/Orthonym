@@ -1,7 +1,7 @@
-"""Regression tests for steroid naming format fixes (Phase 65-02).
+"""Regression tests for steroid naming format fixes (a phase-02).
 
 Tests cover:
-1. Scaffold coverage: all 9 IUPAC P-31 steroid stems recognized
+1. Scaffold coverage: all 9 IUPAC steroid stems recognized
 2. Benchmark steroid compounds: 11 compounds from format-issue category
 3. IUPAC terminal 'e' elision: -ane -> -an before vowel suffixes
 4. Extensibility: new scaffold stems work with the assembly pipeline
@@ -77,7 +77,7 @@ STEROID_SCAFFOLDS = [
 
 @pytest.mark.integration
 class TestSteroidScaffoldCoverage:
-    """Verify all 9 IUPAC P-31 steroid stems are in scaffold data."""
+    """Verify all 9 IUPAC steroid stems are in scaffold data."""
 
     @pytest.mark.parametrize("smiles,expected_stem,expected_name", STEROID_SCAFFOLDS)
     def test_scaffold_in_data_dict(self, smiles, expected_stem, expected_name):
@@ -123,7 +123,7 @@ class TestSteroidScaffoldCoverage:
 
 # 11 steroid compounds from the format-issue category in the v7.0 benchmark.
 # Each entry: (SMILES, expected_stem_in_name, current_baseline_name,
-#              opsin_status, comment)
+# opsin_status, comment)
 BENCHMARK_STEROIDS = [
     pytest.param(
         "O=C1C[C@@H](O)[C@]2(C)C3=CC=C4C[C@@H](O)CC[C@@]4(C)[C@H]3CC[C@]12[C@@H](C)CC[C@H](C)C(C)C",

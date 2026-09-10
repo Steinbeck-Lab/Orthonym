@@ -7,10 +7,10 @@ prefixes is that the chain finder includes non-principal terminal FG carbons
 in the principal chain, inflating chain length and preventing prefix emission.
 
 IUPAC references:
-  P-35.1(e) cyano prefix
-  P-35.1(f) carbamoyl prefix
-  P-66.1(c) carbamoyl as subordinate
-  P-66.4(b) cyano as subordinate
+  (e) cyano prefix
+  (f) carbamoyl prefix
+  (c) carbamoyl as subordinate
+  (b) cyano as subordinate
 """
 import pytest
 from orthonym import name_compound
@@ -23,7 +23,7 @@ class TestCarbamoylPrefix:
         """NC(=O)CCCC(N)C(=O)O -> 2,6-diamino-6-oxohexanoic acid.
 
         Post-wave-3 the non-principal terminal primary amide is expressed as the
-        amino-oxo PIN form (P-65.1.6.1); the amide carbon IS part of the 6C
+        amino-oxo PIN form; the amide carbon IS part of the 6C
         parent chain (as C6, bearing 6-amino-6-oxo), so the parent is hexanoic.
         """
         name = name_compound("NC(=O)CCCC(N)C(=O)O")
@@ -45,7 +45,7 @@ class TestCyanoPrefix:
     def test_cyano_propanoic_acid(self):
         """N#CCC(=O)O (cyanoacetic acid) -> cyano PREFIX on a 2-carbon acid parent.
 
-        v22 Phase B (DD1 Fix 1, P-66.5.1.1.4): the non-principal nitrile is a
+         Phase B (DD1 Fix 1,: the non-principal nitrile is a
         'cyano' prefix whose carbon is EXCLUDED from the parent chain, so the
         parent is the 2-carbon acid (ethanoic/acetic), NOT a 3-carbon 'propanoic'
         chain (which would wrongly count the nitrile C). This SMILES is

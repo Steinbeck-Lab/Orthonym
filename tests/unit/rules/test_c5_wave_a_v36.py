@@ -13,11 +13,11 @@ project CLAUDE.md). An in-scope mixed cage (aspidosperma-shaped,
 naming/abstaining exactly as today, just fast.
 
 FIX 2 (assembly/substituent_prefix_forms.py::get_sulfanyl_prefix): the existing
-fail-closed guard only checks bond ORDER (``GetBondTypeAsDouble() >= 2.0``), which misses
+fail-closed guard only checks bond ORDER (``GetBondTypeAsDouble >= 2.0``), which misses
 the charge-separated sulfoxide ``C[S+]([O-])CC`` -- its S-O bond is order 1.0, so the
 function still builds ``ethylsulfanyl`` (silently dropping the [O-], a wrong molecule
-today only caught downstream by SELF-01/RT). Fix: fail closed on
-``sulfur.GetDegree() != 2`` (divalent-S contract, degree not just bond order). Sibling
+today only caught downstream by /RT). Fix: fail closed on
+``sulfur.GetDegree != 2`` (divalent-S contract, degree not just bond order). Sibling
 functions ``get_sulfinyl_prefix``/``get_sulfonyl_prefix`` are untouched and must stay
 byte-identical (canaries below).
 """
@@ -131,7 +131,7 @@ def test_charge_separated_sulfoxide_no_longer_ethylsulfanyl():
     """C[S+]([O-])CC (charge-separated ethyl methyl sulfoxide): the S-O bond is
     order 1.0, so the OLD bond-order-only guard missed it and get_sulfanyl_prefix
     built 'ethylsulfanyl', silently dropping the [O-] (a wrong molecule). After the
-    fix (fail closed on GetDegree() != 2) it must NOT produce that wrong prefix
+    fix (fail closed on GetDegree != 2) it must NOT produce that wrong prefix
     anywhere in the emitted name."""
     import orthonym
     name = orthonym.name_compound("C[S+]([O-])CC", style="pin")

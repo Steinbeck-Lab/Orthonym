@@ -9,7 +9,7 @@ abstainers ship a FULL-InChIKey-RT-verified name at the BEST-EFFORT tier
 
 The REAL demotion gate is NOT the three sites the task brief named
 (`namer.py:3234/3272/3294`); those never fire for these witnesses (verified by a
-live monkeypatch trace). The gate is the **T4 coverage-by-construction handoff**
+live monkeypatch trace). The gate is the ** coverage-by-construction handoff**
 inside `_try_general_engine_recovery` (`namer.py:3760`,
 `if not self._general_fallback_unverified: return None`), with the same
 best-effort-only pattern shared by the two abstain-rescues `namer.py:3234`
@@ -158,10 +158,10 @@ class TestUnverifiedRescueStillAbstains:
     it."""
 
     def test_rt_failing_t4_candidate_abstains_at_complete(self, monkeypatch):
-        # Force the T4 producer to emit a VALID name for a DIFFERENT molecule.
+        # Force the producer to emit a VALID name for a DIFFERENT molecule.
         # Haloperidol has no stereocentres, so the stereo gate passes and only
         # the constitution RT gate can reject — isolating the precision guard.
-        # Disable the two sibling abstain-rescues so ONLY the promoted T4 handoff
+        # Disable the two sibling abstain-rescues so ONLY the promoted handoff
         # is in play (otherwise they would legitimately name the molecule and
         # mask what this test isolates).
         monkeypatch.setattr(
@@ -178,7 +178,7 @@ class TestUnverifiedRescueStillAbstains:
             f"COMPLETE tier SHIPPED an RT-failing T4 candidate: {name!r}")
 
     def test_wrong_candidate_never_ships_as_wrong_molecule(self, monkeypatch, _oracle):
-        # Broader 0-wrong guard: even with the T4 producer sabotaged, the
+        # Broader 0-wrong guard: even with the producer sabotaged, the
         # COMPLETE tier NEVER ships the wrong molecule — it abstains or finds a
         # correct name by another (RT-verified) path.
         wrong_ik = _ik("c1ccccc1")
@@ -194,7 +194,7 @@ class TestUnverifiedRescueStillAbstains:
                 f"COMPLETE tier shipped a wrong molecule: {name!r}")
 
     def test_unpatched_nostereo_witness_ships_at_complete(self, _oracle):
-        # Positive bracket: with the REAL (RT-verified) T4 name, the same input
+        # Positive bracket: with the REAL (RT-verified) name, the same input
         # ships at COMPLETE — so the negative control's abstain is the RT gate
         # rejecting the wrong candidate, not the input being unnameable.
         name = _complete(_NOSTEREO_T4)

@@ -1,10 +1,10 @@
-"""v27 Phase 4 — added-indicated-H ring THIONE / SELONE suffix (P-64.2 chalcogen
+""" a phase — added-indicated-H ring THIONE / SELONE suffix chalcogen
 replacement). Extends the suffix-agnostic cyclic-oxo added-IH engine from =O/=NH
 to =S/=Se, so ring thiones emit the PIN `-thione` suffix instead of the non-PIN
 `sulfanylidene` substitutive prefix.
 
 Also LOCKS the added-indicated-H coverage the default path already provides
-(reproduce-first Phase 4 finding: the added-IH monocycle class is fully covered;
+(reproduce-first a phase finding: the added-IH monocycle class is fully covered;
 these are regression guards) and the =O/=NH byte-identity.
 """
 import pytest

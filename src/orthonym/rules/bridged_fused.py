@@ -1,7 +1,7 @@
 """
-Bridged fused nomenclature (FR-8) - systems that are part fused and part bridged.
+Bridged fused nomenclature  - systems that are part fused and part bridged.
 
-Implements IUPAC 2013 P-25.7 rules for naming systems like 1,4-methanonaphthalene
+Implements IUPAC 2013 rules for naming systems like 1,4-methanonaphthalene
 where a fused core (naphthalene) has additional bridges across non-adjacent positions.
 
 Key concepts:
@@ -11,11 +11,11 @@ Key concepts:
 - Name format: [locants]-[bridge_prefix][fused_parent_name]
   e.g., "1,4-methanonaphthalene", "1,4:5,8-dimethanonaphthalene"
 
-Bridge prefixes (FR-8.3):
+Bridge prefixes (.3):
 - Carbon bridges: methano (1C), ethano (2C), propano (3C), butano (4C)
 - Heteroatom bridges: epoxy (O), epithio (S), epimino (NH), epidioxy (O-O)
 
-Reference: IUPAC 2013 Blue Book, P-25.7 (Bridged Fused Ring Systems)
+Reference: IUPAC 2013 Blue Book, (Bridged Fused Ring Systems)
 """
 
 from collections import defaultdict, deque
@@ -108,12 +108,12 @@ def detect_bridged_fused(mol) -> bool:
         True if molecule is a bridged fused system, False otherwise
 
     Examples:
-        >>> mol = Chem.MolFromSmiles("c1ccc2ccccc2c1")  # naphthalene
+        >>> mol = Chem.MolFromSmiles("c1ccc2ccccc2c1") # naphthalene
         >>> detect_bridged_fused(mol)
-        False  # pure fused, no bridges
-        >>> mol = Chem.MolFromSmiles("C1CC2CCC1C2")  # norbornane
+        False # pure fused, no bridges
+        >>> mol = Chem.MolFromSmiles("C1CC2CCC1C2") # norbornane
         >>> detect_bridged_fused(mol)
-        False  # pure bridged, no fused core
+        False # pure bridged, no fused core
     """
     if mol is None:
         return False
@@ -296,12 +296,12 @@ def _connected_via_set(mol, atom1: int, atom2: int, via_atoms: Set[int]) -> bool
 
 def identify_fused_core(mol) -> Optional[Dict[str, Any]]:
     """
-    Identify the maximal fused ring component (FR-8.2 algorithm).
+    Identify the maximal fused ring component (.2 algorithm).
 
     For a bridged fused system, the fused core is the largest set of
     rings that share edges (ortho-fused or ortho-peri-fused).
 
-    Maximization priority (FR-8.2):
+    Maximization priority (.2):
     1. Maximum number of fused rings
     2. Maximum number of skeletal atoms
 
@@ -317,7 +317,7 @@ def identify_fused_core(mol) -> Optional[Dict[str, Any]]:
         Or None if no fused core found
 
     Examples:
-        >>> mol = Chem.MolFromSmiles("c1ccc2ccccc2c1")  # naphthalene
+        >>> mol = Chem.MolFromSmiles("c1ccc2ccccc2c1") # naphthalene
         >>> core = identify_fused_core(mol)
         >>> len(core['core_atoms'])
         10
@@ -472,10 +472,10 @@ def identify_bridges(mol, fused_core_atoms: Set[int]) -> List[Dict[str, Any]]:
         - 'heteroatom': Heteroatom type if not all carbon
 
     Examples:
-        >>> mol = Chem.MolFromSmiles("c1ccc2ccccc2c1")  # naphthalene
+        >>> mol = Chem.MolFromSmiles("c1ccc2ccccc2c1") # naphthalene
         >>> bridges = identify_bridges(mol, set(range(10)))
         >>> len(bridges)
-        0  # No bridges in pure naphthalene
+        0 # No bridges in pure naphthalene
     """
     if mol is None or not fused_core_atoms:
         return []
@@ -618,7 +618,7 @@ def name_bridged_fused_system(mol):
     """
     Generate the IUPAC name for a bridged fused system.
 
-    Name format (FR-8): [locants]-[bridge_prefix][fused_parent_name]
+    Name format : [locants]-[bridge_prefix][fused_parent_name]
     Examples:
     - 1,4-methanonaphthalene
     - 1,4:5,8-dimethanonaphthalene
@@ -635,9 +635,9 @@ def name_bridged_fused_system(mol):
         discover substituents), or None if not a bridged fused system.
 
     Examples:
-        >>> mol = Chem.MolFromSmiles("c1ccc2ccccc2c1")  # naphthalene
+        >>> mol = Chem.MolFromSmiles("c1ccc2ccccc2c1") # naphthalene
         >>> name_bridged_fused_system(mol)
-        None  # Not bridged fused
+        None # Not bridged fused
     """
     if mol is None:
         return None
@@ -739,10 +739,10 @@ def is_bridged_fused(mol) -> bool:
 
 
 # ============================================================================
-# Bridged-fused PIN constructor (v22 Phase G1, DD7 COV-01)
+# Bridged-fused PIN constructor (Phase G1, DD7)
 # ============================================================================
 #
-# A bridged fused ring system (P-25.4.1.1) = a recognised fused parent (the
+# A bridged fused ring system = a recognised fused parent (the
 # "main ring system", e.g. naphthalene) + one or more bridges across it.
 # The G0 fail-closed safety (DD7 S1) currently refuses these (von Baeyer would
 # drop the benzo aromaticity). This constructor names the dominant, well-defined
@@ -750,26 +750,26 @@ def is_bridged_fused(mol) -> bool:
 # outside it, so we never emit a wrong bridged-fused name.
 #
 # Handled class (this phase):
-#   * a SINGLE divalent bridge (1-2 skeletal atoms; C or a single O/S/NH),
-#   * across a NAPHTHALENE residual (10 C, two ortho-fused 6-rings, one benzo),
-#   * with the parent ring system carrying NO substituents (bare ring systems).
+# * a SINGLE divalent bridge (1-2 skeletal atoms; C or a single O/S/NH),
+# * across a NAPHTHALENE residual (10 C, two ortho-fused 6-rings, one benzo),
+# * with the parent ring system carrying NO substituents (bare ring systems).
 # Anything else (anthracene+ residual, multi-bridge, polyvalent/composite/cyclic
 # bridge, substituted, heteroaromatic parent) -> None -> G0 fail-closed (G1b/G2+).
 
 
 def name_bridged_fused_pin(mol):
-    """Name a bridged-fused ring system by the P-25.4 cascade (DD7 COV-01).
+    """Name a bridged-fused ring system by the cascade (DD7).
 
     Returns the standard complex-ring tuple ``(name, ring_atoms, atom_to_locant,
     substituents_included)`` for the handled class, else ``None`` (the caller then
     falls through to G0 fail-closed). The name is assembled as:
     bridge + hydro prefixes cited TOGETHER in alphanumerical order, ignoring
     multiplying prefixes ('epoxy' < 'ethano' < 'hydro' < 'methano'), each with its
-    own locant set, then the parent (Blue Book P-25.4.3.4 / P-31.1.4.3.4):
+    own locant set, then the parent (Blue Book /:
     '1,4-dihydro-1,4-methanonaphthalene', '1,4-epoxy-1,4-dihydronaphthalene',
     '1,4-ethano-1,2,3,4-tetrahydronaphthalene'.
 
-    SECONDARY BRIDGES (P-23.2.6.2.3/.2.4/.2.5) are NOT handled here: a dependent
+    SECONDARY BRIDGES /.2.4/.2.5) are NOT handled here: a dependent
     secondary bridge (a bridge whose termini are themselves bridge atoms,
     numbered with superscript locants like ``0^2,7``) is von Baeyer territory
     (``tetracyclo[...0^2,7]...``), owned by ``polycyclic_von_baeyer.py``. Such a
@@ -784,7 +784,7 @@ def name_bridged_fused_pin(mol):
     ri = mol.GetRingInfo()
     rings = [set(r) for r in ri.AtomRings()]
     # Need fused parent (>=2 rings) + at least one extra ring created by a bridge.
-    # P-51.3.2.1: a multiplicative-parent-enumeration structure (e.g. biphenyl =
+    #: a multiplicative-parent-enumeration structure (e.g. biphenyl =
     # two rings joined by a single bond) is owned by multiplicative.py, NOT this
     # constructor; the <3-ring guard here (plus the clean-partition / bare-ring
     # guards below) declines it so a bridged name never hijacks a multiplicative
@@ -839,7 +839,7 @@ def name_bridged_fused_pin(mol):
     if results:
         return None  # ambiguous (>1 distinct) name — fail closed
 
-    # Wave-2 completion (P-25.4.3.4.1): the MANCUDE bridged classes — the
+    # Wave-2 completion: the MANCUDE bridged classes — the
     # residual keeps its full aromatic system and the bridgeheads stay sp2
     # (0 H, part of a ring double bond), so there is NO hydro prefix:
     # 1,4-epoxynaphthalene / 1,4-ethanonaphthalene / 9,10-ethanoanthracene /
@@ -850,7 +850,7 @@ def name_bridged_fused_pin(mol):
 
 
 def _name_bridged_fused_excision(mol, bridge_atoms: Set[int], residual, all_ring_atoms: Set[int]):
-    """Build the P-25.4 name for one (bridge, residual) excision — naphthalene,
+    """Build the name for one (bridge, residual) excision — naphthalene,
     anthracene, or acridine residual — or None if the excision is not an
     in-scope, correctly-nameable bridged-fused system. Every guard here is a
     no-wrong-name guard: a None return cascades to G0 fail-closed."""
@@ -863,7 +863,7 @@ def _name_bridged_fused_excision(mol, bridge_atoms: Set[int], residual, all_ring
         for nb in mol.GetAtomWithIdx(b).GetNeighbors():
             if nb.GetIdx() not in bridge_atoms:
                 bridgeheads.add(nb.GetIdx())
-    # P-25.4.1.7/.2.2.1/.2.2.2 fail-closed backstop: a POLYVALENT (tripodal,
+    # /.2.2.1/.2.2.2 fail-closed backstop: a POLYVALENT (tripodal,
     # 3+-attachment) bridge has >2 bridgeheads and no OPSIN-2.9-parseable oracle
     # (metheno==methano for the monocyclic case; [1,1,2]triyl forms unparseable).
     # Declining here guarantees a divalent bridge name is never emitted for a
@@ -873,7 +873,7 @@ def _name_bridged_fused_excision(mol, bridge_atoms: Set[int], residual, all_ring
     if any(bh not in orig_to_res for bh in bridgeheads):
         return None
 
-    # A P-25.4 bridge spans NON-adjacent atoms whose attachment positions are
+    # A bridge spans NON-adjacent atoms whose attachment positions are
     # SATURATED. If the two bridgeheads are directly bonded, or either remains
     # aromatic, this is an ORTHO-FUSED ring (fusion nomenclature, e.g.
     # cyclopropa[b]naphthalene), NOT a bridge — fail closed (a 2,3-methano "bridge"
@@ -884,14 +884,14 @@ def _name_bridged_fused_excision(mol, bridge_atoms: Set[int], residual, all_ring
     if any(mol.GetAtomWithIdx(b).GetIsAromatic() for b in bridgeheads):
         return None
 
-    # P-25.4.2.1.2/.1.3 CYCLIC (ring) bridge guard. A ring bridge (the bridge
+    # /.1.3 CYCLIC (ring) bridge guard. A ring bridge (the bridge
     # atoms close a ring with the two bridgeheads: [1,2]benzeno, [1,2]epicyclopenta)
     # has its own free-valence-bracket grammar and OPSIN 2.9 cannot round-trip the
     # BB PIN (9,10-[1,2]benzenoanthracene) — an INTERNAL-ORACLE-only class. The
     # recognizer below identifies the two named ring bridges; the full residual +
     # bracket assembly is a documented follow-up, so we fail closed (return None)
     # rather than emit an unverifiable name for anything not already handled. A
-    # heterocyclic ring bridge (P-25.4.2.1.5) returns None here too (all-carbon
+    # heterocyclic ring bridge returns None here too (all-carbon
     # check), which is the correct fail-closed for its no-OPSIN-oracle class.
     if _cyclic_bridge_prefix(mol, bridge_atoms, bridgeheads) is not None:
         return None
@@ -899,14 +899,14 @@ def _name_bridged_fused_excision(mol, bridge_atoms: Set[int], residual, all_ring
     # Bridge composition: only an all-carbon bridge (methano/ethano/propano) or a
     # SINGLE-atom heteroatom bridge (epoxy/epithio/epimino) is named correctly here.
     # A multi-atom or multi-heteroatom bridge (epidioxy -O-O-, composite -CH2-O-,
-    # -CH2-O-CH2-) needs the composite-bridge grammar (P-25.4.1.5); get_bridge_prefix's
+    # -CH2-O-CH2-) needs the composite-bridge grammar; get_bridge_prefix's
     # length-blind heteroatom shortcut would otherwise silently DROP atoms — fail closed.
     elements = [mol.GetAtomWithIdx(b).GetSymbol() for b in bridge_atoms]
     n_hetero = sum(1 for e in elements if e != 'C')
     if n_hetero > 1 or (n_hetero == 1 and len(bridge_atoms) != 1):
         return None
 
-    # Bridge unsaturation (Wave-2 completion C, P-25.4.2.1.1): a single inner
+    # Bridge unsaturation (Wave-2 completion C,: a single inner
     # C=C in a 2-carbon all-C bridge is the 'etheno' bridge (9,10-dihydro-
     # 9,10-ethenoanthracene = dibenzobarrelene). Any bond from a bridge atom
     # to a BRIDGEHEAD must stay single, and any other unsaturation pattern
@@ -949,7 +949,7 @@ def _name_bridged_fused_excision(mol, bridge_atoms: Set[int], residual, all_ring
                if res_mol.GetAtomWithIdx(i).GetHybridization()
                == Chem.HybridizationType.SP3}
         if base_name == 'acridine':
-            # P-25.4.3.4.1: bridging N10 forbids the quinoid mancude form,
+            #: bridging N10 forbids the quinoid mancude form,
             # so the compound carries INDICATED hydrogen at C9, not hydro.
             # Exactly the C-bridgehead may be sp3; H counts are checked on
             # the ORIGINAL molecule (the residual's cut bridgeheads gain H).
@@ -998,11 +998,11 @@ def _name_bridged_fused_excision(mol, bridge_atoms: Set[int], residual, all_ring
     if not bridge_prefix:
         return None
 
-    # Assembly (P-31.1.4.2.4, Wave-2 completion C ordering fix): hydro
+    # Assembly, Wave-2 completion C ordering fix): hydro
     # prefixes sit between detachable and NONDETACHABLE prefixes; the bridge
     # prefix is nondetachable and abuts the parent — so hydro is cited
     # BEFORE the bridge in every BB example (1,4-dihydro-1,4-ethano-
-    # anthracene BB:14399, octahydro-9,10-ethanoanthracene BB:19964). The
+    # anthracene the Blue Book, octahydro-9,10-ethanoanthracene the Blue Book). The
     # old alphanumeric mixing emitted '1,4-ethano-1,2,3,4-tetrahydro-'
     # (BB-nonconformant; OPSIN accepts both, so RT never caught it).
     parts = []
@@ -1023,7 +1023,7 @@ def _name_bridged_fused_excision(mol, bridge_atoms: Set[int], residual, all_ring
 
 
 def _try_mancude_bridged(mol, all_ring_atoms: Set[int]):
-    """P-25.4.3.4.1 mancude bridged-fused constructor (Wave-2 completion).
+    """ mancude bridged-fused constructor (Wave-2 completion).
 
     Handles bare ring systems where excising every saturated (all-single-bond)
     ring atom leaves a fully AROMATIC naphthalene or anthracene residual and
@@ -1051,7 +1051,7 @@ def _try_mancude_bridged(mol, all_ring_atoms: Set[int]):
         return all(b.GetBondType() == Chem.BondType.SINGLE
                    for b in kek.GetAtomWithIdx(idx).GetBonds())
 
-    # P-25.4.2.1.1 (Wave-2 P5): an UNSATURATED acyclic bridge (-CH=CH-, etc.)
+    # (Wave-2 P5): an UNSATURATED acyclic bridge (-CH=CH-, etc.)
     # carries an internal C=C, so its atoms are not all-single and are invisible
     # to the saturated seed above. Grow bridge components on the kekulized copy
     # by absorbing double-bonded ring neighbours, then keep only components whose
@@ -1079,7 +1079,7 @@ def _try_mancude_bridged(mol, all_ring_atoms: Set[int]):
 
     # Discover bridge components. A SATURATED bridge is a connected component of
     # the all-single atoms (the fast, common path — 1,4-methano/ethano/epoxy).
-    # An UNSATURATED acyclic bridge (P-25.4.2.1.1: -CH=CH-, -CH=CH-CH=CH-) has
+    # An UNSATURATED acyclic bridge: -CH=CH-, -CH=CH-CH=CH-) has
     # NO all-single atom, so it is discovered by enumerating short connected
     # subsets of the ring atoms whose EXTERNAL bonds are all single (the exact
     # bridge attachment criterion — a parent aromatic edge like naphthalene's
@@ -1142,7 +1142,7 @@ def _validate_and_name_mancude(mol, components: List[Set[int]],
     """Shared validator/assembler for the mancude bridged path: given the bridge
     *components* (each a connected set of removed ring atoms), excise them, verify
     a clean naphthalene/anthracene residual, validate every bridge, and assemble
-    the P-25.4.3.4.1 name. Returns the complex-ring tuple or None (fail closed).
+    the name. Returns the complex-ring tuple or None (fail closed).
     """
     removed = set().union(*components)
     # Excise ALL bridges at once; the residual must be a clean fully-aromatic
@@ -1172,7 +1172,7 @@ def _validate_and_name_mancude(mol, components: List[Set[int]],
         # Mancude form: the bridgehead keeps its ring double bond -> 0 H.
         if any(mol.GetAtomWithIdx(b).GetTotalNumHs() != 0 for b in bh):
             return None
-        # P-25.4.2.1.1: classify saturated vs unsaturated-acyclic bridge. A
+        #: classify saturated vs unsaturated-acyclic bridge. A
         # component with an internal double bond (not all-single on the
         # kekulized copy) is an etheno/buta[1,3]dieno bridge; the length-keyed
         # 'ano' table would silently drop the double bond, so route it through
@@ -1187,10 +1187,10 @@ def _validate_and_name_mancude(mol, components: List[Set[int]],
             if prefix is None:
                 return None
         else:
-            # P-15.3.1.2.2.1 composite bridge (-O-CH2-, -CH2-O-CH2-): a
+            # composite bridge (-O-CH2-, -CH2-O-CH2-): a
             # multi-atom bridge with a heteroatom that the single-simple-bridge
             # composition guard would reject. Recognize it FIRST; composite
-            # prefixes are parenthesized (P-25.4.2.3.2).
+            # prefixes are parenthesized.
             comp_bridge = _composite_bridge_prefix(mol, comp, bridgeheads)
             if comp_bridge is not None:
                 prefix = f"({comp_bridge[0]})"
@@ -1217,7 +1217,7 @@ def _validate_and_name_mancude(mol, components: List[Set[int]],
 
     if len(entries) == 2:
         if base_name == 'naphthalene':
-            # P-25.4.5.x (Wave-2 P5): two (1,4)-type bridges on naphthalene's two
+            #.x (Wave-2 P5): two (1,4)-type bridges on naphthalene's two
             # distinct 6-rings -> 1,4:5,8-di<prefix>. Each bridge's bridgeheads
             # must lie in ONE naphthalene ring and the two bridges in DIFFERENT
             # rings; naphthalene's two rings are equivalent, so the first-cited
@@ -1246,9 +1246,9 @@ def _validate_and_name_mancude(mol, components: List[Set[int]],
             return None
         else:
             # Two bridges on DISTINCT anthracene terminal rings, each a (1,4)
-            # alpha,alpha or (1,3) alpha,beta pattern. P-25.4.4.1: assign the
+            # alpha,alpha or (1,3) alpha,beta pattern.: assign the
             # two ring windows (1-4 / 5-8) to MINIMISE the combined locant set;
-            # cite alphanumerically (P-25.4.3.2.2), heteroatom bridge senior.
+            # cite alphanumerically, heteroatom bridge senior.
             if any(loc not in ([1, 4], [1, 3]) for _, loc in entries):
                 return None
             # Each component's bridgeheads must belong to different terminal rings.
@@ -1281,7 +1281,7 @@ def _validate_and_name_mancude(mol, components: List[Set[int]],
 def has_aromatic_mancude_bridge(mol) -> bool:
     """True when a FULLY-AROMATIC-perceived ring system is actually a mancude
     bridged-fused hydrocarbon that ``name_bridged_fused_pin`` can name
-    (P-25.4.2.1.1 etheno/buta[1,3]dieno on naphthalene: RDKit's extended
+     etheno/buta[1,3]dieno on naphthalene: RDKit's extended
     aromaticity marks the -CH=CH- bridge aromatic, so the von-Baeyer gate's
     all-aromatic skip would otherwise strand it). Used only to EXEMPT this class
     from that skip; returns False for a plain fused PAH (no bridge) so the
@@ -1301,7 +1301,7 @@ def has_aromatic_mancude_bridge(mol) -> bool:
 
 def has_aromatic_chalcogen_bridge(mol) -> bool:
     """True when a divalent O/S ring atom is a genuine BRIDGE that RDKit's
-    extended aromaticity model hides (Wave-2 completion, P-25.4.3.3(a)):
+    extended aromaticity model hides (Wave-2 completion, (a)):
     its two neighbours share a ring that does NOT contain the chalcogen, at
     NON-ADJACENT positions of that ring (1,4-epoxynaphthalene). A fusion
     chalcogen (dibenzofuran O) shares only its own ring with its neighbours
@@ -1443,7 +1443,7 @@ def _mancude_bridge_locants(res_mol, bh_res: Set[int], base_name: str,
     naphthalene: both bridgeheads must be the alpha,alpha pair (1,4) of ONE
     ring — non-fusion, each adjacent to a fusion atom, not adjacent to each
     other. (1,3/2,3/peri patterns fail closed: fusion nomenclature or the
-    unbuilt P-25.4.3.3 locant cascade owns them.)
+    unbuilt locant cascade owns them.)
     anthracene: the meso pair -> [9, 10]; a terminal alpha,alpha pair ->
     [1, 4] (ring-local; the caller maps the second bridge to 5,8)."""
     if base_name == 'anthracene' and bh_res == ring_map['meso']:
@@ -1465,7 +1465,7 @@ def _mancude_bridge_locants(res_mol, bh_res: Set[int], base_name: str,
     # Number the four non-fusion atoms of the host ring 1..4 (endpoints adjacent
     # to a fusion atom = alpha = 1,4; the two interior = beta = 2,3). Choose the
     # direction giving the bridgeheads the lower locant pair. A 1,4 (alpha,alpha)
-    # bridge is the common case; a 1,3 (alpha,beta) bridge is P-25.4.4.1 too
+    # bridge is the common case; a 1,3 (alpha,beta) bridge is too
     # (5,8-epoxy-1,3-methanoanthracene). Peri/2,3 patterns still fail closed.
     endpoints = [a for a in non_fusion
                  if {n.GetIdx() for n in res_mol.GetAtomWithIdx(a).GetNeighbors()}
@@ -1518,7 +1518,7 @@ def _hydro_prefix(n_sp3: int) -> Optional[str]:
     return _HYDRO_PREFIXES.get(n_sp3)
 
 
-# Prefix table for acyclic unsaturated bridges (P-25.4.2.1.1). The double-bond
+# Prefix table for acyclic unsaturated bridges. The double-bond
 # locant is the bridge-INTERNAL numbering (prop[1]eno etc.), NOT the final
 # ring-system locant. Keyed on (n_carbons, tuple(sorted internal db positions)).
 _UNSATURATED_ACYCLIC_BRIDGE: Dict[Tuple[int, Tuple[int, ...]], str] = {
@@ -1555,10 +1555,10 @@ def _linear_bridge_order(mol, comp: Set[int], bridgeheads: Set[int]):
     return path if path[-1] in ends else None
 
 
-# Composite two/three-atom bridge sequences (P-15.3.1.2.2.1 + P-25.4.2.3.1).
+# Composite two/three-atom bridge sequences +.
 # Key = tuple of element symbols in atom order from one bridgehead to the other;
 # value = the concatenated prefix (senior simple bridge first, 'epi' elided when
-# not first). Heteroatom seniority O > S > Se > N (P-25.4.2.3.1).
+# not first). Heteroatom seniority O > S > Se > N.
 _COMPOSITE_BRIDGE_SEQUENCES: Dict[Tuple[str, ...], str] = {
     ('O', 'C'): 'epoxymethano',            # -O-CH2-
     ('C', 'O', 'C'): 'methanooxymethano',  # -CH2-O-CH2-
@@ -1566,7 +1566,7 @@ _COMPOSITE_BRIDGE_SEQUENCES: Dict[Tuple[str, ...], str] = {
 
 
 def _composite_bridge_prefix(mol, bridge_atoms: Set[int], bridgeheads: Set[int]):
-    """P-15.3.1.2.2.1/.2.2.4 + P-25.4.2.3.1: a composite (multi-simple-bridge)
+    """/.2.2.4 +: a composite (multi-simple-bridge)
     acyclic bridge. Order the bridge atoms into a chain between the two
     bridgeheads, look up the element sequence (tried both directions). Returns
     ('epoxymethano', sorted([bh_lo, bh_hi])) or None (fail closed). Only
@@ -1588,17 +1588,17 @@ def _composite_bridge_prefix(mol, bridge_atoms: Set[int], bridgeheads: Set[int])
     return (name, sorted(bridgeheads))
 
 
-# P-25.4.4.1(a): heteroatom bridges are senior (get low locants); within a tier
-# citation is alphanumerical by prefix name (P-25.4.3.2.2). Kept as the seniority
+# (a): heteroatom bridges are senior (get low locants); within a tier
+# citation is alphanumerical by prefix name. Kept as the seniority
 # key used by _order_two_bridges below.
 _HETEROATOM_BRIDGE_PREFIX_SET = frozenset({'epoxy', 'epithio', 'epimino',
                                            'epidioxy'})
 
 
 def _order_two_bridges(entries: List[Tuple[str, List[int]]]):
-    """P-25.4.4.1(a) + P-25.4.3.2.2: order two bridge (prefix, ring-local-locants)
+    """(a) +: order two bridge (prefix, ring-local-locants)
     entries for citation. Heteroatom bridges sort before carbon bridges; within a
-    tier, alphanumerically by prefix. Returns the ordered [(prefix, locants), ...]
+    tier, alphanumerically by prefix. Returns the ordered [(prefix, locants),...]
     list (the low-locant assignment is applied by _assemble_two_bridge_name)."""
     def key(e):
         het = 0 if e[0] in _HETEROATOM_BRIDGE_PREFIX_SET else 1
@@ -1609,7 +1609,7 @@ def _order_two_bridges(entries: List[Tuple[str, List[int]]]):
 def _assemble_two_bridge_name(ordered: List[Tuple[str, List[int]]], base_name: str):
     """Assemble a two-bridge name from the ORDERED entries (each locant pair is
     the ring-local (1,4)-type pattern). Identical bridges -> 1,4:5,8-di<prefix>
-    (P-25.4.3.2.1); different bridges -> 1,4-<a>-5,8-<b> in citation order."""
+    ; different bridges -> 1,4-<a>-5,8-<b> in citation order."""
     a, b = ordered[0], ordered[1]
     if a[0] == b[0]:
         return f"1,4:5,8-di{a[0]}{base_name}"
@@ -1617,7 +1617,7 @@ def _assemble_two_bridge_name(ordered: List[Tuple[str, List[int]]], base_name: s
 
 
 def _assemble_anthracene_two_bridge(entries: List[Tuple[str, List[int]]]):
-    """P-25.4.4.1/.3.2.2: two bridges on anthracene's two terminal rings, each a
+    """/.3.2.2: two bridges on anthracene's two terminal rings, each a
     ring-local (1,4) alpha,alpha or (1,3) alpha,beta pattern. Assign the two ring
     windows (1-4 / 5-8) to MINIMISE the combined locant set (first point of
     difference); on a tie, the heteroatom bridge takes the low window. Cite the
@@ -1641,11 +1641,11 @@ def _assemble_anthracene_two_bridge(entries: List[Tuple[str, List[int]]]):
         return (f"{_format_locants(pair_lo)}:{_format_locants(pair_hi)}"
                 f"-di{pa}")
 
-    # cite alphanumerically, heteroatom bridge senior (P-25.4.3.2.2).
+    # cite alphanumerically, heteroatom bridge senior.
     senior_pfx = _order_two_bridges(entries)[0][0]
 
     def combined(opt):
-        # P-25.4.4.1 minimise combined locant set; TIE-BREAK: the senior
+        # minimise combined locant set; TIE-BREAK: the senior
         # (alphanumerically-first / heteroatom) bridge takes the LOW window.
         return (tuple(sorted(opt[pa] + opt[pb])),
                 tuple(sorted(opt[senior_pfx])))
@@ -1657,11 +1657,11 @@ def _assemble_anthracene_two_bridge(entries: List[Tuple[str, List[int]]]):
 
 
 def _cyclic_bridge_prefix(mol, bridge_atoms: Set[int], bridgeheads: Set[int]):
-    """P-25.4.2.1.2/.1.3 divalent monocyclic hydrocarbon bridge prefix.
+    """/.1.3 divalent monocyclic hydrocarbon bridge prefix.
     A ring bridge is the bridge atoms forming, WITH the two bridgeheads, a single
     ring. Return '[1,2]benzeno' for a benzene ring bridge, '[1,2]epicyclopenta'
     for a cyclopentane ring bridge, else None (fail closed). All-carbon only — a
-    heteroatom ring bridge (P-25.4.2.1.5 furano/epipyrrolo) returns None (no
+    heteroatom ring bridge furano/epipyrrolo) returns None (no
     OPSIN 2.9 oracle for that class)."""
     if any(mol.GetAtomWithIdx(a).GetSymbol() != 'C' for a in bridge_atoms):
         return None
@@ -1680,9 +1680,9 @@ def _cyclic_bridge_prefix(mol, bridge_atoms: Set[int], bridgeheads: Set[int]):
 
 
 def _unsaturated_bridge_prefix(mol, comp: Set[int], bridgeheads: Set[int]):
-    """P-25.4.2.1.1 prefix for an all-carbon acyclic bridge that carries one or
+    """ prefix for an all-carbon acyclic bridge that carries one or
     more internal C=C. Returns None (fail closed) for any hetero, branched,
-    cumulated, triple-bond (P-31.1.4.3), or non-tabulated pattern — the
+    cumulated, triple-bond, or non-tabulated pattern — the
     length-keyed 'ano' table would otherwise mis-name it. Bonds from a bridge
     atom to a bridgehead MUST be single (a double bond to the aromatic ring is
     fusion, not a bridge)."""
@@ -1694,7 +1694,7 @@ def _unsaturated_bridge_prefix(mol, comp: Set[int], bridgeheads: Set[int]):
     chain = _linear_bridge_order(mol, comp, bridgeheads)
     if chain is None:
         return None
-    # P-31.1.4.3: a triple bond anywhere in the bridge has no verified
+    #: a triple bond anywhere in the bridge has no verified
     # bridged-fused oracle — decline rather than mis-name it 'ano'/'eno'.
     for a in atoms:
         for bond in mol.GetAtomWithIdx(a).GetBonds():
@@ -1832,7 +1832,7 @@ def _excise_to_naphthalene_residual(mol, bridge_atoms: Set[int], all_ring_atoms:
 def _number_naphthalene_bridged_ring(res_mol, bridgeheads_res: Set[int]) -> Optional[Dict[int, int]]:
     """Number the bridged (non-benzo) ring of a naphthalene residual 1..4 around
     its four non-fusion atoms, choosing the direction that gives the bridgeheads
-    the lowest locant set (P-25.4.4). Returns ``{res_idx: locant}`` for those four
+    the lowest locant set. Returns ``{res_idx: locant}`` for those four
     atoms, or None if the bridge is not across a numberable position pair.
     """
     ri = res_mol.GetRingInfo()
@@ -1904,12 +1904,12 @@ def get_bridged_fused_info(mol) -> Optional[Dict[str, Any]]:
     Returns:
         Dict with all bridged fused information, or None if not applicable:
         - 'is_bridged_fused': True
-        - 'core': Result from identify_fused_core()
-        - 'bridges': Result from identify_bridges()
+        - 'core': Result from identify_fused_core
+        - 'bridges': Result from identify_bridges
         - 'name': Generated IUPAC name
 
     Examples:
-        >>> mol = Chem.MolFromSmiles("...")  # bridged fused system
+        >>> mol = Chem.MolFromSmiles("...") # bridged fused system
         >>> info = get_bridged_fused_info(mol)
         >>> info['is_bridged_fused']
         True

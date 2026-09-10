@@ -1,7 +1,7 @@
-"""§P-14.3.4 where the locant was BAKED INTO THE PREFIX TEXT before any licence ran.
+"""§ where the locant was BAKED INTO THE PREFIX TEXT before any licence ran.
 
  Phase C Task 3b. Five defects, one shared root cause: a producer that renders
-``{locants}-{prefix}`` into a string, so the P-14.3.4 licence downstream has nothing
+``{locants}-{prefix}`` into a string, so the licence downstream has nothing
 left to withhold. Measured at HEAD `` with a trace validated on two known
 positives (``chloropropanedioic acid``, ``chlorobutanedioic acid`` -> licence True)
 and a known negative (``ethanol`` -> zero calls at every site):
@@ -41,9 +41,9 @@ Blue Book evidence, all verified by line:
 * ``:29834`` ``2,3-dihydroxybutanedioic acid (PIN)`` -- the DIsubstituted control:
   L3 requires monosubstitution, so this row must keep both locants.
 * ``:16408`` ``diphenylmethyl (preferred prefix) (not benzhydryl)`` + ``:55912``
-  (``(C6H5)2CH-``, P-29.6.3) -- defect D. A ``methyl`` substituent group with 2 of
-  its 3 substitutable hydrogens replaced is PARTIAL substitution, so P-14.3.4.5 does
-  not apply; the locant-free preferred prefix is licensed by **P-14.3.4.6**
+  (``(C6H5)2CH-``, -- defect D. A ``methyl`` substituent group with 2 of
+  its 3 substitutable hydrogens replaced is PARTIAL substitution, so does
+  not apply; the locant-free preferred prefix is licensed by ****
   (``:3031``) because all three hydrogens share locant 1. ⇒ The brief's claim that
   ``:3009`` REQUIRES a locant here is refuted by the Blue Book's own preferred prefix.
 * ``:5098`` ``1,1-dimethoxypropane (PIN)`` vs ``:35344``
@@ -174,8 +174,8 @@ def test_defect_b_ring_prefix_locant_omitted(namer, smiles, expected):
     "smiles,expected",
     [
         # ★ A PRINTED BLUE BOOK PIN the brief did not mention, found by the targeted
-        # blast-radius sweep: the Blue Book's P-13.1 table row is
-        # `| 7 | oxirane (PIN) | substitutive | phenyloxirane (PIN) | P-13.1 |`
+        # blast-radius sweep: the Blue Book's table row is
+        # `| 7 | oxirane (PIN) | substitutive | phenyloxirane (PIN) | |`
         # -- a MONOsubstituted oxirane with the locant omitted. HEAD emitted
         # `2-phenyloxirane`, so defect B's fix corrects a row against the Blue Book's
         # own PIN. Oxirane's two ring CH2 are one orbit.
@@ -240,7 +240,7 @@ def test_defect_c_polyfunctional_prefix_locant_omitted(namer, smiles, expected):
         ("OC(=O)C(O)C(O)C(=O)O", "2,3-dihydroxybutanedioic acid"),
         # A monoacid parent: C2 and C3 are different orbits.
         ("OC(=O)C(O)C", "2-hydroxypropanoic acid"),
-        # The retained acetic-acid path (P-14.3.4.6) must be untouched.
+        # The retained acetic-acid path must be untouched.
         ("OCC(=O)O", "hydroxyacetic acid"),
         ("N#CCC(=O)O", "cyanoacetic acid"),
         ("SCC(=O)O", "sulfanylacetic acid"),
@@ -264,7 +264,7 @@ def test_defect_c_guards(namer, smiles, expected):
         ("COC(OC)C1CCCCC1", "(dimethoxymethyl)cyclohexane"),
         ("COC(OC)(OC)c1ccccc1", "(trimethoxymethyl)benzene"),
         # E, the other side of the boundary: the UNCONTRACTED `methylsulfanyl` is a
-        # substituted prefix and keeps `bis(...)` per:35344 / P-16.3.5(a). At HEAD
+        # substituted prefix and keeps `bis(...)` per:35344 / (a). At HEAD
         # this emitted `bis((methylsulfanyl))methylbenzene` -- double-enclosed, and
         # rejected by the OPSIN grammar check. ⚠ The MISSING OUTER MARKS
         # (`[bis(methylsulfanyl)methyl]benzene` would be right) are a separate,
@@ -281,10 +281,10 @@ def test_defect_e_multiplier_and_enclosure(namer, smiles, expected):
 @pytest.mark.parametrize(
     "smiles,expected",
     [
-        # A ONE-carbon backbone omits (P-14.3.4.6, all H at locant 1).
+        # A ONE-carbon backbone omits, all H at locant 1).
         ("COCc1ccccc1", "(methoxymethyl)benzene"),
         # A TWO-carbon backbone CITES: `*CC` has substitutable H at locants 1 and 2,
-        # so P-14.3.4.6 does not fire and P-14.3.4.5 is partial.
+        # so does not fire and is partial.
         ("COCCc1ccccc1", "(2-methoxyethyl)benzene"),
         ("COCC1CCCCC1", "(methoxymethyl)cyclohexane"),
     ],
@@ -295,7 +295,7 @@ def test_defect_d_backbone_length_boundary(namer, smiles, expected):
 
 def test_defect_d_licence_is_the_predicate_not_the_backbone_length():
     """The replaced condition was ``len(backbone) > 1``. The licence that actually
-    licenses the one-carbon case is P-14.3.4.6 measured on the substituent's PARENT
+    licenses the one-carbon case is measured on the substituent's PARENT
     HYDRIDE, and it must AGREE with the old answer on both lengths -- that agreement
     is the evidence the old condition was right for the wrong reason, and the reason
     it may be replaced without moving a name."""
@@ -327,13 +327,13 @@ def test_defect_d_licence_is_the_predicate_not_the_backbone_length():
         ("OC(=O)CC(C)C(=O)O", "methylbutanedioic acid"),
         # The guard: agreement must hold while the locant is KEPT.
         ("OC(=O)CCC(C)C(=O)O", "2-methylpentanedioic acid"),
-        # The P-14.3.4.5 sibling, which has applied its licence to the fragments
+        # The sibling, which has applied its licence to the fragments
         # since Task 5b and therefore already agreed at HEAD.
         ("OC(=O)C(F)(F)C(F)(F)F", "pentafluoropropanoic acid"),
     ],
 )
 def test_licensed_rows_keep_their_structured_tree(smiles, expected_name):
-    """The P-14.3.4.3 licence must reach the NAME TREE, not just the legacy string.
+    """The licence must reach the NAME TREE, not just the legacy string.
 
     ``general_acyclic`` is the sole member of ``SERIALIZER_PRODUCTION_CLASSES``, so the
     name-tree serializer IS its production composition site. The licence used to be
@@ -405,7 +405,7 @@ def test_fragment_boundary_observation_reads_the_visited_set():
 def test_every_site_consults_the_fragment_boundary_observation(
     namer, monkeypatch, smiles, licensed, cited,
 ):
-    """P-14.3.4 licences that empty a scope of ALL its locants must consult THREE
+    """ licences that empty a scope of ALL its locants must consult THREE
     things, and a licence consulting two of three is broken on the third's whole class
     (`internal notes`).
     The other two are ambient ContextVars checked inside ``locant_omission``; this one
@@ -455,7 +455,7 @@ def test_no_private_multiplier_table_in_the_ether_chain_producer():
 
 
 def test_assemble_fragments_has_no_print_time_locant_flag():
-    """The P-14.3.4.3 licence must not be re-introduced as a print-time parameter of
+    """The licence must not be re-introduced as a print-time parameter of
     ``_assemble_fragments``: that renderer is only ONE of the two reading the fragment
     list, so a flag there cannot reach the name-tree serializer."""
     import inspect

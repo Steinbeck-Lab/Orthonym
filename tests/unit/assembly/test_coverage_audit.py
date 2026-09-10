@@ -1,12 +1,12 @@
 # tests/unit/assembly/test_coverage_audit.py
-"""v33 Phase 0 Task L0.1/L0.2: producer-agnostic coverage AUDIT (SHADOW).
+""" a phase Task L0.1/L0.2: producer-agnostic coverage AUDIT (SHADOW).
 
 Two carrier-specific proofs feed ONE CoverageVerdict:
-  * GeneralEngineResult (has .bindings) -> certify_general_result (E1 + spine).
-  * bare str (PIN handlers) -> the SELF-01 verdict already computed at
+  * GeneralEngineResult (has.bindings) -> certify_general_result (E1 + spine).
+  * bare str (PIN handlers) -> the verdict already computed at
     `_final_opsin_validity_gate` (CARRIED RULING, see task-L0-brief.md), falling
     back to a fresh OPSIN re-anchor (validate_atom_coverage) only when no
-    SELF-01 result is available for this name.
+     result is available for this name.
 """
 import pytest
 from rdkit import Chem
@@ -60,7 +60,7 @@ class TestBareStrReanchorPath:
 
 
 class TestBareStrSelf01Reuse:
-    """CARRIED RULING: when a SELF-01 verdict is supplied, use it and do NOT
+    """CARRIED RULING: when a verdict is supplied, use it and do NOT
     call OPSIN a second time (no `validate_atom_coverage` fallback)."""
 
     def test_self01_complete_true_is_used_verbatim(self):
@@ -76,7 +76,7 @@ class TestBareStrSelf01Reuse:
 
 
 class TestBareStrSkipReanchor:
-    """v33 Phase 0 L0 fix (review C1): some resolved gate outcomes make a
+    """ a phase L0 fix (review C1): some resolved gate outcomes make a
     fresh OPSIN re-anchor GUARANTEED useless (a carve-out PIN is
     OPSIN-unparseable BY DESIGN; gate disabled/unavailable/not-run all mean no
     real gate decision exists to reuse). `skip_reanchor=True` must produce the

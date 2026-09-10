@@ -1,7 +1,7 @@
 """
-Unit tests for the OPSIN format validator (FMT-01).
+Unit tests for the OPSIN format validator .
 
-Tests that validate_name_format() correctly detects known
+Tests that validate_name_format correctly detects known
 OPSIN-incompatible patterns and passes valid names.
 """
 
@@ -11,7 +11,7 @@ from orthonym.validation.format_validator import validate_name_format
 
 
 class TestValidateNameFormat:
-    """Core format validation tests (FMT-01)."""
+    """Core format validation tests ."""
 
     def test_simple_valid_name(self):
         """Simple single-word name should pass."""
@@ -76,7 +76,7 @@ class TestValidateNameFormat:
         assert "empty" in msg
 
     def test_empty_parentheses(self):
-        """Name with empty () should fail."""
+        """Name with empty  should fail."""
         ok, msg = validate_name_format("methyl()ethane")
         assert ok is False
         assert "empty_parentheses" in msg
@@ -131,7 +131,7 @@ class TestValidateNameFormat:
 
 
 class TestMultiWordValidation:
-    """Tests for multi-word name validation (FMT-05)."""
+    """Tests for multi-word name validation ."""
 
     def test_ester_pattern(self):
         """Ester multi-word: 'methyl propanoate' should pass."""
@@ -192,7 +192,7 @@ class TestMultiWordValidation:
 
 
 class TestBracketNesting:
-    """Tests for bracket nesting hierarchy (FMT-04)."""
+    """Tests for bracket nesting hierarchy ."""
 
     def test_simple_parens(self):
         """Simple parentheses should pass."""

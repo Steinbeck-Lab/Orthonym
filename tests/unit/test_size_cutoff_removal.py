@@ -1,4 +1,4 @@
-"""Size-cutoff band-aid removal gate — Phase 169.6 Plan 04 (Task 3).
+"""Size-cutoff band-aid removal gate — a phase Plan 04 (Task 3).
 
 The three size-cutoff band-aids DROP the charge on a large ion / zwitterion and
 reclassify it ``neutral`` (perception/ions.py:130-135 >10 HA single charge;
@@ -31,8 +31,8 @@ from orthonym.perception.ions import detect_species_type
 
 # ---------------------------------------------------------------------------
 # 1. LARGE NEUTRAL negative-test set (MUST be byte-identical after removal).
-#    Each has > 10 HA (and one > 20 HA), no formal charge. The cutoffs never
-#    fired on these (they require has_any_charge), so removal cannot change them.
+# Each has > 10 HA (and one > 20 HA), no formal charge. The cutoffs never
+# fired on these (they require has_any_charge), so removal cannot change them.
 # ---------------------------------------------------------------------------
 LARGE_NEUTRALS = {
     # (smiles, expected_name)
@@ -52,15 +52,15 @@ class TestLargeNeutralByteIdentical:
     @pytest.mark.parametrize("label", list(LARGE_NEUTRALS.keys()))
     def test_large_neutral_unchanged(self, label):
         smiles, expected = LARGE_NEUTRALS[label]
-        # It is a neutral species ...
+        # It is a neutral species...
         assert detect_species_type(Chem.MolFromSmiles(smiles)) == "neutral"
-        # ... and its name is the recorded fixture (byte-identical pre/post).
+        #... and its name is the recorded fixture (byte-identical pre/post).
         assert name_compound(smiles) == expected
 
 
 # ---------------------------------------------------------------------------
 # 2. CUTOFF CASUALTIES — large ions/zwitterions whose charge was DROPPED by the
-#    cutoff and is now preserved (charge survives, routed through route_charged).
+# cutoff and is now preserved (charge survives, routed through route_charged).
 # ---------------------------------------------------------------------------
 @pytest.mark.unit
 class TestCutoffCasualtiesNowCharged:
@@ -84,7 +84,7 @@ class TestCutoffCasualtiesNowCharged:
     def test_large_anion_above_25ha_routes(self):
         """>25 HA single anion: cutoff-3 (_is_anion_small <=25 HA) excluded it
         from the anion handler. After removal it routes through route_charged
-        and keeps its charge (a long-chain carboxylate -> ...oate)."""
+        and keeps its charge (a long-chain carboxylate ->...oate)."""
         # Triacontanoate: 30-carbon carboxylate (30 HA O2 = 32 HA) > 25.
         smi = "CCCCCCCCCCCCCCCCCCCCCCCCCCCCC C(=O)[O-]".replace(" ", "")
         st = detect_species_type(Chem.MolFromSmiles(smi))

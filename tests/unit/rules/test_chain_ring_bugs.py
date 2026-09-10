@@ -146,7 +146,7 @@ class TestAminoAcidRingAtomLeakage:
         )
 
     def test_tyrosine_has_phenyl_or_hydroxyphenyl(self):
-        """WSD-07 (Phase 175): free L-tyrosine resolves to its retained PIN
+        """-07 (a phase): free L-tyrosine resolves to its retained PIN
         'tyrosine' (OPSIN-round-trip-verified), so no ring atoms can leak into a
         chain name (the original leakage concern is moot for the retained form).
         Was the systematic '...(4-hydroxyphenyl)propanoic acid'."""

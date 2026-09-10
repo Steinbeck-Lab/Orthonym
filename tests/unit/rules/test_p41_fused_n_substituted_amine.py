@@ -1,19 +1,19 @@
-"""An N-substituted amine on a fused parent takes the ``-amine`` SUFFIX (P-41).
+"""An N-substituted amine on a fused parent takes the ``-amine`` SUFFIX.
 
 `rules/fused_rings.py`'s substituent collector routed only the BARE ``amino`` to
 the amine suffix. Every N-substituted amine fell through to the generic
 ``functional`` branch and was cited as a PREFIX on the parent hydride, so the
 senior characteristic group got no suffix at all::
 
-    CNc1ccc2ccccc2n1   ->  2-(methylamino)quinoline      (no suffix; non-PIN)
-                       =>  N-methylquinolin-2-amine
+    CNc1ccc2ccccc2n1 -> 2-(methylamino)quinoline (no suffix; non-PIN)
+                       => N-methylquinolin-2-amine
 
 WHY THE PREFIX FORM IS NOT AVAILABLE HERE
 -----------------------------------------
-``anilino`` and ``alkylamino`` ARE preferred prefixes -- ``BlueBookV2.md:6371``
+``anilino`` and ``alkylamino`` ARE preferred prefixes -- ``the Blue Book``
 prints ``4-[(4-hydroxyanilino)methyl]phenol (PIN)``. But that parent bears a
 PHENOL, which outranks the amine, so the amine is correctly demoted. With no
-senior characteristic group present the amine IS the principal one and P-41
+senior characteristic group present the amine IS the principal one and
 requires it as the suffix. The shape is ``:21610``'s
 ``4-methoxy-*N*-phenylaniline (PIN)``.
 
@@ -84,7 +84,7 @@ class TestTheGuardsHold:
     """The detector must decline anything that is not a plain amine nitrogen."""
 
     def test_amide_nitrogen_is_not_an_amine(self):
-        """An acyl branch makes this an AMIDE (P-66.1), which is senior to and
+        """An acyl branch makes this an AMIDE, which is senior to and
         different from an amine; naming it `N-...-amine` would be wrong. The
         emitted name must therefore NOT be an amine suffix on the ring."""
         name = name_compound("CC(=O)Nc1ccc2ccccc2n1")

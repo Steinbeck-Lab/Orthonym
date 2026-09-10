@@ -1,4 +1,4 @@
-"""Integration tests for Phase 89: Ring System Recognition Expansion.
+"""Integration tests for a phase: Ring System Recognition Expansion.
 
 Verifies that dictionary additions from Plan 89-01 prevent VB polycyclic
 over-application. Tests the full naming pipeline end-to-end: new ring system
@@ -71,14 +71,14 @@ class TestFusedHeterocycleNaming:
         assert not _has_vb_notation(name)
 
     def test_acridone(self):
-        # v23 cyclic-oxo engine: PIN is acridin-9(10H)-one (acridine is the retained
-        # PIN ring parent; P-64.2.2.2.2 added-IH ketone). 'acridone' is a non-PIN trivial.
+        # cyclic-oxo engine: PIN is acridin-9(10H)-one (acridine is the retained
+        # PIN ring parent; added-IH ketone). 'acridone' is a non-PIN trivial.
         name = name_compound("O=c1c2ccccc2[nH]c2ccccc12")
         assert name == "acridin-9(10H)-one", f"Got {name}"
         assert not _has_vb_notation(name)
 
     def test_4h_quinolizine(self):
-        # Fixed SMILES (Phase 101): was C1=CC2=CCC=CN2C=C1
+        # Fixed SMILES (a phase): was C1=CC2=CCC=CN2C=C1
         smi = _canonical("C1=CCN2C=CC=CC2=C1")
         name = name_compound(smi)
         assert "quinolizin" in name.lower()
@@ -95,7 +95,7 @@ class TestFusedHeterocycleNaming:
 
     def test_substituted_phenanthridine(self):
         """6-chlorophenanthridine should get substituent + retained name."""
-        # Fixed: use correct phenanthridine SMILES (Phase 101)
+        # Fixed: use correct phenanthridine SMILES (a phase)
         smi = "Clc1nc2ccccc2c2ccccc12"
         name = name_compound(smi)
         lower = name.lower()
@@ -126,15 +126,15 @@ class TestFlavonoidNaming:
         assert not _has_vb_notation(name)
 
     def test_chromanone(self):
-        # v23 IH-01h: PIN is 2,3-dihydro-4H-1-benzopyran-4-one (cyclic-oxo engine;
-        # the 4-one substitutes the 4H >CH2, P-64.2.2.2.2). 'chromanone' is non-PIN.
+        #: PIN is 2,3-dihydro-4H-1-benzopyran-4-one (cyclic-oxo engine;
+        # the 4-one substitutes the 4H >CH2,. 'chromanone' is non-PIN.
         name = name_compound("O=C1CCOc2ccccc21")
         assert name == "2,3-dihydro-4H-1-benzopyran-4-one", f"Got {name}"
         assert not _has_vb_notation(name)
 
     def test_chromone(self):
-        # v23 IH-01f: PIN is 4H-1-benzopyran-4-one (1-benzopyran is the PIN ring parent
-        # per P-19(d); P-64.2.2.2.2 ketone = substitution of the 4H >CH2).
+        #: PIN is 4H-1-benzopyran-4-one (1-benzopyran is the PIN ring parent
+        # per (d); ketone = substitution of the 4H >CH2).
         name = name_compound("O=c1ccoc2ccccc12")
         assert name == "4H-1-benzopyran-4-one", f"Got {name}"
         assert not _has_vb_notation(name)
@@ -169,7 +169,7 @@ class TestOPSINRoundTrip:
     """Validate OPSIN can parse all new retained names."""
 
     COMPOUNDS = [
-        ("c1ccc2c(c1)cnc1ccccc12", "phenanthridine"),  # Fixed SMILES (Phase 101)
+        ("c1ccc2c(c1)cnc1ccccc12", "phenanthridine"),  # Fixed SMILES (a phase)
         ("c1ccc2c(c1)[nH]c1cnccc12", "beta-carboline"),
         ("O=c1c2ccccc2[nH]c2ccccc12", "acridone"),
         ("O=c1cc(-c2ccccc2)oc2ccccc12", "flavone"),

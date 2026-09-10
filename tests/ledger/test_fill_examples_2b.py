@@ -52,10 +52,10 @@ class TestMechanismA:
 
     def test_exact_match_preferred_over_base_ref(self):
         """
-        Given two source rows that share the same base_ref (P-44.2):
-          - 'P-44.2 (criterion a)' has NO SMILES
-          - 'P-44.2 (criterion b)' HAS a SMILES and an expected
-        The ledger row for 'P-44.2 (criterion b)' should recover the SMILES
+        Given two source rows that share the same base_ref:
+          - ' (criterion a)' has NO SMILES
+          - ' (criterion b)' HAS a SMILES and an expected
+        The ledger row for ' (criterion b)' should recover the SMILES
         via the exact match path, not be blocked by the SMILES-less 'criterion a' row.
         """
         smiles_b = "CCO"

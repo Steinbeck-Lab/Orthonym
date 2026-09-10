@@ -5,18 +5,18 @@ Root cause (traced 2026-09-08, internal notes):
 1. Fused-ring `iupac_locants` catalog tables store fusion/prime locants as BARE
    STRINGS (`'4a'`, `'8a'`, `'10b'`). They reach ``compare_locant_sets`` through the
    ring parent-selection pool (``p44_scorer._candidate_locants``) UNCOERCED, and the
-   fast-path ``sorted()`` then raised
+   fast-path ``sorted`` then raised
    ``TypeError: '<' not supported between 'str' and 'int'`` on a str/int-mixed set —
    which crashed ``_classify`` and abstained N fused polycyclics. Fixed by coercing
    bare-string locants to the declared ``int | (int, str)`` contract at the top of
-   ``compare_locant_sets`` (P-14.5.2-correct: ``4 < 4a < 5``).
+   ``compare_locant_sets`` -correct: ``4 < 4a < 5``).
 
 2. With the crash fixed, a genuinely combinatorial fused system runs the full main
    path and exhausts the macrocycle-hang budget (``PerfBudgetExceeded``), which used
    to abstain unconditionally. The outermost boundary now offers ONE bounded,
-   strictly-OPSIN-RT-gated whole-molecule T4 name before abstaining, so a molecule the
+   strictly-OPSIN-RT-gated whole-molecule name before abstaining, so a molecule the
    coverage-by-construction producer can name cheaply and exactly is recovered — while
-   a real hang witness (whose T4 also explodes / does not round-trip) still abstains
+   a real hang witness (whose also explodes / does not round-trip) still abstains
    cleanly (that half is pinned in ``test_m25_workbudget.py``).
 
 Both halves preserve 0-wrong: every recovered name OPSIN-round-trips to the input.
@@ -29,7 +29,7 @@ from orthonym.rules.locants import compare_locant_sets
 # ── Part 1: comparator coercion (fast, no JVM) ──────────────────────────────
 
 class TestCompareLocantSetsBareString:
-    """`compare_locant_sets` must be total AND P-14.5.2-correct on bare-string
+    """`compare_locant_sets` must be total AND -correct on bare-string
     fusion locants, without changing the ordering of any pure-int / pure-tuple set."""
 
     def test_the_exact_crash_case_no_longer_raises(self):
@@ -40,7 +40,7 @@ class TestCompareLocantSetsBareString:
                                    [1, 2, 3, 4, 5, 6, 7, '3a', '7a']) == 1
 
     def test_bare_string_orders_between_its_integer_neighbours(self):
-        # P-14.5.2: locant 4 is lower than 4a, and 4a is lower than 5.
+        #: locant 4 is lower than 4a, and 4a is lower than 5.
         assert compare_locant_sets(['4a'], [4]) == 1     # 4 < 4a -> set_b preferred
         assert compare_locant_sets(['4a'], [5]) == -1    # 4a < 5 -> set_a preferred
 
@@ -63,7 +63,7 @@ class TestCompareLocantSetsBareString:
         assert compare_locant_sets(["2'"], [3]) == -1    # 2 < 3
 
 
-# ── Part 2: the perf-budget T4 rescue recovers a real giant, 0-wrong ─────────
+# ── Part 2: the perf-budget rescue recovers a real giant, 0-wrong ─────────
 
 # A 100-heavy-atom / 10-ring Si-free tetra-fused-heteroaromatic peptide-tail molecule
 # (scratchpad/r1.smi). Its main path exhausts the op budget; the rescue names it via

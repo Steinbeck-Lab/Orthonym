@@ -1,6 +1,6 @@
-"""The P-29.2 free-valence morphology oracle.
+"""The free-valence morphology oracle.
 
-Phase 1b. A pure text oracle, exactly the ``token_arity`` discipline: it reads
+a phase. A pure text oracle, exactly the ``token_arity`` discipline: it reads
 a prefix token's own morphemes and reports how many free valences that text
 ASSERTS, or refuses. It is shared by the two places that must agree about it --
 the producer guard in ``substituent_enumerator`` and the spine's P7 -- so that
@@ -20,21 +20,21 @@ pytestmark = pytest.mark.unit
 class TestConfidentReadings:
 
     @pytest.mark.parametrize("token,expected", [
-        # P-29.2 one free valence
+        # one free valence
         ("methyl", 1),
         ("propan-2-yl", 1),
         ("phenyl", 1),
         ("2-hydroxyethyl", 1),
         ("acetyl", 1),
         ("methoxycarbonyl", 1),
-        # P-29.2 two on the same atom
+        # two on the same atom
         ("methylidene", 2),
         ("ethylidene", 2),
         ("propan-2-ylidene", 2),
         ("benzylidene", 2),
         ("sulfanylidene", 2),
         ("hydrazinylidene", 2),
-        # P-29.2 three on the same atom
+        # three on the same atom
         ("methylidyne", 3),
         ("ethylidyne", 3),
     ])

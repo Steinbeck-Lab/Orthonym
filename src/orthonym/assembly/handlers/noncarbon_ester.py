@@ -1,12 +1,12 @@
-"""W3-P07 non-carbon ester handler (P-65.6.3.1.2 / P-65.6.3.2.1 / P-65.6.3.4).
+"""W3-P07 non-carbon ester handler / /.
 
 Dispatches the three ester classes whose acid or alcohol component is not the
 ordinary carbon-on-oxygen carboxylic ester, and which therefore never match the
 generic ``[CX3](=O)[OX2][#6]`` 'ester' perception:
 
-  * pseudoester    R-CO-O-Z  (Z a Group-13/14/15 organyl) -> 'trimethylsilyl acetate'
-  * sulfonic ester R-SO2-O-R'                            -> 'methyl methanesulfonate'
-  * sulfinic ester R-S(=O)-O-R'                          -> 'methyl methanesulfinate'
+  * pseudoester R-CO-O-Z (Z a Group-13/14/15 organyl) -> 'trimethylsilyl acetate'
+  * sulfonic ester R-SO2-O-R' -> 'methyl methanesulfonate'
+  * sulfinic ester R-S(=O)-O-R' -> 'methyl methanesulfinate'
 
 The body is the single shared ``rules.esters.name_noncarbon_ester`` mechanism
 (build the neutral free acid -> '-ate' + O-side organyl). Fail-closed: returns
@@ -24,7 +24,7 @@ _NONCARBON_ESTER_PGS = ("pseudoester", "sulfonic_ester", "sulfinic_ester")
 
 def _is_noncarbon_ester(features: Any) -> bool:
     """Predicate: principal_group is one of the non-carbon ester classes AND a
-    concrete match tuple is available (pure read-only per D-25)."""
+    concrete match tuple is available (pure read-only per)."""
     if getattr(features, "principal_group", None) not in _NONCARBON_ESTER_PGS:
         return False
     return bool(getattr(features, "principal_group_atoms", None))

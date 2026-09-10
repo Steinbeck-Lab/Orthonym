@@ -1,19 +1,19 @@
-"""N-substituted sulfonamides — P-66.1.1.3.1.1 producer-level tests.
+"""N-substituted sulfonamides — producer-level tests.
 
 Blue Book authority
 -------------------
-**P-66.1.1.2** "Sulfonamides, sulfinamides, and related selenium and tellurium
-amides" (``BlueBookV2/BlueBookV2.md:32746``):
+**** "Sulfonamides, sulfinamides, and related selenium and tellurium
+amides" (``the Blue Book Blue Book``):
 
     "Sulfonamides, sulfinamides, and the analogous selenium and tellurium
     amides are named substitutively using the following suffixes:
-    -SO2-NH2 sulfonamide (preselected suffix) ... These suffixes may be
+    -SO2-NH2 sulfonamide (preselected suffix)... These suffixes may be
     assigned to any position of a parent hydride."
 
 Worked ``(PIN)``: ``CH3-SO2-NH2 methanesulfonamide (PIN)`` (``:32752``).
 
-**P-66.1.1.3.1** "*N*-Substitution", subsection **P-66.1.1.3.1.1**
-(``BlueBookV2.md:32774``) — the decisive sentence:
+**** "*N*-Substitution", subsection ****
+(``the Blue Book``) — the decisive sentence:
 
     "Substituted primary amides, with general structures such as R-CO-NHR' and
     R-CO-NR'R'', **and the corresponding amides derived from chalcogen acids**
@@ -93,7 +93,7 @@ def test_ring_parent_mono_n_substituted(smiles, expected):
 
 
 # --------------------------------------------------------------------------
-# N,N-disubstitution (P-66.1.1.3.1.1 "R-CO-NR'R''")
+# N,N-disubstitution "R-CO-NR'R''")
 # --------------------------------------------------------------------------
 @pytest.mark.parametrize("smiles,expected", [
     ("CS(=O)(=O)N(C)C",        "N,N-dimethylmethanesulfonamide"),
@@ -105,7 +105,7 @@ def test_symmetric_n_n_disubstituted(smiles, expected):
 
 def test_unsymmetric_n_n_disubstituted_is_alphabetised():
     """Two different N-substituents are cited alphabetically, each with its
-    own italic N locant (P-66.1.1.3.1.1)."""
+    own italic N locant."""
     assert _name("CS(=O)(=O)N(C)CC") == "N-ethyl-N-methylmethanesulfonamide"
 
 
@@ -148,7 +148,7 @@ def test_fails_closed_outside_the_class(smiles, why):
     ("CNS(=O)(=O)c1ccc(Cl)cc1", "4-chloro-N-methylbenzene-1-sulfonamide"),
 ])
 def test_substituted_benzene_parent_merges_locants(smiles, expected):
-    """P-66.1.1.3.1.1 + P-14.3.2 / P-14.3.4.2(c) (BB:32879, :2913): the N and ring
+    """ + / (c) (the Blue Book,:2913): the N and ring
     locants are ONE ordered prefix list and a di-substituted ring cites the '1'."""
     assert _name(smiles) == expected
 
@@ -170,7 +170,7 @@ def test_never_emits_a_concatenated_locant_run():
 
 
 def test_never_drops_the_n_substituent_carbon():
-    """The v29 defect this class fixes: the producer used to emit the parent
+    """The defect this class fixes: the producer used to emit the parent
     name `methanesulfonamide` for CS(=O)(=O)NC, silently dropping a carbon."""
     assert _name("CS(=O)(=O)NC") != "methanesulfonamide"
 
@@ -206,8 +206,8 @@ def test_heteroatom_in_acyclic_parent_fails_closed(smiles, was):
 # --------------------------------------------------------------------------
 # Task Y: INTERIOR attachment is not substitution.
 #
-# P-66.1.1.2 (BlueBookV2.md:32748): "These suffixes may be assigned to any
-# position of a parent hydride." The worked (PIN) at :32754 is
+# (the Blue Book): "These suffixes may be assigned to any
+# position of a parent hydride." The worked (PIN) at:32754 is
 # ``butane-2-sulfinamide (PIN)`` for CH3-CH2-CH(-SO-NH2)-CH3 -- the attachment
 # carbon is a branch point in SMILES terms, yet the PIN is a bare parent hydride
 # plus a SUFFIX locant, carrying no substituent prefix at all. So nothing has to

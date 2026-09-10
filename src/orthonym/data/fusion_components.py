@@ -13,12 +13,12 @@ Used by fusion_descriptors.py to:
 2. Determine parent/child using IUPAC seniority
 3. Generate correct fusion prefixes
 
-IUPAC 2013 Seniority (P-25.2.1):
+IUPAC 2013 Seniority:
 - Nitrogen heterocycle > Oxygen heterocycle > Sulfur heterocycle > Carbocycle
 - Among same heteroatom class: larger ring > smaller ring
 - Among same size/heteroatom: more heteroatoms > fewer
 
-Reference: IUPAC 2013 Blue Book, Section P-25 (Fused Ring Systems)
+Reference: IUPAC 2013 Blue Book, Section (Fused Ring Systems)
 """
 
 from typing import Any, Dict, List, Optional
@@ -32,12 +32,12 @@ from typing import Any, Dict, List, Optional
 # 'seniority' is a numeric value -- LOWER is MORE SENIOR (parent preference).
 #
 # Seniority tiers:
-#   40-49: 6-membered N-heterocycles (most senior among heterocycles)
-#   50-59: 5-membered N-heterocycles
-#   60-69: 5-membered N+O heterocycles
-#   70-79: O-heterocycles
-#   80-89: S-heterocycles / N+S heterocycles
-#   200:   Carbocycles (least senior)
+# 40-49: 6-membered N-heterocycles (most senior among heterocycles)
+# 50-59: 5-membered N-heterocycles
+# 60-69: 5-membered N+O heterocycles
+# 70-79: O-heterocycles
+# 80-89: S-heterocycles / N+S heterocycles
+# 200: Carbocycles (least senior)
 # ============================================================================
 
 MONOCYCLIC_COMPONENTS: Dict[str, Dict[str, Any]] = {
@@ -99,15 +99,15 @@ MONOCYCLIC_COMPONENTS: Dict[str, Dict[str, Any]] = {
         'ring_size': 5,
         'heteroatoms': ['N', 'N'],
         'hetero_positions': [1, 3],   # 1,3-diazole
-        # Phase 155.C D-11: seniority corrected from 47 -> 50 per P-25.2.2.4
-        # Jan 2022 errata. 155-AUDIT-C.md row 7: classification WRONG-tier
+        # a phase.C: seniority corrected from 47 -> 50 per
+        # Jan 2022 errata. internal notes-C.md row 7: classification WRONG-tier
         # (expected 50-59 = 5-mem N-het band, was 47 in 6-mem N-het band
-        # 40-49). Cross-check Phase 149 fused_ring_selection.py:
+        # 40-49). Cross-check a phase fused_ring_selection.py:
         # select_base_component still picks IUPAC-preferred base after
-        # change (FR-2.3 (a)-(f) decides before this last-resort tiebreaker
-        # is consulted — verified by 8-case P-25.2.2.4 regression matrix
-        # in 155-AUDIT-C.md). Preserves imidazole < pyrrole(55) — i.e.
-        # 5-mem 2N more senior than 5-mem 1N when FR-2.3 ties.
+        # change (.3 (a)-(f) decides before this last-resort tiebreaker
+        # is consulted — verified by 8-case regression matrix
+        # in internal notes-C.md). Preserves imidazole < pyrrole(55) — i.e.
+        # 5-mem 2N more senior than 5-mem 1N when.3 ties.
         'seniority': 50,
         'aromatic': True,
     },
@@ -116,11 +116,11 @@ MONOCYCLIC_COMPONENTS: Dict[str, Dict[str, Any]] = {
         'ring_size': 5,
         'heteroatoms': ['N', 'N'],
         'hetero_positions': [1, 2],   # 1,2-diazole
-        # Phase 155.C D-11: seniority corrected from 48 -> 51 per P-25.2.2.4
-        # Jan 2022 errata. 155-AUDIT-C.md row 8: classification WRONG-tier
+        # a phase.C: seniority corrected from 48 -> 51 per
+        # Jan 2022 errata. internal notes-C.md row 8: classification WRONG-tier
         # (expected 50-59 = 5-mem N-het band, was 48 in 6-mem N-het band
         # 40-49). Preserves pyrazole < pyrrole(55) and pyrazole > imidazole(50)
-        # ordering — 1,2-diazole and 1,3-diazole both 5-mem 2N; FR-2.3
+        # ordering — 1,2-diazole and 1,3-diazole both 5-mem 2N;.3
         # (a)-(f) decides ordering before this fallback fires.
         'seniority': 51,
         'aromatic': True,
@@ -150,12 +150,12 @@ MONOCYCLIC_COMPONENTS: Dict[str, Dict[str, Any]] = {
         'ring_size': 5,
         'heteroatoms': ['N', 'S'],
         'hetero_positions': [1, 3],   # S at 1, N at 3
-        # Phase 155.C D-11: seniority corrected from 77 -> 80 per P-25.2.2.4
-        # Jan 2022 errata. 155-AUDIT-C.md row 11: classification WRONG-tier
+        # a phase.C: seniority corrected from 77 -> 80 per
+        # Jan 2022 errata. internal notes-C.md row 11: classification WRONG-tier
         # (expected 80-89 = S/N+S-het band, was 77 in O-het band 70-79).
         # Cross-check: thiazole stays MORE senior than thiophene(85) under
         # this tiebreaker — i.e. 5-mem N+S more senior than 5-mem 1×S when
-        # FR-2.3 ties. FR-2.3 (a) heteroatom-priority N > O > S already
+        #.3 ties..3 (a) heteroatom-priority N > O > S already
         # decides thiazole vs furan/pyran without consulting this field.
         'seniority': 80,
         'aromatic': True,
@@ -165,19 +165,19 @@ MONOCYCLIC_COMPONENTS: Dict[str, Dict[str, Any]] = {
         'ring_size': 5,
         'heteroatoms': ['N', 'S'],
         'hetero_positions': [1, 2],   # S at 1, N at 2
-        # Phase 155.C D-11: seniority corrected from 78 -> 81 per P-25.2.2.4
-        # Jan 2022 errata. 155-AUDIT-C.md row 12: classification WRONG-tier
+        # a phase.C: seniority corrected from 78 -> 81 per
+        # Jan 2022 errata. internal notes-C.md row 12: classification WRONG-tier
         # (expected 80-89 = S/N+S-het band, was 78 in O-het band 70-79).
         # Preserves isothiazole < thiophene(85) and isothiazole > thiazole(80)
         # ordering — both 5-mem N+S; 1,3-isomer (thiazole) more senior than
-        # 1,2-isomer (isothiazole) per FR-2.3 (h) lower-locant cascade.
+        # 1,2-isomer (isothiazole) per.3 (h) lower-locant cascade.
         'seniority': 81,
         'aromatic': True,
     },
 
-    # ---- 5-membered Se analogues (Wave-2 completion, P-25.3.2.4(g)) ----
+    # ---- 5-membered Se analogues (Wave-2 completion, (g)) ----
     # Seniority keys sit just after their S siblings (S band 80/81/85); this
-    # last-resort tiebreaker is only consulted after FR-2.3 (a)-(f).
+    # last-resort tiebreaker is only consulted after.3 (a)-(f).
     'selenazole': {
         'prefix': 'selenazolo',
         'ring_size': 5,
@@ -330,8 +330,8 @@ def get_component_prefix(name: str) -> str:
     """
     if name in MONOCYCLIC_COMPONENTS:
         return MONOCYCLIC_COMPONENTS[name]['prefix']
-    # Fallback, P-25.3.2.4 (BlueBookV2.md:11905): "The names of attached
-    # components are formed by replacing the last letter 'e' by 'o' ... (or by
+    # Fallback, (the Blue Book): "The names of attached
+    # components are formed by replacing the last letter 'e' by 'o'... (or by
     # ADDING the letter 'o' when no final letter 'e' is present, i.e., pyrano
     # from pyran)."
     if name.endswith('ene'):
@@ -343,7 +343,7 @@ def get_component_prefix(name: str) -> str:
     if name.endswith('ane'):
         return name[:-3] + 'o'
     # NOTE: the historical '-an' -> '-o' truncation was DELETED here -- it turned
-    # 'pyran' into the OPSIN-unparseable 'pyro', violating P-25.3.2.4 ("pyrano
+    # 'pyran' into the OPSIN-unparseable 'pyro', violating ("pyrano
     # from pyran"). 'pyran'/'furan' live in MONOCYCLIC_COMPONENTS above, so a bare
     # '-an' name correctly falls through to the "add 'o'" default below.
     if name.endswith('e'):

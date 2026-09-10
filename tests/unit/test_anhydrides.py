@@ -1,7 +1,7 @@
 """Tests for anhydride naming (19-02).
 
 Tests functional class naming for anhydrides following IUPAC conventions:
-- Symmetric acyclic: acetic anhydride (retained acid name, PIN per P-65.1.1.1)
+- Symmetric acyclic: acetic anhydride (retained acid name, PIN per
 - Mixed/asymmetric: acetic propanoic anhydride (alphabetical)
 - Cyclic (from diacids): butanedioic anhydride
 - Consumed-atom filtering: anhydride atoms removed from ester FG detection
@@ -14,7 +14,7 @@ class TestSymmetricAnhydrides:
     """Test symmetric acyclic anhydride naming."""
 
     def test_ethanoic_anhydride(self):
-        """Acetic anhydride - simplest symmetric (retained acid PIN P-65.1.1.1)."""
+        """Acetic anhydride - simplest symmetric (retained acid PIN."""
         result = name_compound("CC(=O)OC(=O)C")
         assert result == "acetic anhydride"
 
@@ -29,7 +29,7 @@ class TestSymmetricAnhydrides:
         assert result == "butanoic anhydride"
 
     def test_methanoic_anhydride(self):
-        """Formic anhydride - C1 symmetric (retained acid PIN P-65.1.1.1)."""
+        """Formic anhydride - C1 symmetric (retained acid PIN."""
         result = name_compound("O=COC=O")
         assert result == "formic anhydride"
 
@@ -52,45 +52,45 @@ class TestThioSelenoAcylAnhydrides:
     """D: acyclic thio-/seleno-ACYL anhydrides R-C(=X)-Y-C(=X)-R'.
 
     The acyl chalcogen (=O/=S/=Se) fixes each acid component's affix
-    ('...thioic'/'...selenoic'; P-65.7.6.4.3); components are cited in
-    ALPHABETICAL order (P-65.7.2); the BRIDGE chalcogen (O/S/Se/Te) fixes the
-    class word ('anhydride'/'thioanhydride'/'selenoanhydride'; P-65.7.6.4.2).
+    ('...thioic'/'...selenoic';; components are cited in
+    ALPHABETICAL order; the BRIDGE chalcogen (O/S/Se/Te) fixes the
+    class word ('anhydride'/'thioanhydride'/'selenoanhydride';.
     All names OPSIN-round-trip to the input structure.
     """
 
     def test_propanethioic_anhydride(self):
-        """P-65.7.1 symmetric thioacyl, O bridge: C(=S)-O-C(=S)."""
+        """ symmetric thioacyl, O bridge: C(=S)-O-C(=S)."""
         result = name_compound("CCC(=S)OC(=S)CC")
         assert result == "propanethioic anhydride"
 
     def test_benzenecarbothioic_anhydride(self):
-        """P-65.7.1 symmetric ring thioacyl (benzoyl =S), O bridge."""
+        """ symmetric ring thioacyl (benzoyl =S), O bridge."""
         result = name_compound("c1ccccc1C(=S)OC(=S)c1ccccc1")
         assert result == "benzenecarbothioic anhydride"
 
     def test_ethanethioic_propanoic_anhydride(self):
-        """P-65.7.2 mixed acyl (=S + =O), O bridge -> 'anhydride';
+        """ mixed acyl (=S + =O), O bridge -> 'anhydride';
         alphabetical order 'ethanethioic' < 'propanoic'."""
         result = name_compound("CC(=S)OC(=O)CC")
         assert result == "ethanethioic propanoic anhydride"
 
     def test_ethanethioic_propanethioic_anhydride(self):
-        """P-65.7.3 both acyls =S, O bridge -> 'anhydride'."""
+        """ both acyls =S, O bridge -> 'anhydride'."""
         result = name_compound("CC(=S)OC(=S)CC")
         assert result == "ethanethioic propanethioic anhydride"
 
     def test_ethanethioic_propanethioic_thioanhydride(self):
-        """P-65.7.6.4.2 both acyls =S, S bridge -> 'thioanhydride'."""
+        """ both acyls =S, S bridge -> 'thioanhydride'."""
         result = name_compound("CC(=S)SC(=S)CC")
         assert result == "ethanethioic propanethioic thioanhydride"
 
     def test_ethanethioic_propanoic_thioanhydride(self):
-        """P-65.7.6.4.2 mixed acyl (=S + =O), S bridge -> 'thioanhydride'."""
+        """ mixed acyl (=S + =O), S bridge -> 'thioanhydride'."""
         result = name_compound("CC(=S)SC(=O)CC")
         assert result == "ethanethioic propanoic thioanhydride"
 
     def test_acetic_propanethioic_selenoanhydride(self):
-        """P-65.7.6.4.2 Se bridge -> 'selenoanhydride'; the =O acetic component
+        """ Se bridge -> 'selenoanhydride'; the =O acetic component
         keeps its retained name, the =S propanethioic its thioic affix."""
         result = name_compound("CC(=O)[Se]C(=S)CC")
         assert result == "acetic propanethioic selenoanhydride"
@@ -101,7 +101,7 @@ class TestCyclicAnhydrides:
 
     def test_butanedioic_anhydride(self):
         """Succinic anhydride - 5-membered ring. D-FOLLOWON item 6: PIN is the
-        heterocyclic-pseudoketone dione (P-65.7.7.1 method 1), not the non-PIN
+        heterocyclic-pseudoketone dione method 1), not the non-PIN
         functional-class 'butanedioic anhydride'."""
         result = name_compound("O=C1CCC(=O)O1")
         assert result == "oxolane-2,5-dione"
@@ -145,7 +145,7 @@ class TestConsumedAtomFilteringAnhydride:
 
 
 class TestDicarbonicDihalidePseudohalide:
-    """ a phase (P-65.5.3.2): dicarbonic dihalides / dipseudohalides,
+    """ a phase: dicarbonic dihalides / dipseudohalides,
     X-CO-O-CO-Y -> 'dicarbonic <class word(s)>'."""
 
     def test_dicarbonic_dichloride(self):

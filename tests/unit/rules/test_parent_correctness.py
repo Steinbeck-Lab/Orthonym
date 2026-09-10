@@ -1,12 +1,12 @@
-"""Unit tests for ParentCorrectnessScorer (Phase 145.1 SC-2).
+"""Unit tests for ParentCorrectnessScorer (a phase).
 
 Covers:
 - Production path (no reference set) -> 0.5
-- Failure modes per RESEARCH §4.4 (8 modes, all return 0.5)
-- _extract_parent_token regex heuristic (CD-01, 9 verified cases)
+- Failure modes per RESEARCH (8 modes, all return 0.5)
+- _extract_parent_token regex heuristic (, 9 verified cases)
 - OPSIN subprocess wrapper (timeout, parse, failure)
 - Match / mismatch / no-decision scoring
-- Thread-local context isolation (D-07)
+- Thread-local context isolation
 - Substructure-match ambiguity tiebreak (canonical-rank determinism)
 
 Tests requiring OPSIN are guarded with module-level skipif marker per the
@@ -174,9 +174,9 @@ class TestScorer:
     def test_scorer_handles_substructure_ambiguity_deterministically(self):
         """Test 11: ambiguous substructure match -> deterministic via canonical rank.
 
-        From RESEARCH §4.2: '4-oxo-4-(prop-2-enoyloxy)but-2-enoic acid'
+        From RESEARCH: '4-oxo-4-(prop-2-enoyloxy)but-2-enoic acid'
         yields 2 substructure matches; canonical-rank tiebreak picks one
-        deterministically. Calling score() twice must return the SAME value.
+        deterministically. Calling score twice must return the SAME value.
         """
         set_reference_name("4-oxo-4-(prop-2-enoyloxy)but-2-enoic acid")
         mol = Chem.MolFromSmiles("O=C(C=CC(=O)O)OC(C=C)=O")
@@ -200,7 +200,7 @@ class TestThreadLocalContext:
         assert getattr(_pc_context, 'reference_name', None) is None
 
     def test_thread_local_isolation(self):
-        """Test 12: reference name set in thread A is invisible to thread B (D-07)."""
+        """Test 12: reference name set in thread A is invisible to thread B ."""
         results = {}
 
         def thread_a():
@@ -225,7 +225,7 @@ class TestThreadLocalContext:
 
 
 # ---------------------------------------------------------------------------
-# Phase 166 SCORE-03: reusable per-node alignment helpers
+# a phase SCORE-03: reusable per-node alignment helpers
 # ---------------------------------------------------------------------------
 
 class TestPerNodeAlignmentHelpers:

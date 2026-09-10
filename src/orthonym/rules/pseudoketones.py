@@ -1,5 +1,5 @@
 """Pseudoketone routing for acyl-on-ring-nitrogen "hidden amides" (DD1 Fix 3,
-Blue Book P-66.1.3 / P-64.3.2 / P-66.1.4.3).
+Blue Book / /.
 
 An acyl group on a *ring-system* nitrogen (or any skeletal heteroatom that is not
 an acyclic amine N) is NOT named as an amide: the ring N is a skeletal atom of a
@@ -7,9 +7,9 @@ ring parent hydride, so the C=O carbon becomes the principal group as a KETONE
 (pseudoketone) and the ring fragment is cited as an N-yl substituent on the
 carbonyl carbon::
 
-    CC(=O)N1CCCCC1 -> 1-(piperidin-1-yl)ethan-1-one (P-66.1.3)
+    CC(=O)N1CCCCC1 -> 1-(piperidin-1-yl)ethan-1-one
     CCC(=O)N1CCCCC1 -> 1-(piperidin-1-yl)propan-1-one
-    CC(=S)N1CCCC1 -> 1-(pyrrolidin-1-yl)ethane-1-thione (P-66.1.4.3)
+    CC(=S)N1CCCC1 -> 1-(pyrrolidin-1-yl)ethane-1-thione
 
 Detection is on the original graph: the amide N must be a RING member and the
 carbonyl carbon must be EXOCYCLIC to that ring (so a lactam, whose C=O is itself
@@ -41,7 +41,7 @@ _AMIDE_FGS = (
     "thioamide", "selenoamide", "telluroamide",
 )
 
-# carbonyl chalcogen symbol -> ketone (pseudoketone) suffix per P-66.1.3 / P-66.1.4.3.
+# carbonyl chalcogen symbol -> ketone (pseudoketone) suffix per /.
 _CHALCOGEN_KETONE_SUFFIX = {"O": "one", "S": "thione", "Se": "selone", "Te": "tellone"}
 _CHALCOGENS = ("O", "S", "Se", "Te")
 
@@ -203,7 +203,7 @@ __all__ = ["is_hidden_amide", "name_pseudoketone"]
 
 
 def name_acyl_hetero_pseudoketone(mol) -> Optional[str]:
-    """P-64.1.2.1(b) / P-64.5.2.2 acyl on Si/Ge/P/As (Wave-2 completion C):
+    """(b) / acyl on Si/Ge/P/As (Wave-2 completion C):
     CC(=O)[SiH3] -> 1-silylethan-1-one, [PH2]C(=O)CCC -> 1-phosphanylbutan-1-one
     (both BB verbatim). The ketone SMARTS requires C on both flanks, so these
     molecules previously perceived NO functional group and died unnamed.
@@ -222,7 +222,7 @@ def name_acyl_hetero_pseudoketone(mol) -> Optional[str]:
         if atom.GetFormalCharge() != 0 or atom.GetNumRadicalElectrons() != 0:
             return None
     _HUBS = {'Si', 'Ge', 'P', 'As'}
-    # Group-16 hubs (P-65.6.3.4.2): an acyl on a chalcogen whose non-acyl
+    # Group-16 hubs: an acyl on a chalcogen whose non-acyl
     # neighbour is a HETEROATOM (compound substituent) is a pseudoketone
     # (R-CO-S-OO-CH3 -> [1-(methylperoxy)sulfanyl]butan-1-one). A chalcogen hub
     # carrying a PLAIN CARBON (R-CO-S-C) is an ordinary thioester (senior, named
@@ -291,7 +291,7 @@ def name_acyl_hetero_pseudoketone(mol) -> Optional[str]:
                 continue
             return None
 
-    # Group-16 (chalcogen) hub: acyl-hetero pseudoketone (P-65.6.3.4.2). The
+    # Group-16 (chalcogen) hub: acyl-hetero pseudoketone. The
     # hub's non-acyl neighbour must be a HETEROATOM (a compound substituent such
     # as the -OO-CH3 peroxy chain); a PLAIN-CARBON non-acyl neighbour makes this
     # an ordinary thioester (R-CO-S-C, senior) which must NOT be swallowed here —
@@ -312,13 +312,13 @@ def name_acyl_hetero_pseudoketone(mol) -> Optional[str]:
         base_name = f"{get_chain_prefix(length)}an"
         # Two distinct shapes share this hub substituent, distinguished by whether
         # the hub-substituent name ALREADY carries its own internal enclosing marks:
-        # * P-65.6.3.4.2 (hubyl has inner marks, e.g. '(methylperoxy)sulfanyl'):
+        # * (hubyl has inner marks, e.g. '(methylperoxy)sulfanyl'):
         # the locant sits INSIDE the outer bracket -->
         # '[1-(methylperoxy)sulfanyl]butan-1-one' (BB verbatim).
-        # * P-64.1.2.1 (hubyl is a flat compound word with NO inner marks, e.g.
+        # * (hubyl is a flat compound word with NO inner marks, e.g.
         # 'methoxydisulfanyl'): the hub substituent is parenthesised and the
         # locant sits OUTSIDE --> '1-(methoxydisulfanyl)ethan-1-one' (the Blue Book).
-        # The old template emitted the P-65.6.3.4.2 shape for both, so the flat-word
+        # The old template emitted the shape for both, so the flat-word
         # case shipped the malformed '[1-methoxydisulfanyl]ethan-1-one'.
         if '(' in hubyl or '[' in hubyl:
             return f"[1-{hubyl}]{base_name}-1-one"
@@ -326,7 +326,7 @@ def name_acyl_hetero_pseudoketone(mol) -> Optional[str]:
 
     # Hub scope (fail-closed): the hub carries only H or pure ORGANYL
     # substituents — a heteroatom on the hub (Si-OH: silanol territory,
-    # P-68.2 suffix seniority interplay) is not built here.
+    # suffix seniority interplay) is not built here.
     if any(mol.GetAtomWithIdx(a).GetAtomicNum() != 6
            for a in hub_frag if a != hub.GetIdx()):
         return None
@@ -347,7 +347,7 @@ def name_acyl_hetero_pseudoketone(mol) -> Optional[str]:
             #: the organyl guard is the shared chokepoint, so a hub organyl
             # may now be cyclic, branched, unsaturated or long — and its prefix may
             # carry locants, a retained italicized prefix, or its own marks. The
-            # hub is a MONONUCLEAR skeleton, so composition follows P-16.5.1.3.1
+            # hub is a MONONUCLEAR skeleton, so composition follows
             # (BB 7272, verbatim): "the first cited substituent never has enclosing
             # marks unless it includes a locant. The second and further
             # substituents are each enclosed with parentheses even for simple
@@ -360,8 +360,8 @@ def name_acyl_hetero_pseudoketone(mol) -> Optional[str]:
             # `ethylmethylphosphanyl` this block used to emit was non-PIN.
             #
             # Every decision below is a shared primitive: citation order
-            # (P-14.5.2/P-14.5.4), the compound test (P-16.3.3), the italicized
-            # carve-out (P-16.3.4) and the mark escalation (P-16.5.4.1).
+            # /, the compound test, the italicized
+            # carve-out and the mark escalation.
             from collections import Counter
 
             from ..assembly.naming_utils import (
@@ -379,7 +379,7 @@ def name_acyl_hetero_pseudoketone(mol) -> Optional[str]:
                 names.append(nm)
             counts = Counter(names)
             # -CLOSEOUT Item A: arity bound local, multiplier word from
-            # the shared primitive (P-16.3.5(a) bis/tris when SUBSTITUTED).
+            # the shared primitive (a) bis/tris when SUBSTITUTED).
             _SUPPORTED_COUNTS = frozenset((1, 2, 3))
             parts = []
             for i, nm in enumerate(sorted(counts, key=prefix_citation_sort_key)):
@@ -387,14 +387,14 @@ def name_acyl_hetero_pseudoketone(mol) -> Optional[str]:
                     return None
                 marked = enclose_if_compound(nm)
                 if i > 0 and marked == nm:
-                    marked = apply_enclosing_marks(nm, -1)   # P-16.5.1.3.1
+                    marked = apply_enclosing_marks(nm, -1)   #
                 parts.append(multiplied_component(counts[nm], nm, marked))
             hubyl = ''.join(parts) + base
     if not hubyl:
         return None
     # Compound hub names take enclosing marks (1-(trimethylsilyl)propan-2-one
     # engine precedent); the bare silyl/phosphanyl forms stay unmarked. The marks
-    # ESCALATE (-> [ over an inner pair (P-16.5.4.1), which a raw f"({hubyl})"
+    # ESCALATE (-> [ over an inner pair, which a raw f"({hubyl})"
     # could not do: BB 39228 writes `[ethyl(methyl)phosphanyl]`, never
     # `(ethyl(methyl)phosphanyl)`.
     from ..assembly.naming_utils import apply_enclosing_marks as _marks
@@ -406,14 +406,14 @@ def name_acyl_hetero_pseudoketone(mol) -> Optional[str]:
     return f"1-{token}{base_name}-1-one"
 
 
-# Chalcogen-chain parent-hydride stems (P-21.2.2) for the trioxidanyl substituent.
+# Chalcogen-chain parent-hydride stems for the trioxidanyl substituent.
 _CHALCOGENCHAIN_STEMS = {"O": "oxidane", "S": "sulfane", "Se": "selane",
                          "Te": "tellane"}
 _CHALCOGENCHAIN_MULT = {2: "di", 3: "tri", 4: "tetra", 5: "penta", 6: "hexa"}
 
 
 def name_acyl_chalcogenchain_pseudoketone(mol) -> Optional[str]:
-    """P-68.4.1.3 (BB 39389): an acyl group terminating a HOMOGENEOUS chain of
+    """ (BB 39389): an acyl group terminating a HOMOGENEOUS chain of
     >=3 identical chalcogens (``-O-O-OH`` = trioxidane) is named as a pseudoketone
     whose carbonyl component is the parent (``-one``) and the chalcogen chain is
     the ``-yl`` substituent::

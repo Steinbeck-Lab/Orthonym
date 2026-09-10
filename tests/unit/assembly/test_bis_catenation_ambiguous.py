@@ -1,4 +1,4 @@
-"""P-35.1 di/bis catenation disambiguation + P-16.5.1.10 bis-parentheses
+""" di/bis catenation disambiguation + bis-parentheses
 (Wave-2 P0c Task 8). BB the Blue Book ('disulfanyl, -SSH, and
 bis(sulfanyl), two -SH groups') and:7368 (parentheses enclose bis/tris terms).
 
@@ -25,12 +25,12 @@ class TestP351Multiplier:
         assert get_multiplier_prefix(3, name) == "tris"
 
     def test_set_contents_pinned(self):
-        # Each member collides with a P-29.3.1 catenated-hydride prefix:
+        # Each member collides with a catenated-hydride prefix:
         # disulfanyl -SSH, diselanyl -SeSeH, ditellanyl -TeTeH, diphosphanyl
         # -PH-PH2, diarsanyl, distibanyl, diazanyl -NH-NH2, dioxidanyl -OOH.
         # added the multi-atom chain prefixes themselves: two -S-S-H
         # groups are bis(disulfanyl) (the Blue Book, the Blue Book), because 'didisulfanyl'
-        # would read as a P-29.3.1 catenation ('di' + 'disulfanyl' = -SSSS-);
+        # would read as a catenation ('di' + 'disulfanyl' = -SSSS-);
         # the tri- forms (-S-S-S-H) collide the same way.
         assert CATENATION_AMBIGUOUS_PREFIXES == frozenset({
             "sulfanyl", "selanyl", "tellanyl", "phosphanyl",
@@ -49,7 +49,7 @@ class TestP351Multiplier:
 
 class TestP165110Parentheses:
     def test_bis_term_is_parenthesized(self):
-        # P-16.5.1.10: 'Parentheses are used to enclose terms modified by
+        #: 'Parentheses are used to enclose terms modified by
         # the numerical prefixes bis, tris, tetrakis'.
         assert format_substituent_prefix("sulfanyl", [3, 3], 2) == \
             "3,3-bis(sulfanyl)"
@@ -70,7 +70,7 @@ class TestDisulfanylChainMultiplier:
         "trisulfanyl", "triselanyl", "tritellanyl",
     ])
     def test_chain_prefix_takes_bis(self, name):
-        # 'didisulfanyl' would read as 'di' + 'disulfanyl' = a P-29.3.1 chain, so
+        # 'didisulfanyl' would read as 'di' + 'disulfanyl' = a chain, so
         # two -S-S-H groups must be bis(disulfanyl) (the Blue Book 'not didisulfanyl').
         assert get_multiplier_prefix(2, name) == "bis"
         assert get_multiplier_prefix(3, name) == "tris"

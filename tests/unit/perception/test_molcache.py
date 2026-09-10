@@ -1,4 +1,4 @@
-"""S2 (audit 2026-09-03): ``for a in mol.GetAtoms()`` goes through RDKit's
+"""S2 (audit 2026-09-03): ``for a in mol.GetAtoms`` goes through RDKit's
 Python sequence wrapper (about 88 us per 58-atom walk); the engine walks the
 same molecule hundreds of times per name, mostly in dispatch predicates. 24% of
 engine CPU on a dev split was this wrapper. ``atoms_of``/``bonds_of`` return a tuple
@@ -6,7 +6,7 @@ built once per molecule per top-level naming call (the memo scope) and reuse
 it; molecules that can be edited in place (RWMol) are never cached.
 
 Byte-identity contract: the tuple must contain the same atoms, in the same
-order, as ``mol.GetAtoms()``; a stale tuple must be impossible to observe.
+order, as ``mol.GetAtoms``; a stale tuple must be impossible to observe.
 """
 import pytest
 from rdkit import Chem
@@ -81,7 +81,7 @@ def test_off_mode_always_rebuilds(scope, monkeypatch):
 
 def test_verify_mode_raises_when_the_cached_tuple_is_not_this_molecule(scope, monkeypatch):
     """Simulates the one failure class the cache could have (an entry that
-    belongs to another molecule of the same size, e.g. after an id() reuse):
+    belongs to another molecule of the same size, e.g. after an id reuse):
     verify mode must catch it instead of serving it."""
     monkeypatch.setattr(molcache, "_MODE", "verify")
     mol = Chem.MolFromSmiles("CCO"); other = Chem.MolFromSmiles("CCN")

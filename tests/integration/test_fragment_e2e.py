@@ -1,8 +1,8 @@
 """
-End-to-end integration tests for Phase 22: Fragment-Aware Naming.
+End-to-end integration tests for a phase: Fragment-Aware Naming.
 
-Validates all Phase 22 features working together through the full naming
-pipeline (SMILES -> name_compound() -> IUPAC name):
+Validates all a phase features working together through the full naming
+pipeline (SMILES -> name_compound -> IUPAC name):
 
 1. Peptide naming (glycylglycine, alanylalanine, tripeptides)
 2. NP ester decoration (testosterone acetate functional class naming)
@@ -27,29 +27,29 @@ class TestPeptideE2E:
 
     @pytest.mark.integration
     def test_glycylglycine(self):
-        """Gly-Gly dipeptide. v38: the peptide PIN is the SUBSTITUTIVE form
-        (V38-PEPTIDE-PIN-VERDICT.md; Chapter P-10 identifies no PINs, so the
+        """Gly-Gly dipeptide.: the peptide PIN is the SUBSTITUTIVE form
+        (V38-PEPTIDE-PIN-VERDICT.md; Chapter identifies no PINs, so the
         retained peptide name is non-PIN). Full-InChIKey round-trip verified."""
         result = name_compound("NCC(=O)NCC(=O)O")
         assert result == "(2-aminoacetamido)acetic acid"
 
     @pytest.mark.integration
     def test_l_alanyl_l_alanine(self):
-        """L-Ala-L-Ala dipeptide. v38 substitutive PIN
+        """L-Ala-L-Ala dipeptide. substitutive PIN
         (V38-PEPTIDE-PIN-VERDICT.md); full-InChIKey round-trip verified."""
         result = name_compound("N[C@@H](C)C(=O)N[C@@H](C)C(=O)O")
         assert result == "(2S)-2-[(2S)-2-aminopropanamido]propanoic acid"
 
     @pytest.mark.integration
     def test_glycyl_l_alanine(self):
-        """Gly-L-Ala dipeptide. v38 substitutive PIN
+        """Gly-L-Ala dipeptide. substitutive PIN
         (V38-PEPTIDE-PIN-VERDICT.md); full-InChIKey round-trip verified."""
         result = name_compound("NCC(=O)N[C@@H](C)C(=O)O")
         assert result == "(2S)-2-(2-aminoacetamido)propanoic acid"
 
     @pytest.mark.integration
     def test_l_alanylglycine(self):
-        """L-Ala-Gly dipeptide. v38 substitutive PIN
+        """L-Ala-Gly dipeptide. substitutive PIN
         (V38-PEPTIDE-PIN-VERDICT.md); full-InChIKey round-trip verified."""
         result = name_compound("N[C@@H](C)C(=O)NCC(=O)O")
         assert result == "2-[(2S)-2-aminopropanamido]ethanoic acid"
@@ -58,7 +58,7 @@ class TestPeptideE2E:
     def test_tripeptide_gly_ala_leu(self):
         """Gly-L-Ala-L-Leu tripeptide -> 'glycylalanylleucine'.
 
-        P-103.3.4 (BlueBookV2.md:54717): both L-descriptors omitted."""
+         (the Blue Book): both L-descriptors omitted."""
         result = name_compound(
             "NCC(=O)N[C@@H](C)C(=O)N[C@@H](CC(C)C)C(=O)O"
         )
@@ -68,7 +68,7 @@ class TestPeptideE2E:
     def test_asparagine_not_misrouted(self):
         """Asparagine (amide side chain), UNDEFINED stereo, must NOT route to
         peptide naming -- it is one molecule. Bare 'asparagine' implies L
-        (v33 Phase-1 stereo honesty), so undefined stereo names systematically;
+        (Phase-1 stereo honesty), so undefined stereo names systematically;
         the single-molecule systematic name confirms no peptide misrouting.
         OPSIN round-trip verified."""
         result = name_compound("NC(CC(N)=O)C(=O)O")
@@ -92,8 +92,8 @@ class TestPeptideE2E:
     def test_simple_alanine_unchanged(self):
         """Single amino acid alanine, UNDEFINED stereo -> systematic name.
 
-        v33 Phase-1 stereo honesty: bare 'alanine' implies L
-        (P-101.2.6/P-103.1.3.1), so an undefined-stereo input declines it."""
+         Phase-1 stereo honesty: bare 'alanine' implies L
+        /, so an undefined-stereo input declines it."""
         result = name_compound("CC(N)C(=O)O")
         assert result == "2-aminopropanoic acid"
 
@@ -212,7 +212,7 @@ class TestRecursionGuardE2E:
 
 
 class TestCrossFeatureRegression:
-    """Verify Phase 22 changes do not break existing naming features."""
+    """Verify a phase changes do not break existing naming features."""
 
     @pytest.mark.integration
     def test_simple_amide_unchanged(self):

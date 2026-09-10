@@ -13,7 +13,7 @@ each independently RT-validated). Plan: docs/superpowers/plans/
 3A-b: assembly/substituent_enumerator.py + assembly/substituent_naming.py --
       a compound-substituent fragment carrying a REAL (non-internal) formal
       charge must route through the existing charge-aware cation_to_prefix
-      primitive (P-74.1.3) when the cation is the fragment's own attach atom,
+      primitive when the cation is the fragment's own attach atom,
       and fail closed (never guess) otherwise.
 3A-c: rules/ions.py::name_anion -- the single-anion fall-through must never
       accept _try_neutralize_and_name's bare NEUTRAL-skeleton name as the
@@ -118,7 +118,7 @@ class TestCationSubstituentPrefix:
         NOTE: this molecule also has a SEPARATE, unrelated wrong-candidate
         source (a different decomposition names the choline head as if it
         were the WHOLE molecule, 'hydroxy-N,N,N-trimethylethanaminium' --
-        an atom-drop bug, not a charge-blind-prefix bug) that SELF-01 catches
+        an atom-drop bug, not a charge-blind-prefix bug) that catches
         via the OPSIN backstop in most environments but not universally; it
         is OUT OF SCOPE for this narrowly-scoped 3A-b fix (a different
         subsystem produces it) and is reported separately, not asserted on
@@ -150,7 +150,7 @@ class TestCationSubstituentPrefix:
         assert prefix == "trimethylazaniumyl", prefix
 
     def test_name_substituent_fragment_names_pendant_onium_branch(self):
-        """ a phase enabler (P-74.1.3): the "no nested-substituent
+        """ a phase enabler: the "no nested-substituent
         composer exists for that shape yet" premise this test used to assert
         is no longer true -- `_name_polyfunctional_acyclic_substituent`
         (assembly/substituent_naming.py, Pass 1d) now composes a pendant

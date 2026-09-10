@@ -12,14 +12,14 @@ names.
 
 Blue Book authority (heading + deciding sentence):
 
-  P-62.2.1.2 (the Blue Book Blue Book) -- "Primary amines, R-NH2, are
+   (the Blue Book Blue Book) -- "Primary amines, R-NH2, are
   systematically named in the following ways: (1) by adding the suffix 'amine'
   to the name of the parent hydride". The suffix attaches to the PARENT
   HYDRIDE, whose skeletal atoms carry the locants; the -NH2 nitrogen is not a
   parent-hydride atom. Its own examples are ``quinolin-4-amine (PIN)`` and
   ``1-benzofuran-2-amine (PIN)`` -- the locant is the ring carbon.
 
-  P-63.1.2 "Systematic names of alcohols, phenols, enols, and ynols"
+   "Systematic names of alcohols, phenols, enols, and ynols"
   (:26826) -- "(1) substitutively, using the suffix 'ol'... When there is a
   choice for numbering, the starting point and the direction of numbering of a
   compound are chosen so as to give lowest locants to the 'ol' suffixes".
@@ -27,7 +27,7 @@ Blue Book authority (heading + deciding sentence):
   (PIN)``: the cited locants are ring carbons -- the hydroxy oxygen has no
   skeletal locant at all.
 
-  P-14.3.3 "Citation of locants" (:2869) -- "the name 2-chloroethan-1-ol is the
+   "Citation of locants" (:2869) -- "the name 2-chloroethan-1-ol is the
   PIN". The '1' designates the carbon bearing the -OH, not the oxygen.
 """
 
@@ -49,7 +49,7 @@ class TestAttachmentIndices:
     @pytest.mark.parametrize("fg", ["phenol", "aromatic_amine", "enol"])
     def test_heteroatom_leading_pg_points_at_index_1(self, fg):
         # [OX2H][cX3] / [NX3H2][cX3] / [OX2H][CX3]=[CX3] -- index 1 is the
-        # carbon the suffix converts (P-63.1.2, P-62.2.1.2 above).
+        # carbon the suffix converts, above).
         assert PG_ATTACHMENT_INDICES[fg] == [1], (
             f"{fg} must cite its carbon, not its heteroatom"
         )
@@ -124,7 +124,7 @@ class TestRecoveredName:
         # also the configuration the breadth harness measures.
         from orthonym import Orthonym
 
-        # Spelling updated with the P-16.7.1(a) elision fix on the von Baeyer
+        # Spelling updated with the (a) elision fix on the von Baeyer
         # path: 'diamine' begins with a CONSONANT, so the terminal 'e' of the
         # 'ene' ending is RETAINED ('...triene-3,4-diamine'). The previous
         # expectation '...trien-3,4-diamine' encoded the defect -- the cage
@@ -132,7 +132,7 @@ class TestRecoveredName:
         #
         # Evidence for the moved value (OPSIN accepts BOTH spellings and
         # returns the same structure, so round-trip cannot adjudicate it):
-        # * P-16.7 "ELISION OF VOWELS", P-16.7.1(a) (the Blue Book) --
+        # * "ELISION OF VOWELS", (a) (the Blue Book) --
         # elision applies to the 'ene'/'yne' endings only before a suffix
         # beginning 'a', 'e', 'i', 'o', 'u', or 'y'.
         # * Worked example in the Blue Book: 'undeca-2,9-diene-4,8-diol

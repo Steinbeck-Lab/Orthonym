@@ -1,5 +1,5 @@
-"""v37 SP2.1' — spiro-VB substituent supplier: acyloxy ester must be named
-(threaded as a P-65.6.3.2.3 detachable prefix), never dropped or mis-spelled.
+"""' — spiro-VB substituent supplier: acyloxy ester must be named
+(threaded as a detachable prefix), never dropped or mis-spelled.
 
 RE-SCOPED from the refuted deep-VB-numbering task (SP2.0/rescope: 0/38 of the
 spiro-VB abstainer bucket is blocked by ring numbering). The real blocker for the
@@ -9,7 +9,7 @@ retained acid is mis-spelled by ``name_substituent`` as an OPSIN-grammar-invalid
 oxa-replacement chain (``...-2-oxo-1-oxabutyl``), so the whole complex-ring name
 is suppressed and the molecule abstains — a breadth loss (0-wrong already held).
 
-STEP-1 (invariant 8) VERIFIED on HEAD in a fresh process: the drop is at the
+ (a project rule) VERIFIED on HEAD in a fresh process: the drop is at the
 ``_enrich_complex_ring_with_subs`` consumer of ``name_spiro_vonbaeyer``
 (composer.py), NOT in the spiro-VB numbering core. ``name_substituent`` returned
 ``(3S)-4-chloro-3-hydroxy-3-methyl-2-oxo-1-oxabutyl`` for W1's ester (grammar-
@@ -20,7 +20,7 @@ engine (``rules.lipids._acyloxy_for_site`` -> full ``name_compound`` on the
 isolated acid) — the SAME machinery the ordinary substitutive path uses
 (``substituent_naming.py`` Pass 1c / enumerator Tier 1.95). Byte-identical for a
 retained acyl (``acetyloxy`` stays bare); it only REPLACES the grammar-invalid
-oxa-chain for a systematic acyl. SELF-01 round-trip is the 0-wrong gate.
+oxa-chain for a systematic acyl. round-trip is the 0-wrong gate.
 """
 import pytest
 

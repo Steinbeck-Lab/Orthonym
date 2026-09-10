@@ -79,7 +79,7 @@ def quinuclidine():
 
 
 # ============================================================================
-# Tests for is_bicyclo_system()
+# Tests for is_bicyclo_system
 # ============================================================================
 
 class TestIsBicycloSystem:
@@ -123,7 +123,7 @@ class TestIsBicycloSystem:
 
 
 # ============================================================================
-# Tests for find_true_bridgeheads()
+# Tests for find_true_bridgeheads
 # ============================================================================
 
 class TestFindTrueBridgeheads:
@@ -163,7 +163,7 @@ class TestFindTrueBridgeheads:
 
 
 # ============================================================================
-# Tests for find_bridge_paths()
+# Tests for find_bridge_paths
 # ============================================================================
 
 class TestFindBridgePaths:
@@ -201,7 +201,7 @@ class TestFindBridgePaths:
 
 
 # ============================================================================
-# Tests for get_bridge_lengths()
+# Tests for get_bridge_lengths
 # ============================================================================
 
 class TestGetBridgeLengths:
@@ -244,7 +244,7 @@ class TestGetBridgeLengths:
 
 
 # ============================================================================
-# Tests for generate_bicyclo_descriptor()
+# Tests for generate_bicyclo_descriptor
 # ============================================================================
 
 class TestGenerateBicycloDescriptor:
@@ -299,7 +299,7 @@ class TestGenerateBicycloDescriptor:
 
 
 # ============================================================================
-# Tests for name_bicyclo_system()
+# Tests for name_bicyclo_system
 # ============================================================================
 
 class TestNameBicycloSystem:
@@ -390,19 +390,19 @@ class TestRetainedNames:
 
     @pytest.mark.unit
     def test_retained_names_count(self):
-        """Should have at least 5 retained bicyclo names (RING-04: added bornane, pinane)."""
+        """Should have at least 5 retained bicyclo names (: added bornane, pinane)."""
         assert len(BICYCLO_RETAINED_NAMES) >= 5
 
     @pytest.mark.unit
     def test_bornane_canonical_lookup(self):
-        """Bornane should be found by canonical SMILES (RING-04)."""
+        """Bornane should be found by canonical SMILES ."""
         canonical = "CC12CCC(CC1)C2(C)C"
         name = get_retained_bicyclo_name(canonical)
         assert name == "bornane"
 
     @pytest.mark.unit
     def test_pinane_canonical_lookup(self):
-        """Pinane should be found by canonical SMILES (RING-04)."""
+        """Pinane should be found by canonical SMILES ."""
         canonical = "CC1CCC2CC1C2(C)C"
         name = get_retained_bicyclo_name(canonical)
         assert name == "pinane"
@@ -521,7 +521,7 @@ class TestBicycloNamingIntegration:
 
 
 # ============================================================================
-# a phase.5 SUB-02 — bridged-bicyclic bridgehead perception (Wave 0)
+# a phase — bridged-bicyclic bridgehead perception (Wave 0)
 #
 # The NEGATIVE canaries are the #1 regression gate (C3/): relaxing the
 # bridgehead predicate makes naphthalene/decalin yield 2 bridgeheads identical
@@ -553,33 +553,33 @@ class TestSUB02NegativeCanary:
 
     def test_negative_cubane_retained(self):
         # a phase: cubane is a retained name AND a PIN (Blue Book line 9881 /
-        # P-23.2.5.1). The bicyclo_systems catalog key was previously the WRONG
+        #. The bicyclo_systems catalog key was previously the WRONG
         # (CH)8 cage isomer (InChIKey BOLISNSTKUABPW), so true cubane missed its
         # retained name and got the systematic von-Baeyer name. After the rekey to
         # the true cubane canonical (TXWRERCHRDBNLG) it correctly emits 'cubane'.
         assert name_compound("C12C3C4C1C5C2C3C45") == "cubane"
 
     def test_negative_bridged_tricyclic_unchanged(self):
-        # 13B(d) + M4#1: the P-23.2.1 main-ring fix selects the maximal
-        # (9-membered) main ring (branches 5,2), and the P-23.2.4 main-bridge
+        # 13B(d) + M4#1: the main-ring fix selects the maximal
+        # (9-membered) main ring (branches 5,2), and the main-bridge
         # fix then selects the maximal (2-atom) main bridge -- giving
         # tricyclo[5.2.2.0^4,10]undecane, not the older tricyclo[5.2.1.1^4,10]
-        # (main bridge 1, secondary bridge 1). P-23.2.4 (the Blue Book): the
+        # (main bridge 1, secondary bridge 1). (the Blue Book): the
         # main bridge "includes as many of the atoms as possible that are not
         # included in the main ring", so 2 is preferred over 1. Both descriptors
         # round-trip to the same C11 cage via OPSIN; the new form is the more
-        # P-23.2.4-conformant decomposition.
+        # -conformant decomposition.
         assert name_compound("C1CC2CCC3CCC1C2C3") == \
             "tricyclo[5.2.2.0^4,10]undecane"
 
 
 @pytest.mark.unit
 class TestSUB02Camphor:
-    """SUB-02 target — camphor names algorithmically as a bicyclo[2.2.1]
+    """ target — camphor names algorithmically as a bicyclo[2.2.1]
     heptan-2-one (xfail until Plan 03 relaxes the bridgehead predicate)."""
 
     def test_camphor_is_bicycloheptanone(self):
-        # SUB-02 Plan 03: bridgehead predicate relaxation + carbonyl-suffix
+        # Plan 03: bridgehead predicate relaxation + carbonyl-suffix
         # emission -> camphor now names as a bicyclo[2.2.1]heptan-N-one form
         # (was the wrong monocyclic (2R,5R)-1,1,2-trimethylcyclopentan-2-one).
         name = name_compound("CC1(C)[C@@H]2CC[C@@]1(C)C(=O)C2")
@@ -609,27 +609,27 @@ class TestSUB02Camphor:
 
 @pytest.mark.unit
 class TestBicycloDiketoneSuffix:
-    """WR-03 + IN-06 (code review 2026-06-02): a bicyclic DIKETONE must emit BOTH
+    """ + (code review 2026-06-02): a bicyclic DIKETONE must emit BOTH
     carbonyl locants with the 'di' multiplier, and keep the parent's terminal 'e'
-    before the consonant-initial '-dione' (IUPAC P-16.3.3)."""
+    before the consonant-initial '-dione' (IUPAC."""
 
     def test_bicyclo_diketone_names_both_carbonyls(self):
         # Both carbonyls emitted with the 'di' multiplier; terminal 'e' RETAINED
-        # before the consonant-initial '-dione' (IN-06 / P-16.7.1(a) elision rule).
-        # a phase WS-6 (DEF-7): von Baeyer numbering now obeys P-14.4, giving the
+        # before the consonant-initial '-dione' (/ (a) elision rule).
+        # a phase : von Baeyer numbering now obeys, giving the
         # carbonyls the LOWEST locants {2,6} (compare_locant_sets([2,6],[3,8]) < 0).
         # The prior '3,8-dione' was the topology-only numbering the audit flagged
         # (RT-valid but non-PIN). Verified: 'bicyclo[2.2.2]octane-2,6-dione'
         # OPSIN-round-trips to the input.
         name = name_compound("O=C1CC2CCC1C(=O)C2")
         assert name == "bicyclo[2.2.2]octane-2,6-dione"
-        assert "dione" in name           # WR-03: both carbonyls multiplied
-        assert "octane-" in name         # IN-06: parent 'e' kept before 'dione'
+        assert "dione" in name           #: both carbonyls multiplied
+        assert "octane-" in name         #: parent 'e' kept before 'dione'
 
     def test_bicyclo_monoketone_elides_e(self):
         # A single ring ketone elides the 'e' before the vowel-initial '-one'.
-        # a phase WS-6 (DEF-7): P-14.4 numbering gives the ketone the lowest
-        # locant (2, not the prior topology-only 3). This is the DEF-7 gold target
+        # a phase : numbering gives the ketone the lowest
+        # locant (2, not the prior topology-only 3). This is the gold target
         # (benchmarks/the gold set/gold_pins.json) — PIN 'bicyclo[2.2.1]heptan-2-one'.
         name = name_compound("O=C1CC2CCC1C2")
         assert name == "bicyclo[2.2.1]heptan-2-one"

@@ -1,9 +1,9 @@
 """
 OPSIN round-trip integration tests for multi-ring substituent naming.
 
-Phase 82 Plan 02 — Verifies that ring assembly prefixes ([1,1'-biphenyl]-4-yl)
+a phase Plan 02 — Verifies that ring assembly prefixes ([1,1'-biphenyl]-4-yl)
 and mixed-ring compound prefixes round-trip through OPSIN, and that enclosing
-marks follow IUPAC P-16.5.1.1 nesting hierarchy.
+marks follow IUPAC nesting hierarchy.
 """
 
 import subprocess
@@ -77,7 +77,7 @@ skip_no_opsin = pytest.mark.skipif(
 
 
 # ============================================================================
-# Ring Assembly Prefix Round-Trip Tests (IUPAC P-28.3)
+# Ring Assembly Prefix Round-Trip Tests (IUPAC
 # ============================================================================
 
 @pytest.mark.integration
@@ -132,7 +132,7 @@ class TestRingAssemblyRoundTrip:
 
 
 # ============================================================================
-# Mixed-Ring Compound Prefix Round-Trip Tests (IUPAC P-31)
+# Mixed-Ring Compound Prefix Round-Trip Tests (IUPAC
 # ============================================================================
 
 @pytest.mark.integration
@@ -167,7 +167,7 @@ class TestMixedRingRoundTrip:
 
 
 # ============================================================================
-# Enclosing Mark Format Tests (IUPAC P-16.5.1.1)
+# Enclosing Mark Format Tests (IUPAC
 # ============================================================================
 
 @pytest.mark.integration
@@ -189,12 +189,12 @@ class TestEnclosingMarks:
     def test_biphenyl_prefix_has_outer_parentheses(self):
         """Biphenyl prefix wrapped in parentheses: ([1,1'-biphenyl]-N-yl).
 
-        Per IUPAC P-16.5.1.1: parentheses () enclose square brackets [].
+        Per IUPAC: parentheses  enclose square brackets .
         """
         smi = "OC(=O)CCCc1ccc(-c2ccccc2)cc1"
         name = name_compound(smi)
         assert name is not None
-        # Should contain pattern: ([ ... ])
+        # Should contain pattern: ([... ])
         assert "([" in name, (
             f"Expected '([' in name for outer parentheses, got: '{name}'"
         )

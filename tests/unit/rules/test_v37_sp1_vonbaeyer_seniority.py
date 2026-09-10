@@ -1,17 +1,17 @@
-"""v37 SP1.5 -- von Baeyer element-seniority locant tiebreak (P-23.3.2.2).
+""" -- von Baeyer element-seniority locant tiebreak.
 
 For a mixed-heteroatom von Baeyer skeleton, the numbering selector
 (``get_bicyclo_numbering._key_lists``/``_cmp`` in ``rules/bicyclo.py``) used to
 break a heteroatom locant-SET tie ``{2, 6}`` by RDKit atom index -- a SMILES-
 atom-order artifact -- instead of by element seniority. Governing rule:
 
-    P-23.3.2.2 [BBv2:9789], verbatim at ``rules/ring_replacement.py:150-152``:
+     [BBv2:9789], verbatim at ``rules/ring_replacement.py:150-152``:
     "If there is still a choice, low locants are assigned in accord with the
     decreasing seniority order of heteroatoms
-    O > S > Se > Te > N > P > As > Sb > Bi > Si > Ge > Sn > Pb > B > ..."
+    O > S > Se > Te > N > P > As > Sb > Bi > Si > Ge > Sn > Pb > B >..."
 
 So on a set-tie the SENIOR element must take the LOWER locant. Seniority is
-NOT alphabetical and NOT atomic number (note O > S > ... > N).
+NOT alphabetical and NOT atomic number (note O > S >... > N).
 
 RT-valid either way (each heteroatom lands at its locant regardless of which
 gets 2 vs 6), so this is a pure spelling / PIN-preference fix; 0-wrong holds.
@@ -21,7 +21,7 @@ from orthonym import name_compound
 
 
 class TestVonBaeyerHeteroatomSeniorityLocant:
-    """P-23.3.2.2: the senior heteroatom takes the lower locant on a set-tie."""
+    """: the senior heteroatom takes the lower locant on a set-tie."""
 
     def test_oxygen_senior_to_nitrogen(self):
         # O > N: O must take locant 2 (was 6 -- atom-order artifact).

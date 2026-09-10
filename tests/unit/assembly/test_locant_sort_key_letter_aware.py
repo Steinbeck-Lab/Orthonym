@@ -1,6 +1,6 @@
-"""The floor's spiro locant sort key must be LETTER-aware (P-14.5.2 / P-31.1.4).
+"""The floor's spiro locant sort key must be LETTER-aware /.
 
-M4-L2 () admits a fused component's lettered ring-fusion locants
+M4-L2  admits a fused component's lettered ring-fusion locants
 (`4a`, `8a`) into the combined locant map. The sort key that orders substituent
 citation must then distinguish:
   * a lettered locant from a primed one of the same number (`8a` != `8'`), and
@@ -20,7 +20,7 @@ def test_lettered_locant_distinct_from_primed():
 
 
 def test_letter_orders_after_bare_number_before_next():
-    # 4 < 4a < 5 (P-14.5.2: the fusion letter is a suffix of position 4)
+    # 4 < 4a < 5: the fusion letter is a suffix of position 4)
     assert _locant_sort_key("4") < _locant_sort_key("4a") < _locant_sort_key("5")
 
 

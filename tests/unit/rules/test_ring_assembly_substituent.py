@@ -1,13 +1,13 @@
-"""v30 BLOCKER fix — ring-ASSEMBLY as a substituent takes the P-28.3 primed
+""" BLOCKER fix — ring-ASSEMBLY as a substituent takes the primed
 free-valence form ``[1,1'-biphenyl]-4-yl``, never the yl-less parent hydride
 ``1,1'-biphenyl`` (an OPSIN-unparseable substituent token).
 
 Root cause (pre-fix): ``name_ring_system_substituent``'s enumerator fallback
 routed a biphenyl fragment through the generic cascade, which returned the
 PARENT hydride ``1,1'-biphenyl``; wrapping it shipped ``(1,1'-biphenyl)methyl``
-etc. — SELF-01 suppressed it on the PIN path (abstain) and T4 shipped it
+etc. — suppressed it on the PIN path (abstain) and shipped it
 unverified (wrong). Fix routes ring-assembly substituent fragments through the
-existing ``name_ring_assembly_prefix`` (the same P-28.3 builder the whole-
+existing ``name_ring_assembly_prefix`` (the same builder the whole-
 molecule composer already trusts), with a fail-closed backstop.
 
 Note: a naive decomposition renders biphenyl-as-substituent as
@@ -84,7 +84,7 @@ def test_fused_polycycle_is_not_an_assembly():
     ("Cc1ccc(-c2cccs2)s1", "[2,2'-bithiophen]-5-yl"),
 ])
 def test_heteroaromatic_assembly_free_valence_not_on_junction(smi, expected):
-    """Fable BLOCKER 1: the -yl locant must use the junction-aware per-system
+    """a review BLOCKER 1: the -yl locant must use the junction-aware per-system
     numbering, not orient_heterocycle-in-isolation which placed it ON the 2,2'
     junction ('[2,2'-bithiophen]-2-yl'). Correct is 5-yl (the far position)."""
     m = Chem.MolFromSmiles(smi)
@@ -124,11 +124,11 @@ def test_terphenyl_detected_as_assembly():
     ("CC1CC1C1CC1", "[1,1'-bi(cyclopropan)]-2-yl"),
 ])
 def test_saturated_assembly_component_is_parenthesised(smi, expected):
-    """P-28.2.1 (BB:16122 '[1,1'-bi(cyclohexan)]-4-yl' preferred prefix): a
+    """ (the Blue Book '[1,1'-bi(cyclohexan)]-4-yl' preferred prefix): a
     NON-retained (cycloalkane / von Baeyer) assembly component takes parentheses
     in the SUBSTITUENT prefix too, mirroring the parent path's _enclose_component
     — not the buggy paren-less '[1,1'-bicyclohexan]-2-yl' (RT-valid, so it was
-    invisible to every gate; the spelling-layer blind spot, fable-found)."""
+    invisible to every gate; the spelling-layer blind spot, a review-found)."""
     m = Chem.MolFromSmiles(smi)
     ri = m.GetRingInfo()
     ring = tuple(a.GetIdx() for a in m.GetAtoms() if ri.NumAtomRings(a.GetIdx()) > 0)
@@ -147,7 +147,7 @@ def test_retained_mancude_assembly_stays_bare():
 
 
 def test_terphenyl_substituent_middle_ring_locant():
-    """151-03 D-18/D-19 bug fixed on the substituent path too: para-terphenyl's
+    """151-03 / bug fixed on the substituent path too: para-terphenyl's
     MIDDLE ring back-attachment locant must be 4' ('1,1':4',1'''), not the buggy
     per-pair '1,1':1',1''' that OPSIN parses to a different (spiro) molecule."""
     mol, ring_atoms, attach, _ = _biphenyl_attach(

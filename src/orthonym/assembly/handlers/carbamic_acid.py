@@ -1,15 +1,15 @@
-"""Phase 160 carbamic_acid handler — Tier B retained-name (gate 0.40).
+"""a phase carbamic_acid handler — Tier B retained-name (gate 0.40).
 
 Verbatim lift of composer.py:855-863 (inline branch) +
-composer.py:2498-2560 (_name_carbamic_acid body). Per CONTEXT D-24,
+composer.py:2498-2560 (_name_carbamic_acid body). Per internal notes,
 body stays in composer.py until Plan-03 commit 03-10.
 
-IUPAC cite: P-66.5.5 (carbamic acids; retained name with N-substitution).
+IUPAC cite: (carbamic acids; retained name with N-substitution).
 
 References:
 - composer.py:855-863 (inline dispatch branch; REMOVED at this commit).
 - composer.py:2498-2560 (_name_carbamic_acid body).
-- 160-AUDIT-DECOMP.md § 1 row 'carbamic_acid' + § 2.7 purity proof.
+- internal notes-DECOMP.md row 'carbamic_acid' + purity proof.
 """
 from __future__ import annotations
 
@@ -26,7 +26,7 @@ def _is_carbamic_acid(features: Any) -> bool:
 def name_carbamic_acid(
     features: Any, mol: Any = None, style: str = "pin",
 ) -> Optional[NamingResult]:
-    """Phase 160 Tier-B carbamic acid handler.
+    """a phase Tier-B carbamic acid handler.
 
     Verbatim semantics of composer.py:855-863.
     """

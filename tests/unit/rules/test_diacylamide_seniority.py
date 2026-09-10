@@ -1,8 +1,8 @@
-"""P-66.1.2.1 — (R-CO)2NH named as N-acyl derivative of the SENIOR primary amide.
+""" — (R-CO)2NH named as N-acyl derivative of the SENIOR primary amide.
 
-BB P-66.1.2.1 (Diacylamines): a diacylamide is named as the N-acyl derivative of the
+BB (Diacylamines): a diacylamide is named as the N-acyl derivative of the
 senior primary amide; verbatim example 'N-acetylbenzamide (PIN)'. The senior acid is
-chosen by P-41 (here both are carboxylic acids, so P-44.1.2.2 ring>chain: benzoic >
+chosen by (here both are carboxylic acids, so ring>chain: benzoic >
 acetic), so benzamide is the parent and acetyl the N-acyl prefix -- NOT the other way.
 
 Root cause was decomposition/engine.py::_select_best_bond choosing the cleaved acid by

@@ -1,6 +1,6 @@
 """ Phase-A: determinism gate — same molecule => same PIN regardless of SMILES atom order.
 
-P-14.3.5 / P-44.3.3 / P-63.1.1.2 require a UNIQUE PIN. If the name changes when the same molecule
+ / / require a UNIQUE PIN. If the name changes when the same molecule
 is re-spelled, the selection cascade fell through to input order (a Blue-Book violation RT cannot see).
 
 Each curated probe (benchmarks/the gold set/determinism_probes.json) is named from its input SMILES, its

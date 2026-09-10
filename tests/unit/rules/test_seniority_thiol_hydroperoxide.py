@@ -1,14 +1,14 @@
 """
-Tests verifying the thiol-vs-hydroperoxide seniority (BBR-HYG/D-09, Phase 169.7).
+Tests verifying the thiol-vs-hydroperoxide seniority (BBR-HYG/, a phase).
 
 CORRECTION: the prior version of this file asserted the INVERSE (hydroperoxide
-outranks thiol, mis-citing "P-43 Table 5.1 Class 19/20"). That was the audit's
-DISC-04 inversion bug. Per IUPAC 2013 Blue Book P-41 Table 4.1 (BlueBookV2 lines
+outranks thiol, mis-citing " Class 19/20"). That was the audit's
+ inversion bug. Per IUPAC 2013 Blue Book (the Blue Book lines
 ~18190-18191, verbatim):
 
-    17  Hydroxy compounds and chalcogen analogues  (alcohols, phenols, -ol, -thiol,
+    17 Hydroxy compounds and chalcogen analogues (alcohols, phenols, -ol, -thiol,
         -selenol, -tellurol)
-    18  Hydroperoxides (peroxols), i.e. -OOH
+    18 Hydroperoxides (peroxols), i.e. -OOH
 
 so class 17 (hydroxy + thiol/selenol/tellurol) is SENIOR to class 18 (hydroperoxide).
 The 169.7 swap moved hydroperoxide BELOW the chalcogen-ols; these tests now assert
@@ -43,7 +43,7 @@ class TestHydroperoxideThiolSeniority:
 
     def test_combined_sh_ooh_selects_thiol(self):
         """For a molecule with both -SH and -OOH, the principal group is THIOL
-        (class 17), with -OOH expressed as the hydroperoxy prefix (P-41 Table 4.1)."""
+        (class 17), with -OOH expressed as the hydroperoxy prefix."""
         smiles = "OOCCS"  # 2-hydroperoxyethane-1-thiol
         mol = Chem.MolFromSmiles(smiles)
         assert mol is not None, f"Failed to parse SMILES: {smiles}"

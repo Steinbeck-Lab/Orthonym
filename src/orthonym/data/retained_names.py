@@ -29,10 +29,10 @@ RETAINED_NAMES = {
     "c1ccc2ccccc2c1": "naphthalene",
     # a phase: pentalene (PIN per Blue Book line 11459; bicyclo[3.3.0] fully
     # mancude non-benzenoid). HEAD dropped one ring -> 'cyclopenta-1,3-diene'
-    # (SELF-01-suppressed to 'unknown'); the retained name keeps both rings.
+    # (-suppressed to 'unknown'); the retained name keeps both rings.
     # OPSIN-RT verified ('pentalene' -> same molecule).
     "C1=CC2=CC=CC2=C1": "pentalene",
-    # P-25.1.2.3 / P-25.3 (the Blue Book "pentalene (PIN) octalene (PIN)"):
+    # / (the Blue Book "pentalene (PIN) octalene (PIN)"):
     # the mancude bicyclo[6.6.0] all-carbon fused system is the retained PIN
     # 'octalene', not a von Baeyer name. Exact-SMILES retained parent.
     "c1cccc2ccccccc-2cc1": "octalene",
@@ -60,9 +60,9 @@ RETAINED_NAMES = {
     # key OC(=O)C(O)=O never matched (every input canonicalizes to
     # O=C(O)C(=O)O), so the canonical SMILES resolved to the OPSIN-import
     # 'dihydroxalate' instead. Re-key to canonical + deny 'dihydroxalate' in
-    # iupac_2013_pin_list.json so this retained PIN (P-65.1.1.1) wins the merge.
+    # iupac_2013_pin_list.json so this retained PIN wins the merge.
     "O=C(O)C(=O)O": "oxalic acid",
-    # Task 1.10 (PIN-policy): oxamic acid is a retained PIN (P-65.1.1.1) with no
+    # Task 1.10 (PIN-policy): oxamic acid is a retained PIN with no
     # prior key (systematic engine emits '1-carbamoylmethanoic acid' otherwise).
     "NC(=O)C(=O)O": "oxamic acid",
     "OC(=O)CC(=O)O": "malonic acid",
@@ -78,14 +78,14 @@ RETAINED_NAMES = {
     "O=Cc1ccccc1": "benzaldehyde",
 
     # === KETONES ===
-    # NOTE: acetone removed -- IUPAC 2013 P-31.1.3 PIN is "propan-2-one"
+    # NOTE: acetone removed -- IUPAC 2013 PIN is "propan-2-one"
     #: `chalcone` is the ONE retained ketone name that is a PIN.
-    # P-64.2.1.1 (the Blue Book), under `### **P-64.2.1** Retained names`:
+    # (the Blue Book), under `### **** Retained names`:
     # "The name 'chalcone' is the only retained name as a preferred IUPAC name
     # and is limited to ring substitution only by characteristic groups lower
     # than 'ketone'. Chalcone refers only to the trans- or (E)- stereoisomer."
     # The (PIN) line follows at:28299 -- `chalcone (PIN) (2E)-1,3-diphenyl-
-    # prop-2-en-1-one`. P-64.2.1.2 (:28307) then closes the GENERAL-only ketone
+    # prop-2-en-1-one`. (:28307) then closes the GENERAL-only ketone
     # list and ends "Substitutive names, systematically constructed, are the
     # preferred IUPAC names for ketones" -- which is why acetophenone and
     # benzophenone below are `_PIN_DENY_HC`-demoted to general-only while this
@@ -124,13 +124,13 @@ RETAINED_NAMES = {
     "O=C(c1ccccc1)c1ccccc1": "benzophenone",
 
     # === AMINES ===
-    # P-62.2.1.2 / P-15.2: methylamine / ethylamine / trimethylamine /
+    # /: methylamine / ethylamine / trimethylamine /
     # triethylamine are GENERAL-nomenclature functional-class names, NOT PINs.
     # The PINs are the substitutive forms (methanamine, ethanamine,
     # N,N-dimethylmethanamine, N,N-diethylethanamine), which the systematic
     # path already produces once these retained entries are absent. Removed from
     # the PIN-headline path (DD1 Fix 4 / H5). 'aniline' IS a retained PIN
-    # (P-62.2.1.1.1) and stays.
+    # and stays.
     "Nc1ccccc1": "aniline",
 
     # === PHENOLS ===
@@ -144,16 +144,16 @@ RETAINED_NAMES = {
     # === 5-MEMBERED AROMATIC HETEROCYCLES ===
     "c1ccoc1": "furan",
     "c1ccsc1": "thiophene",
-    # Azoles carry a leading indicated hydrogen in the PIN (P-25.7.1.3): the
+    # Azoles carry a leading indicated hydrogen in the PIN: the
     # NH is the indicated-H position, cited as 1H-. Each SMILES key fixes a
     # specific tautomer, so the indicated-H locant is determined per key
-    # (all OPSIN-2.9.0 round-trip verified, IH-01).
+    # (all OPSIN-2.9.0 round-trip verified,).
     "c1cc[nH]c1": "1H-pyrrole",
     "c1c[nH]cn1": "1H-imidazole",
     "c1cnc[nH]1": "1H-imidazole",
     "c1cn[nH]c1": "1H-pyrazole",   # Canonical SMILES for pyrazole
     "c1cc[nH]n1": "1H-pyrazole",   # Alternate input form
-    "c1cocn1": "1,3-oxazole",   # HW-locant PIN (P-52.2.2.2 / P-22.2.1); 'oxazole' is general-only
+    "c1cocn1": "1,3-oxazole",   # HW-locant PIN /; 'oxazole' is general-only
     "c1cnco1": "1,3-oxazole",   # Alternate input form
     "c1cnoc1": "1,2-oxazole",   # PIN (was 'isoxazole')
     "c1ccno1": "1,2-oxazole",   # Alternate input form
@@ -166,7 +166,7 @@ RETAINED_NAMES = {
     # (CAS-style) name that is NOT a PIN, and it was live: `c1nc[nH]n1` emitted
     # `s-triazole`, and once the N-substituted form began resolving here it
     # assembled as the malformed `1-methyls-triazole`. The PIN is the HW name
-    # plus its indicated hydrogen: P-14.7.1 (`the Blue Book`) "in a
+    # plus its indicated hydrogen: (`the Blue Book`) "in a
     # preferred IUPAC name a locant and the symbol 'H' must be cited", over the
     # HW name the Blue Book's own glossary spells out at `:1832`
     # ("for example 1,2,4-triazole and 1,2-oxazole"); `:42460` prints the parent
@@ -174,8 +174,8 @@ RETAINED_NAMES = {
     # (PIN)`. Hand-curated wins the merge, so this row is what ships.
     "c1nc[nH]n1": "1H-1,2,4-triazole",
     # 5-membered heteroarenes with THREE heteroatoms (>=1 N): Hantzsch-Widman
-    # PINs (P-25.2.1; furazan is general-only, PIN = 1,2,5-oxadiazole per
-    # P-31.1.4.2.4 / BlueBookV2 line 14717). No indicated H (all ring N are
+    # PINs; furazan is general-only, PIN = 1,2,5-oxadiazole per
+    # / the Blue Book). No indicated H (all ring N are
     # pyridine-type). Each key is canonical(OPSIN(name)) => bare name AND the
     # free-valence substituent locant round-trip (T2, OPSIN-RT verified).
     "c1ncon1": "1,2,4-oxadiazole",
@@ -199,7 +199,7 @@ RETAINED_NAMES = {
     "c1ccc2ncccc2c1": "quinoline",
     "c1ccc2cnccc2c1": "isoquinoline",
     "c1ccc2[nH]ccc2c1": "1H-indole",  # 1H-indole is IUPAC 2013 PIN
-    # === GROUP-15 (As/P) FUSED RING RETAINED PARENTS (P-25.2.1 Table 2.9) ===
+    # === GROUP-15 (As/P) FUSED RING RETAINED PARENTS ===
     # the Blue Book "arsenic or phosphorus atoms replace nitrogen atoms";
     # the arsenic/phosphorus analogues of indole/isoindole/indolizine/quinolizine
     # are retained PINs spelled with the terminal 'e' (the Blue Book "arsindole (PIN)
@@ -218,46 +218,46 @@ RETAINED_NAMES = {
     "c1ccp2cccc2c1": "phosphindolizine",        # the Blue Book (5+6 indolizine-type, fully mancude: NO indicated H)
     # phosphinolizine is the 6+6 QUINOLIZINE analogue (Table 2.9 row 15), so it
     # carries indicated hydrogen exactly like its N parent: the Blue Book "the PIN is
-    # 4H-quinolizine"; P-14.7.1 (the Blue Book) + P-25.7.1.3.1 (the Blue Book) require the
+    # 4H-quinolizine"; (the Blue Book) + (the Blue Book) require the
     # indicated H to be cited. The bare "phosphinolizine (PIN)" in Table 2.9 is
     # shorthand (as "quinolizine (PIN)" is). OPSIN parses 4H-phosphinolizine to the
     # identical structure (RT-verified). 11-FABLEFIX.
     "C1=CCP2C=CC=CC2=C1": "4H-phosphinolizine",  # the Blue Book / the Blue Book (6+6 quinolizine analogue)
     "c1ccc2[nH]cnc2c1": "1H-benzimidazole",  # 1H-benzimidazole is IUPAC 2013 PIN
-    # P-25.2.2.4 (the Blue Book) "for preferred IUPAC names locants must be
+    # (the Blue Book) "for preferred IUPAC names locants must be
     # cited": the (PIN) example prints "1-benzofuran (PIN) benzofuran" -- the bare
     # stem is a retained general name, the PIN carries the O locant. The FUSED
     # catalog already spells these '1-*', but this hand-curated retained entry wins
     # the ALL_RETAINED_NAMES merge, so the bare-parent PIN is fixed here.
     "c1ccc2occc2c1": "1-benzofuran",
     # the Blue Book "(2,1-benzothiazole is senior to 1-benzothiophene)"
-    # confirms the PIN stem is '1-benzothiophene' (P-25.2.2.4 locant citation).
+    # confirms the PIN stem is '1-benzothiophene' locant citation).
     "c1ccc2sccc2c1": "1-benzothiophene",
     "c1cnc2ccccc2n1": "quinazoline",
     "c1ccc2nccnc2c1": "quinoxaline",
     "c1ncnc2[nH]cnc12": "7H-purine",  # 7H-purine is IUPAC 2013 PIN
 
-    # === RETAINED TRICYCLIC RING PARENTS (P-25.2.1 / P-25.2.2.3) ===
-    # As/Sb/P/Se fused-ring heterocycles are P-25 organic ring nomenclature and
-    # ARE IN SCOPE (out-of-scope is P-69 organometallics only). Bare parents; the
+    # === RETAINED TRICYCLIC RING PARENTS / ===
+    # As/Sb/P/Se fused-ring heterocycles are organic ring nomenclature and
+    # ARE IN SCOPE (out-of-scope is organometallics only). Bare parents; the
     # name-only ALL_RETAINED_NAMES path preempts the errors.py "<metal> compound
     # (not supported)" last-resort fallback (trace-verified). OPSIN 2.9.0 round-trips
     # every one to the input InChIKey. Keys are RDKit-canonical.
-    # P-25.2.1 (heteroatom analogues of acridine/phenanthridine):
+    # (heteroatom analogues of acridine/phenanthridine):
     "C1=c2ccccc2=c2ccccc2=[As]1": "arsanthridine",     # the Blue Book arsanthridine (PIN)
     "C1=c2ccccc2=[As]c2ccccc21": "acridarsine",        # the Blue Book acridarsine (PIN)
     "c1ccc2pc3ccccc3cc2c1": "acridophosphine",         # the Blue Book acridophosphine (PIN)
-    # P-25.2.2.3 (phenoxa-/phenothia- C4OX-C6-C6 family, the Blue Book table):
+    # (phenoxa-/phenothia- C4OX-C6-C6 family, the Blue Book table):
     # phenoxathiine's bare parent is emitted from ALL_RETAINED_NAMES, where the
     # OPSIN import (_OPSIN_NAMES) carries the non-PIN 'phenoxathiin' (trace-verified
-    # winning source); this hand-curated entry overrides it with the P-25.2.2.3 PIN
+    # winning source); this hand-curated entry overrides it with the PIN
     # 'phenoxathiine' (the Blue Book "X = S phenoxathiine (PIN)"). The FUSED
     # catalog value is fixed in lockstep for the substituted/fused path.
     "c1ccc2c(c1)Oc1ccccc1S2": "phenoxathiine",         # the Blue Book phenoxathiine (PIN)
     "c1ccc2c(c1)Oc1ccccc1[Se]2": "phenoxaselenine",    # the Blue Book phenoxaselenine (PIN)
     # The 4 X-H (P/As/Sb) tricyclics carry a saturated X-H at ring position 10, so
     # their PIN cites the mandatory indicated hydrogen 10H- (the Blue Book
-    # print the "10H-isomer shown"; P-25.7.1.3 (the Blue Book) "all indicated hydrogen atoms
+    # print the "10H-isomer shown"; (the Blue Book) "all indicated hydrogen atoms
     # must be cited"), exactly as the isostructural N-cases emit 10H-phenoxazine /
     # 10H-phenothiazine. (phenoxaselenine/phenoxathiine have divalent Se/S = no H.)
     "c1ccc2c(c1)Oc1ccccc1P2": "10H-phenoxaphosphinine",    # the Blue Book 10H-phenoxaphosphinine (PIN)
@@ -309,7 +309,7 @@ RETAINED_NAMES = {
     "CC(=O)N": "acetamide",
     "CC(N)=O": "acetamide",  # canonical form of CC(=O)N
 
-    # === HYDRAZIDES (P-66.3.1.1: retained acyl-stem + hydrazide) ===
+    # === HYDRAZIDES: retained acyl-stem + hydrazide) ===
     # C1: formic acid -> formohydrazide (H-C(=O)-NH-NH2)
     "NNC=O": "formohydrazide",
     # C2: acetic acid -> acetohydrazide (CH3-C(=O)-NH-NH2)
@@ -317,7 +317,7 @@ RETAINED_NAMES = {
     # Aromatic: benzoic acid -> benzohydrazide (C6H5-C(=O)-NH-NH2)
     "NNC(=O)c1ccccc1": "benzohydrazide",
     # C2 diacid: oxalic acid -> oxalohydrazide (H2N-NH-CO-CO-NH-NH2). One of the
-    # five retained hydrazide PINs (P-66.3.1.2.1, the Blue Book "acetohydrazide (PIN)
+    # five retained hydrazide PINs, the Blue Book "acetohydrazide (PIN)
     # benzohydrazide (PIN) oxalohydrazide (PIN)"); the systematic form is
     # 'ethanedihydrazide'. Oxalic acid has no substitutable position, so only the
     # bare molecule is in scope -> exact-SMILES retained key.
@@ -327,17 +327,17 @@ RETAINED_NAMES = {
     # These carbonic-acid derivatives have PINs the substitutive engine cannot
     # derive; the OPSIN-import trivials (is_pin=False) are denied in
     # iupac_2013_pin_list.json and routed to --trivial. Phosgene model.
-    # W3-P01-4 (P-68.3.1.2.6): H2N-NH-C(=O)-NH-NH2. PIN hydrazinecarbohydrazide
+    # W3-P01-4: H2N-NH-C(=O)-NH-NH2. PIN hydrazinecarbohydrazide
     # (the Blue Book); the Blue Book 'the names carbonohydrazide, carbohydrazide, and
     # carbazide are not recommended'. Canonical key of NNC(=O)NN.
     "NNC(=O)NN": "hydrazinecarbohydrazide",
-    # W3-P01-5 (P-68.3.1.3.4): HN=N-C(=O)-NH-NH2. PIN diazenecarbohydrazide
+    # W3-P01-5: HN=N-C(=O)-NH-NH2. PIN diazenecarbohydrazide
     # (the Blue Book); the Blue Book 'The name carbazone is not recommended'. Canonical
     # key of N=NC(=O)NN.
     "N=NC(=O)NN": "diazenecarbohydrazide",
-    # W3-P01-6 (P-68.3.1.3.6): HN=N-C(=O)-N=NH. PIN bis(diazenyl)methanone
+    # W3-P01-6: HN=N-C(=O)-N=NH. PIN bis(diazenyl)methanone
     # (the Blue Book '...(PIN) [not 1,1'-carbonylbis(diazene)]'); the -one suffix is
-    # senior to the diazene parent (P-41). REPRODUCE-FIRST: the substitutive
+    # senior to the diazene parent. REPRODUCE-FIRST: the substitutive
     # engine fails closed (unknown) on this symmetric diazenyl ketone, so the
     # exact-SMILES retained PIN supplies it; trivial 'carbodiazone' denied in
     # iupac_2013_pin_list.json (--trivial). Canonical key of N=NC(=O)N=N.
@@ -367,7 +367,7 @@ RETAINED_NAMES = {
     # (fulminic acid, diacetamide and pinacol are NOT listed here -- their
     # systematic engines already derive the correct PIN unaided, verified.)
     #
-    # P-66.5.4.1 / P-61.10 -- HO-N=C:; the Blue Book 'N-hydroxy-λ2-methanamine (PIN)'
+    # / -- HO-N=C:; the Blue Book 'N-hydroxy-λ2-methanamine (PIN)'
     # for the structure drawn at the Blue Book. The trivial 'isofulminic acid' is
     # state (c) NOT ACCEPTABLE (the Blue Book). The λ-superscript is rendered with a
     # plain digit exactly as the on-disk Blue Book renders it in running text
@@ -376,31 +376,31 @@ RETAINED_NAMES = {
     # 'lambda' and 'λ'. InChI normalises the charge-separated [C-]#[N+]O and the
     # neutral [C]=NO to one key (OTXBWGUYZNKPMG), so this key IS the BB's HO-N=C:.
     "[C-]#[N+]O": "N-hydroxy-λ2-methanamine",
-    # P-66.1.6.1.3.2 -- the Blue Book 'carbamimidothioic acid (PIN)' / '(not
+    # -- the Blue Book 'carbamimidothioic acid (PIN)' / '(not
     # isothiourea)'; the Blue Book 'H2N-C(=NH)-SH carbamimidothioic acid (PIN)'.
     "N=C(N)S": "carbamimidothioic acid",
-    # P-66.1.6.3 -- the Blue Book "1,2,3-trithiodicarbonic diamide (PIN) (not
+    # -- the Blue Book "1,2,3-trithiodicarbonic diamide (PIN) (not
     # 'thiuram monosulfide')".
     "NC(=S)SC(N)=S": "1,2,3-trithiodicarbonic diamide",
-    # P-66.1.6.3 -- the Blue Book "2-dithioperoxy-1,3-dithiodicarbonic diamide (PIN)
+    # -- the Blue Book "2-dithioperoxy-1,3-dithiodicarbonic diamide (PIN)
     # (not 'thiuram disulfide')".
     "NC(=S)SSC(N)=S": "2-dithioperoxy-1,3-dithiodicarbonic diamide",
-    # P-66.4.1.2.1 -- the Blue Book 'The names biguanide, triguanide, etc., are no
+    # -- the Blue Book 'The names biguanide, triguanide, etc., are no
     # longer recommended... named systematically as the diamides of
     # imidodicarbonimidic acid, diimidotricarbonimidic acid, and
     # triimidotetracarbonimidic acid.' triguanide is n=3. The sibling n=2
     # (N=C(N)NC(=N)N) already emits 'imidodicarbonimidic diamide' unaided, which
     # is why only the n=3 homologue needs a word-form here.
     "N=C(N)NC(=N)NC(=N)N": "diimidotricarbonimidic diamide",
-    # P-66.1.2.1 -- the Blue Book condemns 'triacetamide'; the (R-CO)3N shape is named
+    # -- the Blue Book condemns 'triacetamide'; the (R-CO)3N shape is named
     # N,N-diacyl + parent carboxamide per the Blue Book, and the Blue Book
     # 'N-acetyl-N-cyclopentylacetamide (PIN)' fixes the acetyl skeleton.
     "CC(=O)N(C(C)=O)C(C)=O": "N,N-diacetylacetamide",
-    # P-63.1.1.2 -- the Blue Book 'pentaerythritol / 2,2-bis(hydroxymethyl)propane-
+    # -- the Blue Book 'pentaerythritol / 2,2-bis(hydroxymethyl)propane-
     # 1,3-diol (PIN)'. Note the deny-only fallback named it a 1,2,3-TRIOL, i.e. a
     # different structure, so this row is a correctness fix and not cosmetic.
     "OCC(CO)(CO)CO": "2,2-bis(hydroxymethyl)propane-1,3-diol",
-    # P-31.1.2.1 -- the Blue Book 'The name carbodiimide, for HN=C=NH, is retained but
+    # -- the Blue Book 'The name carbodiimide, for HN=C=NH, is retained but
     # only for general nomenclature... The systematic name, methanediimine, is
     # the preferred IUPAC name.'
     "N=C=N": "methanediimine",
@@ -409,15 +409,15 @@ RETAINED_NAMES = {
     "ClCCl": "dichloromethane",
     "ClC(Cl)Cl": "chloroform",
     "ClC(Cl)(Cl)Cl": "carbon tetrachloride",
-    # Task 1.10 (PIN-policy): carbonyl dichloride IS the P-65.5.5.1 PIN for
+    # Task 1.10 (PIN-policy): carbonyl dichloride IS the PIN for
     # phosgene (functional-class name the substitutive engine cannot derive;
     # it goes to unknown otherwise). Canonical key of ClC(=O)Cl. The trivial
     # 'phosgene' (OPSIN import) is denied in iupac_2013_pin_list.json.
     "O=C(Cl)Cl": "carbonyl dichloride",
-    # P-66.5.3.1 (Wave-2 completion C): functional-class IS the PIN for
+    # (Wave-2 completion C): functional-class IS the PIN for
     # carbonic-acid nitriles; the engine cannot derive these word-forms.
     "N#CC(=O)C#N": "carbonyl dicyanide",
-    # W3-P01-2 (P-65.1.4.1): methaneperoxoic acid IS the PIN for HC(=O)-O-OH
+    # W3-P01-2: methaneperoxoic acid IS the PIN for HC(=O)-O-OH
     # (the Blue Book '...(PIN) peroxyformic acid performic acid'). Unlike the C>=2
     # case (CCC(=O)OO->propaneperoxoic acid works via the systematic peroxoic
     # suffix), the C1 formic edge case is mis-perceived as an aldehyde and the
@@ -425,7 +425,7 @@ RETAINED_NAMES = {
     # (phosgene model); the trivial 'performic acid' is denied in
     # iupac_2013_pin_list.json (--trivial fallback). Canonical key of O=COO.
     "O=COO": "methaneperoxoic acid",
-    # W3-P01-3 (P-65.5.3.3): carbononitridic chloride IS the PIN for N#C-Cl
+    # W3-P01-3: carbononitridic chloride IS the PIN for N#C-Cl
     # (the Blue Book 'NC-Cl carbononitridic chloride (PIN) cyanic chloride';
     # the Blue Book 'Method (1) generates preferred IUPAC names'). The substitutive
     # engine cannot derive the 'carbononitridic' word-form (same rationale as
@@ -467,7 +467,7 @@ RETAINED_NAMES = {
     "CP(C)(C)=O": "trimethylphosphane oxide",
     "CCP(=O)(CC)CC": "triethylphosphane oxide",
     "O=P(c1ccccc1)(c1ccccc1)c1ccccc1": "triphenylphosphane oxide",
-    # Phosphonic acids (a phase: substituent-prefix PIN P-67.1.1.2 — the
+    # Phosphonic acids (a phase: substituent-prefix PIN — the
     # 'methane'/'ethane' parent-hydride-stem forms are explicitly rejected)
     "CP(=O)(O)O": "methylphosphonic acid",
     "CCP(=O)(O)O": "ethylphosphonic acid",
@@ -476,7 +476,7 @@ RETAINED_NAMES = {
     "CP(C)(=O)O": "dimethylphosphinic acid",
     "CCP(=O)(O)CC": "diethylphosphinic acid",
     # Phosphate esters (functional class naming).
-    # Mono-/di-ester rows for methyl/ethyl were REMOVED here (): "methyl
+    # Mono-/di-ester rows for methyl/ethyl were REMOVED here : "methyl
     # phosphate"/"dimethyl phosphate"/"ethyl phosphate"/"diethyl phosphate"
     # denote the ANION (OPSIN parses them back to the deprotonated dianion),
     # not the neutral acid-ester SMILES these rows were keyed on. The neutral
@@ -490,18 +490,18 @@ RETAINED_NAMES = {
 
     # === RETAINED NITROGEN COMPOUNDS ===
     "NC(N)=O": "urea",
-    # Wave-2 completion (P-66.1.6.1.3 / P-15.5.3.4.3): thiourea is the retained
+    # Wave-2 completion /: thiourea is the retained
     # functional-parent PIN for the standalone NC(=S)N (thio-analogue of urea).
     # The thiourea-as-substituent prefix 'carbamothioylamino' is separate.
     "NC(N)=S": "thiourea",
-    # Wave-2 completion (P-52.1.5.1): pentazolidine — the saturated homogeneous
+    # Wave-2 completion: pentazolidine — the saturated homogeneous
     # all-nitrogen 5-ring (HW-preselected). RDKit aromatises the all-NH ring to
     # [nH]1[nH][nH][nH][nH]1, distinct from 1H-pentazole; exact-SMILES lookup.
     "[nH]1[nH][nH][nH][nH]1": "pentazolidine",
     "N=C(N)N": "guanidine",
-    # Wave2 T2d (P-34.1.1.5 / P-68.3.1.3.5): formazan HN=N-CH=N-NH2 is the
+    # Wave2 /: formazan HN=N-CH=N-NH2 is the
     # retained PIN (fully substitutable; substituted formazans + the
-    # formazan-N-yl prefixes are a deferred follow-on, P-68.3.1.3.5.2). The
+    # formazan-N-yl prefixes are a deferred follow-on,. The
     # systematic fall-through emitted the RT-correct but non-PIN functional-
     # class name '1-diazenylmethanal hydrazone'.
     "N=NC=NN": "formazan",
@@ -509,20 +509,20 @@ RETAINED_NAMES = {
     # === OTHER COMMON COMPOUNDS ===
     "O": "water",
     "N": "ammonia",
-    # Wave2 T2d (P-34.1.1.5 / P-68.3.1.1): bare H2N-OH — retained parent
+    # Wave2 /: bare H2N-OH — retained parent
     # hydride 'hydroxylamine'. The perception SMARTS requires a C on N (the
     # handler names substituted forms), so the bare parent fell through to
     # 'unknown'. Exact-SMILES match, same tier as water/ammonia.
     "NO": "hydroxylamine",
     "O=C=O": "carbon dioxide",
-    # P-66.5.1.2.1 (the Blue Book "HCN formonitrile(PIN) methanenitrile
+    # (the Blue Book "HCN formonitrile(PIN) methanenitrile
     # hydrogen cyanide"): the PIN for HCN is 'formonitrile', not the retained
     # functional-class 'hydrogen cyanide'. Exact-SMILES whole-molecule parent.
     "C#N": "formonitrile",
-    # P-66.5.1.2.1 (the Blue Book "NC-CN oxalonitrile (PIN)
+    # (the Blue Book "NC-CN oxalonitrile (PIN)
     # ethanedinitrile"): the PIN for NC-CN is 'oxalonitrile'. The systematic
     # engine derives 'ethanedinitrile' (right molecule, non-PIN spelling);
-    # exact-SMILES retained PIN wins at RETAINED_NAME@1300.
+    # exact-SMILES retained PIN wins at RETAINED_NAME.
     "N#CC#N": "oxalonitrile",
     "O=S=O": "sulfur dioxide",
     "N#N": "dinitrogen",
@@ -532,13 +532,13 @@ RETAINED_NAMES = {
     "O=[N+]([O-])O": "nitric acid",
     "O=[N+]([O-])OO": "peroxynitric acid",
 
-    # === NITRILES - AROMATIC (a phase.6 BUG-2 fix) ===
-    "N#Cc1ccccc1": "benzonitrile",  # C6H5CN - PIN per P-66.1.1.1
+    # === NITRILES - AROMATIC (a phase fix) ===
+    "N#Cc1ccccc1": "benzonitrile",  # C6H5CN - PIN per
 
     # === AMIDES - AROMATIC (a phase suffix FG fix) ===
-    "NC(=O)c1ccccc1": "benzamide",  # C6H5CONH2 - PIN per P-66.1.1.1
+    "NC(=O)c1ccccc1": "benzamide",  # C6H5CONH2 - PIN per
 
-    # === THIAZOLIDINES (a phase.6 BUG-6 fix) ===
+    # === THIAZOLIDINES (a phase fix) ===
     # 1,3-thiazolidine: S at 1, N at 3 (not adjacent)
     "C1CSCN1": "thiazolidine",
     # 1,2-isothiazolidine: S at 1, N at 2 (adjacent)
@@ -550,7 +550,7 @@ RETAINED_NAMES = {
     # configuration the input lacks -- safe to keep in this dumb, stereo-blind
     # dict.
     "NCC(=O)O": "glycine",
-    # a phase T5 (stereo honesty, LIVE 0-wrong): the other 19 common amino
+    # a phase (stereo honesty, LIVE 0-wrong): the other 19 common amino
     # acids used to have a flat/stereo-free entry HERE too. This dict is keyed
     # by EXACT canonical SMILES with no stereo awareness at all, and
     # `_handle_retained_name` (routing/dispatch_table.py, StoutClass.RETAINED_
@@ -559,7 +559,7 @@ RETAINED_NAMES = {
     # (no wedge/parity), this flat entry matched FIRST and silently emitted the
     # bare retained name (e.g. `NC(CC(N)=O)C(=O)O` -> "asparagine"), which
     # OPSIN parses back to the L stereoisomer -- a stereo the input never
-    # defined (full RT-fail). `## **P-103.1.3.1** The stereodescriptors 'D' and 'L'`
+    # defined (full RT-fail). `## **** The stereodescriptors 'D' and 'L'`
     # (the Blue Book): "The stereodescriptor 'xi' (Greek letter xi)
     # indicates unknown configuration" -- so an unresolved centre must never
     # be spelled with the plain (implicit-L) name. `data.amino_acids.
@@ -575,7 +575,7 @@ RETAINED_NAMES = {
 
     # === ADDITIONAL SATURATED HETEROCYCLES (a phase expansion) ===
     "C1COCCO1": "1,4-dioxane",
-    # P-15.5.3.1 / Table 2.3: morpholine chalcogen-replacement parents.
+    # / Table 2.3: morpholine chalcogen-replacement parents.
     "C1CSCCO1": "1,4-oxathiane",        # O+S ring (was MISLABELED thiomorpholine)
     "C1CSCCN1": "thiomorpholine",       # S-for-O morpholine (PIN; wins OPSIN 'thiamorpholine')
     "C1C[Se]CCN1": "selenomorpholine",  # Se-for-O morpholine (PIN)
@@ -590,7 +590,7 @@ RETAINED_NAMES = {
     # It WAS live: C1CCN2CCCCC2C1 emitted "decahydroisoquinoline". Deleted rather
     # than re-keyed to the true structure, because adding a NEW retained-name
     # emission is a separate decision (the 2013 PIN would carry the full hydro
-    # locant set, P-31.1.4.2) and this change must not smuggle one in.
+    # locant set, and this change must not smuggle one in.
 
     # === FATTY ACIDS (a phase expansion) ===
     "CCCCC(=O)O": "pentanoic acid",
@@ -622,7 +622,7 @@ RETAINED_NAMES = {
     # `CC=CC(=O)O` / `CC=CC=CC(=O)O` / `CC=CC=O` specify no geometry, while
     # crotonic acid IS (E)-but-2-enoic acid (the Z isomer is isocrotonic acid)
     # and sorbic acid IS (2E,4E). So the name named a stereoisomer the input
-    # never claimed -- invisible to SELF-01, which compares the InChIKey
+    # never claimed -- invisible to, which compares the InChIKey
     # skeleton block and is stereo-insensitive by design.
     #
     # Measured at 27160d6a: all three now emit the PIN and round-trip EXACTLY to the
@@ -632,10 +632,10 @@ RETAINED_NAMES = {
     # ⚠ DO NOT extend this deletion to the 19 unqualified amino-acid entries
     # (alanine, leucine, isoleucine, threonine,...). They look identical to a
     # round-trip metric -- OPSIN resolves a bare `isoleucine` to the L-form, so they
-    # fail RT too -- but they are BLUE-BOOK-CORRECT. P-103.1.3.1 "The
+    # fail RT too -- but they are BLUE-BOOK-CORRECT. "The
     # stereodescriptors 'D' and 'L'" (the Blue Book) spells configuration with
     # the prefix: ":54324 L-isoleucine (symbols 'Ile', 'I') (2S,3S)-2-amino-3-
-    # methylpentanoic acid", and the P-103 amino-acid table at:54191 lists bare
+    # methylpentanoic acid", and the amino-acid table at:54191 lists bare
     # `alanine` against a structure drawn WITHOUT stereochemistry
     # ("CH3-CH(NH2)-COOH"). Deleting them would buy 2 round-trip points by emitting
     # a less preferred name -- Goodharting the metric against conformance.
@@ -659,7 +659,7 @@ RETAINED_NAMES = {
     "CC(=O)C=C(C)C": "mesityl oxide",
 
     # === DIOLS AND POLYOLS (a phase expansion) ===
-    # a phase HYG-03: ethylene/propylene/trimethylene glycol removed (deprecated
+    # a phase: ethylene/propylene/trimethylene glycol removed (deprecated
     # "glycol" names, not PINs). Systematic ethane-1,2-diol / propane-1,2-diol /
     # propane-1,3-diol now emitted; also enforced by _PIN_DENY (recurrence guard).
     # See docs/retained_name_conflicts.md § "a phase".
@@ -678,10 +678,10 @@ RETAINED_NAMES = {
     "Oc1ccc(-c2ccccc2)cc1": "4-phenylphenol",
 
     # === COMMON PHARMACEUTICALS (a phase expansion) ===
-    # a phase HYG-03: "aspirin" (brand name) removed; PIN 2-acetyloxybenzoic
+    # a phase: "aspirin" (brand name) removed; PIN 2-acetyloxybenzoic
     # acid now emitted; also enforced by _PIN_DENY. See retained_name_conflicts.md.
 
-    # === CYCLIC IMIDES (a phase, expanded a phase.1) ===
+    # === CYCLIC IMIDES (a phase, expanded a phase) ===
     "O=C1CCC(=O)N1": "succinimide",
     "O=C1C=CC(=O)N1": "maleimide",
     "O=C1CCCC(=O)N1": "glutarimide",
@@ -690,18 +690,18 @@ RETAINED_NAMES = {
     # === COMMONLY ENCOUNTERED RETAINED NAMES (a phase) ===
     # Source: IUPAC 2013 Blue Book, various sections
     # OPSIN RT verified 2026-03-08
-    "c1ccc(-c2ccccc2)cc1": "biphenyl",  # P-31.1.2.4 general nomenclature
-    "C#C": "acetylene",  # P-31.1.2.1 PIN for unsubstituted ethyne
-    "COc1ccccc1": "anisole",  # P-34.1.1.4 PIN
+    "c1ccc(-c2ccccc2)cc1": "biphenyl",  # general nomenclature
+    "C#C": "acetylene",  # PIN for unsubstituted ethyne
+    "COc1ccccc1": "anisole",  # PIN
     #: "caprolactam" WITHDRAWN from the PIN path (demoted to
     # GENERAL_RETAINED_NAMES by the pin:false row in iupac_2013_pin_list.json).
-    # The PIN is `azepan-2-one` -- P-64.3.1 (the Blue Book) "Cyclic anhydrides, esters
+    # The PIN is `azepan-2-one` -- (the Blue Book) "Cyclic anhydrides, esters
     # and amides are named as pseudoketones; the resulting names are preferred
     # IUPAC names", whose own example prints it at the Blue Book: `azepan-2-one (PIN)
-    # hexano-6-lactam (see P-66.1.5.1)`. It was the only break in the systematic
+    # hexano-6-lactam (see `. It was the only break in the systematic
     # series azetidin-2-one / pyrrolidin-2-one / piperidin-2-one / _ / azocan-2-one.
-    # ⚠ The former inline citation here read "P-31.1.4 retained lactam name";
-    # P-31.1.4 (the Blue Book) is "Bi- and polycyclic von Baeyer parent hydrides" and
+    # ⚠ The former inline citation here read " retained lactam name";
+    # (the Blue Book) is "Bi- and polycyclic von Baeyer parent hydrides" and
     # licenses nothing of the sort. `caprolactam` has 0 the Blue Book hits.
     "O=C1CCCCCN1": "caprolactam",
 
@@ -715,7 +715,7 @@ RETAINED_NAMES = {
     "Cc1cn([C@H]2C[C@H](O)[C@@H](CO)O2)c(=O)[nH]c1=O": "thymidine",
     "O=c1ccn([C@@H]2O[C@H](CO)[C@@H](O)[C@H]2O)c(=O)[nH]1": "uridine",
     # a phase: 2'-deoxynucleoside PINs (the prime is REQUIRED — 'deoxyadenosine'
-    # is ambiguous; '2'-deoxyadenosine' is the PIN, P-105.2.1 / carbohydrate P-102.5).
+    # is ambiguous; '2'-deoxyadenosine' is the PIN, / carbohydrate.
     # All four OPSIN-RT; 2'-deoxyuridine was MISSING. Old bare 'deoxy…' keys renamed.
     "Nc1ncnc2c1ncn2[C@H]1C[C@H](O)[C@@H](CO)O1": "2'-deoxyadenosine",
     "Nc1nc2c(ncn2[C@H]2C[C@H](O)[C@@H](CO)O2)c(=O)[nH]1": "2'-deoxyguanosine",
@@ -773,15 +773,15 @@ RETAINED_NAMES = {
     "COc1cc(C(=O)O)ccc1O": "vanillic acid",
 
     # === CYCLIC ANHYDRIDES -> heterocyclic-pseudoketone (dione) PINs ===
-    # D-FOLLOWON item 6 (P-65.7.7.1 method 1): the PIN for a cyclic anhydride is
+    # D-FOLLOWON item 6 method 1): the PIN for a cyclic anhydride is
     # the heterocyclic dione, NOT the functional-class '{diacid} anhydride'.
     # Retargeted from the non-PIN retained names 'maleic anhydride'/'phthalic
-    # anhydride' (general nomenclature only). The anhydride handler (@1200) emits
+    # anhydride' (general nomenclature only). The anhydride handler  emits
     # these via get_retained_name; succinic/glutaric (no retained entry) take the
     # saturated-oxa-dione path (oxolane-2,5-dione / oxane-2,6-dione).
     "O=C1C=CC(=O)O1": "furan-2,5-dione",
     "O=C1OC(=O)c2ccccc21": "2-benzofuran-1,3-dione",
-    # W8-P4 (P-65.7.7.3): the mancude (aromatic-benzo-fused) thio analogue of
+    # W8-P4: the mancude (aromatic-benzo-fused) thio analogue of
     # phthalic anhydride. BB verbatim gives the SATURATED benzo form
     # "hexahydro-2-benzothiophene-1,3-dione (PIN)" (BB 32546); dropping
     # "hexahydro" for this fully-aromatic ring is the direct BB-sanctioned
@@ -854,8 +854,8 @@ RETAINED_NAMES = {
     "O=C(O)c1ccco1": "furan-2-carboxylic acid",       # furoic acid
     # (Wave-2 completion) The old "bipyridyl" row here keyed the canonical
     # SMILES of 2,4'-bipyridine to the NAME "2,2'-bipyridine" — a wrong-key
-    # data bug (SELF-01 suppressed it to unknown). Bipyridines are named
-    # systematically by rules/ring_assemblies.py (P-28.2.1); no retained row.
+    # data bug (suppressed it to unknown). Bipyridines are named
+    # systematically by rules/ring_assemblies.py; no retained row.
     "Oc1cc(O)cc(O)c1": "phloroglucinol",              # benzene-1,3,5-triol
     "c1ccc2c(c1)ccc1cccnc12": "benzo[f]quinoline",
     "c1ccc2c(c1)ccc1ncccc12": "benzo[h]quinoline",
@@ -923,7 +923,7 @@ def is_retained_name_compound(canonical_smiles: str) -> bool:
 def add_retained_name(canonical_smiles: str, name: str) -> None:
     """DEPRECATED: prefer ``orthonym.data.register_retained_name``.
 
-    a phase + REVIEW CR-01 root-cause fix: ``ALL_RETAINED_NAMES``
+    a phase + REVIEW root-cause fix: ``ALL_RETAINED_NAMES``
     is built once at import time (``data/__init__.py``); runtime mutators
     must keep the HC dict and the merged dict synchronised so the public
     ``get_retained_name`` lookup sees new entries.

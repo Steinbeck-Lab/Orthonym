@@ -1,17 +1,17 @@
-"""W2F-P1 Tasks 4-5-7 — P-29.5.2 benzylic-ether classes.
+"""W2F-P1 Tasks 4-5-7 — benzylic-ether classes.
 
-Symmetric class (Tasks 4-5): the PIN is MULTIPLICATIVE (P-51.3.1, BB 23180;
-research §2.A corrects the brief) — new composite-bridge recognizer
+Symmetric class (Tasks 4-5): the PIN is MULTIPLICATIVE, BB 23180;
+research A corrects the brief) — new composite-bridge recognizer
 _try_chalcogenbis_methylene_bridge in rules/multiplicative.py:
--CH2-O-CH2- -> 'oxybis(methylene)' (P-15.3.1.2.2.1, BB 5242 verbatim),
--CH2-S-CH2- -> 'sulfanediylbis(methylene)' (P-29.5.2 family, BB 16256).
+-CH2-O-CH2- -> 'oxybis(methylene)', BB 5242 verbatim),
+-CH2-S-CH2- -> 'sulfanediylbis(methylene)' family, BB 16256).
 
-Asymmetric sub-class (Task 7): P-51.3.1(3) fails -> substitutive PIN with the
+Asymmetric sub-class (Task 7): (3) fails -> substitutive PIN with the
 phenol (PCG) ring as parent; retained 'benzyloxy' is forbidden on a
-substituted ring in PINs (P-29.6.1, BB 16274).
+substituted ring in PINs, BB 16274).
 
 All expected names OPSIN-2.9-verified in
-internal notes §2.D.
+internal notes D.
 """
 import pytest
 from rdkit import Chem
@@ -41,7 +41,7 @@ class TestOxybisMethyleneBridge:
             "4,4'-[sulfanediylbis(methylene)]diphenol"
 
     def test_substituted_identical_units_bis(self):
-        # P-15.3.2.1/P-15.3.2.4.1: substituted identical units take bis(...)
+        # /: substituted identical units take bis(...)
         assert name_compound("Cc1cc(COCc2cc(C)c(O)cc2)ccc1O") == \
             "4,4'-[oxybis(methylene)]bis(2-methylphenol)"
 
@@ -56,7 +56,7 @@ class TestOxybisMethyleneBridge:
     # --- regression anchors: shipped bridge family stays byte-identical ---
 
     def test_methylenebis_oxy_untouched(self):
-        # gold W2C-C-MA-02 (recognizer _try_methylenebis_oxy_bridge:862)
+        # gold W2C-C- (recognizer _try_methylenebis_oxy_bridge:862)
         assert name_compound("Oc1ccc(OCOc2ccc(O)cc2)cc1") == \
             "4,4'-[methylenebis(oxy)]diphenol"
 
@@ -80,7 +80,7 @@ class TestBridgeFailClosed:
         # (canon-identical) so the identity test passes — the shared
         # _resolve_unit_and_assemble per-connection locant equality check
         # (multiplicative.py:1617-1620) is the LOAD-BEARING rejection
-        # (P-51.3.1 condition (3): suffix locants must be identical).
+        # condition (3): suffix locants must be identical).
         from orthonym.rules.multiplicative import (
             _try_chalcogenbis_methylene_bridge,
         )
@@ -119,8 +119,8 @@ class TestBridgeDeterminism:
 
 @pytest.mark.unit
 class TestAsymmetricSubstitutedBenzyloxy:
-    """Task 7: C2 — P-51.3.1(3) fails (methoxy vs hydroxy) -> substitutive
-    PIN, phenol parent (only ring with the -ol PCG); P-29.6.1 kills retained
+    """Task 7: C2 — (3) fails (methoxy vs hydroxy) -> substitutive
+    PIN, phenol parent (only ring with the -ol PCG); kills retained
     benzyloxy on the substituted ring."""
 
     def test_chokepoint_substituted_ring(self):
@@ -153,7 +153,7 @@ class TestAsymmetricSubstitutedBenzyloxy:
         strict=True,
     )
     def test_asymmetric_target_braces_pin(self):
-        # strict P-16.5.4 escalation parens->brackets->braces (research §0)
+        # strict escalation parens->brackets->braces (research)
         assert name_compound("COc1ccc(COCc2ccc(O)cc2)cc1") == \
             "4-{[(4-methoxyphenyl)methoxy]methyl}phenol"
 
@@ -165,6 +165,6 @@ class TestAsymmetricSubstitutedBenzyloxy:
 
     def test_benzyloxy_sibling_regression(self):
         # HEAD-OK anchor: retained benzyloxy VALID while ring+CH2 are bare
-        # (P-29.6.1; P-35.4.2 BB 18116 '(benzyloxy)carbonyl' precedent)
+        #; BB 18116 '(benzyloxy)carbonyl' precedent)
         assert name_compound("Oc1ccc(COCc2ccccc2)cc1") == \
             "4-(benzyloxymethyl)phenol"

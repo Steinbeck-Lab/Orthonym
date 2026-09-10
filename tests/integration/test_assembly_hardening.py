@@ -1,5 +1,5 @@
 """
-Phase 113 Plan 02 - Assembly Pipeline Hardening Integration Tests
+a phase Plan 02 - Assembly Pipeline Hardening Integration Tests
 
 Tests for 20+ compounds that previously had correct parent identification but
 wrong assembly output. Validates that assembly-layer improvements correctly
@@ -34,7 +34,7 @@ class TestPolyfunctionalAcidWithRingSub:
         Ideal: "[1,1'-biphenyl]-4-carboxylic acid" (acid as PG suffix).
         Current: "4-formyl-1,1'-biphenyl" (COOH named as prefix via recursive
         fallback). This is an improvement over "4-substituent-1,1'-biphenyl".
-        Full fix requires ring assembly handler to respect FG seniority (ASML-04).
+        Full fix requires ring assembly handler to respect FG seniority .
         """
         name = name_compound("OC(=O)c1ccc(-c2ccccc2)cc1")
         assert name is not None
@@ -55,7 +55,7 @@ class TestPolyfunctionalAcidWithRingSub:
 
     def test_cyclohexyl_acetic_acid(self):
         """2-cyclohexylacetic acid: cycloalkyl-as-sub on chain acid.
-        DROP-19 ring substituent naming fallback.
+         ring substituent naming fallback.
         """
         name = name_compound("OC(=O)CC1CCCCC1")
         assert name is not None

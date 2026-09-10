@@ -1,12 +1,12 @@
-"""Unit tests for PIN heteroaryl substituent numbering (Phase 173.5 L1).
+"""Unit tests for PIN heteroaryl substituent numbering (a phase L1).
 
 Covers ``pin_heteroaryl_substituent_name`` — the free-valence-aware PIN
 substituent numbering for monocyclic heteroaromatic rings acting as
-substituents (IUPAC 2013 P-31.1.4.3.4 / P-29.3.5).
+substituents (IUPAC 2013 /.
 
 Numbering criterion order (first point of difference wins):
   1. heteroatoms as a set get lowest locants
-  2. heteroatoms in element-seniority order (O > S > Se > N ...)
+  2. heteroatoms in element-seniority order (O > S > Se > N...)
   3. indicated hydrogen gets lowest locant
   4. the free valence (attachment) gets lowest locant
 
@@ -85,9 +85,9 @@ def test_pin_positive(smiles, expected):
 # Guard cases — must return None (no wrong locant; caller keeps current form)
 # ---------------------------------------------------------------------------
 def test_pyrazole_named_not_misclassified_as_imidazole():
-    # v26 BP-3 R-bug fix: identify_ring_system() returns 'imidazole' for BOTH
+    # R-bug fix: identify_ring_system returns 'imidazole' for BOTH
     # N,N 5-rings; the adjacent-N case is pyrazole and is now NAMED with the
-    # retained pyrazol- stem (P-25.2.1) instead of refused (which previously fell
+    # retained pyrazol- stem instead of refused (which previously fell
     # through to a WRONG imidazol-*-yl name downstream). Attachment is the ring
     # carbon adjacent to the =N- (locant 3). OPSIN round-trip verified.
     mol, ring, attach = _ring_and_attach("Cc1cc[nH]n1")  # pyrazol-3-yl (C is the stub)
@@ -117,7 +117,7 @@ def test_guard_extra_ring_substituent():
 
 def test_guard_saturated_ring():
     # pin_heteroaryl_substituent_name claims heteroarenes and saturated
-    # HETEROcyclic monocycles (piperidin-4-yl, oxan-2-yl — WS-A task 9 / Phase 4
+    # HETEROcyclic monocycles (piperidin-4-yl, oxan-2-yl — task 9 / a phase
     # SUBST-01d), but NOT a saturated carbocycle: those are named by the
     # cycloalkyl path, so the heteroaryl primitive must decline them.
     mol, ring, attach = _ring_and_attach("CC1CCCCC1")  # methyl-cyclohexane

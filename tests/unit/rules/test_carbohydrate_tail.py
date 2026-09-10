@@ -1,8 +1,8 @@
-"""P7 (Wave-8) sub-plan 7b — carbohydrate semisystematic tail (P-102).
+"""P7 (Wave-8) sub-plan 7b — carbohydrate semisystematic tail.
 
-7b.2 — open-chain uronic acid PINs (P-102.5.6.6.4.1).
+7b.2 — open-chain uronic acid PINs.
 
-Blue Book P-102.5.6.6.4.1 (the Blue Book-53783): "Names of individual uronic acids
+Blue Book (the Blue Book-53783): "Names of individual uronic acids
 are formed by changing the ending 'ose' in the retained or systematic name of
 the corresponding aldose to 'uronic acid'. The numbering of the aldose is kept
 intact; the locant '1' is still assigned to the (potential) aldehydic group."
@@ -42,7 +42,7 @@ def test_uronic_ring_form_unchanged():
     assert GATED.name(can) == "α-D-glucopyranuronic acid"
 
 
-# 7b.3 — aldarate mono-ester (P-102.5.6.6.5.3). The C1 (or C6) carboxyl of an
+# 7b.3 — aldarate mono-ester. The C1 (or C6) carboxyl of an
 # aldaric acid esterified: `<n>-<alkyl> hydrogen <config>-<stem>arate`. The 1-vs-6
 # locant identifies distinct isomers (BB gives both 1-methyl and 6-methyl hydrogen
 # L-altrarate), disambiguated by a HARD OPSIN round-trip (fail-closed w/o Java).
@@ -63,10 +63,10 @@ def test_meso_aldarate_ester_fails_closed():
 
 
 @pytest.mark.parametrize("smi,expected", [
-    # 7b.4 (P-102.5.6.3.2): C-substitution replacing a non-terminal OH (deoxy-C).
+    # 7b.4: C-substitution replacing a non-terminal OH (deoxy-C).
     ("OC[C@H]1O[C@H](O)[C@H](c2ccccc2)[C@@H](O)[C@@H]1O",
      "2-deoxy-2-phenyl-α-D-glucopyranose"),
-    # 7b.4 (P-102.5.6.3.1): C-substitution ADDED at a non-terminal C (n-C-R).
+    # 7b.4: C-substitution ADDED at a non-terminal C (n-C-R).
     ("C[C@]1(O)[C@@H](O)O[C@H](CO)[C@@H](O)[C@@H]1O",
      "2-C-methyl-α-D-glucopyranose"),
     ("C[C@@]1(O)[C@@H](CO)O[C@@H](O)[C@@H]1O",
@@ -78,7 +78,7 @@ def test_c_substituted_sugar_pin(smi, expected):
 
 
 def test_glycosyloxy_n_o_yl_pin():
-    # 7b.5 (P-102.6.2): sugar attached via a NON-anomeric O to acetic acid ->
+    # 7b.5: sugar attached via a NON-anomeric O to acetic acid ->
     # (β-D-glucopyranos-2-O-yl)acetic acid.
     can = Chem.MolToSmiles(Chem.MolFromSmiles(
         "O=C(O)CO[C@@H]1[C@@H](O)[C@H](O)[C@@H](CO)O[C@H]1O"))

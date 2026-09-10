@@ -1,11 +1,11 @@
 """
 Unit tests for orient_chain alphabetical tiebreaker (criterion e).
 
-IUPAC 2013 P-14.4(g): when substituent locant sets are identical in both
+IUPAC 2013 (g): when substituent locant sets are identical in both
 directions, the orientation giving the lowest locant to the alphabetically
 first substituent prefix is preferred.
 
-Reference: IUPAC 2013 Blue Book, P-14.4, P-14.6, P-14.7
+Reference: IUPAC 2013 Blue Book,,,
 """
 
 import pytest

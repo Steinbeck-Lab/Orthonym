@@ -1,15 +1,15 @@
-"""Phase 160 sulfoxide handler — Tier B shim (gate 0.40).
+"""a phase sulfoxide handler — Tier B shim (gate 0.40).
 
 1-line wrapper around ``rules.sulfur.name_sulfoxide``. Verbatim move
 of composer.py:966-979 dispatch logic (sulfoxide branch of the shared
 if-else with sulfone).
 
-IUPAC cite: P-66.5.2.4 (sulfoxides; functional class naming).
+IUPAC cite: (sulfoxides; functional class naming).
 
 References:
 - composer.py:966-979 (inline sulfoxide branch; REMOVED at this commit).
 - rules.sulfur.name_sulfoxide — chemical-logic body.
-- 160-AUDIT-DECOMP.md § 1 row 'sulfoxide' + § 2.19 purity proof.
+- internal notes-DECOMP.md row 'sulfoxide' + purity proof.
 """
 from __future__ import annotations
 
@@ -48,7 +48,7 @@ def name_sulfoxide(
     if not matches:
         return None
 
-    # Wave2 T3b conservation: both names below describe EXACTLY R-SO-R'.
+    # Wave2 conservation: both names below describe EXACTLY R-SO-R'.
     # When the molecule has atoms beyond that unit, the functional-class
     # walk silently dropped them ('CSCCS(=O)C' -> 'ethyl methyl sulfoxide',
     # -S-CH3 lost). Decline so the polyfunctional path names the whole
@@ -56,7 +56,7 @@ def name_sulfoxide(
     if not chalcogen_oxide_fc_covers_molecule(features.mol, matches[0]):
         return None
 
-    # Wave2 T3b (P-63.6): substitutive is the PIN — '(methanesulfinyl)methane'
+    # Wave2: substitutive is the PIN — '(methanesulfinyl)methane'
     # (BB 46154), '1-(ethanesulfinyl)butane' (28094), "1,1'-sulfinyldibenzene"
     # (28110). Functional class stays for --trivial and as the fallback for
     # shapes the substitutive builder declines (fail-open to a valid name).

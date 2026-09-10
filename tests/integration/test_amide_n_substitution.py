@@ -1,11 +1,11 @@
 """
-Tests for N-substituted amide naming patterns (Phase 29, Plan 01).
-Updated Phase 54: phenylamino -> anilino for OPSIN compatibility.
+Tests for N-substituted amide naming patterns (a phase, Plan 01).
+Updated a phase: phenylamino -> anilino for OPSIN compatibility.
 
 Covers:
-  AM-01: anilino format for N-phenyl amino substituents (OPSIN simple substituent)
-  AM-02: Simple amide N-substitution regression guard
-  AM-03: Peptide aromatic residue format verification
+  : anilino format for N-phenyl amino substituents (OPSIN simple substituent)
+  : Simple amide N-substitution regression guard
+  : Peptide aromatic residue format verification
   Regression guard: ensures "phenylamino" never appears in output
 """
 
@@ -14,7 +14,7 @@ from orthonym import name_compound
 
 
 # ---------------------------------------------------------------------------
-# Section 1: N-phenyl amide naming (AM-01 verification)
+# Section 1: N-phenyl amide naming (verification)
 # ---------------------------------------------------------------------------
 
 
@@ -42,7 +42,7 @@ class TestNPhenylAmideNaming:
 
 
 # ---------------------------------------------------------------------------
-# Section 2: Simple amide N-substituent naming (AM-02 regression guard)
+# Section 2: Simple amide N-substituent naming (regression guard)
 # ---------------------------------------------------------------------------
 
 
@@ -75,7 +75,7 @@ class TestSimpleAmideNSubstitution:
 
 
 # ---------------------------------------------------------------------------
-# Section 3: Peptide aromatic residue format (AM-03 verification)
+# Section 3: Peptide aromatic residue format (verification)
 # ---------------------------------------------------------------------------
 
 
@@ -97,14 +97,14 @@ class TestPeptideAromaticResidue:
 
 
 # ---------------------------------------------------------------------------
-# Section 4: Guard against phenylamino regression (Phase 54 update)
+# Section 4: Guard against phenylamino regression (a phase update)
 # ---------------------------------------------------------------------------
 
 
 class TestPhenylaminoRegressionGuard:
     """Parametrized test ensuring phenylamino never appears in output.
 
-    Phase 54: OPSIN requires 'anilino' instead of '(phenylamino)'.
+    a phase: OPSIN requires 'anilino' instead of '(phenylamino)'.
     This guard ensures the old format never regresses back.
     """
 

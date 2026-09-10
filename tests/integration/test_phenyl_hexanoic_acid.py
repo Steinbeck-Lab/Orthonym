@@ -1,14 +1,14 @@
-"""Phase 146 P-44.1.1 canonical chain-wins test (RESEARCH §7 Dimension 2).
+"""a phase canonical chain-wins test (RESEARCH Dimension 2).
 
 SMILES: c1ccc(CCCCCC(=O)O)cc1 (6-phenylhexanoic acid)
   - Chain: hexanoic acid (6 carbons + 1 PCG = COOH)
   - Ring: benzene (6 carbons + 0 PCGs)
 
-Per P-44.1.1: max PCG count wins → chain wins. V18 must produce a name
+Per: max PCG count wins → chain wins. V18 must produce a name
 whose parent stem is `hexanoic acid`.
 
 V17 may produce a ring-biased name (e.g., an acyl-benzene variant) —
-that is the bug Phase 146 aims to fix. This test documents V17 baseline
+that is the bug a phase aims to fix. This test documents V17 baseline
 without asserting the specific string, so calibration drift does not
 break the test; only the V18 expectation is strict.
 
@@ -17,7 +17,7 @@ time env-var reads take effect cleanly, following the pattern adopted
 in Plan 03's test_feature_flag.py (Rule-1 Auto-fix: avoids
 importlib.reload class-identity leakage into downstream tests).
 
-Source: https://iupac.qmul.ac.uk/BlueBook/P4.html P-44.1.1
+Source: https://iupac.qmul.ac.uk/BlueBook/P4.html
 """
 
 import os
@@ -67,11 +67,11 @@ def _run_in_mode(use_v18: str, sel_mode: str) -> str:
 
 @pytest.mark.integration
 def test_v18_picks_chain_parent():
-    """V18 P-44.1.1: chain has 1 PCG, ring has 0 → chain (hexanoic acid) wins.
+    """V18: chain has 1 PCG, ring has 0 → chain (hexanoic acid) wins.
 
     The Tier-1 cascade step 1 (max PCG count) picks the chain over the
     ring. The produced name must contain 'hexanoic' (e.g.,
-    '6-phenylhexanoic acid' in P-44.1.1-compliant IUPAC PIN style).
+    '6-phenylhexanoic acid' in -compliant IUPAC PIN style).
     """
     name = _run_in_mode(use_v18="true", sel_mode="score_based")
     assert name, (
@@ -89,8 +89,7 @@ def test_v17_documents_baseline(capsys):
 
     Documents V17 behavior for comparison with V18 in
     test_v18_picks_chain_parent. V17 may produce a ring-biased name
-    (e.g., 'hexanoylbenzene' or similar) — that is the v17 bug Phase
-    146's two-tier selector fixes. This test exists to ensure the V17
+    (e.g., 'hexanoylbenzene' or similar) — that is the v17 bug a phase's two-tier selector fixes. This test exists to ensure the V17
     path doesn't regress to empty.
     """
     name = _run_in_mode(use_v18="false", sel_mode="first_applicable")

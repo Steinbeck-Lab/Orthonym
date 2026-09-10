@@ -1,17 +1,17 @@
-"""Wave 0 — accuracy-first safety: the SELF-01 constitutional self-consistency
+"""Wave 0 — accuracy-first safety: the constitutional self-consistency
 gate must not let a name for the WRONG structure through.
 
-Empirical verification (2026-07-01) of the GAP-REPORT §4b/§4c leak list found that
+Empirical verification (2026-07-01) of the GAP-REPORT b/c leak list found that
 almost all listed "leaks" were either already fail-closed at production HEAD, or
 audit structure-reading errors (the emitted name was actually correct). The one
 genuine remaining leak: the hydroperoxide anion [O-]O was named 'dioxidane'
-(neutral OO) — SELF-01's InChIKey-skeleton comparison EXCLUDES the charge layer,
+(neutral OO) — 's InChIKey-skeleton comparison EXCLUDES the charge layer,
 so a charge-dropping name shared the skeleton and passed. Fix: the verdict also
 compares net formal charge.
 
 These tests target the pure verdict function directly (deterministic, no OPSIN
 subprocess / gate-config dependence — the end-to-end fail-close is covered by the
-v22 PIN-conformance gate which runs with all gates enabled).
+ PIN-conformance gate which runs with all gates enabled).
 """
 from orthonym.namer import (
     _self_consistency_verdict,
@@ -60,7 +60,7 @@ def test_stereo_only_difference_is_ok():
 # These ship regardless of gate config (skeleton+charge match / ungated path).
 
 def test_indene_substituent_is_correct_not_a_leak():
-    # GAP-REPORT §4b called this a dihydronaphthalene leak, but the ring is [5,6]
+    # GAP-REPORT b called this a dihydronaphthalene leak, but the ring is [5,6]
     # (indene) and the name round-trips exactly to the input — it is correct.
     assert name_compound("OC(=O)CCC1=CCc2ccccc21", style="pin") == "3-(1H-inden-3-yl)propanoic acid"
 

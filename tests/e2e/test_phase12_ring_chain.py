@@ -1,12 +1,12 @@
 """
-End-to-end tests for Phase 12: Ring-Chain Parent Selection.
+End-to-end tests for a phase: Ring-Chain Parent Selection.
 
 These tests verify the complete naming workflow from SMILES input
 to IUPAC name output for compounds with both rings and functionalized chains.
 
 IUPAC Rules tested:
-- P-44.1: Parent selection (where is principal group?)
-- P-61.5: Ring substituent naming (phenyl, cyclohexyl, etc.)
+-: Parent selection (where is principal group?)
+-: Ring substituent naming (phenyl, cyclohexyl, etc.)
 
 RINGCHAIN-05: Retained names must be preserved (tested explicitly).
 """
@@ -16,7 +16,7 @@ from orthonym.namer import name_compound
 
 
 class TestPhase12CanonicalCases:
-    """Canonical test cases from Phase 12 analysis."""
+    """Canonical test cases from a phase analysis."""
 
     def test_4_phenylbutanoic_acid(self):
         """Primary test case: 4-phenylbutanoic acid."""
@@ -122,7 +122,7 @@ class TestCyclopropylAndCyclobutylSubstituent:
 
 class TestRetainedNamesNotBroken:
     """
-    CRITICAL: Verify retained names still work after Phase 12 changes.
+    CRITICAL: Verify retained names still work after a phase changes.
 
     RINGCHAIN-05 requirement: Amino acid retained names (phenylalanine)
     must be detected BEFORE parent selection runs. This class explicitly
@@ -164,7 +164,7 @@ class TestRetainedNamesNotBroken:
         of 'phenylalanine'.
 
         The correct behavior is:
-        1. Check retained names FIRST (in name() method)
+        1. Check retained names FIRST (in name method)
         2. Match 'phenylalanine' pattern
         3. Return 'phenylalanine' without ever running parent selection
 
@@ -221,7 +221,7 @@ class TestEdgeCases:
 
     def test_acetophenone_ring_is_parent(self):
         """Acetophenone: ketone directly on ring. Wave2 T1d: PIN is the
-        substitutive 1-phenylethan-1-one (acetophenone de-headlined, P-64.2.1.2)."""
+        substitutive 1-phenylethan-1-one (acetophenone de-headlined,."""
         result = name_compound('c1ccc(C(=O)C)cc1')
         assert result == '1-phenylethan-1-one', f'Got: {result}'
 

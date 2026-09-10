@@ -2,7 +2,7 @@
 
 At HEAD (before the core-namer fix) each witness ABSTAINS at the best-effort
 tier: a ring-parent substituent enumerator names the parent but silently drops a
-ring-bearing compound substituent it cannot render, and SELF-01 then suppresses
+ring-bearing compound substituent it cannot render, and then suppresses
 the atom-incomplete partial name (final output ``unknown organic compound``).
 
 Two root causes were found (full trace trail:
@@ -19,7 +19,7 @@ commits):
 2. The chalcogen prefix primitive
    (``assembly/substituent_prefix_forms.py::get_sulfanyl_prefix``) named a
    sulfinyl ``-S(=O)-`` as ``sulfanyl``, silently dropping the =O -> a wrong
-   (reduced-thioether) molecule that SELF-01 suppressed to an abstention.
+   (reduced-thioether) molecule that suppressed to an abstention.
 
 The fix threads the best-effort context into the un-wired ring-parent substituent
 enumerators and makes ``get_sulfanyl_prefix`` fail closed on a non-divalent
@@ -133,7 +133,7 @@ def test_composer_fail_closed_on_unnameable_ring_bearing_substituent():
     """Task 4: a RING-BEARING compound substituent on a complex-ring parent that
     cannot render must ABORT the whole name (return None), not silently drop the
     substituent and leak an atom-incomplete partial (a wrong molecule that only
-    the downstream RT/SELF-01 gate would catch). RED at HEAD, where the composer
+    the downstream RT/ gate would catch). RED at HEAD, where the composer
     ``continue``d and returned the bare parent."""
     from rdkit import Chem
     import orthonym.assembly.composer as comp

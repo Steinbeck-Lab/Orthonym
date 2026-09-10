@@ -9,9 +9,9 @@ Validates that:
 5. Existing diol/triol/polysubstituted names remain correct
 
 These tests target the fixes in Plan 17-04:
-- _generate_suffix() now computes locants for ring compounds via oriented_ring
-- _assemble_fragments() detects suffix-prefix locant collisions on ring parents
-- _estimate_parent_size_from_name() estimates parent atom count from name text
+- _generate_suffix now computes locants for ring compounds via oriented_ring
+- _assemble_fragments detects suffix-prefix locant collisions on ring parents
+- _estimate_parent_size_from_name estimates parent atom count from name text
 - polyfunctional.py collision detection safety net
 """
 

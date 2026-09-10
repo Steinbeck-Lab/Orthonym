@@ -9,7 +9,7 @@ a different molecule. Rings fared worse: cyclohexyl acetate came out `hexyl`,
 and cyclobutyl acetate came out `butan-2-yl` when the branch heuristic misfired
 on the ring.
 
-None of those shipped: SELF-01 re-perceived the name, saw a different molecule
+None of those shipped: re-perceived the name, saw a different molecule
 and suppressed it to the descriptive fallback. So the visible symptom was an
 ABSTENTION, and `assembly/general_engine.py:252` logged
 `REFUSE:unsupported suffix for pg='ester'` downstream — which is how this was
@@ -86,7 +86,7 @@ def test_the_agreeing_cases_are_unchanged(smiles, organyl):
 
 
 # --------------------------------------------------------------------------
-# End to end: these molecules used to ABSTAIN (SELF-01 suppressed the wrong
+# End to end: these molecules used to ABSTAIN (suppressed the wrong
 # name). The gate must now be cleared by a correct one.
 # --------------------------------------------------------------------------
 
@@ -100,14 +100,14 @@ def test_molecules_that_abstained_now_name(smiles, name):
 
 
 def test_cyclohexyl_acetate_is_the_functional_class_pin():
-    """P-65.6.3.2.1 "General methodology": "All preferred IUPAC names for esters
+    """ "General methodology": "All preferred IUPAC names for esters
     are named by functional class nomenclature." So the PIN is the two-word
     `cyclohexyl acetate`, not the substitutive prefix form.
 
     This molecule previously emitted `acetyloxycyclohexane` — a valid but
     NON-PIN name — precisely because the ester path produced `hexyl acetate`,
-    SELF-01 suppressed it as a different molecule, and the cascade fell through
-    to the acyloxy-prefix form (P-65.6.3.2.3, which applies only when a senior
+     suppressed it as a different molecule, and the cascade fell through
+    to the acyloxy-prefix form, which applies only when a senior
     group is present or the ester cannot otherwise be named).
     """
     assert Orthonym(style="pin").name("CC(=O)OC1CCCCC1") == "cyclohexyl acetate"
@@ -141,10 +141,10 @@ def test_stereo_descriptor_is_not_doubled(smiles):
 # --------------------------------------------------------------------------
 
 @pytest.mark.parametrize("smiles,name", [
-    ("CCOC(=O)C",        "ethyl acetate"),            # P-65.6.3.2.1 (PIN)
-    ("COC(=O)C",         "methyl acetate"),           # P-65.6.3.2.1 (PIN)
+    ("CCOC(=O)C",        "ethyl acetate"),            #
+    ("COC(=O)C",         "methyl acetate"),           #
     ("COC(=O)c1ccccc1",  "methyl benzoate"),
-    ("CCOC(=O)CCC(=O)OC", "ethyl methyl butanedioate"),  # P-65.6.3.2.1 (PIN)
+    ("CCOC(=O)CCC(=O)OC", "ethyl methyl butanedioate"),  #
 ])
 def test_blue_book_pin_examples_unchanged(smiles, name):
     assert Orthonym(style="pin").name(smiles) == name

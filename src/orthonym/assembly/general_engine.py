@@ -5,7 +5,7 @@ Unlike the legacy composer path, every emission carries a TokenBinding
 partition over ALL heavy atoms, so the E1 certificate
 (validation/e1_certificate.py) can verify no atom was silently dropped --
 Java-free. Output is OPT-IN (namer general_fallback flag); it re-enters the
-existing moat (>15-HA gate, P10 vetoes, SELF-01 OPSIN-RT) downstream.
+existing moat (>15-HA gate, P10 vetoes, OPSIN-RT) downstream.
 
 G1 scope: neutral, single-fragment, chain-parented molecules with an
 all-carbon parent chain of length >= 2 and a suffix from the supported set
@@ -38,7 +38,7 @@ _SUPPORTED_SUFFIX_STYLES = {
 # adds no skeletal atom: it CONVERTS one parent-hydride atom into the
 # characteristic group, so its locant designates THAT atom and no other.
 #
-# P-64.2.2.2 "Cyclic ketones" (the Blue Book Blue Book heading;
+# "Cyclic ketones" (the Blue Book Blue Book heading;
 # sentence at:28386) -- "Names of cyclic ketones are formed substitutively
 # by using the suffix 'one'. As the formation of ketones is achieved by the
 # conversion of a methylene, >CH2, group into a >C=O group, the suffix 'one'
@@ -63,7 +63,7 @@ def _inline_suffix_locant(pg, match, parent_set, atom_to_locant):
     -- the primitive that already owns the "which atom of this SMARTS match
     bears the locant" question, driven by ``seniority.PG_ATTACHMENT_INDICES``
     (``ketone`` -> ``[1]``, the alcohol/thiol/amine family -> the carbon(s),
-    ``imine`` -> the SMARTS-leading carbon by default). ``min()`` over the
+    ``imine`` -> the SMARTS-leading carbon by default). ``min`` over the
     survivors matches that primitive's documented contract for multi-position
     groups such as ``secondary_amine`` -> ``[1, 2]``.
 
@@ -112,14 +112,14 @@ _LEADING_ANCHOR_RING_PGS = frozenset({
 
 
 def _pg_bearing_ring_atoms(mol, pg, match, ring_set):
-    """Ring atoms that BEAR the principal characteristic group (P-14.4).
+    """Ring atoms that BEAR the principal characteristic group.
 
     The raw SMARTS match is not the answer. ``[#6][CX3](=O)[#6]`` matches a
     ring ketone's carbonyl carbon *and both of its ring neighbours*, so
     intersecting the whole match with the ring hands the numbering comparator
     three atoms for a monoketone and all six for a para-dione -- identical for
     every candidate orientation, which silently neuters the principal-group
-    criterion and lets ring unsaturation win instead. P-64.2.1.2
+    criterion and lets ring unsaturation win instead.
     (``the Blue Book``) settles the intended outcome at ``:28320``:
     ``1,4-benzoquinone cyclohexa-2,5-diene-1,4-dione (PIN)`` -- the dione
     takes 1,4, the diene takes 2,5.
@@ -164,7 +164,7 @@ def _pg_bearing_ring_atoms(mol, pg, match, ring_set):
 
 
 def _urea_ring_carboxamide_match(mol, functional_groups, ring_set):
-    """P-66.1.1.1.1.3 (the Blue Book): '...the -CO-NH2 group attached to a ring, ring
+    """ (the Blue Book): '...the -CO-NH2 group attached to a ring, ring
     system, or to a heteroacyclic parent' takes the ring '-carboxamide' suffix
     (``piperidine-1-carboxamide (PIN)``), NOT a 'carbamoyl' substituent prefix.
 
@@ -289,7 +289,7 @@ def _common_refusal(mol, allow_charged: bool = False) -> Optional[str]:
 
 
 def _skeletal_anion_base(mol, acls, atom_idx) -> Optional[str]:
-    """P-72.2.2.1 skeletal-atom ``-ide``/``-uide`` base for an anion ALREADY
+    """ skeletal-atom ``-ide``/``-uide`` base for an anion ALREADY
     known to sit on the parent-hydride skeleton (a ring/chain atom of the
     numbered parent).
 
@@ -310,7 +310,7 @@ def _skeletal_anion_base(mol, acls, atom_idx) -> Optional[str]:
     N valence 3 (``degree + H + 1 == 3``), which an aromatic ring N(-) (degree 2,
     0 H) satisfies. Shared by ``_charge_suffix_text`` (net-charged single-sign)
     and ``_zwitterion_suffix_plan`` (net-neutral both-skeletal) so the two never
-    disagree about what a ring-N anion spells. References: IUPAC 2013 P-72.2.2.1.
+    disagree about what a ring-N anion spells. References: IUPAC 2013.
     """
     if acls in ('carbanion', 'heteroatom_hydride_anion'):
         return 'ide'
@@ -326,12 +326,12 @@ def _skeletal_anion_base(mol, acls, atom_idx) -> Optional[str]:
 
 def _charge_suffix_text(mol, atom_to_locant, parent_only: bool = False
                         ) -> Optional[Tuple[str, Tuple[int, ...]]]:
-    """ (BB P-73 cations / P-74 anions): the charge-suffix string for
+    """ (BB cations / anions): the charge-suffix string for
     skeletal charge(s) on the ALREADY-NUMBERED general parent --
     ``-1-ium`` / ``-2-ylium`` / ``-1-ide`` / ``-1-uide`` (or the multiplied
     ``-1,4-diium`` / ``-1,2-diylium`` / ``-1,4-diide`` forms).
 
-    WS7 () ``parent_only``: the DEFAULT (False) keeps the GLOBAL scope --
+      ``parent_only``: the DEFAULT (False) keeps the GLOBAL scope --
     the whole molecule must be single-sign (a plain cation OR anion), which is
     right for ``general_engine``'s whole-molecule suffix. The universal
     coverage-floor calls it with ``parent_only=True`` because it resolves charge
@@ -347,7 +347,7 @@ def _charge_suffix_text(mol, atom_to_locant, parent_only: bool = False
     sites never pass it -> byte-identical.
 
     The locant is the ACTUAL charged atom's parent locant, so the emitted
-    descriptor is structurally faithful on its own (SELF-01 is only the
+    descriptor is structurally faithful on its own (is only the
     backstop, which fails OPEN without Java). Reuses the proven ion perception
     (``get_ion_sites``) + classifiers (``classify_cation`` / ``classify_anion``)
     rather than reinventing charge typing.
@@ -365,18 +365,18 @@ def _charge_suffix_text(mol, atom_to_locant, parent_only: bool = False
         charge sits on an off-parent oxygen -- the PIN charged path owns those;
       * diazonium / acylium cations -- the PIN path owns those;
       * a multiply-charged single atom, mixed sign centres, mixed suffix kinds,
-        an internal-only (P-59 nitro/azide/N-oxide/diazo) charge, or a
+        an internal-only nitro/azide/N-oxide/diazo) charge, or a
         multiplicity beyond the simple table.
     """
     from ..perception.ions import get_ion_sites
     from ..rules.ions import classify_anion, classify_cation
 
-    sites = get_ion_sites(mol)  # excludes internal P-59 charges
+    sites = get_ion_sites(mol)  # excludes internal charges
     anions = list(sites.get('anions') or [])
     cations = list(sites.get('cations') or [])
     parent_atoms = set(atom_to_locant)
     if parent_only:
-        # WS7: judge single-vs-both sign over ONLY the charges on THIS parent;
+        #: judge single-vs-both sign over ONLY the charges on THIS parent;
         # off-parent charges of the other sign are expressed elsewhere by the
         # coverage-floor (a terminal charged leaf / another spine level).
         anions = [s for s in anions if s['atom_idx'] in parent_atoms]
@@ -395,7 +395,7 @@ def _charge_suffix_text(mol, atom_to_locant, parent_only: bool = False
         if abs(int(site.get('charge', 0))) != 1:
             return None  # multiply-charged single atom -> tight scope
         if negative:
-            # P-72.2.2.1 skeletal -ide/-uide (incl. a ring-N azolide/azinide);
+            # skeletal -ide/-uide (incl. a ring-N azolide/azinide);
             # an FG anion (carboxylate/alkoxide/exocyclic aminide) -> None, PIN owns it.
             base = _skeletal_anion_base(mol, classify_anion(mol, site), idx)
             if base is None:
@@ -403,9 +403,9 @@ def _charge_suffix_text(mol, atom_to_locant, parent_only: bool = False
         else:
             ccls = classify_cation(mol, site)
             if ccls == 'ylium':
-                base = 'ylium'        # P-73.2.2.1.1: loss of H- from a skeletal C
+                base = 'ylium'        #: loss of H- from a skeletal C
             elif ccls in ('aminium', 'onium', 'quaternary'):
-                base = 'ium'          # P-73.1: protonated / substituted skeletal heteroatom
+                base = 'ium'          #: protonated / substituted skeletal heteroatom
             else:
                 return None           # diazonium / acylium -> PIN path owns it
         per_locant_base.append((atom_to_locant[idx], base))
@@ -439,7 +439,7 @@ def _append_charge_suffix(name: str, mol, atom_to_locant,
     ``-ide``/``-uide``) start with i/y/u. The MULTIPLIED forms
     (``-1,4-diium``/``-1,4-diide``/...) begin with the consonant of the
     multiplier (di/tri/...), so the terminal 'e' must be RETAINED
-    (P-16.7.1(a) elides only before a vowel or 'y'), e.g.
+    (a) elides only before a vowel or 'y'), e.g.
     ``1,4-diazine``->``1,4-diazine-1,4-diium`` (NOT
     ``diazin-1,4-diium``). Returns ``(charged_name, charged_atom_ids)``, or
     None to FAIL CLOSED (a charge that is not expressible, or a co-occurring
@@ -454,23 +454,23 @@ def _append_charge_suffix(name: str, mol, atom_to_locant,
 
 
 def _elide_before_ionic_suffix(name: str, cs: str) -> str:
-    """P-16.7.1(a) / P-74.1.1 (:42417) parent-'e' elision before an ionic suffix.
+    """(a) / (:42417) parent-'e' elision before an ionic suffix.
 
-    The governing rule is **P-16.7 "ELISION OF VOWELS"** (:7591), clause
-    **P-16.7.1(a)** (:7595): *"the terminal letter 'e' in names of parent
+    The governing rule is ** "ELISION OF VOWELS"** (:7591), clause
+    **(a)** (:7595): *"the terminal letter 'e' in names of parent
     hydrides or endings 'ene' and 'yne' when followed by a suffix or 'en' ending
-    beginning with 'a', 'e', 'i', 'o', 'u', or 'y'"*. **P-74.1.1 "Ionic centers
+    beginning with 'a', 'e', 'i', 'o', 'u', or 'y'"*. ** "Ionic centers
     in the same parent structure"** (:42417) restates it for ionic suffixes
     specifically: *"The final letter 'e' of the name of a parent hydride, or of
     an 'ide' or 'uide' suffix, is elided before the letter 'i' or 'y', or before
-    a cumulative suffix beginning with a vowel."* (NOT P-16.3.3, which is
+    a cumulative suffix beginning with a vowel."* (NOT, which is
     "The basic numerical prefixes 'di', 'tri', 'tetra', etc." -- multiplication,
     not elision.) The single-charge bases
     (``ium``/``ylium``/``ide``/``uide``/``olate``) start with a vowel or 'y' ->
     elide (``...pentaene`` -> ``...pentaen-6-ium``). The MULTIPLIED forms
     (``-1,4-diium``) begin with the multiplier's consonant -> the 'e' is
     RETAINED (``1,4-diazine-1,4-diium``). Extracted from ``_append_charge_suffix``
-    so the zwitterion (P-74.1.1) path elides by the SAME rule, not a copy."""
+    so the zwitterion path elides by the SAME rule, not a copy."""
     first_alpha = next((c for c in cs if c.isalpha()), '')
     stem = name[:-1] if name.endswith('e') and first_alpha in 'aeiouy' else name
     return stem + cs
@@ -485,8 +485,8 @@ def _genuine_ion_sites(mol):
     ``4-methyl-2-oxo-1,2-oxaphospholane`` for ``CC1CO[PH+](C1)[O-]``.
 
     That subtraction has moved to its root cause,
-    ``perception/ions.py::_semipolar_chalcogenide_atoms`` (P-74.2.1.2 /
-    P-74.2.1.4), so ``get_ion_sites`` no longer reports the pair at all and
+    ``perception/ions.py::_semipolar_chalcogenide_atoms`` /
+    , so ``get_ion_sites`` no longer reports the pair at all and
     every other caller is fixed too, not just this one.
 
     The local version is not merely redundant, it was WRONG, and it is worth
@@ -516,12 +516,12 @@ def _has_ionic_centres(mol) -> bool:
     return bool(cations) or bool(anions)
 
 
-# P-73.1 / P-73.2.2.1.1 cationic suffix bases, keyed by ``classify_cation``.
+# / cationic suffix bases, keyed by ``classify_cation``.
 _ZWIT_CATION_BASES = {
     'aminium': 'ium', 'onium': 'ium', 'quaternary': 'ium', 'ylium': 'ylium',
 }
-# P-72.2.2.1 / P-72.3 SKELETAL anionic suffix bases, keyed by ``classify_anion``.
-# This is the P-74.1.1 branch (BOTH ionic centres skeletal to the parent hydride)
+# / SKELETAL anionic suffix bases, keyed by ``classify_anion``.
+# This is the branch (BOTH ionic centres skeletal to the parent hydride)
 # and it is REACHED -- not a lookup table nobody visits (CLAUDE.md #10). Entry
 # point: ``name_general_ring``/``name_general_spiro`` -> ``_emit_ring_from_analysis``.
 # Five cage zwitterions exercise it, every emitted name OPSIN-round-tripped to the
@@ -534,7 +534,7 @@ _ZWIT_CATION_BASES = {
 _ZWIT_SKELETAL_ANION_BASES = {
     'carbanion': 'ide', 'heteroatom_hydride_anion': 'ide', 'uide_anion': 'uide',
 }
-# P-72.2.2 ``-ol`` -> ``-olate``: an anionic oxygen hanging off ONE parent atom.
+# ``-ol`` -> ``-olate``: an anionic oxygen hanging off ONE parent atom.
 _ZWIT_OLATE_ANION_CLASSES = frozenset({'alkoxide', 'phenolate'})
 
 
@@ -542,7 +542,7 @@ def _zwitterion_suffix_plan(mol, atom_to_locant, allow_fg_anion: bool = True):
     """Cumulative ionic suffixes for a NET-NEUTRAL zwitterion whose ionic
     centres lie in THIS numbered parent.
 
-    **The governing case is P-74.1.2** "Zwitterionic compounds with at least one
+    **The governing case is ** "Zwitterionic compounds with at least one
     ionic center on a characteristic group" (heading:42445). Its sentence
     (:42447): *"Zwitterionic compounds with at least one ionic center on a
     characteristic group may be named by adding the appropriate ionic suffix to
@@ -552,7 +552,7 @@ def _zwitterion_suffix_plan(mol, atom_to_locant, allow_fg_anion: bool = True):
     ``-ium`` plus a characteristic-group-derived anionic suffix, which is exactly
     the shape of the R7 target's ``-6-ium-2-olate`` (the ``-olate`` branch below).
 
-    **P-74.1.1** "Ionic centers in the same parent structure" (heading:42415)
+    **** "Ionic centers in the same parent structure" (heading:42415)
     governs the other branch — both centres skeletal to the parent hydride — and
     supplies the construction and elision used by BOTH branches.:42419: *"For
     nomenclature purposes, zwitterionic compounds having the ionic centers in the
@@ -570,22 +570,22 @@ def _zwitterion_suffix_plan(mol, atom_to_locant, allow_fg_anion: bool = True):
     ``2-methyl-4-oxo-3,4-dihydro-1H-2-benzoselenopyran-2-ium-3-ide (PIN)``
     *(not ``…-2-ium-3-id-4-one``)*.
 
-    LOCANTS. P-74.1.2 (:42447) closes with *"For assignment of lower locants,
+    LOCANTS. (:42447) closes with *"For assignment of lower locants,
     ionic centers on skeletal atoms of the parent hydride are preferred to the
     locants for positions of attachment of characteristic groups denoted by
     ionic suffixes."* This function does NOT re-number: it consumes the
     ``atom_to_locant`` the ring/chain engine already fixed. That is sound
     because the ionic criterion never gets a choice here — for a heterocyclic
-    von Baeyer parent, P-23.3.1 (:9765) fixes the numbering from the hydrocarbon
-    system and P-23.3.2.1 (:9777) then assigns *"low locants … to the
+    von Baeyer parent, (:9765) fixes the numbering from the hydrocarbon
+    system and (:9777) then assigns *"low locants … to the
     heteroatoms considered together as a set"*, which is decided strictly BEFORE
     any ionic-suffix locant. For the R7 target the four numberings the
     bicyclo[4.4.0] descriptor permits give heteroatom sets {1,2,4}, {1,8,10},
-    {3,5,6} and {6,7,9} — all distinct, so P-23.3.2.1 decides alone and the
-    P-74.1.2 locant sentence is satisfied VACUOUSLY (zero remaining freedom).
+    {3,5,6} and {6,7,9} — all distinct, so decides alone and the
+     locant sentence is satisfied VACUOUSLY (zero remaining freedom).
     See ``test_p74_1_2_ionic_locant_rule_has_no_freedom_here`` and the xfail
     ``test_von_baeyer_heteroatom_locants_should_be_lowest_set`` for the separate,
-    PRE-EXISTING P-23.3.2.1 defect that the cage engine picks {3,5,6}.
+    PRE-EXISTING defect that the cage engine picks {3,5,6}.
 
     Returns ``(held_out_atoms, suffix_text)`` where ``held_out_atoms`` must be
     withheld from substituent discovery so the anion is not ALSO spelled as a
@@ -613,7 +613,7 @@ def _zwitterion_suffix_plan(mol, atom_to_locant, allow_fg_anion: bool = True):
     if abs(int(anion.get('charge', 0))) != 1:
         return None
 
-    # --- cationic centre: must be a numbered atom of THIS parent (P-74.1.1) ---
+    # --- cationic centre: must be a numbered atom of THIS parent ---
     cation_idx = cation['atom_idx']
     if cation_idx not in atom_to_locant:
         return None
@@ -650,7 +650,7 @@ def _zwitterion_suffix_plan(mol, atom_to_locant, allow_fg_anion: bool = True):
         anion_locant = atom_to_locant[neighbour.GetIdx()]
         held.add(anion_idx)
 
-    # P-74.1.2 (:42447): cationic suffix first, then the anionic suffix.
+    # (:42447): cationic suffix first, then the anionic suffix.
     text = '-%s-%s-%s-%s' % (cation_locant, cation_base,
                             anion_locant, anion_base)
     return frozenset(held), text
@@ -664,7 +664,7 @@ def _prefix_spells_charge(token: str, negative: bool) -> bool:
     A cationic substituent carries ``-ium`` (``...prop-1-en-1-ium-1-yl``,
     ``iminium``, ``ylium`` -- all contain ``ium``). An anionic substituent
     carries ``-ide``/``-uide``/``-olate``. This is a necessary-condition boundary
-    check, not the constitution authority: the whole-name SELF-01 round-trip is
+    check, not the constitution authority: the whole-name round-trip is
     what proves the charge lands on the right atom, so a token that passes here
     but mis-places the charge is caught downstream and abstains (0-wrong)."""
     if negative:
@@ -676,7 +676,7 @@ def _distribute_ring_zwitterion_charges(
     name, mol, atom_to_locant, frag_bindings, has_fg_suffix,
 ):
     """NET-NEUTRAL zwitterion whose ionic centres split between the ring PARENT
-    and its SUBSTITUENTS (P-74.1.1 / P-74.1.2).
+    and its SUBSTITUENTS /.
 
     The class: an aromatic azolide/azinide ring anion (a deprotonated ring N,
     ``-ide`` on the ring parent) conjugated to an exocyclic amidinium/iminium/
@@ -694,7 +694,7 @@ def _distribute_ring_zwitterion_charges(
     parent is neutral and every charge rides in substituents. Every genuine
     charged atom is CLAIMED (parent suffix atoms + a per-substituent-charge
     ``role='charge'`` binding) so P3 charge-totality proves the name accounts for
-    the whole charge state; SELF-01 then verifies the constitution.
+    the whole charge state; then verifies the constitution.
 
     Returns ``(new_name, [charge TokenBindings])`` or ``None`` to FAIL CLOSED
     (a substituent charge whose prefix does not spell it; an atom no substituent
@@ -717,7 +717,7 @@ def _distribute_ring_zwitterion_charges(
 
     # --- parent charge suffix ---
     if parent_has_cation and parent_has_anion:
-        # (a) both centres skeletal to the ring parent -> P-74.1.1 cumulative
+        # (a) both centres skeletal to the ring parent -> cumulative
         # suffix. An -olate held-out is the cage producer's job, not this
         # substituent-discovering path, so decline it (allow_fg_anion False).
         plan = _zwitterion_suffix_plan(mol, atom_to_locant, allow_fg_anion=False)
@@ -830,7 +830,7 @@ def _partition(mol, features, chain) -> Optional[dict]:
             if not on_chain:
                 return _refuse("PG instance not on parent chain")
             if suffix_core in _INLINE_SUFFIX_CORES:
-                # P-64.2.2.2 (:28386): an inline suffix CONVERTS a parent atom,
+                # (:28386): an inline suffix CONVERTS a parent atom,
                 # so its locant is that atom's -- never a flanking atom of the
                 # SMARTS match, and never an attachment atom standing in for a
                 # characteristic carbon that is off the chain.
@@ -870,7 +870,7 @@ def _partition(mol, features, chain) -> Optional[dict]:
 
 def _alpha_key(prefix: str) -> str:
     """Alphabetization key: letters only; sec-/tert- excluded, iso/neo/cyclo
-    included (IUPAC P-14.5.2).
+    included (IUPAC.
 
     : the italicized-prefix strip is the shared primitive, not a re-derived
     copy of the literal tuple (this loop form is one of the two the
@@ -881,12 +881,12 @@ def _alpha_key(prefix: str) -> str:
         strip_italicized_structural_prefix,
     )
     remainder, _ = strip_italicized_structural_prefix(prefix)
-    #: strip the P-14.5 non-alphabetising noise (Greek α/β/ξ stereodescriptors,
+    #: strip the non-alphabetising noise (Greek α/β/ξ stereodescriptors,
     # D/L configuration, isotopes, CIP) via the SHARED primitive before reducing to
     # letters — the old bare ``[^a-z]`` reduction kept the D-config ('D'->'d') and
     # left Greek out, so a sugar prefix sorted by 'd...' (β-D-) vs 'betad...' (ASCII):
     # the same substituent alphabetised differently by spelling (the greek-emit
-    # regression). strip_alphanumerical_noise removes exactly what P-14.5 bars.
+    # regression). strip_alphanumerical_noise removes exactly what bars.
     return re.sub(r"[^a-z]", "", strip_alphanumerical_noise(remainder).lower())
 
 
@@ -894,7 +894,7 @@ def _is_complex_prefix(name: str) -> bool:
     """Does ``name`` need bis/tris + enclosure (as opposed to di/tri, bare)?
 
     ``_COMPLEX_PREFIX_RE`` includes a hyphen in its character class, which made
-    this a copy of the compound predicate carrying no P-16.3.4 carve-out — and
+    this a copy of the compound predicate carrying no carve-out — and
     because ONE regex drives both the enclosure choice and the di-vs-bis choice
     here, a 'tert-butyl' got BOTH wrong at once ('bis(tert-butyl)' where the Blue
     Book writes 'di-tert-butyl'). The carve-out is the shared primitive.
@@ -906,7 +906,7 @@ def _is_complex_prefix(name: str) -> bool:
     )
     if italicized_prefix_is_bare(name):
         return False
-    # P-16.5.1.1 / P-16.3.4: consult the codebase's canonical "does this prefix need
+    # /: consult the codebase's canonical "does this prefix need
     # enclosing marks" predicate. needs_brackets already knows the compound-
     # heteroatom prefixes (nitrooxy, thiocyanato,...) that this general-engine copy
     # otherwise missed, emitting them bare ('3-nitrooxy...' instead of '3-(nitrooxy)
@@ -915,7 +915,7 @@ def _is_complex_prefix(name: str) -> bool:
     # choices consistent (per the milestone's "one predicate, not four" rule).
     if needs_brackets(name):
         return True
-    # (P-16.3.3): the regex catches locant/hyphen/bracket composites but MISSES
+    #: the regex catches locant/hyphen/bracket composites but MISSES
     # the "internal multiplying prefix" its own comment claims (a substituted
     # substituent whose locants are omitted leaves no marks) -- so a compound
     # substituent like 'pentafluoroethoxy'/'trifluoromethyl'/'dimethylamino'/
@@ -942,7 +942,7 @@ def _mult_prefix(n: int, name: str) -> Optional[str]:
         return None
     if table is _MULT_COMPLEX:
         return f"{table[n]}{apply_enclosing_marks(name, -1)}"
-    # P-16.3.3(b)/P-16.2.4.1(d) second leg: 'di-tert-butyl', never 'ditert-butyl'.
+    # (b)/(d) second leg: 'di-tert-butyl', never 'ditert-butyl'.
     from .naming_utils import multiplier_needs_hyphen
     return f"{table[n]}{'-' if multiplier_needs_hyphen(name) else ''}{name}"
 
@@ -959,7 +959,7 @@ def _stereo_prefix(mol, atom_to_locant) -> str:
 
 
 def _apply_parent_stereo(name: str, mol, locant_map) -> str:
-    """ ST.1 (SC-1): inject parent-scope stereo, RT-gating the numbering at
+    """ ST.1 : inject parent-scope stereo, RT-gating the numbering at
     TOP LEVEL exactly as the sibling ring producers do (``composer.py:4615``,
     ``polycyclic.py:3354``, ``tier_a_ring.py:546``, all Wave-E).
 
@@ -967,7 +967,7 @@ def _apply_parent_stereo(name: str, mol, locant_map) -> str:
     RT-gate, so an OPSIN-UNPARSEABLE stereo layer (e.g. a pseudoasymmetric
     ``(1s,4s)-``) was certified "complete" by ``general_engine_stereo_complete``
     and forced the verified branch to ABSTAIN instead of degrading to the flat
-    constitution (V37-a trace-STEREO.md SC-1). Routing through
+    constitution (V37-a trace-STEREO.md). Routing through
     ``inject_stereo_reanchored_rt_gated`` fixes that at 0-wrong: candidate A
     reuses the exact ``collect_stereodescriptors(mol, locant_map)`` this path
     already built, so a currently-round-tripping stereo name is returned
@@ -976,7 +976,7 @@ def _apply_parent_stereo(name: str, mol, locant_map) -> str:
     STRIPPED to the constitution (stereo omitted per
     feedback_stereo_omission_is_not_wrong_molecule) — never a wrong stereoisomer.
 
-    Sub-fragment naming (``is_top_level_naming()`` False) keeps the direct prefix
+    Sub-fragment naming (``is_top_level_naming`` False) keeps the direct prefix
     (no per-fragment OPSIN calls); the whole-molecule gate downstream still
     applies. The reanchor fails OPEN to candidate A when OPSIN is unavailable, so
     a missing JVM never hard-fails a name.
@@ -1126,14 +1126,14 @@ def _assemble(mol, features, chain, part,
         bindings.append(TokenBinding((), '', 'charge',
                                      charge_atom_ids=charge_atom_ids))
     elif _has_ionic_centres(mol):
-        # P-74.1.1 (:42419): a zwitterion is "not considered as a neutral
+        # (:42419): a zwitterion is "not considered as a neutral
         # compound". The chain producer holds no atom out of discovery, so it
         # cannot build the cumulative suffix without double-counting an FG
         # anion -> fail closed rather than ship a neutral (wrong) structure.
         return _refuse("ionic centres not expressible as a chain-parent suffix")
     #: parent-scope stereo from structure (substituent-internal
     # stereo is already handled inside name_substituent's stereo route).
-    # ST.1 (SC-1): RT-gated at top level (see _apply_parent_stereo).
+    # ST.1 : RT-gated at top level (see _apply_parent_stereo).
     _stereo_locants = {a: atom_to_locant[a] for a in chain}
     name = _apply_parent_stereo(name, mol, _stereo_locants)
     bindings.append(TokenBinding(tuple(chain), parent_token, 'parent'))
@@ -1147,10 +1147,10 @@ def _assemble(mol, features, chain, part,
 #: widened for the high-enrichment linker/suffix groups that previously
 # forced the ring engine to abstain. All are gated on the engine tier
 # (allow_aromatic_general) via name_general_ring/_monocycle, so the PIN default
-# is byte-identical; each emission is SELF-01-verified downstream.
+# is byte-identical; each emission is -verified downstream.
 # * 'sulfonamide' / 'carboximidamide' (amidine) attach directly to the ring
-# carbon (like -carboxamide) -> 'appended' (P-65.3.1 / P-66.4.1).
-# * 'imine' is the aza-'-one' (P-66.3) -> 'inline'; it shares the ketone
+# carbon (like -carboxamide) -> 'appended' /.
+# * 'imine' is the aza-'-one' -> 'inline'; it shares the ketone
 # valence guard (see the suffix_core in ('one','imine') check below).
 _RING_SUFFIX_STYLES = {
     'ol': 'inline', 'one': 'inline', 'amine': 'inline', 'thiol': 'inline',
@@ -1158,7 +1158,7 @@ _RING_SUFFIX_STYLES = {
     'carboxylic acid': 'appended', 'carbaldehyde': 'appended',
     'carbonitrile': 'appended', 'carboxamide': 'appended',
     'sulfonamide': 'appended', 'carboximidamide': 'appended',
-    # (P-65.6.3.2.1): ester ring PIN is the functional-class TWO-WORD
+    #: ester ring PIN is the functional-class TWO-WORD
     # `<R-yl> <ring>carboxylate`. The parent block is built with the 'appended'
     # carboxylate suffix on the acid core; the alcoholic `R-yl ` word is
     # prepended by name_general_ring (see _extract_ring_ester). Only the clean
@@ -1207,7 +1207,7 @@ def _detect_ring_lactone(mol, pg_matches, ring_set):
 
 
 def _extract_ring_ester(mol, pg_matches, ring_set, allow_mancude):
-    """ (P-65.6.3.2.1): decompose a ring carboxylic-acid ESTER for the
+    """: decompose a ring carboxylic-acid ESTER for the
     functional-class two-word PIN ``<R-yl> <ring>carboxylate``.
 
     Returns ``(r_word, r_frag_atoms, acid_core_atoms, ring_attach_atom)`` for
@@ -1292,7 +1292,7 @@ def _extract_ring_ester(mol, pg_matches, ring_set, allow_mancude):
 
 
 def _ring_amide_n_prefixes(mol, pg_matches, allow_mancude):
-    """ (P-66.1.1.3.1 / P-65.3.1): collect and format N-substituents on a
+    """ /: collect and format N-substituents on a
     ring carboxamide / sulfonamide.
 
     The amide/sulfonamide nitrogen's non-H neighbours (other than the C=O / S
@@ -1413,7 +1413,7 @@ def name_general_ring(
 
     ring_systems = list(getattr(features, 'ring_systems', None) or [])
     if ring_systems:
-        # vB-engine Piece 1 (P-44.1): under best-effort, honour the
+        # vB-engine Piece 1: under best-effort, honour the
         # principal-group-bearing ring system in selection so the true parent is
         # not orphaned into an unnameable substituent. Passed ONLY when
         # allow_aromatic_general (best-effort) -> PIN gets no hint -> byte-identical.
@@ -1437,8 +1437,8 @@ def name_general_ring(
 def _emit_ring_from_analysis(
     mol, features, cage, allow_aromatic_general: bool, allow_charged: bool,
 ) -> Optional[GeneralEngineResult]:
-    """: shared ring-emission tail — ring suffix (P-6x) + substituent
-    recursion (P-29.2) + charge suffix + parent-scope stereo — for a
+    """: shared ring-emission tail — ring suffix + substituent
+    recursion + charge suffix + parent-scope stereo — for a
     ``UniversalCage`` OR ``SpiroSystem`` analysis -- two forms of the ONE field
     contract declared in ``rules/vonbaeyer_universal.RingAnalysis`` (they inherit
     it and add nothing, so a field added there reaches both by construction).
@@ -1456,7 +1456,7 @@ def _emit_ring_from_analysis(
     cage_set = set(cage.cage_atoms)
     atom_to_locant = dict(cage.atom_to_locant)
 
-    # (P-25.3): PIN-quality fusion upgrade over the VB polyene for a BARE
+    #: PIN-quality fusion upgrade over the VB polyene for a BARE
     # mancude FUSED parent (no suffix, no substituents). Fail-closed to the VB
     # polyene: name_fusion_parent only returns a fusion word that is a vetted
     # catalog exact-match (Java-free) or AFFIRMATIVE-RT-verified (rejects the
@@ -1473,7 +1473,7 @@ def _emit_ring_from_analysis(
         # so it CANNOT express a non-standard-valence ring atom -- e.g. the λ4
         # sulfur of c1ccc2c(c1)O[SH2]O2, for which the catalog returns
         # '[1,3,2]benzodioxathiole' (the DIVALENT-S ring = a different molecule,
-        # SELF-01-suppressed -> abstain, LOSING the valid von-Baeyer name
+        # -suppressed -> abstain, LOSING the valid von-Baeyer name
         # '7,9-dioxa-8lambda4-thiabicyclo[4.3.0]nona-1,3,5-triene'). Mirrors the
         # stereo carve-out below: fall through to the VB polyene tail (which emits
         # the lambda descriptor and round-trips) when ANY cage atom needs a λ.
@@ -1483,10 +1483,10 @@ def _emit_ring_from_analysis(
             mol, cage.cage_atoms)
         # Phase S Task 2: the bare fusion word carries NO stereo block, so
         # take this early-return ONLY when the parent has no defined stereo
-        # element (all-or-nothing, PS-1). If a mancude fused parent DID carry a
+        # element (all-or-nothing,). If a mancude fused parent DID carry a
         # ring stereocentre / ring-bond E/Z, fall through to the VB polyene tail
         # (line ~893) whose _stereo_prefix expresses it — never ship a stereo-
-        # dropping fusion word past the stereo-blind SELF-01. For the common
+        # dropping fusion word past the stereo-blind. For the common
         # achiral aromatic parent (the P5 win) this is byte-identical (nd == 0).
         if _fusion_word and general_engine_stereo_complete(mol, _fusion_word):
             return GeneralEngineResult(
@@ -1518,7 +1518,7 @@ def _emit_ring_from_analysis(
         if suffix_core not in _RING_SUFFIX_STYLES:
             return _refuse(f"unsupported ring suffix for pg={pg!r}")
         if suffix_core == 'carboxylate':
-            # (P-65.6.3.2.1): ring ester -> functional-class two-word.
+            #: ring ester -> functional-class two-word.
             # The acid core (C=O, ester O) becomes the appended 'carboxylate'
             # suffix on the ring; the alcoholic R is prepended as a word.
             er = _extract_ring_ester(
@@ -1537,7 +1537,7 @@ def _emit_ring_from_analysis(
                 seen.add(key)
                 on_cage = [i for i in match if i in cage_set]
                 if suffix_core in _INLINE_SUFFIX_CORES:
-                    # P-64.2.2.2 (:28386) -- see _inline_suffix_locant.
+                    # (:28386) -- see _inline_suffix_locant.
                     loc = _inline_suffix_locant(pg, match, cage_set,
                                                 atom_to_locant)
                     if loc is None:
@@ -1557,7 +1557,7 @@ def _emit_ring_from_analysis(
                         # cage (a SECOND carboxylic acid borne on an off-ring
                         # methine). It is NOT a ring suffix -- leave its atoms
                         # for discover_substituents to fold into a compound ring
-                        # substituent (P-44.1: ring is parent; the off-ring acid
+                        # substituent: ring is parent; the off-ring acid
                         # becomes a `[...(carboxy)...]` prefix). Only ONE PG
                         # instance need touch the cage for the ring to bear the
                         # suffix (guarded post-loop). Previously refused whole.
@@ -1607,11 +1607,11 @@ def _emit_ring_from_analysis(
             return _refuse("ring ketone/imine locant coincides with ring double "
                            "bond (valence)")
 
-    # P-74.1.2 (the Blue Book, sentence:42447) is the governing case for
+    # (the Blue Book, sentence:42447) is the governing case for
     # the R7 shape -- a skeletal ring cation plus a characteristic-group-derived
-    # anionic suffix. P-74.1.1 (:42419) supplies the construction: a zwitterion
+    # anionic suffix. (:42419) supplies the construction: a zwitterion
     # whose ionic centres lie in THIS parent is "not considered as a neutral
-    # compound" -> cumulative ionic suffixes (cationic before anionic, P-74.1.2
+    # compound" -> cumulative ionic suffixes (cationic before anionic,
     #:42447). Planned BEFORE discovery because the anionic oxygen of an -olate
     # must be HELD OUT of the substituent partition -- otherwise it is also
     # spelled as a neutral 'oxo'/'hydroxy' prefix and the atom is counted twice.
@@ -1658,7 +1658,7 @@ def _emit_ring_from_analysis(
                                           'prefix'))
 
     # Ring substituents and N-substituents are detachable prefixes cited in one
-    # alphanumeric order (P-14.5.2); N-substituent tokens carry the italic N
+    # alphanumeric order; N-substituent tokens carry the italic N
     # locant instead of a numeral but sort by the same substituent-name key.
     prefix_entries: List = list(n_sub_entries)
     for prefix in groups:
@@ -1693,7 +1693,7 @@ def _emit_ring_from_analysis(
     else:
         name = core
 
-    # P-74.1.1: cumulative ionic suffixes for a net-neutral zwitterion, then the
+    #: cumulative ionic suffixes for a net-neutral zwitterion, then the
     # net-charge suffix, then the fail-closed backstop. A molecule with a
     # genuine ionic centre must NEVER receive a neutral name -- that is a
     # different (uncharged) species, not an approximation.
@@ -1713,11 +1713,11 @@ def _emit_ring_from_analysis(
     elif _has_ionic_centres(mol):
         return _refuse("ionic centres not expressible as a cage-parent suffix")
 
-    # / ST.1 (SC-1): parent-scope stereo from structure (VB locants),
+    # / ST.1 : parent-scope stereo from structure (VB locants),
     # routed through the RT-gated reanchor at TOP LEVEL so an OPSIN-unverifiable
     # layer degrades to the flat constitution instead of forcing an abstain.
     #
-    # (P-65.6.3.2.1): the functional-class ester two-word PIN prepends the
+    #: the functional-class ester two-word PIN prepends the
     # alcoholic component as a separate word -> `ethyl <ring>carboxylate`. The
     # stereodescriptor belongs on the ACID ring component (`ethyl (1R)-...
     # carboxylate`), so for the ester form inject it directly on the ring word
@@ -1764,7 +1764,7 @@ def _ring_parent_bindings(cage, name: str, parent_block: str
     So the parent keeps the WHOLE cage (anything less is an ``ARITY_MISMATCH``
     error against a correct name -- the exact false alarm this task exists to
     remove) and each replacement morpheme binds ZERO atoms. That satisfies
-    EXCLUSIVE CLAIM trivially, and P-24.2 agrees: the prefix replaces, the stem
+    EXCLUSIVE CLAIM trivially, and agrees: the prefix replaces, the stem
     counts.
 
     One binding per HETEROATOM, not per distinct morpheme. ``'7,8-diaza…'``
@@ -1835,7 +1835,7 @@ def _ring_suffix_text(core: str, locants: List[int]) -> Optional[str]:
 def _bond_ring_locant(la: int, lb: int, n: int) -> int:
     """Ring-bond locant for a bond between ring positions ``la`` and ``lb``
     (1..n): the lower endpoint, except the wraparound bond {n, 1} which is
-    cited as ``n`` (P-31.1.4.3 lowest-locant numbering already handled by the
+    cited as ``n`` lowest-locant numbering already handled by the
     orienter; this only formats the chosen orientation)."""
     if {la, lb} == {1, n}:
         return n
@@ -1845,11 +1845,11 @@ def _bond_ring_locant(la: int, lb: int, n: int) -> int:
 def _orient_carbocycle(mol, ring_order, sub_positions, pg_ring_atoms):
     """Number an all-carbon monocycle by lowest locants to, in order:
     principal group -> ring unsaturation -> substituents -> canonical rank
-    (P-14.4 / P-31.1.4). Returns (oriented_ring, atom_to_locant).
+     /. Returns (oriented_ring, atom_to_locant).
 
     The canonical-rank final tier is a deterministic symmetry-breaker; among
     orientations that tie on every IUPAC criterion the choice is round-trip
-    equivalent (SELF-01 is the downstream authority for the emitted string)."""
+    equivalent (is the downstream authority for the emitted string)."""
     ring_list = list(ring_order)
     n = len(ring_list)
     canon = list(Chem.CanonicalRankAtoms(mol, breakTies=True))
@@ -1876,7 +1876,7 @@ def _orient_carbocycle(mol, ring_order, sub_positions, pg_ring_atoms):
             uns.sort()
             dbl.sort()
             sub = sorted(loc[i] for i in sub_positions if i in loc)
-            # P-31.1.4.2.4 / P-31.1.4.3.4: after the COMBINED ene+yne locant set
+            # /: after the COMBINED ene+yne locant set
             # (`uns`) is made as low as possible, the remaining choice is broken
             # by giving the DOUBLE bonds (`ene`) the lower locants -- i.e.
             # cycloicos-1-en-3-yne, NOT cycloicos-3-en-1-yne. This mirrors
@@ -1954,7 +1954,7 @@ def name_general_monocycle(
     machinery (``name_heterocycle`` + ``orient_heterocycle_with_substituents``
     for heterocycles; ``benzene``/cycloalkane for all-carbon). Fail-closed
     (returns None) on anything outside this scope; the E1 atom-partition and
-    SELF-01 OPSIN round-trip are the downstream authorities.
+     OPSIN round-trip are the downstream authorities.
 
     Gated behind ``allow_aromatic_general`` -- inert (returns None) when the
     flag is False, so the PIN/default path stays byte-identical.
@@ -2004,7 +2004,7 @@ def name_general_monocycle(
     # --- suffix (ring forms; mirror name_general_ring) ---
     pg = getattr(features, 'principal_group', None)
     pg_matches = list(getattr(features, 'principal_group_atoms', None) or [])
-    # P-66.1.1.1.1.3 (the Blue Book): a -CO-NH2 on a ring nitrogen is the ring
+    # (the Blue Book): a -CO-NH2 on a ring nitrogen is the ring
     # '-carboxamide' suffix (piperidine-1-carboxamide), not a carbamoyl prefix.
     # RDKit perceives H2N-CO-N(ring) as a 'urea', which is not promoted to a
     # principal group (pg stays None), so reclassify a clean ring-N urea to the
@@ -2020,7 +2020,7 @@ def name_general_monocycle(
     suffix_atoms: set = set()
     pg_locants: List[int] = []
     pg_ring_atoms: set = set()
-    # RISK 5 Class 1 (P-66.6.1): a ring ester (LACTONE) -- carbonyl C AND the
+    # RISK 5 Class 1: a ring ester (LACTONE) -- carbonyl C AND the
     # single-bonded ester O both in THIS ring -- is the oxa-heterocycle bearing a
     # ring '-one', never a '<ring>-carboxylate' (the ester producer emits an
     # impossible ring-O locant + an anion suffix on a neutral: '2,5-dihydrofuran-1-
@@ -2101,7 +2101,7 @@ def name_general_monocycle(
             seen.add(key)
             on_ring = [i for i in match if i in ring_set]
             if suffix_core in _INLINE_SUFFIX_CORES:
-                # P-64.2.2.2 (:28386) -- see _inline_suffix_locant.
+                # (:28386) -- see _inline_suffix_locant.
                 loc = _inline_suffix_locant(pg, match, ring_set,
                                             atom_to_locant)
                 if loc is None:
@@ -2195,12 +2195,12 @@ def name_general_monocycle(
 
     # Charge handling (best-effort / allow_charged only; PIN default is
     # byte-identical because every branch below is behind allow_charged):
-    # * NET-charged, single sign on the parent -> P5 skeletal suffix ().
-    # * NET-neutral zwitterion (P-74.1.1/.2) -> distribute the charge: the ring
+    # * NET-charged, single sign on the parent -> P5 skeletal suffix .
+    # * NET-neutral zwitterion /.2) -> distribute the charge: the ring
     # parent expresses its own sign as a skeletal -ide/-ium suffix and the
     # opposite sign rides inside a substituent's prefix (the azolide + exocyclic
     # amidinium class), or BOTH centres are skeletal to the ring parent
-    # (triazin-1-ide-5-ium). Every charged atom is CLAIMED; SELF-01 verifies.
+    # (triazin-1-ide-5-ium). Every charged atom is CLAIMED; verifies.
     if allow_charged and Chem.GetFormalCharge(mol) != 0:
         charge_result = _append_charge_suffix(name, mol, atom_to_locant,
                                               has_fg_suffix=bool(suffix_core))
@@ -2219,7 +2219,7 @@ def name_general_monocycle(
         name, extra_charge_bindings = dist
         bindings.extend(extra_charge_bindings)
     elif _has_ionic_centres(mol):
-        # P-74.1.1 (:42419) fail-closed backstop -- see the chain producer.
+        # (:42419) fail-closed backstop -- see the chain producer.
         return _refuse("ionic centres not expressible as a monocycle-parent "
                        "suffix")
 
@@ -2237,7 +2237,7 @@ def name_general_spiro(
     mol, features, allow_aromatic_general: bool = False,
     allow_charged: bool = False,
 ) -> Optional[GeneralEngineResult]:
-    """ (P-24.2): general SPIRO ring-parent path (opt-in engine only).
+    """: general SPIRO ring-parent path (opt-in engine only).
 
     The von-Baeyer cage engine refuses spiro (``<2 bridgeheads``), so a spiro
     ring system that the default per-class handlers abstain on (functionalized /
@@ -2245,7 +2245,7 @@ def name_general_spiro(
     This sibling routes the senior spiro ring system through
     ``analyze_spiro_universal`` (audited) and reuses the SAME
     ``_emit_ring_from_analysis`` tail as the cage path. Fail-closed (None) on any
-    non-spiro / unaudited system; the SELF-01 round-trip is the downstream gate.
+    non-spiro / unaudited system; the round-trip is the downstream gate.
     """
     from ..rules.ring_selection import select_principal_ring_system
     from ..rules.vonbaeyer_universal import analyze_spiro_universal
@@ -2291,13 +2291,13 @@ def name_general_spiro(
     spiro = analyze_spiro_universal(
         mol, cage_atoms=cage_seed, allow_mancude=allow_aromatic_general)
     if spiro is None:
-        # P-24.5.1 fallback: analyze_spiro_universal handles a PURE spiro system;
+        # fallback: analyze_spiro_universal handles a PURE spiro system;
         # a MIXED fused+spiro one (a fused/tricyclic cage spiro-joined to a
         # monocycle -- a spiro terpenoid lactone / alkaloid) is named by the
         # component-name method instead. name_spiro_vonbaeyer builds the two-
         # component spiro parent; the enrich path adds every FG (incl. a demoted
         # ester -> acetyloxy) as a prefix, and ring stereo is cited on the same
-        # numbering. Best-effort only; SELF-01 round-trip is the correctness gate.
+        # numbering. Best-effort only; round-trip is the correctness gate.
         _vb = _spiro_vonbaeyer_component_fallback(mol)
         if _vb is not None:
             return _vb
@@ -2308,10 +2308,10 @@ def name_general_spiro(
 
 
 def _spiro_vonbaeyer_component_fallback(mol) -> Optional[GeneralEngineResult]:
-    """P-24.5.1 component-name spiro (mixed fused+spiro) as a best-effort ring
+    """ component-name spiro (mixed fused+spiro) as a best-effort ring
     parent: ``name_spiro_vonbaeyer`` core + ``_enrich_complex_ring_with_subs``
     prefixes + ring stereo. Returns a GeneralEngineResult or None (fail-closed).
-    A single whole-molecule parent binding certifies atom coverage (E1); SELF-01
+    A single whole-molecule parent binding certifies atom coverage (E1);
     proves the name denotes the right structure."""
     from ..rules.spiro import name_spiro_vonbaeyer
     from .composer import _enrich_complex_ring_with_subs
@@ -2360,7 +2360,7 @@ def _name_terminal_ring_parent(
     """: the LAST-RESORT whole-molecule PARENT-HYDRIDE tier.
 
     ``rules.terminal_ring.terminal_ring_name(mol, ring, free_valence_atom=None)``
-    returns an audited von Baeyer / spiro / P-22.2.3-replacement parent hydride
+    returns an audited von Baeyer / spiro / -replacement parent hydride
     and has done since PB -- but it was reachable ONLY as a ``-yl``
     substituent namer, so a bare ring system no catalog covers abstained even
     though the generator could name it. This is the parent-side sibling of the
@@ -2393,7 +2393,7 @@ def _name_terminal_ring_parent(
     which is what lets it express fused aromatics. No existing default changes.
 
     Every guard inside ``terminal_ring`` stays in force -- the reconstruction
-    audit, the charged-skeletal-atom (P-73) refusal, ``MAX_CAGE_ATOMS`` and
+    audit, the charged-skeletal-atom refusal, ``MAX_CAGE_ATOMS`` and
     ``MAX_CAGE_RINGS``. A refused ring system abstains, and that is correct.
     """
     if not allow_aromatic_general:
@@ -2409,7 +2409,7 @@ def _name_terminal_ring_parent(
     # connectivity walk below admit only ONE connected ring system, so a second
     # fragment refuses either as a non-ring heavy atom or as a disjoint system.
     # * net/atom charge -- ``terminal_ring_name`` refuses ANY charged skeletal
-    # ring atom (P-73 is a different naming class), and every heavy atom here
+    # ring atom is a different naming class), and every heavy atom here
     # IS a skeletal ring atom, so its guard is the stricter of the two.
     # * isotope -- kept, explicitly: a parent hydride expresses no isotope, so
     # naming an isotopologue with it would denote a different species.
@@ -2417,12 +2417,12 @@ def _name_terminal_ring_parent(
     # tier could not fire without saying so. RDKit reports a skeletal atom in a
     # non-standard valence state as carrying radical electrons: in
     # ``C1CC[Al]CC1`` the ring aluminium has two bonds against a default
-    # valence of three, so ``GetNumRadicalElectrons()`` is 1. That is not a
+    # valence of three, so ``GetNumRadicalElectrons`` is 1. That is not a
     # radical, it is exactly the case the lambda convention exists to express
-    # (P-15.4.1.3), and ``build_replacement_prefix`` already emits it --
+    #, and ``build_replacement_prefix`` already emits it --
     # ``1lambda2-aluminacyclohexane``, which round-trips through OPSIN to the
     # input. A radical on a skeletal CARBON is a genuine radical and belongs to
-    # P-71 radical nomenclature, which this tier does not build, so it refuses.
+    # radical nomenclature, which this tier does not build, so it refuses.
     if any(a.GetIsotope() for a in mol.GetAtoms()):
         return _refuse("isotope (a parent hydride expresses none)")
     if any(a.GetNumRadicalElectrons() and a.GetAtomicNum() == 6
@@ -2478,7 +2478,7 @@ def _name_terminal_ring_parent(
     # function's underlying namer DOES silently drop real, RDKit-detected
     # ring stereo it structurally cannot express -- e.g. a bare
     # 8/9-membered-ring endocyclic C=C carries a genuine defined E/Z
-    # ``_CIPCode`` (P-31.1.3 admits E/Z on rings >=8) and ``terminal_ring_name``
+    # ``_CIPCode`` admits E/Z on rings >=8) and ``terminal_ring_name``
     # emits no descriptor for it. But this tier is the LAST of five in
     # ``name_general``'s dispatch (cage/spiro/monocycle all tried first), and
     # ``name_general_monocycle`` -- which DOES thread stereo -- already
@@ -2528,16 +2528,16 @@ def _name_terminal_ring_assembly(
     tail gives **44 of 71**. The tail owns the three things a hand join gets
     wrong -- ``_mult_prefix`` (enclosing marks and ``bis``/``tris``, so
     ``15-(2-methylpropyl)`` rather than ``15-2-methylpropyl``), ``_alpha_key``
-    (P-14.5.2 order), and ``_stereo_prefix``. The last one is why the gain
+     order), and ``_stereo_prefix``. The last one is why the gain
     lands in **rt_exact and not merely rt_constitutional**.
 
     ⚠ **Conformance debt, deliberately incurred and recorded.** A PG-suppressed
-    name cites a ketone as ``3-oxo-…`` with NO suffix. P-33 requires the
+    name cites a ketone as ``3-oxo-…`` with NO suffix. requires the
     principal characteristic group to be the suffix, so these are valid
     descriptions of the right structure that are **not well-formed PINs**. That
-    is licit on T4 -- a project rule: "a table miss must degrade to an uglier name,
+    is licit on -- a project rule: "a table miss must degrade to an uglier name,
     never to a refusal" -- and it is confined to the best-effort branch, but it
-    is invisible to round-trip, SELF-01 and E1, which is exactly the spelling
+    is invisible to round-trip, and E1, which is exactly the spelling
     layer the BB-conformance audit sized. It is 's axis, not a defect here.
 
     Order and gating are identical to the parent tier above and load-bearing for
@@ -2549,13 +2549,13 @@ def _name_terminal_ring_assembly(
     """
     if not allow_aromatic_general or mol is None:
         return None
-    # T4 ONLY for a suffix-free name. `allow_suffix_free` is the best-effort
+    # ONLY for a suffix-free name. `allow_suffix_free` is the best-effort
     # discriminator (`general_fallback_unverified`), NOT `allow_aromatic_general`
     # -- the latter is True for `complete` as well, and a suffix-free name on
     # `complete` would assert RT-VERIFIED status for an ill-formed name.
     #
     # Scoped to the case that is actually ill-formed: with no principal
-    # characteristic group there is no required suffix to omit (P-41 only
+    # characteristic group there is no required suffix to omit only
     # mandates a suffix when such a group is present), so that name is
     # well-formed and may run wherever this tier runs. Suppressing a PG that
     # DOES exist is the ill-formed construction, and that needs T4.
@@ -2586,7 +2586,7 @@ def _name_terminal_ring_assembly(
     senior = sorted(set(senior))
 
     # GATE. terminal_ring_name is the authority on whether this ring system may
-    # be spelled at all: it kekulizes, refuses a charged skeletal atom (P-73),
+    # be spelled at all: it kekulizes, refuses a charged skeletal atom,
     # enforces MAX_CAGE_ATOMS / MAX_CAGE_RINGS, and RE-PROVES the von Baeyer
     # reconstruction audit at the emission point. Its answer is not merely a
     # hint -- if it declines, this tier declines.

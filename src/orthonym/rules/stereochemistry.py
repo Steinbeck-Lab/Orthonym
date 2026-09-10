@@ -45,7 +45,7 @@ def _composite_locant_sort_key(
     ring-junction collector (collect_ring_junction_stereo, line ~680) share
     one sort discipline.
 
-    Per IUPAC P-91.1, composite locants like '3a' sort BETWEEN integer 3
+    Per IUPAC, composite locants like '3a' sort BETWEEN integer 3
     and integer 4 (after 3 because '' < 'a' in tuple-lex comparison).
 
     a phase -- single source of truth for descriptor ordering. Per
@@ -62,7 +62,7 @@ def _composite_locant_sort_key(
         return (locant, '')
     # Primed locant from a MULTI-COMPONENT ring: atom_to_locant returns tuples
     # like (5, "'") / (3, "''") for the primed component (fused_rings /
-    # multi-component numbering). Per P-14.3.2 a primed locant sorts AFTER its
+    # multi-component numbering). Per a primed locant sorts AFTER its
     # unprimed twin at the same number ('' < "'" < "''"), so key on
     # (number, prime-suffix). Fixes a TypeError crash (a review review RISK 6):
     # int(locant) on a tuple raised instead of failing closed.
@@ -75,7 +75,7 @@ def _composite_locant_sort_key(
     # Fail closed, never crash: an unparseable locant sorts last. The descriptor
     # ORDER only affects the emitted string (OPSIN parses the descriptor set
     # order-independently), so a defensive last-sort degrades spelling at worst,
-    # never structure -- and the whole name is still RT/SELF-01 gated.
+    # never structure -- and the whole name is still RT/ gated.
     try:
         return (int(locant), '')
     except (TypeError, ValueError):
@@ -98,7 +98,7 @@ def _is_true_exocyclic(mol, in_scope_idx: int, other_idx: int) -> bool:
     `2,2,3-tri(cyclodec-1-en-1-yl)propanoate` acquired a parent-scope `(3E)`: the
     C=C lies inside a cyclodecene SUBSTITUENT, and propanoate has no double bond at
     its C3 for the descriptor to resolve to (OPSIN: `Could not find bond that:
-    <stereoChemistry locant="3" …> was referring to`). Per P-91.3 (the Blue Book) that
+    <stereoChemistry locant="3" …> was referring to`). Per (the Blue Book) that
     descriptor belongs on the substituent prefix, not at parent scope.
     """
     if not mol.GetAtomWithIdx(in_scope_idx).IsInRing():
@@ -125,9 +125,9 @@ def collect_stereodescriptors(
                        EMITS. It used to admit E/Z bonds one hop away from the
                        parent (neither bond atom in atom_to_locant, but one has
                        a neighbour that is), citing the neighbour's locant, on
-                       the stated authority of "IUPAC P-93.5.2". That citation
-                       is wrong — P-93.5.2 (the Blue Book) is "von Baeyer compounds".
-                       P-91.3 (the Blue Book) instead requires a substituent's
+                       the stated authority of "IUPAC ". That citation
+                       is wrong — (the Blue Book) is "von Baeyer compounds".
+                        (the Blue Book) instead requires a substituent's
                        descriptor to be cited "at the front of the corresponding
                        prefix", so a bond lying wholly inside a substituent has
                        no locant in the PARENT's numbering and is now skipped.
@@ -159,7 +159,7 @@ def collect_stereodescriptors(
                 locant = atom_to_locant[atom_idx]
                 cip_code = atom.GetProp('_CIPCode')
                 # Preserve CIP code as-is: R/S for normal stereocenters,
-                # r/s for pseudoasymmetric centers per IUPAC P-92.1.4.2.
+                # r/s for pseudoasymmetric centers per IUPAC.
                 descriptors.append((locant, cip_code))
 
     # Collect E/Z double bonds (bond-based)
@@ -173,8 +173,8 @@ def collect_stereodescriptors(
     # `format_stereodescriptor_string` spelled it '(7M,7Sa)-' — a malformed
     # duplicate-locant block. Measured on the suite's own `_make_biaryl_atropisomer`.
     #
-    # The filter is on the CIP CODE VALUE, deliberately, NOT on `bond.GetStereo()`.
-    # Gating on `GetStereo() in (STEREOE, STEREOZ)` looks like the obvious test and is
+    # The filter is on the CIP CODE VALUE, deliberately, NOT on `bond.GetStereo`.
+    # Gating on `GetStereo in (STEREOE, STEREOZ)` looks like the obvious test and is
     # WRONG: measured with RDKit here, an ordinary SMILES double bond reports
     # STEREOTRANS / STEREOCIS while carrying `_CIPCode` 'E'/'Z' —
     # 'C/C=C/C' -> stereo=STEREOTRANS, _CIPCode=E
@@ -190,7 +190,7 @@ def collect_stereodescriptors(
             # Skip ring-constrained double bonds in small rings: double bonds
             # in rings of size 7 or fewer have geometry fixed by ring strain.
             # Macrocyclic rings (8+ members) CAN have meaningful E/Z geometry
-            # per P-31.1.3 errata (Sep 2024).
+            # per errata (Sep 2024).
             if bond.IsInRing():
                 ri = mol.GetRingInfo()
                 min_ring_size = float('inf')
@@ -205,7 +205,7 @@ def collect_stereodescriptors(
 
             # Determine locant for this E/Z bond.
             # Standard case: both atoms in atom_to_locant -> use lower locant.
-            # Exocyclic case (IUPAC P-91.2): one atom in a ring that is
+            # Exocyclic case (IUPAC: one atom in a ring that is
             # in atom_to_locant, the other outside the ring -> use the
             # ring atom's locant. Only applies to true ring-exocyclic
             # bonds (prevents false E/Z on chain substituent bonds).
@@ -229,11 +229,11 @@ def collect_stereodescriptors(
                 #
                 # A "one-hop" branch used to stand here: it walked to a neighbouring
                 # in-scope atom and cited THAT atom's locant, on the stated authority of
-                # "IUPAC P-93.5.2". That citation is wrong — P-93.5.2 (the Blue Book) is
+                # "IUPAC ". That citation is wrong — (the Blue Book) is
                 # "von Baeyer compounds", and says nothing about projecting a
                 # substituent's double bond onto a parent locant.
                 #
-                # The rule that does govern is P-91.3 "NAMING OF STEREOISOMERS"
+                # The rule that does govern is "NAMING OF STEREOISOMERS"
                 # (the Blue Book): "They are placed at the front of the complete name when
                 # related to the parent structure... WHEN THEY RELATE TO SUBSTITUENT
                 # GROUPS, THEY ARE CITED AT THE FRONT OF THE CORRESPONDING PREFIX." A C=C
@@ -252,7 +252,7 @@ def collect_stereodescriptors(
             cip_code = bond.GetProp('_CIPCode')  # 'E' or 'Z'
             descriptors.append((locant, cip_code))
 
-    # Collect axial chirality (Ra/Sa) -- atropisomers and allenes (IUPAC P-93.5)
+    # Collect axial chirality (Ra/Sa) -- atropisomers and allenes (IUPAC
     axial_elements = detect_axial_chirality(mol)
     for element in axial_elements:
         cip = element.get('cip')
@@ -267,7 +267,7 @@ def collect_stereodescriptors(
 
     # Sort by locant ascending.: use the composite-locant safe key so
     # mixed int / '<int><letter>' (e.g. '3a', '7a' from ComplexRingResult.
-    # atom_to_locant per fused_rings.py:317) sort per IUPAC P-91.1
+    # atom_to_locant per fused_rings.py:317) sort per IUPAC
     # ('3a' BETWEEN integer 3 and 4). Byte-identical to the pre-153
     # `lambda x: x[0]` for int-only inputs (locked by
     # TestStereoBackstopRegressionInvariant in tests/unit/rules/
@@ -280,7 +280,7 @@ def collect_stereodescriptors(
     # `parent_size` is the max of the very map that produced every locant, so it can only
     # ever catch 0/negatives. It cannot tell that the map itself belongs to a different
     # scope than the name being decorated. The caller owns that (see
-    # `handlers/general_acyclic.py`, P-91.3).
+    # `handlers/general_acyclic.py`,.
     if descriptors and atom_to_locant:
         int_locants = [v for v in atom_to_locant.values() if isinstance(v, int)]
         parent_size = max(int_locants) if int_locants else 0
@@ -288,7 +288,7 @@ def collect_stereodescriptors(
             from .locant_validation import validate_stereo_locants
             descriptors = validate_stereo_locants(descriptors, parent_size)
 
-    # P-91.3 "NAMING OF STEREOISOMERS" (the Blue Book): a stereodescriptor is "preceded by a
+    # "NAMING OF STEREOISOMERS" (the Blue Book): a stereodescriptor is "preceded by a
     # numerical or letter locant to describe THE POSITION OF THE STEREOGENIC UNIT". A
     # locant names one position in one numbering, so two descriptors sharing a locant in
     # a single block do not describe two positions — the block is unresolvable, and OPSIN
@@ -297,7 +297,7 @@ def collect_stereodescriptors(
     # Two DIFFERENT double bonds cannot share one parent locant, so an E/Z locant cited
     # twice means at least one of them was projected in from another scope, e.g.
     # `2,2,3-tri(cyclodec-1-en-1-yl)propanoate` -> `(2E,2E,3E)-`, where the bonds live in
-    # the SUBSTITUENTS and P-91.3 puts their descriptors "at the front of the corresponding
+    # the SUBSTITUENTS and puts their descriptors "at the front of the corresponding
     # prefix". Fail closed on the contested locant rather than arbitrarily keeping one,
     # which would assert a configuration for a position with more than one unit on it.
     #
@@ -396,7 +396,7 @@ def format_stereodescriptor_string(
         Returns empty string if no descriptors.
 
     Examples:
-        >>> format_stereodescriptor_string([])
+        >>> format_stereodescriptor_string()
         ''
         >>> format_stereodescriptor_string([(2, 'R')])
         '(2R)-'
@@ -413,7 +413,7 @@ def format_stereodescriptor_string(
     # Build comma-separated list of "locantCIP".
     # A PRIMED tuple locant from a MULTI-COMPONENT (spiro/fused) name — e.g.
     # (6, "'") / (3, "''") for the 2nd component — must render as its number
-    # followed by the prime(s) ('6'', '3''') per P-14.3.2, NOT the Python tuple
+    # followed by the prime(s) ('6'', '3''') per, NOT the Python tuple
     # repr `(6, "'")`. This is the render-side counterpart to
     # `_composite_locant_sort_key`, which already accepts the (int, "'") tuple.
     # Scalar int / composite-str locants ('2', '7a') render byte-identically to
@@ -451,11 +451,11 @@ _STEREO_EMBEDDED_RE = re.compile(
     r"\(\d*[a-z]?'{0,2}[RSEZrsez](,\d*[a-z]?'{0,2}[RSEZrsez])*\)"
 )
 # Pattern C — carbohydrate / amino-acid traditional notation.: also match the
-# Blue-Book GREEK anomeric symbols α/β (P-102), now emitted in place of the ASCII
+# Blue-Book GREEK anomeric symbols α/β, now emitted in place of the ASCII
 # words (OPSIN parses both identically).
 _CARBOHYDRATE_STEREO_RE = re.compile(r'(alpha|beta|alfa|α|β)-[DL]-', re.IGNORECASE)
 
-# a phase WS-B.0 (): Pattern D — a leading/embedded D-/L- configurational
+# a phase.0 : Pattern D — a leading/embedded D-/L- configurational
 # token (D-alanine, d-glyceraldehyde, L-valine) AND peptide acyl chains
 # (L-valyl-… / D-glucosaminyl-…) are treated as stereo-already-present, alongside
 # the existing alpha/beta-anomeric Pattern C. These names already encode their
@@ -473,7 +473,7 @@ _DL_CONFIG_RE = re.compile(r'(^|[\s\-])([DL])-', re.I)
 # Peptide acyl chain (L-valyl- / D-glucosaminyl-) — case-insensitive.
 _PEPTIDE_ACYL_RE = re.compile(r'\b[DL]-[a-z]+yl-', re.I)
 
-# W5-A4 (P-103.3.4): detector for an L-SUPPRESSED peptide name. After L-omission
+# W5-A4: detector for an L-SUPPRESSED peptide name. After L-omission
 # a peptide such as 'alanylalanine' / 'valyltyrosylisoleucine' carries no D/L
 # token, so Pattern D can no longer see it. This does an EXACT greedy
 # decomposition against the amino-acid acyl/terminal tables: internal residues
@@ -506,7 +506,7 @@ def _peptide_stem_sets():
 
 
 def _looks_like_peptide(name: str) -> bool:
-    """True iff *name* is an Orthonym peptide of >=2 residues (P-103.3.2/.3.4).
+    """True iff *name* is an Orthonym peptide of >=2 residues /.3.4).
 
     Greedy longest-match decomposition: strip a cited 'D-' descriptor (leading, or
     '-D-' before a later residue), consume the whole remainder as a terminal AA
@@ -541,7 +541,7 @@ def _looks_like_peptide(name: str) -> bool:
         residues += 1
     return False
 
-# OPSIN-validity stereo carve-out (a phase.7): a LEADING stereo / relative-configuration descriptor-block
+# OPSIN-validity stereo carve-out (a phase): a LEADING stereo / relative-configuration descriptor-block
 # matcher for strip_stereo. Mirrors scripts/pin_strict_eval._STEREO_PREFIX (the
 # validation precedent). Matches a leading (...)- block whose contents are PURELY
 # stereo descriptors (digits, optional composite-locant letter, r/s/e/z/R/S/E/Z/*,
@@ -558,7 +558,7 @@ _STRIP_STEREO_LEADING_RE = re.compile(
 # (``[(1r,4r)-4-methylcyclohexyl]benzene``, ``N-[(1s,4s)-4-methylcyclohexyl]…``).
 # The leading matcher above only reaches a block at name-start, so a nested
 # substituent-stereo block was invisible to the "does the constitutional form
-# parse?" probe, and the DEF-9 gate wrongly suppressed a correct-by-construction
+# parse?" probe, and the gate wrongly suppressed a correct-by-construction
 # PIN whose ONLY OPSIN-unparseable feature is the r/s cyclohexane stereo layer.
 # This removes ONLY the pure-stereo block, preserving the enclosing mark (so the
 # substituent constitution is left intact for the OPSIN parse test); it can never
@@ -572,7 +572,7 @@ _STRIP_STEREO_NESTED_RE = re.compile(
 
 def strip_stereo(name: str) -> str:
     """Return *name* with leading stereo / relative-config descriptor blocks removed
-    (to a fixpoint) — the OPSIN-validity stereo carve-out "where does OPSIN fail" probe (CONTEXT).
+    (to a fixpoint) — the OPSIN-validity stereo carve-out "where does OPSIN fail" probe (internal notes).
 
     READ-ONLY: this is NOT a postprocessor on shipped names. The validity gate uses it
     only to test whether a name's CONSTITUTIONAL (stereo-stripped) form parses; the
@@ -598,7 +598,7 @@ def strip_stereo(name: str) -> str:
 def needs_stereo_injection(mol, name: str) -> bool:
     """Return True iff *mol* carries CIP stereo not represented in *name*.
 
-    Pure read-only predicate () used both by the namer.py backstop
+    Pure read-only predicate  used both by the namer.py backstop
     (after a phase refactor) and by inject_stereo_from_locant_map.
 
     Per, the three name-side detection patterns are byte-identical to
@@ -626,16 +626,16 @@ def needs_stereo_injection(mol, name: str) -> bool:
     # Pattern C — carbohydrate / amino acid traditional notation
     if _CARBOHYDRATE_STEREO_RE.search(name):
         return False
-    # Pattern D (a phase WS-B.0 /) — a D/L configurational token or a
+    # Pattern D (a phase.0 /) — a D/L configurational token or a
     # peptide acyl chain means the name already carries its configuration.
-    # SHARED primitive (): both the namer backstop (_final_stereo_check) and
+    # SHARED primitive : both the namer backstop (_final_stereo_check) and
     # inject_stereo_from_locant_map delegate detection here, so this suppresses
     # both injection seams uniformly. Load-bearing for the Plan-02 backstop flip
     # (peptides report complex_ring/unknown/direct, NOT heterocycle — RESEARCH
     # Pitfall 1 — so the inject-allowlist exclusion is not sufficient on its own).
     if _DL_CONFIG_RE.search(name) or _PEPTIDE_ACYL_RE.search(name):
         return False
-    # Pattern E (W5-A4) — an L-SUPPRESSED peptide name (P-103.3.4). With the L
+    # Pattern E (W5-A4) — an L-SUPPRESSED peptide name. With the L
     # descriptor omitted (alanylalanine, glycylalanine, valyltyrosylisoleucine),
     # Patterns C/D no longer fire, so the descriptor-free peptide would wrongly
     # look injection-eligible. name_peptide already carries all cited (D-) config
@@ -661,7 +661,7 @@ def count_defined_stereo_elements(mol) -> int:
       * every bond with ``_CIPCode`` EXCEPT ring bonds whose smallest ring is
         <8 (ring-strain-fixed geometry — not a free stereogenic unit; the SAME
         exclusion ``collect_stereodescriptors`` applies, so what is *counted*
-        as defined matches exactly what CAN be expressed, P-31.1.3);
+        as defined matches exactly what CAN be expressed,;
       * every detected axial element with a determined CIP label.
 
     Read-only. Used by ``general_engine_stereo_complete`` for the all-or-nothing
@@ -702,7 +702,7 @@ def count_defined_stereo_in_fragment(mol, frag_atoms) -> int:
 
       * every fragment atom carrying ``_CIPCode``;
       * every bond with ``_CIPCode`` whose BOTH ends are in the fragment, EXCEPT
-        a ring bond whose smallest ring is <8 — ``### **P-91.2.2** Omission of
+        a ring bond whose smallest ring is <8 — ``### **** Omission of
         stereodescriptors`` (``the Blue Book``) recommends omitting the
         descriptor for "*three- through seven-membered unsaturated alicyclic
         compounds where any double bond has a fixed configuration*", so such a
@@ -733,7 +733,7 @@ def count_defined_stereo_in_fragment(mol, frag_atoms) -> int:
             min_ring = min((len(r) for r in ri.BondRings()
                             if b.GetIdx() in r), default=99)
             if min_ring < 8:
-                continue  # P-91.2.2 ring-strain-fixed; not an expressible unit
+                continue  # ring-strain-fixed; not an expressible unit
         n += 1
     return n
 
@@ -766,7 +766,7 @@ def general_engine_stereo_complete(mol, name: str) -> bool:
     name-side boolean (``not needs_stereo_injection``) at the general-engine
     emission sites, closing the verified hole where a PARTIAL-stereo name (some
     elements expressed, others dropped) matched Pattern A and shipped as if
-    fully specified — invisible to the stereo-blind SELF-01 (P-91.2.1: a PIN
+    fully specified — invisible to the stereo-blind: a PIN
     must specify every stereogenic unit).
 
     The exact ``==`` (not ``>=``) ALSO fail-closes on OVER-expression (a
@@ -791,9 +791,9 @@ def inject_stereo_from_locant_map(
     *,
     include_near_parent_ez: bool = True,
 ) -> str:
-    """Prepend a P-91 stereo descriptor block to *name* using authoritative locants.
+    """Prepend a stereo descriptor block to *name* using authoritative locants.
 
-    Per IUPAC P-91 / P-91.1, prepends a `(R/S/E/Z)-` block built from
+    Per IUPAC /, prepends a `(R/S/E/Z)-` block built from
     collect_stereodescriptors + format_stereodescriptor_string.
 
     Per, **no atom-index fallback**: when atom_to_locant is None, empty,
@@ -806,12 +806,12 @@ def inject_stereo_from_locant_map(
         mol: RDKit Mol object with stereo info.
         atom_to_locant: Authoritative {atom_idx: 1-indexed locant} map from
             the handler's own perception (heterocycle / benzene / cycloalkane
-            / cycloalkene). Must NOT be derived from raw atom indices ().
+            / cycloalkene). Must NOT be derived from raw atom indices .
         include_near_parent_ez: When True (default -- preserves benzene /
             heterocycle Tier-A behaviour), exocyclic E/Z bonds one hop from
             the parent are attributed to the lowest neighbouring locant per
-            P-93.5.2. When False (cycloalkane / cycloalkene caller post-
-            BL-02 fix), exocyclic E/Z bonds are NOT attributed to ring
+            . When False (cycloalkane / cycloalkene caller post-
+             fix), exocyclic E/Z bonds are NOT attributed to ring
             locants; only ring-atom R/S and ring-bond E/Z are emitted. This
             is the conservative gate per ("better a missing stereo
             block than a wrong one") for handlers where exocyclic E/Z can
@@ -820,7 +820,7 @@ def inject_stereo_from_locant_map(
     Returns:
         name unchanged (predicate False / no locant map / no descriptors)
         OR prefix + name where prefix is e.g. '(2R)-', '(2R,3S)-',
-        '(2E,3R,5Z)-', '(2r,3s)-' per P-91.
+        '(2E,3R,5Z)-', '(2r,3s)-' per.
 
     Example:
         >>> mol = Chem.MolFromSmiles('C[C@@H](O)CC')
@@ -832,7 +832,7 @@ def inject_stereo_from_locant_map(
         return name
 
     #: hard precondition — no atom-index fallback.
-    # WR-02 fix (a phase-02, 2026-05-03): also reject all-zero / non-positive
+    # fix (a phase-02, 2026-05-03): also reject all-zero / non-positive
     # locant maps. A locant of 0 or negative is IUPAC-malformed (locants are
     # 1-indexed); accepting it would emit '(0R)-name' or '(-1R)-name' garbage.
     # Per ("missing > wrong"), skip injection.
@@ -845,9 +845,9 @@ def inject_stereo_from_locant_map(
         )
         return name
 
-    #: include_near_parent_ez defaults to True for P-93.5.2 compliance
+    #: include_near_parent_ez defaults to True for compliance
     # (top-level only; is_top_level_naming guard at the call site enforces
-    # this). BL-02 fix (a phase-02, 2026-05-03): cycloalkane / cycloalkene
+    # this). fix (a phase-02, 2026-05-03): cycloalkane / cycloalkene
     # caller passes include_near_parent_ez=_ring_is_whole_molecule so chain-
     # side exocyclic E/Z is NOT attributed to ring locants.
     descriptors = collect_stereodescriptors(
@@ -868,7 +868,7 @@ def inject_stereo_reanchored_rt_gated(
     include_near_parent_ez: bool = True,
     input_smiles: Optional[str] = None,
 ) -> str:
-    """Inject a P-91 stereo block on *base_name*, RT-gating the LOCANT numbering
+    """Inject a stereo block on *base_name*, RT-gating the LOCANT numbering
     (CLAUDE.md a project rule — offer numberings, keep the one that round-trips).
 
     Candidate A uses ``builder_map`` (the handler's own numbering) exactly as
@@ -936,7 +936,7 @@ def inject_stereo_reanchored_rt_gated(
     # placed on a numbering OPSIN reads back correctly. Returning candidate A here
     # ships a name whose stereo layer OPSIN cannot verify — the OPSIN-validity stereo
     # carve-out (namer.py) then emits it whole because its CONSTITUTION parses,
-    # i.e. a WRONG/unverifiable-stereo name reaches T1 (a residual 0-wrong leak).
+    # i.e. a WRONG/unverifiable-stereo name reaches (a residual 0-wrong leak).
     # Instead return the stereo-STRIPPED FLAT name: constitution-correct,
     # OPSIN-parseable, stereo OMITTED per project policy
     # (feedback_stereo_omission_is_not_wrong_molecule). ``base_name`` is the
@@ -960,7 +960,7 @@ def _ring_atom_to_locant_from_oriented(oriented_ring: List[int]) -> Dict[int, in
     Returns:
         Dict mapping each atom idx to its 1-indexed locant. When duplicate
         atom indices appear, the LAST occurrence wins (matches dict semantics
-        of the original one-liner at composer.py:7184). WR-03 fix
+        of the original one-liner at composer.py:7184). fix
         (a phase-02, 2026-05-03): also emits a WARNING log when duplicates
         are present so a buggy upstream orientator does not silently produce
         a wrong locant map.
@@ -1177,7 +1177,7 @@ def format_ring_stereo_with_descriptors(
     Example:
         >>> format_ring_stereo_with_descriptors('cis-', [(1, 'R'), (2, 'S')])
         'cis-(1R,2S)-'
-        >>> format_ring_stereo_with_descriptors('trans-', [])
+        >>> format_ring_stereo_with_descriptors('trans-', )
         'trans-'
         >>> format_ring_stereo_with_descriptors(None, [(1, 'R')])
         '(1R)-'

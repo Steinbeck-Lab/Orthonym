@@ -7,7 +7,7 @@ Tests the polycyclic_bridged module functions:
 - Bridgehead detection
 - Bridge path finding
 
-Coverage of IUPAC 2013 P-23.3 (polycyclic ring systems).
+Coverage of IUPAC 2013 (polycyclic ring systems).
 """
 
 import pytest
@@ -59,7 +59,7 @@ def bicyclo_222_octane():
 
 
 # ============================================================================
-# Tests for get_ring_count()
+# Tests for get_ring_count
 # ============================================================================
 
 class TestGetRingCount:
@@ -93,7 +93,7 @@ class TestGetRingCount:
 
 
 # ============================================================================
-# Tests for classify_bridged_system()
+# Tests for classify_bridged_system
 # ============================================================================
 
 class TestClassifyBridgedSystem:
@@ -127,7 +127,7 @@ class TestClassifyBridgedSystem:
         then fell through to ``f'{ring_count}cyclo'``, so every system with 11+
         rings was labelled with a non-word. Both counts below are past that old
         ceiling; 21 is additionally past ``CYCLO_PREFIXES``' ceiling of 20, so
-        it exercises the P-14.2.1.2 composition ('henicosa') too.
+        it exercises the composition ('henicosa') too.
         """
         # [12]-ladderane: two 12-carbon rails joined by 12 rungs -> 11 rings.
         # [22]-ladderane, same construction -> 21 rings.
@@ -144,7 +144,7 @@ class TestClassifyBridgedSystem:
 
 
 # ============================================================================
-# Tests for is_tricyclo_system()
+# Tests for is_tricyclo_system
 # ============================================================================
 
 class TestIsTricycloSystem:
@@ -167,7 +167,7 @@ class TestIsTricycloSystem:
 
 
 # ============================================================================
-# Tests for find_all_bridgeheads()
+# Tests for find_all_bridgeheads
 # ============================================================================
 
 class TestFindAllBridgeheads:
@@ -199,7 +199,7 @@ class TestFindAllBridgeheads:
 
 
 # ============================================================================
-# Tests for analyze_polycyclic_system()
+# Tests for analyze_polycyclic_system
 # ============================================================================
 
 class TestAnalyzePolycyclicSystem:
@@ -329,7 +329,7 @@ class TestZeroLengthBridges:
     def test_cubane_has_correct_bridge_count(self):
         """Cubane must have exactly 6 bridge lengths (ring_count + 1 = 5 + 1 = 6).
 
-        13B(d): with the P-23.2.1 main-ring fix the main ring is now the maximal
+        13B(d): with the main-ring fix the main ring is now the maximal
         (8-membered) cycle, so the main bridge is 0 atoms and FOUR of the six
         bridge lengths are zero (descriptor pentacyclo[3.3.0.0^2,6.0^3,7.0^4,8]),
         up from three under the previous (non-maximal main-ring) decomposition.
@@ -357,7 +357,7 @@ class TestZeroLengthBridges:
         """Cubane descriptor must contain 'pentacyclo[' and zero-length bridges.
 
         13B(d): PIN superscript typography for secondary bridges
-        (``0^low,high`` per P-23.2.5.1) and a 0-atom main bridge from the
+        (``0^low,high`` per and a 0-atom main bridge from the
         maximal main ring => three zero-length SECONDARY-bridge entries plus the
         zero main bridge.
         """
@@ -421,7 +421,7 @@ class TestZeroLengthBridges:
         """Adamantane secondary bridge via unassigned atoms must still work.
 
         Adamantane has unassigned atoms forming a secondary bridge of length 1.
-        This ensures the Phase 1 (unassigned-atom) processing path is preserved.
+        This ensures the a phase (unassigned-atom) processing path is preserved.
         """
         mol = Chem.MolFromSmiles("C1C2CC3CC1CC(C2)C3")
         ring_atoms = _get_ring_atoms(mol)

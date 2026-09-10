@@ -5,7 +5,7 @@ Provides authoritative chain prefix generation for all carbon chain lengths
 from 1 to 9999, following IUPAC 2013 Blue Book nomenclature rules.
 
 IUPAC Long Chain Naming System:
-- 1-20: Individual retained prefixes (meth, eth, prop, ... icos)
+- 1-20: Individual retained prefixes (meth, eth, prop,... icos)
 - 21+: Compositional system using units + tens + hundreds + thousands
   - Units (1-9): hen, do, tri, tetra, penta, hexa, hepta, octa, nona
   - Tens (20-90): cos, triacont, tetracont, pentacont, hexacont, heptacont,
@@ -24,7 +24,7 @@ Special linking rules:
 
 References:
     IUPAC 2013 Blue Book, Table A6.1 (Numerical terms used in nomenclature)
-    IUPAC 2013 Blue Book, P-14.2.1.2 (Thousands digit prefixes)
+    IUPAC 2013 Blue Book, (Thousands digit prefixes)
 
 Examples:
     >>> get_chain_prefix(1)
@@ -68,7 +68,7 @@ UNITS = {
 
 # Tens digit (2-9) -> tens prefix
 # Note: tens=1 (10-19) is handled by FIRST_20 for n<=20,
-#   and by "deca" for 110, 210, etc. (in combination with hundreds)
+# and by "deca" for 110, 210, etc. (in combination with hundreds)
 # tens=2 (20-29) uses "cos" (special: "icos" for 21 with linking 'i')
 TENS = {
     2: "cos", 3: "triacont", 4: "tetracont", 5: "pentacont",
@@ -82,7 +82,7 @@ HUNDREDS = {
 }
 
 # Thousands digit (1-9) -> thousands prefix
-# Source: IUPAC 2013 Blue Book Table 1.4 (P-14.2.1.2)
+# Source: IUPAC 2013 Blue Book Table 1.4
 THOUSANDS = {
     1: "kili", 2: "dili", 3: "trili", 4: "tetrali", 5: "pentali",
     6: "hexali", 7: "heptali", 8: "octali", 9: "nonali",
@@ -153,11 +153,11 @@ def get_chain_prefix(n: int) -> str:
         return _build_prefix_21_to_999(n)
 
     if remainder == 0:
-        # Pure thousands: 1000, 2000, ...
+        # Pure thousands: 1000, 2000,...
         return THOUSANDS[thousands]
 
     # Build sub-thousand part using compositional units (not retained names)
-    # For 1-9: use UNITS (hen, do, tri, ...) - same as hundreds context
+    # For 1-9: use UNITS (hen, do, tri,...) - same as hundreds context
     # For 10-20: use compositional sub-hundred system
     # For 21-999: use full compositional builder
     if remainder <= 9:
@@ -196,7 +196,7 @@ def _build_prefix_21_to_999(n: int) -> str:
     # Build the sub-hundred part (ones + tens)
     sub_hundred = _build_sub_hundred(ones, tens)
 
-    # Pure hundreds (100, 200, 300, ...)
+    # Pure hundreds (100, 200, 300,...)
     if not sub_hundred and hundreds > 0:
         return HUNDREDS[hundreds]
 
@@ -236,7 +236,7 @@ def _build_sub_hundred(ones: int, tens: int) -> str:
 
     if tens == 1:
         # Teens in hundreds context (e.g., 110 = dec + a + hect,
-        #   111 = hendec + a + hect, 112 = dodec + a + hect)
+        # 111 = hendec + a + hect, 112 = dodec + a + hect)
         if ones == 0:
             return "dec"
         else:
@@ -248,7 +248,7 @@ def _build_sub_hundred(ones: int, tens: int) -> str:
     tens_prefix = TENS[tens]
 
     if ones == 0:
-        # Pure tens: 20, 30, 40, ...
+        # Pure tens: 20, 30, 40,...
         # 20 is handled by FIRST_20, so this is for 30+, or 20 in hundreds
         return tens_prefix
 
@@ -382,7 +382,7 @@ def get_enoate_name(n: int, unsaturation=None) -> str:
         n: Number of carbons including the carbonyl carbon.
         unsaturation: Optional list of ``(double_bond_locant, 'E'|'Z'|'')`` tuples
             (locants counted from the carbonyl carbon = 1). None/empty → the
-            saturated ``-anoate`` form (identical to :func:`get_anoate_name`).
+            saturated ``-anoate`` form (identical to:func:`get_anoate_name`).
 
     Returns:
         e.g. ``'octadecanoate'`` (saturated), ``'(9Z)-octadec-9-enoate'`` (1 db),

@@ -1,16 +1,16 @@
 """
 Batch regression tests for medium molecule stereo auto-unlock and charge fixes.
 
-Phase 66 Plan 03: Verifies that stereo descriptors appear in names after
+a phase Plan 03: Verifies that stereo descriptors appear in names after
 Wave 1 parent selection improvements, and that charge pipeline produces
 correct names for medium-molecule ions/salts.
 
 Test groups:
   1. Stereo auto-unlocked: Compounds that gained stereodescriptors after
-     Wave 1 parent fixes (11 compounds, STER-05)
+     Wave 1 parent fixes (11 compounds,)
   2. Charge improved: Medium-molecule charge compounds with better names
-     after Phase 64/66 pipeline fixes (5 compounds, CHRG-05)
-  3. RT verification: Compounds that round-trip through OPSIN after Phase 66
+     after a phase/66 pipeline fixes (5 compounds,)
+  3. RT verification: Compounds that round-trip through OPSIN after a phase
 """
 
 import pytest
@@ -18,9 +18,9 @@ from orthonym import name_compound
 
 
 # ---------------------------------------------------------------------------
-# Group 1: Stereo auto-unlocked compounds (STER-05)
+# Group 1: Stereo auto-unlocked compounds
 # These compounds gained stereodescriptors when Wave 1 fixed their parent
-# selection. Validates that Phase 63 stereo wiring works automatically
+# selection. Validates that a phase stereo wiring works automatically
 # once the correct parent is identified.
 # ---------------------------------------------------------------------------
 STEREO_AUTOUNLOCK = [
@@ -101,9 +101,9 @@ def test_stereo_auto_unlock(smiles, stereo_marker):
 
 
 # ---------------------------------------------------------------------------
-# Group 2: Charge improved compounds (CHRG-05)
+# Group 2: Charge improved compounds
 # Validates that medium-molecule charged species produce meaningful names
-# after Phase 64 + 66 pipeline improvements.
+# after a phase + 66 pipeline improvements.
 # ---------------------------------------------------------------------------
 CHARGE_FIXES = [
     pytest.param(
@@ -123,12 +123,12 @@ CHARGE_FIXES = [
     ),
     pytest.param(
         "CCCCCCCCCC(=O)OCC(COP(=O)([O-])OCC[N+](C)(C)C)OC(=O)CCCCCCCCC",
-        # Phase 157 cleanup: relaxed substring from "decane" to "decan" so
+        # a phase cleanup: relaxed substring from "decane" to "decan" so
         # that both `decane` (chain-PIN) AND `decanoyloxy` (acyloxy
-        # connector PIN per P-66.6 / P-25.5) are accepted. The v18 output
-        # `1,2-bis(decanoyloxy)propyl ...` uses the acyloxy form — valid
+        # connector PIN per / are accepted. The output
+        # `1,2-bis(decanoyloxy)propyl...` uses the acyloxy form — valid
         # IUPAC. Deeper bug (trimethylammonium mis-perceived as
-        # propylamino) is tracked as D-157-06 in cleanup-deferred-items.md.
+        # propylamino) is tracked as -06 in cleanup-deferred-items.md.
         "decan",  # accepts decane, decanoyl, decanoyloxy, decanediyl, etc.
         id="phospholipid-didecanoate",
     ),
@@ -152,8 +152,8 @@ def test_charge_naming_medium(smiles, expected):
 
 
 # ---------------------------------------------------------------------------
-# Group 3: Newly round-tripping compounds from Phase 66
-# These compounds gained correct names through Phase 66 parent fixes that
+# Group 3: Newly round-tripping compounds from a phase
+# These compounds gained correct names through a phase parent fixes that
 # now successfully round-trip through OPSIN -> InChI comparison.
 # ---------------------------------------------------------------------------
 NEWLY_RT_P66 = [
@@ -178,7 +178,7 @@ NEWLY_RT_P66 = [
 @pytest.mark.integration
 @pytest.mark.parametrize("smiles,expected_name", NEWLY_RT_P66)
 def test_newly_rt_phase66(smiles, expected_name):
-    """Compounds that newly round-trip after Phase 66 must keep exact names."""
+    """Compounds that newly round-trip after a phase must keep exact names."""
     name = name_compound(smiles)
     assert name == expected_name, (
         f"Expected: {expected_name}\nGot: {name}"

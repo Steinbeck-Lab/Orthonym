@@ -1,4 +1,4 @@
-"""Measurement instrumentation for the v25 coverage program (P0).
+"""Measurement instrumentation for the coverage program (P0).
 
 Side-effect-free telemetry only: nothing in this package may change an
 emitted name. The abstention module tags WHY a naming call failed closed;

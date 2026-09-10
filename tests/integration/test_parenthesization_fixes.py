@@ -1,9 +1,9 @@
 """
-Regression tests for Phase 65 Plan 03: Acyloxy parenthesization fixes.
+Regression tests for a phase Plan 03: Acyloxy parenthesization fixes.
 
 Tests verify that:
-1. Acyloxy compound prefixes use IUPAC P-16.3.3 complex multipliers (bis/tris)
-2. No hybrid di(/tri( format remains in generated names
+1. Acyloxy compound prefixes use IUPAC complex multipliers (bis/tris)
+2. No hybrid di(/tri(format remains in generated names
 3. Parenthesization compounds (#11, #65, #84, #106) have correct format
 4. Stereo-prefixed compound substituents get proper bracket nesting
 
@@ -17,7 +17,7 @@ Results of 55 format-issue compound sweep (across Plans 01-03):
   where format was only a secondary issue after deeper naming errors
 
 Categories of remaining failures:
-- Wrong parent selection: ~60 compounds (deferred to Phase 66)
+- Wrong parent selection: ~60 compounds (deferred to a phase)
 - Decomposition garbling: ~20 compounds (fragment assembly limitations)
 - Complex ring systems: ~15 compounds (naming depth/coverage gaps)
 - OPSIN bugs: ~5 compounds (OPSIN valency errors on valid names)
@@ -34,7 +34,7 @@ from orthonym import name_compound
 
 
 class TestAcyloxyParenthesization:
-    """Test that acyloxy prefixes use IUPAC P-16.3.3 complex multipliers."""
+    """Test that acyloxy prefixes use IUPAC complex multipliers."""
 
     @pytest.mark.integration
     def test_triacetin_uses_tris(self):
@@ -86,7 +86,7 @@ class TestAcyloxyParenthesization:
 
 
 class TestParenthesizationCompounds:
-    """Tests for the 4 parenthesization-issue compounds from FMTX-03."""
+    """Tests for the 4 parenthesization-issue compounds from."""
 
     @pytest.mark.integration
     def test_compound_11_no_hybrid_format(self):
@@ -96,7 +96,7 @@ class TestParenthesizationCompounds:
         assert "bis(acetyloxy)" in name, (
             f"Expected 'bis(acetyloxy)' in '{name}'"
         )
-        # No hybrid di( format
+        # No hybrid di(format
         assert "di(acetyloxy)" not in name, (
             f"Unexpected hybrid 'di(acetyloxy)' in '{name}'"
         )
@@ -149,7 +149,7 @@ class TestParenthesizationCompounds:
 
 
 class TestNoHybridFormat:
-    """Verify that no acyloxy name uses the hybrid di(/tri( multiplier format."""
+    """Verify that no acyloxy name uses the hybrid di(/tri(multiplier format."""
 
     @pytest.mark.integration
     def test_no_hybrid_di_format_in_acyloxy(self):
@@ -206,7 +206,7 @@ class TestStereoSubstituentBrackets:
 
 
 class TestIsComplexSubstituent:
-    """Unit tests for is_complex_substituent() acyloxy recognition."""
+    """Unit tests for is_complex_substituent acyloxy recognition."""
 
     @pytest.mark.integration
     def test_acetyloxy_is_complex(self):
@@ -255,7 +255,7 @@ class TestIsComplexSubstituent:
 
 
 class TestStereoPrefix:
-    """Tests for _has_stereo_prefix() lowercase e/z support."""
+    """Tests for _has_stereo_prefix lowercase e/z support."""
 
     @pytest.mark.integration
     def test_lowercase_ez_detected(self):

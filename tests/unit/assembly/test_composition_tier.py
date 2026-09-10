@@ -1,7 +1,7 @@
 """Slice-1 composition tier — the covered-atom foundation.
 
 The covered-atom computation is the foundation the whole composition step rests on, and the
-Task-1/2 spy proved the obvious source is WRONG: ``features.principal_chain`` alone undercounts,
+Task-1/2 trace proved the obvious source is WRONG: ``features.principal_chain`` alone undercounts,
 reporting ``propan-1-ol`` as 3/4 (it misses the ``-ol`` oxygen). These tests pin the correct
 computation — chain PLUS principal-group atoms — and the uncovered-fragment split that finds the
 dropped remainder. Pure functions, no OPSIN, so this stays in the fast suite.
@@ -38,7 +38,7 @@ def _features(smiles):
 
 
 def test_covered_includes_the_suffix_oxygen_not_just_the_chain():
-    """The exact bug the spy exposed: propan-1-ol is fully covered (4/4), not 3/4."""
+    """The exact bug the trace exposed: propan-1-ol is fully covered (4/4), not 3/4."""
     mol, feats = _features("CCCO")
     covered = parent_covered_atoms(mol, feats)
     assert len(covered) == 4, f"propan-1-ol must cover all 4 heavy atoms, got {covered}"

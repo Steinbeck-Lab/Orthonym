@@ -1,4 +1,4 @@
-"""Tests for ring-as-substituent naming infrastructure (Phase 139 ARCH-02).
+"""Tests for ring-as-substituent naming infrastructure (a phase).
 
 Verifies that:
 1. Fused heterocycle entries exist in RING_SUBSTITUENT_NAMES

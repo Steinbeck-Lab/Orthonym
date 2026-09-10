@@ -40,7 +40,7 @@ class TestDataCompleteness:
             )
 
     def test_validate_all_entries_function(self):
-        """The _validate_all_entries() helper must return True."""
+        """The _validate_all_entries helper must return True."""
         assert _validate_all_entries() is True
 
     def test_minimum_entry_count(self):
@@ -211,8 +211,8 @@ class TestLocantCorrectness:
         """Indolizine: 9 atoms, bridgehead N-system (Blue Book Table 2.8 #20).
 
         Numbering 1,2,3,4,5,6,7,8,8a: the bridgehead N is position 4 and the
-        bridgehead carbon is 8a — there is NO '3a' (that was the DATA-01-flagged
-        wrong stored numbering, N at 8a). v23 13B(a) 5/7-ring data fix re-derived
+        bridgehead carbon is 8a — there is NO '3a' (that was the -flagged
+        wrong stored numbering, N at 8a). 13B(a) 5/7-ring data fix re-derived
         these from OPSIN -o extendedsmi, substituted-RT verified.
         """
         data = FUSED_HETEROCYCLE_DATA['c1ccn2cccc2c1']

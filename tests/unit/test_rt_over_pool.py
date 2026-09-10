@@ -1,5 +1,5 @@
 # tests/unit/test_rt_over_pool.py
-"""v33 Phase 0 Task L4-core: the RT-gate-over-offers SELECTION PRIMITIVE
+""" a phase Task L4-core: the RT-gate-over-offers SELECTION PRIMITIVE
 (`assembly.offer_pool.select_rt_passing`) wired at `namer.py::_finish` via
 `Orthonym._select_rt_passing_offer_name`.
 
@@ -121,11 +121,11 @@ class TestOfferRtOkPredicate:
 
     def test_recorded_self01_pass_still_checks_full_inchikey_matching_passes(
             self, monkeypatch):
-        """v33 Phase 0 L3-1 CHANGE: a recorded SELF-01 pass no longer
+        """ a phase L3-1 CHANGE: a recorded pass no longer
         short-circuits `_offer_rt_ok` -- it proves constitution only (the
         L3 CHARACTERIZATION's whole finding), so the full-InChIKey compare
         still runs. In PRODUCTION `_validity_gate_name_to_smiles` is a cache
-        HIT here (the SELF-01 gate already called it for this exact string,
+        HIT here (the gate already called it for this exact string,
         so no NEW JVM invocation happens) -- this unit test proves the
         DECISION (matching molecule -> True), not the cache mechanics
         (which live inside `OpsinOracle` and are exercised by the
@@ -140,7 +140,7 @@ class TestOfferRtOkPredicate:
 
     def test_recorded_self01_pass_but_full_inchikey_stereo_mismatch_fails(
             self, monkeypatch):
-        """THE L3-1 fix: a name that SELF-01 already marked constitution-
+        """THE L3-1 fix: a name that already marked constitution-
         verified (`self01_complete=True`) but whose OPSIN re-perception
         encodes a DIFFERENT stereoisomer (or a stereo-UNSPECIFIED input named
         by a stereo-fabricating retained name -- the dominant discard-gap
@@ -162,7 +162,7 @@ class TestOfferRtOkPredicate:
     def test_no_recorded_verdict_full_inchikey_stereo_mismatch_fails(
             self, monkeypatch):
         """Same full-InChIKey stereo check, but on the fresh-check branch
-        (no recorded SELF-01 verdict at all) -- both branches must apply the
+        (no recorded verdict at all) -- both branches must apply the
         same stricter bar."""
         monkeypatch.setattr(
             namer_mod, "_self01_lookup", lambda name: (None, False, ""))
@@ -226,8 +226,8 @@ class TestOfferRtOkPredicate:
 
     def test_no_recorded_verdict_transient_unavailable_fails_closed(
             self, monkeypatch):
-        """WS7 fix round 1 (0-wrong, coordinator CRITICAL): a `(None, False, "")`
-        lookup means NO positive SELF-01 verdict for THIS exact string
+        """ fix round 1 (0-wrong, coordinator CRITICAL): a `(None, False, "")`
+        lookup means NO positive verdict for THIS exact string
         (`bypassed`/`suppressed`/`inconclusive` -- e.g. a fresh floor offer). When
         OPSIN cannot re-perceive it (`name_to_smiles`->None) under a transient
         `unavailable`, the offers lane MUST fail CLOSED -- an ungated offer may

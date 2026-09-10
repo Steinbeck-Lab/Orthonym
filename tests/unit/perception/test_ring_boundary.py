@@ -1,5 +1,5 @@
 """
-Unit tests for ring boundary detection - get_complete_ring_atom_set().
+Unit tests for ring boundary detection - get_complete_ring_atom_set.
 
 Tests that all atoms in fused, bridged, spiro, and single ring systems
 are correctly identified, and that exocyclic atoms are excluded.
@@ -115,7 +115,7 @@ class TestMolecularFeaturesAllRingAtoms:
     """Test that MolecularFeatures.all_ring_atoms is populated during perception."""
 
     def test_all_ring_atoms_populated(self):
-        """MolecularFeatures.all_ring_atoms is populated after _perceive()."""
+        """MolecularFeatures.all_ring_atoms is populated after _perceive."""
         from orthonym.namer import Orthonym
         namer = Orthonym()
         mol = Chem.MolFromSmiles("c1ccc2ccccc2c1")  # naphthalene

@@ -1,4 +1,4 @@
-"""W2F-P7 Task 3 (P-45.3.1): emit the (λ5-phosphanyl) substituent prefix.
+"""W2F-P7 Task 3: emit the (λ5-phosphanyl) substituent prefix.
 
 House Greek 'λ5' with NO internal locant on the mononuclear prefix; the
 standard 'phosphanyl' path stays byte-identical (regression).

@@ -2,7 +2,7 @@
 
 THE REGRESSION THIS PINS
 ------------------------
-`65a2206e` made `name_heterocycle` refuse any ring holding fewer ring double
+ made `name_heterocycle` refuse any ring holding fewer ring double
 bonds than its mancude parent, on the correct grounds that spelling the mancude
 stem for such a ring names a *different* molecule (that fix removed 149 wrong
 molecules and must not be undone).
@@ -18,7 +18,7 @@ was refused.
 Measured cost: the correct ``5-(3-fluorophenyl)-1H-pyridin-2-one`` became
 ``unknown organic compound``. Found by a 400-molecule corpus A/B, **not** by the
 phase gate (no such row in the PIN oracle) and **not** by the 397,371-ring
-enumeration behind `65a2206e` (which enumerated *bare* rings, so a ring bearing
+enumeration behind (which enumerated *bare* rings, so a ring bearing
 an aryl substituent was outside its universe).
 
 THE RULE
@@ -26,11 +26,11 @@ THE RULE
 The compound is a **pseudoketone**, named on the numbered mancude ring with an
 added suffix — not a hydro form:
 
-* **P-66.1.3** "'Hidden' amides" (``BlueBookV2.md:33125``) — naming an acyl group
+* **** "'Hidden' amides" (``the Blue Book``) — naming an acyl group
   as a substituent on a heterocyclic ring nitrogen "is allowed but only in
   general nomenclature", because "preferred IUPAC names are constructed" as
   pseudoketones.
-* **P-66.1.5.1** "Lactams and lactims" (``:33224``) — of its two methods,
+* **** "Lactams and lactims" (``:33224``) — of its two methods,
   "(1) as heterocyclic pseudoketones" is the one that "generates preferred IUPAC
   names".
 
@@ -131,7 +131,7 @@ def test_single_exocyclic_bond_does_not_veto_a_ring_nitrogen():
     # the exact molecule the corpus A/B found lost
     ("C1=CC(=CC(=C1)F)C2=CNC(=O)C=C2", "5-(3-fluorophenyl)-1H-pyridin-2-one"),
     ("c1ccc(-c2ccc(=O)[nH]c2)cc1", "5-phenyl-1H-pyridin-2-one"),
-    # ... and the unsubstituted / alkyl / N-substituted members must not move
+    #... and the unsubstituted / alkyl / N-substituted members must not move
     ("O=c1cccc[nH]1", "pyridin-2(1H)-one"),
     ("CC1=CC(=O)NC=C1", "4-methylpyridin-2(1H)-one"),
     ("O=C1C=CC=CN1C", "1-methylpyridin-2(1H)-one"),
@@ -153,7 +153,7 @@ def test_65a2206e_fixes_survive(smiles, expected):
 
     None of these rings carries an exocyclic multiple bond, so the veto returns
     True immediately for every atom and the eligibility expression is the one
-    `65a2206e` shipped, verbatim.
+     shipped, verbatim.
     """
     from orthonym.namer import name_compound
     assert name_compound(smiles) == expected

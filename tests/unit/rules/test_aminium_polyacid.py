@@ -1,7 +1,7 @@
 """Aminium/betaine zwitterions with a MULTI-carboxylate (poly-anion) parent
-(v33 Phase 3).
+(a phase).
 
-Generalizes the P-74.1.3 GUARD-4 zwitterion path
+Generalizes the GUARD-4 zwitterion path
 (`charged_router._route_zwitterion` -> `_name_polyacid_zwitterion`) from
 exactly-one-anion to >= 2 carboxylate anions on one acyclic skeleton, so a
 single cation riding on a poly-acid parent (the glutamate/aspartate
@@ -9,7 +9,7 @@ zwitterion ANION -- net charge -1, both carboxyls deprotonated, the amine
 still protonated) gets a real name instead of abstaining
 ("unknown organic compound").
 
-Root cause (measured, SPY): TWO stacked gaps, not the one hypothesized.
+Root cause (measured, a trace): TWO stacked gaps, not the one hypothesized.
 1. `detect_species_type` classifies a net-NONZERO mixed-sign fragment as
    `'ion'`, not `'zwitterion'` (its own docstring: "Zwitterion - net zero
    charge but has both + and - atoms"), so `assemble_ion_name`'s `'ion'`
@@ -25,7 +25,7 @@ Both are fixed: composer.py routes a mixed cation+anion `'ion'` through
 `name_zwitterion` (pure ADD, RT-gated); `_name_polyacid_zwitterion` is tried
 BEFORE the exactly-one-anion guard for >= 2 carboxylate anions.
 
-RT-gated (`@pytest.mark.opsin_gate`); the top-level SELF-01/OPSIN gate
+RT-gated (`@pytest.mark.opsin_gate`); the top-level /OPSIN gate
 (which also checks net-charge preservation) is the 0-wrong backstop.
 """
 import pytest
@@ -54,7 +54,7 @@ def test_aminium_polyacid_zwitterion(namer, smi, expected):
 # --- regressions: untouched paths ----------------------------------------
 @pytest.mark.opsin_gate
 def test_carboxylate_betaine_unchanged(namer):
-    # Single-anion GUARD-4 betaine path (P-74.1.3) is a completely separate
+    # Single-anion GUARD-4 betaine path is a completely separate
     # branch (len(anions) == 1) -- must stay byte-identical.
     assert namer.name("C[N+](C)(C)CCC(=O)[O-]") == "3-(trimethylazaniumyl)propanoate"
 
@@ -67,7 +67,7 @@ def test_l_carnitine_unchanged(namer):
 @pytest.mark.opsin_gate
 def test_l_serine_zwitterion_unchanged(namer):
     # Single-anion protonated-amine zwitterion -- the established
-    # retained/neutral-form amino-acid path (D-06 defer), unaffected by the
+    # retained/neutral-form amino-acid path (defer), unaffected by the
     # new multi-anion branch (len(anions) == 1 here).
     assert namer.name("[NH3+][C@@H](CO)C(=O)[O-]") == "L-serine"
 
@@ -111,13 +111,13 @@ def test_mixed_carboxylate_sulfonate_zwitterion_failclosed(namer):
 
 @pytest.mark.opsin_gate
 def test_two_cations_build_bis_azaniumyl(namer):
-    # >1 cation is out of scope for the single-cation P-74.1.3 GUARD-4 path
+    # >1 cation is out of scope for the single-cation GUARD-4 path
     # and for `_name_polyacid_zwitterion` (both require exactly one cation),
-    # but v33 charged Slice B's `_name_primary_amine_azaniumyl_zwitterion`
+    # but charged Slice B's `_name_primary_amine_azaniumyl_zwitterion`
     # (tried BEFORE the single-cation scope check) handles the multi-cation
     # shape: the anion is the parent and each primary -NH3+ is an `azaniumyl`
-    # prefix, two of the same kind -> `bis(azaniumyl)` (P-16.3.4). This is the
-    # P-74.2.1.2 ionic PIN, replacing the 4782742f neutral over-reach
+    # prefix, two of the same kind -> `bis(azaniumyl)`. This is the
+    # ionic PIN, replacing the 4782742f neutral over-reach
     # (`2,3-diaminopentanedioic acid`). The builder full-InChIKey RT-gates its
     # own emission (0-wrong); verified independently via OPSIN below.
     from rdkit import Chem
@@ -125,7 +125,7 @@ def test_two_cations_build_bis_azaniumyl(namer):
     smi = "[NH3+]C(CC(=O)[O-])C([NH3+])C(=O)[O-]"
     out = namer.name(smi)
     assert out == "2,3-bis(azaniumyl)pentanedioate"
-    assert "dioic acid" not in out  # not the non-PIN neutral form (P-74.2.1.2)
+    assert "dioic acid" not in out  # not the non-PIN neutral form
     g = opsin_parse(out)
     assert g and Chem.MolToInchiKey(Chem.MolFromSmiles(g)) == \
         Chem.MolToInchiKey(Chem.MolFromSmiles(smi))
@@ -133,7 +133,7 @@ def test_two_cations_build_bis_azaniumyl(namer):
 
 def test_ring_cation_declines_the_new_branch_directly():
     # Unit-level (no JVM needed): a ring-borne cation must be declined by
-    # _name_polyacid_zwitterion itself (P-74.1.2 is out of scope here), not
+    # _name_polyacid_zwitterion itself is out of scope here), not
     # silently accepted with a wrong locant/prefix.
     from rdkit import Chem
     from orthonym.perception.ions import get_ion_sites
@@ -148,11 +148,11 @@ def test_ring_cation_declines_the_new_branch_directly():
     assert result == ''
 
 
-# --- v33 Phase 3 review follow-up (Findings A/B/C) -----------------------
+# --- a phase review follow-up (Findings A/B/C) -----------------------
 @pytest.mark.opsin_gate
 def test_tricarboxylate_parent_failclosed(namer):
     # Finding B: a 3-carboxylate parent (`propane-1,2,3-tricarboxylic acid`
-    # -- P-65.1.1) is named `...tricarboxylate` by `name_carboxylate_anion`,
+    # -- is named `...tricarboxylate` by `name_carboxylate_anion`,
     # which `_parent_has_chain_locants` does NOT recognize (only
     # anoate/enoate/ynoate/dioate). The cation sits on C2 (locant 2, NOT the
     # licensed-omission position), so shipping the prefix unlocanted would
@@ -160,7 +160,7 @@ def test_tricarboxylate_parent_failclosed(namer):
     # (`.venv/bin/python -m orthonym`): before the Finding-B tightening this
     # emitted the unlocanted 'azaniumylpropane-1,2,3-tricarboxylate', which
     # OPSIN parses as a DIFFERENT molecule (NH3+ defaults onto C1) and the
-    # outer SELF-01 gate suppressed -> abstain. `_name_polyacid_zwitterion`
+    # outer gate suppressed -> abstain. `_name_polyacid_zwitterion`
     # now declines this shape itself (proactive fail-closed, not just an
     # accidental gate catch).
     from orthonym.errors import is_failure_name

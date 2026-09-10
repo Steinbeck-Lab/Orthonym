@@ -337,7 +337,7 @@ class TestBackwardCompatibility:
 
 
 # ============================================================================
-# IUPAC Numbering Correctness Tests (DATA-07)
+# IUPAC Numbering Correctness Tests
 # ============================================================================
 
 @pytest.mark.unit
@@ -441,14 +441,14 @@ class TestIupacNumberingCorrectness:
 
 
 # ============================================================================
-# Phase 147 CD-04 Drift Parity Test
+# a phase Drift Parity Test
 # ============================================================================
 
 @pytest.mark.parametrize("pah_name", [
     "naphthalene", "anthracene", "phenanthrene", "pyrene",
 ])
 def test_iupac_numbering_matches_canonical(pah_name):
-    """Phase 147 CD-04 defensive drift test for the 4 populated PAHs.
+    """a phase defensive drift test for the 4 populated PAHs.
 
     Each populated PAH entry's hardcoded ``iupac_numbering`` mapping
     (canonical atom index -> IUPAC locant) is parsed by the live
@@ -456,7 +456,7 @@ def test_iupac_numbering_matches_canonical(pah_name):
     molecule, ``mol.GetSubstructMatch(canonical_mol)`` is the identity
     permutation, so the wrapper's returned dict keys ARE canonical atom
     indices. Each value must equal the stored ``iupac_numbering`` value
-    after string '4a' -> tuple (4, 'a') normalization (Phase 147 D-01).
+    after string '4a' -> tuple (4, 'a') normalization (a phase).
 
     Catches the latent failure mode: a future RDKit version reorders
     canonical atom indices for one of the 4 populated PAH canonical_smiles,
@@ -464,9 +464,9 @@ def test_iupac_numbering_matches_canonical(pah_name):
     green. By comparing wrapper output to stored data on the canonical mol
     itself, this test fails LOUDLY the moment that drift occurs.
 
-    Source: Phase 147 CONTEXT CD-04 (RDKit canonical-drift guard).
-    Source: https://iupac.qmul.ac.uk/BlueBook/P2.html P-25 (PAH numbering FIXED).
-    Source: Phase 147 D-01 (string fusion locant -> (int, str) tuple at boundary).
+    Source: a phase internal notes (RDKit canonical-drift guard).
+    Source: https://iupac.qmul.ac.uk/BlueBook/P2.html (PAH numbering FIXED).
+    Source: a phase (string fusion locant -> (int, str) tuple at boundary).
     """
     import re
     from orthonym.data.polycyclic_data import POLYCYCLIC_DATA

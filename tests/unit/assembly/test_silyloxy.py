@@ -1,4 +1,4 @@
-"""Phase 1 B5: silyloxy substituent form.
+"""a phase B5: silyloxy substituent form.
 
 `-O-[Si]<` is `{silyl}oxy` ('(trimethylsilyl)oxy'), NOT the cascade's mis-rooted
 `hydroxy{silyl}` (a DIFFERENT molecule, -Si-OH). Silicon is a substitutive

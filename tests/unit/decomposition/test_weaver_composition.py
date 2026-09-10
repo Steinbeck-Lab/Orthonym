@@ -31,7 +31,7 @@ from orthonym import name_compound
 from orthonym.errors import is_failure_name
 from orthonym.validation.opsin_roundtrip import opsin_parse
 
-# This module is ABOUT the SELF-01/OPSIN-gate interaction (the weaver only ships
+# This module is ABOUT the /OPSIN-gate interaction (the weaver only ships
 # a verified name; before the fix these abstained under the production gate), so
 # it must run gate-ON like the sibling decomposition/charged tests.
 pytestmark = pytest.mark.opsin_gate
@@ -52,7 +52,7 @@ def _full_rt(smiles: str, name: str) -> bool:
 
 
 # Three smallest confirmed converters (full-InChIKey RT-verified 2026-08-15),
-# each previously SELF-01-suppressed to an abstention.
+# each previously -suppressed to an abstention.
 CONVERTS = [
     # phosphatidylglycerol-like (ester + phosphodiester + a glycerol head)
     "CCCC/C=C\\CCCCCCCC(=O)OC[C@@H](O)COP(=O)(O)OC[C@@H](O)CO",

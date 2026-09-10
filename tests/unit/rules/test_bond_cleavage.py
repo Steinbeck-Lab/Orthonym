@@ -1,7 +1,7 @@
 """
 TDD tests for bond cleavage detection in the decomposition engine.
 
-Tests that find_cleavable_bonds() correctly identifies ester, amide,
+Tests that find_cleavable_bonds correctly identifies ester, amide,
 and glycosidic bonds while excluding lactones, lactams, carbamates,
 and ureas.
 """
@@ -245,7 +245,7 @@ class TestPhosphodiesterDetection:
 
     def test_cyclic_phosphodiester_excluded(self):
         """Cyclic phosphodiester (sugar-phosphate ring) should be excluded
-        by _atoms_in_same_ring() guard. O=P1(O)OCCO1 is a cyclic phosphate."""
+        by _atoms_in_same_ring guard. O=P1(O)OCCO1 is a cyclic phosphate."""
         mol = Chem.MolFromSmiles("O=P1(O)OCCO1")
         bonds = find_cleavable_bonds(mol)
         phos_bonds = [b for b in bonds if b["type"] == "phosphodiester"]

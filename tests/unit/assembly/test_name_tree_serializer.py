@@ -1,4 +1,4 @@
-"""Phase 179 (WSA-03) — per-gap byte-identity unit tests for the completed
+"""a phase (-03) — per-gap byte-identity unit tests for the completed
 ``_assemble_explicit_fields`` serializer path.
 
 These are JVM-free, pure-serializer unit tests: each test constructs a
@@ -7,7 +7,7 @@ These are JVM-free, pure-serializer unit tests: each test constructs a
 probing ``name_with_tree`` on the corresponding SMILES), with
 ``fragment_legacy`` left ``None`` so the explicit-field branch runs (NOT the
 ``str`` short-circuit). Each asserts ``name_tree_to_string(node) == "<exact
-legacy name>"`` — the byte-identical contract of CONTEXT D-02.
+legacy name>"`` — the byte-identical contract of internal notes.
 
 The root node MUST carry ``class_id="general_acyclic"`` (in
 ``SERIALIZER_PRODUCTION_CLASSES``) so the serializer applies the BARE-hydride
@@ -20,13 +20,13 @@ The expected strings are the production ``name_compound(smiles)`` outputs
 (copied verbatim) so the tests are self-documenting and prove parity with the
 legacy ``_assemble_fragments`` assembler.
 
-Gap map (CONTEXT D-02 / 179-RESEARCH "8 Composition Gaps"):
-  #2 prefix already-has-locant guard      -> 2-methylbutane (NOT 2-2-2-methylbut)
-  #3 P-16.5.1.3.1 mononuclear enclosing    -> bromo(chloro)(fluoro)methane
+Gap map (internal notes / internal notes "8 Composition Gaps"):
+  #2 prefix already-has-locant guard -> 2-methylbutane (NOT 2-2-2-methylbut)
+  #3 mononuclear enclosing -> bromo(chloro)(fluoro)methane
   #5 full suffix grammar (multiplier/elide) -> butan-1-ol / pentanal / butane-1,4-diol
-  #6 unsaturation infix (en/yn + ring)      -> hex-3-yne / cyclodecane
-  #7 prefix->parent hyphenation             -> 1-chloropentane
-  #8 stereo prepend (no extra hyphen)       -> (2S)-butan-2-ol (NOT (2S)--but-2-ol)
+  #6 unsaturation infix (en/yn + ring) -> hex-3-yne / cyclodecane
+  #7 prefix->parent hyphenation -> 1-chloropentane
+  #8 stereo prepend (no extra hyphen) -> (2S)-butan-2-ol (NOT (2S)--but-2-ol)
 """
 from __future__ import annotations
 
@@ -52,7 +52,7 @@ pytestmark = pytest.mark.unit
 
 
 class TestSuffixGrammarGap5:
-    """Gap #5: full suffix grammar via format_suffix_with_locants (P-16.7.1
+    """Gap #5: full suffix grammar via format_suffix_with_locants
     elision, multiplier, infix). Bare-stem root + bare suffix + suffix locants."""
 
     def test_butan_1_ol(self):
@@ -110,7 +110,7 @@ class TestPrefixLocantGap2And7:
 
 
 class TestMononuclearEnclosingGap3:
-    """Gap #3: P-16.5.1.3.1 mononuclear enclosing marks + the multiplier carve-out."""
+    """Gap #3: mononuclear enclosing marks + the multiplier carve-out."""
 
     def test_bromo_chloro_fluoro_methane(self):
         # C(Br)(Cl)F -> bromo(chloro)(fluoro)methane. Mononuclear 'meth' with

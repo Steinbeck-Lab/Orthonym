@@ -4,7 +4,7 @@ Tests that Tier 2 handlers in composer.py produce stereodescriptors for
 compounds with stereocenters. Validates the near-miss stereo threshold
 and handler-specific stereo injection.
 
-STER-08: _inject_stereo_if_missing accepts atom_to_locant for all 34 handlers,
+: _inject_stereo_if_missing accepts atom_to_locant for all 34 handlers,
 >= 50% near-miss compounds correct.
 """
 import re
@@ -266,15 +266,15 @@ class TestHandlerStereoInjection:
 
 @pytest.mark.integration
 class TestStereoMismatchCompounds:
-    """Test the 4 explicit stereo_mismatch compounds from 124-RESEARCH.md.
+    """Test the 4 explicit stereo_mismatch compounds from internal notes.
 
-    SM-40 and SM-42 may benefit from locant mapping improvements.
-    SM-41 and SM-43 have no @/@@ in SMILES, so they cannot produce stereo
+     and may benefit from locant mapping improvements.
+     and have no @/@@ in SMILES, so they cannot produce stereo
     regardless of locant mapping -- documented as unfixable by a phase.
     """
 
     def test_sm40_stereo_present(self):
-        """SM-40: Cholesterol derivative with stereo.
+        """: Cholesterol derivative with stereo.
 
         Has multiple stereocenters in SMILES. Name should contain stereo.
         Note: RT may still fail (OPSIN adds more stereo from steroid name).
@@ -286,7 +286,7 @@ class TestStereoMismatchCompounds:
         )
 
     def test_sm42_lactone_stereo(self):
-        """SM-42: Lactone with (3S,4S) stereo.
+        """: Lactone with (3S,4S) stereo.
 
         Should produce stereodescriptors via lactone handler.
         """
@@ -297,7 +297,7 @@ class TestStereoMismatchCompounds:
         )
 
     def test_sm41_no_stereo_in_smiles(self):
-        """SM-41: No @/@@ in SMILES -- cannot produce stereo.
+        """: No @/@@ in SMILES -- cannot produce stereo.
 
         This compound has NO stereochemistry in its SMILES input.
         a phase cannot fix this -- the input molecule has no stereo information.
@@ -308,9 +308,9 @@ class TestStereoMismatchCompounds:
         assert '@' not in smi, "SM-41 should have no stereo markers"
 
     def test_sm43_no_stereo_in_smiles(self):
-        """SM-43: No @/@@ in SMILES -- cannot produce stereo.
+        """: No @/@@ in SMILES -- cannot produce stereo.
 
-        Same as SM-41: no stereochemistry in input SMILES.
+        Same as: no stereochemistry in input SMILES.
         """
         smi = 'C=C(C)C(C)CCC(C)C1CCC2C3=CCC4CC(O)CCC4(C)C3CCC21C'
         mol = Chem.MolFromSmiles(smi)

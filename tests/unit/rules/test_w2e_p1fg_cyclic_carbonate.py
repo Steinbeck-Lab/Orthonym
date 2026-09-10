@@ -1,4 +1,4 @@
-"""P-64.1.2.1(a) cyclic carbonates as pseudoketones + P-64.3.1 verify.
+"""(a) cyclic carbonates as pseudoketones + verify.
 
 BB 28258: "(a) 1,3-dioxan-2-one (PIN)" — carbonyl bonded to TWO ring O.
 BB 29314: "Cyclic anhydrides, esters and amides are named as pseudoketones".
@@ -13,13 +13,13 @@ from rdkit import Chem
 
 @pytest.mark.unit
 class TestCyclicCarbonate:
-    def test_dioxanone_pin(self):                       # P-64.1.2.1(a) target
+    def test_dioxanone_pin(self):                       # (a) target
         assert name_compound("O=C1OCCCO1", style="pin") == "1,3-dioxan-2-one"
 
     def test_dioxolanone_pin(self):                     # 5-ring analogue
         assert name_compound("O=C1OCCO1", style="pin") == "1,3-dioxolan-2-one"
 
-    def test_lactone_unchanged(self):                   # P-64.3.1 protect
+    def test_lactone_unchanged(self):                   # protect
         assert name_compound("O=C1CCCO1", style="pin") == "oxolan-2-one"
 
     def test_direct_namer_dioxanone(self):

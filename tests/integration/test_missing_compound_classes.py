@@ -1,14 +1,14 @@
 """
-Integration tests for all 5 missing compound classes (Phase 49).
+Integration tests for all 5 missing compound classes (a phase).
 
 Validates end-to-end naming for:
-  CLS-01: Acetals/Hemiacetals (cyclic and acyclic)
-  CLS-02: Disulfides/Trisulfides (replacement naming)
-  CLS-03: Cyclic Imides (retained and systematic)
-  CLS-04: Thiocarboxylic Acids (S-acid, O-acid, dithioic)
-  CLS-05: Carbamic Acid (parent and N-substituted)
+  : Acetals/Hemiacetals (cyclic and acyclic)
+  : Disulfides/Trisulfides (replacement naming)
+  : Cyclic Imides (retained and systematic)
+  : Thiocarboxylic Acids (S-acid, O-acid, dithioic)
+  : Carbamic Acid (parent and N-substituted)
 
-Each test calls name_compound() on real-world SMILES and verifies the
+Each test calls name_compound on real-world SMILES and verifies the
 expected IUPAC name. OPSIN round-trip validation confirms parseability
 of all generated names.
 """
@@ -61,7 +61,7 @@ def _inchi_match(smi1: str, smi2: str) -> bool:
 
 
 # ====================================================================
-# CLS-01: Acetals / Hemiacetals
+#: Acetals / Hemiacetals
 # ====================================================================
 
 
@@ -122,7 +122,7 @@ class TestCLS01Acetals:
 
 
 # ====================================================================
-# CLS-02: Disulfides / Trisulfides
+#: Disulfides / Trisulfides
 # ====================================================================
 
 
@@ -139,7 +139,7 @@ class TestCLS02Disulfides:
 
     @pytest.mark.integration
     def test_dithiahexane(self):
-        """Symmetric disulfide: CCSSCC. DD2 (Phase D, P-63.3.1(1)): substitutive
+        """Symmetric disulfide: CCSSCC. DD2 (Phase D, (1)): substitutive
         PIN, not the 'dithia' skeletal form."""
         assert name_compound("CCSSCC") == "(ethyldisulfanyl)ethane"
 
@@ -157,16 +157,16 @@ class TestCLS02Disulfides:
     def test_diphenyl_disulfide(self):
         """Aromatic disulfide: PhSSPh -- names via sulfanyl/disulfanediyl prefix.
 
-        Phase 157 cleanup: extended the substring check to accept the
-        multiplicative `disulfanediyl` connector form (IUPAC P-25.3.1.3 /
-        P-66.6.3 valid PIN) in addition to the substitutive `sulfanyl`
-        and functional-class `disulfide` forms. The current v18 output
+        a phase cleanup: extended the substring check to accept the
+        multiplicative `disulfanediyl` connector form (IUPAC /
+         valid PIN) in addition to the substitutive `sulfanyl`
+        and functional-class `disulfide` forms. The current output
         `1,1'-disulfanediyldibenzene` uses the multiplicative form per
-        P-14.5 — equally valid for symmetric aromatic disulfides.
+         — equally valid for symmetric aromatic disulfides.
         """
         name = name_compound("c1ccc(SSc2ccccc2)cc1")
         # PhSSPh names: 'sulfanyl' (substitutive), 'disulfanediyl'
-        # (multiplicative connector, P-25.3.1.3), or 'disulfide'
+        # (multiplicative connector,, or 'disulfide'
         # (functional class). All are valid IUPAC PIN forms.
         assert "sulfan" in name or "disulfide" in name, (
             f"Expected 'sulfan*' or 'disulfide' in '{name}'"
@@ -207,7 +207,7 @@ class TestCLS02Disulfides:
 
 
 # ====================================================================
-# CLS-03: Cyclic Imides
+#: Cyclic Imides
 # ====================================================================
 
 
@@ -226,7 +226,7 @@ class TestCLS03CyclicImides:
 
     @pytest.mark.integration
     def test_phthalimide_retained(self):
-        """Phthalimide -> retained name (IUPAC P-31.1.3.4)."""
+        """Phthalimide -> retained name (IUPAC."""
         assert name_compound("O=C1NC(=O)c2ccccc21") == "phthalimide"
 
     @pytest.mark.integration
@@ -283,7 +283,7 @@ class TestCLS03CyclicImides:
 
 
 # ====================================================================
-# CLS-04: Thiocarboxylic Acids
+#: Thiocarboxylic Acids
 # ====================================================================
 
 
@@ -344,7 +344,7 @@ class TestCLS04ThiocarboxylicAcids:
 
 
 # ====================================================================
-# CLS-05: Carbamic Acid
+#: Carbamic Acid
 # ====================================================================
 
 

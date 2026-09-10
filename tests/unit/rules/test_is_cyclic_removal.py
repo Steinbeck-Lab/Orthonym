@@ -1,4 +1,4 @@
-"""Tests for is_cyclic mutation removal and chain_is_parent architecture (Phase 139 ARCH-01).
+"""Tests for is_cyclic mutation removal and chain_is_parent architecture (a phase).
 
 Verifies that:
 1. is_cyclic=False is never set in namer.py

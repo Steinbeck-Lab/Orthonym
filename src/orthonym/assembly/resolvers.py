@@ -45,9 +45,9 @@ class ParentInfo:
     Attributes:
         parent_label: Classification tag (e.g., "cyclohexane", "indole", "propane").
                       Used to select the naming handler. NOT the final IUPAC name.
-        parent_type:  One of "chain", "ring", "benzene", "fused_heterocycle",
+        parent_type: One of "chain", "ring", "benzene", "fused_heterocycle",
                       "polycyclic", "complex_ring", "polycyclic_aromatic".
-        atom_count:   Number of atoms in parent (chain length or ring size).
+        atom_count: Number of atoms in parent (chain length or ring size).
         atom_to_locant: Atom index -> IUPAC locant mapping.
         is_named_ring: True for benzene, naphthalene, indole (fixed numbering).
     """
@@ -63,9 +63,9 @@ class SuffixInfo:
     """Describes the resolved suffix for the principal functional group.
 
     Attributes:
-        text:        Suffix text (e.g., "ol", "one", "oic acid", "").
-        locants:     Locant positions (e.g., [1,3] for diol, [2] for ketone).
-        count:       Number of suffix instances (e.g., 2 for diol).
+        text: Suffix text (e.g., "ol", "one", "oic acid", "").
+        locants: Locant positions (e.g., [1,3] for diol, [2] for ketone).
+        count: Number of suffix instances (e.g., 2 for diol).
         is_terminal: True if suffix group is always terminal (e.g., -oic acid, -al).
     """
     text: str = ""
@@ -212,7 +212,7 @@ def resolve_suffix(features: Any, parent_info: ParentInfo) -> SuffixInfo:
 
     Args:
         features: MolecularFeatures object.
-        parent_info: ParentInfo from resolve_parent().
+        parent_info: ParentInfo from resolve_parent.
 
     Returns:
         SuffixInfo with text, locants, count, and is_terminal flag.
@@ -280,7 +280,7 @@ _ANION_SUFFIX_MAP = {
     "ol": "olate",
     "oic acid": "oate",
     "amine": "aminide",
-    # P-72.2.2.2.3 (BB:41049): an imine anion (=N-) -> 'iminide' ('imine' + 'ide'),
+    # (the Blue Book): an imine anion (=N-) -> 'iminide' ('imine' + 'ide'),
     # the exact parallel of 'amine' -> 'aminide'. The cation map (below) already has
     # the symmetric 'imine' -> 'iminium'; this closes the asymmetry. Distinct 5-char
     # ending from 'amine' (a name ending "imine" never ends "amine"), so no
@@ -291,35 +291,35 @@ _ANION_SUFFIX_MAP = {
     "sulfinic acid": "sulfinate",
     "phosphonic acid": "phosphonate",
     "phosphinic acid": "phosphinate",
-    # IN-01 (code review 2026-06-02): RESERVED / unreachable-by-design. A correct
+    # (code review 2026-06-02): RESERVED / unreachable-by-design. A correct
     # chemical mapping, but O-P phosphate ESTERS are deliberately excluded from
     # the oxoacid-anion routing upstream (classify_anion sends them to 'alkoxide',
     # not 'phosphonate'/'phosphate'), so no neutral name ending in "phosphoric
     # acid" currently reaches _ionize_acid_name. Kept for completeness/future use.
-    "phosphoric acid": "phosphate",  # SUB-01/D-02
-    # P-72.2.2.2.1.1 (169.6-02): "the 'ic acid' or 'ous acid' ending ... by
+    "phosphoric acid": "phosphate",  # /
+    # (169.6-02): "the 'ic acid' or 'ous acid' ending... by
     # 'ate' or 'ite', respectively" — the -ous-acid anion takes -ite, parallel
     # to the -ic-acid -> -ate transforms above.
     "ous acid": "ite",
-    # D-06: "nitric acid": "nitrate" DEFERRED — Plan-01 reach = 2/7,500; the
+    #: "nitric acid": "nitrate" DEFERRED — Plan-01 reach = 2/7,500; the
     # internal-charge-filter precision change (protecting every nitro) is not
     # justified at that frequency.
-    "carboxylic acid": "carboxylate",  # P-72.2.2.2.1.1 (CORRECT — stays)
-    # P-72.2.2.2.4 (169.6-02 FIX): amide/carboxamide/carbonitrile anionic
+    "carboxylic acid": "carboxylate",  # (CORRECT — stays)
+    # (169.6-02 FIX): amide/carboxamide/carbonitrile anionic
     # centers are named on the corresponding ANIONIC PARENT HYDRIDE form
     # (e.g. CH3-CO-NH(-) -> acetylazanide), NOT a suffix -ate/-ate/-ate.
     # "Suffixes such as 'amidide' and 'carboxamidide' are not recommended."
     # The four non-IUPAC entries amide->amidate, carboxamide->carboxamidate,
-    # carbonitrile->carbonitrilate were REMOVED here (audit §4.1); the seam now
+    # carbonitrile->carbonitrilate were REMOVED here (the audit); the seam now
     # returns '' for them so route_charged falls through to the parent-hydride
     # path (Plan 03) instead of emitting a wrong -ate name.
 }
 
 _CATION_SUFFIX_MAP = {
-    "amine": "aminium",  # P-73.1.2.1 WAY1 / Table 7.4 (protonated amine, the PIN)
-    # Table 7.4 (P-73.1.2.1 / 169.6-02 ADD): cationic characteristic-group
+    "amine": "aminium",  # WAY1 / Table 7.4 (protonated amine, the PIN)
+    # Table 7.4 / 169.6-02 ADD): cationic characteristic-group
     # suffixes formed by adding 'ium' to the neutral nitrogen-bearing suffix
-    # ("the largest neutral parent possible is used", P-73.1.2).
+    # ("the largest neutral parent possible is used",.
     "amide": "amidium",
     "carboxamide": "carboxamidium",
     "imide": "imidium",
@@ -327,9 +327,9 @@ _CATION_SUFFIX_MAP = {
     "nitrile": "nitrilium",
     "carbonitrile": "carbonitrilium",
     "imine": "iminium",
-    # P-73.1.2.1 (169.6-02 FIX): "ol" -> "olium" REMOVED. A protonated alcohol
+    # (169.6-02 FIX): "ol" -> "olium" REMOVED. A protonated alcohol
     # is named on the oxidanium parent cation (e.g. ethylideneoxidanium), NOT a
-    # bogus -olium suffix; -ol carries no nitrogen so WAY-2 (substitute a
+    # bogus -olium suffix; -ol carries no nitrogen so (substitute a
     # cationic parent hydride) governs, not a suffix swap. Removing it makes the
     # seam return '' for an -ol stem so the cation path does not mis-fire.
 }
@@ -345,7 +345,7 @@ def apply_ion_suffix_modification(suffix_info: SuffixInfo, features: Any) -> Suf
     Salts, zwitterions, and neutral species are returned unchanged.
 
     Args:
-        suffix_info: SuffixInfo from resolve_suffix().
+        suffix_info: SuffixInfo from resolve_suffix.
         features: MolecularFeatures with species_type and total_charge.
 
     Returns:
@@ -420,7 +420,7 @@ def _apply_cation_modification(suffix_info: SuffixInfo) -> SuffixInfo:
                 is_terminal=suffix_info.is_terminal,
             )
 
-    # IN-02 (code review 2026-06-02): no canonical cation transform for this
+    # (code review 2026-06-02): no canonical cation transform for this
     # suffix -> return it UNCHANGED (the safe default). The previous comment
     # claimed an "-ium" was appended ("one" -> "onium"), which the code never
     # did; corrected to describe the actual behavior.
@@ -504,7 +504,7 @@ def _get_ring_atom_count(features: Any, mol: Any) -> int:
 def _get_polycyclic_atom_count(mol: Any) -> int:
     """Heavy-atom count for a polycyclic aromatic parent (capacity check input).
 
-    IN-03 (code review 2026-06-02): returns the molecule's heavy-atom count. This
+     (code review 2026-06-02): returns the molecule's heavy-atom count. This
     is exact for an unsubstituted PAH (the parent IS the whole molecule) but
     OVER-counts when the PAH carries substituents/side-chains (it counts those
     too). The previously-declared ``polycyclic_name`` parameter was never used and

@@ -9,7 +9,7 @@ pass runs the EXISTING retained/fused-heterocycle catalogs
 (``data.fused_heterocycles.get_fused_heterocycle_name``,
 ``data.retained_names.get_retained_name``, the ``heterocycles.py`` monocyclic
 retained lookup) on the WHOLE input molecule. If one matches AND the name it
-returns independently round-trips (SELF-01), that name replaces the general
+returns independently round-trips , that name replaces the general
 ``cand``; otherwise the general ``cand`` ships unchanged (fail-closed). This
 is a PREFERENCE over an emission the engine already produced, never a
 precondition to naming -- if the general engine could not name the molecule
@@ -35,14 +35,14 @@ catalog molecules DO abstain at ``pin``:
     abstains (PIN-PATH CONFOUND, traced via a direct probe): the SAME
     canonical SMILES also keys ``ALL_RETAINED_NAMES`` (consulted elsewhere
     on the PIN path, e.g. ``ring_assemblies.py``) to the WRONG, non-isomeric
-    ``'benzo[h]quinoline'``; production's real SELF-01 gate silently
+    ``'benzo[h]quinoline'``; production's real gate silently
     suppresses that wrong PIN-path candidate to abstention -- so "pin
     abstains" here is itself a symptom of the SAME ``data/retained_names.py``
     defect the DATA-QUALITY finding below documents (out of P6 scope to
     fix). This means ``Orthonym(style="pin").name(...)`` for this molecule
     is NOT a safe Java-independent test double (see the note on
     ``test_preference_fires_under_complete``): with the module-level gate
-    off (this suite's conftest default), ``pin.name()`` ships the WRONG
+    off (this suite's conftest default), ``pin.name`` ships the WRONG
     ``'benzo[h]quinoline'`` directly, never reaching G2 recovery at all --
     only the REAL gate (``production_gate``) reproduces genuine abstention.
   * ``quinolizidine`` (``C1CCN2CCCCC2C1``) -- pin abstains (same PIN-PATH
@@ -85,10 +85,10 @@ OPSIN-round-trip to the input) respectively. ``_retained_structural_
 preference`` therefore tries ``get_fused_heterocycle_name`` FIRST and
 short-circuits on a hit; this ordering is load-bearing (swapping it would
 surface the bad ``ALL_RETAINED_NAMES`` entries), and is additionally backed
-by the unconditional SELF-01 gate at the call site.
+by the unconditional gate at the call site.
 
 Harness mirrors test_v26_p5_charged_general.py: conftest force-disables the
-production SELF-01 gate for the whole suite; ``production_gate`` re-enables
+production gate for the whole suite; ``production_gate`` re-enables
 it (skipped without Java/OPSIN) for the full-namer cases; the
 recognizer-direct and constructor-flag-wired cases are deterministic and
 gate-independent (using ``_disable_opsin_validity_gate=True``, the
@@ -110,7 +110,7 @@ pytestmark = pytest.mark.unit
 
 
 # Real ACCEPT cases: pin ABSTAINS; complete (pre-P6) ships the von-Baeyer name;
-# complete (post-P6) ships the retained name instead (SELF-01-verified).
+# complete (post-P6) ships the retained name instead (-verified).
 ACCEPT_CASES = [
     ("c1ccc2c(c1)ccc1ncccc12", "benzo[f]quinoline",
      "6-azatricyclo[8.4.0.0^2,7]tetradeca-1(14),2,4,6,8,10,12-heptaene"),
@@ -150,7 +150,7 @@ def _find_opsin_jar():
 
 @pytest.fixture
 def production_gate(monkeypatch):
-    """Re-enable the production SELF-01 OPSIN validity gate (the suite disables
+    """Re-enable the production OPSIN validity gate (the suite disables
     it). Skips when Java/OPSIN are unavailable."""
     if not shutil.which("java") or _find_opsin_jar() is None:
         pytest.skip("OPSIN/Java not available for production-gate semantics")
@@ -191,7 +191,7 @@ def test_recognizer_finds_retained_name(smiles, expected, _general):
 @pytest.mark.parametrize("smiles,expected,_general", FAILCLOSED_CASES)
 def test_recognizer_finds_a_name_even_though_it_will_fail_closed(
         smiles, expected, _general):
-    """The recognizer itself has no SELF-01 awareness -- it is expected to
+    """The recognizer itself has no awareness -- it is expected to
     return the catalog name here; the CALLER (_try_general_engine_recovery)
     is what fails closed when this name does not round-trip standalone."""
     nm = Orthonym(style="pin")
@@ -234,9 +234,9 @@ def test_recognizer_returns_none_when_nothing_matches():
 # --------------------------------------------------------------------------
 @pytest.mark.parametrize("smiles,expected,_general", ACCEPT_CASES)
 def test_preference_fires_under_complete(smiles, expected, _general):
-    """Calls ``_try_general_engine_recovery`` DIRECTLY (not ``.name()``) --
+    """Calls ``_try_general_engine_recovery`` DIRECTLY (not ``.name``) --
     see the module docstring PIN-PATH CONFOUND note: under the test suite's
-    conftest-default gate-off, ``.name()``'s EARLIER pipeline stage for these
+    conftest-default gate-off, ``.name``'s EARLIER pipeline stage for these
     two molecules independently surfaces the SAME bad ``ALL_RETAINED_NAMES``
     entry this phase works around (unsuppressed only because the real
     production gate is off), so it is not a safe proxy for the G2/P6 ladder
@@ -410,7 +410,7 @@ def test_control_cases_unchanged_under_pin_and_complete(smiles, expected,
 
 
 # --------------------------------------------------------------------------
-# SELF-01: the names P6 prefers round-trip to the input structure.
+#: the names P6 prefers round-trip to the input structure.
 # --------------------------------------------------------------------------
 @pytest.mark.parametrize("smiles,name", sorted(
     ((smi, name) for smi, name, _ in ACCEPT_CASES)))

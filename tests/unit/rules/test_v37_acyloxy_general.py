@@ -1,6 +1,6 @@
-"""v37: general acyloxy-ester substituent naming (generalize the SP2.1' fix).
+""": general acyloxy-ester substituent naming (generalize the SP2.1' fix).
 
-STEP-1 spy (invariant 8) findings that scope these tests:
+ trace (a project rule) findings that scope these tests:
   * The oxa-replacement chain form ('...-2-oxo-1-oxabutyl') is OPSIN-VALID and
     round-trips EXACT -- the SP2.1' 'OPSIN-grammar-invalid' premise is refuted.
   * On the BEST-EFFORT tier a systematic acyloxy substituent already emits that
@@ -11,8 +11,8 @@ STEP-1 spy (invariant 8) findings that scope these tests:
 
 The fix routes a plain acyloxy ester '-O-C(=O)-R' (systematic, non-retained)
 through the SAME recognizer SP2.1' used (composer._acyloxy_prefix_for_frag ->
-rules.lipids._acyloxy_for_site), producing the P-65.6.3.2.3 '<acyl>oxy' prefix on
-ALL tiers. 0-wrong is preserved by the downstream RT/SELF-01 gate + the B2 stereo
+rules.lipids._acyloxy_for_site), producing the '<acyl>oxy' prefix on
+ALL tiers. 0-wrong is preserved by the downstream RT/ gate + the B2 stereo
 guard; retained acyls and pure-ether oxa chains are byte-identical (fire-only-when-
 differs + fail-closed recognizer).
 """
@@ -24,7 +24,7 @@ from orthonym import Orthonym
 from orthonym.validation.opsin_roundtrip import opsin_roundtrip_check
 
 
-# The SELF-01 OPSIN validity gate is DISABLED by default in the test harness
+# The OPSIN validity gate is DISABLED by default in the test harness
 # (conftest autouse `_opsin_validity_gate_state`); real deployment runs it ON.
 # 0-wrong is a property of the gate-ON config, so every test here opts in -- it
 # skips (never silently passes) if the OPSIN jar is absent.

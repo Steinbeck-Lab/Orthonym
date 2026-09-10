@@ -1,14 +1,14 @@
-"""Phase 161 routing tests for ORGANOMETALLIC StoutClass member.
+"""a phase routing tests for ORGANOMETALLIC StoutClass member.
 
 Mirrors tests/unit/routing/test_dispatch_table.py — the LOCKED analog for
 CFR registration + predicate purity + cascade-continuation patterns
 (PATTERNS lines 1037-1064).
 
-CONTEXT D-02 + D-12 ENFORCEMENT: ORGM CFR entry at priority 50 (intercepts
-BEFORE SALT@100); side_effect_inventory=(); _is_organometallic is
+internal notes + ENFORCEMENT: ORGM CFR entry at priority 50 (intercepts
+BEFORE SALT@100); side_effect_inventory=; _is_organometallic is
 predicate-pure (no mol/features mutation).
 
-NEVER uses @pytest.mark.xfail (CONTEXT D-29) — honest-fail-on-data.
+NEVER uses @pytest.mark.xfail (internal notes) — honest-fail-on-data.
 """
 import inspect
 import pytest
@@ -22,15 +22,15 @@ from orthonym.routing.dispatch_table import (
 
 @pytest.mark.unit
 class TestOrgmDispatch:
-    """Phase 161 routing-layer tests for ORGM."""
+    """a phase routing-layer tests for ORGM."""
 
     def test_organometallic_member_exists(self):
-        """CONTEXT D-02: StoutClass.ORGANOMETALLIC is uncommented + registered."""
+        """internal notes: StoutClass.ORGANOMETALLIC is uncommented + registered."""
         assert hasattr(StoutClass, 'ORGANOMETALLIC')
         assert StoutClass.ORGANOMETALLIC.value == 'organometallic'
 
     def test_organometallic_in_dispatch_table(self):
-        """CFR-02 inheritance: every enum member must be in DISPATCH_TABLE."""
+        """ inheritance: every enum member must be in DISPATCH_TABLE."""
         assert StoutClass.ORGANOMETALLIC in DISPATCH_TABLE
 
     def test_orgm_priority_is_50(self):
@@ -42,7 +42,7 @@ class TestOrgmDispatch:
         assert DISPATCH_TABLE[StoutClass.ORGANOMETALLIC].tier == 1
 
     def test_orgm_side_effect_inventory_is_empty(self):
-        """CONTEXT D-12 HARD INVARIANT: side_effect_inventory MUST be ()."""
+        """internal notes HARD INVARIANT: side_effect_inventory MUST be ."""
         entry = DISPATCH_TABLE[StoutClass.ORGANOMETALLIC]
         assert entry.side_effect_inventory == ()
 
@@ -55,7 +55,7 @@ class TestOrgmDispatch:
         assert callable(entry.handler)
 
     def test_orgm_iupac_section_contains_p69(self):
-        """iupac_section cites P-69 or Salzer 1999."""
+        """iupac_section cites or Salzer 1999."""
         entry = DISPATCH_TABLE[StoutClass.ORGANOMETALLIC]
         assert (
             'P-69' in entry.iupac_section
@@ -63,17 +63,17 @@ class TestOrgmDispatch:
         )
 
     def test_orgm_priority_below_salt(self):
-        """CONTEXT D-02: ORGM@50 fires BEFORE SALT@100."""
+        """internal notes: ORGM@50 fires BEFORE SALT@100."""
         orgm_prio = DISPATCH_TABLE[StoutClass.ORGANOMETALLIC].priority
         salt_prio = DISPATCH_TABLE[StoutClass.SALT].priority
         assert orgm_prio < salt_prio
 
     def test_orgm_predicate_mol_none_returns_false(self):
-        """Defensive guard: _is_organometallic(None, ...) returns False."""
+        """Defensive guard: _is_organometallic(None,...) returns False."""
         assert _is_organometallic(None, '', '') is False
 
     def test_orgm_predicate_purity_mol_unchanged(self):
-        """CONTEXT D-12: _is_organometallic mutates nothing."""
+        """internal notes: _is_organometallic mutates nothing."""
         mol = Chem.MolFromSmiles('[Fe+2].c1cc[cH-]c1.c1cc[cH-]c1')
         atom_count_pre = mol.GetNumAtoms()
         bond_count_pre = mol.GetNumBonds()
@@ -128,14 +128,14 @@ class TestOrgmDispatch:
     def test_orgm_below_other_cfr_priorities(self):
         """ORGM@50 is lower (fires earlier) than every other CFR entry.
 
-        Per CONTEXT D-02: ORGM intercepts BEFORE SALT@100 (lowest pre-Phase-161
+        Per internal notes: ORGM intercepts BEFORE SALT@100 (lowest pre-Phase-161
         priority), so its priority is below all existing CFR entries.
         """
         orgm_prio = DISPATCH_TABLE[StoutClass.ORGANOMETALLIC].priority
         for cls, entry in DISPATCH_TABLE.items():
             if cls == StoutClass.ORGANOMETALLIC:
                 continue
-            # v22 G2 COV-02 + v23 Phase 6/7/10: a small set of parent-hydride /
+            # + a phase/7/10: a small set of parent-hydride /
             # inorganic recognizers deliberately fire BEFORE ORGM@50 so a free
             # inorganic oxoacid (silicic acid O[Si](O)(O)O), a mononuclear hydride
             # (SF6, trimethylarsane), a chalcogen chain (trisulfane), a polyazane
@@ -184,7 +184,7 @@ class TestOrgmDispatch:
             )
 
     def test_orgm_predicate_inspect_no_seniority_import(self):
-        """CONTEXT D-06: _is_organometallic does NOT trigger rules.seniority import."""
+        """internal notes: _is_organometallic does NOT trigger rules.seniority import."""
         src = inspect.getsource(_is_organometallic)
         assert 'seniority' not in src
 

@@ -1,15 +1,15 @@
-"""Phase 166 Plan 01 Wave 0 RED scaffold — SCORE-03 per-node scorer.
+"""a phase Plan 01 Wave 0 RED scaffold — SCORE-03 per-node scorer.
 
 These tests import ``PerNodeScorer`` / ``NodeScores`` from
 ``orthonym.assembly.per_substring_scoring``, which does NOT exist until Plan 02.
 Collection therefore ERRORS (ModuleNotFoundError) — the expected Wave 0 RED
 state. Plan 02 creates the module and turns these GREEN.
 
-Locked contracts under test (166-AUDIT-per-substring-scoring.md):
+Locked contracts under test (internal notes-per-substring-scoring.md):
   - ``score_tree`` returns ``{}`` when no reference name is set (production
     byte-identical guard — the production path never calls set_reference_name).
   - ``score_tree`` returns ``{}`` on a coarse tree even WITH a reference set
-    (D-02 coarse fallback).
+    (coarse fallback).
   - ``node_scores`` attach POST-HOC: ``.confidence`` / ``.factors`` are unchanged
     with vs without a reference set (POST-HOC byte-identical contract).
   - a structured node scored with a reference yields ``NodeScores`` whose
@@ -64,7 +64,7 @@ class TestPerNodeScorer:
         assert PerNodeScorer.score_tree(node, mol) == {}
 
     def test_coarse_tree_returns_empty(self):
-        """Coarse tree -> {} even WITH a reference set (D-02 coarse fallback).
+        """Coarse tree -> {} even WITH a reference set (coarse fallback).
 
         A coarse node carries only the final string (parent_stem ==
         fragment_legacy, no prefixes, no suffix), so there are no scoreable
@@ -77,7 +77,7 @@ class TestPerNodeScorer:
         assert PerNodeScorer.score_tree(coarse, mol) == {}
 
     def test_posthoc_no_confidence_change(self):
-        """node_scores attach POST-HOC: .confidence / .factors are byte-equal
+        """node_scores attach POST-HOC:.confidence /.factors are byte-equal
         with vs without a reference set (POST-HOC byte-identical contract).
 
         Uses the EXISTING ``'score_based'`` mode (NOT the per-substring mode that
@@ -126,7 +126,7 @@ class TestPerNodeScorer:
 
 
 # ---------------------------------------------------------------------------
-# Phase 166 SCORE-04: lexicographic near-tie comparator (no OPSIN needed)
+# a phase SCORE-04: lexicographic near-tie comparator (no OPSIN needed)
 # ---------------------------------------------------------------------------
 
 def _cand(parent, locant, subst, name="x"):
@@ -171,7 +171,7 @@ class TestCompareByNodeScores:
 
     def test_unscored_candidates_tie(self):
         """No node_scores -> all-0.5 sentinel -> tie -> aggregate fallback
-        (an unscored candidate never wins/loses on per-substring; D-05)."""
+        (an unscored candidate never wins/loses on per-substring;)."""
         a = CandidateName(name="a", handler="chain", confidence=0.7)
         b = CandidateName(name="b", handler="chain", confidence=0.3)
         assert compare_by_node_scores(a, b) == 0

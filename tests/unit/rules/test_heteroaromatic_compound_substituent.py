@@ -1,4 +1,4 @@
-"""v30 #29 — heteroaromatic parent + COMPOUND N-substituent + PCG suffix must
+""" #29 — heteroaromatic parent + COMPOUND N-substituent + PCG suffix must
 name at the PIN tier (not only best-effort).
 
 Root cause (pre-fix): name_substituted_heterocycle declined every N/O/S-anchored
@@ -19,7 +19,7 @@ pytestmark = pytest.mark.unit
 
 
 def _pin():
-    return Orthonym(style="pin")  # PIN default — SELF-01 on
+    return Orthonym(style="pin")  # PIN default — on
 
 
 @pytest.mark.parametrize("smi,expected", [
@@ -37,8 +37,8 @@ def test_baseline_amino_unchanged():
 
 
 @pytest.mark.parametrize("smi,expected", [
-    # v30 #29 gap-a (was abstaining): the substituted-arene arenesulfonamido
-    # substituent now names at PIN — the exact BB row P-66.1.1.4.3 :33034 —
+    # #29 gap-a (was abstaining): the substituted-arene arenesulfonamido
+    # substituent now names at PIN — the exact BB row:33034 —
     # after the _acid_stem_unsaturated_oxide_prefix piece-selection fix. Generalises
     # across heteroaromatic hosts (thiazole/thiophene/pyridine).
     ("OC(=O)c1cnc(NS(=O)(=O)c2ccc(N)cc2)s1",

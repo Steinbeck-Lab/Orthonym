@@ -6,13 +6,13 @@ historically used ``pg_atoms[0]`` as the canonical attachment for ring/chain
 locant comparison, which is wrong for any FG whose SMARTS leads with a
 non-locant-bearing atom. For 5-membered S-S-in-ring heterocycles fused with an
 exocyclic alkyl chain of equal size (e.g. CHEBI:174033 trithiolane), this
-caused the P-44.1(f) cascade to flip ring->chain incorrectly and silently
+caused the (f) cascade to flip ring->chain incorrectly and silently
 drop the ring sulfurs from the generated name.
 
 a phase surfaced this latent bug by switching ring numbering to true IUPAC
 locants (sulfurs at locants 1,2,4 instead of sorted-fallback). The fix
 introduces ``PG_ATTACHMENT_INDICES`` in ``rules/seniority.py`` and a
-``_pg_attachment_atoms()`` helper used by every PG-locant comparison.
+``_pg_attachment_atoms`` helper used by every PG-locant comparison.
 
 Evidence: `internal notes`
 """
@@ -46,7 +46,7 @@ class TestDisulfideAttachmentRegression:
 class TestDisulfideRingCanaries:
     """Currently-correct disulfide-containing rings that must not regress.
 
-    These are simple cases that bypass the buggy P-44.1(f) cascade today
+    These are simple cases that bypass the buggy (f) cascade today
     (chain length 0 or 1 -> ring is parent automatically). They serve as
     regression guards: the fix must keep them naming correctly.
     """
@@ -76,21 +76,21 @@ class TestDisulfideRingCanaries:
 class TestAcyclicDisulfideCanaries:
     """Acyclic disulfides use ``a-thia`` replacement nomenclature.
 
-    These do NOT exercise the disulfide-as-PG path through P-44.1, but they
+    These do NOT exercise the disulfide-as-PG path through, but they
     confirm the fix does not perturb the disulfide perception layer.
     """
 
     def test_dimethyl_disulfide(self):
         """``CSSC`` -> ``(methyldisulfanyl)methane``.
 
-        DD2 (Phase D, P-63.3.1(1)): a dialkyl disulfide is a SUBSTITUTIVE PIN —
+        DD2 (Phase D, (1)): a dialkyl disulfide is a SUBSTITUTIVE PIN —
         the senior R as parent + ``(R'disulfanyl)`` prefix — not the ``dithia``
         skeletal-replacement chain (the old ``2,3-dithiabutane`` consumed the S-S
         bond as two skeletal thia atoms, the catalog C3 defect)."""
         assert name_compound("CSSC") == "(methyldisulfanyl)methane"
 
     def test_diethyl_disulfide(self):
-        """``CCSSCC`` -> ``(ethyldisulfanyl)ethane`` (substitutive PIN, P-63.3.1(1))."""
+        """``CCSSCC`` -> ``(ethyldisulfanyl)ethane`` (substitutive PIN, (1))."""
         assert name_compound("CCSSCC") == "(ethyldisulfanyl)ethane"
 
 
@@ -114,7 +114,7 @@ class TestPgAttachmentIndicesTable:
 
     def test_disulfide_returns_both_sulfurs(self):
         """For disulfide, the helper returns BOTH heteroatom indices so
-        downstream comparators can use ``min(locants)`` per IUPAC P-31.1.4."""
+        downstream comparators can use ``min(locants)`` per IUPAC."""
         from orthonym.rules.parent_selection import _pg_attachment_atoms
         # Synthetic: (flanking_C, S, S, flanking_C).
         atoms = _pg_attachment_atoms("disulfide", (5, 6, 7, 8))

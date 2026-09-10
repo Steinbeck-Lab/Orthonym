@@ -1,25 +1,25 @@
 """a phase.C integration tests: benzo-fusion corpus fixtures with OPSIN
 layer-1 InChI round-trip.
 
-Per CONTEXT: every fixture pipes through OPSIN
+Per internal notes: every fixture pipes through OPSIN
 (``opsin-cli-2.9.0-jar-with-dependencies.jar``) and asserts InChI layer-1
 (skeleton, stereo-stripped) match against the input SMILES. Stereo-layer
 mismatches do not fail the test (a phase/153 owns stereo).
 
 Fixtures: ``tests/fixtures/benzo_fusion/corpus_mined.json`` (>=10 entries
 spanning >=5 benzo-fusion sub-classes; mined from chebi_5000 +
-pubchem_2000 + opsin_selftest_500 + Blue Book P-25.2.2.4 canonical
+pubchem_2000 + opsin_selftest_500 + Blue Book canonical
 examples per corpus-shortfall protocol).
 
 Skip-vs-fail policy per (no band-aids):
   * ``name_compound(smi) is None`` for an in-scope fixture: SKIP with
-    155-AUDIT-C.md row cite (audit-acknowledged out-of-scope gap).
+    internal notes-C.md row cite (audit-acknowledged out-of-scope gap).
   * OPSIN cannot parse Orthonym-emitted name: SKIP with a phase
     quarantine note (the parent / cascade-other-than-benzo-fusion is
     where the bug lives).
   * OPSIN parses but InChI L1 mismatches: ASSERT FAIL (wrong-name bug).
 
-Source: internal notes,,,;
+Source: 155-internal notes,,,;
         tests/integration/test_skeletal_replacement_corpus.py:1-100
         (substrate copied verbatim).
 """
@@ -172,7 +172,7 @@ def test_benzo_fusion_corpus_opsin_roundtrip(fixture):
 
 @pytest.mark.integration
 def test_corpus_fixture_count_meets_d15_minimum():
-    """ floor: >= 10 corpus-mined fixtures per V18-155-AC-3."""
+    """ floor: >= 10 corpus-mined fixtures per V18-155-."""
     assert len(_CORPUS_FIXTURES) >= 10, (
         f"D-15 corpus floor breach: only {len(_CORPUS_FIXTURES)} fixtures "
         f"in tests/fixtures/benzo_fusion/corpus_mined.json; minimum is 10."

@@ -8,11 +8,11 @@ class TestWave2P5FusedVerify:
     """C5 fused rows already correct at HEAD — lock them against regression."""
 
     @pytest.mark.parametrize("smiles,expected", [
-        ("c1cc2ccc3cccc4ccc(c1)c2c34", "pyrene"),          # P-25.3.1.3
-        ("c1ccc2ccccc2c1", "naphthalene"),                 # P-25.3.2.4 (g)
-        ("c1ccc2ncccc2c1", "quinoline"),                   # P-25.3.2.4 (h)
-        ("c1ccc2[nH]ccc2c1", "1H-indole"),                 # P-25.3.2.4 (i)
-        ("c1ccc2nc[nH]c2c1", "1H-benzimidazole"),          # P-25.3.2.4 (j)
+        ("c1cc2ccc3cccc4ccc(c1)c2c34", "pyrene"),          #
+        ("c1ccc2ccccc2c1", "naphthalene"),                 # (g)
+        ("c1ccc2ncccc2c1", "quinoline"),                   # (h)
+        ("c1ccc2[nH]ccc2c1", "1H-indole"),                 # (i)
+        ("c1ccc2nc[nH]c2c1", "1H-benzimidazole"),          # (j)
     ])
     def test_already_correct(self, smiles, expected):
         assert name_compound(smiles) == expected
@@ -24,7 +24,7 @@ class TestWave2P5FusedVerify:
         ("c1ccc2ncccc2c1", "c1ccc2c(c1)nccc2"),
     ])
     def test_parent_selection_ab_order_invariant(self, s1, s2):
-        # P-25.3.2.4: parent/orientation selection must not depend on the
+        #: parent/orientation selection must not depend on the
         # RDKit atom order induced by the input SMILES spelling.
         assert name_compound(s1) == name_compound(s2)
 
@@ -32,7 +32,7 @@ class TestWave2P5FusedVerify:
 @pytest.mark.unit
 class TestP52BenzoGhiPerylene:
     def test_benzo_ghi_perylene(self):
-        # P-52.2.4.2 / large peri-fused PAH catalog parent.
+        # / large peri-fused PAH catalog parent.
         # OPSIN-RT-verified: benzo[ghi]perylene -> c1cc2ccc3ccc4ccc5cccc6c(c1)c2c3c4c56
         assert name_compound("c1cc2ccc3ccc4ccc5cccc6c(c1)c2c3c4c56") == "benzo[ghi]perylene"
 
@@ -40,7 +40,7 @@ class TestP52BenzoGhiPerylene:
 @pytest.mark.unit
 class TestP25MultiparentDifuranC:
     def test_benzo_difuran_c_prime(self):
-        # P-25.3.5.3: multiparent name preferred to a fused-ring name.
+        #: multiparent name preferred to a fused-ring name.
         # OPSIN-RT-verified: benzo[1,2-b:4,5-c']difuran -> c1cc2cc3cocc3cc2o1
         assert name_compound("c1cc2cc3cocc3cc2o1") == "benzo[1,2-b:4,5-c']difuran"
 
@@ -52,7 +52,7 @@ class TestP25MultiparentDifuranC:
 @pytest.mark.unit
 class TestP25MultiparentDifuranB:
     def test_benzo_difuran_b_prime(self):
-        # P-25.3.7.1: multiparent, one interparent (benzene) component; primed letters, colon-separated.
+        #: multiparent, one interparent (benzene) component; primed letters, colon-separated.
         # OPSIN-RT-verified: benzo[1,2-b:4,5-b']difuran -> c1cc2cc3occc3cc2o1
         assert name_compound("c1cc2cc3occc3cc2o1") == "benzo[1,2-b:4,5-b']difuran"
 
@@ -66,7 +66,7 @@ class TestP25MultiparentDifuranB:
 @pytest.mark.unit
 class TestP25MultiparentTriplePrimed:
     def test_dicyclobuta_difuran(self):
-        # P-25.3.7.3: three+ interparent components, double-primed benzo interparent.
+        #: three+ interparent components, double-primed benzo interparent.
         # OPSIN-RT-verified BB-verbatim PIN.
         expected = "benzo[1'',2'':3,4;4'',5'':3',4']dicyclobuta[1,2-b:1',2'-c']difuran"
         assert name_compound("O1C2=C(C=C1)C=1C2=CC2=C(C3=COC=C32)C1") == expected
@@ -74,7 +74,7 @@ class TestP25MultiparentTriplePrimed:
 
 @pytest.mark.unit
 class TestP25ParentSelectionTiebreakGtoJ:
-    """P-25.3.2.4 (g)-(j) parent-selection tiebreaks. No OPSIN-parseable
+    """ (g)-(j) parent-selection tiebreaks. No OPSIN-parseable
     example isolates a (g)-(j) decision, so this locks: (1) the (a)-(f)-decided
     examples are unchanged after the stubs become computed; (2) the computed
     (g)-(j) fields are spelling-invariant (determinism-sensitive scorer)."""
@@ -110,7 +110,7 @@ class TestP25ParentSelectionTiebreakGtoJ:
 
 @pytest.mark.unit
 class TestP25InteriorAtomNumberingFailClosed:
-    """P-25.3.3.2/.2.1/.2.2/.2.3/.3.3.2 — interior-atom numbering needs
+    """/.2.1/.2.2/.2.3/.3.3.2 — interior-atom numbering needs
     superscript interior locants (3a1 / 2a1H). OPSIN 2.9 CANNOT parse any
     name carrying such a token (verified: '2a1H-cyclopenta[cd]pyrene' and
     'pyracylene' both yield blank), so there is NO verifiable oracle.
@@ -125,7 +125,7 @@ class TestP25InteriorAtomNumberingFailClosed:
     3a1 interior position).
 
     NOTE 2 (reproduce-first finding): the test-suite conftest autouse fixture
-    `_disable_opsin_validity_gate_for_tests` turns the production SELF-01 OPSIN
+    `_disable_opsin_validity_gate_for_tests` turns the production OPSIN
     validity gate OFF, so with the gate off the namer emits a von-Baeyer
     fallback (e.g. '13-aza-tricyclo[...]...') rather than the sentinel. That
     von-Baeyer name is NOT an interior-superscript FUSION name, and in
@@ -164,7 +164,7 @@ class TestP25InteriorAtomNumberingFailClosed:
     # ⚠ This asserts only what is VERIFIABLE: the emission exists, round-trips to
     # the input structure, and carries no interior-superscript token. It does NOT
     # enshrine the exact von-Baeyer string, and it does NOT claim the von-Baeyer
-    # form is the PIN — it is not. Under P-52.2.4.1 (the Blue Book) fusion
+    # form is the PIN — it is not. Under (the Blue Book) fusion
     # nomenclature is the PIN for a system with two or more rings of five or more
     # members, so for these three fused six-membered rings the fusion name is the
     # PIN and the von-Baeyer form is a general-nomenclature degrade. The engine
@@ -174,7 +174,7 @@ class TestP25InteriorAtomNumberingFailClosed:
 
     @pytest.mark.parametrize("smiles", _INTERIOR_SMILES)
     def test_production_gate_emits_a_verified_degrade_not_the_sentinel(self, smiles, monkeypatch):
-        # Re-enable the production SELF-01 validity gate (the conftest autouse
+        # Re-enable the production validity gate (the conftest autouse
         # fixture disables it) and assert the namer emits a name that round-trips
         # (rather than the sentinel), without enshrining the exact string or its
         # tier. The systematic (von-Baeyer) degrade is acceptable HERE only because
@@ -201,7 +201,7 @@ class TestP25InteriorAtomNumberingFailClosed:
 
 @pytest.mark.unit
 class TestP25ThreeComponentOrthoPeri:
-    """P-25.5.1.2 / P-25.5.2 — three-component ortho/peri-fused systems.
+    """ / — three-component ortho/peri-fused systems.
 
     REPRODUCE-FIRST DIVERGENCE (recorded): the plan's Task 8 premise was that
     the sibling p5_bridged plan builds these two targets and this plan only
@@ -210,22 +210,22 @@ class TestP25ThreeComponentOrthoPeri:
     and its `test_indeno_naphthalene_is_fusion_not_bridged` asserts the bridged
     constructor DECLINES so the fusion engine names it. Both PINs are
     OPSIN-RT-verified, so this plan CATALOGS them (closed-structure exact match,
-    the Tasks 2-5 precedent). The P-25.5 header evidence has no OPSIN-2.9-
+    the Tasks 2-5 precedent). The header evidence has no OPSIN-2.9-
     verifiable PIN -> fail closed."""
 
     def test_cyclobuta_indeno_naphthalene(self):
-        # P-25.5.2 — OPSIN-RT-verified (all-carbon 18-atom PAH catalog parent)
+        # — OPSIN-RT-verified (all-carbon 18-atom PAH catalog parent)
         assert name_compound("C1=C2C=CC3=CC4=CC=5C=CC=CC5C=C4C1=C23") == \
             "cyclobuta[1,7]indeno[5,6-b]naphthalene"
 
     def test_trioxa_methanocyclopenta_azulene(self):
-        # P-25.5.1.2 — OPSIN-RT-verified (skeletal-'a' + methano bridge on a
+        # — OPSIN-RT-verified (skeletal-'a' + methano bridge on a
         # cyclopenta[cd]azulene residual; cataloged as a closed exact-match)
         assert name_compound("C=1OC2=C3C(C4=CC=C(C13)O4)=CO2") == \
             "2,3,9-trioxa-5,8-methanocyclopenta[cd]azulene"
 
     def test_p25_5_header_fails_closed(self, monkeypatch):
-        # P-25.5 header evidence has no OPSIN-2.9-verifiable PIN
+        # header evidence has no OPSIN-2.9-verifiable PIN
         # (proposed benzo[4,5-b]naphtho[2,3-d]anthracene parses to a DIFFERENT
         # structure) -> must decline, never emit a guessed name. Assert under the
         # production gate (the conftest autouse fixture disables it by default).
@@ -240,13 +240,13 @@ class TestP25ThreeComponentOrthoPeri:
 @pytest.mark.unit
 class TestP31HeteroatomicRingAssembly:
     def test_bi_oxaphosphinine(self):
-        # P-31.1.7.3: heteroatomic ring assembly named by a-replacement;
+        #: heteroatomic ring assembly named by a-replacement;
         # low locants to ring junctions -> heteroatoms -> unsaturation.
         # OPSIN-RT-verified: 4,4'-bi(4H-1,4-oxaphosphinine) -> O1C=CP(C=C1)P1C=COC=C1
         # Three defects fixed: (1) stem 'oxaphosphine' -> 'oxaphosphinine'
         # (HW Table 2.7 class 6C '-inine' unsaturated ending); (2) missing '4H'
         # indicated hydrogen (computed on the isolated parent hydride, not the
-        # assembly-embedded ring); (3) missing enclosing parentheses (P-28.2.1
+        # assembly-embedded ring); (3) missing enclosing parentheses
         # compound-component enclosure with the indicated-H kept inside).
         assert name_compound("O1C=CP(C=C1)P1C=COC=C1") == "4,4'-bi(4H-1,4-oxaphosphinine)"
 

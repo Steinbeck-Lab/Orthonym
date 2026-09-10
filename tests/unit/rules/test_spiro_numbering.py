@@ -1,10 +1,10 @@
-"""Phase 151-02 D-11 / D-20: P-24.2.2 numbering — compare_locant_sets reuse.
+"""a phase-02 /: numbering — compare_locant_sets reuse.
 
 Wave-0 RED scaffold. Verifies Plan 151-02 lands the ``compare_locant_sets``
 import in ``spiro.py`` and DOES NOT define a parallel comparator.
 
-Source: 151-02-PLAN.md tasks 1b/2; 151-AUDIT-B.md; 151-CONTEXT.md
-D-11 / D-20.
+Source: 151-02-PLAN.md tasks 1b/2; internal notes-B.md; 151-internal notes
+ /.
 """
 from __future__ import annotations
 
@@ -23,7 +23,7 @@ def _spiro_or_skip():
 
 
 class TestNoParallelComparator:
-    """D-20: spiro.py must NOT introduce a parallel locant comparator."""
+    """: spiro.py must NOT introduce a parallel locant comparator."""
 
     @pytest.mark.unit
     def test_spiro_module_uses_compare_locant_sets(self):
@@ -52,18 +52,18 @@ class TestNoParallelComparator:
 
 
 class TestP2422LowestLocantTiebreak:
-    """P-24.2.2 lowest-locant tiebreak.
+    """ lowest-locant tiebreak.
 
-    Plan 151-02 documents this as a v19 follow-up for the existing
+    Plan 151-02 documents this as a follow-up for the existing
     pure-spiro segment-locant numbering (currently picks a non-canonical
     set on 4/10 Blue Book fixtures). The Wave-0 RED test holds room for
-    the v19 fix; in v18 the tiebreak is enforced ONLY in the new
+    the fix; in the tiebreak is enforced ONLY in the new
     ``name_mixed_spiro_fused`` body's spiro-side orientation step.
     """
 
     @pytest.mark.unit
     def test_dispiro_descriptor_uses_compare_locant_sets_in_mixed_only(self):
-        """In v18 the comparator gate is in name_mixed_spiro_fused, not
+        """In the comparator gate is in name_mixed_spiro_fused, not
         in _compute_spiro_segments. This test documents the boundary."""
         spiro = _spiro_or_skip()
         try:
@@ -81,7 +81,7 @@ class TestP2422LowestLocantTiebreak:
 
     @pytest.mark.unit
     def test_pure_spiro_tiebreak_documented_followup(self):
-        """Audit logs pure-spiro tiebreak refinement to v19 — the Plan
+        """Audit logs pure-spiro tiebreak refinement to — the Plan
         151-02 acceptance is import-only for spiro.py module top-level."""
         spiro = _spiro_or_skip()
         try:
@@ -93,7 +93,7 @@ class TestP2422LowestLocantTiebreak:
 
 
 class TestPureSpiroNumberingSmoke:
-    """P-31.3.1.2 smoke checks — confirm get_spiro_numbering returns
+    """ smoke checks — confirm get_spiro_numbering returns
     a complete map for monospiro inputs."""
 
     @pytest.mark.unit
@@ -130,7 +130,7 @@ class TestPureSpiroNumberingSmoke:
 
     @pytest.mark.unit
     def test_spiro_numbering_starts_in_smaller_ring(self):
-        """P-31.3.1.2: numbering starts adjacent to spiro centre in the
+        """: numbering starts adjacent to spiro centre in the
         smaller ring."""
         from orthonym.rules.spiro import (
             get_spiro_numbering, get_spiro_atoms,
@@ -179,7 +179,7 @@ class TestPureSpiroNumberingSmoke:
 
     @pytest.mark.unit
     def test_compare_locant_sets_signature(self):
-        """compare_locant_sets is the authoritative comparator (D-11)."""
+        """compare_locant_sets is the authoritative comparator ."""
         from orthonym.rules.locants import compare_locant_sets
         # Lower locant set (1,2,4) should be preferred over (1,3,4).
         assert compare_locant_sets([1, 2, 4], [1, 3, 4]) < 0
@@ -195,5 +195,5 @@ class TestPureSpiroNumberingSmoke:
         except ImportError:
             pytest.skip("name_mixed_spiro_fused not yet exported")
         src = inspect.getsource(spiro)
-        # Either explicit `from .locants import` or an in-body usage.
+        # Either explicit `from.locants import` or an in-body usage.
         assert "compare_locant_sets" in src

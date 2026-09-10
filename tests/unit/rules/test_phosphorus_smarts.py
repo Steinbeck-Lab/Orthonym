@@ -5,7 +5,7 @@ Verifies all 9 phosphorus-related SMARTS patterns have correct positive and
 negative detection, including the phosphate specificity chain
 (triester > diester > monoester) via collision resolution.
 
-Requirement: PERC-06
+Requirement:
 """
 
 import pytest
@@ -139,17 +139,17 @@ class TestPhosphateSpecificityChain:
 
 class TestPhosphoricAcidDocumentedBehavior:
     """
-    Phosphoric acid OP(=O)(O)O is the free inorganic oxoacid (P-67), NOT a
-    carbon phosphonic acid (P-65.3, which requires a C-P bond).
+    Phosphoric acid OP(=O)(O)O is the free inorganic oxoacid, NOT a
+    carbon phosphonic acid, which requires a C-P bond).
 
-    BBR-PERC / DEF-4 (Phase 169.7) FIXED the prior false match: the phosphonic_acid
+    BBR-PERC / (a phase) FIXED the prior false match: the phosphonic_acid
     SMARTS now carries a recursive-env `$([PX4][#6])` carbon-attachment constraint,
     and a dedicated `phosphoric_acid` SMARTS perceives the free oxoacid. This
     corrects the audit's documented `OP(=O)(O)O -> trihydrophosphate` mis-cast.
     """
 
     def test_phosphoric_acid_is_not_phosphonic_acid(self):
-        """OP(=O)(O)O perceives `phosphoric_acid`, NOT the carbon-acid `phosphonic_acid` (DEF-4 fix)."""
+        """OP(=O)(O)O perceives `phosphoric_acid`, NOT the carbon-acid `phosphonic_acid` (fix)."""
         mol = Chem.MolFromSmiles("OP(=O)(O)O")
         assert mol is not None
         fgs = detect_functional_groups(mol)

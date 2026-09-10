@@ -1,4 +1,4 @@
-"""W2E-P1FC Task 5 — P-29.2 / P-29.3.2.2 (BB 15935) free-valence suffix
+"""W2E-P1FC Task 5 — / (BB 15935) free-valence suffix
 vocabulary and citation order.
 "If there is a choice, low locants are assigned, in order, to the suffixes
 'yl', 'ylidene', and 'ylidyne'. In names, the suffixes are cited in the
@@ -20,7 +20,7 @@ class TestP292FreeValence:
         assert unbranched_alkylidene_name(mol, 1, 2) == "ethylidene"
 
     def test_ylidene_end_to_end(self):
-        # ...=CH-CH3 on a ring parent -> ylidene form (OPSIN-RT verified).
+        #...=CH-CH3 on a ring parent -> ylidene form (OPSIN-RT verified).
         assert name_compound("CC=C1CCCCC1") == "ethylidenecyclohexane"
 
     def test_diol_not_diyl(self):

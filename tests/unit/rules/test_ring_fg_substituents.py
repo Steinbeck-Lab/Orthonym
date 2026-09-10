@@ -1,19 +1,19 @@
-"""WS-D.1 — FG-aware ring-as-substituent emitter (oxo / cyano).
+""".1 — FG-aware ring-as-substituent emitter (oxo / cyano).
 
 A ring demoted to a substituent of a chain parent must keep its
 characteristic groups as prefixes inside the enclosing marks
-(P-66.6.1 ketone->oxo; P-66.5.1 nitrile->cyano):
+ ketone->oxo; nitrile->cyano):
 
     O=C1CCCCC1CCCC(=O)O -> 4-(2-oxocyclohexyl)butanoic acid
     (HEAD before fix: "4-cyclohexylbutanoic acid" -- a structurally WRONG name)
 
-Design per internal notes WS-D.1 (skeptic-
+Design per internal notes.1 (skeptic-
 corrected): the chemistry primitive lives in rules.ring_substituents and is
 consumed by composer._detect_ring_substituents; the widened (non-6-membered)
 ring path fires ONLY when an FG prefix is present (no silent activation of
 alkyl/halo emission on small rings -- that change set needs its own
 enumerated canary budget); heteroaryl rings are out of scope (their PINs use
-fixed heteroatom-lowest numbering, P-31.1.4.3.4, not attachment-relative).
+fixed heteroatom-lowest numbering,, not attachment-relative).
 
 Every expected name below was OPSIN-verified (name -> structure -> InChI
 match against the test SMILES) before being baked in.
@@ -77,7 +77,7 @@ class TestRingAtomFgPrefixes:
         assert ring_atom_fg_prefixes(mol, idx, ring) == []
 
     def test_carboxy_emitted(self):
-        # a phase (, P-65.1.7.2.1): ring-COOH demotion is now reachable
+        # a phase (,: ring-COOH demotion is now reachable
         # (the S2 parent chokepoint landed), so the primitive emits 'carboxy'
         # for a ring atom bearing an exocyclic free carboxylic-acid carbon.
         mol = Chem.MolFromSmiles("OC(=O)C1CCCCC1C")
@@ -107,7 +107,7 @@ class TestEmitterEndToEnd:
         ("O=C1CCCC1CCCC(=O)O", "4-(2-oxocyclopentyl)butanoic acid"),
         # 7-ring oxo (size 3-8 widening)
         ("O=C1CCCCCC1CCCC(=O)O", "4-(2-oxocycloheptyl)butanoic acid"),
-        # aromatic all-carbon ring + cyano (P-66.5.1)
+        # aromatic all-carbon ring + cyano
         ("N#Cc1cccc(CCCC(=O)O)c1", "4-(3-cyanophenyl)butanoic acid"),
         # multiplier path: two oxo -> dioxo
         ("O=C1CCCC(=O)C1CCCC(=O)O", "4-(2,6-dioxocyclohexyl)butanoic acid"),
@@ -127,10 +127,10 @@ class TestEmitterEndToEnd:
 class TestWideningGate:
     """Wave2 T3a: the old tripwire demanded that alkyl/halo emission on
     non-6 rings only land as a conscious, separately-enumerated change —
-    T3a is that change. The former gate returned the bare base_name,
+     is that change. The former gate returned the bare base_name,
     silently DROPPING the ring's substituents ('4-cyclopentylbutanoic acid'
     for the 2-methylcyclopentyl input: a different molecule, caught only by
-    the OPSIN-armed SELF-01). The widened path names every branch exactly
+    the OPSIN-armed). The widened path names every branch exactly
     via the recursive fragment namer or FAILS CLOSED (constitution-
     conservation guard in _detect_ring_substituents /
     _build_substituted_ring_name), so the skeptic's silent-activation

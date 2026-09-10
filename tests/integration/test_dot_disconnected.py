@@ -52,7 +52,7 @@ class TestNeutralDotDisconnected:
         assert "butane" in result
 
     def test_single_atom_fragments_fall_through(self):
-        """Single-atom fragments like .Cl cause fallthrough to normal pipeline.
+        """Single-atom fragments like.Cl cause fallthrough to normal pipeline.
 
         When a dot-disconnected SMILES has fewer than 2 multi-atom fragments,
         it falls through to the normal naming pipeline rather than splitting.
@@ -96,7 +96,7 @@ class TestNeutralDotDisconnected:
         assert "propanoic acid" in result
 
     def test_neutral_dot_chlorine_falls_through(self):
-        """Neutral .Cl fragments are single atoms and fall through to normal pipeline.
+        """Neutral.Cl fragments are single atoms and fall through to normal pipeline.
 
         This prevents regression on molecules like arginine.Cl.Cl where the
         normal pipeline produces better names for the organic component.

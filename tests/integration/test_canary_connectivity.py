@@ -9,7 +9,7 @@ naming that should not regress.
 These names are frozen at v10.0 state. If v11.0 intentionally improves a name,
 update the expected value.
 
-Source: Phase 095 benchmark (500 ChEBI compounds, seed=123)
+Source: a phase benchmark (500 ChEBI compounds, seed=123)
 Tier: 2 of 3 (Tier 1 = RT-exact in test_canary_rt75.py, Tier 3 = name-stability)
 """
 
@@ -21,7 +21,7 @@ from orthonym import name_compound
 # ---------------------------------------------------------------------------
 # 4 connectivity canary compounds: (SMILES, expected_name)
 # Connectivity-layer InChI match but not full InChI match
-# Phase 095 v10.0 canary expansion
+# a phase v10.0 canary expansion
 # ---------------------------------------------------------------------------
 
 CONNECTIVITY_CANARY = [
@@ -31,7 +31,7 @@ CONNECTIVITY_CANARY = [
     ),
     (
         "CC(C)CC[C@@H](O)[C@H]1C(=O)OC[C@@H]1CO",
-        "(3S,4S)-3-[(R)-1-hydroxy-4-methylpentyl]-4-hydroxymethyloxolan-2-one",  # Phase 130: stereo (R) added
+        "(3S,4S)-3-[(R)-1-hydroxy-4-methylpentyl]-4-hydroxymethyloxolan-2-one",  # a phase: stereo (R) added
     ),
     (
         "CSCCC(N)C(=O)Oc1ccc(CC(N)C(=O)O)cc1",

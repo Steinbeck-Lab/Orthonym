@@ -1,16 +1,16 @@
-"""Unit tests for ``scripts/generate_calibration_splits_148_1.py`` (D-08 Tier 1).
+"""Unit tests for ``scripts/generate_calibration_splits_148_1.py`` (Tier 1).
 
 Covers:
 - ``_classify_rt`` bucketing across the three RT buckets + defensive paths
-  (verbatim duplicate of Phase 146 analog test for self-contained coverage).
+  (verbatim duplicate of a phase analog test for self-contained coverage).
 - ``_primary_class`` first-token extraction + empty handling.
 - ``generate_splits`` invariants: sum=n, seed reproducibility, pairwise
   disjoint train/val/test, approximate fraction correctness at n=1000,
   stratification preservation at n=300 with 3 handlers.
-- D-03 ``--exclude-corpus`` filter: default-excludes opsin_selftest_500;
+- ``--exclude-corpus`` filter: default-excludes opsin_selftest_500;
   empty exclude keeps all (back-compat); multiple corpora can be excluded.
-- Constants: DEFAULT_SEED == 321 (Phase 145 D-03), DEFAULT_EXCLUDE
-  contains opsin_selftest_500 (D-03).
+- Constants: DEFAULT_SEED == 321 (a phase), DEFAULT_EXCLUDE
+  contains opsin_selftest_500 .
 
 Uses ``importlib.import_module`` to load the script under test because
 ``scripts/`` is not on the package import path (same pattern as
@@ -28,7 +28,7 @@ gs = importlib.import_module("generate_calibration_splits_148_1")
 
 
 class TestClassifyRT:
-    """Bucket-assignment tests for ``_classify_rt`` (D-15 dimension #3)."""
+    """Bucket-assignment tests for ``_classify_rt`` (dimension #3)."""
 
     def test_rt1(self) -> None:
         assert gs._classify_rt({"inchi_rt": "1", "parent_score": "0.5"}) == "rt1"
@@ -45,7 +45,7 @@ class TestClassifyRT:
 
 
 class TestPrimaryClass:
-    """First-token extraction from ``compound_classes`` (D-15 dimension #2)."""
+    """First-token extraction from ``compound_classes`` (dimension #2)."""
 
     def test_first_class(self) -> None:
         assert gs._primary_class({"compound_classes": "aromatic|fused"}) == "aromatic"
@@ -71,7 +71,7 @@ def _make_rows(n: int = 100, handlers=("chain", "ring_a", "ring_b"),
 
 
 class TestGenerateSplits:
-    """Invariants of the 80/10/10 partitioning (D-15)."""
+    """Invariants of the 80/10/10 partitioning ."""
 
     def test_sum_equals_total(self) -> None:
         rows = _make_rows(100)
@@ -150,7 +150,7 @@ class TestExcludeCorpusFilter:
             assert r["source_corpus"] != "opsin_selftest_500"
 
     def test_explicit_empty_exclude_keeps_all(self):
-        """Back-compat: empty exclude set keeps all rows (Phase 146 splits behavior)."""
+        """Back-compat: empty exclude set keeps all rows (a phase splits behavior)."""
         rows = self._make_corpora(n_chebi=70, n_opsin=30)
         kept = [
             r for r in rows
@@ -182,12 +182,12 @@ class TestExcludeCorpusFilter:
 
 
 class TestSeedAndRange:
-    """Constants locked by Phase 145 D-03 + Phase 148.1 D-03."""
+    """Constants locked by a phase + a phase."""
 
     def test_default_seed_is_321(self):
-        """Phase 145 D-03 reproducibility lock."""
+        """a phase reproducibility lock."""
         assert gs.DEFAULT_SEED == 321
 
     def test_default_exclude_contains_opsin_selftest_500(self):
-        """D-03 default: G2 HARD gate corpus held out."""
+        """ default: G2 HARD gate corpus held out."""
         assert "opsin_selftest_500" in gs.DEFAULT_EXCLUDE

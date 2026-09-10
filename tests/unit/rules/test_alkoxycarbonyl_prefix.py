@@ -1,14 +1,14 @@
-"""Tests for alkoxycarbonyl prefix generation (IUPAC P-65.6.3).
+"""Tests for alkoxycarbonyl prefix generation (IUPAC.
 
 When an ester group is NOT the principal characteristic group, it is
 expressed as an alkoxycarbonyl prefix:
-  -COOCH3   -> methoxycarbonyl
-  -COOC2H5  -> ethoxycarbonyl
-  -COOPh    -> phenoxycarbonyl
+  -COOCH3 -> methoxycarbonyl
+  -COOC2H5 -> ethoxycarbonyl
+  -COOPh -> phenoxycarbonyl
 
 NOTE: OPSIN 2.8.0 does not parse alkoxycarbonyl prefixes, so
-round-trip validation is not possible for these names.  The names
-are correct per IUPAC 2013 Blue Book P-65.6.3.
+round-trip validation is not possible for these names. The names
+are correct per IUPAC 2013 Blue Book.
 """
 
 import pytest
@@ -87,9 +87,9 @@ class TestAlkoxycarbonylNegative:
         prefix, never as 'alkoxycarbonyl'.
 
         Asserted word changed from 'palmitoyloxy' to the PIN in Task J3 --
-        P-65.6.3.2.3 (BlueBookV2.md:31696), whose :31723 example prints a
+         (the Blue Book), whose:31723 example prints a
         trivial-derived acyloxy prefix as the non-preferred alternative, and
-        Appendix 2 :56482 'hexadecanoyl* = palmitoyl' (legend :55416, "The symbol
+        Appendix 2:56482 'hexadecanoyl* = palmitoyl' (legend:55416, "The symbol
         * designates the preferred prefix").
         """
         result = name_compound("CCCCCCCCCCCCCCCC(=O)OC(CCCCC)CCCCCCCCCCCC(=O)[O-]")

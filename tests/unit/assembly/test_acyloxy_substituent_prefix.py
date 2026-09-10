@@ -1,4 +1,4 @@
-"""An `-O-C(=O)-R` substituent is `<acyl>oxy`, not `<acyl>` (P-65.6.3.2.3).
+"""An `-O-C(=O)-R` substituent is `<acyl>oxy`, not `<acyl>`.
 
 Third member of one defect family, and the family is the point:
 `substituent_naming.parent_to_prefix` maps an acid NAME to an ACYL prefix through
@@ -6,14 +6,14 @@ Third member of one defect family, and the family is the point:
 mapping is wrong whenever the fragment retains an oxygen the acyl group does not have.
 Which oxygen is lost depends only on where the fragment attaches:
 
-    attached via the carbonyl C, retaining -OH   -> `carboxy`   (was `formyl`,  9e2648a2)
-    attached via the ester O,   retaining -O-    -> `<acyl>oxy` (was `acetyl`,  this file)
+    attached via the carbonyl C, retaining -OH -> `carboxy` (was `formyl`, 9e2648a2)
+    attached via the ester O, retaining -O- -> `<acyl>oxy` (was `acetyl`, this file)
 
 `parent_to_prefix` receives only a name, so it cannot tell the two apart — the caller has
 the graph and must decide. Measured before the fix:
 
-    -OC(=O)CH3  -> 'acetyl'   which is -C(=O)CH3, an oxygen SHORT -> wrong molecule
-    -C(=O)CH3   -> None       (the real acetyl case is refused, separately)
+    -OC(=O)CH3 -> 'acetyl' which is -C(=O)CH3, an oxygen SHORT -> wrong molecule
+    -C(=O)CH3 -> None (the real acetyl case is refused, separately)
 
 Target verified by round-trip before being asserted: `(acetyloxy)benzene` parses to
 `C(C)(=O)OC1=CC=CC=C1`, the same constitution as phenyl acetate, while `(acetyl)benzene`

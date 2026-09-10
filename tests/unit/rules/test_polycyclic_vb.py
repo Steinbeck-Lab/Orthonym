@@ -2,10 +2,10 @@
 Tests for von Baeyer polycyclic descriptor generation.
 
 Tests cover the VonBaeyerAnalyzer class and associated functions
-for generating correct IUPAC von Baeyer descriptors (VB-1 through VB-7)
+for generating correct IUPAC von Baeyer descriptors (through)
 for polycyclic bridged systems (bicyclo through pentacyclo+).
 
-Reference: IUPAC 2013 Blue Book P-23, VB-1 through VB-9.
+Reference: IUPAC 2013 Blue Book, through.
 """
 
 import pytest
@@ -21,27 +21,27 @@ from orthonym.rules.polycyclic import (
 
 
 # =============================================================================
-# VB_LOCANT OPSIN Round-Trip Results (Phase 72, 2026-02-24)
+# VB_LOCANT OPSIN Round-Trip Results (a phase, 2026-02-24)
 #
 # 38 VB_LOCANT compounds tested against OPSIN CLI 2.8.0
 # Overall: 0/38 InChI round-trip, 36/38 OPSIN-parseable
 #
 # Root cause of InChI mismatch: NOT bridge citation order.
 # Failures dominated by:
-#   - Missing unsaturation naming (aromatic rings described as saturated)
-#   - Wrong substituent naming (DROP-22 polyfunctional failures)
-# These are pre-existing naming issues outside Phase 72 VB scope.
+# - Missing unsaturation naming (aromatic rings described as saturated)
+# - Wrong substituent naming (polyfunctional failures)
+# These are pre-existing naming issues outside a phase VB scope.
 #
 # OPSIN parse failures (2/38):
-#   - Compound 10: OPSIN cannot parse descriptor
-#   - Compound 13: OPSIN cannot parse descriptor
+# - Compound 10: OPSIN cannot parse descriptor
+# - Compound 13: OPSIN cannot parse descriptor
 #
 # Algorithm status:
-#   - Independent/dependent classification: IMPLEMENTED
-#   - Numbering order (VB-7): IMPLEMENTED
-#   - Citation order (VB-6): IMPLEMENTED
-#   - IUPAC vs OPSIN conflict: NONE FOUND
-#   - VB invariant: ENFORCED at runtime
+# - Independent/dependent classification: IMPLEMENTED
+# - Numbering order : IMPLEMENTED
+# - Citation order : IMPLEMENTED
+# - IUPAC vs OPSIN conflict: NONE FOUND
+# - VB invariant: ENFORCED at runtime
 # =============================================================================
 
 
@@ -292,7 +292,7 @@ class TestDescriptorFormatting:
         """Adamantane descriptor: tricyclo[3.3.1.1^3,7] (PIN superscript form)."""
         ring_atoms = _get_ring_atoms(adamantane)
         desc = analyzer.analyze(adamantane, ring_atoms)
-        # 13B(d): PIN superscript locants for secondary bridges (P-23.2.5.1).
+        # 13B(d): PIN superscript locants for secondary bridges.
         assert desc.descriptor_string == "tricyclo[3.3.1.1^3,7]", (
             f"Expected 'tricyclo[3.3.1.1^3,7]', got '{desc.descriptor_string}'"
         )
@@ -312,7 +312,7 @@ class TestDescriptorFormatting:
 # ============================================================================
 
 class TestVBNumbering:
-    """Test VB-7 numbering order."""
+    """Test numbering order."""
 
     @pytest.mark.unit
     def test_norbornane_numbering_bridgeheads(self, norbornane, analyzer):
@@ -363,7 +363,7 @@ class TestVBNumbering:
 # ============================================================================
 
 class TestFullNameGeneration:
-    """Test generate_polycyclic_name() for complete base names."""
+    """Test generate_polycyclic_name for complete base names."""
 
     @pytest.mark.unit
     def test_norbornane_full_name(self, norbornane):
@@ -378,7 +378,7 @@ class TestFullNameGeneration:
         """Adamantane -> tricyclo[3.3.1.1^3,7]decane.
 
         13B(d): secondary-bridge locants now use the PIN superscript typography
-        (``1^3,7``) per P-23.2.5.1 / P-23.2.6.1.2; was the older ``1(3,7)``
+        (``1^3,7``) per /; was the older ``1(3,7)``
         parenthesis form. OPSIN round-trips both.
         """
         name = generate_polycyclic_name(adamantane)
@@ -408,11 +408,11 @@ class TestFullNameGeneration:
 
 
 # ============================================================================
-# is_polycyclic_system() Detection Tests
+# is_polycyclic_system Detection Tests
 # ============================================================================
 
 class TestIsPolycyclicSystem:
-    """Test is_polycyclic_system() detection function."""
+    """Test is_polycyclic_system detection function."""
 
     @pytest.mark.unit
     def test_adamantane_is_polycyclic(self, adamantane):
@@ -487,7 +487,7 @@ class TestFindLongestPath:
 
     @pytest.mark.unit
     def test_wr02_dfs_expansion_cap_bounds_search(self, norbornane, monkeypatch):
-        """WR-02 (code review 2026-06-02): the DFS is bounded by
+        """ (code review 2026-06-02): the DFS is bounded by
         ``_MAX_DFS_EXPANSIONS`` so a pathological dense cage cannot hang. With the
         cap forced to 1 the search aborts immediately (best-so-far is shorter than
         the full path); with the real cap (>> expansions a real polycyclic needs)
@@ -589,7 +589,7 @@ class TestCycloPrefixesExtended:
 
     @pytest.mark.unit
     def test_ring_count_above_20_is_composed_not_numeric(self):
-        """Ring count > 20 COMPOSES a real word (P-23.1.9 + P-14.2.1.2).
+        """Ring count > 20 COMPOSES a real word +.
 
         This test previously asserted the malformed ``"25cyclo"`` that the old
         f-string fallback produced. That was never a word, and it shipped: the
@@ -599,7 +599,7 @@ class TestCycloPrefixesExtended:
                                                 cyclo_ring_count_word)
         assert 25 not in CYCLO_PREFIXES
         assert cyclo_ring_count_word(25) == "pentacosacyclo"
-        # 21 is 'henicosa' (BlueBookV2.md:2820), NOT the CAS variant 'heneicosa'
+        # 21 is 'henicosa' (the Blue Book), NOT the CAS variant 'heneicosa'
         assert cyclo_ring_count_word(21) == "henicosacyclo"
         assert cyclo_ring_count_word(22) == "docosacyclo"
         assert cyclo_ring_count_word(30) == "triacontacyclo"
@@ -612,7 +612,7 @@ class TestCycloPrefixesExtended:
 
     @pytest.mark.unit
     def test_bicyclo_not_dicyclo(self):
-        """P-23.1.9 (BlueBookV2.md:9558): 'bicyclo' (not dicyclo)."""
+        """ (the Blue Book): 'bicyclo' (not dicyclo)."""
         from orthonym.rules.polycyclic import cyclo_ring_count_word
         assert cyclo_ring_count_word(2) == "bicyclo"
 
@@ -622,7 +622,7 @@ class TestCycloPrefixesExtended:
 
         Every tabulated entry except 2 (the 'bi'/'di' irregularity) must equal
         ``simple_multiplier_word(n) + 'cyclo'``. If they ever diverge the table
-        is wrong, because P-23.1.9 states the composition and tabulates nothing.
+        is wrong, because states the composition and tabulates nothing.
         """
         from orthonym.assembly.naming_utils import simple_multiplier_word
         from orthonym.rules.polycyclic import CYCLO_PREFIXES
@@ -651,7 +651,7 @@ class TestCycloPrefixesExtended:
         # A formable count still builds normally...
         assert analyzer._build_descriptor(21, [3, 2, 1], [], {}) == (
             "henicosacyclo[3.2.1]")
-        # ...and an unformable one refuses the molecule.
+        #...and an unformable one refuses the molecule.
         with pytest.raises(OrthonymLimitError):
             analyzer._build_descriptor(10000, [3, 2, 1], [], {})
 
@@ -661,7 +661,7 @@ class TestCycloPrefixesExtended:
 # ============================================================================
 
 class TestHigherVBDescriptorAccuracy:
-    """Tests for tetracyclo+ VB descriptor correctness per IUPAC P-23.2.6."""
+    """Tests for tetracyclo+ VB descriptor correctness per IUPAC."""
 
     @pytest.mark.unit
     def test_cubane_descriptor_opsin_parseable(self):

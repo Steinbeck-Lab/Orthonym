@@ -49,9 +49,9 @@ def test_simple_salt_unchanged():
 
 
 def test_inorganic_salt_fails_closed():
-    # out of scope -> must abstain, never a guessed/partial name. FIND-2:
+    # out of scope -> must abstain, never a guessed/partial name.:
     # name_salt used to silently drop the unnameable chlorosilanolate anion
-    # and emit the partial 'beryllium strontium'. With _be()
+    # and emit the partial 'beryllium strontium'. With _be
     # (general_fallback=True), the correct abstain value is None, not a
     # literal sentinel string: namer.py's documented " Composer1 Task 5
     # best-effort clean-abstain contract" (name_tiered, ~:2939-2949)

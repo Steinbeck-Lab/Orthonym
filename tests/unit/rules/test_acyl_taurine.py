@@ -1,13 +1,13 @@
-"""Simple N-acyl-taurine / acyl-amino-sulfonate anion naming (v33 Phase 3).
+"""Simple N-acyl-taurine / acyl-amino-sulfonate anion naming (a phase).
 
-SPY finding (see .superpowers/sdd/2026-08-17-v33-phase3-acid-ester-anion/
+a trace finding (see.superpowers/sdd/2026-08-17--phase3-acid-ester-anion/
 acyltaurine-report.md for the full trace): the primary target,
 N-acetyltaurine anion (``CC(=O)NCCS(=O)(=O)[O-]``), was measured as an
 abstention in an earlier session but is ALREADY NAMED CORRECTLY at this
 commit -- no production code change was required. The single-anion
 sulfonate path (``ions.py::name_anion`` -> ``charged_router.route_charged``)
 neutralizes to the acid, names it via the general/polyfunctional engine
-(which already builds the P-66.1.1.4.3 method-(1) amido prefix --
+(which already builds the method-(1) amido prefix --
 ``formamido``/``acetamido``/``{stem}anamido`` -- via
 ``composer.py::_check_for_acylamino`` -> ``substituent_naming.py::
 linear_acyl_amido_prefix``), then converts the ``-ic acid`` suffix to
@@ -26,7 +26,7 @@ well outside "simple acyl-amino-sulfonate anion naming" scope. It failed
 CLOSED (abstained to the sentinel) rather than emitting a wrong name, so
 0-wrong held; not fixed in this Phase-3 slice.
 
-UPDATE (2026-08-18, v33 Phase 6 lead a): that general-engine principal-chain
+UPDATE (2026-08-18, a phase lead a): that general-engine principal-chain
 defect is now FIXED (`perception/chains.py::find_principal_chain` -- the
 heteroatom-only-suffix acid classes, sulfonic/sulfinic/phosphonic/phosphinic
 + imidic/peroxoic/thioic S variants, now register their S/P-bearing carbon
@@ -96,7 +96,7 @@ def test_integration_bile_acid_taurine_conjugate_failclosed(namer):
 def test_integration_longer_acyl_chain_now_named(namer):
     # A longer unbranched acyl (propanoyl) on the same taurine skeleton used
     # to abstain (a separate, out-of-scope general-engine principal-chain
-    # selection defect -- see module docstring). v33 Phase 6 lead a fixed
+    # selection defect -- see module docstring). a phase lead a fixed
     # that defect (perception/chains.py::find_principal_chain now registers
     # the sulfonic acid's bearing carbon), so this now names correctly.
     # RT-verified: InChIKey CIPJBOMLFKUUEH-UHFFFAOYSA-M on both sides.

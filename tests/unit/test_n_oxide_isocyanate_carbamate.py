@@ -1,12 +1,12 @@
 """Tests for N-oxide, isocyanate, isothiocyanate, and carbamate naming.
 
-Phase 21, Plan 02: Functional class naming for these 4 FG types.
+a phase, Plan 02: Functional class naming for these 4 FG types.
 All use functional class nomenclature (two-word names like "methyl isocyanate").
 
-FG-04: N-oxides ("pyridine 1-oxide", "trimethylamine N-oxide")
-FG-05: Isocyanates ("methyl isocyanate")
-FG-06: Isothiocyanates ("phenyl isothiocyanate")
-FG-09: Carbamates ("ethyl carbamate", "ethyl N-methylcarbamate")
+: N-oxides ("pyridine 1-oxide", "trimethylamine N-oxide")
+: Isocyanates ("methyl isocyanate")
+: Isothiocyanates ("phenyl isothiocyanate")
+: Carbamates ("ethyl carbamate", "ethyl N-methylcarbamate")
 """
 
 import pytest
@@ -14,7 +14,7 @@ from orthonym import name_compound
 
 
 # ============================================================================
-# N-oxide tests (FG-04)
+# N-oxide tests
 # ============================================================================
 
 class TestAromaticNOxide:
@@ -37,7 +37,7 @@ class TestAliphaticNOxide:
     def test_trimethylamine_n_oxide(self):
         result = name_compound("C[N+](C)(C)[O-]")
         assert "N-oxide" in result, f"Expected 'N-oxide' in '{result}'"
-        # v22 Phase B (DD1 Fix 4 / H5): trimethylamine is general-nomenclature;
+        # Phase B (DD1 Fix 4 / H5): trimethylamine is general-nomenclature;
         # removing the retained PIN-headline entry makes the N-oxide use the
         # substitutive amine PIN -> 'N,N-dimethylmethanamine N-oxide'.
         assert "N,N-dimethylmethanamine" in result, (
@@ -77,11 +77,11 @@ class TestNOxideRouting:
 
 
 # ============================================================================
-# Isocyanate tests (FG-05)
+# Isocyanate tests
 # ============================================================================
 
 class TestIsocyanate:
-    """Isocyanates. Wave2 T2a (P-61.8): the PIN is the SUBSTITUTIVE
+    """Isocyanates. Wave2: the PIN is the SUBSTITUTIVE
     isocyanato prefix on the parent hydride (BB VERBATIM
     'isocyanatocyclohexane (PIN) cyclohexyl isocyanate'); the functional-
     class 'R isocyanate' remains for --trivial and (interim) for AROMATIC
@@ -115,11 +115,11 @@ class TestIsocyanate:
 
 
 # ============================================================================
-# Isothiocyanate tests (FG-06)
+# Isothiocyanate tests
 # ============================================================================
 
 class TestIsothiocyanate:
-    """Isothiocyanates. Wave2 T2a (P-61.8): substitutive isothiocyanato PIN
+    """Isothiocyanates. Wave2: substitutive isothiocyanato PIN
     (parallel to isocyanato); aryl keeps functional class interim."""
 
     @pytest.mark.unit
@@ -134,7 +134,7 @@ class TestIsothiocyanate:
 
 
 # ============================================================================
-# Carbamate tests (FG-09)
+# Carbamate tests
 # ============================================================================
 
 class TestCarbamate:

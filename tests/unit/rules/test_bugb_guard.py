@@ -4,7 +4,7 @@ Tests that the BRANCH_HANDLED_FGS frozenset (shared from naming_utils) only
 contains FG types whose prefixes are reliably emitted by the substituent naming
 path when the FG is on a small (1-3C) branch.
 
-IUPAC P-59.1(a): all non-principal functional groups must appear as prefixes.
+IUPAC (a): all non-principal functional groups must appear as prefixes.
 The BUG-B guard filters FGs from the polyfunctional prefix loop when they are
 on small substituent branches, trusting that substituent naming will emit the
 FG prefix (e.g., "hydroxymethyl" for -CH2OH). If substituent naming does NOT

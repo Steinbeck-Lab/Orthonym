@@ -1,10 +1,10 @@
 """
-Unit tests for bridged fused nomenclature (FR-8).
+Unit tests for bridged fused nomenclature .
 
-Tests FR-8 naming rules for systems that are part fused and part bridged,
+Tests naming rules for systems that are part fused and part bridged,
 such as 1,4-methanonaphthalene (naphthalene with a methano bridge).
 
-IUPAC Reference: P-25.7 (Bridged Fused Ring Systems)
+IUPAC Reference: (Bridged Fused Ring Systems)
 
 Key concepts:
 - Bridged fused = fused core + additional bridges across the fused system
@@ -176,7 +176,7 @@ class TestFusedCoreIdentification:
 
     @pytest.mark.unit
     def test_fused_core_maximizes_fused_rings(self):
-        """Fused core should maximize number of fused rings (FR-8.2)."""
+        """Fused core should maximize number of fused rings (.2)."""
         # Anthracene has 3 fused rings
         smiles = "c1ccc2cc3ccccc3cc2c1"
         mol = Chem.MolFromSmiles(smiles)
@@ -193,11 +193,11 @@ class TestFusedCoreIdentification:
 # ============================================================================
 
 class TestNameAssembly:
-    """Test FR-8 name format assembly."""
+    """Test name format assembly."""
 
     @pytest.mark.unit
     def test_name_format_locant_bridge_parent(self):
-        """FR-8 names should follow [locants]-[bridge_prefix][parent] format."""
+        """ names should follow [locants]-[bridge_prefix][parent] format."""
         # Test with a known bridged fused structure
         # benzonorbornadiene: benzene fused with norbornadiene
         smiles = "C1=CC2=CC=CC=C2C2C=CC12"  # benzonorbornadiene-like

@@ -1,4 +1,4 @@
-"""Tests for anhydride handler substituent discovery (Phase 125).
+"""Tests for anhydride handler substituent discovery (a phase).
 
 Verifies that branched acyl fragments in anhydrides produce correct
 acid names including substituent prefixes.
@@ -18,7 +18,7 @@ class TestAnhydrideSubstituents:
         assert "anhydride" in result
 
     def test_simple_ethanoic_anhydride_unchanged(self):
-        # Retained acid name is the PIN (P-65.1.1.1): acetic, not ethanoic.
+        # Retained acid name is the PIN: acetic, not ethanoic.
         result = name_compound("CC(=O)OC(=O)C")
         assert "acetic anhydride" == result
 
@@ -28,7 +28,7 @@ class TestAnhydrideSubstituents:
         assert "butanoic anhydride" == result
 
     def test_cyclic_succinic_anhydride_is_dione_pin(self):
-        # v23 D-FOLLOWON item 6 (P-65.7.7.1 method 1): succinic anhydride's PIN is
+        # D-FOLLOWON item 6 method 1): succinic anhydride's PIN is
         # the heterocyclic-pseudoketone dione, not 'butanedioic anhydride'.
         result = name_compound("O=C1CCC(=O)O1")
         assert "oxolane-2,5-dione" == result

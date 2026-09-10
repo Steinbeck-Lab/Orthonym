@@ -1,7 +1,7 @@
-"""v22 Phase G1 — bridged-fused P-25.4 constructor (DD7 COV-01, bridged half).
+""" Phase G1 — bridged-fused constructor (DD7, bridged half).
 
 G1 turns the G0 fail-closed refusals for the *bridged-fused* class into correct
-IUPAC PINs. A bridged fused ring system (P-25.4.1.1) is a fused ring system
+IUPAC PINs. A bridged fused ring system is a fused ring system
 (the recognised parent, e.g. naphthalene) plus one or more bridges across it.
 The constructor:
 
@@ -12,13 +12,13 @@ The constructor:
   * cites bridge prefixes (methano/ethano/epoxy/...) and hydro prefixes TOGETHER
     in alphanumerical order ignoring multiplying prefixes
     ('epoxy' < 'ethano' < 'hydro' < 'methano'), each with its own locant set
-    (Blue Book P-25.4.3.4; verified against the PIN examples
+    (Blue Book; verified against the PIN examples
     '1,4-dihydro-1,4-methanonaphthalene', '1,4-epoxy-5,8-methanonaphthalene').
 
 Per guardrail A8 these test the rule FAMILY (any single-bridge-over-recognised-
 fused-aromatic-parent) plus determinism and OPSIN constitutional round-trip,
 not just literal canary rows. Systems OUTSIDE the handled class (polycomponent
-fusion P-25.3.4, polyspiro) MUST stay G0 fail-closed — never a wrong name.
+fusion, polyspiro) MUST stay G0 fail-closed — never a wrong name.
 """
 import pytest
 from rdkit import Chem
@@ -45,7 +45,7 @@ def _ik(smi):
 
 @pytest.mark.parametrize("smiles,expected", BRIDGED_FUSED_GOLD)
 def test_bridged_fused_exact_pin(smiles, expected):
-    """The constructor emits the exact P-25.4 PIN (gold name-exact-match)."""
+    """The constructor emits the exact PIN (gold name-exact-match)."""
     assert name_compound(smiles) == expected
 
 
@@ -72,7 +72,7 @@ def test_bridged_fused_deterministic(smiles, expected):
 
 
 # --------------------------------------------------------------------------- #
-# Protect: the constructor must NOT perturb pure-fused / pure-bridged systems  #
+# Protect: the constructor must NOT perturb pure-fused / pure-bridged systems #
 # --------------------------------------------------------------------------- #
 PROTECT = [
     ("c1ccc2ccccc2c1", "naphthalene"),
@@ -92,7 +92,7 @@ def test_protect_unchanged(smiles, expected):
 # --------------------------------------------------------------------------- #
 STILL_REFUSED = [
     # NOTE: difuropyridine + furo+thieno+pyridine were here as polycomponent
-    # out-of-class examples; v22 Phase G1b (2026-06-20) now NAMES them correctly
+    # out-of-class examples; Phase G1b (2026-06-20) now NAMES them correctly
     # (difuro[3,2-b:2',3'-e]pyridine etc.) via the polycomponent ortho-fusion
     # constructor, so they moved out of this fail-closed list.
     # Wave-2 completion B4 (2026-07-07): spirobi-indane
@@ -102,7 +102,7 @@ STILL_REFUSED = [
     # only because the VB misroute raised before the spirobi check.
     # CRITICAL-1 (code review): ortho-fused small rings share a BOND with naphthalene
     # (fusion nomenclature, e.g. 1H-cyclopropa[b]naphthalene) — the bridgeheads are
-    # adjacent + aromatic, so they are NOT a P-25.4 bridge. Must NOT emit
+    # adjacent + aromatic, so they are NOT a bridge. Must NOT emit
     # '2,3-methano-/ethano-/propanonaphthalene' (a non-PIN that even OPSIN re-parses
     # to the same structure, so the RT gate can't catch it).
     "c1ccc2cc3c(cc2c1)C3",         # cyclopropa[b]naphthalene
@@ -110,7 +110,7 @@ STILL_REFUSED = [
     "c1ccc2cc3c(cc2c1)CCC3",       # cyclopenta[b]naphthalene
     # CRITICAL-2 (code review): a composite / multi-heteroatom bridge would DROP atoms
     # via the length-blind heteroatom prefix (epidioxy -> 'epoxy' loses an O). Must
-    # fail closed until the composite-bridge grammar (P-25.4.1.5) is built.
+    # fail closed until the composite-bridge grammar is built.
     "C1=CC2OOC1c1ccccc12",         # -O-O- (epidioxy bridge)
     "C1=CC2COCC1c1ccccc12",        # -CH2-O-CH2- (composite bridge)
     "C1=CC2CSCC1c1ccccc12",        # -CH2-S-CH2- (composite bridge)
@@ -120,7 +120,7 @@ STILL_REFUSED = [
 @pytest.mark.parametrize("smiles", STILL_REFUSED)
 def test_out_of_class_still_fails_closed(smiles, monkeypatch):
     # Assert the PRODUCTION fail-closed behavior: the suite's autouse fixture
-    # disables the SUB-03 validity gate, but these out-of-class bridged systems
+    # disables the validity gate, but these out-of-class bridged systems
     # are fail-closed IN PRODUCTION via that gate (a raw benzene/parent candidate
     # is suppressed). Re-enable it. (Wave-close note: p8's benzene parent-selection
     # chokepoint made a few of these emit a raw 'benzene' pre-gate — a handler-level

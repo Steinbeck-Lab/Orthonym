@@ -1,4 +1,4 @@
-"""W2F-P3 item 15 (P-59.2.1.8 / P-29.2 / P-16.3.3): branched acyclic FG-bearing
+"""W2F-P3 item 15 / /: branched acyclic FG-bearing
 substituent on a ring principal-characteristic-group parent. Task 3.
 
 Expected PINs OPSIN-verified (opsin-cli-2.9.0 -> RDKit canonical == input) at
@@ -15,7 +15,7 @@ pytestmark = pytest.mark.unit
 
 @pytest.fixture
 def gated(monkeypatch):
-    """Re-enable the production OPSIN-validity + SELF-01 gate for the end-to-end
+    """Re-enable the production OPSIN-validity + gate for the end-to-end
     fail-closed tripwire. The autouse conftest fixture disables the gate by default,
     so an out-of-envelope molecule surfaces its pre-suppression wrong name (a bare
     'cyano' leak) instead of 'unknown'; the v1 envelope declines and the production

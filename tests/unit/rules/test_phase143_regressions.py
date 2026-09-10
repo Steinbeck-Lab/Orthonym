@@ -1,4 +1,4 @@
-"""Tests for Phase 143 regression investigation.
+"""Tests for a phase regression investigation.
 
 Validates that the heterocyclic ring locant fix in _get_polycyclic_attachment_locant
 correctly assigns IUPAC positions using Hantzsch-Widman numbering for retained-name
@@ -11,11 +11,11 @@ from orthonym.namer import name_compound
 class TestHeterocyclicSubstituentLocants:
     """Verify correct IUPAC locant numbering for heterocyclic ring-as-substituent.
 
-    Wave2 T3a rewrite: these originally asserted substrings of WHOLE-MOLECULE
+    Wave2 rewrite: these originally asserted substrings of WHOLE-MOLECULE
     raw names for antibiotic-scale structures. Those raw names silently
     dropped the heterocyclyl ring's own substituents (production, jar-armed,
     was ALREADY 'unknown organic compound' at HEAD for all three — verified
-    by worktree A/B), and the T3a constitution-conservation guard now makes
+    by worktree A/B), and the constitution-conservation guard now makes
     the raw path honestly fail closed too. The locant logic under test is
     the ring-substituent namer's — so assert it at the FRAGMENT level, which
     is exactly the machinery the original Phase-143 fix patched.
@@ -105,7 +105,7 @@ class TestHeterocyclicSubstituentLocants:
 
 
 class TestOPSINParseRegressions:
-    """Document the 8 compounds that lost OPSIN parseability in Phase 143.
+    """Document the 8 compounds that lost OPSIN parseability in a phase.
 
     All 8 are trade-offs or OPSIN limitations: the new names are more correct
     IUPAC but OPSIN 2.9.0 cannot parse them. None of these had RT=1 in baseline.
@@ -114,8 +114,8 @@ class TestOPSINParseRegressions:
     def test_ajmaline_retained_name(self):
         """Ajmaline is correctly resolved as retained NP name (was VB hexacyclo...).
 
-        Phase 157 cleanup: removed stale @pytest.mark.xfail. Phase 150
-        OPSIN XML retained-name expansion (914 entries; commit `1d1301f8`)
+        a phase cleanup: removed stale @pytest.mark.xfail. a phase
+        OPSIN XML retained-name expansion (914 entries; commit)
         brought ajmaline into the registry; the test passes cleanly.
         """
         name = name_compound(
@@ -126,7 +126,7 @@ class TestOPSINParseRegressions:
     def test_berberine_retained_name(self):
         """Berberine is correctly resolved as retained NP name (was VB tetracyclo...).
 
-        Phase 157 cleanup: removed stale @pytest.mark.xfail. Phase 150
+        a phase cleanup: removed stale @pytest.mark.xfail. a phase
         OPSIN XML retained-name expansion brought berberine into the
         registry; the test passes cleanly.
         """

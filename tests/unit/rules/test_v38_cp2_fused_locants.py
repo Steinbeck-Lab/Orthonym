@@ -7,7 +7,7 @@ Any decoration whose numbering direction forces a citation onto a fusion atom
 then produced an OPSIN-unparseable name and the molecule abstained at every
 tier.
 
-The fix numbers the component per P-31.1.4 / P-25.3.1.3: peripheral atoms get
+The fix numbers the component per /: peripheral atoms get
 integers, each fusion atom gets a letter locant ``"{preceding-peripheral}a"``
 (decalin -> ``4a``/``8a``), and the numbering orientation is chosen by lowest
 locants to the cited positions (spiro atom + substituents), deterministically
@@ -15,8 +15,8 @@ on RDKit canonical rank. The spiro-descriptor locant stays an integer peripheral
 position (OPSIN rejects a lettered locant there); a spiro atom that can only land
 on a fusion carbon is VOIDed (fail closed), never emitted with a faked integer.
 
-Governing rules: P-31.1.4 (von Baeyer / fused parent hydride numbering),
-P-25.3.1.3 (lowest-locants orientation), P-24.5.1 (spiro-component citation +
+Governing rules: (von Baeyer / fused parent hydride numbering),
+ (lowest-locants orientation), (spiro-component citation +
 low locants to the spiro atoms), the Blue Book (fusion-position letter
 locants),:3755 (``naphthalene-4a,8a-diol (PIN)``). OPSIN-verified targets in
 the CP2 build-grounding doc.

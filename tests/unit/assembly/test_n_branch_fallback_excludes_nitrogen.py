@@ -12,7 +12,7 @@ Design of this function (its two earlier branches): name the CARBON part that
 hangs off the nitrogen, then wrap it -- "(cyclohexylamino)", "((prefix)amino)".
 The last-resort branch now does the same: nitrogen excluded, one connected
 carbon branch, named with the real substituent namer from its true attach atom.
-Blue Book P-62.2.1.1.1 (the Blue Book) shows the pattern for an N-attached
+Blue Book (the Blue Book) shows the pattern for an N-attached
 carbon group as a prefix: "anilino (preferred prefix) phenylamino" and
 "4-chloroanilino (preferred prefix) (4-chlorophenyl)amino" -- the carbon group,
 then "amino"; never an amine name wrapped in "amino".

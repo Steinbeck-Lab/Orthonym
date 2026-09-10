@@ -1,4 +1,4 @@
-"""RISK 3 (fable v30) — the recovery lane's stereo-flagged RT compare.
+"""RISK 3 (a review) — the recovery lane's stereo-flagged RT compare.
 
 `_stereo_emit_decision` flags an emission `stereo_unexpressed` whenever the name is
 stereo-INCOMPLETE, which includes a name asserting PARTIAL (possibly wrong) stereo. The old
@@ -50,8 +50,8 @@ def test_flagged_does_not_loosen_charge():
 
 
 def test_flagged_rejects_isotope_difference():
-    # a plain name for a 13C-labeled chiral input is the WRONG isotopologue (P-82) -> reject.
-    # (fable RISK 1: the old `isomericSmiles=False` guard stripped isotopes too and accepted it.)
+    # a plain name for a 13C-labeled chiral input is the WRONG isotopologue -> reject.
+    # (a review RISK 1: the old `isomericSmiles=False` guard stripped isotopes too and accepted it.)
     assert NM.Orthonym._rt_match("[13CH3][C@H](O)CC", "CCC(C)O", True) is False
 
 
@@ -68,7 +68,7 @@ def test_unflagged_isomeric_exact_unchanged():
 # --- RISK 3 holes now CLOSED: per-element stereo conflict must be rejected -----------------
 
 def test_flagged_partial_stereo_conflict_rejected():
-    # 2-center input; name asserts 1 center WRONG (the literal RISK-3 shape).
+    # 2-center input; name asserts 1 center WRONG (the literal shape).
     assert NM.Orthonym._rt_match(
         "C[C@H](O)[C@H](N)C(=O)O", "C[C@@H](O)C(N)C(=O)O", True) is False
 

@@ -1,7 +1,7 @@
-"""P-66.6.1.2.1 — acetaldehyde as a SUBSTITUTABLE retained functional parent.
+""" — acetaldehyde as a SUBSTITUTABLE retained functional parent.
 
-BB P-66.6.1.2.1: "The following names are preferred IUPAC names, with substitution
-allowed for acetaldehyde and benzaldehyde"; P-66.6.1.2 "Substitution of aldehydes
+BB: "The following names are preferred IUPAC names, with substitution
+allowed for acetaldehyde and benzaldehyde"; "Substitution of aldehydes
 parallels that of... carboxylic acids". Like acetic acid, acetaldehyde has a single
 substitutable position (the alpha carbon), so substituent locants are omitted:
 
@@ -20,7 +20,7 @@ from rdkit import Chem
 from orthonym import Orthonym
 from orthonym.validation.opsin_roundtrip import opsin_parse
 
-# The measure's flags — bare Orthonym() under-emits and would mislead.
+# The measure's flags — bare Orthonym under-emits and would mislead.
 _FLAGS = dict(general_fallback=True, general_fallback_unverified=True,
               allow_aromatic_general=True)
 

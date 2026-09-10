@@ -1,7 +1,7 @@
-"""Integration test: BLK-02 closure — substituted-terphenyl round-trip via
+"""Integration test: closure — substituted-terphenyl round-trip via
 name_compound + OPSIN with InChI L1 comparison.
 
-Phase 151-04 BLK-02: the canary at test_canary_name_stability.py:1196
+a phase-04: the canary at test_canary_name_stability.py:1196
 previously stored a wrong-prime form (1,1':4,1''-terphenyl) that contradicted
 the unit test at test_ring_assemblies_3plus.py:276 (1,1':4',1''-terphenyl).
 A frozen-string canary alone cannot detect prime-dropping bugs because the
@@ -36,7 +36,7 @@ def _opsin_available():
 
 
 class TestSubstitutedTerphenylRoundTrip:
-    """Phase 151-04 BLK-02 closure — round-trip OPSIN gate against
+    """a phase-04 closure — round-trip OPSIN gate against
     prime-dropping regressions in substituted ring-assembly emission."""
 
     @pytest.mark.roundtrip
@@ -57,7 +57,7 @@ class TestSubstitutedTerphenylRoundTrip:
             f"name_compound returned None/unknown on canary input: {name!r}"
         )
 
-        # Phase 151-04 BLK-02 hard gate: the emitted name MUST contain the
+        # a phase-04 hard gate: the emitted name MUST contain the
         # primed form. This is a fast-fail before round-trip — if the engine
         # drops the prime, surface it immediately rather than waiting for
         # OPSIN to disagree.
@@ -95,7 +95,7 @@ class TestSubstitutedTerphenylRoundTrip:
     @pytest.mark.skipif(not _opsin_available(), reason="OPSIN jar not available")
     def test_unsubstituted_terphenyl_round_trip_unchanged(self):
         """Sanity check: the unsubstituted unit-test path (which was
-        VERIFIED before BLK-02 closure) must still round-trip after any
+        VERIFIED before closure) must still round-trip after any
         engine changes. This guards Scenario A (engine fix) against
         regressing the unsubstituted path while fixing the substituted
         path."""

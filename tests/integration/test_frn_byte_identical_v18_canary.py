@@ -2,14 +2,14 @@
 
 Asserts the -substrate + ORGM + ML canary corpus (~2,150 fixtures)
 stays byte-identical after a phase ship EXCEPT for the explicitly-
-enumerated FRN-routed exceptions in 163-AUDIT-FRN.md § 4 (expected ZERO
-per RESEARCH §6.2 + §9 Risk I; Plan-02 empirical scan ratified ZERO).
+enumerated FRN-routed exceptions in internal notes-FRN.md (expected ZERO
+per RESEARCH + Risk I; Plan-02 empirical scan ratified ZERO).
 
-Per CONTEXT: any non-empty exceptions list requires audit-amendment.
+Per internal notes: any non-empty exceptions list requires audit-amendment.
 
 References:
-- 163-AUDIT-FRN.md § 4 exception list (expected ZERO; ratified at Plan-02)
-- Plan-02 SUMMARY decision 5 (Empirical canary flip scan ratifies audit § 4.2
+- internal notes-FRN.md exception list (expected ZERO; ratified at Plan-02)
+- Plan-02 SUMMARY decision 5 (Empirical canary flip scan ratifies the audit
   projection of ZERO flips)
 - tests/integration/test_canary_rt75.py (703 RT-exact fixtures)
 - tests/integration/test_canary_connectivity.py (593 InChI L1 connectivity)
@@ -94,14 +94,14 @@ class TestFRNByteIdenticalV18Canary:
     def test_canary_organometallics_byte_identical(self):
         """test_canary_organometallics.py (a phase ORGM canary) preserved.
 
-        Per a phase 161-VERIFICATION.md § 3, 4 fixtures (T4-07/12/15/22)
+        Per a phase internal notes, 4 fixtures (T4-07/12/15/22)
         are Phase-161.1-deferred and honest-fail at baseline; the canary
         suite exit code reflects that pre-existing posture. This test asserts
         FRN ship does NOT introduce NEW regressions on top of the a phase
         posture (delta from a phase ship baseline).
 
         Implementation: invoke the canary; if exit is non-zero, the test
-        documents the pre-existing failures from the a phase.1 backlog
+        documents the pre-existing failures from the a phase backlog
         without flagging a phase as introducing them.
         """
         r = subprocess.run(
@@ -110,7 +110,7 @@ class TestFRNByteIdenticalV18Canary:
             cwd=_PROJECT_ROOT, env=_project_env(),
             capture_output=True, text=True, timeout=600,
         )
-        # a phase.1 backlog: 4 ORGM fixtures may fail at baseline.
+        # a phase backlog: 4 ORGM fixtures may fail at baseline.
         # a phase must not introduce ADDITIONAL ORGM regressions.
         # Pattern: "<N> failed" matches the failure count; ORGM baseline
         # allows up to 12 honest-fail tests (4 fixtures × 2 PIN+SYS + tier4).
@@ -124,15 +124,15 @@ class TestFRNByteIdenticalV18Canary:
         )
 
     def test_audit_exception_list_remains_empty(self):
-        """163-AUDIT-FRN.md § 4 ZERO-flip prediction per RESEARCH §6.2.
+        """internal notes-FRN.md ZERO-flip prediction per RESEARCH
 
         Plan-02 empirical scan (SUMMARY Decision 5) ratified ZERO flips of
         the -substrate + ORGM + ML canary corpus against the 16 new FRN
-        SMARTS. This test asserts the audit doc § 4 explicitly states the
+        SMARTS. This test asserts the audit doc explicitly states the
         ZERO-flip outcome.
 
-        Per CONTEXT: if non-zero flips surface, the fix is an
-        audit-amendment commit enumerating the exception in § 4, NOT
+        Per internal notes: if non-zero flips surface, the fix is an
+        audit-amendment commit enumerating the exception in, NOT
         relaxing the byte-identical gate.
         """
         audit = (
@@ -141,7 +141,7 @@ class TestFRNByteIdenticalV18Canary:
             "163-AUDIT-FRN.md"
         )
         text = audit.read_text()
-        # § 4 must contain the ZERO-flip statement per Plan-01 task 163-01-01
+        # must contain the ZERO-flip statement per Plan-01 task 163-01-01
         # (specifically: "ZERO -substrate" / "ZERO flips" / "ZERO data rows" /
         # "ZERO byte-identical" / "ZERO existing").
         zero_markers = [

@@ -1,27 +1,27 @@
 """
 Wave2 Tier 5b — located acyclic alkyl N-substituents WITH simple internal
-substituents (P-29.2 / P-46.1.12 / P-14.5.2).
+substituents / /.
 
 Reproduce-first: both master-plan witnesses were fail-closed 'unknown' at HEAD
 (NOT the plan-claimed halogen double-count):
 
   CC(Br)C(C(C)Cl)NC(C)=O -> N-(2-bromo-4-chloropentan-3-yl)acetamide
-  CC(CO)NC(C)=O          -> N-(1-hydroxypropan-2-yl)acetamide
+  CC(CO)NC(C)=O -> N-(1-hydroxypropan-2-yl)acetamide
 
 Root cause: `_located_acyclic_alkyl_name` (the tier-1.8 located-alkyl deriver)
 rejected ANY heteroatom in the fragment, and the polyfunctional acyclic path
 is terminal-attachment-only, so heteroatom-bearing internally-attached
-N-fragments had no producer.  Fix: the deriver's CHAIN stays all-carbon, but
+N-fragments had no producer. Fix: the deriver's CHAIN stays all-carbon, but
 degree-1 halogens and hydroxyl oxygens are now allowed as BRANCHES (named by
-the shared substituent namer: bromo/chloro/hydroxy).  Everything else (ethers,
+the shared substituent namer: bromo/chloro/hydroxy). Everything else (ethers,
 amino, carbonyl — the intra-fragment double-bond check, charges) still
 declines fail-closed.
 
-Locant rules exercised: free valence lowest (P-46.1.8); direction tie broken
-by lowest branch-locant set at first point of difference (P-29.4.1, shipped
+Locant rules exercised: free valence lowest; direction tie broken
+by lowest branch-locant set at first point of difference, shipped
 T3c); NEW final tie-break — equal locant sets assign the lowest locant to the
-substituent cited first in alphanumerical order (`### **P-14.4** NUMBERING`
-item (g), BB 3307 -- P-14.5.2 has no lettered sub-items): the Br/Cl
+substituent cited first in alphanumerical order (`### **** NUMBERING`
+item (g), BB 3307 -- has no lettered sub-items): the Br/Cl
 pentan-3-yl witness must number bromo=2, never '4-bromo-2-chloro...'.
 """
 
@@ -49,7 +49,7 @@ def test_tier5b_substituted_n_alkyl_amides(smiles, expected):
 @pytest.mark.parametrize(
     "smiles,expected",
     [
-        # shipped located-alkyl behavior must not move (SEN-04 / E2 golds)
+        # shipped located-alkyl behavior must not move (/ E2 golds)
         ("CC(=O)NC(C)CCCC", "N-(hexan-2-yl)acetamide"),
         ("CCC(CC)NC(C)=O", "N-(pentan-3-yl)acetamide"),
     ],
@@ -111,7 +111,7 @@ def test_tier5b_deriver_fail_closed(smiles, attach, why):
 
 @pytest.mark.unit
 def test_tier5b_deriver_pure_alkyl_unchanged():
-    # pentan-3-yl and 2-methylpentan-3-yl behavior byte-identical (T3c tie).
+    # pentan-3-yl and 2-methylpentan-3-yl behavior byte-identical (tie).
     mol = Chem.MolFromSmiles("C(CC)CC")
     assert _located_acyclic_alkyl_name(
         mol, list(range(mol.GetNumAtoms())), 0

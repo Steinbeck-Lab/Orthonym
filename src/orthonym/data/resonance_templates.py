@@ -1,22 +1,22 @@
 """
 Resonance-shifted (bond_orders, charges) chain templates for terminal
-nitrogen chains: azido, diazo, diazonium (Phase 3B).
+nitrogen chains: azido, diazo, diazonium (a phase).
 
 RDKit does NOT normalise resonance forms on ``MolFromSmiles`` -- each drawing
 keeps its own literal bond orders / formal charges. Two independently-valid
-resonance drawings exist for each of these three P-59/P-61/P-73.2.2.3
+resonance drawings exist for each of these three //
 classes; a single closed 3-set of six ``(bond_orders, charges)`` vectors over
 the ordered attach->terminal nitrogen chain distinguishes all of them
-(Phase 3B SPY, ``.planning/audit-v32/phase3b-resonance-spy.md`` Q3):
+(a phase a trace, `internal notes` Q3):
 
-    class      | drawing                        | bond_orders | charges
+    class | drawing | bond_orders | charges
     -----------|---------------------------------|-------------|------------------
-    azido      | R-N=[N+]=[N-] (canonical)       | (1, 2, 2)   | (0, 0, +1, -1)
-    azido      | R-[N-]-[N+]#N (charge-sep. alt) | (1, 1, 3)   | (0, -1, +1, 0)
-    diazonium  | R-N+#N (canonical)              | (1, 3)      | (0, +1, 0)
-    diazonium  | R-N=N+ (charge-on-terminal alt) | (1, 2)      | (0, 0, +1)
-    diazo      | R2C=[N+]=[N-] (canonical)       | (2, 2)      | (0, +1, -1)
-    diazo      | R2[C-]-[N+]#N (carbanion alt)   | (1, 3)      | (-1, +1, 0)
+    azido | R-N=[N+]=[N-] (canonical) | (1, 2, 2) | (0, 0, +1, -1)
+    azido | R-[N-]-[N+]#N (charge-sep. alt) | (1, 1, 3) | (0, -1, +1, 0)
+    diazonium | R-N+#N (canonical) | (1, 3) | (0, +1, 0)
+    diazonium | R-N=N+ (charge-on-terminal alt) | (1, 2) | (0, 0, +1)
+    diazo | R2C=[N+]=[N-] (canonical) | (2, 2) | (0, +1, -1)
+    diazo | R2[C-]-[N+]#N (carbanion alt) | (1, 3) | (-1, +1, 0)
 
 Resonance-template table (independent implementation) --
 a per-cell shape: ``key`` / ``bond_orders`` / ``charges`` as
@@ -77,7 +77,7 @@ def _row_matches(wanted: Tuple[Cell, ...], got: Tuple[int, ...]) -> bool:
     return all(_cell_matches(w, g) for w, g in zip(wanted, got))
 
 
-# Closed 3-set -- Phase 3B SPY Q3. Chain order is (attach, n1, n2, (n3)).
+# Closed 3-set -- a phase a trace Q3. Chain order is (attach, n1, n2, (n3)).
 RESONANCE_CHAIN_TEMPLATES: Tuple[ResonanceChainTemplate, ...] = (
     # azido R-N=[N+]=[N-] (canonical) / R-[N-]-[N+]#N (charge-separated alt)
     ResonanceChainTemplate('azido', (1, 2, 2), (0, 0, 1, -1)),
@@ -130,7 +130,7 @@ def chain_vector(mol, chain: Tuple[int, ...]
 
 def _walk_n_chain(mol, attach_idx: int, first_n_idx: int,
                    max_n: int = 3) -> Optional[Tuple[int, ...]]:
-    """Ordered ``(attach_idx, n1, n2, ...)`` linear chain of consecutive
+    """Ordered ``(attach_idx, n1, n2,...)`` linear chain of consecutive
     nitrogen atoms starting at ``first_n_idx`` (bonded to ``attach_idx``),
     stopping at the first atom with no further heavy neighbour (the true
     terminal atom of the group).
@@ -180,7 +180,7 @@ def find_resonance_chains(mol) -> List[Tuple[str, Tuple[int, ...]]]:
 
 
 def _find_resonance_chains_impl(mol) -> List[Tuple[str, Tuple[int, ...]]]:
-    """Scan ``mol`` for every linear ``(non-N attach) -> N -> ...`` chain and
+    """Scan ``mol`` for every linear ``(non-N attach) -> N ->...`` chain and
     classify it against the closed 3-set.
 
     Returns a list of ``(class_key, chain)`` where ``chain`` is

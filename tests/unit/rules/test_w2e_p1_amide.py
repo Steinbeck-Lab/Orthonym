@@ -11,7 +11,7 @@ from orthonym.namer import name_compound
 
 @pytest.fixture()
 def _validity_gate_on(monkeypatch):
-    """Turn the OPSIN validity gate (SELF-01) back ON — conftest disables it
+    """Turn the OPSIN validity gate  back ON — conftest disables it
     for unit-test speed. Required to assert end-to-end fail-closed behavior."""
     import orthonym.namer as _namer
     monkeypatch.setattr(_namer, "_DISABLE_VALIDITY_GATE", False, raising=False)
@@ -20,8 +20,8 @@ def _validity_gate_on(monkeypatch):
 
 @pytest.mark.unit
 class TestT2CarbonicFamilyParents:
-    """P-66.1.1.1.1.3 (BB 32675) + P-68.3.1.2.4 (BB 38623: 'The systematic
-    name is the preferred IUPAC name') + P-66.4.2.2 (BB 34480)."""
+    """ (BB 32675) + (BB 38623: 'The systematic
+    name is the preferred IUPAC name') + (BB 34480)."""
 
     @pytest.mark.parametrize("smiles,expected", [
         ("NNC(=O)N", "hydrazinecarboxamide"),          # was 'semicarbazide'
@@ -50,7 +50,7 @@ class TestT3AromaticCarboximidamideProtect:
 
 @pytest.mark.unit
 class TestT4SulfonimidamideRingAndSe:
-    """P-66.4.1.1 (BB 34173): S/Se/Te imidamide suffixes; ring parent form."""
+    """ (BB 34173): S/Se/Te imidamide suffixes; ring parent form."""
 
     @pytest.mark.parametrize("smiles,expected", [
         ("N=S(N)(=O)c1ccccc1", "benzenesulfonimidamide"),
@@ -70,7 +70,7 @@ class TestT4SulfonimidamideRingAndSe:
 
 @pytest.mark.unit
 class TestT5Biguanide:
-    """P-66.4.1.2.1.2 (BB 34298): condensed guanidines are named as diamides
+    """ (BB 34298): condensed guanidines are named as diamides
     of imidodicarbonimidic acid; 'biguanide' no longer recommended."""
 
     def test_bare_biguanide_pin(self):
@@ -89,14 +89,14 @@ class TestT5Biguanide:
 
 @pytest.mark.unit
 class TestT6AmidrazonePrefixes:
-    """P-66.4.2.3.1 (BB 34490) + P-66.4.2.3.2 (BB 34498): chain-terminal
+    """ (BB 34490) + (BB 34498): chain-terminal
     amidrazone C stays IN the chain (hydrazinyl+imino / amino+hydrazinylidene);
     ring-attached keeps the full acyl prefix (hydrazinecarboximidoyl)."""
 
     @pytest.mark.parametrize("smiles,expected", [
         # BB 34494 verbatim PIN:
         ("N=C(NN)CC(=O)O", "3-hydrazinyl-3-iminopropanoic acid"),
-        # P-66.4.2.3.2 chain-end pattern (OPSIN-verified):
+        # chain-end pattern (OPSIN-verified):
         ("NC(=NN)CC(=O)O", "3-amino-3-hydrazinylidenepropanoic acid"),
         ("NN=C(N)CCC(=O)O", "4-amino-4-hydrazinylidenebutanoic acid"),
         # BB 34496 verbatim PIN (ring parent -> acyl prefix retained):
@@ -106,10 +106,10 @@ class TestT6AmidrazonePrefixes:
         assert name_compound(smiles) == expected
 
     @pytest.mark.parametrize("smiles,expected", [
-        # PF-2 pass-D pins share the hydrazonamide FG machinery — protect:
+        # pass-D pins share the hydrazonamide FG machinery — protect:
         ("CC(=NN)NCCC(=O)O", "3-(ethanehydrazonamido)propanoic acid"),
         ("CC(=NN)N", "ethanehydrazonamide"),
-        # AM-4 pass-D chain-amidine pins share _TERMINAL_C_FGS + the amidine
+        # pass-D chain-amidine pins share _TERMINAL_C_FGS + the amidine
         # block — protect:
         ("CCN=C(CCC(=O)OC)N(C)C",
          "methyl 4-(dimethylamino)-4-(ethylimino)butanoate"),
@@ -143,7 +143,7 @@ class TestT7ImidohydrazideFamily:
 
 @pytest.mark.unit
 class TestT8SulfinoSulfonoHydrazonamido:
-    """P-66.4.2.3.5 (BB 34540 verbatim PIN) + P-66.4.3.2 (BB 34617):
+    """ (BB 34540 verbatim PIN) + (BB 34617):
     S(=N-NH2) N-attached branches take the e->o amide-name prefix."""
 
     @pytest.mark.parametrize("smiles,expected", [
@@ -164,7 +164,7 @@ class TestT8SulfinoSulfonoHydrazonamido:
 
 @pytest.mark.unit
 class TestT9ComplexPolyamines:
-    """P-62.2.4.1.3 (BB 26375): senior parent DIAMINE retained; other amine
+    """ (BB 26375): senior parent DIAMINE retained; other amine
     N demoted into N-substituent branches; numeric N-locant tags."""
 
     @pytest.mark.parametrize("smiles,expected", [
@@ -189,7 +189,7 @@ class TestT9ComplexPolyamines:
 
 @pytest.mark.unit
 class TestT10Am2AcylChainSubstituents:
-    """AM-2 ROOT-1 (P-66.1.7, BB 33576 verbatim): the T5b off-chain amide
+    """, BB 33576 verbatim): the off-chain amide
     block must express acyl-chain substituents or decline."""
 
     def test_heals(self):
@@ -207,7 +207,7 @@ class TestT10Am2AcylChainSubstituents:
 
 @pytest.mark.unit
 class TestT11Am2PoolDiscard:
-    """AM-2 ROOT-2: the correct amide candidate must win the pool; the
+    """: the correct amide candidate must win the pool; the
     polyfunctional double-express (amide N named twice) must not be
     emitted for ANY input (structure-wrong)."""
 
@@ -225,7 +225,7 @@ class TestT11Am2PoolDiscard:
 
 @pytest.mark.unit
 class TestT12GeminalDicarboximidamide:
-    """AM-3 (P-66.4.1.4.2 / P-16.9.1): geminal ring diamide/diimidamide."""
+    """ /: geminal ring diamide/diimidamide."""
 
     def test_geminal_diamide_base(self):
         # step (a): the {1,1} locant dedup fix (BUILT, OPSIN-RT verified)
@@ -233,7 +233,7 @@ class TestT12GeminalDicarboximidamide:
             "cyclohexane-1,1-dicarboxamide"
 
     def test_geminal_dicarboximidamide_substituted(self):
-        # AM-3 step (b) BUILT (W2E-D4, P-66.4.1.4.2 / P-16.9.1): per-group
+        # step (b) BUILT (W2E-D4, /: per-group
         # primed-N superscript locant subsystem (N''1-ethyl / N1,N1-dimethyl
         # with load-bearing priming + lowest-locant group assignment).
         assert name_compound("CCNC(=N)C1(C(=N)N(C)C)CCCCC1") == \
@@ -241,7 +241,7 @@ class TestT12GeminalDicarboximidamide:
 
     def test_substituted_stays_fail_closed(self, _validity_gate_on):
         # W2E-D4: now BUILT — the substituted geminal dicarboximidamide names
-        # correctly and round-trips (SELF-01 accepts it). Verifies the built
+        # correctly and round-trips (accepts it). Verifies the built
         # class survives the end-to-end validity gate (not a wrong name).
         assert name_compound("CCNC(=N)C1(C(=N)N(C)C)CCCCC1") == \
             "N''1-ethyl-N1,N1-dimethylcyclohexane-1,1-dicarboximidamide"

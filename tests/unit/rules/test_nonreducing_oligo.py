@@ -22,12 +22,12 @@ def test_raffinose_nonreducing_trisaccharide():
 
 
 def test_raffinose_via_public_entry():
-    # name_disaccharide (the public P-102.7 entry) must now route raffinose too
+    # name_disaccharide (the public entry) must now route raffinose too
     mol = Chem.MolFromSmiles(RAFFINOSE)
     assert O.name_disaccharide(mol) == EXPECTED
 
 
-# --- slice 2: BRANCHED reducing oligosaccharides (P-102.7.3) ---
+# --- slice 2: BRANCHED reducing oligosaccharides ---
 # a unit accepting >1 glycosyl; both expected names are OPSIN-RT-verified to the input.
 BRANCHED_GLUCOTRIOSE = "OC[C@H]1O[C@H](OC[C@H]2OC(O)[C@H](O)[C@@H](O)[C@@H]2O[C@H]2O[C@H](CO)[C@@H](O)[C@H](O)[C@H]2O)[C@H](O)[C@@H](O)[C@@H]1O"
 BRANCHED_GLUCOTRIOSE_NAME = "α-D-glucopyranosyl-(1->6)-[α-D-glucopyranosyl-(1->4)]-D-glucopyranose"
@@ -88,7 +88,7 @@ def test_nonreducing_declines_under_three_units():
 # module's own `_detect_sugar_units_links`): the single dominant, well-defined
 # scale cap on real >=3-ring backlog witnesses is that `name_branched_
 # oligosaccharide`'s reducing-terminus detection REQUIRED a free hemiacetal
-# -OH (`GetTotalNumHs() > 0`) with no relaxation at all -- `_oligo_topology`
+# -OH (`GetTotalNumHs > 0`) with no relaxation at all -- `_oligo_topology`
 # (used only by the LINEAR namer) already had an alkyl/aryl-capped-terminus
 # relaxation (Engine-2 fix (b)), but it was never generalized to the
 # BRANCHED namer, so ANY branched tree sitting behind a capped root (the
@@ -99,18 +99,18 @@ def test_nonreducing_declines_under_three_units():
 #
 # A second, independent bug found by the same a trace: `_glycoside_cap_name`
 # always guessed `attach_locant=1` when converting the isolated cap fragment's
-# own free-molecule name into a substituent prefix (P-29.2) -- correct only
+# own free-molecule name into a substituent prefix -- correct only
 # when the free valence happens to sit at the fragment's own C1, and silently
 # WRONG (declining a nameable cap) whenever a senior group claims that locant
 # instead, e.g. `pentan-1-amine` for a 5-aminopentyl linker (amine at C1,
 # attachment at C5). Root-cause fix: try `_located_acyclic_alkyl_name`
 # (`assembly/substituent_naming.py`) FIRST -- it derives the free-valence
-# locant FROM THE STRUCTURE (P-46.1.8) rather than guessing -- falling back to
+# locant FROM THE STRUCTURE rather than guessing -- falling back to
 # the old name+convert path only for what it declines (aromatic/ring caps).
 #
 # Fixed together: `name_branched_oligosaccharide` now detects a capped root
 # exactly like `_oligo_topology` does, and renders it via the same
-# P-102.5.6.2.2 "{cap} n-O-{substituent}-{glycosideHead}" form the linear
+# "{cap} n-O-{substituent}-{glycosideHead}" form the linear
 # namer already uses, generalized so the O-substituent can be a full
 # recursively-rendered branched subtree (`_render`), not just a linear chain.
 #

@@ -3,7 +3,7 @@ from scripts.ledger.reaudit_w8 import classify, resolve_smiles, norm
 
 
 def test_ledger_error_when_expected_is_a_comparison_note():
-    # P-44.2.1.8: expected is the note "morpholine > pyrimidine"; output has morpholine as parent
+    #: expected is the note "morpholine > pyrimidine"; output has morpholine as parent
     assert classify("morpholine > pyrimidine",
                     "4-[(pyrimidin-5-yl)methyl]morpholine",
                     "4-[(pyrimidin-5-yl)methyl]morpholine", True) == "ledger_error"

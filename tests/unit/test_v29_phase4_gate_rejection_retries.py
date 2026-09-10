@@ -1,16 +1,16 @@
-"""v29 Phase 4 — a GATE REJECTION re-enters the dispatch cascade.
+""" a phase — a GATE REJECTION re-enters the dispatch cascade.
 
 `_name_impl`'s cascade already falls through when a handler returns ``None``. But
-the OPSIN/SELF-01 gates run out in ``name()``, AFTER the cascade has exited, so a
+the OPSIN/ gates run out in ``name``, AFTER the cascade has exited, so a
 handler that produced a name the gate then rejected aborted the whole molecule with
-no retry. Phase 4 closes that: "keep the first that clears both gates, fall through
+no retry. a phase closes that: "keep the first that clears both gates, fall through
 instead of aborting the molecule."
 
 ★ THE ROADMAP NAMED THE WRONG MECHANISM, and this test file exists partly to record
-it. Phase 4's text describes filtering over ``CandidatePool``. Measured 2026-07-31:
-the pool holds **one** candidate in **158 of 158** spied ``best()`` calls over 120
-dev500 rows, and ``_best_two_tier`` records zero. The pool is not the generator of
-alternatives — the DISPATCH CASCADE is, and Phase 4 works with it directly.
+it. a phase's text describes filtering over ``CandidatePool``. Measured 2026-07-31:
+the pool holds **one** candidate in **158 of 158** traced ``best`` calls over 120
+a dev split rows, and ``_best_two_tier`` records zero. The pool is not the generator of
+alternatives — the DISPATCH CASCADE is, and a phase works with it directly.
 
 SAFETY ARGUMENT (why this cannot ship a wrong name)
 ---------------------------------------------------
@@ -28,16 +28,16 @@ from orthonym.errors import _DESCRIPTIVE_FALLBACK_NAMES
 
 
 # ⚠ REQUIRED. ``tests/conftest.py`` disables the OPSIN validity gate suite-wide
-# (most tests assert raw output and will not pay a per-name OPSIN call). Phase 4
+# (most tests assert raw output and will not pay a per-name OPSIN call). a phase
 # is *defined* by what happens on a gate rejection, so with the gate off every
 # test here is green-but-blind — and worse, ``CC(=O)N(CC1CO1)C(C)C`` then SHIPS
 # `(5-carbamoylpentyl)oxirane`, a different molecule, because nothing suppresses
 # it. The marker re-enables the gate, and additionally SKIPS if the OPSIN jar is
-# absent — without a jar the gate fails OPEN (D-13) and these tests would be
+# absent — without a jar the gate fails OPEN  and these tests would be
 # blind a second way. See ``tests/unit/test_opsin_gate_test_harness.py``.
 pytestmark = pytest.mark.opsin_gate
 
-# A ceramide that abstained before Phase 4: its first-matching class produced a
+# A ceramide that abstained before a phase: its first-matching class produced a
 # name the gate rejected, and the molecule died there. A later class names it
 # correctly.
 CERAMIDE = ("CCCCCCCCCCCCCCCCCCCC[C@@H](O)C(=O)N[C@@H](CO)"
@@ -70,7 +70,7 @@ def test_it_still_abstains_when_no_class_can_clear_the_gate():
 class TestNoOrderDependence:
     """The exclusion set is per-molecule scratch state on the instance, which is
     exactly the shape that caused a real cross-molecule contamination bug before
-    (the stereo/confidence thread-locals — see the reset block in `name()`). These
+    (the stereo/confidence thread-locals — see the reset block in `name`). These
     three properties are the ones that would break if it leaked."""
 
     def test_idempotent_on_one_instance(self):

@@ -6,7 +6,7 @@ generalizes the terminal-halogen exclusion (commit d3590326) to the WHOLE
 non-skeletal class in ONE closed check, derived directly from the same table
 ``_build_hetero_prefix`` uses to spell a skeletal heteroatom.
 
-Root cause (spiro-followup Task A cascade-spy, 2026-08-30): a non-skeletal atom
+Root cause (spiro-followup Task A cascade-trace, 2026-08-30): a non-skeletal atom
 threaded into the chain spine was COUNTED in the chain length (a phantom carbon)
 yet SILENTLY SKIPPED by ``_build_hetero_prefix`` (``if sym in
 REPLACEMENT_TERMS``) -- i.e. dropped, yielding a coverage-complete name of a
@@ -24,8 +24,8 @@ stannane) are asserted to still round-trip.
 
 Reachable ONLY on the best-effort coverage floor (this whole module is
 ``_general_fallback``-gated in namer.py), so PIN/default output is byte-identical
--- proven by the fast gate. IUPAC 2013 P-15.4 / P-21 ('a'-replacement skeletal
-element set); P-29.3 / P-35.1 (halogen substituent prefixes).
+-- proven by the fast gate. IUPAC 2013 / ('a'-replacement skeletal
+element set); / (halogen substituent prefixes).
 
 Targeted-file run only (avoid the OPSIN-pipe deadlock of a full pytest run):
     .venv/bin/python -m pytest tests/unit/assembly/test_universal_skeleton_allowlist.py -q
@@ -74,9 +74,9 @@ def test_non_skeletal_elements_are_excluded():
     Al/Ga/In/Tl (no REPLACEMENT_TERMS morpheme) MUST be kept off the spine --
     threading them absorbs a phantom carbon and silently drops the atom."""
     non_skeletal = [
-        "F", "Cl", "Br", "I", "At",          # halogens (P-35.1 prefixes)
+        "F", "Cl", "Br", "I", "At",          # halogens prefixes)
         "Al", "Ga", "In", "Tl",               # off-table 'a'-terminators
-        "Fe", "Na", "K", "Mg", "Zn", "Cu",    # metals (organometallic, P-69, OOS)
+        "Fe", "Na", "K", "Mg", "Zn", "Cu",    # metals (organometallic,, OOS)
         "He", "Ne", "Ar",                     # noble gases
     ]
     for el in non_skeletal:
@@ -162,7 +162,7 @@ def test_hypervalent_halogen_never_ships_a_phantom_carbon_name():
 
 
 def test_metal_center_fails_closed_not_phantom_carbon():
-    """An organometallic centre (P-69, out of scope) must fail closed -- void
+    """An organometallic centre, out of scope) must fail closed -- void
     or RT-fail -- never a phantom-carbon name that round-trips."""
     smi = "CC[Fe]CC"
     m = Chem.MolFromSmiles(smi)

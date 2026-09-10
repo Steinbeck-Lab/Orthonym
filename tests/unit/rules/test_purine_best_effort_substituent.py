@@ -1,4 +1,4 @@
-"""v33 Defect B: best-effort rescue for a purine ring substituent that
+""" Defect B: best-effort rescue for a purine ring substituent that
 `_identify_fused_substituent` cannot (fully) identify.
 
 `get_fused_heterocycle_substituents` silently drops any exocyclic branch it
@@ -12,14 +12,14 @@ producers were never built to recognise a whole nucleotide tail.
 `_best_effort_augment_purine_subs` (purine.py) retries any unaccounted branch
 with the general recursive substituent namer, gated on `best_effort_ctx`, so
 the PIN/default tier stays byte-identical and 0-wrong is preserved by the
-downstream SELF-01/OPSIN round-trip gate.
+downstream /OPSIN round-trip gate.
 
 ⚠ Acetyl-CoA's arm (41 heavy atoms) is the clean unit-level demonstration:
 `_identify_fused_substituent`'s general fallback caps at 25 atoms, so this
 branch is UNAMBIGUOUSLY unidentified (`sub_info is None` for every atom in
 it), never partially-and-wrongly identified. A DIFFERENT, smaller molecule
 (`OP(=O)(O)OCn1cnc2c(N)ncnc21`, a bare phosphate directly on N9) is deliberately
-NOT used for a direct `name_substituted_purine()` unit assertion here: probing
+NOT used for a direct `name_substituted_purine` unit assertion here: probing
 it surfaced a PRE-EXISTING, separate bug -- `_identify_fused_substituent`'s
 functionalized-chain identifier mis-names the whole `-CH2-O-P(=O)(OH)2` branch
 as bare `hydroxymethyl` (2 atoms) while claiming (via `sub_info['atoms']`) to
@@ -27,7 +27,7 @@ have consumed the SAME atom set as the full 6-atom branch, so
 `_exocyclic_atoms_accounted` reports the branch as already fully accounted
 and this fix's augmentation never runs -- WRONG on the PIN/default path too,
 not something this fix introduces or can gate. It is caught downstream (the
-top-level SELF-01/OPSIN gate suppresses it: 0-wrong holds at the pipeline
+top-level /OPSIN gate suppresses it: 0-wrong holds at the pipeline
 level, confirmed by `test_...pipeline` below round-tripping via a DIFFERENT
 producer's candidate), but it is a live latent defect in the shared
 identifier, out of scope here (explicitly not to be touched by this task) and
@@ -49,7 +49,7 @@ _ACETYL_COA = (
     "OCC1OC(n2cnc3c(N)ncnc32)C(O)C1OP(=O)(O)O"
 )
 # Team-lead acceptance case #2: a phosphate arm directly on N9. NOT used for a
-# direct name_substituted_purine() assertion (see module docstring); exercised
+# direct name_substituted_purine assertion (see module docstring); exercised
 # only end-to-end, where the full pipeline's producer competition round-trips
 # correctly regardless of which internal candidate wins.
 _PHOSPHO_ARM_PURINE = "OP(=O)(O)OCn1cnc2c(N)ncnc21"
@@ -162,7 +162,7 @@ def test_acetyl_coa_end_to_end_best_effort_pipeline():
 def test_phospho_arm_purine_end_to_end_best_effort_pipeline():
     # Team-lead acceptance case #2, via the real pipeline (see module
     # docstring for why this is not also asserted as a direct
-    # name_substituted_purine() call).
+    # name_substituted_purine call).
     from orthonym import Orthonym
     from orthonym.validation.opsin_roundtrip import opsin_roundtrip_check
     from orthonym.jvm_budget import jvm_slots

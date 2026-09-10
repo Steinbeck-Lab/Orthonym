@@ -123,8 +123,8 @@ class TestNPDecorationEnumeration:
 
         : renamed from test_camphor_exact_match and the expected value
         changed from "camphor". Camphor is now an adjudicated non-PIN -- it is a
-        ketone, and P-64.2.1.1 (the Blue Book) makes chalcone "the only
-        retained name as a preferred IUPAC name", while P-64.2.1.2 (:28307) is a
+        ketone, and (the Blue Book) makes chalcone "the only
+        retained name as a preferred IUPAC name", while (:28307) is a
         closed general-nomenclature list that excludes it. The point this test
         guards is unchanged: the name comes from the von Baeyer builder, NOT from
         steroid enumeration. The value is the Blue Book's own form at:52648.

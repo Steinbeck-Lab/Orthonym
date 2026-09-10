@@ -1,14 +1,14 @@
-"""Phase 160 phosphine_oxide handler — direct-return shim.
+"""a phase phosphine_oxide handler — direct-return shim.
 
 1-line wrapper around ``rules.phosphorus.name_phosphine_oxide``. Verbatim
 move of composer.py:974-989 dispatch logic.
 
-IUPAC cite: P-68.3 (phosphine oxides).
+IUPAC cite: (phosphine oxides).
 
 References:
 - composer.py:974-989 (inline phosphine_oxide branch; REMOVED at this commit).
 - rules.phosphorus.name_phosphine_oxide — chemical-logic body.
-- 160-AUDIT-DECOMP.md § 1 row 'phosphine_oxide' + § 2.22 purity proof.
+- internal notes-DECOMP.md row 'phosphine_oxide' + purity proof.
 """
 from __future__ import annotations
 
@@ -50,7 +50,7 @@ def name_phosphine_oxide(
 
     pool = get_current_pool()
     pool.add(name, "phosphine_oxide", features)
-    # composer.py:989 inline: _inject_stereo_if_missing(features, pool.best().name)
+    # composer.py:989 inline: _inject_stereo_if_missing(features, pool.best.name)
     final_name = _inject_stereo_if_missing(features, pool.best().name)
     return NamingResult(
         name=final_name,

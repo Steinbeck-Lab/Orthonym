@@ -1,6 +1,6 @@
-"""Tests for cyclic imides (IUPAC P-66.2.1).
+"""Tests for cyclic imides (IUPAC.
 
-P-66.2.1 (the Blue Book): "Cyclic imides are preferably named as heterocyclic
+ (the Blue Book): "Cyclic imides are preferably named as heterocyclic
 pseudoketones." The PIN is therefore the ring-DIONE, and the trivial imide
 names are general-nomenclature only:
   * succinimide -> pyrrolidine-2,5-dione (PIN, the Blue Book)
@@ -29,7 +29,7 @@ class TestCyclicImideRetainedNames:
     """Retained name lookup tests for cyclic imides."""
 
     def test_succinimide_demoted_to_general(self):
-        """P-66.2.1: succinimide is general-only; the PIN retained lookup no
+        """: succinimide is general-only; the PIN retained lookup no
         longer serves it (the systematic PIN pyrrolidine-2,5-dione wins), but it
         stays reachable via GENERAL_RETAINED_NAMES / --trivial."""
         canonical = Chem.CanonSmiles("O=C1CCC(=O)N1")
@@ -43,7 +43,7 @@ class TestCyclicImideRetainedNames:
         assert get_retained_name(canonical) == "maleimide"
 
     def test_glutarimide_demoted_to_general(self):
-        """P-66.2.1: glutarimide is general-only; PIN is piperidine-2,6-dione."""
+        """: glutarimide is general-only; PIN is piperidine-2,6-dione."""
         canonical = Chem.CanonSmiles("O=C1CCCC(=O)N1")
         assert get_retained_name(canonical) is None
         assert get_general_retained_name(canonical) == "glutarimide"
@@ -59,7 +59,7 @@ class TestCyclicImideNaming:
     """End-to-end naming tests for cyclic imides."""
 
     def test_succinimide(self):
-        """P-66.2.1: O=C1CCC(=O)N1 -> pyrrolidine-2,5-dione (PIN, the Blue Book)."""
+        """: O=C1CCC(=O)N1 -> pyrrolidine-2,5-dione (PIN, the Blue Book)."""
         assert name_compound("O=C1CCC(=O)N1") == "pyrrolidine-2,5-dione"
 
     def test_maleimide(self):
@@ -67,7 +67,7 @@ class TestCyclicImideNaming:
         assert name_compound("O=C1C=CC(=O)N1") == "maleimide"
 
     def test_glutarimide(self):
-        """P-66.2.1: O=C1CCCC(=O)N1 -> piperidine-2,6-dione (PIN)."""
+        """: O=C1CCCC(=O)N1 -> piperidine-2,6-dione (PIN)."""
         assert name_compound("O=C1CCCC(=O)N1") == "piperidine-2,6-dione"
 
     def test_phthalimide(self):

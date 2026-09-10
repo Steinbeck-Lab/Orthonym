@@ -19,16 +19,16 @@ GAP A root cause (``rules/ring_substituents.py`` ``decorated_ring_substituent_na
 ------------------------------------------------------------------------------
 The function skipped every exocyclic neighbour of the attachment atom::
 
-    parent_nbrs = {nbr.GetIdx() for nbr in
-                   mol.GetAtomWithIdx(attachment_atom).GetNeighbors()
-                   if nbr.GetIdx() not in ring_set}
+    parent_nbrs = {nbr.GetIdx for nbr in
+                   mol.GetAtomWithIdx(attachment_atom).GetNeighbors
+                   if nbr.GetIdx not in ring_set}
 
 Exactly one of those bonds is the free valence to the parent; the rest are
 genuine decorations. On a mono-substituted attachment carbon there is only
 one, so skipping "all of them" and skipping "the parent bond" coincide and the
 defect is invisible. On a **gem-disubstituted** attachment carbon the ring's
 own substituent is discarded with it, ``atom_prefixes`` comes back empty, and
-the ``if not any(atom_prefixes.values())`` guard returns None. The caller
+the ``if not any(atom_prefixes.values)`` guard returns None. The caller
 (``rules/amides.py:_name_n_substituent``) then fell through to
 ``name_substituent``, which returned the unnameable sentinel ``'substituent'``,
 and ``_enrich_ring_n_substituent`` prepended the very decoration that had been
@@ -46,7 +46,7 @@ GAP B root cause (``assembly/composer.py`` ``_enrich_handler_name``)
 re-discovered the handler's OWN, already-spelled thiourea core as a ring
 substituent and prepended it, yielding
 ``1-(carbamothioylamino)N-cyclohexylthiourea`` -- the same unit spelled twice,
-a different molecule, suppressed by SELF-01. The exclusion list at
+a different molecule, suppressed by. The exclusion list at
 ``composer.py:281`` is a hand-maintained tuple that had gone stale: it carries
 ``'urea'`` but not ``'thiourea'`` (nor ``cyanamide`` / ``imidate`` /
 ``chalcogen_ester``). The fix derives the exclusion from the handler's own
@@ -54,8 +54,8 @@ a different molecule, suppressed by SELF-01. The exclusion list at
 
 Blue Book, quotations verified by opening ``the Blue Book Blue Book``:
 
-* **P-66.1.6.1.3 "Chalcogen analogues of urea and isourea"** (:33437),
-  **P-66.1.6.1.3.1** (:33439): *"Chalcogen analogues of urea are named by
+* ** "Chalcogen analogues of urea and isourea"** (:33437),
+  **** (:33439): *"Chalcogen analogues of urea are named by
   functional replacement nomenclature using the prefixes 'thio', 'seleno', and
   'telluro'. Preferred IUPAC names use the letter locants N, and N'. Numerical
   locants may be used for thiourea in general nomenclature."* Restated at
@@ -65,7 +65,7 @@ Blue Book, quotations verified by opening ``the Blue Book Blue Book``:
 * The mono-N-substituted class exemplar (:33451):
   **``N-(butan-2-yl)selenourea (PIN)``** -- a singly substituted chalcogen urea
   that KEEPS its ``N`` locant. ``N-cyclohexylthiourea`` follows it directly.
-* **P-29.2** free-valence morphology and **P-14.4** (:3221) criterion (c),
+* **** free-valence morphology and **** (:3221) criterion (c),
   free valence low, which fixes the attachment carbon of a carbocyclic
   substituent at locant 1 -- hence ``1-methylcyclohexyl``.
 
@@ -259,7 +259,7 @@ def test_gap_b_handler_does_not_enrich_a_complete_name():
     retained parent plus every N-substituent, refusing rather than skipping an
     un-nameable one -- so enrichment can only spell an atom a second time. It
     re-discovered the handler's own core and prepended
-    ``1-(carbamothioylamino)``. SELF-01 suppressed the result, so asserting on
+    ``1-(carbamothioylamino)``. suppressed the result, so asserting on
     the shipped name would have judged the GATE, not the generator.
 
     The second assertion keeps this from going vacuous: it shows enrichment
@@ -303,7 +303,7 @@ def test_gap_b_family_ring_sizes_3_to_8(namer, smiles, expected):
 @pytest.mark.parametrize("smiles,expected", [
     # These abstained before: the handler's complete name was enriched with a
     # prefix numbered against a parent (urea) that has no atom 1 or 4 at all
-    # -- `1-methylN-(1-methylcyclohexyl)urea` -- which SELF-01 suppressed.
+    # -- `1-methylN-(1-methylcyclohexyl)urea` -- which suppressed.
     ("NC(=S)NC1(C)CCCCC1",  "N-(1-methylcyclohexyl)thiourea"),
     ("NC(=O)NC1(C)CCCCC1",  "N-(1-methylcyclohexyl)urea"),
     ("NC(=O)NC1CCC(C)CC1",  "N-(4-methylcyclohexyl)urea"),
@@ -330,7 +330,7 @@ def test_decorated_ring_on_a_retained_urea_parent(namer, smiles, expected):
     # Engine 4 change-asserted-value: `(S)-` -> `(1S)-`. The carrier chain
     # numbering the prefix cites was not reaching the stereo emitter, so the
     # descriptor shipped unlocanted. Rule (VERIFIED, `the Blue Book`,
-    # heading `## **P-91.3** NAMING OF STEREOISOMERS`): a substituent-group
+    # heading `## **** NAMING OF STEREOISOMERS`): a substituent-group
     # stereodescriptor is "preceded by a numerical or letter locant to describe
     # the position of the stereogenic unit *when such locants are present*" --
     # worked `(PIN)` example `[(1R)-1-chloropropyl]benzene`; the unlocanted form
@@ -339,8 +339,8 @@ def test_decorated_ring_on_a_retained_urea_parent(namer, smiles, expected):
     # OPSIN 2.9.0 parses BOTH spellings to the input's full InChIKey, so this is
     # a pure conformance change (0-wrong-neutral).
     # NOTE the outer `(` is a PRE-EXISTING enclosing-mark defect, unrelated and
-    # unchanged: P-16.5.4.1.3 (`the Blue Book`) counts stereo parentheses
-    # toward nesting, so P-16.5.4.1.4 requires `[...]` here. `_STEREO_PAREN_RE`
+    # unchanged: (`the Blue Book`) counts stereo parentheses
+    # toward nesting, so requires `[...]` here. `_STEREO_PAREN_RE`
     # STRIPS them (and matches only the unlocanted `(S)`/`(R)`), which is why the
     # `(S)-` spelling never tripped the grammar check and `(1S)-` now does. The
     # name is still emitted per / and round-trips exactly.
@@ -356,14 +356,14 @@ def test_cyanamide_complete_names_are_not_enriched(namer, smiles, expected):
 
 
 def test_retained_tert_butyl_never_names_a_ring():
-    """PRODUCER-level. ``tert-butyl`` is ACYCLIC (P-29.6.1, the Blue Book).
+    """PRODUCER-level. ``tert-butyl`` is ACYCLIC, the Blue Book).
 
     The retained matcher accepted any fragment with 4 carbons, 3 carbon
     neighbours at the attachment atom, and no heteroatom -- and
     **1-methylcyclopropyl** satisfies all three (its attachment carbon has two
     RING neighbours plus the methyl). So `NC(=O)NC1(C)CC1` was named
     `N-tert-butylurea`: a cyclopropane ring opened into a chain, a different
-    molecule with the same C4H9 formula, caught only by SELF-01.
+    molecule with the same C4H9 formula, caught only by.
 
     Exactly the class of
     internal notes -- the same
@@ -393,7 +393,7 @@ def test_cyclopropyl_is_not_flattened_to_tert_butyl(namer, smiles, expected):
 
 
 def test_gap_b_letter_locant_not_a_numeral(namer):
-    """P-66.1.6.1.3.1 (:33439/:33446): numerals are general nomenclature only."""
+    """ (:33439/:33446): numerals are general nomenclature only."""
     got = _name(namer, "NC(=S)NC1CCCCC1")
     assert got.startswith("N-"), got
     assert not got[0].isdigit(), got
@@ -407,10 +407,10 @@ def test_retained_urea_parent_rejects_a_numeric_front_of_name_stereo_block():
     """PRODUCER-level, on the shared stereo owner.
 
     ``urea``/``thiourea``/``cyanamide`` have no numbered skeleton -- their only
-    locants are the italic letters *N* / *N*' (P-66.1.6.1.3.1, the Blue Book;:33446
+    locants are the italic letters *N* / *N*', the Blue Book;:33446
     "Numerical locants are no longer used for thiourea in the IUPAC preferred
     name"). A front-of-name block citing 1/3/5 therefore denotes nothing in
-    that parent (P-14.3.3 "Citation of locants", the Blue Book) and OPSIN cannot
+    that parent "Citation of locants", the Blue Book) and OPSIN cannot
     parse it.
 
     Measured over the 144 stereo-bearing urea/thiourea rows of pubchem_2000 +
@@ -434,7 +434,7 @@ def test_retained_urea_parent_rejects_a_numeric_front_of_name_stereo_block():
 
 @pytest.mark.parametrize("smiles,expected", [
     # stereo lives in the N-substituent and is cited THERE -- unchanged
-    # Engine 4 change-asserted-value: `(S)-` -> `(1S)-`, same P-91.3
+    # Engine 4 change-asserted-value: `(S)-` -> `(1S)-`, same
     # citation as the cyanamide row above (`the Blue Book`; `(PIN)`
     # example `[(1R)-1-chloropropyl]benzene`). The property this row exists to
     # pin -- the descriptor stays INSIDE the N-substituent bracket and no locant

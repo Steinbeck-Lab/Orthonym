@@ -1,15 +1,15 @@
 """
-Ring system type classification, scoring, and selection per IUPAC P-44.2.
+Ring system type classification, scoring, and selection per IUPAC.
 
 Provides the foundation for correct principal ring system selection.
 Implements:
-- P-44.2.2 type hierarchy (RingSystemType enum)
-- P-44.2.1 general criteria (ring_system_score tuple)
+- type hierarchy (RingSystemType enum)
+- general criteria (ring_system_score tuple)
 - Principal ring system selection (select_principal_ring_system)
 
 These are pure functions that can be tested independently before integration.
 
-Reference: IUPAC 2013 Blue Book, P-44.2 (Selection of Preferred Ring System)
+Reference: IUPAC 2013 Blue Book, (Selection of Preferred Ring System)
 """
 
 from enum import IntEnum
@@ -23,54 +23,54 @@ from ..perception.rings import (
 )
 
 # ============================================================================
-# P-44.2.2 Ring System Type Hierarchy
+# Ring System Type Hierarchy
 # ============================================================================
 
 
 class RingSystemType(IntEnum):
-    """P-44.2.2 type hierarchy. Lower value = more senior.
+    """ type hierarchy. Lower value = more senior.
 
-    IUPAC 2013 P-44.2.2.2:
-    1. Spiro ring systems (P-24)
-    2. Cyclic phane parent hydrides (P-26.4)
-    3. Fused ring systems (P-25)
-    4. Bridged fused ring systems (P-25.7)
-    5. Von Baeyer ring systems (P-23)
-    6. Linear phane parent hydrides (P-26)
-    7. Ring assemblies (P-28)
+    IUPAC 2013:
+    1. Spiro ring systems
+    2. Cyclic phane parent hydrides
+    3. Fused ring systems
+    4. Bridged fused ring systems
+    5. Von Baeyer ring systems
+    6. Linear phane parent hydrides
+    7. Ring assemblies
 
-    MONOCYCLIC is not in P-44.2.2 but needed as fallback for simple rings.
+    MONOCYCLIC is not in but needed as fallback for simple rings.
     """
-    SPIRO = 1           # P-44.2.2.2.1
-    CYCLIC_PHANE = 2    # P-44.2.2.2.2 (stub)
-    FUSED = 3           # P-44.2.2.2.3
-    BRIDGED_FUSED = 4   # P-44.2.2.2.4
-    VON_BAEYER = 5      # P-44.2.2.2.5
-    LINEAR_PHANE = 6    # P-44.2.2.2.6 (stub)
-    RING_ASSEMBLY = 7   # P-44.2.2.2.7
-    MONOCYCLIC = 8      # Simple monocyclic (not in P-44.2.2 hierarchy)
+    SPIRO = 1           #
+    CYCLIC_PHANE = 2    # (stub)
+    FUSED = 3           #
+    BRIDGED_FUSED = 4   #
+    VON_BAEYER = 5      #
+    LINEAR_PHANE = 6    # (stub)
+    RING_ASSEMBLY = 7   #
+    MONOCYCLIC = 8      # Simple monocyclic (not in hierarchy)
 
 
 # ============================================================================
-# Heteroatom Seniority for P-44.2.1
+# Heteroatom Seniority for
 # ============================================================================
 
-# Higher value = more senior. Used negated in scoring tuple so min() wins.
-# P-44.2.1 ring selection uses P-18(b) heteroatom order plus halogens.
+# Higher value = more senior. Used negated in scoring tuple so min wins.
+# ring selection uses (b) heteroatom order plus halogens.
 # Expanded per IUPAC 2013 errata (BBerrors.html) to include all 20 elements
 # that can appear as heteroatoms in ring systems.
 _HETEROATOM_SENIORITY = {
-    'N': 20,     # Most senior heteroatom per P-18(b)
-    'F': 19,     # Halogen (P-44.2.1 ring comparison)
+    'N': 20,     # Most senior heteroatom per (b)
+    'F': 19,     # Halogen ring comparison)
     'Cl': 18,    # Halogen
     'Br': 17,    # Halogen
     'I': 16,     # Halogen
-    'O': 15,     # P-18(b) Group 16
+    'O': 15,     # (b) Group 16
     'S': 14,
     'Se': 13,
     'Te': 12,
-    'P': 11,     # P-18(b) Group 15
-    'As': 10,    # Per P-18(b) errata
+    'P': 11,     # (b) Group 15
+    'As': 10,    # Per (b) errata
     'Sb': 9,
     'Bi': 8,
     'Si': 7,     # Group 14
@@ -82,9 +82,9 @@ _HETEROATOM_SENIORITY = {
     'Ga': 1,
 }
 
-# Seniority order for P-44.2.1(g) term-by-term variety comparison.
+# Seniority order for (g) term-by-term variety comparison.
 # Tuple position i represents the count of element _HETEROATOM_VARIETY_ORDER[i].
-# Negated counts so min() selects ring with MORE of senior element.
+# Negated counts so min selects ring with MORE of senior element.
 _HETEROATOM_VARIETY_ORDER = [
     'F', 'Cl', 'Br', 'I', 'O', 'S', 'Se', 'Te', 'N',
     'P', 'As', 'Sb', 'Bi', 'Si', 'Ge', 'Sn', 'Pb', 'B', 'Al', 'Ga'
@@ -100,7 +100,7 @@ def classify_ring_system_type(
     mol: Chem.Mol,
     ring_system_atoms: Set[int]
 ) -> RingSystemType:
-    """Classify a ring system into its P-44.2.2 type.
+    """Classify a ring system into its type.
 
     Reuses existing detection functions from the codebase, operating on a
     sub-molecule built from the ring system atoms when necessary.
@@ -154,8 +154,8 @@ def classify_ring_system_type(
         return RingSystemType.SPIRO
 
     # a phase.A +: Cyclophane classification fires after spiro and
-    # before bridged-fused (P-44.2.2 hierarchy: SPIRO=1 < CYCLIC_PHANE=2 < FUSED=3).
-    # Source: internal notes,,; ring_selection.py:48 enum.
+    # before bridged-fused hierarchy: SPIRO=1 < CYCLIC_PHANE=2 < FUSED=3).
+    # Source: 155-internal notes,,; ring_selection.py:48 enum.
     # NOTE (root-cause-only,): narrow exception scope to ImportError
     # only -- circular-import-safe lazy import idiom (matches multiplicative.py
     # lazy-import pattern). Runtime errors from is_cyclophane MUST bubble up;
@@ -303,12 +303,12 @@ def _build_submol(mol: Chem.Mol, atom_indices: Set[int]) -> Optional[Chem.Mol]:
 
 
 # ============================================================================
-# Ring System Scoring (P-44.2.1 General Criteria)
+# Ring System Scoring General Criteria)
 # ============================================================================
 
 
 def _spiro_fusion_count(mol: Chem.Mol, system_atoms: Set[int]) -> int:
-    """P-44.2.2.2.1.1: number of spiro fusions in this ring system (spiro atoms
+    """: number of spiro fusions in this ring system (spiro atoms
     that lie within the system). 0 for a non-spiro system. Deterministic
     (depends only on the atom set, not SMILES order)."""
     return len(get_spiro_atoms(mol) & set(system_atoms))
@@ -322,7 +322,7 @@ _SPIRO_LOCANT_SENTINEL = 10 ** 6
 
 
 def _is_saturated_monocyclic_spiro(mol: Chem.Mol, system_atoms: Set[int]) -> bool:
-    """P-44.2.2.2.1.2 criterion (b): the system is a spiro system whose every
+    """ criterion (b): the system is a spiro system whose every
     component ring is a SATURATED MONOCYCLE (no ring multiple/aromatic bonds).
     Deterministic (atom-set only)."""
     spiro_in = get_spiro_atoms(mol) & set(system_atoms)
@@ -348,7 +348,7 @@ def _is_saturated_monocyclic_spiro(mol: Chem.Mol, system_atoms: Set[int]) -> boo
 
 
 def _spiro_atom_locant_set(mol: Chem.Mol, system_atoms: Set[int]) -> Tuple[int, ...]:
-    """P-44.2.2.2.1.2: the spiro-atom locant set (increasing, fixed-width padded).
+    """: the spiro-atom locant set (increasing, fixed-width padded).
     Uses the deterministic spiro numbering (get_spiro_numbering /
     _get_polyspiro_numbering, both CanonicalRankAtoms-tiebroken). Returns an
     all-sentinel tuple for a non-spiro system (so it never wins the tier).
@@ -406,9 +406,9 @@ def _fused_system_name(mol: Chem.Mol, system_atoms: Set[int]) -> Optional[str]:
 
 
 def _fusion_descriptor_letters(mol: Chem.Mol, system_atoms: Set[int]) -> Tuple[int, ...]:
-    """P-44.2.2.2.3.3 criterion (c): the fused system's italic fusion-descriptor
+    """ criterion (c): the fused system's italic fusion-descriptor
     LETTERS, compared as a set (lower letters = senior). Returns a fixed-width
-    tuple of letter ordinals (a>=1), padded with a sentinel. ``()``-equivalent
+    tuple of letter ordinals (a>=1), padded with a sentinel. ````-equivalent
     (all sentinel) when the system has no explicit fusion descriptor (retained
     names like quinoline/isoquinoline, or non-fused). Spelling-independent."""
     pad = (_FUSION_LETTER_SENTINEL,) * _FUSION_LETTER_WIDTH
@@ -427,7 +427,7 @@ def _fusion_descriptor_letters(mol: Chem.Mol, system_atoms: Set[int]) -> Tuple[i
 
 
 def _fusion_descriptor_numbers(mol: Chem.Mol, system_atoms: Set[int]) -> Tuple[int, ...]:
-    """P-44.2.2.2.3.4 criterion (d): the fused system's fusion-descriptor NUMBERS
+    """ criterion (d): the fused system's fusion-descriptor NUMBERS
     (attachment locants inside the bracket, in citation order; lower = senior).
     Returns a fixed-width tuple padded with a sentinel; all-sentinel when no
     explicit descriptor. Spelling-independent (deterministic namer)."""
@@ -452,9 +452,9 @@ _P25_8_SENTINEL = 10 ** 6
 
 
 def _p25_8_component_rank(mol: Chem.Mol, system_atoms: Set[int]) -> Tuple[int, ...]:
-    """P-44.2.2.2.3.5 criterion (e): the senior ring COMPONENT per P-25.8. Two
+    """ criterion (e): the senior ring COMPONENT per. Two
     fused systems that tie on all prior criteria are separated by the seniority
-    of their (base) component. The P-25.8 sub-criterion that distinguishes e.g.
+    of their (base) component. The sub-criterion that distinguishes e.g.
     quinoline (N at locant 1) from isoquinoline (N at 2) is the HETEROATOM
     LOCANT SET in the component's own numbering (lower = senior). Returns a
     fixed-width tuple (lower = senior), all-sentinel when not resolvable so the
@@ -479,7 +479,7 @@ def _p25_8_component_rank(mol: Chem.Mol, system_atoms: Set[int]) -> Tuple[int, .
 
     def _base_int(v):
         # CP2 widened the fused-component locant map to also carry lettered
-        # fusion locants ('4a') and (int, primes) tuples. This P-25.8 (e)-criterion
+        # fusion locants ('4a') and (int, primes) tuples. This (e)-criterion
         # het-locant tiebreak must use the BASE integer of each (as it did pre-CP2,
         # when the map was coerced to int upstream) so a heteroatom on a ring-fusion
         # carbon still contributes its number -- not be silently dropped by an
@@ -508,7 +508,7 @@ def _p25_8_component_rank(mol: Chem.Mol, system_atoms: Set[int]) -> Tuple[int, .
 def _bridged_fused_prebridge_metrics(
     mol: Chem.Mol, system_atoms: Set[int]
 ) -> Tuple[int, int, int, int]:
-    """P-44.2.2.2.4 criteria (a),(b),(c),(n) — the cheaply + deterministically
+    """ criteria (a),(b),(c),(n) — the cheaply + deterministically
     computable subset of the 14 bridged-fused tiebreakers:
       (a) more rings, (b) more ring atoms, (c) fewer heteroatoms,
       (n) more noncumulative double bonds — scoped to the bridged-fused system.
@@ -542,7 +542,7 @@ def _bridged_fused_prebridge_metrics(
         if a in system_atoms and b in system_atoms:
             if bond.GetIsAromatic() or bond.GetBondType() == Chem.BondType.DOUBLE:
                 num_double += 1
-    # (a) more rings, (b) more atoms, (n) more double bonds -> negate for min();
+    # (a) more rings, (b) more atoms, (n) more double bonds -> negate for min;
     # (c) FEWER heteroatoms -> keep positive so fewer sorts first.
     return (-num_rings, -num_ring_atoms, num_hetero, -num_double)
 
@@ -554,43 +554,43 @@ def ring_system_score(
     """Score a ring system for principal ring system selection.
 
     Returns a scoring tuple where ALL values are arranged so that
-    ``min()`` selects the most senior ring system.
+    ``min`` selects the most senior ring system.
 
-    IUPAC P-44.2: General criteria (P-44.2.1) are applied BEFORE type
-    hierarchy (P-44.2.2). Type hierarchy is a tiebreaker within the
-    same general criteria class. P-44.4.1 unsaturation is a FURTHER
-    tiebreaker, applied only after P-44.2.2 type seniority (so e.g.
+    IUPAC: General criteria are applied BEFORE type
+    hierarchy. Type hierarchy is a tiebreaker within the
+    same general criteria class. unsaturation is a FURTHER
+    tiebreaker, applied only after type seniority (so e.g.
     spiro > phane > fused stays senior to a mere double-bond difference).
 
-    Tuple ordering (39 elements; Tasks 12-17 + the P-44.2.2.2.4 pre-bridge
-    metrics append P-44.2.2.2.x tiebreakers AFTER the P-44.4.1 tier so they only
+    Tuple ordering (39 elements; Tasks 12-17 + the pre-bridge
+    metrics append.x tiebreakers AFTER the tier so they only
     break within-type ties):
-    - [0] -has_heteroatom: P-44.2.1(a) heterocyclic preferred (negated)
-    - [1] -has_nitrogen: P-44.2.1(b) N-containing preferred (negated)
-    - [2] -senior_heteroatom_rank: P-44.2.1(c) most senior heteroatom (negated)
-    - [3] -num_rings: P-44.2.1(d) more rings = senior (negated)
-    - [4] -num_skeletal_atoms: P-44.2.1(e) more atoms = senior (negated)
-    - [5] -num_heteroatoms: P-44.2.1(f) more heteroatoms = senior (negated)
-    - [6..25] heteroatom_variety_tuple: P-44.2.1(g) term-by-term comparison
+    - [0] -has_heteroatom: (a) heterocyclic preferred (negated)
+    - [1] -has_nitrogen: (b) N-containing preferred (negated)
+    - [2] -senior_heteroatom_rank: (c) most senior heteroatom (negated)
+    - [3] -num_rings: (d) more rings = senior (negated)
+    - [4] -num_skeletal_atoms: (e) more atoms = senior (negated)
+    - [5] -num_heteroatoms: (f) more heteroatoms = senior (negated)
+    - [6..25] heteroatom_variety_tuple: (g) term-by-term comparison
               (20 elements: -count_N, -count_F, -count_Cl, -count_Br, -count_I,
                -count_O, -count_S, -count_Se, -count_Te, -count_P,...)
-    - [26] type_rank: P-44.2.2 type hierarchy (tiebreaker, lower = senior)
-    - [27] -num_multiple_bonds: P-44.4.1.1 max ring multiple bonds (negated)
-    - [28] -num_double_bonds: P-44.4.1.2 then max double bonds (negated)
-    - [29] -spiro_fusions: P-44.2.2.2.1.1 more spiro fusions = senior (negated)
-    - [30] -sat_monocyclic_spiro: P-44.2.2.2.1.2(b) all-sat-monocyclic (negated)
-    - [31] spiro-atom locant set: P-44.2.2.2.1.2 lower locants (nested tuple)
-    - [32] fusion-descriptor letters: P-44.2.2.2.3.3 lower letters (nested tuple)
-    - [33] fusion-descriptor numbers: P-44.2.2.2.3.4 lower numbers (nested tuple)
-    - [34] P-25.8 component rank: P-44.2.2.2.3.5 senior component (nested tuple;
+    - [26] type_rank: type hierarchy (tiebreaker, lower = senior)
+    - [27] -num_multiple_bonds: max ring multiple bonds (negated)
+    - [28] -num_double_bonds: then max double bonds (negated)
+    - [29] -spiro_fusions: more spiro fusions = senior (negated)
+    - [30] -sat_monocyclic_spiro: (b) all-sat-monocyclic (negated)
+    - [31] spiro-atom locant set: lower locants (nested tuple)
+    - [32] fusion-descriptor letters: lower letters (nested tuple)
+    - [33] fusion-descriptor numbers: lower numbers (nested tuple)
+    - [34] component rank: senior component (nested tuple;
            het-locant set — quinoline<isoquinoline)
-    - [35..38] bridged-fused pre-bridge metrics (a,b,c,n): P-44.2.2.2.4
+    - [35..38] bridged-fused pre-bridge metrics (a,b,c,n):
 
-    The unsaturation tier (S1, V21 WS-A.1) breaks the among-equal-carbocycle
+    The unsaturation tier (S1, V21.1) breaks the among-equal-carbocycle
     tie that previously made ``C1CCCCC1c1ccccc1`` resolve to the arbitrary
     list-order winner ``phenylcyclohexane``; benzene now wins on unsaturation
-    (P-44.4.1.1) -> ``cyclohexylbenzene``. Appended AFTER type_rank so it can
-    never override P-44.2.2 type seniority. RDKit reports benzene bonds as
+     -> ``cyclohexylbenzene``. Appended AFTER type_rank so it can
+    never override type seniority. RDKit reports benzene bonds as
     AROMATIC, so the counter must treat AROMATIC as multiple (a naive
     DOUBLE-only count gives benzene zero).
 
@@ -599,7 +599,7 @@ def ring_system_score(
         system_atoms: Set of atom indices in this ring system
 
     Returns:
-        Tuple suitable for comparison with min() to select most senior
+        Tuple suitable for comparison with min to select most senior
     """
     if not system_atoms:
         return (
@@ -645,7 +645,7 @@ def ring_system_score(
     # Number of skeletal atoms
     num_skeletal_atoms = len(system_atoms)
 
-    # P-44.4.1 unsaturation (aromatic-aware): count ring bonds that are
+    # unsaturation (aromatic-aware): count ring bonds that are
     # DOUBLE / TRIPLE / AROMATIC. RDKit kekulizes benzene to AROMATIC bonds,
     # so AROMATIC must count as multiple or an aromatic ring scores zero.
     num_multiple_bonds = 0
@@ -660,44 +660,44 @@ def ring_system_score(
             if bond.GetIsAromatic() or bt == Chem.BondType.DOUBLE:
                 num_double_bonds += 1
 
-    # P-44.2.1(g): heteroatom variety -- term-by-term comparison by seniority
+    # (g): heteroatom variety -- term-by-term comparison by seniority
     # Build tuple: (-count_of_N, -count_of_F,..., -count_of_P)
-    # Negated so min() selects ring with MORE of the most-senior element
+    # Negated so min selects ring with MORE of the most-senior element
     heteroatom_variety_tuple = tuple(
         -heteroatom_counts.get(elem, 0)
         for elem in _HETEROATOM_VARIETY_ORDER
     )
 
-    # P-44.2.2.2.1.1 (Task 12): number of spiro fusions (more = senior). Appended
-    # AFTER the P-44.4.1 unsaturation tier so it only breaks a WITHIN-spiro tie
+    # (Task 12): number of spiro fusions (more = senior). Appended
+    # AFTER the unsaturation tier so it only breaks a WITHIN-spiro tie
     # and never overrides type/unsaturation seniority. Deterministic (atom-set
     # only), so it introduces no spelling dependence.
     spiro_fusions = _spiro_fusion_count(mol, system_atoms)
-    # P-44.2.2.2.1.2 (Task 13): (b) all-saturated-monocyclic-spiro preferred,
+    # (Task 13): (b) all-saturated-monocyclic-spiro preferred,
     # then the lower spiro-atom locant set. Applied AFTER the Task-12 spiro-
-    # fusion term (P-44.2.2.2.1 "applied successively"). Both are deterministic.
+    # fusion term "applied successively"). Both are deterministic.
     sat_mono = _is_saturated_monocyclic_spiro(mol, system_atoms)
     spiro_locants = _spiro_atom_locant_set(mol, system_atoms)
 
-    # P-44.2: General criteria (P-44.2.1) applied BEFORE type hierarchy (P-44.2.2)
+    #: General criteria applied BEFORE type hierarchy
     return (
-        -int(has_heteroatom),               # P-44.2.1(a): heterocyclic preferred
-        -int(has_nitrogen),                 # P-44.2.1(b): N-containing preferred
-        -senior_heteroatom_rank,            # P-44.2.1(c): most senior heteroatom
-        -num_rings,                         # P-44.2.1(d): more rings = senior
-        -num_skeletal_atoms,                # P-44.2.1(e): more atoms = senior
-        -num_heteroatoms,                   # P-44.2.1(f): more heteroatoms
-        *heteroatom_variety_tuple,          # P-44.2.1(g): 20 elements, term-by-term
-        type_rank,                          # P-44.2.2: type hierarchy (tiebreaker)
-        -num_multiple_bonds,                # P-44.4.1.1: max ring multiple bonds
-        -num_double_bonds,                  # P-44.4.1.2: then max double bonds
-        -spiro_fusions,                     # P-44.2.2.2.1.1: more spiro fusions
-        -int(sat_mono),                     # P-44.2.2.2.1.2(b): sat-monocyclic-spiro
-        spiro_locants,                      # P-44.2.2.2.1.2: lower spiro-atom locants
-        _fusion_descriptor_letters(mol, system_atoms),  # P-44.2.2.2.3.3: fusion letters
-        _fusion_descriptor_numbers(mol, system_atoms),  # P-44.2.2.2.3.4: fusion numbers
-        _p25_8_component_rank(mol, system_atoms),        # P-44.2.2.2.3.5: P-25.8 component
-        *_bridged_fused_prebridge_metrics(mol, system_atoms),  # P-44.2.2.2.4 (a,b,c,n)
+        -int(has_heteroatom),               # (a): heterocyclic preferred
+        -int(has_nitrogen),                 # (b): N-containing preferred
+        -senior_heteroatom_rank,            # (c): most senior heteroatom
+        -num_rings,                         # (d): more rings = senior
+        -num_skeletal_atoms,                # (e): more atoms = senior
+        -num_heteroatoms,                   # (f): more heteroatoms
+        *heteroatom_variety_tuple,          # (g): 20 elements, term-by-term
+        type_rank,                          #: type hierarchy (tiebreaker)
+        -num_multiple_bonds,                #: max ring multiple bonds
+        -num_double_bonds,                  #: then max double bonds
+        -spiro_fusions,                     #: more spiro fusions
+        -int(sat_mono),                     # (b): sat-monocyclic-spiro
+        spiro_locants,                      #: lower spiro-atom locants
+        _fusion_descriptor_letters(mol, system_atoms),  #: fusion letters
+        _fusion_descriptor_numbers(mol, system_atoms),  #: fusion numbers
+        _p25_8_component_rank(mol, system_atoms),        #: component
+        *_bridged_fused_prebridge_metrics(mol, system_atoms),  # (a,b,c,n)
     )
 
 
@@ -710,19 +710,19 @@ def _ylidene_linked_parent_ring(
     mol: Chem.Mol,
     ring_systems: List[Set[int]],
 ) -> Optional[Set[int]]:
-    """Return the ring system that is the parent under P-31.1.4 ylidene linkage.
+    """Return the ring system that is the parent under ylidene linkage.
 
     Detects a single exocyclic methine/methanediyl carbon that is double-bonded
     into exactly ONE ring system and single-bonded into exactly ONE OTHER ring
     system (and bonded to nothing else heavy). The double-bonded ring is the
     parent; the single-bonded ring + the methine carbon form the ylidene
-    substituent (P-29.6.1 benzylidene for a bare phenyl).
+    substituent benzylidene for a bare phenyl).
 
     Fail-closed: returns None (no override) unless there is exactly one such
     linking carbon connecting exactly two of the given ring systems, with the
     two rings distinct and the double/single sides unambiguous. Any other shape
     (>2 rings involved, branching on the methine, no double bond, ring-directly-
-    bonded-ring) leaves the P-44.2 score selector in charge.
+    bonded-ring) leaves the score selector in charge.
     """
     def _ring_of(atom_idx: int) -> Optional[int]:
         for i, sysset in enumerate(ring_systems):
@@ -827,13 +827,13 @@ def select_principal_ring_system(
 ) -> Tuple[int, ...]:
     """Select the most senior ring system from a list of candidates.
 
-    Uses ring_system_score() to compare candidates. The system with the
-    minimum score tuple is the most senior (P-44.2 hierarchy).
+    Uses ring_system_score to compare candidates. The system with the
+    minimum score tuple is the most senior hierarchy).
 
     Args:
         mol: RDKit Mol object
         ring_systems: List of sets, each set contains atom indices in
-                      one ring system (from get_ring_systems())
+                      one ring system (from get_ring_systems)
 
     Returns:
         Tuple of sorted atom indices of the most senior ring system,
@@ -847,14 +847,14 @@ def select_principal_ring_system(
 
     # tail (glycoside convention, best-effort only): a GLYCOSIDE names its
     # AGLYCONE as the parent and every sugar as a glycosyloxy substituent
-    # (P-102 / the natural-product convention), even though strict P-44.2 makes
+    # / the natural-product convention), even though strict makes
     # a heterocyclic sugar ring senior to an all-carbon ring system. When exactly
     # one all-carbon FUSED ring system (>=2 rings) competes with ONLY
     # monosaccharide-like rings (a single ring, exactly one ring O, no other ring
     # heteroatom, bearing >=2 exocyclic hydroxy/CH2OH -- i.e. a pyranose/furanose),
     # prefer the carbon core so the sugars become substituents. GATED on the
     # best-effort context so the PIN default is byte-identical (the 1652 gate is
-    # untouched); SELF-01 round-trip is the 0-wrong net. Verified: #11/#12 saponins
+    # untouched); round-trip is the 0-wrong net. Verified: #11/#12 saponins
     # name FULL-InChIKey only via this preference.
     try:
         from ..metrics.provenance import best_effort_ctx
@@ -881,9 +881,9 @@ def select_principal_ring_system(
     except Exception:  # pragma: no cover - a hint must never break selection
         pass
 
-    # P-44.1: the senior parent bears the principal characteristic group, and
-    # that outranks the P-44.2 ring-type hierarchy scored below. ``ring_system_
-    # score`` takes only the ring atoms, so it cannot honour P-44.1; the optional
+    #: the senior parent bears the principal characteristic group, and
+    # that outranks the ring-type hierarchy scored below. ``ring_system_
+    # score`` takes only the ring atoms, so it cannot honour; the optional
     # ``principal_group_atoms`` hint supplies it. POSITIVE EVIDENCE only -- the
     # override fires ONLY when EXACTLY ONE ring system bears the group, so an
     # absent, empty, or ambiguous hint falls through to the unchanged scoring
@@ -914,12 +914,12 @@ def select_principal_ring_system(
             if len(bearing) == 1:
                 return tuple(sorted(bearing[0]))
 
-    # W2E-D2 (P-29.6.1 / P-31.1.4): a substituent attached to a ring by an
+    # W2E-D2 /: a substituent attached to a ring by an
     # exocyclic DOUBLE bond (ylidene) belongs to the ring on the double-bond
     # side; the ring it is single-bonded to is cited as the ylidene substituent
     # (e.g. benzylidenecyclohexane: the =CH-C6H5 methine double-bonds cyclohexane
     # and single-bonds benzene, so cyclohexane is parent and 'benzylidene' the
-    # substituent). The P-44.2 ring_system_score below would otherwise pick the
+    # substituent). The ring_system_score below would otherwise pick the
     # senior aromatic ring as parent and try to name the aliphatic ring as a
     # (never-nameable) ylidene substituent, failing closed. Force the
     # double-bonded ring here. Fail-closed (no override) on any shape but the
@@ -933,15 +933,15 @@ def select_principal_ring_system(
     best_score = min(scores)
     tied = [i for i, s in enumerate(scores) if s == best_score]
     if len(tied) > 1:
-        # A1 (P-45.2.1): when >=2 candidate parent rings TIE on the P-44.2
+        # A1: when >=2 candidate parent rings TIE on the
         # ring-system score, the senior parent is the one carrying the MAXIMUM
-        # number of substituents cited as prefixes (the Blue Book, "P-45.2.1
+        # number of substituents cited as prefixes (the Blue Book, "
         # the maximum number of substituent groups cited as prefixes"; worked
         # examples:6235/:6249/:6257). Before this the tie fell to list order
         # (ring_systems[0]) -- a non-preferred parent for e.g. a carotenoid/terpene
         # of two carbocycles joined by a chain (the 3- vs 4-substituent ring).
         # NARROWED to NON-AROMATIC ALL-CARBON tied rings: the aromatic ring path
-        # already resolves P-45.2.1, and a ring with skeletal heteroatoms (a
+        # already resolves, and a ring with skeletal heteroatoms (a
         # glycoside's pyranose) is owned by conventions where an exocyclic-bond
         # count is not the prefix count. Blast-radius measured (0 name changes / 0
         # RT-regressions on pubchem_2000+a dev split+chebi_5000): the narrowing fires

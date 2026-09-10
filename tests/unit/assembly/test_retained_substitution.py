@@ -1,6 +1,6 @@
-"""Phase 168 Plan-02: triviality-controller unit tests.
+"""a phase Plan-02: triviality-controller unit tests.
 
-Mirrors the Phase 167 HYG-04 class-per-bug discipline (analog:
+Mirrors the a phase class-per-bug discipline (analog:
 tests/unit/assembly/test_diaryl_methyl_substituent.py). Tests construct ``NameTreeNode``
 directly and exercise the per-Type dispatch + the frozen-dataclass invariants WITHOUT the
 perception layer / OPSIN / candidate_pool wiring — the per-Type checks and ``_build_rewrite``
@@ -10,7 +10,7 @@ Pins the reviews-iter-1 fixes: #2 (conditional fragment_legacy reset via
 ``_replace_preserving_or_resetting_legacy``) and #3 (the hint-based path removed; zero
 ``atom_to_locant_hint`` references; 3-path recovery).
 
-Source: 168-CONTEXT.md D-01/D-02/D-04/D-06/D-07/D-08; 168-REVIEWS.md #2 + #3.
+Source: 168-internal notes /////; internal notes #2 + #3.
 """
 
 import dataclasses
@@ -39,7 +39,7 @@ def _entry(smiles):
 
 
 class TestStageAInvariants:
-    """enabled=False is a no-op; coarse nodes pass through unchanged (D-04 + D-08)."""
+    """enabled=False is a no-op; coarse nodes pass through unchanged (+)."""
 
     @pytest.mark.unit
     def test_enabled_false_returns_input_unchanged(self):
@@ -56,7 +56,7 @@ class TestStageAInvariants:
 
 
 class TestType1Branch:
-    """Type 1 (P-15.1.8.1): unconditional swap on a canonical-SMILES match."""
+    """Type 1: unconditional swap on a canonical-SMILES match."""
 
     @pytest.mark.unit
     def test_type_1_check_always_true(self):
@@ -74,7 +74,7 @@ class TestType1Branch:
 
 def _real_principal_group(smiles):
     """The actual ``features.principal_group`` value the controller compares against — driven
-    through the perception layer so a test cannot encode a stale literal (WR-02)."""
+    through the perception layer so a test cannot encode a stale literal ."""
     from orthonym.perception.functional_groups import detect_functional_groups
     from orthonym.rules.seniority import get_principal_group
     mol = Chem.MolFromSmiles(smiles)
@@ -83,9 +83,9 @@ def _real_principal_group(smiles):
 
 
 class TestType2aBranch:
-    """Type 2a (P-15.1.8.2.1): principal-group-bound swap; refuses on PG mismatch (Pitfall 2).
+    """Type 2a: principal-group-bound swap; refuses on PG mismatch (Pitfall 2).
 
-    CR-04 + WR-02 (code review 2026-05-30): these drive ``_type_2a_check`` with the REAL
+     + (code review 2026-05-30): these drive ``_type_2a_check`` with the REAL
     ``get_principal_group`` output (NOT a hand-written literal). The pre-fix seed required
     "primary_alcohol"/"primary_amine", but perception returns "phenol"/"aromatic_amine", so the
     phenol/aniline swaps could NEVER fire — and the old ``test_phenol_swap_with_matching_pg``
@@ -118,7 +118,7 @@ class TestType2aBranch:
 
 
 class TestType2bBranch:
-    """Type 2b (P-15.1.8.2.2): closed-list; bare reduces to unconditional."""
+    """Type 2b: closed-list; bare reduces to unconditional."""
 
     @pytest.mark.unit
     def test_formic_acid_present(self):
@@ -135,13 +135,13 @@ class TestType2bBranch:
 
 
 class TestType2cBranch:
-    """Type 2c (P-15.1.8.2.3): default-to-Type-3 when no locus override (hydroxylamine).
+    """Type 2c: default-to-Type-3 when no locus override (hydroxylamine).
 
-    F-T9 (DD6 RET-01): anisole was removed from the seed table — it is no longer a PIN
-    (the PIN is methoxybenzene, P-12.1), so the triviality controller must NOT swap
+    F- (DD6): anisole was removed from the seed table — it is no longer a PIN
+    (the PIN is methoxybenzene,, so the triviality controller must NOT swap
     methoxybenzene -> anisole. The Type-2c bare/substituted dispatch is now exercised via
     hydroxylamine, the remaining Type-2c entry; ``test_anisole_removed_from_seed`` locks the
-    F-T9 policy.
+    F- policy.
     """
 
     @pytest.mark.unit
@@ -160,14 +160,14 @@ class TestType2cBranch:
 
     @pytest.mark.unit
     def test_anisole_removed_from_seed(self):
-        # F-T9 / DD6 RET-01: 'anisole' is general-only (PIN methoxybenzene), denied in
+        # F- / DD6: 'anisole' is general-only (PIN methoxybenzene), denied in
         # iupac_2013_pin_list.json. It must NOT be a triviality-controller swap target
         # (the deny gate in load_seed_table would otherwise zero the whole table).
         assert Chem.CanonSmiles("COc1ccccc1") not in SEED_TABLE
 
 
 class TestType3Branch:
-    """Type 3 (P-15.1.8.3): bare-only + locant_context (toluene/xylene; Pitfall 3)."""
+    """Type 3: bare-only + locant_context (toluene/xylene; Pitfall 3)."""
 
     @pytest.mark.unit
     def test_toluene_bare_swap_allowed(self):
@@ -190,7 +190,7 @@ class TestType3Branch:
 
 class TestFrozenDataclassInvariants:
     """Rewrites never mutate the input; parent-changing rewrite resets fragment_legacy;
-    TRIV-02 multiplier is re-derived via the SSOT predicates (NOT statically None)."""
+     multiplier is re-derived via the SSOT predicates (NOT statically None)."""
 
     @pytest.mark.unit
     def test_rewrite_does_not_mutate_input(self):
@@ -221,24 +221,24 @@ class TestFrozenDataclassInvariants:
 
     @pytest.mark.unit
     def test_multiplier_recompute_unsubstituted_stays_di(self):
-        """TRIV-02: the recompute consults ``is_substituted_substituent``, so a name that
+        """: the recompute consults ``is_substituted_substituent``, so a name that
         is *complex* but **not substituted** keeps ``di``.
 
         ⚠ **RENAMED AND CORRECTED 2026-07-30.** This was
         ``test_multiplier_recompute_complex_flips_to_bis`` and expected ``"bis"``, on the
         premise that "1,2-xylene is COMPLEX (digit + hyphen) => di flips to bis". The
-        premise names a predicate the code does not use: a spy measured
+        premise names a predicate the code does not use: a trace measured
         ``is_complex_substituent`` at **zero** calls from ``get_multiplier_prefix``.
         Measured, ``1,2-xylene`` is complex=True but **substituted=False**, so ``di`` is
-        both what the code produces and what the Blue Book requires — P-16.3.2 /
-        P-16.3.5, with ``:25719``'s ``di(propan-2-yl)`` the analogous unsubstituted case
+        both what the code produces and what the Blue Book requires — /
+        , with ``:25719``'s ``di(propan-2-yl)`` the analogous unsubstituted case
         against ``:25811``'s ``1,2-bis(bromomethyl)benzene (PIN)``.
 
         Reachable scope: **0 shipped names.** ``_recompute_multiplicative_prefix`` is
         reached only through ``apply_triviality_controller``, whose callers pass an
         ``enabled`` flag defaulting FALSE. So this was a stale test over dormant code,
         not a live defect — but the docstrings it agreed with had already caused one real
-        regression (``b3f6ce7c``), which is why both were corrected too.
+        regression (``), which is why both were corrected too.
         """
         entry = _entry("Cc1ccccc1C")
         out = _build_rewrite(NameTreeNode(parent_stem="x", multiplicative_prefix="di"), entry, ())
@@ -258,7 +258,7 @@ class TestFrozenDataclassInvariants:
 
 
 class TestCompleteNameFieldReset:
-    """CR-01 + CR-02 regression (code review 2026-05-30): ``_build_rewrite`` resets the fields a
+    """ + regression (code review 2026-05-30): ``_build_rewrite`` resets the fields a
     COMPLETE retained name already subsumes (Type 2a/2b/2c/3: locants, suffix, indicated_h,
     unsaturation) and PRESERVES the principal-group suffix for a BARE Type-1 parent hydride.
     Each case serializes the rewritten node to prove the absence of the double-render bug
@@ -266,7 +266,7 @@ class TestCompleteNameFieldReset:
 
     @pytest.mark.unit
     @pytest.mark.parametrize("smiles,suffix,expected", [
-        ("CC(=O)O", "oic acid", "acetic acid"),        # CR-02
+        ("CC(=O)O", "oic acid", "acetic acid"),        #
         ("O=C(O)c1ccccc1", "ic acid", "benzoic acid"),
         ("O=C(O)C(=O)O", "dioic acid", "oxalic acid"),
     ])

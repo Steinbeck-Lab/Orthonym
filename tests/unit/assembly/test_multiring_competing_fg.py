@@ -1,9 +1,9 @@
-"""v31: multi-ring + competing-FG partition. A ring parent bearing the principal
+""": multi-ring + competing-FG partition. A ring parent bearing the principal
 group (acid) plus an aryl substituent bearing a SECOND characteristic group (amide)
 must NOT double-count that group: `fallback_chain_ring` emitted a stray unlocanted
 `carbamoyl-` parent prefix AND the substituent name `(4-carbamoylphenyl)` (which
 already includes it) -> unparseable `carbamoyl-4-(4-carbamoylphenyl)cyclohexane...`
--> SELF-01 abstain. The FG-on-a-ring-substituent must be filtered from the parent
+-> abstain. The FG-on-a-ring-substituent must be filtered from the parent
 prefix set (the branch name covers it), regardless of the substituent's carbon count
 (the old 1<=c<=3 bound missed the 6+-carbon aryl ring). Halogens already filtered.
 """

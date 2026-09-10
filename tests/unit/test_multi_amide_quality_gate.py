@@ -1,4 +1,4 @@
-"""Unit tests for multi-amide quality gate detection (PEP-01).
+"""Unit tests for multi-amide quality gate detection .
 
 N-acyl multi-amide chains (e.g., CC(=O)NCC(=O)NCC(=O)NCC(=O)O) with no
 free NH2 terminus bypass the peptide namer and produce partial names like
@@ -111,14 +111,14 @@ class TestMultiAmideEndToEnd:
         smiles = "CC(=O)NCC(=O)O"
         result = name_compound(smiles)
 
-        # Should still be the correct single-amide name (P-66.1.1.4.3
+        # Should still be the correct single-amide name
         # method (1): acetamido is the preferred prefix)
         assert result == "2-acetamidoethanoic acid", (
             f"Single amide should keep its correct name. Got: {result}"
         )
 
     def test_peptide_with_terminal_nh2_unchanged(self):
-        """Gly-Gly (terminal NH2) routes through the peptide dispatch. v38: its
+        """Gly-Gly (terminal NH2) routes through the peptide dispatch.: its
         PIN is the SUBSTITUTIVE form (V38-PEPTIDE-PIN-VERDICT.md; peptide names
         are non-PIN). Full-InChIKey round-trip verified."""
         smiles = "NCC(=O)NCC(=O)O"

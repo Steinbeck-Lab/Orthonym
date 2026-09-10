@@ -1,9 +1,9 @@
-"""P-14.4(j) / P-45.6.3: CIP-stereodescriptor orientation tie-break.
+"""(j) /: CIP-stereodescriptor orientation tie-break.
 
-BB P-14.4(j) (the Blue Book): "When there is a choice for lower locants
+BB (j) (the Blue Book): "When there is a choice for lower locants
 related to the presence of stereogenic centers or stereoisomers, the lower
 locant is assigned to CIP stereodescriptors Z, R, M, and r (pseudoasymmetry)
-that are preferred to E, S, P, and s, respectively...". BB P-45.6.3
+that are preferred to E, S, P, and s, respectively...". BB
 (the Blue Book) states the R-before-S citation-order half.
 
 The orient_chain criterion (f) reuses ``cip_descriptor_rank_key`` so this
@@ -45,7 +45,7 @@ class TestOrientChainP4563:
             (atl[a.GetIdx()], a.GetProp("_CIPCode"))
             for a in probe.GetAtoms() if a.HasProp("_CIPCode")
         )
-        # P-45.6.3: 'R' at the first point of difference -> locant 2 is R.
+        #: 'R' at the first point of difference -> locant 2 is R.
         assert codes == [(2, "R"), (3, "S")]
 
     def test_end_to_end_name(self):
@@ -62,7 +62,7 @@ class TestOrientChainP4563:
 
 
 class TestOrientChainP1444jDoubleBonds:
-    """P-14.4(j): the Z double-bond descriptor takes the lower locant.
+    """(j): the Z double-bond descriptor takes the lower locant.
 
     The whole reason criterion (f) reuses ``cip_descriptor_rank_key`` instead of
     a plain string comparison: 'Z' is senior to 'E' although 'E' < 'Z'
@@ -72,7 +72,7 @@ class TestOrientChainP1444jDoubleBonds:
 
     # Constitutionally symmetric deca-2,8-diene, one bond E and one Z. Both
     # numbering directions give the same locant SET {2, 8}; only the E/Z
-    # assignment differs, so P-14.4(j) decides -> Z at the lower locant.
+    # assignment differs, so (j) decides -> Z at the lower locant.
     EZ_DIENE = r"C/C=C/CCCC/C=C\C"
 
     def test_z_double_bond_gets_low_locant_direct(self):
@@ -92,7 +92,7 @@ class TestOrientChainP1444jDoubleBonds:
             if b.GetBondType() == Chem.BondType.DOUBLE and b.HasProp("_CIPCode"):
                 loc = min(atl[b.GetBeginAtomIdx()], atl[b.GetEndAtomIdx()])
                 loc_code[loc] = b.GetProp("_CIPCode")
-        # P-14.4(j): Z is preferred -> it must sit at the lower locant (2).
+        # (j): Z is preferred -> it must sit at the lower locant (2).
         assert loc_code == {2: "Z", 8: "E"}, loc_code
 
     def test_ez_diene_end_to_end_name(self):
@@ -107,7 +107,7 @@ class TestOrientChainP1444jCombined:
 
     ``C/C=C\\[C@@H](O)CCC[C@@H](O)/C=C\\C`` is a meso undeca-2,9-diene-4,8-diol:
     constitution is symmetric, both double bonds are Z, and the two stereocentres
-    are R and S. P-14.4(j) prefers R at the first differing locant, so the PIN is
+    are R and S. (j) prefers R at the first differing locant, so the PIN is
     ``(2Z,4R,8S,9Z)`` -- R at locant 4, NOT ``(2Z,4S,8R,9Z)``.
     """
 

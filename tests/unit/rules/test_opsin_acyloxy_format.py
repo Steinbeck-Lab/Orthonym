@@ -1,13 +1,13 @@
 """
 Tests for OPSIN-compatible acyloxy bracket format and bare 'oxy' elimination.
 
-Phase 54, Plan 02: OPFX-03 (acyloxy brackets) and OPFX-06 (bare oxy removal).
+a phase, Plan 02: (acyloxy brackets) and (bare oxy removal).
 
 Validates:
 - Acyloxy prefixes are correctly bracketed: "(acetyloxy)", "(propanoyloxy)"
 - No generated name contains standalone bare 'oxy' prefix
 - Polyol ester compounds produce correct multiplicative acyloxy brackets
-- Tricyclo+stereo OPSIN failures are vocabulary limits (OPFX-04), not format
+- Tricyclo+stereo OPSIN failures are vocabulary limits , not format
 """
 
 import re
@@ -24,7 +24,7 @@ class TestAcyloxyBracketFormat:
     def test_acyloxy_brackets_on_benzene(self):
         """Acyloxy prefix on benzene ring is bracketed: 4-(acetyloxy)benzoic acid.
 
-        Wave-3: the acyl group is 'acetyl' (PIN, P-65.6.3.2.3); 'ethanoyl' is
+        Wave-3: the acyl group is 'acetyl' (PIN,; 'ethanoyl' is
         general-only, so the bracketed prefix is '(acetyloxy)'.
         """
         name = name_compound("CC(=O)Oc1ccc(C(=O)O)cc1")
@@ -52,8 +52,8 @@ class TestAcyloxyBracketFormat:
     def test_polyol_ester_acyloxy_brackets(self):
         """Non-glycerol polyol ester keeps the multiplicative (acyloxy) prefix form.
 
-        Phase 180 update: glycerol triacetate (triacetin) is a triacylglycerol and
-        now routes through the P-107 lipid assembler to the Form B systematic ester
+        a phase update: glycerol triacetate (triacetin) is a triacylglycerol and
+        now routes through the lipid assembler to the Form B systematic ester
         name ``propane-1,2,3-triyl triacetate`` (OPSIN-RT-verified). The general
         multiplicative-(acyloxy) formatting is unchanged for NON-glycerol polyols,
         verified here on erythritol tetraacetate (the lipid detector hard-gates it
@@ -84,7 +84,7 @@ class TestNoBareOxy:
     def test_no_bare_oxy_methoxybenzene(self):
         """Anisole (methoxybenzene) does not contain bare 'oxy'."""
         name = name_compound("COc1ccccc1")
-        # Now returns "anisole" (retained name, P-34.1.1.4 PIN)
+        # Now returns "anisole" (retained name, PIN)
         assert name == "anisole" or "methoxy" in name.lower(), (
             f"Expected 'anisole' or 'methoxy' in '{name}'"
         )
@@ -146,7 +146,7 @@ class TestNoBareOxy:
 
 @pytest.mark.unit
 class TestTricycloOpsinLimitation:
-    """Document OPFX-04: tricyclo+stereo OPSIN failures are vocabulary limits.
+    """Document: tricyclo+stereo OPSIN failures are vocabulary limits.
 
     The tricyclo[a.b.c.d(e,f)] VB format is correct and OPSIN-compatible
     for simple cases. Failures occur only when combined with many

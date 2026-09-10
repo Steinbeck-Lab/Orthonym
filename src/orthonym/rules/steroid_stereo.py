@@ -1,4 +1,4 @@
-"""Steroid ring-face α/β configurational descriptors (IUPAC P-101.2.6, Phase 181 WSC-02).
+"""Steroid ring-face α/β configurational descriptors (IUPAC, a phase -02).
 
 Generate ring-face α/β descriptors (``3beta``, ``5alpha``) for steroid scaffolds by
 INVERTING OPSIN's own forward parser. OPSIN parses α/β names by applying a parity to a
@@ -7,14 +7,14 @@ ring stereocentre from its ``alphaBetaClockWiseAtomOrdering`` (ABO) — see
 842-918) and ``SMILESWriter.atomParityToSmiles`` (880-952). This module runs that
 algorithm backwards: read the molecule's RDKit chiral parity at each ABO ring locant
 and map it back to α/β. Because it inverts OPSIN's own data + algorithm, the emitted
-descriptor round-trips through OPSIN by construction (D-01).
+descriptor round-trips through OPSIN by construction .
 
-Sign convention (D-02): empirically pinned this build — OPSIN parity ``+1 → beta``,
+Sign convention : empirically pinned this build — OPSIN parity ``+1 → beta``,
 ``-1 → alpha``. The 6-structure parity unit test is the tripwire; if a future RDKit
 upgrade flips neighbour-ordering semantics it fails loudly and ``_SIGN`` is flipped
 ONCE, globally — never per-molecule.
 
-Root-cause-only (D-09): no postprocessor, no regex on the existing ``(3R,5S,...)`` string,
+Root-cause-only : no postprocessor, no regex on the existing ``(3R,5S,...)`` string,
 no seniority/dispatch edit. All logic is parity arithmetic + dict lookups + set math.
 """
 
@@ -23,7 +23,7 @@ from typing import List, Tuple
 from rdkit import Chem
 
 # Empirically pinned sign convention (this session): OPSIN parity +1 → β, −1 → α.
-# v43: emit the Blue-Book GREEK symbols (P-101.2.6, BlueBookV2.md:51045), not the
+#: emit the Blue-Book GREEK symbols, the Blue Book), not the
 # ASCII words — routed through the shared source of truth (RT-identical in OPSIN).
 from .greek_stereo_descriptors import ALPHA, BETA
 
@@ -102,7 +102,7 @@ def _ring_wiring(scaffold_info):
 
     ringorder is the ABO in IUPAC-locant space; loc2idx/idx2loc bridge it to the
     target molecule's atom indices. Returns None when the ABO or numbering map is
-    absent — NO ad-hoc ordering is ever synthesized (D-03).
+    absent — NO ad-hoc ordering is ever synthesized .
     """
     from ..data.opsin_imports.natural_products_opsin import OPSIN_NATURAL_PRODUCTS
     from .natural_products import _build_target_to_iupac
@@ -126,13 +126,13 @@ def _ring_wiring(scaffold_info):
 
 
 def _reference_profile(scaffold_smiles, ringorder):
-    """Compute the implied-stereoparent α/β profile over the catalogued scaffold (D-05).
+    """Compute the implied-stereoparent α/β profile over the catalogued scaffold .
 
     The catalogued NATURAL_PRODUCT_SCAFFOLDS SMILES carry the natural @/@@ configuration,
     so running the SAME recipe over the reference mol yields the parent's natural face at
     each ring locant. A target ring stereocentre is cited as INVERTED only where it differs
     from this reference (D-04c). Read ONLY for the diff — the emitted value is always the
-    target's own parity (D-15). Returns {} (conservative: nothing inverted) on any failure.
+    target's own parity . Returns {} (conservative: nothing inverted) on any failure.
     """
     from ..data.natural_products import get_scaffold_numbering
     from ..perception.stereo import assign_stereochemistry
@@ -158,14 +158,14 @@ def _reference_profile(scaffold_smiles, ringorder):
 
 
 def collect_steroid_alpha_beta(mol, scaffold_info, numbering):
-    """Return {'ring_ab': {locant: 'alpha'/'beta'}, 'side_rs': [(locant, cip), ...]} for a
-    steroid, or None to signal the per-molecule no-mix fallback (D-08).
+    """Return {'ring_ab': {locant: 'alpha'/'beta'}, 'side_rs': [(locant, cip),...]} for a
+    steroid, or None to signal the per-molecule no-mix fallback .
 
     - ring_ab cites: C-5 when chiral (D-04a) ∪ substituent/suffix-bearing ring stereocentres
       (D-04b) ∪ ring stereocentres inverted vs the implied parent (D-04c). Natural-config
       fixed stereocentres (bridgeheads C-8/9/10/13/14, C-17, etc.) are suppressed.
     - side_rs keeps acyclic side-chain stereocentres (C-20/22/24/25 — NOT in the ABO) as R/S,
-      a separate leading block (D-06); ring atoms are never passed into this collection.
+      a separate leading block ; ring atoms are never passed into this collection.
     - Returns None (whole-molecule R/S fallback) iff any DEFINED ring stereocentre cannot be
       resolved to α/β — never mixes ring α/β with ring R/S. An sp2 C-5 (Δ5) or sp2 ketone
       carbon is not a defined stereocentre → never a fallback trigger (Pitfall 1).
@@ -177,14 +177,14 @@ def collect_steroid_alpha_beta(mol, scaffold_info, numbering):
 
     wiring = _ring_wiring(scaffold_info)
     if wiring is None:
-        return None                                          # D-03/D-08: fall back to R/S
+        return None                                          # /: fall back to R/S
     ringorder, loc2idx, idx2loc = wiring
     ringset = set(ringorder)
 
-    # Canonical-stereoparent gate (D-08): the ABO numbering models only the unmodified
+    # Canonical-stereoparent gate : the ABO numbering models only the unmodified
     # androstane/cholestane/pregnane ring skeleton. Molecules carrying EXTRA ring carbons
     # (e.g. 4,4,14-trimethyl lanostane/cycloartane triterpenoids mis-detected by the broad
-    # steroid query) or O/N ring-bridges (epoxy/ether) are NOT P-101.2.6 stereoparents — their
+    # steroid query) or O/N ring-bridges (epoxy/ether) are NOT stereoparents — their
     # ABO-derived α/β is unreliable and regresses RT. Decline α/β for them and fall back to the
     # whole-graph R/S string (which OPSIN round-trips). Root-cause exclusion, not a per-molecule
     # band-aid: the signal is "a ring atom bears an exocyclic substituent the parent hydride
@@ -215,7 +215,7 @@ def collect_steroid_alpha_beta(mol, scaffold_info, numbering):
         if loc in loc2idx and mol.GetAtomWithIdx(loc2idx[loc]).GetChiralTag() in _TETRAHEDRAL
     ]
 
-    # NO-MIX FALLBACK (D-08, Pitfall 2): every DEFINED ring stereocentre must resolve to α/β,
+    # NO-MIX FALLBACK (, Pitfall 2): every DEFINED ring stereocentre must resolve to α/β,
     # else discard all α/β and emit the whole-graph R/S string.
     target_ab = {}
     for loc in ring_stereo_locants:
@@ -239,7 +239,7 @@ def collect_steroid_alpha_beta(mol, scaffold_info, numbering):
         cited.add(5)
     cited |= decorated                                       # D-04b: substituent/suffix-bearing
 
-    # D-04c / D-08: every IMPLIED (non-cited) ring stereocentre — bridgeheads C-8/9/10/13/14
+    # D-04c /: every IMPLIED (non-cited) ring stereocentre — bridgeheads C-8/9/10/13/14
     # and other fixed centres — must match the implied-stereoparent reference. If any differs,
     # we cannot represent it with the suppressed natural config, so fall back to the whole-graph
     # R/S string (which represents ANY configuration). This (a) names genuinely inverted steroids
@@ -254,11 +254,11 @@ def collect_steroid_alpha_beta(mol, scaffold_info, numbering):
 
     ring_ab = {loc: target_ab[loc] for loc in cited}
 
-    # SIDE-CHAIN R/S (D-06, Pitfall 3): stereocentres whose locant is NOT in the ABO.
+    # SIDE-CHAIN R/S (, Pitfall 3): stereocentres whose locant is NOT in the ABO.
     side_map = {idx: loc for idx, loc in numbering.items() if loc not in ringset}
     side_rs: List[Tuple[int, str]] = collect_stereodescriptors(mol, side_map) if side_map else []
 
-    # Phase 182 (WSC-03): suppress side-chain stereocentres whose CIP matches the canonical
+    # a phase (-03): suppress side-chain stereocentres whose CIP matches the canonical
     # stereoparent reference AND that bear no decoration — they are IMPLIED by the stem name
     # (e.g. cholestane implies C-20 R; ChEBI omits it: `cholest-5-en-3beta-yl sulfate`). This
     # mirrors the ring D-04c suppression for the acyclic side chain. A side-chain centre is

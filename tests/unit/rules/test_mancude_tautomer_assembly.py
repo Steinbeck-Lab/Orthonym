@@ -1,6 +1,6 @@
 """Ring assembly of one mancude parent in two indicated-hydrogen states.
 
-IUPAC P-28.2.3 (the Blue Book) + P-31.1.4: a ring assembly of two *identical* mancude
+IUPAC (the Blue Book) +: a ring assembly of two *identical* mancude
 ring systems is named on the one mancude parent stem, with the indicated hydrogen
 cited per component ring as required. Aromatic pyridine and its N-substituted 2H
 tautomer are the SAME mancude parent (``pyridine``) differing only in indicated-H
@@ -15,7 +15,7 @@ mancude monocycle AND each is in a mancude state (``_is_mancude_indicated_h_stat
 (tetrahydropyridine) partner is a genuinely different parent and must NOT be
 mis-detected as an assembly (that is what would emit a wrong-molecule name).
 
-Task 9-B3det (a phase). Cites P-28.2.3 / P-31.1.4.
+Task 9-B3det (a phase). Cites /.
 """
 
 import pytest
@@ -30,11 +30,11 @@ from orthonym.rules.ring_assemblies import (
 
 
 class TestMancudeTautomerTarget:
-    """The 2H-1,2'-bipyridine target (P-28.2.3 / P-31.1.4)."""
+    """The 2H-1,2'-bipyridine target /."""
 
     @pytest.mark.unit
     def test_detected_as_assembly(self):
-        # P-28.2.3: pyridine + its N-substituted 2H tautomer = one assembly.
+        #: pyridine + its N-substituted 2H tautomer = one assembly.
         mol = Chem.MolFromSmiles("C1=CCN(c2ccccn2)C=C1")
         info = detect_ring_assembly(mol, get_ring_systems(mol, include_spiro=False))
         assert info is not None
@@ -45,13 +45,13 @@ class TestMancudeTautomerTarget:
 
     @pytest.mark.unit
     def test_names_2H_bipyridine(self):
-        # P-28.2.3 / P-31.1.4: mancude stem 'pyridine', 2H on the tautomer ring.
+        # /: mancude stem 'pyridine', 2H on the tautomer ring.
         assert name_compound("C1=CCN(c2ccccn2)C=C1") == "2H-1,2'-bipyridine"
 
 
 class TestMustNotMisdetect:
     """Two rings joined by a bond that are NOT one mancude parent + its
-    indicated-H tautomer must NOT be merged into an assembly (P-31.1.4: a hydro
+    indicated-H tautomer must NOT be merged into an assembly: a hydro
     derivative is a different parent, not another indicated-H state)."""
 
     @pytest.mark.unit
@@ -96,8 +96,8 @@ class TestIndicatedHydrogenLowestLocantDeterminism:
     """ BLOCKER-3: the indicated-hydrogen locant must be the LOWEST possible
     and INDEPENDENT of the SMILES atom order.
 
-    P-32.2.1 (the Blue Book) orders the numbering criteria "heteroatoms have the lower
-    possible locants, then indicated hydrogen atoms..." and P-25.3.3.1.2(f)
+     (the Blue Book) orders the numbering criteria "heteroatoms have the lower
+    possible locants, then indicated hydrogen atoms..." and (f)
     (the Blue Book) "low locants are assigned to indicated hydrogen atoms". For a
     2H-pyridin-1-yl junction the inter-system bond atom IS the ring nitrogen
     (locant 1 in both walking directions), so the connection-locant set ties and
@@ -109,7 +109,7 @@ class TestIndicatedHydrogenLowestLocantDeterminism:
     @pytest.mark.unit
     @pytest.mark.parametrize("writings,expected", [
         # 1,2'-bipyridine -- four writings of the SAME molecule (RDKit-canonical
-        # C1=CCN(c2ccccn2)C=C1). All must give 2H-, never 6H- (P-32.2.1).
+        # C1=CCN(c2ccccn2)C=C1). All must give 2H-, never 6H-.
         ([
             "C1=CCN(c2ccccn2)C=C1",
             "C1=CC=CN(C1)c1ccccn1",

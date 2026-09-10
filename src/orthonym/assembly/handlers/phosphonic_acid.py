@@ -1,4 +1,4 @@
-"""v23 Phase 9 phosphonic_acid handler — substituent-prefix PIN (P-67.1.1.2).
+""" a phase phosphonic_acid handler — substituent-prefix PIN.
 
 Parallel to ``handlers.phosphinic_acid``. Without this handler an organyl
 phosphonic acid R-P(=O)(OH)2 falls through to the generic suffix assembler and
@@ -10,7 +10,7 @@ which names the single organyl substituent; it fail-closes (returns ``None``,
 cascade-continuation) for a complex substituent so the generic path is preserved
 for parents the simple namer cannot handle.
 
-IUPAC cite: P-67.1.1.2 (substitution of the central-atom H of phosphonic acid).
+IUPAC cite: (substitution of the central-atom H of phosphonic acid).
 """
 from __future__ import annotations
 

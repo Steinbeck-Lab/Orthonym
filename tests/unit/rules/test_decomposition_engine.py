@@ -1,7 +1,7 @@
 """Unit tests for decomposition engine quality gating and orchestration.
 
 Tests the quality gate (_name_quality_is_acceptable), bond selection
-(_select_best_bond), and try_decompose() orchestration from
+(_select_best_bond), and try_decompose orchestration from
 orthonym.decomposition.engine.
 """
 
@@ -38,7 +38,7 @@ def _mol(smiles: str):
 
 @pytest.mark.unit
 class TestNameQualityGate:
-    """Test _name_quality_is_acceptable() correctly identifies good/poor names."""
+    """Test _name_quality_is_acceptable correctly identifies good/poor names."""
 
     def test_good_name_ethanol(self):
         """Good name for simple molecule should be acceptable."""
@@ -101,7 +101,7 @@ class TestNameQualityGate:
         # "2-methyldocosane-1" (18 chars) / 22 HA = 0.82 > 0.65 -> passes chars/HA gate
         assert _name_quality_is_acceptable("2-methyldocosane-1", large_mol) is True
 
-    # -- DECO-24: chars/HA quality gate for 15-30 HA range --
+    # --: chars/HA quality gate for 15-30 HA range --
 
     def test_quality_gate_chars_per_ha_rejects_low_ratio(self):
         """A name with chars/HA < 0.65 for a 23 HA molecule should be rejected.
@@ -159,7 +159,7 @@ class TestNameQualityGate:
 
 @pytest.mark.unit
 class TestBondSelection:
-    """Test _select_best_bond() priority and balance logic."""
+    """Test _select_best_bond priority and balance logic."""
 
     def test_single_bond_returns_it(self):
         """With only one bond, return it directly."""
@@ -193,7 +193,7 @@ class TestBondSelection:
 
 @pytest.mark.unit
 class TestTryDecompose:
-    """Test try_decompose() orchestration flow."""
+    """Test try_decompose orchestration flow."""
 
     def setup_method(self):
         """Reset naming depth before each test."""
@@ -382,7 +382,7 @@ class TestDecompositionForCompoundClasses:
 
 @pytest.mark.unit
 class TestSugarFragmentIntercept:
-    """Test _name_sugar_fragment() sugar lookup intercept."""
+    """Test _name_sugar_fragment sugar lookup intercept."""
 
     def test_name_sugar_fragment_glucose(self):
         """Beta-D-glucose canonical SMILES returns glycosyloxy prefix."""
@@ -432,7 +432,7 @@ class TestSugarFragmentIntercept:
 
 @pytest.mark.unit
 class TestCoverageGate:
-    """Test _coverage_is_adequate() name-length heuristic for decomposition results."""
+    """Test _coverage_is_adequate name-length heuristic for decomposition results."""
 
     def test_small_molecule_always_passes(self):
         """Molecules with <= 10 heavy atoms always pass coverage gate."""
@@ -516,7 +516,7 @@ class TestCoverageGate:
 
 @pytest.mark.unit
 class TestGarbledPatternExtension:
-    """Test _decomposition_is_worse() with extended garbled patterns for new bond types."""
+    """Test _decomposition_is_worse with extended garbled patterns for new bond types."""
 
     def test_thioateyl_detected_as_garbled(self):
         """'thioateyl' in decomposed name is detected as garbled."""
@@ -610,7 +610,7 @@ class TestLeafFirstOrdering:
 
 @pytest.mark.unit
 class TestNameFragmentWithFallback:
-    """Test _name_fragment_with_fallback() helper function."""
+    """Test _name_fragment_with_fallback helper function."""
 
     def test_fallback_returns_name_for_simple_smiles(self):
         """Simple molecule naming via fallback should return ethanol."""
@@ -627,7 +627,7 @@ class TestNameFragmentWithFallback:
 
 
 # ============================================================================
-# Partial assembly tests (DECO-25)
+# Partial assembly tests
 # ============================================================================
 
 
@@ -635,7 +635,7 @@ class TestNameFragmentWithFallback:
 class TestPartialAssembly:
     """Test partial assembly strategy in _try_multi_bond_decompose.
 
-    DECO-25: When 2/3+ fragments name successfully, assemble a partial
+    : When 2/3+ fragments name successfully, assemble a partial
     name instead of aborting entirely.
     """
 
@@ -646,7 +646,7 @@ class TestPartialAssembly:
             _fragment_guard.cache = None
 
     def test_ester_threshold_is_two(self):
-        """DECO-22: Ester multi-bond threshold should be 2 (lowered from 3)."""
+        """: Ester multi-bond threshold should be 2 (lowered from 3)."""
         from orthonym.decomposition.engine import _MULTI_BOND_THRESHOLD
         assert _MULTI_BOND_THRESHOLD["ester"] == 2, (
             f"Ester threshold should be 2, got {_MULTI_BOND_THRESHOLD['ester']}"
@@ -657,11 +657,11 @@ class TestPartialAssembly:
         (a phase -- internal notes).
 
         Mock scenario: 3 fragments from multi-bond ester cleavage, where the
-        third fragment fails naming (even after the T4 rescue rung inside
+        third fragment fails naming (even after the rescue rung inside
         `_name_fragment_with_fallback`, which this test bypasses entirely by
         mocking that function directly). Shipping a name built from the 2
         successful fragments would describe a SMALLER molecule than the
-        input -- exactly the SELF-01-suppressed-partial defect the phase
+        input -- exactly the -suppressed-partial defect the phase
         fixed. The engine must decline (return None) instead of ever
         silently dropping the third fragment's atoms.
 
@@ -720,7 +720,7 @@ class TestPartialAssembly:
     def test_partial_assembly_one_of_three_aborts(self):
         """When only 1/3 fragments names successfully, should return None.
 
-        DECO-25: requires at least 2 named fragments for assembly.
+        : requires at least 2 named fragments for assembly.
         """
         from unittest.mock import patch
         from orthonym.decomposition.engine import _try_multi_bond_decompose

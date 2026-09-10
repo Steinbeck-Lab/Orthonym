@@ -1,4 +1,4 @@
-"""v33 Phase 3 (beta-lactam layer 2): the bicyclo composer's OWN substituent
+""" a phase (beta-lactam layer 2): the bicyclo composer's OWN substituent
 builder (`_build_bicyclo_substituent_prefix`, composer.py) had no recursive
 substituent namer -- any heteroatom-bearing substituent (acylamino,
 acyloxymethyl) was silently mis-spelled as a same-carbon-count alkyl, because
@@ -8,20 +8,20 @@ bare halogen/hydroxy/amino/pure-hydrocarbon.
 
 Layer 1 (commit 8217684f) fixed `is_bicyclo_system`'s pendant-ring scope bug
 so the bicyclo composer is REACHED for penicillin-G-shaped molecules; this
-layer fixes what it does once reached. SPY (see
-`.superpowers/sdd/2026-08-17-v33-phase3-acid-ester-anion/spy-betalactam-full.md`)
+layer fixes what it does once reached. a trace (see
+`.superpowers/sdd/2026-08-17--phase3-acid-ester-anion/trace-betalactam-full.md`)
 named `name_substituent`/`_enrich_complex_ring_with_subs` as the candidate
 reuse target. Direct probing found a REFINEMENT: `name_substituent` alone
 returns the `'substituent'` sentinel for a branched/ring-containing acyl in
 an acylamino branch (phenylacetamido, penicillin G's own side chain) -- it
-has no route to the PEP-04 ring-in-acyl-subtree fix that already lives in
+has no route to the ring-in-acyl-subtree fix that already lives in
 `_check_for_acylamino` (composer.py:8851), the primitive
 `rules/polyfunctional.py:3272` already uses for the identical problem on a
 CHAIN parent. The fix therefore tries BOTH existing primitives in sequence
 (`_check_for_acylamino` first, then `name_substituent`), reusing two already
 -shipped, already-tested naming mechanisms -- no new substituent namer was
 written. Neither succeeding fails the whole bicyclo parent closed (returns
-None), matching the existing P-29.2 `unnameable` contract already in this
+None), matching the existing `unnameable` contract already in this
 function.
 """
 from unittest.mock import patch
@@ -67,12 +67,12 @@ class TestPenicillinG:
         (2S,5R,6R)-3,3-dimethyl-7-oxo-6-{acylamino}-4-thia-1-azabicyclo[3.2.0]-
         heptane-2-carboxylic acid. The 6-substituent is the acylamino side
         chain -NHC(=O)CH2C6H5 (2-phenylacetamido); before this fix its 8
-        carbons were mis-spelled '6-octyl' (SELF-01 correctly caught it as a
+        carbons were mis-spelled '6-octyl' (correctly caught it as a
         different molecule -- 0-wrong held, but the molecule abstained).
 
         Per the task's own instruction, the EXACT substituent spelling is not
-        forced here -- '(2-phenylacetamido)' (P-66.1.1.4.3 method (1),
-        BB:32859/32995 contracted amido form, already verified elsewhere in
+        forced here -- '(2-phenylacetamido)' method (1),
+        the Blue Book contracted amido form, already verified elsewhere in
         this codebase) is accepted as well as the method-(2)
         '[(2-phenylacetyl)amino]' form; only round-trip-exactness to the
         input's InChIKey is asserted.
@@ -98,7 +98,7 @@ class TestSimplerAcylaminoOnBicyclo:
         substituent builder) in isolation from layer 1's zero-bridge
         pendant-ring scope fix -- `is_bicyclo_system` already returned True
         for this shape before either fix. Before layer 2: the acetamido's 2
-        carbons were mis-spelled '2-ethyl' (SELF-01 caught it; the molecule
+        carbons were mis-spelled '2-ethyl' (caught it; the molecule
         abstained).
         """
         smiles = "CC(=O)NC1CC2CCC1(C2)C(=O)O"
@@ -112,7 +112,7 @@ class TestSimplerAcylaminoOnBicyclo:
         (-CH2-O-C(=O)-CH3): `is_bicyclo_system` already returns True for this
         exact shape without needing layer 1 (no pendant ring >= 5 anywhere),
         so this isolates layer 2 alone. Before the fix: the acetoxymethyl's
-        3 carbons were mis-spelled '3-propyl' (SELF-01 caught it; the
+        3 carbons were mis-spelled '3-propyl' (caught it; the
         molecule abstained). `name_substituent` alone (no
         `_check_for_acylamino` needed here) spells this correctly as
         '(acetyloxy)methyl'.
@@ -165,7 +165,7 @@ class TestFailClosedOnUnspellableSubstituent:
 
         # Real inputs, captured from the exact call `_assemble_complete_
         # bicyclo_name` makes for the acetamido-norbornane-carboxylic-acid
-        # case above (spied, not hand-built, so the substituents/atom_to_
+        # case above (traced, not hand-built, so the substituents/atom_to_
         # locant shapes are authentic).
         captured = {}
         original = composer_module._build_bicyclo_substituent_prefix

@@ -1,4 +1,4 @@
-"""v29 Phase 1: the independent morpheme-arity oracle.
+""" a phase: the independent morpheme-arity oracle.
 
 WHY this module exists
 ----------------------
@@ -48,7 +48,7 @@ Four specific refusals follow from that contract, and each is deliberate:
   components SHARE their fusion atoms, so a fusion prefix's atoms cannot be
   summed with the base component's at all.
 
-WHY AGREEMENT IS NOT ENOUGH (the v29 confident-wrong defect)
+WHY AGREEMENT IS NOT ENOUGH (the confident-wrong defect)
 ------------------------------------------------------------
 "Enumerate every decomposition and require agreement" is sound only if the
 correct decomposition is among those enumerated. When a morpheme is MISSING
@@ -95,29 +95,29 @@ A VIEW OVER SHIPPED DATA, NOT A NEW CATALOG
 Every count below is derived from a table this project already ships, so the
 oracle cannot drift away from the tables the namer itself names from:
 
-===========================  =========================================
-Morpheme class               Source
-===========================  =========================================
-chain stems (meth-, dec-)    ``data.chain_names.get_chain_prefix``
+=========================== =========================================
+Morpheme class Source
+=========================== =========================================
+chain stems (meth-, dec-) ``data.chain_names.get_chain_prefix``
                              (inverted over n=1..``_MAX_CHAIN``)
-suffix particles (-ol, -ic)  ``data.opsin_imports.suffix_rules`` --
+suffix particles (-ol, -ic) ``data.opsin_imports.suffix_rules`` --
                              ``OPSIN_SUFFIX_APPLICABILITY`` bridges the
                              surface morpheme to a rule, whose
                              ``addgroup`` SMILES gives the atom count
-substituent prefixes         ``data.opsin_imports`` group tables
-(hydroxy-, nitro-, chloro-)  (SMILES per entry)
-retained/trivial names       ``data.ALL_RETAINED_NAMES`` (inverted) and
+substituent prefixes ``data.opsin_imports`` group tables
+(hydroxy-, nitro-, chloro-) (SMILES per entry)
+retained/trivial names ``data.ALL_RETAINED_NAMES`` (inverted) and
                              ``data/iupac_2013_pin_list.json``
-ring systems, aryl groups    ``data.opsin_imports`` aryl/cyclic tables
-ring substituents (phenyl-)  ``rules.ring_substituents`` chained to the
+ring systems, aryl groups ``data.opsin_imports`` aryl/cyclic tables
+ring substituents (phenyl-) ``rules.ring_substituents`` chained to the
                              parent ring's own count
-fusion prefixes (benzo-)     ``data.fusion_components`` ``ring_size``
-Hantzsch-Widman stems        ``data.hw_stems.HW_STEMS`` (inverted)
-replacement prefixes (aza-)  ``rules.skeletal_replacement``
-multipliers (di-, bis-)      ``assembly.naming_utils`` (inverted)
-elided stems (thiazol-)      terminal-'e' elision (P-16.7.1(a)) of the
+fusion prefixes (benzo-) ``data.fusion_components`` ``ring_size``
+Hantzsch-Widman stems ``data.hw_stems.HW_STEMS`` (inverted)
+replacement prefixes (aza-) ``rules.skeletal_replacement``
+multipliers (di-, bis-) ``assembly.naming_utils`` (inverted)
+elided stems (thiazol-) terminal-'e' elision (a)) of the
                              skeletons the tables above agreed on
-===========================  =========================================
+=========================== =========================================
 
 Only morphemes that NO shipped table covers are written by hand, in
 ``_STRUCTURAL_AFFIXES`` below, and each carries a comment saying why it is not
@@ -174,7 +174,7 @@ _GROUP_TERMINATORS = (SUBST, ATTACH)
 ENDING = "ending"
 PREMARK = "premark"
 
-# Chain stems are inverted out of get_chain_prefix() up to this length. Beyond
+# Chain stems are inverted out of get_chain_prefix up to this length. Beyond
 # it a token simply goes unrecognised (safe) rather than wrong.
 _MAX_CHAIN = 60
 
@@ -220,7 +220,7 @@ _STEREO_GROUP = re.compile(
     r")\)-?"
 )
 
-# Hypervalence: out of scope for Phase 1 (see module docstring).
+# Hypervalence: out of scope for a phase (see module docstring).
 _LAMBDA = re.compile(r"lambda|λ")
 
 # von Baeyer / spiro heads. 'cyclo' alone is monocyclic and needs no
@@ -264,7 +264,7 @@ _PREMARKS = frozenset(
 #: atom count of a name that asserts one, because RDKit merges unlabelled
 #: hydrogens into the implicit count while it KEEPS labelled ones as atoms --
 #: so 'borodeuteride' paired with '[BH4-]' loses exactly the four atoms the
-#: name spells. Named as a class (P-82 isotopic modification), not per token.
+#: name spells. Named as a class isotopic modification), not per token.
 _ISOTOPE_MORPHEMES = re.compile(r"deuter|triti|proti")
 
 #: HW stems distinctive enough to be a reliable ring assertion in a name's
@@ -299,7 +299,7 @@ _CARB_FORM_SURFACES: Dict[str, str] = {
 }
 
 # OPSIN group_type whose suffix semantics are the ordinary chain/ring ones.
-# The other types (acidStem, aminoAcid, carbohydrate, ...) attach the SAME
+# The other types (acidStem, aminoAcid, carbohydrate,...) attach the SAME
 # surface morpheme with a different atom accounting -- e.g. surface 'yl' is
 # the 0-atom radical suffix on a standardGroup but the 1-atom 'oyl' rule on an
 # acidStem. Restricting to standardGroup is what makes the surface->count map
@@ -398,7 +398,7 @@ def _hydride_flags(smiles: str) -> Tuple[bool, bool]:
     A **parent hydride** is a bare skeleton carrying no characteristic group.
     Every non-carbon atom being a RING atom is the whole test, and it is enough
     for the one question ``_well_formed`` R3 asks: a characteristic-group suffix
-    attaches to a parent hydride (P-14.2), never to a molecule that already
+    attaches to a parent hydride, never to a molecule that already
     carries its own characteristic group. ``benzene``, ``cyclohexane``,
     ``pyridine`` and ``1,3-thiazole`` pass; ``phosphoramid`` (whose SMILES
     already holds the acid oxygens that ``-ic acid`` would add again, giving 7
@@ -582,7 +582,7 @@ def _add_suffix_morphemes(general: _Lexicon) -> None:
         # A rule with a cyclic-extra atom states TWO different accountings:
         # the bare surface's count is the CHAIN one, valid only when the acid
         # carbon belongs to the chain. On a ring the carb- form is required
-        # (P-65.1.1, P-66.1), so the bare surface is chain-only.
+        #,, so the bare surface is chain-only.
         general.add(surface, chain_atoms, ATTACH if attaches else AFFIX,
                     suffix_only=not attaches,
                     chain_only=bool(any(s[1] for s in scored)) and not attaches)
@@ -741,7 +741,7 @@ def _add_chain_stems(general: _Lexicon) -> None:
 
 
 def _add_elided_stems(general: _Lexicon) -> None:
-    """Terminal-'e' elision of the NAMED skeletons (P-16.7.1(a)).
+    """Terminal-'e' elision of the NAMED skeletons (a)).
 
     A parent hydride drops its final 'e' before a suffix or a locant:
     "1,3-thiazole" but "1,3-thiazol-5-yl", "pyridine" but "pyridin-2-yl". The
@@ -855,16 +855,16 @@ def _multipliers() -> Dict[str, int]:
 # of the 2,546-entry table is 116 KB and loads in 3 ms.
 #
 # Invariants (each is load-bearing for byte-identity):
-# * A cache HIT must equal a fresh build. The key is a SHA-256 over every source
-#   file the build reads, the derivation-step tuple, the package version, the
-#   Python major.minor and the RDKit version, so any change to any input yields
-#   a new file name; stale files are simply never opened.
+# * A cache HIT must equal a fresh build. The key is a over every source
+# file the build reads, the derivation-step tuple, the package version, the
+# Python major.minor and the RDKit version, so any change to any input yields
+# a new file name; stale files are simply never opened.
 # * Anything unexpected -> build fresh and try to rewrite. A missing directory, an
-#   unreadable or corrupt file, a wrong-shaped payload, a read-only filesystem:
-#   none of these may change the returned table or raise.
+# unreadable or corrupt file, a wrong-shaped payload, a read-only filesystem:
+# none of these may change the returned table or raise.
 # * Writes are atomic (tmp file + os.replace) because 40 shards start at once.
 # * ORTHONYM_LEXICON_CACHE=off disables it; ORTHONYM_CACHE_DIR moves it
-#   (default: $XDG_CACHE_HOME/orthonym or ~/.cache/orthonym).
+# (default: $XDG_CACHE_HOME/orthonym or ~/.cache/orthonym).
 # The file is a pickle from the user's own cache directory; the build reads no
 # untrusted input, so this is the same trust boundary as the installed package.
 # ---------------------------------------------------------------------------
@@ -884,7 +884,7 @@ _LEXICON_SOURCE_FILES: Tuple[str, ...] = (
 
 
 def lexicon_cache_key() -> str:
-    """SHA-256 identifying the exact inputs of the lexicon build."""
+    """ identifying the exact inputs of the lexicon build."""
     h = _hashlib.sha256()
     files = [_PKG_ROOT / rel for rel in _LEXICON_SOURCE_FILES]
     files += sorted((_PKG_ROOT / "data").rglob("*.py"))
@@ -952,7 +952,7 @@ def _store_lexicon_cache(path: Path, table: Dict[str, _Morph]) -> None:
 
 @lru_cache(maxsize=1)
 def _lexicon() -> Dict[str, _Morph]:
-    """The one morpheme table (see :func:`_build_lexicon`), served from the
+    """The one morpheme table (see:func:`_build_lexicon`), served from the
     on-disk cache when a file for exactly this code exists."""
     if not _lexicon_cache_enabled():
         return _build_lexicon()
@@ -1190,7 +1190,7 @@ def _content(segments: List[_Seg]) -> List[_Seg]:
 
 
 def _ends_free_valence(text: str) -> bool:
-    """Does ``text`` end in a P-29.2 free-valence affix?
+    """Does ``text`` end in a free-valence affix?
 
     A morpheme that does is a SUBSTITUENT form ("phenyl", "cyclohexyl") and may
     legally be followed by the skeleton it is attached to, which a bare stem may
@@ -1213,14 +1213,14 @@ def _well_formed(segments: List[_Seg], kind_name: str,
     for index, segment in enumerate(content):
         previous = content[index - 1] if index else None
 
-        # R1. Fusion is not addition (P-25.3.1): the components share the atoms
+        # R1. Fusion is not addition: the components share the atoms
         # of every fusion bond, so no sum over a fusion prefix is a count.
         if segment.category == FUSE:
             return (f"fusion prefix {segment.text!r}: fused components share "
                     f"their fusion atoms, so their arities cannot be summed")
 
         # R2. A skeletal replacement prefix REPLACES an atom of a skeleton
-        # (P-15.4), so it contributes 0 only because some stem beside it already
+        #, so it contributes 0 only because some stem beside it already
         # counted that atom. With no stem to qualify, the 0 counts nothing --
         # this is the 'diazenyl' = di|az|en|yl = 0 defect.
         if segment.category == REPL:
@@ -1236,10 +1236,10 @@ def _well_formed(segments: List[_Seg], kind_name: str,
                         f"skeleton, so its zero atoms replace nothing")
 
         # R3. A characteristic-group suffix attaches to a parent hydride and
-        # closes the name (P-14.2, P-15.1). It may not float in the middle of a
+        # closes the name,. It may not float in the middle of a
         # token ('alanylalanine' read as al|an|yl|alanine) and it may not hang
         # off a substituent prefix ('imido|hydrazide' -- where the true
-        # accounting is functional REPLACEMENT, P-25.3, not addition).
+        # accounting is functional REPLACEMENT,, not addition).
         if segment.suffix_only:
             if any(not s.suffix_only for s in content[index + 1:]):
                 return (f"suffix morpheme {segment.text!r} is not final, so it "
@@ -1259,7 +1259,7 @@ def _well_formed(segments: List[_Seg], kind_name: str,
 
             # R3c. The bare chain form of an acid/amide/nitrile suffix counts the
             # acid carbon as part of the CHAIN. On a ring parent the carb- form
-            # is required instead (P-65.1.1, P-66.1) and spells one atom more, so
+            # is required instead, and spells one atom more, so
             # the bare form beside a ring stem is a mis-tiling:
             # "ethylideneazinic acid" read as eth|ylidene|azin|IC ACID and
             # answered a CONFIDENT 10 for a 5-atom acid.
@@ -1356,7 +1356,7 @@ def _evaluate(segments: List[_Seg]) -> Optional[int]:
         # count already includes -- "heptyl" is 7 atoms whether or not two of
         # them are relabelled O by "1,3-dioxa"), so a locant-count multiplier
         # in front of one can never add atoms, unlike a multiplier in front of
-        # a genuine SUBST/ATTACH group ("dimethylamino"). Phase 0c Task 2b
+        # a genuine SUBST/ATTACH group ("dimethylamino"). a phase Task 2b
         # regression: without this, a SUBST prefix earlier in the SAME
         # composite token (e.g. "2-hydroxy-2-oxo-1,3-dioxa-6-aza-2-phosphaheptyl")
         # set ``seen_content`` before the multiplier was reached, so the
@@ -1434,7 +1434,7 @@ def _evaluate(segments: List[_Seg]) -> Optional[int]:
 def token_arity(token: str, kind: "object" = "prefix") -> ArityEstimate:
     """How many heavy atoms does ``token`` spell?
 
-    ``kind`` may be a :class:`~orthonym.validation.binding_spine.BindingKind`
+    ``kind`` may be a:class:`~orthonym.validation.binding_spine.BindingKind`
     or the equivalent plain string. It does NOT select a lexicon -- there is one
     lexicon and every reading is always enumerated (see ``_lexicon``). It settles
     one positional question only: whether a characteristic-group suffix may open
@@ -1559,16 +1559,16 @@ def lexicon_sources() -> Tuple[str, ...]:
 
 
 # ---------------------------------------------------------------------------
-# P-29.2 free-valence morphology (Phase 1b)
+# free-valence morphology (a phase)
 # ---------------------------------------------------------------------------
 #
 # A second, much smaller text oracle with the same contract as ``token_arity``:
 # it reads a prefix token's ENDING and reports how many free valences that text
-# asserts. IUPAC 2013 P-29.2:
+# asserts. IUPAC 2013:
 #
-#     -yl       one free valence
-#     -ylidene  two on the same skeletal atom
-#     -ylidyne  three on the same skeletal atom
+# -yl one free valence
+# -ylidene two on the same skeletal atom
+# -ylidyne three on the same skeletal atom
 #
 # It lives here, next to ``token_arity``, because it is pure text analysis with
 # no knowledge of any graph, and because it is SHARED: the substituent producer
@@ -1603,7 +1603,7 @@ _MULTIPLIED_FREE_VALENCE = re.compile(
 class FreeValenceEstimate:
     """How many free valences a token's text asserts, or an explicit refusal.
 
-    Mirrors :class:`ArityEstimate`: ``confident`` is the only field a caller
+    Mirrors:class:`ArityEstimate`: ``confident`` is the only field a caller
     may branch on, ``free_valences`` is meaningful ONLY when it is True and is
     ``None`` otherwise, and ``basis`` always explains the answer.
     """
@@ -1614,7 +1614,7 @@ class FreeValenceEstimate:
 
 
 def free_valence_morphology(token: object) -> FreeValenceEstimate:
-    """Read the P-29.2 free-valence count that ``token``'s own text asserts."""
+    """Read the free-valence count that ``token``'s own text asserts."""
     if not isinstance(token, str):
         return FreeValenceEstimate(None, False, "not a string")
     text = token.strip().lower()

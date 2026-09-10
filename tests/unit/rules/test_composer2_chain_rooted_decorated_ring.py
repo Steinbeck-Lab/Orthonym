@@ -1,8 +1,8 @@
 """Composer #2 — chain-rooted ring substituent with MULTI-ATOM ring decorations.
 
-v30 sub-lever A, first increment. `_compound_ring_on_chain_substituent` folded only
+ sub-lever A, first increment. `_compound_ring_on_chain_substituent` folded only
 DEGREE-1 ring decorations into the ring-yl, so a multi-atom decoration (methoxy = O-CH3,
-isopropyl, ...) landed in the carrier and broke the carrier-path check. Under the
+isopropyl,...) landed in the carrier and broke the carrier-path check. Under the
 best-effort tier (allow_mancude) fold every non-carrier decoration subgraph into the
 recursively-named ring-yl, so `(4-methoxyphenyl)methyl` and the whole decorated-aryl/
 decorated-cycloalkyl-on-a-simple-carrier class names.

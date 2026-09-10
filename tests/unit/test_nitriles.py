@@ -1,4 +1,4 @@
-"""Tests for nitrile naming (POLY-04).
+"""Tests for nitrile naming .
 
 Tests the nitrile naming module for:
 - Simple chain nitriles (acetonitrile, propanenitrile)
@@ -6,7 +6,7 @@ Tests the nitrile naming module for:
 - Ring-attached nitriles (cyclohexanecarbonitrile)
 - Nitrile as prefix (cyano-) when not principal group
 
-Based on IUPAC 2013 Blue Book P-66.1.
+Based on IUPAC 2013 Blue Book.
 """
 import pytest
 from rdkit import Chem

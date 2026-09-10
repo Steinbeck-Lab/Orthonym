@@ -1,4 +1,4 @@
-"""Merged N + numeric prefix lists on amides — P-16.3.3 / P-14.3.3 / P-14.5.2.
+"""Merged N + numeric prefix lists on amides — / /.
 
 THE TWO DEFECTS THIS CLOSES (they are NOT one class)
 ----------------------------------------------------
@@ -7,9 +7,9 @@ their own string and glued it in front of the ring-prefix string. That produced
 two independent errors, and BOTH round-tripped cleanly through OPSIN to the
 correct InChIKey -- a round trip proves the STRUCTURE, never the SPELLING:
 
-* **MERGE**  ``CNC(=O)c1ccc(C)cc1``  -> ``N-methyl-4-methylbenzamide``
+* **MERGE** ``CNC(=O)c1ccc(C)cc1`` -> ``N-methyl-4-methylbenzamide``
   PIN ``N,4-dimethylbenzamide``
-* **ORDER**  ``CNC(=O)c1cccc(Cl)c1`` -> ``N-methyl-3-chlorobenzamide``
+* **ORDER** ``CNC(=O)c1cccc(Cl)c1`` -> ``N-methyl-3-chlorobenzamide``
   PIN ``3-chloro-N-methylbenzamide``
 
 `chloro` and `methyl` are DIFFERENT prefix names and can never merge, so the
@@ -22,19 +22,19 @@ hyphenated before a DIGIT only, so an italic locant glued on as
 
 BLUE BOOK AUTHORITY (each pointer re-opened with `sed -n '<N>p'` at write time)
 ------------------------------------------------------------------------------
-**P-16.3.3** (``BlueBookV2.md:7038``) -- OCR-mangled in the dump (`P"16.3.3`,
+**** (``the Blue Book``) -- OCR-mangled in the dump (`P"16.3.3`,
 `!` for spaces), so it is quoted from the surrounding block:
 
     "The basic numerical prefixes 'di', 'tri', 'tetra', etc. are used to
-    indicate a multiplicity of: ... (b) simple substituent prefixes, including
+    indicate a multiplicity of:... (b) simple substituent prefixes, including
     parent hydrides with 'ene' and 'yne' endings (without locants)"
 
 with ``dimethyl`` printed in clause (b)'s own example list (``:7067`` ff).
 Multiplicity is therefore a property of the substituent NAME, not of which atom
 carries it -- an ``N``-methyl and a ring 4-methyl are ONE group of two.
 
-**P-14.3.3** "Citation of locants" (``:2869``) is deny-by-default: "if any
-locants are essential ... then all locants must be cited". So the merged set is
+**** "Citation of locants" (``:2869``) is deny-by-default: "if any
+locants are essential... then all locants must be cited". So the merged set is
 cited whole: ``N,4-``.
 
 The Blue Book's own MIXED italic/numeral sets fix the rendering and the
@@ -43,7 +43,7 @@ intra-set order (italic letters lead):
 * ``:42213`` ``*N*,*N*,*N*,1-tetramethylquinolin-1-ium-3-aminium (PIN)``
 * ``:42460`` ``*N*,1,4-triphenyl-1*H*-1,2,4-triazol-4-ium-3-aminide (PIN)``
 
-And within P-66.1.1.3.1.1 itself, ``:32879``
+And within itself, ``:32879``
 ``*N*,4-dimethyl-*N*-(3-methylphenyl)benzamide (PIN)`` is the merge, while
 ``:32881`` ``3-chloro-*N*-(2-chlorophenyl)naphthalene-2-sulfonamide (PIN)``
 is the order -- a chalcogen-acid amide citing the parent's ``3-chloro`` BEFORE
@@ -64,9 +64,9 @@ from orthonym.namer import name_compound
 # It was never broken -- the N-substituents were simply never put in its bucket.
 # --------------------------------------------------------------------------
 @pytest.mark.parametrize("name,locants,count,expected", [
-    ("methyl", ["N", 4], 2, "N,4-dimethyl"),            # :32879
-    ("methyl", ["N", "N", "N", 1], 4, "N,N,N,1-tetramethyl"),  # :42213
-    ("phenyl", ["N", 1, 4], 3, "N,1,4-triphenyl"),      # :42460
+    ("methyl", ["N", 4], 2, "N,4-dimethyl"),            #:32879
+    ("methyl", ["N", "N", "N", 1], 4, "N,N,N,1-tetramethyl"),  #:42213
+    ("phenyl", ["N", 1, 4], 3, "N,1,4-triphenyl"),      #:42460
     ("methyl", ["N"], 1, "N-methyl"),
     ("propan-2-yl", ["N"], 1, "N-(propan-2-yl)"),
 ])

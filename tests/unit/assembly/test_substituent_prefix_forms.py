@@ -1,6 +1,6 @@
 """Per-FG unit tests for assembly/substituent_prefix_forms.py.
 
-a phase.1 Plan-02-03 — per CONTEXT + + RESEARCH §12 Dim 1.
+a phase Plan-02-03 — per internal notes + + RESEARCH Dim 1.
 
 Acceptance threshold: >= 56 tests (14 generators x 4 fixtures each).
 Per-FG isolation: each test class targets ONE generator function.
@@ -32,22 +32,22 @@ def _match_atoms(mol, fg_name):
 
 
 # ====================================================================
-# Row 1: ester (alkyl) - get_alkoxycarbonyl_prefix per IUPAC P-65.6.3
+# Row 1: ester (alkyl) - get_alkoxycarbonyl_prefix per IUPAC
 # ====================================================================
 
 
 class TestAlkoxycarbonyl:
-    """Row 1+2: -C(=O)OR -> R-oxycarbonyl per IUPAC P-65.6.3."""
+    """Row 1+2: -C(=O)OR -> R-oxycarbonyl per IUPAC."""
 
     def test_methoxycarbonyl_positive_minimal(self):
-        """-C(=O)OCH3 -> methoxycarbonyl per P-65.6.3."""
+        """-C(=O)OCH3 -> methoxycarbonyl per."""
         mol = Chem.MolFromSmiles("COC(=O)CC")  # methyl propanoate
         atoms = _match_atoms(mol, "ester")
         result = get_alkoxycarbonyl_prefix(mol, atoms, principal_chain=None)
         assert result == "methoxycarbonyl", f"got {result!r}"
 
     def test_ethoxycarbonyl_positive_variant(self):
-        """-C(=O)OC2H5 -> ethoxycarbonyl per P-65.6.3."""
+        """-C(=O)OC2H5 -> ethoxycarbonyl per."""
         mol = Chem.MolFromSmiles("CCOC(=O)C")
         atoms = _match_atoms(mol, "ester")
         result = get_alkoxycarbonyl_prefix(mol, atoms, principal_chain=None)
@@ -89,17 +89,17 @@ class TestAlkoxycarbonyl:
 
 
 class TestPhenoxycarbonyl:
-    """Row 2: -C(=O)OAr -> phenoxycarbonyl per IUPAC P-65.6.3."""
+    """Row 2: -C(=O)OAr -> phenoxycarbonyl per IUPAC."""
 
     def test_phenoxycarbonyl_positive_minimal(self):
-        """-C(=O)OPh -> phenoxycarbonyl per P-65.6.3."""
+        """-C(=O)OPh -> phenoxycarbonyl per."""
         mol = Chem.MolFromSmiles("O=C(Oc1ccccc1)C")  # phenyl acetate
         atoms = _match_atoms(mol, "ester")
         result = get_alkoxycarbonyl_prefix(mol, atoms, principal_chain=None)
         assert result == "phenoxycarbonyl", f"got {result!r}"
 
     def test_benzyloxycarbonyl_positive_variant(self):
-        """-C(=O)OCH2Ph -> (benzyloxy)carbonyl per P-65.6.3."""
+        """-C(=O)OCH2Ph -> (benzyloxy)carbonyl per."""
         mol = Chem.MolFromSmiles("O=C(OCc1ccccc1)C")  # benzyl acetate
         atoms = _match_atoms(mol, "ester")
         result = get_alkoxycarbonyl_prefix(mol, atoms, principal_chain=None)
@@ -130,17 +130,17 @@ class TestPhenoxycarbonyl:
 
 
 # ====================================================================
-# Row 15 (): iminoester (imidate) - get_alkoxycarbonimidoyl_prefix
-# per IUPAC P-65.2.1.5 / P-66: -C(=NH)-O-R -> R-oxycarbonimidoyl.
+# Row 15 : iminoester (imidate) - get_alkoxycarbonimidoyl_prefix
+# per IUPAC /: -C(=NH)-O-R -> R-oxycarbonimidoyl.
 # Exact mirror of the ester row's guards; N-unsubstituted only (SMARTS
 # [NX2H1]), so N-substituted imidates are never perceived here.
 # ====================================================================
 
 
 class TestAlkoxycarbonimidoyl:
-    """Row 15: -C(=NH)OR -> C-{alkoxy}carbonimidoyl per IUPAC P-65.2.1.5.
+    """Row 15: -C(=NH)OR -> C-{alkoxy}carbonimidoyl per IUPAC.
 
-    The italic ``C-`` locant is REQUIRED (P-66.1.6.1.2.2, BB 33425) to prevent
+    The italic ``C-`` locant is REQUIRED, BB 33425) to prevent
     ambiguity with N-substitution; every BB substituted-carbonimidoyl prefix
     carries it (the (PIN) example ``4-(C-hydroxycarbonimidoyl)benzoic acid``,
     BB 30033). The OR is named by the audited composed primitive, never a carbon
@@ -148,14 +148,14 @@ class TestAlkoxycarbonimidoyl:
     """
 
     def test_methoxycarbonimidoyl_positive_minimal(self):
-        """-C(=NH)OCH3 -> C-methoxycarbonimidoyl per P-65.2.1.5."""
+        """-C(=NH)OCH3 -> C-methoxycarbonimidoyl per."""
         mol = Chem.MolFromSmiles("CCC(=N)OC")  # methyl propanimidate
         atoms = _match_atoms(mol, "iminoester")
         result = get_alkoxycarbonimidoyl_prefix(mol, atoms, principal_chain=None)
         assert result == "C-methoxycarbonimidoyl", f"got {result!r}"
 
     def test_ethoxycarbonimidoyl_positive_variant(self):
-        """-C(=NH)OC2H5 -> C-ethoxycarbonimidoyl per P-65.2.1.5."""
+        """-C(=NH)OC2H5 -> C-ethoxycarbonimidoyl per."""
         mol = Chem.MolFromSmiles("CCC(=N)OCC")  # ethyl propanimidate
         atoms = _match_atoms(mol, "iminoester")
         result = get_alkoxycarbonimidoyl_prefix(mol, atoms, principal_chain=None)
@@ -240,12 +240,12 @@ class TestAlkoxycarbonimidoyl:
 
 
 # ====================================================================
-# Row 3: primary_amide - static-table "carbamoyl" per IUPAC P-66.6.1
+# Row 3: primary_amide - static-table "carbamoyl" per IUPAC
 # ====================================================================
 
 
 class TestPrimaryAmideCarbamoyl:
-    """Row 3: -C(=O)NH2 -> carbamoyl per IUPAC P-66.6.1."""
+    """Row 3: -C(=O)NH2 -> carbamoyl per IUPAC."""
 
     def test_carbamoyl_positive_minimal(self):
         """-C(=O)NH2 substituent -> carbamoyl via dispatcher static-table."""
@@ -281,27 +281,27 @@ class TestPrimaryAmideCarbamoyl:
 
 
 # ====================================================================
-# Row 4: secondary_amide - get_n_alkyl_carbamoyl_prefix per IUPAC P-66.1.1.4.1.1
+# Row 4: secondary_amide - get_n_alkyl_carbamoyl_prefix per IUPAC
 # ====================================================================
 
 
 class TestNAlkylCarbamoyl:
-    """Row 4: -C(=O)NHR -> (alkyl)carbamoyl per IUPAC P-66.1.1.4.1.1.
+    """Row 4: -C(=O)NHR -> (alkyl)carbamoyl per IUPAC.
 
     The carbamoyl N is the sole substitutable locus, so its italic N-locant is
-    OMITTED (P-14.3.4). BB PINs: 'methylcarbamoyl', 'phenylcarbamoyl' (:30396),
+    OMITTED. BB PINs: 'methylcarbamoyl', 'phenylcarbamoyl' (:30396),
     '(4-nitrophenyl)carbamoyl' (:30400); the italic-N form is nowhere in the BB.
     """
 
     def test_n_methylcarbamoyl_positive_minimal(self):
-        """-C(=O)NHCH3 -> methylcarbamoyl per P-66.1.1.4.1.1 (N-locant omitted)."""
+        """-C(=O)NHCH3 -> methylcarbamoyl per (N-locant omitted)."""
         mol = Chem.MolFromSmiles("CNC(=O)CC")  # N-methylpropanamide
         atoms = _match_atoms(mol, "secondary_amide")
         result = get_n_alkyl_carbamoyl_prefix(mol, atoms, principal_chain=None)
         assert result == "methylcarbamoyl", f"got {result!r}"
 
     def test_n_ethylcarbamoyl_positive_variant(self):
-        """-C(=O)NHC2H5 -> ethylcarbamoyl per P-66.1.1.4.1.1 (N-locant omitted)."""
+        """-C(=O)NHC2H5 -> ethylcarbamoyl per (N-locant omitted)."""
         mol = Chem.MolFromSmiles("CCNC(=O)CC")  # N-ethylpropanamide
         atoms = _match_atoms(mol, "secondary_amide")
         result = get_n_alkyl_carbamoyl_prefix(mol, atoms, principal_chain=None)
@@ -323,29 +323,29 @@ class TestNAlkylCarbamoyl:
 
 
 # ====================================================================
-# Row 5: tertiary_amide - get_n_n_dialkyl_carbamoyl_prefix per IUPAC P-66.1.1.4.1.1
+# Row 5: tertiary_amide - get_n_n_dialkyl_carbamoyl_prefix per IUPAC
 # ====================================================================
 
 
 class TestNNDialkylCarbamoyl:
-    """Row 5: -C(=O)N(R)(R') -> (dialkyl)carbamoyl per IUPAC P-66.1.1.4.1.1.
+    """Row 5: -C(=O)N(R)(R') -> (dialkyl)carbamoyl per IUPAC.
 
-    Italic N-locants OMITTED (P-14.3.4). A MIXED pair is alphabetized and the
-    second substituent is enclosed per P-16.5.1.3.1 -- BB PIN witness
+    Italic N-locants OMITTED. A MIXED pair is alphabetized and the
+    second substituent is enclosed per -- BB PIN witness
     'methyl(phenyl)carbamoyl' in '5-methyl-2-[methyl(phenyl)carbamoyl]benzoic
     acid' (:32957).
     """
 
     def test_n_n_dimethylcarbamoyl_positive_minimal(self):
-        """-C(=O)N(CH3)2 -> dimethylcarbamoyl per P-66.1.1.4.1.1 (N-locant omitted)."""
+        """-C(=O)N(CH3)2 -> dimethylcarbamoyl per (N-locant omitted)."""
         mol = Chem.MolFromSmiles("CN(C)C(=O)CC")  # N,N-dimethylpropanamide
         atoms = _match_atoms(mol, "tertiary_amide")
         result = get_n_n_dialkyl_carbamoyl_prefix(mol, atoms, principal_chain=None)
         assert result == "dimethylcarbamoyl", f"got {result!r}"
 
     def test_n_ethyl_n_methylcarbamoyl_positive_mixed(self):
-        """-C(=O)N(CH3)(C2H5) -> ethyl(methyl)carbamoyl: alphabetized (P-14.5.2),
-        N-locants omitted, second enclosed (P-16.5.1.3.1)."""
+        """-C(=O)N(CH3)(C2H5) -> ethyl(methyl)carbamoyl: alphabetized,
+        N-locants omitted, second enclosed."""
         mol = Chem.MolFromSmiles("CCN(C)C(=O)CC")
         atoms = _match_atoms(mol, "tertiary_amide")
         result = get_n_n_dialkyl_carbamoyl_prefix(mol, atoms, principal_chain=None)
@@ -369,12 +369,12 @@ class TestNNDialkylCarbamoyl:
 
 
 # ====================================================================
-# Row 6: nitrile - static-table "cyano" per IUPAC P-66.5.2.1
+# Row 6: nitrile - static-table "cyano" per IUPAC
 # ====================================================================
 
 
 class TestNitrileCyano:
-    """Row 6: -C#N -> cyano per IUPAC P-66.5.2.1."""
+    """Row 6: -C#N -> cyano per IUPAC."""
 
     def test_cyano_positive_minimal(self):
         """-C#N substituent -> cyano via dispatcher static-table."""
@@ -413,12 +413,12 @@ class TestNitrileCyano:
 
 
 # ====================================================================
-# Row 7: sulfoxide - get_sulfinyl_prefix per IUPAC P-63.6
+# Row 7: sulfoxide - get_sulfinyl_prefix per IUPAC
 # ====================================================================
 
 
 class TestSulfinyl:
-    """Row 7: -S(=O)R -> R-sulfinyl per IUPAC P-63.6."""
+    """Row 7: -S(=O)R -> R-sulfinyl per IUPAC."""
 
     def test_methylsulfinyl_positive_minimal(self):
         """-S(=O)CH3 -> methanesulfinyl (Wave2 T3b: PIN acid-stem form, BB 18284)."""
@@ -453,12 +453,12 @@ class TestSulfinyl:
 
 
 # ====================================================================
-# Row 8: sulfone - get_sulfonyl_prefix per IUPAC P-63.6
+# Row 8: sulfone - get_sulfonyl_prefix per IUPAC
 # ====================================================================
 
 
 class TestSulfonyl:
-    """Row 8: -S(=O)(=O)R -> R-sulfonyl per IUPAC P-63.6."""
+    """Row 8: -S(=O)(=O)R -> R-sulfonyl per IUPAC."""
 
     def test_methylsulfonyl_positive_minimal(self):
         """-S(=O)(=O)CH3 -> methanesulfonyl (Wave2 T3b: PIN acid-stem, BB 28150)."""
@@ -488,22 +488,22 @@ class TestSulfonyl:
 
 
 # ====================================================================
-# Row 9: thioether - get_sulfanyl_prefix per IUPAC P-63.2.5
+# Row 9: thioether - get_sulfanyl_prefix per IUPAC
 # ====================================================================
 
 
 class TestSulfanyl:
-    """Row 9: -SR -> R-sulfanyl per IUPAC P-63.2.5."""
+    """Row 9: -SR -> R-sulfanyl per IUPAC."""
 
     def test_methylsulfanyl_positive_minimal(self):
-        """-SCH3 -> methylsulfanyl per P-63.2.5."""
+        """-SCH3 -> methylsulfanyl per."""
         mol = Chem.MolFromSmiles("CSCC")  # ethyl methyl sulfide
         atoms = _match_atoms(mol, "thioether")
         result = get_sulfanyl_prefix(mol, atoms, principal_chain=None)
         assert result == "methylsulfanyl", f"got {result!r}"
 
     def test_ethylsulfanyl_positive_variant(self):
-        """-SC2H5 -> ethylsulfanyl per P-63.2.5."""
+        """-SC2H5 -> ethylsulfanyl per."""
         mol = Chem.MolFromSmiles("CCSCC")  # diethyl sulfide
         atoms = _match_atoms(mol, "thioether")
         result = get_sulfanyl_prefix(mol, atoms, principal_chain=None)
@@ -523,29 +523,29 @@ class TestSulfanyl:
 
 
 # ====================================================================
-# Row 10: ether - get_alkoxy_prefix per IUPAC P-63.1 / P-63.2.5
+# Row 10: ether - get_alkoxy_prefix per IUPAC /
 # ====================================================================
 
 
 class TestAlkoxy:
-    """Row 10: -OR -> R-oxy / alkoxy per IUPAC P-63.1, P-63.2.5."""
+    """Row 10: -OR -> R-oxy / alkoxy per IUPAC,."""
 
     def test_methoxy_positive_minimal(self):
-        """-OCH3 -> methoxy per P-63.2.5."""
+        """-OCH3 -> methoxy per."""
         mol = Chem.MolFromSmiles("COCC")  # methyl ethyl ether
         atoms = _match_atoms(mol, "ether")
         result = get_alkoxy_prefix(mol, atoms, principal_chain=None)
         assert result == "methoxy", f"got {result!r}"
 
     def test_ethoxy_positive_variant(self):
-        """-OC2H5 -> ethoxy per P-63.2.5."""
+        """-OC2H5 -> ethoxy per."""
         mol = Chem.MolFromSmiles("CCOCC")  # diethyl ether
         atoms = _match_atoms(mol, "ether")
         result = get_alkoxy_prefix(mol, atoms, principal_chain=None)
         assert result == "ethoxy", f"got {result!r}"
 
     def test_phenoxy_positive_aryl(self):
-        """-OPh -> phenoxy per P-63.2.5.
+        """-OPh -> phenoxy per.
 
         Use a longer-alkyl + phenyl ether so the smaller-fragment fallback
         selects the phenyl side as the substituent.
@@ -565,22 +565,22 @@ class TestAlkoxy:
 
 
 # ====================================================================
-# Row 11: carbamate - get_carbamoyloxy_prefix per IUPAC P-66.6.4
+# Row 11: carbamate - get_carbamoyloxy_prefix per IUPAC
 # ====================================================================
 
 
 class TestCarbamoyloxy:
-    """Row 11: -NHC(=O)OR / -OC(=O)NR2 per IUPAC P-66.6.4 (two orientations)."""
+    """Row 11: -NHC(=O)OR / -OC(=O)NR2 per IUPAC (two orientations)."""
 
     def test_methoxycarbonylamino_branch_a_positive(self):
-        """Branch A: -NHC(=O)OCH3 -> (methoxycarbonyl)amino per P-66.6.4."""
+        """Branch A: -NHC(=O)OCH3 -> (methoxycarbonyl)amino per."""
         mol = Chem.MolFromSmiles("CNC(=O)OC")  # methyl methylcarbamate
         atoms = _match_atoms(mol, "carbamate")
         result = get_carbamoyloxy_prefix(mol, atoms, principal_chain=None)
         assert result == "(methoxycarbonyl)amino", f"got {result!r}"
 
     def test_ethoxycarbonylamino_branch_a_variant(self):
-        """Branch A variant: -NHC(=O)OC2H5 -> (ethoxycarbonyl)amino per P-66.6.4."""
+        """Branch A variant: -NHC(=O)OC2H5 -> (ethoxycarbonyl)amino per."""
         mol = Chem.MolFromSmiles("CNC(=O)OCC")
         atoms = _match_atoms(mol, "carbamate")
         result = get_carbamoyloxy_prefix(mol, atoms, principal_chain=None)
@@ -603,12 +603,12 @@ class TestCarbamoyloxy:
 
 
 # ====================================================================
-# Row 12: urea - static-table "carbamoylamino" per IUPAC P-66.6.5
+# Row 12: urea - static-table "carbamoylamino" per IUPAC
 # ====================================================================
 
 
 class TestUreaCarbamoylamino:
-    """Row 12: -NHC(=O)NH2 -> carbamoylamino per IUPAC P-66.6.5."""
+    """Row 12: -NHC(=O)NH2 -> carbamoylamino per IUPAC."""
 
     def test_carbamoylamino_positive_minimal(self):
         """-NHC(=O)NH2 substituent -> carbamoylamino."""
@@ -648,12 +648,12 @@ class TestUreaCarbamoylamino:
 
 
 # ====================================================================
-# Row 13: isocyanate - static-table "isocyanato" per IUPAC P-66.5.4
+# Row 13: isocyanate - static-table "isocyanato" per IUPAC
 # ====================================================================
 
 
 class TestIsocyanate:
-    """Row 13: -N=C=O -> isocyanato per IUPAC P-66.5.4."""
+    """Row 13: -N=C=O -> isocyanato per IUPAC."""
 
     def test_isocyanato_positive_minimal(self):
         """-N=C=O substituent -> isocyanato."""
@@ -690,12 +690,12 @@ class TestIsocyanate:
 
 
 # ====================================================================
-# Row 14: isothiocyanate - static-table "isothiocyanato" per IUPAC P-66.5.4
+# Row 14: isothiocyanate - static-table "isothiocyanato" per IUPAC
 # ====================================================================
 
 
 class TestIsothiocyanate:
-    """Row 14: -N=C=S -> isothiocyanato per IUPAC P-66.5.4."""
+    """Row 14: -N=C=S -> isothiocyanato per IUPAC."""
 
     def test_isothiocyanato_positive_minimal(self):
         """-N=C=S substituent -> isothiocyanato."""
@@ -732,20 +732,20 @@ class TestIsothiocyanate:
 
 
 # ====================================================================
-# a phase.2 Plan-04-01 — CR-01 unit-level Branch A vs Branch B routing
+# a phase Plan-04-01 — unit-level Branch A vs Branch B routing
 # ====================================================================
 
 
 class TestCarbamateAttachIdxRouting:
-    """a phase.2 Plan-04-01 CR-01 unit-level coverage of
+    """a phase Plan-04-01 unit-level coverage of
     ``_check_substituent_prefix_form`` Branch A vs Branch B routing per
-    IUPAC P-66.6.4.
+    IUPAC.
 
     SMARTS ``[NX3][CX3](=O)[OX2][#6]`` match indexes:
         match[0]=amide_N (Branch A trigger), match[3]=ester_O (Branch B
         trigger), match[4]=alkyl_C (parent attach point in Branch B).
 
-    Pre-CR-01 fix: ``_check_substituent_prefix_form`` never consulted
+    Pre- fix: ``_check_substituent_prefix_form`` never consulted
     ``attach_idx`` for carbamate, silently dropping the Branch B
     (``carbamoyloxy``) path documented at lines 1006-1008. This test
     class locks the new Branch B routing.
@@ -799,7 +799,7 @@ class TestCarbamateAttachIdxRouting:
         """attach_idx == match[0] (amide_N) MUST NOT return ``carbamoyloxy``.
 
         Branch A is the documented default for amide-N-attached carbamates;
-        the unit test enforces that the CR-01 special-case for Branch B
+        the unit test enforces that the special-case for Branch B
         does NOT misroute Branch A inputs to ``carbamoyloxy``.
         """
         from orthonym.assembly.substituent_prefix_forms import (
@@ -822,12 +822,12 @@ class TestCarbamateAttachIdxRouting:
 
 
 # ====================================================================
-# a phase.2 Plan-04-03a — WR-05 _PREFIX_FORM_PATTERNS thread-safety
+# a phase Plan-04-03a — _PREFIX_FORM_PATTERNS thread-safety
 # ====================================================================
 
 
 class TestWR05PrefixFormCacheThreadSafe:
-    """a phase.2 Plan-04-03a WR-05 closure: ``_PREFIX_FORM_PATTERNS``
+    """a phase Plan-04-03a closure: ``_PREFIX_FORM_PATTERNS``
     lazy init is thread-safe via ``threading.Lock`` double-check pattern.
 
     Validates the documented contract:
@@ -841,7 +841,7 @@ class TestWR05PrefixFormCacheThreadSafe:
         """The lock object is an actual ``threading.Lock`` / ``RLock``."""
         import threading
         from orthonym.assembly import substituent_prefix_forms as spf
-        # threading.Lock() returns a _thread.lock instance — check via the
+        # threading.Lock returns a _thread.lock instance — check via the
         # public sentinel methods (locked / acquire / release).
         assert hasattr(spf._PREFIX_FORM_CACHE_LOCK, "locked")
         assert callable(spf._PREFIX_FORM_CACHE_LOCK.locked)
@@ -896,7 +896,7 @@ class TestWR05PrefixFormCacheThreadSafe:
 
 @pytest.mark.unit
 class TestAlkoxycarbonylChainMembership:
-    """W2F-P2 Task 1 (P-65.6.3.3.5 method (1), BB 31958-31962): a CHAIN-MEMBER
+    """W2F-P2 Task 1 method (1), BB 31958-31962): a CHAIN-MEMBER
     ester carbonyl is expressed as oxo + alkoxy (group split), never as
     R-oxycarbonyl — that spelling double-counts the carbonyl carbon
     ('4-methoxycarbonylbutanoic acid' OPSIN-parses to monomethyl GLUTARATE,
@@ -946,7 +946,7 @@ class TestAlkoxycarbonylChainMembership:
 
 @pytest.mark.unit
 class TestAcylOnChalcogenSulfanyl:
-    """W2F-P2 Task 4 (P-35.5.1 BB 18128 + P-65.1.7.2.1): CH3-CO-S- is
+    """W2F-P2 Task 4 BB 18128 +: CH3-CO-S- is
     'acetylsulfanyl'. The alkyl counter previously collapsed the acyl C=O into
     the alkyl count ('ethylsulfanyl' = a constitutionally different molecule).
     v1 scope: unsubstituted LINEAR alkanoyl (retained formyl/acetyl +
@@ -995,7 +995,7 @@ class TestAcylOnChalcogenSulfanyl:
         assert result == "formylsulfanyl", f"got {result!r}"
 
     def test_substituted_acyl_fail_closed(self):
-        # 2-hydroxyacetyl: heteroatom inside the acyl -> v1 refuses (P-65.1.7.2.1
+        # 2-hydroxyacetyl: heteroatom inside the acyl -> v1 refuses
         # 'acetyl' cannot be chain-extended; substituted-acyl assembly out of v1)
         mol, m = self._thioether_atoms("OCC(=O)SCCC(=O)O")
         assert get_sulfanyl_prefix(mol, m, principal_chain=[5, 6]) is None

@@ -1,10 +1,10 @@
 """
-Regression tests for Phase 65 Plan 01 format/decomposition fixes.
+Regression tests for a phase Plan 01 format/decomposition fixes.
 
 Tests cover:
-- FMTX-01: Double N- prefix patterns eliminated
-- FMTX-02: Amino/hydroxy duplication eliminated
-- FMTX-04: HW elision correct, garbled suffix detection
+-: Double N- prefix patterns eliminated
+-: Amino/hydroxy duplication eliminated
+-: HW elision correct, garbled suffix detection
 
 Each test verifies both:
 1. Negative: bad pattern does NOT appear in the generated name
@@ -16,7 +16,7 @@ from orthonym import name_compound
 
 
 # ---------------------------------------------------------------------------
-# FMTX-01: No double N-N- prefix patterns
+#: No double N-N- prefix patterns
 # ---------------------------------------------------------------------------
 
 class TestDoubleNPrefixEliminated:
@@ -63,7 +63,7 @@ class TestDoubleNPrefixEliminated:
 
 
 # ---------------------------------------------------------------------------
-# FMTX-02: No amino/hydroxy duplication
+#: No amino/hydroxy duplication
 # ---------------------------------------------------------------------------
 
 class TestHydroxyDuplicationEliminated:
@@ -112,7 +112,7 @@ class TestHydroxyDuplicationEliminated:
 
 
 # ---------------------------------------------------------------------------
-# FMTX-04: HW elision and garbled suffix patterns
+#: HW elision and garbled suffix patterns
 # ---------------------------------------------------------------------------
 
 class TestHWElisionAndSuffixes:
@@ -162,7 +162,7 @@ class TestHWElisionAndSuffixes:
 # ---------------------------------------------------------------------------
 
 _ALL_TARGET_SMILES = [
-    # FMTX-01
+    #
     "CC(=O)N[C@@H](CC(C)C)C(=O)N[C@@H](CCCNC(N)=N)C(=O)NCC(=O)O",
     (
         "O=C(Nc1ccc([N+](=O)[O-])cc1)c1ccc(NC(=O)[C@@H](N)CCCC(=O)"
@@ -177,12 +177,12 @@ _ALL_TARGET_SMILES = [
         "C(=O)N[C@@H](CC(=O)N)C(=O)N[C@@H](CCCCN)C(=O)N[C@@H]"
         "(CC(C)C)C(=O)NCC(=O)O"
     ),
-    # FMTX-02
+    #
     "CCCCCCCCCCCCCCCCCC(=O)NC(CO)C(O)CCCCCCCCCCCCC",
     "CCCCCCCCCCCCCCCCCCC(=O)NC(CO)C(O)/C=C/CCCCCCCCCCCCC",
     "CCCCCCCCCCCCCCCCCC(=O)N[C@@H](CO)[C@@H](O)CCCCCCCCCCCCCC",
     "CCCCCCCCCCCCCCC(=O)NC(CO)C(O)/C=C/CCCCCCCCCCCCC",
-    # FMTX-04
+    #
     "Cc1ncco1",
     "O1CCN(c2ncc[nH]2)[C@@]1(c1ccccc1)C(C)(C)C",
 ]

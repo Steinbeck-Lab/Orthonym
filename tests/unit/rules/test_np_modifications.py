@@ -1,8 +1,8 @@
 """Unit tests for natural product modification prefix detection and formatting.
 
-Tests the detect_np_modifications() and format_np_modification_prefix() functions
+Tests the detect_np_modifications and format_np_modification_prefix functions
 that implement IUPAC nor-, homo-, seco- modification prefixes for natural product
-scaffolds per P-10/P-31.1.3 and steroid nomenclature rules 3S-7, 3S-8.
+scaffolds per / and steroid nomenclature rules 3S-7, 3S-8.
 
 Test classes:
 - TestDetectNpModifications: Detection of nor-/homo-/seco- structural changes
@@ -60,7 +60,7 @@ MORPHINE_SMILES = (
 
 
 # ===========================================================================
-# Test Class 1: detect_np_modifications()
+# Test Class 1: detect_np_modifications
 # ===========================================================================
 
 @pytest.mark.unit
@@ -193,7 +193,7 @@ class TestDetectNpModifications:
 
 
 # ===========================================================================
-# Test Class 2: format_np_modification_prefix()
+# Test Class 2: format_np_modification_prefix
 # ===========================================================================
 
 @pytest.mark.unit
@@ -274,7 +274,7 @@ class TestFormatNpModificationPrefix:
 
 
 # ===========================================================================
-# Test Class 3: Integration with name_natural_product()
+# Test Class 3: Integration with name_natural_product
 # ===========================================================================
 
 @pytest.mark.unit
@@ -341,15 +341,15 @@ class TestNameNaturalProductWithModifications:
 
 
 # ===========================================================================
-# Test Class 4: Full pipeline integration via name_compound()
+# Test Class 4: Full pipeline integration via name_compound
 # ===========================================================================
 
 @pytest.mark.unit
 class TestNameNaturalProductIntegration:
-    """End-to-end tests via name_compound() for NP modification prefixes."""
+    """End-to-end tests via name_compound for NP modification prefixes."""
 
     def test_name_compound_estrane_retains_name(self):
-        """name_compound() on estrane scaffold produces 'estrane' (retained name)."""
+        """name_compound on estrane scaffold produces 'estrane' (retained name)."""
         from orthonym import name_compound
         mol = _mol(ESTRANE_SMILES)
         result = name_compound(Chem.MolToSmiles(mol))
@@ -357,7 +357,7 @@ class TestNameNaturalProductIntegration:
         assert result == "estrane"
 
     def test_name_compound_cholesterol_unchanged(self):
-        """name_compound() on cholesterol still returns 'cholesterol'."""
+        """name_compound on cholesterol still returns 'cholesterol'."""
         from orthonym import name_compound
         result = name_compound(CHOLESTEROL_SMILES)
         assert result == "cholesterol"

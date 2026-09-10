@@ -1,9 +1,9 @@
 """
-Unit tests for generic alcohol detection (PERC-05).
+Unit tests for generic alcohol detection .
 
 Ensures the generic alcohol catch-all SMARTS [OX2H][CX4] detects hydroxyl
 groups on sp3 carbons regardless of non-carbon neighbors (halogens, nitrogen,
-sulfur, etc.).  Also verifies that specific sub-type patterns (primary_alcohol,
+sulfur, etc.). Also verifies that specific sub-type patterns (primary_alcohol,
 secondary_alcohol, tertiary_alcohol) still work, and that phenol is NOT caught
 by the generic alcohol pattern.
 """
@@ -14,7 +14,7 @@ from orthonym.perception.functional_groups import detect_functional_groups
 
 
 class TestGenericAlcoholDetection:
-    """PERC-05: Generic alcohol catch-all [OX2H][CX4] detects OH on non-standard carbons."""
+    """: Generic alcohol catch-all [OX2H][CX4] detects OH on non-standard carbons."""
 
     def test_halogenated_alcohol(self):
         """OC(F)Cl: OH on carbon with halogen neighbors."""

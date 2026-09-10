@@ -1,4 +1,4 @@
-"""v28 ring-substituent tranche T1 — decorated monocyclic heteroaromatic
+""" ring-substituent tranche — decorated monocyclic heteroaromatic
 substituents name via the recursive composer (unified stem source, resolves
 Composer #1 I1 duplication).
 
@@ -7,7 +7,7 @@ The recursion's `_monocycle_core_tail` sourced heteroarene stems from the small
 cover the systematic azoles (isoxazole/oxazole/thiazole/triazole...) that the
 authoritative dispatcher `get_ring_substituent_name` DOES name. So a DECORATED
 azolyl substituent (which must go through the recursion because the narrow
-decorated producer shares the incomplete table) declined. T1 makes the gated
+decorated producer shares the incomplete table) declined. makes the gated
 core-tail borrow the stem from the dispatcher.
 
 Producers are called DIRECTLY (unit tests disable the OPSIN gate); every new

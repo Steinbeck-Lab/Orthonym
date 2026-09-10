@@ -1,8 +1,8 @@
 """
-Unit tests for vinyl amine detection (PERC-07).
+Unit tests for vinyl amine detection .
 
 Ensures secondary and tertiary amine SMARTS patterns detect amines bonded
-to sp2 (vinyl) carbons, not just sp3 and aromatic carbons.  Also verifies
+to sp2 (vinyl) carbons, not just sp3 and aromatic carbons. Also verifies
 that amide and guanidine exclusions are preserved (no false positives).
 """
 
@@ -12,7 +12,7 @@ from orthonym.perception.functional_groups import detect_functional_groups
 
 
 class TestVinylAmineDetection:
-    """PERC-07: Secondary/tertiary amine SMARTS detect vinyl amines."""
+    """: Secondary/tertiary amine SMARTS detect vinyl amines."""
 
     def test_vinyl_secondary_amine(self):
         """C=CNHC: secondary amine on sp2 carbon."""

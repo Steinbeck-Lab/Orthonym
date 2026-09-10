@@ -1,8 +1,8 @@
-"""Phase 149 D-07: identify_parent_and_child wrap preservation tests.
+"""a phase: identify_parent_and_child wrap preservation tests.
 
 Source: https://iupac.qmul.ac.uk/fusedring/FR23.html
-Source: 149-CONTEXT.md D-07, D-15.
-Source: 149-RESEARCH.md "Hook Point #1: fusion_descriptors.identify_parent_and_child Wrap".
+Source: 149-internal notes,.
+Source: internal notes "Hook Point #1: fusion_descriptors.identify_parent_and_child Wrap".
 """
 import inspect
 
@@ -13,13 +13,13 @@ from orthonym.rules.fusion_descriptors import identify_parent_and_child
 
 
 class TestIdentifyParentAndChildD07Wrap:
-    """D-07 lock: signature + return shape + empty-name early return."""
+    """ lock: signature + return shape + empty-name early return."""
 
     def test_signature_byte_identical_to_pre_149(self):
-        """D-07 signature lock: parameters must be (mol, ring_a, ring_b).
+        """ signature lock: parameters must be (mol, ring_a, ring_b).
 
         Source: https://iupac.qmul.ac.uk/fusedring/FR23.html
-        Source: 149-CONTEXT.md D-07.
+        Source: 149-internal notes.
         """
         sig = inspect.signature(identify_parent_and_child)
         params = list(sig.parameters)
@@ -28,10 +28,10 @@ class TestIdentifyParentAndChildD07Wrap:
         )
 
     def test_return_shape_is_4_tuple(self):
-        """D-07 return shape: (str, str, list, list) preserved.
+        """ return shape: (str, str, list, list) preserved.
 
         Source: https://iupac.qmul.ac.uk/fusedring/FR23.html
-        Source: 149-CONTEXT.md D-07.
+        Source: 149-internal notes.
         """
         mol = Chem.MolFromSmiles('c1ccc2ncccc2c1')
         ri = mol.GetRingInfo()
@@ -43,10 +43,10 @@ class TestIdentifyParentAndChildD07Wrap:
         assert isinstance(ra, list) and isinstance(rb, list)
 
     def test_quinoline_pyridine_is_parent_per_fr23(self):
-        """D-07 FR-2.3(a): quinoline pyridine ring (N) is parent.
+        """.3(a): quinoline pyridine ring (N) is parent.
 
-        Source: https://iupac.qmul.ac.uk/fusedring/FR23.html FR-2.3(a)
-        Source: 149-CONTEXT.md D-07, D-15.
+        Source: https://iupac.qmul.ac.uk/fusedring/FR23.html.3(a)
+        Source: 149-internal notes,.
         """
         mol = Chem.MolFromSmiles('c1ccc2ncccc2c1')
         ri = mol.GetRingInfo()
@@ -65,16 +65,16 @@ class TestIdentifyParentAndChildD07Wrap:
         )
 
     def test_empty_names_early_return_preserved(self):
-        """D-07 empty-name early return: when neither ring is recognized
-        as a known monocyclic component, return ('', '', [], []) without
+        """ empty-name early return: when neither ring is recognized
+        as a known monocyclic component, return ('', '', , ) without
         invoking select_base_component.
 
-        Source: 149-CONTEXT.md D-07.
+        Source: 149-internal notes.
         """
         # Construct a fused mol with two rings that neither match any known
         # MONOCYCLIC_COMPONENTS entry — but we can't trivially construct
         # such a molecule. The contract is that when both name_a and name_b
-        # are empty, the function returns ('', '', [], []).
+        # are empty, the function returns ('', '', , ).
         # We simulate this by directly checking the empty-name path is
         # functional via the structural invariant: any successful call must
         # produce 4-tuple shape.

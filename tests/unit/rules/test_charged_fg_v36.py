@@ -7,7 +7,7 @@ Covers four trace-pinpointed fixes (`internal notes`):
    message, never the "unknown organic compound" sentinel.
 2. Unblocking the already-correct inorganic oxoanion namer: a carbon-free
    whole-molecule guard in ``perception/ions.py::_get_internal_charge_atoms``
-   (nitrate's own charge centres were mis-marked P-59 "internal"), plus a
+   (nitrate's own charge centres were mis-marked "internal"), plus a
    ``name_anion`` fallback wired into ``routing/dispatch_table.py``'s
    ``_handle_poly_anion`` and ``_is_mixed_sign_zwitterion`` /
    ``_handle_mixed_sign_zwitterion`` (the mixed +/- single-ion oxoanion
@@ -107,11 +107,11 @@ def test_looks_like_ionic_name_recognises_ite_suffix():
 # Task 4: substitutive nitramide / N-nitro producer
 # ---------------------------------------------------------------------------
 
-# a phase (task 11C1, P-67.1.2 / the Blue Book "(chloromethyl)(methyl)nitramide
+# a phase (task 11C1, / the Blue Book "(chloromethyl)(methyl)nitramide
 # (PIN)"): the amide N of the `nitramide` functional parent is its ONLY
-# substitutable position, so the N-locant is OMITTED (P-14.3.4.2) and the
+# substitutable position, so the N-locant is OMITTED and the
 # substituent prefixes are enclosed per the mononuclear single-attachment rule
-# P-16.5.1.3.1 (the Blue Book). The `N,N'-dinitromethanediamine` row keeps its locants
+# (the Blue Book). The `N,N'-dinitromethanediamine` row keeps its locants
 # -- it is the TWO-different-amide-nitrogens shape, where they disambiguate.
 @pytest.mark.opsin_gate
 @pytest.mark.parametrize("smi,expected", [

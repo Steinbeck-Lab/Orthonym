@@ -2,7 +2,7 @@
 # Source: suffixRules.xml + suffixApplicability.xml
 # Derived from OPSIN (Open Parser for Systematic IUPAC Nomenclature),
 # MIT License, Copyright (c) Daniel Lowe and contributors.
-# Source project: https://github.com/dan2097/opsin  — see the repository NOTICE file.
+# Source project: https://github.com/dan2097/opsin — see the repository NOTICE file.
 """OPSIN suffix rules - auto-generated, do not edit manually."""
 
 

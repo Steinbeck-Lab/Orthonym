@@ -1,6 +1,6 @@
 """ abstain-recovery — salt / charged multi-fragment component coverage.
 
-A salt (``cation anion`` binary name, P-77.1.1) abstained whenever ONE
+A salt (``cation anion`` binary name, abstained whenever ONE
 component was named WRONG by the ordinary per-component namer -- even though the
 same component names correctly standalone via the full engine. Measured root
 cause: ``name_cation`` returns a CONFIDENTLY-WRONG name for a complex organic
@@ -8,7 +8,7 @@ cation (a fused azatetracyclo cage cation -> ``tropan-1-ium``, a different,
 smaller ring system; the same cation is also named ``...heptaen-3-onium`` in a
 nested naming context). Being non-empty, that wrong name shadowed the
 best-effort per-component fallback (``if not name:`` never fired), so only the
-top-level SELF-01 joined-salt gate caught it and the WHOLE salt abstained.
+top-level joined-salt gate caught it and the WHOLE salt abstained.
 
 Fix (``rules/salts.py``): under a best-effort flag, verify each ORGANIC ion
 component round-trips to its own fragment (``_ion_fragment_roundtrips``); when
@@ -21,7 +21,7 @@ untouched (curated single source of truth, covered by the joined gate).
 
 0-WRONG ABSOLUTE: every component round-trips AND the whole salt OPSIN-round-
 trips to the full multi-fragment InChIKey, else the salt abstains. Governing
-rules: P-77.1.1 (binary salt name), P-73.1 (-ium cation suffix), P-23.2
+rules: (binary salt name), (-ium cation suffix),
 (von Baeyer cage parent).
 """
 import pytest
@@ -129,7 +129,7 @@ class TestCanariesByteIdentical:
         ("[Na+].CC(=O)[O-]", "sodium acetate"),
         ("CC(=O)[O-].C[NH3+]", "methanaminium acetate"),
         ("C[NH3+].[Cl-]", "methanaminium chloride"),
-        # P-73.4 verbatim (PIN) azabicyclo-ium salt.
+        # verbatim (PIN) azabicyclo-ium salt.
         ("C[N+]12CCC(CC1)C2.[Cl-]",
          "1-methyl-1-azabicyclo[2.2.1]heptan-1-ium chloride"),
         ("O=C([O-])CCC(=O)O.[NH4+]", "ammonium 3-carboxypropanoate"),

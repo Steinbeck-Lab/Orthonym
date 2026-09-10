@@ -1,8 +1,8 @@
-"""v29 P3-REGRESSION — a pre-enclosed FG prefix must not be enclosed a second time.
+"""-REGRESSION — a pre-enclosed FG prefix must not be enclosed a second time.
 
 WHAT BROKE, AND WHY THE GATE WAS THE ONLY THING THAT SAW IT
 ----------------------------------------------------------
-`064fefd5` added `is_substituted_substituent(prefix_form)` as a third disjunct to
+ added `is_substituted_substituent(prefix_form)` as a third disjunct to
 the ENCLOSURE decision in `polyfunctional.format_fg_prefix`, so that enclosing
 marks would stop being held by the multiplier WORD (the real I13 defect:
 `1,3-bis(phosphonooxy)propan-2-ol` had collapsed to `1,3-diphosphonooxypropan-2-ol`).
@@ -14,19 +14,19 @@ deliberately looks THROUGH enclosing marks — `naming_utils.py`:
     # A fully enclosed token is a single component: decide on its interior
     # (`(2-chloroethyl)` is substituted, `(propan-2-yl)` is not).
     if _is_fully_enclosed(work):
-        return is_substituted_substituent(work[1:-1], ...)
+        return is_substituted_substituent(work[1:-1],...)
 
 so `is_substituted_substituent('(dimethylamino)')` is `True`. Callers legitimately
 pre-enclose (`polyfunctional.py:1693` passes `f"({_oxa}imino)"` verbatim), and the
 result was a second enclosure plus a lost hyphen:
 
-    methyl 4-(dimethylamino)-4-(ethylimino)butanoate      <- gold, and correct
-    methyl 4-[(dimethylamino)]4-[(ethylimino)]butanoate   <- shipped at 64af6b2f
+    methyl 4-(dimethylamino)-4-(ethylimino)butanoate <- gold, and correct
+    methyl 4-[(dimethylamino)]4-[(ethylimino)]butanoate <- shipped at 64af6b2f
 
 Four gold TARGET rows regressed (gate `target_passes` 1641 -> 1637). **Every one of
 the four still round-trips through OPSIN cleanly**, which is exactly why no RT-based
 check could see it: OPSIN re-parses the redundant brackets and the missing hyphen
-and returns the right structure. This is the DEF-4/DEF-8 format class the
+and returns the right structure. This is the / format class the
 exact-match PIN gate exists for.
 
 THE SECOND, INDEPENDENT DEFECT
@@ -37,27 +37,27 @@ double-enclosure at all, on the escalated prefix the module's own comment
 documents (`polyfunctional.py:407`, `'[(methylcarbamoyl)amino]'`, W2F-P6):
 
     _join_prefixes(['2-[(methylcarbamoyl)amino]', '4-methyl'])
-        -> '2-[(methylcarbamoyl)amino]4-methyl'      (no hyphen)
+        -> '2-[(methylcarbamoyl)amino]4-methyl' (no hyphen)
 
 Both are pinned here so neither can regress silently again.
 
 BLUE BOOK
 ---------
-`**P-16.5.1.1**` (BlueBookV2.md:7232), verbatim: "*Parentheses are used around
-compound (see P-29.1.2) and complex (see P-29.1.3) prefixes; after the
+`****` (the Blue Book), verbatim: "*Parentheses are used around
+compound (see and complex (see prefixes; after the
 multiplicative prefixes 'bis', 'tris', etc.*" — a requirement already SATISFIED by
 the marks the caller supplied.
 
-`### **P-16.5.4** Multiple types of enclosing marks` (:7444), verbatim at :7446:
+`### **** Multiple types of enclosing marks` (:7444), verbatim at:7446:
 "*When multiple types of enclosing marks are required, the nesting order is as
-follows: {[({[( )]})]}, etc.*" — a further type is taken only when one is
+follows: {[({})]}, etc.*" — a further type is taken only when one is
 REQUIRED, so a prefix already carrying its outermost marks does not take another.
 
 (The section heading is "Multiple types of enclosing marks". An earlier draft of
 this fix cited it as "Nesting order of enclosing marks", which is the heading it
-does NOT have; corrected after reading the line. Chapter P-16 is OCR-mangled in
+does NOT have; corrected after reading the line. Chapter is OCR-mangled in
 this file — `P"16.5.4`, `!` for spaces, `G` for hyphens — so a literal grep for
-`P-16.5.4` finds NOTHING. The pattern that works is `P"16.5.4`, positive-controlled
+`` finds NOTHING. The pattern that works is `P"16.5.4`, positive-controlled
 by `grep -c 'P"16'` = 64 hits.)
 """
 
@@ -158,7 +158,7 @@ class TestJoinPrefixesHyphenatesAfterEveryEnclosingMark:
 
     @pytest.mark.parametrize("left,right,expected", [
         # An italic-N locant is a locant-bearing term too — the module's own
-        # comment says so ("like a numeric locant", HYG-04 site#2) — so it takes
+        # comment says so ("like a numeric locant", site#2) — so it takes
         # the separator after `]`/`}` for exactly the same reason.
         ("2-(methylsulfanyl)", "N,N-dimethyl", "2-(methylsulfanyl)-N,N-dimethyl"),
         ("2-[(methylcarbamoyl)amino]", "N,N-dimethyl",

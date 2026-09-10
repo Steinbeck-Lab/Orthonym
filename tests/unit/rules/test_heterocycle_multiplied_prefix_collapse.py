@@ -10,22 +10,22 @@ machinery works. Only the *ring-nitrogen* methyl stood outside it.
 
 THE RULE
 --------
-* **P-16.3.3** "The basic numerical prefixes 'di', 'tri', 'tetra', etc. are used to
+* **** "The basic numerical prefixes 'di', 'tri', 'tetra', etc. are used to
   indicate a multiplicity of:" (``the Blue Book Blue Book``), clause **(b)**
   (``:7067``): "simple substituent prefixes, including parent hydrides with 'ene' and
   'yne' endings (without locants)", whose own example list prints ``dimethyl`` (``:7069``),
   ``diethenyl`` (``:7071``) and ``dibromo`` (``:7073``). ``methyl`` and ``ethyl`` are
-  simple unsubstituted prefixes -- **P-16.3.2 (a)** (``:7033``): "Simple components are
+  simple unsubstituted prefixes -- ** (a)** (``:7033``): "Simple components are
   ... unsubstituted prefixes, such as ethyl or *tert*-butyl... All of these are
   multiplied by the multiplicative prefixes 'di', 'tri', etc." -- so the multiplier is
-  ``di``/``tri``/``tetra``, not ``bis``/``tris`` (**P-16.3.2 (c)**, ``:7035``, reserves
+  ``di``/``tri``/``tetra``, not ``bis``/``tris`` (** (c)**, ``:7035``, reserves
   those for a *substituted* component).
-* **P-14.3.3** "Citation of locants" (``:2867``), sentence ``:2869``: "if any locants
+* **** "Citation of locants" (``:2867``), sentence ``:2869``: "if any locants
   are essential for defining the structure of the parent structure or of a unit of
   structure as defined by its appropriate enclosing marks, then **all** locants must be
   cited for the parent structure or that structural unit." Deny-by-default: the
   collapsed prefix cites the whole locant set, ``1,2-``.
-* **P-14.3.2** "Position of locants" (``:2857``), sentence ``:2859``: "Locants (numerals
+* **** "Position of locants" (``:2857``), sentence ``:2859``: "Locants (numerals
   and/or letters) are placed immediately before that part of the name to which they
   relate" -- one locant set, immediately before the one multiplied prefix.
 
@@ -35,11 +35,11 @@ Mixing a ring-N locant with ring-C locants changes **nothing**, because a ring n
 that is part of the ring numbering does not take an italic ``N`` locant at all -- it
 takes its ring number. The Blue Book draws that line explicitly:
 
-* **P-66.1.3** "'Hidden' amides" (``:33125``): naming an acyl group as a substituent on
+* **** "'Hidden' amides" (``:33125``): naming an acyl group as a substituent on
   a heterocyclic ring nitrogen "is allowed but only in general nomenclature", because
   "preferred IUPAC names are constructed" as pseudoketones -- on the numbered ring.
   ``:33129`` prints ``1-(piperidin-1-yl)ethan-1-one (PIN)`` against ``1-acetylpiperidine``.
-* **P-66.1.5.1** "Lactams and lactims" (``:33224``): of its two methods, "(1) as
+* **** "Lactams and lactims" (``:33224``): of its two methods, "(1) as
   heterocyclic pseudoketones" is the one that "generates preferred IUPAC names".
 * The ``(PIN)`` examples spell the ring N as a numeral and demote the italic form to the
   general name: ``:27249`` ``pyrrolidine-1,2-diol (PIN)`` (alternatives
@@ -48,15 +48,15 @@ takes its ring number. The Blue Book draws that line explicitly:
 
 .. warning::
 
-   This docstring used to rest the crux on **P-65.2.3.1.2.1** (``:31041``) alone. The
+   This docstring used to rest the crux on **** (``:31041``) alone. The
    quote was verbatim, but the emphasis bolded *around* "amide linkages" and so
    reconstructed the very elision that inverts the sentence -- and the section governs
-   **superscripted** locants (*N*\\:sup:`2`, *N*\\:sup:`3`) under P-65.2.3, "di-, tri-,
-   tetra-, and polycarbonic acids", not ring nitrogens. Its neighbour **P-65.2.3.1.4**
+   **superscripted** locants (*N*\\:sup:`2`, *N*\\:sup:`3`) under, "di-, tri-,
+   tetra-, and polycarbonic acids", not ring nitrogens. Its neighbour ****
    (``:31107``) states the convention cleanly -- italic letter locants "are used to
    designate substitution on nitrogen atoms that are not amide linkages for which
    numerical locants are used" -- but carries the same chapter scope, so it corroborates
-   rather than governs. Corrected 2026-08-02; do not re-derive this from P-65.2.3.
+   rather than governs. Corrected 2026-08-02; do not re-derive this from.
 
 And the Blue Book prints multiplied prefixes over exactly such mixed locant sets:
 
@@ -76,7 +76,7 @@ THE ROOT CAUSE -- the collapse is NOT absent; the PARTITION is wrong
 -------------------------------------------------------------------
 ``name_substituted_heterocycle`` bucketed prefixes into **two** name-keyed dicts,
 ``n_groups`` and ``c_groups``, split by ``is_on_nitrogen`` -- which is a *ring-atom*
-test (``heterocycles.py:2060``, ``ring_atom.GetSymbol() == 'N'``). Each dict then took
+test (``heterocycles.py:2060``, ``ring_atom.GetSymbol == 'N'``). Each dict then took
 its own ``count = len(locants)``, so a methyl on the ring N and a methyl on a ring C were
 two groups of one instead of one group of two. Both formatters already delegate to the
 shared ``naming_utils.multiplied_component``; nothing about the multiplier was broken.
@@ -175,7 +175,7 @@ def test_multiplicity_is_recounted_not_merely_relocanted():
     ("CN1CCN(C)CC1",    "1,4-dimethylpiperazine"),
     # a single N-substituent: nothing to collapse
     ("CN1CCCC1",        "1-methylpyrrolidine"),
-    # the P-14.3.4.3 locant-omission licence must NOT be unmasked by the merge
+    # the locant-omission licence must NOT be unmasked by the merge
     ("CN1CCOCC1",       "4-methylmorpholine"),
 ])
 def test_already_correct_names_are_unchanged(smiles, expected):
@@ -190,7 +190,7 @@ def test_already_correct_names_are_unchanged(smiles, expected):
     ("Clc1cccn1C",   "2-chloro-1-methyl-1H-pyrrole"),
 ])
 def test_non_identical_substituents_must_not_collapse(smiles, expected):
-    """Different prefixes stay separate and alphabetised -- P-16.3.3 multiplies
+    """Different prefixes stay separate and alphabetised -- multiplies
     a multiplicity of the SAME component only."""
     assert produce(smiles) == expected
 
@@ -199,10 +199,10 @@ def test_non_identical_substituents_must_not_collapse(smiles, expected):
 def test_italic_n_fallback_is_untouched():
     """A ring N with no numeric locant keeps the italic-'N' citation.
 
-    P-66.1.3 (the Blue Book) / P-66.1.5.1 (the Blue Book) -- a ring N that IS numbered takes
+     (the Blue Book) / (the Blue Book) -- a ring N that IS numbered takes
     its numeral in a PIN, so the italic form is left to a nitrogen that receives no
     arabic number. The merge is conditioned on every locant being a number, so this
-    branch must be unreachable from it. (Not P-65.2.3.1.2.1 -- see the module
+    branch must be unreachable from it. (Not -- see the module
     docstring's warning; that section is polycarbonic-acid superscripts.)
     """
     assert _format_n_substituent("methyl", 1, locants=None) == "N-methyl"

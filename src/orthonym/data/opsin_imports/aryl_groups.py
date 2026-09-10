@@ -2,7 +2,7 @@
 # Source: arylGroups.xml
 # Derived from OPSIN (Open Parser for Systematic IUPAC Nomenclature),
 # MIT License, Copyright (c) Daniel Lowe and contributors.
-# Source project: https://github.com/dan2097/opsin  — see the repository NOTICE file.
+# Source project: https://github.com/dan2097/opsin — see the repository NOTICE file.
 """OPSIN aryl groups - auto-generated, do not edit manually."""
 
 from typing import Dict
@@ -6855,7 +6855,7 @@ OPSIN_ARYL_GROUPS: Dict[str, dict] = {
         'is_pin': False,
     },
     'c1ccc2cocc2c1': {
-        'names': ['2-benzofuran'],  # PIN (Blue Book P-25 line 11829); isobenzofuran/benzo[c]furan non-PIN
+        'names': ['2-benzofuran'],  # PIN (Blue Book line 11829); isobenzofuran/benzo[c]furan non-PIN
         'smiles': 'c1ccc2cocc2c1',
         'labels': '1/2/3/3a/4/5/6/7/7a',
         'type': 'ring',

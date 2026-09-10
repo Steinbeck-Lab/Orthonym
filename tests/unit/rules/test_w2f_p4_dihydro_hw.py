@@ -1,5 +1,5 @@
-"""P-54.4.1 partial-saturation of non-aromatizable HW rings (W2F p4).
-BB P-54.4.1 (BlueBookV2.md:24169): hydro-prefixed HW names are PINs for partially
+""" partial-saturation of non-aromatizable HW rings (W2F p4).
+BB (the Blue Book): hydro-prefixed HW names are PINs for partially
 unsaturated rings. Phosphete mancude = 2 double bonds, 0 indicated-H → the 1-ene
 evidence is a DIhydro name, not '1H-phosphete'."""
 import orthonym
@@ -26,16 +26,16 @@ class TestDihydroHW:
         assert orthonym.name_compound("C1CPC1", style="pin") == "phosphetane"
 
     def test_dihydroazepine_boundary(self):
-        # A 7-membered ring is Hantzsch-Widman territory: P-22.2.3
-        # (BlueBookV2.md:8482) "Mancude and saturated heteromonocyclic
+        # A 7-membered ring is Hantzsch-Widman territory:
+        # (the Blue Book) "Mancude and saturated heteromonocyclic
         # compounds with up to and including ten ring members are named by the
-        # extended Hantzsch-Widman system".  Partial saturation is expressed as
-        # hydro prefixes on that mancude parent -- P-31.2.3.1 (:16906), whose
+        # extended Hantzsch-Widman system". Partial saturation is expressed as
+        # hydro prefixes on that mancude parent -- (:16906), whose
         # own PIN examples include 2,7-dihydro-1H-azepine (:16920) and
         # 4,5-dihydro-3H-azepine (:16888).
         #
         # This assertion previously demanded "1-azacyclohepta-2,4-diene",
-        # justified in-comment as an "RT-verified replacement PIN".  An OPSIN
+        # justified in-comment as an "RT-verified replacement PIN". An OPSIN
         # round-trip proves a name denotes the right STRUCTURE; it never
         # decides which name is PREFERRED, and no Blue Book rule was cited for
         # sending an unsaturated 7-ring to replacement nomenclature.

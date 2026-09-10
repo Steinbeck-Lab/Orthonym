@@ -1,16 +1,16 @@
 """Every consumer of a doubly-bonded fragment takes the pipeline's morphology.
 
-Phase 1b, consumer half.
+a phase, consumer half.
 
 Five namers cite a fragment that is DOUBLE-bonded to their core -- the
 semicarbazone and hydrazone namers in ``composer``, the azine handler, the
-cumulative ium/ide chain emitter in ``rules.ions``, and the P-64.5(3) ketene
+cumulative ium/ide chain emitter in ``rules.ions``, and the (3) ketene
 branch. All five used to do the same thing:
 
     yl = name_substituent(mol, frag, c)
     if not yl.endswith("yl"):
         return None
-    ... f"{yl}idene" ...
+    ... f"{yl}idene"...
 
 That is the free-valence morphology being decided a SECOND time, in the
 consumer, by rewriting a token. It only ever worked because the pipeline was
@@ -23,8 +23,8 @@ rather than rewrites. These tests pin the end-to-end names so the surgery
 cannot come back: each one FAILS both if the pipeline regresses to ``-yl`` and
 if a consumer starts appending morphemes again.
 
-References: IUPAC 2013 P-29.2; P-68.3.1.2.2 (hydrazone), P-68.3.1.2.3 (azine),
-P-15.2.2 (semicarbazone), P-64.5(3) (ketene ylidene-methanone).
+References: IUPAC 2013; (hydrazone), (azine),
+ (semicarbazone), (3) (ketene ylidene-methanone).
 """
 import pytest
 
@@ -67,7 +67,7 @@ class TestAzine:
 class TestKeteneOxomethylidene:
 
     def test_ring_ylidene_methanone(self):
-        """P-64.5(3): O=C=C(ring) -> '<ring-ylidene>methanone'."""
+        """(3): O=C=C(ring) -> '<ring-ylidene>methanone'."""
         assert _name("O=C=C1CCCCC1") == "cyclohexylidenemethanone"
 
 

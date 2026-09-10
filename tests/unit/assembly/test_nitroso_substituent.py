@@ -1,4 +1,4 @@
-"""v30 Phase-1 tail: the -N=O nitroso substituent morpheme (P-66.5).
+""" Phase-1 tail: the -N=O nitroso substituent morpheme.
 
 Before this, name_substituent spelled -N=O via skeletal replacement
 ('2-oxa-1-azaeth-1-en-1-yl') -- RT-valid but non-PIN and ugly. The morpheme
@@ -43,14 +43,14 @@ class TestNitrosoMorpheme:
 
 
 class TestNitrosoOnHeterocycleWithSuffix:
-    """v30 tail #24: an N-nitroso ring that ALSO carries a principal-group
+    """ tail #24: an N-nitroso ring that ALSO carries a principal-group
     suffix (acid / ester). The heterocycle handler's hetero-substituent
     identifier lacked a -N=O branch, so it flagged nitroso 'unnameable' and
     the whole heterocycle candidate declined -- even though bare
-    1-nitrosopyrrolidine already named. Both now reach T1 (PIN)."""
+    1-nitrosopyrrolidine already named. Both now reach (PIN)."""
 
     def test_nitrosoproline_acid_pin(self):
-        # Default PIN tier: the acid is now a clean T1 PIN.
+        # Default PIN tier: the acid is now a clean PIN.
         r = Orthonym().name_tiered("O=NN1CCCC1C(=O)O")
         assert r.get("name") == "1-nitrosopyrrolidine-2-carboxylic acid"
 

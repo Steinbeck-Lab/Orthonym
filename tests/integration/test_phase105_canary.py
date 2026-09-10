@@ -1,7 +1,7 @@
-"""Phase 105 canary tests: freeze compound names before assembly fixes.
+"""a phase canary tests: freeze compound names before assembly fixes.
 
-These tests lock down the CURRENT output of compounds relevant to Phase 105
-(FIX-02 BUG-B guard, FIX-03 format, FIX-09 NP steroid). If a Phase 105 fix
+These tests lock down the CURRENT output of compounds relevant to a phase
+(BUG-B guard, format, NP steroid). If a a phase fix
 changes the output, the canary must be updated deliberately (not silently).
 
 Canary compounds exercise:
@@ -10,13 +10,13 @@ Canary compounds exercise:
 - Ring polyfunctional: FGs on ring + FGs on branches
 - Ring prefix conversion: heterocyclic ring substituents (Plan 03)
 - Unsaturation format: 'a' euphonic connector (Plan 02)
-- IUPAC P-59.1(a): all non-principal groups as prefixes
+- IUPAC (a): all non-principal groups as prefixes
 """
 
 import pytest
 from orthonym.namer import name_compound
 
-# Phase 105 canary compounds: frozen CURRENT output
+# a phase canary compounds: frozen CURRENT output
 PHASE105_CANARY = [
     # -- BUG-B guard: hydroxy/amino/halogen on small substituent branches --
     ("OCC(CCC)C(=O)O", "2-(hydroxymethyl)pentanoic acid"),
@@ -49,7 +49,7 @@ _CANARY_IDS = [
 
 @pytest.mark.parametrize("smiles,expected", PHASE105_CANARY, ids=_CANARY_IDS)
 def test_phase105_canary(smiles, expected):
-    """Phase 105 name-stability canary: output must not change unexpectedly."""
+    """a phase name-stability canary: output must not change unexpectedly."""
     result = name_compound(smiles)
     assert result == expected, (
         f"PHASE 105 CANARY REGRESSION: {smiles}\n"

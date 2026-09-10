@@ -1,10 +1,10 @@
-"""Unit tests for the charged-species chokepoint route_charged (Phase 169.6-03).
+"""Unit tests for the charged-species chokepoint route_charged (a phase-03).
 
 CHOKE-01 (universal routing) + CHOKE-02 (the 4 IUPAC guards). Each test cites the
 governing Blue Book P-rule. The Wave-0 file named in 169.6-VALIDATION.md.
 
 route_charged(mol, style) GENERALIZES the proven _name_oxoacid_anion template
-(neutralize -> re-enter Orthonym(style).name() -> re-apply the class-correct
+(neutralize -> re-enter Orthonym(style).name -> re-apply the class-correct
 ionic suffix). These tests prove the carbon-counting stubs (the heptanolate bug
 class) are dead: a branched/substituted alkoxide now names structurally-complete.
 """
@@ -24,7 +24,7 @@ class TestPerClass:
     """One worked target per charged class (CHOKE-01 universal routing)."""
 
     def test_anion_sulfonate(self):
-        """P-72.2.2.2.1.1: an aryl sulfonate anion -> ...sulfonate (acid anion),
+        """: an aryl sulfonate anion ->...sulfonate (acid anion),
         via neutralize (sulfonic acid) -> re-enter -> -sulfonate suffix."""
         assert _rc("CCS(=O)(=O)[O-]") == "ethanesulfonate"
 
@@ -38,20 +38,20 @@ class TestPerClass:
         assert _rc("[O-]C(=O)CCC(=O)[O-]") == ""  # succinate stays on proven path
 
     def test_anion_oxoacid_sulfonate(self):
-        """P-72.2.2.2.1.1: an S/P-oxoacid anion IS owned by route_charged (it
+        """: an S/P-oxoacid anion IS owned by route_charged (it
         shares the deleted-stub neighborhood) -> -sulfonate."""
         assert _rc("CCCS(=O)(=O)[O-]") == "propane-1-sulfonate" or \
             "sulfonate" in _rc("CCCS(=O)(=O)[O-]")
 
     def test_cation_carbenium(self):
-        """P-73.2.2.1.1: carbenium PIN is methylium (NOT 'carbenium'); class-keyed
+        """: carbenium PIN is methylium (NOT 'carbenium'); class-keyed
         ane->ylium on the parent hydride restored by adding the lost hydride."""
         assert _rc("[CH3+]") == "methylium"
         assert _rc("CC[CH2+]") == "propylium"
 
     def test_dianion_via_guard2(self):
-        """P-72.7(a) (GUARD 2): a fully-deprotonated S/P-oxoacid DIANION's parent
-        bears BOTH centers and keeps the charge -> ...phosphonate (both [O-]
+        """(a) (GUARD 2): a fully-deprotonated S/P-oxoacid DIANION's parent
+        bears BOTH centers and keeps the charge ->...phosphonate (both [O-]
         neutralized to the acid, then the single ionic suffix re-applied). (The
         CARBOXYLATE dianion is deferred to the proven path; see
         test_anion_carboxylate_deferred_to_proven_path.)"""
@@ -59,20 +59,20 @@ class TestPerClass:
         assert "phosphonate" in out and "acid" not in out
 
     def test_radical_monovalent(self):
-        """P-71.1.1: a monovalent alkyl radical -> ...yl (the radical center is
+        """: a monovalent alkyl radical ->...yl (the radical center is
         H-saturated, the neutral alkane re-entered, the -yl suffix re-applied).
         CC[CH2] is the propyl radical (3 carbons)."""
         assert _rc("CC[CH2]") == "propyl"
         assert _rc("[CH3]") == "methyl"
 
     def test_radical_divalent(self):
-        """P-71: a divalent (carbene) radical -> ...ylidene."""
+        """: a divalent (carbene) radical ->...ylidene."""
         assert _rc("[CH2]") == "methylidene"
 
 
 @pytest.mark.unit
 class TestGuard1NoCrossFire:
-    """GUARD 1 (P-72.2.2.2.1 vs P-72.2.2.2.2): FG class chosen BEFORE the suffix,
+    """GUARD 1 vs: FG class chosen BEFORE the suffix,
     so an alkoxide names with -olate and a sulfonate with -sulfonate and they can
     NEVER cross-fire. This is the heptanolate-bug-dead proof on a branched/
     substituted substrate (the deleted _name_alkoxide_systematic counted carbons
@@ -83,12 +83,12 @@ class TestGuard1NoCrossFire:
         (NOT a bare carbon-count name) -- proves _name_alkoxide_systematic
         (heptanolate) dead. Uses a genuinely SYSTEMATIC branched alkoxide;
         CC(C)(C)[O-] is NOT used here because tert-butoxide is a RETAINED PIN
-        (BB P-72.2.2.2.2, lines 28180/41017: "tert-butoxide ... is also retained
+        (BB, lines 28180/41017: "tert-butoxide... is also retained
         as a preferred IUPAC name"), so it never exercises the systematic path."""
         assert _rc("CCC(C)C[O-]") == "2-methylbutan-1-olate"
 
     def test_tert_butoxide_is_retained_pin(self):
-        """BB P-72.2.2.2.2 (lines 28180/41017): tert-butoxide is retained AS A
+        """BB (lines 28180/41017): tert-butoxide is retained AS A
         PREFERRED IUPAC NAME (it just cannot be substituted). It must NOT be
         systematised to 2-methylpropan-2-olate."""
         assert _rc("CC(C)(C)[O-]") == "tert-butoxide"
@@ -108,20 +108,20 @@ class TestGuard1NoCrossFire:
         assert "olate" not in out
 
     def test_thiolate_not_olate(self):
-        """P-72.2.2.2.2: a thiolate (-S-) takes -thiolate, never -olate."""
+        """: a thiolate (-S-) takes -thiolate, never -olate."""
         out = _rc("[S-]CC")
         assert out == "ethanethiolate"
 
 
 @pytest.mark.unit
 class TestGuard2MultiCenter:
-    """GUARD 2 (P-72.7 a-c): on a multi-center ion the parent maximizes anionic
-    center count before P-44 length -- realized by neutralizing ALL same-sign
+    """GUARD 2 a-c): on a multi-center ion the parent maximizes anionic
+    center count before length -- realized by neutralizing ALL same-sign
     centers so the re-entered pipeline names the multi-suffix parent."""
 
     def test_phosphonate_dianion_keeps_charge(self):
         """A fully-deprotonated S/P-oxoacid dianion ships the anion name
-        (methanephosphonate), NOT the neutral acid (P-72.7(a) / CR-02). GUARD 2:
+        (methanephosphonate), NOT the neutral acid (a) /). GUARD 2:
         BOTH [O-] are neutralized so the single phosphonate parent is named."""
         out = _rc("CP(=O)([O-])[O-]")
         assert "phosphonate" in out
@@ -135,9 +135,9 @@ class TestGuard2MultiCenter:
 
 @pytest.mark.unit
 class TestGuard3ElementSeniority:
-    """GUARD 3 (P-72.7d / P-73.7c): a skeletal heteroatom charge picks the senior
+    """GUARD 3 /: a skeletal heteroatom charge picks the senior
     element (N>P>...>O>S>...>C) as the parent-bearing atom. For the single-center
-    majority the re-entered P-44.1.2 cascade applies the SAME element order, so
+    majority the re-entered cascade applies the SAME element order, so
     the senior-element parent is chosen automatically."""
 
     def test_heteroatom_anion_routes_through_chokepoint(self):
@@ -147,7 +147,7 @@ class TestGuard3ElementSeniority:
 
     def test_aminide_charge_on_nitrogen(self):
         """An amide/amine anion's charge on N routes to the N-bearing parent
-        (P-72.7d: N is the most senior). The chokepoint neutralizes + re-enters;
+        : N is the most senior). The chokepoint neutralizes + re-enters;
         if no canonical -aminide transform applies it falls through ('')."""
         # Mechanism check: route returns either a valid aminide name or '' (never
         # a carbon-counted carbanion misname); both are acceptable fall-through.
@@ -161,7 +161,7 @@ class TestDeferrals:
     '' (deferred to Plan 04) so the legacy path is byte-identical this plan."""
 
     def test_metal_complex_deferred(self):
-        """_has_metal -> '' (simple-metal-salt composition is Plan 04, P-65.6.2.1)."""
+        """_has_metal -> '' (simple-metal-salt composition is Plan 04,."""
         assert _rc("CCC(=O)[O-].[K+]") == ""
         assert _rc("CCC(=O)[O-].[Na+]") == ""
 
@@ -170,7 +170,7 @@ class TestDeferrals:
         assert _rc("CC(=O)[O-].CC(=O)[O-]") == ""
 
     def test_zwitterion_p74_1_2_skeletal_implemented(self):
-        """F-T6 (DD3, P-74.1.2): a zwitterion whose cation is SKELETAL to the
+        """F- (DD3,: a zwitterion whose cation is SKELETAL to the
         anion's parent ring (a pyridinium-2-carboxylate ring N+) is now named with
         the cumulative ``<ring>-<N-locant>-ium-<carboxyl-locant>-carboxylate``
         suffix via ``emit_zwitterion_ring_carboxylate`` (was deferred to '' in
@@ -181,14 +181,14 @@ class TestDeferrals:
 
     def test_neutral_internal_charge_not_routed(self):
         """A molecule whose only charge is an internal nitro/N-oxide bonding
-        charge (P-59) is NOT a charged species -> '' (the internal-charge filter
+        charge is NOT a charged species -> '' (the internal-charge filter
         excludes it, so the neutral path names it)."""
         assert _rc("CC[N+](=O)[O-]") == ""  # nitroethane: internal charge only
 
 
 @pytest.mark.unit
 class TestFailSafe:
-    """route_charged never crashes and returns '' on degenerate input (the v18
+    """route_charged never crashes and returns '' on degenerate input (the
     byte-identical no-crash contract)."""
 
     def test_none_mol(self):

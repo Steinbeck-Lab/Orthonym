@@ -1,10 +1,10 @@
-"""Wave-8 Phase P9 unit tests for P-69 organometallic additive nomenclature.
+"""Wave-8 Phase P9 unit tests for organometallic additive nomenclature.
 
 Covers docs/superpowers/plans/2026-07-16-wave8-p9-organometallics.md Tasks
 9.1-9.6. Every test targets a live reproduce-first finding (verified at HEAD
 both gated and gate-off raw per the plan's verified-scope table).
 
-NEVER uses @pytest.mark.xfail (CONTEXT) — honest-fail-on-data.
+NEVER uses @pytest.mark.xfail (internal notes) — honest-fail-on-data.
 """
 import pytest
 from rdkit import Chem
@@ -25,7 +25,7 @@ def _raw():
 
 @pytest.mark.unit
 class TestTask91EtaCarveOut:
-    """P-69.2.6: Tier-4 already generates the correct PIN; the OPSIN-2.9 eta
+    """: Tier-4 already generates the correct PIN; the OPSIN-2.9 eta
     grammar gap must NOT suppress it (carve-out, like inositol/dianhydride)."""
 
     def test_bis_benzene_chromium_ships_gated(self):
@@ -41,7 +41,7 @@ class TestTask91EtaCarveOut:
         # (item 4): neutral propene C=CC (C3H6) is NOT the η³-prop-2-en-1-yl
         # anion (C3H5) — naming it so drops 1 H per ligand (C6H12Ni named for a
         # C6H10Ni constitution). The conservation veto declines -> abstain
-        # (organometallics out of scope, P-69). See _organometallic_conserves.
+        # (organometallics out of scope,. See _organometallic_conserves.
         assert (
             Orthonym().name("[Ni].[CH2]=CC.[CH2]=CC")
             == "nickel compound (not supported)"
@@ -118,7 +118,7 @@ class TestTask92StructureLossVeto:
         assert raw.name("C[Ga](C)C") == "trimethylgallane"
 
     def test_veto_fires_gated_too(self):
-        """The gated (production) path already suppresses these via SELF-01;
+        """The gated (production) path already suppresses these via;
         the veto must not regress that -- both paths agree."""
         gated = Orthonym()
         assert gated.name("C[Ti](Cl)(Cl)Cl") != "methane"
@@ -161,7 +161,7 @@ class TestTask92CovalentMetalCarbonPredicate:
 
 @pytest.mark.unit
 class TestTask93CarbonylStockDecision:
-    """BB verbatim (P-69.2.4, P6a.pdf pp. examples): every neutral-metal
+    """BB verbatim, P6a.pdf pp. examples): every neutral-metal
     carbonyl PIN example given ('tricarbonyliron', 'dicarbonyl...molybdenum')
     OMITS the Stock oxidation number. Cationic examples use ionic charge
     notation ('molybdenum(1+)'), never a Roman-numeral Stock number, for a
@@ -184,14 +184,14 @@ class TestTask93CarbonylStockDecision:
 
 
 # ---------------------------------------------------------------------------
-# Task 9.4 -- P-69.2.3 additive sigma-coordination (transition metal +
+# Task 9.4 -- additive sigma-coordination (transition metal +
 # anionic + organic ligands)
 # ---------------------------------------------------------------------------
 
 
 @pytest.mark.unit
 class TestTask94AdditiveSigmaCoordination:
-    """BB P-69.2.3 verbatim (line 39789 / P6a.pdf):
+    """BB verbatim (line 39789 / P6a.pdf):
     '[Ti(CH3)Cl3] trichlorido(methanido)titanium trichlorido(methyl)titanium'.
     PIN uses the substitutive ligand name '(methyl)'; ligands cited in
     alphanumerical order ('chlorido' < 'methyl'), then the metal."""
@@ -218,19 +218,19 @@ class TestTask94AdditiveSigmaCoordination:
 
 
 # ---------------------------------------------------------------------------
-# Task 9.5 -- metallacycle namer (P-69.4), monocyclic tractable case
+# Task 9.5 -- metallacycle namer, monocyclic tractable case
 # ---------------------------------------------------------------------------
 
 
 @pytest.mark.unit
 class TestTask95Metallacycle:
-    """BB P-69.4 verbatim (P6a.pdf):
+    """BB verbatim (P6a.pdf):
     '1,1-dichloro-2,3,4,5-tetramethylplatinole (Hantzsch-Widman type name)'
     '1,1-dichloro-2,3,4,5-tetramethyl-1-platinacyclopenta-2,4-diene
     (skeletal replacement name)'. Orthonym ships the skeletal-replacement
     form (systematic/PIN-style per project convention; the BB explicitly
     withholds an official PIN designation for transition-metal
-    organometallics at P-69.0)."""
+    organometallics at."""
 
     def test_platinacyclopentadiene(self):
         assert (
@@ -256,19 +256,19 @@ class TestTask95Metallacycle:
 
 
 # ---------------------------------------------------------------------------
-# Task 9.6 -- dimetal seniority (P-69.5.2 tractable; P-69.5.1 fail-closed)
+# Task 9.6 -- dimetal seniority tractable; fail-closed)
 # ---------------------------------------------------------------------------
 
 
 @pytest.mark.unit
 class TestTask96DimetalClass1Class2:
-    """BB P-69.5.2 verbatim (P6a.pdf):
+    """BB verbatim (P6a.pdf):
     '[4-(diphenylstibanyl)phenyl](phenyl)mercury' -- class-1 metal (Hg) is
     the central atom; the class-2 metal (Sb) is named as a substituent
     group ('diphenylstibanyl') on the organic ligand."""
 
     def test_mu_bridge_dinuclear_fails_closed(self):
-        """P-69.5.1 (two class-1 metals + mu-bridge) is the hardest P-69
+        """ (two class-1 metals + mu-bridge) is the hardest
         construct -- explicitly deferred (design-contract). Must fail
         closed, never guess a partial/atom-dropping name."""
         smi = "c1cc(sc1[Hg]O)[Hg]c1ccncc1[As](C)C"
@@ -276,13 +276,13 @@ class TestTask96DimetalClass1Class2:
         assert name.endswith("(not supported)")
 
     def test_class1_class2_dimetal_p6952_built(self):
-        """P-69.5.2 (BUILD): class-1 central metal (Hg, Group 12) +
+        """ (BUILD): class-1 central metal (Hg, Group 12) +
         class-2 substituent metalloid (Sb, Group 15). Named additively with
         Hg as central atom, the Sb-bearing aryl cited as the recursive
-        substituent '4-(diphenylstibanyl)phenyl'. BB P-69.5.2 worked example
+        substituent '4-(diphenylstibanyl)phenyl'. BB worked example
         VERBATIM (the Blue Book). The complex ligand's enclosing marks
-        upgrade to '[]' (P-16.3.3 nesting, since the name already contains
-        '()'). Was previously deferred/fail-closed; now built via a class-
+        upgrade to '' nesting, since the name already contains
+        ''). Was previously deferred/fail-closed; now built via a class-
         aware metal partition + Group-12 recursive ligand naming + a general
         'stibanyl' substituent primitive (mirrors the arsanyl machinery)."""
         smi = "c1ccc(cc1)[Hg]c1ccc(cc1)[Sb](c1ccccc1)c1ccccc1"
@@ -290,7 +290,7 @@ class TestTask96DimetalClass1Class2:
         assert name == "[4-(diphenylstibanyl)phenyl](phenyl)mercury", name
 
     def test_dimetal_generalizes_not_special_cased(self):
-        """The P-69.5.2 build is a CLASS fix, not a WSC-02 special-case: a
+        """The build is a CLASS fix, not a -02 special-case: a
         different diorganyl-stibanyl aryl on mercury must also name via the
         same class-aware partition + recursive ligand path. Here the second
         Hg ligand is methyl (not phenyl), and the stibanyl carries tolyl

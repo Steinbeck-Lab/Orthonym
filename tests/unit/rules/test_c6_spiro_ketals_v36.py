@@ -1,19 +1,19 @@
-""" Milestone-C Wave D (phase C6) — component spiro / spiro-ketal (P-24.5).
+""" Milestone-C Wave D (phase C6) — component spiro / spiro-ketal.
 
 Grounding trace: internal notes
 
-The deliverable class this file locks is the ONE clean, RT-verified P-24.5 gap the
+The deliverable class this file locks is the ONE clean, RT-verified gap the
 trace found: a monospiro system where one component is a von-Baeyer CAGE and the
 OTHER is a SATURATED heteromonocycle too large for a Hantzsch-Widman stem
 (ring size > 10). Such a component must be named by skeletal-replacement ('a')
 nomenclature per
 
-    P-24.5.4 (the Blue Book): "In the case of ring systems modified by skeletal
-    replacement ('a') nomenclature, P-24.5.1 and P-24.5.3 are applied to name the
+     (the Blue Book): "In the case of ring systems modified by skeletal
+    replacement ('a') nomenclature, and are applied to name the
     ring system before skeletal replacement ('a') nomenclature is applied as
-    described in P-24.5.2."
-    P-24.5.2: "...at least one ring component requiring the use of skeletal
-    replacement ('a') nomenclature are named as in P-24.5.1; then, the skeletal
+    described in."
+    : "...at least one ring component requiring the use of skeletal
+    replacement ('a') nomenclature are named as in; then, the skeletal
     replacement ('a') prefixes are introduced and cited before the 'spiro' term."
 
 i.e. the large heteromonocycle is named as its all-carbon parent (`cyclododecane`)
@@ -57,15 +57,15 @@ def _rt_ok(smiles: str, name: str) -> bool:
     return opsin_roundtrip_check(smiles, name)["passed"]
 
 
-# P-24.5.2/.4 skeletal-replacement of a large (>10) heteromonocyclic spiro
+# /.4 skeletal-replacement of a large (>10) heteromonocyclic spiro
 # component joined to a von-Baeyer cage. (smiles, exact expected PIN-shaped name)
 # Both round-trip to the input skeleton (verified independently via opsin_parse).
 FIX_TARGETS = [
-    # W14 — the Blue Book P-24.5.2 PIN example: 12-membered 2,12-dioxa ring + bicyclo[2.2.1]heptane
+    # W14 — the Blue Book PIN example: 12-membered 2,12-dioxa ring + bicyclo[2.2.1]heptane
     ("C1CCCCOC2(CC3CCC2C3)OCCCC1",
      "2',12'-dioxaspiro[bicyclo[2.2.1]heptane-2,1'-cyclododecane]"),
     # 11-membered oxa ring + bicyclo[2.2.1]heptane. The spiro atom of the
-    # monocyclic component takes the LOW locant 1' (P-24.5.2 example explanation:
+    # monocyclic component takes the LOW locant 1' example explanation:
     # "The spiro atom of the monocyclic hydrocarbon component is given preference
     # for low locant."), so the oxa follows at 2'.
     ("C1CCCCOC2(CCCC1)CC1CCC2C1",

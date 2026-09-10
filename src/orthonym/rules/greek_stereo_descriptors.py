@@ -1,6 +1,6 @@
 """Shared Greek stereodescriptor letters for natural-product nomenclature.
 
-IUPAC 2013 P-101.2.6 (BlueBookV2.md:51045) writes the steroid ring-face and the
+IUPAC 2013 (the Blue Book) writes the steroid ring-face and the
 carbohydrate anomeric configuration with the GREEK letters ``α``, ``β``, ``ξ`` —
 "The stereodescriptors 'α', 'β', and 'ξ' … are cited before the name of the
 fundamental parent structure", "The symbols 'α', 'β', or 'ξ' … are placed

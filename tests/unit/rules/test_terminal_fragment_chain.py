@@ -106,16 +106,16 @@ def test_never_raises_on_degenerate_input():
 # ⚠ Every expected value below was corrected from the task brief and
 # OPSIN-verified by wrapping the token in `(token)benzene` and comparing the
 # canonical structure to the fragment attached at atom 0 (2026-08-04):
-#   (2-methylpropyl)benzene    -> PhCH2CH(CH3)2      == CC(C)C attach@0
-#   (2-methylbutyl)benzene     -> PhCH2CH(CH3)CH2CH3 == CC(C)CC attach@0
-#   (3-methyl-2-oxabutyl)benzene -> PhCH2OCH(CH3)2   == COC(C)C attach@0
-#   (2,2-dimethylpropyl)benzene -> PhCH2C(CH3)3       == CC(C)(C)C attach@0
+# (2-methylpropyl)benzene -> PhCH2CH(CH3)2 == CC(C)C attach@0
+# (2-methylbutyl)benzene -> PhCH2CH(CH3)CH2CH3 == CC(C)CC attach@0
+# (3-methyl-2-oxabutyl)benzene -> PhCH2OCH(CH3)2 == COC(C)C attach@0
+# (2,2-dimethylpropyl)benzene -> PhCH2C(CH3)3 == CC(C)(C)C attach@0
 # The brief's originals (1-methylpropyl / 1-methylbutyl / 1-methyl-2-oxapropyl
 # / 1,1-dimethylpropyl) all name a DIFFERENT molecule -- e.g. "1-methylpropyl"
 # is sec-butyl, which requires an unbranched n-butane skeleton attached at an
 # INTERNAL atom; "CC(C)C" is isobutane (2-methylpropane) and atom 0 is a leaf,
 # so no attach point in it can ever produce sec-butyl's name. Every corrected
-# value here is the textbook name for its group (isobutyl, neopentyl, ...).
+# value here is the textbook name for its group (isobutyl, neopentyl,...).
 # ---------------------------------------------------------------------------
 @pytest.mark.parametrize("smiles,expected", [
     # backbone is the longest path from the attachment atom; the remaining
@@ -221,10 +221,10 @@ def test_embedded_branched_fragment_bonded_to_an_outside_ring():
 
 # ---------------------------------------------------------------------------
 # Fix wave 1: a branch that is ITSELF compound (a branched sub-fragment, not a
-# single simple substituent) must be spliced in with P-16.5.1.1 enclosing
+# single simple substituent) must be spliced in with enclosing
 # marks, and TWO IDENTICAL compound branches must use the DERIVED multiplier
-# (bis/tris/...) rather than the basic one (di/tri/...) -- P-16.3.3(b)/
-# P-16.3.5(a) (BlueBookV2.md:4857). Before this fix, the module spliced the
+# (bis/tris/...) rather than the basic one (di/tri/...) -- (b)/
+# (a) (the Blue Book). Before this fix, the module spliced the
 # recursive branch name in bare and always used SIMPLE_MULTIPLIERS, so the
 # multi-locant case emitted a name OPSIN 2.9.0 cannot even parse:
 # '(5,6-di1-methylethyldecyl)benzene' fails; '(5,6-bis(1-methylethyl)decyl)
@@ -296,19 +296,19 @@ def test_simple_branch_still_bare_with_basic_multiplier(smiles, expected):
 # OPSIN needed -- this is pure structural bookkeeping), independently of what
 # this module's own implementation happens to emit:
 #
-#   'C=CCC': atom 0 has 2 H and is DOUBLE-bonded to atom 1 -- it IS the
-#   alkene-bearing terminal carbon of but-1-ene (CH2=CH-CH2-CH3), not the
-#   methyl terminal. `_frag` attaches at atom 0, and the free valence MUST
-#   receive locant 1 (only one numbering direction exists from a terminal
-#   atom of an unbranched chain), which forces the double bond onto locants
-#   1,2: 'but-1-en-1-yl'. The brief's 'but-3-en-1-yl' names the substituent
-#   from the OTHER terminal (methyl end, atom 3) of the SAME parent alkene --
-#   a chemically different group ('but-1-en-1-yl' is -CH=CH-CH2-CH3;
-#   'but-3-en-1-yl' is -CH2-CH2-CH=CH2).
+# 'C=CCC': atom 0 has 2 H and is DOUBLE-bonded to atom 1 -- it IS the
+# alkene-bearing terminal carbon of but-1-ene (CH2=CH-CH2-CH3), not the
+# methyl terminal. `_frag` attaches at atom 0, and the free valence MUST
+# receive locant 1 (only one numbering direction exists from a terminal
+# atom of an unbranched chain), which forces the double bond onto locants
+# 1,2: 'but-1-en-1-yl'. The brief's 'but-3-en-1-yl' names the substituent
+# from the OTHER terminal (methyl end, atom 3) of the SAME parent alkene --
+# a chemically different group ('but-1-en-1-yl' is -CH=CH-CH2-CH3;
+# 'but-3-en-1-yl' is -CH2-CH2-CH=CH2).
 #
-#   'C#CCC': identical shape -- atom 0 has 1 H and is TRIPLE-bonded to atom 1
-#   (the terminal alkyne carbon of but-1-yne), so attach=0 gives
-#   'but-1-yn-1-yl', not the brief's 'but-3-yn-1-yl'.
+# 'C#CCC': identical shape -- atom 0 has 1 H and is TRIPLE-bonded to atom 1
+# (the terminal alkyne carbon of but-1-yne), so attach=0 gives
+# 'but-1-yn-1-yl', not the brief's 'but-3-yn-1-yl'.
 #
 # 'CC=CC' (atom 0 is the CH3 terminal, double bond is at position 1-2) and
 # 'COC=C' (atom 0 is CH3, the alkene is at the far end) both already attach at
@@ -363,11 +363,11 @@ def test_an_unspellable_bond_order_refuses():
 # Every expected value below was OPSIN-verified 2026-08-04 by wrapping the
 # token in a parent and comparing the canonical SMILES to the independently
 # built expected structure:
-#   (penta-1,3-dien-1-yl)benzene         -> CC=CC=Cc1ccccc1
-#   (buta-1,2-dien-1-yl)benzene          -> CC=C=Cc1ccccc1      (allene)
-#   (penta-1,3-diyn-1-yl)benzene         -> CC#CC#Cc1ccccc1
-#   (hexa-1,3,5-trien-1-yl)benzene       -> C=CC=CC=Cc1ccccc1
-#   (hexa-1,3-dien-5-yn-1-yl)benzene     -> C#CC=CC=Cc1ccccc1
+# (penta-1,3-dien-1-yl)benzene -> CC=CC=Cc1ccccc1
+# (buta-1,2-dien-1-yl)benzene -> CC=C=Cc1ccccc1 (allene)
+# (penta-1,3-diyn-1-yl)benzene -> CC#CC#Cc1ccccc1
+# (hexa-1,3,5-trien-1-yl)benzene -> C=CC=CC=Cc1ccccc1
+# (hexa-1,3-dien-5-yn-1-yl)benzene -> C#CC=CC=Cc1ccccc1
 # ---------------------------------------------------------------------------
 @pytest.mark.parametrize("smiles,expected", [
     # two double bonds -> 'di' + linking 'a'
@@ -379,7 +379,7 @@ def test_an_unspellable_bond_order_refuses():
     # three double bonds -> 'tri' + linking 'a'
     ("C=CC=CC=C",   "hexa-1,3,5-trien-1-yl"),
     # mixed: TWO enes (multiplied, 'di') + ONE yne (not multiplied) -- 'ene'
-    # precedes 'yne' (P-31.1.1.1) and the linking 'a' appears ONCE, on the stem
+    # precedes 'yne' and the linking 'a' appears ONCE, on the stem
     ("C=CC=CC#C",   "hexa-1,3-dien-5-yn-1-yl"),
 ])
 def test_multiplied_backbone_unsaturation(smiles, expected):
@@ -394,7 +394,7 @@ def test_single_of_each_type_is_byte_identical_to_before_the_fix():
     """Regression pin: ONE ene and ONE yne together must NOT gain a
     multiplier or a linking 'a' -- neither suffix is multiplied here, so
     'pent-1-en-3-yn-1-yl' is unchanged (no 'a', no 'di'/'tri'). This is the
-    case invariant 1's "must not change" clause protects.
+    case a project rule's "must not change" clause protects.
     """
     mol, frag, attach = _frag("C=CC#CC")
     got = terminal_fragment_name(mol, frag, attach)

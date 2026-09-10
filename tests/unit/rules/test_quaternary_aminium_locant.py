@@ -1,4 +1,4 @@
-""" (P-31.1.4.2.4 / P-73.1.2.1): a quaternary ammonium whose parent branch is
+""" /: a quaternary ammonium whose parent branch is
 substituted must number that branch with the N-attached carbon as C1 (the amine
 principal group takes the lowest locant). Regression: `CC[N+](CC)(CC)CCF` emitted
 `1-fluoro-N,N,N-triethylethanaminium` (fluoro at C1 — the chain numbered from the
@@ -41,30 +41,30 @@ def test_substituted_quaternary_aminium_locant_rt_exact(smiles):
 
 
 # =============================================================================
-# a phase (WS-Q): two independent bugs in `name_quaternary_aminium` that
+# a phase : two independent bugs in `name_quaternary_aminium` that
 # made a quaternary ammonium with an acid or phenol on the parent branch
-# abstain (correctly, via SELF-01 -- 0-wrong held, but breadth was lost).
+# abstain (correctly, via -- 0-wrong held, but breadth was lost).
 #
-# Bug A (WS-Q.1, ~ions.py:4183-4199): after the manual `principal_chain.
-# reverse()` that re-orients the N-carbon to C1, `features.atom_to_locant`
+# Bug A (.1, ~ions.py:4183-4199): after the manual `principal_chain.
+# reverse` that re-orients the N-carbon to C1, `features.atom_to_locant`
 # was NOT recomputed -- it stayed keyed to the PRE-reversal chain order, so
 # every downstream locant lookup (the aminium suffix locant in particular)
 # disagreed with the chain it was nominally numbering. `[N+](C)(C)(C)
-# CCCC(=O)O` emitted the wrong-topology '...propan-3-aminium' (SELF-01
+# CCCC(=O)O` emitted the wrong-topology '...propan-3-aminium' (
 # correctly suppressed it -> abstain) instead of '...propan-1-aminium'.
 #
-# Bug B (WS-Q.2, ~ions.py:4142-4143 injection site): `PG_ATTACHMENT_INDICES
+# Bug B (.2, ~ions.py:4142-4143 injection site): `PG_ATTACHMENT_INDICES
 # ['tertiary_amine'] == [1, 2, 3]` (rules/seniority.py) assumes the canonical
 # 3-carbon tertiary-amine SMARTS shape (N + 3 C). The quaternary-N override
 # injects a 4-carbon match (N + 4 C, a 5-tuple); `_pg_attachment_atoms`
 # (rules/parent_selection.py) silently drops whichever branch lands at tuple
 # position 4 -- RDKit neighbour-iteration order, not seniority. When the
 # dropped branch is the one reaching a competing ring (e.g. a phenol several
-# atoms down the chain), the P-44.1.1 PG-count tie sees 0-vs-0 (the 3
+# atoms down the chain), the PG-count tie sees 0-vs-0 (the 3
 # surviving branches are bare methyls), falls through to the ring-senior-
 # to-chain default, and the ring wins -- emptying `principal_chain` and
 # losing the amine parent entirely. `C[N+](C)(C)CCc1ccc(O)cc1` (candicine
-# cation, ChEBI CHEBI:3350) emitted a garbled ring-parent name (SELF-01/
+# cation, ChEBI CHEBI:3350) emitted a garbled ring-parent name (/
 # OPSIN-unparseable -> abstain) instead of naming the amine chain with the
 # phenol ring as a substituent.
 #
@@ -111,7 +111,7 @@ def test_quaternary_aminium_regressions_unchanged(smiles, expected):
 
 @pytest.mark.opsin_gate
 @pytest.mark.parametrize("smiles,expected", [
-    # Task 8B RC2 (P-73.1.2.1, the Blue Book): a quaternary N bonded DIRECTLY to an
+    # Task 8B RC2, the Blue Book): a quaternary N bonded DIRECTLY to an
     # (hetero)aromatic ring is named on the ring-amine parent (aniline is retained),
     # not the chain amine. This class USED to fail closed -- `_assemble_amine_name`
     # cannot name an aromatic ring parent ('_generate_ring_parent' returns '' ->
@@ -122,14 +122,14 @@ def test_quaternary_aminium_regressions_unchanged(smiles, expected):
     ("C[N+](C)(C)c1ccncc1", "N,N,N-trimethylpyridin-4-aminium"),  # heteroaromatic ring
 ])
 def test_aryl_quaternary_aminium_now_built(smiles, expected):
-    """Task 8B RC2 (P-73.1.2.1, the Blue Book): aryl-quaternary-N ->...anilinium."""
+    """Task 8B RC2, the Blue Book): aryl-quaternary-N ->...anilinium."""
     name = _pin_name(smiles)
     assert name == expected, f"{smiles} -> {name!r}, expected {expected!r}"
 
 
 @pytest.mark.opsin_gate
 def test_substituted_aryl_quaternary_aminium_fails_closed():
-    """A SUBSTITUTED aromatic ring parent is deliberately DECLINED (P-73.1.2.1 scope
+    """A SUBSTITUTED aromatic ring parent is deliberately DECLINED scope
     boundary): the bounded producer does not alphabetise the ring's C-substituent
     prefixes against the N-locant block, and OPSIN still parses the mis-spelled
     concatenation (the RT gate cannot catch it), so this must fail closed (abstain),

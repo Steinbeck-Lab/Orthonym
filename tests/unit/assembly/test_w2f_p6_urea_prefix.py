@@ -1,6 +1,6 @@
-"""P-66.1.6.1.1.3 - N-substituted urea substituent prefix (W2F p6 Task 1).
+""" - N-substituted urea substituent prefix (W2F p6 Task 1).
 
-BB P-66.1.6.1.1.3 (BlueBookV2.md:33338,33354): urea substituent = (R-carbamoyl)amino;
+BB (the Blue Book,33354): urea substituent = (R-carbamoyl)amino;
 'ureido'/'3-methylureido' NOT recommended. Distal-N substituents are cited inside the
 carbamoyl acyl name, enclosed.
 

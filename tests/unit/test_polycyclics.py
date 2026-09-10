@@ -308,12 +308,12 @@ class TestPolycyclicNamingFunction:
 
 
 class TestRetainedFusedStemAzulene:
-    """v22 Phase C-T10 (V-1, theme T10): the empty/malformed-stem bug.
+    """ Phase C- (V-1, theme T10): the empty/malformed-stem bug.
 
-    Azulene is a retained fused-ring hydrocarbon (IUPAC 2013 P-25.1.1,
+    Azulene is a retained fused-ring hydrocarbon (IUPAC 2013,
     Table 28.1): a 5-membered ring ortho-fused to a 7-membered ring, fully
     mancude (aromatic). It was *declared* in resolvers._NAMED_PAH_SYSTEMS but
-    had no entry in POLYCYCLIC_DATA, so identify_polycyclic() returned None and
+    had no entry in POLYCYCLIC_DATA, so identify_polycyclic returned None and
     the molecule fell through name_fused_heterocycle (None: carbocyclic) and
     name_ortho_fused_bicyclic (None: aromatic, so _name_saturated_fused_
     carbocyclic declines) to the acyclic chain catch-all, which emitted the
@@ -350,7 +350,7 @@ class TestRetainedFusedStemAzulene:
         assert 'azulene' in POLYCYCLIC_DATA
 
     def test_named_pah_systems_class_never_emits_empty_stem(self):
-        """C-T10 CLASS INVARIANT: no retained PAH declared in
+        """C- CLASS INVARIANT: no retained PAH declared in
         resolvers._NAMED_PAH_SYSTEMS may collapse to the malformed empty stem
         'ane' / 'unknown' (the V-1 bug class). azulene was the declared member
         that did; this guards the whole declared set against recurrence,

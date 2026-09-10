@@ -3,8 +3,8 @@
  residue Task R. The residue item recorded "λ⁵-heterones unnameable".
 **The premise is stale.** Enumerating the class against every worked (PIN)
 example the Blue Book prints for it found the mono-oxo heterone family complete
-and byte-exact, including the λ-convention, the P-16.5.1.3 enclosing marks for
-three different substituents, and the P-74.2.1.5 heterimine next door. The
+and byte-exact, including the λ-convention, the enclosing marks for
+three different substituents, and the heterimine next door. The
 producer is ``rules/mononuclear_hydrides.py::name_heterone``, dispatched from
 ``routing/dispatch_table.py``'s ``HETERONE`` entry.
 
@@ -18,11 +18,11 @@ selects the stem. Derivation and evidence:
 `internal notes`.
 
 **The MONO-chalcogen half (=S/=Se/=Te) is now built (a phase).** The earlier
-"spelling would have to be invented" premise is stale: **P-68.3.2.3.1**
+"spelling would have to be invented" premise is stale: ****
 "Substitutive nomenclature, suffix mode" (``:39109``) makes the suffix mode the
 PIN for ``=O, =S, =Se, =Te`` and is ELEMENT-GENERAL — its worked examples span
 both phosphane (``phenylphosphanone``) and arsane (``phenylarsanethione (PIN)``
-``:39141``, ``trimethyl-λ⁵-arsanetellone (PIN)`` ``:39135``), and ``P-74.2.1.4``
+``:39141``, ``trimethyl-λ⁵-arsanetellone (PIN)`` ``:39135``), and ````
 ``:43057`` extends "these methods" to arsine and stibine "sulfides, etc." So
 ``phosphane + thione = phosphanethione`` is DETERMINED, exactly as
 ``arsane + thione = arsanethione`` is printed. OPSIN 2.9.0 round-trips
@@ -45,7 +45,7 @@ would silently measure the gate instead of this guard.
 Blue Book, ``the Blue Book Blue Book`` (every pointer re-opened with
 ``sed -n '<N>p'`` at write time):
 
-* **P-74.2.1.4 "Phosphine oxides and chalcogen analogues"** (heading
+* ** "Phosphine oxides and chalcogen analogues"** (heading
   ``:43041``). Methods ``:43045-43047``; the decisive sentence is the one AFTER
   the list, ``:43049``: *"Method (3) leads to preferred IUPAC names."* — method
   (3) being ``:43047``: *"substitutively, as heterones, by using the suffix
@@ -53,19 +53,19 @@ Blue Book, ``the Blue Book Blue Book`` (every pointer re-opened with
   ``:43054``: ``triphenyl-λ⁵-phosphanone``. Closing sentence ``:43057``:
   *"These methods are also applied to arsine and stibine oxides, sulfides,
   etc."*
-* **P-64.1.2.2 "Heterones"** (heading, above ``:28287``) — ``:28289``
+* ** "Heterones"** (heading, above ``:28287``) — ``:28289``
   ``methylsilanone (PIN)``, ``:28291`` ``phenylphosphanone (PIN)``.
-* **P-61.6 "HETERONES"** (heading, above ``:25983``).
+* ** "HETERONES"** (heading, above ``:25983``).
 * Definition, ``:1844``: *"**Heterone.** A compound having an oxygen atom
   doubly bonded to a heteroatom, for example methylsilanone."*
-* **P-61.6 "HETERONES"** body, ``:25977``: *"Compounds containing the –PO,
-  –PO2, –AsO or –AsO2 are called heterones (see P-64.1.2.2, P-64.4). In the
+* ** "HETERONES"** body, ``:25977``: *"Compounds containing the –PO,
+  –PO2, –AsO or –AsO2 are called heterones (see,. In the
   presence of a more senior characteristic group they are described by the
   compound prefixes oxophosphanyl, dioxo-λ⁵-phosphanyl, oxoarsanyl, and
   dioxo-λ⁵-arsanyl."* — four groups, four prefixes, 1:1. This is the sentence
   that makes the dione a member of the same class as the mono-oxo heterone, and
   that puts ``–AsO2`` in it alongside ``–PO2``.
-* **P-64.1.2.2 "Heterones"** body, ``:28281``: *"Heterones are compounds having
+* ** "Heterones"** body, ``:28281``: *"Heterones are compounds having
   an oxygen atom formally doubly bonded to a heteroatom... They are named in
   the same way as ketones except when expressed as compulsory prefixes"* — the
   clause that supplies the multiplied ``-dione`` suffix.
@@ -205,7 +205,7 @@ BUILT_HETERONES = [
         "OPSIN 2.9.0 round-trips triphenyl-λ5-phosphanethione to the input. "
         "REPLACES the stale v29 refusal (spelling was thought un-invented).",
     ),
-    # --- Sb / Bi heterone hubs, shipped by a phase (P-68.3.3) ---
+    # --- Sb / Bi heterone hubs, shipped by a phase ---
     (
         "O=[Bi](c1ccccc1)(c1ccccc1)c1ccccc1",
         "triphenyl-λ5-bismuthanone",
@@ -299,12 +299,12 @@ def _norm(name):
 def test_heterone_family_matches_the_blue_book_pin(
     namer, smiles, expected, provenance
 ):
-    """P-74.2.1.4:43049 -- method (3) (substitutive, as a heterone) is the PIN."""
+    """:43049 -- method (3) (substitutive, as a heterone) is the PIN."""
     assert _norm(namer.name(smiles)) == expected, provenance
 
 
 def test_lambda_descriptor_tracks_the_hub_bonding_number(namer):
-    """P-74.2.1.4:43047 -- the parent hydride is λ⁵-phosphane only when the
+    """:43047 -- the parent hydride is λ⁵-phosphane only when the
     phosphorus actually carries bonding number 5.
 
     The two phosphanones differ ONLY in the hub's bonding number, so this pins
@@ -330,7 +330,7 @@ def test_heterone_stays_fail_closed(smiles, reason):
 
 
 def test_lambda_is_computed_for_the_dione_too(namer):
-    """P-31.1.4.2 -- the λ⁵ on the dione comes from the hub's bonding number
+    """ -- the λ⁵ on the dione comes from the hub's bonding number
     (2 oxo double bonds + 1 organyl = 5), not from the suffix.
 
     Paired with ``phenylphosphanone`` (λ³, no descriptor) this shows the same
@@ -341,7 +341,7 @@ def test_lambda_is_computed_for_the_dione_too(namer):
 
 
 def test_the_dione_element_gate_is_the_bluebook_class_not_the_hub_list():
-    """P-61.6:25977 puts exactly ``-PO``, ``-PO2``, ``-AsO``, ``-AsO2`` in the
+    """:25977 puts exactly ``-PO``, ``-PO2``, ``-AsO``, ``-AsO2`` in the
     heterone class, so the DIONE gate is narrower than the mono-oxo hub list:
     Si and Ge take ``-one`` but never ``-dione``.
 
@@ -355,7 +355,7 @@ def test_the_dione_element_gate_is_the_bluebook_class_not_the_hub_list():
 
 
 def test_a_three_oxo_hub_is_outside_the_count_window():
-    """The guard is a WINDOW (1..2), not ``>= 1``. Nothing in P-61.6's class has
+    """The guard is a WINDOW (1..2), not ``>= 1``. Nothing in 's class has
     three oxo groups on one mononuclear hub, so a third must fail closed.
 
     Built with an explicit RWMol because such a hub has no valid SMILES -- which
@@ -374,7 +374,7 @@ def test_a_three_oxo_hub_is_outside_the_count_window():
 
 
 def test_p74_2_1_5_heterimine_also_emits(namer):
-    """P-74.2.1.5 "Phosphine imides" (heading:43061),:43069 'Method (3) leads
+    """ "Phosphine imides" (heading:43061),:43069 'Method (3) leads
     to preferred IUPAC names'; worked (PIN) example:43075.
 
     The =NH/=NR sibling of the heterone, included because Task R's premise
@@ -394,7 +394,7 @@ def test_p74_2_1_5_heterimine_also_emits(namer):
     ids=["C[Sb]=N", "C[Bi]=N"],
 )
 def test_p68_3_3_standard_valence_stiban_bismuthan_imine(namer, smiles, expected):
-    """P-68.3.3 (the Blue Book) 'Preferred and preselected names are chosen
+    """ (the Blue Book) 'Preferred and preselected names are chosen
     as for P, As, and Sb parents and prefixes' -> the standard-valence heteroimine
     X=NH extends to stibane/bismuthane (a phase).
 

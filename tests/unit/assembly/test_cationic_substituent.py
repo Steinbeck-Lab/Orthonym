@@ -1,4 +1,4 @@
-""" a phase enabler (P-74.1.3 / P-73): a pendant ONIUM cation branch off a
+""" a phase enabler /: a pendant ONIUM cation branch off a
 chain carbon must be nameable as a locanted substituent prefix.
 
 Root cause: ``_name_polyfunctional_acyclic_substituent``
@@ -66,9 +66,9 @@ def test_direct_attach_shape_unaffected_by_generic_namer():
     """The DIRECT-ATTACHMENT shape (cation itself IS attach_idx) is NOT
     reached through this generic ``name_substituent`` entry point at all --
     measured on HEAD (pre-fix): ``name_substituent`` calls
-    ``name_substituent_fragment(..., parent_chain=[])`` (Tier 4, empty
+    ``name_substituent_fragment(..., parent_chain=)`` (Tier 4, empty
     parent list), which blanks the ``parent_set`` Step 2e's direct-attach
-    branch depends on, so it always falls to the DROP-26 decline regardless
+    branch depends on, so it always falls to the decline regardless
     of structure. The REAL working direct-attach mechanism
     (`trimethylazaniumyl`, `4-(trimethylazaniumyl)butanoate`) lives entirely
     in ``rules/charged_router.py`` / ``rules/ions.py``, calling

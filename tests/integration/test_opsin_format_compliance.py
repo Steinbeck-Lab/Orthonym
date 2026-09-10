@@ -47,7 +47,7 @@ class TestBicycloHeteroatomFix:
     """Test that heterocyclic bicyclo compounds use correct total atom count
     and heteroatom replacement prefixes (oxa, aza, thia).
 
-    Root cause: get_complete_bicyclo_data() was counting only carbon atoms
+    Root cause: get_complete_bicyclo_data was counting only carbon atoms
     for the parent name suffix, producing e.g. 'bicyclo[4.1.0]hexane' (6C)
     instead of '7-oxabicyclo[4.1.0]heptane' (7 total atoms including O).
     """
@@ -100,7 +100,7 @@ class TestVBNotationFormat:
         """tricyclo descriptors use PIN superscript locants for secondary bridges.
 
         13B(d): secondary-bridge attachment locants are now cited in the PIN
-        superscript form ``<len>^<lo>,<hi>`` (P-23.2.5.1 / P-23.2.6.1.2), e.g.
+        superscript form ``<len>^<lo>,<hi>`` /, e.g.
         ``tricyclo[6.3.0.0^2,6]``, replacing the older ``0(2,6)`` parenthesis
         form. OPSIN parses both, so this is a typography upgrade only.
         """
@@ -119,7 +119,7 @@ class TestStereoFormatEdgeCases:
 
     Most 'stereo_issue' triage items are actually wrong parent selection
     (missing substituents, wrong ring chosen), not stereo format problems.
-    The stereo prefix format (2R,3S)- is correct per IUPAC P-93.
+    The stereo prefix format (2R,3S)- is correct per IUPAC.
     """
 
     def test_stereo_format_parenthesized(self):
@@ -141,7 +141,7 @@ class TestSteroidSuffixOrdering:
     """Test that steroid names have correct IUPAC suffix ordering:
     unsaturation BEFORE principal group (e.g., 'trien-3-one', not 'an-3-one-trien').
 
-    Also tests IUPAC P-31.1.3.4: terminal 'a' added to stem when
+    Also tests IUPAC: terminal 'a' added to stem when
     multiple unsaturation locants are cited (cholesta-5,7-dien, not cholest-5,7-dien).
     """
 
@@ -193,7 +193,7 @@ class TestSteroidSuffixOrdering:
 
 
 class TestNBracketWrapping:
-    """Test IUPAC P-16.5.1.1 bracket escalation for N-substituents.
+    """Test IUPAC bracket escalation for N-substituents.
 
     When an N-substituent name contains parenthesized content (stereo
     descriptors or compound substituent names), the N-prefix must use
@@ -202,7 +202,7 @@ class TestNBracketWrapping:
     Root cause: N-prefix construction sites (composer.py, fragment_assembly.py,
     engine.py, amides.py, benzene.py, etc.) previously produced f"N-{name}"
     without checking for parentheses. Now all sites route through
-    _wrap_n_substituent() which applies P-16.5.1.1 bracket escalation.
+    _wrap_n_substituent which applies bracket escalation.
     """
 
     # ---- Unit-level tests for _wrap_n_substituent ----
@@ -394,15 +394,15 @@ class TestFormatEdgeFixes:
     N-locant comma format, and benzene-vs-phenyl in substituent context.
 
     Root causes:
-    - Missing separator: _assemble_amide_name() concatenated non-N prefixes
+    - Missing separator: _assemble_amide_name concatenated non-N prefixes
       directly with base_name that starts with an N-prefix (e.g., "2-methylN-methyl"
       instead of "2-methyl-N-methyl"). Fixed by inserting hyphen before "N" prefix.
-    - Extra comma: _assemble_amine_name() used f"N,{'N,' * (count-1)}" which
+    - Extra comma: _assemble_amine_name used f"N,{'N,' * (count-1)}" which
       produces "N,N,di..." instead of "N,N-di...". Fixed by using
       ",".join(["N"] * count) + "-" for correct IUPAC N-locant format.
     - benzene-vs-phenyl: decomposition fragment assembly used "benzene" parent
       name when fragment was used as a substituent prefix. Fixed by adding
-      _parent_to_substituent_prefix() conversion per IUPAC P-31.1.3.4.
+      _parent_to_substituent_prefix conversion per IUPAC.
     """
 
     def test_no_missing_separator_before_n_prefix(self):
@@ -476,8 +476,8 @@ class TestFormatEdgeFixes:
 
         Root cause: decomposition fragment assembly used parent name 'benzene'
         directly when constructing substituent prefixes. Fixed by
-        _parent_to_substituent_prefix() converting benzene -> phenyl per
-        IUPAC P-31.1.3.4.
+        _parent_to_substituent_prefix converting benzene -> phenyl per
+        IUPAC.
         """
         smiles = "COc1cccc2c1[C@@H](OC)O[C@H]2c1c(O)ccc2c1C(=O)CC(C)(O)C2"
         name = name_compound(smiles)

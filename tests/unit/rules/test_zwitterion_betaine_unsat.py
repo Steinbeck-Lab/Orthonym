@@ -44,7 +44,7 @@ def test_parent_has_chain_locants_retained_2_naphthoate():
     assert _parent_has_chain_locants("2-naphthoate") is False
 
 
-# Integration tests with Orthonym().name() — require OPSIN gate ON
+# Integration tests with Orthonym.name — require OPSIN gate ON
 @pytest.mark.opsin_gate
 @pytest.mark.parametrize("smi,expected", [
     # the unsaturated betaine (the fix)

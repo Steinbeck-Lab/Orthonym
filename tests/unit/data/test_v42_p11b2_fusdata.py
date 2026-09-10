@@ -1,4 +1,4 @@
-""" a phase (B2 / CW-2 remainder) — pin the 5 two-ring fused-parent PINs.
+""" a phase (B2 / remainder) — pin the 5 two-ring fused-parent PINs.
 
 Each of these ring systems is a verbatim Blue-Book ``(PIN)`` example whose name the
 systematic fusion / von-Baeyer path degrades (it lacks these small-ring components /
@@ -14,11 +14,11 @@ through this same lookup (``1H-indene`` / ``pyrene`` are named by this table too
 
 Blue Book citations (``the Blue Book Blue Book``; the ``expected`` column of
 ``benchmarks/bb_conformance/bb_measure_rows.baseline.jsonl`` IS the verbatim PIN):
-  * 2H-furo[3,2-b]pyran P-25.3.2.4, the Blue Book (PIN)
-  * 2H-1,3-benzoxathiole P-25.7.1.1, the Blue Book (PIN)
-  * pyrrolo[3,2-b]pyrrole P-25.7.1.1, the Blue Book (PIN) [fully mancude, no iH]
-  * 1H-cyclopenta[8]annulene P-25.3.8.1, the Blue Book (PIN)
-  * 1H,3H-thieno[3,4-c]thiophene P-25.7.1.3.2, the Blue Book (PIN)
+  * 2H-furo[3,2-b]pyran, the Blue Book (PIN)
+  * 2H-1,3-benzoxathiole, the Blue Book (PIN)
+  * pyrrolo[3,2-b]pyrrole, the Blue Book (PIN) [fully mancude, no iH]
+  * 1H-cyclopenta[8]annulene, the Blue Book (PIN)
+  * 1H,3H-thieno[3,4-c]thiophene, the Blue Book (PIN)
 """
 import shutil
 from pathlib import Path

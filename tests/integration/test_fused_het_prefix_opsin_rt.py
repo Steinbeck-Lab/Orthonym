@@ -1,7 +1,7 @@
 """
 OPSIN round-trip tests for fused heterocycle prefix stems.
 
-Phase 78 Plan 01 — Verifies every generated prefix stem round-trips
+a phase Plan 01 — Verifies every generated prefix stem round-trips
 through OPSIN when embedded in a test compound name.
 
 Format: "4-({stem}-{locant}-yl)butanoic acid" → OPSIN → valid SMILES

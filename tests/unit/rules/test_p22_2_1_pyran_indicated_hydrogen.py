@@ -1,6 +1,6 @@
-"""P-22.2.1: the pyran family keeps its indicated hydrogen on every chalcogen.
+""": the pyran family keeps its indicated hydrogen on every chalcogen.
 
-Task AA3.  ``BlueBookV2.md:8141``, section **P-22.2.1 "Retained names of
+Task AA3. ``the Blue Book``, section ** "Retained names of
 heteromonocycles"**, adjudicates all four chalcogens in one sentence and prints
 the bare stem as *not* the PIN each time::
 
@@ -9,19 +9,19 @@ the bare stem as *not* the PIN each time::
     selenopyran (Se instead of O) (2H-isomer shown; the PIN is 2H-selenopyran)
     telluropyran (Te instead of O) (2H-isomer shown; the PIN is 2H-telluropyran)
 
-Before the fix, S/Se/Te emitted the bare stem.  The cause was **not** a missing
+Before the fix, S/Se/Te emitted the bare stem. The cause was **not** a missing
 rule: ``rules/heterocycles.py`` derives every one of these unaided (measured).
 The bare stem came from ``data/opsin_imports/aryl_groups.py``, whose rows were
 promoted into ``ALL_RETAINED_NAMES`` and short-circuited the dispatch before the
-generic path ever ran.  Oxygen escaped only because a hand-curated ``2H-pyran``
+generic path ever ran. Oxygen escaped only because a hand-curated ``2H-pyran``
 row happened to overwrite the OPSIN row in the merge -- i.e. the one member that
-worked was the one that never reached the rule.  The fix is three deny rows in
+worked was the one that never reached the rule. The fix is three deny rows in
 ``data/iupac_2013_pin_list.json``, each carrying the citation above and a
 verified replacement.
 
-⚠ No round-trip oracle can protect this.  OPSIN resolves the bare ``thiopyran``
+⚠ No round-trip oracle can protect this. OPSIN resolves the bare ``thiopyran``
 to the 2H isomer, so name -> structure -> InChIKey agrees for a name the Blue
-Book prints as not-the-PIN.  These assertions are spelling assertions, checked
+Book prints as not-the-PIN. These assertions are spelling assertions, checked
 against the Blue Book by eye; that is the point of the file.
 """
 import pytest
@@ -31,7 +31,7 @@ from orthonym.namer import name_compound
 
 
 # --------------------------------------------------------------------------
-# 1. BlueBookV2.md:8141 -- the four chalcogen 2H-isomers ("the PIN is 2H-...")
+# 1. the Blue Book -- the four chalcogen 2H-isomers ("the PIN is 2H-...")
 # --------------------------------------------------------------------------
 
 # Tellurium parses in RDKit only in bracket form; ``C1=CCTeC=C1`` is not a
@@ -50,7 +50,7 @@ def test_2h_isomer_keeps_indicated_hydrogen(smiles, expected):
     assert name_compound(smiles) == expected
 
 
-# The 4H tautomers were already correct and must not move.  They are the
+# The 4H tautomers were already correct and must not move. They are the
 # control: they prove the generic indicated-hydrogen path was live and working
 # on sulfur all along, which is why adding table rows would have been the wrong
 # fix -- there was no rule missing to add.
@@ -76,7 +76,7 @@ BARE_PYRAN_STEMS = {"pyran", "thiopyran", "selenopyran", "telluropyran"}
 def test_no_bare_pyran_stem_is_a_headline_retained_name():
     """No bare chalcogen pyran stem may be reachable as a whole-molecule PIN.
 
-    This is the invariant, not the three molecules above.  ``aryl_groups.py`` is
+    This is the invariant, not the three molecules above. ``aryl_groups.py`` is
     a generated OPSIN import: every row in it carries ``is_pin: False`` as a
     hard-coded generator default, so a re-import can silently re-add these rows.
     Only the adjudicated deny list in ``iupac_2013_pin_list.json`` keeps them
@@ -101,8 +101,8 @@ def test_no_bare_pyran_stem_is_a_headline_retained_name():
 # Measured while scoping the fix: withdrawing the hand-curated rows for these
 # three does NOT fall through to the retained PIN, it falls through to the
 # Hantzsch-Widman systematic name -- ``1H-1,3-diazole`` for imidazole and
-# ``1H-1,2-diazole`` for pyrazole.  So those rows are load-bearing and the
-# "remove the redundant mask" cleanup is only safe for pyran.  Recorded as a
+# ``1H-1,2-diazole`` for pyrazole. So those rows are load-bearing and the
+# "remove the redundant mask" cleanup is only safe for pyran. Recorded as a
 # test so the next person measures instead of assuming.
 TABLE_2_2_INDICATED_H = [
     ("c1cc[nH]c1", "1H-pyrrole"),

@@ -1,37 +1,37 @@
-"""a phase SC-4: 153/153 catalog regression scaffold for FR-2.3 agreement.
+"""a phase: 153/153 catalog regression scaffold for.3 agreement.
 
-Per V18 plan §6 a phase acceptance + 149-CONTEXT.md Tier 2:
+Per V18 plan a phase acceptance + 149-internal notes Tier 2:
 parametrized over every entry in FUSED_HETEROCYCLE_DATA (live count 153,
 verified 2026-04-28; ROADMAP says 148 — live count is binding per
-149-CONTEXT).
+149-internal notes).
 
 ## Test predicate scope (Plan 02 triage decision)
 
 The Plan 02 RESEARCH §"Tier 2 Catalog Regression Scaffold" (lines 481-557)
 specifies the predicate "locant-1 atom is in algorithmic base". On first
 run this revealed 58/141 (41%) systematic disagreements clustered in
-THREE categories per RESEARCH §551 triage taxonomy:
+THREE categories per RESEARCH triage taxonomy:
 
 1. **Het-vs-het 2-ring systems** (42 entries, e.g.
-   `1H-pyrazolo[3,4-b]pyridine`): both rings have N → FR-2.3(a) ties →
-   FR-2.3(b) ring count ties → FR-2.3(c) larger ring wins. Catalog's
+   `1H-pyrazolo[3,4-b]pyridine`): both rings have N →.3(a) ties →
+   .3(b) ring count ties →.3(c) larger ring wins. Catalog's
    locant-1 atom lives in the smaller heteroatom-rich ring (pyrazole)
-   while FR-2.3(c) algorithmically picks the larger ring (pyridine,
+   while.3(c) algorithmically picks the larger ring (pyridine,
    matching the SUFFIX of the IUPAC name). This is the **suffix-vs-
    peripheral-locant-1 divergence**: IUPAC peripheral numbering can
-   start in either ring depending on FR-5.x lowest-locant rules; the
-   "base component" (FR-2.3 base) is determined by the suffix in the
+   start in either ring depending on.x lowest-locant rules; the
+   "base component" (.3 base) is determined by the suffix in the
    IUPAC name (e.g., `pyrazolo[...]pyridine` → base is pyridine), NOT
-   by which ring contains locant 1. RESEARCH §551 case 3: "Genuine
-   FR-2.3 vs catalog policy divergence". FR-2.3 implementation is
-   CORRECT per V18 Appendix A.6 + IUPAC P-25.3.2.4; the test predicate
+   by which ring contains locant 1. RESEARCH case 3: "Genuine
+   .3 vs catalog policy divergence"..3 implementation is
+   CORRECT per V18 Appendix A.6 + IUPAC; the test predicate
    is mismatched for these systems.
 
 2. **3-ring fused systems** (16 entries, e.g. `9H-carbazole`,
-   `acridine`, `9H-xanthene`, `phenoxazine`): FR-2.3 correctly selects
+   `acridine`, `9H-xanthene`, `phenoxazine`):.3 correctly selects
    the middle heterocyclic ring as base, but IUPAC peripheral numbering
    places locant 1 on a peripheral carbocyclic ring atom. RESEARCH
-   §548 anticipates this: "For 3-ring fused systems, the 'components'
+    anticipates this: "For 3-ring fused systems, the 'components'
    can be either (A) 3 SSSR rings, or (B) 2 macro-components... per
     lock: SSSR rings only." The 3-SSSR-ring decomposition is
    correct; the locant-1 predicate is unreliable for 3+ ring systems.
@@ -41,20 +41,20 @@ THREE categories per RESEARCH §551 triage taxonomy:
 
 ## Scope adjustment
 
-Per RESEARCH §554 + (no band-aids; root-cause fixes), the correct
+Per RESEARCH + (no band-aids; root-cause fixes), the correct
 remedy is to **scope the predicate** to systems where it is reliable —
 NOT to special-case individual SMILES via 58 inline `pytest.skip`s
 (which would constitute a band-aid). The reliable predicate scope is:
 
   **2-component (2-ring) fused systems where exactly ONE ring is
-  heterocyclic** — FR-2.3(a) "Heterocycles always beat arenes" is the
+  heterocyclic** —.3(a) "Heterocycles always beat arenes" is the
   dominant cascade criterion and locant-1 reliably lives in the
   het-bearing base ring (e.g., 1H-indole, quinoline, benzofuran).
 
 For systems outside this scope, the predicate is documented as
-mismatched (NOT FR-2.3 wrong; NOT catalog wrong) and the test
+mismatched (NOT.3 wrong; NOT catalog wrong) and the test
 explicitly `pytest.skip`s with a category-level rationale citing
-RESEARCH §551 + this docstring.
+RESEARCH + this docstring.
 
 ## Acceptance
 
@@ -65,12 +65,12 @@ a phase follow-up (where peripheral-locant numbering for non-
 cataloged systems is implemented).
 
 Source: https://iupac.qmul.ac.uk/fusedring/FR23.html
-Source: https://iupac.qmul.ac.uk/BlueBook/P2.html P-25.3.2.4
-Source: AUTONOM-1990 §4.
-Source: 149-CONTEXT.md Tier 2; byte-identical lock; no
+Source: https://iupac.qmul.ac.uk/BlueBook/P2.html
+Source: AUTONOM-1990
+Source: 149-internal notes Tier 2; byte-identical lock; no
         band-aids.
-Source: 149-RESEARCH.md "Tier 2 Catalog Regression Scaffold" lines
-        481-557; "Edge cases / expected acceptance failures" §548-554.
+Source: internal notes "Tier 2 Catalog Regression Scaffold" lines
+        481-557; "Edge cases / expected acceptance failures" -554.
 """
 import pytest
 from rdkit import Chem
@@ -86,7 +86,7 @@ def _has_heteroatom_in_smiles(smi: str) -> bool:
 
     Per RESEARCH §"Edge cases / expected acceptance failures" line 549:
     Plan 02 Tier 2 must skip PAH entries — pyrene etc. flow through
-    polycyclics.py Branch 2; FR-2.3 doesn't apply to them.
+    polycyclics.py Branch 2;.3 doesn't apply to them.
     """
     mol = Chem.MolFromSmiles(smi)
     if mol is None:
@@ -119,15 +119,15 @@ def _ring_has_heteroatom(mol, ring_atoms):
 def test_fr23_agrees_with_catalog(smiles, expected_name):
     """For each non-PAH cataloged entry whose decomposition fits the
     reliable-predicate scope (2-ring, exactly 1 heterocyclic ring),
-    FR-2.3's chosen base contains the catalog's locant-1 atom.
+    .3's chosen base contains the catalog's locant-1 atom.
 
     Out-of-scope entries (3+ ring systems, het-vs-het 2-ring systems,
     single-component) are skipped with documented rationale per
-    RESEARCH §548-554 + module docstring "Scope adjustment".
+    RESEARCH -554 + module docstring "Scope adjustment".
 
     Source: https://iupac.qmul.ac.uk/fusedring/FR23.html
-    Source: 149-CONTEXT.md Tier 2; no band-aids.
-    Source: 149-RESEARCH.md §551 triage taxonomy.
+    Source: 149-internal notes Tier 2; no band-aids.
+    Source: internal notes triage taxonomy.
     """
     entry = FUSED_HETEROCYCLE_DATA[smiles]
     mol = Chem.MolFromSmiles(smiles)
@@ -139,9 +139,9 @@ def test_fr23_agrees_with_catalog(smiles, expected_name):
         pytest.skip(f"{expected_name}: single-component catalog entry")
 
     # Scope guard #1: 3+ ring fused systems.
-    # FR-2.3 correctly selects the middle/heterocyclic ring as base, but
+    #.3 correctly selects the middle/heterocyclic ring as base, but
     # IUPAC peripheral numbering for 3+ ring systems places locant 1 on a
-    # carbocyclic peripheral atom per FR-5.x lowest-locant rules. The
+    # carbocyclic peripheral atom per.x lowest-locant rules. The
     # locant-1 predicate is unreliable here. a phase owns peripheral
     # numbering for these systems.
     if len(components) >= 3:
@@ -152,14 +152,14 @@ def test_fr23_agrees_with_catalog(smiles, expected_name):
         )
 
     # Scope guard #2: het-vs-het 2-ring systems.
-    # Both rings heterocyclic → FR-2.3(a) ties → FR-2.3(c) larger ring
+    # Both rings heterocyclic →.3(a) ties →.3(c) larger ring
     # wins. Catalog's locant-1 atom can live in the smaller het-rich ring
-    # (matching IUPAC convention for prefix component) while FR-2.3 picks
+    # (matching IUPAC convention for prefix component) while.3 picks
     # the larger ring (matching the IUPAC name's suffix). This is the
-    # suffix-vs-peripheral-locant divergence — FR-2.3 is CORRECT, the
-    # locant-1 predicate just doesn't capture FR-2.3's architectural
+    # suffix-vs-peripheral-locant divergence —.3 is CORRECT, the
+    # locant-1 predicate just doesn't capture.3's architectural
     # output. Verified separately in Tier 1 unit tests
-    # (test_fused_ring_selection.py covers FR-2.3(a)-(c) on synthetic
+    # (test_fused_ring_selection.py covers.3(a)-(c) on synthetic
     # rings without locant-1 ambiguity).
     het_count_per_ring = [
         sum(1 for c in components if _ring_has_heteroatom(mol, c))

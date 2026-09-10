@@ -3,12 +3,12 @@
 Measured gap (a review review + trace, internal notes): the
 acylamino path `-NHC(=O)R` where R is a ring bearing a heteroatom (proline's N-ring,
 oxolane's O-ring) LINEARIZED the acyl (carbon-only BFS) to 'pentanoic acid' and emitted
-the wrong '(pentanoylamino)' — suppressed to 'unknown' by SELF-01. Two root-cause fixes:
+the wrong '(pentanoylamino)' — suppressed to 'unknown' by. Two root-cause fixes:
 
   (1) walk the WHOLE acyl fragment (ring heteroatoms included) so it is not linearized;
   (2) when the retained acid name does not convert to an amido ('proline' -> None), retry
       with the SYSTEMATIC acid name ('pyrrolidine-2-carboxylic acid' ->...carboxamido),
-      threaded via name_fragment_recursively(style='systematic'). P-66.1.1.4.3 method (1);
+      threaded via name_fragment_recursively(style='systematic'). method (1);
       the peptide 'prolyl' form implies L and breaks RT (the Blue Book), so systematic is required.
 """
 import pytest
@@ -56,8 +56,8 @@ class TestRingAcylAmidoPIN:
         ("OC(=O)CNC(=O)C1CCCO1", "(oxolane-2-carboxamido)acetic acid"),
         # proline N-ring: tests ring-walk + systematic retry
         ("OC(=O)CNC(=O)C1CCCN1", "(pyrrolidine-2-carboxamido)acetic acid"),
-        # P-16.5.4 nesting: a compound amido prefix that itself contains marks
-        # escalates ()->[] (a review review of cbb28539).
+        # nesting: a compound amido prefix that itself contains marks
+        # escalates -> (a review review of cbb28539).
         ("OC(=O)CNC(=O)Cc1ccncc1", "[2-(pyridin-4-yl)acetamido]acetic acid"),
         # regression: benzoyl (all-carbon ring) unchanged, bare (no marks)
         ("OC(=O)CNC(=O)c1ccccc1", "benzamidoacetic acid"),
@@ -69,7 +69,7 @@ class TestRingAcylAmidoPIN:
         assert name_compound(smiles) == expected
 
     def test_nested_stereo_uses_square_brackets_not_parens(self):
-        # P-16.5.4: a stereodescriptor-bearing amido prefix nests to []
+        #: a stereodescriptor-bearing amido prefix nests to
         from orthonym import name_compound
         name = name_compound("OC(=O)CNC(=O)[C@@H]1CCCN1")
         assert "[(2S)-pyrrolidine-2-carboxamido]" in name, name

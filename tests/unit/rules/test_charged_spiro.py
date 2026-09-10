@@ -1,4 +1,4 @@
-"""P-73.2.2.1.1 method (1) — a cationic (onium) SPIRO-JUNCTION atom.
+""" method (1) — a cationic (onium) SPIRO-JUNCTION atom.
 
 A quaternary onium at a spiro junction -- a ring N+ (or P+/...) whose four
 bonds are ALL ring bonds -- used to abstain (``unknown organic compound``).
@@ -6,7 +6,7 @@ The charged router names ring cations by neutralize -> re-enter, but removing
 the charge here leaves an over-valent neutral heteroatom (a 4-bonded neutral N)
 that RDKit ``SanitizeMol`` rejects, so no neutral parent name is ever produced
 (``_emit_ring_cumulative_suffix``'s DEMOTE branch also declines: a spiro
-junction has no exocyclic substituent to sever, so ``exo == []``).
+junction has no exocyclic substituent to sever, so ``exo == ``).
 
 Fix: ``rules/spiro.py::name_charged_spiro_system`` names the neutral
 skeletal-replacement ('a') spiro PARENT directly off the CHARGED mol
@@ -18,7 +18,7 @@ via ``_cation_name_rt_ok`` -- ship only on a full-InChIKey match, else abstain.
 
 Method (1) (neutral 'a' parent + '-ium' suffix) gives the PREFERRED IUPAC name
 and is preferred to the ``azonia`` cationic skeletal-replacement alternative
-(P-73.4, "Method (1) gives preferred IUPAC names", BlueBookV2 the Blue Book;
+, "Method (1) gives preferred IUPAC names", the Blue Book the Blue Book;
 ``1-methyl-1-azabicyclo[2.2.1]heptan-1-ium`` (PIN) vs the ``azonia`` form,
 the Blue Book). So the emitted PIN is ``...azaspiro...-ium``, NEVER
 ``...azoniaspiro...``.
@@ -35,7 +35,7 @@ from orthonym.namer import Orthonym
 from orthonym.rules.spiro import name_charged_spiro_system
 from orthonym.validation.opsin_roundtrip import opsin_roundtrip_check
 
-# The whole module needs the REAL OPSIN validity / SELF-01 gate switched on:
+# The whole module needs the REAL OPSIN validity / gate switched on:
 # the suite disables it by default, but the fail-closed abstention row depends
 # on the production gate actually running, and the router's own RT gate
 # (`_cation_name_rt_ok`) is what makes these emissions 0-wrong.
@@ -68,7 +68,7 @@ def test_charged_spiro_junction_names(namer, smiles, expected):
 
 
 # ---------------------------------------------------------------------------
-# The halide salt composes via the salt path once the cation names (RX §2).
+# The halide salt composes via the salt path once the cation names (RX).
 # ---------------------------------------------------------------------------
 @pytest.mark.parametrize("smiles,expected", [
     ("[Cl-].C1CCCC[N+]12CCCCC2",

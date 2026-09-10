@@ -1,10 +1,10 @@
 """Tests for functional group perception fixes and new FG patterns.
 
-Phase 91.1 Plan 02: PERC-01 through PERC-04
-- PERC-01: Aldehyde SMARTS fix (formaldehyde detection)
-- PERC-02: Amine SMARTS fix (sp2 carbon amines)
-- PERC-03: New FG patterns (hydroxamic acid, cyanate, thiocyanate, azo)
-- PERC-04: Seniority table entries for new FGs
+a phase Plan 02: through
+-: Aldehyde SMARTS fix (formaldehyde detection)
+-: Amine SMARTS fix (sp2 carbon amines)
+-: New FG patterns (hydroxamic acid, cyanate, thiocyanate, azo)
+-: Seniority table entries for new FGs
 """
 
 import pytest
@@ -13,7 +13,7 @@ from orthonym.perception.functional_groups import detect_functional_groups
 from orthonym.rules.seniority import SUFFIX_FORMS, PREFIX_FORMS, SENIORITY_ORDER
 
 
-# ─── PERC-01: Aldehyde SMARTS fix ───────────────────────────────────────
+# ───: Aldehyde SMARTS fix ───────────────────────────────────────
 
 class TestAldehydeDetection:
     """Aldehyde pattern must match formaldehyde (O=C) and not regress on normal aldehydes."""
@@ -50,7 +50,7 @@ class TestAldehydeDetection:
         # but carboxylic_acid must be present
 
 
-# ─── PERC-02: Amine SMARTS fix ──────────────────────────────────────────
+# ───: Amine SMARTS fix ──────────────────────────────────────────
 
 class TestAmineDetection:
     """Amine pattern must match amines on sp2 carbons."""
@@ -80,7 +80,7 @@ class TestAmineDetection:
         # The amide N is NX3H2 but attached to C(=O), so amide SMARTS should match first
 
 
-# ─── PERC-03: New FG patterns ───────────────────────────────────────────
+# ───: New FG patterns ───────────────────────────────────────────
 
 class TestHydroxamicAcidDetection:
     """Hydroxamic acid: R-C(=O)-NHOH pattern."""
@@ -169,7 +169,7 @@ class TestAzoDetection:
         assert "azo" not in groups
 
 
-# ─── PERC-04: Seniority table entries ───────────────────────────────────
+# ───: Seniority table entries ───────────────────────────────────
 
 class TestSeniorityEntries:
     """New FGs must have proper entries in seniority tables."""
@@ -178,9 +178,9 @@ class TestSeniorityEntries:
         assert "hydroxamic_acid" in SENIORITY_ORDER
 
     def test_hydroxamic_acid_suffix_form(self):
-        # R8c (P-66.1.1.3.2 / P-65.1.3.4): hydroxamic acid is named via the
+        # R8c /: hydroxamic acid is named via the
         # amide handler as 'N-hydroxy<stem>amide', NOT the retained 'hydroxamic
-        # acid' suffix.  SUFFIX_FORMS entry is None (handler-emitted, no
+        # acid' suffix. SUFFIX_FORMS entry is None (handler-emitted, no
         # substitutive suffix) — same contract as thioether, sulfoxide, etc.
         assert "hydroxamic_acid" in SUFFIX_FORMS
         assert SUFFIX_FORMS["hydroxamic_acid"] is None

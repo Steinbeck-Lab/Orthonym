@@ -1,6 +1,6 @@
 """a phase.A integration tests: cyclophane corpus + Blue Book fixtures.
 
-Per CONTEXT + 155-AUDIT-A.md S6: OPSIN 2.9.0 does NOT parse the
+Per internal notes + internal notes-A.md S6: OPSIN 2.9.0 does NOT parse the
 [m.n]paracyclophane semi-systematic name form (verified at audit time
 2026-05-04 -- every form returns 'is unparsable'). All cyclophane integration
 fixtures are therefore quarantined via pytest.skip with a a phase grammar
@@ -15,7 +15,7 @@ What this test DOES verify (without the OPSIN oracle):
    ``is_cyclophane`` MUST still accept (topology gate works) but
    ``name_compound`` may return None or a non-cyclophane name (R3 deferred).
 
-Source: internal notes; 155-AUDIT-A.md S6 + S8 (R3); 155-PATTERNS.md.
+Source: 155-internal notes; internal notes-A.md S6 + S8 (R3); internal notes.
 """
 from __future__ import annotations
 
@@ -67,7 +67,7 @@ def _opsin_parse(name: str) -> str | None:
 def _inchi_l1(smiles: str) -> str:
     """Return InChI layer-1 (skeleton; strips connectivity onward).
 
-    Per CONTEXT: the ``/c`` split isolates the formula portion of the
+    Per internal notes: the ``/c`` split isolates the formula portion of the
     InChI string -- the binding correctness oracle for skeletal nomenclature.
     Stereo / charge / isotope layers (everything after ``/c``) are
     intentionally dropped.
@@ -124,14 +124,14 @@ def test_cyclophane_name_compound(fixture):
     Wave-8 P8: fixtures carrying an ``expected_pin`` field (monocyclic
     all-benzene-homophane class -- `build_phane_pin` verified BB-name-exact,
     see docs/superpowers/plans/2026-07-16-wave8-p8-phane.md Task 8.7/8.12)
-    now EMIT that P-26 simplified-skeletal PIN in production. Every other
+    now EMIT that simplified-skeletal PIN in production. Every other
     non-quarantined fixture (a topology `build_phane_pin` doesn't cover yet)
-    still hits the T6c fail-closed refusal ('unknown organic compound') --
+    still hits the fail-closed refusal ('unknown organic compound') --
     OPSIN cannot parse any phane form, so an unverified composed name is
     withheld rather than shipped.
 
     Heterocyclic-bridge / heterocyclic-linker fixtures (R3 quarantine flag)
-    are skipped here per 155-AUDIT-A.md S8 -- the topology gate accepts them
+    are skipped here per internal notes-A.md S8 -- the topology gate accepts them
     but the name composition is deferred (still fail-closed in production).
     """
     if fixture.get("integration_quarantine"):
@@ -167,7 +167,7 @@ def test_cyclophane_name_compound(fixture):
 def test_cyclophane_opsin_roundtrip_quarantine(fixture):
     """: name_compound -> OPSIN -> InChI L1 round-trip.
 
-    Per 155-AUDIT-A.md S6: OPSIN 2.9.0 does NOT parse cyclophane semi-systematic
+    Per internal notes-A.md S6: OPSIN 2.9.0 does NOT parse cyclophane semi-systematic
     names. Every fixture is expected to skip-and-cite per the fallback
     policy. If OPSIN ever gains cyclophane support (a phase grammar
     pre-validation hand-off), this test starts asserting the round-trip.

@@ -1,5 +1,5 @@
 # tests/unit/rules/test_vonbaeyer_universal.py
-"""v25 G2: universal von-Baeyer cage analysis (aromatic via kekulized enes)."""
+""": universal von-Baeyer cage analysis (aromatic via kekulized enes)."""
 import pytest
 from rdkit import Chem
 
@@ -24,9 +24,9 @@ class TestSaturatedCages:
 
 
 class TestMancudeRefused:
-    # v25 G5-A: von-Baeyer is non-PIN for mancude/aromatic systems; the engine
+    # -A: von-Baeyer is non-PIN for mancude/aromatic systems; the engine
     # fail-closes on them (their PIN is a fused/retained parent + added/indicated
-    # H, P-25/P-58.2.2, a future G5-B build). Emitting von-Baeyer polyene cages
+    # H, /, a future G5-B build). Emitting von-Baeyer polyene cages
     # here ships non-PIN strings and — with oxo — invalid names (the caffeine
     # oxo/ene valence-clash class).
     @pytest.mark.parametrize("smi", [
@@ -79,7 +79,7 @@ class TestRefusals:
 
 
 class TestCompoundLocants:
-    # v25 G5-A: a ring double bond between non-consecutively-numbered atoms (a
+    # -A: a ring double bond between non-consecutively-numbered atoms (a
     # fusion/bridge ene, e.g. octalin's 1(6)) must be cited with the compound
     # von-Baeyer locant n(m), NOT min(n,m) which mislabels it (and, next to an
     # oxo, fabricates the caffeine-class valence clash).

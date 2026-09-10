@@ -1,4 +1,4 @@
-"""v37 SP5.4 -- the load-bearing ISOLATION property for the
+""" -- the load-bearing ISOLATION property for the
 ``--emit-tier full-coverage`` flag.
 
 With the flag OFF (the default everywhere) behavior is byte-identical to

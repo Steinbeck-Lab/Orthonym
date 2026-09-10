@@ -1,18 +1,18 @@
-"""Unit tests for Phase 146 _compute_multiple_bond_count factor.
+"""Unit tests for a phase _compute_multiple_bond_count factor.
 
-Per Phase 146 CONTEXT.md D-06: the factor counts double + triple bonds
+Per a phase internal notes: the factor counts double + triple bonds
 where BOTH endpoints are in parent_atom_indices (parent atoms ONLY, NOT
 entire molecule). Substituent multiple bonds (e.g., a nitrile substituent's
 C#N triple) must NOT contribute.
 
 **Test strategy note:** The V18/V17 integration tests (scenarios 12, 13)
-run in a subprocess to avoid importlib.reload()-induced class-identity
+run in a subprocess to avoid importlib.reload-induced class-identity
 leakage (``isinstance(cand, CandidateName)`` fails in downstream tests if
 the module is reloaded mid-suite — the reloaded class is a new object).
 The pure-factor unit tests (scenarios 1-11) run in-process; they never
 touch FACTOR_WEIGHTS and therefore don't trigger the leakage.
 
-Source: https://iupac.qmul.ac.uk/BlueBook/P4.html P-44.4.1.2
+Source: https://iupac.qmul.ac.uk/BlueBook/P4.html
 """
 
 import subprocess
@@ -109,7 +109,7 @@ def test_benzene_kekule_three_double_bonds():
 
     RDKit's MolFromSmiles promotes Kekulé-written input like C1=CC=CC=C1 to
     AROMATIC bond types by default (aromaticity perception runs during parse).
-    To count the three formal double bonds required by P-44.4.1.2, the caller
+    To count the three formal double bonds required by, the caller
     must invoke Chem.Kekulize(mol, clearAromaticFlags=True) first. This test
     exercises that path so the factor returns 3.0 on properly kekulized input.
 
@@ -157,7 +157,7 @@ def test_benzene_aromatic_bondtype_quirk():
 def test_nitrile_substituent_excluded():
     """Propanenitrile CCC#N: parent={0,1} (ethyl), nitrile C#N is substituent → 0.0.
 
-    Per D-06: the C#N triple bond has endpoint atom 2 IN parent-adjacent
+    Per: the C#N triple bond has endpoint atom 2 IN parent-adjacent
     but atom 3 (N) OUTSIDE the parent set — the count requires BOTH endpoints
     in parent, so the triple bond is excluded. Tests the parent-atoms-only
     contract head-on.
@@ -175,7 +175,7 @@ def test_nitrile_substituent_excluded():
 def test_double_bond_bridging_parent_excluded():
     """Acetone CC(=O)C: parent={0,1,3} (3-C chain), C=O bridges parent/O → 0.0.
 
-    Atom 1 is IN parent; atom 2 (O) is OUTSIDE parent. Per D-06 the bond is
+    Atom 1 is IN parent; atom 2 (O) is OUTSIDE parent. Per the bond is
     counted only if BOTH endpoints are in parent_atom_indices, so the C=O
     double bond does NOT contribute to the factor.
     """
@@ -227,7 +227,7 @@ def test_v18_mode_includes_factor():
 
     Subprocess isolation: reloading coverage_scoring in-process would
     invalidate the CandidateName class identity held by other test modules,
-    causing their isinstance() checks to fail (Rule 1 bug). Running under a
+    causing their isinstance checks to fail (Rule 1 bug). Running under a
     fresh interpreter avoids that contamination.
     """
     out = _run_with_env({"ORTHONYM_USE_V18_WEIGHTS": "true"}, """

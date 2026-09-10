@@ -29,7 +29,7 @@ def _get_assemble_complex_ring_name_source() -> str:
 
 
 class TestComposerDispatchInvariants:
-    """a phase-04 BLK-01 anti-regression locks."""
+    """a phase-04 anti-regression locks."""
 
     @pytest.mark.unit
     def test_mixed_spiro_fused_elif_branch_present_in_function_body(self):

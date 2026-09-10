@@ -1,14 +1,14 @@
 """
-Tests for chain_score() 9-criterion selection in find_principal_chain().
+Tests for chain_score 9-criterion selection in find_principal_chain.
 
-Tests all IUPAC 2013 P-44 criteria for principal chain selection:
+Tests all IUPAC 2013 criteria for principal chain selection:
 1. Contains principal group
 2. Maximum number of principal groups
 3. Maximum chain length
 4. Maximum multiple bonds (double + triple)
 5. Maximum double bonds
-6. Lowest locants for principal group (P-44.4h)
-7. Lowest locants for multiple bonds (P-44.4j)
+6. Lowest locants for principal group
+7. Lowest locants for multiple bonds
 8. Maximum substituents
 9. Lowest locants for substituents
 """
@@ -268,9 +268,9 @@ class TestRegressionExistingBehavior:
 
 
 class TestFGInstanceCounting:
-    """Tests for FG instance counting fix (PSEL-01).
+    """Tests for FG instance counting fix .
 
-    chain_score() criterion 2 must count distinct FG instances (SMARTS match
+    chain_score criterion 2 must count distinct FG instances (SMARTS match
     tuples with any atom on chain), NOT the number of FG atoms on the chain.
     """
 
@@ -356,9 +356,9 @@ class TestFGInstanceCounting:
 
 
 class TestSkeletalChainFinding:
-    """Tests for find_all_skeletal_chains() and find_longest_skeletal_chain() (PSEL-02).
+    """Tests for find_all_skeletal_chains and find_longest_skeletal_chain .
 
-    Skeletal chains follow C, O, N, S atoms per IUPAC P-44.3 / P-15.4.
+    Skeletal chains follow C, O, N, S atoms per IUPAC /.
     """
 
     def test_ether_extends_through_oxygen(self):
@@ -433,7 +433,7 @@ class TestSkeletalChainFinding:
         """PEG-like molecule respects max_chains limit."""
         from orthonym.perception.chains import find_all_skeletal_chains
         import time
-        # PEG-6: C-O-C-C-O-C-C-O-C-C-O-C-C-O-C-C-O-C
+        #: C-O-C-C-O-C-C-O-C-C-O-C-C-O-C-C-O-C
         mol = Chem.MolFromSmiles("COCCOCCOCCOCCOCCOC")
         start = time.time()
         chains = find_all_skeletal_chains(mol, max_chains=100)

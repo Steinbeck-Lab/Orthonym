@@ -1,19 +1,19 @@
-"""Phase 160 lactone handler — direct-return shim with coverage gate.
+"""a phase lactone handler — direct-return shim with coverage gate.
 
 Verbatim lift of composer.py:826-848 (inline branch) wrapping
 ``rules.lactones.is_monocyclic_lactone`` + ``rules.lactones.name_monocyclic_lactone``.
-Per CONTEXT D-24, the rule bodies stay in rules.lactones unchanged.
+Per internal notes, the rule bodies stay in rules.lactones unchanged.
 
 The handler preserves the inline branch's coverage guard
 (``ring_size > 8 or total_heavy <= ring_size + 8``) — without this guard,
 substituted lactones in larger molecules would produce incomplete names.
 
-IUPAC cite: P-66.6.3 (lactones / cyclic esters as heterocyclic ketones).
+IUPAC cite: (lactones / cyclic esters as heterocyclic ketones).
 
 References:
 - composer.py:826-848 (inline dispatch branch; REMOVED at this commit).
 - rules.lactones.{is_monocyclic_lactone, name_monocyclic_lactone}.
-- 160-AUDIT-DECOMP.md § 1 row 'lactone' + § 2.13 purity proof.
+- internal notes-DECOMP.md row 'lactone' + purity proof.
 """
 from __future__ import annotations
 
@@ -29,9 +29,9 @@ def _has_separate_senior_group(mol: Any, lactone_info: dict) -> bool:
     """True when a suffix-capable characteristic group SENIOR to the lactone
     (a pseudoketone) is present as a SEPARATE group from the lactone itself.
 
-    P-65.6.3.5.1 (BB:32112): "A lactone, as a pseudoketone, ranks lower in the
+     (the Blue Book): "A lactone, as a pseudoketone, ranks lower in the
     seniority of classes than an acid or an ester, but higher than an alcohol,
-    amine, or imine." Table 4.1 (BB:18170): Acids (7) > Ketones/pseudoketones
+    amine, or imine." Table 4.1 (the Blue Book): Acids (7) > Ketones/pseudoketones
     (16). So when a molecule carries BOTH a lactone and a group senior to the
     ketone tier, that senior group owns the principal-characteristic-group
     suffix and the lactone C=O degrades to an ``oxo`` prefix.
@@ -78,10 +78,10 @@ def _is_lactone(features: Any) -> bool:
     Plan-02 byte-identical preservation. Plan-04 performance benchmark
     can identify if memoization is needed.
 
-    Pure read-only per CONTEXT D-25 / AP-160-26: reads features.mol via
+    Pure read-only per internal notes / -26: reads features.mol via
     Chem.MolFromSmarts + GetSubstructMatches; no mutation.
 
-    P-65.6.3.5.1 seniority guard: decline the lactone-as-parent when a
+     seniority guard: decline the lactone-as-parent when a
     SEPARATE suffix-capable group senior to the ketone/pseudoketone tier is
     present, so dispatch falls through to the general suffix assembler (which
     builds e.g. ``5-oxooxolane-2-carboxylic acid`` with the ring C=O as
@@ -138,7 +138,7 @@ def name_lactone(
 
     pool = get_current_pool()
     pool.add(lactone_name, "lactone", features)
-    # composer.py:848 inline: _inject_stereo_if_missing(features, pool.best().name, atom_to_locant=None)
+    # composer.py:848 inline: _inject_stereo_if_missing(features, pool.best.name, atom_to_locant=None)
     final_name = _inject_stereo_if_missing(
         features, pool.best().name, atom_to_locant=None,
     )

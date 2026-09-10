@@ -1,4 +1,4 @@
-""" a phase — analyze_spiro_universal + audit_spiro_descriptor (P-24.2).
+""" a phase — analyze_spiro_universal + audit_spiro_descriptor.
 
 Reference SMILES seeded via OPSIN (name->structure) from the BB PIN examples
 quoted in internal notes
@@ -189,10 +189,10 @@ def _ring_frag_attach(mol):
     # hetero spiro substituent (was carbocyclic-only -> "substituent")
     ("C1OCCC12CCC(CC2)CC(=O)O", "2-oxaspiro[4.5]decan-8-yl"),
     # polyspiro substituent. round 2: this dispiro skeleton's two
-    # equal-length middle-ring arcs (both 2 carbons) are a genuine P-24.2.2
+    # equal-length middle-ring arcs (both 2 carbons) are a genuine
     # numbering tie the descriptor/spiro-atom-locant rules do not resolve
     # (same descriptor "dispiro[3.2.3.2]", same spiro-atom locants {4,7}
-    # either way) -- P-31.1.4.3.4 (lowest locant to the free valence) then
+    # either way) -- (lowest locant to the free valence) then
     # picks locant 5 over the old code's arbitrary 12. Both denote the
     # IDENTICAL molecule (confirmed: OPSIN-parsing "dispiro[3.2.3.2]dodecan-
     # 5-yl"acetic acid and the -12-yl form give the same InChIKey,
@@ -202,7 +202,7 @@ def _ring_frag_attach(mol):
 ])
 def test_universal_spiro_substituent(smi, expected):
     """Java-free unit test of the P3 spiro `-yl` producer (the fragment namer),
-    independent of the whole-molecule SELF-01 gate."""
+    independent of the whole-molecule gate."""
     from orthonym.rules.ring_substituents import (
         _universal_spiro_substituent_name,
     )

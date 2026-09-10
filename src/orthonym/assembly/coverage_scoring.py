@@ -15,10 +15,10 @@ Four scoring factors:
   4. substituent_completeness -- fraction of substituents reflected in the name
 
 Thread-local confidence store allows callers to retrieve metadata after
-assemble_name() returns without changing its str return type.
+assemble_name returns without changing its str return type.
 
 PROVENANCE WARNING (C4) -- ``factors['atom_coverage']`` is NOT a coverage
-measurement in the production path. ``CandidatePool.add()``
+measurement in the production path. ``CandidatePool.add``
 (``candidate_pool.py``, "Risk 1" mitigation) deliberately calls
 ``compute_confidence`` WITHOUT ``parent_atom_indices`` in order to keep
 confidence byte-identical, and attaches ``parent_atom_indices`` to the
@@ -119,9 +119,9 @@ HANDLER_UNMEASURED = 'unmeasured'
 def unmeasured_confidence(name: str = '', handler: str = HANDLER_UNMEASURED) -> dict:
     """The single honest record for "nothing measured this name's coverage".
 
-    One shared constructor so the ``name()`` path and the
-    ``name_with_confidence()`` path cannot disagree (they did: ``name()``
-    reported ``handler='unknown', confidence=0.0``; ``name_with_confidence()``
+    One shared constructor so the ``name`` path and the
+    ``name_with_confidence`` path cannot disagree (they did: ``name``
+    reported ``handler='unknown', confidence=0.0``; ``name_with_confidence``
     fabricated ``handler='direct', confidence=1.0`` with all four factors at
     ``1.0``, i.e. a perfect score on a name nothing had scored).
 
@@ -161,65 +161,65 @@ class CandidateName:
     # C4: provenance of factors['atom_coverage'] -- one of
     # COVERAGE_MEASURED / COVERAGE_ESTIMATED_NAME_LENGTH /
     # COVERAGE_RETAINED_NAME_BOOST, or None when factors is empty. Set by
-    # compute_confidence(); purely descriptive, so it cannot perturb the
+    # compute_confidence; purely descriptive, so it cannot perturb the
     # weighted sum (byte-identical safe). Consumers MUST check it before
     # treating atom_coverage as a coverage measurement -- in the production
     # path it is never COVERAGE_MEASURED (see module PROVENANCE WARNING).
     coverage_provenance: Optional[str] = None
-    # New in a phase.1: parent atom indices populated POST-HOC by
-    # CandidatePool.add() (see candidate_pool.py). Used by
+    # New in a phase: parent atom indices populated POST-HOC by
+    # CandidatePool.add (see candidate_pool.py). Used by
     # ParentCorrectnessScorer to compare against OPSIN-extracted
     # reference parent. None when handler doesn't report parent atoms
     # (most direct-return handlers; benzene/heterocycle/complex_ring
     # populate via features.benzene_ring / features.principal_ring /
-    # ring atoms from _assemble_complex_ring_name()).
-    # CRITICAL: this field is set AFTER compute_confidence() returns.
+    # ring atoms from _assemble_complex_ring_name).
+    # CRITICAL: this field is set AFTER compute_confidence returns.
     # Do NOT pass it as a positional arg to compute_confidence — that
-    # changes atom_coverage and breaks byte-identical (see RESEARCH §9.1
+    # changes atom_coverage and breaks byte-identical (see RESEARCH
     # Risk 3 / PATTERNS Risk 1).
     parent_atom_indices: Optional[set] = None
-    # a phase CD-01: principal-characteristic-group count for the parent
-    # structure. Populated POST-HOC by CandidatePool.add() via
+    # a phase: principal-characteristic-group count for the parent
+    # structure. Populated POST-HOC by CandidatePool.add via
     # _count_pcgs_in_parent. Same Risk 1 mitigation as parent_atom_indices:
-    # NEVER passed into compute_confidence() — that would break the
+    # NEVER passed into compute_confidence — that would break the
     # byte-identical guarantee. Used by Tier-1 cascade filter
-    # _filter_max_pcg_count (P-44.1.1).
+    # _filter_max_pcg_count.
     # Default None means "not yet computed" (the cascade treats None as 0).
-    # Source: https://iupac.qmul.ac.uk/BlueBook/P4.html P-44.1.1
+    # Source: https://iupac.qmul.ac.uk/BlueBook/P4.html
     parent_pcg_count: Optional[int] = None
     # a phase: ring-type authoritative IUPAC locants used by
-    # Tier-1 cascade step 6 (_filter_lowest_locants) per P-44.4.1.4+.
-    # Populated POST-HOC by CandidatePool.add() — same Risk 1 mitigation
-    # as parent_atom_indices: NEVER passed into compute_confidence()
+    # Tier-1 cascade step 6 (_filter_lowest_locants) per +.
+    # Populated POST-HOC by CandidatePool.add — same Risk 1 mitigation
+    # as parent_atom_indices: NEVER passed into compute_confidence
     # (would break byte-identical guarantee).
     # Shape: {"iupac_locants": {atom_idx: int | (int, str) tuple}} or None.
     # None means "no authoritative locants available" (spiro/VB stubs
     # per, or unsupported ring type) — cascade step 6 short-circuits
     # via _has_iupac_locants probe at candidate_pool.py:501-514.
-    # Source: https://iupac.qmul.ac.uk/BlueBook/P4.html P-44.4.1.4+
+    # Source: https://iupac.qmul.ac.uk/BlueBook/P4.html +
     ring_info: Optional[Dict[str, Any]] = None
     # a phase SCORE-01: structured Name-Tree IR for this candidate. Populated
     # POST-HOC by CandidatePool.add(tree=...) — same Risk 1 mitigation as
-    # parent_atom_indices / ring_info: NEVER passed into compute_confidence()
+    # parent_atom_indices / ring_info: NEVER passed into compute_confidence
     # (would break the byte-identical guarantee). None means "no tree yet"
-    # (coarse-bucket counted in Plan 04). pool.best().tree surfaces the winner's.
+    # (coarse-bucket counted in Plan 04). pool.best.tree surfaces the winner's.
     tree: Optional["NameTreeNode"] = None
     # a phase SCORE-03: POST-HOC per-node {id(node): NodeScores}, same Risk 1
     # mitigation as tree / parent_atom_indices / ring_info: NEVER passed into
-    # compute_confidence() (would break the byte-identical guarantee). None / {}
+    # compute_confidence (would break the byte-identical guarantee). None / {}
     # means "no per-substring signal" — the production no-reference path, or a
-    # coarse tree. pool.best().node_scores surfaces the winner's map for the
+    # coarse tree. pool.best.node_scores surfaces the winner's map for the
     # Plan 04 SCORE-06 measurement.
     node_scores: Optional[dict] = None
-    # a phase WSB-01 (): authoritative {atom_idx: 1-indexed locant} for the
+    # a phase -01 : authoritative {atom_idx: 1-indexed locant} for the
     # parent structure, threaded to the namer backstop _final_stereo_check so it
     # can inject stereodescriptors on the chain / non-phenol-benzene cohort.
-    # POST-HOC — NEVER passed into compute_confidence() (byte-identity Risk 1),
+    # POST-HOC — NEVER passed into compute_confidence (byte-identity Risk 1),
     # same mitigation as parent_atom_indices / ring_info / tree / node_scores.
     # None for direct-return handlers / complex_ring / polycyclic / phenol benzene
     # (no authoritative map -> backstop stays log-only there, /).
     atom_to_locant: Optional[Dict[int, int]] = None
-    # a phase WSB-01 (): True when the benzene parent is a PHENOL, so the
+    # a phase -01 : True when the benzene parent is a PHENOL, so the
     # backstop excludes it from the inject allowlist (phenol benzene stays
     # log-only). None/False otherwise. POST-HOC, never into compute_confidence.
     is_phenol_benzene: Optional[bool] = None
@@ -273,7 +273,7 @@ HANDLER_PRIORITY: Dict[str, int] = {
     'ring_assembly': 5,
     'ring_nitrile': 5,
     'amide': 5,
-    # a phase.1 ADDS (remediation): single source of truth for
+    # a phase ADDS (remediation): single source of truth for
     # candidate_pool.HANDLER_POLICIES. Plan 01's HANDLER_POLICIES dict pulls
     # every priority from this dict; missing entries break with KeyError.
     # n_oxide and amine handlers exist at composer.py:740 and composer.py:1383
@@ -306,10 +306,10 @@ CONFIDENCE_GATE_THRESHOLD: float = 0.40
 # ratio (0.042) = atom_coverage (0.042)
 # Pre-calibration baseline: ratio=0.30, atom_cov=0.30, fg=0.25, sub=0.15
 #
-# a phase (): two dicts FACTOR_WEIGHTS_V17 and FACTOR_WEIGHTS_V18 are
+# a phase : two dicts FACTOR_WEIGHTS_V17 and FACTOR_WEIGHTS_V18 are
 # declared; FACTOR_WEIGHTS is bound to one or the other at module-import time
 # based on the ORTHONYM_USE_V18_WEIGHTS env var (default 'false' = V17).
-# The V18 dict adds the multiple_bond_count factor (, P-44.4.1.2).
+# The V18 dict adds the multiple_bond_count factor (,.
 # Calibrated weight values are written by Plan 04 grid search.
 #
 # ----------------------------------------------------------------
@@ -318,15 +318,15 @@ CONFIDENCE_GATE_THRESHOLD: float = 0.40
 # Default 'false' (V17 active) during the post-148 soak week per.
 # Rollback one-liner:
 # ORTHONYM_USE_V18_WEIGHTS=false ORTHONYM_SELECTION_MODE=first_applicable pytest tests/
-# Source: https://iupac.qmul.ac.uk/BlueBook/P4.html P-44.1.1, P-44.4.1.2
+# Source: https://iupac.qmul.ac.uk/BlueBook/P4.html,
 # ----------------------------------------------------------------
 _USE_V18 = os.getenv('ORTHONYM_USE_V18_WEIGHTS', 'false').strip().lower() == 'true'
 
-# V17 weights (a phase.1 + 145.2 baseline — byte-identical preserved).
+# V17 weights (a phase + 145.2 baseline — byte-identical preserved).
 # ratio=0.0 from 145.2 -a.1 (zero IUPAC justification per Blue Book grep).
 # parent_correctness=0.0 from 145.1 (scaffolded; raised to calibrated value in V18).
 #
-# BYTE-IDENTICAL PROOF ():
+# BYTE-IDENTICAL PROOF :
 # - Python 3.7+ dict iteration is insertion-order-deterministic.
 # - compute_confidence's sum-loop iterates FACTOR_WEIGHTS in insertion order.
 # - parent_correctness inserted LAST so the existing 4 weighted-sum terms
@@ -347,27 +347,27 @@ FACTOR_WEIGHTS_V17: Dict[str, float] = {
 
 # V18 weights (a phase calibrated by grid search in Plan 04).
 # CALIBRATED by Plan 04 grid search (2026-04-24, 52 configs, anti-overfit delta=0.0).
-# Grid: 5^5 with sum-to-1.0 constraint; parent_correctness DROPPED per CD-03
+# Grid: 5^5 with sum-to-1.0 constraint; parent_correctness DROPPED per
 # (std=0.0 until a phase wires features.parent_selection_result); 52 surviving
 # configs evaluated over ~2.5 hrs wall-clock on 4 workers.
-# multiple_bond_count is the NEW factor per (P-44.4.1.2) — calibration
+# multiple_bond_count is the NEW factor per — calibration
 # retained it at 0.25 (NOT triggered; factor has meaningful discriminative
-# signal even under CD-03's production path).
+# signal even under 's production path).
 # Insertion order: multiple_bond_count is APPENDED LAST per IEEE 754
 # invariant (when V17 loop encounters this dict via reload, the 6th term
 # is added LAST so prior 5 sums are byte-identical to V17).
-# Source: https://iupac.qmul.ac.uk/BlueBook/P4.html P-44.4.1.2
+# Source: https://iupac.qmul.ac.uk/BlueBook/P4.html
 FACTOR_WEIGHTS_V18: Dict[str, float] = {
-    'ratio': 0.0,                       # permanent 0.0 (a phase.2 -a.1)
-    'atom_coverage': 0.05,              # RECALIBRATED via a phase.2 boundary-extension grid
+    'ratio': 0.0,                       # permanent 0.0 (a phase -a.1)
+    'atom_coverage': 0.05,              # RECALIBRATED via a phase boundary-extension grid
     'fg_recognition': 0.25,             # RECALIBRATED (post-148 cascade unblock shifts optimum)
     'substituent_completeness': 0.25,   # RECALIBRATED
-    'parent_correctness': 0.35,         # RECALIBRATED — a phase.2 INTERIOR optimum (was 0.25 at 148.1 corner)
+    'parent_correctness': 0.35,         # RECALIBRATED — a phase INTERIOR optimum (was 0.25 at 148.1 corner)
     'multiple_bond_count': 0.10,        # RECALIBRATED (lowered to keep sum-to-1.0)
 }
 # Sum = 1.00 (0.00 + 0.05 + 0.25 + 0.25 + 0.35 + 0.10); sum-to-1.0 constraint satisfied.
-# a phase.2 partial (100/255 configs; 5-hr abort): Wilson-95-LB winner;
-# CD-02 SATISFIED: parent_correctness=0.35 is INTERIOR to [0.30, 0.50] grid; no further
+# a phase partial (100/255 configs; 5-hr abort): Wilson-95-LB winner;
+# SATISFIED: parent_correctness=0.35 is INTERIOR to [0.30, 0.50] grid; no further
 # boundary extension needed. Top-10 cluster: PC=0.30 (5/10), PC=0.35 (3/10), PC=0.40 (1/10), PC=0.45 (1/10).
 
 # Active weights — flipped via ORTHONYM_USE_V18_WEIGHTS env var.
@@ -446,7 +446,7 @@ def _compute_fg_recognition(features: Any) -> float:
 
     The principal group is always counted as recognised (it becomes the
     suffix). Non-principal groups are counted if they have a known prefix
-    form via ``get_prefix()``.
+    form via ``get_prefix``.
 
     Returns 1.0 when there are no functional groups to miss.
     """
@@ -524,7 +524,7 @@ def _compute_multiple_bond_count(
 ) -> float:
     """Count (double + triple) bonds where both endpoints are in parent_atom_indices.
 
-    a phase: parent atoms ONLY (NOT entire molecule), per P-44.4.1.2
+    a phase: parent atoms ONLY (NOT entire molecule), per
     which says "ring system or chain" = the parent skeleton. Substituent
     multiple bonds (e.g. a nitrile substituent's C#N triple bond) do NOT
     contribute because the bond's endpoints are not both in parent_atom_indices.
@@ -538,9 +538,9 @@ def _compute_multiple_bond_count(
     candidate_pool._count_multiple_bonds_in_atom_set; the duplication is
     intentional to avoid a coverage_scoring <-> candidate_pool circular import
     (candidate_pool imports compute_confidence from coverage_scoring, so the
-    reverse direction is forbidden). See RESEARCH §2.5.
+    reverse direction is forbidden). See RESEARCH
 
-    Source: https://iupac.qmul.ac.uk/BlueBook/P4.html P-44.4.1.2
+    Source: https://iupac.qmul.ac.uk/BlueBook/P4.html
     """
     mol = getattr(features, 'mol', None)
     if mol is None or not parent_atom_indices:
@@ -591,7 +591,7 @@ def compute_confidence(
 
     # Factor 2: heavy atom coverage.
     # C4: record WHICH of the three things this number actually is. No
-    # production caller passes parent_atom_indices (candidate_pool.add()
+    # production caller passes parent_atom_indices (candidate_pool.add
     # withholds it as its "Risk 1" byte-identical mitigation), so in practice
     # this is the name-length proxy, numerically equal to ratio_score.
     if parent_atom_indices is not None:
@@ -636,19 +636,19 @@ def compute_confidence(
         'atom_coverage': round(min(atom_cov, 1.0), 4),
         'fg_recognition': round(fg_recognition, 4),
         'substituent_completeness': round(sub_completeness, 4),
-        # a phase.1: placeholder set to 0.0 so the sum-loop at lines 324-326
-        # doesn't raise KeyError on the new FACTOR_WEIGHTS key. CandidatePool.add()
-        # overwrites this POST-HOC with the real ParentCorrectnessScorer.score()
+        # a phase: placeholder set to 0.0 so the sum-loop at lines 324-326
+        # doesn't raise KeyError on the new FACTOR_WEIGHTS key. CandidatePool.add
+        # overwrites this POST-HOC with the real ParentCorrectnessScorer.score
         # result. With FACTOR_WEIGHTS['parent_correctness'] = 0.0, the placeholder
         # contributes exactly 0.0 to confidence (IEEE 754) -- byte-identical safe.
         'parent_correctness': 0.0,
     }
     # a phase: multiple_bond_count factor (V18-only).
     # Guard ensures V17 path (where the key is absent from FACTOR_WEIGHTS)
-    # produces byte-identical factors dict. POST-HOC overwrite in pool.add()
+    # produces byte-identical factors dict. POST-HOC overwrite in pool.add
     # for V18 mode handles the case where this is initially 0.0
     # (parent_atom_indices=None at compute_confidence call time per Risk 1).
-    # Source: https://iupac.qmul.ac.uk/BlueBook/P4.html P-44.4.1.2
+    # Source: https://iupac.qmul.ac.uk/BlueBook/P4.html
     if 'multiple_bond_count' in FACTOR_WEIGHTS:
         factors['multiple_bond_count'] = round(
             _compute_multiple_bond_count(features, parent_atom_indices), 4
@@ -706,7 +706,7 @@ def select_best_candidate(candidates: List[CandidateName]) -> CandidateName:
             if c_pri > b_pri:
                 best = c
             elif c_pri == b_pri:
-                # Tiebreak 2 (P-45.5): earlier in alphanumerical order.
+                # Tiebreak 2: earlier in alphanumerical order.
                 # Replaces the input-order first-wins fallback so equal
                 # candidates resolve identically regardless of registration
                 # or SMILES-spelling order.
@@ -765,7 +765,7 @@ def retrieve_confidence() -> dict:
     When no metadata has been stored the record is the shared honest
     "unmeasured" record (C4): ``confidence=None``,
     ``verification='unverified'``, ``factors={}``. ``handler`` stays
-    ``'unknown'`` for that case because the ``name()`` quality gates use
+    ``'unknown'`` for that case because the ``name`` quality gates use
     ``handler != 'unknown'`` as their "was anything actually scored?" guard.
 
     ``confidence`` was previously ``0.0`` here. That is a fabricated FAIL --
@@ -792,7 +792,7 @@ def retrieve_confidence() -> dict:
         'factors': dict(candidate.factors),
         'coverage_provenance': provenance,
         'handler': candidate.handler,
-        # a phase WSB-01 (): surface the POST-HOC authoritative parent
+        # a phase -01 : surface the POST-HOC authoritative parent
         # locant map + phenol flag for the namer backstop.
         'atom_to_locant': getattr(candidate, 'atom_to_locant', None),
         'is_phenol_benzene': getattr(candidate, 'is_phenol_benzene', None),

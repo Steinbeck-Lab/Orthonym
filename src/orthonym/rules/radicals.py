@@ -1,5 +1,5 @@
 """
-Radical naming rules per IUPAC 2013 P-71.
+Radical naming rules per IUPAC 2013.
 
 Handles naming of:
 - Monovalent radicals: -yl suffix (methyl, ethyl, phenyl)
@@ -9,7 +9,7 @@ Handles naming of:
 - Oxyl radicals: -oxyl suffix (methoxyl, phenoxyl)
 
 IUPAC 2013 References:
-- P-71: Radical nomenclature
+-: Radical nomenclature
 
 Key naming patterns:
 - Monovalent alkyl radicals: alkane - H -> alkyl (methyl, ethyl)
@@ -242,7 +242,7 @@ def _is_carboxyl_carbon(mol, idx: int, from_idx: int) -> bool:
 
 
 def _name_carboxy_alkyl_radical(mol, radical_idx: int) -> Optional[str]:
-    """P-41 Table 4.1 cls 1: the radical (free valence) is the MOST senior
+    """ cls 1: the radical (free valence) is the MOST senior
     class, senior to a carboxylic acid. A monovalent alkyl radical whose linear
     carbon chain (starting at the free valence = C-1) terminates in a
     carboxylic-acid carbon names the chain as the -yl parent and cites the acid
@@ -303,17 +303,17 @@ def _name_carboxy_alkyl_radical(mol, radical_idx: int) -> Optional[str]:
     return f"{acid_locant}-carboxy{stem}yl"
 
 
-# 169.6-03 (CHOKE-01, kill-list §2.2): the carbon-counting chain-counter that
+# 169.6-03 (CHOKE-01, kill-list): the carbon-counting chain-counter that
 # fed the alkyl / -ylidene / -ylidyne radical naming was DELETED. The three
 # helpers below are now thin shims over route_charged (the single chokepoint),
 # which H-saturates the radical center, re-enters the FULL pipeline, and
-# re-applies the P-71 suffix — so a SUBSTITUTED/branched/unsaturated alkyl
+# re-applies the suffix — so a SUBSTITUTED/branched/unsaturated alkyl
 # radical is named correctly instead of by a bare carbon count.
 
 
 def name_alkyl_radical(mol, radical_site: Dict[str, Any]) -> str:
     """
-    Name an alkyl radical (R.) via the route_charged chokepoint (P-71.1.1).
+    Name an alkyl radical (R.) via the route_charged chokepoint.
 
     169.6-03: delegates to route_charged (neutralize the radical center ->
     re-enter the full pipeline -> re-apply the -yl/-ylidene/-ylidyne suffix),
@@ -422,7 +422,7 @@ def _is_plain_alkyl_radical_fragment(mol, radical_idx: int, attach_idx: int) -> 
     """True iff the R group of an aliphatic R-O. radical is a BARE, LINEAR,
     SATURATED hydrocarbon chain rooted AT ``attach_idx`` -- the exact shape
     the existing retained '-oxyl' contraction (methoxyl/ethoxyl/propoxyl/
-    .../hexoxyl) was already built for (BB P-71.3.4/P-71.2.1.2: 'methoxyl,
+    .../hexoxyl) was already built for (BB /: 'methoxyl,
     ethoxyl, propoxyl, butoxyl, *tert*-butoxyl, phenoxyl... are retained and
     are preferred IUPAC names' -- a FIXED short list of straight-chain/simple
     contractions, not a licence to count carbons on ANY hydrocarbon shape).
@@ -468,7 +468,7 @@ def _is_plain_alkyl_radical_fragment(mol, radical_idx: int, attach_idx: int) -> 
 
 
 def _name_oxyl_parent_group(mol, radical_idx: int, attach_idx: int) -> str:
-    """Name the R group of an R-O. oxyl radical as a substituent (P-29.2 -yl
+    """Name the R group of an R-O. oxyl radical as a substituent -yl
     prefix), via the project's existing recursive substituent-naming
     chokepoint ``name_substituent_fragment`` -- the SAME pipeline other rule
     modules use to name an R group hanging off an excluded heteroatom (e.g.
@@ -482,11 +482,11 @@ def _name_oxyl_parent_group(mol, radical_idx: int, attach_idx: int) -> str:
 
 
 def _radical_name_round_trips(mol, name: str) -> bool:
-    """Best-effort ``-r`` (allowRadicals) OPSIN round-trip check for a P-71
+    """Best-effort ``-r`` (allowRadicals) OPSIN round-trip check for a
     radical-name CANDIDATE against ``mol``'s own structure. Two uses in this
     module: (a) belt-and-suspenders over the shape guards above (never trust
     a retained/contracted candidate on shape alone -- confirm it actually
-    parses back to the same molecule); (b) the tie-break between P-71.3.4's
+    parses back to the same molecule); (b) the tie-break between 's
     two composition methods in ``_compose_oxyl_name`` below.
 
     Fails OPEN (True -- trust the candidate) whenever OPSIN cannot be
@@ -494,7 +494,7 @@ def _radical_name_round_trips(mol, name: str) -> bool:
     failure. A no-Java deployment is not a real one here (OPSIN spawns
     unconditionally elsewhere in this pipeline -- see
     ``feedback_no_synthetic_no_java_chase``), and the outer OPSIN-validity /
-    SELF-01 gate re-verifies the FINAL emitted name downstream regardless,
+     gate re-verifies the FINAL emitted name downstream regardless,
     abstaining on any genuine mismatch -- so this local check only needs to
     catch a DEFINITE rejection or a DEFINITE wrong-structure parse; it is not
     the sole gate. Fails CLOSED (False) only on such a definite outcome."""
@@ -531,7 +531,7 @@ def _radical_name_round_trips(mol, name: str) -> bool:
 
 
 def _compose_oxyl_name(mol, parent: str, additive_suffix: str, systematic_suffix: str) -> str:
-    """P-71.3.4 (VERIFIED, the Blue Book-40709): a radical formed by
+    """ (VERIFIED, the Blue Book-40709): a radical formed by
     removing the hydrogen of a hydroxy/peroxy characteristic group is named
     in TWO ways -- (1) additively, ``R`` + 'oxyl'/'peroxyl' (e.g.
     '(chloroacetyl)oxyl (PIN)', 'hexanoylperoxyl (PIN)', 'butanoyloxyl
@@ -543,7 +543,7 @@ def _compose_oxyl_name(mol, parent: str, additive_suffix: str, systematic_suffix
     verified fallback for an R shape method (1) cannot express. '' if
     NEITHER verifies (fail closed -- never a wrong name).
 
-    A compound/locanted R takes enclosing marks (P-16.5.1.1) via the same
+    A compound/locanted R takes enclosing marks via the same
     ``enclose_if_compound`` gate every other compound substituent prefix in
     this codebase uses, for both methods alike."""
     from ..assembly.naming_utils import enclose_if_compound
@@ -558,7 +558,7 @@ def _compose_oxyl_name(mol, parent: str, additive_suffix: str, systematic_suffix
 
 
 def _name_peroxyl_radical(mol, radical_idx: int, bridge_o_idx: int) -> str:
-    """P-71.3.4: name an R-O-O. peroxyl radical. ``bridge_o_idx`` is the
+    """: name an R-O-O. peroxyl radical. ``bridge_o_idx`` is the
     peroxide oxygen bonded to the radical oxygen; its remaining heavy
     neighbour (excluding the radical O) is the R group's attachment point,
     named through the SAME substituent-naming chokepoint the plain oxyl
@@ -595,7 +595,7 @@ def name_oxyl_radical(mol, radical_site: Dict[str, Any]) -> str:
 
     Oxygen-centered radicals named as R-oxyl for the small retained set of
     UNSUBSTITUTED R groups (methoxyl/ethoxyl/phenoxyl/propoxyl/.../hexoxyl),
-    or per P-71.3.4 method (1) as ``(R)oxyl``/``R-peroxyl`` -- the VERIFIED
+    or per method (1) as ``(R)oxyl``/``R-peroxyl`` -- the VERIFIED
     PIN form ("Method (1) generates preferred IUPAC names",
     the Blue Book) -- when R itself carries a further substituent, via
     ``_compose_oxyl_name``. A2 generalisation: the R group is named
@@ -631,7 +631,7 @@ def name_oxyl_radical(mol, radical_site: Dict[str, Any]) -> str:
     neighbor = heavy_neighbors[0]
 
     if neighbor.GetSymbol() == 'O':
-        # R-O-O. peroxyl radical (P-71.3.4): the free valence sits on the
+        # R-O-O. peroxyl radical: the free valence sits on the
         # OUTER oxygen of a peroxide bridge. '' (fail-closed) falls through
         # to the plain 'oxyl' default below rather than mis-cutting the
         # bridge -- never a wrong name.
@@ -698,7 +698,7 @@ def name_oxyl_radical(mol, radical_site: Dict[str, Any]) -> str:
 
 def name_divalent_radical(mol, radical_site: Dict[str, Any]) -> str:
     """
-    Name a divalent (carbene-like) radical -> -ylidene, via route_charged (P-71).
+    Name a divalent (carbene-like) radical -> -ylidene, via route_charged.
 
     169.6-03: delegates to the chokepoint (replacing the carbon-counting body).
 
@@ -714,7 +714,7 @@ def name_divalent_radical(mol, radical_site: Dict[str, Any]) -> str:
 
 def name_trivalent_radical(mol, radical_site: Dict[str, Any]) -> str:
     """
-    Name a trivalent (carbyne-like) radical -> -ylidyne, via route_charged (P-71).
+    Name a trivalent (carbyne-like) radical -> -ylidyne, via route_charged.
 
     169.6-03: delegates to the chokepoint (replacing the carbon-counting body).
 
@@ -761,36 +761,36 @@ def name_aryl_radical(mol, radical_site: Dict[str, Any]) -> str:
         return 'aryl'
 
 
-# === HETEROATOM-CENTRED RADICALS (P-71.2.1.2 / P-71.2.2.2 / P-71.3.2 / P-71.3.3) ===
+# === HETEROATOM-CENTRED RADICALS / / / ===
 #
 # The carbon chokepoint (charged_router.route_charged) names a parent hydride by
 # neutralize -> re-enter -> _apply_radical_suffix, which drops the whole 'ane'
-# ending (methane->methyl, silane->silyl). That contraction is the P-71.2.1.1 rule
+# ending (methane->methyl, silane->silyl). That contraction is the rule
 # and is correct ONLY for Group-14 mononuclear hydrides / acyclic-hydrocarbon
 # termini / monocyclic saturated hydrocarbon rings. For a NON-Group-14 heteroatom
-# parent hydride (azane, sulfane, borane,...) the P-71.2.1.2 general method elides
+# parent hydride (azane, sulfane, borane,...) the general method elides
 # ONLY the final 'e' (azane->azanyl, sulfane->sulfanyl, borane->boranyl) — so the
 # chokepoint produced the WRONG 'azyl'/'sulfyl'/'boryl'. These namers own the
 # heteroatom cases with the correct, element-keyed contraction and fail closed
 # ('' -> the caller's carbon path) for everything else.
 
-# P-71.2.1.1 / P-71.2.2.1: Group-14 mononuclear parent hydrides -> drop 'ane'.
+# /: Group-14 mononuclear parent hydrides -> drop 'ane'.
 _GROUP14_HYDRIDE_RADICAL = {
     'C': 'methane', 'Si': 'silane', 'Ge': 'germane', 'Sn': 'stannane', 'Pb': 'plumbane',
 }
-# P-71.2.1.2 / P-71.2.2.2: non-Group-14 heteroatom parent hydrides -> elide 'e' only.
+# /: non-Group-14 heteroatom parent hydrides -> elide 'e' only.
 _ELIDE_E_HYDRIDE_RADICAL = {
     'N': 'azane', 'P': 'phosphane', 'As': 'arsane', 'Sb': 'stibane', 'Bi': 'bismuthane',
     'S': 'sulfane', 'Se': 'selane', 'Te': 'tellane',
     'B': 'borane', 'Al': 'alumane', 'Ga': 'gallane', 'In': 'indigane', 'Tl': 'thallane',
 }
 _RADICAL_SUFFIX_BY_NE = {1: 'yl', 2: 'ylidene', 3: 'ylidyne'}
-# P-70.3.2: multiplying prefixes 'bis'/'tris'/... precede compound suffixes.
+#: multiplying prefixes 'bis'/'tris'/... precede compound suffixes.
 _COMPOUND_MULTIPLIER = {2: 'bis', 3: 'tris', 4: 'tetrakis'}
 
 
 def _parent_hydride_radical_name(element: str, n_electrons: int) -> str:
-    """P-71.2.1.1/.2 + P-71.2.2.1/.2: name a MONONUCLEAR heteroatom radical from its
+    """/.2 + /.2: name a MONONUCLEAR heteroatom radical from its
     element's parent-hydride name. Group-14 (silane/germane) drop the whole 'ane';
     non-Group-14 (azane/sulfane/borane) elide only the final 'e'.
     -> azanyl, azanylidene, sulfanyl, boranyl, silyl, germyl. '' if unmapped.
@@ -918,17 +918,17 @@ def name_heteroatom_radical(mol, radical_sites: List[Dict[str, Any]],
     BEFORE its carbon-centric path so a heteroatom never gets a wrong Group-14
     contraction):
 
-      * P-71.2.1.2 / P-71.2.2.2 mononuclear parent-hydride radicals — azanyl,
+      * / mononuclear parent-hydride radicals — azanyl,
         azanylidene, sulfanyl, boranyl, silyl, germyl,...
-      * P-71.3.2 amine / imine / amide compound-suffix radicals — methanaminyl,
+      * amine / imine / amide compound-suffix radicals — methanaminyl,
         propan-1-iminyl, formamidyl.
-      * P-71.3.3 multiplicative poly-amine radicals — (ethane-1,2-diyl)bis(aminyl).
+      * multiplicative poly-amine radicals — (ethane-1,2-diyl)bis(aminyl).
 
     Returns '' (fail-closed) for any carbon-centred or out-of-scope radical so the
     caller's existing carbon path / name_radical helpers run unchanged."""
     if not radical_sites:
         return ''
-    # Multi-centre: only the P-71.3.3 multiplicative poly-amine class is in scope
+    # Multi-centre: only the multiplicative poly-amine class is in scope
     # here; every other multi-radical is the carbon polyvalent primitive's job.
     if len(radical_sites) >= 2:
         return _name_multiplicative_amine_radical(mol, radical_sites)
@@ -1012,7 +1012,7 @@ def name_radical(mol, style: str = 'pin') -> str:
         elif subtype == 'aryl':
             return name_aryl_radical(mol, site)
 
-        # P-41 Table 4.1 cls 1: the free valence is the MOST senior class,
+        # cls 1: the free valence is the MOST senior class,
         # senior to a carboxylic acid — a chain-terminal -COOH on an alkyl
         # radical is demoted to a 'carboxy' prefix (2-carboxyethyl). Try this
         # before route_charged (which H-saturates the acid and mis-drops it).
@@ -1021,17 +1021,17 @@ def name_radical(mol, style: str = 'pin') -> str:
             if carboxy_name:
                 return carboxy_name
 
-        # 169.6-03 (CHOKE-01, kill-list §2.2): the alkyl / -ylidene / -ylidyne
+        # 169.6-03 (CHOKE-01, kill-list): the alkyl / -ylidene / -ylidyne
         # carbon-counting paths are DELETED. Delegate to route_charged, which
         # H-saturates the radical center, re-enters the FULL pipeline (so
         # substituents/unsaturation/branching are named correctly), and re-applies
-        # the P-71 -yl/-ylidene/-ylidyne suffix. On '' fall through to '' (no
+        # the -yl/-ylidene/-ylidyne suffix. On '' fall through to '' (no
         # carbon-counted misname).
         from .charged_router import route_charged
         return route_charged(mol, style)
 
-    # Multiple radicals: delegate to route_charged (P-71.2.3 multi-site free-valence
+    # Multiple radicals: delegate to route_charged multi-site free-valence
     # namer). No first-site oxyl/acyl shortcut — it produced structure-dropping names
-    # (e.g. [O]CC[O] -> 'ethoxyl') that SELF-01 only suppressed. Fail closed on ''.
+    # (e.g. [O]CC[O] -> 'ethoxyl') that only suppressed. Fail closed on ''.
     from .charged_router import route_charged
     return route_charged(mol, style)

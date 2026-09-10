@@ -1,10 +1,10 @@
-"""W2F-P8 Task 4: the P-45.6 stereo-differing diaryl-ether evidence PIN.
+"""W2F-P8 Task 4: the stereo-differing diaryl-ether evidence PIN.
 
 Two constitutionally identical para-(1-chloroethyl)phenyl rings joined by O, one
-arm R and one S. Multiplicative is disallowed (P-45.6.2); the substitutive PIN is
-chosen with the R arm first-cited (P-45.6.3, 'R' precedes 'S'). The parent ring is
-the one bearing R, so its own 1-chloroethyl (cited before the ...phenoxy complex
-prefix) carries (1R). BlueBookV2.md:22585 (Example 2), :22603 (P-45.6.3).
+arm R and one S. Multiplicative is disallowed; the substitutive PIN is
+chosen with the R arm first-cited, 'R' precedes 'S'). The parent ring is
+the one bearing R, so its own 1-chloroethyl (cited before the...phenoxy complex
+prefix) carries (1R). the Blue Book (Example 2),:22603.
 
 Determinism: the parent choice is a name-string comparison, so 10 random SMILES
 respellings must all yield one identical name.

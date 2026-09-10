@@ -1,5 +1,5 @@
-""" Milestone A3 -- isotope-descriptor PLACEMENT gaps (P-82.2.1 / P-82.2.2.1 /
-P-82.6.3.2). The decorator (``rules/isotopes.py``) already exists and already
+""" Milestone A3 -- isotope-descriptor PLACEMENT gaps / /
+. The decorator (``rules/isotopes.py``) already exists and already
 names simple isotopologues; this file covers three measured placement gaps
 plus a regression guard for the working simple cases.
 
@@ -21,7 +21,7 @@ def _name(smiles, tier="pin"):
 
 
 # ---------------------------------------------------------------------------
-# Task 1 -- systematic-parent fallback (P-82.6.3.2) + multi-attachment-group
+# Task 1 -- systematic-parent fallback + multi-attachment-group
 # placement, per-D-glycine
 # ---------------------------------------------------------------------------
 
@@ -32,10 +32,10 @@ def test_per_deuterated_glycine_systematic_parent():
     name = _name(PER_D_GLYCINE)
     assert name and name not in ("unknown organic compound", None), "abstained"
     assert opsin_roundtrip_check(PER_D_GLYCINE, name)["passed"], name
-    # P-82.6.3.2: retained 'glycine' has no numbered positions for the label
+    #: retained 'glycine' has no numbered positions for the label
     # -> systematic parent. The default systematic-STYLE skeleton itself
     # still keeps the retained "acetic acid" stem (measured 2026-08-23), so
-    # this also asserts the P-82.6.3.2 fallback actually fired.
+    # this also asserts the fallback actually fired.
     assert "glycine" not in name.lower()
     assert "acetic" not in name.lower()
 
@@ -48,7 +48,7 @@ def test_per_deuterated_glycine_systematic_parent():
 # works generally for a single isotope label on a ring/parent atom that
 # carries its own substituent locant -- see the 3 positive witnesses below,
 # none of which needed any code change. This specific witness's skeleton
-# carries a P-92 pseudoasymmetric ring-stereo descriptor, "(1r,3r)-", and
+# carries a pseudoasymmetric ring-stereo descriptor, "(1r,3r)-", and
 # OPSIN 2.9.0 cannot parse THAT at all -- verified directly:
 # opsin_parse("(1r,3r)-1,3-difluorocyclobutane") -> None
 # opsin_parse("(1R,3R)-1-amino-3-fluorocyclobutane-1-carboxylic acid") -> None

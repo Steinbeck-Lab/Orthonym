@@ -101,7 +101,7 @@ class TestIUPACValueVerification:
         (111, "undecahect"), (132, "dotriacontahect"),
         (231, "hentriacontadict"), (486, "hexaoctacontatetract"),
         (999, "nonanonacontanonact"),
-        # Pure thousands (IUPAC P-14.2.1.2)
+        # Pure thousands (IUPAC
         (1000, "kili"), (2000, "dili"), (3000, "trili"),
         (4000, "tetrali"), (5000, "pentali"),
         (6000, "hexali"), (7000, "heptali"), (8000, "octali"),

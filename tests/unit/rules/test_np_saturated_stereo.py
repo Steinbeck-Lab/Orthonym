@@ -6,7 +6,7 @@ calls the alpha/beta stereo collector `_collect_np_stereo` inside the UNSATURATE
 (`ene`/`yne`) arm. A fully-saturated bare scaffold with a non-natural ring stereocentre
 (e.g. 5-beta rather than the reference 5-alpha) falls straight to
 `return scaffold_info["scaffold_name"]` -- a stereo-free bare name -- which a phase's
-SELF-01 gate then abstains as a stereo omission (the emitted name OPSIN-round-trips to a
+ gate then abstains as a stereo omission (the emitted name OPSIN-round-trips to a
 DIFFERENT, epimeric molecule).
 
 This test file locks:
@@ -41,7 +41,7 @@ CONTROL_ANDROSTANE = "C[C@@]12CCC[C@H]1[C@@H]1CCC3CCCC[C@]3(C)[C@H]1CC2"
 
 # a review BLOCKER witness (2026-08-12): a pregnane skeleton that leaves a ring centre
 # UNDEFINED. Any 'X-pregnane' name over-specifies (the '-pregnane' stem itself asserts
-# 6 of 7 ring centres), and SELF-01 TOLERATES over-specification (namer.py:992), so it
+# 6 of 7 ring centres), and TOLERATES over-specification (namer.py:992), so it
 # cannot catch a wrong over-specified stereoisomer. Pre-fix this shipped the wrong
 # '(5S,8S,9S,10S,13R,14S)-pregnane'; the RT-gate on the whole-graph fallback makes it
 # abstain instead. NEVER ship the wrong name.
@@ -85,7 +85,7 @@ class TestSaturatedBareScaffoldStereoEmission:
     @pytest.mark.opsin_gate
     def test_control_androstane_full_pipeline_unchanged(self):
         """Same control through the full pipeline with the OPSIN gate ON: verified
-        pre-fix to emit the clean bare name with no SELF-01 suppression; must stay
+        pre-fix to emit the clean bare name with no suppression; must stay
         byte-identical after the fix."""
         name = name_compound(CONTROL_ANDROSTANE)
         assert name == "androstane", name
@@ -93,7 +93,7 @@ class TestSaturatedBareScaffoldStereoEmission:
     @pytest.mark.opsin_gate
     def test_partial_stereo_sterane_never_ships_wrong_overspecified_name(self):
         """a review BLOCKER (2026-08-12): the whole-graph-R/S fallback must NOT ship an
-        over-specified name for an input that leaves a ring centre undefined. SELF-01
+        over-specified name for an input that leaves a ring centre undefined.
         tolerates over-specification (namer.py:992), so it cannot catch it -- the
         RT-gate on the fallback (ship only if it OPSIN-round-trips) makes this abstain
         rather than ship the wrong '(5S,8S,9S,10S,13R,14S)-pregnane'. If a future fix

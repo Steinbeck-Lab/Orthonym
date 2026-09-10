@@ -1,13 +1,13 @@
 """W3-P15 azine handler — substitutive 'ylidene' derivatives of hydrazine
-(P-68.3.1.2.3).
+.
 
-An azine has the general structure R2C=N-N=CR2 (BB P-68.3.1.2.3.1) or the
-unsymmetrical R2C=N-N=CR'2 (P-68.3.1.2.3.2). Preferred IUPAC names are formed
+An azine has the general structure R2C=N-N=CR2 (BB or the
+unsymmetrical R2C=N-N=CR'2. Preferred IUPAC names are formed
 SUBSTITUTIVELY as 'ylidene' derivatives of the parent hydride hydrazine, NOT by
 functional-class nomenclature ('acetone azine'):
 
-    (CH3)2C=N-N=C(CH3)2   -> di(propan-2-ylidene)hydrazine   (symmetric, P-...3.1)
-    CH3CH2C(CH3)=N-N=C6H10 -> (butan-2-ylidene)(cyclohexylidene)hydrazine  (P-...3.2)
+    (CH3)2C=N-N=C(CH3)2 -> di(propan-2-ylidene)hydrazine (symmetric, P-...3.1)
+    CH3CH2C(CH3)=N-N=C6H10 -> (butan-2-ylidene)(cyclohexylidene)hydrazine (P-...3.2)
 
 The two C=N carbons carry the ylidene fragments. This handler perceives the
 acyclic C=N-N=C motif on the molecule graph (NOT via a global-table SMARTS — the
@@ -21,7 +21,7 @@ exact shape: any charge/radical, a ring-internal C=N-N=C, an N bearing anything
 but its =C and the N-N bond, a non-organyl arm, or any atom the two arms + the
 two nitrogens do not fully account for.
 
-IUPAC cite: P-68.3.1.2.3.
+IUPAC cite:.
 """
 from __future__ import annotations
 
@@ -99,7 +99,7 @@ def _is_azine(features: Any) -> bool:
 def _ylidene_arm(mol, c_idx: int, n_idx: int) -> Optional[Tuple[str, Set[int]]]:
     """BFS the ylidene fragment rooted at ``c_idx`` (never crossing the imino
     ``n_idx``) and name it via the substituent pipeline, which emits the
-    P-29.2 '-ylidene' directly from the C=N bond order.
+     '-ylidene' directly from the C=N bond order.
     Return ``(ylidene_name, fragment_atom_set)`` or None."""
     frag: Set[int] = {c_idx}
     stack = [c_idx]
@@ -146,12 +146,12 @@ def name_azine(
         return f"({nm})" if is_complex_substituent(nm) else nm
 
     if name1 == name2:
-        # Symmetric azine (P-68.3.1.2.3.1): 'di(<X>ylidene)hydrazine'. The BB
+        # Symmetric azine: 'di(<X>ylidene)hydrazine'. The BB
         # PIN uses the simple multiplier 'di' even for a locant-bearing ylidene
         # (BB 38592 'di(propan-2-ylidene)hydrazine', not 'bis(...)').
         name = f"di{_enclose(name1)}hydrazine"
     else:
-        # Unsymmetric azine (P-68.3.1.2.3.2): alphanumeric citation, each
+        # Unsymmetric azine: alphanumeric citation, each
         # ylidene enclosed, no position locants (BB '(butan-2-ylidene)'
         # '(cyclohexylidene)hydrazine').
         from ..naming_utils import alpha_sort_key

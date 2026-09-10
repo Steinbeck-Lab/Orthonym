@@ -5,7 +5,7 @@ the nitrogen included -- carries an arabic ring locant, and a substituent on tha
 nitrogen is cited with that numeral. Italic '*N*' is for a nitrogen that receives
 no numeral.
 
-  * P-66.1.5 "Lactams, lactims, sultams, and sultims" / P-66.1.5.1 "Lactams and
+  * "Lactams, lactims, sultams, and sultims" / "Lactams and
     lactims" (`the Blue Book`, `:33224`): "Lactams are named in two ways:
     (1) as heterocyclic pseudoketones; (2) by substituting 'lactam' for the 'ic
     acid' ending...". The decisive sentence is the last one (`:33229`):
@@ -17,12 +17,12 @@ no numeral.
     `:33236` `1-azacyclotridecan-2-one (PIN) dodecano-12-lactam`
     -- the locant '1' in `1-aza...` IS the lactam nitrogen.
 
-  * P-66.1.3 "'Hidden' amides" (`:33125`) settles the N/C crux head-on: "An
+  * "'Hidden' amides" (`:33125`) settles the N/C crux head-on: "An
     *N*-acyl group attached to a nitrogen atom of a heterocyclic system has been
     called a 'hidden amide'... The traditional way to name such compounds by
     using acyl groups as substituents on the nitrogen atom of the heterocyclic
     system is allowed **but only in general nomenclature**. Such compounds are now
-    considered as pseudoketones (see P-64.3) and preferred IUPAC names are
+    considered as pseudoketones (see and preferred IUPAC names are
     constructed accordingly." Example `:33129`
     `1-(piperidin-1-yl)ethan-1-one (PIN) 1-acetylpiperidine` -- the ring nitrogen
     is `piperidin-1-yl`, a NUMERAL, and the italic-N amide reading is explicitly
@@ -33,17 +33,17 @@ no numeral.
     preferred prefix). Position 1 is the imide nitrogen; the Blue Book's own
     diagram at `:40643` numbers it '1'.
 
-  * P-14.3.3 "Citation of locants" (`:2869`) is deny-by-default, so once the N
+  * "Citation of locants" (`:2869`) is deny-by-default, so once the N
     locant is the numeral '1' the whole set is cited: `1,5-dimethyl...`.
 
-  * P-16.3.3 "The basic numerical prefixes 'di', 'tri', 'tetra', etc. are used to
+  * "The basic numerical prefixes 'di', 'tri', 'tetra', etc. are used to
     indicate a multiplicity of:" (`:7038`), clause (b) (`:7067`): multiplicity is
     a property of the substituent NAME, not of which ring atom carries it. So a
     methyl on the ring N and a methyl on a ring C are ONE group of two.
 
 CONTRAST -- these are NOT lactams and italic '*N*' is correct for them, because
 their nitrogen is not a ring atom and receives no numeral: `N-methylacetamide`,
-`methyl N-methylcarbamate`, `N-cyclohexylthiourea`. P-66.1.2 "Secondary and
+`methyl N-methylcarbamate`, `N-cyclohexylthiourea`. "Secondary and
 tertiary amides" (`:33093`) prints `*N*-acetylbenzamide (PIN)` etc. Those travel a
 different producer entirely (measured: `name_monocyclic_lactam` records 0 calls
 for all three), so they are covered here only as a boundary statement.
@@ -84,7 +84,7 @@ def test_ring_nitrogen_locant_is_a_numeral_across_ring_sizes(smiles, expected):
     [
         ("CCN1CCCC1=O", "1-ethylpyrrolidin-2-one"),
         ("CCCN1CCCC1=O", "1-propylpyrrolidin-2-one"),
-        # P-16.3.5 enclosing marks: a substituent name carrying its own locant is
+        # enclosing marks: a substituent name carrying its own locant is
         # parenthesised once it is cited with a ring locant.
         ("CC(C)N1CCCC1=O", "1-(propan-2-yl)pyrrolidin-2-one"),
         ("c1ccccc1N1CCCC1=O", "1-phenylpyrrolidin-2-one"),
@@ -103,7 +103,7 @@ def test_ring_nitrogen_locant_is_a_numeral_across_substituents(smiles, expected)
     ],
 )
 def test_no_italic_n_locant_survives_on_any_lactam(smiles):
-    """The italic form is what P-66.1.3 demotes to general nomenclature."""
+    """The italic form is what demotes to general nomenclature."""
     name = _name(smiles)
     assert not name.startswith("N-"), f"italic N- locant in {name!r}"
     assert "-N-" not in name, f"italic N- locant in {name!r}"
@@ -112,7 +112,7 @@ def test_no_italic_n_locant_survives_on_any_lactam(smiles):
 
 # --------------------------------------------------------------------------- #
 # 2. Identical substituents on ring N and ring C are ONE multiplied prefix. #
-# (P-16.3.3 -- only reachable once the N locant is a numeral.) #
+# -- only reachable once the N locant is a numeral.) #
 # --------------------------------------------------------------------------- #
 
 @pytest.mark.parametrize(
@@ -186,5 +186,5 @@ def test_controls_unchanged(smiles, expected):
 )
 def test_non_lactams_are_refused_by_this_producer(smiles):
     """Boundary. The acyclic amide / carbamate / thiourea controls keep their
-    italic 'N-' because they never reach this producer at all (P-66.1.2)."""
+    italic 'N-' because they never reach this producer at all."""
     assert name_monocyclic_lactam(Chem.MolFromSmiles(smiles)) is None

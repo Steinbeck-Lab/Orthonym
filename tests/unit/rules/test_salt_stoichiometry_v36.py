@@ -87,10 +87,10 @@ def test_w7_ester_salt_round_trips():
     assert opsin_roundtrip_check(W7_ESTER_SALT, name)["passed"], name
 
 
-# === v36-A1 FABLE finding: the di-collision oxoanion class ==================
+# === -A1 FABLE finding: the di-collision oxoanion class ==================
 # FABLE cross-model review BLOCKER: for a bare mononuclear oxoanion X, ``di``+X
 # is a REAL OPSIN word for a DIFFERENT (pyro/condensed) species. Ca3(PO4)2 emitted
-# 'tricalcium diphosphate' -> OPSIN reads calcium PYROPHOSPHATE (P2O7) -> SELF-01
+# 'tricalcium diphosphate' -> OPSIN reads calcium PYROPHOSPHATE (P2O7) ->
 # suppresses (0-wrong safe) -> the salt needlessly ABSTAINS, even though
 # 'tricalcium bis(phosphate)' round-trips. _DI_COLLISION_ANIONS (VERIFIED
 # 2026-08-23 by probing every INORGANIC_ANIONS value + every emittable single-word
@@ -130,7 +130,7 @@ def test_collision_word_wraps_with_enclosing_multiplier():
 # --- Integration RED->GREEN (OPSIN): the FABLE witness Ca3(PO4)2 -----------
 # RED (pre-fix, captured in fix1-report.md): name_compound emitted the
 # not-supported placeholder 'calcium compound (not supported)' because
-# 'tricalcium diphosphate' (= pyrophosphate) was SELF-01-suppressed and did NOT
+# 'tricalcium diphosphate' (= pyrophosphate) was -suppressed and did NOT
 # round-trip. GREEN: emits 'tricalcium bis(phosphate)', which round-trips.
 CA3_PO4_2 = "[O-]P(=O)([O-])[O-].[O-]P(=O)([O-])[O-].[Ca+2].[Ca+2].[Ca+2]"
 
@@ -146,7 +146,7 @@ def test_fable_witness_ca3_po4_2_round_trips():
 
 # --- Second colliding-oxoanion salt (RED->GREEN): sodium carbonate, count 2 -
 # RED: 'sodium compound (not supported)' (dicarbonate = pyrocarbonate C2O5,
-# SELF-01-suppressed). GREEN: 'tetrasodium bis(carbonate)', RT-verified.
+# -suppressed). GREEN: 'tetrasodium bis(carbonate)', RT-verified.
 NA4_CO3_2 = "[O-]C(=O)[O-].[O-]C(=O)[O-].[Na+].[Na+].[Na+].[Na+]"
 
 

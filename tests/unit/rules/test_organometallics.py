@@ -1,14 +1,14 @@
-"""Phase 161 unit tests for organometallic rules (P-69 + Salzer 1999).
+"""a phase unit tests for organometallic rules + Salzer 1999).
 
 Mirrors tests/unit/test_functional_groups.py rules-layer pattern. Tests
 the ORGM_LIGAND_ORDER / METAL_NAMES / METAL_OXIDATION_STATE_HINTS tables
 + the assemble_organometallic_name + select_ligand_naming public API.
 
-CONTEXT D-06 ENFORCEMENT: this module verifies that
+internal notes ENFORCEMENT: this module verifies that
 src/orthonym/rules/organometallics.py does NOT import from
 src/orthonym/rules/seniority.py — the two cascades MUST stay separate.
 
-NEVER uses @pytest.mark.xfail (CONTEXT D-29) — honest-fail-on-data.
+NEVER uses @pytest.mark.xfail (internal notes) — honest-fail-on-data.
 """
 import inspect
 import pytest
@@ -58,7 +58,7 @@ class TestOrgmLigandOrder:
         assert 'benzene' in ORGM_LIGAND_ORDER
 
     def test_no_seniority_import_in_rules_module(self):
-        """CONTEXT D-06 HARD INVARIANT: rules/organometallics.py NEVER imports rules.seniority."""
+        """internal notes HARD INVARIANT: rules/organometallics.py NEVER imports rules.seniority."""
         from orthonym.rules import organometallics
         src = inspect.getsource(organometallics)
         # Compiled grep gates per Plan-02 task 02-03
@@ -95,7 +95,7 @@ class TestMetalNames:
         assert METAL_NAMES['Fe']['naming_system'] == 'metal_direct'
 
     def test_tin_hydride_parent_name(self):
-        """Sn uses hydride-parent system per IUPAC P-69.2 (stannane)."""
+        """Sn uses hydride-parent system per IUPAC (stannane)."""
         assert METAL_NAMES['Sn']['hydride_parent'] == 'stannane'
         assert METAL_NAMES['Sn']['naming_system'] == 'hydride_parent'
 
@@ -144,7 +144,7 @@ class TestMetalNames:
 
 @pytest.mark.unit
 class TestMetalOxidationStateHints:
-    """METAL_OXIDATION_STATE_HINTS per (metal, ligand_class) coverage per CONTEXT D-07."""
+    """METAL_OXIDATION_STATE_HINTS per (metal, ligand_class) coverage per internal notes."""
 
     def test_iron_cp2_stock_required_in_systematic(self):
         """Ferrocene systematic includes (II); PIN omits Stock."""
@@ -154,13 +154,13 @@ class TestMetalOxidationStateHints:
         assert hints['stock_required_pin'] is False
 
     def test_lithium_alkyl_never_stock(self):
-        """Alkali metals always +1; Stock omitted per D-07."""
+        """Alkali metals always +1; Stock omitted per."""
         hints = METAL_OXIDATION_STATE_HINTS[('Li', 'alkyl')]
         assert hints['stock_required_systematic'] is False
         assert hints['stock_required_pin'] is False
 
     def test_tin_alkyl4_never_stock(self):
-        """Group 14 hydride-parent system; Stock implicit per P-69.2."""
+        """Group 14 hydride-parent system; Stock implicit per."""
         hints = METAL_OXIDATION_STATE_HINTS[('Sn', 'alkyl4')]
         assert hints['stock_required_systematic'] is False
         assert hints['default_state'] == 4
@@ -197,7 +197,7 @@ class TestMetalOxidationStateHints:
 
 @pytest.mark.unit
 class TestAssembleOrganometallicName:
-    """End-to-end name assembly per fixture per CONTEXT D-01 tier scope."""
+    """End-to-end name assembly per fixture per internal notes tier scope."""
 
     def test_ferrocene_systematic(self):
         """Tier-1 ferrocene systematic form per Salzer §5.4."""
@@ -277,7 +277,7 @@ class TestAssembleOrganometallicName:
         assert name == 'bis(η⁶-benzene)chromium(0)'
 
     def test_seniority_py_not_imported(self):
-        """CONTEXT D-06 enforcement: rules/organometallics.py NEVER imports rules.seniority.
+        """internal notes enforcement: rules/organometallics.py NEVER imports rules.seniority.
 
         Restated test (also in TestOrgmLigandOrder; explicit per Plan-04 spec).
         """
@@ -298,11 +298,11 @@ class TestAssembleOrganometallicName:
 
 @pytest.mark.unit
 class TestSelectLigandNaming:
-    """select_ligand_naming(): Plan-02 stub returns empty string.
+    """select_ligand_naming: Plan-02 stub returns empty string.
 
     Plan-03 implementation kept the stub since the actual ligand-name lookup
     happens inside assemble_organometallic_name. Tests verify stub contract +
-    that future Phase 161.1+ can extend without breaking the API.
+    that future a phase+ can extend without breaking the API.
     """
 
     def test_select_ligand_naming_returns_string(self):
@@ -344,7 +344,7 @@ class TestSelectLigandNaming:
 
 @pytest.mark.unit
 class TestMetalRankingForParentSelection:
-    """METAL_RANKING_FOR_PARENT_SELECTION per CONTEXT D-06 forward compat."""
+    """METAL_RANKING_FOR_PARENT_SELECTION per internal notes forward compat."""
 
     def test_iron_in_ranking(self):
         """Fe is part of the ranking table."""

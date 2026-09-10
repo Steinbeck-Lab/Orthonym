@@ -1,4 +1,4 @@
-"""P-29.2 free-valence class: NO ring family may name ``=CH2`` as ``-yl``.
+""" free-valence class: NO ring family may name ``=CH2`` as ``-yl``.
 
 WHY THIS FILE EXISTS
 --------------------
@@ -25,23 +25,23 @@ comes back out, not about which function was called.
 
 WHY BOTH JVM MODES
 ------------------
-SELF-01 (namer.py) re-perceives the emitted name through OPSIN and suppresses it
+ (namer.py) re-perceives the emitted name through OPSIN and suppresses it
 when it encodes a different molecule -- but it is deliberately fail-OPEN when no
-JVM is present (namer.py ``_validity_gate_jar_present``, the D-13 guard: a
+JVM is present (namer.py ``_validity_gate_jar_present``, the guard: a
 no-Java host must not have every name suppressed). The no-JVM path is therefore
 the one where a wrong structure actually escapes to a user, and it is how the
 original defect shipped. Both modes are exercised:
 
-* ``jar_present`` -- production configuration, SELF-01 armed. Proves the release
+* ``jar_present`` -- production configuration, armed. Proves the release
   path is clean.
-* ``no_jvm`` -- ``_find_opsin_jar`` patched to None, SELF-01 disarmed. Proves the
+* ``no_jvm`` -- ``_find_opsin_jar`` patched to None, disarmed. Proves the
   PRODUCERS are clean, with no downstream net to hide behind. This is the mode
   with the teeth.
 
 The round-trip verdict itself always uses the real OPSIN: the patch is applied
 around the naming call only, and lifted before the name is checked.
 
-References: IUPAC 2013 P-29.2 (free-valence morphology), P-29.3.2/P-29.3.3
+References: IUPAC 2013 (free-valence morphology), /
 (locants for the free valence).
 """
 import pytest
@@ -55,7 +55,7 @@ from orthonym.validation import opsin_roundtrip
 # exocyclic ``=CH2``: the smallest shape that distinguishes ``-ylidene`` from
 # ``-yl``, and the shape whose mis-naming silently ADDS two hydrogens.
 RING_FAMILY_YLIDENES = [
-    # family                         SMILES                    expected PIN
+    # family SMILES expected PIN
     ("monocycle-carbocycle", "C=C1CCCCC1", "methylidenecyclohexane"),
     ("monocycle-heterocycle", "C=C1CCNCC1", "4-methylidenepiperidine"),
     ("bicyclo-bridged", "C=C1CC2CCC1C2", "2-methylidenebicyclo[2.2.1]heptane"),
@@ -82,14 +82,14 @@ RING_FAMILY_YLIDENES = [
 # contains 'methylidene' / 'ethylideneamino'); what is wrong is something else,
 # which is why fixing it belongs to a different phase:
 #
-#   decalin/tetralin -- the producer names ONE ring of an ortho-fused pair as
-#       the parent and the other ring's atoms as an open 'butan-1-yl' chain
-#       (handler=fallback_chain_ring, which self-reports accounted=7/11 and
-#       ships anyway). A partial-coverage emitter, not a bond-order reader.
-#   CC=NCC(=O)O -- the C=N is claimed TWICE, once by the correct
-#       'ethylideneamino' prefix and again as an 'imino'. An atom double-count.
+# decalin/tetralin -- the producer names ONE ring of an ortho-fused pair as
+# the parent and the other ring's atoms as an open 'butan-1-yl' chain
+# (handler=fallback_chain_ring, which self-reports accounted=7/11 and
+# ships anyway). A partial-coverage emitter, not a bond-order reader.
+# CC=NCC(=O)O -- the C=N is claimed TWICE, once by the correct
+# 'ethylideneamino' prefix and again as an 'imino'. An atom double-count.
 #
-# All four abstain correctly in production (SELF-01 with a JVM); they escape
+# All four abstain correctly in production (with a JVM); they escape
 # only on a Java-less host, which is what the no_jvm parameter reproduces.
 OUT_OF_CLASS_LEAKS = [
     ("ortho-fused-decalin", "C=C1CCC2CCCCC2C1", "partial-coverage emitter"),
@@ -105,7 +105,7 @@ def _canonical(smiles):
 
 
 def _name_under(mode, smiles, monkeypatch):
-    """Name ``smiles`` with SELF-01 armed (``jar_present``) or not (``no_jvm``)."""
+    """Name ``smiles`` with armed (``jar_present``) or not (``no_jvm``)."""
     import orthonym.namer as namer
 
     # The suite-wide autouse fixture disables the validity gate so tests can
@@ -218,7 +218,7 @@ def test_known_out_of_class_leaks_are_still_wrong(label, smiles, why,
     ids=[case[0] for case in OUT_OF_CLASS_LEAKS])
 def test_known_out_of_class_leaks_abstain_in_production(label, smiles, why,
                                                         monkeypatch):
-    """...and with a JVM present, SELF-01 catches every one of them."""
+    """...and with a JVM present, catches every one of them."""
     if not opsin_roundtrip._find_opsin_jar():
         pytest.skip("OPSIN jar required")
     name = _name_under("jar_present", smiles, monkeypatch)
@@ -285,7 +285,7 @@ def test_primitive_defers_on_single_bonds_and_heteroatom_attachments():
 
     A single free valence must defer (or every ``-yl`` name in the project
     would have to be rebuilt here), and so must a non-carbon attachment -- an
-    exocyclic ``=O`` is ``oxo``/``-one``, whose token spells no P-29.2 morpheme
+    exocyclic ``=O`` is ``oxo``/``-one``, whose token spells no morpheme
     at all, so treating it as in-class would fail-close every ring ketone.
     """
     from orthonym.assembly.substituent_enumerator import (

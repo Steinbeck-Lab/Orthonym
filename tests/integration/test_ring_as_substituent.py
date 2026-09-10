@@ -1,7 +1,7 @@
 """
 Integration tests for ring-as-substituent naming through all 6 enumeration paths.
 
-Phase 79: Verifies that non-phenyl ring substituents are correctly named
+a phase: Verifies that non-phenyl ring substituents are correctly named
 when appearing as substituents in different structural contexts. Each test
 class covers one of the 6 substituent enumeration paths.
 
@@ -59,7 +59,7 @@ class TestPath2RingAlkylRingSub:
 class TestPath3RingAsSub:
     """Path 3: _generate_ring_substituent_prefixes - ring as substituent on chain.
 
-    This is the reference path, already using get_ring_substituent_name().
+    This is the reference path, already using get_ring_substituent_name.
     Tests verify it continues to work correctly.
     """
 
@@ -82,10 +82,10 @@ class TestPath3RingAsSub:
 
 @pytest.mark.integration
 class TestPath5RecursiveNbranch:
-    """Path 5: _name_heteroatom_substituent - ring on N-branch (DROP-18 fix).
+    """Path 5: _name_heteroatom_substituent - ring on N-branch (fix).
 
     When a non-phenyl ring is attached to a nitrogen on the principal chain,
-    it should be named using get_ring_substituent_name() and formatted with
+    it should be named using get_ring_substituent_name and formatted with
     the amino context.
     """
 
@@ -117,7 +117,7 @@ class TestPath5RecursiveNbranch:
         )
 
     def test_anilino_still_works(self):
-        """Anilino (phenyl on N) detection unchanged by Phase 79 changes.
+        """Anilino (phenyl on N) detection unchanged by a phase changes.
 
         The inline anilino detection at _name_heteroatom_substituent:4650-4656
         must still produce 'anilino' for phenyl-on-N when chain is parent.
@@ -134,7 +134,7 @@ class TestPath5RecursiveNbranch:
 
 @pytest.mark.integration
 class TestPath5RecursiveCbranch:
-    """Path 5: _name_heteroatom_substituent - ring on C-branch (DROP-19 fix).
+    """Path 5: _name_heteroatom_substituent - ring on C-branch (fix).
 
     When a C-branch substituent on the chain contains a ring,
     it should be identified and named.
@@ -177,10 +177,10 @@ class TestPath6Polyfunctional:
 
 @pytest.mark.integration
 class TestAmineNSubRing:
-    """_assemble_amine_name() N-sub path (DROP-25 fix).
+    """_assemble_amine_name N-sub path (fix).
 
     When an amine has a non-phenyl ring N-substituent, it should be named
-    using get_ring_substituent_name() instead of falling back to alkyl naming.
+    using get_ring_substituent_name instead of falling back to alkyl naming.
     """
 
     def test_n_cyclohexyl_amine(self):
@@ -193,7 +193,7 @@ class TestAmineNSubRing:
         )
 
     def test_n_phenyl_amine_still_works(self):
-        """N-phenylamine detection unchanged by Phase 79 changes.
+        """N-phenylamine detection unchanged by a phase changes.
 
         When benzene is parent (ring > chain), phenyl doesn't appear as
         substituent prefix -- the output is N-ethylaminobenzene.
@@ -233,13 +233,13 @@ class TestRingSubstituentPrefixVariety:
 
 
 # ===========================================================================
-# Phase 79-02: Fused heterocycle ring-as-substituent tests
+# a phase-02: Fused heterocycle ring-as-substituent tests
 # ===========================================================================
 
 
 @pytest.mark.integration
 class TestFusedHetOnNBranch:
-    """RSUB-02 + RSUB-04: Fused het ring on N-branch via _name_heteroatom_substituent.
+    """ +: Fused het ring on N-branch via _name_heteroatom_substituent.
 
     When a fused heterocycle (quinoline, indole, etc.) is bonded to N on a
     chain parent, the fused het should be identified using static O(1) lookup
@@ -288,7 +288,7 @@ class TestFusedHetOnNBranch:
 
 @pytest.mark.integration
 class TestFusedHetOnCBranch:
-    """RSUB-02: Fused het ring on C-branch via _name_heteroatom_substituent.
+    """: Fused het ring on C-branch via _name_heteroatom_substituent.
 
     When a fused heterocycle is directly bonded to a carbon on the chain,
     it should be named using the fused het prefix lookup.
@@ -313,10 +313,10 @@ class TestFusedHetOnCBranch:
 
 @pytest.mark.integration
 class TestDROP18Elimination:
-    """RSUB-04: Verify DROP-18 triggers are eliminated for known ring systems.
+    """: Verify triggers are eliminated for known ring systems.
 
     These molecules have ring systems on N-branches that previously triggered
-    DROP-18. After Phase 79-01 (monocyclic) and 79-02 (fused het), known
+    . After a phase-01 (monocyclic) and 79-02 (fused het), known
     ring systems should produce correct prefix names.
     """
 
@@ -329,7 +329,7 @@ class TestDROP18Elimination:
         ('OC(=O)CCCN1CCCC1', 'pyrrolid'),
     ])
     def test_known_rings_on_n_branch_not_dropped(self, smiles, expected_ring_token):
-        """Known ring systems on N-branches produce ring prefix, not DROP-18."""
+        """Known ring systems on N-branches produce ring prefix, not."""
         result = name_compound(smiles)
         assert result is not None, f"name_compound returned None for {smiles}"
         assert expected_ring_token in result.lower(), (
@@ -339,7 +339,7 @@ class TestDROP18Elimination:
 
 @pytest.mark.integration
 class TestFusedHetSubstRoundTrip:
-    """QUAL-04: Fused het substituent prefix names should contain correct stems.
+    """: Fused het substituent prefix names should contain correct stems.
 
     Verifies that fused het ring systems appearing as substituents produce
     names containing the correct IUPAC prefix stem (e.g., quinolin, indol).
@@ -366,7 +366,7 @@ class TestFusedHetSubstRoundTrip:
 
 @pytest.mark.integration
 class TestDROPReduction:
-    """Verify that DROP-18/DROP-19 are reduced by ring-as-substituent wiring."""
+    """Verify that / are reduced by ring-as-substituent wiring."""
 
     def test_known_ring_subs_dont_trigger_drops(self):
         """Molecules with known ring substituents should produce names, not drops."""

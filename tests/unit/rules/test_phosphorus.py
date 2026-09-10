@@ -59,29 +59,29 @@ class TestPhosphineNaming:
 
     def test_dimethylethylphosphane(self):
         """CCP(C)C -> ethyldi(methyl)phosphane (asymmetric tertiary, with multiplier)
-        v29 P3-FIX Item 3 re-baseline: the multiplicative prefix goes OUTSIDE the
-        parentheses.  ``### **P-16.5.1.3** Parentheses are placed also around
+        -FIX Item 3 re-baseline: the multiplicative prefix goes OUTSIDE the
+        parentheses. ``### **** Parentheses are placed also around
         prefixes denoting simple substituent groups qualified by locants``
-        (``BlueBookV2.md:7270``) -> ``**P-16.5.1.3.1**`` (``:7272``), whose scope
+        (``the Blue Book``) -> ``****`` (``:7272``), whose scope
         sentence is "*For mononuclear parent hydrides with two or more
         substituents the first cited substituent never has enclosing marks unless
         it includes a locant. The second and further substituents are each
         enclosed with parentheses even for simple substituents. When the simple
         substituent groups are accompanied by multiplicative prefixes such as
         'di' and 'tri', the multiplicative prefixes are not included in the
-        parentheses.*"  The verbatim PIN example is ``ethyldi(methyl)phosphane``
-        (``:7290``); for the aryl form, ``### **P-68.3.2.3.2.1** Substitution of
+        parentheses.*" The verbatim PIN example is ``ethyldi(methyl)phosphane``
+        (``:7290``); for the aryl form, ``### **** Substitution of
         phosphanes, arsanes, and stibanes by organyl groups`` gives
         ``(arsanylmethyl)di(phenyl)phosphane (PIN)`` (``:39224``), and ``:42468``
-        carries ``methyldi(phenyl)phosphaniumyl`` inside a PIN.  The first cited
+        carries ``methyldi(phenyl)phosphaniumyl`` inside a PIN. The first cited
         group here is ``ethyl``/``methyl`` -- simple and locant-free -- so it is
         correctly BARE, satisfying the first-cited clause above.
-        The gold set already agrees (``benchmarks/pin_oracle/packs/
+        The gold set already agrees (``benchmarks/the gold set/packs/
         characteristic_groups.json`` ships ``tert-butyldi(methyl)(oxiranyl-
         methoxy)silane``), so these 7 unit assertions were the only stale copy.
         DO NOT "fix" these back to ``X(diY)``.
 
-        Per P-16.5.1.3 errata: first substituent no marks, second+ in parens."""
+        Per errata: first substituent no marks, second+ in parens."""
         mol = Chem.MolFromSmiles("CCP(C)C")
         result = name_phosphine(mol, 2)
         # Alphabetical: ethyl + dimethyl (multiplier for identical groups)
@@ -127,8 +127,8 @@ class TestPhosphineOxideNaming:
 class TestPhosphonicAcidNaming:
     """Tests for phosphonic acid naming.
 
-    v23 Phase 9: phosphonic acid is named in substituent-prefix mode (the IUPAC
-    PIN, P-67.1.1.2) — ``methylphosphonic acid``, NOT the explicitly-rejected
+     a phase: phosphonic acid is named in substituent-prefix mode (the IUPAC
+    PIN, — ``methylphosphonic acid``, NOT the explicitly-rejected
     parent-hydride-stem form ``methanephosphonic acid``. ``name_phosphonic_acid``
     now takes only ``(mol, phosphonic_atoms)`` and derives the organyl prefix
     itself (the old ``parent_name`` argument is gone)."""
@@ -205,7 +205,7 @@ class TestPhosphateEsterNaming:
     def test_methyl_phosphate(self):
         """COP(=O)(O)O -> methyl dihydrogen phosphate.
 
-        The two acidic -OH are cited as 'dihydrogen' (P-67/P-68); the older
+        The two acidic -OH are cited as 'dihydrogen' /; the older
         bare 'methyl phosphate' is the ANION name (OPSIN full-InChIKey RT FAILS
         against the neutral input), so it named a different (charged) species.
         """
@@ -405,7 +405,7 @@ class TestPhosphorusEdgeCases:
 
 
 class TestArylDetection:
-    """Tests for _characterize_substituent() aryl vs alkyl detection."""
+    """Tests for _characterize_substituent aryl vs alkyl detection."""
 
     def test_phenyl_detected(self):
         """Aromatic 6-C ring attached to P should be detected as phenyl."""
@@ -590,7 +590,7 @@ class TestArylPhosphinicAcid:
 
 
 class TestPhosphanylPrefix:
-    """Tests for get_phosphanyl_prefix()."""
+    """Tests for get_phosphanyl_prefix."""
 
     def test_diphenylphosphanyl(self):
         """P with 2 phenyl -> diphenylphosphanyl"""
@@ -654,12 +654,12 @@ class TestPhosphanylPrefix:
 
 
 class TestPhosphateEsterProtonationRegression:
-    """v33 fix: a hardcoded ``retained_names.py`` table used to shadow
+    """ fix: a hardcoded ``retained_names.py`` table used to shadow
     ``name_phosphate_ester`` at dispatch priority 1300 for these 4 neutral
     mono-/di-esters, shipping "methyl phosphate" / "dimethyl phosphate" /
     "ethyl phosphate" / "diethyl phosphate" -- names that OPSIN parses back
     to the deprotonated DIANION, not the neutral input SMILES. Correct PIN
-    cites the free -OH as "(di)hydrogen" (P-67/P-68). Gate ON (production
+    cites the free -OH as "(di)hydrogen" /. Gate ON (production
     path) + RT-verified against the real OPSIN jar, so this cannot regress
     silently back to the anion name.
     """

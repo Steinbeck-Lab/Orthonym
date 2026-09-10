@@ -1,26 +1,26 @@
-"""P-16.7.1(a) -- vowel elision on the von Baeyer / cage parent path.
+"""(a) -- vowel elision on the von Baeyer / cage parent path.
 
 ``polycyclic._build_parent_with_unsaturation`` decided elision from the BARE
 suffix, and its unsaturated branch did not decide at all::
 
     if has_unsaturation:
-        result = stem + ''.join(unsat_parts) + suffix_part   # no elision check
+        result = stem + ''.join(unsat_parts) + suffix_part # no elision check
     else:
-        first_char_of_suffix = suffix_text[0]                # the BARE suffix
+        first_char_of_suffix = suffix_text[0] # the BARE suffix
 
 ``unsat_parts`` hardcodes ``-en``/``-yn``, so the terminal ``e`` of the
 ``ene``/``yne`` ending was dropped unconditionally, and the saturated branch
 tested ``one`` when the *complete* suffix was ``dione``.
 
-Blue Book, **P-16.7 ELISION OF VOWELS**, **P-16.7.1(a)**
-(``BlueBookV2/BlueBookV2.md:7595``):
+Blue Book, ** ELISION OF VOWELS**, **(a)**
+(``the Blue Book Blue Book``):
 
     "the terminal letter 'e' in names of parent hydrides or endings **'ene' and
     'yne'** when followed by a suffix or 'en' ending beginning with 'a', 'e',
     'i', 'o', 'u', or 'y'"
 
 -- the rule names the ``ene``/``yne`` endings explicitly, so the unsaturated
-branch is squarely in scope.  Restated at ``:25013``:
+branch is squarely in scope. Restated at ``:25013``:
 
     "**If, and only if, the complete suffix** (that is, the suffix plus its
     multiplying prefixes, if any) begins with a vowel, a terminal letter 'e'
@@ -84,7 +84,7 @@ class TestTerminalEIsRetainedBeforeAConsonantSuffix:
 
     @pytest.mark.unit
     def test_saturated_before_tetrol(self):
-        """tetra+ol elides to 'tetrol' (P-63.1.2), which begins with 't'."""
+        """tetra+ol elides to 'tetrol', which begins with 't'."""
         assert _build(6, suffix="ol", locants=[1, 2, 3, 4]) == \
             "hexane-1,2,3,4-tetrol"
 
@@ -136,5 +136,5 @@ class TestOtherBranchesUnaffected:
 # default, so a name asserted via ``Orthonym.name_tiered`` under pytest can
 # come from a different producer than the one the CLI selects (measured: the
 # cage probe CC12CCCCC1CCCC2=O yields '1-methylbicyclo[4.4.0]decan-10-one' from
-# the CLI but '2-(butan-1-yl)-2-methylcyclohexan-1-one' under pytest).  Encoding
+# the CLI but '2-(butan-1-yl)-2-methylcyclohexan-1-one' under pytest). Encoding
 # the gate-off artefact as an expectation here would guard the wrong pipeline.

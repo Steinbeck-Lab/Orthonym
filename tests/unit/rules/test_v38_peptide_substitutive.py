@@ -10,7 +10,7 @@ reachable end-to-end:
     name carries a leading stereodescriptor + locant (e.g.
     '(2S)-2-aminohexanoic acid') is now a valid "open" swap parent, and a
     residue is spliced into its real '(stereo)-N-amino' token as a systematic
-    '(2S)-2-...amido' prefix (P-66.1.1.4.3, P-16.3.3 enclosure), rather than
+    '(2S)-2-...amido' prefix, enclosure), rather than
     only the retained 'alanyl'/'glycyl' acyl-prepend form. So
     `CCCC[C@H](NC(=O)[C@H](C)N)C(=O)O` (Ala->norleucine, a free-COOH
     C-terminus that already dispatched) names

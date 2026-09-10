@@ -5,7 +5,7 @@ Ensures every FG in SENIORITY_ORDER has explicit entries in both
 SUFFIX_FORMS and PREFIX_FORMS. Acts as a guardrail preventing future
 additions without corresponding dict entries.
 
-Phase 93-01: seniority completeness invariant tests.
+a phase-01: seniority completeness invariant tests.
 """
 
 import pytest
@@ -88,7 +88,7 @@ class TestPrefixFormsStructure:
 
 
 class TestGetSuffixHandlesNone:
-    """get_suffix() must return None for functional-class-only FGs."""
+    """get_suffix must return None for functional-class-only FGs."""
 
     @pytest.mark.parametrize("fg_name", [
         "thioester",
@@ -109,18 +109,18 @@ class TestGetSuffixHandlesNone:
         "thiocyanate",
     ])
     def test_get_suffix_returns_none_for_functional_class_only(self, fg_name):
-        """get_suffix() returns None for FGs with no substitutive suffix."""
+        """get_suffix returns None for FGs with no substitutive suffix."""
         assert get_suffix(fg_name) is None
         assert get_suffix(fg_name, is_ring=True) is None
 
 
 class TestGetSuffixReturnsCorrectValues:
-    """get_suffix() returns correct tuple values for FGs with real suffixes."""
+    """get_suffix returns correct tuple values for FGs with real suffixes."""
 
     def test_hydrazide_chain_suffix(self):
-        """Hydrazide chain suffix is 'hydrazide' (IUPAC P-66.3.1.1 PIN).
+        """Hydrazide chain suffix is 'hydrazide' (IUPAC PIN).
 
-        P-66.3.1.1: the suffix is formed by replacing the '-ic acid' ending
+        : the suffix is formed by replacing the '-ic acid' ending
         with '-hydrazide' — giving 'pentane-hydrazide' (h is consonant, no
         vowel elision of stem-final 'e'), not 'pentano-hydrazide'.
         The old value 'ohydrazide' was wrong per the Blue Book PIN and produced
@@ -129,35 +129,35 @@ class TestGetSuffixReturnsCorrectValues:
         assert get_suffix("hydrazide") == "hydrazide"
 
     def test_hydrazide_ring_suffix(self):
-        """Hydrazide ring suffix is 'carbohydrazide' (IUPAC P-66.3)."""
+        """Hydrazide ring suffix is 'carbohydrazide' (IUPAC."""
         assert get_suffix("hydrazide", is_ring=True) == "carbohydrazide"
 
     def test_imide_chain_suffix(self):
-        """Imide chain suffix is 'imide' (IUPAC P-66.2)."""
+        """Imide chain suffix is 'imide' (IUPAC."""
         assert get_suffix("imide") == "imide"
 
     def test_imide_ring_suffix(self):
-        """Imide ring suffix is 'dicarboximide' (IUPAC P-66.2)."""
+        """Imide ring suffix is 'dicarboximide' (IUPAC."""
         assert get_suffix("imide", is_ring=True) == "dicarboximide"
 
 
 class TestGetPrefixReturnsCorrectValues:
-    """get_prefix() returns correct string values for newly-added entries."""
+    """get_prefix returns correct string values for newly-added entries."""
 
     def test_hydrazide_prefix(self):
-        """Hydrazide prefix is 'hydrazinecarbonyl' (IUPAC P-66.3.5)."""
+        """Hydrazide prefix is 'hydrazinecarbonyl' (IUPAC."""
         assert get_prefix("hydrazide") == "hydrazinecarbonyl"
 
     def test_thioaldehyde_prefix(self):
-        """Thioaldehyde prefix is 'thioxo' (IUPAC P-63.1.5)."""
+        """Thioaldehyde prefix is 'thioxo' (IUPAC."""
         assert get_prefix("thioaldehyde") == "thioxo"
 
     def test_sulfoxide_prefix(self):
-        """Sulfoxide prefix is 'sulfinyl' (IUPAC P-63.6)."""
+        """Sulfoxide prefix is 'sulfinyl' (IUPAC."""
         assert get_prefix("sulfoxide") == "sulfinyl"
 
     def test_sulfone_prefix(self):
-        """Sulfone prefix is 'sulfonyl' (IUPAC P-63.6)."""
+        """Sulfone prefix is 'sulfonyl' (IUPAC."""
         assert get_prefix("sulfone") == "sulfonyl"
 
     def test_anhydride_prefix_is_none(self):

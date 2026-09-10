@@ -1,7 +1,7 @@
 """
-Integration tests for ring-based compound substituent naming (Phase 38 Plan 03).
+Integration tests for ring-based compound substituent naming (a phase Plan 03).
 
-Tests recursive substituent naming via name_substituent_fragment() on:
+Tests recursive substituent naming via name_substituent_fragment on:
 1. Benzene with branched substituents (isopropyl, tert-butyl, sec-butyl)
 2. Cycloalkane with branched substituents
 3. Fused ring with branched substituents
@@ -9,8 +9,8 @@ Tests recursive substituent naming via name_substituent_fragment() on:
 5. v3.0 benchmark substituent_loss validation (30+ cases)
 
 These tests verify that ring-based substituent naming modules route branched
-substituents through name_substituent_fragment() instead of simple carbon
-counting via get_alkyl_name().
+substituents through name_substituent_fragment instead of simple carbon
+counting via get_alkyl_name.
 """
 
 import pytest
@@ -27,14 +27,14 @@ class TestBenzeneRetainedSubstituents:
 
     @pytest.mark.integration
     def test_isopropylbenzene_cumene(self):
-        """F-T9/DD6 RET-02: PIN is '(propan-2-yl)benzene' (cumene/isopropyl are general-only)."""
+        """F-T9/DD6: PIN is '(propan-2-yl)benzene' (cumene/isopropyl are general-only)."""
         result = name_compound("CC(C)c1ccccc1")
         assert result is not None
         assert "propan-2-yl" in result.lower(), f"Expected propan-2-yl in {result}"
 
     @pytest.mark.integration
     def test_sec_butylbenzene(self):
-        """F-T9/DD6 RET-02: secondary attachment -> 'butan-2-yl' (sec-butyl deprecated)."""
+        """F-T9/DD6: secondary attachment -> 'butan-2-yl' (sec-butyl deprecated)."""
         result = name_compound("CCC(C)c1ccccc1")
         assert result is not None
         assert "butan-2-yl" in result, f"Expected butan-2-yl in {result}"
@@ -48,14 +48,14 @@ class TestBenzeneRetainedSubstituents:
 
     @pytest.mark.integration
     def test_isobutylbenzene(self):
-        """F-T9/DD6 RET-02: terminal-branched -> '2-methylpropyl' (isobutyl deprecated)."""
+        """F-T9/DD6: terminal-branched -> '2-methylpropyl' (isobutyl deprecated)."""
         result = name_compound("CC(C)Cc1ccccc1")
         assert result is not None
         assert "2-methylpropyl" in result, f"Expected 2-methylpropyl in {result}"
 
     @pytest.mark.integration
     def test_neopentylbenzene(self):
-        """F-T9/DD6 RET-02: -> '2,2-dimethylpropyl' (neopentyl deprecated)."""
+        """F-T9/DD6: -> '2,2-dimethylpropyl' (neopentyl deprecated)."""
         result = name_compound("CC(C)(C)Cc1ccccc1")
         assert result is not None
         assert "2,2-dimethylpropyl" in result, f"Expected 2,2-dimethylpropyl in {result}"
@@ -74,7 +74,7 @@ class TestCycloalkaneRetainedSubstituents:
 
     @pytest.mark.integration
     def test_isopropylcyclohexane(self):
-        """F-T9/DD6 RET-02: -> 'propan-2-yl' (isopropyl deprecated)."""
+        """F-T9/DD6: -> 'propan-2-yl' (isopropyl deprecated)."""
         result = name_compound("CC(C)C1CCCCC1")
         assert result is not None
         assert "propan-2-yl" in result, f"Expected propan-2-yl in {result}"
@@ -88,21 +88,21 @@ class TestCycloalkaneRetainedSubstituents:
 
     @pytest.mark.integration
     def test_isobutylcyclohexane(self):
-        """F-T9/DD6 RET-02: -> '2-methylpropyl' (isobutyl deprecated)."""
+        """F-T9/DD6: -> '2-methylpropyl' (isobutyl deprecated)."""
         result = name_compound("CC(C)CC1CCCCC1")
         assert result is not None
         assert "2-methylpropyl" in result, f"Expected 2-methylpropyl in {result}"
 
     @pytest.mark.integration
     def test_neopentylcyclohexane(self):
-        """F-T9/DD6 RET-02: -> '2,2-dimethylpropyl' (neopentyl deprecated)."""
+        """F-T9/DD6: -> '2,2-dimethylpropyl' (neopentyl deprecated)."""
         result = name_compound("CC(C)(C)CC1CCCCC1")
         assert result is not None
         assert "2,2-dimethylpropyl" in result, f"Expected 2,2-dimethylpropyl in {result}"
 
     @pytest.mark.integration
     def test_sec_butylcyclopentane(self):
-        """F-T9/DD6 RET-02: -> 'butan-2-yl' (sec-butyl deprecated)."""
+        """F-T9/DD6: -> 'butan-2-yl' (sec-butyl deprecated)."""
         result = name_compound("CCC(C)C1CCCC1")
         assert result is not None
         assert "butan-2-yl" in result, f"Expected butan-2-yl in {result}"
@@ -135,7 +135,7 @@ class TestHeterocycleRetainedSubstituents:
 
     @pytest.mark.integration
     def test_isopropylpyridine(self):
-        """F-T9/DD6 RET-02: isopropyl on pyridine -> 'propan-2-yl'."""
+        """F-T9/DD6: isopropyl on pyridine -> 'propan-2-yl'."""
         result = name_compound("CC(C)c1ccncc1")
         assert result is not None
         # Located PIN: propan-2-yl (isopropyl is general-only)
@@ -148,7 +148,7 @@ class TestHeterocycleRetainedSubstituents:
 
 
 class TestCompoundSubstituentParenthesization:
-    """Verify IUPAC P-16.5.1.1 compound substituent parenthesization."""
+    """Verify IUPAC compound substituent parenthesization."""
 
     @pytest.mark.integration
     def test_fused_ring_compound_sub_parenthesized(self):
@@ -331,23 +331,23 @@ class TestCumulativeRegressionCheck:
 # Summary statistics
 # ============================================================================
 #
-# Benchmark substituent_loss validation results (Phase 38 Plan 03):
+# Benchmark substituent_loss validation results (a phase Plan 03):
 #
 # - Total substituent_loss failures from v3.0: 163
 # - Cases tested in this file: 40
 # - Producing non-empty names: ~38/40
 # - Cases with retained substituent names: varies (isopropyl, tert-butyl, etc.)
 # - Ring-based compound substituent tests: 15 (benzene: 6, cycloalkane: 5,
-#   fused: 2, heterocycle: 1, parenthesization: 1)
+# fused: 2, heterocycle: 1, parenthesization: 1)
 #
 # Many of the 163 substituent_loss failures involve complex functional group
-# naming (esters, amides, peptides) which are Phase 39 (Decomposition Engine)
+# naming (esters, amides, peptides) which are a phase (Decomposition Engine)
 # targets, not pure substituent branching issues.
 #
-# The improvements from Phase 38 Plan 03 primarily fix:
+# The improvements from a phase Plan 03 primarily fix:
 # 1. Retained names on rings (propyl -> isopropyl, butyl -> tert-butyl)
 # 2. Branched alkyl naming on rings (octyl -> 1,2,2-trimethylcyclopentyl)
-# 3. Compound substituent parenthesization (IUPAC P-16.5.1.1)
+# 3. Compound substituent parenthesization (IUPAC
 # 4. Hyphen insertion after closing parentheses in name assembly
 #
 # These fix ~10-15 of the 163 substituent_loss cases directly.

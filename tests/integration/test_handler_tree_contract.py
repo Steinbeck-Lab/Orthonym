@@ -4,9 +4,9 @@ One param per reachable handler_id (loaded from
 ``tests/fixtures/handler_tree_probes.json``). Three contract checks per handler:
 
 - ``test_tree_non_null`` — SCORE-01: ``name_with_tree(smi).tree is not None``
-- ``test_tree_parity`` — SC-1: ``name_tree_to_string(tree) == name`` byte-identical
+- ``test_tree_parity`` —: ``name_tree_to_string(tree) == name`` byte-identical
 - ``test_tree_well_formed``— SCORE-02: structured nodes carry their own fields;
-  coarse ``fragment_legacy`` nodes are recorded () and skipped, not failed.
+  coarse ``fragment_legacy`` nodes are recorded  and skipped, not failed.
 
 At Plan-01 ship this suite is RED for every handler except ``simple_molecule``
 (the one already-tree-emitting reference handler). Each handler green-flips when
@@ -43,17 +43,17 @@ PROBES = _FIXTURE["probes"]
 CONTRACT_PROBES = [p for p in PROBES if p.get("role") == "contract"]
 CONTRACT_IDS = [p["handler_id"] for p in CONTRACT_PROBES]
 
-# WR-1: probes whose handler emits a genuine STRUCTURED tree (recoverable
+#: probes whose handler emits a genuine STRUCTURED tree (recoverable
 # parent/suffix/prefix parts, not a flat fragment_legacy carrier). These get an
 # additional non-vacuous assertion: the public name_with_tree result must NOT be
-# the coarse_fallback node, i.e. the SC-1 boundary in namer.py must NOT have
+# the coarse_fallback node, i.e. the boundary in namer.py must NOT have
 # silently swapped a broken structured tree for a verbatim-round-tripping coarse
 # node. Without this guard the parity assertions below are vacuous for structured
-# handlers (the boundary guarantees parity by construction; see WR-1).
+# handlers (the boundary guarantees parity by construction; see).
 STRUCTURED_PROBES = [p for p in CONTRACT_PROBES if p.get("structured")]
 STRUCTURED_IDS = [p["handler_id"] for p in STRUCTURED_PROBES]
 
-# Handlers whose tree is a counted coarse fragment_legacy node (). Populated
+# Handlers whose tree is a counted coarse fragment_legacy node . Populated
 # by test_tree_well_formed as handlers ship; read by the Plan-04 bucket report.
 COARSE_HANDLERS: set = set()
 
@@ -63,7 +63,7 @@ def namer():
     return Orthonym()
 
 
-# WR-4: the coarse/structured classifier now lives once in
+#: the coarse/structured classifier now lives once in
 # orthonym.assembly.name_tree.is_coarse_node (the provenance-based
 # parent_stem == fragment_legacy form), shared with
 # scripts/measure_coarse_fallback_bucket.py so the contract test and the public
@@ -84,7 +84,7 @@ def test_tree_non_null(probe, namer):
 
 @pytest.mark.parametrize("probe", CONTRACT_PROBES, ids=CONTRACT_IDS)
 def test_tree_parity(probe, namer):
-    """SC-1: name_tree_to_string(tree) is byte-identical to the name field."""
+    """: name_tree_to_string(tree) is byte-identical to the name field."""
     result = namer.name_with_tree(probe["smiles"])
     assert result.tree is not None, f"{probe['handler_id']}: tree is None (RED)"
     assert name_tree_to_string(result.tree, "pin") == result.name, (
@@ -110,11 +110,11 @@ def test_tree_well_formed(probe, namer):
 
 @pytest.mark.parametrize("probe", STRUCTURED_PROBES, ids=STRUCTURED_IDS)
 def test_structured_tree_not_silently_downgraded(probe, namer):
-    """WR-1: a handler declared ``structured`` must surface a genuinely
-    structured tree from ``name_with_tree`` — NOT the SC-1 boundary's
+    """: a handler declared ``structured`` must surface a genuinely
+    structured tree from ``name_with_tree`` — NOT the boundary's
     ``coarse_fallback`` node.
 
-    Why this is the non-vacuous parity check the suite was missing: the SC-1
+    Why this is the non-vacuous parity check the suite was missing: the
     boundary in ``namer.py`` swaps ANY tree for which
     ``name_tree_to_string(tree) != name`` with a ``class_id="coarse_fallback"``
     node whose ``fragment_legacy == name`` round-trips verbatim. That makes
@@ -154,7 +154,7 @@ def test_capture_slot_written_for_all_reachable(namer):
         assert result.name, f"{probe['handler_id']}: empty name for {probe['smiles']!r}"
         fired = [k for k, v in get_inner_dispatch_stats().items() if v]
         if probe["handler_id"] == "ion_path":
-            # IN-6: Plan-04 now populates the ion pre-pool-bypass path (Pitfall 4
+            #: Plan-04 now populates the ion pre-pool-bypass path (Pitfall 4
             # Path D, composer.py:782-799). The probe ``CC(=O)[O-]`` -> ``acetate``
             # must surface a populated ``coarse_fallback`` node (was tree=None
             # pre-Plan-04). Replaces the prior tautological ``tree is None or tree
@@ -167,9 +167,9 @@ def test_capture_slot_written_for_all_reachable(namer):
         else:
             # Capture slot is written for every reachable handler. The tree itself
             # may be coarse or structured, but it must round-trip byte-identically
-            # to the returned name (SC-1). (``isinstance``/``result.name`` above
+            # to the returned name . (``isinstance``/``result.name`` above
             # already cover slot presence; the prior ``result is not None`` line
-            # was vacuous filler and is removed per IN-6.)
+            # was vacuous filler and is removed per.)
             assert result.tree is None or name_tree_to_string(result.tree, "pin") == result.name
         _ = fired  # routing recorded for the diagnostic below
 

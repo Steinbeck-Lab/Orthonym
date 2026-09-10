@@ -1,11 +1,11 @@
-"""P-22.2.1: Tables 2.2 and 2.3 make the LOCANT-BEARING form the PIN.
+""": Tables 2.2 and 2.3 make the LOCANT-BEARING form the PIN.
 
 Task AA5, the sibling of Task AA3 (``test_p22_2_1_pyran_indicated_hydrogen.py``)
 and the same root cause: a bare retained stem imported from
 ``data/opsin_imports/aryl_groups.py`` was promoted into ``ALL_RETAINED_NAMES``
 and short-circuited the dispatch before any rule ran.
 
-Section **P-22.2.1 "Retained names of heteromonocycles"** (heading
+Section ** "Retained names of heteromonocycles"** (heading
 ``the Blue Book``); its lead-in at ``:8117`` reads *"Retained names for
 saturated heteromonocycles are given in Table 2.3."* The governing lines,
 verbatim::
@@ -100,7 +100,7 @@ def test_substituted_derivative_inherits_the_pin(smiles, expected):
 # 3. The suffixed forms were ALREADY right -- guard against double citation
 # --------------------------------------------------------------------------
 
-# ``rules/heterocycles.py::_retained_heteroatom_locant_prefix`` (P-31.1.4.3.4)
+# ``rules/heterocycles.py::_retained_heteroatom_locant_prefix``
 # already injected ``1,3-`` for a suffixed thiazolidine, which is why
 # ``1,3-thiazolidin-4-one`` has always been correct while ``3-methylthiazolidine``
 # was wrong. That injector keys on the BARE stem and returns '' on a miss, so

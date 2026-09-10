@@ -1,13 +1,13 @@
 """Unit tests for hypervalent-iodine naming (λ3-iodane + the iodanium cation).
 
 Blue Book authority (the Blue Book Blue Book):
-  * P-68.5.1 "Nomenclature based on halogen parent hydrides" (the Blue Book):
+  * "Nomenclature based on halogen parent hydrides" (the Blue Book):
       C6H5-I(OH)2 -> phenyl-λ3-iodanediol (PIN) (the Blue Book)
     The λ-convention is used for the nonstandard bonding number of iodine.
-  * P-73.1.1.2 (the Blue Book): the mononuclear Group-17 cation is named on the parent
+  * (the Blue Book): the mononuclear Group-17 cation is named on the parent
     hydride + '-ium' -> "diphenyliodanium (PIN)" (the Blue Book), the SYSTEMATIC PIN, NOT
     the Table-7.3 retained '-onium' spelling.
-  * P-65.6.3.2: a symmetric diol diester is the functional-class '<diol-diyl>
+  *: a symmetric diol diester is the functional-class '<diol-diyl>
     di<acid>ate' form (ethane-1,2-diyl diacetate), so PhI(OAc)2 — the diacetate ester
     of phenyl-λ3-iodanediol — is 'phenyl-λ3-iodanediyl diacetate'.
 
@@ -38,11 +38,11 @@ def _inchikey(smiles):
 
 # (input SMILES, expected PIN) — every row must ALSO OPSIN-round-trip (test below).
 _TARGETS = [
-    # P-68.5.1: triaryl-λ3-iodane (pure-organyl hypervalent iodine hub).
+    #: triaryl-λ3-iodane (pure-organyl hypervalent iodine hub).
     ("c1ccccc1I(c2ccccc2)c3ccccc3", "triphenyl-λ3-iodane"),
-    # P-65.6.3.2 / P-68.5.1: PhI(OAc)2 (PIDA), the diacetate ester of the iodanediol.
+    # /: PhI(OAc)2 (PIDA), the diacetate ester of the iodanediol.
     ("CC(=O)OI(OC(C)=O)c1ccccc1", "phenyl-λ3-iodanediyl diacetate"),
-    # P-73.1.1.2 (the Blue Book): the diaryliodanium CATION — 'iodanium', NOT 'iodonium'.
+    # (the Blue Book): the diaryliodanium CATION — 'iodanium', NOT 'iodonium'.
     ("c1ccccc1[I+]c1ccccc1", "diphenyliodanium"),
 ]
 
@@ -62,14 +62,14 @@ class TestHypervalentIodinePINs:
         assert _inchikey(parsed) == _inchikey(smiles)
 
     def test_iodanium_not_iodonium(self):
-        """P-73.1.1.2 (the Blue Book): the PIN is the systematic 'iodanium', never the
+        """ (the Blue Book): the PIN is the systematic 'iodanium', never the
         Table-7.3 retained 'iodonium'."""
         name = _name("c1ccccc1[I+]c1ccccc1")
         assert "iodanium" in name
         assert "iodonium" not in name
 
     def test_diaryliodanium_salt_recovered(self):
-        """Bonus (P-77.1.1 binary salt): fixing the iodanium cation recovers the
+        """Bonus binary salt): fixing the iodanium cation recovers the
         diaryliodonium-triflate salt cluster for free."""
         smi = "FC(F)(F)S(=O)(=O)[O-].c1ccccc1[I+]c1ccccc1"
         assert _name(smi) == "diphenyliodanium trifluoromethanesulfonate"

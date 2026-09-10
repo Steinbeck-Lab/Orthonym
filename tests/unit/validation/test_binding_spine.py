@@ -1,4 +1,4 @@
-"""v29 Phase 1: the recursion-safe name<->graph binding spine."""
+""" a phase: the recursion-safe name<->graph binding spine."""
 import pytest
 from rdkit import Chem
 
@@ -99,7 +99,7 @@ def test_from_token_bindings_adapts_legacy_flat_result():
 
 
 def test_from_token_bindings_routes_charge_role_atom_ids_to_charge_atom_ids():
-    """Phase 0c Task 2: a role='charge' legacy TokenBinding carries the
+    """a phase Task 2: a role='charge' legacy TokenBinding carries the
     charged atom indices in its OWN ``atom_ids`` (TokenBinding has no separate
     slot), and the adapter must route them to ``SpineBinding.charge_atom_ids``
     -- NEVER to the exclusive-claim ``atom_ids`` -- or the charge binding would
@@ -309,7 +309,7 @@ def test_p2_is_skipped_when_p1_fails():
     assert p.stats["p5_skipped"] is True
     # P7, like P4 and P6, reads each binding against the graph on its own and
     # needs nothing from the partition, so it still runs when P1 has failed.
-    # P8 (Phase 0c Task 3), likewise, reads the mol's real stereo properties
+    # P8 (a phase Task 3), likewise, reads the mol's real stereo properties
     # and the threaded locant map directly, so it too still runs.
     assert p.stats["proofs"] == ("P1", "P3", "P4", "P6", "P7", "P8")
     assert "bonds_total" not in p.stats
@@ -628,7 +628,7 @@ def test_p4_a_non_letter_token_edge_is_itself_a_boundary():
 
 def test_p4_complex_multiplier_counts_through_its_enclosing_mark():
     """'bis(' -- the complex multiplicative prefix is separated from the group
-    it multiplies by an enclosing mark (P-16.3.2), so the alphabetic run
+    it multiplies by an enclosing mark, so the alphabetic run
     immediately before the token is EMPTY and a naive scan reads weight 1.
     Found on real data: every bis/tris/tetrakis prefix was refused
     MULTIPLICITY_MISMATCH.
@@ -704,7 +704,7 @@ def test_p4_a_suffix_after_a_saturation_ending_is_at_a_boundary():
 
 
 def test_p4_multiplier_with_its_vowel_elided_still_counts():
-    """P-16.7.1(a): a multiplying prefix drops its terminal vowel before a
+    """(a): a multiplying prefix drops its terminal vowel before a
     vowel-initial suffix -- 'butane-1,2,3,4-tetraol' is written '...-tetrol'.
 
     The elided form is the SAME morpheme, so it must serve both as boundary
@@ -794,7 +794,7 @@ def test_the_boundary_lexicons_are_directional_in_both_directions():
     """
     # A right-only morpheme ('e', an elision vowel) is not left evidence...
     assert not bs._left_ok("ethan-1-ol", 1, "than", frozenset({"than"}))
-    # ...while on the right it must still hold, or 'phen|anthrene' and every
+    #...while on the right it must still hold, or 'phen|anthrene' and every
     # '...an-1-ol' would be refused.
     assert bs._right_ok("phenanthrene", 4, "phen", frozenset({"phen"}))
     # And the mirror: a left-only morpheme ('cyclo' opens a ring name, it never

@@ -1,16 +1,16 @@
 """P7: a prefix token's free-valence morphology vs the real linkage bond order.
 
-Phase 1b, spine half.
+a phase, spine half.
 
 P2 proves every bond is CLAIMED exactly once. It never looks at a bond's
 ORDER, so the spine happily certified ``methyl`` bound to a carbon that is
-DOUBLE-bonded to the ring -- the exact wrong-structure defect Phase 1b exists
+DOUBLE-bonded to the ring -- the exact wrong-structure defect a phase exists
 to stop. P1-P6 all passed it, which means the proof could not have caught the
 bug that motivated the fix, and any later enforce mode would have shipped it.
 
 P7 closes that. For a PREFIX binding it reads the actual linkage bond out of
 the graph and compares its order with the morphology the token's own text
-asserts (P-29.2: ``-yl`` one, ``-ylidene`` two, ``-ylidyne`` three).
+asserts: ``-yl`` one, ``-ylidene`` two, ``-ylidyne`` three).
 
 The discipline is ``token_arity``'s: a CONFIDENT verdict must be correct, so
 anything the morphology oracle cannot decide -- a token that spells no
@@ -102,7 +102,7 @@ class TestConfidentVerdictsAreCorrect:
         assert bs.FREE_VALENCE_UNVERIFIED not in proof.codes()
 
     def test_ylidyne_morphology_is_read(self):
-        """CH3-C(triple)- : atoms 0,1 are the ``ethylidyne`` fragment and the
+        """CH3-C(triple)-: atoms 0,1 are the ``ethylidyne`` fragment and the
         bond 1-2 out of it is a TRIPLE bond, which is the three free valences
         the token asserts."""
         mol = Chem.MolFromSmiles("CC#CC1CCCCC1")
@@ -142,7 +142,7 @@ class TestUnverifiedIsNeverAnError:
                    if f.code == bs.FREE_VALENCE_UNVERIFIED)
 
     def test_multi_point_attachment_is_info(self):
-        """Two linkage bonds is a bridge/spiro shape (P-25), where the simple
+        """Two linkage bonds is a bridge/spiro shape, where the simple
         -yl/-ylidene/-ylidyne rule does not apply. Never a confident verdict."""
         mol = Chem.MolFromSmiles("C1CCC2(CC1)CCCC2")  # spiro[4.5]decane
         ri = mol.GetRingInfo()

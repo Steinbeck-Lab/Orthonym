@@ -1,6 +1,6 @@
 """Wave-2 completion Tier 2: amide-N prefix vocabulary (WAVE2-COMPLETION-PLAN).
 
-Currently: thiourea -> carbamothioylamino (P-66.1.6.1.3.3). All OPSIN-RT probed.
+Currently: thiourea -> carbamothioylamino. All OPSIN-RT probed.
 """
 
 import pytest

@@ -1,26 +1,26 @@
-"""v29 P3-FIX Item 4 — `di-tert-butyl`, decided from the Blue Book.
+"""-FIX Item 4 — `di-tert-butyl`, decided from the Blue Book.
 
 The coordinator's V6 said neither `ditert-butyl` nor `di-tert-butyl` appears in the
 Blue Book, making this open research. **V6 is REFUTED, and it is a grep artefact:**
 the Blue Book text marks italics with asterisks, so the form is stored as
-`di-*tert*-butyl`. `grep -c 'di-\\*tert\\*-butyl' BlueBookV2/BlueBookV2.md` = **6**,
+`di-*tert*-butyl`. `grep -c 'di-\\*tert\\*-butyl' the Blue Book Blue Book` = **6**,
 three of them `(PIN)`. A plain `grep di-tert-butyl` returns 0 and means nothing.
-(Chapter P-16's body is separately OCR-mangled -- hyphens as `G`, spaces as `!`,
+(Chapter 's body is separately OCR-mangled -- hyphens as `G`, spaces as `!`,
 rule numbers as `P"16.x` -- which is why the governing rule also looked absent.)
 
 So the Blue Book settles all three candidate spellings outright:
 
-* the HYPHEN: `**P-16.2.4** Hyphens` -> `**P-16.2.4.1** Hyphens are used in
+* the HYPHEN: `**** Hyphens` -> `**** Hyphens are used in
   substitutive names:` -> clause `(d) to separate italic letters from Roman
-  letters` (``BlueBookV2.md:6957``), whose verbatim example is
-  ``di-tert-butyl (P-61.2.3)`` (``:6964``). So not `ditert-butyl`.
-* the MULTIPLIER: `**P-16.3.2** General methodology` clause (a)
-  (``BlueBookV2.md:7033``): "*Simple components are unsubstituted parent hydrides,
+  letters` (``the Blue Book``), whose verbatim example is
+  ``di-tert-butyl `` (``:6964``). So not `ditert-butyl`.
+* the MULTIPLIER: `**** General methodology` clause (a)
+  (``the Blue Book``): "*Simple components are unsubstituted parent hydrides,
   such as naphthalene; unsubstituted prefixes, such as ethyl or tert-butyl;
   ... All of these are multiplied by the multiplicative prefixes 'di', 'tri',
   etc.*", with clause (c) reserving bis/tris for a component "*which is
   substituted*". `tert-butyl` is unsubstituted, so `di`, not `bis`.
-* the ENCLOSING MARKS: none. `### **P-61.2.2** Cyclic hydrocarbons` gives
+* the ENCLOSING MARKS: none. `### **** Cyclic hydrocarbons` gives
   ``1,2-di-tert-butylbenzene (PIN)`` (``:25717``) and ``:37495`` gives
   ``2,4,6-tri-tert-butylphenyl`` -- so not `di(tert-butyl)` either, and `tri`
   rather than `tris` at count 3.
@@ -55,22 +55,22 @@ from orthonym.assembly.naming_utils import (format_substituent_prefix,
     (3, 'tert-butyl', 'tri-'),
     (4, 'tert-butyl', 'tetra-'),
     (2, 'sec-butyl',  'di-'),
-    # v29 P3-CLOSEOUT Item A: the claim that an italicized-prefix-led name "can
+    # -CLOSEOUT Item A: the claim that an italicized-prefix-led name "can
     # never take a derived bis/tris multiplier" is FALSE -- `tert-butylsulfanyl`
-    # reduces to the compound `butylsulfanyl` and takes `bis` (P-16.3.5(a)), with
-    # NO hyphen because it is enclosed (P-16.2.4.2, BB 6968). The carve-out is
+    # reduces to the compound `butylsulfanyl` and takes `bis` (a)), with
+    # NO hyphen because it is enclosed, BB 6968). The carve-out is
     # about the italicized PREFIX, not about everything it leads.
     (1, 'tert-butyl', ''),
     (2, 'tert-butylsulfanyl', 'bis'),
     # unchanged for everything else
     (2, 'methyl', 'di'),
     (3, 'phenyl', 'tri'),
-    # v29 P3-CLOSEOUT Item A re-baseline: was 'bis'. `propan-2-yl` is an
-    # UNSUBSTITUTED simple prefix that merely carries a locant, so P-16.3.4(a)
-    # parenthesises it while P-16.3.2(a) multiplies it with the SIMPLE 'di' --
-    # BB's own example is `di(propanG2Gyl)!(preferred!prefix)` at :7087, and
-    # `1,4-di(propan-2-yl)cyclohexane (PIN)` at :25721. `bis` is reserved by
-    # P-16.3.5(a) for a SUBSTITUTED prefix: contrast
+    # -CLOSEOUT Item A re-baseline: was 'bis'. `propan-2-yl` is an
+    # UNSUBSTITUTED simple prefix that merely carries a locant, so (a)
+    # parenthesises it while (a) multiplies it with the SIMPLE 'di' --
+    # BB's own example is `di(propanG2Gyl)!(preferred!prefix)` at:7087, and
+    # `1,4-di(propan-2-yl)cyclohexane (PIN)` at:25721. `bis` is reserved by
+    # (a) for a SUBSTITUTED prefix: contrast
     # `1,4-bis(2-chloropropan-2-yl)benzene (PIN)` (:25793), one chloro apart.
     (2, 'propan-2-yl', 'di'),
     (3, 'cyclohexylmethyl', 'tris'),
@@ -88,7 +88,7 @@ def test_the_hyphen_is_never_doubled():
 
 
 def test_a_simple_prefix_is_never_multiplied_with_bis():
-    """P-16.3.2(a)/(c): unsubstituted -> di/tri; substituted -> bis/tris."""
+    """(a)/(c): unsubstituted -> di/tri; substituted -> bis/tris."""
     assert get_multiplier_prefix(2, 'tert-butyl').rstrip('-') == 'di'
     assert not get_multiplier_prefix(2, 'tert-butyl').startswith('bis')
 
@@ -109,7 +109,7 @@ def namer():
     # The migrated Group-14 path -- was `(ditert-butylmethylsilyl)acetic acid`.
     ('CC(C)(C)[Si](C(C)(C)C)(C)CC(=O)O',
      '(di-tert-butylmethylsilyl)acetic acid'),
-    # ...and its SIBLING producer on the same fragment: these two disagreeing was
+    #...and its SIBLING producer on the same fragment: these two disagreeing was
     # the defect, so they are asserted together.
     ('CC(C)(C)[Si](C(C)(C)C)(C)C', 'di-tert-butyldimethylsilane'),
     # count 3 (BB 37495's `tri-tert-butyl` shape)

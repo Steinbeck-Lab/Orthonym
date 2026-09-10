@@ -8,7 +8,7 @@ Tests cover:
 4. E2E naming integration
 5. Edge cases and error handling
 
-IUPAC 2013 Blue Book P-31.1.1: Hydro prefixes indicate the addition of
+IUPAC 2013 Blue Book: Hydro prefixes indicate the addition of
 hydrogen to specified positions of an otherwise unsaturated parent structure.
 """
 
@@ -247,8 +247,8 @@ class TestE2ESaturationNaming:
     def test_indoline_e2e(self):
         """The indoline ring system emits its PIN, not the retained name.
 
-        P-54.4.3.2 (BB:24256) lists 'indoline' among the retained names that
-        'are not used as preferred IUPAC names'; BB:16992 prints the PIN.
+         (the Blue Book) lists 'indoline' among the retained names that
+        'are not used as preferred IUPAC names'; the Blue Book prints the PIN.
         """
         from orthonym import name_compound
 
@@ -290,7 +290,7 @@ class TestAromaticReferences:
         assert ref['ring_atoms'] == 10
 
     def test_xanthene_reference(self):
-        """Test xanthene reference data (RING-05)."""
+        """Test xanthene reference data ."""
         ref = AROMATIC_REFERENCES.get('xanthene')
         assert ref is not None
         assert ref['ring_atoms'] == 13
@@ -429,7 +429,7 @@ class TestIUPACCompliance:
 
 
 class TestWSD02TetralinNoPhantomAlkyl:
-    """WSD-02 (RING-04): a partially-saturated fused carbocycle names without a
+    """-02 : a partially-saturated fused carbocycle names without a
     phantom alkyl substituent (the saturated bridge / aromatic half is part of
     the fused parent, never a chain substituent)."""
 
@@ -445,8 +445,8 @@ class TestWSD02TetralinNoPhantomAlkyl:
 
     @pytest.mark.unit
     def test_indane_pin_not_the_retained_name(self):
-        # PROTECT: the WSD-02 no-phantom-alkyl behaviour, now pinned on the PIN.
-        # P-54.4.3.2 (BB:24256) / BB:16988: 'indane' is not a preferred IUPAC name.
+        # PROTECT: the -02 no-phantom-alkyl behaviour, now pinned on the PIN.
+        # (the Blue Book) / the Blue Book: 'indane' is not a preferred IUPAC name.
         assert name_compound('C1Cc2ccccc2C1') == '2,3-dihydro-1H-indene'
 
     @pytest.mark.unit
@@ -455,16 +455,16 @@ class TestWSD02TetralinNoPhantomAlkyl:
         #
         # VALUE CORRECTED (was '1-methyl-...'). The old expectation was
         # STRUCTURALLY IMPOSSIBLE for this input, not merely unpreferred:
-        #  * In `1,2,3,4-tetrahydronaphthalene` the hydro prefix occupies
-        #    naphthalene's fixed positions 1-4, whose 1 and 4 are the sp3
-        #    carbons ADJACENT to the fusion carbons 8a/4a -- cf. the BB PINs
-        #    `1,2,3,4-tetrahydronaphthalen-1-amine` (BlueBookV2.md:26489) and
-        #    `5,6,7,8-tetrahydronaphthalen-2-amine` (:26495).
-        #  * The methyl-bearing carbon of `CC1CCc2ccccc2C1` is bonded to two
-        #    sp3 carbons and NO aromatic carbon, so it cannot be locant 1.
-        #  * Independent check (OPSIN 2.9.0, not the code under test):
-        #    '1-methyl-1,2,3,4-tetrahydronaphthalene' -> CC1CCCc2ccccc21,
-        #    a DIFFERENT molecule; '2-methyl-...' -> CC1CCc2ccccc2C1 == input.
+        # * In `1,2,3,4-tetrahydronaphthalene` the hydro prefix occupies
+        # naphthalene's fixed positions 1-4, whose 1 and 4 are the sp3
+        # carbons ADJACENT to the fusion carbons 8a/4a -- cf. the BB PINs
+        # `1,2,3,4-tetrahydronaphthalen-1-amine` (the Blue Book) and
+        # `5,6,7,8-tetrahydronaphthalen-2-amine` (:26495).
+        # * The methyl-bearing carbon of `CC1CCc2ccccc2C1` is bonded to two
+        # sp3 carbons and NO aromatic carbon, so it cannot be locant 1.
+        # * Independent check (OPSIN 2.9.0, not the code under test):
+        # '1-methyl-1,2,3,4-tetrahydronaphthalene' -> CC1CCCc2ccccc21,
+        # a DIFFERENT molecule; '2-methyl-...' -> CC1CCc2ccccc2C1 == input.
         # The locant was incidental to this test's phantom-butyl intent, which
         # is unchanged. See tests/unit/rules/test_hydro_fused_substituent_locants.py.
         assert name_compound('CC1CCc2ccccc2C1') == '2-methyl-1,2,3,4-tetrahydronaphthalene'

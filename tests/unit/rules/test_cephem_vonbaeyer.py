@@ -1,11 +1,11 @@
-"""v33 Phase 3 residual / Phase-8 enabler: the unsaturated CEPHEM (ceph-3-em)
+""" a phase residual / Phase-8 enabler: the unsaturated CEPHEM (ceph-3-em)
 von Baeyer core.
 
-Root cause (SPY, measured): the SATURATED penam core already names correctly
+Root cause (a trace, measured): the SATURATED penam core already names correctly
 (``3,3-dimethyl-7-oxo-4-thia-1-azabicyclo[3.2.0]heptane-2-carboxylic acid``),
 but the ceph-3-em acid core (``OC(=O)C1=CCSC2CC(=O)N12``) is NOT a producer
 abstention -- ``_assemble_complete_bicyclo_name`` DOES build a candidate,
-``7-oxo-5-thia-1-azabicyclo[4.2.0]oct-2-ene-2-carboxylic acid``. SELF-01
+``7-oxo-5-thia-1-azabicyclo[4.2.0]oct-2-ene-2-carboxylic acid``.
 correctly rejects it because OPSIN parses that string to a DIFFERENT molecule
 (the oxo group lands one ring atom off). The bug is in
 ``rules/bicyclo.py::_legacy_bicyclo_numbering``: its secondary (second-longest)
@@ -19,7 +19,7 @@ explicitly reverses that segment); ``_legacy_bicyclo_numbering`` does not.
 
 For most existing molecules this invisible bug never surfaces: either the
 enumerate-based candidate already wins the numbering tie-break on an earlier
-P-14.4 tier (heteroatoms / principal-group suffix / ene), or the secondary
+ tier (heteroatoms / principal-group suffix / ene), or the secondary
 bridge carries no distinguishing substituent so which specific atom gets
 locant N vs N+1 does not change the emitted name. The ceph-3-em core is the
 first case on record where (a) legacy ties the correct candidate on
@@ -76,7 +76,7 @@ def test_cephem_acid_core_names_correctly(opsin_gate):
 
 
 def test_cephem_acid_core_is_not_seven_oxo():
-    """Regression pin on the exact SELF-01-caught defect: the wrong-direction
+    """Regression pin on the exact -caught defect: the wrong-direction
     legacy numbering placed the oxo group at locant 7, one ring atom off from
     the carbonyl carbon it actually names (a DIFFERENT molecule)."""
     emitted = _namer().name(CEPHEM_ACID)
@@ -133,7 +133,7 @@ def test_full_cephalosporin_with_acylamino_names_correctly(opsin_gate):
     numbering) now names correctly at the PIN tier. This used to abstain on an
     UNRELATED pre-existing defect (the -NHC(=O)CH3 acylamino group was
     mis-decomposed as a plain 'ethyl', a WRONG-constitution atom-drop that
-    SELF-01/OPSIN suppressed); that acylamino namer has since been fixed, so the
+    /OPSIN suppressed); that acylamino namer has since been fixed, so the
     acetamido group is now placed and the whole name round-trips. Golden updated
     per change-asserted-value (OPSIN RT to the input InChIKey verified below)."""
     smiles = "OC(=O)C1=CCSC2C(NC(=O)C)C(=O)N12"

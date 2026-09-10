@@ -11,7 +11,7 @@ fused heterocycles and polycyclic compounds:
 - dodecahydro- (12 H added)
 - perhydro- (fully saturated, no locants needed)
 
-IUPAC 2013 Blue Book P-31.1.1:
+IUPAC 2013 Blue Book:
 "Prefixes 'dihydro', 'tetrahydro', etc. indicate the addition of hydrogen
 to specified positions of an otherwise unsaturated parent structure."
 
@@ -21,7 +21,7 @@ Key Rules:
 3. Saturation prefix comes LAST before parent name, AFTER substituents
 4. Order: [substituents]-[saturation prefix]-[indicated H]-[parent]
 
-Reference: IUPAC 2013 Blue Book P-31.1.1
+Reference: IUPAC 2013 Blue Book
 """
 
 from typing import Any, Dict, List, Optional, Set, Tuple, Union
@@ -74,10 +74,10 @@ def detect_partial_saturation(
         - 'is_perhydro': True if fully saturated
 
     Examples:
-        >>> mol = Chem.MolFromSmiles('c1ccc2c(c1)CCCN2')  # tetrahydroquinoline
+        >>> mol = Chem.MolFromSmiles('c1ccc2c(c1)CCCN2') # tetrahydroquinoline
         >>> result = detect_partial_saturation(mol, 'c1ccc2ncccc2c1')
         >>> result['prefix']
-        'hexahydro'  # 3 sp3 carbons * 2 = 6H
+        'hexahydro' # 3 sp3 carbons * 2 = 6H
     """
     if mol is None:
         return None
@@ -189,7 +189,7 @@ def get_saturation_locants(
         Sorted list of locants for saturation prefix
 
     Examples:
-        >>> atom_to_locant = {0: 1, 1: 2, 2: 3, 3: 4, ...}
+        >>> atom_to_locant = {0: 1, 1: 2, 2: 3, 3: 4,...}
         >>> get_saturation_locants(mol, [0, 1, 2, 3], atom_to_locant)
         [1, 2, 3, 4]
     """
@@ -318,9 +318,9 @@ def analyze_saturation_for_naming(
         Formatted saturation prefix string, or None if no saturation
 
     Examples:
-        >>> mol = Chem.MolFromSmiles('c1ccc2c(c1)CCCN2')  # tetrahydroquinoline
-        >>> parent = 'c1ccc2ncccc2c1'  # quinoline
-        >>> atom_to_locant = {...}  # IUPAC locant mapping
+        >>> mol = Chem.MolFromSmiles('c1ccc2c(c1)CCCN2') # tetrahydroquinoline
+        >>> parent = 'c1ccc2ncccc2c1' # quinoline
+        >>> atom_to_locant = {...} # IUPAC locant mapping
         >>> analyze_saturation_for_naming(mol, parent, atom_to_locant)
         '1,2,3,4-tetrahydro'
     """
@@ -359,8 +359,8 @@ def is_fully_saturated(mol: Chem.Mol, aromatic_parent_smiles: str) -> bool:
         True if the molecule is fully saturated (perhydro)
 
     Examples:
-        >>> mol = Chem.MolFromSmiles('C1CCCC2CCCCC12')  # decalin (perhydronaphthalene)
-        >>> is_fully_saturated(mol, 'c1ccc2ccccc2c1')  # naphthalene
+        >>> mol = Chem.MolFromSmiles('C1CCCC2CCCCC12') # decalin (perhydronaphthalene)
+        >>> is_fully_saturated(mol, 'c1ccc2ccccc2c1') # naphthalene
         True
     """
     result = detect_partial_saturation(mol, aromatic_parent_smiles)
@@ -432,7 +432,7 @@ def _carbocyclic_mancude_parents_by_size(n_ring_atoms: int) -> List[str]:
 
     Returning every same-size candidate (e.g. naphthalene AND azulene at 10;
     anthracene AND phenanthrene at 14) is safe: the bond-order-agnostic
-    automorphism match in :func:`_match_mancude_parent_numbering` only succeeds
+    automorphism match in:func:`_match_mancude_parent_numbering` only succeeds
     for the parent whose *connectivity* matches, so a mismatched same-size
     parent is silently skipped (fail-closed — never a wrong parent guess).
     """
@@ -469,9 +469,9 @@ def _match_mancude_parent_numbering(
     fixed ``iupac_numbering`` (incl. the lettered fusion locants 4a/8a/...).
     Among ALL matching numberings (across all candidates) pick the one giving
     the LOWEST locant set FIRST to the principal-characteristic-group ring atoms
-    (``pcg_ring_atoms``, P-59.2.3.2 — the suffix outranks hydro), then to the
+    (``pcg_ring_atoms``, — the suffix outranks hydro), then to the
     hydro positions (the sp3 ring atoms), then to the residual ring double bonds
-    — IUPAC 2013 P-31.1.4.3.4.
+    — IUPAC 2013.
 
     Returns ``(parent_name, {atom_idx: locant})`` for the winning numbering, or
     ``None`` if no candidate's skeleton matches the ring system exactly (fail
@@ -526,7 +526,7 @@ def _match_mancude_parent_numbering(
                 min(_locant_key(atom_to_locant[i]), _locant_key(atom_to_locant[j]))
                 for i, j in ring_double_bonds
             )
-            # P-59.2.3.2: a ring principal-characteristic-group suffix takes the
+            #: a ring principal-characteristic-group suffix takes the
             # lowest locant FIRST — before hydro and before detachable prefixes.
             if pcg_ring_atoms:
                 pcg_locs = sorted(
@@ -535,7 +535,7 @@ def _match_mancude_parent_numbering(
                 )
             else:
                 pcg_locs = []
-            # P-14.4 / P-15.1.5.3: after PCG + hydro + ene, the detachable
+            # /: after PCG + hydro + ene, the detachable
             # substituents take the lowest locants (breaks ties among equivalent
             # numberings, e.g. 5-methyl- vs 8-methyl-tetrahydronaphthalene).
             if substituent_ring_atoms:
@@ -553,7 +553,7 @@ def _match_mancude_parent_numbering(
     return best
 
 
-# P-65.1.1.1: a ring carbon bearing an exocyclic -C(=O)OH is a ring
+#: a ring carbon bearing an exocyclic -C(=O)OH is a ring
 # 'carboxylic acid' PCG. Named as the '-carboxylic acid' suffix on a
 # partially-saturated named-carbocycle parent; the acid carbon is exocyclic
 # (not a ring atom), so it never enters the ring numbering — the ring carbon it
@@ -575,21 +575,21 @@ def _partial_sat_pcg_ring_atoms(mol, fused_ring_atoms: Set[int]) -> Set[int]:
     return out
 
 
-# P-63.1 "HYDROXY COMPOUNDS AND CHALCOGEN ANALOGUES": a ring carbon bearing an
+# "HYDROXY COMPOUNDS AND CHALCOGEN ANALOGUES": a ring carbon bearing an
 # exocyclic -OH is a ring 'ol' PCG, named with the '-ol' suffix on the
-# hydro-prefixed parent. BB verbatim PIN (BlueBookV2.md:26880):
+# hydro-prefixed parent. BB verbatim PIN (the Blue Book):
 # "(1) 5,6,7,8-tetrahydronaphthalen-2-ol (PIN)". The hydroxy oxygen is
 # exocyclic, so the ring carbon it hangs off is the locant-bearing atom.
 _RING_OH_SMARTS = Chem.MolFromSmarts('[#6;R][OX2H1]')
-# A PRIMARY amine (-NH2) on a ring carbon -> the '-amine' suffix (P-62.2.1.2 /
-# P-63.1-adjacent; `1,2,3,4-tetrahydronaphthalen-1-amine` is the PIN at
-# BlueBookV2.md:26489). Neutral, exactly two H, single bond.
+# A PRIMARY amine (-NH2) on a ring carbon -> the '-amine' suffix /
+# -adjacent; `1,2,3,4-tetrahydronaphthalen-1-amine` is the PIN at
+# the Blue Book). Neutral, exactly two H, single bond.
 _RING_NH2_SMARTS = Chem.MolFromSmarts('[#6;R][NX3;H2;+0]')
 
 # Suffix spelling per PCG kind. The '-ol' form elides the parent's terminal 'e'
-# only when no multiplying prefix intervenes (P-16.7.1(a)): the Blue Book prints
+# only when no multiplying prefix intervenes (a)): the Blue Book prints
 # BOTH `naphthalen-4a(2H)-ol (PIN)` and `naphthalene-4a,8a-diol (PIN)`
-# (BlueBookV2.md:26866/:26868).
+# (the Blue Book).
 _PARTIAL_SAT_PCG_SUFFIX = {
     'carboxylic_acid': ('carboxylic acid', False),
     'ol': ('ol', True),
@@ -603,23 +603,23 @@ def _partial_sat_pcg(
     mol, fused_ring_atoms: Set[int]
 ) -> Tuple[Optional[str], Set[int]]:
     """The SENIOR ring principal-characteristic-group of a partially-saturated
-    fused carbocycle, as ``(kind, ring_atoms)`` — ``(None, set())`` when there
+    fused carbocycle, as ``(kind, ring_atoms)`` — ``(None, set)`` when there
     is none.
 
-    ``kind`` is ``'carboxylic_acid'`` (P-65.1.1.1) or ``'ol'`` (P-63.1). P-41
+    ``kind`` is ``'carboxylic_acid'`` or ``'ol'``.
     seniority puts acids above alcohols, so a ring -COOH wins outright and any
     ring -OH then stays a detachable ``hydroxy`` prefix — two suffixes are never
     produced.
 
     The ``'ol'`` class is scoped FAIL-CLOSED to molecules whose only heteroatoms
     are the ring-attached hydroxy oxygens, one per ring carbon. That makes -ol
-    provably the senior characteristic group present (P-41), so the suffix
+    provably the senior characteristic group present, so the suffix
     choice cannot be wrong, and it keeps out of scope an -OH on an EXOCYCLIC
     carbon — which makes that carbon the parent instead
     (``(1,2,3,4-tetrahydronaphthalen-2-yl)methanol``, not an ``-ol``).
 
     Single source of truth: both the numbering primitive (which must give the
-    PCG the lowest locants, P-58.2.5) and the assembler (which spells the
+    PCG the lowest locants, and the assembler (which spells the
     suffix) read this one answer, so the two can never disagree.
     """
     acid = _partial_sat_pcg_ring_atoms(mol, fused_ring_atoms)
@@ -636,7 +636,7 @@ def _partial_sat_pcg(
             ol_oxygens.add(oxygen)
     if not ol_ring:
         # No ring -OH: the next-junior scoped suffix this path spells is the
-        # primary amine (P-41 puts amines below alcohols, so -ol above always
+        # primary amine puts amines below alcohols, so -ol above always
         # wins when present).
         return _partial_sat_pcg_amine(mol, fused_ring_atoms)
     # Exactly one -OH per PCG ring carbon: a geminal diol would need a
@@ -657,14 +657,14 @@ def _partial_sat_pcg(
 def _partial_sat_pcg_amine(
     mol, fused_ring_atoms: Set[int]
 ) -> Tuple[Optional[str], Set[int]]:
-    """The '-amine' PCG of a partially-saturated fused carbocycle (P-62.2.1.2):
+    """The '-amine' PCG of a partially-saturated fused carbocycle:
     a ring carbon bearing a primary -NH2. Scoped FAIL-CLOSED, exactly like the
     '-ol' path — the only heteroatoms present must be those amine nitrogens (so
-    -amine is provably the senior characteristic group, P-41 puts it below
+    -amine is provably the senior characteristic group, puts it below
     alcohols/acids, both already handled above), one -NH2 per ring carbon,
     neutral non-radical. An -NH2 on an EXOCYCLIC carbon is out of scope (that
     carbon is the parent), and an N-substituted amine is deferred (v1 primary
-    only). ``(None, set())`` when it does not apply."""
+    only). ``(None, set)`` when it does not apply."""
     if _RING_NH2_SMARTS is None:
         return (None, set())
     am_ring: Set[int] = set()
@@ -731,7 +731,7 @@ def detect_carbocyclic_partial_saturation(
     3. Matching the ring system size and structure to known parents
     4. Computing the saturation prefix based on sp3 count
 
-    IUPAC 2013 Blue Book P-31.1.1:
+    IUPAC 2013 Blue Book:
     - tetrahydronaphthalene: 4 sp3 atoms = tetrahydro prefix
     - dihydronaphthalene: 2 sp3 atoms = dihydro prefix
     - decahydronaphthalene (decalin): all sp3 = perhydro or decahydro
@@ -755,15 +755,15 @@ def detect_carbocyclic_partial_saturation(
           consumers must inherit it rather than re-derive one.
         - 'pcg_kind': 'carboxylic_acid' | 'ol' | None — the senior ring
           principal characteristic group, which was given the lowest locants
-          (see :func:`_partial_sat_pcg`)
+          (see:func:`_partial_sat_pcg`)
         - 'pcg_ring_atoms': the ring atoms carrying it (empty when None)
 
     Examples:
-        >>> mol = Chem.MolFromSmiles('c1ccc2c(c1)CCCC2')  # tetrahydronaphthalene
-        >>> ri = mol.GetRingInfo()
-        >>> ring_atoms = set()
-        >>> for ring in ri.AtomRings():
-        ...     ring_atoms.update(ring)
+        >>> mol = Chem.MolFromSmiles('c1ccc2c(c1)CCCC2') # tetrahydronaphthalene
+        >>> ri = mol.GetRingInfo
+        >>> ring_atoms = set
+        >>> for ring in ri.AtomRings:
+        ... ring_atoms.update(ring)
         >>> result = detect_carbocyclic_partial_saturation(mol, ring_atoms)
         >>> result['prefix']
         'tetrahydro'
@@ -834,7 +834,7 @@ def detect_carbocyclic_partial_saturation(
             return None
 
     # Residual non-aromatic ring C=C double bonds — needed both to choose the
-    # lowest-locant numbering (P-31.1.4.3.4) and to recognise full saturation.
+    # lowest-locant numbering and to recognise full saturation.
     ring_double_bonds: List[Tuple[int, int]] = []
     for bond in mol.GetBonds():
         if bond.GetBondType() != Chem.BondType.DOUBLE or bond.GetIsAromatic():
@@ -844,7 +844,7 @@ def detect_carbocyclic_partial_saturation(
             ring_double_bonds.append((a, b))
 
     # Identify the mancude parent AND its IUPAC numbering by a bond-order-agnostic
-    # automorphism match (P-31.1.4): the all-carbon parent skeleton whose
+    # automorphism match: the all-carbon parent skeleton whose
     # connectivity matches this ring system, numbered to give the lowest locants
     # first to the hydro (sp3) positions, then to any residual ring double bond.
     # Fail closed if no all-carbon parent of this exact ring size matches — never
@@ -854,7 +854,7 @@ def detect_carbocyclic_partial_saturation(
     # e.g. 1,4-dihydronaphthalene -> wrong "1,2-").
     sp3_set = set(sp3_indices)
     candidates = _carbocyclic_mancude_parents_by_size(total_ring_atoms)
-    # P-14.4 tiebreak: ring atoms bearing an off-ring (substituent) heavy atom.
+    # tiebreak: ring atoms bearing an off-ring (substituent) heavy atom.
     # Among numberings tied on hydro+ene locants, the one giving these the
     # lowest locants wins (5-methyl- not 8-methyl-tetrahydronaphthalene).
     substituent_ring_atoms = {
@@ -862,8 +862,8 @@ def detect_carbocyclic_partial_saturation(
         if any(n.GetIdx() not in fused_ring_atoms
                for n in mol.GetAtomWithIdx(idx).GetNeighbors())
     }
-    # P-58.2.5 "Nondetachable hydro prefixes vs. indicated hydrogen"
-    # (BlueBookV2.md:24890), on the PIN `5,8-dioxo-5,6,7,8-tetrahydro-
+    # "Nondetachable hydro prefixes vs. indicated hydrogen"
+    # (the Blue Book), on the PIN `5,8-dioxo-5,6,7,8-tetrahydro-
     # naphthalene-2-carboxylic acid`: "detachable but nonalphabetized hydro
     # prefixes do not have precedence over the principal characteristic group
     # for low numbering, but has precedence over other detachable prefixes."
@@ -1022,7 +1022,7 @@ def _build_naphthalene_type_locants(
     for i, idx in enumerate(sp3_order):
         atom_to_locant[idx] = i + 1
 
-    # Non-sp3 atoms get higher locants (5, 6, 7, 8, ...)
+    # Non-sp3 atoms get higher locants (5, 6, 7, 8,...)
     non_sp3 = [idx for idx in ring_atoms if idx not in sp3_set]
     next_locant = len(sp3_order) + 1
     for idx in sorted(non_sp3):  # Simple ordering for now
@@ -1051,10 +1051,10 @@ def is_tetrahydronaphthalene(mol: Chem.Mol, fused_ring_atoms: Set[int]) -> bool:
 
     Examples:
         >>> mol = Chem.MolFromSmiles('c1ccc2c(c1)CCCC2')
-        >>> ri = mol.GetRingInfo()
-        >>> ring_atoms = set()
-        >>> for ring in ri.AtomRings():
-        ...     ring_atoms.update(ring)
+        >>> ri = mol.GetRingInfo
+        >>> ring_atoms = set
+        >>> for ring in ri.AtomRings:
+        ... ring_atoms.update(ring)
         >>> is_tetrahydronaphthalene(mol, ring_atoms)
         True
     """
@@ -1112,7 +1112,7 @@ def _locant_key(loc: Union[int, str, Tuple[int, str]]) -> Tuple[int, str]:
 
 def _locant_display(loc: Union[int, str, Tuple[int, str]]) -> str:
     """Render a locant (int / ``(int, str)`` tuple / ``'4a'`` string) as the
-    string used in a name (``4a``, ``8a``, ``1`` ...)."""
+    string used in a name (``4a``, ``8a``, ``1``...)."""
     if isinstance(loc, tuple):
         return f"{loc[0]}{loc[1]}"
     return str(loc)
@@ -1128,7 +1128,7 @@ def name_hydrogenated_fused_carbocycle(mol: Chem.Mol) -> Optional[str]:
     (``decahydro``) name for any non-aromatic two-ring carbocycle, dropping the
     residual double bond and naming a different molecule.
 
-    Algorithm (IUPAC 2013 P-31.1.4):
+    Algorithm (IUPAC 2013:
       1. Require a two-ring, all-carbon, non-aromatic system with >= 1 residual
          ring double bond (fully-saturated systems are handled as ``perhydro``
          elsewhere -> return None here).
@@ -1137,7 +1137,7 @@ def name_hydrogenated_fused_carbocycle(mol: Chem.Mol) -> Optional[str]:
       3. Enumerate every automorphic numbering of the parent skeleton onto the
          molecule (bond-order-agnostic substructure match), and pick the one
          giving the LOWEST locant set to the ``hydro`` prefixes (the sp3 ring
-         atoms), then to the residual double bonds (P-31.1.4.3.4).
+         atoms), then to the residual double bonds.
       4. Emit ``<locants>-<count>hydro<parent>`` (e.g.
          ``1,2,3,4,4a,5,6,8a-octahydronaphthalene``).
 
@@ -1186,11 +1186,11 @@ def name_hydrogenated_fused_carbocycle(mol: Chem.Mol) -> Optional[str]:
     if not ring_double_bonds:
         return None
 
-    # Atom-conservation veto (R12, P-58.2.2.3): this emitter produces only a bare
+    # Atom-conservation veto (R12,: this emitter produces only a bare
     # `<locants>-<prefix><parent>` name with NO substituent slot, so any exocyclic
     # heavy-atom neighbour on a ring atom (e.g. the two ring-fusion -OH of
     # naphthalene-4a,8a-diol) would be silently DROPPED, naming a different
-    # molecule. Gated, SELF-01 catches it; gate-off (no Java) it would ship the
+    # molecule. Gated, catches it; gate-off (no Java) it would ship the
     # atom-dropped name. Fail closed here at the source so a substituted system is
     # never mis-named as its bare hydro-parent. (Unsubstituted hydro-fused
     # carbocycles have no off-ring heavy neighbour and are unaffected.)
@@ -1248,7 +1248,7 @@ def name_hydrogenated_fused_carbocycle(mol: Chem.Mol) -> Optional[str]:
     n_canonical = canonical_mol.GetNumAtoms()
 
     # Choose the numbering minimizing (hydro-locant set, then residual-double-bond
-    # locant set) per P-31.1.4.3.4 (lowest locants to hydro prefixes + ene).
+    # locant set) per (lowest locants to hydro prefixes + ene).
     best_key = None
     best_map: Optional[Dict[int, Any]] = None
     for match in matches:
@@ -1280,12 +1280,12 @@ def name_hydrogenated_fused_carbocycle(mol: Chem.Mol) -> Optional[str]:
 
 
 # =============================================================================
-# Ring peroxol suffix on a partially-saturated fused carbocycle (P-63.4.1)
+# Ring peroxol suffix on a partially-saturated fused carbocycle
 # =============================================================================
 
 
 def name_hydro_fused_chalcogen_suffix(mol: Chem.Mol) -> Optional[str]:
-    """P-63.4.1 (BB 27935): -OOH on an sp3 carbon of a partially saturated
+    """ (BB 27935): -OOH on an sp3 carbon of a partially saturated
     fused carbocycle -> '<hydro-parent>-<locant>-peroxol' (BB verbatim PIN:
     1,2,3,4-tetrahydronaphthalene-1-peroxol).
 
@@ -1334,7 +1334,7 @@ def name_hydro_fused_chalcogen_suffix(mol: Chem.Mol) -> Optional[str]:
 
 
 # =============================================================================
-# Added indicated hydrogen + ring-ketone suffix (P-31.1.4.2.4 / P-58.2)
+# Added indicated hydrogen + ring-ketone suffix /
 # =============================================================================
 
 
@@ -1359,7 +1359,7 @@ def _ring_carbonyl_carbons(mol, ring_set: Set[int]) -> List[int]:
 
 
 def _ring_imine_carbons(mol, ring_set: Set[int]) -> List[int]:
-    """Ring carbons bearing an exocyclic bare imine =NH (P-62.3.1.1), suitable for
+    """Ring carbons bearing an exocyclic bare imine =NH, suitable for
     the -imine / -diimine suffix with the same added-indicated-H numbering as -one.
 
     The nitrogen must be exocyclic, double-bonded, degree 1 (no N-substituent) and
@@ -1384,9 +1384,9 @@ def _ring_imine_carbons(mol, ring_set: Set[int]) -> List[int]:
 
 
 def _ring_chalcogenone_carbons(mol, ring_set: Set[int], symbol: str) -> List[int]:
-    """v27 P4: ring carbons bearing an exocyclic ketone-type ``=S``/``=Se``
+    """: ring carbons bearing an exocyclic ketone-type ``=S``/``=Se``
     (thione / selone), the heavier-chalcogen analogues of the ``-one`` ketone
-    suffix (P-64.2 chalcogen replacement; e.g. ``pyridine-2(1H)-thione``,
+    suffix chalcogen replacement; e.g. ``pyridine-2(1H)-thione``,
     ``pyrimidine-2,4(1H,3H)-dithione``). Mirrors ``_ring_carbonyl_carbons``
     exactly but for ``symbol`` in {'S','Se'} (and 'O' for parity); the exocyclic
     chalcogen must be terminal (degree 1) so a RING sulfur (thiophene) or a
@@ -1441,7 +1441,7 @@ def _fused_ring_system_atoms(rings, seed_atoms) -> Set[int]:
 
 
 def _elide_terminal_e(stem: str) -> str:
-    """Elide a terminal 'e' before a vowel-initial suffix (P-16.7.1(a)): naphthalene
+    """Elide a terminal 'e' before a vowel-initial suffix (a)): naphthalene
     -> naphthalen (before -one); kept before -dione/-trione (consonant)."""
     return stem[:-1] if stem.endswith('e') else stem
 
@@ -1510,14 +1510,14 @@ def _monocyclic_intrinsic_ih_oxo_parents(mol, ring_set):
     """Intrinsic-indicated-H mancude parent candidates for a NON-aromatizing
     6-membered monocycle bearing exactly one chalcogen (O/S/Se/Te) — the pyran
     family. A ring ketone on such a parent is named by DIRECT substitution of
-    the indicated-H >CH2 (P-64.2.2.2.2): ``4H-pyran-4-one`` / ``2H-pyran-2-one``
+    the indicated-H >CH2: ``4H-pyran-4-one`` / ``2H-pyran-2-one``
     and chalcogen analogues. The only mancude (max non-cumulative double bond)
     indicated-H positions of a 6-ring with the heteroatom at locant 1 are 2 and
     4 (positions 3/5 cannot carry two noncumulative double bonds; 6 ≡ 2), so two
     parent isomers per direction are offered. Returns
-    ``[(name, [(loc, {})], ih_locants), ...]``; the carbonyl-at-indicated-H
-    constraint in :func:`name_cyclic_oxo_compound` selects the correct isomer
-    and ring direction. Returns ``[]`` (fail-closed) for any other ring.
+    ``[(name, [(loc, {})], ih_locants),...]``; the carbonyl-at-indicated-H
+    constraint in:func:`name_cyclic_oxo_compound` selects the correct isomer
+    and ring direction. Returns ```` (fail-closed) for any other ring.
     """
     from .heterocycles import _macrocycle_ordered_ring
     if len(ring_set) != 6:
@@ -1549,14 +1549,14 @@ def _monocyclic_intrinsic_ih_oxo_parents(mol, ring_set):
 def _resolve_oxo_parent(mol, ring_atoms):
     """Resolve the mancude parent(s) of a ring-ketone's ring system.
 
-    Returns a list of ``(parent_name, [(locant_map, parentH_map), ...], ih_locants)``
+    Returns a list of ``(parent_name, [(locant_map, parentH_map),...], ih_locants)``
     candidates (empty list if none resolve). ``locant_map``: mol-atom -> IUPAC
     locant. ``ih_locants``: the set of locants carrying INTRINSIC indicated
     hydrogen in this parent (a >CH2 in the otherwise mancude system, e.g. {2} for
     2H-chromene, {4} for 4H-chromene, {2}/{4} for the pyran isomers); empty for a
     fully-mancude parent (naphthalene, pyridine). For an intrinsic-IH parent the
     carbonyl must sit AT one of ``ih_locants`` — the ketone is the direct
-    substitution of that >CH2 (P-64.2.2.2.2) — which disambiguates the parent
+    substitution of that >CH2 — which disambiguates the parent
     isomer (4H-chromen-4-one, not 2H-chromen-3-one). ``parentH_map`` is retained
     for shape compatibility (currently unused downstream).
     """
@@ -1576,8 +1576,8 @@ def _resolve_oxo_parent(mol, ring_atoms):
     if len(rings) == 1:
         if all(mol.GetAtomWithIdx(i).GetSymbol() == 'C' for i in ring_set):
             return []  # carbocyclic monocycle -> cycloalkanone path
-        # v33 Phase 6 (A): "mancude parent + added indicated hydrogen"
-        # (P-31.1.4.2) is a Hantzsch-Widman-range concept (rings of size
+        # a phase (A): "mancude parent + added indicated hydrogen"
+        # is a Hantzsch-Widman-range concept (rings of size
         # 3-10 -- the same bound name_heterocycle's own `ring_size > 10`
         # branch and _name_lambda_heteromonocycle already enforce). Past
         # that, RDKit can still force-sanitize a monocyclic ring as fully
@@ -1627,9 +1627,9 @@ def _resolve_oxo_parent(mol, ring_atoms):
     # Only MANCUDE parents are valid oxo-parents: the ketone substitutes an
     # indicated-H >CH2 and the added-IH/hydro is computed RELATIVE to the mancude
     # ring. A SATURATED catalog entry (chromane, thiochromane, 2,3-dihydro-1-
-    # benzofuran, ...) is NOT a mancude parent — matching it would make a fused
+    # benzofuran,...) is NOT a mancude parent — matching it would make a fused
     # saturated ketone (chroman-4-one) inherit the saturated parent's hydro
-    # pattern instead of re-deriving the lowest-locant form (P-64.2.2.2.2). Skip
+    # pattern instead of re-deriving the lowest-locant form. Skip
     # any entry flagged saturated by its name ('hydro') or ring_system.
     cands = []
     for nm, e in POLYCYCLIC_DATA.items():
@@ -1667,13 +1667,13 @@ def _resolve_oxo_parent(mol, ring_atoms):
                 # atoms attached only by single ring bonds (not in a ring double
                 # bond) that carry hydrogen. These sit on CARBON (1H-indene,
                 # 2H-/4H-chromene) OR on NITROGEN (9H-purine, 1H-indole,
-                # 1H-benzimidazole, 9H-carbazole, ...). Nitrogen was previously
+                # 1H-benzimidazole, 9H-carbazole,...). Nitrogen was previously
                 # excluded, so an N-indicated-H parent reported NO intrinsic IH; the
                 # carbonyl-at-IH validity check below was then bypassed and the
                 # catalog's baked-in tautomer label (e.g. "9H-") was emitted without
                 # verifying it fits the target — over-saturating the ring (the
                 # caffeine "9H-purine-2,6(1H,3H,7H)-dione" bug, caught only by the
-                # SELF-01 backstop). Detecting N here restores the check for the
+                # backstop). Detecting N here restores the check for the
                 # whole N-indicated-H parent class.
                 if (c < cmol.GetNumAtoms() and isinstance(loc, int)
                         and cmol.GetAtomWithIdx(c).GetSymbol() in ('C', 'N')
@@ -1705,25 +1705,25 @@ def _resolve_oxo_parent(mol, ring_atoms):
 def name_cyclic_oxo_compound(mol: Chem.Mol) -> Optional[str]:
     """Name an UNSUBSTITUTED cyclic ketone / dione on a mancude ring system,
     emitting the preferred IUPAC name with added indicated hydrogen and/or hydro
-    prefixes (IUPAC P-31.1.4 / P-58.2 / P-64.2.2.2 / P-14.7.2).
+    prefixes (IUPAC / / /.
 
     Worked examples (all OPSIN-2.9.0 round-trip + Blue-Book verified):
-        ``O=c1cccc[nH]1``              -> ``pyridin-2(1H)-one``
-        ``O=c1ccc2ccccc2[nH]1``        -> ``quinolin-2(1H)-one``
-        ``O=c1c2ccccc2[nH]c2ccccc12``  -> ``acridin-9(10H)-one``
-        ``O=C1CC=Cc2ccccc21``          -> ``naphthalen-1(2H)-one``
-        ``O=C1CCCc2ccccc21``           -> ``3,4-dihydronaphthalen-1(2H)-one``
-        ``O=C1C=CC(=O)c2ccccc21``      -> ``naphthalene-1,4-dione``     (no added-H, P-58.2.2.3)
+        ``O=c1cccc[nH]1`` -> ``pyridin-2(1H)-one``
+        ``O=c1ccc2ccccc2[nH]1`` -> ``quinolin-2(1H)-one``
+        ``O=c1c2ccccc2[nH]c2ccccc12`` -> ``acridin-9(10H)-one``
+        ``O=C1CC=Cc2ccccc21`` -> ``naphthalen-1(2H)-one``
+        ``O=C1CCCc2ccccc21`` -> ``3,4-dihydronaphthalen-1(2H)-one``
+        ``O=C1C=CC(=O)c2ccccc21`` -> ``naphthalene-1,4-dione`` (no added-H,
         ``O=c1[nH]c(=O)c2ccccc2[nH]1`` -> ``quinazoline-2,4(1H,3H)-dione``
-        ``O=C1C=Cc2ccccc21``           -> ``1H-inden-1-one``           (intrinsic-IH parent)
-        ``O=C1CCc2ccccc21``            -> ``2,3-dihydro-1H-inden-1-one``
+        ``O=C1C=Cc2ccccc21`` -> ``1H-inden-1-one`` (intrinsic-IH parent)
+        ``O=C1CCc2ccccc21`` -> ``2,3-dihydro-1H-inden-1-one``
 
     Method: identify the mancude parent + numbering; the carbonyl C(s) take the
     -one/-dione suffix; ring atoms carrying an EXTRA hydrogen vs the mancude
     parent (an N-H or a >CH2) split, by a maximum matching of the ring graph,
     into hydro positions (matched pairs = reduced ring C=C) and added-indicated-H
     positions (unmatched, cited as ``(nH)`` after the suffix locant). Lowest
-    locants go to the suffix, then added-IH, then hydro (P-58.2.2.2 / P-31.1).
+    locants go to the suffix, then added-IH, then hydro /.
 
     Tightly fail-closed (returns None — never a wrong name):
       * >= 1 ring carbonyl; UNSUBSTITUTED (ring + carbonyl O's only);
@@ -1750,9 +1750,9 @@ def name_cyclic_oxo_compound(mol: Chem.Mol) -> Optional[str]:
     # connected by a single bond, sharing 0-1 atoms) is a SUBSTITUENT, not part of
     # the parent, so it must be excluded from ring_set (else _resolve_oxo_parent
     # can't match the parent skeleton, and the carbonyl/substituent split breaks).
-    # Suffix source: a ring exocyclic =O (ketone/lactam/lactone -one, P-64.2.2.2)
+    # Suffix source: a ring exocyclic =O (ketone/lactam/lactone -one,
     # OR, when there is NO ring =O anywhere, a ring exocyclic bare =NH (imine,
-    # P-62.3.1.1). Imine is the LAST seniority class (P-41 Table 4.5 #52), so a
+    #. Imine is the LAST seniority class #52), so a
     # ring bearing BOTH =O and =NH keeps the -one suffix + 'imino' prefix — that
     # path stays on the =O branch below and is byte-identical. The added-indicated-
     # hydrogen engine (matching + numbering + (nH) formatting) is suffix-agnostic.
@@ -1761,7 +1761,7 @@ def name_cyclic_oxo_compound(mol: Chem.Mol) -> Optional[str]:
     suffix_hetero_name = 'oxo'
     all_carbonyls = set(_ring_carbonyl_carbons(mol, all_ring_atoms))
     if not all_carbonyls:
-        # v27 P4: heavier-chalcogen ketone analogues (P-64.2 replacement) — thione
+        #: heavier-chalcogen ketone analogues replacement) — thione
         # (=S), then selone (=Se) — are senior to imine and take the -thione /
         # -selone suffix with the SAME added-indicated-H numbering as -one (the
         # engine is suffix-agnostic). Previously these fell through to the
@@ -1799,12 +1799,12 @@ def name_cyclic_oxo_compound(mol: Chem.Mol) -> Optional[str]:
     if not ring_set:
         return None
 
-    # v36 Wave-B BUILD-1 (parent-selection robustness; C3-SPY Site-3): the carbonyl
+    # Wave-B BUILD-1 (parent-selection robustness; C3-a trace Site-3): the carbonyl
     # here is named on its FUSED ring system only (``ring_set``). When that system is
     # SPIRO- or BRIDGE-joined to further ring atoms — an SSSR ring that shares a
     # junction atom with ``ring_set`` yet also reaches outside it — this added-
     # indicated-H parent CANNOT express the joined partner and would silently drop
-    # it, leaving an atom-incomplete partial (a wrong molecule that only SELF-01/the
+    # it, leaving an atom-incomplete partial (a wrong molecule that only /the
     # RT gate catches -> abstain). Fail closed so the WHOLE shared-atom ring system
     # routes through the complex_ring/spiro namer instead (which names it when it can,
     # else the RT gate abstains — never a silent drop). A single-bond-linked ring
@@ -1817,7 +1817,7 @@ def name_cyclic_oxo_compound(mol: Chem.Mol) -> Optional[str]:
     carbonyls = set(_suffix_carbons(ring_set))
     if not carbonyls:
         return None
-    # P-62.3.1.1 v1 imine gate (fail closed): every imine C's RING neighbours must
+    # v1 imine gate (fail closed): every imine C's RING neighbours must
     # be carbon — a ring-heteroatom neighbour is a cyclic amidine/imidate shape
     # whose seniority is unresolved (buildable follow-on), never a bare ring imine.
     if suffix_symbol == 'N':
@@ -1854,7 +1854,7 @@ def name_cyclic_oxo_compound(mol: Chem.Mol) -> Optional[str]:
         from .seniority import get_principal_group
         # The principal characteristic group must sit on the PARENT ring system —
         # i.e. the ring carbonyl(s) named by the -one suffix (ketone, OR a lactam /
-        # lactone ring C=O, all of which P-64.2.2.2 names as -one). If the PCG's
+        # lactone ring C=O, all of which names as -one). If the PCG's
         # atoms touch a SUBSTITUENT, a senior group lives there (a substituent acid /
         # aldehyde / sulfonic acid) and the ring -one is not the principal group ->
         # fail closed. (Checking PCG-location, not name, keeps lactam pyridinones /
@@ -1927,7 +1927,7 @@ def name_cyclic_oxo_compound(mol: Chem.Mol) -> Optional[str]:
             # Intrinsic-IH parent (1H-indene, 2H-/4H-chromene, the 2H-/4H-pyran
             # isomers): the ketone is the DIRECT substitution of the parent's
             # >CH2, so a carbonyl MUST sit at one of its indicated-H locants
-            # (P-64.2.2.2.2). This disambiguates 4H-chromen-4-one from
+            #. This disambiguates 4H-chromen-4-one from
             # 2H-chromen-3-one and selects the 2H-/4H-pyran isomer + ring
             # direction. No constraint for a fully mancude parent (ih_locants
             # empty) — its added-IH comes from the maximum matching below.
@@ -1935,7 +1935,7 @@ def name_cyclic_oxo_compound(mol: Chem.Mol) -> Optional[str]:
                 continue
             matched, unmatched = _max_oxo_matching(adj, sat, loc)
             added_ih, hydro = unmatched, matched
-            # Substituent locants are the LAST numbering criterion (P-14.4: after
+            # Substituent locants are the LAST numbering criterion: after
             # the suffix, added-IH and hydro).
             sub_ring = {i for i in ring_set
                         if any(nb.GetIdx() in substituent_atoms
@@ -1960,7 +1960,7 @@ def name_cyclic_oxo_compound(mol: Chem.Mol) -> Optional[str]:
         ih_str = '(' + ','.join(f"{_locant_display(loc[a])}H" for a in ih_sorted) + ')'
     else:
         ih_str = ''
-    # P-16.7.1(a): elide terminal 'e' only before a vowel-initial suffix. For the
+    # (a): elide terminal 'e' only before a vowel-initial suffix. For the
     # oxo table this is exactly the single-carbonyl '-one' case; for imine it is
     # single '-imine' (vowel-initial) but NOT '-diimine'/'-triimine' (consonant).
     elide = parent_name.endswith('e') and bool(suffix) and suffix[0] in 'aeiou'

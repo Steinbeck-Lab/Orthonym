@@ -1,9 +1,9 @@
-"""P-73.5.1.1/.2 (v33 Phase 3): symmetric bis-quaternary-ammonium dications.
+"""/.2 (a phase): symmetric bis-quaternary-ammonium dications.
 
 C[N+](C)(C)CCCCCC[N+](C)(C)C (hexamethonium core) used to abstain
 ('unknown organic compound') because route_charged fails closed on EVERY
 multi-cation shape except a homogeneous poly-aminium (charged_router.py
-~1289-1302, "poly-quaternary ... FAILS CLOSED here"), and the fallback
+~1289-1302, "poly-quaternary... FAILS CLOSED here"), and the fallback
 _try_neutralize_and_name over-valences the quaternary N (dropping its +
 charge with no compensating bond removal), matching the observed RDKit
 "Explicit valence for atom # N, 4, is greater than permitted".
@@ -12,7 +12,7 @@ emit_bis_quaternary_ammonium (rules/ions.py) closes this ONE narrow shape:
 exactly 2 quaternary (0-H, degree-4, +1, acyclic) N cations joined by a
 single unbranched, saturated, unsubstituted all-carbon bridge, with
 BYTE-IDENTICAL onium substituent sets on both ends -> named
-'{bridge-diyl}bis({onium unit})' (BB P-73.5.1.1, cf.
+'{bridge-diyl}bis({onium unit})' (BB, cf.
 '(1,4-phenylene)bis(phosphanium)'). Everything else (asymmetric,
 >2 cations, ring-borne, branched/heteroatom linker) fails closed ('').
 """

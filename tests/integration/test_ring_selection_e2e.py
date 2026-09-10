@@ -1,10 +1,10 @@
 """End-to-end integration tests for ring system selection in naming.
 
-Verifies that select_principal_ring_system() from P-44.2 is correctly
+Verifies that select_principal_ring_system from is correctly
 integrated into namer.py and that ring selection affects naming output
 appropriately for multi-ring molecules.
 
-Phase 46 Plan 02: Principal Ring System Selector integration.
+a phase Plan 02: Principal Ring System Selector integration.
 """
 
 import pytest
@@ -78,7 +78,7 @@ class TestBenzeneChainPreserved:
 @pytest.mark.integration
 class TestMultiRingSeniorSystem:
     """Molecules with multiple disconnected ring systems should have
-    senior_ring_system set to the most senior ring per P-44.2."""
+    senior_ring_system set to the most senior ring per."""
 
     def test_pyridine_over_cyclohexane(self):
         """Pyridine (heterocyclic) should be more senior than cyclohexane."""
@@ -100,7 +100,7 @@ class TestMultiRingSeniorSystem:
 
     def test_thp_over_cyclopentane(self):
         """Tetrahydropyran (heterocyclic, O) should be more senior than
-        cyclopentane (carbocyclic) per P-44.2.1(a)."""
+        cyclopentane (carbocyclic) per (a)."""
         features = _get_features("C1CCOC(C1)CC1CCCC1")
         assert features.senior_ring_system is not None
 
@@ -132,7 +132,7 @@ class TestMultiRingSeniorSystem:
         assert result and len(result) > 0
 
     def test_nitrogen_over_oxygen_ring(self):
-        """Pyridine (N) should be more senior than THP (O) per P-44.2.1(b):
+        """Pyridine (N) should be more senior than THP (O) per (b):
         nitrogen-containing preferred over non-nitrogen heterocyclic."""
         # pyridine + THP
         features = _get_features("c1ccncc1CC1CCOCC1")
@@ -200,7 +200,7 @@ class TestSeniorRingSystemField:
 
     def test_principal_ring_preserves_sssr_order(self):
         """principal_ring should be atom_rings[0] (SSSR traversal order),
-        NOT the sorted tuple from select_principal_ring_system()."""
+        NOT the sorted tuple from select_principal_ring_system."""
         features = _get_features("C1CCCCC1")
         # principal_ring comes from atom_rings[0] which is SSSR order
         # It should be a tuple (not sorted necessarily)

@@ -1,13 +1,13 @@
-"""Phase 158 unit tests for ``orthonym.routing.dispatch_table``.
+"""a phase unit tests for ``orthonym.routing.dispatch_table``.
 
-Per CONTEXT D-17 LOCKED test pyramid floor: ≥ 30 dispatch-table integrity tests.
-Per CONTEXT D-26 hard invariant: every entry's ``side_effect_inventory`` MUST
-be ``()`` — verified parametrically for every member of ``StoutClass``.
-Per CONTEXT D-27 + AP-6: no module-globals; every test creates the resources
-it touches.  Per CONTEXT D-15 + RESEARCH § 5.2: dispatch is no-retry; this
-file does not exercise perf (see ``tests/benchmarks/`` for D-15 HARD gate).
-Per CONTEXT D-29 + AP-17: NO ``@pytest.mark.xfail`` markers — every test must
-pass green.  Per CONTEXT D-08 + audit § 1: GENERAL @ priority 99999 is the
+Per internal notes LOCKED test pyramid floor: ≥ 30 dispatch-table integrity tests.
+Per internal notes hard invariant: every entry's ``side_effect_inventory`` MUST
+be ```` — verified parametrically for every member of ``StoutClass``.
+Per internal notes +: no module-globals; every test creates the resources
+it touches. Per internal notes + RESEARCH: dispatch is no-retry; this
+file does not exercise perf (see ``tests/benchmarks/`` for HARD gate).
+Per internal notes +: NO ``@pytest.mark.xfail`` markers — every test must
+pass green. Per internal notes + the audit: GENERAL @ priority 99999 is the
 explicit catch-all (``lambda *_: True``); no silent fallthrough is possible
 by construction.
 
@@ -19,12 +19,12 @@ class-per-concern pattern):
   priority uniqueness + ordering, sort-stability.
 - ``TestStoutClassRegistration`` — parametrized over ``list(StoutClass)``:
   every member is registered with callable predicate + handler, non-empty
-  IUPAC section, tier ∈ {1, 2}, side_effect_inventory == () (D-26).
-- ``TestGeneralCatchAll`` — D-08 catch-all behavior: predicate always
+  IUPAC section, tier ∈ {1, 2}, side_effect_inventory ==  .
+- ``TestGeneralCatchAll`` — catch-all behavior: predicate always
   returns True; accepts arbitrary kwargs; handler is ``_handle_general``.
-- ``TestRegistrationLock`` — D-05 post-import freeze sentinel.
+- ``TestRegistrationLock`` — post-import freeze sentinel.
 
-All tests run in < 10 seconds total.  Parametrize expansion over ~ 19 StoutClass
+All tests run in < 10 seconds total. Parametrize expansion over ~ 19 StoutClass
 members yields ~ 6 × 19 = ~ 114 generated tests in TestStoutClassRegistration,
 putting the file well above the ≥ 30 floor.
 """
@@ -53,10 +53,10 @@ class TestStoutClassEnum:
     """158-AUDIT-CFR.md § 1 + CONTEXT D-11: StoutClass StrEnum shape."""
 
     def test_stoutclass_is_str_enum(self):
-        """CONTEXT D-11: StoutClass values must be JSON-serializable as strings."""
+        """internal notes: StoutClass values must be JSON-serializable as strings."""
         assert issubclass(StoutClass, str)
         assert isinstance(StoutClass.SALT, str)
-        # str() yields just the value (mirrors stdlib StrEnum behavior)
+        # str yields just the value (mirrors stdlib StrEnum behavior)
         assert str(StoutClass.GENERAL) == "general"
 
     def test_stoutclass_has_general_member(self):
@@ -70,7 +70,7 @@ class TestStoutClassEnum:
         assert StoutClass.DECOMPOSITION_PRE_GENERAL.value == "decomposition_pre_general"
 
     def test_stoutclass_values_are_lowercase_snakecase(self):
-        """CONTEXT D-11: enum values are JSON-friendly lowercase snake_case."""
+        """internal notes: enum values are JSON-friendly lowercase snake_case."""
         for c in StoutClass:
             value = c.value
             assert value == value.lower(), f"{c.name} value {value!r} is not lowercase"
@@ -90,19 +90,19 @@ class TestDispatchTableIntegrity:
     """158-AUDIT-CFR.md § 1 + CONTEXT D-05 + D-06: DISPATCH_TABLE structure."""
 
     def test_dispatch_table_is_orderdict(self):
-        """CONTEXT D-05: DISPATCH_TABLE is an ``OrderedDict`` for explicit ordering."""
+        """internal notes: DISPATCH_TABLE is an ``OrderedDict`` for explicit ordering."""
         assert isinstance(DISPATCH_TABLE, OrderedDict)
 
     def test_dispatch_table_count_matches_stoutclass_count(self):
-        """CFR-02 enumeration completeness: every StoutClass has a dispatch row.
+        """ enumeration completeness: every StoutClass has a dispatch row.
 
         No orphan enum members; no orphan registrations.
 
-        Phase 162 D-03 exemption: StoutClass.ML_FALLBACK is a telemetry tag
-        (no CFR dispatch entry; see 162-AUDIT-MLF.md § 8.14). Exclude it
+        a phase exemption: StoutClass.ML_FALLBACK is a telemetry tag
+        (no CFR dispatch entry; see internal notes-MLF.md). Exclude it
         from the count comparison.
         """
-        # Telemetry-only enum members exempt from DISPATCH_TABLE (Phase 162 D-03).
+        # Telemetry-only enum members exempt from DISPATCH_TABLE (a phase).
         EXEMPT = frozenset({"ML_FALLBACK"})
         active_classes = [c for c in StoutClass if c.name not in EXEMPT]
         assert len(active_classes) == len(DISPATCH_TABLE), (
@@ -111,53 +111,53 @@ class TestDispatchTableIntegrity:
         )
 
     def test_dispatch_entries_are_frozen(self):
-        """CONTEXT D-05: ClassDispatchEntry is a frozen dataclass."""
+        """internal notes: ClassDispatchEntry is a frozen dataclass."""
         entry = next(iter(DISPATCH_TABLE.values()))
         with pytest.raises(FrozenInstanceError):
             entry.priority = 99  # type: ignore[misc]
 
     def test_priorities_are_unique(self):
-        """CONTEXT D-06: every priority is unique to enable deterministic sort."""
+        """internal notes: every priority is unique to enable deterministic sort."""
         priorities = [e.priority for e in DISPATCH_TABLE.values()]
         assert len(priorities) == len(set(priorities)), (
             f"Duplicate priority detected; D-06 violation. priorities={priorities}"
         )
 
     def test_priorities_are_spaced_in_hundreds(self):
-        """CONTEXT D-06: non-GENERAL priorities are spaced in 100s for v19 insertability.
+        """internal notes: non-GENERAL priorities are spaced in 100s for insertability.
 
-        Exceptions to the spacing rule (per docstring intent + Phase 161 D-02):
+        Exceptions to the spacing rule (per docstring intent + a phase):
         - GENERAL @ 99999 + DECOMPOSITION_PRE_GENERAL @ 99000 sit far beyond
           the dense outer-cascade region (100-1600); spacing rule applies
           within the dense region only.
-        - Phase 161 D-02 sub-100 insertions (ORGANOMETALLIC @ 50): sit BELOW
+        - a phase sub-100 insertions (ORGANOMETALLIC @ 50): sit BELOW
           the dense floor (100); these are pre-cascade interceptors picked to
           fire BEFORE the dense outer cascade. Spacing rule does not apply
           across the sub-100 -> 100 boundary because the architectural intent
           is "intercept before dense cascade", not "insert within it".
-        - Phase 180 LIPID @ 250 (Tier-1): a deliberate half-step interceptor
+        - a phase LIPID @ 250 (Tier-1): a deliberate half-step interceptor
           inserted BETWEEN RADICAL@200 and ZWITTERION@300 (no hundreds slot is
           available there). It MUST precede ZWITTERION@300 because PC is a
           zwitterion and ZWITTERION returns '' (terminating the cascade), so a
           Tier-2 slot would be unreachable for phospholipids (180 RESOLVED A1).
           Its hard-gate detector fires only on clean lipid backbones, so the
           half-step does not affect insertability of the dense region.
-        - v33 Phase 3 B1 ESTER_ANION_ZWITTERION @ 301 (Tier-1): a deliberate
+        - a phase B1 ESTER_ANION_ZWITTERION @ 301 (Tier-1): a deliberate
           half-step interceptor inserted directly AFTER ZWITTERION@300 (no
           hundreds slot is free between 300 and ANION_RETAINED@400). It MUST
           follow ZWITTERION@300 (a NET-CHARGED acid-ester-anion zwitterion is
           classified 'ion', not 'zwitterion', by `detect_species_type`, so the
           two predicates are mutually exclusive by net-charge sign — ordering
           relative to ZWITTERION is immaterial for correctness, but sits here
-          for the same P-74 family grouping). Its predicate is the SAME
+          for the same family grouping). Its predicate is the SAME
           fully-validated, atom-coverage-checked namer as the handler
           (predicate-is-handler pattern), so the half-step cannot fire on any
           shape it does not also correctly name — it does not affect
           insertability of the dense region.
         """
-        LIPID_HALF_STEP = 250  # Phase 180 Tier-1 interceptor (documented exception)
-        ESTER_ANION_ZWITTERION_HALF_STEP = 301  # v33 Phase 3 B1 (documented exception)
-        # Phase 184 CATION_QUATERNARY @ 480 (Tier-1): a deliberate half-step
+        LIPID_HALF_STEP = 250  # a phase Tier-1 interceptor (documented exception)
+        ESTER_ANION_ZWITTERION_HALF_STEP = 301  # a phase B1 (documented exception)
+        # a phase CATION_QUATERNARY @ 480 (Tier-1): a deliberate half-step
         # interceptor between ANION_RETAINED@400 and CATION_RETAINED@500 (no
         # hundreds slot free there). Same documented-half-step pattern as
         # LIPID@250 / ESTER_ANION_ZWITTERION@301; a pre-existing entry that was
@@ -180,12 +180,12 @@ class TestDispatchTableIntegrity:
         assert DISPATCH_TABLE[StoutClass.GENERAL].priority == 99999
 
     def test_general_is_last_when_sorted_by_priority(self):
-        """CFR-02: GENERAL is the explicit terminal catch-all in priority order."""
+        """: GENERAL is the explicit terminal catch-all in priority order."""
         sorted_entries = sorted(DISPATCH_TABLE.values(), key=lambda e: e.priority)
         assert sorted_entries[-1].class_id == StoutClass.GENERAL
 
     def test_iteration_order_matches_priority_order(self):
-        """CONTEXT D-05 + D-06: insertion order in ``_register_dispatch`` call sequence
+        """internal notes +: insertion order in ``_register_dispatch`` call sequence
         is priority-ascending — verifiable by comparing iteration order to sorted order.
         """
         iter_priorities = [e.priority for e in DISPATCH_TABLE.values()]
@@ -206,7 +206,7 @@ class TestDispatchTableIntegrity:
 class TestStoutClassRegistration:
     """158-AUDIT-CFR.md § 1: every StoutClass row registered with valid contents."""
 
-    # Phase 162 D-03 + 162-AUDIT-MLF.md § 8.14: StoutClass.ML_FALLBACK is a
+    # a phase + internal notes-MLF.md: StoutClass.ML_FALLBACK is a
     # TELEMETRY tag, NOT a CFR dispatch entry. The post-pipeline wrapper at
     # namer.py:1248 (Plan-03 T01) increments the counter via
     # `_cfr_router._increment_stat(StoutClass.ML_FALLBACK)` directly; no
@@ -220,9 +220,9 @@ class TestStoutClassRegistration:
         ids=lambda c: c.name,
     )
     def test_every_stoutclass_has_dispatch_entry(self, class_id):
-        """158-AUDIT-CFR.md § 1: every StoutClass member is in DISPATCH_TABLE (CFR-02).
+        """internal notes-CFR.md: every StoutClass member is in DISPATCH_TABLE .
 
-        Phase 162 D-03 exemption: ML_FALLBACK is telemetry-only (no CFR entry).
+        a phase exemption: ML_FALLBACK is telemetry-only (no CFR entry).
         """
         if class_id.name in self._STOUT_CLASS_EXEMPT_FROM_DISPATCH_TABLE:
             pytest.skip(
@@ -286,11 +286,11 @@ class TestStoutClassRegistration:
         ids=lambda c: c.name,
     )
     def test_side_effect_inventory_is_empty(self, class_id):
-        """CONTEXT D-26 HARD INVARIANT: every entry's side_effect_inventory MUST be ().
+        """internal notes HARD INVARIANT: every entry's side_effect_inventory MUST be .
 
-        Per audit § 4 AP-21 + § 2 predicate-purity proofs: predicates MUST be pure
+        Per the audit + predicate-purity proofs: predicates MUST be pure
         — no mol mutation, no MolecularFeatures mutation, no module-global state,
-        no thread-local state.  The locked spec encodes this as an empty
+        no thread-local state. The locked spec encodes this as an empty
         ``side_effect_inventory`` tuple per row.
         """
         entry = DISPATCH_TABLE[class_id]
@@ -310,9 +310,9 @@ class TestGeneralCatchAll:
     """CONTEXT D-08 + audit § 1 row 18: GENERAL is the explicit catch-all."""
 
     def test_general_predicate_always_true(self):
-        """CONTEXT D-08 + CFR-02: GENERAL predicate is ``lambda *_: True``.
+        """internal notes +: GENERAL predicate is ``lambda *_: True``.
 
-        AP-1 prevention: no silent fallthrough is possible by construction.
+         prevention: no silent fallthrough is possible by construction.
         """
         entry = DISPATCH_TABLE[StoutClass.GENERAL]
         # Call with arbitrary args; must return True regardless.
@@ -320,7 +320,7 @@ class TestGeneralCatchAll:
         assert entry.predicate(None, "X", "Y", "Z") is True
 
     def test_general_predicate_accepts_arbitrary_kwargs(self):
-        """RL-7 kwarg threading: predicate signature must absorb dispatcher kwargs."""
+        """ kwarg threading: predicate signature must absorb dispatcher kwargs."""
         entry = DISPATCH_TABLE[StoutClass.GENERAL]
         # _skip_decomposition + _style are the two kwargs the dispatcher threads.
         assert entry.predicate(
@@ -342,10 +342,10 @@ class TestGeneralCatchAll:
 
 
 class TestRegistrationLock:
-    """CONTEXT D-05: DISPATCH_TABLE is frozen post-import."""
+    """internal notes: DISPATCH_TABLE is frozen post-import."""
 
     def test_register_dispatch_raises_post_frozen(self):
-        """D-05: ``_register_dispatch`` raises RuntimeError after the sentinel sets."""
+        """: ``_register_dispatch`` raises RuntimeError after the sentinel sets."""
         with pytest.raises(RuntimeError, match="frozen"):
             _register_dispatch(
                 class_id=StoutClass.GENERAL,  # any class_id; freeze check fires first
@@ -358,11 +358,11 @@ class TestRegistrationLock:
             )
 
     def test_register_dispatch_raises_on_duplicate_priority_post_frozen(self):
-        """D-05 + D-06: registering a colliding priority on a frozen table raises.
+        """ +: registering a colliding priority on a frozen table raises.
 
         The freeze check fires first; the duplicate-priority check is exercised by
         construction during module import (verified indirectly via
-        ``test_priorities_are_unique`` in TestDispatchTableIntegrity).  This test
+        ``test_priorities_are_unique`` in TestDispatchTableIntegrity). This test
         confirms the registration helper still refuses post-freeze.
         """
         existing_priority = DISPATCH_TABLE[StoutClass.SALT].priority

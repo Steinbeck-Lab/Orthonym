@@ -1,16 +1,16 @@
 """
-Integration tests for Phase 57: Fused Heterocycle Classification Routing.
+Integration tests for a phase: Fused Heterocycle Classification Routing.
 
 Tests that the routing guards in composer.py correctly divert tricyclic fused
 heterocycles (xanthene, phenothiazine, phenoxazine, thianthrene) to the fused
 naming path instead of the polycyclic-bridged or sulfide naming paths.
 
 Requirements tested:
-- PRNT-01: Xanthene named as '9H-xanthene' (not tricyclo[...])
-- PRNT-02: Phenothiazine named as '10H-phenothiazine' (not sulfide)
-- PRNT-03: Phenoxazine named as '10H-phenoxazine' (not tricyclo[...])
-- PRNT-04: Thianthrene named as 'thianthrene' (not sulfide)
-- Phase 57 Plan 02: Canary regression tests for all 7 tricyclic + 4 bicyclic compounds
+-: Xanthene named as '9H-xanthene' (not tricyclo[...])
+-: Phenothiazine named as '10H-phenothiazine' (not sulfide)
+-: Phenoxazine named as '10H-phenoxazine' (not tricyclo[...])
+-: Thianthrene named as 'thianthrene' (not sulfide)
+- a phase Plan 02: Canary regression tests for all 7 tricyclic + 4 bicyclic compounds
 """
 
 import pytest
@@ -21,7 +21,7 @@ from orthonym.assembly.composer import _classify_complex_ring
 
 
 # =============================================================================
-# Core routing fix tests (Phase 57 target compounds)
+# Core routing fix tests (a phase target compounds)
 # =============================================================================
 
 
@@ -30,7 +30,7 @@ class TestPhase57RoutingFixes:
 
     @pytest.mark.integration
     def test_xanthene_not_tricyclo(self):
-        """PRNT-01: Xanthene must use retained name, not VB polycyclic."""
+        """: Xanthene must use retained name, not VB polycyclic."""
         result = name_compound('c1ccc2c(c1)Cc1ccccc1O2')
         assert result == '9H-xanthene', (
             f"Xanthene routing failed: got '{result}', expected '9H-xanthene'"
@@ -38,7 +38,7 @@ class TestPhase57RoutingFixes:
 
     @pytest.mark.integration
     def test_phenothiazine_not_sulfide(self):
-        """PRNT-02: Phenothiazine must use retained name, not sulfide."""
+        """: Phenothiazine must use retained name, not sulfide."""
         result = name_compound('c1ccc2c(c1)Nc1ccccc1S2')
         assert result == '10H-phenothiazine', (
             f"Phenothiazine routing failed: got '{result}', expected '10H-phenothiazine'"
@@ -46,7 +46,7 @@ class TestPhase57RoutingFixes:
 
     @pytest.mark.integration
     def test_phenoxazine_not_tricyclo(self):
-        """PRNT-03: Phenoxazine must use retained name, not VB polycyclic."""
+        """: Phenoxazine must use retained name, not VB polycyclic."""
         result = name_compound('c1ccc2c(c1)Nc1ccccc1O2')
         assert result == '10H-phenoxazine', (
             f"Phenoxazine routing failed: got '{result}', expected '10H-phenoxazine'"
@@ -54,7 +54,7 @@ class TestPhase57RoutingFixes:
 
     @pytest.mark.integration
     def test_thianthrene_not_sulfide(self):
-        """PRNT-04: Thianthrene must use retained name, not sulfide."""
+        """: Thianthrene must use retained name, not sulfide."""
         result = name_compound('c1ccc2c(c1)Sc1ccccc1S2')
         assert result == 'thianthrene', (
             f"Thianthrene routing failed: got '{result}', expected 'thianthrene'"
@@ -148,8 +148,8 @@ class TestThioetherGuardDoesNotAffectRealSulfides:
     """Ensure the thioether guard only affects fused heterocycles, not real sulfides.
 
     A real acyclic sulfide must still be NAMED (not lost to the fused-heterocycle
-    guard). Since the v42 sulfanyl-vs-sulfide slice, the PIN is the SUBSTITUTIVE
-    "(R'-sulfanyl)RH" (P-63.2.5 method 1, BB:27817/27821), not the functional-class
+    guard). Since the sulfanyl-vs-sulfide slice, the PIN is the SUBSTITUTIVE
+    "(R'-sulfanyl)RH" method 1, the Blue Book), not the functional-class
     "R R' sulfide" (method 2) — so these assert the substitutive PIN.
     """
 
@@ -171,7 +171,7 @@ class TestThioetherGuardDoesNotAffectRealSulfides:
 
 
 # =============================================================================
-# Canary compound tests (Phase 57 Plan 02)
+# Canary compound tests (a phase Plan 02)
 # =============================================================================
 
 
@@ -197,7 +197,7 @@ class TestPhase57CanaryCompounds:
 
 
 class TestBicyclicFusedHeterocyclesUnchanged:
-    """Verify bicyclic fused compounds still name correctly after Phase 57 changes."""
+    """Verify bicyclic fused compounds still name correctly after a phase changes."""
 
     @pytest.mark.integration
     @pytest.mark.parametrize("smiles,expected_name", [

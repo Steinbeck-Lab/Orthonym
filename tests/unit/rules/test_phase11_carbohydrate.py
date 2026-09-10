@@ -1,8 +1,8 @@
-""" a phase (CARB-01) — carbohydrate sugar-ring-oxygen-drop root-cause + determinism.
+""" a phase  — carbohydrate sugar-ring-oxygen-drop root-cause + determinism.
 
 These lock in the root-cause fix (the PIN gate does NOT run the unit suite, so a
 regression in the shared ring-substituent numbering path would otherwise slip
-through). The SELF-01 self-consistency gate is OFF in the unit suite (conftest
+through). The self-consistency gate is OFF in the unit suite (conftest
 autouse fixture), so the substitutive sugar names appear directly rather than
 being suppressed to 'unknown'.
 
@@ -22,7 +22,7 @@ improvement that still preserves every atom (S / bridge O), OPSIN-RT verified.
 The fallback path itself is unchanged and still guards the remaining
 non-cataloged sugars (mid-chain-deoxy, 1,5-anhydroalditol).
 
-WSD-08 glycoside-linkage is DEFERRED (its blocker is the principal_ring P-44.1
+-08 glycoside-linkage is DEFERRED (its blocker is the principal_ring
 selection race, a separate high-blast-radius parent-selection fix); it stays a
 documented known_protect_failure and is not asserted here.
 """
@@ -71,7 +71,7 @@ def test_thio_anhydro_catalog_pin(smiles, expected):
 @pytest.mark.parametrize("smiles", [
     "O[C@H]1[C@H](O)[C@@H](O)[C@H](O)[C@H](S1)CO",   # 5-thio-glucopyranose (now catalog)
     "C1[C@H](O)[C@@H](O)[C@H](O)[C@H](O1)CO",        # 1,5-anhydroglucitol (fallback)
-    "O[C@H]1C[C@H](O)[C@H](O1)CO",                   # 2-deoxypentofuranose (W6B-T4 catalog)
+    "O[C@H]1C[C@H](O)[C@H](O1)CO",                   # 2-deoxypentofuranose (W6B- catalog)
 ])
 def test_foxane_drop_numbering_is_deterministic(smiles):
     """The ring numbering must not depend on the input SMILES atom order:

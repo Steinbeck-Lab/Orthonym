@@ -1,16 +1,16 @@
-"""P-64.2.1.1 — `chalcone`, the ONLY retained ketone name that is a PIN.
+""" — `chalcone`, the ONLY retained ketone name that is a PIN.
 
 Authority (opened and read, not relayed):
 
-    BlueBookV2/BlueBookV2.md:28297 — section heading ``### **P-64.2.1** Retained
-    names`` / ``**P-64.2.1.1**`` — "The name 'chalcone' is the only retained name
+    the Blue Book Blue Book — section heading ``### **** Retained
+    names`` / ``****`` — "The name 'chalcone' is the only retained name
     as a preferred IUPAC name and is limited to **ring substitution only by
     characteristic groups lower than 'ketone'**. Chalcone refers only to the
     *trans*- or (*E*)- stereoisomer."
 
-    BlueBookV2/BlueBookV2.md:28299 — ``chalcone (PIN)  (2E)-1,3-diphenylprop-2-en-1-one``
+    the Blue Book Blue Book — ``chalcone (PIN) (2E)-1,3-diphenylprop-2-en-1-one``
 
-Context that makes this a PIN rather than general nomenclature: P-64.2.1.2
+Context that makes this a PIN rather than general nomenclature:
 (:28307) closes the *general*-nomenclature ketone list (acetone, 1,4-benzoquinone,
 naphthoquinone, anthraquinone, ketene, acetophenone, benzophenone) and ends
 "Substitutive names, systematically constructed, are the preferred IUPAC names
@@ -33,7 +33,7 @@ therefore have three DISTINCT keys (measured, see ``test_stereo_variants_have_
 distinct_canonical_keys``), and ANY substitution anywhere — ring or chain,
 junior or senior — changes the key. So the retained name can only ever be
 emitted for the bare (E) parent, and the Blue Book's own worked counter-example
-``2',4'-dihydroxychalcone-4-carboxamide`` (BB :28305, "(not ...)"; already
+``2',4'-dihydroxychalcone-4-carboxamide`` (BB:28305, "(not...)"; already
 listed in ``data/bluebook_not_names.py:171``) is structurally unreachable.
 
 SCOPE (deliberate, documented): substituted chalcones such as the BB's
@@ -56,7 +56,7 @@ Z_ISOMER = r"O=C(/C=C\c1ccccc1)c1ccccc1"
 NO_STEREO = "O=C(C=Cc1ccccc1)c1ccccc1"
 RING_OH = "O=C(/C=C/c1ccc(O)cc1)c1ccccc1"
 # The Blue Book's own counter-example: a carboxamide OUTRANKS ketone, so the
-# chalcone name is forbidden and the systematic form is the PIN (BB :28305).
+# chalcone name is forbidden and the systematic form is the PIN (BB:28305).
 BB_COUNTEREXAMPLE = "O=C(/C=C/c1ccc(cc1)C(N)=O)c1ccc(O)cc1O"
 CHAIN_SUBST = "O=C(/C=C/c1ccccc1)C"   # (3E)-4-phenylbut-3-en-2-one, not chalcone
 SATURATED = "O=C(CCc1ccccc1)c1ccccc1"  # 1,3-diphenylpropan-1-one
@@ -72,7 +72,7 @@ def namer():
 
 
 class TestChalconeRetainedKey:
-    """The data row itself (P-64.2.1.1)."""
+    """The data row itself."""
 
     def test_e_chalcone_is_a_retained_pin(self):
         """BB :28299 — ``chalcone (PIN)  (2E)-1,3-diphenylprop-2-en-1-one``."""
@@ -126,9 +126,9 @@ class TestChalconeEmission:
         assert "chalcone" not in namer.name(smiles).lower()
 
     def test_bb_counterexample_is_never_the_forbidden_name(self, namer):
-        """BB :28305 ``(not 2',4'-dihydroxychalcone-4-carboxamide)``.
+        """BB:28305 ``(not 2',4'-dihydroxychalcone-4-carboxamide)``.
 
-        A carboxamide is SENIOR to ketone, so P-64.2.1.1's "lower than 'ketone'"
+        A carboxamide is SENIOR to ketone, so 's "lower than 'ketone'"
         limit forbids the chalcone name here.
         """
         emitted = namer.name(BB_COUNTEREXAMPLE).lower().strip()
@@ -151,7 +151,7 @@ class TestChalconeEmission:
 
 
 class TestChalconeImpliesItsOwnStereo:
-    """P-64.2.1.1 (:28297): "Chalcone refers only to the trans- or (E)-
+    """ (:28297): "Chalcone refers only to the trans- or (E)-
     stereoisomer." — so the retained name IS the descriptor for its one E/Z
     unit, and the stereo backstop's "name lacks descriptors" warning would be a
     FALSE POSITIVE. `_stereo_is_implied_by_name` is diagnostic-only (both

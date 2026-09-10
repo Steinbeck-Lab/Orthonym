@@ -1,15 +1,15 @@
 """Fragment seniority ranking for decomposition parent/substituent assignment.
 
-Implements IUPAC P-44.1.1 seniority-based fragment ranking to determine which
+Implements IUPAC seniority-based fragment ranking to determine which
 fragment becomes the parent structure in decomposition naming. Uses existing
 seniority.py and functional_groups.py infrastructure -- this is a thin wrapper.
 
 Ranking criteria (applied in order until tie-broken):
-1. Most principal characteristic groups (P-44.1.1.1)
-2. Most senior principal group type (P-44.1.1.2)
-3. Senior heteroatom: N > O > S (P-44.1.2)
-4. Ring system present beats chain-only (P-44.1.2.2)
-5. Most heavy atoms (P-44.3 size tiebreaker)
+1. Most principal characteristic groups
+2. Most senior principal group type
+3. Senior heteroatom: N > O > S
+4. Ring system present beats chain-only
+5. Most heavy atoms size tiebreaker)
 
 Scores are tuples where LOWER = MORE SENIOR (natural sort order).
 """
@@ -26,7 +26,7 @@ _NO_FG_RANK = 999
 
 
 def score_fragment_seniority(frag_smiles: Optional[str]) -> Tuple[int, int, int, int, int]:
-    """Score a fragment SMILES by P-44.1.1 seniority.
+    """Score a fragment SMILES by seniority.
 
     Returns a comparison tuple where LOWER = MORE SENIOR:
         (-pg_count, pg_seniority_rank, heteroatom_rank, -has_ring, -num_heavy_atoms)
@@ -62,13 +62,13 @@ def score_fragment_seniority(frag_smiles: Optional[str]) -> Tuple[int, int, int,
         pg_count = 0
         pg_rank = _NO_FG_RANK
 
-    # Heteroatom rank: N > O > S > none (P-44.1.2 senior heteroatom)
+    # Heteroatom rank: N > O > S > none senior heteroatom)
     hetero_rank = _heteroatom_rank(mol)
 
-    # Ring presence (P-44.1.2.2)
+    # Ring presence
     has_ring = 1 if mol.GetRingInfo().NumRings() > 0 else 0
 
-    # Heavy atom count (P-44.3 size tiebreaker)
+    # Heavy atom count size tiebreaker)
     n_heavy = mol.GetNumHeavyAtoms()
 
     # Return tuple: LOWER = MORE SENIOR
@@ -79,7 +79,7 @@ def score_fragment_seniority(frag_smiles: Optional[str]) -> Tuple[int, int, int,
 def _heteroatom_rank(mol) -> int:
     """Determine the senior heteroatom rank for a fragment.
 
-    Per P-44.1.2: N > O > S > none.
+    Per: N > O > S > none.
 
     Returns:
         0 for N present, 1 for O present, 2 for S present, 3 for none.
@@ -106,7 +106,7 @@ def _heteroatom_rank(mol) -> int:
 
 
 def rank_fragments(fragments: List[Dict]) -> List[Dict]:
-    """Rank fragment dicts by P-44.1.1 seniority (most senior first).
+    """Rank fragment dicts by seniority (most senior first).
 
     Args:
         fragments: List of dicts, each must have a "smiles" key.

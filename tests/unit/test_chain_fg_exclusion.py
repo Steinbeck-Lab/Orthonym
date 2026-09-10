@@ -1,7 +1,7 @@
 """
-Tests for find_principal_chain() behavior with FG carbons.
+Tests for find_principal_chain behavior with FG carbons.
 
-IUPAC P-44.1: The principal chain must contain the principal
+IUPAC: The principal chain must contain the principal
 characteristic group and be the longest chain meeting all criteria.
 
 Non-principal FG terminal carbons whose prefix form includes the carbon
@@ -10,11 +10,11 @@ AND has no in-chain oxo+heteroatom expansion (e.g., a non-principal nitrile
 and ensures correct round-trip naming.
 
 A NON-PRINCIPAL nitrile is the 'cyano' prefix whose carbon belongs to the
-prefix (-C#N), NOT the parent chain, so it is EXCLUDED (v22 Phase B / DD1
-Fix 1, P-66.5.1.1.4). When the nitrile IS the principal group its carbon
+prefix (-C#N), NOT the parent chain, so it is EXCLUDED (Phase B / DD1
+Fix 1,. When the nitrile IS the principal group its carbon
 stays in the chain (the -nitrile suffix counts it).
 
-W3-P03-5 (P-65.1.6.1, BB 30384): a non-principal PRIMARY amide -CO-NH2 at a
+W3-P03-5, BB 30384): a non-principal PRIMARY amide -CO-NH2 at a
 chain end is DIFFERENT — per the Blue Book its carbon STAYS in the chain and
 the group is expressed as 'oxo' (=O) + 'amino' (-NH2): "4-amino-4-oxobutanoic
 acid" (PIN), NOT the non-PIN "3-carbamoylpropanoic acid". So primary_amide is
@@ -22,8 +22,8 @@ NOT excluded from chain enumeration (mirroring the acid-halide oxo+halo and
 amidine amino+imino decisions). The 'carbamoyl' prefix remains the PIN only
 for a RING-attached amide, where the carbon cannot join the ring.
 
-Ref: IUPAC 2013 P-65.1.6.1 (amide amino+oxo, chain end),
-P-66.5.1.1.4 (cyano-prefix exclusion).
+Ref: IUPAC 2013 (amide amino+oxo, chain end),
+ (cyano-prefix exclusion).
 """
 
 import pytest
@@ -39,7 +39,7 @@ class TestChainFGBehavior:
     def test_linear_amide_acid_includes_amide_carbon(self):
         """NC(=O)CCCC(=O)O -- 5-amino-5-oxopentanoic acid (PIN).
 
-        W3-P03-5 (P-65.1.6.1, BB 30384): the chain-end primary amide C STAYS in
+        W3-P03-5, BB 30384): the chain-end primary amide C STAYS in
         the chain, expressed as oxo+amino. Chain = 5 carbons (pentanoic acid).
         Round-trip: OPSIN parses "5-amino-5-oxopentanoic acid" correctly.
         """
@@ -61,7 +61,7 @@ class TestChainFGBehavior:
     def test_linear_shorter_amide_acids(self):
         """NC(=O)CCC(=O)O and NC(=O)CC(=O)O -- shorter linear amide acids.
 
-        W3-P03-5 (P-65.1.6.1): the chain-end amide C stays in the chain
+        W3-P03-5: the chain-end amide C stays in the chain
         (oxo+amino), so the chain is one carbon LONGER than the old carbamoyl
         form -> 4-amino-4-oxobutanoic acid / 3-amino-3-oxopropanoic acid (PINs).
         """
@@ -99,7 +99,7 @@ class TestChainFGBehavior:
     def test_glutamine_like_chain_includes_amide_carbon(self):
         """NC(=O)CCCC(N)C(=O)O -- glutamine-like compound.
 
-        W3-P03-5 (P-65.1.6.1): the chain-end amide C STAYS in the chain
+        W3-P03-5: the chain-end amide C STAYS in the chain
         (oxo+amino). Chain = 6 carbons: COOH-C(NH2)-C-C-C-C(=O amide) ->
         2,6-diamino-6-oxohexanoic acid (PIN).
         """
@@ -121,7 +121,7 @@ class TestChainFGBehavior:
     def test_nitrile_amino_acid_excludes_nitrile_carbon(self):
         """N#CCCCC(N)C(=O)O -- amino acid with a nitrile side chain.
 
-        v22 Phase B (DD1 Fix 1, P-66.5.1.1.4): the carboxylic acid is the
+         Phase B (DD1 Fix 1,: the carboxylic acid is the
         principal group, so the nitrile is a non-principal 'cyano' PREFIX whose
         carbon (-C#N) is EXCLUDED from the parent chain. The backbone is the
         5-carbon pentanoic acid (-> 2-amino-5-cyanopentanoic acid), NOT a 6-carbon

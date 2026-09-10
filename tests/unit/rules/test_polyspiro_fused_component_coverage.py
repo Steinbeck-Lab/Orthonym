@@ -1,22 +1,22 @@
 """M4 lever L2 — polyspiro/dispiro systems whose component is a FUSED ring
-(P-24.5) must EMIT in the best-effort floor, not VOID.
+ must EMIT in the best-effort floor, not VOID.
 
 Root cause (pre-fix): ``rules.spiro._name_linear_polyspiro_fused`` built its
 combined atom->locant coverage map by SKIPPING every non-integer locant
 (``if not isinstance(locant, int): continue``). A fused component (e.g. a
 chromane / 3,4-dihydro-2H-1-benzopyran) carries lettered FUSION locants ('4a',
 '8a') on its ring-fusion atoms. Those atoms were dropped from the map, so the
-coverage invariant (``combined.keys() >= core_ring_atoms``) failed and the
+coverage invariant (``combined.keys >= core_ring_atoms``) failed and the
 namer returned None -> the whole spiro core abstained.
 
 The spiro-DESCRIPTOR junction locants are separately proven integer earlier in
-the same function (P-24.5.1: spiro locants must be peripheral integers); the
+the same function: spiro locants must be peripheral integers); the
 combined map only feeds substituent placement and ``_locant_display`` renders a
 primed lettered locant ('8a', "'") -> "8a'" correctly. Keeping the fusion
 atoms in the map is therefore the root-cause fix.
 
 Witness: chromane dispiro cyclohexane spiro cyclopentane
-    O[C@@H]1CC2(CCC3(CCCC3)CC2)Oc2ccccc21   (spiro atoms {3,6})
+    O[C@@H]1CC2(CCC3(CCCC3)CC2)Oc2ccccc21 (spiro atoms {3,6})
 
 0-wrong is preserved by the caller's offer-RT gate; these tests independently
 verify the FULL-InChIKey round-trip via OPSIN (RDKit compare), so a wrong
@@ -60,7 +60,7 @@ def _constitution_key(smi):
 
 def test_linear_polyspiro_fused_returns_name_with_fused_component():
     """Direct unit: _name_linear_polyspiro_fused must NOT drop the fused
-    component's fusion atoms from its coverage map, so it returns the P-24.5
+    component's fusion atoms from its coverage map, so it returns the
     dispiro name instead of None. The parent descriptor's CORE constitution
     must OPSIN-round-trip (parent has no substituents -> compare de-decorated
     core)."""

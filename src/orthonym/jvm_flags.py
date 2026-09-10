@@ -19,12 +19,12 @@ molecule, not a parse failure -- the single worst failure mode this project has.
 
 Mechanism, verified in all four legs 2026-08-03:
 
-===========================  ==========================================
-a live JVM                   creates ``/tmp/hsperfdata_<user>/<pid>``
-**SIGKILL**                  **the file LEAKS (survives the process)**
-a clean exit                 removes it
-``-XX:-UsePerfData``         **never creates it at all**
-===========================  ==========================================
+=========================== ==========================================
+a live JVM creates ``/tmp/hsperfdata_<user>/<pid>``
+**SIGKILL** **the file LEAKS (survives the process)**
+a clean exit removes it
+``-XX:-UsePerfData`` **never creates it at all**
+=========================== ==========================================
 
 This project kills JVMs routinely -- SIGALRM guards in ``pin_conformance_eval``,
 ``measure_breadth`` slice timeouts, hang-recovery ``pkill`` -- so it manufactures
@@ -34,7 +34,7 @@ cause rather than coping with the symptom. It is also rare (``pid_max`` is
 intermittent, silent wrongness that a green test run cannot see.
 
 Cost: ``jps``/``jstat``/``jcmd`` can no longer discover these JVMs. Nothing in
-this tree uses them; ``orthonym.jvm_budget.status()`` is the supported way to
+this tree uses them; ``orthonym.jvm_budget.status`` is the supported way to
 see what is running.
 
 Belt and braces
@@ -42,7 +42,7 @@ Belt and braces
 Removing the cause is not sufficient on its own -- a JVM can print to stdout for
 other reasons (a GC log, an agent, a future JDK warning). So every positional
 batch parse must ALSO fail closed on a line-count mismatch, the way
-``eval/harness.py:opsin_batch`` already does. Use :func:`aligned_batch_lines`.
+``eval/harness.py:opsin_batch`` already does. Use:func:`aligned_batch_lines`.
 """
 from __future__ import annotations
 
@@ -50,9 +50,9 @@ from typing import List, Optional, Sequence
 
 #: Flags applied to every JVM this project launches.
 #:
-#: ``-XX:-UsePerfData``       no /tmp/hsperfdata file -> the contamination class
-#:                            above becomes structurally impossible.
-#: ``-Djava.awt.headless``    no display is ever available; avoids an AWT probe.
+#: ``-XX:-UsePerfData`` no /tmp/hsperfdata file -> the contamination class
+#: above becomes structurally impossible.
+#: ``-Djava.awt.headless`` no display is ever available; avoids an AWT probe.
 JVM_HYGIENE_FLAGS: List[str] = [
     "-XX:-UsePerfData",
     "-Djava.awt.headless=true",
@@ -67,7 +67,7 @@ def java_cmd(*args: str, heap: Optional[str] = None) -> List[str]:
 
     Args:
         *args: everything after the JVM options -- typically
-            ``"-jar", jar_path, ...`` or ``"-version"``.
+            ``"-jar", jar_path,...`` or ``"-version"``.
         heap: optional ``-Xmx`` value, e.g. ``"512m"``. Worth passing on any
             path that may run many JVMs at once: the ~40 ``java -jar`` sites
             historically carried NO heap flag, so each inherited the JDK

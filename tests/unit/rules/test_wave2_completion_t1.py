@@ -1,8 +1,8 @@
 """Wave-2 completion Tier 1: bare hydrides, skeletal-replacement unsaturation,
 bipyridine retained-key fix, ketenes (WAVE2-COMPLETION-PLAN T1).
 
-All expected names BB-verified (P-21.1.1.1 / P-21.1.2 / P-15.4.3.2.4 /
-P-28.2.1 / P-64.2.2.4) and OPSIN-RT probed at build time.
+All expected names BB-verified / / /
+ / and OPSIN-RT probed at build time.
 """
 
 import pytest
@@ -20,7 +20,7 @@ def _name(smiles):
     return name_compound(Chem.CanonSmiles(smiles))
 
 
-# --- Bare / lambda mononuclear parent hydrides (P-21.1.1.1 / P-21.1.2) ---
+# --- Bare / lambda mononuclear parent hydrides / ---
 
 BARE_HYDRIDES = [
     ("[SiH4]", "silane"),
@@ -75,7 +75,7 @@ def test_bare_hydride_fail_closed():
     assert name_mononuclear_hydride(Chem.MolFromSmiles("C")) is None
 
 
-# --- Skeletal-replacement chain unsaturation (P-15.4.3.2.4) ---
+# --- Skeletal-replacement chain unsaturation ---
 
 SKELETAL_ENE = [
     # BB verbatim example
@@ -116,7 +116,7 @@ def test_skeletal_ene_fail_closed():
         Chem.MolFromSmiles("C=CCOCCOC")) is None
 
 
-# --- Bipyridine retained-key fix (P-28.2.1) ---
+# --- Bipyridine retained-key fix ---
 
 @pytest.mark.parametrize("smiles,expected", [
     ("c1cc(ncc1)-c1ccncc1", "2,4'-bipyridine"),   # was wrong-keyed 2,2'
@@ -128,7 +128,7 @@ def test_bipyridine_isomers(smiles, expected):
     assert _name(smiles) == expected
 
 
-# --- Ketenes (P-64.2.2.4) ---
+# --- Ketenes ---
 
 KETENES = [
     ("C=C=O", "ethenone"),               # BB verbatim
@@ -155,7 +155,7 @@ def test_ketene_fail_closed():
     # general ketone principles (unbuilt) -> None.
     assert name_ketene(Chem.MolFromSmiles("CC=C=O")) is None
     # NOTE: O=C=C1CCCCC1 (cyclohexylidenemethanone) is now BUILT — see
-    # W2E-P1FG Task 3 (scope-decision #4, P-64.5(3) oxomethylidene ring case).
+    # W2E-P1FG Task 3 (scope-decision #4, (3) oxomethylidene ring case).
     assert name_ketene(Chem.MolFromSmiles("O=C=C1CCCCC1")) == \
         "cyclohexylidenemethanone"
     # Non-ketene cumulenes / carbonyls decline.

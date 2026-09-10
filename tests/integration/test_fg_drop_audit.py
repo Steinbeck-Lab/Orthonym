@@ -1,12 +1,12 @@
 """
-Phase 113 Plan 02 - Functional Group Drop Audit Tests
+a phase Plan 02 - Functional Group Drop Audit Tests
 
 Tests that verify specific functional group types are NOT silently dropped
 during assembly. Each test names a polyfunctional compound and asserts that
 all expected FG types appear in the generated name (as either prefix or suffix).
 
 These tests serve as regression guards against FG drops documented in the
-DROP-17 through DROP-25 log labels.
+ through log labels.
 """
 
 import pytest
@@ -195,11 +195,11 @@ class TestSulfoNotDropped:
 
 @pytest.mark.integration
 class TestSplitNotDropped:
-    """Phase 169 POLY-01: a previously-DROP-23-dropped composite loser FG now
+    """a phase: a previously--dropped composite loser FG now
     APPEARS in the name (flag-ON group-splitting). The thioester is the hard
     whole-molecule anchor; the ester is asserted at the decomposition level
     (RESEARCH Pitfall 4 — monoethyl succinate is named via ``ethoxycarbonyl``,
-    a moving-base-atom / Phase-172 path, not DROP-23)."""
+    a moving-base-atom / Phase-172 path, not)."""
 
     def test_thioester_loser_not_dropped(self):
         """S-ethyl monothiosuccinate: the previously-dropped =O is recovered as oxo

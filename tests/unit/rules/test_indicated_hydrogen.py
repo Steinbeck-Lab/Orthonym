@@ -35,7 +35,7 @@ class TestNewFusedHeterocycleEntries:
             f"Dibenzofuran ({can}) should be in FUSED_HETEROCYCLE_DATA"
         )
         entry = FUSED_HETEROCYCLE_DATA[can]
-        # PIN carries the fusion descriptor (, P-25.3.1.3).
+        # PIN carries the fusion descriptor (,.
         assert entry["name"] == "dibenzo[b,d]furan"
 
     @pytest.mark.unit
@@ -47,7 +47,7 @@ class TestNewFusedHeterocycleEntries:
             f"Dibenzothiophene ({can}) should be in FUSED_HETEROCYCLE_DATA"
         )
         entry = FUSED_HETEROCYCLE_DATA[can]
-        # PIN carries the fusion descriptor (, P-25.3.1.3).
+        # PIN carries the fusion descriptor (,.
         assert entry["name"] == "dibenzo[b,d]thiophene"
 
     @pytest.mark.unit
@@ -172,7 +172,7 @@ class TestGroup14HeteroleIndicatedH:
     """Group-14 (Si/Ge/Sn) mancude heteroles keep their indicated hydrogen even
     when every ring-position H is displaced by substitution.
 
-    P-68.2.6 "Silole, germole,... rings" (``the Blue Book``):
+     "Silole, germole,... rings" (``the Blue Book``):
     ``1,1-dibutyl-1H-germole (PIN) (note the indicated hydrogen atom)``. The
     indicated hydrogen is a property of the mancude PARENT (which ring atom is
     the saturated skeletal position), not of the substituted molecule, so a
@@ -184,7 +184,7 @@ class TestGroup14HeteroleIndicatedH:
     @pytest.mark.parametrize("smiles,expected", [
         # fully substituted (0 H at ring position 1) -> 1H still cited (the fix)
         ("CC[Si]1(CC)C=CC=C1", "1,1-diethyl-1H-silole"),
-        ("CCCC[Ge]1(CCCC)C=CC=C1", "1,1-dibutyl-1H-germole"),   # BB P-68.2.6 PIN
+        ("CCCC[Ge]1(CCCC)C=CC=C1", "1,1-dibutyl-1H-germole"),   # BB PIN
         ("CC[Sn]1(CC)C=CC=C1", "1,1-diethyl-1H-stannole"),
     ])
     def test_fully_substituted_group14_heterole_keeps_1h(self, smiles, expected):

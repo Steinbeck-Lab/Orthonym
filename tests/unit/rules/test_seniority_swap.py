@@ -1,7 +1,7 @@
 """Unit tests for seniority-based parent role swapping in bond_cleavage.
 
-Tests the _maybe_swap_parent_roles() function and the roles_swapped flag
-in find_cleavable_bonds() bond info dicts. Covers all 6 non-ether bond
+Tests the _maybe_swap_parent_roles function and the roles_swapped flag
+in find_cleavable_bonds bond info dicts. Covers all 6 non-ether bond
 types (ester, amide, thioester, sulfonamide, phosphodiester, carbamate)
 plus the size guard threshold.
 """
@@ -41,7 +41,7 @@ def _get_bond_atoms(smiles: str, bond_type: str):
 
 @pytest.mark.unit
 class TestMaybeSwapParentRoles:
-    """Test _maybe_swap_parent_roles() directly with various bond types."""
+    """Test _maybe_swap_parent_roles directly with various bond types."""
 
     def test_ester_large_other_swaps(self):
         """Steroid acetate: acid=3 HA (acetate), other=20+ HA steroid -> SWAP.
@@ -327,7 +327,7 @@ class TestSizeGuard:
 
 @pytest.mark.unit
 class TestFindCleavableBondsSwapFlag:
-    """Test that find_cleavable_bonds() returns roles_swapped in all bond dicts."""
+    """Test that find_cleavable_bonds returns roles_swapped in all bond dicts."""
 
     def test_simple_ester_has_roles_swapped_false(self):
         """CCOC(=O)C (ethyl acetate): simple ester should have roles_swapped=False."""

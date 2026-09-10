@@ -1,6 +1,6 @@
 """Wave-2 completion Tier 2: multiplicative single-atom bridge extensions.
 
-Carbonyl (P-15.3.1.2.1.1) and substituted-methylene (P-15.3.1.2.1.2) bridges.
+Carbonyl and substituted-methylene bridges.
 All OPSIN-RT probed at build time.
 """
 

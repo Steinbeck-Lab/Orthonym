@@ -5,10 +5,10 @@ Spec: internal notes. The a trace found
 `_try_multi_bond_decompose` and `_try_iterative_mixed_decompose` cut a large
 molecule at linkages, name each fragment, and ship a name built from whichever
 >= 2 fragments named -- SILENTLY DROPPING any fragment that failed. The
-shipped name denotes a SMALLER molecule than the input, which SELF-01 (rightly)
+shipped name denotes a SMALLER molecule than the input, which (rightly)
 suppresses, so the whole molecule abstains -- but a producer that dishonestly
 offers a smaller-molecule candidate is not the same thing as an honest
-abstention (a project rule: "0-wrong is delivered by E1 + SELF-01 rejecting a
+abstention (a project rule: "0-wrong is delivered by E1 + rejecting a
 candidate, never by a producer declining to build one" -- but PIN-tier fail-
 closed is licensed by the SAME invariant's own carve-out, and this defect
 sits squarely on the PIN-shared decomposition path).
@@ -22,13 +22,13 @@ The fix (`decomposition/engine.py`):
      SUCCESS -- a fragment that already names at PIN tier never reaches it, so
      every currently-correct decomposition name is byte-identical.
   2. Both multi-fragment assemblers now FAIL CLOSED: if any input fragment
-     still could not be named/covered adequately (even after the T4 rescue
+     still could not be named/covered adequately (even after the rescue
      rung), the whole assembly is declined (`return None`) instead of shipping
      a name built from the successfully-named fragments alone.
 
 This file is the load-bearing regression test for that invariant. It is
 deliberately built on REAL molecules (no fragment-naming mocks) so the
-assertions exercise the genuine T4 rescue + fail-closed interaction, not a
+assertions exercise the genuine rescue + fail-closed interaction, not a
 simulated one.
 """
 
@@ -57,7 +57,7 @@ pytestmark = [
         reason="round-trip assertions need the OPSIN jar; without it the "
                "invariant cannot be measured (it would be vacuously true)",
     ),
-    # This file asserts PRODUCTION's invariant (name_compound with the SELF-01
+    # This file asserts PRODUCTION's invariant (name_compound with the
     # OPSIN validity gate ON). The suite's autouse fixture disables that gate
     # by default (see tests/conftest.py's `_opsin_validity_gate_state`), which
     # is a DIFFERENT, deliberately more permissive configuration used to probe
@@ -80,7 +80,7 @@ pytestmark = [
 # `_try_iterative_mixed_decompose`; before this fix, one fragment (the
 # GlcN-thioether unit) failed PIN-tier naming and the assembler shipped
 # "3/4 fragments named (1 failed)" -- a name for a SMALLER molecule, which
-# SELF-01 correctly suppressed (byte-matching the corpus's recorded
+# correctly suppressed (byte-matching the corpus's recorded
 # self01_suppressed_name field for this exact row).
 GPI_MANNOSIDE = (
     "NCCOP(=O)(O)OC[C@H]1O[C@H](O[C@@H]2[C@@H](OC[C@H]3O[C@H](O[C@H]4[C@H](O)"
@@ -103,7 +103,7 @@ GPI_FAILING_FRAGMENT = (
 # `_try_multi_bond_decompose` (amide, 7 bonds) fires for this molecule --
 # confirms the a trace's ASSUMED call-site attribution for the peptide/lipid
 # family. In THIS instance all fragments name successfully (failed_count==0
-# even before this fix); the SELF-01 suppression here traces to a SEPARATE,
+# even before this fix); the suppression here traces to a SEPARATE,
 # out-of-scope defect in `_assemble_multi_amide`'s "N,N-di..." grouping, not
 # a dropped fragment. It is included as a genuinely-decomposed, real-world
 # molecule the no-partial-ship invariant must still hold for.
@@ -187,7 +187,7 @@ class TestNoPartialShip:
         """The GPI mannoside is the a trace's directly-traced positive: before
         this fix it shipped 'α-D-mannopyranosyloxy α-D-mannopyranosyl-
         (...' (3/4 fragments, dropping the failed GlcN-thioether unit's 27
-        atoms) and SELF-01 suppressed it. After this fix the assembler either
+        atoms) and suppressed it. After this fix the assembler either
         ships an ATOM-COMPLETE candidate or the molecule abstains cleanly --
         it must never again reach a partial-ship shape.
         """
@@ -216,7 +216,7 @@ class TestT4RescueMechanism:
 
     def test_fragment_fails_pin_tier_alone(self):
         """Sanity anchor: the isolated GlcN-thioether fragment genuinely
-        fails BOTH PIN-tier rungs on their own (so the T4 rescue rung is
+        fails BOTH PIN-tier rungs on their own (so the rescue rung is
         actually doing new work, not merely duplicating an existing success).
         """
         from orthonym.assembly.fragment_naming import name_fragment_recursively
@@ -241,12 +241,12 @@ class TestT4RescueMechanism:
         fragment that already succeeds at PIN tier (scoping invariant: T4
         never competes with or replaces a PIN-successful fragment name).
         """
-        # Failing-at-PIN fragment: T4 rescue rung fires and returns a name.
+        # Failing-at-PIN fragment: rescue rung fires and returns a name.
         result = _name_fragment_with_fallback(GPI_FAILING_FRAGMENT)
         assert result and "unknown" not in result.lower()
 
         # PIN-successful fragment: identical to the plain PIN pipeline
-        # result -- the T4 rung must not fire/alter it.
+        # result -- the rung must not fire/alter it.
         from orthonym.namer import name_pipeline_only
 
         pin_fragment = "CC(=O)O"  # acetic acid -- trivially PIN-nameable
@@ -258,7 +258,7 @@ class TestT4RescueMechanism:
     def test_iterative_mixed_decompose_achieves_atom_complete_assembly(self):
         """Direct call (real molecule, real fragment naming, no mocks):
         `_try_iterative_mixed_decompose` on the GPI mannoside now accounts
-        for ALL 4 cut fragments (thanks to the T4 rescue rung), where before
+        for ALL 4 cut fragments (thanks to the rescue rung), where before
         this fix it silently dropped the failing one and shipped a 3/4
         "partial assembly". The returned string must mention every
         fragment's structural content (mannopyranosyl appears for BOTH
@@ -266,10 +266,10 @@ class TestT4RescueMechanism:
         GlcN-thioether unit's own descriptive tokens) -- i.e. the assembler
         no longer drops the previously-failing fragment's atoms into the
         void, even though a SEPARATE, out-of-scope limitation (weaving a
-        standalone T4 compound name into a glycoside prefix position) means
+        standalone compound name into a glycoside prefix position) means
         the resulting string does not yet compose into ONE connected IUPAC
         name (it falls back to the pre-existing naive space-join and is
-        correctly SELF-01-rejected as a whole -- see
+        correctly -rejected as a whole -- see
         `test_gpi_mannoside_honestly_abstains_not_partial`).
         """
         mol = Chem.MolFromSmiles(GPI_MANNOSIDE)
@@ -317,7 +317,7 @@ class TestT4RescueMechanism:
 
 class TestHonestAbstainWhenGenuinelyUnnameable:
     """At least one case must still abstain CLEANLY (never a partial) when a
-    fragment is genuinely unnameable even with T4 assistance.
+    fragment is genuinely unnameable even with assistance.
     """
 
     def test_lipopeptide_abstains_cleanly(self):
@@ -336,7 +336,7 @@ class TestHonestAbstainWhenGenuinelyUnnameable:
 
 class TestPinSuccessUnaffected:
     """Byte-identity control: the fix must not perturb an ordinary molecule
-    that was already correctly decomposed at PIN tier (T4 rescue never even
+    that was already correctly decomposed at PIN tier (rescue never even
     fires because every fragment already succeeds at PIN tier)."""
 
     def test_triacetin_still_names_and_round_trips(self):

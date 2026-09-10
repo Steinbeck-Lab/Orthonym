@@ -1,20 +1,20 @@
-"""Integration tests for discover_substituents() -- real-world molecule validation.
+"""Integration tests for discover_substituents -- real-world molecule validation.
 
-Validates the universal substituent discovery function (Phase 84) against
+Validates the universal substituent discovery function (a phase) against
 real-world molecules from the benchmark. Tests three critical properties:
 
-1. **Real-molecule coverage**: discover_substituents() correctly handles
+1. **Real-molecule coverage**: discover_substituents correctly handles
    substituted benzene, fused rings, heterocycles, chain+FG, chain+ring-sub,
    and >25-atom substituents.
 
-2. **A/B canary parity**: naming output is UNCHANGED after Phase 84 (additive
+2. **A/B canary parity**: naming output is UNCHANGED after a phase (additive
    only). 20+ canary compounds produce identical names.
 
-3. **DROP-04 elimination**: molecules that previously triggered silent drops
-   at DROP-04 (ring+heteroatom branches) are handled correctly by
-   discover_substituents().
+3. ** elimination**: molecules that previously triggered silent drops
+   at (ring+heteroatom branches) are handled correctly by
+   discover_substituents.
 
-Phase 84, Plan 02 -- integration gate before Phase 85 builds naming on top.
+a phase, Plan 02 -- integration gate before a phase builds naming on top.
 """
 
 import pytest
@@ -96,7 +96,7 @@ def _count_non_parent_heavy(mol, parent_atoms):
 
 @pytest.mark.integration
 class TestDiscoveryOnRealMolecules:
-    """Test discover_substituents() on real-world molecules with edge cases."""
+    """Test discover_substituents on real-world molecules with edge cases."""
 
     def test_substituted_benzene(self):
         """Toluene (Cc1ccccc1): ring parent with single methyl substituent."""
@@ -221,7 +221,7 @@ AB_CANARY_COMPOUNDS = [
     # Aldehyde
     ("CCCCC=O", "pentanal"),
     # Ring compound - benzene derivative
-    ("Cc1ccc(O)cc1C", "3,4-dimethylphenol"),  # ASML-13: phenol suffix routing
+    ("Cc1ccc(O)cc1C", "3,4-dimethylphenol"),  #: phenol suffix routing
     ("COc1ccc(OC)c(OC)c1", "1,2,4-trimethoxybenzene"),
     # Heterocycle
     ("CCCc1nc(C)c(C)nc1C", "2,3,6-trimethyl-5-propylpyrazine"),
@@ -254,7 +254,7 @@ _AB_IDS = [
 
 @pytest.mark.integration
 class TestCanaryABComparison:
-    """A/B comparison: verify naming is unchanged after Phase 84."""
+    """A/B comparison: verify naming is unchanged after a phase."""
 
     @pytest.mark.parametrize("smiles,expected_name", AB_CANARY_COMPOUNDS, ids=_AB_IDS)
     def test_naming_unchanged(self, smiles, expected_name):
@@ -353,13 +353,13 @@ class TestCanaryABComparison:
 
 @pytest.mark.integration
 class TestDropPointElimination:
-    """Test that discover_substituents() has no silent DROP-04 drops."""
+    """Test that discover_substituents has no silent drops."""
 
     def test_no_drop04_ring_heteroatom_branch_phenoxyacetic(self):
         """Phenoxyacetic acid backbone: -OCC(=O)O on benzene is one fragment.
 
-        Previously triggered DROP-04 (ring+heteroatom branch silent drop).
-        discover_substituents() must return the full -OCC(=O)O as one
+        Previously triggered (ring+heteroatom branch silent drop).
+        discover_substituents must return the full -OCC(=O)O as one
         SubstituentInfo.
         """
         mol, parent, oriented = _ring_parent_info("c1ccc(OCC(=O)O)cc1")
@@ -379,7 +379,7 @@ class TestDropPointElimination:
         """Aminoalkyl on benzene: -NCCCO on benzene is one fragment.
 
         c1ccc(NCCCO)cc1 = 4-(3-hydroxypropyl)amino-type molecule.
-        Previously triggered DROP-04 (ring+heteroatom branch).
+        Previously triggered (ring+heteroatom branch).
         """
         mol, parent, oriented = _ring_parent_info("c1ccc(NCCCO)cc1")
         results = discover_substituents(

@@ -1,7 +1,7 @@
-"""Phase 166 SCORE-03: per-substring (per-node) scoring on the Name-Tree IR.
+"""a phase SCORE-03: per-substring (per-node) scoring on the Name-Tree IR.
 
 Generalizes the scalar ``ParentCorrectnessScorer`` (rules/parent_correctness.py)
-to NODE granularity (CONTEXT D-04): for each STRUCTURED ``NameTreeNode``,
+to NODE granularity (internal notes): for each STRUCTURED ``NameTreeNode``,
 attribute a binary ``parent_score`` / ``locant_score`` / ``substituent_score``
 (1.0 match / 0.0 mismatch / 0.5 no-decision) by aligning the node against the
 OPSIN-parsed reference name.
@@ -15,11 +15,11 @@ Mechanism (REUSED, not re-invented — RESEARCH §Don't-Hand-Roll):
   - Reads the reference name from the SAME thread-local as the parent oracle
     (``parent_correctness._pc_context``). Production (no reference set) -> ``{}``
     with ZERO OPSIN cost -> byte-identical (SCORE-05).
-  - Coarse nodes (``is_coarse_node``, WR-4 single source of truth) are OMITTED
-    from the score dict (D-02): they carry no scoreable substrings; the
+  - Coarse nodes (``is_coarse_node``, single source of truth) are OMITTED
+    from the score dict : they carry no scoreable substrings; the
     aggregate confidence is retained for them.
 
-POST-HOC contract (D-04, audit §POST-HOC Byte-Identical Contract): the
+POST-HOC contract (, audit §POST-HOC Byte-Identical Contract): the
 ``node_scores`` dict is attached on ``CandidateName`` AFTER ``compute_confidence``
 returns; it NEVER feeds back into ``confidence`` (contrast the V18
 ``multiple_bond_count`` recompute at ``candidate_pool.py:810-823`` — the
@@ -51,7 +51,7 @@ class NodeScores:
 
     parent_score: float       # node's parent atom set vs reference parent
     locant_score: float       # node's locants vs reference numbering
-    substituent_score: float  # do node.prefixes[] subtrees match (binary)
+    substituent_score: float  # do node.prefixes subtrees match (binary)
 
 
 def _ref_locant_set(ref_name: str) -> set:
@@ -93,14 +93,14 @@ def _candidate_parent_atoms(node: "NameTreeNode", mol: Any) -> Optional[set]:
 
 
 class PerNodeScorer:
-    """Attributes per-node parent/locant/substituent scores off the IR (D-04)."""
+    """Attributes per-node parent/locant/substituent scores off the IR ."""
 
     @staticmethod
     def score_tree(tree: "NameTreeNode", mol: Any) -> Dict[int, NodeScores]:
         """Return ``{id(node): NodeScores}`` for each STRUCTURED node, or ``{}``.
 
         ``{}`` is returned when: no reference name is set (production
-        byte-identical guard, zero OPSIN cost), the root is coarse (D-02), or
+        byte-identical guard, zero OPSIN cost), the root is coarse , or
         the reference name does not OPSIN-parse (no-decision).
         """
         # Lazy import to avoid any assembly<->rules import-cycle at module load.
@@ -114,7 +114,7 @@ class PerNodeScorer:
         if ref_name is None:
             return {}                    # production: no signal, zero OPSIN cost
         if tree is None or is_coarse_node(tree):
-            return {}                    # coarse -> aggregate retained (D-02)
+            return {}                    # coarse -> aggregate retained
         if opsin_reference_mol(ref_name) is None:
             return {}                    # reference unparseable -> no-decision
         ref_parent_atoms = _extract_reference_parent_atoms(ref_name, mol)
@@ -126,7 +126,7 @@ class PerNodeScorer:
     @staticmethod
     def _walk(node, mol, ref_parent_atoms, ref_locants, scores) -> None:
         if is_coarse_node(node):
-            return                       # skip coarse sub-nodes (D-02)
+            return                       # skip coarse sub-nodes
         scores[id(node)] = PerNodeScorer._score_node(
             node, mol, ref_parent_atoms, ref_locants
         )
@@ -177,19 +177,19 @@ class PerNodeScorer:
 
 
 # ---------------------------------------------------------------------------
-# D-05 lexicographic near-tie comparator (SCORE-04)
+# lexicographic near-tie comparator (SCORE-04)
 # ---------------------------------------------------------------------------
 
 # Sentinel for an unscored candidate: all-no-decision -> ties everything ->
-# the comparator returns 0 and the caller defers to the aggregate (D-05 strict
+# the comparator returns 0 and the caller defers to the aggregate (strict
 # refinement). An unscored candidate never wins or loses on per-substring.
 _NO_DECISION = NodeScores(0.5, 0.5, 0.5)
 
 
 def _scores_from(node_scores, tree) -> NodeScores:
-    """Aggregate an explicit ``(node_scores, tree)`` pair into comparison-level NodeScores (D-05).
+    """Aggregate an explicit ``(node_scores, tree)`` pair into comparison-level NodeScores .
 
-    Phase 168 STAGE B: extracted from ``_candidate_scores`` so the Stage-B selector can build a
+    a phase STAGE B: extracted from ``_candidate_scores`` so the Stage-B selector can build a
     comparison key from ``(node_scores_rewritten, tree_rewritten)`` WITHOUT mutating
     ``cand.node_scores`` (no aliasing, no restore). On ``(cand.node_scores, cand.tree)`` this is
     byte-identical to the prior inline body — the refactor is behavior-preserving.
@@ -207,7 +207,7 @@ def _scores_from(node_scores, tree) -> NodeScores:
 
 
 def _candidate_scores(cand: Any) -> NodeScores:
-    """Aggregate a candidate's tree into comparison-level NodeScores (D-05).
+    """Aggregate a candidate's tree into comparison-level NodeScores .
 
     ``parent_score`` and ``substituent_score`` are read from the ROOT node (the
     main parent + whether its immediate substituents match). ``locant_score``
@@ -218,15 +218,15 @@ def _candidate_scores(cand: Any) -> NodeScores:
     tie these, since the root chain carries no locant.) Returns the all-0.5
     no-decision sentinel when the candidate has no scored tree.
     """
-    # Phase 168 STAGE B: delegate to _scores_from (behavior-preserving; the explicit-pair form lets
+    # a phase STAGE B: delegate to _scores_from (behavior-preserving; the explicit-pair form lets
     # the Stage-B selector key on the rewritten tree without mutating cand.node_scores).
     return _scores_from(getattr(cand, "node_scores", None), getattr(cand, "tree", None))
 
 
 def compare_scores(sa: NodeScores, sb: NodeScores) -> int:
-    """Pure lexicographic first-point-of-difference on two NodeScores (CONTEXT D-05).
+    """Pure lexicographic first-point-of-difference on two NodeScores (internal notes).
 
-    Phase 168 STAGE B: extracted from ``compare_by_node_scores`` so the Stage-B selector can compare
+    a phase STAGE B: extracted from ``compare_by_node_scores`` so the Stage-B selector can compare
     explicit keys (e.g. rewritten-tree scores from ``_scores_from``) without re-reading candidate
     attributes. Behavior on ``_candidate_scores(a/b)`` is byte-identical.
     """
@@ -238,21 +238,21 @@ def compare_scores(sa: NodeScores, sb: NodeScores) -> int:
 
 
 def compare_by_node_scores(a: Any, b: Any) -> int:
-    """Lexicographic first-point-of-difference comparator (CONTEXT D-05).
+    """Lexicographic first-point-of-difference comparator (internal notes).
 
     Compares two near-tie candidates by their ROOT NodeScores in the FIXED
     priority order ``parent_score -> locant_score -> substituent_score``. At
     the first key where they differ, the HIGHER score wins. Returns:
 
-        -1  a is better
-        +1  b is better
-         0  full per-substring tie -> caller defers to the aggregate
+        -1 a is better
+        +1 b is better
+         0 full per-substring tie -> caller defers to the aggregate
             (``select_best_candidate``), a STRICT refinement.
 
     This is NOT a weighted sum (the anti-pattern this phase exists to kill — a
     high ``substituent_score`` must never mask a zero ``parent_score``; the
     parent must be right before locants matter, mirroring IUPAC
-    first-point-of-difference, Blue Book P-31.1.4). Pure function: no OPSIN, no
+    first-point-of-difference, Blue Book. Pure function: no OPSIN, no
     mutation, deterministic.
     """
     return compare_scores(_candidate_scores(a), _candidate_scores(b))

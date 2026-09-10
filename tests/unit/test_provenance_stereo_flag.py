@@ -1,4 +1,4 @@
-"""v27 Phase 6 T6.4 — surface stereo_unexpressed as METADATA (never in the name).
+""" a phase T6.4 — surface stereo_unexpressed as METADATA (never in the name).
 
 The flag lives in provenance + the name_tiered row dict only; the emitted name
 string stays a clean, OPSIN-parseable constitutional IUPAC name (an appended

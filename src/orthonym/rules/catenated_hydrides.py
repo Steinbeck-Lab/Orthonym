@@ -1,19 +1,19 @@
-"""Catenated Group-14 / chalcogen(+N) hydride namer (P-21.2.3 / P-52.1.3).
+"""Catenated Group-14 / chalcogen(+N) hydride namer /.
 
 Alternating homonuclear a(ba)n catenated parent hydrides — a chain of identical
 Group-14 atoms {Si, Ge, Sn, Pb} linked by identical bridge heteroatoms
 {O, N, S, Se, Te}, terminated at both ends by a Group-14 atom, everything else
 saturated with hydrogen::
 
-    [SiH3]O[SiH3]              -> disiloxane        (2 Si, 1 O)
-    [SiH3]O[SiH2]O[SiH3]       -> trisiloxane       (3 Si, 2 O)
-    [SiH3]N[SiH3]              -> N-silylsilanamine  (N bridge -> amine, P-21.2.3.1)
-    [SiH3]S[SiH3]              -> disilathiane      (S bridge; linking 'a')
-    [SnH3]O[SnH3]              -> distannoxane      (Sn)
-    [GeH3]O[GeH3]              -> digermoxane       (Ge)
+    [SiH3]O[SiH3] -> disiloxane (2 Si, 1 O)
+    [SiH3]O[SiH2]O[SiH3] -> trisiloxane (3 Si, 2 O)
+    [SiH3]N[SiH3] -> N-silylsilanamine (N bridge -> amine,
+    [SiH3]S[SiH3] -> disilathiane (S bridge; linking 'a')
+    [SnH3]O[SnH3] -> distannoxane (Sn)
+    [GeH3]O[GeH3] -> digermoxane (Ge)
 
 A nitrogen bridge is the exception: an '-azane' parent hydride is non-PIN for
-these (P-21.2.3.1), so N-bridged chains are named substitutively as amines on the
+these, so N-bridged chains are named substitutively as amines on the
 Group-14 hydride ('silane') -- see ``_name_nitrogen_bridged_group14``.
 
 Every emitted name round-trips through OPSIN 2.9.0.
@@ -94,13 +94,13 @@ def name_catenated_hydride(mol) -> Optional[str]:
         if len(heavy) != 2 or any(n.GetSymbol() != g14_sym for n in heavy):
             return None
 
-    # P-21.2.3.1 (BB 26243/23547/16015): a NITROGEN-bridged Group-14 a(ba)n chain
+    # (BB 26243/23547/16015): a NITROGEN-bridged Group-14 a(ba)n chain
     # is NOT named as an '-azane' parent hydride — 'disilazane'/'trisilazane' are
     # explicitly non-PIN ("disilazane is not a recommended parent hydride, see
-    # P-21.2.3.1"). Nitrogen carries the amine functionality, so the PIN is built
-    # substitutively on the Group-14 hydride 'silane'/'germane'/... :
-    #   SiH3-NH-SiH3         -> N-silylsilanamine         (preselected name, BB 26243)
-    #   SiH3-NH-SiH2-NH-SiH3 -> N,N'-disilylsilanediamine (BB 23547)
+    # "). Nitrogen carries the amine functionality, so the PIN is built
+    # substitutively on the Group-14 hydride 'silane'/'germane'/...:
+    # SiH3-NH-SiH3 -> N-silylsilanamine (preselected name, BB 26243)
+    # SiH3-NH-SiH2-NH-SiH3 -> N,N'-disilylsilanediamine (BB 23547)
     if bridge_sym == 'N':
         return _name_nitrogen_bridged_group14(g14_sym, len(g14_atoms))
 
@@ -124,13 +124,13 @@ _GROUP14_YL_NAME = {'Si': 'silyl', 'Ge': 'germyl', 'Sn': 'stannyl',
 
 def _name_nitrogen_bridged_group14(g14_sym: str, n_g14: int) -> Optional[str]:
     """Return the substitutive amine PIN for a nitrogen-bridged homonuclear
-    Group-14 a(ba)n chain (P-21.2.3.1 / P-62.2.2.1), else ``None`` (fail-closed).
+    Group-14 a(ba)n chain /, else ``None`` (fail-closed).
 
     Only the two Blue-Book-documented members are built — a longer N-bridged chain
     is not a documented PIN and fails closed (cascade-continuation):
 
-        SiH3-NH-SiH3          -> N-silylsilanamine         (BB 26243, preselected)
-        SiH3-NH-SiH2-NH-SiH3  -> N,N'-disilylsilanediamine (BB 23547)
+        SiH3-NH-SiH3 -> N-silylsilanamine (BB 26243, preselected)
+        SiH3-NH-SiH2-NH-SiH3 -> N,N'-disilylsilanediamine (BB 23547)
     """
     from ..assembly.naming_utils import apply_vowel_elision
     hydride = _GROUP14_HYDRIDE_NAME.get(g14_sym)
@@ -139,7 +139,7 @@ def _name_nitrogen_bridged_group14(g14_sym: str, n_g14: int) -> Optional[str]:
         return None
     if n_g14 == 2:
         # One Group-14 hydride is the parent bearing the amine; the far -EH3 is an
-        # N-'yl' substituent (P-62.2.2.1 method 1, BB 26243).
+        # N-'yl' substituent method 1, BB 26243).
         return f"N-{yl}{apply_vowel_elision(hydride, 'amine')}"
     if n_g14 == 3:
         # The central Group-14 hydride bears both amines (a diamine); each amine
@@ -149,28 +149,28 @@ def _name_nitrogen_bridged_group14(g14_sym: str, n_g14: int) -> Optional[str]:
 
 
 # ---------------------------------------------------------------------------
-# P-68.3.2.2 — homonuclear Group-15 (pnictogen) catenated parent hydrides
+# — homonuclear Group-15 (pnictogen) catenated parent hydrides
 # ---------------------------------------------------------------------------
 # The pnictogen (P/As/Sb/Bi) analogue of the polyazane family (N -> polyazane):
 # an unbranched chain of >=2 IDENTICAL Group-15 atoms, fully H-saturated,
-# neutral, acyclic, standard valence -> <multiplier><stem> (P-21.2.2, no elision
+# neutral, acyclic, standard valence -> <multiplier><stem>, no elision
 # of the multiplier vowel):
-#     PP -> diphosphane (BB 39081; not 'diphosphine')
-#     AsAsAsAsAs -> pentaarsane (BB 39083)   H2Bi-BiH2 -> dibismuthane (BB 39278)
+# PP -> diphosphane (BB 39081; not 'diphosphine')
+# AsAsAsAsAs -> pentaarsane (BB 39083) H2Bi-BiH2 -> dibismuthane (BB 39278)
 # Mirrors polyazane's saturated homonuclear-chain logic. Nitrogen deliberately
-# routes to polyazane (higher functionality of amines, P-21.2.3.1); this family
+# routes to polyazane (higher functionality of amines,; this family
 # is P/As/Sb/Bi only.
 _PNICTOGEN_STEM = {'P': 'phosphane', 'As': 'arsane', 'Sb': 'stibane',
                    'Bi': 'bismuthane'}
 # Basic multiplying prefixes (Table 1.4). NO elision of the terminal vowel
-# (P-21.2.2): penta+arsane -> "pentaarsane".
+#: penta+arsane -> "pentaarsane".
 _PNICTOGEN_MULT = {2: 'di', 3: 'tri', 4: 'tetra', 5: 'penta', 6: 'hexa',
                    7: 'hepta', 8: 'octa'}
 
 
 def name_homonuclear_pnictogen_chain(mol) -> Optional[str]:
     """Return the PIN for a homonuclear Group-15 catenated parent hydride
-    (P-68.3.2.2), else ``None`` (fail-closed cascade-continuation).
+    , else ``None`` (fail-closed cascade-continuation).
 
     Scope (a pure graph classifier, NOT SMARTS): a single unbranched chain of
     >=2 IDENTICAL pnictogen atoms {P, As, Sb, Bi}, every one H-saturated, neutral,
@@ -229,24 +229,24 @@ def name_homonuclear_pnictogen_chain(mol) -> Optional[str]:
 
 
 # ---------------------------------------------------------------------------
-# P-68.4.2.1 / P-21.2.3.1 — pure-chalcogen a[ba]n parent hydrides (dithioxane)
+# / — pure-chalcogen a[ba]n parent hydrides (dithioxane)
 # ---------------------------------------------------------------------------
 # An unbranched chain of chalcogen atoms strictly ALTERNATING between two
 # distinct elements and TERMINATED at both ends by the element coming LATER in
 # the seniority order O > S > Se > Te (the JUNIOR terminal element)::
 #
-#     HS-O-SH        -> dithioxane          (2 terminal S junior, 1 central O senior)
-#     CH3-S-O-SH     -> methyldithioxane    (BB: not methylsulfane-OS-thioperoxol)
-#     CH3-S-O-S-CH3  -> dimethyldithioxane
+# HS-O-SH -> dithioxane (2 terminal S junior, 1 central O senior)
+# CH3-S-O-SH -> methyldithioxane (BB: not methylsulfane-OS-thioperoxol)
+# CH3-S-O-S-CH3 -> dimethyldithioxane
 #
-# Name (P-21.2.3.1) = <multiplier(# terminal atoms)> + 'a'-term of the JUNIOR
+# Name = <multiplier(# terminal atoms)> + 'a'-term of the JUNIOR
 # terminal element + 'a'-term of the SENIOR central element + 'ane' (with 'a'
 # elision before a vowel; the multiplier vowel is NOT elided). Terminal organyls
 # are cited as prefixes; the two terminal positions are equivalent by symmetry so
 # BB omits their locants (methyldithioxane / dimethyldithioxane / methyl(phenyl)-
 # dithioxane). These preselected parent hydrides receive the PIN and PRE-EMPT the
 # skeletal-replacement 'a'-name (CH3-S-O-S-CH3 is 'dimethyldithioxane', NOT the
-# valid-but-non-PIN '3-oxa-2,4-dithiapentane') per P-68.4.2.1.
+# valid-but-non-PIN '3-oxa-2,4-dithiapentane') per.
 _CHALCOGEN_ATERM = {'O': 'oxa', 'S': 'thia', 'Se': 'selena', 'Te': 'tellura'}
 # Seniority index (lower = senior) for the a[ba]n terminal/central choice.
 _CHALCOGEN_SENIORITY = {'O': 0, 'S': 1, 'Se': 2, 'Te': 3}
@@ -266,8 +266,8 @@ def _join_aterms(terms) -> str:
 
 
 def name_heterochalcogen_aba(mol) -> Optional[str]:
-    """Return the PIN for a pure-chalcogen a[ba]n parent hydride (P-68.4.2.1 /
-    P-21.2.3.1: dithioxane / methyldithioxane / dimethyldithioxane), else ``None``
+    """Return the PIN for a pure-chalcogen a[ba]n parent hydride /
+    : dithioxane / methyldithioxane / dimethyldithioxane), else ``None``
     (fail-closed cascade-continuation). Pure: no mol mutation.
 
     Scope (a graph classifier, NOT SMARTS): a single unbranched chain of >=3
@@ -367,26 +367,26 @@ def name_heterochalcogen_aba(mol) -> Optional[str]:
         return None
     base = _join_aterms([_CHALCOGEN_ATERM[terminal_elem],
                          _CHALCOGEN_ATERM[central_elem], 'ane'])
-    parent = f"{mult}{base}"                      # dithioxane / trithioxane ...
+    parent = f"{mult}{base}"                      # dithioxane / trithioxane...
     if not subs:
         return parent
 
     # Terminal organyls: no locants (the terminal positions are symmetric — BB
     # methyldithioxane / dimethyldithioxane / methyl(phenyl)dithioxane).
     #
-    # v29 P3: the organyl guard above is now the shared chokepoint, so a prefix
+    #: the organyl guard above is now the shared chokepoint, so a prefix
     # reaching here may carry LOCANTS ('propan-2-yl'), a retained italicized
     # prefix ('tert-butyl') or its own enclosing marks ('(4-bromophenyl)methyl').
-    # Raw `sorted()` + bare concatenation was correct only for the letters-only
+    # Raw `sorted` + bare concatenation was correct only for the letters-only
     # class the retired narrow walker could return, so ordering and marks are
     # delegated to the shared primitives — no local copy of either decision:
-    #   * P-14.5.2/P-14.5.4 `prefix_citation_sort_key` — alphanumerical citation
-    #     order, which ignores enclosing marks and the italicized prefix;
-    #   * BB 25719 `1,4-di(propan-2-yl)cyclohexane` (PIN) — a compound prefix is
-    #     enclosed and the SIMPLE multiplier sits OUTSIDE the marks;
-    #   * BB 16286 `*tert*-butyldi(methyl)phosphane` (PIN) + P-16.3.4 — a retained
-    #     italicized prefix is cited bare and keeps its hyphen under a multiplier
-    #     ('di-tert-butyl', never 'ditert-butyl').
+    # * / `prefix_citation_sort_key` — alphanumerical citation
+    # order, which ignores enclosing marks and the italicized prefix;
+    # * BB 25719 `1,4-di(propan-2-yl)cyclohexane` (PIN) — a compound prefix is
+    # enclosed and the SIMPLE multiplier sits OUTSIDE the marks;
+    # * BB 16286 `*tert*-butyldi(methyl)phosphane` (PIN) + — a retained
+    # italicized prefix is cited bare and keeps its hyphen under a multiplier
+    # ('di-tert-butyl', never 'ditert-butyl').
     from collections import Counter
 
     from ..assembly.naming_utils import (
@@ -403,13 +403,13 @@ def name_heterochalcogen_aba(mol) -> Optional[str]:
         if m is None:
             return None
         # Both mark rules are "enclose unless already enclosed", so ask the
-        # shared compound test (P-16.5.1.1) first and only force marks when it
-        # declined and P-16.5.1.3 still needs a separator.
+        # shared compound test first and only force marks when it
+        # declined and still needs a separator.
         marked = enclose_if_compound(nm)
         if len(uniq) >= 2 and i > 0 and marked == nm:
             marked = apply_enclosing_marks(nm, -1)
         if m and marked == nm and multiplier_needs_hyphen(nm):
-            token = f"{m}-{marked}"              # P-16.3.3(b)/P-16.2.4.1(d) di-tert-butyl
+            token = f"{m}-{marked}"              # (b)/(d) di-tert-butyl
         else:
             token = f"{m}{marked}"
         parts.append(token)

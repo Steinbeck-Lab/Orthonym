@@ -1,11 +1,11 @@
-"""Phase 147 Plan 02 Task 2: tests for get_polycyclic_iupac_locants wrapper.
+"""a phase Plan 02 Task 2: tests for get_polycyclic_iupac_locants wrapper.
 
 The wrapper reads ``POLYCYCLIC_DATA[name]['iupac_numbering']`` (string fusion
 locants like '4a' / '10b') and returns mol-atom-keyed dicts with peripheral
-ints + (int, str) tuple fusion locants per Phase 147 Decision D-01.
+ints + (int, str) tuple fusion locants per a phase Decision.
 
-Source: https://iupac.qmul.ac.uk/BlueBook/P2.html P-25 (PAH numbering FIXED)
-Source: Phase 147 CONTEXT D-01 (tuple encoding); CD-03 (function form).
+Source: https://iupac.qmul.ac.uk/BlueBook/P2.html (PAH numbering FIXED)
+Source: a phase internal notes (tuple encoding); (function form).
 """
 
 import pytest
@@ -36,8 +36,8 @@ def _expected_dict(mol, pah_name):
 def test_naphthalene_complete_coverage():
     """naphthalene: 10 keys (8 ints + 2 fusion tuples (4,'a') and (8,'a')).
 
-    Source: https://iupac.qmul.ac.uk/BlueBook/P2.html P-25
-    Source: Phase 147 D-01 tuple encoding.
+    Source: https://iupac.qmul.ac.uk/BlueBook/P2.html
+    Source: a phase tuple encoding.
     """
     from orthonym.rules.polycyclics import get_polycyclic_iupac_locants
     mol = Chem.MolFromSmiles('c1ccc2ccccc2c1')
@@ -56,8 +56,8 @@ def test_naphthalene_complete_coverage():
 def test_anthracene_four_fusion_atoms():
     """anthracene: 14 keys (10 ints + 4 fusion tuples).
 
-    Source: https://iupac.qmul.ac.uk/BlueBook/P2.html P-25
-    Source: Phase 147 D-01.
+    Source: https://iupac.qmul.ac.uk/BlueBook/P2.html
+    Source: a phase.
     """
     from orthonym.rules.polycyclics import get_polycyclic_iupac_locants
     mol = Chem.MolFromSmiles('c1ccc2cc3ccccc3cc2c1')
@@ -74,8 +74,8 @@ def test_phenanthrene_4b_locant():
     """phenanthrene: 14 keys; fusion set includes (4,'a'), (4,'b'),
     (8,'a'), (10,'a').
 
-    Source: https://iupac.qmul.ac.uk/BlueBook/P2.html P-25
-    Source: Phase 147 D-01.
+    Source: https://iupac.qmul.ac.uk/BlueBook/P2.html
+    Source: a phase.
     """
     from orthonym.rules.polycyclics import get_polycyclic_iupac_locants
     mol = Chem.MolFromSmiles('c1ccc2ccc3ccccc3c2c1')
@@ -94,14 +94,14 @@ def test_pyrene_six_fusion_atoms_and_10b_two_digit():
 
     Critical: '10b' MUST parse to (10, 'b'), NOT (1, '0b').
 
-    v23 IH-01 (2026-06-22): the stored pyrene ``iupac_numbering`` was corrected
+      (2026-06-22): the stored pyrene ``iupac_numbering`` was corrected
     to the OPSIN-authoritative numbering (``pyrene -o extendedsmi``). The prior
     fusion set wrongly contained ``(3,'b')`` and omitted ``(10,'c')`` — pyrene's
     peri carbons are 10a/10b/10c, there is no 3b. This test had pinned the
     invalid numbering.
 
-    Source: https://iupac.qmul.ac.uk/BlueBook/P2.html P-25
-    Source: Phase 147 D-01; v23 IH-01 numbering correction.
+    Source: https://iupac.qmul.ac.uk/BlueBook/P2.html
+    Source: a phase; numbering correction.
     """
     from orthonym.rules.polycyclics import get_polycyclic_iupac_locants
     mol = Chem.MolFromSmiles('c1cc2ccc3cccc4ccc(c1)c2c34')
@@ -119,8 +119,8 @@ def test_pyrene_six_fusion_atoms_and_10b_two_digit():
 def test_unknown_name_returns_none():
     """Unknown PAH name returns None — wrapper does not raise.
 
-    Source: https://iupac.qmul.ac.uk/BlueBook/P2.html P-25
-    Source: Phase 147 D-01.
+    Source: https://iupac.qmul.ac.uk/BlueBook/P2.html
+    Source: a phase.
     """
     from orthonym.rules.polycyclics import get_polycyclic_iupac_locants
     mol = Chem.MolFromSmiles('c1ccc2ccccc2c1')
@@ -128,11 +128,11 @@ def test_unknown_name_returns_none():
 
 
 def test_fluorene_numbered_via_engine_fixed():
-    """v23 13B(a) S2b: fluorene (empty stored iupac_numbering) is now derived by
+    """ 13B(a) S2b: fluorene (empty stored iupac_numbering) is now derived by
     the mixed-ring fusion engine via its special-numbering fixed map (CH2 at 9).
-    Was a fail-closed None pre-S2b (Phase 151 audit).
+    Was a fail-closed None pre-S2b (a phase audit).
 
-    Source: IUPAC P-25.1.1 retained PAH special numbering; rules/fusion_numbering.
+    Source: IUPAC retained PAH special numbering; rules/fusion_numbering.
     """
     from orthonym.rules.polycyclics import get_polycyclic_iupac_locants
     mol = Chem.MolFromSmiles('c1ccc2c(c1)Cc1ccccc1-2')
@@ -156,8 +156,8 @@ def test_two_digit_base_locant_parses_correctly():
     """Defensive: pyrene's (10, 'b') must parse from '10b' as
     (10, 'b'), NOT (1, '0b'). Anchored regex ^(\\d+)([a-z]*)$ guards this.
 
-    Source: https://iupac.qmul.ac.uk/BlueBook/P2.html P-25
-    Source: Phase 147 D-01 (tuple encoding rejects float-style ambiguity).
+    Source: https://iupac.qmul.ac.uk/BlueBook/P2.html
+    Source: a phase (tuple encoding rejects float-style ambiguity).
     """
     from orthonym.rules.polycyclics import get_polycyclic_iupac_locants
     mol = Chem.MolFromSmiles('c1cc2ccc3cccc4ccc(c1)c2c34')
@@ -177,8 +177,8 @@ def test_non_canonical_smiles_input_aligns_via_substructure_match():
     """Non-canonical input SMILES must still map fusion locants to the
     correct mol atoms via GetSubstructMatch alignment.
 
-    Source: https://iupac.qmul.ac.uk/BlueBook/P2.html P-25
-    Source: Phase 147 CONTEXT D-01 (mol indices via substructure match).
+    Source: https://iupac.qmul.ac.uk/BlueBook/P2.html
+    Source: a phase internal notes (mol indices via substructure match).
     """
     from orthonym.rules.polycyclics import get_polycyclic_iupac_locants
     # Use a deliberately non-canonical SMILES (atom order randomised)

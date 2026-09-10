@@ -208,9 +208,9 @@ def test_thread_local_store_clear():
     clear_confidence()
     result = retrieve_confidence()
     assert result['name'] == ''
-    # v29 C4: was `== 0.0`. An empty store measured NOTHING, so it now reports
+    # C4: was `== 0.0`. An empty store measured NOTHING, so it now reports
     # confidence=None / verification='unverified' rather than 0.0 -- which was
-    # a fabricated FAIL, just as the old name_with_confidence() 1.0 was a
+    # a fabricated FAIL, just as the old name_with_confidence 1.0 was a
     # fabricated PASS. The project invariant admits no verdict either way on
     # insufficient evidence. Contract locked by
     # tests/unit/test_coverage_contract.py.
@@ -270,18 +270,18 @@ def test_log_confidence_levels(caplog):
 
 
 # ---------------------------------------------------------------------------
-# Phase 145.1: parent_atom_indices field extension (SC-1)
+# a phase: parent_atom_indices field extension
 # ---------------------------------------------------------------------------
 
 def test_candidate_name_has_parent_atom_indices_field():
-    """Phase 145.1: CandidateName dataclass exposes parent_atom_indices."""
+    """a phase: CandidateName dataclass exposes parent_atom_indices."""
     c = CandidateName(name="ethanol", handler="chain")
     assert hasattr(c, "parent_atom_indices")
     assert c.parent_atom_indices is None
 
 
 def test_candidate_name_parent_atom_indices_accepts_set():
-    """Phase 145.1: parent_atom_indices stores a set of atom indices."""
+    """a phase: parent_atom_indices stores a set of atom indices."""
     c = CandidateName(
         name="ethanol", handler="chain",
         parent_atom_indices={0, 1, 2},
@@ -290,7 +290,7 @@ def test_candidate_name_parent_atom_indices_accepts_set():
 
 
 def test_candidate_name_default_factory_unchanged():
-    """Phase 145.1 regression: factors default_factory still works."""
+    """a phase regression: factors default_factory still works."""
     c = CandidateName(name="x", handler="h")
     assert c.factors == {}
     # Mutating one instance must not affect another
@@ -300,11 +300,11 @@ def test_candidate_name_default_factory_unchanged():
 
 
 # ---------------------------------------------------------------------------
-# Phase 145.1: FACTOR_WEIGHTS extension + byte-identical proof (SC-3, D-14)
+# a phase: FACTOR_WEIGHTS extension + byte-identical proof (,)
 # ---------------------------------------------------------------------------
 
 def test_factor_weights_includes_parent_correctness():
-    """SC-3: FACTOR_WEIGHTS contains parent_correctness key with value 0.0."""
+    """: FACTOR_WEIGHTS contains parent_correctness key with value 0.0."""
     from orthonym.assembly.coverage_scoring import FACTOR_WEIGHTS
     assert 'parent_correctness' in FACTOR_WEIGHTS
     assert FACTOR_WEIGHTS['parent_correctness'] == 0.0
@@ -322,7 +322,7 @@ def test_factor_weights_parent_correctness_is_last_key():
 
 
 def test_factor_weights_total_5_keys():
-    """SC-3: FACTOR_WEIGHTS has exactly 5 keys after extension."""
+    """: FACTOR_WEIGHTS has exactly 5 keys after extension."""
     from orthonym.assembly.coverage_scoring import FACTOR_WEIGHTS
     assert len(FACTOR_WEIGHTS) == 5
 
@@ -337,31 +337,31 @@ def test_factor_weights_existing_keys_unchanged():
 
 
 def test_factor_weights_existing_values_unchanged():
-    """Risk 2: non-demoted factor weights preserved at Phase 145.1 calibration.
+    """Risk 2: non-demoted factor weights preserved at a phase calibration.
 
-    Phase 145.2 D-09-a.1 update: the 'ratio' factor is demoted to 0.0 because
+    a phase -a.1 update: the 'ratio' factor is demoted to 0.0 because
     it has zero IUPAC Blue Book justification (name-length/HA is a heuristic,
     not a naming rule). Byte-identical preserved via position-based
-    pool.best() selection. The other three weights remain at their Phase 81
-    calibration values until Phase 146 SC-4 recalibrates.
+    pool.best selection. The other three weights remain at their a phase
+    calibration values until a phase recalibrates.
     """
     from orthonym.assembly.coverage_scoring import FACTOR_WEIGHTS
-    assert FACTOR_WEIGHTS['ratio'] == 0.0  # Phase 145.2 D-09-a.1 demotion
+    assert FACTOR_WEIGHTS['ratio'] == 0.0  # a phase -a.1 demotion
     assert FACTOR_WEIGHTS['atom_coverage'] == 0.20
     assert FACTOR_WEIGHTS['fg_recognition'] == 0.35
     assert FACTOR_WEIGHTS['substituent_completeness'] == 0.25
 
 
 def test_byte_identical_confidence_with_zero_weight_factor():
-    """D-14 BYTE-IDENTICAL PROOF: adding parent_correctness=0.0 does NOT
+    """ BYTE-IDENTICAL PROOF: adding parent_correctness=0.0 does NOT
     change compute_confidence's output value.
 
-    Phase 145.2 D-09-a.1 update: 'ratio' is ALSO demoted to 0.0 as a
+    a phase -a.1 update: 'ratio' is ALSO demoted to 0.0 as a
     separate invariant (zero IUPAC justification). The 4-key "control"
     dict used in this test must mirror the live FACTOR_WEIGHTS values
     (sans the 5th parent_correctness key) so that the test remains a
-    clean proof of D-14's "last-position 0.0 key insertion is a no-op"
-    claim. If ratio's live value changes in a future phase (Phase 146
+    clean proof of 's "last-position 0.0 key insertion is a no-op"
+    claim. If ratio's live value changes in a future phase (a phase
     recalibration), update the control dict to match.
 
     Strategy: compute confidence via the live FACTOR_WEIGHTS (5 keys);
@@ -382,11 +382,11 @@ def test_byte_identical_confidence_with_zero_weight_factor():
     confidence_5key = cand_5key.confidence
 
     # Save and patch to a 4-key dict (omits parent_correctness).
-    # Phase 145.2 D-09-a.1: 'ratio' mirrors its demoted value (0.0) so
-    # this test isolates the D-14 "5th-key-as-no-op" invariant.
+    # a phase -a.1: 'ratio' mirrors its demoted value (0.0) so
+    # this test isolates the "5th-key-as-no-op" invariant.
     original = cs.FACTOR_WEIGHTS
     cs.FACTOR_WEIGHTS = {
-        'ratio': 0.0,   # Phase 145.2 D-09-a.1 demotion
+        'ratio': 0.0,   # a phase -a.1 demotion
         'atom_coverage': 0.20,
         'fg_recognition': 0.35,
         'substituent_completeness': 0.25,
@@ -405,7 +405,7 @@ def test_byte_identical_confidence_with_zero_weight_factor():
 
 
 def test_handler_priority_extended_with_iss002_entries():
-    """ISS-002 REGRESSION: HANDLER_PRIORITY contains the entries Plan 01's
+    """ REGRESSION: HANDLER_PRIORITY contains the entries Plan 01's
     HANDLER_POLICIES needs. Single source of truth -- no hardcoded literals
     in candidate_pool.py."""
     from orthonym.assembly.coverage_scoring import HANDLER_PRIORITY

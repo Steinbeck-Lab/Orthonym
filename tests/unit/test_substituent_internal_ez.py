@@ -1,5 +1,5 @@
 """
-Tests for E/Z stereodescriptor collection in collect_stereodescriptors().
+Tests for E/Z stereodescriptor collection in collect_stereodescriptors.
 
 Verifies that:
 1. Chain-internal E/Z bonds (both atoms in atom_to_locant) emit descriptors.
@@ -8,7 +8,7 @@ Verifies that:
 4. Multiple chain E/Z bonds all emit correctly.
 5. C=O bonds never produce false E/Z descriptors.
 
-IUPAC P-93.5.1.3: E/Z descriptors are assigned to all double bonds in
+IUPAC: E/Z descriptors are assigned to all double bonds in
 the principal chain or ring that have defined geometry.
 """
 

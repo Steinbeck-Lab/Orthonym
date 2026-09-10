@@ -1,10 +1,10 @@
-"""Phase 160 partial_sat handler — Tier B shim (gate 0.40).
+"""a phase partial_sat handler — Tier B shim (gate 0.40).
 
 Verbatim move of composer.py:1116-1131 dispatch logic. Wraps the inline
 ``_try_partially_saturated_carbocycle(features.mol)`` check + enrichment +
 pool.add gate.
 
-Per CONTEXT D-24 incremental migration: the underlying
+Per internal notes incremental migration: the underlying
 ``_try_partially_saturated_carbocycle`` body STAYS in composer.py during
 Plan-02 and moves to this module in Plan-03 commit 03-10.
 
@@ -14,13 +14,13 @@ the predicate here uses ``not _is_complex_ring_system`` for the fast-path.
 The fallback for complex-ring-rejection cases lives in the inline
 partial_sat block at composer.py:1112+ (unchanged in Plan-02).
 
-IUPAC cite: P-25.3 (partially saturated carbocycles; tetrahydronaphthalene).
+IUPAC cite: (partially saturated carbocycles; tetrahydronaphthalene).
 
 References:
 - composer.py:1116-1131 (inline partial_sat branch; TRIMMED at this commit).
 - composer.py:_try_partially_saturated_carbocycle (STAYS until 03-10).
 - composer.py:_enrich_handler_name (STAYS until 03-10).
-- 160-AUDIT-DECOMP.md § 1 row 'partial_sat' + § 2.27 purity proof.
+- internal notes-DECOMP.md row 'partial_sat' + purity proof.
 """
 from __future__ import annotations
 
@@ -32,10 +32,10 @@ from ..name_tree import NameTreeNode, NamingResult
 def _is_partial_sat(features: Any) -> bool:
     """Predicate: is_cyclic AND not chain_is_parent AND not complex ring system.
 
-    WR-02: the ``_is_complex_ring_system`` SMARTS check is memoized on the
+    : the ``_is_complex_ring_system`` SMARTS check is memoized on the
     features object via ``cached_is_complex_ring_system`` so partial_sat,
     polycyclic, and ring_ester predicates share one evaluation per dispatch
-    instead of three. CONTEXT D-25 predicate purity is preserved — the cache
+    instead of three. internal notes predicate purity is preserved — the cache
     is per-features-instance state owned by features itself.
     """
     from rdkit import Chem
@@ -52,8 +52,8 @@ def _is_partial_sat(features: Any) -> bool:
     # A ring ketone (ring C=O) makes this a cyclic-oxo compound, not a bare
     # partially-saturated carbocycle — _try_partially_saturated_carbocycle would
     # DROP the C=O (2,3-dihydronaphthalene-1,4-dione -> 2,3-dihydronaphthalene,
-    # a wrong structure suppressed by SELF-01). Decline so tier_a_ring@4500
-    # (name_cyclic_oxo_compound) names it correctly (P-58.2.5 / P-58.2.3.1.2).
+    # a wrong structure suppressed by). Decline so tier_a_ring
+    # (name_cyclic_oxo_compound) names it correctly /.
     for atom in mol.GetAtoms():
         if atom.GetSymbol() == 'C' and atom.IsInRing():
             for b in atom.GetBonds():
@@ -63,7 +63,7 @@ def _is_partial_sat(features: Any) -> bool:
                         and not o.IsInRing()):
                     return False
     if cached_is_complex_ring_system(features):
-        # WSD-02 (RING-04): an ortho-fused tetralin is ALWAYS "complex", which
+        # -02 : an ortho-fused tetralin is ALWAYS "complex", which
         # used to veto the (correct) partially-saturated-carbocycle namer and let
         # the generic path re-emit the saturated bridge as a phantom alkyl
         # (`4-butyl-1,2,3,4-tetrahydronaphthalene`). Lift the veto ONLY for the
@@ -85,7 +85,7 @@ def _is_partial_sat(features: Any) -> bool:
             and mol.GetAtomWithIdx(i).GetSymbol() == 'C'
             for i in ring_atom_idxs
         )
-        # WSD-02 (code-review HI-01): restrict to the 2-ring tetralin topology the
+        # -02 (code-review): restrict to the 2-ring tetralin topology the
         # partial-saturation namer numbers correctly. A 3+-ring acene (e.g.
         # 9,10-dihydroanthracene) gets a WRONG hydro-locant from this path
         # (`1,2-dihydroanthracene`), a confidently-wrong-different-molecule name —
@@ -114,23 +114,23 @@ def name_partial_sat(
 
     # Inherit BOTH halves of the producer's answer:
     #
-    #  * its numbering -- the parent name, its hydro locants and any
-    #    principal-characteristic-group suffix were all spelled from THIS map,
-    #    so enrichment must place its substituent prefixes on the same one or it
-    #    spells a different molecule (`1-methyl-` for a 2-substituted tetralin);
-    #  * what it already spelled -- this producer names AROMATIC-ring
-    #    substituents itself and leaves only the sp3-ring ones to enrichment,
-    #    so re-citing them yields `6-methyl-6-methyl-...`.
+    # * its numbering -- the parent name, its hydro locants and any
+    # principal-characteristic-group suffix were all spelled from THIS map,
+    # so enrichment must place its substituent prefixes on the same one or it
+    # spells a different molecule (`1-methyl-` for a 2-substituted tetralin);
+    # * what it already spelled -- this producer names AROMATIC-ring
+    # substituents itself and leaves only the sp3-ring ones to enrichment,
+    # so re-citing them yields `6-methyl-6-methyl-...`.
     #
-    # Both were suppressed by SELF-01 rather than shipped, i.e. each cost a
-    # correct name. P-58.2.5 / P-15.1.5.3.
+    # Both were suppressed by rather than shipped, i.e. each cost a
+    # correct name. /.
     partial_sat_name = _enrich_handler_name(
         features, partial_sat_name, "partial_sat",
         atom_to_locant=atom_to_locant or None,
         already_spelled_atoms=produced.spelled_offring_atoms or None,
     )
 
-    # Phase 145.1: route through pool.add() — Tier B gate-fall-through.
+    # a phase: route through pool.add — Tier B gate-fall-through.
     pool = get_current_pool()
     cand = pool.add(partial_sat_name, "partial_sat", features)
     if cand is None:

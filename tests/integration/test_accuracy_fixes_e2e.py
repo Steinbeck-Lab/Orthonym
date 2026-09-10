@@ -1,12 +1,12 @@
 """
-End-to-end tests for Phase 14.5 accuracy bug fixes.
+End-to-end tests for a phase accuracy bug fixes.
 
 Tests validate fixes for:
-- BUG-1: Aromatic substituent detection (phenyl -> hexyl)
-- BUG-2: Bicyclo substituent and unsaturation naming
-- BUG-3: Fused ring partial saturation (tetrahydronaphthalene)
-- BUG-4: Heterocycle-as-substituent naming (partially addressed)
-- BUG-5: N-substituent stereochemistry
+-: Aromatic substituent detection (phenyl -> hexyl)
+-: Bicyclo substituent and unsaturation naming
+-: Fused ring partial saturation (tetrahydronaphthalene)
+-: Heterocycle-as-substituent naming (partially addressed)
+-: N-substituent stereochemistry
 
 These tests ensure all accuracy fixes work together without regression
 and cover the compound classes identified in GAP_ANALYSIS.md.
@@ -16,7 +16,7 @@ from orthonym.namer import name_compound
 
 
 class TestBug1AromaticSubstituents:
-    """BUG-1: Aromatic rings should not be named as alkyl chains."""
+    """: Aromatic rings should not be named as alkyl chains."""
 
     def test_phenylacetic_acid(self):
         """Phenylacetic acid: phenyl not hexyl."""
@@ -64,7 +64,7 @@ class TestBug1AromaticSubstituents:
 
 
 class TestBug2BicycloComplete:
-    """BUG-2: Bicyclo systems should include substituents and unsaturation."""
+    """: Bicyclo systems should include substituents and unsaturation."""
 
     def test_methylnorbornane(self):
         """Methylnorbornane should have methyl prefix."""
@@ -111,7 +111,7 @@ class TestBug2BicycloComplete:
 
 
 class TestBug3FusedPartialSaturation:
-    """BUG-3: Partially saturated fused rings should name correctly."""
+    """: Partially saturated fused rings should name correctly."""
 
     def test_tetrahydronaphthalene(self):
         """Tetrahydronaphthalene (tetralin)."""
@@ -151,7 +151,7 @@ class TestBug3FusedPartialSaturation:
 
 
 class TestBug4HeterocycleSubstituent:
-    """BUG-4: Heterocycles as substituents should not be alkyl chains."""
+    """: Heterocycles as substituents should not be alkyl chains."""
 
     def test_piperidinyl_pyridine(self):
         """Piperidinyl substituent on pyridine - now works."""
@@ -181,7 +181,7 @@ class TestBug4HeterocycleSubstituent:
 
 
 class TestBug5HeterocycleStereo:
-    """BUG-5: N-substituted heterocycles should include stereochemistry."""
+    """: N-substituted heterocycles should include stereochemistry."""
 
     def test_methylpropylpiperidine_stereo(self):
         """(2S)-1-methyl-2-propylpiperidine from GAP_ANALYSIS."""

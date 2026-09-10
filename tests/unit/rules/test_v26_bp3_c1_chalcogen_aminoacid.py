@@ -1,11 +1,11 @@
-"""v26 BP-3 cluster C1: seleno/telluro-ether amino acids must bail to the
+""" cluster C1: seleno/telluro-ether amino acids must bail to the
 polyfunctional pipeline (not the carbon-count amino-acid namer).
 
-Root cause (blueprint BP-3 C1): the amino-acid systematic namer counts backbone
+Root cause (blueprint C1): the amino-acid systematic namer counts backbone
 carbons; for a -Se-/-Te- ether it walked through the chalcogen and DROPPED it
-(C[Se]CC(N)C(=O)O -> '2-aminobutanoic acid', a different molecule). BB P-63.1.5:
+(C[Se]CC(N)C(=O)O -> '2-aminobutanoic acid', a different molecule). BB:
 the chalcogen ether is a (methylselanyl)/(methyltellanyl) substituent prefix. Fix
-adds the Se/Te ether SMARTS to the amino-acid bail-out list (mirroring the v23
+adds the Se/Te ether SMARTS to the amino-acid bail-out list (mirroring the
 thioether entry) so the polyfunctional pipeline names it correctly.
 """
 import pytest

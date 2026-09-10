@@ -1,23 +1,23 @@
-"""Phase 158 unit tests for ``orthonym.routing.dispatcher`` (ClassFirstRouter).
+"""a phase unit tests for ``orthonym.routing.dispatcher`` (ClassFirstRouter).
 
-Per CONTEXT D-17 LOCKED test pyramid floor: ≥ 30 dispatcher behavior tests.
-Per CONTEXT D-08 + audit § 4: env-var-gated audit log; default-OFF for
-CFR-04 stdout-byte-identical preservation.
-Per CONTEXT D-16 + AP-6: per-instance dispatch_stats counter; no module-global state.
-Per CONTEXT D-26 + RL-5: dispatch determinism + mol non-mutation invariant.
-Per CONTEXT D-29 + AP-17: NO ``@pytest.mark.xfail`` markers.
+Per internal notes LOCKED test pyramid floor: ≥ 30 dispatcher behavior tests.
+Per internal notes + the audit: env-var-gated audit log; default-OFF for
+ stdout-byte-identical preservation.
+Per internal notes +: per-instance dispatch_stats counter; no module-global state.
+Per internal notes +: dispatch determinism + mol non-mutation invariant.
+Per internal notes +: NO ``@pytest.mark.xfail`` markers.
 
 Test classes per concern:
 
-- ``TestRouterConstruction`` — ClassFirstRouter() default + env-var gating + override.
+- ``TestRouterConstruction`` — ClassFirstRouter default + env-var gating + override.
 - ``TestPerStoutClassDispatch`` — parametrized over (smiles, expected_name)
   representatives mined from the live canary corpus: every StoutClass dispatches
   for its representative SMILES.
-- ``TestDispatchPurity`` — D-26 + RL-5 invariants: determinism, no mol mutation,
+- ``TestDispatchPurity`` — + invariants: determinism, no mol mutation,
   per-instance state isolation, defensive raise on impossible-state.
-- ``TestStatsCounter`` — D-16 + AP-6 telemetry counter contract.
+- ``TestStatsCounter`` — + telemetry counter contract.
 - ``TestEdgeCases`` — empty/single-atom/dot-disconnected SMILES.
-- ``TestAuditLogGating`` — D-08 env-var-gated INFO log; CFR-04-preserving
+- ``TestAuditLogGating`` — env-var-gated INFO log; -preserving
   default-OFF behavior.
 
 The Class 2 parametrize over ~ 19 STOUTCLASS_REPRESENTATIVES + ~ 16 explicit
@@ -41,7 +41,7 @@ from orthonym.routing.dispatcher import (
 
 
 # ---------------------------------------------------------------------------
-# Representatives mined from the live canary corpus (audit § 1 column
+# Representatives mined from the live canary corpus (the audit column
 # byte_identical_canary_fixture_id, cross-referenced against
 # tests/canary/canary_pre_cfr_158.csv via Plan-03 development bench).
 #
@@ -66,29 +66,29 @@ STOUTCLASS_REPRESENTATIVES: "OrderedDict[StoutClass, tuple]" = OrderedDict(
             "C[C@]12CC[C@H]3[C@@H](CCC4=CC(=O)CC[C@@]34C)[C@@H]1CC[C@@H]2O",
             "(8R,9S,10S,13S,14S,17S)-17-hydroxyandrost-4-en-3-one",
         )),
-        # v38: peptide PIN is the SUBSTITUTIVE form (V38-PEPTIDE-PIN-VERDICT.md); RT verified.
+        #: peptide PIN is the SUBSTITUTIVE form (V38-PEPTIDE-PIN-VERDICT.md); RT verified.
         (StoutClass.PEPTIDE,                 ("NCC(=O)NCC(=O)O",        "(2-aminoacetamido)acetic acid")),
         (StoutClass.RETAINED_NAME,           ("CCO",                    "ethanol")),
-        (StoutClass.AMINO_ACID,              ("C[C@H](N)C(=O)O",        "alanine")),  # WSD-07: retained PIN (was systematic '(2S)-2-aminopropanoic acid')
-        # R4/P-63.2.4: COCCOC now routes substitutive ('1,2-dimethoxyethane'); use
+        (StoutClass.AMINO_ACID,              ("C[C@H](N)C(=O)O",        "alanine")),  # -07: retained PIN (was systematic '(2S)-2-aminopropanoic acid')
+        # R4/: COCCOC now routes substitutive ('1,2-dimethoxyethane'); use
         # a 3-O chain (>= 3 O keeps skeletal) as the SKELETAL_REPLACEMENT representative.
         (StoutClass.SKELETAL_REPLACEMENT,    ("COCCOCCOC",              "2,5,8-trioxanonane")),
-        # Wave2 T6c fail-closed (P-26): the CYCLOPHANE entry still matches and
+        # Wave2 fail-closed: the CYCLOPHANE entry still matches and
         # dispatches, but production REFUSES the composed bracket-prefix name
         # ('[3.3]orthocyclophane' — no phane form is OPSIN-parseable) via the
         # G0 UNSUPPORTED_RING_SYSTEM signal.
         (StoutClass.CYCLOPHANE,              ("C1CCc2ccccc2CCCc2ccccc21",
                                               "unknown organic compound")),
-        # v29 Task J2: the acyl word was 'palmitate'. Corrected to the PIN --
-        # P-65.1.1.1 (BlueBookV2.md:29715) retains only formic/oxalic/acetic/
-        # benzoic/oxamic as PINs, and P-65.1.2 (:29860) sends the rest to
-        # general nomenclature; :29787 prints '(PIN)' on 'hexadecanoic acid'.
+        #: the acyl word was 'palmitate'. Corrected to the PIN --
+        # (the Blue Book) retains only formic/oxalic/acetic/
+        # benzoic/oxamic as PINs, and (:29860) sends the rest to
+        # general nomenclature;:29787 prints '(PIN)' on 'hexadecanoic acid'.
         # The row exists to pin DISPATCH, so the spelling is incidental to it.
         (StoutClass.DECOMPOSITION_PRE_GENERAL,
                                               ("CCCCCCCCCCCCCCCC(=O)OCCC",
                                               "propyl hexadecanoate")),
         # GENERAL: a SMILES whose final dispatch class (after cascade fall-through)
-        # is GENERAL.  Heptan-1-ol is not in retained names and falls through
+        # is GENERAL. Heptan-1-ol is not in retained names and falls through
         # to the GENERAL pipeline after DECOMPOSITION_PRE_GENERAL declines.
         (StoutClass.GENERAL,                 ("CCCCCCCO",               "heptan-1-ol")),
     ]
@@ -101,22 +101,22 @@ STOUTCLASS_REPRESENTATIVES: "OrderedDict[StoutClass, tuple]" = OrderedDict(
 
 
 class TestRouterConstruction:
-    """CONTEXT D-03 + D-08: ClassFirstRouter() construction + env-var defaults."""
+    """internal notes +: ClassFirstRouter construction + env-var defaults."""
 
     def test_default_construction_no_audit_log(self, monkeypatch):
-        """CONTEXT D-08: default-OFF audit log preserves CFR-04 stdout-byte-identical."""
+        """internal notes: default-OFF audit log preserves stdout-byte-identical."""
         monkeypatch.delenv(ORTHONYM_DISPATCH_AUDIT_ENV_VAR, raising=False)
         r = ClassFirstRouter()
         assert r._audit_log is False
 
     def test_audit_log_kwarg_overrides_env_var(self, monkeypatch):
-        """CONTEXT D-08: explicit ``_audit_log`` kwarg overrides env var (for tests)."""
+        """internal notes: explicit ``_audit_log`` kwarg overrides env var (for tests)."""
         monkeypatch.setenv(ORTHONYM_DISPATCH_AUDIT_ENV_VAR, "1")
         r = ClassFirstRouter(_audit_log=False)
         assert r._audit_log is False
 
     def test_env_var_set_enables_audit_log(self, monkeypatch):
-        """CONTEXT D-08: ``ORTHONYM_DISPATCH_AUDIT=1`` enables INFO logging by default."""
+        """internal notes: ``ORTHONYM_DISPATCH_AUDIT=1`` enables INFO logging by default."""
         monkeypatch.setenv(ORTHONYM_DISPATCH_AUDIT_ENV_VAR, "1")
         r = ClassFirstRouter()
         assert r._audit_log is True
@@ -128,7 +128,7 @@ class TestRouterConstruction:
 
 
 class TestPerStoutClassDispatch:
-    """CONTEXT D-17: each StoutClass produces its byte-identical name + dispatches to
+    """internal notes: each StoutClass produces its byte-identical name + dispatches to
     the expected entry (verified via the per-instance dispatch_stats counter)."""
 
     @pytest.mark.parametrize(
@@ -137,10 +137,10 @@ class TestPerStoutClassDispatch:
         ids=[c.name for c in STOUTCLASS_REPRESENTATIVES.keys()],
     )
     def test_per_stoutclass_dispatch(self, class_id, smiles, expected_name):
-        """158-AUDIT-CFR.md § 1: each StoutClass dispatches for its representative SMILES.
+        """internal notes-CFR.md: each StoutClass dispatches for its representative SMILES.
 
         The byte-identical contract is on NAME OUTPUT only; the dispatch_stats
-        counter confirms the routing decision (audit § 1 column traceability).
+        counter confirms the routing decision (the audit column traceability).
         """
         namer = Orthonym(style="pin")
         name = namer.name(smiles)
@@ -175,7 +175,7 @@ class TestDispatchPurity:
         assert result1.class_id == result2.class_id
 
     def test_dispatch_does_not_mutate_mol(self):
-        """RL-5 concrete check: dispatch must not mutate input mol properties."""
+        """ concrete check: dispatch must not mutate input mol properties."""
         router = ClassFirstRouter()
         mol = Chem.MolFromSmiles("CC(=O)O")
         before_props = mol.GetPropsAsDict()
@@ -201,7 +201,7 @@ class TestDispatchPurity:
         assert sum(r1.get_dispatch_stats().values()) == 1
 
     def test_dispatch_raises_on_general_unreachable(self, monkeypatch):
-        """D-29 defensive raise: if DISPATCH_TABLE has no matching entry, raise.
+        """ defensive raise: if DISPATCH_TABLE has no matching entry, raise.
 
         This is unreachable by construction in production (GENERAL's
         ``lambda *_: True`` always matches), but the defensive raise is part of
@@ -209,7 +209,7 @@ class TestDispatchPurity:
 
         We mutate the dispatcher's view of the table via monkeypatch on the
         ``DISPATCH_TABLE`` symbol re-exported in ``dispatcher`` module; only
-        the dispatcher's iteration is affected.  No table fields are mutated.
+        the dispatcher's iteration is affected. No table fields are mutated.
         """
         # Build a replacement table that omits all entries — dispatch must raise.
         empty = OrderedDict()
@@ -227,10 +227,10 @@ class TestDispatchPurity:
 
 
 class TestStatsCounter:
-    """CONTEXT D-16 + AP-6: per-instance dispatch_stats Counter contract."""
+    """internal notes +: per-instance dispatch_stats Counter contract."""
 
     def test_stats_increment_on_dispatch(self):
-        """D-16: each dispatch call increments the matching class's counter."""
+        """: each dispatch call increments the matching class's counter."""
         router = ClassFirstRouter()
         mol = Chem.MolFromSmiles("CCO")
         for _ in range(5):
@@ -239,7 +239,7 @@ class TestStatsCounter:
         assert sum(stats.values()) == 5
 
     def test_reset_zeroes_stats(self):
-        """D-16: ``reset_dispatch_stats()`` clears all counters."""
+        """: ``reset_dispatch_stats`` clears all counters."""
         router = ClassFirstRouter()
         mol = Chem.MolFromSmiles("CCO")
         router.dispatch(mol, "CCO", "CCO", None, _style="pin")
@@ -248,7 +248,7 @@ class TestStatsCounter:
         assert router.get_dispatch_stats() == {}
 
     def test_stats_defensive_copy(self):
-        """D-16: ``get_dispatch_stats()`` returns a defensive copy (no leak)."""
+        """: ``get_dispatch_stats`` returns a defensive copy (no leak)."""
         router = ClassFirstRouter()
         mol = Chem.MolFromSmiles("CCO")
         router.dispatch(mol, "CCO", "CCO", None, _style="pin")
@@ -261,7 +261,7 @@ class TestStatsCounter:
         )
 
     def test_stat_keys_match_stoutclass(self):
-        """D-16: STAT_KEYS class constant enumerates StoutClass member values."""
+        """: STAT_KEYS class constant enumerates StoutClass member values."""
         assert set(ClassFirstRouter.STAT_KEYS) == {c.value for c in StoutClass}
 
 
@@ -271,26 +271,26 @@ class TestStatsCounter:
 
 
 class TestEdgeCases:
-    """v18 behavior preservation on edge-case SMILES."""
+    """ behavior preservation on edge-case SMILES."""
 
     def test_dispatch_on_empty_smiles_v18_unknown(self):
-        """v18 contract preserved: empty SMILES returns "unknown" (no exception).
+        """ contract preserved: empty SMILES returns "unknown" (no exception).
 
-        This mirrors the v18 cascade behavior — an empty SMILES parses to an
+        This mirrors the cascade behavior — an empty SMILES parses to an
         empty molecule, falls through every predicate, and the GENERAL pipeline
-        produces "unknown" via the _descriptive_fallback path.  Phase 158
-        substrate preserves this byte-identical per CFR-04.
+        produces "unknown" via the _descriptive_fallback path. a phase
+        substrate preserves this byte-identical per.
         """
         result = name_compound("")
         assert result == "unknown"
 
     def test_dispatch_on_single_atom(self):
-        """v18 contract: single-atom SMILES (carbon) names to "methane" (retained)."""
+        """ contract: single-atom SMILES (carbon) names to "methane" (retained)."""
         result = name_compound("C")
         assert result == "methane"
 
     def test_dispatch_on_dot_disconnected(self):
-        """158-AUDIT-CFR.md § 1 row 8: dot-disconnected neutral multi-atom fragments
+        """internal notes-CFR.md row 8: dot-disconnected neutral multi-atom fragments
         dispatch to MULTI_COMPONENT_NEUTRAL (verified end-to-end via name + stats)."""
         namer = Orthonym(style="pin")
         name = namer.name("CCO.OCC")
@@ -306,10 +306,10 @@ class TestEdgeCases:
 
 
 class TestAuditLogGating:
-    """CONTEXT D-08: env-var-gated INFO log; default-OFF for CFR-04 stdout-byte-identical."""
+    """internal notes: env-var-gated INFO log; default-OFF for stdout-byte-identical."""
 
     def test_audit_log_emits_when_env_var_set(self, monkeypatch, caplog):
-        """D-08: ``ORTHONYM_DISPATCH_AUDIT=1`` causes one INFO record per dispatch."""
+        """: ``ORTHONYM_DISPATCH_AUDIT=1`` causes one INFO record per dispatch."""
         monkeypatch.setenv(ORTHONYM_DISPATCH_AUDIT_ENV_VAR, "1")
         router = ClassFirstRouter()
         assert router._audit_log is True

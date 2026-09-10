@@ -6,8 +6,8 @@ opsin_unparseable names because `_sugar_name_rt_ok`'s "cannot determine" branche
 (missing jar, or ANY exception during the OPSIN check) returned ``True`` -- i.e.
 shipped the candidate name UNVERIFIED -- regardless of tier. The PIN/default tier
 already measured 0 wrong on this same 413-row set because its own downstream
-`_final_opsin_validity_gate` / SELF-01 gate is a second backstop that catches a
-fail-open miss; the best-effort tier has NO such backstop (T4 emissions bypass it
+`_final_opsin_validity_gate` / gate is a second backstop that catches a
+fail-open miss; the best-effort tier has NO such backstop (emissions bypass it
 by design), so `_sugar_name_rt_ok`'s fail-open was the ONLY check standing between
 an unverified glycan name and best-effort output.
 

@@ -1,11 +1,11 @@
 """
 Unit tests for axial chirality detection and Ra/Sa descriptor formatting.
 
-Tests the detect_axial_chirality() function in perception/stereo.py for
+Tests the detect_axial_chirality function in perception/stereo.py for
 atropisomeric biaryls (STEREOATROPCW/CCW) and allenes (CHI_ALLENE), plus
-the integration of Ra/Sa descriptors into format_stereodescriptor_string().
+the integration of Ra/Sa descriptors into format_stereodescriptor_string.
 
-IUPAC Reference: P-93.5 (axial chirality descriptors)
+IUPAC Reference: (axial chirality descriptors)
 RDKit: STEREOATROPCW/CCW for atropisomers, CHI_ALLENE for allenes
 Mapping: RDKit CIP P -> Ra, RDKit CIP M -> Sa
 """
@@ -122,7 +122,7 @@ class TestDetectAxialChiralityAtropisomer:
     def test_stereoatropcw_returns_m(self):
         """STEREOATROPCW bond -> RDKit helicity 'M' -> PIN descriptor 'M'.
 
-        P-91.2.1.1 (:44582) lists under *"used as preferred stereodescriptors"*
+         (:44582) lists under *"used as preferred stereodescriptors"*
         clause (c) (:44588) *"'M' and 'P', to specify the absolute configuration
         of an axial or planar entity using the helicity rule"*; 'Sa' is
         *"recommended for general nomenclature"* (:44594) and is reachable via
@@ -163,7 +163,7 @@ class TestDetectAxialChiralityAtropisomer:
         """Molecule with both R/S stereocenters and atropisomer chirality.
 
         detect_axial_chirality should ONLY return the atropisomer element;
-        point chirality (R/S) is handled separately by get_stereocenters().
+        point chirality (R/S) is handled separately by get_stereocenters.
         """
         # Create a biaryl with a stereocenter: use a chiral center on one ring
         mol = Chem.RWMol(Chem.MolFromSmiles('C[C@H](O)c1ccccc1-c1ccccc1C'))
@@ -225,7 +225,7 @@ class TestManualAlleneCIP:
     def test_manual_cip_returns_m_or_p(self):
         """Manual CIP for a chiral allene returns the helicity letter 'M'/'P'.
 
-        P-92.1.2.2 "The helicity rule: stereodescriptors 'M' and 'P'" (:44812):
+         "The helicity rule: stereodescriptors 'M' and 'P'" (:44812):
         *"the chirality is described by the symbols 'M' if the path is
         anticlockwise; the symbol is 'P' if the path is clockwise"*."""
         mol = _make_allene_with_chi_allene()
@@ -349,8 +349,8 @@ class TestCollectStereodescriptorsAxial:
         descriptors = collect_stereodescriptors(mol, atom_to_locant)
         assert descriptors, "no stereodescriptor at all -- the axis was lost"
         # STEREOATROPCW -> RDKit helicity 'M', which IS the PIN axial descriptor
-        # (P-91.2.1.1(c), :44588). It used to be re-lettered to 'Sa', the form
-        # P-91.2.1.1 reserves for general nomenclature (:44594).
+        # (c),:44588). It used to be re-lettered to 'Sa', the form
+        # reserves for general nomenclature (:44594).
         assert descriptors == [(7, 'M')], (
             f"expected exactly one axial descriptor, got {descriptors}"
         )
@@ -361,7 +361,7 @@ class TestCollectStereodescriptorsAxial:
 
         This guard was written when a bare 'M'/'P' in the output could only be a
         leak from the E/Z channel, and it asserted their ABSENCE. 'M'/'P' are
-        now the deliberate PIN emission (P-91.2.1.1(c), :44588), so that
+        now the deliberate PIN emission (c),:44588), so that
         assertion would today forbid the correct answer. The defect it was
         protecting against is unchanged and is still caught: the E/Z leak
         emitted the single axis TWICE, as [(7, 'M'), (7, 'Sa')] spelled
@@ -396,7 +396,7 @@ class TestCollectStereodescriptorsAxial:
         """The M/P filter must not disturb ordinary E/Z collection.
 
         Guards the near-miss in the fix: gating the E/Z loop on
-        `bond.GetStereo() in (STEREOE, STEREOZ)` is the intuitive filter and is
+        `bond.GetStereo in (STEREOE, STEREOZ)` is the intuitive filter and is
         WRONG — RDKit reports STEREOTRANS/STEREOCIS for ordinary SMILES double
         bonds while `_CIPCode` is 'E'/'Z', so that allow-list would have deleted
         essentially every E/Z descriptor the project emits. The real filter keys
@@ -498,7 +498,7 @@ class TestCollectStereodescriptorsAxial:
         round-trip validation. This is NOT an Orthonym bug.
 
         See: opsin/opsin-core/src/main/java/.../StereochemistryHandler.java
-        See: 115-RESEARCH.md Pitfall 4
+        See: internal notes Pitfall 4
         """
         # This is a documentation-only test -- it always passes.
         # The actual OPSIN limitation is documented in the docstring.

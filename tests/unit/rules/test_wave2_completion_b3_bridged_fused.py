@@ -1,4 +1,4 @@
-"""Wave-2 completion batch B3 — mancude bridged-fused constructor (P-25.4).
+"""Wave-2 completion batch B3 — mancude bridged-fused constructor.
 
 The new `_try_mancude_bridged` path names bridged-fused systems whose residual
 keeps its full aromatic system and whose bridgeheads stay sp2 (0 H) — so no
@@ -34,7 +34,7 @@ def _pin(smiles):
 class TestMancudeBridgedConstructor:
     def test_ethano_methano_anthracene_bb_verbatim(self):
         # Two bridges on distinct terminal rings; ethano cited first
-        # (alphanumerical) and takes 1,4 (P-25.4.3.3(b)).
+        # (alphanumerical) and takes 1,4 (b)).
         assert (_pin("C12=CC=C(C3=CC=4C5=CC=C(C4C=C13)C5)CC2")
                 == "1,4-ethano-5,8-methanoanthracene")
 
@@ -53,7 +53,7 @@ class TestMancudeBridgedConstructor:
 
     def test_dihydro_path_hydro_first_order(self):
         # sp3 bridgeheads keep the dihydro/tetrahydro path; Wave-2 completion C
-        # fixed the citation order to hydro-BEFORE-bridge (P-31.1.4.2.4 --
+        # fixed the citation order to hydro-BEFORE-bridge --
         # hydro sits between detachable and nondetachable prefixes).
         assert (_pin("C1CC2CCC1c1ccccc21")
                 == "1,2,3,4-tetrahydro-1,4-ethanonaphthalene")

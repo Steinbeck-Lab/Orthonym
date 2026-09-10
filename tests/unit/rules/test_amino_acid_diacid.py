@@ -1,4 +1,4 @@
-"""Tests for AMAC-01: Dicarboxylic amino acid bailout to polyfunctional pipeline.
+"""Tests for: Dicarboxylic amino acid bailout to polyfunctional pipeline.
 
 Verifies that amino acids with 2+ carboxylic acid groups (aspartic acid,
 glutamic acid) bail out of the specialized amino acid handler and produce
@@ -10,15 +10,15 @@ from orthonym import name_compound
 
 @pytest.mark.unit
 class TestDicarboxylicAminoAcidBailout:
-    """AMAC-01: Dicarboxylic amino acids should produce 'dioic' names."""
+    """: Dicarboxylic amino acids should produce 'dioic' names."""
 
     def test_aspartic_acid_nonstereo(self):
         """Non-stereo (alpha-carbon CHI_UNSPECIFIED) aspartic acid now DEFERS to
         the systematic name rather than the retained name, which asserts a
         defined (L) configuration this input lacks.
 
-        v33 Phase 0 T5 (change-asserted-value, was `== "aspartic acid"`): see
-        `test_amino_acids.py`'s module docstring for the full P-103.1.3.1 /
+         a phase (change-asserted-value, was `== "aspartic acid"`): see
+        `test_amino_acids.py`'s module docstring for the full /
         InChIKey / mutation-test evidence -- identical argument, same input.
         """
         result = name_compound("NC(CC(=O)O)C(=O)O")
@@ -31,15 +31,15 @@ class TestDicarboxylicAminoAcidBailout:
         assert result == "2-aminopentanedioic acid"
 
     def test_aspartic_acid_stereo(self):
-        """WSD-07 (Phase 175): a stereo-tagged free aspartic acid resolves to the
+        """-07 (a phase): a stereo-tagged free aspartic acid resolves to the
         retained PIN 'aspartic acid' (OPSIN-round-trip-verified), not the old
         systematic 'aminobutanedioic acid' bailout (standard AAs use the retained
-        name with the configurational descriptor, P-103.1.1.1)."""
+        name with the configurational descriptor,."""
         result = name_compound("N[C@@H](CC(=O)O)C(=O)O")
         assert result == "aspartic acid", f"Expected 'aspartic acid', got: {result}"
 
     def test_glutamic_acid_stereo(self):
-        """WSD-07 (Phase 175): a stereo-tagged free glutamic acid resolves to the
+        """-07 (a phase): a stereo-tagged free glutamic acid resolves to the
         retained PIN 'glutamic acid' (OPSIN-round-trip-verified), not the old
         systematic 'aminopentanedioic acid' bailout."""
         result = name_compound("N[C@@H](CCC(=O)O)C(=O)O")
@@ -64,7 +64,7 @@ class TestDicarboxylicAminoAcidBailout:
 
 @pytest.mark.unit
 def test_n_carboxymethyl_aspartic_counts_only_on_chain_acids():
-    """v30: a COOH inside a SUBSTITUENT must not inflate the parent acid-suffix
+    """: a COOH inside a SUBSTITUENT must not inflate the parent acid-suffix
     multiplicity. N-(carboxymethyl)aspartic acid's third COOH is the carboxymethyl
     group, so the butanedioic parent stays 'dioic' -- it was mis-built as
     'butanetrioic' (three -oic on a two-acid parent) and suppressed as unparseable.

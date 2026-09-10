@@ -1,17 +1,17 @@
-"""v42 11-FABLEFIX — two spelling-layer defects a cross-model (Fable) review found.
+""" 11-FABLEFIX — two spelling-layer defects a cross-model (a review) review found.
 
 BLOCKER 1 — the multiplicative pnictogen-oxoacid guard was too narrow (it declined
 only NAKED diaryl rings). A SUBSTITUTED diaryl phosphinic/arsinic acid, and a
 diaryl phosphinate/arsinate ESTER, still shipped the wrong multiplicative name
 (``1,1'-(hydroxyphosphoryl)bis(4-methylbenzene)`` etc.). The guard is now a
-SENIORITY comparison (P-41 Table 4.1, BB:18143ff / BB:18162ff): decline the
+SENIORITY comparison, the Blue Bookff / the Blue Bookff): decline the
 multiplicative name → acid/ester parent when NO ring fragment carries a group
 SENIOR to the pnictogen oxoacid (class 7c). A carboxylic-acid ring (class 7a) is
 senior, so ``4,4'-(hydroxyarsoryl)dibenzoic acid`` STAYS multiplicative.
 
 BLOCKER 2 — ``phosphinolizine`` shipped bare but is the 6+6 QUINOLIZINE analogue,
-so it carries indicated hydrogen exactly like its N parent (BB:11584 "the PIN is
-4H-quinolizine"; P-14.7.1 BB:3557 + P-25.7.1.3.1 BB:14605 require indicated H to
+so it carries indicated hydrogen exactly like its N parent (the Blue Book "the PIN is
+4H-quinolizine"; the Blue Book + the Blue Book require indicated H to
 be cited). The 5+6 indolizine-type analogues (arsindolizine / phosphindolizine)
 are fully mancude and STAY bare.
 """
@@ -43,7 +43,7 @@ class TestBlocker1PnictogenAcidEster:
                 == "bis(4-chlorophenyl)phosphinic acid")
 
     def test_methyl_diphenylphosphinate_ester(self):
-        # P-41 class 9 ester; P had no phosphinate-ester PERCEPTION before this fix
+        # class 9 ester; P had no phosphinate-ester PERCEPTION before this fix
         assert (name_compound("c1ccccc1P(=O)(OC)c1ccccc1")
                 == "methyl diphenylphosphinate")
 
@@ -58,7 +58,7 @@ class TestBlocker1RegressionPins:
 
     def test_dibenzoic_acid_STAYS_multiplicative(self):
         # each ring carries a carboxylic acid (class 7a), SENIOR to the arsinic-acid
-        # bridge (7c) -> the ring is the parent, multiplicative is kept (BB:18143)
+        # bridge (7c) -> the ring is the parent, multiplicative is kept (the Blue Book)
         assert (name_compound("OC(=O)c1ccc(cc1)[As](=O)(O)c1ccc(cc1)C(=O)O")
                 == "4,4'-(hydroxyarsoryl)dibenzoic acid")
 
@@ -88,8 +88,8 @@ class TestBlocker1RegressionPins:
 
 
 class TestBlocker2Phosphinolizine:
-    """P-14.7.1 (BB:3557) + P-25.7.1.3.1 (BB:14605): indicated hydrogen is cited.
-    phosphinolizine is the 6+6 quinolizine analogue (BB:11584 parallel)."""
+    """ (the Blue Book) + (the Blue Book): indicated hydrogen is cited.
+    phosphinolizine is the 6+6 quinolizine analogue (the Blue Book parallel)."""
 
     def test_phosphinolizine_carries_indicated_hydrogen(self):
         assert name_compound("C1=CCP2C=CC=CC2=C1") == "4H-phosphinolizine"

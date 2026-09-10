@@ -19,7 +19,7 @@ def test_wildcard_ester_does_not_ship_ethyl_formate():
     assert _name("CCOC(=O)*") == WILDCARD_MSG
 
 def test_isotope_over_wildcard_abstains():
-    # [2H]CC* : the isotope decorator runs first (2847) and its recursive skeleton
+    # [2H]CC*: the isotope decorator runs first (2847) and its recursive skeleton
     # name is now the wildcard sentinel -> decorator fails closed -> abstain.
     assert _name("[2H]CC*") == WILDCARD_MSG
 

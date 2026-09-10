@@ -1,4 +1,4 @@
-"""T4 universal coverage-by-construction namer (best-effort tier ONLY).
+""" universal coverage-by-construction namer (best-effort tier ONLY).
 
 Reached only on the general-fallback best-effort recovery path -- master
 switch ``self._general_fallback`` in ``namer.py`` (its early ``return None``
@@ -9,7 +9,7 @@ PIN emission; it only ever fills in where the PIN tiers were silent.
 
 Produces an atom-complete, E1-certified name or ``None`` (clean abstain,
 never a partial name). ``validation.e1_certificate.verify_certificate`` is
-the atom-coverage certificate; SELF-01 downstream (OPSIN round-trip) is the
+the atom-coverage certificate; downstream (OPSIN round-trip) is the
 second half of the 0-wrong net, not a substitute for E1 here.
 
 This module is the Task 2 SKELETON only: the control flow + the locked
@@ -45,7 +45,7 @@ class _Candidate:
 
 
 def name_t4_complete(mol, features) -> Optional[str]:
-    """Best-effort T4 name for ``mol``, or ``None`` (clean abstain).
+    """Best-effort name for ``mol``, or ``None`` (clean abstain).
 
     Control flow (locked for Tasks 3-6):
       1. Ask ``_best_effort_candidate`` for a name + its E1 proof object.
@@ -57,16 +57,16 @@ def name_t4_complete(mol, features) -> Optional[str]:
 
     Audit-coverage note (Fix 3a, final review): this returns a bare ``str``, not
     the ``GeneralEngineResult`` with its atom->token ``bindings``. So when
-    ``namer.py`` ships a T4 name it CANNOT populate the binding-proof ledger --
+    ``namer.py`` ships a name it CANNOT populate the binding-proof ledger --
     ``_record_binding_proof`` runs only on the engine's own-name ``else`` branch,
-    never on the T4 branch. That is an audit-coverage gap, not a correctness one:
+    never on the branch. That is an audit-coverage gap, not a correctness one:
     it is benign under the default (``binding_proof`` off), and T4's 0-wrong net
-    is E1 (proven internally here) + SELF-01 (the OPSIN round-trip in namer.py),
-    neither of which needs the ledger. A follow-on wanting T4 binding proofs
+    is E1 (proven internally here) + (the OPSIN round-trip in namer.py),
+    neither of which needs the ledger. A follow-on wanting binding proofs
     would return the ``_Candidate`` (which carries ``result_obj``) instead of a
     bare string.
 
-    Phase 0c Task 2b: ALSO requires ``verify_spine`` (audit mode) to pass.
+    a phase Task 2b: ALSO requires ``verify_spine`` (audit mode) to pass.
     ``verify_certificate`` proves only the flat atom partition (P1's job); the
     binding spine additionally proves bond totality (P2), token-span anchoring
     (P4/P5) and arity (P6) -- axes E1 cannot see at all (a name whose bindings
@@ -79,7 +79,7 @@ def name_t4_complete(mol, features) -> Optional[str]:
     disagree about scope. A spine failure voids the candidate exactly like an
     E1 failure does -- no new control flow.
 
-    Phase 0c Task 4: ``escalate=STRICT_STEREO_CHARGE_AXES`` promotes JUST the
+    a phase Task 4: ``escalate=STRICT_STEREO_CHARGE_AXES`` promotes JUST the
     P8 stereo axis and P3's ``CHARGE_UNVERIFIED`` to error severity, on top of
     ``mode="audit"`` -- the coverage certificate's stereo axis was shipped
     audit-only in Task 3 (findings recorded, `ok` never affected); the Task 4
@@ -87,16 +87,16 @@ def name_t4_complete(mol, features) -> Optional[str]:
     drops, so this makes it enforcing. ``allow_charged=False`` means
     ``NET_CHARGE_OUT_OF_SCOPE`` (unconditional "error", not mode/escalate-
     gated) already voids any nonzero-net-charge candidate reaching this
-    point regardless of this promotion; what newly blocks is a T4 ZWITTERION
+    point regardless of this promotion; what newly blocks is a ZWITTERION
     (net charge 0, but individual atoms charged) whose charges no producer
     threaded through ``charge_atom_ids`` -- measured byte-identical on
-    dev500 best-effort (see the Task 4 report).
+    a dev split best-effort (see the Task 4 report).
 
     Task 2a first wired this and measurably false-voided 3 correct,
-    OPSIN-round-tripping dev500 rows via a pre-existing P6 (``token_arity``)
+    OPSIN-round-tripping a dev split rows via a pre-existing P6 (``token_arity``)
     false-positive on replacement-nomenclature substituent tokens; that bug is
     fixed (Task 2b, ``name_morphemes.py::_evaluate``'s multiplier short-circuit
-    now also skips zero-atom REPL segments) and the dev500 best-effort
+    now also skips zero-atom REPL segments) and the a dev split best-effort
     before/after re-measurement is BYTE-IDENTICAL emit/rt_exact -- see
     `.superpowers/sdd/2026-08-12-phase0c-coverage-certificate-and-locant/task-2-report.md`.
     """
@@ -105,12 +105,12 @@ def name_t4_complete(mol, features) -> Optional[str]:
         return None
     if candidate.result_obj is None:
         return candidate.name
-    # Phase 1 Part A: the shared best-effort certification gate (E1 + the
+    # a phase Part A: the shared best-effort certification gate (E1 + the
     # binding spine). Behaviour-identical to the former inline
     # verify_certificate + verify_spine(escalate=STRICT_STEREO_CHARGE_AXES)
     # pair; now the ONE place all three lanes route through so they cannot
     # drift (validation/coverage_gate.py). ``allow_charged=False`` preserves
-    # the T4 net-charge-out-of-scope contract.
+    # the net-charge-out-of-scope contract.
     if not certify_general_result(mol, candidate.result_obj, allow_charged=False):
         return None
     return candidate.name
@@ -124,7 +124,7 @@ def _run_general_e1(mol, features) -> Optional[_Candidate]:
     ``allow_aromatic_general=True`` opens the lone-monocycle / mancude-cage
     paths and lifts the charge/mancude refusals; ``allow_suffix_free=True`` is
     the best-effort terminal-ring assembly. Chosen independent of the calling
-    instance's flags -- T4 is best-effort, so it always uses the most permissive
+    instance's flags -- is best-effort, so it always uses the most permissive
     engine. ``name_general`` is fail-closed (returns None, never a wrong name),
     but the call is wrapped so any engine error is a clean abstain.
 
@@ -134,13 +134,13 @@ def _run_general_e1(mol, features) -> Optional[_Candidate]:
     voided one call later. The coverage check means we return ``None`` ourselves
     rather than rely on the backstop, so no partial is ever handed up.
 
-    Phase 0c Task 2b: the SAME additional ``verify_spine`` (audit mode) check as
+    a phase Task 2b: the SAME additional ``verify_spine`` (audit mode) check as
     ``name_t4_complete`` -- see that docstring for why. Duplicated here (not
     only at the outer gate) so a rung this function rejects never reaches the
     cascade's next rung believing it merely failed E1; it is rejected for
     exactly the reason the outer gate would reject it, one call earlier.
 
-    Phase 0c Task 4: the SAME ``escalate=STRICT_STEREO_CHARGE_AXES`` promotion
+    a phase Task 4: the SAME ``escalate=STRICT_STEREO_CHARGE_AXES`` promotion
     as ``name_t4_complete`` -- see that docstring.
     """
     from .general_engine import name_general
@@ -156,7 +156,7 @@ def _run_general_e1(mol, features) -> Optional[_Candidate]:
 
     if result is None:
         return None
-    # Phase 1 Part A: the SAME shared certification gate as name_t4_complete
+    # a phase Part A: the SAME shared certification gate as name_t4_complete
     # (E1 + binding spine). Duplicated here so a rung this function rejects is
     # rejected for exactly the reason the outer gate would reject it, one call
     # earlier -- behaviour-identical to the former inline pair.
@@ -169,10 +169,10 @@ def _clone_features_with(features, **overrides):
     """Return a shallow COPY of ``features`` with the given attributes set, or
     ``None`` if it is not clonable.
 
-    The caller owns ``features`` and reuses it (namer.py's T4 dispatch), so it
+    The caller owns ``features`` and reuses it (namer.py's dispatch), so it
     is never mutated in place -- exactly the ``_copy.copy(features)`` + reassign
     pattern ``general_engine._name_terminal_ring_assembly`` uses to suppress a
-    principal group. Reassigning ``principal_group_atoms`` to a fresh ``[]``
+    principal group. Reassigning ``principal_group_atoms`` to a fresh ````
     (never mutating the shared list) keeps the original object intact.
     """
     import copy as _copy
@@ -189,7 +189,7 @@ def _clone_features_with(features, **overrides):
 
 
 def _prefer_verified_floor(mol, candidate: "_Candidate") -> "_Candidate":
-    """v35 Track A #2 -- verify-before-commit for every best-effort cascade rung.
+    """ Track A #2 -- verify-before-commit for every best-effort cascade rung.
 
     Each early rung here (``_run_general_e1`` rung 0, the polyol rung, the
     feature-override cascade) is E1-complete -- E1 proves atom COVERAGE (every
@@ -202,7 +202,7 @@ def _prefer_verified_floor(mol, candidate: "_Candidate") -> "_Candidate":
     constitution-complete (and, since 33f5e47c, branch-stereo-complete). The
     wrong rung name then FAILS the downstream full-InChIKey gate -- and because
     it is the only offer, the whole molecule ABSTAINS, even though the floor
-    names it correctly (invariant 18 offer-not-return; council Track A #2).
+    names it correctly (a project rule offer-not-return; council Track A #2).
 
     So: full-InChIKey verify the rung's name. If it verifies, keep it (the
     engine rungs give better nomenclature than the ugly floor). If it does NOT,
@@ -293,15 +293,15 @@ def _best_effort_candidate(mol, features) -> Optional[_Candidate]:
         complete form available.
 
     Each rung is complete-or-nothing: E1 proves every heavy atom is bound before
-    a candidate is handed up, and SELF-01 (OPSIN round-trip) downstream is the
+    a candidate is handed up, and (OPSIN round-trip) downstream is the
     second half of the 0-wrong net. When a decline needs a capability the
     codebase lacks -- e.g. the dichlorophosphoryl-carbamate substituent of
     ``C1CCC(CC1)OC(=O)NP(=O)(Cl)Cl``, whose recursive substituent namer hits its
     depth cap -- every rung fails E1 and the producer HONESTLY abstains
     (``None``), never a fabricated or partial name. A suffix-free prefix name is
     a valid description of the right structure that is not a well-formed PIN;
-    that is licit here (invariant 1: "a table miss must degrade to an uglier
-    name, never to a refusal") and confined to this best-effort T4 branch.
+    that is licit here (a project rule: "a table miss must degrade to an uglier
+    name, never to a refusal") and confined to this best-effort branch.
 
     Task 6 (measured 2026-08-11) -- WHY the cascade STOPS at rung 2, and where
     the remaining polyfunctional breadth lives. Two facts were established, not
@@ -337,7 +337,7 @@ def _best_effort_candidate(mol, features) -> Optional[_Candidate]:
       * acyl substituents built as ``name(R)`` + ``carbonyl`` / ``amino`` so an
         internal C=C never blocks them (the ``C/C=C/C(=O)NCC(=O)O`` enamide
         "branch unnameable" class);
-      * OFFER-not-RETURN parent competition (invariant 18): a parent choice that
+      * OFFER-not-RETURN parent competition (a project rule): a parent choice that
         leaves an unnameable fragment should lose to a competitor parent rather
         than terminate the molecule;
       * a peptide-residue namer for deep peptide/ester side chains (perindopril's
@@ -346,7 +346,7 @@ def _best_effort_candidate(mol, features) -> Optional[_Candidate]:
         salts) and spiro/fused/monocycle ring-parent producers (~9/150).
 
     Whichever of these ships, its output still flows through THIS producer's E1
-    gate + SELF-01 unchanged, so 0-wrong / 0-partial is preserved by
+    gate + unchanged, so 0-wrong / 0-partial is preserved by
     construction. NOTE (namer.py follow-on, symptom VERIFIED / cause a LEAD):
     for ``CC(=O)NCN(C)N=O`` (cid 43057) this producer builds a complete,
     OPSIN-round-tripping replacement name when called cleanly, but a DEGRADED
@@ -359,17 +359,17 @@ def _best_effort_candidate(mol, features) -> Optional[_Candidate]:
     # Rung 0: the full engine with the perceived principal group (Task 3).
     candidate = _run_general_e1(mol, features)
     if candidate is not None:
-        return _prefer_verified_floor(mol, candidate)  # v35: verify-before-commit
+        return _prefer_verified_floor(mol, candidate)  #: verify-before-commit
 
-    # Rung 0.5 (v30 tail #21): the acyclic polyol / polyether / POLYESTER class.
+    # Rung 0.5 (tail #21): the acyclic polyol / polyether / POLYESTER class.
     # name_general is a ring/von-Baeyer engine and returns None for an acyclic
-    # polyol chain (the composer names a plain polyol, but an ester's P-41
+    # polyol chain (the composer names a plain polyol, but an ester's
     # seniority makes the composer commit to the ester and LINEARISE the polyol
-    # -- a wrong 'tricosyl 2-methylpropanoate' SELF-01 suppresses). This producer
-    # supplies the T4 degrade (P-65.6.3.2 method 2): choose the polyol chain as
+    # -- a wrong 'tricosyl 2-methylpropanoate' suppresses). This producer
+    # supplies the degrade method 2): choose the polyol chain as
     # the parent, cite free -OH as the -ol suffix, and DEMOTE every ester to an
     # (Racyloxy) prefix. It is coverage-complete by construction and, carrying no
-    # result_obj, is verified by the downstream SELF-01 round-trip (the 0-wrong
+    # result_obj, is verified by the downstream round-trip (the 0-wrong
     # net). Fail-closed (None) for every shape outside its tight scope.
     try:
         from ..rules.polyol_polyester import name_acyclic_polyol_polyester
@@ -384,7 +384,7 @@ def _best_effort_candidate(mol, features) -> Optional[_Candidate]:
     # first. A fixed, bounded list -- no unbounded recursion.
     cascade = (
         # rung 1: ring-first -- demote chain_is_parent so a ring parent is
-        # chosen and the acyl-oxy is cited as an ...oyloxy/acetyloxy prefix.
+        # chosen and the acyl-oxy is cited as an...oyloxy/acetyloxy prefix.
         dict(principal_group=None, principal_group_atoms=[],
              chain_is_parent=False),
         # rung 2: keep the perceived parent, PG suppressed (ring-less /
@@ -403,7 +403,7 @@ def _best_effort_candidate(mol, features) -> Optional[_Candidate]:
             continue
         candidate = _run_general_e1(mol, alt_features)
         if candidate is not None:
-            return _prefer_verified_floor(mol, candidate)  # v35: verify-before-commit
+            return _prefer_verified_floor(mol, candidate)  #: verify-before-commit
 
     # Final rung (Phase B4): the UNCONDITIONAL recursive substitutive namer.
     # Every feature-override rung above declined -- the remaining abstentions
@@ -417,7 +417,7 @@ def _best_effort_candidate(mol, features) -> Optional[_Candidate]:
     # token rather than declining. It is coverage-complete BY CONSTRUCTION
     # (its own atom-coverage assertion) and, like the polyol-polyester rung
     # above, carries NO result_obj -- so `name_t4_complete` ships it straight
-    # to the caller's SELF-01 round-trip ladder (namer.py), which is the
+    # to the caller's round-trip ladder (namer.py), which is the
     # 0-wrong net: an unverifiable universal name (or a stereo CONFLICT) is
     # suppressed there, a constitution-correct one (or a safe stereo-OMISSION
     # via the `_rt_match` superset gate) ships. It renders no stereo
@@ -429,7 +429,7 @@ def _best_effort_candidate(mol, features) -> Optional[_Candidate]:
     # whole module is `_general_fallback`-gated in namer.py), so PIN is
     # untouched.
     try:
-        # v36 A2 (C2): a SINGLE P-71 free-valence centre that the dedicated
+        # A2 (C2): a SINGLE free-valence centre that the dedicated
         # radicals.py/route_charged path already declined (this whole rung is
         # reached only after that path's own candidate -- if any -- failed
         # its OPSIN ``-r`` gate check, per this module's header) gets ONE more

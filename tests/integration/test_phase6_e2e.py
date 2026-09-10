@@ -11,7 +11,7 @@ Validates all a phase requirements (COMPLEX-01 through COMPLEX-06 + VALID):
 
 This test file provides comprehensive E2E coverage for a phase Final Validation.
 
-Reference: IUPAC 2013 Blue Book, Sections P-23, P-24, P-25, P-26
+Reference: IUPAC 2013 Blue Book, Sections,,,
 """
 
 import pytest
@@ -269,11 +269,11 @@ class TestCOMPLEX05_FusedHeterocycles:
         # Benzimidazole
         ("c1ccc2[nH]cnc2c1", "1H-benzimidazole"),
         # Benzofuran
-        #: PIN carries the O locant (P-25.2.2.4, the Blue Book
+        #: PIN carries the O locant, the Blue Book
         # "1-benzofuran (PIN) benzofuran")
         ("c1ccc2occc2c1", "1-benzofuran"),
         # Benzothiophene
-        #: PIN carries the S locant (P-25.2.2.4, the Blue Book)
+        #: PIN carries the S locant, the Blue Book)
         ("c1ccc2sccc2c1", "1-benzothiophene"),
     ])
     def test_fused_heterocycle_retained_names(self, smiles, expected):

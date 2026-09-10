@@ -1,4 +1,4 @@
-"""v30 RISK 5 Class 2 — the general-engine substituent path must name a substituted amine
+""" RISK 5 Class 2 — the general-engine substituent path must name a substituted amine
 (-N(R)R') as a composed (dialkylamino) prefix, not the malformed `amino-N,N-diethyl...` token.
 
 Root cause: `_name_polyfunctional_acyclic_substituent` (assembly/substituent_naming.py) declined a
@@ -8,8 +8,8 @@ substituted amine, so the fragment fell to `parent_to_prefix` string-surgery whi
 this test pins the general-engine (best-effort) path to the same composer.
 
 Targets verified by OPSIN round-trip:
-  CNCC1=CC=CO1               -> 2-[(methylamino)methyl]furan
-  OC(=O)c1ccc(CCN(CC)CC)cc1  -> ...[2-(diethylamino)ethyl]... (benzenecarboxylic-acid form ok)
+  CNCC1=CC=CO1 -> 2-[(methylamino)methyl]furan
+  OC(=O)c1ccc(CCN(CC)CC)cc1 ->...[2-(diethylamino)ethyl]... (benzenecarboxylic-acid form ok)
 """
 from orthonym import Orthonym
 from orthonym.cli import _emit_tier_flags

@@ -20,7 +20,7 @@ def test_low_counts_unchanged():
     assert "tetraen" in _build_alkenyl_name(10, 1, [2, 4, 6, 8], [])
 
 def test_polyyne_multiplier_word_not_digit():
-    # triple-bond path at :571 has the identical bug
+    # triple-bond path at:571 has the identical bug
     name = _build_alkenyl_name(20, 1, [], [2, 6, 10, 14, 18, 22])
     assert "hexayn" in name, name
     assert "6yn" not in name, name

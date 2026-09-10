@@ -7,7 +7,7 @@ Test classes:
 - TestExactDerivativeNaming: Exact SMILES → trivial name
 - TestScaffoldNaming: Parent scaffolds → scaffold name
 - TestNonNaturalProducts: Non-NP molecules → None
-- TestPipelineIntegration: End-to-end via name_compound()
+- TestPipelineIntegration: End-to-end via name_compound
 """
 
 import pytest
@@ -101,19 +101,19 @@ class TestExactDerivativeNaming:
         assert name_natural_product(mol) == "diamorphine"
 
     def test_camphor_is_withheld_from_the_np_surface(self):
-        """v29 Task E2: was ``== "camphor"``. Camphor is an adjudicated non-PIN, so
+        """: was ``== "camphor"``. Camphor is an adjudicated non-PIN, so
         this surface now declines it and the PIN path names it systematically.
 
         Camphor is a KETONE, and the retained-ketone rule is a CLOSED list that
-        excludes it -- a positive exclusion, not an absence argument. P-64.2.1
-        "Retained names" (BlueBookV2.md:28295): P-64.2.1.1 (:28297) "The name
-        'chalcone' is the only retained name as a preferred IUPAC name"; P-64.2.1.2
+        excludes it -- a positive exclusion, not an absence argument.
+        "Retained names" (the Blue Book): (:28297) "The name
+        'chalcone' is the only retained name as a preferred IUPAC name";
         (:28307) retains only acetone, 1,4-benzoquinone, naphthoquinone,
         anthraquinone, ketene, acetophenone and benzophenone for general
         nomenclature, closing "Substitutive names, systematically constructed, are
         the preferred IUPAC names for ketones". The Blue Book never constructs
-        "camphor": its 2 occurrences are :32500 (a different compound, camphoric
-        anhydride) and :52646, the familiar label beside "(1R,4R)-bornan-2-one".
+        "camphor": its 2 occurrences are:32500 (a different compound, camphoric
+        anhydride) and:52646, the familiar label beside "(1R,4R)-bornan-2-one".
         """
         mol = _mol(CAMPHOR_SMILES)
         assert name_natural_product(mol) is None
@@ -158,7 +158,7 @@ class TestScaffoldNaming:
 
 @pytest.mark.unit
 class TestNonNaturalProducts:
-    """Non-NP molecules should return None from name_natural_product()."""
+    """Non-NP molecules should return None from name_natural_product."""
 
     def test_benzene_returns_none(self):
         mol = _mol("c1ccccc1")
@@ -181,7 +181,7 @@ class TestNonNaturalProducts:
 
 
 # ===========================================================================
-# Test Class 4: Pipeline integration via name_compound()
+# Test Class 4: Pipeline integration via name_compound
 # ===========================================================================
 
 @pytest.mark.unit
@@ -214,26 +214,26 @@ class TestPipelineIntegration:
         assert result == "morphine"
 
     def test_camphor_via_name_compound(self):
-        """v29 Task E2: was ``== "camphor"``. The PIN path now emits the Blue Book's
-        own rendering, printed verbatim at BlueBookV2.md:52648 as
+        """: was ``== "camphor"``. The PIN path now emits the Blue Book's
+        own rendering, printed verbatim at the Blue Book as
         "(1R,4R)-1,7,7-trimethylbicyclo[2.2.1]heptan-2-one" (this input carries no
-        stereo, so no descriptors are due). See P-64.2.1.1/.2 for why the trivial
-        name has no standing: BlueBookV2.md:28297 and :28307.
+        stereo, so no descriptors are due). See /.2 for why the trivial
+        name has no standing: the Blue Book and:28307.
         """
         result = name_compound(CAMPHOR_SMILES)
         assert result == "1,7,7-trimethylbicyclo[2.2.1]heptan-2-one"
 
 
 # ===========================================================================
-# Test Class 5: NP hydroxyl prefix/suffix exclusivity (Phase 105-02)
+# Test Class 5: NP hydroxyl prefix/suffix exclusivity (a phase-02)
 # ===========================================================================
 
 @pytest.mark.unit
 class TestNPHydroxylRepresentation:
     """Verify hydroxyl appears as suffix OR prefix, never both.
 
-    IUPAC P-35.2.1: principal group as suffix only.
-    IUPAC P-59.1: non-principal groups as prefixes only.
+    IUPAC: principal group as suffix only.
+    IUPAC: non-principal groups as prefixes only.
 
     - Hydroxyl-only steroid: -ol suffix, NO hydroxy prefix
     - Hydroxyl+ketone steroid: hydroxy prefix + -one suffix
@@ -311,7 +311,7 @@ class TestNPHydroxylRepresentation:
 
 
 # ===========================================================================
-# Test Class 6: Expanded steroid derivatives (Phase 141)
+# Test Class 6: Expanded steroid derivatives (a phase)
 # ===========================================================================
 
 @pytest.mark.unit
@@ -361,7 +361,7 @@ class TestExpandedSteroidDerivatives:
 
 
 # ===========================================================================
-# Test Class 7: Expanded alkaloid derivatives (Phase 141)
+# Test Class 7: Expanded alkaloid derivatives (a phase)
 # ===========================================================================
 
 @pytest.mark.unit
@@ -410,7 +410,7 @@ class TestExpandedAlkaloidDerivatives:
 
 
 # ===========================================================================
-# Test Class 8: Expanded terpene derivatives (Phase 141)
+# Test Class 8: Expanded terpene derivatives (a phase)
 # ===========================================================================
 
 @pytest.mark.unit
@@ -444,12 +444,12 @@ class TestExpandedTerpeneDerivatives:
 
 
 # ===========================================================================
-# Test Class 9: New scaffold recognition (Phase 141)
+# Test Class 9: New scaffold recognition (a phase)
 # ===========================================================================
 
 @pytest.mark.unit
 class TestNewScaffoldRecognition:
-    """New scaffolds added in Phase 141 are detected."""
+    """New scaffolds added in a phase are detected."""
 
     def test_aconitane_scaffold(self):
         """Bare aconitane scaffold should be recognized."""
@@ -476,7 +476,7 @@ class TestNewScaffoldRecognition:
 
 
 # ===========================================================================
-# Test Class 10: No regression on original 26 NP derivatives (Phase 141)
+# Test Class 10: No regression on original 26 NP derivatives (a phase)
 # ===========================================================================
 
 @pytest.mark.unit
@@ -499,11 +499,11 @@ class TestNoRegressionExistingNP:
         assert name_compound(HYDROCODONE_SMILES) == "hydrocodone"
 
     def test_camphor(self):
-        """v29 Task E2: camphor is the ONE of these 26 rows that is deliberately no
+        """: camphor is the ONE of these 26 rows that is deliberately no
         longer returned as a trivial name -- it is an adjudicated non-PIN
-        (P-64.2.1.1 BlueBookV2.md:28297, P-64.2.1.2 :28307). This is a demotion, not
+         the Blue Book,:28307). This is a demotion, not
         a regression: the emitted name is the Blue Book's own von Baeyer rendering
-        from :52648, and the row is still present in NATURAL_PRODUCT_DERIVATIVES.
+        from:52648, and the row is still present in NATURAL_PRODUCT_DERIVATIVES.
         """
         assert name_compound(CAMPHOR_SMILES) == "1,7,7-trimethylbicyclo[2.2.1]heptan-2-one"
 
@@ -527,7 +527,7 @@ class TestNoRegressionExistingNP:
         assert name_compound(smi) == "beta-carotene"
 
     def test_flavone(self):
-        # v26 BP-4 Ph4: de-headlined (general-only per P-102.6.1.4) -> systematic PIN
+        # Ph4: de-headlined (general-only per -> systematic PIN
         assert name_compound("O=c1cc(-c2ccccc2)oc2ccccc12") == \
             "2-phenyl-4H-1-benzopyran-4-one"
 
@@ -544,8 +544,8 @@ class TestNoRegressionExistingNP:
             "2,3-dihydro-4H-1-benzopyran-4-one"
 
     def test_chromone(self):
-        # v23 IH-01f: chromone de-headlined to the PIN (1-benzopyran is the PIN ring
-        # parent per P-19(d); P-64.2.2.2.2 ketone = substitution of the 4H >CH2).
+        #: chromone de-headlined to the PIN (1-benzopyran is the PIN ring
+        # parent per (d); ketone = substitution of the 4H >CH2).
         assert name_compound("O=c1ccoc2ccccc12") == "4H-1-benzopyran-4-one"
 
     def test_pinane(self):

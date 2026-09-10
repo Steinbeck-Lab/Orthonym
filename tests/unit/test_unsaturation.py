@@ -18,7 +18,7 @@ class TestAlkeneNaming:
     @pytest.mark.unit
     @pytest.mark.parametrize("smiles,expected", [
         ("C=C", "ethene"),
-        ("C=CC", "propene"),   # P-14.3.4.2(d): unsubstituted trinuclear omits '1'
+        ("C=CC", "propene"),   # (d): unsubstituted trinuclear omits '1'
         ("CC=C", "propene"),   # Same molecule, different SMILES
         ("CC=CC", "but-2-ene"),
         ("C=CCC", "but-1-ene"),
@@ -41,7 +41,7 @@ class TestAlkeneNaming:
 
     @pytest.mark.unit
     def test_propene_no_locant(self):
-        """Unsubstituted propene omits the bond locant (P-14.3.4.2(d) PIN);
+        """Unsubstituted propene omits the bond locant (d) PIN);
         a substituent restores it (3-chloroprop-1-ene)."""
         result = name_compound("C=CC")
         assert result == "propene"
@@ -61,7 +61,7 @@ class TestAlkyneNaming:
     @pytest.mark.unit
     @pytest.mark.parametrize("smiles,expected", [
         ("C#C", "acetylene"),
-        ("C#CC", "propyne"),   # P-14.3.4.2(d): unsubstituted trinuclear omits '1'
+        ("C#CC", "propyne"),   # (d): unsubstituted trinuclear omits '1'
         ("CC#C", "propyne"),   # Same molecule, different SMILES
         ("CC#CC", "but-2-yne"),
         ("C#CCC", "but-1-yne"),
@@ -74,14 +74,14 @@ class TestAlkyneNaming:
 
     @pytest.mark.unit
     def test_ethyne_no_locant(self):
-        """C#C returns retained name 'acetylene' (P-31.1.2.1 PIN)."""
+        """C#C returns retained name 'acetylene' PIN)."""
         result = name_compound("C#C")
         assert result == "acetylene"
         assert "-" not in result
 
     @pytest.mark.unit
     def test_propyne_no_locant(self):
-        """Unsubstituted propyne omits the bond locant (P-14.3.4.2(d) PIN)."""
+        """Unsubstituted propyne omits the bond locant (d) PIN)."""
         result = name_compound("C#CC")
         assert result == "propyne"
         assert "-" not in result

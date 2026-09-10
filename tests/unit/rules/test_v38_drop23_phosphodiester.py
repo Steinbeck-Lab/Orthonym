@@ -8,10 +8,10 @@ premise that the class ABSTAINS today (trace: ``COP(=O)(O)OC[C@H](N)C(=O)O`` →
 That premise is REFUTED on HEAD 8773c400 for the entry point the eval harness
 (``eval/harness.py`` → ``name_tiered``) and ``scripts/measure_breadth.py``
 (→ ``name_tiered``) actually use: the whole addressable class already EMITS an
-RT-verified (full-InChIKey) name at best-effort tier T3 via the general engine.
+RT-verified (full-InChIKey) name at best-effort tier via the general engine.
 The trace's "abstains today" was an artifact of probing through
-``name_with_confidence()`` — an entry point that DIVERGES from
-``name()`` / ``name_tiered()`` (it abstains where they emit) and is used by
+``name_with_confidence`` — an entry point that DIVERGES from
+``name`` / ``name_tiered`` (it abstains where they emit) and is used by
 neither harness (only ``name_compound(..., include_confidence=True)`` reaches it).
 
 Full analysis: `internal notes`.
@@ -22,7 +22,7 @@ regress:
   * the symmetric-diester passers stay byte-identical (the invariant-14 risk the
     brief flagged) — at BOTH default and best-effort tiers,
   * the witness emits the PIN-correct, *alphabetically ordered* prefix
-    ``[hydroxy(methoxy)phosphoryl]oxy`` (P-14.5.2) and round-trips 0-wrong,
+    ``[hydroxy(methoxy)phosphoryl]oxy`` and round-trips 0-wrong,
   * that spelling is deterministic across input SMILES orderings,
   * the class members (lyso-PE, guanidinoethyl phosphate) emit a non-failure,
     RT-verified name via ``name_tiered`` at best-effort.
@@ -149,9 +149,9 @@ def test_addressable_class_members_emit_rt_verified_at_besteffort(smiles):
 def test_weave_renderer_is_head_first_not_pin():
     """Documents WHY the sited mechanism must not be shipped: the existing
     renderer ``weave._phosphoryloxy_name`` emits the head-first substituent order
-    ``[(methoxy)hydroxyphosphoryl]oxy``, which is NOT P-14.5.2 alphabetical.
+    ``[(methoxy)hydroxyphosphoryl]oxy``, which is NOT alphabetical.
     Wired at substituent_no_prefix_form (earlier in the cascade than the general engine) it would
-    override and REGRESS the current PIN-correct T3 spelling."""
+    override and REGRESS the current PIN-correct spelling."""
     from orthonym.decomposition import weave
     mol = Chem.MolFromSmiles(WITNESS)
     p_idx = next(a.GetIdx() for a in mol.GetAtoms() if a.GetSymbol() == "P")

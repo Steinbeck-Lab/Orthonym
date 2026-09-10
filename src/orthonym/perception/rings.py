@@ -53,7 +53,7 @@ def get_ring_systems(mol, include_spiro: bool = False) -> List[Set[int]]:
     ri = mol.GetRingInfo()
     systems = []
 
-    for ring in ri.AtomRings():  # PERC-08: merge is order-independent (produces same sets)
+    for ring in ri.AtomRings():  #: merge is order-independent (produces same sets)
         ring_atoms = set(ring)
 
         # Threshold: >1 for fused only, >0 to include spiro
@@ -75,10 +75,10 @@ def get_ring_systems(mol, include_spiro: bool = False) -> List[Set[int]]:
 def get_complete_ring_atom_set(mol) -> frozenset:
     """Return ALL atoms in ALL ring systems (fused, bridged, spiro merged).
 
-    IUPAC P-25.3: Ring system = all atoms in connected ring components.
+    IUPAC: Ring system = all atoms in connected ring components.
     Includes bridgehead atoms, bridge atoms, spiro atoms.
-    Does NOT include exocyclic atoms (=O, -OH, etc.) per P-31.1.3.
-    RDKit's AtomRings() correctly reports only ring-member atoms.
+    Does NOT include exocyclic atoms (=O, -OH, etc.) per.
+    RDKit's AtomRings correctly reports only ring-member atoms.
 
     Args:
         mol: RDKit Mol object
@@ -361,15 +361,15 @@ def find_ring_bridgeheads(mol, ring_atoms: Set[int] = None) -> Set[int]:
     """Find von-Baeyer bridgehead atoms: ring-skeletal atoms bonded to >=3
     other ring-skeletal atoms.
 
-    SUB-02/D-08: the SINGLE consolidated bridgehead predicate (seeded from
+    /: the SINGLE consolidated bridgehead predicate (seeded from
     VonBaeyerAnalyzer._find_all_bridgeheads, polycyclic.py:425-433). Counts
     only ring-member neighbours, so an exocyclic substituent (camphor's
     gem-dimethyl bridgehead) does NOT disqualify a bridgehead — exactly the
-    SUB-02 fix. This is distinct from get_bridgehead_atoms() (count>=2 ring
+     fix. This is distinct from get_bridgehead_atoms (count>=2 ring
     membership, too loose) which is left unchanged because it is widely
     imported.
 
-    IUPAC P-23.2.1: a bridgehead is a skeletal atom bonded to three or more
+    IUPAC: a bridgehead is a skeletal atom bonded to three or more
     other skeletal atoms (excluding H); bridgeheads MAY be quaternary/
     substituted.
 
@@ -418,17 +418,17 @@ def classify_ring(mol, ring_atoms: Tuple[int, ...]) -> str:
         'aromatic', 'cycloalkane', or 'cycloalkene'
 
     Examples:
-        >>> mol = Chem.MolFromSmiles('C1CCCCC1')  # cyclohexane
-        >>> classify_ring(mol, mol.GetRingInfo().AtomRings()[0])
+        >>> mol = Chem.MolFromSmiles('C1CCCCC1') # cyclohexane
+        >>> classify_ring(mol, mol.GetRingInfo.AtomRings[0])
         'cycloalkane'
-        >>> mol = Chem.MolFromSmiles('c1ccccc1')  # benzene
-        >>> classify_ring(mol, mol.GetRingInfo().AtomRings()[0])
+        >>> mol = Chem.MolFromSmiles('c1ccccc1') # benzene
+        >>> classify_ring(mol, mol.GetRingInfo.AtomRings[0])
         'aromatic'
-        >>> mol = Chem.MolFromSmiles('c1ccncc1')  # pyridine
-        >>> classify_ring(mol, mol.GetRingInfo().AtomRings()[0])
+        >>> mol = Chem.MolFromSmiles('c1ccncc1') # pyridine
+        >>> classify_ring(mol, mol.GetRingInfo.AtomRings[0])
         'heterocyclic_aromatic'
-        >>> mol = Chem.MolFromSmiles('C1CCNCC1')  # piperidine
-        >>> classify_ring(mol, mol.GetRingInfo().AtomRings()[0])
+        >>> mol = Chem.MolFromSmiles('C1CCNCC1') # piperidine
+        >>> classify_ring(mol, mol.GetRingInfo.AtomRings[0])
         'heterocyclic_saturated'
     """
     # Check heterocyclic first (highest priority)

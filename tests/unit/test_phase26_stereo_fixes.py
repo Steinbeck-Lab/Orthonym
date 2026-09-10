@@ -73,7 +73,7 @@ class TestSteroidStereoPresence:
     def test_androstandiol_has_stereo_prefix(self):
         """Androstan-3,17-diol with stereocenters carries stereo descriptors.
 
-        a phase (WSC-02): steroid ring stereocentres now emit ring-face α/β
+        a phase (-02): steroid ring stereocentres now emit ring-face α/β
         (`5β-androstan-3α,17α-diol`) rather than a whole-graph (R/S) block.
         """
         name = name_compound(ANDROSTANDIOL_SMILES)
@@ -116,9 +116,9 @@ class TestSteroidStereoPresence:
 
 @pytest.mark.unit
 class TestSteroidStereoFormat:
-    """Test that steroid ring-face α/β descriptors follow the P-101.2.6 format.
+    """Test that steroid ring-face α/β descriptors follow the format.
 
-    a phase (WSC-02): a steroid whose ring stereocentres resolve emits Latin α/β
+    a phase (-02): a steroid whose ring stereocentres resolve emits Latin α/β
     descriptors INLINE — on the stem (`5β-`) and at each substituent/suffix locant
     (`3α`, `17α`) — NOT a leading whole-graph `(R/S)-` parenthesised block.
     """
@@ -199,14 +199,14 @@ class TestSteroidStereoOPSIN:
     """
 
     def test_androstandiol_opsin_roundtrip(self):
-        """OPSIN parses the α/β-annotated androstan-3,17-diol and matches (WSC-02).
+        """OPSIN parses the α/β-annotated androstan-3,17-diol and matches (-02).
 
         a phase: the name is now `5β-androstan-3α,17α-diol`; OPSIN parses the
         ring-face descriptors and returns SMILES that canonicalizes to the input structure.
         """
         name = name_compound(ANDROSTANDIOL_SMILES)
         assert "androstan" in name
-        #: the ring-face descriptors are the Blue-Book GREEK α/β (P-101.2.6),
+        #: the ring-face descriptors are the Blue-Book GREEK α/β,
         # not the ASCII words (commit 94b00800b). Accept either spelling.
         assert re.search(r"\d+(alpha|beta|α|β)", name), f"expected ring-face α/β in {name}"
 

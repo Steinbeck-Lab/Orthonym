@@ -1,10 +1,10 @@
-"""Phase 169.7 BBR-PERC / DEF-3 — structural chain-exclusion of prefix-only FG atoms.
+"""a phase BBR-PERC / — structural chain-exclusion of prefix-only FG atoms.
 
 Azide / diazo / nitroso / nitrite / nitro / N-oxide heteroatoms are characteristic
-groups (P-59 / P-65.5 / P-61), NOT chain skeletal atoms. They must never be walked
+groups / /, NOT chain skeletal atoms. They must never be walked
 into an aza/oxa parent chain (the audit's `CN=[N+]=[N-] -> 2,3-diazabutane` bug).
 
-The fix is STRUCTURAL (CONTEXT D-04): `get_chain_excluded_atoms` derives the atom
+The fix is STRUCTURAL (internal notes): `get_chain_excluded_atoms` derives the atom
 set from perception's own FG matches (not a per-FG SMARTS blocklist), the skeletal-
 replacement path suppresses on it, and `get_principal_group` skips prefix-only
 groups so the FG is emitted as a substitutive prefix.
@@ -46,7 +46,7 @@ def test_excluded_atoms_nitroso_are_heteroatoms():
 
 @pytest.mark.unit
 def test_structural_not_blocklist_edit():
-    # CONTEXT D-04: derived from detect_functional_groups, NOT a _PRIORITY_FG_SMARTS edit.
+    # internal notes: derived from detect_functional_groups, NOT a _PRIORITY_FG_SMARTS edit.
     src = inspect.getsource(get_chain_excluded_atoms)
     assert "_PRIORITY_FG_SMARTS" not in src
     assert "detect_functional_groups" in src
@@ -67,7 +67,7 @@ def test_diazomethane_prefix_not_dropped(namer):
 @pytest.mark.unit
 def test_genuine_skeletal_replacement_unaffected(namer):
     # a real oxa chain (no prefix-only FG) must STILL skeletal-replace.
-    # R4 / P-63.2.4: CCOCCOCC has exactly 2 embedded O-ethers with no terminal
+    # R4 /: CCOCCOCC has exactly 2 embedded O-ethers with no terminal
     # -ol suffix; the substitutive PIN is '1,2-diethoxyethane' (not skeletal).
-    # Updated from pre-R4 '3,6-dioxaoctane'.  A 3-O chain still keeps skeletal:
+    # Updated from pre-R4 '3,6-dioxaoctane'. A 3-O chain still keeps skeletal:
     assert namer.name("COCCOCCOC") == "2,5,8-trioxanonane"

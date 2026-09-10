@@ -1,4 +1,4 @@
-"""v26 companion — ring-parent poly-amine with per-nitrogen N-locants (P-62.2.2).
+""" companion — ring-parent poly-amine with per-nitrogen N-locants.
 
 A ring parent bearing >=2 exocyclic -NHR amines (as the principal group) is a
 'ring-x,y-diamine' whose N-substituents must carry each amine nitrogen's RING

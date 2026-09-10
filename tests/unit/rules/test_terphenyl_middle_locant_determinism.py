@@ -1,12 +1,12 @@
-"""v30 #41 — the middle carbocyclic ring of a linear ring assembly has TWO
+""" #41 — the middle carbocyclic ring of a linear ring assembly has TWO
 inter-ring junctions; a substituent/PCG on it must get a DETERMINISTIC lowest
 locant (2', not 3') independent of input SMILES spelling.
 
 Pre-fix: ``_get_substituent_info`` numbered the middle ring from the FIRST
 inter-system connection atom (SMILES-order dependent), so p-terphenyl-2'-
 carboxylic acid emitted ``-2'-`` or ``-3'-`` depending on the spelling. Same
-molecule (0-wrong, SELF-01 blind; the PIN oracle uses fixed spellings, so the
-gate's determinism check is blind to it). Found by fable review a998bea712.
+molecule (0-wrong, blind; the PIN oracle uses fixed spellings, so the
+gate's determinism check is blind to it). Found by a review review a998bea712.
 """
 import pytest
 from rdkit import Chem

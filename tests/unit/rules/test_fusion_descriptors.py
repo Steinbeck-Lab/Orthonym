@@ -2,13 +2,13 @@
 Unit tests for fusion descriptor generation.
 
 Tests cover:
-- get_fusion_edge() for finding shared edges in parent rings
-- get_fusion_letter() for edge-to-letter conversion
-- get_child_locants() for child ring atom positions
-- generate_fusion_descriptor() for [num,num-letter] format
-- get_fusion_prefix() for ring name to prefix conversion
-- build_systematic_fusion_name() for complete name assembly
-- identify_parent_and_child() for ring role determination
+- get_fusion_edge for finding shared edges in parent rings
+- get_fusion_letter for edge-to-letter conversion
+- get_child_locants for child ring atom positions
+- generate_fusion_descriptor for [num,num-letter] format
+- get_fusion_prefix for ring name to prefix conversion
+- build_systematic_fusion_name for complete name assembly
+- identify_parent_and_child for ring role determination
 """
 
 import pytest
@@ -51,7 +51,7 @@ class TestEdgeLetters:
 
 
 # ============================================================================
-# Test get_fusion_edge()
+# Test get_fusion_edge
 # ============================================================================
 
 class TestGetFusionEdge:
@@ -124,7 +124,7 @@ class TestGetFusionEdge:
 
 
 # ============================================================================
-# Test get_fusion_letter()
+# Test get_fusion_letter
 # ============================================================================
 
 class TestGetFusionLetter:
@@ -188,7 +188,7 @@ class TestGetFusionLetter:
 
 
 # ============================================================================
-# Test get_child_locants()
+# Test get_child_locants
 # ============================================================================
 
 class TestGetChildLocants:
@@ -234,7 +234,7 @@ class TestGetChildLocants:
 
 
 # ============================================================================
-# Test generate_fusion_descriptor()
+# Test generate_fusion_descriptor
 # ============================================================================
 
 class TestGenerateFusionDescriptor:
@@ -295,7 +295,7 @@ class TestGenerateFusionDescriptor:
 
 
 # ============================================================================
-# Test get_fusion_prefix()
+# Test get_fusion_prefix
 # ============================================================================
 
 class TestGetFusionPrefix:
@@ -402,7 +402,7 @@ class TestGetFusionPrefix:
 
 
 # ============================================================================
-# Test build_systematic_fusion_name()
+# Test build_systematic_fusion_name
 # ============================================================================
 
 class TestBuildSystematicFusionName:
@@ -448,7 +448,7 @@ class TestBuildSystematicFusionName:
 
 
 # ============================================================================
-# Test identify_parent_and_child()
+# Test identify_parent_and_child
 # ============================================================================
 
 class TestIdentifyParentAndChild:
@@ -456,7 +456,7 @@ class TestIdentifyParentAndChild:
 
     @pytest.mark.unit
     def test_heterocyclic_is_parent_over_carbocyclic(self):
-        """IUPAC seniority: heterocyclic ring is parent over carbocyclic (P-25.2.1)."""
+        """IUPAC seniority: heterocyclic ring is parent over carbocyclic."""
         mol = Chem.MolFromSmiles('c1ccc2[nH]ccc2c1')  # indole
         ri = mol.GetRingInfo()
         rings = ri.AtomRings()
@@ -532,7 +532,7 @@ class TestIdentifyParentAndChild:
 
 
 # ============================================================================
-# Test generate_systematic_name_for_fused_pair()
+# Test generate_systematic_name_for_fused_pair
 # ============================================================================
 
 class TestGenerateSystematicNameForFusedPair:

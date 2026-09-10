@@ -1,16 +1,16 @@
-"""Phase 160 phosphine handler — direct-return shim with benzene skip guard.
+"""a phase phosphine handler — direct-return shim with benzene skip guard.
 
 Verbatim move of composer.py:1016-1061 dispatch logic. Covers tertiary,
 secondary, and primary phosphine principal-group variants and preserves
 the benzene-parent skip guard that the inline branch enforced (multi-P
 or ring-with-other-substituents cases defer to benzene-as-parent naming).
 
-IUPAC cite: P-68.3.1.2 (phosphines).
+IUPAC cite: (phosphines).
 
 References:
 - composer.py:1016-1061 (inline phosphine branch; REMOVED at this commit).
 - rules.phosphorus.name_phosphine — chemical-logic body.
-- 160-AUDIT-DECOMP.md § 1 row 'phosphine' + § 2.24 purity proof.
+- internal notes-DECOMP.md row 'phosphine' + purity proof.
 """
 from __future__ import annotations
 
@@ -29,9 +29,9 @@ _PHOSPHINE_GROUPS = (
 def _is_phosphine(features: Any) -> bool:
     """Mirrors composer.py:1016 (principal_group in the three phosphine variants).
 
-    Tier-A ring mutex (D4 / P-22.2.2.1): if the molecule is cyclic and the
-    chain is NOT the parent, decline so tier_a_ring@4500 handles it via the
-    Hantzsch-Widman builder.  Mirrors amine.py lines 55-58 exactly.
+    Tier-A ring mutex (D4 /: if the molecule is cyclic and the
+    chain is NOT the parent, decline so tier_a_ring handles it via the
+    Hantzsch-Widman builder. Mirrors amine.py lines 55-58 exactly.
     """
     if getattr(features, 'principal_group', None) not in _PHOSPHINE_GROUPS:
         return False

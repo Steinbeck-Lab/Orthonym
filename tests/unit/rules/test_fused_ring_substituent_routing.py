@@ -1,13 +1,13 @@
-"""WS-A task 9 — fused-ring routing + ring-system substituent emission.
+""" task 9 — fused-ring routing + ring-system substituent emission.
 
 Two coupled defect families (among-rings gold reds, cluster A):
 
 ROUTING (A-i): the PAH early-return (namer) and the whole-molecule
-complex-ring path (tier_a_ring sub-path 1) fire BEFORE the P-44 among-rings
+complex-ring path (tier_a_ring sub-path 1) fire BEFORE the among-rings
 decision, so a non-senior fused system seizes the parent
 (naphthalene over furan/pyridine/pyrrolidine; benzofuran over pyridine) and
 even a PG on another ring is ignored. `select_principal_ring_system` returns
-the correct P-44.2 winner for every one of these rows — the fix is to gate
+the correct winner for every one of these rows — the fix is to gate
 the early paths on that decision, not to re-derive it.
 
 EMISSION (A-ii): the fused-parent paths name ring-system substituents by
@@ -19,7 +19,7 @@ ring_substituents.get_ring_substituent_name) already names these fragments
 on the chain-parent path and must be the single delegate.
 
 LOCANT: get_ring_substituent_name cites the attachment by one arbitrary
-substructure match ('naphthalen-6-yl'); P-29.2/P-14.4 require the LOWEST
+substructure match ('naphthalen-6-yl'); / require the LOWEST
 locant over the ring system's symmetry ('naphthalen-2-yl').
 
 All PINs below are the OPSIN-verified among-rings gold oracle values.
@@ -33,7 +33,7 @@ from orthonym.namer import name_compound
 
 @pytest.mark.unit
 class TestFusedRoutingGold:
-    """A-i: parent must follow the P-44 among-rings decision."""
+    """A-i: parent must follow the among-rings decision."""
 
     def test_naphthalenyl_furan(self):
         assert (
@@ -60,8 +60,8 @@ class TestFusedRoutingGold:
         )
 
     def test_pg_ring_beats_pah(self):
-        # P-44.1: the -ol bearing cyclohexane is the parent; naphthalene is a
-        # substituent even though it is the P-44.2-senior ring system.
+        #: the -ol bearing cyclohexane is the parent; naphthalene is a
+        # substituent even though it is the -senior ring system.
         # (Currently names bare 'naphthalene' — PG silently discarded.)
         assert (
             name_compound("OC1CCCCC1c1ccc2ccccc2c1").strip()
@@ -88,7 +88,7 @@ class TestFusedParentSubstituentEmission:
     def test_phenylnaphthalene_not_hexyl(self):
         # The silent-corruption case: phenyl was being named 'hexyl' by the
         # carbon-count alkyl identifier (2-hexylnaphthalene — a DIFFERENT
-        # molecule). Naphthalene stays parent (P-44.2 senior over benzene).
+        # molecule). Naphthalene stays parent senior over benzene).
         assert (
             name_compound("c1ccc(-c2ccc3ccccc3c2)cc1").strip()
             == "2-phenylnaphthalene"

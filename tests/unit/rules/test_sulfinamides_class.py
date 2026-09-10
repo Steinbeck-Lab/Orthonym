@@ -2,13 +2,13 @@
 
 Blue Book authority
 -------------------
-**P-66.1.1.2** "Sulfonamides, sulfinamides, and related selenium and tellurium
-amides" (``BlueBookV2/BlueBookV2.md:32744``) — the section heading names the
+**** "Sulfonamides, sulfinamides, and related selenium and tellurium
+amides" (``the Blue Book Blue Book``) — the section heading names the
 class, and the suffix table at ``:32746`` reads:
 
     "Sulfonamides, sulfinamides, and the analogous selenium and tellurium amides
     are named substitutively using the following suffixes: -SO2-NH2 sulfonamide
-    (preselected suffix) **-SO-NH2 sulfinamide (preselected suffix)** ..."
+    (preselected suffix) **-SO-NH2 sulfinamide (preselected suffix)**..."
 
 **Table 6.1 item 24** (``:18782``) ``| 24. Sulfinamides | -SO-NH2 | sulfinamide |``
 places it below sulfonamide (19) / sulfonimidamide (20) and above
@@ -22,7 +22,7 @@ Worked ``(PIN)`` examples, each re-opened at write time:
 * ``3-[(aminosulfinyl)oxy]propanoic acid (PIN)`` (``:36500``), printed against
   "[not 3-(sulfinamidoyloxy)propanoic acid; the name sulfinamidic acid is not an
   approved name]" — which is also why the SMARTS must exclude H2N-S(=O)-OH.
-* ``aminosulfinyl* (not sulfinamoyl) | H2N-S(O)- | P-66.1.1.4.2`` (``:55485``) —
+* ``aminosulfinyl* (not sulfinamoyl) | H2N-S(O)- | `` (``:55485``) —
   the prefix form is ``aminosulfinyl``; ``sulfinamoyl`` is named as NOT preferred.
 
 These tests assert at the DATA/PRODUCER level (the SMARTS, ``SENIORITY_ORDER``,
@@ -81,7 +81,7 @@ def test_primary_bucket_does_not_swallow_n_substituted_forms():
     """The primary/secondary/tertiary split is LOAD-BEARING, not cosmetic.
 
     A single permissive ``[NX3]`` bucket would route ``CS(=O)NC`` down the
-    generic suffix path and silently DROP the N-methyl carbon — the v29 defect
+    generic suffix path and silently DROP the N-methyl carbon — the defect
     recorded in ``rules/sulfonamides.py``. With the split, the N-substituted
     forms have no producer and therefore fail CLOSED instead of shipping a name
     that is missing an atom.
@@ -92,7 +92,7 @@ def test_primary_bucket_does_not_swallow_n_substituted_forms():
 
 @pytest.mark.unit
 def test_carbon_guard_excludes_the_unapproved_sulfinamidic_acid():
-    """BB:36500 — "the name sulfinamidic acid is not an approved name".
+    """the Blue Book — "the name sulfinamidic acid is not an approved name".
 
     ``H2N-S(=O)-OH`` has no S-C bond, so the ``$([SX3][#6])`` guard must reject
     it; without the guard the pattern would claim it and invent a parent.
@@ -141,7 +141,7 @@ def test_sulfinamide_is_in_the_seniority_order(key):
 
 @pytest.mark.unit
 def test_table_6_1_ordering_sulfonimidamide_then_sulfinamide_then_sulfinimidamide():
-    """Table 6.1 (BB:18782): item 20 > item 24 > item 25."""
+    """Table 6.1 (the Blue Book): item 20 > item 24 > item 25."""
     order = SENIORITY_ORDER
     assert order.index("sulfonimidamide") < order.index("primary_sulfinamide")
     for key in SULFINAMIDES:
@@ -162,7 +162,7 @@ def test_suffix_word_is_sulfinamide_for_both_chain_and_ring(key):
 @pytest.mark.unit
 @pytest.mark.parametrize("key", SULFINAMIDES)
 def test_prefix_form_is_aminosulfinyl_not_sulfinamoyl(key):
-    """BB:55485 prints ``aminosulfinyl* (not sulfinamoyl)``.
+    """the Blue Book prints ``aminosulfinyl* (not sulfinamoyl)``.
 
     The prefix is required so a DEMOTED sulfinamide is not dropped by the
     ``no_fg_prefix_form`` skip when a senior group takes the suffix — the
@@ -179,8 +179,8 @@ def test_two_carbon_parent_elides_the_suffix_locant(key):
     """``ethanesulfinamide``, not ``ethane-1-sulfinamide``.
 
     The symmetric 2-carbon parent has only one distinguishable position, so
-    P-14.3.4.4 lets the locant go. A 3+ carbon chain KEEPS it, which the Blue
-    Book's own PINs require: ``butane-2-sulfinamide`` (BB:32754) and
-    ``N-hydroxypropane-1-sulfinamide`` (BB:31236).
+     lets the locant go. A 3+ carbon chain KEEPS it, which the Blue
+    Book's own PINs require: ``butane-2-sulfinamide`` (the Blue Book) and
+    ``N-hydroxypropane-1-sulfinamide`` (the Blue Book).
     """
     assert key in _ETHANE_SUFFIX_ELIDE_FGS

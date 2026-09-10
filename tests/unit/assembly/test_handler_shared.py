@@ -1,9 +1,9 @@
-"""Unit tests for Phase 160.2 Plan-02-01: 6 _generate_* helpers lifted to
-handlers/_handler_shared.py per CONTEXT D-02 + D-03.
+"""Unit tests for a phase Plan-02-01: 6 _generate_* helpers lifted to
+handlers/_handler_shared.py per internal notes +.
 
 Per plan must_haves:
 - Shim re-export tests verify composer.py's local-name binding IS the
-  same function object as _handler_shared's export, per CONTEXT D-13
+  same function object as _handler_shared's export, per internal notes
   forbidden-boundary preservation + RESEARCH §Pattern 3.
 - Functional tests verify byte-identical end-to-end naming output for
   representative compounds whose names depend on each lifted helper.
@@ -18,7 +18,7 @@ from orthonym.assembly.handlers import _handler_shared
 # =============================================================================
 # Shim re-export identity tests (per RESEARCH §Pattern 3)
 # Each test verifies composer.py shim re-export creates the EXACT same
-# function object as _handler_shared's export per CONTEXT D-13 +
+# function object as _handler_shared's export per internal notes +
 # Python import semantics.
 # =============================================================================
 

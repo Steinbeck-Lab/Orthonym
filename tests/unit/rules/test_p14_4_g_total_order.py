@@ -1,4 +1,4 @@
-"""P-14.4 is an ORDERED CASCADE, and it must terminate in the STRUCTURE.
+""" is an ORDERED CASCADE, and it must terminate in the STRUCTURE.
 
  Phase C Task 9b. Task 9 (``) implemented criterion **(c)** and left
 the cascade to fall through to RDKit's ring-atom enumeration order -- i.e. to the
@@ -10,7 +10,7 @@ input SMILES. Consequence, one command:
 
 Which one is right, derived at source
 -------------------------------------
-§**P-14.4 "NUMBERING"** (``the Blue Book Blue Book``): *"When several
+§** "NUMBERING"** (``the Blue Book Blue Book``): *"When several
 structural features appear in cyclic and acyclic compounds, low locants are
 assigned to them in the following decreasing order of seniority:"*
 
@@ -34,7 +34,7 @@ The decisive worked examples for (g):
   * ``:3315`` ``4-methyl-5-nitrooctanedioic acid (PIN)``
   * ``:3317`` ``1-methyl-4-nitronaphthalene (PIN) (not 4-methyl-1-nitronaphthalene)``
 
-and (g) is stated a SECOND time, with a benzene example, as §**P-61.11.2 "Low
+and (g) is stated a SECOND time, with a benzene example, as §** "Low
 locants are assigned to the prefix cited first in the name"** (``:26085``):
   * ``1-bromo-2-chloroethane (PIN)``
   * ``:26094`` ``1-azido-4-isocyanatobenzene (PIN)``
@@ -126,7 +126,7 @@ G_TARGETS = [
 
 @pytest.mark.parametrize("smiles,expected", G_TARGETS)
 def test_g_decides_and_every_spelling_agrees(smiles, expected):
-    """P-14.4(g)/P-61.11.2: one molecule, one PIN, whatever the input SMILES."""
+    """(g)/: one molecule, one PIN, whatever the input SMILES."""
     names = [name_compound(s) for s in _respellings(smiles)]
     assert set(names) == {expected}, sorted(set(names))
 
@@ -151,11 +151,11 @@ def test_bb_g_worked_examples_on_benzene(smiles, expected):
 
 
 # --------------------------------------------------------------------------
-# (g) must use the P-14.5.1/P-14.5.3 alphanumerical key, not raw string order.
+# (g) must use the / alphanumerical key, not raw string order.
 # Witness derived after a MUTATION SURVIVED: replacing ``alpha_sort_key`` with a
-# plain ``sorted()`` in the (g) key was invisible to every other test here.
+# plain ``sorted`` in the (g) key was invisible to every other test here.
 #
-# §**P-14.5.3** (``the Blue Book Blue Book``): *"When an alphanumerical
+# §**** (``the Blue Book Blue Book``): *"When an alphanumerical
 # ordering is required and Roman letters do not permit a decision for the order of
 # citation, italicized letters are considered."* So the italicized ``tert`` is NOT
 # part of the primary comparison -- the BB's own example cites
@@ -166,7 +166,7 @@ def test_bb_g_worked_examples_on_benzene(smiles, expected):
 #
 # ⚠ NOTE FOR THE READER: ``CLAUDE.md`` states "INCLUDE for alphabetization: iso-,
 # neo-, cyclo-, sec-, tert-". That is right for the nonitalic iso/neo/cyclo and
-# WRONG for the italicized sec-/tert-, per P-14.5.3 above.
+# WRONG for the italicized sec-/tert-, per above.
 # --------------------------------------------------------------------------
 
 ALPHA_KEY_WITNESSES = [
@@ -185,7 +185,7 @@ ALPHA_KEY_WITNESSES = [
 
 @pytest.mark.parametrize("smiles,expected", ALPHA_KEY_WITNESSES)
 def test_g_uses_the_iupac_alphanumerical_key(smiles, expected):
-    """P-14.5.3: the italicized ``tert`` is not part of the Roman-letter order."""
+    """: the italicized ``tert`` is not part of the Roman-letter order."""
     names = [name_compound(s) for s in _respellings(smiles)]
     assert set(names) == {expected}, sorted(set(names))
 
@@ -193,7 +193,7 @@ def test_g_uses_the_iupac_alphanumerical_key(smiles, expected):
 def test_the_alpha_key_and_raw_string_order_really_disagree_here():
     """Proves the witnesses above are load-bearing rather than incidental.
 
-    If ``alpha_sort_key`` ever stopped differing from ``sorted()`` on this pair,
+    If ``alpha_sort_key`` ever stopped differing from ``sorted`` on this pair,
     the rows above would silently stop testing anything.
     """
     from orthonym.assembly.naming_utils import alpha_sort_key
@@ -321,7 +321,7 @@ def test_promotion_authority_promotes_hydroxy_when_nothing_senior_holds_the_slot
 
 
 def test_promotion_authority_demotes_a_junior_suffix_but_not_a_senior_one():
-    """P-41: -ol outranks -thiol, and a carboxylic acid outranks -ol."""
+    """: -ol outranks -thiol, and a carboxylic acid outranks -ol."""
     assert benzene_prefix_suffix_promotion(
         {"thiol"}, {"hydroxy"}, {},
     ) == ("ol", frozenset({"hydroxy"}))
@@ -384,7 +384,7 @@ def test_functional_class_keys_all_exist_in_the_detector_registry():
 
 
 def test_azido_does_not_block_the_ol_promotion_p61_7():
-    """§P-61.7 AZIDES (the Blue Book): azido is a substitutive PREFIX and gives PINs.
+    """§ AZIDES (the Blue Book): azido is a substitutive PREFIX and gives PINs.
 
     ``:25997`` ``3-azidonaphthalene-2-sulfonic acid (PIN)`` shows azido cited as a
     detachable prefix while a SUFFIX governs the parent, so an azide cannot stop
@@ -499,7 +499,7 @@ def test_the_mirror_pair_is_protected_by_BOTH_g_tiers(monkeypatch):
     green-but-blind: ``orient_benzene``'s (g) and ``_renumber_relative_to``'s (g)
     each produce the PIN on their own, so disabling either leaves the other to do
     it. With BOTH disabled the pair collapses onto the NON-PIN
-    ``6-chloro-2-methylphenol`` -- both spellings agree, but on the name P-14.4(g)
+    ``6-chloro-2-methylphenol`` -- both spellings agree, but on the name (g)
     forbids. (It no longer SPLITS, because the split needed the crude "position 1
     goes to the alphabetically first substituent at position 1" tier that (g)
     replaced; that tier's key was constant across every survivor, so its stable

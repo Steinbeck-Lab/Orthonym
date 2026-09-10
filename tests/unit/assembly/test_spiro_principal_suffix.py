@@ -1,4 +1,4 @@
-"""v31 PIN conformance (P-33.3): a suffixable principal characteristic group on a
+""" PIN conformance: a suffixable principal characteristic group on a
 SPIRO parent must be cited as the principal SUFFIX, not demoted to a prefix.
 
 Root cause (measured 2026-08-10): the `complex_ring` assembly named the acid/ol/

@@ -19,7 +19,7 @@ IUPAC priority, Table 2.4's own "decreasing order of seniority" [BBv2:8236]:
   F > Cl > Br > I > O > S > Se > Te > N > P > As > Sb > Bi > Si > Ge > Sn > Pb
     > B > Al > Ga > In > Tl
 
-Reference: IUPAC 2013 Blue Book, **Table 2.4** (P-22.2.2.1.1) [BBv2:8234-8250].
+Reference: IUPAC 2013 Blue Book, **Table 2.4** [BBv2:8234-8250].
     Earlier revisions of this docstring cited "Table 2.3"; that table is the
     retained-name morpholine entry, not the Hantzsch-Widman prefix table.
     Corrected against the book.
@@ -31,7 +31,7 @@ from typing import Dict, Optional
 # Maps element symbol to the standard HW prefix
 HW_PREFIXES: Dict[str, str] = {
     # Group 17 (halogens — only reachable in lambda-convention rings,
-    # P-22.2.7.1: 1lambda3-iodinane; standard-valence halogens cannot be
+    #: 1lambda3-iodinane; standard-valence halogens cannot be
     # skeletal ring atoms)
     'F': 'fluora',
     'Cl': 'chlora',
@@ -57,7 +57,7 @@ HW_PREFIXES: Dict[str, str] = {
     'Sn': 'stanna',
     'Pb': 'plumba',
 
-    # Group 13. Al/Ga/In/Tl are the four elements P-22.2.2 [BBv2:8218] ADDED to
+    # Group 13. Al/Ga/In/Tl are the four elements [BBv2:8218] ADDED to
     # the recommended Hantzsch-Widman system. Their Table 2.4 spellings are
     # transcribed verbatim from [BBv2:8244-8248] and TWO of them deliberately
     # differ from Table 1.5: the book prints ``aluminium | 3 | aluma`` with the
@@ -73,16 +73,16 @@ HW_PREFIXES: Dict[str, str] = {
     'In': 'indiga',
     'Tl': 'thalla',
 
-    # NOTE: mercury is deliberately ABSENT. P-22.2.2 [BBv2:8218]: "The elements
+    # NOTE: mercury is deliberately ABSENT. [BBv2:8218]: "The elements
     # aluminium, gallium, indium, and thallium are now included in the recommended
     # Hantzsch-Widman system and mercury has been deleted." Hg appears in neither
     # Table 1.5 nor Table 2.4 (only in the Appendix 1 *seniority* list), so
     # offering ``mercura`` here spelled a prefix the replacement system does not
-    # have. Organomercury is named by P-69 organometallic nomenclature, which
+    # have. Organomercury is named by organometallic nomenclature, which
     # keeps its own ``data/organometallics.METALLACYCLE_A_PREFIX`` -- that is the
     # legitimate home of Hg/Zn/Cd and is untouched by this removal.
     #
-    # Al/Ga/In/Tl -- which P-22.2.2 ADDED to Hantzsch-Widman in the same sentence
+    # Al/Ga/In/Tl -- which ADDED to Hantzsch-Widman in the same sentence
     # -- are now listed above, per element against [BBv2:8244-8248].
 }
 
@@ -90,17 +90,17 @@ HW_PREFIXES: Dict[str, str] = {
 # Heteroatom priority for ring numbering
 # Lower number = higher priority (gets position 1)
 # Table 2.4 order [BBv2:8236]: F > Cl > Br > I > O > S > Se > Te > N > P > As
-#   > Sb > Bi > Si > Ge > Sn > Pb > B > Al > Ga > In > Tl. Identical, element for
-#   element, to P-23.3.1's von Baeyer citation order [BBv2:9765] -- which is why
-#   the Table-1.5 spiro sites that sort with this table have never disagreed with
-#   ``ring_replacement.HETEROATOM_PREFIXES``'s ranks. Only the SPELLINGS diverge
-#   (aluma/indiga), and those come from HW_PREFIXES above, never from here.
-# Phase 151-04 WR-01: halogens included per IUPAC P-25.3.1.3 (skeletal
+# > Sb > Bi > Si > Ge > Sn > Pb > B > Al > Ga > In > Tl. Identical, element for
+# element, to 's von Baeyer citation order [BBv2:9765] -- which is why
+# the Table-1.5 spiro sites that sort with this table have never disagreed with
+# ``ring_replacement.HETEROATOM_PREFIXES``'s ranks. Only the SPELLINGS diverge
+# (aluma/indiga), and those come from HW_PREFIXES above, never from here.
+# a phase-04: halogens included per IUPAC (skeletal
 # replacement nomenclature priority). Negative values keep them strictly
 # more senior than O without renumbering downstream callers that depend
 # on the relative ordering of O..B established before halogens were added.
 HETEROATOM_PRIORITY: Dict[str, int] = {
-    # Group 17 (halogens — most senior per IUPAC P-25.3.1.3)
+    # Group 17 (halogens — most senior per IUPAC
     'F': -4,
     'Cl': -3,
     'Br': -2,
@@ -140,9 +140,9 @@ HETEROATOM_PRIORITY: Dict[str, int] = {
     'Tl': 18,
 
     # NOT a replacement-seniority position: Hg has no prefix in Table 1.5 OR
-    # Table 2.4 (P-22.2.2 deleted it), so no name can ever cite it from here and
+    # Table 2.4 deleted it), so no name can ever cite it from here and
     # this rank is unreachable in every replacement path. Kept only so the value
-    # stays defined for the P-69 organometallic consumers, and moved past In/Tl so
+    # stays defined for the organometallic consumers, and moved past In/Tl so
     # those two could take their real Table 2.4 positions. Do not read it as
     # sanctioning ``mercura`` in replacement nomenclature -- see HW_PREFIXES.
     'Hg': 19,
@@ -165,7 +165,7 @@ def get_hw_prefix(element: str) -> Optional[str]:
     aluminium rings: the heteroatom vanished from the name while the HW stem still
     counted it toward the ring size.
 
-    This is Table 2.4 (P-22.2.2.1.1), the Hantzsch-Widman context only. General
+    This is Table 2.4, the Hantzsch-Widman context only. General
     skeletal replacement -- von Baeyer, spiro, chains, rings > 10 -- uses
     Table 1.5 via ``rules/ring_replacement.HETEROATOM_PREFIXES``, which spells Al
     and In differently on purpose (``alumina``/``inda`` vs ``aluma``/``indiga``,
@@ -177,9 +177,9 @@ def get_hw_prefix(element: str) -> Optional[str]:
         'oxa'
         >>> get_hw_prefix('N')
         'aza'
-        >>> get_hw_prefix('C')  # Carbon has no HW prefix
+        >>> get_hw_prefix('C') # Carbon has no HW prefix
         None
-        >>> get_hw_prefix('Hg')  # deleted from HW by P-22.2.2
+        >>> get_hw_prefix('Hg') # deleted from HW by
         None
     """
     return HW_PREFIXES.get(element)
@@ -205,7 +205,7 @@ def get_heteroatom_priority(element: str) -> int:
         5
         >>> get_heteroatom_priority('O') < get_heteroatom_priority('N')
         True
-        >>> get_heteroatom_priority('X')  # Unknown element
+        >>> get_heteroatom_priority('X') # Unknown element
         999
     """
     return HETEROATOM_PRIORITY.get(element, 999)
@@ -226,11 +226,11 @@ def compare_heteroatom_priority(element1: str, element2: str) -> int:
 
     Examples:
         >>> compare_heteroatom_priority('O', 'N')
-        -1  # O has higher priority
+        -1 # O has higher priority
         >>> compare_heteroatom_priority('N', 'O')
-        1   # O has higher priority
+        1 # O has higher priority
         >>> compare_heteroatom_priority('O', 'O')
-        0   # Same priority
+        0 # Same priority
     """
     p1 = get_heteroatom_priority(element1)
     p2 = get_heteroatom_priority(element2)

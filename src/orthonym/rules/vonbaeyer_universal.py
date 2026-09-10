@@ -1,11 +1,11 @@
-"""v25 G2: universal von-Baeyer cage analysis.
+""": universal von-Baeyer cage analysis.
 
 Names ANY bridged/fused polycyclic cage — including AROMATIC cages — by
 kekulizing a canonical copy and expressing every former-aromatic bond as an
-explicit ene locant (P-23 unsaturation). The emitted ``...-polyene`` cage
+explicit ene locant unsaturation). The emitted ``...-polyene`` cage
 re-parses (OPSIN) to a kekule structure whose canonicalization re-aromatizes
 to the SAME molecule, so structural fidelity is preserved; this is the
-universal T3 ring fallback for the opt-in general engine ONLY. The default
+universal ring fallback for the opt-in general engine ONLY. The default
 PIN path's aromatic-cage refusal (polycyclic.py:2789) is deliberately
 untouched.
 
@@ -31,21 +31,21 @@ class _Malformed(Exception):
     locant to itself). Raised inside the reconstructor, never propagated."""
 
 #: Implementation ceilings on the cage this module will analyse. The Blue Book
-#: sets NO upper size limit on von Baeyer nomenclature (P-23 is construction
+#: sets NO upper size limit on von Baeyer nomenclature is construction
 #: rules only), so both numbers are ours, not nomenclature's. They guard only
 #: this module -- the default PIN path (``polycyclic.name_polycyclic_complete``)
 #: caps nothing above ``ring_count < 2``.
 #:
-#: v29 Phase 2 T3b measured what raising them buys, over the 1203 ring molecules
+#: a phase measured what raising them buys, over the 1203 ring molecules
 #: of ``benchmarks/pubchem_2000.csv``, and the answer is NOTHING: with both caps
 #: set to 200 the emitted name is byte-identical for every molecule the caps
 #: touch. So the VALUES stay and the fix went to what was being COUNTED --
 #: ``MAX_CAGE_RINGS`` was compared against RDKit's symmetrized ring-set
-#: cardinality instead of the P-23.1.9 ring number (see
+#: cardinality instead of the ring number (see
 #: ``polycyclic.von_baeyer_ring_count``), which made this cap refuse *heptacyclo*
 #: cages for being "more than 8 rings".
 #:
-#: Do not raise ``MAX_CAGE_RINGS`` without first fixing P-23.2.4 main-bridge
+#: Do not raise ``MAX_CAGE_RINGS`` without first fixing main-bridge
 #: selection: ``_find_main_ring`` only ever offers a 0- or 1-atom main bridge, so
 #: 7 of 19 Blue Book von Baeyer PIN descriptors come back with a non-preferred
 #: main bridge (locked in ``tests/unit/rules/test_v29_p2_vb_ring_count.py``).
@@ -58,7 +58,7 @@ MAX_CAGE_RINGS = 8
 class RingAnalysis:
     """The ONE field contract ``_emit_ring_from_analysis`` consumes.
 
-    Why this base exists (v29 Phase 2 T5 follow-up)
+    Why this base exists (a phase follow-up)
     -----------------------------------------------
     ``UniversalCage`` (von Baeyer) and ``SpiroSystem`` (spiro) are two ring
     analysis forms feeding ONE shared emission tail, so the tail is written
@@ -66,10 +66,10 @@ class RingAnalysis:
     TWICE -- ``SpiroSystem`` re-declared ``UniversalCage``'s fields by hand --
     and the two copies drifted every time either producer was touched:
 
-    * ``4e0a13d1``: the skeletal-replacement TOTALITY gate was added to the
+    * ``: the skeletal-replacement TOTALITY gate was added to the
       spiro analyzer only, so a mercury von-Baeyer ring shipped as
       ``bicyclo[3.3.0]octane`` -- a hydrocarbon name;
-    * ``c931432a``: ``hetero_per_atom`` was added to the cage only, so the
+    * ``: ``hetero_per_atom`` was added to the cage only, so the
       spiro sibling kept the ``UNBOUND_MORPHEME`` finding that commit existed
       to remove.
 
@@ -84,7 +84,7 @@ class RingAnalysis:
 
     descriptor: str                 # e.g. "bicyclo[2.2.1]" / "spiro[4.5]"
     total_atoms: int
-    hetero_prefix: str              # "" | "7-oxa" | "2,5-diaza" ...
+    hetero_prefix: str              # "" | "7-oxa" | "2,5-diaza"...
     unsaturation: dict              # {'double_bonds': [...], 'triple_bonds': [...]}
     cage_atoms: Tuple[int, ...]     # ORIGINAL (input-mol) indices
     atom_to_locant: Dict[int, int]  # ORIGINAL idx -> ring locant
@@ -93,14 +93,14 @@ class RingAnalysis:
                                     # under the opt-in complete tier
                                     # (allow_mancude), where it emits as a
                                     # kekulized polyene
-    # v29 Phase 2 T5: which ORIGINAL atom each morpheme of ``hetero_prefix``
+    # a phase T5: which ORIGINAL atom each morpheme of ``hetero_prefix``
     # spells -- (orig idx, morpheme), e.g. ((6, 'oxa'),). Carried so a consumer
     # can bind one token per replacement morpheme instead of letting the parent
     # token over-claim the heteroatoms it does not spell. MUST come from the
     # same builder that spelled ``hetero_prefix`` (never a second, differently
     # -spelling one) so the decomposition agrees with the string by
-    # construction. Defaults to () so a hand-built or foreign-shaped analysis
-    # stays valid; () means "not reported" and consumers must fall back to
+    # construction. Defaults to  so a hand-built or foreign-shaped analysis
+    # stays valid;  means "not reported" and consumers must fall back to
     # whole-parent attribution, NOT assume the ring is all-carbon.
     hetero_per_atom: Tuple[Tuple[int, str], ...] = ()
 
@@ -113,7 +113,7 @@ class UniversalCage(RingAnalysis):
     """
 
 
-#: ``bicyclo[`` / ``tricyclo[`` / ... head, capturing the bracket body.
+#: ``bicyclo[`` / ``tricyclo[`` /... head, capturing the bracket body.
 _VB_HEAD_RE = re.compile(r'^[a-z]+cyclo\[(.+)\]$')
 #: one secondary-bridge term: ``2^3,7`` (PIN typography) or ``2(3,7)`` (the
 #: older parenthesis form ``_build_descriptor`` also emits; OPSIN parses both).
@@ -129,7 +129,7 @@ def parse_von_baeyer_descriptor(descriptor: str):
     the string is not a well-formed von Baeyer descriptor.
 
     The three leading integers are the bicyclic system (two main-ring branches
-    then the main bridge, P-23.2.2 "cited in descending numerical order"); each
+    then the main bridge, "cited in descending numerical order"); each
     remaining term is ``length^low,high`` for one secondary bridge.
     """
     if not descriptor:
@@ -167,18 +167,18 @@ def reconstruct_von_baeyer_skeleton(descriptor: str, secondary_order=None):
     The numbering is not a convention of ours; it is read straight off the Blue
     Book, which is what makes this a proof rather than a heuristic:
 
-    * **P-23.2.3 "Numbering bicyclic alicyclic hydrocarbons"**
-      (``BlueBookV2/BlueBookV2.md:9589``): *"The bicyclic ring system is numbered
+    * ** "Numbering bicyclic alicyclic hydrocarbons"**
+      (``the Blue Book Blue Book``): *"The bicyclic ring system is numbered
       starting with one of the bridgeheads and proceeding first along the longer
       segment of the main ring to the second bridgehead, then back to the first
       bridgehead along the unnumbered segment of the main ring. Numbering is
       completed by numbering the main bridge beginning with the atom next to the
       first bridgehead."*
-    * **P-23.2.5.2 "Numbering the secondary bridge"** (``:9623``): *"After the
+    * ** "Numbering the secondary bridge"** (``:9623``): *"After the
       main ring and main bridge have been numbered, the independent secondary
       bridge is numbered continuing from the higher numbered bridgehead of the
       main ring."*
-    * **P-23.2.6.3 "Numbering of secondary bridges"** (``:9711``): *"the
+    * ** "Numbering of secondary bridges"** (``:9711``): *"the
       numbering continues from the highest number of the main ring and main
       bridge. Each secondary bridge is numbered in turn starting with the
       independent secondary bridge linked to the highest numbered bridgehead
@@ -188,8 +188,8 @@ def reconstruct_von_baeyer_skeleton(descriptor: str, secondary_order=None):
       bridgehead."*
 
     ``secondary_order`` overrides the order in which the secondary bridges
-    consume locants. P-23.2.6.3 fixes that order by descending attachment
-    bridgehead, but leaves ties to P-23.2.6.4; the caller uses this to try the
+    consume locants. fixes that order by descending attachment
+    bridgehead, but leaves ties to; the caller uses this to try the
     remaining orderings rather than false-reject a cage whose only deviation is
     a tie-break, which is a *preference* question and not a legality one.
     """
@@ -199,7 +199,7 @@ def reconstruct_von_baeyer_skeleton(descriptor: str, secondary_order=None):
     (a, b, c), secondary = parsed
     if a < 0 or b < 0 or c < 0:
         return None
-    # P-23.2.2: the bicyclic numbers are cited in descending order, and the
+    #: the bicyclic numbers are cited in descending order, and the
     # numbering rule above ("first along the LONGER segment") depends on it.
     if a < b or b < c:
         return None
@@ -224,7 +224,7 @@ def reconstruct_von_baeyer_skeleton(descriptor: str, secondary_order=None):
         return None
 
     if secondary_order is None:
-        # independent bridges before dependent (P-23.2.6.1.3); within each,
+        # independent bridges before dependent; within each,
         # the one linked to the highest numbered bridgehead first.
         secondary_order = sorted(
             range(len(secondary)),
@@ -287,7 +287,7 @@ def audit_von_baeyer_descriptor(
 
     * **False rejections.** ``BridgeInfo.atoms`` for a secondary bridge is stored
       in the opposite order to the bond path (numbering runs from the *higher*
-      numbered bridgehead, P-23.2.6.3), so the walk crossed a non-bonded pair and
+      numbered bridgehead,, so the walk crossed a non-bonded pair and
       the audit refused **556/8,201** enumerated and **14/1,623** corpus cages
       whose emitted name was perfectly correct.
     * **False acceptances.** The bridge list can agree with itself while the
@@ -296,7 +296,7 @@ def audit_von_baeyer_descriptor(
 
     Set-equality against the string catches both, and is what the name is
     actually judged on. It is deliberately independent of OPSIN: both downstream
-    gates (the validity gate and SELF-01) are documented FAIL-OPEN when Java is
+    gates (the validity gate and) are documented FAIL-OPEN when Java is
     unavailable (``namer.py:588``, ``:608``), and with them off **30** enumerated
     cages ship a descriptor whose brackets account for fewer atoms than its own
     stem counts (e.g. ``tetracyclo[5.1.1.2^3,6]dodecane`` -- 11 bracketed atoms,
@@ -312,12 +312,12 @@ def audit_von_baeyer_descriptor(
     total, asserted = rebuilt
     if total != len(cage):
         return False
-    # P-23.1.9, under P-23.1 "DEFINITIONS AND TERMINOLOGY"
-    # (``BlueBookV2/BlueBookV2.md:9558``): *"A 'polycyclic system' contains a
+    #, under "DEFINITIONS AND TERMINOLOGY"
+    # (``the Blue Book Blue Book``): *"A 'polycyclic system' contains a
     # number of rings equal to the minimum number of scissions required to
     # convert the system into an acyclic skeleton. The number of rings is
     # indicated by the nondetachable prefix 'bicyclo' (not dicyclo), 'tricyclo',
-    # 'tetracyclo', etc."*  The word is part of the name, so a descriptor whose
+    # 'tetracyclo', etc."* The word is part of the name, so a descriptor whose
     # brackets are right but whose ring-count word is wrong still denotes the
     # wrong system -- ``tetracyclo[3.3.1.1^3,7]`` for adamantane passed every
     # other clause of this audit.
@@ -338,7 +338,7 @@ def audit_von_baeyer_descriptor(
         return False
     if actual == asserted:
         return True
-    # P-23.2.6.4 leaves a tie-break when two secondary bridges attach to the
+    # leaves a tie-break when two secondary bridges attach to the
     # same bridgehead. A cage that matches under some other ordering IS legally
     # described by this string; only the numbering preference differs, so
     # refusing it would lose a correct name (the failure mode this audit had).
@@ -363,15 +363,15 @@ def analyze_cage_universal(
 
     ``spiro_atom`` (default None, original-mol atom index) is the spiro-junction
     atom when this cage is a COMPONENT of a spiro ring system. When passed, the
-    von-Baeyer numbering selection gives that atom the lowest locant (P-24.5.2),
+    von-Baeyer numbering selection gives that atom the lowest locant,
     above the heteroatom criteria; it is mapped into the canonical index space
     used internally before being threaded to ``VonBaeyerAnalyzer.analyze``. Every
     whole-molecule caller leaves it None, and the result is byte-identical.
 
-    v26 P2: when ``allow_mancude`` is True the aromatic/mancude-cage refusal
+    : when ``allow_mancude`` is True the aromatic/mancude-cage refusal
     below is LIFTED -- the cage is kekulized (already done above) and every
     former-aromatic bond is emitted as an explicit von-Baeyer polyene ene
-    locant (P-23 unsaturation). When False (the default / PIN path) the
+    locant unsaturation). When False (the default / PIN path) the
     refusal fires exactly as before, so that path is byte-identical.
 
     Every returned descriptor is put through ``audit_von_baeyer_descriptor``
@@ -403,7 +403,7 @@ def analyze_cage_universal(
     match = mol_for_match.GetSubstructMatch(canon) if canon is not None else ()
 
     if canon is None or len(match) != mol.GetNumAtoms():
-        # WS-NOABSTAIN fallback (only reached when the original check above
+        # NOABSTAIN fallback (only reached when the original check above
         # already failed, so this can only ADD coverage, never change an
         # already-working case). If the caller passed an already-Kekulized
         # mol (aromatic flags cleared -- e.g. `universal_substituent.py`'s
@@ -424,12 +424,12 @@ def analyze_cage_universal(
             # A prior ``Chem.Kekulize(..., clearAromaticFlags=True)`` demotes
             # a bracket-explicit H -- e.g. the pyrrole-type ``[nH]`` in an
             # indole/purine/imidazole-fused system -- from EXPLICIT to
-            # IMPLICIT bookkeeping (``GetTotalNumHs()`` stays correct
-            # throughout, but ``GetNumExplicitHs()`` drops to 0).
+            # IMPLICIT bookkeeping (``GetTotalNumHs`` stays correct
+            # throughout, but ``GetNumExplicitHs`` drops to 0).
             # ``SetAromaticity`` above restores the aromatic FLAG but not
             # that explicit-H bookkeeping, and ``MolToSmiles`` decides
             # whether to write ``[nH]`` vs. bare ``n`` from the
-            # explicit/no-implicit state, not from ``GetTotalNumHs()`` alone
+            # explicit/no-implicit state, not from ``GetTotalNumHs`` alone
             # -- so the canonical SMILES below would silently lose the ring
             # N-H, and re-parsing it would then fail to kekulize entirely
             # (measured on plain pyrrole and on this task's protonated-
@@ -478,7 +478,7 @@ def analyze_cage_universal(
 
     if len(cage_canon) > MAX_CAGE_ATOMS:
         return None
-    # v29 Phase 2 T3b: count rings the way P-23.1.9 defines them (minimum
+    # a phase T3b: count rings the way defines them (minimum
     # scissions to reach an acyclic skeleton = circuit rank), NOT the count of
     # RDKit's symmetrized ring set. The symmetrized count over-counts symmetric
     # cages (adamantane 4 vs 3, cubane 6 vs 5), so this cap used to refuse
@@ -491,7 +491,7 @@ def analyze_cage_universal(
     if len(analyzer._find_all_bridgeheads(kek, cage_canon)) < 2:
         return None  # spiro / degenerate: out of G2 scope
     # Map the spiro-junction atom into the canonical index space the analyzer
-    # works in (P-24.5.2 low-locant preference); None -> spiro-blind, byte-
+    # works in low-locant preference); None -> spiro-blind, byte-
     # identical to every whole-molecule caller.
     spiro_canon = (
         orig_to_canon.get(spiro_atom) if spiro_atom is not None else None
@@ -508,16 +508,16 @@ def analyze_cage_universal(
         logger.info("vonbaeyer_universal: numbering!=cage; refuse")
         return None
     # AUDIT: descriptor+numbering must assert the exact molecular ring/bridge
-    # bond set (Java-free skeleton floor; SELF-01 fails open without Java).
+    # bond set (Java-free skeleton floor; fails open without Java).
     if not audit_von_baeyer_descriptor(
             kek, cage_canon, desc.numbering, desc.descriptor_string):
         logger.info("vonbaeyer_universal: descriptor edge-audit failed; refuse")
         return None
 
-    # v29 Phase 2 T2a: skeletal-replacement TOTALITY. The prefix builder can only
+    # a phase T2a: skeletal-replacement TOTALITY. The prefix builder can only
     # spell the elements in its table; every other skeletal ring atom used to be
     # skipped while the stem kept counting it, so ``C1CC2CC[Hg]C2C1`` named as
-    # ``bicyclo[3.3.0]octane`` — a hydrocarbon name for a mercury ring. SELF-01
+    # ``bicyclo[3.3.0]octane`` — a hydrocarbon name for a mercury ring.
     # fails OPEN with no OPSIN jar (a supported mode), so nothing downstream
     # caught it. Refuse whenever a skeletal atom is left unexpressed: never a
     # ring stem that counts an atom no morpheme in the name spells.
@@ -529,15 +529,15 @@ def analyze_cage_universal(
         return None
     hetero = replacement.prefix
 
-    # v25 G5-A / v29 Phase 2 T1: cite each ring double bond with the von-Baeyer
+    # -A / a phase T1: cite each ring double bond with the von-Baeyer
     # COMPOUND locant n(m) when its two atoms are NOT consecutively numbered (a
     # fusion/bridge ene, e.g. octalin 1(6)); plain n when m == n+1. The bare
     # min(n,m) model mislabels non-consecutive enes (and, adjacent to an oxo,
     # fabricates the 5-bond-carbon valence clash). ``double_bond_pairs`` (raw
     # (low,high) VB locants) is retained for the engine's valence guard.
     #
-    # T1 moved this to ``rules/ring_unsaturation.py`` so it covers BOTH bond
-    # orders. Before T1 the triple-bond locants came straight from
+    # moved this to ``rules/ring_unsaturation.py`` so it covers BOTH bond
+    # orders. Before the triple-bond locants came straight from
     # ``get_polycyclic_unsaturation``'s ``min(loc1, loc2)`` — a bare locant with
     # no composite form and NO GUARD, i.e. a wrong-bond citation waiting for a
     # non-consecutively-numbered yne. The primitive fails closed on that state
@@ -557,20 +557,20 @@ def analyze_cage_universal(
     cage_orig = tuple(sorted(match[c] for c in cage_canon))
     atom_to_locant = {match[c]: loc for c, loc in desc.numbering.items()}
 
-    # v25 G5-A / v26 P2: a cage carrying an AROMATIC ring atom (original-mol
+    # -A /: a cage carrying an AROMATIC ring atom (original-mol
     # perception) is mancude. On the DEFAULT / PIN path (allow_mancude=False)
-    # its PIN is a fused/retained parent (P-25) + added/indicated H (P-58.2.2),
+    # its PIN is a fused/retained parent + added/indicated H,
     # NOT a von-Baeyer polyene, so we still refuse (fail-closed, byte-identical
     # to pre-P2). Under the opt-in complete tier (allow_mancude=True) the cage
     # was kekulized above and every former-aromatic bond is already captured in
-    # ``unsat`` as an explicit ene locant (P-23) -- express it as the kekulized
+    # ``unsat`` as an explicit ene locant -- express it as the kekulized
     # von-Baeyer polyene instead of refusing. Isolated ring double bonds
     # (norbornadiene) and saturated hetero cages (quinuclidine) are NOT aromatic
     # -> named on both paths. The oxo/ene valence guard in the engine
     # (general_engine.name_general_ring, suffix_core=='one') still fires.
-    # WS-NOABSTAIN: read aromaticity off `mol_for_match` (the re-aromatized
+    # NOABSTAIN: read aromaticity off `mol_for_match` (the re-aromatized
     # copy above), never the original `mol` -- an already-Kekulized caller's
-    # `mol` has every `GetIsAromatic()` flag cleared, which used to make this
+    # `mol` has every `GetIsAromatic` flag cleared, which used to make this
     # ALWAYS read False (never mancude) regardless of true aromaticity. That
     # was latent/inert only because the match check above voided the whole
     # call first for every genuinely aromatic cage; now that the match is
@@ -603,15 +603,15 @@ def analyze_cage_universal(
 
 
 # =====================================================================
-# v27 P3 (P-24.2): general SPIRO analysis — a sibling to the von-Baeyer
+#: general SPIRO analysis — a sibling to the von-Baeyer
 # cage engine above. ``analyze_cage_universal`` deliberately refuses spiro
-# (``<2 bridgeheads`` at :156); this analyzer names monospiro / linear &
+# (``<2 bridgeheads`` at:156); this analyzer names monospiro / linear &
 # branched polyspiro / heterocyclic spiro ring SYSTEMS, returning the SAME
 # dataclass shape (``SpiroSystem`` mirrors ``UniversalCage``) so the general
 # engine's suffix+substituent+stereo emission tail consumes it unchanged.
 # It composes the audited building blocks in ``rules/spiro.py`` (do not
 # re-derive) and runs every result through ``audit_spiro_descriptor`` — the
-# mandatory Java-free structural floor (SELF-01 fails OPEN without Java).
+# mandatory Java-free structural floor (fails OPEN without Java).
 # =====================================================================
 
 
@@ -634,9 +634,9 @@ def audit_spiro_descriptor(
 
     Mirrors ``audit_von_baeyer_descriptor``'s set-equality contract, adapted to
     spiro topology. Fail-closed (``False``) on any of:
-      (bijection)  numbering is not a 1-1 map of the cage atoms onto {1..N}
+      (bijection) numbering is not a 1-1 map of the cage atoms onto {1..N}
                    (rejects a numbering that maps two atoms to the same locant);
-      (coverage)   the SSSR rings contained in the cage do not union to exactly
+      (coverage) the SSSR rings contained in the cage do not union to exactly
                    the cage atom set (a ring atom silently dropped);
       (pure-spiro) two cage rings share >1 atom (fused/bridged mis-routed here),
                    a shared atom is not a declared spiro atom, a spiro atom is
@@ -743,9 +743,9 @@ def analyze_spiro_universal(
 
     ``cage_atoms`` selects the spiro ring system inside ``mol`` (defaults to all
     ring atoms). ``free_valence_atoms`` (original indices) biases the monospiro
-    numbering to give the free valence the lowest locant (P-29.3, substituent
+    numbering to give the free valence the lowest locant, substituent
     use). ``allow_mancude`` lifts the aromatic-spiro refusal, emitting the
-    kekulized ene-locant (P-23) form; when False an aromatic spiro fails closed
+    kekulized ene-locant form; when False an aromatic spiro fails closed
     (deferring to the retained-ring-name PIN path). Every result is put through
     ``audit_spiro_descriptor`` (fail-closed on any structural mismatch).
     """
@@ -782,7 +782,7 @@ def analyze_spiro_universal(
 
     ri = sub.GetRingInfo()
     n_rings = ri.NumRings()
-    # v29 Phase 2 T3b: the CAP is on the P-23.1.9 ring count (circuit rank), not
+    # a phase T3b: the CAP is on the ring count (circuit rank), not
     # on the symmetrized ring-set cardinality -- same fix as the cage sibling.
     # ``n_rings`` itself is left as the symmetrized count because the pure-spiro
     # identity check below (n_rings == n_spiro + 1) is written against that
@@ -834,7 +834,7 @@ def analyze_spiro_universal(
             Chem.Kekulize(kek, clearAromaticFlags=True)
         except Exception:
             return None
-    # v29 Phase 2 T1: one shared producer for both bond orders (this block and the
+    # a phase T1: one shared producer for both bond orders (this block and the
     # cage sibling's computed the same thing twice, and only this copy guarded the
     # yne). The blanket non-consecutive-yne refusal that used to live here is now
     # the primitive's, so both paths refuse identically.
@@ -850,12 +850,12 @@ def analyze_spiro_universal(
         'triple_bonds': list(ring_unsat.triple_locants),
     }
 
-    # --- heteroatom skeletal-replacement prefix (P-24.2.4) ---
+    # --- heteroatom skeletal-replacement prefix ---
     hetero_prefix = ""
     hetero_per_atom: Tuple[Tuple[int, str], ...] = ()
     if any(sub.GetAtomWithIdx(i).GetSymbol() != 'C'
            for i in range(sub.GetNumAtoms())):
-        # v29 Phase 2 T2a: the SAME skeletal-replacement totality rule the cage
+        # a phase T2a: the SAME skeletal-replacement totality rule the cage
         # sibling applies. ``build_replacement_prefix`` is consulted for
         # ``.unexpressed`` ONLY — the spelling stays with ``_build_hetero_prefix``
         # so this path's strings are byte-identical for the in-table elements (the
@@ -885,12 +885,12 @@ def analyze_spiro_universal(
         if hp is None:
             return None  # hetero present but prefix underivable -> fail closed
         hetero_prefix = hp.prefix
-        # v29 Phase 2 T5 (sibling completion): the per-morpheme decomposition of
+        # a phase (sibling completion): the per-morpheme decomposition of
         # the prefix, in ORIGINAL indices -- the same field, from the same
         # builder-that-spelled-it discipline, as the cage sibling above. Without
         # it the shared emission tail binds no token to ``oxa``/``thia`` and P5
         # reports the morpheme as name text nothing accounts for, which is the
-        # exact finding T5 removed on the cage while leaving it live here.
+        # exact finding removed on the cage while leaving it live here.
         hetero_per_atom = tuple(sorted(
             (sub_to_mol[k], morpheme) for k, morpheme in hp.per_atom))
 

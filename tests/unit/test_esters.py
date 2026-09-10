@@ -1,4 +1,4 @@
-"""Tests for ester naming (POLY-02).
+"""Tests for ester naming .
 
 Tests two-component ester naming following IUPAC conventions:
 - Simple esters: "alkyl alkanoate" format
@@ -415,14 +415,14 @@ class TestEsterFindMatch:
 
 
 # ============================================================================
-# NEW: Acyloxy Prefix Tests (a phase.7, Plan 02)
+# NEW: Acyloxy Prefix Tests (a phase, Plan 02)
 # ============================================================================
 
 
 class TestAcyloxyPrefixTrivial:
     """Test acyloxy prefix generation from trivial acid names.
 
-    IUPAC P-65.6.3.2.2: When the ester is named as a substituent prefix,
+    IUPAC: When the ester is named as a substituent prefix,
     the R-CO-O- portion is named as an 'acyloxy' group.
     Conversion: acid name -> drop '-ic' -> add '-yloxy'
     """
@@ -608,14 +608,14 @@ class TestDetectExocyclicEsters:
 
 
 # ============================================================================
-# Acyloxy Prefix for -carboxylic acids (FMT-01/FMT-02 fix)
+# Acyloxy Prefix for -carboxylic acids (/ fix)
 # ============================================================================
 
 
 class TestAcyloxyPrefixCarboxylic:
     """Test acyloxy prefix for ring -carboxylic acids.
 
-    FMT-01/FMT-02: cyclopentanecarboxylic/cyclohexanecarboxylic acids
+    /: cyclopentanecarboxylic/cyclohexanecarboxylic acids
     must produce -carbonyloxy, NOT -carboxylyloxy (the ylyloxy bug).
     """
 
@@ -663,17 +663,17 @@ class TestAcyloxyPrefixCarboxylic:
 class TestSaturatedFattyEstersUsePinAcylWord:
     """: the ester acyl word must come from the PIN acid stem.
 
-    P-65.6.3.2.1 "General methodology" (the Blue Book) -- "All preferred
+     "General methodology" (the Blue Book) -- "All preferred
     IUPAC names for esters are named by functional class nomenclature." Its own
     worked examples settle where the acyl word comes from: "CH3-CO-O-CH2-CH3
     ethyl acetate (PIN)" keeps the trivial word because acetic acid IS retained
-    as a PIN (P-65.1.1.1,:29715, "Only the following five carboxylic acids
+    as a PIN,:29715, "Only the following five carboxylic acids
     retained names and are also preferred IUPAC names"), whereas
     "CH3-O-CO-CH2-CH2-CO-O-CH2-CH3 ethyl methyl butanedioate (PIN)" uses the
     SYSTEMATIC word even though succinic acid is a retained name -- because it
-    is retained only for general nomenclature (P-65.1.1.2.2,:29745).
+    is retained only for general nomenclature,:29745).
 
-    No fatty acid is in the five. P-65.1.2 "Systematic names" (heading:29858)
+    No fatty acid is in the five. "Systematic names" (heading:29858)
     disposes of the rest at:29860, and the book prints the marker on the
     systematic side::29787 "palmitic acid hexadecanoic acid (PIN)",:29791
     "stearic acid octadecanoic acid (PIN)".
@@ -721,7 +721,7 @@ class TestSaturatedFattyEstersUsePinAcylWord:
         assert ester_stem == acid_stem
 
     def test_retained_pin_acids_keep_their_trivial_acyl_word(self):
-        """Guard the over-correction: the five P-65.1.1.1 acids must NOT move."""
+        """Guard the over-correction: the five acids must NOT move."""
         assert name_compound("CC(=O)OCC") == "ethyl acetate"
         assert name_compound("CCOC(=O)c1ccccc1") == "ethyl benzoate"
 
@@ -735,18 +735,18 @@ class TestAcylPrefixUsesPinAcidStem:
     ('hexadecanoic' -> 'palmitoyloxy') which took the already-preferred stem and
     converted it back to the non-PIN word.
 
-    THE RULE. P-65.6.3.2.3 "Esters cited as prefixes" (the Blue Book) --
+    THE RULE. "Esters cited as prefixes" (the Blue Book) --
     "an ester group is indicated by prefixes as 'acyloxy' for the group
     R-CO-O-". Its worked examples give both sides of the boundary:
 
       :31711 3-(benzoyloxy)propanoic acid (PIN)
               -- benzoic acid IS retained as a preferred IUPAC name
-                 (P-65.1.1.1:29715), so 'benzoyloxy' is PREFERRED and must
+                  :29715), so 'benzoyloxy' is PREFERRED and must
                  survive.
       :31723 3-[(pyridine-3-carbonyl)oxy]propanoic acid (PIN)
                 3-(nicotinoyloxy)propanoic acid
               -- nicotinic acid is retained for GENERAL nomenclature only
-                 (P-65.1.1.2.2 heading:29745; row:29773), so its
+                  heading:29745; row:29773), so its
                  trivial-derived acyloxy prefix is the NON-preferred alternative.
 
     palmitic/stearic/oleic sit in that same general-only list (:29787,:29791,
@@ -771,7 +771,7 @@ class TestAcylPrefixUsesPinAcidStem:
     ]
 
     # The unsaturated rows. J2 deferred these fearing the fall-through would hit
-    # the SATURATED get_acid_stem() and yield a WRONG MOLECULE. Measured: the
+    # the SATURATED get_acid_stem and yield a WRONG MOLECULE. Measured: the
     # unsaturation branch runs first and returns the full systematic stem, which
     # is verbatim the Blue Book PIN -- e.g. oleic acid is
     # '(9Z)-octadec-9-enoic acid (PIN)' at:29785.
@@ -806,7 +806,7 @@ class TestAcylPrefixUsesPinAcidStem:
         )
 
     def test_preferred_acyl_prefixes_survive(self):
-        """Guard the over-correction -- the P-65.1.7.2.1 preferred prefixes.
+        """Guard the over-correction -- the preferred prefixes.
 
         acetyl (:30442), formyl (:30444), benzoyl (:30446) are preferred
         prefixes and MUST NOT be systematised. Appendix 2: 'acetyloxy*'
@@ -863,20 +863,20 @@ class TestAcylPrefixUsesPinAcidStem:
 
 
 class TestBenzeneAcidEsterDemotion:
-    """P-65.6.3.3.5 partial-ester acid demotion on a benzene parent.
+    """ partial-ester acid demotion on a benzene parent.
 
     A benzene ring bearing a FREE carboxylic acid AND a co-present ester is
-    named as the ACID (the acid is class 7 in the P-41 seniority order
+    named as the ACID (the acid is class 7 in the seniority order
     :18170, the ester class 9:18182 -- "an acid is senior to an ester"
     :36540), with every ester demoted to the alkoxycarbonyl prefix
-    (methoxycarbonyl / ethoxycarbonyl / phenoxycarbonyl; P-65.6.3). Before
+    (methoxycarbonyl / ethoxycarbonyl / phenoxycarbonyl;. Before
     the benzene collector learned this, the ester substituent hit the
     carbonyl-guarded universal fallback and became an 'unnameable' sentinel,
     so the whole molecule abstained.
     """
 
     def test_ortho_methoxycarbonyl_benzoic_acid(self):
-        # monomethyl phthalate -> the free acid is the parent (P-41:36540).
+        # monomethyl phthalate -> the free acid is the parent:36540).
         assert name_compound("OC(=O)c1ccccc1C(=O)OC") == \
             "2-(methoxycarbonyl)benzoic acid"
 
@@ -896,7 +896,7 @@ class TestBenzeneAcidEsterDemotion:
             "4-(phenoxycarbonyl)benzoic acid"
 
     def test_ester_only_stays_ester_parent(self):
-        # P-41 gate: with NO free acid the ester IS the PCG and must NOT be
+        # gate: with NO free acid the ester IS the PCG and must NOT be
         # demoted -- methyl benzoate stays methyl benzoate.
         assert name_compound("O=C(OC)c1ccccc1") == "methyl benzoate"
 

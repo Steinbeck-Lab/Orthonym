@@ -1,17 +1,17 @@
-"""v33 charged Slice B — PIN-correct azaniumyl zwitterion namer (P-74.2.1.2).
+""" charged Slice B — PIN-correct azaniumyl zwitterion namer.
 
 Corrects the 4782742f over-reach (a zwitterion shipped its NON-PIN neutral name
-on the DEFAULT/PIN path) and builds the P-74.2.1.2 IONIC PIN instead: the ANION
+on the DEFAULT/PIN path) and builds the IONIC PIN instead: the ANION
 is the parent (keeps its -oate/... suffix) and each PROTONATED-amine cation is an
 `azaniumyl` prefix (two or more of the same kind -> `bis(azaniumyl)` /
-`tris(azaniumyl)`, P-16.3.4). Extends the namer to NET-CHARGED mixed-sign species
+`tris(azaniumyl)`,. Extends the namer to NET-CHARGED mixed-sign species
 (protonated diamino-acids) via a new Tier-1 dispatch door
 (`routing.dispatch_table._is_mixed_sign_zwitterion`, priority 302) -- those have
 net charge != 0, so `detect_species_type` buckets them as 'ion' and ZWITTERION@300
 never sees them.
 
 Design (see `charged_router._name_primary_amine_azaniumyl_zwitterion`):
-  * The betaine SEVER path (P-74.1.3) cannot serve a PRIMARY amino-acid zwitterion
+  * The betaine SEVER path cannot serve a PRIMARY amino-acid zwitterion
     -- severing the -NH3+ and capping its carbon with H DESTROYS the alpha
     stereocentre, so it could never spell the (2R)/(2S) descriptor. The builder
     instead NEUTRALIZES in place (-NH3+ -> -NH2, -COO- -> -COOH), names the neutral
@@ -22,7 +22,7 @@ Design (see `charged_router._name_primary_amine_azaniumyl_zwitterion`):
     species is never neutralized in the emitted name).
   * PIN-first: the DEFAULT/PIN tier emits azaniumyl or ABSTAINS -- never the
     non-PIN neutral name (that fallback is best-effort-only).
-  * The standard-AA retained table (P-103.2.4.4) still fires FIRST (before
+  * The standard-AA retained table still fires FIRST (before
     route_charged), so D-leucine / glycine / L-alanine are unchanged.
 
 Every RT-verified target below was checked against OPSIN 2.9.0 + RDKit full
@@ -81,7 +81,7 @@ def test_netzero_aa_zwitterion_names_and_roundtrips(smi):
         Chem.MolToInchiKey(Chem.MolFromSmiles(smi))
 
 
-# --- 1. standard AA retained table unchanged (P-103.2.4.4, fires first) ----
+# --- 1. standard AA retained table unchanged, fires first) ----
 @pytest.mark.opsin_gate
 def test_leucine_zwitterion_retained_unchanged():
     # D-leucine is a Table-10.4 standard AA -> the retained name (fired before
@@ -92,7 +92,7 @@ def test_leucine_zwitterion_retained_unchanged():
 # --- 2. single-cation net-0 amino-acid zwitterion -> azaniumyl PIN ----------
 @pytest.mark.opsin_gate
 def test_s_methylcysteine_azaniumyl_default():
-    # BB P-103.2.4.4 example. Default path must be the ionic PIN, NOT the neutral
+    # BB example. Default path must be the ionic PIN, NOT the neutral
     # acid (the 4782742f over-reach). Descriptor is (2R) for this SMILES.
     smi = "[NH3+][C@@H](CSC)C(=O)[O-]"
     name = G.name(smi)
@@ -103,7 +103,7 @@ def test_s_methylcysteine_azaniumyl_default():
 
 @pytest.mark.opsin_gate
 def test_s_methylcysteine_azaniumyl_gate_off():
-    # RAW (gate off) proves the PRODUCER's own full-InChIKey RT gate, not SELF-01.
+    # RAW (gate off) proves the PRODUCER's own full-InChIKey RT gate, not.
     smi = "[NH3+][C@@H](CSC)C(=O)[O-]"
     name = RAW.name(smi)
     assert name == "(2R)-2-azaniumyl-3-(methylsulfanyl)propanoate"
@@ -202,14 +202,14 @@ def test_builder_declines_extra_nitrogen_directly():
 
 
 # =============================================================================
-# Task C1 (v33 charged completion): thiolate `sulfido` prefix + cysteinate
+# Task C1 (charged completion): thiolate `sulfido` prefix + cysteinate
 # multi-anion fallback.
 #
 # `classify_anion` (ions.py:112) already returns 'thiolate' for a terminal
 # C-bonded [S-]; `_apply_anionic_substituent_prefixes` (ions.py:~3986) did NOT
 # know how to cite a JUNIOR thiolate centre -- the neutral-acid path built
 # 'sulfanyl...' (the neutral -SH substituent prefix), which round-trips to a
-# DIFFERENT (neutral-thiol) molecule and SELF-01 correctly rejected it.
+# DIFFERENT (neutral-thiol) molecule and correctly rejected it.
 # FIX 3a mirrors the existing sulfinato/sulfonato/phosphonato swap blocks with
 # a 'sulfanyl'->'sulfido' single-occurrence swap.
 #
@@ -263,7 +263,7 @@ def test_c1_no_regression_existing_partial_and_dianion_shapes(smi, expected):
 
 
 # =============================================================================
-# Task C2 (v33 charged completion): partial-acid-salt CHAIN widening
+# Task C2 (charged completion): partial-acid-salt CHAIN widening
 # (guard AND builder together).
 #
 # `_name_partial_acid_salt_anion` (ions.py) had 3 guards protecting its

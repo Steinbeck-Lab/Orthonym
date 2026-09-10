@@ -1,13 +1,13 @@
-"""v38 DROP-12 — carbon-free P-oxo substituent fragment rendered as a prefix.
+""" — carbon-free P-oxo substituent fragment rendered as a prefix.
 
 A phosphono / phosphonato group that must be cited as a NESTED substituent
 prefix was DROPPED because the bare P-oxo fragment ``O=P(O)O`` has no carbon and
 the whole-molecule namer rejects it as ``inorganic compound (not supported)``.
 Two substituent chokepoints delegated the fragment to that reject:
-``assembly/substituent_naming.py::name_substituent_fragment`` (DROP-12) and
+``assembly/substituent_naming.py::name_substituent_fragment``  and
 ``assembly/substituent_enumerator.py::name_substituent`` (P-rooted block). Both
 now dispatch a carbon-free P-oxo fragment to the RETAINED prefixes
-(``phosphono`` P-67.1.4.1 / ``phosphonato`` P-72.6.1, both RT-proven) via
+(``phosphono`` / ``phosphonato``, both RT-proven) via
 ``rules/phosphorus.carbon_free_phospho_prefix`` BEFORE the inorganic reject.
 
 Measured deliverable (HEAD A/B, gate-ON): a nicotinic-acid mononucleotide-class
@@ -93,13 +93,13 @@ def test_pyridinium_nucleotide_pinned_name():
 # ---------------------------------------------------------------------------
 
 @pytest.mark.parametrize("smiles,prefix", [
-    ("CP(=O)(O)O", "phosphono"),          # neutral -P(=O)(OH)2  (P-67.1.4.1)
-    ("P(=O)([O-])([O-])C", "phosphonato"),  # di-anion -P(=O)(O-)2 (P-72.6.1)
+    ("CP(=O)(O)O", "phosphono"),          # neutral -P(=O)(OH)2
+    ("P(=O)([O-])([O-])C", "phosphonato"),  # di-anion -P(=O)(O-)2
 ])
 def test_carbon_free_phospho_prefix_renders(smiles, prefix):
     mol, frag, p = _phospho_frag(smiles)
     assert carbon_free_phospho_prefix(mol, frag, p) == prefix
-    # ...and the same fragment routed through the enumerator chokepoint.
+    #...and the same fragment routed through the enumerator chokepoint.
     assert name_substituent(mol, frag, p) == prefix
 
 
@@ -148,7 +148,7 @@ def test_never_wrong(smiles):
 
 @pytest.mark.roundtrip
 def test_target_pins_are_rt_valid():
-    # medronic acid PIN candidates (P-67.2 diphosphonic / phosphono form).
+    # medronic acid PIN candidates diphosphonic / phosphono form).
     assert _rt_ok(MEDRONIC, "(phosphonomethyl)phosphonic acid")
     assert _rt_ok(MEDRONIC, "methylenediphosphonic acid")
     # bis-nucleotide best-effort target (needs general-fallback tier to emit).

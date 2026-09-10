@@ -1,19 +1,19 @@
 """
-End-to-end integration tests for Phase 23: Ring System Extensions.
+End-to-end integration tests for a phase: Ring System Extensions.
 
-Validates all Phase 23 features working together through the full naming
-pipeline (SMILES -> name_compound() -> IUPAC name):
+Validates all a phase features working together through the full naming
+pipeline (SMILES -> name_compound -> IUPAC name):
 
-1. Skeletal replacement nomenclature (RING-EXT-03)
+1. Skeletal replacement nomenclature (RING-)
    - Plain replacement chains (dioxahexane, dioxaoctane)
    - Terminal alcohol suffix integration (dioxaoctan-1-ol)
-2. Ring assemblies (RING-EXT-01)
+2. Ring assemblies (RING-)
    - Biphenyl, bipyridine, bithiophene
    - Substituted ring assemblies
-3. Fused heterocycle locants (RING-EXT-02)
+3. Fused heterocycle locants (RING-)
    - Indole indicated hydrogen
    - Substituted fused heterocycles
-4. Monocyclic lactams (RING-EXT-04)
+4. Monocyclic lactams (RING-)
    - Beta through epsilon lactams
 
 Run with: pytest tests/integration/test_phase23_e2e.py -v -m "not roundtrip"
@@ -30,7 +30,7 @@ from orthonym import name_compound
 
 
 # ============================================================================
-# Section 1: Skeletal Replacement (RING-EXT-03)
+# Section 1: Skeletal Replacement (RING-)
 # ============================================================================
 
 
@@ -88,7 +88,7 @@ class TestSkeletalReplacementE2E:
 
 
 # ============================================================================
-# Section 2: Ring Assemblies (RING-EXT-01)
+# Section 2: Ring Assemblies (RING-)
 # ============================================================================
 
 
@@ -114,7 +114,7 @@ class TestRingAssemblyE2E:
 
     @pytest.mark.integration
     def test_biphenyl_full_name(self):
-        """Unsubstituted biphenyl produces 'biphenyl' (retained name per P-31.1.2.4)."""
+        """Unsubstituted biphenyl produces 'biphenyl' (retained name per."""
         result = name_compound("c1ccc(-c2ccccc2)cc1")
         assert result == "biphenyl"
 
@@ -133,7 +133,7 @@ class TestRingAssemblyE2E:
 
 
 # ============================================================================
-# Section 3: Fused Heterocycle Locants (RING-EXT-02)
+# Section 3: Fused Heterocycle Locants (RING-)
 # ============================================================================
 
 
@@ -173,7 +173,7 @@ class TestFusedHeterocycleLocantE2E:
 
 
 # ============================================================================
-# Section 4: Lactams (RING-EXT-04)
+# Section 4: Lactams (RING-)
 # ============================================================================
 
 
@@ -187,10 +187,10 @@ class TestLactamE2E:
             ("C1CC(=O)N1", "azetidin-2-one"),
             ("C1CCC(=O)N1", "pyrrolidin-2-one"),
             ("C1CCCC(=O)N1", "piperidin-2-one"),
-            # v29 Task A: was "caprolactam" cited to "P-31.1.4", which is
-            # "Bi- and polycyclic von Baeyer parent hydrides" (BB:16619) and
-            # licenses nothing here. The PIN is the pseudoketone form, P-64.3.1
-            # (BB:29314), printed at BB:29323 as `azepan-2-one (PIN)`.
+            #: was "caprolactam" cited to "", which is
+            # "Bi- and polycyclic von Baeyer parent hydrides" (the Blue Book) and
+            # licenses nothing here. The PIN is the pseudoketone form,
+            # (the Blue Book), printed at the Blue Book as `azepan-2-one (PIN)`.
             ("C1CCCCC(=O)N1", "azepan-2-one"),
         ],
         ids=["beta-lactam", "gamma-lactam", "delta-lactam", "epsilon-lactam"],
@@ -214,7 +214,7 @@ class TestLactamE2E:
 
 
 class TestPhase23Regressions:
-    """Verify Phase 23 features do not regress existing naming."""
+    """Verify a phase features do not regress existing naming."""
 
     @pytest.mark.integration
     @pytest.mark.parametrize(
@@ -242,7 +242,7 @@ class TestPhase23Regressions:
         ],
     )
     def test_basic_naming_unchanged(self, smiles, expected):
-        """Basic compound naming is unaffected by Phase 23 additions."""
+        """Basic compound naming is unaffected by a phase additions."""
         assert name_compound(smiles) == expected
 
 
@@ -292,7 +292,7 @@ LACTAM_ROUNDTRIP = [
     ("C1CC(=O)N1", "azetidin-2-one"),
     ("C1CCC(=O)N1", "pyrrolidin-2-one"),
     ("C1CCCC(=O)N1", "piperidin-2-one"),
-    ("C1CCCCC(=O)N1", "azepan-2-one"),  # v29 Task A; PIN per P-64.3.1 (BB:29323)
+    ("C1CCCCC(=O)N1", "azepan-2-one"),  #; PIN per (the Blue Book)
 ]
 
 # Ring assembly names for OPSIN round-trip

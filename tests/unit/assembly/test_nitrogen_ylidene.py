@@ -1,14 +1,14 @@
-"""a phase B1: the P-29.2 / BB(:1703) nitrogen ylidene substituent form.
+"""a phase B1: the / BB(:1703) nitrogen ylidene substituent form.
 
 A nitrogen attached to its parent by a DOUBLE bond is an ``ylidene`` free
 valence, not a ``-yl``: ``=N-N<`` -> ``hydrazinylidene`` (the deprecated
 ``hydrazono`` is never emitted, BB:1703), ``=N-R`` -> ``{R}imino``. Before this
-the cascade built ``...hydrazinyl`` and the P-29.2 guard refused it, so the
+the cascade built ``...hydrazinyl`` and the guard refused it, so the
 whole branch abstained -- the measured decorated-steroid / hydrazone class.
 
 Asserted at the SUBSTITUENT-PREFIX level (deterministic, OPSIN-free). The
 whole-molecule round-trip is verified in a fresh subprocess by
-``scripts/measure_breadth.py`` (the in-pytest SELF-01/OPSIN path is unreliable
+``scripts/measure_breadth.py`` (the in-pytest /OPSIN path is unreliable
 across process warm-up -- the reason that harness uses subprocesses); each
 prefix below is confirmed to round-trip embedded in a parent, e.g.
 ``(dimethylhydrazinylidene)cyclohexane`` -> ``CN(C)N=C1CCCCC1``.
@@ -43,7 +43,7 @@ def _frag_and_attach(smi):
 
 
 @pytest.mark.parametrize("smi,expected", [
-    # a phase (P-14.3.4 / the Blue Book "(dimethylcarbamoyl)hydrazinylidene",
+    # a phase / the Blue Book "(dimethylcarbamoyl)hydrazinylidene",
     # the Blue Book): the hydrazinylidene free valence is at the valence-FULL N1, so
     # every substituent must sit on N2 -- the '1'/'2' locants are unambiguous and
     # are OMITTED.

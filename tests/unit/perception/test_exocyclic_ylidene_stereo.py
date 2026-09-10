@@ -1,4 +1,4 @@
-"""M3 (): the canonical CIP path must label exocyclic ylidene double bonds.
+"""M3 : the canonical CIP path must label exocyclic ylidene double bonds.
 
 The vendored `centres` engine (default CIP source) does not emit an E/Z label for
 an exocyclic double bond to an aromatic-flagged ring atom (o-/p-quinoid / fulvenoid

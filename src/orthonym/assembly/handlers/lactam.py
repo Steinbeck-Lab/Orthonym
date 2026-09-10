@@ -1,15 +1,15 @@
-"""Phase 160 lactam handler — direct-return shim with coverage gate.
+"""a phase lactam handler — direct-return shim with coverage gate.
 
 Parallel to lactone handler; verbatim lift of composer.py:830-852
 (inline branch) wrapping ``rules.lactams.is_monocyclic_lactam`` +
 ``rules.lactams.name_monocyclic_lactam``.
 
-IUPAC cite: P-66.6.3 (lactams / cyclic amides).
+IUPAC cite: (lactams / cyclic amides).
 
 References:
 - composer.py:830-852 (inline dispatch branch; REMOVED at this commit).
 - rules.lactams.{is_monocyclic_lactam, name_monocyclic_lactam}.
-- 160-AUDIT-DECOMP.md § 1 row 'lactam' + § 2.14 purity proof.
+- internal notes-DECOMP.md row 'lactam' + purity proof.
 """
 from __future__ import annotations
 
@@ -62,7 +62,7 @@ def name_lactam(
 
     pool = get_current_pool()
     pool.add(lactam_name, "lactam", features)
-    # composer.py:852 inline: _inject_stereo_if_missing(features, pool.best().name, atom_to_locant=None)
+    # composer.py:852 inline: _inject_stereo_if_missing(features, pool.best.name, atom_to_locant=None)
     final_name = _inject_stereo_if_missing(
         features, pool.best().name, atom_to_locant=None,
     )

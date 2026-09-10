@@ -1,12 +1,12 @@
 """-1a: neutral single-atom co-components (methane / hydrogen sulfide /
-phosphane) name as P-14.8 adduct partners instead of forcing the whole
+phosphane) name as adduct partners instead of forcing the whole
 multi-component row to abstain.
 
 Root cause (FABLE full-census): `SINGLE_ATOM_COMPONENT_NAMES` held only
 O/F/Cl/Br/I, so a bare C/S/P fragment made `_name_component` return None and
 `name_adduct` decline the entire row -- a table-miss-degrades-to-refusal
 defect (CLAUDE.md a project rule). CH4/H2S/PH3 are neutral molecular species and
-legitimate P-14.8.1 adduct components; each name is OPSIN-2.9.0-parseable in
+legitimate adduct components; each name is OPSIN-2.9.0-parseable in
 em-dash adduct notation ("benzene—methane (1/1)").
 
 Bare metals and bare N/ammonia stay excluded (organometallic routing / a bare

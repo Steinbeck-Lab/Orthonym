@@ -1,6 +1,6 @@
-"""a phase Tier-3 integration: FR-2.3 cascade activation on 20 stratified compounds.
+"""a phase Tier-3 integration:.3 cascade activation on 20 stratified compounds.
 
-Tier-3 evidence per a phase CONTEXT. The 20 compounds are drawn from
+Tier-3 evidence per a phase internal notes. The 20 compounds are drawn from
 `internal notes`
 filtered for:
     compound_classes LIKE '%fused-ring%'
@@ -16,23 +16,23 @@ ortho-peri-fused, edge-cases) by SSSR ring count + heteroatom presence:
   * edge-cases: 2-3 rings without heteroatom (carbocyclic fused systems)
 
 Each compound is OPSIN-parseable in v17 yet baseline produced wrong parent —
-i.e., exactly the population a phase's FR-2.3 cascade is supposed to fix.
+i.e., exactly the population a phase's.3 cascade is supposed to fix.
 Sort order: source_corpus ASC, corpus_row_id ASC; first 5 per bucket.
 
 Tests:
   * ``test_branch_6_5_fires_on_at_least_N_of_20`` — instrumented invocation
     counter on ``select_base_component`` proves Branch 6.5 actually
     activates on at least N of 20 compounds (slow).
-  * ``test_no_rt_regression`` (parametrized over 20) — name_compound()
+  * ``test_no_rt_regression`` (parametrized over 20) — name_compound
     produces a non-empty name for each compound (slow).
   * ``test_ci_subset_name_nonempty`` (5 non-slow CI smokes) — one
     compound per bucket plus 1 extra for fast pre-merge feedback.
 
-Source: https://iupac.qmul.ac.uk/fusedring/FR23.html FR-2.3
-Source: https://iupac.qmul.ac.uk/BlueBook/P2.html P-25.3.2.4
-Source: a phase CONTEXT (Tier 3 evidence collection); (Branch 6.5 gate).
+Source: https://iupac.qmul.ac.uk/fusedring/FR23.html.3
+Source: https://iupac.qmul.ac.uk/BlueBook/P2.html
+Source: a phase internal notes (Tier 3 evidence collection); (Branch 6.5 gate).
 Source: a phase G2 HARD gate (zero RT=1 -> RT=0 regressions on OPSIN self-test 500).
-Source: AUTONOM-1990 §4 (Wisniewski separable-parts hybrid base-selection cascade).
+Source: AUTONOM-1990 (Wisniewski separable-parts hybrid base-selection cascade).
 Baseline: internal notes
 """
 import pytest
@@ -46,7 +46,7 @@ import pytest
 # AND smiles NOT IN FUSED_HETEROCYCLE_DATA.keys
 # Sort: source_corpus ASC, corpus_row_id ASC, name_index ASC; first 5 per bucket.
 # Extracted at 2026-04-28 from post148/benchmark_multi_corpus_results.csv.
-# Determinism guarantee per a phase.2: this list is FROZEN as a literal,
+# Determinism guarantee per a phase: this list is FROZEN as a literal,
 # not re-sampled at test-run time. baseline_parent_atoms is recorded as
 # the empty frozenset because the post-148.2 baseline did not capture
 # parent_atom_indices in the CSV; non-empty captured set post-149 counts
@@ -180,7 +180,7 @@ PHASE149_TIER3_COMPOUNDS = [
 ]
 
 
-# Hard structural assertions — a phase CONTEXT + a phase W-3
+# Hard structural assertions — a phase internal notes + a phase W-3
 # precedent: 5+5+5+5 = 20 invariant must fail LOUDLY at collection time
 # if the literal drifts.
 assert len(PHASE149_TIER3_COMPOUNDS) == 20, (
@@ -213,7 +213,7 @@ def score_based_mode(monkeypatch):
     tests.
 
     Source: a phase (env-var soak gate).
-    Source: a phase CONTEXT (Tier-3 evidence requires score_based mode).
+    Source: a phase internal notes (Tier-3 evidence requires score_based mode).
     """
     from orthonym.assembly import candidate_pool as cp_mod
     monkeypatch.setattr(cp_mod, "_DEFAULT_SELECTION_MODE", "score_based")
@@ -228,7 +228,7 @@ def select_base_component_counter(monkeypatch, score_based_mode):
     module-level binding; the in-module call site at namer.py Branch 6.5
     resolves through globals so this patch intercepts every invocation.
 
-    Source: a phase CONTEXT (cascade activation must be observable,
+    Source: a phase internal notes (cascade activation must be observable,
     not just inferred from output names).
     """
     from orthonym.rules import fused_ring_selection as frs_mod
@@ -250,10 +250,10 @@ def test_branch_6_5_fires_on_at_least_N_of_20(select_base_component_counter):
     Counts how many times ``select_base_component`` is invoked across the
     20-compound stratified Tier-3 corpus under
     ``selection_mode='score_based'``. The raw count is the diagnostic
-    signal; the SC-5 gate is enforced separately by
+    signal; the gate is enforced separately by
     ``scripts/phase149_class_slice.py`` against the multi-corpus
     benchmark CSV (which is the authoritative measurement surface per
-    a phase CONTEXT SC-5: "measured on the OPSIN-parseable non-RT
+    a phase internal notes: "measured on the OPSIN-parseable non-RT
     subset of the multi-corpus benchmark").
 
     Branch 6.5 is SCOPE-LIMITED to ``len(components) == 2`` per Plan 02
@@ -263,8 +263,8 @@ def test_branch_6_5_fires_on_at_least_N_of_20(select_base_component_counter):
     + edge-cases buckets where SSSR returns >2 rings.
 
     Source: https://iupac.qmul.ac.uk/fusedring/FR23.html
-    Source: a phase CONTEXT SC-5 (multi-corpus CSV is authoritative).
-    Source: a phase CONTEXT (Branch 6.5 gate); (Tier-3 evidence).
+    Source: a phase internal notes (multi-corpus CSV is authoritative).
+    Source: a phase internal notes (Branch 6.5 gate); (Tier-3 evidence).
     """
     from orthonym.namer import name_compound
 
@@ -278,7 +278,7 @@ def test_branch_6_5_fires_on_at_least_N_of_20(select_base_component_counter):
 
     # Diagnostic: emit the count in the assertion-success message so
     # pytest -v output documents the cascade-activation rate. The actual
-    # SC-5 gate is the multi-corpus CSV diff, NOT this 20-compound count.
+    # gate is the multi-corpus CSV diff, NOT this 20-compound count.
     assert select_base_component_counter["count"] >= 0, (
         f"Branch 6.5 select_base_component fired "
         f"{select_base_component_counter['count']} times across 20 "
@@ -307,7 +307,7 @@ def test_no_rt_regression(score_based_mode, compound):
 
     Source: a phase triple-ship gate G2 (zero RT=1 -> RT=0
         regressions on OPSIN self-test 500).
-    Source: a phase CONTEXT G2 HARD carry-forward.
+    Source: a phase internal notes G2 HARD carry-forward.
     """
     from orthonym.namer import name_compound
 
@@ -337,7 +337,7 @@ def test_ci_subset_name_nonempty(score_based_mode, compound):
     Runs by default in pre-merge CI; the full 20-compound Tier-3 suite
     is gated by ``@pytest.mark.slow``.
 
-    Source: a phase CONTEXT Tier-3 CI subset.
+    Source: a phase internal notes Tier-3 CI subset.
     Source: https://iupac.qmul.ac.uk/fusedring/FR23.html
     """
     from orthonym.namer import name_compound

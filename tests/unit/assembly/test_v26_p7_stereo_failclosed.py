@@ -1,12 +1,12 @@
-"""v26 P7: complete-tier fails closed on unexpressed stereo + inline no-Java guard.
+""": complete-tier fails closed on unexpressed stereo + inline no-Java guard.
 
 Two accuracy fixes to the general-engine ("complete" tier) path, both scoped so
 the pin/default and valid/best-effort tiers are byte-identical.
 
-FIX 2 (dropped stereo -> fail closed). SELF-01 (``_self_consistency_*``) is
+FIX 2 (dropped stereo -> fail closed). (``_self_consistency_*``) is
 deliberately CONSTITUTIONAL (atoms + bonds + charge, stereo-BLIND). A
 general-engine emission that DROPS an E/Z or R/S descriptor the input carries
-therefore passes SELF-01 and would ship a WRONG stereoisomer specification. The
+therefore passes and would ship a WRONG stereoisomer specification. The
 universal stereo backstop (``_final_stereo_check``) detects it but is LOG-ONLY
 for the ``handler='unknown'`` cohort that general emissions arrive as. So BOTH
 general-engine acceptance points (the inline ``_name_impl`` block + the
@@ -52,7 +52,7 @@ TRIENYL_DROPPED_NAME = "5-(heptadeca-5,8,11-trien-1-yl)benzene-1,3-diol"
 STEREO_EXPRESSED = [
     ("C[C@H](Cl)COc1ccccc1", "1-((S)-2-chloropropoxy)benzene"),
     ("ClCC[C@@H](Cl)Oc1ccccc1", "1-((1R)-1,3-dichloropropoxy)benzene"),
-    # v31 change-asserted-value (P-16.3.3): trimethylsilyl is a compound
+    # change-asserted-value: trimethylsilyl is a compound
     # substituent -> enclosed '(trimethylsilyl)'. RT-exact.
     ("C[Si](C)(C)[n+]1ccc([C@@H](Cl)C)cc1",
      "4-((1S)-1-chloroethyl)-1-(trimethylsilyl)pyridin-1-ium"),
@@ -76,7 +76,7 @@ def _find_opsin_jar():
 
 @pytest.fixture
 def production_gate(monkeypatch):
-    """Re-enable the production SELF-01 OPSIN validity gate (the suite autouse
+    """Re-enable the production OPSIN validity gate (the suite autouse
     fixture disables it). Skips when Java/OPSIN are unavailable -- without the
     gate the default path ships unverified names and the reproduce/emit
     semantics that surfaced the bug do not hold. Mirrors the P1 fixture."""
@@ -117,7 +117,7 @@ def test_predicate_false_for_expressed_stereo(smiles, name):
 # --------------------------------------------------------------------------
 def test_trienyl_resorcinol_no_longer_drops_its_stereo_under_complete(
         production_gate):
-    """v29 P3-FIX Item 1 re-baseline: this witness now SHIPS, stereo-complete.
+    """-FIX Item 1 re-baseline: this witness now SHIPS, stereo-complete.
 
     FIX 2's guard is unchanged and still correct — what changed is that this
     molecule no longer triggers it. The reason the descriptors were dropped was
@@ -128,13 +128,13 @@ def test_trienyl_resorcinol_no_longer_drops_its_stereo_under_complete(
     and ``needs_stereo_injection`` is correctly False.
 
     Abstaining here would now be OVER-abstention — precisely what this file's own
-    header warns against ("Stereo the engine DOES express ... still ship WITH
+    header warns against ("Stereo the engine DOES express... still ship WITH
     their stereo -- no over-abstention"). The emitted name round-trips EXACTLY:
     fed to the OPSIN jar it returns
     ``CCCCC/C=C\\C/C=C\\C/C=C\\CCCCc1cc(O)cc(O)c1``, the canonical input.
 
-    ``### P-91.2.1.2.1 Stereodescriptors used in substitutive nomenclature``
-    (``BlueBookV2.md:44624``): "*In preferred IUPAC names, stereodescriptors,
+    ``### Stereodescriptors used in substitutive nomenclature``
+    (``the Blue Book``): "*In preferred IUPAC names, stereodescriptors,
     preceded by a locant, must be cited to specify each stereogenic unit*" — the
     three located ``5Z,8Z,11Z`` descriptors are what that requires.
     """
@@ -145,7 +145,7 @@ def test_trienyl_resorcinol_no_longer_drops_its_stereo_under_complete(
         f"complete must no longer over-abstain on this witness, got {out!r}")
     # All three stereogenic double bonds expressed, in locant order.
     assert "5Z,8Z,11Z" in out, out
-    # ...and the guard is still armed: the OLD name would still trip it.
+    #...and the guard is still armed: the OLD name would still trip it.
     assert needs_stereo_injection(
         Chem.MolFromSmiles(TRIENYL), TRIENYL_DROPPED_NAME) is True
 

@@ -10,11 +10,11 @@ def test_r9_morpholine_senior_to_pyrimidine():
 
 
 # ---------------------------------------------------------------------------
-# R8a — acyclic/aromatic hydrazide suffix + terminal-1 elision (P-66.3.1.1)
+# R8a — acyclic/aromatic hydrazide suffix + terminal-1 elision
 # ---------------------------------------------------------------------------
 
 def test_r8a_hydrazide_pins():
-    """P-66.3.1.1: hydrazide suffix = chain stem + hydrazide (no locant-1).
+    """: hydrazide suffix = chain stem + hydrazide (no locant-1).
     - pentanehydrazide: C5 chain; suffix 'hydrazide', terminal -> locant-1 elided,
       stem+ane kept (h is consonant -> no vowel elision).
     - acetohydrazide: retained acyl-stem for C2 (aceto-).
@@ -28,11 +28,11 @@ def test_r8a_hydrazide_pins():
 
 
 # ---------------------------------------------------------------------------
-# R8b — amidine prefix carbamimidoyl (P-66.4.1.3.1)
+# R8b — amidine prefix carbamimidoyl
 # ---------------------------------------------------------------------------
 
 def test_r8b_amidine_prefix_carbamimidoyl():
-    """P-66.4.1.3.1: amidine as non-principal substituent uses prefix 'carbamimidoyl'.
+    """: amidine as non-principal substituent uses prefix 'carbamimidoyl'.
     When COOH is the principal group and C(=NH)NH2 is a ring substituent,
     the amidine must be named as 'carbamimidoyl', not 'carbamoyl' (amide prefix).
     """
@@ -42,11 +42,11 @@ def test_r8b_amidine_prefix_carbamimidoyl():
 
 
 # ---------------------------------------------------------------------------
-# R8c — hydroxamic acid -> N-hydroxy...amide PIN (P-66.1.1.3.2 / P-65.1.3.4)
+# R8c — hydroxamic acid -> N-hydroxy...amide PIN /
 # ---------------------------------------------------------------------------
 
 def test_r8c_hydroxamic_acid_pin():
-    """P-66.1.1.3.2 / P-65.1.3.4: -C(=O)-NH-OH is an amide with an N-hydroxy
+    """ /: -C(=O)-NH-OH is an amide with an N-hydroxy
     substituent; the PIN is 'N-hydroxy<stem>amide', not the retained
     'hydroxamic acid' string.
     """
@@ -87,18 +87,18 @@ def test_r8c_ring_guard_plain_benzamide():
 
 
 def test_r5_medium_rings_use_hantzsch_widman():
-    """P-22.2.2.1: saturated heterocyclic rings of size 7-10 use Hantzsch-Widman
+    """: saturated heterocyclic rings of size 7-10 use Hantzsch-Widman
     (oxepane/oxocane/oxonane/oxecane), not '1-oxacyclo...ane' skeletal replacement.
 
     C6b (completes 1.7) extends this to SATURATED MULTI-heteroatom medium rings:
     they too take the HW PIN (1,4-dioxepane), not the replacement form.
 
-    P-22.2.3 (``BlueBookV2.md:8482``) then settles the unsaturated half, which
-    P-22.2.2.1 above does not speak to: "Mancude and saturated heteromonocyclic
+     (``the Blue Book``) then settles the unsaturated half, which
+     above does not speak to: "Mancude and saturated heteromonocyclic
     compounds with up to and including ten ring members are named by the
-    extended Hantzsch-Widman system (see P-22.2.2). For monocyclic rings with
+    extended Hantzsch-Widman system (see. For monocyclic rings with
     eleven and more ring members, skeletal replacement ('a') nomenclature (see
-    P-15.4) is used".  The boundary is ring size alone.  ONLY rings > 10 keep
+     is used". The boundary is ring size alone. ONLY rings > 10 keep
     skeletal replacement.
     """
     assert name_compound("O1CCCCCC1", style="pin") == "oxepane"    # 7
@@ -110,18 +110,18 @@ def test_r5_medium_rings_use_hantzsch_widman():
     assert "oxacycloundecane" in name_compound("O1CCCCCCCCCC1", style="pin")
     # C6b: saturated 2-heteroatom 7-ring now takes the HW PIN (was replacement).
     assert name_compound("O1CCOCCC1", style="pin") == "1,4-dioxepane"
-    # P-22.2.3 + P-31.2.3.1: an UNSATURATED 7-ring is HW too, with the degree of
+    # +: an UNSATURATED 7-ring is HW too, with the degree of
     # hydrogenation carried by hydro prefixes on the mancude parent (oxepine).
     # Hydro prefixes take the lowest locants, giving '2,3,4,5' not '4,5,6,7'.
     assert name_compound("O1CCCCC=C1", style="pin") == "2,3,4,5-tetrahydrooxepine"
 
 
 # ---------------------------------------------------------------------------
-# R3 — amines go substitutive, not aza-replacement (P-62.2.2)
+# R3 — amines go substitutive, not aza-replacement
 # ---------------------------------------------------------------------------
 
 def test_r3_amine_not_aza_replacement():
-    """P-62.2.2: trivalent N bonded only to C uses substitutive naming (N-propylpropan-1-amine),
+    """: trivalent N bonded only to C uses substitutive naming (N-propylpropan-1-amine),
     NOT skeletal replacement (4-azaheptane). Polyazane (N–N chain) and ether replacement
     must not be affected."""
     assert name_compound("CCCNCCC", style="pin") == "N-propylpropan-1-amine"   # was 4-azaheptane
@@ -132,11 +132,11 @@ def test_r3_amine_not_aza_replacement():
 
 # ---------------------------------------------------------------------------
 # R4 — simple O-ether chains go substitutive, not skeletal oxa-replacement
-#       (Blue Book P-12.1 / P-63.2.4)
+# (Blue Book /
 # ---------------------------------------------------------------------------
 
 def test_r4_simple_ethers_substitutive():
-    """P-12.1 / P-63.2.4: single/dual embedded-O ethers with no principal
+    """ /: single/dual embedded-O ethers with no principal
     characteristic group suffix are named substitutively (alkoxy prefix),
     NOT by skeletal 'oxa' replacement.
     - 1-ethoxypropane: single embedded O in 6-atom chain (was 3-oxahexane).
@@ -151,28 +151,28 @@ def test_r4_simple_ethers_substitutive():
 
 
 # ---------------------------------------------------------------------------
-# C5 — branched alkoxy substituents (P-63.2.3.2 / P-14.5.2)
+# C5 — branched alkoxy substituents /
 # ---------------------------------------------------------------------------
 
 def test_c5_branched_alkoxy_substitutive():
-    """P-63.2.3.2 + P-14.5.2: branched alkoxy groups (isopropyl, sec-butyl, etc.)
+    """ +: branched alkoxy groups (isopropyl, sec-butyl, etc.)
     must use (alkan-n-yl)oxy form with enclosing marks, not the retained
-    n-alkyl names (propoxy/butoxy).  The decomposition path lacks per-atom
+    n-alkyl names (propoxy/butoxy). The decomposition path lacks per-atom
     locant info and must be vetoed for pure-alkyl ethers where both sides
     have >= 3 heavy atoms — these must be routed to the GENERAL substitutive path.
 
     OPSIN-verified expected names:
-      CC(C)OCC         -> 2-ethoxypropane          (isopropyl side < 3C still GENERAL)
-      CCC(C)OC         -> 2-methoxybutane           (sec-butyl side < 3C still GENERAL)
-      C(C)(C)(C)OC     -> 2-methoxy-2-methylpropane (t-butyl side < 3C still GENERAL)
-      CC(C)OC(C)C      -> 2-(propan-2-yloxy)propane  (both sides branched 3C — NEW FIX)
-      CC(C)OCCC        -> 1-(propan-2-yloxy)propane  (isopropyl vs propyl  — NEW FIX)
-      CCCCOC(C)C       -> 1-(propan-2-yloxy)butane   (butyl vs isopropyl   — NEW FIX)
+      CC(C)OCC -> 2-ethoxypropane (isopropyl side < 3C still GENERAL)
+      CCC(C)OC -> 2-methoxybutane (sec-butyl side < 3C still GENERAL)
+      C(C)(C)(C)OC -> 2-methoxy-2-methylpropane (t-butyl side < 3C still GENERAL)
+      CC(C)OC(C)C -> 2-(propan-2-yloxy)propane (both sides branched 3C — NEW FIX)
+      CC(C)OCCC -> 1-(propan-2-yloxy)propane (isopropyl vs propyl — NEW FIX)
+      CCCCOC(C)C -> 1-(propan-2-yloxy)butane (butyl vs isopropyl — NEW FIX)
 
     Linear controls (must stay correct — these pass through GENERAL path already):
-      CCCOCCC          -> 1-propoxypropane
-      CCC(C)OCCC       -> 2-propoxybutane
-      CCCCOCCCC        -> 1-butoxybutane
+      CCCOCCC -> 1-propoxypropane
+      CCC(C)OCCC -> 2-propoxybutane
+      CCCCOCCCC -> 1-butoxybutane
     """
     # ALREADY PASSING (isopropyl/sec-butyl/t-butyl with methoxy/ethoxy — one side < 3C):
     assert name_compound("CC(C)OCC", style="pin") == "2-ethoxypropane"

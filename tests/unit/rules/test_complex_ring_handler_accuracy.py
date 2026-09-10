@@ -3,7 +3,7 @@ Complex ring handler accuracy test suite.
 
 Tests polycyclic aromatics, spiro systems, bicyclo systems, and fused rings
 both as parent structures and as ring-as-substituent prefixes in chain-is-parent
-contexts. Derived from benchmark failure analysis (D-04 diagnostics).
+contexts. Derived from benchmark failure analysis (diagnostics).
 
 Key fix verified: naphthalene as ring substituent produces 'naphthalen-X-yl'
 prefix, not 'cyclodecyl' (the bug was in get_ring_substituent_name not checking
@@ -24,7 +24,7 @@ from orthonym.namer import name_compound
     ("c1ccc2ccccc2c1", "naphthalene"),
     ("c1ccc2cc3ccccc3cc2c1", "anthracene"),
     ("c1cc2ccc3cccc4ccc(c1)c2c34", "pyrene"),
-    # F-T9/DD6 RET-01: 'biphenyl' is general-only; the PIN is 1,1'-biphenyl (P-28.2.1).
+    # F-T9/DD6: 'biphenyl' is general-only; the PIN is 1,1'-biphenyl.
     ("c1ccc(-c2ccccc2)cc1", "1,1'-biphenyl"),
 ])
 def test_polycyclic_retained_names(smiles, expected_name):

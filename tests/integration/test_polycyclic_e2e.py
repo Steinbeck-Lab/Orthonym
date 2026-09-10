@@ -1,15 +1,15 @@
 """
-End-to-end integration tests for Phase 16 polycyclic naming.
+End-to-end integration tests for a phase polycyclic naming.
 
 Tests validate:
 - Von Baeyer nomenclature (tricyclo, tetracyclo, pentacyclo+)
 - Heteroatom replacement nomenclature (oxa-, aza-, thia-)
 - Polycyclic lactone naming
-- Bridged fused (FR-8) nomenclature
+- Bridged fused  nomenclature
 - Stereodescriptors on polycyclic frameworks
 - Regression testing for existing naming (bicyclo, fused, simple cycles)
 
-Uses name_compound() as the single entry point, testing the full pipeline
+Uses name_compound as the single entry point, testing the full pipeline
 from SMILES to IUPAC name.
 """
 import pytest
@@ -17,7 +17,7 @@ from orthonym.namer import name_compound
 
 
 class TestVonBaeyerE2E:
-    """Full pipeline tests for Von Baeyer nomenclature (SMILES -> name_compound())."""
+    """Full pipeline tests for Von Baeyer nomenclature (SMILES -> name_compound)."""
 
     def test_norbornane_still_works(self):
         """Norbornane: existing bicyclo naming preserved."""
@@ -28,7 +28,7 @@ class TestVonBaeyerE2E:
             f"Expected norbornane or bicyclo[2.2.1]heptane, got: {result}"
 
     def test_adamantane_retained_name(self):
-        """Adamantane: retained name per IUPAC P-31.1.2.1."""
+        """Adamantane: retained name per IUPAC."""
         result = name_compound('C1C2CC3CC1CC(C2)C3')
         assert result == 'adamantane', f"Expected adamantane, got: {result}"
 
@@ -46,9 +46,9 @@ class TestVonBaeyerE2E:
             f"Expected -ene or norbornene, got: {result}"
 
     def test_cubane_retained_name(self):
-        """Cubane: retained name AND PIN per IUPAC P-23.2.5.1 (Blue Book 9881)."""
+        """Cubane: retained name AND PIN per IUPAC (Blue Book 9881)."""
         # Cubane = pentacyclo[4.2.0.0(2,5).0(3,8).0(4,7)]octane, retained name preferred.
-        # v23 Phase 5: the prior SMILES C12C3C4C1C5C3C4C25 was the WRONG (CH)8 cage
+        # a phase: the prior SMILES C12C3C4C1C5C3C4C25 was the WRONG (CH)8 cage
         # isomer (InChIKey BOLISNSTKUABPW); the true cubane canonical is below
         # (TXWRERCHRDBNLG), matching what OPSIN emits for 'cubane'.
         result = name_compound('C12C3C4C1C1C2C3C41')
@@ -143,18 +143,18 @@ class TestPolycyclicLactoneE2E:
 
 
 class TestBridgedFusedE2E:
-    """Tests for FR-8 bridged fused nomenclature."""
+    """Tests for bridged fused nomenclature."""
 
     def test_methanonaphthalene(self):
         """1,4-methanonaphthalene: bridged fused AROMATIC system.
 
-        v22 Phase G0 (DD7 S1): this molecule (10 aromatic atoms) was previously
+         Phase G0 (DD7 S1): this molecule (10 aromatic atoms) was previously
         named as a von-Baeyer `tricyclo[…]` cage that DROPS the benzo
         aromaticity — a structurally WRONG name (it re-parses to a different,
         over-saturated molecule). The old assertion ACCEPTED that wrong 'cyclo'
         name as "fused recognition". G0 now fails closed (von Baeyer cannot
         represent aromaticity); the correct bridged-fused PIN
-        (1,4-dihydro-1,4-methanonaphthalene, P-25.4) is a Phase-G1 build.
+        (1,4-dihydro-1,4-methanonaphthalene, is a Phase-G1 build.
         Acceptable outcomes: a fail-closed refusal, OR a real fused-system
         name (when G1 lands) — but NEVER the de-aromatised von-Baeyer cage.
         """
@@ -266,7 +266,7 @@ class TestRegressionE2E:
 
 
 class TestSuccessCriteria:
-    """Explicit tests for Phase 16 success criteria from PLAN.md."""
+    """Explicit tests for a phase success criteria from PLAN.md."""
 
     def test_adamantane_produces_retained_name(self):
         """SUCCESS-1: Adamantane SMILES produces retained name 'adamantane'."""
@@ -412,7 +412,7 @@ class TestClassificationFixes:
             f"Expected camphor, got: {result}"
 
     def test_pentacyclic_reaches_polycyclic_path(self):
-        """Pentacyclic lactone must be recognized by is_polycyclic_system()."""
+        """Pentacyclic lactone must be recognized by is_polycyclic_system."""
         from rdkit import Chem
         from orthonym.rules.polycyclic import is_polycyclic_system
         mol = Chem.MolFromSmiles(
@@ -506,7 +506,7 @@ class TestOPSINCompatibleVBFormat:
         """Cubane: retained name is OPSIN-compatible.
 
         Cubane now returns retained name; VB descriptor format tested via
-        generate_polycyclic_name. v23 Phase 5: SMILES corrected from the wrong
+        generate_polycyclic_name. a phase: SMILES corrected from the wrong
         (CH)8 cage isomer to the true cubane canonical (TXWRERCHRDBNLG).
         """
         result = name_compound('C12C3C4C1C1C2C3C41')

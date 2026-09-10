@@ -32,7 +32,7 @@ NAME_STABILITY_CANARY = [
         # W6-P1: this N-acetyl disaccharide already fail-closes to 'unknown' at
         # HEAD (the legacy (glycosyloxy)parent fallback is OPSIN-unparseable once
         # F-CATALOG-JOIN puts a locant first); frozen value updated to reality.
-        # Proper P-102.7 disaccharide name is Wave-6 Task 17.
+        # Proper disaccharide name is Wave-6 Task 17.
         "unknown organic compound",
     ),
     (
@@ -41,7 +41,7 @@ NAME_STABILITY_CANARY = [
     ),
     (
         "c1ccc2cc3c(cc2c1)-c1cc2ccccc2cc1-c1cc2ccccc2cc1-c1cc2ccccc2cc1-3",
-        "unknown organic compound",  # a phase.2: RATIO_REJECT_FLOOR=0.10 rejects 'ane' garbage chain name (ratio=0.05 for 4-naphthyl fused system). Falls through to generic "unknown" fallback — semantically equivalent "couldn't name" signal as the a phase SMILES-passthrough.
+        "unknown organic compound",  # a phase: RATIO_REJECT_FLOOR=0.10 rejects 'ane' garbage chain name (ratio=0.05 for 4-naphthyl fused system). Falls through to generic "unknown" fallback — semantically equivalent "couldn't name" signal as the a phase SMILES-passthrough.
     ),
     (
         "NC(C(=O)O)C(CC[C@H](N)C(=O)O)C(=O)O",
@@ -53,7 +53,7 @@ NAME_STABILITY_CANARY = [
         # same defect class as CC*->"ethane" -- the old pinned name below silently
         # dropped the wildcard position instead of refusing. Correct behaviour
         # (measured post-fix) is the unconditional wildcard sentinel.
-        "compound with wildcard atoms (not supported)",  # was: "(ethanediamide)(2S,3R,4E)-1,3-dihydroxy-2-(methanoylamino)octadec-4-enamide" # ASML-12: locant-aware prefix merge
+        "compound with wildcard atoms (not supported)",  # was: "(ethanediamide)(2S,3R,4E)-1,3-dihydroxy-2-(methanoylamino)octadec-4-enamide" #: locant-aware prefix merge
     ),
     (
         "C[C@@H](O)[C@H](NC(=O)[C@@H]1CCCN1)C(=O)N[C@@H](Cc1ccccc1)C(=O)O",
@@ -69,7 +69,7 @@ NAME_STABILITY_CANARY = [
     ),
     (
         "*N[C@@H](CC(=O)NC1O[C@H](CO)[C@@H](O[C@@H]2O[C@H](CO)[C@@H](O[C@@H]3O[C@H](CO[C@H]4O[C@H](CO[C@H]5O[C@H](CO)[C@@H](O)[C@H](O)[C@@H]5O)[C@@H](O)[C@H](O[C@H]5O[C@H](CO)[C@@H](O)[C@H](O)[C@@H]5O[C@H]5O[C@H](CO)[C@@H](O)[C@H](O)[C@@H]5O)[C@@H]4O)[C@@H](O)[C@H](O[C@H]4O[C@H](CO)[C@@H](O)[C@H](O)[C@@H]4O[C@H]4O[C@H](CO)[C@@H](O)[C@H](O)[C@@H]4O[C@H]4O[C@H](CO)[C@@H](O)[C@H](O[C@H]5O[C@H](CO)[C@@H](O)[C@H](O)[C@H]5O)[C@@H]4O)[C@@H]3O)[C@H](O)[C@H]2NC(C)=O)[C@H](O)[C@H]1NC(C)=O)C(*)=O",
-        "compound with wildcard atoms (not supported)",  # a phase.2: RATIO_REJECT_FLOOR=0.10 rejects '(3S)-butanetriamide' as truncated garbage (ratio=0.094 on 100+ atom glycan w/ wildcards). Correct routing: wildcard-atom detection branch, which was always the right semantic for this SMILES.
+        "compound with wildcard atoms (not supported)",  # a phase: RATIO_REJECT_FLOOR=0.10 rejects '(3S)-butanetriamide' as truncated garbage (ratio=0.094 on 100+ atom glycan w/ wildcards). Correct routing: wildcard-atom detection branch, which was always the right semantic for this SMILES.
     ),
     pytest.param(
         "CC[C@H](C)[C@H](NC(=O)[C@@H](NC(=O)[C@H](C)NC(=O)[C@H](CCCCNC(=O)CCl)NC(=O)[C@H](CC(=O)O)NC(C)=O)[C@@H](C)O)C(=O)NCC(=O)N[C@@H](Cc1ccccc1)C(=O)N[C@@H](CCC(=O)O)C(=O)N[C@H](C(=O)N[C@@H](CCC(N)=O)C(=O)N[C@@H](CCC(=O)O)C(=O)N[C@@H](CCC(=O)O)C(=O)O)C(C)C",
@@ -79,7 +79,7 @@ NAME_STABILITY_CANARY = [
             reason="Brittle wrong-form name (S4 precedent): a modified-peptide (non-standard N-terminal chloro/acetamido/aminoacyl residue) that is 'unknown' in isolation on BOTH HEAD and work (SELF-01 suppresses the mis-named candidate). The frozen string only surfaces via OPSIN-gate fail-open under suite load and had ALREADY drifted in its N-acyl part (hexylamino/ethanoylamino -> tricosyl/acetamido) independent of W5. W5-A4 additionally L-suppresses the (suppressed) peptide portion per P-103.3.4. Modified-peptide naming is a carved-out subsystem; xfail(non-strict) rather than freeze a brittle wrong-form name.",
         )
     ),
-    # a phase Plan 02 Task 03: cascade unblock per P-44.1(a)/(b). Pre-148
+    # a phase Plan 02 Task 03: cascade unblock per (a)/(b). Pre-148
     # the deleted `_should_bypass_fused_guard` produced ring-as-parent
     # `3-(2-aminoethyl)-1H-indole`-style prefix; post-148 cascade routes the
     # propanamide chain as parent (acid PG on chain). The indole is still
@@ -106,7 +106,7 @@ NAME_STABILITY_CANARY = [
     ),
     (
         "CC1=C[C@]2(C)C[C@@H](C)CC[C@@H]2[C@H](C(=O)[C@@H]2C(=O)N3CC[C@@H]4C(=O)O[C@H]2[C@@]43O)[C@@H]1C",
-        "(3R,4R,5R,6S)-3-[(S)-2-methylbutyl]hydroxy-1,3,6-trimethyl-5-oxocyclohex-1-enecarboxylate",  # PERC-05: generic alcohol detects hemiaminal OH
+        "(3R,4R,5R,6S)-3-[(S)-2-methylbutyl]hydroxy-1,3,6-trimethyl-5-oxocyclohex-1-enecarboxylate",  #: generic alcohol detects hemiaminal OH
     ),
     (
         r"CO[C@H]1C=C/C=C\C=C/C[C@H](OC(=O)[C@@H](C)NC(=O)C2=CCCCC2)[C@H](C)[C@@H](O)/C(C)=C\CCc2cc(O)cc(c2O)NC(=O)C1",
@@ -132,7 +132,7 @@ NAME_STABILITY_CANARY = [
         "[O]=[Sb]([O-])([O-])[OH]",
         "antimony compound (not supported)",
     ),
-    # a phase Plan 02 Task 03: cascade unblock per P-44.1. Pre-148
+    # a phase Plan 02 Task 03: cascade unblock per. Pre-148
     # `3-acetyl-1H-indolyl` (ring-as-substituent w/ ketone prefix);
     # post-148 cascade picks the chain (carbonyl PG); indole rendered as
     # `2-(1H-indol-3-yl)-...` substituent. Acceptable churn.
@@ -144,9 +144,9 @@ NAME_STABILITY_CANARY = [
             reason="v21 WS-A task 9: wrong-both-ways row; frozen string is OPSIN-gate-load-sensitive and shifted with the task-9 rebalance. xfail(non-strict) per the S4 precedent.",
         )
     ),
-    # WS-A.1 S4: wrong-both-ways glycosphingolipid (RT=False at every step;
-    # needs the WS-C lipid subsystem). S4 ring-senior parent selection lengthened
-    # the raw name; whether name() returns that raw name or "unknown organic
+    #.1 S4: wrong-both-ways glycosphingolipid (RT=False at every step;
+    # needs the lipid subsystem). S4 ring-senior parent selection lengthened
+    # the raw name; whether name returns that raw name or "unknown organic
     # compound" now hinges on the OPSIN validity gate's timeout/fail-open under
     # load — the documented OPSIN-timeout flake class. xfail(non-strict): do not
     # freeze a brittle wrong-form string for a compound we cannot yet name.
@@ -229,7 +229,7 @@ NAME_STABILITY_CANARY = [
     ),
     (
         "CO[C@@H]1[C@H](OC(=O)CCC(=O)O)CC[C@](O)(CCl)[C@H]1[C@@]1(C)O[C@@H]1CC=C(C)C",
-        # P-44.3 fix: no-PG path now selects chain over small oxirane ring in substituent
+        # fix: no-PG path now selects chain over small oxirane ring in substituent
         "(1R,2S,3S,4R)-2-[(1R,4R)-(3R)-3-methyl-1-oxiranylbut-2-enyl]-1-(chloromethyl)-1-hydroxy-3-methoxycyclohexyl butanedioate",
     ),
     (
@@ -238,7 +238,7 @@ NAME_STABILITY_CANARY = [
     ),
     # a phase / Plan 02 Task 03: cascade unblock interacts with the
     # Plan-01 carry-forward decomposition fragment-naming bug (148-01-SUMMARY
-    # Risks §2). Pre-148 cascade non-fired → quinazoline-as-parent +
+    # Risks). Pre-148 cascade non-fired → quinazoline-as-parent +
     # biphenylamino prefix. Post-148 cascade fires (acrylamide chain has C=O
     # PG); decomposition layer then mis-names the quinazoline+biphenyl ring
     # system, dropping it from the output. Marked xfail; root cause is the
@@ -490,7 +490,7 @@ NAME_STABILITY_CANARY = [
         "C=C(CC[C@@H](C(=O)O)[C@H]1[C@H](O)[C@H](O)[C@@]2(C)C3=CC[C@H]4C(C)(C)C(=O)CC[C@]4(C)C3=CC[C@]12C)C(C)C",
         "(5R,10S,13R,14R,15R,16S,17R,20R)-15,16,21-trihydroxy-4,4,14-trimethylergosta-7,9,24-trien-3,21-dione",
     ),
-    # WS-A.1 S4: wrong-both-ways glycolipid (RT=False; needs WS-C). Frozen
+    #.1 S4: wrong-both-ways glycolipid (RT=False; needs). Frozen
     # string is OPSIN-gate-timeout-flaky after the S4 raw-name lengthening.
     pytest.param(
         "CCCCCCCCCCCCCCCCCCCCCCCC(O)C(O)C(=O)N[C@@H](COP(=O)([O-])O[C@@H]1[C@H](O)[C@H](O)[C@@H](O)[C@H](O)[C@H]1OC1O[C@H](COP(=O)([O-])O[C@@H]2[C@H](O)[C@H](O)[C@@H](O)[C@H](O)[C@H]2O)[C@@H](O)[C@H](O)[C@@H]1O)[C@H](O)C(O)CCCCCCCCCCCCCC",
@@ -507,7 +507,7 @@ NAME_STABILITY_CANARY = [
     ),
     (
         "COc1cccc2c1[C@@H](OC)O[C@H]2c1c(O)ccc2c1C(=O)CC(C)(O)C2",
-        "(methoxyphenyl)methanol",  # a phase: was '(methoxybenzene)methanol'; benzene -> phenyl in substituent context (IUPAC P-31.1.3.4)
+        "(methoxyphenyl)methanol",  # a phase: was '(methoxybenzene)methanol'; benzene -> phenyl in substituent context (IUPAC
     ),
     (
         "NC(N)=NCCC[C@H](NC(=O)[C@H](CC(=O)O)NC(=O)[C@@H](N)Cc1cnc[nH]1)C(=O)O",
@@ -530,7 +530,7 @@ NAME_STABILITY_CANARY = [
         "unknown organic compound",
     ),
     (
-        # a phase Plan 02 Task 03: cascade unblock per P-44.1(a). Pre-148
+        # a phase Plan 02 Task 03: cascade unblock per (a). Pre-148
         # ring-as-parent `3-(11-carboxyundecyl)-1H-indole` placed acid PG on
         # ring-substituent prefix (IUPAC-incorrect); post-148 cascade picks
         # the chain (peptide acid) as parent. Indole correctly rendered as
@@ -547,7 +547,7 @@ NAME_STABILITY_CANARY = [
         "(4R,5S,6R)-4,5,6-trihydroxy-2-oxophosphono-7-phosphonooxyheptanoate",
     ),
     (
-        # a phase Plan 02 Task 03: cascade unblock per P-44.1(a). Pre-148
+        # a phase Plan 02 Task 03: cascade unblock per (a). Pre-148
         # ring-as-parent `3-(2-carboxyethyl)-1H-indole` placed acid PG on
         # ring-substituent prefix; post-148 cascade picks chain (PG-bearing
         # peptide) as parent. Indole rendered as `1H-indol-3-yl` substituent.
@@ -601,7 +601,7 @@ NAME_STABILITY_CANARY = [
         "CC(C)C(=O)OC[C@H]1O[C@H](O[C@H]2O[C@H](CO)[C@@H](O)[C@H](O)[C@H]2O)[C@H](O)[C@@H](O)[C@@H]1O",
         # Updated: branched acid naming fix correctly identifies 2-methylpropanoyl
         # (principal chain = 3C) instead of butanoyl (4C total carbon count).
-        # IUPAC P-65.6.3.2.2: acyloxy prefix uses principal chain for acid stem.
+        # IUPAC: acyloxy prefix uses principal chain for acid stem.
         "(α-D-glucopyranosyloxy)((2-methylpropanoyl)oxy)-2-methylpropanetriol",
     ),
     (
@@ -612,11 +612,11 @@ NAME_STABILITY_CANARY = [
     # Pre-148 indole rendered as `3-(3-(3-carboxypropyl)-1H-indolyl)`
     # (ring-as-substituent w/ acid prefix); post-148 cascade unblock changes
     # the indole side-chain rendering to `3-(11-carboxyundecyl)` (chain
-    # carries acid PG per P-44.1(a) within the substituent). Macrocycle parent
+    # carries acid PG per (a) within the substituent). Macrocycle parent
     # locants/stereo unchanged. Acceptable churn.
     (
         "CC(C)[C@@H]1NC(=O)[C@H](NC(=O)NC(Cc2c[nH]c3ccccc23)C(=O)O)CCCCNC(=O)[C@H](Cc2ccccc2)NC(=O)[C@H](C)N(C)C(=O)[C@H](CCc2ccc(O)cc2)NC1=O",
-        "(3R,10S,13S,16S,19S)-10-benzyl-3-(11-carboxyundecyl)-16-(hydroxy4-ethylphenyl)-19-isopropyl-13-methyl-N-methyl-9,12,15,18-tetraoxoazacyclononadecan-2-one",  # a phase cascade unblock; ASML-13 phenol suffix routing preserved
+        "(3R,10S,13S,16S,19S)-10-benzyl-3-(11-carboxyundecyl)-16-(hydroxy4-ethylphenyl)-19-isopropyl-13-methyl-N-methyl-9,12,15,18-tetraoxoazacyclononadecan-2-one",  # a phase cascade unblock; phenol suffix routing preserved
     ),
     (
         "CCC(C)C1=C2C(=O)OC[C@H]2[C@@H](C)[C@H](C)O1",
@@ -632,7 +632,7 @@ NAME_STABILITY_CANARY = [
     ),
     (
         "CCCCCCCCCCCCCCCCC[C@@H](O)[C@H](CO)NC(=O)C(O)CCCCCCCCCCCCCCCC",
-        "(2S,3R)-2-(octadecanoylamino)-1,3-dihydroxyicosanamide",  # ASML-12: locant-aware prefix merge
+        "(2S,3R)-2-(octadecanoylamino)-1,3-dihydroxyicosanamide",  #: locant-aware prefix merge
     ),
     (
         "CC[C@H](C)[C@H](NC(=O)[C@@H]1CCCN1)C(=O)N[C@@H](Cc1cnc[nH]1)C(=O)O",
@@ -650,7 +650,7 @@ NAME_STABILITY_CANARY = [
         "C=C(C(=O)OC)N1C(=O)C[C@@H](C)C1=O",
         "(octanoyloxy)-2-pyrrolidinylprop-2-enimide",
     ),
-    # ---- a phase-01: N-substituent naming canaries (FIX-11) ----
+    # ---- a phase-01: N-substituent naming canaries  ----
     # Cycloalkyl, branched, heterocyclic, and mixed N-substituents
     # that were previously mis-named as linear alkyls.
     (
@@ -685,9 +685,9 @@ NAME_STABILITY_CANARY = [
         "CC(=O)N(C)c1ccccc1",
         "N-methyl-N-phenylacetamide",
     ),
-    # ---- a phase-02: Multi-ester naming canaries (FIX-04, DECO-08/DECO-09) ----
+    # ---- a phase-02: Multi-ester naming canaries (, /) ----
     # Dicarboxylic diesters, polyol polyesters, independent esters, single ester,
-    # DECO-09 (3+ ester bonds), DECO-08 (HA > 30)
+    # (3+ ester bonds), (HA > 30)
     (
         "COC(=O)CC(=O)OC",
         "dimethyl propanedioate",
@@ -721,52 +721,52 @@ NAME_STABILITY_CANARY = [
         "2-[(11Z,14Z)-icosa-11,14-dienoyloxy]-1,3-bis(linoleoyloxy)propane",
     ),
     # --- a phase-02 canary compounds ---
-    # FIX-13: iterative decomposition (multi-ester with glycosidic linkage)
+    #: iterative decomposition (multi-ester with glycosidic linkage)
     (
         "CC(=O)OCC1OC(OC(=O)C)C(OC(C)=O)C(OC(C)=O)C1OC(C)=O",
         "1,2,3,4-tetrakis(acetyloxy)oxane",
     ),
-    # FIX-10: fused ring dictionary (dibenzo[b,d]furan)
+    #: fused ring dictionary (dibenzo[b,d]furan)
     (
         "c1ccc2c(c1)oc1ccccc12",
         "dibenzo[b,d]furan",
     ),
-    # FIX-10: fused ring dictionary (dibenzo[b,d]thiophene)
+    #: fused ring dictionary (dibenzo[b,d]thiophene)
     (
         "c1ccc2c(c1)sc1ccccc12",
         "dibenzo[b,d]thiophene",
     ),
-    # FIX-10: fused ring dictionary (9H-carbazole)
+    #: fused ring dictionary (9H-carbazole)
     (
         "c1ccc2c(c1)[nH]c1ccccc12",
         "9H-carbazole",
     ),
-    # FIX-14: ylidene substituent naming (methylidenecyclohexane)
+    #: ylidene substituent naming (methylidenecyclohexane)
     (
         "C=C1CCCCC1",
         "methylidenecyclohexane",
     ),
-    # FIX-14: ylidene on chain parent (3-methylidenepentane)
+    #: ylidene on chain parent (3-methylidenepentane)
     (
         "CCC(=C)CC",
         "3-methylidenepentane",
     ),
-    # FIX-15: skeletal replacement for large heterocyclic ring
+    #: skeletal replacement for large heterocyclic ring
     (
         "C1CCOCCO1",
         "1,4-dioxacycloheptane",
     ),
-    # FIX-15: mixed heteroatom large ring replacement
+    #: mixed heteroatom large ring replacement
     (
         "C1CCNCCOC1",
         "1-oxa-4-azacyclooctane",
     ),
-    # FIX-15: zwitterion detection (beta-alanine)
+    #: zwitterion detection (beta-alanine)
     (
         "[NH3+]CCC(=O)[O-]",
         "beta-alanine",
     ),
-    # FIX-15: zwitterion detection (betaine)
+    #: zwitterion detection (betaine)
     (
         "C[N+](C)(C)CC(=O)[O-]",
         "betaine",
@@ -795,11 +795,11 @@ NAME_STABILITY_CANARY = [
     ),
     (
         "N=C(N)NC(=N)Nc1ccc(O)cc1",
-        "4-(N-methylguanidinyl)phenol",  # ASML-13: phenol suffix routing
+        "4-(N-methylguanidinyl)phenol",  #: phenol suffix routing
     ),
     (
         "COc1cc(CO)cc(CC=C(C)C)c1O",
-        "4-(hydroxymethyl)-6-methoxy-2-(2-methylbut-2-enyl)phenol",  # ASML-13: phenol suffix routing
+        "4-(hydroxymethyl)-6-methoxy-2-(2-methylbut-2-enyl)phenol",  #: phenol suffix routing
     ),
     (
         "COc1cc(C(=O)CC(C)C)oc(=O)c1",
@@ -843,11 +843,11 @@ NAME_STABILITY_CANARY = [
     ),
     (
         "COc1cc(O)cc(C)c1Oc1cc(C)cc(O)c1O",
-        "3-methoxy-5-methyl-4-phenoxyphenol",  # ASML-13: phenol suffix routing
+        "3-methoxy-5-methyl-4-phenoxyphenol",  #: phenol suffix routing
     ),
     # fragment_loss compounds (8)
     (
-        # a phase.6 T3: was the fragment-loss bug 'ethanolate' (dropped the
+        # a phase T3: was the fragment-loss bug 'ethanolate' (dropped the
         # sulfonate); orient_chain now anchors the sulfonate on C1 -> correct,
         # RT-True '2-oxoethanesulfonate' (oxo at C2). Intended improvement.
         "O=CCS(=O)(=O)[O-]",
@@ -863,7 +863,7 @@ NAME_STABILITY_CANARY = [
     ),
     (
         "COc1cc(C2OC2C(=O)NCCCCN)ccc1O",
-        "2-methoxyphenol",  # ASML-13: phenol suffix routing
+        "2-methoxyphenol",  #: phenol suffix routing
     ),
     (
         "Cc1c(CO)oc(=O)c2c(O)cc(O)cc12",
@@ -875,7 +875,7 @@ NAME_STABILITY_CANARY = [
     ),
     (
         "CCCCCCCCNC(O)CCc1ccc(O)c(OC)c1",
-        "2-methoxyphenol",  # ASML-13: phenol suffix routing
+        "2-methoxyphenol",  #: phenol suffix routing
     ),
     (
         "CCCCCC(C)OC(=O)COc1ccc(Cl)c2cccnc12",
@@ -898,7 +898,7 @@ NAME_STABILITY_CANARY = [
     ),
     (
         "CCCOC(C)OCCc1ccccc1",
-        "(1-hydroxy-1-ethoxyethylpropyl)benzene",  # PERC-05: generic alcohol detects fragment hydroxyl
+        "(1-hydroxy-1-ethoxyethylpropyl)benzene",  #: generic alcohol detects fragment hydroxyl
     ),
     (
         "NC(=O)N/C=C\\C(=O)OO",
@@ -1000,7 +1000,7 @@ NAME_STABILITY_CANARY = [
         "(7Z,9R,10R,11S,13Z,15Z,19R)-1-(cyclohexanecarbonyloxy)-3,9-dihydroxy-14-hydroxymethyl-2,4-dimethyl-12-oxo-8-propyl1-azacyclohenicosene",
     ),
     # a phase Plan 02 Task 03: duplicate of the above (same SMILES at L116);
-    # cascade unblock per P-44.1. Acceptable churn — see L116 for rationale.
+    # cascade unblock per. Acceptable churn — see L116 for rationale.
     (
         "CCCCCC/C=C\\CC(=O)N[C@@H](CO)[C@@H](O)CC(=O)N[C@H](C(=O)N[C@H](/C=C/C(=O)NCC(=O)c1c[nH]c2ccccc12)CO)C(C)C",  # aromatic,heterocycle,fused-ring,polyfunctional,large
         "(2E,4R)-1-(2-oxo2-(1H-indol-3-yl)-1-aminoethyl)-5-hydroxy-4-(pentanoylamino)pent-2-enetetraamide",
@@ -1068,17 +1068,17 @@ NAME_STABILITY_CANARY = [
     # furanose-phosphate-adenine (a phase / IM-x.x decomposition layer).
     # Acceptable churn — both names are partial; the new name is more
     # representative than the OLD `adenine` placeholder.
-    # Re-baselined WS-A.1 S4: ring numbering now anchors the ring atom
-    # bearing the (unexpressed) senior N-acyl group per P-31.1.4(c); the
+    # Re-baselined.1 S4: ring numbering now anchors the ring atom
+    # bearing the (unexpressed) senior N-acyl group per (c); the
     # hydroxy/oxo prefixes follow at {2,6}. Wrong-both-ways row (dangling
     # 'amino', partial decomposition coverage), OPSIN RT=False either way.
     (
         "CC(C)(COP(=O)([O-])OP(=O)([O-])OC[C@H]1O[C@@H](n2cnc3c(N)ncnc32)[C@H](O)[C@@H]1OP(=O)([O-])[O-])[C@@H](O)C(=O)NCCC(=O)NCCSC(=O)C1C(=O)CCCC1O",  # aromatic,heterocycle,fused-ring,polyfunctional,charged,large,carbohydrate
         "N-[(2R)-2-hydroxy-3,3-dimethylbutanoyl]amino-2-hydroxy-6-oxocyclohexane",
     ),
-    # WS-A.1 S4: wrong-both-ways deuterated secosteroid (RT=False at every
-    # step; needs WS-C). S4 ring-senior parent selection lengthened the raw
-    # name; name() now returns either that raw name or "unknown organic
+    #.1 S4: wrong-both-ways deuterated secosteroid (RT=False at every
+    # step; needs). S4 ring-senior parent selection lengthened the raw
+    # name; name now returns either that raw name or "unknown organic
     # compound" depending on OPSIN-gate timeout/fail-open under load (the
     # documented OPSIN-timeout flake class). xfail(non-strict): never freeze a
     # brittle wrong-form string for a compound we cannot yet name.
@@ -1121,12 +1121,12 @@ NAME_STABILITY_CANARY = [
     ),
     (
         "Nc1ncnc2c1ncn2[C@@H]1O[C@H](COP(=O)(O)OC(=O)CCCC[C@@H]2SC[C@@H]3NC(=O)N[C@@H]32)[C@@H](O)[C@H]1O",  # aromatic,heterocycle,fused-ring,polyfunctional,large,carbohydrate
-        # a phase cleanup: PIN rebaselined per IUPAC P-22.2.1 Table 2.3.
+        # a phase cleanup: PIN rebaselined per IUPAC
         # The saturated 5-mem ring with 2 nitrogens at 1,3 is the retained
         # name "imidazolidine" (PIN), not the systematic Hantzsch-Widman
         # "1,3-diazolidine". Source-of-truth: data/iupac_2013_pin_list.json
         # line 50 ({"name": "imidazolidine", "smiles": "C1CNCN1", "pin":
-        # true, "citation": "P-22.2.1 Table 2.3"}). The pre-Phase-150
+        # true, "citation": ""}). The pre-Phase-150
         # canary expectation was captured before OPSIN XML retained-name
         # expansion brought imidazolidine into the registry.
         "adenosine (4R,5S)-2-oxoimidazolidine",
@@ -1271,7 +1271,7 @@ NAME_STABILITY_CANARY = [
     ),
     # a phase Plan 02 Task 03: acridone derivative. Pre-148 produced
     # acridone-as-parent w/ chain prefix (`...-N-methylacridone`); post-148
-    # cascade unblock per P-44.1(a) selects the chain (carbinol) and renders
+    # cascade unblock per (a) selects the chain (carbinol) and renders
     # the acridine ring as `acridin-9-yl` substituent. The acridone (=O on
     # ring) is dropped from the parent rendering — a known consequence of
     # cascade preferring chain when chain has alcohol PG. Acceptable churn.
@@ -1317,10 +1317,10 @@ NAME_STABILITY_CANARY = [
     ),
     (
         "COc1cc(-c2ccc(O)c(CC=C(C)C)c2)c(OC)c(O)c1-c1ccc(O)c(O)c1",  # aromatic,large
-        # a phase-04 BLK-02 Scenario A fix: previous frozen string had an
+        # a phase-04 Scenario A fix: previous frozen string had an
         # unprimed back-attachment locant on the middle ring (the connection
         # string was emitted with the second pair lacking a prime on its
-        # first element). Per IUPAC P-28.2.1 the middle ring of a
+        # first element). Per IUPAC the middle ring of a
         # ter-assembly is in the single-prime namespace; both connection
         # locants on the middle ring must be primed. The root-cause fix in
         # ring_assemblies.py (_order_systems_along_path) walks the
@@ -1345,7 +1345,7 @@ NAME_STABILITY_CANARY = [
     ),
     # a phase Plan 02 Task 03: estradiol-tetraol. Locant numbering on
     # estra ring system updated from 1,2,4-trien to 1,3,5-trien (correct
-    # IUPAC numbering for the aromatic A-ring of estranes per P-31.1.5
+    # IUPAC numbering for the aromatic A-ring of estranes per
     # estra-X numbering convention). Stereo descriptors and hydroxyl
     # locants unchanged. Per Plan 01 SUMMARY this is "unrelated to
     # a phase" (incidental locant correction in the estra ring system,
@@ -1744,7 +1744,7 @@ NAME_STABILITY_CANARY = [
         "(1R,2S,4S,5R,9S,10S,13R)-2-hydroxy-5,9-dimethyl-tetracyclo[8.5.0.1(1,13).0(4,9)]hexadecane-5-carboxylic acid",
     ),
     pytest.param(
-        # a phase SC-1 / commit 2/5: complex_ring stereo injection
+        # a phase / commit 2/5: complex_ring stereo injection
         # now emits R/S prefix where a phase returned bare name. The
         # carry-over compound `stereo_gap_post_commit_5.txt` row 3 drops
         # out of the a phase backstop trace per gold-standard
@@ -1897,7 +1897,7 @@ NAME_STABILITY_CANARY = [
         )
     ),
     pytest.param(
-        # a phase SC-1 / commit 2/5: spiro stereo injection now
+        # a phase / commit 2/5: spiro stereo injection now
         # correctly emits R/S prefix.
         "C=C(C)[C@@H]1CC[C@@H](C)[C@@]12CC=C(C)CC2",  # small
         "unknown organic compound",
@@ -1909,9 +1909,9 @@ NAME_STABILITY_CANARY = [
     (
         "COc1cc(/C=C\\c2ccc(OC)c(O)c2)cc(OC)c1",  # aromatic,medium
         # a phase cleanup: stereo descriptor rebaselined per a phase
-        # ERRATA-02 (P-31.1.3 / P-44.4.1, Sep 2024). The SMILES specifies
+        # ERRATA-02 /, Sep 2024). The SMILES specifies
         # (1Z) cis-double-bond stereochemistry via /C=C\, and the
-        # stereo pipeline correctly emits the (1Z)- prefix per IUPAC P-91
+        # stereo pipeline correctly emits the (1Z)- prefix per IUPAC
         # mandatory descriptor rules for stereodefined double bonds. Live
         # behavior verified at src/orthonym/rules/stereochemistry.py:126
         # (a phase ERRATA-02 deliverable preserved).
@@ -2123,7 +2123,7 @@ NAME_STABILITY_CANARY = [
         "CC(=O)N[C@@H]1[C@@H](O)[C@H](O[C@@H]2O[C@H](CO)[C@@H](O[C@@H]3O[C@H](CO[C@H]4O[C@H](CO)[C@@H](O)[C@H](O)[C@@H]4O[C@@H]4O[C@H](CO)[C@@H](O[C@@H]5O[C@H](CO)[C@H](O)[C@H](O)[C@H]5O)[C@H](O)[C@H]4NC(C)=O)[C@@H](O)[C@H](O[C@H]4O[C@H](CO)[C@@H](O)[C@H](O)[C@@H]4O[C@@H]4O[C@H](CO)[C@@H](O[C@@H]5O[C@H](CO)[C@H](O)[C@H](O)[C@H]5O)[C@H](O)[C@H]4NC(C)=O)[C@@H]3O)[C@H](O)[C@H]2NC(C)=O)[C@@H](CO[C@@H]2O[C@@H](C)[C@@H](O)[C@@H](O)[C@@H]2O)O[C@H]1O",  # heterocycle,large,carbohydrate
         # W6-P1: this decasaccharide already fail-closes to 'unknown' at HEAD
         # (OPSIN-unparseable glycosyloxy-cascade fallback); frozen value updated to
-        # reality. Proper P-102.7 oligosaccharide name is Wave-6 Task 17.
+        # reality. Proper oligosaccharide name is Wave-6 Task 17.
         "unknown organic compound",
     ),
     (
@@ -2186,7 +2186,7 @@ NAME_STABILITY_CANARY = [
     # picks chain (acid PG); decomposition fragment-naming bug then renders
     # the benzoxazole+benzothiazole as "cyclononyl" — clearly wrong.
     # a phase / IM-x.x decomposition layer fix territory. Marked xfail;
-    # NOT a a phase regression (cascade decision is correct per P-44.1(a);
+    # NOT a a phase regression (cascade decision is correct per (a);
     # only the downstream substituent-naming layer needs the fix).
     pytest.param(
         "O=C(O)CCCCCN1C(=CC=Cc2oc3cc(S(=O)(=O)[O-])ccc3[n+]2CCCCCC(=O)O)Oc2cc(S(=O)(=O)O)ccc21",  # aromatic,heterocycle,fused-ring,large
@@ -2463,7 +2463,7 @@ NAME_STABILITY_CANARY = [
         "CC(C)C[C@@H]1NC(=O)[C@@H](CC(C)C)OC(=O)CCNC(=O)[C@H](Cc2ccccc2)NC(=O)[C@H](CC(C)C)OC1=O",  # aromatic,heterocycle,large
         "(7S,10S,13S,16R)-7-benzyl-10,13,16-triisobutyl-6,9,12,15-tetraoxooxacyclohexadecan-2-one",
     ),
-    # WS-A.1 S4: wrong-both-ways glycolipid (RT=False; needs WS-C). Frozen
+    #.1 S4: wrong-both-ways glycolipid (RT=False; needs). Frozen
     # string is OPSIN-gate-timeout-flaky after the S4 raw-name lengthening.
     pytest.param(
         "CCCCCCCCCCCCCCCCCCCCCCCCC(O)C(=O)N[C@@H](COP(=O)(O)O[C@@H]1[C@H](O)[C@H](O)[C@@H](O)[C@H](O)[C@H]1OC1O[C@H](COP(=O)(O)O[C@@H]2[C@H](O)[C@H](O)[C@@H](O)[C@H](O)[C@H]2O)[C@@H](O)[C@H](O)[C@@H]1O)[C@H](O)CCCCCCCCCCCCCCC",  # heterocycle,large,carbohydrate
@@ -2662,7 +2662,7 @@ NAME_STABILITY_CANARY = [
     ),
     (
         "COc1cc(O)cc2cc(CO)c(=O)oc12",  # aromatic,heterocycle,fused-ring,medium
-        # IH-01f: coumarin -> PIN 2H-1-benzopyran-2-one (P-19(d)); OPSIN-RT verified
+        #: coumarin -> PIN 2H-1-benzopyran-2-one (d)); OPSIN-RT verified
         "6-hydroxy-3-hydroxymethyl-8-methoxy-2H-1-benzopyran-2-one",
     ),
     (
@@ -2798,7 +2798,7 @@ NAME_STABILITY_CANARY = [
 # a phase Plan 02 Task 03: NAME_STABILITY_CANARY entries may now be either
 # bare (smiles, expected_name) tuples OR pytest.param(...) instances (used to
 # attach xfail markers for Phase-149-deferred decomposition fragment-naming
-# bugs per 148-01-SUMMARY Risks §2). Extract the SMILES from both forms.
+# bugs per 148-01-SUMMARY Risks). Extract the SMILES from both forms.
 def _extract_smiles(entry):
     if hasattr(entry, "values"):
         return entry.values[0]
@@ -2829,9 +2829,9 @@ def test_canary_name_stability(smiles, expected_name):
 
 
 # ---------------------------------------------------------------------------
-# P-44.3 canary compounds: 25 compounds frozen BEFORE a phase parent
+# canary compounds: 25 compounds frozen BEFORE a phase parent
 # selection changes. These track the impact of fixing the ring-vs-chain
-# parent selection metric (IUPAC P-44.3(a)).
+# parent selection metric (IUPAC (a)).
 #
 # Categories covered:
 # - Fused ring + chain (8): ring system total atoms > chain but individual
@@ -2849,13 +2849,13 @@ def test_canary_name_stability(smiles, expected_name):
 P44_3_CANARY = [
     # --- Fused ring + chain (8 compounds) ---
     # Row 12: anthranilic acid derivative; fused ring system should be parent
-    # per P-44.3 but individual ring size (6) < chain causes chain selection
+    # per but individual ring size (6) < chain causes chain selection
     (
         "CC(=O)[C@@H](C)Nc1ccccc1C(=O)O",
         "2-[(R)-2-oxo(3R)-3-aminobutyl]benzoic acid",
     ),
     # Row 45: imidazopyridine + tolyl; fused system (9 atoms) vs chain
-    # a phase Plan 02 Task 03: cascade unblock per P-44.1(a). Pre-148
+    # a phase Plan 02 Task 03: cascade unblock per (a). Pre-148
     # ring-as-parent `imidazo[1,2-a]pyridine` w/ chain prefix; post-148
     # cascade picks chain (amide PG); imidazopyridine rendered as
     # `imidazo[1,2-a]pyridin-3-yl` substituent. Acceptable churn (cascade
@@ -2891,7 +2891,7 @@ P44_3_CANARY = [
     # Row 60: anthraquinone + acetic acid chain
     (
         "COc1cccc2c1C(=O)c1ccc3c(c1C2=O)C(=O)C[C@@H](CC(=O)O)C3",
-        # Re-baselined WS-A task 9 (Fix H, P-29.2): carbocycle substituent
+        # Re-baselined task 9 (Fix H,: carbocycle substituent
         # morphology drops the whole '-ane' (cyclooctadecyl, was the
         # malformed 'cyclooctadecanyl'). Wrong-both-ways row either way.
         "2-cyclooctadecylethanoic acid",
@@ -2914,7 +2914,7 @@ P44_3_CANARY = [
     ),
     # Row 59: long-chain amide with indole; NP ring vs C24 chain
     # Updated a phase: N-substituent pipeline produces amide-centric name
-    # Updated a phase: parenthesized per IUPAC P-16.5.1.1 (positional locants)
+    # Updated a phase: parenthesized per IUPAC (positional locants)
     (
         "CCCCCCCCCCCCCCCCCCCCCCCC(=O)NCCc1c[nH]c2ccccc12",
         "N-(3-ethyl-1H-indolyl)tetracosanamide",
@@ -2968,7 +2968,7 @@ P44_3_CANARY = [
         "(3R)-3-(butanoyloxy)-hydroxybutanoate",
     ),
     # --- Hydrocarbon no-PG (3 compounds) ---
-    # Synthetic: cyclopropane + decane; P-44.3 fix: chain (10) > ring (3)
+    # Synthetic: cyclopropane + decane; fix: chain (10) > ring (3)
     (
         "C1CC1CCCCCCCCCC",
         "1-cyclopropyldecane",
@@ -3006,7 +3006,7 @@ P44_3_CANARY = [
     ),
 ]
 
-# Build test IDs for P-44.3 canary (extract SMILES from bare-tuple OR
+# Build test IDs for canary (extract SMILES from bare-tuple OR
 # pytest.param entries — see a phase Plan 02 Task 03 _CANARY_IDS rationale)
 _P44_3_IDS = [
     _extract_smiles(entry)[:40]
@@ -3017,9 +3017,9 @@ _P44_3_IDS = [
 
 @pytest.mark.parametrize("smiles,expected_name", P44_3_CANARY, ids=_P44_3_IDS)
 def test_canary_p44_3(smiles, expected_name):
-    """P-44.3 canary test: freeze current names BEFORE parent selection fix (25 compounds).
+    """ canary test: freeze current names BEFORE parent selection fix (25 compounds).
 
-    These compounds are known P-44.3 parent selection failures from FAILURE-TRACES.md.
+    These compounds are known parent selection failures from FAILURE-TRACES.md.
     They are frozen at their CURRENT (pre-fix) names so that a phase Plan 02 changes
     can be tracked. After the parent selection fix, some names will intentionally change
     as the ring-vs-chain metric becomes IUPAC-compliant (total ring atoms instead of

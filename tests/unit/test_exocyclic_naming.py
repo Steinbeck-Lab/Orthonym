@@ -2,11 +2,11 @@
 Tests for ring-exocyclic double bond naming.
 
 Exocyclic double bonds (=CH2, =CHR, =NR) on ring systems require:
-- ylidene suffix (-ylidene instead of -yl) per IUPAC P-31.1.3.1
+- ylidene suffix (-ylidene instead of -yl) per IUPAC
 - E/Z stereodescriptors when the exocyclic bond has asymmetric substitution
 - No false E/Z in substituent/prefix contexts
 
-These tests cover STER-04 (deferred from Phase 92-03).
+These tests cover (deferred from a phase-03).
 """
 
 import subprocess
@@ -25,7 +25,7 @@ class TestExocyclicYlideneNaming:
     def test_ethylidene_cyclohexanone_contains_ethylidene(self):
         """Exocyclic =CHCH3 on cyclohexanone should be named ethylidene, not ethyl.
 
-        IUPAC P-31.1.3.1: The suffix -ylidene is used for substituents attached
+        IUPAC: The suffix -ylidene is used for substituents attached
         by a double bond to the parent structure.
         """
         from orthonym.namer import Orthonym
@@ -40,7 +40,7 @@ class TestExocyclicYlideneNaming:
     def test_methylidene_cyclohexane_contains_methylidene(self):
         """Exocyclic =CH2 on cyclohexane should be named methylidene, not methyl.
 
-        IUPAC P-31.1.3.1: =CH2 -> methylidene
+        IUPAC: =CH2 -> methylidene
         """
         from orthonym.namer import Orthonym
         namer = Orthonym()
@@ -85,7 +85,7 @@ class TestExocyclicEZEmission:
     def test_e_exocyclic_ethylidene_cyclohexanone(self):
         """(E)-ethylidene on cyclohexanone emits E descriptor with ring-atom locant.
 
-        IUPAC P-91.2: E/Z locant for exocyclic bonds uses endocyclic atom position.
+        IUPAC: E/Z locant for exocyclic bonds uses endocyclic atom position.
         """
         from orthonym.rules.stereochemistry import collect_stereodescriptors
 
@@ -232,7 +232,7 @@ class TestNoFalseEZInSubstituentContext:
         """When a ring is named as a substituent (prefix context), exocyclic E/Z
         should not appear in the substituent name.
 
-        Phase 92-03 deferred this: naive extension caused false (1E) on
+        a phase-03 deferred this: naive extension caused false (1E) on
         ethylidenecyclohexanone as a substituent.
         """
         from orthonym.rules.stereochemistry import collect_stereodescriptors
@@ -328,8 +328,8 @@ class TestExocyclicEndToEnd:
         )
 
     def test_e2e_isopropylidene_cyclohexane(self):
-        """End-to-end: =C(CH3)2 on a ring gives propan-2-ylidene (F-T9/DD6 RET-02:
-        the PIN is the located 'propan-2-ylidene'; 'isopropylidene' is P-29.6.2.2
+        """End-to-end: =C(CH3)2 on a ring gives propan-2-ylidene (F-T9/DD6:
+        the PIN is the located 'propan-2-ylidene'; 'isopropylidene' is
         general-only)."""
         # 1-methyl-4-(propan-2-ylidene)cyclohexane
         name = self._name('CC1CCC(=C(C)C)CC1')
@@ -369,8 +369,8 @@ class TestExocyclicOpsinRoundtrip:
     def test_opsin_methylidene_cyclohexane(self):
         """OPSIN should parse methylidenecyclohexane.
 
-        Phase 157 cleanup: removed stale @pytest.mark.xfail(reason="OPSIN
-        2.8.0 ..."). Phase 138 D-22 / Phase 156 D-09 upgraded the project
+        a phase cleanup: removed stale @pytest.mark.xfail(reason="OPSIN
+        2.8.0..."). a phase / a phase upgraded the project
         to OPSIN 2.9.0 which DOES parse ylidene names on rings; the test
         passes cleanly.
         """
@@ -380,7 +380,7 @@ class TestExocyclicOpsinRoundtrip:
     def test_opsin_ethylidene_cyclohexanone(self):
         """OPSIN should parse 2-ethylidenecyclohexan-1-one.
 
-        Phase 157 cleanup: removed stale @pytest.mark.xfail (same reason
+        a phase cleanup: removed stale @pytest.mark.xfail (same reason
         as test_opsin_methylidene_cyclohexane).
         """
         smi = _opsin_name_to_smiles("2-ethylidenecyclohexan-1-one")

@@ -1,4 +1,4 @@
-"""v36 Milestone C — Pattern A2: primed (spiro/fused) stereo locant render + recognize.
+""" Milestone C — Pattern A2: primed (spiro/fused) stereo locant render + recognize.
 
 These tests pin the SHARED stereo primitive
 (`rules/stereochemistry.py::format_stereodescriptor_string` + `_STEREO_PREFIX_RE`
@@ -27,7 +27,7 @@ class TestPrimedLocantRender:
     """format_stereodescriptor_string must render primed tuple locants as `n'`."""
 
     def test_single_primed_locant_renders_as_apostrophe(self):
-        # (1, "'") + CIP R  ->  1'R   NOT   (1, "'")R
+        # (1, "'") + CIP R -> 1'R NOT (1, "'")R
         out = format_stereodescriptor_string([((1, "'"), "R")])
         assert out == "(1'R)-", out
         assert "(1, " not in out  # no Python tuple repr leaked
@@ -110,7 +110,7 @@ _RT_PASS_WITNESSES = [
 ]
 
 # A witness whose CONSTITUTION (bare core) is OPSIN-unparseable — the stereo
-# block injects fine, but SELF-01 must suppress on the core → abstain (0-wrong).
+# block injects fine, but must suppress on the core → abstain (0-wrong).
 _ABSTAIN_WITNESSES = [
     "c1cc2c(c3c1CNC3)O[C@@]1(CCC[C@H]3CCCC[C@@H]31)C2",
 ]
@@ -163,7 +163,7 @@ class TestSpiroVBStereoCompletionWitnessRT:
     @pytest.mark.parametrize("smi", _ABSTAIN_WITNESSES)
     def test_constitutional_defect_witnesses_abstain(self, smi, named_results):
         name, emitted, _rt = named_results[smi]
-        # Constitution unparseable → SELF-01 suppresses → abstain (never wrong).
+        # Constitution unparseable → suppresses → abstain (never wrong).
         assert not emitted, f"expected abstain (0-wrong), got emitted name {name!r}"
 
     def test_zero_wrong_invariant_all_witnesses(self, named_results):

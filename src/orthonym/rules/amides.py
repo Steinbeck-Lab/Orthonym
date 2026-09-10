@@ -7,7 +7,7 @@ Amide naming follows these patterns:
 - Tertiary amides: N,N-disubstituent + stem + 'amide' (N,N-dimethylacetamide)
 - Ring-attached amides: parent + 'carboxamide' (cyclohexanecarboxamide)
 
-Based on IUPAC 2013 Blue Book P-66.1.
+Based on IUPAC 2013 Blue Book.
 """
 
 import re
@@ -24,21 +24,21 @@ from ..assembly.naming_utils import (
 from ..errors import is_refusal_sentinel
 
 # Pattern matching a leading positional locant (digit(s)) in a substituent
-# name.  Used to detect compound N-substituent names that need
-# parenthesization per IUPAC P-16.5.1.1.
+# name. Used to detect compound N-substituent names that need
+# parenthesization per IUPAC.
 _POSITIONAL_LOCANT_RE = re.compile(r'(?:^|\b)\d')
 
 
 def _has_positional_locants(name: str) -> bool:
     """Whether an N-substituent needs enclosing marks (parentheses).
 
-    Phase 171 assembly/parenthesisation fix (DEF-8 consolidation): this is no longer a divergent
-    digit-only test. The audit (06 §3.1) found that the parenthesization decision
+    a phase assembly/parenthesisation fix (consolidation): this is no longer a divergent
+    digit-only test. The audit (06) found that the parenthesization decision
     here disagreed with the bis/tris multiplier decision (get_multiplier_prefix ->
     is_complex_substituent) for digit-less complex substituents like 'chloroethyl'
     -> 'N,N-bischloroethyl' (malformed; PIN 'N,N-bis(2-chloroethyl)'). The fix is
     to unify both decisions onto the ONE correct predicate is_complex_substituent
-    (P-16.3.5 / P-16.5.1.1). This delegate is retained so the consolidation tripwire
+     /. This delegate is retained so the consolidation tripwire
     (tests/unit/assembly/test_needs_parens_consolidation.py) sees the two views agree.
     """
     return is_complex_substituent(name)
@@ -102,7 +102,7 @@ def get_n_substituents(mol, amide_atoms: tuple) -> List[Dict]:
         amide_atoms: Atom indices from amide SMARTS match
 
     Returns:
-        List of dicts: [{"atoms": [atom_indices], "name": "methyl"}, ...]
+        List of dicts: [{"atoms": [atom_indices], "name": "methyl"},...]
     """
     substituents = []
 
@@ -116,7 +116,7 @@ def get_n_substituents(mol, amide_atoms: tuple) -> List[Dict]:
             nitrogen_idx = idx
         elif atom.GetSymbol() == 'C':
             # Find the chalcogen-double-bonded carbon (=O for regular amides,
-            # =S/=Se/=Te for Phase 163 chalcogen amides).
+            # =S/=Se/=Te for a phase chalcogen amides).
             for neighbor in atom.GetNeighbors():
                 if neighbor.GetSymbol() in _AMIDE_CHALCOGEN_ELEMENTS:
                     bond = mol.GetBondBetweenAtoms(idx, neighbor.GetIdx())
@@ -156,8 +156,8 @@ def get_n_substituents(mol, amide_atoms: tuple) -> List[Dict]:
 def _name_n_substituent(mol, sub_atoms: List[int], carbon_count: int) -> Optional[str]:
     """Name an N-substituent by delegating to the universal naming pipeline.
 
-    All N-substituent naming is handled by ``name_substituent()`` from the
-    universal pipeline (Phase 85), which provides correct IUPAC names via
+    All N-substituent naming is handled by ``name_substituent`` from the
+    universal pipeline (a phase), which provides correct IUPAC names via
     a five-tier cascade: retained names (isopropyl, phenyl, tert-butyl),
     fragment cache, linear alkyl fast path, recursive naming, and fallback.
 
@@ -173,7 +173,7 @@ def _name_n_substituent(mol, sub_atoms: List[int], carbon_count: int) -> Optiona
     # attach_idx is the first atom in BFS order (directly bonded to nitrogen)
     attach_idx = sub_atoms[0]
 
-    # WS-A.2: when the decorated-ring primitive can name the WHOLE fragment
+    #.2: when the decorated-ring primitive can name the WHOLE fragment
     # (ring + its substituents, coverage-checked), use that name directly and
     # skip _enrich_ring_n_substituent — the enricher would prepend the same
     # prefixes a second time ('4-methyl' + '4-methylphenyl'). This also
@@ -204,11 +204,11 @@ def _enrich_ring_n_substituent(mol, base_name: str, sub_atoms: List[int]) -> str
     via the universal pipeline and prepends their IUPAC-locanted prefixes
     to the base ring name.
 
-    Follows the ``_enrich_complex_ring_with_subs()`` pattern from Phase 119.
+    Follows the ``_enrich_complex_ring_with_subs`` pattern from a phase.
 
     Args:
         mol: RDKit Mol object.
-        base_name: Name returned by ``name_substituent()`` (e.g., "cyclohexyl").
+        base_name: Name returned by ``name_substituent`` (e.g., "cyclohexyl").
         sub_atoms: List of atom indices in the N-substituent fragment (BFS order).
 
     Returns:
@@ -235,7 +235,7 @@ def _enrich_ring_n_substituent(mol, base_name: str, sub_atoms: List[int]) -> str
     # (e.g. '(4-hydroxyphenyl)methyl', '(4-methylphenyl)methyl'), so
     # re-discovering its ring substituents here and prepending them
     # DOUBLE-COUNTS them: '4-hydroxy(4-hydroxyphenyl)methyl' — a parseable
-    # WRONG molecule (found by the v31 lever-A gate-OFF honesty sweep on the
+    # WRONG molecule (found by the lever-A gate-OFF honesty sweep on the
     # N-(4-hydroxybenzyl) amide). The enricher is only needed for ALIPHATIC
     # ring stems that name_substituent returns bare (e.g. 'cyclohexyl' ->
     # '4-methylcyclohexyl'); _extract_ring_base_name already returns the full
@@ -250,8 +250,8 @@ def _enrich_ring_n_substituent(mol, base_name: str, sub_atoms: List[int]) -> str
         return base_name  # Ring-only, nothing to enrich
 
     # Orient the ring starting from the attachment atom (sub_atoms[0], bonded
-    # to nitrogen) as locant 1.  Choose the traversal direction that yields
-    # the lowest locant set for sub-substituents (IUPAC P-31.1.3).
+    # to nitrogen) as locant 1. Choose the traversal direction that yields
+    # the lowest locant set for sub-substituents (IUPAC.
     attach_atom = sub_atoms[0]  # first atom in BFS = bonded to N
     oriented_ring = _orient_ring_from_attachment(mol, frag_ring_atoms, attach_atom)
 
@@ -271,7 +271,7 @@ def _enrich_ring_n_substituent(mol, base_name: str, sub_atoms: List[int]) -> str
 
     # Name and collect sub-substituent prefixes, filtering to only those
     # whose atoms are within the N-substituent fragment scope
-    prefix_groups = defaultdict(list)  # name -> [locant, ...]
+    prefix_groups = defaultdict(list)  # name -> [locant,...]
     for sub_info in subs:
         frag_atoms_set = set(sub_info.frag_atoms)
         # Skip sub-substituents outside the N-substituent scope (e.g., the
@@ -429,7 +429,7 @@ def format_n_substitution(substituents: List[Dict]) -> Optional[str]:
     - Two different: "N-ethyl-N-methyl" (alphabetized)
 
     Args:
-        substituents: List of dicts from get_n_substituents()
+        substituents: List of dicts from get_n_substituents
 
     Returns:
         Formatted N-substitution prefix (e.g., "N-methyl", "N,N-dimethyl"), or
@@ -446,12 +446,12 @@ def format_n_substitution(substituents: List[Dict]) -> Optional[str]:
 
     # M2 Task 3 fail-closed splice guard: a substituent name that is a refusal
     # sentinel (the substituent cascade's bare 'substituent' placeholder,
-    # 'unknown ...', '(not supported)', empty) must never be woven into the
+    # 'unknown...', '(not supported)', empty) must never be woven into the
     # N-prefix -- e.g. get_multiplier_prefix(2, 'substituent') builds the
     # literal string 'disubstituent'. VOID this candidate instead; callers
     # already treat a falsy return as "no N-prefix available" and fall back
     # or abstain. Mirrors the guard fragment_naming.py already applies at its
-    # name_compound() splice point.
+    # name_compound splice point.
     if any(is_refusal_sentinel(name) for name in groups):
         return None
 
@@ -459,7 +459,7 @@ def format_n_substitution(substituents: List[Dict]) -> Optional[str]:
     parts = []
     for name in sorted(groups.keys(), key=alpha_sort_key):
         count = groups[name]
-        # IUPAC P-16.3.5 / P-16.5.1.1 (Phase 171 assembly/parenthesisation fix, DEF-8): a complex
+        # IUPAC / (a phase assembly/parenthesisation fix,): a complex
         # (substituted/compound) substituent is enclosed in parentheses whenever
         # cited — at count 1 AND when multiplied with bis/tris. The paren decision
         # MUST use the SAME predicate (is_complex_substituent) that
@@ -468,11 +468,11 @@ def format_n_substitution(substituents: List[Dict]) -> Optional[str]:
         is_complex = is_complex_substituent(name)
         from ..assembly.naming_utils import _wrap_n_substituent
         if is_complex:
-            # P-16.5.4 nesting ORDER (BB 7444; escalation P-16.5.4.1.5, BB 7509) under the P-16.5.1.1 marks requirement (BB 7232): if the substituent ALREADY carries an
+            # nesting ORDER (BB 7444; escalation, BB 7509) under the marks requirement (BB 7232): if the substituent ALREADY carries an
             # inner "(...)" (e.g. a "(2S)-" stereo descriptor), the outer
             # enclosure must escalate to square brackets — "[(2S)-butan-2-yl]",
-            # NOT "((2S)-butan-2-yl)". _wrap_n_substituent picks [] when an inner
-            # paren is present and () otherwise. Applying it to the BARE name (not
+            # NOT "((2S)-butan-2-yl)". _wrap_n_substituent picks  when an inner
+            # paren is present and  otherwise. Applying it to the BARE name (not
             # a pre-parenthesised one) lets it make that choice correctly; a
             # pre-wrap "(name)" would be mis-read as already-balanced and the
             # escalation would be skipped.
@@ -511,7 +511,7 @@ def is_ring_attached_amide(mol, amide_atoms: tuple) -> bool:
         True if the amide is ring-attached
     """
     # Find the carbonyl-like carbon (=O regular amide, or =S/=Se/=Te
-    # for Phase 163 chalcogen amides)
+    # for a phase chalcogen amides)
     carbonyl_carbon_idx = None
     for idx in amide_atoms:
         atom = mol.GetAtomWithIdx(idx)
@@ -550,9 +550,9 @@ def get_amide_chain_length(mol, amide_atoms: tuple) -> int:
     """
     Get the chain length for an amide (including carbonyl carbon).
 
-    Works for regular amides (=O) and Phase 163 chalcogen amides
-    (=S thioamide / =Se selenoamide / =Te telluroamide) per P-66.1.4.1.1
-    + P-66.6.3.
+    Works for regular amides (=O) and a phase chalcogen amides
+    (=S thioamide / =Se selenoamide / =Te telluroamide) per
+    +.
 
     The chain length determines the parent name:
     - 1: formamide / methanethioamide / methaneselenoamide
@@ -595,7 +595,7 @@ def get_amide_chain_length(mol, amide_atoms: tuple) -> int:
         if atom.GetSymbol() in _AMIDE_CHALCOGEN_ELEMENTS:
             exclude.add(idx)
 
-    # BP-5: the acyl parent chain is acyclic (P-44.3) — exclude every ring atom
+    #: the acyl parent chain is acyclic — exclude every ring atom
     # (except the acyl carbon itself, always acyclic on this path) so the walker
     # never absorbs a substituent ring into the chain. Mirrors the general cyclic
     # path in namer.py (find_principal_chain(exclude_atoms=all_ring_atoms)).
@@ -626,7 +626,7 @@ def _find_longest_carbon_chain(mol, start_idx: int, exclude: set) -> List[int]:
             if neighbor.GetSymbol() != 'C':
                 continue
             if neighbor.IsInRing():
-                # BP-5 (P-44.3 / P-44.1.2.2(1)): the acyclic acyl parent chain of
+                # / (1)): the acyclic acyl parent chain of
                 # an amide cannot traverse ring atoms — a ring is a separate
                 # parent/substituent (heptylbenzene, not a C13 chain). On this
                 # path the acyl carbon is guaranteed acyclic (ring-attached amides
@@ -658,7 +658,7 @@ def get_amide_parent_name(
         chain_length: Number of carbons in parent chain
         is_ring: If True, use -carboxamide form
         suffix_form: One of "amide", "thioamide", "selenoamide", "telluroamide"
-            (P-66.1.4.1.1 + P-66.6.3 functional replacement). For chalcogen forms
+             + functional replacement). For chalcogen forms
             the IUPAC PIN preserves the parent-stem terminal 'e' (e.g.,
             'propanethioamide') because the suffix starts with a consonant.
 
@@ -671,13 +671,13 @@ def get_amide_parent_name(
         stem = _get_chain_prefix(chain_length)
         if suffix_form == "amide":
             return f"cyclo{stem}anecarboxamide"
-        # P-66.1.4.1.1 chalcogen analogs: "-carbothioamide", "-carboselenoamide",
+        # chalcogen analogs: "-carbothioamide", "-carboselenoamide",
         # "-carbotelluroamide". OPSIN-confirmed PINs.
         return f"cyclo{stem}anecarbo{suffix_form}"
 
     # Chain amides
     if suffix_form == "amide":
-        # Retained PIN names for regular amides (P-66.1.1.1.1)
+        # Retained PIN names for regular amides
         if chain_length == 1:
             return "formamide"
         elif chain_length == 2:
@@ -686,11 +686,11 @@ def get_amide_parent_name(
             stem = _get_chain_prefix(chain_length)
             return f"{stem}anamide"
 
-    # Phase 163 chalcogen amides (-thioamide / -selenoamide / -telluroamide):
+    # a phase chalcogen amides (-thioamide / -selenoamide / -telluroamide):
     # NO retained "thioformamide" / "thioacetamide" forms — systematic only per
     # OPSIN-confirmed PINs methanethioamide / ethanethioamide / propanethioamide.
     # Suffix starts with consonant, so terminal 'e' of '{stem}ane' is preserved
-    # per IUPAC P-16.7.1(a) vowel-elision rule.
+    # per IUPAC (a) vowel-elision rule.
     stem = _get_chain_prefix(chain_length)
     return f"{stem}ane{suffix_form}"
 
@@ -704,14 +704,14 @@ def name_amide(mol, amide_atoms: tuple, suffix_form: str = "amide") -> str:
     - Secondary amides: N-methylacetamide
     - Tertiary amides: N,N-dimethylformamide
     - Ring-attached amides: cyclohexanecarboxamide
-    - Phase 163 chalcogen amides (suffix_form="thioamide"/"selenoamide"/"telluroamide"):
+    - a phase chalcogen amides (suffix_form="thioamide"/"selenoamide"/"telluroamide"):
       ethanethioamide, N-methylpropaneselenoamide, etc.
 
     Args:
         mol: RDKit Mol object
         amide_atoms: Atom indices from amide SMARTS match
         suffix_form: PIN suffix variant — "amide" (default) or chalcogen analog
-            ("thioamide" / "selenoamide" / "telluroamide", per P-66.1.4.1.1).
+            ("thioamide" / "selenoamide" / "telluroamide", per.
 
     Returns:
         IUPAC name for the amide
@@ -789,8 +789,8 @@ def name_chain_diamide(
     """Name an acyclic chain diamide with optional N-substituents (D3).
 
     Handles the mixed primary + N-substituted (and symmetric primary /
-    symmetric secondary) acyclic diamide class per BB P-66.1.1.1.1
-    (parent = ``{stem}anediamide``) and P-66.1.1.3.1.1 (N-substituents cited
+    symmetric secondary) acyclic diamide class per BB
+    (parent = ``{stem}anediamide``) and (N-substituents cited
     as ``N{locant}`` prefixes where the locant is the chain-carbon locant of
     the amide carbonyl; identical substituents on both ends give the
     ``N1,N4-di...`` form).
@@ -833,7 +833,7 @@ def name_chain_diamide(
         return None
 
     # Extract N-substituents at each end: (locant, [names]).
-    per_end = []  # list of (locant, [sub_name, ...])
+    per_end = []  # list of (locant, [sub_name,...])
     for locant, match in positioned:
         subs = get_n_substituents(mol, match)
         names = []
@@ -844,7 +844,7 @@ def name_chain_diamide(
             names.append(name)
         per_end.append((locant, names))
 
-    # Orientation (P-14.5.1): choose forward vs reversed numbering so the
+    # Orientation: choose forward vs reversed numbering so the
     # N-substituents get the lowest locant set. The chain carries two
     # numbering directions; the amide carbonyls are fixed at {1, chain_len}.
     # For each candidate orientation compute the N-locant assigned to each
@@ -868,7 +868,7 @@ def name_chain_diamide(
         for name in names:
             placed.append((eff, name))
 
-    # Parent name: {stem}anediamide (P-66.1.1.1.1). chain_len==2 -> ethanediamide.
+    # Parent name: {stem}anediamide. chain_len==2 -> ethanediamide.
     stem = _get_chain_prefix(chain_len)
     if not stem:
         return None
@@ -878,12 +878,12 @@ def name_chain_diamide(
         # Symmetric unsubstituted diamide (e.g. butanediamide) — plain parent.
         return parent_name
 
-    # Group by substituent name, collecting its N-locants (P-66.1.1.3.1.1).
+    # Group by substituent name, collecting its N-locants.
     groups: Dict[str, List[int]] = defaultdict(list)
     for eff_locant, name in placed:
         groups[name].append(eff_locant)
 
-    # Build prefix parts, alphabetised by substituent name (P-14.5.2).
+    # Build prefix parts, alphabetised by substituent name.
     parts = []  # (sort_key, prefix_string)
     for name in groups:
         locants = sorted(groups[name])

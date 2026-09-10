@@ -1,7 +1,7 @@
 """Unit tests for compound prefix generators (sulfoxide, sulfone, thioether)
 and static PREFIX_FORMS entries (acid halides, phosphonooxy).
 
-Phase 80, Plan 01: Fill missing PREFIX_FORMS entries and add dynamic
+a phase, Plan 01: Fill missing PREFIX_FORMS entries and add dynamic
 compound prefix generation for S-bearing functional groups.
 """
 
@@ -41,7 +41,7 @@ class TestSulfinylPrefixGenerator:
 
     @pytest.mark.unit
     def test_methylsulfinyl_on_acid(self):
-        """Methyl sulfoxide on ethanoic acid -> methanesulfinyl (Wave2 T3b PIN acid-stem)."""
+        """Methyl sulfoxide on ethanoic acid -> methanesulfinyl (Wave2 PIN acid-stem)."""
         prefix = _get_fg_prefix('OC(=O)CS(=O)C', 'sulfoxide')
         assert prefix is not None, "sulfoxide prefix should not be None"
         assert 'sulfinyl' in prefix, f"Expected 'sulfinyl' in '{prefix}'"
@@ -49,7 +49,7 @@ class TestSulfinylPrefixGenerator:
 
     @pytest.mark.unit
     def test_ethylsulfinyl_on_acid(self):
-        """Ethyl sulfoxide on ethanoic acid -> ethanesulfinyl (Wave2 T3b PIN acid-stem)."""
+        """Ethyl sulfoxide on ethanoic acid -> ethanesulfinyl (Wave2 PIN acid-stem)."""
         prefix = _get_fg_prefix('OC(=O)CS(=O)CC', 'sulfoxide')
         assert prefix is not None
         assert prefix == 'ethanesulfinyl', f"Expected 'ethanesulfinyl', got '{prefix}'"
@@ -80,7 +80,7 @@ class TestSulfonylPrefixGenerator:
 
     @pytest.mark.unit
     def test_methylsulfonyl_on_acid(self):
-        """Methyl sulfone on ethanoic acid -> methanesulfonyl (Wave2 T3b PIN acid-stem)."""
+        """Methyl sulfone on ethanoic acid -> methanesulfonyl (Wave2 PIN acid-stem)."""
         prefix = _get_fg_prefix('OC(=O)CS(=O)(=O)C', 'sulfone')
         assert prefix is not None, "sulfone prefix should not be None"
         assert 'sulfonyl' in prefix, f"Expected 'sulfonyl' in '{prefix}'"
@@ -88,7 +88,7 @@ class TestSulfonylPrefixGenerator:
 
     @pytest.mark.unit
     def test_ethylsulfonyl_on_acid(self):
-        """Ethyl sulfone on ethanoic acid -> ethanesulfonyl (Wave2 T3b PIN acid-stem)."""
+        """Ethyl sulfone on ethanoic acid -> ethanesulfonyl (Wave2 PIN acid-stem)."""
         prefix = _get_fg_prefix('OC(=O)CS(=O)(=O)CC', 'sulfone')
         assert prefix is not None
         assert prefix == 'ethanesulfonyl', f"Expected 'ethanesulfonyl', got '{prefix}'"
@@ -138,7 +138,7 @@ class TestAcidHalidePrefixForms:
 
     @pytest.mark.unit
     def test_acid_chloride_prefix(self):
-        # ERRATA-09 (P-29.1.2): chlorocarbonyl -> carbonochloridoyl
+        # ERRATA-09: chlorocarbonyl -> carbonochloridoyl
         assert PREFIX_FORMS.get('acid_chloride') == 'carbonochloridoyl', \
             f"Expected 'carbonochloridoyl', got '{PREFIX_FORMS.get('acid_chloride')}'"
 
@@ -177,18 +177,18 @@ class TestNoRegressions:
     def test_hydroxy_acid(self):
         """HO-CH2-COOH is `hydroxyacetic acid`, the Blue Book's verbatim PIN.
 
-        v29 P3-CLEANUP: this expected `2-hydroxyethanoic acid` and had been
-        failing. The EXPECTATION was wrong, not the code. BlueBookV2.md:29854,
+        -CLEANUP: this expected `2-hydroxyethanoic acid` and had been
+        failing. The EXPECTATION was wrong, not the code. the Blue Book,
         verbatim: `HO-CH2-COOH hydroxyacetic acid (PIN) (not glycolic acid)`,
-        under `### **P-65.1.1.2** Retained names only for general nomenclature`
+        under `### **** Retained names only for general nomenclature`
         (:29731) -- a section that pairs each non-preferred trivial name with its
         PIN, e.g. `prop-2-ynoic acid (PIN) (not propiolic acid)`.
 
-        Acetic acid is one of the four named exceptions: `## **P-65.1.2**
+        Acetic acid is one of the four named exceptions: `## ****
         Systematic names` (:29858) says "*Except for formic acid, acetic acid,
-        oxalic acid ... and oxamic acid ..., systematically formed names are
+        oxalic acid... and oxamic acid..., systematically formed names are
         preferred IUPAC names*". So substituted derivatives are built ON the
-        retained acid, and the locant is omitted -- compare :3037,
+        retained acid, and the locant is omitted -- compare:3037,
         `difluoroacetic acid (PIN) (not 2,2-difluoroacetic acid)`.
 
         The propanoic siblings in this suite stay systematic; propanoic acid is
@@ -216,14 +216,14 @@ class TestNoRegressions:
 
     @pytest.mark.unit
     def test_dimethyl_sulfoxide_substitutive_pin(self):
-        """Wave2 T3b (P-63.6): the PIN is substitutive '(methanesulfinyl)methane'
+        """Wave2: the PIN is substitutive '(methanesulfinyl)methane'
         (BB 46154 verbatim); 'dimethyl sulfoxide' demoted to --trivial."""
         result = name_compound('CS(=O)C')
         assert result == '(methanesulfinyl)methane', f"Got '{result}'"
 
     @pytest.mark.unit
     def test_dimethyl_sulfone_substitutive_pin(self):
-        """Wave2 T3b (P-63.6): PIN '(methanesulfonyl)methane' (parallel to BB
+        """Wave2: PIN '(methanesulfonyl)methane' (parallel to BB
         28115 '(ethanesulfonyl)ethane'); functional class demoted to --trivial."""
         result = name_compound('CS(=O)(=O)C')
         assert result == '(methanesulfonyl)methane', f"Got '{result}'"

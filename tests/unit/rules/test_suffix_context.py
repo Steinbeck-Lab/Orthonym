@@ -1,6 +1,6 @@
 """Unit tests for chain-vs-ring suffix selection.
 
-Verifies IUPAC P-31.1.3 suffix context rules:
+Verifies IUPAC suffix context rules:
 - Chain-parent molecules (principal chain chosen over ring) get chain suffixes:
   -oic acid, -al, -amide, -nitrile (not -carboxylic acid, -carbaldehyde, etc.)
 - Ring-parent molecules (ring is parent structure) get ring suffixes:

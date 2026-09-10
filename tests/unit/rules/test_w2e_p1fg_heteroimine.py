@@ -1,4 +1,4 @@
-"""P-62.3.1.3 (BB 26568): "Compounds containing the group X=NH, where X is
+""" (BB 26568): "Compounds containing the group X=NH, where X is
 a heteroatom and =NH the principal characteristic group, are named as
 imines". BB verbatim: CH3-P=NH -> 1-methylphosphanimine (PIN).
 """
@@ -21,6 +21,6 @@ class TestHeteroimine:
         assert name_heteroimine(Chem.MolFromSmiles("CC=N")) is None
 
     def test_n_substituted_declines(self):
-        # CP=NC would need N-methyl handling (P-62.3.1.3 silanimine
+        # CP=NC would need N-methyl handling silanimine
         # example) — not built in this task: fail closed here.
         assert name_heteroimine(Chem.MolFromSmiles("CP=NC")) is None

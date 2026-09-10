@@ -10,8 +10,8 @@ lower locants -- is given to the DOUBLE bonds. So `cycloicos-1-en-3-yne`, NOT
 `...-11-en-2-yne`.
 
 Governing rule: the general unsaturation ordering the Blue Book states at
-P-31.1.4.2.4 (assign low locants first to the combined ene+yne set, then to the
-double bonds) is inherited by ring / von-Baeyer parents through P-31.1.4.3.4.
+ (assign low locants first to the combined ene+yne set, then to the
+double bonds) is inherited by ring / von-Baeyer parents through.
 The acyclic chain numberer already implements it as `orient_chain` criteria
 (b) [combined set] -> (c) [double bonds specifically]; this task ports the same
 (b)->(c) pair into the two cyclic numberers that were missing criterion (c):
@@ -48,7 +48,7 @@ def _name_one(smiles):
     return json.loads(line[-1])
 
 
-# --- Targets: combined ene+yne set ties -> ene wins the low member (P-31.1.4.2.4)
+# --- Targets: combined ene+yne set ties -> ene wins the low member
 
 
 def test_cycloicos_1_en_3_yne_monocycle():
@@ -83,7 +83,7 @@ def test_cyclododeca_pentaen_11_yne_mancude_monocycle():
 
 def test_bicyclo_11_3_1_heptadec_2_en_11_yne_von_baeyer():
     """von Baeyer: combined set {2,11} either way -> the ene takes 2, the yne 11
-    (P-31.1.4.3.4 inherits the ene-before-yne tie-break). def 31.1.4.3."""
+     inherits the ene-before-yne tie-break). def 31.1.4.3."""
     res = _name_one("C1#CC2CCCC(C=CCCCCCCC1)C2")
     assert res.get("name") == "bicyclo[11.3.1]heptadec-2-en-11-yne", res
     assert res.get("rt") is True
@@ -115,7 +115,7 @@ def test_regression_cycloicosa_1_7_dien_3_yne_monocycle():
 
 def test_regression_pent_3_en_1_yne_acyclic():
     """Acyclic reference (orient_chain criteria (b)->(c)) the cyclic fix mirrors;
-    must be unaffected. P-31.1.4.2.4 verbatim direction."""
+    must be unaffected. verbatim direction."""
     res = _name_one("C#CC=CC")
     assert res.get("name") == "pent-3-en-1-yne", res
     assert res.get("rt") is True

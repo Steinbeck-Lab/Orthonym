@@ -1,5 +1,5 @@
 """
-Phase 5 Integration Tests - Stereochemistry
+a phase Integration Tests - Stereochemistry
 
 End-to-end tests verifying all STEREO requirements (01-05).
 Tests full pipeline from SMILES input to stereodescriptor output.
@@ -227,9 +227,9 @@ class TestSTEREO05_DescriptorPosition:
         # 3-methylbutan-2-ol with stereo
         result = name_compound("C[C@H](O)C(C)C")
         if "(" in result:
-            # The ( should come before any prefix
+            # The (should come before any prefix
             paren_pos = result.index("(")
-            # Any letter before ( would be wrong
+            # Any letter before (would be wrong
             prefix = result[:paren_pos]
             assert not any(c.isalpha() for c in prefix), \
                 f"Prefix before stereo: {result}"
@@ -237,7 +237,7 @@ class TestSTEREO05_DescriptorPosition:
     def test_descriptor_format_locant_cip_hyphen(self):
         """Format should be (locantCIP)- with trailing hyphen."""
         result = name_compound("C[C@H](O)CC")
-        # Check for (digit + R/S) followed by )-
+        # Check for (digit + R/S) followed by)-
         assert re.match(r"\(\d+[RS]\)-", result), f"Wrong format: {result}"
 
 
@@ -360,7 +360,7 @@ def test_comprehensive_stereo_naming(smiles, checks):
 
 
 # =============================================================================
-# Stereo Injection Tests for Early-Return Handlers (Phase 92-02)
+# Stereo Injection Tests for Early-Return Handlers (a phase-02)
 # =============================================================================
 
 class TestStereoInjectionHandlers:

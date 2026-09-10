@@ -1,7 +1,7 @@
 """
-Integration tests for Phase 31: Ester & Lipid Format fixes.
-Tests EL-01 (ring ester prefix joining) and EL-02 (polyfunctional ester demotion).
-Tests EL-03 (phospholipid routing) and OPSIN round-trip validation.
+Integration tests for a phase: Ester & Lipid Format fixes.
+Tests (ring ester prefix joining) and (polyfunctional ester demotion).
+Tests (phospholipid routing) and OPSIN round-trip validation.
 """
 import os
 import subprocess
@@ -44,15 +44,15 @@ def _opsin_parse(name: str) -> str:
 
 @pytest.mark.integration
 class TestRingEsterPrefixJoining:
-    """EL-01: Ring ester prefixes use hyphen joining with locants."""
+    """: Ring ester prefixes use hyphen joining with locants."""
 
     def test_single_ester_is_functional_class_not_an_acyloxy_prefix(self):
         """A MONO-ester with no senior group is functional class, not a prefix.
 
-        Updated in v29 Phase 5. This previously asserted `acetyloxybenzene`.
-        P-65.6.3.2.1 "General methodology": "All preferred IUPAC names for
+        Updated in a phase. This previously asserted `acetyloxybenzene`.
+         "General methodology": "All preferred IUPAC names for
         esters are named by functional class nomenclature." The acyloxy prefix
-        is licensed by P-65.6.3.2.3 only when a senior group is present or the
+        is licensed by only when a senior group is present or the
         ester cannot otherwise be named; here the ester IS the principal group
         and it names cleanly, so the PIN is the two-word form.
 
@@ -90,7 +90,7 @@ class TestRingEsterPrefixJoining:
 
 @pytest.mark.integration
 class TestPolyfunctionalEsterDemotion:
-    """EL-02: Esters demoted to acyloxy prefixes in polyfunctional compounds."""
+    """: Esters demoted to acyloxy prefixes in polyfunctional compounds."""
 
     def test_glycerol_diacetate_no_dioate(self):
         """Glycerol diacetate: acyloxy prefix + -ol suffix, NOT -dioate."""
@@ -153,7 +153,7 @@ class TestPolyfunctionalEsterDemotion:
 
 
 # ===========================================================================
-# EL-03: OPSIN round-trip validation for Phase 31 ester format fixes
+#: OPSIN round-trip validation for a phase ester format fixes
 # ===========================================================================
 
 
@@ -222,8 +222,8 @@ class TestEsterOPSINRoundTrip:
     def test_format_phenyl_acetate_no_hyphens_missing(self):
         """Format is clean (no stray hyphens).
 
-        Updated in v29 Phase 5: this molecule is now the functional-class PIN
-        `phenyl acetate` (P-65.6.3.2.1), not `acetyloxybenzene`. The format
+        Updated in a phase: this molecule is now the functional-class PIN
+        `phenyl acetate`, not `acetyloxybenzene`. The format
         assertion — the actual point of the test — is retained.
         """
         name = name_compound("CC(=O)Oc1ccccc1")
@@ -239,7 +239,7 @@ class TestEsterOPSINRoundTrip:
         assert "(propanoyloxy)" in name
 
     def test_format_diacetate_has_multiplier(self):
-        """Glycerol diacetate uses complex multiplier prefix bis() per IUPAC P-16.3.3."""
+        """Glycerol diacetate uses complex multiplier prefix bis per IUPAC."""
         name = name_compound("CC(=O)OCC(O)COC(=O)C")
         assert name is not None
         assert "bis" in name or "di" in name, f"Expected multiplier in '{name}'"
@@ -248,7 +248,7 @@ class TestEsterOPSINRoundTrip:
 
 
 # ===========================================================================
-# EL-03: Phospholipid compound coverage (best-effort)
+#: Phospholipid compound coverage (best-effort)
 # ===========================================================================
 
 

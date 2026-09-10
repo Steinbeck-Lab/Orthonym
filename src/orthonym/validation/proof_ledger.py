@@ -1,10 +1,10 @@
-"""v29 Phase 1: the proof ledger -- assert the spine on the FINAL name.
+""" a phase: the proof ledger -- assert the spine on the FINAL name.
 
 WHY this module exists
 ----------------------
 ``e1_certificate.verify_certificate`` is checked on the string the PRODUCER
 built. That string is not the string the caller receives. Between the
-certificate and the ``return``, ``name()`` runs the universal stereo
+certificate and the ``return``, ``name`` runs the universal stereo
 backstop, the OPSIN-grammar repair backstop, the real-OPSIN validity gate,
 the empty-string normalisation, a last-resort decomposition retry and the
 trivial-name fallback -- and, on the late-recovery path, a retained/catalog
@@ -14,7 +14,7 @@ it. A proof that is checked on a string nobody ships is not a proof of what
 was shipped.
 
 The ledger closes exactly that gap and nothing else. A producer RECORDS its
-``(mol, spine)`` mid-pipeline; the exit of ``name()`` FINALIZES, re-running
+``(mol, spine)`` mid-pipeline; the exit of ``name`` FINALIZES, re-running
 ``verify_spine`` against the string actually being returned. Where the two
 strings differ, the re-anchor is *supposed* to report findings -- that
 visibility is the deliverable, not a defect to suppress.
@@ -133,7 +133,7 @@ def finalize(final_name: str, *, mode: str = "audit") -> Optional[SpineProof]:
 def get_proof() -> Dict[str, Any]:
     """The ledger's current state, for telemetry and the Task 7 census.
 
-    ``ok is None`` and ``codes == ()`` mean no verdict exists yet (nothing
+    ``ok is None`` and ``codes == `` mean no verdict exists yet (nothing
     recorded, or recorded but not finalized) -- deliberately distinct from
     ``ok is False`` with codes, which is a real failed proof.
     """

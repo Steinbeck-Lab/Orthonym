@@ -1,6 +1,6 @@
-"""AM-1 cyanamide handler — retained-name parent with N-substitution.
+""" cyanamide handler — retained-name parent with N-substitution.
 
-IUPAC cite: P-66.1.6.2 (cyanamide; retained name H2N-C#N with N-substitution,
+IUPAC cite: (cyanamide; retained name H2N-C#N with N-substitution,
 no N-locants). Mirrors the urea/guanidine Tier-B handler shape.
 
 References:
@@ -26,7 +26,7 @@ def _is_cyanamide(features: Any) -> bool:
 def name_cyanamide(
     features: Any, mol: Any = None, style: str = "pin",
 ) -> Optional[NamingResult]:
-    """AM-1 Tier-B cyanamide handler."""
+    """ Tier-B cyanamide handler."""
     from ..candidate_pool import get_current_pool
     from ..composer import (
         _inject_stereo_if_missing,
@@ -47,7 +47,7 @@ def name_cyanamide(
     if cand is None:
         return None
 
-    # 'cyanamide' is a retained parent with no numbered skeleton (P-66.1.6.2);
+    # 'cyanamide' is a retained parent with no numbered skeleton;
     # a numeric front-of-name stereo block cannot resolve against it.
     final_name = _inject_stereo_if_missing(features, cand.name,
                                            atom_to_locant=None,

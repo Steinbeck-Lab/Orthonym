@@ -1,12 +1,12 @@
-"""v31 #44 (RISK-3): a stereodescriptor on an acyclic-alkyl substituent must
+""" #44 : a stereodescriptor on an acyclic-alkyl substituent must
 carry the stereocentre's substituent locant, not a bare ``(R)-``/``(S)-``, when
 the centre is not the attachment atom.
 
-P-91.3 ("## **P-91.3** NAMING OF STEREOISOMERS", ``BlueBookV2.md:44686``): a
+ ("## **** NAMING OF STEREOISOMERS", ``the Blue Book``): a
 substituent-group stereodescriptor is "preceded by a numerical or letter locant
 to describe the position of the stereogenic unit when such locants are present".
 The locant comes from the substituent's OWN principal-chain numbering (attach=1),
-which ``_located_acyclic_alkyl_name`` derives from structure (P-46.1.8) -- the
+which ``_located_acyclic_alkyl_name`` derives from structure -- the
 same numbering the constitutional name already uses. RT-invisible (OPSIN infers
 the lone centre), so this is a pure spelling-layer conformance fix; 0-wrong holds.
 """

@@ -1,10 +1,10 @@
-"""P-65.3.1: an S-attached sulfonic/sulfinic acyl fragment (R-SO2- / R-SO-)
+""": an S-attached sulfonic/sulfinic acyl fragment (R-SO2- / R-SO-)
 names as a `{arene/alkane}sulfonyl` / `...sulfinyl` substituent prefix.
 
 Before this branch `name_substituent_fragment` returned None for an acyl-S
 attachment, which fail-closed every recursive caller (notably the disubstituted
-azanide emitter P-72.2.2.2.4 for an N-tosyl secondary-amide anion). Cite:
-the Blue Book P-65.3.1 (acyl groups of sulfonic/sulfinic acids).
+azanide emitter for an N-tosyl secondary-amide anion). Cite:
+the Blue Book (acyl groups of sulfonic/sulfinic acids).
 """
 import pytest
 from rdkit import Chem

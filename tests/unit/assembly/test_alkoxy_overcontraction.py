@@ -1,4 +1,4 @@
-"""F-spell-oxy — alkoxy substituent-prefix morphology (P-63.2.2).
+"""F-spell-oxy — alkoxy substituent-prefix morphology.
 
 The naive `name[:-2] + 'oxy'` idiom over-contracted a COMPLEX / ring / C5+ R'
 group ('oxan-2-yl' -> 'oxan-2-oxy', 'cyclohexyl' -> 'cyclohexoxy', 'pentyl' ->
@@ -6,14 +6,14 @@ group ('oxan-2-yl' -> 'oxan-2-oxy', 'cyclohexyl' -> 'cyclohexoxy', 'pentyl' ->
 ('pyridin-2-yl' -> 'pyridin-2-yloxy'). Every PIN-default emitter now routes
 through the BB-verbatim `composed_alkoxy_prefix`:
 
-  * P-63.2.2.2 retained set contracts (methoxy/ethoxy/propoxy/butoxy, and their
+  * retained set contracts (methoxy/ethoxy/propoxy/butoxy, and their
     substituted primary members: chloromethoxy, methoxymethoxy, 2-methoxyethoxy,
-    2-methylpropoxy) — BB:27667 "fully substitutable", BB:27711 chloromethoxy PIN;
+    2-methylpropoxy) — the Blue Book "fully substitutable", the Blue Book chloromethoxy PIN;
   * a locant-bearing / ring free valence keeps the whole '-yl' inside marks
-    ('(oxan-2-yl)oxy', '(pyridin-2-yl)oxy') — BB:27641 "(pyridin-2-yl)oxy
-    (preferred prefix)", BB:27687 "(butan-2-yl)oxy";
+    ('(oxan-2-yl)oxy', '(pyridin-2-yl)oxy') — the Blue Book "(pyridin-2-yl)oxy
+    (preferred prefix)", the Blue Book "(butan-2-yl)oxy";
   * C5+ concatenates ('pentyloxy'); a ring with no '-N-yl' locant concatenates
-    without inner marks ('cyclohexyloxy', BB:27768).
+    without inner marks ('cyclohexyloxy', the Blue Book).
 
 Every expected name is OPSIN RT-EXACT (verified 2026-08-08).
 """
@@ -51,8 +51,8 @@ RAW = Orthonym(_disable_opsin_validity_gate=True)
     ("pentyl", "pentyloxy"),
     ("cyclohexyl", "cyclohexyloxy"),
     # cycloalkyls whose name ENDS in a retained stem must NOT contract
-    # (fable MINOR-1: 'cyclopropoxy'/'cyclobutoxy' occur 0x in the BB; concatenate
-    # like 'cyclohexyloxy' BB:27768). A genuine substituent prefix before the stem
+    # (a review MINOR-1: 'cyclopropoxy'/'cyclobutoxy' occur 0x in the BB; concatenate
+    # like 'cyclohexyloxy' the Blue Book). A genuine substituent prefix before the stem
     # still contracts ('cyclopropylmethyl' -> 'cyclopropylmethoxy').
     ("cyclopropyl", "cyclopropyloxy"),
     ("cyclobutyl", "cyclobutyloxy"),
@@ -64,7 +64,7 @@ def test_composed_alkoxy_prefix_boundary(token, expected):
 
 
 # The emitter-facing wrapper ALSO contracts a DECORATED phenyl to the retained,
-# fully-substitutable 'phenoxy' (P-63.2.2.2 / BB 17796) — composed_alkoxy_prefix
+# fully-substitutable 'phenoxy' / BB 17796) — composed_alkoxy_prefix
 # declines '...phenyl' (biphenyl conservatism), so this must be preserved when
 # routing general substituent names through the alkoxy emitter (F-spell-oxy).
 @pytest.mark.parametrize("token,expected", [
@@ -87,7 +87,7 @@ def test_alkoxy_prefix_from_substituent_phenyl_contraction(token, expected):
     ("OC(=O)CCOC1CCCCO1", "3-[(oxan-2-yl)oxy]propanoic acid"),
     ("OCCOC1CCCCO1",       "2-[(oxan-2-yl)oxy]ethan-1-ol"),
     # compound (concatenated) prefix takes enclosing marks on benzene
-    # (P-16.3.3; BB:27768 "(cyclohexyloxy)benzene (PIN)").
+    #; the Blue Book "(cyclohexyloxy)benzene (PIN)").
     ("c1ccccc1OC1CCCCC1",  "(cyclohexyloxy)benzene"),
     ("c1ccccc1OCCCCC",     "(pentyloxy)benzene"),
 ])

@@ -1,11 +1,11 @@
-"""Inorganic oxoacids + functional-class derivatives (P-67 / P-65.2.1) — PINs.
+"""Inorganic oxoacids + functional-class derivatives / — PINs.
 
 Orthonym has no functional-parent subsystem for the mononuclear and simple
 polynuclear inorganic oxoacids: free ``phosphoric``/``sulfuric``/… either return
 ``unknown`` or mis-name (``OP(=O)(O)O`` → ``trihydrophosphate``; ``OC(=O)O`` →
 ``methane``). The Blue Book gives these *retained / preselected* names directly
-(P-67.1.1 phosphoric acid, sulfuric acid; P-65.2.1 carbonic acid; P-68.2 silicic
-acid; P-68.1.4.1 boric/boronic/borinic acid; P-67.2.1 di-acids), so there is no
+ phosphoric acid, sulfuric acid; carbonic acid; silicic
+acid; boric/boronic/borinic acid; di-acids), so there is no
 constitutional algorithm to run — the correct PIN is a table lookup.
 
 This module is an EXACT canonical-SMILES recognizer: it returns the PIN only for
@@ -15,14 +15,14 @@ false positives — a charged conjugate base, an ester, or any substituted
 derivative simply will not match and cascades onward.
 
 Three tables, all consulted by:func:`name_inorganic_acid`:
-  * ``_INORGANIC_OXOACIDS`` — the FREE acids (P-67.1.1 / P-65.2.1 / P-68).
+  * ``_INORGANIC_OXOACIDS`` — the FREE acids / /.
   * ``_INORGANIC_ACID_DERIVATIVES`` — a phase: acid-halide acyl-word forms
-    (``phosphoryl trichloride``, ``sulfuryl dichloride``, P-67.1.2.5.1) and the
+    (``phosphoryl trichloride``, ``sulfuryl dichloride``, and the
     amide functional-class names (``phosphoric triamide``, ``sulfuric diamide``,
-    ``sulfamic acid``, P-67.1.2.6.1). The acyl-halide names are spelled by the
+    ``sulfamic acid``,. The acyl-halide names are spelled by the
     shared FRN engine (``rules.functional_replacement``).
   * ``_CARBONIC_FRN`` — a phase: the carbonic/carbamic functional-replacement
-    acids (P-65.2.1.2/.3) — ``carbonoperoxoic`` / ``carbonodithioic`` /
+    acids /.3) — ``carbonoperoxoic`` / ``carbonodithioic`` /
     ``carbonotrithioic`` / ``carbonimidic`` / ``carbamimidic`` / ``dicarbonic`` /
     ``tricarbonic`` — names built by the SAME FRN engine.
 
@@ -43,10 +43,10 @@ from .functional_replacement import (
     build_polyacid_name,
 )
 
-# Single-bonded halogen -> class-infix combining form (P-67.1.2.3.2 (1)).
+# Single-bonded halogen -> class-infix combining form (1)).
 _HALIDO_INFIX = {"Cl": "chlorido", "F": "fluorido", "Br": "bromido", "I": "iodido"}
 
-# a phase: P-67.1.2.4 central-atom stems for the class-infix FRN engine,
+# a phase: central-atom stems for the class-infix FRN engine,
 # WITHOUT the linking vowel (build_p_frn_acid_name appends it). Keyed by element,
 # then by the skeletal (C + H) substituent count on the central atom: 0 -> the
 # -oric parent stem, 1 -> the -onic parent stem (phosphinic/-inic FRN, count 2,
@@ -54,7 +54,7 @@ _HALIDO_INFIX = {"Cl": "chlorido", "F": "fluorido", "Br": "bromido", "I": "iodid
 # table plus a central-atom search over {P, As, Sb}; build_p_frn_acid_name is
 # unchanged.
 #
-# P-67.1.2.4.2 GUARD ("Name construction guidelines"): "The names phosphonous,
+# GUARD ("Name construction guidelines"): "The names phosphonous,
 # phosphinous, phosphonic and phosphinic acid (and similarly for arsenic, antimony
 #...) can only be used when P, As or Sb is attached to atoms of hydrogen, carbon
 # or another atom of a parent hydride such as N, As, Si." Only C and H are counted
@@ -74,48 +74,48 @@ _FRN_CENTRAL_STEMS = {
 # protonated acid. Every name has been confirmed to round-trip through OPSIN to
 # the same structure. Verify any new row against PIN-VERIFICATION before adding.
 _INORGANIC_OXOACIDS = {
-    "O=P(O)(O)O": "phosphoric acid",            # P-67.1.1.1 H3PO4 (preselected)
-    "O=S(=O)(O)O": "sulfuric acid",             # P-67.1.1.1 H2SO4
-    "O=S(O)O": "sulfurous acid",                # P-67.1.1 H2SO3
-    "O=C(O)O": "carbonic acid",                 # P-65.2.1 H2CO3 (retained)
-    "O[Si](O)(O)O": "silicic acid",             # P-68.2 Si(OH)4
+    "O=P(O)(O)O": "phosphoric acid",            # H3PO4 (preselected)
+    "O=S(=O)(O)O": "sulfuric acid",             # H2SO4
+    "O=S(O)O": "sulfurous acid",                # H2SO3
+    "O=C(O)O": "carbonic acid",                 # H2CO3 (retained)
+    "O[Si](O)(O)O": "silicic acid",             # Si(OH)4
     # (nitric acid HNO3 is intentionally NOT here — it already round-trips via the
     # RETAINED_NAME tier; zwitterion/salt predicates decline its charge-separated
     # form, so no early mis-route. Kept out to avoid a duplicate-table drift.)
-    "O=P(O)(O)OP(=O)(O)O": "diphosphoric acid",  # P-67.2.1 (HO)2P(O)-O-P(O)(OH)2
-    "O=P(O)(O)P(=O)(O)O": "hypodiphosphoric acid",  # P-67.2.1 (HO)2P(O)-P(O)(OH)2 (direct P-P; W3-P10 idx 1892 parent)
-    "O=S(=O)(O)OS(=O)(=O)O": "disulfuric acid",  # P-67.2.1 (HO)SO2-O-SO2(OH)
-    # --- a phase: mononuclear halogen oxoacids (P-67.1.1.1, all preselected
+    "O=P(O)(O)OP(=O)(O)O": "diphosphoric acid",  # (HO)2P(O)-O-P(O)(OH)2
+    "O=P(O)(O)P(=O)(O)O": "hypodiphosphoric acid",  # (HO)2P(O)-P(O)(OH)2 (direct P-P; W3-P10 idx 1892 parent)
+    "O=S(=O)(O)OS(=O)(=O)O": "disulfuric acid",  # (HO)SO2-O-SO2(OH)
+    # --- a phase: mononuclear halogen oxoacids, all preselected
     # PINs). RDKit canonicalises the hypervalent X(=O)n(OH) forms to a
     # charge-separated SMILES, so the keys carry the [X+n]/[O-] charges; the
     # molecule is neutral overall and reaches INORGANIC_ACID@40 (the dispatch
     # minimum). Every name OPSIN-RT-confirmed. ---
-    "OCl": "hypochlorous acid",                  # P-67.1.1.1 Cl(OH)
-    "[O-][Cl+]O": "chlorous acid",               # P-67.1.1.1 Cl(O)(OH)
-    "[O-][Cl+2]([O-])O": "chloric acid",         # P-67.1.1.1 Cl(O)2(OH)
-    "[O-][Cl+3]([O-])([O-])O": "perchloric acid",  # P-67.1.1.1 Cl(O)3(OH)
-    "OBr": "hypobromous acid",                   # P-67.1.1.1 Br(OH)
-    "[O-][Br+]O": "bromous acid",                # P-67.1.1.1 Br(O)(OH)
-    "[O-][Br+2]([O-])O": "bromic acid",          # P-67.1.1.1 Br(O)2(OH)
-    "[O-][Br+3]([O-])([O-])O": "perbromic acid",  # P-67.1.1.1 Br(O)3(OH)
-    "OI": "hypoiodous acid",                      # P-67.1.1.1 I(OH)
-    "[O-][I+]O": "iodous acid",                   # P-67.1.1.1 I(O)(OH)
-    "[O-][I+2]([O-])O": "iodic acid",            # P-67.1.1.1 I(O)2(OH)
-    "[O-][I+3]([O-])([O-])O": "periodic acid",   # P-67.1.1.1 I(O)3(OH) (metaperiodic)
+    "OCl": "hypochlorous acid",                  # Cl(OH)
+    "[O-][Cl+]O": "chlorous acid",               # Cl(O)(OH)
+    "[O-][Cl+2]([O-])O": "chloric acid",         # Cl(O)2(OH)
+    "[O-][Cl+3]([O-])([O-])O": "perchloric acid",  # Cl(O)3(OH)
+    "OBr": "hypobromous acid",                   # Br(OH)
+    "[O-][Br+]O": "bromous acid",                # Br(O)(OH)
+    "[O-][Br+2]([O-])O": "bromic acid",          # Br(O)2(OH)
+    "[O-][Br+3]([O-])([O-])O": "perbromic acid",  # Br(O)3(OH)
+    "OI": "hypoiodous acid",                      # I(OH)
+    "[O-][I+]O": "iodous acid",                   # I(O)(OH)
+    "[O-][I+2]([O-])O": "iodic acid",            # I(O)2(OH)
+    "[O-][I+3]([O-])([O-])O": "periodic acid",   # I(O)3(OH) (metaperiodic)
     # --- a phase: the three preselected/retained boron parent acids
-    # (P-68.1.4.1 / P-67.1.1.1). These are the UNSUBSTITUTED parents; the
+    # /. These are the UNSUBSTITUTED parents; the
     # carbon-bearing R-boronic acids (CB(O)O -> methylboronic acid) carry a
     # carbon and so never match these exact carbon-free keys — they continue
     # to the dedicated boronic_acid handler. Boron is kept OUT of the Group-14
     # substitutive-suffix path (organometallics._GROUP14_SUFFIX_ELEMENTS) — a
     # boron hydroxy acid is named here, never 'boranetriol' (the lesson).
     # Every name OPSIN-RT-confirmed. ---
-    "OB(O)O": "boric acid",                      # P-68.1.4.1 B(OH)3 (H3BO3)
-    "OBO": "boronic acid",                       # P-68.1.4.1 HB(OH)2 (H3BO2, parent)
-    "BO": "borinic acid",                        # P-68.1.4.1 H2B(OH) (H3BO, parent)
-    # --- a phase A.0: complete the P-67.1.1.1 mononuclear preselected
-    # free-acid table. P-67.1.1.1 "Names of mononuclear noncarbon oxoacids":
-    # "Preselected names (see P-12.2) of the mononuclear noncarbon oxoacids
+    "OB(O)O": "boric acid",                      # B(OH)3 (H3BO3)
+    "OBO": "boronic acid",                       # HB(OH)2 (H3BO2, parent)
+    "BO": "borinic acid",                        # H2B(OH) (H3BO, parent)
+    # --- a phase A.0: complete the mononuclear preselected
+    # free-acid table. "Names of mononuclear noncarbon oxoacids":
+    # "Preselected names (see of the mononuclear noncarbon oxoacids
     # used for deriving preferred IUPAC names... are noted in the following
     # list". Every name below is verbatim "(preselected name)" in that list
     # — the CLOSED preselected table, so the correct PIN is a lookup, no
@@ -124,42 +124,42 @@ _INORGANIC_OXOACIDS = {
     # (e.g. '2-hydroxy-1,3-dioxa-2-arsaprop-1-ene' for arsonic acid). Exact
     # full-molecule canonical-SMILES keys => zero false positives; every name
     # OPSIN-RT-confirmed (full InChIKey == input). The trivalent -ous /
-    # substituted P-67.1.1.2 acids are producer work (A.1), not table rows.
+    # substituted acids are producer work (A.1), not table rows.
     # Arsenic (As):
-    "O=[AsH2]O": "arsinic acid",                 # P-67.1.1.1 H2As(O)(OH)
-    "O[AsH2]": "arsinous acid",                  # P-67.1.1.1 H2As(OH)
-    "O=[AsH](O)O": "arsonic acid",               # P-67.1.1.1 HAs(O)(OH)2
-    "O[AsH]O": "arsonous acid",                  # P-67.1.1.1 HAs(OH)2
-    "O=[As](O)(O)O": "arsoric acid",             # P-67.1.1.1 As(O)(OH)3 (preferred to 'arsenic acid')
-    "O[As](O)O": "arsorous acid",                # P-67.1.1.1 As(OH)3 (formerly arsen(i)ous acid)
+    "O=[AsH2]O": "arsinic acid",                 # H2As(O)(OH)
+    "O[AsH2]": "arsinous acid",                  # H2As(OH)
+    "O=[AsH](O)O": "arsonic acid",               # HAs(O)(OH)2
+    "O[AsH]O": "arsonous acid",                  # HAs(OH)2
+    "O=[As](O)(O)O": "arsoric acid",             # As(O)(OH)3 (preferred to 'arsenic acid')
+    "O[As](O)O": "arsorous acid",                # As(OH)3 (formerly arsen(i)ous acid)
     # Nitrogen (N) oxoacids:
-    "[O-][NH2+]O": "azinic acid",                # P-67.1.1.1 H2N(O)(OH)
-    "[O-][NH+](O)O": "azonic acid",              # P-67.1.1.1 HN(O)(OH)2
-    "ONO": "azonous acid",                       # P-67.1.1.1 HN(OH)2
-    "ON(O)O": "azorous acid",                    # P-67.1.1.1 N(OH)3
-    "[O-][N+](O)(O)O": "nitroric acid",          # P-67.1.1.1 N(O)(OH)3
-    "O=NO": "nitrous acid",                      # P-67.1.1.1 HO-NO
+    "[O-][NH2+]O": "azinic acid",                # H2N(O)(OH)
+    "[O-][NH+](O)O": "azonic acid",              # HN(O)(OH)2
+    "ONO": "azonous acid",                       # HN(OH)2
+    "ON(O)O": "azorous acid",                    # N(OH)3
+    "[O-][N+](O)(O)O": "nitroric acid",          # N(O)(OH)3
+    "O=NO": "nitrous acid",                      # HO-NO
     # Fluorine (F):
-    "OF": "hypofluorous acid",                   # P-67.1.1.1 F(OH)
+    "OF": "hypofluorous acid",                   # F(OH)
     # Phosphorus (P):
-    "O=[PH2]O": "phosphinic acid",               # P-67.1.1.1 H2P(O)(OH)
-    "OP": "phosphinous acid",                    # P-67.1.1.1 H2P(OH)
-    "O=[PH](O)O": "phosphonic acid",             # P-67.1.1.1 HP(O)(OH)2
-    "OPO": "phosphonous acid",                   # P-67.1.1.1 HP(OH)2
-    "OP(O)O": "phosphorous acid",                # P-67.1.1.1 P(OH)3
+    "O=[PH2]O": "phosphinic acid",               # H2P(O)(OH)
+    "OP": "phosphinous acid",                    # H2P(OH)
+    "O=[PH](O)O": "phosphonic acid",             # HP(O)(OH)2
+    "OPO": "phosphonous acid",                   # HP(OH)2
+    "OP(O)O": "phosphorous acid",                # P(OH)3
     # Selenium (Se) / Tellurium (Te):
-    "O=[Se](=O)(O)O": "selenic acid",            # P-67.1.1.1 Se(O)2(OH)2
-    "O=[Se](O)O": "selenous acid",               # P-67.1.1.1 Se(O)(OH)2
-    "O=[Te](=O)(O)O": "telluric acid",           # P-67.1.1.1 Te(O)2(OH)2
+    "O=[Se](=O)(O)O": "selenic acid",            # Se(O)2(OH)2
+    "O=[Se](O)O": "selenous acid",               # Se(O)(OH)2
+    "O=[Te](=O)(O)O": "telluric acid",           # Te(O)2(OH)2
     # Antimony (Sb):
-    "[O]=[SbH2][OH]": "stibinic acid",           # P-67.1.1.1 H2Sb(O)(OH)
-    "[OH][SbH2]": "stibinous acid",              # P-67.1.1.1 H2Sb(OH)
-    "[O]=[SbH]([OH])[OH]": "stibonic acid",      # P-67.1.1.1 HSb(O)(OH)2
-    "[OH][SbH][OH]": "stibonous acid",           # P-67.1.1.1 HSb(OH)2
-    "[O]=[Sb]([OH])([OH])[OH]": "stiboric acid",  # P-67.1.1.1 Sb(O)(OH)3 (preferred to 'antimonic acid')
-    "[OH][Sb]([OH])[OH]": "stiborous acid",      # P-67.1.1.1 Sb(OH)3 (formerly antimonous acid)
-    # --- a phase B.1: the P-67.2.1 di-/tri-nuclear PRESELECTED free acids.
-    # P-67.2.1 "Preselected names": "The following traditional names are
+    "[O]=[SbH2][OH]": "stibinic acid",           # H2Sb(O)(OH)
+    "[OH][SbH2]": "stibinous acid",              # H2Sb(OH)
+    "[O]=[SbH]([OH])[OH]": "stibonic acid",      # HSb(O)(OH)2
+    "[OH][SbH][OH]": "stibonous acid",           # HSb(OH)2
+    "[O]=[Sb]([OH])([OH])[OH]": "stiboric acid",  # Sb(O)(OH)3 (preferred to 'antimonic acid')
+    "[OH][Sb]([OH])[OH]": "stiborous acid",      # Sb(OH)3 (formerly antimonous acid)
+    # --- a phase B.1: the di-/tri-nuclear PRESELECTED free acids.
+    # "Preselected names": "The following traditional names are
     # retained as preselected names... for consistency... the numerical
     # infix 'di' has been uniformly used in naming dinuclear 'hypo' acids".
     # Every name below is verbatim "(preselected name)" in that list — a
@@ -173,35 +173,35 @@ _INORGANIC_OXOACIDS = {
     # 'meta' acids are NOT here — OPSIN 2.9.0 parses them to a charged /
     # radical / unresolvable species, so they are not in the gold oracle and
     # cannot be RT-confirmed; they degrade to abstain (never a wrong name).
-    # Boron / silicon (P-67.2.1):
+    # Boron / silicon:
     "OB(O)OB(O)O": "diboric acid",                      # (HO)2B-O-B(OH)2
     "O[Si](O)(O)O[Si](O)(O)O": "disilicic acid",        # (HO)3Si-O-Si(OH)3
-    # Phosphorus di-nuclear (P-67.2.1). diphosphoric / hypodiphosphoric are above.
+    # Phosphorus di-nuclear. diphosphoric / hypodiphosphoric are above.
     "O=[PH](O)O[PH](=O)O": "diphosphonic acid",         # (HO)HP(O)-O-HP(O)(OH)
     "O=[PH](O)[PH](=O)O": "hypodiphosphonic acid",      # (HO)(O)HP-PH(O)(OH)
     "OPOPO": "diphosphonous acid",                      # HO-PH-O-PH-OH
     "OPPO": "hypodiphosphonous acid",                   # (HO)HP-PH(OH)
     "OP(O)OP(O)O": "diphosphorous acid",                # (HO)2P-O-P(OH)2
     "OP(O)P(O)O": "hypodiphosphorous acid",             # (HO)2P-P(OH)2
-    # Arsenic di-nuclear (P-67.2.1). '-orous'/'-onous'/'-oric' families:
+    # Arsenic di-nuclear. '-orous'/'-onous'/'-oric' families:
     "O[AsH]O[AsH]O": "diarsonous acid",                 # HO-AsH-O-AsH-OH
     "O[AsH][AsH]O": "hypodiarsonous acid",              # (HO)HAs-AsH(OH)
     "O=[As](O)(O)O[As](=O)(O)O": "diarsoric acid",      # (HO)2As(O)-O-As(O)(OH)2
     "O=[As](O)(O)[As](=O)(O)O": "hypodiarsoric acid",   # (HO)2(O)As-As(O)(OH)2
     "O[As](O)O[As](O)O": "diarsorous acid",             # (HO)2As-O-As(OH)2
     "O[As](O)[As](O)O": "hypodiarsorous acid",          # (HO)2As-As(OH)2
-    # Antimony di-nuclear (P-67.2.1):
+    # Antimony di-nuclear:
     "[OH][SbH][O][SbH][OH]": "distibonous acid",        # HO-SbH-O-SbH-OH
     "[OH][SbH][SbH][OH]": "hypodistibonous acid",       # (HO)HSb-SbH(OH)
     "[O]=[Sb]([OH])([OH])[O][Sb](=[O])([OH])[OH]": "distiboric acid",     # (HO)2Sb(O)-O-Sb(O)(OH)2
     "[O]=[Sb]([OH])([OH])[Sb](=[O])([OH])[OH]": "hypodistiboric acid",    # (HO)2(O)Sb-Sb(O)(OH)2
     "[OH][Sb]([OH])[O][Sb]([OH])[OH]": "distiborous acid",   # (HO)2Sb-O-Sb(OH)2
     "[OH][Sb]([OH])[Sb]([OH])[OH]": "hypodistiborous acid",  # (HO)2Sb-Sb(OH)2
-    # Sulfur di-nuclear (P-67.2.1). disulfuric is above; dithionic/dithionous are
-    # the S-S direct-bond 'hypo'-family preselected names (P-67.2.1).
+    # Sulfur di-nuclear. disulfuric is above; dithionic/dithionous are
+    # the S-S direct-bond 'hypo'-family preselected names.
     "O=S(=O)(O)S(=O)(=O)O": "dithionic acid",           # HO-SO2-SO2-OH (hypodisulfuric)
     "O=S(O)S(=O)O": "dithionous acid",                  # HO-SO-SO-OH (hypodisulfurous)
-    # Tri-nuclear (P-67.2.1):
+    # Tri-nuclear:
     "O=[PH](O)OP(=O)(O)O[PH](=O)O": "triphosphonic acid",       # (HO)HP(O)-O-HP(O)-O-HP(O)(OH)
     "O=P(O)(O)OP(=O)(O)OP(=O)(O)O": "triphosphoric acid",       # (HO)2P(O)-O-P(O)(OH)-O-P(O)(OH)2
     "O=S(=O)(O)OS(=O)(=O)OS(=O)(=O)O": "trisulfuric acid",      # HO-SO2-O-SO2-O-SO2-OH
@@ -209,8 +209,8 @@ _INORGANIC_OXOACIDS = {
 
 # --- a phase: acid-halide + amide functional-class derivatives ---
 # Acid halides of phosphoric/sulfuric (identical replaceable -OH groups) use the
-# acyl-group word (P-67.1.2.5.1); amides replace all -OH by -NH2 (P-67.1.2.6.1).
-# These intercept @40 BEFORE the OPSIN-imported retained tier (RETAINED_NAME@1300)
+# acyl-group word; amides replace all -OH by -NH2.
+# These intercept @40 BEFORE the OPSIN-imported retained tier (RETAINED_NAME)
 # which would otherwise emit the non-PIN 'phosphorous(v) oxychloride' /
 # 'phosphoramide' / 'sulfamide'. Keys are RDKit canonical SMILES of the neutral
 # molecule; every name is OPSIN-RT-confirmed.
@@ -221,26 +221,26 @@ _INORGANIC_ACID_DERIVATIVES = {
     "S=P(Cl)(Cl)Cl": build_acyl_halide_name("phosphorothioyl", "chloride", 3),  # PSCl3 (FRN thio)
     "O=S(=O)(Cl)Cl": build_acyl_halide_name("sulfuryl", "chloride", 2),         # SO2Cl2
     "O=S(=O)(F)F": build_acyl_halide_name("sulfuryl", "fluoride", 2),           # SO2F2
-    "NP(N)(N)=O": "phosphoric triamide",   # P-67.1.2.6.1 PIN ('phosphoramide' = non-PIN alt)
-    "NS(N)(=O)=O": "sulfuric diamide",     # P-67.1.2.6.1 PIN ('sulfamide' = general name)
+    "NP(N)(N)=O": "phosphoric triamide",   # PIN ('phosphoramide' = non-PIN alt)
+    "NS(N)(=O)=O": "sulfuric diamide",     # PIN ('sulfamide' = general name)
     # Wave-2 completion C2 (carbonic-family composite-N parents; exact keys):
-    "N=C(N)SSC(=N)N": "carbamimidic dithioperoxyanhydride",  # P-66.4.1.5 (formamidine disulfide; anhydride is the senior class per P-41)
-    "NN=C(N)N": "carbonohydrazonic diamide",                 # P-66.4.2.2 (aminoguanidine, BB verbatim)
-    "NN=C(NN)NN": "hydrazinecarbohydrazonohydrazide",        # P-66.4.3.3 (BB verbatim)
-    "NS(=O)(=O)O": "sulfamic acid",        # P-67.1.2.4.1.1 H2N-SO2-OH (contraction of sulfuramidic)
+    "N=C(N)SSC(=N)N": "carbamimidic dithioperoxyanhydride",  # (formamidine disulfide; anhydride is the senior class per
+    "NN=C(N)N": "carbonohydrazonic diamide",                 # (aminoguanidine, BB verbatim)
+    "NN=C(NN)NN": "hydrazinecarbohydrazonohydrazide",        # (BB verbatim)
+    "NS(=O)(=O)O": "sulfamic acid",        # H2N-SO2-OH (contraction of sulfuramidic)
     # Wave-2 P1AM (2026-07-09): hydrazine-parent carbonic-family parents.
-    # P-66.1.1.1.1.3 (BB 32675): 'carboxamide' is ALWAYS the suffix on a
-    # heteroacyclic parent -> hydrazinecarboxamide (PIN); P-68.3.1.2.4
+    # (BB 32675): 'carboxamide' is ALWAYS the suffix on a
+    # heteroacyclic parent -> hydrazinecarboxamide (PIN);
     # (BB 38623): "The systematic name is the preferred IUPAC name"
     # (semicarbazide = general nomenclature only). Intercepts @40 before
-    # RETAINED_NAME@1300 which emitted 'semicarbazide'.
+    # RETAINED_NAME which emitted 'semicarbazide'.
     "NNC(N)=O": "hydrazinecarboxamide",
-    # P-66.4.2.2 (BB 34480 verbatim): amidrazone of carbonic acid.
+    # (BB 34480 verbatim): amidrazone of carbonic acid.
     "N=C(NN)NN": "hydrazinecarboximidohydrazide",
-    # P-66.4.2.2 family (aminoguanidine =NH tautomer; hydrazine parent +
-    # carboximidamide suffix per P-66.4.1.1; OPSIN-RT verified).
+    # family (aminoguanidine =NH tautomer; hydrazine parent +
+    # carboximidamide suffix per; OPSIN-RT verified).
     "N=C(N)NN": "hydrazinecarboximidamide",
-    # P-66.4.1.2.1.2 (BB 34298): "The names biguanide, triguanide, etc., are
+    # (BB 34298): "The names biguanide, triguanide, etc., are
     # no longer recommended. Condensed guanidines... are named systematically
     # as the diamides of imidodicarbonimidic acid". Bare parent only; the
     # @40 exact key never matches substituted forms, which keep the guanidine
@@ -262,56 +262,56 @@ _CARBONIC_FRN = {
     "O=C(O)OC(=O)OC(=O)O": build_polyacid_name("carbonic acid", 3),  # tricarbonic acid
 }
 
-# --- W3-P05 (P-65.1.8.1): carbonic-acid halides ---
+# --- W3-P05: carbonic-acid halides ---
 # Carbonic acid (HO-CO-OH) with one -OH replaced by a halogen -> the retained
-# ``carbono{halogen}idic acid`` PIN (P-65.1.8.1; BB 30684-30686: 'Cl-COOH
-# carbonochloridic acid (PIN), not chloroformic acid'). P-65.1.8.1 (BB 30670)
+# ``carbono{halogen}idic acid`` PIN; BB 30684-30686: 'Cl-COOH
+# carbonochloridic acid (PIN), not chloroformic acid'). (BB 30670)
 # FORBIDS naming X-CO-OH as a substituted formic/methanoic acid, so the general
 # chain-acid path's '1-chloro-1-oxomethanoic acid' is a non-PIN that MUST be
 # intercepted @40. Exact full-molecule canonical-SMILES keys => zero false
 # positives. Every name OPSIN-RT-confirmed.
 _CARBONIC_ACID_HALIDES = {
-    "O=C(O)Cl": "carbonochloridic acid",   # P-65.1.8.1 Cl-CO-OH
-    "O=C(O)Br": "carbonobromidic acid",    # P-65.1.8.1 Br-CO-OH
-    "O=C(O)F": "carbonofluoridic acid",    # P-65.1.8.1 F-CO-OH
-    "O=C(O)I": "carbonoiodidic acid",      # P-65.1.8.1 I-CO-OH
+    "O=C(O)Cl": "carbonochloridic acid",   # Cl-CO-OH
+    "O=C(O)Br": "carbonobromidic acid",    # Br-CO-OH
+    "O=C(O)F": "carbonofluoridic acid",    # F-CO-OH
+    "O=C(O)I": "carbonoiodidic acid",      # I-CO-OH
 }
 
-# --- W3-P05 (P-65.1.8.2): C-substituted formic acids (retained-name base) ---
+# --- W3-P05: C-substituted formic acids (retained-name base) ---
 # Formic acid (H-CO-OH) whose formyl H is replaced by an approved substituent is
-# named on the retained 'formic acid' parent (P-65.1.8.2; BB 30692: 'permitted
-# when substituent groups are other than those cited in P-65.1.8.1'). This is NOT
-# a general substituted-formic-acid engine (P-65.1.8.1 @30670 forbids that: the
+# named on the retained 'formic acid' parent; BB 30692: 'permitted
+# when substituent groups are other than those cited in '). This is NOT
+# a general substituted-formic-acid engine forbids that: the
 # halides/pseudohalides are their own retained 'carbono...idic acid' PINs, not
 # 'chloroformic'/'cyanoformic'); each entry is a Blue-Book (PIN) whose substituent
-# is off the P-65.1.8.1 forbidden list. Exact full-molecule canonical-SMILES key
+# is off the forbidden list. Exact full-molecule canonical-SMILES key
 # => zero false positives. Intercepts @40 before the general acid path; the nitro
 # entry also preempts the (now-tightened) carbamic_acid SMARTS whose old form
 # false-matched the nitro N and emitted a wrong 'carbamic acid'. OPSIN-RT-confirmed.
 _C1_ACID_C_SUBSTITUTED = {
-    "O=C(O)[N+](=O)[O-]": "nitroformic acid",              # P-65.1.8.2 O2N-CO-OH BB 30696
-    # HOS2C-COOH: the -CS-O-SH acyl (dithiocarbonoperoxoyl) is off the P-65.1.8.1
+    "O=C(O)[N+](=O)[O-]": "nitroformic acid",              # O2N-CO-OH BB 30696
+    # HOS2C-COOH: the -CS-O-SH acyl (dithiocarbonoperoxoyl) is off the
     # forbidden list, so the formic-parent name is a PIN (the Blue Book, location of
     # sulfur atoms unknown). The engine cannot build the compound acyl prefix, so
     # this is an exact-SMILES catalog entry (mirrors 'nitroformic acid').
-    "O=C(O)C(=S)OS": "(dithiocarbonoperoxoyl)formic acid",  # P-65.1.8.2 the Blue Book
+    "O=C(O)C(=S)OS": "(dithiocarbonoperoxoyl)formic acid",  # the Blue Book
 }
 
-# --- W3-P05 (P-65.2.1.4): carbonic-acid pseudohalides ---
+# --- W3-P05: carbonic-acid pseudohalides ---
 # Carbonic acid (HO-CO-OH) with one -OH replaced by a pseudohalide (cyanido,
-# azido) -> the retained ``carbono{pseudohalide}idic acid`` PIN (P-65.2.1.4
-# @30814, cyanido infix; BB 30832 'NC-CO-OH carbonocyanidic acid (PIN)'; BB 30834
-# carbonazidic acid). As with the halides, P-65.1.8.1 (@30670) FORBIDS the
+# azido) -> the retained ``carbono{pseudohalide}idic acid`` PIN
+#, cyanido infix; BB 30832 'NC-CO-OH carbonocyanidic acid (PIN)'; BB 30834
+# carbonazidic acid). As with the halides,  FORBIDS the
 # substituted-formic-acid name ('1-cyanomethanoic acid'). Exact full-molecule
 # canonical-SMILES keys => zero false positives: cyanoacetic acid (N#CCC(=O)O)
 # has an extra CH2 and never matches, cascading to the general acid path. Every
 # name OPSIN-RT-confirmed.
 _CARBONIC_ACID_PSEUDOHALIDES = {
-    "N#CC(=O)O": "carbonocyanidic acid",        # P-65.2.1.4 NC-CO-OH
-    "[N-]=[N+]=NC(=O)O": "carbonazidic acid",   # P-65.2.1.4 N3-CO-OH
+    "N#CC(=O)O": "carbonocyanidic acid",        # NC-CO-OH
+    "[N-]=[N+]=NC(=O)O": "carbonazidic acid",   # N3-CO-OH
 }
 
-# --- W3-P15 (P-68.3.1.1.1.4 / P-68.3.1.1.1.6): hydroxylamine functional-parent
+# --- W3-P15 /: hydroxylamine functional-parent
 # PRESELECTED names ---
 # Hydroxylamine (H2N-OH) is, exceptionally, a functional parent to which acid /
 # amide suffixes attach at the OXYGEN atom (locant 'O'), and whose chalcogen
@@ -322,10 +322,10 @@ _CARBONIC_ACID_PSEUDOHALIDES = {
 # zero false positives (a substituted / charged derivative simply will not match
 # and cascades onward). Every name OPSIN-RT-confirmed.
 _HYDROXYLAMINE_PRESELECTED = {
-    # P-68.3.1.1.1.4 (BB 38400): H2N-O-SO2-OH -> the -OH acid suffix sits on the
+    # (BB 38400): H2N-O-SO2-OH -> the -OH acid suffix sits on the
     # hydroxylamine O with locant 'O' ('not azanyl hydrogen sulfate').
     "NOS(=O)(=O)O": "hydroxylamine-O-sulfonic acid",
-    # P-68.3.1.1.1.6 (BB 38446): H2N-SH -> chalcogen analogue of hydroxylamine
+    # (BB 38446): H2N-SH -> chalcogen analogue of hydroxylamine
     # ('thio' functional-replacement); preselected name.
     "NS": "thiohydroxylamine",
 }
@@ -347,12 +347,12 @@ def lookup_exact_acid_name(canonical_smiles: str) -> Optional[str]:
     EXACT canonical-SMILES key (carbamimidic acid, carbonimidic acid,...), or
     None. Consumed by the ester path so a tabled acid analog keeps its
     retained '-ic acid' stem instead of the systematic-but-non-PIN chain name
-    (P-66.1.6.1.2.1: 'carbamimidic acid', not '1-aminomethanimidic acid')."""
+    : 'carbamimidic acid', not '1-aminomethanimidic acid')."""
     return _ALL_INORGANIC.get(canonical_smiles)
 
 
 def name_silicate_ester(mol) -> Optional[str]:
-    """Tetraalkyl silicate ester PIN (P-68.2.4 / BB 35978): a NEUTRAL silicon
+    """Tetraalkyl silicate ester PIN / BB 35978): a NEUTRAL silicon
     bearing exactly four ``-O-R`` groups (a fully-esterified silicic acid) ->
     ``{multiplier}{R} silicate`` (``tetramethyl silicate``,
     ``tetrakis(propan-2-yl) silicate``), or space-separated alphabetical citation
@@ -362,7 +362,7 @@ def name_silicate_ester(mol) -> Optional[str]:
     Fail-closed (returns ``None``) for ANY Si that is not exactly Si(OR)4: a free
     Si-OH (partial ester / silicic acid -> stays the free-acid table row or the
     substitutive silanetriol path), an Si-C bond (genuine organosilicon ->
-    P-69 / mononuclear-hydride), a charge, or a non-carbon-rooted O substituent.
+     / mononuclear-hydride), a charge, or a non-carbon-rooted O substituent.
     """
     if mol is None:
         return None
@@ -424,7 +424,7 @@ def name_silicate_ester(mol) -> Optional[str]:
 
 def _is_cyanatido_oxygen(mol, o_atom, p_idx: int) -> bool:
     """True iff ``o_atom`` (a single-bonded neighbour of the acid P) is the O of an
-    ``-O-C#N`` cyanatido group (P-67.1.2.4.1.3): O bonded only to P and a two-
+    ``-O-C#N`` cyanatido group: O bonded only to P and a two-
     coordinate carbon that is triple-bonded to a terminal N."""
     others = [x for x in o_atom.GetNeighbors() if x.GetIdx() != p_idx]
     if len(others) != 1 or others[0].GetSymbol() != "C":
@@ -447,7 +447,7 @@ def _amido_n_prefix(mol, n_idx: int, p_idx: int) -> Optional[str]:
     ``-N(R)(R')`` bonded to the acid P — ``"N,N-dimethyl"``, ``"N-methyl"``,
     ``"N-ethyl-N-methyl"`` — ``""`` for a bare ``-NH2``, or ``None`` (fail-closed)
     when any N-substituent is not a simple unbranched alkyl / phenyl-naphthyl aryl
-    (P-67.1.2.4.1: nonacidic-hydrogen substitution cited with the italic N locant).
+    : nonacidic-hydrogen substitution cited with the italic N locant).
     """
     from collections import Counter
 
@@ -474,13 +474,13 @@ def _amido_n_prefix(mol, n_idx: int, p_idx: int) -> Optional[str]:
     #: the guard above is the shared chokepoint, so a prefix here may carry
     # a locant or a retained italicized prefix. The italic-N locant is joined by a
     # hyphen, so an unmarked locanted prefix would read as two locant sets --
-    # enclosing marks come from the shared P-16.5.1.1 primitive:
+    # enclosing marks come from the shared primitive:
     # BB 32784 `N-(propan-2-yl)acetamide` (PIN) -> locanted organyl enclosed;
     # BB 3465 `4-butyl-4-tert-butylcyclohexan-1-ol` (PIN) -> the retained
     # italicized prefix is cited BARE even straight after a locant
-    # (the BB 3465 example itself; the rule is P-16.2.4.1(d) for the
-    # hyphen and P-16.3.3(b)/BB 7070 for the simple multiplier, NOT
-    # P-16.3.4, which is the parentheses rule). Hence the bare
+    # (the BB 3465 example itself; the rule is (d) for the
+    # hyphen and (b)/BB 7070 for the simple multiplier, NOT
+    #, which is the parentheses rule). Hence the bare
     # N-substituent form, and `N,N-di-tert-butyl` keeps the
     # multiplier's hyphen. ('N-tert-butyl' is not itself a BB example.)
     for nm in sorted(counts, key=alpha_sort_key):
@@ -497,15 +497,15 @@ def _amido_n_prefix(mol, n_idx: int, p_idx: int) -> Optional[str]:
 
 
 def name_p_oxoacid_frn(mol) -> Optional[str]:
-    """P-67.1.2.4 mononuclear P/As/Sb oxoacid functional-replacement PIN (Engine A).
+    """ mononuclear P/As/Sb oxoacid functional-replacement PIN (Engine A).
 
     A NEUTRAL, single-fragment molecule with exactly one central atom E in
     {P, As, Sb} that bears one ``E=O``, at least one remaining ``-OH`` (so the
-    class is 'acid', P-67.1.2.4), and at least one ``-OH`` REPLACED by a class
+    class is 'acid',, and at least one ``-OH`` REPLACED by a class
     group — amido (``-N(R)(R')``), halido (``-Cl/-F/-Br/-I``) or cyanatido
     (``-O-C#N``). The skeletal (C + H) substituent count on E selects the parent:
     0 -> the -oric stem (``phosphor`` / ``arsor`` / ``stibor``); 1 -> the -onic
-    stem (``phosphon`` / ``arson`` / ``stibon``). P-67.1.2.4.2: a C-E bond forces
+    stem (``phosphon`` / ``arson`` / ``stibon``).: a C-E bond forces
     the '-ono' stem, never '-ini'; a halogen/N/replaced-O is a CLASS infix, never
     skeletal, so ``Cl-E(O)(OH)2`` is ``E-orochloridic acid``, never
     ``chloro-E-onic acid``.
@@ -513,7 +513,7 @@ def name_p_oxoacid_frn(mol) -> Optional[str]:
         (CH3)2N-P(O)(OH)2 -> N,N-dimethylphosphoramidic acid
         CH3-P(O)(OCN)(OH) -> methylphosphonocyanatidic acid
         C6H5-P(O)(Cl)(OH) -> phenylphosphonochloridic acid
-        Cl-As(O)(OH)2 -> arsorochloridic acid (guard, P-67.1.2.4.2)
+        Cl-As(O)(OH)2 -> arsorochloridic acid (guard,
         CH3-As(O)(Cl)(OH) -> methylarsonochloridic acid
 
     Fail-closed (returns ``None``) off this exact shape: a plain -onic / -oric acid
@@ -522,7 +522,7 @@ def name_p_oxoacid_frn(mol) -> Optional[str]:
     or chalcogenol ``-SH/-SeH/-TeH`` neighbour (chalcogen-infix FRN is a separate
     path), an E=N/E#N/E=S multiple bond, >=2 organyl groups (-inic FRN — out of
     scope), a molecule carrying more than one P/As/Sb, or the organyl+N-substituent
-    combination that needs E-/N- locant disambiguation (P-45). Pure: no mol mutation.
+    combination that needs E-/N- locant disambiguation. Pure: no mol mutation.
     """
     from ..assembly.naming_utils import enclose_if_compound
     from .substituent_purity import organyl_prefix_name
@@ -589,7 +589,7 @@ def name_p_oxoacid_frn(mol) -> Optional[str]:
 
     if oh_count < 1 or not infix_counts:             # class 'acid' + >=1 replacement
         return None
-    skeletal = len(organyl_c) + p.GetTotalNumHs()    # P-67.1.2.4.2: only C + H
+    skeletal = len(organyl_c) + p.GetTotalNumHs()    #: only C + H
     parent_stem = _FRN_CENTRAL_STEMS[symbol].get(skeletal)
     if parent_stem is None:
         return None                                  # -inic FRN (skeletal 2) out of scope
@@ -612,7 +612,7 @@ def name_p_oxoacid_frn(mol) -> Optional[str]:
 
     if organyl_names:
         # `build_p_frn_acid_name` concatenates `front` straight onto the stem and
-        # does no marking of its own, so a compound prefix takes its P-16.5.1.1 marks
+        # does no marking of its own, so a compound prefix takes its marks
         # here or it runs into the stem ('propan-2-ylphosphono...'). The shared
         # primitive keeps every simple prefix BARE, as `phenylphosphonochloridic
         # acid` already was.
@@ -624,13 +624,13 @@ def name_p_oxoacid_frn(mol) -> Optional[str]:
     return build_p_frn_acid_name(front, parent_stem, infix_counts)
 
 
-# a phase: single-bonded halogen -> halide class word (P-67.1.2.5.1).
+# a phase: single-bonded halogen -> halide class word.
 _HALIDE_CLASS_WORD = {"Cl": "chloride", "F": "fluoride", "Br": "bromide",
                       "I": "iodide"}
 
 
 def _halide_pseudohalide_class_word(mol, nb, ctr_idx: int) -> Optional[str]:
-    """P-67.1.2.5.1 class word for a halide / pseudohalide attached to the central
+    """ class word for a halide / pseudohalide attached to the central
     atom, else ``None`` (so an unrecognised neighbour fails the caller closed).
 
     Detection is tight (0-wrong): a bare halogen; azide ``-N=[N+]=[N-]``;
@@ -680,12 +680,12 @@ def _halide_pseudohalide_class_word(mol, nb, ctr_idx: int) -> Optional[str]:
     return None
 
 
-# a phase: chalcogenol -> chalcogen infix (P-67.1.2.3 / P-67.1.2.4.1.1).
+# a phase: chalcogenol -> chalcogen infix /.
 _CHALCOGEN_INFIX = {"S": "thio", "Se": "seleno", "Te": "telluro"}
 
 
 def name_p_oxoacid_chalcogen_frn(mol) -> Optional[str]:
-    """P-67.1.2.4.1.1 mononuclear P/As/Sb oxoacid CHALCOGEN-infix FRN (locant-free
+    """ mononuclear P/As/Sb oxoacid CHALCOGEN-infix FRN (locant-free
     subset only). E(=O) with two or more acidic -OH replaced by the SAME chalcogen
     -SH / -SeH / -TeH, giving the position-undetermined, locant-free name::
 
@@ -693,12 +693,12 @@ def name_p_oxoacid_chalcogen_frn(mol) -> Optional[str]:
         P(O)(SH)3 -> phosphorotrithioic acid
         C6H5-P(O)(SH)2 -> phenylphosphonodithioic acid
 
-    SAFELY NARROW by design (0-wrong + the P-65.1.5 tautomer-locant spelling-blind
+    SAFELY NARROW by design (0-wrong + the tautomer-locant spelling-blind
     spot): it fires ONLY when the =O is present and >=2 replacements are the SAME
     chalcogen, so a locant is provably omitted. It FAILS CLOSED on every case that
     needs an italic tautomer locant — a MONO replacement (``arsorothioic S-acid`` /
     ``O,O,O-acid``), a =S/=Se double bond, a mixed chalcogen set, or a peroxo /
-    class-infix mix. Those belong to a phase Group A's P-65.1.5.1 derivation; here
+    class-infix mix. Those belong to a phase Group A's derivation; here
     they degrade to the existing paths / abstain, never to a wrong spelling. Every
     emission is OPSIN-round-trip gated downstream. Pure: no mol mutation.
     """
@@ -777,15 +777,15 @@ def name_p_oxoacid_chalcogen_frn(mol) -> Optional[str]:
 
 
 def name_p_oxoacid_halide_amide(mol) -> Optional[str]:
-    """P-67.1.2.5 / P-67.1.2.6 mononuclear P/As/Sb oxoacid HALIDE / AMIDE PIN.
+    """ / mononuclear P/As/Sb oxoacid HALIDE / AMIDE PIN.
 
     The ``oh_count == 0`` sibling of:func:`name_p_oxoacid_frn`: every acidic -OH
     is replaced, so the compound is not class 'acid' — its class word is a halide /
-    pseudohalide (P-67.1.2.5.1) or, when no halide is present and every -OH became
-    -NH2, an amide (P-67.1.2.6.1). The acid STEM WORD is the same one
+    pseudohalide or, when no halide is present and every -OH became
+    -NH2, an amide. The acid STEM WORD is the same one
     :func:`name_p_oxoacid_frn` builds (``phenylphosphonous``, ``phenylphosphonic``,
     ``N,N-dimethylphosphoramidic``); the halide/amide builders append the class
-    word(s) in P-67.1.5.2 / P-67.1.2.6.1(b) seniority order::
+    word(s) in / (b) seniority order::
 
         C6H5-PBrCl -> phenylphosphonous bromide chloride (BB L35718)
         (C6H5)2P-Cl -> diphenylphosphinous chloride (BB L35712)
@@ -794,7 +794,7 @@ def name_p_oxoacid_halide_amide(mol) -> Optional[str]:
 
     Fail-closed (``None``) off this exact shape. In particular it declines the
     bare skeletal-0 no-infix case (``POCl3`` = phosphoryl trichloride, the
-    P-67.1.2.5.1 acyl-word exception — owned by the existing acyl path), any -OH
+     acyl-word exception — owned by the existing acyl path), any -OH
     left (that is class 'acid' -> the acid paths own it), an E=N/E=S multiple bond,
     an ester -OR neighbour, and the organyl+N-substituent combination that needs
     E-/N- locant disambiguation. Pure: no mol mutation.
@@ -889,13 +889,13 @@ def name_p_oxoacid_halide_amide(mol) -> Optional[str]:
 
     # ---- amide/hydrazide derivative (no halide; every -OH -> -NH2) --------------
     if amide_n and not amido_n_has_substituent(mol, amide_n, ctr.GetIdx()):
-        # P-67.1.2.6.2 principle: the amide of a *bare* mononuclear hydride whose
+        # principle: the amide of a *bare* mononuclear hydride whose
         # parent hydride is a preselected name is named SUBSTITUTIVELY, not by the
         # functional class 'amide' (H2B-NH2 -> boranamine, *not* borinic amide).
         # Phosphane/arsane/stibane (PH3/AsH3/SbH3) are preselected parent hydrides
-        # (P-21.1.1), so the bare trivalent -ous hydride amide H2E-NH2 / HE(NH2)2
+        #, so the bare trivalent -ous hydride amide H2E-NH2 / HE(NH2)2
         # (oxo == 0 AND no organyl) is the substitutive amine phosphanamine /
-        # arsanamine / stibanamine (P-41, amine is expressed as suffix), NOT
+        # arsanamine / stibanamine, amine is expressed as suffix), NOT
         # 'phosphinous amide'. The functional-class -ous amide stays the PIN only
         # when the acid carries organyl substituents (cf. dimethylphosphinous
         # hydrazide, BB L23150; phenylphosphonous diamide) or is an oxoacid
@@ -955,7 +955,7 @@ def _pnictogen_acid_stem_word(symbol, oxo, skeletal, organyl_names, n_prefixes,
 
 
 def name_p_frn_ester(mol) -> Optional[str]:
-    """P-67.1.2.4 FRN-modified phosphorus-acid ESTER PIN.
+    """ FRN-modified phosphorus-acid ESTER PIN.
 
     An ester of a functional-replacement-modified phosphorus acid: the central P
     carries one or more ``-O-R`` ester owners AND at least one class infix (amido
@@ -1096,7 +1096,7 @@ def name_p_frn_ester(mol) -> Optional[str]:
     stem_word = build_p_frn_acid_stem_word(front, parent_stem, infix_counts)
     if stem_word is None or not stem_word.endswith("ic"):
         return None
-    # P-67 ester suffix: -ate for the pentavalent (P=O) acid, -ite for the trivalent.
+    # ester suffix: -ate for the pentavalent (P=O) acid, -ite for the trivalent.
     ester_stem = stem_word[:-2] + ("ate" if dbl_o == 1 else "ite")
 
     owner_tokens = []
@@ -1122,14 +1122,14 @@ def name_p_frn_ester(mol) -> Optional[str]:
     return " ".join(pieces)
 
 
-# Chalcogen replacement -> prefix (P-67.1.2.2 / P-67.1.2.3.3). No linking-o
-# elision on these prefixes (P-67.1.2.4.1.2 'thiosilicic acid').
+# Chalcogen replacement -> prefix /. No linking-o
+# elision on these prefixes 'thiosilicic acid').
 _CHALCOGENOL_PREFIX = {"S": "thio", "Se": "seleno", "Te": "telluro"}
 _CHALCOGEN_PREFIX_ORDER = {"thio": 2, "seleno": 0, "telluro": 1}  # alpha: seleno<telluro<thio
 
 
 def name_silicic_acid_frn(mol) -> Optional[str]:
-    """P-67.1.2.4.1.2 chalcogen-prefix functional replacement on silicic acid.
+    """ chalcogen-prefix functional replacement on silicic acid.
 
     Silicic acid Si(OH)4 with one or more -OH replaced by -SH / -SeH / -TeH ->
     ``{thio|seleno|telluro}silicic acid`` (prefixes, cited alphabetically, no 'o'
@@ -1179,7 +1179,7 @@ def name_silicic_acid_frn(mol) -> Optional[str]:
 
 
 def name_borane_amine(mol) -> Optional[str]:
-    """P-67.1.2.6.2: amides of the boron acids are named SUBSTITUTIVELY on the
+    """: amides of the boron acids are named SUBSTITUTIVELY on the
     parent hydride borane (BH3), not as ``boric triamide``.
 
         B(NH2)3 -> boranetriamine (BB L35838; 'not boric triamide')
@@ -1220,11 +1220,11 @@ def name_borane_amine(mol) -> Optional[str]:
     return "borane" + {2: "di", 3: "tri", 4: "tetra"}.get(n_count, "") + "amine"
 
 
-# --- W3-P10 Engine B: di-/polynuclear noncarbon-oxoacid derivatives (P-67.2) ---
+# --- W3-P10 Engine B: di-/polynuclear noncarbon-oxoacid derivatives ---
 # Parent (preselected) names keyed by (acid-centre element, bridge slot). A direct
 # centre-centre bond (no bridge) is the 'hypo' parent.
 #
-# a phase B.2 (P-67.2.3/.2.4): the DERIVATIVE element set is extended from
+# a phase B.2 /.2.4): the DERIVATIVE element set is extended from
 # {P, S, Se} to add the S-S direct 'dithionic' family and the pentavalent (=O,
 # degree-4) As / Sb '-oric' families, so a functional-class derivative of those
 # di-acids (diarsoric tetrachloride, distiboric tetraamide, a partial-amido
@@ -1246,19 +1246,19 @@ _POLYACID_PARENT = {
     ("P", "bridge"): "diphosphoric acid",
     ("P", "direct"): "hypodiphosphoric acid",
     ("S", "bridge"): "disulfuric acid",
-    ("S", "direct"): "dithionic acid",          # HO-SO2-SO2-OH (P-67.2.1; 'hypodisulfuric')
+    ("S", "direct"): "dithionic acid",          # HO-SO2-SO2-OH; 'hypodisulfuric')
     ("Se", "bridge"): "diselenic acid",
-    ("As", "bridge"): "diarsoric acid",         # (HO)2As(O)-O-As(O)(OH)2 (P-67.2.1)
-    ("As", "direct"): "hypodiarsoric acid",     # (HO)2(O)As-As(O)(OH)2 (P-67.2.1)
-    ("Sb", "bridge"): "distiboric acid",        # (HO)2Sb(O)-O-Sb(O)(OH)2 (P-67.2.1)
-    ("Sb", "direct"): "hypodistiboric acid",    # (HO)2(O)Sb-Sb(O)(OH)2 (P-67.2.1)
+    ("As", "bridge"): "diarsoric acid",         # (HO)2As(O)-O-As(O)(OH)2
+    ("As", "direct"): "hypodiarsoric acid",     # (HO)2(O)As-As(O)(OH)2
+    ("Sb", "bridge"): "distiboric acid",        # (HO)2Sb(O)-O-Sb(O)(OH)2
+    ("Sb", "direct"): "hypodistiboric acid",    # (HO)2(O)Sb-Sb(O)(OH)2
 }
 # =O count that marks a pentavalent (degree-4) acid centre. As/Sb '-oric' centres
 # carry exactly one =O, like the -ic phosphorus centre.
 _POLYACID_OXO = {"P": 1, "S": 2, "Se": 2, "As": 1, "Sb": 1}
 _BRIDGE_THIO_PREFIX = {"S": "thio", "Se": "seleno", "Te": "telluro"}
 
-# Irregular retained oxoanion words (P-67.2.5.1.1) — NOT a mechanical 'ic acid'
+# Irregular retained oxoanion words — NOT a mechanical 'ic acid'
 # -> 'ate' transform (phosphoric->phosphate, sulfuric->sulfate).
 _POLYACID_ANION_WORD = {
     "diphosphoric acid": "diphosphate",
@@ -1350,16 +1350,16 @@ def _classify_acid_position(mol, nb, centre_idx):
 
 
 def name_polyacid_derivative(mol) -> Optional[str]:
-    """P-67.2.2/.2.3/.2.4/.2.5.3: PIN for a di-nuclear noncarbon-oxoacid
+    """/.2.3/.2.4/.2.5.3: PIN for a di-nuclear noncarbon-oxoacid
     derivative (Engine B). Handles, off a tightly-detected backbone:
 
-      * uniform full replacement -> functional class (P-67.2.3/.2.4):
+      * uniform full replacement -> functional class /.2.4):
         ``diphosphoric tetrachloride`` / ``diphosphoric tetraamide``
-      * bridge chalcogen replacement -> prefix at the bridge locant (P-67.2.2.2):
+      * bridge chalcogen replacement -> prefix at the bridge locant:
         ``2-thiodisulfuric acid``
       * partial replacement -> class prefix on the acid with centre locants
-        (P-67.2.2.2): ``1,3-diamidodiphosphoric acid``
-      * full acyl esterification -> anhydride (P-67.2.5.3):
+        : ``1,3-diamidodiphosphoric acid``
+      * full acyl esterification -> anhydride:
         ``tetraacetic hypodiphosphoric tetraanhydride``
 
     Fail-closed (returns ``None``) off the tabled backbone set or for any mixed /
@@ -1416,7 +1416,7 @@ def name_polyacid_derivative(mol) -> Optional[str]:
     centre_loc = {centres[0]: locs[0], centres[1]: locs[1]}
     bridge_loc = 2 if bridge_idx is not None else None
 
-    # --- Case D: full acyl esterification -> anhydride (P-67.2.5.3) ---
+    # --- Case D: full acyl esterification -> anhydride ---
     if kinds_set == {"acyloxy"} and bridge_elem in (None, "O"):
         from .lipids import _acid_fragment_name
         acids = []
@@ -1434,7 +1434,7 @@ def name_polyacid_derivative(mol) -> Optional[str]:
         anh_mult = _MULT.get(n_total, "")
         return f"{acid_cited} {parent_word} {anh_mult}anhydride"
 
-    # --- Case A: uniform full replacement -> functional class (P-67.2.3/.2.4) ---
+    # --- Case A: uniform full replacement -> functional class /.2.4) ---
     if oh_n == 0 and bridge_elem in (None, "O"):
         if kinds_set == {"halido"}:
             hal_words = {"chlorido": "chloride", "fluorido": "fluoride",
@@ -1457,7 +1457,7 @@ def name_polyacid_derivative(mol) -> Optional[str]:
     # --- Case C / B: >=1 -OH left (class 'acid') -> prefixes on the acid ---
     if oh_n >= 1:
         prefixes = []                                # (sort_key, cited_string)
-        # bridge chalcogen replacement -> '{2}-thio' etc. (P-67.2.2.2)
+        # bridge chalcogen replacement -> '{2}-thio' etc.
         if bridge_elem not in (None, "O"):
             pre = _BRIDGE_THIO_PREFIX[bridge_elem]
             prefixes.append((pre, f"{bridge_loc}-{pre}"))
@@ -1494,7 +1494,7 @@ def name_polyacid_derivative(mol) -> Optional[str]:
 
 
 def name_polyacid_anion(frag_mol) -> Optional[str]:
-    """P-67.2.5.1.1: anion word for a (partially or fully) deprotonated
+    """: anion word for a (partially or fully) deprotonated
     di-/polynuclear noncarbon-oxoacid whose NEUTRAL parent is a tabled polyacid.
     Re-protonates every terminal ``-O(-)`` to ``-OH``, and iff the result is a
     recognised di-nuclear polyacid backbone with a tabled ``...ic acid`` parent,
@@ -1532,34 +1532,34 @@ def name_polyacid_anion(frag_mol) -> Optional[str]:
 
 # =============================================================================
 # a phase Group B: carbonic / poly-carbonic functional-replacement acids
-# (P-65.2.1.2/.1.3 mononuclear, P-65.2.3.1.2-.4 di-/tri-/tetra-carbonic).
+# /.1.3 mononuclear, -.4 di-/tri-/tetra-carbonic).
 #
 # A CARBON-backbone analogue of name_polyacid_derivative (which is P/S/Se-centred):
 # a linear alternating chain of acyl carbons C=X... C=X joined by O/S/Se/NH or
 # peroxy (-O-O-) bridges, the two ends bearing an acidic / functional group. Every
-# oxygen of the parent poly-carbonic acid may be replaced (P-65.2.3.1.2): a =O by
+# oxygen of the parent poly-carbonic acid may be replaced: a =O by
 # =S/=Se/=Te (thio/seleno/telluro), =NH (imido) or =N-NH2 (hydrazono); a bridging
 # -O- by -S-/-Se- (thio/seleno), -NH- (imido) or -O-O- (peroxy); an acidic -OH by
-# -SH/-SeH/-TeH (thio/seleno/telluro), -OOH (peroxy), -NH2 (amido, P-65.2.3.1.4),
-# -NHNH2 (hydrazido) or a halide (P-65.2.3.1.3). Fully fail-closed by TOTAL heavy-
+# -SH/-SeH/-TeH (thio/seleno/telluro), -OOH (peroxy), -NH2 (amido,,
+# -NHNH2 (hydrazido) or a halide. Fully fail-closed by TOTAL heavy-
 # atom accounting: any atom the template cannot place -> None (degrade to the
 # systematic name; never a wrong constitution). Every emitted name has been
 # confirmed to round-trip through OPSIN 2.9.0 to the input structure.
 #
-# 0-WRONG TAUTOMER GUARD (P-65.2.3.1.2.2/.3): the nonspecific 'n-thio...' spelling
+# 0-WRONG TAUTOMER GUARD /.3): the nonspecific 'n-thio...' spelling
 # is interpreted by OPSIN as the acyl-chalcogen tautomer (=S with -OH retained). So
 # a chalcogen on an acidic -XH position is emitted ONLY when the SAME chalcogen also
 # sits on that carbon's acyl (both determined, e.g. tetrathio); a determined
-# '=O + -SH' carbon (methanethioic S-acid territory, P-65.2.3.1.2.3) FAILS CLOSED
+# '=O + -SH' carbon (methanethioic S-acid territory, FAILS CLOSED
 # rather than emit an ambiguous name that would round-trip to the other tautomer.
 # =============================================================================
 
-# Poly-carbonic detachable-prefix words per replacement (P-65.2.3.1.2-.4); NOTE
+# Poly-carbonic detachable-prefix words per replacement -.4); NOTE
 # these differ from the mononuclear STEM infixes (poly 'peroxy' vs mono 'peroxo').
 _CARB_CHALC_PREFIX = {"S": "thio", "Se": "seleno", "Te": "telluro"}
 _CARB_HALO_PREFIX = {"F": "fluoro", "Cl": "chloro", "Br": "bromo", "I": "iodo"}
 # Terminal-only prefixes (cannot sit at a bridge): a lone one on a symmetric parent
-# omits its locant (P-14.3.4; 'chlorodicarbonic acid', not '1-chloro...').
+# omits its locant; 'chlorodicarbonic acid', not '1-chloro...').
 _CARB_TERMINAL_ONLY = set(_CARB_HALO_PREFIX.values()) | {"amido", "hydrazido"}
 _CARB_MULT = {1: "", 2: "di", 3: "tri", 4: "tetra", 5: "penta", 6: "hexa",
               7: "hepta", 8: "octa", 9: "nona", 10: "deca"}
@@ -1660,7 +1660,7 @@ def _carb_bridge(mol, c, nb, acid_cs):
 
 
 def name_carbonic_frn_family(mol):
-    """P-65.2.1.2/.1.3 + P-65.2.3.1.2-.4: PIN for a mononuclear carbonic/carbamic
+    """/.1.3 + -.4: PIN for a mononuclear carbonic/carbamic
     functional-replacement acid or a di-/tri-/tetra-carbonic FRN acid, else None.
 
     Fail-closed by total heavy-atom accounting; pure (no mutation). The plain
@@ -1724,7 +1724,7 @@ def name_carbonic_frn_family(mol):
     # halide / amido / hydrazido, the -OH groups are fully replaced and the compound
     # is an acid HALIDE / AMIDE / HYDRAZIDE functional CLASS (dicarbonyl dichloride,
     # dicarbonic diamide, carbonimidic diamide,...), owned by a different path --
-    # fail closed so it is not mis-named as an '-ic acid' (P-65.6 principal-group
+    # fail closed so it is not mis-named as an '-ic acid' principal-group
     # seniority). Without this, Cl-CO-O-CO-Cl and H2N-C(=NH)-NH-CO-NH2 were claimed.
     _ACIDIC = {"oh", "thio", "seleno", "telluro", "peroxy"}
     if not any(k in _ACIDIC for tl in terminals.values() for (k, _) in tl):
@@ -1866,7 +1866,7 @@ def name_carbonic_frn_family(mol):
     total_o = 2 * n + 1                    # replaceable O positions of the parent
     n_reps = sum(len(v) for v in reps.values())
 
-    # Assemble the cited-prefix string (alphabetical; P-65.2.3.1.2 / P-14.5.2).
+    # Assemble the cited-prefix string (alphabetical; /.
     frags = []
     single_infix = len(reps) == 1
     for infix in sorted(reps):
@@ -1888,14 +1888,14 @@ def name_carbonic_frn_family(mol):
 
 
 # --- Substituted / multiplicative hydrazinecarboxamide (semicarbazide) family ---
-# P-66.1.1.1.1.3 (BB 32675) 'carboxamide' + P-68.3.1.2.4 (systematic name is the
-# PIN) + P-15.3 (multiplicative). The exact base 'NNC(N)=O' -> 'hydrazinecarboxamide'
+# (BB 32675) 'carboxamide' + (systematic name is the
+# PIN) + (multiplicative). The exact base 'NNC(N)=O' -> 'hydrazinecarboxamide'
 # is tabled above, but every SUBSTITUTED form and the symmetric bis-form (two units
 # joined through their amide nitrogens by an alkanediyl) were mis-perceived as a
 # 'hydrazide' and garbled. This general namer perceives the
 # R2N-N(R)-C(=O)-N(R)R skeleton, assigns the N / 1 / 2 locants (carboxamide N = 'N',
 # hydrazine N1 = the C-bonded hydrazine N, hydrazine N2 = the terminal one), and
-# names either the substituted monomer or the P-15.3 multiplicative dimer. Fails
+# names either the substituted monomer or the multiplicative dimer. Fails
 # closed on any senior group, unaccounted atom, or unnameable substituent.
 _HZC_MULT = {1: '', 2: 'di', 3: 'tri', 4: 'tetra', 5: 'penta', 6: 'hexa'}
 
@@ -2011,7 +2011,7 @@ def _hzc_assemble_prefix(subs):
     for tok, locs in groups.items():
         locs_sorted = sorted(locs, key=_loc_key)
         mult = _HZC_MULT.get(len(locs), '')
-        # P-16.3.3: a compound/complex substituent (internal locant, two prefixes,
+        #: a compound/complex substituent (internal locant, two prefixes,
         # inner mark) takes enclosing marks -- '2-(propan-2-ylidene)', not
         # '2-propan-2-ylidene'.
         rendered = enclose_if_compound(tok)
@@ -2044,7 +2044,7 @@ def name_hydrazinecarboxamide(mol) -> Optional[str]:
         return None
     total_heavy = {a.GetIdx() for a in mol.GetAtoms() if a.GetAtomicNum() > 1}
 
-    # Seniority guard (P-41): the carboxamide is only the PIN parent when nothing
+    # Seniority guard: the carboxamide is only the PIN parent when nothing
     # senior is present. A carbon carbonyl / nitrile / an S or P oxoacid OUTSIDE
     # the center skeleton(s) would outrank the carboxamide, so fail closed and let
     # the general seniority machinery own the molecule (avoids a wrong parent).
@@ -2074,7 +2074,7 @@ def name_hydrazinecarboxamide(mol) -> Optional[str]:
     if len(centers) == 2:
         c1, c2 = centers
         # The bridge is a single unbranched all-carbon acyclic chain joining the
-        # two amide nitrogens (P-15.3 multiplicative linker).
+        # two amide nitrogens multiplicative linker).
         start = next((x.GetIdx() for x in mol.GetAtomWithIdx(c1['N']).GetNeighbors()
                       if x.GetSymbol() == 'C' and x.GetIdx() != c1['C']), None)
         if start is None:
@@ -2125,7 +2125,7 @@ def name_hydrazinecarboxamide(mol) -> Optional[str]:
 def name_inorganic_acid(mol) -> Optional[str]:
     """Return the PIN for a free inorganic oxoacid or its tabled functional-class
     derivative (acid halide / amide / carbonic-FRN acid), the tetraalkyl silicate
-    ester (P-68.2.4), else ``None``.
+    ester, else ``None``.
 
     Pure: no mol mutation, no global state. Recomputes the RDKit canonical
     SMILES so the key matches regardless of how the input was written.
@@ -2140,20 +2140,20 @@ def name_inorganic_acid(mol) -> Optional[str]:
     if tabled is not None:
         return tabled
     # Substituted / multiplicative hydrazinecarboxamide (semicarbazide family):
-    # the exact base is tabled above; the substituted and P-15.3 bis forms are
+    # the exact base is tabled above; the substituted and bis forms are
     # named here (fail-closed graph matcher, zero false positives by full atom
     # accounting).
     hzc = name_hydrazinecarboxamide(mol)
     if hzc is not None:
         return hzc
-    # a phase (P-65.2.1.2/.1.3 + P-65.2.3.1.2-.4): carbonic / poly-carbonic
+    # a phase /.1.3 + -.4): carbonic / poly-carbonic
     # functional-replacement acids (carbonimidothioic acid, 2-imidodicarbonic acid,
     # 1-amido-2-thiodicarbonic acid,...). Fail-closed by total heavy-atom
     # accounting; the plain parents + tabled FRN rows matched above never reach it.
     carb_frn = name_carbonic_frn_family(mol)
     if carb_frn is not None:
         return carb_frn
-    # W3-P10 (P-67.1.2.4): mononuclear-P oxoacid functional-replacement (Engine A):
+    # W3-P10: mononuclear-P oxoacid functional-replacement (Engine A):
     # phosphoramidic / phosphonocyanatidic / phosphonochloridic acids. Fires only on
     # an acid (>=1 -OH) carrying a class replacement group, so plain phosphonic /
     # phosphoric acids (no class group) and the amide/acid-halide functional classes
@@ -2161,40 +2161,40 @@ def name_inorganic_acid(mol) -> Optional[str]:
     frn = name_p_oxoacid_frn(mol)
     if frn is not None:
         return frn
-    # a phase (P-67.1.2.4.1.1): chalcogen-infix FRN, locant-free di+ subset
+    # a phase: chalcogen-infix FRN, locant-free di+ subset
     # (arsorodithioic / phosphorotrithioic). Fires only on >=2 identical -SH/-SeH/-TeH
-    # with a =O; mono / tautomer-locant cases fail closed (a phase's P-65.1.5).
+    # with a =O; mono / tautomer-locant cases fail closed (a phase's.
     chalco_frn = name_p_oxoacid_chalcogen_frn(mol)
     if chalco_frn is not None:
         return chalco_frn
-    # a phase (P-67.1.2.5 / P-67.1.2.6): mononuclear P/As/Sb oxoacid HALIDE /
+    # a phase /: mononuclear P/As/Sb oxoacid HALIDE /
     # AMIDE (oh_count == 0). Fires only when every -OH is replaced, so the acid
     # paths above (>=1 -OH) never reach here; fail-closed on the phosphoryl/sulfuryl
     # acyl-word exception so POCl3 stays 'phosphoryl trichloride'.
     hal_amide = name_p_oxoacid_halide_amide(mol)
     if hal_amide is not None:
         return hal_amide
-    # a phase (P-67.1.2.4): FRN-modified phosphorus-acid ESTER (>=1 -O-R owner
+    # a phase: FRN-modified phosphorus-acid ESTER (>=1 -O-R owner
     # AND >=1 class infix): methyl N,N-dimethylphosphoramidochloridite. A
     # non-overlapping addition; a plain phosphate/phosphite ester never reaches here.
     p_frn_ester = name_p_frn_ester(mol)
     if p_frn_ester is not None:
         return p_frn_ester
-    # W3-P10 (P-67.1.2.4.1.2): chalcogen-prefix FRN on silicic acid (thiosilicic).
+    # W3-P10: chalcogen-prefix FRN on silicic acid (thiosilicic).
     si_frn = name_silicic_acid_frn(mol)
     if si_frn is not None:
         return si_frn
-    # W3-P10 (P-67.1.2.6.2): boron-acid amides named on borane (boranetriamine).
+    # W3-P10: boron-acid amides named on borane (boranetriamine).
     b_amine = name_borane_amine(mol)
     if b_amine is not None:
         return b_amine
-    # W3-P10 (P-67.3.1): mixed acyl/phosphoric anhydride named substitutively as
+    # W3-P10: mixed acyl/phosphoric anhydride named substitutively as
     # an (acyloxy)phosphonic acid (acid senior to anhydride).
     from .phosphorus import name_acyloxy_phosphonic_acid
     axp = name_acyloxy_phosphonic_acid(mol)
     if axp is not None:
         return axp
-    # W3-P10 (P-67.2.x): di-/polynuclear oxoacid derivatives (Engine B):
+    # W3-P10.x): di-/polynuclear oxoacid derivatives (Engine B):
     # diphosphoric tetrachloride/tetraamide, 2-thiodisulfuric acid,
     # 1,3-diamidodiphosphoric acid, tetraacetic hypodiphosphoric tetraanhydride.
     poly = name_polyacid_derivative(mol)
@@ -2207,7 +2207,7 @@ def name_inorganic_acid(mol) -> Optional[str]:
 
 
 def name_azinic_derivative(mol) -> Optional[str]:
-    """P-61.5.3 ylidene derivatives of azinic acid H2N(O)OH (Wave-2
+    """ ylidene derivatives of azinic acid H2N(O)OH (Wave-2
     completion C): CH3-CH=N(O)-OH -> ethylideneazinic acid (BB verbatim;
     aci-nitroethane). Fail-closed: exactly one N+ with a -O(-), an -OH and a
     DOUBLE bond to an unbranched all-carbon chain; net charge 0; nitro

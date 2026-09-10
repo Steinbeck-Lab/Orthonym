@@ -1,5 +1,5 @@
 # tests/unit/assembly/test_offer_pool.py
-"""v33 Phase 0 Task L2.1/L4-core: whole-molecule `Offer` + rank/select.
+""" a phase Task L2.1/L4-core: whole-molecule `Offer` + rank/select.
 
 Pure data structure -- no OPSIN, no rdkit, no namer import. `rank_offers`
 sorts ASCENDING by (0 if complete else 1, 0 if is_pin else 1,

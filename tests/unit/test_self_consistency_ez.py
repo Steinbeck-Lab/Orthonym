@@ -1,21 +1,21 @@
-"""C6 (v30) — `_self_consistency_verdict` must catch an EQUAL-count stereo CONFLICT even on a
+"""C6  — `_self_consistency_verdict` must catch an EQUAL-count stereo CONFLICT even on a
 conjugated/aromatic double bond, where the RegistrationHash TAUTOMER_HASH layer is E/Z-blind
 (fumarate vs maleate hash equal). The fix decides an equal-count, same-EXACT-constitution case
 by a sound per-element atom-mapped compare, while preserving tautomer/mobile-H tolerance (the
 gate is deliberately tautomer-insensitive).
 
-v27 Phase 0 ABANDONED stereo-omission tolerance: a name whose OPSIN re-perception specifies
+ a phase ABANDONED stereo-omission tolerance: a name whose OPSIN re-perception specifies
 FEWER stereo features than the input (nb < na) describes a less-specific WRONG molecule, so
 `_name_omits_input_stereo` (namer.py) makes it a "mismatch", not an "ok". This module's tests
 reflect that current contract — see `test_ez_omission_is_mismatch` /
 `test_tetrahedral_omission_is_mismatch` below (this docstring previously claimed the opposite,
 "a less-specific name is valid", which was already dead by the time it was written here).
 
-v33 Phase 1 (C3): the na==0 case (stereo-unspecified input vs a stereo-implying name) is
-likewise NOT tolerated — it FABRICATES configuration the input does not define (P-92 "CIP
-Priority and Sequence Rules" / P-93 "Configuration Specification", BlueBookV2.md:44525/:44527)
+ a phase (C3): the na==0 case (stereo-unspecified input vs a stereo-implying name) is
+likewise NOT tolerated — it FABRICATES configuration the input does not define "CIP
+Priority and Sequence Rules" / "Configuration Specification", the Blue Book)
 and is now a "mismatch". See tests/unit/test_gate_stereo_fabrication.py.
-`_self_consistency_verdict` is the SELF-01 stereo decision on the DEFAULT (PIN) path.
+`_self_consistency_verdict` is the stereo decision on the DEFAULT (PIN) path.
 """
 from orthonym import namer as NM
 
@@ -40,7 +40,7 @@ def test_cinnamic_ez_conflict_is_mismatch():
 # --- preserved behaviors --------------------------------------------------------------------
 
 def test_ez_omission_is_mismatch():
-    # v27 Phase 0: name leaves the double-bond geometry unspecified -> the OPSIN
+    # a phase: name leaves the double-bond geometry unspecified -> the OPSIN
     # re-perception describes a LESS-SPECIFIC (wrong) molecule -> rejected, not
     # tolerated.
     assert V("OC(=O)/C=C/C(=O)O", "OC(=O)C=CC(=O)O") == "mismatch"
@@ -59,13 +59,13 @@ def test_tetrahedral_exact_is_ok():
 
 
 def test_tetrahedral_omission_is_mismatch():
-    # v27 Phase 0: omission is rejected, not tolerated (this test used to encode
-    # the pre-v27 "ok" contract, which was already dead here).
+    # a phase: omission is rejected, not tolerated (this test used to encode
+    # the pre- "ok" contract, which was already dead here).
     assert V("C[C@H](N)C(=O)O", "CC(N)C(=O)O") == "mismatch"
 
 
 def test_unspecified_input_fabricated_stereo_is_mismatch():
-    # v33 Phase 1 (C3): na==0 (flat input) vs a stereo-asserting name FABRICATES
+    # a phase (C3): na==0 (flat input) vs a stereo-asserting name FABRICATES
     # configuration -> mismatch (was tolerated pre-C3).
     assert V("CC(C)CC([NH3+])C(=O)O", "[NH3+][C@@H](CC(C)C)C(=O)O") == "mismatch"
 

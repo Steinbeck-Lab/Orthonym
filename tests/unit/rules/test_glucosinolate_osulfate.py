@@ -1,4 +1,4 @@
-"""Thiohydroximate/oxime O-sulfate ANION producer (v33 Phase 3, glucosinolate
+"""Thiohydroximate/oxime O-sulfate ANION producer (a phase, glucosinolate
 aglycone class).
 
 ``R2C=N-O-S(=O)(=O)-[O-]`` -> ``[({R2C}ylidene)amino] sulfate``: the sulfate
@@ -114,7 +114,7 @@ def test_integration_full_glucosinolate_failclosed(namer):
 
 @pytest.mark.opsin_gate
 @pytest.mark.parametrize("smi,expected", [
-    # Slice A regressions (P-72.2.2.2.1.2 plain C-anchored ester owner) must
+    # Slice A regressions plain C-anchored ester owner) must
     # stay byte-identical -- the new N-anchored sibling must never intercept
     # or change these.
     ("CCCCCCCCCCCCOS(=O)(=O)[O-]", "dodecyl sulfate"),

@@ -1,30 +1,30 @@
-""": charged general path under ``complete`` (BB P-73 / P-74).
+""": charged general path under ``complete`` (BB /.
 
 ``general_engine._common_refusal`` refuses any net-charged molecule ("net charge
 (G3 scope)"). P5 lifts that refusal ONLY under ``complete``
 (``allow_aromatic_general`` -> ``allow_charged``) and appends a charge suffix on
 the ALREADY-NUMBERED general parent:
 
-  * ``-ylium`` cation by loss of H- from a skeletal carbon (P-73.2.2.1.1)
-  * ``-ium`` protonated / substituted skeletal heteroatom (P-73.1)
-  * ``-ide`` anion by loss of H+ from a skeletal atom (P-72.2.2.1)
-  * ``-uide`` anion by addition of H- to a skeletal atom (P-72.3)
+  * ``-ylium`` cation by loss of H- from a skeletal carbon
+  * ``-ium`` protonated / substituted skeletal heteroatom
+  * ``-ide`` anion by loss of H+ from a skeletal atom
+  * ``-uide`` anion by addition of H- to a skeletal atom
 
 The charge suffix's locant is the ACTUAL charged atom's parent locant, so the
-descriptor is structurally faithful on its own; SELF-01 (OPSIN round-trip) is
+descriptor is structurally faithful on its own; (OPSIN round-trip) is
 the backstop but fails OPEN without Java, hence the structural fail-closed rules.
 
-Reproduce-first (confirmed 2026-07-21, production OPSIN gate on; RB-2 pin-emit
+Reproduce-first (confirmed 2026-07-21, production OPSIN gate on; pin-emit
 split 2026-08-21):
   - PIN_EMIT_CASES: the three silyl/germyl heteroarene-ammonium rows ARE PINs
-    (P-73.1.1.2 + P-68.2.2) and EMIT at the default pin tier.
+     + and EMIT at the default pin tier.
   - PIN_ABSTAIN_CASES: pin (default) ABSTAINS; ``complete`` emits an
     OPSIN-round-tripping charged name.
   - FAIL-CLOSED cases: ``complete`` abstains (never a wrong / charge-dropped
     name) -- charge on a substituent, a radical-cation, an unexpressible charge.
 
 Harness mirrors test_v26_p3_failclosed_routing: ``conftest`` force-disables the
-production SELF-01 gate for the whole suite; the full-namer cases here re-enable
+production gate for the whole suite; the full-namer cases here re-enable
 it via ``production_gate`` (skipped without Java/OPSIN); the engine-direct and
 byte-identity cases are deterministic and gate-independent.
 """
@@ -45,17 +45,17 @@ from orthonym.validation.e1_certificate import verify_certificate
 pytestmark = pytest.mark.unit
 
 
-# Two expectation tables, split (RB-2) because the FULL NAMER and the
+# Two expectation tables, split  because the FULL NAMER and the
 # ENGINE-DIRECT (``name_general``) call paths legitimately produce different --
 # each individually correct -- strings for the fused-ring cation. See
-# internal notes (§1 PIN status, §2 engine gap):
-# * FULL_NAMER_CASES -- what ``Orthonym.name()`` actually ships. The three
-# heteroarene-ammonium rows are PINs (P-73.1.1.2, whose own worked example is
+# internal notes (PIN status, engine gap):
+# * FULL_NAMER_CASES -- what ``Orthonym.name`` actually ships. The three
+# heteroarene-ammonium rows are PINs, whose own worked example is
 # ``1-methylpyridin-1-ium (PIN)``; silyl/germyl are PIN-eligible preselected
-# prefixes, P-68.2.2), so they EMIT at the default pin tier -- they do NOT
-# abstain. For the fused-ring cation the production ``ions.py`` P-74 onium
-# router supplies the retained ``isoquinolin-2-ium`` form (P-25.5 /
-# P-52.2.4.4: a fusion name is preferred over a skeletal-replacement 'a'
+# prefixes,, so they EMIT at the default pin tier -- they do NOT
+# abstain. For the fused-ring cation the production ``ions.py`` onium
+# router supplies the retained ``isoquinolin-2-ium`` form /
+#: a fusion name is preferred over a skeletal-replacement 'a'
 # name) and wins at every tier.
 # * ENGINE_DIRECT_CASES -- what ``name_general`` emits when called in
 # isolation, bypassing the onium router. ``name_general_ring`` has no
@@ -70,8 +70,8 @@ PIN_EMIT_CASES = [
     ("[SiH3][n+]1ccccc1", "1-silylpyridin-1-ium"),
     ("[GeH3][n+]1ccccc1", "1-germylpyridin-1-ium"),
     # Fused-ring cation: the full namer ships the retained fusion name
-    # ``2-silylisoquinolin-2-ium`` (P-25.5 / P-52.2.4.4, worked example:42203),
-    # via the ions.py P-74 onium router recursing on the neutral bare ring.
+    # ``2-silylisoquinolin-2-ium`` /, worked example:42203),
+    # via the ions.py onium router recursing on the neutral bare ring.
     ("[SiH3][n+]1ccc2ccccc2c1", "2-silylisoquinolin-2-ium"),
 ]
 
@@ -80,7 +80,7 @@ PIN_ABSTAIN_CASES = [
     ("[SiH3]C[CH-]C", "1-silylpropan-2-ide"),
     ("FC(F)(F)[CH-]C", "1,1,1-trifluoropropan-2-ide"),
     # Multi-charge dication: the multiplied suffix ("-1,4-diium") begins with
-    # the consonant 'd' (di-), NOT a vowel -- P-16.7.1(a) requires the parent's
+    # the consonant 'd' (di-), NOT a vowel -- (a) requires the parent's
     # terminal 'e' be RETAINED ("...diazine-1,4-diium", not "diazin-1,4-diium").
     # Regression case for the elision-conditional fix in _append_charge_suffix.
     ("C[n+]1cc[n+](C)cc1", "1,4-dimethyl-1,4-diazine-1,4-diium"),
@@ -96,7 +96,7 @@ ENGINE_DIRECT_CASES = [
     ("[SiH3][n+]1ccccc1", "1-silylpyridin-1-ium"),
     ("[GeH3][n+]1ccccc1", "1-germylpyridin-1-ium"),
     # change-asserted-value: the aza-cage heteroatom takes the LOWEST locant
-    # (P-31.1.4: among valid von-Baeyer numberings of the equal-bridge
+    #: among valid von-Baeyer numberings of the equal-bridge
     # bicyclo[4.4.0] cage, heteroatoms get lowest locants). N is separated from a
     # bridgehead by one carbon, so its lowest attainable locant is 3, NOT 4. The
     # old `4-silyl-4-aza` expectation was a stale higher-locant numbering; the
@@ -134,7 +134,7 @@ def _find_opsin_jar():
 
 @pytest.fixture
 def production_gate(monkeypatch):
-    """Re-enable the production SELF-01 OPSIN validity gate (the suite disables
+    """Re-enable the production OPSIN validity gate (the suite disables
     it). Skips when Java/OPSIN are unavailable."""
     import orthonym.namer as _namer_mod
     if not shutil.which("java") or _find_opsin_jar() is None:
@@ -223,7 +223,7 @@ def test_charge_claims_are_declared_in_the_binding_spine(smiles, expected):
 
 
 # --------------------------------------------------------------------------
-# a phase Task 4 Part C: the T4 wiring now promotes P8's stereo axis and
+# a phase Task 4 Part C: the wiring now promotes P8's stereo axis and
 # P3's CHARGE_UNVERIFIED to error severity (``escalate=STRICT_STEREO_CHARGE_AXES``,
 # ``mode`` stays "audit"). These two charge cases are the task's named charge
 # witnesses -- confirm the promotion does not touch them: their
@@ -299,12 +299,12 @@ def test_engine_fails_closed(smiles):
 # --------------------------------------------------------------------------
 @pytest.mark.parametrize("smiles,expected", PIN_EMIT_CASES)
 def test_pin_emits(smiles, expected, production_gate):
-    """RB-2: these three are PINs, so the DEFAULT pin tier emits them rather
+    """: these three are PINs, so the DEFAULT pin tier emits them rather
     than abstaining. `1-silylpyridin-1-ium`/`1-germylpyridin-1-ium` by direct
-    analogy to `1-methylpyridin-1-ium (PIN)` (P-73.1.1.2); silyl/germyl are
-    PIN-eligible preselected prefixes (P-68.2.2). The fused-ring cation ships
-    the retained `2-silylisoquinolin-2-ium` (P-25.5 / P-52.2.4.4, worked example
-    :42203) via the production ions.py P-74 onium router, NOT the P5 complete-tier
+    analogy to `1-methylpyridin-1-ium (PIN)`; silyl/germyl are
+    PIN-eligible preselected prefixes. The fused-ring cation ships
+    the retained `2-silylisoquinolin-2-ium` /, worked example
+    :42203) via the production ions.py onium router, NOT the P5 complete-tier
     lever. See internal notes."""
     pin = Orthonym(style="pin")
     out = pin.name(Chem.CanonSmiles(smiles))
@@ -336,7 +336,7 @@ def test_complete_fails_closed(smiles, production_gate):
 
 
 # --------------------------------------------------------------------------
-# SELF-01: every name complete emits round-trips to the input structure.
+#: every name complete emits round-trips to the input structure.
 # --------------------------------------------------------------------------
 @pytest.mark.parametrize("smiles,name", sorted(_RT_NAMES.items()))
 def test_emitted_names_roundtrip(smiles, name, opsin_roundtrip):

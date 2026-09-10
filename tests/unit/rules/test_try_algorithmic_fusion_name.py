@@ -1,8 +1,8 @@
-"""Phase 149 D-08: _try_algorithmic_fusion_name gate broadening tests.
+"""a phase: _try_algorithmic_fusion_name gate broadening tests.
 
 Source: https://iupac.qmul.ac.uk/fusedring/FR23.html
-Source: 149-CONTEXT.md D-08.
-Source: 149-RESEARCH.md "Hook Point #3: _try_algorithmic_fusion_name Gate Audit (D-08)".
+Source: 149-internal notes.
+Source: internal notes "Hook Point #3: _try_algorithmic_fusion_name Gate Audit ".
 """
 import logging
 
@@ -13,21 +13,21 @@ from orthonym.rules.fused_rings import _try_algorithmic_fusion_name
 
 
 class TestTryAlgorithmicFusionNameD08:
-    """D-08: ONE gate broadens (>=2 rings); FOUR gates preserved."""
+    """: ONE gate broadens (>=2 rings); FOUR gates preserved."""
 
     def test_broaden_2ring_gate_to_at_least_2(self):
-        """D-08: single-ring mol returns None (no fusion to name).
+        """: single-ring mol returns None (no fusion to name).
 
         Source: https://iupac.qmul.ac.uk/fusedring/FR23.html
-        Source: 149-CONTEXT.md D-08.
+        Source: 149-internal notes.
         """
         mol = Chem.MolFromSmiles('c1ccccc1')  # benzene, 1 ring
         assert _try_algorithmic_fusion_name(mol) is None
 
     def test_2ring_path_preserves_engine(self):
-        """D-08: 2-ring fused-hetero (quinoline) routes through engine.
+        """: 2-ring fused-hetero (quinoline) routes through engine.
 
-        Source: 149-CONTEXT.md D-08.
+        Source: 149-internal notes.
         """
         mol = Chem.MolFromSmiles('c1ccc2ncccc2c1')
         # Result may be a string (engine produced a name) or None (engine
@@ -38,9 +38,9 @@ class TestTryAlgorithmicFusionNameD08:
         assert result is None or isinstance(result, str)
 
     def test_3plus_ring_returns_none_decision_only(self, caplog):
-        """D-08: 3+ ring fused (carbazole) returns None decision-only.
+        """: 3+ ring fused (carbazole) returns None decision-only.
 
-        Source: 149-CONTEXT.md D-08.
+        Source: 149-internal notes.
         """
         mol = Chem.MolFromSmiles('c1ccc2c(c1)[nH]c1ccccc12')
         with caplog.at_level(logging.DEBUG, logger='orthonym.rules.fused_rings'):
@@ -50,9 +50,9 @@ class TestTryAlgorithmicFusionNameD08:
         )
 
     def test_acyclic_returns_none(self):
-        """D-08 broadened gate `< 2`: acyclic mol returns None.
+        """ broadened gate `< 2`: acyclic mol returns None.
 
-        Source: 149-CONTEXT.md D-08.
+        Source: 149-internal notes.
         """
         mol = Chem.MolFromSmiles('CCO')
         assert _try_algorithmic_fusion_name(mol) is None

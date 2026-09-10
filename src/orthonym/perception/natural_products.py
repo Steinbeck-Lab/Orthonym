@@ -1,7 +1,7 @@
 """
 Natural product scaffold detection via RDKit substructure matching.
 
-IUPAC P-31.1.3: Retained names for natural product ring systems (steroids,
+IUPAC: Retained names for natural product ring systems (steroids,
 terpenoids, alkaloids). These parent scaffolds have IUPAC-recommended retained
 names that take precedence over systematic von Baeyer nomenclature.
 
@@ -10,15 +10,15 @@ Uses flexible query patterns (bond-generic) so that unsaturated derivatives
 scaffold (cholestane). Stereochemistry is also relaxed in patterns to allow
 matching molecules with undefined or different stereocenters.
 
-IUPAC P-31.1.3.4: Steroid parent hydrides use retained names (androstane,
+IUPAC: Steroid parent hydrides use retained names (androstane,
 pregnane, cholestane, etc.) with modification for unsaturation.
 
 Provides:
-- detect_natural_product(): Main detection entry point
-- get_non_scaffold_atoms(): Identify atoms not part of matched scaffold
-- get_scaffold_substituents(): Identify substituents attached to scaffold
-- is_steroid(): Quick steroid check
-- is_alkaloid(): Quick alkaloid check
+- detect_natural_product: Main detection entry point
+- get_non_scaffold_atoms: Identify atoms not part of matched scaffold
+- get_scaffold_substituents: Identify substituents attached to scaffold
+- is_steroid: Quick steroid check
+- is_alkaloid: Quick alkaloid check
 """
 
 import logging

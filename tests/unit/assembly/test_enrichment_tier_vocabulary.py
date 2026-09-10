@@ -1,4 +1,4 @@
-"""v30: the enrichment path must use the vocabulary of the tier it is naming on.
+""": the enrichment path must use the vocabulary of the tier it is naming on.
 
 ``composer._integrate_universal_prefixes`` names every substituent for every
 handler that enriches a core name, and it called::
@@ -10,10 +10,10 @@ when the molecule was being named on the **best-effort** tier, and refused
 substituents the best-effort vocabulary can name -- measured, on the same mol /
 fragment / attachment::
 
-    NS(=O)=O                False -> 'substituent'   (a REFUSAL)
-                            True  -> '1-amino-1-oxo-2-oxa-1λ6-thiaeth-1-en-1-yl'
-    c1ccc2c(c1)OCO2         False -> 'substituent'
-                            True  -> '7,9-dioxabicyclo[4.3.0]nona-1,3,5-trien-4-yl'
+    NS(=O)=O False -> 'substituent' (a REFUSAL)
+                            True -> '1-amino-1-oxo-2-oxa-1λ6-thiaeth-1-en-1-yl'
+    c1ccc2c(c1)OCO2 False -> 'substituent'
+                            True -> '7,9-dioxabicyclo[4.3.0]nona-1,3,5-trien-4-yl'
 
 ⚠ **The hard constraint is why the flag arrives from the tier and not from the
 call.** ``_integrate_universal_prefixes`` is shared by PIN-path handlers
@@ -47,7 +47,7 @@ def _clean_naming_session():
 
     Not hygiene theatre -- it is load-bearing for these tests, and it documents a
     real fragility. The namer publishes the tier flag only inside
-    ``if is_top_level_naming():``, and ``is_top_level_naming()`` is
+    ``if is_top_level_naming:``, and ``is_top_level_naming`` is
     ``len(_fragment_guard.visited) == 0``. ``end_naming_session`` clears that set
     only when it is ALREADY empty, so if an exception ever escapes a fragment
     naming without discarding its SMILES, the set stays non-empty for the rest of
@@ -110,7 +110,7 @@ def _allow_mancude_values_for(smiles: str, tier: str, monkeypatch) -> list:
 
 #: An acid halide with a branch. ``acid_halides`` calls the enrichment helper
 #: explicitly, so this reaches the site -- verified against 6 such positives
-#: before this test was written, because a spy that records zero for every input
+#: before this test was written, because a trace that records zero for every input
 #: proves nothing.
 ENRICHING_INPUT = "CC(C)C(=O)Cl"
 

@@ -1,8 +1,8 @@
-"""Tests for amino acid multi-group naming format (NP-03 / 30-02).
+"""Tests for amino acid multi-group naming format (/ 30-02).
 
 Covers:
 - Simple amino acids (regression guards for trivial name lookup)
-- Multi-amine format (the core NP-03 fix: no "2-diamino" malformation)
+- Multi-amine format (the core fix: no "2-diamino" malformation)
 - Geminal amine cases (two NH2 on same carbon)
 - Diacid amino acids (two COOH groups)
 - Peptide guard (peptides should NOT be named as simple amino acids)
@@ -19,8 +19,8 @@ class TestSimpleAminoAcidRegression:
     def test_alanine_systematic(self):
         """Alanine (UNDEFINED stereo): 2-aminopropanoic acid.
 
-        v33 Phase-1 stereo honesty (748bf56d): the retained name 'alanine'
-        implies the L enantiomer (P-101.2.6 + P-103.1.3.1), so an
+         Phase-1 stereo honesty: the retained name 'alanine'
+        implies the L enantiomer +, so an
         undefined-stereo input honestly declines it and emits the systematic
         name. OPSIN round-trip verified."""
         result = name_compound("NC(C)C(=O)O")
@@ -53,7 +53,7 @@ class TestSimpleAminoAcidRegression:
 
 
 class TestMultiAmineFormat:
-    """Core NP-03 fix: multi-amine amino acids must have correct locant format."""
+    """Core fix: multi-amine amino acids must have correct locant format."""
 
     @pytest.mark.integration
     def test_no_2_diamino_malformation(self):
@@ -78,10 +78,10 @@ class TestMultiAmineFormat:
         """NC(N)C(=O)O: geminal diamine -> 'diaminoacetic acid' (NO locant).
 
         Both NH2 sit on acetic acid's sole substitutable carbon (C2), so all
-        locants are omitted -- P-14.3.4.6 ("All locants are omitted ... when all
+        locants are omitted -- ("All locants are omitted... when all
         substitutable hydrogen atoms have the same locant"), exactly the shape
         the Blue Book itself locks with `difluoroacetic acid (PIN) (not
-        2,2-difluoroacetic acid)` (BlueBookV2.md:3037). Contrast the diacid
+        2,2-difluoroacetic acid)` (the Blue Book). Contrast the diacid
         below, where butanedioic acid's C3 is also substitutable so the locant
         returns."""
         result = name_compound("NC(N)C(=O)O")
@@ -91,7 +91,7 @@ class TestMultiAmineFormat:
     def test_geminal_diamine_diacid(self):
         """NC(CC(=O)O)(C(=O)O)N: geminal diamine diacid -> 2,2-diaminobutanedioic
         acid. Butanedioic acid has a second substitutable carbon (C3), so
-        P-14.3.4.6 does NOT apply and the '2,2' locants are required."""
+         does NOT apply and the '2,2' locants are required."""
         result = name_compound("NC(CC(=O)O)(C(=O)O)N")
         assert result == "2,2-diaminobutanedioic acid"
 

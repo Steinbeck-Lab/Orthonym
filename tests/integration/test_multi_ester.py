@@ -6,8 +6,8 @@ a dicarboxylic acid backbone, producing names in the format:
   "[multiplier]alkyl [parent]anedioate"
 
 Examples:
-  COC(=O)CC(=O)OC  -> "dimethyl propanedioate"  (dimethyl malonate)
-  CCOC(=O)CCC(=O)OCC -> "diethyl butanedioate"  (diethyl succinate)
+  COC(=O)CC(=O)OC -> "dimethyl propanedioate" (dimethyl malonate)
+  CCOC(=O)CCC(=O)OCC -> "diethyl butanedioate" (diethyl succinate)
 """
 
 import pytest

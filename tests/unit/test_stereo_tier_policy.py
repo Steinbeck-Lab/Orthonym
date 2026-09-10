@@ -1,13 +1,13 @@
-"""v27 Phase 6 T6.2 + T6.3 — the shared stereo-emit policy & constitution-
-granularity SELF-01.
+""" a phase T6.2 + T6.3 — the shared stereo-emit policy & constitution-
+granularity.
 
 Root-cause logic under test:
   * ``Orthonym._stereo_emit_decision`` — ONE policy call shared by both
     general-engine emission sites. complete/valid/pin ABSTAIN on dropped stereo
-    (P-91.2.1: PINs specify every stereogenic unit; SELF-01 is stereo-blind);
+    : PINs specify every stereogenic unit; is stereo-blind);
     best-effort ships a CONSTITUTION-ONLY name flagged ``stereo_unexpressed``
-    (P-91.2.2 sanctions omission for exactly the polycyclic classes it emits).
-  * ``Orthonym._rt_match`` — SELF-01 round-trip compare at the granularity the
+     sanctions omission for exactly the polycyclic classes it emits).
+  * ``Orthonym._rt_match`` — round-trip compare at the granularity the
     name asserts: stereo-STRIPPED for a flagged emission, exact isomeric
     otherwise. Never credits a stereo-bearing parse for a flagged name.
 
@@ -15,7 +15,7 @@ The end-to-end tests drive ``_try_general_engine_recovery`` directly with a
 monkeypatched ``name_general`` + ``verify_certificate`` so the policy is
 isolated from the (OPSIN-heavy, hang-prone) real ring engine. This also
 exercises the flagged emission through both the gate-disabled (T4) and the
-gate-active (constitution-granularity SELF-01) branches.
+gate-active (constitution-granularity) branches.
 """
 import pytest
 from rdkit import Chem
@@ -108,9 +108,9 @@ _CONSTITUTION_NAME = "pentan-2-ol"
 def _patch_engine(monkeypatch, name=_CONSTITUTION_NAME):
     """Force name_general to yield a constitution-only name; certification ok.
 
-    Phase 1 B4: both emission lanes certify the ``GeneralEngineResult`` through
+    a phase B4: both emission lanes certify the ``GeneralEngineResult`` through
     ``coverage_gate.certify_general_result`` (E1 + structural binding spine).
-    These tests isolate the stereo-emit + SELF-01 policy DOWNSTREAM of
+    These tests isolate the stereo-emit + policy DOWNSTREAM of
     certification, so they fake certification as passing at that single seam."""
     import orthonym.assembly.general_engine as ge
     import orthonym.validation.coverage_gate as cg

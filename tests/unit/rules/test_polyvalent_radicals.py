@@ -1,4 +1,4 @@
-"""P-29.2 / P-71.2.3 multi-site free-valence (polyradical) PINs (w2f p5 Tasks 1-3).
+""" / multi-site free-valence (polyradical) PINs (w2f p5 Tasks 1-3).
 
 Names here are ASSERTED as raw strings straight off the rule functions (no OPSIN
 in the assertion path). Every expected string is OPSIN-2.9-`-r`-verified in
@@ -22,13 +22,13 @@ def _mol_centers(smiles):
 
 class TestHomogeneousPolyradical:
     @pytest.mark.parametrize("smiles,expected", [
-        ("[CH2][CH2]",        "ethane-1,2-diyl"),        # BB P-71.2.3 verbatim; 'e' kept before 'd'
+        ("[CH2][CH2]",        "ethane-1,2-diyl"),        # BB verbatim; 'e' kept before 'd'
         ("[CH2]C[CH2]",       "propane-1,3-diyl"),       # symmetric
         ("[CH2]CC[CH2]",      "butane-1,4-diyl"),
         ("[CH2][CH]C",        "propane-1,2-diyl"),       # asymmetric set -> lowest-set orientation {1,2}
         ("CC([CH2])[CH2]",    "2-methylpropane-1,3-diyl"),# substituent prefix on the diyl parent
-        ("[CH2][CH][CH2]",    "propane-1,2,3-triyl"),    # BB P-71.2.3 verbatim; three 1e sites
-        ("C[C]C[C]C",         "pentane-2,4-diylidene"),  # BB P-71.2.3 verbatim; two 2e sites
+        ("[CH2][CH][CH2]",    "propane-1,2,3-triyl"),    # BB verbatim; three 1e sites
+        ("C[C]C[C]C",         "pentane-2,4-diylidene"),  # BB verbatim; two 2e sites
     ])
     def test_homogeneous(self, smiles, expected):
         mol, centers = _mol_centers(smiles)
@@ -93,7 +93,7 @@ class TestRouteChargedMultiSite:
 
 class TestMixedSuffix:
     @pytest.mark.parametrize("smiles,expected", [
-        ("[CH2][CH]",   "ethan-1-yl-2-ylidene"),   # BB P-71.6 verbatim; yl gets locant 1; 'e' elided before 'y'
+        ("[CH2][CH]",   "ethan-1-yl-2-ylidene"),   # BB verbatim; yl gets locant 1; 'e' elided before 'y'
         ("[CH]C[CH2]",  "propan-1-yl-3-ylidene"),   # yl-lowest tie-break picks 1-yl over 3-yl
     ])
     def test_mixed_yl_ylidene(self, smiles, expected):
@@ -101,7 +101,7 @@ class TestMixedSuffix:
         assert emit_parent_hydride_polyvalent_suffixes(mol, centers) == expected
 
     def test_citation_order_yl_before_ylidene(self):
-        # even when ylidene holds the lower locant, yl is CITED first (P-29.3.2.2)
+        # even when ylidene holds the lower locant, yl is CITED first
         mol, centers = _mol_centers("[CH2][CH]")
         out = emit_parent_hydride_polyvalent_suffixes(mol, centers)
         assert out.index("yl") < out.index("ylidene")

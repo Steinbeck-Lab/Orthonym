@@ -1,7 +1,7 @@
-"""Tests for multiplicative nomenclature (IUPAC P-51.3).
+"""Tests for multiplicative nomenclature (IUPAC.
 
 Multiplicative naming applies to molecules with two or more identical parent
-structures connected by a polyvalent linking group (bridge).  For example,
+structures connected by a polyvalent linking group (bridge). For example,
 4,4'-methylenedianiline has two identical aniline units linked by a CH2 bridge.
 
 RED phase: these tests define the expected behavior before implementation.

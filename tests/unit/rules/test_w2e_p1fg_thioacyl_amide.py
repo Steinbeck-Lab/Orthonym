@@ -1,4 +1,4 @@
-"""P-66.1.4.2 (BB 33172): "CH3-CS-NH-CS-CH3
+""" (BB 33172): "CH3-CS-NH-CS-CH3
 N-(ethanethioyl)ethanethioamide (PIN)" — BB verbatim example.
 
 BUILT (W2E-D3): a dedicated fail-closed thioimide subsystem

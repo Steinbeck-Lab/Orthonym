@@ -1,26 +1,26 @@
-"""v29 Phase 6 — decorated CARBOCYCLIC substituents get a producer.
+""" a phase — decorated CARBOCYCLIC substituents get a producer.
 
 `_decorated_heteroaryl_substituent_name` is the producer for "a ring carrying
 its own decorations, free valence on a ring atom". It was heteroaryl-ONLY: it
 looked its stem up in `_PIN_HETEROARYL_STEMS`, a 19-entry table with no entry
 for benzene, and returned None for anything absent. So a **decorated phenyl**
 substituent — among the commonest shapes in drug-like space — had no producer
-at all and fell through to the DROP-24 fail-closed guard.
+at all and fell through to the fail-closed guard.
 
-Measured on the Phase 5 corpus before this change, each of these was unnameable
+Measured on the a phase corpus before this change, each of these was unnameable
 at EVERY ring attachment point:
 
-    CN(C)c1ccccc1       ->  (nothing)      wanted 4-(dimethylamino)phenyl
-    NS(=O)(=O)c1ccccc1  ->  (nothing)      wanted 4-sulfamoylphenyl
+    CN(C)c1ccccc1 -> (nothing) wanted 4-(dimethylamino)phenyl
+    NS(=O)(=O)c1ccccc1 -> (nothing) wanted 4-sulfamoylphenyl
 
-P-29.3.5: the free valence of a benzene substituent is position 1 and its
+: the free valence of a benzene substituent is position 1 and its
 locant is NOT cited — the retained prefix is `phenyl`, never `benzen-1-yl` —
 after which the decorations take the lowest locants. The existing numbering
 cascade already yields exactly that for a carbocycle (with no heteroatoms and
 no indicated H its sort key degenerates to `(fv_loc, deco_locs)`), so only the
 core spelling is new.
 
-The second half of this file covers P-16.3.3 enclosing marks, which the shared
+The second half of this file covers enclosing marks, which the shared
 decoration assembler was omitting for BOTH the carbocyclic and the pre-existing
 heteroaryl path.
 """
@@ -77,7 +77,7 @@ def test_decorated_phenyl_now_names(smiles, expected):
 
 
 def test_free_valence_locant_is_never_cited_on_phenyl():
-    """P-29.3.5 — the prefix is `4-methylphenyl`, never `4-methylbenzen-1-yl`
+    """ — the prefix is `4-methylphenyl`, never `4-methylbenzen-1-yl`
     or `4-methylphenyl-1-yl`."""
     for name in _names_at_every_ring_attachment("Cc1ccccc1"):
         assert "benzen" not in name
@@ -106,7 +106,7 @@ def test_alphanumerical_tie_break_on_equal_locant_sets():
     "c1(Br)cccc(Cl)c1",
 ])
 def test_p14_4_g_breaks_the_symmetric_tie_deterministically(smiles):
-    """P-14.4(g): when every earlier criterion ties, the lower locant goes to
+    """(g): when every earlier criterion ties, the lower locant goes to
     the substituent cited FIRST in alphanumerical order.
 
     With a bromine on one ortho position and a chlorine on the other, BOTH
@@ -114,8 +114,8 @@ def test_p14_4_g_breaks_the_symmetric_tie_deterministically(smiles):
     the fix the winner was whichever direction RDKit's neighbour order
     enumerated first, so the SAME MOLECULE written two ways got two names:
 
-        Brc1cccc(Cl)c1  ->  2-bromo-6-chlorophenyl   (correct)
-        Clc1cccc(Br)c1  ->  6-bromo-2-chlorophenyl   (non-PIN)
+        Brc1cccc(Cl)c1 -> 2-bromo-6-chlorophenyl (correct)
+        Clc1cccc(Br)c1 -> 6-bromo-2-chlorophenyl (non-PIN)
 
     Nondeterministic and non-PIN. `bromo` sorts before `chloro`, so it takes
     locant 2 regardless of how the input was written.
@@ -128,7 +128,7 @@ def test_p14_4_g_breaks_the_symmetric_tie_deterministically(smiles):
 
 
 # --------------------------------------------------------------------------
-# P-16.3.3 enclosing marks
+# enclosing marks
 # --------------------------------------------------------------------------
 
 def test_multiplied_decoration_prefix_takes_enclosing_marks():
@@ -160,7 +160,7 @@ def test_simple_decoration_prefixes_stay_bare():
     ("diazenyl", "diazenyl"),      # atomic prefix that merely starts with 'di'
     ("diazo", "diazo"),
     ("(already)", "(already)"),
-    # escalates ( -> [ when the inner name already carries parentheses
+    # escalates (-> [ when the inner name already carries parentheses
     ("3-(methylsulfanyl)phenyl", "[3-(methylsulfanyl)phenyl]"),
 ])
 def test_enclosing_marks_come_from_the_shared_primitive(nm, enclosed):
@@ -169,7 +169,7 @@ def test_enclosing_marks_come_from_the_shared_primitive(nm, enclosed):
 
     A hand-rolled version was written first: "wrap when the name starts with a
     multiplying prefix", plus a hand-maintained list of atomic false friends
-    (diazo, diazenyl, ...) that merely begin with those letters. It was deleted.
+    (diazo, diazenyl,...) that merely begin with those letters. It was deleted.
     `enclose_if_compound` already unions `needs_brackets` with
     `is_complex_substituent` — neither is complete alone — gets every one of
     these right with no list to maintain, and escalates the mark level.
@@ -187,7 +187,7 @@ def test_unnameable_decoration_still_fails_closed():
     not a phenyl name that silently drops it.
 
     ⚠ This assertion is written to be NON-VACUOUS. The first version was
-    `for name in ...: assert "sulf" in name`, which passes trivially when the
+    `for name in...: assert "sulf" in name`, which passes trivially when the
     set is empty — and it IS empty, so the test proved nothing (a code review
     caught it; cf. `feedback_harness_that_reports_success`).
 
@@ -206,7 +206,7 @@ def test_unnameable_decoration_still_fails_closed():
 
 
 def test_known_remaining_gaps_are_declines_not_wrong_names():
-    """Two shapes named in the Phase 6 commit message are NOT fixed by it, and
+    """Two shapes named in the a phase commit message are NOT fixed by it, and
     this test pins that honestly so the claim cannot drift.
 
     * `NS(=O)(=O)c1ccccc1` — the sulfonamide decoration is unnameable (above).

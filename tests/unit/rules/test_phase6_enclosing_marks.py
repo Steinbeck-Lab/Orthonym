@@ -1,5 +1,5 @@
-"""v33 Phase 6 (B): enclosing-mark escalation ( -> [ -> { at 3 render sites.
-All are LIVE, RT-OK-today spelling defects (P-16.5.4.1) — the fix must keep RT and
+""" a phase (B): enclosing-mark escalation (-> [ -> { at 3 render sites.
+All are LIVE, RT-OK-today spelling defects — the fix must keep RT and
 never wrap a simple prefix or mangle a fusion descriptor."""
 import pytest
 from rdkit import Chem

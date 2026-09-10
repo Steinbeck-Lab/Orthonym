@@ -1,14 +1,14 @@
 """
-Retained names + lookup tables for IUPAC P-69 organometallic compounds.
+Retained names + lookup tables for IUPAC organometallic compounds.
 
 This module provides lookup tables for organometallic compounds named per
-IUPAC 2013 Blue Book §P-69 + IUPAC Red Book §IR-10 + Salzer 1999 IUPAC
+IUPAC 2013 Blue Book § + IUPAC Red Book § + Salzer 1999 IUPAC
 Recommendations (Pure Appl. Chem. 71(8) 1557).
 
-Keys are RDKit canonical SMILES (verified per CONTEXT line 18 + RESEARCH §1.7
+Keys are RDKit canonical SMILES (verified per internal notes + RESEARCH
 empirical measurement). All entries are pure data; no logic in this module.
 
-Phase 161 (v19 first scope-expansion phase per ADR-19-07).
+a phase (first scope-expansion phase per -07).
 
 Anti-patterns to avoid (PATTERNS lines 385-388):
 - NEVER use raw SMARTS without `[p for p in [...] if p is not None]` filter.
@@ -21,9 +21,9 @@ from typing import Dict, Optional, Tuple
 
 from rdkit import Chem
 
-# === RETAINED METALLOCENES (Phase 161 D-01 Tier-1; AUDIT § 1) ===
+# === RETAINED METALLOCENES (a phase Tier-1; AUDIT) ===
 # Canonical SMILES → retained PIN. All keys verified RDKit-canonical per
-# RESEARCH §2.2 empirical measurement.
+# RESEARCH empirical measurement.
 RETAINED_METALLOCENES: Dict[str, str] = {
     '[Fe+2].c1cc[cH-]c1.c1cc[cH-]c1': 'ferrocene',          # ORG-T1-01
     '[Ru+2].c1cc[cH-]c1.c1cc[cH-]c1': 'ruthenocene',        # ORG-T1-02
@@ -35,13 +35,13 @@ RETAINED_METALLOCENES: Dict[str, str] = {
     '[Mn+2].c1cc[cH-]c1.c1cc[cH-]c1': 'manganocene',        # ORG-T1-08
     '[Fe+3].c1cc[cH-]c1.c1cc[cH-]c1': 'ferrocenium',        # ORG-T1-09
     # Tier 4 stretch — decamethylferrocene; key is the RDKit canonical
-    # SMILES (Chem.MolToSmiles output of the AUDIT § 1 input SMILES),
+    # SMILES (Chem.MolToSmiles output of the AUDIT input SMILES),
     # which is what the lookup site (Chem.MolToSmiles(mol)) produces.
     'Cc1c(C)c(C)[c-](C)c1C.Cc1c(C)c(C)[c-](C)c1C.[Fe+2]': 'decamethylferrocene',
 }
 
 
-# === METAL NAMES (per IUPAC P-69 + Salzer 1999; AUDIT § 6) ===
+# === METAL NAMES (per IUPAC + Salzer 1999; AUDIT) ===
 # Element symbol → naming-system dict per Risk R-06 mitigation
 # (Group 14: hydride-parent system; Groups 1/2/12/13: metal-direct).
 METAL_NAMES: Dict[str, Dict[str, Optional[str]]] = {
@@ -61,7 +61,7 @@ METAL_NAMES: Dict[str, Dict[str, Optional[str]]] = {
     'Ga': {'direct': 'gallium',   'hydride_parent': None, 'naming_system': 'metal_direct'},
     'In': {'direct': 'indium',    'hydride_parent': None, 'naming_system': 'metal_direct'},
     'Tl': {'direct': 'thallium',  'hydride_parent': None, 'naming_system': 'metal_direct'},
-    # Group 14 (hydride-parent per IUPAC P-69.2)
+    # Group 14 (hydride-parent per IUPAC
     'Si': {'direct': 'silicon',   'hydride_parent': 'silane',    'naming_system': 'hydride_parent'},
     'Ge': {'direct': 'germanium', 'hydride_parent': 'germane',   'naming_system': 'hydride_parent'},
     'Sn': {'direct': 'tin',       'hydride_parent': 'stannane',  'naming_system': 'hydride_parent'},
@@ -93,7 +93,7 @@ METAL_NAMES: Dict[str, Dict[str, Optional[str]]] = {
 }
 
 
-# === METAL_HYDRIDE_PARENT_NAMES (per IUPAC P-69.2; AUDIT § 6) ===
+# === METAL_HYDRIDE_PARENT_NAMES (per IUPAC; AUDIT) ===
 # Convenience flat view of METAL_NAMES restricted to hydride-parent system.
 # Used by rules.organometallics for Group 14 substitutive naming.
 METAL_HYDRIDE_PARENT_NAMES: Dict[str, str] = {
@@ -103,15 +103,15 @@ METAL_HYDRIDE_PARENT_NAMES: Dict[str, str] = {
 }
 
 
-# === METALLACYCLE_A_PREFIX (P-69.4; W8-P9 Task 9.5) ===
+# === METALLACYCLE_A_PREFIX; W8-P9 Task 9.5) ===
 # Skeletal-replacement nondetachable 'a'-prefix for a Group 2-12 metal ring
-# atom (BB P-69.4 verbatim, P6a.pdf): "selecting a parent hydrocarbon ring
-# ... and replacing one or more carbon atoms by a metal atom from Groups 2
+# atom (BB verbatim, P6a.pdf): "selecting a parent hydrocarbon ring
+#... and replacing one or more carbon atoms by a metal atom from Groups 2
 # through 12 using a nondetachable skeletal replacement ('a') prefix".
 # Table scoped to the metals with a worked BB example (platina/irida/titana)
 # plus the common analogues by the standard 'a'-suffix pattern (element stem
 # + 'a', matching the existing METAL_NAMES 'direct' stems). Deliberately
-# excludes Groups 13-16 (Si/Ge/Sn/Pb/B/etc.) — those are WSD-04's existing
+# excludes Groups 13-16 (Si/Ge/Sn/Pb/B/etc.) — those are -04's existing
 # Hantzsch-Widman-only ring territory (silole/borole/stannole), a SEPARATE
 # established path this table must not overlap.
 METALLACYCLE_A_PREFIX: Dict[str, str] = {
@@ -127,7 +127,7 @@ METALLACYCLE_A_PREFIX: Dict[str, str] = {
 }
 
 
-# === LIGAND NAMES (SMARTS-canonical-key → IUPAC ligand name; AUDIT § 2) ===
+# === LIGAND NAMES (SMARTS-canonical-key → IUPAC ligand name; AUDIT) ===
 # Used for naming the prefix part of organometallic names. Per CBC ligand
 # classification (LibreTexts 13.02).
 LIGAND_NAMES: Dict[str, str] = {
@@ -143,7 +143,7 @@ LIGAND_NAMES: Dict[str, str] = {
     'C#C':               'ethyne',
     # 7-atom ring cycloheptatrienyl + 8-atom ring cyclooctatetraene
     # — Plan-02 substrate previously mislabeled the 8-atom ring as
-    # cycloheptatrienyl. Amendment per AUDIT § 1 ORG-T4-08/09.
+    # cycloheptatrienyl. Amendment per AUDIT ORG-T4-08/09.
     'C1=CC=CC=CC=1':     'cycloheptatrienyl',
     'C1=CC=CC=CC=C1':    'cyclooctatetraene',
     '[H-]':              'hydrido',
@@ -158,14 +158,14 @@ LIGAND_NAMES: Dict[str, str] = {
 }
 
 
-# === LIGAND ETA DEFAULTS (per RESEARCH §3.3; AUDIT § 2) ===
+# === LIGAND ETA DEFAULTS (per RESEARCH; AUDIT) ===
 # SMARTS-canonical-key → (default_hapticity, ligand_name) per Salzer 1999.
 LIGAND_ETA_DEFAULTS: Dict[str, Tuple[int, str]] = {
     'c1cc[cH-]c1':       (5, 'cyclopentadienyl'),
     '[c-]1cccc1':        (5, 'cyclopentadienyl'),
     # pentamethyl-Cp: key is RDKit canonical SMILES per Plan-03-04 amendment.
     'Cc1c(C)c(C)[c-](C)c1C': (5, 'pentamethylcyclopentadienyl'),
-    # mono-methyl-Cp: per AUDIT § 1 ORG-T4-25 amendment.
+    # mono-methyl-Cp: per AUDIT ORG-T4-25 amendment.
     'C[c-]1cccc1':       (5, 'methylcyclopentadienyl'),
     'c1ccccc1':          (6, 'benzene'),
     'C=CC=C':            (4, '1,3-butadiene'),
@@ -177,7 +177,7 @@ LIGAND_ETA_DEFAULTS: Dict[str, Tuple[int, str]] = {
     'C1=CC=CC=CC=1':     (7, 'cycloheptatrienyl'),
     # 8-atom ring cyclooctatetraene (COT; C1=CC=CC=CC=C1; 8 atoms total)
     # — Plan-02 substrate previously mislabeled this as 'cycloheptatrienyl'.
-    # Amendment per AUDIT § 1 ORG-T4-08/09.
+    # Amendment per AUDIT ORG-T4-08/09.
     'C1=CC=CC=CC=C1':    (8, 'cyclooctatetraene'),
     '[c+]1cccccc1':      (7, 'tropylium'),
     '[C-]#[O+]':         (1, 'carbonyl'),

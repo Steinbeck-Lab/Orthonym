@@ -1,6 +1,6 @@
 """Exocyclic C= on a von Baeyer parent must be NAMED, never dropped.
 
-Phase 1b, PIN-path half.
+a phase, PIN-path half.
 
 ``get_polycyclic_substituents`` used to blanket-``continue`` on EVERY exocyclic
 double bond, with the comment "=O, =S for suffixes". That premise holds for the
@@ -13,7 +13,7 @@ JVM present the wrong name shipped.
 
 Two properties are pinned:
 
-  * an exocyclic ``=CH2`` is emitted as a P-29.2 ``methylidene`` prefix at the
+  * an exocyclic ``=CH2`` is emitted as a ``methylidene`` prefix at the
     ring locant the numbering machinery already assigned;
   * when the exocyclic carbon fragment is outside the ylidene class the whole
     ring handler FAILS CLOSED (``OrthonymLimitError``) instead of dropping

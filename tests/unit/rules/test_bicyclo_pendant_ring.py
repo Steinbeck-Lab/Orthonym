@@ -1,8 +1,8 @@
 """
-Regression test for the bicyclo pendant-ring scope bug (v33 Phase 3, beta-lactam layer 1).
+Regression test for the bicyclo pendant-ring scope bug (a phase, beta-lactam layer 1).
 
 `is_bicyclo_system`'s zero-bridge ring-size guard (bicyclo.py, the
-`if lengths and min(lengths) == 0:` block) used to read `ri.AtomRings()`
+`if lengths and min(lengths) == 0:` block) used to read `ri.AtomRings`
 (whole-molecule SSSR) instead of the connected-component ring scope already
 computed a few lines earlier (`ring_atoms_set`, via
 `_get_largest_connected_ring_component`). That meant ANY pendant substituent
@@ -46,7 +46,7 @@ class TestPendantRingDoesNotBlockBicyclo:
         """
         Penicillin-G-like penam core (fused beta-lactam + thiazolidine,
         zero-length bridge) with a pendant phenyl on the acylamino side
-        chain. Before the fix, ri.AtomRings() over the WHOLE molecule
+        chain. Before the fix, ri.AtomRings over the WHOLE molecule
         included the phenyl's 6-ring, inflating sorted ring sizes to
         [4, 5, 6] so ring_sizes[-2] (5) >= 5 tripped the "route to fused"
         branch and is_bicyclo_system returned False -- even though the
@@ -84,14 +84,14 @@ class TestPendantRingDoesNotBlockBicyclo:
 
     def test_composer_reached_for_phenyl_bearing_fused_bicyclic(self):
         """
-        Integration-level, via monkeypatch spy on the composer entry point
-        (the same technique the coordinator's SPY used): confirm
+        Integration-level, via monkeypatch trace on the composer entry point
+        (the same technique the coordinator's a trace used): confirm
         `_assemble_complete_bicyclo_name` is actually CALLED (the gate is
         reached) when naming penicillin G, whose pendant phenyl used to
         block `is_bicyclo_system` outright (0 calls before the fix). We do
         not assert a full/correct final name -- the substituent (acylamino)
         spelling is a separate, not-yet-fixed layer, and the top-level
-        SELF-01 gate is expected to suppress a wrong candidate for it,
+         gate is expected to suppress a wrong candidate for it,
         which is correct 0-wrong behaviour, not a test failure.
         """
         import orthonym.assembly.composer as composer_module
@@ -145,10 +145,10 @@ class TestVonBaeyerByteIdenticalRegression:
         ("C1CC2CCC1(C)C2", "1-methylbicyclo[2.2.1]heptane"),
         ("OC1CC2CCC1CC2", "bicyclo[2.2.2]octan-2-ol"),
         ("C1CC2CC1C(=O)C2", "bicyclo[2.2.1]heptan-2-one"),
-        # v41 M4#1 P-23.2.4: main bridge maximized (2) before symmetric division,
+        # M4#1: main bridge maximized (2) before symmetric division,
         # so tricyclo[5.2.2.0^2,6] (main bridge 2) is preferred over the older
         # tricyclo[4.3.0.2^2,5] (main bridge 0). Both OPSIN-round-trip to the same
-        # C11 cage; the new form is the more P-23.2.4-conformant decomposition.
+        # C11 cage; the new form is the more -conformant decomposition.
         ("C1CC2CCC1C1CCCC21", "tricyclo[5.2.2.0^2,6]undecane"),
     ]
 

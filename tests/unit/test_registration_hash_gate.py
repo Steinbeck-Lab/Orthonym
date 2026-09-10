@@ -1,6 +1,6 @@
-"""v30 C6: SELF-01 verdict uses a RegistrationHash-backed stereo layer.
+""" C6: verdict uses a RegistrationHash-backed stereo layer.
 
-The InChIKey skeleton block is stereo-insensitive (ADR-18-07), so the pre-C6
+The InChIKey skeleton block is stereo-insensitive (-07), so the pre-C6
 verdict judged a wrong-stereoisomer name as "ok". C6 keeps the gold-safe
 constitution+charge logic and ADDS a stereo-CONFLICT guard on the stereo-strict
 primary path, while the BBR-GATE stereo carve-out stays stereo-insensitive via
@@ -40,7 +40,7 @@ def test_stereo_omission_is_tolerated_on_primary_path():
 
 
 def test_stereo_difference_is_ok_when_ignore_stereo():
-    # The :1173 carve-out compares full-stereo input vs a stereo-STRIPPED parse.
+    # The:1173 carve-out compares full-stereo input vs a stereo-STRIPPED parse.
     assert namer._self_consistency_verdict(
         "C[C@H](N)C(=O)O", "CC(N)C(=O)O", ignore_stereo=True) == "ok"
 

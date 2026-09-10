@@ -1,10 +1,10 @@
-"""P-45.5 / P-14.5 alphanumerical name comparison + P-14.3.5 locant ordering.
+""" / alphanumerical name comparison + locant ordering.
 
 Pure string logic — no RDKit, no imports from handlers (safe to import from
 anywhere in assembly/ or rules/ without cycles).
 
-BB P-14.3.5 (BlueBookV2.md:3191-3195): "Primed locants are placed immediately
-after the corresponding unprimed locants ...; locants consisting of a number
+BB (the Blue Book-3195): "Primed locants are placed immediately
+after the corresponding unprimed locants...; locants consisting of a number
 and a lower-case letter with or without primes as 4a and 4'a (not 4a') are
 placed immediately after the corresponding numeric locant and are followed by
 locants having superscripts. Italic capital and lower-case letter locants are
@@ -16,7 +16,7 @@ import re
 from typing import List, Tuple
 
 # ---------------------------------------------------------------------------
-# P-14.3.5 — single-locant total order
+# — single-locant total order
 # ---------------------------------------------------------------------------
 
 _GREEK = {
@@ -26,8 +26,8 @@ _GREEK = {
 }
 
 # ASCII locant token grammar used by Orthonym names:
-#   numeral form:  4 | 4a | 2' | 4'a | 3a^1 | 1^2 | 1λ5 | 1lambda5
-#   italic form:   N | N' | N2 | N2' | O | S | P
+# numeral form: 4 | 4a | 2' | 4'a | 3a^1 | 1^2 | 1λ5 | 1lambda5
+# italic form: N | N' | N2 | N2' | O | S | P
 _NUMERAL_TOKEN_RE = re.compile(
     r"^(?P<num>\d+)(?P<primes1>'*)(?P<letter>[a-z]?)(?P<primes2>'*)"
     r"(?:\^(?P<sup>\d+))?(?:(?:λ|lambda)(?P<lam>\d+))?$"
@@ -38,7 +38,7 @@ _ITALIC_TOKEN_RE = re.compile(
 
 
 def locant_sort_key(token: str) -> tuple:
-    """Total-order key for one locant token per P-14.3.5.
+    """Total-order key for one locant token per.
 
     Key layout: (class, base, letter, primes, superscript)
       class: 0 = italic Roman letter (N/O/S/P), 1 = Greek, 2 = numeral
@@ -46,9 +46,9 @@ def locant_sort_key(token: str) -> tuple:
       with primes ranking between the bare number and the letter-suffixed
       forms (4 < 4' < 4a < 4'a), superscripts last (3a < 3a^1).
 
-    The λ bonding-number mark (P-45.3.2 material) does NOT perturb the
-    P-14.3.5 order — the base locant decides; the λ value is exposed via
-    parse_lambda_locant() for the P-45.3.2 comparator (Task 4).
+    The λ bonding-number mark material) does NOT perturb the
+     order — the base locant decides; the λ value is exposed via
+    parse_lambda_locant for the comparator (Task 4).
     """
     tok = token.strip()
     m = _NUMERAL_TOKEN_RE.match(tok)
@@ -80,7 +80,7 @@ def compare_locant_strings(a: str, b: str) -> int:
 
 
 def compare_locant_str_sets(set_a: List[str], set_b: List[str]) -> int:
-    """First-point-of-difference over string locant sets (P-14.3.5).
+    """First-point-of-difference over string locant sets.
 
     Mirrors rules/locants.py::compare_locant_sets semantics: both sets are
     sorted ascending (by locant_sort_key), compared term by term; on a tied
@@ -100,10 +100,10 @@ def compare_locant_str_sets(set_a: List[str], set_b: List[str]) -> int:
 
 
 # ---------------------------------------------------------------------------
-# P-45.5 — alphanumerical order of complete names
+# — alphanumerical order of complete names
 # ---------------------------------------------------------------------------
 
-# Stereodescriptor parenthetical: (R)-, (2S)-, (1R,2S)-, (E)-, (2E,4Z)- ...
+# Stereodescriptor parenthetical: (R)-, (2S)-, (1R,2S)-, (E)-, (2E,4Z)-...
 _STEREO_DESC_RE = re.compile(r"\((?:\d*[a-zA-Z]?'*[RSEZrsez](?:,\d*[a-zA-Z]?'*[RSEZrsez])*)\)-?")
 # Leading/embedded indicated hydrogen: 1H-, 9aH-, 2H,3H- (italic H + locant)
 _IH_STEM_RE = re.compile(r"\d+[a-z]?'*H[,-]")
@@ -111,9 +111,9 @@ _IH_STEM_RE = re.compile(r"\d+[a-z]?'*H[,-]")
 _ITALIC_LOCANT_RE = re.compile(r"(?<![a-zA-Z])[NOSP]\d*'*(?=[,-])")
 # Numeral locant tokens in appearance order (incl. primes/superscript/lambda).
 # The negative lookbehind stops a BARE lambda-convention marker with no
-# preceding locant ("λ5-phosphanyl", P-45.3.1 mononuclear substituent) from
+# preceding locant ("λ5-phosphanyl", mononuclear substituent) from
 # having its bonding-number digit mis-read as an unrelated standalone locant
-# ("5"); a real locant+lambda token ("2λ5", P-21.2.4 skeletal replacement)
+# ("5"); a real locant+lambda token ("2λ5", skeletal replacement)
 # is unaffected since the lookbehind only guards the digit run's OWN start,
 # and there the "2" -- not "λ" -- immediately precedes it.
 _LOCANT_TOKEN_FINDER = re.compile(
@@ -126,7 +126,7 @@ from .naming_utils import _FUSION_BRACKET_RE, _INDICATED_H_RE  # noqa: E402
 def _roman_letter_key(name: str) -> str:
     """Tier 1: Roman letters in order of appearance; italic elements removed.
 
-    Removes (per BB P-45.5) stereodescriptors, indicated-hydrogen descriptors,
+    Removes (per BB stereodescriptors, indicated-hydrogen descriptors,
     fusion/von-Baeyer bracket contents, and italic heteroatom locants, then
     keeps only alphabetic characters, lowercased.
     """
@@ -153,12 +153,12 @@ def _italic_letter_key(name: str) -> str:
 
 def _numeral_key(name: str) -> Tuple[tuple, ...]:
     """Tier 3: numerical locants in order of APPEARANCE (not sorted) —
-    BB P-45.5 final sentence."""
+    BB final sentence."""
     return tuple(locant_sort_key(t) for t in _LOCANT_TOKEN_FINDER.findall(name))
 
 
 def compare_names(a: str, b: str) -> int:
-    """P-45.5 alphanumerical comparison of two complete candidate names.
+    """ alphanumerical comparison of two complete candidate names.
 
     Returns -1 if a is earlier (preferred as PIN), 1 if b, 0 if equal.
     Tier 1: Roman letters in order of appearance (italics excluded).
@@ -175,7 +175,7 @@ def compare_names(a: str, b: str) -> int:
 
 
 # ---------------------------------------------------------------------------
-# P-45.3.2 — lower locant set for higher-bonding-number (λ) prefixes
+# — lower locant set for higher-bonding-number (λ) prefixes
 # ---------------------------------------------------------------------------
 
 _LAMBDA_SPLIT_RE = re.compile(r"^(?P<base>\d+'*[a-z]?'*)(?:λ|lambda)(?P<bond>\d+)$")
@@ -184,7 +184,7 @@ _LAMBDA_SPLIT_RE = re.compile(r"^(?P<base>\d+'*[a-z]?'*)(?:λ|lambda)(?P<bond>\d
 def parse_lambda_locant(token: str):
     """Split '1λ5' / '1lambda5' / "2'λ4" into (base_locant, bonding_number).
 
-    Returns None for tokens without a λ mark. P-14.1.3: the λ symbol is
+    Returns None for tokens without a λ mark.: the λ symbol is
     'cited in conjunction with an appropriate locant'.
     """
     m = _LAMBDA_SPLIT_RE.match(token.strip())
@@ -194,12 +194,12 @@ def parse_lambda_locant(token: str):
 
 
 def compare_lambda_locant_sets(set_a: List[str], set_b: List[str]) -> int:
-    """P-45.3.2 (BlueBookV2.md:22200): 'The preferred IUPAC name has the
+    """ (the Blue Book): 'The preferred IUPAC name has the
     lower locant set for substituent group(s) with the higher bonding
     number(s) cited as prefixes.'
 
     Only λ-bearing tokens participate; their BASE locants are compared with
-    P-14.3.5 first-point-of-difference semantics. Returns 0 when neither
+     first-point-of-difference semantics. Returns 0 when neither
     side cites a λ prefix (tier does not apply).
     """
     a_bases = [p[0] for p in (parse_lambda_locant(t) for t in set_a) if p]
@@ -207,7 +207,7 @@ def compare_lambda_locant_sets(set_a: List[str], set_b: List[str]) -> int:
     if not a_bases and not b_bases:
         return 0
     if a_bases and not b_bases:
-        return -1   # P-45.3.1: more higher-bonding-number prefixes wins
+        return -1   #: more higher-bonding-number prefixes wins
     if b_bases and not a_bases:
         return 1
     return compare_locant_str_sets(a_bases, b_bases)

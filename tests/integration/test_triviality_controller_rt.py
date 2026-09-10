@@ -1,17 +1,17 @@
-"""Phase 168 Plan-03: TRIV-03 OPSIN round-trip safety integration corpus.
+"""a phase Plan-03: OPSIN round-trip safety integration corpus.
 
-Verifies the controller is RT-safe by construction (CONTEXT D-07): every emitted name round-trips
+Verifies the controller is RT-safe by construction (internal notes): every emitted name round-trips
 through OPSIN (InChI L1 match), and a hypothetical RT-unsafe swap is silently rejected (the
-systematic form is kept). Also pins the Phase-167 HYG-04 inheritance (diphenylmethoxy preserved,
+systematic form is kept). Also pins the Phase-167 inheritance (diphenylmethoxy preserved,
 benzhydryl never introduced).
 
-HONEST NOTE (CONTEXT honest-RT-framing #1): the controller fires 0 times end-to-end on the current
+HONEST NOTE (internal notes honest-RT-framing #1): the controller fires 0 times end-to-end on the current
 IR (the structured IR fraction is disjoint from the seed targets, which are coarse-handled). So the
-T2 RT-reject path is not exercised end-to-end here (it is unit-tested via OpsinOracle in Plan-02);
+ RT-reject path is not exercised end-to-end here (it is unit-tested via OpsinOracle in Plan-02);
 the RT-pass corpus confirms the controller introduces no RT regression (ON output round-trips,
 identical to OFF).
 
-Source: 168-CONTEXT.md D-07 + TRIV-03; RESEARCH section 6.4; Pattern S5.
+Source: 168-internal notes +; RESEARCH section 6.4; Pattern S5.
 """
 
 import glob
@@ -68,7 +68,7 @@ RT_PASS_FIXTURES = [
     "c1ccc2ncccc2c1", "c1ccc2cnccc2c1", "c1ccsc1", "Cc1ccncc1", "Oc1ccc(Cl)cc1",
 ]
 
-# Phase 167 HYG-04 inheritance — diphenhydramine core + variants.
+# a phase inheritance — diphenhydramine core + variants.
 HYG04_INHERITANCE_FIXTURES = [
     "CN(C)CCOC(c1ccccc1)c1ccccc1", "OCCOC(c1ccccc1)c1ccccc1",
     "OCCCOC(c1ccccc1)c1ccccc1", "OCCCCOC(c1ccccc1)c1ccccc1",
@@ -90,7 +90,7 @@ class TestRTSafeCorpus:
 
 
 class TestRTRejectGuard:
-    """TRIV-03 by-construction safety: an emitted name never fails round-trip. The controller is
+    """ by-construction safety: an emitted name never fails round-trip. The controller is
     0-fire end-to-end on the current IR, so no swap is RT-rejected here; the invariant asserted is
     that ON never introduces an RT-failing name (no regression vs OFF)."""
 
@@ -110,7 +110,7 @@ class TestRTRejectGuard:
     @pytest.mark.integration
     def test_controller_event_emitted_on_reject(self, caplog):
         # The OpsinOracle/ControllerEvent diagnostic surface exists (Plan-02). End-to-end no swap
-        # fires (0-fire reach-bound), so no reject event is produced here; the unit-level T2 reject
+        # fires (0-fire reach-bound), so no reject event is produced here; the unit-level reject
         # is exercised in Plan-02. Assert the controller runs without error under DEBUG logging.
         with caplog.at_level(logging.DEBUG, logger="orthonym.assembly.retained_substitution"):
             out = name_compound("Oc1ccccc1", enable_triviality_controller=True)
@@ -121,7 +121,7 @@ class TestHYG04Inheritance:
     @pytest.mark.integration
     @pytest.mark.parametrize("smiles", HYG04_INHERITANCE_FIXTURES)
     def test_hyg04_inheritance_diphenylmethoxy_preserved(self, smiles):
-        # Phase 167 HYG-04: the controller MUST NOT undo diphenylmethyl -> benzhydryl.
+        # a phase: the controller MUST NOT undo diphenylmethyl -> benzhydryl.
         actual = name_compound(smiles, enable_triviality_controller=True).lower()
         assert "diphenylmethoxy" in actual, f"diphenylmethoxy lost: {actual!r}"
         assert "benzhydryl" not in actual, f"benzhydryl introduced: {actual!r}"

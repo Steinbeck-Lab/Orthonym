@@ -1,15 +1,15 @@
-"""Ketene namer (P-64.2.2.4).
+"""Ketene namer.
 
 Ketene is the class name for H2C=C=O and its derivatives. The unsubstituted
 structure and its halogen derivatives are named on the ``ethenone`` parent
 (BB verbatim examples)::
 
-    C=C=O          -> ethenone         (PIN)
-    BrC(Br)=C=O    -> dibromoethenone  (PIN; "not dibromoketene")
+    C=C=O -> ethenone (PIN)
+    BrC(Br)=C=O -> dibromoethenone (PIN; "not dibromoketene")
 
 SCOPE (fail-closed, accuracy-first): the exact terminal heterocumulene
 O=C=C< where the sp carbon carries NOTHING else and the terminal carbon
-carries only hydrogen and/or halogens. Halogens are the P-15.1.8.2
+carries only hydrogen and/or halogens. Halogens are the
 "compulsory prefix" substituents the retained class name allows, and the
 single substitutable carbon makes the prefix locants unambiguous (BB cites
 ``dibromoethenone`` with no locants). Everything else fails a guard and
@@ -83,7 +83,7 @@ def name_ketene(mol) -> Optional[str]:
     if oxygen.GetDegree() != 1:
         return None
 
-    # Branch 3 (P-64.5(3) oxomethylidene on a ring): terminal C is a RING
+    # Branch 3 (3) oxomethylidene on a ring): terminal C is a RING
     # atom (spiro-exocyclic cumulene) -> '<ring-ylidene>methanone'
     # (cyclohexylidenemethanone). Ring must be a plain cycloalkane fragment
     # nameable as an '-ylidene' substituent; else fail closed.
@@ -101,7 +101,7 @@ def name_ketene(mol) -> Optional[str]:
             return None
         return f"{base}methanone"
 
-    # Branch 2 (P-64.2.2.4): BOTH substituents identical ARYL groups, zero H
+    # Branch 2: BOTH substituents identical ARYL groups, zero H
     # on the terminal C -> '<di><name>ethenone' (BB/scope-decision verbatim:
     # diphenylethenone). Only aromatic-ring substituents take this
     # ethenone form; ACYCLIC alkyl cumulated chains use ordinary ketone

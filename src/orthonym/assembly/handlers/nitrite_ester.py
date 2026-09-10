@@ -1,15 +1,15 @@
-"""WSD-05 (Phase 175) nitrite-ester handler — P-67 functional-class naming.
+"""-05 (a phase) nitrite-ester handler — functional-class naming.
 
 A nitrite ester R-O-N=O is named in the two-word functional-class form
-``<R> nitrite`` (P-67 / P-65.5; e.g. ``ethyl nitrite``), NOT as a C-nitroso
+``<R> nitrite`` /; e.g. ``ethyl nitrite``), NOT as a C-nitroso
 compound. This handler is the genuinely-missing emitter co-shipped with the
-PERC-03 ``nitroso`` ``[#6]`` guard: without it, guarding ``nitroso`` would leave
+ ``nitroso`` ``[#6]`` guard: without it, guarding ``nitroso`` would leave
 ``CCON=O`` nameless (there is no nitrite/nitrous seniority entry; the
 ``nitric acid -> nitrate`` mapping was deferred — resolvers.py:299).
 
 Modeled on handlers/imidate.py (two-word functional-class, predicate-pure +
 pool.add + stereo injection) and registered in inner_dispatch at the specialty
-tier (priority 2960, after chalcogen_ester@2950).
+tier (priority 2960, after chalcogen_ester).
 """
 from __future__ import annotations
 
@@ -19,7 +19,7 @@ from ..name_tree import NameTreeNode, NamingResult
 
 
 def _is_nitrite_ester(features: Any) -> bool:
-    """Predicate (D-07 pure): the nitrite ester R-O-N=O is the senior/sole
+    """Predicate (pure): the nitrite ester R-O-N=O is the senior/sole
     characteristic group. Defers (False) when a higher-seniority PG is present,
     so the handler never claims a polyfunctional molecule where nitrite loses.
     NO mol/features mutation; NO module state."""
@@ -33,12 +33,12 @@ def _is_nitrite_ester(features: Any) -> bool:
 def name_nitrite_ester(
     features: Any, mol: Any = None, style: str = "pin",
 ) -> Optional[NamingResult]:
-    """Emit ``<R> nitrite`` (P-67) for a nitrite ester R-O-N=O.
+    """Emit ``<R> nitrite`` for a nitrite ester R-O-N=O.
 
     Algorithm: from the ``nitrite`` SMARTS match (R_carbon, O, N, O), name the
     R (alkyl/aryl) fragment via the universal substituent pipeline and join as
     ``"<R> nitrite"``. Returns None (defer) if the R cannot be named.
-    Style is ignored (single PIN per compound, CONTEXT D-04).
+    Style is ignored (single PIN per compound, internal notes).
     """
     from ..candidate_pool import get_current_pool
     from ..composer import _inject_stereo_if_missing

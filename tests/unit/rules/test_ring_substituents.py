@@ -1,5 +1,5 @@
 """
-Unit tests for ring substituent naming (IUPAC P-61.5).
+Unit tests for ring substituent naming (IUPAC.
 
 Tests the ring_substituents module for correct identification and naming
 of rings when they become substituents on a chain parent.

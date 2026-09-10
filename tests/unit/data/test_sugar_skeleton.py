@@ -1,7 +1,7 @@
 """
-D-13 catalog-reproduction HARD gate for the structure-derived sugar recognizer.
+ catalog-reproduction HARD gate for the structure-derived sugar recognizer.
 
-Phase 176 Plan 01 (WSD-08). These tests are the fail-stop that keeps
+a phase Plan 01 (-08). These tests are the fail-stop that keeps
 ``recognize_sugar_skeleton`` honest: the deriver MUST reproduce the existing
 retained-sugar catalog's ``(anomer, config, base)`` tuple for every
 structurally-clean stereo entry, and MUST fail closed (return ``None``, never a
@@ -17,12 +17,12 @@ Two notions of "clean" exist in the catalog and they are NOT the same set:
   *names* carry no "deoxy" token even though they are structurally deoxy
   (ring-CH3, not ring-CH2OH).
 
-* **Structurally-clean** (the deriver's actual D-06 contract): the clean
+* **Structurally-clean** (the deriver's actual contract): the clean
   hexose/pentose OH/H/CH2OH fingerprint — 40 stereo pyranose/furanose entries.
   rhamnopyranose/fucopyranose are EXCLUDED here (they are deoxy → the deriver
-  returns ``None`` per D-06 / RESEARCH §"Verified deriver fingerprint").
+  returns ``None`` per / RESEARCH §"Verified deriver fingerprint").
 
-The catalog-reproduction gate (D-13) therefore reproduces the 40 structurally
+The catalog-reproduction gate  therefore reproduces the 40 structurally
 clean entries; the None gate covers the remaining stereo ring sugars (the 4
 deoxy + 4 N-acetyl + 2 uronic = 10 modified ring sugars), proving the deriver
 never emits a wrong tuple on out-of-scope input.
@@ -62,7 +62,7 @@ def _is_keyword_clean(base_name):
 
 
 def _is_structurally_clean(smiles):
-    """The deriver's D-06 contract: clean hexose/pentose OH/H/CH2OH fingerprint.
+    """The deriver's contract: clean hexose/pentose OH/H/CH2OH fingerprint.
 
     A single 5- or 6-membered ring with exactly one ring oxygen, every ring
     carbon bearing only OH (or one CH2OH exocyclic carbon), no nitrogen, no
@@ -123,13 +123,13 @@ MODIFIED_RING = [(s, v) for s, v in _RING_SUGARS if not _is_structurally_clean(s
 
 @pytest.mark.unit
 class TestSugarSkeletonCatalogReproduction:
-    """D-13 HARD gate: the deriver reproduces the clean catalog, fails closed."""
+    """ HARD gate: the deriver reproduces the clean catalog, fails closed."""
 
     def test_clean_set_scope_self_validates(self):
         """The clean-set scope is exactly what the catalog pins (catalog-drift trip).
 
-        v23 CARB-02 grew the catalog with the complete systematic monosaccharide
-        stereo family (SYSTEMATIC_MONOSACCHARIDE_NAMES). Since then the v33
+          grew the catalog with the complete systematic monosaccharide
+        stereo family (SYSTEMATIC_MONOSACCHARIDE_NAMES). Since then the
         breadth program (~30 later feature commits) grew ALL_SUGAR_NAMES further:
         keyword-clean 220 -> 236 (+16) and structural-clean 216 -> 224 (+8), so
         the two-notions difference widened from 4 to 12. These counts are the
@@ -142,7 +142,7 @@ class TestSugarSkeletonCatalogReproduction:
         assert len(clean) == 236, (
             f"keyword-clean catalog scope drifted: got {len(clean)} (expected 236)"
         )
-        # Structural-clean is the deriver's D-06 contract (measured live).
+        # Structural-clean is the deriver's contract (measured live).
         assert len(STRUCTURAL_CLEAN) == 224, (
             f"structural-clean scope drifted: got {len(STRUCTURAL_CLEAN)} "
             "(expected 224)"
@@ -152,7 +152,7 @@ class TestSugarSkeletonCatalogReproduction:
         assert len(KEYWORD_CLEAN) - len(STRUCTURAL_CLEAN) == 12
 
     def test_catalog_reproduction(self):
-        """Deriver reproduces (anomer, config, base) for every clean entry (D-13)."""
+        """Deriver reproduces (anomer, config, base) for every clean entry ."""
         for smiles, expected in STRUCTURAL_CLEAN:
             mol = Chem.MolFromSmiles(smiles)
             assert mol is not None, f"unparseable catalog SMILES: {smiles}"
@@ -165,7 +165,7 @@ class TestSugarSkeletonCatalogReproduction:
             assert result == lookup_sugar(Chem.MolToSmiles(mol))
 
     def test_modified_entries_return_none(self):
-        """Deriver fails closed on every modified/out-of-scope ring sugar (D-06)."""
+        """Deriver fails closed on every modified/out-of-scope ring sugar ."""
         assert MODIFIED_RING, "expected modified ring sugars in the catalog"
         for smiles, value in MODIFIED_RING:
             mol = Chem.MolFromSmiles(smiles)
@@ -183,7 +183,7 @@ class TestSugarSkeletonCatalogReproduction:
 
 @pytest.mark.unit
 class TestSkeletonIdealization:
-    """Phase 183 (WSC-04, D-01): physical idealize-then-lookup reproduces the
+    """a phase (-04,): physical idealize-then-lookup reproduces the
     clean parent skeleton for each modified-sugar class (deoxy / uronic / amino).
 
     This is the floor the Wave-1 generalization must defend: the raw modified
@@ -191,7 +191,7 @@ class TestSkeletonIdealization:
     re-ranks ring CIP), so idealization MUST be physical (edit the molecule, then
     re-run rdCIPLabeler). Each idealization restores the EXACT canonical SMILES of
     clean β-D-glucopyranose, and the existing deriver recovers (beta, D,
-    glucopyranose) from it (RESEARCH §1).
+    glucopyranose) from it (RESEARCH).
     """
 
     # Verified modified-sugar SMILES (OPSIN-RT True this session); the clean parent.
@@ -202,11 +202,11 @@ class TestSkeletonIdealization:
 
     @staticmethod
     def _idealize(smiles):
-        """Physical idealization (RESEARCH §1): restore the parent skeleton.
+        """Physical idealization (RESEARCH): restore the parent skeleton.
 
         deoxy -> add an exocyclic O on the bare terminal ring-attached CH3;
         uronic -> remove the carbonyl =O so COOH -> CH2OH;
-        amino  -> SetAtomicNum(8) on the single nitrogen.
+        amino -> SetAtomicNum(8) on the single nitrogen.
         Returns the canonical SMILES of the idealized (NEW) molecule.
         """
         m = Chem.RWMol(Chem.MolFromSmiles(smiles))
@@ -267,7 +267,7 @@ class TestSkeletonIdealization:
 
 @pytest.mark.unit
 class TestGlycosideClassName:
-    """D-07: -ose -> -oside with an ASCII alpha/beta-D/L- prefix."""
+    """: -ose -> -oside with an ASCII alpha/beta-D/L- prefix."""
 
     def test_glycoside_class_name_transform(self):
         assert (
@@ -302,10 +302,10 @@ class TestGlycosideClassName:
 
 @pytest.mark.unit
 class TestSystematicMonosaccharideFamilyCoverage:
-    """v23 CARB-02: the systematic monosaccharide family must be COMPLETE over the
+    """: the systematic monosaccharide family must be COMPLETE over the
     full ALL_SUGAR_NAMES union — every family base has all six
     {D,L} x {alpha,beta,unspecified-anomer} combos — with only the two
-    chemically-impossible exclusions.  Guards against future catalog drift and
+    chemically-impossible exclusions. Guards against future catalog drift and
     against the coverage-asymmetry the PIN audit flagged (which was a false
     positive: the alpha-D/beta-D forms of the natural sugars live in the
     hand-curated SUGAR_RETAINED_NAMES, so completeness only holds over the union,
@@ -314,7 +314,7 @@ class TestSystematicMonosaccharideFamilyCoverage:
 
     # 2-ketopentoses (ribulo/xylulo) form only furanoses (a pyranose would need a
     # C6 the 5-carbon ketose lacks); aldotetroses (erythro/threo) likewise have no
-    # pyranose.  These are the ONLY legitimate exclusions (chemistry, not data).
+    # pyranose. These are the ONLY legitimate exclusions (chemistry, not data).
     _FAMILY_BASES = [
         # aldohexoses (pyranose + furanose)
         "allopyranose", "altropyranose", "glucopyranose", "mannopyranose",

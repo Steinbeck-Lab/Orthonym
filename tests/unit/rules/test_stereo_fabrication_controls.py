@@ -1,4 +1,4 @@
-"""v33 Phase 1 Task 6 (C4): known-positive control tests for the stereo-honesty
+""" a phase Task 6 (C4): known-positive control tests for the stereo-honesty
 closure (C1 predicate + C2a steroid guard + C2b amino-acid guard + C3 gate
 backstop).
 
@@ -8,7 +8,7 @@ and a fully STEREO-DEFINED input of the same family that must still get its
 correct, specific PIN -- proving the guard is not overbroad and did not regress
 a real positive into an abstention.
 
-Reference: .superpowers/sdd/2026-08-16-v33-phase1-stereo-honesty/task-6-brief.md
+Reference:.superpowers/sdd/2026-08-16--phase1-stereo-honesty/task-6-brief.md
 """
 import logging
 

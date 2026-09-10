@@ -169,7 +169,7 @@ class TestConsumedAtomFiltering:
 
 
 class TestImidoylThioylHalides:
-    """ a phase (P-65.5.1): acyl halides of the imido / chalcogeno analogues
+    """ a phase: acyl halides of the imido / chalcogeno analogues
     of carboxylic acid. BB 31438 'cyclohexanecarboximidoyl chloride (PIN)',
     31442 'cyclohexanecarbothioyl chloride (PIN)'."""
 
@@ -182,23 +182,23 @@ class TestImidoylThioylHalides:
         assert name_compound("S=C(Cl)C1CCCCC1") == "cyclohexanecarbothioyl chloride"
 
     def test_cyclohexanecarboximidoyl_bromide(self):
-        # P-65.5.1: halide word tracks the halogen element.
+        #: halide word tracks the halogen element.
         assert name_compound("N=C(Br)C1CCCCC1") == "cyclohexanecarboximidoyl bromide"
 
     def test_cyclohexanecarboselenoyl_chloride(self):
-        # P-65.5.1: selenium analogue (=Se).
+        #: selenium analogue (=Se).
         assert name_compound("[Se]=C(Cl)C1CCCCC1") == "cyclohexanecarboselenoyl chloride"
 
     def test_cyclopentanecarbothioyl_chloride(self):
-        # P-65.5.1: ring size generalises.
+        #: ring size generalises.
         assert name_compound("S=C(Cl)C1CCCC1") == "cyclopentanecarbothioyl chloride"
 
     def test_ethanimidoyl_chloride(self):
-        # P-65.5.1: chain parent, imido (=NH); the alkane 'e' elides before 'imidoyl'.
+        #: chain parent, imido (=NH); the alkane 'e' elides before 'imidoyl'.
         assert name_compound("CC(=N)Cl") == "ethanimidoyl chloride"
 
     def test_propanethioyl_chloride(self):
-        # P-65.5.1: chain parent, thio (=S).
+        #: chain parent, thio (=S).
         assert name_compound("CCC(=S)Cl") == "propanethioyl chloride"
 
     def test_nonprincipal_imidoyl_degrades_not_abstains(self):
@@ -226,7 +226,7 @@ class TestImidoylThioylHalides:
 
 class TestRetainedDiacylAndCarbonicHalides:
     """ a phase: retained 'oxalyl'/'oxamoyl' acyls and the mononuclear
-    carbonic dihalides (P-65.5.1 / P-65.5.3.1)."""
+    carbonic dihalides /."""
 
     def test_oxalyl_dichloride(self):
         # the Blue Book 'Cl-CO-CO-Cl oxalyl dichloride (PIN) ethanedioyl dichloride'.
@@ -245,7 +245,7 @@ class TestRetainedDiacylAndCarbonicHalides:
         assert name_compound("NC(=O)N=C=O") == "carbamoyl isocyanate"
 
     def test_carbamoyl_chloride(self):
-        # P-65.5.3.1: carbamoyl (retained acyl of carbamic acid) + halide class word.
+        #: carbamoyl (retained acyl of carbamic acid) + halide class word.
         assert name_compound("NC(=O)Cl") == "carbamoyl chloride"
 
     def test_n_substituted_carbamoyl_fails_closed(self):

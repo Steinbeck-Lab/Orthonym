@@ -1,5 +1,5 @@
 """
-Benchmark regression tests for ring boundary fix (Phase 89.2 Plan 02).
+Benchmark regression tests for ring boundary fix (a phase Plan 02).
 
 Validates that the ring boundary fix eliminates fabricated substituents on
 polycyclic molecules from the ChEBI 500 benchmark. These tests serve as

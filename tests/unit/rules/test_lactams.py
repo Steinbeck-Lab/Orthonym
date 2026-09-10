@@ -5,7 +5,7 @@ Tests cover:
 - Detection of lactams in ring sizes 4-7 (beta through epsilon)
 - Imide disambiguation (succinimide, maleimide, glutarimide rejected)
 - Naming with correct HW parent + vowel elision + -2-one suffix
-- End-to-end naming via name_compound()
+- End-to-end naming via name_compound
 - Negative tests (lactones, acyclic amides not detected)
 - Substituent handling (N-methyl, C-alkyl)
 """
@@ -24,7 +24,7 @@ from orthonym import name_compound
 
 @pytest.mark.unit
 class TestLactamDetection:
-    """Test is_monocyclic_lactam() detection logic."""
+    """Test is_monocyclic_lactam detection logic."""
 
     def test_beta_lactam_detected(self):
         """4-membered ring lactam (beta-lactam) is detected."""
@@ -120,7 +120,7 @@ class TestLactamDetection:
 
 @pytest.mark.unit
 class TestLactamNaming:
-    """Test name_monocyclic_lactam() naming logic."""
+    """Test name_monocyclic_lactam naming logic."""
 
     def test_beta_lactam_name(self):
         """Beta-lactam named as azetidin-2-one."""
@@ -146,10 +146,10 @@ class TestLactamNaming:
         """A beta-lactam's ring N is locant 1, so its methyl cites '1-'.
 
         CORRECTED 2026-08-02 (Task W). This asserted `N-methylazetidin-2-one`.
-        A lactam's PIN is a heterocyclic pseudoketone -- P-66.1.5.1
+        A lactam's PIN is a heterocyclic pseudoketone --
         (`the Blue Book`), decisive last sentence at `:33229` "Method (1)
         generates preferred IUPAC names." -- so the ring nitrogen is numbered and
-        its substituent cites that numeral. P-66.1.3 "'Hidden' amides" (`:33125`)
+        its substituent cites that numeral. "'Hidden' amides" (`:33125`)
         demotes the italic-N reading of a heterocyclic ring nitrogen to "general
         nomenclature" only; `:33847` prints
         `1-bromopyrrolidine-2,5-dione (PIN) (not N-bromosuccinimide)`.
@@ -181,7 +181,7 @@ class TestLactamNaming:
 
 @pytest.mark.unit
 class TestLactamEndToEnd:
-    """Test lactam naming through the full name_compound() pipeline."""
+    """Test lactam naming through the full name_compound pipeline."""
 
     def test_beta_lactam_e2e(self):
         """Beta-lactam through name_compound."""
@@ -199,7 +199,7 @@ class TestLactamEndToEnd:
         """Epsilon-lactam through name_compound.
 
         : was the retained name `caprolactam`, withdrawn from the PIN
-        path as unlicensed (0 the Blue Book hits). P-64.3.1 (the Blue Book) -- "Cyclic
+        path as unlicensed (0 the Blue Book hits). (the Blue Book) -- "Cyclic
         anhydrides, esters and amides are named as pseudoketones; the resulting
         names are preferred IUPAC names" -- and its example list prints
         `azepan-2-one (PIN) hexano-6-lactam` at the Blue Book.
@@ -208,7 +208,7 @@ class TestLactamEndToEnd:
 
     def test_succinimide_not_lactam_e2e(self):
         """Succinimide is a cyclic imide -> the ring DIONE pseudoketone
-        pyrrolidine-2,5-dione (P-66.2.1, the Blue Book), NOT a mono-'one' lactam."""
+        pyrrolidine-2,5-dione, the Blue Book), NOT a mono-'one' lactam."""
         name = name_compound("O=C1CCC(=O)N1")
         assert name == "pyrrolidine-2,5-dione"
 

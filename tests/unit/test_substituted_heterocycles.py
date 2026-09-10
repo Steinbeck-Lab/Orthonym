@@ -7,17 +7,17 @@ Tests N-substitution (HETERO-09) and C-substitution for heterocyclic compounds:
 - C-substitution uses numeric locants (2-methyl, 3-ethyl)
 - Saturation prefixes (dihydro-, tetrahydro-) with explicit locants
 
-Reference: IUPAC 2013 Blue Book, Section P-22 (Heterocycles)
+Reference: IUPAC 2013 Blue Book, Section (Heterocycles)
 
 CORRECTED 2026-08-02 (Task W). This file previously asserted the italic form for
 all seven saturated rings below -- "N-substitution uses N-locant format" -- and
 those 8 assertions had been RED since the ring-N producer was corrected. The
 italic 'N' is for a nitrogen that receives NO numeral; a ring nitrogen inside the
-ring numbering takes its numeral. P-65.2.3.1.4 (`the Blue Book`): italic
+ring numbering takes its numeral. (`the Blue Book`): italic
 letter locants "are used to designate substitution on nitrogen atoms that are not
 amide linkages for which numerical locants are used." Per-name citations are on
 each row. Two committed gold PIN-oracle rows (`benchmarks/the gold set/gold_pins.json`,
-`bluebook_ref: P-73.4`, `category: target`) independently assert the same thing and
+`bluebook_ref: `, `category: target`) independently assert the same thing and
 were curated without this code path: `1,1-dimethylpiperidin-1-ium` ("both methyls
 at the N locant") and `4,4-dimethylmorpholin-4-ium` ("O=1 senior, N=4; 4,4-dimethyl
 at the ring-N locant").
@@ -300,7 +300,7 @@ class TestSubstitutedHeterocycleRegression:
         """Test that adding substituent support doesn't break unsubstituted naming."""
         # 5-membered
         assert name_compound("c1ccoc1") == "furan"
-        assert name_compound("c1cc[nH]c1") == "1H-pyrrole"  # IH-01: leading indicated-H
+        assert name_compound("c1cc[nH]c1") == "1H-pyrrole"  #: leading indicated-H
         assert name_compound("c1ccsc1") == "thiophene"
         assert name_compound("C1CCOC1") == "oxolane"
         assert name_compound("C1CCNC1") == "pyrrolidine"

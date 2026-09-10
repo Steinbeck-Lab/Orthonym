@@ -1,7 +1,7 @@
-"""Unit tests for the P-107 lipid backbone-aware assembler (a phase, WSC-01).
+"""Unit tests for the lipid backbone-aware assembler (a phase, -01).
 
-Target name form = Form B (systematic substitutive / P-68 functional-class),
-empirically OPSIN-round-trip-verified (180-CONTEXT.md). Each test asserts
+Target name form = Form B (systematic substitutive / functional-class),
+empirically OPSIN-round-trip-verified (180-internal notes). Each test asserts
 the exact PIN the assembler must produce.
 
 WAVE 0 CONTRACT: these import the not-yet-built `name_lipid` symbol INSIDE each
@@ -15,7 +15,7 @@ from orthonym import name_compound
 
 
 # ---------------------------------------------------------------------------
-# Glycerides (P-107.2) — ester PCG on the glycerol-derived parent
+# Glycerides — ester PCG on the glycerol-derived parent
 # ---------------------------------------------------------------------------
 
 class TestGlycerides:
@@ -47,7 +47,7 @@ class TestGlycerides:
 
 
 # ---------------------------------------------------------------------------
-# Phospholipids (P-107.3) — functional-class phosphate diester
+# Phospholipids — functional-class phosphate diester
 # ---------------------------------------------------------------------------
 
 class TestPhospholipids:
@@ -73,7 +73,7 @@ class TestPhospholipids:
 
 
 # ---------------------------------------------------------------------------
-# Sphingolipids / ceramides (P-107.4.3) — amide PCG, sphingoid N-substituent
+# Sphingolipids / ceramides — amide PCG, sphingoid N-substituent
 # ---------------------------------------------------------------------------
 
 class TestSphingolipids:
@@ -87,7 +87,7 @@ class TestSphingolipids:
 
 
 # ---------------------------------------------------------------------------
-# Glyco-lipids (P-107.4) — single sugar via reused Phase-176 machinery
+# Glyco-lipids — single sugar via reused Phase-176 machinery
 # ---------------------------------------------------------------------------
 
 class TestGlycoLipids:
@@ -113,7 +113,7 @@ class TestGlycoLipids:
 
 
 # ---------------------------------------------------------------------------
-# Hard-gate negatives () — must NOT be claimed by the lipid path
+# Hard-gate negatives  — must NOT be claimed by the lipid path
 # ---------------------------------------------------------------------------
 
 class TestHardGateNegatives:

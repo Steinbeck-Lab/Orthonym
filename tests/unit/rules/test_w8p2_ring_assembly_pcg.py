@@ -1,9 +1,9 @@
-""" W8 P2 Tasks 2.2/2.3 — biphenyl ring-assembly PCG parent (P-44.2.1.5).
+""" W8 P2 Tasks 2.2/2.3 — biphenyl ring-assembly PCG parent.
 
 A ring assembly of two benzene rings (2 rings) is senior to a single benzene ring
-for parent selection (P-44.2.1.5 "greater number of rings"), so the PCG is a
+for parent selection "greater number of rings"), so the PCG is a
 suffix on the assembly: biphenyl-4-ol -> [1,1'-biphenyl]-4-ol (not 4-phenylphenol),
-benzidine -> [1,1'-biphenyl]-4,4'-diamine (P-62.2.4.1.1: benzidine is Type-2
+benzidine -> [1,1'-biphenyl]-4,4'-diamine: benzidine is Type-2
 retained, general-nomenclature only). The ring-assembly builder already emits
 these (biphenyl-2-ol/-3-ol/-carbaldehyde/-4,4'-diol/-4-amine all work); the only
 blockers were two hand-curated whole-molecule retained entries ('4-phenylphenol',
@@ -43,7 +43,7 @@ def test_biphenyl_assembly_siblings_unregressed(smiles, expected):
     assert name_compound(smiles, style="pin") == expected
 
 
-# P-16.7.1(c) (BB 7623/7625): the terminal 'a' of a numerical multiplying prefix
+# (c) (BB 7623/7625): the terminal 'a' of a numerical multiplying prefix
 # is elided before a vowel-initial suffix -- 'tetra'+'ol' -> 'tetrol',
 # 'tetra'+'amine' -> 'tetramine' ([1,1'-biphenyl]-3,3',4,4'-tetramine, PIN;
 # benzenehexol, not benzenehexaol). 'di'/'tri' carry no terminal 'a', and
@@ -71,14 +71,14 @@ def test_biphenyl_multiplier_no_over_elision(smiles, expected):
 
 
 # ---------------------------------------------------------------------------
-# Task 2.4 — mixed prefix+suffix ring-assembly builder (P-28.2.1 + P-66).
+# Task 2.4 — mixed prefix+suffix ring-assembly builder +.
 #
 # When a suffix-expressible PCG (-COOH/-CHO/-CN/-OH/-NH2) coexists with OTHER
 # substituents on a biaryl, the SENIOR PCG is the suffix on the enclosed
-# assembly parent and every other substituent is a prefix (P-14.4 / P-41
+# assembly parent and every other substituent is a prefix /
 # seniority, reused from rules/seniority.py). The PCG ring is UNPRIMED so the
-# suffix gets the lowest locant (P-31.1.4.3.4). PIN form has NO hyphen between
-# the prefix block and the opening bracket (BB: 6,6'-dinitro[1,1'-biphenyl]-
+# suffix gets the lowest locant. PIN form has NO hyphen between
+# the prefix block and the opening bracket (the Blue Book,6'-dinitro[1,1'-biphenyl]-
 # 2,2'-dicarboxylic acid; 4'-cyano[1,1'-biphenyl]-4-yl). All 6 targets below
 # were derived from the Blue Book and RT-verified against OPSIN 2.9 to the
 # authoritative input structures.
@@ -137,7 +137,7 @@ def test_mixed_builder_no_overreach_without_pcg(smiles, expected):
 # 'unknown organic compound'. The abstention belongs at the veto loop,
 # immediately before ``s['name']`` is spelled into the prefix string.
 #
-# P-61.5.1 "Nitro and nitroso compounds" (the Blue Book): "Compounds containing the
+# "Nitro and nitroso compounds" (the Blue Book): "Compounds containing the
 # -NO2 or -NO group are named by means of the prefixes 'nitro' and 'nitroso',
 # respectively, unless these groups can be named on the basis of the parent
 # structures nitric and nitrous acids, NO2-OH and NO-OH, respectively, or their
@@ -145,7 +145,7 @@ def test_mixed_builder_no_overreach_without_pcg(smiles, expected):
 # assembly therefore always HAS a preferred prefix form; abstaining was never
 # nomenclaturally correct.
 #
-# P-28.2.1 "Ring assemblies with a single bond junction" (the Blue Book): "Each
+# "Ring assemblies with a single bond junction" (the Blue Book): "Each
 # cyclic system is numbered in the traditional way, one with unprimed locants,
 # the other with primed locants. Lowest possible locants must be used to denote
 # the positions of attachment. These locants must be cited in preferred IUPAC

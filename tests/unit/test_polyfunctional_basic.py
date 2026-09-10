@@ -4,17 +4,17 @@ from orthonym import name_compound
 
 
 class TestHydroxyAcids:
-    """Test hydroxy acid naming (POLY-06)."""
+    """Test hydroxy acid naming ."""
 
     def test_glycolic_acid_pin(self):
-        """`hydroxyacetic acid` -- BlueBookV2.md:29854 verbatim,
+        """`hydroxyacetic acid` -- the Blue Book verbatim,
         `HO-CH2-COOH hydroxyacetic acid (PIN) (not glycolic acid)`, under
-        `### **P-65.1.1.2** Retained names only for general nomenclature` (:29731).
+        `### **** Retained names only for general nomenclature` (:29731).
 
-        v29 P3-CLEANUP: this expected `2-hydroxyethanoic acid` and had been
+        -CLEANUP: this expected `2-hydroxyethanoic acid` and had been
         failing; the expectation was wrong. The old comment "ethanoic = acetic,
         both are valid" is true of general nomenclature and irrelevant to a PIN
-        assertion -- acetic acid is one of the four acids `## **P-65.1.2**
+        assertion -- acetic acid is one of the four acids `## ****
         Systematic names` (:29858) exempts from systematic naming, so the
         substituted derivative is built on it and carries no locant (compare
         :3037, `difluoroacetic acid (PIN) (not 2,2-difluoroacetic acid)`)."""
@@ -37,7 +37,7 @@ class TestHydroxyAcids:
 
 
 class TestKetoAcids:
-    """Test keto acid naming (POLY-08)."""
+    """Test keto acid naming ."""
 
     def test_pyruvic_acid_systematic(self):
         # 2-oxopropanoic acid (pyruvic acid trivial name)
@@ -53,7 +53,7 @@ class TestKetoAcids:
 
 
 class TestEthers:
-    """Test ether naming as alkoxy prefixes (POLY-05)."""
+    """Test ether naming as alkoxy prefixes ."""
 
     def test_methoxymethane(self):
         # Dimethyl ether substitutive name
@@ -110,10 +110,10 @@ class TestPolyfunctionalIntegration:
     """End-to-end polyfunctional naming tests."""
 
     def test_hydroxy_acid_full_pipeline(self):
-        """v29 P3-CLEANUP: the `"oic acid" in result` half was wrong and had been
+        """-CLEANUP: the `"oic acid" in result` half was wrong and had been
         failing. It encoded an assumption -- that every acid is named on a
-        systematic `-oic acid` stem -- which `## **P-65.1.2** Systematic names`
-        (BlueBookV2.md:29858) explicitly denies for formic, acetic, oxalic and
+        systematic `-oic acid` stem -- which `## **** Systematic names`
+        (the Blue Book) explicitly denies for formic, acetic, oxalic and
         oxamic acid. The PIN here is `hydroxyacetic acid` (:29854, verbatim
         `HO-CH2-COOH hydroxyacetic acid (PIN) (not glycolic acid)`), so assert the
         name itself rather than a stem shape that cannot hold for the exceptions."""
@@ -232,12 +232,12 @@ class TestLocantDetermination:
 
 
 # ============================================================================
-# Phase 169.5 SUB-05 — detachable-prefix separators + enclosing marks (Wave 0)
+# a phase — detachable-prefix separators + enclosing marks (Wave 0)
 #
-# Must-not-split negatives assert NOW (D-16: legitimately-fused tokens +
+# Must-not-split negatives assert NOW (: legitimately-fused tokens +
 # single-formatter 2,3-dimethyl stay intact). Glued/dropped-locant/nested-stereo
 # targets xfail until Plan 04 (4a off-chain locant recovery, 4b _join_prefixes
-# separator, D-17 enclosing-mark unify).
+# separator, enclosing-mark unify).
 # ============================================================================
 
 import pytest  # noqa: E402
@@ -264,12 +264,12 @@ class TestSUB05GluedAndDroppedPrefix:
     """Glued detachable-prefix pair + dropped off-chain locant — xfail (Plan 04)."""
 
     def test_join_separates_oxo_phosphono(self):
-        # SUB-05 Plan 04 (4b): gated detachable-prefix separator.
+        # Plan 04 (4b): gated detachable-prefix separator.
         assert _join_prefixes(["3-oxo", "phosphono"]) != "3-oxophosphono"
 
     def test_glued_oxophosphono_in_name(self, monkeypatch):
-        # SUB-05 Plan 04 (4b): the 'oxophosphono' glue is gone (now 'oxo-phosphono').
-        # Assert PRODUCTION output: the suite disables the SUB-03 gate, gate-off this
+        # Plan 04 (4b): the 'oxophosphono' glue is gone (now 'oxo-phosphono').
+        # Assert PRODUCTION output: the suite disables the gate, gate-off this
         # emits an un-suppressed malformed candidate; production fail-closes to
         # 'unknown' (no 'oxophosphono'). Re-enable the gate.
         import orthonym.namer as _nm
@@ -286,34 +286,34 @@ class TestSUB05GluedAndDroppedPrefix:
 
 @pytest.mark.unit
 class TestAlphaChalcogenAceticAcids:
-    """P-65.1.5 substituted-acetic PINs (v42 Phase 11 task 11B4).
+    """ substituted-acetic PINs (a phase task 11B4).
 
     A 2-carbon monocarboxylic acid whose alpha-carbon bears a double-bonded
     chalcogen PLUS a single-bonded chalcogen substituent is a SUBSTITUTED
-    retained functional parent 'acetic acid' (P-65.1.1.1) with the alpha locants
-    omitted (P-14.3.4.2). The plain FG loop used to mis-read the alpha C(=O)SH /
+    retained functional parent 'acetic acid' with the alpha locants
+    omitted. The plain FG loop used to mis-read the alpha C(=O)SH /
     C(=S)OH / C(=O)SOH as one acyl prefix (sulfanylcarbonyl/carbothioyl/sulfeno),
     double-counting the alpha carbon and building the wrong molecule.
     """
 
     def test_oxo_sulfanyl_acetic_acid(self):
         # O=C(O)C(=O)S -> oxo(sulfanyl)acetic acid (PIN); BB def 65.1.5.1.
-        # Second SIMPLE prefix enclosed (P-16.5.1.3.2, boundary disambiguation).
+        # Second SIMPLE prefix enclosed, boundary disambiguation).
         assert name_compound("O=C(O)C(=O)S") == "oxo(sulfanyl)acetic acid"
 
     def test_hydroxy_sulfanylidene_acetic_acid(self):
-        # HO-CS-COOH -> hydroxy(sulfanylidene)acetic acid (PIN); BlueBookV2.md:30305.
+        # HO-CS-COOH -> hydroxy(sulfanylidene)acetic acid (PIN); the Blue Book.
         assert name_compound("O=C(O)C(O)=S") == "hydroxy(sulfanylidene)acetic acid"
 
     def test_hydroxysulfanyl_oxo_acetic_acid(self):
-        # HOS-CO-COOH -> (hydroxysulfanyl)oxoacetic acid (PIN); BlueBookV2.md:30361.
+        # HOS-CO-COOH -> (hydroxysulfanyl)oxoacetic acid (PIN); the Blue Book.
         # oxo stays BARE: the preceding compound prefix already closes with ')'.
         assert name_compound("O=C(O)C(=O)SO") == "(hydroxysulfanyl)oxoacetic acid"
 
     def test_dithiocarbonoperoxoyl_formic_acid(self):
-        # HOS2C-COOH -> (dithiocarbonoperoxoyl)formic acid (PIN); BlueBookV2.md:30357.
-        # 'dithiocarbonoperoxoyl' is off the P-65.1.8.1 forbidden list (P-65.1.8.2,
-        # BlueBookV2.md:30692), so the formic parent is a PIN (exact-SMILES entry).
+        # HOS2C-COOH -> (dithiocarbonoperoxoyl)formic acid (PIN); the Blue Book.
+        # 'dithiocarbonoperoxoyl' is off the forbidden list,
+        # the Blue Book), so the formic parent is a PIN (exact-SMILES entry).
         assert name_compound("O=C(O)C(=S)OS") == "(dithiocarbonoperoxoyl)formic acid"
 
     def test_plain_alpha_substituents_unaffected(self):
@@ -331,6 +331,6 @@ class TestSUB05NestedStereoEnclosing:
 
     @pytest.mark.xfail(reason="DEFERRED (169.5, honest-fail): for a benzene parent the stereocentre lives INSIDE the substituent, but _generate_stereodescriptors emits it as a MOLECULAR-level '(R)-' prefix, not enclosed with the substituent. The generic-ring D-17 enclosing path IS fixed; the benzene/molecular-stereo case needs substituent-local stereodescriptor generation (a deep architectural change, related to the SUB-04 fragment-context issue). Out of SUB-05 scope.", strict=False)
     def test_nested_stereo_enclosed(self):
-        # (R)-3-methylpentylbenzene -> [(R)-3-methylpentyl]benzene (P-16.3.3).
+        # (R)-3-methylpentylbenzene -> [(R)-3-methylpentyl]benzene.
         name = name_compound("CC[C@@H](C)CCc1ccccc1")
         assert name == "[(R)-3-methylpentyl]benzene"

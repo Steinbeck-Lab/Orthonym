@@ -1,59 +1,59 @@
-"""Phase 146 D-18: 20 NP-backbone canary tests for P-31.1.3.4 override regression.
+"""a phase: 20 NP-backbone canary tests for override regression.
 
-Per CONTEXT.md D-18: when Phase 148 deletes `_should_bypass_fused_guard`,
-`select_parent()` runs for ALL cyclic molecules — including NP backbones that
+Per internal notes: when a phase deletes `_should_bypass_fused_guard`,
+`select_parent` runs for ALL cyclic molecules — including NP backbones that
 previously bypassed the cascade via the fused-heterocycle guard. The override
 at `parent_selection.py:594-606` should preserve ring-parent for morphine,
-adenosine, taxol, etc. — but it depends on `detect_natural_product()`
-correctly classifying them. If `detect_natural_product()` returns None for a
+adenosine, taxol, etc. — but it depends on `detect_natural_product`
+correctly classifying them. If `detect_natural_product` returns None for a
 compound that was previously protected by the fused-guard, it will drop into
-P-44.1 cascade, potentially picking the wrong parent.
+ cascade, potentially picking the wrong parent.
 
-These tests run BEFORE Phase 148 lands as a regression guard.
+These tests run BEFORE a phase lands as a regression guard.
 
 Each of the 20 NP compounds runs under BOTH V17 (first_applicable) and V18
 (score_based) modes via the `feature_flag_mode` parametrized fixture —
 mirroring the pattern in tests/integration/test_score_based_mode.py.
 
-Acceptance model (intentionally soft per D-18):
+Acceptance model (intentionally soft per):
   - name_compound(smiles) MUST NOT crash and MUST produce a non-empty name
     in either mode. A catastrophic regression (empty name, exception) fails
     the test.
   - The `test_np_canary_name_contains_substring_or_is_systematic` test is
     soft: it accepts either a trivial-name substring match OR a long
     systematic name (>30 chars). Subtle naming differences are caught by
-    Phase 146 Plan 07's ship-gate diagnostic disclosure (D-12), not here.
+    a phase Plan 07's ship-gate diagnostic disclosure , not here.
 
-D-18 context: per CONTEXT.md, paclitaxel == taxol (same compound, different
-names). The CONTEXT.md list includes both names as intentional duplicates
+ context: per internal notes, paclitaxel == taxol (same compound, different
+names). The internal notes list includes both names as intentional duplicates
 (one as "taxol", the other as "paclitaxel"). We keep the SMILES for each
 slot distinct by design — one PubChem canonical paclitaxel SMILES, and a
 second "taxol" slot using a mildly different representation that
 canonicalizes to the same molecule. The test passes as long as both
 representations produce non-empty names in both modes.
 
-Source: https://iupac.qmul.ac.uk/BlueBook/P3.html P-31.1.3.4
-Source: https://iupac.qmul.ac.uk/BlueBook/P4.html P-44.1
+Source: https://iupac.qmul.ac.uk/BlueBook/P3.html
+Source: https://iupac.qmul.ac.uk/BlueBook/P4.html
 """
 import importlib
 
 import pytest
 from rdkit import Chem
 
-from orthonym.errors import is_failure_name  # v22 G0 (DD7 S1) fail-closed signal
+from orthonym.errors import is_failure_name  # (DD7 S1) fail-closed signal
 
 
-# 20 NP compounds per CONTEXT.md D-18.
+# 20 NP compounds per internal notes.
 # SMILES verified to parse via RDKit at test-collection time by
 # `_skip_if_unparseable`. Truncated / simplified representations are used
 # for the vinca alkaloids (vinblastine / vincristine / vinorelbine) and
 # strychnine because the full Wikipedia structures push PubChem-size
 # canonical strings that drag the test runtime. The simplified forms
-# preserve the indole / alkaloid backbones that detect_natural_product()
+# preserve the indole / alkaloid backbones that detect_natural_product
 # classifies on (parent_selection.py:594-606 NP override).
 
 # NP-backbone scaffold aliases accepted by the soft gate.
-# When the cascade fires the P-31.1.3.4 NP override (parent_selection.py:594)
+# When the cascade fires the NP override (parent_selection.py:594)
 # it picks the recognized NP backbone as the parent, producing names like
 # "ergosta-5,22-dien-3-ol" (NOT "ergosterol"), "tropan-3-yl octanoate"
 # (NOT "atropine"), or "cinchonane" (NOT "quinine"). These are CORRECT
@@ -80,10 +80,10 @@ NP_BACKBONE_ALIASES = {
     "nicotine":     ["pyrrolidin", "pyridin", "nicotin"],
     "caffeine":     ["purin", "xanthin", "caffein"],
     "adenosine":    ["adenosin", "purin", "furan", "ribose", "oxolan"],
-    # Phase 148 D-05: 5 fused-heterocycle NP boundary cases.
+    # a phase: 5 fused-heterocycle NP boundary cases.
     # Caffeine alias above already covers the new caffeine_v18_canary slot
-    # (same trivial-name compound, different V18-plan-§6 SMILES form).
-    # Per RESEARCH §4b, all 5 boundary compounds produce non-empty
+    # (same trivial-name compound, different V18-plan- SMILES form).
+    # Per RESEARCH b, all 5 boundary compounds produce non-empty
     # IUPAC-correct names in BOTH first_applicable AND score_based modes
     # via cascade non-entry (chain_len < 2 → ring-as-parent) for the
     # plain purines, and via cascade entry → acid-suffix decomposition
@@ -95,7 +95,7 @@ NP_BACKBONE_ALIASES = {
     # acid_on_purine_adv: cascade entry (chain_len=2) per Task 148-02-01;
     # name contains "oic acid" / "propanoic acid" suffix; pre-Phase-149
     # decomposition fragment-naming may render the purine ring as a
-    # "cyclononyl" (Plan 01 carry-forward bug — escalated to Phase 149 /
+    # "cyclononyl" (Plan 01 carry-forward bug — escalated to a phase /
     # IM-x.x decomposition fragment-naming). Soft-gate accepts any of
     # the listed substrings.
     "acid_on_purine_adv":  ["purin", "xanthin", "carbox", "oic acid"],
@@ -116,7 +116,7 @@ NP_CANARIES = [
     ("colchicine",   "COc1cc2CCC(NC(=O)C)C(=O)c3cc(OC)c(OC)c(OC)c3-c2cc1OC"),
     ("vinblastine",  "CCC1(O)CC2CN(CCc3c2[nH]c2ccccc23)CC1"),
     ("vinorelbine",  "CCC1(O)CC2CN(Cc3c2[nH]c2cc(OC)ccc32)CC1"),
-    # paclitaxel == taxol (intentional duplicate per D-18 list). We use a
+    # paclitaxel == taxol (intentional duplicate per list). We use a
     # differently-formatted SMILES here to exercise the canonicalization
     # path alongside the "taxol" slot above. Both canonicalize to the
     # same structure; both must produce non-empty names in both modes.
@@ -126,15 +126,15 @@ NP_CANARIES = [
     ("cholesterol",  "CC(C)CCC[C@@H](C)[C@H]1CC[C@H]2[C@@H]3CC=C4C[C@@H](O)CC[C@]4(C)[C@H]3CC[C@]12C"),
     ("testosterone", "C[C@]12CC[C@H]3[C@@H](CCC4=CC(=O)CC[C@]34C)[C@@H]1CC[C@@H]2O"),
     ("progesterone", "CC(=O)[C@H]1CC[C@H]2[C@@H]3CCC4=CC(=O)CC[C@]4(C)[C@H]3CC[C@]12C"),
-    # Phase 148 D-05: 5 fused-heterocycle NP boundary cases.
-    # Per RESEARCH §4c-§4d: detect_natural_product() returns None for purines —
+    # a phase: 5 fused-heterocycle NP boundary cases.
+    # Per RESEARCH c-d: detect_natural_product returns None for purines —
     # caffeine / theobromine / theophylline / xanthine stay ring-parent post-148
     # via cascade NON-entry (chain_len < 2), NOT via the NP override. The
     # acid_on_purine_adv case has chain_len >= 2 — DOES enter the cascade —
     # covers the actual cascade-entry purine risk surface. Soft-gate aliases
     # accept the systematic purine-2,6-dione output. Acid-on-purine SMILES
     # verified to enter cascade (chain_len=2) via Task 148-02-01 diagnostic.
-    ("caffeine_v18_canary",  "Cn1cnc2c1c(=O)n(C)c(=O)n2C"),     # V18 plan §6 SMILES
+    ("caffeine_v18_canary",  "Cn1cnc2c1c(=O)n(C)c(=O)n2C"),     # V18 plan SMILES
     ("theobromine",          "Cn1cnc2c1c(=O)[nH]c(=O)n2C"),
     ("theophylline",         "Cn1c(=O)c2[nH]cnc2n(C)c1=O"),
     ("xanthine_explicit",    "O=c1[nH]c(=O)c2[nH]cnc2[nH]1"),
@@ -148,8 +148,8 @@ NP_CANARIES = [
 
 
 @pytest.fixture(params=[
-    ("false", "first_applicable"),  # V17 (default soak per D-07)
-    ("true",  "score_based"),        # V18 (two-tier active per D-01)
+    ("false", "first_applicable"),  # V17 (default soak per)
+    ("true",  "score_based"),        # V18 (two-tier active per)
 ], ids=["v17", "v18"])
 def feature_flag_mode(request, monkeypatch):
     """Parametrized fixture: each test runs under both V17 and V18.
@@ -192,17 +192,17 @@ def _name(smi):
 
 
 # ---------------------------------------------------------------------------
-# D-18 canary tests
+# canary tests
 # ---------------------------------------------------------------------------
 
 
 @pytest.mark.integration
 @pytest.mark.parametrize("name_substring,smiles", NP_CANARIES)
 def test_np_canary_produces_non_empty_name(name_substring, smiles, feature_flag_mode):
-    """D-18 hard gate: each NP canary produces a non-empty name in BOTH V17 and V18.
+    """ hard gate: each NP canary produces a non-empty name in BOTH V17 and V18.
 
-    Any regression here blocks Phase 146 closure and the 146-147-148 triple
-    merge per CONTEXT.md D-18: "Any regression in 148 pre-merge blocks phase
+    Any regression here blocks a phase closure and the 146-147-148 triple
+    merge per internal notes: "Any regression in 148 pre-merge blocks phase
     closure."
     """
     _skip_if_unparseable(smiles, name_substring)
@@ -221,11 +221,11 @@ def test_np_canary_produces_non_empty_name(name_substring, smiles, feature_flag_
 def test_np_canary_name_contains_substring_or_is_systematic(
     name_substring, smiles, feature_flag_mode,
 ):
-    """D-18 soft gate: NP canary names are either recognizable (trivial-name
+    """ soft gate: NP canary names are either recognizable (trivial-name
     substring match) or defensibly systematic (>30-char name from the cascade).
 
     Subtle differences between V17 and V18 output are expected and handled
-    by Phase 146 Plan 07's ship-gate diagnostic disclosure (D-12). This
+    by a phase Plan 07's ship-gate diagnostic disclosure . This
     test catches suspicious short-name outputs that would suggest the
     cascade failed to fire.
     """
@@ -237,12 +237,12 @@ def test_np_canary_name_contains_substring_or_is_systematic(
     lower = name.lower()
     contains_trivial = name_substring.lower() in lower
     # NP-backbone aliases: "ergosta-5,22-dien-3-ol" is the correct
-    # P-31.1.3.4-cascade output for ergosterol; "tropan-3-yl octanoate"
+    # -cascade output for ergosterol; "tropan-3-yl octanoate"
     # for atropine; etc. These are IUPAC-systematic NP-scaffold names.
     aliases = NP_BACKBONE_ALIASES.get(name_substring, [])
     contains_alias = any(alias.lower() in lower for alias in aliases)
     is_long_systematic = len(name) > 30
-    # v22 Phase G0 (DD7 S1): the indole/colchicine alkaloids (reserpine,
+    # Phase G0 (DD7 S1): the indole/colchicine alkaloids (reserpine,
     # vinblastine, vinorelbine, vincristine, colchicine) were previously
     # accepted here via `is_long_systematic` because the cascade produced a
     # long von-Baeyer `…cyclo[…]` name — but that name DROPS the fused
@@ -253,7 +253,7 @@ def test_np_canary_name_contains_substring_or_is_systematic(
     # NOT the "suspicious short name = cascade silently failed" case this soft
     # gate guards against, so accept it as a valid outcome.
     is_fail_closed = is_failure_name(name)
-    # v22 Phase G0 (DD7 S1) known limitation: colchicine's ONLY prior name was a
+    # Phase G0 (DD7 S1) known limitation: colchicine's ONLY prior name was a
     # structurally-WRONG von-Baeyer cage (it drops the aromatic tropone + benzo
     # rings). G0 correctly removes that wrong candidate; the molecule then
     # decomposes to a fragment ('ethanamide') — a SEPARATE, pre-existing
@@ -277,11 +277,11 @@ def test_np_canary_name_contains_substring_or_is_systematic(
 
 @pytest.mark.integration
 def test_np_canary_count_is_25():
-    """Phase 146 D-18 (20 originals) + Phase 148 D-05 (5 fused-hetero boundary
+    """a phase (20 originals) + a phase (5 fused-hetero boundary
     cases) explicit count check: NP_CANARIES has exactly 25 entries.
 
-    The original 20 cover P-31.1.3.4 NP-override regression guard (morphine /
-    nucleosides / steroids / alkaloids etc.). The Phase 148 D-05 additions
+    The original 20 cover NP-override regression guard (morphine /
+    nucleosides / steroids / alkaloids etc.). The a phase additions
     (caffeine_v18_canary / theobromine / theophylline / xanthine_explicit /
     acid_on_purine_adv) extend coverage to the fused-heterocycle NP boundary
     where the cascade non-entry path (chain_len < 2) keeps purines as
@@ -296,31 +296,31 @@ def test_np_canary_count_is_25():
 
 @pytest.mark.integration
 def test_np_canary_names_match_context_md_list():
-    """D-18 + Phase 148 D-05 cross-reference: the 25 substrings match the
-    CONTEXT.md D-18 list (20 originals) plus the Phase 148 D-05 additions (5
+    """ + a phase cross-reference: the 25 substrings match the
+    internal notes list (20 originals) plus the a phase additions (5
     fused-heterocycle NP boundary cases).
 
-    The CONTEXT.md D-18 list enumerates 20 names including the intentional
-    duplicate taxol/paclitaxel. Phase 148 D-05 adds:
-      - caffeine_v18_canary (V18-plan-§6 SMILES form)
+    The internal notes list enumerates 20 names including the intentional
+    duplicate taxol/paclitaxel. a phase adds:
+      - caffeine_v18_canary (V18-plan- SMILES form)
       - theobromine, theophylline, xanthine_explicit (purine NPs that the
         deleted `_should_bypass_fused_guard` was protecting via its
         strict-PG-count branch; now protected by cascade non-entry,
         chain_len < 2 → ring is parent)
-      - acid_on_purine_adv (the ONE D-05 case with chain_len >= 2 — exercises
+      - acid_on_purine_adv (the ONE case with chain_len >= 2 — exercises
         the actual cascade-entry purine risk surface)
     Verify all 25 required names are present (as substrings of the
     compound_name_substring slot).
     """
     required = {
-        # Phase 146 D-18 originals (20)
+        # a phase originals (20)
         "morphine", "adenosine", "taxol", "strychnine", "quinine",
         "camptothecin", "atropine", "cocaine", "nicotine", "caffeine",
         "reserpine", "colchicine", "vinblastine", "vinorelbine",
-        "paclitaxel",  # duplicate of taxol per CONTEXT.md D-18
+        "paclitaxel",  # duplicate of taxol per internal notes
         "vincristine", "ergosterol", "cholesterol", "testosterone",
         "progesterone",
-        # Phase 148 D-05 additions (5 fused-heterocycle NP boundary cases)
+        # a phase additions (5 fused-heterocycle NP boundary cases)
         "caffeine_v18_canary", "theobromine", "theophylline",
         "xanthine_explicit", "acid_on_purine_adv",
     }

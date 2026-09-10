@@ -1,4 +1,4 @@
-"""Tests for _name_r_group() phenyl shortcut fix (Phase 125).
+"""Tests for _name_r_group phenyl shortcut fix (a phase).
 
 Verifies that functional-class handlers correctly name substituted
 aromatic R-groups instead of returning bare 'phenyl' or wrong 'benzyl'.
@@ -9,7 +9,7 @@ from orthonym.namer import name_compound
 
 @pytest.mark.unit
 class TestSubstitutedRGroupNaming:
-    """Ensure _name_r_group() handles substituted phenyl rings."""
+    """Ensure _name_r_group handles substituted phenyl rings."""
 
     def test_chlorophenyl_isocyanate(self):
         result = name_compound("Clc1ccc(N=C=O)cc1")

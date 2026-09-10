@@ -1,4 +1,4 @@
-"""v38 Perf Phase P, lever P2 — reverse-pair memo for the chain-scoring hot loop.
+""" Perf Phase P, lever P2 — reverse-pair memo for the chain-scoring hot loop.
 
 The memo in ``find_principal_chain`` caches ``chain_score`` on a reverse-canonical
 key (``min(tuple, reversed tuple)``). It is correct iff ``chain_score`` is

@@ -1,4 +1,4 @@
-"""Integration tests for stereo quick-win fixes (Phase 45 Plan 04).
+"""Integration tests for stereo quick-win fixes (a phase Plan 04).
 
 These tests cover 4 stereo-mismatch compounds from the v5.0 benchmark.
 "Stereo mismatch" means Tanimoto = 1.0 (perfect structural connectivity)
@@ -7,11 +7,11 @@ but InChI round-trip fails due to wrong/missing stereochemistry.
 Root cause analysis:
   - Compound 4 (diazine sec-butyl): CIP label on substituent was dropped
     during retained-name path in name_substituent_fragment. Fixed by adding
-    _add_substituent_stereo() call for retained substituent names.
+    _add_substituent_stereo call for retained substituent names.
   - Compound 2 (peptide): CIP label (2S) IS present in generated name, but
     OPSIN requires bracket format for correct parsing. The peptide is routed
     through decomposition (not peptide assembler) because proline's N-terminus
-    is secondary (NH not NH2), which fails _is_valid_peptide(). The stereo
+    is secondary (NH not NH2), which fails _is_valid_peptide. The stereo
     label is present but OPSIN format is a separate issue.
   - Compounds 1, 3 (steroids): Input SMILES have NO @/@@ stereo atoms.
     Orthonym correctly omits stereo descriptors. OPSIN adds default steroid
@@ -57,7 +57,7 @@ class TestStereoMismatchCompounds:
 
         SMILES: C[C@H](NC(=O)[C@H](C)NC(=O)[C@@H]1CCCN1)C(=O)O
         The stereo label (2S) IS present in the generated name. With
-        multi-bond retry (Phase 56-02), the decomposition takes a
+        multi-bond retry (a phase-02), the decomposition takes a
         different bond path, producing a systematic amide name rather
         than using L-amino acid retained names.
         """
@@ -120,7 +120,7 @@ class TestSystemicSubstituentStereo:
     """Verify the sec-butyl stereo fix works broadly for retained substituents.
 
     These compounds are NOT from the benchmark 500. They test that the
-    _add_substituent_stereo() fix in name_substituent_fragment() works
+    _add_substituent_stereo fix in name_substituent_fragment works
     systemically for any retained substituent name with a stereocenter.
     """
 

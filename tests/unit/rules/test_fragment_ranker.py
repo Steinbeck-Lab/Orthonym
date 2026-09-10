@@ -1,6 +1,6 @@
 """Unit tests for fragment seniority ranking.
 
-Tests the fragment_ranker module which scores fragments by P-44.1.1
+Tests the fragment_ranker module which scores fragments by
 seniority for decomposition parent/substituent assignment.
 """
 
@@ -9,7 +9,7 @@ import pytest
 
 @pytest.mark.unit
 class TestScoreFragmentSeniority:
-    """Test score_fragment_seniority() returns correct comparison tuples."""
+    """Test score_fragment_seniority returns correct comparison tuples."""
 
     def test_carboxylic_acid_fragment(self):
         """Carboxylic acid fragment: benzoic acid."""
@@ -107,7 +107,7 @@ class TestScoreFragmentSeniority:
 
 @pytest.mark.unit
 class TestRankFragments:
-    """Test rank_fragments() ordering."""
+    """Test rank_fragments ordering."""
 
     def test_rank_two_fragments(self):
         """Acid fragment ranked before plain alkyl."""
@@ -134,7 +134,7 @@ class TestRankFragments:
 
 @pytest.mark.unit
 class TestAcidIsMoreSenior:
-    """Test acid_is_more_senior() convenience function."""
+    """Test acid_is_more_senior convenience function."""
 
     def test_acid_is_more_senior_true(self):
         """Carboxylic acid vs plain alkane -> True."""

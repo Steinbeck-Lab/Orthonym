@@ -1,10 +1,10 @@
-"""Charged multi-centre subsystem (root R11; P-71..75) — W8-P5.
+"""Charged multi-centre subsystem (root R11;..75) — W8-P5.
 
 Task 0: guard-characterization test locking the ~44 already-built charged
 golds so later work in this subsystem can never regress them (these already
 pass at HEAD; this is a characterization lock, not a new-behaviour test).
 
-Task 1 (P-73.2.3.1, BB 41623 PIN): acylium detection + neutralize-as-acid
+Task 1, BB 41623 PIN): acylium detection + neutralize-as-acid
 emitter — ``classify_cation`` must return 'acylium' (not the generic
 carbenium 'ylium') for a C+ double-bonded to O, and the name must be the
 reconstructed-acid PIN ('acetylium'/'cyclohexanecarbonylium'), never the
@@ -19,20 +19,20 @@ from orthonym.rules.ions import classify_cation
 
 
 GUARD = {
-    "C[N-][N+](C)(C)C": "1,2,2,2-tetramethylhydrazin-2-ium-1-ide",   # P-74.1.1
-    "CC(C)=[O+][O-]":   "2-(propan-2-ylidene)dioxidan-2-ium-1-ide",  # P-74.1.1
-    "C[P+](C)(C)[C-](C)C": "2-(trimethylphosphaniumyl)propan-2-ide", # P-74.2.1.1
-    "[C-]#[C-]": "ethynediide",                                       # P-72.2.2.1
-    "[O-]CC[O-]": "ethane-1,2-bis(olate)",                            # P-72.2.2.2.2
-    "[NH-]CC[NH-]": "ethane-1,2-bis(aminide)",                        # P-72.2.2.2.3
-    "[NH3+]CC[NH3+]": "ethane-1,2-bis(aminium)",                      # P-73.5 poly-aminium
-    "C[N+](C)(C)C": "N,N,N-trimethylmethanaminium",                   # P-73.1.2.1
-    "[CH-]1CCCCC1": "cyclohexanide",                                  # P-14.3.4.2(c) the Blue Book locant omitted
-    "C[B-](C)(C)C": "tetramethylboranuide",                           # P-72.3
-    "C[P-](C)(C)C": "tetramethylphosphanuide",                        # P-72.3
-    "NC(=[OH+])N": "uronium",                                         # P-73.1.2.2
-    "CCC=[S+][O-]": "propylidene-λ4-sulfanone",                       # P-74.2.2.1.8
-    "CC(C)[O-]": "propan-2-olate",                                    # P-72.2.2.2.2
+    "C[N-][N+](C)(C)C": "1,2,2,2-tetramethylhydrazin-2-ium-1-ide",   #
+    "CC(C)=[O+][O-]":   "2-(propan-2-ylidene)dioxidan-2-ium-1-ide",  #
+    "C[P+](C)(C)[C-](C)C": "2-(trimethylphosphaniumyl)propan-2-ide", #
+    "[C-]#[C-]": "ethynediide",                                       #
+    "[O-]CC[O-]": "ethane-1,2-bis(olate)",                            #
+    "[NH-]CC[NH-]": "ethane-1,2-bis(aminide)",                        #
+    "[NH3+]CC[NH3+]": "ethane-1,2-bis(aminium)",                      # poly-aminium
+    "C[N+](C)(C)C": "N,N,N-trimethylmethanaminium",                   #
+    "[CH-]1CCCCC1": "cyclohexanide",                                  # (c) the Blue Book locant omitted
+    "C[B-](C)(C)C": "tetramethylboranuide",                           #
+    "C[P-](C)(C)C": "tetramethylphosphanuide",                        #
+    "NC(=[OH+])N": "uronium",                                         #
+    "CCC=[S+][O-]": "propylidene-λ4-sulfanone",                       #
+    "CC(C)[O-]": "propan-2-olate",                                    #
 }
 
 
@@ -41,7 +41,7 @@ def test_charged_guard_no_regression(smi, expected):
     assert Orthonym().name(smi) == expected
 
 
-# === Task 1: acylium (P-73.2.3.1) =============================================
+# === Task 1: acylium =============================================
 
 def test_classify_acylium():
     mol = Chem.MolFromSmiles("C[C+]=O")  # CH3-C(+)=O
@@ -81,12 +81,12 @@ def test_acylium_gated_equals_raw():
         assert gated.name(smi) == raw.name(smi)
 
 
-# === Task 2: Group-14/halogen uide extension (P-72.3 / P-72.8.1) ============
+# === Task 2: Group-14/halogen uide extension / ============
 #
 # NOTE on evidence SMILES: the plan doc's Task 2 fixture ``C[SiH3-]`` is a
 # 4-coordinate Si anion (degree 1 + 3 H = 4 bonds), which is NEITHER the
-# 'ide' pattern (v-1 = 3 bonds, P-72.2.2.1) NOR the 'uide' pattern (v+1 = 5
-# bonds, P-72.3) for standard-valence-4 silicon -- it is a typo. Verified via
+# 'ide' pattern (v-1 = 3 bonds, NOR the 'uide' pattern (v+1 = 5
+# bonds, for standard-valence-4 silicon -- it is a typo. Verified via
 # OPSIN reverse-parse of the literal PIN string "methylsilanuide", which
 # gives the canonical SMILES ``C[SiH4-]`` (5-coordinate: 1 C + 4 H, charge
 # -1) -- BYTE-IDENTICAL to RDKit's own canonicalization of ``C[SiH4-]``. The
@@ -148,7 +148,7 @@ def test_diphenyliodanuide_gated_equals_raw():
 def test_uide_atom_drop_veto_iodanuide():
     """Source-level atom-conservation veto (MANDATORY per Global Constraints:
     the RT-gate fails OPEN for the halogen-uide carve-out, since OPSIN cannot
-    parse ANY substituted halogen-uide name to run the SELF-01 check).
+    parse ANY substituted halogen-uide name to run the check).
     classify_substituent, invoked on a bare interior atom subset, silently
     degrades a hetero-substituted branch to a plain hydrocarbon name
     ('CCO' -> 'ethyl', dropping -OH). ``_emit_group13_uide`` must decline
@@ -160,7 +160,7 @@ def test_uide_atom_drop_veto_iodanuide():
 
 def test_uide_atom_drop_veto_boranuide():
     """Same veto, defense-in-depth on the already-shipped boranuide family
-    (this case was already fail-closed via the SELF-01 OPSIN gate before this
+    (this case was already fail-closed via the OPSIN gate before this
     task's change; the new source-level veto adds a Java-independent second
     guard)."""
     raw = Orthonym(_disable_opsin_validity_gate=True)
@@ -168,9 +168,9 @@ def test_uide_atom_drop_veto_boranuide():
 
 
 # === Fix 1: azido/diazo are NOT cumulative zwitterions =========
-# P-61.7: the -N=[N+]=[N-] azide group is a NEUTRAL internal-charge (P-59
+#: the -N=[N+]=[N-] azide group is a NEUTRAL internal-charge
 # Table 5.1) prefix group named 'azido' by substitutive nomenclature — NOT a
-# P-74.1.1 same-parent '-ium…-ide' zwitterion. emit_cumulative_ium_ide must
+# same-parent '-ium…-ide' zwitterion. emit_cumulative_ium_ide must
 # decline (return None) for any azide/diazo so dispatch cascades to the neutral
 # azido-prefix / acyl-azide handlers, while genuine cumulative zwitterions
 # (single-bond hydrazinium/triazenium, dioxidane) still name.
@@ -200,20 +200,20 @@ class TestAzidoNotCumulativeZwitterion:
         assert emit_cumulative_ium_ide(Chem.MolFromSmiles(smi)) is not None
 
     @pytest.mark.parametrize("smi,expected", [
-        ("[N-]=[N+]=Nc1ccccc1", "azidobenzene"),   # P-61.7 (PIN)
-        ("CN=[N+]=[N-]", "azidomethane"),           # P-66.4.1
-        ("CCCC(=O)N=[N+]=[N-]", "butanoyl azide"),  # P-65.5.2.1 acyl azide
+        ("[N-]=[N+]=Nc1ccccc1", "azidobenzene"),   #
+        ("CN=[N+]=[N-]", "azidomethane"),           #
+        ("CCCC(=O)N=[N+]=[N-]", "butanoyl azide"),  # acyl azide
     ])
     def test_azide_full_name(self, smi, expected):
         assert Orthonym().name(smi) == expected
 
 
 class TestAlkylammoniumAminiumPIN:
-    """ (P-73.1.2.1): protonated/alkylated amine cations take the
+    """: protonated/alkylated amine cations take the
     substitutive '-aminium' PIN, NOT the general 'alkylammonium' retained name.
     BB: 'methanaminium chloride (PIN)' (26672), 'N,N,N-trimethylmethanaminium
     (PIN)' over 'tetramethylammonium' (41354). NH4+ is a DIFFERENT case: its PIN
-    is the mononuclear parent-hydride cation 'azanium' (P-73.1.1.2, the Blue Book --
+    is the mononuclear parent-hydride cation 'azanium', the Blue Book --
     "not those given in Table 7.3"), NOT the Table-7.3 'ammonium'."""
 
     @pytest.mark.parametrize("smi,expected", [
@@ -223,21 +223,21 @@ class TestAlkylammoniumAminiumPIN:
         ("C[NH2+]C", "N-methylmethanaminium"),
         ("C[NH+](C)C", "N,N-dimethylmethanaminium"),
         ("C[N+](C)(C)C", "N,N,N-trimethylmethanaminium"),
-        ("[NH4+]", "azanium"),  # P-73.1.1.2 PIN (parent-hydride cation, was 'ammonium')
+        ("[NH4+]", "azanium"),  # PIN (parent-hydride cation, was 'ammonium')
     ])
     def test_aminium_pin(self, smi, expected):
         assert Orthonym().name(smi) == expected
 
 
 class TestP74AcyclicZwitterionReclaim8G:
-    """Task 8G — small P-74.2.2 acyclic-zwitterion reclaims (all RT-clean).
+    """Task 8G — small acyclic-zwitterion reclaims (all RT-clean).
 
-    - RC-B (P-74.1.1 via P-29.2 '-ylidyne'): a triple-bond substituent on the
+    - RC-B via '-ylidyne'): a triple-bond substituent on the
       cumulative ium/ide chain is now cited ('ethylidyne'), so the nitrile imide
       names instead of abstaining.
-    - RC-C (P-74.2.1.1 / P-72.2.2.2.3): the ylide anion parent may be a nitrogen
+    - RC-C /: the ylide anion parent may be a nitrogen
       'aminide', carrying the onium prefix at the 'N' locant.
-    - RC-D (P-16.3.3 enclosing-mark nesting): a compound onium prefix already
+    - RC-D enclosing-mark nesting): a compound onium prefix already
       containing '(...)' escalates the outer mark to square brackets.
     """
 

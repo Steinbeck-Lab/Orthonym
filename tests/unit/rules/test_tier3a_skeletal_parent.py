@@ -1,12 +1,12 @@
-"""Wave2 T3a — SKELETAL_SUFFIX_PGS extension + constitution-conservation guard.
+"""Wave2 — SKELETAL_SUFFIX_PGS extension + constitution-conservation guard.
 
-Three coupled root-cause fixes (P-52.2.8 / P-29.4.2 / P-14.3.4):
+Three coupled root-cause fixes / /:
 
 1. SKELETAL parent selection: -ol/-thiol/-selenol/-tellurol/-amine/-imine
    decorate a skeletal atom — no exocyclic-carbon suffix form exists (unlike
    -carbaldehyde/-carboxylic acid). The single-carbon ring-neighbour shortcut
    (namer._classify gate + parent_selection single-carbon branch) mis-parented
-   OCC1CCCCC1 to ring ('cyclohexan-1-ol', a different molecule, SELF-01-
+   OCC1CCCCC1 to ring ('cyclohexan-1-ol', a different molecule, -
    suppressed). Extending SKELETAL_SUFFIX_PGS REQUIRED paired
    PG_ATTACHMENT_INDICES overrides (the SMARTS lead with O/N/S; membership
    must test the bearing CARBON or 4-methylcyclohexan-1-ol goes
@@ -23,7 +23,7 @@ Three coupled root-cause fixes (P-52.2.8 / P-29.4.2 / P-14.3.4):
    now named via name_substituent_fragment (heals the trimethanol gold).
 
 3. Locant hygiene: a mononuclear (1-atom) chain parent takes no substituent
-   locants (phenylmethanol, NOT 1-phenylmethanol; P-14.3.4 Rule 1 through
+   locants (phenylmethanol, NOT 1-phenylmethanol; Rule 1 through
    format_substituent_prefix); a SUBSTITUTED 2-carbon parent CITES the suffix
    locant on the generic path ('1-cyclohexylethan-1-imine',
    '2-chloroethane-1-selenol' — parallel to the dedicated -ol handler's
@@ -31,10 +31,10 @@ Three coupled root-cause fixes (P-52.2.8 / P-29.4.2 / P-14.3.4):
    (the FG's own pseudo-branch in features.substituents is excluded).
 
 Reproduce-first notes: all six chain-parent heal targets were fail-closed
-'unknown' at HEAD (not wrong names — SELF-01 caught the relocations);
-OCC1CCC(O)CC1 (exo-CH2OH + ring-OH) is unknown at HEAD *and* after T3a via a
+'unknown' at HEAD (not wrong names — caught the relocations);
+OCC1CCC(O)CC1 (exo-CH2OH + ring-OH) is unknown at HEAD *and* after via a
 PRE-EXISTING ring-suffix anchor-walk defect (proven identical in a HEAD
-worktree A/B) — not a T3a regression, deferred.
+worktree A/B) — not a regression, deferred.
 """
 
 import pytest
@@ -66,7 +66,7 @@ class TestSkeletalSuffixChainParent:
             "phenyl(pyridin-4-yl)methanone"
 
     def test_benzophenone_demoted_to_diphenylmethanone(self):
-        # v24 W8-P1 R6 (P-64.2.1.2, BB 28326/28378): 'benzophenone' is retained
+        # W8-P1 R6, BB 28326/28378): 'benzophenone' is retained
         # for GENERAL nomenclature only; the PIN is the systematic
         # diphenylmethanone (mirror of acetophenone -> 1-phenylethan-1-one).
         assert name_compound("O=C(c1ccccc1)c1ccccc1") == "diphenylmethanone"
@@ -80,9 +80,9 @@ class TestRingParentGuards:
     @pytest.mark.parametrize("smiles,expected", [
         ("OC(=O)C1CCCCC1", "cyclohexanecarboxylic acid"),
         ("O=CC1CCCCC1", "cyclohexanecarbaldehyde"),
-        # v29 Phase C tranche A: these three are MONOsubstituted homogeneous
-        # monocycles, so P-14.3.4.2(c) (``BlueBookV2.md:2913``, "The locant '1' is
-        # omitted: ... (c) in monosubstituted homogeneous monocyclic rings") licenses
+        # Phase C tranche A: these three are MONOsubstituted homogeneous
+        # monocycles, so (c) (``the Blue Book``, "The locant '1' is
+        # omitted:... (c) in monosubstituted homogeneous monocyclic rings") licenses
         # the omission -- ``:2917`` prints ``cyclohexanethiol`` as the rule's own
         # example and ``:26854``/``:14916`` print ``cyclopentanol``/``cyclohexanone``.
         # The rows BELOW keep their locants because a ring bearing a suffix AND a
@@ -128,7 +128,7 @@ class TestRingParentGuards:
 
 @pytest.mark.unit
 class TestSuffixLocantOnSubstitutedParent:
-    """P-14.3.4: substituents force the suffix locant back on the generic
+    """: substituents force the suffix locant back on the generic
     path; bare symmetric parents still elide."""
 
     @pytest.mark.parametrize("smiles,expected", [
@@ -156,7 +156,7 @@ class TestSuffixLocantOnSubstitutedParent:
 
 @pytest.mark.unit
 class TestMononuclearParentLocants:
-    """P-14.3.4 Rule 1: a 1-atom parent takes no substituent locants."""
+    """ Rule 1: a 1-atom parent takes no substituent locants."""
 
     def test_tetrabromomethane_control(self):
         assert name_compound("BrC(Br)(Br)Br") == "tetrabromomethane"
@@ -174,7 +174,7 @@ class TestConstitutionConservation:
     def test_si_bridge_heals_multiplicative(self):
         # Was '4-(8-carboxyoctyl)benzoic acid' raw (Si dropped, ring
         # re-linearised); the tier-3a guard made the refusal deterministic.
-        # Wave-2 completion B2 then built the proper P-29.4.2 composite
+        # Wave-2 completion B2 then built the proper composite
         # CH2-SiH2-CH2 multiplicative bridge -- the OPSIN-RT-verified PIN.
         assert name_compound(
             "OC(=O)c1ccc(C[SiH2]Cc2ccc(C(=O)O)cc2)cc1"
@@ -182,7 +182,7 @@ class TestConstitutionConservation:
 
     def test_oxy_bridge_names_multiplicative(self):
         # Was fail-closed 'unknown' (no -CH2-O-CH2- recognizer). w2f p1 then
-        # built the proper P-15.3.1.2.2.1 / P-51.3.1 composite CH2-O-CH2
+        # built the proper / composite CH2-O-CH2
         # oxybis(methylene) multiplicative bridge -- the OPSIN-RT-verified PIN
         # (constitution PRESERVED; gold W2F-P1-07). Exact analog of the
         # silanediylbis(methylene) heal above (Wave-2 completion B2).
@@ -242,15 +242,15 @@ class TestConstitutionConservation:
         # Compound (hetero-bearing) ring branches now named exactly via the
         # recursive fragment namer instead of being dropped.
         # Wave2 T5a: the multiplicative alcohol-arm PIN now claims this row
-        # (P-15.3.2.1); the T3a substitutive form remains the conservation
+        #; the substitutive form remains the conservation
         # fallback when the multiplicative path declines.
         ("OCc1cc(CO)cc(CO)c1", "(benzene-1,3,5-triyl)trimethanol"),
         # ⚠ PRE-EXISTING DEFECT, marked so rather than silently red. We emit
         # `(2-chloromethylphenyl)methanol` -- the INNER enclosing marks around
         # `chloromethyl` are lost, so the name reads as `2-chloro` + `methylphenyl`,
         # a different substitution pattern. `chloromethyl` is a compound substituent
-        # and P-31.1.2.3 requires the marks. Measured 2026-07-30 against pre-Phase-C
-        # `974aba86` in a worktree: BYTE-IDENTICAL there, so this is NOT a Phase C
+        # and requires the marks. Measured 2026-07-30 against pre-Phase-C
+        # in a worktree: BYTE-IDENTICAL there, so this is NOT a Phase C
         # regression -- it is the same lost-enclosing-mark class Task 5a fixed for
         # `_HALOALKYL_RE`'s truncated multiplier list, surviving on a different path.
         pytest.param(

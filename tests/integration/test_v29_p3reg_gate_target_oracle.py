@@ -29,7 +29,7 @@ pytestmark = [pytest.mark.integration]
 
 # (SMILES, expected PIN) — verbatim from the gold rows, def_ids in the comments.
 REGRESSED_GOLD_TARGETS = [
-    # W2C-D-AM-04
+    # W2C-D-
     ("CCN=C(CCC(=O)OC)N(C)C",
      "methyl 4-(dimethylamino)-4-(ethylimino)butanoate"),
     # W2F-P2-04

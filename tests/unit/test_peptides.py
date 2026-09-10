@@ -21,7 +21,7 @@ class TestDipeptidesAchiral:
 
     def test_glycylglycine(self):
         """Gly-Gly PIN is the SUBSTITUTIVE form (V38-PEPTIDE-PIN-VERDICT.md:
-        Chapter P-10 identifies NO PINs, so the retained peptide name
+        Chapter identifies NO PINs, so the retained peptide name
         'glycylglycine' is non-PIN). Full-InChIKey round-trip verified."""
         result = name_compound("NCC(=O)NCC(=O)O")
         assert result == "(2-aminoacetamido)acetic acid"
@@ -66,7 +66,7 @@ class TestTripeptides:
     """Test tripeptide naming (3 residues)."""
 
     def test_glycyl_l_alanyl_l_leucine(self):
-        """Gly-L-Ala-L-Leu: three residues, all L -> P-103.3.4 omits L."""
+        """Gly-L-Ala-L-Leu: three residues, all L -> omits L."""
         result = name_compound("NCC(=O)N[C@@H](C)C(=O)N[C@@H](CC(C)C)C(=O)O")
         assert result == "glycylalanylleucine"
 
@@ -75,7 +75,7 @@ class TestTripeptides:
 # _extract_residues used to order internal residues by atom index, which is
 # SMILES-spelling-dependent, so a tetrapeptide's two internal residues could
 # swap (Val-Glu-Ile-Arg -> Val-Ile-Glu-Arg) — a wrong constitution that only
-# SELF-01 stopped. Residues are now ordered by walking the amide backbone N->C.
+# stopped. Residues are now ordered by walking the amide backbone N->C.
 
 @pytest.mark.unit
 class TestTetrapeptideOrder:
@@ -194,10 +194,10 @@ class TestPeptideEdgeCases:
     def test_asparagine_not_misrouted(self):
         """Asparagine has a primary amide side chain but is a single amino acid.
 
-         a phase T5 (change-asserted-value, was `== "asparagine"`): the input
+         a phase (change-asserted-value, was `== "asparagine"`): the input
         SMILES has NO wedge/parity at the alpha-carbon (CHI_UNSPECIFIED) -- a
         genuinely stereo-undefined structure. The bare retained name `asparagine`
-        is Table 10.4's name for the DEFINED (L) configuration (`## **P-103.1.3.1**
+        is Table 10.4's name for the DEFINED (L) configuration (`## ****
         The stereodescriptors 'D' and 'L'`, the Blue Book: "The
         stereodescriptor 'xi'... indicates unknown configuration"), and OPSIN's
         grammar always resolves a bare amino-acid retained name to that ONE
@@ -291,13 +291,13 @@ class TestStereoMapping:
         assert not result.startswith("D-")
 
 
-# ── Cysteine L/D inversion (FMT-04a) ────────────────────────────────
+# ── Cysteine L/D inversion  ────────────────────────────────
 
 @pytest.mark.unit
 class TestCysteineStereoInversion:
     """Test that cysteine CIP inversion is handled correctly.
 
-    FMT-04a: Cysteine has sulfur (Z=16) in its side chain which
+    : Cysteine has sulfur (Z=16) in its side chain which
     outranks oxygen (Z=8) in COOH, inverting CIP priorities.
     Result: L-cysteine = R (CIP), D-cysteine = S (CIP).
     """
@@ -305,7 +305,7 @@ class TestCysteineStereoInversion:
     def test_l_cysteine_gets_l_prefix(self):
         """L-cysteine (R config, inverted) is identified as L, then omitted.
 
-        P-103.3.4 suppresses the L descriptor; the CIP inversion still matters
+         suppresses the L descriptor; the CIP inversion still matters
         because a broken inversion would tag R-cysteine as D and emit 'D-cysteine'.
         So the invariant is: the residue names as (L-)cysteine with NO 'D-'.
         """
@@ -326,7 +326,7 @@ class TestCysteineStereoInversion:
     def test_l_alanine_still_correct(self):
         """L-alanine (S config, NOT inverted) is identified as L, then omitted.
 
-        In a peptide the L is omitted (P-103.3.4), so the N-terminal residue must
+        In a peptide the L is omitted, so the N-terminal residue must
         be a bare 'alanyl' with no 'D-' (a broken S->L mapping would tag it D-).
         """
         #: L-Ala-Gly emits the substitutive PIN (V38-PEPTIDE-PIN-VERDICT.md);
@@ -358,10 +358,10 @@ class TestCysteineStereoInversion:
 
 # ── Stereo honesty: never fabricate an implicit L on stereo-UNSPECIFIED
 # residues (a phase L3-2e) ───────────────────────────────────────────
-# P-103.1.3.1 "The stereodescriptors 'D' and 'L'" (the Blue Book): a
+# "The stereodescriptors 'D' and 'L'" (the Blue Book): a
 # bare retained amino-acid name asserts a SPECIFIC configuration -- "The
 # stereodescriptor 'xi' (Greek letter xi) indicates unknown configuration."
-# P-103.3.4 "Indication of configuration in peptides" (:54715): omitting 'L'
+# "Indication of configuration in peptides" (:54715): omitting 'L'
 # in a peptide name is a DISPLAY convention for a residue KNOWN to be L --
 # its own text: "A residue of unknown configuration is indicated by the
 # prefix xi (Greek letter xi)." Orthonym does not emit xi-prefixed names,

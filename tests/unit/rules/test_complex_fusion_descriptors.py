@@ -7,7 +7,7 @@ Tests the extended fusion descriptor functionality including:
 - Complex edge locants ([2,3-b], [1,2-a:4,5-b'] notation)
 - End-to-end complex fusion name generation
 
-Reference: IUPAC 2013 Blue Book, Section P-25 (Fused Ring Systems)
+Reference: IUPAC 2013 Blue Book, Section (Fused Ring Systems)
 """
 
 import pytest

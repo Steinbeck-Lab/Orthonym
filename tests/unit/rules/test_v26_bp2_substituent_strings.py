@@ -1,13 +1,13 @@
-""" BP-2 (L3): malformed substituent-string bugs.
+""" (L3): malformed substituent-string bugs.
 
-RC-1 (accuracy, whole-class): parent_to_prefix must FAIL CLOSED (return None) on a
+ (accuracy, whole-class): parent_to_prefix must FAIL CLOSED (return None) on a
 functional-parent residue it cannot express as a '+yl' prefix, instead of
 fabricating 'isothiocyanic acidyl' / 'ethyl formatyl' / 'prop-2-enalyl'. BB
-P-65.1.1 (acid-as-substituent is 'carboxy', never '«acid»yl') + P-66 note (p).
+ (acid-as-substituent is 'carboxy', never '«acid»yl') + note (p).
 
-RC-2a (coverage): the terminal pseudohalides -N=C=O / -N=C=S / -N#C / -S-C#N are
+ (coverage): the terminal pseudohalides -N=C=O / -N=C=S / -N#C / -S-C#N are
 always cited as prefixes (isocyanato / isothiocyanato / isocyano / thiocyanato) in
-PINs — BB P-66.5.1.2 (the Blue Book). name_substituent_fragment now detects
+PINs — BB (the Blue Book). name_substituent_fragment now detects
 them structurally and returns the authoritative prefix.
 """
 import pytest
@@ -23,10 +23,10 @@ def namer_pin():
 
 
 @pytest.mark.parametrize("smiles,expected", [
-    # RC-2a pseudohalide-on-ring coverage wins (were garbage -> now correct PIN)
+    # pseudohalide-on-ring coverage wins (were garbage -> now correct PIN)
     ("O=C(O)c1ccccc1N=C=S", "2-isothiocyanatobenzoic acid"),
     ("O=C(O)c1ccccc1N=C=O", "2-isocyanatobenzoic acid"),
-    # RC-1 bonus: declining the bad ester-substituent promotes the ester to
+    # bonus: declining the bad ester-substituent promotes the ester to
     # principal group -> correct carboxylate PIN.
     ("CCOC(=O)C1(c2ccccc2)CCN(C)CC1", "ethyl 1-methyl-4-phenylpiperidine-4-carboxylate"),
 ])
@@ -35,7 +35,7 @@ def test_bp2_coverage_wins(namer_pin, smiles, expected):
 
 
 @pytest.mark.parametrize("smiles,expected", [
-    # P-65.6.3.3.7.2.2 target (BB:32041 verbatim, PIN): the CHAIN-borne
+    # target (BB:32041 verbatim, PIN): the CHAIN-borne
     # thiocyanate -S-C#N is the 'thiocyanato' prefix, PARENTHESIZED (BB
     # '3-(thiocyanato)propanethioate'). The chain substituent path went
     # through substituent_enumerator, which named -S-C#N 'cyanosulfanyl'
@@ -48,7 +48,7 @@ def test_thiocyanato_chain_prefix_is_pin(namer_pin, smiles, expected):
 
 
 def test_thiocyanato_takes_parens_isothiocyanato_does_not():
-    """P-66.5.1.2: 'thiocyanato' is enclosed in PINs (BB:31013,:32041) but its
+    """: 'thiocyanato' is enclosed in PINs (BB:31013,:32041) but its
     N-anchored sibling 'isothiocyanato' is not (isothiocyanatobenzene)."""
     from orthonym.assembly.naming_utils import needs_brackets
     assert needs_brackets("thiocyanato") is True
@@ -60,9 +60,9 @@ def test_thiocyanato_takes_parens_isothiocyanato_does_not():
     "CCCC(C)(COC(N)=O)COC(=O)NC(C)C",  # was '...carbamatyl carbamate' garbage
 ])
 def test_bp2_no_fabricated_garbage(namer_pin, smiles):
-    """RC-1 contract: the fabricated OPSIN-unparseable '+yl' string never appears.
+    """ contract: the fabricated OPSIN-unparseable '+yl' string never appears.
 
-    (The molecule then either fails closed to 'unknown' or the SELF-01 OPSIN gate
+    (The molecule then either fails closed to 'unknown' or the OPSIN gate
     suppresses a wrong candidate; that final outcome is OPSIN-availability
     dependent and verified via diagnose.py, so it is not asserted here — the
     robust, environment-independent invariant is the absence of the garbage.)

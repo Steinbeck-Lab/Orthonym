@@ -1,11 +1,11 @@
-"""Phase 146 D-10 verification: low-heavy-atom rescue fallback preservation.
+"""a phase verification: low-heavy-atom rescue fallback preservation.
 
-Per CONTEXT.md D-10:
+Per internal notes:
   The internal /1.5 fallback at composer.py (formerly
   `_MIN_RATIO_ACCEPT/1.5`) is PRESERVED — it is a low-heavy-atom rescue,
   NOT a weighted-sum gate.
 
-Phase 146 SC-4 removes the top-level _MIN_RATIO_ACCEPT gate, but Plan 05
+a phase removes the top-level _MIN_RATIO_ACCEPT gate, but Plan 05
 Task 2 preserves the inner fallback as `_MIN_RATIO_FALLBACK = 0.20` with
 the same `if total_heavy <= 15 or ratio >= _MIN_RATIO_FALLBACK` semantics.
 
@@ -17,14 +17,14 @@ Tests in this module verify:
   (d) 3 low-heavy-atom canary molecules produce valid names in BOTH
       V17 and V18 modes — the fallback is doing its job.
 
-Source: https://iupac.qmul.ac.uk/BlueBook/P4.html P-44.1
+Source: https://iupac.qmul.ac.uk/BlueBook/P4.html
 """
 
 import importlib
 import pytest
 
 
-# Three low-heavy-atom canaries per CONTEXT.md D-10 ("add 3 low-heavy-atom
+# Three low-heavy-atom canaries per internal notes ("add 3 low-heavy-atom
 # molecules to canary to prove the fallback still fires").
 LOW_HA_CANARIES = [
     # (SMILES, expected-name-substring)
@@ -57,7 +57,7 @@ def both_modes(request, monkeypatch):
 def test_low_ha_canaries_produce_name_in_both_modes(
     smiles, expected_substring, both_modes
 ):
-    """D-10: low-HA molecules MUST produce a non-empty name in both V17 and V18.
+    """: low-HA molecules MUST produce a non-empty name in both V17 and V18.
 
     The fallback `if total_heavy <= 15: return best.name` ensures small
     molecules (<=15 heavy atoms) always return the best Tier A candidate
@@ -78,12 +78,12 @@ def test_low_ha_canaries_produce_name_in_both_modes(
 
 @pytest.mark.integration
 def test_min_ratio_fallback_constant_exists():
-    """Verify `_MIN_RATIO_FALLBACK = 0.20` exists in composer.py per D-10.
+    """Verify `_MIN_RATIO_FALLBACK = 0.20` exists in composer.py per.
 
     This is a source-level assertion: the constant must be present as a
     literal in the module source so static introspection confirms the
     preservation invariant. Renaming to a different literal (e.g., 0.15
-    or 0.25) silently breaks D-10 and this test catches it.
+    or 0.25) silently breaks and this test catches it.
     """
     import orthonym.assembly.composer as composer
     with open(composer.__file__) as fp:
@@ -101,7 +101,7 @@ def test_min_ratio_fallback_constant_exists():
 
 @pytest.mark.integration
 def test_min_ratio_accept_constant_removed():
-    """Confirm the top-level ratio-accept gate constant is gone (SC-4).
+    """Confirm the top-level ratio-accept gate constant is gone .
 
     The CONSTANT `_MIN_RATIO_ACCEPT` must not appear anywhere in
     composer.py source. Comments referencing it in the commit history
@@ -118,7 +118,7 @@ def test_min_ratio_accept_constant_removed():
 
 @pytest.mark.integration
 def test_cascade_ratio_min_constant_removed():
-    """Confirm the top-level cascade-ratio-min gate constant is gone (SC-4).
+    """Confirm the top-level cascade-ratio-min gate constant is gone .
 
     The CONSTANT `_CASCADE_RATIO_MIN` must not appear anywhere in
     composer.py source.

@@ -1,6 +1,6 @@
-"""§P-14.3.4.3 (BB:2939) — the locant of a lone substitution on a symmetric parent.
+"""§ (the Blue Book) — the locant of a lone substitution on a symmetric parent.
 
-v29 Phase C Task 3. Covers the rule verbatim::
+ Phase C Task 3. Covers the rule verbatim::
 
     "The locant is omitted in monosubstituted symmetrical parent hydrides or parent
      compounds where there is only one kind of substitutable hydrogen."
@@ -13,15 +13,15 @@ acid`` a **prefix** one, which is why the licence is wired at two joins.
 
 ★ THE BOUNDARY THIS WHOLE TASK TURNS ON — and why the predicate tests below are the
 real guard rather than a formality. Two rows sit in the example block of a DIFFERENT
-sub-rule, §P-14.3.4.1 (``:2877``), and read as a flat contradiction::
+sub-rule, § (``:2877``), and read as a flat contradiction::
 
-    :2883   HOOC-CH2-CH(Cl)-COOH      chlorobutanedioic acid (PIN)     locant OMITTED
-    :2887   H2N-CO-CH(CH3)-CO-NH2     2-methylpropanediamide (PIN)     locant KEPT
+    :2883 HOOC-CH2-CH(Cl)-COOH chlorobutanedioic acid (PIN) locant OMITTED
+    :2887 H2N-CO-CH(CH3)-CO-NH2 2-methylpropanediamide (PIN) locant KEPT
 
-They are reconciled by splitting the two rules: **P-14.3.4.1 withdraws only the
+They are reconciled by splitting the two rules: ** withdraws only the
 TERMINAL (suffix) locants** — that is what makes both of them ``-dioic acid`` /
 ``-diamide`` rather than ``-1,4-dioic acid`` / ``-1,3-diamide``, and it says nothing
-about substituent locants — and **P-14.3.4.3 then decides the substituent locant** on
+about substituent locants — and ** then decides the substituent locant** on
 the substitutable-hydrogen test. Propanedioic acid's two acid O-H are on a chalcogen
 and are NOT substitutable (``:3007``), leaving C2 as the only kind, so the licence
 fires. Propane**diamide** has C2 *and* two amide N-H, which are neither chalcogen nor
@@ -74,7 +74,7 @@ def _atoms_except(mol, *symbols):
 
 
 # --------------------------------------------------------------------------- #
-# 1. THE PREDICATE — the C4 pair, and the orbit boundary either side of it     #
+# 1. THE PREDICATE — the C4 pair, and the orbit boundary either side of it #
 # --------------------------------------------------------------------------- #
 @pytest.mark.parametrize(
     "smiles,label,expected",
@@ -84,18 +84,18 @@ def _atoms_except(mol, *symbols):
         ("NC(=O)C(C)C(=O)N", "2-methylpropanediamide — C2, CH3 and N-H", False),
         # The undecorated diamide, so the denial cannot be blamed on the methyl.
         ("NC(=O)CC(=O)N", "propanediamide — C2 AND amide N-H = two kinds", False),
-        # :2883 — equivalent by symmetry rather than by being a lone position.
+        #:2883 — equivalent by symmetry rather than by being a lone position.
         ("OC(=O)CCC(=O)O", "butanedioic acid — C2/C3 one orbit", True),
         # ★ The next homologue DENIES, and no rule about diacids says so: pentanedioic
         # acid's C2/C4 are one orbit but C3 is another. This is the row that proves the
         # predicate is measuring orbits and not "is a diacid".
         ("OC(=O)CCCC(=O)O", "pentanedioic acid — C2/C4 vs C3 = two orbits", False),
-        # :2949's parent hydride, and the three rings it must be distinguished from.
+        #:2949's parent hydride, and the three rings it must be distinguished from.
         ("c1cnccn1", "pyrazine — four equivalent CH", True),
         ("c1ccncc1", "pyridine — C2/C6, C3/C5, C4 = three orbits", False),
         ("C1CCNCC1", "piperidine — N-H, C2/C6, C3/C5, C4 = four orbits", False),
         ("C1CNCCN1", "piperazine — N-H and CH2 = two orbits", False),
-        # :2943's parent compound.
+        #:2943's parent compound.
         ("NC(=O)N", "urea — two equivalent NH2", True),
         # Carbocyclic controls.
         ("C1CCCCC1", "cyclohexane", True),
@@ -103,7 +103,7 @@ def _atoms_except(mol, *symbols):
         # An all-chalcogen parent has NO substitutable hydrogen at all, so the licence
         # denies by construction. ⚠ Do not "fix" this to make `methyltrisulfane` work:
         # the chalcogen exclusion is load-bearing for `chloropropanedioic acid` above,
-        # and trisulfane is licensed by P-14.3.4.4, a different (unimplemented) rule.
+        # and trisulfane is licensed by, a different (unimplemented) rule.
         ("SSS", "trisulfane — every H on sulfur", False),
     ],
 )
@@ -112,7 +112,7 @@ def test_l3_orbit_predicate(smiles, label, expected):
 
 
 # --------------------------------------------------------------------------- #
-# 2. "MONOSUBSTITUTED" IS PROVEN STRUCTURALLY, NOT ASSUMED                     #
+# 2. "MONOSUBSTITUTED" IS PROVEN STRUCTURALLY, NOT ASSUMED #
 # --------------------------------------------------------------------------- #
 def test_one_substituent_removed_counts_components_not_atoms():
     """Three fluorines are THREE substituents, not one — the shape that would
@@ -133,7 +133,7 @@ def test_one_substituent_removed_rejects_nothing_and_everything():
 
 
 def test_one_substituent_removed_rejects_a_doubly_bonded_group():
-    """A group attached twice is a fused/bridging unit, which :2939 does not licence.
+    """A group attached twice is a fused/bridging unit, which:2939 does not licence.
     Cyclohexane fused to the chain would present TWO attachment bonds."""
     m = _mol("O=C(O)C1CCC(C(=O)O)CC1")
     ring = set(m.GetRingInfo().AtomRings()[0])
@@ -168,7 +168,7 @@ def test_one_substituent_removed_needs_the_connected_component_check():
 
 
 # --------------------------------------------------------------------------- #
-# 3. THE LICENCE ENTRY POINT, INCLUDING BOTH AMBIENT P-14.3.3 SCOPES           #
+# 3. THE LICENCE ENTRY POINT, INCLUDING BOTH AMBIENT SCOPES #
 # --------------------------------------------------------------------------- #
 def _acid_licence():
     m = _mol("OC(=O)C(Cl)C(=O)O")
@@ -206,7 +206,7 @@ def test_licence_declines_on_each_essential_locant_route(kwargs, why):
 
 
 def test_licence_declines_inside_forced_locant_scope():
-    """P-14.3.3 as an ambient scope. The positive above is re-asserted OUTSIDE the
+    """ as an ambient scope. The positive above is re-asserted OUTSIDE the
     scope in the same test so a broken licence cannot make this vacuously green."""
     m, parent = _acid_licence()
     call = dict(prefix_locants=[2], suffix_locants=[],
@@ -217,10 +217,10 @@ def test_licence_declines_inside_forced_locant_scope():
 
 
 def test_licence_declines_inside_isotopic_naming_scope():
-    """⚠ ``locants_are_forced()`` ALONE IS NOT ENOUGH — measured in Task 5a, where the
+    """⚠ ``locants_are_forced`` ALONE IS NOT ENOUGH — measured in Task 5a, where the
     isotope decorator enters the forced scope only conditionally and a licence wired on
     the forced flag alone emptied a scope that still carried a ``(13C1)`` descriptor
-    (P-82.6.1.1, ``:44180``). This licence empties its scope of ALL locants, so it must
+    , ``:44180``). This licence empties its scope of ALL locants, so it must
     decline on the weaker declaration too."""
     m, parent = _acid_licence()
     call = dict(prefix_locants=[2], suffix_locants=[],
@@ -244,7 +244,7 @@ def test_core_licence_requires_exactly_one_substitution(n_subs):
         parent_cites_locants=False, stereo_text="", has_indicated_h=False,
         has_isotope=False,
     ) is False
-    # ...and the same call with n_substitutions=1 DOES fire, so the above is not
+    #...and the same call with n_substitutions=1 DOES fire, so the above is not
     # vacuously green.
     assert l3_monosubstituted_locant_omitted(
         parent, n_substitutions=1, prefix_locants=[2], suffix_locants=[],
@@ -284,23 +284,23 @@ def test_licence_declines_when_the_parent_is_the_wrong_atom_set():
 
 
 # --------------------------------------------------------------------------- #
-# 4. END TO END — the three targets, across BOTH joins                        #
+# 4. END TO END — the three targets, across BOTH joins #
 # --------------------------------------------------------------------------- #
 @pytest.mark.parametrize(
     "smiles,expected,citation",
     [
-        # Ring-SUFFIX join (rules/heterocycles.py). :2949 verbatim.
+        # Ring-SUFFIX join (rules/heterocycles.py).:2949 verbatim.
         ("OC(=O)c1cnccn1", "pyrazinecarboxylic acid", ":2949"),
-        # Substituent-PREFIX join (assembly/handlers/_handler_shared.py). :2951 verbatim.
+        # Substituent-PREFIX join (assembly/handlers/_handler_shared.py).:2951 verbatim.
         ("OC(=O)C(Cl)C(=O)O", "chloropropanedioic acid", ":2951"),
-        # :2883 verbatim — L1 takes the suffix locants, L3 the substituent one.
+        #:2883 verbatim — L1 takes the suffix locants, L3 the substituent one.
         ("OC(=O)CC(Cl)C(=O)O", "chlorobutanedioic acid", ":2883"),
-        # Fused-PAH PREFIX join (rules/polycyclics.py). :2947 verbatim — coronene's
-        # twelve CH are ONE orbit (v42 Task 7B2).
+        # Fused-PAH PREFIX join (rules/polycyclics.py).:2947 verbatim — coronene's
+        # twelve CH are ONE orbit .
         ("Clc1cc2ccc3ccc4ccc5ccc6ccc1c1c2c3c4c5c61", "chlorocoronene", ":2947"),
-        # Retained-parent urea join (assembly/composer.py). :2943 verbatim — urea's
+        # Retained-parent urea join (assembly/composer.py).:2943 verbatim — urea's
         # four N-H are ONE orbit, so the monosubstituted italic-N locant is omitted
-        # (v42 Task 7B2). NOT the chalcogen analogues -> see the negatives below.
+        # . NOT the chalcogen analogues -> see the negatives below.
         ("CNC(=O)N", "methylurea", ":2943"),
     ],
 )
@@ -335,7 +335,7 @@ def test_class_generalises(namer, smiles, expected, why):
         # ★ MUTATION-DERIVED WITNESSES. Deleting the N-substituent guard at the ring
         # -suffix join survived the first test round — these are the rows that kill it.
         # The italic-N locant is ESSENTIAL, and it is prepended AFTER the suffix join,
-        # so the guard has to be consulted at the join or P-14.3.3 (:2869) is violated:
+        # so the guard has to be consulted at the join or (:2869) is violated:
         # one essential locant in the scope restores EVERY locant in it. Without the
         # guard these become 'N-methylpyrazinamine' / 'N,N-dimethylpyrazinamine' /
         # 'N-methylpyrazinecarboxamide'.
@@ -364,27 +364,27 @@ def test_an_essential_N_locant_restores_the_ring_suffix_locant(namer, smiles, ex
         ("ClCCC(=O)O", "3-chloropropanoic acid", "ditto"),
         ("OC(=O)C(Cl)C(Cl)C(=O)O", "2,3-dichlorobutanedioic acid",
          "TWO substituents — not 'monosubstituted'"),
-        # --- the ring boundary, :34728 vs :34730 ---
+        # --- the ring boundary,:34728 vs:34730 ---
         ("OC(=O)C1CCCCC1", "cyclohexanecarboxylic acid",
          "already correct via P-14.3.4.2(c); the in-handler control"),
         ("N#CC1CCCCC1", "cyclohexanecarbonitrile", ":34728 carbocycle omits"),
         ("N#CN1CCCCC1", "piperidine-1-carbonitrile",
          "★ :34730 — same suffix, HETEROcycle KEEPS. Four orbits."),
         ("OC(=O)c1ccncc1", "pyridine-4-carboxylic acid", "three orbits"),
-        # --- a parent name that already cites locants restores them all (P-14.3.3) ---
+        # --- a parent name that already cites locants restores them all ---
         ("OC(=O)C1COCCO1", "1,4-dioxane-2-carboxylic acid",
          "heteroatom locant set in the parent name"),
         ("OC(=O)c1ncncn1", "1,3,5-triazine-2-carboxylic acid", "ditto"),
         ("OC(=O)c1cc[nH]c1", "1H-pyrrole-3-carboxylic acid", "indicated hydrogen"),
-        # --- urea OMITS (see the positives above, :2943); its CHALCOGEN analogues
-        #     and its disubstituted forms KEEP the letter locant ---
+        # --- urea OMITS (see the positives above,:2943); its CHALCOGEN analogues
+        # and its disubstituted forms KEEP the letter locant ---
         ("NC(=O)N", "urea", "the retained parent"),
         ("CNC(=S)N", "N-methylthiourea",
          "chalcogen analogue keeps its letter locant — P-66.1.6.1.3.1, :33451 "
          "N-(butan-2-yl)selenourea (PIN); one-orbit but a MORE SPECIFIC rule"),
         ("CNC(=O)NC", "N,N'-dimethylurea",
          "TWO substituents — not 'monosubstituted' (:33327)"),
-        # --- P-14.3.4.5 / L6 neighbours, none of which L3 may disturb ---
+        # --- / L6 neighbours, none of which L3 may disturb ---
         ("OC(=O)C(F)(F)F", "trifluoroacetic acid", "L6, :3037"),
         ("OC(=O)CC(F)(F)F", "3,3,3-trifluoropropanoic acid", "partial -> :3009 retains"),
         ("OC(=O)C(F)C(F)(F)F", "2,3,3,3-tetrafluoropropanoic acid", "ditto"),
@@ -402,7 +402,7 @@ def test_an_essential_N_locant_restores_the_ring_suffix_locant(namer, smiles, ex
          "no principal characteristic group -> (c) vacuous"),
         ("OC1CCCCC1", "cyclohexanol", "P-14.3.4.2(c)"),
         ("CCO", "ethanol", "P-14.3.4.2(a)"),
-        # --- not this task: L4 (P-14.3.4.4) owns the polysulfanes ---
+        # --- not this task: L4 owns the polysulfanes ---
         # SHIPPED by Task 11 (2026-07-30): L4 is implemented and this row is now
         # BB 39335's verbatim PIN. It stays in THIS file's negative list because
         # the point it makes is unchanged -- L3 must not be widened to reach it,
@@ -423,17 +423,17 @@ def test_negatives_unchanged(namer, smiles, expected, why):
 
 
 # --------------------------------------------------------------------------- #
-# 5b. THE HETEROATOM-H BOUNDARY OF THE UREA LICENCE (v42 Task 7B2-fix)          #
+# 5b. THE HETEROATOM-H BOUNDARY OF THE UREA LICENCE (-fix) #
 # --------------------------------------------------------------------------- #
-# P-14.3.4.3 omits the italic-N locant only while the parent keeps "only one kind
+# omits the italic-N locant only while the parent keeps "only one kind
 # of substitutable hydrogen". Task 7B2 wired the licence for a CARBON substituent
-# (methylurea, BB:2943) but over-fired on a substituent that carries its OWN
+# (methylurea, the Blue Book) but over-fired on a substituent that carries its OWN
 # substitutable heteroatom-H: N=C(N)NC(N)=O was mis-named `carbamimidoylurea`.
 # Carbamimidoyl (H2N-C(=NH)-) bears an imino and an amino N-H, which are a SECOND
-# kind of substitutable hydrogen, so the locant MUST be cited — BB:34292 verbatim
-# `N-carbamimidoylurea (PIN)` (also `N-carbamimidoylformamide` :34290,
-# `N-carbamimidoylacetamide` :34294). The omit rows are re-asserted alongside the
-# keep row so the keep assertion is not vacuously green (session invariant 11).
+# kind of substitutable hydrogen, so the locant MUST be cited — the Blue Book verbatim
+# `N-carbamimidoylurea (PIN)` (also `N-carbamimidoylformamide`:34290,
+# `N-carbamimidoylacetamide`:34294). The omit rows are re-asserted alongside the
+# keep row so the keep assertion is not vacuously green (session a project rule).
 @pytest.mark.parametrize(
     "smiles,expected,why",
     [
@@ -448,12 +448,12 @@ def test_negatives_unchanged(namer, smiles, expected, why):
     ],
 )
 def test_urea_locant_kept_when_substituent_has_heteroatom_h(namer, smiles, expected, why):
-    """The WHOLE name is asserted (session invariant 11)."""
+    """The WHOLE name is asserted (session a project rule)."""
     assert namer.name(smiles) == expected
 
 
 # --------------------------------------------------------------------------- #
-# 6. THE MANDATORY NEGATIVE THAT IS NOT NAMEABLE — asserted as strict xfail    #
+# 6. THE MANDATORY NEGATIVE THAT IS NOT NAMEABLE — asserted as strict xfail #
 # --------------------------------------------------------------------------- #
 @pytest.mark.xfail(
     strict=True,

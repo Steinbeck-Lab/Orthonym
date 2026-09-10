@@ -1,4 +1,4 @@
-"""W2F-P3 item 8 (P-45.5-corroborating / P-45.2.1 / P-29.2): branch-resident nitro
+"""W2F-P3 item 8 -corroborating / /: branch-resident nitro
 naming + fail-closed count guard. Tasks 1 (defect a + b-het) and 2 (defect b-pure-C).
 
 All expected PINs OPSIN-verified (opsin-cli-2.9.0 -> RDKit canonical == input) at
@@ -14,7 +14,7 @@ pytestmark = pytest.mark.unit
 
 @pytest.fixture
 def gated(monkeypatch):
-    """Re-enable the production OPSIN-validity + SELF-01 gate for the
+    """Re-enable the production OPSIN-validity + gate for the
     end-to-end fail-closed tripwire. The autouse conftest fixture disables the
     gate by default (for speed), so an out-of-envelope molecule surfaces its
     pre-suppression wrong name (a bare un-locanted 'thiocyanato' leak) instead
@@ -38,7 +38,7 @@ class TestItem8BranchNitro:
     # --- Task 1: defect (a) + (b)-het heals ---
     def test_evidence_dinitropropyl_branch(self):
         # off-chain dinitro branch -> owned by the branch name; F-branch is the
-        # P-45.2.1 parent chain (max prefixes). Was raw
+        # parent chain (max prefixes). Was raw
         # '6,7-difluoro-5-methyldinitro-4-propylheptanoic acid' -> unknown.
         assert _name("OC(=O)CCC(C(C)C(F)CF)C([N+](=O)[O-])C([N+](=O)[O-])C") == \
             "4-(1,2-dinitropropyl)-6,7-difluoro-5-methylheptanoic acid"

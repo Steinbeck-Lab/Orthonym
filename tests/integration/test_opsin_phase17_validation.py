@@ -38,7 +38,7 @@ VALIDATION_RESULTS_PATH = (
 class TestPhase17Regressions:
     """Regression tests for specific a phase fix categories.
 
-    These tests are NOT marked slow -- they only call name_compound() and run
+    These tests are NOT marked slow -- they only call name_compound and run
     in <1s each. They cover each fix category introduced in Plans 17-01 to
     17-06 to prevent regressions.
     """
@@ -51,7 +51,7 @@ class TestPhase17Regressions:
         assert result == "acetate", f"Expected acetate, got: {result}"
 
     def test_ion_retained_ammonium(self):
-        """NH4+ PIN is 'azanium' (P-73.1.1.2, the Blue Book; was 'ammonium')."""
+        """NH4+ PIN is 'azanium', the Blue Book; was 'ammonium')."""
         result = name_compound("[NH4+]")
         assert result == "azanium", f"Expected azanium, got: {result}"
 

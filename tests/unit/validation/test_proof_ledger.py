@@ -1,4 +1,4 @@
-"""v29 Phase 1: the proof ledger asserts the spine on the FINAL name."""
+""" a phase: the proof ledger asserts the spine on the FINAL name."""
 import pytest
 from rdkit import Chem
 

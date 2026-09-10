@@ -318,7 +318,7 @@ def test_key_compounds():
 @pytest.mark.integration
 def test_bicyclic_compounds():
     """
-    Test bicyclic compounds that were added in Phase 6.
+    Test bicyclic compounds that were added in a phase.
     """
     bicyclic_cases = [
         # Basic bicyclo systems
@@ -352,7 +352,7 @@ def test_bicyclic_compounds():
 @pytest.mark.integration
 def test_spiro_compounds():
     """
-    Test spiro compounds that were added in Phase 6.
+    Test spiro compounds that were added in a phase.
     """
     spiro_cases = [
         ("C1CCC2(CC1)CCCCC2", "spiro[5.5]undecane"),

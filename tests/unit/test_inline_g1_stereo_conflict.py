@@ -5,7 +5,7 @@ consumed `_stereo_emit_decision`'s flag but never checked a flagged emission
 against `_rt_match` before shipping -- it relied entirely on whatever the
 caller does with `_name_impl`'s return value downstream.
 
-Reproduced by calling `Orthonym._name_impl` DIRECTLY (bypassing `name()`'s
+Reproduced by calling `Orthonym._name_impl` DIRECTLY (bypassing `name`'s
 outer retry-cascade / late-recovery layer, which for SOME molecules happens
 to independently re-derive and correctly gate the same candidate via a
 DIFFERENT mechanism -- see the note below): for input
@@ -18,15 +18,15 @@ HEAD before this fix (`scripts/an A/B check` confirmed: HEAD ships the
 conflict name unchanged; the fix abstains). This is a genuine wrong-
 stereoisomer ship with zero verification at the point `_name_impl` returns.
 
-⚠ Note on why testing at the full `.name()` level does NOT discriminate for
+⚠ Note on why testing at the full `.name` level does NOT discriminate for
 THIS specific molecule (a real, if narrower, finding in its own right,
-documented so nobody re-derives it from scratch): `.name()` layers a retry-
+documented so nobody re-derives it from scratch): `.name` layers a retry-
 cascade on top of `_name_impl` -- when the outer `_final_opsin_validity_gate`
-(SELF-01) suppresses a result to the descriptive fallback, `is_failure_name`
+ suppresses a result to the descriptive fallback, `is_failure_name`
 triggers `_try_general_engine_recovery` (the LATE-RECOVERY lane, Task A's own
 domain, already `_rt_match`-gated) to re-derive a candidate FRESH. For this
 molecule that lane happens to independently reach the SAME right answer via
-its OWN (correct) `_rt_match` check, which is why `.name()` end-to-end looks
+its OWN (correct) `_rt_match` check, which is why `.name` end-to-end looks
 safe regardless of this fix. That is a coincidence of THIS reproduction, not
 an architectural guarantee for every molecule the inline-G1 lane might
 mishandle -- `_name_impl` itself must not depend on a downstream lane to
@@ -57,7 +57,7 @@ SMILES_2_CENTRES = "C[C@@H](O)[C@@H](N)C"
 CONFLICT_NAME = "(3R)-3-aminobutan-2-ol"
 
 # Omits the butan-2-ol centre but asserts the CORRECT value for the amino
-# centre -- a genuine, SAFE partial omission (must still ship: P-91.2.2/P-91.3
+# centre -- a genuine, SAFE partial omission (must still ship: /
 # sanction citing fewer descriptors than the input defines as a valid,
 # less-specific best-effort degrade -- never gate a true omission).
 SAFE_OMISSION_NAME = "(3S)-3-aminobutan-2-ol"
@@ -65,7 +65,7 @@ SAFE_OMISSION_NAME = "(3S)-3-aminobutan-2-ol"
 
 def _run_inline_g1_isolated(monkeypatch, stub_name: str) -> str:
     """Call `_name_impl` directly -- isolates the inline-G1 lane from
-    `name()`'s outer retry-cascade / late-recovery layer (see module
+    `name`'s outer retry-cascade / late-recovery layer (see module
     docstring for why that layer would otherwise mask this specific hole)."""
     import orthonym.assembly.general_engine as ge_mod
     import orthonym.validation.coverage_gate as cg_mod

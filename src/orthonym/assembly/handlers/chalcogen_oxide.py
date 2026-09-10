@@ -1,6 +1,6 @@
 """-6I selenoxide / selenone / telluroxide / tellurone handlers.
 
-Se/Te analogues of the sulfoxide/sulfone handlers (P-63.6, the Blue Book:
+Se/Te analogues of the sulfoxide/sulfone handlers, the Blue Book:
 "selenium and tellurium... named in the same way"). The chemical-logic body
 is the SHARED, element-generic ``rules.sulfur.name_chalcogen_oxide_substitutive``
 (diaryl multiplicative / ring+chain / two-chain substitutive PINs) with the
@@ -65,7 +65,7 @@ def _make_chalcogen_oxide_handler(
         if not chalcogen_oxide_fc_covers_molecule(features.mol, matches[0]):
             return None
 
-        # P-63.6: substitutive is the PIN ('(ethaneseleninyl)benzene',
+        #: substitutive is the PIN ('(ethaneseleninyl)benzene',
         # "1,1'-selenonyldibenzene"). Functional class ('dimethyl selenoxide')
         # stays for --trivial and as the fail-open fallback for shapes the
         # substitutive builder declines.

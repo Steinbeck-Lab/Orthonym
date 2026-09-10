@@ -3,8 +3,8 @@
 `(1-oxamethyl)` is a wrong-molecule construction, and the mechanism is exact rather than
 suspected. Asked what it denotes, OPSIN answers:
 
-    (1-oxamethyl)benzene            -> OC1=CC=CC=C1          i.e. PHENOL
-    (2-(1-oxamethyl)butyl)benzene   -> OC(CC1=CC=CC=C1)CC    i.e. a secondary ALCOHOL
+    (1-oxamethyl)benzene -> OC1=CC=CC=C1 i.e. PHENOL
+    (2-(1-oxamethyl)butyl)benzene -> OC(CC1=CC=CC=C1)CC i.e. a secondary ALCOHOL
 
 So `1-oxamethyl` denotes `-OH`. Emitting it for `=O` loses the double bond *and* the
 carbon, turning a ketone into an alcohol.
@@ -13,11 +13,11 @@ carbon, turning a ketone into an alcohol.
 (`:381`), so a lone `=O` came back as a one-atom oxa-replacement chain. Measured, the
 construction is wrong wherever it appears and right nowhere:
 
-    -CH2C(=O)CH2CH3  -> 2-(1-oxamethyl)butyl              WRONG
-    -CH2CH2COOH      -> 3-(1-oxamethyl)-4-oxabutyl        WRONG
-    -CH2C(=O)CH3     -> 2-methyl-3-oxaprop-2-en-1-yl      RT-EXACT  (O in the BACKBONE)
-    -CH2CHO          -> 3-oxaprop-2-en-1-yl               RT-EXACT  (O in the BACKBONE)
-    -CH2CH(OH)CH3    -> 2-methyl-3-oxapropyl              RT-EXACT  (O in the BACKBONE)
+    -CH2C(=O)CH2CH3 -> 2-(1-oxamethyl)butyl WRONG
+    -CH2CH2COOH -> 3-(1-oxamethyl)-4-oxabutyl WRONG
+    -CH2C(=O)CH3 -> 2-methyl-3-oxaprop-2-en-1-yl RT-EXACT (O in the BACKBONE)
+    -CH2CHO -> 3-oxaprop-2-en-1-yl RT-EXACT (O in the BACKBONE)
+    -CH2CH(OH)CH3 -> 2-methyl-3-oxapropyl RT-EXACT (O in the BACKBONE)
 
 ⇒ The module's *chain* handling is sound; only its *branch* handling was not. The four
 backbone cases must not regress — they are pinned below, because a fix aimed at the branch
@@ -26,7 +26,7 @@ could easily perturb the backbone decomposition that produces them.
 The vocabulary is reused, not re-tabled: `substituent_enumerator._descriptive_fallback`
 already maps a single heteroatom to its standard prefix and already distinguishes `oxo`
 from `hydroxy` by hydrogen count (`:2101`, `'hydroxy' if total_hs >= 1 else 'oxo'`), which
-is exactly the discrimination needed here. Same shape as the `carboxy` fix in `9e2648a2`,
+is exactly the discrimination needed here. Same shape as the `carboxy` fix in,
 which reused `ring_assemblies._is_carboxyl_substituent`.
 """
 

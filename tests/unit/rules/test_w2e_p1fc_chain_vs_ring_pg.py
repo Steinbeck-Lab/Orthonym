@@ -1,4 +1,4 @@
-"""W2E-P1FC Task 11 — P-59.2.1.6 (BB 25207): PG in both chain and ring; the
+"""W2E-P1FC Task 11 — (BB 25207): PG in both chain and ring; the
 portion with the GREATER number of the PG is the parent; tie -> ring.
 BB Example 2: 4-(2-oxobutyl)cyclopentane-1,2-dione (PIN) — ring has 2 ketones
 (dione) vs chain 1 ketone, so ring wins; chain ketone -> 2-oxobutyl prefix.
@@ -6,7 +6,7 @@ BB Example 2: 4-(2-oxobutyl)cyclopentane-1,2-dione (PIN) — ring has 2 ketones
 STATUS (2026-07-09): DEFERRED to strict-xfail. At HEAD the fallback_chain_ring
 handler ABSORBS the pendant chain ketone (the 2-oxobutyl) as a THIRD ring oxo
 and drops the ethyl, producing 'cyclopentane-1,2,4-trione' (a different
-molecule). In production this is caught by SELF-01 (OPSIN re-perception) and the
+molecule). In production this is caught by (OPSIN re-perception) and the
 molecule fails closed (never a wrong name). The correct build — chain-vs-ring
 PG-count parent selection (ring 2 diones beats chain 1 ketone) plus expressing
 the chain ketone as the '2-oxobutyl' substituent prefix — requires broad
@@ -35,7 +35,7 @@ class TestP59216ChainVsRingPG:
             "4-(2-oxobutyl)cyclopentane-1,2-dione"
 
     def test_oxobutyl_determinism_random_spellings(self):
-        # Determinism guard: the P-59.2.1.6 off-ring-PG demotion must be
+        # Determinism guard: the off-ring-PG demotion must be
         # spelling-independent (parent/suffix split keyed on canonical ring
         # membership, not atom/registration order). Name 8 random SMILES
         # renderings and assert one identical PIN.

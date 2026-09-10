@@ -1,5 +1,5 @@
 # tests/unit/test_v26_p0_complete_flag.py
-"""v26 P0: `--emit-tier complete` flag + `allow_aromatic_general` threading.
+""": `--emit-tier complete` flag + `allow_aromatic_general` threading.
 
 Pure plumbing — P0 lands NO behavior change. These tests assert:
   (a) the CLI parser accepts `complete` as a new --emit-tier choice;
@@ -9,7 +9,7 @@ Pure plumbing — P0 lands NO behavior change. These tests assert:
   (d) a simple molecule under `complete` still names correctly (falls
       through to the existing PIN path unaffected).
 
-Test strings assert EXACT output (SELF-01/OPSIN is flaky under CPU
+Test strings assert EXACT output (/OPSIN is flaky under CPU
 contention per project convention; do not rely on it here).
 """
 import pytest
@@ -81,7 +81,7 @@ class TestEngineSignaturesAcceptNewParam:
 
     def test_analyze_cage_universal_mancude_default_refused_p2_lifts(self):
         # allow_mancude=False (the default / PIN path) STILL refuses an
-        # aromatic cage -> byte-identity preserved. v26 P2 (commit ba2b8ae7)
+        # aromatic cage -> byte-identity preserved. (commit ba2b8ae7)
         # lifted the refusal under allow_mancude=True: an aromatic cage is now
         # expressed as a kekulized von-Baeyer polyene, so naphthalene analyzes
         # as a bicyclo[4.4.0] cage. (Reconciled 2026-07-21: this superseded the

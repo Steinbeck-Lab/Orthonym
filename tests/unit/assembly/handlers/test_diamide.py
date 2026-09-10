@@ -4,13 +4,13 @@ Mixed primary + N-substituted acyclic diamides (and symmetric variants)
 that previously returned 'unknown organic compound' because the
 primary_amide + secondary_amide combination was mis-counted as
 polyfunctional (double-counting the terminal secondary amide) or the
-N-alkyl carbons were swept into pg_atom_set (DROP-03) and dropped.
+N-alkyl carbons were swept into pg_atom_set  and dropped.
 
 Fix: dedicated ``name_chain_diamide`` handler dispatched at inner_dispatch
-priority 1490 (just before ester_family@1500), naming both amide ends with
-numeric-N locants per BB P-66.1.1.3.1.1.
+priority 1490 (just before ester_family), naming both amide ends with
+numeric-N locants per BB.
 
-IUPAC cite: P-66.1.1.1.1 (acyclic diamide parent) / P-66.1.1.3.1.1
+IUPAC cite: (acyclic diamide parent) /
 (N{locant} substituent prefixes).
 """
 from __future__ import annotations

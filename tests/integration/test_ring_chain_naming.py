@@ -1,7 +1,7 @@
 """
 Integration tests for ring-chain parent selection naming.
 
-Tests IUPAC P-44.1 parent selection and P-61.5 ring substituent naming
+Tests IUPAC parent selection and ring substituent naming
 for molecules containing both ring and chain systems.
 
 When a functional group is on the chain (not the ring), the chain becomes
@@ -180,10 +180,10 @@ class TestEdgeCases:
 
 @pytest.mark.integration
 class TestP441ParentCorrections:
-    """Phase 61 E2E tests: verify parent selection corrections for ring+chain compounds.
+    """a phase E2E tests: verify parent selection corrections for ring+chain compounds.
 
-    These tests validate that the P-44.1 cascade (PRNT-01 chain length, PRNT-02
-    multiple bonds) and PRNT-05 (PG proximity) changes produce correct naming
+    These tests validate that the cascade (chain length,
+    multiple bonds) and (PG proximity) changes produce correct naming
     for compounds that previously had wrong parent selection.
     """
 
@@ -221,7 +221,7 @@ class TestP441ParentCorrections:
         """Alcohol on both ring and chain, chain is longer -> chain should be parent.
 
         OC1CCCCC1CCCCO: cyclohexanol (ring, 6 atoms) + butan-1-ol chain (chain has
-        more atoms including the cyclohexyl-bearing carbon). P-44.1 chain-length
+        more atoms including the cyclohexyl-bearing carbon). chain-length
         criterion should select chain as parent when PG count ties.
         """
         result = name_compound('OC1CCCCC1CCCCO')
@@ -235,7 +235,7 @@ class TestP441ParentCorrections:
         """Multi-ring with PG: cyclohexanone + cyclohexane connected by chain.
 
         O=C1CCCCC1CCC1CCCCC1: cyclohexanone has PG directly on ring. The other
-        cyclohexane has no PG. PRNT-05 PG proximity should select cyclohexanone
+        cyclohexane has no PG. PG proximity should select cyclohexanone
         ring as the parent (senior ring system for naming).
         """
         result = name_compound('O=C1CCCCC1CCC1CCCCC1')
@@ -251,7 +251,7 @@ class TestP441ParentCorrections:
         """Pyridine + cyclohexane: pyridine is more senior ring system.
 
         c1ccncc1CCC1CCCCC1: pyridine (heterocyclic, contains N) should be
-        preferred over cyclohexane per P-44.2 ring seniority.
+        preferred over cyclohexane per ring seniority.
         """
         result = name_compound('c1ccncc1CCC1CCCCC1')
         # Pyridine should be the parent ring, cyclohexane as substituent

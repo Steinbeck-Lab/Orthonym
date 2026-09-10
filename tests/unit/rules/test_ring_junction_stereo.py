@@ -8,7 +8,7 @@ systems like decalin (decahydronaphthalene), including:
 - R/S and r/c/t notation formatting
 - cis/trans determination for simple bicyclics
 
-Reference: IUPAC 2013 Blue Book, Section P-93 (Stereoisomer Nomenclature)
+Reference: IUPAC 2013 Blue Book, Section (Stereoisomer Nomenclature)
 """
 
 import pytest

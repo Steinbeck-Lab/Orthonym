@@ -1,17 +1,17 @@
 """D3 chain_diamide handler — acyclic diamide with N-substituents.
 
 Intercepts the mixed primary + N-substituted (and symmetric) acyclic diamide
-class BEFORE ester_family(@1500) / the polyfunctional path, which otherwise
-double-count the terminal secondary amide (SELF-01 -> 'unknown') or sweep the
+class BEFORE ester_family / the polyfunctional path, which otherwise
+double-count the terminal secondary amide (-> 'unknown') or sweep the
 N-alkyl carbons into pg_atom_set and drop them (principal_group_branch_overlap -> wrong molecule).
 
-Dispatched at inner_dispatch priority 1490 (just before ester_family@1500).
+Dispatched at inner_dispatch priority 1490 (just before ester_family).
 The predicate is TIGHT (exactly 2 amide groups, both carbonyl carbons at chain
 ends) so it never intercepts mono-amides, diacids, esters, or triamides. When
 the diamide has no N-substituents (symmetric primary, e.g. butanediamide) the
 handler returns the same plain parent name the general_acyclic path produced.
 
-IUPAC cite: P-66.1.1.1.1 (acyclic diamide parent) / P-66.1.1.3.1.1
+IUPAC cite: (acyclic diamide parent) /
 (N{locant} substituent prefixes).
 
 References:

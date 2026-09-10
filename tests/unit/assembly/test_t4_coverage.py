@@ -1,9 +1,9 @@
-"""Unit tests for the T4 coverage-by-construction skeleton (Task 2).
+"""Unit tests for the coverage-by-construction skeleton (Task 2).
 
 These exercise ``name_t4_complete``'s control flow DIRECTLY, via monkeypatch
 on ``_best_effort_candidate`` -- no real ``GeneralEngineResult`` is needed
 yet (Task 3 builds the producer; Tasks 4-6 wire the cascade + namer.py). This
-module is NOT wired into ``Orthonym.name()`` until Task 4, so a test that
+module is NOT wired into ``Orthonym.name`` until Task 4, so a test that
 went through ``Orthonym(...).name(smi)`` here would exercise only the
 EXISTING namer and assert nothing about this skeleton.
 """
@@ -18,8 +18,8 @@ from orthonym.namer import Orthonym
 from orthonym.validation import coverage_gate
 from orthonym.validation.e1_certificate import verify_certificate
 
-# CLASS-A T4 target -- 2-[(dimethylamino)methyl]cyclohexan-1-ol (cid 1542461).
-# The PIN/default path abstains on it; the T4 producer names it completely.
+# CLASS-A target -- 2-[(dimethylamino)methyl]cyclohexan-1-ol (cid 1542461).
+# The PIN/default path abstains on it; the producer names it completely.
 _ABSTAINER_SMILES = "CN(C)C[C@H]1CCCC[C@H]1O"
 # An ester whose senior parent is a 2-carbon acetyl chain the general engine
 # genuinely DECLINES on (``_partition``: "unsupported suffix for pg='ester'").
@@ -51,13 +51,13 @@ def _mol():
 
 
 def _classified(smi):
-    """Build ``(mol, features)`` the way ``namer.py``'s T4 dispatch does --
+    """Build ``(mol, features)`` the way ``namer.py``'s dispatch does --
     ``self._perceive(mol, smiles, canonical); self._classify(feats)``. Task 4
     passes exactly this ``features`` shape, so the producer and its tests must
     use it too (``compute_features`` alone does NOT run ``_classify``, so it
     leaves ``principal_group`` unset -- see the Task-2 report). Perception and
-    classification are flag-independent, so a default ``Orthonym()`` builds
-    the same object the T4 dispatch would.
+    classification are flag-independent, so a default ``Orthonym`` builds
+    the same object the dispatch would.
     """
     nm = Orthonym()
     mol = Chem.MolFromSmiles(smi)
@@ -84,7 +84,7 @@ def test_declining_molecule_returns_none():
         # partial (0-partial invariant). An E1-backed rung (rungs 0-2) carries a
         # ``result_obj``; the polyol/universal FLOOR rungs carry ``result_obj is
         # None`` and are coverage-complete BY CONSTRUCTION (verified downstream
-        # by SELF-01), so accept either but reject a partial E1 object.
+        # by), so accept either but reject a partial E1 object.
         cand = t4_coverage._best_effort_candidate(mol, feats)
         assert cand is not None
         if cand.result_obj is not None:
@@ -98,9 +98,9 @@ def test_declining_molecule_returns_none():
 def test_universal_floor_names_former_unroutable_carbamate():
     """Phase B4: the organophosphorus carbamate that USED to be the clean-abstain
     fixture (``C1CCC(CC1)OC(=O)NP(=O)(Cl)Cl`` -- its recursive substituent namer
-    hit the DROP-12 depth cap) is now named by the unconditional universal
+    hit the depth cap) is now named by the unconditional universal
     floor rung, coverage-complete and carrying no ``result_obj`` (verified
-    downstream by SELF-01). This is the abstention-rate lever the phase exists
+    downstream by). This is the abstention-rate lever the phase exists
     for: a hard branch degrades to an ugly-but-valid systematic name instead of
     failing the whole molecule.
     """
@@ -199,7 +199,7 @@ def test_e1_passes_but_bond_drop_is_caught_by_the_wired_spine(monkeypatch):
     but the two undeclared cross bonds CLOSE A CYCLE that no substituent
     prefix spells (BOND_AMBIGUOUS_LINKAGE, mirroring
     ``test_p2_two_undeclared_cross_bonds_are_ambiguous`` in
-    ``test_binding_spine.py``, exercised here through the actual T4 wiring).
+    ``test_binding_spine.py``, exercised here through the actual wiring).
     Before a phase Task 2 this candidate would have SHIPPED as
     'propylpropane' for cyclohexane -- a wrong structural claim E1 cannot see.
     """
@@ -223,7 +223,7 @@ def test_e1_passes_but_bond_drop_is_caught_by_the_wired_spine(monkeypatch):
 @pytest.mark.unit
 def test_t4_ring_plus_offring_fg_is_complete():
     """The CLASS-A target (a ring parent + an off-ring FG the PIN path
-    abstains on) emits a complete name from the T4 producer.
+    abstains on) emits a complete name from the producer.
 
     ``CN(C)C[C@H]1CCCC[C@H]1O`` -> the cyclohexanol ring parent + the
     ``(dimethylamino)methyl`` off-ring substituent, atom-complete and
@@ -244,7 +244,7 @@ def test_t4_chiral_ester_alkyl_word_does_not_void_the_parent_stereo():
     that word's descriptor instead of the parent's -- reporting all 3 real
     parent centres MISSING and, under
     ``escalate=STRICT_STEREO_CHARGE_AXES``, voiding this otherwise fully
-    correct T4 candidate (an abstain, not a wrong name -- but a genuine
+    correct candidate (an abstain, not a wrong name -- but a genuine
     breadth regression this fix closes).
     """
     smi = "CC[C@]12C=CCN3CC[C@]4(C(=C(C(=O)O[C@@H](C)CC)C1)Nc1ccccc14)[C@@H]32"
@@ -285,7 +285,7 @@ def test_t4_routes_around_ester_decline():
     that principal group so the ring becomes the parent and the acyl-oxy is
     cited as an ``acetyloxy`` PREFIX -- no ester suffix -- giving a complete,
     E1-certified, OPSIN-round-tripping name. Direct producer call with
-    classified features (the exact shape namer.py's T4 dispatch passes).
+    classified features (the exact shape namer.py's dispatch passes).
 
     Gated ``opsin_gate`` because the assertion round-trips through OPSIN; the
     hook skips it when the jar is absent (green-but-blind).
@@ -325,9 +325,9 @@ def test_t4_routes_around_ester_decline():
 _POLYFUNC_COMPLETE_SMILES = "CC(=O)N[C@@H](CCCC=O)C(=O)O"  # cid 6303498
 _POLYFUNC_COMPLETE_EXPECTED = "(2S)-2-acetamido-6-oxohexanoic acid"
 
-# Molecules the T4 producer cannot complete with existing capabilities, so it
+# Molecules the producer cannot complete with existing capabilities, so it
 # HONESTLY abstains (None): perindopril's deep peptide-ester side chain hits
-# DROP-12 recursion_depth_fallback (peptide-residue follow-on), and the crotonyl
+# recursion_depth_fallback (peptide-residue follow-on), and the crotonyl
 # enamide branch is "branch unnameable" (unsaturated-acyl-substituent follow-on).
 # Neither is forced -- 0-partial holds (the design's honest-abstain bar).
 _POLYFUNC_ABSTAIN = [
@@ -340,7 +340,7 @@ _POLYFUNC_ABSTAIN = [
 @pytest.mark.opsin_gate
 def test_t4_polyfunctional_complete_coverage_locks():
     """A polyfunctional molecule (amide + aldehyde + acid + stereo) is named by
-    the T4 universal-decomposition path with EVERY heavy atom bound (E1-complete)
+    the universal-decomposition path with EVERY heavy atom bound (E1-complete)
     and the name OPSIN-round-trips. This locks the complete-coverage contract for
     the polyfunctional class -- a fragment-drop here would fail E1, and a
     constitution error would fail the round-trip.
@@ -369,7 +369,7 @@ def test_t4_polyfunctional_complete_coverage_locks():
 @pytest.mark.unit
 @pytest.mark.parametrize("smi", _POLYFUNC_ABSTAIN)
 def test_t4_polyfunctional_honest_abstain_no_partial(smi):
-    """A polyfunctional molecule the T4 producer cannot COMPLETE abstains
+    """A polyfunctional molecule the producer cannot COMPLETE abstains
     honestly (None) -- never a bare fragment / partial. This is the corrected,
     strengthened form of the brief's Step-1 test: the atom-drop it worried about
     (a scaffold named while side chains are dropped) does NOT happen here,
@@ -394,14 +394,14 @@ def test_t4_polyfunctional_honest_abstain_no_partial(smi):
 
 # --- Task 4: the through-namer integration test (Tasks 2/3 deferred this) ---
 # The meaningful proof of the wiring: a molecule the PIN/default path abstains
-# on must EMIT a complete name once the best-effort/unverified T4 tier is opted
-# in -- and it must round-trip OPSIN-exact (SELF-01), since the wiring routes
-# the T4 name through the same final round-trip ladder the engine's own name
+# on must EMIT a complete name once the best-effort/unverified tier is opted
+# in -- and it must round-trip OPSIN-exact , since the wiring routes
+# the name through the same final round-trip ladder the engine's own name
 # gets. Kept in this file (not the isolation file) because it needs a live OPSIN
 # JVM; the isolation file stays JVM-cheap. The exact string is the producer's
 # verified emission for cid 1542461.
 #
-# Enclosing marks per P-16.5.2.4 ("Brackets enclose substituent prefixes in
+# Enclosing marks per ("Brackets enclose substituent prefixes in
 # which parentheses have already been used", the Blue Book, verbatim PIN
 # example ``4-[(hydroxyselanyl)methyl]benzoic acid``): the compound prefix
 # ``(dimethylamino)methyl`` already uses parentheses, so its enclosure is SQUARE
@@ -409,7 +409,7 @@ def test_t4_polyfunctional_honest_abstain_no_partial(smi):
 # expectation was a stale non-PIN spelling recorded before the enclosing-mark
 # convention was corrected; the producer emits the correct bracket form (proven
 # to be identical with and without the Phase-B4 universal-floor rung -- it comes
-# from an earlier T4 rung this task's diff did not touch), and OPSIN round-trips
+# from an earlier rung this task's diff did not touch), and OPSIN round-trips
 # both spellings to the same structure (the bracket form is the PIN).
 _T4_TARGET_EXPECTED = "(1R,2R)-2-[(dimethylamino)methyl]cyclohexan-1-ol"
 
@@ -418,13 +418,13 @@ _T4_TARGET_EXPECTED = "(1R,2R)-2-[(dimethylamino)methyl]cyclohexan-1-ol"
 @pytest.mark.opsin_gate
 def test_t4_wired_into_namer_emits_for_abstainer():
     """`Orthonym(general_fallback=True, general_fallback_unverified=True)`
-    emits the complete, atom-covering, OPSIN-round-tripping T4 name for the
+    emits the complete, atom-covering, OPSIN-round-tripping name for the
     CLASS-A abstainer that the default PIN path cannot name.
 
     Runs with the OPSIN validity gate ON (``opsin_gate`` marker): under the
     conftest default (gate OFF) the PIN path ships an atom-DROPPED wrong name
-    ((1R,2R)-2-aminocyclohexan-1-ol) that SELF-01 would suppress, so the
-    abstention path the T4 producer sits behind is only reached with the gate
+    ((1R,2R)-2-aminocyclohexan-1-ol) that would suppress, so the
+    abstention path the producer sits behind is only reached with the gate
     live. The hook skips this test if the OPSIN jar is absent (green-but-blind).
     """
     from orthonym.jvm_budget import jvm_slots
@@ -441,9 +441,9 @@ def test_t4_wired_into_namer_emits_for_abstainer():
 @pytest.mark.unit
 @pytest.mark.opsin_gate
 def test_t4_wiring_does_not_fire_without_unverified_optin():
-    """The T4 producer is gated on `general_fallback_unverified`: with only the
+    """The producer is gated on `general_fallback_unverified`: with only the
     (conservative) verified general-fallback tier on, the abstainer still
-    abstains -- the aggressive T4 producer must not run for it. Gate ON for the
+    abstains -- the aggressive producer must not run for it. Gate ON for the
     same reason as the emission test above.
     """
     from orthonym.jvm_budget import jvm_slots
@@ -458,19 +458,19 @@ def test_t4_wiring_does_not_fire_without_unverified_optin():
 @pytest.mark.unit
 @pytest.mark.opsin_gate
 def test_t4_unparseable_name_abstains_not_ships_unverified(monkeypatch):
-    """FINAL-REVIEW FIX 1: a T4 producer name OPSIN CANNOT PARSE must make the
-    T4 recovery path ABSTAIN (None), never ship it with opsin_status='unverified'.
+    """FINAL-REVIEW FIX 1: a producer name OPSIN CANNOT PARSE must make the
+     recovery path ABSTAIN (None), never ship it with opsin_status='unverified'.
 
     The shared emit ladder's ``elif not general_fallback_unverified: return None``
-    is False for the T4 opt-in, so BEFORE the fix an unparseable T4 name shipped
-    unverified. The fix flags the T4 origin (``_cand_from_t4``) so that branch
-    rejects it -- a T4 name must POSITIVELY round-trip or abstain. E1 proves atom
+    is False for the opt-in, so BEFORE the fix an unparseable name shipped
+    unverified. The fix flags the origin (``_cand_from_t4``) so that branch
+    rejects it -- a name must POSITIVELY round-trip or abstain. E1 proves atom
     COVERAGE (so never a wrong MOLECULE), but a name OPSIN cannot parse is
     malformed and must not ship.
 
     Uses the CLASS-A abstainer, which the acceptance probe confirms enters the
-    T4 branch of ``_try_general_engine_recovery`` (its own engine attempt
-    declines at allow_aromatic_general=False, so the T4 producer is invoked).
+     branch of ``_try_general_engine_recovery`` (its own engine attempt
+    declines at allow_aromatic_general=False, so the producer is invoked).
     The first assertion proves the fix does NOT over-reject: the real producer's
     positively-round-tripping name still ships.
     """
@@ -480,12 +480,12 @@ def test_t4_unparseable_name_abstains_not_ships_unverified(monkeypatch):
 
     with jvm_slots(1, purpose="test-t4-fix1-unparseable"):
         nm = Orthonym(general_fallback=True, general_fallback_unverified=True)
-        # (1) the real producer's valid name DOES ship (T4 branch entered; the
-        # fix leaves a positively-round-tripping T4 name untouched).
+        # (1) the real producer's valid name DOES ship (branch entered; the
+        # fix leaves a positively-round-tripping name untouched).
         shipped = nm._try_general_engine_recovery(_ABSTAINER_SMILES)
         assert shipped is not None and not is_failure_name(shipped), shipped
         assert shipped == _T4_TARGET_EXPECTED, shipped
-        # (2) force the hole: an unparseable T4 name must now ABSTAIN, not ship.
+        # (2) force the hole: an unparseable name must now ABSTAIN, not ship.
         monkeypatch.setattr(
             t4_coverage, "name_t4_complete",
             lambda mol, feats: "zzz-not-a-real-iupac-name-zzz")
@@ -539,7 +539,7 @@ def test_t4_backbone_acceptance_probe():
     molecule, e.g. from a silently dropped fragment).
 
     The only hard assertion is ``partial_count == 0`` -- the 0-wrong contract
-    for the T4 backbone. The converted count is recorded (printed, visible
+    for the backbone. The converted count is recorded (printed, visible
     with ``-s``) purely informationally; NO threshold is asserted on it,
     because that number is expected to grow as the follow-on per-class
     sub-namers (heterocyclic unsaturation, decorated-ring substituents, fused
@@ -548,11 +548,11 @@ def test_t4_backbone_acceptance_probe():
     work that hasn't happened yet.
 
     Both ``general_fallback`` and ``general_fallback_unverified`` are
-    required to reach the T4 tier (see
+    required to reach the tier (see
     ``test_t4_wiring_does_not_fire_without_unverified_optin`` above -- the
     verified-only tier does not run this producer). Runs under
-    ``opsin_gate`` so the PIN path's own SELF-01 round-trip gate is live,
-    matching how T4 is actually reached in production (T4 only fires once
+    ``opsin_gate`` so the PIN path's own round-trip gate is live,
+    matching how is actually reached in production (only fires once
     the gated PIN/general path has honestly abstained).
     """
     from orthonym.errors import is_failure_name
@@ -626,7 +626,7 @@ def test_cascade_rung2_is_a_unique_producer():
     rung 0 (perceived PG) NOR rung 1 (PG-suppressed + chain_is_parent=False)
     can -- proving rung 2 is the sole producer for the ring-less/chain-preferred
     class, not redundant with rung 1. Runs under ``opsin_gate`` so the general
-    engine's internal validity suppression matches how T4 is reached in
+    engine's internal validity suppression matches how is reached in
     production (and how the measuring probe ran).
     """
     from orthonym.jvm_budget import jvm_slots

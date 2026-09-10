@@ -1,4 +1,4 @@
-"""`_ORGANIC_ELEMENTS` is NOT the gate that blocks the P-68 elements.
+"""`_ORGANIC_ELEMENTS` is NOT the gate that blocks the elements.
 
  Phase A Task 1 planned to widen `errors._ORGANIC_ELEMENTS` by
 {As, Sb, Bi, Ge, Sn, Pb, Te}, on the recorded premise that it is "the single
@@ -14,7 +14,7 @@ Both halves were refuted by measurement on 2026-08-04:
    and `assembly/composer.py:8264`, a FAIL-CLOSED guard that refuses a
    substituent branch carrying an unnameable non-organic element.
 
-2. A paired two-arm run over the 90 P-68 rows of the Blue Book conformance
+2. A paired two-arm run over the 90 rows of the Blue Book conformance
    corpus (`benchmarks/bb_conformance/`), one fresh process per arm so no cache
    could serve one arm's answer to the other: **90 of 90 rows changed, and 0
    gained a name.** Every row moved from a specific refusal
@@ -29,7 +29,7 @@ Both halves were refuted by measurement on 2026-08-04:
    the trace looked green: they were never blocked.
 
 The real blocker for the largest nameable slice of those rows was the
-Hantzsch-Widman six-membered-ring stem (P-22.2.2.1.6) -- see
+Hantzsch-Widman six-membered-ring stem -- see
 `tests/unit/data/test_hw_six_ring_least_senior_stem.py`.
 
 This test exists so the refuted change cannot be re-attempted silently. It is

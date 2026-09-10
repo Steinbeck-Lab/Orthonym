@@ -1,9 +1,9 @@
-"""P-29.2 free-valence morphology for CARBON substituent prefixes.
+""" free-valence morphology for CARBON substituent prefixes.
 
-Phase 1b. A substituent prefix names a free valence, and IUPAC P-29.2 fixes
+a phase. A substituent prefix names a free valence, and IUPAC fixes
 its morphology by the NUMBER of free valences on the attachment atom:
 
-    -yl      one free valence     (single bond to the parent)
+    -yl one free valence (single bond to the parent)
     -ylidene two on the same atom (double bond to the parent)
     -ylidyne three on the same atom (triple bond to the parent)
 
@@ -25,8 +25,8 @@ Two things are pinned here:
 The single-bond controls are the byte-identity half: for ``free_valence == 1``
 the new gate must be a strict no-op.
 
-References: IUPAC 2013 P-29.2, P-29.3.2 (free valence gets the lowest locant
-consistent with the chain numbering), P-29.6.2.3 (retained ``propyl``-style
+References: IUPAC 2013, (free valence gets the lowest locant
+consistent with the chain numbering), (retained ``propyl``-style
 unbranched stems, hence ``propylidene`` rather than ``propan-1-ylidene``).
 """
 import pytest
@@ -84,7 +84,7 @@ class TestFreeValenceAtAttachment:
 
     def test_multi_point_attachment_is_undecidable(self):
         """A fragment bonded to the parent at more than one place is a bridge
-        (P-25), not a substituent prefix. Return None -- out of scope, and the
+        , not a substituent prefix. Return None -- out of scope, and the
         caller must not treat it as a single free valence."""
         # spiro: the CH2CH2CH2CH2 fragment touches the parent ring twice
         mol = _mol("C1CCC2(CC1)CCCC2")
@@ -112,7 +112,7 @@ class TestFreeValenceAtAttachment:
 
 
 class TestCarbonYlidenePrefixes:
-    """P-29.2 morphology emitted from the actual attachment bond order."""
+    """ morphology emitted from the actual attachment bond order."""
 
     def test_exocyclic_methylene_is_methylidene_not_methyl(self):
         """THE defect. =CH2 on a ring carbon is ``methylidene``; ``methyl``
@@ -124,7 +124,7 @@ class TestCarbonYlidenePrefixes:
 
     def test_propan_2_ylidene(self):
         """Free valence in the middle of the chain: the lowest locant it can
-        take is 2 (P-29.3.2), so the enclosing-mark-free token is
+        take is 2, so the enclosing-mark-free token is
         ``propan-2-ylidene``, not ``propylidene``."""
         assert name_substituent(_mol("CC(C)=C1CCCCC1"),
                                 {0, 1, 2}, 1) == "propan-2-ylidene"
@@ -135,8 +135,8 @@ class TestCarbonYlidenePrefixes:
                                 {0, 1, 2}, 2) == "propylidene"
 
     def test_methylidyne(self):
-        """Three free valences on one carbon -- P-29.2 ``-ylidyne``."""
-        # HC(triple)C-  :  the terminal CH of a chain triple-bonded to a
+        """Three free valences on one carbon -- ``-ylidyne``."""
+        # HC(triple)C-: the terminal CH of a chain triple-bonded to a
         # fragment boundary. Build it explicitly: propyne, fragment = {0}
         # (the CH), attached to C1 by a triple bond.
         mol = _mol("C#CC1CCCCC1")
@@ -154,7 +154,7 @@ class TestCarbonYlidenePrefixes:
         mol = _mol("CC(C)C1CCCCC1")
         assert _carbon_ylidene_prefix(mol, {0, 1, 2}, 1, 1) is None
         assert _carbon_ylidene_prefix(_mol("CC1CCCCC1"), {0}, 0, 1) is None
-        # ... while the multivalent asks are answered from the same fragment
+        #... while the multivalent asks are answered from the same fragment
         # shape, so the refusal above is about the VALENCE, not the fragment.
         assert _carbon_ylidene_prefix(
             _mol("CC(C)=C1CCCCC1"), {0, 1, 2}, 1, 2) == "propan-2-ylidene"
@@ -244,7 +244,7 @@ class TestFailsClosedOutsideTheClass:
         round-trips the exact input), so it is no longer an abstention and
         cannot demonstrate one. The boronic-acid ylidene below still is: the
         recursive namer produces no readable single-valence reading for it, so
-        the gate has nothing to give the P-29.2 morpheme to.
+        the gate has nothing to give the morpheme to.
         """
         mol = _mol("OB(O)C=C1CCCCC1")
         assert _free_valence_at_attachment(mol, {0, 1, 2, 3}, 3) == 2

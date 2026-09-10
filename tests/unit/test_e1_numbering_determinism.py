@@ -1,13 +1,13 @@
-"""v22 Phase E1 (DD4) — numbering + locant determinism.
+""" Phase E1 (DD4) — numbering + locant determinism.
 
 Rule-family coverage (guardrail A8: test the NAME OUTPUT, parameterized by rule
 family, not a literal canary) for the three numbering engines routed through the
 single shared ``compare_numbering`` comparator + ``ELEMENT_NUMBERING_SENIORITY``:
 
-  * H2 skeletal-replacement element-seniority tie-break (P-15.4.1.2)
-  * H1 fused-PAH / fused-heterocycle automorphism-minimization (P-25.3.3.1.2(a))
+  * H2 skeletal-replacement element-seniority tie-break
+  * H1 fused-PAH / fused-heterocycle automorphism-minimization (a))
   * acridine ``iupac_locants`` data correction (re-derived via OPSIN)
-  * benzene P-14.4(c) PCG-anchor tier (additive, default-off)
+  * benzene (c) PCG-anchor tier (additive, default-off)
   * determinism: name(SMILES) == name(seeded re-spellings)
 """
 import random
@@ -44,7 +44,7 @@ def _respell_names(namer, smiles, k=6):
 
 
 # --------------------------------------------------------------------------- #
-# ELEMENT_NUMBERING_SENIORITY (single source of truth) + derived table         #
+# ELEMENT_NUMBERING_SENIORITY (single source of truth) + derived table #
 # --------------------------------------------------------------------------- #
 class TestElementSeniorityConstant:
     def test_canonical_order_prefix(self):
@@ -74,7 +74,7 @@ class TestElementSeniorityConstant:
 
 
 # --------------------------------------------------------------------------- #
-# compare_numbering tier behaviour                                             #
+# compare_numbering tier behaviour #
 # --------------------------------------------------------------------------- #
 class TestCompareNumbering:
     def test_pcg_tier_dominates(self):
@@ -108,7 +108,7 @@ class TestCompareNumbering:
         assert compare_numbering(a, b) == 0
 
     def test_alpha_tier(self):
-        # P-14.4(g) lowest locant to the alphabetically-first prefix: the tier
+        # (g) lowest locant to the alphabetically-first prefix: the tier
         # compares the supplied sortable keys; None (no prefix at position 1)
         # sorts last.
         assert compare_numbering({"alpha": (("bromo", 1),)},
@@ -119,19 +119,19 @@ class TestCompareNumbering:
         assert compare_numbering({"alpha": None}, {"alpha": (("a", 1),)}) == 1
 
     def test_pcg_outranks_substituents(self):
-        # WR-01 PAH PCG-anchor: pcg locant set is compared before substituents.
+        # PAH PCG-anchor: pcg locant set is compared before substituents.
         assert compare_numbering({"pcg": [2], "substituents": [6]},
                                  {"pcg": [6], "substituents": [2]}) == -1
 
 
 # --------------------------------------------------------------------------- #
-# H2 — skeletal-replacement element-seniority determinism                      #
+# H2 — skeletal-replacement element-seniority determinism #
 # --------------------------------------------------------------------------- #
 class TestSkeletalReplacementSeniority:
     @pytest.mark.parametrize("smiles", ["COCSC", "CSCOC"])
     def test_oxa_thia_carbon_over_ether_pin(self, namer, smiles):
-        # v22 Phase E2 (SEN-02): COCSC now routes to the carbon-parent PIN
-        # methoxy(methylsulfanyl)methane (P-41 cls 40 > 41/42), not the skeletal
+        # Phase E2 : COCSC now routes to the carbon-parent PIN
+        # methoxy(methylsulfanyl)methane cls 40 > 41/42), not the skeletal
         # 2-oxa-4-thiapentane. E1 made it DETERMINISTIC (both SMILES orders give one
         # name — still true); E2 made it the correct PIN. The O-senior-to-S element
         # numbering tiebreak is still covered directly at the comparator level by
@@ -140,9 +140,9 @@ class TestSkeletalReplacementSeniority:
 
     @pytest.mark.parametrize("smiles", ["COCNC", "CNCOC"])
     def test_oxa_aza_senior_oxygen_low_locant(self, namer, smiles):
-        # P-62.2.2: amine Gate 2c blocks '2-oxa-4-azapentane' (skeletal replacement).
+        #: amine Gate 2c blocks '2-oxa-4-azapentane' (skeletal replacement).
         # The N is bonded only to C atoms → substitutive naming on the carbon
-        # parent. Per P-14.3.4.2(a) / P-14.3.4.4 a single-carbon (mononuclear
+        # parent. Per (a) / a single-carbon (mononuclear
         # 'methane') parent omits ALL trivially-'1' locants (cf. BB 'chloromethanol',
         # line 5110), so the PIN is 'methoxy-N-methylmethanamine' (no '1' on the
         # methoxy prefix or the amine suffix). Determinism is maintained (both
@@ -159,14 +159,14 @@ class TestSkeletalReplacementSeniority:
 
 
 # --------------------------------------------------------------------------- #
-# H1 — fused PAH automorphism-minimization                                     #
+# H1 — fused PAH automorphism-minimization #
 # --------------------------------------------------------------------------- #
 class TestPolycyclicAutomorphismMin:
     def test_methylanthracene_pin(self, namer):
         assert _name(namer, "Cc1ccc2cc3ccccc3cc2c1") == "2-methylanthracene"
 
     def test_anthracene_amine_locant(self, namer):
-        # v28 Cluster A Fix 2 (P-62.2.1.2 / P-14.4(c) / P-16.7.1(a)): the primary
+        # Fix 2 / (c) / (a)): the primary
         # amine is the molecular principal group -> '-amine' SUFFIX with the
         # automorphism-min PCG locant, not the 'amino' prefix.
         assert _name(namer, "Nc1ccc2cc3ccccc3cc2c1") == "anthracen-2-amine"
@@ -182,8 +182,8 @@ class TestPolycyclicAutomorphismMin:
         assert _name(namer, smiles) == expected
 
     def test_pah_pcg_outranks_prefix_substituent(self, namer):
-        # WR-01: the principal characteristic group (carboxylic acid suffix) must
-        # take the lowest locant before the detachable methyl prefix (P-14.4(c)).
+        #: the principal characteristic group (carboxylic acid suffix) must
+        # take the lowest locant before the detachable methyl prefix (c)).
         assert _name(namer, "Cc1ccc2cc(C(=O)O)ccc2c1") == "6-methylnaphthalene-2-carboxylic acid"
 
     def test_pah_single_suffix_unchanged(self, namer):
@@ -203,23 +203,23 @@ class TestPolycyclicAutomorphismMin:
     ])
     def test_pah_primary_amine_suffix(self, namer, smiles, expected):
         # Fix 2 extension: primary amine as principal group on naphthalene ->
-        # '-amine' suffix, automorphism-min locant (P-62.2.1.2 / P-14.4(c)).
+        # '-amine' suffix, automorphism-min locant / (c)).
         assert _name(namer, smiles) == expected
 
     def test_pah_amine_stays_prefix_when_acid_senior(self, namer):
         # A senior suffix (carboxylic acid) present -> amine demotes to the
-        # 'amino' PREFIX; the acid keeps the '-carboxylic acid' suffix (P-41).
+        # 'amino' PREFIX; the acid keeps the '-carboxylic acid' suffix.
         assert _name(namer, "Nc1ccc2cc(C(=O)O)ccc2c1") == "6-aminonaphthalene-2-carboxylic acid"
 
     def test_pah_amine_stays_prefix_under_senior_hydroxy(self, namer):
-        # -OH is senior to -NH2 (P-41 Table 4.1: hydroxy class 17 > amine class 19,
-        # BB:18190/:18192), so the ring -OH is the principal characteristic group and
+        # -OH is senior to -NH2: hydroxy class 17 > amine class 19,
+        # the Blue Book), so the ring -OH is the principal characteristic group and
         # renders as the '-ol' SUFFIX while the amine stays the 'amino' PREFIX.
-        # RB-1: the '-ol' PCG must also claim the LOWER symmetry-equivalent locant
-        # BEFORE the amino prefix (P-14.4(c), BB:3256; naphthalene example :3262).
+        #: the '-ol' PCG must also claim the LOWER symmetry-equivalent locant
+        # BEFORE the amino prefix (c), the Blue Book; naphthalene example:3262).
         # (The prior assertion `2-amino-6-hydroxynaphthalene` was doubly stale: the
         # '-ol' promotion had already landed AND the PCG did not yet claim the low
-        # locant -- this test was already red at BASE before the RB-1 fix.)
+        # locant -- this test was already red at BASE before the fix.)
         assert _name(namer, "Nc1ccc2cc(O)ccc2c1") == "6-aminonaphthalen-2-ol"
 
     def test_populated_pahs_never_use_naphthalene_heuristic(self, monkeypatch):
@@ -244,7 +244,7 @@ class TestPolycyclicAutomorphismMin:
 
 
 # --------------------------------------------------------------------------- #
-# Azulene substituent path (now wired via iupac_numbering)                     #
+# Azulene substituent path (now wired via iupac_numbering) #
 # --------------------------------------------------------------------------- #
 class TestAzuleneSubstituentPath:
     def test_bare_azulene(self, namer):
@@ -280,7 +280,7 @@ class TestAzuleneSubstituentPath:
 
 
 # --------------------------------------------------------------------------- #
-# Acridine data fix + fused-heterocycle automorphism-min                       #
+# Acridine data fix + fused-heterocycle automorphism-min #
 # --------------------------------------------------------------------------- #
 class TestAcridineAndFusedHeterocycles:
     def test_acridin_2_amine_pin(self, namer):
@@ -321,7 +321,7 @@ class TestAcridineAndFusedHeterocycles:
 
 
 # --------------------------------------------------------------------------- #
-# Benzene P-14.4(c) PCG tier (additive, default-off)                           #
+# Benzene (c) PCG tier (additive, default-off) #
 # --------------------------------------------------------------------------- #
 class TestBenzenePcgTier:
     @pytest.mark.parametrize("smiles,expected", [

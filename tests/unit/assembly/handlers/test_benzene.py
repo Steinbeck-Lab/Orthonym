@@ -1,10 +1,10 @@
-"""Phase 160 Plan-04 per-handler test STUB for ``benzene`` (DEFERRED).
+"""a phase Plan-04 per-handler test STUB for ``benzene`` (DEFERRED).
 
 This handler is one of the 8 NOT YET EXTRACTED handlers per Plan-02 +
-Plan-03 honest-fail (CONTEXT D-27): byte-identical extraction requires
-architectural changes beyond Phase 160 scope.
+Plan-03 honest-fail (internal notes): byte-identical extraction requires
+architectural changes beyond a phase scope.
 
-Per ADR-19-02: a future v19.x follow-up plan must:
+Per -02: a future.x follow-up plan must:
   - Extract the handler from composer.py:_assemble_name_impl inline branch.
   - Add an InnerDispatchEntry registration at the appropriate priority.
   - Update this test file to exercise the real handler.

@@ -1,4 +1,4 @@
-"""Phase 27: Isoindoline locant mapping tests.
+"""a phase: Isoindoline locant mapping tests.
 
 Tests that the iupac_locants mapping in FUSED_HETEROCYCLE_DATA for isoindoline
 produces correct IUPAC locants from the perception layer -- no postprocessor
@@ -31,15 +31,15 @@ class TestIsoindolineDioneLocants:
     def test_hydroxy_phthalimide(self):
         """Hydroxy-substituted phthalimide has correct locants.
 
-        v29 Phase C: the ring-system stem follows its PIN parent (P-54.4.3.2,
-        BB:24256 / BB:16999).
+         Phase C: the ring-system stem follows its PIN parent,
+        the Blue Book / the Blue Book).
 
         ⚠ The `6-hydroxy` this test used to demand was ALREADY WRONG and this test
         was ALREADY FAILING before the rename -- a HEAD A/B shows HEAD emitting
         `5-hydroxyisoindoline-1,3-dione`. The locant 5 is correct and was not
         changed here: both carbonyls of an isoindole-1,3-dione are equivalent so
         either may be C1, the reflection through N2 maps 4<->7 and 5<->6 with the
-        N-substituent ON that axis, and P-14.3.5 takes the lower locant. Recorded
+        N-substituent ON that axis, and takes the lower locant. Recorded
         so nobody credits the rename with a locant fix it did not make.
         """
         name = name_compound("O=C1CCC(N2C(=O)c3ccc(O)cc3C2=O)C(=O)N1")
@@ -109,9 +109,9 @@ class TestIsoindolineIndex200:
 
         from orthonym.validation.opsin_roundtrip import _find_opsin_jar
 
-        # Phase 157 cleanup: route through the canonical _find_opsin_jar
-        # helper instead of hardcoded "opsin-cli-2.8.0-...jar". Phase 138
-        # D-22 + Phase 156 D-09 establish opsin-cli-2.9.0 as the project's
+        # a phase cleanup: route through the canonical _find_opsin_jar
+        # helper instead of hardcoded "opsin-cli-2.8.0-...jar". a phase
+        # + a phase establish opsin-cli-2.9.0 as the project's
         # primary oracle JAR; the hardcoded 2.8.0 path was dead since the
         # JAR was upgraded. Helper falls back gracefully if a JAR is
         # absent, and pytest skips rather than emits a misleading parse

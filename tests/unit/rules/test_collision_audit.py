@@ -1,13 +1,13 @@
 """
 Collision resolution audit tests for functional group detection.
 
-Verifies that _resolve_fg_collisions() correctly handles all overlap
+Verifies that _resolve_fg_collisions correctly handles all overlap
 scenarios between FG patterns, including new seniority entries from
-Phase 093 Plan 01 and all existing collision rules (PERC-01, PERC-02,
-PERC-03, USUB-11).
+a phase Plan 01 and all existing collision rules (,,
+,).
 
-Requirements: QUAL-01 (zero regressions), QUAL-02 (canary stability),
-              QUAL-04 (collision coverage)
+Requirements: (zero regressions), (canary stability),
+               (collision coverage)
 """
 
 import pytest
@@ -62,7 +62,7 @@ class TestThioesterCollisions:
 
 
 class TestImideCollisions:
-    """Imide (C(=O)-N-C(=O)) must suppress overlapping amide matches (USUB-11)."""
+    """Imide (C(=O)-N-C(=O)) must suppress overlapping amide matches ."""
 
     def test_imide_detected(self):
         """Succinimide detects as imide."""
@@ -70,14 +70,14 @@ class TestImideCollisions:
         assert "imide" in fgs
 
     def test_imide_suppresses_primary_amide(self):
-        """Imide suppresses primary_amide on overlapping atoms (USUB-11)."""
+        """Imide suppresses primary_amide on overlapping atoms ."""
         fgs = _detect("O=C1CCC(=O)N1")
         assert "primary_amide" not in fgs, (
             "USUB-11: imide atoms should suppress overlapping amide"
         )
 
     def test_imide_suppresses_secondary_amide(self):
-        """Imide suppresses secondary_amide on overlapping atoms (USUB-11)."""
+        """Imide suppresses secondary_amide on overlapping atoms ."""
         fgs = _detect("O=C1CCC(=O)N1")
         assert "secondary_amide" not in fgs
 
@@ -101,7 +101,7 @@ class TestAzidoCollisions:
     """Azido (N=N+=N-) detection and imine collision."""
 
     def test_azido_detected(self):
-        """Methyl azide detects azido FG (SMARTS [N;+0]=[N+]=[N-] fixed in SUB-01;
+        """Methyl azide detects azido FG (SMARTS [N;+0]=[N+]=[N-] fixed in;
         the stale xfail referencing the old [NX1]=... pattern is removed in 169.7)."""
         fgs = _detect("CN=[N+]=[N-]")
         assert "azido" in fgs
@@ -116,7 +116,7 @@ class TestAzidoCollisions:
 
 
 class TestCyanateCollisions:
-    """Cyanate (O-C#N) must suppress ether + nitrile (PERC-03)."""
+    """Cyanate (O-C#N) must suppress ether + nitrile ."""
 
     def test_cyanate_detected(self):
         """Methyl cyanate detects cyanate FG."""
@@ -124,14 +124,14 @@ class TestCyanateCollisions:
         assert "cyanate" in fgs
 
     def test_cyanate_suppresses_ether(self):
-        """Cyanate suppresses ether on overlapping O atom (PERC-03)."""
+        """Cyanate suppresses ether on overlapping O atom ."""
         fgs = _detect("COC#N")
         assert "ether" not in fgs, (
             "PERC-03: cyanate O should not also be detected as ether"
         )
 
     def test_cyanate_suppresses_nitrile(self):
-        """Cyanate suppresses nitrile on overlapping C#N atoms (PERC-03)."""
+        """Cyanate suppresses nitrile on overlapping C#N atoms ."""
         fgs = _detect("COC#N")
         assert "nitrile" not in fgs, (
             "PERC-03: cyanate C#N should not also be detected as nitrile"
@@ -139,7 +139,7 @@ class TestCyanateCollisions:
 
 
 class TestThiocyanateCollisions:
-    """Thiocyanate (S-C#N) must suppress thioether + nitrile (PERC-03)."""
+    """Thiocyanate (S-C#N) must suppress thioether + nitrile ."""
 
     def test_thiocyanate_detected(self):
         """Methyl thiocyanate detects thiocyanate FG."""
@@ -147,14 +147,14 @@ class TestThiocyanateCollisions:
         assert "thiocyanate" in fgs
 
     def test_thiocyanate_suppresses_thioether(self):
-        """Thiocyanate suppresses thioether on overlapping S atom (PERC-03)."""
+        """Thiocyanate suppresses thioether on overlapping S atom ."""
         fgs = _detect("CSC#N")
         assert "thioether" not in fgs, (
             "PERC-03: thiocyanate S should not also be detected as thioether"
         )
 
     def test_thiocyanate_suppresses_nitrile(self):
-        """Thiocyanate suppresses nitrile on overlapping C#N atoms (PERC-03)."""
+        """Thiocyanate suppresses nitrile on overlapping C#N atoms ."""
         fgs = _detect("CSC#N")
         assert "nitrile" not in fgs, (
             "PERC-03: thiocyanate C#N should not also be detected as nitrile"
@@ -162,7 +162,7 @@ class TestThiocyanateCollisions:
 
 
 class TestAzoCollisions:
-    """Azo (C-N=N-C) must suppress imine (PERC-03)."""
+    """Azo (C-N=N-C) must suppress imine ."""
 
     def test_azo_detected(self):
         """Azomethane detects azo FG."""
@@ -170,7 +170,7 @@ class TestAzoCollisions:
         assert "azo" in fgs
 
     def test_azo_suppresses_imine(self):
-        """Azo suppresses imine on overlapping N=N atoms (PERC-03)."""
+        """Azo suppresses imine on overlapping N=N atoms ."""
         fgs = _detect("CN=NC")
         assert "imine" not in fgs, (
             "PERC-03: azo N=N should not also be detected as imine"
@@ -178,11 +178,11 @@ class TestAzoCollisions:
 
 
 # ===========================================================================
-# 2. Existing collision stability (PERC-01, PERC-02, PERC-03, USUB-11)
+# 2. Existing collision stability (,,,)
 # ===========================================================================
 
 class TestCarboxylicAcidAldehydeCollision:
-    """Carboxylic acid C=O must suppress aldehyde (PERC-01)."""
+    """Carboxylic acid C=O must suppress aldehyde ."""
 
     def test_carboxylic_acid_detected(self):
         """Acetic acid detects carboxylic_acid."""
@@ -190,7 +190,7 @@ class TestCarboxylicAcidAldehydeCollision:
         assert "carboxylic_acid" in fgs
 
     def test_carboxylic_acid_suppresses_aldehyde(self):
-        """Carboxylic acid C=O should not also match aldehyde (PERC-01)."""
+        """Carboxylic acid C=O should not also match aldehyde ."""
         fgs = _detect("CC(=O)O")
         assert "aldehyde" not in fgs, (
             "PERC-01: carboxylic acid C=O should suppress aldehyde"
@@ -198,7 +198,7 @@ class TestCarboxylicAcidAldehydeCollision:
 
 
 class TestAromaticAminePrimaryAmineCollision:
-    """Aromatic amine must suppress primary_amine (PERC-02)."""
+    """Aromatic amine must suppress primary_amine ."""
 
     def test_aromatic_amine_detected(self):
         """Aniline detects aromatic_amine."""
@@ -206,7 +206,7 @@ class TestAromaticAminePrimaryAmineCollision:
         assert "aromatic_amine" in fgs
 
     def test_aromatic_amine_suppresses_primary_amine(self):
-        """Aromatic amine suppresses primary_amine on overlapping N atom (PERC-02)."""
+        """Aromatic amine suppresses primary_amine on overlapping N atom ."""
         fgs = _detect("Nc1ccccc1")
         assert "primary_amine" not in fgs, (
             "PERC-02: aromatic_amine should suppress primary_amine"
@@ -214,7 +214,7 @@ class TestAromaticAminePrimaryAmineCollision:
 
 
 class TestHydroxamicAcidCollisions:
-    """Hydroxamic acid must suppress amide + alcohol (PERC-03)."""
+    """Hydroxamic acid must suppress amide + alcohol ."""
 
     def test_hydroxamic_acid_detected(self):
         """Acetohydroxamic acid detects hydroxamic_acid."""
@@ -305,13 +305,13 @@ class TestEdgeCases:
         )
 
     def test_ester_suppresses_aldehyde(self):
-        """Ester C=O must not also match aldehyde (PERC-01)."""
+        """Ester C=O must not also match aldehyde ."""
         fgs = _detect("CC(=O)OC")
         assert "ester" in fgs
         assert "aldehyde" not in fgs
 
     def test_acid_chloride_suppresses_aldehyde(self):
-        """Acid chloride C=O must not also match aldehyde (PERC-01)."""
+        """Acid chloride C=O must not also match aldehyde ."""
         fgs = _detect("CC(=O)Cl")
         assert "acid_chloride" in fgs
         assert "aldehyde" not in fgs

@@ -1,8 +1,8 @@
-"""v31: the P5 fusion-word upgrade in the general engine must NOT preempt the
+""": the P5 fusion-word upgrade in the general engine must NOT preempt the
 von-Baeyer polyene when the fused parent carries a λ (non-standard-valence) ring
 atom the bare fusion word cannot express. Regression: `c1ccc2c(c1)O[SH2]O2`
 (λ4-sulfur) returned the catalog fusion word `[1,3,2]benzodioxathiole` — which
-denotes the DIVALENT-S ring, a different molecule (SELF-01-suppressed → abstain),
+denotes the DIVALENT-S ring, a different molecule (-suppressed → abstain),
 LOSING the valid von-Baeyer name `7,9-dioxa-8lambda4-thiabicyclo[4.3.0]nona-1,3,5-triene`
 that DOES round-trip. Mirrors the pre-existing stereo carve-out on the same
 early-return. Normal fused aromatics (no λ) keep the fusion word.

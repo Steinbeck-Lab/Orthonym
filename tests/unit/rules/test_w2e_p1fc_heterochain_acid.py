@@ -1,4 +1,4 @@
-"""W2E-P1FC Task 9 — P-58.3.2 (BB 24896): homogeneous heteroatom chain broken
+"""W2E-P1FC Task 9 — (BB 24896): homogeneous heteroatom chain broken
 on the senior characteristic group.
 "an acyclic homogeneous heterocyclic chain may be broken in order to recognize
 a senior function" — H2N-NH-NH-NH-COOH -> tetraazane-1-carboxylic acid (PIN)

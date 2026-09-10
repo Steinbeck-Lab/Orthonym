@@ -1,9 +1,9 @@
 """Isotopic substitution decorator (Wave-2 P2 Tasks 1-4).
 
-BB P-82.2.1 (the Blue Book): the nuclide symbol(s) in parentheses,
+BB (the Blue Book): the nuclide symbol(s) in parentheses,
 preceded by any necessary locants, are inserted before the isotopically
 substituted part; a preceding locant takes a hyphen after the parenthesis;
-polysubstitution count is a right subscript. P-45.4.1/.4.2/.4.3
+polysubstitution count is a right subscript. /.4.2/.4.3
 (the Blue Book-22232): lowest locants to modified positions, then to
 higher atomic number, then to higher mass number.
 """
@@ -75,7 +75,7 @@ class TestNuclideSymbol:
 
 
 class TestFormatIsotopeDescriptor:
-    """P-82.2.1 (the Blue Book-43720): the count subscript is shown "when
+    """ (the Blue Book-43720): the count subscript is shown "when
     polysubstitution at a single position is possible". Groups carry an optional
     5th field ``max_at_pos`` (the polysubstitution quantity); the subscript is
     emitted iff ``count > 1`` OR ``max_at_pos > 1``. A missing 5th field (legacy
@@ -85,13 +85,13 @@ class TestFormatIsotopeDescriptor:
 
     def test_trideuterio_with_locant(self):
         # (2,2,2-2H3) three 2H at locant 2 -> single grouped token, count 3
-        # BB P-84 (the Blue Book): (2,2,2-2H3)ethan-1-ol. count > 1 -> shown.
+        # BB (the Blue Book): (2,2,2-2H3)ethan-1-ol. count > 1 -> shown.
         groups = [(2, 2, "H", 3, 3)]
         assert format_isotope_descriptor(groups) == "(2,2,2-2H3)"
 
     def test_single_14c_drops_subscript(self):
         # the Blue Book (2-13C); here (2-14C). A carbon position holds one carbon
-        # (max_at_pos 1, count 1) -> subscript OMITTED (FIX-A). P-82.2.1.
+        # (max_at_pos 1, count 1) -> subscript OMITTED (FIX-A)..
         assert format_isotope_descriptor([(2, 14, "C", 1, 1)]) == "(2-14C)"
 
     def test_deuterio_no_locant_single_position_ring_substituent(self):
@@ -100,19 +100,19 @@ class TestFormatIsotopeDescriptor:
 
     def test_12c_methane_drops_subscript(self):
         # the Blue Book trichloro(12C)methane — a carbon position (max_at_pos 1,
-        # count 1) omits the subscript (FIX-A). P-82.2.1.
+        # count 1) omits the subscript (FIX-A)..
         assert format_isotope_descriptor([(None, 12, "C", 1, 1)]) == "(12C)"
 
     def test_deuterio_methane_count_one_KEEPS_subscript(self):
         # the Blue Book (2H1)methane — REGRESSION PIN. The methane carbon can bear 4 H
         # (max_at_pos 4), so polysubstitution at that position IS possible and the
-        # subscript is KEPT even at count 1. P-82.2.1. Mutating the predicate to
+        # subscript is KEPT even at count 1.. Mutating the predicate to
         # unconditionally drop would break this.
         assert format_isotope_descriptor([(None, 2, "H", 1, 4)]) == "(2H1)"
 
     def test_deuterio_on_single_H_position_drops_subscript(self):
         # A D on a CH (1 substitutable H, max_at_pos 1) omits the subscript:
-        # (2S)-(2-2H)butan-2-ol. P-82.2.1.
+        # (2S)-(2-2H)butan-2-ol..
         assert format_isotope_descriptor([(2, 2, "H", 1, 1)]) == "(2-2H)"
 
     def test_legacy_four_tuple_keeps_subscript(self):
@@ -126,15 +126,15 @@ class TestFormatIsotopeDescriptor:
             == "(2-14C1)"
 
     def test_two_nuclides_same_place_alphabetical_then_mass(self):
-        # P-82.2.1: cited alphabetically by element, then by mass number.
+        #: cited alphabetically by element, then by mass number.
         # elements alphabetical C < H, so 13C first. 13C drops (carbon position);
         # the D at max_at_pos 1 also drops -> (1-13C,1-2H).
         groups = [(1, 2, "H", 1, 1), (1, 13, "C", 1, 1)]
         assert format_isotope_descriptor(groups) == "(1-13C,1-2H)"
 
     def test_fixf_bracket_mode_is_opt_in(self):
-        # FIX-F (P-83.1.1): the specifically-labelled bracket form is OPT-IN. The
-        # default path stays parenthetical (P-82); bracket=True swaps the outer
+        # FIX-F: the specifically-labelled bracket form is OPT-IN. The
+        # default path stays parenthetical; bracket=True swaps the outer
         # enclosing marks. All ch83 rows are a documented ceiling under the default.
         assert format_isotope_descriptor([(None, 2, "H", 1, 4)]) == "(2H1)"
         assert format_isotope_descriptor([(None, 2, "H", 1, 4)], bracket=True) == "[2H1]"
@@ -142,7 +142,7 @@ class TestFormatIsotopeDescriptor:
 
 
 class TestDecorateEndToEnd:
-    """Full name_compound path through the isotope decorator (P-45.4 + P-82.2.1).
+    """Full name_compound path through the isotope decorator +.
 
     Every expected_pin below was OPSIN round-trip verified against its SMILES
     on 2026-07-09 (see plan header table).
@@ -150,10 +150,10 @@ class TestDecorateEndToEnd:
 
     @pytest.mark.parametrize("smiles,expected", [
         # FIX-A: a heavy-atom label at a single position omits the count subscript
-        # (P-82.2.1). Verbatim BB PINs.
-        ("[14CH3]CO", "(2-14C)ethan-1-ol"),           # P-45.4.1 lowest locant -> CH3 = C2
+        #. Verbatim BB PINs.
+        ("[14CH3]CO", "(2-14C)ethan-1-ol"),           # lowest locant -> CH3 = C2
         ("[13CH3]CO", "(2-13C)ethan-1-ol"),           # the Blue Book
-        ("[2H]C([2H])([2H])CO", "(2,2,2-2H3)ethan-1-ol"),  # P-84 verbatim, count 3 keeps
+        ("[2H]C([2H])([2H])CO", "(2,2,2-2H3)ethan-1-ol"),  # verbatim, count 3 keeps
         ("[2H]C([2H])([2H])Oc1ccccc1", "(2H3)methoxybenzene"),  # the Blue Book, count 3 keeps
         ("[12CH](Cl)(Cl)Cl", "trichloro(12C)methane"),         # the Blue Book
     ])
@@ -181,7 +181,7 @@ class TestDecorateEndToEnd:
 
 class TestNuclideTieBreaks:
     def test_tritium_round_trips_via_count_form(self):
-        # P-45.4.3 / oracle: [3H] parses only as (nH1); the count form does.
+        # / oracle: [3H] parses only as (nH1); the count form does.
         from orthonym.namer import name_compound
         got = name_compound("[3H]C([3H])([3H])CO", style="systematic")
         assert got == "(2,2,2-3H3)ethan-1-ol", f"got {got!r}"
@@ -204,7 +204,7 @@ class TestNuclideTieBreaks:
 
 
 class TestDeMultiplicationP4542:
-    """P-82.2.2.1 / P-45.4.1 — one labeled copy among identical substituent prefixes.
+    """ / — one labeled copy among identical substituent prefixes.
 
     Target OPSIN-verified in internal notes §Item-2 §A/§D.
     """
@@ -214,7 +214,7 @@ class TestDeMultiplicationP4542:
         assert got == "1-(13C)methoxy-2-methoxyethane", f"got {got!r}"
 
     def test_ambiguity_tiebreak_lowest_labeled_locant(self):
-        # both 1- and 2- forms RT (symmetric); P-45.4.1 picks the labeled copy at locant 1
+        # both 1- and 2- forms RT (symmetric); picks the labeled copy at locant 1
         from orthonym.namer import name_compound
         got = name_compound("[13CH3]OCCOC", style="pin")
         assert got.startswith("1-(13C)methoxy"), got
@@ -223,7 +223,7 @@ class TestDeMultiplicationP4542:
         # W2F-P5-11: TWO DIFFERENT nuclides (18O and 13C), one per identical
         # methoxy copy. The parent (1,2-dimethoxyethane) is symmetric, so BOTH
         # numbering directions round-trip in OPSIN — the oracle cannot choose.
-        # P-45.4.2 governs: the HIGHER atomic number gets the LOWER locant, so
+        # governs: the HIGHER atomic number gets the LOWER locant, so
         # 18O (Z=8) > 13C (Z=6) => 18O-methoxy at locant 1. Gold OPSIN-RT verified.
         from orthonym.namer import name_compound
         got = name_compound("C[18O]CCO[13CH3]", style="pin")
@@ -232,7 +232,7 @@ class TestDeMultiplicationP4542:
     @pytest.mark.parametrize("smiles,expected", [
         # PROTECT: existing shipped isotope golds unaffected by the de-mult branch
         # (skeletons carry no LEADING locanted simple multiplier -> branch inert).
-        # Heavy-atom labels omit the count subscript (FIX-A, P-82.2.1); count>1
+        # Heavy-atom labels omit the count subscript (FIX-A,; count>1
         # deuterio groups keep it.
         ("[14CH3]CO",               "(2-14C)ethan-1-ol"),
         ("[13CH3]CO",               "(2-13C)ethan-1-ol"),
@@ -296,7 +296,7 @@ class TestRefuseOnUndecoratablePolicy:
     def test_mixed_two_label_now_decorated(self):
         # HISTORY: the mixed 18O/13C two-copy case used to fail closed (v1 de-mult
         # was single-group only). The multi-nuclide de-mult extension now names it;
-        # it must emit the P-45.4.2 PIN, NEVER the label-dropping unlabeled skeleton.
+        # it must emit the PIN, NEVER the label-dropping unlabeled skeleton.
         from orthonym.namer import name_compound
         assert name_compound("C[18O]CCO[13CH3]", style="pin") == \
             "1-(18O)methoxy-2-(13C)methoxyethane"
@@ -324,12 +324,12 @@ class TestRefuseOnUndecoratablePolicy:
 
 
 class TestFixACountSubscriptOmission:
-    """FIX-A (P-82.2.1, the Blue Book-43720): the count subscript is shown "when
+    """FIX-A, the Blue Book-43720): the count subscript is shown "when
     polysubstitution at a single position is possible". A heavy-atom label is a
     single skeleton position (one atom of that element), and a D on a
     single-hydrogen carrier has one occupiable H, so both OMIT the subscript; a D
     on a multi-hydrogen carrier and any count>1 group KEEP it. Every expected
-    string below is the verbatim Blue-Book PIN from the P-82 conformance oracle
+    string below is the verbatim Blue-Book PIN from the conformance oracle
     (benchmarks/bb_conformance/bb_measure_rows.jsonl), OPSIN-2.9.0 round-trip
     verified.
     """
@@ -359,7 +359,7 @@ class TestFixACountSubscriptOmission:
     def test_multi_h_or_polysubstituted_KEEP_subscript(self, smiles, expected):
         # REGRESSION PIN: a position that can bear >1 H (or a count>1 group) keeps
         # the subscript. Mutating the predicate to unconditionally drop breaks
-        # these. P-82.2.1.
+        # these..
         from orthonym.namer import name_compound
         got = name_compound(smiles, style="systematic")
         assert got == expected, f"{smiles}: got {got!r} want {expected!r}"
@@ -373,9 +373,9 @@ class TestFixACountSubscriptOmission:
         assert "(2H1)" in got, f"subscript must be kept: {got!r}"
 
     def test_fixb_amide_nitrogen_letter_locant(self):
-        # FIX-B (P-82.2.5, the Blue Book): a D on the amide nitrogen takes the letter
+        # FIX-B, the Blue Book): a D on the amide nitrogen takes the letter
         # locant N, which no integer locant can express -- (N-2H1)acetamide. The
-        # amide N bears 2 H, so the count subscript is KEPT (P-82.2.1). The skeleton
+        # amide N bears 2 H, so the count subscript is KEPT. The skeleton
         # names via the retained 'acetamide' stem. Row 82.2.5 (was ABSTAIN).
         from orthonym.namer import Orthonym
         n = Orthonym(style="systematic", general_fallback=True,
@@ -383,7 +383,7 @@ class TestFixACountSubscriptOmission:
         assert n.name_tiered("[2H]NC(C)=O").get("name") == "(N-2H1)acetamide"
 
     @pytest.mark.parametrize("smiles,expected", [
-        # FIX-D (P-82.4, BB:~43855): a centre that is chiral ONLY because a nuclide
+        # FIX-D, BB:~43855): a centre that is chiral ONLY because a nuclide
         # breaks a local symmetry. The stripped skeleton is achiral, so the
         # stereodescriptor is cited first, ahead of the isotope descriptor. Every
         # candidate is FULL-InChIKey (stereo + isotope) round-trip gated.
@@ -398,7 +398,7 @@ class TestFixACountSubscriptOmission:
         assert got == expected, f"{smiles}: got {got!r} want {expected!r}"
 
     @pytest.mark.parametrize("smiles,expected", [
-        # FIX-D + P-82.2.2.1 de-multiplication (task-10-ISO): the induced
+        # FIX-D + de-multiplication (task-10-ISO): the induced
         # centre sits on a DE-MULTIPLIED parent -- 1,3-diiodopropan-2-ol whose two
         # iodomethyl arms are made distinct by one heavy-iodine nuclide, which is
         # precisely what makes C2 a stereocentre. The single-descriptor placement
@@ -407,17 +407,17 @@ class TestFixACountSubscriptOmission:
         # only) and then prefixes the stereodescriptor; the FINAL name is re-gated
         # on the full stereo+isotope InChIKey, so 0-wrong is preserved.
         #
-        # P-82.4.1 (the Blue Book, decisive sentence: "the stereodescriptors are cited
+        # (the Blue Book, decisive sentence: "the stereodescriptors are cited
         # first"; PIN example the Blue Book `(1R)-(1-2H1)ethan-1-ol`). The
-        # substituted-compound descriptor is PARENTHESISED per P-82.2.1
+        # substituted-compound descriptor is PARENTHESISED per
         # (the Blue Book "the nuclide symbol(s) enclosed in parentheses"), NOT the
-        # labelled-compound square bracket of P-83.1.2.1 (the Blue Book) -- the Blue Book
+        # labelled-compound square bracket of (the Blue Book) -- the Blue Book
         # prints `(2R)-1-(131I)iodo-3-iodopropan-2-ol (PIN)` for this exact
         # constitution.
         ("O[C@H](CI)C[131I]",  "(2R)-1-(131I)iodo-3-iodopropan-2-ol"),   # def 14.4, the Blue Book
-        # def 92.3 gold was corrected `[125I]`->`(125I)`: the Blue Book (a P-92 CIP
+        # def 92.3 gold was corrected `[125I]`->`(125I)`: the Blue Book (a CIP
         # illustration) prints the labelled-compound bracket, inconsistent with
-        # P-82.2.1 and with the Blue Book for the same constitution.
+        # and with the Blue Book for the same constitution.
         ("O[C@@H](CI)C[125I]", "(2S)-1-(125I)iodo-3-iodopropan-2-ol"),   # def 92.3, the Blue Book
     ])
     def test_fixd_demultiplied_induced_stereocentre(self, smiles, expected):
@@ -442,7 +442,7 @@ class TestFixACountSubscriptOmission:
         # forced (2H1) form rather than abstaining -- right molecule, non-preferred
         # spelling, never silence. The two CH2/NH2 groups (count 2) keep (2H2).
         #
-        # P-82.2.1 + the Blue Book ((2R)-1-(131I)iodo-3-iodopropan-2-ol): the descriptor is
+        # + the Blue Book ((2R)-1-(131I)iodo-3-iodopropan-2-ol): the descriptor is
         # inserted directly before the PART it labels (locant -> descriptor -> affix),
         # so the amino-N deuteriums are cited 2-(2H2)amino, NOT the front-detached
         # (2H2)2-amino (the same defect fixed for 5-(81Br)bromo). Both forms round-trip
@@ -456,22 +456,22 @@ class TestFixACountSubscriptOmission:
 
 
 class TestIsotopeDescriptorPlacementAndNestedBracket:
-    """P-82.2.1 + the Blue Book ((2R)-1-(131I)iodo-3-iodopropan-2-ol): a LOCANTED
+    """ + the Blue Book ((2R)-1-(131I)iodo-3-iodopropan-2-ol): a LOCANTED
     isotope descriptor is inserted directly before the affix it modifies
     (locant -> descriptor -> affix), NOT detached at the front of the name; and
-    P-16.5.4.1.3 (the Blue Book): a substituent that received an inner isotope
-    descriptor steps its enclosing marks up ()->[].
+     (the Blue Book): a substituent that received an inner isotope
+    descriptor steps its enclosing marks up ->.
 
-    Multi-position witnesses P-45.2.1 (the Blue Book) and P-45.2.2 (the Blue Book) exercise
+    Multi-position witnesses (the Blue Book) and (the Blue Book) exercise
     both fixes at once: the parent 81Br gets `5-(81Br)bromo` (placement) and the
     81Br-bearing propyl substituent gets `[...]` (nested bracket)."""
 
     @pytest.mark.roundtrip
     @pytest.mark.parametrize("smiles,expected", [
-        # P-45.2.1 (the Blue Book): parent 5-(81Br)bromo + [1-(81Br)bromopropyl].
+        # (the Blue Book): parent 5-(81Br)bromo + [1-(81Br)bromopropyl].
         ("CCC([81Br])C(CC(=O)O)C(C)C(C)[81Br]",
          "5-(81Br)bromo-3-[1-(81Br)bromopropyl]-4-methylhexanoic acid"),
-        # P-45.2.2 (the Blue Book): parent 4-(81Br)bromo + [2-(81Br)bromopropyl].
+        # (the Blue Book): parent 4-(81Br)bromo + [2-(81Br)bromopropyl].
         ("CCC([81Br])C(CC(=O)O)CC(C)[81Br]",
          "4-(81Br)bromo-3-[2-(81Br)bromopropyl]hexanoic acid"),
     ])
@@ -489,10 +489,10 @@ class TestIsotopeDescriptorPlacementAndNestedBracket:
 
 
 class TestUniformMultiplierBracketStepUp:
-    """P-82.2.1 + P-16.5.4.1.3 (the Blue Book; example:7492) -- a UNIFORM multiplied
+    """ + (the Blue Book; example:7492) -- a UNIFORM multiplied
     substituent, every copy carrying the IDENTICAL nuclide descriptor, keeps the
-    multiplier and steps the enclosing marks up ()->[]:
-        1,2-di[(13C)methyl]benzene (PIN, P-82.2.1)
+    multiplier and steps the enclosing marks up ->:
+        1,2-di[(13C)methyl]benzene (PIN,
 
     NOT the whole-molecule combined descriptor 1,2-di(1,1-13C2)methylbenzene the
     single-descriptor enumeration used to build. _decorate_demultiplied declines

@@ -1,7 +1,7 @@
-"""Tests for assembly coverage guard fixes (ASML-14, ASML-15).
+"""Tests for assembly coverage guard fixes (,).
 
-ASML-14: Lactone/lactam coverage guard relaxed from ring_size + 4 to ring_size + 8.
-ASML-15: Hard 20 HA fragment size gate removed; quality filters handle garbled names.
+: Lactone/lactam coverage guard relaxed from ring_size + 4 to ring_size + 8.
+: Hard 20 HA fragment size gate removed; quality filters handle garbled names.
 """
 
 import pytest
@@ -11,12 +11,12 @@ from orthonym.namer import name_compound
 
 
 # ============================================================================
-# ASML-14: Lactone coverage guard uses ring_size + 8
+#: Lactone coverage guard uses ring_size + 8
 # ============================================================================
 
 @pytest.mark.unit
 class TestLactoneGuardRelaxed:
-    """ASML-14: Lactone coverage guard uses ring_size + 8."""
+    """: Lactone coverage guard uses ring_size + 8."""
 
     def test_substituted_lactone_uses_lactone_path(self):
         """5-membered lactone with pentyl (11 HA total, old guard=9, new=13).
@@ -46,12 +46,12 @@ class TestLactoneGuardRelaxed:
 
 
 # ============================================================================
-# ASML-15: Fragments >20 HA get naming attempt
+#: Fragments >20 HA get naming attempt
 # ============================================================================
 
 @pytest.mark.unit
 class TestLargeFragmentNaming:
-    """ASML-15: Fragments >20 HA get naming attempt instead of being dropped."""
+    """: Fragments >20 HA get naming attempt instead of being dropped."""
 
     def test_large_fragment_not_silently_dropped(self):
         """A ring compound with a large substituent should attempt naming.

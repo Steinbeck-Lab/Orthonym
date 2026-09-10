@@ -6,7 +6,7 @@ Orthonym correctly omits stereodescriptors (cannot invent stereo).
 RT mismatch with OPSIN is expected: OPSIN adds default steroid stereo
 when parsing retained names like "stigmast-5-en-3,7-diol".
 
-FMT-04b: Closed as expected behavior, not a bug.
+: Closed as expected behavior, not a bug.
 """
 import pytest
 from orthonym import name_compound

@@ -2,12 +2,12 @@
 Unit tests for fused ring system classification and naming.
 
 Tests cover:
-- classify_fused_system() for ortho-fused, ortho-peri-fused detection
-- is_fused_bicyclic() for 2-ring systems
-- name_fused_heterocycle() with retained names and substituents
+- classify_fused_system for ortho-fused, ortho-peri-fused detection
+- is_fused_bicyclic for 2-ring systems
+- name_fused_heterocycle with retained names and substituents
 - N-substitution handling
-- get_fused_heterocycle_substituents() for substituent detection
-- name_ortho_fused_bicyclic() for systematic naming fallback
+- get_fused_heterocycle_substituents for substituent detection
+- name_ortho_fused_bicyclic for systematic naming fallback
 """
 
 import pytest
@@ -43,7 +43,7 @@ from orthonym.data.fused_heterocycles import match_fused_heterocycle_core
 
 
 # ============================================================================
-# Test classify_fused_system()
+# Test classify_fused_system
 # ============================================================================
 
 class TestClassifyFusedSystem:
@@ -111,7 +111,7 @@ class TestClassifyFusedSystem:
 
 
 # ============================================================================
-# Test is_fused_bicyclic()
+# Test is_fused_bicyclic
 # ============================================================================
 
 class TestIsFusedBicyclic:
@@ -155,7 +155,7 @@ class TestIsFusedBicyclic:
 
 
 # ============================================================================
-# Test name_fused_heterocycle()
+# Test name_fused_heterocycle
 # ============================================================================
 
 class TestNameFusedHeterocycle:
@@ -287,7 +287,7 @@ class TestNSubstitution:
 
 
 # ============================================================================
-# Test get_fused_heterocycle_substituents()
+# Test get_fused_heterocycle_substituents
 # ============================================================================
 
 class TestGetFusedHeterocycleSubstituents:
@@ -308,7 +308,7 @@ class TestGetFusedHeterocycleSubstituents:
 
     @pytest.mark.unit
     def test_n_methylindole_substituent_detection(self):
-        """Indole's nitrogen IS ring position 1 (P-25.3.1.3), so the methyl on it
+        """Indole's nitrogen IS ring position 1, so the methyl on it
         is detected as a position-1 RING substituent, not a separate 'N-'
         substituent. (item 2: the PIN is 1-methyl-1H-indole; RT-verified.)"""
         mol = Chem.MolFromSmiles('Cn1ccc2ccccc12')  # N-methylindole
@@ -322,7 +322,7 @@ class TestGetFusedHeterocycleSubstituents:
 
 
 # ============================================================================
-# Test get_shared_atoms()
+# Test get_shared_atoms
 # ============================================================================
 
 class TestGetSharedAtoms:
@@ -363,7 +363,7 @@ class TestGetSharedAtoms:
 
 
 # ============================================================================
-# Test name_ortho_fused_bicyclic()
+# Test name_ortho_fused_bicyclic
 # ============================================================================
 
 class TestNameOrthoFusedBicyclic:
@@ -389,7 +389,7 @@ class TestNameOrthoFusedBicyclic:
 
 
 # ============================================================================
-# Test is_fused_aromatic_system() and is_fused_heterocyclic_system()
+# Test is_fused_aromatic_system and is_fused_heterocyclic_system
 # ============================================================================
 
 class TestFusedSystemDetection:
@@ -453,7 +453,7 @@ class TestEdgeCases:
 
     @pytest.mark.unit
     def test_indoline_saturated(self):
-        """The saturated indole ring system is named by its PIN (P-54.4.3.2,
+        """The saturated indole ring system is named by its PIN,
         the Blue Book; PIN printed at the Blue Book)."""
         mol = Chem.MolFromSmiles('c1ccc2c(c1)CCN2')  # indoline
         name = name_fused_heterocycle(mol)
@@ -643,7 +643,7 @@ class TestSubstituentLocantAssignment:
 
     @pytest.mark.unit
     def test_n_methylindole_uses_position_1_locant(self):
-        """N-methylindole: indole's nitrogen IS position 1 (P-25.3.1.3), so the
+        """N-methylindole: indole's nitrogen IS position 1, so the
         PIN is 1-methyl-1H-indole, not N-methyl (item 2; OPSIN-RT verified
         2026-09-04, ITEM2-VERIFICATION.md)."""
         mol = Chem.MolFromSmiles('Cn1ccc2ccccc12')
@@ -703,19 +703,19 @@ class TestSubstituentLocantAssignment:
 
 
 # ============================================================================
-# Test functionalized substituent detection (BUG-3 fix)
+# Test functionalized substituent detection (fix)
 # ============================================================================
 
 class TestFunctionalizedSubstituents:
-    """Tests for functionalized substituent detection on fused rings (BUG-3 fix).
+    """Tests for functionalized substituent detection on fused rings (fix).
 
     This tests the _identify_functionalized_substituent function and its
-    integration with the fused ring naming pipeline. BUG-3 was that
-    _identify_alkyl_substituent() rejected chains with heteroatoms,
+    integration with the fused ring naming pipeline. was that
+    _identify_alkyl_substituent rejected chains with heteroatoms,
     causing functionalized chains (cyanomethyl, carboxymethyl) to be dropped.
 
-    IUPAC Reference: P-64.4 (acetic acid derivatives as substituents),
-    P-25.3 (naming fused ring substituents)
+    IUPAC Reference: (acetic acid derivatives as substituents),
+     (naming fused ring substituents)
     """
 
     @pytest.mark.unit
@@ -736,12 +736,12 @@ class TestFunctionalizedSubstituents:
     def test_indole_acetonitrile_e2e(self):
         """N#CCc1c[nH]c2ccccc12 (indole-3-acetonitrile) should contain 'indol'.
 
-        a phase Plan 02 Task 03: post-148 cascade per P-44.1(a) selects the
+        a phase Plan 02 Task 03: post-148 cascade per (a) selects the
         chain as parent (chain bears nitrile PG). The chain-as-parent name is
         `2-(1H-indol-3-yl)ethanenitrile` ('ethanenitrile' suffix instead of
         the v17 'cyanomethyl'/'acetonitrile' prefix). Both renderings are
-        IUPAC-acceptable; v17 was ring-as-parent (P-44.1 violation), is
-        chain-as-parent (P-44.1 compliant). Updated assertion to accept the
+        IUPAC-acceptable; v17 was ring-as-parent violation), is
+        chain-as-parent compliant). Updated assertion to accept the
         post-148 form per.claude/skills/fix-methodology.md.
         """
         from orthonym import name_compound
@@ -751,7 +751,7 @@ class TestFunctionalizedSubstituents:
         assert (
             'cyanomethyl' in result.lower()
             or 'acetonitrile' in result.lower()
-            or 'ethanenitrile' in result.lower()  # a phase P-44.1(a) chain-as-parent
+            or 'ethanenitrile' in result.lower()  # a phase (a) chain-as-parent
         ), f"Expected 'cyanomethyl' or 'acetonitrile' or 'ethanenitrile' in name, got: {result}"
 
     @pytest.mark.unit
@@ -767,12 +767,12 @@ class TestFunctionalizedSubstituents:
     def test_indole_acetic_acid_e2e(self):
         """OC(=O)Cc1c[nH]c2ccccc12 (indole-3-acetic acid) should contain 'indol'.
 
-        a phase Plan 02 Task 03: post-148 cascade per P-44.1(a) selects the
+        a phase Plan 02 Task 03: post-148 cascade per (a) selects the
         chain as parent (chain bears acid PG). The chain-as-parent name is
         `2-(1H-indol-3-yl)ethanoic acid` ('ethanoic acid' suffix instead of
         the v17 'carboxymethyl'/'acetic' prefix). Both renderings are
-        IUPAC-acceptable; v17 was ring-as-parent (P-44.1 violation), is
-        chain-as-parent (P-44.1 compliant). Updated assertion to accept the
+        IUPAC-acceptable; v17 was ring-as-parent violation), is
+        chain-as-parent compliant). Updated assertion to accept the
         post-148 form per.claude/skills/fix-methodology.md.
         """
         from orthonym import name_compound
@@ -782,7 +782,7 @@ class TestFunctionalizedSubstituents:
         assert (
             'carboxymethyl' in result.lower()
             or 'acetic' in result.lower()
-            or 'ethanoic' in result.lower()  # a phase P-44.1(a) chain-as-parent
+            or 'ethanoic' in result.lower()  # a phase (a) chain-as-parent
         ), f"Expected 'carboxymethyl' or 'acetic' or 'ethanoic' in name, got: {result}"
 
     @pytest.mark.unit
@@ -861,7 +861,7 @@ class TestFunctionalizedSubstituents:
 class TestAutonomBPrecedence:
     """a phase.B: AUTONOM section 3(b) numbering-precedence criterion ordering.
 
-    BRANCH A (no-op verdict in 155-AUDIT-B.md): AUTONOM section 3(b)-aware
+    BRANCH A (no-op verdict in internal notes-B.md): AUTONOM section 3(b)-aware
     regression lock test. The 153-row catalog audit + 18 corpus fixtures found
     NO entry where indicated-H placement materially decides the locant set
     chosen vs alternative orderings under (a) -> (c) -> (d) cascade. So
@@ -882,8 +882,8 @@ class TestAutonomBPrecedence:
     `_compute_general_indicated_h(..., autonom_b_precedence=True)` returns
     the criterion-(b)-preferred locant set.
 
-    Source: internal notes; AUTONOM-1990 section 3(b);
-            Blue Book P-31.1.4; 155-AUDIT-B.md AUTONOM section 3(b)
+    Source: 155-internal notes; AUTONOM-1990 section 3(b);
+            Blue Book; internal notes-B.md AUTONOM section 3(b)
             Cascade Audit verdict.
     """
 
@@ -907,7 +907,7 @@ class TestAutonomBPrecedence:
         ("c1ccc2[nH]cnc2c1", 1, "1H-benzimidazole (1H)"),
         # 2H subclass
         ("C1=Cc2ccccc2OC1", 2, "2H-chromene (2H)"),
-        # 3H subclass (DATA-01: both were mislabeled — C1=Nc2ccccc2C1 is 3H-indole,
+        # 3H subclass (: both were mislabeled — C1=Nc2ccccc2C1 is 3H-indole,
         # not 2H-isoindole; c1cc2nc[nH]cc-2n1 is 3H-pyrrolo[3,2-d]pyrimidine, not
         # 3H-imidazo[4,5-c]pyridine. Both still carry the 3H indicated-H.)
         ("C1=Nc2ccccc2C1", 3, "3H-indole (3H)"),
@@ -974,7 +974,7 @@ class TestAutonomBPrecedence:
 
         2,2'-biindole must emit the canonical IUPAC PIN
         ``1H,1'H-2,2'-biindole`` (NOT the buggy pre-fix
-        ``2,2'-bi1H-indole``) per IUPAC P-31.1.4 +
+        ``2,2'-bi1H-indole``) per IUPAC +
         AUTONOM-followups.md Follow-up 12.
         """
         from orthonym import name_compound
@@ -1055,7 +1055,7 @@ class TestTask60FusedNBicyclicLeakVeto:
 
 class TestClusterAJunctionGeneralization:
     """Wave-8 P6 Cluster A: generalize the ring-junction stereo prefix beyond
-    decalin (P-91.2.1.2.1 / P-93.5.4.1).
+    decalin /.
 
     The bare 5,6-fused saturated carbocyclic (hydrindane) has a REAL (not
     pseudoasymmetric) pair of bridgehead stereocentres because the two rings
@@ -1063,7 +1063,7 @@ class TestClusterAJunctionGeneralization:
     (R vs S), unlike decalin/pentalene where the bridgeheads sit in truly
     equivalent environments and always match. The bare bicyclic skeleton
     (indene numbering 1,2,3,3a,4,5,6,7,7a) has a mirror automorphism that
-    swaps which physical bridgehead is '3a' vs '7a', so BB P-31.1.4.3.4(j)
+    swaps which physical bridgehead is '3a' vs '7a', so BB (j)
     ("lower locant assigned to R preferred to S, r preferred to s") decides
     the assignment -- NOT an arbitrary atom-index order.
     """
@@ -1092,7 +1092,7 @@ class TestClusterAJunctionGeneralization:
         cluster relies on is exactly why: 'R at 3a, S at 7a' and 'S at 3a,
         R at 7a' describe the identical compound, so BOTH inputs correctly
         collapse to the ONE canonical name via the R-preferred-at-lower-
-        locant tie-break (P-31.1.4.3.4(j)). This is NOT an enantiomer-name
+        locant tie-break (j)). This is NOT an enantiomer-name
         collision -- there is only one physical compound in this diastereomer
         (unlike the matching-descriptor S,S/R,R diastereomer, which IS a
         genuine chiral pair and is correctly kept distinct -- see
@@ -1143,7 +1143,7 @@ class TestClusterAJunctionGeneralization:
     def test_existing_gold_smiles_still_correct_with_1h_fix(self):
         """The pre-existing gold_pins.json SMILES for octahydroindene
         (matching S,S descriptors) must now include the '1H-' indicated
-        hydrogen (P-31.1.4 -- indene's PIN is 1H-indene; the Blue Book)."""
+        hydrogen -- indene's PIN is 1H-indene; the Blue Book)."""
         from orthonym import Orthonym
         o = Orthonym(_disable_opsin_validity_gate=True)
         out = o.name("C1CC[C@@H]2CCCC[C@@H]12")

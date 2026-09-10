@@ -1,4 +1,4 @@
-"""P-66.1.6.1.1.3 (BB 33338): urea-derived prefixes are systematic;
+""" (BB 33338): urea-derived prefixes are systematic;
 table BB 55463: "carbamoylamino* (not ureido) | H2N-CO-NH-".
 Target (DEFERRED doc, OPSIN-RT verified): NC(=O)NCCCNC=O ->
 N-[3-(carbamoylamino)propyl]formamide.
@@ -26,5 +26,5 @@ class TestCarbamoylaminoNSub:
 
     def test_urea_parent_protect(self):
         # Urea parent still names as a urea (not hijacked by the carbamoylamino
-        # prefix path); monosubstituted urea omits the locant (P-14.3.4.3, the Blue Book).
+        # prefix path); monosubstituted urea omits the locant, the Blue Book).
         assert name_compound("CNC(N)=O", style="pin") == "methylurea"

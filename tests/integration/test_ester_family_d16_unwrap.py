@@ -1,17 +1,17 @@
-"""WR-08 regression: ``ester_family`` D-16 un-wrap contract.
+""" regression: ``ester_family`` un-wrap contract.
 
-Phase 160.2 Plan-04-03a WR-08 closure per 160.1-REVIEW.md WR-08.
+a phase Plan-04-03a closure per 160.1-REVIEW.md.
 
 The composite handler's exception-raising path is documented at
-``handlers/ester_family.py:121-139``: when ``pool.best()`` returns ``None``
+``handlers/ester_family.py:121-139``: when ``pool.best`` returns ``None``
 (pool rejected the only candidate per quality threshold / wildcard /
-ratio-floor), ``pool.best().name`` raises ``AttributeError``, mirroring
+ratio-floor), ``pool.best.name`` raises ``AttributeError``, mirroring
 the pre-Plan-03-01 inline cascade at ``composer.py:875``. The
 ``AttributeError`` propagates UN-WRAPPED through ``dispatch_inner`` per
-the D-16 exception list at ``inner_dispatch.py:346-349``:
+the exception list at ``inner_dispatch.py:346-349``:
 
     except (AttributeError, KeyError, IndexError, TypeError):
-        raise  # un-wrapped per D-16
+        raise # un-wrapped per
 
 Without this regression test, a future refactor could:
 
@@ -23,7 +23,7 @@ Without this regression test, a future refactor could:
 
 This file enforces both contracts by exercising the actual un-wrap path
 through ``dispatch_inner`` with a controlled handler that raises
-``AttributeError`` mirroring the live ``pool.best().name`` path.
+``AttributeError`` mirroring the live ``pool.best.name`` path.
 """
 from __future__ import annotations
 
@@ -78,12 +78,12 @@ def _install_raising_handler(handler_id: str, exc: BaseException):
 
 
 def test_ester_family_attribute_error_unwrapped():
-    """D-16 un-wrap contract: ``AttributeError`` propagates un-wrapped
+    """ un-wrap contract: ``AttributeError`` propagates un-wrapped
     through ``dispatch_inner``.
 
     The handler raises ``AttributeError("'NoneType' object has no
     attribute 'name'")`` mirroring the live
-    ``pool.best().name`` shape (``handlers/ester_family.py:172``). The
+    ``pool.best.name`` shape (``handlers/ester_family.py:172``). The
     un-wrap allow-list at ``inner_dispatch.py:346-349`` MUST re-raise
     it un-wrapped (NOT wrap in ``RuntimeError``); namer's broad
     ``except (TypeError, KeyError, IndexError, AttributeError)`` at
@@ -107,7 +107,7 @@ def test_ester_family_attribute_error_unwrapped():
 
 
 def test_keyerror_unwrapped_through_dispatch_inner():
-    """D-16 un-wrap contract: ``KeyError`` propagates un-wrapped.
+    """ un-wrap contract: ``KeyError`` propagates un-wrapped.
 
     Mirrors the AttributeError case for the other entries in the allow-list
     tuple at ``inner_dispatch.py:346``
@@ -120,7 +120,7 @@ def test_keyerror_unwrapped_through_dispatch_inner():
     try:
         with pytest.raises(KeyError) as excinfo:
             dispatch_inner(object())
-        # KeyError str() wraps in quotes — check identity instead.
+        # KeyError str wraps in quotes — check identity instead.
         assert excinfo.value is original, (
             f"KeyError was wrapped instead of re-raised: {excinfo.value!r}"
         )
@@ -129,7 +129,7 @@ def test_keyerror_unwrapped_through_dispatch_inner():
 
 
 def test_indexerror_unwrapped_through_dispatch_inner():
-    """D-16 un-wrap contract: ``IndexError`` propagates un-wrapped."""
+    """ un-wrap contract: ``IndexError`` propagates un-wrapped."""
     original = IndexError("synthetic list index out of range")
     restore = _install_raising_handler(
         "synthetic_ester_family_indexerror", original,
@@ -151,7 +151,7 @@ def test_valueerror_wrapped_as_runtime_error():
     ``ValueError`` is NOT in the allow-list ``(AttributeError, KeyError,
     IndexError, TypeError)``; ``dispatch_inner`` MUST wrap it as
     ``RuntimeError`` with the original chained via ``__cause__``. This
-    test pins the boundary between the D-16 list and the broader wrap.
+    test pins the boundary between the list and the broader wrap.
     """
     original = ValueError("synthetic not-in-allow-list error")
     restore = _install_raising_handler(

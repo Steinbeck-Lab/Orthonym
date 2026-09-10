@@ -1,4 +1,4 @@
-"""v30 RISK 5 Class 3 (backstop) — a substituent prefix can never contain a SPACE.
+""" RISK 5 Class 3 (backstop) — a substituent prefix can never contain a SPACE.
 
 A space marks a FUNCTIONAL-CLASS multi-word name (e.g. 'urea oxime', 'taxifoline acetate'),
 which is a whole-molecule name, never a valid single substituent token. `parent_to_prefix`

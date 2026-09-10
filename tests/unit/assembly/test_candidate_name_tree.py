@@ -1,9 +1,9 @@
-"""Phase 165 Plan 02 Task 1: CandidateName.tree field + pool.add(tree=...)
-POST-HOC attachment + best().tree surfacing.
+"""a phase Plan 02 Task 1: CandidateName.tree field + pool.add(tree=...)
+POST-HOC attachment + best.tree surfacing.
 
 Mirrors test_candidate_name_ring_info.py (the ring_info post-hoc analog).
-Source: Phase 165 SCORE-01 (D-03 per-candidate tree carry);
-        Phase 146 CONTEXT D-19 (Risk 1 byte-identical guarantee — tree MUST be
+Source: a phase SCORE-01 (per-candidate tree carry);
+        a phase internal notes (Risk 1 byte-identical guarantee — tree MUST be
         POST-HOC like parent_atom_indices / ring_info, never into compute_confidence).
 """
 
@@ -18,7 +18,7 @@ def test_candidate_name_default_tree_is_none():
 
 
 def test_candidate_name_tree_post_hoc_assignment():
-    """tree can be set POST-HOC after construction (D-03 attach pattern)."""
+    """tree can be set POST-HOC after construction (attach pattern)."""
     from orthonym.assembly.coverage_scoring import CandidateName
     from orthonym.assembly.name_tree import NameTreeNode
     c = CandidateName(name='ethanol', handler='chain')
@@ -30,7 +30,7 @@ def test_candidate_name_tree_post_hoc_assignment():
 
 def test_pool_add_attaches_tree_post_hoc():
     """pool.add(..., tree=node) attaches the NameTreeNode POST-HOC and
-    best().tree surfaces it for the winning candidate."""
+    best.tree surfaces it for the winning candidate."""
     from rdkit import Chem
     from orthonym.assembly.candidate_pool import CandidatePool
     from orthonym.assembly.name_tree import NameTreeNode
@@ -47,7 +47,7 @@ def test_pool_add_attaches_tree_post_hoc():
 
 
 def test_pool_add_without_tree_kwarg_leaves_none():
-    """pool.add() without the tree kwarg leaves cand.tree as None (back-compat:
+    """pool.add without the tree kwarg leaves cand.tree as None (back-compat:
     existing call sites need not pass the new kwarg; that candidate is coarse-
     bucket counted in Plan 04)."""
     from rdkit import Chem
@@ -65,7 +65,7 @@ def test_pool_add_without_tree_kwarg_leaves_none():
 
 def test_pool_tree_not_threaded_into_compute_confidence():
     """Risk 1 guard: adding a tree does NOT change the candidate's confidence
-    (tree is POST-HOC; never passed into compute_confidence per D-19)."""
+    (tree is POST-HOC; never passed into compute_confidence per)."""
     from rdkit import Chem
     from orthonym.assembly.candidate_pool import CandidatePool
     from orthonym.assembly.name_tree import NameTreeNode

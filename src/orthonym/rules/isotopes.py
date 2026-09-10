@@ -1,18 +1,18 @@
-"""Isotopically substituted compound names (IUPAC P-82.2.1 + P-45.4).
+"""Isotopically substituted compound names (IUPAC +.
 
 Fail-closed decorator layer. Orthonym's core pipeline strips isotope labels
 (RDKit perception ignores GetIsotope for skeleton naming), so a labeled mol
 would otherwise emit the UNLABELED name — a wrong PIN. This module runs as an
-EARLY branch in Orthonym.name(): it strips the labels, names the skeleton in
+EARLY branch in Orthonym.name: it strips the labels, names the skeleton in
 systematic style (locanted parents), then re-derives the isotopic descriptor
 by an INTERNAL ORACLE (OPSIN-parse a candidate name; compare rdkit canonical
 SMILES — with isotopes — to the original). If no candidate round-trips, it
 returns None and the label is never mis-placed.
 
-BB P-82.2.1 (the Blue Book): the nuclide symbol(s) in parentheses,
+BB (the Blue Book): the nuclide symbol(s) in parentheses,
 preceded by any necessary locant(s), are inserted before the isotopically
 substituted part; polysubstitution count is a right subscript to the symbol.
-BB P-45.4.1/.4.2/.4.3 (the Blue Book-22232): lowest locants to modified
+BB /.4.2/.4.3 (the Blue Book-22232): lowest locants to modified
 positions; then to higher atomic number; then to higher mass number.
 """
 from __future__ import annotations
@@ -60,7 +60,7 @@ def strip_isotopes(mol: Chem.Mol) -> Tuple[Chem.Mol, Dict[int, int]]:
 
 
 # ---------------------------------------------------------------------------
-# P-82.2.1 — isotopic descriptor formatting
+# — isotopic descriptor formatting
 # ---------------------------------------------------------------------------
 
 
@@ -68,14 +68,14 @@ def nuclide_symbol(mass: int, element: str) -> str:
     """Nuclide symbol with the mass number as a leading integer (ASCII form).
 
     Orthonym emits ASCII (no <sup>); OPSIN accepts the leading-digit form
-    (probe: (2-14C)ethan-1-ol -> C([14CH3])O). P-82.2.1.
+    (probe: (2-14C)ethan-1-ol -> C([14CH3])O)..
     """
     return f"{mass}{element}"
 
 
 def _max_atoms_at_position(atom: Chem.Atom) -> int:
     """Atoms of this element that could occupy ``atom``'s position in the
-    UNMODIFIED parent -- the P-82.2.1 "polysubstitution at a single position"
+    UNMODIFIED parent -- the "polysubstitution at a single position"
     quantity that decides whether the count subscript is shown.
 
     A labelled HEAVY atom (13C, 18O, 15N, 131I,...) IS a skeleton position and a
@@ -100,16 +100,16 @@ def format_isotope_descriptor(groups, force_show: bool = False,
                               bracket: bool = False) -> str:
     """Build the parenthesized isotopic descriptor from grouped labels.
 
-    ``bracket=True`` (FIX-F, P-83.1.1/P-83.1.2.2) renders the SPECIFICALLY-LABELLED
-    form ``[2H1]`` / ``[13C]`` in square brackets instead of the P-82 substituted
+    ``bracket=True`` (FIX-F, / renders the SPECIFICALLY-LABELLED
+    form ``[2H1]`` / ``[13C]`` in square brackets instead of the substituted
     form ``(2H1)`` / ``(13C)``. It is OPT-IN and OFF on the default single-call
-    path by design: a P-83 labelled compound is STRUCTURALLY IDENTICAL to its P-82
+    path by design: a labelled compound is STRUCTURALLY IDENTICAL to its
     substituted counterpart (``[13CH4]`` is one graph), so nothing in a bare SMILES
-    selects between the two conventions -- the whole of chapter P-83 is therefore a
+    selects between the two conventions -- the whole of chapter is therefore a
     permanent RIGHT_MOL_NONPIN ceiling under the default parenthetical form, not a
     reclaimable gap. The renderer exists and is testable so a caller that KNOWS it
     wants the labelled convention (e.g. a future explicit-mode API) can request it;
-    the P-83.1.2.2 swap of the enclosing marks around a nested complex prefix is a
+    the swap of the enclosing marks around a nested complex prefix is a
     documented extension point, not built here. See internal notes
 
     ``force_show=True`` restores the pre-FIX-A always-emit-the-subscript form
@@ -126,16 +126,16 @@ def format_isotope_descriptor(groups, force_show: bool = False,
                       descriptor, e.g. (2H3)methoxybenzene, (12C)methane).
       locant int -> the count locants are repeated then hyphen-joined to the
                       nuclide, e.g. (2,2,2-2H3), (2-14C).
-      max_at_pos -> OPTIONAL 5th field, the P-82.2.1 polysubstitution quantity
+      max_at_pos -> OPTIONAL 5th field, the polysubstitution quantity
                       (:func:`_max_atoms_at_position`). Absent (legacy 4-tuple) ->
                       the count subscript is kept unconditionally (the pre-FIX-A
                       behaviour), so only a caller that supplies max_at_pos gets
                       the omission.
 
     Multiple groups at (possibly) the same place are cited alphabetically by
-    element then by mass number (P-82.2.1 / P-82.3); groups are comma-joined.
+    element then by mass number /; groups are comma-joined.
 
-    P-82.2.1 (the Blue Book-43720): the count subscript is shown "when polysubstitution
+     (the Blue Book-43720): the count subscript is shown "when polysubstitution
     at a single position is possible". So it is emitted iff ``count > 1`` (more
     than one atom of the nuclide is cited together) OR ``max_at_pos > 1`` (the
     single position could carry a second atom of that element) -- e.g. a lone D on
@@ -158,7 +158,7 @@ def format_isotope_descriptor(groups, force_show: bool = False,
         loc_part = ",".join(str(locant) for _ in range(count))
         return f"{loc_part}-{sym}{sub}"
 
-    # P-82.2.1: alphabetical by element symbol, then by mass number, then locant.
+    #: alphabetical by element symbol, then by mass number, then locant.
     ordered = sorted(groups, key=lambda g: (g[2], g[1], g[0] if g[0] is not None else -1))
     inner = ",".join(_one(g) for g in ordered)
     open_mark, close_mark = ("[", "]") if bracket else ("(", ")")
@@ -166,10 +166,10 @@ def format_isotope_descriptor(groups, force_show: bool = False,
 
 
 # ---------------------------------------------------------------------------
-# P-45.4.1 / P-82.2.1 — internal-oracle isotopic-descriptor placement
+# / — internal-oracle isotopic-descriptor placement
 # ---------------------------------------------------------------------------
 # The skeleton name fixes the parent numbering, but Orthonym does NOT expose a
-# reliable atom->locant map for acyclic parents (retrieve_confidence()
+# reliable atom->locant map for acyclic parents (retrieve_confidence
 # ['atom_to_locant'] is None for CCO). Rather than re-perceive the chain
 # independently (which risks diverging from the name's own numbering — a
 # fail-closed violation), the decorator treats the skeleton name's locant space
@@ -177,10 +177,10 @@ def format_isotope_descriptor(groups, force_show: bool = False,
 # placements, OPSIN-parses each candidate, and accepts the one whose relabeled
 # structure is rdkit-canonical-identical (isotopes retained) to the original.
 # Because OPSIN itself renumbers to give the isotope its lowest legal locant,
-# the round-trip test IS the P-45.4.1 / P-31.1.4.3.4(i) implementation — the
+# the round-trip test IS the / (i) implementation — the
 # wrong-locant candidate simply fails to reproduce the structure.
 
-_ELEMENT_Z = {  # atomic numbers for P-45.4.2 tie-break
+_ELEMENT_Z = {  # atomic numbers for tie-break
     "H": 1, "C": 6, "N": 7, "O": 8, "F": 9, "P": 15, "S": 16,
     "Cl": 17, "Se": 34, "Br": 35, "I": 53,
 }
@@ -188,7 +188,7 @@ _ELEMENT_Z = {  # atomic numbers for P-45.4.2 tie-break
 
 def _opsin_parse(candidate_name: str) -> Optional[str]:
     """Parse ``candidate_name`` to SMILES via the repo's shared OPSIN CLI
-    helper (validation.opsin_roundtrip.opsin_parse — the SAME loader the name()
+    helper (validation.opsin_roundtrip.opsin_parse — the SAME loader the name
     validity gate uses). Fail-closed (None) on any error / no JAR."""
     try:
         from ..validation.opsin_roundtrip import opsin_parse
@@ -205,7 +205,7 @@ def _isotope_round_trips(candidate_name: str, original_mol: Chem.Mol,
 
     ``stereo_blind=True`` compares CONSTITUTION only (stereochemistry stripped
     from both sides, InChIKey layer not consulted). Used by the isotope-induced
-    stereocentre path (FIX-D, P-82.4) to find the descriptor placement that
+    stereocentre path (FIX-D, to find the descriptor placement that
     reproduces the connectivity before the stereodescriptor prefix is chosen --
     the full-stereo compare is then re-applied to the prefixed candidate, so no
     isotopologue or stereoisomer is ever shipped on a stereo-blind pass alone.
@@ -258,7 +258,7 @@ _BRACKET_INDICATED_H_RE = re.compile(r"[(\[{]\d+H-")
 def _insertion_offsets(skel: str) -> List[int]:
     """Offsets in ``skel`` at which an isotopic descriptor may be inserted.
 
-    P-82.2.1: the descriptor "is inserted before the part of the compound that is
+    : the descriptor "is inserted before the part of the compound that is
     isotopically substituted". The enumeration does not parse the skeleton's
     grammar -- it offers every plausible offset and lets the OPSIN round-trip
     oracle pick the one that is right -- so the only thing that matters here is
@@ -270,7 +270,7 @@ def _insertion_offsets(skel: str) -> List[int]:
     legal to put the descriptor and failed closed -- ``[2H]C1=C(N(C=C1)C)[N+](=O)[O-]``
     named nothing at all, though its unlabelled skeleton names fine.
 
-    P-82 prints the construction four times, every one a PIN
+     prints the construction four times, every one a PIN
     (``the Blue Book Blue Book``-``:43796``)::
 
         (15N)-1H-indole (PIN)
@@ -295,10 +295,10 @@ def _insertion_offsets(skel: str) -> List[int]:
 
 
 def _p4542_p4543_key(groups) -> tuple:
-    """P-45.4.2 then P-45.4.3 ordering key for a candidate placement.
+    """ then ordering key for a candidate placement.
 
     Prefer the placement giving the lowest locant to the HIGHER atomic number
-    (P-45.4.2), then to the HIGHER mass number (P-45.4.3). Implemented as: for
+    , then to the HIGHER mass number. Implemented as: for
     each group sorted by locant ascending, emit (-Z, -mass); the lexicographically
     smallest key is the preferred placement. the Blue Book / the Blue Book / the Blue Book(i).
     """
@@ -319,8 +319,8 @@ def _bracket_depth(skel: str, off: int) -> int:
     or ``[`` opened before ``off`` and not yet closed. Depth 0 means the
     descriptor modifies the PARENT hydride; depth > 0 means it is nested inside a
     SUBSTITUENT's own enclosing marks (``(1,1,2,2,2-pentafluoro(13C1)ethyl)…``).
-    The P-82.6.1.1 parent-scope locant gate applies only at depth 0 -- a
-    substituent-scoped descriptor is a separate rule (P-82.2.1) this fix leaves
+    The parent-scope locant gate applies only at depth 0 -- a
+    substituent-scoped descriptor is a separate rule this fix leaves
     untouched (PREP-T3: the ``(13C1)ethyl`` rows are out of scope)."""
     head = skel[:off]
     return (head.count("(") - head.count(")")
@@ -328,7 +328,7 @@ def _bracket_depth(skel: str, off: int) -> int:
 
 
 def _placement_quality(skel: str, off: int) -> int:
-    """P-82.2.1 placement rank for an isotope descriptor spliced at ``off``:
+    """ placement rank for an isotope descriptor spliced at ``off``:
     ``0`` when the descriptor sits directly before the AFFIX / parent name it
     modifies (an alphabetic character, or the ``-nH-`` indicated-hydrogen
     prefix), ``1`` when it is DETACHED from that affix by an intervening locant
@@ -344,7 +344,7 @@ def _placement_quality(skel: str, off: int) -> int:
     round-tripper is the detached form still emits rather than failing closed.
     (The legitimate front-of-parent hyphen-joined placement for a
     skeletal-replacement locant, ``_front_hyphen_candidate``, is scored 0
-    explicitly by its caller -- it is the P-82.2.1 parent-scope placement.)"""
+    explicitly by its caller -- it is the parent-scope placement.)"""
     rest = skel[off:]
     if rest[:1].isalpha():
         return 0
@@ -354,11 +354,11 @@ def _placement_quality(skel: str, off: int) -> int:
 
 
 def _placement_unambiguous(skel: str, off: int, keys, n_pos: int) -> bool:
-    """P-82.6.1.1: may the isotope descriptor's locant be OMITTED at this
+    """: may the isotope descriptor's locant be OMITTED at this
     placement? True iff, splicing every explicit locant ``1..n_pos`` into the
     SAME descriptor slot, OPSIN accepts at most ONE distinct isotopomer.
 
-    Verbatim P-82.6.1.1 (the Blue Book): "if isotopic modification requires a locant
+    Verbatim (the Blue Book): "if isotopic modification requires a locant
     to specify its position, then all locants must be specified and none are
     omitted." A locant-free descriptor that merely round-trips is not proof the
     position is unique -- OPSIN's *default* placement of an unlocanted label can
@@ -403,7 +403,7 @@ def _placement_unambiguous(skel: str, off: int, keys, n_pos: int) -> bool:
 #: ``3-`` of ``3-oxatricyclo…`` or ``1-`` of ``1-azabicyclo…``, optionally behind
 #: leading stereo / configuration prefixes (``(2R,4S)-``, ``rel-``, ``rac-``). The
 #: isotope descriptor for the WHOLE parent goes at the front, hyphen-joined to that
-#: locant (P-82.2.1: "inserted before the part … isotopically substituted") --
+#: locant: "inserted before the part … isotopically substituted") --
 #: ``(2R,4S)-(2-2H1)-3-oxatricyclo…``, NOT the mid-parent ``…-3-(2-2H1)oxa…`` a
 #: pure alpha-offset splice yields. The ``\dH`` indicated-H opening is EXCLUDED --
 #: ``_INDICATED_H_PREFIX_RE`` already reuses that hyphen.
@@ -441,7 +441,7 @@ def _front_hyphen_candidate(skel: str, desc: str) -> Optional[Tuple[int, str]]:
 
 
 def _letter_locant_candidates(original: Chem.Mol, label_map: Dict[int, int]) -> List[str]:
-    """Letter locants (P-82.2.5) the placement search should offer in addition to
+    """Letter locants the placement search should offer in addition to
     the integer locants -- currently the amide/amine nitrogen ``N``.
 
     A labelled H (D/T) on a non-ring nitrogen sits on a position the parent's
@@ -481,7 +481,7 @@ def _find_best_placement(
     masked ``original``) share ONE oracle-driven search, instead of two
     independently-maintained copies that could drift apart.
 
-    ``loc_rank`` is -1 when the winning descriptor needs NO locant (P-45.4.1
+    ``loc_rank`` is -1 when the winning descriptor needs NO locant
     lowest-locant-first: the locant-free form is tried before any integer),
     else the locant that turned out to be required.
 
@@ -499,7 +499,7 @@ def _find_best_placement(
             seen.add(x)
             offs.append(x)
     won = []
-    # P-82.2.5 letter locants (e.g. amide ``N``) are tried after the locant-free
+    # letter locants (e.g. amide ``N``) are tried after the locant-free
     # form and before the integer locants -- an amide/amine D belongs on ``N``,
     # which no integer locant can express. RT-gated like every other candidate.
     for locant in [None] + list(extra_locants or []) + list(range(1, n_pos + 1)):
@@ -521,14 +521,14 @@ def _find_best_placement(
             for off in offs:
                 candidate = skel[:off] + desc + skel[off:]
                 if _isotope_round_trips(candidate, original, stereo_blind=stereo_blind):
-                    # P-82.6.1.1: a locant-free descriptor may only be OMITTED when
+                    #: a locant-free descriptor may only be OMITTED when
                     # its position is genuinely unambiguous. A round-trip alone is
                     # not proof -- OPSIN's default placement can coincidentally match
                     # the true atom on an asymmetric parent. Verify uniqueness at this
                     # slot before accepting the omission; otherwise fall through to
                     # the explicit-locant search (and the forced_locant_scope
                     # re-render below), which produces the required locanted form.
-                    # P-82.6.1.1 applies at ANY enclosing-mark depth: a locant-free
+                    # applies at ANY enclosing-mark depth: a locant-free
                     # descriptor inside a substituent bracket
                     # ('[(13C6)naphthalen-2-yl]…' -- 6 of 10 ring C, no locants) is
                     # just as ambiguous as one on the parent, and round-trips only by
@@ -542,7 +542,7 @@ def _find_best_placement(
                         continue
                     won.append((p4542, loc_rank, sub_rank,
                                 _placement_quality(skel, off), off, desc, candidate))
-            # P-82.2.1 front placement: a REQUIRED locant on a parent that opens
+            # front placement: a REQUIRED locant on a parent that opens
             # with a skeletal-replacement locant belongs at the front, hyphen-
             # joined, not spliced mid-parent. Offer that candidate (RT-gated) with
             # the lowest possible offset so it wins the tie-break over the
@@ -551,30 +551,30 @@ def _find_best_placement(
                 fh = _front_hyphen_candidate(skel, desc)
                 if fh is not None and _isotope_round_trips(
                         fh[1], original, stereo_blind=stereo_blind):
-                    # front-hyphen is the P-82.2.1 parent-scope placement -- it is
+                    # front-hyphen is the parent-scope placement -- it is
                     # adjacent to the part it modifies, so it is quality 0.
                     won.append((p4542, locant, sub_rank, 0, fh[0], desc, fh[1]))
         if won:
-            # P-45.4.1: the first locant-form that yields ANY round-tripper is
+            #: the first locant-form that yields ANY round-tripper is
             # the lowest-locant form; do not consider higher-locant forms.
             break
     if not won:
         return None, None, None, None
-    # Tie-break order: P-45.4.2/.3 (w[0]) -> locant (w[1]) -> subscript form
-    # (w[2]) -> P-82.2.1 placement quality (w[3], adjacent-to-affix beats
+    # Tie-break order: /.3 (w[0]) -> locant (w[1]) -> subscript form
+    # (w[2]) -> placement quality (w[3], adjacent-to-affix beats
     # front-detached) -> insertion offset (w[4], deterministic final key).
     won.sort(key=lambda w: (w[0], w[1], w[2], w[3], w[4]))
     _, loc_rank, _sub_rank, _q, off, desc, candidate = won[0]
-    # P-16.5.4.1.3 (the Blue Book "1,2-di[(13C)methyl]benzene"): a descriptor spliced
+    # (the Blue Book "1,2-di[(13C)methyl]benzene"): a descriptor spliced
     # INSIDE a substituent's own enclosing marks makes that substituent compound,
-    # so the marks step up () -> [ ] -> { } ('1-(amino(14C)methyl)cyclopentan-
+    # so the marks step up  ->  -> { } ('1-(amino(14C)methyl)cyclopentan-
     # 1-ol' -> '1-[amino(14C)methyl]cyclopentan-1-ol'). Escalate for THIS
     # single-descriptor placement; the multi-attachment caller
     # (:func:`_decorate_multi_position`) discards this candidate and runs its own
     # cascade after splicing every group, so it is unaffected. A descriptor at
     # parent scope (no enclosing pair) leaves the name untouched.
     candidate = _escalate_marks_for_descriptor(candidate, off)
-    # P-14.5.2 (the Blue Book) / the Blue Book "(15N)-1*H*-indole (PIN)": a parenthetical
+    # (the Blue Book) / the Blue Book "(15N)-1*H*-indole (PIN)": a parenthetical
     # isotope descriptor placed at the FRONT of a parent that opens with a locant
     # digit (an indicated-hydrogen locant '1H-', a leading skeletal locant) is
     # separated from that locant by a hyphen -- a name-part is always separated
@@ -622,7 +622,7 @@ def _partition_by_attachment(
 ) -> List[Dict[int, int]]:
     """Partition ``label_map`` into groups that share ONE skeleton attachment
     point, so each group's descriptor can be placed at its OWN insertion
-    offset independently (P-82.2.1: the descriptor is inserted "before the
+    offset independently: the descriptor is inserted "before the
     part of the compound that is isotopically substituted" -- different
     PARTS of the compound take different insertion points).
 
@@ -653,7 +653,7 @@ def _partition_by_attachment(
 
 def _enclosing_pairs(name: str) -> List[Tuple[int, int]]:
     """Every matched enclosing-mark pair ``(open_idx, close_idx)`` in ``name``,
-    across ``()``, ``[]`` and ``{}`` alike (they interleave by nesting level, not
+    across ````, ```` and ``{}`` alike (they interleave by nesting level, not
     by type). Unmatched marks are ignored -- a name string is always balanced by
     construction."""
     stack: List[int] = []
@@ -667,9 +667,9 @@ def _enclosing_pairs(name: str) -> List[Tuple[int, int]]:
 
 
 def _escalate_marks_for_descriptor(name: str, desc_start: int) -> str:
-    """P-16.5.4.1.3: an isotope descriptor spliced INSIDE a substituent's
+    """: an isotope descriptor spliced INSIDE a substituent's
     existing enclosing marks makes that substituent compound, so its marks must
-    step up ``()`` -> ``[]`` -> ``{}`` (the Blue Book ``1,2-di[(13C)methyl]benzene``).
+    step up ```` -> ```` -> ``{}`` (the Blue Book ``1,2-di[(13C)methyl]benzene``).
 
     ``desc_start`` is where the descriptor's own ``(`` now sits in ``name``. The
     immediately-enclosing detachable pair (the one with the largest open index
@@ -704,7 +704,7 @@ def _decorate_multi_position(
     skeleton: str, groups: List[Dict[int, int]], original: Chem.Mol, n_pos: int
 ) -> Optional[str]:
     """Place ONE descriptor per attachment GROUP, each at its own insertion
-    offset (P-82.2.1 + P-82.6.3.1/.2/.3 -- different labelled parts of a
+    offset + /.2/.3 -- different labelled parts of a
     compound each get their own descriptor scoped to that part, e.g. BB's own
     ``benzene(13C)carbonitrile`` / ``3-[ethyl(2-34S)trisulfanyl]propanoic
     acid`` pattern of several independently-scoped parenthetical descriptors
@@ -757,7 +757,7 @@ def _decorate_multi_position(
     out = skeleton
     for off, desc in placements:
         out = out[:off] + desc + out[off:]
-    # P-16.5.4.1.3: step up the enclosing marks of any substituent that just
+    #: step up the enclosing marks of any substituent that just
     # received a descriptor INSIDE its own marks (``(1-bromopropyl)`` +
     # ``(81Br)`` -> ``[1-(81Br)bromopropyl]``). The final start index of each
     # descriptor in ``out`` is its own offset plus the total length of every
@@ -787,7 +787,7 @@ def _decorate_distinct_multi_locant(
     skeleton: str, keys, original: Chem.Mol,
     label_map: Dict[int, int], n_pos: int,
 ) -> Optional[str]:
-    """P-45.4.1 / P-82.2.1: ONE nuclide labelled at MULTIPLE structurally
+    """ /: ONE nuclide labelled at MULTIPLE structurally
     DISTINCT positions on ONE parent -> a single ascending multi-locant
     descriptor, e.g. D at cage/ring positions 1,3,7 -> ``(1,3,7-2H3)``.
 
@@ -810,7 +810,7 @@ def _decorate_distinct_multi_locant(
     must be filled from its matching locant class; the labelled SET (not the
     individual atom, which is indistinguishable on a symmetric parent) is what the
     isotopomer fixes, so it enumerates the candidate locant sets in lowest-locant
-    order (P-45.4.1) and returns the first that OPSIN-RT gates against the true
+    order and returns the first that OPSIN-RT gates against the true
     original.
 
     The candidate locants include PRIMED forms (``4'``, ``1''``) when the skeleton
@@ -905,9 +905,9 @@ def _decorate_distinct_multi_locant(
             locs = sorted((tok for group in pick for tok in group),
                           key=_locant_sort_key)
             candidate_sets.append(tuple(locs))
-        # P-45.4.1 lowest-locant-first, unprimed before primed
+        # lowest-locant-first, unprimed before primed
         candidate_sets.sort(key=lambda s: [_locant_sort_key(t) for t in s])
-        # P-82.2.1 / P-14.5.2: a descriptor spliced immediately before a locant
+        # /: a descriptor spliced immediately before a locant
         # digit (a front skeletal locant '1,1'-biphenyl', or a bracketed/leading
         # indicated-H '1H-indol-...') is hyphen-separated from it:
         # '(2,4',5-2H3)-1,1'-biphenyl', '(15N)-1H-indole'. Try the hyphenated form
@@ -927,7 +927,7 @@ def _decorate_distinct_multi_locant(
 
 
 def _locant_sort_key(tok: str) -> tuple:
-    """P-14.3.5 (the Blue Book) locant order: 'Primed locants are placed
+    """ (the Blue Book) locant order: 'Primed locants are placed
     immediately after the corresponding unprimed locants in a set arranged in
     ascending order; locants consisting of a number and a lower-case letter...
     are placed immediately after the corresponding numeric locant'.
@@ -963,14 +963,14 @@ def _n_choose_k(n: int, k: int) -> int:
 
 
 # ---------------------------------------------------------------------------
-# P-82.6.3.2 (the Blue Book) -- systematic-parent fallback
+# (the Blue Book) -- systematic-parent fallback
 # ---------------------------------------------------------------------------
 # "When the nuclide is located at a position in a retained name that is not
 # numbered[,] a systematic name that identifies separately the relevant atom
 # is used for the IUPAC preferred name." style='systematic' does not always
 # deliver that: measured 2026-08-23, on a substituted 2-carbon carboxylic
 # acid it still keeps the RETAINED "acetic acid" stem ("aminoacetic acid",
-# not "aminoethanoic acid") -- P-14.3.4 omits the substituent's own locant and
+# not "aminoethanoic acid") -- omits the substituent's own locant and
 # the retained "acid" suffix has no "-oic acid" slot to insert a descriptor
 # before, unlike the fully systematic form. The amino-acid class already
 # carries its own fully systematic namer for exactly this shape
@@ -1009,7 +1009,7 @@ _LETTER_MULT_RE = re.compile(
 
 def _decorate_letter_multiplier(skeleton, keys, original, stripped,
                                 stereo_blind: bool = False) -> Optional[str]:
-    """P-82.2.2.1 de-multiplication for a REPEATED-LETTER-LOCANT substituent
+    """ de-multiplication for a REPEATED-LETTER-LOCANT substituent
     cluster (e.g. ``N,N,N-trimethyl``), found ANYWHERE in the skeleton -- not
     only a leading multiplier at the very front of the whole name (that
     narrower shape, with a NUMERIC locant list, is:func:`_decorate_demultiplied`).
@@ -1057,14 +1057,14 @@ def _decorate_letter_multiplier(skeleton, keys, original, stripped,
                 continue
             # Locant None: the descriptor sits immediately after the "N-"
             # substituent citation already spliced into ``candidate`` below,
-            # so P-82.2.1's "before the part... substituted" scope is already
+            # so 's "before the part... substituted" scope is already
             # unambiguous without also repeating the letter INSIDE the
             # descriptor itself (that would be a different, unverified
             # spelling -- e.g. ``(N-11C1)`` -- not the one this function is
             # built to produce).
             desc = format_isotope_descriptor([(None, mass, el, 1, maxpos)])
             candidate = f"{prefix}{bare_seg}{letter}-{desc}{base}{tail}"
-            # ``stereo_blind`` (P-82.4 caller): compare CONSTITUTION only so the
+            # ``stereo_blind`` caller): compare CONSTITUTION only so the
             # stereodescriptor-less split reproduces the connectivity; the caller
             # re-gates the stereodescriptor-prefixed candidate full-InChIKey. The
             # intermediate ``unlabelled_split`` probe stays FULL (it locates the
@@ -1076,21 +1076,21 @@ def _decorate_letter_multiplier(skeleton, keys, original, stripped,
 
 def _decorate_demultiplied(skeleton, keys, original, stripped,
                            stereo_blind: bool = False) -> Optional[str]:
-    """Generalized P-82.2.2.1 de-multiplication (single OR mixed nuclides).
+    """Generalized de-multiplication (single OR mixed nuclides).
 
     Split a leading-locant simple multiplier (e.g. ``1,2-dimethoxyethane``) and
     scope a DISTINCT nuclide descriptor to each labeled copy, leaving at most one
     copy bare. Handles both:
       * single-group — one labeled copy among bare copies
-                        (P-82.2.2.1 + P-45.4.1, e.g. 1-(13C1)methoxy-2-methoxyethane)
+                         +, e.g. 1-(13C1)methoxy-2-methoxyethane)
       * mixed — DISTINCT nuclides on DISTINCT copies, where — because the
                         parent is symmetric — BOTH numbering directions round-trip
-                        and P-45.4.2/.4.3 must choose (e.g.
+                        and /.4.3 must choose (e.g.
                         1-(18O1)methoxy-2-(13C1)methoxyethane: 18O Z=8 > 13C Z=6).
 
     Every candidate is OPSIN-RT gated with isotopes retained; among the
-    round-trippers, P-45.4.1 (lowest locants to the modified copies) then
-    P-45.4.2/.4.3 (higher atomic number then higher mass number at the lower
+    round-trippers, (lowest locants to the modified copies) then
+    /.4.3 (higher atomic number then higher mass number at the lower
     locant) selects deterministically. The single-combined-descriptor enumeration
     in decorate_isotopic_name CANNOT place distinct nuclides on distinct copies,
     and would exhaust its JVM-per-candidate search fruitlessly on a de-mult
@@ -1128,7 +1128,7 @@ def _decorate_demultiplied(skeleton, keys, original, stripped,
     tail = m.group("tail")
 
     # One nuclide instance per labeled copy (count 1 each). ``maxpos_of`` carries
-    # the P-82.2.1 polysubstitution quantity per nuclide out to the descriptor
+    # the polysubstitution quantity per nuclide out to the descriptor
     # build below WITHOUT entering ``labels`` -- the set-distinctness / repeated-
     # nuclide guards must key on (mass, el) alone (two copies of one nuclide could
     # differ in max_at_pos yet must still be treated as identical here).
@@ -1186,7 +1186,7 @@ def _decorate_demultiplied(skeleton, keys, original, stripped,
                     else:
                         segs.append(f"{L}-{base}")
                 cand = "-".join(segs) + parent
-                # ``stereo_blind`` (P-82.4 caller): compare CONSTITUTION only so a
+                # ``stereo_blind`` caller): compare CONSTITUTION only so a
                 # de-multiplied constitution that lacks the stereodescriptor still
                 # passes; the caller re-gates the stereo-prefixed candidate on the
                 # full InChIKey. The ``bare`` vs ``stripped`` probe above stays FULL
@@ -1199,7 +1199,7 @@ def _decorate_demultiplied(skeleton, keys, original, stripped,
                     winners.append((p4541, _p4542_p4543_key(groups), k, cand))
     if not winners:
         return None
-    # P-45.4.1 (lowest locants to modified copies) then P-45.4.2/.4.3; the
+    # (lowest locants to modified copies) then /.4.3; the
     # trailing candidate STRING term (w[3]) makes the winner fully deterministic
     # regardless of assignment-iteration order -- it is load-bearing, not a
     # decorative tiebreak. Do not drop it.
@@ -1209,15 +1209,15 @@ def _decorate_demultiplied(skeleton, keys, original, stripped,
 
 def _decorate_uniform_multiplier(skeleton, keys, original, stripped,
                                  stereo_blind: bool = False) -> Optional[str]:
-    """P-82.2.1 + P-16.5.4.1.3 — a UNIFORM multiplied substituent: every copy of a
+    """ + — a UNIFORM multiplied substituent: every copy of a
     de-multipliable prefix carries the IDENTICAL nuclide descriptor.
 
     ``_decorate_demultiplied`` deliberately DECLINES the repeated-identical-nuclide
     case (its docstring: identical copies must stay GROUPED under the multiplier, a
     DIFFERENT name shape). This builds that shape. It keeps the ``di``/``tri``/...
     multiplier and scopes ONE descriptor to the repeated substituent, then steps the
-    enclosing marks up ``()`` -> ``[]`` because the substituent already carries the
-    descriptor's parentheses (P-16.5.4.1.3, the Blue Book; verbatim example the Blue Book
+    enclosing marks up ```` -> ```` because the substituent already carries the
+    descriptor's parentheses, the Blue Book; verbatim example the Blue Book
     ``1,2-di[(13C)methyl]benzene``). The step-up reuses the shared
     ``apply_enclosing_marks`` primitive -- no string post-processing.
 
@@ -1266,14 +1266,14 @@ def _decorate_uniform_multiplier(skeleton, keys, original, stripped,
     # Split ``tail`` into the repeated substituent (``methyl``) and the parent
     # (``benzene``). The grammar is opaque to this module, so every split is offered
     # and the OPSIN round-trip oracle keeps only the one that reproduces the mol
-    # (P-82.2.1 descriptor scope). ``apply_enclosing_marks(..., -1)`` steps ()->[]
-    # (P-16.5.4.1.3). Deterministic: lowest split index, then candidate string.
+    # descriptor scope). ``apply_enclosing_marks(..., -1)`` steps ->
+    #. Deterministic: lowest split index, then candidate string.
     winners = []
     for k in range(1, len(tail)):
         base, parent = tail[:k], tail[k:]
         sub = apply_enclosing_marks(f"{desc}{base}", -1)
         cand = f"{m.group('locs')}-{m.group('mult')}{sub}{parent}"
-        # ``stereo_blind`` (P-82.4 caller): constitution-only gate; the caller
+        # ``stereo_blind`` caller): constitution-only gate; the caller
         # re-gates the stereo-prefixed candidate full-InChIKey (0-wrong preserved).
         if _isotope_round_trips(cand, original, stereo_blind=stereo_blind):
             winners.append((k, cand))
@@ -1284,7 +1284,7 @@ def _decorate_uniform_multiplier(skeleton, keys, original, stripped,
 
 
 # ---------------------------------------------------------------------------
-# P-82.4 (BB:~43855) -- isotope-INDUCED stereocentre
+# (BB:~43855) -- isotope-INDUCED stereocentre
 # ---------------------------------------------------------------------------
 def _cip_labeled_count(mol: Chem.Mol) -> int:
     """Number of atoms carrying an assigned CIP label under the project's
@@ -1310,7 +1310,7 @@ def _cip_labeled_count(mol: Chem.Mol) -> int:
 
 def _decorate_isotope_stereo(skeleton, keys, original, stripped, n_pos,
                              extra_locants) -> Optional[str]:
-    """P-82.4: an isotope-INDUCED stereocentre -- a centre that is a stereocentre
+    """: an isotope-INDUCED stereocentre -- a centre that is a stereocentre
     only because a nuclide breaks a local symmetry (``(1R)-(1-2H1)ethan-1-ol``,
     achiral once the D is collapsed). The skeleton is named from the STRIPPED mol
     and carries no such descriptor, and the isotope descriptor alone reproduces
@@ -1326,7 +1326,7 @@ def _decorate_isotope_stereo(skeleton, keys, original, stripped, n_pos,
       3. accept the first (lowest-locant, deterministic) prefixed candidate whose
          FULL InChIKey (stereo + isotope) reproduces the original.
 
-    P-82.4: "the stereodescriptors are cited first" -- the prefix leads the name.
+    : "the stereodescriptors are cited first" -- the prefix leads the name.
     Every emission is FULL-oracle gated, so a wrong config/locant fails closed;
     fails closed (None) when there is no induced centre, no constitution placement,
     the enumeration would exceed the cap, or nothing round-trips.
@@ -1339,7 +1339,7 @@ def _decorate_isotope_stereo(skeleton, keys, original, stripped, n_pos,
         extra_locants=extra_locants, stereo_blind=True)
     if base is None:
         # The single-descriptor placement above cannot SPLIT a symmetry-broken
-        # multiplied substituent (P-82.2.2.1) -- e.g. the two iodomethyl arms of
+        # multiplied substituent -- e.g. the two iodomethyl arms of
         # 1,3-diiodopropan-2-ol, made distinct by one heavy-iodine nuclide, which
         # is exactly what induces the C2 centre. Obtain that de-multiplied
         # constitution stereo-blind (connectivity only) from the demux helpers so
@@ -1369,7 +1369,7 @@ def _decorate_isotope_stereo(skeleton, keys, original, stripped, n_pos,
                 winners.append((locs, cfg, cand))
     if not winners:
         return None
-    # P-45.4 lowest-locant-first; deterministic tiebreak on the candidate string.
+    # lowest-locant-first; deterministic tiebreak on the candidate string.
     winners.sort(key=lambda w: (w[0], w[1], w[2]))
     return winners[0][2]
 
@@ -1379,7 +1379,7 @@ def _decorate_isotope_stereo(skeleton, keys, original, stripped, n_pos,
 #
 # It was built and wired here, and it REGRESSED a correct name, so it is recorded rather
 # than kept. It asked "can this nuclide multiset be placed on the skeleton in more than
-# one non-isomorphic way?" and forced a locant when so. That ignores **P-82.2.1**
+# one non-isomorphic way?" and forced a locant when so. That ignores ****
 # (``:44182``, verbatim): the descriptor is inserted *"before the part of the compound
 # that is isotopically substituted"* -- so the descriptor's POSITION carries its scope,
 # and ambiguity has to be judged inside that scope, not over the whole molecule.
@@ -1388,24 +1388,24 @@ def _decorate_isotope_stereo(skeleton, keys, original, stripped, n_pos,
 # acetate has three distinct carbons, so a whole-molecule test says "ambiguous" and forces
 # ``(1-13C1)methyl acetate``. But the descriptor sits before ``methyl``, whose scope is a
 # single carbon, so the name is already unique. ``:7492`` settles it:
-# ``1,2-di[(13C)methyl]benzene (PIN. P-82.2.1)`` -- descriptor inside the brackets,
+# ``1,2-di[(13C)methyl]benzene (PIN. `` -- descriptor inside the brackets,
 # scoped to ``methyl``, no locant on the label.
 #
 # Judging scope correctly needs awareness of the name's grammar, which this module does
 # not have (it enumerates insertion offsets and lets the round-trip oracle choose). So the
 # general rule is NOT implemented. What IS implemented below is the half with a verbatim
-# Blue Book anchor: when the descriptor itself needs a locant, P-82.6.1.1 restores the
+# Blue Book anchor: when the descriptor itself needs a locant, restores the
 # parent's locants. See the open-defect note in
 # internal notes
 # ─────────────────────────────────────────────────────────────────────────────────────
 
 
 def decorate_isotopic_name(smiles: str, style: str, namer) -> Optional[str]:
-    """Fail-closed isotopic-substitution PIN (P-82.2.1 + P-45.4).
+    """Fail-closed isotopic-substitution PIN +.
 
     1. Parse + strip isotopes; if none, None.
     2. Name the skeleton in systematic style (locanted parents).
-    3. Enumerate candidate descriptors (lowest-locant-first, P-45.4.1) and
+    3. Enumerate candidate descriptors (lowest-locant-first, and
        accept the first whose OPSIN round-trip reproduces the original mol.
     4. None if nothing round-trips (never a wrong labeled name).
     """
@@ -1415,14 +1415,14 @@ def decorate_isotopic_name(smiles: str, style: str, namer) -> Optional[str]:
     stripped, label_map = strip_isotopes(original)
     if not label_map:
         return None
-    # P-82.6.1.1 (``:44180``). Everything below names the isotope-STRIPPED molecule,
+    # (``:44180``). Everything below names the isotope-STRIPPED molecule,
     # so no structural test further down can see that a label exists -- measured: at
-    # the P-14.3.4 substituent licences every ``GetIsotope()`` in scope reads 0 even
+    # the substituent licences every ``GetIsotope`` in scope reads 0 even
     # for a 13C input. Declare it ambiently instead, UNCONDITIONALLY, so a licence
     # about to empty a scope of all its locants can decline. This is deliberately
     # weaker than ``forced_locant_scope`` (entered further down only once a locant is
     # known to be REQUIRED): the weaker flag must not gag the omissions that stay
-    # correct under P-82.6.1.3, i.e. ``(13C1)benzenehexol`` and ``(2H6)benzene``.
+    # correct under, i.e. ``(13C1)benzenehexol`` and ``(2H6)benzene``.
     from ..assembly.locant_omission import isotopic_naming_scope
     with isotopic_naming_scope("isotope"):
         return _decorate_isotopic_name_inner(
@@ -1435,7 +1435,7 @@ def _flagged_systematic_namer(namer):
 
      (p4-trace): the isotope decorator named the isotope-STRIPPED skeleton with a
     FLAG-LESS ``Orthonym(style="systematic")``. The default top-level style is
-    ``"pin"``, so the flag-carrying ``namer.name()`` path below is bypassed and this
+    ``"pin"``, so the flag-carrying ``namer.name`` path below is bypassed and this
     fresh engine ran WITHOUT the caller's ``general_fallback`` /
     ``general_fallback_unverified`` / ``allow_aromatic_general`` — so a skeleton the
     general engine could only name at the best-effort tier returned
@@ -1471,7 +1471,7 @@ def _decorate_isotopic_name_inner(smiles, style, namer, original, stripped,
 
     # Group labels by (mass, element) -> count; element read from the ORIGINAL
     # mol at each labeled atom index (label_map keys index the original).
-    # ``maxpos_by_key`` carries the P-82.2.1 polysubstitution quantity per nuclide
+    # ``maxpos_by_key`` carries the polysubstitution quantity per nuclide
     # (:func:`_max_atoms_at_position`), taken as the MAX over the group's atoms so
     # a count-1 nuclide contributes its single atom's capacity -- it decides
     # whether the count subscript is shown (FIX-A). ``keys`` entries are enriched
@@ -1487,13 +1487,13 @@ def _decorate_isotopic_name_inner(smiles, style, namer, original, stripped,
 
     n_pos = stripped.GetNumHeavyAtoms()
 
-    # Alphabetical by element then mass (P-82.2.1 citation order).
+    # Alphabetical by element then mass citation order).
     keys = sorted(
         (((mass, el), by_key[(mass, el)], maxpos_by_key[(mass, el)])
          for (mass, el) in by_key),
         key=lambda kv: (kv[0][1], kv[0][0]))
 
-    # P-82.2.2.1 de-multiplication FIRST (single OR mixed nuclides). This is the
+    # de-multiplication FIRST (single OR mixed nuclides). This is the
     # ONLY path that can place DISTINCT nuclides on DISTINCT copies of a
     # de-multiplied substituent (the mixed 18O/13C case), and it is bounded, so
     # routing it ahead of the single-combined-descriptor enumeration below both
@@ -1504,7 +1504,7 @@ def _decorate_isotopic_name_inner(smiles, style, namer, original, stripped,
     if demux is not None:
         return demux
 
-    # P-82.2.1 + P-16.5.4.1.3: a UNIFORM multiplied substituent, every copy carrying
+    # +: a UNIFORM multiplied substituent, every copy carrying
     # the IDENTICAL nuclide descriptor (which _decorate_demultiplied declines by
     # design -- identical copies stay grouped under the multiplier). Keep the
     # multiplier and scope one bracket-stepped descriptor to the repeated copy:
@@ -1517,7 +1517,7 @@ def _decorate_isotopic_name_inner(smiles, style, namer, original, stripped,
     if uniform is not None:
         return uniform
 
-    # A3 Task 3 (P-82.2.2.1, letter-locant class): a repeated IDENTICAL
+    # A3 Task 3, letter-locant class): a repeated IDENTICAL
     # letter-locant multiplier ANYWHERE in the skeleton (e.g. the
     # ``N,N,N-trimethyl`` of a quaternary ammonium salt cation) -- distinct
     # from the numeric leading-multiplier shape ``_decorate_demultiplied``
@@ -1526,7 +1526,7 @@ def _decorate_isotopic_name_inner(smiles, style, namer, original, stripped,
     if letter_demux is not None:
         return letter_demux
 
-    # P-82.2.1: the descriptor "is inserted before the part of the compound that
+    #: the descriptor "is inserted before the part of the compound that
     # is isotopically substituted". For a whole-parent label that is the front of
     # the name; for a labeled part after substituent prefixes (the labeled C of
     # trichloro(12C1)methane) it sits before the parent stem. Orthonym does not
@@ -1535,10 +1535,10 @@ def _decorate_isotopic_name_inner(smiles, style, namer, original, stripped,
     # ONE offset round-trips per (structure, descriptor)). Front (0) is tried
     # first so the front placement is preferred when it is valid.
     #
-    # Locant-form order (P-45.4.1 / P-14.3.4): the no-locant form (None) is
+    # Locant-form order /: the no-locant form (None) is
     # tried first — locants are omitted when the position is unambiguous; then
     # integer locants ascending (lowest-locant-first). Among round-trippers,
-    # P-45.4.2/.4.3 (higher Z then higher mass at the lower locant) breaks ties.
+    # /.4.3 (higher Z then higher mass at the lower locant) breaks ties.
     # (A3: the search itself now lives in the module-level
     # ``_find_best_placement`` so the multi-attachment path below can reuse it
     # unchanged; this closure is a thin adapter preserving the existing
@@ -1549,7 +1549,7 @@ def _decorate_isotopic_name_inner(smiles, style, namer, original, stripped,
         """Best (candidate, loc_rank) for one skeleton spelling, or (None, None).
 
         ``loc_rank`` is -1 when the winning descriptor needs NO locant, else the
-        locant. That value is the P-82.6.1.1 trigger: see below.
+        locant. That value is the trigger: see below.
         """
         candidate, _off, _desc, loc_rank = _find_best_placement(
             skel, keys, original, n_pos, allow_front_hyphen=True,
@@ -1558,7 +1558,7 @@ def _decorate_isotopic_name_inner(smiles, style, namer, original, stripped,
 
     best, loc_rank = _enumerate(skeleton)
     if best is None:
-        # A3 Task 1 (P-82.6.3.2 + multi-position placement): the single
+        # A3 Task 1 + multi-position placement): the single
         # combined descriptor above shares ONE locant across every labelled
         # atom of a nuclide, which cannot express labels sitting at more than
         # one structurally distinct position (per-D-glycine: D on the amino
@@ -1566,7 +1566,7 @@ def _decorate_isotopic_name_inner(smiles, style, namer, original, stripped,
         # (a) one descriptor per attachment group, on THIS skeleton;
         # (b) if the skeleton itself has no slot at all for some part of
         # the label (a retained parent with an unnumbered position,
-        # P-82.6.3.2), retry every placement strategy against a MORE
+        #, retry every placement strategy against a MORE
         # fully systematic alternate parent.
         groups = _partition_by_attachment(original, label_map)
         if len(groups) > 1:
@@ -1600,7 +1600,7 @@ def _decorate_isotopic_name_inner(smiles, style, namer, original, stripped,
                 alt_skeleton, keys, original, label_map, n_pos)
             if alt_ml is not None:
                 return alt_ml
-        # P-82.4 isotope-INDUCED stereocentre: the constitution round-trips but
+        # isotope-INDUCED stereocentre: the constitution round-trips but
         # the full-stereo oracle does not, because a nuclide made an otherwise
         # achiral centre chiral. Enumerate the stereodescriptor prefix (oracle-
         # driven, full-InChIKey gated). Tried last so a plain (non-stereo) row is
@@ -1614,7 +1614,7 @@ def _decorate_isotopic_name_inner(smiles, style, namer, original, stripped,
         # try -> fail closed (never a wrong labeled name).
         return None
 
-    # ── P-82.6.1.1 (the Blue Book), the conditional locant restoration ────────────────
+    # ── (the Blue Book), the conditional locant restoration ────────────────
     # Verbatim: "In preferred IUPAC names, locants are omitted if no locants are
     # necessary in unmodified names. However, if isotopic modification requires a locant
     # to specify its position, then all locants must be specified and none are omitted."
@@ -1626,13 +1626,13 @@ def _decorate_isotopic_name_inner(smiles, style, namer, original, stripped,
     # when the locant-free form failed to round-trip -- i.e. when the position genuinely
     # has to be stated. When `loc_rank == -1` no locant was needed, the condition in the
     # rule is not met, and the parent keeps its licensed omission. That is what makes
-    # `(13C1)benzenehexol` correct (P-82.6.1.3, the Blue Book -- all six ring positions are one
+    # `(13C1)benzenehexol` correct, the Blue Book -- all six ring positions are one
     # orbit, so there is only one isotopomer) while `(13C2)benzenehexol` is not.
     #
-    # The skeleton above was named from the isotope-STRIPPED molecule, so the P-14.3.4
+    # The skeleton above was named from the isotope-STRIPPED molecule, so the
     # licences could not see the label and elided freely. Re-name it inside the ambient
-    # P-14.3.3 scope so they decline, then re-enumerate against the locanted spelling.
-    # A letter locant (P-82.2.5 amide ``N``) is a non-int ``loc_rank``; it is
+    # scope so they decline, then re-enumerate against the locanted spelling.
+    # A letter locant amide ``N``) is a non-int ``loc_rank``; it is
     # already forced INTO the descriptor, so the parent-relocanting re-render below
     # (which handles integer positions on the parent chain/ring) does not apply --
     # skip it for non-int ranks.

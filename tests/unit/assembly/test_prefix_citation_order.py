@@ -1,12 +1,12 @@
-"""P-14.5.4: identical-Roman-letter prefixes cited lowest-locant-first
-(Wave-2 P0c Task 7). BB BlueBookV2.md:3517 + worked example line 3531.
+""": identical-Roman-letter prefixes cited lowest-locant-first
+(Wave-2 P0c Task 7). BB the Blue Book + worked example line 3531.
 """
 from orthonym.assembly.naming_utils import prefix_citation_sort_key
 
 
 class TestPrefixCitationSortKey:
     def test_identical_letters_lowest_locant_first(self):
-        # BB line 3531: pentan-2-yl cited before pentan-3-yl.
+        # the Blue Book: pentan-2-yl cited before pentan-3-yl.
         a = prefix_citation_sort_key("(pentan-2-yl)")
         b = prefix_citation_sort_key("(pentan-3-yl)")
         assert a[0] == b[0]          # identical Roman letters
@@ -14,14 +14,14 @@ class TestPrefixCitationSortKey:
 
     def test_leading_parent_locants_do_not_decide(self):
         # The prefix's PARENT locant ('4-') is stripped; only the group's
-        # own contained locants participate (P-14.5.4: "the group that
+        # own contained locants participate: "the group that
         # CONTAINS the lowest locants").
         #
-        # v29 P3-FIX Item 2: the convention is now DECLARED at the call rather
+        # -FIX Item 2: the convention is now DECLARED at the call rather
         # than guessed from the string. These two inputs are already-RENDERED
         # prefix strings, so their leading locants are parent locants -> the
         # caller says `parent_locants=True`. A bare substituent NAME leads with
-        # its own locant, which P-14.5.4 must see; one silent strip served both
+        # its own locant, which must see; one silent strip served both
         # and that is what made the key non-injective (see
         # test_the_two_conventions_disagree_and_must_both_be_expressible).
         a = prefix_citation_sort_key("4-(pentan-2-yl)", parent_locants=True)
@@ -38,18 +38,18 @@ class TestPrefixCitationSortKey:
         bare_a = prefix_citation_sort_key("4-(pentan-2-yl)")
         bare_b = prefix_citation_sort_key("1-(pentan-3-yl)")
         assert rendered_a < rendered_b        # by the GROUP's own locants: 2 < 3
-        assert bare_b < bare_a                # by the leading locant:      1 < 4
+        assert bare_b < bare_a                # by the leading locant: 1 < 4
 
     def test_the_key_is_total_so_a_tie_cannot_reach_atom_order(self):
         """Tiers 1-2 can tie; the full-string tier must still separate them, or a
-        stable ``sorted()`` resolves the tie by RDKit neighbour order."""
+        stable ``sorted`` resolves the tie by RDKit neighbour order."""
         a = prefix_citation_sort_key("cyclohexylmethyl")
         b = prefix_citation_sort_key("(cyclohexyl)methyl")
         assert a[:2] == b[:2]                 # tiers 1-2 tie
-        assert a != b                         # ...tier 3 does not
+        assert a != b                         #...tier 3 does not
 
     def test_alpha_still_dominates(self):
-        # Different letters: P-14.5.2 alphabetical order decides as before.
+        # Different letters: alphabetical order decides as before.
         assert prefix_citation_sort_key("2-chloroethyl") < \
             prefix_citation_sort_key("1-methylethyl")
 

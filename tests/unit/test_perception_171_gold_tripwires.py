@@ -1,6 +1,6 @@
-"""a phase parent-selection + assembly/parenthesisation + charged-species fixes — RED gold-target tripwires (DEF-1/3/4/8).
+"""a phase parent-selection + assembly/parenthesisation + charged-species fixes — RED gold-target tripwires (/3/4/8).
 
-The executable form of 171-CONTEXT / the PIN-strict gold oracle
+The executable form of 171-internal notes / the PIN-strict gold oracle
 (``benchmarks/the gold set/gold_pins.json``). Each target is marked
 ``xfail(strict=True)`` so the moment the owning workstream lands the fix the test
 XPASSES, which ``strict=True`` turns into a hard error — forcing the implementing
@@ -10,18 +10,18 @@ NO band-aids: exact-string equality against the Blue-Book-cited PIN. No string
 post-processing — the fixes are upstream (parent selection / assembly / charged router).
 
 Phase-171 gold targets (def_id / SMILES / PIN / Blue Book / owning workstream):
-  DEF-1 CCCCCCCc1ccccc1 -> heptylbenzene (P-44.1.2.2) WS-1
-  DEF-1 CCCCCCCCC1CCCCC1 -> octylcyclohexane (P-44.1.2.2) WS-1
-  DEF-4 ClCCCCC -> 1-chloropentane (P-14.3.4) WS-3
-  DEF-4 ClCC(F)C -> 1-chloro-2-fluoropropane (P-14.3.4) WS-3
-  DEF-4 FCCCl -> 1-chloro-2-fluoroethane (P-14.3.4) WS-3
-  DEF-3 O=C(O)CCS(=O)(=O)[O-] -> 2-carboxyethane-1-sulfonate (P-72.7/P-41) WS-2
+    CCCCCCCc1ccccc1 -> heptylbenzene
+    CCCCCCCCC1CCCCC1 -> octylcyclohexane
+    ClCCCCC -> 1-chloropentane
+    ClCC(F)C -> 1-chloro-2-fluoropropane
+    FCCCl -> 1-chloro-2-fluoroethane
+    O=C(O)CCS(=O)(=O)[O-] -> 2-carboxyethane-1-sulfonate /
                                     (locant corrected 2026-08-02; see the test)
-  DEF-8 O=C(CCl)N(CCCl)CCCl -> 2-chloro-N,N-bis(2-chloroethyl)acetamide (P-16.3.5) WS-3
-  DEF-8 ClCCCCc1ccccc1 -> (4-chlorobutyl)benzene (P-46) WS-3
-  DEF-8 CCC[Se]C -> 1-(methylselanyl)propane (P-16.3.5) WS-3 (selenide parens)
+    O=C(CCl)N(CCCl)CCCl -> 2-chloro-N,N-bis(2-chloroethyl)acetamide
+    ClCCCCc1ccccc1 -> (4-chlorobutyl)benzene
+    CCC[Se]C -> 1-(methylselanyl)propane (selenide parens)
 
-DEF-6 (piperidin-4-one, 5-methylpyridin-2-ol) + DEF-7 (bicyclo[2.2.1]heptan-2-one)
+ (piperidin-4-one, 5-methylpyridin-2-ol) + (bicyclo[2.2.1]heptan-2-one)
 are a phase (ring construction) and are NOT armed here.
 """
 
@@ -35,51 +35,51 @@ def namer():
     return Orthonym()
 
 
-# --- DEF-1 — parent spine: ring senior to chain regardless of size (P-44.1.2.2), WS-1 ---
+# --- — parent spine: ring senior to chain regardless of size, ---
 
-@pytest.mark.unit  # WS-1 parent-selection fix (171-03) FIXED: deleted the len(ring)>=chain_len size gate (P-44.1.2.2)
+@pytest.mark.unit  # parent-selection fix (171-03) FIXED: deleted the len(ring)>=chain_len size gate
 def test_def1_heptylbenzene(namer):
     assert namer.name("CCCCCCCc1ccccc1") == "heptylbenzene"
 
 
-@pytest.mark.unit  # WS-1 parent-selection fix (171-03) FIXED: ring senior regardless of size (P-44.1.2.2)
+@pytest.mark.unit  # parent-selection fix (171-03) FIXED: ring senior regardless of size
 def test_def1_octylcyclohexane(namer):
     # Gold PIN corrected in 171: CCCCCCCCC1CCCCC1 has 8 non-ring carbons (octyl),
     # RT-verified to the exact input; the curated 'nonylcyclohexane' was off by one.
     assert namer.name("CCCCCCCCC1CCCCC1") == "octylcyclohexane"
 
 
-# --- DEF-4 — locant-1 elision uses molecule-wide count (P-14.3.4), WS-3 ---
+# --- — locant-1 elision uses molecule-wide count, ---
 
-@pytest.mark.unit  # WS-3 assembly/parenthesisation fix (171-02) FIXED: molecule-wide locant-1 count + Rule 5 chain==2
+@pytest.mark.unit  # assembly/parenthesisation fix (171-02) FIXED: molecule-wide locant-1 count + Rule 5 chain==2
 def test_def4_1_chloropentane(namer):
     assert namer.name("ClCCCCC") == "1-chloropentane"
 
 
-@pytest.mark.unit  # WS-3 assembly/parenthesisation fix (171-02) FIXED
+@pytest.mark.unit  # assembly/parenthesisation fix (171-02) FIXED
 def test_def4_1_chloro_2_fluoropropane(namer):
     assert namer.name("ClCC(F)C") == "1-chloro-2-fluoropropane"
 
 
-@pytest.mark.unit  # WS-3 assembly/parenthesisation fix (171-02) FIXED
+@pytest.mark.unit  # assembly/parenthesisation fix (171-02) FIXED
 def test_def4_1_chloro_2_fluoroethane(namer):
     assert namer.name("FCCCl") == "1-chloro-2-fluoroethane"
 
 
-# --- DEF-3 — charged class-before-neutralize (P-72.7/P-41), WS-2 ---
-# FIXED in a phase.6 (T3): the charged chokepoint re-enters with the anion's acid
-# forced as principal (P-72/P-74) and orient_chain anchors the sulfonic-acid locant
+# --- — charged class-before-neutralize /, ---
+# FIXED in a phase (T3): the charged chokepoint re-enters with the anion's acid
+# forced as principal / and orient_chain anchors the sulfonic-acid locant
 # on its attachment carbon, so the neutral COOH is demoted to a 'carboxy' prefix and
 # the sulfonate is the suffix at C1. xfail removed (was strict -> XPASS failed the run).
 # CORRECTED 2026-08-02: this asserted the locant-omitted `2-carboxyethanesulfonate`.
 # The gold oracle was already fixed on 2026-07-23 (, VERIFY-GOLD) and this
 # test was never updated with it, so the suite contradicted `gold_pins.json`.
 #
-# P-14.3.4.2 (``:2891``) licence **(b)** (``:2900``) omits the locant '1' only "in
+# (``:2891``) licence **(b)** (``:2900``) omits the locant '1' only "in
 # **monosubstituted** homogeneous chains consisting of only two identical atoms" —
 # worked example ``CH3-CH2-OH ethanol (PIN)``. HOOC-CH2-CH2-SO3(-) carries TWO
 # substituents on the ethane (carboxy at C2, sulfonate at C1), so it is not
-# monosubstituted, the licence does not reach it, and P-14.3.3 (``:2869``,
+# monosubstituted, the licence does not reach it, and (``:2869``,
 # deny-by-default) requires the locant to be cited.
 #
 # The Blue Book prints exactly this shape, locant and all:
@@ -101,24 +101,24 @@ def test_def3_monosubstituted_ethane_sulfonate_still_elides(namer):
     """The control for the licence boundary: MONOsubstituted keeps eliding.
 
     Without this, the correction above could be satisfied by a producer that simply
-    always cites the locant — which would be wrong for `ethanesulfonate` (P-14.3.4.2(b)).
+    always cites the locant — which would be wrong for `ethanesulfonate` (b)).
     """
     assert namer.name("CCS(=O)(=O)[O-]") == "ethanesulfonate"
 
 
-# --- DEF-8 — assembly: bis()/enclosing marks + P-46 compound-substituent locants, WS-3 ---
+# --- — assembly: bis/enclosing marks + compound-substituent locants, ---
 
-@pytest.mark.unit  # WS-3 assembly/parenthesisation fix (171-02) FIXED: one paren predicate + P-46 + amide locant
+@pytest.mark.unit  # assembly/parenthesisation fix (171-02) FIXED: one paren predicate + + amide locant
 def test_def8_bis_chloroethyl_acetamide(namer):
     assert namer.name("O=C(CCl)N(CCCl)CCCl") == "2-chloro-N,N-bis(2-chloroethyl)acetamide"
 
 
-@pytest.mark.unit  # WS-3 assembly/parenthesisation fix (171-02) FIXED: P-46 attachment=locant-1 + enclosing parens
+@pytest.mark.unit  # assembly/parenthesisation fix (171-02) FIXED: attachment=locant-1 + enclosing parens
 def test_def8_4_chlorobutylbenzene(namer):
     assert namer.name("ClCCCCc1ccccc1") == "(4-chlorobutyl)benzene"
 
 
-@pytest.mark.unit  # WS-3 assembly/parenthesisation fix (171-02) FIXED: selanyl/tellanyl now complex -> enclosing parens
+@pytest.mark.unit  # assembly/parenthesisation fix (171-02) FIXED: selanyl/tellanyl now complex -> enclosing parens
 def test_def8_methylselanyl_propane(namer):
     assert namer.name("CCC[Se]C") == "1-(methylselanyl)propane"
 

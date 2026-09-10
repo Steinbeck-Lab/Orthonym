@@ -1,15 +1,15 @@
-"""Tests for alkenyl/alkynyl substituent prefix naming (IUPAC P-31.1.3).
+"""Tests for alkenyl/alkynyl substituent prefix naming (IUPAC.
 
 When a substituent contains C=C or C#C unsaturation, it must be named
 using systematic alkenyl/alkynyl forms, not saturated alkyl names:
-  -CH=CH2         -> ethenyl  (not ethyl or vinyl)
-  -CH2-CH=CH2     -> prop-2-en-1-yl  (not propyl or allyl)
-  -C#CH           -> ethynyl  (not ethyl)
-  -C(=CH2)(CH3)   -> prop-1-en-2-yl  (not isopropyl)
+  -CH=CH2 -> ethenyl (not ethyl or vinyl)
+  -CH2-CH=CH2 -> prop-2-en-1-yl (not propyl or allyl)
+  -C#CH -> ethynyl (not ethyl)
+  -C(=CH2)(CH3) -> prop-1-en-2-yl (not isopropyl)
 
 References:
-    IUPAC 2013 Blue Book P-31.1.3 (naming of substituent groups)
-    IUPAC 2013 Blue Book P-31.1.3.4 (numbering priority: free valence > unsaturation)
+    IUPAC 2013 Blue Book (naming of substituent groups)
+    IUPAC 2013 Blue Book (numbering priority: free valence > unsaturation)
 """
 
 import pytest
@@ -80,7 +80,7 @@ class TestAlkenylNegative:
 
     def test_isopropyl_still_retained(self):
         """Saturated isopropyl is named as the located alkyl 'propan-2-yl' (F-T9/DD6
-        RET-02), NOT as an alkenyl — the point of this test is that no spurious 'en'
+        ), NOT as an alkenyl — the point of this test is that no spurious 'en'
         unsaturation appears."""
         result = name_compound("CC(C)C1CCCCC1")
         assert "propan-2-yl" in result.lower()
@@ -121,7 +121,7 @@ class TestAlkenylCIRegression:
 
 
 class TestBranchedAlkenylPrefix:
-    """v28 Cluster A Fix 4 (P-32.1.1(1)): a BRANCHED acyclic alkenyl substituent
+    """ Fix 4 (1)): a BRANCHED acyclic alkenyl substituent
     must cite the free-valence locant ('-1-yl'), not the locant-dropped '-enyl'
     the recursive parent_to_prefix fallback produced. The principal chain runs
     through the free valence (longest, then max unsaturation)."""

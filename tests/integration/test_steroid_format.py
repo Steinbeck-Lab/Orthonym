@@ -1,10 +1,10 @@
-"""Integration tests for steroid naming format fixes (Phase 30-01).
+"""Integration tests for steroid naming format fixes (a phase-01).
 
 Tests the format correctness of steroid name assembly, covering:
-- NP-01: prefix_parts list pattern in _assemble_np_name()
-- NP-02: mixed-ester acyloxy prefix format in _assemble_np_ester_name()
+-: prefix_parts list pattern in _assemble_np_name
+-: mixed-ester acyloxy prefix format in _assemble_np_ester_name
 - Regression guards for existing steroid naming formats
-- End-to-end naming of steroid SMILES via name_compound()
+- End-to-end naming of steroid SMILES via name_compound
 """
 
 import pytest
@@ -18,7 +18,7 @@ from orthonym.rules.natural_products import (
 
 
 # ---------------------------------------------------------------------------
-# NP-01: prefix_parts pattern tests for _assemble_np_name
+#: prefix_parts pattern tests for _assemble_np_name
 # ---------------------------------------------------------------------------
 
 class TestAssembleNpNamePrefixParts:
@@ -109,7 +109,7 @@ class TestAssembleNpNamePrefixParts:
 
 
 # ---------------------------------------------------------------------------
-# NP-02: Mixed ester format tests for _assemble_np_ester_name
+#: Mixed ester format tests for _assemble_np_ester_name
 # ---------------------------------------------------------------------------
 
 class TestAssembleNpEsterName:
@@ -249,7 +249,7 @@ class TestAcylateToAcyloxy:
 # ---------------------------------------------------------------------------
 
 class TestSteroidE2EFormat:
-    """Test end-to-end naming format for steroid SMILES via name_compound()."""
+    """Test end-to-end naming format for steroid SMILES via name_compound."""
 
     @pytest.mark.integration
     def test_cholesterol_no_stereo_e2e(self):

@@ -1,4 +1,4 @@
-""" composed-charge lever — reusable RT probe + charged-backlog re-derivation (WS0).
+""" composed-charge lever — reusable RT probe + charged-backlog re-derivation .
 
 `probe(smiles_list) -> dict` is the interface every later workstream imports:
 
@@ -30,15 +30,15 @@
     oracle exists to catch. The compare below never treats an empty/falsy key as
     equal to anything; ``full``/``block1`` require BOTH sides to be genuine keys.
 
-BEST-EFFORT tier config (grounded in the WS0 brief — do not change):
+BEST-EFFORT tier config (grounded in the brief — do not change):
     Orthonym(general_fallback=True, general_fallback_unverified=True,
               allow_aromatic_general=True)
 
 Reuses the OPSIN idiom of `internal notes` (per-molecule
-SIGALRM hang guard; ``opsin_parse()``, which prefers the in-process JVM bridge over a
+SIGALRM hang guard; ``opsin_parse``, which prefers the in-process JVM bridge over a
 subprocess launch per name) — adapted, not reinvented. The whole probe call reserves
 exactly one JVM slot via ``orthonym.jvm_budget.jvm_slots(1)`` per the environment rules;
-never call ``probe()`` from inside another ``jvm_slots()`` block or a multiprocessing
+never call ``probe`` from inside another ``jvm_slots`` block or a multiprocessing
 worker.
 
 Run standalone to re-derive the charged backlog against the grounded corpus (a dev split +
@@ -150,7 +150,7 @@ def probe(smiles_list: List[str]) -> Dict[str, dict]:
 
 
 # --------------------------------------------------------------------------
-# Standalone backlog re-derivation (Step 4 of the WS0 brief).
+# Standalone backlog re-derivation (Step 4 of the brief).
 # --------------------------------------------------------------------------
 
 def load_dev500() -> List[str]:

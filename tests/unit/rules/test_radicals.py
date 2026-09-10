@@ -1,6 +1,6 @@
 """Unit tests for radical naming rules.
 
-Tests radical naming according to IUPAC 2013 P-71:
+Tests radical naming according to IUPAC 2013:
 - Monovalent radicals: -yl suffix (methyl, ethyl)
 - Divalent radicals: -ylidene suffix (methylidene, ethylidene)
 - Trivalent radicals: -ylidyne suffix (methylidyne)

@@ -3,14 +3,14 @@
 flat producer.
 
 Root cause (internal notes sec.4):
-`rules/amino_acids.py::is_peptide()` -- the dispatch predicate that gates
+`rules/amino_acids.py::is_peptide` -- the dispatch predicate that gates
 whether `rules/peptides.py::name_peptide` is ever called
 (`routing/dispatch_table.py:604-612`) -- used SMARTS that were never updated
-when `peptides.py`'s own backbone-bond pattern was broadened () to admit
+when `peptides.py`'s own backbone-bond pattern was broadened  to admit
 a C-terminal cyclic imino acid (proline/hydroxyproline): the ring nitrogen
 loses its only hydrogen once acylated by the preceding residue's peptide
 bond (a tertiary amide, H0), so the stale `[NX3;H1]`/`[NX3;H2,H1]` patterns
-never matched and `is_peptide()` returned False even though `name_peptide()`
+never matched and `is_peptide` returned False even though `name_peptide`
 would already build a correct name if called directly.
 
 Sized at 9/226 true peptides in the backlog. OPSIN full-InChI round-trip
@@ -20,7 +20,7 @@ Gln + Asp) is WRONG -- caught only incidentally today because the flat
 acylamino-convention emission (`name_peptide` step 4) is not itself
 RT-gated. This module proves:
 
-  1. the dispatch predicate now reaches all 9 (`is_peptide()` True);
+  1. the dispatch predicate now reaches all 9 (`is_peptide` True);
   2. the 8 correct ones round-trip through the full `name_compound` pipeline;
   3. the 1 wrong one ABSTAINS (never ships a wrong molecule);
   4. the broadened predicate does NOT fire on non-peptide amino-acid-shaped
@@ -55,7 +55,7 @@ def _full_rt(smiles: str, name: str) -> bool:
 
 # The 9 dispatch-blocked-but-nameable witnesses (Phase-0 a trace, re-derived
 # directly from internal notes's `peptide`
-# bucket: `is_peptide()` False today, `name_peptide()` builds a candidate
+# bucket: `is_peptide` False today, `name_peptide` builds a candidate
 # when called directly). Index 0 is the ONE that OPSIN-round-trips WRONG.
 _WRONG_WITNESS = (
     "CCC(C)[C@H](N)C(=O)N1CCC[C@H]1C(=O)N[C@@H](CCC(N)=O)C(=O)N[C@H]"
@@ -91,7 +91,7 @@ _ALL_9_WITNESSES = [_WRONG_WITNESS] + _GOOD_WITNESSES
 
 @pytest.mark.unit
 class TestDispatchPredicateUnblocked:
-    """`is_peptide()` must now return True for all 9 -- the actual
+    """`is_peptide` must now return True for all 9 -- the actual
     stale-SMARTS fix under test."""
 
     @pytest.mark.parametrize("smi", _ALL_9_WITNESSES)
@@ -152,9 +152,9 @@ class TestNoOverBroadening:
         SAME local shape a real X-Pro peptide bond has -- a ring N, H0,
         bonded to an acyl carbon on one side and the ring alpha-carbon
         bearing free COOH on the other -- so the cheap dispatch PREDICATE
-        cannot distinguish the two locally; `is_peptide()` does flip to True
+        cannot distinguish the two locally; `is_peptide` does flip to True
         for it. This is not a regression: it is unreachable functionally
-        because `name_peptide()`'s own `_is_valid_peptide` (unchanged,
+        because `name_peptide`'s own `_is_valid_peptide` (unchanged,
         requires a genuine free N-terminus + a >=2-residue chain for the
         acyl-cap lever) still declines it, so dispatch falls through exactly
         as before -- verified end-to-end via `scripts/an A/B check` (A == B,

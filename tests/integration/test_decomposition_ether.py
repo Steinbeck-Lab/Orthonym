@@ -1,5 +1,5 @@
 """
-Integration tests for ether bond cleavage in the decomposition engine (DEC-01).
+Integration tests for ether bond cleavage in the decomposition engine .
 
 Tests that ether-bridged molecules produce names with alkoxy prefixes when the
 quality gate triggers decomposition, and that small/ring ethers are correctly
@@ -10,7 +10,7 @@ excluded from decomposition via the 5 guards:
   4. Skeletal replacement exclusion (polyethers)
   5. Minimum fragment size (< 5 heavy atoms per side)
 
-Phase 50, Plan 03 -- ether decomposition validation.
+a phase, Plan 03 -- ether decomposition validation.
 """
 
 import pytest

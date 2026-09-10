@@ -2,11 +2,11 @@
 Integration tests for principal chain selection against real benchmark failures.
 
 Tests compounds from the v3.0 gap analysis parent_mismatch category (69 total).
-These tests validate that Phase 37 fixes (ring-atom leakage, chain scoring,
+These tests validate that a phase fixes (ring-atom leakage, chain scoring,
 ester parent selection) produce improved names for parent_mismatch compounds.
 
 Improvement count: 5 of 69 parent_mismatch compounds produce clearly improved
-names after Phase 37 fixes (37-01 ring-atom leakage, 37-02 chain scoring,
+names after a phase fixes (37-01 ring-atom leakage, 37-02 chain scoring,
 37-03 ester edge cases). The remaining compounds have deeper structural issues
 (complex polycyclics, steroids, phospholipids) that require future architectural
 improvements.
@@ -122,11 +122,11 @@ class TestEsterParentSelection:
 
 # ---------------------------------------------------------------------------
 # Category C: Chain scoring tiebreakers
-# Tests where criteria 6-9 from IUPAC P-44 determine chain selection.
+# Tests where criteria 6-9 from IUPAC determine chain selection.
 # ---------------------------------------------------------------------------
 
 class TestChainScoringTiebreakers:
-    """Verify chain scoring correctly applies IUPAC P-44 criteria."""
+    """Verify chain scoring correctly applies IUPAC criteria."""
 
     def test_pentanoic_acid_minimal_chain(self):
         """Pentanoic acid should be named correctly with 5C chain."""
@@ -154,7 +154,7 @@ class TestChainScoringTiebreakers:
 # ---------------------------------------------------------------------------
 
 class TestRingVsChainPriority:
-    """Verify ring-vs-chain priority decisions per IUPAC P-44.1."""
+    """Verify ring-vs-chain priority decisions per IUPAC."""
 
     def test_phenylbutanoic_acid_chain_is_parent(self):
         """4-phenylbutanoic acid: FG on chain only, chain is parent."""
@@ -344,7 +344,7 @@ class TestImprovementTracking:
     """Track which parent_mismatch compounds show improved naming."""
 
     # These are compounds where the v3.0 benchmark name was clearly wrong
-    # and Phase 37 fixes produce demonstrably better names.
+    # and a phase fixes produce demonstrably better names.
 
     def test_tyrosine_improved(self):
         """Tyrosine: was '2-aminononanoic acid', now has correct phenyl."""
@@ -377,8 +377,8 @@ class TestImprovementTracking:
     def test_dimethylcyclohexyl_pentanoic_acid_changed(self):
         """Cyclohexyl pentanoic acid: name unchanged (chain exclusion does not affect this path).
 
-        Phase 103-01: chain exclusion only affects non-principal FG terminal carbons
-        whose prefix includes the carbon.  This compound's amide C is not terminal
+        a phase-01: chain exclusion only affects non-principal FG terminal carbons
+        whose prefix includes the carbon. This compound's amide C is not terminal
         on the principal chain, so the name is unchanged.
         """
         name = name_compound(r"CC1C/C(=C\CC(CC(N)=O)CC(=O)O)C(=O)C(C)C1")

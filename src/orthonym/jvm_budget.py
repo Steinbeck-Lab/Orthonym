@@ -3,8 +3,8 @@
 Replaces the blanket folk rule "never run two OPSIN jobs concurrently" with a
 measured budget and real enforcement. The rule it replaces was never measured;
 worse, it did not describe the code -- ``eval/harness.py`` has always run
-``mp.Pool(cpu_count() - 4)`` = 12 concurrent JPype JVMs on this host.
-Measurements and citations: ``.planning/audit-v29/FINDING-opsin-concurrency-budget.md``.
+``mp.Pool(cpu_count - 4)`` = 12 concurrent JPype JVMs on this host.
+Measurements and citations: `internal notes`.
 
 Why a budget at all, given memory is not the constraint
 -------------------------------------------------------
@@ -41,12 +41,12 @@ Usage
         run_conformance(...)
 
     # an eval harness: one JVM per pool worker
-    with jvm_slots(jobs, purpose="harness:dev500"):
+    with jvm_slots(jobs, purpose="harness:a dev split"):
         pool.map(...)
 
     # see what holds the budget right now (replaces `pgrep -f v22_gate`)
     from orthonym.jvm_budget import status
-    for slot in status()["held"]:
+    for slot in status["held"]:
         print(slot["purpose"], slot["pid"])
 """
 from __future__ import annotations
@@ -68,7 +68,7 @@ logger = logging.getLogger(__name__)
 
 #: Slots reserved for the interactive shell, RDKit, and the coordinating Python
 #: process itself. ``eval/harness.py:454`` independently arrived at the same
-#: ``cpu_count() - 4``; keeping the identical formula means wiring the budget in
+#: ``cpu_count - 4``; keeping the identical formula means wiring the budget in
 #: does not change that tool's existing default degree of parallelism.
 _RESERVED_CPUS = 4
 
@@ -78,7 +78,7 @@ _ENV_OFF = "ORTHONYM_JVM_BUDGET"
 
 
 class BudgetTimeout(RuntimeError):
-    """Raised by :func:`jvm_slots` when ``on_timeout='raise'`` and the wait expired."""
+    """Raised by:func:`jvm_slots` when ``on_timeout='raise'`` and the wait expired."""
 
 
 def is_enabled() -> bool:
@@ -134,7 +134,7 @@ class _Held:
     def release(self) -> None:
         for fd in self._fds:
             # Closing the descriptor releases the flock. Truncate first so a
-            # later status() does not report a dead holder's metadata.
+            # later status does not report a dead holder's metadata.
             with contextlib.suppress(OSError):
                 os.ftruncate(fd, 0)
             with contextlib.suppress(OSError):
@@ -156,7 +156,7 @@ def _try_take(path: Path, purpose: str) -> Optional[int]:
         if exc.errno not in (errno.EAGAIN, errno.EACCES, errno.EWOULDBLOCK):
             logger.debug("slot %s flock error: %s", path, exc)
         return None
-    # Record who holds it, for status() / debugging. Best-effort only.
+    # Record who holds it, for status / debugging. Best-effort only.
     with contextlib.suppress(OSError):
         os.ftruncate(fd, 0)
         os.write(fd, json.dumps({
@@ -231,7 +231,7 @@ def jvm_slots(count: int = 1, *, purpose: str = "unnamed",
             or one ``java -jar`` subprocess is 1; an ``mp.Pool(n)`` whose workers
             each start a JVM is ``n``.
         purpose: short label recorded in the slot file and shown by
-            :func:`status` -- e.g. ``"v22_gate"``, ``"harness:dev500"``.
+            :func:`status` -- e.g. ``"v22_gate"``, ``"harness:a dev split"``.
         timeout: seconds to wait. ``None`` waits indefinitely.
         on_timeout: ``"proceed"`` (default) runs anyway with a warning --
             correct for a long job a caller must not lose; ``"raise"`` raises

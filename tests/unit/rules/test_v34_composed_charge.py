@@ -1,6 +1,6 @@
-"""v34 composed-charge lever — control acceptance tripwire (WS0).
+""" composed-charge lever — control acceptance tripwire .
 
-These two round-trip TODAY (verified) and must never regress across the v34
+These two round-trip TODAY (verified) and must never regress across the
 composed-charge workstreams. Do NOT edit the expected values to match a future
 regression — that defeats the tripwire; if one of these breaks, STOP and report
 the actual output so the failure gets diagnosed, not silenced.
@@ -28,13 +28,13 @@ def test_composed_charge_controls_unchanged(smi, expected):
 
 
 # --------------------------------------------------------------------------
-# WS0 review round 1 — synthetic branch coverage for v34_charged_probe.probe()'s
+# review round 1 — synthetic branch coverage for v34_charged_probe.probe's
 # RT classifier. The real charged corpus backlog measured B=0 (no wrong/
 # unparseable rows), so the `wrong` and `unparseable` branches — and the
 # falsy-InChIKey fail-closed guard the Critical finding was about — are
 # otherwise never exercised by any test. `v34_charged_probe.py` lives outside
 # the `orthonym` package (it is a measurement script, not shipped code). It
-# used to sit in `.planning/audit-v33`, which the public-release commit
+# used to sit in internal notes, which the public-release commit
 # 0245191d1 untracked, so collection failed with ModuleNotFoundError; since
 # 2026-09-03 the test's own copy lives in `tests/support/` and is imported via
 # an explicit sys.path insert.
@@ -42,7 +42,7 @@ def test_composed_charge_controls_unchanged(smi, expected):
 _PROBE_DIR = str(Path(__file__).resolve().parents[2] / "support")
 if _PROBE_DIR not in sys.path:
     sys.path.insert(0, _PROBE_DIR)
-import v34_charged_probe as v34_probe  # noqa: E402  (path must be inserted first)
+import v34_charged_probe as v34_probe  # noqa: E402 (path must be inserted first)
 
 
 def test_probe_classifies_wrong_molecule_name_as_wrong(monkeypatch):
@@ -67,7 +67,7 @@ def test_probe_classifies_opsin_unparseable_name_as_unparseable(monkeypatch):
 
 
 def test_probe_wildcard_input_never_classified_full(monkeypatch):
-    """Exact regression test for the Critical finding (WS0 review round 1).
+    """Exact regression test for the Critical finding (review round 1).
 
     ``Chem.MolToInchiKey(Chem.MolFromSmiles('*CC'))`` returns ``''`` — falsy,
     NOT an exception, NOT ``None`` — for any wildcard/dummy-atom structure. The
@@ -75,7 +75,7 @@ def test_probe_wildcard_input_never_classified_full(monkeypatch):
     (``*CC``) is wildcard-bearing, and so — after monkeypatching OPSIN's parse
     — is the "round-tripped" structure. Pre-fix this hit ``have == want`` as
     ``'' == ''`` and returned ``full`` (reproduced directly against the OLD
-    branch logic before writing this test — see the WS0 fix-report note).
+    branch logic before writing this test — see the fix-report note).
     Post-fix, ``not have`` fires first and this must classify ``unparseable``,
     never ``full``.
     """
@@ -102,7 +102,7 @@ def test_probe_falsy_want_with_genuine_have_classified_wrong_not_full(monkeypatc
 
 
 # --------------------------------------------------------------------------
-# WS1+WS6 (merged, 2026-08-22) — carboxylate/polyacid junior-prefix
+# + (merged, 2026-08-22) — carboxylate/polyacid junior-prefix
 # multiplicity fix.
 #
 # Diagnosis (verified, NOT the brief's original hypothesis): the "clean-PIN
@@ -111,16 +111,16 @@ def test_probe_falsy_want_with_genuine_have_classified_wrong_not_full(monkeypatc
 # (`_try_neutralize_and_name`) already inherits best-effort from
 # `general_fallback_ctx` -- for every backlog witness probed, the BACKBONE
 # itself already named correctly under best-effort. The actual blocker was
-# ONE STEP LATER, in `_apply_anionic_substituent_prefixes` (P-72.6, "cite a
+# ONE STEP LATER, in `_apply_anionic_substituent_prefixes`, "cite a
 # JUNIOR anionic centre by its anionic prefix"): it computed
 # `junior_carb = n_carb - 1`, silently assuming the parent suffix ALWAYS
 # consumes exactly one carboxylate. A genuine POLYACID parent
-# ('-dioate'/'-tricarboxylate'/...) consumes 2, 3, ... -- so a real
+# ('-dioate'/'-tricarboxylate'/...) consumes 2, 3,... -- so a real
 # tricarboxylate anion (a '-dioate' parent + ONE junior 'carboxy' arm) was
 # undercounted as TWO junior sites, tripped the (deliberately fail-closed)
 # `total_junior != 1` guard, and shipped the junior COOH as the NEUTRAL
 # 'carboxy' prefix -- a charge-dropping name for a DIFFERENT (less-anionic)
-# molecule that SELF-01 correctly suppressed to an avoidable abstention.
+# molecule that correctly suppressed to an avoidable abstention.
 #
 # Fix: `_parent_acid_suffix_multiplicity` reads the multiplying prefix
 # already embedded in the converted suffix ('-dioate' -> 2, '-tricarboxylate'
@@ -132,8 +132,8 @@ def test_probe_falsy_want_with_genuine_have_classified_wrong_not_full(monkeypatc
 # fails closed -- converting two different substituent words risks
 # re-ordering the alphabetized prefix list).
 #
-# Witness (WS0 backlog, bucket A, pulled from
-# `.planning/audit-v33/v34_charged_backlog.json`): a tricarboxylate anion
+# Witness (backlog, bucket A, pulled from
+# internal notes): a tricarboxylate anion
 # (net -3, no cation) whose backbone is a heptanedioate chain decorated with
 # an amide-linked succinyl arm -- exactly the "carboxylate anion whose
 # backbone is decorated" shape the brief asked for. Re-derived with
@@ -182,7 +182,7 @@ def test_parent_acid_suffix_multiplicity_reads_the_embedded_multiplier():
     assert mult("benzene-1,2-dicarboxylate") == 2
     assert mult("pentane-1,2,4,5-tetracarboxylate") == 4
     # Retained/irregular suffixes this producer does not model default to 1
-    # (the ORIGINAL, pre-v34 assumption) rather than guessing.
+    # (the ORIGINAL, pre- assumption) rather than guessing.
     assert mult("acetate") == 1
     assert mult("formate") == 1
 
@@ -192,7 +192,7 @@ def test_ws1_homogeneous_two_junior_carboxylates_convert():
     pentanedioate parent -- multiplicity 2 -- plus a direct 'carboxy' AND a
     non-identical '(2-carboxyethyl)' junior arm, so no 'bis(...)' grouping
     hides the count) both convert to 'carboxylato'. Built directly against
-    ``_apply_anionic_substituent_prefixes`` (the P-72.6 producer) on a REAL,
+    ``_apply_anionic_substituent_prefixes`` (the producer) on a REAL,
     fully-ionized tetracarboxylate mol; the composed name is OPSIN-RT-verified
     against the exact structure (see impl report) rather than asserted blind.
     """
@@ -218,7 +218,7 @@ def test_ws1_homogeneous_two_junior_carboxylates_convert():
 def test_ws1_mixed_junior_classes_still_fail_closed():
     """Regression guard: a genuinely MIXED junior set (one junior carboxylate
     AND one junior alkoxide on the SAME pentanedioate parent) must still
-    decline (return the name unchanged) -- the v34 widening covers ONLY a
+    decline (return the name unchanged) -- the widening covers ONLY a
     homogeneous multi-junior set, never a mixed one (prefix re-ordering risk,
     per the function's own docstring)."""
     from orthonym.rules.ions import _apply_anionic_substituent_prefixes
@@ -236,10 +236,10 @@ def test_ws1_mixed_junior_classes_still_fail_closed():
 
 
 # --------------------------------------------------------------------------
-# WS7 (2026-08-22) — the coverage-FLOOR no-abstain backstop for the charged
+# (2026-08-22) — the coverage-FLOOR no-abstain backstop for the charged
 # residual.
 #
-# STEP-0 reachability spy (ws7-reachability.json) confirmed the universal floor
+# reachability trace (ws7-reachability.json) confirmed the universal floor
 # (`assembly/universal_substituent.py`) is REACHED for 96/97 in-scope charged
 # bucket-A abstains and `_resolve_spine_charge` VOIDED for 87 of them.
 #
@@ -252,10 +252,10 @@ def test_ws1_mixed_junior_classes_still_fail_closed():
 # -- a CHARGED substituent prefix (`oxido`/`sulfido`/`azaniumyl`) carrying the
 # charge -- plus `_charge_suffix_text(parent_only=True)` so a SKELETAL cation in
 # a zwitterion still gets its `-ium` while the paired anion rides as a leaf. All
-# floor emissions are still gated by the caller's SELF-01 / verify_or_none net
+# floor emissions are still gated by the caller's / verify_or_none net
 # (0-wrong preserved: a stereo-CONFLICT or unverifiable name is suppressed).
 #
-# Witnesses below are REAL WS0 bucket-A rows; each expected string was OPSIN-RT
+# Witnesses below are REAL bucket-A rows; each expected string was OPSIN-RT
 # re-derived (`_full_ik_rt`), never hand-edited.
 # --------------------------------------------------------------------------
 
@@ -280,9 +280,9 @@ def _floor_name_and_verify(smi):
 
 
 def test_ws7_net_anion_dithiocarbamate_carboxylate_names_and_full_rt():
-    """WS0 bucket-A (pubchem500): a net-1 carboxylate whose backbone also bears
-    a dithiocarbamate. Pre-WS7 the floor VOIDED on the carboxylate `[O-]`;
-    post-WS7 the charged-leaf `oxido` names it and ``verify_or_none`` CONFIRMs it
+    """ bucket-A (pubchem500): a net-1 carboxylate whose backbone also bears
+    a dithiocarbamate. Pre- the floor VOIDED on the carboxylate `[O-]`;
+    post- the charged-leaf `oxido` names it and ``verify_or_none`` CONFIRMs it
     on the FULL InChIKey (constitution + charge; no stereo to omit)."""
     smi = "CN(C)C(=S)SCCC(=O)[O-]"
     name, verified = _floor_name_and_verify(smi)
@@ -292,7 +292,7 @@ def test_ws7_net_anion_dithiocarbamate_carboxylate_names_and_full_rt():
 
 
 def test_ws7_diglycine_zwitterion_skeletal_ium_plus_oxido_leaves_full_rt():
-    """WS0 bucket-A (chebi500): a net-1 zwitterion -- two carboxylate anions and
+    """ bucket-A (chebi500): a net-1 zwitterion -- two carboxylate anions and
     an internal (degree-2, SKELETAL) ammonium. The paired anions ride as `oxido`
     leaves while the skeletal `[NH2+]` gets its `-ium` suffix via
     `_charge_suffix_text(parent_only=True)` (the both-signs global gate no longer
@@ -304,7 +304,7 @@ def test_ws7_diglycine_zwitterion_skeletal_ium_plus_oxido_leaves_full_rt():
 
 
 def test_ws7_net_dianion_triacetate_amine_names_and_full_rt():
-    """WS0 bucket-A (chebi500): a net-2 species (three carboxylates + one
+    """ bucket-A (chebi500): a net-2 species (three carboxylates + one
     internal ammonium). Exercises multi-`oxido` + a recursively-named charged
     branch arm. ``verify_or_none`` CONFIRMs FULL."""
     smi = "O=C([O-])CNCC[NH+](CC(=O)[O-])CC(=O)[O-]"
@@ -315,19 +315,19 @@ def test_ws7_net_dianion_triacetate_amine_names_and_full_rt():
 
 
 def test_ws7_stereo_carboxylate_now_ships_full_stereo_ws_stereo_win():
-    """WS0 bucket-A (dev500): a STEREO carboxylate, all 5 defined stereocentres
-    on the polycyclic RING SPINE itself. Pre-WS-STEREO the floor emitted a
+    """ bucket-A (a dev split): a STEREO carboxylate, all 5 defined stereocentres
+    on the polycyclic RING SPINE itself. Pre-STEREO the floor emitted a
     constitution-only name and this test locked ``verified is None`` (a safe
-    stereo-OMISSION superset, per the pipeline's `_rt_match` gate). WS-STEREO
+    stereo-OMISSION superset, per the pipeline's `_rt_match` gate). STEREO
     now prepends the ring spine's OWN ``_stereo_prefix`` (mirroring
     general_engine's four parent engines) and 0-wrong-gates it through
     ``verify_or_none`` before shipping -- for THIS witness every stereocentre is
     on the spine (none buried in an off-spine branch), so the with-stereo
     candidate FULL-RT-verifies and block1 -> full. Re-verified independently via
     OPSIN's own parse-back + full-InChIKey compare (not just re-run of the
-    generator): reverting the WS-STEREO splice (``_stereo_prefix`` forced to
+    generator): reverting the STEREO splice (``_stereo_prefix`` forced to
     ``''``) reproduces the exact former value (name without the ``(...)-``
-    block, ``verified is None``) -- see task-WS-STEREO-report.md's mutation
+    block, ``verified is None``) -- see task-STEREO-report.md's mutation
     check. Do NOT revert this value without re-deriving it the same way."""
     smi = ("C=C[C@]1(C)CC[C@@H]2C(=CC[C@@H]3[C@]2(C)CCC[C@]3(C)"
            "C(=O)[O-])C1")
@@ -345,7 +345,7 @@ def test_ws7_stereo_carboxylate_now_ships_full_stereo_ws_stereo_win():
 def test_ws_stereo_branch_buried_stereocentre_still_omits_not_wrong():
     """0-WRONG GUARD (task brief, CRITICAL): the sec-butyl substituent's own
     stereocentre is BRANCH-internal (off the ring spine), which this producer's
-    WS-STEREO splice intentionally does not capture (scope: top-level SPINE
+    STEREO splice intentionally does not capture (scope: top-level SPINE
     stereo only, mirroring general_engine's own parent-scope-only split). The
     ring spine's OWN stereocentre (position 5) DOES have a computable CIP
     ('(5S)-') -- so a naive splice would ship a name that specifies ONLY the
@@ -374,7 +374,7 @@ def test_ws_stereo_branch_buried_stereocentre_still_omits_not_wrong():
 
 
 def test_ws7_control_betaine_still_prefers_route_charged_pin():
-    """WS7 must NOT regress the PIN charged path: betaine is still named by
+    """ must NOT regress the PIN charged path: betaine is still named by
     `route_charged` as `(trimethylazaniumyl)acetate`, NOT the floor's uglier
     von-Baeyer/replacement alternative (the floor is only reached AFTER the PIN
     charged path declines). End-to-end assertion (route_charged does not depend
@@ -384,7 +384,7 @@ def test_ws7_control_betaine_still_prefers_route_charged_pin():
 
 
 # --------------------------------------------------------------------------
-# WS7 fix round 1 (dual review) — the offers-lane 0-wrong fail-open + the
+# fix round 1 (dual review) — the offers-lane 0-wrong fail-open + the
 # selanido/sulfido/azaniumyl cleanup.
 # --------------------------------------------------------------------------
 
@@ -405,7 +405,7 @@ def test_ws7_offers_lane_fails_closed_on_transient_opsin_bypassed_offer():
     floor_name = "2,2-difluoro-2-borapropan-2-uide"
     smi = "F[B-](F)(F)F"
     try:
-        # a REAL SELF-01 verdict recorded for a DIFFERENT (primary) string ->
+        # a REAL verdict recorded for a DIFFERENT (primary) string ->
         # resolve_gate_outcome(floor_name) == bypassed (the exact trigger).
         pv.record_gate_outcome(pv.GATE_OUTCOME_SELF01, "some-other-primary-name")
         assert pv.resolve_gate_outcome(
@@ -489,20 +489,20 @@ def test_ws7_azaniumyl_leaf_requires_three_h_not_a_nitrenium():
 
 
 # --------------------------------------------------------------------------
-# WS-STEREO (v34): the coverage floor now emits stereo descriptors. Root
+# STEREO : the coverage floor now emits stereo descriptors. Root
 # cause: `_build_ctx` already computes CIP via `assign_stereochemistry` but
 # nothing downstream ever consulted `general_engine._stereo_prefix` /
 # `collect_stereodescriptors`. Fix: prepend the TOP-LEVEL spine's OWN stereo
 # block (mirroring general_engine's four parent engines,
 # general_engine.py:893/1473/1930/2037), 0-wrong-gated through
 # `verify_or_none` -- ships ONLY on a full-InChIKey confirm, else falls back
-# to the plain (stereo-omitted) name unchanged. Witnesses below are REAL WS0
+# to the plain (stereo-omitted) name unchanged. Witnesses below are REAL
 # bucket-C (block1) rows from `v34_charged_backlog.json`; each expected string
 # is OPSIN-RT re-derived via `_floor_name_and_verify`, never hand-edited.
 # --------------------------------------------------------------------------
 
 def test_ws_stereo_bicyclic_carnitine_ester_converts_block1_to_full():
-    """WS0 bucket-C (dev500/chebi500): a quaternary-ammonium ester of a
+    """ bucket-C (a dev split/chebi500): a quaternary-ammonium ester of a
     bicyclo[2.2.1]heptane alcohol. All 3 defined stereocentres sit on the
     polycyclic ring SPINE (`analyze_cage_universal`'s own atom_to_locant), so
     the with-stereo candidate full-RT-verifies and block1 -> full."""
@@ -514,7 +514,7 @@ def test_ws_stereo_bicyclic_carnitine_ester_converts_block1_to_full():
 
 
 def test_ws_stereo_cyclohexene_ammonium_ester_converts_block1_to_full():
-    """WS0 bucket-C (dev500/chebi500): a triethyl/methyl-ammonium ester of a
+    """ bucket-C (a dev split/chebi500): a triethyl/methyl-ammonium ester of a
     trimethylcyclohexenol. The 3 defined stereocentres are all monocyclic ring
     SPINE atoms (`_name_ring_spine`'s own atom_to_locant) -> block1 -> full."""
     smi = "CC[N+](C)(CC)CC(=O)OC[C@H]1[C@@H](CC(=C[C@@H]1C)C)C"
@@ -525,7 +525,7 @@ def test_ws_stereo_cyclohexene_ammonium_ester_converts_block1_to_full():
 
 
 def test_ws_stereo_long_chain_phosphocholine_thioester_converts_block1_to_full():
-    """WS0 bucket-C (dev500/chebi500): a long acyclic replacement-nomenclature
+    """ bucket-C (a dev split/chebi500): a long acyclic replacement-nomenclature
     parent chain (thio/oxa-substituted, E/Z-laden). The ONE defined
     stereocentre (the glycerol-type carbon) is itself a CHAIN SPINE atom
     (`_name_chain_spine`'s own atom_to_locant), so it converts block1 -> full
@@ -542,7 +542,7 @@ def test_ws_stereo_long_chain_phosphocholine_thioester_converts_block1_to_full()
 
 
 # --------------------------------------------------------------------------
-# WS-NOABSTAIN (v34) -- class 1: fused mancude/aromatic ring anion/cation
+# NOABSTAIN  -- class 1: fused mancude/aromatic ring anion/cation
 # (flavonoid/isoflavone phenolate + protonated heteroaromatic).
 #
 # Root cause (empirically established via direct probing of
@@ -566,7 +566,7 @@ def test_ws_stereo_long_chain_phosphocholine_thioester_converts_block1_to_full()
 # Fix (`rules/vonbaeyer_universal.py`): try the ORIGINAL self-consistency
 # check UNCHANGED first (so every existing, already-working caller is
 # byte-identical); only on failure, retry against a re-aromatized COPY with
-# every atom's already-correct `GetTotalNumHs()` re-pinned as EXPLICIT
+# every atom's already-correct `GetTotalNumHs` re-pinned as EXPLICIT
 # (`SetNoImplicit(True)` + `SetNumExplicitHs`) before serializing -- without
 # this, `MolToSmiles` silently drops a pyrrole-type ring N-H (e.g. the
 # protonated-purine witness below) that Kekulize had demoted from explicit to
@@ -575,15 +575,15 @@ def test_ws_stereo_long_chain_phosphocholine_thioester_converts_block1_to_full()
 # `allow_mancude=True` -- the SAME opt-in `ring_substituents.py`'s
 # `_universal_cage_substituent_name` already uses -- since this module is the
 # unconditional best-effort FLOOR (`t4_coverage.py`: "Reachable ONLY on the
-# best-effort path ... so PIN is untouched"), never reached at PIN tier.
+# best-effort path... so PIN is untouched"), never reached at PIN tier.
 #
-# Witnesses are the REAL WS-NOABSTAIN-brief rows (dev500, in-scope charged
+# Witnesses are the REAL NOABSTAIN-brief rows (a dev split, in-scope charged
 # abstains). Expected strings are OPSIN-RT re-derived via
 # `_floor_name_and_verify` / `opsin_parse`, never hand-typed.
 # --------------------------------------------------------------------------
 
 def test_ws_noabstain_flavonoid_phenolate_mancude_cage_names_full_rt():
-    """WS-NOABSTAIN class 1, witness 1 (dev500): a chromone/flavonoid
+    """NOABSTAIN class 1, witness 1 (a dev split): a chromone/flavonoid
     phenolate anion. Pre-fix: floor VOIDED (Kekulize/re-aromatize mismatch);
     post-fix: emits a von-Baeyer polyene floor name that FULL-RT-verifies."""
     smi = "COc1cc(-c2cc(=O)c3c(O)cc([O-])cc3o2)ccc1O"
@@ -595,7 +595,7 @@ def test_ws_noabstain_flavonoid_phenolate_mancude_cage_names_full_rt():
 
 
 def test_ws_noabstain_isoflavone_phenolate_mancude_cage_names_full_rt():
-    """WS-NOABSTAIN class 1, witness 2 (dev500): an isoflavone (methylenedioxy
+    """NOABSTAIN class 1, witness 2 (a dev split): an isoflavone (methylenedioxy
     + phenolate) mancude bicyclic anion. Same fix as witness 1."""
     smi = "COc1cc2c(=O)c(-c3cc4c(cc3OC)OCO4)coc2cc1[O-]"
     name, verified = _floor_name_and_verify(smi)
@@ -606,11 +606,11 @@ def test_ws_noabstain_isoflavone_phenolate_mancude_cage_names_full_rt():
 
 
 def test_ws_noabstain_protonated_purine_mancude_cage_block1_safe_omission():
-    """WS-NOABSTAIN class 1, witness 3 (dev500): a protonated fused
+    """NOABSTAIN class 1, witness 3 (a dev split): a protonated fused
     imidazo-pyrimidinium (purine-like) cation riding a piperidine amide arm
     with 2 branch-internal stereocentres. The mancude cage fix (this test's
     module docstring) is what stops the whole call from VOIDING; the 2
-    stereocentres are branch-internal (off the ring spine WS-STEREO
+    stereocentres are branch-internal (off the ring spine STEREO
     captures), so the emitted name is constitution-correct but
     stereo-silent -- a SAFE OMISSION (`verify_or_none` returns None; block1,
     never `wrong`), not a wrong molecule. Mirrors
@@ -661,7 +661,7 @@ def test_ws_noabstain_achiral_saturated_bicycle_self_check_unchanged():
 
 
 # --------------------------------------------------------------------------
-# WS-NOABSTAIN (v34) -- class 2: cyclic phosphate diester (ring-embedded P,
+# NOABSTAIN  -- class 2: cyclic phosphate diester (ring-embedded P,
 # nucleotide).
 #
 # No dedicated code fix needed: this witness's abstain was a DOWNSTREAM
@@ -677,7 +677,7 @@ def test_ws_noabstain_achiral_saturated_bicycle_self_check_unchanged():
 # --------------------------------------------------------------------------
 
 def test_ws_noabstain_ring_phosphate_bromopurine_nucleotide_full_rt():
-    """WS-NOABSTAIN class 2 (dev500): a cyclic phosphate diester (ring-
+    """NOABSTAIN class 2 (a dev split): a cyclic phosphate diester (ring-
     embedded P) on a fused bromo-purine nucleoside. FULL-RT-verifies once the
     fused purine ring's mancude-cage bug (class 1) is fixed."""
     smi = ("Nc1nc2c(nc(Br)n2[C@@H]2O[C@@H]3COP(=O)([O-])O[C@H]3[C@H]2O)"
@@ -691,7 +691,7 @@ def test_ws_noabstain_ring_phosphate_bromopurine_nucleotide_full_rt():
 
 
 # --------------------------------------------------------------------------
-# WS-NOABSTAIN (v34) -- class 3: phosphinate P-H + poly-anion (3 independent
+# NOABSTAIN  -- class 3: phosphinate P-H + poly-anion (3 independent
 # charged leaves).
 #
 # Root cause (measured, NOT the brief's "net-charge/coverage composition in
@@ -703,7 +703,7 @@ def test_ws_noabstain_ring_phosphate_bromopurine_nucleotide_full_rt():
 # bare "phospha" position with its `[O-]` riding as an "oxido" branch
 # substituent -- exactly the pattern that correctly spells a CARBON-hosted
 # carboxylate (`-C(=O)[O-]` -> "...-oxido-1-oxaethene...", verified
-# extensively by the class-1/WS7 tests above). It silently mis-spells a
+# extensively by the class-1/ tests above). It silently mis-spells a
 # PHOSPHORUS-hosted analogue: carbon's standard valence (4) leaves exactly 1
 # spare valence unit for the "oxido" branch once the chain's own `=O` + `-C`
 # bonds are counted (2+1=3, +1 for oxido = 4, self-consistent); phosphorus's
@@ -713,7 +713,7 @@ def test_ws_noabstain_ring_phosphate_bromopurine_nucleotide_full_rt():
 # ANOTHER double-bonded oxo, silently dropping the anion's charge (and the
 # defining P-H) entirely: `C[PH](=O)[O-]` -> floor's old chain spelling
 # "2-oxido-1-oxa-2-phosphaprop-1-ene" -> OPSIN parses to the NEUTRAL
-# `O=P(=O)C`. Citing the correct P-15.4.1 lambda convention
+# `O=P(=O)C`. Citing the correct lambda convention
 # (`rules.lambda_convention`) on that SAME chain spelling does NOT fix it
 # either (measured: `2-oxido-1-oxa-2λ5-phosphaprop-1-ene` still parses back
 # to `O=P(=O)C`) -- OPSIN simply does not validate this shape via replacement
@@ -734,7 +734,7 @@ def test_ws_noabstain_ring_phosphate_bromopurine_nucleotide_full_rt():
 #
 # The 3-simultaneous-charged-leaf witness itself carries a genuine, separate
 # E/Z (not R/S) geometric descriptor on its central C=C that this producer's
-# WS-STEREO splice does not cite (scoped to tetrahedral CIP only) -- so it
+# STEREO splice does not cite (scoped to tetrahedral CIP only) -- so it
 # converts abstain -> block1 (safe geometric-descriptor OMISSION, right
 # constitution, never a wrong molecule), while the 2 simpler (no E/Z)
 # phosphinate witnesses convert abstain -> full.
@@ -758,7 +758,7 @@ def test_ws_noabstain_ethylphosphinate_leaf_full_rt():
 
 
 def test_ws_noabstain_triple_charged_leaf_phosphinate_polyanion_block1():
-    """WS-NOABSTAIN class 3, the brief's own witness (chebi500): a net-3
+    """NOABSTAIN class 3, the brief's own witness (chebi500): a net-3
     polyanion -- two independent carboxylates plus the phosphinate leaf above,
     all on one short unsaturated backbone. Converts abstain -> block1 (a
     genuine E/Z geometric-descriptor omission on the central C=C, verified
@@ -795,7 +795,7 @@ def test_ws_noabstain_phosphinate_leaf_excluded_from_chain_continuation():
 
 
 # --------------------------------------------------------------------------
-# WS-NOABSTAIN (v34) -- class 4: reverse-prenyl substituent riding a
+# NOABSTAIN  -- class 4: reverse-prenyl substituent riding a
 # zwitterion (a GENERAL chain/unsaturation defect, not a charge defect per
 # the brief).
 #
@@ -809,7 +809,7 @@ def test_ws_noabstain_phosphinate_leaf_excluded_from_chain_continuation():
 # prenyl -- NOT the brief's feared saturated "pentyl" mis-spelling), so no
 # general chain/unsaturation fix was needed at all. Converts abstain ->
 # block1: the ONE defined stereocentre sits on the azaniumyl/carboxylate
-# BRANCH (off the ring spine), which this producer's WS-STEREO splice
+# BRANCH (off the ring spine), which this producer's STEREO splice
 # intentionally does not capture (spine-only scope, same as
 # `test_ws_stereo_branch_buried_stereocentre_still_omits_not_wrong` above)
 # -- confirmed a safe OMISSION, not a wrong molecule, via direct InChIKey
@@ -817,7 +817,7 @@ def test_ws_noabstain_phosphinate_leaf_excluded_from_chain_continuation():
 # --------------------------------------------------------------------------
 
 def test_ws_noabstain_reverse_prenyl_indole_zwitterion_block1_safe_omission():
-    """WS-NOABSTAIN class 4 (dev500): a tryptophan-like zwitterion decorated
+    """NOABSTAIN class 4 (a dev split): a tryptophan-like zwitterion decorated
     with a prenyl substituent on the fused indole ring."""
     smi = "CC(C)=CCc1cccc2c(C[C@H]([NH3+])C(=O)[O-])c[nH]c12"
     name, verified = _floor_name_and_verify(smi)
@@ -831,9 +831,9 @@ def test_ws_noabstain_reverse_prenyl_indole_zwitterion_block1_safe_omission():
     have = Chem.MolToInchiKey(Chem.MolFromSmiles(got))
     want = Chem.MolToInchiKey(Chem.MolFromSmiles(smi))
     assert have[:14] == want[:14]  # constitution matches (block1) --
-    #   the reverse-prenyl arm IS correctly unsaturated, not the feared defect
+    # the reverse-prenyl arm IS correctly unsaturated, not the feared defect
     assert have != want            # the branch stereocentre is genuinely
-    #                                 omitted, not wrong
+    # omitted, not wrong
 
 
 def test_ws_stereo_achiral_floor_name_unaffected_no_stereo_block():
@@ -850,15 +850,15 @@ def test_ws_stereo_achiral_floor_name_unaffected_no_stereo_block():
 
 
 # --------------------------------------------------------------------------
-# WS-NOABSTAIN (v34) -- class 5: WS3 fold-in, the P-74.1.2 skeletal-`ium`
+# NOABSTAIN  -- class 5: fold-in, the skeletal-`ium`
 # `_p74_bare_ring_stem` spurious `-2-yl` bug (name QUALITY, not an abstain --
-# WS7's floor already masked this with a valid, full-RT name).
+# 's floor already masked this with a valid, full-RT name).
 #
 # Root cause: ``_p74_bare_ring_stem`` (``rules/ions.py``) strips every
 # EXOCYCLIC substituent off the ring (`RWMol.RemoveAtom`) to get a bare stem
 # to re-name, e.g. "pyridine". `RemoveAtom` does NOT recompute a REMAINING
 # ring atom's implicit-H bookkeeping when a heavy neighbour is deleted -- the
-# P-74.1.2 carboxylate-bearing ring carbon's own bracket atom (`[C@H]`) keeps
+# carboxylate-bearing ring carbon's own bracket atom (`[C@H]`) keeps
 # its ORIGINAL `noImplicit=True` / explicit-H=1 from when it had 4
 # connections (2 ring bonds + the now-deleted carboxyl branch + 1 H). After
 # deletion it has only 3 (2 ring bonds + 1 explicit H) -- one short of
@@ -874,20 +874,20 @@ def test_ws_stereo_achiral_floor_name_unaffected_no_stereo_block():
 # the same underlying reason), not just the cation -- a ring atom that never
 # lost a neighbour is unaffected (clearing an already-False flag is a no-op).
 #
-# The overall PIPELINE OUTPUT for the witness is unchanged by this fix (WS7's
-# floor + WS-STEREO already ship the SAME full-RT name either way, since
-# SELF-01 already suppressed the malformed pre-fix string and fell through to
+# The overall PIPELINE OUTPUT for the witness is unchanged by this fix ('s
+# floor + STEREO already ship the SAME full-RT name either way, since
+# already suppressed the malformed pre-fix string and fell through to
 # the floor) -- this is a pure internal-quality fix: `route_charged`'s own
 # emitted string is no longer grammatically malformed/unparseable for this
-# whole class (any P-74.1.2 skeletal-ium ring whose anion-attachment ring
+# whole class (any skeletal-ium ring whose anion-attachment ring
 # atom is a stereocentre), even though it still omits the stereo descriptor
 # itself (a separate, larger gap -- threading stereo into this NEW
 # cumulative-suffix builder is out of this fix's scope).
 # --------------------------------------------------------------------------
 
 def test_ws_noabstain_p74_skeletal_ium_stem_no_longer_emits_spurious_yl():
-    """WS-NOABSTAIN class 5 (dev500): `emit_zwitterion_ring_carboxylate` on
-    the brief's own witness must emit a VALID, OPSIN-parseable P-74.1.2
+    """NOABSTAIN class 5 (a dev split): `emit_zwitterion_ring_carboxylate` on
+    the brief's own witness must emit a VALID, OPSIN-parseable
     cumulative name -- no more spurious `-yl` glued onto the ring stem."""
     from orthonym.rules.ions import emit_zwitterion_ring_carboxylate
     smi = "C[NH+]1CCC[C@H]1C(=O)[O-]"
@@ -925,7 +925,7 @@ def test_ws_noabstain_p74_bare_ring_stem_resets_every_ring_atom():
 def test_ws_noabstain_p74_end_to_end_still_ships_full_via_floor():
     """End-to-end: the witness's SHIPPED name is unchanged by this fix (both
     before and after, `route_charged`'s malformed/stereo-incomplete string is
-    SELF-01-suppressed and the WS-STEREO-capable floor ships the same full-RT
+    -suppressed and the STEREO-capable floor ships the same full-RT
     name) -- this locks that this is a pure internal-quality fix, not a
     behaviour change to what users see for THIS witness."""
     from orthonym.assembly.universal_substituent import (

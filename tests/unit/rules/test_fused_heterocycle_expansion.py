@@ -88,7 +88,7 @@ class TestEntryIntegrity:
                 )
 
     def test_validate_all_entries_passes(self):
-        """The built-in _validate_all_entries() check must pass."""
+        """The built-in _validate_all_entries check must pass."""
         assert _validate_all_entries(), "Some entries have incomplete iupac_locants"
 
     def test_parent_atoms_matches_smiles(self):
@@ -174,7 +174,7 @@ class TestSpecificNewEntries:
     def test_indane_new(self):
         """The indane ring system is catalogued under its PIN.
 
-        P-54.4.3.2 (the Blue Book) names 'indane' verbatim as NOT a preferred IUPAC
+         (the Blue Book) names 'indane' verbatim as NOT a preferred IUPAC
         name; the Blue Book prints '(formerly indan) 2,3-dihydro-1H-indene (PIN)'.
         """
         smi = Chem.CanonSmiles("C1Cc2ccccc2C1")
@@ -183,11 +183,11 @@ class TestSpecificNewEntries:
         assert data["name"] == "2,3-dihydro-1H-indene"
 
     def test_phenoxathiin_new(self):
-        """Phenoxathiine should be a catalog entry (P-25.2.2.3 PIN)."""
+        """Phenoxathiine should be a catalog entry PIN)."""
         smi = Chem.CanonSmiles("c1ccc2c(c1)Oc1ccccc1S2")
         assert smi in FUSED_HETEROCYCLE_DATA
         data = FUSED_HETEROCYCLE_DATA[smi]
-        #: PIN keeps the terminal 'e' (P-25.2.2.3, the Blue Book
+        #: PIN keeps the terminal 'e', the Blue Book
         # "X = S phenoxathiine (PIN)").
         assert data["name"] == "phenoxathiine"
 

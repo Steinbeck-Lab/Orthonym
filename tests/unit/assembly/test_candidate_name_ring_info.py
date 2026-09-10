@@ -1,9 +1,9 @@
-"""Phase 147 Plan 02 Task 1: tests for CandidateName.ring_info field
+"""a phase Plan 02 Task 1: tests for CandidateName.ring_info field
 + pool.add(ring_info=...) POST-HOC attachment + _has_iupac_locants probe.
 
-Source: https://iupac.qmul.ac.uk/BlueBook/P4.html P-44.4.1.4+
-Source: Phase 147 CONTEXT D-03 (dispatch helper consumer);
-        Phase 146 CONTEXT D-19 (Risk 1 byte-identical guarantee on
+Source: https://iupac.qmul.ac.uk/BlueBook/P4.html +
+Source: a phase internal notes (dispatch helper consumer);
+        a phase internal notes (Risk 1 byte-identical guarantee on
         compute_confidence — ring_info MUST be POST-HOC like
         parent_atom_indices and parent_pcg_count).
 """
@@ -14,8 +14,8 @@ import pytest
 def test_candidate_name_default_ring_info_is_none():
     """CandidateName instantiates with ring_info defaulting to None.
 
-    Source: https://iupac.qmul.ac.uk/BlueBook/P4.html P-44.4.1.4+
-    Source: Phase 147 CONTEXT D-03.
+    Source: https://iupac.qmul.ac.uk/BlueBook/P4.html +
+    Source: a phase internal notes.
     """
     from orthonym.assembly.coverage_scoring import CandidateName
     c = CandidateName(name='foo', handler='benzene')
@@ -25,8 +25,8 @@ def test_candidate_name_default_ring_info_is_none():
 def test_candidate_name_ring_info_constructor_kwarg():
     """CandidateName accepts ring_info via constructor kwarg.
 
-    Source: https://iupac.qmul.ac.uk/BlueBook/P4.html P-44.4.1.4+
-    Source: Phase 147 CONTEXT D-03.
+    Source: https://iupac.qmul.ac.uk/BlueBook/P4.html +
+    Source: a phase internal notes.
     """
     from orthonym.assembly.coverage_scoring import CandidateName
     c = CandidateName(
@@ -38,10 +38,10 @@ def test_candidate_name_ring_info_constructor_kwarg():
 
 
 def test_candidate_name_ring_info_post_hoc_assignment():
-    """ring_info can be set POST-HOC after construction (D-03 attach pattern).
+    """ring_info can be set POST-HOC after construction (attach pattern).
 
-    Source: https://iupac.qmul.ac.uk/BlueBook/P4.html P-44.4.1.4+
-    Source: Phase 147 CONTEXT D-03.
+    Source: https://iupac.qmul.ac.uk/BlueBook/P4.html +
+    Source: a phase internal notes.
     """
     from orthonym.assembly.coverage_scoring import CandidateName
     c = CandidateName(name='foo', handler='benzene')
@@ -57,10 +57,10 @@ def test_compute_confidence_byte_identical_with_ring_info_field():
     Calling compute_confidence twice on the same SMILES must produce
     identical confidence values — this protects against accidental wiring
     of ring_info INTO compute_confidence (which would break the
-    byte-identical contract per Phase 146 D-19).
+    byte-identical contract per a phase).
 
-    Source: https://iupac.qmul.ac.uk/BlueBook/P4.html P-44.4.1.4+
-    Source: Phase 146 CONTEXT D-19.
+    Source: https://iupac.qmul.ac.uk/BlueBook/P4.html +
+    Source: a phase internal notes.
     """
     from rdkit import Chem
     from orthonym.assembly.coverage_scoring import compute_confidence
@@ -78,8 +78,8 @@ def test_pool_add_attaches_ring_info_post_hoc():
     """pool.add(..., ring_info={'iupac_locants': {...}}) attaches the dict
     to the returned CandidateName POST-HOC (after compute_confidence).
 
-    Source: https://iupac.qmul.ac.uk/BlueBook/P4.html P-44.4.1.4+
-    Source: Phase 147 CONTEXT D-03; Phase 146 CONTEXT D-19.
+    Source: https://iupac.qmul.ac.uk/BlueBook/P4.html +
+    Source: a phase internal notes; a phase internal notes.
     """
     from rdkit import Chem
     from orthonym.assembly.candidate_pool import CandidatePool
@@ -97,11 +97,11 @@ def test_pool_add_attaches_ring_info_post_hoc():
 
 
 def test_pool_add_without_ring_info_kwarg_leaves_none():
-    """pool.add() without the ring_info kwarg leaves cand.ring_info as None
+    """pool.add without the ring_info kwarg leaves cand.ring_info as None
     (back-compat: existing call sites need not pass the new kwarg).
 
-    Source: https://iupac.qmul.ac.uk/BlueBook/P4.html P-44.4.1.4+
-    Source: Phase 147 CONTEXT D-03.
+    Source: https://iupac.qmul.ac.uk/BlueBook/P4.html +
+    Source: a phase internal notes.
     """
     from rdkit import Chem
     from orthonym.assembly.candidate_pool import CandidatePool
@@ -117,17 +117,17 @@ def test_pool_add_without_ring_info_kwarg_leaves_none():
 
 def test_has_iupac_locants_truth_table():
     """_has_iupac_locants returns False if ANY candidate has unpopulated
-    iupac_locants (per D-02 / D-06 conservative gate — spiro/VB stubs and
+    iupac_locants (per / conservative gate — spiro/VB stubs and
     candidates with ring_info=None correctly disable cascade step 6).
 
     Truth table:
-      both None              -> False
+      both None -> False
       one None, one populated -> False
       both populated-non-empty -> True
       one None-stub (iupac_locants=None inside dict) + populated -> False
 
-    Source: https://iupac.qmul.ac.uk/BlueBook/P4.html P-44.4.1.4+
-    Source: Phase 147 CONTEXT D-02, D-06.
+    Source: https://iupac.qmul.ac.uk/BlueBook/P4.html +
+    Source: a phase internal notes,.
     """
     from orthonym.assembly.coverage_scoring import CandidateName
     from orthonym.assembly.candidate_pool import _has_iupac_locants

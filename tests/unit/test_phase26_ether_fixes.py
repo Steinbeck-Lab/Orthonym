@@ -45,10 +45,10 @@ class TestGlycosideNaming:
 
     @pytest.mark.unit
     @pytest.mark.parametrize("smiles,expected_fragment", [
-        # B2: ASML-13 phenol routing changes decomposition path, now uses oxane acid + diol
+        # B2: phenol routing changes decomposition path, now uses oxane acid + diol
         ("Cc1ccc(O[C@H]2O[C@@H](C(=O)O)C(O)[C@@H](O)C2O)c(O)c1", "oxane"),
         # B7 - ring boundary fix: benzene BFS no longer walks into fused lactone
-        # ASML-13: phenol suffix routing changes to dimethylphenol
+        #: phenol suffix routing changes to dimethylphenol
         (
             "Cc1c(O)cc2c(c1C)C(=O)O[C@@H]"
             "([C@@]1([C@@H]3CC=C4CCC[C@H](C)[C@@]4(C)C3)CO1)O2",
@@ -63,8 +63,8 @@ class TestGlycosideNaming:
         )
 
     # B3 (trigalloyl ester) and B5 (thiocarbamate + rhamnose glycoside) are
-    # complex molecules the T4 best-effort decomposition can only name WRONGLY
-    # (both were RT-WRONG snapshots gate-off; the pre-existing SELF-01 gate is
+    # complex molecules the best-effort decomposition can only name WRONGLY
+    # (both were RT-WRONG snapshots gate-off; the pre-existing gate is
     # what makes them safe). In PRODUCTION (gate ON) both abstain — the 0-wrong
     # pin. This is unchanged by F-spell-oxy (the gate-off raw string moved, the
     # production behaviour did not); asserted gate-on so it is meaningful.
@@ -74,7 +74,7 @@ class TestGlycosideNaming:
         ("COC(=S)NCc1ccc(OC2OC(C)C(O)C(O)C2O)cc1", "B5-glycosyloxy"),
     ])
     def test_complex_ether_abstains_in_production(self, smiles, test_id):
-        """Gate-ON: SELF-01 suppresses the RT-WRONG T4 best-effort name."""
+        """Gate-ON: suppresses the RT-WRONG best-effort name."""
         assert name_compound(smiles) == "unknown organic compound", test_id
 
 
@@ -153,7 +153,7 @@ class TestBGroupRegression:
             "B2-oxanyloxy",
         ),
         # B4: benzophenone with an aminohexyloxy chain. F-spell-oxy: the correct
-        # 'hexyloxy' morphology lets the WHOLE structure name and pass SELF-01 —
+        # 'hexyloxy' morphology lets the WHOLE structure name and pass —
         # abstain -> VERIFIED RT-EXACT (breadth gain, 0-wrong preserved).
         (
             "C=CCN(C)CCCCCCOc1ccc(C(=O)c2ccc(Br)cc2)c(F)c1",
@@ -162,7 +162,7 @@ class TestBGroupRegression:
         ),
         # B6: substituted xanthone. F-spell-oxy: now emits the PIN
         # '9H-xanthen-9-one' core (matching gold rings_numbering.json:1146 where
-        # IH-01g de-headlined the retained 'xanthone'); the old snapshot was the
+        # de-headlined the retained 'xanthone'); the old snapshot was the
         # non-PIN retained name. Both RT-EXACT; new form is the conformant PIN.
         (
             "COc1cc(OC)c2c(=O)c3c(O)cc(C)cc3oc2c1",
@@ -173,7 +173,7 @@ class TestBGroupRegression:
         (
             "Cc1c(O)cc2c(c1C)C(=O)O[C@@H]"
             "([C@@]1([C@@H]3CC=C4CCC[C@H](C)[C@@]4(C)C3)CO1)O2",
-            "2,3-dimethylphenol",  # ASML-13: phenol suffix routing
+            "2,3-dimethylphenol",  #: phenol suffix routing
             "B7-oxanyloxy",
         ),
     ])

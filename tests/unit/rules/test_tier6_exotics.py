@@ -1,17 +1,17 @@
 """Wave2 Tier 6 — fail-closed conversions + splice fixes for exotic classes.
 
-6a Spiro ring-unsaturation splice (P-24.2.0 / P-31.1.5.1) + tri+ polyspiro
-    fail-closed (P-24.2.2/.2.3) + propene/propyne locant elision
-    (P-14.3.4.2(d)).
+6a Spiro ring-unsaturation splice / + tri+ polyspiro
+    fail-closed /.2.3) + propene/propyne locant elision
+    (d)).
 6b Substituent-mode hydro emitter for heteromonocyclic mancude substituents
-    (P-32.2.1) + the saturated-stem (oxanyl) wrong-constitution guard.
-6c Acyl pseudohalides (P-65.5.2.1 functional-class PINs), mixed
-    divalent-chalcogen bridge (P-63.3.2), phane production (P-26).
+     + the saturated-stem (oxanyl) wrong-constitution guard.
+6c Acyl pseudohalides functional-class PINs), mixed
+    divalent-chalcogen bridge, phane production.
 
 Every positive expectation below was OPSIN-round-trip verified at build time
 (phane names, which OPSIN cannot parse, by molecular-formula conservation).
  (item 2, 2026-09-04): tri+ polyspiro, the S-attached chalcogen bridge and
-P-26 phane production are now BUILT (capability gains) — see
+ phane production are now BUILT (capability gains) — see
 internal notes
 """
 import pytest
@@ -38,10 +38,10 @@ def _validity_gate_on(monkeypatch):
 
 @pytest.mark.unit
 @pytest.mark.parametrize("smiles,expected", [
-    ("C1CCCC12C=CCCC2", "spiro[4.5]dec-6-ene"),      # BB P-31.1.5.1.1 verbatim
+    ("C1CCCC12C=CCCC2", "spiro[4.5]dec-6-ene"),      # BB verbatim
     ("C1=CCCC11CCCCC1", "spiro[4.5]dec-1-ene"),      # OPSIN-corrected ledger row
     ("C1CCC2(CC1)C=CCCC2", "spiro[5.5]undec-1-ene"),
-    ("N1CC=CC12CCCCC2", "1-azaspiro[4.5]dec-3-ene"),  # BB P-31.1.5.1.3 verbatim
+    ("N1CC=CC12CCCCC2", "1-azaspiro[4.5]dec-3-ene"),  # BB verbatim
 ])
 def test_spiro_unsaturation_splice(smiles, expected):
     assert name_compound(smiles) == expected
@@ -84,7 +84,7 @@ def test_tri_plus_polyspiro_now_named(smiles, expected):
 
 
 # ---------------------------------------------------------------------------
-# 6a — propene/propyne bond-locant elision (P-14.3.4.2(d))
+# 6a — propene/propyne bond-locant elision (d))
 # ---------------------------------------------------------------------------
 
 @pytest.mark.unit
@@ -105,7 +105,7 @@ def test_trinuclear_bond_locant_elision(smiles, expected):
 
 
 # ---------------------------------------------------------------------------
-# 6b — heteromonocyclic mancude-substituent hydro emitter (P-32.2.1)
+# 6b — heteromonocyclic mancude-substituent hydro emitter
 # ---------------------------------------------------------------------------
 
 @pytest.mark.unit
@@ -169,7 +169,7 @@ def test_het_attach_on_heteroatom_declines():
 
 
 # ---------------------------------------------------------------------------
-# 6c — acyl pseudohalides (P-65.5.2.1)
+# 6c — acyl pseudohalides
 # ---------------------------------------------------------------------------
 
 @pytest.mark.unit
@@ -182,12 +182,12 @@ def test_het_attach_on_heteroatom_declines():
     ("CC(=O)C#N", "acetyl cyanide"),
     ("O=C(C#N)c1ccccc1", "benzoyl cyanide"),
     ("CC(C)C(=O)N=[N+]=[N-]", "2-methylpropanoyl azide"),
-    # -3 (P-66.5.2, the Blue Book '3-chloropropanoyl cyanide (PIN)'): a
+    # -3, the Blue Book '3-chloropropanoyl cyanide (PIN)'): a
     # substituent on the acyl chain must number from the carbonyl C = 1
-    # (P-65.5.1). The nitrile carbon inflated the locant before this fix
+    #. The nitrile carbon inflated the locant before this fix
     # ('4-chloro...', which OPSIN rejected -> abstain).
     ("ClCCC(=O)C#N", "3-chloropropanoyl cyanide"),
-    # -3 (P-66.5.1.3.1 / P-66.5.3.1, the Blue Book): a diacyl
+    # -3 /, the Blue Book): a diacyl
     # DIpseudohalide -> 'oxalyl dicyanide' (was dropped to 'acetyl cyanide').
     ("N#CC(=O)C(=O)C#N", "oxalyl dicyanide"),
 ])
@@ -197,7 +197,7 @@ def test_acyl_pseudohalides(smiles, expected):
 
 @pytest.mark.unit
 @pytest.mark.parametrize("smiles,expected", [
-    # -3 (P-66.5.1.3.2, the Blue Book 'CH3-SO2-CN methanesulfonyl cyanide
+    # -3, the Blue Book 'CH3-SO2-CN methanesulfonyl cyanide
     # (PIN)'): the cyanide of a sulfonic acid, functional-class naming. Was the
     # RT-correct-but-non-PIN '(methanesulfonyl)methanenitrile'.
     ("CS(=O)(=O)C#N", "methanesulfonyl cyanide"),
@@ -222,7 +222,7 @@ def test_sulfonyl_cyanide(smiles, expected):
     ("CCN=C=O", "isocyanatoethane"),
     ("CCC#N", "propanenitrile"),
     # -3: sulfonyl cyanide is now the functional-class PIN
-    # 'methanesulfonyl cyanide' (P-66.5.1.3.2, the Blue Book), not the prior
+    # 'methanesulfonyl cyanide', the Blue Book), not the prior
     # RT-correct-but-non-PIN '(methanesulfonyl)methanenitrile'. Asserted in
     # test_sulfonyl_cyanide above; the acyl-pseudohalide ([CX3] anchor) path
     # still does NOT claim it (a separate sulfonyl_cyanide FG does).
@@ -233,13 +233,13 @@ def test_pseudohalide_protections(smiles, expected):
 
 @pytest.mark.unit
 def test_carbonyl_dicyanide_retained_pin(_validity_gate_on):
-    """P-66.5.3.1 (Wave-2 completion C): functional-class IS the PIN for
+    """ (Wave-2 completion C): functional-class IS the PIN for
     carbonic-acid nitriles -- retained exact-SMILES row, OPSIN-RT verified."""
     assert name_compound("O=C(C#N)C#N") == "carbonyl dicyanide"
 
 
 # ---------------------------------------------------------------------------
-# 6c — mixed divalent-chalcogen bridge (P-63.3.2)
+# 6c — mixed divalent-chalcogen bridge
 # ---------------------------------------------------------------------------
 
 @pytest.mark.unit
@@ -280,7 +280,7 @@ def test_s_attached_mixed_bridge_now_named(_validity_gate_on):
 
 
 # ---------------------------------------------------------------------------
-# 6c — phane production refusal (P-26)
+# 6c — phane production refusal
 # ---------------------------------------------------------------------------
 
 @pytest.mark.unit
@@ -289,7 +289,7 @@ def test_s_attached_mixed_bridge_now_named(_validity_gate_on):
     ("C1CCc2ccccc2CCCc2ccccc21", "1,5(1,2)-dibenzenacyclooctaphane"),
 ])
 def test_phane_production_now_named(smiles, expected):
-    """ (item 2): P-26 phane skeletal PINs now produced via the hard-gated,
+    """ (item 2): phane skeletal PINs now produced via the hard-gated,
     formula-conservation-vetoed rules.phane composer (capability gain). No phane
     name is OPSIN-parseable, so correctness is verified by molecular-formula
     conservation (C16H16 / C18H20 preserved), not round-trip — see
@@ -299,7 +299,7 @@ def test_phane_production_now_named(smiles, expected):
 
 @pytest.mark.unit
 def test_phane_composer_machinery_intact():
-    """The rules.phane composer classifies + composes the P-26 skeletal PIN
+    """The rules.phane composer classifies + composes the skeletal PIN
     (upgraded from the old '[2.2]paracyclophane' bracket form)."""
     from orthonym.rules.phane import is_cyclophane, name_cyclophane
     mol = Chem.MolFromSmiles("C1Cc2ccc(cc2)CCc2ccc1cc2")

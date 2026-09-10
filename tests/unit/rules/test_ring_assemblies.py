@@ -1,5 +1,5 @@
 """
-Unit tests for ring assembly detection and naming (IUPAC P-28).
+Unit tests for ring assembly detection and naming (IUPAC.
 
 Tests cover:
   - Detection of identical ring systems connected by single bonds
@@ -21,7 +21,7 @@ from orthonym.rules.ring_assemblies import detect_ring_assembly, name_ring_assem
 # ---------------------------------------------------------------------------
 
 class TestDetection:
-    """Tests for detect_ring_assembly()."""
+    """Tests for detect_ring_assembly."""
 
     @pytest.mark.unit
     def test_biphenyl_detected(self):
@@ -108,7 +108,7 @@ class TestDetection:
         assembly. Pre-fix, ``_system_signature`` ignored ring double-bond
         count, so this pair falsely matched and the namer emitted
         '1,1'-bi(cyclooctene)' for a molecule where only ONE ring actually
-        has the double bond -- a wrong-structure name that OPSIN's SELF-01
+        has the double bond -- a wrong-structure name that OPSIN's
         gate caught (fails-OPEN without Java) but no source-level check did.
         """
         mol = Chem.MolFromSmiles(r"C1CCCCC/C=C\1C1CCCCCCC1")
@@ -132,12 +132,12 @@ class TestDetection:
 # ---------------------------------------------------------------------------
 
 class TestNaming:
-    """Tests for ring assembly naming via name_compound()."""
+    """Tests for ring assembly naming via name_compound."""
 
     @pytest.mark.unit
     def test_biphenyl_name(self):
-        """Biphenyl SMILES produces the PIN '1,1'-biphenyl' (F-T9/DD6 RET-01: bare
-        'biphenyl' is general-only; the ring-assembly PIN is 1,1'-biphenyl, P-28.2.1)."""
+        """Biphenyl SMILES produces the PIN '1,1'-biphenyl' (F-T9/DD6: bare
+        'biphenyl' is general-only; the ring-assembly PIN is 1,1'-biphenyl,."""
         name = name_compound("c1ccc(-c2ccccc2)cc1")
         assert name == "1,1'-biphenyl"
 
@@ -217,11 +217,11 @@ class TestNamingNegatives:
 
 
 # ---------------------------------------------------------------------------
-# RING-01: Higher multiplier tests (quinque through deci)
+#: Higher multiplier tests (quinque through deci)
 # ---------------------------------------------------------------------------
 
 class TestHigherMultipliers:
-    """Tests for ASSEMBLY_MULTIPLIERS extension to 5-10 (IUPAC P-28.2)."""
+    """Tests for ASSEMBLY_MULTIPLIERS extension to 5-10 (IUPAC."""
 
     @pytest.mark.unit
     def test_quinque_in_dict(self):
@@ -263,7 +263,7 @@ class TestHigherMultipliers:
     def test_all_eleven_entries(self):
         """ASSEMBLY_MULTIPLIERS has exactly 11 entries (2 through 12).
 
-        P-28.5 (Wave2 P1CB Task 8): extended past the old deci(10) cap with
+         (Wave2 P1CB Task 8): extended past the old deci(10) cap with
         undeci(11)/dodeci(12) so ring assemblies of >6 (and >10) identical
         systems name correctly. Counts above 12 keep the.get->None decline.
         """
@@ -274,7 +274,7 @@ class TestHigherMultipliers:
 
     @pytest.mark.unit
     def test_quinquepyridine_name(self):
-        """name_ring_assembly() with 5 identical pyridine rings returns name
+        """name_ring_assembly with 5 identical pyridine rings returns name
         containing 'quinquepyridine'."""
         # 5 pyridines linked: c1ccncc1-c1ccncc1-c1ccncc1-c1ccncc1-c1ccncc1
         smiles = "c1ccncc1-c1ccncc1-c1ccncc1-c1ccncc1-c1ccncc1"
@@ -290,7 +290,7 @@ class TestHigherMultipliers:
 
     @pytest.mark.unit
     def test_quinquephenyl_prefix(self):
-        """name_ring_assembly() with 5 identical benzene rings returns name
+        """name_ring_assembly with 5 identical benzene rings returns name
         containing 'quinquephenyl'."""
         from orthonym.rules.ring_assemblies import name_ring_assembly_prefix
         smiles = "c1ccc(-c2ccc(-c3ccc(-c4ccc(-c5ccccc5)cc4)cc3)cc2)cc1"
@@ -306,7 +306,7 @@ class TestHigherMultipliers:
 
     @pytest.mark.unit
     def test_count_11_12_supported_13_unsupported(self):
-        """P-28.5 (Wave2 P1CB Task 8): undeci(11)/dodeci(12) supported (OPSIN-RT
+        """ (Wave2 P1CB Task 8): undeci(11)/dodeci(12) supported (OPSIN-RT
         verified); count 13 and above keep the.get->None decline (no
         OPSIN-verifiable affix -> fail closed)."""
         from orthonym.rules.ring_assemblies import ASSEMBLY_MULTIPLIERS
@@ -317,7 +317,7 @@ class TestHigherMultipliers:
     @pytest.mark.unit
     def test_regression_biphenyl(self):
         """Regression: biphenyl detection + naming produces the PIN 1,1'-biphenyl
-        (F-T9/DD6 RET-01)."""
+        (F-T9/DD6)."""
         name = name_compound("c1ccc(-c2ccccc2)cc1")
         assert name == "1,1'-biphenyl"
 
@@ -329,15 +329,15 @@ class TestHigherMultipliers:
 
 
 # ---------------------------------------------------------------------------
-# RING-02: Fused ring assembly unit tests
+#: Fused ring assembly unit tests
 # ---------------------------------------------------------------------------
 
 class TestFusedRingAssemblyUnits:
-    """Tests for fused ring systems as ring assembly units (IUPAC P-28.1)."""
+    """Tests for fused ring systems as ring assembly units (IUPAC."""
 
     @pytest.mark.unit
     def test_get_ring_parent_name_naphthalene(self):
-        """_get_ring_parent_name() with naphthalene system atoms returns 'naphthalene'."""
+        """_get_ring_parent_name with naphthalene system atoms returns 'naphthalene'."""
         from orthonym.rules.ring_assemblies import _get_ring_parent_name
         mol = Chem.MolFromSmiles("c1ccc2ccccc2c1")
         # naphthalene is a single ring system; all atoms form the system
@@ -348,7 +348,7 @@ class TestFusedRingAssemblyUnits:
 
     @pytest.mark.unit
     def test_get_ring_parent_name_quinoline(self):
-        """_get_ring_parent_name() with quinoline system atoms returns 'quinoline'."""
+        """_get_ring_parent_name with quinoline system atoms returns 'quinoline'."""
         from orthonym.rules.ring_assemblies import _get_ring_parent_name
         mol = Chem.MolFromSmiles("c1ccc2ncccc2c1")
         system_atoms = set(range(mol.GetNumAtoms()))
@@ -358,7 +358,7 @@ class TestFusedRingAssemblyUnits:
 
     @pytest.mark.unit
     def test_get_ring_parent_name_indole(self):
-        """_get_ring_parent_name() with indole system atoms returns a name containing 'indole'."""
+        """_get_ring_parent_name with indole system atoms returns a name containing 'indole'."""
         from orthonym.rules.ring_assemblies import _get_ring_parent_name
         mol = Chem.MolFromSmiles("c1ccc2[nH]ccc2c1")
         system_atoms = set(range(mol.GetNumAtoms()))
@@ -368,7 +368,7 @@ class TestFusedRingAssemblyUnits:
 
     @pytest.mark.unit
     def test_binaphthalene_detection(self):
-        """detect_ring_assembly() on two identical naphthalene systems returns count==2."""
+        """detect_ring_assembly on two identical naphthalene systems returns count==2."""
         # 1,1'-binaphthalene
         smiles = "c1ccc2ccccc2c1-c1ccc2ccccc2c1"
         mol = Chem.MolFromSmiles(smiles)
@@ -380,7 +380,7 @@ class TestFusedRingAssemblyUnits:
 
     @pytest.mark.unit
     def test_binaphthalene_name(self):
-        """name_compound() on binaphthalene SMILES produces name containing 'binaphthalene'."""
+        """name_compound on binaphthalene SMILES produces name containing 'binaphthalene'."""
         smiles = "c1ccc2ccccc2c1-c1ccc2ccccc2c1"
         name = name_compound(smiles)
         assert name is not None
@@ -389,7 +389,7 @@ class TestFusedRingAssemblyUnits:
 
     @pytest.mark.unit
     def test_biquinoline_detection(self):
-        """detect_ring_assembly() on two identical quinoline systems returns count==2."""
+        """detect_ring_assembly on two identical quinoline systems returns count==2."""
         smiles = "c1ccc2ncccc2c1-c1ccc2ncccc2c1"
         mol = Chem.MolFromSmiles(smiles)
         assert mol is not None, f"Invalid SMILES: {smiles}"
@@ -400,11 +400,11 @@ class TestFusedRingAssemblyUnits:
 
 
 # ---------------------------------------------------------------------------
-# G3 /: P-28.2.1 enclosing marks (von Baeyer confusion)
+# G3 /: enclosing marks (von Baeyer confusion)
 # ---------------------------------------------------------------------------
 
 class TestP28EnclosingMarks:
-    """IUPAC P-28.2.1: 'bi' + parent hydride name *enclosed in parentheses, if
+    """IUPAC: 'bi' + parent hydride name *enclosed in parentheses, if
     necessary*. Parentheses are used to avoid confusion with von Baeyer names,
     so cycloalkane / von-Baeyer components are enclosed (``1,1'-bi(cyclopropane)``)
     while mancude rings (phenyl / pyridine / furan / naphthalene) are NOT
@@ -419,7 +419,7 @@ class TestP28EnclosingMarks:
         ("C1CCCCC1C1CCCCC1", "1,1'-bi(cyclohexane)"),
     ])
     def test_cycloalkane_assembly_enclosing_marks(self, smiles, expected):
-        """Cycloalkane ring assemblies get enclosing marks (P-28.2.1)."""
+        """Cycloalkane ring assemblies get enclosing marks."""
         assert name_compound(smiles) == expected
 
     @pytest.mark.unit
@@ -437,11 +437,11 @@ class TestP28EnclosingMarks:
 
 
 # ---------------------------------------------------------------------------
-# G3 /: P-28.2.2 double-bond junction (ylidene)
+# G3 /: double-bond junction (ylidene)
 # ---------------------------------------------------------------------------
 
 class TestP28DoubleBondJunction:
-    """IUPAC P-28.2.2: two identical cyclic systems linked by a *double bond*
+    """IUPAC: two identical cyclic systems linked by a *double bond*
     are named with the ylidene substituent form, enclosed in parentheses:
     ``1,1'-bi(cyclopentylidene)``. All PINs OPSIN-RT-verified.
     """
@@ -449,7 +449,7 @@ class TestP28DoubleBondJunction:
     @pytest.mark.unit
     def test_double_bond_detector_accepts_identical_carbocycles(self):
         """detect_ring_assembly now recognises a double-bond junction between
-        identical saturated carbocycles (P-28.2.2)."""
+        identical saturated carbocycles."""
         mol = Chem.MolFromSmiles("C1CCCC1=C1CCCC1")
         rs = get_ring_systems(mol)
         info = detect_ring_assembly(mol, rs)
@@ -464,12 +464,12 @@ class TestP28DoubleBondJunction:
         ("C1CCC1=C1CCC1", "1,1'-bi(cyclobutylidene)"),
     ])
     def test_cycloalkane_ylidene_assembly(self, smiles, expected):
-        """Double-bond cycloalkane assemblies name as bi(...ylidene) (P-28.2.2)."""
+        """Double-bond cycloalkane assemblies name as bi(...ylidene)."""
         assert name_compound(smiles) == expected
 
     @pytest.mark.unit
     def test_multiring_saturated_dimer_not_claimed(self):
-        """CR-01: a double-bond dimer of a MULTI-ring saturated carbocycle
+        """: a double-bond dimer of a MULTI-ring saturated carbocycle
         (norbornane) is NOT claimed by detect_ring_assembly — the monocyclic
         ylidene namer cannot name it, so it must fall through to the prior path
         rather than trigger the namer.py early-return into a fail-closed dead end.
@@ -486,16 +486,16 @@ class TestP28DoubleBondJunction:
 
 
 # ---------------------------------------------------------------------------
-# G3 /: P-28.2.1 + P-28.3.1 citation-order locant determinism
+# G3 /: + citation-order locant determinism
 # ---------------------------------------------------------------------------
 
 class TestP28CitationOrderDeterminism:
-    """IUPAC P-28.2.1 ("lowest possible locants... for the positions of
-    attachment") + P-28.3.1 erratum (8 Oct 2025, "lowest locant set, then order
+    """IUPAC ("lowest possible locants... for the positions of
+    attachment") + erratum (8 Oct 2025, "lowest locant set, then order
     of citation"): for a 2-component assembly of identical rings, the unprimed
     (first-cited) ring must carry the lower attachment locant. The name must be
     invariant to SMILES atom order (2,3'-bifuran, never 3,2'-bifuran).
-    BB P-28.2.1 worked example: '2,3'-bifuran (PIN)'.
+    BB worked example: '2,3'-bifuran (PIN)'.
     """
 
     @pytest.mark.unit
@@ -516,11 +516,11 @@ class TestP28CitationOrderDeterminism:
 
 
 # ---------------------------------------------------------------------------
-# Task 9-B3a: P-28.2.3 per-ring indicated hydrogen for single-ring assemblies
+# Task 9-B3a: per-ring indicated hydrogen for single-ring assemblies
 # ---------------------------------------------------------------------------
 
 class TestP2823PerRingIndicatedHydrogen:
-    """IUPAC P-28.2.3 "Indicated hydrogen" (the Blue Book): in a ring assembly the
+    """IUPAC "Indicated hydrogen" (the Blue Book): in a ring assembly the
     indicated hydrogen is cited at the position REQUIRED IN EACH COMPONENT RING,
     per-ring in the assembly numbering, NOT front-replicated from the first
     ring. The old front-replicate path copied component 0's descriptor across
@@ -541,7 +541,7 @@ class TestP2823PerRingIndicatedHydrogen:
 
     @pytest.mark.unit
     def test_bipyrrole_drops_spurious_indicated_h(self):
-        """P-31.1.4: the isolated component is 1H-pyrrole, but in 1,1'-bipyrrole
+        """: the isolated component is 1H-pyrrole, but in 1,1'-bipyrrole
         the N is aromatic with its hydrogen displaced by the ring–ring bond, so
         the ring is fully mancude with no saturated position — NO indicated
         hydrogen is cited. Front-replicate wrongly emitted 1H,1'H."""
@@ -552,7 +552,7 @@ class TestP2823PerRingIndicatedHydrogen:
         """The decisive asymmetric case: the two azepine rings carry the
         indicated hydrogen at DIFFERENT positions (1 and 3), so no single
         front-replicated descriptor can be right. The indicated-H priming
-        tiebreak (P-14.4(b), senior to substituent prefixes) puts the lower
+        tiebreak (b), senior to substituent prefixes) puts the lower
         locant on the unprimed ring -> 1H,3'H, not 3H,1'H."""
         assert (name_compound("C1=CN=CCC(C2=CC=CNC=C2)=C1")
                 == "1H,3'H-4,4'-biazepine")
@@ -586,13 +586,13 @@ class TestP2823PerRingIndicatedHydrogen:
 
 @pytest.mark.unit
 class TestP2822YlideneAndReplacementAssemblies:
-    """Task 9-B3b: P-28.2.2 double-bond (ylidene) junctions on heterocyclic
-    mancude rings, and P-28.4.1 skeletal-replacement ('a') ring assemblies
+    """Task 9-B3b: double-bond (ylidene) junctions on heterocyclic
+    mancude rings, and skeletal-replacement ('a') ring assemblies
     (identical rings, ``di``-combined heteroatoms; single- and double-bond
     junctions)."""
 
     def test_heterocyclic_ylidene_bifuranylidene(self):
-        """P-28.2.2 / P-28.2.3: a double-bond junction between two mancude
+        """ /: a double-bond junction between two mancude
         furan rings is named on the MANCUDE parent stem 'furan' with per-ring
         indicated hydrogen at each component's saturated (CH2) position, not on
         the '2,3-dihydrofuran' component name. The two rings attach at different
@@ -601,7 +601,7 @@ class TestP2822YlideneAndReplacementAssemblies:
                 == "2'H,3H-2,3'-bifuranylidene")
 
     def test_replacement_dithia_ylidene_double_bond(self):
-        """P-28.4.1 + P-28.2.2: two identical 12-membered 1-thia rings joined by
+        """ +: two identical 12-membered 1-thia rings joined by
         a DOUBLE bond -> skeletal-replacement assembly named as
         'bi(cyclododecylidene)' (ylidene skeleton) with the two ring sulfurs
         cited once, ``di``-combined: 2,2'-dithia."""
@@ -609,7 +609,7 @@ class TestP2822YlideneAndReplacementAssemblies:
                 == "2,2'-dithia-1,1'-bi(cyclododecylidene)")
 
     def test_replacement_dioxa_single_bond_identical_rings(self):
-        """P-28.4.1: two IDENTICAL 14-membered 1-oxa rings joined by a single
+        """: two IDENTICAL 14-membered 1-oxa rings joined by a single
         bond take skeletal-replacement nomenclature over the cycloalkane
         skeleton (not 'bioxacyclotetradecane'), with both ring oxygens cited once
         and ``di``-combined: 3,3'-dioxa-1,1'-bi(cyclotetradecane)."""
@@ -619,24 +619,24 @@ class TestP2822YlideneAndReplacementAssemblies:
     def test_regression_mixed_replacement_single_bond(self):
         """Regression pin: the mixed O/S single-bond replacement assembly keeps
         its distinct-element citation (no ``di`` combination), unchanged by the
-        di-combination logic: 3'-oxa-2-thia-1,1'-bi(cyclotetradecane) (P-28.4.2)."""
+        di-combination logic: 3'-oxa-2-thia-1,1'-bi(cyclotetradecane)."""
         assert (name_compound("C1CCCCCCC(C2CCCCCCCCCCCOC2)SCCCCC1")
                 == "3'-oxa-2-thia-1,1'-bi(cyclotetradecane)")
 
     def test_regression_carbocyclic_ylidene_cyclopentylidene(self):
-        """Regression pin: the saturated-carbocycle ylidene path (P-28.2.2)
+        """Regression pin: the saturated-carbocycle ylidene path
         stays FIRST and unchanged -> 1,1'-bi(cyclopentylidene)."""
         assert (name_compound("C1CCC(=C2CCCC2)C1")
                 == "1,1'-bi(cyclopentylidene)")
 
     def test_regression_carbocyclic_ylidene_cyclohexylidene(self):
         """Regression pin: carbocyclic ylidene, six-membered rings ->
-        1,1'-bi(cyclohexylidene) (P-28.2.2)."""
+        1,1'-bi(cyclohexylidene)."""
         assert (name_compound("C1CCC(=C2CCCCC2)CC1")
                 == "1,1'-bi(cyclohexylidene)")
 
     def test_regression_single_bond_bifuran_unchanged(self):
         """Regression pin: a SINGLE-bond aromatic bifuran is not a ylidene and
-        must keep its plain assembly name 2,3'-bifuran (P-28.2.1), unaffected by
+        must keep its plain assembly name 2,3'-bifuran, unaffected by
         the exocyclic-double indicated-H exclusion."""
         assert (name_compound("c1coc(-c2ccoc2)c1") == "2,3'-bifuran")

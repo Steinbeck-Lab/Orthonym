@@ -1,14 +1,14 @@
 """
-E2E integration tests for Phase 14.7: Ester Routing and Lactone Architecture Fix.
+E2E integration tests for a phase: Ester Routing and Lactone Architecture Fix.
 
 Tests cover:
 1. Monocyclic lactone naming (oxolan-2-one, oxan-2-one, etc.)
 2. Simple ester preservation (methyl acetate, ethyl acetate)
 3. Ring-attached ester naming (acyloxy prefixes on ring parents)
 4. Regression guards for existing compound classes
-5. Success criteria from all three Phase 14.7 plans
+5. Success criteria from all three a phase plans
 
-Reference: IUPAC 2013 Blue Book, P-25.5.2 (Lactones), P-65.6.3.2.2 (Acyloxy prefixes)
+Reference: IUPAC 2013 Blue Book, (Lactones), (Acyloxy prefixes)
 """
 
 import pytest
@@ -179,8 +179,8 @@ class TestExistingCompoundsPreserved:
 
     @pytest.mark.integration
     def test_coumarin(self):
-        """v23 IH-01f: coumarin de-headlined to the PIN 2H-1-benzopyran-2-one
-        (1-benzopyran is the PIN ring parent per P-19(d)); 'coumarin' is not a PIN."""
+        """: coumarin de-headlined to the PIN 2H-1-benzopyran-2-one
+        (1-benzopyran is the PIN ring parent per (d)); 'coumarin' is not a PIN."""
         result = name_compound("O=c1ccc2ccccc2o1")
         assert result == "2H-1-benzopyran-2-one", (
             f"Expected '2H-1-benzopyran-2-one', got '{result}'"
@@ -213,7 +213,7 @@ class TestExistingCompoundsPreserved:
 
 
 class TestSuccessCriteria:
-    """Tests mapping directly to must_haves truths from Phase 14.7 plans."""
+    """Tests mapping directly to must_haves truths from a phase plans."""
 
     @pytest.mark.integration
     def test_truth_gamma_butyrolactone_is_oxolan_2_one(self):

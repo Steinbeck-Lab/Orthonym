@@ -1,5 +1,5 @@
 """
-Integration tests for bare oxy / format fix verification (DEC-02).
+Integration tests for bare oxy / format fix verification .
 
 Tests that benzene.py and polyfunctional.py no longer produce bare "oxy"
 prefixes for compounds where a nameable alkyl chain exists. Also verifies
@@ -11,7 +11,7 @@ Bare oxy detection: a name has "bare oxy" if it starts with "oxy" or has
 without a qualifying alkyl/aryl prefix. Compounds like "methoxybenzene"
 or "sulfanyloxybenzene" are NOT bare oxy.
 
-Phase 50, Plan 03 -- bare oxy elimination validation.
+a phase, Plan 03 -- bare oxy elimination validation.
 """
 
 import pytest
@@ -125,7 +125,7 @@ class TestLegitimateAlkoxyPreserved:
 
     @pytest.mark.integration
     def test_methoxybenzene_still_works(self):
-        """Methoxybenzene: now returns 'anisole' (retained name, P-34.1.1.4 PIN)."""
+        """Methoxybenzene: now returns 'anisole' (retained name, PIN)."""
         name = name_compound("c1ccc(OC)cc1")
         assert name == "anisole" or "methoxy" in name.lower(), (
             f"Expected 'anisole' or 'methoxy' in name, got: {name}"

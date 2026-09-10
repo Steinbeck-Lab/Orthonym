@@ -2,22 +2,22 @@
 Tests for benzene ring-attached suffix functional group naming.
 
 IUPAC 2013 Rules:
-- P-65.1.2: Principal group on ring uses suffix form
-- P-66.1.1.1: Amides of benzoic acid -> benzamide (retained)
-- P-66.4.1: Sulfonamides use -sulfonamide suffix
+-: Principal group on ring uses suffix form
+-: Amides of benzoic acid -> benzamide (retained)
+-: Sulfonamides use -sulfonamide suffix
 - Dicarboxylic acids on benzene: benzene-1,2-dicarboxylic acid
 
-RING-FG-01: Amides (carboxamide suffix)
-RING-FG-02: Sulfonamides (sulfonamide suffix)
-RING-FG-03: Dicarboxylic acids and dialdehydes (suffix form)
-RING-FG-04: Comprehensive FG audit (no silent FG dropping)
+RING-: Amides (carboxamide suffix)
+RING-: Sulfonamides (sulfonamide suffix)
+RING-: Dicarboxylic acids and dialdehydes (suffix form)
+RING-: Comprehensive FG audit (no silent FG dropping)
 """
 
 import pytest
 from orthonym import name_compound
 
 
-# === RING-FG-01: Ring-attached amides ===
+# === RING-: Ring-attached amides ===
 
 @pytest.mark.unit
 @pytest.mark.parametrize("smiles, expected", [
@@ -36,14 +36,14 @@ def test_benzene_amide_suffix(smiles, expected):
     assert result == expected, f"For {smiles}: got {result!r}, expected {expected!r}"
 
 
-# === RING-FG-02: Ring-attached sulfonamides ===
+# === RING-: Ring-attached sulfonamides ===
 
 @pytest.mark.unit
 @pytest.mark.parametrize("smiles, expected", [
-    # Basic sulfonamide -- MONOsubstituted ring, so no '1' (P-14.3.4.2(c):2913).
+    # Basic sulfonamide -- MONOsubstituted ring, so no '1' (c):2913).
     ("NS(=O)(=O)c1ccccc1", "benzenesulfonamide"),
     # Substituted sulfonamide -- a RING substituent makes the ring DI-substituted,
-    # so P-14.3.3 (:2869, deny-by-default) cites the suffix '1' (F-B, 2026-08-08).
+    # so (:2869, deny-by-default) cites the suffix '1' (F-B, 2026-08-08).
     # Corrected from the non-PIN ' 4-methylbenzenesulfonamide' (locant omitted): the
     # whole arenesulfon* family carries -1- in the Blue Book (e.g.:31174
     # 4-aminobenzene-1-sulfonic acid;:33034 4-aminobenzene-1-sulfonamido), and the
@@ -56,7 +56,7 @@ def test_benzene_sulfonamide_suffix(smiles, expected):
     assert result == expected, f"For {smiles}: got {result!r}, expected {expected!r}"
 
 
-# === RING-FG-03: Dicarboxylic acids and dialdehydes as suffix ===
+# === RING-: Dicarboxylic acids and dialdehydes as suffix ===
 
 @pytest.mark.unit
 @pytest.mark.parametrize("smiles, expected", [
@@ -75,7 +75,7 @@ def test_benzene_dicarboxylic_and_dialdehyde_suffix(smiles, expected):
     assert result == expected, f"For {smiles}: got {result!r}, expected {expected!r}"
 
 
-# === RING-FG-04: Comprehensive FG audit (no silent FG dropping) ===
+# === RING-: Comprehensive FG audit (no silent FG dropping) ===
 # Every FG type on benzene must produce a non-"benzene" output.
 
 @pytest.mark.unit
@@ -147,7 +147,7 @@ def test_benzene_fg_exact_names(smiles, expected):
     ("Cc1ccccc1", "methyl (toluene)"),
 ])
 def test_benzene_fg_not_dropped(smiles, desc):
-    """Audit: every FG type on benzene produces a non-'benzene' output (RING-FG-04)."""
+    """Audit: every FG type on benzene produces a non-'benzene' output (RING-)."""
     result = name_compound(smiles)
     assert result is not None, f"FG dropped (None) for {smiles} ({desc})"
     assert result != "benzene", f"FG dropped for {smiles} ({desc}): got 'benzene'"
@@ -167,12 +167,12 @@ def test_benzene_fg_not_dropped(smiles, desc):
     # ⚠ CORRECTED 2026-07-28 (Phase C tranche C). This row asserted
     # `1-methyl-4-sulfanylbenzene`, i.e. BOTH groups as prefixes on a bare benzene
     # parent. That is wrong: `-thiol` is a suffixable characteristic group, and with
-    # nothing senior present it MUST be the suffix (P-41) -- the Blue Book and the Blue Book both
+    # nothing senior present it MUST be the suffix -- the Blue Book and the Blue Book both
     # print `C6H5-SH benzenethiol (PIN) (not thiophenol)`. A hydrocarbon parent carrying
     # only prefixes is correct only when no suffixable group exists. Benzene simply had
     # no `-thiol` suffix form, so the SH was demoted and this row froze that behaviour.
     # The true PIN also cites the suffix locant, because the 4-methyl locant is
-    # essential and P-14.3.3 (the Blue Book) then restores every locant in the scope --
+    # essential and (the Blue Book) then restores every locant in the scope --
     # cf. the Blue Book `4-methylbenzene-1,3-disulfonic acid (PIN)`. We now emit
     # `4-methylbenzenethiol`, which fixes the suffix but still under-cites, so the row
     # keeps the TRUE PIN and is marked xfail rather than being re-frozen on the

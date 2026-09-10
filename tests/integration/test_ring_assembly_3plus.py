@@ -6,12 +6,12 @@ Compatibility Evidence") and asserts that ``name_compound(smiles)`` emits
 a name OPSIN can parse back to a SMILES whose InChI layer 1 (formula +
 connectivity) matches the input.
 
-Per CONTEXT stereo-layer mismatches don't fail this test (handled in
+Per internal notes stereo-layer mismatches don't fail this test (handled in
 a phase/153). The InChI layer-1 split (``.split('/c')[0]``) restricts
 the comparison to the formula portion.
 
-Source: 151-CONTEXT.md.
-Source: 151-RESEARCH.md §"OPSIN Compatibility Evidence" (12 names).
+Source: 151-internal notes.
+Source: internal notes §"OPSIN Compatibility Evidence" (12 names).
 """
 from __future__ import annotations
 
@@ -68,7 +68,7 @@ _LIT_FIXTURES = json.loads((_FIXTURE_DIR / "literature_validated.json").read_tex
 
 
 # Fixtures known to need substituent-classification fix per
-# 151-AUDIT-C.md "Out-of-scope follow-ups" + AUTONOM-followups.md.
+# internal notes-C.md "Out-of-scope follow-ups" + AUTONOM-followups.md.
 _XFAIL_FIXTURES = {
     "ra_lit_terphenyl_dicarboxylic_acid": (
         "151-AUDIT-C.md out-of-scope: -CHO vs -COOH substituent "

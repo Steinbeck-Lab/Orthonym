@@ -1,11 +1,11 @@
 """
-Tests for amide handler ring substituent naming (Phase 121, Plan 02).
+Tests for amide handler ring substituent naming (a phase, Plan 02).
 
 Verifies that N-substituent fragments containing rings get sub-substituent
 prefixes with correct IUPAC locants via the universal discovery pipeline.
 
 Covers:
-  ASML-08: Ring enrichment for N-substituent naming in amide handler
+  : Ring enrichment for N-substituent naming in amide handler
   - Ring-containing N-substituents get sub-substituent prefixes with locants
   - Ring-only N-substituents are returned unchanged
   - Simple non-ring N-substituents are unaffected

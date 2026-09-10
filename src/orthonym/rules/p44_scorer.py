@@ -1,33 +1,33 @@
-"""v25 G1: unified Blue Book P-44 parent-structure scorer.
+""": unified Blue Book parent-structure scorer.
 
 ONE deterministic comparator over a POOLED ring+chain candidate list,
-replacing the staged class-specific ``select_parent`` cascade (the v25 P0
+replacing the staged class-specific ``select_parent`` cascade (the
 root-cause coverage gap: staged branches + fail-open default-to-ring).
 
-Rule grounding (BlueBookV2/BlueBookV2.md, verified 2026-07-19):
-- P-44.1.1  (~18850): max count of principal characteristic group as suffix.
-- P-44.1.2  (18917): class order N>P>As>Sb>Bi>Si>Ge>Sn>Pb>B>Al>Ga>In>Tl>
+Rule grounding (the Blue Book Blue Book, verified 2026-07-19):
+- (~18850): max count of principal characteristic group as suffix.
+- (18917): class order N>P>As>Sb>Bi>Si>Ge>Sn>Pb>B>Al>Ga>In>Tl>
   O>S>Se>Te>C; chooses between rings and chains, NOT among rings/'a'-chains.
-- P-44.1.2.2(1) (19340): same class -> ring senior to chain, regardless of
+- (1) (19340): same class -> ring senior to chain, regardless of
   hydrogenation (heptylbenzene PIN) or chain length (BB 35011:
   2-(7-oxoheptyl)cyclopentane-1-carbaldehyde PIN, ring 5 beats chain 7 on
   a PG tie).
-- P-44.2.1 (19408): among rings (a) heterocycle (b) has-N (c) earliest
+- (19408): among rings (a) heterocycle (b) has-N (c) earliest
   heteroatom F>Cl>Br>I>O>S>Se>Te>P>... (d) more rings (e) more skeletal
   atoms (f) more heteroatoms (g) more of the earliest heteroatom.
-- P-44.3 (20926): among chains (a) more skeletal heteroatoms (b) more
+- (20926): among chains (a) more skeletal heteroatoms (b) more
   skeletal atoms (c) more of the senior heteroatom O>S>Se>Te>N>P>...
-- P-44.4.1 (21016): shared tiebreaks (a) multiple bonds (b) double bonds
+- (21016): shared tiebreaks (a) multiple bonds (b) double bonds
   (h) lower suffix locants (j) lower ene/yne locants; mancude rings count
   as noncumulative double bonds.
-- P-51.4: chain skeletal-replacement nomenclature admitted at >= 4
+-: chain skeletal-replacement nomenclature admitted at >= 4
   bridging hetero units (candidate ADMISSION gate, not a comparison rule).
 
-Expressibility principle (class rank + P-44.3 hetero criteria): a chain
+Expressibility principle (class rank + hetero criteria): a chain
 heteroatom only counts as SKELETON when the name can express it as such --
-a pure non-carbon hydride chain (silane, phosphane, hydrazine: P-21) or a
-P-51.4 replacement-admissible mixed chain. Below that, a mixed C/het chain
-is a carbon parent with functionalized bridges (Phase 91.1 semantics) and
+a pure non-carbon hydride chain (silane, phosphane, hydrazine: or a
+ replacement-admissible mixed chain. Below that, a mixed C/het chain
+is a carbon parent with functionalized bridges (a phase semantics) and
 ranks as carbon. Principal-group match atoms are suffix, never skeleton.
 """
 from __future__ import annotations
@@ -38,17 +38,17 @@ from typing import List, Optional, Tuple
 
 logger = logging.getLogger(__name__)
 
-# P-44.1.2 (BB line 18917) - decides between rings and chains at class level.
+# (the Blue Book) - decides between rings and chains at class level.
 P44_CLASS_ORDER = ['N', 'P', 'As', 'Sb', 'Bi', 'Si', 'Ge', 'Sn', 'Pb',
                    'B', 'Al', 'Ga', 'In', 'Tl', 'O', 'S', 'Se', 'Te', 'C']
 P44_CLASS_RANK = {s: len(P44_CLASS_ORDER) - i for i, s in enumerate(P44_CLASS_ORDER)}
 
-# P-44.2.1(c) (BB line 19455) - ring heteroatom seniority.
+# (c) (the Blue Book) - ring heteroatom seniority.
 RING_HETERO_ORDER = ['F', 'Cl', 'Br', 'I', 'O', 'S', 'Se', 'Te', 'P', 'As',
                      'Sb', 'Bi', 'Si', 'Ge', 'Sn', 'Pb', 'B', 'Al', 'Ga', 'In', 'Tl']
 RING_HETERO_RANK = {s: len(RING_HETERO_ORDER) - i for i, s in enumerate(RING_HETERO_ORDER)}
 
-# P-44.3.3 (BB line 21002) - chain heteroatom seniority (O first!).
+# (the Blue Book) - chain heteroatom seniority (O first!).
 CHAIN_HETERO_ORDER = ['O', 'S', 'Se', 'Te', 'N', 'P', 'As', 'Sb', 'Bi',
                       'Si', 'Ge', 'Sn', 'Pb', 'B', 'Al', 'Ga', 'In', 'Tl']
 CHAIN_HETERO_RANK = {s: len(CHAIN_HETERO_ORDER) - i for i, s in enumerate(CHAIN_HETERO_ORDER)}
@@ -60,7 +60,7 @@ class ParentCandidate:
 
     kind: 'ring' | 'chain'.
     atoms: ring -> sorted ring-system atom indices; chain -> chain order.
-    pg_count: P-44.1.1 count of principal-characteristic-group instances
+    pg_count: count of principal-characteristic-group instances
         expressible as suffix on THIS candidate.
     """
     kind: str
@@ -79,11 +79,11 @@ def pool_candidates(mol, ring_systems, principal_chain,
     - a longer PG-bearing skeletal hetero chain is admitted ONLY in the
       tied-PG context (PG on BOTH the ring system and the carbon principal
       chain) with a bridging heteroatom - exactly the branch where the
-      legacy staged cascade considered it (Phase 91.1 / P-44.3(b)).
+      legacy staged cascade considered it (a phase / (b)).
       Outside that context the skeletal chain must not displace the
       carbon-chain parent (e.g. the secondary-amine C-N-C shape);
     - with no principal group, a longer skeletal chain is admitted at
-      >= 4 bridging hetero units (P-51.4 replacement admission).
+      >= 4 bridging hetero units replacement admission).
     """
     from ..perception.chains import find_longest_skeletal_chain
     from ..perception.functional_groups import get_chain_excluded_atoms
@@ -148,7 +148,7 @@ def _pg_atom_set(principal_group_atoms) -> set:
 
 def _chain_hetero_expressible(mol, atoms) -> bool:
     """True when the chain's heteroatoms are expressible as SKELETON:
-    a pure non-carbon hydride chain (P-21) or a P-51.4 replacement-
+    a pure non-carbon hydride chain or a replacement-
     admissible mixed chain (>= 4 bridging hetero units)."""
     from .parent_selection import _count_bridging_heteroatoms
     syms = {mol.GetAtomWithIdx(i).GetSymbol() for i in atoms}
@@ -158,7 +158,7 @@ def _chain_hetero_expressible(mol, atoms) -> bool:
 
 
 def _class_rank(mol, cand: ParentCandidate, principal_group_atoms=None) -> int:
-    """P-44.1.2: rank of the most senior EXPRESSIBLE skeletal element."""
+    """: rank of the most senior EXPRESSIBLE skeletal element."""
     if cand.kind == 'ring':
         return max((P44_CLASS_RANK.get(mol.GetAtomWithIdx(i).GetSymbol(), 0)
                     for i in cand.atoms), default=0)
@@ -177,8 +177,8 @@ def _class_rank(mol, cand: ParentCandidate, principal_group_atoms=None) -> int:
 def _n_multiple_bonds(mol, atom_set) -> Tuple[int, int]:
     """(multiple, double) bond counts within the candidate skeleton.
 
-    P-44.4.1.1: mancude (aromatic) bonds count as noncumulative double
-    bonds -- GetBondTypeAsDouble() returns 1.5 for aromatic, > 1.0 counts.
+    : mancude (aromatic) bonds count as noncumulative double
+    bonds -- GetBondTypeAsDouble returns 1.5 for aromatic, > 1.0 counts.
     """
     n_mult = n_dbl = 0
     for b in mol.GetBonds():
@@ -192,7 +192,7 @@ def _n_multiple_bonds(mol, atom_set) -> Tuple[int, int]:
 
 
 def _locant_sort_key(v):
-    """v33 Phase 0 cleanup T3: TOTAL, crash-proof sort key for the locant
+    """ a phase cleanup T3: TOTAL, crash-proof sort key for the locant
     values `_candidate_locants` collects (below).
 
     The `_Locant` type contract (`locants.py`) only ever admits ``int`` or
@@ -204,7 +204,7 @@ def _locant_sort_key(v):
     coerced to ``(3, 'a')``) in that dict and every one of ``cand.atoms``
     still happens to be a key, the fast path takes it uncoerced -- and
     plain ``sorted(locs)`` then compares that string against an ``int``/
-    ``tuple`` neighbour and raises ``TypeError`` (measured, L3-2/L3-3 SPY:
+    ``tuple`` neighbour and raises ``TypeError`` (measured, L3-2/L3-3 a trace:
     crashes ``_classify`` -> the molecule abstains; 0-wrong-safe but a
     robustness defect).
 
@@ -219,9 +219,9 @@ def _locant_sort_key(v):
     doing that correctly means root-causing the producer that leaks the
     unconverted string in the first place, out of scope for this fix (the
     task brief sanctions the minimal safe fix here). It only guarantees
-    `sorted()` cannot raise, matching the project's fail-closed contract.
+    `sorted` cannot raise, matching the project's fail-closed contract.
 
-    Byte-identical for every list this project has ever fed `sorted()`
+    Byte-identical for every list this project has ever fed `sorted`
     here: a homogeneous-int or homogeneous-(int, str)-tuple list (the
     only two shapes the type contract already allowed) reduces to the
     SAME relative order `sorted(locs)` always gave it, since every
@@ -241,7 +241,7 @@ def _candidate_locants(mol, cand: ParentCandidate, target_atoms,
                        ring_info=None):
     """Lowest-locant set for `target_atoms` on this candidate.
 
-    Chain: try both directions, keep the lower set (P-14.4 first point of
+    Chain: try both directions, keep the lower set first point of
     difference). Ring: use IUPAC locants from ring_info when available for
     THIS ring system, else the deterministic sorted-position fallback
     (`_build_ring_pos` -- same fallback the legacy cascade used).
@@ -265,12 +265,12 @@ def _candidate_locants(mol, cand: ParentCandidate, target_atoms,
             pos = iupac
     if pos is None:
         pos = _build_ring_pos(set(cand.atoms), ring_info=ring_info)
-    # Phase 147 homogeneity: raw iupac_locants (and thus the fast path
+    # a phase homogeneity: raw iupac_locants (and thus the fast path
     # above) can mix int locants (2) with (int, str) fusion/prime tuples
     # ((4, 'a'), (2, "'")). Coerce ints to (n, '') when any tuple is
     # present so BOTH this sort AND the downstream compare_locant_sets stay
     # type-safe (same idiom as _build_ring_pos:180-184 and
-    # compare_locant_sets). v30 #40: fused ring assembly Tier-5 non-crash.
+    # compare_locant_sets). #40: fused ring assembly Tier-5 non-crash.
     locs = [pos[a] for a in targets if a in pos]
     if any(isinstance(v, tuple) for v in locs):
         locs = [(v, '') if isinstance(v, int) else v for v in locs]
@@ -305,7 +305,7 @@ def _ring_hetero_rank_vector(mol, atoms):
 
 def _chain_hetero_rank_vector(mol, cand, principal_group_atoms=None):
     """Descending rank vector of EXPRESSIBLE chain skeletal heteroatoms
-    (P-44.3(a)/(c)); suffix (PG-match) heteroatoms never count."""
+    (a)/(c)); suffix (PG-match) heteroatoms never count."""
     if not _chain_hetero_expressible(mol, cand.atoms):
         return ()
     pg_atoms = _pg_atom_set(principal_group_atoms)
@@ -325,7 +325,7 @@ def compare_with_reason(mol, a: ParentCandidate, b: ParentCandidate, *,
                         principal_group=None,
                         principal_group_atoms=None,
                         ring_info=None) -> Tuple[int, str]:
-    """Blue Book P-44 seniority with the deciding criterion.
+    """Blue Book seniority with the deciding criterion.
 
     Returns (sign, label): sign >0 a senior, <0 b senior, 0 tie; label
     names the rule that decided.
@@ -333,24 +333,24 @@ def compare_with_reason(mol, a: ParentCandidate, b: ParentCandidate, *,
     from .locants import compare_locant_sets
     from .parent_selection import _pg_attachment_atoms
 
-    # P-44.1.1 -- more principal characteristic groups as suffix.
+    # -- more principal characteristic groups as suffix.
     if a.pg_count != b.pg_count:
         return _cmp(a.pg_count, b.pg_count), "PG count (P-44.1.1)"
 
-    # P-44.1.2 -- senior skeletal atom class (ring-vs-chain / class level).
+    # -- senior skeletal atom class (ring-vs-chain / class level).
     r = _cmp(_class_rank(mol, a, principal_group_atoms),
              _class_rank(mol, b, principal_group_atoms))
     if r:
         return r, "senior atom class (P-44.1.2)"
 
-    # P-44.1.2.2(1) -- same class: ring senior to chain (also the
-    # P-52.2.8 ring-on-tie preference of the staged cascade).
+    # (1) -- same class: ring senior to chain (also the
+    # ring-on-tie preference of the staged cascade).
     if a.kind != b.kind:
         return ((1 if a.kind == 'ring' else -1),
                 "ring senior to chain (P-44.1.2.2/P-52.2.8)")
 
     if a.kind == 'ring':
-        # P-44.2.1 (a)..(g)
+        # (a)..(g)
         sa = {mol.GetAtomWithIdx(i).GetSymbol() for i in a.atoms}
         sb = {mol.GetAtomWithIdx(i).GetSymbol() for i in b.atoms}
         r = _cmp(sa != {'C'}, sb != {'C'})
@@ -380,7 +380,7 @@ def compare_with_reason(mol, a: ParentCandidate, b: ParentCandidate, *,
         if r:
             return r, "earlier ring heteroatom set (P-44.2.1.8)"
     else:
-        # P-44.3 (a)..(c)
+        # (a)..(c)
         ha = _chain_hetero_rank_vector(mol, a, principal_group_atoms)
         hb = _chain_hetero_rank_vector(mol, b, principal_group_atoms)
         r = _cmp(len(ha), len(hb))
@@ -393,7 +393,7 @@ def compare_with_reason(mol, a: ParentCandidate, b: ParentCandidate, *,
         if r:
             return r, "senior chain heteroatoms (P-44.3.3)"
 
-    # P-44.4.1 shared tiebreaks.
+    # shared tiebreaks.
     ma, da = _n_multiple_bonds(mol, set(a.atoms))
     mb, db = _n_multiple_bonds(mol, set(b.atoms))
     r = _cmp(ma, mb)
@@ -432,7 +432,7 @@ def compare_with_reason(mol, a: ParentCandidate, b: ParentCandidate, *,
         if r:
             return r, "lower unsaturation locants (P-44.4.1.10)"
 
-    # Legacy-preserved final criteria (P-44.1(h)/(i) of the staged cascade):
+    # Legacy-preserved final criteria (h)/(i) of the staged cascade):
     # more substituents, then lower substituent locants.
     pa = _substituent_positions(mol, a)
     pb = _substituent_positions(mol, b)
@@ -455,7 +455,7 @@ def compare_parent_candidates(mol, a: ParentCandidate, b: ParentCandidate, *,
                               principal_group=None,
                               principal_group_atoms=None,
                               ring_info=None) -> int:
-    """Blue Book P-44 seniority: >0 a senior, <0 b senior, 0 tie."""
+    """Blue Book seniority: >0 a senior, <0 b senior, 0 tie."""
     return compare_with_reason(
         mol, a, b,
         principal_group=principal_group,
@@ -475,14 +475,14 @@ def select_parent_unified(
     """Drop-in unified replacement for ``parent_selection.select_parent``.
 
     Pre-empts (admission/priority rules) are preserved from the staged
-    implementation; everything else is ONE pooled P-44 comparator sort.
+    implementation; everything else is ONE pooled comparator sort.
 
-    v37 SP1.3 (offer-not-return, invariant 18): ``_offer_rank`` selects WHICH
-    member of the P-44-ranked pool becomes the parent. ``_offer_rank == 0`` (the
+     (offer-not-return, a project rule): ``_offer_rank`` selects WHICH
+    member of the -ranked pool becomes the parent. ``_offer_rank == 0`` (the
     default at every normal call site) commits to ``ranked[0]`` — byte-identical
     to the pre-SP1.3 behaviour for every molecule. A best-effort retry may pass
     ``_offer_rank == k`` to force the k-th-ranked candidate ONLY after
-    ``ranked[0]`` has already abstained; the P-44 ranking is NEVER reordered and
+    ``ranked[0]`` has already abstained; the ranking is NEVER reordered and
     an out-of-range rank clamps back to ``ranked[0]``. Every returned result
     carries ``parent_pool_size`` so the caller can bound its retry.
     """
@@ -498,7 +498,7 @@ def select_parent_unified(
         all_ring_atoms.update(ring)
     ring_tuples = [tuple(sorted(r)) for r in ring_systems]
 
-    # --- Pre-empt 1: no chain -> ring (legacy :735) ---
+    # --- Pre-empt 1: no chain -> ring (legacy:735) ---
     if not principal_chain:
         return ParentSelectionResult(
             parent_type='ring',
@@ -507,7 +507,7 @@ def select_parent_unified(
             reasoning="P-44.1 unified: no chain provided - ring is parent",
         )
 
-    # --- Pre-empt 2: single-carbon chain (legacy :752-776, verbatim rule) ---
+    # --- Pre-empt 2: single-carbon chain (legacy:752-776, verbatim rule) ---
     if len(principal_chain) == 1:
         _single = principal_chain[0]
         _single_ring_attached = any(
@@ -527,7 +527,7 @@ def select_parent_unified(
             )
         # else fall through: the 1-carbon PCG chain joins the pool below.
 
-    # --- Pre-empt 3: natural-product backbone (P-31.1.3.4, legacy :779) ---
+    # --- Pre-empt 3: natural-product backbone, legacy:779) ---
     np_info = detect_natural_product(mol)
     if np_info is not None and ring_systems:
         pool = pool_candidates(mol, ring_systems, [], principal_group,
@@ -566,10 +566,10 @@ def select_parent_unified(
     else:
         label = "only candidate"
 
-    # v37 SP1.3: OFFER the ranked pool. ``_offer_rank == 0`` -> ``chosen`` IS
+    #: OFFER the ranked pool. ``_offer_rank == 0`` -> ``chosen`` IS
     # ``best`` (byte-identical). A best-effort retry may force a junior member;
     # an out-of-range rank clamps to ``best`` so the offer can never fabricate a
-    # parent that was not in the P-44-ranked pool.
+    # parent that was not in the -ranked pool.
     _pool_size = len(ranked)
     offer = _offer_rank if 0 <= _offer_rank < _pool_size else 0
     chosen = ranked[offer]

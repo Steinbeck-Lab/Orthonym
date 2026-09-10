@@ -1,34 +1,34 @@
 """
 Wave2 Tier 5a — multiplicative substituted-unit numbering + composite bridges.
 
-Blue Book rules exercised (all verbatim-verified against BlueBookV2.md):
+Blue Book rules exercised (all verbatim-verified against the Blue Book):
 
-  * P-15.3.2.4.1 — SUBSTITUTED identical units take bis/tris + enclosure:
-    "4,4'-oxybis(2-chlorobenzoic acid)" (PIN, the P-45.1.1 example). The unit's
+  * — SUBSTITUTED identical units take bis/tris + enclosure:
+    "4,4'-oxybis(2-chlorobenzoic acid)" (PIN, the example). The unit's
     prefix locants are assigned on the FREE unit by the fragment namer, so the
     joint numbering is only direction-invariant at a para attachment on a
     benzene unit — every other substituted-unit shape fails closed
     (_ring_unit_direction_safe).
-  * P-15.3.2.1 — units with mere suffix locants keep di/tri + parentheses
+  * — units with mere suffix locants keep di/tri + parentheses
     ("2,2'-oxydi(ethan-1-ol)"); locant-free units stay bare ("oxydiacetic").
-  * P-15.3.1.1(3) — both units' attachment locants must be identical: the
+  * (3) — both units' attachment locants must be identical: the
     para/meta mixed diether declines structurally (jar-independent).
   * Composite bridge "[ethane-1,2-diylbis(oxy)]" (BB verbatim:
     "2,2'-[ethane-1,2-diylbis(oxy)]diacetic acid" (PIN)); square brackets per
-    the P-16.5 nesting order.
+    the nesting order.
   * Acyclic N connectors: azanediyl (NH) and nitrilo (N<) —
     "2,2',2''-nitrilotri(ethan-1-ol)" (BB verbatim PIN, triethanolamine),
     "2,2'-azanediyldiacetic acid" (iminodiacetic; BB sibling
     "3,3'-azanediyldipropanenitrile" (PIN)). Amine arms are allowed for the
     CHALCOGEN bridges only (BB "2,2'-oxydi(ethan-1-amine)" (PIN)) — never for
-    N bridges, where the substitutive polyamine parent is the PIN (P-44.1.1).
+    N bridges, where the substitutive polyamine parent is the PIN.
   * Central-arene alcohol arms: "(benzene-1,3,5-triyl)trimethanol"
-    (mononuclear methanol units carry no locants per P-14.3.4.2, cf. BB
+    (mononuclear methanol units carry no locants per, cf. BB
     "[oxydi(pyridazine-4,3,5-triyl)]tetramethanol").
-  * P-16.3.3 hyphenated italic prefixes under a multiplier:
+  * hyphenated italic prefixes under a multiplier:
     "1,2-di-tert-butylbenzene" (PIN) — never "ditert-butyl".
 
-Retained-name demotions (pin:false, acetophenone RET-01 precedent):
+Retained-name demotions (pin:false, acetophenone precedent):
 triethanolamine, diethanolamine, terephthalyl alcohol.
 """
 
@@ -48,10 +48,10 @@ from orthonym.rules.multiplicative import name_multiplicative
 @pytest.mark.parametrize(
     "smiles,expected",
     [
-        # P-15.3.2.4.1 substituted units -> bis (BB P-45.1.1 verbatim)
+        # substituted units -> bis (BB verbatim)
         ("OC(=O)c1ccc(Oc2ccc(C(=O)O)c(Cl)c2)cc1Cl",
          "4,4'-oxybis(2-chlorobenzoic acid)"),
-        # composite bridge (BB P-15.3.2.1 verbatim)
+        # composite bridge (BB verbatim)
         ("OC(=O)COCCOCC(=O)O",
          "2,2'-[ethane-1,2-diylbis(oxy)]diacetic acid"),
         # triethylene glycol
@@ -65,7 +65,7 @@ from orthonym.rules.multiplicative import name_multiplicative
         ("OCCN(CCO)CCO", "2,2',2''-nitrilotri(ethan-1-ol)"),
         ("N(CCC(=O)O)(CCC(=O)O)CCC(=O)O",
          "3,3',3''-nitrilotripropanoic acid"),
-        # amine arms on chalcogen bridges (BB P-15.3.2.1 verbatim)
+        # amine arms on chalcogen bridges (BB verbatim)
         ("NCCOCCN", "2,2'-oxydi(ethan-1-amine)"),
         ("NCCSCCN", "2,2'-sulfanediyldi(ethan-1-amine)"),
         # central-arene alcohol arms (mononuclear units, no locants)
@@ -81,7 +81,7 @@ def test_tier5a_multiplicative_heals(smiles, expected):
 @pytest.mark.parametrize(
     "smiles,expected",
     [
-        # P-16.3.3: multiplier joins an italicized prefix with a hyphen
+        #: multiplier joins an italicized prefix with a hyphen
         ("CC(C)(C)c1ccccc1C(C)(C)C", "1,2-di-tert-butylbenzene"),
         ("CC(C)(C)c1cccc(C(C)(C)C)c1O", "2,6-di-tert-butylphenol"),
     ],
@@ -186,10 +186,10 @@ def test_tier5a_fail_closed(smiles, why):
         ("benzoic acid", 2, "di"),
         ("ethan-1-ol", 2, "di"),
         ("cyclohexane-1-carboxylic acid", 2, "di"),
-        ("benzene-1,4-diamine", 2, "di"),       # mid-name comma: P-15.3.2.2.2
-        ("2-chlorobenzoic acid", 2, "bis"),     # substituted: P-15.3.2.4.1
+        ("benzene-1,4-diamine", 2, "di"),       # mid-name comma:
+        ("2-chlorobenzoic acid", 2, "bis"),     # substituted:
         ("4-bromobenzene", 2, "bis"),
-        ("1,3-thiazole", 2, "bis"),             # leading locant: P-15.3.2.3
+        ("1,3-thiazole", 2, "bis"),             # leading locant:
         ("N-methylmethanamine", 2, "bis"),
         ("acetic acid", 3, "tri"),
     ],
@@ -201,7 +201,7 @@ def test_tier5a_select_multiplier(parent, count, expected):
 
 @pytest.mark.unit
 def test_tier5a_dec_stem_units_take_parens():
-    """P-16.3.4(d): unit names beginning with 'dec' are enclosed so
+    """(d): unit names beginning with 'dec' are enclosed so
     'di(decanoic acid)' cannot read as 'didecanoic acid'."""
     from orthonym.rules.multiplicative import _assemble_multiplicative_name
     name = _assemble_multiplicative_name(10, "oxy", "decanoic acid")

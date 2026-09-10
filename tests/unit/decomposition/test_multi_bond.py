@@ -1,7 +1,7 @@
 """Unit tests for multi-bond decomposition (a phase-01, 56-02, and 099-02).
 
 Tests the MAX_CLEAVABLE_BONDS performance guard, consecutive duplicate-word
-detection in _name_quality_is_acceptable(), multi-bond retry logic,
+detection in _name_quality_is_acceptable, multi-bond retry logic,
 recursive fragment decomposition, and a phase multi-bond same-type
 cleavage with multi-ester assembly.
 """
@@ -30,7 +30,7 @@ from orthonym.decomposition.fragment_assembly import _assemble_multi_ester
 
 @pytest.mark.unit
 class TestPerformanceGuard:
-    """Tests for the MAX_CLEAVABLE_BONDS performance guard in try_decompose()."""
+    """Tests for the MAX_CLEAVABLE_BONDS performance guard in try_decompose."""
 
     def test_performance_guard_constant_exists(self):
         """MAX_CLEAVABLE_BONDS constant is defined and is 20 (a phase)."""
@@ -122,9 +122,9 @@ class TestPerformanceGuard:
         that would only re-derive the same string must not change the name.
 
          corrected the acyl word from the non-PIN 'palmitate':
-        P-65.1.2 "Systematic names" (the Blue Book) -- "Except for formic
+         "Systematic names" (the Blue Book) -- "Except for formic
         acid, acetic acid, oxalic acid..., and oxamic acid..., systematically
-        formed names are preferred IUPAC names; the names given in P-65.1.1.2
+        formed names are preferred IUPAC names; the names given in
         are retained names for use in general nomenclature." What this test
         asserts -- that the name is unchanged by skipping decomposition -- is
         unaffected by the spelling.
@@ -140,7 +140,7 @@ class TestPerformanceGuard:
 
 @pytest.mark.unit
 class TestQualityGateDuplicateWords:
-    """Tests for consecutive duplicate-word detection in _name_quality_is_acceptable()."""
+    """Tests for consecutive duplicate-word detection in _name_quality_is_acceptable."""
 
     def _make_mol(self, heavy_atoms: int):
         """Create a mol object with approximately the given number of heavy atoms."""
@@ -242,7 +242,7 @@ class TestQualityGateDuplicateWords:
 
 @pytest.mark.unit
 class TestMultiBondRetry:
-    """Tests for multi-bond retry logic in try_decompose() (DECP-01)."""
+    """Tests for multi-bond retry logic in try_decompose ."""
 
     def test_max_bond_retry_attempts_constant_exists(self):
         """MAX_BOND_RETRY_ATTEMPTS constant is defined and is 5."""
@@ -251,7 +251,7 @@ class TestMultiBondRetry:
     def test_single_bond_path_unchanged(self):
         """Molecule with exactly 1 cleavable bond: result identical to baseline.
 
-        DECP-05: single-bond molecules must return single_result directly
+        : single-bond molecules must return single_result directly
         without any quality gate check on the decomposition result.
         """
         # Methyl acetate has exactly 1 ester bond
@@ -379,7 +379,7 @@ class TestMultiBondRetry:
 
 
 # ---------------------------------------------------------------------------
-# Recursive fragment decomposition test (a phase-02, DECP-02)
+# Recursive fragment decomposition test (a phase-02,)
 # ---------------------------------------------------------------------------
 
 
@@ -388,7 +388,7 @@ class TestRecursiveFragmentDecomposition:
     """Test that fragments with cleavable bonds are recursively decomposed."""
 
     def test_recursive_fragment_decomposition(self):
-        """DECP-02: proves recursive fragment decomposition.
+        """: proves recursive fragment decomposition.
 
         Uses a molecule with 2 ester bonds on a glycerol backbone.
         The fragment from the first bond cleavage still has a cleavable
@@ -397,7 +397,7 @@ class TestRecursiveFragmentDecomposition:
         CCCCCCCCCCCCCCCC(=O)OCC(O)COC(=O)CCCCCCCCCCCCCCC
         = glycerol dipalmitate (2 esters on a 3-carbon backbone)
         """
-        # DECP-02: proves recursive fragment decomposition -- the fragment
+        #: proves recursive fragment decomposition -- the fragment
         # from first bond cleavage still has a cleavable bond and is
         # recursively decomposed.
         from orthonym.namer import name_compound
@@ -431,10 +431,10 @@ class TestRecursiveFragmentDecomposition:
 
 @pytest.mark.unit
 class TestMultiBondDecompose:
-    """Tests for _try_multi_bond_decompose() in engine.py (a phase-02)."""
+    """Tests for _try_multi_bond_decompose in engine.py (a phase-02)."""
 
     def test_triacetin_produces_multifragment_name(self):
-        """_try_multi_bond_decompose() with triacetin produces name with
+        """_try_multi_bond_decompose with triacetin produces name with
         multiplicative prefix (triacetate) or acetate reference."""
         # Triacetin = glycerol triacetate
         mol = Chem.MolFromSmiles("CC(=O)OCC(COC(C)=O)OC(C)=O")
@@ -455,7 +455,7 @@ class TestMultiBondDecompose:
             )
 
     def test_returns_none_when_fragments_unnamed(self):
-        """_try_multi_bond_decompose() returns None when fragments cannot be named."""
+        """_try_multi_bond_decompose returns None when fragments cannot be named."""
         mol = Chem.MolFromSmiles("CC(=O)OCC(COC(C)=O)OC(C)=O")
         from orthonym.decomposition.bond_cleavage import find_cleavable_bonds
         bonds = find_cleavable_bonds(mol)
@@ -472,7 +472,7 @@ class TestMultiBondDecompose:
         )
 
     def test_returns_none_for_single_bond(self):
-        """_try_multi_bond_decompose() returns None when only 1 bond provided."""
+        """_try_multi_bond_decompose returns None when only 1 bond provided."""
         mol = Chem.MolFromSmiles("CC(=O)OC")  # methyl acetate, 1 ester
         single_bond = [{"bond_idx": 0, "type": "ester", "acid_atom": 1, "alkyl_atom": 3}]
         result = _try_multi_bond_decompose(mol, single_bond, "pin")
@@ -481,13 +481,13 @@ class TestMultiBondDecompose:
         )
 
     def test_returns_none_for_empty_bonds(self):
-        """_try_multi_bond_decompose() returns None for empty bond list."""
+        """_try_multi_bond_decompose returns None for empty bond list."""
         mol = Chem.MolFromSmiles("CCCC")
         result = _try_multi_bond_decompose(mol, [], "pin")
         assert result is None
 
     def test_try_decompose_integrates_multi_bond_path(self):
-        """try_decompose() integrates multi-bond path for 3+ same-type ester bonds.
+        """try_decompose integrates multi-bond path for 3+ same-type ester bonds.
 
         Uses triacetin (3 ester bonds). After single-bond retry loop fails to
         produce a good name, the multi-bond path should be attempted.
@@ -537,7 +537,7 @@ class TestMultiBondDecompose:
 
 @pytest.mark.unit
 class TestMultiEsterAssembly:
-    """Tests for _assemble_multi_ester() in fragment_assembly.py (a phase-02)."""
+    """Tests for _assemble_multi_ester in fragment_assembly.py (a phase-02)."""
 
     def test_identical_acid_names_use_multiplicative_prefix(self):
         """Identical acid names produce multiplicative prefix (e.g., triacetate)."""
@@ -731,7 +731,7 @@ class TestRaisedPerformanceLimits:
 
 @pytest.mark.unit
 class TestSugarDetectionBypass:
-    """Tests for sugar-detection bypass in _select_best_bond() (a phase-02)."""
+    """Tests for sugar-detection bypass in _select_best_bond (a phase-02)."""
 
     def test_glycosidic_bond_with_sugar_gets_priority(self):
         """When a glycosidic bond leads to a known sugar, it should be preferred."""
@@ -934,16 +934,16 @@ class TestMultiBondThresholds:
     """Tests for bond-type-specific multi-bond thresholds (a phase-04)."""
 
     def test_threshold_dict_has_correct_values(self):
-        """_MULTI_BOND_THRESHOLD has glycosidic=2, amide=3, ester=2 (DECO-22)."""
+        """_MULTI_BOND_THRESHOLD has glycosidic=2, amide=3, ester=2 ."""
         from orthonym.decomposition.engine import _MULTI_BOND_THRESHOLD
         assert _MULTI_BOND_THRESHOLD["glycosidic"] == 2
         assert _MULTI_BOND_THRESHOLD["amide"] == 3
-        assert _MULTI_BOND_THRESHOLD["ester"] == 2  # DECO-22: lowered from 3 to enable diester decomposition
+        assert _MULTI_BOND_THRESHOLD["ester"] == 2  #: lowered from 3 to enable diester decomposition
 
 
 @pytest.mark.unit
 class TestMultiGlycosideAssembly:
-    """Tests for _assemble_multi_glycoside() in fragment_assembly.py (a phase-04)."""
+    """Tests for _assemble_multi_glycoside in fragment_assembly.py (a phase-04)."""
 
     def test_two_sugars_one_aglycone(self):
         """2 sugar fragments + 1 aglycone produces multi-glycosyloxy pattern."""
@@ -1011,7 +1011,7 @@ class TestMultiGlycosideAssembly:
 
 @pytest.mark.unit
 class TestMultiAmideAssembly:
-    """Tests for _assemble_multi_amide() in fragment_assembly.py (a phase-04)."""
+    """Tests for _assemble_multi_amide in fragment_assembly.py (a phase-04)."""
 
     def test_two_acyl_one_amine(self):
         """2 acyl fragments + 1 amine core produces 'N-acyl1-N-acyl2-amine' pattern."""
@@ -1158,7 +1158,7 @@ class TestMultiBondIntegration:
 
 @pytest.mark.unit
 class TestFragmentStorageAndRoles:
-    """Tests for DECO-17 (list-of-tuples storage) and DECO-18 (middle-fragment
+    """Tests for (list-of-tuples storage) and (middle-fragment
     core identification) fixes in engine.py and fragment_assembly.py.
 
     These tests verify:
@@ -1177,7 +1177,7 @@ class TestFragmentStorageAndRoles:
         SMILES (simulating a triglyceride with 3 identical fatty acids), all
         fragments appear in the named list (not deduplicated by dict overwrite).
 
-        DECO-17: verifies that named_fragments is a list of tuples, not a dict.
+        : verifies that named_fragments is a list of tuples, not a dict.
         """
         mol = Chem.MolFromSmiles("CC(=O)OCC(COC(C)=O)OC(C)=O")  # triacetin
         from orthonym.decomposition.bond_cleavage import find_cleavable_bonds
@@ -1227,7 +1227,7 @@ class TestFragmentStorageAndRoles:
         """_assemble_multi_ester with fragments where one has side='middle'
         uses that fragment as core.
 
-        DECO-18: middle-role fragments should be preferred as core.
+        : middle-role fragments should be preferred as core.
         """
         named_fragments = [
             ({"smiles": "CC(=O)O", "side": "acid"}, "acetic acid"),

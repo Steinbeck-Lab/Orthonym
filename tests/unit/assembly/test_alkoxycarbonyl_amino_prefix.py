@@ -1,6 +1,6 @@
 """C4d — the chalcogen-rooted acyl-amino prefix class, ``R-X-CO-NH-``.
 
-A carbamate (Boc, Cbz, Fmoc, methoxycarbonyl, ...) is an ester of carbamic
+A carbamate (Boc, Cbz, Fmoc, methoxycarbonyl,...) is an ester of carbamic
 acid, not an acyl of a carboxylic acid, so no CARBON COUNT can describe it.
 Both count-based emitters proved it: one stops at the heteroatom and counts only
 the carbonyl carbon, so it returned 1 for a true formyl ``H-CO-NH-`` AND for
@@ -8,22 +8,22 @@ the carbonyl carbon, so it returned 1 for a true formyl ``H-CO-NH-`` AND for
 the molecule does not have; the other WALKS ACROSS the heteroatom and counted
 the organyl beyond it, spelling ``CH3-S-CO-NH-`` 'ethanoylamino'.
 
-The Blue Book builds the prefix by P-35.4.2 CONCATENATION onto the
+The Blue Book builds the prefix by CONCATENATION onto the
 chalcogen-group prefix:
 
-  BB 18116  -CO-O-CH2-C6H5   (benzyloxy)carbonyl (preferred prefix)
-  BB 18128  CH3-CO-S-CO-     (acetylsulfanyl)carbonyl (preferred prefix)
-  BB 31698  P-65.6.3.2.3 names -CO-OR' 'alkoxycarbonyl'
+  BB 18116 -CO-O-CH2-C6H5 (benzyloxy)carbonyl (preferred prefix)
+  BB 18128 CH3-CO-S-CO- (acetylsulfanyl)carbonyl (preferred prefix)
+  BB 31698 names -CO-OR' 'alkoxycarbonyl'
 
-Bare-vs-marked is the P-63.2.2.1.1 / P-63.2.2.2 simple-vs-compound split: the
+Bare-vs-marked is the / simple-vs-compound split: the
 retained contractions are SIMPLE (BB 27667), so *tert*-butoxy concatenates bare
 (BB 54417 ``N2-(tert-butoxycarbonyl)-L-lysine``) while the concatenated
 ``benzyloxy`` is COMPOUND (BB 27633) and takes marks (BB 54422
-``N5-acetyl-N2-[(benzyloxy)carbonyl]-L-glutamine``); both P-103.2.1.
+``N5-acetyl-N2-[(benzyloxy)carbonyl]-L-glutamine``); both.
 
-``amino`` is the P-62.2.3 morpheme (BB 26314), and the assembled shape is the
+``amino`` is the morpheme (BB 26314), and the assembled shape is the
 Blue Book's own (BB 33213 ``[(methanesulfinothioyl)amino]acetic acid (PIN)``).
-Parent selection is P-41 / P-65.1.8.1 (BB 30676): "A carboxylic acid named by
+Parent selection is / (BB 30676): "A carboxylic acid named by
 means of a suffix is senior to a derivative of carbonic acid formed by
 functional replacement", so the acid is the parent and the carbamate is the
 prefix.
@@ -79,11 +79,11 @@ class TestPrimitiveMorphology:
         ("OC(=O)CNC(=O)OC", "(methoxycarbonyl)amino"),
         ("OC(=O)CNC(=O)OCC", "(ethoxycarbonyl)amino"),
         # BB 18116/54422: benzyloxy is COMPOUND -> keeps its own marks, and the
-        # outer pair escalates ( ) -> [ ] per P-16.5.2.4.
+        # outer pair escalates  ->  per.
         ("OC(=O)CNC(=O)OCc1ccccc1", "[(benzyloxy)carbonyl]amino"),
         # A locant-bearing free valence keeps the alkyl whole inside marks
-        # (P-63.2.2.2, BB 27683 '(propan-2-yl)oxy'), and the outer pair
-        # escalates a second step ( ) -> [ ] -> { }.
+        #, BB 27683 '(propan-2-yl)oxy'), and the outer pair
+        # escalates a second step  ->  -> { }.
         ("CC(C)OC(=O)NCC(=O)O", "{[(propan-2-yl)oxy]carbonyl}amino"),
         # BB 18128: the sulfur analogue takes marks round the sulfanyl.
         ("CSC(=O)NCC(=O)O", "[(methylsulfanyl)carbonyl]amino"),
@@ -111,8 +111,8 @@ class TestPrimitiveFailsClosed:
     unspellable member must fail closed -- never fall through to a count."""
 
     @pytest.mark.parametrize("smiles", [
-        "CC(=O)NCC(=O)O",       # acetyl  -- a carbon acyl
-        "O=CNCC(=O)O",          # formyl  -- the case the count got RIGHT
+        "CC(=O)NCC(=O)O",       # acetyl -- a carbon acyl
+        "O=CNCC(=O)O",          # formyl -- the case the count got RIGHT
         "CCC(=O)NCC(=O)O",      # propanoyl
         "c1ccccc1C(=O)NCC(=O)O",  # benzoyl -- a ring acyl
     ])
@@ -192,8 +192,8 @@ class TestSecondEmitterPath:
 
     @pytest.mark.parametrize("smiles", [
         "CC(C)C(=O)NC",     # isobutyryl -- a count says 4 carbons = n-butyryl
-        "C=CC(=O)NC",       # acryloyl   -- a count erases the double bond
-        "CC(C)(C)C(=O)NC",  # pivaloyl   -- a count says 5 carbons = n-pentanoyl
+        "C=CC(=O)NC",       # acryloyl -- a count erases the double bond
+        "CC(C)(C)C(=O)NC",  # pivaloyl -- a count says 5 carbons = n-pentanoyl
     ])
     def test_count_refuses_what_it_cannot_spell(self, smiles):
         """Must be None, not a stem. Coercing the count to 1 here is what
@@ -253,16 +253,16 @@ class TestWholeName:
 
     @pytest.mark.parametrize("smiles,expected", [
         # Boc-glycine. BB 33213 gives this exact '[(acyl)amino]acetic acid'
-        # shape as a PIN, and P-66.1.1.4.3 uses 'acetic acid' as the parent for
+        # shape as a PIN, and uses 'acetic acid' as the parent for
         # N-substituted glycine.
         ("OC(=O)CNC(=O)OC(C)(C)C",
          "[(tert-butoxycarbonyl)amino]acetic acid"),
-        # Boc-L-alanine: L == S (P-103.1.3.1), and R/S are the preferred
-        # stereodescriptors (P-91.2.1.1).
+        # Boc-L-alanine: L == S, and R/S are the preferred
+        # stereodescriptors.
         ("C[C@H](NC(=O)OC(C)(C)C)C(=O)O",
          "(2S)-2-[(tert-butoxycarbonyl)amino]propanoic acid"),
         # Cbz-glycine: the compound benzyloxy forces a third mark level, the
-        # shape of P-66.1.1.4.3's '{[(cyclohexylmethyl)sulfonyl]amino}acetic
+        # shape of 's '{[(cyclohexylmethyl)sulfonyl]amino}acetic
         # acid'.
         ("OC(=O)CNC(=O)OCc1ccccc1",
          "{[(benzyloxy)carbonyl]amino}acetic acid"),
@@ -275,7 +275,7 @@ class TestWholeName:
         ("CSC(=O)NCC(=O)O",
          "{[(methylsulfanyl)carbonyl]amino}acetic acid"),
         # An N-substituted carbamate cites both branches through the shared
-        # assembler (P-66.1.1.4.3 method (2), BB 33042).
+        # assembler method (2), BB 33042).
         ("CCOC(=O)N(CC)CC(=O)O",
          "[(ethoxycarbonyl)(ethyl)amino]acetic acid"),
     ])
@@ -297,7 +297,7 @@ class TestWholeName:
                 assert lie not in low, f"{smiles} -> {low}"
 
     def test_n_substituted_carbamate_keeps_its_branch(self):
-        """An N-substituted carbamate cites both N-substituents (P-66.1.1.4.3
+        """An N-substituted carbamate cites both N-substituents
         method (2), BB 33042 '2-[methyl(propanoyl)amino]benzene-1-sulfonic
         acid'). Failing closed here is NOT safe: the caller then DROPS the whole
         branch and still emits, which turned this molecule into a bare
@@ -320,7 +320,7 @@ class TestWholeName:
 
     @pytest.mark.parametrize("smiles", [
         "CC(C)C(=O)NCC(=O)O",   # isobutyryl: count says 'butanoyl' (n-butyryl)
-        "C=CC(=O)NCC(=O)O",     # acryloyl:   count says 'propanoyl' (saturated)
+        "C=CC(=O)NCC(=O)O",     # acryloyl: count says 'propanoyl' (saturated)
         "CC(C)(C)C(=O)NCC(=O)O",  # pivaloyl: count says 'pentanoyl'
     ])
     def test_count_path_refuses_acyls_it_cannot_describe(self, smiles):

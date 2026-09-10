@@ -1,4 +1,4 @@
-"""Unit tests for the class-agnostic conjugate classifier (a phase, WSC-03).
+"""Unit tests for the class-agnostic conjugate classifier (a phase, -03).
 
 The conjugate controller (`rules/conjugate_controller.py`,) is a NEW standalone,
 class-agnostic primitive: it classifies a sulfate / phosphate / glycosyl(uronyl)
@@ -104,7 +104,7 @@ def test_sulfate_word():
 
 
 def test_phosphate_word():
-    """Phosphate three ionisation states ():
+    """Phosphate three ionisation states :
     -OPO(OH)2 -> 'dihydrogen phosphate'; mono-anion -> 'hydrogen phosphate';
     di-anion -> 'phosphate'.
     """
@@ -153,7 +153,7 @@ def test_completeness_honest_fail():
     """classify_conjugate is importable and fails closed for a non-conjugate
     fragment (a plain hydroxyl / methyl substituent returns None).
 
-    The full no-silent-drop completeness invariant () lands in 182-02; here we
+    The full no-silent-drop completeness invariant  lands in 182-02; here we
     assert the thin contract: the classifier returns None rather than guessing.
     """
     from orthonym.rules.conjugate_controller import classify_conjugate
@@ -169,7 +169,7 @@ def test_completeness_honest_fail():
 
 def test_rt_fallback():
     """The Phase-181 OPSIN RT gate `_alpha_beta_rt_ok` is the reused RT-check
-    fallback (). Contract only here; full behaviour wired in 182-02.
+    fallback . Contract only here; full behaviour wired in 182-02.
     """
     from orthonym.rules.natural_products import _alpha_beta_rt_ok  # noqa: F401
 

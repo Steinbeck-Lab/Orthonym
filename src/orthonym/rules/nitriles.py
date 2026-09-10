@@ -7,7 +7,7 @@ Nitrile naming follows these patterns:
 
 The nitrile carbon (C of -C#N) IS counted in the chain length.
 
-Based on IUPAC 2013 Blue Book P-66.1.
+Based on IUPAC 2013 Blue Book.
 """
 
 from typing import List, Optional

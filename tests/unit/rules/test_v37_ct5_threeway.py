@@ -1,17 +1,17 @@
-"""v37 CT.5 -- sub-lever D (true 3-way: spiro + fused + bridged) cage naming.
+""" CT.5 -- sub-lever D (true 3-way: spiro + fused + bridged) cage naming.
 
-STEP-1 SPY OUTCOME (invariant 8/10/17): DOCUMENTED NO-OP + NAMED-BLOCKER.
+ a trace OUTCOME (a project rule/10/17): DOCUMENTED NO-OP + NAMED-BLOCKER.
 
 The task charter proposed an offer-not-return retry in
 ``name_bridged_fused_system`` (``bridged_fused.py:617``): the premise was that the
 handler "IS invoked for true spiro+fused+bridged witnesses but fragment-collapses
-(returns a wrong fragment name -> SELF-01 rejects), fix = try alternative
+(returns a wrong fragment name -> rejects), fix = try alternative
 parent/bridge-assignment candidates and keep the first that RT-verifies".
 
-A fresh spy on current HEAD REFUTES that premise:
+A fresh trace on current HEAD REFUTES that premise:
 
   1. The residual is REAL -- both grounding witnesses still ABSTAIN at best-effort
-     (0 breadth), and 0-wrong holds (SELF-01 / OPSIN gate reject every fragment).
+     (0 breadth), and 0-wrong holds (/ OPSIN gate reject every fragment).
 
   2. ``name_bridged_fused_system`` returns **None** for these -- it does NOT
      fragment-collapse. The fragment the pipeline finally rejects
@@ -25,7 +25,7 @@ A fresh spy on current HEAD REFUTES that premise:
      (several are salts/charged = out-of-construction). **Zero** reach the
      candidate-assembly code, so ``identify_bridges`` returns empty and there are
      NO bridge assignments to offer alternatives for. The offer-not-return lever
-     has an EMPTY input set -> building it is dead code (invariant 17).
+     has an EMPTY input set -> building it is dead code (a project rule).
 
   4. Not even every 3-way witness routes through this site: the spiro-epoxide
      macrolactam classifies 'polycyclic-bridged' and routes to
@@ -50,7 +50,7 @@ from orthonym.assembly.composer import _classify_complex_ring
 from orthonym.rules.bridged_fused import name_bridged_fused_system
 from orthonym.rules.vonbaeyer_universal import analyze_cage_universal
 
-# The two grounding CT.5 witnesses (V37-SPY-CONSTRUCTION.md CT.0 addendum).
+# The two grounding CT.5 witnesses (V37-a trace-CONSTRUCTION.md CT.0 addendum).
 NOTOAMIDE = (
     "C=CC(C)(C)c1[nH]c2ccccc2c1C=C1NC(=O)[C@]23C[C@H]"
     "(c4c(c(C)cc(O)c4C(=O)OC)O2)[C@]2(CC(=O)C=C(OC)C2=O)N3C1=O"

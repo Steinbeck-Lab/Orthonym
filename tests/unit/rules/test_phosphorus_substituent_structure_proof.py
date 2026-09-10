@@ -13,7 +13,7 @@ was renamed as the straight chain of the same carbon count:
     CP(C)CC=C allyl -> 'dimethyl(propyl)phosphane' WRONG MOLECULE
     CP(C)CCCO 3-hydroxypropyl -> the -OH is not counted and is DROPPED
 
-Each of those was produced and then suppressed by the SELF-01 OPSIN gate, so the
+Each of those was produced and then suppressed by the OPSIN gate, so the
 molecule abstained rather than shipping. The gate is the margin, not the producer:
 ``_final_opsin_validity_gate`` has ten ``return name`` carve-outs that never reach
 a self-consistency decision, so a producer that emits a wrong molecule is a latent
@@ -111,7 +111,7 @@ def test_emission_does_not_ship_a_count_derived_wrong_molecule():
     These are the names the carbon COUNT produced at this site. Under the test
     configuration the OPSIN gate is disabled, so this asserts on the PRODUCER
     rather than on what the gate lets through -- which is the point: in
-    production every one of these was caught by SELF-01 as "different molecule",
+    production every one of these was caught by as "different molecule",
     so the gate was the only thing standing between them and a shipped name.
 
     NOT asserted here: ``CP(C)C1CCCCC1`` -> ``'cyclohexane'`` (the phosphine is

@@ -1,4 +1,4 @@
-"""Tests for Phase 118 Plan 02 gap closure: DKP, tropane, ergostene fixes.
+"""Tests for a phase Plan 02 gap closure: DKP, tropane, ergostene fixes.
 
 Tests cover:
 - Piperazine-2,5-dione retained name recognition

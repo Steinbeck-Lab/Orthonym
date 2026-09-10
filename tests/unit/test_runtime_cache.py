@@ -1,4 +1,4 @@
-"""Tests for the runtime dynamic fragment cache (Phase 77).
+"""Tests for the runtime dynamic fragment cache (a phase).
 
 The runtime cache stores (canonical SMILES -> name) pairs during a single
 naming session, avoiding redundant re-computation of the same fragment.

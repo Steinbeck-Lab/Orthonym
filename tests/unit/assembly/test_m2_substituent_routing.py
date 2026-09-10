@@ -22,7 +22,7 @@ engine lever (28 rows). All 7 witnesses below are drawn from that measured set,
 not invented.
 
 ⚠ Every test below is marked ``opsin_gate``. ``tests/conftest.py`` disables the
-OPSIN self-consistency/validity gate (SELF-01) suite-wide by DEFAULT so most
+OPSIN self-consistency/validity gate  suite-wide by DEFAULT so most
 tests can assert raw generator output cheaply -- but that makes "PIN default
 still abstains" and "best-effort now names it" claims meaningless without the
 gate, because gate-OFF ships whatever a recovery-lane candidate happens to
@@ -159,7 +159,7 @@ def test_m4_fold_besteffort_roundtrips(eng, tag, smi):
 # (`substituent_enumerator.py`) closes that gap: it H/OH-caps the declined
 # fragment, names the capped fragment via `name_compound` at best-effort, and
 # converts the result to a `-yl` prefix carrying the correct attachment
-# locant (via the injected -OH's own P-31 locant, whether it wins suffix
+# locant (via the injected -OH's own locant, whether it wins suffix
 # seniority or falls back to a `<locant>-hydroxy` prefix on the fused/spiro
 # ring producers, which build suffix-free names).
 #
@@ -317,7 +317,7 @@ def _is_whole_name_abstention(nm: str) -> bool:
     """True when ``nm`` is itself a legitimate, honest whole-molecule refusal
     sentinel -- NOT a real name with the placeholder woven into it.
 
-    ``Orthonym.name()`` is always-emit (``namer.py:2877``): a molecule it
+    ``Orthonym.name`` is always-emit (``namer.py:2877``): a molecule it
     cannot name at all returns one of a small, fixed set of descriptive
     fallback strings verbatim (``errors.py``'s ``_make``/``classify_scope_
     limit`` family) -- most commonly the exact string 'unknown organic
@@ -349,7 +349,7 @@ def test_placeholder_never_splices(eng):
     sentinel 'unknown organic compound' (not an offender -- see
     ``_is_whole_name_abstention``); 0 timeouts; 0 exceptions; 0 rows where the
     placeholder is embedded in a longer/different constructed name reach the
-    final ``eng.name()`` result -- Tasks 1-2 (tier propagation + routing) plus
+    final ``eng.name`` result -- Tasks 1-2 (tier propagation + routing) plus
     the existing OPSIN self-consistency gate (visible in this run's log as
     'OPSIN validity gate suppressed unparseable name:...unknown...' for
     several internal candidates, e.g. 'unknownmethanol') already void every

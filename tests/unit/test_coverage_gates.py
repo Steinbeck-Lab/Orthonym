@@ -28,7 +28,7 @@ Tests coverage heuristic edge cases:
 - Empty name -> 0.0
 - Zero heavy atoms -> 1.0
 
-Tests retained name exact-match (NAM-01):
+Tests retained name exact-match :
 - Exact benzene SMILES -> "benzene"
 - Toluene SMILES -> NOT bare "benzene"
 - Large benzene-containing molecule -> NOT bare "benzene"
@@ -45,7 +45,7 @@ from orthonym.assembly.coverage_utils import estimate_parent_coverage
 # ---------------------------------------------------------------------------
 
 class TestEstimateParentCoverage:
-    """Tests for estimate_parent_coverage()."""
+    """Tests for estimate_parent_coverage."""
 
     def test_full_coverage_benzene(self):
         """Benzene (6 atoms) with all 6 atoms in parent -> 1.0."""
@@ -151,7 +151,7 @@ class TestNPScaffoldCoverageGate:
 
 
 # ---------------------------------------------------------------------------
-# Retained name exact-match tests (NAM-01 validation)
+# Retained name exact-match tests (validation)
 # ---------------------------------------------------------------------------
 
 class TestRetainedNameExactMatch:

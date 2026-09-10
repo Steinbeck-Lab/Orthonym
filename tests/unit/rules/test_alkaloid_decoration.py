@@ -6,7 +6,7 @@ methoxys, unsaturation, N-alkyls) using the morphinan numbering system
 (positions 1-17, N at 17).
 
 References:
-    IUPAC 2013 Blue Book P-101 (natural product nomenclature)
+    IUPAC 2013 Blue Book (natural product nomenclature)
     WHO INN numbering for morphinan skeleton
 """
 

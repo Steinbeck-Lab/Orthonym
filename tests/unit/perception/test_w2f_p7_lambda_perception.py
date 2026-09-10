@@ -1,4 +1,4 @@
-"""W2F-P7 Task 2 (P-14.1.3): λ-hydride phosphorus perception.
+"""W2F-P7 Task 2: λ-hydride phosphorus perception.
 
 ``is_lambda_hydride_phosphorus`` fires for a NEUTRAL, radical-free, acyclic P
 whose bonding number is 5 (nonstandard) AND whose every non-attachment bond is

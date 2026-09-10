@@ -1,17 +1,17 @@
 """
 Sulfur compound naming rules per IUPAC 2013.
 
-IUPAC P-63.6: Sulfur-containing functional groups:
-- Thiols (-SH): suffix -thiol, prefix sulfanyl- (P-63.6.1.1)
-- Sulfides (R-S-R'): the PIN is SUBSTITUTIVE — (R'-sulfanyl)RH, P-63.2.5 method (1)
+IUPAC: Sulfur-containing functional groups:
+- Thiols (-SH): suffix -thiol, prefix sulfanyl-
+- Sulfides (R-S-R'): the PIN is SUBSTITUTIVE — (R'-sulfanyl)RH, method (1)
   (the Blue Book "Method (1), substitutive nomenclature, gives preferred IUPAC names";
   the Blue Book "(methylsulfanyl)methane (PIN)... dimethyl sulfide"). The functional-class
   "R R' sulfide" (method 2) below is retained for GENERAL nomenclature only; on the PIN
   path the thioether handler (assembly/handlers/thioether.py) declines the neutral case
   so the substitutive producer names it, and name_sulfide only serves the charged degrade.
-- Sulfoxides (R-SO-R'): functional class naming (P-63.6.3.1)
-- Sulfones (R-SO2-R'): functional class naming (P-63.6.3.2)
-- Sulfonic acids (-SO3H): suffix -sulfonic acid, prefix sulfo- (P-65.3.1.2)
+- Sulfoxides (R-SO-R'): functional class naming
+- Sulfones (R-SO2-R'): functional class naming
+- Sulfonic acids (-SO3H): suffix -sulfonic acid, prefix sulfo-
 """
 
 from collections import deque
@@ -50,7 +50,7 @@ def name_sulfide(mol, sulfur_idx: int) -> Optional[str]:
     """
     Build the functional-class (method 2) name of a sulfide (thioether).
 
-    ⚠ This is NOT the PIN. Per P-63.2.5 (the Blue Book) the preferred IUPAC name of a
+    ⚠ This is NOT the PIN. Per (the Blue Book) the preferred IUPAC name of a
     chalcogen analogue of an ether is the SUBSTITUTIVE form "(R'-sulfanyl)RH"
     (method 1); the functional-class "R R' sulfide" is retained for general
     nomenclature only. The thioether handler declines the neutral acyclic case so
@@ -58,9 +58,9 @@ def name_sulfide(mol, sulfur_idx: int) -> Optional[str]:
     degrade (a dithiocarbamate ammonium, a nitrile-sulfide ylide) where the
     substitutive route would misroute — keeping a valid, non-PIN name (0-wrong).
 
-    Functional-class grammar (P-63.2.5 method 2):
+    Functional-class grammar method 2):
     - Symmetric: "dimethyl sulfide", "diethyl sulfide"
-    - Asymmetric: "ethyl methyl sulfide" (alphabetical order, P-14.4)
+    - Asymmetric: "ethyl methyl sulfide" (alphabetical order,
 
     Args:
         mol: RDKit Mol object
@@ -72,7 +72,7 @@ def name_sulfide(mol, sulfur_idx: int) -> Optional[str]:
     sulfur = mol.GetAtomWithIdx(sulfur_idx)
 
     # A RING sulfur is never an acyclic functional-class sulfide ("R R' sulfide",
-    # P-63.6.2.1) — it is a skeletal heteroatom named by the ring system (thiophene,
+    # — it is a skeletal heteroatom named by the ring system (thiophene,
     # thiane, the epithio bridge of a bridged-fused parent,...). Characterising its
     # two ring branches as substituent groups LINEARISES the ring into a phantom
     # chain (e.g. the S-bridged 1,4-epithio-1,4-dihydronaphthalene -> "didecyl
@@ -109,9 +109,9 @@ def name_sulfoxide(mol, sulfoxide_atoms: Tuple[int, ...]) -> Optional[str]:
     """
     Name a sulfoxide using functional class nomenclature.
 
-    IUPAC P-63.6.3.1 prefers functional class for simple sulfoxides:
+    IUPAC prefers functional class for simple sulfoxides:
     - Symmetric: "dimethyl sulfoxide"
-    - Asymmetric: "ethyl methyl sulfoxide" (alphabetical order, P-14.4)
+    - Asymmetric: "ethyl methyl sulfoxide" (alphabetical order,
 
     Args:
         mol: RDKit Mol object
@@ -164,9 +164,9 @@ def name_sulfone(mol, sulfone_atoms: Tuple[int, ...]) -> Optional[str]:
     """
     Name a sulfone using functional class nomenclature.
 
-    IUPAC P-63.6.3.2 prefers functional class for simple sulfones:
+    IUPAC prefers functional class for simple sulfones:
     - Symmetric: "dimethyl sulfone"
-    - Asymmetric: "ethyl methyl sulfone" (alphabetical order, P-14.4)
+    - Asymmetric: "ethyl methyl sulfone" (alphabetical order,
 
     Args:
         mol: RDKit Mol object
@@ -231,13 +231,13 @@ def name_sulfonic_acid(mol, sulfonic_atoms: Tuple[int, ...], parent_name: str) -
 
 
 def name_sulfonyl_halide(features, style: str = "pin") -> Optional[str]:
-    """P-67.1.4.4.1 / P-68.5.0 / P-65.3.1: the acid halide of a sulfonic /
+    """ / /: the acid halide of a sulfonic /
     sulfinic acid, named by the two-word functional-class grammar
     '{parent-stem}sulfonyl {halide}' / '{parent-stem}sulfinyl {halide}'.
 
-    BB-verbatim targets: 'ethanesulfonyl chloride' (@39650, PIN),
+    BB-verbatim targets: 'ethanesulfonyl chloride' (, PIN),
     'propane-1-sulfonyl chloride', '4-isocyanatobenzene-1-sulfonyl chloride
-    (PIN)' (@26014).
+    (PIN)' .
 
     Implementation (root-cause reuse, not a band-aid): cap the S-bonded halogen
     with -OH to form the parent sulfonic/sulfinic acid, name that acid with the
@@ -261,10 +261,10 @@ def name_sulfonyl_halide(features, style: str = "pin") -> Optional[str]:
 
     # Cap the S-bonded leaving group -> -OH, forming the parent sulfonic/sulfinic
     # acid; ``halide_word`` is the functional-class word ('chloride'... or
-    # 'cyanide' for the P-66.5.1.3.2 sulfonyl cyanide).
+    # 'cyanide' for the sulfonyl cyanide).
     rw = Chem.RWMol(mol)
     if pg == "sulfonyl_cyanide":
-        # -3 (P-66.5.1.3.2, the Blue Book 'CH3-SO2-CN methanesulfonyl cyanide
+        # -3, the Blue Book 'CH3-SO2-CN methanesulfonyl cyanide
         # (PIN)'). Match tuple (S, =O, =O, cyanide-C, N): drop the -C#N and cap S
         # with -OH by converting the cyanide carbon to O and deleting the N.
         halide_word = "cyanide"
@@ -331,7 +331,7 @@ _OXIDE_ACID_SUFFIX = {"sulfinyl": "sulfinic acid", "sulfonyl": "sulfonic acid"}
 def _acid_stem_unsaturated_oxide_prefix(
     mol, sub_carbon: int, sulfur_idx: int, oxide_kind: str,
 ) -> Optional[str]:
-    """P-63.6 acid-stem prefix ('prop-2-ene-1-sulfinyl') for an arm that
+    """ acid-stem prefix ('prop-2-ene-1-sulfinyl') for an arm that
     ``_classify_oxide_side`` declines (unsaturated / branched / hetero).
 
     Root-cause reuse (mirrors ``name_sulfonyl_halide``): isolate the arm + the
@@ -377,7 +377,7 @@ def _acid_stem_unsaturated_oxide_prefix(
     # of S is the amide N, not a carbon) can have its R-sulfonyl stem built: cap S
     # with -OH after detaching the N and the arm names as the R-sulfonic acid
     # (`4-aminobenzene-1-sulfonic acid`), rewritten to `...sulfonyl` (task #28,
-    # unblocks the substituted-arene `{Ar}sulfonamido` PIN, BB P-66.1.1.4.3:33034).
+    # unblocks the substituted-arene `{Ar}sulfonamido` PIN, BB:33034).
     # Purely additive: sulfone/sulfoxide callers require two-carbon S (SMARTS), so
     # this branch only fires where the old carbon-only filter returned None. The
     # cap-name-rewrite is fail-closed (a non-clean `... sulfonic/sulfinic acid`
@@ -470,7 +470,7 @@ def _acid_stem_unsaturated_oxide_prefix(
     # validity gate DISABLED, so an acid-namer defect that still ends in 'sulfonic acid'
     # (SO3H migrating onto a ring -> 'methylcyclohexanesulfonic acid'; a dropped arm ->
     # 'ethanesulfonic acid') would become a wrong sulfinyl/sulfonyl prefix. RE-ANCHOR the
-    # accepted acid name explicitly (gate-INDEPENDENT: does not rely on the global SELF-01
+    # accepted acid name explicitly (gate-INDEPENDENT: does not rely on the global
     # setting, which is off in tests and absent with no jar): OPSIN-parse it and require
     # the same constitutional skeleton as the capped fragment; fail closed on mismatch or
     # when OPSIN is unavailable.
@@ -487,7 +487,7 @@ def _acid_stem_unsaturated_oxide_prefix(
     if _sk_name is None or _sk_frag is None or _sk_name != _sk_frag:
         return None
     # #36 (a review F6 finding 3): the skeleton block above is the InChIKey first
-    # block, which EXCLUDES stereo (ADR-18-07), so a WRONG CIP descriptor (E/Z, R/S)
+    # block, which EXCLUDES stereo (-07), so a WRONG CIP descriptor (E/Z, R/S)
     # from the gate-disabled acid sub-namer would re-anchor skeleton-exact and ship a
     # wrong-stereo `...sulfinyl/sulfonyl` prefix. Also require the C6 RegistrationHash
     # stereo layer (stereo-bearing, tautomer-canonical) to match — gate-INDEPENDENT,
@@ -503,7 +503,7 @@ def _acid_stem_unsaturated_oxide_prefix(
 
 
 def _classify_oxide_side(mol, c_idx: int, sulfur_idx: int):
-    """Classify one R side of R-S(=O)x-R' for substitutive P-63.6 naming.
+    """Classify one R side of R-S(=O)x-R' for substitutive naming.
 
     Wave2 T3b. Returns ``(stem, kind, atoms)`` where ``stem`` is the
     parent-hydride name used both for the acid-form prefix
@@ -589,7 +589,7 @@ def _classify_oxide_side(mol, c_idx: int, sulfur_idx: int):
 def name_chalcogen_oxide_substitutive(
     mol, match_atoms: Tuple[int, ...], oxide_kind: str,
 ) -> Optional[str]:
-    """P-63.6 substitutive PIN for R-S(=O)-R' / R-S(=O)(=O)-R' (Wave2 T3b).
+    """ substitutive PIN for R-S(=O)-R' / R-S(=O)(=O)-R' (Wave2 T3b).
 
     BB-verbatim targets: '(methanesulfinyl)methane' (46154, DMSO),
     '1-(ethanesulfinyl)butane' (28094), '(ethanesulfonyl)ethane' (28115),
@@ -634,7 +634,7 @@ def name_chalcogen_oxide_substitutive(
 
     (stem_a, kind_a, atoms_a), (stem_b, kind_b, atoms_b) = sides
 
-    # Symmetric diaryl -> multiplicative (P-63.6 form (3) is the PIN).
+    # Symmetric diaryl -> multiplicative form (3) is the PIN).
     if kind_a == 'ring' and kind_b == 'ring':
         if stem_a == stem_b == 'benzene':
             return f"1,1'-{oxide_kind}dibenzene"
@@ -642,14 +642,14 @@ def name_chalcogen_oxide_substitutive(
         # multiplicative ring machinery lands in Tier 5a — fail through.
         return None
 
-    # Ring + chain: ring is the senior parent (P-44.1.2.2).
+    # Ring + chain: ring is the senior parent.
     if kind_a == 'ring' or kind_b == 'ring':
         ring_stem = stem_a if kind_a == 'ring' else stem_b
         chain_stem = stem_b if kind_a == 'ring' else stem_a
         chain_atoms = atoms_b if kind_a == 'ring' else atoms_a
-        # W3-P04 (P-65.3.2.2.2 / P-14.3.4): the acyl-from-sulfonic substituent is
+        # W3-P04 /: the acyl-from-sulfonic substituent is
         # located on the CHAIN carbon it derives from — 'propane-1-sulfonyl'
-        # (BB @31396 '(propane-1-sulfonyl)benzene (PIN)'). The '-1-' is cited for
+        # (BB '(propane-1-sulfonyl)benzene (PIN)'). The '-1-' is cited for
         # C3+ chains and omitted for methane/ethane (BB @302 '(ethanesulfonyl)
         # ethane', DMSO '(methanesulfinyl)benzene'), exactly like the two-chain
         # branch below.
@@ -660,7 +660,7 @@ def name_chalcogen_oxide_substitutive(
             return f"({chain_stem}{oxide_kind}){ring_stem}"
         return f"({chain_stem}-1-{oxide_kind}){ring_stem}"
 
-    # Two chains: the longer chain is the parent (P-44.3); tie -> either
+    # Two chains: the longer chain is the parent; tie -> either
     # (identical stems for the symmetric case).
     n_a, n_b = len(atoms_a), len(atoms_b)
     if n_a >= n_b:
@@ -678,7 +678,7 @@ def name_chalcogen_oxide_substitutive(
 def chalcogen_oxide_fc_covers_molecule(
     mol, match_atoms: Tuple[int, ...],
 ) -> bool:
-    """Wave2 T3b conservation guard for the functional-class sulfoxide/
+    """Wave2 conservation guard for the functional-class sulfoxide/
     sulfone namers: their name describes EXACTLY R-S(=O)x-R', so it is only
     honest when S + its =O oxygens + both full side fragments account for
     every heavy atom in the molecule. 'CSCCS(=O)C' used to emit 'ethyl
@@ -743,7 +743,7 @@ def _characterize_sulfur_substituent(mol, start_idx: int, exclude: set):
             return ("naphthyl", 10)
         return (None, 0)
 
-    # Alkyl group — Wave2 T3b conservation: the old C-only BFS silently
+    # Alkyl group — Wave2 conservation: the old C-only BFS silently
     # flattened branched / ring / hetero-bearing sides into a linear alkyl
     # count ('CSCCS(=O)C' -> 'ethyl methyl sulfoxide', the -S-CH3 dropped;
     # a benzyl side became 'heptyl'). Route through the strict side
@@ -775,7 +775,7 @@ def get_sulfur_prefix(fg_name: str) -> Optional[str]:
         Prefix string, or None if group uses functional class naming
     """
     SULFUR_PREFIXES = {
-        "thiol": "sulfanyl",  # IUPAC P-63.6.1.1 (2013), not "mercapto"
+        "thiol": "sulfanyl",  # IUPAC (2013), not "mercapto"
         "sulfonic_acid": "sulfo",
         "sulfinic_acid": "sulfino",
         # These use functional class naming, no prefix:

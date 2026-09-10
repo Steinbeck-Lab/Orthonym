@@ -1,16 +1,16 @@
-"""v29 Phase 2 T3b: the von Baeyer ring COUNT, and what the cage caps bound.
+""" a phase T3b: the von Baeyer ring COUNT, and what the cage caps bound.
 
 Two things are locked here.
 
-1. ``von_baeyer_ring_count`` computes the number P-23.1.9 defines and
+1. ``von_baeyer_ring_count`` computes the number defines and
    ``cyclo_ring_count_word`` spells. It is NOT RDKit's ring-set cardinality:
    RDKit returns the *symmetrized* SSSR, which keeps extra symmetry-equivalent
    smallest rings and therefore over-counts precisely the symmetric cages von
    Baeyer nomenclature exists for (adamantane 4 vs 3, cubane 6 vs 5). Before
-   T3b ``MAX_CAGE_RINGS`` was compared against that over-count, so a cap meant
+    ``MAX_CAGE_RINGS`` was compared against that over-count, so a cap meant
    to bound "8 rings" refused *heptacyclo* (7-ring) cages.
 
-2. P-23.2.4 main-bridge selection (v41 M4 subpart #1, FIXED). ``_find_main_ring``
+2. main-bridge selection (M4 subpart #1, FIXED). ``_find_main_ring``
    used to offer only a 0-atom (direct bond) or 1-atom (common neighbour) main
    bridge, so a bridgehead pair joined by a 2+-atom bridge was never a candidate
    and the ``main_bridge_len`` slot of its score could hold only 0 or 1 -- the
@@ -21,11 +21,11 @@ Two things are locked here.
    ``BB_MAIN_BRIDGE_SUBPART2_CASES`` still need consistent secondary/dependent
    bridge numbering (subpart #2) and DEGRADE cleanly until then.
 
-Ground truth is the Blue Book itself, cited by ``BlueBookV2/BlueBookV2.md`` line.
+Ground truth is the Blue Book itself, cited by ``the Blue Book Blue Book`` line.
 The structures were obtained by parsing each cited Blue Book name to a structure
 (name -> structure is a settled direction, and no claim of PIN *preference* is
 made from it); each one is independently re-checked here against the descriptor's
-own arithmetic -- P-23.2.6.1.4, ":9651": total ring atoms == sum of the bracket
+own arithmetic --, ":9651": total ring atoms == sum of the bracket
 numbers + 2 -- and against its ring-count prefix, so a mis-parse cannot pass.
 """
 import pytest
@@ -55,7 +55,7 @@ def _cage_of(smiles):
 
 # --------------------------------------------------------------------------
 # 1. The count itself, against Blue Book ring-count prefixes.
-#    (bb_line, label, smiles, bb_ring_count, bb_cyclo_word)
+# (bb_line, label, smiles, bb_ring_count, bb_cyclo_word)
 # --------------------------------------------------------------------------
 BB_RING_COUNTS = [
     (9840, "adamantane = tricyclo[3.3.1.1^3,7]decane (PIN)",
@@ -74,7 +74,7 @@ BB_RING_COUNTS = [
 @pytest.mark.unit
 @pytest.mark.parametrize("bb_line,label,smiles,count,word", BB_RING_COUNTS)
 def test_ring_count_is_the_blue_book_number(bb_line, label, smiles, count, word):
-    """P-23.1.9 (``:9558``) / P-23.2.6.1.1 (``:9645``): the ring number is the
+    """ (``:9558``) / (``:9645``): the ring number is the
     minimum number of scissions that makes the skeleton acyclic. It must equal
     the ``...cyclo`` prefix of the cited Blue Book name."""
     mol, cage = _cage_of(smiles)
@@ -90,7 +90,7 @@ def test_ring_count_is_the_blue_book_number(bb_line, label, smiles, count, word)
 def test_symmetrized_ring_set_is_a_different_quantity(
         bb_line, label, smiles, count, word):
     """The reason the primitive exists. RDKit's ring-set cardinality is >= the
-    P-23.1.9 count and is strictly greater on the symmetric cages, so it must
+     count and is strictly greater on the symmetric cages, so it must
     never be used where the Blue Book number is meant."""
     mol, cage = _cage_of(smiles)
     symmetrized = sum(1 for r in mol.GetRingInfo().AtomRings()
@@ -129,11 +129,11 @@ def test_ring_count_counts_components_separately():
 
 
 # --------------------------------------------------------------------------
-# 2. The cap now bounds that count (the T3b behaviour change).
+# 2. The cap now bounds that count (the behaviour change).
 # --------------------------------------------------------------------------
 #: 12-atom bridged cage; reference name ``10,11-dimethylheptacyclo[...]dodecane``
 #: -> 7 rings, well inside ``MAX_CAGE_RINGS = 8``. RDKit's symmetrized ring set
-#: has ELEVEN rings for it, so the pre-T3b cap refused it as "> 8 rings".
+#: has ELEVEN rings for it, so the pre- cap refused it as "> 8 rings".
 HEPTACYCLO_CAGE = "C1CC2C(CC1C)C3C45C36C47C56C72"
 
 
@@ -154,7 +154,7 @@ def test_cap_admits_a_heptacyclo_cage_the_symmetrized_count_refused():
 @pytest.mark.unit
 def test_cap_still_fails_closed_above_the_limit(monkeypatch):
     """The backstop above the new limit. Squeezing the cap below the cage's own
-    P-23.1.9 count must still refuse -- the cap is live, not decorative."""
+     count must still refuse -- the cap is live, not decorative."""
     import orthonym.rules.vonbaeyer_universal as vbu
     mol, cage = _cage_of(HEPTACYCLO_CAGE)
     assert von_baeyer_ring_count(mol, cage) == 7
@@ -170,7 +170,7 @@ def test_ovalene_stays_refused():
     but well INSIDE the atom cap, and it also fails the descriptor edge-audit,
     so it refuses at any cap value -- see
     ``tests/unit/rules/test_v26_p2_aromatic_vonbaeyer.py`` for the re-derived
-    reason. Locked here because T3b only ever LOWERS a ring count, so a
+    reason. Locked here because only ever LOWERS a ring count, so a
     once-refused system must not become nameable by accident."""
     ovalene = "c1cc2ccc3ccc4ccc5ccc6ccc7ccc8ccc1c1c2c3c4c2c5c6c7c8c12"
     mol, cage = _cage_of(ovalene)
@@ -180,16 +180,16 @@ def test_ovalene_stays_refused():
 
 
 # --------------------------------------------------------------------------
-# 3. P-23.2.4 main-bridge selection (v41 M4 subpart #1).
-#    (bb_line, bb_descriptor, smiles, bb_atoms, bb_ring_count,
-#     bb_main_ring_atoms, bb_main_bridge_len, bb_balance)
+# 3. main-bridge selection (M4 subpart #1).
+# (bb_line, bb_descriptor, smiles, bb_atoms, bb_ring_count,
+# bb_main_ring_atoms, bb_main_bridge_len, bb_balance)
 #
 # ``_find_main_ring`` used to offer only a 0-atom (direct bond) or 1-atom
 # (common neighbour) main bridge, so a bridgehead pair joined by a 2+-atom bridge
 # was never a candidate and the ``main_bridge_len`` slot of its score could hold
-# only 0 or 1. v41 M4 subpart #1 adds Case 3 (a 2+-atom main bridge) and makes
-# ``_find_main_bridge`` select the LARGEST bridge (P-23.2.4), so the preferred
-# main bicycle (P-23.2.4 largest main bridge, P-23.2.6.2.1 symmetric division) is
+# only 0 or 1. M4 subpart #1 adds Case 3 (a 2+-atom main bridge) and makes
+# ``_find_main_bridge`` select the LARGEST bridge, so the preferred
+# main bicycle largest main bridge, symmetric division) is
 # now produced.
 #
 # PIN_CASES: subpart #1 alone reaches the exact Blue Book PIN end to end.
@@ -211,8 +211,8 @@ BB_MAIN_BRIDGE_PIN_CASES = [
      "C12CC34CCCC(CC(CCCC1)CCC2)(CC3)C4", 19, 4, 13, 3, 4),
 ]
 
-# v41 M4#2 splits the subpart-2 cases by the defect that blocked each (see
-# .planning/audit-v41/M4-2-CODEMAP.md): Finding B = main-bridge numbering direction
+# M4#2 splits the subpart-2 cases by the defect that blocked each (see
+# internal notes): Finding B = main-bridge numbering direction
 # (fixed in Task 1), Finding A = branched-component/dependent-bridge discovery (Task 2).
 # Fix B (main-bridge orientation) alone reaches the PIN for all three of these --
 # including 9731, whose descriptor DOES carry a dependent bridge (0^11,25): the
@@ -248,7 +248,7 @@ def _split(descriptor):
     """(main_ring_atoms, main_bridge_len, balance) from a von Baeyer descriptor.
 
     The first three bracket numbers are the main bicycle: two main-ring branches
-    then the main bridge (P-23.2.6.1.2, ``:9647``). Main ring = branch1 +
+    then the main bridge, ``:9647``). Main ring = branch1 +
     branch2 + the 2 main bridgeheads; balance = the smaller branch.
     """
     body = descriptor[descriptor.index("[") + 1:descriptor.rindex("]")]
@@ -266,7 +266,7 @@ def _split(descriptor):
 def test_blue_book_datum_is_self_consistent(
         bb_line, bb_desc, smiles, atoms, rings, mr, mb, bal):
     """Validates the ground truth independently of how the structure was
-    obtained: P-23.2.6.1.4 (``:9651``) atom arithmetic, the P-23.1.9 ring count
+    obtained: (``:9651``) atom arithmetic, the ring count
     against the ``...cyclo`` prefix, and our reading of the bracket."""
     mol, cage = _cage_of(smiles)
     assert len(cage) == atoms, f"BlueBookV2.md:{bb_line}: cage atom count"
@@ -274,7 +274,7 @@ def test_blue_book_datum_is_self_consistent(
     assert cyclo_ring_count_word(rings) == bb_desc.split("[")[0]
     got_mr, got_mb, got_bal = _split(bb_desc)
     assert (got_mr, got_mb, got_bal) == (mr, mb, bal)
-    # P-23.2.6.1.4: sum of the bracket numbers + 2 == total ring atoms
+    #: sum of the bracket numbers + 2 == total ring atoms
     body = bb_desc[bb_desc.index("[") + 1:bb_desc.rindex("]")]
     total = sum(int(p.split("^")[0]) for p in body.split("."))
     assert total + 2 == atoms
@@ -285,14 +285,14 @@ def test_blue_book_datum_is_self_consistent(
     "bb_line,bb_desc,smiles,atoms,rings,mr,mb,bal", BB_MAIN_BRIDGE_PIN_CASES)
 def test_subpart1_reaches_blue_book_pin(
         bb_line, bb_desc, smiles, atoms, rings, mr, mb, bal):
-    """v41 M4 subpart #1 (P-23.2.4 / P-23.2.6.2.1): the preferred main bicycle
+    """ M4 subpart #1 /: the preferred main bicycle
     is now produced AND the full descriptor equals the Blue Book PIN.
 
-    P-23.2.1 (main ring = as many skeletal atoms as possible) was always
+     (main ring = as many skeletal atoms as possible) was always
     satisfied -- our main ring has exactly the Blue Book's atom count. What used
-    to fail was the next criterion, P-23.2.4 (``:9603``, the main bridge
+    to fail was the next criterion, (``:9603``, the main bridge
     "includes as many of the atoms as possible that are not included in the main
-    ring") and P-23.2.6.2.1 (``:9661``, "the main ring must be divided as
+    ring") and (``:9661``, "the main ring must be divided as
     symmetrically as possible by the main bridge"). ``_find_main_ring`` Case 3
     (a 2+-atom main bridge) plus ``_find_main_bridge``'s largest-bridge selection
     fix both: the main-ring size, main-bridge length AND balance now match the
@@ -316,7 +316,7 @@ def test_subpart1_reaches_blue_book_pin(
     "bb_line,bb_desc,smiles,atoms,rings,mr,mb,bal", BB_SUBPART2_FINDING_B_CASES)
 def test_subpart2_finding_b_main_bridge_direction(
         bb_line, bb_desc, smiles, atoms, rings, mr, mb, bal):
-    """v41 M4#2 Fix B (P-23.2.6.3 main-bridge numbering direction): the engine
+    """ M4#2 Fix B main-bridge numbering direction): the engine
     already builds the byte-correct BB descriptor string, but Step 2 of
     ``_order_and_number_secondary_bridges`` numbered the main bridge in stored order
     with no direction check (unlike Step 5), so after ``_select_pin_orientation``
@@ -338,7 +338,7 @@ def test_subpart2_finding_b_main_bridge_direction(
     "bb_line,bb_desc,smiles,atoms,rings,mr,mb,bal", BB_SUBPART2_FINDING_A_CASES)
 def test_subpart2_finding_a_dependent_bridge(
         bb_line, bb_desc, smiles, atoms, rings, mr, mb, bal):
-    """v41 M4#2 Fix A (P-23.1.8 / P-23.2.6.3): a branched secondary-bridge component
+    """ M4#2 Fix A /: a branched secondary-bridge component
     (≥3 assigned endpoints) is decomposed into an independent bridge + dependent
     bridge(s) instead of collapsing to one 2-endpoint path that dropped an atom. The
     dependent bridge lands on an interior atom of the independent bridge, and the

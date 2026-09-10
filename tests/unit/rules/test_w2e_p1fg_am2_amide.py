@@ -1,11 +1,11 @@
-"""P-66.1.7 (BB 33557): polyfunctional amides; BB verbatim example 33580:
+""" (BB 33557): polyfunctional amides; BB verbatim example 33580:
 H2N-CH2-CO-N(CH3)-CH2-CHOH-CH2OH ->
 2-amino-N-(2,3-dihydroxypropyl)-N-methylacetamide (PIN).
 
-W2E-P1FG Task 14 (AM-2): reproduce-first at the CODE level (2026-07-09)
+W2E-P1FG Task 14 : reproduce-first at the CODE level (2026-07-09)
 exposed a STALE DEFERRED spec — BOTH targets already emit the correct
-OPSIN-RT-verified PIN at HEAD (the ROOT-1 T5b acyl-substituent drop and
-ROOT-2 pool discard the DEFERRED doc recorded were healed by an earlier
+OPSIN-RT-verified PIN at HEAD (the acyl-substituent drop and
+ pool discard the DEFERRED doc recorded were healed by an earlier
 pass / the p1_amide plan). This is now a VERIFY-ONLY regression pin so the
 rows can never silently regress; no src edit was needed.
 """

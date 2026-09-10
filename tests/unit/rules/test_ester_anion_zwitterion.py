@@ -1,11 +1,11 @@
-"""Choline-family acid-ester-anion zwitterions (v33 Phase 3 B1).
+"""Choline-family acid-ester-anion zwitterions (a phase B1).
 
-Wires the cation-bearing-owner-substituent capability (`e4936b8e`) into the
+Wires the cation-bearing-owner-substituent capability  into the
 GUARD-4 zwitterion path (`charged_router._route_zwitterion`) so a cation +
 acid-ester anion zwitterion (a single P/S oxoacid mono-ester whose owner arm
 carries the quaternary cation, e.g. choline sulfate/phosphate) gets a real
 name instead of abstaining. RT-gated (`@pytest.mark.opsin_gate`); the
-top-level SELF-01/OPSIN gate is the 0-wrong backstop.
+top-level /OPSIN gate is the 0-wrong backstop.
 """
 import pytest
 from orthonym import Orthonym
@@ -30,7 +30,7 @@ def test_choline_ester_anion_zwitterion(namer, smi, expected):
 # --- regressions: untouched paths ----------------------------------------
 @pytest.mark.opsin_gate
 def test_carboxylate_betaine_unchanged(namer):
-    # GUARD 4's existing (…azaniumyl)-prefix betaine path (P-74.1.3) must be
+    # GUARD 4's existing (…azaniumyl)-prefix betaine path must be
     # completely unaffected by the new ester-anion helper (its central-atom
     # check declines instantly for a carboxylate O, whose neighbour is C).
     assert namer.name("C[N+](C)(C)CCC(=O)[O-]") == "3-(trimethylazaniumyl)propanoate"

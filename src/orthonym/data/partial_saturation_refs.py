@@ -6,7 +6,7 @@ saturated fused heterocycles. By comparing a molecule's ring atoms against
 its aromatic parent, we can detect the saturation level and generate
 appropriate prefixes (dihydro-, tetrahydro-, hexahydro-, perhydro-).
 
-IUPAC 2013 Blue Book P-31.1.1: Hydro prefixes indicate the addition of
+IUPAC 2013 Blue Book: Hydro prefixes indicate the addition of
 hydrogen to an otherwise unsaturated parent structure.
 
 Key aromatic systems covered:
@@ -164,7 +164,7 @@ AROMATIC_REFERENCES: Dict[str, Dict[str, Any]] = {
         'description': 'dibenzo[b,e]pyrazine',
     },
 
-    # RING-05: Xanthene (9H-xanthene, dibenzo[b,e]pyran)
+    #: Xanthene (9H-xanthene, dibenzo[b,e]pyran)
     'xanthene': {
         'smiles': 'c1ccc2c(c1)oc1ccccc1c2',
         'ring_atoms': 13,
@@ -247,7 +247,7 @@ AROMATIC_REFERENCES: Dict[str, Dict[str, Any]] = {
     },
 
     # =========================================================================
-    # ADDITIONAL MONOCYCLIC AND POLYCYCLIC REFERENCES (Phase 89)
+    # ADDITIONAL MONOCYCLIC AND POLYCYCLIC REFERENCES (a phase)
     # =========================================================================
 
     'pyrazine': {
@@ -316,11 +316,11 @@ def get_aromatic_reference(mol: Chem.Mol) -> Optional[Tuple[str, str]]:
         None otherwise.
 
     Examples:
-        >>> mol = Chem.MolFromSmiles('c1ccc2c(c1)CCCN2')  # tetrahydroquinoline
+        >>> mol = Chem.MolFromSmiles('c1ccc2c(c1)CCCN2') # tetrahydroquinoline
         >>> get_aromatic_reference(mol)
         ('quinoline', 'c1ccc2ncccc2c1')
 
-        >>> mol = Chem.MolFromSmiles('c1ccc2c(c1)CCN2')  # dihydroindole
+        >>> mol = Chem.MolFromSmiles('c1ccc2c(c1)CCN2') # dihydroindole
         >>> get_aromatic_reference(mol)
         ('indole', 'c1ccc2[nH]ccc2c1')
     """
@@ -401,7 +401,7 @@ def get_carbocyclic_aromatic_reference(mol: Chem.Mol) -> Optional[Tuple[str, str
         None otherwise.
 
     Examples:
-        >>> mol = Chem.MolFromSmiles('c1ccc2c(c1)CCCC2')  # tetrahydronaphthalene
+        >>> mol = Chem.MolFromSmiles('c1ccc2c(c1)CCCC2') # tetrahydronaphthalene
         >>> get_carbocyclic_aromatic_reference(mol)
         ('naphthalene', 'c1ccc2ccccc2c1')
     """

@@ -1,4 +1,4 @@
-"""N-substituted sulfonamides — P-66.1.1.3.1.1 (chalcogen-acid amides).
+"""N-substituted sulfonamides — (chalcogen-acid amides).
 
 THE DEFECT THIS CLOSES
 ----------------------
@@ -8,8 +8,8 @@ THE DEFECT THIS CLOSES
 N-substituent. Every path that reached one emitted a name for a DIFFERENT
 molecule and was killed downstream by the OPSIN self-consistency gate:
 
-* ``CS(=O)(=O)NC``        -> ``methanesulfonamide``   (N-methyl carbon DROPPED)
-* ``c1ccccc1S(=O)(=O)NC`` -> ``sulfanylbenzene``      (both =O, N and C dropped)
+* ``CS(=O)(=O)NC`` -> ``methanesulfonamide`` (N-methyl carbon DROPPED)
+* ``c1ccccc1S(=O)(=O)NC`` -> ``sulfanylbenzene`` (both =O, N and C dropped)
 * ``C1CCCCC1S(=O)(=O)NC`` -> ``carbamoylcyclohexane-1-sulfonamide`` (fabricated)
 
 So the class did not "fail closed by design" — it fail-closed by ACCIDENT, one
@@ -17,17 +17,17 @@ gate downstream of a wrong-constitution producer.
 
 BLUE BOOK AUTHORITY
 -------------------
-**P-66.1.1.2** "Sulfonamides, sulfinamides, and related selenium and tellurium
-amides" (``BlueBookV2/BlueBookV2.md:32746``):
+**** "Sulfonamides, sulfinamides, and related selenium and tellurium
+amides" (``the Blue Book Blue Book``):
 
     "Sulfonamides, sulfinamides, and the analogous selenium and tellurium
     amides are named substitutively using the following suffixes: -SO2-NH2
-    sulfonamide (preselected suffix) ... These suffixes may be assigned to any
+    sulfonamide (preselected suffix)... These suffixes may be assigned to any
     position of a parent hydride."
 
 with ``CH3-SO2-NH2 methanesulfonamide (PIN)`` (``:32752``).
 
-**P-66.1.1.3.1** "*N*-Substitution" / **P-66.1.1.3.1.1** (``:32774``) — the
+**** "*N*-Substitution" / **** (``:32774``) — the
 sentence that governs the italic locant, quoted with its operative clause:
 
     "Substituted primary amides, with general structures such as R-CO-NHR' and
@@ -49,7 +49,7 @@ so the anilide contraction must never be emitted for an N-phenyl sulfonamide.
 
 DESIGN — no count stands in for a structure proof
 -------------------------------------------------
-Per ``.planning/audit-v29/FINDING-count-based-naming-sites.md`` the parent is
+Per `internal notes` the parent is
 never derived from an atom count. Instead the N-substituent branches are
 EXCISED from the real molecule and the residual R-SO2-NH2 is named by
 re-entering the naming pipeline, exactly as ``handlers/hydroximic_acid.py:92``
@@ -70,7 +70,7 @@ MEASURED CLASS BOUNDARY (fails closed outside it)
   its PIN is ``1-(methanesulfonyl)piperidine``, a sulfonyl PREFIX on a ring
   parent, not an N-substituted sulfonamide.
 * exactly one sulfonamide unit. Di- and polysulfonamides need the superscripted
-  ``N^1``/``N^3`` locants of P-66.1.1.3.1.1, which are not built here.
+  ``N^1``/``N^3`` locants of, which are not built here.
 * sulfur only. Sulfinamides (-SO-NH2) and the Se/Te analogues have NO functional
   group perception in this tree at all, so even the UNSUBSTITUTED
   ``methanesulfinamide`` is unnameable; that is a separate unbuilt class.
@@ -115,12 +115,12 @@ def _sulfonyl_nitrogen(mol: Any) -> Optional[Tuple[int, int]]:
 
     Every condition is a structural assertion; nothing is inferred from a count
     of carbons. Refuses (returns None) whenever the shape is not exactly the one
-    P-66.1.1.3.1.1 governs.
+     governs.
     """
     matches = mol.GetSubstructMatches(_SULFONAMIDE_SN)
     if len(matches) != 1:
         # 0 -> not a sulfonamide; >1 -> a di/polysulfonamide needing the
-        # superscripted N-locants of P-66.1.1.3.1.1, which are not built here.
+        # superscripted N-locants of, which are not built here.
         return None
     s_idx, _o1, _o2, n_idx = matches[0]
 
@@ -128,7 +128,7 @@ def _sulfonyl_nitrogen(mol: Any) -> Optional[Tuple[int, int]]:
     n_atom = mol.GetAtomWithIdx(n_idx)
 
     # -- sulfur must be a clean sulfonyl: exactly two terminal =O, exactly one
-    #    amide N, and exactly one other (the R of R-SO2-).
+    # amide N, and exactly one other (the R of R-SO2-).
     dbl_o = [
         nb.GetIdx() for nb in s_atom.GetNeighbors()
         if nb.GetAtomicNum() == 8
@@ -174,10 +174,10 @@ def _sulfonyl_on_benzene(mol: Any, s_idx: int) -> bool:
             if nb.GetIdx() not in ring or len(ring) != 6:
                 continue
             # An ISOLATED benzene only: every ring atom aromatic carbon AND a member
-            # of exactly one ring. A FUSED arene (naphthalene, indane, ...) has a
+            # of exactly one ring. A FUSED arene (naphthalene, indane,...) has a
             # shared bond -> NumAtomRings > 1 for the bridgeheads, and delegating it
             # to the benzene namer would rename it as benzene, DROPPING the fused
-            # carbons (a wrong molecule; F-B fable BLOCKER 1). Reject those here.
+            # carbons (a wrong molecule; F-B a review BLOCKER 1). Reject those here.
             if all(mol.GetAtomWithIdx(i).GetAtomicNum() == 6
                    and mol.GetAtomWithIdx(i).GetIsAromatic()
                    and ring_info.NumAtomRings(i) == 1
@@ -221,7 +221,7 @@ def _collect_n_substituents(
             continue
         if nb.GetAtomicNum() != 6:
             # An N-heteroatom substituent (N-hydroxy, N-amino, N-N) is a
-            # different construction (P-66.1.1.3.2 hydroxamic etc.).
+            # different construction hydroxamic etc.).
             return None
         branch = _branch_atoms(mol, nb.GetIdx(), n_idx)
         if s_idx in branch:
@@ -379,7 +379,7 @@ def _excised_parent_name(
 def n_substituted_sulfonamide_name(
     mol: Any, style: str = "pin",
 ) -> Optional[str]:
-    """Return the P-66.1.1.3.1.1 PIN for an N-substituted sulfonamide, else None.
+    """Return the PIN for an N-substituted sulfonamide, else None.
 
     ``N-methylmethanesulfonamide``, ``N,N-dimethylbenzenesulfonamide``,
     ``N-phenylmethanesulfonamide``. Fails closed on every shape outside the
@@ -396,7 +396,7 @@ def n_substituted_sulfonamide_name(
     if branches is None:
         return None
 
-    # F-B (P-66.1.1.3.1.1 + P-14.3.4.2): when the parent hydride is a BENZENE ring
+    # F-B +: when the parent hydride is a BENZENE ring
     # the italic-N and ring locants must be merged into ONE alphanumerical prefix
     # list and the suffix '1' cited on a di-substituted ring
     # (`N,4-dimethylbenzene-1-sulfonamide`). Prefixing a delegated parent name
@@ -415,7 +415,7 @@ def n_substituted_sulfonamide_name(
         # a substituted-ring parent is refused there anyway (never a wrong name).
 
     # A substituted parent hydride needs the N and numerical locants merged into
-    # one ordered prefix list (P-66.1.1.3.1.1; `N,4-dimethyl...` at :32879),
+    # one ordered prefix list; `N,4-dimethyl...` at:32879),
     # which prefixing a delegated parent name cannot do. Refuse.
     if not _parent_hydride_is_unsubstituted(mol, s_idx):
         return None

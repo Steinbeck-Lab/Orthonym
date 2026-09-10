@@ -10,7 +10,7 @@ IUPAC 2013 Rules:
 - Prefix order follows Hantzsch-Widman priority (O > S > N)
 - Polycyclic lactones: ring O gets oxa- prefix, C=O gets -one suffix
 
-Reference: IUPAC 2013 Blue Book P-23.4 and P-25.5
+Reference: IUPAC 2013 Blue Book and
 """
 
 import pytest
@@ -470,7 +470,7 @@ class TestVBIntegration:
 
 
 # ============================================================================
-# v23 Phase 13: lambda-convention (P-31.1.4.2 / P-23.6.1) in the VB 'a'-prefix
+# a phase: lambda-convention / in the VB 'a'-prefix
 # ============================================================================
 
 class TestVonBaeyerLambdaConvention:
@@ -505,16 +505,16 @@ class TestVonBaeyerLambdaConvention:
     @pytest.mark.unit
     def test_full_name_round_trippable_pin(self):
         from orthonym.namer import name_compound
-        # S1 (v24): the replacement 'a'-prefix attaches DIRECTLY to the von-Baeyer
-        # descriptor (P-23.3.1) — no hyphen. PIN is `3λ4-thiabicyclo[3.2.1]octane`.
+        # S1 : the replacement 'a'-prefix attaches DIRECTLY to the von-Baeyer
+        # descriptor — no hyphen. PIN is `3λ4-thiabicyclo[3.2.1]octane`.
         name = name_compound("C12C[SH2]CC(CC1)C2")
         assert name == "3λ4-thiabicyclo[3.2.1]octane"
 
 
 class TestVonBaeyerReplacementPrefixNoStrayHyphen:
-    """S1 (v24): hetero von-Baeyer replacement prefix must not emit a stray hyphen
+    """S1 : hetero von-Baeyer replacement prefix must not emit a stray hyphen
     before the descriptor. PIN = `2-oxabicyclo[...]`, NOT `2-oxa-bicyclo[...]`
-    (P-23.3.1). The spiro/bicyclo.py paths were already correct; polycyclic.py's
+    . The spiro/bicyclo.py paths were already correct; polycyclic.py's
     `get_heteroatom_replacement_prefix` appended a trailing '-' (the duplicated-
     formatter bug the cross-tool audit flagged as S1)."""
 
@@ -541,7 +541,7 @@ class TestVonBaeyerReplacementPrefixNoStrayHyphen:
     def test_carbocyclic_substituted_vb_no_stray_hyphen(self, smiles, pin):
         # Same stray-hyphen class as S1, on the SUBSTITUENT-prefix path: for a
         # substituted CARBOCYCLIC (no-heteroatom) von-Baeyer system the substituent
-        # prefix attaches DIRECTLY to the descriptor (P-31) -> `1-methyltricyclo...`,
+        # prefix attaches DIRECTLY to the descriptor -> `1-methyltricyclo...`,
         # not `1-methyl-tricyclo...`. (bicyclo.py handles bicyclo correctly already;
         # this is the name_polycyclic_complete tricyclo+ path.)
         from orthonym.namer import name_compound

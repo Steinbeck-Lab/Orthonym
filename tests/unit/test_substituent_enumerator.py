@@ -42,7 +42,7 @@ def _get_ring_and_oriented(smiles):
 
 @pytest.mark.unit
 class TestRingSubstituentExtraction:
-    """Tests for extract_ring_substituents()."""
+    """Tests for extract_ring_substituents."""
 
     def test_ring_methyl_cyclohexane(self):
         """CC1CCCCC1 -> 1 substituent (methyl)."""
@@ -165,7 +165,7 @@ class TestRingSubstituentExtraction:
 
 @pytest.mark.unit
 class TestChainSubstituentExtraction:
-    """Tests for extract_chain_substituents()."""
+    """Tests for extract_chain_substituents."""
 
     def test_chain_basic_conversion(self):
         """Substituents dict is correctly converted to SubstituentInfo list."""
@@ -217,7 +217,7 @@ class TestChainSubstituentExtraction:
 
 @pytest.mark.unit
 class TestClassifyAndNameFragment:
-    """Tests for classify_and_name_fragment()."""
+    """Tests for classify_and_name_fragment."""
 
     def test_classify_fg_only_chloro(self):
         """Chloro fragment -> 'chloro'."""
@@ -337,7 +337,7 @@ class TestClassifyAndNameFragment:
 
 @pytest.mark.unit
 class TestCollectSubstituentAtomSet:
-    """Tests for collect_substituent_atom_set()."""
+    """Tests for collect_substituent_atom_set."""
 
     def test_empty_list(self):
         """Empty list returns empty set."""
@@ -448,7 +448,7 @@ class TestFullPipeline:
         assert len(results) == 1
         name = classify_and_name_fragment(mol, results[0], ring_set)
         assert name is not None
-        # F-T9/DD6 RET-02: the PIN is the located 'propan-2-yl' (not the deprecated
+        # F-T9/DD6: the PIN is the located 'propan-2-yl' (not the deprecated
         # 'isopropyl'/'1-methylethyl'). Accept the historical forms too for robustness.
         assert ('propan-2-yl' in name.lower() or 'propyl' in name.lower()
                 or 'methylethyl' in name.lower())

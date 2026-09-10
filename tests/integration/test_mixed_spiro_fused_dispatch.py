@@ -1,7 +1,7 @@
-"""Integration tests: BLK-01 closure — name_compound dispatches mixed-spiro-fused
+"""Integration tests: closure — name_compound dispatches mixed-spiro-fused
 inputs through the new elif branch in _assemble_complex_ring_name.
 
-Phase 151-04 closes the gap where the 151-02 SUMMARY claimed to add this dispatch
+a phase-04 closes the gap where the 151-02 SUMMARY claimed to add this dispatch
 but a git-stash incident silently dropped it. These tests exercise the FULL
 name_compound pipeline (not just direct calls to name_mixed_spiro_fused) so
 a future regression in the dispatch chain CANNOT be silently masked.
@@ -21,7 +21,7 @@ def _load_mixed_spiro_fused_fixtures():
         return []
     with open(FIXTURE_PATH) as f:
         data = json.load(f)
-    # Phase 151-02 mined fixtures with compound_class field; only the
+    # a phase-02 mined fixtures with compound_class field; only the
     # spiro-mixed-fused subset routes through the new elif branch.
     return [f for f in data if f.get("compound_class") == "spiro-mixed-fused"]
 
@@ -33,7 +33,7 @@ class TestMixedSpiroFusedDispatch:
     def test_dispatch_does_not_return_none_on_known_mixed_smiles(self):
         """The composer dispatch must invoke name_mixed_spiro_fused; if the
         elif branch is missing, _assemble_complex_ring_name returns None and
-        the entire AUTONOM §4 path is dead code from name_compound.
+        the entire AUTONOM path is dead code from name_compound.
 
         We use a synthetic spiro-fused SMILES known to classify as
         mixed-spiro-fused per is_mixed_spiro_fused. If the function returns
@@ -43,7 +43,7 @@ class TestMixedSpiroFusedDispatch:
         from orthonym.rules.spiro import is_mixed_spiro_fused
 
         # Synthetic mixed-spiro-fused: indoline (fused) + cyclohexane (spiro side)
-        # The exact SMILES is the canonical AUTONOM §4 example
+        # The exact SMILES is the canonical AUTONOM example
         # spiro[indoline-3,1'-cyclohexane]: C1CCC2(CC1)CC1=CC=CC=C1N2
         smi = "C1CCC2(CC1)CC1=CC=CC=C1N2"
         mol = Chem.MolFromSmiles(smi)
@@ -55,7 +55,7 @@ class TestMixedSpiroFusedDispatch:
             )
 
         name = name_compound(smi)
-        # BLK-01 proof: name_compound must NOT silently return None for inputs
+        # proof: name_compound must NOT silently return None for inputs
         # that classify as mixed-spiro-fused. If the elif branch is missing,
         # _assemble_complex_ring_name returns None for this input, and the
         # downstream pipeline produces either None or a wildly different name.
@@ -74,11 +74,11 @@ class TestMixedSpiroFusedDispatch:
     def test_corpus_mixed_spiro_fused_routes_through_dispatch(self, fixture):
         """Each corpus mixed-spiro-fused fixture: assert name_compound
         does NOT return None AND the returned name contains 'spiro['
-        (AUTONOM §4 separable-parts nested form per 151-02 D-13).
+        (AUTONOM separable-parts nested form per 151-02).
 
         If a particular fixture's name_mixed_spiro_fused implementation
         returns None today (legitimately — some fixtures are logged to
-        AUTONOM-followups.md per D-24 as v19 architectural followups),
+        AUTONOM-followups.md per as architectural followups),
         mark it xfail with the followup citation. The HARD assertion is
         that AT LEAST ONE corpus fixture returns a non-None name with
         'spiro[' — proving the elif branch is live.

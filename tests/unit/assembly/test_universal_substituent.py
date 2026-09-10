@@ -16,7 +16,7 @@ Coverage:
     two SEPARATE ring systems linked by a chain
   * hard-branch witnesses that abstain TODAY on ``main`` (confirmed by the
     B.1 trace) -- complete coverage + ``verify_or_none`` CONFIRMS
-  * WS-STEREO (): the top-level spine's own stereo descriptor block is now
+  * STEREO : the top-level spine's own stereo descriptor block is now
     prepended (mirroring ``general_engine``'s four parent engines) and
     0-wrong-gated through ``verify_or_none`` -- a witness whose stereocentres
     are all on the spine now FULL-InChIKey CONFIRMS; a witness with a
@@ -27,11 +27,11 @@ Coverage:
   * the atom-coverage assertion actually VOIDS a rigged incomplete binding
     (proves the gate fires, not just that good input passes it)
   * Task B2b: charge / indicated-H as suffixes (design step 4) -- a genuine
-    net-charged cation/anion, a skeletal (P-74.1.1) zwitterion, a charged
+    net-charged cation/anion, a skeletal zwitterion, a charged
     substituent on a neutral parent, and the nitroethane-class internally
     charge-separated species (now NAMED, not voided, when spellable+
     verified) reusing ``general_engine``'s own charge-suffix primitives;
-    WS7 () adds the FG-anion/terminal-cation charged-leaf
+      adds the FG-anion/terminal-cation charged-leaf
     (``oxido``/``sulfido``/``azaniumyl``), so a carboxylate/sulfonate/
     alkoxide anion and an amino-acid-style zwitterion are now NAMED and
     full-InChIKey verified, never voided or mis-named
@@ -196,7 +196,7 @@ def test_hard_branch_witness_perindopril_fragment():
 
 def test_stereo_bearing_witness_now_full_ws_stereo_win():
     """The stereo-bearing ORIGINAL of the sulfooxy/carboxylic-acid witness.
-    WS-STEREO () now prepends the top-level spine's own stereo descriptor
+    STEREO  now prepends the top-level spine's own stereo descriptor
     block (mirroring ``general_engine``'s parent engines) and 0-wrong-gates it
     through ``verify_or_none``: BOTH defined descriptors here (the C=C bond
     E/Z is on the chain spine itself) are spine-scoped, so the with-stereo
@@ -204,7 +204,7 @@ def test_stereo_bearing_witness_now_full_ws_stereo_win():
     complete, not merely a safe degrade. Mutation-checked: forcing
     ``general_engine._stereo_prefix`` to ``''`` (as bound in this module)
     reproduces the exact former value (name without the leading ``(5Z)-``
-    block, ``verify_or_none`` -> ``None``) -- see task-WS-STEREO-report.md.
+    block, ``verify_or_none`` -> ``None``) -- see task-STEREO-report.md.
     Do NOT revert this value without re-deriving it the same way."""
     smi = r"C/C=C(/COS(=O)(=O)O)C(=O)O"
     mol = Chem.MolFromSmiles(smi)
@@ -218,9 +218,9 @@ def test_stereo_bearing_witness_now_full_ws_stereo_win():
 
 
 def test_stereo_bearing_perindopril_now_full_ws_stereo_win():
-    """WS-STEREO (): both defined stereocentres are chain-SPINE atoms, so
+    """STEREO : both defined stereocentres are chain-SPINE atoms, so
     the with-stereo candidate FULL-InChIKey CONFIRMS. Mutation-checked (see
-    the sibling test above and task-WS-STEREO-report.md)."""
+    the sibling test above and task-STEREO-report.md)."""
     smi = r"CCC[C@H](N[C@H](C)C=O)C(=O)OCC"
     mol = Chem.MolFromSmiles(smi)
     result = name_universal_substitutive(mol)
@@ -246,7 +246,7 @@ def test_internally_charged_species_now_named_not_voided():
     on "N bonded to two terminal O's" with no bond-order/charge check, fired
     on the wrong shape and mis-named a different molecule). B2b replaces the
     blanket guard with a charge-and-bond-order-VALIDATED ``_nitro_shortcut``
-    (nitro's charges are P-59 INTERNAL, excluded from
+    (nitro's charges are INTERNAL, excluded from
     ``perception.ions.get_ion_sites``'s genuine-ion-site perception, so this
     is spelled directly as a leaf, never via the charge-suffix machinery).
     This is the CLAUDE.md-mandated regression check: an internally
@@ -258,14 +258,14 @@ def test_internally_charged_species_now_named_not_voided():
 
 
 # ===========================================================================
-# M2 (internal/semipolar charge): the P-59 internal centres get_ion_sites
+# M2 (internal/semipolar charge): the internal centres get_ion_sites
 # STRIPS -- so they void the raw-formal-charge guard -- now rendered by
 # dedicated leaves instead. Each is net-neutral and OPSIN-round-trips (the
 # spelling was verified against OPSIN 2.9.0 before wiring).
 # ===========================================================================
 
 def test_m2_azide_terminal_named_not_voided():
-    """M2 inc1: an organic azide ``-N=[N+]=[N-]`` (P-59 internal, net-0) is
+    """M2 inc1: an organic azide ``-N=[N+]=[N-]`` internal, net-0) is
     rendered as the ``azido`` prefix (OPSIN-RT-verified: ``azidobenzene`` ->
     the input) rather than voiding on the raw-charge guard. The DOMINANT
     residual centre (~1354 of the M2 class)."""
@@ -295,7 +295,7 @@ def test_m2_azide_on_decorated_backbone():
 
 
 def test_m2_diazo_terminal_named_not_voided():
-    """M2 inc1: a diazo group ``>C=[N+]=[N-]`` (P-66.4.1.2.1 / P-59 internal,
+    """M2 inc1: a diazo group ``>C=[N+]=[N-]`` / internal,
     net-0) is rendered as the ``diazo`` prefix rather than voiding on the
     raw-charge guard. Each emission is full-InChIKey RT-verified (0-wrong)."""
     for smi in ("C=[N+]=[N-]", "CC=[N+]=[N-]", "CC(=[N+]=[N-])C"):
@@ -316,8 +316,8 @@ def test_m2_diazo_composed_backbone_is_zero_wrong():
 
 
 def test_m2_nitrate_ester_named_not_voided():
-    """M2 inc2: a nitrate ester ``R-O-[N+](=O)[O-]`` (P-67.1.4.3.1 preselected,
-    P-59 internal, net-0) is rendered as the ``nitrooxy`` prefix rather than
+    """M2 inc2: a nitrate ester ``R-O-[N+](=O)[O-]`` preselected,
+     internal, net-0) is rendered as the ``nitrooxy`` prefix rather than
     voiding on the raw-charge guard. OPSIN-RT-verified (``nitrooxymethane`` ->
     the input); the census's 3rd-largest residual centre (~83 molecules)."""
     for smi in ("CO[N+](=O)[O-]", "CCO[N+](=O)[O-]"):
@@ -339,10 +339,10 @@ def test_m2_nitrate_ester_on_ring_and_backbone_zero_wrong():
 
 
 def test_m2_isocyanide_named_not_voided():
-    """M2 inc3: an isocyanide ``R-[N+]#[C-]`` (P-66.5.3 / P-59 internal, net-0 --
+    """M2 inc3: an isocyanide ``R-[N+]#[C-]`` / internal, net-0 --
     R-N=C has no uncharged depiction) is rendered as the ``isocyano`` prefix
     rather than the previous charged ``azaethynyl-ium-ide`` monstrosity. Its
-    C-/N+ are reclassified P-59 internal in ``perception.ions`` (the root cause),
+    C-/N+ are reclassified internal in ``perception.ions`` (the root cause),
     so ``get_ion_sites`` strips them and the leaf carries them. OPSIN-RT-verified
     (``isocyanobenzene`` / ``isocyanomethane`` -> the input)."""
     for smi in ("[C-]#[N+]c1ccccc1", "[C-]#[N+]C", "[C-]#[N+]CCCC"):
@@ -366,7 +366,7 @@ def test_m2_n_oxide_named_not_voided():
     """M2 inc4: an N-oxide (aromatic or aliphatic amine) ``>[N+]-[O-]`` -- the
     DOMINANT residual centre (~962 net-neutral void molecules) -- is now rendered
     as the substitutive zwitterion ``<n>-oxido...-<n>-ium`` (the O- as ``oxido``,
-    the N+ as ``-ium``, both P-59/P-74.2.1 internal). OPSIN-RT-verified: the
+    the N+ as ``-ium``, both / internal). OPSIN-RT-verified: the
     kekulized ``1-oxido-1-azacyclohexa-1,3,5-trien-1-ium`` parses back to pyridine
     N-oxide, etc."""
     for smi in ("[O-][n+]1ccccc1", "Cc1cccc[n+]1[O-]", "[O-][n+]1ccc(C)cc1"):
@@ -402,7 +402,7 @@ def test_m2_charge_separated_chalcogenide_named_via_neutral_form():
     """M2 inc5: a charge-separated STANDARD-VALENCE chalcogenide -- a sulfonyl /
     sulfone / phosphoryl drawn ``X(+)(=O)[O-]`` (a =O on the cation, so the
     ``oxido``/``-ium`` leaf declines) -- has a valid uncharged depiction with the
-    SAME InChIKey (P-74.2.1). It is named via that neutral form and full-InChIKey
+    SAME InChIKey. It is named via that neutral form and full-InChIKey
     RT-verifies against the CHARGED input (0-wrong; the neutralization is the
     ``perception.ions`` semipolar detector's own proven InChIKey-equal rewrite)."""
     cases = ["O=[P+]([O-])CCCF",
@@ -427,7 +427,7 @@ def test_m2_polynitro_now_named_not_voided():
     """A side benefit of the ``_walkable_pieces`` seed fix (M2 inc3): a polynitro
     ``C(-NO2)n`` -- previously voided because a nitro fragment could seed a
     degenerate spine -- now composes cleanly (the carbon parent + N nitro leaves),
-    full-InChIKey RT-verified. Each nitro group is P-59 internal, so 0-wrong holds
+    full-InChIKey RT-verified. Each nitro group is internal, so 0-wrong holds
     (a shredded/unspellable nitro still voids on the raw-charge guard)."""
     cases = {
         "C([N+](=O)[O-])[N+](=O)[O-]": "1,1-dinitromethane",
@@ -456,7 +456,7 @@ def test_quaternary_ammonium_cation_gets_ium_suffix():
 
 
 def test_carboxylate_anion_names_via_charged_leaf():
-    """WS7 (composed-charge): a net-charged FG anion is now NAMED, not
+    """ (composed-charge): a net-charged FG anion is now NAMED, not
     voided. Acetate (``CC(=O)[O-]``) classifies 'carboxylate', but in THIS
     module's skeletal-replacement construction the carbonyl ``=O`` is threaded
     INTO the parent (``1-oxaprop-1-ene``), leaving the anionic ``[O-]`` as a
@@ -465,8 +465,8 @@ def test_carboxylate_anion_names_via_charged_leaf():
     ``hydroxy``). Coverage-complete and STRICT full-InChIKey ``verify_or_none``
     CONFIRMs it (there is no stereo to omit).
 
-    CONTRACT CHANGE (was ``... is None``): pre-WS7 this producer had no way to
-    express an FG anion and voided; WS7's charged-leaf handler is exactly the
+    CONTRACT CHANGE (was ``... is None``): pre- this producer had no way to
+    express an FG anion and voided; 's charged-leaf handler is exactly the
     mechanism that closes that gap. The expected string is re-derived, not
     hand-edited (verified to OPSIN-round-trip WITH its -1 charge)."""
     result, verified = _name_and_verify("CC(=O)[O-]")
@@ -475,15 +475,15 @@ def test_carboxylate_anion_names_via_charged_leaf():
 
 
 def test_zwitterion_amino_acid_names_via_charged_leaves():
-    """WS7 (): the glycine zwitterion ``C(C(=O)[O-])[NH3+]`` (net-0,
+    """ : the glycine zwitterion ``C(C(=O)[O-])[NH3+]`` (net-0,
     internally charge-separated) is now NAMED, not voided. Both charged termini
     are rendered as charged substituent prefixes -- the aminium as ``azaniumyl``
     and the carboxylate ``[O-]`` (its ``=O`` threaded into the ``1-oxaprop-1-ene``
     skeleton) as ``oxido`` -- so the whole zwitterion is covered and the -/+
     charges are both carried. STRICT full-InChIKey ``verify_or_none`` CONFIRMs.
 
-    CONTRACT CHANGE (was ``... is None``): the pre-WS7 producer could express the
-    skeletal aminium cation but had no FG-anion layer, so it voided; WS7's
+    CONTRACT CHANGE (was ``... is None``): the pre- producer could express the
+    skeletal aminium cation but had no FG-anion layer, so it voided; 's
     charged-leaf handler names both centres. Expected string re-derived and
     OPSIN-round-trip-verified, not hand-edited. (The FULL namer still prefers the
     retained name ``glycine`` for this input; this is the isolated floor test.)"""
@@ -516,7 +516,7 @@ def test_charged_substituent_on_neutral_parent_carries_on_branch_name():
 # ===========================================================================
 
 # Every one of these carries a nonzero RAW formal charge that ``get_ion_sites``
-# STRIPS as a P-59 INTERNAL / P-74.2.1 semipolar bonding feature -- invisible
+# STRIPS as a INTERNAL / semipolar bonding feature -- invisible
 # to both ``_resolve_spine_charge`` and the charge-coverage assertion. Before
 # the fix, the element-symbol-only spine builders absorbed each into the
 # skeleton AS IF NEUTRAL and emitted a coverage-complete name of a DIFFERENT
@@ -569,18 +569,18 @@ def test_internal_charge_classes_void_never_misname(label, smiles):
          "thionitro", "sulfoxide"],
 )
 def test_m2_semipolar_oxide_family_now_named(smiles, expected):
-    """M2 inc4: the whole P-74.2.1 semipolar-oxide family -- an ``X(+)-[O-]``
+    """M2 inc4: the whole semipolar-oxide family -- an ``X(+)-[O-]``
     centre (X in N/P/S) -- is now rendered as the substitutive ``oxido``/``-ium``
     zwitterion instead of voiding. Every one is full-InChIKey RT-verified (0-wrong,
     the same molecule incl. charge/tautomer); these are best-effort systematic
-    names, not necessarily PINs (T4 floor)."""
+    names, not necessarily PINs (floor)."""
     result, verified = _name_and_verify(smiles)
     assert result.name == expected, (smiles, result.name)
     assert verified == result.name, smiles
 
 
 def test_np_ylide_zwitterion_names_and_verifies():
-    """Fix round 1 keep-green: a P-74.1.1 skeletal zwitterion (both ionic
+    """Fix round 1 keep-green: a skeletal zwitterion (both ionic
     centres genuine and on the same spine) is IN scope and must still emit +
     verify -- the raw-charge guard allows it because both charged atoms are
     genuine ion sites (``cation_sites | anion_sites``) the suffix machinery
@@ -1036,7 +1036,7 @@ def test_phase_e_token_in_name_violation_voids(monkeypatch):
 @pytest.mark.parametrize("smi", ["C[N+](C)(C)C", "C[N+](C)(C)[CH2-]"])
 def test_phase_e_charged_species_still_names_no_elision_false_positive(smi):
     """Regression: the charge/ionic suffix elides the parent core's trailing
-    'e' (``2-azapropane`` -> ``...2-azapropan-2-ium``; P-16.7.1(a)/P-74.1.1),
+    'e' (``2-azapropane`` -> ``...2-azapropan-2-ium``; (a)/,
     which a literal-substring token-in-name check would spuriously reject. The
     FULL ``spine_core`` token is stored (so element_soundness/P1 see the real token); the
     elision is tolerated on the token-in-name axis ALONE inside

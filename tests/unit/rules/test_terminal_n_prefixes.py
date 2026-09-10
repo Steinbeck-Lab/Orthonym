@@ -1,6 +1,6 @@
-"""Wave2 T2b — claimed-atom mask + terminal N-heteroatom prefixes.
+"""Wave2 — claimed-atom mask + terminal N-heteroatom prefixes.
 
-Two fixes in one batch (P-35.2.1 / P-35.2.2 / P-68.3.1.1.1.5 / P-35.3.1):
+Two fixes in one batch / / /:
 
 1. CLAIMED-ATOM MASK: FG prefixes that fully name their substituent branch
    (isocyanato, isothiocyanato, isocyano, guanidino) are added to the
@@ -84,17 +84,17 @@ class TestProtectedNeighbors:
     @pytest.mark.parametrize("smiles,expected", [
         # secondary amine substituent path (walker, not FG loop)
         ("CNCCCCCCCC(=O)O", "8-(methylamino)octanoic acid"),
-        # ureido: the SEPARATE carbamoylamino PIN (P-66.1.1.4.5.1)
+        # ureido: the SEPARATE carbamoylamino PIN
         ("NC(=O)NCCC[C@H](N)C(=O)O",
          "(2S)-2-amino-5-(carbamoylamino)pentanoic acid"),
-        # AM-4 (P-66.4.1.3.2, BB 34338): a chain-terminal amidine carbon stays
+        #, BB 34338): a chain-terminal amidine carbon stays
         # IN the chain -> amino+imino (was '4-carbamimidoylbutanoic acid'; the
         # new form is OPSIN-RT canonical-equal to the same SMILES).
         ("N=C(N)CCCC(=O)O", "5-amino-5-iminopentanoic acid"),
         # hydroxylamine as PARENT (senior path untouched by the prefix row)
         ("CCNO", "N-ethylhydroxylamine"),
-        # Wave2 T2a supersedes the original 'butyl isocyanate' control here:
-        # P-61.8 substitutive isocyanato is the PIN (BB VERBATIM
+        # Wave2 supersedes the original 'butyl isocyanate' control here:
+        # substitutive isocyanato is the PIN (BB VERBATIM
         # 'isocyanatocyclohexane (PIN) cyclohexyl isocyanate'); the
         # functional-class form remains under --trivial.
         ("O=C=NCCCC", "1-isocyanatobutane"),
@@ -102,12 +102,12 @@ class TestProtectedNeighbors:
         ("[N-]=[N+]=NCCCC(=O)O", "4-azidobutanoic acid"),
         # oxime is not stolen by hydroxylamine/diazenyl.
         # Expectation corrected (was unparenthesised): the compound prefix takes
-        # P-16.5.1.1 enclosing marks, printed verbatim in three PINs --
-        # BlueBookV2.md:38474 `3-(hydroxyimino)butan-2-one (PIN)`, :38478
+        # enclosing marks, printed verbatim in three PINs --
+        # the Blue Book `3-(hydroxyimino)butan-2-one (PIN)`,:38478
         # `4-(hydroxyimino)-1-methylcyclohexa-2,5-diene-1-carboxylic acid (PIN)`,
-        # :30140 `5-hydroxy-5-(hydroxyimino)pentanoic acid (PIN)`.
+        #:30140 `5-hydroxy-5-(hydroxyimino)pentanoic acid (PIN)`.
         ("ON=CCCC(=O)O", "4-(hydroxyimino)butanoic acid"),
-        # terminal hydrazine stays hydrazinyl (P-35.2.2 sibling, existing)
+        # terminal hydrazine stays hydrazinyl sibling, existing)
         ("NNCCCC(=O)O", "4-hydrazinylbutanoic acid"),
     ])
     def test_protected(self, smiles, expected):
@@ -122,13 +122,13 @@ class TestSortAndBrackets:
         ("diazenyl", "diazenyl"),   # structural 'di' — NOT stripped
         ("diazo", "diazo"),         # structural 'di' — NOT stripped
         ("diazido", "azido"),       # genuine 2x azido — still strips
-        # P-14.5.2: 'dimethylamino' is ONE compound prefix, so its internal 'di'
+        #: 'dimethylamino' is ONE compound prefix, so its internal 'di'
         # is part of the complete name and alphabetizes at 'd'. Expectation
-        # corrected from 'methylamino' against BlueBookV2.md:26630,
+        # corrected from 'methylamino' against the Blue Book,
         # `1,5-bis(dimethylamino)-N,N-dimethylpentan-3-amine N-oxide (PIN)`:
         # bis(dimethylamino) is cited BEFORE N,N-dimethyl, which is only possible
         # if it keys at 'd' -- keying at 'm' gives methyl < methylamino and
-        # inverts the PIN. P-16.3.5(a) (:7104) independently lists
+        # inverts the PIN. (a) (:7104) independently lists
         # `bis(dimethylamino)` as a preferred prefix, i.e. a COMPOUND prefix.
         ("dimethylamino", "dimethylamino"),
         ("hydroxyamino", "hydroxyamino"),
@@ -139,7 +139,7 @@ class TestSortAndBrackets:
         assert alpha_sort_key(prefix) == key
 
     @pytest.mark.parametrize("prefix,bracketed", [
-        # compound heteroatom-substituted amino/oxy prefixes: P-16.5.1.1 marks
+        # compound heteroatom-substituted amino/oxy prefixes: marks
         ("hydroxyamino", True),
         ("aminooxy", True),
         ("fluoroamino", True),

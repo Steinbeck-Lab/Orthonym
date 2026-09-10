@@ -18,7 +18,7 @@ The 'n_saturated' variants use '-idine' suffixes for N-containing saturated
 rings (e.g., pyrrolidine = 5-membered saturated N-ring, olidine stem).
 Note: Many N-saturated heterocycles have retained names (piperidine, morpholine).
 
-Reference: IUPAC 2013 Blue Book, Table 2.2 and Section P-22.2.2.1
+Reference: IUPAC 2013 Blue Book, Table 2.2 and Section
 Source: Derived from OPSIN hwSuffixes.xml
 """
 
@@ -27,13 +27,13 @@ from typing import Dict, Optional, Set, Tuple
 # Hantzsch-Widman stem suffixes by ring size
 # Keys: ring size (3-10)
 # Values: dict with saturation variants
-#   - 'unsaturated': Maximum unsaturation for ring size
-#   - 'saturated': Standard saturated suffix (or 'saturated_os' / 'saturated_n' for 6-membered)
-#   - 'n_saturated': Alternative suffix for N-containing saturated rings (optional)
+# - 'unsaturated': Maximum unsaturation for ring size
+# - 'saturated': Standard saturated suffix (or 'saturated_os' / 'saturated_n' for 6-membered)
+# - 'n_saturated': Alternative suffix for N-containing saturated rings (optional)
 HW_STEMS: Dict[int, Dict[str, str]] = {
     3: {
         'unsaturated': 'irene',      # e.g., oxirene (non-N or mixed heteroatoms)
-        # Wave2 T2d (P-22.2.2.1.5.1): a 3-membered MANCUDE ring whose only
+        # Wave2: a 3-membered MANCUDE ring whose only
         # heteroatoms are nitrogen uses 'irine' (1H-/2H-azirine, diazirine),
         # not 'irene'. Selected in build_hw_name (needs the full heteroatom
         # set, which get_hw_stem's single-element signature cannot express).
@@ -52,12 +52,12 @@ HW_STEMS: Dict[int, Dict[str, str]] = {
         'n_saturated': 'olidine',    # e.g., pyrrolidine (aza-olidine)
     },
     6: {
-        # P-22.2.2.1.3 / Table 2.7: the 6-membered stem ending depends on the
+        # / Table 2.7: the 6-membered stem ending depends on the
         # heteroatom CLASS present in the ring:
-        #   6A (O, S, Se, Te, Bi): unsaturated 'ine',   saturated 'ane'
-        #   6B (N, Si, Ge, Sn, Pb): unsaturated 'ine',  saturated 'inane'
-        #   6C (F, Cl, Br, I, P, As, Sb, B, Al, Ga, In, Tl):
-        #                           unsaturated 'inine', saturated 'inane'
+        # 6A (O, S, Se, Te, Bi): unsaturated 'ine', saturated 'ane'
+        # 6B (N, Si, Ge, Sn, Pb): unsaturated 'ine', saturated 'inane'
+        # 6C (F, Cl, Br, I, P, As, Sb, B, Al, Ga, In, Tl):
+        # unsaturated 'inine', saturated 'inane'
         # Precedence for stem selection when classes mix: 6C > 6B > 6A.
         'unsaturated': 'ine',        # 6A/6B unsaturated: azine (pyridine); oxine overridden by retained "2H-pyran"
         'unsaturated_6c': 'inine',   # 6C unsaturated: 1,4-oxaphosphinine, 1,3,5-triphosphinine
@@ -89,13 +89,13 @@ HETEROATOMS_USE_ANE: Set[str] = {'O', 'S', 'Se', 'Te', 'Bi', 'Hg'}
 
 
 # Heteroatoms that use '-inane' for saturated 6-membered rings
-# (6B ∪ 6C: N, Si, Ge, Sn, Pb  +  P, As, Sb, B, Al, Ga, In, Tl, and halogens)
+# (6B ∪ 6C: N, Si, Ge, Sn, Pb + P, As, Sb, B, Al, Ga, In, Tl, and halogens)
 HETEROATOMS_USE_INANE: Set[str] = {'N', 'Si', 'Ge', 'Sn', 'Pb',
                                    'P', 'As', 'Sb', 'B', 'Al', 'Ga', 'In', 'Tl',
                                    'F', 'Cl', 'Br', 'I'}
 
 
-# P-22.2.2.1.3 / Table 2.7 class 6C: these heteroatoms give a 6-membered
+# / Table 2.7 class 6C: these heteroatoms give a 6-membered
 # UNSATURATED (mancude) ring the '-inine' ending (not '-ine'). Saturated form
 # is still '-inane' (shared with 6B).
 #
@@ -107,19 +107,19 @@ HETEROATOMS_USE_ININE: Set[str] = {'F', 'Cl', 'Br', 'I',
                                    'P', 'As', 'Sb', 'B', 'Al', 'Ga', 'In', 'Tl'}
 
 
-# P-22.2.2.1.3 (BlueBookV2.md:8284): "If two or more kinds of heteroatoms occur
+# (the Blue Book): "If two or more kinds of heteroatoms occur
 # in the same name, their order of citation follows the sequence: F, Cl, Br, I,
 # O, S, Se, Te, N, P, As, Sb, Bi, Si, Ge, Sn, Pb, B, Al, Ga, In, Tl."
 #
 # Most senior first, so the LEAST senior heteroatom of a ring is the one
 # occurring LAST in this sequence -- equivalently the one whose 'a' prefix is
-# written immediately before the stem, which is how P-22.2.2.1.6 phrases it.
+# written immediately before the stem, which is how phrases it.
 SIX_RING_CITATION_SENIORITY: Tuple[str, ...] = (
     'F', 'Cl', 'Br', 'I', 'O', 'S', 'Se', 'Te', 'N', 'P', 'As',
     'Sb', 'Bi', 'Si', 'Ge', 'Sn', 'Pb', 'B', 'Al', 'Ga', 'In', 'Tl',
 )
 
-# Table 2.5 (BlueBookV2.md:8259-8261). The three groups partition exactly the 22
+# Table 2.5 (the Blue Book-8261). The three groups partition exactly the 22
 # elements of SIX_RING_CITATION_SENIORITY (5 + 5 + 12), which is the consistency
 # check that the two tables describe the same element set.
 #
@@ -134,10 +134,10 @@ SIX_RING_GROUP_C: Set[str] = {'F', 'Cl', 'Br', 'I', 'P', 'As', 'Sb',
 def least_senior_six_ring_heteroatom(ring_heteroatoms: Set[str]) -> Optional[str]:
     """The heteroatom that selects a six-membered ring's stem, or None.
 
-    P-22.2.2.1.6 (BlueBookV2.md:8411), heading "Selecting Hantzsch-Widman names
+     (the Blue Book), heading "Selecting Hantzsch-Widman names
     for six-membered rings": "The stem for six-membered rings depends on the
     least senior heteroatom in the ring, i.e., the heteroatom whose name directly
-    precedes the stem. ... The stem is selected in accordance with the group to
+    precedes the stem.... The stem is selected in accordance with the group to
     which the least senior heteroatom belongs."
 
     Returns None when the ring carries no heteroatom that Table 2.5 classifies
@@ -162,7 +162,7 @@ def get_hw_stem(ring_size: int, is_saturated: bool, heteroatom: str = 'O',
         heteroatom: Principal heteroatom symbol (used for 6-membered ring
                     suffix selection: O/S use 'ane', N/P/Si use 'inane')
         ring_heteroatoms: OPTIONAL set of ALL heteroatom symbols in the ring.
-                    P-22.2.2.1.3 / Table 2.7 class 6C (P, As, Sb, B, halogens,
+                     / Table 2.7 class 6C (P, As, Sb, B, halogens,
                     ...) gives an UNSATURATED 6-ring the '-inine' ending; that
                     depends on whether ANY 6C atom is present, not on the single
                     dominant heteroatom, so callers pass the full set. When
@@ -173,17 +173,17 @@ def get_hw_stem(ring_size: int, is_saturated: bool, heteroatom: str = 'O',
         HW stem suffix string, or None if ring size not supported
 
     Examples:
-        >>> get_hw_stem(5, False)  # Unsaturated 5-ring
+        >>> get_hw_stem(5, False) # Unsaturated 5-ring
         'ole'
-        >>> get_hw_stem(5, True)   # Saturated 5-ring
+        >>> get_hw_stem(5, True) # Saturated 5-ring
         'olane'
-        >>> get_hw_stem(6, True, 'O')  # Saturated 6-ring with O
+        >>> get_hw_stem(6, True, 'O') # Saturated 6-ring with O
         'ane'
-        >>> get_hw_stem(6, True, 'N')  # Saturated 6-ring with N
+        >>> get_hw_stem(6, True, 'N') # Saturated 6-ring with N
         'inane'
-        >>> get_hw_stem(6, False, 'O', {'O', 'P'})  # unsaturated O+P 6-ring
+        >>> get_hw_stem(6, False, 'O', {'O', 'P'}) # unsaturated O+P 6-ring
         'inine'
-        >>> get_hw_stem(3, True, 'N')  # Saturated 3-ring with N
+        >>> get_hw_stem(3, True, 'N') # Saturated 3-ring with N
         'iridine'
     """
     if ring_size not in HW_STEMS:
@@ -191,13 +191,13 @@ def get_hw_stem(ring_size: int, is_saturated: bool, heteroatom: str = 'O',
 
     stems = HW_STEMS[ring_size]
 
-    # P-22.2.2.1.6 (BlueBookV2.md:8411): a SIX-membered ring's stem is selected
+    # (the Blue Book): a SIX-membered ring's stem is selected
     # by the group of its LEAST SENIOR heteroatom -- not by the most senior one,
     # and not by "any group-C atom present". The two older heuristics agree with
     # the rule whenever the least senior heteroatom shares a group with the most
     # senior (which is why 1,3-oxazinane and 1,3-oxaselenane were already right)
     # and disagree otherwise: O+As gave 'oxarsane' instead of 1,3-oxarsinane
-    # (PIN, :8455), and As+Bi would give the group-C stem though Bi, the least
+    # (PIN,:8455), and As+Bi would give the group-C stem though Bi, the least
     # senior, is group A.
     if ring_size == 6:
         check_set = ring_heteroatoms if ring_heteroatoms is not None else {heteroatom}

@@ -7,12 +7,12 @@ the von-Baeyer main-ring path search / O(paths^2) pairing loop (corrins) and
 the fused-heterocycle core matcher re-invoked thousands of times (peptides).
 Two per-top-level budgets (``fragment_naming._PERF_BUDGET`` inner ops +
 ``_ANALYSIS_CALL_BUDGET`` expensive-analysis calls) now bound that work; on
-exhaustion ``PerfBudgetExceeded`` unwinds to the outermost ``name()`` and the
+exhaustion ``PerfBudgetExceeded`` unwinds to the outermost ``name`` and the
 whole molecule abstains CLEANLY (inv 9 — never a partial / atom-dropped name).
 
 Measured sizing (M2.5 Task 2B, ``.superpowers/sdd/M2-STEREO-PLAN/task-m25b-report.md``):
 
-  * hang witnesses:   Ni/Fe-corrin ~7-12M inner ops; cob(III)yrinate 553 analyze
+  * hang witnesses: Ni/Fe-corrin ~7-12M inner ops; cob(III)yrinate 553 analyze
     calls; vancomycin/thiopeptide ~1000+ fused-matcher calls (all growing without
     bound) — every one blows past a budget in bounded, DETERMINISTIC work.
   * nameable ceiling: Mg-chlorophyll (a genuine non-curated name) needs 7.29M
@@ -65,7 +65,7 @@ _HANG_WITNESSES = {
 
 # ── Molecules that must still NAME byte-identically (was: 2 porphyrins that
 # always named + Fe-corrin, a hang witness whose exact-InChIKey ChEBI curated
-# coordination name in COORDINATION_RETAINED ships via name()'s audited exit
+# coordination name in COORDINATION_RETAINED ships via name's audited exit
 # regardless of the budget -- so the budget makes it TERMINATE, unchanged). ─────
 _FE_CORRIN = ("C[C@@]1(CC(=O)O)C2=CC3=[N+]4C(=Cc5c(CCC(=O)O)c(CC(=O)O)c6[n]5"
               "[Fe-2]45[N]2C(=CC2=[N+]5C(=C6)[C@@H](CCC(=O)O)[C@]2(C)CC(=O)O)"
@@ -117,7 +117,7 @@ def _name_best_effort(smiles: str, timeout_s: int = _WALL_KILL_S) -> str:
 @pytest.mark.parametrize("label,smiles", sorted(_HANG_WITNESSES.items()))
 def test_hang_witness_abstains_cleanly(label, smiles):
     """Each compute-bound-hang witness returns in bounded time with a CLEAN
-    abstain (the honest '(no name — ...)' sentinel), never a wrong / partial /
+    abstain (the honest '(no name —...)' sentinel), never a wrong / partial /
     atom-dropped name (inv 9)."""
     out = _name_best_effort(smiles)
     assert out.startswith("(no name"), (
@@ -136,7 +136,7 @@ def test_name_controls_unchanged(label, smiles, expected):
 
 def test_guard_is_deterministic():
     """The budgets are fixed operation/call counts reset at the outermost
-    name(), so the abstain decision is deterministic: naming the same explosive
+    name, so the abstain decision is deterministic: naming the same explosive
     witness twice yields byte-identical output."""
     a = _name_best_effort(_COBYRINATE)
     b = _name_best_effort(_COBYRINATE)

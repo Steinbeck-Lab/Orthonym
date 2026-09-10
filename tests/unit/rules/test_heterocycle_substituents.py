@@ -1,9 +1,9 @@
 """Tests for heterocycle substituent detection and naming.
 
-Phase 125-03 Task 1: Verify that halogens and heteroatom-containing groups
+a phase-03 Task 1: Verify that halogens and heteroatom-containing groups
 on heterocyclic rings appear in the generated IUPAC name.
 
-Root cause: _identify_hetero_substituent() only recognized 5 patterns
+Root cause: _identify_hetero_substituent only recognized 5 patterns
 (amino, hydroxy, nitro, sulfanyl, oxo), silently dropping halogens and
 all multi-atom heteroatom groups.
 """
@@ -37,8 +37,8 @@ class TestHeterocycleHalogens:
 
 
 class TestHeterocycleExistingPatterns:
-    """Ring principal characteristic groups are expressed as SUFFIXES (P-33),
-    not detachable prefixes. Phase 170 WS-4 / BBR-RSFX (DEF-6): the prior
+    """Ring principal characteristic groups are expressed as SUFFIXES,
+    not detachable prefixes. a phase / BBR-RSFX : the prior
     `amino`/`hydroxy`-as-prefix forms were the defect the Blue Book audit flagged;
     the PIN is the suffix form. Both corrected names OPSIN-round-trip."""
 
@@ -74,12 +74,12 @@ class TestLargeSubstituentsOnComplexRings:
 
     def test_long_chain_on_cyclohexane(self):
         """A long secondary chain on cyclohexane is named (not dropped), numbered
-        from the free valence per DD5/SEN-04 (P-46.1.8)."""
+        from the free valence per DD5/."""
         smi = "CCCCCCCCCC(C1CCCCC1)C"
         result = name_compound(smi)
         # The C11 secondary chain is the substituent on the cyclohexane parent,
         # numbered from the free valence -> undecan-2-yl (was the wrong-constitution
-        # decyl/methyl split before the SEN-04 located deriver).
+        # decyl/methyl split before the located deriver).
         assert "undecan-2-yl" in result and "cyclohexane" in result, (
             f"Expected free-valence-numbered chain on the ring parent in '{result}'"
         )

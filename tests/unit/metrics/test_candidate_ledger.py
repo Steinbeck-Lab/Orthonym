@@ -1,4 +1,4 @@
-"""Contract tests for the PE-1 candidate ledger.
+"""Contract tests for the candidate ledger.
 
 The ledger's whole claim to be an *instrument* rather than a behaviour change rests
 on two properties, and both are asserted here rather than assumed:
@@ -8,7 +8,7 @@ on two properties, and both are asserted here rather than assumed:
   2. Naming is **byte-identical** with it on and off.
 
 Plus the measured design constraint from `internal notes`
-§1: ``scope`` distinguishes a whole-molecule candidate from a fragment name, because
+: ``scope`` distinguishes a whole-molecule candidate from a fragment name, because
 a correct fragment name can never round-trip to the whole input and treating one as a
 molecule candidate manufactures a fake producer-correctness class.
 """
@@ -21,7 +21,7 @@ from orthonym.metrics import candidate_ledger as cl
 @pytest.fixture(autouse=True)
 def _clean_ledger():
     """Every test starts and ends with the ledger off — it is thread-local state
-    and a leaked ``enable()`` would make a later test pass for the wrong reason."""
+    and a leaked ``enable`` would make a later test pass for the wrong reason."""
     cl.disable()
     yield
     cl.disable()

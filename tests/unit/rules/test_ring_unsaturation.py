@@ -1,4 +1,4 @@
-"""v29 Phase 2 T1 (H2): the shared ring-unsaturation locant primitive.
+""" a phase (H2): the shared ring-unsaturation locant primitive.
 
 The hole this closes, reproduced before the fix
 -----------------------------------------------
@@ -15,11 +15,11 @@ that case outright; the cage path was silent.
 producer for both bond orders, on both paths.
 
 The ``-yne`` policy: a non-consecutive triple bond REFUSES (``None``).
-P-31.1.4.2(1) grants the compound ``x(y)`` locant to DOUBLE bonds only, and every
+(1) grants the compound ``x(y)`` locant to DOUBLE bonds only, and every
 Blue Book ``-yne`` example carries a plain locant -- so the bare lower locant is
 correct on every structure the Blue Book covers, and no compound ``-yne`` form
 exists to fall back on. The state is moreover unreachable for standard bonding
-numbers (P-23.1.2 + P-23.1.1: every non-consecutively-numbered bond is incident to
+numbers +: every non-consecutively-numbered bond is incident to
 a bridgehead, a bridgehead has >= 3 skeletal neighbours, a C(triple)C carbon has 2
 sigma bonds), so reaching it means the upstream NUMBERING is wrong and citing the
 bare locant would be a genuine wrong-structure emission (a reader parses
@@ -214,9 +214,9 @@ def test_result_is_frozen():
 # ---------------------------------------------------------------------------
 # 4. The STRUCTURAL claim behind the refusal, tested rather than assumed.
 #
-# P-23.1.2: a bridge connects two bridgeheads, so von Baeyer numbering is a
+#: a bridge connects two bridgeheads, so von Baeyer numbering is a
 # concatenation of runs each ending at a bridgehead and every
-# non-consecutively-numbered bond is incident to a bridgehead. P-23.1.1: a
+# non-consecutively-numbered bond is incident to a bridgehead.: a
 # bridgehead has >= 3 skeletal neighbours. A C(triple)C carbon has 2 sigma bonds.
 # Hence no triple bond can be non-consecutive -- for standard bonding numbers.
 # (A lambda-n heteroatom that is both 3-connected and triply bonded would escape
@@ -241,9 +241,9 @@ STANDARD_BONDING_CORPUS = [
     "C1CC2CCOC2C1",             # hetero cage
 ]
 
-#: FOUND COUNTEREXAMPLE (v29 Phase 2 T1). The lambda-n hole the Blue Book research
+#: FOUND COUNTEREXAMPLE (a phase T1). The lambda-n hole the Blue Book research
 #: flagged as NOT ESTABLISHED is REACHABLE: a pnictogen bridgehead carrying two
-#: ring bonds plus a triple bond is 3-connected (a bridgehead, P-23.1.1) at valence
+#: ring bonds plus a triple bond is 3-connected (a bridgehead, at valence
 #: 5, so it escapes the degree-2 argument. In these bicyclo[6.6.0] cages the triple
 #: bond spans locants 1<->8. HEAD cited ``[1]`` for it -- i.e. named the 1-2 bond,
 #: a wrong structure. So the fail-closed branch is LOAD-BEARING, not defensive.
@@ -305,14 +305,14 @@ def test_lambda_n_bridgehead_yne_is_reachable_and_refused(smiles):
     i, j = yne[0].GetBeginAtomIdx(), yne[0].GetEndAtomIdx()
     lo, hi = sorted((numbering[i], numbering[j]))
 
-    # (a) the triple bond really is non-consecutively numbered ...
+    # (a) the triple bond really is non-consecutively numbered...
     assert hi != lo + 1, "corpus expectation: this yne must be non-consecutive"
-    # (b) ... because an endpoint is a 3-connected (bridgehead) skeletal atom,
-    #     which the neutral-carbon degree-2 argument cannot exclude ...
+    # (b)... because an endpoint is a 3-connected (bridgehead) skeletal atom,
+    # which the neutral-carbon degree-2 argument cannot exclude...
     assert max(kek.GetAtomWithIdx(i).GetDegree(),
                kek.GetAtomWithIdx(j).GetDegree()) >= 3
-    # (c) ... so the primitive must refuse rather than cite the bare lower locant,
-    #     which would denote the lo/lo+1 bond -- a different molecule.
+    # (c)... so the primitive must refuse rather than cite the bare lower locant,
+    # which would denote the lo/lo+1 bond -- a different molecule.
     assert render_ring_unsaturation(kek, numbering) is None
 
 

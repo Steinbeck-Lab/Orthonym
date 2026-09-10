@@ -1,11 +1,11 @@
-"""v31 lever B — P-16.3.3 enclosing marks for a compound FG-prefix + alkyl.
+""" lever B — enclosing marks for a compound FG-prefix + alkyl.
 
 A SUBSTITUTED alkyl ('hydroxymethyl', 'cyanomethyl', 'carboxymethyl',
 'aminomethyl') is a COMPOUND substituent and takes enclosing marks even though it
 carries no locant/hyphen. Two divergent enclosure predicates missed this class
 (they keyed on digits/hyphens only), so it was cited BARE:
 
-* N-substituent path -> 'N-cyanomethylacetamide'      (want 'N-(cyanomethyl)...')
+* N-substituent path -> 'N-cyanomethylacetamide' (want 'N-(cyanomethyl)...')
 * ring-decoration path -> 'N-(4-hydroxymethylphenyl)...'
                                        (want 'N-[4-(hydroxymethyl)phenyl]...')
 
@@ -14,7 +14,7 @@ Fixed by teaching BOTH ``naming_utils.is_complex_substituent`` and
 the same ``_COMPOUND_FG_PREFIXES`` + alkyl-root recognition that
 ``naming_utils.needs_brackets`` already used.
 
-Blue Book PIN authority: '2-(hydroxymethyl)benzene-1,4-diol' (BlueBookV2.md:6802),
+Blue Book PIN authority: '2-(hydroxymethyl)benzene-1,4-diol' (the Blue Book),
 '6-(hydroxymethyl)oxane-2,3,4-triol' (:2688), '4-chloro-2-(hydroxymethyl)-5-oxohexyl'
 (:25293), '(cyanomethyl)' (:33087). All names below are RT-exact.
 """
@@ -33,7 +33,7 @@ from orthonym.assembly.naming_utils import (
     "nitromethyl", "aminoethyl", "hydroxyethyl",
 ])
 def test_compound_alkyl_is_complex_and_needs_brackets(name):
-    # both predicates now agree this class is compound (P-16.3.3)
+    # both predicates now agree this class is compound
     assert is_complex_substituent(name) is True
     assert needs_brackets(name) is True
     assert enclose_if_compound(name) == f"({name})"
@@ -48,7 +48,7 @@ def test_simple_substituents_stay_bare(name):
 @pytest.mark.parametrize("smiles,expected", [
     # N-substituent path
     ("CC(=O)NCC#N", "N-(cyanomethyl)acetamide"),
-    # ring-decoration path: inner () forces outer [] escalation
+    # ring-decoration path: inner  forces outer  escalation
     ("CC(=O)Nc1ccc(CO)cc1", "N-[4-(hydroxymethyl)phenyl]acetamide"),
     # ring decorations on non-amide parents (BB-shaped)
     ("OCc1ccccc1C(=O)O", "2-(hydroxymethyl)benzoic acid"),

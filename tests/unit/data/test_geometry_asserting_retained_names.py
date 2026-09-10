@@ -1,4 +1,4 @@
-"""v30 PF: a retained name must not assert double-bond geometry its key leaves open.
+""" PF: a retained name must not assert double-bond geometry its key leaves open.
 
 `crotonic acid`, `sorbic acid` and `crotonaldehyde` were keyed by geometry-FREE
 SMILES (`CC=CC(=O)O`, `CC=CC=CC(=O)O`, `CC=CC=O`) while each name denotes one
@@ -6,14 +6,14 @@ specific isomer -- crotonic acid IS (E)-but-2-enoic acid (the Z isomer has its o
 name, isocrotonic acid) and sorbic acid IS (2E,4E). So the emitted name named a
 stereoisomer the input never claimed.
 
-SELF-01 cannot catch this: it compares the InChIKey **skeleton** block and is
+ cannot catch this: it compares the InChIKey **skeleton** block and is
 stereo-insensitive by design, which is exactly why these shipped with every gate
 green. The assertions below are structural, not string comparisons, so they keep
 their teeth if the spelling of the systematic name ever changes.
 
 Evidence for the change (`change-asserted-value`, three artifacts):
 
-  1. PRIMARY SOURCE -- all three names occur **0** times in BlueBookV2.md under a
+  1. PRIMARY SOURCE -- all three names occur **0** times in the Blue Book under a
      markup/OCR-tolerant search whose known-positive control passed in the same run
      (acetic acid 178, benzoic acid 185, but-2-enoic acid 4), while the replacement
      is marked PIN verbatim: "but-2-enoic acid (PIN)".
@@ -24,9 +24,9 @@ Evidence for the change (`change-asserted-value`, three artifacts):
   3. MUTATION -- restoring the three dict entries makes
      `test_geometry_free_keys_are_not_in_the_retained_table` fail.
 
-⚠ The 19 unqualified amino-acid entries (alanine, leucine, isoleucine, ...) look
-identical to a round-trip metric and are deliberately NOT touched: P-103.1.3.1
-spells configuration with the D/L prefix, and the P-103 table lists bare `alanine`
+⚠ The 19 unqualified amino-acid entries (alanine, leucine, isoleucine,...) look
+identical to a round-trip metric and are deliberately NOT touched:
+spells configuration with the D/L prefix, and the table lists bare `alanine`
 against a structure drawn without stereochemistry. `test_amino_acids_are_kept`
 pins that, so a future round-trip-driven sweep cannot quietly delete them.
 """
@@ -81,8 +81,8 @@ def test_amino_acids_are_kept(key, name):
     """Guard against a round-trip-driven sweep deleting Blue-Book-correct names.
 
     These fail round-trip for the same surface reason the three above did -- OPSIN
-    resolves a bare `isoleucine` to the L-form -- but P-103.1.3.1 makes the D/L
-    PREFIX the carrier of configuration, and the P-103 table lists bare `alanine`
+    resolves a bare `isoleucine` to the L-form -- but makes the D/L
+    PREFIX the carrier of configuration, and the table lists bare `alanine`
     against a stereo-free structure. Removing them would trade conformance for
     round-trip points.
     """
@@ -123,9 +123,9 @@ def test_old_names_denote_a_different_molecule_than_the_key(key, name, geometry,
 @pytest.mark.opsin_gate
 @pytest.mark.slow
 def test_the_replacements_round_trip_exactly(opsin_gate):
-    """The other half of invariant 9: verify what is emitted AFTER the removal.
+    """The other half of a project rule: verify what is emitted AFTER the removal.
 
-    Removing a wrong output can unmask a worse generator -- four times in v29. So
+    Removing a wrong output can unmask a worse generator -- four times in. So
     this asserts the replacement is not merely different but correct.
     """
     from rdkit import Chem

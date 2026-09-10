@@ -6,8 +6,8 @@ stereoisomer -- under full standard InChIKey it is a FAIL, not a valid superset.
 So the best-effort tier (``general_fallback_unverified``) must decline it exactly
 like the complete tier, rather than emit a constitution-only stripped form.
 
-Governing rule for the emission it REPLACES: P-91.2.1 (a name must specify every
-stereogenic unit to denote one stereoisomer). The old P-91.2.2 "omit descriptors"
+Governing rule for the emission it REPLACES: (a name must specify every
+stereogenic unit to denote one stereoisomer). The old "omit descriptors"
 ship path is retained only under ORTHONYM_BE_STRIP_STEREO=1 (measurement).
 """
 import os
@@ -73,7 +73,7 @@ def test_stereo_free_input_still_emits():
 
 
 def test_strip_escape_hatch_restores_old_behaviour(monkeypatch):
-    # ORTHONYM_BE_STRIP_STEREO=1 restores the P-91.2.2 ship-stripped path
+    # ORTHONYM_BE_STRIP_STEREO=1 restores the ship-stripped path
     # (measurement/back-compat only).
     monkeypatch.setenv("ORTHONYM_BE_STRIP_STEREO", "1")
     assert _emits("CN1[C@@H]2CC[C@H]1C[C@H](O)C2") is not None

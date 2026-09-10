@@ -1,36 +1,36 @@
 """a phase-03.. unit tests for ring assemblies size 3+.
 
 Covers:
-- TestIdentity (): n-way signature identity already structurally enforced
+- TestIdentity : n-way signature identity already structurally enforced
   in detect_ring_assembly:185 (existing). New tests verify the contract for
   3+ component cases (terphenyl/quaterphenyl) and rejection cases
   (mixed phenyl-pyridyl chain).
-- TestTopology (): NEW _check_path_topology helper rejects branched
+- TestTopology : NEW _check_path_topology helper rejects branched
   arrangements (1,3,5-triphenylbenzene, central degree=3) and accepts
   linear chains (terphenyl, quaterphenyl). 4'-methylbiphenyl is the
   canary control (RESEARCH Pitfall 4).
 - TestPrimedLocants (,,): primed-locant emission via
-  _format_prime; Blue Book P-28.2.1 form is primary; carat is opt-in
+  _format_prime; Blue Book form is primary; carat is opt-in
   fallback only and never emitted by default.
-- TestMultiplierClosed (): ASSEMBLY_MULTIPLIERS table closed at
+- TestMultiplierClosed : ASSEMBLY_MULTIPLIERS table closed at
   deci(10); size-11 returns None.
-- TestConnectionLocant (): per-ring own IUPAC numbering used for
+- TestConnectionLocant : per-ring own IUPAC numbering used for
   connection locant; heterocycles via heteroatom priority; carbocyclics
   numbered relative to inter-ring bonds.
-- TestLowestLocantTiebreak (): symmetric assemblies pick lowest set
+- TestLowestLocantTiebreak : symmetric assemblies pick lowest set
   per first-point-of-difference using compare_locant_sets.
 - TestSupplierCoverageInvariant: cascade-step-6 supplier returns None
   on partial coverage (Pitfall 7); full coverage on complete cases.
 - TestNoParallelComparator (/): grep-style lock that no
   ``def _compare_locant*`` is introduced in ring_assemblies.py.
-- TestRoundTripViaOPSIN (): OPSIN parses every Blue-Book/literature
+- TestRoundTripViaOPSIN : OPSIN parses every Blue-Book/literature
   fixture name back to the expected SMILES with InChI L1 match.
 
-Source: 151-CONTEXT.md,,,,,,,,
+Source: 151-internal notes,,,,,,,,
         ,.
-Source: https://iupac.qmul.ac.uk/BlueBook/P2.html P-28.2.1.
-Source: 151-RESEARCH.md §"OPSIN Compatibility Evidence" (12 names).
-Source: 151-AUDIT-C.md (verdict: ENGINE_N3_PLUS_PARTIAL +
+Source: https://iupac.qmul.ac.uk/BlueBook/P2.html.
+Source: internal notes §"OPSIN Compatibility Evidence" (12 names).
+Source: internal notes-C.md (verdict: ENGINE_N3_PLUS_PARTIAL +
         PATH_TOPOLOGY_MISSING + SUPPLIER_MISSING + Q-04
         SUBSTITUENT_NAMING_ROUND_TRIPS).
 """
@@ -47,7 +47,7 @@ from rdkit import Chem
 
 # Lazy imports inside test bodies so test collection succeeds even when
 # new code (Task 2) hasn't landed yet. Same pattern used in 151-01 and
-# 151-02 Wave-0 scaffolds for audit-first cadence per CONTEXT.
+# 151-02 Wave-0 scaffolds for audit-first cadence per internal notes.
 
 def _ra_import():
     """Return the ring_assemblies module symbols this test file uses."""
@@ -69,7 +69,7 @@ def _ra_topology_import():
     return _check_path_topology
 
 
-# OPSIN oracle (). The jar lives at the worktree root via symlink to
+# OPSIN oracle . The jar lives at the worktree root via symlink to
 # parent project's jar. Path resolution depth is parents[3] for tests/unit/rules/.
 _OPSIN_JAR = (
     Path(__file__).resolve().parents[3]
@@ -119,7 +119,7 @@ _LIT_FIXTURES = json.loads((_FIXTURE_DIR / "literature_validated.json").read_tex
 
 
 # ============================================================================
-# TestIdentity ()
+# TestIdentity
 # ============================================================================
 class TestIdentity:
     """: n-way identity check rejects mixed-ring chains."""
@@ -167,7 +167,7 @@ class TestIdentity:
 
 
 # ============================================================================
-# TestTopology ()
+# TestTopology
 # ============================================================================
 class TestTopology:
     """: linear-path requirement; branched arrangements rejected."""
@@ -277,10 +277,10 @@ class TestPrimedLocants:
 
 
 # ============================================================================
-# TestMultiplierClosed ()
+# TestMultiplierClosed
 # ============================================================================
 class TestMultiplierClosed:
-    """: multiplier table. Extended to dodeci(12) by P-28.5 (Wave2 P1CB
+    """: multiplier table. Extended to dodeci(12) by (Wave2 P1CB
     Task 8, OPSIN-RT verified for undeci); still closed above 12."""
 
     @pytest.mark.unit
@@ -290,7 +290,7 @@ class TestMultiplierClosed:
 
     @pytest.mark.unit
     def test_size_11_12_present(self):
-        # P-28.5 (Wave2 P1CB Task 8): undeci(11)/dodeci(12) now supported.
+        # (Wave2 P1CB Task 8): undeci(11)/dodeci(12) now supported.
         ra = _ra_import()
         assert ra.ASSEMBLY_MULTIPLIERS.get(11) == "undeci"
         assert ra.ASSEMBLY_MULTIPLIERS.get(12) == "dodeci"
@@ -325,7 +325,7 @@ class TestMultiplierClosed:
 
 
 # ============================================================================
-# TestConnectionLocant ()
+# TestConnectionLocant
 # ============================================================================
 class TestConnectionLocant:
     """: per-ring own IUPAC numbering used for connection locant."""
@@ -364,7 +364,7 @@ class TestConnectionLocant:
 
 
 # ============================================================================
-# TestLowestLocantTiebreak ()
+# TestLowestLocantTiebreak
 # ============================================================================
 class TestLowestLocantTiebreak:
     """: lowest-locant tiebreak via compare_locant_sets (no parallel)."""
@@ -471,14 +471,14 @@ class TestNoParallelComparator:
 
 
 # ============================================================================
-# TestRoundTripViaOPSIN ()
+# TestRoundTripViaOPSIN
 # ============================================================================
 @pytest.mark.skipif(not _opsin_available(), reason="OPSIN/Java not available")
 class TestRoundTripViaOPSIN:
     """: every named fixture must round-trip via OPSIN with InChI L1 match."""
 
     # Fixtures known to need substituent-classification fix per
-    # 151-AUDIT-C.md "Out-of-scope follow-ups" + AUTONOM-followups.md.
+    # internal notes-C.md "Out-of-scope follow-ups" + AUTONOM-followups.md.
     # Marked xfail so the suite stays GREEN while the upstream bug is
     # tracked for.
     _XFAIL_FIXTURES = {
@@ -541,9 +541,9 @@ class TestRoundTripViaOPSIN:
 
 
 class TestCyclicRejectionWR02:
-    """a phase-04 WR-02: a cyclic arrangement of 3+ ring systems where
+    """a phase-04: a cyclic arrangement of 3+ ring systems where
     each system has degree 2 must be REJECTED — it is not a linear-path
-    ring assembly per IUPAC P-28.2."""
+    ring assembly per IUPAC."""
 
     @pytest.mark.unit
     def test_cyclic_three_system_arrangement_rejected(self):

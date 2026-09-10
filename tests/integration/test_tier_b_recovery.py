@@ -1,19 +1,19 @@
-"""Tier-B recovery test — a phase SC-3 acceptance gate.
+"""Tier-B recovery test — a phase acceptance gate.
 
 Plan-03 Task 3 deliverable. Parametrizes over the audit-locked
 `tier_b_v18_pre_156.json` fixture (Plan-01 deliverable) and asserts
-the data-driven SC-3 acceptance bar:
+the data-driven acceptance bar:
 
     N_target = min(40, floor(M_format_fixable * 0.85))
 
-per `156-AUDIT.md` § 3. With M_format_fixable = 5 the target is 4.
+per `internal notes` With M_format_fixable = 5 the target is 4.
 
 Anti-pattern hygiene:
-    AP-15: batched OPSIN call (single JVM startup) — `parse_batch_with_opsin`
+    : batched OPSIN call (single JVM startup) — `parse_batch_with_opsin`
            helper from `scripts/benchmark_chebi500.py`. Per-row
            `subprocess.run` is forbidden (would cost ~1269ms × N).
-    AP-16: JAR candidate list contains v2.9.0 ONLY.
-    AP-17: pytest.skip with classification reason for non-format-fixable
+    : JAR candidate list contains v2.9.0 ONLY.
+    : pytest.skip with classification reason for non-format-fixable
            rows; NEVER xfail.
 """
 
@@ -45,7 +45,7 @@ def _java_available() -> bool:
 
 
 def _opsin_jar_path():
-    # AP-16: v2.9.0 ONLY.
+    #: v2.9.0 ONLY.
     candidates = [
         "opsin-cli-2.9.0-jar-with-dependencies.jar",
         "opsin/opsin-cli-2.9.0-jar-with-dependencies.jar",
@@ -72,7 +72,7 @@ _SKIP = pytest.mark.skipif(
 def _parse_batch_with_opsin_helper(names, jar):
     """Local re-import of `scripts/benchmark_chebi500.parse_batch_with_opsin`.
 
-    Per 156-PATTERNS.md line 575 + AP-15 prevention: ONE JVM startup, NOT N.
+    Per internal notes line 575 + prevention: ONE JVM startup, NOT N.
     """
     # scripts/ is not on the package path; add it once for this test module.
     scripts_dir = Path(__file__).parent.parent.parent / "scripts"
@@ -92,7 +92,7 @@ def tier_b_with_156():
     """Compute -with-156 outputs ONCE per test module run.
 
     Returns the rows list with two added keys per row:
-        - `v18_name_with_156`: Orthonym().name(smiles) (grammar layer ON)
+        - `v18_name_with_156`: Orthonym.name(smiles) (grammar layer ON)
         - `v18_opsin_score_with_156`: 1 if OPSIN parses + RDKit accepts, else 0
     """
     if not _java_available() or _opsin_jar_path() is None:
@@ -110,7 +110,7 @@ def tier_b_with_156():
             r["v18_naming_error"] = str(e)
 
     # a phase: Batch-OPSIN-parse all unique non-empty names in ONE JVM call
-    # per AP-15 prevention. Per 156-AUDIT.md CF-1 the empirical OPSIN
+    # per prevention. Per internal notes the empirical OPSIN
     # call cost is 1269ms mean; per-row subprocess.run would cost ~89s
     # for 70 rows. Batched stdin/stdout streaming amortizes to ~17ms/name.
     unique_names = list({
@@ -159,13 +159,13 @@ def tier_b_with_156():
 
 
 # ---------------------------------------------------------------------------
-# SC-3 aggregate acceptance gate
+# aggregate acceptance gate
 # ---------------------------------------------------------------------------
 
 
 @_SKIP
 def test_tier_b_recovery_aggregate(tier_b_with_156):
-    """SC-3 data-driven acceptance per 156-AUDIT.md § 3.
+    """ data-driven acceptance per internal notes
 
     N_target = min(40, floor(M_format_fixable * 0.85))
     With M_format_fixable = 5, N_target = 4.
@@ -186,7 +186,7 @@ def test_tier_b_recovery_aggregate(tier_b_with_156):
 
 # ---------------------------------------------------------------------------
 # Per-row parametrized test (documentation-quality; pytest.skip for
-# non-format-fixable rows per AP-17 — no xfail).
+# non-format-fixable rows per — no xfail).
 # ---------------------------------------------------------------------------
 
 
@@ -195,7 +195,7 @@ def _row_id(r):
     return smi[:30]
 
 
-# Using `_load_tier_b()` at collection time is acceptable here: this
+# Using `_load_tier_b` at collection time is acceptable here: this
 # only loads the audit-locked JSON; the Orthonym naming + OPSIN parsing
 # happens inside the module-scoped fixture, NOT at collection.
 _ALL_ROWS = _load_tier_b() if _FIXTURE_PATH.exists() else []
@@ -207,7 +207,7 @@ def test_tier_b_per_row(row, tier_b_with_156):
     """Per-row diagnostic test.
 
     Skip with classification reason for non-format-fixable rows per
-    156-PATTERNS.md line 577 + AP-17 (NEVER xfail).
+    internal notes line 577 + (NEVER xfail).
     """
     classification = row.get("v18_classification", "?")
     if classification != "format-fixable":

@@ -1,10 +1,10 @@
-"""P-52.2.7.3 phane-vs-ring-assembly boundary (Wave-2 P2 Task 5).
+""" phane-vs-ring-assembly boundary (Wave-2 P2 Task 5).
 
-BB P-52.2.7.3 (BlueBookV2.md:24088): "Phane names are preferred IUPAC names
+BB (the Blue Book): "Phane names are preferred IUPAC names
 rather than ring assembly names when seven or more rings or ring systems are
 present." Orthonym does NOT build the linear-phane amplification engine
-(P-52.2.5, >=7 nodes) in Wave-2 P2 — this guard fails closed so no WRONG phane
-name is ever emitted. It also asserts the existing P-26.4 cyclophane API is
+, >=7 nodes) in Wave-2 P2 — this guard fails closed so no WRONG phane
+name is ever emitted. It also asserts the existing cyclophane API is
 untouched.
 """
 import pytest
@@ -13,7 +13,7 @@ from rdkit import Chem
 from orthonym.rules.phane import (
     linear_phane_scope_guard,
     is_seven_plus_ring_assembly,
-    is_cyclophane,       # existing P-26.4 API must remain importable/intact
+    is_cyclophane,       # existing API must remain importable/intact
     name_cyclophane,
 )
 
@@ -48,5 +48,5 @@ class TestExistingCyclophaneApiIntact:
     def test_cyclophane_helpers_still_callable(self):
         assert callable(is_cyclophane)
         assert callable(name_cyclophane)
-        # A plain benzene is not a cyclophane (regression guard on the P-26.4 gate).
+        # A plain benzene is not a cyclophane (regression guard on the gate).
         assert is_cyclophane(Chem.MolFromSmiles("c1ccccc1")) is False

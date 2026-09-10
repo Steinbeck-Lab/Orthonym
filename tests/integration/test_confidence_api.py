@@ -1,11 +1,11 @@
-"""Integration tests for the confidence metadata API (Phase 81, Task 3).
+"""Integration tests for the confidence metadata API (a phase, Task 3).
 
 Verifies:
-1. Orthonym.name_with_confidence() returns correct dict shape
+1. Orthonym.name_with_confidence returns correct dict shape
 2. name_compound(include_confidence=True) returns dict
-3. name_compound() default still returns str (backward compat)
+3. name_compound default still returns str (backward compat)
 4. Confidence values are in valid range
-5. Names match between name() and name_with_confidence()
+5. Names match between name and name_with_confidence
 6. CLI --confidence flag works
 """
 
@@ -17,7 +17,7 @@ from orthonym import name_compound, Orthonym
 
 
 class TestNameWithConfidence:
-    """Tests for Orthonym.name_with_confidence()."""
+    """Tests for Orthonym.name_with_confidence."""
 
     def test_returns_dict(self):
         """name_with_confidence returns a dict with all required keys."""
@@ -32,7 +32,7 @@ class TestNameWithConfidence:
     def test_ethanol_is_named_correctly_and_reports_unverified(self):
         """Ethanol takes an early return, so NOTHING scores its coverage.
 
-        v29 C4 re-derivation. This test used to assert
+         C4 re-derivation. This test used to assert
         ``result['confidence'] == 1.0`` with the comment "Early return path
         for retained names -> confidence 1.0". That was asserting a
         FABRICATION, not a behaviour: ``namer.py:2693-2699`` built a metadata
@@ -63,8 +63,8 @@ class TestNameWithConfidence:
     def test_complex_molecule_has_factors(self):
         """Complex molecule returns all 5 factor keys.
 
-        Phase 145.1 ISS-004 update: 'parent_correctness' is the 5th factor
-        added at LAST position in FACTOR_WEIGHTS (Plan 02 D-14). It must be
+        a phase update: 'parent_correctness' is the 5th factor
+        added at LAST position in FACTOR_WEIGHTS (Plan 02). It must be
         present in the factors dict — value is 0.5 in production path
         (FACTOR_WEIGHTS['parent_correctness']=0.0 zeros its contribution to
         confidence aggregation, preserving byte-identical behavior).
@@ -94,7 +94,7 @@ class TestNameCompoundConfidence:
         assert 'handler' in result
 
     def test_default_returns_str(self):
-        """name_compound() without include_confidence returns str."""
+        """name_compound without include_confidence returns str."""
         result = name_compound("CCO")
         assert isinstance(result, str)
         assert result == "ethanol"
@@ -110,7 +110,7 @@ class TestNameCompoundConfidence:
         ]
         for smi in test_smiles:
             result = name_compound(smi, include_confidence=True)
-            # v29 C4: confidence is None when nothing scored the candidate --
+            # C4: confidence is None when nothing scored the candidate --
             # the honest third state, not a number out of range. Previously
             # every one of these molecules reported a FABRICATED 1.0 from
             # namer.py:2693-2699, so this range check could never fail and
@@ -130,7 +130,7 @@ class TestNameCompoundConfidence:
 
 
 class TestAPIParity:
-    """Verify name() and name_with_confidence()['name'] produce same results."""
+    """Verify name and name_with_confidence['name'] produce same results."""
 
     DIVERSE_SMILES = [
         "CCO",                          # ethanol
@@ -147,7 +147,7 @@ class TestAPIParity:
 
     @pytest.mark.parametrize("smiles", DIVERSE_SMILES)
     def test_names_match(self, smiles):
-        """name() and name_with_confidence()['name'] must agree."""
+        """name and name_with_confidence['name'] must agree."""
         namer = Orthonym()
         plain_name = namer.name(smiles)
         conf_result = namer.name_with_confidence(smiles)

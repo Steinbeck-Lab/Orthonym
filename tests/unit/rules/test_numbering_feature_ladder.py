@@ -1,5 +1,5 @@
-"""P-59.1.10 numbering-feature ladder in compare_numbering (Wave-2 P0c
-Task 11). BB BlueBookV2.md:25030: (b) heteroatoms before (c) indicated
+""" numbering-feature ladder in compare_numbering (Wave-2 P0c
+Task 11). BB the Blue Book: (b) heteroatoms before (c) indicated
 hydrogen before (d) principal group suffix.
 """
 from orthonym.rules.locants import compare_numbering

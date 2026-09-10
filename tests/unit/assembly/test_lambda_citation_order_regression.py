@@ -1,11 +1,11 @@
 """Regression lock: the λ-spelling fix (ASCII 'lambda' -> Greek 'λ') exposed a
 latent citation-order bug for substituents whose name differs from a plain
-substituent ONLY by a P-45.3.1 lambda-convention marker.
+substituent ONLY by a lambda-convention marker.
 
 TWO independent root causes, both in code that predates the λ-spelling change
 and were masked by it, not caused by it:
 
-1. ``naming_utils._ALPHA_NOISE_HEAD`` (P-14.5 preamble, the Blue Book:
+1. ``naming_utils._ALPHA_NOISE_HEAD`` preamble, the Blue Book:
    "Italicized Greek letters... are not involved in the alphanumerical
    order") matched only a BARE single Greek letter (``[α-ω]``), never a
    Greek letter immediately followed by a bonding-number digit
@@ -17,8 +17,8 @@ and were masked by it, not caused by it:
    but happened to sort correctly anyway ('l' < 'p'), which is exactly why
    the λ-spelling change (not this defect) is what turned the gold row red.
 
-2. ``assembly.name_comparison._LOCANT_TOKEN_FINDER`` (P-14.3.5 numeral-locant
-   tokenizer, reused by ``prefix_citation_sort_key`` tier 2 / P-14.5.4) is a
+2. ``assembly.name_comparison._LOCANT_TOKEN_FINDER`` numeral-locant
+   tokenizer, reused by ``prefix_citation_sort_key`` tier 2 / is a
    bare ``\\d+...`` pattern with no anchor on what precedes it. Once (1) is
    fixed, ``λ5-phosphanyl`` and ``phosphanyl`` tie at tier 1 (both strip to
    'phosphanyl'), so the comparison falls through to tier 2 -- where the
@@ -28,12 +28,12 @@ and were masked by it, not caused by it:
    sorts AFTER the true empty tuple ``phosphanyl`` gets. That flipped
    ``1-(λ5-phosphanyl)-3-phosphanylpropan-2-ol`` to
    ``3-phosphanyl-1-(λ5-phosphanyl)propan-2-ol`` (W2F-P7-05). A genuine
-   locant+lambda token (``2λ5``, P-21.2.4 skeletal replacement / P-24.2.4.1
+   locant+lambda token (``2λ5``, skeletal replacement /
    spiro) is unaffected: there the digit immediately before the λ IS a real
    locant, so the fix's negative lookbehind lets that match through exactly
    as before.
 
-Both are P-14.5/.3.5 rule-derivation bugs in shared infrastructure, not
+Both are /.3.5 rule-derivation bugs in shared infrastructure, not
 lambda-spelling bugs -- see `internal notes`
 and the lambda-fix-report.md append for the fast-gate finding
 (W2F-P7-04/W2F-P7-05, 1650/1652) that surfaced them.
@@ -47,7 +47,7 @@ from orthonym.namer import Orthonym
 
 @pytest.mark.unit
 def test_strip_alphanumerical_noise_removes_bare_lambda_marker():
-    """P-14.5: the λ-convention descriptor is excluded from alphanumerical
+    """: the λ-convention descriptor is excluded from alphanumerical
     order exactly like a bare Greek letter, INCLUDING its bonding-number
     digit (the digit is part of the same excluded token, not a locant)."""
     assert strip_alphanumerical_noise('λ5-phosphanyl') == 'phosphanyl'
@@ -67,7 +67,7 @@ def test_strip_alphanumerical_noise_unaffected_regressions():
 @pytest.mark.unit
 def test_locant_token_finder_ignores_bare_lambda_digit():
     """A standalone λN/lambdaN marker with NO preceding locant contributes
-    no locant token (P-14.3.5 tier 2 must not manufacture a fake tie-break
+    no locant token tier 2 must not manufacture a fake tie-break
     out of the bonding-number digit)."""
     assert _LOCANT_TOKEN_FINDER.findall('λ5-phosphanyl') == []
     assert _LOCANT_TOKEN_FINDER.findall('(λ5-phosphanyl)') == []
@@ -77,7 +77,7 @@ def test_locant_token_finder_ignores_bare_lambda_digit():
 @pytest.mark.unit
 def test_locant_token_finder_still_reads_genuine_locant_lambda_tokens():
     """A REAL locant immediately followed by its bonding-number marker
-    (P-21.2.4 skeletal replacement, P-24.2.4.1 spiro) must still tokenize as
+     skeletal replacement, spiro) must still tokenize as
     ONE combined token, unaffected by the bare-marker fix above."""
     assert _LOCANT_TOKEN_FINDER.findall('2λ5,3-oxathiolane') == ['2λ5', '3']
     assert _LOCANT_TOKEN_FINDER.findall('4λ4-thiaspiro') == ['4λ4']
@@ -89,7 +89,7 @@ def test_locant_token_finder_still_reads_genuine_locant_lambda_tokens():
 
 @pytest.mark.unit
 def test_w2f_p7_04_lambda_before_phosphanylmethyl():
-    """W2F-P7-04 (the Blue Book, P-45.3.1 evidence PIN): once λ5 is
+    """W2F-P7-04 (the Blue Book, evidence PIN): once λ5 is
     excluded from alphanumerical order, 'phosphanyl' is a proper PREFIX of
     'phosphanylmethyl' and is cited first, regardless of which locant is
     numerically lower."""
@@ -99,8 +99,8 @@ def test_w2f_p7_04_lambda_before_phosphanylmethyl():
 
 @pytest.mark.unit
 def test_w2f_p7_05_lambda_before_plain_phosphanyl_on_tie():
-    """W2F-P7-05 (the Blue Book,3334, P-14.4(h)): 'phosphanyl' and
-    'λ5-phosphanyl' tie completely at P-14.5 tier 1 (both strip to the
+    """W2F-P7-05 (the Blue Book,3334, (h)): 'phosphanyl' and
+    'λ5-phosphanyl' tie completely at tier 1 (both strip to the
     identical word); citation must not fall back to insertion-order luck."""
     assert Orthonym().name("OC(C[PH4])CP") == (
         "1-(λ5-phosphanyl)-3-phosphanylpropan-2-ol")

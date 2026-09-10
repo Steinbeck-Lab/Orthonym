@@ -1,4 +1,4 @@
-"""v29 Phase 2 T2a (H1): total skeletal ('a') replacement-prefix construction
+""" a phase (H1): total skeletal ('a') replacement-prefix construction
 for RING (von-Baeyer / spiro) systems.
 
 The hole this closes, reproduced before the fix
@@ -9,14 +9,14 @@ was skipped, contributing **no** replacement morpheme -- while still counting
 toward the von-Baeyer stem (``total_atoms = len(ring_atoms)``). So
 ``C1CC2CC[Hg]C2C1`` came back as ``bicyclo[3.3.0]octane``: a hydrocarbon name for
 a mercury-containing ring, i.e. a WRONG STRUCTURE, on both the default and the
-complete path. Nothing downstream caught it -- SELF-01 (the name->structure round
+complete path. Nothing downstream caught it -- (the name->structure round
 trip) fails OPEN when the OPSIN jar is absent, which is a supported mode and is
 the mode this whole module runs in.
 
 The spiro sibling was NOT "already failing closed" (a premise this module
 disproves): ``spiro.py::_build_hetero_prefix`` reaches
 ``polycyclic_bridged.get_heteroatom_prefix``, whose fallback is
-``symbol.lower() + 'a'`` -- so an off-table element got an INVENTED morpheme
+``symbol.lower + 'a'`` -- so an off-table element got an INVENTED morpheme
 (``3-znaspiro[5.5]undecane``, ``3-feaspiro[…]``, ``3-alaspiro[…]``) instead of
 being dropped. A different failure mode, equally unsound.
 
@@ -29,7 +29,7 @@ the sound floor: the 14 in-table elements keep working BYTE-IDENTICALLY, and
 everything else refuses instead of lying.
 
 (The name ``rules/skeletal_replacement.py`` was already taken by the ACYCLIC
-P-15.4 chain namer, hence ``ring_replacement``.)
+ chain namer, hence ``ring_replacement``.)
 """
 import pytest
 from rdkit import Chem
@@ -62,12 +62,12 @@ pytestmark = pytest.mark.unit
 # all-heteroatom cages (heptasila / heptagerma / heptatellura -- the cases the
 # builder's own docstring cites); 10 multi-element systems exercising the
 # Table-2.8 citation order (note ``5-oxa-3-sila`` and ``5-aza-3-bora``: cited by
-# ELEMENT seniority, not by locant); three lambda cases (P-31.1.4.2).
+# ELEMENT seniority, not by locant); three lambda cases.
 # ---------------------------------------------------------------------------
-# v36 REBASELINE (2026-08-24): the 25 rows below were re-captured after v34
+# REBASELINE (2026-08-24): the 25 rows below were re-captured after
 # (58209798, analyze_cage_universal) corrected the von-Baeyer heteroatom
-# numbering to give the LOWEST locant set (P-31.1.4.3.4). The pre-v34 captures
-# (3-oxa, 3-oxa-5-aza, 2,4,7-trioxa, 3lambda3-tellura ...) put heteroatoms at
+# numbering to give the LOWEST locant set. The pre- captures
+# (3-oxa, 3-oxa-5-aza, 2,4,7-trioxa, 3lambda3-tellura...) put heteroatoms at
 # NON-minimal locants; a valid lower-locant numbering exists for each (OPSIN
 # round-trips the new full name to the input InChIKey), so the old values
 # VIOLATED the lowest-locant rule and were non-preferred. New values are
@@ -122,7 +122,7 @@ BASELINE = [
     ("[PH]12CCC(CC1)C2", "1λ4-phospha"),
     ("[SbH]12CCC(CC1)C2", "1λ4-stiba"),
     # --- lambda is SUPPRESSED (bridgehead valence forced by skeletal degree, so
-    #     an explicit lambda there is redundant and rejected) ---
+    # an explicit lambda there is redundant and rejected) ---
     ("[TeH]12CCC(CC1)C2", "1-tellura"),
     ("[SeH]12CCC(CC1)C2", "1-selena"),
     ("[SH]12CCC(CC1)C2", "1-thia"),
@@ -147,12 +147,12 @@ LAMBDA_SUPPRESSED = [
 # Skeletal elements the table cannot spell. Each is a real von-Baeyer cage
 # (bicyclo[3.3.0]) whose stem counts 8 atoms.
 #
-# Two DIFFERENT reasons to refuse, both covered here (v29 P2-T2b):
-#   * Hg/Zn/Fe -- in no replacement table at all; no morpheme exists.
-#   * I/At/Po  -- Table 1.5 rows with a real morpheme (``ioda``/``astata``/
-#     ``polona``) that P-23.3.1 and/or P-23.3.2.2 do not rank, so there is no
-#     sanctioned von Baeyer citation position or numbering rank. See
-#     ``ring_replacement.VB_INADMISSIBLE``.
+# Two DIFFERENT reasons to refuse, both covered here (-T2b):
+# * Hg/Zn/Fe -- in no replacement table at all; no morpheme exists.
+# * I/At/Po -- Table 1.5 rows with a real morpheme (``ioda``/``astata``/
+# ``polona``) that and/or do not rank, so there is no
+# sanctioned von Baeyer citation position or numbering rank. See
+# ``ring_replacement.VB_INADMISSIBLE``.
 # ``[AlH]`` was in this list until T2b, which made Al emittable (``alumina``);
 # the Al cases now assert the SPELLING, in test_v29_table_1_5_completion.
 OFF_TABLE_CAGES = [
@@ -196,8 +196,8 @@ def _off_table_ring_atoms(mol, ring_atoms):
 
 # ---------------------------------------------------------------------------
 # 1. Byte-identity: the primitive AND the retained wrapper reproduce the
-#    captured strings exactly. A single character of drift here breaks the
-#    1630/1630 PIN gold, so this is the hard requirement of the task.
+# captured strings exactly. A single character of drift here breaks the
+# 1630/1630 PIN gold, so this is the hard requirement of the task.
 # ---------------------------------------------------------------------------
 @pytest.mark.parametrize("smiles,expected", BASELINE)
 def test_primitive_prefix_is_byte_identical(smiles, expected):
@@ -287,7 +287,7 @@ def test_unexpressed_reports_a_heteroatom_with_no_locant():
 
 # ---------------------------------------------------------------------------
 # 3. ``per_atom``: one entry per EXPRESSED heteroatom, carrying the morpheme
-#    that spells it (consumed by the per-token proof bindings).
+# that spells it (consumed by the per-token proof bindings).
 # ---------------------------------------------------------------------------
 @pytest.mark.parametrize("smiles,_expected", BASELINE)
 def test_per_atom_covers_exactly_the_expressed_heteroatoms(smiles, _expected):
@@ -379,7 +379,7 @@ def test_result_is_frozen():
 
 # ---------------------------------------------------------------------------
 # 4. The contract at the two callers: refuse, never a stem that counts an atom
-#    no morpheme spells.
+# no morpheme spells.
 # ---------------------------------------------------------------------------
 @pytest.mark.parametrize("smiles", OFF_TABLE_CAGES)
 @pytest.mark.parametrize("allow_mancude", [False, True])
@@ -407,7 +407,7 @@ def test_analyze_cage_universal_still_names_in_table(
 def test_analyze_spiro_universal_refuses_off_table(smiles):
     """The sibling analyzer adopts the SAME rule. Before this task it emitted an
     invented morpheme (``3-zna``, ``3-fea``, ``3-ala``) from
-    ``get_heteroatom_prefix``'s ``symbol.lower() + 'a'`` fallback."""
+    ``get_heteroatom_prefix``'s ``symbol.lower + 'a'`` fallback."""
     mol = Chem.MolFromSmiles(smiles)
     assert analyze_spiro_universal(mol) is None
 
@@ -423,8 +423,8 @@ def test_analyze_spiro_universal_still_names_in_table():
 # ---------------------------------------------------------------------------
 # 5. End-to-end, with the OPSIN jar made UNAVAILABLE.
 #
-# This is the whole point of the task. SELF-01 fails OPEN with no jar, so a fix
-# verified only with the jar present is not verified (Phase 1b established
+# This is the whole point of the task. fails OPEN with no jar, so a fix
+# verified only with the jar present is not verified (a phase established
 # this). The suite-wide autouse fixture already forces
 # ``_DISABLE_VALIDITY_GATE = True``; the fixture below additionally removes the
 # jar itself, so no downstream round trip can mask a wrong name.

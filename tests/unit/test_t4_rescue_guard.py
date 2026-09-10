@@ -1,4 +1,4 @@
-"""Phase 1 B5 general lever: the RT-mismatch -> T4 cascade rescue is
+"""a phase B5 general lever: the RT-mismatch -> cascade rescue is
 best-effort-ONLY, so it can never fire on the PIN/complete/valid tiers (0-wrong
 critical -- it must not perturb the default path).
 """
@@ -17,7 +17,7 @@ pytestmark = pytest.mark.unit
 ])
 def test_rescue_is_a_noop_off_best_effort(flags):
     """Without ``general_fallback_unverified`` (best-effort), the rescue returns
-    None before any T4 work -- so it cannot change a PIN/complete/valid result."""
+    None before any work -- so it cannot change a PIN/complete/valid result."""
     nm = Orthonym(**flags)
     mol = Chem.MolFromSmiles("CCO")
     # feats=None is safe: the best-effort guard returns before touching it.

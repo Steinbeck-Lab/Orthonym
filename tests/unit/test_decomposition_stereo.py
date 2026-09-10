@@ -6,9 +6,9 @@ Covers:
 - Unresolvable stereocenters after cleavage (symmetric fragments)
 - E/Z preservation in acid-side fragments
 - E/Z not generated for bonds spanning cleavage point
-- Compound-specific integration tests through name_compound()
+- Compound-specific integration tests through name_compound
 
-Phase 63-03: STER-03 requirement.
+a phase-03: requirement.
 """
 
 import pytest
@@ -80,7 +80,7 @@ class TestCIPReassignment:
 
     def test_stereocenter_retained_after_amide_cleavage(self):
         """R/S stereocenter on amine side of amide retains CIP after cleavage."""
-        # CC(=O)N[C@@H](C)S  -> amine fragment: [C@H](N)(C)S
+        # CC(=O)N[C@@H](C)S -> amine fragment: [C@H](N)(C)S
         smiles = "CC(=O)N[C@@H](C)S"
         frags = _get_fragment_cip(smiles)
         amine_frags = [f for f in frags if f["side"] == "amine"]
@@ -377,7 +377,7 @@ class TestFragmentCappingStereo:
 
 
 # ===========================================================================
-# Phase 140: End-to-end decomposition stereo via name_compound
+# a phase: End-to-end decomposition stereo via name_compound
 # ===========================================================================
 
 import re as _re

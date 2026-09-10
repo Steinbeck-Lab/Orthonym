@@ -1,10 +1,10 @@
 """Integration tests for the 14-row prefix-form table via the public
 `orthonym.name_compound` API.
 
-Phase 160.1 Plan-02-06 — per CONTEXT D-10 (test pyramid integration row)
-+ RESEARCH §12 Dim 1 (≥ 14 integration tests).
+a phase Plan-02-06 — per internal notes (test pyramid integration row)
++ RESEARCH Dim 1 (≥ 14 integration tests).
 
-Each test embeds one of the 14 IUPAC P-65 / P-66 prefix forms as a
+Each test embeds one of the 14 IUPAC / prefix forms as a
 NON-PRINCIPAL substituent in a multi-substituent parent molecule and
 asserts the IUPAC-canonical prefix appears in the output name.
 """
@@ -29,7 +29,7 @@ class TestPrefixFormsViaNameCompound:
         smi = "OC(=O)CC(C(=O)OC)CC(=O)O"
         n = name_compound(smi)
         assert "methoxycarbonyl" in n, f"got {n!r}"
-        # Phase 160.1 fix target: NO duplicate hydroxymethyl
+        # a phase fix target: NO duplicate hydroxymethyl
         assert "hydroxymethyl" not in n, f"hydroxymethyl present in {n!r}"
 
     def test_row1_regression_fixture_full(self):
@@ -100,7 +100,7 @@ class TestPrefixFormsViaNameCompound:
         assert n is not None and "unknown" not in n.lower()
 
     def test_no_duplicate_prefix_on_ester_substituent(self):
-        """Verify Phase 160.1 deduplication: no `methoxycarbonyl` + `hydroxymethyl`
+        """Verify a phase deduplication: no `methoxycarbonyl` + `hydroxymethyl`
         on the same ester atoms (the original bug).
         """
         smi = "OC(=O)CC(C(=O)OC)CC(=O)O"

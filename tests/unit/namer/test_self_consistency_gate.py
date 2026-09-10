@@ -1,4 +1,4 @@
-"""v23 Phase 0 (SELF-01) — constitutional self-consistency gate unit tests.
+""" a phase  — constitutional self-consistency gate unit tests.
 
 The gate suppresses an emitted name ONLY when OPSIN re-perceives it as a
 CONSTITUTIONALLY DIFFERENT molecule than the input. It must be stereo-insensitive,
@@ -25,7 +25,7 @@ class TestVerdict:
         assert nm._self_consistency_verdict("Fc1ccc2CCCCc2c1", "c1ccc2CCCCc2c1") == "mismatch"
 
     def test_stereo_only_is_ok(self):
-        # R vs S — constitution identical; the gate must NOT suppress (ADR-18-07)
+        # R vs S — constitution identical; the gate must NOT suppress (-07)
         assert nm._self_consistency_verdict("C[C@H](O)CC", "C[C@@H](O)CC") == "ok"
         # E vs Z
         assert nm._self_consistency_verdict(r"C/C=C/C", r"C/C=C\C") == "ok"

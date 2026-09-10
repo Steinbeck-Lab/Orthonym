@@ -1,16 +1,16 @@
 """a phase integration: assert -substrate canary preserved byte-identical.
 
-RESEARCH §6.2 + Q3 predicts ZERO flips. Per CONTEXT + ORGM-03 +:
+RESEARCH + Q3 predicts ZERO flips. Per internal notes + +:
 - src/orthonym/rules/seniority.py is UNCHANGED (hard invariant)
-- src/orthonym/assembly/composer.py is UNCHANGED (ORGM-03 enforcement)
+- src/orthonym/assembly/composer.py is UNCHANGED (enforcement)
 - src/orthonym/namer.py orchestration is UNCHANGED
 
 The exceptions file at internal notes
-161-AUDIT-ORGM-exceptions.csv MUST stay header-only — ANY non-header rows
+internal notes-ORGM-exceptions.csv MUST stay header-only — ANY non-header rows
 indicate a silent canary flip that was absorbed without an explicit
 audit-amendment commit. Per a phase + a phase cadence inheritance.
 
-NEVER uses @pytest.mark.xfail (CONTEXT) — honest-fail-on-data.
+NEVER uses @pytest.mark.xfail (internal notes) — honest-fail-on-data.
 """
 import subprocess
 from pathlib import Path
@@ -26,10 +26,10 @@ EXCEPTIONS_FILE = (
 
 @pytest.mark.integration
 def test_v18_decomp_canary_byte_identical():
-    """CFR-04 inheritance: substrate canary byte-identical post-ORGM landing.
+    """ inheritance: substrate canary byte-identical post-ORGM landing.
 
     Runs ``scripts/verify_decomp_byte_identical.py --mode delta`` with the
-    EMPTY (header-only) a phase exceptions file. Per RESEARCH §6.2
+    EMPTY (header-only) a phase exceptions file. Per RESEARCH
     ZERO-flip prediction: exit code 0 expected.
     """
     result = subprocess.run(
@@ -50,7 +50,7 @@ def test_v18_decomp_canary_byte_identical():
 
 @pytest.mark.integration
 def test_v18_cfr_canary_byte_identical():
-    """CFR-04 inheritance: CFR canary byte-identical post-ORGM landing.
+    """ inheritance: CFR canary byte-identical post-ORGM landing.
 
     The full `verify_cfr_byte_identical.py --mode post` re-emit takes
     ~10 minutes (~ 1,282 OPSIN round-trip invocations). For the pytest
@@ -80,7 +80,7 @@ def test_v18_cfr_canary_byte_identical():
 
 @pytest.mark.integration
 def test_exceptions_file_header_only():
-    """RESEARCH §6.2 ZERO-flip prediction: exceptions file MUST stay header-only.
+    """RESEARCH ZERO-flip prediction: exceptions file MUST stay header-only.
 
     Non-empty exceptions list = silent canary flip detection per R-10 mitigation.
     """
@@ -94,7 +94,7 @@ def test_exceptions_file_header_only():
 
 @pytest.mark.integration
 def test_seniority_py_unchanged():
-    """CONTEXT hard invariant: ZERO edits to src/orthonym/rules/seniority.py."""
+    """internal notes hard invariant: ZERO edits to src/orthonym/rules/seniority.py."""
     result = subprocess.run(
         ["git", "diff", "--quiet", "src/orthonym/rules/seniority.py"],
         cwd=str(PROJECT_ROOT), capture_output=True,
@@ -108,7 +108,7 @@ def test_seniority_py_unchanged():
 
 @pytest.mark.integration
 def test_composer_py_unchanged():
-    """ORGM-03 structural enforcement: ZERO edits to composer.py."""
+    """ structural enforcement: ZERO edits to composer.py."""
     result = subprocess.run(
         ["git", "diff", "--quiet", "src/orthonym/assembly/composer.py"],
         cwd=str(PROJECT_ROOT), capture_output=True,

@@ -25,7 +25,7 @@ def has_unverifiable_atoms(mol) -> bool:
     """True iff *mol* carries an atom no oracle can verify.
 
     Wave 0 scope: a dummy/wildcard atom (atomic number 0, SMILES ``*``). Such an
-    atom makes the input InChIKey uncomputable, so the SELF-01/OPSIN round-trip
+    atom makes the input InChIKey uncomputable, so the /OPSIN round-trip
     oracle has no reference and FAILS OPEN — a wildcard input then ships a WRONG
     molecule (``CC*`` -> ``ethane``). Callers must fail closed (abstain) when this
     returns True. Wave 0 is wildcard only, matching ``errors.classify_scope_limit``.
@@ -53,10 +53,10 @@ class ReconResult:
 class NameFacts:
     parent_kind: str                 # "chain" | "carbocycle"
     parent_length: int
-    replacements: tuple = ()         # ((locant, "O"|"N"|"S"|"P"), ...)
-    unsaturations: tuple = ()        # ((locant, 2|3), ...)
+    replacements: tuple = ()         # ((locant, "O"|"N"|"S"|"P"),...)
+    unsaturations: tuple = ()        # ((locant, 2|3),...)
     principal_group: Optional[tuple] = None   # (key, (locants,))
-    substituents: tuple = ()         # ((name, locant), ...) NAME, never input SMILES
+    substituents: tuple = ()         # ((name, locant),...) NAME, never input SMILES
     indicated_h: tuple = ()
     net_charge: int = 0
     isotopes: bool = False

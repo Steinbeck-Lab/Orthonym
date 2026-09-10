@@ -1,20 +1,20 @@
 """CQ5 Task A — open the RT-failure fall-through at best-effort tier.
 
-Root cause (spy-confirmed at HEAD on all 3 witnesses, invariant 8):
+Root cause (trace-confirmed at HEAD on all 3 witnesses, a project rule):
 for each witness the primary producer builds a NON-failure but RT-INVALID name;
 ``_final_opsin_validity_gate`` -> ``_self_consistency_decision`` voids it to the
 descriptive fallback; the late ``_try_general_engine_recovery`` (namer.py:3278) is
-then reached, but INSIDE ``name()`` the general engine's substituent recursion runs
+then reached, but INSIDE ``name`` the general engine's substituent recursion runs
 with the best-effort contextvars set + an elevated session-depth floor, so it emits
 the SAME RT-failing name (not the systematic replacement-nomenclature name) and
 declines at ``namer.py:4061``. The RT-verifying systematic candidate that
 ``name_general`` produces in a CLEAN context (best-effort contextvars reset +
 depth-0 isolated session) is never consulted, and the molecule abstains.
 
-Fix (offer-not-return, invariant 18): on the ship-a-failure path, best-effort only,
+Fix (offer-not-return, a project rule): on the ship-a-failure path, best-effort only,
 re-invoke the RT-gated recovery in that clean context and adopt its result iff it is
 a real (RT-verified) name. 0-wrong via the recovery's existing OPSIN round-trip gate
-(invariant 9 — a candidate that does not round-trip stays abstained). PIN/complete
+(a project rule — a candidate that does not round-trip stays abstained). PIN/complete
 tiers are untouched (gated on ``_general_fallback_unverified``).
 """
 from rdkit import Chem
@@ -50,9 +50,9 @@ WITNESSES = [
 # `rules/spiro.py::_walk_ring_between_spiros` picked the LONGER middle-ring arc
 # first, disagreeing with the descriptor string's own shorter-arc-first
 # convention) that did NOT round-trip, so it correctly stayed abstained
-# (0-wrong; invariant 9). Task F (CQ5/QM9 finding,
+# (0-wrong; a project rule). Task F (CQ5/QM9 finding,
 # `.superpowers/sdd/CQ1-IMPL-PLAN/task-F-report.md`) fixed that root cause in
-# ``rules/spiro.py`` directly (P-24.2.2), so this molecule now NAMES correctly
+# ``rules/spiro.py`` directly, so this molecule now NAMES correctly
 # at both tiers -- see ``test_dispiro_now_converts_after_taskF_descriptor_fix``
 # below, which supersedes the old "stays abstained" assertion.
 NEGATIVE_DISPIRO = "C1C2(CCC2)C11CCO1"
@@ -117,7 +117,7 @@ def test_pin_gold_byte_identical(smiles, expected):
 
 
 def test_dispiro_now_converts_after_taskF_descriptor_fix():
-    """Task F fixed the ``rules/spiro.py`` root cause (P-24.2.2 shorter-arc-
+    """Task F fixed the ``rules/spiro.py`` root cause shorter-arc-
     first numbering), so this molecule -- formerly this file's "stays
     abstained" negative witness -- now emits a real, OPSIN-RT-verified name at
     BOTH best-effort and PIN tiers (a genuine PIN improvement: it previously
@@ -135,12 +135,12 @@ def test_dispiro_now_converts_after_taskF_descriptor_fix():
 
 
 def test_negative_rt_mismatch_stays_abstained():
-    """v39 Task F round 2, smaller finding 1: this file's original negative
+    """ round 2, smaller finding 1: this file's original negative
     witness (a QM9 dispiro whose name_general output carried a WRONG
     descriptor) was CONSUMED when Task F fixed that root cause -- the
     molecule now correctly converts (see
     ``test_dispiro_now_converts_after_taskF_descriptor_fix`` above), leaving
-    this file with NO regression coverage for invariant 9 ("a wrong name is
+    this file with NO regression coverage for a project rule ("a wrong name is
     never shipped"). A search for a fresh, naturally-occurring RT-wrong
     general-engine candidate (dispiro/trispiro/cage variants, several dozen
     constructed + randomized-atom-order probes) found none currently live --
@@ -148,7 +148,7 @@ def test_negative_rt_mismatch_stays_abstained():
     robust here). Rather than leave this regression UNTESTED (or invent a
     fake "fix" for a bug that does not reproduce), this tests the gate
     MECHANISM directly, the same way ``test_oligosaccharides_be_rt_gate.py``
-    already does in this tree: force ``Orthonym._rt_match`` (spy-confirmed
+    already does in this tree: force ``Orthonym._rt_match`` (trace-confirmed
     the actual gate this witness's fall-through consults -- 3 calls,
     ``certify_general_result`` 5 calls, ``opsin_roundtrip_check`` 0 calls) to
     report a mismatch for a real witness that would otherwise convert, and

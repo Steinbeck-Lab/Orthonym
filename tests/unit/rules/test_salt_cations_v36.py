@@ -1,6 +1,6 @@
 """ Milestone B1+B2 -- salt organic-cation producer + mixed/amine salts.
 
-Grounding spies: `internal notes` (§6) and ``V36-a trace-B2.md``.
+Grounding spies: `internal notes`  and ``V36-a trace-B2.md``.
 
 The 0-wrong core (Task 1) is an atom-coverage guard between ``route_charged``'s
 neutralize->re-enter step and the ionic-suffix step: the gate-DISABLED re-entry
@@ -14,7 +14,7 @@ systematic von Baeyer parent).
 Every emitted cation-salt name below is OPSIN-round-trip-verified (full InChI /
 InChIKey match) or the row abstains -- never a wrong / atom-dropped molecule, and
 never an unverified stereo descriptor (OPSIN 2.9.0 cannot parse a stereo
-descriptor cited at ring position 3 of an azabicyclo -- a trace-B1 §3).
+descriptor cited at ring position 3 of an azabicyclo -- a trace-B1).
 """
 import pytest
 
@@ -77,7 +77,7 @@ def test_benzatropine_flat_no_atom_drop_and_round_trips(namer):
 @pytest.mark.opsin_gate
 def test_benzatropine_full_stereo_never_ships_unverified(namer):
     """The FULL-stereo salt: OPSIN 2.9.0 cannot parse a stereo descriptor at ring
-    position 3 of the azabicyclooctane (a trace-B1 §3), so a full-stereo name cannot
+    position 3 of the azabicyclooctane (a trace-B1), so a full-stereo name cannot
     round-trip. It must abstain -- NEVER ship an unverified-stereo (or atom-dropped
     ``tropanium``) name."""
     out = namer.name(BENZATROPINE_SALT_STEREO)

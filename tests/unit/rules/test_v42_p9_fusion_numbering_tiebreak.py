@@ -8,20 +8,20 @@ component's senior heteroatom is EQUIDISTANT from the fusion bond (a "symmetric"
 child) its two numberings tie on heteroatom + fusion-bond locants, and the code
 used to break that tie arbitrarily. Now the co-optimal child numberings are
 enumerated and the fusion descriptor lowest in citation order is chosen, per
-P-25.3.1.3 (the Blue Book, "the letter as early in the alphabet as
+ (the Blue Book, "the letter as early in the alphabet as
 possible... these numbers are chosen to be as low as is consistent with the
 numbering of the compound and their order conforms to the direction of lettering
-of the parent component") + P-25.3.4.2.4(d) (:13403/:13409, "the locant set '4,5'
+of the parent component") + (d) (:13403/:13409, "the locant set '4,5'
 is lower than '5,4'"). Fixes ``selenopheno[3,4-b]selenophene`` (was [4,3-b]).
 
 Fix 2 (>=3-ring star path, ``_pcf_name_with_base``): the same symmetric-child tie
 for one attachment of a polycomponent star. Fixes the second (primed) furan of
 ``difuro[3,2-b:3',4'-e]pyridine`` (was 4',3'-e). BB PIN verbatim at
-P-25.3.6.1 (:13467 heading /:13479 example).
+ (:13467 heading /:13479 example).
 
 Every emission below is OPSIN-round-trip-gated on the full InChIKey (0-wrong by
 construction). Fresh process per naming probe (feedback_spy_before_you_refute).
-Heteroatom-first component numbering: P-25.3.3.1.2(a):12543 / (b):12558.
+Heteroatom-first component numbering: (a):12543 / (b):12558.
 """
 import json
 import subprocess
@@ -85,7 +85,7 @@ def test_thieno_2_3_b_furan_regression_pin():
 def test_difuro_3_2_b_3p_4p_e_pyridine_pin():
     """Second furan is symmetric (O in the middle, meta to the fusion bond) ->
     tie broken to the lower cited pair (3,4)<(4,3) -> 3',4'-e. PIN verbatim at
-    P-25.3.6.1 the Blue Book."""
+     the Blue Book."""
     res = _name_one("c1cc2nc3cocc3cc2o1")
     assert res.get("name") == "difuro[3,2-b:3',4'-e]pyridine", (
         f"expected difuro[3,2-b:3',4'-e]pyridine, got {res.get('name')!r}")

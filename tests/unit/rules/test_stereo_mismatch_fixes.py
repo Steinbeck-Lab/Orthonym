@@ -1,18 +1,18 @@
 """
-Tests for stereo_mismatch benchmark compounds (SM-40 through SM-44).
+Tests for stereo_mismatch benchmark compounds (through).
 
-Phase 103 Plan 03 Task 1: Fix stereodescriptor accuracy for benchmark compounds.
+a phase Plan 03 Task 1: Fix stereodescriptor accuracy for benchmark compounds.
 
 Root cause analysis of 5 stereo_mismatch compounds:
-- SM-40: Generated name already correct (matches benchmark). RT fails due to
+-: Generated name already correct (matches benchmark). RT fails due to
   steroid naming convention (OPSIN adds more stereo from steroid name).
-- SM-41: No stereo in original SMILES (no @/@@ notation). Unfixable without
+-: No stereo in original SMILES (no @/@@ notation). Unfixable without
   adding stereo that doesn't exist in input.
-- SM-42: Missing substituent stereocenter (1R) in name. Requires substituent-level
-  stereo descriptor support (deferred to Phase 105).
-- SM-43: Missing (E) descriptor for exocyclic C=C bond on substituent.
+-: Missing substituent stereocenter (1R) in name. Requires substituent-level
+  stereo descriptor support (deferred to a phase).
+-: Missing (E) descriptor for exocyclic C=C bond on substituent.
   Fixable by enhancing collect_stereodescriptors to capture near-parent E/Z bonds.
-- SM-44: No stereo in original SMILES. Unfixable.
+-: No stereo in original SMILES. Unfixable.
 """
 
 import pytest
@@ -23,7 +23,7 @@ from orthonym import name_compound
 
 
 # ============================================================================
-# SM-40: Stereocenters correct -- name already matches benchmark
+#: Stereocenters correct -- name already matches benchmark
 # ============================================================================
 
 SM_40_SMILES = (
@@ -33,7 +33,7 @@ SM_40_SMILES = (
 
 
 class TestSM40:
-    """SM-40: Stereocenters already correctly emitted in name."""
+    """: Stereocenters already correctly emitted in name."""
 
     def test_name_contains_stereodescriptor_block(self):
         """The generated name should contain a (xR,yS,...) block."""
@@ -51,7 +51,7 @@ class TestSM40:
         assert any(c in stereo_block for c in "RS"), f"No R/S in stereo block: {stereo_block}"
 
     def test_sm40_matches_benchmark(self):
-        """SM-40 generated name matches the benchmark name."""
+        """ generated name matches the benchmark name."""
         name = name_compound(SM_40_SMILES)
         benchmark = (
             "(3S,7S,14R,15S)-3,7,15,27-tetrahydroxy-4,4,14-trimethyl"
@@ -61,17 +61,17 @@ class TestSM40:
 
 
 # ============================================================================
-# SM-41: No stereo in SMILES -- unfixable, documented
+#: No stereo in SMILES -- unfixable, documented
 # ============================================================================
 
 SM_41_SMILES = "CCC(CCC(C)C1CCC2C3C(O)C=C4CC(O)CCC4(C)C3CCC12C)C(C)C"
 
 
 class TestSM41:
-    """SM-41: No stereo in SMILES -- cannot generate stereodescriptors."""
+    """: No stereo in SMILES -- cannot generate stereodescriptors."""
 
     def test_no_stereo_in_smiles(self):
-        """Verify that SM-41 SMILES has no stereo notation."""
+        """Verify that SMILES has no stereo notation."""
         assert "@" not in SM_41_SMILES, "SM-41 should have no @ notation"
 
     def test_no_cip_labels_assigned(self):
@@ -82,30 +82,30 @@ class TestSM41:
         assert len(cip_atoms) == 0, f"Unexpected CIP labels on SM-41: {len(cip_atoms)}"
 
     def test_name_is_steroid(self):
-        """SM-41 should produce a steroid retained name."""
+        """ should produce a steroid retained name."""
         name = name_compound(SM_41_SMILES)
         assert "stigmast" in name.lower(), f"Expected steroid name: {name}"
 
 
 # ============================================================================
-# SM-42: Missing substituent stereocenter
+#: Missing substituent stereocenter
 # ============================================================================
 
 SM_42_SMILES = "CC(C)CC[C@@H](O)[C@H]1C(=O)OC[C@@H]1CO"
 
 
 class TestSM42:
-    """SM-42: 3 stereocenters, name shows 2 (ring atoms only). Substituent
+    """: 3 stereocenters, name shows 2 (ring atoms only). Substituent
     stereocenter (1R on 1-hydroxy-4-methylpentyl) missing from name.
 
     The 3rd stereocenter is on the substituent, not the parent ring.
-    IUPAC P-93.5.2 requires stereo within substituent brackets, e.g.,
+    IUPAC requires stereo within substituent brackets, e.g.,
     3-[(1R)-1-hydroxy-4-methylpentyl]. This is a substituent naming
-    feature deferred to Phase 105.
+    feature deferred to a phase.
     """
 
     def test_three_stereocenters_detected(self):
-        """RDKit should detect 3 stereocenters in SM-42."""
+        """RDKit should detect 3 stereocenters in."""
         mol = Chem.MolFromSmiles(SM_42_SMILES)
         rdCIPLabeler.AssignCIPLabels(mol)
         cip_atoms = [a for a in mol.GetAtoms() if a.HasProp("_CIPCode")]
@@ -125,14 +125,14 @@ class TestSM42:
 
 
 # ============================================================================
-# SM-43: Missing (E) descriptor for exocyclic C=C bond
+#: Missing (E) descriptor for exocyclic C=C bond
 # ============================================================================
 
 SM_43_SMILES = "CC(C)C1=C(O)C(N)=C(/C=C/c2ccccc2)C(=O)C1=O"
 
 
 class TestSM43:
-    """SM-43: Has E double bond in substituent, missing from name.
+    """: Has E double bond in substituent, missing from name.
 
     The /C=C/ bond between the ring and phenyl creates an E configuration.
     RDKit detects this as E on the bond between atoms 9-10.
@@ -168,17 +168,17 @@ class TestSM43:
 
 
 # ============================================================================
-# SM-44: No stereo in SMILES -- unfixable, documented
+#: No stereo in SMILES -- unfixable, documented
 # ============================================================================
 
 SM_44_SMILES = "C=C(C)C(C)CCC(C)C1CCC2C3=CCC4CC(O)CCC4(C)C3CCC21C"
 
 
 class TestSM44:
-    """SM-44: No stereo in SMILES -- cannot generate stereodescriptors."""
+    """: No stereo in SMILES -- cannot generate stereodescriptors."""
 
     def test_no_stereo_in_smiles(self):
-        """Verify that SM-44 SMILES has no stereo notation."""
+        """Verify that SMILES has no stereo notation."""
         assert "@" not in SM_44_SMILES, "SM-44 should have no @ notation"
 
     def test_no_cip_labels_assigned(self):
@@ -189,7 +189,7 @@ class TestSM44:
         assert len(cip_atoms) == 0, f"Unexpected CIP labels on SM-44: {len(cip_atoms)}"
 
     def test_name_is_steroid(self):
-        """SM-44 should produce a steroid retained name."""
+        """ should produce a steroid retained name."""
         name = name_compound(SM_44_SMILES)
         assert "ergosta" in name.lower(), f"Expected steroid name: {name}"
 

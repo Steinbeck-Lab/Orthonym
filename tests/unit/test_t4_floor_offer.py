@@ -1,4 +1,4 @@
-"""v33 Phase 0 Task L3-1: the systematic floor as a surviving, full-RT-gated
+""" a phase Task L3-1: the systematic floor as a surviving, full-RT-gated
 offer -- THE breadth lever (measured ~36/86 discard-gap conversions).
 
 The floor (`assembly.t4_coverage.name_t4_complete`) already builds a
@@ -60,7 +60,7 @@ class TestFloorWinsOverStereoWrongPrimary:
             pytest.skip("OPSIN jar unavailable in this environment")
         assert _full_inchikey(smiles) == _full_inchikey(opsin_smi), (
             f"emitted name {name!r} does not full-RT-match the input")
-        # v35 re-baseline: the invariant these rows prove is that a
+        # re-baseline: the invariant these rows prove is that a
         # full-InChIKey-correct name SHIPS for a formerly stereo-wrong primary
         # -- via whichever offer wins. When these tests were written that was
         # the t4_floor offer; the primary producers have since improved to emit
@@ -88,21 +88,21 @@ class TestFloorWinsOverAbstainedPrimary:
             pytest.skip("OPSIN jar unavailable in this environment")
         assert _full_inchikey(smiles) == _full_inchikey(opsin_smi), (
             f"emitted name {name!r} does not full-RT-match the input")
-        # v35 re-baseline: see TestFloorWinsOverStereoWrongPrimary -- the
+        # re-baseline: see TestFloorWinsOverStereoWrongPrimary -- the
         # formerly-abstaining primary now emits a full-RT-correct name directly,
         # so `_t4_floor_candidate` is None (the floor was not needed). The
         # 0-wrong outcome asserted above is the invariant that must hold.
 
 
 class TestStereoOnlyFloorCompletenessL3_2a:
-    """v33 Phase 0 L3-2a: the STEREO_ONLY 7-row bucket from the L3-2/L3-3 SPY
+    """ a phase L3-2a: the STEREO_ONLY 7-row bucket from the L3-2/L3-3 a trace
     (`FLOOR_COVERS_RT_FAIL` -- both the primary AND the floor omitted real
     defined stereo on a decorated acyclic side-chain substituent, e.g.
     '1,2,3-trihydroxypropyl'/'5-(propan-2-yl)heptan-2-yl' with NO leading
     descriptor block, even though the constitution was already right).
 
     Root cause: `substituent_naming._add_substituent_stereo`'s multi-centre
-    branch unconditionally declined (D-09 'missing beats wrong') because it
+    branch unconditionally declined ('missing beats wrong') because it
     had no way to thread the substituent's OWN chain numbering -- fixed by
     reusing `_acyclic_alkyl_located_stereo_name` (the same deriver the
     single-centre branch already trusts). Measured: 5 of the 7 bucket rows
@@ -137,9 +137,9 @@ class TestStereoOnlyFloorCompletenessL3_2a:
 
 
 class TestByteIdentityUnderPin:
-    """v33 Phase 0 L3-1 guard: best-effort ONLY -- structurally impossible to
+    """ a phase L3-1 guard: best-effort ONLY -- structurally impossible to
     reach `name_t4_complete` from `_finish` under `--emit-tier pin` (the
-    default `Orthonym()` constructor)."""
+    default `Orthonym` constructor)."""
 
     def test_simple_alcohol_unchanged(self):
         nm = Orthonym()
@@ -157,7 +157,7 @@ class TestByteIdentityUnderPin:
         appended -- that is `_general_fallback_unverified`-gated), so
         best-effort can never alter the PIN-default output.
 
-        v35 re-baseline: this row's input is stereo-UNDEFINED
+         re-baseline: this row's input is stereo-UNDEFINED
         (`CC(O)C(N)...`, no `@`), so the old expected `threonylcysteine` was
         itself a 0-wrong DEFECT -- that retained name implies L-stereo the input
         does not carry, and full-InChIKey RT-mismatches. The primary now emits

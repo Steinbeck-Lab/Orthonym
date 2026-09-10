@@ -1,4 +1,4 @@
-"""Wave2 T2a imine handler — N-substituted acyclic imines (P-62.3.1.1).
+"""Wave2 imine handler — N-substituted acyclic imines.
 
 BB VERBATIM: 'N-methylethanimine (PIN) [not N-ethylidenemethanamine; nor
 N-ethylidene(methyl)amine]'. Bare (=NH) imines already name correctly via
@@ -11,7 +11,7 @@ Predicate is deliberately narrow (FAIL-CLOSED): a single acyclic imine
 whose nitrogen actually carries a substituent; polyfunctional / cyclic-
 parent shapes keep their own paths.
 
-IUPAC cite: P-62.3.1.1.
+IUPAC cite:.
 """
 from __future__ import annotations
 

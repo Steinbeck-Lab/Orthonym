@@ -1,4 +1,4 @@
-"""v25 P0 Task 0.3 — the corrected three-metric coverage instrument.
+""" Task 0.3 — the corrected three-metric coverage instrument.
 
 Pure classifiers + aggregator. NO Java and NO Orthonym naming happen in
 this module: the round-trip is performed by an injected callable
@@ -6,7 +6,7 @@ this module: the round-trip is performed by an injected callable
 branch with a dict-backed fake OPSIN. The production runner
 (``scripts/coverage_metrics.py``) supplies the real OPSIN subprocess.
 
-Corrected metric contract (binds the v25 ship gate — see the master plan
+Corrected metric contract (binds the ship gate — see the master plan
 "Metric definitions"):
 
 * ``coverage`` = emitted / total. "Emitted" = Orthonym produced a real
@@ -35,14 +35,14 @@ Every metric is reported under BOTH matchers (they are NOT interchangeable):
   tautomer and stereo specificity?"
 * ``strict`` — the Orthonym house matcher: InChIKey skeleton block (formula
   + connectivity + mobile-H, stereo- AND charge-insensitive) PLUS net formal
-  charge. This is exactly the SELF-01 constitutional key. It is
+  charge. This is exactly the constitutional key. It is
   charge-SENSITIVE (catches a dropped/added charge the parity lens forgives)
   and tautomer-tolerant only to InChI's mobile-H scope (it does NOT merge
   keto-enol), while remaining stereo-insensitive.
 
 **Stereo caveat (documented, not a bug).** BOTH matchers forgive stereo, so
 neither flags a stereo INVERSION (name says S, input is R) — it counts as
-RT-valid. This is by design and consistent with the SELF-01 RT gate being
+RT-valid. This is by design and consistent with the RT gate being
 stereo-insensitive; stereo-inversion residual wrongness is owned by the C.1
 stratified residual-sampling audit, not by these automated matchers. The
 upshot: of-emitted-RT is a (small) OVER-estimate to the extent stereo
@@ -154,7 +154,7 @@ def _net_charge(smiles: str) -> Optional[int]:
 
 def strict_match(input_smiles: str, opsin_smiles: str) -> bool:
     """True iff InChIKey skeleton block AND net formal charge agree (the
-    SELF-01 constitutional key). False if either side cannot be hashed."""
+     constitutional key). False if either side cannot be hashed."""
     sa, sb = _skeleton(input_smiles), _skeleton(opsin_smiles)
     if sa is None or sb is None or sa != sb:
         return False

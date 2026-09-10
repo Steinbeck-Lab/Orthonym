@@ -1,4 +1,4 @@
-"""Wave-0 unit tests for WSB-02 substituent-stereo placement (Phase 177 Plan 02).
+"""Wave-0 unit tests for -02 substituent-stereo placement (a phase Plan 02).
 
 Covers ``substituent_naming._add_substituent_stereo``:
 
@@ -6,10 +6,10 @@ Covers ``substituent_naming._add_substituent_stereo``:
   correct form — this is what STEREO-06's mononuclear parent reuses at the
   handler level).
 - Multi-centre branch uses the substituent's OWN threaded numbering, never the
-  raw atom-index positions of the WR-06 bug (D-07). When the substituent's own
-  numbering cannot be threaded, NO stereo block is emitted (D-09: missing > wrong).
+  raw atom-index positions of the bug . When the substituent's own
+  numbering cannot be threaded, NO stereo block is emitted (: missing > wrong).
 
-These tests are RED until Task 2 replaces the WR-06 raw-index block.
+These tests are RED until Task 2 replaces the raw-index block.
 """
 
 import pytest
@@ -51,7 +51,7 @@ class TestMultiCentre:
     def test_multi_centre_unthreadable_emits_no_block(self):
         # A two-stereocentre fragment where no substituent-own numbering can be
         # threaded (we pass a bare atom-set with no numbering context) MUST emit
-        # NO stereo block (D-09: missing beats wrong) — NOT the old raw-index
+        # NO stereo block (: missing beats wrong) — NOT the old raw-index
         # "(1R,2S)-" guess.
         mol = _mol("C[C@H](Cl)[C@@H](Br)C")  # 2 stereocentres
         stereo_idx = [a.GetIdx() for a in mol.GetAtoms()
@@ -59,14 +59,14 @@ class TestMultiCentre:
         assert len(stereo_idx) == 2
         sub_atoms = [a.GetIdx() for a in mol.GetAtoms()]
         out = _add_substituent_stereo(mol, sub_atoms, "some-substituent")
-        # The legacy WR-06 path would have prepended a raw-index "(1R,2S)-"
+        # The legacy path would have prepended a raw-index "(1R,2S)-"
         # block. The fix emits NO block when own-numbering is unthreadable.
         assert not out.startswith("("), out
         assert out == "some-substituent", out
 
     def test_multi_centre_does_not_use_raw_atom_index(self):
         # Whatever the multi-centre branch does, it must NOT key locants off the
-        # raw sorted atom-index (the WR-06 bug numbers a leading heteroatom "1").
+        # raw sorted atom-index (the bug numbers a leading heteroatom "1").
         # We assert the output is either a clean name (no block) or a block whose
         # locants are NOT the raw 1..N enumerate positions of sorted atom idxs.
         mol = _mol("Cl[C@H](C)[C@@H](C)Br")
@@ -79,17 +79,17 @@ class TestMultiCentre:
 
 
 class TestMultiCentreThreadedViaAcyclicAlkyl:
-    """v33 Phase 0 L3-2a: when ``attach_idx`` IS known and the fragment is a
+    """ a phase L3-2a: when ``attach_idx`` IS known and the fragment is a
     plain (optionally hydroxy/halogen/amino-decorated) ACYCLIC alkyl chain,
     ``_acyclic_alkyl_located_stereo_name`` (the SAME deriver the single-centre
-    branch already trusts) exposes the substituent's own P-46.1.8/.12
+    branch already trusts) exposes the substituent's own /.12
     chain-position map, so the multi-centre branch can now thread it instead
-    of unconditionally falling back to D-09's 'missing beats wrong'.
+    of unconditionally falling back to 's 'missing beats wrong'.
 
     Root cause + measured 7-row bucket: this is the class that made the T4
     floor omit real defined stereo on a decorated glycoside/lipid/steroid
     side-chain substituent ('1,2,3-trihydroxypropyl', '2,3,4-trihydroxybutyl',
-    '5-(propan-2-yl)heptan-2-yl' ...), which fails full-InChIKey RT and is
+    '5-(propan-2-yl)heptan-2-yl'...), which fails full-InChIKey RT and is
     voided by the L3-1 offer gate.
     """
 
@@ -107,7 +107,7 @@ class TestMultiCentreThreadedViaAcyclicAlkyl:
         # Free valence at C2 of a branched heptyl chain, with BOTH
         # stereocentres off the attachment atom -- the steroid side-chain
         # shape (row 7/10/16 of the L3-2a bucket: free valence at locant 2,
-        # not 1). Locants must come from the chain's OWN P-46.1.8 numbering,
+        # not 1). Locants must come from the chain's OWN numbering,
         # never a raw atom-index guess (attach_idx=1 -> locant 2; the other
         # stereocentre at raw atom-index 4 -> locant 5, NOT enumerate
         # position 5 of sorted(sub_atoms), which this fragment's shape makes
@@ -136,7 +136,7 @@ class TestMultiCentreThreadedViaAcyclicAlkyl:
 
     def test_unthreadable_shape_still_falls_back_unchanged(self):
         # A RING stereocentre (not an acyclic alkyl chain) -- the deriver
-        # declines (None) and D-09's fallback must still hold: no fabricated
+        # declines (None) and 's fallback must still hold: no fabricated
         # block, even though attach_idx is now provided.
         mol = _mol("C[C@H]1CC[C@@H](C)CC1")
         stereo_idx = [a.GetIdx() for a in mol.GetAtoms()

@@ -8,12 +8,12 @@ names that are configurationally COMPLETE.
 Root cause: `needs_stereo_injection`'s descriptor vocabulary is `{R,S,r,s,E,Z}`
 inside parentheses, plus `alpha|beta-D/L-` (the ANOMERIC sugar form only) and a
 bare `D-`/`L-` token. The Blue Book's PIN descriptor vocabulary is wider —
-`## **P-91.2.1.2.2** Stereodescriptors used in the nomenclature of natural
+`## **** Stereodescriptors used in the nomenclature of natural
 products` (`the Blue Book`), items at `:44628-44632`, additionally
 legitimises italic cyclitol/carbohydrate prefixes and, item (iii), "*the
 stereodescriptors 'alpha', 'beta'... to describe the absolute configuration of
 alkaloids, terpenes and terpenoids, steroids*". On top of that,
-`### **P-101.2.6**` (`:51047`) makes a stereoparent's own name carry its
+`### ****` (`:51047`) makes a stereoparent's own name carry its
 skeleton's configuration.
 
 So four channels express configuration invisibly to the counter, and the
@@ -40,7 +40,7 @@ pytestmark = pytest.mark.unit
 # Every name below is a verbatim string from the certified gate log.
 # ---------------------------------------------------------------------------
 
-# Family 4 — the name ALREADY carries alpha/beta descriptors (P-101.2.6).
+# Family 4 — the name ALREADY carries alpha/beta descriptors.
 STEROID_ALPHA_BETA = [
     "cholest-5-en-3β-yl hydrogen sulfate",
     "3β-hydroxy-5α-androstan-17β-yl hydrogen sulfate",
@@ -55,13 +55,13 @@ STEROID_ALPHA_BETA = [
     "17β-methoxy-5α-androstan-3α-ol",
 ]
 
-# Family 1 — the italic prefix IS the descriptor (P-104.2.1).
+# Family 1 — the italic prefix IS the descriptor.
 INOSITOLS = [
     "myo-inositol", "scyllo-inositol", "neo-inositol", "muco-inositol",
     "epi-inositol", "allo-inositol", "cis-inositol",
 ]
 
-# Family 3 — retained nucleosides/nucleotides (P-105.1 / P-106.1).
+# Family 3 — retained nucleosides/nucleotides /.
 NUCLEOSIDES = [
     "adenosine", "inosine",
     "5'-adenylic acid", "5'-inosinic acid",
@@ -74,7 +74,7 @@ NUCLEOSIDES = [
     "adenosine 5'-acetate",
 ]
 
-# Family 5 — stereoparent hydrides (P-101.2.1.3 / P-101.2.6 / P-101.3.6).
+# Family 5 — stereoparent hydrides / /.
 STEREOPARENTS = [
     "trichothecane", "taxane", "ursane", "oleanane", "lupane", "hopane",
     "tropane", "yohimban", "vincane", "strychnidine", "stigmastane",
@@ -86,38 +86,38 @@ STEREOPARENTS = [
     "atisane", "aspidospermidine", "aristolane", "ambrosane", "abietane",
 ]
 
-# Family 2b — sphinganine, implied by definition (P-107.4.3.1).
+# Family 2b — sphinganine, implied by definition.
 SPHINGOIDS = ["sphinganine"]
 
 
 @pytest.mark.parametrize("name", STEROID_ALPHA_BETA)
 def test_steroid_alpha_beta_names_already_carry_descriptors(name):
-    """P-101.2.6: a locant-prefixed alpha/beta IS a stereodescriptor."""
+    """: a locant-prefixed alpha/beta IS a stereodescriptor."""
     assert _stereo_is_implied_by_name(name) is True
 
 
 @pytest.mark.parametrize("name", INOSITOLS)
 def test_inositol_prefix_is_the_descriptor(name):
-    """P-104.2.1: "Names denoted by the prefixes are preferred"."""
+    """: "Names denoted by the prefixes are preferred"."""
     assert _stereo_is_implied_by_name(name) is True
 
 
 @pytest.mark.parametrize("name", NUCLEOSIDES)
 def test_retained_nucleoside_stereo_is_implied(name):
-    """P-105.1 / P-106.1: retained names, BB examples descriptor-free."""
+    """ /: retained names, BB examples descriptor-free."""
     assert _stereo_is_implied_by_name(name) is True
 
 
 @pytest.mark.parametrize("name", STEREOPARENTS)
 def test_stereoparent_name_carries_its_configuration(name):
-    """P-101.2.6: "...usually implies the absolute configuration of all
+    """: "...usually implies the absolute configuration of all
     chirality centers... without further specification"."""
     assert _stereo_is_implied_by_name(name) is True
 
 
 @pytest.mark.parametrize("name", SPHINGOIDS)
 def test_sphinganine_is_implied_by_definition(name):
-    """P-107.4.3.1: the retained name is for the amino alcohol "having the
+    """: the retained name is for the amino alcohol "having the
     described absolute configuration"."""
     assert _stereo_is_implied_by_name(name) is True
 
@@ -127,13 +127,13 @@ def test_sphinganine_is_implied_by_definition(name):
 # button. A too-broad exemption would silence a REAL stereo gap.
 # ---------------------------------------------------------------------------
 
-# The free amino acids: the warning here is TRUE. `P-103.1.3.1` (:54291)
-# requires the alpha-carbon configuration to be designated D or L; `P-103.3.4`
+# The free amino acids: the warning here is TRUE. `` (:54291)
+# requires the alpha-carbon configuration to be designated D or L; ``
 # (:54715) scopes L-omission to PEPTIDES only; and Table 10.4 pairs each
 # retained name with a `rel-` (RELATIVE) systematic equivalent (:54204,:54211),
 # so the bare name is not enantiospecific. Deliberately NOT exempted.
 # -CLEANUP: the last two were written HYPHENATED here. That spelling never
-# shipped -- settled on the FUSED form that `## **P-103.1.3.2.2** Use of
+# shipped -- settled on the FUSED form that `## **** Use of
 # the prefix 'allo'` (:54320) writes (`allothreonine`), and the hyphenated italic
 # `*allo*-` in the Blue Book is a CARBOHYDRATE/cyclitol prefix (:53011,:53021,
 #:54890), a different device. The assertion below passes either way -- both forms
@@ -151,8 +151,8 @@ GENUINE_AMINO_ACID_GAP = [
 
 @pytest.mark.parametrize("name", GENUINE_AMINO_ACID_GAP)
 def test_free_amino_acids_are_NOT_exempted(name):
-    """A real gap must keep warning — P-103.1.3.1 requires D/L on a free
-    amino acid, and P-103.3.4 licenses omission only inside a peptide."""
+    """A real gap must keep warning — requires D/L on a free
+    amino acid, and licenses omission only inside a peptide."""
     assert _stereo_is_implied_by_name(name) is False, (
         f"{name!r} genuinely lacks its configurational descriptor; exempting "
         f"it would silence a real defect"
@@ -172,7 +172,7 @@ def test_empty_and_none_are_not_exempted():
 
 
 def test_alpha_beta_needs_a_locant_to_count_as_a_descriptor():
-    """A bare 'beta' with no locant is not the P-101.2.6 descriptor form.
+    """A bare 'beta' with no locant is not the descriptor form.
 
     `β-D-glucopyranose` is already handled upstream by the anomeric pattern
     in `needs_stereo_injection`; a stray 'alpha'/'beta' inside an ordinary word
@@ -212,9 +212,9 @@ KEPT_VISIBLE = [
     # governing rule, so "no Blue Book text found" was wrong; either way the name
     # carries no configurational descriptor and must keep warning.
     "xylitol",
-    # `## **P-103.1.3.1** The stereodescriptors 'D' and 'L'` (:54291) requires the
+    # `## **** The stereodescriptors 'D' and 'L'` (:54291) requires the
     # alpha-carbon configuration to be designated on a free amino acid, and the
-    # neuraminic acids are not peptides, so P-103.3.4's omission licence
+    # neuraminic acids are not peptides, so 's omission licence
     # (:54715) does not reach them.
     "N-acetylneuraminic acid",
     "N-glycolylneuraminic acid",
@@ -242,7 +242,7 @@ def test_the_sphingoid_leg_is_anchored_to_the_retained_name():
     #...while the two spellings the Blue Book retains still are.
     assert _stereo_is_implied_by_name("sphinganine") is True
     assert _stereo_is_implied_by_name("(4E)-sphing-4-enine") is True
-    #...and a sphingoid-ADJACENT non-Blue-Book name is not (P-107.4.3.1 names
+    #...and a sphingoid-ADJACENT non-Blue-Book name is not names
     # `sphinganine`; `sphingosine` is "not a Blue Book name" per the project's
     # own `data/natural_products.py` comment).
     assert _stereo_is_implied_by_name("sphingomyelin") is False
@@ -259,7 +259,7 @@ def test_the_steroid_leg_requires_a_stereoparent_not_just_a_descriptor():
     for n in ("5α-cholestan-3β-ol",
               "cholest-5-en-3β-yl 2-hydroxypropanoate"):
         assert _stereo_is_implied_by_name(n) is True, n
-    # M1 KILLER on the steroid leg. `**P-101.2.6**` gives the descriptor form
+    # M1 KILLER on the steroid leg. `****` gives the descriptor form
     # WITH a locant (`3β`, `5α`); an unlocanted `beta-` designates no
     # centre, so a steroid carrying one is not self-describing and must keep
     # warning. Under the locant-free mutation this is exempted.
@@ -330,7 +330,7 @@ def test_exempted_name_produces_NO_warning_through_the_real_check(caplog):
 def test_NON_exempted_name_STILL_warns_through_the_real_check(caplog):
     """...and the exemption must not be a mute button.
 
-    `alanine` is a genuine gap (P-103.1.3.1), so the warning must survive. This
+    `alanine` is a genuine gap, so the warning must survive. This
     is the test that fails if the call site is short-circuited to always exempt.
     """
     from rdkit import Chem

@@ -1,4 +1,4 @@
-"""v29 Phase 1: the binding-proof flag is off by default, audit changes no
+""" a phase: the binding-proof flag is off by default, audit changes no
 name, and the audit path is actually EXERCISED (not merely 'no crash')."""
 from unittest import mock
 
@@ -24,7 +24,7 @@ PROBES = ["CCO", "CC(=O)O", "Cc1ccccc1", "CCCCCCCCCCCC(=O)O",
 # NOTE: conftest disables the OPSIN validity gate for the whole unit suite
 # (``_disable_opsin_validity_gate_for_tests``), which changes WHICH molecules
 # reach the engine: two of these three are named by a legacy handler here and
-# only reach the engine in production, where SELF-01 suppresses that emission.
+# only reach the engine in production, where suppresses that emission.
 ENGINE_PROBES = ["ClCCOc1ccccc1", "CC1CCC2CCCCC2C1", "CC1C2C=CC1c1ccccc12"]
 # The one verified to record under THIS harness (gate disabled). Used where a
 # test needs a recorded spine as a precondition rather than as a sweep.
@@ -81,7 +81,7 @@ def test_off_mode_records_nothing():
 
 
 def test_ledger_is_reset_per_molecule():
-    """Added by mutation check M11: dropping clear_ledger() from the
+    """Added by mutation check M11: dropping clear_ledger from the
     per-molecule reset block broke no test, yet a molecule that records
     nothing would then finalize the PREVIOUS molecule's spine against ITS
     name -- inventing findings that never happened."""
@@ -125,7 +125,7 @@ def test_inline_general_engine_site_records():
 
 
 def test_early_limit_exit_finalizes_too():
-    """name() has TWO exits. The early ``return _rec`` after a recovered
+    """name has TWO exits. The early ``return _rec`` after a recovered
     OrthonymLimitError bypasses even _apply_trivial_fallback, so a finalize
     hooked only at the main exit would leave that whole path unaudited."""
     from orthonym.namer import OrthonymLimitError
@@ -196,7 +196,7 @@ def test_a_suppressed_emission_is_not_proved_against_the_abstention_sentinel():
                            staticmethod(_recover)), \
          mock.patch("orthonym.assembly.t4_coverage.name_t4_complete",
                     return_value=None):
-        # v33 Phase 0 L3-1: `_try_general_engine_recovery` is no longer the
+        # a phase L3-1: `_try_general_engine_recovery` is no longer the
         # ONLY rescue path for a suppressed emission -- `_finish` now ALSO
         # tries the systematic floor directly (`name_t4_complete`) whenever
         # the primary is a failure-name sentinel, independent of this test's
@@ -224,7 +224,7 @@ def test_a_retained_name_swap_after_the_certificate_is_reported(monkeypatch):
     _retained_structural_preference can replace the whole name AFTER
     verify_certificate passed, so the recorded bindings then describe a string
     that is no longer shipped and the re-anchor must say so (TOKEN_ABSENT).
-    This is a real gap in today's proof coverage -- Phase 3 produces bindings
+    This is a real gap in today's proof coverage -- a phase produces bindings
     for the substituted name -- and it is deliberately NOT suppressed.
 
     It also pins the abstention guard's SCOPE: that guard skips only the

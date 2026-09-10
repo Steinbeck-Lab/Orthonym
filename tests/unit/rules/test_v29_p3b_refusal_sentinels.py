@@ -1,6 +1,6 @@
-"""v29 Phase 3B (Job 2) — a refusal sentinel is never consumed as a name component.
+""" a phase (Job 2) — a refusal sentinel is never consumed as a name component.
 
-    CCS[Zn]SCC  ->  'zinc compound (not supported)ylethane'
+    CCS[Zn]SCC -> 'zinc compound (not supported)ylethane'
 
 A refusal STRING was taken for a substituent name and given a ``-yl`` ending. Any
 caller checking "did I get a non-empty string?" reads that as success, which
@@ -30,7 +30,7 @@ from orthonym.namer import Orthonym
 
 @pytest.fixture
 def ungated_namer(monkeypatch):
-    """A namer with the SELF-01 OPSIN validity gate explicitly DISABLED.
+    """A namer with the OPSIN validity gate explicitly DISABLED.
 
     The gate fails OPEN when no JRE is present, so every safety property here is
     asserted in the mode where nothing downstream can suppress a wrong producer
@@ -123,7 +123,7 @@ def test_carbon_count_fallback_refuses_a_heteroatom_bearing_fragment():
         fragment_is_linear_terminal_alkyl as ok,
     )
     mol = Chem.MolFromSmiles("CCS[Zn]SCC")
-    frag = [0, 1, 2, 3]            # CC-S-Zn : carries S and Zn
+    frag = [0, 1, 2, 3]            # CC-S-Zn: carries S and Zn
     assert ok(mol, frag, 0) is False
     mol2 = Chem.MolFromSmiles("CCCC")
     assert ok(mol2, [0, 1, 2, 3], 0) is True      # linear, attached at a terminus

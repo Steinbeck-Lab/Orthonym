@@ -1,6 +1,6 @@
 """a phase - 3-signal AND classifier unit tests.
 
-Per CONTEXT: classifier is a pure 3-signal AND function:
+Per internal notes: classifier is a pure 3-signal AND function:
   Signal 1: _is_complete_name heuristic
   Signal 2: data/iupac_2013_pin_list.json allow-list (PIN authority)
   Signal 3: per-entry OPSIN round-trip via InChI L1 (Plan 02)
@@ -9,12 +9,12 @@ Promotion rule: (S1 OR S2) AND S3.
 Provisional mode (Plan 01 before validator runs): (S1 OR S2) only.
 
 Each test cites:
-  - The QMUL P-section URL (P-22.1.3, P-22.2.1, P-23.7)
+  - The QMUL P-section URL,,
   - The IUPAC rule code
-  - a phase CONTEXT,, decisions
+  - a phase internal notes,, decisions
 
 Source: https://iupac.qmul.ac.uk/BlueBook/P2.html
-Source: 150-CONTEXT.md +.
+Source: 150-internal notes +.
 """
 import json
 from pathlib import Path
@@ -44,8 +44,8 @@ PIN_LIST_PATH = (
 class TestIsCompleteNameExtension:
     """Signal 1 (_is_complete_name) heuristic-acceptance tests.
 
-    See https://iupac.qmul.ac.uk/BlueBook/P2.html (P-22.1.3, P-22.2.1).
-    Per CONTEXT: Signal 1 is the original (a phase) heuristic;
+    See https://iupac.qmul.ac.uk/BlueBook/P2.html,.
+    Per internal notes: Signal 1 is the original (a phase) heuristic;
     Signals 2/3 augment but never replace it.
     """
 
@@ -53,9 +53,9 @@ class TestIsCompleteNameExtension:
     def test_is_complete_name_accepts_acetic_acid(self):
         """Names containing spaces are complete IUPAC PIN forms.
 
-        Cites P-22.1.3 (substituent + functional class compound naming).
+        Cites (substituent + functional class compound naming).
         See https://iupac.qmul.ac.uk/BlueBook/P2.html.
-        a phase CONTEXT Signal 1.
+        a phase internal notes Signal 1.
         """
         assert _is_complete_name("acetic acid") is True
 
@@ -63,8 +63,8 @@ class TestIsCompleteNameExtension:
     def test_is_complete_name_accepts_pyridine(self):
         """The -ine ending marks a mancude heterocycle PIN form.
 
-        Cites P-22.2.1 Table 2.2. See https://iupac.qmul.ac.uk/BlueBook/P2.html.
-        a phase CONTEXT Signal 1.
+        Cites See https://iupac.qmul.ac.uk/BlueBook/P2.html.
+        a phase internal notes Signal 1.
         """
         assert _is_complete_name("pyridine") is True
 
@@ -72,8 +72,8 @@ class TestIsCompleteNameExtension:
     def test_is_complete_name_accepts_morpholine(self):
         """The -ine ending also marks saturated heterocycle PIN forms.
 
-        Cites P-22.2.1 Table 2.3. See https://iupac.qmul.ac.uk/BlueBook/P2.html.
-        a phase CONTEXT Signal 1.
+        Cites See https://iupac.qmul.ac.uk/BlueBook/P2.html.
+        a phase internal notes Signal 1.
         """
         assert _is_complete_name("morpholine") is True
 
@@ -82,8 +82,8 @@ class TestIsCompleteNameExtension:
         """OPSIN stem 'perimidin' (no -e) must not be promoted as a PIN.
 
         Cites RESEARCH section 4.2 + ADDITION 2 (stem-vs-complete forms).
-        See https://iupac.qmul.ac.uk/BlueBook/P2.html (P-22.2.1).
-        a phase CONTEXT Signal 1; resolved post-Plan-01 via
+        See https://iupac.qmul.ac.uk/BlueBook/P2.html.
+        a phase internal notes Signal 1; resolved post-Plan-01 via
         scripts/import_opsin_xml.py:_complete_stem normalization.
         """
         assert _is_complete_name("perimidin") is False
@@ -93,8 +93,8 @@ class TestIsCompleteNameExtension:
         """OPSIN stem 'acridin' (no -e) must not be promoted as a PIN.
 
         Cites RESEARCH section 4.2 + ADDITION 2.
-        See https://iupac.qmul.ac.uk/BlueBook/P2.html (P-22.2.1 Table 2.2).
-        a phase CONTEXT Signal 1.
+        See https://iupac.qmul.ac.uk/BlueBook/P2.html.
+        a phase internal notes Signal 1.
         """
         assert _is_complete_name("acridin") is False
 
@@ -103,34 +103,34 @@ class TestPINAllowList:
     """Signal 2 (_PIN_ALLOW frozenset) authority assertions.
 
     See https://iupac.qmul.ac.uk/BlueBook/P2.html.
-    Per CONTEXT: data/iupac_2013_pin_list.json is the single source
+    Per internal notes: data/iupac_2013_pin_list.json is the single source
     of truth for which retained names are PINs.
     """
 
     @pytest.mark.unit
     def test_pin_allow_contains_benzene(self):
-        """Benzene is a retained PIN (P-22.1.3).
+        """Benzene is a retained PIN.
 
         See https://iupac.qmul.ac.uk/BlueBook/P2.html.
-        a phase CONTEXT (PIN allow-list authority).
+        a phase internal notes (PIN allow-list authority).
         """
         assert "benzene" in _PIN_ALLOW
 
     @pytest.mark.unit
     def test_pin_allow_contains_adamantane(self):
-        """Adamantane is a retained von Baeyer PIN (P-23.7 Table 2.6).
+        """Adamantane is a retained von Baeyer PIN.
 
         See https://iupac.qmul.ac.uk/BlueBook/P2.html.
-        a phase CONTEXT.
+        a phase internal notes.
         """
         assert "adamantane" in _PIN_ALLOW
 
     @pytest.mark.unit
     def test_pin_allow_contains_furan_pyridine_morpholine(self):
-        """Heterocycle retained PINs (P-22.2.1 Tables 2.2 + 2.3).
+        """Heterocycle retained PINs Tables 2.2 + 2.3).
 
         See https://iupac.qmul.ac.uk/BlueBook/P2.html.
-        a phase CONTEXT.
+        a phase internal notes.
         """
         for name in ("furan", "pyridine", "morpholine"):
             assert name in _PIN_ALLOW, f"missing PIN: {name}"
@@ -140,8 +140,8 @@ class TestPINDenyOverrides:
     """Signal 2 hard-deny semantics: non-PIN names that look complete.
 
     See https://iupac.qmul.ac.uk/BlueBook/P2.html.
-    Per CONTEXT: explicit DENY in PIN list overrides Signal 1 even
-    when _is_complete_name returns True. Per CONTEXT CD-02:
+    Per internal notes: explicit DENY in PIN list overrides Signal 1 even
+    when _is_complete_name returns True. Per internal notes:
     _OPSIN_NON_PIN_EXCLUSIONS is now derived from _PIN_DENY (single
     source of truth).
     """
@@ -150,8 +150,8 @@ class TestPINDenyOverrides:
     def test_pin_deny_contains_mesitylene(self):
         """Mesitylene is NOT a PIN; PIN is 1,3,5-trimethylbenzene.
 
-        Cites P-22.1.3. See https://iupac.qmul.ac.uk/BlueBook/P2.html.
-        a phase CONTEXT.
+        Cites. See https://iupac.qmul.ac.uk/BlueBook/P2.html.
+        a phase internal notes.
         """
         assert "mesitylene" in _PIN_DENY
 
@@ -160,11 +160,11 @@ class TestPINDenyOverrides:
         """Even when Signal 1 says True, an explicit DENY rejects.
 
         Mesitylene ends in -ene (Signal 1 True) but PIN is
-        1,3,5-trimethylbenzene per P-22.1.3, so the classifier must
+        1,3,5-trimethylbenzene per, so the classifier must
         return False.
 
-        Cites P-22.1.3. See https://iupac.qmul.ac.uk/BlueBook/P2.html.
-        a phase CONTEXT hard-deny override semantic.
+        Cites. See https://iupac.qmul.ac.uk/BlueBook/P2.html.
+        a phase internal notes hard-deny override semantic.
         """
         # Sanity: Signal 1 actually returns True for "mesitylene"
         assert _is_complete_name("mesitylene") is True
@@ -175,12 +175,12 @@ class TestPINDenyOverrides:
     def test_pin_deny_contains_alane_quinuclidine_prismane(self):
         """Three deprecated/non-PIN entries from RESEARCH 6.4-6.5.
 
-        - alane: deprecated; replacement alumane (P-21.1.1.1).
-        - quinuclidine: PIN is 1-azabicyclo[2.2.2]octane (P-23.7).
-        - prismane: deprecated; tetracyclo systematic equivalent (P-23.7).
+        - alane: deprecated; replacement alumane.
+        - quinuclidine: PIN is 1-azabicyclo[2.2.2]octane.
+        - prismane: deprecated; tetracyclo systematic equivalent.
 
         See https://iupac.qmul.ac.uk/BlueBook/P2.html.
-        a phase CONTEXT.
+        a phase internal notes.
         """
         for name in ("alane", "quinuclidine", "prismane"):
             assert name in _PIN_DENY, f"missing PIN-deny: {name}"
@@ -195,21 +195,21 @@ class TestThreeSignalGate:
     Plan 02's validator produces. Plan 02 ships that JSON, which
     graduates the gate to full (S1 OR S2) AND S3.
 
-    These tests assert the post-graduation behaviour. See WR-09 fix
+    These tests assert the post-graduation behaviour. See fix
     in test_promotable_provisional_mode_active for self-explanatory
     failure handling when the validation JSON is missing.
 
     See https://iupac.qmul.ac.uk/BlueBook/P2.html.
-    Source: 150-CONTEXT.md + +.
-    Source: 150-REVIEW.md WR-09 + IN-01.
+    Source: 150-internal notes + +.
+    Source: internal notes +.
     """
 
     @pytest.mark.unit
     def test_promotable_benzene_passes_via_signal_2(self):
         """Benzene passes the gate via Signal 2 even in provisional mode.
 
-        Cites P-22.1.3. See https://iupac.qmul.ac.uk/BlueBook/P2.html.
-        a phase CONTEXT +.
+        Cites. See https://iupac.qmul.ac.uk/BlueBook/P2.html.
+        a phase internal notes +.
         """
         assert _is_promotable("c1ccccc1", "benzene") is True
 
@@ -223,11 +223,11 @@ class TestThreeSignalGate:
         at src/orthonym/data/opsin_imports/_phase150_validation.json,
         which graduates the gate to full (S1 OR S2) AND S3.
 
-        Per CONTEXT +. Plan 02 acceptance criterion (Task
+        Per internal notes +. Plan 02 acceptance criterion (Task
         02-03) requires _PROVISIONAL_MODE is False post-graduation.
         See https://iupac.qmul.ac.uk/BlueBook/P2.html.
 
-        a phase REVIEW WR-09: emit a self-explanatory failure if
+        a phase REVIEW: emit a self-explanatory failure if
         the validation JSON is missing on disk (e.g., a fresh
         checkout that strips files starting with '_'). Without this
         the test fails as a bare 'False is False' assertion with no
@@ -245,12 +245,12 @@ class TestThreeSignalGate:
     def test_promotable_signal_3_deferred_in_provisional(self):
         """In provisional mode (S1 OR S2), pyridine (S1 True) passes.
 
-        Pyridine is a mancude heterocycle PIN (P-22.2.1 Table 2.2):
+        Pyridine is a mancude heterocycle PIN:
         S1 True via -ine ending; S2 True via PIN allow-list. Either
         path is sufficient in provisional mode.
 
         See https://iupac.qmul.ac.uk/BlueBook/P2.html.
-        a phase CONTEXT provisional-mode gate.
+        a phase internal notes provisional-mode gate.
         """
         assert _is_promotable("c1ccncc1", "pyridine") is True
 
@@ -259,7 +259,7 @@ class TestJSONAllowListSchema:
     """data/iupac_2013_pin_list.json must conform to a fixed schema.
 
     See https://iupac.qmul.ac.uk/BlueBook/P2.html.
-    Per CONTEXT + CD-02: every entry must carry a P-section citation
+    Per internal notes +: every entry must carry a P-section citation
     so reviewers can audit each PIN-or-not classification against the
     Blue Book.
     """
@@ -268,7 +268,7 @@ class TestJSONAllowListSchema:
     def test_pin_list_json_loads(self):
         """JSON file loads cleanly with required top-level keys.
 
-        a phase CONTEXT.
+        a phase internal notes.
         See https://iupac.qmul.ac.uk/BlueBook/P2.html.
         """
         with open(PIN_LIST_PATH) as f:
@@ -277,7 +277,7 @@ class TestJSONAllowListSchema:
             assert key in data, f"missing top-level key: {key}"
         assert isinstance(data["entries"], list)
         assert len(data["entries"]) >= 57
-        # a phase REVIEW CR-03: tighten schema to catch total_entries
+        # a phase REVIEW: tighten schema to catch total_entries
         # drift; the previous '>= 57' threshold let the field disagree
         # with the actual array length silently.
         assert data["total_entries"] == len(data["entries"]), (
@@ -289,7 +289,7 @@ class TestJSONAllowListSchema:
     def test_pin_list_entries_have_required_fields(self):
         """Every entry has name, smiles, pin, citation, note.
 
-        a phase CONTEXT schema contract; CD-02 single-source
+        a phase internal notes schema contract; single-source
         of truth requires citation traceability for every entry.
         See https://iupac.qmul.ac.uk/BlueBook/P2.html.
         """
@@ -309,9 +309,9 @@ class TestJSONAllowListSchema:
                 f"entry {i} citation {entry['citation']!r} "
                 f"does not start with P-"
             )
-        # a phase REVIEW WR-07: classifier is name-keyed (the
+        # a phase REVIEW: classifier is name-keyed (the
         # _PIN_ALLOW / _PIN_DENY frozensets are built from
-        # entry["name"].lower()), so duplicate names would silently
+        # entry["name"].lower), so duplicate names would silently
         # collapse into a single classifier slot whose pin flag is
         # whichever entry the iterator visits last. Duplicate SMILES
         # are intentional (e.g., benzene + [6]annulene share
@@ -325,7 +325,7 @@ class TestJSONAllowListSchema:
 
 
 # ============================================================================
-# a phase (HYG-03) — deny / gate-safety tests.
+# a phase  — deny / gate-safety tests.
 # Audit: docs/retained_name_conflicts.md § "a phase".
 # ============================================================================
 
@@ -335,7 +335,7 @@ class TestErythreneDenied:
 
     'erythrene' currently slips the gate because (S1 OR S2) AND S3 admits any
     OPSIN-recognised synonym that round-trips — round-trip != PIN. Explicit DENY
-    wins (data/__init__.py:_is_promotable). See 167-RESEARCH.md HYG-03 root cause.
+    wins (data/__init__.py:_is_promotable). See internal notes root cause.
     """
 
     @pytest.mark.unit
@@ -358,17 +358,17 @@ class TestHCGateSafetyA1:
     emittable in ALL_RETAINED_NAMES. Green now and after Plan 02 (regression guard).
     """
 
-    # F-T9/DD6 RET-01: 'biphenyl' is NO LONGER genuine — it is general-only (PIN
+    # F-T9/DD6: 'biphenyl' is NO LONGER genuine — it is general-only (PIN
     # 1,1'-biphenyl) and is now correctly denied. Replaced with 'naphthalene', a true
     # retained PIN that must stay non-denied + emittable.
     #
     #: 'camphor' is NO LONGER genuine either, and is removed here for the
     # same reason biphenyl was. It is a KETONE, and the retained-ketone rule is a
     # closed list that excludes it, so this is a POSITIVE exclusion, not an absence
-    # argument. P-64.2.1 "Retained names" (heading the Blue Book):
-    # * P-64.2.1.1 (:28297) — "The name 'chalcone' is the only retained name as a
+    # argument. "Retained names" (heading the Blue Book):
+    # * (:28297) — "The name 'chalcone' is the only retained name as a
     # preferred IUPAC name". Camphor is not chalcone.
-    # * P-64.2.1.2 (:28307) — the general-nomenclature retained set is exactly
+    # * (:28307) — the general-nomenclature retained set is exactly
     # acetone, 1,4-benzoquinone, naphthoquinone, anthraquinone, ketene,
     # acetophenone and benzophenone, closing with "Substitutive names,
     # systematically constructed, are the preferred IUPAC names for ketones".
@@ -377,7 +377,7 @@ class TestHCGateSafetyA1:
     # book, at:32500 (a DIFFERENT compound, "camphoric anhydride") and at:52646,
     # where it is the familiar label printed beside "(1R,4R)-bornan-2-one".
     # Replaced with 'toluene' so the guard keeps its width — a name the curated list
-    # positively affirms (pin: true, P-22.1.3), not merely one it fails to deny.
+    # positively affirms (pin: true,, not merely one it fails to deny.
     # The POSITIVE record that camphor is now deliberately denied (and demoted, not
     # deleted) lives in tests/unit/data/test_pin_deny_amino_and_trivial.py
     #::TestNaturalProductSurfaceIsGated, so removing it here loses no coverage.

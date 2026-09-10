@@ -1,14 +1,14 @@
-"""Integration tests for Phase 85 name_substituent() and gap closures.
+"""Integration tests for a phase name_substituent and gap closures.
 
-Tests the complete Phase 85 deliverables:
+Tests the complete a phase deliverables:
 - name_substituent(mol, frag_atoms, attach_idx) end-to-end on real molecules
 - Never-None guarantee under parametric fuzzing
 - Canary compound naming stability
 - Gap closure verification (fused_rings.py, composer.py)
 
 References:
-    IUPAC 2013 P-31.1.3 (substituent prefix naming)
-    Phase 85 Plan 02: USUB-05 gap closure, QUAL-01, QUAL-02
+    IUPAC 2013 (substituent prefix naming)
+    a phase Plan 02: gap closure,,
 """
 
 import pytest
@@ -23,7 +23,7 @@ from orthonym.namer import name_compound
 # ============================================================================
 
 class TestNameSubstituentRealMolecules:
-    """Test name_substituent() on real molecule fragments."""
+    """Test name_substituent on real molecule fragments."""
 
     def test_toluene_methyl(self):
         """Methyl on benzene -> 'methyl'."""
@@ -43,7 +43,7 @@ class TestNameSubstituentRealMolecules:
         assert "ethyl" in result.lower()
 
     def test_isopropyl_on_benzene(self):
-        """F-T9/DD6 RET-02: isopropyl fragment -> located PIN 'propan-2-yl'."""
+        """F-T9/DD6: isopropyl fragment -> located PIN 'propan-2-yl'."""
         mol = Chem.MolFromSmiles("CC(C)c1ccccc1")
         assert mol is not None
         # Fragment: atoms 0, 1, 2 (CC(C) chain), attach at atom 1
@@ -93,7 +93,7 @@ class TestNameSubstituentRealMolecules:
 # ============================================================================
 
 class TestNameSubstituentNeverNone:
-    """Verify name_substituent() NEVER returns None for any valid input."""
+    """Verify name_substituent NEVER returns None for any valid input."""
 
     MOLECULES = [
         "CC",
@@ -114,7 +114,7 @@ class TestNameSubstituentNeverNone:
 
     @pytest.mark.parametrize("smi", MOLECULES)
     def test_never_none(self, smi):
-        """name_substituent() returns non-None string for first atom as fragment."""
+        """name_substituent returns non-None string for first atom as fragment."""
         mol = Chem.MolFromSmiles(smi)
         assert mol is not None
         frag_atoms = {0}
@@ -125,7 +125,7 @@ class TestNameSubstituentNeverNone:
 
 
 # ============================================================================
-# TestCanaryNamingStability: verify name_compound() stability
+# TestCanaryNamingStability: verify name_compound stability
 # ============================================================================
 
 CANARY_COMPOUNDS = [
@@ -141,7 +141,7 @@ CANARY_COMPOUNDS = [
 
 
 class TestCanaryNamingStability:
-    """All canary compounds produce identical names after Phase 85."""
+    """All canary compounds produce identical names after a phase."""
 
     @pytest.mark.parametrize(
         "smi,expected_name",
@@ -163,10 +163,10 @@ class TestCanaryNamingStability:
 # ============================================================================
 
 class TestGapClosureVerification:
-    """Verify the Phase 85 gap closures are effective."""
+    """Verify the a phase gap closures are effective."""
 
     def test_fused_ring_fallback_does_not_return_none_for_simple_c_sub(self):
-        """_identify_fused_substituent() with fallback should name simple C substituents."""
+        """_identify_fused_substituent with fallback should name simple C substituents."""
         from orthonym.rules.fused_rings import _identify_fused_substituent
         # Naphthalene with a propyl chain
         mol = Chem.MolFromSmiles("CCCc1ccc2ccccc2c1")
@@ -185,7 +185,7 @@ class TestGapClosureVerification:
             assert 'name' in result
 
     def test_composer_has_ring_atoms_helper(self):
-        """_has_ring_atoms() utility function is importable and functional."""
+        """_has_ring_atoms utility function is importable and functional."""
         from orthonym.assembly.composer import _has_ring_atoms
         mol = Chem.MolFromSmiles("c1ccccc1C")
         assert mol is not None
@@ -196,7 +196,7 @@ class TestGapClosureVerification:
         assert _has_ring_atoms(mol, {6}) is False
 
     def test_composer_name_reflects_ring_helper(self):
-        """_name_reflects_ring() detects ring system identifiers in names."""
+        """_name_reflects_ring detects ring system identifiers in names."""
         from orthonym.assembly.composer import _name_reflects_ring
         assert _name_reflects_ring("cyclohexyl") is True
         assert _name_reflects_ring("phenyl") is True
@@ -225,10 +225,10 @@ class TestGapClosureVerification:
                 result = _identify_fused_substituent(mol, idx, first_ring)
                 # The fallback guard should prevent naming this ring atom
                 # It may get an alkyl result (from existing handlers that don't
-                # check ring membership), but the Phase 85 fallback should NOT fire
+                # check ring membership), but the a phase fallback should NOT fire
                 # because the start atom is in a ring
                 if result and result.get('type') == 'functionalized':
-                    # This would mean the Phase 85 fallback fired for a ring atom
+                    # This would mean the a phase fallback fired for a ring atom
                     assert False, f"Fallback should not fire for ring atom {idx}: {result}"
                 break
 
@@ -258,7 +258,7 @@ class TestGapClosureVerification:
 # ============================================================================
 
 class TestZeroRegressionValidation:
-    """Verify that Phase 85 changes do not regress any existing behavior."""
+    """Verify that a phase changes do not regress any existing behavior."""
 
     def test_simple_compounds_unchanged(self):
         """Core compound naming must be unchanged."""
@@ -269,7 +269,7 @@ class TestZeroRegressionValidation:
             ("CCC", "propane"),
             ("CCCC", "butane"),
             ("C=C", "ethene"),
-            ("C#C", "acetylene"),  # retained name (P-31.1.2.1 PIN)
+            ("C#C", "acetylene"),  # retained name PIN)
             ("CO", "methanol"),
             ("CCO", "ethanol"),
             ("C=O", "formaldehyde"),  # retained name

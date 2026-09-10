@@ -1,4 +1,4 @@
-"""P-15.3.2.2.1 (N primes) / P-15.3.2.2.2 (superscript-arabic N) conformance
+""" (N primes) / (superscript-arabic N) conformance
 pins (Wave-2 P0c Task 9). BB the Blue Book. Evidence rows verified
 OPSIN-RT 2026-07-09.
 """
@@ -18,7 +18,7 @@ class TestP1532221Primes:
         assert _name("CCNC(=O)NCC") == "N,N'-diethylurea"
 
     def test_unprimed_before_primed(self):
-        # P-14.3.5: N cited before N' in the locant set (never N',N).
+        #: N cited before N' in the locant set (never N',N).
         name = _name("CCNC(=O)NCC")
         assert "N,N'-" in name and "N',N-" not in name
 
@@ -40,13 +40,13 @@ class TestBuilderUnitLevel:
             [("N", "ethyl"), ("N'", "ethyl")], "urea") == "N,N'-diethylurea"
 
     def test_build_n_substituted_single(self):
-        # P-14.3.4.3 (the Blue Book): a monosubstituted urea omits the italic-N locant.
+        # (the Blue Book): a monosubstituted urea omits the italic-N locant.
         from orthonym.assembly.composer import _build_n_substituted_name
         assert _build_n_substituted_name([("N", "methyl")], "urea") == \
             "methylurea"
 
     def test_build_n_substituted_single_chalcogen_keeps_locant(self):
-        # The chalcogen analogue KEEPS its letter locant (P-66.1.6.1.3.1,:33451),
+        # The chalcogen analogue KEEPS its letter locant,:33451),
         # so the `== 'urea'` scoping must not fire for thiourea.
         from orthonym.assembly.composer import _build_n_substituted_name
         assert _build_n_substituted_name([("N", "methyl")], "thiourea") == \

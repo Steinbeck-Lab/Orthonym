@@ -10,13 +10,13 @@ Book. The authoritative ``MONOCYCLIC_COMPONENTS`` registry already stored
 this produced malformed fusion-component names such as ``pyro[3,2-d]pyrazole`` that
 OPSIN cannot parse, so the whole spiro molecule abstained.
 
-GOVERNING RULE, IUPAC 2013 **P-25.3.2.4** (``BlueBookV2/BlueBookV2.md:11905``):
+GOVERNING RULE, IUPAC 2013 **** (``the Blue Book Blue Book``):
 
   "The names of attached components are formed by replacing the last letter 'e' by
    'o' in the name of the component, i.e., indeno from indene (or by ADDING the
    letter 'o' when no final letter 'e' is present, i.e., **pyrano from pyran**)..."
 
-``BlueBookV2.md:12030`` gives "selenopyrano (preferred prefix) (from selenopyran,
+``the Blue Book`` gives "selenopyrano (preferred prefix) (from selenopyran,
 PIN)". Cross-checked against OPSIN's own ``fusionComponents`` token list
 (``pyrano`` / ``thiopyrano`` / ``selenopyrano`` / ``telluropyrano``).
 
@@ -44,7 +44,7 @@ def _const_key(smi):
 
 
 class TestPyranFamilyFusionPrefix:
-    """P-25.3.2.4: no final 'e' -> ADD 'o' ("pyrano from pyran"); the '-an'
+    """: no final 'e' -> ADD 'o' ("pyrano from pyran"); the '-an'
     truncation that produced 'pyro' is a defect."""
 
     @pytest.mark.unit

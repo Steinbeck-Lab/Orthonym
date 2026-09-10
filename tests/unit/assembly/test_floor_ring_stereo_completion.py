@@ -1,6 +1,6 @@
-"""M4 (): the best-effort floor must COMPLETE ring stereochemistry.
+"""M4 : the best-effort floor must COMPLETE ring stereochemistry.
 
-A saturated ring stereocentre needs a relative descriptor (cis/trans, P-31.1.4) or
+A saturated ring stereocentre needs a relative descriptor (cis/trans, or
 an OPSIN-numbering-anchored absolute descriptor — NOT the bare `(1r,3R)-` absolute
 R/S block `collect_stereodescriptors` emits, which OPSIN cannot parse. When the
 ring block is unparseable the whole stereo layer is dropped and the molecule
@@ -54,7 +54,7 @@ def _best_effort_name(smiles):
     p = subprocess.run([sys.executable, "-c", code], capture_output=True, text=True,
                        cwd="/home/kohulan/OpenSTOUT/Orthonym")
     out = p.stdout.strip().splitlines()
-    # the child prints repr() of the name string; ast.literal_eval parses that
+    # the child prints repr of the name string; ast.literal_eval parses that
     # string literal safely (never eval on subprocess output).
     return ast.literal_eval(out[-1]) if out else None
 

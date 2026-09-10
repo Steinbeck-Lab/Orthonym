@@ -1,15 +1,15 @@
-""" BP-3 cluster C2 — chalcogen-ether / sulfinyl-sulfonyl ARM recursion.
+""" cluster C2 — chalcogen-ether / sulfinyl-sulfonyl ARM recursion.
 
 The `-S-R` / `-Se-R` / `-Te-R` / `-S(=O)-R` / `-S(=O)(=O)-R` substituent arm was
 named by CARBON-COUNT, collapsing unsaturation / branching / hetero / aryl to a
 saturated linear alkyl (allyl -> propyl, isobutyl -> butyl, 2-hydroxyethyl ->
-ethyl, phenyl -> hexyl) — a constitutionally different molecule that SELF-01 then
+ethyl, phenyl -> hexyl) — a constitutionally different molecule that then
 suppressed to `unknown`.
 
 C2-A recurses into the arm via ``name_substituent_fragment`` and encloses a
-complex arm per P-16.3.3 (BB 27836 ``[(penta-1,4-dien-3-yl)sulfanyl]cyclobutane``;
+complex arm per (BB 27836 ``[(penta-1,4-dien-3-yl)sulfanyl]cyclobutane``;
 BB 25713 ``(prop-2-en-1-yl)cyclohexane``). C2-B builds the acid-stem sulfinyl /
-sulfonyl PIN (P-63.6) for an arm ``_classify_oxide_side`` declines.
+sulfonyl PIN for an arm ``_classify_oxide_side`` declines.
 
 These assert the exact builder-return strings (no OPSIN); the enclosing-mark and
 fail-closed contract are what this lever changes. Full-name round-trips are

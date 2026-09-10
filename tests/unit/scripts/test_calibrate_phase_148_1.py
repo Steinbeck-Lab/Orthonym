@@ -1,14 +1,14 @@
-"""Unit tests for ``scripts/calibrate_phase_148_1.py`` (D-08 Tier 1).
+"""Unit tests for ``scripts/calibrate_phase_148_1.py`` (Tier 1).
 
 Covers:
-- D-02 grid topology + sum-to-1.0 filter (50-300 valid configs).
-- D-05 3-level tie-breaker logic (parent_correctness > balance > lex).
-- D-04 anti-overfitting guard (carry-forward of Phase 146 D-16).
-- D-07 wall-clock guard constants (3-hr soft warning / 5-hr hard abort).
-- D-01 path constants (BASELINE_CSV → post-148, SPLITS/OUT → 148.1 paths).
+- grid topology + sum-to-1.0 filter (50-300 valid configs).
+- 3-level tie-breaker logic (parent_correctness > balance > lex).
+- anti-overfitting guard (carry-forward of a phase).
+- wall-clock guard constants (3-hr soft warning / 5-hr hard abort).
+- path constants (BASELINE_CSV → post-148, SPLITS/OUT → 148.1 paths).
 
 Uses ``importlib.import_module`` to load the script under test (same pattern
-as Phase 146 analog tests).
+as a phase analog tests).
 """
 import importlib
 import sys
@@ -22,7 +22,7 @@ cp = importlib.import_module("calibrate_phase_148_1")
 
 
 class TestGridGeneration:
-    """D-02 grid topology + sum-to-1.0 filter."""
+    """ grid topology + sum-to-1.0 filter."""
 
     def test_sum_to_1_filter_reduces_to_realistic_count(self):
         """5^5=3125 grid × sum-to-1.0 (±0.01) → between 50 and 300 valid configs."""
@@ -40,15 +40,15 @@ class TestGridGeneration:
             assert pc in valid_pc, f"D-02 violation: parent_correctness={pc}"
 
     def test_grid_version_is_phase148_1_v1(self):
-        """D-01 GRID_VERSION lock."""
+        """ GRID_VERSION lock."""
         assert cp.GRID_VERSION == "phase148_1_v1", (
             f"D-01 GRID_VERSION wrong: {cp.GRID_VERSION}"
         )
 
     def test_ratio_locked_at_zero(self):
-        """Phase 145.2 D-09-a.1 carry-forward: ratio is permanently 0.0.
+        """a phase -a.1 carry-forward: ratio is permanently 0.0.
 
-        Note: ``ratio`` is not in FACTOR_GRID for Phase 148.1; the worker
+        Note: ``ratio`` is not in FACTOR_GRID for a phase; the worker
         sets it to 0.0 in cs.FACTOR_WEIGHTS_V18. The grid only generates
         configs with the 5 active factors (atom_coverage, fg_recognition,
         substituent_completeness, parent_correctness, multiple_bond_count).
@@ -64,7 +64,7 @@ class TestGridGeneration:
 
 
 class TestTieBreaker:
-    """D-05 3-level tie-breaker."""
+    """ 3-level tie-breaker."""
 
     def _result(self, weights, test_rt):
         return {
@@ -163,7 +163,7 @@ class TestTieBreaker:
 
 
 class TestAntiOverfittingGuard:
-    """D-04 anti-overfitting guard (carry-forward Phase 146 D-16)."""
+    """ anti-overfitting guard (carry-forward a phase)."""
 
     def test_guard_passes_when_train_test_aligned(self):
         """Train-best and test-best agree on the same config → 0% direction change."""
@@ -185,7 +185,7 @@ class TestAntiOverfittingGuard:
         ]
         chosen = cp.select_winner_with_anti_overfit(results)
         check = chosen.get("anti_overfitting_check", {})
-        # Either D-04 key or D-16 (legacy) key indicates pass.
+        # Either key or (legacy) key indicates pass.
         assert (
             check.get("passes_d04_5pct_threshold") is True
             or check.get("passes_d16_5pct_threshold") is True
@@ -233,7 +233,7 @@ class TestAntiOverfittingGuard:
 
 
 class TestWallClockGuard:
-    """D-07 wall-clock budget."""
+    """ wall-clock budget."""
 
     def test_wallclock_constants_match_d07(self):
         """Source contains 3-hr warn + 5-hr abort constants in literal form."""

@@ -5,7 +5,7 @@ Tests both the fix for cycloalkyl, branched, heterocyclic, and substituted
 aryl N-substituents (which were incorrectly named as linear alkyls) and
 regression protection for existing simple N-substituent naming.
 
-Phase 106-01: FIX-11 from Phase 102.5 audit.
+a phase-01: from a phase audit.
 """
 
 import pytest
@@ -22,7 +22,7 @@ COMPLEX_N_SUBSTITUENT_CASES = [
     ("CC(=O)NC(C)C", "propan-2-yl", "branched substituent (F-T9 RET-02: PIN propan-2-yl, not isopropyl)"),
     ("CC(=O)NC(C)(C)C", "tert-butyl", "branched substituent (tert-butyl)"),
     ("CC(=O)Nc1ccncc1", "pyridin", "heterocyclic substituent"),
-    # WS-A.2 re-baseline: the old expectation 'tolu' locked the WRONG form
+    #.2 re-baseline: the old expectation 'tolu' locked the WRONG form
     # 'N-(4-methyltoluenyl)acetamide' (toluenyl is non-PIN and double-counts
     # the methyl). PIN is N-(4-methylphenyl)acetamide (OPSIN-verified).
     ("CC(=O)Nc1ccc(C)cc1", "4-methylphenyl", "substituted aryl substituent (PIN form)"),
@@ -70,7 +70,7 @@ def test_simple_n_substituent_regression(smiles, expected_name):
 # ---- Mixed N-substituents (alphabetization) ----
 
 def test_mixed_n_substituents_alphabetized():
-    """Mixed N-substituents must be alphabetized per IUPAC P-14.5."""
+    """Mixed N-substituents must be alphabetized per IUPAC."""
     name = name_compound("CC(=O)N(CC)c1ccccc1")
     assert name == "N-ethyl-N-phenylacetamide", (
         f"Expected 'N-ethyl-N-phenylacetamide', got '{name}'"

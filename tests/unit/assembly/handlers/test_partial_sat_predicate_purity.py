@@ -1,6 +1,6 @@
-"""WR-02 regression: predicates do not re-run _is_complex_ring_system per call.
+""" regression: predicates do not re-run _is_complex_ring_system per call.
 
-Per 160-REVIEW.md WR-02: the partial_sat, polycyclic, and ring_ester
+Per internal notes: the partial_sat, polycyclic, and ring_ester
 predicates each call ``composer._is_complex_ring_system(mol)`` directly.
 Three predicates running the same SMARTS check per dispatch is wasteful.
 Plan-05 introduces a shared memoization helper

@@ -6,7 +6,7 @@ Verifies that:
 3. Known CIP limitations are documented (docs/cip_known_limitations.md exists)
 4. The stereo pipeline gracefully handles CIP assignment failures
 
-a phase: STER-19 requirement.
+a phase: requirement.
 """
 import os
 import pytest
@@ -110,7 +110,7 @@ class TestCIPDocumentationExists:
     """Verify CIP limitations documentation exists."""
 
     def test_cip_limitations_doc_exists(self):
-        """docs/cip_known_limitations.md must exist per STER-19."""
+        """docs/cip_known_limitations.md must exist per."""
         doc_path = os.path.join(
             os.path.dirname(__file__), '..', '..', '..', 'docs',
             'cip_known_limitations.md'
@@ -141,7 +141,7 @@ class TestCIPDocumentationExists:
             assert category in content, f"Missing failure category: {category}"
 
     def test_cip_doc_contains_ster18_deferral(self):
-        """Document must reference STER-18 deferral to a phase."""
+        """Document must reference deferral to a phase."""
         doc_path = os.path.join(
             os.path.dirname(__file__), '..', '..', '..', 'docs',
             'cip_known_limitations.md'
@@ -163,15 +163,15 @@ class TestCIPDocumentationExists:
 
 
 # ============================================================================
-# a phase.5 SUB-04 — stereo r/s casing (Wave 0), RE-SCOPED per C5 + VERIFIED.
+# a phase — stereo r/s casing (Wave 0), RE-SCOPED per C5 + VERIFIED.
 #
 # VERIFIED (rdCIPLabeler probe, 2026-06-02, per the "verify don't trust numbers"
 # directive / A1): the genuine pseudo-asymmetric set = the molecules where
 # rdCIPLabeler ITSELF assigns lowercase r/s on the WHOLE molecule. The fix
-# () defaults to that verdict, so these MUST keep lowercase (regression
+#  defaults to that verdict, so these MUST keep lowercase (regression
 # gate, assert NOW). NOTE: the (1r,3r)-1-amino-3-fluorocyclobutane the SPEC
 # called a "false leak" is in fact GENUINE (rdCIPLabeler -> r,r; a 1,3-
-# disubstituted cyclobutane is pseudo-asymmetric per P-92.1.4.2) — OPSIN
+# disubstituted cyclobutane is pseudo-asymmetric per — OPSIN
 # rejecting it in BOTH casings is OPSIN's documented CIP-sequence-rule
 # limitation, not ours. The ACTUAL false leak is the ceramide
 # cyclohexane-1,2,3,4,5,6-hexayl substituent series (name shows 2s/5r but

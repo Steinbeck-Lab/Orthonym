@@ -1,4 +1,4 @@
-""" — a carbon COUNT may never stand in for a STRUCTURE PROOF.
+""" Task — a carbon COUNT may never stand in for a STRUCTURE PROOF.
 
 ``get_alkyl_name(n)`` can spell exactly one shape: an unbranched, SATURATED,
 acyclic, all-carbon chain attached at one of its two termini. ``(name, count)``
@@ -52,7 +52,7 @@ from orthonym.namer import Orthonym
 
 @pytest.fixture
 def ungated_namer(monkeypatch):
-    """A namer with the SELF-01 OPSIN validity gate explicitly DISABLED.
+    """A namer with the OPSIN validity gate explicitly DISABLED.
 
     Most of these fabrications were GATE-SUPPRESSED, so asserting on the default
     path would pass vacuously against the pre-fix tree too. The gate is the
@@ -125,17 +125,17 @@ def test_s4_butenyl_is_not_butyl(ungated_namer):
 
 
 # ---------------------------------------------------------------------------
-# S4 follow-on — the enclosing marks P-16.3.4 requires once locants can arrive
+# S4 follow-on — the enclosing marks requires once locants can arrive
 # ---------------------------------------------------------------------------
 
 def test_multiplied_alkenyl_prefix_takes_di_and_parentheses():
-    """P-16.3.4 'Parentheses (round brackets)... are used to enclose multiplied
+    """ 'Parentheses (round brackets)... are used to enclose multiplied
     components that are:... (b) simple substituent prefixes modified by 'ene'
     and 'yne' endings and that have locants' (the Blue Book,:7104; its own
     example is 'di(prop-1-en-2-yl)' (preferred prefix), and the Blue Book carries the
     PIN '1,1-dimethyl-3,4-di(prop-1-en-2-yl)germolane').
 
-    'di', NOT 'bis': every clause of P-16.3.5 (:7104) is gated on the component
+    'di', NOT 'bis': every clause of (:7104) is gated on the component
     being SUBSTITUTED — '(a) compound or complex (i.e. substituted) prefixes' —
     and an unsubstituted alkenyl prefix is neither.
 
@@ -148,7 +148,7 @@ def test_multiplied_alkenyl_prefix_takes_di_and_parentheses():
         Chem.MolFromSmarts("[CX3](=O)[NX3]([#6])[#6]"))
     assert match, "the tertiary-amide SMARTS must match"
     out = get_n_n_dialkyl_carbamoyl_prefix(mol, match)
-    # P-66.1.1.4.1.1: carbamoyl N-locant omitted; 'di' + enclosed alkenyl stem.
+    #: carbamoyl N-locant omitted; 'di' + enclosed alkenyl stem.
     assert out == "di(prop-2-en-1-yl)carbamoyl", out
     assert "bis(" not in out
 
@@ -159,7 +159,7 @@ def test_saturated_dialkyl_carbamoyl_is_byte_identical():
     match = mol.GetSubstructMatch(
         Chem.MolFromSmarts("[CX3](=O)[NX3]([#6])[#6]"))
     assert get_n_n_dialkyl_carbamoyl_prefix(mol, match) == (
-        "dipropylcarbamoyl")  # P-66.1.1.4.1.1: N-locant omitted
+        "dipropylcarbamoyl")  #: N-locant omitted
 
 
 def test_mono_n_alkyl_carbamoyl_saturated_is_byte_identical():
@@ -171,18 +171,18 @@ def test_mono_n_alkyl_carbamoyl_saturated_is_byte_identical():
         Chem.MolFromSmarts("[CX3](=O)[NX3H1][#6]"))
     assert len(matches) == 1, matches
     out = get_n_alkyl_carbamoyl_prefix(mol, matches[0])
-    assert out == "propylcarbamoyl", out  # P-66.1.1.4.1.1: N-locant omitted
+    assert out == "propylcarbamoyl", out  #: N-locant omitted
 
 
 def test_mono_n_alkyl_carbamoyl_alkenyl_gains_its_marks():
-    """The other half of P-16.3.4: once an 'ene'-ending prefix with locants can
+    """The other half of: once an 'ene'-ending prefix with locants can
     reach the interpolation, it must be enclosed."""
     mol = Chem.MolFromSmiles("OC(=O)CCCC(=O)NCC=C")
     matches = mol.GetSubstructMatches(
         Chem.MolFromSmarts("[CX3](=O)[NX3H1][#6]"))
     assert len(matches) == 1, matches
     out = get_n_alkyl_carbamoyl_prefix(mol, matches[0])
-    # N-locant omitted (P-66.1.1.4.1.1); the alkenyl stem keeps its marks.
+    # N-locant omitted; the alkenyl stem keeps its marks.
     assert out == "(prop-2-en-1-yl)carbamoyl", out
 
 
@@ -258,7 +258,7 @@ def test_s2_taurine_amide_names_correctly_end_to_end(ungated_namer):
     N-acyl-substituent form built on top of that wrong-chain selection.
     a phase lead a fixed principal-chain selection for heteroatom-only-suffix
     acids (sulfonic/sulfinic/phosphonic/phosphinic now register their
-    S/P-bearing carbon so criterion 1, P-44.1, picks the correct chain), so
+    S/P-bearing carbon so criterion 1,, picks the correct chain), so
     this molecule now names via the same acylamido form as its siblings in
     test_acyl_taurine.py (2-acetamidoethane-1-sulfonate,
     2-formamidoethane-1-sulfonate, 2-propanamidoethane-1-sulfonate).
@@ -285,10 +285,10 @@ def test_s2_does_not_fabricate_a_c43_chain(ungated_namer):
     ("OC(=O)CCNC(=O)NCCC", "3-[(propylcarbamoyl)amino]propanoic acid"),
     ("OC(=O)CCNC(=O)NC", "3-[(methylcarbamoyl)amino]propanoic acid"),
     ("OC(=O)CCCC(=O)N(CCC)CCC",
-     "5-(dipropylamino)-5-(dipropylcarbamoyl)pentanoic acid"),  # P-66.1.1.4.1.1: N omitted
+     "5-(dipropylamino)-5-(dipropylcarbamoyl)pentanoic acid"),  #: N omitted
     ("OC(=O)CCSCCC", "3-(propylsulfanyl)propanoic acid"),
     ("OC(=O)CCSCC(C)C", "3-[(2-methylpropyl)sulfanyl]propanoic acid"),
-    # P-63.2.5 (the Blue Book): the PIN for a chalcogen analogue of an ether
+    # (the Blue Book): the PIN for a chalcogen analogue of an ether
     # is substitutive (method 1), not the functional-class "R R' sulfide" (method 2).
     ("CCSCC", "(ethylsulfanyl)ethane"),          # was "diethyl sulfide" (the Blue Book)
     ("CSc1ccccc1", "(methylsulfanyl)benzene"),   # was "methyl phenyl sulfide" (the Blue Book "(not thioanisole)")

@@ -1,12 +1,12 @@
 """
-Unit tests for fused heterocycle prefix stem data and get_fused_heterocycle_prefix().
+Unit tests for fused heterocycle prefix stem data and get_fused_heterocycle_prefix.
 
-Phase 78 Plan 01 — RED tests (written before implementation).
+a phase Plan 01 — RED tests (written before implementation).
 
 Tests:
 - FUSED_HETEROCYCLE_PREFIX_STEMS dict completeness
-- _derive_prefix_stem() terminal-e elision rule
-- get_fused_heterocycle_prefix() locant resolution
+- _derive_prefix_stem terminal-e elision rule
+- get_fused_heterocycle_prefix locant resolution
 - Tautomer locant preservation
 - Partial saturation stems
 - O(1) static lookup (no name_compound recursion)
@@ -67,7 +67,7 @@ class TestPrefixStemsExist:
 
 
 class TestDerivePrefixStem:
-    """Test _derive_prefix_stem() terminal-e elision rule."""
+    """Test _derive_prefix_stem terminal-e elision rule."""
 
     @pytest.mark.parametrize("name,expected", [
         ("quinoline", "quinolin"),
@@ -99,7 +99,7 @@ class TestDerivePrefixStem:
 
 
 class TestLocantResolution:
-    """Test get_fused_heterocycle_prefix() returns correct stem-locant-yl strings."""
+    """Test get_fused_heterocycle_prefix returns correct stem-locant-yl strings."""
 
     @pytest.mark.parametrize("smiles,attach_idx,expected_prefix", [
         # Quinoline: attach at C-2 (IUPAC locant 2)
@@ -227,14 +227,14 @@ class TestPartialSaturation:
     """Verify partially saturated entries produce correct prefix stems."""
 
     @pytest.mark.parametrize("smiles,expected_stem", [
-        # v29 Phase C: the SAME P-54.4.3.2 sentence that demotes chromane/isochromane
+        # Phase C: the SAME sentence that demotes chromane/isochromane
         # (see the note below) names 'indoline' and 'isoindoline' as non-preferred too,
-        # so their prefix stems follow the PIN parents (BB:16992 / :16999). OPSIN-RT
+        # so their prefix stems follow the PIN parents (the Blue Book /:16999). OPSIN-RT
         # verified: `1-(2,3-dihydro-1H-indol-1-yl)ethan-1-one` round-trips.
         ("c1ccc2c(c1)CCN2", "2,3-dihydro-1H-indol"),
         ("c1ccc2c(c1)CNC2", "2,3-dihydro-1H-isoindol"),
         ("c1ccc2c(c1)CCC2", "2,3-dihydro-1H-inden"),
-        # v23 IH-01h: chromane/isochromane PINs are the 1-/2-benzopyran forms (P-54.4.3.2);
+        #: chromane/isochromane PINs are the 1-/2-benzopyran forms;
         # the substituent prefix stem follows (OPSIN-RT: 3,4-dihydro-2H-1-benzopyran-6-yl parses).
         ("c1ccc2c(c1)CCCO2", "3,4-dihydro-2H-1-benzopyran"),
         ("c1ccc2c(c1)CCCN2", "1,2,3,4-tetrahydroquinolin"),
@@ -252,7 +252,7 @@ class TestNoRecursion:
     """Verify O(1) static lookup — no name_compound recursion."""
 
     def test_no_name_compound_recursion(self):
-        """get_fused_heterocycle_prefix() does NOT call name_compound."""
+        """get_fused_heterocycle_prefix does NOT call name_compound."""
         src = inspect.getsource(get_fused_heterocycle_prefix)
         assert "name_compound" not in src, (
             "get_fused_heterocycle_prefix() must not call name_compound "
@@ -261,7 +261,7 @@ class TestNoRecursion:
 
 
 class TestEdgeCases:
-    """Edge cases for get_fused_heterocycle_prefix()."""
+    """Edge cases for get_fused_heterocycle_prefix."""
 
     def test_returns_none_for_unknown_smiles(self):
         """Unknown core SMILES returns None."""

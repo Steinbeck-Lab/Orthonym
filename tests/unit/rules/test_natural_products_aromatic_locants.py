@@ -1,11 +1,11 @@
-"""Phase 160.1 D-19 + D-20 + ADR-19-05: deterministic aromatic-ring
+"""a phase + + -05: deterministic aromatic-ring
 canonical locants for retained NP scaffolds.
 
 Tests cover:
-- _NP_AROMATIC_RING_LOCANTS table presence + estrane entry per IUPAC P-31.1.3.4
-- _find_scaffold_unsaturation table-path branch (D-20 implementation)
+- _NP_AROMATIC_RING_LOCANTS table presence + estrane entry per IUPAC
+- _find_scaffold_unsaturation table-path branch (implementation)
 - _find_scaffold_unsaturation Kekulize-path branch preservation (non-cataloged)
-- Indicated-H marker rendering per IUPAC P-31.1.4.3.4 in _assemble_np_name
+- Indicated-H marker rendering per IUPAC in _assemble_np_name
 - Saturated-A-ring estrane negative case (no (10) marker on non-aromatic)
 - Non-aromatic-scaffold path unchanged (cholestane, androstane)
 """
@@ -25,10 +25,10 @@ from orthonym.perception.natural_products import detect_natural_product
 
 
 class TestNPAromaticRingLocantsTable:
-    """CONTEXT D-20 + ADR-19-05: canonical-locant table for aromatic NP scaffolds."""
+    """internal notes + -05: canonical-locant table for aromatic NP scaffolds."""
 
     def test_estrane_in_canonical_table(self):
-        """_NP_AROMATIC_RING_LOCANTS has estrane entry per IUPAC P-31.1.3.4."""
+        """_NP_AROMATIC_RING_LOCANTS has estrane entry per IUPAC."""
         assert "estrane" in _NP_AROMATIC_RING_LOCANTS
         ene = _NP_AROMATIC_RING_LOCANTS["estrane"]
         assert ene == [(1, 2, None), (3, 4, None), (5, 10, 10)], (
@@ -63,12 +63,12 @@ class TestNPAromaticRingLocantsTable:
 
 
 class TestFindScaffoldUnsaturationTablePath:
-    """CONTEXT D-20: _find_scaffold_unsaturation table-path branch."""
+    """internal notes: _find_scaffold_unsaturation table-path branch."""
 
     def test_find_scaffold_unsaturation_returns_indicated_h_dict(self):
         """When scaffold_class is in the table AND molecule has aromatic atoms
         in the scaffold, _find_scaffold_unsaturation returns canonical locants
-        from the table + an ene_indicated_h dict per IUPAC P-31.1.4.3.4."""
+        from the table + an ene_indicated_h dict per IUPAC."""
         smi = "C[C@]12CC[C@@H]3c4ccc(O)cc4CC[C@H]3[C@@H]1[C@@H](O)[C@@H](O)[C@@H]2O"
         mol = Chem.MolFromSmiles(smi)
         info = detect_natural_product(mol)
@@ -86,7 +86,7 @@ class TestFindScaffoldUnsaturationTablePath:
         assert u["ene"] == [1, 3, 5], (
             f"Expected ene [1, 3, 5] from canonical table; got: {u['ene']}"
         )
-        # ene_indicated_h should map 5 -> 10 per IUPAC P-31.1.4.3.4
+        # ene_indicated_h should map 5 -> 10 per IUPAC
         assert u["ene_indicated_h"] == {5: 10}, (
             f"Expected ene_indicated_h {{5: 10}}; got: {u['ene_indicated_h']}"
         )
@@ -125,7 +125,7 @@ class TestFindScaffoldUnsaturationTablePath:
 
 
 class TestAromaticScaffoldRendering:
-    """CONTEXT D-20 + IUPAC P-31.1.4.3.4: rendering of (10) marker."""
+    """internal notes + IUPAC: rendering of (10) marker."""
 
     def test_indicated_h_marker_appears_in_output(self):
         """The (10) indicated-H marker MUST appear in rendered output for
@@ -151,7 +151,7 @@ class TestAromaticScaffoldRendering:
 
 
 class TestBackwardsCompatibility:
-    """Verify the D-20 amendment preserves backwards compatibility."""
+    """Verify the amendment preserves backwards compatibility."""
 
     def test_unsaturation_dict_still_has_ene_key(self):
         """The 'ene' key continues to be a sorted List[int] for backwards-compat."""

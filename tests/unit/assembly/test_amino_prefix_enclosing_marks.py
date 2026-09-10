@@ -1,14 +1,14 @@
 """An N,N-dialkylamino prefix must be assembled, never concatenated.
 
 `assembly/substituent_enumerator.py::_name_amino_branch` built its prefix from a
-local `Counter` + `SIMPLE_MULTIPLIERS` copy and a raw `sorted()`, joined with no
+local `Counter` + `SIMPLE_MULTIPLIERS` copy and a raw `sorted`, joined with no
 enclosing marks. For a SYMMETRIC pair that happens to be right
 (`dimethylamino`), so the defect stayed invisible; for an ASYMMETRIC pair it
 emitted `ethylmethylamino`, which OPSIN reads as the single substituent
 *2-ethylmethyl*. `CCN(C)CC(=O)N` was therefore named
 `2-ethylmethylaminoacetamide` -> `CCC(NC)C(N)=O`, a DIFFERENT constitution.
 
-Governing rule, P-16.5.1.3.1 (BlueBookV2.md:7272, under
+Governing rule, (the Blue Book, under
 `### **P"16.5** ENCLOSING MARKS`):
 
     "For mononuclear parent hydrides with two or more substituents the first
@@ -21,7 +21,7 @@ Governing rule, P-16.5.1.3.1 (BlueBookV2.md:7272, under
 The nitrogen is that mononuclear parent -- which is exactly why the symmetric
 `dimethylamino` keeps its multiplier outside and needs no inner pair, while the
 asymmetric `ethyl(methyl)amino` does. The whole prefix then takes the outer
-bracket: P-63.7 POLYFUNCTIONAL COMPOUNDS, BB:28170
+bracket: POLYFUNCTIONAL COMPOUNDS, the Blue Book
 `2-[di(butan-2-yl)amino]butan-2-ol (PIN)`.
 
 Second, independent defect in the same function: each branch was named by
@@ -45,7 +45,7 @@ from orthonym import Orthonym
 
 @pytest.fixture(scope="module")
 def namer():
-    # Gate OFF on purpose: with the gate on, SELF-01 merely REFUSES the wrong
+    # Gate OFF on purpose: with the gate on, merely REFUSES the wrong
     # name ('unknown organic compound'). That hides the generator defect and
     # turns a wrong molecule into a coverage loss. Judge the generator.
     _namer._DISABLE_VALIDITY_GATE = True

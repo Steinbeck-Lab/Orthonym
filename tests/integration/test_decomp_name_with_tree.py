@@ -1,12 +1,12 @@
-"""Phase 160 Plan-04 integration tests: Orthonym.name_with_tree() round-trip.
+"""a phase Plan-04 integration tests: Orthonym.name_with_tree round-trip.
 
-Per CONTEXT D-04 + D-05 + DECOMP-02: ``Orthonym.name_with_tree(smi)``
+Per internal notes + + DECOMP-02: ``Orthonym.name_with_tree(smi)``
 returns a NamingResult(name, tree, atom_to_locant_hint) per the public API.
 
-Per CONTEXT D-05 incremental migration: for the 30 currently-extracted
+Per internal notes incremental migration: for the 30 currently-extracted
 handlers (Plans 02-03 ship) tree is None; the name field is byte-
 identical to ``Orthonym.name(smi)``. For tree-emitting handlers
-(v19+1), name_tree_to_string(tree) round-trips byte-identical to name.
+(+1), name_tree_to_string(tree) round-trips byte-identical to name.
 
 This file verifies:
 - name_with_tree returns NamingResult.
@@ -74,14 +74,14 @@ def test_name_field_matches_name(smi, expected_name_or_none, namer):
 
 
 def test_tree_is_optional_per_d05(namer):
-    """Per CONTEXT D-05 first-wave: tree is None for the 30 extracted handlers."""
+    """Per internal notes first-wave: tree is None for the 30 extracted handlers."""
     result = namer.name_with_tree("CCO")
-    # Tree may be None (first-wave) or NameTreeNode (v19+1).
+    # Tree may be None (first-wave) or NameTreeNode (+1).
     assert result.tree is None or isinstance(result.tree, NameTreeNode)
 
 
 def test_atom_to_locant_hint_is_optional(namer):
-    """atom_to_locant_hint is Optional[Dict] per CONTEXT D-05."""
+    """atom_to_locant_hint is Optional[Dict] per internal notes."""
     result = namer.name_with_tree("CCO")
     assert result.atom_to_locant_hint is None or isinstance(
         result.atom_to_locant_hint, dict,
@@ -95,7 +95,7 @@ def test_round_trip_on_tree_populated_node():
     This exercises the explicit-field serialization branch of
     name_tree_to_string (NOT the legacy fragment_legacy path).
     """
-    # Manual tree construction (mirrors what a v19+1 tree-emitting handler
+    # Manual tree construction (mirrors what a +1 tree-emitting handler
     # would do).
     tree = NameTreeNode(parent_stem="ethan", suffix="ol")
     serialized = name_tree_to_string(tree)
@@ -107,7 +107,7 @@ def test_round_trip_on_tree_populated_node():
 
 
 def test_name_with_tree_idempotent(namer):
-    """Two name_with_tree() calls on the same SMILES produce same result."""
+    """Two name_with_tree calls on the same SMILES produce same result."""
     r1 = namer.name_with_tree("CCO")
     r2 = namer.name_with_tree("CCO")
     assert r1.name == r2.name
@@ -125,14 +125,14 @@ def test_name_with_tree_handles_complex_smiles(namer):
 
 
 def test_name_with_tree_invalid_smiles_raises(namer):
-    """Invalid SMILES raises ValueError (matches Orthonym.name() contract)."""
+    """Invalid SMILES raises ValueError (matches Orthonym.name contract)."""
     with pytest.raises(ValueError):
         namer.name_with_tree("not-a-valid-smiles-string-XYZ!!")
 
 
 def test_name_with_tree_tree_population_status(namer):
-    """Phase 165: every reachable handler populates a NameTreeNode (SCORE-01) and
-    the Plan-04 SC-3 boundary fallback guarantees a non-null, parity-passing tree
+    """a phase: every reachable handler populates a NameTreeNode (SCORE-01) and
+    the Plan-04 boundary fallback guarantees a non-null, parity-passing tree
     for ANY SMILES — including functional-class / retained / ion names produced
     BELOW dispatch_inner (which get a coarse_fallback node).
     """
@@ -148,8 +148,8 @@ def test_name_with_tree_tree_population_status(namer):
         )
         assert name_tree_to_string(result.tree, "pin") == result.name
 
-    # Functional-class name produced BELOW dispatch_inner -> SC-3 boundary
-    # coarse fallback (Phase 165 Plan 04): non-null + parity, class_id marks it.
+    # Functional-class name produced BELOW dispatch_inner -> boundary
+    # coarse fallback (a phase Plan 04): non-null + parity, class_id marks it.
     result = namer.name_with_tree("CS(=O)C")  # dimethyl sulfoxide (bypasses dispatch_inner)
     assert isinstance(result.tree, NameTreeNode)
     assert name_tree_to_string(result.tree, "pin") == result.name
@@ -182,7 +182,7 @@ def test_simple_molecule_emits_tree_round_trip(smi, namer):
 
 
 def test_atom_to_locant_hint_preserved_for_n_oxide(namer):
-    """CR-04 part B regression: n_oxide handler's atom_to_locant_hint
+    """ part B regression: n_oxide handler's atom_to_locant_hint
     threads to name_with_tree caller (no longer silently None).
 
     The n_oxide handler produces a non-None ``atom_to_locant_hint``

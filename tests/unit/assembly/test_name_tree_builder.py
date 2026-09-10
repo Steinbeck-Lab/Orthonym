@@ -99,7 +99,7 @@ class TestFieldMapping:
 
 
 class TestPurity:
-    """AP-160-15 /: no mutation of inputs."""
+    """-15 /: no mutation of inputs."""
 
     def test_purity_inputs_unchanged(self):
         frags = [
@@ -118,7 +118,7 @@ class TestPurity:
 
 
 class TestParityWithAssembleFragments:
-    """SC-1: name_tree_to_string(fragments_to_tree(f)) == _assemble_fragments(f, style)."""
+    """: name_tree_to_string(fragments_to_tree(f)) == _assemble_fragments(f, style)."""
 
     def _frag_lists(self):
         return [

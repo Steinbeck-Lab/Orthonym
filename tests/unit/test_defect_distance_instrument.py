@@ -1,4 +1,4 @@
-"""a phase.6 CHOKE-03 instrument self-check.
+"""a phase CHOKE-03 instrument self-check.
 
 Asserts the *correctness* invariants of ``scripts/audit_defect_distance.py``
 (the cohort *usefulness* judgement for Phase-171 targeting stays MANUAL per

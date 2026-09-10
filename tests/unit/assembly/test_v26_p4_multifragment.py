@@ -14,13 +14,13 @@ P4 lifts this ONLY under the ``complete`` tier
 ``Orthonym._name_multifragment_complete``,
 ``src/orthonym/namer.py:2120``): split the mol into connected components,
 name each NEUTRAL component through the ``complete``-tier single-component
-pipeline (a fresh ``Orthonym`` instance, per the existing RL-4 fresh-
-instance pattern), order + join them via the existing P-14.8.1 adduct
+pipeline (a fresh ``Orthonym`` instance, per the existing fresh-
+instance pattern), order + join them via the existing adduct
 assembler (``rules.adducts.name_adduct`` / ``_name_component``,
-``src/orthonym/rules/adducts.py``), then run the SAME whole-string SELF-01
+``src/orthonym/rules/adducts.py``), then run the SAME whole-string
 gate the rest of the recovery path already applies. Fail-closed: if ANY
 component is charged (P5 owns charged multi-fragment input) or unnameable by
-ANY tier, or the assembled string fails SELF-01, the whole recovery declines
+ANY tier, or the assembled string fails, the whole recovery declines
 (``None`` -> the pre-existing abstention/descriptive-fallback is kept
 byte-identical) -- P4 never drops, placeholders, or partially joins a
 component.
@@ -30,7 +30,7 @@ bounded probe process -- see ``scripts/diagnose.py``-style batched-JVM RT):
   - COVERAGE cases: pin abstains cleanly (``unknown organic compound``);
     complete emits the per-component split-name-join and it round-trips.
   - BYTE-IDENTICAL cases: wherever the PIN path already names the
-    multi-fragment input (existing P-14.8.1 handler on two PIN-nameable
+    multi-fragment input (existing handler on two PIN-nameable
     organics, the salt handler on a charged pair, or the frozen space-join
     on identical-component input), complete reproduces it EXACTLY -- P4 is a
     strict no-op there.
@@ -39,7 +39,7 @@ bounded probe process -- see ``scripts/diagnose.py``-style batched-JVM RT):
     organoiron component (``diphenyliron``) both stay byte-identical
     failure signals under complete -- never a wrong/partial joined name.
 
-NOTE on the harness: ``conftest`` force-disables the production SELF-01 gate
+NOTE on the harness: ``conftest`` force-disables the production gate
 for the whole suite (tests assert raw output). The full-namer cases here
 re-enable it via ``production_gate`` (skipped without Java/OPSIN). The
 direct ``rules.adducts`` function-level cases are deterministic and
@@ -66,7 +66,7 @@ pytestmark = pytest.mark.unit
 COVERAGE_CASES = [
     ("[SiH3]c1ccccn1.O", "2-silylpyridine—water (1/1)"),
     # change-asserted-value: the aza-cage heteroatom takes the LOWEST locant
-    # (P-31.1.4 heteroatoms-lowest over the equal-bridge bicyclo[4.4.0]). Here N
+    # heteroatoms-lowest over the equal-bridge bicyclo[4.4.0]). Here N
     # is adjacent to a bridgehead, so it attains locant 2 and the silyl carbon 3;
     # the old `4-silyl-5-aza` was a stale higher-locant numbering. Engine now
     # emits `3-silyl-2-aza…` (deterministic; OPSIN round-trips). The pyridine
@@ -76,7 +76,7 @@ COVERAGE_CASES = [
      "—2-silylpyridine (1/1)"),
 ]
 
-# BYTE-IDENTICAL: the PIN path ALREADY names these (existing P-14.8.1 adduct
+# BYTE-IDENTICAL: the PIN path ALREADY names these (existing adduct
 # handler on two PIN-nameable organics, the salt handler on a charged pair,
 # the frozen space-join on identical-component input); complete MUST equal
 # pin EXACTLY -- P4 must be a strict no-op whenever the PIN path succeeds.
@@ -126,7 +126,7 @@ def _find_opsin_jar():
 
 @pytest.fixture
 def production_gate(monkeypatch):
-    """Re-enable the production SELF-01 OPSIN validity gate (the suite disables
+    """Re-enable the production OPSIN validity gate (the suite disables
     it). Skips when Java/OPSIN are unavailable."""
     if not shutil.which("java") or _find_opsin_jar() is None:
         pytest.skip("OPSIN/Java not available for production-gate semantics")
@@ -167,7 +167,7 @@ def _complete():
 # ('[SiH3]c1ccccn1.[SiH3]c1ccc2ccccc2n1'), one component
 # ('[SiH3]c1ccc2ccccc2n1') is a P3 fused-heterocycle group-DROP case (the
 # silyl substituent is dropped, yielding the bare wrong name 'quinoline');
-# only the production SELF-01 gate catches that and turns it into a clean
+# only the production gate catches that and turns it into a clean
 # abstention (reproduced: with the gate off, raw pin emits 'quinoline').
 # --------------------------------------------------------------------------
 @pytest.mark.parametrize("smiles,_expected", COVERAGE_CASES)
@@ -180,7 +180,7 @@ def test_pin_abstains_on_general_only_component(smiles, _expected,
 
 # --------------------------------------------------------------------------
 # complete emits the expected per-component split-name-join (needs the
-# production gate: the emission must be SELF-01-verified, matching the P3
+# production gate: the emission must be -verified, matching the P3
 # full-namer pattern).
 # --------------------------------------------------------------------------
 @pytest.mark.parametrize("smiles,expected", COVERAGE_CASES)
@@ -293,7 +293,7 @@ def test_name_adduct_declines_charged_fragment_even_under_complete():
 
 
 # --------------------------------------------------------------------------
-# SELF-01: every non-failure name in the case tables above OPSIN-round-trips
+#: every non-failure name in the case tables above OPSIN-round-trips
 # to its input structure.
 # --------------------------------------------------------------------------
 @pytest.mark.parametrize("smiles,name", sorted(_RT_NAMES.items()))

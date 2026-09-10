@@ -41,7 +41,7 @@ def _make_features(smiles: str):
 
 @pytest.mark.unit
 class TestResolveParent:
-    """Tests for resolve_parent() parent type classification."""
+    """Tests for resolve_parent parent type classification."""
 
     def test_simple_chain_butane(self):
         """Butane: parent_type='chain', atom_count=4."""
@@ -165,7 +165,7 @@ class TestResolveParent:
 
 @pytest.mark.unit
 class TestResolveSuffix:
-    """Tests for resolve_suffix() suffix resolution."""
+    """Tests for resolve_suffix suffix resolution."""
 
     def test_alcohol_suffix(self):
         """Propan-1-ol: suffix text contains 'ol', count=1."""
@@ -253,7 +253,7 @@ class TestResolveSuffix:
 
 @pytest.mark.unit
 class TestApplyIonSuffixModification:
-    """Tests for apply_ion_suffix_modification() ion suffix transforms."""
+    """Tests for apply_ion_suffix_modification ion suffix transforms."""
 
     def _make_mock_features(self, species_type='neutral', total_charge=0):
         """Create a minimal mock features object."""

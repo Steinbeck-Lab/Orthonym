@@ -15,13 +15,13 @@ Naming algorithm:
    - 11: oxacycloundecan, 13: oxacyclotridecan, 15: oxacyclopentadecan
 5. Apply vowel elision and append '-2-one'.
 
-Reference: IUPAC 2013 Blue Book, P-25.5.2 (Lactones), P-31.1.3 (Replacement)
+Reference: IUPAC 2013 Blue Book, (Lactones), (Replacement)
 
 Examples:
-    O=C1CCO1      (beta-propiolactone)    -> oxetan-2-one
-    O=C1CCCO1     (gamma-butyrolactone)   -> oxolan-2-one
-    O=C1CCCCO1    (delta-valerolactone)   -> oxan-2-one
-    O=C1CCCCCO1   (epsilon-caprolactone)  -> oxepan-2-one
+    O=C1CCO1 (beta-propiolactone) -> oxetan-2-one
+    O=C1CCCO1 (gamma-butyrolactone) -> oxolan-2-one
+    O=C1CCCCO1 (delta-valerolactone) -> oxan-2-one
+    O=C1CCCCCO1 (epsilon-caprolactone) -> oxepan-2-one
     O=C1CCCCCCCCCO1 (10-membered lactone) -> oxacycloundecan-2-one
 """
 
@@ -67,12 +67,12 @@ def is_monocyclic_lactone(mol) -> Optional[Dict]:
 
     # SMARTS: carbonyl(-like) carbon with a double-bonded chalcogen and a
     # single-bonded ester O. The double-bond partner may be O (ordinary
-    # lactone) or S/Se/Te (thiono / seleno / telluro lactone, P-65.6.3.5.1);
+    # lactone) or S/Se/Te (thiono / seleno / telluro lactone,;
     # the ester O stays O in every case (the ring oxygen).
-    #   [CX3](=[O,S,#34,#52])[OX2]
-    #   match[0] = carbonyl carbon
-    #   match[1] = carbonyl chalcogen (=O/=S/=Se/=Te, exocyclic)
-    #   match[2] = ester oxygen (-O-, must be in ring)
+    # [CX3](=[O,S,#34,#52])[OX2]
+    # match[0] = carbonyl carbon
+    # match[1] = carbonyl chalcogen (=O/=S/=Se/=Te, exocyclic)
+    # match[2] = ester oxygen (-O-, must be in ring)
     pattern = Chem.MolFromSmarts("[CX3](=[O,S,#34,#52])[OX2]")
     matches = mol.GetSubstructMatches(pattern)
 
@@ -110,7 +110,7 @@ def is_monocyclic_lactone(mol) -> Optional[Dict]:
                 if not is_monocyclic:
                     continue
 
-                # P-64.1.2.1(a) cyclic carbonate: carbonyl bonded to TWO
+                # (a) cyclic carbonate: carbonyl bonded to TWO
                 # ring oxygens -> 1,3-dioxan-2-one class. Detect a SECOND
                 # ring O bonded to the carbonyl C.
                 extra_o = None
@@ -127,7 +127,7 @@ def is_monocyclic_lactone(mol) -> Optional[Dict]:
                     if mol.GetAtomWithIdx(i).GetAtomicNum() != 6:
                         return None
 
-                # v33 Phase 6 (A): unsaturated / dione monocyclic lactones.
+                # a phase (A): unsaturated / dione monocyclic lactones.
                 # name_lactone_ring/name_monocyclic_lactone only builds a
                 # SATURATED single-oxo stem (oxacyclo...an-2-one) -- an
                 # in-ring C=C or a second in-ring carbonyl would otherwise
@@ -143,7 +143,7 @@ def is_monocyclic_lactone(mol) -> Optional[Dict]:
                 # (rules.heterocycles.name_heterocycle + the substituted-
                 # heterocycle assembler), which already has that machinery.
                 #
-                # Ring sizes >10 have no HW mancude parent at all; P-31.1.4's
+                # Ring sizes >10 have no HW mancude parent at all; 's
                 # replacement-nomenclature PIN there is direct ene-locant
                 # citation on the SAME fixed O=1/C=2 numbering this module
                 # already uses for the saturated case
@@ -186,9 +186,9 @@ def is_monocyclic_lactone(mol) -> Optional[Dict]:
                     "extra_ring_O_idx": extra_o,
                     # Exocyclic double-bond partner symbol: 'O' (ordinary
                     # lactone) or 'S'/'Se'/'Te' (thiono/seleno/telluro lactone,
-                    # P-65.6.3.5.1 -> -thione/-selone/-tellone suffix).
+                    # -> -thione/-selone/-tellone suffix).
                     "chalcogen": mol.GetAtomWithIdx(carbonyl_o).GetSymbol(),
-                    # v33 Phase 6 (A): in-ring C=C atom-idx pairs (empty for
+                    # a phase (A): in-ring C=C atom-idx pairs (empty for
                     # the saturated case). Only ever non-empty here for
                     # ring_size > 10 (the HW range declines above), so the
                     # macrocyclic ene-locant path is the sole consumer.
@@ -208,7 +208,7 @@ _HW_RING_SIZES = frozenset(range(3, 11))
 # Maximum ring size for macrolide lactone naming
 _MAX_MACROLIDE_SIZE = 50
 
-# Exocyclic-chalcogen -> lactone suffix (P-65.6.3.5.1). The ordinary lactone
+# Exocyclic-chalcogen -> lactone suffix. The ordinary lactone
 # (=O) keeps '-one'; the thiono/seleno/telluro lactones take -thione/-selone/
 # -tellone. Vowel elision is suffix-driven: '-one' elides the parent's terminal
 # 'e' (oxolan-2-one) but the consonant-initial -thione does NOT (oxolane-2-thione).
@@ -239,11 +239,11 @@ def name_lactone_ring(ring_size: int, extra_o_locant: Optional[int] = None,
     Args:
         ring_size: Number of atoms in the lactone ring (3-50 supported).
         extra_o_locant: locant of a SECOND ring oxygen bonded to the
-            carbonyl carbon (cyclic carbonate, P-64.1.2.1(a)). When set to
+            carbonyl carbon (cyclic carbonate, (a)). When set to
             3 (the only geometry this namer describes), builds the
             1,3-dioxa Hantzsch-Widman parent (1,3-dioxan-2-one). Any other
             value returns None (fail closed).
-        ene_locants: v33 Phase 6 (A). Sorted list of the lower-numbered
+        ene_locants: a phase (A). Sorted list of the lower-numbered
             locant of each in-ring C=C, on the SAME fixed O=1/C=2 numbering
             this function already uses. Ring sizes 11+ ONLY (the HW range
             has no replacement-nomenclature ring stem to attach an ene
@@ -278,7 +278,7 @@ def name_lactone_ring(ring_size: int, extra_o_locant: Optional[int] = None,
     if suffix is None:
         return None
 
-    # P-64.1.2.1(a) cyclic carbonate: two ring oxygens bonded to the
+    # (a) cyclic carbonate: two ring oxygens bonded to the
     # carbonyl C. Only the 1,3 geometry (extra O at locant 3) is a valid
     # dioxanone/dioxolanone; anything else is out of this namer's scope.
     if extra_o_locant is not None:
@@ -330,7 +330,7 @@ def name_lactone_ring(ring_size: int, extra_o_locant: Optional[int] = None,
         # 'oxacyclo...an' ends in a consonant so no elision applies.
         return f"oxacyclo{chain_prefix}an-2-{suffix}"
 
-    # v33 Phase 6 (A): unsaturated macrocyclic lactone. Replace the
+    # a phase (A): unsaturated macrocyclic lactone. Replace the
     # saturated '...an' stem with the standard cycloalkENE construction
     # ('...an' dropped, '-{locants}-{mult}ene' takes its place -- e.g.
     # cyclotridecane -> cyclotridec-10-ene), then join the -one suffix
@@ -409,7 +409,7 @@ def name_monocyclic_lactone(mol) -> Optional[str]:
         # Build atom-to-locant mapping (1-indexed)
         atom_to_locant = {atom_idx: i + 1 for i, atom_idx in enumerate(ordered)}
 
-    # v33 Phase 6 (A): in-ring C=C locants (macrocyclic only -- see
+    # a phase (A): in-ring C=C locants (macrocyclic only -- see
     # name_lactone_ring's ene_locants docstring) on this SAME fixed
     # numbering. Each bond's cited locant is the LOWER of its two atoms'
     # locants; safe without a wraparound check because the only ring
@@ -427,7 +427,7 @@ def name_monocyclic_lactone(mol) -> Optional[str]:
         if len(ene_locants) != len(_dbl):
             return None  # a double-bond atom fell outside the numbering -> fail closed
 
-    # P-64.1.2.1(a) cyclic carbonate: the second ring O bonded to the
+    # (a) cyclic carbonate: the second ring O bonded to the
     # carbonyl C sits at locant 3 by the O=1, carbonyl C=2 numbering.
     extra_o_locant = 3 if info.get("extra_ring_O_idx") is not None else None
     parent_name = name_lactone_ring(
@@ -448,7 +448,7 @@ def name_monocyclic_lactone(mol) -> Optional[str]:
     assign_stereochemistry(mol)
     stereo_descriptors = collect_stereodescriptors(mol, atom_to_locant)
 
-    # Discover exocyclic substituents via universal pipeline (Phase 86).
+    # Discover exocyclic substituents via universal pipeline (a phase).
     # Parent atoms = ring atoms; exclude = carbonyl O (=O of the lactone).
     # The _integrate_universal_prefixes helper adds exclude_atoms to the
     # effective parent set so they are never discovered as substituents.
@@ -479,15 +479,15 @@ def name_monocyclic_lactone(mol) -> Optional[str]:
 
 
 # ---------------------------------------------------------------------------
-# Cyclic di/polyester (lactide) — P-65.6.3.5.3
+# Cyclic di/polyester (lactide) —
 # ---------------------------------------------------------------------------
 
 def name_cyclic_polyester(mol) -> Optional[str]:
-    """P-65.6.3.5.3: name a cyclic di-/polyester (lactide) as a Hantzsch-Widman
+    """: name a cyclic di-/polyester (lactide) as a Hantzsch-Widman
     heterocycle whose acyl carbons are expressed with a ``-dione``/``-trione``
     suffix::
 
-        O=C1COC(=O)CO1   (glycolide)  -> 1,4-dioxane-2,5-dione (PIN)
+        O=C1COC(=O)CO1 (glycolide) -> 1,4-dioxane-2,5-dione (PIN)
 
     The single-carbonyl lactone namer (:func:`name_monocyclic_lactone`) fails
     closed on this class because a SECOND ring oxygen is itself an ester O

@@ -1,11 +1,11 @@
-"""Tests for PEP-04: Ring-containing acyl fragment naming in acylamino prefixes.
+"""Tests for: Ring-containing acyl fragment naming in acylamino prefixes.
 
-Bug: _check_for_acylamino() calls _count_carbon_chain() which traverses ring C-C bonds,
+Bug: _check_for_acylamino calls _count_carbon_chain which traverses ring C-C bonds,
 linearizing ring carbons. N-benzoylglycine (6 ring C + 1 carbonyl C = 7) becomes
 "heptanoylamino" instead of a benzoyl-based name.
 
-Fix: Detect rings in acyl fragment and use name_substituent_fragment() for ring-containing
-acyl groups, preserving _count_carbon_chain() for linear chains.
+Fix: Detect rings in acyl fragment and use name_substituent_fragment for ring-containing
+acyl groups, preserving _count_carbon_chain for linear chains.
 """
 
 import pytest
@@ -43,14 +43,14 @@ class TestAcylaminoRingFix:
         )
 
     def test_linear_acylamino_still_works(self):
-        """N-hexanoylglycine (linear chain) -> 'hexanamido' (P-66.1.1.4.3)."""
+        """N-hexanoylglycine (linear chain) -> 'hexanamido'."""
         result = name_compound("OC(=O)CNC(=O)CCCCC")
         assert "hexanamido" in result.lower(), (
             f"Expected 'hexanamido' in result, got '{result}'"
         )
 
     def test_n_acetylglycine_still_works(self):
-        """N-acetylglycine (simplest acyl) -> 'acetamido' (P-66.1.1.4.3)."""
+        """N-acetylglycine (simplest acyl) -> 'acetamido'."""
         result = name_compound("OC(=O)CNC(=O)C")
         assert "acetamido" in result.lower(), (
             f"Expected 'acetamido' in result, got '{result}'"

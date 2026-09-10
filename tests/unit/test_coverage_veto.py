@@ -45,7 +45,7 @@ _TERPENOID_MALFORMED_NAME = (
 
 # The VETO-mode rescue: when the veto rejects the incomplete-spine winner above,
 # the L2-L4 offer layer (select_rt_passing, landed AFTER this test was authored)
-# substitutes a DIFFERENT, complete, full-InChIKey-RT-verified T4 floor candidate
+# substitutes a DIFFERENT, complete, full-InChIKey-RT-verified floor candidate
 # instead of abstaining -- so a name still ships and 0-wrong is held. It uses the
 # tetrahydroxy PREFIX + '-ene' form rather than the '-tetrol' suffix.
 _TERPENOID_VETO_RESCUE_NAME = (
@@ -71,7 +71,7 @@ class TestVetoRejectsIncompleteEGeneralEngineWinner:
         #
         # change-asserted-value: this test originally asserted the veto
         # ABSTAINS. Since then the L2-L4 offer layer (select_rt_passing over
-        # the offers, incl. the T4 floor) landed inside the same `_finish`
+        # the offers, incl. the floor) landed inside the same `_finish`
         # block, running unconditionally under general_fallback_unverified. So
         # the veto still REJECTS the incomplete-spine winner, but instead of
         # abstaining the offer layer now substitutes a DIFFERENT, complete,

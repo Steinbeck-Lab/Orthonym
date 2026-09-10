@@ -14,7 +14,7 @@ class TestPrefixEmissionE2E:
     def test_glutamine_full_name(self):
         """Glutamine should be named with carbamoyl prefix and amino prefix.
 
-        Expected: 2-amino-4-carbamoylbutanoic acid  (or 2-amino-5-carbamoylpentanoic acid
+        Expected: 2-amino-4-carbamoylbutanoic acid (or 2-amino-5-carbamoylpentanoic acid
         depending on chain length computation, but MUST contain carbamoyl).
         """
         name = name_compound("NC(=O)CCCC(N)C(=O)O")

@@ -9,10 +9,10 @@ class TestWave2P1ChainsAVerify:
     """Rows already correct at HEAD — lock them against regression."""
 
     @pytest.mark.parametrize("smiles,expected", [
-        ("[PH3]", "phosphane"),                              # P-52.1.1
-        ("[SnH3]O[SnH2]O[SnH3]", "tristannoxane"),           # P-52.1.3
-        ("N1CCOCCCCCCCC1", "1-oxa-4-azacyclododecane"),      # P-22.2.3.2.3
-        ("C[C@H](Cl)[C@@H](Cl)C", "(2S,3S)-2,3-dichlorobutane"),  # P-44.4.1.12
+        ("[PH3]", "phosphane"),                              #
+        ("[SnH3]O[SnH2]O[SnH3]", "tristannoxane"),           #
+        ("N1CCOCCCCCCCC1", "1-oxa-4-azacyclododecane"),      #
+        ("C[C@H](Cl)[C@@H](Cl)C", "(2S,3S)-2,3-dichlorobutane"),  #
     ])
     def test_already_correct(self, smiles, expected):
         assert name_compound(smiles) == expected
@@ -21,7 +21,7 @@ class TestWave2P1ChainsAVerify:
 @pytest.mark.unit
 class TestP22SingleHeteroatomLocantElision:
     def test_thiacyclododecane_omits_locant_1(self):
-        # P-22.2.3.2.1: single heteroatom -> locant '1' omitted
+        #: single heteroatom -> locant '1' omitted
         assert name_compound("S1CCCCCCCCCCC1") == "thiacyclododecane"
 
 
@@ -39,7 +39,7 @@ class TestP15ReplacementMorpholine:
 @pytest.mark.unit
 class TestP54HWPhosphorusPartialSat:
     def test_dihydrophosphole(self):
-        # P-54.4.1: 2,3-dihydro-1H-phosphole (PIN)
+        #: 2,3-dihydro-1H-phosphole (PIN)
         # NOTE: the plan's evidence SMILES "C1=CCP1" is a 4-membered ring
         # (phosphete-derived); the actual 2,3-dihydro-1H-phosphole is the
         # 5-membered "P1CCC=C1" (OPSIN-verified). Corrected here per
@@ -50,7 +50,7 @@ class TestP54HWPhosphorusPartialSat:
 @pytest.mark.unit
 class TestP41RadicalMostSenior:
     def test_carboxyethyl_radical(self):
-        # P-41 cls 1: radical senior to acid -> acid demoted to 'carboxy' prefix,
+        # cls 1: radical senior to acid -> acid demoted to 'carboxy' prefix,
         # free valence is C-1 of the ethyl point-of-attachment chain.
         mol = Chem.MolFromSmiles("[CH2]CC(=O)O")
         assert name_radical(mol) == "2-carboxyethyl"
@@ -60,7 +60,7 @@ class TestP41RadicalMostSenior:
 class TestP44SeniorAtomParent:
     @pytest.mark.parametrize("smiles,expected", [
         ("C[PH][SiH3]", "methyl(silyl)phosphane"),  # P>Si>C: P is the senior parent atom
-        ("[PH2]N", "phosphanamine"),                  # N senior heterane class (P-41 cls 21)
+        ("[PH2]N", "phosphanamine"),                  # N senior heterane class cls 21)
     ])
     def test_senior_atom_parent(self, smiles, expected):
         assert name_compound(smiles) == expected
@@ -69,21 +69,21 @@ class TestP44SeniorAtomParent:
 @pytest.mark.unit
 class TestP64RingKetonicSuffixSeniority:
     def test_thiazolidinone_structural(self):
-        # P-64.6.2 root heal: the lactam handler was DROPPING the ring S
-        # (O=C1CSCN1 -> 'pyrrolidin-2-one', SELF-01-suppressed). The narrowed
+        # root heal: the lactam handler was DROPPING the ring S
+        # (O=C1CSCN1 -> 'pyrrolidin-2-one', -suppressed). The narrowed
         # lactam predicate + the ring-ketone '-one' suffix now name it
-        # structurally correctly (OPSIN-RT verified). Since the P-31.1.4.3.4
+        # structurally correctly (OPSIN-RT verified). Since the
         # heteroatom-locant citation shipped, the exact PIN form '1,3-...' is
         # now emitted (see test_thiazolidinone_exact_pin).
         assert name_compound("O=C1CSCN1") == "1,3-thiazolidin-4-one"
 
     def test_thiazolidinone_exact_pin(self):
-        # P-31.1.4.3.4: suffixed retained HW-derived saturated hetero-ring parent
+        #: suffixed retained HW-derived saturated hetero-ring parent
         # cites its heteroatom locant set before the stem ('1,3-thiazolidin-4-one').
         assert name_compound("O=C1CSCN1") == "1,3-thiazolidin-4-one"
 
     def test_thiazolidine_thione_one(self):
-        # P-64.6.2: C=O senior to C=S -> ring C=O is the '-one' suffix,
+        #: C=O senior to C=S -> ring C=O is the '-one' suffix,
         # ring C=S is the 'sulfanylidene' prefix. Root cause was the exocyclic
         # ring C=S being flagged 'unnameable' (whole heterocycle candidate
         # declined); _identify_hetero_substituent now recognises =S/=Se/=Te on a
@@ -94,14 +94,14 @@ class TestP64RingKetonicSuffixSeniority:
 @pytest.mark.unit
 class TestP58NondetachableHydroDione:
     def test_dihydronaphthalenedione(self):
-        # P-58.2.5: added-IH/hydro dione, NOT tetrahydro
+        #: added-IH/hydro dione, NOT tetrahydro
         assert name_compound("O=C1CCC(=O)c2ccccc21") == "2,3-dihydronaphthalene-1,4-dione"
 
 
 @pytest.mark.unit
 class TestP58AddedIHDistribution:
     def test_cyclopentanaphthalene_dione(self):
-        # P-58.2.3.1.2: extra IH spills to lowest nonfusion peripheral atom
+        #: extra IH spills to lowest nonfusion peripheral atom
         assert name_compound("C1(C(CC=2C1=C1C=CC=CC1=CC2)=O)=O") == \
             "1H-cyclopenta[a]naphthalene-1,2(3H)-dione"
 
@@ -109,7 +109,7 @@ class TestP58AddedIHDistribution:
 @pytest.mark.unit
 class TestP59DetachableHydroPlacement:
     def test_bromo_dihydroazulene_carboxylic_acid(self):
-        # P-59.2.3.2: name_partially_saturated_carbocycle now carries a ring
+        #: name_partially_saturated_carbocycle now carries a ring
         # principal-characteristic-group suffix ('-carboxylic acid', lowest
         # locant), detachable halogen prefixes, and the 'dihydro' cited before
         # the parent stem. Numbering prioritises the PCG locant, then hydro,
@@ -121,28 +121,28 @@ class TestP59DetachableHydroPlacement:
 @pytest.mark.unit
 class TestP66CarboxamideSeniorToUrea:
     def test_formamide_senior_to_urea(self):
-        # P-66.1.6.1.1.5: carboxamide/formamide senior to urea (already correct
+        #: carboxamide/formamide senior to urea (already correct
         # at HEAD; locked against regression). urea cited as carbamoylamino.
         assert name_compound("NC(=O)NCCCNC=O") == "N-[3-(carbamoylamino)propyl]formamide"
 
     def test_pure_urea_unchanged(self):
         assert name_compound("NC(=O)N") == "urea"
-        # Monosubstituted urea omits the italic-N locant (P-14.3.4.3,:2943).
+        # Monosubstituted urea omits the italic-N locant,:2943).
         assert name_compound("NC(=O)NCC") == "ethylurea"
 
 
 @pytest.mark.unit
 class TestP57ReplacementSubstituent:
     @pytest.mark.parametrize("smiles,expected", [
-        ("COCCOc1ccccc1", "(2-methoxyethoxy)benzene"),                       # P-57.1.6.2
+        ("COCCOc1ccccc1", "(2-methoxyethoxy)benzene"),                       #
         ("COCOCc1ccccc1", "[(methoxymethoxy)methyl]benzene"),                # nested alkoxy
     ])
     def test_oxa_thia_substituent(self, smiles, expected):
         assert name_compound(smiles) == expected
 
     def test_thioether_substituent_underscoped(self):
-        # Strict P-16.3.3 cycling nesting: inner () -> [] -> outer {}.
-        # Wave2 D7c (P-63.2.2 / P-44.1.2.2): thioether joined
+        # Strict cycling nesting: inner  ->  -> outer {}.
+        # Wave2 D7c /: thioether joined
         # _PREFIX_ONLY_PRINCIPAL (it has no suffix form), so it is no longer
         # mis-claimed as the PCG. With no PCG, the benzene ring is correctly
         # senior to the acyclic -CH2-S-CH2-O-CH3 substituent chain and the
@@ -171,7 +171,7 @@ class TestP57ReplacementSubstituent:
 @pytest.mark.unit
 class TestP32FixedNumberingSubstituent:
     def test_bicyclooctenyl_propanoic_acid(self):
-        # P-32.1.3: fixed-numbering ring substituent; free valence lowest (2),
+        #: fixed-numbering ring substituent; free valence lowest (2),
         # then the ring double bond (5) -> bicyclo[2.2.2]oct-5-en-2-yl.
         assert name_compound("OC(=O)CCC1CC2CCC1C=C2") == \
             "3-(bicyclo[2.2.2]oct-5-en-2-yl)propanoic acid"
@@ -188,7 +188,7 @@ class TestP32FixedNumberingSubstituent:
 @pytest.mark.unit
 class TestP28MixedHeteroatomAssembly:
     def test_oxa_thia_bicyclotetradecane(self):
-        # P-28.4.2: mixed-heteroatom ring-assembly 'a'-replacement; lowest
+        #: mixed-heteroatom ring-assembly 'a'-replacement; lowest
         # COMBINED locant set (2,3') + element-seniority citation (oxa < thia).
         assert name_compound("C1(SCCCCCCCCCCCC1)C1COCCCCCCCCCCC1") == \
             "3'-oxa-2-thia-1,1'-bi(cyclotetradecane)"
@@ -197,7 +197,7 @@ class TestP28MixedHeteroatomAssembly:
 @pytest.mark.unit
 class TestP15DetachablePrefixOnHydroFused:
     def test_methyl_tetrahydronaphthalene(self):
-        # P-15.1.5.3: a detachable substituent on a partially-saturated fused
+        #: a detachable substituent on a partially-saturated fused
         # carbocycle; methyl gets locant 5 (lowest after the 1,2,3,4 hydro set)
         # and is cited before the nondetachable 'tetrahydro'.
         assert name_compound("Cc1cccc2c1CCCC2") == "5-methyl-1,2,3,4-tetrahydronaphthalene"
@@ -209,11 +209,11 @@ class TestP15DetachablePrefixOnHydroFused:
 @pytest.mark.unit
 class TestP15RetainedNameSubstitution:
     def test_o_methylhydroxylamine(self):
-        # P-15.1.8.2 Type 2c: O-methylhydroxylamine (PIN) [not methoxyamine]
+        # Type 2c: O-methylhydroxylamine (PIN) [not methoxyamine]
         assert name_compound("CON") == "O-methylhydroxylamine"
 
     def test_naphthalene_1_sulfonic_acid(self):
-        # P-15.1.8.2 Type 2: fused-ring sulfonic acid
+        # Type 2: fused-ring sulfonic acid
         assert name_compound("OS(=O)(=O)c1cccc2ccccc12") == "naphthalene-1-sulfonic acid"
 
     def test_benzenesulfonic_acid_unchanged(self):
@@ -229,7 +229,7 @@ class TestP15RetainedNameSubstitution:
 
 @pytest.mark.unit
 class TestP13HomoSecoFailClosed:
-    """P-13.3.1: homo/seco steroid PINs do NOT parse in OPSIN (no oracle) and
+    """: homo/seco steroid PINs do NOT parse in OPSIN (no oracle) and
     Orthonym has no deterministic homo/seco builder, so a ring-expanded (homo)
     or bond-cleaved (seco) skeleton must FAIL CLOSED — never emit the bare
     scaffold name (a wrong name for a modified skeleton). The exact-scaffold

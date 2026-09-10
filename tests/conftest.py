@@ -302,7 +302,7 @@ def pytest_configure(config):
 # The OPSIN validity gate in tests — declarative, and never silently blind.
 # ============================================================================
 # The gate is default-ON in production: suppressing a name OPSIN cannot parse,
-# or that OPSIN parses to a DIFFERENT molecule (SELF-01), is the whole point of
+# or that OPSIN parses to a DIFFERENT molecule , is the whole point of
 # it. The suite disables it by default because most tests assert RAW generator
 # output — some deliberately malformed — and must not pay a per-name OPSIN call.
 #
@@ -310,29 +310,29 @@ def pytest_configure(config):
 # behaviour is green-but-blind unless it re-enables the gate, and nothing says
 # so. Measured 2026-07-31 on the canary `CC(=O)N(CC1CO1)C(C)C`:
 #
-#     gate OFF -> '(5-carbamoylpentyl)oxirane'   <- a DIFFERENT molecule
-#     gate ON  -> 'unknown organic compound'     <- SELF-01 suppressed it
+# gate OFF -> '(5-carbamoylpentyl)oxirane' <- a DIFFERENT molecule
+# gate ON -> 'unknown organic compound' <- suppressed it
 #
 # so "assert this molecule abstains" passes for the wrong reason with the gate
 # off, and would keep passing if the gate were deleted outright.
 #
 # There is now exactly ONE supported way to ask for the gate:
 #
-#     pytestmark = pytest.mark.opsin_gate       # module-wide, or
-#     @pytest.mark.opsin_gate                   # per-test, or
-#     def test_x(opsin_gate): ...               # fixture form
+# pytestmark = pytest.mark.opsin_gate # module-wide, or
+# @pytest.mark.opsin_gate # per-test, or
+# def test_x(opsin_gate):... # fixture form
 #
 # and it is VERIFIED rather than merely requested. Two silent-failure modes are
 # closed:
 #
-#   1. A rename of the flag. The old `raising=False` meant a rename would turn
-#      every re-enable in the suite into a no-op at once, silently. The setattr
-#      below raises.
-#   2. A missing OPSIN jar. `_final_opsin_validity_gate` fails OPEN when the jar
-#      is absent (D-13), so "gate on, no jar" is the same blind state by another
-#      route — and a worktree checkout has no jar (the `opsin` gitlink has no
-#      .gitmodules to fetch from). `pytest_runtest_call` below skips those tests
-#      instead of passing them.
+# 1. A rename of the flag. The old `raising=False` meant a rename would turn
+# every re-enable in the suite into a no-op at once, silently. The setattr
+# below raises.
+# 2. A missing OPSIN jar. `_final_opsin_validity_gate` fails OPEN when the jar
+# is absent , so "gate on, no jar" is the same blind state by another
+# route — and a worktree checkout has no jar (the `opsin` gitlink has no
+#.gitmodules to fetch from). `pytest_runtest_call` below skips those tests
+# instead of passing them.
 #
 # (2) is enforced at the hook level rather than in the fixture, so it also covers
 # the ~36 legacy files that still hand-roll
@@ -403,7 +403,7 @@ def pytest_runtest_call(item):
     Runs after every fixture has been set up, so it observes the gate state the
     test body will actually see — whether that came from the `opsin_gate`
     marker or from a legacy hand-rolled monkeypatch. With the gate on but no
-    jar, `_final_opsin_validity_gate` returns the name unchanged (D-13
+    jar, `_final_opsin_validity_gate` returns the name unchanged (
     fail-OPEN) and the test asserts nothing about the gate.
     """
     if _gate_is_on() and not _opsin_jar_present():
@@ -426,7 +426,7 @@ def _phase146_clear_thread_locals():
 
     The clear_* helpers are imported lazily and wrapped in try/except so
     a missing import (during partial module reloads) never breaks an
-    otherwise-passing test. Reference: 146-RESEARCH.md §8.4.
+    otherwise-passing test. Reference: internal notes
     """
     yield
     try:

@@ -1,12 +1,12 @@
-"""Phase 160 Plan-06 composite handler: Tier-A ring cascade.
+"""a phase Plan-06 composite handler: Tier-A ring cascade.
 
-Per CONTEXT D-28 (gap-closure) + ADR-19-02 §3.2 Option A: encodes the
+Per internal notes (gap-closure) + -02 Option A: encodes the
 Tier-A pool-compete cascade as a SINGLE composite handler so the
-dispatch_inner first-match-wins interface (CONTEXT D-22) stays untouched.
+dispatch_inner first-match-wins interface (internal notes) stays untouched.
 
-LIFT SOURCE: composer.py:996-1322 (verbatim, with ``return pool.best().name``
+LIFT SOURCE: composer.py:996-1322 (verbatim, with ``return pool.best.name``
 or ``return candidate_name`` replaced by ``return NamingResult(name=...,
-tree=<coarse NameTreeNode>, atom_to_locant_hint=None)`` — Phase 165 SCORE-01
+tree=<coarse NameTreeNode>, atom_to_locant_hint=None)`` — a phase SCORE-01
 attaches a coarse tree at EVERY return site, including the early returns).
 
 Internal cascade order (preserved verbatim from composer.py inline body):
@@ -15,7 +15,7 @@ Internal cascade order (preserved verbatim from composer.py inline body):
 3. partial_sat fallback when complex_ring rejected (composer.py:1103-1110) — direct return
 4. heterocycle + lactone safety net (composer.py:1122-1152)
 5. benzene (composer.py:1159-1173)
-6. Phase 146 chain push-to-pool (composer.py:1185-1192)
+6. a phase chain push-to-pool (composer.py:1185-1192)
 7. select_best_candidate selector + handler-level stereo injection (composer.py:1197-1305)
 
 Returns None if all sub-paths fall through AND no Tier-A candidate ratio
@@ -24,15 +24,15 @@ general_acyclic catch-all (Plan-08).
 
 CRITICAL PRESERVATION CONSTRAINTS:
 - The ``_tier_a_pool_count_before_complex`` slicing pattern at
-  composer.py:1197 MUST be preserved verbatim per Phase 153 D-02 + the
+  composer.py:1197 MUST be preserved verbatim per a phase + the
   PHASE 146 PRESERVE block at composer.py:964-994.
 - The two ``inject_stereo_from_locant_map`` call sites (composer.py:1301)
-  are part of this composite per CONTEXT D-13 + Phase 152 D-04 layering.
+  are part of this composite per internal notes + a phase layering.
 - ``assemble_ion_name`` pre-pool bypass (composer.py:751-768) is NOT in
   this composite — that's the outer pre-pool path before dispatch_inner
-  runs per CONTEXT D-09.
+  runs per internal notes.
 
-IUPAC cite: P-44.1 (principal chain vs ring competition).
+IUPAC cite: (principal chain vs ring competition).
 """
 from __future__ import annotations
 
@@ -45,7 +45,7 @@ logger = logging.getLogger(__name__)
 
 
 def _spiro_principal_suffix_preference(features: Any, current_name: str) -> Optional[str]:
-    """v31 PIN conformance (P-33.3): return the general-engine SUFFIX-form name for
+    """ PIN conformance: return the general-engine SUFFIX-form name for
     a spiro parent whose principal characteristic group the complex_ring assembly
     demoted to a prefix (`9-carboxyspiro[5.5]undecane` -> `spiro[5.5]undecane-3-
     carboxylic acid`), or None to keep ``current_name``.
@@ -86,7 +86,7 @@ def _spiro_principal_suffix_preference(features: Any, current_name: str) -> Opti
 def _is_tier_a_ring(features: Any) -> bool:
     """Predicate: matches if features.is_cyclic AND not chain_is_parent.
 
-    Per CONTEXT D-25 + AP-160-26 predicate-purity. Pure read-only.
+    Per internal notes + -26 predicate-purity. Pure read-only.
     """
     if not getattr(features, 'is_cyclic', False):
         return False
@@ -96,12 +96,12 @@ def _is_tier_a_ring(features: Any) -> bool:
 
 
 def _benzene_is_phenol(features: Any) -> bool:
-    """Phase 177 WSB-01 (D-05): True iff a hydroxyl (-OH) is directly bonded to
+    """a phase -01 : True iff a hydroxyl (-OH) is directly bonded to
     an aromatic ring carbon of the benzene parent.
 
     Phenol benzene is EXCLUDED from the backstop inject allowlist (peptides /
     tyrosine-type compounds and ring-OH parents are already configured or carry
-    no authoritative orientation for injection per D-05). Pure read-only.
+    no authoritative orientation for injection per). Pure read-only.
     """
     mol = getattr(features, 'mol', None)
     ring = getattr(features, 'benzene_ring', None) or getattr(
@@ -127,10 +127,10 @@ def name_tier_a_ring(
 ) -> Optional[NamingResult]:
     """Composite handler encoding the Tier-A pool-compete cascade.
 
-    Per ADR-19-02 §3.2 + CONTEXT D-28: dispatch_inner cannot natively
+    Per -02 + internal notes: dispatch_inner cannot natively
     model pool-compete semantics; this composite encodes the full
     cascade in one entry while keeping dispatch_inner first-match-wins
-    interface unchanged (CONTEXT D-22).
+    interface unchanged (internal notes).
 
     Two early-return paths preserved verbatim from composer.py:996-1322:
     - The lactone safety-net path (composer.py:1126-1136) returns the
@@ -149,7 +149,7 @@ def name_tier_a_ring(
         None: all sub-paths fell through AND the selector rejected the
             Tier-A subset (low-ratio rescue did not fire).
     """
-    # v23 IH-01 (Phase 2): an unsubstituted ring ketone on a mancude ring is the
+    # (a phase): an unsubstituted ring ketone on a mancude ring is the
     # added-indicated-hydrogen form (pyridin-2(1H)-one / naphthalen-1(2H)-one).
     # The default paths drop the C=O (carbocyclic) or name it as a '2-oxo'
     # prefix (heterocyclic). This recognizer is tightly scoped + fail-closed
@@ -185,13 +185,13 @@ def name_tier_a_ring(
             atom_to_locant_hint=None,
         )
 
-    # Lever C (v31, P-41 / P-66.1): a ring-attached ANILIDE — a senior secondary/
+    # Lever C (, /: a ring-attached ANILIDE — a senior secondary/
     # tertiary amide whose acyl is a simple unsubstituted carbocycle (benzoyl,
     # cyclohexanecarbonyl) and whose only junior FGs live inside the N-aryl
     # substituent — must be named as the amide parent (benzamide /
     # cyclohexanecarboxamide), NOT with the junior N-aryl ring as parent. Tier-A
     # otherwise picks the phenol/aniline ring and demotes the amide to an
-    # 'N-benzoyl' prefix ('N-benzoyl-4-aminophenol', a P-41 violation — the amide
+    # 'N-benzoyl' prefix ('N-benzoyl-4-aminophenol', a violation — the amide
     # outranks the phenol). _name_ring_attached_anilide is tightly scoped +
     # fail-closed (returns None for everything else — substituted/fused/hetero
     # acyl rings, defined stereo, un-contained junior FGs), so it preempts only
@@ -210,11 +210,11 @@ def name_tier_a_ring(
         )
 
     # =========================================================================
-    # TIER A RING COMPETITION — Phase 145.1 routes through CandidatePool
+    # TIER A RING COMPETITION — a phase routes through CandidatePool
     # =========================================================================
     # PHASE 146 PRESERVE — DO NOT remove this comment block. The Tier A
-    # subset slicing pattern below MUST survive Phase 146's gate deletion
-    # per Phase 153 D-02 + the inline body's PRESERVE marker.
+    # subset slicing pattern below MUST survive a phase's gate deletion
+    # per a phase + the inline body's PRESERVE marker.
     # =========================================================================
 
     _complex_ring_accepted = False
@@ -222,17 +222,17 @@ def name_tier_a_ring(
     _tier_a_pool = get_current_pool()
     _tier_a_pool_count_before_complex = len(_tier_a_pool.all_candidates())
 
-    # WS-A task 9 (A-i): the whole-molecule complex-ring path must not
-    # preempt the P-44 parent decision. With >=2 ring systems, skip it when
+    # task 9 (A-i): the whole-molecule complex-ring path must not
+    # preempt the parent decision. With >=2 ring systems, skip it when
     # the parent is NOT the fused/complex system:
-    #   (a) the among-rings senior system (P-44.2) is a MONOCYCLE
-    #       (2-(1-benzofuran-2-yl)pyridine: pyridine is the parent), or
-    #   (b) the principal characteristic group sits on a ring system other
-    #       than the senior one (P-44.1 — that system is the parent).
+    # (a) the among-rings senior system is a MONOCYCLE
+    # (2-(1-benzofuran-2-yl)pyridine: pyridine is the parent), or
+    # (b) the principal characteristic group sits on a ring system other
+    # than the senior one — that system is the parent).
     _skip_complex_non_senior = False
     _ring_systems = getattr(features, 'ring_systems', None) or []
 
-    # FR-4 / P-66.2.2 + P-44.1 (BB 33859 imido preferred prefix): classification
+    # / + (BB 33859 imido preferred prefix): classification
     # already chose a PAH parent (features.polycyclic_name set via the namer L1
     # among-rings exemption) BECAUSE the principal characteristic group sits ON
     # the PAH core while a senior fused-heterocyclic ring is only a SUBSTITUENT
@@ -259,8 +259,8 @@ def name_tier_a_ring(
 
     if features.is_cyclic and len(_ring_systems) >= 2:
         _senior = getattr(features, 'senior_ring_system', None)
-        # The among-rings P-44.2 decision applies to SEPARATE ring systems
-        # only. Spiro rings share an ATOM (one ring SYSTEM per P-24) yet may
+        # The among-rings decision applies to SEPARATE ring systems
+        # only. Spiro rings share an ATOM (one ring SYSTEM per yet may
         # arrive as two entries here — skipping the complex path for them
         # dropped half the molecule ('(3R,6S)-oxan-3-ol' for a dioxaspiro
         # parent, self-test RT True->False). Any atom overlap between ring
@@ -317,14 +317,14 @@ def name_tier_a_ring(
                     complex_result.ring_atoms,
                     complex_result.atom_to_locant,
                 )
-            # v36 core-namer FAIL-CLOSED: the enricher returns None when a
+            # core-namer FAIL-CLOSED: the enricher returns None when a
             # RING-BEARING compound substituent on the complex-ring parent cannot
             # render. Emitting the bare parent would be an atom-incomplete
             # (wrong-molecule) partial, so fall through to the other tiers rather
             # than pool it -- exactly the "If complex ring naming fails, fall
             # through" contract already documented below.
             if complex_name is not None:
-                # v31 PIN conformance (P-33.3): the complex_ring assembly demotes a
+                # PIN conformance: the complex_ring assembly demotes a
                 # suffixable principal characteristic group to a PREFIX on a SPIRO
                 # parent (`9-carboxyspiro[5.5]undecane`), where the PIN cites it as
                 # the principal SUFFIX (`spiro[5.5]undecane-3-carboxylic acid`).
@@ -353,12 +353,12 @@ def name_tier_a_ring(
                         _complex_ring_accepted = True
         # If complex ring naming fails, fall through.
 
-    # === Wave2 T6a fail-closed guard: pure-monocyclic spiro system ===
+    # === Wave2 fail-closed guard: pure-monocyclic spiro system ===
     # A molecule whose rings are monocycles joined ONLY at spiro atoms has no
     # valid fallback below this point: the generic paths name a single ring
     # and silently drop the others (branched trispiro -> 'cyclononane'), or
     # re-perceive a wrong core. If the spiro subsystem itself declined (tri+
-    # polyspiro descriptors, compound-locant unsaturation, ...), refuse via
+    # polyspiro descriptors, compound-locant unsaturation,...), refuse via
     # the G0 UNSUPPORTED_RING_SYSTEM signal — jar-independent, never a wrong
     # name. Fused/bridged hybrids are untouched (their own paths run below).
     if not _complex_ring_accepted and not getattr(features, 'chain_is_parent', False):
@@ -426,9 +426,9 @@ def name_tier_a_ring(
             )
             from .lactone import _has_separate_senior_group
             lactone_info = is_monocyclic_lactone(features.mol)
-            # P-65.6.3.5.1 (BB:32112) seniority guard: a lactone is a
+            # (the Blue Book) seniority guard: a lactone is a
             # pseudoketone and ranks below an acid or ester (Table 4.1,
-            # BB:18170). When a SEPARATE senior suffix-capable group is present
+            # the Blue Book). When a SEPARATE senior suffix-capable group is present
             # the lactone must NOT claim the parent; fall through to the
             # heterocycle assembler, which expresses the ring C=O as an ``oxo``
             # prefix and the senior group as the suffix (e.g.
@@ -467,7 +467,7 @@ def name_tier_a_ring(
                     ),
                 )
 
-    # === Sub-path 5: Phase 146 chain push-to-pool (composer.py:1185-1192) ===
+    # === Sub-path 5: a phase chain push-to-pool (composer.py:1185-1192) ===
     if _tier_a_pool.selection_mode == 'score_based':
         from ..candidate_pool import compute_chain_candidate
         _chain_cand = compute_chain_candidate(features, style=style)
@@ -478,7 +478,7 @@ def name_tier_a_ring(
             )
 
     # === Selector + handler-level stereo injection (composer.py:1197-1321) ===
-    # PHASE 146 PRESERVE: the slicing pattern below MUST survive Phase 146's
+    # PHASE 146 PRESERVE: the slicing pattern below MUST survive a phase's
     # gate deletion (see comment block at top of this section).
     _tier_a_candidates_added = (
         _tier_a_pool.all_candidates()[_tier_a_pool_count_before_complex:]
@@ -488,7 +488,7 @@ def name_tier_a_ring(
         log_confidence(best)
         from ..fragment_naming import is_top_level_naming
         if is_top_level_naming():
-            # Phase 177 WSB-01 (D-04/D-05): thread the authoritative benzene
+            # a phase -01 (/): thread the authoritative benzene
             # atom_to_locant + phenol flag onto the winning candidate as POST-HOC
             # fields (never into compute_confidence — byte-identity Risk 1) so
             # the namer backstop can inject a missed stereodescriptor on the
@@ -501,7 +501,7 @@ def name_tier_a_ring(
                     # Phenol detection: an -OH directly on the benzene ring.
                     best.is_phenol_benzene = _benzene_is_phenol(features)
             store_confidence(best)
-        # D-10 PRESERVED: low-heavy-atom rescue fallback.
+        # PRESERVED: low-heavy-atom rescue fallback.
         _MIN_RATIO_FALLBACK = 0.20
         total_heavy = features.mol.GetNumHeavyAtoms()
         if total_heavy <= 15 or best.factors.get('ratio', 0) >= _MIN_RATIO_FALLBACK:
@@ -546,14 +546,14 @@ def name_tier_a_ring(
                                 _complex_result_for_injection, features.mol,
                             )
                         if _is_complex:
-                            # v36-C1C2C6 Pattern A: the complex_ring atom->locant
+                            # -C1C2C6 Pattern A: the complex_ring atom->locant
                             # map (e.g. a spiro-of-fused-component parent's
                             # combined_locants) can be numbered inconsistently
                             # with the printed descriptor, dropping the stereo
                             # descriptor on the wrong locant -> OPSIN-unparseable.
                             # RT-gate the numbering and re-anchor to OPSIN's own
                             # locants when the first candidate fails to round-trip
-                            # (invariant 18; byte-identical for every currently-
+                            # (a project rule; byte-identical for every currently-
                             # round-tripping name).
                             candidate_name = inject_stereo_reanchored_rt_gated(
                                 candidate_name, features.mol, atom_to_locant,
@@ -576,7 +576,7 @@ def name_tier_a_ring(
             best.handler, best.confidence, best.factors.get('ratio', 0),
         )
         # BYTE-IDENTICAL FIX: truncate rejected Tier-A candidates so the
-        # outer fallback doesn't see them via pool.best().
+        # outer fallback doesn't see them via pool.best.
         del _tier_a_pool._candidates[_tier_a_pool_count_before_complex:]
 
     # All sub-paths fell through; signal dispatch_inner to continue.

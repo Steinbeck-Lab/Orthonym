@@ -338,7 +338,7 @@ class TestSubstitutedLactones:
 
 
 class TestLactoneSeniority:
-    """P-65.6.3.5.1 (the Blue Book): a lactone is a pseudoketone and ranks LOWER in
+    """ (the Blue Book): a lactone is a pseudoketone and ranks LOWER in
     the seniority of classes than an acid or an ester (Table 4.1, the Blue Book:
     Acids/esters > ketones/pseudoketones), but HIGHER than an alcohol, amine or
     imine. These are end-to-end (name_compound) assertions because the seniority

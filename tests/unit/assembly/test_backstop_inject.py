@@ -1,4 +1,4 @@
-"""Wave-0 unit tests for the WSB-01 backstop flip (Phase 177 Plan 02).
+"""Wave-0 unit tests for the -01 backstop flip (a phase Plan 02).
 
 The universal stereo backstop ``namer._final_stereo_check`` is converted from
 detect-only to real injection on the ONLY cohort with an authoritative parent
@@ -8,9 +8,9 @@ D/L-configured name stay LOG-ONLY (no descriptor added by the backstop).
 
 These tests call ``_final_stereo_check`` directly against its POST-Task-3
 target signature (gains an ``atom_to_locant`` keyword) — so they are RED until
-Task 3 flips the backstop. Decisions: D-04 (threaded authoritative map),
-D-05 (allowlist = chain + non-phenol benzene), D-06 (detect-only where no map),
-D-09 (missing beats wrong).
+Task 3 flips the backstop. Decisions: (threaded authoritative map),
+ (allowlist = chain + non-phenol benzene), (detect-only where no map),
+ (missing beats wrong).
 """
 
 import pytest
@@ -36,14 +36,14 @@ class TestBackstopInjectsChain:
 
     def test_chain_with_threaded_map_injects(self):
         # butan-2-ol: SMILES "CC[C@H](C)O" -> atoms
-        #   0=CH3(ethyl end), 1=CH2, 2=C(@H) stereocenter, 3=CH3, 4=O.
+        # 0=CH3(ethyl end), 1=CH2, 2=C(@H) stereocenter, 3=CH3, 4=O.
         # The oriented IUPAC chain places the OH-bearing carbon at locant 2:
-        #   locant 1 = atom 0, 2 = atom 1, 3 = atom 2, 4 = atom 3  (butane chain)
+        # locant 1 = atom 0, 2 = atom 1, 3 = atom 2, 4 = atom 3 (butane chain)
         # but PIN numbers from the end giving the OH the lowest locant -> the
-        # stereocenter (atom 2) is locant 2.  Build that authoritative map.
+        # stereocenter (atom 2) is locant 2. Build that authoritative map.
         mol = _mol_with_cip("CC[C@H](C)O")
         # Oriented principal chain so atom 2 (stereocenter, OH-bearing) = locant 2.
-        oriented_chain = [3, 2, 1, 0]  # CH3 - C(@) - CH2 - CH3  -> locants 1,2,3,4
+        oriented_chain = [3, 2, 1, 0]  # CH3 - C(@) - CH2 - CH3 -> locants 1,2,3,4
         atom_to_locant = build_atom_to_locant(oriented_chain)
         assert atom_to_locant[2] == 2  # stereocenter is locant 2
 
@@ -63,7 +63,7 @@ class TestBackstopLogOnly:
     def test_non_allowlisted_handler_log_only(self, handler):
         mol = _mol_with_cip("CC[C@H](C)O")
         # Even with a map threaded, a non-allowlisted handler must NOT inject
-        # (D-05/D-06: no authoritative map for these classes -> log-only).
+        # (/: no authoritative map for these classes -> log-only).
         name = "some-complex-ring-name"
         result = _final_stereo_check(
             mol, name, handler=handler, atom_to_locant={2: 2}
@@ -71,7 +71,7 @@ class TestBackstopLogOnly:
         assert result == name
 
     def test_chain_without_map_log_only(self):
-        # D-06: backstop stays detect-only where NO proven map exists.
+        #: backstop stays detect-only where NO proven map exists.
         mol = _mol_with_cip("CC[C@H](C)O")
         result = _final_stereo_check(mol, "butan-2-ol", handler="chain",
                                      atom_to_locant=None)

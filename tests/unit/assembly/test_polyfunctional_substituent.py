@@ -1,15 +1,15 @@
-"""Unit tests for the polyfunctional acyclic substituent namer (v23 SL).
+"""Unit tests for the polyfunctional acyclic substituent namer (SL).
 
 `substituent_naming._name_polyfunctional_acyclic_substituent` names a saturated
 acyclic carbon-chain substituent bearing >=2 simple detachable prefixes
 (carboxy / amino / hydroxy / oxo / halogen) FROM STRUCTURE, numbered from the
-free valence (P-29.2 / P-31.1.4.3.4 / P-65.1.1). This is the root-cause fix for
+free valence / /. This is the root-cause fix for
 the structure-loss bug where the recursive path let `parent_to_prefix` DROP the
 secondary prefixes (serine-O -CH2CH(NH2)COOH -> '(R)-2-carboxyethyl', amino lost)
 and the cache mapped the H-capped fragment to a wrong retained name
 ('alanine' -> 'alaninyl').
 
-It unblocks phosphatidylserine (P-107.3.3): the serine head, previously
+It unblocks phosphatidylserine: the serine head, previously
 unknown, is now named via the functional-class hydrogen-phosphate diester.
 """
 
@@ -37,7 +37,7 @@ class TestPolyfunctionalSubstituentNamed:
     """>=2 detachable prefixes — enumerated from structure (every group kept)."""
 
     def test_serine_carbon_skeleton(self):
-        # -CH2-CH(NH2)-COOH : ethyl backbone, amino+carboxy at C2 (alphabetical)
+        # -CH2-CH(NH2)-COOH: ethyl backbone, amino+carboxy at C2 (alphabetical)
         assert _name_frag("CCC(N)C(=O)O") == "2-amino-2-carboxyethyl"
 
     def test_serine_L_stereo(self):
@@ -59,8 +59,8 @@ class TestPolyfunctionalSubstituentNamed:
         assert _name_frag("CCC(=O)CO") == "3-hydroxy-2-oxopropyl"
 
     def test_methyl_backbone_two_prefixes(self):
-        # -CH(NH2)COOH : mononuclear (1-carbon) backbone, locants elided.
-        # P-16.5.1.3.1 / P-16.3.3: first prefix bare, the rest EACH enclosed. The
+        # -CH(NH2)COOH: mononuclear (1-carbon) backbone, locants elided.
+        # /: first prefix bare, the rest EACH enclosed. The
         # bare concatenation 'aminocarboxymethyl' is RT-ambiguous -- OPSIN parses
         # it as amino + carboxymethyl (amino ON THE RING), a DIFFERENT molecule;
         # 'amino(carboxy)methyl' round-trips (BB witness '[amino(imino)methyl]').
@@ -71,16 +71,16 @@ class TestPolyfunctionalSubstituentNamed:
 
 
 class TestSingleFGSubstituent:
-    """v23 single-FG extension: ONE detachable prefix, numbered from the free
-    valence so the locant is attachment-correct (P-29.2). 1-carbon backbones
+    """ single-FG extension: ONE detachable prefix, numbered from the free
+    valence so the locant is attachment-correct. 1-carbon backbones
     elide the locant; >=2-carbon backbones carry it."""
 
     def test_2_hydroxyethyl(self):
-        # -CH2CH2OH : was 'hydroxyethyl' (locant dropped)
+        # -CH2CH2OH: was 'hydroxyethyl' (locant dropped)
         assert _name_frag("CCCO") == "2-hydroxyethyl"
 
     def test_3_hydroxypropyl(self):
-        # -CH2CH2CH2OH : was '1-hydroxypropyl' (numbered from the WRONG end)
+        # -CH2CH2CH2OH: was '1-hydroxypropyl' (numbered from the WRONG end)
         assert _name_frag("CCCCO") == "3-hydroxypropyl"
 
     def test_2_aminoethyl(self):
@@ -90,23 +90,23 @@ class TestSingleFGSubstituent:
         assert _name_frag("CCCCN") == "3-aminopropyl"
 
     def test_carboxymethyl(self):
-        # -CH2COOH : was 'acetyl' (a DIFFERENT molecule -C(=O)CH3)
+        # -CH2COOH: was 'acetyl' (a DIFFERENT molecule -C(=O)CH3)
         assert _name_frag("CCC(=O)O") == "carboxymethyl"
 
     def test_2_carboxyethyl(self):
         assert _name_frag("CCCC(=O)O") == "2-carboxyethyl"
 
     def test_2_oxopropyl(self):
-        # -CH2C(=O)CH3 : oxo on C2 (not the attachment) -> '2-oxopropyl'
+        # -CH2C(=O)CH3: oxo on C2 (not the attachment) -> '2-oxopropyl'
         assert _name_frag("CCC(=O)C") == "2-oxopropyl"
 
     def test_hydroxymethyl_one_carbon_byte_identical(self):
         assert _name_frag("CCO") == "hydroxymethyl"
 
     def test_acyl_oxo_on_attachment_named_as_acyl(self):
-        # -C(=O)CH3 : the oxo sits on the free-valence carbon = an acyl group. A
-        # LINEAR SATURATED acyl is now named as the acyl PREFIX here (P-66.6,
-        # BB:17762 'acetyl (preferred prefix)'), NOT '1-oxoethyl' and NOT the old
+        # -C(=O)CH3: the oxo sits on the free-valence carbon = an acyl group. A
+        # LINEAR SATURATED acyl is now named as the acyl PREFIX here,
+        # the Blue Book 'acetyl (preferred prefix)'), NOT '1-oxoethyl' and NOT the old
         # garbled '1-methyl-2-oxaeth-1-en-1-yl' (which the previous decline +
         # acetaldehyde-cap downstream produced). RT-verified:
         # methyl 4-acetylcyclohexane-1-carboxylate round-trips.
@@ -147,7 +147,7 @@ class TestPolyfunctionalSubstituentFailClosed:
         assert _name_frag("CCN") == "aminomethyl"
 
     def test_ether_declined(self):
-        # -CH2-O-CH2COOH : ether linkage -> namer declines (other tiers own it)
+        # -CH2-O-CH2COOH: ether linkage -> namer declines (other tiers own it)
         out = _name_frag("CCOCC(=O)O")
         assert "amino" not in out  # not mis-claimed; ether handled elsewhere
 
@@ -166,7 +166,7 @@ class TestPolyfunctionalSubstituentFailClosed:
 
 
 class TestPhosphatidylserine:
-    """End-to-end P-107.3.3: PS now names via the functional-class diester."""
+    """End-to-end: PS now names via the functional-class diester."""
 
     def test_ps_achiral(self):
         smi = ("CCCCCCCCCCCCCCCC(=O)OCC(COP(O)(=O)OCC(N)C(=O)O)"
@@ -177,9 +177,9 @@ class TestPhosphatidylserine:
         )
 
     def test_ps_L_serine_sn_glycero(self):
-        # v31 change-asserted-value: the engine now emits the substitutive
-        # L-serine-parent PIN (P-107.3.3 Phosphatidylserines), which is
-        # byte-identical to the Blue Book template at BlueBookV2.md:55162
+        # change-asserted-value: the engine now emits the substitutive
+        # L-serine-parent PIN Phosphatidylserines), which is
+        # byte-identical to the Blue Book template at the Blue Book
         # ("O-{[(2R)-2,3-bis(octadecanoyloxy)propoxy]hydroxyphosphoryl}-L-serine",
         # here with hexadecanoyl for the C16 input) — the PIN, superseding the old
         # functional-class "... hydrogen phosphate" diester expectation. Verified

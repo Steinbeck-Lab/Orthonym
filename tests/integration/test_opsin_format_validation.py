@@ -389,7 +389,7 @@ class TestSpeciesTypeDetection:
 class TestStereoCasePreservation:
     """Verify that E/Z stereodescriptors retain uppercase in acyloxy/ion names.
 
-    Bug: get_acyloxy_prefix() and ion naming functions used.lower() on the
+    Bug: get_acyloxy_prefix and ion naming functions used.lower on the
     entire acid name, converting (11Z,14Z) to (11z,14z). Fixed by preserving
     original case and using lowercase only for comparison/lookup.
     """

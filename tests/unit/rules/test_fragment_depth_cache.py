@@ -3,7 +3,7 @@
 Tests the infrastructure in fragment_naming.py:
 - MAX_NAMING_DEPTH = 7 (legacy constant, kept for backward compatibility)
 - Cycle-detection via visited-SMILES set
-- Canonical SMILES normalization before calling name_compound()
+- Canonical SMILES normalization before calling name_compound
 - Cycle-guard compound regression tests (V8-DEPTH-01)
 """
 
@@ -26,9 +26,9 @@ def _inchikey(smiles: str) -> str:
     mis-flags e.g. a guanidino ``N=C(N)N`` vs ``NC(N)=N`` redraw as a wrong
     molecule even though the standard-InChI mobile-H layer makes them one
     species. A full InChIKey compares skeleton + stereo + protonation, so it is
-    strictly stronger than production's own skeleton-only SELF-01 check and
+    strictly stronger than production's own skeleton-only check and
     stays a genuine 0-wrong guard. Used only by
-    ``test_production_never_emits_a_wrong_name`` -- see RB-6 in
+    ``test_production_never_emits_a_wrong_name`` -- see in
     internal notes."""
     mol = Chem.MolFromSmiles(smiles)
     assert mol is not None, f"Invalid SMILES: {smiles}"
@@ -434,7 +434,7 @@ class TestDepthLimitCompounds:
         file. Skips rather than passes when the jar is absent, because the gate
         fails OPEN without it (see tests/conftest.py).
 
-        RB-6: the oracle is the full-InChIKey ``_inchikey`` helper, not the
+        : the oracle is the full-InChIKey ``_inchikey`` helper, not the
         shared (tautomer-sensitive) ``canonical`` SMILES fixture, so a mobile-H
         redraw of the same species (e.g. row 017's guanidino group) is not
         mis-flagged as a wrong molecule. See RB3-RB6-DERIVATION.md.

@@ -1,25 +1,25 @@
-"""P-24.3.2 -- hydro / indicated-hydrogen hoisting for 'spirobi' components.
+""" -- hydro / indicated-hydrogen hoisting for 'spirobi' components.
 
 This is the build that unblocked the indane / indoline / isoindoline rename
-(P-54.4.3.2, ``BB:24256``). ``data/fused_heterocycles.py``'s ``name`` field feeds
+, ``the Blue Book``). ``data/fused_heterocycles.py``'s ``name`` field feeds
 TWO consumers: standalone naming, and ``rules/spiro.py::_name_spirobi_core``,
 which used to embed that string verbatim as the spiro component. Renaming the row
 alone therefore produced ``1,2'-spirobi[2,3-dihydro-1H-indene]``, and the obvious
 shortcut ``1,2'-spirobi[1H-indene]`` denotes the UNSATURATED molecule -- a wrong
 STRUCTURE, not a wrong spelling. The gate rejected the first attempt.
 
-**P-24.3.2** (``BB:10152``), verbatim:
+**** (``the Blue Book``), verbatim:
 
     Where appropriate the maximum number of noncumulative double bonds is added
     (i.e., the system is made mancude) AFTER CONSTRUCTION OF THE COMPLETE
-    SKELETON. Indicated hydrogen (P-14.7) of individual components is not cited.
+    SKELETON. Indicated hydrogen of individual components is not cited.
     No indicated hydrogen is cited when none is present in the spiro system. If
     indicated hydrogen is needed, it is cited in front of the spiro atom locants.
 
 Two consequences are asserted here:
 
   1. The bracket holds the MANCUDE component; saturation is hoisted outside it.
-     Template ``BB:46336``:
+     Template ``the Blue Book``:
      ``1,3'-dihydro-3H-1lambda6,1'-spirobi[[2,1]benzoxathiole] (PIN)``.
      Every one of the ~20 'spirobi' examples in the Blue Book cites indicated
      hydrogen OUTSIDE the bracket; not one cites it inside.
@@ -30,14 +30,14 @@ Two consequences are asserted here:
      matching, so no indicated hydrogen is needed and the hydro positions are
      2,3 (unprimed) and 1',3' (primed) -- NOT 2,3,2',3'.
 
-Locant order is **P-14.3.5** (``BB:3193``): *"Primed locants are placed
+Locant order is **** (``the Blue Book``): *"Primed locants are placed
 immediately after the corresponding unprimed locants in a set arranged in
 ascending order"*, i.e. ``1 < 1' < 2 < 2' < 3 < 3'`` -- NOT every unprimed before
-every primed. Confirmed inside the spirobi section itself by ``BB:16779``
+every primed. Confirmed inside the spirobi section itself by ``the Blue Book``
 ``2-phospha-3,3'-spirobi[bicyclo[3.3.1]nonane]-6',7-diene (PIN)``, which cites
-``6'`` BEFORE ``7``, and by ``BB:10170`` ``1'H,2H-1,2'-spirobi[azulene] (PIN)``.
+``6'`` BEFORE ``7``, and by ``the Blue Book`` ``1'H,2H-1,2'-spirobi[azulene] (PIN)``.
 
-★ Every assertion is on the WHOLE emitted name (session invariant 11): removing a
+★ Every assertion is on the WHOLE emitted name (session a project rule): removing a
 wrong output can unmask a worse generator, so a substring check would not show
 that the hydro prefix landed in the right place.
 """
@@ -85,7 +85,7 @@ class TestSpirobiHydroHoisting:
         "c1ccc2c(c1)CC1(C2)Cc2ccccc2C1",
     ])
     def test_no_saturation_inside_the_bracket(self, namer, smiles):
-        """P-24.3.1/P-24.3.2: the bracket holds the MANCUDE ring system only."""
+        """/: the bracket holds the MANCUDE ring system only."""
         got = namer.name(smiles)
         bracket = got[got.index("[") + 1:got.rindex("]")]
         assert bracket == "indene", f"bracket must be mancude, got {bracket!r} in {got!r}"
@@ -114,8 +114,8 @@ class TestSpirobiHydroHoisting:
     def test_hydro_locant_order_is_p14_3_5_not_unprimed_first(self, namer):
         """``1',2,3,3'`` and not ``2,3,1',3'``.
 
-        P-14.3.5 (``BB:3193``) interleaves: 1 < 1' < 2 < 2' < 3 < 3'. The
-        superseded gold value used the unprimed-first ordering, which BB:16779
+         (``the Blue Book``) interleaves: 1 < 1' < 2 < 2' < 3 < 3'. The
+        superseded gold value used the unprimed-first ordering, which the Blue Book
         (``-6',7-diene``) contradicts.
         """
         got = namer.name("C1Cc2ccccc2C13Cc1ccccc1C3")
@@ -156,7 +156,7 @@ class TestFullyMancudeComponentsUnchanged:
 # --------------------------------------------------------------------------
 
 class TestLocantOrderP1435:
-    """``_spirobi_locant_key`` implements P-14.3.5 (``BB:3193``) exactly."""
+    """``_spirobi_locant_key`` implements (``the Blue Book``) exactly."""
 
     def test_primed_sorts_immediately_after_its_own_unprimed(self):
         order = [_spirobi_locant_key(1, 0), _spirobi_locant_key(1, 1),
@@ -165,18 +165,18 @@ class TestLocantOrderP1435:
         assert order == sorted(order)
 
     def test_primed_one_sorts_BEFORE_unprimed_two(self):
-        """The discriminating case: BB:10170 cites ``1'H`` before ``2H``, and
-        BB:16779 cites ``6'`` before ``7``."""
+        """The discriminating case: the Blue Book cites ``1'H`` before ``2H``, and
+        the Blue Book cites ``6'`` before ``7``."""
         assert _spirobi_locant_key(1, 1) < _spirobi_locant_key(2, 0)
 
     def test_lettered_fusion_locant_sorts_after_its_number(self):
-        """P-14.3.5: ``4a`` and ``4'a`` follow the plain ``4``, before ``5``."""
+        """: ``4a`` and ``4'a`` follow the plain ``4``, before ``5``."""
         assert (_spirobi_locant_key(4, 0) < _spirobi_locant_key(4, 1)
                 < _spirobi_locant_key('4a', 0) < _spirobi_locant_key('4a', 1)
                 < _spirobi_locant_key(5, 0))
 
     def test_prime_is_rendered_after_the_NUMBER_not_the_whole_locant(self):
-        """P-14.3.5 spells the primed fusion locant ``4'a`` and states
+        """ spells the primed fusion locant ``4'a`` and states
         explicitly ``(not 4a')``."""
         assert _spirobi_locant_display(4, 1) == "4'"
         assert _spirobi_locant_display('4a', 1) == "4'a"
@@ -217,7 +217,7 @@ class TestDoubleBondEligibility:
 
 class TestMancudeMatching:
     """``_mancude_max_matching`` maximises pairs, then minimises the unmatched
-    locant set (P-14.3.5)."""
+    locant set."""
 
     def test_even_path_is_perfectly_matched(self):
         adj = {1: [2], 2: [1, 3], 3: [2, 4], 4: [3]}
@@ -233,7 +233,7 @@ class TestMancudeMatching:
         assert unmatched == {1}, "the indicated-H position must take the low locant"
 
     def test_isolated_node_is_forced_unmatched(self):
-        """BB:10176 ``2'H,3H-2,3'-spirobi[[1]benzothiophene]``: with the spiro
+        """the Blue Book ``2'H,3H-2,3'-spirobi[[1]benzothiophene]``: with the spiro
         atom at 3', C2' has only the divalent S left as a neighbour, so it is
         isolated in the eligible subgraph and MUST carry the indicated hydrogen."""
         adj = {2: [], 4: [5], 5: [4]}
@@ -289,7 +289,7 @@ class TestComponentSaturationAgainstBlueBookPINs:
         return _spirobi_component_saturation(mol, comp, spiro, numbering)
 
     def test_naphthalene_spiro_at_2_needs_one_indicated_hydrogen(self):
-        """BB:10158 ``1H,1'H-2,2'-spirobi[naphthalene] (PIN)``.
+        """the Blue Book ``1H,1'H-2,2'-spirobi[naphthalene] (PIN)``.
 
         The half is a naphthalene skeleton whose C2 is the spiro atom. Nine
         non-spiro atoms is ODD, so one cannot be matched and the lowest locant
@@ -306,7 +306,7 @@ class TestComponentSaturationAgainstBlueBookPINs:
         assert hydro == set(), f"nothing was added, so no hydro: {hydro}"
 
     def test_indene_spiro_at_1_needs_neither(self):
-        """BB:10164 ``1,1'-spirobi[indene] (PIN)`` -- no hydro, no indicated H,
+        """the Blue Book ``1,1'-spirobi[indene] (PIN)`` -- no hydro, no indicated H,
         because the spiro atom itself occupies indene's only sp3 position."""
         half = ("[CH2:1]1[CH:2]=[CH:3][c:31]2[cH:4][cH:5][cH:6][cH:7]"
                 "[c:71]12")
@@ -337,7 +337,7 @@ class TestComponentSaturationAgainstBlueBookPINs:
         assert indicated == set(), indicated
 
     def test_benzothiophene_spiro_at_2_puts_indicated_h_at_3_not_on_sulfur(self):
-        """BB:10160 ``3H,3'H-2,2'-spirobi[[1]benzothiophene] (PIN)``.
+        """the Blue Book ``3H,3'H-2,2'-spirobi[[1]benzothiophene] (PIN)``.
 
         The divalent ring S is ineligible for a double bond, leaving SEVEN
         eligible carbons (odd), so one indicated hydrogen is required and the

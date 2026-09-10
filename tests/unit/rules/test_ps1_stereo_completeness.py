@@ -1,4 +1,4 @@
-"""v27 Phase S Task 1 — per-element stereo COMPLETENESS predicate (accuracy
+""" Phase S Task 1 — per-element stereo COMPLETENESS predicate (accuracy
 keystone).
 
 ``general_engine_stereo_complete(mol, name)`` returns True iff the name
@@ -6,7 +6,7 @@ expresses EVERY defined CIP stereo element the mol carries (all-or-nothing).
 This closes the verified latent hole in the old name-side boolean
 (``needs_stereo_injection`` Pattern A): a PARTIAL-stereo name — e.g. cage R/S
 expressed but one substituent E/Z dropped — used to look "already stereoed" and
-ship past the stereo-blind SELF-01. Under PS-1 a partial name is INCOMPLETE →
+ship past the stereo-blind. Under a partial name is INCOMPLETE →
 complete abstains / best-effort flags (never a partial ship in the PIN tiers).
 """
 from rdkit import Chem
@@ -57,7 +57,7 @@ def test_small_ring_ez_not_counted():
 
 
 def test_macrocycle_ez_is_counted():
-    """A double bond in an 8+ ring CAN carry E/Z (P-31.1.3) -> must be expressed."""
+    """A double bond in an 8+ ring CAN carry E/Z -> must be expressed."""
     mol = Chem.MolFromSmiles("C1CCC/C=C/CC1")  # (E)-cyclooctene
     # only counts if RDKit assigned a bond CIP code
     from orthonym.perception.stereo import assign_stereochemistry

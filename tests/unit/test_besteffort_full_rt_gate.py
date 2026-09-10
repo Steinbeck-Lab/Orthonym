@@ -5,7 +5,7 @@ name is NOT a lesser name -- it is a WRONG name and must abstain (user-directed
 2026-08-30; FABLE precision-leak + the 1500-mol head-to-head).
 
 The PIN/default tier is UNCHANGED (its correct-by-construction OPSIN-unparseable
-carve-outs -- inositol / np-stereoparent / thioperoxol / ... -- still ship), so
+carve-outs -- inositol / np-stereoparent / thioperoxol /... -- still ship), so
 the 1656 PIN gold gate is byte-identical. These tests run BEST-EFFORT only.
 """
 import ast
@@ -70,7 +70,7 @@ def test_opsin_unparseable_ring_stereo_abstains(smiles):
 
 
 def test_out_of_scope_organotin_abstains():
-    # organo-tin (P-69): PIN abstains ("tin compound (not supported)"); best-effort
+    # organo-tin: PIN abstains ("tin compound (not supported)"); best-effort
     # must too (Sn is in REPLACEMENT_TERMS, so the core would otherwise build a
     # `stanna` name whose OPSIN re-perception mis-valences Sn and never full-RTs).
     smi = "CC(C)OP(=O)(C(C[Sn]Cl)P(=O)(OC(C)C)OC(C)C)OC(C)C"

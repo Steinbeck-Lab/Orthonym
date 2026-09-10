@@ -1,8 +1,8 @@
-"""P-66.5.4.2 lambda-branch: -C#[N+][O-] as (oxo-λ5-azanylidyne)methyl
+""" lambda-branch: -C#[N+][O-] as (oxo-λ5-azanylidyne)methyl
 prefix in ANION context only; neutral (suffix-form) contexts fail closed.
 
 'sodium 4-[(oxo-λ5-azanylidyne)methyl]benzoate' is the BB PIN verbatim
-(BlueBookV2.md:34897); OPSIN-2.9.0 parses it back to the input structure
+(the Blue Book); OPSIN-2.9.0 parses it back to the input structure
 (verified 2026-07-09).
 """
 import pytest

@@ -1,4 +1,4 @@
-"""W2E-P1FC Task 7 — P-35.4.2 (BB 18114): complex prefixes by concatenation.
+"""W2E-P1FC Task 7 — (BB 18114): complex prefixes by concatenation.
 "(benzyloxy)carbonyl (preferred prefix)" for -CO-O-CH2-C6H5.
 benzyl carbonochloridate = the acyl chloride of mono-benzyl carbonic acid."""
 import pytest

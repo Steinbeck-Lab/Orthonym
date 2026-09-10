@@ -1,6 +1,6 @@
 """Blue Book Table 1.5, whole: which rows we may emit, and why not the rest.
 
-v29 Phase 2, T2b. Before this change the ring 'a'-replacement table carried 14 of
+ a phase, T2b. Before this change the ring 'a'-replacement table carried 14 of
 Table 1.5's 25 rows and the other 11 were simply absent -- sound (they failed
 closed) but undecided, so nobody could tell "not implemented" from "the Blue Book
 gives us no rule". This suite makes the disposition of every one of the 25 rows
@@ -8,28 +8,28 @@ explicit and cited.
 
 The trap this suite locks: THREE orders, THREE different element sets
 ---------------------------------------------------------------------
-=============  ============================================  ========  ==========
-rule           governs                                       elements  citation
-=============  ============================================  ========  ==========
-P-15.4.1.2     general / chains, "naming and numbering"        **25**   [BBv2:6446]
-P-23.3.1       citation order INSIDE a von Baeyer name         **22**   [BBv2:9765]
-P-23.3.2.2     numbering seniority when there IS a choice      **18**   [BBv2:9789]
-=============  ============================================  ========  ==========
+============= ============================================ ======== ==========
+rule governs elements citation
+============= ============================================ ======== ==========
+     general / chains, "naming and numbering" **25** [BBv2:6446]
+       citation order INSIDE a von Baeyer name **22** [BBv2:9765]
+     numbering seniority when there IS a choice **18** [BBv2:9789]
+============= ============================================ ======== ==========
 
 Emitting a replacement prefix needs BOTH a citation position and a numbering rank,
-so the emittable set is the intersection: P-23.3.2.2's eighteen. Reading a
-P-15.4.1.2 position for an element P-23.3.1 never ranks would be inventing a rule,
+so the emittable set is the intersection: 's eighteen. Reading a
+ position for an element never ranks would be inventing a rule,
 which is why ``At``/``Po``/``C`` fail closed despite having Table 1.5 morphemes.
 
-What T2b actually changed, and what it deliberately did not
+What actually changed, and what it deliberately did not
 ----------------------------------------------------------
 * **+4 emittable**: Al ``alumina``, Ga ``galla``, In ``inda``, Tl ``thalla`` --
-  the four elements P-22.2.2 [BBv2:8218] ADDED in the same sentence that deleted
-  mercury. Both P-23.3.1 and P-23.3.2.2 rank all four, and their standard bonding
+  the four elements [BBv2:8218] ADDED in the same sentence that deleted
+  mercury. Both and rank all four, and their standard bonding
   number is 3, the same as boron's, which already worked. No lambda is involved.
 * **7 refused, with a reason each**: At/Po/C (ranked by neither von Baeyer rule)
   and F/Cl/Br/I (ranked for citation but NOT for numbering -- and a skeletal RING
-  halogen always has a nonstandard bonding number, so P-15.4.1.3 makes its lambda
+  halogen always has a nonstandard bonding number, so makes its lambda
   mandatory while the ring lambda helper suppresses exactly that
   connectivity-forced case). The halogens are marked NOT ESTABLISHED in-code.
 * **Zn/Cd/Hg unchanged**: in NO replacement table, so still off Table 1.5 itself.
@@ -40,8 +40,8 @@ What T2b actually changed, and what it deliberately did not
 * The ACYCLIC chain table (``rules/skeletal_replacement.REPLACEMENT_TERMS``) was
   deliberately NOT extended: whether replacement or the substitutive parent
   hydride (``alumane``/``gallane``/``indigane``/``thallane``, Table 2.1
-  [BBv2:7924-7930]) is the PIN for a Group-13 atom in a CHAIN is a P-51.4
-  selection question T2b did not answer, so that path still fails closed.
+  [BBv2:7924-7930]) is the PIN for a Group-13 atom in a CHAIN is a
+  selection question did not answer, so that path still fails closed.
 """
 from __future__ import annotations
 
@@ -78,12 +78,12 @@ BB_TABLE_1_5 = {
     'Po': ('polona', 2), 'At': ('astata', 1),
 }
 
-# P-23.3.1 [BBv2:9765] verbatim.
+# [BBv2:9765] verbatim.
 BB_P_23_3_1 = (
     'F', 'Cl', 'Br', 'I', 'O', 'S', 'Se', 'Te', 'N', 'P', 'As', 'Sb', 'Bi',
     'Si', 'Ge', 'Sn', 'Pb', 'B', 'Al', 'Ga', 'In', 'Tl',
 )
-# P-23.3.2.2 [BBv2:9789] verbatim.
+# [BBv2:9789] verbatim.
 BB_P_23_3_2_2 = (
     'O', 'S', 'Se', 'Te', 'N', 'P', 'As', 'Sb', 'Bi',
     'Si', 'Ge', 'Sn', 'Pb', 'B', 'Al', 'Ga', 'In', 'Tl',
@@ -99,7 +99,7 @@ NO_REPLACEMENT_TABLE_AT_ALL = ('Zn', 'Cd', 'Hg', 'Fe', 'U')
 def namer(monkeypatch):
     """A namer with the OPSIN jar made UNAVAILABLE.
 
-    SELF-01 (name -> structure round trip) fails OPEN with no jar -- a supported
+     (name -> structure round trip) fails OPEN with no jar -- a supported
     mode -- so a source-level refusal must hold on its own. Mirrors the fixture in
     ``test_v29_replacement_prefix_totality`` on purpose: an OPSIN-verified name is
     evidence about the WITH-jar path only.
@@ -136,7 +136,7 @@ def test_table_1_5_row_matches_the_book(symbol):
 def test_every_table_1_5_row_has_an_explicit_disposition():
     """No row may be silently absent: emitted, or refused with a stated reason.
 
-    This is the property T2b exists to establish. Adding a row to ``TABLE_1_5``
+    This is the property exists to establish. Adding a row to ``TABLE_1_5``
     without deciding its von Baeyer status fails here.
     """
     decided = set(HETEROATOM_PREFIXES) | set(VB_INADMISSIBLE)
@@ -168,7 +168,7 @@ def test_numbering_seniority_is_p_23_3_2_2_verbatim():
 
 @pytest.mark.unit
 def test_the_three_sets_differ_exactly_as_the_book_does():
-    """At/Po/C absent from P-23.3.1; those three AND the halogens from P-23.3.2.2."""
+    """At/Po/C absent from; those three AND the halogens from."""
     assert set(TABLE_1_5) - set(VB_CITATION_ORDER) == set(NO_VON_BAEYER_RULE)
     assert (set(VB_CITATION_ORDER) - set(VB_NUMBERING_SENIORITY)
             == set(HALOGENS))
@@ -178,10 +178,10 @@ def test_the_three_sets_differ_exactly_as_the_book_does():
 def test_numbering_order_is_a_subsequence_of_the_citation_order():
     """One integer key can serve both orders only if this holds.
 
-    ``HETEROATOM_PREFIXES``'s rank is used as the citation order (P-23.3.1) by
-    ``build_replacement_prefix`` and as the numbering rank (P-23.3.2.2) by the
+    ``HETEROATOM_PREFIXES``'s rank is used as the citation order by
+    ``build_replacement_prefix`` and as the numbering rank by the
     numbering consumers. That is sound only because dropping the halogens from
-    P-23.3.1 leaves P-23.3.2.2 in the same relative order.
+     leaves in the same relative order.
     """
     position = {el: i for i, el in enumerate(VB_CITATION_ORDER)}
     assert list(VB_NUMBERING_SENIORITY) == sorted(
@@ -189,7 +189,7 @@ def test_numbering_order_is_a_subsequence_of_the_citation_order():
 
 
 # ---------------------------------------------------------------------------
-# 3. The emittable set = the intersection, and the pre-T2b keys did not move.
+# 3. The emittable set = the intersection, and the pre- keys did not move.
 # ---------------------------------------------------------------------------
 @pytest.mark.unit
 def test_emittable_set_is_citation_intersect_numbering():
@@ -236,7 +236,7 @@ def test_inadmissible_rows_are_not_emittable(symbol):
 
 @pytest.mark.unit
 def test_carba_is_ruled_out_by_the_book_not_just_by_the_orders():
-    """P-21.1.1.1 [BBv2:7915]: "The name 'carbane' ... is not recommended.\"
+    """ [BBv2:7915]: "The name 'carbane'... is not recommended.\"
 
     Recorded separately because ``C`` is the one inadmissible row with a SECOND,
     independent Blue Book reason -- so a future session that finds a carbon
@@ -251,8 +251,8 @@ def test_carba_is_ruled_out_by_the_book_not_just_by_the_orders():
 def test_halogen_refusal_reason_records_both_blockers(symbol):
     """NOT ESTABLISHED, not merely unimplemented -- and the record must say why.
 
-    Two independent blockers: no P-23.3.2.2 numbering rank, and a mandatory
-    lambda (P-15.4.1.3) we cannot currently spell. A future reader must be able
+    Two independent blockers: no numbering rank, and a mandatory
+    lambda we cannot currently spell. A future reader must be able
     to tell this from an ordinary "we did not get to it".
     """
     reason = VB_INADMISSIBLE[symbol]
@@ -267,9 +267,9 @@ def test_halogen_refusal_reason_records_both_blockers(symbol):
 def test_elements_in_no_replacement_table_are_not_even_in_table_1_5(symbol):
     """The fail-closed FLOOR: Zn/Cd/Hg are a different refusal from At/Po/C.
 
-    They have no morpheme anywhere in replacement nomenclature -- P-22.2.2
+    They have no morpheme anywhere in replacement nomenclature --
     DELETED mercury -- so they must not appear in the book's table either, let
-    alone in the emittable set. ``mercura`` lives only in the P-69 organometallic
+    alone in the emittable set. ``mercura`` lives only in the organometallic
     table.
     """
     assert symbol not in TABLE_1_5
@@ -284,7 +284,7 @@ def test_elements_in_no_replacement_table_are_not_even_in_table_1_5(symbol):
 # ---------------------------------------------------------------------------
 @pytest.mark.unit
 def test_hw_table_covers_exactly_the_p_23_3_1_element_set():
-    """Table 2.4's 22 rows are the same 22 elements P-23.3.1 ranks [BBv2:8236].
+    """Table 2.4's 22 rows are the same 22 elements ranks [BBv2:8236].
 
     A cross-check on both transcriptions at once: two independently printed Blue
     Book tables agreeing element-for-element is strong evidence neither was
@@ -326,7 +326,7 @@ def test_exactly_two_rows_diverge_between_the_tables():
 
 
 # ---------------------------------------------------------------------------
-# 6. The determinism hazard T2b had to fix alongside the table.
+# 6. The determinism hazard had to fix alongside the table.
 # ---------------------------------------------------------------------------
 @pytest.mark.unit
 def test_priority_table_ranks_every_hw_element():
@@ -353,7 +353,7 @@ def test_priority_sort_separates_indium_from_thallium():
 
 @pytest.mark.unit
 def test_mercury_rank_is_not_a_replacement_position():
-    """Hg keeps a value for the P-69 consumers but must rank BELOW every real row.
+    """Hg keeps a value for the consumers but must rank BELOW every real row.
 
     If it ever sorted above In/Tl again it would re-create the tie this fixed.
     """
@@ -481,7 +481,7 @@ def test_primitive_reports_at_po_and_the_off_table_metals_as_unexpressed(smiles)
     ('C1CCCCCC[InH]CCCCC1', 'indacyclotridecane'),
 ])
 def test_added_elements_name_end_to_end(smiles, expected, namer):
-    """Every one of these is also OPSIN round-trip verified (see the T2b report).
+    """Every one of these is also OPSIN round-trip verified (see the report).
 
     Byte-exact, so a spelling, locant or stray-hyphen regression fails here even
     with no jar present. The bicyclo[2.2.2] and bicyclo[3.2.1] skeletons are the
@@ -498,15 +498,15 @@ def test_added_elements_name_end_to_end(smiles, expected, namer):
 ])
 def test_sole_heteroatom_locant_is_omitted_in_a_saturated_macrocycle(
         element, expected):
-    """P-22.2.3.2.1 [BBv2:8494]: the sole heteroatom's '1' is OMITTED.
+    """ [BBv2:8494]: the sole heteroatom's '1' is OMITTED.
 
     Asserted on the ring>10 builder directly, because the defect this locks was
     invisible end to end: ``_build_replacement_name`` emitted ``1-<prefix>`` for
     EVERY element, but O/S/N/Si never reach it -- an earlier producer that already
     omits the locant handles them, which is why the shipped gold targets
     ``thiacyclododecane`` and ``azacyclotridecane`` (same citation) were green.
-    Al and In started falling through to this builder when T2b made them
-    spellable, so without the fix T2b would have shipped
+    Al and In started falling through to this builder when made them
+    spellable, so without the fix would have shipped
     ``1-aluminacyclotridecane`` beside ``oxacyclotridecane``.
     """
     from orthonym.rules.heterocycles import _build_replacement_name
@@ -582,7 +582,7 @@ def test_inadmissible_and_off_table_ring_atoms_still_refuse(smiles, namer):
 
 @pytest.mark.unit
 def test_senior_heteroatom_is_cited_first_even_when_it_holds_the_higher_locant():
-    """P-23.3.1 citation order is NOT ascending-locant order.
+    """ citation order is NOT ascending-locant order.
 
     Here aluminium holds locant 2 and oxygen locant 7, yet ``oxa`` (rank 1) must
     be cited before ``alumina`` (rank 15). A locant-sorted implementation, or one
@@ -596,7 +596,7 @@ def test_senior_heteroatom_is_cited_first_even_when_it_holds_the_higher_locant()
 
 @pytest.mark.unit
 def test_boron_is_cited_before_aluminium():
-    """B rank 14 < Al rank 15: the new rows go AFTER boron, per P-23.3.1."""
+    """B rank 14 < Al rank 15: the new rows go AFTER boron, per."""
     name = _namer_name('C1CC2(CC[AlH]1)CC[BH]CC2')
     assert name == '3-bora-9-aluminaspiro[5.5]undecane', name
 

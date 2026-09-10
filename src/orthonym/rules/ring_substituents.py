@@ -1,7 +1,7 @@
 """
 Ring-as-substituent naming according to IUPAC 2013 (Blue Book).
 
-Implements IUPAC P-61.5: Standard substituent names for rings when they
+Implements IUPAC: Standard substituent names for rings when they
 become substituents on a chain parent structure.
 
 Examples:
@@ -16,7 +16,7 @@ from typing import Dict, List, Optional, Set, Tuple
 # Chain length prefixes - delegated to centralized chain_names module
 from ..data.chain_names import get_chain_prefix as _get_chain_prefix
 
-# IUPAC P-61.5: Standard substituent names for rings
+# IUPAC: Standard substituent names for rings
 # Maps ring system name to substituent prefix name
 RING_SUBSTITUENT_NAMES: Dict[str, str] = {
     # Carbocyclic aromatic
@@ -66,7 +66,7 @@ RING_SUBSTITUENT_NAMES: Dict[str, str] = {
     'oxirane': 'oxiranyl',
     'aziridine': 'aziridinyl',
 
-    # Fused heterocyclic (Phase 139 ARCH-02)
+    # Fused heterocyclic (a phase)
     'indole': 'indolyl',
     'quinoline': 'quinolinyl',
     'isoquinoline': 'isoquinolinyl',
@@ -128,7 +128,7 @@ def identify_ring_system(mol, ring_atoms: Tuple[int, ...]) -> Optional[str]:
     ring_size = len(ring_atoms)
     ring_set = set(ring_atoms)
 
-    # --- Single-ring guard (Phase 4 SUBST-01) -------------------------------
+    # --- Single-ring guard (a phase SUBST-01) -------------------------------
     # identify_ring_system describes ONE ring by its size + heteroatom set. If
     # the atom set spans more than one ring (a fused/bridged/spiro polycyclic
     # system) the size-based branches below would mislabel it as a monocycle of
@@ -166,7 +166,7 @@ def identify_ring_system(mol, ring_atoms: Tuple[int, ...]) -> Optional[str]:
             elif heteroatoms == ['N']:
                 return 'pyridine'
             elif heteroatoms == ['P']:
-                # P-22.2.1 / P-25.2.1: the 6-membered mancude ring with one P is
+                # /: the 6-membered mancude ring with one P is
                 # the retained name 'phosphinine' (OPSIN parses phosphinin-Y-yl).
                 # Without this the substituent path fell to the systematic
                 # replacement name '1-phosphacyclohexa-1,3,5-trien-Y-yl'.
@@ -197,9 +197,9 @@ def identify_ring_system(mol, ring_atoms: Tuple[int, ...]) -> Optional[str]:
                 return 'pyrimidine'  # fallback
             elif heteroatoms == ['N', 'N', 'N']:
                 # Distinguish triazine isomers by counting adjacent N-N bonds:
-                #   0 adjacent pairs -> 1,3,5-triazine (sym-triazine)
-                #   1 adjacent pair  -> 1,2,4-triazine (as-triazine PIN)
-                #   2 adjacent pairs -> 1,2,3-triazine (v-triazine)
+                # 0 adjacent pairs -> 1,3,5-triazine (sym-triazine)
+                # 1 adjacent pair -> 1,2,4-triazine (as-triazine PIN)
+                # 2 adjacent pairs -> 1,2,3-triazine (v-triazine)
                 n_indices = [idx for idx in ring_atoms
                              if mol.GetAtomWithIdx(idx).GetSymbol() == 'N']
                 adj_count = sum(
@@ -244,7 +244,7 @@ def identify_ring_system(mol, ring_atoms: Tuple[int, ...]) -> Optional[str]:
             elif heteroatoms == ['N', 'N']:
                 return 'imidazole'
             elif heteroatoms == ['N', 'N', 'N']:
-                # P-25.2.1 retained triazoles. 1,2,3-triazole has a MIDDLE N
+                # retained triazoles. 1,2,3-triazole has a MIDDLE N
                 # bonded to two ring N's (the N1-N2-N3 run); 1,2,4-triazole has
                 # no N with two N ring-neighbours (N1-N2-C3-N4-C5). The stem
                 # itself encodes the heteroatom positions, so the free-valence
@@ -308,12 +308,12 @@ def identify_ring_system(mol, ring_atoms: Tuple[int, ...]) -> Optional[str]:
     return None
 
 
-# IUPAC P-31.1.4.3.4 / P-29.3.5: PIN substituent stems for monocyclic
+# IUPAC /: PIN substituent stems for monocyclic
 # heteroarenes (ring name with the trailing 'e' removed). Only these rings are
-# claimed by pin_heteroaryl_substituent_name(); anything else guards to None.
+# claimed by pin_heteroaryl_substituent_name; anything else guards to None.
 _PIN_HETEROARYL_STEMS: Dict[str, str] = {
     'pyridine': 'pyridin',
-    # P-22.2.1: retained mancude 6-ring with one P. Substituent = phosphinin-Y-yl.
+    #: retained mancude 6-ring with one P. Substituent = phosphinin-Y-yl.
     'phosphinine': 'phosphinin',
     'pyrimidine': 'pyrimidin',
     'pyrazine': 'pyrazin',
@@ -322,38 +322,38 @@ _PIN_HETEROARYL_STEMS: Dict[str, str] = {
     'thiophene': 'thiophen',
     'pyrrole': 'pyrrol',
     'imidazole': 'imidazol',
-    # P-25.2.1 retained azole substituent stems. identify_ring_system
+    # retained azole substituent stems. identify_ring_system
     # distinguishes 1,2,3- vs 1,2,4-triazole by N-adjacency; the free-valence
     # numbering cascade minimises the heteroatom locant set, reproducing the
     # {1,2,3}/{1,2,4}/{1,2,3,4} positions the stem name asserts.
     '1,2,3-triazole': '1,2,3-triazol',
     '1,2,4-triazole': '1,2,4-triazol',
     'tetrazole': 'tetrazol',
-    # WS-A task 9: fully-SATURATED retained monocycles take the same
-    # free-valence numbering (P-29.2): pyrrolidin-1-yl, morpholin-4-yl,
+    # task 9: fully-SATURATED retained monocycles take the same
+    # free-valence numbering: pyrrolidin-1-yl, morpholin-4-yl,
     # piperidin-1-yl, piperazin-1-yl.
     'pyrrolidine': 'pyrrolidin',
     'morpholine': 'morpholin',
     'piperidine': 'piperidin',
     'piperazine': 'piperazin',
-    # Phase 4 SUBST-01 (d): saturated O/S monocycles take the same free-valence
+    # a phase SUBST-01 (d): saturated O/S monocycles take the same free-valence
     # numbering (heteroatom = locant 1): oxan-2-yl, oxolan-3-yl, thian-2-yl,
     # thiolan-3-yl. Extends the path beyond the N-rings above.
     'oxane': 'oxan',
     'oxolane': 'oxolan',
     'thiane': 'thian',
     'thiolane': 'thiolan',
-    # P-31.1.4.2: triazine PIN stems
+    #: triazine PIN stems
     '1,2,4-triazine': '1,2,4-triazin',
     '1,2,3-triazine': '1,2,3-triazin',
     '1,3,5-triazine': '1,3,5-triazin',
 }
 
 # Element seniority for assigning low locants to heteroatoms (IUPAC Table 28:
-# F > Cl > Br > I > O > S > Se > Te > N > P > ...). Lower value = senior.
+# F > Cl > Br > I > O > S > Se > Te > N > P >...). Lower value = senior.
 #
-# v22 Phase E1 / DD4: DERIVED from the single source of truth
-# ``locants.ELEMENT_NUMBERING_SENIORITY`` (the full P-15.4.1.2 order) instead of
+# Phase E1 / DD4: DERIVED from the single source of truth
+# ``locants.ELEMENT_NUMBERING_SENIORITY`` (the full order) instead of
 # a hand-maintained 4th copy. Densely re-ranking that order restricted to the
 # elements that appear as ring heteroatoms reproduces the original
 # {F:0,...,B:17} mapping byte-identically (At/Po/C and the Al..Tl tail are not
@@ -380,7 +380,7 @@ def pin_heteroaryl_substituent_name(
 ) -> Optional[str]:
     """PIN substituent name for a monocyclic heteroaromatic ring substituent.
 
-    Computes free-valence-aware numbering per IUPAC 2013 P-31.1.4.3.4: when a
+    Computes free-valence-aware numbering per IUPAC 2013: when a
     ring is detached as a substituent it is renumbered so low locants go, in
     order of decreasing priority, to (1) the heteroatoms as a set, (2) the
     heteroatoms in element-seniority order, (3) the indicated hydrogen, and
@@ -396,7 +396,7 @@ def pin_heteroaryl_substituent_name(
     locant-less form, guaranteeing zero regression) whenever the PIN locant is
     not provably correct —
       * the ring is not one of the supported monocyclic heteroarenes;
-      * it is a pyrazole (which identify_ring_system() reports as 'imidazole');
+      * it is a pyrazole (which identify_ring_system reports as 'imidazole');
       * the ring carries any substituent other than the single attachment;
       * the ring is not a simple aromatic monocycle;
       * ``attachment_atom`` is not a ring atom.
@@ -425,7 +425,7 @@ def pin_heteroaryl_substituent_name(
         return None
 
     # --- Guard: aromatic OR fully saturated simple monocycle -----------------
-    # WS-A task 9: fully-saturated heterocyclic monocycles (pyrrolidine,
+    # task 9: fully-saturated heterocyclic monocycles (pyrrolidine,
     # morpholine, piperidine, piperazine) use the SAME free-valence numbering
     # cascade — minus indicated hydrogen, an aromatic-only concept. Mixed
     # saturation stays guarded out (None -> legacy form).
@@ -454,10 +454,10 @@ def pin_heteroaryl_substituent_name(
                  if mol.GetAtomWithIdx(i).GetSymbol() != 'C']
 
     # --- imidazole vs pyrazole (R-bug fix) -----------------------------------
-    # identify_ring_system() reports BOTH 5-membered N,N arenes as 'imidazole'.
+    # identify_ring_system reports BOTH 5-membered N,N arenes as 'imidazole'.
     # Genuine imidazole has its two ring N's NON-adjacent (1,3); pyrazole has
     # them adjacent (1,2). Retarget the adjacent-N case to the retained pyrazole
-    # stem (P-25.2.1) so a bare pyrazolyl names correctly instead of emitting an
+    # stem so a bare pyrazolyl names correctly instead of emitting an
     # imidazol-*-yl name for a pyrazole (was: return None -> misid downstream).
     if ring_name == 'imidazole':
         n_idx = [i for i in het_atoms
@@ -550,13 +550,13 @@ def _decorated_heteroaryl_substituent_name(
     attachment_atom: int,
     allow_mancude: bool = False,
 ) -> Optional[str]:
-    """BP-3 cluster R: PIN substituent name for a monocyclic heteroaryl ring that
+    """ cluster R: PIN substituent name for a monocyclic heteroaryl ring that
     carries its OWN decorations, with the free valence on a ring atom — e.g.
     ``5-hydroxy-1,3-dimethylpyrazol-4-yl``.
 
     Extends the ``pin_heteroaryl_substituent_name`` free-valence numbering cascade
-    (P-31.1.4.3.4: heteroatoms as a set → element seniority → indicated H → free
-    valence) with a final P-59.2.3 lowest-decoration-locant term, then reads the
+    : heteroatoms as a set → element seniority → indicated H → free
+    valence) with a final lowest-decoration-locant term, then reads the
     decorations off the winning numbering. Decorations are identified with the
     same ``_identify_fused_substituent`` machinery the fused-ring path uses, so a
     branch it cannot name → ``None`` (fail closed; the caller keeps the whole
@@ -586,15 +586,15 @@ def _decorated_heteroaryl_substituent_name(
 
     het_atoms = [i for i in ring_list if mol.GetAtomWithIdx(i).GetSymbol() != 'C']
 
-    # v29 Phase 6: CARBOCYCLIC (benzene) rings have no heteroaryl stem, so a
+    # a phase: CARBOCYCLIC (benzene) rings have no heteroaryl stem, so a
     # DECORATED PHENYL substituent had no producer at all and fell straight
     # through to ring_fragment_declined_by_ring_engine — even though it is among the commonest shapes in
-    # drug-like space. Measured on the Phase 5 corpus, every one of these was
+    # drug-like space. Measured on the a phase corpus, every one of these was
     # unnameable at EVERY ring attachment point:
-    #     CN(C)c1ccccc1      -> 4-(dimethylamino)phenyl
-    #     NS(=O)(=O)c1ccccc1 -> 4-sulfamoylphenyl
+    # CN(C)c1ccccc1 -> 4-(dimethylamino)phenyl
+    # NS(=O)(=O)c1ccccc1 -> 4-sulfamoylphenyl
     #
-    # P-29.6.1 "Retained prefixes that are preferred prefixes" (`:16270`) — the
+    # "Retained prefixes that are preferred prefixes" (`:16270`) — the
     # free valence of a benzene substituent is position 1 and its locant is NOT
     # cited; the retained preferred prefix is 'phenyl', never 'benzen-1-yl'.
     # The verbatim BB example is `4-methylphenyl (preferred prefix)` (`:16298`).
@@ -617,7 +617,7 @@ def _decorated_heteroaryl_substituent_name(
         ring_adj[idx] = nbrs
 
     # Pyrazole vs imidazole (R-bug): identify_ring_system reports BOTH N,N 5-rings
-    # as 'imidazole'; adjacent ring N's = pyrazole (retained stem, P-25.2.1).
+    # as 'imidazole'; adjacent ring N's = pyrazole (retained stem,.
     if ring_name == 'imidazole':
         n_idx = [i for i in het_atoms if mol.GetAtomWithIdx(i).GetSymbol() == 'N']
         if len(n_idx) == 2 and mol.GetBondBetweenAtoms(n_idx[0], n_idx[1]) is not None:
@@ -653,7 +653,7 @@ def _decorated_heteroaryl_substituent_name(
                 continue
             info = _identify_fused_substituent(mol, ni, ring_set)
             if info is None:
-                # v30 tail: a decoration that carries its OWN ring through a
+                # tail: a decoration that carries its OWN ring through a
                 # chain/hetero linker ((4-chlorophenoxy)methyl on a triazole) is
                 # declined by _identify_fused_substituent, which does not thread
                 # the best-effort ring-on-chain path. Fall back to the universal
@@ -734,7 +734,7 @@ def _decorated_heteroaryl_substituent_name(
                       if indicated_h_atom is not None else 0)
             fv_loc = atom_to_pos[attachment_atom]
             deco_locs = tuple(sorted(atom_to_pos[ra] for ra in deco_atoms))
-            # P-14.4(g): when every earlier criterion ties, the lower locant
+            # (g): when every earlier criterion ties, the lower locant
             # goes to the substituent cited FIRST in alphanumerical order.
             # Without this term the tie was broken by whichever ring-traversal
             # direction happened to be enumerated first, which depends on RDKit
@@ -771,17 +771,17 @@ def _decorated_heteroaryl_substituent_name(
         mult = _DECO_MULT.get(len(locs))
         if mult is None:
             return None
-        # Enclosing marks. P-16.3.4 "Parentheses (round brackets) ... are used
-        # to enclose multiplied components that are: ... (c) simple substituent
+        # Enclosing marks. "Parentheses (round brackets)... are used
+        # to enclose multiplied components that are:... (c) simple substituent
         # prefixes and functionalized parent hydrides beginning with a
-        # multiplicative prefix" (`:7085`), and P-16.3.5(a) covers "compound or
+        # multiplicative prefix" (`:7085`), and (a) covers "compound or
         # complex (i.e. substituted) prefixes" with the verbatim example
         # `bis(dimethylamino) (preferred prefix)` (`:7104`). So
         # `4-dimethylaminophenyl` — which can read as di(methylamino) — must be
         # `4-(dimethylamino)phenyl`. `enclose_if_compound` is the shared
         # primitive for this — it unions needs_brackets with
         # is_complex_substituent (neither is complete alone), escalates
-        # ( -> [ -> { for an already-bracketed inner name, leaves simple
+        # (-> [ -> { for an already-bracketed inner name, leaves simple
         # prefixes bare, and is idempotent.
         text = f"{','.join(str(l) for l in locs)}-{mult}{_enclose_if_compound(nm)}"
         prefix_parts.append((_alpha(nm), text))
@@ -789,7 +789,7 @@ def _decorated_heteroaryl_substituent_name(
     body = '-'.join(p[1] for p in prefix_parts)
     ih = f"{ih_locant}H-" if indicated_h_atom is not None else ""
     if is_carbocyclic:
-        # P-29.3.5: 'phenyl', with the free valence at 1 and its locant elided.
+        #: 'phenyl', with the free valence at 1 and its locant elided.
         # The guard is not decorative — if the cascade ever failed to place the
         # free valence at 1 the elided locant would name a DIFFERENT molecule,
         # so fail closed rather than emit an unlocanted prefix.
@@ -811,7 +811,7 @@ def _decorated_fused_substituent_name(
     ring_atoms: Tuple[int, ...],
     attachment_atom: int,
 ) -> Optional[str]:
-    """v30 Piece 2: PIN substituent name for a FUSED ring system carrying its
+    """ Piece 2: PIN substituent name for a FUSED ring system carrying its
     OWN decorations, free valence on a ring atom — e.g. ``6-methoxynaphthalen-2-yl``.
 
     The monocyclic sibling ``_decorated_heteroaryl_substituent_name`` declines
@@ -826,13 +826,13 @@ def _decorated_fused_substituent_name(
     (inconsistent). Instead ``compute_fused_numbering`` gives ONE canonical
     atom->locant map and ``_ring_system_automorphisms`` gives the residual ring
     symmetry; among the symmetry-equivalent numberings we take the one giving
-    the FREE VALENCE the lowest locant (P-31.1.4.3.4 free-valence priority),
-    then the decorations the lowest set (P-59.2.3), and read every locant off
+    the FREE VALENCE the lowest locant free-valence priority),
+    then the decorations the lowest set, and read every locant off
     that single numbering so they are mutually consistent.
 
     Fail closed (None) on anything not provably correct — an unnameable or
     unaccounted decoration, a system ``compute_fused_numbering`` declines, a
-    ring with no retained fused stem. SELF-01 then backstops a mis-numbering
+    ring with no retained fused stem. then backstops a mis-numbering
     (abstain, never a wrong molecule).
     """
     from rdkit import Chem
@@ -917,7 +917,7 @@ def _decorated_fused_substituent_name(
         return None  # a heavy atom unaccounted -> fail closed
 
     # Enumerate symmetry-equivalent numberings; pick lowest FREE VALENCE first
-    # (P-31.1.4.3.4), then lowest decoration set (P-59.2.3), then the alpha tie.
+    #, then lowest decoration set, then the alpha tie.
     deco_atoms = [ra for ra, _ in decorations]
     best_key = None
     best_pos = None
@@ -983,9 +983,9 @@ def _build_ene_yne_infix(stem: str, ene: List[int], yne: List[int]) -> Optional[
     """Assemble ``<stem>[a]-<locs>-[mult]en[-<locs>-[mult]yn]`` WITHOUT the
     trailing 'e', so the caller appends ``-<loc>-yl``.
 
-    ``cyclohex`` + ene=[1]      -> ``cyclohex-1-en``
-    ``cyclohex`` + ene=[1,3]    -> ``cyclohexa-1,3-dien``   (euphonic 'a' before di)
-    Per IUPAC 2013 P-31.1.4: the parent-hydride stem keeps its 'a' before a
+    ``cyclohex`` + ene=[1] -> ``cyclohex-1-en``
+    ``cyclohex`` + ene=[1,3] -> ``cyclohexa-1,3-dien`` (euphonic 'a' before di)
+    Per IUPAC 2013: the parent-hydride stem keeps its 'a' before a
     multiplied unsaturation suffix (hexa-1,3-diene) but elides it before a single
     'ene' (hex-1-ene).
     """
@@ -1005,12 +1005,12 @@ def _build_ene_yne_infix(stem: str, ene: List[int], yne: List[int]) -> Optional[
 def _unsaturated_carbocyclic_substituent(
     mol, ring_atoms: Tuple[int, ...], attachment_atom: int
 ) -> Optional[str]:
-    """P-31.1.4.3.4 substituent name for a monocyclic, all-carbon, non-aromatic
+    """ substituent name for a monocyclic, all-carbon, non-aromatic
     ring carrying >=1 skeletal multiple bond and no other decoration:
     ``cyclohex-1-en-1-yl``, ``cyclohex-2-en-1-yl``, ``cyclohexa-2,4-dien-1-yl``.
 
     The free valence takes locant 1 (lowest for a carbocyclic monocyclic
-    substituent, P-29.2); the ring is numbered in the direction giving the lowest
+    substituent,; the ring is numbered in the direction giving the lowest
     locants to the skeletal multiple bonds. Returns None (fail-closed) for
     anything outside this narrow class — heteroatoms, charge, fused/spiro atoms,
     saturated rings, or any extra exocyclic decoration.
@@ -1088,12 +1088,12 @@ _HYDRO_MULTIPLIERS = {2: 'di', 4: 'tetra', 6: 'hexa', 8: 'octa', 10: 'deca'}
 def _unsaturated_heteromonocyclic_substituent(
     mol, ring_atoms: Tuple[int, ...], attachment_atom: int
 ) -> Optional[str]:
-    """Wave2 T6b (P-32.2.1): substituent name for a NON-AROMATIC monocyclic
+    """Wave2: substituent name for a NON-AROMATIC monocyclic
     ring with exactly ONE heteroatom carrying >=1 skeletal double bond, named
     on its mancude parent with hydro prefixes and indicated hydrogen:
     ``3,4-dihydro-2H-pyran-2-yl``, ``2,3-dihydrofuran-...-yl``.
 
-    Locant selection follows P-32.2.1: heteroatom lowest (fixed = 1), then
+    Locant selection follows: heteroatom lowest (fixed = 1), then
     indicated hydrogen, then the free-valence suffix, and finally 'hydro'
     prefixes. The mancude double-bond patterns are enumerated as maximum
     matchings of the ring cycle (O/S/Se/Te excluded from double bonds); the
@@ -1343,9 +1343,9 @@ def _extract_ring_submol(mol, ring_atoms, attachment_atom):
 
 def _vonbaeyer_substituent_name(sub, attach_sub) -> Optional[str]:
     """``bicyclo[2.2.1]heptan-2-yl`` etc. for a detached carbocyclic von-Baeyer
-    ring system, reusing the bicyclo parent namer (P-23) with the free valence
-    treated as the lowest-locant feature (P-31.1.4.3.4). A ring double bond is
-    cited with the ``-<loc>-en-`` infix (P-32.1.3: free valence gets the lowest
+    ring system, reusing the bicyclo parent namer with the free valence
+    treated as the lowest-locant feature. A ring double bond is
+    cited with the ``-<loc>-en-`` infix: free valence gets the lowest
     locant first, THEN the unsaturation) -> ``bicyclo[2.2.2]oct-5-en-2-yl``.
     Carbocyclic only; heteroatom von-Baeyer stems are out of this phase's
     scope -> None."""
@@ -1368,7 +1368,7 @@ def _vonbaeyer_substituent_name(sub, attach_sub) -> Optional[str]:
         stem = bicyclo._get_alkane_name(sub.GetNumAtoms())  # 'heptane'
 
         # Ring double bonds (skeletal, non-aromatic). Cite each as an 'ene' at
-        # the lower of its two atom locants (P-31.1.4). Fail closed if a ring
+        # the lower of its two atom locants. Fail closed if a ring
         # double-bond atom is not in the numbering (should not happen).
         ene: List[int] = []
         for b in sub.GetBonds():
@@ -1378,12 +1378,12 @@ def _vonbaeyer_substituent_name(sub, attach_sub) -> Optional[str]:
             if a1 not in numbering or a2 not in numbering:
                 return None
             l1, l2 = numbering[a1], numbering[a2]
-            # v27 P1: the consecutive-locant `-n-ene` infix can only express a
+            #: the consecutive-locant `-n-ene` infix can only express a
             # double bond between adjacently-numbered atoms. A bridgehead/bridge
             # ene (non-consecutive locants, e.g. 8=15) needs the `-n(m)-ene`
             # form, which this narrow namer does not build -- it used to cite the
             # lower locant alone (`-8-ene`), an OPSIN-unparseable / ambiguous name
-            # that never round-tripped (SELF-01 then suppressed it to unknown).
+            # that never round-tripped (then suppressed it to unknown).
             # Fail closed so the universal von-Baeyer cage namer (which cites the
             # `n(m)` form correctly, under the complete tier) takes over.
             if abs(l1 - l2) != 1:
@@ -1411,7 +1411,7 @@ def _vonbaeyer_substituent_name(sub, attach_sub) -> Optional[str]:
 
 def _spiro_substituent_name(sub, attach_sub) -> Optional[str]:
     """``spiro[4.5]decan-<loc>-yl`` for a detached carbocyclic monospiro ring
-    system, reusing the spiro parent namer (P-24). Carbocyclic only -> None
+    system, reusing the spiro parent namer. Carbocyclic only -> None
     otherwise."""
     from . import spiro
     try:
@@ -1444,7 +1444,7 @@ def _spiro_substituent_name(sub, attach_sub) -> Optional[str]:
 def _fused_hydro_substituent_name(sub, attach_sub) -> Optional[str]:
     """``5,6,7,8-tetrahydronaphthalen-1-yl`` etc. for a detached partially
     saturated fused carbocycle, reusing the partial-saturation parent perception
-    but numbered with the FREE VALENCE first (P-31.1.4.3.4): low locant to the
+    but numbered with the FREE VALENCE first: low locant to the
     attachment, then to the hydro positions, then to any residual ring double
     bond. Also names the FULLY-saturated (perhydro) case with the count-form
     prefix (``decahydronaphthalen-2-yl``; D-FOLLOWON item 3). Returns None
@@ -1500,7 +1500,7 @@ def _fused_hydro_substituent_name(sub, attach_sub) -> Optional[str]:
         stem = parent[:-1] if parent.endswith('e') else parent  # naphthalen
         if is_perhydro:
             # Fully-saturated fused carbocycle: cite the COUNT-form prefix
-            # (P-31.1.4.3.4 / the explicit-hydrogen convention this project uses
+            # / the explicit-hydrogen convention this project uses
             # for the PARENT, e.g. 'decahydronaphthalene'), with NO per-position
             # hydro locants, then the free-valence locant ->
             # 'decahydronaphthalen-2-yl'. Fail-closed if the count is non-standard.
@@ -1515,11 +1515,11 @@ def _fused_hydro_substituent_name(sub, attach_sub) -> Optional[str]:
         return None
 
 
-#: v30 P3-T1c lead 1: the von Baeyer parent hydrides whose RETAINED name is the
+#: - lead 1: the von Baeyer parent hydrides whose RETAINED name is the
 #: PIN, keyed by the descriptor string the cage analyzer emits.
 #:
-#: **P-23.7 "RETAINED NAMES FOR VON BAEYER PARENT HYDRIDES"**
-#: (``BlueBookV2/BlueBookV2.md:9879``): *"The retained names adamantane and cubane
+#: ** "RETAINED NAMES FOR VON BAEYER PARENT HYDRIDES"**
+#: (``the Blue Book Blue Book``): *"The retained names adamantane and cubane
 #: are used in general nomenclature and as preferred IUPAC names. The name
 #: quinuclidine is retained for general nomenclature only (see Table 2.6)."*
 #: Table 2.6 (``:9885``) prints *"adamantane (PIN) tricyclo[3.3.1.1^3,7]decane"*
@@ -1530,7 +1530,7 @@ def _fused_hydro_substituent_name(sub, attach_sub) -> Optional[str]:
 #: ⚠ Only these two. ``tricyclo.TRICYCLO_RETAINED_NAMES`` also carries
 #: ``twistane``, which Table 2.6 does NOT retain, and ``quinuclidine``, which
 #: Table 2.6 retains for general nomenclature ONLY. Neither may be used as a PIN
-#: stem, so this table is keyed off P-23.7 rather than reusing that dict.
+#: stem, so this table is keyed off rather than reusing that dict.
 #:
 #: The key is the DESCRIPTOR, not a SMILES: by the time it is consulted the
 #: descriptor has already passed ``audit_von_baeyer_descriptor``, so it is proven
@@ -1548,7 +1548,7 @@ _VB_RETAINED_PIN_STEM = {
 
 
 def _retained_pin_cage_stem(cage, stem: str) -> Optional[str]:
-    """The P-23.7 retained PIN stem for ``cage``, or None.
+    """The retained PIN stem for ``cage``, or None.
 
     Applies only to an all-carbon, fully saturated cage whose audited descriptor
     is in ``_VB_RETAINED_PIN_STEM``: a heteroatom or a ring multiple bond makes
@@ -1571,7 +1571,7 @@ def _retained_pin_cage_stem(cage, stem: str) -> Optional[str]:
 def _lowest_locant_cage_numbering(sub, cage, cage_atoms, attach_sub,
                                   deco_carriers_sub=()):
     """Re-map ``cage.atom_to_locant`` through the cage's own AUTOMORPHISMS to give
-    the free valence (P-29.3.2) and then the substituents the lowest locants.
+    the free valence and then the substituents the lowest locants.
 
     Returns a ``{sub_idx: locant}`` dict, never None — the analyzer's own
     numbering is the fallback, so this can only improve the locant set.
@@ -1584,7 +1584,7 @@ def _lowest_locant_cage_numbering(sub, cage, cage_atoms, attach_sub,
 
     ⚠ Deliberately applied ONLY on the retained-PIN path (adamantane / cubane).
     Applying it to every von Baeyer substituent would relabel names that already
-    ship. That generalisation is P-29.3.3, which
+    ship. That generalisation is, which
     ``_universal_cage_substituent_name``'s own docstring already defers.
     """
     from rdkit import Chem
@@ -1626,10 +1626,10 @@ def _lowest_locant_cage_numbering(sub, cage, cage_atoms, attach_sub,
 def _universal_cage_substituent_name(
     sub, attach_sub, allow_mancude: bool = False
 ) -> Optional[str]:
-    """v27 P1 (BB P-29.2 / P-29.3.3-5): name ANY von-Baeyer cage as a
+    """ (BB / -5): name ANY von-Baeyer cage as a
     ``...-<loc>-yl`` substituent by routing the detached ring system through the
     SAME audited ``analyze_cage_universal`` engine that ``name_general_ring``
-    uses for the PARENT, then citing the free valence's P-23 locant.
+    uses for the PARENT, then citing the free valence's locant.
 
     Restores parent<->substituent symmetry: the narrow ``_vonbaeyer_substituent_name``
     only handles a 2-bridgehead ``is_bicyclo_system`` carbocycle, so tricyclo+/
@@ -1641,8 +1641,8 @@ def _universal_cage_substituent_name(
     refusal (spiro / >40 atoms / kekulize failure / mancude-with-flag-off /
     numbering that does not cover exactly the ring atoms) — fail-closed, never a
     wrong or coverage-incomplete cage. The free-valence locant is the primary
-    P-23 numbering ``analyze_cage_universal`` assigns (a valid numbering ->
-    SELF-01-safe); P-29.3.3 free-valence-lowest refinement is Task 5.
+     numbering ``analyze_cage_universal`` assigns (a valid numbering ->
+    -safe); free-valence-lowest refinement is Task 5.
     """
     from .polycyclic import _build_parent_with_unsaturation
     from .vonbaeyer_universal import analyze_cage_universal
@@ -1667,12 +1667,12 @@ def _universal_cage_substituent_name(
             cage.total_atoms, cage.unsaturation)
         if not parent_block:
             return None
-        # P-29.2 suffix elision: elide the terminal 'e' of the parent stem
+        # suffix elision: elide the terminal 'e' of the parent stem
         # before '-<loc>-yl' (octane -> octan-3-yl; pentadec-1(15)-ene ->
         # pentadec-1(15)-en-8-yl). _build_parent_with_unsaturation always
         # returns an 'e'-terminal stem (…ane / …ene / …yne / …diene).
         stem = parent_block[:-1] if parent_block.endswith('e') else parent_block
-        # v30 P3-T1c lead 1: P-23.7 retained PIN stem in place of the von Baeyer
+        # - lead 1: retained PIN stem in place of the von Baeyer
         # descriptor. Until now this function emitted `tricyclo[3.3.1.1^3,7]
         # decan-N-yl` for a cage whose PIN stem is `adamantan-`, so the ONE thing
         # this project claims over -- a retained name where
@@ -1692,7 +1692,7 @@ def _universal_cage_substituent_name(
 def _universal_spiro_substituent_name(
     sub, attach_sub, allow_mancude: bool = False
 ) -> Optional[str]:
-    """v27 P3 (BB P-24.2 + P-29.3): name ANY spiro ring system as a
+    """ (BB +: name ANY spiro ring system as a
     ``...-<loc>-yl`` substituent by routing the detached ring system through the
     audited ``analyze_spiro_universal`` engine, then citing the free valence's
     spiro locant.
@@ -1700,7 +1700,7 @@ def _universal_spiro_substituent_name(
     Generalizes the narrow ``_spiro_substituent_name`` (carbocyclic monospiro
     only) to HETERO spiro (``2-oxaspiro[4.5]decan-8-yl``), POLYSPIRO
     (``dispiro[...]-yl``) and ring-unsaturated spiro. The free valence gets the
-    lowest locant AFTER the heteroatoms (P-24.2.4 fixes the heteroatom locants
+    lowest locant AFTER the heteroatoms fixes the heteroatom locants
     first; ``get_spiro_numbering`` orders het < free-valence). Returns None on
     any refusal — fail-closed, never a mis-numbered or coverage-incomplete `-yl`.
     """
@@ -1741,7 +1741,7 @@ def _polycyclic_substituent_name(
     (fail-closed) for any polycyclic the routed namers cannot number — never a
     monocycle size-guess (the old ``cyclo{N}yl`` corruption).
 
-    v27 P1: when ``allow_mancude`` is set (complete/best-effort engine tier only)
+    : when ``allow_mancude`` is set (complete/best-effort engine tier only)
     the universal cage namer is appended AFTER the narrow PIN namers, so their
     existing emissions are untouched and the new capability only ADDS coverage
     (tricyclo+/adamantane, and mancude fused-aromatic cages as polyenes). Default
@@ -1761,7 +1761,7 @@ def _polycyclic_substituent_name(
         if name:
             return name
     if allow_mancude:
-        # v27 P1/P3: the universal cage + spiro engines (tricyclo+/adamantane +
+        # /P3: the universal cage + spiro engines (tricyclo+/adamantane +
         # mancude cages; hetero/poly/unsaturated spiro), complete-tier only.
         # Fail-closed (None) on any refusal.
         for _uni in (_universal_cage_substituent_name,
@@ -1776,9 +1776,9 @@ def _polycyclic_substituent_name(
 
 
 def _pah_core_numbering(mol, ring_atoms, attach, deco_carriers):
-    """v28 Task 2b helper: full ``{orig_idx: int_locant}`` numbering + bare
+    """ helper: full ``{orig_idx: int_locant}`` numbering + bare
     ``...-<fv>-yl`` tail for a retained fused CARBOCYCLIC aromatic core
-    (naphthalene / anthracene / phenanthrene / pyrene ...). Reuses the fixed-PAH
+    (naphthalene / anthracene / phenanthrene / pyrene...). Reuses the fixed-PAH
     numbering machinery (``get_polycyclic_iupac_locants``) which already runs the
     automorphism minimization; the free valence takes the lowest locant (routed
     through the ``pcg`` tier), then the decorations. Returns ``(pos, tail)`` or
@@ -1815,13 +1815,13 @@ def _pah_core_numbering(mol, ring_atoms, attach, deco_carriers):
 
 
 def _cage_core_numbering(mol, ring_atoms, attach, deco_carriers=()):
-    """v28 Task 2b helper: full ``{orig_idx: int_locant}`` numbering + bare
+    """ helper: full ``{orig_idx: int_locant}`` numbering + bare
     ``...-<fv>-yl`` tail for a von-Baeyer / bridged CAGE core (adamantane /
-    tricyclo+ ...). Detaches the ring-only submol (property-tagged so the
+    tricyclo+...). Detaches the ring-only submol (property-tagged so the
     submol->orig index map is preserved) and routes it through the SAME
     audited ``analyze_cage_universal`` engine ``_universal_cage_substituent_name``
     uses, then reads BOTH the free-valence locant and every ring-atom locant off
-    the single P-23 numbering (mutually consistent -> SELF-01-safe). Returns
+    the single numbering (mutually consistent -> -safe). Returns
     ``(pos, tail)`` or ``None`` on any refusal (spiro / >MAX / kekulize /
     numbering that does not cover exactly the ring atoms, or -- mirroring
     ``_pah_core_numbering`` / ``_fused_heterocycle_core_numbering`` -- any of
@@ -1878,12 +1878,12 @@ def _cage_core_numbering(mol, ring_atoms, attach, deco_carriers=()):
     if not parent_block:
         return None
     stem = parent_block[:-1] if parent_block.endswith('e') else parent_block
-    # v30 P3-T1c lead 1: the same P-23.7 retained-PIN substitution as
+    # - lead 1: the same retained-PIN substitution as
     # ``_universal_cage_substituent_name``, applied here so a DECORATED cage core
     # (the composer's route) gets it too. Both the tail and ``pos`` below are read
     # off the SAME numbering, so the decoration locants stay consistent with the
     # free-valence locant by construction. Here the decoration carriers are known,
-    # so the lowest-locant re-map minimises the free valence FIRST (P-29.3.2) and
+    # so the lowest-locant re-map minimises the free valence FIRST and
     # then the substituent set -- which is what turns `7-hydroxyadamantan-3-yl`
     # into the PIN `3-hydroxyadamantan-1-yl`.
     _retained = _retained_pin_cage_stem(cage, stem)
@@ -1912,16 +1912,16 @@ def _cage_core_numbering(mol, ring_atoms, attach, deco_carriers=()):
 
 
 def _fused_heterocycle_core_numbering(mol, ring_atoms, attach, deco_carriers):
-    """v28 Task 2c helper: full ``{orig_idx: int_locant}`` numbering + bare
+    """ helper: full ``{orig_idx: int_locant}`` numbering + bare
     ``...-<fv>-yl`` tail for a retained fused-HETEROCYCLE core (1H-indole /
-    quinoline / 1H-benzimidazole / 1-benzothiophene / purine ...).
+    quinoline / 1H-benzimidazole / 1-benzothiophene / purine...).
 
     Reuses the FIXED IUPAC numbering catalogued in ``data.fused_heterocycles``
     (the ``iupac_locants`` map — canonical-SMILES atom index -> peripheral
     locant — and the retained ``name`` that already embeds the indicated
     hydrogen). ONE canonical numbering is read for BOTH the free valence AND
     every decoration carrier, so they are mutually consistent -> any single
-    valid numbering is SELF-01-safe. The indicated H is taken VERBATIM from the
+    valid numbering is -safe. The indicated H is taken VERBATIM from the
     catalog name (a fused-heterocycle pitfall — never guessed); the production
     OPSIN round-trip gate arbitrates any residual indicated-H uncertainty.
 
@@ -1952,7 +1952,7 @@ def _fused_heterocycle_core_numbering(mol, ring_atoms, attach, deco_carriers):
         return None
     # ``iupac_locants`` is keyed by the ENTRY reference SMILES' atom indices, so
     # rebuild the reference from the (matched) catalog key and translate onto
-    # THIS ring system by substructure match (P-29.2: minimise the free-valence
+    # THIS ring system by substructure match: minimise the free-valence
     # locant over automorphic matches; asymmetric cores have a single match).
     ref = Chem.MolFromSmiles(frag_smi)
     if ref is None:
@@ -1993,27 +1993,27 @@ def polycyclic_core_numbering(
     mol, ring_atoms: Tuple[int, ...], attachment_atom: int,
     deco_carriers, allow_mancude: bool = False,
 ) -> Optional[Tuple[Dict[int, int], str]]:
-    """v28 Task 2b: return ``(pos_map, bare_tail)`` for a POLYCYCLIC ring core so
+    """: return ``(pos_map, bare_tail)`` for a POLYCYCLIC ring core so
     the recursive substituent composer can place decoration locants on a
     fused / bridged / cage core (the biggest drug-like breadth lever).
 
     ``pos_map`` is ``{orig_atom_idx: int_locant}`` and ``bare_tail`` the
     ``...-<fv>-yl`` core token — BOTH derived from ONE numbering, so the free
     valence and every decoration locant are mutually consistent. Any single
-    VALID numbering is SELF-01-safe: a wrong-locant name is suppressed by the
+    VALID numbering is -safe: a wrong-locant name is suppressed by the
     production OPSIN round-trip gate, never shipped, so the composer ATTEMPTS a
     covered candidate rather than fail-closing on numbering uncertainty.
 
     Covered classes: retained fused CARBOCYCLIC aromatics (naphthalene,
-    anthracene, phenanthrene, pyrene ...), von-Baeyer CAGES (adamantane /
-    tricyclo+ ...) and — v28 Task 2c — retained fused HETEROCYCLES (indole,
-    quinoline, benzimidazole, benzothiophene, purine ...) via the
+    anthracene, phenanthrene, pyrene...), von-Baeyer CAGES (adamantane /
+    tricyclo+...) and — — retained fused HETEROCYCLES (indole,
+    quinoline, benzimidazole, benzothiophene, purine...) via the
     ``data.fused_heterocycles`` catalog numbering. Returns ``None`` (clean
     abstain) for every other polycyclic core class — spiro, partial-hydro fused,
     non-cataloged fusions — which stay deferred (the composer then fails closed,
     never a wrong locant).
 
-    Precondition (M3, v28 Composer #1 final review): complete/best-effort
+    Precondition (M3, Composer #1 final review): complete/best-effort
     tier only. The sole production caller (the recursive decoration composer
     in ``substituent_enumerator.py``) is itself gated on ``allow_mancude`` and
     never reaches this function with ``allow_mancude=False``; a hypothetical
@@ -2026,8 +2026,8 @@ def polycyclic_core_numbering(
         res = _pah_core_numbering(mol, ring_atoms, attachment_atom, deco_carriers)
         if res is not None:
             return res
-        # v28 Task 2c: retained fused-HETEROCYCLE core (indole / quinoline /
-        # benzimidazole / benzothiophene / purine ...) — tried BEFORE the
+        #: retained fused-HETEROCYCLE core (indole / quinoline /
+        # benzimidazole / benzothiophene / purine...) — tried BEFORE the
         # general von-Baeyer cage numberer, which would otherwise name these
         # mancude fused aromatics as (valid but non-preferred) aza-bicyclo
         # polyenes. The retained name is the preferred emission. Gated on
@@ -2036,7 +2036,7 @@ def polycyclic_core_numbering(
             mol, ring_atoms, attachment_atom, deco_carriers)
         if res is not None:
             return res
-        # von-Baeyer / bridged CAGE fallback (adamantane / tricyclo+ ..., and
+        # von-Baeyer / bridged CAGE fallback (adamantane / tricyclo+..., and
         # any non-cataloged mancude fused system as a polyene).
         res = _cage_core_numbering(mol, ring_atoms, attachment_atom, deco_carriers)
         if res is not None:
@@ -2046,7 +2046,7 @@ def polycyclic_core_numbering(
 
 def _phthalimido_substituent_name(mol, frag_set: Set[int],
                                   attach_idx: int) -> Optional[str]:
-    """P-66.2.2 (BB 33859/55900): the phthalimido fragment
+    """ (BB 33859/55900): the phthalimido fragment
     O=C1N([*])C(=O)c2ccccc21 -> '1,3-dioxo-1,3-dihydro-2H-isoindol-2-yl'
     (the BB preferred prefix). Matched by SUBGRAPH (attach N carries the
     two flanking carbonyls of a benzo-fused 5-ring imide) with EXACT
@@ -2065,7 +2065,7 @@ def _phthalimido_substituent_name(mol, frag_set: Set[int],
     if patt is None:
         return None
     for match in mol.GetSubstructMatches(patt):
-        # match atoms: O, C, N, [*], C, O, c, c, c, c, c, c  (12 atoms)
+        # match atoms: O, C, N, [*], C, O, c, c, c, c, c, c (12 atoms)
         # the [*] (index 3) is the attachment substituent, OUTSIDE the frag.
         n_in_match = match[2]
         star = match[3]
@@ -2087,15 +2087,15 @@ def name_ring_system_substituent(
     allow_mancude: bool = False,
     pos_out: Optional[Dict[int, int]] = None,
 ) -> Optional[str]:
-    """Name a RING-CONTAINING substituent fragment (WS-A task 9 chokepoint).
+    """Name a RING-CONTAINING substituent fragment (task 9 chokepoint).
 
     The single delegate used by every ring-parent path (fused-heterocycle
     parents, PAH parents) when a substituent fragment contains ring atoms.
     Chooses the producer:
 
     - fragment IS exactly one ring system rooted at a ring atom ->
-      ``get_ring_substituent_name`` (PIN free-valence locant, P-29.2:
-      naphthalen-2-yl, pyridin-2-yl, 1H-indol-2-yl, ...);
+      ``get_ring_substituent_name`` (PIN free-valence locant,:
+      naphthalen-2-yl, pyridin-2-yl, 1H-indol-2-yl,...);
     - anything else (ring + chain linker, chain-rooted) -> the universal
       ``substituent_enumerator.name_substituent``.
 
@@ -2128,7 +2128,7 @@ def name_ring_system_substituent(
             return None
 
     name: Optional[str] = None
-    # P-66.2.2 (BB 33859/55900, W2E-P1FG Task 15 L2): the exact phthalimido
+    # (BB 33859/55900, W2E-P1FG Task 15 L2): the exact phthalimido
     # fragment — a benzo-fused 5-ring imide N-attached, with the two ring
     # carbons flanking the N each bearing an exocyclic =O -> the BB preferred
     # prefix '1,3-dioxo-1,3-dihydro-2H-isoindol-2-yl'. Matched by subgraph
@@ -2145,7 +2145,7 @@ def name_ring_system_substituent(
     # generic decorated-fused path declines it (its retained-stem lookup keys on
     # the bare-ring SMILES `c1ncc2ncnc2n1`, no [nH], which misses the catalog).
     # This producer derives purine's fixed numbering + graph indicated-H directly
-    # and fails closed, so it is safe on any tier (SELF-01 backstops). Pass the
+    # and fails closed, so it is safe on any tier (backstops). Pass the
     # RING ATOMS ONLY (not frag_set, which also includes exocyclic decorations
     # like the C6-amino nitrogen) -- name_purine_substituent requires an exact
     # match on the 9-atom purine core; the exocyclic amino is picked up inside
@@ -2164,7 +2164,7 @@ def name_ring_system_substituent(
             name = None
     elif (frag_ring_atoms and frag_ring_atoms < frag_set
           and ring_info.NumAtomRings(attach_idx) > 0):
-        # BP-3 cluster R: a ring that carries its OWN decorations, rooted at a
+        # cluster R: a ring that carries its OWN decorations, rooted at a
         # ring atom (proper subset: ring atoms + decoration atoms). Neither the
         # bare-ring branch nor the ring-on-chain branch matched. Name it by
         # recursing the free-valence numbering cascade over the decorated ring.
@@ -2178,16 +2178,16 @@ def name_ring_system_substituent(
         except Exception:
             name = None
         if name is None and allow_mancude:
-            # v30 Piece 2: the monocyclic producer declines a FUSED decorated
+            # Piece 2: the monocyclic producer declines a FUSED decorated
             # ring-substituent (e.g. 6-methoxynaphthalen-2-yl). Reuse the
             # fused-ring parent numbering to place the decorations + free
             # valence. BEST-EFFORT ONLY (allow_mancude): fused-substituent
             # numbering is a NEW capability that has not been proven byte-
             # identical against the PIN gold set, so — exactly as Piece 1 —
             # gate it behind the best-effort tier to keep PIN byte-identical by
-            # construction (the v30 axis is best-effort breadth, invariant 16).
+            # construction (the axis is best-effort breadth, a project rule).
             # Fail closed (None -> enumerator fallback -> ring_fragment_declined_by_ring_engine), so this only
-            # ADDS successful best-effort emissions; SELF-01 backstops a
+            # ADDS successful best-effort emissions; backstops a
             # mis-numbering (abstain, never a wrong molecule).
             try:
                 name = _decorated_fused_substituent_name(
@@ -2197,7 +2197,7 @@ def name_ring_system_substituent(
                 name = None
     elif frag_ring_atoms and ring_info.NumAtomRings(attach_idx) == 0:
         # Chain-ROOTED fragment carrying a ring system, e.g. -CH2-naphthalene.
-        # P-29.1.2 compound substituent: '(naphthalen-2-yl)methyl'. The
+        # compound substituent: '(naphthalen-2-yl)methyl'. The
         # generic recursive namer mis-roots these (it names the fragment as a
         # molecule and appends -yl: '2-methylnaphthalenyl'), so build the
         # carrier+ring form here under tight guards; anything more complex
@@ -2212,8 +2212,8 @@ def name_ring_system_substituent(
         # ring-bearing fragments back here (Tier 1.95). When called from there,
         # the caller passes allow_enumerator_fallback=False so a decline returns
         # None instead of re-entering the cascade (no infinite loop).
-        # v28 Composer1 Task 3: thread allow_mancude so a decorated/fused core
-        # this function's own narrow producers decline (BP-3 et al.) still
+        # Composer1 Task 3: thread allow_mancude so a decorated/fused core
+        # this function's own narrow producers decline (et al.) still
         # reaches the recursive decoration composer
         # (``_recursive_fragment_substituent_name``) through the full cascade,
         # instead of silently dropping back to allow_mancude=False here. Every
@@ -2223,7 +2223,7 @@ def name_ring_system_substituent(
         name = name_substituent(
             mol, frag_atoms, attach_idx, allow_mancude=allow_mancude)
         # Fail-closed backstop: if this fragment IS a ring assembly but the
-        # P-28.3 builder in get_ring_substituent_name declined it above (an
+        # builder in get_ring_substituent_name declined it above (an
         # assembly it cannot number — e.g. >5 rings, replacement class), the
         # generic cascade returns the yl-LESS parent hydride ('1,1'-biphenyl',
         # '4-chloro-1,1'-biphenyl'). That token ends in 'yl' and carries no
@@ -2240,12 +2240,12 @@ def name_ring_system_substituent(
 
 
 def _fold_nonring_decorations(mol, frag_set, frag_ring_atoms, attach_idx):
-    """v30 sub-lever A / Composer #2: fold every non-carrier decoration subgraph
+    """ sub-lever A / Composer #2: fold every non-carrier decoration subgraph
     of a chain-rooted ring branch into the ring-yl atom set.
 
     The CARRIER is the connected component of ``frag_set - frag_ring_atoms`` that
     contains the free-valence ``attach_idx``; every OTHER non-ring component hangs
-    off a ring atom and is a RING DECORATION (methoxy ``-O-CH3``, isopropyl, ...),
+    off a ring atom and is a RING DECORATION (methoxy ``-O-CH3``, isopropyl,...),
     which the degree-1-only folder leaves behind so it lands in the carrier and
     breaks the all-carbon carrier-path guard. Fold each such component into
     ``frag_ring_atoms`` so the decorated ring-yl is named as a unit by the
@@ -2301,23 +2301,23 @@ def _compound_ring_on_chain_substituent(
 
     ``pos_out``: an optional caller-owned dict this producer FILLS with the
     carrier chain numbering it actually used to place the ring-yl locant
-    (``{atom index: locant}``, free valence = 1 per P-29.2). It is the same
+    (``{atom index: locant}``, free valence = 1 per. It is the same
     ``pos`` contract ``_located_acyclic_alkyl_name(..., with_pos=True)``
     returns, and it exists for one reason: a carrier atom can itself be a
     stereocentre (e.g. ``-CH(CH3)-`` bridging a ring to the parent), and
     ``_add_substituent_stereo`` can only cite a descriptor at a locant it can
     prove came from the numbering THE NAME USED — re-deriving one is the
-    rejected BFS-from-attachment heuristic (see that function's WR-06 note).
+    rejected BFS-from-attachment heuristic (see that function's note).
     Without this channel the acyclic-only deriver declines on a ring-bearing
     fragment and every own-carrier descriptor was silently DROPPED, shipping a
     stereo-incomplete (wrong-diastereomer) substituent prefix.
     Filled ONLY on the branches whose emitted name actually cites a carrier
     locant; left EMPTY for the mononuclear-carrier branches (benzyl,
     '{ring-yl}methyl', the α-halogen-decorated carrier), whose descriptor is
-    unlocanted by P-91 because the position is unique. An empty/absent map
+    unlocanted by because the position is unique. An empty/absent map
     reproduces the previous behaviour exactly.
 
-    v28 Composer1 Task 3: when ``allow_mancude`` is True (complete/
+     Composer1 Task 3: when ``allow_mancude`` is True (complete/
     best-effort engine tier only) the carrier may ALSO admit exactly ONE
     simple, neutral, non-aromatic, divalent S/O/N atom bridging the carbon
     carrier directly to the ring (the RING-ON-CHAIN heteroatom-carrier case,
@@ -2327,7 +2327,7 @@ def _compound_ring_on_chain_substituent(
     composer for a fused/decorated ring the narrow producers decline).
     Default False keeps every existing caller byte-identical.
     """
-    # P-29.6.2.1 (BB 16304): a substituent ON the ring (e.g. -Cl at para of a
+    # (BB 16304): a substituent ON the ring (e.g. -Cl at para of a
     # benzyl's phenyl) belongs to the ring-yl name '(4-chlorophenyl)', NOT to
     # the carrier. Fold single non-H heavy atoms that hang off a ring atom (and
     # are NOT part of the ring themselves) INTO frag_ring_atoms BEFORE computing
@@ -2361,8 +2361,8 @@ def _compound_ring_on_chain_substituent(
             ring_substituent_atoms.add(ni)
     frag_ring_atoms = set(frag_ring_atoms) | ring_substituent_atoms
     if allow_mancude:
-        # v30 sub-lever A / Composer #2: also fold MULTI-ATOM ring decorations
-        # (methoxy, isopropyl, ...) into the ring-yl, so '(4-methoxyphenyl)methyl'
+        # sub-lever A / Composer #2: also fold MULTI-ATOM ring decorations
+        # (methoxy, isopropyl,...) into the ring-yl, so '(4-methoxyphenyl)methyl'
         # and the decorated-aryl/-cycloalkyl-on-a-simple-carrier class names via
         # the name_ring_system_substituent recursion below. Best-effort only; the
         # PIN default keeps the degree-1-only folding above, byte-identical.
@@ -2372,14 +2372,14 @@ def _compound_ring_on_chain_substituent(
             return None
         frag_ring_atoms = _widened
     raw_carrier = frag_set - frag_ring_atoms
-    # w2f p1 (P-29.6.2.1, BB 16322 'bromo(4-methylphenyl)methyl (preferred
+    # w2f p1, BB 16322 'bromo(4-methylphenyl)methyl (preferred
     # prefix)'): an α-HALOGEN on the carrier is a carrier DECORATION cited
     # as a prefix, not a carrier atom (it used to land in `carrier` and
     # fail the all-carbon guard at the return-None below). v1 whitelist:
     # halogens ONLY — compulsory prefix-only groups (Table 5.1), valence-1,
     # locant-free on a mononuclear carrier; they can never re-parent the
     # substituent nor form a PCG. Everything else (nitro / OH / NH2 / =O)
-    # stays fail-closed or is owned by parent selection (research §3.C).
+    # stays fail-closed or is owned by parent selection (research C).
     _halogen_z = {9, 17, 35, 53}
     decorations = set()
     for _a in raw_carrier:
@@ -2397,7 +2397,7 @@ def _compound_ring_on_chain_substituent(
     carrier = raw_carrier - decorations
     if decorations and (len(carrier) != 1 or len(decorations) > 2):
         # v1: decorated MONONUCLEAR carriers with 1-2 halogens only (the
-        # P-29.6.2.1 benzylic α class). Decorated LONGER carriers need
+        # benzylic α class). Decorated LONGER carriers need
         # decoration locants — not built; stays fail-closed as today.
         return None
     # Guards: all-carbon, fully SATURATED, undecorated carrier; attach is a
@@ -2407,7 +2407,7 @@ def _compound_ring_on_chain_substituent(
     # emitted as 'propyl', RT True->False).
     if attach_idx not in carrier:
         return None
-    # v28 Composer1 Task 3: admit exactly ONE simple, neutral, non-aromatic,
+    # Composer1 Task 3: admit exactly ONE simple, neutral, non-aromatic,
     # divalent S/O/N carrier atom under allow_mancude (the PIN default keeps
     # the ORIGINAL all-carbon-only rejection byte-identical). Anything richer
     # (sulfoxide/sulfone O, charged/H-bearing/aromatic heteroatom, a SECOND
@@ -2475,15 +2475,15 @@ def _compound_ring_on_chain_substituent(
     if carrier | frag_ring_atoms | decorations != frag_set:
         return None
     if decorations:
-        # P-45.1.1 identical-units decline (research §3.C.4 — LOAD-BEARING,
+        # identical-units decline (research C.4 — LOAD-BEARING,
         # the item's #1 hazard): when the in-fragment ring unit equals the
         # parent side, the PIN is MULTIPLICATIVE
         # (1,1'-(dichloromethylene)dibenzene). Shapes name_multiplicative
         # CAN build never reach here (dispatch @900); shapes it cannot yet
         # build (gem-dihalo, classifier requires 1 sub + 1 H) MUST
         # refuse — the substitutive '[dichloro(phenyl)methyl]benzene' is
-        # RT-valid but non-PIN (a SELF-01-invisible wrong name, leak proof
-        # research §3.D).
+        # RT-valid but non-PIN (a -invisible wrong name, leak proof
+        # research D).
         from rdkit import Chem
         try:
             _unit_a = Chem.MolFragmentToSmiles(
@@ -2503,7 +2503,7 @@ def _compound_ring_on_chain_substituent(
     if not ring_name:
         return None
     if hetero_carrier_atom is not None:
-        # v28 Composer1 Task 3: the heteroatom-carrier shape is handled by a
+        # Composer1 Task 3: the heteroatom-carrier shape is handled by a
         # SEPARATE assembly path (the '{ring-yl}{connective}' compound prefix
         # replaces what would otherwise be a bare ring-yl decoration on the
         # carbon carrier) -- it never reaches the α-halogen citation branch or
@@ -2538,9 +2538,9 @@ def _compound_ring_on_chain_substituent(
             is_complex_substituent,
         )
         if connective == 'oxy':
-            # P-63.2.1: the retained contraction 'phenoxy' for a BARE phenyl
+            #: the retained contraction 'phenoxy' for a BARE phenyl
             # ring-yl; every other ring-yl (retained or systematic) uses the
-            # general uncontracted '{ring-yl}oxy' form (P-63.2.2.2), enclosed
+            # general uncontracted '{ring-yl}oxy' form, enclosed
             # as a unit only if the ring-yl itself left un-self-enclosed marks
             # inside the concatenation (mirrors
             # ``_name_ether_substituted_chain``'s O-branch, the established
@@ -2554,7 +2554,7 @@ def _compound_ring_on_chain_substituent(
                 if ('(' in group or '[' in group) and not _is_fully_enclosed(group):
                     group = apply_enclosing_marks(group, -1)
         else:
-            # P-16.3.3/P-29.5.2: an '{ring-yl}sulfanyl'/'{ring-yl}amino'
+            # /: an '{ring-yl}sulfanyl'/'{ring-yl}amino'
             # compound prefix is ALWAYS enclosed as a unit before
             # concatenating the carbon-carrier stem (mirrors
             # ``_name_ether_substituted_chain``'s S-branch: '(benzylsulfanyl)',
@@ -2566,7 +2566,7 @@ def _compound_ring_on_chain_substituent(
             return None
         if len(carbon_path) == 1:
             # Mononuclear carrier: no locant is cited, so no map is published
-            # (a unique-position descriptor stays unlocanted per P-91).
+            # (a unique-position descriptor stays unlocanted per.
             return f'{group}methyl'
         if pos_out is not None:
             pos_out.update({_a: _i for _i, _a in enumerate(carbon_path, start=1)})
@@ -2580,14 +2580,14 @@ def _compound_ring_on_chain_substituent(
         return None
     loc = ring_attach_positions[0]
     if decorations:
-        # w2f p1 (P-29.6.2.1 / P-16.5.1.3.1, BB 7272): cite ALL carrier
+        # w2f p1 /, BB 7272): cite ALL carrier
         # substituents (halo prefixes + ring-yl) in ONE alphanumerical
         # sequence by the letters-only key; first-cited bare UNLESS it
         # includes a locant; every further item parenthesized; multiplying
-        # prefixes outside parens. OPSIN-verified surfaces (research §3.D):
+        # prefixes outside parens. OPSIN-verified surfaces (research D):
         # bromo(phenyl)methyl / dichloro(phenyl)methyl /
         # chloro(fluoro)(phenyl)methyl / (4-bromophenyl)(chloro)methyl.
-        # An α-decorated carrier NEVER takes retained 'benzyl' (P-29.6.2.1:
+        # An α-decorated carrier NEVER takes retained 'benzyl':
         # any α-substitution kills the retained form in PINs) — the tail
         # below (incl. the benzyl gate) is unreachable from here.
         from collections import Counter
@@ -2601,7 +2601,7 @@ def _compound_ring_on_chain_substituent(
         if any(_k > 1 for _k in _halo_counts.values()) and \
                 any(_ch.isdigit() for _ch in ring_name):
             # gem-dihalo + locant-bearing ring-yl: no OPSIN-verified
-            # surface (research §3.C.5) — refuse rather than guess.
+            # surface (research C.5) — refuse rather than guess.
             return None
         _items = []
         for _hname, _k in _halo_counts.items():
@@ -2622,16 +2622,16 @@ def _compound_ring_on_chain_substituent(
                 _parts.append(f'({_rendered})')
         # Returned BARE (no spaces -> passes the space-guard); the citation
         # layer (naming_utils.format_substituent_prefix, Task 6) escalates
-        # the outer mark to brackets (P-16.5.2.4). Mononuclear carrier
+        # the outer mark to brackets. Mononuclear carrier
         # cites no locant.
         return f"{''.join(_parts)}{alkyl}"
-    # P-16.5.1.1: enclose the ring-yl in marks only when it is itself complex
+    #: enclose the ring-yl in marks only when it is itself complex
     # (carries locants/parens, e.g. '(naphthalen-2-yl)methyl'); a simple ring-yl
     # is concatenated bare ('cyclohexylmethyl', 'phenylmethyl' is retained
     # 'benzyl' elsewhere). The old unconditional parens produced the non-PIN
     # '(cyclohexyl)methyl'.
     from ..assembly.naming_utils import apply_enclosing_marks, is_complex_substituent
-    # P-16.3.3 enclosing-mark nesting: escalate the outer mark to brackets when a
+    # enclosing-mark nesting: escalate the outer mark to brackets when a
     # DECORATED ring-yl already carries an inner enclosure ('4-(propan-2-yl)phenyl'
     # -> '[4-(propan-2-yl)phenyl]methyl'). apply_enclosing_marks is byte-identical
     # to the old f'({ring_name})' for every mark-free ring-yl (naphthalen-2-yl,
@@ -2639,11 +2639,11 @@ def _compound_ring_on_chain_substituent(
     inner = (apply_enclosing_marks(ring_name, -1)
              if is_complex_substituent(ring_name) else ring_name)
     if len(path) == 1:
-        # P-29.6.1 (BB 16270): the UNSUBSTITUTED -CH2-C6H5 group is the retained
+        # (BB 16270): the UNSUBSTITUTED -CH2-C6H5 group is the retained
         # PREFERRED prefix 'benzyl', not 'phenylmethyl'. Gated tightly to the
         # bare phenyl case (ring_name == 'phenyl' means the ring carries no
         # substituent — a substituted phenyl comes back as '4-chlorophenyl' and
-        # correctly stays the systematic (4-chlorophenyl)methyl per P-29.6.2.1).
+        # correctly stays the systematic (4-chlorophenyl)methyl per.
         # The single -CH2- carrier is already guaranteed by len(path)==1 plus
         # the saturated/undecorated carrier guards above.
         if ring_name == 'phenyl':
@@ -2658,7 +2658,7 @@ def _compound_ring_on_chain_substituent(
 def _contained_rings(mol, ring_atoms: Tuple[int, ...]):
     """The SSSR rings wholly inside ``ring_atoms``.
 
-    Mirrors the single-ring guard in :func:`identify_ring_system`; factored out
+    Mirrors the single-ring guard in:func:`identify_ring_system`; factored out
     so the Task AA5 heteromonocycle fallback applies the identical test rather
     than a second, drifting copy of it.
     """
@@ -2717,7 +2717,7 @@ def _heteromonocycle_parent_name(mol, ring_atoms: Tuple[int, ...]) -> Optional[s
 def _ring_assembly_substituent_prefix(
     mol, ring_atoms: Tuple[int, ...], attachment_point: Optional[int]
 ) -> Optional[str]:
-    """P-28.3 substituent prefix for a RING ASSEMBLY fragment, or ``None``.
+    """ substituent prefix for a RING ASSEMBLY fragment, or ``None``.
 
     A ring assembly is a set of identical (or single-heteroatom-replacement)
     ring systems joined directly by single bonds — biphenyl, terphenyl,
@@ -2726,7 +2726,7 @@ def _ring_assembly_substituent_prefix(
     that the generic ``name_substituent`` cascade returns for such a fragment
     (an OPSIN-UNPARSEABLE substituent token — the elevated-blocker F1 class).
 
-    Delegates to the SAME P-28.3 builder the whole-molecule composer already
+    Delegates to the SAME builder the whole-molecule composer already
     trusts on the PIN path (``composer.py`` ->
     ``4-([1,1'-biphenyl]-4-yl)butanoic acid``): restrict the whole molecule's
     ring systems to those lying wholly inside this fragment, require the free
@@ -2752,7 +2752,7 @@ def _ring_assembly_substituent_prefix(
         return None  # free valence must lie in one assembly ring system
     info = detect_ring_assembly(mol, frag_systems)
     if info is None:
-        return None  # non-identical / branched / atom-bridged — not P-28.3
+        return None  # non-identical / branched / atom-bridged — not
     try:
         return name_ring_assembly_prefix(mol, info, attachment_point)
     except Exception:  # noqa: BLE001 — a builder error is a decline, not a crash
@@ -2762,7 +2762,7 @@ def _ring_assembly_substituent_prefix(
 def _fragment_is_ring_assembly(mol, frag_atoms) -> bool:
     """True iff ``frag_atoms`` is exactly a ring assembly (biphenyl-like).
 
-    Detection only, independent of whether the P-28.3 prefix builder can NUMBER
+    Detection only, independent of whether the prefix builder can NUMBER
     it — used as the fail-closed backstop so the generic cascade's yl-less
     parent hydride can never leak for an assembly the builder declined.
     """
@@ -2795,7 +2795,7 @@ def get_ring_substituent_name(
         ring_atoms: Tuple of atom indices in the ring
         attachment_point: Optional ring atom index where the ring attaches to chain.
                          Used for position-specific names (e.g., 2-pyridyl vs 4-pyridyl).
-        allow_mancude: v27 P1 opt-in (complete/best-effort engine tier only).
+        allow_mancude: opt-in (complete/best-effort engine tier only).
                        When True, an unretained multi-ring cage the narrow PIN
                        namers decline (tricyclo+/adamantane, and mancude
                        fused-aromatic systems) is named via the universal
@@ -2804,10 +2804,10 @@ def get_ring_substituent_name(
 
     Returns:
         Substituent name string (e.g., 'phenyl', 'cyclohexyl', '2-pyridyl'), or
-        None when the ring system cannot be named by a provable rule (Phase 4
+        None when the ring system cannot be named by a provable rule (a phase
         SUBST-01: fail-closed — never a monocycle size-guess for a polycyclic).
     """
-    # P-29.2 free-valence gate. Every stem below ('cyclohexyl', 'phenyl', a
+    # free-valence gate. Every stem below ('cyclohexyl', 'phenyl', a
     # retained fused name + '-yl') spells ONE free valence, chosen from the ring
     # system's identity alone -- the attachment BOND is never read. So a ring
     # joined to its parent by a double bond was named '-yl' and the double bond
@@ -2828,7 +2828,7 @@ def get_ring_substituent_name(
     ring_name = identify_ring_system(mol, ring_atoms)
 
     if ring_name is None:
-        # P-28.3: a RING ASSEMBLY (identical rings joined by single bonds —
+        #: a RING ASSEMBLY (identical rings joined by single bonds —
         # biphenyl, terphenyl, bipyridine) takes the primed free-valence
         # substituent form '[1,1'-biphenyl]-4-yl'. Try it BEFORE the retained /
         # polycyclic producers: those decline an assembly and the generic
@@ -2839,7 +2839,7 @@ def get_ring_substituent_name(
         if _asm is not None:
             return _asm
         # Multi-ring system (fused polycyclic): check retained names
-        # identify_ring_system() only handles single rings (up to 8 atoms).
+        # identify_ring_system only handles single rings (up to 8 atoms).
         # For multi-ring systems (naphthalene=10, anthracene=14, etc.),
         # extract the fragment SMILES and look up retained names.
         from rdkit import Chem
@@ -2847,7 +2847,7 @@ def get_ring_substituent_name(
         if frag_smi:
             from ..data import get_retained_name
             retained = get_retained_name(frag_smi)
-            # WS-A task 9: the fused-heterocycle catalog name carries the
+            # task 9: the fused-heterocycle catalog name carries the
             # indicated-hydrogen / numbering prefix the plain retained table
             # drops ('1-benzofuran' vs 'benzofuran', '1H-indole' vs
             # 'indole') — prefer it for PIN substituent stems.
@@ -2877,17 +2877,17 @@ def get_ring_substituent_name(
                     # 'decahydronaphthalene' (_get_polycyclic_attachment_locant
                     # only numbers mancude PAH stems). Do NOT emit the locant-less
                     # '{stem}-yl': it mis-names a non-symmetric attachment and
-                    # fails OPSIN-RT (SELF-01 then suppresses it to unknown).
+                    # fails OPSIN-RT (then suppresses it to unknown).
                     # Fall through to _polycyclic_substituent_name below, which
                     # numbers the free valence via the mancude parent
                     # (D-FOLLOWON item 3 -> 'decahydronaphthalen-2-yl').
                 else:
                     return f'{stem}-yl'
 
-        # Phase 4 SUBST-01: multi-ring substituent with no retained name —
+        # a phase SUBST-01: multi-ring substituent with no retained name —
         # route the detached system through the von-Baeyer / spiro / partial-hydro
         # parent namers with free-valence numbering (bicyclo[2.2.1]heptan-2-yl,
-        # 5,6,7,8-tetrahydronaphthalen-1-yl, spiro[4.5]decan-2-yl). v27 P1:
+        # 5,6,7,8-tetrahydronaphthalen-1-yl, spiro[4.5]decan-2-yl).:
         # under the complete tier (allow_mancude) this also reaches the
         # universal cage engine (tricyclo+/adamantane, mancude polyenes).
         poly = _polycyclic_substituent_name(
@@ -2895,7 +2895,7 @@ def get_ring_substituent_name(
         if poly:
             return poly
 
-        # Task AA5 (P-22.2.1): last resort for a HETEROMONOCYCLE the retained
+        # Task AA5: last resort for a HETEROMONOCYCLE the retained
         # table does not name.
         #
         # ``identify_ring_system`` describes a ring by size + heteroatom set and
@@ -2906,9 +2906,9 @@ def get_ring_substituent_name(
         # Task AA5 the retained lookup above rescued them by returning a BARE
         # stem ('thiazolidine'), so the substituent path had no route of its own
         # to the systematic name -- it depended entirely on the retained table.
-        # Withdrawing those bare stems as non-PINs (they are: P-22.2.1 Table 2.3
-        # prints '1,3-thiazolidine (PIN)' at BlueBookV2.md:8182 and
-        # '1,2-thiazolidine (PIN)' at :8184) therefore turned ten correct names
+        # Withdrawing those bare stems as non-PINs (they are:
+        # prints '1,3-thiazolidine (PIN)' at the Blue Book and
+        # '1,2-thiazolidine (PIN)' at:8184) therefore turned ten correct names
         # into abstentions -- '(thiazolidin-4-yl)methanol' became 'unknown'.
         # That is the CLAUDE.md invariant-9 trap: removing a wrong output
         # unmasked a worse one. The parent path never had this gap because it
@@ -2944,7 +2944,7 @@ def get_ring_substituent_name(
                     if locant is not None:
                         return f'{stem}-{locant}-yl'
 
-        # v30 P3-T1b: the AUDITED systematic terminal ring namer, complete /
+        # -T1b: the AUDITED systematic terminal ring namer, complete /
         # best-effort tier only. This is the "downgrade, don't refuse" end of the
         # cascade: every retained / fused / von-Baeyer / spiro / hydro / HW
         # producer above has declined, so the choice here is between an uglier
@@ -2975,7 +2975,7 @@ def get_ring_substituent_name(
         # locant-less form or an honest ``unknown`` rather than a wrong name.
         return None
 
-    # Phase 4 SUBST-01 (a): a monocyclic, all-carbon, non-aromatic ring carrying
+    # a phase SUBST-01 (a): a monocyclic, all-carbon, non-aromatic ring carrying
     # a skeletal multiple bond keeps its ene/yne locants as a substituent
     # (cyclohex-1-en-1-yl) — identify_ring_system reports the saturated stem
     # ('cyclohexane'), dropping the unsaturation. Free-valence-first numbering.
@@ -2985,7 +2985,7 @@ def get_ring_substituent_name(
         if _unsat is not None:
             return _unsat
 
-    # Wave2 T6b (P-32.2.1): heteromonocyclic analog — mancude parent + hydro
+    # Wave2: heteromonocyclic analog — mancude parent + hydro
     # prefixes + indicated hydrogen (3,4-dihydro-2H-pyran-2-yl).
     if attachment_point is not None:
         _h_unsat = _unsaturated_heteromonocyclic_substituent(
@@ -2993,7 +2993,7 @@ def get_ring_substituent_name(
         if _h_unsat is not None:
             return _h_unsat
 
-    # Wave2 T6b fail-closed: a NON-AROMATIC heteromonocycle with a skeletal
+    # Wave2 fail-closed: a NON-AROMATIC heteromonocycle with a skeletal
     # multiple bond must never fall through to its SATURATED dictionary stem —
     # 'oxanyl' for a dihydropyranyl fragment names a DIFFERENT molecule (the
     # ring double bond is silently dropped). If the dedicated emitter above
@@ -3011,7 +3011,7 @@ def get_ring_substituent_name(
                 if _j in _ring_set_t6 and _i < _j:
                     _b = mol.GetBondBetweenAtoms(_i, _j)
                     if _b.GetBondTypeAsDouble() >= 2.0:
-                        # v30 P3-T1b: this refusal exists because the SATURATED
+                        # -T1b: this refusal exists because the SATURATED
                         # dictionary stem would silently drop the ring double bond
                         # ('oxanyl' for a dihydropyranyl fragment = a different
                         # molecule). The systematic generator cites every ring
@@ -3027,8 +3027,8 @@ def get_ring_substituent_name(
                                 return _t6.name
                         return None
 
-    # IUPAC P-31.1.4.3.4: a monocyclic heteroaryl substituent takes
-    # free-valence numbering (pyridin-3-yl, 1H-imidazol-5-yl, furan-2-yl, ...),
+    # IUPAC: a monocyclic heteroaryl substituent takes
+    # free-valence numbering (pyridin-3-yl, 1H-imidazol-5-yl, furan-2-yl,...),
     # which supersedes both the legacy POSITION_SPECIFIC forms (3-pyridyl) and
     # the locant-less dictionary forms (imidazolyl). Guarded — returns None and
     # falls through to the legacy forms below whenever the locant is not
@@ -3057,10 +3057,10 @@ def get_ring_substituent_name(
     # Generally: remove 'e' and add 'yl' (benzene -> benzyl, but benzene -> phenyl is special)
     if ring_name.endswith('ane'):
         if ring_name.startswith('cyclo'):
-            # P-29.2: carbocyclic cycloalkanes drop '-ane' entirely:
+            #: carbocyclic cycloalkanes drop '-ane' entirely:
             # cyclononane -> cyclononyl, cyclododecane -> cyclododecyl
             # (sizes 3-8 hit RING_SUBSTITUENT_NAMES above; >=9 land here —
-            # the old [:-1] kept 'an': 'cyclododecanyl', WS-A task 9).
+            # the old [:-1] kept 'an': 'cyclododecanyl', task 9).
             return ring_name[:-3] + 'yl'
         # Hantzsch-Widman '-ane' heterocycles elide only the final 'e':
         # azepane -> azepanyl, oxocane -> oxocanyl
@@ -3106,12 +3106,12 @@ def _get_polycyclic_attachment_locant(
     from rdkit import Chem
 
     # Try to get IUPAC numbering from fused heterocycle data.
-    # WS-A task 9: 'iupac_locants' is keyed by the atom indices of the DATA
+    # task 9: 'iupac_locants' is keyed by the atom indices of the DATA
     # ENTRY's reference SMILES, NOT this molecule's indices. The old direct
     # `attachment_atom in iupac_locants` lookup compared across index spaces
     # and returned whatever locant collided ('1H-indol-3-yl' for a C2
     # attachment). Translate via substructure match of the reference onto
-    # THIS ring system, minimized over automorphisms (P-29.2 lowest
+    # THIS ring system, minimized over automorphisms lowest
     # free-valence locant).
     frag_smi = Chem.MolFragmentToSmiles(mol, list(ring_atoms), canonical=True)
     try:
@@ -3139,8 +3139,8 @@ def _get_polycyclic_attachment_locant(
     except ImportError:
         pass
 
-    # WS-A task 9: carbocyclic polycyclic aromatics (naphthalene, anthracene,
-    # ...) have authoritative IUPAC numbering in the PAH machinery. P-29.2:
+    # task 9: carbocyclic polycyclic aromatics (naphthalene, anthracene,
+    #...) have authoritative IUPAC numbering in the PAH machinery.:
     # the free valence takes the LOWEST locant the numbering allows, so
     # minimize over ALL automorphic substructure matches of THIS ring system
     # (naphthalen-2-yl, never the symmetry-equivalent -6-yl).
@@ -3234,7 +3234,7 @@ def _get_polycyclic_attachment_locant(
             attach_locant = path.index(attachment_atom) + 1  # 1-indexed
             # Lowest heteroatom locants fix the ring numbering; among numberings
             # TIED on that (a symmetric ring has two equivalent directions), the
-            # free valence takes the LOWEST locant it can (P-31.1.4.3.4 free-
+            # free valence takes the LOWEST locant it can free-
             # valence lowest-locant rule). Previously the first tied direction
             # won, yielding a non-lowest locant for symmetric heteroarenes
             # (1,3,4-oxadiazol-5-yl instead of -2-yl). Because all tied
@@ -3256,7 +3256,7 @@ def _get_polycyclic_attachment_locant(
     # to direction). For MULTI-ring systems this would fabricate a locant
     # from the arbitrary atom-index order — a wrong locant is worse than a
     # locant-less name, so return None and let the caller emit the bare
-    # '{stem}-yl' form (WS-A task 9).
+    # '{stem}-yl' form (task 9).
     ri_local = mol.GetRingInfo()
     n_rings_in_fragment = sum(
         1 for r in ri_local.AtomRings() if set(r) <= ring_set
@@ -3556,10 +3556,10 @@ def _ring_atom_simple_substituents(mol, ring_atom_idx: int,
     table (the caller must then guard out to its legacy form; emitting a
     partially-decorated name would be structurally wrong).
 
-    v1 table (per the WS-A.2 flip-population scope — covers the head of the
+    v1 table (per the.2 flip-population scope — covers the head of the
     distribution): oxo, cyano, carboxy, halogen, hydroxy, methoxy/simple
-    n-alkoxy, amino (-NH2), nitro, unbranched pure alkyl, and (v28 Cluster D,
-    P-65.6.3) simple alkyl esters -> alkoxycarbonyl prefix. Deliberately NOT
+    n-alkoxy, amino (-NH2), nitro, unbranched pure alkyl, and (,
+     simple alkyl esters -> alkoxycarbonyl prefix. Deliberately NOT
     supported (guard out): amides/acyl, aryl/branched-alkyl esters, sulfonyl,
     nested ring substituents, branched alkyl, anything charged or exotic.
     """
@@ -3638,7 +3638,7 @@ def _ring_atom_simple_substituents(mol, ring_atom_idx: int,
                     covered.add(ni)
                     covered.update(_chain_atoms(o_nbrs[0].GetIdx(), ni))
                     continue
-            # v30 tail #13 (P-63.2.2.2): the ether-O's ligand is ANOTHER RING
+            # tail #13: the ether-O's ligand is ANOTHER RING
             # -- a glycosidic / inter-ring link (this ring atom bears
             # -O-(anomeric C of a second ring)). Name that inner ring system
             # RECURSIVELY as a substituent and cite '({inner-yl})oxy'. This is the
@@ -3710,11 +3710,11 @@ def _ring_atom_simple_substituents(mol, ring_atom_idx: int,
                 covered.add(ni)
                 covered.add(c_nbrs[0].GetIdx())
                 continue
-            # carboxy (P-65.1.7.2.1): exocyclic C (single bond, no H) bearing a
+            # carboxy: exocyclic C (single bond, no H) bearing a
             # terminal =O AND a hydroxyl -OH (second O carries an H). The H on the
             # -OH is the ester-exclusion guard: -C(=O)OR esters have 0 H on that O
             # and stay out of scope (alkoxycarbonyl). Mirrors the carboxy branch in
-            # name_ring_system_substituent. BlueBookV2:1804 (-COOH), :5154/:3262.
+            # name_ring_system_substituent. the Blue Book:1804 (-COOH),:5154/:3262.
             if (len(c_nbrs) == 2 and nbr.GetTotalNumHs() == 0
                     and all(x.GetSymbol() == 'O' for x in c_nbrs)):
                 has_carbonyl_O = any(
@@ -3731,9 +3731,9 @@ def _ring_atom_simple_substituents(mol, ring_atom_idx: int,
                     covered.add(ni)
                     covered.update(x.GetIdx() for x in c_nbrs)
                     continue
-                # v28 Cluster D (P-65.6.3): an ALKYL-ESTER decoration -C(=O)-O-R
+                #: an ALKYL-ESTER decoration -C(=O)-O-R
                 # (the second O has NO H and is bonded onward to a carbon) is
-                # expressed as the alkoxycarbonyl prefix (methoxycarbonyl, ...).
+                # expressed as the alkoxycarbonyl prefix (methoxycarbonyl,...).
                 # Reuse the canonical producer; principal_chain=None makes it use
                 # SMARTS-based alkyl-side discrimination and skip the chain-
                 # orientation guard. Fail closed (return None) for aryl/branched/
@@ -3784,7 +3784,7 @@ def _ring_atom_simple_substituents(mol, ring_atom_idx: int,
                 covered.update(_chain_atoms(ni, ring_atom_idx))
                 continue
             # Branched / substituted acyclic-carbon substituent (e.g.
-            # (1S)-1-chloroethyl for P-45.6): the v1 table deliberately excluded
+            # (1S)-1-chloroethyl for: the v1 table deliberately excluded
             # branched alkyl and has no stereodescriptor support. Name the whole
             # exocyclic branch with the universal acyclic substituent namer (it
             # renders '(1S)-1-chloroethyl'); the assembly brackets it as a
@@ -3801,11 +3801,11 @@ def _ring_atom_simple_substituents(mol, ring_atom_idx: int,
                     continue
             return None
         # pnictogen substituent (-As/-Sb/-Bi bearing organyl/H) -> arsanyl /
-        # stibanyl / bismuthanyl prefix (P-67.1.5.1 / P-68.3). Collect the
+        # stibanyl / bismuthanyl prefix /. Collect the
         # pnictogen subgraph (the As/Sb/Bi + everything hanging off it, NOT
         # re-entering the ring) and reuse the general pnictogen-yl namer. This
         # is what lets a benzene ring bearing -Sb(C6H5)2 name AS a substituent
-        # -> '4-(diphenylstibanyl)phenyl' (the P-69.5.2 organomercurial ligand).
+        # -> '4-(diphenylstibanyl)phenyl' (the organomercurial ligand).
         # Fail closed (return None) if the pnictogen namer declines.
         if sym in ('As', 'Sb', 'Bi') and order == 1.0 and charge == 0:
             pnic_frag: Set[int] = set()
@@ -3844,15 +3844,15 @@ def decorated_ring_substituent_name(mol, ring_atoms, attachment_atom: int,
     naming a specific fragment use this so the emitted name can never cover
     more or less than the fragment.
 
-    This is the WS-A.2 demoted-ring emitter: when parent selection demotes a
+    This is the.2 demoted-ring emitter: when parent selection demotes a
     decorated ring to a substituent, its decoration must be carried (the
     Phase-171 / rt75_0582 class of regression: a parent flip that silently
     drops the demoted ring's groups).
 
-    Numbering per P-14.4 (BlueBookV2.md:3221), applied in order:
+    Numbering per (the Blue Book), applied in order:
       1. ring heteroatoms low (set, then element seniority) — criterion (a);
       2. free valence (attachment) low — criterion (c), which OUTRANKS the
-         detachable prefixes (cf. '6-carboxynaphthalen-2-yl', :3262);
+         detachable prefixes (cf. '6-carboxynaphthalen-2-yl',:3262);
       3. detachable-prefix locant set low (first point of difference) — (f);
       4. first-cited (alphabetically) prefix low — (g).
 
@@ -3941,7 +3941,7 @@ def decorated_ring_substituent_name(mol, ring_atoms, attachment_atom: int,
     #
     # The parent bond is identified STRUCTURALLY -- the exocyclic neighbour
     # lying outside the fragment being named -- never by a count or an index
-    # (`.planning/audit-v29/FINDING-count-based-naming-sites.md`).
+    # (internal notes).
     # The `> 1` filter is DEFENSIVE and is a proven EQUIVALENT MUTANT today:
     # every production caller passes a heavy-atom `expected_atoms`, and the
     # production molecules carry implicit hydrogens, so there is no H neighbour
@@ -3978,7 +3978,7 @@ def decorated_ring_substituent_name(mol, ring_atoms, attachment_atom: int,
     if expected_atoms is not None and (ring_set | covered_all) != set(expected_atoms):
         return None  # name would not cover exactly the requested fragment
 
-    # --- enumerate numberings per P-14.4 -------------------------------------
+    # --- enumerate numberings per -------------------------------------
     def _walk(start, second):
         order = {1: start}
         prev, cur = start, second
@@ -4001,11 +4001,11 @@ def decorated_ring_substituent_name(mol, ring_atoms, attachment_atom: int,
                                 if mol.GetAtomWithIdx(i).GetSymbol() != 'C'))
         best = min(het_locs(o) for o in candidates)
         candidates = [o for o in candidates if het_locs(o) == best]
-        # (1b) element seniority at the heteroatom positions (P-22.2.3.1);
-        # lower rank = more senior = lower locant. v22 E1 / DD4 (IN-01/02):
+        # (1b) element seniority at the heteroatom positions;
+        # lower rank = more senior = lower locant. E1 / DD4 (/02):
         # routed through the single ELEMENT_NUMBERING_SENIORITY source of truth
         # (order-consistent with the old inline F,Cl,Br,I,O,S,Se,Te,N,P list —
-        # behaviour-preserving) so the P-15.4.1.2 order has exactly one definition.
+        # behaviour-preserving) so the order has exactly one definition.
         from .locants import element_seniority_rank as _element_seniority_rank
         def het_rank_seq(o):
             return tuple(
@@ -4048,29 +4048,29 @@ def decorated_ring_substituent_name(mol, ring_atoms, attachment_atom: int,
     def _is_complex_prefix(nm: str) -> bool:
         # simple v1-table prefixes are bare lowercase words; a branched/stereo
         # substituent name carries a locant, hyphen, or enclosing mark.
-        # v28 Cluster D (P-16.3.3): a COMPOUND substituent prefix (formed by
+        #: a COMPOUND substituent prefix (formed by
         # substitution, e.g. the alkoxycarbonyl family methoxycarbonyl/
         # ethoxycarbonyl/phenoxycarbonyl) is enclosed even though it is a bare
         # lowercase word -> '2-(methoxycarbonyl)cyclohexyl', not '2-methoxy...'.
         if nm.endswith('oxycarbonyl'):
             return True
-        # P-16.3.3: a SUBSTITUTED pnictogen-yl (diphenylstibanyl / dimethylarsanyl
-        # / ...bismuthanyl) is a compound prefix requiring enclosing marks, even
+        #: a SUBSTITUTED pnictogen-yl (diphenylstibanyl / dimethylarsanyl
+        # /...bismuthanyl) is a compound prefix requiring enclosing marks, even
         # though it is a bare lowercase word; the bare parent-hydride-yl
         # ('arsanyl'/'stibanyl'/'bismuthanyl') stays simple (cf. naming_utils
-        # .is_complex_substituent). Narrowly scoped so simple alkyl/aryl (methyl,
+        #.is_complex_substituent). Narrowly scoped so simple alkyl/aryl (methyl,
         # phenyl) keep the byte-identical legacy path.
         for _pn in ('arsanyl', 'stibanyl', 'bismuthanyl'):
             if nm.endswith(_pn) and nm != _pn:
                 return True
         # The hyphen in the character class made this a copy of the compound
-        # predicate; the P-16.3.4 carve-out is the shared primitive, so
+        # predicate; the carve-out is the shared primitive, so
         # 'tert-butyl' is simple (BB 16286 cites it bare) while
         # 'tert-butylsulfanyl' stays compound.
         from ..assembly.naming_utils import italicized_prefix_is_bare
         if italicized_prefix_is_bare(nm):
             return False
-        # v31 lever B (P-16.3.3): a compound FG-prefix + alkyl ('hydroxymethyl',
+        # lever B: a compound FG-prefix + alkyl ('hydroxymethyl',
         # 'cyanomethyl', 'carboxymethyl', 'aminoethyl') is a SUBSTITUTED (compound)
         # substituent and takes enclosing marks even though it carries no
         # digit/hyphen/mark — the character-class heuristic below misses it, so a
@@ -4101,8 +4101,8 @@ def decorated_ring_substituent_name(mol, ring_atoms, attachment_atom: int,
             parts.append(f'{loc_str}-{mult}{name}')
         prefix_str = '-'.join(parts)
     else:
-        # P-16.5.4: a complex (branched/stereo) prefix is enclosed; ordering is
-        # by the alphanumerical key of its stereo-stripped base name (P-14.5.2:
+        #: a complex (branched/stereo) prefix is enclosed; ordering is
+        # by the alphanumerical key of its stereo-stripped base name:
         # '(1S)-1-chloroethyl' alphabetizes at 'c', descriptor + locant ignored).
         from ..assembly.naming_utils import (
             alpha_sort_key as _alpha_sort_key,
@@ -4124,7 +4124,7 @@ def decorated_ring_substituent_name(mol, ring_atoms, attachment_atom: int,
             parts.append(f'{loc_str}-{mult}{rendered}')
         prefix_str = '-'.join(parts)
 
-    # W4-S2 (P-93.5.1.1.2 / BB 48117): emit the ring substituent's OWN internal
+    # W4-S2 / BB 48117): emit the ring substituent's OWN internal
     # stereodescriptors, keyed to the SAME numbering `order` the name uses. The
     # pseudoasymmetric C-1/C-4 centres of a 1,4-disubstituted cyclohexane (and any
     # ring-member stereocentre) were previously DROPPED entirely: the multi-centre
@@ -4133,11 +4133,11 @@ def decorated_ring_substituent_name(mol, ring_atoms, attachment_atom: int,
     # atom), so the descriptor is correct-by-construction and the locants match the
     # emitted name exactly. Additive: fires ONLY when a ring atom carries a CIP
     # label, so every non-stereo ring is byte-identical to the legacy output. The
-    # lowercase r/s pseudoasymmetric casing is inherited VERBATIM from RDKit (D-15;
-    # P-92.1.4.2) — the BB PIN is `bis[(1r,4r)-4-methylcyclohexyl]phosphane` (BB
+    # lowercase r/s pseudoasymmetric casing is inherited VERBATIM from RDKit (;
+    # — the BB PIN is `bis[(1r,4r)-4-methylcyclohexyl]phosphane` (BB
     # 48117), and `collect_stereodescriptors` is CALLED read-only (not modified).
     # OPSIN's generation grammar rejects the r/s cyclohexane layer, but the
-    # constitutional form parses, so the DEF-9 stereo carve-out in the validity
+    # constitutional form parses, so the stereo carve-out in the validity
     # gate (namer.py) ships the full PIN — cf. `(1s,4s)-cyclohexane-1,4-diol`.
     _stereo_prefix = ''
     if any(mol.GetAtomWithIdx(i).HasProp('_CIPCode') for i in ring_list):
@@ -4158,7 +4158,7 @@ def decorated_ring_substituent_name(mol, ring_atoms, attachment_atom: int,
 
 
 # --------------------------------------------------------------------------- #
-# P-62.2.1.1.1 — the substituted-'anilino' PREFERRED PREFIX (v29 P4-a)        #
+# — the substituted-'anilino' PREFERRED PREFIX (-a) #
 # --------------------------------------------------------------------------- #
 _PHENYL_STEM = 'phenyl'
 _ANILINO_STEM = 'anilino'
@@ -4169,27 +4169,27 @@ def anilino_preferred_prefix(ring_prefix: Optional[str],
                             *, enclose: bool = True) -> Optional[str]:
     """The Blue Book PREFERRED PREFIX for a (fully substitutable) C6H5-NH- group.
 
-    Governing rule, verbatim, under the heading chain ``## P-62.2 AMINES`` /
-    ``### P-62.2.1 Primary amines`` / ``### P-62.2.1.1 Retained names`` /
-    ``**P-62.2.1.1.1**`` (BlueBookV2.md:26139):
+    Governing rule, verbatim, under the heading chain ``## AMINES`` /
+    ``### Primary amines`` / ``### Retained names`` /
+    ``****`` (the Blue Book):
 
         "Aniline, for C6H5-NH2, is the only name for a primary amine retained as a
          preferred IUPAC name for which full substitution is permitted on the ring
-         and the nitrogen atom. ... The prefix name 'anilino' is retained as the
+         and the nitrogen atom.... The prefix name 'anilino' is retained as the
          preferred prefix for C6H5-NH- with full substitution allowed. The name
          'phenylamino' may be used in general nomenclature."
 
-    Corroborated by P-62.2.3 (heading BB:26298, "The substituent prefix name
+    Corroborated by (heading the Blue Book, "The substituent prefix name
     'anilino' is a preferred IUPAC prefix and substitution is allowed"), the
-    retained-prefix tables (BB:17800 / BB:17860 / BB:24565) and the P-34.2.1.3
-    worked explanation (BB:24605, "'anilino' is chosen as retained prefix preferred
+    retained-prefix tables (the Blue Book / the Blue Book / the Blue Book) and the
+    worked explanation (the Blue Book, "'anilino' is chosen as retained prefix preferred
     to 'phenylamino'").
 
     The Blue Book's own two-column pairs — PREFERRED PREFIX | general nomenclature:
 
-        BB:26151   anilino                  | phenylamino
-        BB:26153   4-chloroanilino          | (4-chlorophenyl)amino
-        BB:26166   4-methylanilino          | (4-methylphenyl)amino  (not p-toluidino)
+        the Blue Book anilino | phenylamino
+        the Blue Book 4-chloroanilino | (4-chlorophenyl)amino
+        the Blue Book 4-methylanilino | (4-methylphenyl)amino (not p-toluidino)
 
     so ``(<X>phenyl)amino`` -> ``<X>anilino``, LOCANTS UNCHANGED. The locants
     coincide by construction: ``decorated_ring_substituent_name`` numbers a
@@ -4203,17 +4203,17 @@ def anilino_preferred_prefix(ring_prefix: Optional[str],
     may carry is unbounded, so any finite table of anilino spellings would be wrong
     on its complement by construction.
 
-    Enclosure, from BB:26306 vs BB:26308 — a prefix carrying its own locant(s) takes
+    Enclosure, from the Blue Book vs the Blue Book — a prefix carrying its own locant(s) takes
     enclosing marks, one carrying none does not:
 
-        BB:26306   3-anilinobenzoic acid (PIN)        | 3-(phenylamino)benzoic acid
-        BB:26308   3-(N-methylanilino)phenol (PIN)    | 3-[methyl(phenyl)amino]phenol
+        the Blue Book 3-anilinobenzoic acid (PIN) | 3-(phenylamino)benzoic acid
+        the Blue Book 3-(N-methylanilino)phenol (PIN) | 3-[methyl(phenyl)amino]phenol
 
     ★ SCOPE. This function only SPELLS a prefix. It must be called only where an
     anilino-family prefix is already the chosen construction; it must never be used
     to promote one over a senior name-selection criterion. Two Blue Book boundary
-    rows pin that limit: BB:26419 (P-62.2.5.1 — multiplicative nomenclature beats
-    BOTH substitutive forms) and BB:26404 (P-45.2.1 — maximum prefix count declines
+    rows pin that limit: the Blue Book — multiplicative nomenclature beats
+    BOTH substitutive forms) and the Blue Book — maximum prefix count declines
     an anilino prefix outright, and marks the anilino-bearing alternative 'not').
 
     Args:
@@ -4224,7 +4224,7 @@ def anilino_preferred_prefix(ring_prefix: Optional[str],
         n_substituent: the OTHER substituent on the nitrogen, as a substituent
             prefix name (``'methyl'``, ``'phenyl'``). An anilino nitrogen carries
             at most one (parent + ring + this), so a single name, not a list.
-        enclose: apply the P-16.5.1.1 enclosing marks when the prefix carries its
+        enclose: apply the enclosing marks when the prefix carries its
             own locant(s). Callers that wrap the result themselves pass False.
 
     Returns:
@@ -4241,7 +4241,7 @@ def anilino_preferred_prefix(ring_prefix: Optional[str],
         return None
     if ring_decoration and n_substituent:
         # Both an N locant and ring locants would have to be merged into ONE
-        # alphanumerical prefix sequence (P-14.5.2). The derivation found no Blue
+        # alphanumerical prefix sequence. The derivation found no Blue
         # Book worked example fixing that merge, so decline rather than invent an
         # order. Measured 2026-07-28: production already abstains on this shape
         # (e.g. Oc1cccc(N(C)c2ccc(C)cc2)c1 -> 'unknown organic compound'), so
@@ -4252,7 +4252,7 @@ def anilino_preferred_prefix(ring_prefix: Optional[str],
         core = f'N-{_wrap_n_substituent(n_substituent)}{_ANILINO_STEM}'
     else:
         core = f'{ring_decoration}{_ANILINO_STEM}'
-    # BB:26306 bare vs BB:26308 enclosed: marks iff the prefix has its own locant.
+    # the Blue Book bare vs the Blue Book enclosed: marks iff the prefix has its own locant.
     carries_own_locant = bool(ring_decoration) or bool(n_substituent)
     if enclose and carries_own_locant:
         from ..assembly.naming_utils import apply_enclosing_marks
@@ -4262,7 +4262,7 @@ def anilino_preferred_prefix(ring_prefix: Optional[str],
 
 def anilino_prefix_from_aniline_name(aniline_name: Optional[str],
                                      *, enclose: bool = True) -> Optional[str]:
-    """``'<X>aniline'`` -> the P-62.2.1.1.1 preferred prefix ``'<X>anilino'``.
+    """``'<X>aniline'`` -> the preferred prefix ``'<X>anilino'``.
 
     Third entry point for ``anilino_preferred_prefix``, for callers that hold an
     ASSEMBLED aniline parent name rather than a ring name plus branch names.
@@ -4271,25 +4271,25 @@ def anilino_prefix_from_aniline_name(aniline_name: Optional[str],
     a derived fact, not an assumption: the Blue Book prints the parent and prefix
     forms with IDENTICAL decoration —
 
-        BB:26147   4-chloroaniline (PIN)
-        BB:26153   4-chloroanilino (preferred prefix)  | (4-chlorophenyl)amino
-        BB:26162   4-methylaniline (PIN)
-        BB:26166   4-methylanilino (preferred prefix)  | (4-methylphenyl)amino
+        the Blue Book 4-chloroaniline (PIN)
+        the Blue Book 4-chloroanilino (preferred prefix) | (4-chlorophenyl)amino
+        the Blue Book 4-methylaniline (PIN)
+        the Blue Book 4-methylanilino (preferred prefix) | (4-methylphenyl)amino
 
-    — and P-14.5.2 orders detachable prefixes among THEMSELVES; the head morpheme
+    — and orders detachable prefixes among THEMSELVES; the head morpheme
     does not participate. So whatever order is correct for the aniline parent is
     correct for the anilino prefix, and this function inherits the ordering that
     ``rules/benzene.py``'s aniline joiner already computes (which merges N- and
-    ring-locant prefixes into one alphanumerical sequence per P-14.5.2). That is
+    ring-locant prefixes into one alphanumerical sequence per. That is
     what lets this path serve the ring-AND-nitrogen-substituted case that
     ``anilino_preferred_prefix`` declines: here the merge is not invented, it is
     inherited from a producer that already ships the parent form.
 
     Why it exists: ``assembly/substituent_naming.py``'s ``parent_to_prefix`` reached
-    the P-31.1.3 heterocyclic '-ine' -> '-inyl' rule with '4-methyl-N-methylaniline'
+    the heterocyclic '-ine' -> '-inyl' rule with '4-methyl-N-methylaniline'
     and produced '4-methyl-N-methylanilinyl'. Aniline is not a heterocycle and
     'anilinyl' is not a Blue Book morpheme; the preferred prefix is the retained
-    'anilino' (BB:26139).
+    'anilino' (the Blue Book).
 
     Returns None (fail closed) for anything that is not an aniline-family name.
     """
@@ -4372,7 +4372,7 @@ def anilino_prefix_from_n_branch(mol, n_idx: int, branch_atoms,
         return None  # the N bridges two atoms of the same ring: not an anilino
     rest = branch_set - {n_idx} - set(candidate)
     if not rest:
-        # Unsubstituted C6H5-NH-: the bare retained prefix (BB:26151), which is
+        # Unsubstituted C6H5-NH-: the bare retained prefix (the Blue Book), which is
         # byte-identical to what these sites emitted before.
         return anilino_preferred_prefix(_PHENYL_STEM, enclose=enclose)
     decorated = decorated_ring_substituent_name(
@@ -4396,11 +4396,11 @@ def ring_atom_fg_prefixes(
     identically.
 
     Scope (the previously *dropped* characteristic groups):
-      * ``oxo``  (P-66.6.1) — the ring atom is a carbonyl carbon: an exocyclic
+      * ``oxo`` — the ring atom is a carbonyl carbon: an exocyclic
         double bond to an oxygen that bears no H and is otherwise terminal.
-      * ``cyano`` (P-66.5.1) — the ring atom bears an exocyclic nitrile carbon
+      * ``cyano`` — the ring atom bears an exocyclic nitrile carbon
         (single bond to a C that is triple-bonded to a terminal N).
-      * ``carboxy`` (P-65.1.7.2.1) — the ring atom bears an exocyclic
+      * ``carboxy`` — the ring atom bears an exocyclic
         carboxylic-acid carbon (an exocyclic C with =O carrying no H AND -OH).
         The S2 parent chokepoint (commit 835faffa) now demotes the ring-acid
         parent, so this branch is reachable. Esters ``-C(=O)OR`` are EXCLUDED
@@ -4420,10 +4420,10 @@ def ring_atom_fg_prefixes(
             which neighbours are exocyclic).
 
     Returns:
-        Sorted list of prefix strings (``[]`` when the atom carries none).
+        Sorted list of prefix strings (```` when the atom carries none).
         With ``return_atoms=True``, returns ``(prefixes, claimed_atoms)``
         where ``claimed_atoms`` is the set of exocyclic atom indices the
-        emitted prefixes account for (Wave2 T3a conservation accounting —
+        emitted prefixes account for (Wave2 conservation accounting —
         callers use it to prove every branch atom is represented in the name).
     """
     prefixes: List[str] = []
@@ -4455,13 +4455,13 @@ def ring_atom_fg_prefixes(
                     claimed.add(ni)
                     claimed.add(c_nbrs[0].GetIdx())
                     continue
-        # carboxy (P-65.1.7.2.1): the ring atom bears an exocyclic carboxylic-acid
+        # carboxy: the ring atom bears an exocyclic carboxylic-acid
         # carbon — an exocyclic C (single bond) that carries =O (terminal, no H) AND
         # -OH (the second O carries an H). The H on the second O is the ester-exclusion
-        # guard: -C(=O)OR esters have GetTotalNumHs()==0 on that O and must stay
+        # guard: -C(=O)OR esters have GetTotalNumHs==0 on that O and must stay
         # alkoxycarbonyl / out of scope. Lactone/anhydride topologies that slip past
         # here are caught by the None-return of decorated_ring_substituent_name (the
-        # carry-all-or-None safety net). BlueBookV2:1804 (-COOH), :5154/:3262 (carboxy).
+        # carry-all-or-None safety net). the Blue Book:1804 (-COOH),:5154/:3262 (carboxy).
         if (sym == 'C' and bond is not None
                 and bond.GetBondTypeAsDouble() == 1.0):
             c_nbrs = [x for x in nbr.GetNeighbors() if x.GetIdx() != ring_atom_idx]

@@ -7,7 +7,7 @@ Specifically tests that:
 2. Compound substituents have enclosing parens: '2-(pentanoylamino)' not '2-pentanoylamino'
 3. OPSIN CLI successfully parses all generated acyl prefix names
 
-Phase 15.5 Plan 01: OPSIN Format Fixes - Acyl Prefix Format
+a phase Plan 01: OPSIN Format Fixes - Acyl Prefix Format
 """
 
 import os
@@ -56,7 +56,7 @@ def opsin_parse(name: str) -> str:
 
 @pytest.mark.integration
 class TestAcylaminoFormat:
-    """N-acyl prefixes use the amido form (P-66.1.1.4.3 method (1) = PIN).
+    """N-acyl prefixes use the amido form method (1) = PIN).
 
     Wave2 T1c: the method-(2) '(pentanoylamino)' forms were replaced by the
     preferred amido family (formamido/acetamido/{stem}anamido), which are

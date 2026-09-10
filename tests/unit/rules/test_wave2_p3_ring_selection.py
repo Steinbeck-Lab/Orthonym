@@ -8,7 +8,7 @@ from orthonym.rules.ring_selection import (
 @pytest.mark.unit
 class TestP44SpiroFusionCount:
     def test_score_tuple_has_spiro_fusion_term(self):
-        # P-44.2.2.2.1.1: greater number of spiro fusions = more senior.
+        #: greater number of spiro fusions = more senior.
         # The tuple grows as later ring_selection tasks append terms; this asserts
         # the CURRENT cumulative length (spiro-fusion term is present at idx 29).
         m = Chem.MolFromSmiles("C1CC2(CC1)CC1(CC2)CCCC1")
@@ -59,7 +59,7 @@ class TestP44SaturatedMonocyclicSpiro:
 
     def test_lower_spiro_locants_win(self):
         # Two saturated monocyclic spiro systems: the one with the lower spiro-atom
-        # locant set is senior (P-44.2.2.2.1.2). Scorer-level assertion.
+        # locant set is senior. Scorer-level assertion.
         from orthonym.rules.ring_selection import _spiro_atom_locant_set
         m = Chem.MolFromSmiles("C1CCC2(CC1)CCCC2")  # spiro[4.5]decane
         all_ring = {a.GetIdx() for a in m.GetAtoms() if a.IsInRing()}
@@ -127,11 +127,11 @@ class TestP44ComponentSeniorityP25_8:
     def test_score_tuple_grows(self):
         m = Chem.MolFromSmiles("c1ccc2ncccc2c1")
         tup = ring_system_score(m, {a.GetIdx() for a in m.GetAtoms() if a.IsInRing()})
-        assert len(tup) >= 35  # 34 + P-25.8 component-rank term
+        assert len(tup) >= 35  # 34 + component-rank term
         assert isinstance(tup[34], tuple)
 
     def test_quinoline_senior_to_isoquinoline(self):
-        # P-44.2.2.2.3.5 / P-25.8: quinoline > isoquinoline. Two fused N-systems
+        # /: quinoline > isoquinoline. Two fused N-systems
         # that tie on every prior criterion are now separated.
         from orthonym.perception.rings import get_ring_systems
         m = Chem.MolFromSmiles("c1ccc2ncccc2c1Cc1cccc2cnccc12")

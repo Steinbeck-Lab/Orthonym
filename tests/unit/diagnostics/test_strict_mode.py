@@ -1,5 +1,5 @@
 """R4 (audit 2026-09-03): the tree has 592 broad ``except`` blocks; the two at
-the top of ``name()`` / ``name_tiered()`` turn ANY escaped exception into an
+the top of ``name`` / ``name_tiered`` turn ANY escaped exception into an
 abstention. ``raise_on_limit=True`` already re-raises there, but batch
 harnesses cannot pass it. ``ORTHONYM_STRICT=1`` is the environment switch for
 the same behaviour, so a run can be made to fail loudly on programming errors.

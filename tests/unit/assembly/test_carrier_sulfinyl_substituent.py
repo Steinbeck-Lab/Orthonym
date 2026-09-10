@@ -1,4 +1,4 @@
-"""v31 composition lever: a sulfoxide/sulfone substituent that attaches through a
+""" composition lever: a sulfoxide/sulfone substituent that attaches through a
 CARBON CARRIER (e.g. benzyl methyl sulfoxide -CH2-S(=O)-CH3) must NOT be named as a
 bare (R)sulfinyl/(R)sulfonyl prefix -- that drops the carrier carbon and denotes a
 different molecule. The prefix form is valid only when the fragment attaches through

@@ -1,21 +1,21 @@
 """The Hantzsch-Widman / skeletal-replacement ring-size boundary.
 
-Blue Book P-22.2.3 "Heteromonocyclic hydrides named by skeletal replacement
-('a') nomenclature" (``BlueBookV2/BlueBookV2.md:8482``) opens with the
+Blue Book "Heteromonocyclic hydrides named by skeletal replacement
+('a') nomenclature" (``the Blue Book Blue Book``) opens with the
 decisive sentence:
 
     "Mancude and saturated heteromonocyclic compounds with up to and
     including ten ring members are named by the extended Hantzsch-Widman
-    system (see P-22.2.2). For monocyclic rings with eleven and more ring
-    members, skeletal replacement ('a') nomenclature (see P-15.4) is used
+    system (see. For monocyclic rings with eleven and more ring
+    members, skeletal replacement ('a') nomenclature (see is used
     for the fully saturated or fully unsaturated compounds ([n]annulenes)."
 
 The boundary is therefore RING SIZE ALONE (<=10 -> HW, >=11 -> replacement).
-It is *not* conditioned on saturation.  Confirmed independently by
-P-51.4.2.1 (``:23442``) and P-52.2.2.2 (``:23682``).
+It is *not* conditioned on saturation. Confirmed independently by
+ (``:23442``) and (``:23682``).
 
 Partially saturated <=10 rings are expressed as hydro prefixes on the HW
-mancude parent -- P-31.2.3.1 "The prefix 'hydro'" (``:16906``): "'Hydro'
+mancude parent -- "The prefix 'hydro'" (``:16906``): "'Hydro'
 prefixes are used to modify the degree of hydrogenation of monocyclic
 mancude compounds having retained or systematic names", whose own PIN
 examples include ``4,5,6,7-tetrahydro-1,4-thiazepine`` and
@@ -52,7 +52,7 @@ def _first_ring(mol):
 
 # ---------------------------------------------------------------------------
 # The router must hand every <=10-membered heteromonocycle to the HW namer,
-# saturated or not.  This is the assertion that was RED before the fix.
+# saturated or not. This is the assertion that was RED before the fix.
 # ---------------------------------------------------------------------------
 
 # (smiles, why)
@@ -81,7 +81,7 @@ HW_TERRITORY = [
     ("N1=CC=CC=CC=C1", "mancude 8-ring, 1 N"),
     ("O1CC=CC=CC=C1", "mancude 8-ring, 1 O"),
     # --- 9- and 10-ring (these only worked by accident: RDKit called them
-    #     aromatic, so a separate has_aromatic gate rescued them) ---
+    # aromatic, so a separate has_aromatic gate rescued them) ---
     ("N1C=CC=CC=CC=C1", "mancude 9-ring, 1 N"),
     ("N1=CC=CC=CC=CC=C1", "mancude 10-ring, 1 N"),
     ("O1CC=CC=CC=CC=C1", "partly saturated 10-ring, 1 O (non-aromatic)"),
@@ -92,7 +92,7 @@ HW_TERRITORY = [
 
 @pytest.mark.parametrize("smiles,why", HW_TERRITORY)
 def test_router_yields_ring_of_ten_or_fewer_to_hantzsch_widman(smiles, why):
-    """P-22.2.3: <=10 ring members belong to HW, saturated or not."""
+    """: <=10 ring members belong to HW, saturated or not."""
     assert try_skeletal_replacement_name(_mol(smiles)) is None, (
         f"{smiles} ({why}) was claimed by skeletal replacement; "
         "P-22.2.3 reserves 'a' nomenclature for rings of eleven or more"
@@ -100,7 +100,7 @@ def test_router_yields_ring_of_ten_or_fewer_to_hantzsch_widman(smiles, why):
 
 
 # ---------------------------------------------------------------------------
-# The other side of the boundary must NOT move.  Without these, deleting the
+# The other side of the boundary must NOT move. Without these, deleting the
 # ring-size test entirely would leave the suite green.
 # ---------------------------------------------------------------------------
 
@@ -113,7 +113,7 @@ REPLACEMENT_TERRITORY = [
 
 @pytest.mark.parametrize("smiles,why", REPLACEMENT_TERRITORY)
 def test_router_keeps_rings_of_eleven_or_more(smiles, why):
-    """P-22.2.3 / P-51.4.2.1: >10 ring atoms stay with 'a' nomenclature."""
+    """ /: >10 ring atoms stay with 'a' nomenclature."""
     name = try_skeletal_replacement_name(_mol(smiles))
     assert name is not None, f"{smiles} ({why}) lost its replacement name"
     assert "cyclo" in name, f"{smiles} -> {name!r} is not a cyclic replacement name"

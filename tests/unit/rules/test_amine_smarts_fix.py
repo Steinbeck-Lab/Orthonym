@@ -1,4 +1,4 @@
-"""Tests for DATA-02: broadened secondary/tertiary amine SMARTS.
+"""Tests for: broadened secondary/tertiary amine SMARTS.
 
 The new SMARTS patterns use [#6] instead of [CX4] to allow aromatic carbon
 neighbors (e.g., N-methylaniline), while excluding amides and guanidines

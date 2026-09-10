@@ -1,9 +1,9 @@
 """
 Tests for chain_score tiebreaker criteria refinements.
 
-Phase 103 Plan 03 Task 2: Refine chain_score to fix:
-- P-44.1(b): FG instance counting (count instances, not atoms)
-- P-44.1(h): Separate double-bond locant comparison
+a phase Plan 03 Task 2: Refine chain_score to fix:
+- (b): FG instance counting (count instances, not atoms)
+- (h): Separate double-bond locant comparison
 """
 
 import pytest
@@ -14,7 +14,7 @@ from orthonym.perception.functional_groups import detect_functional_groups
 
 
 # ============================================================================
-# P-44.1(b): FG instance counting
+# (b): FG instance counting
 # ============================================================================
 
 
@@ -50,7 +50,7 @@ class TestFGInstanceCounting:
         3-methylpentanedioic acid (2 COOH, 5C chain) vs
         a hypothetical longer chain with only 1 COOH.
         """
-        # OC(=O)CC(C)CC(=O)O  -- 3-methylpentanedioic acid
+        # OC(=O)CC(C)CC(=O)O -- 3-methylpentanedioic acid
         # Both COOH are on the 5C chain. This is a simple regression guard.
         mol = Chem.MolFromSmiles("OC(=O)CC(C)CC(=O)O")
         fg = detect_functional_groups(mol)
@@ -59,7 +59,7 @@ class TestFGInstanceCounting:
 
 
 # ============================================================================
-# P-44.1(h): Double-bond locant tiebreaker
+# (h): Double-bond locant tiebreaker
 # ============================================================================
 
 
@@ -68,7 +68,7 @@ class TestDoubleBondLocantTiebreaker:
     locant comparison should break ties where chains have same combined bond
     locants but different double-bond positions.
 
-    Per IUPAC P-44.4(h): when two chains have the same overall multiple bond
+    Per IUPAC (h): when two chains have the same overall multiple bond
     locant set, the chain with lower locants for double bonds is preferred.
     """
 
@@ -90,7 +90,7 @@ class TestDoubleBondLocantTiebreaker:
     def test_enyne_double_bond_locant_tiebreaker(self):
         """For en-yne compounds, double bond position should break ties.
 
-        IUPAC P-31.1.3.4: When a chain has both double and triple bonds,
+        IUPAC: When a chain has both double and triple bonds,
         and two orientations give the same combined bond locant set,
         the one giving lower locants to double bonds is preferred.
         """

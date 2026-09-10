@@ -1,14 +1,14 @@
-"""v37 SP1.4 — P-16.3.3/P-16.3.4 enclosing-marks fix for the mixed-acetal class.
+""" — / enclosing-marks fix for the mixed-acetal class.
 
 `_name_ether_substituted_chain` assembled >=2 DISTINCT unlocanted alkoxy
 prefixes with a bare ``''.join`` (``ethoxymethoxymethyl``); OPSIN then reads the
 fused ``ethoxymethoxy`` as a single compound (chained) prefix = a DIFFERENT
-constitution, so SELF-01 rejected the pretty substitutive name and the engine
+constitution, so rejected the pretty substitutive name and the engine
 shipped the ugly a-replacement rescue. The fix separates the co-cited distinct
 prefixes with enclosing marks -> ``ethoxy(methoxy)methyl`` (OPSIN-RT-verified).
 
 This is a best-effort SPELLING/quality fix: PIN-default ABSTAINS on these inputs
-(no PIN to regress); 0-wrong is preserved by SELF-01 either way. Genuine chain
+(no PIN to regress); 0-wrong is preserved by either way. Genuine chain
 skeletal-replacement PINs (``2,5,8-trioxanonane``) must stay untouched.
 """
 import os
@@ -49,7 +49,7 @@ def _rt_ok(name, smi):
     return bool(parsed) and _ik(parsed) == _ik(smi)
 
 
-# --- FIX: >=2 DISTINCT unlocanted alkoxy prefixes get P-16.3.3 enclosing marks -
+# --- FIX: >=2 DISTINCT unlocanted alkoxy prefixes get enclosing marks -
 def test_mixed_acetal_encloses_later_distinct_prefix():
     assert _sub('c1ccccc1C(OC)OCC') == 'ethoxy(methoxy)methyl'
     assert _sub('c1ccccc1C(OCC)OCCC') == 'ethoxy(propoxy)methyl'
@@ -63,8 +63,8 @@ def test_single_and_identical_prefixes_stay_bare():
 
 
 # --- End-to-end: the marked substitutive name now wins over the rescue + RTs ---
-# opsin_gate: exercise the PRODUCTION SELF-01 validity gate (disabled suite-wide
-# by default). Before the fix the unmarked `ethoxymethoxymethyl` is SELF-01-
+# opsin_gate: exercise the PRODUCTION validity gate (disabled suite-wide
+# by default). Before the fix the unmarked `ethoxymethoxymethyl` is -
 # suppressed and the a-replacement rescue ships (`oxa`/`cyclohexa-1,3,5-triene`);
 # after the fix the marked name passes the gate and wins. Skips (never green-
 # blind) if the OPSIN jar is absent.
@@ -79,9 +79,9 @@ def test_besteffort_prefers_marked_substitutive_and_rts(smi, opsin_gate):
     # a-replacement rescue must NOT be what ships any more.
     assert 'oxa' not in out
     assert 'cyclohexa-1,3,5-triene' not in out
-    # the marked substitutive substituent must be present ...
+    # the marked substitutive substituent must be present...
     assert 'ethoxy(' in out
-    # ... and it must still round-trip (SELF-01 / 0-wrong preserved).
+    #... and it must still round-trip (/ 0-wrong preserved).
     assert _rt_ok(out, smi), f"{out!r} did not round-trip to {smi}"
 
 

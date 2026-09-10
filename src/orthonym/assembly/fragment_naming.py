@@ -1,8 +1,8 @@
 """Fragment naming infrastructure with cycle-detection guard.
 
 Provides thread-safe cycle detection to prevent infinite loops when
-fragment naming calls name_compound() recursively. Uses a visited-SMILES
-set (threading.local() pattern) instead of an arbitrary depth counter.
+fragment naming calls name_compound recursively. Uses a visited-SMILES
+set (threading.local pattern) instead of an arbitrary depth counter.
 
 The visited set tracks which SMILES are currently being named up the call
 stack. If a SMILES is encountered that's already being processed, cycle
@@ -39,13 +39,13 @@ MAX_NAMING_DEPTH = 7
 # is different. Generous limit (20 vs old limit of 7) to allow deep
 # but finite naming chains.
 _MAX_VISITED_SIZE = 50  # a phase: raised from 30 for deeper decomposition; fallback at limit
-# NOTE (): raising this to 200 was measured INERT for the acyl-CoA giant (its
+# NOTE : raising this to 200 was measured INERT for the acyl-CoA giant (its
 # pantetheine-thioester substituent fails for a different reason, not this net) and is a
 # global change with gate/perf risk, so it is NOT raised. Revisit as a measured breadth lever
 # once the per-top-level work budget is proven a sufficient anti-runaway guard corpus-wide.
 
 # giant-molecule hang fix: negative-cache sentinel. Stored in the runtime
-# fragment cache to mark a fragment that is CONTEXT-INDEPENDENTLY unnameable (the
+# fragment cache to mark a fragment that is internal notes-INDEPENDENTLY unnameable (the
 # recursive namer refused it / it produced a refusal sentinel / it raised) so the
 # combinatorial partition search never re-descends the same dead fragment (e.g.
 # the bare diphosphate ``COP(=O)(O)OP(=O)(O)O`` in an acyl-CoA). NOT used for the
@@ -71,7 +71,7 @@ def _get_visited() -> set:
 # regardless of recursion state. Analogous to retained_names.py but for
 # fragments produced during recursive decomposition of complex molecules.
 #
-# Every entry was verified against name_compound() at depth 0 (2026-02-25).
+# Every entry was verified against name_compound at depth 0 (2026-02-25).
 # Only fragments with CORRECT verified names are included.
 FRAGMENT_NAME_CACHE: Dict[str, str] = {
     # --- Simple alkanes ---
@@ -111,7 +111,7 @@ FRAGMENT_NAME_CACHE: Dict[str, str] = {
     "CCC(C)=O": "butan-2-one",
     # --- Simple amines ---
     # methylamine/ethylamine are general-nomenclature (non-PIN) functional-class
-    # names (P-62.2.1.2); removed so fragments resolve to the substitutive PIN
+    # names; removed so fragments resolve to the substitutive PIN
     # (methanamine/ethanamine) via the systematic path. DD1 Fix 4 / H5.
     "CCCN": "propan-1-amine",
     "CCCCN": "butan-1-amine",
@@ -216,7 +216,7 @@ FRAGMENT_NAME_CACHE: Dict[str, str] = {
     # --- Ethers and sulfides (verified 2026-03-28, a phase-03) ---
     "COC": "methoxymethane",
     "CCOCC": "ethoxyethane",
-    # NB: no "CSC" entry. Per P-63.2.5 (the Blue Book) the PIN for a sulfide is the
+    # NB: no "CSC" entry. Per (the Blue Book) the PIN for a sulfide is the
     # substitutive "(methylsulfanyl)methane", NOT the functional-class "dimethyl
     # sulfide"; this cache holds PIN names (see the comment at the FRAGMENT_NAME_CACHE
     # lookup site), so the sulfide is emitted by the substitutive path, not here.
@@ -246,8 +246,8 @@ def start_naming_session():
     ⚠ **"Outermost" is an EXPLICIT COUNTER, not `len(visited) == 0`.** Inferring it
     from the visited set was a latent defect with five milestones of exposure: if an
     exception escaped a fragment naming without discarding its SMILES, `visited`
-    stayed non-empty for the rest of the thread, so `is_top_level_naming()` never
-    returned True again and `namer.name()` stopped publishing
+    stayed non-empty for the rest of the thread, so `is_top_level_naming` never
+    returned True again and `namer.name` stopped publishing
     ``general_fallback_ctx`` / ``best_effort_ctx`` — **best-effort silently reverted
     to the PIN substituent vocabulary, with no error anywhere.** It surfaced as a
     test that passed alone and failed in a 17-file run under load, i.e. it needs a
@@ -285,7 +285,7 @@ def end_naming_session():
         _fragment_guard.session_depth = 0
         _fragment_guard.visited = set()
         # giant-molecule hang fix: the fragment memo cache is owned by the
-        # NAME SCOPE (enter/exit_name_scope, keyed to the true outermost name()),
+        # NAME SCOPE (enter/exit_name_scope, keyed to the true outermost name),
         # NOT by the session. Inside an ``isolated_naming_session`` the session
         # depth is reset to 0, so the FIRST nested ``name_compound`` would drive
         # this branch (session_depth 1 -> 0) and, if it cleared the cache, WIPE the
@@ -301,7 +301,7 @@ def end_naming_session():
 # --- Per-top-level-call fragment work budget (giant-molecule hang fix) ---
 #
 # A hard ceiling on how many recursive fragment-naming ATTEMPTS one top-level
-# ``name()`` call may make. It guarantees that EVERY molecule terminates (name or
+# ``name`` call may make. It guarantees that EVERY molecule terminates (name or
 # abstain) instead of hanging when its decomposition re-explores fragments
 # combinatorially -- the >60-heavy-atom best-effort HANG (acyl-CoA, peptide-glycan
 # bioconjugates). Normal molecules make far fewer attempts than the budget, so
@@ -309,11 +309,11 @@ def end_naming_session():
 # abstains fast (0-wrong is unaffected -- the molecule was going to abstain
 # anyway, it just does so in bounded time).
 #
-# CRITICAL: the budget is armed at the TRUE outermost ``name()`` entry and is NOT
+# CRITICAL: the budget is armed at the TRUE outermost ``name`` entry and is NOT
 # touched by ``start_naming_session`` or ``isolated_naming_session``. A previous
 # attempt tied it to session state and ``isolated_naming_session`` (which resets
 # ``session_depth`` to 0) re-initialised it on every nested recovery entry, so it
-# never bounded anything. ``name_call_depth`` is a raw ``name()`` call-stack
+# never bounded anything. ``name_call_depth`` is a raw ``name`` call-stack
 # counter, independent of the session/isolation machinery.
 _WORK_BUDGET = 6000
 
@@ -350,9 +350,9 @@ _WORK_BUDGET = 6000
 # the substituent recursion's redundant re-analysis of the giant symmetric ring).
 #
 # DETERMINISTIC by construction (fixed operation/call counts, reset at the true
-# outermost ``name()`` — never wall-clock; SIGALRM is swallowed under the live
+# outermost ``name`` — never wall-clock; SIGALRM is swallowed under the live
 # OPSIN JVM). 0-wrong is unaffected: an exhausted budget raises
-# ``PerfBudgetExceeded`` which unwinds to the outermost ``name()`` and converts
+# ``PerfBudgetExceeded`` which unwinds to the outermost ``name`` and converts
 # to the SAME clean abstain the engine already emits for an unnameable input
 # (inv 9: a clean abstain, never a partial / atom-dropped / wrong name). A
 # molecule that never approaches either budget is byte-identical.
@@ -376,7 +376,7 @@ class PerfBudgetExceeded(BaseException):
     loops live many frames below dozens of broad ``except Exception:`` handlers
     on the recursive naming path, any one of which would otherwise swallow the
     signal and let the hang resume. As a ``BaseException`` it unwinds straight
-    to the ``_budget_scope`` wrapper around the true-outermost ``name()``, which
+    to the ``_budget_scope`` wrapper around the true-outermost ``name``, which
     is the ONLY site that catches it and turns it into a clean abstain. It must
     never escape that boundary. (No bare ``except:`` exists in the package, so
     nothing between the hot loop and that boundary intercepts it.)"""
@@ -397,7 +397,7 @@ def spend_perf_work(n: int = 1) -> None:
     per-candidate substructure attempt) against ``_PERF_BUDGET``.
 
     Raises ``PerfBudgetExceeded`` when exhausted. A no-op when no budget is armed
-    (a direct producer call outside any ``name()`` scope keeps its exact prior
+    (a direct producer call outside any ``name`` scope keeps its exact prior
     behaviour), and a pure counter when measurement mode is on.
     """
     if _PERF_MEASURE:
@@ -418,7 +418,7 @@ def spend_analysis_call(n: int = 1) -> None:
     one fused-heterocycle core-match) against ``_ANALYSIS_CALL_BUDGET``.
 
     Same contract as ``spend_perf_work`` — raises ``PerfBudgetExceeded`` when
-    exhausted, no-op outside a name() scope, counter in measurement mode.
+    exhausted, no-op outside a name scope, counter in measurement mode.
     """
     if _PERF_MEASURE:
         _ANALYSIS_SPENT_TOTAL[0] += n
@@ -434,7 +434,7 @@ def spend_analysis_call(n: int = 1) -> None:
 
 
 def disarm_hang_budgets() -> None:
-    """Disable both macrocycle-hang budgets for the remainder of this name()
+    """Disable both macrocycle-hang budgets for the remainder of this name
     scope. Called at the outermost boundary ONCE the abstain decision is made,
     so the descriptive/coordination-fallback finishing work (which itself
     re-enters the fused matcher and von-Baeyer via ``_classify``) cannot
@@ -447,7 +447,7 @@ def rearm_hang_budgets() -> None:
     """Re-arm both macrocycle-hang budgets to a FRESH ceiling.
 
     Used by the outermost ``PerfBudgetExceeded`` boundary to BOUND a single
-    last-resort whole-molecule T4 rescue attempt made AFTER the main-path budget
+    last-resort whole-molecule rescue attempt made AFTER the main-path budget
     was exhausted (the ``_try_perf_budget_t4_rescue`` recovery). A fresh ceiling
     guarantees the rescue itself terminates: if the rescue's own analysis
     re-explodes it re-raises ``PerfBudgetExceeded`` (caught by the rescue -> clean
@@ -461,12 +461,12 @@ def rearm_hang_budgets() -> None:
 
 def enter_name_scope():
     """Arm the per-top-level fragment work budget AND memo cache at the outermost
-    ``name()``.
+    ``name``.
 
-    Increments a raw ``name()`` call-stack counter; on the 0 -> 1 transition (the
+    Increments a raw ``name`` call-stack counter; on the 0 -> 1 transition (the
     TRUE outermost call) it (re)initialises the work budget and allocates the
-    whole-molecule fragment memo cache. Nested ``name()`` calls -- including the
-    recursion re-entry through ``name_compound`` and the isolated T4 producer --
+    whole-molecule fragment memo cache. Nested ``name`` calls -- including the
+    recursion re-entry through ``name_compound`` and the isolated producer --
     share both. Crucially, ``isolated_naming_session`` and the nested
     ``end_naming_session`` never reset these, so the memo survives the whole
     molecule (this is what stops a giant from re-exploring the same fragment
@@ -491,7 +491,7 @@ def enter_name_scope():
 
 
 def exit_name_scope():
-    """Close one ``name()`` scope; the outermost one disarms the budget and frees
+    """Close one ``name`` scope; the outermost one disarms the budget and frees
     the whole-molecule memo cache."""
     d = getattr(_fragment_guard, 'name_call_depth', 1) - 1
     if d <= 0:
@@ -509,7 +509,7 @@ def spend_fragment_work() -> bool:
 
     Returns True if work may proceed, False if the budget is exhausted (the
     caller must abstain). Returns True when no budget is armed -- e.g. a direct
-    producer call outside any ``name()`` scope -- so non-``name()`` entry points
+    producer call outside any ``name`` scope -- so non-``name`` entry points
     keep their exact prior behaviour.
     """
     wb = getattr(_fragment_guard, 'work_budget', None)
@@ -530,13 +530,13 @@ def isolated_naming_session(reset_cache: bool = False):
 
     Saves the current session state (``session_depth`` + cache + visited),
     resets to a clean depth-0 session, and restores it on exit. Used by
-    ``namer``'s recovery-lane T4 producer: ``name_t4_complete`` is conceptually a
-    fresh whole-molecule naming, but the recovery lane invokes it mid-``name()``
+    ``namer``'s recovery-lane producer: ``name_t4_complete`` is conceptually a
+    fresh whole-molecule naming, but the recovery lane invokes it mid-``name``
     with ``session_depth >= 1``, so its recursion consumes the shared
     ``MAX_NAMING_DEPTH`` budget from an elevated floor and a deep substituent hits
     the cap prematurely -- it then DEGRADES to an abstention where a standalone
     call names the molecule completely (measured: ``CC(=O)NCN(C)N=O`` and the
-    in-scope suppressed cohort). Isolating the session gives T4 the full depth-0
+    in-scope suppressed cohort). Isolating the session gives the full depth-0
     budget, exactly as a direct call gets. Restores on exit so the enclosing
     session continues unperturbed. Never raises out of the restore.
 
@@ -544,7 +544,7 @@ def isolated_naming_session(reset_cache: bool = False):
     ALSO save the whole-molecule fragment memo cache, install a fresh empty one for
     the isolated body, and restore the original on exit. The default keeps the
     cache LIVE (see the giant-hang note below); the opt-in is for the best-effort
-    clean fall-through, which simulates a fresh TOP-LEVEL ``name()`` and so needs
+    clean fall-through, which simulates a fresh TOP-LEVEL ``name`` and so needs
     the fresh cache a true top-level call gets from ``enter_name_scope``. WHY it
     matters: the memo caches ``(canonical SMILES -> name)``, and the comment below
     calls that "a context-free pure function" -- but a cached entry for a substituent
@@ -565,14 +565,14 @@ def isolated_naming_session(reset_cache: bool = False):
     # is always correct and prevents a >60-heavy-atom molecule from re-naming the
     # same fragment on every nested recovery entry (the best-effort HANG). Only the
     # depth budget (session_depth + visited) is reset -- the sole reason this
-    # isolation exists: give the nested T4 producer the full recursion budget a
+    # isolation exists: give the nested producer the full recursion budget a
     # standalone call gets. The inner ``start_naming_session`` keeps, not clobbers,
     # this cache (it only allocates one when ``cache is None``).
     #
     # ``reset_cache`` opts INTO cache isolation too: it saves the live cache and
     # installs a fresh ``{}`` for the isolated body, restoring the original on exit.
     # ``start_naming_session`` sees a non-None cache and keeps this fresh one. This
-    # is bounded against the giant-hang by the per-``name()`` work budget, which is
+    # is bounded against the giant-hang by the per-``name`` work budget, which is
     # name-scope-owned and NOT reset here, so a giant's fall-through re-explore
     # shares the already-partly-spent budget and abstains fast rather than hanging.
     saved_cache = getattr(_fragment_guard, 'cache', None)

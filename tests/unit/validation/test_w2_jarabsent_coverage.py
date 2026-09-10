@@ -1,14 +1,14 @@
 """task-W2 jar-absent-proper: producer-level atom-coverage close.
 
 The default (PIN) tier used to ship atom-DROPPED wrong names from two producers
-that silently discard atoms before emission — caught jar-present by SELF-01/OPSIN
+that silently discard atoms before emission — caught jar-present by /OPSIN
 but, jar-absent, by nothing:
 
   * Witness A — captopril `CC(CS)C(=O)N1CCCC1C(=O)O` -> `pyrrolidine-2-carboxylic
     acid` (the N-acyl chain dropped by rules/heterocycles.py
     get_heterocycle_substituents).
   * Witness B — methyl hydrogen sulfate `COS(=O)(=O)O` -> `methane` (the
-    carbon-free sulfate ester dropped at DROP-01 in composer._generate_alkyl_
+    carbon-free sulfate ester dropped at in composer._generate_alkyl_
     prefixes).
 
 The fix wires the shared shape-agnostic E1 partition primitive
@@ -85,7 +85,7 @@ _GUARD = {
     "CC(C)O": "propan-2-ol",
     "CN1CCCC1": "1-methylpyrrolidine",
     "OC(=O)C1CCCN1": "pyrrolidine-2-carboxylic acid",   # proline: SAME string,
-    #                                                     here it is CORRECT
+    # here it is CORRECT
     "Cc1ccccn1": "2-methylpyridine",
     "Cc1ccc(=O)[nH]c1": "5-methylpyridin-2(1H)-one",
     "C1CCNCC1": "piperidine",

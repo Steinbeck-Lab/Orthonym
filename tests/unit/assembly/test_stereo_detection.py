@@ -5,7 +5,7 @@ Tests that the stereo-already-present regex correctly detects:
 2. Unlocanted stereo: (R)-, (S)-, (E)-, (Z)-
 3. Does NOT false-match parenthesized substituent names like (oxan-2-yl)
 
-Phase 105 Plan 02 Task 1: Stereo detection regex tests.
+a phase Plan 02 Task 1: Stereo detection regex tests.
 """
 
 import pytest
@@ -19,7 +19,7 @@ class TestStereoDetectionRegex:
     """Test the stereo detection regex for correct matching."""
 
     # The fixed regex: allows zero or more digits before R/S/E/Z,
-    # requires closing )-
+    # requires closing)-
     PATTERN = r'\(\d*[RSrsEZez]\)-'
 
     def test_locanted_R(self):

@@ -1,16 +1,16 @@
-"""a phase SC-2 - OPSIN round-trip integration tests (Tier 2).
+"""a phase - OPSIN round-trip integration tests (Tier 2).
 
-Per CONTEXT Tier 2: sample 50 entries per source dict (cyclic, NP, aryl,
+Per internal notes Tier 2: sample 50 entries per source dict (cyclic, NP, aryl,
 simple); 200+ round-trip tests total. Each test runs OPSIN CLI, computes
 InChI L1 for both source SMILES and OPSIN parse output, asserts L1 match.
 
-Determinism per a phase.2: sample is FROZEN as a sorted list at planning
+Determinism per a phase: sample is FROZEN as a sorted list at planning
 time (seed=42), NOT re-sampled at test-run time.
 
-Source: 150-CONTEXT.md + Tier 2.
-Source: 150-RESEARCH.md section 10.2.
-Source: 150-PATTERNS.md "NEW test_opsin_retained_roundtrip.py".
-Source: https://iupac.qmul.ac.uk/BlueBook/P2.html (P-22 retained-name PIN tier).
+Source: 150-internal notes + Tier 2.
+Source: internal notes section 10.2.
+Source: internal notes "NEW test_opsin_retained_roundtrip.py".
+Source: https://iupac.qmul.ac.uk/BlueBook/P2.html retained-name PIN tier).
 """
 
 import os
@@ -31,7 +31,7 @@ from orthonym.data.opsin_imports import (
 
 # ---------------------------------------------------------------------------
 # Helpers REUSED INLINE from tests/integration/test_opsin_roundtrip_validation.py
-# (NOT cross-imported per CONTEXT Tier 2 acceptance: "helpers reused
+# (NOT cross-imported per internal notes Tier 2 acceptance: "helpers reused
 # verbatim as inline definitions, NOT cross-test-file import")
 # ---------------------------------------------------------------------------
 
@@ -56,7 +56,7 @@ def _opsin_jar_path():
 
 
 def _opsin_name_to_smiles(name: str, jar_path: str) -> str:
-    """a phase REVIEW WR-02: catch TimeoutExpired so a single hung
+    """a phase REVIEW: catch TimeoutExpired so a single hung
     OPSIN invocation does not crash the test session. Returning ""
     routes the test through the existing 'OPSIN cannot parse' xfail
     branch in each parametrized test.
@@ -91,7 +91,7 @@ def _inchi_match(smi1: str, smi2: str) -> bool:
 
 
 # ---------------------------------------------------------------------------
-# Frozen 50-entry sample per source (sorted + seed=42; a phase.2 determinism)
+# Frozen 50-entry sample per source (sorted + seed=42; a phase determinism)
 # ---------------------------------------------------------------------------
 
 
@@ -121,7 +121,7 @@ def _select_primary_name(names):
 #
 # Strict=False because the OPSIN parser may improve in a future release; if a
 # previously-failing case starts passing, pytest reports XPASS but does not
-# fail the suite (per the standard a phase SC-7 + RESEARCH section 7.2 pattern).
+# fail the suite (per the standard a phase + RESEARCH section 7.2 pattern).
 _KNOWN_OPSIN_AMBIGUOUS_FAILURES = {
     # (test-target, name) -> citation text
     ("aryl", "lupetidine"): (
@@ -199,17 +199,17 @@ NP_PARAMS = _build_param(OPSIN_NATURAL_PRODUCTS, "np")
 
 
 # ---------------------------------------------------------------------------
-# Tests (4 parametrized; ~50 cases each → 200+ total per CONTEXT)
+# Tests (4 parametrized; ~50 cases each → 200+ total per internal notes)
 # ---------------------------------------------------------------------------
 
 
 @pytest.mark.integration
 @pytest.mark.parametrize("smiles,name", ARYL_PARAMS)
 def test_aryl_groups_roundtrip(smiles, name):
-    """a phase SC-2: aryl_groups entries round-trip via OPSIN L1.
+    """a phase: aryl_groups entries round-trip via OPSIN L1.
 
-    Source: https://iupac.qmul.ac.uk/BlueBook/P2.html P-22.1.x
-    Source: 150-CONTEXT.md + Tier 2.
+    Source: https://iupac.qmul.ac.uk/BlueBook/P2.html.x
+    Source: 150-internal notes + Tier 2.
     """
     jar = _opsin_jar_path()
     if jar is None or not _java_available():
@@ -225,10 +225,10 @@ def test_aryl_groups_roundtrip(smiles, name):
 @pytest.mark.integration
 @pytest.mark.parametrize("smiles,name", SIMPLE_PARAMS)
 def test_simple_groups_roundtrip(smiles, name):
-    """a phase SC-2: simple_groups entries round-trip via OPSIN L1.
+    """a phase: simple_groups entries round-trip via OPSIN L1.
 
-    Source: https://iupac.qmul.ac.uk/BlueBook/P2.html P-22.x
-    Source: 150-CONTEXT.md + Tier 2.
+    Source: https://iupac.qmul.ac.uk/BlueBook/P2.html.x
+    Source: 150-internal notes + Tier 2.
     """
     jar = _opsin_jar_path()
     if jar is None or not _java_available():
@@ -244,10 +244,10 @@ def test_simple_groups_roundtrip(smiles, name):
 @pytest.mark.integration
 @pytest.mark.parametrize("smiles,name", CYCLIC_PARAMS)
 def test_cyclic_groups_roundtrip(smiles, name):
-    """a phase SC-2: cyclic_groups entries round-trip via OPSIN L1.
+    """a phase: cyclic_groups entries round-trip via OPSIN L1.
 
-    Source: https://iupac.qmul.ac.uk/BlueBook/P2.html P-22.2.1
-    Source: 150-CONTEXT.md + Tier 2.
+    Source: https://iupac.qmul.ac.uk/BlueBook/P2.html
+    Source: 150-internal notes + Tier 2.
     """
     jar = _opsin_jar_path()
     if jar is None or not _java_available():
@@ -263,10 +263,10 @@ def test_cyclic_groups_roundtrip(smiles, name):
 @pytest.mark.integration
 @pytest.mark.parametrize("smiles,name", NP_PARAMS)
 def test_natural_products_roundtrip(smiles, name):
-    """a phase SC-2: natural_products entries round-trip via OPSIN L1.
+    """a phase: natural_products entries round-trip via OPSIN L1.
 
     Source: https://iupac.qmul.ac.uk/BlueBook/P2.html (NP retained names)
-    Source: 150-CONTEXT.md + Tier 2.
+    Source: 150-internal notes + Tier 2.
     """
     jar = _opsin_jar_path()
     if jar is None or not _java_available():

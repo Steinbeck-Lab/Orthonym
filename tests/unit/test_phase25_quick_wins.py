@@ -1,10 +1,10 @@
-"""Tests for Phase 25 quick-win naming fixes."""
+"""Tests for a phase quick-win naming fixes."""
 import pytest
 from orthonym import name_compound
 
 
 class TestQW01MultiplierPrefixFix:
-    """QW-01: get_multiplier_prefix() missing-arg fixes."""
+    """: get_multiplier_prefix missing-arg fixes."""
 
     def test_biphenyl_ether_no_typeerror(self):
         """Biphenyl ether should produce valid name, not TypeError."""
@@ -33,7 +33,7 @@ class TestQW01MultiplierPrefixFix:
 
 
 class TestQW04PeroxynitricAcid:
-    """QW-04: Peroxynitric acid retained name."""
+    """: Peroxynitric acid retained name."""
 
     def test_peroxynitric_acid(self):
         """Peroxynitric acid should be named."""
@@ -47,15 +47,15 @@ class TestQW04PeroxynitricAcid:
 
 
 class TestQW02QW03AlreadyFixed:
-    """QW-02 and QW-03: Verify previously fixed items still work."""
+    """ and: Verify previously fixed items still work."""
 
     def test_disulfane_retained_name(self):
-        """QW-03: disulfane should already work (phase 24 fix)."""
+        """: disulfane should already work (phase 24 fix)."""
         result = name_compound("SS")
         assert result == "disulfane"
 
     def test_dicarboxylate_anion(self):
-        """QW-02: dicarboxylate anions should produce names (phase 24 fix)."""
+        """: dicarboxylate anions should produce names (phase 24 fix)."""
         result = name_compound("O=C([O-])CC=CC(=O)C(=O)[O-]")
         assert result is not None
         assert result != "unknown"

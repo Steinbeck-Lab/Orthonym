@@ -1,6 +1,6 @@
 """
-Integration tests for Phase 32: Macrocyclic & Misc Format fixes.
-Tests MC-01 (replacement prefix hyphen joining) and MC-03 (large ring chain prefix verification).
+Integration tests for a phase: Macrocyclic & Misc Format fixes.
+Tests (replacement prefix hyphen joining) and (large ring chain prefix verification).
 """
 import re
 import subprocess
@@ -13,7 +13,7 @@ from orthonym.namer import name_compound
 def opsin_parse(name: str) -> str | None:
     """Parse IUPAC name through OPSIN, return SMILES or None.
 
-    Phase 157 cleanup: routed through `_find_opsin_jar()` (Phase 138 D-22
+    a phase cleanup: routed through `_find_opsin_jar` (a phase
     canonical helper). The hardcoded `opsin-cli-2.8.0-...jar` was dead
     since the project upgraded to opsin-cli-2.9.0.
     """
@@ -43,7 +43,7 @@ def opsin_parse(name: str) -> str | None:
 
 @pytest.mark.integration
 class TestReplacementPrefixHyphen:
-    """MC-01: Mixed-element macrocyclic replacement prefixes use hyphen separator."""
+    """: Mixed-element macrocyclic replacement prefixes use hyphen separator."""
 
     def test_oxa_aza_cyclododecane(self):
         """O+N macrocyclic must have hyphen between oxa and aza groups."""
@@ -120,7 +120,7 @@ class TestReplacementPrefixHyphen:
 
 @pytest.mark.integration
 class TestReplacementPrefixOPSINRoundTrip:
-    """MC-01: OPSIN round-trip tests for macrocyclic replacement names."""
+    """: OPSIN round-trip tests for macrocyclic replacement names."""
 
     @pytest.mark.roundtrip
     def test_tetraoxacyclododecane_opsin(self):
@@ -152,7 +152,7 @@ class TestReplacementPrefixOPSINRoundTrip:
 
 @pytest.mark.integration
 class TestLargeRingChainPrefix:
-    """MC-03: Verify get_chain_prefix() produces correct names for large rings."""
+    """: Verify get_chain_prefix produces correct names for large rings."""
 
     def test_cyclononadecane(self):
         """19-membered ring produces correct name."""

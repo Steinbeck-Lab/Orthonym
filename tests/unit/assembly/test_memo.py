@@ -1,4 +1,4 @@
-"""Unit tests for the scoped-per-call memo infra (v41 M1, Levers C1 + E).
+"""Unit tests for the scoped-per-call memo infra (M1, Levers C1 + E).
 
 Covers the memo contract itself (off/on/verify, scope teardown, nesting) and the
 COMPLETENESS of the Lever C1 ``name_substituent`` cache key -- every key component

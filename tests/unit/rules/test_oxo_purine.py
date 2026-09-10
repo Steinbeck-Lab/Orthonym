@@ -5,9 +5,9 @@ Both RT-exact targets below were confirmed via OPSIN 2.9.0 round-trip
 (name -> SMILES -> InChIKey, identical to the input SMILES's InChIKey) before
 this engine was written:
 
-    9-methylguanine       Cn1cnc2c1nc(N)[nH]c2=O
+    9-methylguanine Cn1cnc2c1nc(N)[nH]c2=O
         -> 2-amino-9-methyl-1,9-dihydro-6H-purin-6-one
-    9-methylhypoxanthine  Cn1cnc2c1[nH]cnc2=O  (also O=c1[nH]cnc2n(C)cnc12)
+    9-methylhypoxanthine Cn1cnc2c1[nH]cnc2=O (also O=c1[nH]cnc2n(C)cnc12)
         -> 9-methyl-1,9-dihydro-6H-purin-6-one
 
 The C2-amino (guanine family) is placed as an ordinary `2-amino` PREFIX --

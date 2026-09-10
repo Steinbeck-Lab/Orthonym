@@ -1,18 +1,18 @@
-"""Phase 151-02 D-09 / D-13: mixed spiro/fused detector + name builder + suppliers.
+"""a phase-02 /: mixed spiro/fused detector + name builder + suppliers.
 
 Wave-0 RED scaffold: tests target the NEW Plan 151-02 functions that
 must be added to ``src/orthonym/rules/spiro.py`` in Task 2:
 
-- ``is_mixed_spiro_fused(mol)``  (D-09 + D-13)
-- ``name_mixed_spiro_fused(mol)``  (D-13 + AUTONOM §4)
-- ``get_spiro_iupac_locants(mol)``  (D-21 partial)
-- ``get_mixed_spiro_fused_iupac_locants(mol)``  (D-21 partial)
+- ``is_mixed_spiro_fused(mol)`` (+)
+- ``name_mixed_spiro_fused(mol)`` (+ AUTONOM)
+- ``get_spiro_iupac_locants(mol)`` (partial)
+- ``get_mixed_spiro_fused_iupac_locants(mol)`` (partial)
 
 Lazy-import pattern matches Plan 151-01's test scaffold so RED-state
 collection succeeds before Task 2 lands.
 
-Source: 151-02-PLAN.md tasks 1b/2; 151-AUDIT-B.md; 151-CONTEXT.md
-D-09/D-13/D-20/D-21/D-22(b); 151-RESEARCH.md Pitfall 3 + AUTONOM §4.
+Source: 151-02-PLAN.md tasks 1b/2; internal notes-B.md; 151-internal notes
+////(b); internal notes Pitfall 3 + AUTONOM
 """
 from __future__ import annotations
 
@@ -28,7 +28,7 @@ from rdkit import Chem
 
 
 # ---------------------------------------------------------------------------
-# OPSIN round-trip helpers (D-23) — same shape as canary infra.
+# OPSIN round-trip helpers  — same shape as canary infra.
 # parents[3]: tests/unit/rules/test_X.py -> project root.
 # ---------------------------------------------------------------------------
 
@@ -129,11 +129,11 @@ _MIXED_CORPUS = _filter(_CORPUS, compound_class="spiro-mixed-fused")
 _MIXED_BLUE_BOOK = _filter(_BLUE_BOOK, compound_class="spiro-mixed-fused")
 _PURE_CORPUS = _filter(_CORPUS, compound_class="spiro-pure")
 
-# Combined fixture set for the D-23 round-trip oracle: corpus mining
-# (mostly natural-product variants — many fail v18 due to AUTONOM §4 step 6
+# Combined fixture set for the round-trip oracle: corpus mining
+# (mostly natural-product variants — many fail due to AUTONOM step 6
 # unsaturation recalc, logged to AUTONOM-followups) + Blue Book + AUTONOM-1990
-# §4 examples (Q-05 NESTED_FORM_PARSEABLE-validated). The acceptance gate
-# (≥10 of N round-trip) measures the COMBINED set so v18 ships with a
+# examples (Q-05 NESTED_FORM_PARSEABLE-validated). The acceptance gate
+# (≥10 of N round-trip) measures the COMBINED set so ships with a
 # verifiable correctness signal.
 _MIXED_ROUNDTRIP_FIXTURES = _MIXED_CORPUS + _MIXED_BLUE_BOOK
 
@@ -208,11 +208,11 @@ class TestIsMixedSpiroFusedAntiCanary:
 
 
 # ===========================================================================
-# Class: pure-spiro contract preservation (D-09 lock)
+# Class: pure-spiro contract preservation (lock)
 # ===========================================================================
 
 class TestPureSpiroContractPreserved:
-    """D-09 lock: is_spiro_system body byte-identical; returns True for
+    """ lock: is_spiro_system body byte-identical; returns True for
     pure spiro and False for mixed."""
 
     @pytest.mark.unit
@@ -234,7 +234,7 @@ class TestPureSpiroContractPreserved:
 
     @pytest.mark.unit
     def test_is_spiro_system_body_unchanged(self):
-        """D-09: source-level enforcement that the body's invariant
+        """: source-level enforcement that the body's invariant
         ``n_rings == n_spiro + 1`` remains intact."""
         from orthonym.rules import spiro
         src = inspect.getsource(spiro.is_spiro_system)
@@ -253,7 +253,7 @@ class TestPureSpiroContractPreserved:
 
 
 # ===========================================================================
-# Class: AUTONOM §4 separable-parts naming (D-13)
+# Class: AUTONOM separable-parts naming
 # ===========================================================================
 
 class TestSeparablePartsNaming:
@@ -273,7 +273,7 @@ class TestSeparablePartsNaming:
             pytest.skip(f"SMILES invalid: {fixture['fixture_id']}")
         result = name_mixed_spiro_fused(mol)
         if result is None:
-            # Acceptable — Plan 151-02 D-24: failures log to AUTONOM-followups.
+            # Acceptable — Plan 151-02: failures log to AUTONOM-followups.
             return
         assert isinstance(result, tuple), fixture["fixture_id"]
         assert len(result) == 4, fixture["fixture_id"]
@@ -286,7 +286,7 @@ class TestSeparablePartsNaming:
 
     @pytest.mark.unit
     def test_returns_none_on_pure_spiro(self):
-        """name_mixed_spiro_fused(pure spiro) -> None (D-09 dispatch contract)."""
+        """name_mixed_spiro_fused(pure spiro) -> None (dispatch contract)."""
         name_mixed_spiro_fused = _import_or_skip("name_mixed_spiro_fused")
         mol = Chem.MolFromSmiles("C1CCC2(CC1)CCCCC2")
         assert name_mixed_spiro_fused(mol) is None
@@ -366,7 +366,7 @@ class TestSupplierCoverageInvariant:
 
 
 # ===========================================================================
-# Class: D-11/D-20 enforcement — no parallel locant comparator
+# Class: / enforcement — no parallel locant comparator
 # ===========================================================================
 
 class TestNoParallelLocantComparator:
@@ -375,8 +375,8 @@ class TestNoParallelLocantComparator:
     @pytest.mark.unit
     def test_spiro_module_imports_compare_locant_sets(self):
         """Plan 151-02 lands the import even if the existing pure-spiro
-        helpers do not yet use it (v19 follow-up). The import lock is
-        proof D-11/D-20 invariant is honored."""
+        helpers do not yet use it (follow-up). The import lock is
+        proof / invariant is honored."""
         _import_or_skip("name_mixed_spiro_fused")  # gates on Task 2
         from orthonym.rules import spiro
         src = inspect.getsource(spiro)
@@ -386,7 +386,7 @@ class TestNoParallelLocantComparator:
 
     @pytest.mark.unit
     def test_no_parallel_comparator_definition(self):
-        """No private locant-comparator function in spiro.py (D-20 lock)."""
+        """No private locant-comparator function in spiro.py (lock)."""
         from orthonym.rules import spiro
         src = inspect.getsource(spiro)
         # Strip comments / docstrings: count only `def _compare_locant`
@@ -401,11 +401,11 @@ class TestNoParallelLocantComparator:
 
 
 # ===========================================================================
-# Class: D-12 enforcement — heteroatom prefix reuse
+# Class: enforcement — heteroatom prefix reuse
 # ===========================================================================
 
 class TestHeteroatomPrefixReuse:
-    """D-12: spiro.py reuses polycyclic_bridged.get_heteroatom_prefix."""
+    """: spiro.py reuses polycyclic_bridged.get_heteroatom_prefix."""
 
     @pytest.mark.unit
     def test_spiro_imports_get_heteroatom_prefix(self):
@@ -425,20 +425,20 @@ class TestHeteroatomPrefixReuse:
 
 
 # ===========================================================================
-# Class: round-trip via OPSIN (D-23)
+# Class: round-trip via OPSIN
 # ===========================================================================
 
 class TestRoundTripViaOPSIN:
-    """D-23 hard test gate. Plan 151-02 acceptance: ≥10 corpus mixed
+    """ hard test gate. Plan 151-02 acceptance: ≥10 corpus mixed
     fixtures round-trip via OPSIN with InChI L1 match."""
 
     @staticmethod
     def _ring_system_inchi(mol):
         """Extract the ring-system-only sub-mol and return its InChI L1.
 
-        Mixed-spiro/fused naming in v18 covers the RING SKELETON only;
+        Mixed-spiro/fused naming in covers the RING SKELETON only;
         substituent decoration is handled by the composer's downstream
-        enrichment layer per D-13 / 151-AUDIT-B audit. The D-23 OPSIN
+        enrichment layer per / internal notes-B audit. The OPSIN
         round-trip oracle therefore compares the ring-system fragment
         of the input against the OPSIN output (which is itself the
         bare ring system named by name_mixed_spiro_fused).
@@ -479,11 +479,11 @@ class TestRoundTripViaOPSIN:
     def test_round_trip_mixed_corpus(self, fixture):
         """Round-trip InChI L1 on the RING-SYSTEM skeleton only.
 
-        v18 mixed-spiro/fused naming covers the ring skeleton; the
+         mixed-spiro/fused naming covers the ring skeleton; the
         composer's downstream substituent layer adds decoration. The
-        D-23 oracle compares input.ring_system_inchi vs. OPSIN output
+         oracle compares input.ring_system_inchi vs. OPSIN output
         InChI (bare skeleton). Substituent-enrichment correctness is
-        Phase 152's responsibility.
+        a phase's responsibility.
         """
         name_mixed_spiro_fused = _import_or_skip("name_mixed_spiro_fused")
         mol = Chem.MolFromSmiles(fixture["smiles"])
@@ -507,18 +507,18 @@ class TestRoundTripViaOPSIN:
         if i_in is None or i_rt is None:
             pytest.skip(f"InChI extraction failed for "
                         f"{fixture['fixture_id']}")
-        # AUTONOM §4 step 6 unsaturation recalculation is a v19 follow-up
-        # per 151-AUDIT-B verdict. When the input has in-ring unsaturation
-        # but the v18 fused-name handler emits a fully-saturated parent
+        # AUTONOM step 6 unsaturation recalculation is a follow-up
+        # per internal notes-B verdict. When the input has in-ring unsaturation
+        # but the fused-name handler emits a fully-saturated parent
         # (e.g., decahydroindene/octahydroindene), the formula layer
         # mismatches by 2H per double bond. Skip with a clear marker;
-        # the failure is logged in .planning/references/AUTONOM-followups.md.
+        # the failure is logged in internal notes
         if i_in != i_rt:
             in_atoms = i_in.split("/")[1] if "/" in i_in else ""
             rt_atoms = i_rt.split("/")[1] if "/" in i_rt else ""
             if in_atoms and rt_atoms and in_atoms != rt_atoms:
                 # Different formulas — likely saturation mismatch.
-                # Allowed v19 deferral per AUTONOM §4 step 6.
+                # Allowed deferral per AUTONOM step 6.
                 pytest.skip(
                     f"Ring-system formula mismatch (v19 AUTONOM §4 step 6 "
                     f"unsaturation recalc) on {fixture['fixture_id']}: "
@@ -545,8 +545,8 @@ class TestRoundTripViaOPSIN:
 
 
 class TestHeteroatomSeniorityWR01:
-    """Phase 151-04 WR-01: side-ring heteroatom seniority must include
-    halogens per IUPAC P-25.3.1.3."""
+    """a phase-04: side-ring heteroatom seniority must include
+    halogens per IUPAC."""
 
     @pytest.mark.unit
     def test_no_local_priority_dict_in_walk_side_ring_locants(self):
@@ -562,7 +562,7 @@ class TestHeteroatomSeniorityWR01:
         non_comment = "\n".join(
             L for L in src.split("\n") if not L.strip().startswith("#")
         )
-        # WR-01 lock: the literal local-priority-dict pattern must NOT
+        # lock: the literal local-priority-dict pattern must NOT
         # appear in the function body.
         assert 'priority = {"O": 0' not in non_comment, (
             "WR-01 regression: local priority dict reintroduced in "
@@ -577,7 +577,7 @@ class TestHeteroatomSeniorityWR01:
     @pytest.mark.unit
     def test_get_heteroatom_priority_orders_halogens_above_oxygen(self):
         """Sanity: confirm the canonical helper ranks F senior to O.
-        If this ever flips, the WR-01 fix's correctness premise is gone."""
+        If this ever flips, the fix's correctness premise is gone."""
         from orthonym.data.hw_heteroatoms import get_heteroatom_priority
         assert get_heteroatom_priority("F") < get_heteroatom_priority("O"), (
             "IUPAC P-25.3.1.3: F is more senior than O. If this assertion "
@@ -590,7 +590,7 @@ class TestHeteroatomSeniorityWR01:
 
 
 # ===========================================================================
-# v37 Task CT.3 — offer-not-return for spiro-CORE-plus-PENDANT-RING molecules
+#.3 — offer-not-return for spiro-CORE-plus-PENDANT-RING molecules
 # ===========================================================================
 
 def _full_inchikey(smi: str):
@@ -607,7 +607,7 @@ class TestCT3PendantRingOfferNotReturn:
     ``name_mixed_spiro_fused`` -> None -> abstain. The correct behaviour is to
     OFFER the spiro CORE parent (fused component + side ring) and let the
     cascade substituent supplier attach the pendant ring, with the RT gate
-    (SELF-01 / OPSIN full InChIKey) deciding acceptance (invariant 18).
+    (/ OPSIN full InChIKey) deciding acceptance (a project rule).
 
     0-wrong is preserved by the RT gate — this class asserts the *positive*
     wins (previously-abstaining molecules that now round-trip EXACT) and the

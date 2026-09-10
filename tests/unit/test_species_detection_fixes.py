@@ -22,7 +22,7 @@ from orthonym import name_compound
 # ============================================================
 
 class TestSpeciesTypeDetection:
-    """Test that detect_species_type() correctly classifies molecules."""
+    """Test that detect_species_type correctly classifies molecules."""
 
     def test_simple_carboxylate_is_ion(self):
         """Simple carboxylate (acetate) should be classified as 'ion'."""
@@ -128,14 +128,14 @@ class TestNoSuitableAtomGuard:
         assert isinstance(result, str)
 
     def test_valid_amine_cation_returns_aminium(self):
-        """NH4+ PIN is 'azanium' (P-73.1.1.2, the Blue Book; was 'ammonium')."""
+        """NH4+ PIN is 'azanium', the Blue Book; was 'ammonium')."""
         mol = Chem.MolFromSmiles('[NH4+]')
         result = name_cation(mol)
         assert result == 'azanium'
 
     def test_methylammonium_cation(self):
         """Methylamine cation names successfully.: the PIN is the
-        substitutive 'methanaminium' (P-73.1.2.1); the 'ammonium' retained form
+        substitutive 'methanaminium'; the 'ammonium' retained form
         is general/common style only."""
         mol = Chem.MolFromSmiles('C[NH3+]')
         assert name_cation(mol) == 'methanaminium'
@@ -237,7 +237,7 @@ class TestNamerRoutingIntegration:
         assert name == 'acetate'
 
     def test_ammonium_retained_name(self):
-        """NH4+ PIN is 'azanium' (P-73.1.1.2, the Blue Book; was 'ammonium')."""
+        """NH4+ PIN is 'azanium', the Blue Book; was 'ammonium')."""
         name = name_compound('[NH4+]')
         assert name == 'azanium'
 

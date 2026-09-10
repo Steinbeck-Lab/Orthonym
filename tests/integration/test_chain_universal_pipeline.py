@@ -1,7 +1,7 @@
 """
 Integration tests for chain substituent naming via universal pipeline.
 
-Verifies that _generate_alkyl_prefixes() correctly names all substituent
+Verifies that _generate_alkyl_prefixes correctly names all substituent
 types on chain parents using the universal pipeline (discover + classify).
 Covers: simple alkyl, branched alkyl, heteroatom-containing (alkoxy,
 acylamino, acyloxy), ring-on-chain, and compound substituents.

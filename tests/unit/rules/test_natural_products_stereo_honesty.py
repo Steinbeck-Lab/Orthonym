@@ -25,7 +25,7 @@ def test_defined_steroid_keeps_retained_name():
 
 
 def test_partially_defined_steroid_keeps_honest_name():
-    """WSC-02 regression (fix round 2, 2026-08-16 coordinator ruling): a steroid with the
+    """-02 regression (fix round 2, 2026-08-16 coordinator ruling): a steroid with the
     ring stereocentres DEFINED but one substituent centre (C-20, atom idx 1) left
     UNDEFINED must NOT decline. Round 1's guard declined whenever ANY matched
     stereocentre was undefined, which fabricated a fabrication-guard false positive on

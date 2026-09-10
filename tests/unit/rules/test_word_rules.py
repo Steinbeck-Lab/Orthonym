@@ -1,5 +1,5 @@
 """
-Unit tests for OPSIN word rules data (FMT-05).
+Unit tests for OPSIN word rules data .
 
 Verifies that the OPSIN_WORD_RULES data imported from wordRules.xml
 has the expected structure and content.

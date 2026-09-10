@@ -1,4 +1,4 @@
-"""Wave-2 completion Tier 2: benzene ring-FG walker root (P-61 / P-15.2.1.1).
+"""Wave-2 completion Tier 2: benzene ring-FG walker root /.
 
 Explicit recognizers for azido / isocyano / iodosyl / iodyl / oxophosphanyl ring
 substituents that the plain-symbol walker branches mis-named or dropped. All
@@ -18,12 +18,12 @@ def _name(smiles):
 
 
 @pytest.mark.parametrize("smiles,expected", [
-    ("[N-]=[N+]=Nc1ccccc1", "azidobenzene"),               # P-15.2.1.1
-    ("O=Ic1ccccc1", "iodosylbenzene"),                     # P-61.3.2.3
+    ("[N-]=[N+]=Nc1ccccc1", "azidobenzene"),               #
+    ("O=Ic1ccccc1", "iodosylbenzene"),                     #
     ("O=I(=O)c1ccccc1", "iodylbenzene"),
-    # Wave-2 C: BB P-64.1.2.2 PIN via the heterone namer (was the prefix form)
+    # Wave-2 C: BB PIN via the heterone namer (was the prefix form)
     ("O=Pc1ccccc1", "phenylphosphanone"),
-    ("[C-]#[N+]c1ccccc1", "isocyanobenzene"),              # P-15.2.1.1
+    ("[C-]#[N+]c1ccccc1", "isocyanobenzene"),              #
     ("[N-]=[N+]=Nc1ccc(F)cc1", "1-azido-4-fluorobenzene"),
     ("[N-]=[N+]=Nc1ccc(Cl)cc1Cl", "1-azido-2,4-dichlorobenzene"),
 ])
@@ -42,7 +42,7 @@ def test_halogen_and_nitroso_unchanged():
 
 def test_azido_nitro_coexistence_heals():
     # Wave-2 completion B4 BUILT the former charged-FG gap: the zwitterion
-    # detector now masks internal-charge FG atoms (P-59 Table 5.1), so the
+    # detector now masks internal-charge FG atoms, so the
     # pre-dispatch neutralisation no longer corrupts azide+nitro molecules.
     # OPSIN-RT verified.
     assert _name("[N-]=[N+]=Nc1ccccc1[N+](=O)[O-]") == "1-azido-2-nitrobenzene"

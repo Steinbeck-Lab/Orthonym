@@ -1,4 +1,4 @@
-"""v31 composition-completeness lever — best-effort rt_exact tests.
+""" composition-completeness lever — best-effort rt_exact tests.
 
 Root cause (measured 2026-08-10): the PIN ring-substituent path
 (`classify_and_name_fragment` -> `name_ring_system_substituent` ->
@@ -32,7 +32,7 @@ def test_decorated_aryl_methyl_branch_on_ring_parent(smiles):
 
 @pytest.mark.roundtrip
 def test_r1_sulfonylbenzyl_no_partition_double_count():
-    """v31 FIXED (was xfail): the sulfonyl S was double-counted (branch named
+    """ FIXED (was xfail): the sulfonyl S was double-counted (branch named
     [4-(methanesulfonyl)phenyl]methyl AND a spurious parent 'sulfonyl' prefix).
     The unconditional ring-substituent containment filter in
     _handler_shared._generate_prefixes now drops any FG entirely inside a ring

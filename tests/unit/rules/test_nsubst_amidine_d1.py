@@ -1,5 +1,5 @@
 """D1 gap-fix tests — N-substituted amidines with N/N' locants (Blue Book
-P-66.4.1 / P-66.4.1.2 / P-66.4.1.3.1, completes C2 sub-fix (c)).
+ / /, completes C2 sub-fix (c)).
 
 D1 EXTENDS the C2 machinery (carbamimidoyl prefix, benzenecarboximidamide
 suffix, chain-count exclusion — all for UNsubstituted amidines) to
@@ -112,7 +112,7 @@ class TestD1Guards:
 
 
 # ---------------------------------------------------------------------------
-# a phase task 2 (P-14.5.2): N-substituent CITATION ORDER is alphanumerical by
+# a phase task 2: N-substituent CITATION ORDER is alphanumerical by
 # NAME, NOT by italic-N locant. The italic-N locant is only a tie-break
 # (the Blue Book dicarboximidamide PIN 'N''1-ethyl-N1,N1-dimethyl...' cites ethyl
 # before dimethyl across N''1 > N1). All rows are OPSIN-RT gold PINs.
@@ -128,7 +128,7 @@ class TestAmidineCitationOrderAlphanumerical:
                 == "N'-methyl-N,N-diphenylbenzenecarboximidamide")
 
     def test_Nprime_hydroxy_N_methyl_ethanimidamide(self):
-        # P-66.4.4 amidoxime read: hydroxy(N') < methyl(N).
+        # amidoxime read: hydroxy(N') < methyl(N).
         assert _pin("CNC(C)=NO") == "N'-hydroxy-N-methylethanimidamide"
 
     def test_Nprime_ethyl_NN_dimethyl_carbamimidoyl_benzoic_acid(self):

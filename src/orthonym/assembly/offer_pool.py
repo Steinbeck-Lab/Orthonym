@@ -1,9 +1,9 @@
-"""v33 Phase 0 Task L2.1: whole-molecule Offer + rank_offers/select_offer.
+""" a phase Task L2.1: whole-molecule Offer + rank_offers/select_offer.
 
 A NEW, small, PURE module -- deliberately NOT built on `assembly.candidate_pool`
-or wired through `assembly.inner_dispatch`. The L2 SPY (task-L2-brief.md,
-invariant 17) proved those are the wrong vehicle: `candidate_pool.best()` ranks
-parent SKELETONS by the P-44 seniority criteria and `CandidateName` carries no
+or wired through `assembly.inner_dispatch`. The L2 a trace (task-L2-brief.md,
+a project rule) proved those are the wrong vehicle: `candidate_pool.best` ranks
+parent SKELETONS by the seniority criteria and `CandidateName` carries no
 `is_pin`/`tier`/coverage field at all, and restructuring `dispatch_inner` would
 hit `tier_a_ring.py:540-542`, which scrubs its own rejected candidates from the
 shared pool.
@@ -24,10 +24,10 @@ from dataclasses import dataclass
 from typing import Any, List, Optional
 
 #: Confidence-band names for the result ``tier`` field (renamed from the
-#: T1..T5 codes; single source of truth for the spelling -- `namer.py`
+#: T1.. codes; single source of truth for the spelling -- `namer.py`
 #: imports these rather than re-spelling the literals).
 PIN_VERIFIED = "pin_verified"            # was T1
-PIN_UNVERIFIED = "pin_unverified"        # was T2 (reserved, unused)
+PIN_UNVERIFIED = "pin_unverified"        # was (reserved, unused)
 SYSTEMATIC_VERIFIED = "systematic_verified"  # was T3
 BEST_EFFORT = "best_effort"              # was T4
 ABSTAIN = "abstain"                      # was T5
@@ -96,7 +96,7 @@ def select_offer(offers: List[Offer]) -> Optional[Offer]:
 
 
 def select_rt_passing(offers: List[Offer], rt_ok) -> Optional[Offer]:
-    """v33 Phase 0 L4-core: the RT/PIN-gate-over-offers SELECTION PRIMITIVE.
+    """ a phase L4-core: the RT/PIN-gate-over-offers SELECTION PRIMITIVE.
 
     Walks ``rank_offers(offers)`` in order and returns the FIRST offer that is
     both ``.complete`` and passes the caller-injected ``rt_ok(offer) -> bool``

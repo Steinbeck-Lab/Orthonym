@@ -1,7 +1,7 @@
 """
 Unit tests for ring classification.
 
-Tests classify_ring() returns correct type for each ring category:
+Tests classify_ring returns correct type for each ring category:
 - heterocyclic_aromatic: pyridine, furan, thiophene, imidazole
 - heterocyclic_saturated: piperidine, THF, thiolane, morpholine
 - aromatic: benzene (carbocyclic aromatic)

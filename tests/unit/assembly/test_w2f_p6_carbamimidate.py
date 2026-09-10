@@ -1,6 +1,6 @@
-"""P-66.1.6.1.2.1 - N/N'-substituted carbamimidate citation (W2F p6 Task 5).
+""" - N/N'-substituted carbamimidate citation (W2F p6 Task 5).
 
-BB P-66.1.6.1.2.1 (BlueBookV2.md:33408): 'ethyl N'-methyl-N,N-diphenyl-
+BB (the Blue Book): 'ethyl N'-methyl-N,N-diphenyl-
 carbamimidate (PIN)'. N = amino (sp3) N; N' = imino (=N-) N; citation order
 alphanumerical (methyl < phenyl). Un-nameable N-fragment -> fail closed.
 """
@@ -12,7 +12,7 @@ from orthonym.assembly.handlers.imidate import _name_carbamimidate
 
 class TestCarbamimidateNSub:
     def test_target(self):
-        # BB P-66.1.6.1.2.1 verbatim PIN (BlueBookV2.md:33408)
+        # BB verbatim PIN (the Blue Book)
         assert orthonym.name_compound("CCOC(=NC)N(c1ccccc1)c1ccccc1", style="pin") == \
             "ethyl N'-methyl-N,N-diphenylcarbamimidate"
 

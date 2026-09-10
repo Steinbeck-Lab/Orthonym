@@ -1,11 +1,11 @@
-"""v41 macrocyclic-limonoid naming — the three-fix milestone (F2 ene compound-locant,
-F1 P-16.3 enclosing marks, F3 decoration composition).
+""" macrocyclic-limonoid naming — the three-fix milestone (F2 ene compound-locant,
+F1 enclosing marks, F3 decoration composition).
 
 These deep NP cages emit a whole-molecule oxa-von-Baeyer ``complex_ring`` candidate whose
 skeleton numbering is correct (audit 0 diff edges vs OPSIN) but whose name string does not
 OPSIN-parse, so the engine abstains (0-wrong). F2 is the dominant blocker: a ring double
 bond spanning a bridge (its two locants are non-consecutive) must be cited with the
-P-31.1.4.2(1) compound locant ``15(36)``; the current path emits a bare ``15`` which OPSIN
+(1) compound locant ``15(36)``; the current path emits a bare ``15`` which OPSIN
 reads as the 15=16 bond, and 16 is a carbonyl → cumulated ketene → ``C valency: 5``.
 
 Building the whole-cage candidate for a 53-atom cage takes ~90 s with the macrocycle-hang
@@ -81,7 +81,7 @@ def _capture(site, smiles):
 @pytest.mark.unit
 @pytest.mark.slow
 def test_f2_ring_double_bond_uses_compound_locant():
-    """v41 F2 (P-31.1.4.2(1)): the built whole-cage parent name cites a ring double bond
+    """ F2 (1)): the built whole-cage parent name cites a ring double bond
     whose end-locants are NOT consecutive as ``lo(hi)``, not a bare ``lo``. The bare form
     makes OPSIN read the wrong bond and raise ``C valency: 5``.
 
@@ -98,7 +98,7 @@ def test_f2_ring_double_bond_uses_compound_locant():
 @pytest.mark.unit
 @pytest.mark.slow
 def test_f1_compound_substituent_prefix_is_enclosed():
-    """v41 F1 (P-16.3.3 / P-29.6.1): a COMPOUND substituent prefix on the whole-cage
+    """ F1 /: a COMPOUND substituent prefix on the whole-cage
     candidate (e.g. the ylidene ``3-methoxy-3-oxopropan-2-ylidene``) is cited in
     enclosing marks — ``20-(3-methoxy-3-oxopropan-2-ylidene)`` — not bare. The bare form
     leaves OPSIN unable to assign the substituent's internal locants.

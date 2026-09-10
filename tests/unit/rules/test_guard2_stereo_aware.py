@@ -1,4 +1,4 @@
-"""v30 #36 (fable F6 finding 3) — guard 2 of ``_acid_stem_unsaturated_oxide_prefix``
+""" #36 (a review F6 finding 3) — guard 2 of ``_acid_stem_unsaturated_oxide_prefix``
 re-anchors the acid sub-namer's output by CONSTITUTIONAL skeleton only (InChIKey
 first block, stereo-free), so a WRONG CIP descriptor (E/Z, R/S) from the
 gate-disabled sub-namer would ship a wrong-stereo ``...sulfinyl/sulfonyl`` prefix.

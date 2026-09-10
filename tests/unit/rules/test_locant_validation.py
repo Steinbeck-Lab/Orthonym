@@ -7,7 +7,7 @@ Tests cover four validation domains:
 3. Stereo locant validation (filtering invalid stereodescriptor locants)
 4. Multiplier-locant count consistency
 
-Reference: IUPAC 2013 Blue Book, P-14.4, P-31.1
+Reference: IUPAC 2013 Blue Book,,
 """
 
 import pytest

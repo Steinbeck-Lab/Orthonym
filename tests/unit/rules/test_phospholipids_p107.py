@@ -1,12 +1,12 @@
-"""P7 (Wave-8) sub-plan 7c — sphingolipid / phospholipid PINs (P-107).
+"""P7 (Wave-8) sub-plan 7c — sphingolipid / phospholipid PINs.
 
-7c.1 — (4E)-sphing-4-enine (P-107.4.3.1).
+7c.1 — (4E)-sphing-4-enine.
 
-Blue Book P-107.4.3.1: the retained name 'sphinganine' is preferred to the
+Blue Book: the retained name 'sphinganine' is preferred to the
 systematic (2S,3R)-2-aminooctadecane-1,3-diol, and it generates the preferred
 names of its unsaturated / N- / O-substituted derivatives. The listed example
 is ``(4E)-sphing-4-enine`` for ``(2S,3R,4E)-2-aminooctadec-4-ene-1,3-diol``
-(BB:55235). The common name 'sphingosine' is NOT a Blue Book name (0
+(the Blue Book). The common name 'sphingosine' is NOT a Blue Book name (0
 occurrences); Orthonym currently emits it from the non-PIN OPSIN simpleGroup
 import — the PIN is ``(4E)-sphing-4-enine``.
 
@@ -41,7 +41,7 @@ def test_sphing_4_enine_smiles_is_2s_3r_4e():
 
 
 def test_sphing_4_enine_is_pin_not_sphingosine():
-    # P-107.4.3.1 PIN, replacing the non-BB common name 'sphingosine'.
+    # PIN, replacing the non-BB common name 'sphingosine'.
     assert RAW.name(SPHING_4_ENINE) == "(4E)-sphing-4-enine"
 
 
@@ -51,8 +51,8 @@ def test_sphinganine_retained_name_unchanged():
 
 
 def test_phosphatidylserine_serine_parent_pin():
-    # 7c.3 (P-107.3.3): phosphatidylserine is named on the L-serine parent (the
-    # carboxylic acid outranks the phosphorus oxoacid, P-41), NOT the phosphate-
+    # 7c.3: phosphatidylserine is named on the L-serine parent (the
+    # carboxylic acid outranks the phosphorus oxoacid,, NOT the phosphate-
     # ester-parent form. Locant/config RT-verified.
     ps = "CCCCCCCCCCCCCCCCCC(=O)OC[C@H](COP(=O)(O)OC[C@H](N)C(=O)O)OC(=O)CCCCCCCCCCCCCCCCC"
     assert GATED.name(ps) == (

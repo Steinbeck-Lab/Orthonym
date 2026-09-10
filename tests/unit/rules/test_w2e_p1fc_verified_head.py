@@ -1,7 +1,7 @@
-"""W2E-P1FC Task 1 — verify-only pins for P-35.2.2 (BB 18015).
+"""W2E-P1FC Task 1 — verify-only pins for (BB 18015).
 
 "Substituents formed by subtracting one or more hydrogen atoms from mono-
-and dinuclear parent hydrides (see P-21.1, P-21.2)": systematic sulfanyl
+and dinuclear parent hydrides (see, ": systematic sulfanyl
 (not mercapto), sulfanylidene (not thioxo), selanyl (not selenyl), tellanyl,
 selanylidene. All outputs OPSIN-RT verified at HEAD 2026-07-09.
 """
@@ -24,7 +24,7 @@ class TestP3522SystematicChalcogenPrefixes:
 
 @pytest.mark.unit
 class TestP59218SubstitutedSubstituent:
-    """P-59.2.1.8 (BB 25269): subsidiary substituents named as prefixes;
+    """ (BB 25269): subsidiary substituents named as prefixes;
     attachment point takes the lowest locant. Verified healed at HEAD."""
 
     def test_dichlorocyclohexanecarboxylic_acid(self):

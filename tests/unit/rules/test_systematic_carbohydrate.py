@@ -1,4 +1,4 @@
-"""RED unit tests for the systematic monosaccharide engine (a phase, WSC-04).
+"""RED unit tests for the systematic monosaccharide engine (a phase, -04).
 
 The systematic-mono engine (`data/sugar_names.name_monosaccharide_systematic`,
 /) is a *generalization* of the existing `recognize_sugar_skeleton`
@@ -8,7 +8,7 @@ uronic) it PHYSICALLY idealizes the ring to its parent aldose/ketose skeleton
 ring N -> O), re-runs `rdCIPLabeler.AssignCIPLabels`, looks the idealized
 fingerprint up in `_SKELETON_FINGERPRINT_INDEX` to recover (anomer, config,
 base), then re-applies the modifications as detachable prefixes / the uronic
-suffix with derived locants. It is fail-closed (): any out-of-scope ring
+suffix with derived locants. It is fail-closed : any out-of-scope ring
 returns None -> existing pipeline.
 
 WAVE 0 CONTRACT (mirror tests/unit/rules/test_conjugate_controller.py): imports
@@ -40,7 +40,7 @@ RDLogger.DisableLog("rdApp.*")
 # ---------------------------------------------------------------------------
 # 6-deoxy-β-D-glucopyranose (ring-CH3 instead of ring-CH2OH at C6).
 DEOXY_SMILES = "C[C@H]1O[C@@H](O)[C@H](O)[C@@H](O)[C@@H]1O"
-# β-D-glucopyranuronic acid (C6 oxidized -CH2OH -> -COOH); free acid form ().
+# β-D-glucopyranuronic acid (C6 oxidized -CH2OH -> -COOH); free acid form .
 URONIC_SMILES = "O=C(O)[C@H]1O[C@@H](O)[C@H](O)[C@@H](O)[C@@H]1O"
 # 3-amino-3-deoxy-β-D-glucopyranose: NON-cataloged amino sugar (Pitfall 3).
 # Built from clean β-D-glucopyranose by replacing the C3 exocyclic O with N;
@@ -48,21 +48,21 @@ URONIC_SMILES = "O=C(O)[C@H]1O[C@@H](O)[C@H](O)[C@@H](O)[C@@H]1O"
 # parse of "3-amino-3-deoxy-β-D-glucopyranose" this session.
 AMINO_SMILES = "N[C@@H]1[C@@H](O)[C@H](O)O[C@H](CO)[C@H]1O"
 
-# Clean parent every idealization must reproduce (Pitfall 1 / RESEARCH §1).
+# Clean parent every idealization must reproduce (Pitfall 1 / RESEARCH).
 CLEAN_GLUCOPYRANOSE = "OC[C@H]1O[C@@H](O)[C@H](O)[C@@H](O)[C@@H]1O"
 
 # Open-chain aldoheptose (no-regression: the acyclic substitutive form
 # emits correctly today and MUST stay byte-identical; C7+ cyclic is honest-fail
 # per Assumption A3). HEAD output pinned below as the expected value.
 HEPTOSE_ACYCLIC_SMILES = "OC[C@@H](O)[C@H](O)[C@@H](O)[C@H](O)[C@H](O)C=O"
-# W6B-T4: the open-chain aldoheptose now catalogs to its P-102.5.1 carbohydrate
+# W6B-T4: the open-chain aldoheptose now catalogs to its carbohydrate
 # PIN (configurational-prefix name is preferred over the substitutive
-# hexahydroxyheptanal per P-102.2.1); OPSIN-RT confirmed.
+# hexahydroxyheptanal per; OPSIN-RT confirmed.
 HEPTOSE_ACYCLIC_HEAD_NAME = "D-glycero-L-gulo-heptose"
 
 
 def _idealize_to_parent_inline(smiles):
-    """Replicate the RESEARCH §1 physical idealization (Pitfall 1) inline.
+    """Replicate the RESEARCH physical idealization (Pitfall 1) inline.
 
     deoxy: add an exocyclic O on the bare terminal ring-attached CH3.
     uronic: RemoveAtom the carbonyl =O so COOH -> CH2OH.
@@ -112,7 +112,7 @@ def _idealize_to_parent_inline(smiles):
 
 @pytest.mark.unit
 class TestSystematicMonosaccharide:
-    """WSC-04 systematic monosaccharide engine (deoxy / amino / uronic)."""
+    """-04 systematic monosaccharide engine (deoxy / amino / uronic)."""
 
     def test_deoxy_systematic(self):
         """6-deoxy hexose names with a 'deoxy' detachable prefix, not an oxane."""
@@ -128,7 +128,7 @@ class TestSystematicMonosaccharide:
         assert "oxane" not in name
 
     def test_uronic_free_acid(self):
-        """Free uronic acid names as the OPSIN-parseable '...pyranuronic acid' ()."""
+        """Free uronic acid names as the OPSIN-parseable '...pyranuronic acid' ."""
         from orthonym.data.sugar_names import name_monosaccharide_systematic
 
         mol = Chem.MolFromSmiles(URONIC_SMILES)
@@ -138,7 +138,7 @@ class TestSystematicMonosaccharide:
         assert name == "β-D-glucopyranuronic acid"
 
     def test_amino_systematic(self):
-        """A NON-cataloged amino-deoxy sugar names systematically (P-102.5.4, Pitfall 3)."""
+        """A NON-cataloged amino-deoxy sugar names systematically, Pitfall 3)."""
         from orthonym.data.sugar_names import (
             AMINO_SUGAR_NAMES,
             name_monosaccharide_systematic,
@@ -186,16 +186,16 @@ class TestSystematicMonosaccharide:
             )
 
     def test_heptose_acyclic_catalog_pin(self):
-        """C7 acyclic aldoheptose: W6B-T4 catalogs it to the P-102.5.1
+        """C7 acyclic aldoheptose: W6B- catalogs it to the
         configurational-prefix carbohydrate PIN (preferred over the substitutive
-        hexahydroxyheptanal per P-102.2.1); OPSIN-RT confirmed.
+        hexahydroxyheptanal per; OPSIN-RT confirmed.
         """
         from orthonym import name_compound
 
         assert name_compound(HEPTOSE_ACYCLIC_SMILES) == HEPTOSE_ACYCLIC_HEAD_NAME
 
     def test_systematic_mono_fail_closed(self):
-        """Fail-closed (): None for a non-sugar and an out-of-scope ring."""
+        """Fail-closed : None for a non-sugar and an out-of-scope ring."""
         from orthonym.data.sugar_names import name_monosaccharide_systematic
 
         # Non-sugar (benzene) -> None.
@@ -212,8 +212,8 @@ class TestSystematicMonosaccharide:
 
 @pytest.mark.unit
 class TestCARB03ModifiedMonosaccharides:
-    """ CARB-03: uronic-acid family completion (P-102.5.6.6), halogeno-deoxy
-    (P-102.5.3), and the anomer-unspecified D/L descriptor fix. All targets were
+    """: uronic-acid family completion, halogeno-deoxy
+    , and the anomer-unspecified D/L descriptor fix. All targets were
     OPSIN-round-trip verified; imports go inside each test body (module contract).
     """
 
@@ -245,7 +245,7 @@ class TestCARB03ModifiedMonosaccharides:
         assert name_monosaccharide_systematic(gluc) == "β-D-glucopyranuronic acid"
 
     def test_halogeno_deoxy(self):
-        """A ring C-OH replaced by a halogen names x-deoxy-x-halogeno (P-102.5.3)."""
+        """A ring C-OH replaced by a halogen names x-deoxy-x-halogeno."""
         from orthonym.data.sugar_names import name_monosaccharide_systematic
 
         # 2-deoxy-2-fluoro-D-galactopyranose (anomer unspecified; keeps D).
@@ -271,7 +271,7 @@ class TestCARB03ModifiedMonosaccharides:
 
 @pytest.mark.unit
 class TestSugarPhosphateSulfateEster:
-    """W6-P1 free-sugar mono-phosphate / sulfate esters (BB P-102.5.6.1.2/.1.3).
+    """W6-P1 free-sugar mono-phosphate / sulfate esters (BB /.1.3).
 
     The sugar is the parent; the ester is cited as ``<locant>-(dihydrogen
     phosphate)`` / ``<locant>-sulfate`` after the sugar name (BB 53209/53231).
@@ -343,7 +343,7 @@ class TestSugarPhosphateSulfateEster:
 
 
 class TestW6bMultiPhosphateEster:
-    """Wave 6b Task 3 (P-102.5.6.1.2): 2-3 mono-phosphate esters -> bis/tris; the
+    """Wave 6b Task 3: 2-3 mono-phosphate esters -> bis/tris; the
     ketose (fructose) numbering fix also enables fructose mono-phosphates."""
 
     def test_fructose_1_6_bisphosphate(self):
@@ -363,8 +363,8 @@ class TestW6bMultiPhosphateEster:
 
 
 class TestW6bDeoxyHeptoseCatalog:
-    """Wave 6b Task 4: 2-deoxypentofuranose (P-102.5.3) + open-chain aldoheptose
-    (P-102.5.1) catalogs. The heptose ledger label was mislabeled."""
+    """Wave 6b Task 4: 2-deoxypentofuranose + open-chain aldoheptose
+     catalogs. The heptose ledger label was mislabeled."""
 
     def test_2_deoxy_erythro_pentofuranose(self):
         from orthonym import name_compound
@@ -385,7 +385,7 @@ class TestW6bDeoxyHeptoseCatalog:
 
 
 class TestW6bAminoalditol:
-    """Wave 6b Task 5 (P-102.5.6.5.4): 2-amino-2-deoxy-hexitols catalog. The
+    """Wave 6b Task 5: 2-amino-2-deoxy-hexitols catalog. The
     ledger 'D-glucosaminitol' census SMILES has an UNDEFINED C2 -> stays
     fail-closed (no config assignable); only fully-defined forms catalog."""
 
@@ -407,7 +407,7 @@ class TestW6bAminoalditol:
 
 
 class TestW6bUlosonicAcid:
-    """Wave 6b Task 7 (P-102.5.6.6.3): KDO/KDN/Neu5Ac/Neu5Gc catalog + a
+    """Wave 6b Task 7: KDO/KDN/Neu5Ac/Neu5Gc catalog + a
     fail-closed veto so uncataloged 2-ulosonic acids never ship a stereo-dropped
     ring-carboxylic name."""
 
@@ -439,7 +439,7 @@ class TestW6bUlosonicAcid:
 
 
 class TestW6bAldonateAldarateEster:
-    """Wave 6b Task 8 (P-102.5.6.6.2.1/.5.3): open-chain aldonate + aldarate
+    """Wave 6b Task 8 /.5.3): open-chain aldonate + aldarate
     partial esters; ordinary esters unaffected."""
 
     def test_propan_2_yl_gluconate(self):
@@ -455,7 +455,7 @@ class TestW6bAldonateAldarateEster:
     def test_aldarate_partial_ester_named(self):
         from orthonym.data.sugar_names import name_aldonate_ester
         from rdkit import Chem
-        # W8-P7b.3: the aldarate partial ester is now NAMED (P-102.5.6.6.5.3). The
+        # W8-P7b.3: the aldarate partial ester is now NAMED. The
         # 1-vs-6 ester locant (distinct isomers) is resolved by a HARD OPSIN
         # round-trip of each candidate against the input (opsin_parse fails-CLOSED
         # w/o Java), so no wrong locant can ship. (Was previously deferred.)
@@ -471,7 +471,7 @@ class TestW6bAldonateAldarateEster:
 
 
 class TestW6bAminoDeoxyOpenSugar:
-    """Wave 6b Task 9 (P-102.5.4.1.2): N-alkylamino / amino open-chain aldose;
+    """Wave 6b Task 9: N-alkylamino / amino open-chain aldose;
     N-acyl fails closed."""
 
     def test_butylamino_glucose(self):
@@ -492,7 +492,7 @@ class TestW6bAminoDeoxyOpenSugar:
 
 
 class TestW6bGlycosyloxyAglycone:
-    """Wave 6b Task 12 (P-102.6.1.2): glycosyloxy on a senior aglycone; a
+    """Wave 6b Task 12: glycosyloxy on a senior aglycone; a
     non-senior aglycone (phenol/methanol) stays a glycoside (fail-closed)."""
 
     def test_glucosyloxy_acetophenone(self):
@@ -516,8 +516,8 @@ class TestW6bGlycosyloxyAglycone:
 
 
 class TestW6bCGlycosyl:
-    """Wave 6b Task 13 (P-102.6.1.4): C-glycosyl on a senior aglycone. (The n-O-yl
-    form P-102.6.2 is deferred fail-closed -- Orthonym names the aglycone
+    """Wave 6b Task 13: C-glycosyl on a senior aglycone. (The n-O-yl
+    form is deferred fail-closed -- Orthonym names the aglycone
     'ethanoic acid' not the target 'acetic acid', and the '-n-O-yl' construction
     has no clean placeholder; it stays 'unknown', never a wrong name.)"""
 
@@ -532,7 +532,7 @@ class TestW6bCGlycosyl:
 
     def test_n_o_yl_named(self):
         from orthonym import name_compound
-        # W8-P7b.5 (P-102.6.2): the glycosyloxy n-O-yl is now NAMED (sugar bonded
+        # W8-P7b.5: the glycosyloxy n-O-yl is now NAMED (sugar bonded
         # via a non-anomeric ring O -> <anomer>-<config>-glycopyranos-n-O-yl on the
         # senior parent). The locant is RT-verified (fail-closed w/o Java). (Was
         # previously deferred fail-closed to 'unknown'.)
@@ -542,7 +542,7 @@ class TestW6bCGlycosyl:
 
 @pytest.mark.unit
 class TestGlycosylamineAndHalide:
-    """W6-P2 glycosylamine (P-102.6.1.3) + glycosyl halide (P-102.6.1.5).
+    """W6-P2 glycosylamine + glycosyl halide.
 
     The anomeric -OH is replaced by a bare -NH2 -> ``-osylamine`` head, or by a
     single halogen -> functional-class ``<glycosyl> <halide>``. Fail-closed on
@@ -577,7 +577,7 @@ class TestGlycosylamineAndHalide:
 
 @pytest.mark.unit
 class TestSugarOMethyl:
-    """W6-P3 O-methyl (O-alkyl) ether sugars (BB P-102.5.6.1): n-O-methyl- prefix.
+    """W6-P3 O-methyl (O-alkyl) ether sugars (BB: n-O-methyl- prefix.
 
     Strip-and-name (sugar-ring-oxygen-drop-safe: the residual must be a recognized free
     sugar). The anomeric O-methyl is a GLYCOSIDE (methyl glucopyranoside), NOT an
@@ -617,13 +617,13 @@ class TestSugarOMethyl:
 
 
 class TestW6bMultiplierElision:
-    """Wave 6b Task 1 (P-63.1.2): a multiplied -ol/-one/-amine suffix on the
+    """Wave 6b Task 1: a multiplied -ol/-one/-amine suffix on the
     generic HW/oxane namer must elide the multiplier's terminal 'a'
     (tetra+ol -> tetrol, not tetraol)."""
 
     def test_c_phenyl_sugar_named_as_pin(self):
         from orthonym import name_compound
-        # W8-P7b.4 (P-102.5.6.3.1): the 2-C-phenyl sugar is now named as the
+        # W8-P7b.4: the 2-C-phenyl sugar is now named as the
         # carbohydrate PIN (config + anomer RT-verified), not the systematic
         # oxane-tetrol it previously emitted.
         assert name_compound("OC[C@H]1O[C@@H](O)[C@](O)(c2ccccc2)[C@@H](O)[C@@H]1O") == \
@@ -631,7 +631,7 @@ class TestW6bMultiplierElision:
 
 
 class TestW6bSugarAcylEster:
-    """Wave 6b Task 2 (P-102.5.6.1.1): free-sugar O-acyl esters -> functional-class
+    """Wave 6b Task 2: free-sugar O-acyl esters -> functional-class
     ester name; anomeric O-acyl (glycosyl ester) and mixed-acyl fail closed."""
 
     def test_glucose_6_acetate(self):
@@ -666,7 +666,7 @@ class TestW6bSugarAcylEster:
 
 @pytest.mark.unit
 class TestV33Task1p4FreeSugarNAcylDecoration:
-    """.4 (BB P-102.5.4 / P-102.5.6.2): a STANDALONE free sugar
+    """.4 (BB /: a STANDALONE free sugar
     bearing N-acyl (amide) decoration, or O-acyl COMBINED with N-acyl on the
     same ring -- the two shapes neither ``name_free_sugar`` (no functional-
     class analog for an amide) nor ``name_sugar_ester``'s O-acyl

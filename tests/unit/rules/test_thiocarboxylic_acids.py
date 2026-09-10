@@ -1,4 +1,4 @@
-"""Unit tests for thiocarboxylic acid detection and naming (IUPAC P-65.3).
+"""Unit tests for thiocarboxylic acid detection and naming (IUPAC.
 
 Tests three variants:
 - thioic S-acid: R-C(=O)-SH
@@ -114,7 +114,7 @@ class TestThiocarboxylicAcidSeniority:
         assert get_suffix("dithioic_acid", is_ring=True) == "carbodithioic acid"
 
     def test_prefix_forms(self):
-        """Thiocarboxylic acids have prefix forms per IUPAC P-65.1.1.4."""
+        """Thiocarboxylic acids have prefix forms per IUPAC."""
         assert get_prefix("thioic_S_acid") == "sulfanylcarbonyl"
         assert get_prefix("thioic_O_acid") == "carbothioyl"
         assert get_prefix("dithioic_acid") == "dithiocarboxy"

@@ -35,7 +35,7 @@ def test_carotene_all_flags_is_not_pin_verified():
     r = _all_flags().name_tiered(CAROTENE)
     # the NAME is correct and unchanged (the polyene is rendered in full)
     assert r.get("name") and "octadeca" in r["name"] and "unknown" not in r["name"]
-    # but its PIN status is uncertified (best-effort component + unverified P-44
+    # but its PIN status is uncertified (best-effort component + unverified
     # ring-parent choice) -> never pin_verified.
     assert r.get("tier") == "pin_unverified", r.get("tier")
     assert r.get("is_pin") is False

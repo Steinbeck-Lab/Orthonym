@@ -1,9 +1,9 @@
 """
 OPSIN format validation for generated IUPAC names.
 
-FMT-01: Heuristic validator that detects known OPSIN-incompatible patterns.
-FMT-04: Bracket nesting verification (P-16.5.4.1 hierarchy).
-FMT-05: Multi-word name validation against OPSIN's 21 wordRules.xml patterns.
+: Heuristic validator that detects known OPSIN-incompatible patterns.
+: Bracket nesting verification hierarchy).
+: Multi-word name validation against OPSIN's 21 wordRules.xml patterns.
 
 This is a DIAGNOSTIC tool, not a postprocessor. It flags known issues
 so upstream fixes can be applied at the root cause.
@@ -226,13 +226,13 @@ def _matches_known_multiword_pattern(words: list) -> bool:
 
 
 def _check_bracket_nesting(name: str) -> Tuple[bool, str]:
-    """Verify P-16.5.4.1 bracket hierarchy: () inside [] inside {}.
+    """Verify bracket hierarchy:  inside  inside {}.
 
     IUPAC enclosing marks hierarchy:
-    - Level 0: parentheses ()
-    - Level 1: brackets []
+    - Level 0: parentheses
+    - Level 1: brackets
     - Level 2: braces {}
-    - Then repeat: (()) [[]] {{}}
+    - Then repeat: () [] {{}}
 
     We check that nesting order is correct: parentheses should not
     contain brackets at a shallower depth than expected.
@@ -291,7 +291,7 @@ def _check_bracket_nesting(name: str) -> Tuple[bool, str]:
 def validate_name_format(name: str) -> Tuple[bool, str]:
     """Validate an IUPAC name for known OPSIN-incompatible patterns.
 
-    This is a diagnostic heuristic validator (FMT-01). It checks for
+    This is a diagnostic heuristic validator . It checks for
     patterns known to cause OPSIN parse failures. It is NOT a full
     OPSIN parser reimplementation.
 
@@ -305,11 +305,11 @@ def validate_name_format(name: str) -> Tuple[bool, str]:
     Checks performed:
         1. Empty name
         2. Unbalanced brackets (parentheses, square brackets, braces)
-        3. Empty parentheses ()
+        3. Empty parentheses
         4. Bare 'oxy' prefix (not part of a larger word)
         5. Double hyphens -- (except within VB descriptors)
-        6. Multi-word name validation against OPSIN word rules (FMT-05)
-        7. Bracket nesting hierarchy verification (FMT-04)
+        6. Multi-word name validation against OPSIN word rules
+        7. Bracket nesting hierarchy verification
     """
     # 1. Empty name check
     if not name or not name.strip():
@@ -352,14 +352,14 @@ def validate_name_format(name: str) -> Tuple[bool, str]:
     if "--" in masked:
         return False, "double_hyphen: name contains '--' outside VB descriptors"
 
-    # 6. Multi-word validation (FMT-05)
+    # 6. Multi-word validation
     # Split on spaces to detect multi-word names
     words = name.split()
     if len(words) > 1:
         if not _matches_known_multiword_pattern(words):
             return False, f"unknown_multi_word_pattern: '{name}' does not match any known OPSIN word rule"
 
-    # 7. Bracket nesting hierarchy (FMT-04)
+    # 7. Bracket nesting hierarchy
     ok, reason = _check_bracket_nesting(name)
     if not ok:
         return False, f"bracket_nesting: {reason}"

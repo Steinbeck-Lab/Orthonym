@@ -1,4 +1,4 @@
-"""v31 composition lever: a carboxylic (carbamic) acid on a RING nitrogen names as
+""" composition lever: a carboxylic (carbamic) acid on a RING nitrogen names as
 the ring '-carboxylic acid' suffix at the N locant (piperazine-1-carboxylic acid,
 morpholine-4-carboxylic acid). Best-effort tier; RT-exact.
 
@@ -14,7 +14,7 @@ from tests.support.rt_assert import assert_rt_exact
 
 # These require the PRODUCTION OPSIN validity gate ON (the `opsin_gate` fixture):
 # without it, an atom-dropping handler ships bare 'piperazine' (drops the COOH); in
-# production SELF-01 suppresses that and the recovery lane's general engine emits the
+# production suppresses that and the recovery lane's general engine emits the
 # correct ring-N carboxylic acid. conftest disables the gate suite-wide, so opt in.
 @pytest.mark.roundtrip
 @pytest.mark.parametrize("smiles", [

@@ -1,4 +1,4 @@
-"""v33: chain stereodescriptors on a deep located-FG (`_located_fg_assemble`)
+""": chain stereodescriptors on a deep located-FG (`_located_fg_assemble`)
 substituent must be emitted from the chain's own free-valence numbering.
 
 Regression for the acyl-CoA pantetheine 3-hydroxy stereocentre: when the

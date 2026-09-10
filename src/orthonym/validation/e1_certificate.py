@@ -1,4 +1,4 @@
-"""v25 G1: E1 atom-coverage certificate.
+""": E1 atom-coverage certificate.
 
 Verifies a GeneralEngineResult's atom->token partition: every heavy atom of
 the molecule is bound by EXACTLY ONE token, every token occurs in the
@@ -30,7 +30,7 @@ class E1Verdict:
 # tier, which ships on the certificate rather than on OPSIN-RT.
 #
 # The check is CONSERVATIVE and SOUND-BY-REFUSAL (mirrors name_morphemes' own
-# contract, and invariant 9: a false rejection would regress breadth / unmask a
+# contract, and a project rule: a false rejection would regress breadth / unmask a
 # worse generator). It rejects ONLY when a token is CONFIDENTLY all-carbon (a
 # plain alkane/alkyl stem or a carbocyclic retained name) yet is bound to a
 # NON-carbon heavy atom. Any token that could legitimately carry a heteroatom
@@ -89,15 +89,15 @@ def _verify_partition(mol, name, pairs, allow_charged: bool = False,
 
     Extracted verbatim from the historical ``verify_certificate`` body so that
     ONE certification core is shared across every producer whose output is an
-    atom->token partition (invariant 12: extend, don't duplicate). Two callers
+    atom->token partition (a project rule: extend, don't duplicate). Two callers
     today: ``verify_certificate`` (the object-shape wrapper below, for a
     ``GeneralEngineResult``) and the universal recursive namer
     (``assembly/universal_substituent.py``), whose ``UniversalResult.bindings``
-    is *already* ``Tuple[Tuple[str, FrozenSet[int]], ...]`` -- exactly ``pairs``.
+    is *already* ``Tuple[Tuple[str, FrozenSet[int]],...]`` -- exactly ``pairs``.
 
     Args:
-      * ``name``   -- the emitted name string (token-in-name check target).
-      * ``pairs``  -- any iterable of ``(token, atom_ids)`` 2-tuples. Materialised
+      * ``name`` -- the emitted name string (token-in-name check target).
+      * ``pairs`` -- any iterable of ``(token, atom_ids)`` 2-tuples. Materialised
         here (``list``), so a one-shot generator is fine (iterated three times).
       * ``allow_charged`` -- lifts the G1 net-formal-charge refusal, for a caller
         that owns the charge axis by a stronger, earlier check (the universal
@@ -110,7 +110,7 @@ def _verify_partition(mol, name, pairs, allow_charged: bool = False,
     Checks, in order: P1 atom partition (every reference-set heavy atom bound by
     exactly one token, no double-count, no phantom/non-reference atom),
     token-in-name (each non-empty token is a substring of ``name``, tolerating
-    the P-16.7.1(a)/P-74.1.1 terminal-'e' elision before a vowel-initial ionic
+    the (a)/ terminal-'e' elision before a vowel-initial ionic
     suffix), element_soundness chemistry-soundness (a confidently all-carbon token may not
     bind a heteroatom), G1 charge scope.
     """
@@ -134,7 +134,7 @@ def _verify_partition(mol, name, pairs, allow_charged: bool = False,
         return E1Verdict(False, f"bindings reference non-heavy/missing "
                                 f"atoms: {sorted(phantom)}")
     # Token-in-name: every non-empty token is a literal substring of ``name``.
-    # ELISION-ROBUST on THIS axis only (P-16.7.1(a) / P-74.1.1): a parent-hydride
+    # ELISION-ROBUST on THIS axis only (a) /: a parent-hydride
     # token's terminal 'e' is elided before a vowel-initial ionic/cumulative
     # suffix (``2-azapropane`` -> ``...2-azapropan-2-ium``), so the FULL token
     # is legitimately absent while its stem (token without the trailing 'e') is
@@ -174,16 +174,16 @@ def _verify_partition(mol, name, pairs, allow_charged: bool = False,
 def verify_atom_coverage(mol, name, atom_id_groups, allow_charged: bool = True):
     """Producer-side atom-COVERAGE close (the task-W2 reusable template).
 
-    A thin wrapper over :func:`_verify_partition` for the recurring producer
+    A thin wrapper over:func:`_verify_partition` for the recurring producer
     situation the W2 jar-absent-proper fix addresses: *"here are the atom groups
     my emitted ``name`` accounts for — confirm together they cover EVERY heavy
     atom of ``mol``, else I must decline (fail-closed) rather than ship a name
     that silently dropped atoms."*
 
     This is the OPSIN-free, jar-independent guard that catches an atom-drop at
-    CONSTRUCTION (defense-in-depth: jar-present SELF-01 would also catch it, but
+    CONSTRUCTION (defense-in-depth: jar-present would also catch it, but
     only after a JVM round-trip; jar-absent nothing else does). It reuses the E1
-    partition primitive rather than duplicating a coverage check (invariant 12:
+    partition primitive rather than duplicating a coverage check (a project rule:
     extend, don't duplicate) and is deliberately scoped to the COVERAGE axis:
 
     * Groups are DEDUPLICATED before binding, so a benign double-listing of an
@@ -204,9 +204,9 @@ def verify_atom_coverage(mol, name, atom_id_groups, allow_charged: bool = True):
     Args:
       * ``atom_id_groups`` -- iterable of iterables of heavy-atom indices, one per
         name-piece the producer emitted (ring atoms, each named substituent's
-        atoms, suffix atoms, ...). Their UNION is the accounted set.
+        atoms, suffix atoms,...). Their UNION is the accounted set.
 
-    Returns an :class:`E1Verdict`; ``.ok`` is False (with an ``unbound heavy
+    Returns an:class:`E1Verdict`; ``.ok`` is False (with an ``unbound heavy
     atoms`` reason) when any heavy atom is left unaccounted. Callers decline
     (return ``None`` / abstain) on a non-ok verdict.
     """
@@ -223,7 +223,7 @@ def verify_atom_coverage(mol, name, atom_id_groups, allow_charged: bool = True):
 def verify_certificate(mol, result, allow_charged: bool = False) -> E1Verdict:
     """Atom-partition certificate for a GeneralEngineResult.
 
-    v26 P5: ``allow_charged`` (set only under ``complete``) lifts the
+    : ``allow_charged`` (set only under ``complete``) lifts the
     net-formal-charge refusal -- the charge is expressed as a
     ``-ylium``/``-ide``/``-uide``/``-ium`` suffix on an already-bound skeletal
     atom, so it introduces NO new atom and the partition is still complete.

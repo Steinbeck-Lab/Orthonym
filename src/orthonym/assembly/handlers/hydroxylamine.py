@@ -1,13 +1,13 @@
-"""functional-group perception fix (Phase 169.7) hydroxylamine handler.
+"""functional-group perception fix (a phase) hydroxylamine handler.
 
 Names substituted hydroxylamines on the retained parent hydride ``hydroxylamine``
-(H2N-OH, P-68.3.1.1). Substituents on the nitrogen take the ``N-`` locant; those
-on the oxygen take ``O-`` (P-68.3.1.2.1):
+(H2N-OH,. Substituents on the nitrogen take the ``N-`` locant; those
+on the oxygen take ``O-``:
 
-    CCCNO        -> N-propylhydroxylamine
-    CCCN(O)C     -> N-methyl-N-propylhydroxylamine
-    CON          -> O-methylhydroxylamine
-    CN(C)O       -> N,N-dimethylhydroxylamine
+    CCCNO -> N-propylhydroxylamine
+    CCCN(O)C -> N-methyl-N-propylhydroxylamine
+    CON -> O-methylhydroxylamine
+    CN(C)O -> N,N-dimethylhydroxylamine
 
 Without this handler the perceived ``hydroxylamine`` FG (added to
 ``functional_groups.py`` in 169.7) is dropped and the molecule names as the bare
@@ -16,7 +16,7 @@ carbon chain (``CCCNO`` -> ``propane``), silently losing both heteroatoms.
 The substituent names come from the shared ``name_substituent_fragment`` namer;
 multiplying affixes + alphanumeric ordering reuse the standard prefix helpers.
 
-IUPAC cite: P-68.3.1.2.1.
+IUPAC cite:.
 """
 from __future__ import annotations
 
@@ -33,11 +33,11 @@ logger = logging.getLogger(__name__)
 def _is_hydroxylamine(features: Any) -> bool:
     """Fire when hydroxylamine is the principal characteristic group, OR when the
     ONLY functional group is 'aminooxy' (H2N-O-R) and the whole molecule is a
-    hydroxylamine derivative with no more-senior parent (P-68.3.1.1.1.2: the
+    hydroxylamine derivative with no more-senior parent: the
     O-substituted-N-bare form's PIN is O-substituted hydroxylamine, e.g.
     CON -> O-methylhydroxylamine, NOT the prefix 'aminooxy...' which applies only
     when a senior parent is present), OR when the molecule is an N,O-disubstituted
-    hydroxylamine (P-68.3.1.1.1.3), whose PIN is an O-substituted AMINE."""
+    hydroxylamine, whose PIN is an O-substituted AMINE."""
     if getattr(features, "principal_group", None) == "hydroxylamine":
         return True
     if _is_pure_aminooxy_hydroxylamine(features):
@@ -49,8 +49,8 @@ def _is_hydroxylamine(features: Any) -> bool:
 def no_disub_hydroxylamine_core(mol) -> Optional[Tuple[int, int]]:
     """Return ``(n_idx, o_idx)`` for an N,O-DISUBSTITUTED hydroxylamine core
     (R-NH-O-R' or R2N-O-R'), else None. The PIN of such a compound is an
-    O-substituted AMINE (P-68.3.1.1.1.3), and skeletal ('a') replacement is
-    explicitly forbidden (BB note @38390).
+    O-substituted AMINE, and skeletal ('a') replacement is
+    explicitly forbidden (BB note).
 
     Fail-closed to None off this exact class: a single acyclic neutral N-O single
     bond where the N bears >=1 carbon (besides O) AND the O bears exactly one
@@ -175,7 +175,7 @@ def _named_substituents(mol, center_idx: int, other_center_idx: int) -> List[str
 def _format_locant_block(names: List[str], locant: str) -> List[Tuple[str, str]]:
     """Group identical substituents into ``(sort_key, "locant,locant-prefixname")``
     tuples with the simple multiplying affix (di/tri/...)."""
-    from ..naming_utils import SIMPLE_MULTIPLIERS  # {2: 'di', 3: 'tri', ...}
+    from ..naming_utils import SIMPLE_MULTIPLIERS  # {2: 'di', 3: 'tri',...}
 
     out: List[Tuple[str, str]] = []
     # Count duplicates preserving first-seen order.
@@ -193,19 +193,19 @@ def _format_locant_block(names: List[str], locant: str) -> List[Tuple[str, str]]
     return out
 
 
-# P-63.2.2.2 verbatim, the complete retained R-O– contraction list ("Some
-# contracted names are retained for R-O– substituent groups ... they are used both
+# verbatim, the complete retained R-O– contraction list ("Some
+# contracted names are retained for R-O– substituent groups... they are used both
 # as preferred IUPAC prefixes"): methoxy, ethoxy, propoxy, butoxy, phenoxy, and
 #
-#     (CH3)3C-O–   *tert*-butoxy (preferred prefix) (no substitution)
+# (CH3)3C-O– *tert*-butoxy (preferred prefix) (no substitution)
 #
 # so the (CH3)3C-O– prefix is 'tert-butoxy', NOT 'tert-butyloxy' (the index at
-# BlueBookV2.md:55662 spells the rejection out: "tert-butoxy* (unsubstituted) =
-# (2-methylpropan-2-yl)oxy = 1,1-dimethylethoxy (not tert-butyloxy)", and :55671
+# the Blue Book spells the rejection out: "tert-butoxy* (unsubstituted) =
+# (2-methylpropan-2-yl)oxy = 1,1-dimethylethoxy (not tert-butyloxy)", and:55671
 # "tert-butyloxy: see tert-butoxy*"), and certainly not the over-enclosed
 # '(tert-butyl)oxy' this module used to emit.
 #
-# Every key is matched EXACTLY and every value is P-63.2.2.2's "no substitution" /
+# Every key is matched EXACTLY and every value is 's "no substitution" /
 # fully-substitutable form as cited, so a substituted R (which arrives spelled with
 # locants, e.g. '2-methylpropan-2-yl') can never reach a contraction it is not
 # entitled to.
@@ -218,7 +218,7 @@ _CONTRACTED_ALKOXY = {
 
 def _alkoxy_prefix(mol, o_idx: int, r_c_idx: int) -> Optional[str]:
     """Name the ``-O-R'`` group as an alkoxy/aryloxy substituent prefix
-    (P-63.2.2.2): methyl -> methoxy, ethyl -> ethoxy, ...; longer / complex R'
+    : methyl -> methoxy, ethyl -> ethoxy,...; longer / complex R'
     -> ``{R'}oxy`` or ``({R'})oxy``. None if R' cannot be named."""
     from ..substituent_naming import name_substituent_fragment
     frag = _collect_substituent_fragment(mol, r_c_idx, o_idx)
@@ -227,15 +227,15 @@ def _alkoxy_prefix(mol, o_idx: int, r_c_idx: int) -> Optional[str]:
         return None
     if alkyl in _CONTRACTED_ALKOXY:
         return _CONTRACTED_ALKOXY[alkyl]
-    # P-16.3.4 / P-29.6.1 carve-out, via the SHARED primitive rather than the raw
+    # / carve-out, via the SHARED primitive rather than the raw
     # `"-" in alkyl` this line used to carry: the hyphen of a leading italicized
     # structural prefix is not a compound boundary, so it must not draw enclosing
-    # marks. But P-63.2.2.2 grants a retained -oxy contraction to exactly the six
+    # marks. But grants a retained -oxy contraction to exactly the six
     # groups in _CONTRACTED_ALKOXY above and REVOKES the others by name —
     # "The prefixes '*sec*-butoxy' and 'isobutoxy' are no longer recommended", with
     # the PIN being '(butan-2-yl)oxy'. So an italicized-led R that is NOT in the
     # table has no spelling this function is entitled to emit ('sec-butyloxy' is
-    # rejected verbatim at BlueBookV2.md:55646) and the only correct one,
+    # rejected verbatim at the Blue Book) and the only correct one,
     # '(butan-2-yl)oxy', requires a different name for R than the one handed in.
     # Fail closed rather than invent a rejected contraction; in practice the
     # substituent namer already returns the locanted 'butan-2-yl', which falls
@@ -249,11 +249,11 @@ def _alkoxy_prefix(mol, o_idx: int, r_c_idx: int) -> Optional[str]:
 
 
 def _name_no_disub_hydroxylamine(features: Any) -> Optional[NamingResult]:
-    """P-68.3.1.1.1.3: an N,O-disubstituted hydroxylamine (R-NH-O-R') is named
+    """: an N,O-disubstituted hydroxylamine (R-NH-O-R') is named
     as an O-substituted AMINE — the N-carbon skeleton is the amine parent and the
     ``-O-R'`` is an N-(R'-oxy) substituent: CNOC -> N-methoxymethanamine;
     C6H5-NH-O-CH2CH3 -> N-ethoxyaniline. Skeletal ('a') replacement is forbidden
-    for these (BB note @38390), so this must outrank it.
+    for these (BB note), so this must outrank it.
 
     SCOPE (fail-closed -> None): the N bears EXACTLY ONE carbon (the clean
     R-NH-O-R' parent-amine case); R2N-O-R' (a second N-carbon needing N-locant
@@ -298,7 +298,7 @@ def _name_no_disub_hydroxylamine(features: Any) -> Optional[NamingResult]:
     except Exception:
         return None
     # The fragment is a clean primary amine (R-NH2), so its PIN is an amine parent
-    # ('methanamine', 'ethanamine', 'aniline', ...). Reject only a failure sentinel.
+    # ('methanamine', 'ethanamine', 'aniline',...). Reject only a failure sentinel.
     if not base or "unknown" in base or "not supported" in base:
         return None
     name = f"N-{alkoxy}{base}"
@@ -322,8 +322,8 @@ def name_hydroxylamine(
     features: Any, mol: Any = None, style: str = "pin",
 ) -> Optional[NamingResult]:
     """Name a substituted hydroxylamine on the ``hydroxylamine`` parent, or an
-    N,O-disubstituted hydroxylamine as an O-substituted amine (P-68.3.1.1.1.3)."""
-    # P-68.3.1.1.1.3: N,O-disubstituted hydroxylamine -> O-substituted amine
+    N,O-disubstituted hydroxylamine as an O-substituted amine."""
+    #: N,O-disubstituted hydroxylamine -> O-substituted amine
     # (skeletal 'a'-replacement forbidden). Try this first; fail-closed otherwise.
     _no_disub = _name_no_disub_hydroxylamine(features)
     if _no_disub is not None:
@@ -336,7 +336,7 @@ def name_hydroxylamine(
         o_idx, n_idx = match[0], match[1]
     else:
         # Pure aminooxy whole-molecule case (H2N-O-R -> O-substituted
-        # hydroxylamine, P-68.3.1.1.1.2): locate the single N-O core.
+        # hydroxylamine,: locate the single N-O core.
         amx = features.functional_groups.get("aminooxy", [])
         if not amx or not _is_pure_aminooxy_hydroxylamine(features):
             return None
@@ -351,7 +351,7 @@ def name_hydroxylamine(
     if not n_subs and not o_subs:
         return None  # bare hydroxylamine has no carbon substituents — leave to default
 
-    # Alphanumeric order on the substituent name (P-14.5.2); each term already
+    # Alphanumeric order on the substituent name; each term already
     # carries its leading O-/N- locant, so adjacent terms hyphen-join and the parent
     # attaches directly (e.g. "N-ethyl-N-methylhydroxylamine", "N-propylhydroxylamine").
     terms = _format_locant_block(o_subs, "O") + _format_locant_block(n_subs, "N")

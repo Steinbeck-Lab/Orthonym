@@ -1,6 +1,6 @@
-"""Phase 160 Plan-04 per-handler unit tests for ``acid_halide``.
+"""a phase Plan-04 per-handler unit tests for ``acid_halide``.
 
-Per CONTEXT D-20 + Phase 158 D-17 mirror: >= 5 tests per extracted handler
+Per internal notes + a phase mirror: >= 5 tests per extracted handler
 covering:
   - Signature: name_acid_halide(features, mol=None, style='pin') signature.
   - Predicate: _is_acid_halide(features) signature + purity.
@@ -11,7 +11,7 @@ covering:
   - INNER_DISPATCH_TABLE registration (handler is registered at the
     expected handler_id key).
 
-Representative SMILES (from audit § 1): 'CC(=O)Cl'
+Representative SMILES (from the audit): 'CC(=O)Cl'
 """
 from __future__ import annotations
 
@@ -47,7 +47,7 @@ class TestNameAcidHalide:
         assert "features" in sig.parameters
 
     def test_predicate_purity_returns_bool(self):
-        """Predicate returns a bool / falsy value (CONTEXT D-25 purity hint)."""
+        """Predicate returns a bool / falsy value (internal notes purity hint)."""
         class EmptyFeatures:
             principal_group = None
             is_cyclic = False
@@ -83,7 +83,7 @@ class TestNameAcidHalide:
         assert entry.handler is name_acid_halide
 
     def test_byte_identical_name_via_namer(self):
-        """Pipeline-level: Orthonym().name(rep_smi) is reachable and deterministic.
+        """Pipeline-level: Orthonym.name(rep_smi) is reachable and deterministic.
 
         We don't assert a specific name string because canary baselines
         are the authoritative byte-identical contract. Here we just
@@ -100,7 +100,7 @@ class TestNameAcidHalide:
         assert isinstance(name, str) and name
 
     def test_pipeline_idempotent(self):
-        """Two name() calls on same SMILES produce same name."""
+        """Two name calls on same SMILES produce same name."""
         if REPRESENTATIVE_SMILES is None:
             pytest.skip("no representative SMILES for this handler in audit § 1")
         namer = Orthonym()

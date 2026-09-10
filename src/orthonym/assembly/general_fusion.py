@@ -1,4 +1,4 @@
-"""v27 P5: general fusion-nomenclature PARENT producer (P-25.3), a PIN-quality
+""": general fusion-nomenclature PARENT producer, a PIN-quality
 upgrade over the von-Baeyer polyene the complete-tier engine ships for mancude
 fused ring systems.
 
@@ -7,7 +7,7 @@ computed fusion descriptor blindly. Every candidate fusion word is either
 (a) an EXACT structural match against a vetted catalog (canonical-SMILES keyed,
 Java-free) or (b) put through an AFFIRMATIVE OPSIN round-trip (the fusion word ->
 structure must equal the input). The round-trip fails CLOSED when Java/OPSIN is
-unavailable (unlike the pipeline's SELF-01, which fails OPEN), so a wrong fusion
+unavailable (unlike the pipeline's, which fails OPEN), so a wrong fusion
 descriptor -- e.g. the fusion machinery's known benzo[f]/benzo[h] orientation
 slips -- is NEVER emitted in any environment. On any refusal the caller keeps the
 (correct, non-PIN) von-Baeyer polyene form. This makes the phase strictly
@@ -137,7 +137,7 @@ def _benzo_annulation_name(mol, target_smiles: str) -> Optional[str]:
 
 
 def name_fusion_parent(mol, cage_atoms) -> Optional[str]:
-    """Return a verified P-25.3 fusion-PIN word for the BARE mancude fused parent
+    """Return a verified fusion-PIN word for the BARE mancude fused parent
     whose ring atoms are exactly ``cage_atoms``, or None (fail-closed) to keep the
     VB-polyene form.
 

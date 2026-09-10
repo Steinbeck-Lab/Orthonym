@@ -1,5 +1,5 @@
 # tests/unit/metrics/test_provenance.py
-"""v25 G3: tier/provenance labels on naming output."""
+""": tier/provenance labels on naming output."""
 import pytest
 
 from orthonym.namer import Orthonym
@@ -19,7 +19,7 @@ def test_abstention_is_t5():
     row = nm.name_tiered("O=C1CCC2CCCCC2C1")  # suppression class; engine OFF
     # gate disabled -> the wrong legacy candidate ships in unit tests; accept
     # either the shipped string or the failure sentinel, but tier must be
-    # T1/T5 accordingly and never T3/T4 with the engine off.
+    # T1/ accordingly and never T3/ with the engine off.
     assert row["tier"] in ("pin_verified", "abstain")
     assert row["source"] != "general_engine"
 

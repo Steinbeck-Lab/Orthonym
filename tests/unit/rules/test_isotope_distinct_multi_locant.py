@@ -1,4 +1,4 @@
-"""P-45.4.1 / P-82.2.1: ONE nuclide labelled at MULTIPLE DISTINCT positions on
+""" /: ONE nuclide labelled at MULTIPLE DISTINCT positions on
 one parent -> a single ascending multi-locant descriptor (1,4-2H2 / 1,3,5-2H3 /
 1,4-13C2). Before ``_decorate_distinct_multi_locant`` the placement search only
 enumerated a SINGLE shared locant (2,2,2-2H3 -- all at one position) and the
@@ -6,7 +6,7 @@ attachment-group split handled only distinct PARTS, so a multiply-labelled ring
 or cage fell through to abstention. Every candidate stays OPSIN-RT gated, so a
 wrong locant set is never shipped.
 
-Cite: the Blue Book P-82.2.1 (descriptor + locants), P-45.4.1 (lowest locants).
+Cite: the Blue Book (descriptor + locants), (lowest locants).
 """
 import pytest
 from rdkit import Chem

@@ -1,12 +1,12 @@
-"""v33 Phase 4 Lever A2: fold a recognized neutral solvate (water of
+""" a phase Lever A2: fold a recognized neutral solvate (water of
 crystallization) into an ionic-salt name instead of abstaining.
 
 `name_salt` used to fail-closed unconditionally on ANY neutral co-fragment
 (`if neutrals: return ''`). A salt with water of crystallization -- e.g.
 cetylpyridinium chloride monohydrate (CHEBI:3566) -- therefore abstained
 even though the ionic part names fine. This relaxes the guard to fold a
-recognized water solvate as a '<salt> <mult>hydrate' suffix (P-16.4 /
-P-14.8.2 general nomenclature) while keeping the hard fail-closed for any
+recognized water solvate as a '<salt> <mult>hydrate' suffix /
+ general nomenclature) while keeping the hard fail-closed for any
 UNRECOGNIZED neutral co-former (0-wrong).
 """
 from orthonym import name_compound
@@ -60,11 +60,11 @@ def _rt_ok_or_abstain(smi: str) -> bool:
 
 
 def test_aqueous_hydrohalide_fails_closed():
-    # Fable-found 0-wrong BLOCKER: a hydroacid written ionically ([H+].[X-])
+    # a review-found 0-wrong BLOCKER: a hydroacid written ionically ([H+].[X-])
     # plus water of crystallization used to leave the [H+] orphaned -- the
     # hydroacid-merge branch only fires when an ORGANIC neutral (>1 heavy
     # atom) is present, so a water-only neutral set never reaches it. The
-    # FIND-2 cation guard then passed VACUOUSLY (0 == 0, since h_plus_frags
+    # cation guard then passed VACUOUSLY (0 == 0, since h_plus_frags
     # is excluded from cation_list), and the A2 water-fold appended
     # 'monohydrate' to an anion-only name -- shipping a WRONG species (net
     # charge -1 instead of neutral): 'O.[H+].[Cl-]' -> 'chloride monohydrate'.

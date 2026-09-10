@@ -5,7 +5,7 @@
 FREE N-terminal amine and a FREE C-terminal carboxylic acid. Phase-0's a trace
 (internal notes sec.3) measured that a
 capped terminus is the DOMINANT decline site over the true-peptide backlog
-(153/215 = 71.2% of all `name_peptide()` declines are `_is_valid_peptide`
+(153/215 = 71.2% of all `name_peptide` declines are `_is_valid_peptide`
 False; the largest single sub-shape, 85/215 = 40%, is BOTH termini capped
 -- almost always an N-methylated backbone plus a C-terminal PRIMARY AMIDE).
 
@@ -25,7 +25,7 @@ mis-rendering degrades to abstention, never a wrong name (0-wrong
 ABSOLUTE). The C-terminal-amide side explicitly declines (abstains) when
 the identified residue is aspartic/glutamic/asparagine/glutamine -- the
 "side-chain-acid trap" (a free side-chain acid/amide would outrank a
-suffix-amide swap under P-41 seniority, which this flat convention cannot
+suffix-amide swap under seniority, which this flat convention cannot
 express).
 
 The dispatch predicate (`rules.amino_acids.is_peptide`) also needed a

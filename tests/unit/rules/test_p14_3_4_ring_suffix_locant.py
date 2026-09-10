@@ -1,24 +1,24 @@
-"""P-14.3.4.2(c) — omission of a trivial mono-suffix locant on a ring (v29 Phase C tranche A).
+"""(c) — omission of a trivial mono-suffix locant on a ring (Phase C tranche A).
 
-Governing rule chain, verbatim from ``BlueBookV2/BlueBookV2.md``:
+Governing rule chain, verbatim from ``the Blue Book Blue Book``:
 
-``P-14.3.3`` "Citation of locants" (``:2869``) is **DENY BY DEFAULT** —
+```` "Citation of locants" (``:2869``) is **DENY BY DEFAULT** —
 
     "if any locants are essential … then all locants must be cited for the parent
      structure or that structural unit"
 
-so ``P-14.3.4`` "Omission of locants" (``:2871``) grants narrow LICENCES, and its own
+so ```` "Omission of locants" (``:2871``) grants narrow LICENCES, and its own
 preamble says *"for absolute clarity in preferred IUPAC names it is necessary to be
 prescriptive about when omission of locants is permissible."*
 
-The licence exercised here, P-14.3.4.2(c), is witnessed verbatim:
+The licence exercised here, (c), is witnessed verbatim:
 
-    ``:14916``  "by suffixes, such as 'cyclohexanecarboxylic acid' (PIN) and
+    ``:14916`` "by suffixes, such as 'cyclohexanecarboxylic acid' (PIN) and
                  'cyclohexanone' (PIN)"
-    ``:26854``  "(1) cyclopentanol (PIN)"
+    ``:26854`` "(1) cyclopentanol (PIN)"
 
-ROOT CAUSE this file guards (found by a validated call-spy, 2026-07-28):
-``_handler_shared._generate_suffix`` gates its whole P-14.3.4 elision block — including
+ROOT CAUSE this file guards (found by a validated call-trace, 2026-07-28):
+``_handler_shared._generate_suffix`` gates its whole elision block — including
 the ``should_omit_locant_one`` call — on ``features.principal_chain`` being non-empty
 (``:411``). A RING parent has no principal chain, so **rings never reached the elision
 logic at all**, and the non-terminal ring branch cited the locant unconditionally. The
@@ -38,7 +38,7 @@ def _name(smiles: str) -> str:
 
 
 # --------------------------------------------------------------------------- #
-# 1. The licence fires — trivial mono-suffix locant on a saturated carbocycle  #
+# 1. The licence fires — trivial mono-suffix locant on a saturated carbocycle #
 # --------------------------------------------------------------------------- #
 class TestLicensedOmission:
     @pytest.mark.parametrize("smiles,expected,authority", [
@@ -54,8 +54,8 @@ class TestLicensedOmission:
 
 
 # --------------------------------------------------------------------------- #
-# 2. The deny-default holds — every one of these MUST keep its locant          #
-#    (the Part-D tripwire set; each asserts the whole name)                    #
+# 2. The deny-default holds — every one of these MUST keep its locant #
+# (the Part-D tripwire set; each asserts the whole name) #
 # --------------------------------------------------------------------------- #
 class TestDenyByDefault:
     @pytest.mark.parametrize("smiles,expected,why", [
@@ -77,7 +77,7 @@ class TestDenyByDefault:
          "alpha-carbon substituent"),
         # Ring unsaturation makes positions distinct.
         ("OC1CC=CCC1", "cyclohex-3-en-1-ol", "ring double bond"),
-        # A heterocycle keeps it (cf. piperidine-1-carbonitrile, BB:34730).
+        # A heterocycle keeps it (cf. piperidine-1-carbonitrile, the Blue Book).
         ("OC1CCNCC1", "piperidin-4-ol", "heterocycle"),
         # ★ imine is EXCLUDED from the licence: no verbatim bare '-imine' row exists,
         # and licensing it shipped a defect the GATE caught. For an oxime the OH is
@@ -85,7 +85,7 @@ class TestDenyByDefault:
         # `N-hydroxy` prefix, so the N-substituent is invisible at that point -- both
         # `features.mol` and `features.canonical_smiles` carry the reduced form of
         # `ON=C1CCCCC1`. The licence fired and emitted `N-hydroxycyclohexanimine`, but
-        # `N` is an essential locant in the same scope and P-14.3.3 (BB:2869) restores
+        # `N` is an essential locant in the same scope and (the Blue Book) restores
         # every locant in a scope once one is essential.
         ("N=C1CCCCC1", "cyclohexan-1-imine", "imine: no verbatim BB row"),
         ("ON=C1CCCCC1", "N-hydroxycyclohexan-1-imine",
@@ -94,7 +94,7 @@ class TestDenyByDefault:
         # updated. It asserted `cyclohexane-1-carboperoxoic acid` on the reasoning
         # "a multi-atom suffix is out of scope for tranche A, so the ring+1-heavy-atom
         # condition correctly denies it". The DENIAL was correct for tranche A, but the
-        # asserted STRING was a non-PIN: BB:30184 prints `cyclohexanecarboperoxoic acid
+        # asserted STRING was a non-PIN: the Blue Book prints `cyclohexanecarboperoxoic acid
         # (PIN)` verbatim. So this tripwire was enshrining a wrong name — the same trap
         # tranche A's own gold row fell into — and it FAILED the moment tranche B Task 2
         # fixed the real defect (a one-row asymmetry: `peroxy_acid` was missing from
@@ -148,7 +148,7 @@ class TestDenyByDefault:
 
 
 # --------------------------------------------------------------------------- #
-# 3. The predicate itself, unit-level                                         #
+# 3. The predicate itself, unit-level #
 # --------------------------------------------------------------------------- #
 class TestPredicateDeniesByDefault:
     @staticmethod

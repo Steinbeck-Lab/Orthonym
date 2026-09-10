@@ -1,9 +1,9 @@
-"""v30 breadth — sulfinyl / sulfonyl substituent on a heteroaromatic parent.
+""" breadth — sulfinyl / sulfonyl substituent on a heteroaromatic parent.
 
 Benzene names a -S(=O)R / -S(=O)(=O)R substituent as (R)sulfinyl / (R)sulfonyl
 (`(methanesulfinyl)benzene`), but every HETEROaromatic parent dropped it: the
 heterocycle substituent collector counted the R carbons and dropped the S + its
-=O, so the whole molecule abstained (SELF-01 caught the atom-drop). The recursive
+=O, so the whole molecule abstained (caught the atom-drop). The recursive
 `name_substituent(..., allow_mancude=True)` already builds these prefixes; the
 heterocycle path now routes a ring-borne S(=O)-substituent through it, behind a
 gate-independent atom-coverage guard. best-effort-gated -> PIN default byte-identical.
@@ -40,7 +40,7 @@ def test_benzene_control_unchanged():
 
 
 def test_complex_arm_names_substitutively():
-    """v36 Wave F (core-namer item 3): a benzyl/aryl-methyl arm now names
+    """ Wave F (core-namer item 3): a benzyl/aryl-methyl arm now names
     SUBSTITUTIVELY via the sulfinyl/sulfonyl-rooted guard in
     ``name_substituent`` -> ``4-(benzylsulfinyl)pyridine`` (was the stale
     abstain pin, and before the guard the 'a'-replacement

@@ -1,11 +1,11 @@
-"""Unit tests for v23 Phase 10 — P-69 organometallic / catenated-hydride core (M-L).
+"""Unit tests for a phase — organometallic / catenated-hydride core (M-L).
 
 Three clusters, all OPSIN-2.9.0 round-trip verified:
   * 10a ethenyl/vinyl sigma-ligand recognition (root-cause fix in
     rules.organometallics._ligand_name_from_atoms): a 2-carbon C=C sigma-ligand
     is 'ethenyl', not 'ethyl' (the double bond was dropped = structure loss).
   * 10b metal carbonyls in the disconnected (dot) representation.
-  * 10c two-atom Group-14/Group-15 catenated parent hydride (P-69.5.3): a new
+  * 10c two-atom Group-14/Group-15 catenated parent hydride: a new
     rules.mononuclear_hydrides.name_dinuclear_hydride at DINUCLEAR_HYDRIDE@48.
 
 These tests run with the OPSIN validity gate disabled (conftest autouse), so
@@ -62,7 +62,7 @@ class TestMetalCarbonylDotForm:
 
 
 class TestDinuclearHydrideWins:
-    """10c: Group-14 substituent on senior Group-15 parent (P-69.5.3 / P-41)."""
+    """10c: Group-14 substituent on senior Group-15 parent /."""
 
     @pytest.mark.parametrize("smiles,expected", [
         ("[SiH3][AsH2]", "silylarsane"),
@@ -87,7 +87,7 @@ class TestDinuclearHydrideWins:
         assert name_compound("[PbH3][BiH2]", style="pin") == "plumbylbismuthane"
 
     def test_parent_is_always_the_group15_atom(self):
-        """P-41: Group-15 outranks Group-14, so it is always the parent hydride."""
+        """: Group-15 outranks Group-14, so it is always the parent hydride."""
         # germyl (Ge, Group 14) on stibane (Sb, Group 15) — never the reverse.
         assert _dinuc("[GeH3][SbH2]") == "germylstibane"
         assert _dinuc("[SbH2][GeH3]") == "germylstibane"  # SMILES order independent

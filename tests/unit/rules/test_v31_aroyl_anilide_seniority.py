@@ -1,14 +1,14 @@
-"""v31 lever C — aroyl/acyl anilide seniority (P-41 / P-66.1).
+""" lever C — aroyl/acyl anilide seniority /.
 
 A ring-attached secondary/tertiary amide whose acyl is a simple unsubstituted
-carbocycle (benzoyl, cyclohexanecarbonyl, ...) and whose only junior FGs live on
-the N-aryl ring is a ring-attached AMIDE: the amide (P-41-senior to phenol /
+carbocycle (benzoyl, cyclohexanecarbonyl,...) and whose only junior FGs live on
+the N-aryl ring is a ring-attached AMIDE: the amide -senior to phenol /
 amine / ether) is the parent (benzamide / cyclohexanecarboxamide), and the N-aryl
 is a located N-substituent. Tier-A ring competition otherwise picked the junior
 phenol/aniline ring as parent and demoted the amide to an 'N-benzoyl' prefix:
 
-    O=C(Nc1ccc(O)cc1)c1ccccc1  ->  'N-benzoyl-4-aminophenol'   (P-41 violation)
-    O=C(Nc1ccc(N)cc1)c1ccccc1  ->  abstained
+    O=C(Nc1ccc(O)cc1)c1ccccc1 -> 'N-benzoyl-4-aminophenol' violation)
+    O=C(Nc1ccc(N)cc1)c1ccccc1 -> abstained
 
 Fixed by a tightly-scoped, fail-closed preempt at the top of
 ``handlers/tier_a_ring.name_tier_a_ring`` that delegates to

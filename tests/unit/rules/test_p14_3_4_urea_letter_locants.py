@@ -1,18 +1,18 @@
-"""Urea locants: MONO omits, DI keeps, chalcogen analogues keep — a P-14.3.4 tripwire.
+"""Urea locants: MONO omits, DI keeps, chalcogen analogues keep — a tripwire.
 
  Phase C Task 7(a), CORRECTED. This file exists so a change to any
-P-14.3.4 licence cannot break either half of the urea boundary: a MONOsubstituted
+ licence cannot break either half of the urea boundary: a MONOsubstituted
 urea must OMIT its italic-N locant, while a DIsubstituted urea and every CHALCOGEN
 analogue must KEEP theirs.
 
 ⚠ THIS FILE'S ORIGINAL THESIS WAS BACKWARDS AND IS NOW CORRECTED
 ----------------------------------------------------------------
 It formerly asserted ``CNC(=O)N -> N-methylurea`` and argued that ``methylurea``
-(``the Blue Book Blue Book``) was outranked by P-66.1.6.1.1.1. That reading
+(``the Blue Book Blue Book``) was outranked by. That reading
 was wrong, and the oracle-integrity pass corrected the gold to ``methylurea``.
 The resolution:
 
-* ``:2943`` prints, verbatim, inside the example block of §**P-14.3.4.3** ("The
+* ``:2943`` prints, verbatim, inside the example block of §**** ("The
   locant is omitted in monosubstituted symmetrical parent hydrides or parent
   compounds where there is only one kind of substitutable hydrogen")::
 
@@ -20,19 +20,19 @@ The resolution:
 
   Urea's four N-H are a single ``CanonicalRankAtoms(breakTies=False)`` orbit, so a
   single N-substituent is unambiguous and the locant is omitted.
-* §**P-66.1.6.1.1.1** (``:33308``) — "urea... is the preferred IUPAC name, **with
+* §**** (``:33308``) — "urea... is the preferred IUPAC name, **with
   locants N and N'**" and ``:33318`` "Numerical locants for urea are no longer used
   in the IUPAC preferred name" — define urea's locant SCHEME (letter ``N``/``N'``,
   NOT numeric ``1``/``2``/``3``). They say which locant to cite *when one is cited*;
   they do NOT mandate citing one. Every urea example in that block that DOES cite a
   locant is DIsubstituted (``:33327`` ``N,N'-dimethylurea (PIN)``, ``:33336``
   ``N-[1-cyano-3-(methylsulfanyl)propyl]-N'-methylurea (PIN)``), where the locant is
-  genuinely essential. So P-66.1.6.1.1.1 and P-14.3.4.3 do not conflict.
+  genuinely essential. So and do not conflict.
 
 WHAT STILL KEEPS THE LETTER LOCANT (the live tripwire)
 ------------------------------------------------------
 * a DIsubstituted urea — two substituents make the position essential (``:33327``);
-* the CHALCOGEN analogues, even MONOsubstituted — §**P-66.1.6.1.3.1** (``:33439``)
+* the CHALCOGEN analogues, even MONOsubstituted — §**** (``:33439``)
   "Chalcogen analogues of urea... **Preferred IUPAC names use the letter locants
   N, and N'.**", and its own worked PIN is the monosubstituted
   ``N-(butan-2-yl)selenourea (PIN)`` (``:33451``). thiourea/selenourea/tellurourea
@@ -56,14 +56,14 @@ def namer():
 @pytest.mark.parametrize(
     "smiles,expected",
     [
-        # Unsubstituted parent — the retained PIN itself (P-66.1.6.1.1.1,:33308).
+        # Unsubstituted parent — the retained PIN itself,:33308).
         ("NC(=O)N", "urea"),
-        # ★ MONOsubstituted: the locant is OMITTED (P-14.3.4.3,:2943 `methylurea
+        # ★ MONOsubstituted: the locant is OMITTED,:2943 `methylurea
         # (PIN)`). If a change ever re-introduces `N-methylurea`,:2943 has been
         # allowed to be overridden by a misreading of:33308.
         ("CNC(=O)N", "methylurea"),
         # ★ DIsubstituted -> the letter locants ARE essential and cited
-        # (P-66.1.6.1.1.1 'N and N'';:33327). The mono-omission must not reach here.
+        # 'N and N'';:33327). The mono-omission must not reach here.
         ("CNC(=O)NC", "N,N'-dimethylurea"),
         # Both substituents on ONE nitrogen -> unprimed pair, a different molecule from
         # the row above. Present so a "just drop the prime" change cannot pass.
@@ -78,7 +78,7 @@ def test_urea_mono_omits_di_keeps_letter_locants(namer, smiles, expected):
     "smiles,expected_pin,citation",
     [
         # ★ THE OVER-STRIP TRIPWIRE. The chalcogen analogues are one-orbit exactly
-        # like urea, but P-66.1.6.1.3.1 (:33439) is a MORE SPECIFIC rule whose PIN
+        # like urea, but (:33439) is a MORE SPECIFIC rule whose PIN
         # keeps the letter locant even when MONOsubstituted -- its own worked example
         # is `N-(butan-2-yl)selenourea (PIN)` (:33451). The `base_name == 'urea'`
         # scoping of the mono-omission is what protects these; if it is ever widened

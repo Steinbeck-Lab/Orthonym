@@ -1,4 +1,4 @@
-"""Tests for 6 new functional group classes added in Phase 109 (DATA-03, DATA-04, DATA-05).
+"""Tests for 6 new functional group classes added in a phase (,,).
 
 Each new FG class requires:
   1. SMARTS pattern in FUNCTIONAL_GROUP_SMARTS (functional_groups.py)
@@ -21,10 +21,10 @@ def _detect(smiles):
 
 
 # ---------------------------------------------------------------------------
-# DATA-03: Amidine (IUPAC P-66.4.1)
+#: Amidine (IUPAC
 # ---------------------------------------------------------------------------
 class TestAmidine:
-    """Amidine: R-C(=NH)-NH2, suffix -imidamide/-carboximidamide, prefix carbamimidoyl (P-66.4.1.3.1)."""
+    """Amidine: R-C(=NH)-NH2, suffix -imidamide/-carboximidamide, prefix carbamimidoyl."""
 
     def test_acetamidine_detected(self):
         """Acetamidine CC(=N)N should be detected as amidine."""
@@ -55,12 +55,12 @@ class TestAmidine:
         assert SUFFIX_FORMS["amidine"] == ("imidamide", "carboximidamide")
 
     def test_amidine_prefix_form(self):
-        """Amidine prefix: carbamimidoyl (IUPAC P-66.4.1.3.1; 'amidino' was wrong)."""
+        """Amidine prefix: carbamimidoyl (IUPAC; 'amidino' was wrong)."""
         assert PREFIX_FORMS["amidine"] == "carbamimidoyl"
 
 
 # ---------------------------------------------------------------------------
-# DATA-04: Acid Iodide (IUPAC P-65.5.1)
+#: Acid Iodide (IUPAC
 # ---------------------------------------------------------------------------
 class TestAcidIodide:
     """Acid iodide: R-C(=O)-I, parallel to acid_chloride/bromide/fluoride."""
@@ -92,7 +92,7 @@ class TestAcidIodide:
 
 
 # ---------------------------------------------------------------------------
-# DATA-05a: Diazo (IUPAC P-61.5)
+#: Diazo (IUPAC
 # ---------------------------------------------------------------------------
 class TestDiazo:
     """Diazo: R=N+=N-, prefix-only."""
@@ -117,7 +117,7 @@ class TestDiazo:
 
 
 # ---------------------------------------------------------------------------
-# DATA-05b: Disulfide (IUPAC P-63.6.2)
+#: Disulfide (IUPAC
 # ---------------------------------------------------------------------------
 class TestDisulfide:
     """Disulfide: R-S-S-R, prefix-only."""
@@ -142,7 +142,7 @@ class TestDisulfide:
 
 
 # ---------------------------------------------------------------------------
-# DATA-05c: Hydrazine (IUPAC P-62.4)
+#: Hydrazine (IUPAC
 # ---------------------------------------------------------------------------
 class TestHydrazine:
     """Hydrazine FG: R-NH-NH2, prefix-only."""
@@ -179,13 +179,13 @@ class TestHydrazine:
 
 
 # ---------------------------------------------------------------------------
-# DATA-05d: Sulfenic Acid (IUPAC P-65.3.1.4)
+#: Sulfenic Acid (IUPAC
 # ---------------------------------------------------------------------------
 class TestSulfenicAcid:
     """Sulfenic acid: R-S-OH, between sulfinic and phosphonic acid in seniority."""
 
     def test_methanesulfenic_acid_detected(self):
-        """DD2 (Phase D, P-56.2): R-S-OH is now perceived as ``so_thioperoxol`` and
+        """DD2 (Phase D,: R-S-OH is now perceived as ``so_thioperoxol`` and
         named ``methane-SO-thioperoxol`` (PIN), NOT the Blue-Book-retired
         ``methanesulfenic acid``. ``so_thioperoxol`` suppresses ``sulfenic_acid``
         on overlap (collision resolver)."""

@@ -1,6 +1,6 @@
-"""Phase 160 Plan-04 integration tests: --dump-tree CLI end-to-end.
+"""a phase Plan-04 integration tests: --dump-tree CLI end-to-end.
 
-Per CONTEXT D-19 + DECOMP-04: ``python -m orthonym --dump-tree <smi>``
+Per internal notes + DECOMP-04: ``python -m orthonym --dump-tree <smi>``
 emits the NameTreeNode IR (text or JSON format). This file invokes the
 CLI via subprocess and verifies the output is parseable + correct.
 
@@ -10,8 +10,8 @@ Test coverage:
 - name field matches programmatic Orthonym.name_with_tree(smi).name.
 - tree=None case: legacy fragment_legacy renderer is exercised.
 - tree-populated case: explicit-field renderer (currently no extracted
-  handlers emit trees per CONTEXT D-05 first-wave; will be added when
-  v19+1 handlers ship).
+  handlers emit trees per internal notes first-wave; will be added when
+  +1 handlers ship).
 - error handling: invalid SMILES exits non-zero with stderr message.
 """
 from __future__ import annotations
@@ -58,7 +58,7 @@ def test_dump_tree_text_format_simple():
 
 
 def test_dump_tree_text_renders_populated_tree():
-    """Phase 165: CCO routes to general_acyclic which now emits a populated tree;
+    """a phase: CCO routes to general_acyclic which now emits a populated tree;
     the text dump renders parent_stem with NO first-wave tree=None placeholder."""
     stdout, stderr, rc = _run_cli(["--dump-tree", "CCO"])
     assert rc == 0
@@ -77,7 +77,7 @@ def test_dump_tree_json_format_parseable():
 
 
 def test_dump_tree_json_name_field():
-    """JSON dump's name field matches programmatic name_with_tree().name."""
+    """JSON dump's name field matches programmatic name_with_tree.name."""
     stdout, _stderr, rc = _run_cli(
         ["--dump-tree", "--format", "json", "CCO"],
     )
@@ -89,7 +89,7 @@ def test_dump_tree_json_name_field():
 
 
 def test_dump_tree_json_tree_populated():
-    """Phase 165: CCO emits a populated tree; JSON dump renders it as a dict
+    """a phase: CCO emits a populated tree; JSON dump renders it as a dict
     with the structured fields."""
     stdout, _stderr, rc = _run_cli(
         ["--dump-tree", "--format", "json", "CCO"],
@@ -141,7 +141,7 @@ def test_dump_tree_format_help():
 
 
 def test_dump_tree_recursive_multiprefix_text():
-    """Phase 165 D-04: a multi-prefix molecule renders nested prefixes[] subtrees
+    """a phase: a multi-prefix molecule renders nested prefixes subtrees
     (the recursive renderer emits a parent_stem line per node)."""
     stdout, stderr, rc = _run_cli(["--dump-tree", "CC(C)CC(C)CO"])
     assert rc == 0, f"stderr={stderr!r}"

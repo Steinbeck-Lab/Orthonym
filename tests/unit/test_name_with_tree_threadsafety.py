@@ -1,9 +1,9 @@
 """W7 regression: name_with_tree is concurrent-safe via contextvars.ContextVar.
 
-Per 160-REVIEW.md CR-04 part B resolution: the inner-dispatch NamingResult is
+Per internal notes part B resolution: the inner-dispatch NamingResult is
 captured into a contextvars.ContextVar slot (PEP 567). ContextVar gives
 thread-local AND asyncio-task-local isolation, so two threads invoking
-Orthonym().name_with_tree on different SMILES never see each other's slots.
+Orthonym.name_with_tree on different SMILES never see each other's slots.
 """
 from __future__ import annotations
 
@@ -13,7 +13,7 @@ from orthonym import Orthonym
 
 
 def test_name_with_tree_concurrent_threads_isolated():
-    """Two threads call Orthonym().name_with_tree on different SMILES;
+    """Two threads call Orthonym.name_with_tree on different SMILES;
     each must receive the correct name (no cross-thread state leak)."""
     errors = []
 

@@ -2,7 +2,7 @@
 review): the `t4_floor` offer used to fail-open on `gate_outcome=not_run`.
 
 Mechanism: `resolve_gate_outcome` returns `not_run` whenever no gate call was
-recorded anywhere in the whole `name()` call (`metrics/provenance.py:222-223`).
+recorded anywhere in the whole `name` call (`metrics/provenance.py:222-223`).
 Several real exits -- the limit-path/exception-path exits, the wildcard exit,
 the isotope-decorator-failure exit -- return through `_finish` WITHOUT ever
 calling `_final_opsin_validity_gate`, so `not_run` is reachable on real
@@ -12,7 +12,7 @@ outcome) inside `_offer_rt_ok`, so a `t4_floor` offer with NO recorded
 verdict at all could win `select_rt_passing` with ZERO verification.
 
 FABLE proved this end-to-end (`scratchpad/probe_whitebox_floor.py`): stubbing
-ONLY the T4 producer (`t4_coverage.name_t4_complete`) to return `"ethanol"`
+ONLY the producer (`t4_coverage.name_t4_complete`) to return `"ethanol"`
 for the real `not_run` abstainer `CC(=O)C1=C(C)S[C@@H](C)CC1=O`, the genuine
 `_finish`/`_maybe_append_t4_floor_offer`/`_offer_rt_ok`/`select_rt_passing`
 chain shipped `'ethanol'` -- a wrong-molecule name -- with winning offer
@@ -29,7 +29,7 @@ from orthonym.errors import is_failure_name
 
 pytestmark = [pytest.mark.unit, pytest.mark.opsin_gate]
 
-# Measured real a dev split best-effort abstainer whose whole name() call ends
+# Measured real a dev split best-effort abstainer whose whole name call ends
 # with gate_outcome=not_run (task-A-fixround1-findings.md Finding 1).
 NOT_RUN_ABSTAINER = "CC(=O)C1=C(C)S[C@@H](C)CC1=O"
 
@@ -41,7 +41,7 @@ def _best_effort_namer() -> Orthonym:
 
 def test_wrong_molecule_stub_does_not_ship_fable_reproduction(monkeypatch):
     """FABLE's exact white-box mechanism proof, as a real test: stubbing ONLY
-    the T4 producer to return a wrong-but-real name for a genuine not_run
+    the producer to return a wrong-but-real name for a genuine not_run
     abstainer must NOT ship it. This is the reproduction FIRST, on the
     fixed code -- if this test is red, the hole is still open."""
     import orthonym.assembly.t4_coverage as t4c
@@ -68,7 +68,7 @@ def test_wrong_molecule_stub_does_not_ship_fable_reproduction(monkeypatch):
     # independently of the namer (RDKit InChIKey compare). The EXACT spelling is
     # not asserted (this test is name-agnostic) and it depends on parent selection
     # in the recovery, which the `name_t4_complete` stub above perturbs: as this
-    # test runs (T4 stubbed) it ships
+    # test runs (stubbed) it ships
     # `1-[(6S)-2,6-dimethyl-4-oxo-1-thiacyclohex-2-en-3-yl]ethan-1-one`, while
     # PLAIN best-effort (no stub) ships the ring-parent form
     # `(6S)-2,6-di(methan-1-yl)-4-oxo-3-(1-oxoethan-1-yl)-1-thiacyclohex-2-ene` --

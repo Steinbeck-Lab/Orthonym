@@ -1,5 +1,5 @@
-"""P-62.3.1.1 mancude-ring exocyclic imine suffix (W2F p4).
-BB P-62.3.1.1 (BlueBookV2.md:26536): 'naphthalen-2(1H)-imine (PIN)'. The
+""" mancude-ring exocyclic imine suffix (W2F p4).
+BB (the Blue Book): 'naphthalen-2(1H)-imine (PIN)'. The
 added-indicated-H engine is suffix-agnostic; a ring bare =NH takes '-imine' with
 the identical (nH) numbering as '-one'. Imine is the LAST seniority class, so a
 ring bearing BOTH =O and =NH keeps -one + imino prefix (already works at HEAD)."""
@@ -8,7 +8,7 @@ import orthonym
 
 class TestRingImine:
     def test_naphthalen_2_1h_imine(self):
-        # BB-verbatim PIN (BlueBookV2.md:26536)
+        # BB-verbatim PIN (the Blue Book)
         assert orthonym.name_compound("N=C1Cc2ccccc2C=C1", style="pin") == "naphthalen-2(1H)-imine"
 
     def test_indanimine(self):
@@ -29,7 +29,7 @@ class TestRingImine:
         # only) declines and the new imine branch never fires. Under pytest the
         # OPSIN validity gate is disabled (conftest autouse), so the raw namer
         # emits its pre-existing best-guess with the imine dropped; production
-        # SELF-01 suppresses that to 'unknown organic compound' (verified with
+        # suppresses that to 'unknown organic compound' (verified with
         # the gate ON). The p4 boundary that matters: no '-imine' is emitted.
         from rdkit import Chem
         from orthonym.rules.partial_saturation import _ring_imine_carbons

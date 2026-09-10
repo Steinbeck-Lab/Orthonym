@@ -21,7 +21,7 @@ from rdkit import Chem
 
 from ..assembly.naming_utils import alpha_sort_key
 from ..assembly.naming_utils import get_alkyl_name as _canonical_get_alkyl_name
-from .locants import compare_locant_sets as _compare_locant_sets  # IM-02
+from .locants import compare_locant_sets as _compare_locant_sets  #
 
 
 def get_ring_double_bonds(mol, ring_atoms: Tuple[int, ...]) -> List[Tuple[int, int]]:
@@ -50,7 +50,7 @@ def get_ring_double_bonds(mol, ring_atoms: Tuple[int, ...]) -> List[Tuple[int, i
 
 
 def is_mancude_monocyclic_hydrocarbon(mol, ring_atoms: Tuple[int, ...]) -> bool:
-    """P-22.1.2(b) / P-25.3.2.1.1 detection: a mancude monocyclic hydrocarbon
+    """(b) / detection: a mancude monocyclic hydrocarbon
     that RDKit marks aromatic but which is NOT benzene is named as the
     cyclo-polyene (cyclodeca-1,3,5,7,9-pentaene), never as an [n]annulene
     component prefix.
@@ -95,7 +95,7 @@ def get_ring_substituents(mol, ring_atoms: Tuple[int, ...]) -> Dict[int, List[Li
     """
     from ..perception.rings import get_containing_ring_system
 
-    # Use the complete ring system as BFS boundary (IUPAC P-25.3)
+    # Use the complete ring system as BFS boundary (IUPAC
     # Prevents walking into fused/bridged partner rings
     ring_set = set(get_containing_ring_system(mol, ring_atoms))
     substituents: Dict[int, List[List[int]]] = defaultdict(list)
@@ -161,7 +161,7 @@ def orient_cycloalkane(
     - Multiple substituents: apply first-point-of-difference rule
 
     When the principal characteristic group sits on ring atoms (expressed as
-    a suffix: -ol, -one, -amine, ...), P-31.1.4 numbering applies instead:
+    a suffix: -ol, -one, -amine,...), numbering applies instead:
     the suffix anchor takes the lowest locant before any detachable prefix.
 
     Args:
@@ -182,7 +182,7 @@ def orient_cycloalkane(
     # Get substituted positions (indices in ring_list)
     substituted_atom_indices = set(substituent_positions.keys())
 
-    # --- P-31.1.4: principal group on ring -> suffix-locant priority ---
+    # ---: principal group on ring -> suffix-locant priority ---
     if principal_group_atoms:
         pg_set = {a for a in principal_group_atoms if a in ring_list}
         if pg_set:
@@ -273,10 +273,10 @@ def _orient_cycloalkane_with_pg(
     pg_set: Set[int]
 ) -> List[int]:
     """
-    P-31.1.4 numbering for a saturated ring whose principal characteristic
-    group sits on ring atoms (suffix expression: -ol, -one, -amine, ...).
+     numbering for a saturated ring whose principal characteristic
+    group sits on ring atoms (suffix expression: -ol, -one, -amine,...).
 
-    Tier order, first-decision-wins (P-31.1.4.2.4 / P-31.1.4.3.4):
+    Tier order, first-decision-wins /:
       (c) lowest locants to the suffix anchor atoms,
       (f) lowest locants to the detachable-prefix-only set — the suffix
           expression itself (the heteroatom-rooted substituent list at a PG
@@ -389,7 +389,7 @@ def orient_cycloalkene(
     """
     Orient a cycloalkene ring for IUPAC naming.
 
-    IUPAC 2013 rules (P-31.1.3.4):
+    IUPAC 2013 rules:
     - When a principal characteristic group is on the ring, it receives
       the lowest possible locant (ideally 1).
     - Double bond locant is secondary to principal group locant.
@@ -624,7 +624,7 @@ def _build_oriented_ring(
 def _get_alkyl_name(carbon_count: int) -> Optional[str]:
     """Get alkyl substituent name from carbon count.
 
-    Delegates to the canonical get_alkyl_name() in naming_utils.
+    Delegates to the canonical get_alkyl_name in naming_utils.
     Returns None for invalid or unknown counts.
     """
     try:

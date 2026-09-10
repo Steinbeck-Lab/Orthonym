@@ -1,10 +1,10 @@
-"""Phase 163 Tier FRN-A..E seniority entries unit tests.
+"""a phase Tier FRN-A..E seniority entries unit tests.
 
 Asserts the 14 new SENIORITY_ORDER + SUFFIX_FORMS + PREFIX_FORMS entries
 shipped in Plan-03 commit 163-03-01 are correctly placed AND that LOCKED
-PIN suffix forms match AUDIT § 5 decisions.
+PIN suffix forms match AUDIT decisions.
 
-Test pyramid per CONTEXT D-12 + RESEARCH §8.2:
+Test pyramid per internal notes + RESEARCH:
 - Section A: SUFFIX_FORMS entries (chain_terminal + ring_attached forms)
 - Section B: PREFIX_FORMS entries (non-principal-group prefix names)
 - Section C: SENIORITY_ORDER position invariants
@@ -14,7 +14,7 @@ Total: >= 20 tests.
 
 References:
 - src/orthonym/rules/seniority.py SENIORITY_ORDER + SUFFIX_FORMS + PREFIX_FORMS
-- 163-AUDIT-FRN.md § 5 position map + LOCKED PIN suffix forms
+- internal notes-FRN.md position map + LOCKED PIN suffix forms
 """
 import pytest
 
@@ -58,9 +58,9 @@ class TestFRNSuffixForms:
         assert SUFFIX_FORMS['telluroamide'] == ('telluroamide', 'carbotelluroamide')
 
     def test_selenoaldehyde_suffix_selenal_short_form(self):
-        """AUDIT § 5.2 LOCK: PIN is -selenal short form (parallel to -thial).
+        """AUDIT LOCK: PIN is -selenal short form (parallel to -thial).
 
-        v22 C-T2 (V-2): the added-carbon form is 'carboselenaldehyde' (Blue Book
+         C- (V-2): the added-carbon form is 'carboselenaldehyde' (Blue Book
         Table 28, BB ~line 18827; parallel to the 'carbothialdehyde' above) — the
         prior 'carboselenoaldehyde' (extra 'o') was a data typo mirroring the
         acid/amide infix form. Assertion updated to the corrected value.
@@ -161,7 +161,7 @@ class TestFRNNoRegressionOnExistingEntries:
     """No regression: existing thio* entries unchanged (5 tests)."""
 
     def test_thioic_S_acid_still_present(self):
-        """No regression: v18 thioic_S_acid SENIORITY + SUFFIX_FORMS unchanged."""
+        """No regression: thioic_S_acid SENIORITY + SUFFIX_FORMS unchanged."""
         assert 'thioic_S_acid' in SENIORITY_ORDER
         assert SUFFIX_FORMS.get('thioic_S_acid') == (
             'thioic S-acid', 'carbothioic S-acid'

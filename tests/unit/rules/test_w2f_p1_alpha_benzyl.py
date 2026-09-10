@@ -1,14 +1,14 @@
-"""W2F-P1 Tasks 6, 8, 9 — P-29.6.2.1 α-substituted benzyl prefixes + the
-P-16.5.2.4/P-16.5.4.1 citation-layer escalation both this class and the
+"""W2F-P1 Tasks 6, 8, 9 — α-substituted benzyl prefixes + the
+/ citation-layer escalation both this class and the
 asymmetric benzylic ether (Task 7) require.
 
-BB P-29.6.2.1 (the Blue Book): 'bromo(4-methylphenyl)methyl (preferred
+BB (the Blue Book): 'bromo(4-methylphenyl)methyl (preferred
 prefix)'. The enclosing marks are STRUCTURE-BEARING: OPSIN parses the
 marks-dropped 'bromo(phenyl)methylbenzene' to a DIFFERENT molecule
-(Brc1ccccc1Cc1ccccc1 — research §3.A).
+(Brc1ccccc1Cc1ccccc1 — research A).
 
 All expected names OPSIN-2.9-verified in
-internal notes §3.D (and §2.D for Task-7 shapes).
+internal notes D (and D for Task-7 shapes).
 """
 import pytest
 from rdkit import Chem
@@ -49,7 +49,7 @@ class TestCitationLayerEscalation:
             "1-(chloromethyl)"
 
     def test_fusion_brackets_not_escalated(self):
-        # P-16.5.4.1.2: fusion brackets are nesting-IGNORED -> plain parens
+        #: fusion brackets are nesting-IGNORED -> plain parens
         from orthonym.assembly.naming_utils import format_substituent_prefix
         assert format_substituent_prefix("furo[3,2-b]pyridin-2-yl", [4], 1) == \
             "4-(furo[3,2-b]pyridin-2-yl)"
@@ -64,7 +64,7 @@ class TestAlphaHaloBenzylEndToEnd:
             "1-bromo-4-[bromo(phenyl)methyl]benzene"
 
     def test_pcg_parent_benzoic_acid(self):
-        # P-44.1: the acid fixes the parent outright — no ring-choice question
+        #: the acid fixes the parent outright — no ring-choice question
         assert name_compound("OC(=O)c1ccc(C(Cl)c2ccccc2)cc1") == \
             "4-[chloro(phenyl)methyl]benzoic acid"
 
@@ -75,7 +75,7 @@ class TestAlphaHaloBenzylEndToEnd:
 
     def test_interleave_ring_yl_first_keeps_parens(self):
         # '(4-bromophenyl)' sorts as 'bromophenyl' < 'chloro' -> cited FIRST
-        # but LOCANT-BEARING so it KEEPS its parens (P-16.5.1.3.1 "unless it
+        # but LOCANT-BEARING so it KEEPS its parens "unless it
         # includes a locant")
         assert name_compound("OC(=O)c1ccc(C(Cl)c2ccc(Br)cc2)cc1") == \
             "4-[(4-bromophenyl)(chloro)methyl]benzoic acid"
@@ -124,14 +124,14 @@ class TestAlphaBenzylFailClosedAndGuards:
         assert out in (UNKNOWN, "1-bromo-4-[nitro(phenyl)methyl]benzene")
 
     def test_identical_units_gem_dichloro_stays_unknown(self):
-        # THE leak hazard (research §3.F): '[dichloro(phenyl)methyl]benzene'
+        # THE leak hazard (research F): '[dichloro(phenyl)methyl]benzene'
         # is RT-valid but non-PIN (PIN = multiplicative
         # 1,1'-(dichloromethylene)dibenzene, not yet buildable). The
         # in-builder identical-units decline must keep this refused.
         assert name_compound("ClC(Cl)(c1ccccc1)c1ccccc1") == UNKNOWN
 
     def test_identical_units_sibling_multiplicative_untouched(self):
-        # P-45.1.1: identical units -> multiplicative@900 stays senior
+        #: identical units -> multiplicative@900 stays senior
         assert name_compound("c1ccccc1C(Br)c1ccccc1") == \
             "1,1'-(bromomethylene)dibenzene"
 
@@ -139,7 +139,7 @@ class TestAlphaBenzylFailClosedAndGuards:
         # α-OH = PCG -> carbinol/methanol path owns it; the halogen
         # whitelist excludes O by construction. HEAD emits the RT-OK
         # '(4-bromophenyl)phenylmethanol' (pre-existing marks style defect,
-        # research §3.D — do NOT pin the exact marks, only the parent).
+        # research D — do NOT pin the exact marks, only the parent).
         out = name_compound("OC(c1ccccc1)c1ccc(Br)cc1")
         assert out.endswith("methanol")
 
@@ -163,7 +163,7 @@ class TestAlphaBenzylFailClosedAndGuards:
 
 @pytest.mark.unit
 class TestAlphaBenzylDeterminism:
-    """Task 9: research §3.C det-probe protocol — evidence, sibling,
+    """Task 9: research C det-probe protocol — evidence, sibling,
     gem-dichloro (d2 refusal), gem-mixed; 10+ random spellings each,
     byte-identical. All citation inputs are spelling-invariant strings
     (fixed halo-name map + letters-only key); any spread is a REAL bug."""

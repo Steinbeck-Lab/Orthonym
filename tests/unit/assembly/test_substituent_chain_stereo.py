@@ -1,4 +1,4 @@
-"""v33 Engine 4: a CARRIER-chain stereocentre inside a ring-bearing substituent
+""" Engine 4: a CARRIER-chain stereocentre inside a ring-bearing substituent
 must emit its descriptor at the locant the substituent's own name cites.
 
 The defect: ``_add_substituent_stereo`` could only obtain a substituent-local
@@ -6,16 +6,16 @@ locant map from ``_acyclic_alkyl_located_stereo_name``, which DECLINES on any
 fragment containing ring atoms. So for a ring-on-chain substituent — a carrier
 chain bridging a ring system to the parent, named by
 ``ring_substituents._compound_ring_on_chain_substituent`` — every carrier-borne
-stereocentre was silently DROPPED (the multi-centre branch's D-09 "missing beats
+stereocentre was silently DROPPED (the multi-centre branch's "missing beats
 wrong" fallback), shipping a stereo-incomplete, i.e. WRONG-diastereomer, prefix.
 
 The fix threads the producer's OWN carrier numbering (``pos_out``, free valence
-= 1 per P-29.2) through ``name_ring_system_substituent`` into the stereo
+= 1 per through ``name_ring_system_substituent`` into the stereo
 emitter's ``located`` channel, so the descriptor is cited at the locant the name
-really used — never a re-derived BFS-from-attachment guess (the WR-06 hazard).
+really used — never a re-derived BFS-from-attachment guess (the hazard).
 
-Rule (VERIFIED, ``BlueBookV2/BlueBookV2.md:44643``, section heading
-``## **P-91.3** NAMING OF STEREOISOMERS``): "When they relate to substituent
+Rule (VERIFIED, ``the Blue Book Blue Book``, section heading
+``## **** NAMING OF STEREOISOMERS``): "When they relate to substituent
 groups, they are cited at the front of the corresponding prefix. They are
 preceded by a numerical or letter locant to describe the position of the
 stereogenic unit *when such locants are present*." Its worked ``(PIN)``
@@ -69,9 +69,9 @@ def _find_opsin_jar():
 
 @pytest.fixture
 def production_gate(monkeypatch):
-    """Re-enable the production SELF-01 OPSIN validity gate; the suite's autouse
+    """Re-enable the production OPSIN validity gate; the suite's autouse
     fixture disables it. Without the gate this witness ships an EARLIER,
-    wrong-molecule candidate ('6-hexyloxy...15-octyl...') that SELF-01 exists to
+    wrong-molecule candidate ('6-hexyloxy...15-octyl...') that exists to
     suppress, so the tier under test is never reached. Mirrors the fixture in
     ``test_v26_p7_stereo_failclosed.py``."""
     if not shutil.which("java") or _find_opsin_jar() is None:
@@ -106,7 +106,7 @@ class TestProducerPublishesItsOwnCarrierNumbering:
     stay EMPTY wherever the name cites no carrier locant."""
 
     def test_two_carbon_carrier_publishes_map(self):
-        # C[C@@H](c1ccccc1) hung off an amide N: carrier = C1(stereogenic) + C2.
+        # C[C@@H] hung off an amide N: carrier = C1(stereogenic) + C2.
         mol = _mol("CC(=O)N[C@@H](C)c1ccccc1")
         n_idx = next(a.GetIdx() for a in mol.GetAtoms() if a.GetSymbol() == "N")
         attach = next(n.GetIdx() for n in mol.GetAtomWithIdx(n_idx).GetNeighbors()
@@ -121,12 +121,12 @@ class TestProducerPublishesItsOwnCarrierNumbering:
             pos_out=pos,
         )
         assert name == "1-phenylethyl", name
-        # Free valence is locant 1 (P-29.2); the map covers the whole carrier.
+        # Free valence is locant 1; the map covers the whole carrier.
         assert pos.get(attach) == 1, pos
         assert sorted(pos.values()) == [1, 2], pos
 
     def test_mononuclear_carrier_publishes_no_map(self):
-        # A single -CH2- carrier cites no locant ('benzyl'), so the P-91.3
+        # A single -CH2- carrier cites no locant ('benzyl'), so the
         # unlocanted form must stay reachable -> no map published.
         mol = _mol("CC(=O)NCc1ccccc1")
         n_idx = next(a.GetIdx() for a in mol.GetAtoms() if a.GetSymbol() == "N")
@@ -168,11 +168,11 @@ class TestEmittedNameCarriesTheDescriptor:
         from orthonym.namer import Orthonym
         namer = Orthonym(style="pin")
         name = namer.name("CC(=O)N[C@@H](C)C1CCCCC1")
-        # P-91.3: locant present in the prefix -> the descriptor is locanted.
+        #: locant present in the prefix -> the descriptor is locanted.
         assert name == "N-[(1S)-1-cyclohexylethyl]acetamide", name
 
     def test_mononuclear_carrier_stays_unlocanted(self):
-        """P-91.3 negative control — a prefix with NO locant must not acquire
+        """ negative control — a prefix with NO locant must not acquire
         one (the '(R)-bromo(chloro)fluoromethane (PIN)' direction)."""
         from orthonym.assembly.substituent_naming import _add_substituent_stereo
         mol = _mol("CC(=O)NCc1ccccc1")

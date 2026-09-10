@@ -46,13 +46,13 @@ _DEFAULT_TRIV = _TRIV_ENV in ("1", "true", "yes", "on")
 _GS_ENV = os.environ.get("ORTHONYM_ENABLE_GROUP_SPLITTING", "").strip().lower()
 _DEFAULT_GS = _GS_ENV in ("1", "true", "yes", "on")
 
-# CR-04 part B + W7: per-call NamingResult capture slot for name_with_tree.
+# part B + W7: per-call NamingResult capture slot for name_with_tree.
 # ContextVar provides thread-local AND asyncio-task-local isolation per PEP 567;
-# safer than a module-global dict against concurrent Orthonym().name_with_tree()
-# calls. The slot is installed by Orthonym.name_with_tree() before invoking
-# self.name(); composer._assemble_name_impl writes the inner-dispatch
+# safer than a module-global dict against concurrent Orthonym.name_with_tree
+# calls. The slot is installed by Orthonym.name_with_tree before invoking
+# self.name; composer._assemble_name_impl writes the inner-dispatch
 # NamingResult into the slot when present (default=None makes the regular
-# Orthonym.name() path a no-op).
+# Orthonym.name path a no-op).
 _name_with_tree_capture: "contextvars.ContextVar[Optional[Dict[str, Any]]]" = (
     contextvars.ContextVar("name_with_tree_capture", default=None)
 )
@@ -88,13 +88,13 @@ from .perception.stereo import (
 # so this is NOT a circular import — the predicate factories + handler
 # shims inside `routing/dispatch_table.py` use lazy imports for
 # `orthonym.rules.*` and `orthonym.namer.Orthonym` per
-# PATTERNS § 3 + namer.py:853 lazy-import precedent.
+# PATTERNS + namer.py:853 lazy-import precedent.
 from .routing.dispatch_table import ClassDispatchResult, StoutClass
 from .rules.locants import build_atom_to_locant, orient_chain
 from .rules.seniority import get_principal_group
 
 # ---------------------------------------------------------------------------
-# Universal stereo backstop (a phase, STER-16)
+# Universal stereo backstop (a phase,)
 # ---------------------------------------------------------------------------
 
 
@@ -110,7 +110,7 @@ def _final_stereo_check(
     Runs AFTER all handler-specific stereo injection. Only activates when
     a handler missed stereo (predicate `needs_stereo_injection` True).
 
-    a phase WSB-01 (//): the backstop is flipped from detect-only
+    a phase -01 (//): the backstop is flipped from detect-only
     to REAL injection on the only cohort carrying an authoritative parent
     locant map — `chain` and NON-phenol `benzene` (threaded via the per-call
     confidence dict as a POST-HOC CandidateName field). When the (now D/L-aware,
@@ -124,8 +124,8 @@ def _final_stereo_check(
     authoritative numbering exists for those, and a fabricated locant is worse
     than a missing one (/: missing beats wrong). This is the path the
     E-stilbene `unknown` case keeps (descriptor-less output is EXPECTED per the
-    WSB-01 LOG-ONLY PROTECT, not a regression — the lipid/steroid reservoir flip
-    is WS-C-gated,).
+    -01 LOG-ONLY PROTECT, not a regression — the lipid/steroid reservoir flip
+    is -gated,).
 
     Args:
         mol: RDKit Mol object (with stereo info from original SMILES)
@@ -149,7 +149,7 @@ def _final_stereo_check(
     if not needs_stereo_injection(mol, name):
         return name
 
-    # WSB-01 (): inject allowlist = chain + NON-phenol benzene ONLY, and
+    # -01 : inject allowlist = chain + NON-phenol benzene ONLY, and
     # only when an authoritative atom_to_locant has been threaded.
     _allow_inject = (
         atom_to_locant
@@ -166,14 +166,14 @@ def _final_stereo_check(
         # non-positive) or there was nothing to inject -> fall through to the
         # log-only branch (a missing descriptor beats a wrong one).
 
-    # W4-S1 (P-93.2.2 / P-93.2.3 / P-93.2.6): a SINGLE stereogenic unit on a
+    # W4-S1 / /: a SINGLE stereogenic unit on a
     # NON-CARBON centre (sulfoxide S, quaternary N+, silane Si, chiral P,...)
     # that the parent atom_to_locant never covers -> the descriptor is dropped
     # by the allow-list path above (the centre is a substituent atom, a
     # characteristic-group heteroatom, or a mononuclear hetero parent, none of
     # which appear in the carbon-parent locant map). Such a lone hetero
     # stereocentre carries NO locant (a single unambiguous stereogenic unit;
-    # the same P-91 locant omission as the STEREO-06 mononuclear-methane case
+    # the same locant omission as the STEREO-06 mononuclear-methane case
     # `(R)-bromo(chloro)(fluoro)methane`), so emit the bare "(R)-"/"(S)-".
     # ACCURACY GATES (missing beats wrong): fire ONLY on EXACTLY ONE R/S atom
     # with ZERO E/Z bonds (never drops a second descriptor), and ONLY when that
@@ -216,7 +216,7 @@ def _final_stereo_check(
 # `needs_stereo_injection`'s descriptor vocabulary is `{R,S,r,s,E,Z}` inside
 # parentheses, plus `alpha|beta-D/L-` (the ANOMERIC sugar form) and a bare
 # `D-`/`L-` token. The Blue Book's PIN descriptor vocabulary is wider.
-# `## **P-91.2.1.2.2** Stereodescriptors used in the nomenclature of natural
+# `## **** Stereodescriptors used in the nomenclature of natural
 # products` (the Blue Book) legitimises, at:44628-44632, "*(i) The
 # descriptors 'D' and 'L'... for carbohydrates, amino acids and peptides, and
 # cyclitols; (ii) '*erythro*' and '*threo*'...; (iii) The stereodescriptors
@@ -238,23 +238,23 @@ def _final_stereo_check(
 #
 # NOT exempted, deliberately: the free amino acids (`alanine`, `serine`,
 # `cysteine`, `cystine`, `threonine`, `isoleucine`, `allo-threonine`,
-# `allo-isoleucine`). There the warning is TRUE — `## **P-103.1.3.1** The
+# `allo-isoleucine`). There the warning is TRUE — `## **** The
 # stereodescriptors 'D' and 'L'` (:54291) requires the configuration at the
-# alpha-carbon to be designated, `### **P-103.3.4** Indication of configuration
+# alpha-carbon to be designated, `### **** Indication of configuration
 # in peptides` (:54715) scopes L-omission to PEPTIDES only, and Table 10.4 pairs
 # each retained name with a `rel-` (RELATIVE) systematic equivalent (:54204,
 #:54211), so the bare name is not enantiospecific. Left warning on purpose.
 
-# `### **P-101.2.6** Stereochemical configuration of parent structures`
+# `### **** Stereochemical configuration of parent structures`
 # (:51045): "*The stereodescriptors 'alpha', 'beta', and 'xi'... are cited
-# before the name of the fundamental parent structure*", and `**P-101.2.6.1**`
+# before the name of the fundamental parent structure*", and `****`
 # (:51051) "*Each chirality center is described by the stereodescriptor 'alpha',
 # 'beta', or 'xi'*". A locant-prefixed alpha/beta IS a stereodescriptor.
 _ALPHA_BETA_DESCRIPTOR_RE = re.compile(r"\d+(?:alpha|beta|xi|α|β|ξ)\b")
 
-# `## **P-105.1** RETAINED NAMES OF NUCLEOSIDES` (:54943) retains exactly these
+# `## **** RETAINED NAMES OF NUCLEOSIDES` (:54943) retains exactly these
 # seven, whose full ribofuranosyl configuration is implied by the name; the
-# nucleotide stems come from `## **P-106.1** RETAINED NAMES` (:55003). BB's own
+# nucleotide stems come from `## **** RETAINED NAMES` (:55003). BB's own
 # examples are descriptor-free, e.g. `uridine 5'-(tetrahydrogen triphosphate)`
 # (:55029) and `2',3',5'-tri-O-acetyladenosine` (:54981).
 #
@@ -266,7 +266,7 @@ _ALPHA_BETA_DESCRIPTOR_RE = re.compile(r"\d+(?:alpha|beta|xi|α|β|ξ)\b")
 # neuraminic acids -- the exact three names this predicate must leave VISIBLE --
 # and survived all 92 tests. There is no longer a literal tuple to append to.
 def _nucleoside_stems() -> Tuple[str, ...]:
-    """Retained nucleoside stems (P-105.1) + nucleotide stems (P-106.1)."""
+    """Retained nucleoside stems + nucleotide stems."""
     stems = set()
     try:
         from .rules.nucleosides import _NUCLEOSIDE_STEM
@@ -278,10 +278,10 @@ def _nucleoside_stems() -> Tuple[str, ...]:
                 stems.add(value.lower().split('-')[-1])
     except Exception:  # pragma: no cover - table is always importable in-tree
         pass
-    # `## **P-106.1** RETAINED NAMES` (:55003) -- the nucleotide `-ylic acid`
+    # `## **** RETAINED NAMES` (:55003) -- the nucleotide `-ylic acid`
     # stems, which have no constructor table of their own in this repo. Kept
     # explicit and separately cited rather than folded into the derived set.
-    # `thymidine` is retained by `## **P-105.1** RETAINED NAMES OF NUCLEOSIDES`
+    # `thymidine` is retained by `## **** RETAINED NAMES OF NUCLEOSIDES`
     # (:54943) but is not reachable through `_NUCLEOSIDE_STEM`, which maps
     # (uracil, deoxy) to `2'-deoxyuridine`; kept so the exemption covers what the
     # Blue Book retains rather than only what today's constructor emits.
@@ -374,9 +374,9 @@ def _has_steroid_stereoparent_stem(low: str) -> bool:
     return (_STEROID_STEM_SHORT_RE is not None
             and _STEROID_STEM_SHORT_RE.search(low))
 
-# `### **P-107.4.3.1**` (:55227) retains `sphinganine` "*for the aliphatic amino
+# `### ****` (:55227) retains `sphinganine` "*for the aliphatic amino
 # alcohol HAVING THE DESCRIBED ABSOLUTE CONFIGURATION*", and (:55231) gives
-# `(4E)-sphing-4-enine` under `### **P-107.4.3** Glycosphingolipids`.
+# `(4E)-sphing-4-enine` under `### **** Glycosphingolipids`.
 #
 # -FINAL I10: this was a SIX-CHARACTER substring test, `'sphing' in name`,
 # whose first clause (`'sphinganine' in name`) was dead by subsumption. It
@@ -403,7 +403,7 @@ def _stereo_is_implied_by_name(name: str) -> bool:
     written to delete, so it is repaired rather than trimmed.
 
     It also cannot see COMPLETENESS, and the citation it rests on says
-    completeness is required. `### **P-101.2.6**` (:51045) in full: the name of a
+    completeness is required. `### ****` (:51045) in full: the name of a
     fundamental parent structure "*implies the absolute configuration of all
     chirality centers **and the configuration of double bonds, when applicable**,
     without further specification. **All chirality must be defined**...*" The
@@ -424,14 +424,14 @@ def _stereo_is_implied_by_name(name: str) -> bool:
 
     _low = name.lower()
 
-    # Family 6 — `chalcone` (). `**P-64.2.1.1**` (:28297), under the
-    # heading `### **P-64.2.1** Retained names`, ends: "*Chalcone refers only to
+    # Family 6 — `chalcone` . `****` (:28297), under the
+    # heading `### **** Retained names`, ends: "*Chalcone refers only to
     # the trans- or (E)- stereoisomer.*" The retained name therefore IS the
     # descriptor for its one E/Z unit — exactly the "channel the R/S + E/Z
     # counter cannot see" this predicate exists to cover. Without this leg every
     # chalcone emission logs "has 0 R/S + 1 E/Z but name lacks descriptors",
     # which is a FALSE POSITIVE: the name is configurationally complete, and
-    # P-101.2.6's completeness obligation is met because the molecule has exactly
+    # 's completeness obligation is met because the molecule has exactly
     # one stereogenic unit and the name implies it.
     #
     # EXACT equality, not a substring: it is anchored to the sole producer, the
@@ -446,7 +446,7 @@ def _stereo_is_implied_by_name(name: str) -> bool:
     # Family 4 — steroid/terpenoid alpha/beta: the name DOES carry descriptors
     # (`cholest-5-en-3beta-yl hydrogen sulfate`, `5alpha-cholestan-3beta-ol`).
     # Produced by `rules.steroid_stereo.collect_steroid_alpha_beta`, whose own
-    # module docstring cites P-101.2.6.
+    # module docstring cites.
     #
     # BOTH conditions are required. The locanted descriptor alone exempted any
     # name containing `3beta`, with no steroid parent anywhere in it; anchoring it
@@ -455,9 +455,9 @@ def _stereo_is_implied_by_name(name: str) -> bool:
             and _has_steroid_stereoparent_stem(_low)):
         return True
 
-    # Family 1 — inositols. `## **P-104.1** DEFINITIONS` (:54821): "*Inositols
+    # Family 1 — inositols. `## **** DEFINITIONS` (:54821): "*Inositols
     # have retained names and... employ the stereodescriptors 'D' and 'L' to
-    # describe configurations*"; `**P-104.2.1**` (:54831): "*Stereoisomeric
+    # describe configurations*"; `****` (:54831): "*Stereoisomeric
     # inositols are described by adding italicized prefixes at the front of the
     # name 'inositol'.... Names denoted by the prefixes are preferred.*" The
     # prefix IS the descriptor for the five meso forms. Same table as the
@@ -476,27 +476,27 @@ def _stereo_is_implied_by_name(name: str) -> bool:
     if _NUCLEOSIDE_STEM_RE is not None and _NUCLEOSIDE_STEM_RE.search(_low):
         return True
 
-    # Family 5 — stereoparent hydrides. `**P-101.2.1.3**` (:50991) defines a
+    # Family 5 — stereoparent hydrides. `****` (:50991) defines a
     # stereoparent as a parent that "*should include as much configuration as
-    # possible*"; `### **P-101.2.6**` (:51045) is the governing sentence: "*The
+    # possible*"; `### ****` (:51045) is the governing sentence: "*The
     # name of a fundamental parent structure usually implies the absolute
     # configuration of all chirality centers **and the configuration of double
     # bonds, when applicable**, without further specification. **All chirality
     # must be defined**...*"
     #
-    # -FINAL: a third citation, `### **P-101.3.6**` (:52106,
+    # -FINAL: a third citation, `### ****` (:52106,
     # "*Stereochemistry implied by the name of the stereoparent structure remains
     # the same, unless otherwise specified*"), is REMOVED as out of scope. The
     # sentence is verbatim, but its section heading is "*Removal of a terminal
     # ring.*" and the same paragraph ends "*This use of 'des' is restricted to
     # steroids*" -- it governs `des`-prefixed steroid names, not stereoparent
-    # implication in general. P-101.2.6 already carries the point.
+    # implication in general. already carries the point.
     #
-    # Membership is `**P-101.2.7**` Table 10.1 (:51377), approached through the
+    # Membership is `****` Table 10.1 (:51377), approached through the
     # THREE tables that emit these names (see the note below), so no new
     # hardcoded list. NB `NATURAL_PRODUCT_DERIVATIVES` is WIDER than Table 10.1
     # -- it carries derivative and trivial names that are not fundamental parent
-    # hydrides -- so this leg is broader than P-101.2.7 alone would license.
+    # hydrides -- so this leg is broader than alone would license.
     # Recorded rather than narrowed: it is diagnostic-only, and narrowing it
     # would restore warnings on names that do carry implied configuration.
     try:
@@ -521,7 +521,7 @@ def _stereo_is_implied_by_name(name: str) -> bool:
     except Exception:
         pass
 
-    # `### **P-107.4.3.1**` (:55227): "*the retained name 'sphinganine' for the
+    # `### ****` (:55227): "*the retained name 'sphinganine' for the
     # aliphatic amino alcohol HAVING THE DESCRIBED ABSOLUTE CONFIGURATION...
     # is preferred to the systematic name (2S,3R)-2-aminooctadecane-1,3-diol*",
     # and (:55231) `(4E)-sphing-4-enine`.
@@ -541,22 +541,22 @@ def _final_grammar_check(name: str, smiles: Optional[str], handler: str,
     """Universal OPSIN-grammar backstop: validate + (round-trip-gated) repair.
 
     Mirrors the `_final_stereo_check` shape (a phase pattern).
-    Single chokepoint per CONTEXT.md — never per-handler-exit
-    (AP-6). On unrepairable failure, log WARNING and return ORIGINAL
+    Single chokepoint per internal notes — never per-handler-exit
+    . On unrepairable failure, log WARNING and return ORIGINAL
     name (,). Never silently mutate.
 
     Args:
         name: The assembled IUPAC name (post stereo backstop).
         smiles: Original SMILES the name was generated from. Forwarded
             to `OpsinGrammar.suggest_fix` for the round-trip gate per
-            CONTEXT.md /. May be None on cold paths; the
+            internal notes /. May be None on cold paths; the
             grammar layer documents the degraded-path contract.
         handler: Handler attribution string (per a phase
             pattern); used in WARNING logs only.
         grammar: An `OpsinGrammar` instance (or None when the
             `_disable_grammar_validation` kwarg was passed at
             construction time per).
-        stats: The per-instance counter dict (/ AP-19) shared by
+        stats: The per-instance counter dict (/) shared by
             reference with the grammar instance. Mutated in-place.
 
     Returns:
@@ -571,7 +571,7 @@ def _final_grammar_check(name: str, smiles: Optional[str], handler: str,
         stats["validate_passed"] = stats.get("validate_passed", 0) + 1
         return name
 
-    # validate() rejected — try suggest_fix (round-trip-gated).
+    # validate rejected — try suggest_fix (round-trip-gated).
     # LOCKED signature: name FIRST, source_smiles SECOND.
     repaired, repair_class = grammar.suggest_fix(name, source_smiles=smiles)
 
@@ -584,7 +584,7 @@ def _final_grammar_check(name: str, smiles: Optional[str], handler: str,
         )
         return repaired
 
-    # validate() rejected and no class produced a round-trip-passing
+    # validate rejected and no class produced a round-trip-passing
     # candidate. Log unrepairable WARNING and fall back to ORIGINAL
     # name per + (never silently mutate).
     logger.warning(
@@ -595,7 +595,7 @@ def _final_grammar_check(name: str, smiles: Optional[str], handler: str,
 
 
 # ============================================================================
-# a phase.5 SUB-03: pre-emission OPSIN-parse validity gate (..)
+# a phase: pre-emission OPSIN-parse validity gate (..)
 # ============================================================================
 # A real-OPSIN sibling to the always-on _final_grammar_check: a generated
 # production name that OPSIN CANNOT PARSE is suppressed -> the EXISTING
@@ -606,11 +606,11 @@ def _final_grammar_check(name: str, smiles: Optional[str], handler: str,
 # Default-ON in production (the OPPOSITE of the 168/169 default-OFF RT-mover
 # flags) — shipping an invalid string IS the bug. Env escape hatch for
 # raw-output tests (the test suite disables it via a conftest autouse fixture;
-# the gate's own tests re-enable it). FAIL-OPEN on no-JAR ().
+# the gate's own tests re-enable it). FAIL-OPEN on no-JAR .
 _VG_ENV = os.environ.get("ORTHONYM_DISABLE_OPSIN_VALIDITY_GATE", "").strip().lower()
 _DISABLE_VALIDITY_GATE = _VG_ENV in ("1", "true", "yes", "on")
 
-# SELF-01 (a phase): the constitutional self-consistency gate. After the
+# (a phase): the constitutional self-consistency gate. After the
 # parseability gate confirms OPSIN ACCEPTS a name, re-perceive it: if OPSIN parses
 # the name to a CONSTITUTIONALLY DIFFERENT molecule than the input, the name is
 # wrong (names a different compound) and is suppressed to the honest fallback.
@@ -619,7 +619,7 @@ _DISABLE_VALIDITY_GATE = _VG_ENV in ("1", "true", "yes", "on")
 # * "on" — suppress on a verified constitutional mismatch (the accuracy-first state).
 # * "off" — disabled.
 # Comparison is STEREO-INSENSITIVE and TAUTOMER-/AROMATICITY-TOLERANT (standard
-# InChIKey skeleton block, ADR-18-07): a stereo-only or mobile-H-tautomer difference
+# InChIKey skeleton block, -07): a stereo-only or mobile-H-tautomer difference
 # must NEVER suppress a constitutionally-correct name. Fail-OPEN on every inconclusive
 # outcome (OPSIN can't be consulted, either structure unparseable by RDKit).
 # Flipped "warn" -> "on" 2026-06-22 after warn-only validation: the constitutional gate
@@ -649,7 +649,7 @@ def _coverage_audit_mode() -> str:
 
 
 def _self01_lookup(name: str) -> Tuple[Optional[bool], bool, str]:
-    """The SELF-01 verdict `_final_opsin_validity_gate` ALREADY computed for
+    """The verdict `_final_opsin_validity_gate` ALREADY computed for
     THIS EXACT `name` -- reused by the L0/L1 coverage audit instead of a
     second OPSIN call (CARRIED RULING, `task-L0-brief.md`) -- PLUS an explicit
     "is a fresh re-anchor even worth trying" decision (a phase L0 review
@@ -665,7 +665,7 @@ def _self01_lookup(name: str) -> Tuple[Optional[bool], bool, str]:
     Returns:
         ``(complete, skip_reanchor, detail)``:
 
-        * ``complete``: ``True``/``False`` when SELF-01 ALREADY answered for
+        * ``complete``: ``True``/``False`` when ALREADY answered for
           this exact string -- a REAL reused verdict (deny-by-default via
           `resolve_gate_outcome`: an outcome recorded for a DIFFERENT string
           -- e.g. `_apply_trivial_fallback` swapped the name after the gate
@@ -711,7 +711,7 @@ def _self01_lookup(name: str) -> Tuple[Optional[bool], bool, str]:
                     _pv.GATE_OUTCOME_SELF01_CONSTITUTION_ONLY,
                     _pv.GATE_OUTCOME_STEREO_RECOMPOSED):
         # STEREO_RECOMPOSED is full-InChIKey verified (a review -P2 F3) — a
-        # stronger proof than SELF-01, so it takes the same "verdict ok, no
+        # stronger proof than, so it takes the same "verdict ok, no
         # reanchor needed" path (the name is already the reanchored, verified form).
         return True, False, ""
     if resolved == _pv.GATE_OUTCOME_SELF01_WARN_MISMATCH:
@@ -725,11 +725,11 @@ def _self01_lookup(name: str) -> Tuple[Optional[bool], bool, str]:
     return None, False, ""
 
 
-# Module-level singleton so the OPSIN parse cache is shared across all name()
+# Module-level singleton so the OPSIN parse cache is shared across all name
 # calls in a process (lazy-init on first use).
 _VALIDITY_ORACLE = None
 
-# W3-P06 (P-65.7.6.1): dianhydride/polyanhydride PIN word-form — >=2 acid-like
+# W3-P06: dianhydride/polyanhydride PIN word-form — >=2 acid-like
 # words then a NUMERICALLY-multiplied '...anhydride' ('diacetic butanedioic
 # dianhydride'). Used ONLY by the validity gate to carve out these OPSIN-
 # unparseable-but-correct-by-construction names (see _final_opsin_validity_gate).
@@ -737,7 +737,7 @@ _DIANHYDRIDE_PIN_RE = re.compile(
     r"^(?:[a-z0-9][a-z0-9,()'\-]* ){2,}(?:di|tri|tetra|penta|hexa)anhydride$"
 )
 
-# W8-P4 (P-65.7.6.4.1): the chalcogen di-/poly-anhydride sibling of the above —
+# W8-P4: the chalcogen di-/poly-anhydride sibling of the above —
 # >=2 acid-like words then a 'bis(thioanhydride)'/'tris(selenoanhydride)'/...
 # class word (BB 32446 'diacetic butanedioic bis(thioanhydride) (PIN)').
 # OPSIN-2.9 has no grammar for the multiplied-and-parenthesised chalcogen-
@@ -749,7 +749,7 @@ _CHALCOGEN_DIANHYDRIDE_PIN_RE = re.compile(
     r"(?:bis|tris|tetrakis)\((?:thio|seleno|telluro)anhydride\)$"
 )
 
-# W3-P07 (P-65.6.3.3.3.2 method (1)): the functional-class polyol polyester PIN —
+# W3-P07 method (1)): the functional-class polyol polyester PIN —
 # a multivalent parent-group descriptor ('propane-1,2,3-triyl') followed by >=2
 # space-separated, locant-prefixed anion words each ending in '...ate'
 # ('propane-1,2,3-triyl 1,3-diacetate 2-propanoate'). Emitted ONLY by the
@@ -762,16 +762,16 @@ _POLYOL_POLYESTER_PIN_RE = re.compile(
     r"(?: [0-9,]+-[A-Za-z0-9()\[\],'*-]*ate){2,}$"
 )
 
-# W3-P10 (P-67.2.2.2): di-/polynuclear noncarbon-oxoacid PREFIX-derivative PINs —
+# W3-P10: di-/polynuclear noncarbon-oxoacid PREFIX-derivative PINs —
 # locant-prefixed class groups on a di/hypodi/tri parent oxoacid
 # ('1,3-diamidodiphosphoric acid'). These are correct-by-construction (emitted
 # ONLY by the hard-gated rules.inorganic_acids.name_polyacid_derivative off an
 # exact backbone), but OPSIN has a locant-assignment BUG for prefix substituents
-# on these polyacid parents: it stacks '1,3-diamido' both on P-1 (verified — OPSIN
+# on these polyacid parents: it stacks '1,3-diamido' both on (verified — OPSIN
 # parses the analogous '1,3-diimido...' correctly, but '1,3-diamido'/'1,3-dichloro'
 # to the wrong constitution). The Blue Book is the sole PIN authority; OPSIN's
 # re-parse bug must not gate our correctness (same rationale as the dianhydride /
-# inositol carve-outs, applied to the SELF-01 constitutional self-consistency check
+# inositol carve-outs, applied to the constitutional self-consistency check
 # rather than the unparseable path). Used ONLY by the validity gate.
 _POLYACID_PREFIX_DERIVATIVE_PIN_RE = re.compile(
     r"^(?:\d+(?:,\d+)*-(?:di|tri|tetra|penta|hexa)?"
@@ -781,14 +781,14 @@ _POLYACID_PREFIX_DERIVATIVE_PIN_RE = re.compile(
     r"(?:phosphoric|phosphonic|sulfuric|selenic|telluric|arsoric) acid$"
 )
 
-# W8-P9 (P-69.2.3/.4/.6): additive/coordination organometallic PINs contain
+# W8-P9 /.4/.6): additive/coordination organometallic PINs contain
 # eta/kappa/mu multicentre descriptors (or '-ido' anionic-ligand words) that
 # OPSIN-2.9's generation grammar cannot parse. These are emitted ONLY by the
 # hard-gated organometallic assembler (rules.organometallics) -> correct by
 # construction. Same rationale as the inositol/dianhydride/thioperoxol carve-outs.
 # CR guard (Task 9.1 open question): tightened so it never un-suppresses an
 # unrelated malformed name -- requires EITHER an eta/kappa/mu descriptor OR a
-# '-ido' coordination-ligand token, AND the name must end in a known P-69
+# '-ido' coordination-ligand token, AND the name must end in a known
 # metal stem (optionally followed by a Stock/Ewens-Bassett suffix).
 _ORGANOMETALLIC_ADDITIVE_PIN_RE = re.compile(
     r"^(?=.*(?:[ηκμ]|(?:chlorido|bromido|fluorido|iodido|hydrido)))"
@@ -797,7 +797,7 @@ _ORGANOMETALLIC_ADDITIVE_PIN_RE = re.compile(
     r"(?:\([0-9IVX+\-]+\))?$"
 )
 
-# W8-P8 (P-26.2/.3): the phane simplified-skeletal PIN
+# W8-P8 /.3): the phane simplified-skeletal PIN
 # ('1,4(1,4)-dibenzenacyclohexaphane') -- superatom locants, a parenthesized
 # attachment-locant set, an amplification prefix ('...ena'/'...ina' etc,
 # possibly di/tri/bis-multiplied), and the 'phane' suffix. OPSIN 2.9.0 has NO
@@ -816,7 +816,7 @@ _PHANE_PIN_RE = re.compile(
     r"(?:cyclo)?[a-z]*phane$"
 )
 
-# W8-P5 Task 2 (P-72.3/P-72.8.1, BB 41102-41110/41303): a SUBSTITUTED
+# W8-P5 Task 2 /, BB 41102-41110/41303): a SUBSTITUTED
 # halogen-uide anion ('diphenyliodanuide (PIN)' BB 41110, the Ph2I- hydride-
 # addition ate-complex) is correct-by-construction (emitted ONLY by the
 # hard-gated `rules.ions._emit_group13_uide` halogen branch, generalized
@@ -840,12 +840,12 @@ _HALOGEN_UIDE_PIN_RE = re.compile(
     r"^[a-z][a-z0-9(),'-]*(?:iodan|broman|chloran)uide$"
 )
 
-# W8-P4 (P-65.7/P-67 atom-drop safety floor): source-level structural motifs
+# W8-P4 / atom-drop safety floor): source-level structural motifs
 # reproduced (2026-07-18) to make the RAW (no-Java, gate-OFF) namer silently
 # DROP atoms or emit a WRONG constitution, because no handler in this cycle's
 # cascade claims them fully. Each is the EXACT verified-open shape from the
 # W8-P4 ledger reproduction -- never a general "any P/S/N present" heuristic.
-# See _p4_oxoacid_anhydride_leak_motif() below for the full per-motif citation.
+# See _p4_oxoacid_anhydride_leak_motif below for the full per-motif citation.
 _P4_THIOPEROXY_ACID_PAT = Chem.MolFromSmarts("[CX3](=O)[OX2][SX2,SeX2]")
 _P4_NITRAMIDO_PAT = Chem.MolFromSmarts("[#6][NX3;H1][N+](=O)[O-]")
 # Ring-excluded: a CYCLIC 'naked carbonate' carbon (e.g. 1,3-dioxan-2-one) is
@@ -860,21 +860,21 @@ def _p4_oxoacid_anhydride_leak_motif(mol) -> bool:
 
     Each branch is a reproduced, gate-OFF WRONG/DROP leak with NO owning
     handler built this cycle:
-      * acyl-O-[S,Se]H thio/seleno-peroxy acid (P-65.1.5.3) -- no peroxy-acid
-        base suffix exists this cycle (OQ-5); 'CC(=O)OS' raw -> 'ethane'
+      * acyl-O-[S,Se]H thio/seleno-peroxy acid -- no peroxy-acid
+        base suffix exists this cycle ; 'CC(=O)OS' raw -> 'ethane'
         (drops S+O2).
-      * -NH-NO2 nitramido on carbon (P-67.1.4.3.2) -- substituent-prefix build
+      * -NH-NO2 nitramido on carbon -- substituent-prefix build
         deferred; 'O=[N+]([O-])NCC(=O)O' raw -> 'ethanoic acid' (drops
         -NH-NO2).
       * an ACYCLIC 'naked carbonate' carbon -O-C(=O)-O- with NO carbon
-        substituent, embedded in a larger chain (P-67.3.1) -- the substitutive
+        substituent, embedded in a larger chain -- the substitutive
         nested-prefix engine ('{[(acetyloxy)carbonyl]oxy}formic acid') is not
         built this cycle; 'CC(=O)OC(=O)OC(=O)O' raw -> a WRONG constitution
         (parses to a smaller, different molecule -- confirmed via OPSIN RT of
         the shipped string). Ring atoms excluded so a genuinely-handled cyclic
         carbonate (1,3-dioxan-2-one) never fires.
-      * an unclaimed di-nuclear noncarbon-oxoacid (P/S/Se) backbone (P-67.2.5.2
-        partial ester / P-67.2.6 substituent-prefix on a senior acid) -- both
+      * an unclaimed di-nuclear noncarbon-oxoacid (P/S/Se) backbone
+        partial ester / substituent-prefix on a senior acid) -- both
         design-contract items deferred this cycle. Reuses the existing
         perception-only ``_find_polyacid_backbone``, then confirms NO builder
         (inorganic-acid table/FRN OR any of the sulfonic/chalcogen/peroxy
@@ -913,7 +913,7 @@ def _p4_oxoacid_anhydride_leak_motif(mol) -> bool:
 
 
 def _validity_gate_jar_present() -> bool:
-    """JAR-presence PROBE for the SUB-03 fail-OPEN guard ().
+    """JAR-presence PROBE for the fail-OPEN guard .
 
     Independent of parse: OpsinOracle.name_to_smiles returns None for BOTH
     "JAR absent" and "parse failed", so the gate cannot infer JAR-absence from
@@ -926,7 +926,7 @@ def _validity_gate_jar_present() -> bool:
 
 
 def _validity_gate_status(name: str) -> str:
-    """Cached 3-valued OPSIN parse outcome for the SUB-03 gate (CR-01).
+    """Cached 3-valued OPSIN parse outcome for the gate .
 
     Returns ``"parsed"`` | ``"rejected"`` | ``"unavailable"``. Delegates to
     ``OpsinOracle.parse_status`` via a module-level singleton so the parse cache
@@ -944,7 +944,7 @@ def _validity_gate_status(name: str) -> str:
 
 def _validity_gate_name_to_smiles(name: str) -> Optional[str]:
     """OPSIN canonical SMILES for ``name`` via the shared singleton oracle (cached),
-    or None if OPSIN rejected it / could not be consulted. Used by the SELF-01
+    or None if OPSIN rejected it / could not be consulted. Used by the
     constitutional self-consistency gate to re-perceive the emitted name."""
     global _VALIDITY_ORACLE
     if _VALIDITY_ORACLE is None:
@@ -958,7 +958,7 @@ def _self_consistency_skeleton(smiles: str) -> Optional[str]:
     """Constitutional skeleton key = the first (skeleton) block of the standard
     InChIKey. It encodes formula + connectivity + mobile-H-normalized H layer, and
     EXCLUDES stereochemistry (the /t,/b layers live in the second block). So it is
-    stereo-insensitive and tautomer-tolerant by construction (ADR-18-07). Returns
+    stereo-insensitive and tautomer-tolerant by construction (-07). Returns
     None if RDKit cannot parse/hash the SMILES (-> the caller fails OPEN)."""
     try:
         mol = Chem.MolFromSmiles(smiles)
@@ -978,7 +978,7 @@ def _self_consistency_full_key(smiles: str) -> Optional[str]:
     An EQUAL full key between the input structure and a name's OPSIN re-perception
     is the strongest possible identity signal: it is exactly the project's headline
     round-trip metric, so two structures with one full InChIKey ARE the same
-    molecule (same constitution, charge and stereo, protonation normalized). SELF-01
+    molecule (same constitution, charge and stereo, protonation normalized).
     uses this to short-circuit to "ok" and thereby stops over-rejecting a salt whose
     input is written ionically (drug.[H+].[Cl-]) while its correct name OPSIN
     re-perceives as the neutral molecular form (drug.Cl): the two share one InChIKey
@@ -1068,12 +1068,12 @@ def _try_compose_input_stereo(
     return None
 
 
-# C6: RegistrationHash-backed stereo layer for SELF-01. The InChIKey skeleton
+# C6: RegistrationHash-backed stereo layer for. The InChIKey skeleton
 # block used by _self_consistency_skeleton EXCLUDES stereo by construction
-# (ADR-18-07), so a name that encodes the WRONG stereoisomer (right constitution)
+# (-07), so a name that encodes the WRONG stereoisomer (right constitution)
 # passes the skeleton compare. RegistrationHash.GetMolLayers gives a stereo-bearing
 # canonical layer that distinguishes enantiomers/diastereomers. Prep is normalize-only
-# (no Cleanup, no tautomer/charge standardization) per spec §4; NO stereo-assignment
+# (no Cleanup, no tautomer/charge standardization) per spec; NO stereo-assignment
 # call — GetMolLayers reads the parsed mol's stereo directly (assign is inert for it).
 from rdkit.Chem import RegistrationHash as _RegistrationHash
 from rdkit.Chem.MolStandardize import rdMolStandardize as _rdMolStandardize
@@ -1192,8 +1192,8 @@ def _self_consistency_verdict(input_smiles: str, opsin_smiles: str,
     na = _specified_stereo_count(mi)
     nb = _specified_stereo_count(mo)
     # a phase (C3): a name that OVER-specifies stereo (nb > na) FABRICATES
-    # configuration the input does not define -- P-92 "CIP Priority and Sequence
-    # Rules" / P-93 "Configuration Specification" (the Blue Book):
+    # configuration the input does not define -- "CIP Priority and Sequence
+    # Rules" / "Configuration Specification" (the Blue Book):
     # a stereodescriptor asserts a specific configuration, so it may only be used
     # when that configuration is actually defined; an undefined centre is left
     # undescribed, never assigned an arbitrary one -> reject. na == 0 alone
@@ -1255,7 +1255,7 @@ def _record_gate_outcome(outcome: str, name: Optional[str]) -> None:
 def _self_consistency_decision(name: str, smiles: Optional[str], opsin_smiles: str,
                                stats: Optional[Dict[str, int]],
                                ignore_stereo: bool = False) -> str:
-    """SELF-01: OPSIN already PARSED ``name``; verify it parses to the SAME molecule.
+    """: OPSIN already PARSED ``name``; verify it parses to the SAME molecule.
 
     Suppresses (mode "on") only on a VERIFIED constitutional (or, on the stereo-strict
     primary path, stereo-CONFLICT) mismatch — never on a stereo-omission / tautomer
@@ -1269,7 +1269,7 @@ def _self_consistency_decision(name: str, smiles: Optional[str], opsin_smiles: s
         return name
     verdict = _self_consistency_verdict(smiles, opsin_smiles, ignore_stereo=ignore_stereo)
     if verdict != "mismatch":
-        # T1: "ok" is the ONE state that earns SELF-01. "inconclusive"
+        # T1: "ok" is the ONE state that earns. "inconclusive"
         # ships by failing OPEN — the comparison could not be made, so nothing
         # was verified and it must not claim to have been.
         _record_gate_outcome(
@@ -1301,16 +1301,16 @@ def _final_opsin_validity_gate(name: str, smiles: Optional[str],
                                stats: Optional[Dict[str, int]] = None,
                                *, besteffort_unverified: bool = False,
                                general_fallback_tier: bool = False) -> str:
-    """SUB-03 real-OPSIN validity gate (//).
+    """ real-OPSIN validity gate (//).
 
     Suppress an OPSIN-unparseable production name to the EXISTING
     _descriptive_fallback STRING (never None / never a shipped invalid string).
     Runs AFTER stereo + grammar repair, as the last transform before the value
-    leaves name()/name_with_confidence(); inside the is_top_level_naming guard
+    leaves name/name_with_confidence; inside the is_top_level_naming guard
     so it never fires on decomposition fragments.
 
     ``besteffort_unverified`` (task-JAR-ABSENT, FABLE 0-wrong hole): the four
-    name()/name_with_confidence() call sites pass ``self._general_fallback_unverified``.
+    name/name_with_confidence call sites pass ``self._general_fallback_unverified``.
     When True AND the OPSIN jar is GENUINELY absent (a no-Java deployment), the
      jar-absent fail-OPEN below is replaced by a fail-CLOSED suppression:
     at best-effort tier we cannot constitutionally verify ANY name without OPSIN
@@ -1371,14 +1371,14 @@ def _final_opsin_validity_gate(name: str, smiles: Optional[str],
             return _suppressed_to
         _record_gate_outcome(_pv.GATE_OUTCOME_UNAVAILABLE, name)
         return name
-    # CR-01 (code review 2026-06-02): suppress ONLY on a DEFINITIVE OPSIN
+    # (code review 2026-06-02): suppress ONLY on a DEFINITIVE OPSIN
     # rejection. 'parsed' ships as-is; 'unavailable' (subprocess timeout / OSError
     # mid-run on a loaded host) fails OPEN — a transient OPSIN failure must never
     # turn a valid, round-trip-passing name into a descriptive fallback. The old
     # `parse-or-None` check conflated 'rejected' with 'unavailable', breaking the
     # phase's "0-regression by construction" guarantee.
     #
-    # SELF-01 (a phase): re-perceive the name via OPSIN. A non-None canonical
+    # (a phase): re-perceive the name via OPSIN. A non-None canonical
     # SMILES means OPSIN PARSED it -> run the constitutional self-consistency check
     # (suppress if the name encodes a DIFFERENT molecule). None means rejected or
     # unavailable; only then consult parse_status to distinguish them (fail-OPEN on
@@ -1394,7 +1394,7 @@ def _final_opsin_validity_gate(name: str, smiles: Optional[str],
         # whose re-parsed Sn valence differs), OR a stereo-INCOMPLETE name (a
         # stereo-stripped/omitted descriptor is a WRONG name, not a lesser one) —
         # MUST abstain, never ship. The PIN/default tier keeps the skeleton-based
-        # SELF-01 below (stereo-tolerant by design for the gold PINs), so the 1656
+        # below (stereo-tolerant by design for the gold PINs), so the 1656
         # gate is byte-identical (this branch is skipped when general_fallback_tier
         # is False). Fail-OPEN only when the input key is uncomputable.
         if general_fallback_tier and smiles is not None:
@@ -1425,7 +1425,7 @@ def _final_opsin_validity_gate(name: str, smiles: Optional[str],
                             # Full-InChIKey verified (a review -P2 F3): record a
                             # VERIFIED outcome, not a carve-out. The composed name
                             # was proven to recompute to the input's full key —
-                            # stronger than SELF-01 — so the public provenance must
+                            # stronger than — so the public provenance must
                             # report it "verified", not "unverified".
                             _record_gate_outcome(
                                 _pv.GATE_OUTCOME_STEREO_RECOMPOSED, _composed)
@@ -1451,7 +1451,7 @@ def _final_opsin_validity_gate(name: str, smiles: Optional[str],
     # cannot canonicalise (an impossible valence — e.g. the lambda6 candidate
     # '1,2lambda6,3-dioxathiolane' produced for a lambda6-multiring-spiro that the
     # spiro engine fail-closes). ONLY 'unavailable' fails OPEN (a transient hiccup
-    # must never suppress a valid, round-trip-passing name — CR-01). A
+    # must never suppress a valid, round-trip-passing name —). A
     # 'parsed'-but-uncanonicalisable output is UNVERIFIABLE: we cannot confirm the
     # name describes the input structure, so it must fall through to the whitelist
     # carve-outs below and, absent a whitelist hit, suppress to the honest fallback
@@ -1475,12 +1475,12 @@ def _final_opsin_validity_gate(name: str, smiles: Optional[str],
     # head-to-head). PIN path untouched.
     if general_fallback_tier:
         #: EXEMPT the construction-verified NP stereoparent carve-out
-        # (germacrane, corynoxan,... -- the P-101.2.7 Table 10.1 retained parent
+        # (germacrane, corynoxan,... -- the retained parent
         # hydrides). These are 0-wrong by EXACT canonical-SMILES table membership
         # (NAME_EXACT_NP_PARENTS) -- a stronger guarantee than OPSIN-RT -- and
         # OPSIN 2.9.0 simply lacks the generation grammar for them
         # (name_to_smiles -> None). Suppressing a curated, exact-match PIN here is a
-        # T4 defect (best-effort abstains where a verified name exists, a project rule):
+        # defect (best-effort abstains where a verified name exists, a project rule):
         # `germacrane`'s systematic form does not round-trip, so best-effort was
         # dropping the retained PIN to the abstention sentinel instead of keeping it.
         # They ship via the ``np_stereoparent`` carve-out below. This is NARROW ON
@@ -1502,11 +1502,11 @@ def _final_opsin_validity_gate(name: str, smiles: Optional[str],
             return _suppressed_to
         # else: fall through to the np_stereoparent carve-out (ships the retained PIN).
     # DD2 / OPSIN-validity grammar carve-out (Phase D): OPSIN's generation grammar does not recognise the
-    # P-63.4.2 chalcogen-peroxol suffix family ('-SO-thioperoxol', '-OS-thioperoxol',
-    # '-dithioperoxol'), so it REJECTS these correct PINs (P-56.2 verbatim:
+    # chalcogen-peroxol suffix family ('-SO-thioperoxol', '-OS-thioperoxol',
+    # '-dithioperoxol'), so it REJECTS these correct PINs verbatim:
     # `CH3-S-OH -> methane-SO-thioperoxol (PIN)`). Like the stereo-grammar carve-out
     # below, an OPSIN coverage gap on a valid IUPAC suffix must not gate Orthonym
-    # correctness — gold is name-exact-match, not RT. CR-03 guard: only un-suppress a
+    # correctness — gold is name-exact-match, not RT. guard: only un-suppress a
     # WELL-FORMED thioperoxol name. The italic 'SO-'/'OS-' descriptor must be
     # separator-led (hyphen/paren); a multiplied form glued straight onto the
     # descriptor ('ethane-1,2-bisSO-thioperoxol') is a real formatting defect and
@@ -1514,7 +1514,7 @@ def _final_opsin_validity_gate(name: str, smiles: Optional[str],
     if "thioperoxol" in name and not re.search(r"[A-Za-z](SO|OS)-thioperoxol", name):
         _record_gate_outcome(_pv.carveout_outcome("thioperoxol"), name)
         return name
-    # a phase follow-on (P-104.2.1): the inositol retained names
+    # a phase follow-on: the inositol retained names
     # (myo-/scyllo-/cis-/epi-/neo-/allo-/muco-/D-chiro-/L-chiro-inositol) are the
     # PIN but are OPSIN-UNPARSEABLE (no generation-grammar support — verified
     # name_to_smiles -> None for every one), exactly the thioperoxol situation
@@ -1528,7 +1528,7 @@ def _final_opsin_validity_gate(name: str, smiles: Optional[str],
             return name
     except Exception:
         pass
-    # a phase (P-101.2.7 Table 10.1 a/c): the terpene/alkaloid stereoparent
+    # a phase a/c): the terpene/alkaloid stereoparent
     # retained names (abietane/kaurane/.../yohimban/sparteine/...) are the recommended
     # semisystematic parent names but are OPSIN-UNPARSEABLE (verified name_to_smiles ->
     # None for each), exactly the inositol/thioperoxol situation. They are produced ONLY
@@ -1542,7 +1542,7 @@ def _final_opsin_validity_gate(name: str, smiles: Optional[str],
             return name
     except Exception:
         pass
-    # W3-P06 (P-65.7.6.1): di-/polyanhydride PINs ('diacetic butanedioic
+    # W3-P06: di-/polyanhydride PINs ('diacetic butanedioic
     # dianhydride') are correct-by-construction (emitted ONLY by the hard-gated
     # rules.anhydrides._name_dianhydride) but OPSIN's anhydride word-rule cannot
     # parse the 'di-'-COLLAPSED acid words ("Unexpected number of words in
@@ -1553,33 +1553,33 @@ def _final_opsin_validity_gate(name: str, smiles: Optional[str],
     if _DIANHYDRIDE_PIN_RE.match(name):
         _record_gate_outcome(_pv.carveout_outcome("dianhydride"), name)
         return name
-    # W8-P4 (P-65.7.6.4.1): chalcogen di-/poly-anhydride PIN carve-out — see
+    # W8-P4: chalcogen di-/poly-anhydride PIN carve-out — see
     # _CHALCOGEN_DIANHYDRIDE_PIN_RE docstring above.
     if _CHALCOGEN_DIANHYDRIDE_PIN_RE.match(name):
         _record_gate_outcome(
             _pv.carveout_outcome("chalcogen_dianhydride"), name)
         return name
-    # W3-P07 (P-65.6.3.3.3.2 method (1)): functional-class polyol polyester PIN
+    # W3-P07 method (1)): functional-class polyol polyester PIN
     # ('propane-1,2,3-triyl 1,3-diacetate 2-propanoate') — correct-by-construction
     # from _assemble_glyceride but OPSIN cannot parse the multi-anion syntax
     # (exactly the inositol/dianhydride generation-grammar gap).
     if _POLYOL_POLYESTER_PIN_RE.match(name):
         _record_gate_outcome(_pv.carveout_outcome("polyol_polyester"), name)
         return name
-    # W8-P9 Task 9.1 (P-69.2.3/.4/.6): additive/coordination organometallic
+    # W8-P9 Task 9.1 /.4/.6): additive/coordination organometallic
     # PIN carve-out — see _ORGANOMETALLIC_ADDITIVE_PIN_RE docstring above.
     if _ORGANOMETALLIC_ADDITIVE_PIN_RE.match(name):
         _record_gate_outcome(
             _pv.carveout_outcome("organometallic_additive"), name)
         return name
-    # W8-P8 Task 8.12 (P-26.2/.3): phane simplified-skeletal PIN carve-out —
+    # W8-P8 Task 8.12 /.3): phane simplified-skeletal PIN carve-out —
     # see _PHANE_PIN_RE docstring above. Emitted ONLY by the hard-gated
     # rules.phane.build_phane_pin (formula-conservation-vetoed), so OPSIN's
     # total lack of phane grammar must not suppress it.
     if _PHANE_PIN_RE.match(name):
         _record_gate_outcome(_pv.carveout_outcome("phane"), name)
         return name
-    # W8-P5 Task 2 (P-72.3/P-72.8.1): substituted halogen-uide PIN carve-out
+    # W8-P5 Task 2 /: substituted halogen-uide PIN carve-out
     # ('diphenyliodanuide') — see _HALOGEN_UIDE_PIN_RE docstring above.
     # Emitted ONLY by the hard-gated rules.ions._emit_group13_uide halogen
     # branch (atom-conservation-vetoed), so OPSIN's substituted-uide grammar
@@ -1587,7 +1587,7 @@ def _final_opsin_validity_gate(name: str, smiles: Optional[str],
     if _HALOGEN_UIDE_PIN_RE.match(name):
         _record_gate_outcome(_pv.carveout_outcome("halogen_uide"), name)
         return name
-    # OPSIN-validity stereo carve-out / DEF-9 (a phase.7): decide on WHERE OPSIN fails. If the name is
+    # OPSIN-validity stereo carve-out / (a phase): decide on WHERE OPSIN fails. If the name is
     # rejected ONLY because of its stereo layer — i.e. the stereo-STRIPPED
     # constitutional form parses — then OPSIN's narrower generation-side stereo
     # grammar must NOT gate Orthonym correctness (audit Dim-08 §C; the verbatim
@@ -1596,8 +1596,8 @@ def _final_opsin_validity_gate(name: str, smiles: Optional[str],
     # form ALSO fails to parse is still suppressed. strip_stereo is read-only — the
     # shipped name keeps its stereo descriptors.
     #
-    # ARCH-2 (2026-07-27): this branch used to `return name` outright, skipping
-    # SELF-01, so ANY constitutional defect rode out free as long as the name
+    # (2026-07-27): this branch used to `return name` outright, skipping
+    #, so ANY constitutional defect rode out free as long as the name
     # happened to carry a stereo prefix OPSIN rejects — verification was strongest
     # on well-formed names and ABSENT on malformed ones, exactly backwards. Measured
     # on benchmarks/pubchem_2000.csv with the gates ON: 107 names shipped through
@@ -1609,26 +1609,26 @@ def _final_opsin_validity_gate(name: str, smiles: Optional[str],
     # The carve-out's licence is narrow — OPSIN need not parse the stereo LAYER —
     # and it was never a licence to ship an UNVERIFIED CONSTITUTION. The comparison
     # was available all along: _self_consistency_verdict compares the InChIKey
-    # SKELETON block, which EXCLUDES stereochemistry by construction (ADR-18-07),
+    # SKELETON block, which EXCLUDES stereochemistry by construction (-07),
     # so it can judge the stereo-STRIPPED parse with no loss of validity. Route it
-    # through the SAME SELF-01 decision the parsed path uses: a verified
+    # through the SAME decision the parsed path uses: a verified
     # constitutional mismatch suppresses, while `ok`/`inconclusive` still ship the
     # FULL stereo name (fail-OPEN on any comparison that could not be made).
     from .rules.stereochemistry import strip_stereo
     _stripped = strip_stereo(name)
     if _stripped != name:
         _stripped_status = _validity_gate_status(_stripped)
-        # ARCH-2-FOLLOWUP: _validity_gate_status is THREE-valued, and the stripped
+        # -FOLLOWUP: _validity_gate_status is THREE-valued, and the stripped
         # probe is a second, independent OPSIN consultation that can hiccup on its
         # own. 'unavailable' (subprocess timeout / OSError on a loaded host) means
         # OPSIN was never consulted — it is NOT evidence against the name — so it
-        # must fail OPEN, exactly as the primary probe already does at CR-01 above.
+        # must fail OPEN, exactly as the primary probe already does at above.
         # Testing `== "parsed"` alone lumped it with 'rejected' and let a transient
         # hiccup suppress the very names this carve-out exists to rescue (the
         # verbatim BB PIN `(1s,4s)-cyclohexane-1,4-diol` -> `unknown`), contradicting
         # the promise made three paragraphs up. Note this is NOT a blanket escape
         # hatch: a PERSISTENTLY unavailable OPSIN (JAR genuinely missing) is already
-        # caught by the _validity_gate_jar_present() probe above, which fails the
+        # caught by the _validity_gate_jar_present probe above, which fails the
         # whole gate open — so the two behaviours agree rather than compete.
         if _stripped_status == "unavailable":
             if stats is not None:
@@ -1656,10 +1656,10 @@ def _final_opsin_validity_gate(name: str, smiles: Optional[str],
                             stats.get("gate_stereo_mismatch", 0) + 1)
                     # `_decided` is the fallback; _self_consistency_decision
                     # already recorded GATE_OUTCOME_SUPPRESSED against it.
-                    return _decided  # SELF-01 PROVED a different molecule -> suppress
+                    return _decided  # PROVED a different molecule -> suppress
                 if stats is not None:
                     stats["gate_stereo_kept"] = stats.get("gate_stereo_kept", 0) + 1
-                # T1: SELF-01 judged the stereo-STRIPPED parse, so an
+                # T1: judged the stereo-STRIPPED parse, so an
                 # "ok" here verifies the CONSTITUTION ONLY — the stereo layer
                 # was never checked (that is the whole point of this
                 # carve-out). Downgrade the inner verdict to say so. Any other
@@ -1685,10 +1685,10 @@ def _final_opsin_validity_gate(name: str, smiles: Optional[str],
                     stats.get("gate_stereo_unverifiable", 0) + 1)
     # NOTE (, resolved): radical names now ship normally. The validity gate's
     # primary probe runs the OpsinOracle WITH `-r` (retained_substitution.py), so
-    # a well-formed radical name parses -> SELF-01 constitutional compare -> ships.
-    # The P-71 non-terminal-locant fix landed long ago (single sites:
+    # a well-formed radical name parses -> constitutional compare -> ships.
+    # The non-terminal-locant fix landed long ago (single sites:
     # C[CH]C -> `propan-2-yl` via emit_parent_hydride_cumulative_suffix); multi-site
-    # free valences (P-71.2.3: ethane-1,2-diyl / propane-1,2,3-triyl /
+    # free valences: ethane-1,2-diyl / propane-1,2,3-triyl /
     # ethan-1-yl-2-ylidene) landed in w2f p5. The suppression below is NOT
     # radical-specific: it is the general fail-closed backstop for names OPSIN
     # rejects EVEN WITH `-r` (constitutional defects) — no validity-gate edit is
@@ -1711,7 +1711,7 @@ def _full_inchikey_offer_match(input_smiles: str, opsin_smiles: str) -> bool:
     protonation/mobile-H-tautomer state all identical.
 
     Strictly stronger than `_self_consistency_skeleton`'s stereo-/charge-
-    insensitive FIRST block (which is what the ordinary SELF-01 gate proves):
+    insensitive FIRST block (which is what the ordinary gate proves):
     the L3 CHARACTERIZATION found the discard-gap primaries are constitution-
     CORRECT (they pass that tolerant compare -- including its deliberate
     ``na == 0`` licence, "a stereo-UNSPECIFIED input named by a stereo-
@@ -1745,7 +1745,7 @@ def _offer_rt_ok(name: str, input_smiles: Optional[str]) -> bool:
     ``offer_pool.select_rt_passing`` is injected with, built at `_finish`).
 
      a phase L3-1 CHANGE: this now requires a FULL-InChIKey match
-    (`_full_inchikey_offer_match`), not merely the constitution-only SELF-01
+    (`_full_inchikey_offer_match`), not merely the constitution-only
     verdict the L4-core version reused outright. The L3 CHARACTERIZATION
     measured that the constitution-only bar lets a stereo-wrong (or stereo-
     fabricated) primary through, which is exactly the gap the systematic
@@ -1753,7 +1753,7 @@ def _offer_rt_ok(name: str, input_smiles: Optional[str]) -> bool:
     NOT out-rank a floor offer that proves the full molecule.
 
     NO double-OPSIN in the common case: `_validity_gate_name_to_smiles` is
-    MEMOIZED (`OpsinOracle._name_cache`), and the ordinary SELF-01 gate
+    MEMOIZED (`OpsinOracle._name_cache`), and the ordinary gate
     (`_final_opsin_validity_gate`) already called it on this EXACT string
     before recording whatever verdict `_self01_lookup` reads back -- so the
     call below is a cache HIT, not a new JVM invocation, for every name the
@@ -1775,7 +1775,7 @@ def _offer_rt_ok(name: str, input_smiles: Optional[str]) -> bool:
     present -- unlike a genuine `carveout:*` (a by-design OPSIN-unparseable
     PIN class -- thioperoxol/inositol/...) or `gate_disabled` (the whole
     verification layer is deliberately off). Fail-opening all four alike let a
-    stubbed T4 producer ship a WRONG-MOLECULE name via a `t4_floor` offer with
+    stubbed producer ship a WRONG-MOLECULE name via a `t4_floor` offer with
     ZERO gates firing end-to-end: `scratchpad/probe_whitebox_floor.py` stubbed
     `t4_coverage.name_t4_complete` to return `"ethanol"` for an unrelated
     abstainer (`CC(=O)C1=C(C)S[C@@H](C)CC1=O`) and the genuine
@@ -1824,15 +1824,15 @@ def _offer_rt_ok(name: str, input_smiles: Optional[str]) -> bool:
     # NOTE: deliberately NOT short-circuited on `self01_complete is True`
     # (L3-1's whole point) -- proceed to the full-InChIKey compare below,
     # reusing the memoized name_to_smiles lookup regardless of what the
-    # constitution-only SELF-01 verdict said.
+    # constitution-only verdict said.
     opsin_smiles = _validity_gate_name_to_smiles(name)
     if opsin_smiles is None:
         # OPSIN could not re-perceive this string. Fail OPEN on a transient
         # 'unavailable' ONLY when this EXACT string ALREADY earned a real
-        # positive SELF-01 verdict (`self01_complete is True`) -- re-looking up a
+        # positive verdict (`self01_complete is True`) -- re-looking up a
         # previously-VERIFIED name and hitting a transient blip must not lose it.
         #
-        # WS7 fix round 1 (coordinator CRITICAL, 0-wrong): for a string with NO
+        # fix round 1 (coordinator CRITICAL, 0-wrong): for a string with NO
         # positive verdict (`self01_complete is None` -- `bypassed` / `suppressed`
         # / `inconclusive`, e.g. a FRESH floor/alternative offer whose exact
         # string the gate NEVER verified), a None here means the offer is
@@ -1842,7 +1842,7 @@ def _offer_rt_ok(name: str, input_smiles: Optional[str]) -> bool:
         # this a transient OPSIN failure shipped an ungated floor offer
         # (`F[B-](F)(F)F` -> the unverified floor `2,2-difluoro-2-borapropan-2-uide`;
         # `[Se-]CC` -> the OPSIN-unparseable `1-selanidoethane`). This makes the
-        # offers lane symmetric with the recovery-lane T4 (`_cand_from_t4`), which
+        # offers lane symmetric with the recovery-lane (`_cand_from_t4`), which
         # already fails CLOSED on the same blip. A definitive 'rejected' fails
         # closed for every string regardless.
         return (self01_complete is True
@@ -2040,7 +2040,7 @@ class MolecularFeatures:
     is_aromatic: bool = False
     ring_type: Optional[str] = None  # 'cycloalkane', 'cycloalkene', 'aromatic', 'heterocyclic_aromatic', 'heterocyclic_saturated'
     principal_ring: Optional[tuple] = None  # Atom indices of the principal ring
-    senior_ring_system: Optional[tuple] = None  # P-44.2 most senior ring system (atom indices)
+    senior_ring_system: Optional[tuple] = None  # most senior ring system (atom indices)
     oriented_ring: Optional[List[int]] = None  # Ring atoms reordered for naming
     ring_substituents: Dict[int, List[List[int]]] = field(default_factory=dict)  # Substituents on ring
     ring_double_bonds: List[tuple] = field(default_factory=list)  # Double bonds in ring
@@ -2081,20 +2081,20 @@ class MolecularFeatures:
 
     # Amide-specific information
     amide_type: Optional[str] = None  # "primary", "secondary", or "tertiary"
-    n_substituents: List[Dict] = field(default_factory=list)  # N-substituents from get_n_substituents()
+    n_substituents: List[Dict] = field(default_factory=list)  # N-substituents from get_n_substituents
 
-    # Ring-as-substituent information (when chain is parent per IUPAC P-44.1)
+    # Ring-as-substituent information (when chain is parent per IUPAC
     ring_substituents_as_groups: List[tuple] = field(default_factory=list)  # Rings that become substituents
     chain_is_parent: bool = False  # True when parent selection chose chain over ring
 
     # Ion/radical species information
     species_type: str = 'neutral'  # 'neutral', 'ion', 'zwitterion', 'salt', 'radical'
-    ion_sites: Dict[str, List[Dict]] = field(default_factory=dict)  # From get_ion_sites()
-    radical_sites: List[Dict] = field(default_factory=list)  # From get_radical_sites()
+    ion_sites: Dict[str, List[Dict]] = field(default_factory=dict)  # From get_ion_sites
+    radical_sites: List[Dict] = field(default_factory=list)  # From get_radical_sites
     total_charge: int = 0  # Net formal charge of the molecule
 
     # a phase / V18 Appendix A.5: parent-selection result for downstream
-    # coverage_scoring readers. Populated by _classify when select_parent()
+    # coverage_scoring readers. Populated by _classify when select_parent
     # runs for a cyclic+chain molecule (chain_len >= 2). a phase /
     # will recalibrate FACTOR_WEIGHTS_V18['parent_correctness'] against the
     # discrimination this slot provides.
@@ -2103,19 +2103,19 @@ class MolecularFeatures:
 
 
 def compute_features(mol, smiles: Optional[str] = None) -> MolecularFeatures:
-    """a phase BL-1: thin module-level wrapper around Orthonym()._perceive.
+    """a phase: thin module-level wrapper around Orthonym._perceive.
 
     Provides a public-API perception entry for tests and downstream
-    callers. Mirrors what name_compound() does internally before naming.
+    callers. Mirrors what name_compound does internally before naming.
 
     Args:
         mol: RDKit Mol object.
         smiles: Optional input SMILES; if None, derived via Chem.MolToSmiles(mol).
 
     Returns:
-        MolecularFeatures populated by Orthonym()._perceive.
+        MolecularFeatures populated by Orthonym._perceive.
 
-    Source: a phase Plan 02 BL-1 fix (public-API perception entry).
+    Source: a phase Plan 02 fix (public-API perception entry).
     """
     if smiles is None:
         smiles = Chem.MolToSmiles(mol)
@@ -2141,9 +2141,9 @@ def _collect_ring_substituent_positions(features, ring_atoms):
 
 
 def _demote_offring_principal_group_matches(features, ring_atoms) -> None:
-    """P-59.2.1.6 (BB 25207): the principal group appears in BOTH the ring and
+    """ (BB 25207): the principal group appears in BOTH the ring and
     a chain; the portion with the GREATER number of the group is the parent
-    (tie -> ring, P-52.2.8). When the ring wins, an off-ring principal-group
+    (tie -> ring,. When the ring wins, an off-ring principal-group
     match must NOT be expressed as a second ring suffix — it stays on its
     demoted chain and is named as a substituent prefix (e.g. the pendant
     butan-2-one on a cyclopentane-1,2-dione -> '4-(2-oxobutyl)').
@@ -2157,7 +2157,7 @@ def _demote_offring_principal_group_matches(features, ring_atoms) -> None:
         -carboxylic acid,...) legitimately anchor exocyclically and are
         untouched (they route through the ring_anchored_pg_atoms path);
       * the ring's on-ring match count is STRICTLY GREATER than the off-ring
-        count (ring wins outright) OR they TIE (P-52.2.8 ring default) — but
+        count (ring wins outright) OR they TIE ring default) — but
         only demote when there is at least one on-ring match to keep as the
         ring suffix (else the ring cannot express the group and we must not
         strip it; fail closed by leaving matches unchanged).
@@ -2200,7 +2200,7 @@ def _demote_offring_principal_group_matches(features, ring_atoms) -> None:
                 is_on_ring = True
                 break
         (on_ring if is_on_ring else off_ring).append(match)
-    # P-59.2.1.6: ring is parent only when it has the GREATER count, or ties
+    #: ring is parent only when it has the GREATER count, or ties
     # (ring default). Require >=1 on-ring match to keep as the suffix and
     # >=1 off-ring match to demote; otherwise nothing to do / fail closed.
     if not on_ring or not off_ring:
@@ -2216,14 +2216,14 @@ def _demote_offring_principal_group_matches(features, ring_atoms) -> None:
 def _build_ring_info_for_parent_selection(features):
     """a phase: dispatch on ring type and produce authoritative IUPAC locants.
 
-    7-branch cascade (order per 147-CONTEXT.md with W-1 fix):
+    7-branch cascade (order per 147-internal notes with W-1 fix):
       1. Fused-heterocycle (match_fused_heterocycle_core) — preserve
          byte-identical path; runs first.
       2. Polycyclic aromatic (identify_polycyclic + get_polycyclic_iupac_locants)
          — runs for ANY ring system with a PAH match, NOT gated on fused_type
          (W-1 fix: pyrene is ortho-peri-fused but must still flow here).
       3. Benzene-only single ring (orient_benzene with canonical
-         get_benzene_substituents helper — BL-2 fix).
+         get_benzene_substituents helper — fix).
       4. Simple heterocycle single ring (orient_heterocycle_with_substituents).
       5. Spiro detection -> {"iupac_locants": None} stub (a phase fills).
       6. Bridged/VB detection -> {"iupac_locants": None} stub (a phase fills).
@@ -2232,8 +2232,8 @@ def _build_ring_info_for_parent_selection(features):
 
     Returns None for acyclic molecules.
 
-    Source: https://iupac.qmul.ac.uk/BlueBook/P4.html P-44.1
-    Source: a phase CONTEXT,,,; Plan 02 W-1, W-2, BL-2.
+    Source: https://iupac.qmul.ac.uk/BlueBook/P4.html
+    Source: a phase internal notes,,,; Plan 02 W-1, W-2,.
     """
     if not features.is_cyclic:
         return None
@@ -2298,9 +2298,9 @@ def _build_ring_info_for_parent_selection(features):
         ring_mol_atoms = [mol.GetAtomWithIdx(i) for i in ring_atoms]
 
         # Branch 3: benzene-only (single 6-aromatic-C ring).
-        # BL-2 fix: use the canonical get_benzene_substituents helper
+        # fix: use the canonical get_benzene_substituents helper
         # (returns Dict[int, List[Dict]] with real substituent entries),
-        # NOT a {idx: []} placeholder — the latter would yield arbitrary
+        # NOT a {idx: } placeholder — the latter would yield arbitrary
         # orientation because orient_benzene checks ``if atom_idx in
         # substituents:`` and every dict key matches an empty-list value.
         if (len(ring_atoms) == 6
@@ -2308,7 +2308,7 @@ def _build_ring_info_for_parent_selection(features):
                         for a in ring_mol_atoms)):
             try:
                 substituents = get_benzene_substituents(mol, ring_atoms)
-                # E1/DD4 (P-14.4(c)): anchor the principal characteristic group
+                # E1/DD4 (c)): anchor the principal characteristic group
                 # to the lowest locant before detachable substituents.
                 # Phase C Task 9: this was derived from the is_suffix marker
                 # alone, which made it EMPTY for phenols (a ring -OH is spelled as
@@ -2317,7 +2317,7 @@ def _build_ring_info_for_parent_selection(features):
                 # the same shared authority as the composer, so the two agree.
                 #
                 # ⚠ Phase C Task 9b: reading ``features.principal_group`` alone
-                # made the whole anchor a NO-OP here. ``compute_features()`` runs
+                # made the whole anchor a NO-OP here. ``compute_features`` runs
                 # ``_perceive`` only, so that attribute is None for all four external
                 # callers (rules/ring_chalcogen_oxide.py:277,
                 # rules/multiplicative.py:1795 and:2454, rules/ions.py:2240) --
@@ -2371,13 +2371,13 @@ def _build_ring_info_for_parent_selection(features):
     #
     # Mixed spiro/fused: is_mixed_spiro_fused True iff ≥1 spiro atom AND
     # n_rings > n_spiro + 1 AND detect_natural_product is None (Pitfall 3
-    # false-positive guard) AND the topology is AUTONOM §4 separable AND
+    # false-positive guard) AND the topology is AUTONOM separable AND
     # the fused part has a catalog name ((b) canary-stability guard).
     #
     # If neither supplier returns full coverage (None), fall through to
     # Branch 6 (a phase-01 VB) and onwards.
     #
-    # Source: 151-CONTEXT.md / /; 151-AUDIT-B.md verdict
+    # Source: 151-internal notes / /; internal notes-B.md verdict
     # MIXED_SPIRO_FUSED_MISSING + Q-05 NESTED_FORM_PARSEABLE.
     from .rules.spiro import (
         get_mixed_spiro_fused_iupac_locants,
@@ -2409,7 +2409,7 @@ def _build_ring_info_for_parent_selection(features):
     # / mixed cases skip this branch and fall through to is_bridged_fused
     # below or downstream branches.
     #
-    # Source: 151-CONTEXT.md / /; 151-AUDIT-A.md verdict
+    # Source: 151-internal notes / /; internal notes-A.md verdict
     # THIN_WRAPPER; a phase cascade-step-6 gate (candidate_pool.py:634).
     from .rules.polycyclic_von_baeyer import (
         get_higher_polycyclo_iupac_locants,
@@ -2428,14 +2428,14 @@ def _build_ring_info_for_parent_selection(features):
         return {"iupac_locants": None}
 
     # Branch 7 (a phase-03): ring assembly size 3+ supplier.
-    # Wires get_ring_assembly_iupac_locants per 151-AUDIT-C.md verdict
-    # SUPPLIER_MISSING + 151-PATTERNS.md Pattern S-3. Path-topology check
+    # Wires get_ring_assembly_iupac_locants per internal notes-C.md verdict
+    # SUPPLIER_MISSING + internal notes Pattern S-3. Path-topology check
     # added to detect_ring_assembly per rejects branched arrangements
     # (1,3,5-triphenylbenzene) so Branch 7 only fires on linear chains.
     # 2-system bi- assemblies are NOT routed here (covered by existing
     # naming pipeline + the >=3 gate keeps blast-radius minimal).
     #
-    # Source: 151-CONTEXT.md / / /; 151-AUDIT-C.md
+    # Source: 151-internal notes / / /; internal notes-C.md
     # composite verdict; Pitfall 7 (full coverage or None).
     if hasattr(features, 'ring_systems') and len(features.ring_systems) >= 3:
         from .rules.ring_assemblies import (
@@ -2454,16 +2454,16 @@ def _build_ring_info_for_parent_selection(features):
     # Cataloged compounds reach Branches 1 (fused-heterocycle catalog) and
     # 2 (PAH) first. If they didn't, but the system is ortho-fused or
     # ortho-peri-fused with EXACTLY 2 SSSR components, route base-component
-    # selection through FR-2.3.
+    # selection through.3.
     #
     # CRITICAL: emits `base_component_atoms` (NEW key), NOT `iupac_locants`.
     # Cascade step 6 in candidate_pool._has_iupac_locants checks
     # specifically for `iupac_locants` — Branch 6.5's new key is invisible
     # to that gate, so cascade step 6 stays GATED for non-cataloged fused
-    # systems (a phase + a phase SC-7 lock).
+    # systems (a phase + a phase lock).
     #
     # SCOPE LIMIT (a phase Plan 02 triage): restricted to 2-component
-    # fused systems where FR-2.3 base selection is reliable. 3+ component
+    # fused systems where.3 base selection is reliable. 3+ component
     # systems (steroids, complex polycycles) fall through to Branch 7 to
     # avoid propagating partial base-atoms that disrupt downstream parent
     # selection for systems whose IUPAC name requires the full ring system
@@ -2471,8 +2471,8 @@ def _build_ring_info_for_parent_selection(features):
     # a phase.x or a phase per trade-off.
     #
     # Source: https://iupac.qmul.ac.uk/fusedring/FR23.html
-    # Source: 149-CONTEXT.md; SC-2; SC-7; trade-off.
-    # Source: 147-CONTEXT.md (cascade step 6 gate carry-forward).
+    # Source: 149-internal notes;;; trade-off.
+    # Source: 147-internal notes (cascade step 6 gate carry-forward).
     if fused_type in ('ortho-fused', 'ortho-peri-fused'):
         # Branch 1 (catalog) and Branch 2 (PAH) already missed (control
         # flow reached this point — Branch 1 returns earlier on
@@ -2526,18 +2526,18 @@ import functools as _functools
 
 
 def _budget_scope(fn):
-    """ giant-molecule hang fix: bracket a top-level ``name()`` with the
+    """ giant-molecule hang fix: bracket a top-level ``name`` with the
     per-top-level fragment work budget.
 
-    ``enter_name_scope``/``exit_name_scope`` maintain a raw ``name()`` call-stack
+    ``enter_name_scope``/``exit_name_scope`` maintain a raw ``name`` call-stack
     counter on the fragment thread-local; the TRUE outermost call arms the budget
     and every nested re-entry (the recursion through ``name_compound`` and the
-    isolated T4 producer) shares it. Crucially, ``isolated_naming_session`` resets
+    isolated producer) shares it. Crucially, ``isolated_naming_session`` resets
     the session state but NOT this counter, so the budget survives the nested
     recovery entries a giant molecule triggers -- guaranteeing termination.
 
     A decorator (not inline enter/exit) so the budget is released on EVERY exit
-    path -- ``name()`` has several early ``return`` sites that each call
+    path -- ``name`` has several early ``return`` sites that each call
     ``end_naming_session`` -- with no leak that could contaminate the next
     molecule.
     """
@@ -2559,7 +2559,7 @@ def _budget_scope(fn):
             # a BaseException, so it unwound PAST every broad ``except Exception``
             # on the recursive path to here. Convert it to the SAME clean abstain
             # the engine emits for any unnameable input -- ONLY at the true
-            # outermost name() (depth == 1); a nested scope re-raises so the
+            # outermost name (depth == 1); a nested scope re-raises so the
             # signal keeps unwinding. inv 9: this is a clean abstain (the
             # descriptive/coordination fallback), never a partial or wrong name.
             if depth != 1:
@@ -2571,7 +2571,7 @@ def _budget_scope(fn):
             disarm_hang_budgets()
             smiles = args[0] if args else kwargs.get('smiles')
             # M0: before the clean abstain, offer ONE bounded, strictly
-            # OPSIN-RT-gated whole-molecule T4 name. The budget fired because the
+            # OPSIN-RT-gated whole-molecule name. The budget fired because the
             # MAIN path's combinatorial ring analysis exploded, but the
             # coverage-by-construction producer often names the same molecule
             # cheaply AND exactly (measured: a 100-atom 10-ring fused peptide is
@@ -2593,9 +2593,9 @@ def _budget_scope(fn):
                                   detail='perf_op_budget')
             except Exception:
                 pass
-            # Route the abstain through name()'s single audited exit (_finish),
-            # but SUPPRESS the T4 floor-offer: the budget fired precisely because
-            # this molecule's naming EXPLODES, so re-running the full T4 producer
+            # Route the abstain through name's single audited exit (_finish),
+            # but SUPPRESS the floor-offer: the budget fired precisely because
+            # this molecule's naming EXPLODES, so re-running the full producer
             # here (a) is now unbudgeted and could re-hang, and (b) for these
             # metallo-macrocycles ships an OPSIN-UNPARSEABLE coordination name
             # its RT gate wrongly accepts (a pre-existing spelling-layer gap this
@@ -2614,7 +2614,7 @@ def _budget_scope(fn):
 #: cross-instance recursion guard for the parent-offer retry. The
 # retry spawns FRESH inner instances whose own best-effort ship-failure hooks
 # (`_try_demote_senior_group_rescue`, decomposition,...) can be top-level
-# (`is_top_level_naming()` keys off the fragment `visited` set, not session
+# (`is_top_level_naming` keys off the fragment `visited` set, not session
 # depth), so without this a demote-spawned inner could re-enter the parent
 # offer. One flag per thread; set for the whole duration of an outer offer.
 _ALT_PARENT_RESCUE = threading.local()
@@ -2630,7 +2630,7 @@ class Orthonym:
     3. Assembly: Build name from fragments
     
     Example:
-        >>> namer = Orthonym()
+        >>> namer = Orthonym
         >>> namer.name("CCO")
         'ethanol'
         >>> namer.name("CC(=O)O")
@@ -2659,7 +2659,7 @@ class Orthonym:
                 - "pin": Preferred IUPAC Names (IUPAC 2013)
                 - "general": General IUPAC (more flexible)
                 - "cas": CAS-style naming
-            _disable_grammar_validation: a phase escape hatch ().
+            _disable_grammar_validation: a phase escape hatch .
                 When True, the OPSIN grammar pre-validation layer is
                 disabled (`self._grammar` is None). ON by default in
                 production; OFF only for unit tests inspecting raw
@@ -2669,8 +2669,8 @@ class Orthonym:
                 invariant). When True, the triviality controller
                 (assembly/retained_substitution.py) swaps systematic
                 PIN-eligible parents to retained PIN forms at the
-                name-tree IR layer per IUPAC P-15.1.8.1..3, and an
-                OpsinOracle is instantiated for the TRIV-03 T2 RT-safety
+                name-tree IR layer per IUPAC..3, and an
+                OpsinOracle is instantiated for the RT-safety
                 gate. Env override:
                 ORTHONYM_ENABLE_TRIVIALITY_CONTROLLER=1/true/yes/on.
             trivial_fallback: PIN-policy fallback flag (CLI ``--trivial``).
@@ -2685,7 +2685,7 @@ class Orthonym:
                 abstention is retried through the binding-carrying general
                 engine (assembly/general_engine.py), gated by the E1
                 certificate (validation/e1_certificate.py) and the existing
-                downstream moat (>15-HA gate, P10 vetoes, SELF-01). Default
+                downstream moat (>15-HA gate, P10 vetoes,). Default
                 False — default output byte-identical for existing callers.
             allow_aromatic_general: opt-in (plumbing only; inert
                 until P1/P2 land). When True, threaded down into
@@ -2699,7 +2699,7 @@ class Orthonym:
                   byte-identical BY CONSTRUCTION, not by careful matching.
                 - "audit": record the general engine's binding spine and
                   re-assert it (validation/proof_ledger.py) against the string
-                  ``name()`` actually returns. OBSERVE-ONLY — the name is never
+                  ``name`` actually returns. OBSERVE-ONLY — the name is never
                   altered, findings go to ``logger.info`` and the ledger.
                 - "enforce": additionally ABSTAIN (fail closed) when the
                   re-anchored proof fails. Implemented and unit-tested here but
@@ -2724,7 +2724,7 @@ class Orthonym:
         # certificate and the existing downstream moat. Default False ->
         # default output byte-identical.
         self._general_fallback: bool = general_fallback
-        #: T4 opt-in — ship an E1-passed engine name when OPSIN cannot
+        #: opt-in — ship an E1-passed engine name when OPSIN cannot
         # verify it (absent jar / rejected / transient). A PARSED-but-
         # MISMATCHED name is never shipped at any tier.
         self._general_fallback_unverified: bool = general_fallback_unverified
@@ -2734,18 +2734,18 @@ class Orthonym:
         # Default False -> default output byte-identical.
         self._allow_aromatic_general: bool = allow_aromatic_general
         #: the full-coverage opt-in (``--emit-tier full-coverage``).
-        # The SINGLE bit that arms the D2 general P-69 coordination-additive
+        # The SINGLE bit that arms the D2 general coordination-additive
         # namer, which sits strictly ABOVE best-effort (full-coverage is
         # best-effort's production superset PLUS this marker). Default False ->
         # D2 dispatch is never reached and EVERY tier's output is
         # byte-identical (the SP5.4 isolation property). Published as
         # ``full_coverage_ctx`` for the recursive re-entry, torn down in the
-        # ``name()`` finally with its three siblings.
+        # ``name`` finally with its three siblings.
         self._full_coverage: bool = full_coverage
-        # SUB-03 (169.5): per-instance bypass for the OPSIN validity gate, used
+        # (169.5): per-instance bypass for the OPSIN validity gate, used
         # by neutralize-recurse / fragment intermediate naming (those produce an
         # INTERMEDIATE name that is transformed downstream, not a final output,
-        # so they must not be gated). Final top-level name() calls leave this
+        # so they must not be gated). Final top-level name calls leave this
         # False -> the gate applies.
         self._disable_opsin_validity_gate: bool = _disable_opsin_validity_gate
         # a phase (verification as a filter over the dispatch cascade).
@@ -2753,7 +2753,7 @@ class Orthonym:
         # GATE-REJECTED for the molecule currently being named; the cascade skips
         # them so the next entry gets its turn. `_last_dispatch_class` is the
         # class that produced the name now under gate. Both are per-molecule
-        # scratch: name() clears them on entry and in a finally, so nothing
+        # scratch: name clears them on entry and in a finally, so nothing
         # leaks between molecules (that would make naming order-dependent).
         # B2: an OPTIONAL seed of dispatch classes to exclude for EVERY
         # molecule named by this instance (default empty -> byte-identical). Used
@@ -2768,24 +2768,24 @@ class Orthonym:
             _seed_excluded_dispatch_classes)
         self._excluded_dispatch_classes: frozenset = self._seed_excluded_dispatch_classes
         self._last_dispatch_class = None
-        # a phase.6 T3: scoped principal-group override (FG name). Set ONLY by the
+        # a phase T3: scoped principal-group override (FG name). Set ONLY by the
         # charged chokepoint's S/P-oxoacid-anion re-entry (_reenter_forced) so the
-        # anionic group is forced as the principal characteristic group per P-72/P-74.
-        # None for every normal name() call -> byte-identical production behaviour.
+        # anionic group is forced as the principal characteristic group per /.
+        # None for every normal name call -> byte-identical production behaviour.
         self._principal_group_override: Optional[str] = _principal_group_override
-        # (offer-not-return, a project rule): force the k-th-ranked P-44
-        # parent instead of ``ranked[0]``. 0 for every normal name() call ->
+        # (offer-not-return, a project rule): force the k-th-ranked
+        # parent instead of ``ranked[0]``. 0 for every normal name call ->
         # byte-identical. Set >0 ONLY by ``_try_alternate_parent_rescue`` on a
         # FRESH inner instance, after ``ranked[0]`` has already abstained, and
         # every candidate it yields is RT-gated before adoption (0-wrong).
         self._forced_parent_rank: int = _forced_parent_rank
-        # Size of the top-level P-44 parent pool from the most recent top-level
+        # Size of the top-level parent pool from the most recent top-level
         # classification (written by _classify). Lets the offer-retry bound its
-        # loop at the real pool length. Reset per top-level name() below.
+        # loop at the real pool length. Reset per top-level name below.
         self._top_parent_pool_size: int = 1
-        # a phase + AP-19: per-instance counter dict, NEVER
+        # a phase +: per-instance counter dict, NEVER
         # module-global. Pre-seed all seven buckets so callers see a
-        # complete histogram even before any name() invocation.
+        # complete histogram even before any name invocation.
         from .validation.opsin_grammar import OpsinGrammar
         self._grammar_stats: Dict[str, int] = {
             k: 0 for k in OpsinGrammar.STAT_KEYS
@@ -2795,23 +2795,23 @@ class Orthonym:
         else:
             # Share the dict by reference per: the grammar
             # instance increments the same dict the Orthonym instance
-            # exposes via `get_validation_stats()`.
+            # exposes via `get_validation_stats`.
             self._grammar = OpsinGrammar(stats=self._grammar_stats)
 
         # a phase NEW: instantiate CFR router (default-ON; no opt-out
-        # flag per CONTEXT + AP-2 + AP-19). Per audit § 3.6 RL-4
-        # fresh-instance invariant: each Orthonym() carries its OWN router
+        # flag per internal notes + +). Per the audit
+        # fresh-instance invariant: each Orthonym carries its OWN router
         # with empty dispatch_stats; recursive `Orthonym(...)` calls produce
         # fresh routers, and the byte-identical contract is on NAME OUTPUT
         # only, NOT on per-call dispatch_stats.
         from .routing import ClassFirstRouter
         self._cfr_router = ClassFirstRouter()
 
-        # a phase RL-7 option (b) NEW: skip-decomposition flag threading.
+        # a phase option (b) NEW: skip-decomposition flag threading.
         # `_name_impl(_skip_decomposition=True)` (called by
-        # `name_pipeline_only()`) sets this on entry; the
+        # `name_pipeline_only`) sets this on entry; the
         # DECOMPOSITION_PRE_GENERAL predicate factory reads from kwargs
-        # passed by `dispatch()`.
+        # passed by `dispatch`.
         self._skip_decomposition: bool = False
 
         # a phase: triviality-controller opt-in (default OFF = Stage A SACRED
@@ -2821,9 +2821,9 @@ class Orthonym:
         self._enable_triviality_controller: bool = (
             enable_triviality_controller or _DEFAULT_TRIV or trivial_fallback
         )
-        # WARNING #9 fix (CRITICAL for TRIV-03 runtime per CONTEXT): instantiate the OpsinOracle
-        # when the flag is ON so the T2 RT-safety gate can run. Without it, OpsinOracle.rt_safe
-        # degrades to the permissive always-True fallback and TRIV-03 runtime enforcement is silently
+        # WARNING #9 fix (CRITICAL for runtime per internal notes): instantiate the OpsinOracle
+        # when the flag is ON so the RT-safety gate can run. Without it, OpsinOracle.rt_safe
+        # degrades to the permissive always-True fallback and runtime enforcement is silently
         # disabled. Default OFF keeps the oracle None (zero cost, byte-identical Stage A).
         self._triv_oracle = None
         if self._enable_triviality_controller:
@@ -2850,7 +2850,7 @@ class Orthonym:
 
         # a phase: group-splitting flag (default OFF -> byte-identical Stage A).
         # Env override ORTHONYM_ENABLE_GROUP_SPLITTING. The OpsinOracle is instantiated
-        # only when the flag is ON so the FAIL-CLOSED per-split RT gate () can run;
+        # only when the flag is ON so the FAIL-CLOSED per-split RT gate  can run;
         # default OFF keeps it None (zero cost, byte-identical Stage A).
         self._enable_group_splitting: bool = enable_group_splitting or _DEFAULT_GS
         self._split_oracle = None
@@ -2880,9 +2880,9 @@ class Orthonym:
         """a phase: per-instance CFR dispatch histogram.
 
         Returns a defensive copy of the (StoutClass -> int) histogram
-        recorded by the CFR router on every dispatch. Per CONTEXT +
-        AP-6 the counter lives on the Orthonym instance via the CFR
-        router; reset on demand via `reset_dispatch_stats()`.
+        recorded by the CFR router on every dispatch. Per internal notes +
+         the counter lives on the Orthonym instance via the CFR
+        router; reset on demand via `reset_dispatch_stats`.
 
         The return type is `Dict[Any, int]` (not `Dict[StoutClass, int]`)
         to avoid eager `from.routing import StoutClass` at module-load
@@ -2898,7 +2898,7 @@ class Orthonym:
         a phase inner-dispatch (module-level) counter. The inner-dispatch
         counter is module-level today (see assembly/inner_dispatch.py
         :_INNER_DISPATCH_STATS) which means it is shared across Orthonym
-        instances — calling ``reset_dispatch_stats()`` on one instance
+        instances — calling ``reset_dispatch_stats`` on one instance
         resets the shared inner counter visible to all instances.
         """
         self._cfr_router.reset_dispatch_stats()
@@ -2916,12 +2916,12 @@ class Orthonym:
         for the GENERAL class, inner-dispatch then routes to one of the
         30 handlers in ``INNER_DISPATCH_TABLE``.
 
-        Per CONTEXT: companion to ``get_dispatch_stats()``; CLI
-        ``--dispatch-stats`` flag prints both together. Per AP-160-13 the
+        Per internal notes: companion to ``get_dispatch_stats``; CLI
+        ``--dispatch-stats`` flag prints both together. Per -13 the
         underlying counter is module-level (shared across instances)
         because inner-dispatch is a pure-function call site — adding
         per-instance threading would require touching every handler entry
-        point. The counter is reset via ``reset_dispatch_stats()`` (which
+        point. The counter is reset via ``reset_dispatch_stats`` (which
         clears BOTH outer + inner counters).
 
         Returns:
@@ -2937,7 +2937,7 @@ class Orthonym:
         a phase ships the NameTreeNode IR substrate alongside the legacy
         ``assemble_name`` path; first-wave handlers (Plans 02-03 ship)
         return ``NamingResult(name=<final string>, tree=None,...)`` per
-        CONTEXT incremental migration. The ``tree`` field is None for
+        internal notes incremental migration. The ``tree`` field is None for
         the 30 currently-extracted handlers; tree population is a +
         follow-up phase. The ``name`` field is byte-identical to
         ``Orthonym.name(smiles)``.
@@ -2961,7 +2961,7 @@ class Orthonym:
         # Lazy import to avoid composer.py -> name_tree -> namer.py cycle
         # at module-load time.
         from .assembly.name_tree import NamingResult
-        # CR-04 part B + W7: install a per-call capture slot via
+        # part B + W7: install a per-call capture slot via
         # contextvars.ContextVar (PEP 567) so composer._assemble_name_impl
         # can write the inner-dispatch NamingResult into it without
         # changing the public assemble_name return type. ContextVar is
@@ -2972,12 +2972,12 @@ class Orthonym:
             try:
                 name = self.name(smiles)
             except ValueError:
-                raise  # invalid SMILES — propagate (matches name() contract)
+                raise  # invalid SMILES — propagate (matches name contract)
             except (TypeError, KeyError, IndexError, AttributeError) as _e:
-                # SC-3 robustness: name_with_tree must be as resilient as the
-                # module-level name_compound. The inner handlers' "pool.best().name
+                # robustness: name_with_tree must be as resilient as the
+                # module-level name_compound. The inner handlers' "pool.best.name
                 # raises on None" fall-through contract surfaces here because
-                # self.name() lacks name_compound's broad except. Recover with the
+                # self.name lacks name_compound's broad except. Recover with the
                 # same descriptive fallback so name_with_tree never crashes and its
                 # name matches the canary's name_compound output.
                 logger.debug(
@@ -2992,7 +2992,7 @@ class Orthonym:
         finally:
             _name_with_tree_capture.reset(token)
         if name:
-            # a phase SC-1 + SC-3 boundary guarantee. Two failure modes:
+            # a phase + boundary guarantee. Two failure modes:
             # (a) tree is None — salts/ions/radicals/retained names are produced
             # by paths BELOW dispatch_inner that never write the capture slot.
             # (b) STALE tree — the inner handler wrote the slot, but downstream
@@ -3000,8 +3000,8 @@ class Orthonym:
             # stereo backstop) OVERRODE the final name afterward, so the
             # captured tree no longer round-trips to it.
             # In BOTH cases synthesize the sanctioned coarse node (, counted)
-            # so name_tree_to_string(tree) == name holds for EVERY SMILES (SC-1)
-            # and --dump-tree works universally (SC-3). The str fragment_legacy
+            # so name_tree_to_string(tree) == name holds for EVERY SMILES
+            # and --dump-tree works universally . The str fragment_legacy
             # round-trips verbatim. class_id="coarse_fallback" distinguishes this
             # boundary node from real handler trees in the coarse-bucket report.
             from .assembly.name_tree import NameTreeNode
@@ -3009,7 +3009,7 @@ class Orthonym:
                 NameTreeSerializerError,
                 name_tree_to_string,
             )
-            # WR-3: this staleness check is the defence point against bad trees,
+            #: this staleness check is the defence point against bad trees,
             # so it must not itself crash on one. name_tree_to_string raises
             # NameTreeSerializerError (a ValueError subclass) on a malformed node
             # (empty parent_stem + non-str fragment_legacy). An uncaught raise
@@ -3051,7 +3051,7 @@ class Orthonym:
         """ a phase: a GATE REJECTION re-enters the dispatch cascade.
 
         The cascade in ``_name_impl`` already falls through when a handler
-        returns ``None``, but the gates run out here in ``name()`` -- AFTER the
+        returns ``None``, but the gates run out here in ``name`` -- AFTER the
         cascade has exited -- so a handler that produced a name the gate then
         rejected aborted the whole molecule with no retry. That is the defect
         this phase exists to close: "keep the first that clears both gates, fall
@@ -3127,14 +3127,14 @@ class Orthonym:
 
         Args:
             smiles: SMILES string representing the molecule
-            raise_on_limit: HYG-02 (a phase) opt-in. When True, a provably
+            raise_on_limit: (a phase) opt-in. When True, a provably
                 out-of-scope input raises ``OrthonymLimitError(code, message)``
                 instead of returning a plausible-but-wrong / descriptive string
                 — letting a caller distinguish "can't handle" from "got it
                 wrong". Default False preserves the always-emit behaviour
                 byte-for-byte (no limit is ever substituted into the result).
 
-                G0 (DD7 S1) note / WR-04: a top-level ring refusal carries the
+                G0 (DD7 S1) note /: a top-level ring refusal carries the
                 specific ``UNSUPPORTED_RING_SYSTEM`` code. When the refusal
                 originates inside a RECURSIVE (substituent/fragment) naming call,
                 that inner frame returns its ``.message`` and the top-level
@@ -3157,9 +3157,9 @@ class Orthonym:
             start_naming_session,
         )
         start_naming_session()
-        # Wave2 T3 (cross-molecule stereo-contamination fix): the confidence /
+        # Wave2 (cross-molecule stereo-contamination fix): the confidence /
         # candidate-pool / parent-correctness thread-locals are PER-MOLECULE, but
-        # they persist across name() calls (documented at the post-dispatch gate
+        # they persist across name calls (documented at the post-dispatch gate
         # below). The pytest conftest clears them per-test; production (and the
         # phase-gate / determinism loops, which name 1000+ molecules through one
         # instance) never did — so a molecule whose handler leaves an
@@ -3187,7 +3187,7 @@ class Orthonym:
             self._last_dispatch_class = None
             #: same per-top-level invariant. The pool size is stale
             # until _classify reruns; default 1 = "no alternative parent" so a
-            # molecule that never reaches P-44 parent selection cannot trigger
+            # molecule that never reaches parent selection cannot trigger
             # the offer-retry on a previous molecule's pool.
             self._top_parent_pool_size = 1
             # Task 0.1: reset the typed-abstention telemetry slot per
@@ -3198,7 +3198,7 @@ class Orthonym:
                 clear_abstention()
             except Exception:
                 pass
-            # PE-1: same per-top-level-molecule invariant as the clears above.
+            #: same per-top-level-molecule invariant as the clears above.
             # A batch consumer names hundreds of inputs in one process; without
             # this reset, molecule N's audit would carry molecule N-1's discarded
             # candidates and manufacture selection failures that never happened.
@@ -3297,7 +3297,7 @@ class Orthonym:
                     self._full_coverage)
             except Exception:
                 self._fc_ctx_token = None
-        # --- Wave-2 P2: isotopic substitution decorator (P-82.2.1 / P-45.4) ---
+        # --- Wave-2 P2: isotopic substitution decorator / ---
         # RDKit skeleton perception ignores GetIsotope, so an isotope-labeled
         # mol would name as the UNLABELED skeleton (wrong PIN). Route it to the
         # fail-closed decorator BEFORE _name_impl strips the label. Clean
@@ -3310,7 +3310,7 @@ class Orthonym:
                 if has_isotopes(_iso_probe):
                     _iso_name = decorate_isotopic_name(smiles, self.style, self)
                     if _iso_name is not None:
-                        # (fix wave 1): every exit of name() goes
+                        # (fix wave 1): every exit of name goes
                         # through _finish. This one lives OUTSIDE the
                         # try/finally below, so it owns its own session
                         # teardown -- try/finally keeps the ordering
@@ -3324,7 +3324,7 @@ class Orthonym:
                     # Decorator failed closed on an isotope-labeled molecule: REFUSE.
                     # Falling through would emit the UNLABELED skeleton name (label
                     # silently dropped) — a wrong name the OPSIN validity gate cannot
-                    # catch (it parses to the unlabeled structure; SELF-01 ignores
+                    # catch (it parses to the unlabeled structure; ignores
                     # isotopes). Accuracy-first: never emit a label-dropping name.
                     from .metrics.abstention import AbstentionCode, record_abstention
                     record_abstention(AbstentionCode.OTHER,
@@ -3334,7 +3334,7 @@ class Orthonym:
                                             smiles)
                     finally:
                         end_naming_session()
-        # --- W3-P09 (P-65.6.2.3.2): normalize a charge-imbalanced acid-salt
+        # --- W3-P09: normalize a charge-imbalanced acid-salt
         # notation. A metal cation + a NEUTRAL polybasic inorganic oxoacid written
         # without the balancing deprotonation ([Na+].OC(=O)O = NaHCO3, net +1) is a
         # valid acid salt in a malformed charge representation. Rewrite it to the
@@ -3357,9 +3357,9 @@ class Orthonym:
         from .assembly.memo import push_scope as _memo_push
         _memo_scope_token = _memo_push()
         try:
-            # HYG-02 + Wave-0 D1: structural scope pre-check, now UNCONDITIONAL.
+            # + Wave-0 D1: structural scope pre-check, now UNCONDITIONAL.
             # A wildcard atom makes the input InChIKey uncomputable, so the
-            # SELF-01 round-trip oracle fails OPEN and a wildcard input ships a
+            # round-trip oracle fails OPEN and a wildcard input ships a
             # WRONG molecule (CC* -> "ethane"). Refuse it before any producer OR
             # the general-engine recovery runs — recovery would re-run producers
             # on the wildcard mol and re-open the hole, so this must NOT route
@@ -3438,8 +3438,8 @@ class Orthonym:
                 # general-engine recovery (RT-gated -> 0-wrong-safe), and if that
                 # too declines, to an honest abstention. Measured: a ring-ketone
                 # producer (name_cyclic_oxo_compound) raises on some fused cages
-                # the T4 systematic path names completely; before this the
-                # exception escaped name() and every caller without its own
+                # the systematic path names completely; before this the
+                # exception escaped name and every caller without its own
                 # try/except crashed (only the eval harness's worker caught it).
                 # The strict opt-in still re-raises so a real bug is not masked
                 # in that mode.
@@ -3458,7 +3458,7 @@ class Orthonym:
                 if _rec is not None:
                     return self._finish(_rec, smiles)
                 return self._finish(_descriptive_fallback(smiles), smiles)
-            # Universal stereo backstop (a phase, STER-16)
+            # Universal stereo backstop (a phase,)
             # Only apply at top level -- decomposition fragments handle stereo
             # through their own naming paths.
             if is_top_level_naming():
@@ -3467,7 +3467,7 @@ class Orthonym:
                     from .assembly.coverage_scoring import retrieve_confidence
                     _conf = retrieve_confidence()
                     handler = _conf.get('handler', 'unknown')
-                    # a phase WSB-01 (): thread the authoritative parent
+                    # a phase -01 : thread the authoritative parent
                     # map + phenol flag to the backstop.
                     result = _final_stereo_check(
                         mol, result, handler=handler,
@@ -3482,8 +3482,8 @@ class Orthonym:
                         result, smiles, handler,
                         self._grammar, self._grammar_stats,
                     )
-                    # SUB-03 (169.5): real-OPSIN validity gate, the last
-                    # transform before the name leaves name(). Default-ON,
+                    # (169.5): real-OPSIN validity gate, the last
+                    # transform before the name leaves name. Default-ON,
                     # fail-OPEN on no-JAR. Skipped for neutralize-recurse /
                     # fragment intermediates (self._disable_opsin_validity_gate).
                     if not self._disable_opsin_validity_gate:
@@ -3505,12 +3505,12 @@ class Orthonym:
             # '', while paths that produce a candidate the validity gate then
             # suppresses go through _descriptive_fallback -> 'unknown organic
             # compound'. For a molecule whose winning path is atom-ordering-
-            # dependent, name() then returns '' on some SMILES spellings and
+            # dependent, name then returns '' on some SMILES spellings and
             # 'unknown organic compound' on others — both mean "no name", but they
             # are different strings, so the determinism eval (raw-string compare)
             # flags it. An empty string is never a valid IUPAC name; normalise it
             # to the canonical fallback so abstention is a single deterministic
-            # string regardless of which internal path abstained. is_unknown()
+            # string regardless of which internal path abstained. is_unknown
             # already treats '' and the fallback as equivalent, so gold matching
             # is unchanged.
             if not (result and result.strip()):
@@ -3536,7 +3536,7 @@ class Orthonym:
             if result and is_refusal_sentinel(result) and not is_failure_name(result):
                 result = _descriptive_fallback(smiles)
             # (opt-in): a candidate suppressed by a downstream gate
-            # (SELF-01 / vetoes) left only the failure sentinel; give the
+            # (/ vetoes) left only the failure sentinel; give the
             # engine its late, fully-gated shot before the failure ships.
             if is_failure_name(result):
                 _rec = self._try_general_engine_recovery(smiles)
@@ -3567,18 +3567,18 @@ class Orthonym:
                 _dr = self._try_demote_senior_group_rescue(smiles)
                 if _dr is not None:
                     result = _dr
-            # (WSC-02): last-resort DECOMPOSITION before abstaining. A
+            # (-02): last-resort DECOMPOSITION before abstaining. A
             # NON-GENERAL handler (e.g. natural_products on a tropane scaffold)
             # can claim a molecule and emit a structure-DROPPING name (`tropane`,
-            # dropping an ester) that SELF-01 then suppresses to the failure
+            # dropping an ester) that then suppresses to the failure
             # sentinel — bypassing the GENERAL-only decomposition fallback inside
             # _name_impl. Give the decomposition engine a final, FULLY-GATED shot
             # here. This is purely additive: it runs ONLY when we are about to
             # ship a failure, so it can turn an 'unknown' into a valid name but
             # can NEVER alter a currently-passing name (0 gold regression by
-            # construction). The candidate is routed through the SAME SELF-01
+            # construction). The candidate is routed through the SAME
             # validity gate (incl. the stereo-strip carve-out for names whose
-            # only OPSIN-narrow layer is stereo, P-91/P-93), so 0-wrong holds:
+            # only OPSIN-narrow layer is stereo, /, so 0-wrong holds:
             # a decomposition name whose constitution does not reproduce the
             # input is suppressed right back to the failure sentinel.
             if (is_top_level_naming() and is_failure_name(result)
@@ -3595,7 +3595,7 @@ class Orthonym:
                         if not is_failure_name(_dgated):
                             result = _dgated
             # (offer-not-return, a project rule): a molecule whose SENIOR
-            # (ranked[0]) P-44 parent dead-ends can be rescued by a JUNIOR pool
+            # (ranked[0]) parent dead-ends can be rescued by a JUNIOR pool
             # member. Runs ONLY on the ship-a-failure path (so no PIN-nameable
             # molecule is re-rooted -- they succeed at ranked[0] and never reach
             # here), and every junior candidate is RT-gated before adoption
@@ -3611,7 +3611,7 @@ class Orthonym:
                 if _ap is not None:
                     result = _ap
             # giants Engine 3: a retained natural-product PARENT HYDRIDE
-            # (`ursane`, `hopane`, `cevane`,... -- the P-101.2.7 Table 10.1
+            # (`ursane`, `hopane`, `cevane`,... -- the
             # stereoparents) IS the PIN, and `_final_opsin_validity_gate`
             # whitelists it (`np_stereoparent` carve-out) precisely because
             # OPSIN 2.9.0 cannot parse it. That is right for the PIN tiers, but
@@ -3640,7 +3640,7 @@ class Orthonym:
             # ships a failure. The general engine DID build a whole-graph
             # systematic candidate that OPSIN round-trips, but it was never
             # consulted: the late `_try_general_engine_recovery` at the top of
-            # this failure block re-ran the engine INSIDE this name() session,
+            # this failure block re-ran the engine INSIDE this name session,
             # where the best-effort contextvars are set + session_depth is
             # elevated, so its substituent recursion emits the SAME RT-failing
             # form the primary did (measured: witnesses in
@@ -3659,7 +3659,7 @@ class Orthonym:
                 _ft = self._try_besteffort_clean_general_fallthrough(smiles)
                 if _ft is not None and not is_failure_name(_ft):
                     result = _ft
-            # HYG-02: post-failure limit (opt-in). If naming produced no real
+            #: post-failure limit (opt-in). If naming produced no real
             # name, map the failure to a named code. Keyed off an actual failure
             # so it can never fire on a successfully-named compound.
             if raise_on_limit and is_top_level_naming() and is_failure_name(result):
@@ -3782,11 +3782,11 @@ class Orthonym:
         prov = get_provenance()
         source = prov["source"] or "pin_path"
         # T1: what the gate DID for THIS name, not whether a jar exists.
-        # The old `gate_active = (not disabled and jar_present())` stamped
-        # `opsin="verified"` / `SELF-01` on every PIN-path emission on a
+        # The old `gate_active = (not disabled and jar_present)` stamped
+        # `opsin="verified"` / `` on every PIN-path emission on a
         # machine with a jar, including the gate's ten by-design carve-outs and
         # its stereo-stripped branch — three OPSIN-UNPARSEABLE names reported
-        # SELF-01 (FINDINGS.md §2). `resolve_gate_outcome` additionally denies
+        # (FINDINGS.md). `resolve_gate_outcome` additionally denies
         # an outcome recorded for a DIFFERENT string than the one shipped.
         if self._disable_opsin_validity_gate:
             # The instance flag short-circuits the gate at its call sites, so
@@ -3829,7 +3829,7 @@ class Orthonym:
             # masquerade a non-name as a name for an abstain row that is already fully
             # LABELED by (tier=abstain, source=abstain, limit_code, formula). Scoped to
             # ``self._general_fallback`` so the PIN-default path (and its always-
-            # emit ``name()``) is byte-identical; ``name()`` itself is untouched.
+            # emit ``name``) is byte-identical; ``name`` itself is untouched.
             if self._general_fallback:
                 name = None
         elif source == "general_engine":
@@ -3864,7 +3864,7 @@ class Orthonym:
         # primary offer (the contextvar and that offer are built from the
         # identical snapshot, so nothing changes below), but WRONG when
         # `_select_rt_passing_offer_name` picked a DIFFERENT, later-appended
-        # offer over that primary (e.g. the T4 systematic floor beating a
+        # offer over that primary (e.g. the systematic floor beating a
         # stereo-wrong primary): the contextvar still describes the LOSING
         # primary. Re-derive from the WINNING `Offer` itself whenever one won
         # and its `.name` is exactly what shipped (`_last_selected_offer` is
@@ -3918,9 +3918,9 @@ class Orthonym:
                 gates.append("self_consistency")
         elif opsin != "n/a":
             # pin_verified / systematic_verified-retained: the token is
-            # whatever the gate actually earned — `SELF-01` only for a
-            # full-name SELF-01 "ok",
-            # `SELF-01(constitution)` for the stereo-stripped verdict, and
+            # whatever the gate actually earned — `` only for a
+            # full-name "ok",
+            # `(constitution)` for the stereo-stripped verdict, and
             # nothing at all for a carve-out, a bypass or a fail-OPEN.
             _token = _pv.gate_token_for_gate_outcome(gate_outcome)
             if _token is not None:
@@ -3928,9 +3928,9 @@ class Orthonym:
         #: honest verification-provenance label for the full-coverage
         # tier. Derived from what ALREADY shipped, deny-by-default "unverified":
         # "identity" -> a D1 exact-InChIKey coordination retained-name hit
-        # "opsin" -> the name round-trips through OPSIN (SELF-01 / engine RT)
+        # "opsin" -> the name round-trips through OPSIN (/ engine RT)
         # "reconstructor" -> (SP5.6, if built) structurally reconstructed
-        # "unverified" -> emitted with no passing oracle (T4 / D2 additive),
+        # "unverified" -> emitted with no passing oracle (/ D2 additive),
         # or an abstain row. Never claims a verification the
         # emission did not earn (mirrors the allowlist
         # discipline of ``opsin_label_for_gate_outcome``).
@@ -3983,13 +3983,13 @@ class Orthonym:
         ``ALL_RETAINED_NAMES`` to ``benzo[h]quinoline`` (a different
         connectivity; OPSIN-verified NOT to round-trip), and quinolizidine's
         key resolves to ``decahydroisoquinoline`` (also a different
-        connectivity). Checking (1) first means the caller's SELF-01 gate
+        connectivity). Checking (1) first means the caller's gate
         never even has to catch these -- and it still would, since this
         method never itself verifies its answer.
 
         Returns the candidate name string or ``None`` (no recognizer
         matched). The caller re-verifies whatever this returns through the
-        SAME OPSIN SELF-01 gate as the general name and keeps the general
+        SAME OPSIN gate as the general name and keeps the general
         name if the retained candidate does not independently round-trip
         (fail-closed; e.g. a lambda-convention ring name that is only valid
         embedded in a larger spiro PIN, not standalone).
@@ -4030,12 +4030,12 @@ class Orthonym:
           * ``(True, True)`` — best-effort (``_general_fallback_unverified``):
             ship a CONSTITUTION-ONLY name and mark it ``stereo_unexpressed``.
             This is honest and NOT a wrong stereoisomer — it names a superset
-            (BB P-91.2.2 sanctions omitting stereodescriptors for exactly the
+            (BB sanctions omitting stereodescriptors for exactly the
             von-Baeyer/spiro/fused polycyclic classes best-effort emits;
-            P-91.3: descriptors are an additive layer over a complete name).
+            : descriptors are an additive layer over a complete name).
           * ``(False, False)`` — pin/valid/complete: ABSTAIN on dropped stereo.
-            SELF-01 is stereo-blind, so a stereo-dropped name would pass it and
-            could ship a WRONG stereoisomer under the PIN contract (P-91.2.1:
+             is stereo-blind, so a stereo-dropped name would pass it and
+            could ship a WRONG stereoisomer under the PIN contract:
             PINs must specify every stereogenic unit). Fail-closed is correct.
 
         Root-cause: replaces the two inline ``needs_stereo_injection`` branches
@@ -4046,9 +4046,9 @@ class Orthonym:
         ``general_engine_stereo_complete`` predicate — NOT the coarse
         ``needs_stereo_injection`` name-side boolean — so a PARTIAL-stereo name
         (some elements expressed, one dropped) is treated as INCOMPLETE and
-        never ships in complete (all-or-nothing; P-91.2.1). This closes the
+        never ships in complete (all-or-nothing;. This closes the
         verified partial-stereo wrong-ship hole (the old boolean returned False
-        on any name with a stereo block, shipping partials past SELF-01).
+        on any name with a stereo block, shipping partials past).
         """
         from .rules.stereochemistry import general_engine_stereo_complete
         if general_engine_stereo_complete(mol, cand):
@@ -4063,7 +4063,7 @@ class Orthonym:
         # genuinely unexpressible/incomplete stereo (e.g. OPSIN-unparseable
         # pseudo-asymmetric) reaches here, and stripping it was the precision leak
         # surfaced by the 4-corpus head-to-head (tropan-3-ol etc.). Set
-        # ORTHONYM_BE_STRIP_STEREO=1 to restore the old P-91.2.2 ship-stripped
+        # ORTHONYM_BE_STRIP_STEREO=1 to restore the old ship-stripped
         # behaviour (measurement/back-compat only).
         import os as _os
         if self._general_fallback_unverified and _os.environ.get(
@@ -4074,7 +4074,7 @@ class Orthonym:
     @staticmethod
     def _rt_match(input_smiles: str, opsin_smiles: str,
                   stereo_flagged: bool) -> bool:
-        """ T6.3: SELF-01 round-trip compare at the granularity the name
+        """ T6.3: round-trip compare at the granularity the name
         asserts.
 
         For a ``stereo_unexpressed``-flagged emission this is a PER-ELEMENT
@@ -4087,7 +4087,7 @@ class Orthonym:
              are copied, ``RemoveStereochemistry``'d, and compared as ISOMERIC
              canonical SMILES. Removing only stereo (not ``isomericSmiles=False``,
              which also erases isotope labels) keeps BOTH charge AND isotope, so
-             neutral != anion and a ``13C``-labelled input != its plain name (P-82;
+             neutral != anion and a ``13C``-labelled input != its plain name;
              the reverted ca6bb3de loosening dropped charge — we must not reintroduce
              it, and the old ``isomericSmiles=False`` guard silently dropped isotope);
           2. a CHIRAL SUBSTRUCTURE match with the name's asserted structure
@@ -4150,7 +4150,7 @@ class Orthonym:
             # key (WGHRUVOOYOJZCP != KXGYMDQLSGIIJG), so a wrong multi-fragment
             # `(1/1/1)` name shipped as verified. Require the FULL InChIKey the
             # 0-wrong oracle (reclaim_measure / _self_consistency_full_key) uses --
-            # the T4 call site already DOCUMENTS `_rt_match` as "a FULL-InChIKey
+            # the call site already DOCUMENTS `_rt_match` as "a FULL-InChIKey
             # compare"; this makes the code match. Fall back to the CanonSmiles match
             # only when InChI is genuinely unavailable for a side (no regression).
             # Strictly tightening (NEW-accepts subset of OLD-accepts).
@@ -4170,9 +4170,9 @@ class Orthonym:
         Covers the two flows the in-``_name_impl`` wiring cannot see:
         (a) a handler raised a NamingLimit (e.g. UNSUPPORTED_RING_SYSTEM)
         that bypassed the GENERAL block, and (b) a candidate name was
-        SUPPRESSED by a downstream gate (SELF-01 / vetoes) after
+        SUPPRESSED by a downstream gate (/ vetoes) after
         ``_name_impl`` returned. Re-perceives, runs the general engine,
-        and re-applies the SAME E1 + SELF-01 gates to the emission.
+        and re-applies the SAME E1 + gates to the emission.
         Returns a verified name or None; never raises (fail-closed).
         Default OFF (``general_fallback=False``) -> byte-identical.
         """
@@ -4203,14 +4203,14 @@ class Orthonym:
             from .assembly.general_engine import name_general
             from .validation.coverage_gate import certify_general_result
             canonical = Chem.MolToSmiles(mol, canonical=True)
-            # T4 FINAL-REVIEW FIX 1: mark whether `cand` came from the
-            # aggressive T4 producer, so the shared ladder below can require it
-            # to POSITIVELY round-trip (never ship a T4 name OPSIN cannot parse).
+            # FINAL-REVIEW FIX 1: mark whether `cand` came from the
+            # aggressive producer, so the shared ladder below can require it
+            # to POSITIVELY round-trip (never ship a name OPSIN cannot parse).
             # Stays False for the multi-fragment and engine-own-name paths, so
             # their `general_fallback_unverified` semantics are byte-identical.
             _cand_from_t4 = False
             # B5 general lever: retained so the RT-mismatch rescue below can
-            # re-run the T4 cascade. Stays None on the multi-fragment path
+            # re-run the cascade. Stays None on the multi-fragment path
             # (which never perceives single-component features), so the rescue
             # is single-component-only by construction.
             feats = None
@@ -4220,10 +4220,10 @@ class Orthonym:
                 # multi-fragment mol, so the recovery would otherwise abstain.
                 # Under `complete` (allow_aromatic_general), name each NEUTRAL
                 # component through the complete-tier single-component pipeline
-                # and re-assemble via the existing P-14.8.1 adduct namer
+                # and re-assemble via the existing adduct namer
                 # (order/proportion/water-last preserved). Fail-closed if ANY
                 # component is unnameable OR charged (charged -> P5 scope). The
-                # whole-string SELF-01 gate below round-trips the joined name.
+                # whole-string gate below round-trips the joined name.
                 cand = self._name_multifragment_complete(mol, canonical)
                 if cand is None:
                     return None
@@ -4239,16 +4239,16 @@ class Orthonym:
                 # partition there too (the charge is a suffix on a bound atom).
                 # a phase B4: the shared best-effort certification gate (E1 +
                 # structural binding-spine axes: atom/bond/charge/stereo). A
-                # structural void routes to the T4 producer below exactly like an
-                # E1 failure -- catching a bad eng result EARLY so T4 gets a
+                # structural void routes to the producer below exactly like an
+                # E1 failure -- catching a bad eng result EARLY so gets a
                 # chance (the measured +1 breadth-routing gain). structural_only
-                # keeps the P4/P5/P6 name-spelling FPs advisory (SELF-01 covers
+                # keeps the P4/P5/P6 name-spelling FPs advisory (covers
                 # name well-formedness downstream).
                 if eng is None or not certify_general_result(
                         mol, eng,
                         allow_charged=self._allow_aromatic_general,
                         structural_only=True):
-                    # T4 (best-effort tier ONLY): the engine's own
+                    # (best-effort tier ONLY): the engine's own
                     # flag-gated attempt just declined (name_general returned
                     # None) or produced a non-atom-complete partition. Hand off
                     # to the universal coverage-by-construction producer, which
@@ -4258,10 +4258,10 @@ class Orthonym:
                     # returning an atom-complete name or None (clean abstain).
                     # PIN-isolated: this whole recovery is already
                     # `_general_fallback`-gated (early `return None` at the top).
-                    # The T4 name is NOT shipped raw: it falls through to the SAME
+                    # The name is NOT shipped raw: it falls through to the SAME
                     # stereo-emit decision + OPSIN round-trip ladder below that the
-                    # engine's own name gets, so a T4 name whose constitution does
-                    # not round-trip is suppressed to abstain (SELF-01).
+                    # engine's own name gets, so a name whose constitution does
+                    # not round-trip is suppressed to abstain .
                     # Task 4 (coverage-by-construction breadth).
                     #
                     # tier-policy: this is the MEASURED demotion gate for the
@@ -4270,41 +4270,41 @@ class Orthonym:
                     # (trace: internal notes CORESTEREO
                     # addendum + task-tierpolicy-report.md). It was
                     # `_general_fallback_unverified` (best-effort only); re-gated
-                    # to `_general_fallback` so a T4 name also ships at the COMPLETE
+                    # to `_general_fallback` so a name also ships at the COMPLETE
                     # tier -- but ONLY through the RT ladder below. At the complete
                     # tier `_stereo_emit_decision` returns `(True, False)` only for
                     # a FULL-stereo name (else `(False, False)` -> abstain), so the
-                    # `_rt_match` is a FULL-InChIKey compare; and a T4 name OPSIN
+                    # `_rt_match` is a FULL-InChIKey compare; and a name OPSIN
                     # cannot parse hits `elif... or _cand_from_t4: return None`
-                    # (below) regardless of tier. An unverified T4 candidate is
+                    # (below) regardless of tier. An unverified candidate is
                     # therefore never shipped at COMPLETE -- 0-wrong preserved.
                     # `name_t4_complete` still requires a live jar (below), and the
                     # default/PIN tier never reaches here (`_general_fallback`
                     # False), so PIN output is byte-identical.
                     if not self._general_fallback:
                         return None
-                    # T4 runs the engine at allow_aromatic_general=True
+                    # runs the engine at allow_aromatic_general=True
                     # unconditionally, which OPENS the von-Baeyer / mancude-cage
                     # path even for instances that deliberately kept
                     # allow_aromatic_general OFF. E1 proves atom COVERAGE but not
                     # ring-numbering validity / PIN-preference, so an aggressive
-                    # von-Baeyer name T4 opens can be caught ONLY by the OPSIN
+                    # von-Baeyer name opens can be caught ONLY by the OPSIN
                     # round-trip ladder below -- and with no jar that gate fails
-                    # OPEN (), so T4 would ship an UNVERIFIED (possibly
+                    # OPEN , so would ship an UNVERIFIED (possibly
                     # non-PIN or valence-illegal) name. Keep the abstention
                     # without a jar, mirroring the inline site's FIX 1
                     # abstain-without-Java contract. (Internal/test mode via
                     # _disable_opsin_validity_gate is a controlled context and
                     # keeps the ladder's own unverified-ship path.) This leaves
                     # the engine's own-name path below byte-identical; it only
-                    # constrains the NEW T4 producer to a live SELF-01.
+                    # constrains the NEW producer to a live.
                     if not (self._disable_opsin_validity_gate
                             or _validity_gate_jar_present()):
                         return None
                     from .assembly.fragment_naming import isolated_naming_session
                     from .assembly.t4_coverage import name_t4_complete
-                    # Phase1 B5: T4 is a fresh whole-molecule naming, but the
-                    # recovery lane invokes it mid-name() at session_depth >= 1, so
+                    # Phase1 B5: is a fresh whole-molecule naming, but the
+                    # recovery lane invokes it mid-name at session_depth >= 1, so
                     # its recursion hits MAX_NAMING_DEPTH prematurely and DEGRADES
                     # to an abstention (measured root cause). Run it in an isolated
                     # depth-0 session so it gets the full recursion budget a
@@ -4313,17 +4313,17 @@ class Orthonym:
                         cand = name_t4_complete(mol, feats)
                     if cand is None:
                         return None
-                    # T4 FINAL-REVIEW FIX 1: this T4 name must POSITIVELY
+                    # FINAL-REVIEW FIX 1: this name must POSITIVELY
                     # round-trip or the path ABSTAINS. The shared ladder below
                     # ships a `general_fallback_unverified` emission even when
                     # OPSIN CANNOT PARSE it (its `elif not
                     # self._general_fallback_unverified` is False for the T4
                     # opt-in) -- correct for the engine's OWN best-effort name,
-                    # but NOT for the aggressive T4 producer, which opens
+                    # but NOT for the aggressive producer, which opens
                     # von-Baeyer / mancude paths whose ONLY validity check is
                     # this round-trip. E1 proves atom COVERAGE (so never a wrong
                     # MOLECULE) but a name OPSIN cannot parse is malformed. Flag
-                    # the T4 origin so the ladder rejects an unparseable T4 name
+                    # the origin so the ladder rejects an unparseable name
                     # instead of shipping it unverified; the parse-but-mismatch
                     # case is already rejected there for every tier. T4-SCOPED:
                     # the flag is False everywhere else, so the engine-own and
@@ -4332,7 +4332,7 @@ class Orthonym:
                 else:
                     cand = eng.name
                     # (audit-only): record the spine the certificate just
-                    # accepted, so the exit of name() can re-assert it on the
+                    # accepted, so the exit of name can re-assert it on the
                     # FINAL string. Deliberately placed BEFORE the retained-name
                     # preference below: when that swap fires, `eng.bindings`
                     # describe a name that is no longer shipped and the re-anchor
@@ -4374,9 +4374,9 @@ class Orthonym:
                             # jar missing: fail-closed -- keep the general `cand`
                             # rather than ship an unverified retained guess.
             # FIX 2: fail closed on DROPPED stereo (general-engine path).
-            # The SELF-01 ladder below is CONSTITUTIONAL (atoms+bonds+charge,
+            # The ladder below is CONSTITUTIONAL (atoms+bonds+charge,
             # stereo-blind), so a general emission that omits E/Z or R/S the
-            # input carries would pass SELF-01 and ship a WRONG stereoisomer
+            # input carries would pass and ship a WRONG stereoisomer
             # specification. The universal stereo backstop is LOG-ONLY for the
             # handler='unknown' cohort that general emissions arrive as (no
             # authoritative parent locant map), so it cannot suppress this. Any
@@ -4400,7 +4400,7 @@ class Orthonym:
             # but-MISMATCHED name is NEVER shipped, at any tier. task-JAR-ABSENT
             # (FABLE 0-wrong hole): the no-jar best-effort branch below no
             # longer ships unverified -- the old claim that "no-jar transience
-            # ships ONLY behind the T4 opt-in... a genuine environment gap,
+            # ships ONLY behind the opt-in... a genuine environment gap,
             # not a proof gap" mischaracterized the hole (FABLE's witnesses were
             # demonstrably WRONG-molecule, not merely-unprovable-but-correct),
             # so the branch now routes through `verify_or_none` and abstains.
@@ -4449,11 +4449,11 @@ class Orthonym:
                     if not self._rt_match(smiles, _opsin_smi, _stereo_flagged):
                         # Phase1 B5 general lever: the recovery lane's own
                         # (rung-0) general name denotes a DIFFERENT molecule, but
-                        # the T4 PG-suppressed cascade may build a complete,
+                        # the PG-suppressed cascade may build a complete,
                         # correct one (measured: 9/45 in-scope suppressed rows).
                         # Try it ONCE -- best-effort + live-jar only, positively
                         # RT-verified -- rather than abstain. Never fires for a
-                        # name that was already T4 (`_cand_from_t4`) or on the
+                        # name that was already (`_cand_from_t4`) or on the
                         # multi-fragment path (`feats is None`).
                         _rescue = (None if (_cand_from_t4 or feats is None)
                                    else self._try_t4_rescue(mol, feats, smiles))
@@ -4462,9 +4462,9 @@ class Orthonym:
                         cand, _stereo_flagged = _rescue
                     opsin_status = "verified"
                 elif not self._general_fallback_unverified or _cand_from_t4:
-                    # rejected/transient: no unverified opt-in, OR a T4 name
+                    # rejected/transient: no unverified opt-in, OR a name
                     # that must POSITIVELY round-trip (FINAL-REVIEW FIX 1). For
-                    # a non-T4 name `_cand_from_t4` is False, so this reduces to
+                    # a non- name `_cand_from_t4` is False, so this reduces to
                     # the pre-existing `not general_fallback_unverified` guard --
                     # byte-identical for the engine-own and multi-fragment paths.
                     return None
@@ -4488,7 +4488,7 @@ class Orthonym:
                     # `name_facts=None` here: `cand` at this rung is an
                     # assembled name STRING from the general engine's own
                     # `name_general` result (`eng`, not a `_Candidate` with a
-                    # T4 `result_obj`), and there is no name->NameFacts
+                    # `result_obj`), and there is no name->NameFacts
                     # extractor for an arbitrary general-engine name yet (a
                     # separate, larger task -- see task-A-report.md A.3). With
                     # `name_facts=None` only the OPSIN branch could confirm,
@@ -4528,9 +4528,9 @@ class Orthonym:
 
         Re-invoke the RT-gated ``_try_general_engine_recovery`` in a CLEAN naming
         context so the general engine reaches the RT-verifying systematic /
-        replacement-nomenclature candidate that the in-``name()`` recovery misses.
+        replacement-nomenclature candidate that the in-``name`` recovery misses.
 
-        THREE things break the in-``name()`` recovery for the converting witnesses
+        THREE things break the in-``name`` recovery for the converting witnesses
         (trace-confirmed, a project rule — `internal notes` +
         ``task-A-report.md`` + ``task1-report.md``):
 
@@ -4542,7 +4542,7 @@ class Orthonym:
         * ``session_depth`` is already >= 1, so the substituent recursion consumes
           ``MAX_NAMING_DEPTH`` from an elevated floor and a deep substituent hits
           the cap prematurely, degrading to a worse name (exactly the reason the
-          T4 sub-branch already wraps its call in ``isolated_naming_session``).
+           sub-branch already wraps its call in ``isolated_naming_session``).
         * CQ5 Task 1 (RISK 4): the whole-molecule fragment MEMO CACHE is still the
           PRIMARY pass's, and it holds ``recursion_depth_fallback`` SKIP entries for
           the deep substituents the primary could not name (poisoned by the same
@@ -4600,7 +4600,7 @@ class Orthonym:
                         pass
 
     def _try_perf_budget_t4_rescue(self, smiles: str) -> Optional[str]:
-        """ M0: last-resort, BOUNDED, strictly-RT-gated whole-molecule T4 name
+        """ M0: last-resort, BOUNDED, strictly-RT-gated whole-molecule name
         for a molecule whose MAIN naming path exhausted the macrocycle-hang budget.
 
         The op budget fires when the main path's combinatorial ring analysis
@@ -4614,7 +4614,7 @@ class Orthonym:
         wrongly accepts). This offers that name back under two guards that
         neutralise both hazards:
 
-        * ``rearm_hang_budgets()`` installs a FRESH budget around the single T4
+        * ``rearm_hang_budgets`` installs a FRESH budget around the single T4
           call, so a genuinely explosive molecule re-raises ``PerfBudgetExceeded``
           (caught here -> clean abstain) rather than hanging.
         * STRICT verification: OPSIN must PARSE the name AND it must round-trip
@@ -4628,8 +4628,8 @@ class Orthonym:
         """
         if not self._general_fallback_unverified:
             return None
-        # Mirror the T4 sub-branch's live-jar contract (FIX 1): with no jar
-        # the OPSIN round-trip below cannot verify, and an unverified T4 name
+        # Mirror the sub-branch's live-jar contract (FIX 1): with no jar
+        # the OPSIN round-trip below cannot verify, and an unverified name
         # (von-Baeyer / mancude paths) must never ship -- abstain cleanly instead.
         if not (self._disable_opsin_validity_gate or _validity_gate_jar_present()):
             return None
@@ -4728,7 +4728,7 @@ class Orthonym:
     def _try_alternate_parent_rescue(self, smiles: str):
         """ (offer-not-return, a project rule): best-effort rescue that,
         when ``ranked[0]`` (the PIN-correct senior parent) leads to an
-        un-nameable remainder, RETRIES the JUNIOR members of the same P-44 pool
+        un-nameable remainder, RETRIES the JUNIOR members of the same pool
         and adopts the FIRST whose full name round-trips. Returns a POSITIVELY
         round-tripping name or ``None`` (fail-closed).
 
@@ -4743,10 +4743,10 @@ class Orthonym:
         call (top-level AND its own internal gate-reject retries), so the junior
         parent stays selected while the dispatch cascade finds a handler for it.
 
-        PIN-safety (a project rule + 8): the P-44 ranking is NEVER reordered and
+        PIN-safety (a project rule + 8): the ranking is NEVER reordered and
         ``ranked[0]`` is never changed -- this runs ONLY on the ship-a-failure
         path at the best-effort tier (the caller checks
-        ``is_top_level_naming() and is_failure_name(result) and
+        ``is_top_level_naming and is_failure_name(result) and
         self._general_fallback_unverified and not
         self._disable_opsin_validity_gate``), so every PIN-nameable molecule has
         already succeeded at ``ranked[0]`` and never reaches here. The RT gate
@@ -4823,17 +4823,17 @@ class Orthonym:
             return None
 
     def _try_t4_rescue(self, mol, feats, smiles):
-        """ Phase1 B5 general lever: build a T4 PG-suppressed cascade name when
+        """ Phase1 B5 general lever: build a PG-suppressed cascade name when
         the recovery lane's own rung-0 general name denoted a DIFFERENT molecule
-        (SELF-01 RT-mismatch). Returns ``(name, stereo_flagged)`` for a POSITIVELY
-        round-tripping T4 name, or ``None``.
+        (RT-mismatch). Returns ``(name, stereo_flagged)`` for a POSITIVELY
+        round-tripping name, or ``None``.
 
-        Guarded exactly like the T4 handoff above -- best-effort opt-in
+        Guarded exactly like the handoff above -- best-effort opt-in
         (``_general_fallback_unverified``) and a live OPSIN jar (or the test-mode
         gate bypass) -- so PIN/complete/valid tiers and jarless runs never reach
         it (the caller only invokes it on the best-effort RT-mismatch abstention
         path). Cannot recurse: ``name_t4_complete`` is a direct producer call,
-        never ``name_tiered``. The T4 name is E1+spine certified inside
+        never ``name_tiered``. The name is E1+spine certified inside
         ``name_t4_complete`` AND re-verified by the positive RT check here, so a
         rescue can only ever turn an abstention into a right-molecule emission.
         """
@@ -4845,8 +4845,8 @@ class Orthonym:
             from .assembly.fragment_naming import isolated_naming_session
             from .assembly.t4_coverage import name_t4_complete
             # Phase1 B5: isolated depth-0 session (see the handoff site) so
-            # T4 gets the full recursion budget a standalone call gets, rather
-            # than the elevated session_depth of the enclosing name().
+            # gets the full recursion budget a standalone call gets, rather
+            # than the elevated session_depth of the enclosing name.
             with isolated_naming_session():
                 cand = name_t4_complete(mol, feats)
         except Exception as e:  # fail-closed: a producer bug keeps the abstention
@@ -4867,10 +4867,10 @@ class Orthonym:
     def _name_multifragment_complete(self, mol, canonical_smiles: str) -> Optional[str]:
         """: name an all-neutral multi-fragment input under `complete`.
 
-        Delegates to the P-14.8.1 adduct assembler (``rules.adducts.name_adduct``)
+        Delegates to the adduct assembler (``rules.adducts.name_adduct``)
         with the per-component namer switched to the ``complete`` tier
         (``general_fallback`` + ``allow_aromatic_general``). name_adduct handles
-        component ordering (P-14.8 seniority / water-last), proportion notation,
+        component ordering seniority / water-last), proportion notation,
         and — crucially — fails closed (returns None) if ANY component is
         unnameable OR charged (charged multi-fragment is the salt/ion router's
         and, when it too abstains, P5's scope). Returns the assembled name or
@@ -4891,7 +4891,7 @@ class Orthonym:
     def _finish(self, name: str, smiles: str) -> str:
         """ (fix wave 1): THE single exit of:meth:`name`.
 
-        ``name()`` has five ``return`` statements -- the isotope decorator
+        ``name`` has five ``return`` statements -- the isotope decorator
         exit, the isotope refusal, the late-recovery exit, the limit /
         ``--trivial`` fallback exit and the main exit. Hooking the
         binding-proof step at individual call sites left three of them
@@ -4913,7 +4913,7 @@ class Orthonym:
           belt-and-braces guard here also covers the ``is_top_level_naming``
           import, which the isotope exit reaches after its session ended.
 
-        It deliberately depends on NOTHING the ``try:`` block in ``name()``
+        It deliberately depends on NOTHING the ``try:`` block in ``name``
         sets up -- only on ``self._binding_proof``, the naming depth and the
         two arguments -- so the isotope exit (which sits before that block)
         can route through it unchanged.
@@ -4924,7 +4924,7 @@ class Orthonym:
         # sentinel (via _descriptive_fallback, already hooked above) OR, when the
         # OPSIN validity gate is degraded, on a WRONG best-effort fragment that
         # bypasses _descriptive_fallback entirely. Override with the exact-InChIKey
-        # ChEBI retained name HERE too, at name()'s single audited exit, so the table
+        # ChEBI retained name HERE too, at name's single audited exit, so the table
         # wins deterministically for exactly these structures regardless of gate
         # state. The exact-InChIKey match (25 curated metal-macrocycles, none of them
         # PIN-nameable) means no correctly-named / PIN molecule is ever touched.
@@ -4937,13 +4937,13 @@ class Orthonym:
                     name = _d1_name
         except Exception:  # pragma: no cover - a lookup must never break naming
             pass
-        # PE-1: record the name actually returned, in its OWN try/except and
+        #: record the name actually returned, in its OWN try/except and
         # BEFORE the ``off`` short-circuit below -- otherwise the emitted record
         # would be silently absent in the default binding-proof mode, which is the
         # mode every measurement runs in.
         #
         # Recorded explicitly rather than inferred by looking the string up among
-        # the candidates, because measured (PE1 plan §1, C10): the pool held
+        # the candidates, because measured (PE1 plan, C10): the pool held
         # '(2R)-piperidine-2-carboxylic acid' while naming emitted
         # '(2R)-piperidine-2-carboxylate'. A lookup would report "emitted name not
         # among candidates" for every anion row.
@@ -4956,9 +4956,9 @@ class Orthonym:
         # a phase L0: producer-agnostic coverage AUDIT, SHADOW mode
         # (telemetry only -- NEVER changes `name`, only stores a verdict on
         # `self._last_coverage_verdict` and logs one line). Gated to the
-        # top-level naming call, the same scope the SELF-01 gate itself uses
-        # (`name()`'s main exit calls `_final_opsin_validity_gate` only inside
-        # its own `is_top_level_naming()` block), so `_self01_lookup`'s
+        # top-level naming call, the same scope the gate itself uses
+        # (`name`'s main exit calls `_final_opsin_validity_gate` only inside
+        # its own `is_top_level_naming` block), so `_self01_lookup`'s
         # provenance read is never asked about a recursive fragment's state.
         # Skipped for a failure-name winner (an abstention makes no coverage
         # claim to audit, and its sentinel string would just waste an OPSIN
@@ -4983,7 +4983,7 @@ class Orthonym:
                             and getattr(_ger, "name", None) == name
                             else None)
                         if _result_obj is not None:
-                            # GER path never needs SELF-01 -- E1 is Java-free
+                            # GER path never needs -- E1 is Java-free
                             # and strictly more informative.
                             _self01, _skip_reanchor, _skip_detail = None, False, ""
                         else:
@@ -5030,7 +5030,7 @@ class Orthonym:
                         # this is a provable IDENTITY WHENEVER that offer's
                         # own `rt_ok` is True (the common case -- the primary
                         # winner was already gated upstream, so `_offer_rt_ok`
-                        # reuses that recorded SELF-01 verdict via
+                        # reuses that recorded verdict via
                         # `_self01_lookup`, zero fresh OPSIN calls); if
                         # `select_rt_passing` returns `None` (no offer both
                         # complete and rt_ok), `_select_rt_passing_offer_name`
@@ -5201,12 +5201,12 @@ class Orthonym:
         valid-tier run can never reach `name_t4_complete` from here either.
 
         Cost guard: `name_t4_complete` recurses the full naming machinery
-        (perception + classification + the T4 producer cascade), so it is
+        (perception + classification + the producer cascade), so it is
         only computed when it might actually be NEEDED --
 
         * ``primary_is_failure=False`` (the ordinary "primary emitted a real
           name" call site): `_offer_rt_ok(primary_name, smiles)` is checked
-          FIRST -- a cheap, MEMOIZED lookup (reuses the SELF-01 gate's own
+          FIRST -- a cheap, MEMOIZED lookup (reuses the gate's own
           OPSIN call for `primary_name`, no new JVM invocation) -- and the
           floor is skipped entirely when the primary already full-RT-passes.
           This is the common case, and exactly what keeps a PIN winner that
@@ -5222,9 +5222,9 @@ class Orthonym:
           ~:1194-1198, without ever calling `_validity_gate_name_to_smiles`
           on it -- so there is no cached verdict to reuse here either).
 
-        `name_t4_complete` is run inside `isolated_naming_session()` (mirrors
-        `_try_general_engine_recovery`'s existing T4 call site, ~:3442-3443):
-        called mid-`name()` at `session_depth >= 1` it would hit
+        `name_t4_complete` is run inside `isolated_naming_session` (mirrors
+        `_try_general_engine_recovery`'s existing call site, ~:3442-3443):
+        called mid-`name` at `session_depth >= 1` it would hit
         `MAX_NAMING_DEPTH` prematurely and degrade to an abstention
         (documented root cause, `t4_coverage.py` ~:292-299 / RE-CONFIRMED at
         `_try_general_engine_recovery` above) -- the isolated session gives
@@ -5259,16 +5259,16 @@ class Orthonym:
         # case, deny-by-default but NOT in `_self01_lookup`'s skip_reanchor
         # bucket) -- so `_offer_rt_ok(primary_name,...)` could go either
         # way depending on provenance left over from a PRIOR, unrelated
-        # `.name()` call in the same process (measured:
+        # `.name` call in the same process (measured:
         # `tests/unit/validation/test_binding_proof_wiring.py::
         # test_a_retained_name_swap_after_the_certificate_is_reported`,
         # order-dependent without this guard). Skipping the floor mechanism
         # entirely when the gate is explicitly off keeps that mode's
         # pre-L3-1 behaviour unchanged -- exactly what "test/internal mode"
         # should mean for a NEW OPSIN-gated capability.
-        # * A missing jar: mirrors the EXISTING T4 producer's own requirement
+        # * A missing jar: mirrors the EXISTING producer's own requirement
         # (`_try_general_engine_recovery` ~:3431-3433, `_try_t4_rescue`
-        # ~:3646 -- "Keep the abstention without a jar") -- a T4 name must
+        # ~:3646 -- "Keep the abstention without a jar") -- a name must
         # never ship UNVERIFIED. Without this, `_offer_rt_ok` fails OPEN
         # (True) for a candidate NO ONE has ever checked, which would let a
         # von-Baeyer name that must NEVER ship win purely because there was
@@ -5456,13 +5456,13 @@ class Orthonym:
         )
         start_naming_session()
         clear_confidence()
-        # Task 0.1: reset the typed-abstention slot (twin of name()).
+        # Task 0.1: reset the typed-abstention slot (twin of name).
         if is_top_level_naming():
             clear_abstention()
         try:
-            # Wave-0 D1: same wildcard pre-check as name(). name_with_confidence
+            # Wave-0 D1: same wildcard pre-check as name. name_with_confidence
             # returns a metadata dict, so mirror the limit handler's fallback dict
-            # (lines ~4405–4419) rather than name()'s string return.
+            # (lines ~4405–4419) rather than name's string return.
             # Perf: zero-false-negative pre-filter -- an RDKit dummy/wildcard
             # atom (atomic number 0) is spelled ONLY as `*`/`[*]` (bare `*`,
             # `[*]`, `[1*]`,...) or as `[#0]`/decorated (`[13#0]`, `[#0-]`,
@@ -5484,18 +5484,18 @@ class Orthonym:
                         _md['limit'] = _scope.as_dict()
                         _md['abstention'] = _abst.value if _abst else None
                         return _md
-            # --- Wave-2 P2: isotopic substitution decorator (P-82.2.1 / P-45.4) ---
-            # Twin of name()'s hook (:2938). name_with_confidence bypassed it and
+            # --- Wave-2 P2: isotopic substitution decorator / ---
+            # Twin of name's hook (:2938). name_with_confidence bypassed it and
             # called _name_impl directly, so an isotope-labeled mol named as the
             # UNLABELED skeleton (label silently dropped = wrong molecule; the OPSIN
             # validity gate cannot catch it — it parses to the unlabeled structure,
-            # and SELF-01's skeleton compare ignores isotopes). Route to the
+            # and 's skeleton compare ignores isotopes). Route to the
             # fail-closed decorator BEFORE _name_impl strips the label. has_isotopes
             # gate => zero cost + byte-identical on the entire unlabeled corpus.
             # Nothing scored coverage on this early-return path, so both exits use
             # the honest unmeasured record (C4). We are already INSIDE the try
             # whose finally ends the session, so just return — no second
-            # end_naming_session (unlike name(), whose hook sat outside its try).
+            # end_naming_session (unlike name, whose hook sat outside its try).
             if is_top_level_naming():
                 _iso_probe = Chem.MolFromSmiles(smiles)
                 if _iso_probe is not None:
@@ -5511,7 +5511,7 @@ class Orthonym:
                         # Decorator failed closed on an isotope-labeled molecule:
                         # REFUSE. Falling through to _name_impl would emit the
                         # UNLABELED skeleton name (label silently dropped). Abstain
-                        # to the descriptive fallback, exactly as name() does (:2967).
+                        # to the descriptive fallback, exactly as name does (:2967).
                         record_abstention(AbstentionCode.OTHER,
                                           detail='isotope_decorator_failed')
                         _fallback_name = _descriptive_fallback(smiles)
@@ -5528,7 +5528,7 @@ class Orthonym:
                 # descriptive-fallback name + the named limit code (no crash).
                 if _limit.smiles is None:
                     _limit.smiles = smiles
-                # Task 0.1: mirror name()'s classification of the
+                # Task 0.1: mirror name's classification of the
                 # limit signal (top-level ring refusal = NO_PARENT).
                 if _limit.code == 'UNSUPPORTED_RING_SYSTEM':
                     record_abstention(
@@ -5538,7 +5538,7 @@ class Orthonym:
                     )
                 else:
                     record_abstention(AbstentionCode.OTHER, detail=_limit.code)
-                # Task 1.9 (C8): apply trivial fallback here, mirroring name().
+                # Task 1.9 (C8): apply trivial fallback here, mirroring name.
                 _fallback_name = self._apply_trivial_fallback(_limit.message, smiles)
                 _abst = abstention_code_for(_fallback_name)
                 # C4: nothing scored this either, so report the shared
@@ -5551,13 +5551,13 @@ class Orthonym:
                 _md['limit'] = _limit.as_dict()
                 _md['abstention'] = _abst.value if _abst else None
                 return _md
-            # Universal stereo backstop (a phase, STER-16)
+            # Universal stereo backstop (a phase,)
             if is_top_level_naming():
                 mol = Chem.MolFromSmiles(smiles)
                 if mol is not None:
                     _conf = retrieve_confidence()
                     handler = _conf.get('handler', 'unknown')
-                    # a phase WSB-01 (): thread the authoritative parent
+                    # a phase -01 : thread the authoritative parent
                     # map + phenol flag to the backstop.
                     name = _final_stereo_check(
                         mol, name, handler=handler,
@@ -5569,7 +5569,7 @@ class Orthonym:
                         name, smiles, handler,
                         self._grammar, self._grammar_stats,
                     )
-                    # SUB-03 (169.5): real-OPSIN validity gate (twin of name()).
+                    # (169.5): real-OPSIN validity gate (twin of name).
                     if not self._disable_opsin_validity_gate:
                         name = _final_opsin_validity_gate(
                             name, smiles, self._grammar_stats,
@@ -5588,7 +5588,7 @@ class Orthonym:
             # MEASURED. The honest record says exactly that: confidence=None,
             # verification='unverified', factors={} (so no consumer can read an
             # atom_coverage that was never computed), handler='unmeasured'.
-            # Shared with the name() path via one constructor so the two can no
+            # Shared with the name path via one constructor so the two can no
             # longer disagree.
             if not metadata['name']:
                 metadata = unmeasured_confidence(name=name)
@@ -5597,7 +5597,7 @@ class Orthonym:
                 # what was returned)
                 metadata['name'] = name
 
-            # HYG-02 (a phase): informational limit annotation (additive — does
+            # (a phase): informational limit annotation (additive — does
             # not change 'name'). None for in-scope inputs; otherwise the named
             # out-of-scope code (scope pre-check, else failure mapping).
             _limit = None
@@ -5610,7 +5610,7 @@ class Orthonym:
                     _limit = _lim.as_dict()
             metadata['limit'] = _limit
 
-            # Task 1.9 (C8): apply trivial fallback, mirroring name() line 1483.
+            # Task 1.9 (C8): apply trivial fallback, mirroring name line 1483.
             # _apply_trivial_fallback is a no-op when trivial_fallback=False,
             # when called recursively, or when a real PIN was derived — safe.
             metadata['name'] = self._apply_trivial_fallback(metadata['name'], smiles)
@@ -5637,7 +5637,7 @@ class Orthonym:
         name as a preferred candidate, adopted by the caller ONLY when its OPSIN
         round-trip verifies -- so a molecule whose fused form is not yet RT-exact
         still falls through to the (valid) von-Baeyer name (no regression; 0-wrong
-        via the RT probe + the downstream SELF-01 gate). ``best_effort_ctx`` is
+        via the RT probe + the downstream gate). ``best_effort_ctx`` is
         already set for this session (the caller gates on
         ``_general_fallback_unverified``), so ``name_substituted_purine`` recurses
         the giant arm under best-effort."""
@@ -5673,8 +5673,8 @@ class Orthonym:
         a recovered one. Both are best-effort-only, RT-gated, whole-molecule
         swaps that leave the PIN default byte-identical.
 
-        `ursane`, `hopane`, `cevane`,... are valid PINs (P-101.2.7 Table 10.1)
-        that OPSIN 2.9.0 cannot parse, so they are whitelisted past the SELF-01
+        `ursane`, `hopane`, `cevane`,... are valid PINs
+        that OPSIN 2.9.0 cannot parse, so they are whitelisted past the
         gate and ship unverified. On the best-effort path a round-trippable name
         is worth more than the retained spelling, so offer it here -- but adopt
         it ONLY on a verified full-InChI round-trip. Most rows recover a
@@ -5724,7 +5724,7 @@ class Orthonym:
 
         a phase substrate: the implicit cascade at lines 853-1115 is
         REPLACED by a single ``self._cfr_router.dispatch(...)`` call. Per
-        audit § 3.5 RL-3 option (c) the zwitterion-character in-place
+        the audit option (c) the zwitterion-character in-place
         mutation (lines 1000-1034) lives INLINE here BEFORE the dispatch
         call — preserves predicate-purity invariant cleanly. Per
         Task 158-02-01 design choice (a) the GENERAL handler shim returns
@@ -5734,10 +5734,10 @@ class Orthonym:
         post-checks at lines 1129-1207 are PRESERVED VERBATIM after
         the dispatch call.
         """
-        # a phase RL-7 option (b): thread `_skip_decomposition` through
+        # a phase option (b): thread `_skip_decomposition` through
         # the instance attribute so the DECOMPOSITION_PRE_GENERAL predicate
         # factory + handler shim can read it from kwargs forwarded by
-        # `dispatch()`.
+        # `dispatch`.
         self._skip_decomposition = _skip_decomposition
 
         # Parse SMILES
@@ -5749,15 +5749,15 @@ class Orthonym:
         canonical_smiles = Chem.MolToSmiles(mol, canonical=True)
 
         # ============================================================
-        # Pre-dispatch: zwitterion-character in-place mutation (RL-3 (c))
+        # Pre-dispatch: zwitterion-character in-place mutation ((c))
         # ============================================================
-        # a phase audit § 3.5 RL-3 option (c) lock: the cascade at
+        # a phase the audit option (c) lock: the cascade at
         # namer.py:1000-1034 MUTATED `mol` and `canonical_smiles` in-place
         # for downstream cascade consumption. CFR's predicate-handler model
         # does NOT support "mutate state, continue cascade" patterns
         # natively. Per the audit's UNANIMOUS decision, the mutation lives
         # INLINE here BEFORE CFR.dispatch — preserves hard invariant
-        # (every entry's `side_effect_inventory == ()`) cleanly.
+        # (every entry's `side_effect_inventory == `) cleanly.
         #
         # CRITICAL byte-identical gate: in the cascade the mutation at
         # line 1000-1034 was only REACHED when ALL of the prior branches
@@ -5775,7 +5775,7 @@ class Orthonym:
         #
         # CHARGE NEUTRALIZATION for large zwitterions reclassified as
         # 'neutral' by the HA>20 + quaternary-N guard in
-        # `detect_species_type()`. These molecules still carry formal
+        # `detect_species_type`. These molecules still carry formal
         # charges (P-O-, N+) that prevent FG detection SMARTS from matching
         # (e.g., [OX2H] for COOH). Neutralize O- to OH; leave quaternary
         # N+ (no H) charged to preserve valid valence. ONLY applies to
@@ -5816,11 +5816,11 @@ class Orthonym:
         # ============================================================
         # a phase single chokepoint integration: CFR routes input
         # mol; backstops (a phase + 156) wrap output name at
-        # `Orthonym.name()` line 654. The CFR dispatcher walks
+        # `Orthonym.name` line 654. The CFR dispatcher walks
         # DISPATCH_TABLE in priority order; the first predicate that
         # matches wins; the result's handler is invoked here.
         #
-        # The audit § 1 DISPATCH_TABLE has 17 outer-cascade rows + GENERAL
+        # The the audit DISPATCH_TABLE has 17 outer-cascade rows + GENERAL
         # catch-all = 18 entries. Several handler shims (ANION_SMALL,
         # POLY_ANION, MULTI_COMPONENT_NEUTRAL, DECOMPOSITION_PRE_GENERAL)
         # may return None to signal "no match — continue cascade", in
@@ -5828,7 +5828,7 @@ class Orthonym:
         # next priority entry runs. This mirrors the cascade's
         # fall-through behavior (e.g., namer.py:913-914 + 955-956).
         #
-        # `_skip_decomposition` is threaded via kwargs per RL-7 option (b);
+        # `_skip_decomposition` is threaded via kwargs per option (b);
         # `style` is threaded via kwargs so the RETAINED_NAME and
         # AMINO_ACID predicates can read it without binding `self`.
         result = self._cfr_router.dispatch(
@@ -5854,7 +5854,7 @@ class Orthonym:
                 general_fallback_unverified=self._general_fallback_unverified,
             )
 
-        # Cascade-continuation when a handler returns None (audit § 1 row
+        # Cascade-continuation when a handler returns None (the audit row
         # notes for ANION_SMALL / POLY_ANION / MULTI_COMPONENT_NEUTRAL /
         # DECOMPOSITION_PRE_GENERAL). The cascade falls through to the
         # next sibling; mirror that here by re-running dispatch with
@@ -5897,7 +5897,7 @@ class Orthonym:
                 if name is not None or entry.class_id == StoutClass.GENERAL:
                     break
         # a phase: whichever class actually produced this name, so a gate
-        # rejection in name() can exclude it and re-enter the cascade.
+        # rejection in name can exclude it and re-enter the cascade.
         self._last_dispatch_class = result.class_id
 
         # ============================================================
@@ -5914,7 +5914,7 @@ class Orthonym:
             assembled = assemble_name(features, style=self.style)
             name = assembled
 
-            # a phase WSB-01 (/): thread the authoritative chain
+            # a phase -01 (/): thread the authoritative chain
             # atom_to_locant to the backstop. The general/chain pipeline does
             # NOT call store_confidence (only the ring path does), so the
             # backstop would otherwise see handler='unknown' and stay log-only.
@@ -5958,7 +5958,7 @@ class Orthonym:
             # default PIN path stays byte-identical (decision 3). An
             # engine emission still re-enters the SAME downstream moat:
             # the >15-HA coverage gate, the P10 source-vetoes, and the
-            # SELF-01 OPSIN-RT gate.
+            # OPSIN-RT gate.
             # ============================================================
             #: prefer a retained fused-heterocycle whole-molecule name (e.g.
             # the `...9H-purin-6-amine` parent of an acyl-CoA) over the general
@@ -5970,7 +5970,7 @@ class Orthonym:
             # fused name first; adopt it ONLY when its OPSIN round-trip verifies,
             # so a molecule whose fused form is not yet RT-exact still falls
             # through to the (valid) von-Baeyer name -- never a regression, 0-wrong
-            # via the RT probe + the downstream SELF-01 gate. Best-effort only
+            # via the RT probe + the downstream gate. Best-effort only
             # (`_general_fallback_unverified`), so PIN/default output is unchanged.
             if (self._general_fallback_unverified
                     and (not name or is_failure_name(name))):
@@ -5996,7 +5996,7 @@ class Orthonym:
                             structural_only=True):
                         # (audit-only): record the certified spine here,
                         # at the inline site, for re-assertion at the exit of
-                        # name(). Everything between this point and the return
+                        # name. Everything between this point and the return
                         # -- the stereo backstop, the grammar repair backstop
                         # and the OPSIN validity gate -- may rewrite the string
                         # the certificate was computed on.
@@ -6020,7 +6020,7 @@ class Orthonym:
                             and not self._disable_opsin_validity_gate
                             and not _validity_gate_jar_present()
                         )
-                        # FIX 2: fail closed on DROPPED stereo. SELF-01 is
+                        # FIX 2: fail closed on DROPPED stereo. is
                         # constitutional (stereo-blind) and the universal stereo
                         # backstop is LOG-ONLY for the handler='unknown' cohort
                         # general emissions arrive as -- so a general name that
@@ -6124,16 +6124,16 @@ class Orthonym:
         # on ANY non-None name (the original implementation) caused
         # PEPTIDE / SALT / etc. handler outputs to be re-checked
         # against the GENERAL pipeline's confidence store, which is
-        # populated by `assemble_name()` and may still hold stale data
+        # populated by `assemble_name` and may still hold stale data
         # from the PREVIOUS call (the `_confidence_store` is thread-
-        # local and persists across `Orthonym.name()` invocations; see
+        # local and persists across `Orthonym.name` invocations; see
         # `assembly/coverage_scoring.py:_confidence_store`). Pre-CFR
         # the gate only ran on `assembled = assemble_name(...)` output
         # at the very end of the cascade — handler early-returns
         # (e.g. peptide / salt / amino_acid) bypassed it entirely.
         # Restrict the gate to GENERAL-pipeline outputs to preserve
-        # CFR-04 byte-identical canary. Honest-fail-on-data per
-        # CONTEXT: the fix is upstream (gate scope), NOT a
+        # byte-identical canary. Honest-fail-on-data per
+        # internal notes: the fix is upstream (gate scope), NOT a
         # threshold relaxation or postprocessor band-aid.
         # ============================================================
         # C4 -- the `> 15` size term was REMOVED from this entry test, so
@@ -6215,7 +6215,7 @@ class Orthonym:
             conf_score = conf_data.get('confidence', None)
             conf_handler = conf_data.get('handler', 'unknown')
             # Only gate on confidence when it was actually computed during
-            # assemble_name() -- handler='unknown' means no scoring happened
+            # assemble_name -- handler='unknown' means no scoring happened
             # (e.g., decomposition path, retained names, etc.).
             if (conf_score is not None
                     and conf_handler != 'unknown'
@@ -6243,7 +6243,7 @@ class Orthonym:
             #
             # (1) `atom_cov` here is NOT a coverage measurement. No production
             # caller passes parent_atom_indices into compute_confidence
-            # (candidate_pool.add()'s "Risk 1" byte-identical mitigation),
+            # (candidate_pool.add's "Risk 1" byte-identical mitigation),
             # so this value is the name-LENGTH proxy -- numerically equal
             # to factors['ratio'] -- or a retained-name 1.0. Its
             # provenance is published as conf_data['coverage_provenance'].
@@ -6303,22 +6303,22 @@ class Orthonym:
 
         # ============================================================
         # W8-P9 Task 9.2: organometallic structure-loss veto (ACCURACY-
-        # CRITICAL, mandatory regardless of which other P-9 tasks land).
+        # CRITICAL, mandatory regardless of which other tasks land).
         # ============================================================
         # A covalent bond between a TRUE metal (Groups 1/2/3-12 -- see
         # has_covalent_metal_carbon_bond) and a carbon atom means the
-        # compound IS a P-69 organometallic. If the ORGANOMETALLIC handler
+        # compound IS a organometallic. If the ORGANOMETALLIC handler
         # did not produce the winning name (result.class_id != ORGANOMETALLIC),
         # the CFR cascade fell through to a class that has NO legitimate way
         # to name a true-metal-carbon compound -- it can only have "won" by
         # silently naming a DECOMPOSED SUB-FRAGMENT that drops the metal
         # (`C[Ti](Cl)(Cl)Cl` -> 'methane'; `Cl[Pt]1(Cl)...` -> '...ole', both
         # confirmed structure-loss leaks in the no-Java gate-off path, where
-        # the OPSIN validity/SELF-01 gate fails OPEN). Source-level veto: does
+        # the OPSIN validity/ gate fails OPEN). Source-level veto: does
         # NOT depend on OPSIN/Java. Never fires for a dot-separated IONIC
         # metallocene/salt (has_covalent_metal_carbon_bond is False -- no bond
         # crosses fragments) or for Group 13-16 metalloids (excluded from the
-        # predicate's scope; MONONUCLEAR_HYDRIDE / WSD-04 heterocycle defer /
+        # predicate's scope; MONONUCLEAR_HYDRIDE / -04 heterocycle defer /
         # etc. are legitimate alternate paths for those, not leaks).
         if name and result.class_id != StoutClass.ORGANOMETALLIC:
             from .perception.metals import (
@@ -6341,7 +6341,7 @@ class Orthonym:
                 return _descriptive_fallback(smiles)
 
         # ============================================================
-        # W8-P4: oxoacid/anhydride atom-drop safety floor (P-65.7/P-67).
+        # W8-P4: oxoacid/anhydride atom-drop safety floor /.
         # ============================================================
         # Mirrors the organometallic veto above: when a WRONG/DROP structural
         # motif (see _p4_oxoacid_anhydride_leak_motif docstring) is present and
@@ -6367,13 +6367,13 @@ class Orthonym:
         # atom-coverage certificate" from the cross-tool audit). Mirrors the
         # organometallic/oxoacid vetoes above -- runs UNCONDITIONALLY (never
         # gated by self._disable_opsin_validity_gate), so the raw/no-Java
-        # path gets the same protection the OPSIN SELF-01 gate gives the
+        # path gets the same protection the OPSIN gate gives the
         # Java path (which fails OPEN without a JAR). See
         # perception/structure_conservation.py for the full design record
         # and the false-positive investigation behind each check's scope.
         # ============================================================
         # Scoped to TOP-LEVEL naming only (never a recursive substituent/
-        # fragment naming call -- e.g. name_fragment_recursively() names an
+        # fragment naming call -- e.g. name_fragment_recursively names an
         # isolated charged fragment such as the boron-anion piece of
         # "trimethylboryl" as a standalone molecule up the call stack; that
         # inner name is not the final shipped name and must not be
@@ -6428,7 +6428,7 @@ class Orthonym:
                 return _descriptive_fallback(smiles)
             # -A: Java-free valence guard — a von-Baeyer name that cites a
             # ring carbon as BOTH a double-bond terminus AND an oxo/-one carbon
-            # is a 5-bond carbon (the caffeine oxo/ene class). SELF-01 catches it
+            # is a 5-bond carbon (the caffeine oxo/ene class). catches it
             # WITH a jar; this source-level check catches it WITHOUT one, so
             # best-effort (T4) can never ship a valence-illegal name. Runs
             # unconditionally (never gated on the jar), like the other P10 vetoes.
@@ -6440,7 +6440,7 @@ class Orthonym:
                                    candidate=name)
                 return _descriptive_fallback(smiles)
 
-        # Orthonym is deterministic-rules-only (ADR-21-01,): there is no
+        # Orthonym is deterministic-rules-only (-01,): there is no
         # ML fallback. The rule-based pipeline output is the final name.
         return name
 
@@ -6488,8 +6488,8 @@ class Orthonym:
         features.triple_bonds = self._find_triple_bonds(mol)
 
         # Assign CIP stereochemistry labels BEFORE extracting stereo info.
-        # WSB-03 (, Pitfall 2): route the SECOND CIP chokepoint through the
-        # single source-of-truth assign_stereochemistry() so this path can never
+        # -03 (, Pitfall 2): route the SECOND CIP chokepoint through the
+        # single source-of-truth assign_stereochemistry so this path can never
         # disagree with perception/stereo.py under ORTHONYM_USE_CENTRES_CIP=1.
         # assign_stereochemistry sets _CIPCode (rdCIPLabeler by default; centres
         # when gated ON + available) AND the _CIP_ASSIGNED_PROP idempotent marker
@@ -6516,7 +6516,7 @@ class Orthonym:
             features.mol,
             features.functional_groups
         )
-        # a phase.6 T3: scoped principal-group override (P-72/P-74). When the
+        # a phase T3: scoped principal-group override /. When the
         # charged chokepoint re-enters an S/P-oxoacid anion that coexists with a
         # SENIOR neutral acid (carboxylic), it forces the anion's acid group
         # (sulfonic/sulfinic/phosphonic) as principal so it becomes the suffix and
@@ -6529,9 +6529,9 @@ class Orthonym:
         features.principal_group_atoms = pg_atoms
 
         # a phase: stash the controller flag + oracle onto features (the
-        # features._ring_info transient-attribute pattern at:1532) so CandidatePool.add()
+        # features._ring_info transient-attribute pattern at:1532) so CandidatePool.add
         # can lift them onto the pool (BLOCKER #9 fix). WARNING #9: the oracle is required
-        # for the TRIV-03 T2 runtime RT-safety gate. Both default to OFF/None (Stage A).
+        # for the runtime RT-safety gate. Both default to OFF/None (Stage A).
         features._enable_triviality_controller = self._enable_triviality_controller
         features._triv_oracle = self._triv_oracle
         # a phase: plumb the group-splitting flag + flag-ON-only oracle onto
@@ -6555,12 +6555,12 @@ class Orthonym:
             )
 
         # Parent selection for ALL cyclic molecules (a phase: no fused-heterocycle bypass).
-        # P-44.1 cascade runs whenever a meaningful chain exists; cascade itself
-        # enforces P-31.1.3.4 NP override (parent_selection.py:688-700) and
-        # P-52.2.8 ring-on-tie tiebreaker (parent_selection.py:862-869).
-        # Source: https://iupac.qmul.ac.uk/BlueBook/P4.html P-44.1
-        # Source: https://iupac.qmul.ac.uk/BlueBook/P5.html P-52.2.8
-        # Source: AUTONOM 1990 §4 (full seniority cascade on ALL structures).
+        # cascade runs whenever a meaningful chain exists; cascade itself
+        # enforces NP override (parent_selection.py:688-700) and
+        # ring-on-tie tiebreaker (parent_selection.py:862-869).
+        # Source: https://iupac.qmul.ac.uk/BlueBook/P4.html
+        # Source: https://iupac.qmul.ac.uk/BlueBook/P5.html
+        # Source: AUTONOM 1990 (full seniority cascade on ALL structures).
         if features.is_cyclic:
             from .rules.parent_selection import select_parent
 
@@ -6570,7 +6570,7 @@ class Orthonym:
                 all_ring_atoms.update(ring)
 
             # Find potential principal chain (excluding ring atoms)
-            # IMPORTANT: namer.py does the chain finding, then passes result to select_parent()
+            # IMPORTANT: namer.py does the chain finding, then passes result to select_parent
             potential_chain = find_principal_chain(
                 features.mol,
                 features.functional_groups,
@@ -6579,12 +6579,12 @@ class Orthonym:
             )
 
             # Only do parent selection if we found a meaningful chain (>= 2
-            # carbons) OR (C-T2 / V-4, P-44.1.1) a 1-carbon chain whose
+            # carbons) OR (C- / V-4, a 1-carbon chain whose
             # principal-characteristic-group carbon is NOT ring-attached: the
             # ring then cannot express the PCG as a ring suffix, so the 1-carbon
             # parent (formamide / formic acid / methanal) must be parent-eligible
             # (else an N-aryl formamide falls to the ring -> 'carbamoylbenzene').
-            # select_parent() applies the same ring-neighbour test, so a
+            # select_parent applies the same ring-neighbour test, so a
             # ring-attached single PCG carbon (benzaldehyde/benzamide) is
             # unaffected.
             _run_parent_selection = bool(potential_chain) and len(potential_chain) >= 2
@@ -6621,7 +6621,7 @@ class Orthonym:
                 # helper covers fused-hetero / PAH / benzene / simple-
                 # hetero / spiro-stub / VB-stub / else->None per.
                 _ring_info = _build_ring_info_for_parent_selection(features)
-                # a phase: stash on features so downstream pool.add()
+                # a phase: stash on features so downstream pool.add
                 # call sites can read it without a signature change at
                 # every composer.py call site (transient runtime
                 # attribute; not a MolecularFeatures dataclass field
@@ -6655,7 +6655,7 @@ class Orthonym:
 
                 if selection.parent_type == 'chain':
                     features.chain_is_parent = True
-                    # is_cyclic stays True -- ring data needed for ring-as-substituent naming (a phase ARCH-01)
+                    # is_cyclic stays True -- ring data needed for ring-as-substituent naming (a phase)
                     features.principal_chain = selection.parent_atoms
                     features.ring_substituents_as_groups = selection.substituent_rings
 
@@ -6673,7 +6673,7 @@ class Orthonym:
                         return  # Skip other ring classification for assemblies
 
             # (a phase) chokepoint consolidation: compute the senior ring
-            # system ONCE (P-44.2 via select_principal_ring_system) and carry it
+            # system ONCE via select_principal_ring_system) and carry it
             # on the ParentSelectionResult, so the PAH guard, the among-rings
             # selector, and the derived senior_ring_system / principal_ring all
             # read ONE authoritative value instead of recomputing the identical
@@ -6696,20 +6696,20 @@ class Orthonym:
             from .rules.polycyclics import get_polycyclic_substituents, identify_polycyclic
             pah_name = identify_polycyclic(features.mol)
             if pah_name and len(features.ring_systems) >= 2:
-                # WS-A task 9 (A-i): the PAH early-return must not preempt the
-                # P-44 parent decision. With >=2 ring systems, take the PAH
+                # task 9 (A-i): the PAH early-return must not preempt the
+                # parent decision. With >=2 ring systems, take the PAH
                 # route ONLY when the PAH system survives:
-                # (a) P-44.1 — a principal characteristic group on a
+                # (a) — a principal characteristic group on a
                 # DIFFERENT ring system makes that system the parent
                 # (2-(naphthalen-2-yl)cyclohexan-1-ol, not naphthalene);
-                # (b) P-44.2 — the among-rings winner must BE the PAH
+                # (b) — the among-rings winner must BE the PAH
                 # system (2-(naphthalen-2-yl)furan: furan is senior).
                 from .rules.parent_selection import is_principal_group_on_ring
                 from .rules.polycyclics import get_polycyclic_core_atoms
                 _core = get_polycyclic_core_atoms(features.mol, pah_name)
                 _core_set = set(_core) if _core else set()
                 if _core_set:
-                    # Default False so the P-44.2 among-rings veto below runs
+                    # Default False so the among-rings veto below runs
                     # unchanged when there is NO principal characteristic group
                     # (no PCG => none can sit on the PAH core). Assigned only
                     # inside the principal_group_atoms branch otherwise.
@@ -6734,12 +6734,12 @@ class Orthonym:
                     if pah_name:
                         #: reuse the one authoritative computation
                         _senior = _principal_ring_system
-                        # FR-4 / P-66.2.2 build (P-44.1 precedes P-44.2): when
+                        # / build precedes: when
                         # the principal characteristic group sits ON the PAH
                         # core, a senior heterocyclic SUBSTITUENT ring must not
                         # steal the parent (5-(1,3-dioxo-...-isoindol-2-yl)-
                         # naphthalene-1-carboxylic acid). Only the among-rings
-                        # tie-break (P-44.2) is skipped; P-44.1 already ran.
+                        # tie-break is skipped; already ran.
                         if (_senior and not (set(_senior) & _core_set)
                                 and not _pg_on_pah):
                             pah_name = None
@@ -6757,10 +6757,10 @@ class Orthonym:
             ring_info = get_ring_info(features.mol)
             atom_rings = ring_info['atom_rings']
 
-            # Wave2 T3 (P-44.1 determinism): among monocyclic candidate rings,
+            # Wave2 determinism): among monocyclic candidate rings,
             # atom_rings[0] (first SSSR ring) is SMILES-order-dependent. When the
-            # principal characteristic group sits on EXACTLY ONE ring, P-44.1 makes
-            # that ring senior (it precedes the P-44.2 seniority tiebreak) — so move
+            # principal characteristic group sits on EXACTLY ONE ring, makes
+            # that ring senior (it precedes the seniority tiebreak) — so move
             # it to the front deterministically. Without this, a molecule with two
             # equal rings where only one bears the PCG (e.g. 4-styrylbenzoic acid:
             # the COOH benzene vs the styryl phenyl) flipped parent by spelling,
@@ -6784,13 +6784,13 @@ class Orthonym:
                     ]
 
             if atom_rings:
-                # Select the most senior ring system per IUPAC P-44.2
+                # Select the most senior ring system per IUPAC
                 # and store it for downstream use (e.g., ring-vs-chain
                 # comparison in the composer). The monocyclic dispatch
                 # path below uses atom_rings[0] which preserves SSSR
                 # cyclic traversal order needed by orientation functions.
                 # Complex multi-ring (fused/bridged) systems are handled
-                # by _classify_complex_ring() in the composer.
+                # by _classify_complex_ring in the composer.
                 #: reuse the one authoritative computation (see top of block)
                 principal = _principal_ring_system
                 features.senior_ring_system = principal if principal else atom_rings[0]
@@ -6800,12 +6800,12 @@ class Orthonym:
                 # system is strictly LARGER than the default ring's system.
                 # This ensures fused/bridged senior systems (imidazopyridine,
                 # xanthene) take precedence over small monocyclic rings
-                # (benzene) per IUPAC P-44.2.
+                # (benzene) per IUPAC.
                 #
-                # WS-A.1 S2: select_principal_ring_system (P-44.2, with the S1
-                # P-44.4.1 unsaturation tiebreak) is now AUTHORITATIVE among ring
+                #.1 S2: select_principal_ring_system, with the S1
+                # unsaturation tiebreak) is now AUTHORITATIVE among ring
                 # systems. The legacy ``size_diff >= 3`` heuristic that DISCARDED
-                # the P-44.2 winner for equal/near-equal senior systems is deleted
+                # the winner for equal/near-equal senior systems is deleted
                 # (it produced (furan-2-yl)benzene instead of 2-phenylfuran and
                 # pyridinylcyclohexane instead of 4-cyclohexylpyridine). Gated only
                 # by the two correctness guards below; verified on the among-rings
@@ -6819,9 +6819,9 @@ class Orthonym:
                             default_system = rs
                             break
 
-                    # Guard (a) P-44.1: the principal characteristic group must be
+                    # Guard (a): the principal characteristic group must be
                     # IN the parent. If the PG sits on the default ring system,
-                    # that ring stays parent regardless of P-44.2 ring seniority.
+                    # that ring stays parent regardless of ring seniority.
                     from .rules.parent_selection import is_principal_group_on_ring
                     pg_on_default = False
                     pg_on_senior = False
@@ -6831,12 +6831,12 @@ class Orthonym:
                             features.principal_group_atoms,
                             features.principal_group,
                         )
-                        # C4 (P-44.1 + P-44.2): a BRIDGING characteristic group
+                        # C4 +: a BRIDGING characteristic group
                         # (e.g. a secondary amine N bonded to a carbon of EACH
-                        # ring — diaryl/aryl-heteroaryl amines) satisfies P-44.1
+                        # ring — diaryl/aryl-heteroaryl amines) satisfies
                         # for BOTH ring systems. When it also sits on the SENIOR
-                        # ring, P-44.1 no longer disqualifies the senior ring, so
-                        # the P-44.2 seniority tiebreak decides -> the senior ring
+                        # ring, no longer disqualifies the senior ring, so
+                        # the seniority tiebreak decides -> the senior ring
                         # is the parent (pyridine over benzene ->
                         # N-phenylpyridin-4-amine, not (aminopyridinyl)benzene).
                         pg_on_senior = is_principal_group_on_ring(
@@ -6849,7 +6849,7 @@ class Orthonym:
                     # parent, both rings are mere substituents; reassigning
                     # principal_ring here perturbs stereodescriptor emission on the
                     # chain handler (the documented +1 self-test regressor of the
-                    # 171 P-1 trial). Among-ring seniority does not decide a chain
+                    # 171 trial). Among-ring seniority does not decide a chain
                     # parent — keep the default ring. (See test_among_rings_gold.py
                     # TestPhase171StereoGuard.)
                     if ((not pg_on_default or pg_on_senior)
@@ -6864,7 +6864,7 @@ class Orthonym:
                                 best_ring = ring
                         features.principal_ring = best_ring
                     else:
-                        # Wave-2 C2 (P-45.2.1): when the PG sits on TWO OR
+                        # Wave-2 C2: when the PG sits on TWO OR
                         # MORE benzene rings (the dicyano-diaryl-ether BB
                         # example), atom_rings[0] is SMILES-order-dependent
                         # — the parent flipped with the spelling (a genuine
@@ -6897,7 +6897,7 @@ class Orthonym:
                     features.principal_ring = atom_rings[0]
                 features.ring_type = classify_ring(features.mol, features.principal_ring)
 
-                # P-59.2.1.6 (BB 25207): the principal ketone-family group sits
+                # (BB 25207): the principal ketone-family group sits
                 # in BOTH the ring and a pendant chain; the ring won parent
                 # selection (more of the group, or ring default on tie), so an
                 # off-ring match must NOT become a second ring '-one' suffix —
@@ -6909,7 +6909,7 @@ class Orthonym:
                         features, features.principal_ring
                     )
 
-                # P-22.1.2(b) / P-25.3.2.1.1: a mancude monocyclic hydrocarbon
+                # (b) /: a mancude monocyclic hydrocarbon
                 # (all-carbon, RDKit-aromatic, NOT benzene, n>=7) is named as the
                 # cyclo-polyene (cyclodeca-1,3,5,7,9-pentaene), never as an
                 # [n]annulene component prefix and never dropped as "unknown".
@@ -6933,7 +6933,7 @@ class Orthonym:
                 from .rules.benzene import get_benzene_substituents, is_benzene_ring
                 if is_benzene_ring(features.mol, features.principal_ring):
                     features.is_benzene = True
-                    # C-T2 (V-3): with >1 benzene ring and no principal
+                    # C- (V-3): with >1 benzene ring and no principal
                     # characteristic group (aralkyl/diaryl ethers, e.g. benzyl
                     # phenyl ether), `atom_rings[0]` is SMILES-order-dependent, so
                     # the parent flipped with the input spelling -> non-determinism
@@ -6950,7 +6950,7 @@ class Orthonym:
                         if is_benzene_ring(features.mol, r)
                     ]
                     if len(_benzene_rings) > 1 and not features.principal_group:
-                        # P-45.5.1 / P-45.6.3 (diaryl-linked-by-heteroatom):
+                        # / (diaryl-linked-by-heteroatom):
                         # pick the parent whose COMPLETE name is preferred by
                         # alphanumerical order (R<S tie-break), naming each tied
                         # candidate. Falls back to the structure-only selector
@@ -6988,9 +6988,9 @@ class Orthonym:
                                 sub_positions.add(idx)
                                 break
 
-                    # WS-4 / ring-suffix fix (DEF-6): identify the ring atoms bearing the
+                    # / ring-suffix fix : identify the ring atoms bearing the
                     # principal characteristic group so the suffix gets the lowest
-                    # locant (P-14.4(c)), after the heteroatom. Same extraction as
+                    # locant (c)), after the heteroatom. Same extraction as
                     # the cycloalkene branch: a ring C whose FG-match heteroatom is
                     # exocyclic (C=O ketone, C-OH alcohol/phenol, C-NH2 amine,...).
                     pg_ring_atoms = set()
@@ -7005,9 +7005,9 @@ class Orthonym:
                         # (the assembly already unions them via the shared 'hydroxy'
                         # prefix). Collect every same-prefix FG class so orient
                         # gives the suffix-bearing ring carbons the lowest locants
-                        # (P-14.4(c)) DETERMINISTICALLY (SEN-03 alcohol-class union);
+                        # (c)) DETERMINISTICALLY (alcohol-class union);
                         # without this the suffix-locant tie is broken by SMILES
-                        # atom order -> non-deterministic numbering (CARB-01).
+                        # atom order -> non-deterministic numbering .
                         for _fg, _matches in features.functional_groups.items():
                             if _pg_prefix is None or _pg_get_prefix(_fg) != _pg_prefix:
                                 continue
@@ -7027,10 +7027,10 @@ class Orthonym:
                                     # rank, giving the suffix the HIGHER locant
                                     # (2-methylfuran-5-carboxylic acid). The
                                     # expressed-suffix ANCHOR is the ring atom
-                                    # bonded to the match carbon; per P-14.4(c)
+                                    # bonded to the match carbon; per (c)
                                     # it takes the lowest locant BEFORE the
                                     # detachable prefix (5-methylfuran-2-
-                                    # carboxylic acid). Same-prefix (SEN-03)
+                                    # carboxylic acid). Same-prefix
                                     # scoping is inherited from the enclosing
                                     # loop, so only principal-group-class
                                     # suffixes are anchored. (A shared helper
@@ -7042,7 +7042,7 @@ class Orthonym:
                                     # match carbon must carry a characteristic
                                     # MULTIPLE bond to a non-carbon match atom
                                     # (C=O aldehyde/acid/amide, C#N nitrile). The
-                                    # SEN-03 same-prefix union also admits an
+                                    # same-prefix union also admits an
                                     # exocyclic -CH2OH / -CH2NH2 whose ring-bonded
                                     # carbon is sp3 single-bonded: that is a
                                     # (hydroxymethyl)/(aminomethyl) PREFIX, not a
@@ -7082,7 +7082,7 @@ class Orthonym:
                                             break
 
                     # Orient considering heteroatoms, the principal group, then
-                    # other substituents for lowest locants (P-14.4 order).
+                    # other substituents for lowest locants order).
                     oriented, atom_to_locant = orient_heterocycle_with_substituents(
                         features.mol, features.principal_ring, sub_positions,
                         principal_group_atoms=pg_ring_atoms if pg_ring_atoms else None
@@ -7119,7 +7119,7 @@ class Orthonym:
                     )
 
                     # Determine principal group atoms on the ring
-                    # IUPAC P-31.1.3.4 / P-31.1.4: principal group gets lowest locant
+                    # IUPAC /: principal group gets lowest locant
                     # We identify ring C atoms that directly bear the principal
                     # group's characteristic heteroatom (e.g., C=O for ketone,
                     # C-OH for alcohol). The characteristic heteroatom must be
@@ -7130,12 +7130,12 @@ class Orthonym:
                         for match in features.functional_groups[features.principal_group]:
                             match_set = set(match)
                             if not (match_set & ring_set):
-                                # WS-A.1 S4: wholly-exocyclic match = an
+                                #.1 S4: wholly-exocyclic match = an
                                 # APPENDED suffix (-carbaldehyde, -carboxylic
                                 # acid, -carbonitrile). Its expressed-suffix
                                 # ANCHOR (the ring atom bonded to the match
                                 # carbon) takes the lowest locant per
-                                # P-31.1.4.2.4 (2-methylcyclohexane-1-
+                                # (2-methylcyclohexane-1-
                                 # carbaldehyde, never 1-methyl-2-). Matches
                                 # with no ring contact at all (a CHO at the
                                 # end of a demoted chain) contribute nothing.
@@ -7221,7 +7221,7 @@ class Orthonym:
                     )
                     for match in features.functional_groups[features.principal_group]:
                         if features.principal_group in SKELETAL_SUFFIX_PGS:
-                            # WS-A task 9: the -one family's locant atom is
+                            # task 9: the -one family's locant atom is
                             # the carbonyl carbon (PG_ATTACHMENT_INDICES);
                             # feeding the whole match (incl. the FLANKING
                             # carbon) made orientation criterion (a) tie at
@@ -7262,8 +7262,8 @@ class Orthonym:
                 )
 
         # ATOM-PARTITION invariant: a principal-group occurrence is a PARENT SUFFIX, not a
-        # substituent's group. get_principal_group() (:4123) gathers every same-prefix-class
-        # occurrence molecule-wide (the SEN-03 alcohol-class union), so the tertiary OH of a
+        # substituent's group. get_principal_group (:4123) gathers every same-prefix-class
+        # occurrence molecule-wide (the alcohol-class union), so the tertiary OH of a
         # C(C)(C)O arm ON A RING is otherwise emitted as a second ring -ol, double-assigning its
         # atom (it is ALSO in ring_substituents) -> an atom-short, wrong parent
         # (cyclohexane-1,2-diol for a mono-ol ring). decide suffix-vs-
@@ -7282,7 +7282,7 @@ class Orthonym:
         # whose locant IS a skeletal atom (parent_selection.py:45-52); appended suffixes
         # (-carboxylic acid/-carbaldehyde/...) have an exocyclic locant by design and are left
         # alone. Never empties the suffix set. E1 disjointness stays the backstop.
-        # ⚠ Excludes amines/imine: N-suffixes carry special multi-N locant handling (P-62,
+        # ⚠ Excludes amines/imine: N-suffixes carry special multi-N locant handling,
         # N1/N2 locants) and the composer already runs its OWN diamine principal_group_atoms
         # filter (composer.py:6461-6493). A generic strip here runs first and breaks it -- it
         # regressed exactly two amine PIN gold rows to abstention (NCCNCN, CN(C)CCN(C)CCN;
@@ -7310,7 +7310,7 @@ class Orthonym:
                 if _kept and len(_kept) < len(features.principal_group_atoms):
                     features.principal_group_atoms = _kept
 
-        # INST-05: Naming decision trace
+        #: Naming decision trace
         if logger.isEnabledFor(logging.DEBUG):
             parent_type = 'chain' if getattr(features, 'chain_is_parent', False) else 'ring'
             parent_atoms = (features.principal_chain if parent_type == 'chain'
@@ -7368,7 +7368,7 @@ class Orthonym:
         """
         Find substituents attached to the principal chain, keyed by atom index.
 
-        This is used for orient_chain() which expects substituent_positions
+        This is used for orient_chain which expects substituent_positions
         keyed by atom indices on the chain, not by position numbers.
 
         Args:
@@ -7420,7 +7420,7 @@ def _filter_consumed_fg_atoms(functional_groups: dict) -> dict:
            with an anhydride group.
 
     Args:
-        functional_groups: Dict from detect_functional_groups().
+        functional_groups: Dict from detect_functional_groups.
 
     Returns:
         Filtered copy of functional_groups with consumed matches removed.
@@ -7468,7 +7468,7 @@ def _filter_consumed_fg_atoms(functional_groups: dict) -> dict:
 def name_with_tree(smiles: str, style: str = "pin"):
     """Module-level convenience wrapper for Orthonym(style).name_with_tree(smiles).
 
-    CR-04 part A (BLOCKER): downstream consumers expect
+     part A (BLOCKER): downstream consumers expect
     ``from orthonym import name_with_tree`` to work analogously to
     ``name_compound``.
 
@@ -7607,7 +7607,7 @@ def name_compound(smiles: str, style: str = "pin",
             if 'unknown' in result.lower():
                 return _descriptive_fallback(smiles)
             return result
-        # If name() returned empty/None, generate descriptive fallback
+        # If name returned empty/None, generate descriptive fallback
         return _descriptive_fallback(smiles)
     except ValueError:
         raise  # Re-raise ValueError (invalid SMILES) for caller to handle
@@ -7637,7 +7637,7 @@ def name_pipeline_only(smiles: str, style: str = "pin"):
     # naive (smiles, style) key is PROVEN output-changing -- the result depends on
     # the ambient tier contextvars (1 same-key-different-result observed), so those
     # four vars are IN the key. push_scope creates a scope iff none is open (a
-    # standalone call), else shares the outer name() scope. Fail-open + verify-mode
+    # standalone call), else shares the outer name scope. Fail-open + verify-mode
     # checked; plan internal notes Step 2.
     from .assembly.memo import cache_or_compute, pop_scope, push_scope
     from .metrics.provenance import (
@@ -7652,7 +7652,7 @@ def name_pipeline_only(smiles: str, style: str = "pin"):
             namer = Orthonym(style=style)
             return namer._name_impl(smiles, _skip_decomposition=True)
         except OrthonymLimitError:
-            # G0 (DD7 S1, WR-03): a fragment-level fail-closed refusal is "no
+            # G0 (DD7 S1,): a fragment-level fail-closed refusal is "no
             # name", not a crash — propagate as None so the decomposition engine
             # treats the fragment as out-of-scope and tries another strategy.
             # Caught explicitly (before the broad except) so the intent is
@@ -7719,7 +7719,7 @@ def _descriptive_fallback(smiles: str) -> str:
     'gold compound (not supported)'. For organic molecules that failed
     naming, returns 'unknown organic compound'.
 
-    HYG-02 (a phase): this now delegates to ``errors.classify_failure_limit``
+     (a phase): this now delegates to ``errors.classify_failure_limit``
     — the single classifier that also backs the named ``OrthonymLimitError``
     catalog. The returned ``.message`` is byte-identical to the strings this
     function returned before (so the default always-emit output is unchanged);

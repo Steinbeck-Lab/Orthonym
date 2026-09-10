@@ -1,25 +1,25 @@
-"""WS-A.1 S4 — P-44.1.2.2 ring-senior-to-chain in the select_parent PG-tie cascade.
+""".1 S4 — ring-senior-to-chain in the select_parent PG-tie cascade.
 
 When a ring and a chain both bear the principal characteristic group (PG count
 tied) and they are the SAME seniority class (same senior element, both
 carbon-based skeletons), the ring is senior to the chain regardless of chain
-length / hydrogenation (P-44.1.2.2). This must be applied BEFORE the
-P-44.1(c) chain-length comparison.
+length / hydrogenation. This must be applied BEFORE the
+(c) chain-length comparison.
 
-Tight same-class gate (V21-ALGORITHM-FIX-PLAN.md §3 WS-A.1 step 4):
+Tight same-class gate (V21-ALGORITHM-FIX-PLAN.md.1 step 4):
   - fires ONLY when best_ring senior element == candidate_chain senior element
     AND both are carbon-based;
-  - the heteroatom-bridged skeletal-chain path (P-44.3, different element:
+  - the heteroatom-bridged skeletal-chain path, different element:
     O/Si/ester chains) stays reachable — the ring must NOT win there.
 
 Gold targets (Blue Book exact-topology PINs; among-rings gold rows):
-  O=CCCCCCC1CCCCC1C=O  -> 2-(6-oxohexyl)cyclohexane-1-carbaldehyde
-  O=CCCCCCCC1CCCC1C=O  -> 2-(7-oxoheptyl)cyclopentane-1-carbaldehyde
+  O=CCCCCCC1CCCCC1C=O -> 2-(6-oxohexyl)cyclohexane-1-carbaldehyde
+  O=CCCCCCCC1CCCC1C=O -> 2-(7-oxoheptyl)cyclopentane-1-carbaldehyde
 
 Protects (the same-class gate must NOT mis-fire ring-wins):
-  C1CCCCC1COCCOCCOCCOC  -> 1-cyclohexyl-2,5,8,11-tetraoxadodecane
+  C1CCCCC1COCCOCCOCCOC -> 1-cyclohexyl-2,5,8,11-tetraoxadodecane
                            (heteroatom skeletal chain; different element)
-  CCCCCCCc1ccccc1       -> heptylbenzene (no PG; benzene ring parent — ring
+  CCCCCCCc1ccccc1 -> heptylbenzene (no PG; benzene ring parent — ring
                            winning here is correct)
 """
 
@@ -47,7 +47,7 @@ class TestRingSeniorToChainGold:
 class TestRingSeniorToChainProtect:
     def test_tetraoxadodecane_keeps_chain_parent(self):
         # Heteroatom (oxa) skeletal chain is a DIFFERENT element class than the
-        # carbocycle -> P-44.3 chain path stays reachable, ring must NOT win.
+        # carbocycle -> chain path stays reachable, ring must NOT win.
         assert (
             name_compound("C1CCCCC1COCCOCCOCCOC").strip()
             == "1-cyclohexyl-2,5,8,11-tetraoxadodecane"

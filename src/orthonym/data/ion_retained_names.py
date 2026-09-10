@@ -28,7 +28,7 @@ RETAINED_ANIONS = {
     'O=C([O-])CC(=O)[O-]': 'malonate',
     'O=C([O-])CCC(=O)[O-]': 'succinate',
 
-    # Alkoxide anions — Wave2 T2d, BB P-63.8.1 VERBATIM: "The traditional
+    # Alkoxide anions — Wave2 T2d, BB VERBATIM: "The traditional
     # names methoxide, ethoxide, propoxide, butoxide, phenoxide, and
     # aminoxide... are retained as preferred IUPAC names and may be
     # substituted in the same way as the corresponding alcohols. The
@@ -54,7 +54,7 @@ RETAINED_ANIONS = {
     # stays — it is a ring carbanion outside the acyclic parent-hydride path.
     '[c-]1ccccc1': 'phenide',  # Also called benzenide
 
-    # Azanide (NH2-) — the conjugate base of azane (NH3). F-T6 (DD3, P-72.2.2.2):
+    # Azanide (NH2-) — the conjugate base of azane (NH3). F- (DD3,:
     # the preselected name of the bare nitrogen-hydride anion. RETAINED_ANIONS is
     # consulted before INORGANIC_ANIONS, so this shadows the legacy inorganic
     # 'amide' (a deprecated name) — azanide is the IUPAC 2013 PIN and OPSIN
@@ -62,7 +62,7 @@ RETAINED_ANIONS = {
     # OPSIN validity gate suppressed to 'unknown organic compound'.)
     '[NH2-]': 'azanide',
 
-    # Hydroxyazanide (HO-NH-) — P-72.2.2.2.4, the Blue Book "HO-NH- hydroxyazanide
+    # Hydroxyazanide (HO-NH-) —, the Blue Book "HO-NH- hydroxyazanide
     # (preselected name)". The N-anion of hydroxylamine is a PRESELECTED NAME
     # built on AZANE (hydroxy + azanide), NOT the retained-amine suffix path
     # (which mis-builds 'hydroxylaminide' from hydroxylamine + 'ide'). Consulted
@@ -73,17 +73,17 @@ RETAINED_ANIONS = {
     # Alkynide anions
     '[C-]#C': 'ethynide',  # Terminal alkynide
 
-    # charged-species fix, 169.6 caveats (a phase.7): retained charged-species names recovered
+    # charged-species fix, 169.6 caveats (a phase): retained charged-species names recovered
     # from the 169.6 route_charged regression (neutralize-first produced OPSIN-
-    # unparseable forms -> suppressed). All RT-verified; sanctioned by P-72/P-74.
-    # HOO-: BB P-72.2.2.2.2 (line 41031) "The retained names hydroxide, for HO-,
+    # unparseable forms -> suppressed). All RT-verified; sanctioned by /.
+    # HOO-: BB (line 41031) "The retained names hydroxide, for HO-,
     # and hydroperoxide, for HOO-, are preselected names but cannot be substituted."
     # So the bare dioxidane anion is the preselected name 'hydroperoxide' (the
     # systematic 'dioxidanide' is the alternative). HEAD dropped the charge to the
     # neutral 'dioxidane'; this restores the correct anion word. Substituted
     # peroxol anions (CH3-O-O-) keep the systematic -peroxolate/-dioxidanide path.
     '[O-]O': 'hydroperoxide',
-    'N[O-]': 'aminoxide',  # H2N-O- conjugate base of hydroxylamine (P-74); was -> unknown
+    'N[O-]': 'aminoxide',  # H2N-O- conjugate base of hydroxylamine; was -> unknown
     'O=S(=O)([N-]S(=O)(=O)C(F)(F)F)C(F)(F)F': 'bistriflimide',  # was -> 'triflimidic acid'
 }
 
@@ -91,7 +91,7 @@ RETAINED_ANIONS = {
 # Named with -ium, -ylium suffixes
 # All keys are in RDKit canonical SMILES form
 RETAINED_CATIONS = {
-    # Ammonium cation NH4+. P-73.1.1.2 "Cations formed by adding... a hydron to
+    # Ammonium cation NH4+. "Cations formed by adding... a hydron to
     # a mononuclear parent hydride" (the Blue Book): "These names for mononuclear
     # cations derived from the mononuclear parent hydrides of the Group 15, 16,
     # and 17 elements are the preferred IUPAC names and not those given in Table
@@ -114,21 +114,21 @@ RETAINED_CATIONS = {
     'C[N+](C)(C)C': 'tetramethylammonium',
     'CC[N+](CC)(CC)CC': 'tetraethylammonium',
 
-    # Guanidinium cation (P-73, Table 7.3)
+    # Guanidinium cation, Table 7.3)
     'NC(N)=[NH2+]': 'guanidinium',
 
-    # Uronium — protonated urea (P-73.1.2.2; BB 1717/41492/41496: the parent
+    # Uronium — protonated urea; BB 1717/41492/41496: the parent
     # cation 'uronium', NO numerical locants in the PIN). Canonical key is the
     # O-protonated tautomer RDKit picks for NC(=[OH+])N.
     'NC(N)=[OH+]': 'uronium',
 
-    # H2N+ nitrenium (P-73.2.2.1 / BB 41563/42381): the PRESELECTED name is
+    # H2N+ nitrenium / BB 41563/42381): the PRESELECTED name is
     # 'azanylium'; 'aminylium'/'nitrenium' are alternatives only. (HEAD emitted
     # 'aminylium' via the general retained-name path — this row wins at
-    # CATION_RETAINED@500, ahead of retained_name@1300.)
+    # CATION_RETAINED@500, ahead of retained_name.)
     '[NH2+]': 'azanylium',
 
-    # Group-14 ylium cations (P-73.2.2.1; BB 41557 lists methylium/propylium/
+    # Group-14 ylium cations; BB 41557 lists methylium/propylium/
     # cyclobutylium AND (C6H5)3Si+ 'triphenylsilylium' as PINs — the ylium of the
     # parent hydride silane/germane). Bare [SiH3+]/[GeH3+] preselected forms.
     '[SiH3+]': 'silylium',
@@ -140,7 +140,7 @@ RETAINED_CATIONS = {
     'c1cc[se+]cc1': 'selenopyrylium',
     'c1cc[te+]cc1': 'telluropyrylium',
 
-    # === Element-hydride onium cations (P-73.1.1.1) ===
+    # === Element-hydride onium cations ===
     # The '-onium' names in the BB 41345-41349 table are RETAINED/traditional
     # forms; the PRESELECTED/PIN is the parent-hydride stem + '-ium' ('-anium'),
     # documented verbatim in the BB "preselected name" column
@@ -174,18 +174,18 @@ RETAINED_CATIONS = {
     # The formulae differ, so this is not an isomer mix-up but a different
     # compound, and it WAS live: C[C+](C)C emitted "isopropylium". Deleted rather
     # than re-keyed, because 'isopropylium' is itself a non-PIN form (the
-    # substitutive PIN is propan-2-ylium, P-73), so re-keying would trade a
+    # substitutive PIN is propan-2-ylium,, so re-keying would trade a
     # wrong-structure emission for a non-PIN one. Now falls through to the
     # systematic cation namer.
     '[CH2+]C(C)(C)C': 'neopentylium',  # Primary carbocation adjacent to tert-butyl
 
-    # Aromatic cations. P-73.2.2.1: a ring ylium formed by H(-) loss from an
+    # Aromatic cations.: a ring ylium formed by H(-) loss from an
     # arene uses the PARENT-HYDRIDE name (benzene -> benzen-ylium), NOT the
     # substituent-prefix 'phenyl'. the Blue Book verbatim: "[C6H5]+... phenyl cation
     # phenylium benzenylium (PIN)".
     '[C+]1=CC=CC=C1': 'benzenylium',
 
-    # Oxonium cations. P-73.1.1.2 (the Blue Book, verbatim above at [NH4+]): the
+    # Oxonium cations. (the Blue Book, verbatim above at [NH4+]): the
     # mononuclear Group-16 oxygen cation PIN is oxidane->'oxidanium' (+ substituent
     # prefixes), NOT the Table-7.3 '-oxonium' form. BB example 'ethylidyneoxidanium
     # (PIN)' confirms the -oxidanium parent. Mirrors [PH4+]->phosphanium.
@@ -193,16 +193,16 @@ RETAINED_CATIONS = {
     'C[OH2+]': 'methyloxidanium',
     'C[OH+]C': 'dimethyloxidanium',
 
-    # Sulfonium cations. P-73.1.1.2 (the Blue Book): the mononuclear Group-16 sulfur
+    # Sulfonium cations. (the Blue Book): the mononuclear Group-16 sulfur
     # cation PIN is sulfane->'sulfanium' (+ substituent prefixes), NOT the
     # Table-7.3 '-sulfonium' form. BB example 'dimethylsulfanium (PIN)' confirms
     # the substituted -sulfanium form. Mirrors [PH4+]->phosphanium.
-    '[SH3+]': 'sulfanium',  # P-73.1.1.2 PIN (was 'sulfonium', Table-7.3 retained)
+    '[SH3+]': 'sulfanium',  # PIN (was 'sulfonium', Table-7.3 retained)
     'C[SH2+]': 'methylsulfanium',
     'C[SH+]C': 'dimethylsulfanium',
     'C[S+](C)C': 'trimethylsulfanium',
 
-    # Phosphonium cations. P-73.1.1.2 (the Blue Book; BB 41378/42393 "phosphanium
+    # Phosphonium cations. (the Blue Book; BB 41378/42393 "phosphanium
     # (preselected name) phosphonium", 41356/42120 "...phosphanium (PIN)"): the
     # mononuclear Group-15 phosphorus cation PIN is phosphane->'phosphanium' (+
     # substituent prefixes), NOT the Table-7.3 '-phosphonium' form. The substituted
@@ -291,18 +291,18 @@ INORGANIC_ANIONS = {
     'O=N[O-]': 'nitrite',
     # PA1 sweep: the row `'O=[SH](=O)[O-]': 'sulfate'` was DELETED. WRONG
     # STRUCTURE: that key is HO3S- (hydrogensulfite / bisulfite, HSO3-), not
-    # sulfate (O4S2-). The formulae differ by a whole oxygen. The WS-E.3 fix
+    # sulfate (O4S2-). The formulae differ by a whole oxygen. The.3 fix
     # already diagnosed this key as broken -- see the _canonicalize_anion_table
-    # comment below, which names it as "the WS-E.3 sulfate-key bug" -- and added
+    # comment below, which names it as "the.3 sulfate-key bug" -- and added
     # the correct dianion key immediately after, but left the wrong key in place.
     # It was NOT merely dead: 'O=[SH](=O)[O-]' is RDKit-canonical and did match,
     # so bisulfite emitted "sulfate". Removed; the correct sulfate key below, and
     # the distinct 'sulfite'/'hydrogensulfate' rows, are unaffected.
-    # SO4(2-) bare dianion of sulfuric acid (P-12.2 / the Blue Book); the
+    # SO4(2-) bare dianion of sulfuric acid / the Blue Book); the
     # legacy 'O=[SH](=O)[O-]' key above was a -1 [SH] form that never matched the
     # real fully-deprotonated dianion '[O-]S(=O)(=O)[O-]' (canonical O=S(=O)([O-])[O-]).
     'O=S(=O)([O-])[O-]': 'sulfate',
-    # HSO4- mono-anion (P-12.2 / the Blue Book); MUST stay distinct from
+    # HSO4- mono-anion / the Blue Book); MUST stay distinct from
     # 'sulfate' (different protonation state). OPSIN round-trips 'hydrogensulfate'
     # -> S(=O)(=O)(O)[O-] (the correct mono-anion).
     'O=S(=O)([O-])O': 'hydrogensulfate',
@@ -326,7 +326,7 @@ INORGANIC_ANIONS = {
     # B3 (d) DATA BUG FIX: this SMILES is ClO2- (2 oxygens) = chlorite,
     # NOT chlorate (ClO3-, 3 oxygens). Verified: OPSIN round-trip of
     # 'chlorate' against this SMILES FAILS (wrong InChIKey); 'chlorite'
-    # PASSES. The wrong name was previously caught downstream by the SELF-01
+    # PASSES. The wrong name was previously caught downstream by the
     # full round-trip gate (0-wrong held), surfacing only as the
     # 'unknown organic compound' sentinel instead of the correct word.
     '[O-][Cl+][O-]': 'chlorite',  # RDKit canonical form
@@ -350,7 +350,7 @@ INORGANIC_ANIONS = {
 def _canonicalize_anion_table(table):
     # Re-key an anion lookup table by RDKit-canonical SMILES so a hand-written
     # non-canonical key can never silently fail to match a canonicalized input
-    # (the WS-E.3 sulfate-key bug: 'O=[SH](=O)[O-]' never matched the bare -2
+    # (the.3 sulfate-key bug: 'O=[SH](=O)[O-]' never matched the bare -2
     # dianion 'O=S(=O)([O-])[O-]'). Keys that fail to parse are kept verbatim.
     out = {}
     for smi, word in table.items():
@@ -363,7 +363,7 @@ INORGANIC_ANIONS = _canonicalize_anion_table(INORGANIC_ANIONS)
 RETAINED_ANIONS = _canonicalize_anion_table(RETAINED_ANIONS)
 
 
-# P-65.6.2.1 / P-65.6.1.1: dicarboxylate anion names that are RETAINED FOR GENERAL
+# /: dicarboxylate anion names that are RETAINED FOR GENERAL
 # NOMENCLATURE ONLY — their preferred IUPAC name is the SYSTEMATIC '-dioate'
 # (malonate -> propanedioate, the Blue Book 'propanedioic acid (PIN)'; succinate ->
 # butanedioate, the Blue Book 'potassium sodium butanedioate (PIN)'). In PIN
@@ -408,7 +408,7 @@ def get_anion_name(smiles: str, pin: bool = False) -> Optional[str]:
 
     # PIN style: a dicarboxylate anion that is retained FOR GENERAL NOMENCLATURE
     # ONLY (malonate/succinate) has no retained PIN -> signal fall-through to the
-    # systematic '-dioate' path (P-65.6.1.1). Retained-PIN anions are unaffected.
+    # systematic '-dioate' path. Retained-PIN anions are unaffected.
     if pin and canonical in _GENERAL_ONLY_ANIONS:
         return None
 
@@ -423,7 +423,7 @@ def get_anion_name(smiles: str, pin: bool = False) -> Optional[str]:
     return None
 
 
-# (P-73.1.2.1): the alkyl/dialkyl/trialkyl(/tetraalkyl)-ammonium
+#: the alkyl/dialkyl/trialkyl(/tetraalkyl)-ammonium
 # retained names are GENERAL nomenclature only, NOT preferred IUPAC names -- the
 # PIN is the substitutive aminium (methylammonium -> methanaminium; dimethyl-
 # ammonium -> N-methylmethanaminium; tetramethylammonium -> N,N,N-trimethyl-
@@ -432,10 +432,10 @@ def get_anion_name(smiles: str, pin: bool = False) -> Optional[str]:
 # 'tetramethylammonium'. On the PIN path these keys are denied so the systematic
 # route_charged aminium name wins; they remain available for general/common style.
 # NH4+ is NOT in this deny list because it is a DIFFERENT mechanism: its PIN is the
-# mononuclear parent-hydride cation 'azanium' (P-73.1.1.2, the Blue Book -- "the
+# mononuclear parent-hydride cation 'azanium', the Blue Book -- "the
 # preferred IUPAC names and not those given in Table 7.3"), which is set directly as
 # the RETAINED_CATIONS value (there is no systematic producer that emits 'azanium').
-# 'ammonium' is only the Table-7.3 general/traditional name (cf. the P-93.2.2 salt-
+# 'ammonium' is only the Table-7.3 general/traditional name (cf. the salt-
 # table title "Azanium (ammonium)... salts"), not a retained PIN.
 PIN_NONPREFERRED_CATIONS = frozenset({
     'C[NH3+]', 'CC[NH3+]', 'CCC[NH3+]', 'C[NH2+]C', 'CC[NH2+]CC',

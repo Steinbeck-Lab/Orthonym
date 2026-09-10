@@ -9,7 +9,7 @@ BUILD 1 — Pattern-A stereo/numbering + invariant-18 RT-gated re-anchor
     spiro descriptor. The injected stereo descriptor lands on the WRONG locant
     (``(3R)-spiro[1,3-dihydro-2-benzofuran-1,1'-2,3-dihydro-1H-indene]`` — locant
     3 is the O-CH2, not the spiro stereocentre), so the FULL name is
-    OPSIN-unparseable. It used to SHIP anyway via the SELF-01 stereo carve-out
+    OPSIN-unparseable. It used to SHIP anyway via the stereo carve-out
     (constitution verified on the stereo-stripped parse) — a live 0-wrong leak:
     an emitted name that does not round-trip.
 
@@ -51,7 +51,7 @@ import pytest
 
 # The 9 mixed-spiro-fused witnesses that BUILT a spiro name (7 unique) from the
 # V36-a trace-C1C2C6 classified set. Every one emitted an OPSIN-UNPARSEABLE name at
-# T1 with a wrong-locant stereo descriptor and shipped via the stereo carve-out.
+# with a wrong-locant stereo descriptor and shipped via the stereo carve-out.
 PATTERN_A_WITNESSES = [
     "c1ccc2c(c1)CC[C@@]21OCc2ccccc21",
     "c1ccc2c(c1)CC[C@]1(C2)OCc2ccccc21",

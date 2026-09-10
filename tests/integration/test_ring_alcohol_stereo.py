@@ -1,5 +1,5 @@
 """
-Tests for STER-10: Ring alcohol stereo descriptor injection.
+Tests for: Ring alcohol stereo descriptor injection.
 
 Verifies that cycloalkanol compounds with true stereocenters (disubstituted
 rings) produce names with CIP stereodescriptors, and that achiral

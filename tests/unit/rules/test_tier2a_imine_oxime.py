@@ -1,6 +1,6 @@
-"""Wave2 T2a — imine broadening + oxime/isocyanato substitutive PINs.
+"""Wave2 — imine broadening + oxime/isocyanato substitutive PINs.
 
-Five units (P-62.3.1.1 / P-66.6.5(f) / P-61.8 / P-14.3.4.4):
+Five units / (f) / /:
 
 U1 methanimine: 'methyleneimine' (OPSIN parser alias) de-headlined via
    pin:false — the PIN is substitutive 'methanimine'.
@@ -10,7 +10,7 @@ U3 N-substituted imines: broadened imine SMARTS ([CX3]=[NX2] with !R and
    oxime/hydrazone/oxime-ether/N-halo exclusions) + new imine handler
    citing the lone N-substituent as an italic-N prefix
    (composer._assemble_imine_name).
-U4 oximes named substitutively as N-hydroxy imines (BB VERBATIM P-66.6.5(f)
+U4 oximes named substitutively as N-hydroxy imines (BB VERBATIM (f)
    + 'N-hydroxypropan-1-imine (PIN)'); bounded surgery builder, stereo /
    substituted forms keep the functional-class fallback.
 U5 isocyanato/isothiocyanato substitutive parents (BB VERBATIM

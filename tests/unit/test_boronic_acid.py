@@ -1,4 +1,4 @@
-"""Tests for boronic acid naming (Phase 21, Plan 04).
+"""Tests for boronic acid naming (a phase, Plan 04).
 
 Boronic acids use functional class naming: "Rboronic acid"
 - Simple alkyl: "methylboronic acid", "ethylboronic acid"
@@ -42,10 +42,10 @@ class TestBoronicAcidNaming:
         assert features.principal_group == "boronic_acid"
 
     def test_boronic_acid_prefix_form_in_seniority(self):
-        """Boronic acid prefix is 'borono' (v22 G2 COV-02; P-68.1.4.2).
+        """Boronic acid prefix is 'borono' (;.
 
-        -B(OH)2 has the *preselected* prefix 'borono' (Blue Book P-68.1.4.2 /
-        P-67.1.4.2 retained); 'dihydroxyboranyl' is the non-PIN systematic
+        -B(OH)2 has the *preselected* prefix 'borono' (Blue Book /
+         retained); 'dihydroxyboranyl' is the non-PIN systematic
         alternative. Updated from the pre-G2 'dihydroxyboranyl' assertion.
         """
         from orthonym.rules.seniority import PREFIX_FORMS

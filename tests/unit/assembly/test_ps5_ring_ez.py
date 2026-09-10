@@ -1,10 +1,10 @@
-"""v27 Phase S Task 5 — ring / endocyclic & von-Baeyer ring-bond E/Z.
+""" Phase S Task 5 — ring / endocyclic & von-Baeyer ring-bond E/Z.
 
 Empirical REFRAME (probed 2026-07-22): the general engine ALREADY emits ring /
 endocyclic E/Z for rings >= 8 and for von-Baeyer ring bonds, and preserves the
 <= 7-membered ring-strain-fixed SUPPRESSION — all via
 ``collect_stereodescriptors``'s ring-bond branch (min-ring < 8 skip,
-P-31.1.3 / P-93.5.1.4.1). These tests LOCK that behaviour and the small-ring
+ /. These tests LOCK that behaviour and the small-ring
 suppression that keeps 0-wrong / no over-abstention.
 """
 from rdkit import Chem

@@ -1,16 +1,16 @@
-"""Phase 169 Plan-03 — Group-splitting integration + OPSIN-RT corpus (POLY-01/02).
+"""a phase Plan-03 — Group-splitting integration + OPSIN-RT corpus (/02).
 
 Demonstrates the split mechanism end-to-end with the flag forced ON per-test
 (production default stays OFF — Stage A byte-identical preserved):
 
-* POLY-01: a composite loser FG is SPLIT (its sub-group prefixes appear in the
+*: a composite loser FG is SPLIT (its sub-group prefixes appear in the
   name) instead of dropped — with the thioester as the hard OPSIN-RT anchor.
-* POLY-02: the split components share the central-carbon locant and are
+*: the split components share the central-carbon locant and are
   alphabetized in place.
-* D-03 negative contract: genuine functional-class FGs are NOT force-split.
+* negative contract: genuine functional-class FGs are NOT force-split.
 
 HONEST NOTE (RESEARCH Pitfall 4 — confirmed in Plan-02): the analyst's ester
-anchor ``OC(=O)CCC(=O)OCC`` (monoethyl succinate) is NOT a DROP-23 case — it is
+anchor ``OC(=O)CCC(=O)OCC`` (monoethyl succinate) is NOT a case — it is
 named ``4-ethoxycarbonylbutanoic acid`` via ``get_alkoxycarbonyl_prefix`` (a
 moving-base-atom / Phase-172 concern, not a group-split). So the ester whole-
 molecule split does not fire there; the ester claim is asserted at the
@@ -91,11 +91,11 @@ ESTER_SMILES = "OC(=O)CCC(=O)OCC"       # decomposes to oxo+ethoxy; whole-mol vi
 
 @pytest.mark.integration
 class TestHeadline:
-    """POLY-01: a composite loser FG is split (components present), not dropped."""
+    """: a composite loser FG is split (components present), not dropped."""
 
     def test_headline_loser_split_not_dropped(self):
         # The thioester loses to the -COOH (principal); instead of dropping the
-        # thioester (today's DROP-23 -> "4-(ethylsulfanyl)butanoic acid", =O lost),
+        # thioester (today's -> "4-(ethylsulfanyl)butanoic acid", =O lost),
         # the split recovers the dropped chalcogen as oxo. Both sub-group prefixes
         # of the previously-vanished group now appear.
         name = name_compound(THIOESTER_SMILES, enable_group_splitting=True)
@@ -106,10 +106,10 @@ class TestHeadline:
 
 @pytest.mark.integration
 class TestEsterLoser:
-    """POLY-01 (ester): -C(=O)-O-R decomposes to oxo + R-oxy (alkoxy).
+    """ (ester): -C(=O)-O-R decomposes to oxo + R-oxy (alkoxy).
 
     Asserted at the decomposition + fragment-RT level (Pitfall 4: the monoethyl-
-    succinate whole-molecule path goes through ethoxycarbonyl, not DROP-23)."""
+    succinate whole-molecule path goes through ethoxycarbonyl, not)."""
 
     def test_ester_loser_decomposes_to_oxo_plus_alkoxy(self):
         mol = Chem.MolFromSmiles(ESTER_SMILES)
@@ -128,7 +128,7 @@ class TestEsterLoser:
 
 @pytest.mark.integration
 class TestThioesterLoser:
-    """POLY-01 (thioester): the hard whole-molecule OPSIN-RT anchor."""
+    """ (thioester): the hard whole-molecule OPSIN-RT anchor."""
 
     def test_thioester_loser_name_has_oxo_and_sulfanyl(self):
         name = name_compound(THIOESTER_SMILES, enable_group_splitting=True)
@@ -144,7 +144,7 @@ class TestThioesterLoser:
 
 @pytest.mark.integration
 class TestLocants:
-    """POLY-02: both split components share the central-carbon locant (Pitfall 3)."""
+    """: both split components share the central-carbon locant (Pitfall 3)."""
 
     def test_split_components_share_central_carbon_locant(self):
         name = name_compound(THIOESTER_SMILES, enable_group_splitting=True)
@@ -158,7 +158,7 @@ class TestLocants:
 
 @pytest.mark.integration
 class TestAlphabetization:
-    """POLY-02: split components are alphabetized in place (P-14.5)."""
+    """: split components are alphabetized in place."""
 
     def test_split_components_alphabetized(self):
         name = name_compound(THIOESTER_SMILES, enable_group_splitting=True)
@@ -168,7 +168,7 @@ class TestAlphabetization:
 
 @pytest.mark.integration
 class TestFunctionalClassNotSplit:
-    """D-03 negative contract: functional-class FGs are NOT force-split (stay dropped)."""
+    """ negative contract: functional-class FGs are NOT force-split (stay dropped)."""
 
     @pytest.mark.parametrize("fg", ["secondary_amide", "phosphate_diester",
                                     "anhydride", "imide"])
@@ -186,7 +186,7 @@ class TestFunctionalClassNotSplit:
 
 @pytest.mark.integration
 class TestNarrowDefaultOnP6563:
-    """W2F-P2 Task 3 (P-65.6.3.3.5 method (1), BB 31958-31962): acid-principal
+    """W2F-P2 Task 3 method (1), BB 31958-31962): acid-principal
     partial esters split by DEFAULT (no flag) — every split is per-candidate
     OPSIN-RT gated, so a wrong assembly can never be emitted."""
 
@@ -196,7 +196,7 @@ class TestNarrowDefaultOnP6563:
         ("COC(=O)CCC(=O)O", "4-methoxy-4-oxobutanoic acid"),
         ("O=C(OC)CCCCCCCC(=O)O", "9-methoxy-9-oxononanoic acid"),
         # curated target, brief items 5+6 (benzyloxy IS the preferred prefix,
-        # P-29.6.2.1/P-35.3.2:18097; alphanumerical benzyloxy < oxo, P-14.5.2)
+        # /:18097; alphanumerical benzyloxy < oxo,
         ("O=C(OCc1ccccc1)CCCCCCCC(=O)O", "9-(benzyloxy)-9-oxononanoic acid"),
         # GS-ON preview verified RT OK at HEAD 2026-07-11 (research item 1 F.3)
         ("O=C(O)CCCC(=O)OCCCO", "5-(3-hydroxypropoxy)-5-oxopentanoic acid"),
@@ -207,12 +207,12 @@ class TestNarrowDefaultOnP6563:
     @_opsin_rt
     @pytest.mark.roundtrip
     def test_substituted_benzyl_boundary_fail_closed(self, monkeypatch):
-        # P-29.6.2.1: substituted benzyl is out of v1. The split declines the
+        #: substituted benzyl is out of v1. The split declines the
         # nested-bracket linker prefix '(4-hydroxyphenyl)methoxy' (it would need
         # '[...]' escalation the single-level emit path cannot render as a PIN),
         # so the ester is dropped and the only remaining candidate is a
         # wrong-structure ester name that the PRODUCTION OPSIN validity gate
-        # (SELF-01) suppresses -> 'unknown'. The autouse test fixture disables
+        #  suppresses -> 'unknown'. The autouse test fixture disables
         # that gate for speed, so re-enable it here to exercise the real
         # production fail-closed path.
         import orthonym.namer as _namer
@@ -237,7 +237,7 @@ class TestAcylSulfanylWholeMolecule:
     @_opsin_rt
     @pytest.mark.roundtrip
     @pytest.mark.parametrize("smiles,expected", [
-        # curated target, brief item 7 (acetylsulfanyl < oxo, P-14.5.2)
+        # curated target, brief item 7 (acetylsulfanyl < oxo,
         ("CC(=O)SC(=O)CCCCCCCC(=O)O", "9-(acetylsulfanyl)-9-oxononanoic acid"),
         # thioether-prefix leg ALONE (thioester carbonyl off-chain, no split)
         ("CC(=O)SCCCCCCCC(=O)O", "8-(acetylsulfanyl)octanoic acid"),
@@ -262,7 +262,7 @@ class TestAcylSulfanylWholeMolecule:
     @pytest.mark.parametrize("smiles", [
         "OCC(=O)SCCC(=O)O",   # substituted acyl -> v1 refuses (research §E Q4)
         "CC(=O)SC(=O)C",      # symmetric thioanhydride: class = anhydride
-                              # (P-65.7.3), no free acid -> substitutive naming
+                              #, no free acid -> substitutive naming
                               # would be WRONG-class; thioanhydride namer not
                               # built -> must refuse
     ])
@@ -279,7 +279,7 @@ class TestAcylSulfanylWholeMolecule:
 @pytest.mark.integration
 class TestW2FP2Determinism:
     """W2F-P2 Task 6: the default split + acyl branch are spelling-invariant
-    (P-45-adjacent determinism; seeded random spellings, reproducible)."""
+    -adjacent determinism; seeded random spellings, reproducible)."""
 
     @_opsin_rt
     @pytest.mark.roundtrip
@@ -301,7 +301,7 @@ class TestW2FP2Determinism:
     def test_multi_anchored_mixed_diester_fail_closed(self, monkeypatch):
         # TWO ester carbonyls + one free acid: v1 splits only when EXACTLY ONE
         # anchored match exists; whichever chain perception picks, the unsplit
-        # ester's atoms stay unaccounted -> RT gate/SELF-01 refuse. Production
+        # ester's atoms stay unaccounted -> RT gate/ refuse. Production
         # is 'unknown' (diagnose 2026-07-11). The autouse fixture disables the
         # validity gate for speed; re-enable it to see the production refusal
         # instead of a gate-off raw leak.

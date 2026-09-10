@@ -1,7 +1,7 @@
-"""v30: the whole-molecule PARENT-HYDRIDE fallback tier.
+""": the whole-molecule PARENT-HYDRIDE fallback tier.
 
 ``rules/terminal_ring.terminal_ring_name(mol, ring_atoms, free_valence_atom=None)``
-returns an audited von Baeyer / spiro / P-22.2.3-replacement PARENT HYDRIDE, and
+returns an audited von Baeyer / spiro / -replacement PARENT HYDRIDE, and
 its own docstring says so -- but until this tier it was reachable ONLY as a
 ``-yl`` substituent namer. Nothing called it for a whole molecule, so a bare ring
 system no catalog covers abstained even though the generator could name it.
@@ -21,7 +21,7 @@ things it must NOT do:
 * **a wrong molecule is still suppressed.** ``terminal_ring_name`` is audited
   against its own emitted string, not against OPSIN, and measured it can still
   emit a name that denotes a DIFFERENT species (the group-14 ``[Sn]``/``[Pb]``
-  rings below). SELF-01 is what catches those, and this tier must not bypass it.
+  rings below). is what catches those, and this tier must not bypass it.
 """
 
 import pytest
@@ -171,7 +171,7 @@ def test_catalog_name_is_unchanged_by_the_parent_hydride_tier(
 # --------------------------------------------------------------------------
 
 def test_charged_skeletal_ring_atom_is_not_named_by_this_tier():
-    """A ring cation is P-73 (``cation_words``/``ion_retained_names``), not
+    """A ring cation is (``cation_words``/``ion_retained_names``), not
     replacement nomenclature; ``terminal_ring_name`` refuses it and the tier must
     not route around that. ``pyridin-1-ium`` comes from the ion path, so the
     assertion is that the von Baeyer/replacement form never appears."""
@@ -197,7 +197,7 @@ def test_a_parent_hydride_that_denotes_a_different_molecule_is_suppressed(
         smiles, opsin_gate):
     """0-wrong. ``terminal_ring_name`` emits ``1-stannacyclohexane`` /
     ``1-plumbacyclohexane`` here and OPSIN parses BOTH to a different species,
-    so the tier must let SELF-01 suppress them rather than shipping a name its
+    so the tier must let suppress them rather than shipping a name its
     own reconstruction audit was happy with."""
     from orthonym.rules.terminal_ring import terminal_ring_name
     mol = Chem.MolFromSmiles(smiles)
@@ -217,7 +217,7 @@ def test_a_parent_hydride_that_denotes_a_different_molecule_is_suppressed(
 # --------------------------------------------------------------------------
 # THE ASSEMBLY TIER -- a nameable ring parent PLUS its substituents
 # --------------------------------------------------------------------------
-# Measured: 0 abstaining dev500 rows are bare ring systems, but 71 have a
+# Measured: 0 abstaining a dev split rows are bare ring systems, but 71 have a
 # nameable ring system AND every substituent nameable. Those need no new
 # generator, only the JOIN -- and the join already exists in
 # ``_emit_ring_from_analysis``. What blocks those rows is the SUFFIX logic
@@ -228,7 +228,7 @@ def test_a_parent_hydride_that_denotes_a_different_molecule_is_suppressed(
 # Reusing that tail rather than composing strings by hand is worth 44 RT_EXACT
 # of 71 against 5 for a hand-rolled composer, because the tail owns the
 # enclosing marks (``_mult_prefix`` -> ``15-(2-methylpropyl)``, ``bis``/``tris``),
-# the P-14.5.2 alphabetisation (``_alpha_key``) and -- decisively -- the
+# the alphabetisation (``_alpha_key``) and -- decisively -- the
 # stereodescriptor block (``_stereo_prefix``), which is why the gain lands in
 # rt_exact rather than rt_constitutional.
 #
@@ -240,12 +240,12 @@ def test_a_parent_hydride_that_denotes_a_different_molecule_is_suppressed(
 # (`…bicyclo[4.4.0]decan-3-ol`, which is better than the `3-hydroxy-…` prefix
 # form this tier would build). Asserting those would have credited this tier
 # with another producer's work and, worse, would have pinned the WRONG spelling
-# as expected. Re-checked rather than trusted (invariant 14).
+# as expected. Re-checked rather than trusted (a project rule).
 ASSEMBLY_POSITIVES = [
     ("CN1C(=O)c2ccccc2NC(=O)[C@@H]1Cc1ccccc1",
      "(4S)-4-benzyl-5-methyl-3,6-dioxo-2,5-diazabicyclo[5.4.0]undeca-"
      "1(11),7,9-triene"),
-    # v31 lever B (P-16.3.3): 'hydroxymethyl' is a compound substituent and is now
+    # lever B: 'hydroxymethyl' is a compound substituent and is now
     # ENCLOSED -> '(hydroxymethyl)'; the perturbed candidate strings also let the
     # PIN-preferred SUFFIX form win (ring 4-OH -> '-4-ol', not a '4-hydroxy'
     # prefix), which this file's own header (lines ~238-243) marks as better.
@@ -259,7 +259,7 @@ ASSEMBLY_POSITIVES = [
     ("O=C1NC2=Nc3ccc(Cl)c(Cl)c3CN2C1O",
      "10,11-dichloro-6-hydroxy-5-oxo-2,4,7-triazatricyclo[7.4.0.0^3,7]"
      "trideca-1(9),2,10,12-tetraene"),
-    # v31 lever B (P-16.3.3): '(hydroxymethyl)' now enclosed + PIN-preferred
+    # lever B: '(hydroxymethyl)' now enclosed + PIN-preferred
     # SUFFIX form (ring 1,5-diol, not a '1,5-dihydroxy' prefix). RT-verified.
     ("C=C1[C@@H](CO)C[C@H](O)[C@H](C)[C@@H]2CC(C)(C)C[C@]12O",
      "(1R,3S,5S,6R,7S)-3-(hydroxymethyl)-6,9,9-trimethyl-2-"
@@ -267,7 +267,7 @@ ASSEMBLY_POSITIVES = [
     ("CC1CCCC(O)/C=C/C2C(O)CC(O)CC2/C=C/C=C\\C/C=C/C=C\\C(=O)O1",
      "(2E,11Z,13E,16Z,18E)-4,22,24-trihydroxy-8-methyl-10-oxo-9-oxabicyclo"
      "[18.4.0]tetracosa-2,11,13,16,18-pentaene"),
-    # P-16.3.3 enclosing-mark nesting: the compound prefix already contains
+    # enclosing-mark nesting: the compound prefix already contains
     # parentheses (the (1Z) descriptor), so its own enclosure escalates to
     # brackets -- '3-[(1Z)-...]', not the doubled-parens '3-((1Z)-...)'.
     # Golden updated (change-asserted-value: RT-verified by this test's own
@@ -314,7 +314,7 @@ def test_the_assembly_site_is_the_one_that_produced_the_name(opsin_gate):
 
     ⚠ This test REQUIRES the gate, and not as a formality. The suite disables
     the OPSIN validity gate by default; with it off, an earlier producer's
-    name for this molecule is never SELF-01-suppressed, so it ships and this
+    name for this molecule is never -suppressed, so it ships and this
     tier -- which is last resort -- is never reached. The test then fails while
     production works. The gate state is part of what "last resort" means here.
     """
@@ -378,7 +378,7 @@ def test_an_assembled_name_of_the_wrong_constitution_never_ships(
 @pytest.mark.opsin_gate
 @pytest.mark.parametrize("smiles,_expected", ASSEMBLY_POSITIVES)
 def test_a_suffix_free_name_is_T4_only(smiles, _expected, opsin_gate):
-    """P-41 (`BlueBookV2.md:25009`, "Seniority order of classes"): *"If
+    """ (`the Blue Book`, "Seniority order of classes"): *"If
     characteristic groups other than those given in Table 5.1 are present, one
     (and only one) kind must be cited as suffix (the principal characteristic
     group) for classes other than radicals"*.
@@ -404,7 +404,7 @@ def test_a_suffix_free_name_is_T4_only(smiles, _expected, opsin_gate):
 def test_the_suffix_free_debt_is_tagged_per_row(opsin_gate):
     """Condition: TAG, do not merely count. A number in a report is not
     recoverable; a field is. ``name_tiered`` must carry
-    ``suffix_free_prefix_name`` so v31 can ENUMERATE these rows."""
+    ``suffix_free_prefix_name`` so can ENUMERATE these rows."""
     namer = _namer("best-effort")
     # a PG-suppressed emission -> flagged
     row = namer.name_tiered("CN1C(=O)c2ccccc2NC(=O)[C@@H]1Cc1ccccc1")

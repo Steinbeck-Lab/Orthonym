@@ -1,7 +1,7 @@
-"""C2 gap-fix tests — amidines (Blue Book P-66.4.1, completes task 1.3).
+"""C2 gap-fix tests — amidines (Blue Book, completes task 1.3).
 
 Three sub-fixes, each OPSIN-verified:
-  (a) aliphatic-chain amidine — SUPERSEDED by AM-4 (P-66.4.1.3.2, BB 34338):
+  (a) aliphatic-chain amidine — SUPERSEDED by, BB 34338):
       a chain-terminal amidine C stays IN the chain and is cited as amino+imino
       ('4-amino-4-iminobutanoic acid'), NOT 'carbamimidoyl' (that prefix is the
       PIN only for RING / off-chain amidine carbons).
@@ -12,9 +12,9 @@ Three sub-fixes, each OPSIN-verified:
       provably safe (guanidine guard must hold, N/N' must be correct).
 
 CRITICAL GUARDS (must stay correct after every step):
-  NC(=N)N          -> guanidine                    (SMARTS must NOT swallow guanidine)
-  N=C(N)C1CCCCC1   -> cyclohexanecarboximidamide   (non-aromatic ring path unchanged)
-  CC(=N)N          -> ethanimidamide               (chain amidine-as-PCG unchanged)
+  NC(=N)N -> guanidine (SMARTS must NOT swallow guanidine)
+  N=C(N)C1CCCCC1 -> cyclohexanecarboximidamide (non-aromatic ring path unchanged)
+  CC(=N)N -> ethanimidamide (chain amidine-as-PCG unchanged)
   N=C(N)c1ccc(C(=O)O)cc1 -> 4-carbamimidoylbenzoic acid (already-working prefix case)
 """
 import pytest
@@ -29,10 +29,10 @@ def _pin(smiles):
 # FIX (a) — aliphatic chain off-by-one (amidine C excluded from chain)
 # ---------------------------------------------------------------------------
 class TestAmidineChainOffByOne:
-    # AM-4 (P-66.4.1.3.2, BB 34338): the chain-terminal amidine carbon stays IN
+    #, BB 34338): the chain-terminal amidine carbon stays IN
     # the chain and is expressed as amino (-NH2) + imino (=NH), NOT the
     # 'carbamimidoyl' prefix. The new forms are OPSIN-RT canonical-equal to the
-    # same SMILES (was '3-carbamimidoylpropanoic acid' etc. before AM-4).
+    # same SMILES (was '3-carbamimidoylpropanoic acid' etc. before).
     def test_4_amino_4_iminobutanoic_acid(self):
         assert _pin("N=C(N)CCC(=O)O") == "4-amino-4-iminobutanoic acid"
 
@@ -71,11 +71,11 @@ class TestBenzeneCarboximidamideSuffix:
 # to document the C2->D1 continuity.
 class TestNSubstitutedAmidine:
     def test_4_N_methylcarbamimidoyl_benzoic_acid(self):
-        # CNC(=N)- : methyl on the single-bonded (amino) N = N-methyl
+        # CNC(=N)-: methyl on the single-bonded (amino) N = N-methyl
         assert _pin("CNC(=N)c1ccc(C(=O)O)cc1") == "4-(N-methylcarbamimidoyl)benzoic acid"
 
     def test_Nprime_methyl_tautomer_correct(self):
-        # CN=C(N)- : methyl on the double-bonded (imino) N = N'-methyl.
+        # CN=C(N)-: methyl on the double-bonded (imino) N = N'-methyl.
         # Adversarial: getting N vs N' backwards flips the molecule.
         assert _pin("CN=C(N)c1ccc(C(=O)O)cc1") == "4-(N'-methylcarbamimidoyl)benzoic acid"
 

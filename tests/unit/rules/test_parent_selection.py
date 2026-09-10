@@ -1,7 +1,7 @@
 """
-Unit tests for parent selection logic (IUPAC P-44.1).
+Unit tests for parent selection logic (IUPAC.
 
-Tests the select_parent() function which determines whether the ring or
+Tests the select_parent function which determines whether the ring or
 chain should be the parent structure based on principal group location.
 """
 
@@ -28,7 +28,7 @@ from orthonym.rules.ring_selection import ring_system_score
 
 
 class TestIsPrincipalGroupOnChain:
-    """Tests for is_principal_group_on_chain()."""
+    """Tests for is_principal_group_on_chain."""
 
     def test_phenylbutanoic_acid_pg_on_chain(self):
         """Carboxylic acid on butyl chain attached to benzene."""
@@ -83,7 +83,7 @@ class TestIsPrincipalGroupOnChain:
 
 
 class TestIsPrincipalGroupOnRing:
-    """Tests for is_principal_group_on_ring()."""
+    """Tests for is_principal_group_on_ring."""
 
     def test_benzoic_acid_pg_on_ring(self):
         """Carboxylic acid where carbonyl C is bonded to ring."""
@@ -176,7 +176,7 @@ class TestCountPgOnRingSelfCheck:
 
 
 class TestSelectParent:
-    """Tests for select_parent() main function."""
+    """Tests for select_parent main function."""
 
     def test_phenylbutanoic_acid_chain_is_parent(self):
         """c1ccc(CCCC(=O)O)cc1 -> chain is parent (4-phenylbutanoic acid)."""
@@ -322,7 +322,7 @@ class TestResultDataclass:
 
 
 class TestFGCountingDedup:
-    """PSEL-01: FG counting deduplication by attachment point."""
+    """: FG counting deduplication by attachment point."""
 
     def test_duplicate_pg_atoms_deduplicated_on_chain(self):
         """If same FG atoms are passed twice, count stays correct."""
@@ -376,7 +376,7 @@ class TestEdgeCases:
             principal_group_atoms=pg_atoms
         )
 
-        # For hydrocarbons without FG, ring has seniority (IUPAC P-44.1.2.2)
+        # For hydrocarbons without FG, ring has seniority (IUPAC
         assert result.parent_type == 'ring', "Ring has seniority for hydrocarbons"
 
     def test_single_carbon_chain(self):
@@ -422,16 +422,16 @@ class TestEdgeCases:
 
 @pytest.mark.unit
 class TestEnhancedParentSelection:
-    """Tests for P-52.2.8, multi-ring seniority, and enhanced tiebreakers."""
+    """Tests for, multi-ring seniority, and enhanced tiebreakers."""
 
     def test_p52_2_8_ring_preferred_on_tie(self):
-        """P-44.1 chain-length: When FG count is tied but chain (all
+        """ chain-length: When FG count is tied but chain (all
         non-ring atoms = 7) is longer than ring (6), chain wins by
-        P-44.1 chain-length criterion.
+         chain-length criterion.
 
         Uses cyclohexanone with a chain ketone -- 1 ketone on ring, 1 on chain.
         Chain (7 atoms incl. oxygens) > ring (6 atoms) -> chain wins per
-        P-44.1 chain-length before P-52.2.8 would apply.
+         chain-length before would apply.
         """
         # O=C1CCCCC1CCC(=O)CC -- cyclohexanone + chain ketone
         smiles = 'O=C1CCCCC1CCC(=O)CC'
@@ -455,7 +455,7 @@ class TestEnhancedParentSelection:
             principal_group_atoms=pg_atoms
         )
 
-        # Chain (7 atoms) > ring (6 atoms) -> chain wins by P-44.1 chain-length
+        # Chain (7 atoms) > ring (6 atoms) -> chain wins by chain-length
         assert result.parent_type == 'chain', (
             "P-44.1 chain-length: chain (7) > ring (6) should win"
         )
@@ -467,7 +467,7 @@ class TestEnhancedParentSelection:
         """Multi-ring: pyridine (heterocyclic) should be selected over cyclohexane.
 
         Uses c1ccncc1CCC1CCCCC1 -- pyridine-propyl-cyclohexane.
-        Pyridine is more senior per P-44.2 (heterocyclic, contains N).
+        Pyridine is more senior per (heterocyclic, contains N).
         """
         smiles = 'c1ccncc1CCC1CCCCC1'
         mol = Chem.MolFromSmiles(smiles)
@@ -496,15 +496,15 @@ class TestEnhancedParentSelection:
         )
 
     def test_short_chain_with_skeletal_pcg_prefers_chain(self):
-        """Wave2 T3a (P-52.2.8): OCC1CCCCC1 = cyclohexylmethanol.
+        """Wave2: OCC1CCCCC1 = cyclohexylmethanol.
 
         -ol is a SKELETAL suffix (no exocyclic-carbon form): the ring can
         never express the PCG on the exocyclic carbinol carbon, so the
-        1-carbon methanol chain MUST be the parent (P-44.1(a)). The old
+        1-carbon methanol chain MUST be the parent (a)). The old
         assertion ('ring is parent') pinned the mis-parenting that emitted
-        'cyclohexan-1-ol' — a different molecule, SELF-01-suppressed.
+        'cyclohexan-1-ol' — a different molecule, -suppressed.
         Exocyclic-carbon suffix classes keep the ring:
-        test_long_chain_with_fg_prefers_chain + the T3a suite's
+        test_long_chain_with_fg_prefers_chain + the suite's
         cyclohexanecarboxylic-acid/carbaldehyde guards cover those.
         """
         smiles = 'OCC1CCCCC1'
@@ -537,7 +537,7 @@ class TestEnhancedParentSelection:
         """Long chain with COOH on chain terminus -> chain is parent.
 
         c1ccc(CCCCCCCC(=O)O)cc1 (8-phenyloctanoic acid): COOH exclusively
-        on 8-atom chain. Chain must be parent per P-44.1.
+        on 8-atom chain. Chain must be parent per.
         """
         smiles = 'c1ccc(CCCCCCCC(=O)O)cc1'
         mol = Chem.MolFromSmiles(smiles)
@@ -568,9 +568,9 @@ class TestEnhancedParentSelection:
         )
 
     def test_nitrogen_ring_senior_atom_preference(self):
-        """Ring system with nitrogen is preferred per P-44.1 senior atom.
+        """Ring system with nitrogen is preferred per senior atom.
 
-        Tests _ring_system_has_nitrogen() and _select_best_ring_system()
+        Tests _ring_system_has_nitrogen and _select_best_ring_system
         when comparing N-containing ring vs carbocyclic ring.
         """
         # Pyridine + cyclohexane
@@ -608,10 +608,10 @@ class TestEnhancedParentSelection:
         assert others == []
 
     def test_p44_1_documented_in_reasoning(self):
-        """P-44.1 chain-length should be referenced in reasoning when chain is longer.
+        """ chain-length should be referenced in reasoning when chain is longer.
 
         Uses same molecule as test_p52_2_8_ring_preferred_on_tie:
-        chain (7 atoms) > ring (6 atoms) with PG tied -> P-44.1 chain-length.
+        chain (7 atoms) > ring (6 atoms) with PG tied -> chain-length.
         """
         smiles = 'O=C1CCCCC1CCC(=O)CC'
         mol = Chem.MolFromSmiles(smiles)
@@ -639,14 +639,14 @@ class TestEnhancedParentSelection:
 
 @pytest.mark.unit
 class TestP441Cascade:
-    """Tests for P-44.1 cascade: PG count > chain length > multiple bonds > P-52.2.8."""
+    """Tests for cascade: PG count > chain length > multiple bonds >."""
 
     def test_p44_1_chain_length_wins_on_tie(self):
         """When PG count ties but chain is longer than ring, chain wins.
 
         O=C1CCC1CCCCC(=O)C: cyclobutanone (4-atom ring) + 5-carbon chain
         with ketone. PG = ketone, 1 on ring + 1 on chain (tied).
-        Chain (8 non-ring atoms) > ring (4) -> chain wins by P-44.1 chain-length.
+        Chain (8 non-ring atoms) > ring (4) -> chain wins by chain-length.
         """
         smiles = 'O=C1CCC1CCCCC(=O)C'
         mol = Chem.MolFromSmiles(smiles)
@@ -680,7 +680,7 @@ class TestP441Cascade:
 
         O=C1CCCCCCC1CCC(=O)C: cyclooctanone (8-atom ring) + 3-carbon chain
         with ketone. PG = ketone, 1 on ring + 1 on chain (tied).
-        Ring (8) > chain (6 non-ring atoms) -> ring wins by P-44.1 ring-size.
+        Ring (8) > chain (6 non-ring atoms) -> ring wins by ring-size.
         """
         smiles = 'O=C1CCCCCCC1CCC(=O)C'
         mol = Chem.MolFromSmiles(smiles)
@@ -705,7 +705,7 @@ class TestP441Cascade:
             f"Ring ({len(all_ring)}) > chain ({len(chain)}): ring should win. "
             f"Got: {result.reasoning}"
         )
-        # Could be P-44.1 ring-size or ring-wins-by-PG-count depending on PG detection
+        # Could be ring-size or ring-wins-by-PG-count depending on PG detection
         assert 'ring' in result.reasoning.lower(), (
             f"Reasoning should indicate ring wins. Got: {result.reasoning}"
         )
@@ -713,7 +713,7 @@ class TestP441Cascade:
     def test_p44_1_multiple_bonds_chain_wins(self):
         """When PG count and length both tie, chain with more multiple bonds wins.
 
-        Tests _count_multiple_bonds() helper directly and verifies the cascade
+        Tests _count_multiple_bonds helper directly and verifies the cascade
         logic since constructing a natural molecule with all criteria tied except
         bonds is difficult.
         """
@@ -758,7 +758,7 @@ class TestP441Cascade:
         # passing carbon-only chain to get length=6 (tied with ring=6).
         # Chain ketone C=O has O outside carbon chain -> chain_mult=0.
         # Ring ketone C=O has O outside ring -> ring_mult=0.
-        # Both 0 -> P-52.2.8 ring wins (tested in test_p44_1_all_tied_ring_wins_p52_2_8).
+        # Both 0 -> ring wins (tested in test_p44_1_all_tied_ring_wins_p52_2_8).
         # To test bond tiebreaker, we need chain to have extra C=C double bond.
         # Use O=C1CCCCC1C=CCCC(=O)C: cyclohexanone + 6-carbon chain with C=C and ketone.
         bond_smiles = 'O=C1CCCCC1C=CCCC(=O)C'
@@ -801,12 +801,12 @@ class TestP441Cascade:
 
     def test_p44_1_all_tied_ring_wins_p52_2_8(self):
         """When PG count, length, and multiple bonds all tie, ring wins as
-        P-52.2.8 final tiebreaker.
+         final tiebreaker.
 
         O=C1CCCCC1CCCCC(=O)C: cyclohexanone (6-atom ring) + chain ketone.
         Pass carbon-only chain (6 carbons) to match ring size.
         Ring C=O and chain C=O both have O outside their respective atom sets,
-        so mult bonds both = 0. All tied -> P-52.2.8 ring wins.
+        so mult bonds both = 0. All tied -> ring wins.
         """
         smiles = 'O=C1CCCCC1CCCCC(=O)C'
         mol = Chem.MolFromSmiles(smiles)
@@ -853,7 +853,7 @@ class TestP441Cascade:
         )
 
     def test_pg_proximity_direct_over_adjacent(self):
-        """PRNT-05: Ring system where PG atom is directly IN the ring should
+        """: Ring system where PG atom is directly IN the ring should
         score higher than a ring with no PG attachment.
 
         Molecule: cyclohexanone + cyclohexane connected by propyl chain.
@@ -921,7 +921,7 @@ class TestP441Cascade:
 
         O=C1CC(=O)CCC1CCCCC(=O)C: cyclohexane-1,3-dione (2 ketones on ring) +
         chain ketone (1 ketone). Ring has 2 PGs > chain has 1 PG -> ring wins
-        by PG count. This path is NOT affected by the P-44.1 cascade.
+        by PG count. This path is NOT affected by the cascade.
         """
         smiles = 'O=C1CC(=O)CCC1CCCCC(=O)C'
         mol = Chem.MolFromSmiles(smiles)
@@ -952,7 +952,7 @@ class TestP441Cascade:
 
 @pytest.mark.unit
 class TestP441CriteriaGI:
-    """Tests for P-44.1(g) and P-44.1(i) comparators."""
+    """Tests for (g) and (i) comparators."""
 
     # --- Criterion (g): _compare_multiple_bond_locants ---
 
@@ -1118,7 +1118,7 @@ class TestP441CriteriaGI:
 
 @pytest.mark.unit
 class TestP441CriterionFLocants:
-    """Tests for P-44.1(f) _compare_pg_locants using 1-indexed IUPAC locants.
+    """Tests for (f) _compare_pg_locants using 1-indexed IUPAC locants.
 
     Verifies that _compare_pg_locants uses 1-indexed IUPAC locants for both
     chain and ring (not 0-indexed positions or raw atom indices).
@@ -1151,7 +1151,7 @@ class TestP441CriterionFLocants:
     def test_ring_uses_1_indexed_positions(self):
         """Ring PG locants should use 1-indexed positional mapping.
 
-        For a ring with sorted atoms [a0, a1, ..., a5], if PG is attached
+        For a ring with sorted atoms [a0, a1,..., a5], if PG is attached
         to a0, its locant should be 1 (not 0).
         """
         # OC(=O)c1ccc(C(=O)O)cc1 -- terephthalic acid (two COOH on ring)
@@ -1198,7 +1198,7 @@ class TestP441CriterionFLocants:
         assert result2.parent_type == 'ring', "Regression: benzoic acid"
 
     def test_pg_locants_documented_with_iupac_reference(self):
-        """The _compare_pg_locants docstring should reference IUPAC P-14.7."""
+        """The _compare_pg_locants docstring should reference IUPAC."""
         import inspect
         source = inspect.getsource(_compare_pg_locants)
         assert 'P-14.7' in source or 'P-44.1(f)' in source, (
@@ -1208,14 +1208,14 @@ class TestP441CriterionFLocants:
 
 @pytest.mark.unit
 class TestSkeletalChainCandidate:
-    """Tests for skeletal chain (C,N,O,S) candidate integration in select_parent().
+    """Tests for skeletal chain (C,N,O,S) candidate integration in select_parent.
 
-    IUPAC P-44.3(b) requires considering heteroatom-inclusive skeletal chains
+    IUPAC (b) requires considering heteroatom-inclusive skeletal chains
     when determining the principal chain. The skeletal chain from chains.py
-    must be wired into select_parent() as a candidate that goes through the
-    full P-44.1 cascade.
+    must be wired into select_parent as a candidate that goes through the
+    full cascade.
 
-    Guards (Phase 91.1 lesson):
+    Guards (a phase lesson):
     - Guard 1: skeletal chain must be STRICTLY longer than carbon-only chain
     - Guard 2: skeletal chain must contain the principal group
     - Guard 3: skeletal chain goes through full cascade (no shortcut)
@@ -1256,14 +1256,14 @@ class TestSkeletalChainCandidate:
             principal_group_atoms=pg_atoms
         )
 
-        # v25 G1 BB correction: the skeletal chain has only 2 bridging
-        # hetero units, below the P-51.4 replacement-nomenclature threshold
+        # BB correction: the skeletal chain has only 2 bridging
+        # hetero units, below the replacement-nomenclature threshold
         # (>= 4), so its heteroatoms are NOT expressible as skeleton and it
         # ranks as a carbon chain. With PG counts tied and both skeletons
-        # carbon-class, P-44.1.2.2 (BB 19340; example BB 35011:
+        # carbon-class, (BB 19340; example BB 35011:
         # 2-(7-oxoheptyl)cyclopentane-1-carbaldehyde PIN, ring 5 over
         # chain 7) makes the RING senior regardless of length. The legacy
-        # length-first expectation (Phase 91.1) never produced an emitted
+        # length-first expectation (a phase) never produced an emitted
         # name for this molecule (HEAD: OPSIN-unparseable -> suppressed).
         assert result.parent_type == 'ring', (
             f"P-44.1.2.2: ring senior on PG tie (sub-P-51.4 chain ranks as "
@@ -1302,10 +1302,10 @@ class TestSkeletalChainCandidate:
             principal_group_atoms=pg_atoms
         )
 
-        # v25 G1 BB correction (see
+        # BB correction (see
         # test_skeletal_chain_used_when_strictly_longer_and_contains_pg):
-        # 2 bridging hetero units < P-51.4 threshold -> carbon-class chain;
-        # PG tie -> P-44.1.2.2 ring senior regardless of length.
+        # 2 bridging hetero units < threshold -> carbon-class chain;
+        # PG tie -> ring senior regardless of length.
         assert result.parent_type == 'ring', (
             f"P-44.1.2.2: ring senior on PG tie (sub-P-51.4 chain ranks as "
             f"carbon). Got: {result.reasoning}"
@@ -1360,7 +1360,7 @@ class TestSkeletalChainCandidate:
     def test_same_length_skeletal_prefers_carbon_chain(self):
         """When skeletal chain == carbon chain length, carbon chain preferred.
 
-        P-44.1.2.1: maximum carbon content principle. Same-length chains
+        : maximum carbon content principle. Same-length chains
         prefer carbon-only chain.
 
         O=C1CCCCC1CCCCC(=O)C: cyclohexanone + hexanone chain (no heteroatoms).
@@ -1389,7 +1389,7 @@ class TestSkeletalChainCandidate:
             principal_group_atoms=pg_atoms
         )
 
-        # This is the P-52.2.8 tiebreaker test from TestP441Cascade.
+        # This is the tiebreaker test from TestP441Cascade.
         # Same-length carbon chain -> no skeletal chain switch -> ring wins.
         assert result.parent_type == 'ring', (
             f"Same-length chains -> carbon-only preferred, ring wins by P-52.2.8. "
@@ -1425,18 +1425,18 @@ class TestSkeletalChainCandidate:
             principal_group_atoms=pg_atoms
         )
 
-        # PG on chain only -> chain wins via P-44.1(a). No change.
+        # PG on chain only -> chain wins via (a). No change.
         assert result.parent_type == 'chain', (
             f"Phenylbutanoic acid: PG on chain only -> chain parent. "
             f"Got: {result.reasoning}"
         )
 
     def test_skeletal_chain_goes_through_full_cascade(self):
-        """Skeletal chain must go through full P-44.1 cascade, not shortcut.
+        """Skeletal chain must go through full cascade, not shortcut.
 
         When skeletal chain is used as candidate, it participates in the
         full ring-vs-chain cascade (criteria c through i), not a blind
-        preference for the longer chain. This is the Phase 91.1 lesson.
+        preference for the longer chain. This is the a phase lesson.
 
         O=C1CCCCC1NCCOCC(=O)C: skeletal(7) > ring(6). The chain wins
         through the cascade criterion (c) -- not a shortcut.
@@ -1464,11 +1464,11 @@ class TestSkeletalChainCandidate:
             principal_group_atoms=pg_atoms
         )
 
-        # v25 G1 BB correction: the skeletal candidate participates in the
-        # FULL unified P-44 comparison (no blind longer-chain shortcut --
-        # the Phase 91.1 lesson is preserved), and the comparison itself is
-        # now BB-faithful: sub-P-51.4 hetero chains rank as carbon, so the
-        # PG tie falls to P-44.1.2.2 ring seniority (BB 19340/35011).
+        # BB correction: the skeletal candidate participates in the
+        # FULL unified comparison (no blind longer-chain shortcut --
+        # the a phase lesson is preserved), and the comparison itself is
+        # now BB-faithful: sub- hetero chains rank as carbon, so the
+        # PG tie falls to ring seniority (BB 19340/35011).
         assert result.parent_type == 'ring', (
             f"P-44.1.2.2: ring senior on PG tie (sub-P-51.4 chain ranks as "
             f"carbon). Got: {result.reasoning}"
@@ -1480,20 +1480,20 @@ class TestSkeletalChainCandidate:
 
 
 class TestEsterCascade:
-    """Test that ester parent selection is handled by the general P-44.1 cascade.
+    """Test that ester parent selection is handled by the general cascade.
 
-    After removing the _compare_ester_parent() override, all ester molecules
+    After removing the _compare_ester_parent override, all ester molecules
     must be correctly handled by the standard cascade criteria. The acyl (C=O)
-    side determines the parent naturally through P-44.1(a) PG location.
+    side determines the parent naturally through (a) PG location.
 
-    PSEL-07: Ester override removal.
+    : Ester override removal.
     """
 
     def test_no_ester_override_function_exists(self):
         """Verify _compare_ester_parent has been removed from the module.
 
-        After PSEL-07, the ester-specific override should not exist.
-        The general P-44.1 cascade handles all esters.
+        After, the ester-specific override should not exist.
+        The general cascade handles all esters.
         """
         import orthonym.rules.parent_selection as ps_module
         assert not hasattr(ps_module, '_compare_ester_parent'), (
@@ -1505,7 +1505,7 @@ class TestEsterCascade:
         """Verify the ester override call site has been removed from source.
 
         The source should not contain 'principal_group == \"ester\"'
-        as a special case in select_parent().
+        as a special case in select_parent.
         """
         import inspect
         import orthonym.rules.parent_selection as ps_module
@@ -1516,10 +1516,10 @@ class TestEsterCascade:
         )
 
     def test_phenyl_acetate_chain_parent(self):
-        """Phenyl acetate: acyl C on chain -> chain is parent via P-44.1(a).
+        """Phenyl acetate: acyl C on chain -> chain is parent via (a).
 
         CC(=O)Oc1ccccc1: The carbonyl C is on the chain, not bonded to ring.
-        P-44.1(a) should select chain as parent.
+        (a) should select chain as parent.
         """
         mol = Chem.MolFromSmiles('CC(=O)Oc1ccccc1')
         ring_systems = get_ring_systems(mol)
@@ -1549,7 +1549,7 @@ class TestEsterCascade:
         """Phenyl benzoate: acyl C bonded to ring -> ring is parent.
 
         O=C(Oc1ccccc1)c1ccccc1: Both sides are rings. The carbonyl C is
-        bonded to a ring. Ring wins by P-44.1(a) or chain-length comparison.
+        bonded to a ring. Ring wins by (a) or chain-length comparison.
         """
         mol = Chem.MolFromSmiles('O=C(Oc1ccccc1)c1ccccc1')
         ring_systems = get_ring_systems(mol)
@@ -1579,7 +1579,7 @@ class TestEsterCascade:
         """Methyl cyclohexanecarboxylate: acyl C bonded to ring -> ring parent.
 
         COC(=O)C1CCCCC1: The carbonyl C is bonded to cyclohexane ring.
-        Ring wins (single-carbon chain check or P-44.1 cascade).
+        Ring wins (single-carbon chain check or cascade).
         """
         mol = Chem.MolFromSmiles('COC(=O)C1CCCCC1')
         ring_systems = get_ring_systems(mol)
@@ -1609,7 +1609,7 @@ class TestEsterCascade:
         """Cyclohexyl acetate: acyl C on chain -> chain is parent.
 
         CC(=O)OC1CCCCC1: The ester oxygen connects to ring, but the
-        acyl C(=O) is on the chain. P-44.1(a): PG on chain -> chain parent.
+        acyl C(=O) is on the chain. (a): PG on chain -> chain parent.
         """
         mol = Chem.MolFromSmiles('CC(=O)OC1CCCCC1')
         ring_systems = get_ring_systems(mol)
@@ -1664,7 +1664,7 @@ class TestEsterCascade:
         """Verify all ester molecules work via general cascade (no override).
 
         This test verifies that for all key ester test molecules, the
-        select_parent() function produces correct results without any
+        select_parent function produces correct results without any
         ester-specific special case in the cascade logic.
         """
         ester_cases = [
@@ -1702,14 +1702,14 @@ class TestEsterCascade:
 
 
 # ---------------------------------------------------------------------------
-# Phase 104 Plan 01: New tests for P-44.3 ring metric, no-PG comparison,
+# a phase Plan 01: New tests for ring metric, no-PG comparison,
 # and NP backbone early-return. Tests for CORRECT (unfixed) behavior are
 # xfail; tests for already-correct behavior pass normally.
 # ---------------------------------------------------------------------------
 
 
 def _setup_parent_selection(smiles):
-    """Helper: parse SMILES and compute all inputs for select_parent().
+    """Helper: parse SMILES and compute all inputs for select_parent.
 
     Returns (mol, ring_systems, chain, pg_name, pg_atoms, all_ring_atoms).
     """
@@ -1729,21 +1729,21 @@ def _setup_parent_selection(smiles):
 
 @pytest.mark.unit
 class TestTotalRingAtomMetric:
-    """Tests that assert the CORRECT P-44.3 behavior using total ring system
+    """Tests that assert the CORRECT behavior using total ring system
     atom count instead of individual SSSR ring size.
 
-    IUPAC P-44.3(a): When comparing ring system vs chain for parent selection,
+    IUPAC (a): When comparing ring system vs chain for parent selection,
     the total number of atoms in the ring system is used, not the largest
-    individual ring. This is the core bug being fixed in Phase 104 Plan 02.
+    individual ring. This is the core bug being fixed in a phase Plan 02.
 
     Tests marked xfail will become passing after Plan 02.
     """
 
     def test_ring_system_total_vs_individual_naphthalene(self):
         """Verify _get_largest_individual_ring_size returns 6 for naphthalene,
-        but len(ring_system) returns 10 (the correct P-44.3 metric).
+        but len(ring_system) returns 10 (the correct metric).
 
-        IUPAC P-44.3(a): ring system atom count for ring-vs-chain comparison.
+        IUPAC (a): ring system atom count for ring-vs-chain comparison.
         """
         mol = Chem.MolFromSmiles('c1ccc2ccccc2c1')
         ring_systems = get_ring_systems(mol)
@@ -1760,7 +1760,7 @@ class TestTotalRingAtomMetric:
     def test_ring_system_total_vs_individual_anthracene(self):
         """Anthracene: individual=6, total=14.
 
-        IUPAC P-44.3(a): total ring atoms for comparison.
+        IUPAC (a): total ring atoms for comparison.
         """
         mol = Chem.MolFromSmiles('c1ccc2cc3ccccc3cc2c1')
         ring_systems = get_ring_systems(mol)
@@ -1792,10 +1792,10 @@ class TestTotalRingAtomMetric:
 
         Ring system: naphthalene = 10 atoms (individual=6).
         Chain: 8 atoms.
-        Current: individual ring (6) < chain (8) -> chain wins via cascade P-44.1(c).
-        Correct: total ring (10) >= chain (8) -> ring should win per P-44.3(a).
+        Current: individual ring (6) < chain (8) -> chain wins via cascade (c).
+        Correct: total ring (10) >= chain (8) -> ring should win per (a).
 
-        IUPAC P-44.3(a), P-52.2.8.
+        IUPAC (a),.
         """
         mol, ring_systems, chain, pg, pa, all_ring = _setup_parent_selection(
             'OC(=O)c1ccc2ccccc2c1CCCCCCCC(=O)O'
@@ -1817,9 +1817,9 @@ class TestTotalRingAtomMetric:
         Ring system: anthracene = 14 atoms (individual=6).
         Chain: 6 atoms.
         Current: individual ring (6) == chain (6) -> further criteria -> chain wins.
-        Correct: total ring (14) > chain (6) -> ring should win per P-44.3(a).
+        Correct: total ring (14) > chain (6) -> ring should win per (a).
 
-        IUPAC P-44.3(a).
+        IUPAC (a).
         """
         mol, ring_systems, chain, pg, pa, all_ring = _setup_parent_selection(
             'OC(=O)c1ccc2cc3ccc(CCCCCC(=O)O)cc3cc2c1'
@@ -1839,7 +1839,7 @@ class TestTotalRingAtomMetric:
         Even with individual ring size (6) > chain (5), ring already wins.
         This should pass now AND after the fix.
 
-        IUPAC P-44.3(a), P-52.2.8.
+        IUPAC (a),.
         """
         mol, ring_systems, chain, pg, pa, all_ring = _setup_parent_selection(
             'OC(=O)c1ccc2ncccc2c1CCCCC(=O)O'
@@ -1857,7 +1857,7 @@ class TestTotalRingAtomMetric:
                 f"Got: {result.parent_type} -- {result.reasoning}"
             )
         else:
-            # PG on one side only -> P-44.1(a) decides
+            # PG on one side only -> (a) decides
             result = select_parent(mol, ring_systems, chain, pg, pa)
             # Either way, the compound works -- just verify no error
             assert result.parent_type in ('ring', 'chain')
@@ -1867,21 +1867,21 @@ class TestTotalRingAtomMetric:
 class TestNoPGSizeComparison:
     """Tests for the hydrocarbon (no principal group) ring-vs-chain path.
 
-    IUPAC P-44.1.2.2 (CORRECTED — Phase 171 DEF-1): a ring or ring system is
+    IUPAC (CORRECTED — a phase): a ring or ring system is
     senior to a chain REGARDLESS of the number of skeletal atoms. The ring is
     ALWAYS the parent in the no-PG hydrocarbon case (heptylbenzene, not
     1-phenylheptane). The earlier tests in this class asserted "chain wins when
-    much longer" citing P-44.3(a) — that was the size-gate BUG the V20 Blue Book
-    audit (DEF-1) identified (the code mis-cited P-44.3); deleting the
+    much longer" citing (a) — that was the size-gate BUG the V20 Blue Book
+    audit  identified (the code mis-cited; deleting the
     `len(ring) >= chain_len` gate is the fix. These tests now assert ring-wins.
     """
 
     def test_cyclopropane_decane_ring_wins(self):
         """Cyclopropane (3 atoms) + decane (10 atoms), no PG.
 
-        P-44.1.2.2: ring is senior to a chain REGARDLESS of size -> the ring
+        : ring is senior to a chain REGARDLESS of size -> the ring
         (cyclopropane) is the parent: decylcyclopropane (OPSIN-RT-verified), NOT
-        1-cyclopropyldecane. (Was the DEF-1 size-gate bug: 'chain wins when longer'.)
+        1-cyclopropyldecane. (Was the size-gate bug: 'chain wins when longer'.)
         """
         mol, ring_systems, chain, pg, pa, all_ring = _setup_parent_selection(
             'C1CC1CCCCCCCCCC'
@@ -1899,7 +1899,7 @@ class TestNoPGSizeComparison:
 
         Ring (6) > chain (2) -> ring wins. Should pass now and after fix.
 
-        IUPAC P-44.1.2.2: ring is larger, ring is parent.
+        IUPAC: ring is larger, ring is parent.
         """
         mol, ring_systems, chain, pg, pa, all_ring = _setup_parent_selection(
             'C1CCCCC1CC'
@@ -1915,9 +1915,9 @@ class TestNoPGSizeComparison:
     def test_ring_chain_tie_ring_wins(self):
         """Cyclohexane (6 atoms) + hexane (6 atoms), no PG.
 
-        Ring (6) == chain (6) -> ring wins on tie (P-52.2.8).
+        Ring (6) == chain (6) -> ring wins on tie.
 
-        IUPAC P-52.2.8: ring preferred when equal number of skeletal atoms.
+        IUPAC: ring preferred when equal number of skeletal atoms.
         """
         mol, ring_systems, chain, pg, pa, all_ring = _setup_parent_selection(
             'C1CCCCC1CCCCCC'
@@ -1933,8 +1933,8 @@ class TestNoPGSizeComparison:
     def test_cyclobutane_octane_ring_wins(self):
         """Cyclobutane (4 atoms) + octane (8 atoms), no PG.
 
-        P-44.1.2.2: ring senior regardless of size -> octylcyclobutane
-        (OPSIN-RT-verified), NOT 1-cyclobutyloctane. (Was the DEF-1 size-gate bug.)
+        : ring senior regardless of size -> octylcyclobutane
+        (OPSIN-RT-verified), NOT 1-cyclobutyloctane. (Was the size-gate bug.)
         """
         mol, ring_systems, chain, pg, pa, all_ring = _setup_parent_selection(
             'C1CCC1CCCCCCCC'
@@ -1952,16 +1952,16 @@ class TestNoPGSizeComparison:
 class TestNPBackboneEarlyReturn:
     """Tests for natural product backbone priority in parent selection.
 
-    IUPAC P-31.1.3.4: Natural product ring systems (steroids, alkaloids)
+    IUPAC: Natural product ring systems (steroids, alkaloids)
     should always use the ring system as parent, regardless of chain length
     or PG placement. This requires an NP detection check before the standard
-    P-44.3 cascade.
+     cascade.
 
-    Phase 104 Plan 02 will add the NP early-return to select_parent().
+    a phase Plan 02 will add the NP early-return to select_parent.
     """
 
     def test_steroid_detected_as_natural_product(self):
-        """Verify detect_natural_product() recognizes steroid scaffolds.
+        """Verify detect_natural_product recognizes steroid scaffolds.
 
         Cholesterol-type steroid should be detected.
         """
@@ -1995,12 +1995,12 @@ class TestNPBackboneEarlyReturn:
         )
 
     def test_steroid_with_pg_on_ring_already_correct(self):
-        """Steroid with OH on ring only -> ring is parent via P-44.1(a).
+        """Steroid with OH on ring only -> ring is parent via (a).
 
         This already works correctly because PG is on ring only.
         The NP early-return would be redundant here but should not break it.
 
-        IUPAC P-31.1.3.4, P-44.1(a).
+        IUPAC, (a).
         """
         mol, ring_systems, chain, pg, pa, all_ring = _setup_parent_selection(
             'CC(C)CCCC(C)C1CCC2C3CC=C4CC(O)CCC4(C)C3CCC12C'
@@ -2013,13 +2013,13 @@ class TestNPBackboneEarlyReturn:
     def test_steroid_with_pg_on_chain_ring_wins(self):
         """Steroid (cholanic acid) with COOH on chain only -> ring should be parent.
 
-        Current: PG on chain only -> chain wins via P-44.1(a).
-        Correct: NP backbone detected -> ring is ALWAYS parent (P-31.1.3.4).
+        Current: PG on chain only -> chain wins via (a).
+        Correct: NP backbone detected -> ring is ALWAYS parent.
 
         This is the key test for the NP early-return. After Plan 02, the NP
-        check should override P-44.1(a) and force ring parent for steroids.
+        check should override (a) and force ring parent for steroids.
 
-        IUPAC P-31.1.3.4: NP ring systems are always the parent.
+        IUPAC: NP ring systems are always the parent.
         """
         from orthonym.perception.natural_products import detect_natural_product
 

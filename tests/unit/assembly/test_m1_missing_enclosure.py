@@ -6,7 +6,7 @@ def eng():
     return Orthonym(general_fallback=True, general_fallback_unverified=True,
                      allow_aromatic_general=True)
 
-# W1 — bis() around a complex ring substituent (composer.py count>1 branch)
+# W1 — bis around a complex ring substituent (composer.py count>1 branch)
 def test_w1_bis_3_chlorophenyl_enclosed(eng):
     smi = "C[C@@H]1C(=O)N[C@H](c2cccc(Cl)c2)C2(C(=O)Nc3cc(Cl)ccc32)[C@@H]1c1cccc(Cl)c1"
     name = eng.name(smi)
@@ -15,7 +15,7 @@ def test_w1_bis_3_chlorophenyl_enclosed(eng):
     assert "bis(3-chlorophenyl)" in name
     assert "bis3-chlorophenyl" not in name
 
-# W3 — [] escalation around a substituent that already contains () (count==1 branch)
+# W3 —  escalation around a substituent that already contains  (count==1 branch)
 def test_w3_methanesulfonyl_quinazolinyl_enclosed(eng):
     smi = "COc1ccc2c(c1)C1(CC1)CN(c1ncnc3ccc(S(C)(=O)=O)cc13)C2"
     name = eng.name(smi)
@@ -51,10 +51,10 @@ def test_w2_roundtrips_to_input(eng):
 # ---------------------------------------------------------------------------
 
 # W4 — _assemble_ring_with_ester_prefixes, count==1 NON-acyloxy branch.
-# At HEAD (pre-fix, `27db95e0`/`0bab4e9c`) this molecule shipped the bare,
+# At HEAD (pre-fix, /) this molecule shipped the bare,
 # BB-nonconformant '4-1-chloroethyl-1,2-bis(acetyloxy)benzene' -- OPSIN's
 # tolerant parser accepted it (structure correct) but the locant-substituent
-# boundary is ambiguous per P-16.3.3, and it does not survive P-14.5
+# boundary is ambiguous per, and it does not survive
 # alphanumerical ordering either (the bare compound token sorted BEFORE
 # 'acetyloxy' instead of after it).
 def test_w4_ring_ester_count1_complex_enclosed(eng):
@@ -63,7 +63,7 @@ def test_w4_ring_ester_count1_complex_enclosed(eng):
     assert name is not None and "unknown" not in name.lower()
     assert "(1-chloroethyl)" in name
     assert "4-1-chloroethyl" not in name
-    # acyloxy branch (LEAVE, composer.py :4104 byte-identity note) unchanged
+    # acyloxy branch (LEAVE, composer.py:4104 byte-identity note) unchanged
     assert "bis(acetyloxy)" in name
 
 
@@ -99,7 +99,7 @@ def test_w5_roundtrips_to_input(eng):
 
 
 # W6 — substituent_naming._compose_n_substituent_prefix, the count==1 complex
-# N-substituent on an onium cation (P-16.3.3). At HEAD this shipped the bare
+# N-substituent on an onium cation. At HEAD this shipped the bare
 # '(ethylmethylpropan-2-ylazaniumyl)acetate' -- OPSIN-valid (structure
 # correct) but the compound 'propan-2-yl' substituent is not enclosed, so it
 # reads ambiguously against the two simple N-substituents beside it.

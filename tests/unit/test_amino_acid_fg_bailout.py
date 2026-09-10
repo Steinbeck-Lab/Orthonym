@@ -1,7 +1,7 @@
 """
-Tests for amino acid FG detection bailout (PEP-02).
+Tests for amino acid FG detection bailout .
 
-When _name_amino_acid_systematic() encounters additional functional groups
+When _name_amino_acid_systematic encounters additional functional groups
 (hydroxy, thiol, halogen, etc.) beyond amino + acid, it should bail out
 (return None) so the general polyfunctional pipeline handles them correctly.
 """
@@ -57,11 +57,11 @@ class TestAminoAcidFGBailout:
     def test_alanine_trivial_name_preserved(self):
         """Alanine naming, non-stereo input, unaffected by bailout logic.
 
-        v33 Phase 0 T5 (change-asserted-value, was `== "alanine"`): the input
+         a phase (change-asserted-value, was `== "alanine"`): the input
         is stereo-UNDEFINED at the alpha-carbon, so the retained (implicit-L)
         name is no longer emitted -- see `test_amino_acids.py`'s module
-        docstring for the full evidence (BB P-103.1.3.1, InChIKey proof,
-        head_ab.sh mutation test). This test's own purpose (bailout logic does
+        docstring for the full evidence (BB, InChIKey proof,
+        an A/B check mutation test). This test's own purpose (bailout logic does
         not swallow alanine) is preserved -- the result is still a name, not None.
         """
         smiles = "CC(N)C(=O)O"

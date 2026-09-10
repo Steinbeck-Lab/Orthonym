@@ -1,4 +1,4 @@
-"""Task 8B RC3 (P-73.1.2.2, the Blue Book): substituted URONIUM / THIOURONIUM cations.
+"""Task 8B RC3, the Blue Book): substituted URONIUM / THIOURONIUM cations.
 
 A cation formed by adding a hydron to (iso)urea -- a carbon bonded to two N and one
 O (uronium) or one S (thiouronium) -- is named on the retained parent cation
@@ -32,7 +32,7 @@ def _ik(s):
     ("CNC(=[NH+]c1ccccc1)SC", "N,S-dimethyl-N'-phenylthiouronium"),
 ])
 def test_substituted_uronium_rt(smiles, expected):
-    """RT is checked by InChIKey, not canonical SMILES: P-73.1.2.2 names the
+    """RT is checked by InChIKey, not canonical SMILES: names the
     delocalised uronium cation on a parent that represents BOTH tautomeric
     structures, so the name's localised OPSIN parse can carry a charge-shifted
     resonance form of the input (identical InChIKey, differing canonical SMILES).

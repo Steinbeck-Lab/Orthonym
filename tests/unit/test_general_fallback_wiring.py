@@ -53,9 +53,9 @@ def test_engine_ring_fallback_fires_behind_flag():
 
 def test_late_recovery_replaces_suppressed_wrong_name():
     """decalin-2-one: legacy names it 'decahydronaphthalene' (atom-dropping,
-    SELF-01-suppressed). The late recovery must emit the engine's verified
+    -suppressed). The late recovery must emit the engine's verified
     cage name instead. Gate disabled here -> recovery returns the engine
-    name directly (in prod the same name must clear SELF-01)."""
+    name directly (in prod the same name must clear)."""
     from orthonym.assembly.general_engine import name_general
     from rdkit import Chem
     smi = "O=C1CCC2CCCCC2C1"
@@ -68,8 +68,8 @@ def test_late_recovery_replaces_suppressed_wrong_name():
     out_on = nm_on.name(smi)
     # With the flag OFF nothing changes (byte-identity)...
     assert nm_off.name(smi) != engine_name
-    # ...with it ON, the abstention/suppression is recovered (or, if the
-    # ungated legacy path ships its wrong candidate here because SELF-01 is
+    #...with it ON, the abstention/suppression is recovered (or, if the
+    # ungated legacy path ships its wrong candidate here because is
     # disabled in unit tests, the flag must still not corrupt it).
     assert out_on in (engine_name, nm_off.name(smi))
 
@@ -77,7 +77,7 @@ def test_late_recovery_replaces_suppressed_wrong_name():
 def test_mancude_refused_regardless_of_optin_no_jar():
     """Post-G5-A, an aromatic/mancude cage is refused by the engine, so neither
     general_fallback nor general_fallback_unverified ships a von-Baeyer name for
-    it — even without the OPSIN jar (SELF-01 fails open). This is the safety win:
+    it — even without the OPSIN jar (fails open). This is the safety win:
     the invalid/non-PIN von-Baeyer polyene for aromatic systems no longer ships
     in ANY mode. The real name comes from the PIN path."""
     from unittest import mock as _m
@@ -104,7 +104,7 @@ def test_flag_propagates_into_recursion():
 
 
 def test_best_effort_no_java_never_ships_valence_illegal():
-    """Even with the OPSIN jar absent (SELF-01 fails open) and best-effort ON,
+    """Even with the OPSIN jar absent (fails open) and best-effort ON,
     a valence-illegal von-Baeyer name (a ring double-bond locant coinciding
     with a dioxo/one locant -> 5-bond carbon, the caffeine class) must never
     ship. Post-G5-A the engine already refuses the mancude entry; this asserts
@@ -122,7 +122,7 @@ def test_best_effort_no_java_never_ships_valence_illegal():
 # ---------------------------------------------------------------------------
 # task-JAR-ABSENT (FABLE 0-wrong hole): the general-engine RECOVERY lanes
 # (`_try_general_engine_recovery` late-recovery ladder + the inline-G1 lane in
-# `name()`) previously shipped a best-effort candidate UNVERIFIED when the OPSIN
+# `name`) previously shipped a best-effort candidate UNVERIFIED when the OPSIN
 # jar is absent -- there was no `else: return None`, so control fell through to
 # the emit with opsin_status="unverified" and ZERO verification. The fix routes
 # both lanes through the OPSIN-free reconstructor oracle `verify_or_none`, which
@@ -221,11 +221,11 @@ def test_jar_absent_besteffort_ships_only_when_reconstructor_confirms():
 @pytest.mark.opsin_gate
 def test_jar_present_witnesses_unchanged_by_fix():
     """Jar-PRESENT regression: the fix ONLY narrows a jar-ABSENT branch (both
-    edited branches are unreachable when `_validity_gate_jar_present()` is True),
+    edited branches are unreachable when `_validity_gate_jar_present` is True),
     so with a live jar + the validity gate ON the witnesses behave exactly as
     before -- best-effort ships a POSITIVELY round-tripping (correct) name, or
     abstains; NEVER a wrong molecule. `opsin_gate` marker => real gate (skipped
-    with no jar, per conftest's D-13 guard). No jar-absent patch here."""
+    with no jar, per conftest's guard). No jar-absent patch here."""
     from rdkit import Chem
     from orthonym.errors import is_failure_name
     from orthonym.validation.opsin_roundtrip import opsin_parse
@@ -322,7 +322,7 @@ def test_oxo_ene_valence_illegal_guard_unit():
     assert oxo_ene_valence_illegal("bicyclo[4.4.0]decan-2-one") is False    # no ene
     assert oxo_ene_valence_illegal("ethanol") is False
 
-    # v46 M4 (scope-aware): a 2-oxo cited INSIDE a substituent scope is a
+    # M4 (scope-aware): a 2-oxo cited INSIDE a substituent scope is a
     # different atom-numbering from the parent ring's ene -- the global union
     # falsely flagged these salt/decorated names. The oxo and the ene never
     # share a scope, so no carbon is five-valent -> legal (was a false positive).

@@ -244,10 +244,10 @@ class TestPolycyclicEsterRouting:
     def test_cyclohexyl_acetate_still_works(self):
         """Cyclohexyl acetate (simple ring ester) should still work.
 
-        v29 Phase 5: the assertion now matches this test's own title. It read
+         a phase: the assertion now matches this test's own title. It read
         `"acetyloxy" in result or "cyclohexane" in result` — the substitutive
         form — which is neither of the words in `cyclohexyl acetate`, the
-        functional-class PIN required by P-65.6.3.2.1. The routing property the
+        functional-class PIN required by. The routing property the
         class is here to protect (a SIMPLE ring ester must not fall into the
         polycyclic path) is asserted more sharply by naming it exactly.
         """

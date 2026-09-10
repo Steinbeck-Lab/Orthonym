@@ -1,4 +1,4 @@
-"""v29 P3-CLEANUP Item 2 + MINORs 4/5/8 — enclosure produced correctly at SOURCE.
+"""-CLEANUP Item 2 + MINORs 4/5/8 — enclosure produced correctly at SOURCE.
 
 WHAT WAS LEFT AFTER P3-REGRESSION
 ---------------------------------
@@ -7,13 +7,13 @@ callers legitimately hand over a pre-enclosed prefix. But an idempotent sink
 cannot tell a legitimate pre-enclosure from a MALFORMED one, and one producer was
 emitting a malformed one:
 
-    _name_amidine_chain_side -> '((4-chlorophenyl)methylamino)'   <- '(' inside '('
+    _name_amidine_chain_side -> '((4-chlorophenyl)methylamino)' <- '(' inside '('
 
-`### **P"16.5.4** Multiple!types!of!enclosing!marks` (BlueBookV2.md:7444), verbatim
-at :7446: "*When multiple types of enclosing marks are required, the nesting order
-is as follows: {[({[( )]})]}*". A directly on-point PIN exists at :26529 —
+`### **P"16.5.4** Multiple!types!of!enclosing!marks` (the Blue Book), verbatim
+at:7446: "*When multiple types of enclosing marks are required, the nesting order
+is as follows: {[({})]}*". A directly on-point PIN exists at:26529 —
 `4-{[(4-chlorophenyl)methylidene]amino}aniline (PIN)`, under
-`## **P-62.3.1** Substitutive names for imines` (:26508): same aryl, same
+`## **** Substitutive names for imines` (:26508): same aryl, same
 N-attached prefix, spelled brace / bracket / paren from the outside in.
 
 The fix is at the PRODUCER, not the sink: the sink stays idempotent (a repair
@@ -23,7 +23,7 @@ the outer marks at all and starts emitting the INNER level it was missing.
 THIS WAS ALSO A COVERAGE LOSS, NOT ONLY A SPELLING ONE
 ------------------------------------------------------
 With two aryl branches the run-together prefix parsed as a DIFFERENT molecule (a
-diarylmethyl), SELF-01 caught it, and the compound abstained. Measured on the real
+diarylmethyl), caught it, and the compound abstained. Measured on the real
 path with the gates ON: `unknown organic compound` before, a correct OPSIN-clean
 name after.
 """
@@ -46,13 +46,13 @@ from orthonym.rules.polyfunctional import (
 class TestAmidineNSubstituentEnclosure:
 
     def test_bb_p62_3_1_nesting_on_the_witness(self):
-        """The review's witness, spelled brace / bracket / paren as BB :26529."""
+        """The review's witness, spelled brace / bracket / paren as BB:26529."""
         assert name_compound("COC(=O)CCC(=NCC)NCc1ccc(Cl)cc1") == (
             "methyl 4-{[(4-chlorophenyl)methyl]amino}-4-(ethylimino)butanoate"
         )
 
     def test_no_paren_directly_inside_a_paren(self):
-        """The P-16.5.4 violation itself, stated as a property.
+        """The violation itself, stated as a property.
 
         Pinning only the literal above would pass for a name that fixed this
         witness and reintroduced `((` elsewhere."""
@@ -71,7 +71,7 @@ class TestAmidineNSubstituentEnclosure:
 
     @pytest.mark.parametrize("smiles,expected", [
         # A COMPOUND substituent with no marks of its own still needs enclosing
-        # (P-16.5.1.1 / P-29.1.2) — it just starts one level lower.
+        # / — it just starts one level lower.
         ("COC(=O)CCC(=NCC)NCC(C)C",
          "methyl 4-(ethylimino)-4-[(2-methylpropyl)amino]butanoate"),
         ("COC(=O)CCC(=NCC)NCCc1ccccc1",
@@ -100,7 +100,7 @@ class TestAmidineNSubstituentEnclosure:
 
     def test_producer_returns_a_bare_prefix(self):
         """The contract change itself: the outer marks belong to
-        `format_fg_prefix`, which picks their TYPE per P-16.5.4. A producer that
+        `format_fg_prefix`, which picks their TYPE per. A producer that
         hard-codes `(` is what produced `(` inside `(`."""
         from rdkit import Chem
         from orthonym.rules.polyfunctional import _name_amidine_chain_side
@@ -119,7 +119,7 @@ class TestAmidineNSubstituentEnclosure:
 # ---------------------------------------------------------------------------
 
 class TestNoLocantDerivedMultiplierBranch:
-    """`format_fg_prefix(prefix, [], count>1)` with a derived multiplier was the
+    """`format_fg_prefix(prefix, , count>1)` with a derived multiplier was the
     one branch still hand-rolling its enclosure. Its guard omitted `{`, so a
     brace-enclosed prefix took a REDUNDANT extra level. Dead today (0 executions
     over 1934 gold + 300 corpus rows) — tested because a dead branch that bypasses
@@ -142,7 +142,7 @@ class TestNoLocantDerivedMultiplierBranch:
         assert format_fg_prefix("(dimethylamino)", [], 2) == "bis(dimethylamino)"
 
     def test_bare_simple_prefix_still_gets_marks_from_the_derived_multiplier(self):
-        """P-16.5.1.10 — the rule the branch exists for must survive the
+        """ — the rule the branch exists for must survive the
         refactor: `bis(sulfanyl)`, never `bissulfanyl`."""
         assert format_fg_prefix("sulfanyl", [], 2) == "bis(sulfanyl)"
 

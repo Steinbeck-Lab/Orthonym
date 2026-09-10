@@ -63,7 +63,7 @@ class TestRetainedCations:
     """Test organic cation name lookup."""
 
     def test_ammonium(self):
-        """Test azanium lookup (P-73.1.1.2 PIN for NH4+; was 'ammonium')."""
+        """Test azanium lookup PIN for NH4+; was 'ammonium')."""
         assert get_cation_name('[NH4+]') == 'azanium'
 
     def test_methylammonium(self):
@@ -83,7 +83,7 @@ class TestRetainedCations:
         assert get_cation_name('[CH3+]') == 'methylium'
 
     def test_oxonium(self):
-        """Test oxidanium lookup (P-73.1.1.2 PIN for OH3+; was 'oxonium')."""
+        """Test oxidanium lookup PIN for OH3+; was 'oxonium')."""
         assert get_cation_name('[OH3+]') == 'oxidanium'
 
     def test_unknown_returns_none(self):
@@ -167,7 +167,7 @@ class TestGetIonName:
     def test_cation_lookup(self):
         """Test get_ion_name finds cations."""
         assert get_ion_name('[Na+]') == 'sodium'
-        assert get_ion_name('[NH4+]') == 'azanium'  # P-73.1.1.2 PIN (was 'ammonium')
+        assert get_ion_name('[NH4+]') == 'azanium'  # PIN (was 'ammonium')
 
     def test_anion_lookup(self):
         """Test get_ion_name finds anions."""

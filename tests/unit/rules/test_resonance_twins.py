@@ -80,7 +80,7 @@ def test_genuine_radical_cation_not_swept_by_diazonium_carveout():
     wrong ``benzenediazonium`` candidate for a real radical species. The
     tightened carve-out must decline to clear ``radical_sites`` here, so
     ``route_charged``'s ordinary "charged AND radical -> bail" guard fires
-    THE PRODUCER ITSELF, never relying on SELF-01 downstream to catch it."""
+    THE PRODUCER ITSELF, never relying on downstream to catch it."""
     from orthonym.perception.ions import get_ion_sites
     from orthonym.rules import charged_router as cr
 

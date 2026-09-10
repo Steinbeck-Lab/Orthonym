@@ -2,18 +2,18 @@
 
 Each test asserts that a a phase / 151 / 152 / 153 / 155.C errata fix
 remains intact after the post-Phase-156 codebase. A failing regression-lock
-is a BLOCKER (per CONTEXT mutual-exclusion contract): a phase does
+is a BLOCKER (per internal notes mutual-exclusion contract): a phase does
 NOT silently re-apply the fix; the failing test triggers an audit of which
 upstream phase silently reverted.
 
-Test taxonomies (CONTEXT):
+Test taxonomies (internal notes):
   1. Regression-lock (>= 11 tests, 1 per errata) -- assert a phase/155.C
      deliverables intact. Suffix: _locked_157.
   2. Re-verification meta-tests (>= 2 tests) -- subprocess greps for NA-
-     classified rules (P-31.2 dehydro, P-31.1.4.3 compound-locants) per
-     CONTEXT. Suffix: _not_applicable_grep_157.
+     classified rules dehydro, compound-locants) per
+     internal notes. Suffix: _not_applicable_grep_157.
   3. Net-new errata tests (>= 0 tests) -- per Plan-01 NO-OP-CONFIRMED on
-     both P-25.8.1 (157-AUDIT.md S3.4) and P-25.4.3.2.2 (157-AUDIT.md S4.5),
+     both (internal notes S3.4) and (internal notes S4.5),
      these tests run as smoke-only protective infrastructure, not FIX-SPEC
      assertions. The S3.5 FIX-SPEC payload remains preserved in the audit
      doc for follow-up.
@@ -22,17 +22,17 @@ Test taxonomies (CONTEXT):
      entries. Suffix: _doc_*_157.
 
 Reference: IUPAC 2013 Blue Book + BBerrors.html corrections through 31 Dec 2025.
-Source: 157-CONTEXT.md..; 157-AUDIT.md (Plan-01 atomic commit);
+Source: 157-internal notes..; internal notes (Plan-01 atomic commit);
         157-02-SUMMARY.md (Plan-03 inputs section).
 
-Per CONTEXT / / / (mutual-exclusion contracts): this
+Per internal notes / / / (mutual-exclusion contracts): this
 test module ONLY IMPORTS from a phase / 155.C / 151 / 137-02 deliverables;
 it MUST NOT modify any of them.
 
-Per CONTEXT Pitfall 7: P-29.1.2 regression-lock does NOT invoke OPSIN
+Per internal notes Pitfall 7: regression-lock does NOT invoke OPSIN
 round-trip (OPSIN v2.9.0 does not parse `carbonochloridoyl`).
 
-Per CONTEXT Pitfall 3: test_carbonochloridoyl_locked_157 asserts BOTH the
+Per internal notes Pitfall 3: test_carbonochloridoyl_locked_157 asserts BOTH the
 chlorocarbonyl -> carbonochloridoyl change AND the bromocarbonyl /
 fluorocarbonyl intentional non-change (BBerrors says only -COCl renamed).
 """
@@ -61,18 +61,18 @@ def _repo_root() -> Path:
 
 
 class TestP18bSeniorityLock157:
-    """P-18(b) regression: 20-element seniority dict preserved post-Phase-156.
+    """(b) regression: 20-element seniority dict preserved post-Phase-156.
 
     a phase-01 ERRATA-01 expanded _HETEROATOM_SENIORITY from 10 to 20.
      mutual-exclusion: NO edit on a phase deliverables. Failure here
     BLOCKS a phase + triggers audit of which upstream phase reverted.
 
-    Source: BBerrors.html P-18(b) Jan 2019 errata.
-    Source: 157-AUDIT.md row 1 + S1.1 row 1 grep transcript.
+    Source: BBerrors.html (b) Jan 2019 errata.
+    Source: internal notes row 1 + S1.1 row 1 grep transcript.
     """
 
     def test_heteroatom_seniority_dict_size_locked_157(self) -> None:
-        """20-element dict preserved per BBerrors.html P-18(b) Jan 2019 errata."""
+        """20-element dict preserved per BBerrors.html (b) Jan 2019 errata."""
         from orthonym.rules.ring_selection import _HETEROATOM_SENIORITY
 
         assert len(_HETEROATOM_SENIORITY) == 20, (
@@ -90,7 +90,7 @@ class TestP18bSeniorityLock157:
         )
 
     def test_heteroatom_seniority_p18b_elements_locked_157(self) -> None:
-        """All 10 P-18(b) ERRATA-01 elements present (As, Sb, Bi, Si, Ge, Sn, Pb, B, Al, Ga)."""
+        """All 10 (b) ERRATA-01 elements present (As, Sb, Bi, Si, Ge, Sn, Pb, B, Al, Ga)."""
         from orthonym.rules.ring_selection import _HETEROATOM_SENIORITY
 
         for added in ('As', 'Sb', 'Bi', 'Si', 'Ge', 'Sn', 'Pb', 'B', 'Al', 'Ga'):
@@ -100,18 +100,18 @@ class TestP18bSeniorityLock157:
             )
 
     def test_heteroatom_variety_order_locked_157(self) -> None:
-        """_HETEROATOM_VARIETY_ORDER uses P-44.2.1.8 criterion (g) order (F>Cl>Br>I>O>S>Se>Te>N>...).
+        """_HETEROATOM_VARIETY_ORDER uses criterion (g) order (F>Cl>Br>I>O>S>Se>Te>N>...).
 
-        NOTE: VARIETY_ORDER (P-44.2.1.8 criterion g) is intentionally different from
-        _HETEROATOM_SENIORITY (P-18(b) criterion f where N is most senior).
-        They serve different Blue Book criteria. See P-44.2.1.8 fix (Wave 1 R9).
+        NOTE: VARIETY_ORDER criterion g) is intentionally different from
+        _HETEROATOM_SENIORITY (b) criterion f where N is most senior).
+        They serve different Blue Book criteria. See fix (Wave 1 R9).
         """
         from orthonym.rules.ring_selection import (
             _HETEROATOM_SENIORITY, _HETEROATOM_VARIETY_ORDER,
         )
 
         # The variety order must contain exactly the same 20 elements as the
-        # seniority dict --- it's the P-44.2.1(g) "greater heteroatom variety"
+        # seniority dict --- it's the (g) "greater heteroatom variety"
         # tuple-position mapping per ring_selection.py:88-94.
         assert len(_HETEROATOM_VARIETY_ORDER) == 20, (
             f"P-44.2.1.8 regression: VARIETY_ORDER size "
@@ -121,8 +121,8 @@ class TestP18bSeniorityLock157:
             f"P-44.2.1.8 regression: VARIETY_ORDER element set differs from "
             f"SENIORITY keys. AUDIT REQUIRED."
         )
-        # P-44.2.1.8 criterion (g): variety order is F>Cl>Br>I>O>S>Se>Te>N>P>...
-        # (halogens first, then chalcogens, then N — different from P-18(b) where N is first).
+        # criterion (g): variety order is F>Cl>Br>I>O>S>Se>Te>N>P>...
+        # (halogens first, then chalcogens, then N — different from (b) where N is first).
         assert _HETEROATOM_VARIETY_ORDER[0] == 'F', (
             f"P-44.2.1.8 regression: VARIETY_ORDER[0] must be 'F' (not "
             f"'{_HETEROATOM_VARIETY_ORDER[0]}'). AUDIT REQUIRED."
@@ -136,12 +136,12 @@ class TestP18bSeniorityLock157:
 
 
 class TestEZThresholdLock157:
-    """P-31.1.3 regression: E/Z stereo threshold preserved at `< 8` (strict).
+    """ regression: E/Z stereo threshold preserved at `< 8` (strict).
 
     a phase-01 ERRATA-02 changed `min_ring_size <= 8` to `< 8` per
-    BBerrors.html P-31.1.3 Sep 2024 errata + P-44.4.1. Plan listed
+    BBerrors.html Sep 2024 errata +. Plan listed
     line 91; live location is line 126 (drift recorded as non-blocking
-    citation correction in 157-AUDIT.md row 2). The COMPARISON OPERATOR
+    citation correction in internal notes row 2). The COMPARISON OPERATOR
     is the regression-lock invariant; the line number is illustrative.
     """
 
@@ -167,18 +167,18 @@ class TestEZThresholdLock157:
 
 
 class TestFusionSeparatorLock157:
-    """P-25.3.8.3 regression: fusion descriptor `:` for multi-edge fusion.
+    """ regression: fusion descriptor `:` for multi-edge fusion.
 
     a phase ERRATA-05 verified the multi-edge fusion branch returns
     `[loc1,loc2-letter:loc3,loc4-letter']` with `:` separator (NOT `;`).
     The plan listed line 860; live location is line 866 (drift recorded
-    in 157-AUDIT.md row 3 + S1.1 row 3). The multi-component branch at
+    in internal notes row 3 + S1.1 row 3). The multi-component branch at
     line 859 uses `,` for dibenzo/dinaphtho per a distinct sub-rule;
     both are correct.
     """
 
     def test_fusion_separator_locked_157(self) -> None:
-        """Multi-edge fusion uses `:` separator per P-25.3.8.3 Dec 2019 errata."""
+        """Multi-edge fusion uses `:` separator per Dec 2019 errata."""
         from orthonym.rules import fusion_descriptors
 
         source_path = Path(fusion_descriptors.__file__)
@@ -198,7 +198,7 @@ class TestFusionSeparatorLock157:
 
 
 class TestHWCorrectionsLock157:
-    """P-22.2.1 regression: Hantzsch-Widman name corrections preserved.
+    """ regression: Hantzsch-Widman name corrections preserved.
 
     a phase-01 ERRATA-06 verified `thiazolidine` (NOT `thioxazolidine`)
     in retained-names dict at retained_names.py:237. Multiple HW spellings
@@ -238,11 +238,11 @@ class TestHWCorrectionsLock157:
 
 
 class TestSymmetricAnhydrideLock157:
-    """P-65.7 regression: symmetric anhydride uses bare `anhydride` (no `bis-`).
+    """ regression: symmetric anhydride uses bare `anhydride` (no `bis-`).
 
     a phase-01 ERRATA-08 verified `anhydrides.py:109` returns
     `f"{acid1_name} anhydride"` (NOT `f"bis-{acid1_name}..."`) when
-    acid1 == acid2. Source: BBerrors.html P-65.7.
+    acid1 == acid2. Source: BBerrors.html.
     """
 
     def test_symmetric_anhydride_locked_157(self) -> None:
@@ -270,7 +270,7 @@ class TestSymmetricAnhydrideLock157:
         )
 
     def test_symmetric_anhydride_canary_locked_157(self) -> None:
-        """P-65.7 smoke: ethanoic acid anhydride canary returns symmetric form."""
+        """ smoke: ethanoic acid anhydride canary returns symmetric form."""
         from orthonym.namer import name_compound
 
         # Canonical canary from anhydrides.py:10:
@@ -291,20 +291,20 @@ class TestSymmetricAnhydrideLock157:
 
 
 class TestCarbonochloridoylLock157:
-    """P-29.1.2 regression: chlorocarbonyl -> carbonochloridoyl.
+    """ regression: chlorocarbonyl -> carbonochloridoyl.
 
-    CRITICAL per CONTEXT Pitfall 3: BBerrors.html P-29.1.2 Nov 2020 errata
+    CRITICAL per internal notes Pitfall 3: BBerrors.html Nov 2020 errata
     renamed ONLY -COCl from `chlorocarbonyl` to `carbonochloridoyl`. The
     bromine and fluorine analogs (-COBr, -COF) were INTENTIONALLY UNCHANGED.
     This test asserts BOTH the change AND the non-change as the regression-
     lock invariants.
 
-    CRITICAL per CONTEXT Pitfall 7: this test does NOT invoke OPSIN round-
+    CRITICAL per internal notes Pitfall 7: this test does NOT invoke OPSIN round-
     trip on `carbonochloridoyl` because OPSIN v2.9.0 does not parse it.
     The dict-import assertion is the canonical regression-lock; OPSIN-side
     vocabulary closure is a follow-up to OPSIN maintainers.
 
-    Source: 157-AUDIT.md row 6 + S1.1 row 6 grep transcript.
+    Source: internal notes row 6 + S1.1 row 6 grep transcript.
     """
 
     def test_carbonochloridoyl_locked_157(self) -> None:
@@ -317,7 +317,7 @@ class TestCarbonochloridoylLock157:
             f"{PREFIX_FORMS.get('acid_chloride')!r} != 'carbonochloridoyl'. "
             f"Phase 137 ERRATA-09 silently reverted. AUDIT REQUIRED."
         )
-        # Per CONTEXT Pitfall 3: the bromine analog is INTENTIONALLY unchanged.
+        # Per internal notes Pitfall 3: the bromine analog is INTENTIONALLY unchanged.
         # If this assertion fires, an over-eager edit applied carbonochloridoyl-
         # style renaming to ALL acid halides --- which is WRONG per BBerrors.
         assert PREFIX_FORMS.get("acid_bromide") == "bromocarbonyl", (
@@ -326,7 +326,7 @@ class TestCarbonochloridoylLock157:
             f"BBerrors.html P-29.1.2 Nov 2020 errata applies ONLY to -COCl. "
             f"The -COBr form was INTENTIONALLY unchanged. AUDIT REQUIRED."
         )
-        # Per CONTEXT Pitfall 3: the fluorine analog is also INTENTIONALLY unchanged.
+        # Per internal notes Pitfall 3: the fluorine analog is also INTENTIONALLY unchanged.
         assert PREFIX_FORMS.get("acid_fluoride") == "fluorocarbonyl", (
             f"P-29.1.2 regression: PREFIX_FORMS['acid_fluoride'] = "
             f"{PREFIX_FORMS.get('acid_fluoride')!r} != 'fluorocarbonyl'. "
@@ -349,10 +349,10 @@ class TestCarbonochloridoylLock157:
 
 
 class TestBracketNestingSubsectionsLock157:
-    """P-16.5.4.1 regression: 5 bracket-nesting subsections preserved.
+    """ regression: 5 bracket-nesting subsections preserved.
 
-    a phase-02 ERRATA-07 implemented `compute_nesting_depth()` +
-    `apply_enclosing_marks()` per BBerrors.html P-16.5.4.1 Dec 2025 errata.
+    a phase-02 ERRATA-07 implemented `compute_nesting_depth` +
+    `apply_enclosing_marks` per BBerrors.html Dec 2025 errata.
     Both functions must remain importable and exhibit the documented
     invariants (depth-0 fusion brackets, depth-1 stereo descriptors,
     auto-detect sentinel `depth=-1`).
@@ -372,12 +372,12 @@ class TestBracketNestingSubsectionsLock157:
         assert callable(apply_enclosing_marks), (
             "P-16.5.4.1 regression: apply_enclosing_marks is not callable."
         )
-        # P-16.5.4.1.2 invariant: fusion brackets do NOT count:
+        # invariant: fusion brackets do NOT count:
         assert compute_nesting_depth("bicyclo[2.2.1]heptane") == 0, (
             "P-16.5.4.1.2 regression: bicyclo brackets counted as nesting. "
             "AUDIT REQUIRED."
         )
-        # P-16.5.4.1.3 invariant: stereo descriptors DO count:
+        # invariant: stereo descriptors DO count:
         assert compute_nesting_depth("(R)-butan-2-yl") >= 1, (
             "P-16.5.4.1.3 regression: stereo descriptor (R) not counted as "
             "nesting. AUDIT REQUIRED."
@@ -391,10 +391,10 @@ class TestBracketNestingSubsectionsLock157:
 
 
 class TestFirstSubstituentNoMarksLock157:
-    """P-16.5.1.3 regression: first-substituent-no-marks for mononuclear hydrides.
+    """ regression: first-substituent-no-marks for mononuclear hydrides.
 
-    a phase-02 ERRATA-10 implemented `_build_substituent_string()` for
-    phosphane prefix assembly per BBerrors.html P-16.5.1.3 May 2021 errata.
+    a phase-02 ERRATA-10 implemented `_build_substituent_string` for
+    phosphane prefix assembly per BBerrors.html May 2021 errata.
     The first substituent gets NO enclosing marks; subsequent substituents
     do. Smoke-test on a typical phosphane prefix list.
     """
@@ -409,7 +409,7 @@ class TestFirstSubstituentNoMarksLock157:
             f"P-16.5.1.3 regression: single substituent got marks: {single!r}. "
             "Expected 'methyl'. AUDIT REQUIRED."
         )
-        # Two substituents --- first bare, second wrapped per P-16.5.1.3:
+        # Two substituents --- first bare, second wrapped per:
         pair = _build_substituent_string(["methyl", "ethyl"])
         # The first must NOT begin with `[` or `(`:
         assert not pair.startswith("("), (
@@ -423,15 +423,15 @@ class TestFirstSubstituentNoMarksLock157:
 
 
 class TestP25224SeniorityBandsLock157:
-    """P-25.2.2.4 regression: 4 corrected benzo-heterocycle seniority bands.
+    """ regression: 4 corrected benzo-heterocycle seniority bands.
 
     a phase.C ERRATA-25224 corrected 4 entries in MONOCYCLIC_COMPONENTS
-    per BBerrors.html P-25.2.2.4 Jan 2022 errata. mutual-exclusion:
+    per BBerrors.html Jan 2022 errata. mutual-exclusion:
     a phase makes ZERO modifications to fusion_components.py; this test
     is the regression-lock asserting the 4 corrected values stay at their
     post-155.C numbers.
 
-    Sentinel values per 155-AUDIT-C.md + 157-AUDIT.md row 9 + S1.1 row 9:
+    Sentinel values per internal notes-C.md + internal notes row 9 + S1.1 row 9:
       imidazole = 50 (was 47 pre-155.C)
       pyrazole = 51 (was 48 pre-155.C)
       thiazole = 80 (was 77 pre-155.C)
@@ -466,7 +466,7 @@ class TestP25224SeniorityBandsLock157:
         """a phase.C invariants: imidazole < pyrazole < pyrrole; thiazole < thiophene."""
         from orthonym.data.fusion_components import MONOCYCLIC_COMPONENTS
 
-        # Per 155-AUDIT-C.md cite-blocks: lower seniority number = MORE senior
+        # Per internal notes-C.md cite-blocks: lower seniority number = MORE senior
         # is FALSE in this catalog --- higher number = MORE senior.
         # Invariants documented at fusion_components.py:110-112 +:123-126:
         # imidazole(50) < pyrrole(55) preserved (pyrrole more senior than imidazole)
@@ -489,29 +489,29 @@ class TestP25224SeniorityBandsLock157:
 
 
 class TestP2543222BridgeNumberingLock157:
-    """P-25.4.3.2.2 regression: a phase cite-line preserved.
+    """ regression: a phase cite-line preserved.
 
-    Per 157-AUDIT.md S4.5 verdict NO-OP-CONFIRMED: a phase already
-    complies with the Dec 2019 P-25.4.3.2.2 revised rule because a phase shipped post-Dec-2019 and reads current Blue Book.
+    Per internal notes S4.5 verdict NO-OP-CONFIRMED: a phase already
+    complies with the Dec 2019 revised rule because a phase shipped post-Dec-2019 and reads current Blue Book.
 
     The protective regression-lock invariants are:
-      (a) polycyclic.py:18 docstring cites "P-23, VB-1 through VB-9"
-          (the Blue Book post-Dec-2019 form per 157-AUDIT.md S4.2).
+      (a) polycyclic.py:18 docstring cites ", through "
+          (the Blue Book post-Dec-2019 form per internal notes S4.2).
       (b) Bridge-numbering canary smoke: norbornane round-trips and the
           [2.2.1] bracket descriptor appears in substituted-bicyclic output.
 
-    Per CONTEXT mutual-exclusion: a phase makes ZERO modifications
+    Per internal notes mutual-exclusion: a phase makes ZERO modifications
     to polycyclic.py / bicyclo.py / ring_assemblies.py. Failure of these
     smoke assertions BLOCKS a phase + triggers a a phase audit.
     """
 
     def test_p2543222_polycyclic_cite_locked_157(self) -> None:
-        """polycyclic.py:18 docstring cites `P-23, VB-1 through VB-9`."""
+        """polycyclic.py:18 docstring cites `, through `."""
         from orthonym.rules import polycyclic
 
         source_path = Path(polycyclic.__file__)
         text = source_path.read_text(encoding="utf-8")
-        # The cite asserts current-Blue-Book conformance per 157-AUDIT.md S4.2:
+        # The cite asserts current-Blue-Book conformance per internal notes S4.2:
         assert "P-23" in text, (
             "P-25.4.3.2.2 regression: polycyclic.py docstring missing `P-23` "
             "cite. Phase 151 cite-block reverted. AUDIT REQUIRED."
@@ -530,7 +530,7 @@ class TestP2543222BridgeNumberingLock157:
     def test_p2543222_bridge_numbering_smoke_locked_157(
         self, smiles: str, expected_token: list, case_label: str,
     ) -> None:
-        """P-25.4.3.2.2 smoke: bridge-descriptor invariant on canary fixtures."""
+        """ smoke: bridge-descriptor invariant on canary fixtures."""
         from orthonym.namer import name_compound
 
         name = name_compound(smiles)
@@ -549,12 +549,12 @@ class TestP2543222BridgeNumberingLock157:
 
 
 class TestP2581QuinolizineLock157:
-    """P-25.8.1 regression: NO-OP-CONFIRMED protective infrastructure.
+    """ regression: NO-OP-CONFIRMED protective infrastructure.
 
-    Per 157-AUDIT.md S3.4 verdict NO-OP-CONFIRMED: no comparison path in
+    Per internal notes S3.4 verdict NO-OP-CONFIRMED: no comparison path in
     the codebase ever pits quinolizine vs quinoline / isoquinoline at
-    the same selection level. P-25.8.1 (Aug 2021 errata) is NOT-APPLICABLE-
-    IN-CURRENT-SCOPE per CONTEXT + 157-02-SUMMARY.md "Conditional
+    the same selection level. (Aug 2021 errata) is NOT-APPLICABLE-
+    IN-CURRENT-SCOPE per internal notes + 157-02-SUMMARY.md "Conditional
     code state".
 
     The protective regression-lock invariants are:
@@ -570,15 +570,15 @@ class TestP2581QuinolizineLock157:
     test (rank=2 for quinoline, =3 for isoquinoline, =1 for 4H-quinolizine)
     MUST be added.
 
-    Source: 157-AUDIT.md S3.4 + S3.5 FIX-SPEC payload.
-    Source: 157-02-SUMMARY.md "Plan-03 Inputs" -> P-25.8.1 conditional state.
+    Source: internal notes S3.4 + S3.5 FIX-SPEC payload.
+    Source: 157-02-SUMMARY.md "Plan-03 Inputs" -> conditional state.
     """
 
     def test_p25_8_1_quinolizine_no_op_confirmed_locked_157(self) -> None:
         """No `principal_seniority_rank` field on any FUSED_HETEROCYCLE_DATA entry."""
         from orthonym.data.fused_heterocycles import FUSED_HETEROCYCLE_DATA
 
-        # The 3 P-25.8.1 SMILES keys per 157-CONTEXT.md S Code Examples 3:
+        # The 3 SMILES keys per 157-internal notes S Code Examples 3:
         quinoline_key = "c1ccc2ncccc2c1"
         isoquinoline_key = "c1ccc2cnccc2c1"
         quinolizine_key = "C1=CCN2C=CC=CC2=C1"
@@ -614,7 +614,7 @@ class TestP2581QuinolizineLock157:
             key for key, val in FUSED_HETEROCYCLE_DATA.items()
             if "principal_seniority_rank" in val
         ]
-        # Per 157-AUDIT.md S3.2 Trace C grep: zero entries carry the field.
+        # Per internal notes S3.2 Trace C grep: zero entries carry the field.
         assert len(with_field) == 0, (
             f"P-25.8.1 regression: {len(with_field)} entries in "
             f"FUSED_HETEROCYCLE_DATA have a `principal_seniority_rank` field "
@@ -628,7 +628,7 @@ class TestP2581QuinolizineLock157:
         """Smoke: 4H-quinolizine SMILES round-trips to its retained name."""
         from orthonym.namer import name_compound
 
-        # Canary from 157-AUDIT.md S3.3 fixture 5:
+        # Canary from internal notes S3.3 fixture 5:
         name = name_compound("C1=CCN2C=CC=CC2=C1")
         assert name is not None
         assert "quinolizine" in name.lower(), (
@@ -645,9 +645,9 @@ class TestP2581QuinolizineLock157:
 
 
 def test_dehydro_not_applicable_grep_157() -> None:
-    """P-31.2 NA re-verification: only OPSIN-imported retained-name hits.
+    """ NA re-verification: only OPSIN-imported retained-name hits.
 
-    Per 157-AUDIT.md S5.1: `grep -rn "dehydro" src/orthonym/ | grep -v
+    Per internal notes S5.1: `grep -rn "dehydro" src/orthonym/ | grep -v
     __pycache__` returns exactly 3 hits, all in `data/opsin_imports/`:
       - amino_acids_opsin.py:72 -- 'dehydroalan'
       - amino_acids_opsin.py:324 -- 'dehydrophenylalan'
@@ -657,12 +657,12 @@ def test_dehydro_not_applicable_grep_157() -> None:
     SMILES match, NOT generated as composable prefixes.
 
     If this test fails, dehydro-prefix generation has been introduced
-    somewhere in src/orthonym/rules or src/orthonym/assembly. The P-31.2
+    somewhere in src/orthonym/rules or src/orthonym/assembly. The
     NA classification no longer holds. a phase audit doc and
     docs/iupac_errata_applied.md MUST be updated to APPLY status with the
     dehydro-before-hydro ordering rule enforced at the prefix-assembly site.
 
-    Source: 157-CONTEXT.md + 157-AUDIT.md S5.1.
+    Source: 157-internal notes + internal notes S5.1.
     """
     src_dir = _repo_root() / "src" / "orthonym"
     result = subprocess.run(
@@ -690,19 +690,19 @@ def test_dehydro_not_applicable_grep_157() -> None:
 
 
 def test_compound_locants_not_applicable_grep_157() -> None:
-    """P-31.1.4.3 NA re-verification: only comments + token-name strings.
+    """ NA re-verification: only comments + token-name strings.
 
-    Per 157-AUDIT.md S5.2: `grep -rn "compound.locant\\|compound_locant"
+    Per internal notes S5.2: `grep -rn "compound.locant\\|compound_locant"
     src/orthonym/` returns 3 hits, all non-generation:
       - validation/opsin_grammar.py:79 -- token-name STRING (a phase grammar)
-      - assembly/naming_utils.py:417 -- DOC-STRING comment citing P-16.5.4.1.3
-      - assembly/composer.py:3966 -- COMMENT line citing P-31.1.4.1
+      - assembly/naming_utils.py:417 -- DOC-STRING comment citing
+      - assembly/composer.py:3966 -- COMMENT line citing
 
     If this test fails, compound-locant generation has been introduced and
-    the P-31.1.4.3 priority rule MUST now be applied to the locant-comparison
+    the priority rule MUST now be applied to the locant-comparison
     cascade.
 
-    Source: 157-CONTEXT.md + 157-AUDIT.md S5.2.
+    Source: 157-internal notes + internal notes S5.2.
     """
     src_dir = _repo_root() / "src" / "orthonym"
     result = subprocess.run(
@@ -713,7 +713,7 @@ def test_compound_locants_not_applicable_grep_157() -> None:
         line for line in result.stdout.strip().split("\n")
         if line and "__pycache__" not in line
     ]
-    # Per 157-AUDIT.md S5.2: hits must be in validation/opsin_grammar.py
+    # Per internal notes S5.2: hits must be in validation/opsin_grammar.py
     # (a phase token-name string), composer.py:3966 (comment), or
     # naming_utils.py:417 (doc-string). NEVER in rules/ generation paths.
     for hit in hits:
@@ -740,7 +740,7 @@ def test_compound_locants_not_applicable_grep_157() -> None:
 # ============================================================================
 
 
-# 14 expected rule names per CONTEXT line 300-315 + 157-AUDIT.md S6.3:
+# 14 expected rule names per internal notes line 300-315 + internal notes S6.3:
 EXPECTED_RULES_157 = [
     "P-18(b)", "P-31.1.3", "P-25.3.8.3", "P-22.2.1", "P-65.7",
     "P-29.1.2", "P-16.5.4.1", "P-16.5.1.3",
@@ -797,9 +797,9 @@ def test_iupac_errata_applied_doc_section_headings_157() -> None:
 
 
 def test_iupac_errata_applied_doc_summary_table_consistent_157() -> None:
-    """CONTEXT Pitfall 5: §5 summary table has >= 14 PIN compliance rows.
+    """internal notes Pitfall 5: summary table has >= 14 PIN compliance rows.
 
-    Each summary-table row MUST have a matching §2 cite-block heading.
+    Each summary-table row MUST have a matching cite-block heading.
     The table format is `| P-X.Y.Z | <status> | <phase> | <test> |`.
     """
     doc = _doc_path_157()
@@ -813,10 +813,10 @@ def test_iupac_errata_applied_doc_summary_table_consistent_157() -> None:
         f"docs/iupac_errata_applied.md S5 summary table has {len(rows)} rows; "
         f">= 14 required per CONTEXT D-09 + 157-AUDIT.md S6.3. G6 fails."
     )
-    # Per Pitfall 5: every §2 entry should appear in the table:
+    # Per Pitfall 5: every entry should appear in the table:
     found_rules = {rule for rule, _status in rows}
     for expected in EXPECTED_RULES_157:
-        # The table may store P-18(b) as `P-18(b)`; we accept exact match.
+        # The table may store (b) as `(b)`; we accept exact match.
         assert expected in found_rules, (
             f"docs/iupac_errata_applied.md S5 summary table missing rule "
             f"{expected!r}. Found rules: {sorted(found_rules)}. G6 fails."
@@ -824,57 +824,57 @@ def test_iupac_errata_applied_doc_summary_table_consistent_157() -> None:
 
 
 def test_iupac_errata_applied_doc_status_consistency_157() -> None:
-    """CONTEXT Pitfall 5: §5 table Status drift detection vs §2 cite-blocks.
+    """internal notes Pitfall 5: table Status drift detection vs cite-blocks.
 
-    For each rule in the §5 summary table, locate the §2 cite-block heading
+    For each rule in the summary table, locate the cite-block heading
     `### P-X.Y.Z` and verify the Status keyword present in the table also
     appears in the cite-block (substring match, case-insensitive).
 
-    This guards against drift where §5 says `applied` but §2 says
+    This guards against drift where says `applied` but says
     `not-applicable` (or vice versa), which would invalidate the public
     PIN compliance claim.
 
-    Source: 157-CONTEXT.md Pitfall 5 + 157-02-SUMMARY.md key-decisions
-    "§5 table Status ↔ §2 cite-block Status invariant".
+    Source: 157-internal notes Pitfall 5 + 157-02-SUMMARY.md key-decisions
+    " table Status ↔ cite-block Status invariant".
     """
     doc = _doc_path_157()
     text = doc.read_text(encoding="utf-8")
-    # Permitted Status keywords per CONTEXT + 157-AUDIT.md Audit Summary:
+    # Permitted Status keywords per internal notes + internal notes Audit Summary:
     status_keywords = {
         "applied", "re-verified", "already-correct",
         "not-applicable", "out-of-scope", "deferred-to-v19",
         "no-op-confirmed", "not-applicable-in-current-scope",
     }
-    # Match §5 summary-table rows:
+    # Match summary-table rows:
     row_pattern = re.compile(
         r"^\|\s*(P-[A-Za-z0-9\.\(\)]+)\s*\|\s*([^|]+?)\s*\|", re.MULTILINE
     )
     rows = row_pattern.findall(text)
     for rule, status_in_table in rows:
         status_in_table_lower = status_in_table.strip().lower()
-        # Locate the §2 cite-block heading:
+        # Locate the cite-block heading:
         heading_pos = text.find(f"### {rule}")
         if heading_pos == -1:
-            # Some entries (P-13.3.5 OUT-OF-SCOPE) may not have a full §2 entry
-            # if the doc places them only in the summary table per CONTEXT
+            # Some entries OUT-OF-SCOPE) may not have a full entry
+            # if the doc places them only in the summary table per internal notes
             # line 315 ("(no test — out of scope)"). Skip those.
             continue
-        # Slice the §2 block (until the next ### heading or EOF):
+        # Slice the block (until the next ### heading or EOF):
         block_end = text.find("\n### ", heading_pos + 1)
         block = text[heading_pos:block_end if block_end != -1 else len(text)]
-        # At least one Status keyword from the table must also appear in the §2 block:
+        # At least one Status keyword from the table must also appear in the block:
         # We accept the keyword in either case (the table tends toward lower-case,
         # the cite-block may use upper-case for the Status field).
         found_match = False
         for keyword in status_keywords:
             # The table entry may be 're-verified (NO-OP-CONFIRMED)' --- check
-            # whether ANY recognized keyword from the table appears in §2:
+            # whether ANY recognized keyword from the table appears in:
             if keyword in status_in_table_lower:
                 if keyword in block.lower():
                     found_match = True
                     break
         # If no keyword matched on either side, just skip --- we cannot infer.
-        # If the table had a keyword but the §2 block has NONE of the keywords,
+        # If the table had a keyword but the block has NONE of the keywords,
         # there is drift.
         table_keywords_present = [
             k for k in status_keywords if k in status_in_table_lower

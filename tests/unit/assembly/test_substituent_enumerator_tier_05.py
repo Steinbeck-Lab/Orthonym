@@ -1,6 +1,6 @@
 """Tier-0.5 hook unit tests for assembly/substituent_enumerator.py.
 
-Phase 160.1 Plan-02-05 — per CONTEXT D-04 + D-25 inheritance.
+a phase Plan-02-05 — per internal notes + inheritance.
 
 Acceptance threshold: >= 12 tests covering:
   * placement-before-Tier-1 invariant (Tier-0.5 fires BEFORE retained-name check)
@@ -31,7 +31,7 @@ class TestTier05PlacementBeforeTier1:
     def test_tier05_block_present_in_source(self):
         """Tier-0.5 block is present in the substituent-naming cascade.
 
-        v29 Phase 1b split ``name_substituent`` into a thin P-29.2
+         a phase split ``name_substituent`` into a thin
         free-valence gate over ``_name_substituent_cascade``, which now holds
         the five tiers. The invariant this test protects is unchanged -- only
         the function that carries it moved -- so the assertion follows the
@@ -92,7 +92,7 @@ class TestTier05PlacementBeforeTier1:
 
 
 class TestTier05Purity:
-    """Tier-0.5 hook is a PURE function call per CONTEXT D-04 + D-25."""
+    """Tier-0.5 hook is a PURE function call per internal notes +."""
 
     def test_check_function_read_only_on_mol(self):
         """`_check_substituent_prefix_form` does not mutate mol."""
@@ -211,7 +211,7 @@ class TestTier05DispatcherIntegration:
         match = mol.GetSubstructMatches(Chem.MolFromSmarts("[CX3](=O)[OX2H1]"))[0]
         frag = set(match)
         result = _check_substituent_prefix_form(mol, frag, match[0])
-        # 14-row table does NOT include carboxylic_acid → None (per CONTEXT D-05)
+        # 14-row table does NOT include carboxylic_acid → None (per internal notes)
         assert result is None
 
 

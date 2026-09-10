@@ -1,9 +1,9 @@
-"""Phase 168 Plan-04: Stage B end-to-end cutover integration tests.
+"""a phase Plan-04: Stage B end-to-end cutover integration tests.
 
 Verifies the Stage A invariant (flag-OFF byte-identical) AND the Stage B behaviour (flag-ON) on a
 real subset, plus the honest controller reach/fire instrumentation.
 
-HONEST 0-FIRE REACH-BOUND (CONTEXT honest-RT-framing #1; empirically established in Plan-03 and
+HONEST 0-FIRE REACH-BOUND (internal notes honest-RT-framing #1; empirically established in Plan-03 and
 confirmed by the Plan-04 7,500-row benchmark): the controller fires 0 times end-to-end on the
 current IR — the structured IR fraction (aliphatic chains) is disjoint from the seed targets
 (aromatic rings/acids, coarse-handled). So flag-ON output EQUALS flag-OFF output (controller is a
@@ -11,9 +11,9 @@ no-op observationally; the cutover machinery is wired and byte-identical at flag
 reach/fire test therefore REPORTS the counts and asserts the honest invariant (fired_count >= 0;
 the controller never errors) — it does NOT impose a reach >= 100 gate the current IR cannot meet
 (that would be a false gate, violating honest-fail-on-data). The full reach/fire numbers over 7,500
-rows are reported in 168-VERIFICATION.md.
+rows are reported in internal notes.
 
-Source: 168-CONTEXT.md D-08/D-09; RESEARCH section 6.6; 168-04-PLAN.md #4 reach-bound disposition.
+Source: 168-internal notes /; RESEARCH section 6.6; 168-04-PLAN.md #4 reach-bound disposition.
 """
 
 import csv
@@ -102,6 +102,6 @@ class TestStageBE2E:
         assert counts["fired"] >= 0
         assert counts["reach"] >= 0
         # Documented reach-bound: on the current IR, reach is low and fired is ~0 (structured IR
-        # disjoint from the seed). The 7,500-row figures are in 168-VERIFICATION.md.
+        # disjoint from the seed). The 7,500-row figures are in internal notes.
         print(f"controller_reach_count={counts['reach']} controller_fired_count={counts['fired']} "
               f"(honest 0-fire reach-bound; see 168-VERIFICATION.md)")

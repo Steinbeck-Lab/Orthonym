@@ -13,8 +13,8 @@ IUPAC 2013 PIN Rules:
 - Toluene is retained ONLY for unsubstituted methylbenzene
 - Substituted methylbenzene uses "methylbenzene" (not "toluene")
 - Position 1 assigned to give lowest locants via first-point-of-difference
-- Ring-attached principal groups use suffix form (P-65.1.2)
-- benzamide = retained name for C6H5CONH2 (P-66.1.1.1)
+- Ring-attached principal groups use suffix form
+- benzamide = retained name for C6H5CONH2
 """
 
 import re
@@ -33,7 +33,7 @@ from ..assembly.naming_utils import (
     prefix_citation_sort_key,
     should_omit_locant_one,
 )
-from .locants import compare_locant_sets as _compare_locant_sets  # IM-02
+from .locants import compare_locant_sets as _compare_locant_sets  #
 
 # Mapping from substituent atom symbol/pattern to prefix name
 # Key: (symbol, hybridization/bond_info) or simple symbol
@@ -52,78 +52,78 @@ SUBSTITUENT_PREFIXES = {
 # Highest priority first (carboxylic acid > sulfonamide > amide > nitrile > aldehyde)
 _SUFFIX_PRIORITY = [
     'carboxylic acid',
-    # v29 Phase C: peroxy acid, rank 1 in SENIORITY_ORDER (directly after
-    # carboxylic_acid at rank 0). BB:30178 benzenecarboperoxoic acid (PIN).
+    # Phase C: peroxy acid, rank 1 in SENIORITY_ORDER (directly after
+    # carboxylic_acid at rank 0). the Blue Book benzenecarboperoxoic acid (PIN).
     'carboperoxoic acid',
     'sulfonic acid',
     # D-FOLLOWON item 5: P/Se/Te + sulfinic ring oxoacids, junior to carboxylic
-    # acid and sulfonic acid (P-41 acid seniority C-acids > S > Se/Te/P oxoacids) so
+    # acid and sulfonic acid acid seniority C-acids > S > Se/Te/P oxoacids) so
     # a co-occurring -COOH stays principal and these demote to their prefixes.
     'sulfinic acid',
     'phosphonic acid',
     'selenonic acid',
-    # W3-P11 (P-65.3): Se/Te -inic ring oxoacids, junior to their -onic parents
+    # W3-P11: Se/Te -inic ring oxoacids, junior to their -onic parents
     # (-onic > -inic) — near-zero-corpus tie only; standalone naming is
     # rank-independent (benzeneseleninic acid is the sole suffix here).
     'seleninic acid',
     'telluronic acid',
     'tellurinic acid',
     'sulfonamide',
-    # Wave-2 P1AM (P-66.4.1.1): sulfonimidamide ranks just below sulfonamide.
+    # Wave-2 P1AM: sulfonimidamide ranks just below sulfonamide.
     'sulfonimidamide',
-    # Task Y (P-66.1.1.2, Table 6.1 item 24 @18782): sulfinamide -SO-NH2 ranks
+    # Task Y, Table 6.1 item 24): sulfinamide -SO-NH2 ranks
     # below sulfonimidamide (item 20) and above sulfonohydrazide (item 34).
     'sulfinamide',
-    # C1 (P-65.3.1): sulfonohydrazide ranks with the sulfonamide family, above
+    # C1: sulfonohydrazide ranks with the sulfonamide family, above
     # the carbon carboxamide/carbohydrazide (S oxoacid-derivatives are named after
     # the S parent; here it is the sole principal group in the target set).
     'sulfonohydrazide',
-    # Wave2 completion (P-66.4.3.2, Table 6.1 item 41): -S(=NNH2)-NHNH2
+    # Wave2 completion, Table 6.1 item 41): -S(=NNH2)-NHNH2
     # ranks below sulfonohydrazide (item 34).
     'sulfinohydrazonohydrazide',
     'carbonyl chloride',
     'carboxamide',
-    # R7 (P-66.1.4.1.1, BB 18762): ring-attached thioamide -C(=S)-NH2 ->
+    # R7, BB 18762): ring-attached thioamide -C(=S)-NH2 ->
     # '-carbothioamide'. The S-analogue of carboxamide; junior to the O-amide
-    # (P-41 chalcogen seniority O > S) so a co-occurring carboxamide/acid stays
+    # chalcogen seniority O > S) so a co-occurring carboxamide/acid stays
     # principal. Rank among the amide cluster is standalone-independent for the
     # sole-group target (benzenecarbothioamide).
     'carbothioamide',
-    # C1 (P-66.3.1.1): ring-attached -C(=O)NN -> '-carbohydrazide'. Ranks with
+    # C1: ring-attached -C(=O)NN -> '-carbohydrazide'. Ranks with
     # the carboxamide (both are added-carbon C-suffixes on the ring); placed after
     # carboxamide so a co-occurring amide would stay principal.
     'carbohydrazide',
-    # Wave2 T3d (P-66.4.3): ring-attached hydrazidine -C(=N-NH2)-NH-NH2 ->
+    # Wave2: ring-attached hydrazidine -C(=N-NH2)-NH-NH2 ->
     # '-carbohydrazonohydrazide'. Ranks with the hydrazide family.
     'carbohydrazonohydrazide',
-    # Wave2 T3d (P-66.3.4): ring-attached thiohydrazide -C(=S)-NH-NH2 ->
+    # Wave2: ring-attached thiohydrazide -C(=S)-NH-NH2 ->
     # '-carbothiohydrazide'.
     'carbothiohydrazide',
-    # C2 (P-66.4.1 / P-14.5.2 seniority): amidine ranks below amide and above
+    # C2 / seniority): amidine ranks below amide and above
     # nitrile, so '-carboximidamide' sits between 'carboxamide' and
     # 'carbonitrile'. A co-occurring amide/acid therefore stays principal.
     'carboximidamide',
-    # Wave2 T3d (P-66.4.2): ring-attached amidrazone -C(=N-NH2)-NH2 ->
+    # Wave2: ring-attached amidrazone -C(=N-NH2)-NH2 ->
     # '-carbohydrazonamide'. Ranks just below carboximidamide (amidine).
     'carbohydrazonamide',
     'carbonitrile',
     'carbaldehyde',
-    # v22 C-T2 (V-2): chalcogen analogues of the aldehyde-on-ring suffix
-    # (P-66.6.3). Seniority O > S > Se > Te. Ring-attached -CH=S/Se/Te was
+    # C- (V-2): chalcogen analogues of the aldehyde-on-ring suffix
+    #. Seniority O > S > Se > Te. Ring-attached -CH=S/Se/Te was
     # silently dropped (the C read as a methyl -> 'methylbenzene'); these emit
     # benzenecarbothialdehyde / benzenecarboselenaldehyde / benzenecarbotelluraldehyde.
     'carbothialdehyde',
     'carboselenaldehyde',
     'carbotelluraldehyde',
-    'ol',  # ASML-13: hydroxyl as suffix when principal group on benzene
-    # v29 Phase C tranche C: thiol is rank 94 in SENIORITY_ORDER, between the alcohols
-    # (88/89) and phenol (91) above it and the amines (102+) below. BB:6656/:27292
+    'ol',  #: hydroxyl as suffix when principal group on benzene
+    # Phase C tranche C: thiol is rank 94 in SENIORITY_ORDER, between the alcohols
+    # (88/89) and phenol (91) above it and the amines (102+) below. the Blue Book
     # `benzenethiol (PIN) (not thiophenol)`. Placed here, NOT appended at the end --
-    # putting it after 'amine' would make a thiol lose to an amine, inverting P-41.
+    # putting it after 'amine' would make a thiol lose to an amine, inverting.
     'thiol',
     'selenol',
     'tellurol',
-    # C4 (P-41 / P-62.2.1.1.1): amine is JUNIOR to alcohol and all C/S/Se/Te/P
+    # C4 /: amine is JUNIOR to alcohol and all C/S/Se/Te/P
     # acids, amides, nitriles, aldehydes, ketones. It MUST be the LAST entry so
     # it only becomes the ring parent suffix ('aniline') when nothing more
     # senior is present; any co-present senior group keeps the amine demoted to
@@ -133,9 +133,9 @@ _SUFFIX_PRIORITY = [
 
 # Prefix forms for suffix FGs when they are NOT the principal group
 _SUFFIX_TO_PREFIX = {
-    # v29 Phase C tranche C: needed so a `-thiol` that loses the suffix slot to the
-    # senior `-ol` (P-41) demotes to its correct prefix rather than being dropped.
-    # BB:6656/:27292 `benzenethiol (PIN)`; the demoted form is `sulfanyl`
+    # Phase C tranche C: needed so a `-thiol` that loses the suffix slot to the
+    # senior `-ol` demotes to its correct prefix rather than being dropped.
+    # the Blue Book `benzenethiol (PIN)`; the demoted form is `sulfanyl`
     # (e.g. `2-sulfanylphenol`).
     'thiol': 'sulfanyl',
     'selenol': 'selanyl',
@@ -146,24 +146,24 @@ _SUFFIX_TO_PREFIX = {
     'sulfinic acid': 'sulfino',
     'phosphonic acid': 'phosphono',
     'selenonic acid': 'selenono',
-    'seleninic acid': 'selenino',  # W3-P11 (P-65.3): -inic prefix form
+    'seleninic acid': 'selenino',  # W3-P11: -inic prefix form
     'telluronic acid': 'tellurono',
-    'tellurinic acid': 'tellurino',  # W3-P11 (P-65.3): -inic prefix form
+    'tellurinic acid': 'tellurino',  # W3-P11: -inic prefix form
     'sulfonamide': 'sulfamoyl',
-    # Task Y: NOT 'sulfinamoyl' -- @55485 gives `aminosulfinyl* (not sulfinamoyl)`.
+    # Task Y: NOT 'sulfinamoyl' -- gives `aminosulfinyl* (not sulfinamoyl)`.
     'sulfinamide': 'aminosulfinyl',
-    'sulfonohydrazide': 'hydrazinesulfonyl',  # C1 (P-65.3.1)
+    'sulfonohydrazide': 'hydrazinesulfonyl',  # C1
     'carbonyl chloride': 'carbonochloridoyl',
     'carboxamide': 'carbamoyl',
-    'carbothioamide': 'carbamothioyl',  # R7 (P-66.1.4.4 / BB 55681)
-    'carbohydrazide': 'hydrazinecarbonyl',  # C1 (P-66.3.5)
-    'carbohydrazonohydrazide': 'hydrazinecarbohydrazonoyl',  # Wave2 T3d (P-66.4.3.4.1)
-    'carbothiohydrazide': 'hydrazinecarbothioyl',  # Wave2 T3d (P-66.3.4)
-    'carboximidamide': 'carbamimidoyl',  # C2 (P-66.4.1.3.1)
-    'carbohydrazonamide': 'carbamohydrazonoyl',  # Wave2 T3d (P-66.4.2.3.2)
+    'carbothioamide': 'carbamothioyl',  # R7 / BB 55681)
+    'carbohydrazide': 'hydrazinecarbonyl',  # C1
+    'carbohydrazonohydrazide': 'hydrazinecarbohydrazonoyl',  # Wave2
+    'carbothiohydrazide': 'hydrazinecarbothioyl',  # Wave2
+    'carboximidamide': 'carbamimidoyl',  # C2
+    'carbohydrazonamide': 'carbamohydrazonoyl',  # Wave2
     'carbonitrile': 'cyano',
     'carbaldehyde': 'formyl',
-    'ol': 'hydroxy',  # ASML-13: when OH is not principal, use prefix form
+    'ol': 'hydroxy',  #: when OH is not principal, use prefix form
     'amine': 'amino',  # C4: demoted amine -> 'amino' prefix when a senior group wins
 }
 
@@ -171,14 +171,14 @@ _SUFFIX_TO_PREFIX = {
 # FGs whose presence blocks the prefix->suffix promotion below, keyed on the
 # DETECTOR's vocabulary (``perception.functional_groups.FUNCTIONAL_GROUP_SMARTS``).
 #
-# ⚠ v29 Phase C Task 9b: this set carried two keys that could never fire --
+# ⚠ Phase C Task 9b: this set carried two keys that could never fire --
 # ``'azide'`` and ``'selenocyanate'`` -- because the detector emits ``'azido'`` and
 # has no selenocyanate pattern at all. That is "presence in a lookup table is not
 # evidence the table is REACHED" in its exact shape, so ``_assert_registry_keys``
 # below now fails at import if a member is not a detector key, and the dead keys are
 # gone rather than repaired: azides must NOT block the promotion.
-# §**P-61.7 "AZIDES"** (``BlueBookV2/BlueBookV2.md:25991``) states *"Compounds
-# containing a -N3 ... group attached to a parent hydride, are named using
+# §** "AZIDES"** (``the Blue Book Blue Book``) states *"Compounds
+# containing a -N3... group attached to a parent hydride, are named using
 # substitutive nomenclature and the prefix 'azido'. This method gives preferred
 # IUPAC names rather than names based on the class name 'azido' in functional class
 # nomenclature"*, and ``:25997`` gives the decisive worked PIN
@@ -204,12 +204,12 @@ _FUNCTIONAL_CLASS_FGS = frozenset({
     'isocyanate', 'isothiocyanate', 'diazo', 'cyanate', 'thiocyanate',
 })
 
-# Suffixes JUNIOR to -ol (P-41): SENIORITY_ORDER ranks phenol 91, thiol 94,
+# Suffixes JUNIOR to -ol: SENIORITY_ORDER ranks phenol 91, thiol 94,
 # selenol/tellurol just after, amines 102+. A junior suffix holding the slot must
 # not block the -ol promotion.
 #
-# ⚠ v29 Phase C Task 9b: two comments used to claim this set was "shared with the
-# P-14.4(c) anchor", which was FALSE -- the anchor never referenced it. The claim is
+# ⚠ Phase C Task 9b: two comments used to claim this set was "shared with the
+# (c) anchor", which was FALSE -- the anchor never referenced it. The claim is
 # now TRUE rather than deleted: it is read by ``benzene_prefix_suffix_promotion``
 # below, which is the single authority both the anchor and the promotion consult.
 _OL_JUNIOR_SUFFIXES = frozenset({'thiol', 'selenol', 'tellurol', 'amine'})
@@ -255,10 +255,10 @@ def benzene_prefix_suffix_promotion(
     1. ``name_substituted_benzene`` -- which prefix does the NAME promote to the
        suffix? (a ring -OH is perceived as the prefix ``hydroxy`` and only becomes
        ``-ol`` here; likewise a promotable amine becomes ``-amine``/aniline.)
-    2. ``principal_group_ring_atoms`` -- which ring atoms may criterion P-14.4(c)
+    2. ``principal_group_ring_atoms`` -- which ring atoms may criterion (c)
        therefore minimise the locants of?
 
-    ⚠ v29 Phase C Task 9b, root cause of C-2: (2) used to answer *"the principal
+    ⚠ Phase C Task 9b, root cause of C-2: (2) used to answer *"the principal
     group has a prefix form that appears on this ring"*, which is true for **76** of
     the 136 seniority names (every entry with both a ring suffix and a prefix) while
     (1) only ever promotes **two** of them. For the other 74, criterion (c)
@@ -274,10 +274,10 @@ def benzene_prefix_suffix_promotion(
             ``amine_candidate`` payload ``_identify_nitrogen_group`` sets.
 
     Returns:
-        ``(promoted_suffix, promoted_prefix_names)``. ``(None, frozenset())`` when
+        ``(promoted_suffix, promoted_prefix_names)``. ``(None, frozenset)`` when
         no promotion happens. For the amine promotion the prefix set is empty
         because the promoted atoms are identified by the ``amine_candidate`` marker
-        (the prefix may be ``amino``, ``(N-methylamino)``, ...), not by one name.
+        (the prefix may be ``amino``, ``(N-methylamino)``,...), not by one name.
     """
     if _has_functional_class_fg(detected_fgs):
         return None, frozenset()
@@ -285,7 +285,7 @@ def benzene_prefix_suffix_promotion(
     suffix_names = set(suffix_names or ())
     prefix_names = set(prefix_names or ())
 
-    # P-41: the guard is "no suffix SENIOR to -ol", not "no suffix at all" -- a
+    #: the guard is "no suffix SENIOR to -ol", not "no suffix at all" -- a
     # junior -thiol holding the slot is demoted to `sulfanyl` instead of blocking.
     senior_to_ol = {s for s in suffix_names if s not in _OL_JUNIOR_SUFFIXES}
     if 'hydroxy' in prefix_names and not senior_to_ol:
@@ -303,31 +303,31 @@ def benzene_prefix_suffix_promotion(
 # Pre-compiled SMARTS for suffix FG identification (avoid per-call recompilation)
 _BENZENE_FG_SMARTS = {
     'acid': Chem.MolFromSmarts('[CX3](=O)[OX2H1]'),
-    # v29 Phase C: aryl PEROXY acid -C(=O)-O-OH -> '-carboperoxoic acid'.
+    # Phase C: aryl PEROXY acid -C(=O)-O-OH -> '-carboperoxoic acid'.
     # Disjoint from 'acid' above by construction: that SMARTS requires the O bonded to
     # the carbon to carry the H ([OX2H1]), and in a peroxy acid that O is bonded to a
     # second O instead. Checked first anyway, so the intent is explicit.
     'peroxy_acid': Chem.MolFromSmarts('[CX3](=O)[OX2][OX2H1]'),
-    # v29 Phase C: aryl THIOL -SH -> '-thiol'. P-63.1.2 / BB:6656 + BB:27292 both print
+    # Phase C: aryl THIOL -SH -> '-thiol'. / the Blue Book + the Blue Book both print
     # 'C6H5-SH benzenethiol (PIN) (not thiophenol)'.
     'ring_thiol': Chem.MolFromSmarts('[SX2H1]'),
     'hydroxamic': Chem.MolFromSmarts('[CX3](=O)[NX3;H1][OX2H]'),
     'amide': Chem.MolFromSmarts('[CX3](=O)[NX3H2]'),
     'sec_amide': Chem.MolFromSmarts('[CX3](=O)[NX3H1][#6]'),
     'tert_amide': Chem.MolFromSmarts('[CX3](=O)[NX3]([#6])[#6]'),
-    # C1 (P-66.3.1.1): ring-attached hydrazide -C(=O)-NH-NH2. The amide N is
+    # C1: ring-attached hydrazide -C(=O)-NH-NH2. The amide N is
     # bonded to N (not H2 / not [#6]), so none of the amide SMARTS above match it;
     # check this pattern BEFORE the amide patterns for cleanliness.
     'hydrazide': Chem.MolFromSmarts('[CX3](=O)[NX3][NX3]'),
     'aldehyde': Chem.MolFromSmarts('[CX3H1](=O)'),
-    # v22 C-T2 (V-2): chalcogen aldehydes (-CH=S / -CH=Se / -CH=Te). The H1
+    # C- (V-2): chalcogen aldehydes (-CH=S / -CH=Se / -CH=Te). The H1
     # requirement excludes 0-H carbons (chalcogen ketones/amides), so a
     # selenobenzamide ring-C(=Se)NH2 is NOT matched here.
     'thioaldehyde': Chem.MolFromSmarts('[CX3H1](=[SX1])'),
     'selenoaldehyde': Chem.MolFromSmarts('[CX3H1](=[SeX1])'),
     'telluroaldehyde': Chem.MolFromSmarts('[CX3H1](=[TeX1])'),
     'nitrile': Chem.MolFromSmarts('[CX2]#[NX1]'),
-    # C2 (P-66.4.1): ring-attached amidine -C(=N)N -> '-carboximidamide' suffix.
+    # C2: ring-attached amidine -C(=N)N -> '-carboximidamide' suffix.
     # =[NX2] (not =O) restricts it to true amidines so C(=O)N (amide) never
     # matches; matched AFTER the amide/hydrazide blocks in the detector so amide
     # wins on seniority. The C(=N)N guanidine/urea attach via N (start_idx would
@@ -340,50 +340,50 @@ _BENZENE_FG_SMARTS = {
     'hydrazidine_ring': Chem.MolFromSmarts('[CX3](=[NX2][NX3])[NX3][NX3]'),
     'hydrazonamide_ring': Chem.MolFromSmarts('[CX3](=[NX2][NX2,NX3])[NX3]'),
     'thiohydrazide_ring': Chem.MolFromSmarts('[CX3](=S)[NX3][NX3]'),
-    # R7 (P-66.1.4.1.1): ring-attached PRIMARY thioamide -C(=S)-NH2. The [NX3H2]
+    # R7: ring-attached PRIMARY thioamide -C(=S)-NH2. The [NX3H2]
     # (unsubstituted amide N) is deliberate: this bare-suffix path cannot cite an
     # N-substituent, so restricting to -NH2 makes an N-mono/N,N-di/N-aryl thioamide
     # NOT match here (both the suffix and the carbamothioyl-prefix roles) rather
     # than silently DROP the N-substituent and emit a methyl-less name (a no-Java
-    # leak; SELF-01 masks it only when Java is present). Disjoint from the
+    # leak; masks it only when Java is present). Disjoint from the
     # thioaldehyde [CX3H1](=[SX1]) (0-H carbon) and from thiohydrazide's -NH-NH2
     # (its amide N is NX3H1, not NX3H2). N-substituted thioamides fall through to
     # the pre-R7 behaviour (fail-closed / general substituent naming).
     'thioamide': Chem.MolFromSmarts('[CX3](=[SX1])[NX3H2]'),
     'acid_cl': Chem.MolFromSmarts('[CX3](=O)[Cl]'),
     'thio_acid': Chem.MolFromSmarts('[CX3](=O)[SX2H1]'),
-    # v42 Phase 2 Group A (P-65.1.3.2 / Table 4.3): ring-attached hydrazonic acid
-    # -C(=N-NH2)-OH -> '-carbohydrazonic acid'.  Perception already fires
+    # a phase Group A / Table 4.3): ring-attached hydrazonic acid
+    # -C(=N-NH2)-OH -> '-carbohydrazonic acid'. Perception already fires
     # (`hydrazonic_acid` FG), but the benzene ring handler had no suffix routing,
-    # so `NN=C(O)c1ccccc1` fell to systematic.  =N-NH2 (not =O / not single N) is
-    # disjoint from amide/hydrazide/amidine here.  No italic chalcogen locant
+    # so `NN=C(O)c1ccccc1` fell to systematic. =N-NH2 (not =O / not single N) is
+    # disjoint from amide/hydrazide/amidine here. No italic chalcogen locant
     # (hydrazonic acid has a single acid oxygen).
     'hydrazonic_acid': Chem.MolFromSmarts('[CX3](=[NX2][NX3H2])[OX2H1]'),
     'sulfonamide': Chem.MolFromSmarts('[SX4](=O)(=O)[NX3H2]'),
-    # F-B (P-66.1.1.3.1.1): N-substituted ring sulfonamide -S(=O)(=O)-NR'R''. The
+    # F-B: N-substituted ring sulfonamide -S(=O)(=O)-NR'R''. The
     # NX3 has fewer than two H, so it is disjoint from the primary 'sulfonamide'
     # (NX3H2) above and matched only after it. The italic-N substituents are named
     # by _detect_sulfonamide_n_substituents and merged with the ring locants.
     'n_sub_sulfonamide': Chem.MolFromSmarts('[SX4](=O)(=O)[NX3;!H2;!$([NX3]~[!#6;!S])]'),
-    # Task Y (P-66.1.1.2 @32746): ring-attached sulfinamide -S(=O)-NH2. SX3 (one
+    # Task Y): ring-attached sulfinamide -S(=O)-NH2. SX3 (one
     # fewer O) keeps it disjoint from every SX4 pattern here; the carbon guard
-    # parallels sulfinic_acid and excludes H2N-S(=O)-OH (@36500 "the name
+    # parallels sulfinic_acid and excludes H2N-S(=O)-OH ("the name
     # sulfinamidic acid is not an approved name").
     'sulfinamide': Chem.MolFromSmarts('[SX3;$([SX3][#6])](=[OX1])[NX3H2]'),
-    # Wave-2 P1AM (P-66.4.1.1, BB 34173): ring-attached sulfonimidamide
+    # Wave-2 P1AM, BB 34173): ring-attached sulfonimidamide
     # -S(=O)(=NH)-NH2. The imido =N breaks the sulfonamide (=O)(=O) SMARTS so
     # there is no overlap; checked BEFORE sulfonamide (more specific).
     'sulfonimidamide': Chem.MolFromSmarts('[SX4](=[OX1])(=[NX2])[NX3H2]'),
-    # C1 (P-65.3.1): ring-attached sulfonohydrazide -SO2-NH-NH2. The N is
+    # C1: ring-attached sulfonohydrazide -SO2-NH-NH2. The N is
     # [NX3H1] bonded to N (not H2), so the sulfonamide SMARTS above never matches
     # it; check this pattern first for cleanliness.
     'sulfonohydrazide': Chem.MolFromSmarts('[SX4](=O)(=O)[NX3][NX3]'),
-    # Wave2 completion (P-66.4.3.2): -S(=N-NH2)-NH-NH2 (SX3 keeps it disjoint
+    # Wave2 completion: -S(=N-NH2)-NH-NH2 (SX3 keeps it disjoint
     # from the SX4 sulfonohydrazide).
     'sulfinohydrazonohydrazide':
         Chem.MolFromSmarts('[SX3](=[NX2][NX3])[NX3][NX3]'),
     'sulfonic': Chem.MolFromSmarts('[SX4](=O)(=O)[OX2H1]'),
-    # D-FOLLOWON item 5 (P-67.1.1.2 / P-65.3): the P/Se/Te ring oxoacids + ring
+    # D-FOLLOWON item 5 /: the P/Se/Te ring oxoacids + ring
     # sulfinic acid as demotable suffix FGs (mirrors the sulfonic/borono ring path;
     # the Phase-9a fix was the acyclic CHAIN path only). The attach atom is at
     # match[0] (guarded == start_idx downstream). Each pattern matches ONLY the
@@ -392,7 +392,7 @@ _BENZENE_FG_SMARTS = {
     'phosphonic': Chem.MolFromSmarts('[PX4](=O)([OX2H1])[OX2H1]'),
     'selenonic': Chem.MolFromSmarts('[SeX4](=O)(=O)[OX2H1]'),
     'telluronic': Chem.MolFromSmarts('[TeX4](=O)(=O)[OX2H1]'),
-    # W3-P11 (P-65.3 Se/Te -inic acids): the SeX3/TeX3 seleninic/tellurinic ring
+    # W3-P11 Se/Te -inic acids): the SeX3/TeX3 seleninic/tellurinic ring
     # oxoacids (R-Se(=O)-OH / R-Te(=O)-OH), the -inic analogues of the SeX4/TeX4
     # -onic acids above. The chain path already names ethaneseleninic acid; only
     # the benzene ring-suffix handler lacked the SeX3/TeX3 pattern -> the target
@@ -429,10 +429,10 @@ def is_benzene_ring(mol, ring_atoms: Tuple[int, ...]) -> bool:
 
 
 def didehydro_benzene_name(mol, ring_atoms) -> Optional[str]:
-    """P-31.2.4.1 (Wave-2 completion): a bare benzene ring in which 2 (or 4)
+    """ (Wave-2 completion): a bare benzene ring in which 2 (or 4)
     ring carbons carry NO hydrogen (RDKit perceives benzyne as an aromatic C6
     ring with a triple bond) is the didehydrobenzene parent:
-    '1,2-didehydrobenzene' (BB verbatim; was 'benzene' -> SELF-01 unknown).
+    '1,2-didehydrobenzene' (BB verbatim; was 'benzene' -> unknown).
 
     Fail-closed: exactly 6 neutral ring carbons, no exocyclic heavy neighbour
     anywhere (substituted didehydrobenzenes are not built), every ring atom
@@ -517,7 +517,7 @@ def get_benzene_substituents(mol, ring_atoms: Tuple[int, ...]) -> Dict[int, List
     """
     from ..perception.rings import get_containing_ring_system
 
-    # Use the complete ring system as BFS boundary (IUPAC P-25.3)
+    # Use the complete ring system as BFS boundary (IUPAC
     # Prevents walking into fused partner rings
     ring_set = set(get_containing_ring_system(mol, ring_atoms))
     substituents: Dict[int, List[Dict]] = defaultdict(list)
@@ -537,11 +537,11 @@ def get_benzene_substituents(mol, ring_atoms: Tuple[int, ...]) -> Dict[int, List
             if sub_info:
                 substituents[ring_idx].append(sub_info)
             else:
-                # Wave2 T3a constitution-conservation guard: an exocyclic
+                # Wave2 constitution-conservation guard: an exocyclic
                 # branch NO recognizer could name used to be silently
                 # dropped — the assembled name then described a different
                 # molecule (bare 'benzoic acid' for the Ar-CH2-SiH2-CH2-Ar'
-                # witness) and only the OPSIN-dependent SELF-01 oracle
+                # witness) and only the OPSIN-dependent oracle
                 # caught it. Record an explicit unnameable sentinel: the
                 # name assemblers decline (fail closed) when one is present,
                 # and the atom-coverage accounting still sees the atoms.
@@ -613,14 +613,14 @@ def _identify_suffix_fg_on_benzene(
 
     # Carbon-based suffix FGs
     if symbol == 'C':
-        # v29 Phase C: peroxy acid -C(=O)-O-OH -> '-carboperoxoic acid'.
-        # BB:30178 verbatim: 'C6H5-CO-OOH benzenecarboperoxoic acid (PIN)
+        # Phase C: peroxy acid -C(=O)-O-OH -> '-carboperoxoic acid'.
+        # the Blue Book verbatim: 'C6H5-CO-OOH benzenecarboperoxoic acid (PIN)
         # peroxybenzoic acid perbenzoic acid'. Before this, benzene had NO peroxy-acid
         # suffix form at all, so the group fell through and the molecule was named from
         # the OPSIN-import trivial name 'perbenzoic acid' -- itself doubly non-preferred
-        # (BB prints the PIN beside it at :30178 and :29797, and BB:3009 states "The
+        # (BB prints the PIN beside it at:30178 and:29797, and the Blue Book states "The
         # prefix 'per-' is no longer recommended"). Denying that trivial name alone
-        # produced an ABSTENTION, not the PIN -- session invariant 11 -- which is why the
+        # produced an ABSTENTION, not the PIN -- session a project rule -- which is why the
         # suffix form had to be built rather than the name merely denied.
         # Seniority: SENIORITY_ORDER puts peroxy_acid at rank 1, directly after
         # carboxylic_acid at rank 0, and _SUFFIX_PRIORITY mirrors that.
@@ -640,7 +640,7 @@ def _identify_suffix_fg_on_benzene(
                     'is_suffix': True, 'atoms': sub_atoms,
                 }
 
-        # Hydrazonic acid: C(=N-NH2)(OH) -> '-carbohydrazonic acid' (P-65.1.3.2).
+        # Hydrazonic acid: C(=N-NH2)(OH) -> '-carbohydrazonic acid'.
         # Checked BEFORE the amide/amidine blocks: =N-NH2 + -OH is an ACID (senior
         # to amide/amidine) and disjoint from their =O / single-N SMARTS.
         for match in mol.GetSubstructMatches(_BENZENE_FG_SMARTS['hydrazonic_acid']):
@@ -653,7 +653,7 @@ def _identify_suffix_fg_on_benzene(
 
         # Hydroxamic acid: C(=O)(NH-OH) — checked BEFORE primary/secondary amide
         # because N has H1 bonded to O (not H2 or NHC), so neither 'amide' nor
-        # 'sec_amide' SMARTS would match.  n_substituents=['hydroxy'] propagates
+        # 'sec_amide' SMARTS would match. n_substituents=['hydroxy'] propagates
         # through the existing _name_substituted_benzamide machinery unchanged.
         for match in mol.GetSubstructMatches(_BENZENE_FG_SMARTS['hydroxamic']):
             if match[0] == start_idx:
@@ -663,7 +663,7 @@ def _identify_suffix_fg_on_benzene(
                     'n_substituents': ['hydroxy'],
                 }
 
-        # C1 (P-66.3.1.1): ring-attached hydrazide C(=O)-NH-NH2 -> '-carbohydrazide'.
+        # C1: ring-attached hydrazide C(=O)-NH-NH2 -> '-carbohydrazide'.
         # Checked BEFORE the amide patterns: the hydrazide N is bonded to another
         # N so the amide SMARTS never match it, but the explicit ordering keeps
         # the intent clear. Emits e.g. 'benzene-1,4-dicarbohydrazide'.
@@ -702,7 +702,7 @@ def _identify_suffix_fg_on_benzene(
                     'n_substituents': n_subs,
                 }
 
-        # C2 (P-66.4.1): ring-attached amidine -C(=N)N -> '-carboximidamide'.
+        # C2: ring-attached amidine -C(=N)N -> '-carboximidamide'.
         # Placed AFTER all amide/hydrazide blocks so a C(=O)N group is claimed as
         # the (senior) amide and never falls here; the =[NX2] in the SMARTS also
         # excludes C=O structurally. Defensive guanidine skip: a guanidino C
@@ -714,12 +714,12 @@ def _identify_suffix_fg_on_benzene(
         # Wave2 T3d: ring-attached composite-N suffixes, tested BEFORE amidine
         # (more specific — amidine/hydrazide partially match these). Each is the
         # added-carbon carbo* form on the ring; N/N'-substituent citation is out
-        # of scope here (fail-closed to the bare suffix, SELF-01 keeps honest).
+        # of scope here (fail-closed to the bare suffix, keeps honest).
         for _fg, _suffix in (
             ('hydrazidine_ring', 'carbohydrazonohydrazide'),
             ('hydrazonamide_ring', 'carbohydrazonamide'),
             ('thiohydrazide_ring', 'carbothiohydrazide'),
-            # R7 (P-66.1.4.1.1): thioamide AFTER thiohydrazide (thiohydrazide's
+            # R7: thioamide AFTER thiohydrazide (thiohydrazide's
             # =S-N-N is more specific and would else be claimed as -carbothioamide).
             ('thioamide', 'carbothioamide'),
         ):
@@ -741,11 +741,11 @@ def _identify_suffix_fg_on_benzene(
             )
             if is_guanidino:
                 continue
-            # D1 (P-66.4.1.2 / P-66.4.1.3.1): detect N/N'-substituents so the
+            # D1 /: detect N/N'-substituents so the
             # already-wired _build_amidine_n_prefix (ring-suffix path) and the
             # demotion path can cite them. Fail-closed: on any non-nameable
             # N-substituent the detector returns None -> emit the bare suffix and
-            # let SELF-01 keep it honest (never a wrong name).
+            # let keep it honest (never a wrong name).
             n_subs = _detect_amidine_n_substituents(mol, start_idx, ring_atoms)
             result = {
                 'name': 'carboximidamide', 'suffix_name': 'carboximidamide',
@@ -753,7 +753,7 @@ def _identify_suffix_fg_on_benzene(
             }
             if n_subs:
                 result['n_substituents'] = n_subs
-            # P-66.4.2.3.1 (BB 34490/34496, plan P1AM Task 6): ring-attached
+            # (BB 34490/34496, plan P1AM Task 6): ring-attached
             # -C(=NH)-NH-NH2 is 'hydrazinecarboximidoyl' (PIN) when demoted;
             # plain carbamimidoyl would DROP the hydrazino N (structure-wrong).
             # Detect: the amidine C's single-bonded N carries exactly one
@@ -775,7 +775,7 @@ def _identify_suffix_fg_on_benzene(
                 if (len(_sgl_heavy) == 1
                         and mol.GetAtomWithIdx(_sgl_heavy[0]).GetSymbol() == 'N'
                         and mol.GetAtomWithIdx(_sgl_heavy[0]).GetDegree() == 1):
-                    # P-16.3.3: 'hydrazinecarboximidoyl' is a compound
+                    #: 'hydrazinecarboximidoyl' is a compound
                     # substituent prefix -> enclose in parentheses so it
                     # alphabetises on its complete name and cites cleanly
                     # ('3-(hydrazinecarboximidoyl)benzoic acid').
@@ -798,8 +798,8 @@ def _identify_suffix_fg_on_benzene(
                     'is_suffix': True, 'atoms': sub_atoms,
                 }
 
-        # v22 C-T2 (V-2): chalcogen aldehydes on the ring (-CH=S/Se/Te).
-        # P-66.6.3 added-carbon suffixes carbothialdehyde/carboselenaldehyde/
+        # C- (V-2): chalcogen aldehydes on the ring (-CH=S/Se/Te).
+        # added-carbon suffixes carbothialdehyde/carboselenaldehyde/
         # carbotelluraldehyde. HEAD dropped the =chalcogen and read the carbon
         # as a methyl (-> 'methylbenzene', a different molecule).
         for _fg, _suffix in (
@@ -840,11 +840,11 @@ def _identify_suffix_fg_on_benzene(
 
     # Sulfur-based suffix FGs
     if symbol == 'S':
-        # v29 Phase C tranche C: ring -SH -> '-thiol'. BB:6656 and BB:27292 BOTH print
+        # Phase C tranche C: ring -SH -> '-thiol'. the Blue Book and the Blue Book BOTH print
         # 'C6H5-SH benzenethiol (PIN) (not thiophenol)'. We emitted 'sulfanylbenzene'
         # because benzene had no thiol SUFFIX form, so the SH was demoted to a
         # 'sulfanyl' prefix -- a missing suffix, not a locant defect, which is why the
-        # P-14.3.4.2(c) licence alone could never have produced the right name.
+        # (c) licence alone could never have produced the right name.
         # Placed FIRST in this branch but guarded on SX2H1, which is disjoint from every
         # oxidised-sulfur pattern below (all SX3/SX4).
         # Seniority: thiol is rank 94 in SENIORITY_ORDER, between the alcohols (88-91)
@@ -856,7 +856,7 @@ def _identify_suffix_fg_on_benzene(
                     'is_suffix': True, 'atoms': sub_atoms,
                 }
 
-        # Wave2 completion (P-66.4.3.2): -S(=N-NH2)-NH-NH2 ->
+        # Wave2 completion: -S(=N-NH2)-NH-NH2 ->
         # '-sulfinohydrazonohydrazide' (BB verbatim benzene example). SX3 vs
         # SX4 keeps this disjoint from the sulfonohydrazide match below.
         for match in mol.GetSubstructMatches(
@@ -868,7 +868,7 @@ def _identify_suffix_fg_on_benzene(
                     'is_suffix': True, 'atoms': sub_atoms,
                 }
 
-        # C1 (P-65.3.1): ring-attached sulfonohydrazide S(=O)(=O)-NH-NH2 ->
+        # C1: ring-attached sulfonohydrazide S(=O)(=O)-NH-NH2 ->
         # '-sulfonohydrazide'. Checked BEFORE sulfonamide (the N-N form is more
         # specific; the sulfonamide SMARTS requires [NX3H2] so it never matches).
         for match in mol.GetSubstructMatches(_BENZENE_FG_SMARTS['sulfonohydrazide']):
@@ -878,7 +878,7 @@ def _identify_suffix_fg_on_benzene(
                     'is_suffix': True, 'atoms': sub_atoms,
                 }
 
-        # Wave-2 P1AM (P-66.4.1.1, BB 34173): ring-attached sulfonimidamide
+        # Wave-2 P1AM, BB 34173): ring-attached sulfonimidamide
         # -S(=O)(=NH)-NH2 -> '-sulfonimidamide'. Checked BEFORE sulfonamide
         # (the imido =N makes it disjoint from the sulfonamide (=O)(=O) SMARTS).
         for match in mol.GetSubstructMatches(_BENZENE_FG_SMARTS['sulfonimidamide']):
@@ -896,7 +896,7 @@ def _identify_suffix_fg_on_benzene(
                     'is_suffix': True, 'atoms': sub_atoms,
                 }
 
-        # F-B (P-66.1.1.3.1.1): N-substituted ring sulfonamide -S(=O)(=O)-NR'R''.
+        # F-B: N-substituted ring sulfonamide -S(=O)(=O)-NR'R''.
         # Detected AFTER the primary (disjoint NX3 H-count). The italic-N
         # substituents are carried on 'n_substituents' and merged with the ring
         # locants by _name_substituted_benzenesulfonamide, exactly as the amide
@@ -944,14 +944,14 @@ def _identify_suffix_fg_on_benzene(
                 }
 
     # Phosphorus / selenium / tellurium ring oxoacids (D-FOLLOWON item 5,
-    # P-67.1.1.2 / P-65.3). Demote to phosphono / selenono / tellurono when a
+    # /. Demote to phosphono / selenono / tellurono when a
     # senior carboxylic acid is the principal group; emit benzenephosphonic /
     # benzeneselenonic / benzenetelluronic acid as the bare principal suffix.
     if symbol in ('P', 'Se', 'Te'):
         for _sym, _fg, _suffix in (
             ('P', 'phosphonic', 'phosphonic acid'),
             ('Se', 'selenonic', 'selenonic acid'),
-            # W3-P11 (P-65.3): SeX3/TeX3 -inic ring oxoacids. Ordered AFTER the
+            # W3-P11: SeX3/TeX3 -inic ring oxoacids. Ordered AFTER the
             # -onic (SeX4/TeX4) pattern so a genuine SeX4 acid matches -onic first
             # (the SeX3 SMARTS cannot match an SeX4 atom anyway; belt-and-braces).
             ('Se', 'seleninic', 'seleninic acid'),
@@ -1029,7 +1029,7 @@ def _detect_sulfonamide_n_substituents(
 ) -> Optional[List[str]]:
     """N-substituent names on a sulfonamide nitrogen, or None to FAIL CLOSED.
 
-    F-B (P-66.1.1.3.1.1). The amide detector above walks from the carbonyl
+    F-B. The amide detector above walks from the carbonyl
     carbon; a sulfonamide N hangs off the SULFONYL sulfur, so this is its
     S-rooted twin. It returns None (never a partial list) whenever the shape is
     outside the class the merge is built for, so ``name_substituted_benzene``
@@ -1039,7 +1039,7 @@ def _detect_sulfonamide_n_substituents(
     * the N is in a ring (a sultam is a ring parent, 1-(arenesulfonyl)…), or
       charged / isotopically labelled;
     * an N-substituent is a heteroatom (N-hydroxy / N-amino / N-N is
-      P-66.1.1.3.2 territory, a different construction);
+       territory, a different construction);
     * an N-substituent branch loops back into the ring or the sulfur;
     * a branch cannot be named by the shared fragment namer;
     * more than two N-substituents (a trivalent amide N cannot carry three).
@@ -1087,12 +1087,12 @@ def _identify_boron_group(
     mol, start_idx: int, ring_atoms: Set[int]
 ) -> Optional[Dict]:
     """Identify a ``-B(OH)2`` boronic-acid substituent on a ring as the
-    preselected ``borono`` prefix (P-68.1.4.2).
+    preselected ``borono`` prefix.
 
     Graph classifier (NOT SMARTS broadening, per feedback_smarts_and_seniority):
     a neutral three-coordinate boron bonded to exactly one ring atom and two
     TERMINAL hydroxy oxygens (-OH), nothing else. The multivalent boranediyl /
-    dimethylboranyl forms (P-68.1.5.2.3) are out of scope and fail closed to
+    dimethylboranyl forms are out of scope and fail closed to
     None (the borono ring-propagation here is the Phase-8 target). Returns the
     prefix dict, or None.
     """
@@ -1121,15 +1121,15 @@ def _identify_boron_group(
 
 def _identify_ring_heteroatom_fg(mol, start_idx: int,
                                  ring_atoms: Set[int]) -> Optional[Dict]:
-    """Wave-2 completion (P-61 ring-FG root): recognize a small closed set of
+    """Wave-2 completion ring-FG root): recognize a small closed set of
     hypervalent-iodine / oxophosphanyl ring substituents that the plain-symbol
     branches would otherwise mis-name or drop. Returns the prefix dict or None
     (fail-closed -> the caller continues its normal per-symbol dispatch).
 
     Handled (all OPSIN-RT verified):
-      * iodine with one terminal =O  -> 'iodosyl'   (P-61.3.2.3)
-      * iodine with two terminal =O  -> 'iodyl'
-      * phosphorus with one terminal =O (bare -PH=O) -> 'oxophosphanyl' (P-61.6)
+      * iodine with one terminal =O -> 'iodosyl'
+      * iodine with two terminal =O -> 'iodyl'
+      * phosphorus with one terminal =O (bare -PH=O) -> 'oxophosphanyl'
     """
     atom = mol.GetAtomWithIdx(start_idx)
     sym = atom.GetSymbol()
@@ -1156,7 +1156,7 @@ def _identify_ring_heteroatom_fg(mol, start_idx: int,
         if len(oxo) == 2:
             return {'name': 'iodyl', 'atoms': [start_idx] + oxo}
     elif sym == 'P':
-        # bare -P(=O)H2 attached to the ring -> oxophosphanyl (P-61.6)
+        # bare -P(=O)H2 attached to the ring -> oxophosphanyl
         if len(oxo) == 1:
             return {'name': 'oxophosphanyl', 'atoms': [start_idx] + oxo}
     return None
@@ -1164,17 +1164,17 @@ def _identify_ring_heteroatom_fg(mol, start_idx: int,
 
 def _nitrile_oxide_prefix(mol, start_idx: int,
                           ring_atoms: Set[int]) -> Optional[Dict]:
-    """P-66.5.4.2 lambda-branch: ring substituent -C#[N+]-[O-] (nitrile
+    """ lambda-branch: ring substituent -C#[N+]-[O-] (nitrile
     oxide, ON#C-) -> preferred prefix '(oxo-λ5-azanylidyne)methyl'
     (not isofulminato).
 
     Three-state return:
-      * prefix dict  — pattern matched AND the fragment being named is an
-        ANION (net formal charge < 0): P-41 class-2 anion parent outranks the
+      * prefix dict — pattern matched AND the fragment being named is an
+        ANION (net formal charge < 0): class-2 anion parent outranks the
         zwitterionic nitrile oxide, so the prefix form is the PIN (BB
         'sodium 4-[(oxo-λ5-azanylidyne)methyl]benzoate', 34897).
       * {'name': None} — pattern matched in a NON-anion context: the nitrile
-        oxide itself is senior (P-41 zwitterion) and the PIN is the
+        oxide itself is senior zwitterion) and the PIN is the
         functional-class '...nitrile oxide' SUFFIX form, unbuilt -> the
         caller must FAIL CLOSED (today's walker silently mis-names the group).
       * None — pattern absent: continue normal dispatch.
@@ -1229,17 +1229,17 @@ def _identify_substituent(mol, start_idx: int, ring_atoms: Set[int]) -> Optional
     start_atom = mol.GetAtomWithIdx(start_idx)
     symbol = start_atom.GetSymbol()
 
-    # Wave-2 completion (P-61 ring-FG root): explicit hypervalent-iodine and
+    # Wave-2 completion ring-FG root): explicit hypervalent-iodine and
     # oxophosphanyl ring substituents, recognized BEFORE the plain-halogen
     # branch so a =O-bearing iodine is not mis-emitted as bare 'iodo' (which
     # would drop the oxide and name a different molecule). O=I- -> iodosyl,
-    # O=I(=O)- -> iodyl (P-61.3.2.3); O=PH- -> oxophosphanyl (P-61.6). All
+    # O=I(=O)- -> iodyl; O=PH- -> oxophosphanyl. All
     # OPSIN-RT verified; fail-closed (fall through) on any other decoration.
     _ring_fg = _identify_ring_heteroatom_fg(mol, start_idx, ring_atoms)
     if _ring_fg is not None:
         return _ring_fg
 
-    # P-66.5.4.2: nitrile oxide -C#[N+]-[O-]. Must run BEFORE the generic C
+    #: nitrile oxide -C#[N+]-[O-]. Must run BEFORE the generic C
     # branches, which mis-name the group (silent structure loss). Prefix form
     # is PIN only in anion context; neutral context fails closed.
     _no = _nitrile_oxide_prefix(mol, start_idx, ring_atoms)
@@ -1263,7 +1263,7 @@ def _identify_substituent(mol, start_idx: int, ring_atoms: Set[int]) -> Optional
         if suffix_fg:
             return suffix_fg
 
-    # DD2 Fix B (Phase D, P-63.3.1(1)): a peroxy (-O-O-R) / disulfanyl (-S-S-R) /
+    # DD2 Fix B (Phase D, (1)): a peroxy (-O-O-R) / disulfanyl (-S-S-R) /
     # thioperoxol (-S-O-R, -O-S-R) substituent on the ring. The attach atom is a
     # divalent (all-single-bond, neutral) chalcogen bonded outside the ring to a
     # second divalent chalcogen — the peroxide/disulfide linkage. Route through the
@@ -1305,7 +1305,7 @@ def _identify_substituent(mol, start_idx: int, ring_atoms: Set[int]) -> Optional
     if symbol == 'S':
         return _identify_sulfur_group(mol, start_idx, ring_atoms)
 
-    # Boron-based groups: the borono prefix -B(OH)2 (P-68.1.4.2 preselected
+    # Boron-based groups: the borono prefix -B(OH)2 preselected
     # substituent prefix). HEAD dropped the whole boron unit on ring parents
     # (4-boronobenzoic acid -> 'benzoic acid', a different molecule) because no
     # 'B' branch existed here — only the acyclic chain path emitted borono.
@@ -1314,7 +1314,7 @@ def _identify_substituent(mol, start_idx: int, ring_atoms: Set[int]) -> Optional
         if boron_result:
             return boron_result
 
-    # Group-14 silyl/germyl substituents (P-68.2.2): -SiH3 -> silyl, -Si(OH)3 ->
+    # Group-14 silyl/germyl substituents: -SiH3 -> silyl, -Si(OH)3 ->
     # trihydroxysilyl, -Si(CH3)3 -> trimethylsilyl. HEAD had no 'Si'/'Ge' branch
     # here, so the whole silyl/germyl unit was dropped on ring parents
     # (4-silylbenzoic acid -> 'benzoic acid', a different molecule). Routes through
@@ -1329,13 +1329,13 @@ def _identify_substituent(mol, start_idx: int, ring_atoms: Set[int]) -> Optional
             # is_complex_substituent (silyl-with-prefixes is now complex).
             return {'name': g14, 'atoms': sub_atoms}
 
-    # Phosphorus-based groups: generate phosphanyl prefix (IUPAC P-68)
+    # Phosphorus-based groups: generate phosphanyl prefix (IUPAC
     if symbol == 'P':
         from ..rules.phosphorus import (
             get_phosphanyl_prefix, name_acyl_prefix_substituent)
         sub_atoms = _bfs_substituent_atoms(mol, start_idx, ring_atoms)
-        # v42 Phase 3c (P-68.3.2.3.2.2): a P ACYL group (a =E'-bearing P, e.g.
-        # -P(=S)Me2) is cited as the P-67.1.4.1.1 acyl prefix
+        # a phase: a P ACYL group (a =E'-bearing P, e.g.
+        # -P(=S)Me2) is cited as the acyl prefix
         # ('dimethylphosphinothioyl'), NOT the trivalent 'phosphanyl' — which
         # would silently drop the =E' chalcogen. Consumes the shared table; the
         # recognizer returns None for a plain trivalent P, so phosphanyl below
@@ -1349,7 +1349,7 @@ def _identify_substituent(mol, start_idx: int, ring_atoms: Set[int]) -> Optional
         if prefix:
             return {'name': prefix, 'atoms': sub_atoms}
 
-    # W3-P10 (P-67.1.5.1): arsenic-based substituent -As(OH)2 -> dihydroxyarsanyl,
+    # W3-P10: arsenic-based substituent -As(OH)2 -> dihydroxyarsanyl,
     # cited as a prefix when a senior organic group (-COOH) is the parent PCG. HEAD
     # had no 'As' branch, so the whole As unit fell through unnamed and the molecule
     # failed closed to 'inorganic compound (not supported)'. Fail-closed (falls
@@ -1358,8 +1358,8 @@ def _identify_substituent(mol, start_idx: int, ring_atoms: Set[int]) -> Optional
         from ..rules.mononuclear_hydrides import name_arsanyl_substituent
         from ..rules.phosphorus import name_acyl_prefix_substituent
         sub_atoms = _bfs_substituent_atoms(mol, start_idx, ring_atoms)
-        # v42 Phase 3c (P-68.3.2.3.2.2): an As/Sb ACYL group (=E'-bearing, e.g.
-        # -As(=O)(OH)) is cited as the P-67.1.4.1.1 acyl prefix ('hydroxyarsoryl'),
+        # a phase: an As/Sb ACYL group (=E'-bearing, e.g.
+        # -As(=O)(OH)) is cited as the acyl prefix ('hydroxyarsoryl'),
         # not the trivalent 'arsanyl' — which would drop the =E'. Fail-closed; a
         # plain trivalent As/Sb (no =E') falls through to the arsanyl namer.
         acyl_prefix = name_acyl_prefix_substituent(mol, sub_atoms, start_idx)
@@ -1371,17 +1371,17 @@ def _identify_substituent(mol, start_idx: int, ring_atoms: Set[int]) -> Optional
 
     # Carbon-based groups (alkyl or functionalized chain) - fallback for non-suffix C
     if symbol == 'C':
-        # Check for nitrile C#N pattern FIRST (BUG-2 fix)
+        # Check for nitrile C#N pattern FIRST (fix)
         nitrile_result = _identify_nitrile_group(mol, start_idx, ring_atoms)
         if nitrile_result:
             return nitrile_result
 
-        # P-65.6.3 + P-41: a co-present ESTER decoration -C(=O)-O-R on a
+        # +: a co-present ESTER decoration -C(=O)-O-R on a
         # benzene whose PRINCIPAL group is a senior ACID demotes to the
         # alkoxycarbonyl prefix (methoxycarbonyl / ethoxycarbonyl /
-        # phenoxycarbonyl). Acids are class 7 in the P-41 seniority order
+        # phenoxycarbonyl). Acids are class 7 in the seniority order
         # (:18170), esters class 9 (:18182), so a free acid always owns the
-        # suffix word ("an acid is senior to an ester", :36540). The
+        # suffix word ("an acid is senior to an ester",:36540). The
         # aliphatic-ring collector already does this
         # (rules/ring_substituents.py:3726); the benzene collector had NO
         # ester branch, so '2-(methoxycarbonyl)benzoic acid' fell to the
@@ -1400,10 +1400,10 @@ def _identify_substituent(mol, start_idx: int, ring_atoms: Set[int]) -> Optional
         if alkyl_result:
             return alkyl_result
 
-        # Wave2 T5c (P-66.6.3): ketone-acyl branch DEMOTED to a retained/
+        # Wave2: ketone-acyl branch DEMOTED to a retained/
         # systematic acyl prefix — ONLY when another branch on this ring bears
         # a SENIOR suffix FG (acid/amide/nitrile/... — all senior to ketone,
-        # P-41), so the ketone can never be the PCG here: 4-acetylbenzoic
+        #, so the ketone can never be the PCG here: 4-acetylbenzoic
         # acid, 4-acetylbenzamide. Without a senior suffix (acetophenone
         # class) the gate is False and the chain-parent ketone PIN
         # (1-phenylethan-1-one) keeps ownership. Fail-closed: branched/
@@ -1425,7 +1425,7 @@ def _identify_substituent(mol, start_idx: int, ring_atoms: Set[int]) -> Optional
         if generic:
             return generic
 
-        # Phase 86: Universal pipeline fallback for complex C-substituents.
+        # a phase: Universal pipeline fallback for complex C-substituents.
         # By this point, suffix FG detection (line 387-389) has already returned
         # for recognized suffix patterns (acid, amide, nitrile, aldehyde, etc.).
         # We only reach here for C-substituents that are NOT suffix FGs and NOT
@@ -1433,12 +1433,12 @@ def _identify_substituent(mol, start_idx: int, ring_atoms: Set[int]) -> Optional
         #
         # Guards:
         # 1. Carbonyl guard: if start C has C=O, it's a carbonyl carbon
-        #    (ester C(=O)OR, ketone C(=O)R). These are FG features handled
-        #    by dedicated handlers; naming them as benzene substituents causes
-        #    routing regressions. All suffix-type carbonyls (acid, amide,
-        #    aldehyde, acid chloride) are already caught by suffix FG check.
+        # (ester C(=O)OR, ketone C(=O)R). These are FG features handled
+        # by dedicated handlers; naming them as benzene substituents causes
+        # routing regressions. All suffix-type carbonyls (acid, amide,
+        # aldehyde, acid chloride) are already caught by suffix FG check.
         # 2. Size guard: fragments larger than 10 atoms are major structural
-        #    features (fused systems, long chains), not genuine substituents.
+        # features (fused systems, long chains), not genuine substituents.
         if sub_atoms:
             # Check if start carbon is a carbonyl (has C=O bond)
             _is_carbonyl = False
@@ -1459,14 +1459,14 @@ def _identify_substituent(mol, start_idx: int, ring_atoms: Set[int]) -> Optional
                     prefix_name = name_substituent(mol, set(sub_atoms), start_idx)
                     if prefix_name and prefix_name != "substituent":
                         # Wrap MARKLESS compound names in parentheses per IUPAC
-                        # P-14.5.2. w2f p1 (research §3.C.6): a name already
+                        #. w2f p1 (research C.6): a name already
                         # carrying an enclosing mark ('(4-bromophenyl)(chloro)
                         # methyl') must NOT take plain parens here — the naive
                         # startswith('(')/endswith(')') test misfires on
                         # interior/trailing-stem marks (the non-PIN '((...)...)'
                         # parens-in-parens). Left BARE, the escalating consumer
                         # (format_substituent_prefix / _omit branch) applies the
-                        # P-16.5.2.4 brackets '[(4-bromophenyl)(chloro)methyl]'.
+                        # brackets '[(4-bromophenyl)(chloro)methyl]'.
                         is_compound = needs_brackets(prefix_name)
                         if (is_compound and '(' not in prefix_name
                                 and '[' not in prefix_name):
@@ -1514,17 +1514,17 @@ def _ring_bears_acid_suffix(
 ) -> bool:
     """True iff ANOTHER exocyclic branch of this ring is a suffix-forming FG
     of the ACID class (carboxylic / sulfonic / sulfinic / phosphonic /
-    selenonic / carbothioic S-acid / carboperoxoic ... — every acid the
+    selenonic / carbothioic S-acid / carboperoxoic... — every acid the
     benzene suffix detector emits carries the word 'acid' in its
     ``suffix_name``).
 
     Narrower than ``_ring_bears_senior_suffix`` on purpose: that helper gates
     the KETONE-acyl demotion and fires on ANY suffix (amide / nitrile /
     aldehyde included), which is correct because a ketone is junior to all of
-    them. An ESTER, by contrast, is class 9 in P-41's order (:18182) and is
+    them. An ESTER, by contrast, is class 9 in 's order (:18182) and is
     SENIOR to amides (11), nitriles (12) and aldehydes (13) — it only demotes
     to a prefix when a class-7 ACID (:18170) owns the parent word ("an acid is
-    senior to an ester", :36540). So the ester-demotion gate must see an acid
+    senior to an ester",:36540). So the ester-demotion gate must see an acid
     specifically, not merely any suffix."""
     for ra in ring_atoms:
         for nbr in mol.GetAtomWithIdx(ra).GetNeighbors():
@@ -1546,9 +1546,9 @@ def _identify_ester_as_alkoxycarbonyl(
     mol, start_idx: int, ring_atoms: Set[int]
 ) -> Optional[Dict]:
     """Recognize a ring-attached ester branch -C(=O)-O-R and, when a senior
-    ACID owns the ring's suffix word (P-41), return its alkoxycarbonyl PREFIX
+    ACID owns the ring's suffix word, return its alkoxycarbonyl PREFIX
     record ('methoxycarbonyl', 'ethoxycarbonyl', 'phenoxycarbonyl',
-    '(benzyloxy)carbonyl'; IUPAC P-65.6.3).
+    '(benzyloxy)carbonyl'; IUPAC.
 
     Anchored on the KNOWN ester carbonyl carbon (never a scanned atom set):
     the attach carbon must carry exactly one terminal C=O and exactly one
@@ -1600,7 +1600,7 @@ def _identify_ester_as_alkoxycarbonyl(
     if carbonyl_o is None or ester_o is None or alkyl_c is None:
         return None
 
-    # P-41 gate: an ester demotes to a prefix ONLY when a senior ACID owns the
+    # gate: an ester demotes to a prefix ONLY when a senior ACID owns the
     # parent suffix word (see _ring_bears_acid_suffix docstring).
     if not _ring_bears_acid_suffix(mol, ring_atoms, start_idx):
         return None
@@ -1621,10 +1621,10 @@ def _identify_ester_as_alkoxycarbonyl(
 
 def _identify_acyl_group(mol, start_idx: int, ring_atoms: Set[int]) -> Optional[Dict]:
     """Recognize a ring-attached ketone-acyl branch -C(=O)-R and return its
-    retained/systematic acyl PREFIX record (Wave2 T5c, P-66.6.3 / P-66.6.1):
+    retained/systematic acyl PREFIX record (Wave2 T5c, /:
 
       R = unbranched saturated all-C chain -> acetyl / propanoyl / {stem}anoyl
-      R = plain (unsubstituted) benzene    -> benzoyl
+      R = plain (unsubstituted) benzene -> benzoyl
 
     Fail-closed None for everything else (branched / unsaturated / hetero /
     substituted-aryl acyls, formyl [aldehyde suffix territory], esters/acids
@@ -1659,7 +1659,7 @@ def _identify_acyl_group(mol, start_idx: int, ring_atoms: Set[int]) -> Optional[
             start_idx, r0.GetIdx()).GetBondTypeAsDouble() != 1.0:
         return None
 
-    # R = plain benzene -> benzoyl (retained acyl prefix, P-66.6.1)
+    # R = plain benzene -> benzoyl (retained acyl prefix,
     if r0.GetIsAromatic() and r0.IsInRing():
         r_ring = None
         for ring in mol.GetRingInfo().AtomRings():
@@ -1830,7 +1830,7 @@ def _identify_nitrogen_group(mol, n_idx: int, ring_atoms: Set[int]) -> Optional[
             'amine_candidate': {'suffix_name': 'amine', 'n_substituents': []},
         }
 
-    # Wave2 T1c (P-66.1.1.4.3): ring-attached amide N (R-CO-NH-ring) takes
+    # Wave2: ring-attached amide N (R-CO-NH-ring) takes
     # the amido-family prefix — formamido / acetamido / {stem}anamido /
     # benzamido — method (1) generates the PIN (4-formamidobenzoic acid).
     # Without this recognizer the branch fell to the generic fragment
@@ -1861,7 +1861,7 @@ def _identify_nitrogen_group(mol, n_idx: int, ring_atoms: Set[int]) -> Optional[
                     'is_complex': _complex,
                 }
         else:
-            # Wave2 T3d (P-66.4.1.3.5): ring-attached amidine via its AMINO N
+            # Wave2: ring-attached amidine via its AMINO N
             # (-NH-C(=NH)-R) -> the {stem}imidamido prefix (4-ethanimidamido-
             # benzoic acid). Parallel to the amido branch above but keyed on the
             # imino C=N. Guards inside imidoyl_amido_prefix_from_branch reject
@@ -1888,7 +1888,7 @@ def _identify_nitrogen_group(mol, n_idx: int, ring_atoms: Set[int]) -> Optional[
                         'is_complex': _complex,
                     }
 
-    # P-66.4.2.3.5 / P-66.4.3.2 (plan P1AM Task 8): ring-attached
+    # / (plan P1AM Task 8): ring-attached
     # -NH-S(=N-NH2)(R)[=O]? -> '(...sulfino/sulfonohydrazonamido)'.
     if h_count == 1 and len(neighbors) == 1 and neighbors[0].GetSymbol() == 'S':
         sub_atoms = _bfs_substituent_atoms(mol, n_idx, ring_atoms)
@@ -1905,14 +1905,14 @@ def _identify_nitrogen_group(mol, n_idx: int, ring_atoms: Set[int]) -> Optional[
                 'is_complex': True,
             }
 
-    # P-45.5 (W2F-P8): -NH-(substituted benzene aryl) -> the decorated aryl ring
+    # (W2F-P8): -NH-(substituted benzene aryl) -> the decorated aryl ring
     # is cited as an 'N-(2,4-dibromophenyl)' substituent (via the shared
     # decorated-ring core namer), promoting the CURRENT benzene ring to the
     # 'aniline' parent (the parent-vs-N-aryl choice runs through parent selection,
-    # P-45.5.1). Only a carbocyclic benzene N-ring is handled: a BARE phenyl gives
+    #. Only a carbocyclic benzene N-ring is handled: a BARE phenyl gives
     # None here (nothing to decorate) and falls through to the 'anilino'/
     # 'N-phenyl' path below, and a heteroaryl N-ring is left to the parent-
-    # selection pipeline (the heterocycle may be the senior parent, P-44.2.1).
+    # selection pipeline (the heterocycle may be the senior parent,.
     # Fail closed when the core cannot be built.
     if (h_count == 1 and len(neighbors) == 1
             and neighbors[0].GetSymbol() == 'C'
@@ -1938,9 +1938,9 @@ def _identify_nitrogen_group(mol, n_idx: int, ring_atoms: Set[int]) -> Optional[
                 expected_atoms=set(_sub_atoms) - {n_idx},
             )
             if _dec is not None and _dec.endswith('phenyl'):
-                # P-62.2.1.1.1 (BB:26139): 'anilino' is the PREFERRED PREFIX for
+                # (the Blue Book): 'anilino' is the PREFERRED PREFIX for
                 # C6H5-NH- with full substitution allowed; '(...phenyl)amino' is
-                # the general-nomenclature column (BB:26153 '4-chloroanilino
+                # the general-nomenclature column (the Blue Book '4-chloroanilino
                 # (preferred prefix) | (4-chlorophenyl)amino'). The locants are
                 # identical because decorated_ring_substituent_name numbers a
                 # carbocycle with the attachment at 1, which is aniline's C-1.
@@ -1974,9 +1974,9 @@ def _identify_nitrogen_group(mol, n_idx: int, ring_atoms: Set[int]) -> Optional[
                 except (ValueError, KeyError):
                     alkyl_name = None
             if alkyl_name:
-                # P-62.2.1.1.1 (BB:26139) retained preferred prefix. Cited BARE:
+                # (the Blue Book) retained preferred prefix. Cited BARE:
                 # the unsubstituted prefix carries no locant of its own, so no
-                # enclosing marks (BB:26306 '3-anilinobenzoic acid (PIN)').
+                # enclosing marks (the Blue Book '3-anilinobenzoic acid (PIN)').
                 # Routed through the shared primitive so this site and the
                 # substituted ones cannot drift apart.
                 if alkyl_name == 'phenyl':
@@ -2001,11 +2001,11 @@ def _identify_nitrogen_group(mol, n_idx: int, ring_atoms: Set[int]) -> Optional[
                     },
                 }
 
-    # P-35.4.1 (BB 18108, W2E-P1FC Task 6): complex substituent prefix by
+    # (BB 18108, W2E-P1FC Task 6): complex substituent prefix by
     # SUBSTITUTION — an -NH-R amino whose R is a compound/substituted prefix
     # (e.g. -NH-CH2Cl chloromethyl) is the complex prefix '(chloromethyl)amino'.
     # The N-monoalkyl branch above only handles a PURE (all-carbon) alkyl via
-    # _collect_pure_alkyl; a substituted branch (halomethyl, alkoxyalkyl, ...)
+    # _collect_pure_alkyl; a substituted branch (halomethyl, alkoxyalkyl,...)
     # skips it and previously mis-parsed as separate amino + chloromethyl. Name
     # the WHOLE N-substituent branch with the universal substituent namer and
     # wrap it as '({branch}amino)'. Fail-closed: decline (fall through) if the
@@ -2017,7 +2017,7 @@ def _identify_nitrogen_group(mol, n_idx: int, ring_atoms: Set[int]) -> Optional[
         # the N-substituent branch is a plain acyclic substituted alkyl (e.g.
         # -CH2Cl). A RING-bearing branch (-NH-pyridinyl, -NH-phenyl) triggers a
         # parent-hydride SENIORITY competition between the two ring systems
-        # (P-44) that must be resolved by the parent-selection pipeline, not
+        # that must be resolved by the parent-selection pipeline, not
         # forced onto the benzene ring here — so decline and let it fall
         # through (N-phenylpyridin-4-amine, not [(pyridin-4-yl)amino]benzene).
         _branch_has_ring = any(mol.GetAtomWithIdx(a).IsInRing()
@@ -2029,7 +2029,7 @@ def _identify_nitrogen_group(mol, n_idx: int, ring_atoms: Set[int]) -> Optional[
                 list(ring_atoms | {n_idx}),
             )
             if _bname and ' ' not in _bname:
-                # P-16.3.3: the inner substituted prefix ('chloromethyl') is
+                #: the inner substituted prefix ('chloromethyl') is
                 # itself enclosed in parentheses, then concatenated with the
                 # 'amino' compound prefix -> '(chloromethyl)amino'. Mark complex
                 # so the outer composer escalates the enclosing marks to square
@@ -2041,12 +2041,12 @@ def _identify_nitrogen_group(mol, n_idx: int, ring_atoms: Set[int]) -> Optional[
                     apply_enclosing_marks,
                     is_complex_substituent,
                 )
-                # Inner substituted prefix gets its own parens (P-16.3.3);
+                # Inner substituted prefix gets its own parens;
                 # 'chloromethyl' -> '(chloromethyl)'.
                 _inner = (f'({_bname})'
                           if is_complex_substituent(_bname) else _bname)
                 _complex_prefix = f'{_inner}amino'
-                # Escalate the OUTER enclosing mark by nesting depth (P-16.5):
+                # Escalate the OUTER enclosing mark by nesting depth:
                 # '(chloromethyl)amino' -> '[(chloromethyl)amino]'. Passing the
                 # already-escalated form to format_substituent_prefix (which
                 # only wraps-if-unwrapped) yields '4-[(chloromethyl)amino]-...'.
@@ -2058,12 +2058,12 @@ def _identify_nitrogen_group(mol, n_idx: int, ring_atoms: Set[int]) -> Optional[
                     'is_complex': True,
                 }
 
-    # P-62.2.1.1.1 (BB:26139) N,N-disubstituted ANILINO. -N(R)-C6H5 takes the
-    # PREFERRED prefix 'N-<R>anilino': BB:26308 verbatim
-    #   '3-(N-methylanilino)phenol (PIN)   3-[methyl(phenyl)amino]phenol'
+    # (the Blue Book) N,N-disubstituted ANILINO. -N(R)-C6H5 takes the
+    # PREFERRED prefix 'N-<R>anilino': the Blue Book verbatim
+    # '3-(N-methylanilino)phenol (PIN) 3-[methyl(phenyl)amino]phenol'
     # so the general-nomenclature column is the methyl(phenyl)amino family, and
-    # HEAD's third spelling '(N-methyl-N-phenylamino)' is non-PIN by P-58.1
-    # (BB:24623 — a PIN requires the names of its COMPONENTS to be preferred names
+    # HEAD's third spelling '(N-methyl-N-phenylamino)' is non-PIN by
+    # (the Blue Book — a PIN requires the names of its COMPONENTS to be preferred names
     # too, even when the parent is right).
     #
     # The anilino ring is detected STRUCTURALLY, never from the branch's name: the
@@ -2174,7 +2174,7 @@ def _identify_nitrogen_group(mol, n_idx: int, ring_atoms: Set[int]) -> Optional[
                 'atoms': [n_idx, neighbors[0].GetIdx()]
             }
 
-    # Wave-2 completion (P-61.11.1 / P-15.2.1.1): azido -N=[N+]=[N-] on the ring.
+    # Wave-2 completion /: azido -N=[N+]=[N-] on the ring.
     # The ring-attached N is neutral with a single N neighbour (=[N+]); the
     # chain is exactly three N atoms. -> 'azido' (azidobenzene, OPSIN-RT).
     if h_count == 0 and len(neighbors) == 1 and neighbors[0].GetSymbol() == 'N':
@@ -2183,7 +2183,7 @@ def _identify_nitrogen_group(mol, n_idx: int, ring_atoms: Set[int]) -> Optional[
                 and all(mol.GetAtomWithIdx(i).GetSymbol() == 'N' for i in sub_atoms)):
             return {'name': 'azido', 'atoms': sub_atoms}
 
-    # Wave-2 completion (P-15.2.1.1): isocyano -[N+]#[C-] on the ring. The
+    # Wave-2 completion: isocyano -[N+]#[C-] on the ring. The
     # ring-attached N is positively charged, triple-bonded to a terminal
     # negative C. -> 'isocyano' (isocyanobenzene, OPSIN-RT).
     if (n_atom.GetFormalCharge() == 1 and len(neighbors) == 1
@@ -2194,7 +2194,7 @@ def _identify_nitrogen_group(mol, n_idx: int, ring_atoms: Set[int]) -> Optional[
                 and c_nbr.GetFormalCharge() == -1):
             return {'name': 'isocyano', 'atoms': [n_idx, c_nbr.GetIdx()]}
 
-    # W2E-D2 (P-16.3.3 / P-35.5.1): mixed additive-prefix N-substituents whose
+    # W2E-D2 /: mixed additive-prefix N-substituents whose
     # attach atom is a heteroatom centre — (alkoxy)sulfinyl [-S(=O)-OR] and
     # [bis(sulfanyl)phosphoryl] [-P(=O)(SH)n]. The single N-neighbour is the S or
     # P (not a carbon), so the C/O/N branches above all decline. Name the whole
@@ -2225,7 +2225,7 @@ def _identify_nitrogen_group(mol, n_idx: int, ring_atoms: Set[int]) -> Optional[
                     },
                 }
 
-    # W3-P15 (P-68.3.1.1.1.5): ring-attached hydroxylamine -NH-OH -> the
+    # W3-P15: ring-attached hydroxylamine -NH-OH -> the
     # 'hydroxyamino' preselected prefix (BB 38428 '4-(hydroxyamino)phenol').
     # The prefix generator already exists (substituent_prefix_forms.get_prefix
     # returns 'hydroxyamino' for an unsubstituted -NH-OH); wire it here so the
@@ -2249,7 +2249,7 @@ def _identify_nitrogen_group(mol, n_idx: int, ring_atoms: Set[int]) -> Optional[
                         'is_complex': True}
 
     # Fallback: complex N-substituent (non-alkyl chains, heteroatom-containing
-    # groups like guanidino, ureido, etc.).  Collect all atoms via BFS and try
+    # groups like guanidino, ureido, etc.). Collect all atoms via BFS and try
     # recursive naming.
     if neighbors:
         sub_atoms = _bfs_substituent_atoms(mol, n_idx, ring_atoms)
@@ -2319,17 +2319,17 @@ def _identify_oxygen_group(mol, o_idx: int, ring_atoms: Set[int]) -> Optional[Di
         if nbr_symbol == 'O' and nbr.GetTotalNumHs() >= 1:
             return {'name': 'hydroperoxy', 'atoms': [o_idx, nbr.GetIdx()]}
 
-        # v37 (generalizes SP2.1'): -O-C(=O)-R is an ACYLOXY, not an alkoxy. The
+        # (generalizes SP2.1'): -O-C(=O)-R is an ACYLOXY, not an alkoxy. The
         # alkoxy branch below collects a "pure alkyl" R via _collect_pure_alkyl,
         # which DROPS the carbonyl =O (and any further hetero) -- measured:
         # -O-C(=O)CH2C(CH3)2OH on benzoic acid -> '4-(pentyloxy)benzoic acid', a
-        # WRONG molecule the SELF-01 gate then suppresses, so the whole molecule
+        # WRONG molecule the gate then suppresses, so the whole molecule
         # abstains on the default tier (best-effort already emits the correct acyloxy
-        # via name_substituent). STEP-1 spy (invariant 8) refuted the SP2.1'
+        # via name_substituent). trace (a project rule) refuted the SP2.1'
         # 'OPSIN-invalid' premise. Route a plain acyloxy ester to the SAME recognizer
         # name_substituent uses (composer._acyloxy_prefix_for_frag ->
         # rules.lipids._acyloxy_for_site -> the full acid engine) for the
-        # P-65.6.3.2.3 '<acyl>oxy' PIN prefix. The recognizer is fail-closed (exactly
+        # '<acyl>oxy' PIN prefix. The recognizer is fail-closed (exactly
         # one terminal '=O' on the carbonyl C, <=1 all-carbon R, whole acyl side
         # self-contained, carbamate/carbonate/thiono excluded); on a non-plain shape
         # it returns None and we FAIL CLOSED here rather than fall through to the
@@ -2357,7 +2357,7 @@ def _identify_oxygen_group(mol, o_idx: int, ring_atoms: Set[int]) -> Optional[Di
         # Alkoxy (-O-C...): methoxy, ethoxy, propoxy, etc. An ARYLOXY
         # (-O-aromatic-ring-C) is NOT an alkoxy — route it to Case 1 below so a
         # bare ring gives 'phenoxy' and a decorated ring is built by the
-        # substituted-aryloxy path (P-45.6). Without this guard _collect_pure_alkyl
+        # substituted-aryloxy path. Without this guard _collect_pure_alkyl
         # greedily walks the aromatic ring as if it were a chain
         # (4-ethylphenoxy -> 'octoxy', a structure-dropping name suppressed to
         # 'unknown' by the validity gate).
@@ -2376,7 +2376,7 @@ def _identify_oxygen_group(mol, o_idx: int, ring_atoms: Set[int]) -> Optional[Di
                     except (ValueError, KeyError):
                         alkyl_name = None
                 if alkyl_name:
-                    # P-63.2.2 morphology via composed_alkoxy_prefix: retained
+                    # morphology via composed_alkoxy_prefix: retained
                     # set contracts (butyl->butoxy), C5+ and rings keep the whole
                     # '-yl' ('pentyl'->'pentyloxy', 'cyclohexyl'->'cyclohexyloxy',
                     # NOT the mangled 'pentoxy'/'cyclohexoxy') (F-spell-oxy).
@@ -2389,7 +2389,7 @@ def _identify_oxygen_group(mol, o_idx: int, ring_atoms: Set[int]) -> Optional[Di
                         return None
                     return {'name': oxy_name, 'atoms': [o_idx] + alkyl_atoms}
 
-            # P-57.1.6.2 / P-46.1.3: _collect_pure_alkyl declines when the R
+            # /: _collect_pure_alkyl declines when the R
             # side carries an INTERIOR ether O / thioether S
             # (-O-CH2CH2-O-CH3). The Case-4 carbon count below would DROP that
             # heteroatom (constitutionally WRONG -> 'propoxy'). Name the R side
@@ -2451,11 +2451,11 @@ def _identify_oxygen_group(mol, o_idx: int, ring_atoms: Set[int]) -> Optional[Di
                             for r in ring
                         )
                         if all_arom_c:
-                            # Wave-2 C2 (P-45.2.1): a SUBSTITUTED aryloxy ring
+                            # Wave-2 C2: a SUBSTITUTED aryloxy ring
                             # (O + C6H5 = 7 atoms; more means decoration) must
                             # carry its substituents — bare 'phenoxy' silently
                             # DROPPED them (2-phenoxy... for the dicyano BB
-                            # example, SELF-01-suppressed). Fail closed when
+                            # example, -suppressed). Fail closed when
                             # the decorated name cannot be built.
                             if len(sub_atoms) > 7:
                                 from .ring_substituents import (
@@ -2486,12 +2486,12 @@ def _identify_oxygen_group(mol, o_idx: int, ring_atoms: Set[int]) -> Optional[Di
                             mol, c_atom.GetIdx(), acyl_excluded
                         )
                         if acyl_atoms_list is not None and acyl_c > 0:
-                            # W3-P07 (P-65.6.3.2.3): use the RETAINED acyl name for
+                            # W3-P07: use the RETAINED acyl name for
                             # the acyloxy prefix ('acetyloxy' is preferred to both
                             # the systematic 'ethanoyloxy' AND 'acetoxy'; formyloxy
                             # for HCO-O-). get_acyloxy_prefix consults the retained-
                             # acyl table, falling back to systematic '<stem>anoyloxy'
-                            # for C>=3 (propanoyloxy, ...). acyl_atoms_list already
+                            # for C>=3 (propanoyloxy,...). acyl_atoms_list already
                             # includes the carbonyl C; add the carbonyl O so the acid
                             # fragment is named as the free acid.
                             from .esters import (
@@ -2522,11 +2522,11 @@ def _identify_oxygen_group(mol, o_idx: int, ring_atoms: Set[int]) -> Optional[Di
                             for r in ring
                         )
                         if ring_has_o and ring_size in (5, 6):
-                            # P-102.6.1.2 first: a recognized cyclic monosaccharide
+                            # first: a recognized cyclic monosaccharide
                             # O-linked here is the compound prefix 'glycosyl'+'oxy'
                             # cited at this ring locant -- BB's own worked example
                             # is 1-[4-(beta-D-glucopyranosyloxy)phenyl]ethan-1-one
-                            # (BlueBookV2.md:53927). Without this the skeleton-only
+                            # (the Blue Book). Without this the skeleton-only
                             # fallback below names the sugar by its RING SIZE alone
                             # and silently discards every decoration on it (all the
                             # hydroxy groups and the CH2OH), while still reporting
@@ -2626,16 +2626,16 @@ def _identify_oxygen_group(mol, o_idx: int, ring_atoms: Set[int]) -> Optional[Di
                     and mol.GetBondBetweenAtoms(s_atom.GetIdx(), nb.GetIdx()).GetBondType() == Chem.BondType.DOUBLE
                 )
                 if s_double_o == 0:
-                    # -O-S- : sulfanyloxy (IUPAC P-63.6)
+                    # -O-S-: sulfanyloxy (IUPAC
                     return {'name': 'sulfanyloxy', 'atoms': sub_atoms}
                 elif s_double_o == 1:
-                    # -O-S(=O)- : sulfinyloxy
+                    # -O-S(=O)-: sulfinyloxy
                     return {'name': 'sulfinyloxy', 'atoms': sub_atoms}
                 elif s_double_o >= 2:
-                    # -O-S(=O)(=O)- : sulfonyloxy
+                    # -O-S(=O)(=O)-: sulfonyloxy
                     return {'name': 'sulfonyloxy', 'atoms': sub_atoms}
 
-            # O-P neighbors: phosphonooxy (IUPAC P-67.1.3)
+            # O-P neighbors: phosphonooxy (IUPAC
             if nbr_symbol == 'P':
                 return {'name': 'phosphonooxy', 'atoms': sub_atoms}
 
@@ -2700,7 +2700,7 @@ def _identify_sulfur_group(mol, s_idx: int, ring_atoms: Set[int]) -> Optional[Di
             o_atom_idxs = [o.GetIdx() for o in o_double_neighbors]
             all_sub_atoms = [s_idx] + o_atom_idxs + alkyl_atoms
             oxide_kind = 'sulfonyl' if len(o_double_neighbors) == 2 else 'sulfinyl'
-            # P-65.3.1 PIN: a ring-attached sulfone/sulfoxide substituent is the
+            # PIN: a ring-attached sulfone/sulfoxide substituent is the
             # ACID-STEM oxide form (methanesulfonyl / ethanesulfonyl / methanesulfinyl),
             # NOT the 'alkyl'+'sulfonyl' concatenation (methylsulfonyl). Route through
             # the shared atom-aware builder -- the SAME producer the benzene-PARENT
@@ -2826,7 +2826,7 @@ def _identify_alkyl_group(mol, start_idx: int, ring_atoms: Set[int]) -> Optional
             carbon_count += 1
         else:
             # Non-carbon in the chain - this is not a simple alkyl
-            # For Phase 2, we'll handle more complex substituents
+            # For a phase, we'll handle more complex substituents
             pass
 
         for neighbor in current_atom.GetNeighbors():
@@ -2841,15 +2841,15 @@ def _identify_alkyl_group(mol, start_idx: int, ring_atoms: Set[int]) -> Optional
         if atom.GetSymbol() not in ('C', 'H'):
             # Contains a heteroatom -> not a simple alkyl. DECLINE so the recursive
             # `name_substituent` fallback (below, ~line 1401) names it from
-            # structure. (v30 B2 bug 2: a vinyl-STARTED fragment carrying a
+            # structure. (B2 bug 2: a vinyl-STARTED fragment carrying a
             # downstream heteroatom -- -CH=CH-CH2OH in p-coumaryl alcohol -- was
             # mislabelled 'ethenyl' here with all_atoms, DROPPING the CH2OH tail ->
-            # `4-ethenylphenol` (atom drop, SELF-01-suppressed). A true vinyl
+            # `4-ethenylphenol` (atom drop, -suppressed). A true vinyl
             # -CH=CH2 is all-carbon, never enters this branch, and is named by the
             # multiple-bond decline below + the recursive fallback.)
             return None
 
-    # Wave2 T3c constitution-conservation guard: the carbon-count name below
+    # Wave2 constitution-conservation guard: the carbon-count name below
     # ('octyl' from carbon_count==8) is only honest for an ACYCLIC SATURATED
     # all-C fragment. A styryl arm -CH=CH-C6H5 walked into the far aromatic
     # ring and was mislabelled '(4E)-4-octyl...' (8 C counted through the ring,
@@ -2883,7 +2883,7 @@ def _get_alkyl_name(mol, start_idx: int, carbon_count: int, ring_atoms: Set[int]
     """
     Get the name for an alkyl substituent.
 
-    Uses name_substituent_fragment() for branched/complex substituents,
+    Uses name_substituent_fragment for branched/complex substituents,
     falls back to get_alkyl_name(carbon_count) for linear alkyls.
 
     Args:
@@ -2960,7 +2960,7 @@ def _identify_functionalized_chain(mol, start_idx: int, ring_atoms: Set[int]) ->
     if not functional_group:
         return None
 
-    # Wave2 T3a constitution-conservation guard (P-29.4.2 safety): the name
+    # Wave2 constitution-conservation guard safety): the name
     # below is generated from carbon_count ALONE, so it is only honest when
     # the collected branch IS a linear, unbranched, acyclic, saturated
     # all-C chain bearing exactly one terminal FG. Anything else used to be
@@ -3018,13 +3018,13 @@ def _identify_functionalized_chain(mol, start_idx: int, ring_atoms: Set[int]) ->
         return None
 
     # Wrap MARKLESS compound substituent names in parentheses per IUPAC
-    # P-14.5.2: "hydroxymethyl" -> "(hydroxymethyl)". w2f p1 (research §3.C.6):
+    #: "hydroxymethyl" -> "(hydroxymethyl)". w2f p1 (research C.6):
     # a name that ALREADY carries an enclosing mark ('(4-bromophenyl)(chloro)
     # methyl', '(oxan-2-yl)oxy') must NOT take plain parens here — the naive
     # startswith('(')/endswith(')') test misfires on interior/trailing-stem
     # marks and produced the non-PIN parens-in-parens '((...)...)'. Left BARE,
     # it flows to the escalating consumers (format_substituent_prefix / the
-    # _omit branch), which apply P-16.5.2.4 brackets ('[(4-bromophenyl)(chloro)
+    # _omit branch), which apply brackets ('[(4-bromophenyl)(chloro)
     # methyl]').
     from ..assembly.naming_utils import needs_brackets
     is_compound = needs_brackets(sub_name)
@@ -3059,23 +3059,23 @@ _FG_SUB_PREFIX = {
         5: "4-carboxybutyl",     # -(CH2)4COOH
     },
     'aldehyde': {
-        # -CHO on the ring carbon (carbon NOT absorbable) -> formyl (P-66.6.1.1.3).
+        # -CHO on the ring carbon (carbon NOT absorbable) -> formyl.
         1: "formyl",             # -CHO
         # Moving-base-atom: the -CHO carbon is absorbed into the chain and expressed
         # as 'oxo' at the terminal carbon (= chain length, opposite the attachment).
-        # '1-oxo...yl' (oxo at the acyl carbon) is the disfavoured CAS form (P-66 note m).
+        # '1-oxo...yl' (oxo at the acyl carbon) is the disfavoured CAS form note m).
         2: "2-oxoethyl",         # -CH2CHO
         3: "3-oxopropyl",        # -(CH2)2CHO
     },
     'alcohol': {
-        # The hydroxy is numbered from the free valence (P-29.2: the attachment is
+        # The hydroxy is numbered from the free valence: the attachment is
         # locant 1, so -OH on the far carbon of an N-carbon chain is locant N). The
-        # 1-carbon form elides the locant (hydroxymethyl). v23 single-FG-substituent
+        # 1-carbon form elides the locant (hydroxymethyl). single-FG-substituent
         # fix: this map mirrors the structure-based namer (_name_polyfunctional_
         # acyclic_substituent, now single-FG) — the Phase-172 NOTE deferred the
         # locant because the sibling parent_to_prefix path dropped it too; that path
         # is now fixed (Tier 1.96 / Step 2c-poly), so both are consistently located.
-        1: "hydroxymethyl",      # -CH2OH        (1-carbon: locant elided)
+        1: "hydroxymethyl",      # -CH2OH (1-carbon: locant elided)
         2: "2-hydroxyethyl",     # -CH2CH2OH
         3: "3-hydroxypropyl",    # -(CH2)2CH2OH
     },
@@ -3102,17 +3102,17 @@ def _name_functionalized_chain_substituent(carbon_count: int, functional_group: 
     if functional_group == 'carboxylic_acid' and carbon_count > 0:
         if carbon_count == 1:
             return "carboxy"
-        # The carboxy carbon (P-65.1.1) is NOT a backbone carbon, so the backbone is
+        # The carboxy carbon is NOT a backbone carbon, so the backbone is
         # (N-1) carbons; the carboxy sits on the carbon farthest from the attachment
-        # = backbone locant (N-1) (P-29.2, numbered from the free valence).
+        # = backbone locant (N-1), numbered from the free valence).
         backbone = carbon_count - 1
         alkyl = _CHAIN_SUB_STEMS.get(backbone)
         if alkyl:
             return f"{backbone}-carboxy{alkyl}" if backbone > 1 else f"carboxy{alkyl}"
 
     if functional_group == 'alcohol' and carbon_count > 0:
-        # Hydroxy on the far carbon, numbered from the free valence (P-29.2): locant
-        # = carbon_count; the 1-carbon form elides it (hydroxymethyl). v23 single-FG
+        # Hydroxy on the far carbon, numbered from the free valence: locant
+        # = carbon_count; the 1-carbon form elides it (hydroxymethyl). single-FG
         # fix — consistent with the structure-based namer (the Phase-172 deferral is
         # resolved now that parent_to_prefix / Tier 1.96 are also located).
         alkyl = _CHAIN_SUB_STEMS.get(carbon_count)
@@ -3121,11 +3121,11 @@ def _name_functionalized_chain_substituent(carbon_count: int, functional_group: 
 
     if functional_group == 'aldehyde' and carbon_count > 0:
         if carbon_count == 1:
-            return "formyl"  # -CHO on the ring carbon (P-66.6.1.1.3); not absorbable
+            return "formyl"  # -CHO on the ring carbon; not absorbable
         alkyl = _CHAIN_SUB_STEMS.get(carbon_count)
         if alkyl:
             # Moving-base-atom: -CHO carbon absorbed -> 'oxo' at the terminal carbon
-            # (= carbon_count). '1-oxo...yl' acyl form is non-PIN (P-66 note m).
+            # (= carbon_count). '1-oxo...yl' acyl form is non-PIN note m).
             return f"{carbon_count}-oxo{alkyl}"
 
     # Cannot name this chain
@@ -3237,19 +3237,19 @@ def principal_group_ring_atoms(
     principal_group: Optional[str] = None,
     detected_fgs: Optional[Dict] = None,
 ) -> Set[int]:
-    """P-14.4(c): the ring atoms bearing the PRINCIPAL characteristic group.
+    """(c): the ring atoms bearing the PRINCIPAL characteristic group.
 
-    This is the input to ``orient_benzene``'s criterion-0 tier. §P-14.4
-    "NUMBERING" (heading at BB:3219) states at BB:3221: "When several structural
+    This is the input to ``orient_benzene``'s criterion-0 tier. §
+    "NUMBERING" (heading at the Blue Book) states at the Blue Book: "When several structural
     features appear in cyclic and acyclic compounds, low locants are assigned to
     them in the following decreasing order of seniority:". That order ranks
     **(c) principal characteristic groups and free valences (suffixes);**
-    (BB:3256) four places ABOVE **(f) detachable alphabetized prefixes, all
-    considered together in a series of increasing numerical order;** (BB:3301) and
+    (the Blue Book) four places ABOVE **(f) detachable alphabetized prefixes, all
+    considered together in a series of increasing numerical order;** (the Blue Book) and
     five above **(g) lowest locants for the substituent cited first as a prefix in
-    the name;** (BB:3307). So the suffix locant set is minimised FIRST and the
-    prefixes take what is left. Benzene has no fixed numbering (a, BB:3227) and no
-    indicated hydrogen (b, BB:3246), so (c) decides whenever it applies.
+    the name;** (the Blue Book). So the suffix locant set is minimised FIRST and the
+    prefixes take what is left. Benzene has no fixed numbering (a, the Blue Book) and no
+    indicated hydrogen (b, the Blue Book), so (c) decides whenever it applies.
 
     Every caller used to derive this set from the ``is_suffix`` marker alone,
     which made it EMPTY for phenols: a ring -OH is still spelled as the *prefix*
@@ -3263,7 +3263,7 @@ def principal_group_ring_atoms(
     ``benzene_prefix_suffix_promotion``, the single authority
     ``name_substituted_benzene`` also reads.
 
-    ⚠ v29 Phase C Task 9b: this used to ask the seniority tables directly --
+    ⚠ Phase C Task 9b: this used to ask the seniority tables directly --
     "does ``get_suffix(pg, is_ring=True)`` exist and is ``get_prefix(pg)`` on this
     ring?" -- which is a test for promotion ELIGIBILITY, not promotion. **76** of
     the 136 seniority entries have both a ring suffix and a prefix form and only
@@ -3273,14 +3273,14 @@ def principal_group_ring_atoms(
     are present, never on where -- which is what lets it be consulted BEFORE the
     ring is numbered.
 
-    P-41 is respected: only the SENIOR group is the principal characteristic
+     is respected: only the SENIOR group is the principal characteristic
     group. ``principal_group`` is the molecule-level answer from
     ``seniority.get_principal_group``, so a ring carrying both -ol and -thiol
     yields the -ol atoms only (matching the emitted ``2-sulfanylphenol``, whose
     numbering hint previously contradicted the name by anchoring the thiol).
 
     FAILS TOWARD CURRENT BEHAVIOUR: whenever the answer is not available (no
-    principal group, no ring suffix for it, nothing promoted, ...) this returns the
+    principal group, no ring suffix for it, nothing promoted,...) this returns the
     legacy ``is_suffix`` union, so the change is a strict improvement rather than a
     coin flip. In particular a ring with NO
     principal characteristic group -- ``Cc1c(C)c(C)c(C)c(C)c1Cl`` -- has
@@ -3344,14 +3344,14 @@ def principal_group_ring_atoms(
         return legacy
 
     # Already spelled as a suffix at orientation time: take THAT group's atoms
-    # only (P-41 -- a co-occurring junior suffix is not the principal group).
+    # only -- a co-occurring junior suffix is not the principal group).
     if pg_ring_suffix in suffix_atoms:
         return set(suffix_atoms[pg_ring_suffix])
 
     # Still spelled as a prefix. Anchor it ONLY if the shared authority says the
     # NAME will actually promote it to exactly this suffix.
     #
-    # ⚠ v29 Phase C Task 9b (C-2): this used to be `get_prefix(principal_group) in
+    # ⚠ Phase C Task 9b (C-2): this used to be `get_prefix(principal_group) in
     # prefix_atoms`, i.e. "the principal group HAS a prefix form and it is on this
     # ring". That is true for 76 seniority entries and only 2 are ever promoted, so
     # criterion (c) was minimising the locant of a group the name still spells as a
@@ -3366,7 +3366,7 @@ def principal_group_ring_atoms(
 
     if promoted_suffix == 'amine':
         # Identified by the promotion marker, not by a prefix name: the prefix may
-        # be 'amino', '(N-methylamino)', 'anilino', ... and only the marked ones
+        # be 'amino', '(N-methylamino)', 'anilino',... and only the marked ones
         # are promoted.
         return set(amine_candidate_atoms)
 
@@ -3381,9 +3381,9 @@ def benzene_prefix_citation_locants(
     substituents: Dict[int, List[Dict]],
     principal_group_positions: Optional[Set[int]] = None,
 ) -> Tuple[Tuple[int, ...], ...]:
-    """P-14.4(g): the per-prefix locant sets, in alphabetical CITATION order.
+    """(g): the per-prefix locant sets, in alphabetical CITATION order.
 
-    §**P-14.4 "NUMBERING"** (``BlueBookV2/BlueBookV2.md:3221``) criterion
+    §** "NUMBERING"** (``the Blue Book Blue Book``) criterion
     **(g)** (``:3307``) reads verbatim:
 
         (g) lowest locants for the substituent cited first as a prefix in the
@@ -3392,11 +3392,11 @@ def benzene_prefix_citation_locants(
     worked at ``:3315`` ``4-methyl-5-nitrooctanedioic acid (PIN)`` and, decisively
     for a ring, at ``:3317`` ``1-methyl-4-nitronaphthalene (PIN) (not
     4-methyl-1-nitronaphthalene)``. The same rule is stated a second time, with a
-    *benzene* worked example, as §**P-61.11.2 "Low locants are assigned to the
+    *benzene* worked example, as §** "Low locants are assigned to the
     prefix cited first in the name"** (``:26085``): ``1-bromo-2-chloroethane
     (PIN)`` and ``1-azido-4-isocyanatobenzene (PIN)`` (``:26094``).
 
-    "Cited first" is the P-14.5.1 alphanumerical order, so the sequence is keyed
+    "Cited first" is the alphanumerical order, so the sequence is keyed
     on the shared ``alpha_sort_key`` (di/tri ignored, iso/neo/cyclo/sec/tert
     included) rather than a hand-rolled sort. Every candidate orientation of one
     molecule carries the SAME set of prefix names, so only the locants differ and
@@ -3413,7 +3413,7 @@ def benzene_prefix_citation_locants(
         ``Nc1ccc(Nc2ccc(Nc3ccccc3)cc2)cc1`` with ``(4-aminophenyl)`` on the HIGHER
         nitrogen, though ``aminoanilino`` is cited before ``anilino``.
       * an ``is_suffix`` substituent outside that set is a JUNIOR suffix that
-        ``name_substituted_benzene`` demotes back to its own prefix form (P-41),
+        ``name_substituted_benzene`` demotes back to its own prefix form,
         so it IS cited as a prefix and enters under ``_SUFFIX_TO_PREFIX``;
       * when no PCG set is supplied every ``is_suffix`` substituent is the
         suffix, so all of them are excluded.
@@ -3456,15 +3456,15 @@ def benzene_prefix_citation_locants(
                 by_name[name].append(i + 1)
 
     # Ordered by the SHARED total order, not by the raw ``alpha_sort_key``
-    # string. P-14.5's preamble (:3442) makes this a two-stage comparison --
-    # "Nonitalic Roman letters are considered first ... When all the Roman
-    # letters are identical, the set of locants ... are compared" -- and a single
+    # string. 's preamble (:3442) makes this a two-stage comparison --
+    # "Nonitalic Roman letters are considered first... When all the Roman
+    # letters are identical, the set of locants... are compared" -- and a single
     # key string conflates the stages, because it still carries digits and,
     # before the enclosing-mark strip, brackets. `4-[(1R)-1-chloroethyl]phenoxy`
     # keyed as `1-chloroethylphenoxy`, whose leading '1' (ASCII 49) sorts under
     # every letter, so it was cited ahead of `chloroethyl` and took locant 1 --
     # the wrong numbering for gold row W2F-P8-01. `prefix_citation_sort_key`
-    # separates the stages (letters, then locants, then P-14.4(j) configuration)
+    # separates the stages (letters, then locants, then (j) configuration)
     # and is the same authority the rest of the cascade consults.
     from ..assembly.naming_utils import prefix_citation_sort_key
     return tuple(
@@ -3480,7 +3480,7 @@ def _canonical_orbit_key(mol, oriented: List[int]) -> Tuple[int, ...]:
     invariant -- verified invariant under ``RenumberAtoms`` -- so this key depends
     only on the STRUCTURE, which is what a numbering cascade must terminate in. A
     cascade that ends in candidate-enumeration order is not an implementation of
-    P-14.4: it is a coin flip that happens to agree on the molecules tested, and
+    : it is a coin flip that happens to agree on the molecules tested, and
     that is exactly how the same molecule came to be named
     ``6-chloro-2-methylphenol`` from one SMILES and ``2-chloro-6-methylphenol``
     from another.
@@ -3513,7 +3513,7 @@ def orient_benzene(
     """
     Orient benzene ring to give lowest locants to substituents.
 
-    §**P-14.4 "NUMBERING"** (``BlueBookV2/BlueBookV2.md:3221``) is an ORDERED
+    §** "NUMBERING"** (``the Blue Book Blue Book``) is an ORDERED
     cascade. Benzene has no fixed numbering (a, ``:3227``), no indicated hydrogen
     (b, ``:3246``), no added indicated hydrogen (d, ``:3270``), no
     saturation/unsaturation choice (e, ``:3288``) and no skeletal atom in a
@@ -3532,14 +3532,14 @@ def orient_benzene(
     2. **(g)** ``:3307`` *lowest locants for the substituent cited first as a
        prefix in the name*, worked at ``:3315`` and ``:3317``
        (``1-methyl-4-nitronaphthalene (PIN) (not 4-methyl-1-nitronaphthalene)``);
-       restated as §P-61.11.2 ``:26085`` with the benzene PIN
+       restated as § ``:26085`` with the benzene PIN
        ``1-azido-4-isocyanatobenzene`` (``:26094``). See
        ``benzene_prefix_citation_locants``.
     3. **last resort** canonical symmetry-class orbits
        (``_canonical_orbit_key``) -- a structure-derived invariant, so the answer
        cannot depend on how the molecule was spelled.
 
-    ⚠ v29 Phase C Task 9b: tiers 2 and 3 are new. Before them the cascade ended
+    ⚠ Phase C Task 9b: tiers 2 and 3 are new. Before them the cascade ended
     at (f) plus a crude "position 1 goes to the alphabetically first substituent
     AT position 1" heuristic, and fell through to candidate-enumeration order --
     which made the emitted name a function of the input SMILES. Tier 2 subsumes
@@ -3556,7 +3556,7 @@ def orient_benzene(
         ring_atoms: Tuple of atom indices in the benzene ring (ordered)
         substituents: Dict from get_benzene_substituents
         principal_group_positions: Optional set of ring atom indices bearing the
-            principal characteristic group (P-14.4(c)). Default None = no PCG
+            principal characteristic group (c)). Default None = no PCG
             tier.
 
     Returns:
@@ -3590,7 +3590,7 @@ def orient_benzene(
             oriented = _build_oriented_ring(ring_list, start_pos, direction)
             candidates.append((oriented, _calculate_locants(oriented, substituents)))
 
-    # --- Criterion 0 (P-14.4(c)): principal characteristic group lowest locant ---
+    # --- Criterion 0 (c)): principal characteristic group lowest locant ---
     # Keep only the orientations giving the PCG its lowest locant set, BEFORE the
     # substituent-set tier below. No-op (byte-identical) when no PCG is supplied.
     if principal_group_positions:
@@ -3607,7 +3607,7 @@ def orient_benzene(
         if best_pcg is not None:
             candidates = [c for c in candidates if _pcg_locants(c[0]) == best_pcg]
 
-    # --- Criterion (f) (P-14.4, BB:3301, worked at :3305): the detachable
+    # --- Criterion (f), the Blue Book, worked at:3305): the detachable
     # alphabetized prefixes considered TOGETHER, first point of difference.
     # Criterion (c) above has already fixed the suffix locant set, so minimising
     # the substituted positions as one series is (f) over what remains -- and when
@@ -3625,8 +3625,8 @@ def orient_benzene(
     if len(best_candidates) == 1:
         return best_candidates[0]
 
-    # --- Criterion (g) (BB:3307, worked at :3315/:3317; restated P-61.11.2
-    # BB:26085 with the benzene PIN '1-azido-4-isocyanatobenzene' BB:26094):
+    # --- Criterion (g) (the Blue Book, worked at:3315/:3317; restated
+    # the Blue Book with the benzene PIN '1-azido-4-isocyanatobenzene' the Blue Book):
     # lowest locants for the substituent cited first as a prefix in the name.
     # Compared lexicographically over the alphabetical citation sequence, so a tie
     # on the first-cited prefix falls to the second, and so on.
@@ -3717,8 +3717,8 @@ def name_substituted_benzene(
     - Alphabetize substituent prefixes
     - Use multiplicative prefixes (di-, tri-) for repeated substituents
     - Format: locants-substituent-benzene (or just substituent-benzene for mono)
-    - Special case: benzonitrile (C6H5CN) uses suffix-style naming per P-66.1.1.1
-    - Ring-attached principal groups use suffix form (P-65.1.2)
+    - Special case: benzonitrile (C6H5CN) uses suffix-style naming per
+    - Ring-attached principal groups use suffix form
 
     Args:
         mol: RDKit Mol object
@@ -3756,7 +3756,7 @@ def name_substituted_benzene(
     prefix_groups: Dict[str, List[int]] = defaultdict(list)
     # Track N-substituents for amides keyed by suffix_name
     n_substituents_map: Dict[str, List[str]] = {}
-    # P-66.4.2.3.1 (plan P1AM Task 6): demoted-prefix stem override by suffix_name
+    # (plan P1AM Task 6): demoted-prefix stem override by suffix_name
     demoted_prefix_overrides: Dict[str, str] = {}
     # C4: track amine prefixes that CAN be promoted to the aniline suffix.
     # Maps locant -> {'prefix_name': <existing prefix>, 'n_substituents': [...]}.
@@ -3773,7 +3773,7 @@ def name_substituted_benzene(
                 # Track N-substituents if present
                 if 'n_substituents' in sub_info and sub_info['n_substituents']:
                     n_substituents_map[sub_info['suffix_name']] = sub_info['n_substituents']
-                # P-66.4.2.3.1 (plan P1AM Task 6): carry a demoted-prefix stem
+                # (plan P1AM Task 6): carry a demoted-prefix stem
                 # override (hydrazinecarboximidoyl) if the detector set one.
                 if sub_info.get('demoted_prefix_override'):
                     demoted_prefix_overrides[sub_info['suffix_name']] = \
@@ -3796,7 +3796,7 @@ def name_substituted_benzene(
     for name in prefix_groups:
         prefix_groups[name].sort()
 
-    # --- ASML-13: Reclassify hydroxyl as suffix when it IS the principal group ---
+    # ---: Reclassify hydroxyl as suffix when it IS the principal group ---
     # _identify_oxygen_group always returns hydroxy as prefix. When hydroxyl is
     # the principal group (no higher-seniority suffix FG detected), move it to
     # suffix_groups so it routes to the phenol/ol naming path.
@@ -3804,22 +3804,22 @@ def name_substituted_benzene(
     # (isocyanate and the cyanate family). These FGs are not in _SUFFIX_PRIORITY, so
     # suffix_groups would be empty even though OH may not be the true principal
     # group. Blacklist approach: only block known functional-class-naming FGs.
-    # ⚠ v29 Phase C Task 9b: the comment here used to say "isocyanate, azide, etc."
+    # ⚠ Phase C Task 9b: the comment here used to say "isocyanate, azide, etc."
     # -- azide was never in the effective set (dead key, see _FUNCTIONAL_CLASS_FGS),
-    # and per P-61.7 (BB:25991) it must not be. The remaining members are a KNOWN
+    # and per (the Blue Book) it must not be. The remaining members are a KNOWN
     # RESIDUAL DEFECT recorded with citations at _FUNCTIONAL_CLASS_FGS.
-    # v29 Phase C Task 9b: the promotion decision itself now comes from the SHARED
-    # authority ``benzene_prefix_suffix_promotion``, which the P-14.4(c) numbering
+    # Phase C Task 9b: the promotion decision itself now comes from the SHARED
+    # authority ``benzene_prefix_suffix_promotion``, which the (c) numbering
     # anchor also reads. Before this, the anchor computed its own answer from the
     # seniority tables and agreed with this block only for hydroxy -- see C-2 in
-    # ``.planning/audit-v29/PHASEC-TASK9B-P14-4-COMPLETION-PLAN.md``.
+    # `internal notes`.
     _promoted_suffix, _promoted_prefixes = benzene_prefix_suffix_promotion(
         set(suffix_groups), set(prefix_groups), detected_fgs,
         has_amine_candidates=bool(amine_candidates),
     )
     # ⚠ The guard is "no suffix SENIOR to -ol", not "no suffix at all".
-    # v29 Phase C tranche C REGRESSION, caught by an A/B against HEAD before shipping:
-    # adding the `-thiol` suffix form (for `benzenethiol`, BB:6656/:27292) made this
+    # Phase C tranche C REGRESSION, caught by an A/B against HEAD before shipping:
+    # adding the `-thiol` suffix form (for `benzenethiol`, the Blue Book) made this
     # `not suffix_groups` test false whenever an SH was present, so the promotion was
     # skipped and the JUNIOR thiol won the suffix -- `Sc1ccccc1O` went from the correct
     # `2-sulfanylphenol` to `2-hydroxybenzenethiol`. Any future junior suffix form would
@@ -3827,8 +3827,8 @@ def name_substituted_benzene(
     # than existence-aware.
     # SENIORITY_ORDER ranks: primary/secondary alcohol 88/89, phenol 91, thiol 94,
     # amines 102+. So -ol outranks -thiol and must claim the suffix when both are
-    # present, leaving the SH as a `sulfanyl` prefix (P-41).
-    # _OL_JUNIOR_SUFFIXES is module level (v29 Phase C Task 9); it is read by
+    # present, leaving the SH as a `sulfanyl` prefix.
+    # _OL_JUNIOR_SUFFIXES is module level (Phase C Task 9); it is read by
     # ``benzene_prefix_suffix_promotion``, which is where the seniority test that
     # used to be inlined here now lives.
     if _promoted_suffix == 'ol':
@@ -3850,7 +3850,7 @@ def name_substituted_benzene(
     # When a suffix SENIOR to -ol is present (acid, aldehyde, etc.), hydroxyl stays
     # as prefix "hydroxy" -- correct per IUPAC seniority rules.
 
-    # --- C4 (P-62.2.1.1.1 / P-41): reclassify an amine as the '-amine'
+    # --- C4 /: reclassify an amine as the '-amine'
     # (aniline) SUFFIX when it IS the molecule-level principal group. ---
     # ``benzene_prefix_suffix_promotion`` returns 'amine' only when NOTHING else
     # holds the suffix -- including the '-ol' it would itself have promoted -- so
@@ -3878,7 +3878,7 @@ def name_substituted_benzene(
             # C4b: multi-amine (benzene-x,y-diamine) path. Carry the FULL
             # per-locant N-substituent map so the assembler can build the
             # 'N-...benzene-x,y-diamine' PIN instead of dropping the
-            # N-substituent (which produced a WRONG structure -> SELF-01
+            # N-substituent (which produced a WRONG structure ->
             # suppressed the whole molecule to 'unknown').
             by_locant = {
                 loc: amine_candidates[loc]['n_substituents']
@@ -3893,29 +3893,29 @@ def name_substituted_benzene(
         name = _assemble_benzene_with_suffix(
             mol, suffix_groups, prefix_groups, n_substituents_map,
             atom_to_locant, oriented_ring, demoted_prefix_overrides,
-            # v29 Phase C tranche B: the P-14.3.4 licence is evaluated PER SCOPE, and a
+            # Phase C tranche B: the licence is evaluated PER SCOPE, and a
             # stereodescriptor in this scope is an essential locant that restores every
-            # other one (P-14.3.3, BB:2869). The suffix assembler could not see them.
+            # other one, the Blue Book). The suffix assembler could not see them.
             stereo_descriptors=stereo_descriptors,
         )
         if name and stereo_descriptors:
             stereo_prefix = format_stereodescriptor_string(stereo_descriptors)
             name = f"{stereo_prefix}{name}"
-        # F-B / RISK-7 gate-independent re-anchor: whenever an N-substituted
+        # F-B / gate-independent re-anchor: whenever an N-substituted
         # sulfonamide contributed to the name -- as the suffix (N,4-dimethyl...
         # sulfonamide) or demoted to a '{N-subs}sulfamoyl' prefix -- the italic-N
         # substituent names come from name_substituent_fragment, which can DROP a
         # benzylic stereodescriptor or MIS-NAME a functional-group branch and yield
         # a name for a DIFFERENT molecule that still OPSIN-parses. Require the whole
-        # name to round-trip InChIKey-exact; fail closed otherwise (8afa533c).
+        # name to round-trip InChIKey-exact; fail closed otherwise.
         if name and n_substituents_map.get('sulfonamide'):
             name = _reanchor_name_to_mol(mol, name)
         return name
 
     # === PREFIX-ONLY PATH (existing logic) ===
 
-    # Check for nitrile - special handling for benzonitrile naming (BUG-2 fix)
-    # IUPAC 2013 PIN: benzonitrile (not cyanobenzene) per P-66.1.1.1
+    # Check for nitrile - special handling for benzonitrile naming (fix)
+    # IUPAC 2013 PIN: benzonitrile (not cyanobenzene) per
     if 'nitrile' in prefix_groups:
         nitrile_locants = prefix_groups['nitrile']
         if len(nitrile_locants) == 1:
@@ -3957,7 +3957,7 @@ def name_substituted_benzene(
         is_monosubstituted=is_monosubstituted,
     )
 
-    # P-14.3.4.5 (BB:3007): a ring whose every substitutable position carries the SAME
+    # (the Blue Book): a ring whose every substitutable position carries the SAME
     # prefix omits all locants -- 'hexamethylbenzene', 'hexafluorobenzene'. Distinct
     # from the monosubstituted licence above (that one has no locant to cite), so it
     # needs its own branch: the MULTIPLIER must survive, and the `_omit` branch below
@@ -3966,14 +3966,14 @@ def name_substituted_benzene(
         mol, oriented_ring, {}, prefix_groups, stereo_descriptors
     )
 
-    # Build prefix strings in P-14.5 citation order. Uses the shared TOTAL order
-    # rather than the raw `alpha_sort_key` string: P-14.5 (:3442) compares
+    # Build prefix strings in citation order. Uses the shared TOTAL order
+    # rather than the raw `alpha_sort_key` string: (:3442) compares
     # nonitalic Roman letters FIRST and only then locants, and a single key
     # string conflates the two because it still carries digits. That is what
     # cited `4-[(1R)-1-chloroethyl]phenoxy` (key `1-chloroethylphenoxy`, leading
     # '1' = ASCII 49) ahead of `chloroethyl`. The citation order here must agree
     # with `benzene_prefix_citation_locants`, which assigns the locants under
-    # P-14.4(g) -- if the two disagree the name's order and its numbering come
+    # (g) -- if the two disagree the name's order and its numbering come
     # from different rules.
     prefixes = []
     for name in sorted(prefix_groups.keys(), key=prefix_citation_sort_key):
@@ -3982,7 +3982,7 @@ def name_substituted_benzene(
 
         if _l5_omit:
             # An empty locant list is format_substituent_prefix's own documented
-            # P-14.3.4 elision path: it drops the locant string and its hyphen while
+            # elision path: it drops the locant string and its hyphen while
             # keeping the multiplier, so 'methyl' x6 -> 'hexamethyl'.
             prefix_str = format_substituent_prefix(name, [], count)
         elif _omit:
@@ -3991,7 +3991,7 @@ def name_substituted_benzene(
                 # A name with a leading bracket may be either FULLY enclosed
                 # ("(oxan-2-yl)oxy" is NOT — trailing 'oxy'; "(2-methylpropyl)"
                 # IS). When it is NOT fully enclosed the whole substituent still
-                # needs an OUTER enclosing mark, escalated per P-16.5.4.1
+                # needs an OUTER enclosing mark, escalated per
                 # ("(methoxymethoxy)methyl" -> "[(methoxymethoxy)methyl]").
                 from ..assembly.naming_utils import (
                     _is_fully_enclosed,
@@ -4002,7 +4002,7 @@ def name_substituted_benzene(
                 else:
                     prefix_str = apply_enclosing_marks(name, -1)
             elif is_complex_substituent(name):
-                # Complex substituent needs enclosing marks per IUPAC P-16.5.1.1
+                # Complex substituent needs enclosing marks per IUPAC
                 # e.g., "(2-methylbut-2-en-1-yl)benzene"
                 prefix_str = f"({name})"
             else:
@@ -4051,9 +4051,9 @@ def _assemble_benzene_with_suffix(
         atom_to_locant: Mapping from atom index to locant
         oriented_ring: The oriented ring
         stereo_descriptors: The scope's stereodescriptors, needed because a
-            stereodescriptor is an essential locant and P-14.3.3 (BB:2869) then
+            stereodescriptor is an essential locant and (the Blue Book) then
             restores every locant in the scope. ``None`` means "not established" and
-            fails closed (the P-14.3.4 licence is refused).
+            fails closed (the licence is refused).
 
     Returns:
         IUPAC name string with suffix FG
@@ -4098,7 +4098,7 @@ def _assemble_benzene_with_suffix(
             continue
         # Convert to prefix form
         prefix_form = _SUFFIX_TO_PREFIX.get(sfx_name, sfx_name)
-        # D1 (P-66.4.1.3.1): a demoted N-/N'-substituted amidine must carry its
+        # D1: a demoted N-/N'-substituted amidine must carry its
         # italic-N locants onto the carbamimidoyl prefix, e.g.
         # 4-(N-methylcarbamimidoyl)benzoic acid. n_substituents_map is keyed by
         # the SUFFIX name ('carboximidamide') and holds (nlocant, name) tuples;
@@ -4106,7 +4106,7 @@ def _assemble_benzene_with_suffix(
         # hyphenated name is 'complex', so format_substituent_prefix wraps it in
         # parentheses. Bare carbamimidoyl (no N-subs) keeps the plain prefix.
         if sfx_name == 'carboximidamide':
-            # P-66.4.2.3.1 (BB 34490/34496, plan P1AM Task 6): a hydrazino-
+            # (BB 34490/34496, plan P1AM Task 6): a hydrazino-
             # bearing ring amidine demotes to 'hydrazinecarboximidoyl', not the
             # N-dropping 'carbamimidoyl'. The override carries no N/N' subs
             # (decorated hydrazino forms are fail-closed at detection).
@@ -4118,10 +4118,10 @@ def _assemble_benzene_with_suffix(
                 n_prefix = _build_amidine_n_prefix(n_subs)
                 if n_prefix:
                     prefix_form = f"{n_prefix}{prefix_form}"
-        # RISK-7 (P-66.1.1.4.2): a demoted N-substituted sulfonamide is the
+        #: a demoted N-substituted sulfonamide is the
         # '{N-substituents}sulfamoyl' substituent prefix, the N-substituents cited
         # WITHOUT the italic N -- BB '2-(dimethylsulfamoyl)benzene-1-sulfonic acid'
-        # (PIN, :32982), 'phenylsulfamoyl' (:32985). The bare 'sulfamoyl' would DROP
+        # (PIN,:32982), 'phenylsulfamoyl' (:32985). The bare 'sulfamoyl' would DROP
         # them (a wrong constitution). Build it; fail closed on a shape the builder
         # does not cover (distinct N-substituents -> the nested 'ethyl(methyl)-'
         # form). The caller re-anchors the whole name gate-independently, so a
@@ -4134,7 +4134,7 @@ def _assemble_benzene_with_suffix(
         if prefix_form:
             remaining_prefix_groups[prefix_form] = sfx_locants
 
-    # ASML-13: Handle hydroxyl suffix -- phenol retained name for benzene
+    #: Handle hydroxyl suffix -- phenol retained name for benzene
     if chosen_suffix == 'ol':
         ol_locants = chosen_locants
         if len(ol_locants) == 1:
@@ -4145,7 +4145,7 @@ def _assemble_benzene_with_suffix(
             )
         else:
             # Multiple OH on benzene: benzene-1,2-diol, benzene-1,2,3,4,5,6-hexol.
-            # Use systematic naming with multiplied -ol suffix; P-63.1.2 elides
+            # Use systematic naming with multiplied -ol suffix; elides
             # the multiplier-final 'a' before '-ol' (hexa+ol → hexol).
             from ..assembly.naming_utils import (
                 SIMPLE_MULTIPLIERS,
@@ -4154,9 +4154,9 @@ def _assemble_benzene_with_suffix(
             mult = SIMPLE_MULTIPLIERS.get(len(ol_locants), str(len(ol_locants)))
             loc_str = ','.join(str(l) for l in sorted(ol_locants))
             multiplied = _join_multiplied_suffix(mult, 'ol')
-            # P-14.3.4.5 (BB:3007): when every substitutable ring position bears the
-            # SAME decoration the locants are omitted -- 'benzenehexol' (PIN) BB:7625.
-            # Deny by default (P-14.3.3, BB:2869): any prefix, any stereodescriptor,
+            # (the Blue Book): when every substitutable ring position bears the
+            # SAME decoration the locants are omitted -- 'benzenehexol' (PIN) the Blue Book.
+            # Deny by default, the Blue Book): any prefix, any stereodescriptor,
             # any partial substitution and the locants all come back.
             if _benzene_l5_uniform_licence(
                 mol, oriented_ring, {'ol': ol_locants}, remaining_prefix_groups,
@@ -4171,7 +4171,7 @@ def _assemble_benzene_with_suffix(
                 return f"{prefix_part}{suffix_part}"
             return suffix_part
 
-    # C4 (P-62.2.1.1.1): amine suffix -- 'aniline' retained name for benzene.
+    # C4: amine suffix -- 'aniline' retained name for benzene.
     # Mirrors the hydroxy->phenol path above (amine sits last in seniority).
     if chosen_suffix == 'amine':
         amine_locants = chosen_locants
@@ -4188,29 +4188,29 @@ def _assemble_benzene_with_suffix(
             # (e.g. Nc1ccc(NC)cc1 -> N-methylbenzene-1,4-diamine), those must
             # be cited as italic-N locant prefixes on the diamine parent.
             # Previously they were DROPPED, yielding a wrong structure that
-            # SELF-01 then suppressed to 'unknown'.
+            # then suppressed to 'unknown'.
             n_by_locant = n_substituents_map.get('__amine_by_locant__', {})
             return _name_substituted_benzenediamine(
                 remaining_prefix_groups, amine_locants, n_by_locant,
             )
 
     # Check for special "benzoic acid" retained base name:
-    # Single carboxylic acid -> "benzoic acid" base (P-65.1.2.1)
+    # Single carboxylic acid -> "benzoic acid" base
     if chosen_suffix == 'carboxylic acid' and chosen_count == 1:
         return _name_substituted_benzoic_acid(
             remaining_prefix_groups, chosen_locants[0],
             atom_to_locant, oriented_ring
         )
 
-    # W3-P04 (P-65.3.1 / P-14.3.4.2): single sulfonic/sulfinic acid on benzene.
-    # Bare -> 'benzenesulfonic acid' (no locant, P-65.3.1 @31163). With ANY other
+    # W3-P04 /: single sulfonic/sulfinic acid on benzene.
+    # Bare -> 'benzenesulfonic acid' (no locant,). With ANY other
     # ring substituent the systematic ring suffix MUST cite its locant per the
-    # Blue Book PINs: '4-aminobenzene-1-sulfonic acid' (@31174),
-    # '2-(dimethylsulfamoyl)benzene-1-sulfonic acid' (@32982),
-    # '4-benzamidobenzene-1-sulfonic acid' (@33016). The general path below drops
+    # Blue Book PINs: '4-aminobenzene-1-sulfonic acid' ,
+    # '2-(dimethylsulfamoyl)benzene-1-sulfonic acid' ,
+    # '4-benzamidobenzene-1-sulfonic acid' . The general path below drops
     # this '-1-' (emitting the valid-but-non-PIN 'sulfanilic'-style form), so a
     # substituted case is intercepted here and re-anchored to the acid (position
-    # 1). Sulfinic follows the identical P-65.3 pattern.
+    # 1). Sulfinic follows the identical pattern.
     if chosen_suffix in ('sulfonic acid', 'sulfinic acid') and chosen_count == 1:
         if not remaining_prefix_groups:
             return f"benzene{chosen_suffix}"
@@ -4242,7 +4242,7 @@ def _assemble_benzene_with_suffix(
         )
 
     # F-B 0-wrong: a MULTI-instance sulfonamide (di/poly) carrying N-substituents
-    # needs the superscripted N^1/N^3 locants of P-66.1.1.3.1.1, which are not
+    # needs the superscripted N^1/N^3 locants of, which are not
     # built here. The general multi-suffix assembler below cannot cite them and
     # would silently DROP the N-substituents (benzene-1,4-disulfonamide for an
     # N,N'-dimethyl input -- a wrong constitution). Fail closed. A PRIMARY
@@ -4250,7 +4250,7 @@ def _assemble_benzene_with_suffix(
     if chosen_suffix == 'sulfonamide' and n_substituents_map.get('sulfonamide'):
         return None
 
-    # Task Y (P-66.1.1.2 @32746): single sulfinamide on benzene ->
+    # Task Y): single sulfinamide on benzene ->
     # 'benzenesulfinamide'. Mirrors the sulfonimidamide rule immediately below:
     # only the unsubstituted parent is built, because a ring substituent would
     # need the merged N/numeric prefix list and N-substitution is not built for
@@ -4260,7 +4260,7 @@ def _assemble_benzene_with_suffix(
             return None
         return "benzenesulfinamide"
 
-    # Wave-2 P1AM (P-66.4.1.1, BB 34173): single sulfonimidamide on benzene ->
+    # Wave-2 P1AM, BB 34173): single sulfonimidamide on benzene ->
     # 'benzenesulfonimidamide'. Only the unsubstituted parent is built here;
     # ANY additional ring substituent (or N/N' substitution, which carries
     # N/N' locant semantics not yet built) -> fail closed (return None).
@@ -4269,11 +4269,11 @@ def _assemble_benzene_with_suffix(
             return None
         return "benzenesulfonimidamide"
 
-    # Wave2 ring-hydrazide (P-66.3.1.2.1): a single carbohydrazide on benzene
+    # Wave2 ring-hydrazide: a single carbohydrazide on benzene
     # keeps the RETAINED acyl stem — 'benzohydrazide' (PIN, substitutable the
     # same way as benzamide) — not the systematic 'benzenecarbohydrazide':
     # 'benzohydrazide', '4-methylbenzohydrazide'. (Multi-instance falls through
-    # to the general 'benzene-1,4-dicarbohydrazide' path below, P-66.3.1.2.2.)
+    # to the general 'benzene-1,4-dicarbohydrazide' path below,.)
     if chosen_suffix == 'carbohydrazide' and chosen_count == 1:
         if not remaining_prefix_groups:
             return "benzohydrazide"
@@ -4285,7 +4285,7 @@ def _assemble_benzene_with_suffix(
         )
         return f"{prefix_part}benzohydrazide"
 
-    # C1 (P-65.3.1): single sulfonohydrazide on benzene. Renumber relative to
+    # C1: single sulfonohydrazide on benzene. Renumber relative to
     # the group (position 1) and cite the locant of any other substituent,
     # mirroring the benzenesulfonamide path: 'benzenesulfonohydrazide',
     # '4-methylbenzenesulfonohydrazide'.
@@ -4301,7 +4301,7 @@ def _assemble_benzene_with_suffix(
         )
         return f"{prefix_part}benzene{chosen_suffix}"
 
-    # C2 (P-66.4.1): single amidine on benzene -> '-carboximidamide' suffix.
+    # C2: single amidine on benzene -> '-carboximidamide' suffix.
     # Bare -> 'benzenecarboximidamide' (no locant). With other substituents the
     # PIN carries an explicit '-1-' on the group (unlike the carbohydrazide path
     # above): '4-methylbenzene-1-carboximidamide' (OPSIN-verified). Multi-instance
@@ -4320,14 +4320,14 @@ def _assemble_benzene_with_suffix(
         return f"{prefix_part}{n_prefix}benzene-1-carboximidamide"
 
     # Single carbaldehyde: delegate to benzaldehyde retained name path
-    # "benzaldehyde" is an IUPAC retained name (P-66.6.3.1.1)
+    # "benzaldehyde" is an IUPAC retained name
     if chosen_suffix == 'carbaldehyde' and chosen_count == 1:
         return _name_substituted_benzaldehyde(
             remaining_prefix_groups, chosen_locants[0],
             atom_to_locant, oriented_ring
         )
 
-    # v22 C-T2 (V-2): single chalcogen aldehyde on benzene. No retained base
+    # C- (V-2): single chalcogen aldehyde on benzene. No retained base
     # exists (unlike benzaldehyde), so the systematic 'benzenecarbo*aldehyde'
     # base is used, with the suffix renumbered to locant 1 when other
     # substituents are present (e.g. 4-methylbenzene-1-carboselenaldehyde).
@@ -4345,11 +4345,11 @@ def _assemble_benzene_with_suffix(
     locant_str = ",".join(str(loc) for loc in chosen_locants)
 
     # Build prefix part from remaining groups.
-    # W3-P04 (P-65.3.2.1 / P-14.4): the general multi-suffix path must PRESERVE
+    # W3-P04 /: the general multi-suffix path must PRESERVE
     # prefix locants — remaining_prefix_groups is already keyed by the final ring
     # locants (same numbering as chosen_locants), so a bare _build_prefix_string
     # would drop e.g. the '4-' on sulfo ('sulfobenzene-1,2-dicarboxylic acid' ->
-    # OPSIN reparses to the wrong isomer -> SELF-01). Use the locant-preserving
+    # OPSIN reparses to the wrong isomer ->). Use the locant-preserving
     # builder (mono_needs_locant=True) exactly like the retained-base branches.
     prefix_part = _build_prefix_string_with_locants(
         remaining_prefix_groups, mono_needs_locant=True
@@ -4405,7 +4405,7 @@ def _name_substituted_phenol(
     """
     Name substituted phenol derivatives.
 
-    Uses "phenol" as the retained base name per IUPAC P-63.1.1.1.
+    Uses "phenol" as the retained base name per IUPAC.
     Position 1 is the hydroxyl position. Other substituents get locants
     relative to it.
 
@@ -4437,12 +4437,12 @@ def _name_substituted_aniline(
     oriented_ring: List[int],
     n_substituents: List[str],
 ) -> str:
-    """Name substituted aniline derivatives (C4, P-62.2.1.1.1).
+    """Name substituted aniline derivatives (C4,.
 
     Uses 'aniline' as the retained base name. Position 1 is the amine-bearing
     carbon. Ring substituents get locants relative to it; N-substituents are
     cited with italic-N locants and are alphabetized TOGETHER with the ring
-    substituents (P-14.5.2 detachable-prefix ordering — the N-locant is not a
+    substituents detachable-prefix ordering — the N-locant is not a
     numeral, so ordering is by the substituent base name).
 
     Models _name_substituted_phenol (ring prefixes + renumbering) plus the
@@ -4463,9 +4463,9 @@ def _name_substituted_aniline(
     from ..assembly.naming_utils import _wrap_n_substituent, enclose_if_compound
 
     # Build the individual N-substituent prefix strings (with N/N,N locants).
-    # P-16.5.1.1: a COMPOUND N-substituent (e.g. '3-methylbutyl') takes its own
+    #: a COMPOUND N-substituent (e.g. '3-methylbutyl') takes its own
     # enclosing marks BEFORE the 'N-' locant is prefixed -- enclose_if_compound
-    # adds the base '(...)' (and escalates ()->[] when the name already carries a
+    # adds the base '(...)' (and escalates -> when the name already carries a
     # mark); _wrap_n_substituent then deliberately only escalates further. Without
     # the enclose step the prefix read 'N-3-methylbutylaniline' instead of
     # 'N-(3-methylbutyl)aniline' (matches the polyfunctional N-substituent path).
@@ -4493,10 +4493,10 @@ def _name_substituted_aniline(
     if not n_prefix_entries and not ring_prefix_entries:
         return "aniline"
 
-    # Alphabetize N- and ring-substituents together (P-14.5.2).
+    # Alphabetize N- and ring-substituents together.
     all_entries = n_prefix_entries + ring_prefix_entries
     # `e[1]` is an already-RENDERED prefix string, so its leading locants are
-    # PARENT locants -> parent_locants=True (P-14.5.4 compares a prefix's OWN
+    # PARENT locants -> parent_locants=True compares a prefix's OWN
     # locants, and a parent locant is assigned BY this very order). `[1:]` keeps
     # the total-order tier so an exact tie cannot fall through to list order.
     all_entries.sort(key=lambda e: (e[0], prefix_citation_sort_key(
@@ -4513,16 +4513,16 @@ def _name_substituted_benzenediamine(
 ) -> str:
     """Name a benzene poly-amine (>=2 -NH2/-NHR/-NR2) as the
     'benzene-<locants>-<mult>amine' PIN, citing N-substituents on any
-    N-substituted nitrogen as italic-N prefixes (C4b, P-62.2.2 / P-31.1.4).
+    N-substituted nitrogen as italic-N prefixes (C4b, /.
 
     C4 promoted every amine to the diamine suffix but silently dropped the
     N-substituent, producing e.g. 'benzene-1,4-diamine' for
-    N-methylbenzene-1,4-diamine — a WRONG structure that SELF-01 then
+    N-methylbenzene-1,4-diamine — a WRONG structure that then
     suppressed to 'unknown'. This restores the correct PIN for the class.
 
     Numbering (all inputs are in the current oriented-ring locant space,
     1..6, cyclic): the ring is renumbered over all 12 symmetry operations
-    (6 rotations x 2 directions). Selection criteria, in order (P-31.1.4):
+    (6 rotations x 2 directions). Selection criteria, in order:
       1. lowest locant set for the amino (parent-suffix) positions,
       2. lowest locants for the N-substituted nitrogens (so a single
          N-substituted amine lands on position 1 -> cited as plain 'N-'),
@@ -4532,8 +4532,8 @@ def _name_substituted_benzenediamine(
     N-substituent citation: the lowest-locant substituted nitrogen is cited
     with a bare 'N' (or 'N,N-' for a disubstituted single nitrogen); any
     additional substituted nitrogen is cited with its numeric ring locant
-    ('N<locant>-', OPSIN-valid, P-14.3.2). Ring and N prefixes are
-    alphabetized together (P-14.5.2).
+    ('N<locant>-', OPSIN-valid,. Ring and N prefixes are
+    alphabetized together.
 
     Args:
         prefix_groups: Non-amine ring substituent groups (current locants).
@@ -4619,7 +4619,7 @@ def _name_substituted_benzenediamine(
     if not all_entries:
         return suffix_part
     # `e[1]` is an already-RENDERED prefix string, so its leading locants are
-    # PARENT locants -> parent_locants=True (P-14.5.4 compares a prefix's OWN
+    # PARENT locants -> parent_locants=True compares a prefix's OWN
     # locants, and a parent locant is assigned BY this very order). `[1:]` keeps
     # the total-order tier so an exact tie cannot fall through to list order.
     all_entries.sort(key=lambda e: (e[0], prefix_citation_sort_key(
@@ -4629,22 +4629,22 @@ def _name_substituted_benzenediamine(
 
 
 def _detect_amidine_n_substituents(mol, c_idx: int, parent_atoms: Set[int]):
-    """D1 (P-66.4.1.2 / P-66.4.1.3.1): detect N/N'-substituents on an amidine C.
+    """D1 /: detect N/N'-substituents on an amidine C.
 
     Given the amidine carbon ``c_idx`` and the set of ``parent_atoms`` (the ring
     or chain atoms that carry the amidine, excluded so they are never walked into
     a substituent), return a list of ``(nlocant, name)`` tuples where:
 
-      * ``nlocant == 'N'``   -> the amino (SINGLE-bonded, -NH-) nitrogen, and
-      * ``nlocant == "N'"``  -> the imino (DOUBLE-bonded, =N-) nitrogen,
+      * ``nlocant == 'N'`` -> the amino (SINGLE-bonded, -NH-) nitrogen, and
+      * ``nlocant == "N'"`` -> the imino (DOUBLE-bonded, =N-) nitrogen,
 
     per OPSIN amidine suffixRule labels /N1 (single) and /N2 (double). Each
     substituent is named through the existing ``name_substituent_fragment``
     pipeline (pure alkyl/nameable fragments only).
 
     Fail-closed: returns ``None`` if any N-substituent is NOT a nameable pure
-    fragment (so the caller keeps the bare form and SELF-01 stays honest). An
-    unsubstituted amidine returns ``[]`` (empty list).
+    fragment (so the caller keeps the bare form and stays honest). An
+    unsubstituted amidine returns ```` (empty list).
     """
     from ..assembly.substituent_naming import name_substituent_fragment
     c_atom = mol.GetAtomWithIdx(c_idx)
@@ -4667,7 +4667,7 @@ def _detect_amidine_n_substituents(mol, c_idx: int, parent_atoms: Set[int]):
             if sub_idx == c_idx or sub_idx in parent_atoms:
                 continue
             if sub.GetSymbol() == 'O':
-                # Wave2 T3d (P-66.4.4): amidoxime -C(=N-OH)-NH2 is an N'-hydroxy
+                # Wave2: amidoxime -C(=N-OH)-NH2 is an N'-hydroxy
                 # (or N'-alkyloxy) amidine — the O on the imino N is the N'-hydroxy
                 # substituent, NOT a fail-closed case. -OH -> 'hydroxy'; -O-R ->
                 # '{alkyl}oxy'. Only the imino (=N, N') nitrogen bears it; a charged
@@ -4694,7 +4694,7 @@ def _detect_amidine_n_substituents(mol, c_idx: int, parent_atoms: Set[int]):
                 # A non-carbon substituent on the amidine N (e.g. N-N) is not
                 # a plain N-alkyl/aryl amidine -> fail closed.
                 return None
-            # AM-5 (P-66.4.1.6, BB 30468): an N-substituent that is itself an
+            #, BB 30468): an N-substituent that is itself an
             # imidoyl carbon R-C(=NH)- is the '{stem}animidoyl' prefix
             # ('ethanimidoyl' for CH3-C(=NH)-, 'methanimidoyl' for HC(=NH)-).
             # Detect: sub C with exactly one DOUBLE bond to a terminal, neutral,
@@ -4744,18 +4744,18 @@ def _detect_amidine_n_substituents(mol, c_idx: int, parent_atoms: Set[int]):
 def _build_amidine_n_prefix(n_substituents) -> str:
     """Build the N/N'-locant prefix for an amidine (carboximidamide) suffix.
 
-    C2/D1 (P-66.4.1.2.3): amidine N-substituent locants are N (the amino,
+    C2/D1: amidine N-substituent locants are N (the amino,
     single-bonded nitrogen) and N' (the imino, =N nitrogen). Entries are
     (nlocant, name) tuples where nlocant is 'N' or "N'". Identical substituent
-    names are collapsed onto a shared multiplier (P-14.3.2 / P-16.3.3):
-      [('N','methyl')]                  -> "N-methyl"
-      [("N'",'methyl')]                 -> "N'-methyl"
-      [('N','methyl'),("N'",'methyl')]  -> "N,N'-dimethyl"
-      [('N','methyl'),('N','methyl')]   -> "N,N-dimethyl"
-      [('N','ethyl'),("N'",'methyl')]   -> "N-ethyl-N'-methyl"  (alpha: ethyl<methyl)
-      [('N','methyl'),("N'",'ethyl')]   -> "N'-ethyl-N-methyl"  (alpha: ethyl<methyl)
-    Citation order is ALPHANUMERICAL by substituent NAME (P-14.5.2); the italic-N
-    locant is only a tie-break, NEVER the primary key (BB:34236 dicarboximidamide
+    names are collapsed onto a shared multiplier /:
+      [('N','methyl')] -> "N-methyl"
+      [("N'",'methyl')] -> "N'-methyl"
+      [('N','methyl'),("N'",'methyl')] -> "N,N'-dimethyl"
+      [('N','methyl'),('N','methyl')] -> "N,N-dimethyl"
+      [('N','ethyl'),("N'",'methyl')] -> "N-ethyl-N'-methyl" (alpha: ethyl<methyl)
+      [('N','methyl'),("N'",'ethyl')] -> "N'-ethyl-N-methyl" (alpha: ethyl<methyl)
+    Citation order is ALPHANUMERICAL by substituent NAME; the italic-N
+    locant is only a tie-break, NEVER the primary key (the Blue Book dicarboximidamide
     PIN 'N''1-ethyl-N1,N1-dimethyl...' cites ethyl before dimethyl across N''1>N1).
     No trailing hyphen, so it can be concatenated directly before the base name.
     Empty list -> "" (plain amidine, both nitrogens unsubstituted).
@@ -4786,8 +4786,8 @@ def _build_amidine_n_prefix(n_substituents) -> str:
             rendered = f"{loc_str}-{_wrap_n_substituent(name)}"
         segments.append((alpha_sort_key(name), _loc_sort(nlocs_sorted[0]), rendered))
 
-    # P-14.5.2 (BB:3477): distinct substituents are cited in ALPHANUMERICAL order
-    # by NAME; the italic-N locant is only a tie-break (BB:34236 dicarboximidamide
+    # (the Blue Book): distinct substituents are cited in ALPHANUMERICAL order
+    # by NAME; the italic-N locant is only a tie-break (the Blue Book dicarboximidamide
     # PIN cites 'N''1-ethyl' before 'N1,N1-dimethyl', i.e. ethyl<methyl wins over
     # the higher N-locant). Primary key = alpha (s[0]); tie-break = locant (s[1]).
     segments.sort(key=lambda s: (s[0], s[1]))
@@ -4824,33 +4824,33 @@ def _name_substituted_benzamide(
     renumbered_groups = _renumber_relative_to(prefix_groups, amide_locant)
 
     # ------------------------------------------------------------------ #
-    # P-16.3.3 (:7038) clause (b) (:7067) -- ONE multiplying prefix per   #
-    # substituent NAME, over the WHOLE locant set.                        #
+    # (:7038) clause (b) (:7067) -- ONE multiplying prefix per #
+    # substituent NAME, over the WHOLE locant set. #
     # ------------------------------------------------------------------ #
     # The N-substituents used to be spelled into their own string and glued in
     # front of the ring-prefix string. That produced TWO distinct defects, both
     # of which round-tripped cleanly through OPSIN + InChIKey (a round trip
     # proves the STRUCTURE, never the SPELLING):
     #
-    #   MERGE  CNC(=O)c1ccc(C)cc1  -> N-methyl-4-methylbenzamide
-    #                                 PIN N,4-dimethylbenzamide      (:32879)
-    #   ORDER  CNC(=O)c1cccc(Cl)c1 -> N-methyl-3-chlorobenzamide
-    #                                 PIN 3-chloro-N-methylbenzamide (:32881)
+    # MERGE CNC(=O)c1ccc(C)cc1 -> N-methyl-4-methylbenzamide
+    # PIN N,4-dimethylbenzamide (:32879)
+    # ORDER CNC(=O)c1cccc(Cl)c1 -> N-methyl-3-chlorobenzamide
+    # PIN 3-chloro-N-methylbenzamide (:32881)
     #
     # They are NOT one defect. `chloro` and `methyl` are different names and can
-    # never merge -- that one is purely P-14.5.2 alphanumerical ORDER, and the
+    # never merge -- that one is purely alphanumerical ORDER, and the
     # Blue Book settles the direction with a sulfonamide PIN that cites the
     # parent's `3-chloro` BEFORE the N-prefix (:32881).
     #
     # Both vanish under one structural change: multiplicity is a property of the
-    # substituent NAME, not of which atom carries it (P-16.3.3(b), whose own
+    # substituent NAME, not of which atom carries it (b), whose own
     # example list prints `dimethyl`), so an N-methyl and a ring 4-methyl are ONE
     # group of two. Put the N-substituents in the SAME name-keyed bucket carrying
     # the italic locant 'N', and `_build_prefix_string_with_locants` then does the
     # merging (name-keyed dict + count) and the alphanumerical ordering
     # (alpha_sort_key) that it already did for ring substituents alone.
     #
-    # P-14.3.3 "Citation of locants" (:2869) is deny-by-default, so the whole
+    # "Citation of locants" (:2869) is deny-by-default, so the whole
     # merged set is cited: `N,4-`. The Blue Book's own mixed italic/numeral sets
     # confirm the rendering -- `N,N,N,1-tetramethyl...` (:42213) and
     # `N,1,4-triphenyl...` (:42460) -- and `format_substituent_prefix` already
@@ -4907,10 +4907,10 @@ def _reanchor_name_to_mol(mol, name: Optional[str]) -> Optional[str]:
 def _build_n_substituted_sulfamoyl_prefix(
     n_substituents: List[str],
 ) -> Optional[str]:
-    """RISK-7 (P-66.1.1.4.2): the '{N-substituents}sulfamoyl' substituent prefix.
+    """: the '{N-substituents}sulfamoyl' substituent prefix.
 
-    The N-substituents are cited WITHOUT the italic N (BB:32982
-    ``dimethylsulfamoyl``, :32985 ``phenylsulfamoyl``). CONSERVATIVE: only the
+    The N-substituents are cited WITHOUT the italic N (the Blue Book
+    ``dimethylsulfamoyl``,:32985 ``phenylsulfamoyl``). CONSERVATIVE: only the
     single-substituent (``methylsulfamoyl``, ``phenylsulfamoyl``) and
     identical-multiplied (``dimethylsulfamoyl``) cases are built. DISTINCT
     N-substituents need the nested ``ethyl(methyl)sulfamoyl`` form, which is not
@@ -4925,7 +4925,7 @@ def _build_n_substituted_sulfamoyl_prefix(
     base = names[0]
     if len(names) == 2:
         base = f"{get_multiplier_prefix(2, base)}{base}"
-    # A substituted substituent -> enclosed per P-16.3.3 ('(methylsulfamoyl)',
+    # A substituted substituent -> enclosed per ('(methylsulfamoyl)',
     # '(dimethylsulfamoyl)'). Pre-enclose here; the downstream formatter leaves an
     # already-bracketed name alone, so there is no double-enclosing.
     return f"({base}sulfamoyl)"
@@ -4944,14 +4944,14 @@ def _name_substituted_benzenesulfonamide(
     Uses "benzenesulfonamide" as the base name. Position 1 is the sulfonamide
     position. Two Blue Book rules are applied here:
 
-    * **P-14.3.4.2(c) / P-14.3.3** (``BlueBookV2.md:2913`` / ``:2869``): the
+    * **(c) / ** (``the Blue Book`` / ``:2869``): the
       suffix locant ``1`` is omitted ONLY on a MONOSUBSTITUTED homogeneous
       monocyclic ring. A RING substituent makes the ring DI-substituted, so the
       ``1`` is cited — ``4-methylbenzene-1-sulfonamide`` — exactly as the
       sulfonic-acid sibling path already emits ``4-methylbenzene-1-sulfonic
       acid``. An N-substituent alone does not substitute the RING, so the bare
       ``N-methylbenzenesulfonamide`` keeps no ``1``.
-    * **P-66.1.1.3.1.1 + P-14.3.2** (``:32879`` ``N,4-dimethyl…benzamide (PIN)``):
+    * ** + ** (``:32879`` ``N,4-dimethyl…benzamide (PIN)``):
       the italic-``N`` substituents and the ring numerals form ONE merged,
       alphanumerically ordered prefix list. This is the identical structural move
       ``_name_substituted_benzamide`` makes — the N-substituents go into the
@@ -5001,10 +5001,10 @@ def _name_substituted_benzaldehyde(
     """
     Name substituted benzaldehyde derivatives.
 
-    Uses 'benzaldehyde' as retained base per IUPAC P-66.6.3.1.1.
+    Uses 'benzaldehyde' as retained base per IUPAC.
     Position 1 = CHO-bearing carbon.
 
-    Pattern follows _name_substituted_benzoic_acid().
+    Pattern follows _name_substituted_benzoic_acid.
 
     Args:
         prefix_groups: Non-aldehyde substituent groups
@@ -5037,14 +5037,14 @@ def _name_substituted_chalcogen_carbaldehyde(
     """
     Name a benzene bearing a single chalcogen aldehyde (-CH=S/Se/Te).
 
-    v22 C-T2 (V-2). Unlike benzaldehyde, the chalcogen analogues have no
-    retained base name (P-66.6.3), so the systematic 'benzenecarbo*aldehyde'
+     C- (V-2). Unlike benzaldehyde, the chalcogen analogues have no
+    retained base name, so the systematic 'benzenecarbo*aldehyde'
     base is used:
 
       - unsubstituted: ``benzenecarboselenaldehyde``
-      - substituted:   ``4-methylbenzene-1-carboselenaldehyde`` (the principal
+      - substituted: ``4-methylbenzene-1-carboselenaldehyde`` (the principal
         group takes locant 1 and is cited because other prefixes are present,
-        P-14.3.4.2)
+        
 
     Args:
         prefix_groups: Non-suffix substituent groups.
@@ -5078,15 +5078,15 @@ def _renumber_relative_to(
     ``orient_benzene`` uses, or the two paths would disagree about the identical
     molecule:
 
-    * **(f)** ``BlueBookV2/BlueBookV2.md:3301`` *detachable alphabetized prefixes,
+    * **(f)** ``the Blue Book Blue Book`` *detachable alphabetized prefixes,
       all considered together in a series of increasing numerical order* (worked at
       ``:3305``);
     * **(g)** ``:3307`` *lowest locants for the substituent cited first as a prefix
       in the name* (worked at ``:3315``, and at ``:3317``
       ``1-methyl-4-nitronaphthalene (PIN) (not 4-methyl-1-nitronaphthalene)``;
-      restated as §P-61.11.2 ``:26085``).
+      restated as § ``:26085``).
 
-    ⚠ v29 Phase C Task 9b: (g) is new here. Without it a tie on (f) silently kept
+    ⚠ Phase C Task 9b: (g) is new here. Without it a tie on (f) silently kept
     ``direction = 1`` -- the direction ``orient_benzene`` happened to hand over,
     i.e. the input SMILES' atom order. That is what made ONE molecule,
     ``Cc1cccc(Cl)c1O``, come out as ``2-chloro-6-methylphenol`` from one spelling
@@ -5144,12 +5144,12 @@ _BENZENE_PARENT_HYDRIDE_CACHE = []
 def _benzene_parent_hydride():
     """The parent hydride benzene, C6H6, atom ``i`` <-> ring locant ``i + 1``.
 
-    P-14.3.4.5 speaks of the substitutable positions of the PARENT, so the licence must
+     speaks of the substitutable positions of the PARENT, so the licence must
     be evaluated against the undecorated ring: on the input molecule a fully
     substituted ring carbon has zero hydrogens, and the count that decides the licence
     would be lost. Benzene's six carbons each carry exactly one substitutable H, which
-    is precisely why ``benzenehexol`` (BB:7625) omits while
-    ``cyclohexane-1,2,3,4,5,6-hexol`` (BB:54823) retains.
+    is precisely why ``benzenehexol`` (the Blue Book) omits while
+    ``cyclohexane-1,2,3,4,5,6-hexol`` (the Blue Book) retains.
     """
     if not _BENZENE_PARENT_HYDRIDE_CACHE:
         from rdkit import Chem
@@ -5164,10 +5164,10 @@ def _benzene_l5_uniform_licence(
     prefix_groups: Optional[Dict[str, List[int]]],
     stereo_descriptors: Optional[List] = None,
 ) -> bool:
-    """P-14.3.4.5 (BB:3007): may this benzene ring omit ALL of its locants?
+    """ (the Blue Book): may this benzene ring omit ALL of its locants?
 
-    v29 Phase C tranche B Task 1. **DENY BY DEFAULT** -- P-14.3.3 "Citation of locants"
-    (BB:2869) says *"if any locants are essential ... then all locants must be cited
+     Phase C tranche B Task 1. **DENY BY DEFAULT** -- "Citation of locants"
+    (the Blue Book) says *"if any locants are essential... then all locants must be cited
     for the parent structure or that structural unit"*, so this returns True only when
     the ring is completely substituted **in the same way**, and False for everything it
     cannot positively establish.
@@ -5177,10 +5177,10 @@ def _benzene_l5_uniform_licence(
         own parent hydride, whose every position carries exactly one substitutable H;
       * every one of the six positions is decorated, and every decoration is the same
         kind (suffix and prefix kinds are distinguished, so ``5 x -ol + 1 x chloro``
-        is heterogeneous and denied -- BB:3009 *"In case of partial substitution or
+        is heterogeneous and denied -- the Blue Book *"In case of partial substitution or
         modification, all numerical prefixes must be indicated"*);
       * nothing else in the scope forces locants: no stereodescriptor, no isotopic
-        label (BB:44180).
+        label (the Blue Book).
 
     ⚠ The decision is delegated to ``assembly.locant_omission`` -- the ONE place the
     Blue Book licences live -- and this function only marshals benzene's scope into it.
@@ -5189,7 +5189,7 @@ def _benzene_l5_uniform_licence(
     ⚠ It counts HYDROGENS, not positions. The whole boundary pair
     (``benzenehexol`` omits, ``cyclohexane-1,2,3,4,5,6-hexol`` retains) turns on the
     ring carbon having one substitutable H rather than two, and a predicate that counts
-    positions strips the inositols -- which BB:54823 spells out in one sentence.
+    positions strips the inositols -- which the Blue Book spells out in one sentence.
 
     ``stereo_descriptors=None`` means "the caller did not establish them" and fails
     closed, because a stereodescriptor is an essential locant in the same scope.
@@ -5211,14 +5211,14 @@ def _benzene_l5_uniform_licence(
         at benzene's own scope and defend the licence if the primitive is ever
         loosened -- not because they are independently exercised.
     """
-    # P-14.3.3 (BB:2869) ambient scope -- see locant_omission.forced_locant_scope.
+    # (the Blue Book) ambient scope -- see locant_omission.forced_locant_scope.
     # The isotope path names an isotope-STRIPPED molecule, so this function's own
-    # `has_isotope` test is structurally unreachable-True there (measured: a spy recorded
-    # isotopes_seen_in_mol=[] for a 13C input). MEASURED consequence:
-    # `Cc1c(C)c(C)c(C)c(C)[13c]1C` shipped `hexamethyl(13C1)benzene` against P-82.6.1.1
-    # (BB:44180). Conditional by construction: the decorator enters the scope only after
+    # `has_isotope` test is structurally unreachable-True there (measured: a trace recorded
+    # isotopes_seen_in_mol= for a 13C input). MEASURED consequence:
+    # `Cc1c(C)c(C)c(C)c(C)[13c]1C` shipped `hexamethyl(13C1)benzene` against
+    # (the Blue Book). Conditional by construction: the decorator enters the scope only after
     # establishing that the label needs a locant, so `(13C1)benzenehexol` -- correct per
-    # P-82.6.1.3 (BB:44202), all six positions one orbit -- is unaffected.
+    # (the Blue Book), all six positions one orbit -- is unaffected.
     from ..assembly.locant_omission import locants_are_forced
     if locants_are_forced():
         return False
@@ -5273,7 +5273,7 @@ def _benzene_l5_uniform_licence(
         has_isotope=has_isotope,
         # A ring assembly / multiplicative name / skeletal replacement never reaches
         # this handler: it names ONE benzene ring as the whole parent. Measured
-        # 2026-07-28 -- a validated call-spy recorded zero hits here for
+        # 2026-07-28 -- a validated call-trace recorded zero hits here for
         # 1,1'-biphenyl and 1,1'-oxydibenzene.
         is_multiplicative=False,
         is_ring_assembly=False,
@@ -5320,7 +5320,7 @@ def _build_prefix_string(prefix_groups: Dict[str, List[int]]) -> str:
                 # Already has enclosing marks -- keep as-is
                 prefix_str = name
             elif is_complex_substituent(name):
-                # Complex substituent needs enclosing marks per IUPAC P-16.5.1.1
+                # Complex substituent needs enclosing marks per IUPAC
                 prefix_str = f"({name})"
             else:
                 prefix_str = name
@@ -5355,7 +5355,7 @@ def _build_prefix_string_with_locants(
 
     prefixes = []
     for name in sorted(prefix_groups.keys(), key=alpha_sort_key):
-        # P-14.3.3 (:2869): the whole locant set of the group is cited, in order.
+        # (:2869): the whole locant set of the group is cited, in order.
         # A MERGED group may hold italic ('N') and numeric locants together, and
         # sorted(['N', 4]) raises TypeError -- locant_sort_key puts the italic
         # letters first, matching `N,N,N,1-tetramethyl...` (:42213).
@@ -5431,7 +5431,7 @@ def _name_substituted_benzonitrile(
 
     # Build prefix strings. Both mono- and poly-substituted use the shared
     # formatter, which cites the locant (the other substituent is never at
-    # position 1 -- the nitrile is) AND applies P-16.5.2.4 enclosing marks to a
+    # position 1 -- the nitrile is) AND applies enclosing marks to a
     # complex name. (BLOCKER 2: the old monosubstituted f-string
     # `f"{locants[0]}-{name}"` never bracketed, shipping the malformed
     # `4-(1E)-3-hydroxyprop-1-en-1-ylbenzonitrile`; siblings via
@@ -5479,9 +5479,9 @@ def _join_benzene_prefixes(prefixes: List[str]) -> str:
             # Hyphen needed between alpha/closing-mark and a following LOCANT
             # e.g. "1-(N,N-dimethylamino)" + "4-amino" needs a hyphen after ")";
             # likewise after a bracket/brace-closed complex prefix
-            # ("1-[4-(1-chloroethyl)phenoxy]" + "4-methyl", P-45.6).
+            # ("1-[4-(1-chloroethyl)phenoxy]" + "4-methyl",.
             #
-            # The test used to be `first_char.isdigit()`, which misses an ITALIC
+            # The test used to be `first_char.isdigit`, which misses an ITALIC
             # locant because it starts with a LETTER: "3-chloro" + "N-methyl"
             # glued into "3-chloroN-methylbenzamide". OPSIN parsed that to the
             # correct InChIKey, so no structural oracle could catch it.
@@ -5498,7 +5498,7 @@ def _join_benzene_prefixes(prefixes: List[str]) -> str:
 def _select_benzene_parent_ring(mol) -> Optional[Tuple[int, ...]]:
     """Deterministically select the benzene ring to use as the parent.
 
-    v22 C-T2 (V-3): ``get_benzene_ring`` returns the FIRST benzene ring in SSSR
+     C- (V-3): ``get_benzene_ring`` returns the FIRST benzene ring in SSSR
     order, which is SMILES-atom-order-dependent. For a molecule with two benzene
     rings connected by a bridge (an aralkyl ether, e.g. benzyl phenyl ether
     ``c1ccccc1COc1ccccc1``) the choice of parent flipped with the input spelling
@@ -5508,7 +5508,7 @@ def _select_benzene_parent_ring(mol) -> Optional[Tuple[int, ...]]:
     has a non-ring carbon neighbour) over a purely heteroatom-linked ring, then
     break ties by the lowest canonical-atom-rank tuple. The carbon-linked
     preference keeps the bridging ether oxygen in the substituent prefix
-    (-> ``phenoxymethyl``, the BB-21618 form) and avoids the heteroatom-linked
+    (-> ``phenoxymethyl``, the form) and avoids the heteroatom-linked
     parent path that mis-names ``-O-CH2-Ar``. Single-benzene molecules (the
     overwhelming majority) are unaffected — the lone ring is returned.
     """
@@ -5538,7 +5538,7 @@ def _select_benzene_parent_ring(mol) -> Optional[Tuple[int, ...]]:
         )
 
     def _key(ring: Tuple[int, ...]):
-        # carbon-linked first (0 < 1); then P-45.2.1 (Wave-2 C2): the ring
+        # carbon-linked first (0 < 1); then (Wave-2 C2): the ring
         # with the GREATER number of substituent attachments is the parent
         # (the BB dicyano-phenoxy example — this tier also killed a genuine
         # spelling-dependence: the old rank-only tie-break flipped parent
@@ -5558,10 +5558,10 @@ def _benzene_parent_candidates(mol) -> List[Tuple[int, ...]]:
 
     A single-benzene molecule returns its lone ring (so naming is byte-identical
     to the old single-parent path). When two or more benzene rings tie — the
-    P-45.5 diaryl-linked-by-heteroatom class (e.g. a stereo-differing diaryl
+     diaryl-linked-by-heteroatom class (e.g. a stereo-differing diaryl
     ether) — ALL tied rings are returned so ``name_benzene_derivative`` can name
     each candidate and select the preferred parent by the alphanumerical order of
-    the complete names (P-45.5.1) with the 'R' < 'S' tie-break (P-45.6.3). The
+    the complete names with the 'R' < 'S' tie-break. The
     canonical-rank total order that formerly broke the tie is retained only as a
     defensive last resort inside the name comparison.
     """
@@ -5602,17 +5602,17 @@ _STEREO_PAREN_BLOCK_RE = re.compile(r'\((\d*[RSEZ*](?:,\d*[RSEZ*])*)\)')
 
 
 def _alphanumerical_name_key(name: str):
-    """P-45.5.1 / P-45.6.3 preference key for choosing between candidate parent
+    """ / preference key for choosing between candidate parent
     names of a diaryl-linked scaffold.
 
     Returns ``(letters, locants, stereo)`` so ``min`` selects the preferred PIN:
       * ``letters`` — the Roman letters in order of appearance, lowercased, with
-        stereodescriptor blocks removed (P-14.5 / line 3446: stereodescriptors are
-        NOT part of the alphanumerical comparison) — P-45.5.1 primary;
-      * ``locants`` — the numeric locants in order of appearance — P-45.5.1
+        stereodescriptor blocks removed / line 3446: stereodescriptors are
+        NOT part of the alphanumerical comparison) — primary;
+      * ``locants`` — the numeric locants in order of appearance —
         secondary (compared only when the letters are identical);
       * ``stereo`` — the 'R'/'S' descriptor letters in order of appearance
-        ('R' < 'S') — P-45.6.3 final tie-break, applied only when letters and
+        ('R' < 'S') — final tie-break, applied only when letters and
         locants are identical (the constitution-symmetric stereo-differing case).
     """
     stereo = tuple(
@@ -5627,12 +5627,12 @@ def _alphanumerical_name_key(name: str):
 
 def _preferred_benzene_parent_ring(mol):
     """Name each candidate parent benzene ring and return the (ring, name) whose
-    complete name is preferred by P-45.5.1 (alphanumerical order) with the
-    P-45.6.3 'R' < 'S' tie-break. Single-benzene molecules return their lone
+    complete name is preferred by (alphanumerical order) with the
+     'R' < 'S' tie-break. Single-benzene molecules return their lone
     (ring, name). Returns None when no benzene ring can be named.
 
     This is the single authority for the diaryl-linked-by-heteroatom parent
-    choice (P-45.5 / P-45.6): both ``name_benzene_derivative`` and the main
+    choice /: both ``name_benzene_derivative`` and the main
     namer dispatch consult it, so the pipeline names exactly the ring this
     selects. The comparison is over the NAME STRINGS (structure-derived, so
     deterministic — never atom-order-dependent).
@@ -5649,11 +5649,11 @@ def _preferred_benzene_parent_ring(mol):
         if not substituents:
             nm = "benzene"
         else:
-            # W3-P04 (P-14.4(c)): anchor the principal characteristic group to
+            # W3-P04 (c)): anchor the principal characteristic group to
             # the lowest locant before detachable substituents (mirrors the
             # composer._assemble_benzene_name path and namer.py Branch 3, so the
             # NAME and locant HINT agree).
-            # v29 Phase C Task 9: routed through the shared authority. This site
+            # Phase C Task 9: routed through the shared authority. This site
             # has no ``features``, so it derives the molecule-level principal group
             # from the same seniority entry point the rest of the pipeline uses.
             # It is only reached for MULTI-benzene molecules whose principal group
@@ -5687,7 +5687,7 @@ def name_benzene_derivative(mol) -> Optional[str]:
     Returns:
         IUPAC name string, or None if not a benzene derivative
     """
-    # Preferred parent benzene ring (P-45.5.1 / P-45.6.3 for diaryl scaffolds;
+    # Preferred parent benzene ring / for diaryl scaffolds;
     # the lone ring for a single-benzene molecule).
     preferred = _preferred_benzene_parent_ring(mol)
     if preferred is None:

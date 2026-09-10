@@ -1,5 +1,5 @@
 """Regression tests for the '_validate_anion_name'/'_validate_cation_name'
-'methylidene' radical-leak guard (v33 Phase 3 review follow-up).
+'methylidene' radical-leak guard (a phase review follow-up).
 
 Root cause: the guard was a project-wide SUBSTRING check --
 
@@ -7,7 +7,7 @@ Root cause: the guard was a project-wide SUBSTRING check --
         return ''
 
 -- added defensively in Plan 17-06 (2026-02-05) against a radical name
-"leaking" into ion naming. SPY (2026-08-17): the leak mechanism is real --
+"leaking" into ion naming. a trace (2026-08-17): the leak mechanism is real --
 ``_try_neutralize_and_name`` (the generic single-atom fallback both
 ``name_anion``/``name_cation`` call when no dedicated class matches) collapses
 a genuine single-carbon ion down to a bare divalent-radical fragment and
@@ -22,7 +22,7 @@ But the substring check ALSO fires on legitimate ylidene-owner names built by
 producers such as the oxime-ether / glucosinolate '(...ylidene)amino'
 substituent (e.g. 'sulfanylmethylideneamino sulfate') whenever the ylidene
 owner happens to be exactly one backbone carbon ('methylidene', as opposed to
-'ethylidene', 'propylidene', ...). In every legitimate case 'methylidene' is
+'ethylidene', 'propylidene',...). In every legitimate case 'methylidene' is
 followed by MORE text (an 'amino'/'hydrazin...' linker word) because it names
 a substituent attached to something else; in the leak case it is the bare
 TERMINAL token of the whole name, with nothing after it.
@@ -105,9 +105,9 @@ def test_two_carbon_ylidene_owner_unchanged(namer):
 # ---------------------------------------------------------------------------
 
 def test_try_neutralize_and_name_can_produce_bare_methylidene_leak():
-    # [CH3+] (methylium) and [CH-] both neutralize down to a lone :CH2
+    # [CH3+] (methylium) and [CH-] both neutralize down to a lone:CH2
     # fragment, which the general engine names 'methylidene' with no ion
-    # suffix -- this is the real shape name_cation()/name_anion() would
+    # suffix -- this is the real shape name_cation/name_anion would
     # return to the validator if route_charged/retained-name lookup ever
     # declines a single-carbon ion of this shape.
     assert _try_neutralize_and_name(Chem.MolFromSmiles("[CH3+]")) == "methylidene"

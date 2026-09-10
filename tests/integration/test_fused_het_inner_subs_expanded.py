@@ -1,11 +1,11 @@
 """
 Integration tests for expanded fused heterocycle inner substituent detection.
 
-Phase 80.5 Plan 01 -- Validates that _detect_fused_het_inner_subs() correctly
+a phase Plan 01 -- Validates that _detect_fused_het_inner_subs correctly
 identifies cyano, nitro, trifluoromethyl, general alkyl (propyl/butyl), and
 general alkoxy (ethoxy/propoxy) substituents on fused heterocycle cores.
 
-Tests verify FHET-01 and FHET-06 requirements.
+Tests verify and requirements.
 """
 
 import pytest
@@ -174,7 +174,7 @@ class TestGeneralAlkoxyInnerSub:
 
 @pytest.mark.integration
 class TestExpandedInnerSubsEndToEnd:
-    """End-to-end tests: name_compound() produces correct compound prefixes."""
+    """End-to-end tests: name_compound produces correct compound prefixes."""
 
     def test_e2e_cyano_indole_on_diacid(self):
         """5-cyano-1H-indole on heptanedioic acid produces '5-cyano-1H-indol-3-yl'."""

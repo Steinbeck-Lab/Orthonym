@@ -59,7 +59,7 @@ def _heavy_atoms(smiles: str) -> int:
 
 @pytest.mark.unit
 class TestLeverBGammaLink:
-    """a trace §2: chebi 494 (gamma-Glu-ACC) + hand-RT-verified gamma-glutamyl
+    """a trace: chebi 494 (gamma-Glu-ACC) + hand-RT-verified gamma-glutamyl
     targets. Was ABSTAIN ('unknown organic compound') before this change."""
 
     def test_chebi494_gamma_glu_acc(self):
@@ -116,7 +116,7 @@ class TestLeverBGammaLink:
 
 @pytest.mark.unit
 class TestLeverANAcylCap:
-    """a trace §3a: a fatty/simple-acyl N-terminal cap. Was ABSTAIN before this
+    """a trace a: a fatty/simple-acyl N-terminal cap. Was ABSTAIN before this
     change for a chain length >= 2 residues behind the cap."""
 
     def test_synthetic_fatty_acyl_dipeptide(self):
@@ -159,7 +159,7 @@ class TestLeverANAcylCap:
 
 @pytest.mark.unit
 class TestFailClosedMidChainNonStandard:
-    """a trace §2 (chebi 371): OPSIN itself mis-parses a non-retained acyl word
+    """a trace (chebi 371): OPSIN itself mis-parses a non-retained acyl word
     used as a CONTINUING chain link (verified via 3 independent controls in
     the a trace), so no phrasing of this molecule via the peptide-chain
     convention can round-trip. Must abstain (a failure-name sentinel),

@@ -1,7 +1,7 @@
 """Task 4: ring-bearing fragments, and the stereochemistry refusal guard.
 
 Ring nomenclature is delegated wholesale to `rules.terminal_ring.terminal_ring_name`,
-which already applies P-22.2.3 skeletal replacement with lambda and ring
+which already applies skeletal replacement with lambda and ring
 multiple-bond locants and gates every result on its own reconstruction audit. What
 is NEW here is the JOIN: a decorated ring fragment must account for the ring atoms
 AND every decoration, and a ring decoration's locant must come from the RING's own
@@ -78,8 +78,8 @@ def test_a_ring_decoration_that_cannot_be_named_refuses_the_whole_fragment():
 # ------------------------------------------- the stereochemistry refusal guard
 
 def test_an_ACYCLIC_stereocentre_emits_the_descriptor():
-    """The acyclic path EMITS the backbone R/S centre (v30 B3), it no longer
-    refuses. SELF-01's C6 stereo layer verifies the emitted descriptor, so a wrong
+    """The acyclic path EMITS the backbone R/S centre (B3), it no longer
+    refuses. 's C6 stereo layer verifies the emitted descriptor, so a wrong
     CIP/locant abstains rather than shipping a different compound.
     """
     # NB `CC[C@H](C)CC` looks like a stereocentre but is NOT one -- two identical
@@ -94,7 +94,7 @@ def test_an_ACYCLIC_stereocentre_emits_the_descriptor():
 
 
 def test_an_ACYCLIC_defined_backbone_double_bond_now_emits_ez():
-    """v30 internal-C=C lever: a defined BACKBONE C=C configuration is now
+    """ internal-C=C lever: a defined BACKBONE C=C configuration is now
     EMITTED as a leading (nE)/(nZ) block rather than refused (only R/S centres,
     which this module still cannot spell, keep refusing -- see the sibling test).
 
@@ -113,14 +113,14 @@ def test_an_ACYCLIC_defined_backbone_double_bond_now_emits_ez():
 
 
 def test_a_stereocentre_in_the_fragment_emits_the_descriptor():
-    """v30 §A: the composite path now EMITS the stereodescriptor instead of the
+    """ §A: the composite path now EMITS the stereodescriptor instead of the
     former blanket refusal.
 
     The old guard refused any defined stereo because the path emitted none and
-    SELF-01's skeleton block is constitution-only. That was resolved two ways: the
+    's skeleton block is constitution-only. That was resolved two ways: the
     composite path cites the ring system's own R/S and every branch cites its own
     (each branch recursion either emits its centre or REFUSES — no silent drop),
-    and SELF-01 now carries the C6 RegistrationHash stereo layer that catches a
+    and now carries the C6 RegistrationHash stereo layer that catches a
     WRONG descriptor. So the centre is cited, never dropped. Here the centre is in
     the -CH2-CH(OH)-CH3 branch, cited by that branch's recursion as (2S).
     """
@@ -159,8 +159,8 @@ def test_stereo_outside_the_fragment_does_not_block_it():
 
 
 def test_ring_system_stereo_is_cited_in_leading_block():
-    """v30 §A: a chiral ring SUBSTITUTENT cites its ring R/S in a leading (...)
-    block using the ring numbering; the whole molecule round-trips (SELF-01 C6)."""
+    """ §A: a chiral ring SUBSTITUTENT cites its ring R/S in a leading (...)
+    block using the ring numbering; the whole molecule round-trips (C6)."""
     # 2-(2-hydroxyethyl)cyclohexan-1-ol as a substituent fragment (attach on ring)
     mol = Chem.MolFromSmiles("OCC[C@H]1CCCC[C@@H]1O")
     got = terminal_fragment_name(mol, set(range(mol.GetNumAtoms())), 3)

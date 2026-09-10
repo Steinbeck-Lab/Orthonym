@@ -5,7 +5,7 @@ Tests that fused ring systems NOT in the dictionary produce correct
 systematic names via the algorithmic generator. Validates against
 OPSIN-verified names and checks zero regression on dictionary entries.
 
-Phase 112, Plan 02: Wire algorithmic fusion naming and validate.
+a phase, Plan 02: Wire algorithmic fusion naming and validate.
 """
 
 import pytest
@@ -60,11 +60,11 @@ ALGORITHMIC_FUSION_CASES = [
     ('c1cc2sncc2cn1', 'isothiazolo[4,5-c]pyridine'),
 
     # 7. pyrazolo[4,5-c]pyridine: pyrazole fused to pyridine
-    # Phase 149 D-07 update: FR-2.3 V18 (Appendix A.6) picks larger ring
+    # a phase update:.3 V18 (Appendix A.6) picks larger ring
     # (pyridine, 6-membered) as base when both rings have senior
     # heteroatom (N). Original test expectation was pyrido[3,4-d]pyrazole
     # which embeds older numeric-seniority preference for smaller
-    # heteroatom-rich ring; per V18 plan + IUPAC P-25.3.2.4, FR-2.3(c)
+    # heteroatom-rich ring; per V18 plan + IUPAC,.3(c)
     # "Larger ring at first point of difference" supersedes. Both names
     # round-trip via OPSIN.
     ('c1cc2n[nH]cc2cn1', 'pyrazolo[4,5-c]pyridine'),
@@ -76,8 +76,8 @@ ALGORITHMIC_FUSION_CASES = [
     ('c1cc2cncnc2cn1', 'pyrido[3,4-d]pyrimidine'),
 
     # 10. imidazo[4,5-c]pyridine: imidazole fused to pyridine
-    # Phase 149 D-07 update: same FR-2.3 V18 rationale as case 7.
-    # Original test expectation was pyrido[3,4-d]imidazole; FR-2.3(c)
+    # a phase update: same.3 V18 rationale as case 7.
+    # Original test expectation was pyrido[3,4-d]imidazole;.3(c)
     # picks larger ring (pyridine) as base.
     ('c1cc2[nH]cnc2cn1', 'imidazo[4,5-c]pyridine'),
 

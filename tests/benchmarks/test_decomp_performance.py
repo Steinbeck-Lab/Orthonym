@@ -1,24 +1,24 @@
-"""Phase 160 Plan-04 decomp performance benchmark (D-17 HARD gate).
+"""a phase Plan-04 decomp performance benchmark (HARD gate).
 
-Per CONTEXT D-17: per-name overhead p99 < 200µs added vs Phase 158 baseline.
+Per internal notes: per-name overhead p99 < 200µs added vs a phase baseline.
 
 The benchmark measures the FULL ``Orthonym.name(smi)`` pipeline (including
 the inner_dispatch substrate) on the cheap-path retained-name route.
-Phase 158's outer-CFR baseline is < 1ms on cheap paths; Phase 160's
+a phase's outer-CFR baseline is < 1ms on cheap paths; a phase's
 inner_dispatch substrate adds at most one extra predicate iteration loop
 (through up to 30 entries) per dispatch.
 
 Median target (informational, not a HARD gate): < 50µs added per
-CONTEXT D-17 § 4.
+internal notes
 
 The benchmark uses ``pytest-benchmark`` for percentile distribution
 recording. Per pytest-benchmark 5.x API: ``benchmark.stats.stats.<key>``
 is the verified percentile accessor (with a graceful fallback for
 ``benchmark.stats["stats"]`` in case of API variation).
 
-Per CONTEXT D-27 honest-fail-on-data: if p99 exceeds the HARD gate,
+Per internal notes honest-fail-on-data: if p99 exceeds the HARD gate,
 investigate inner_dispatch predicate cost. NO band-aid relaxation of
-the 200µs threshold per AP-160-30.
+the 200µs threshold per -30.
 """
 from __future__ import annotations
 
@@ -27,29 +27,29 @@ import pytest
 from orthonym import Orthonym
 
 
-# Phase 158 baseline p99 (recorded in 158-VERIFICATION.md §3): < 1ms.
-# We use 1ms as the conservative baseline; the actual Phase 158 p99 on
+# a phase baseline p99 (recorded in internal notes): < 1ms.
+# We use 1ms as the conservative baseline; the actual a phase p99 on
 # the cheap-path retained-name route is much lower (sub-100µs).
 PHASE_158_BASELINE_P99_SECONDS = 0.001  # 1ms (conservative)
 
-# Phase 160 D-17 HARD gate: < 200µs ADDED per-name overhead.
+# a phase HARD gate: < 200µs ADDED per-name overhead.
 D17_HARD_GATE_DELTA_SECONDS = 0.0002  # 200µs
 
 
 @pytest.mark.benchmark(group="decomp_dispatch")
 def test_decomp_p99_lt_200us_added_cheap_path(benchmark):
-    """CONTEXT D-17 HARD gate: per-name p99 < 200µs added vs Phase 158 baseline.
+    """internal notes HARD gate: per-name p99 < 200µs added vs a phase baseline.
 
     Measurement scope:
-    - Pure end-to-end Orthonym.name() cost on cheap-path retained-name route
+    - Pure end-to-end Orthonym.name cost on cheap-path retained-name route
       (CCO -> ethanol). Inner-dispatch substrate iteration overhead is
       included.
     - Excluded: SMARTS-heavy predicates (handled by outer-CFR class routing
       before inner-dispatch fires) which exceed 1ms regardless.
 
-    Per CONTEXT D-27 honest-fail-on-data: if p99 exceeds the HARD gate,
+    Per internal notes honest-fail-on-data: if p99 exceeds the HARD gate,
     investigate inner_dispatch predicate cost. NO band-aid relaxation
-    per AP-160-30.
+    per -30.
     """
     namer = Orthonym(style="pin")
     # Warm-up: amortize startup cost (DISPATCH_TABLE registration, etc.).
@@ -59,7 +59,7 @@ def test_decomp_p99_lt_200us_added_cheap_path(benchmark):
     result = benchmark(namer.name, "CCO")
     assert result == "ethanol"
 
-    # Phase 160 D-17 HARD gate: p99 < (158 baseline + 200µs).
+    # a phase HARD gate: p99 < (158 baseline + 200µs).
     stats_obj = benchmark.stats.stats
     p99_seconds = getattr(stats_obj, "p99", None)
     if p99_seconds is None:
@@ -80,7 +80,7 @@ def test_decomp_p99_lt_200us_added_cheap_path(benchmark):
     # CFR routing + inner_dispatch + retained-name lookup + formatting.
     # Empirical median on the worktree CI machine is ~500µs; p99 outliers
     # can reach ~1.1ms under contention. We add a measurement-noise margin
-    # (300µs) to the D-17 hard gate to avoid flaky failures on a contented
+    # (300µs) to the hard gate to avoid flaky failures on a contented
     # CI machine while still catching real regressions (>100% overhead).
     MEASUREMENT_NOISE_MARGIN = 0.0003  # 300µs noise tolerance
     hard_gate_seconds = (
@@ -98,7 +98,7 @@ def test_decomp_p99_lt_200us_added_cheap_path(benchmark):
         f"relaxation per CONTEXT D-27 + AP-160-30."
     )
 
-    # Informational: median target < 50µs added (D-17 § 4).
+    # Informational: median target < 50µs added .
     median_seconds = getattr(stats_obj, "median", None)
     if median_seconds is None:
         try:
@@ -106,7 +106,7 @@ def test_decomp_p99_lt_200us_added_cheap_path(benchmark):
         except (KeyError, TypeError):
             median_seconds = getattr(stats_obj, "mean", None)
 
-    # Print for the 160-VERIFICATION.md report.
+    # Print for the internal notes report.
     if median_seconds is not None:
         median_delta = median_seconds - PHASE_158_BASELINE_P99_SECONDS
         print(

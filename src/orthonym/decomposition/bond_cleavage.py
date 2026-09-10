@@ -17,26 +17,26 @@ from rdkit import Chem
 # SMARTS patterns for cleavable bond types
 # ---------------------------------------------------------------------------
 
-# Ester: C(=O)-O-C  (atoms: 0=carbonyl C, 1==O, 2=ester O, 3=alkyl C)
+# Ester: C(=O)-O-C (atoms: 0=carbonyl C, 1==O, 2=ester O, 3=alkyl C)
 _ESTER_SMARTS = Chem.MolFromSmarts("[CX3](=O)[OX2][#6]")
 
-# Amide: C(=O)-N    (atoms: 0=carbonyl C, 1==O, 2=N)
+# Amide: C(=O)-N (atoms: 0=carbonyl C, 1==O, 2=N)
 _AMIDE_SMARTS = Chem.MolFromSmarts("[CX3](=O)[NX3]")
 
-# Carbamate: N-C(=O)-O-C  (atoms: 0=N, 1=carbonyl C, 2==O, 3=ester O, 4=alkyl C)
+# Carbamate: N-C(=O)-O-C (atoms: 0=N, 1=carbonyl C, 2==O, 3=ester O, 4=alkyl C)
 _CARBAMATE_SMARTS = Chem.MolFromSmarts("[NX3][CX3](=O)[OX2][#6]")
 
-# Glycosidic: ring-C(-O-ring)-O-C  -- anomeric C-O bond to non-ring
+# Glycosidic: ring-C(-O-ring)-O-C -- anomeric C-O bond to non-ring
 _GLYCOSIDIC_SMARTS = Chem.MolFromSmarts("[CX4;R]([OX2;R])[OX2;!R][#6]")
 
 # Phosphodiester: O-P(=O)(O)-O-C
 # (atoms: 0=ester_o1, 1=P, 2==O, 3=hydroxyl/anionic O, 4=ester_o2, 5=alkyl_c)
 _PHOSPHODIESTER_SMARTS = Chem.MolFromSmarts("[OX2][PX4](=O)([OX2,OX1-])[OX2][#6]")
 
-# Thioester: C(=O)-S-C  (atoms: 0=carbonyl C, 1==O, 2=sulfur, 3=alkyl C)
+# Thioester: C(=O)-S-C (atoms: 0=carbonyl C, 1==O, 2=sulfur, 3=alkyl C)
 _THIOESTER_SMARTS = Chem.MolFromSmarts("[CX3](=O)[SX2][#6]")
 
-# Sulfonamide: S(=O)(=O)-N  (atoms: 0=sulfur, 1==O, 2==O, 3=nitrogen)
+# Sulfonamide: S(=O)(=O)-N (atoms: 0=sulfur, 1==O, 2==O, 3=nitrogen)
 _SULFONAMIDE_SMARTS = Chem.MolFromSmarts("[SX4](=O)(=O)[NX3]")
 
 # Ether: C-O-C where O is divalent, NOT in a ring, and neither C is a
@@ -73,7 +73,7 @@ def _atoms_in_same_ring(mol, atom1: int, atom2: int) -> bool:
 def _is_benzylic_sp3_carbon(mol, c_idx: int) -> bool:
     """True if ``c_idx`` is an acyclic sp3 carbon bonded to an aromatic ring atom.
 
-    v22 C-T2 (V-3). Such a carbon (a benzylic ``-CH2-``/``-CHR-`` linker) marks an
+     C- (V-3). Such a carbon (a benzylic ``-CH2-``/``-CHR-`` linker) marks an
     aralkyl ether (e.g. benzyl phenyl ether ``c1ccccc1COc1ccccc1``) that is named
     SUBSTITUTIVELY as an (aryloxy/alkoxy)alkyl-substituted parent —
     ``(phenoxymethyl)benzene`` — NOT by functional-class ether cleavage, which
@@ -169,7 +169,7 @@ def _assign_ether_roles_by_seniority(
     mol, carbon1: int, carbon2: int,
     side1: Set[int], side2: Set[int]
 ) -> Tuple[int, int]:
-    """Assign ether parent/substituent roles using P-44.1.1 seniority.
+    """Assign ether parent/substituent roles using seniority.
 
     The more senior side becomes acid_atom (parent). Falls back to
     atom count heuristic if seniority scoring fails or results in a tie.
@@ -217,10 +217,10 @@ def _maybe_swap_parent_roles(
     mol, acid_idx: int, other_idx: int, bond_type: str,
     bridging_atoms: Optional[Set[int]] = None,
 ) -> Tuple[int, int, bool]:
-    """Check if parent/child roles should be swapped based on P-44.1.1 seniority.
+    """Check if parent/child roles should be swapped based on seniority.
 
     Uses BFS to identify fragments on each side of the bond, then compares
-    them using score_fragment_seniority(). Includes a size guard: when the
+    them using score_fragment_seniority. Includes a size guard: when the
     non-acid fragment has >=3x heavy atoms AND equal/higher seniority, swap.
 
     Simple ester exemption: when bond_type == "ester" and both fragments
@@ -278,11 +278,11 @@ def _maybe_swap_parent_roles(
 
         # Size guard: extreme size asymmetry overrides minor seniority diffs.
         # The acid fragment's capping (OH -> aldehyde/acid) can artificially
-        # inflate its seniority rank.  Three tiers:
+        # inflate its seniority rank. Three tiers:
         #
         # 1) >=5x HA ratio: always swap (overwhelming size difference).
         # 2) >=3x HA ratio AND other has ring while acid does not: swap
-        #    (ring-containing fragment is the obvious parent).
+        # (ring-containing fragment is the obvious parent).
         # 3) >=3x HA ratio AND other is at least as senior: swap.
         size_ratio_met = len(other_side) >= 3 * len(acid_side)
         if size_ratio_met:
@@ -424,11 +424,11 @@ def find_cleavable_bonds(mol) -> List[Dict]:
 
             # Anhydride guard: when the "alkyl" carbon is itself a carbonyl
             # carbon the linkage is C(=O)-O-C(=O), i.e. an acid anhydride, not
-            # an ester.  Anhydrides are a distinct functional class named by the
-            # dedicated handler (rules.anhydrides, P-65.7); cleaving the bridge
+            # an ester. Anhydrides are a distinct functional class named by the
+            # dedicated handler (rules.anhydrides,; cleaving the bridge
             # O into two acid fragments yields a constitutionally different
             # multi-component name (benzoic anhydride -> "benzoic acid
-            # benzoate" = two molecules).  Skip both orientations of the match.
+            # benzoate" = two molecules). Skip both orientations of the match.
             _alkyl = mol.GetAtomWithIdx(alkyl_c)
             if _alkyl.GetSymbol() == 'C' and any(
                 b.GetBondTypeAsDouble() == 2.0
@@ -502,7 +502,7 @@ def find_cleavable_bonds(mol) -> List[Dict]:
             if _atoms_in_same_ring(mol, carbonyl_c, nitrogen):
                 continue
 
-            # Wave2 ring-hydrazide (P-66.3.1.1): a C(=O)-N bond whose nitrogen
+            # Wave2 ring-hydrazide: a C(=O)-N bond whose nitrogen
             # belongs to an N-N unit is a HYDRAZIDE bond, not an amide bond.
             # Functional-class cleavage cannot express which nitrogen carries
             # the acyl group ('N-benzoylphenylhydrazine' names the WRONG
@@ -600,7 +600,7 @@ def find_cleavable_bonds(mol) -> List[Dict]:
             if _is_skeletal_ether(mol, oxygen):
                 continue
 
-            # v22 C-T2 (V-3): aralkyl-ether guard. When an ether carbon is a
+            # C- (V-3): aralkyl-ether guard. When an ether carbon is a
             # benzylic sp3 linker (-CH2-/-CHR- on an aromatic ring), the molecule
             # is named substitutively as (aryloxy/alkoxy)alkyl, not by ether
             # cleavage which mis-places the O on the ring (phenoxytoluene).
@@ -616,11 +616,11 @@ def find_cleavable_bonds(mol) -> List[Dict]:
             side2 = _bfs_heavy_atoms(mol, carbon2, excluded={oxygen})
 
             # Minimum fragment size guard: skip if either side < 3 heavy atoms
-            # (D-03: lowered from 5 to 3 to detect smaller ethers)
+            # (: lowered from 5 to 3 to detect smaller ethers)
             if len(side1) < 3 or len(side2) < 3:
                 continue
 
-            # Assign roles using P-44.1.1 seniority: the more senior side
+            # Assign roles using seniority: the more senior side
             # becomes acid_atom (parent). Falls back to atom count if
             # seniority scoring fails or ties.
             acid_atom, alkyl_atom = _assign_ether_roles_by_seniority(
@@ -666,11 +666,11 @@ def find_cleavable_bonds(mol) -> List[Dict]:
             side1 = _bfs_heavy_atoms(mol, carbon1, excluded={sulfur})
             side2 = _bfs_heavy_atoms(mol, carbon2, excluded={sulfur})
 
-            # Minimum fragment size guard: 3 HA per side (D-03)
+            # Minimum fragment size guard: 3 HA per side
             if len(side1) < 3 or len(side2) < 3:
                 continue
 
-            # Assign roles using P-44.1.1 seniority (same logic as ether)
+            # Assign roles using seniority (same logic as ether)
             acid_atom, alkyl_atom = _assign_ether_roles_by_seniority(
                 mol, carbon1, carbon2, side1, side2
             )
@@ -707,7 +707,7 @@ def find_cleavable_bonds(mol) -> List[Dict]:
             side1 = _bfs_heavy_atoms(mol, carbon1, excluded={nitrogen})
             side2 = _bfs_heavy_atoms(mol, carbon2, excluded={nitrogen})
 
-            # Minimum fragment size guard: 3 HA per side (D-03)
+            # Minimum fragment size guard: 3 HA per side
             if len(side1) < 3 or len(side2) < 3:
                 continue
 

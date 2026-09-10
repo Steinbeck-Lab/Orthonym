@@ -1,4 +1,4 @@
-"""Integration gold tests for steroid conjugate preservation (a phase, WSC-03).
+"""Integration gold tests for steroid conjugate preservation (a phase, -03).
 
 Per-fragment triviality controller: a steroid scaffold conjugated through a
 heteroatom linker to a sulfate / phosphate / glycosyl(uronyl) fragment keeps BOTH
@@ -83,7 +83,7 @@ def test_ergostan_hsulfate():
     """CHEBI:136768 ergostane sulfate ester: the conjugate MUST be kept and the name MUST
     OPSIN-round-trip; the EXACT stereo-citation style is the binding assertion's relaxation.
 
-    The WSC-03 conjugate-loss fix works for ergostane — the conjugate is kept, the word is the
+    The -03 conjugate-loss fix works for ergostane — the conjugate is kept, the word is the
     correct neutral-form `hydrogen sulfate` (free acid -OSO2OH), and the name round-trips.
     The ChEBI reference cites the ergostane ring-face α/β block
     `(22S)-3β-hydroxy-6-oxo-5α-ergostan-22-yl hydrogen sulfate`, but ergostane α/β is a
@@ -104,7 +104,7 @@ def test_ergostan_hsulfate():
     n = name_compound(smiles)
     # Conjugate kept (no silent drop) + correct neutral-form word + scaffold -yl anchor.
     assert n is not None and "hydrogen sulfate" in n and "ergostan" in n and "-yl " in n, n
-    # And the emitted name OPSIN-round-trips () — never a worse name than prior (dropped).
+    # And the emitted name OPSIN-round-trips  — never a worse name than prior (dropped).
     canon = Chem.MolToSmiles(Chem.MolFromSmiles(smiles))
     assert opsin_roundtrip_check(canon, n).get("passed"), n
 
@@ -146,7 +146,7 @@ def test_disulfate_honest_fail():
     """CHEBI:137389 (disulfate) -> must NOT silently drop a fragment.
 
     Out-of-scope multi-conjugate (two equal-seniority sulfates). The completeness
-    invariant () makes it honest-fail (None / legacy / 'unknown organic
+    invariant  makes it honest-fail (None / legacy / 'unknown organic
     compound') rather than emit a fragment-omitting name. The xfail marks the
     out-of-scope deferral — it is NOT an output band-aid. Full multi-conjugate
     prefix treatment is a phase/184.

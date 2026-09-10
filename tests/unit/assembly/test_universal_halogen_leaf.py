@@ -1,15 +1,15 @@
 """Universal coverage-floor: a monovalent halogen is a substituent PREFIX, never
 a chain-spine atom.
 
-Root cause (measured 2026-08-30, spiro-followup Task A cascade-spy): the
+Root cause (measured 2026-08-30, spiro-followup Task A cascade-trace): the
 universal best-effort core's chain-spine walk (``_tree_neighbors`` /
 ``_name_chain_spine``) treated a terminal halogen (F/Cl/Br/I) as a heavy
 chain-continuation atom, so a fluoroalkyl branch was absorbed into the parent
 skeleton -- a PHANTOM extra carbon plus a dropped halogen:
 
-    ``c1ccccc1C(F)F``   (CHF2, difluoromethyl) -> ``1-fluoroethan-1-yl...``  WRONG
-    ``c1ccccc1C(F)(F)F`` (CF3)                  -> ``1,1-difluoroethan-1-yl`` WRONG
-    ``CCC(F)F`` / ``CC(F)(F)F``                  -> None (whole molecule voids)
+    ``c1ccccc1C(F)F`` (CHF2, difluoromethyl) -> ``1-fluoroethan-1-yl...`` WRONG
+    ``c1ccccc1C(F)(F)F`` (CF3) -> ``1,1-difluoroethan-1-yl`` WRONG
+    ``CCC(F)F`` / ``CC(F)(F)F`` -> None (whole molecule voids)
 
 A halogen is monovalent: it is ALWAYS a terminal substituent and NEVER a
 skeletal chain/replacement atom, so it must be excluded from the chain-spine
@@ -19,7 +19,7 @@ by the existing ``_leaf_shortcut`` (``fluoro``/``chloro``/``bromo``/``iodo``).
 
 Reachable ONLY on the best-effort coverage floor (this whole module is
 ``_general_fallback``-gated in namer.py), so PIN/default output is byte-identical
--- proven by the fast gate. IUPAC 2013 P-29.3 / P-35.1 (halogen substituent
+-- proven by the fast gate. IUPAC 2013 / (halogen substituent
 prefixes).
 
 Targeted-file run only (avoid the OPSIN-pipe deadlock of a full pytest run):

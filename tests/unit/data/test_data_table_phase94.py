@@ -82,20 +82,20 @@ class TestSimpleRetainedNames:
 
     @pytest.mark.unit
     @pytest.mark.parametrize("smiles,expected", [
-        # F-T9/DD6 RET-01: 'biphenyl'/'anisole' are general-only; the PIN headline is
+        # F-T9/DD6: 'biphenyl'/'anisole' are general-only; the PIN headline is
         # the systematic 1,1'-biphenyl / methoxybenzene. acetylene stays (hc_override).
         ("c1ccc(-c2ccccc2)cc1", "1,1'-biphenyl"),
         ("C#C", "acetylene"),
         ("COc1ccccc1", "anisole"),  # a review RISK 7: bare anisole IS the PIN (the Blue Book / the Blue Book)
         #: same treatment as biphenyl/anisole above -- 'caprolactam'
         # is general-only (0 the Blue Book hits) and the PIN headline is the
-        # systematic pseudoketone, P-64.3.1 (the Blue Book), printed `azepan-2-one
+        # systematic pseudoketone, (the Blue Book), printed `azepan-2-one
         # (PIN)` at the Blue Book. The raw hand-curated dict still carries the trivial
         # name, which is why the two tests above are unchanged.
         ("O=C1CCCCCN1", "azepan-2-one"),
     ], ids=["biphenyl-e2e", "acetylene-e2e", "anisole-e2e", "caprolactam-e2e"])
     def test_name_compound_e2e(self, smiles, expected):
-        """name_compound() should return the PIN headline (retained PIN or systematic)."""
+        """name_compound should return the PIN headline (retained PIN or systematic)."""
         result = name_compound(smiles)
         assert result == expected, f"Expected '{expected}', got '{result}'"
 
@@ -135,7 +135,7 @@ class TestNucleosideRetainedNames:
     @pytest.mark.parametrize("smiles,expected", NUCLEOSIDE_ENTRIES,
                              ids=[f"{e[1]}-e2e" for e in NUCLEOSIDE_ENTRIES])
     def test_nucleoside_e2e(self, smiles, expected):
-        """name_compound() should return the retained name for nucleosides."""
+        """name_compound should return the retained name for nucleosides."""
         result = name_compound(smiles)
         assert result == expected, f"Expected '{expected}', got '{result}'"
 
@@ -201,7 +201,7 @@ class TestSialicAcidRetainedName:
 
     @pytest.mark.unit
     def test_sialic_acid_e2e(self):
-        """name_compound() should return N-acetylneuraminic acid."""
+        """name_compound should return N-acetylneuraminic acid."""
         result = name_compound(self.SIALIC_SMILES)
         assert result == "N-acetylneuraminic acid"
 
@@ -250,7 +250,7 @@ class TestAminoSugarNames:
     @pytest.mark.parametrize("smiles,anomer,config,name", AMINO_SUGAR_ENTRIES,
                              ids=[f"{e[1]}-{e[3]}-lookup" for e in AMINO_SUGAR_ENTRIES])
     def test_amino_sugar_lookup(self, smiles, anomer, config, name):
-        """lookup_sugar() should return correct tuple for amino sugars."""
+        """lookup_sugar should return correct tuple for amino sugars."""
         result = lookup_sugar(smiles)
         assert result is not None, f"lookup_sugar returned None for {smiles}"
         assert result == (anomer, config, name)
@@ -401,11 +401,11 @@ class TestSMILESValidity:
 
 
 # ============================================================================
-# Test 9: Steroid Vocabulary Verification (DATA-03)
+# Test 9: Steroid Vocabulary Verification
 # ============================================================================
 
 class TestSteroidVocabulary:
-    """Verify DATA-03: all 6 steroid stems present in NATURAL_PRODUCT_SCAFFOLDS."""
+    """Verify: all 6 steroid stems present in NATURAL_PRODUCT_SCAFFOLDS."""
 
     @pytest.mark.unit
     @pytest.mark.parametrize("steroid_name", [

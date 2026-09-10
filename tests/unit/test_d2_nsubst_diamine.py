@@ -1,12 +1,12 @@
 """D2: N-substituted acyclic diamines with numeric-superscript italic-N locants.
 
-Gap-fix D2 (P-62.2.2 / P-16.3.3): the acyclic secondary/tertiary amine
+Gap-fix D2 /: the acyclic secondary/tertiary amine
 handler _assemble_amine_name was a SINGLE-nitrogen handler. For a diamine
 it walked only the first N and dropped the second N's substituent, producing
-a WRONG structure that SELF-01 suppressed to 'unknown'. Fix generalizes it to
+a WRONG structure that suppressed to 'unknown'. Fix generalizes it to
 multi-N, mirroring the aromatic analog _name_substituted_benzenediamine.
 
-a phase Thread A (P-62.2.4.1.2, the Blue Book): the N-substituent locant of a
+a phase Thread A, the Blue Book): the N-substituent locant of a
 SIMPLE polyamine (all principal amine N on the parent chain) is the NUMERIC
 SUPERSCRIPT = the parent-hydride locant of the carbon the nitrogen attaches to
 (flattened N1, N2, N3), NOT a bare prime (N, N'). the Blue Book gives
@@ -23,7 +23,7 @@ from orthonym import name_compound
 
 
 # ---- ACCEPTANCE: N-substituted acyclic di/poly-amines (was 'unknown') ----
-# P-62.2.4.1.2 (the Blue Book): numeric-superscript italic-N locants.
+# (the Blue Book): numeric-superscript italic-N locants.
 
 DIAMINE_ACCEPTANCE = [
     ("CNCCNC", "N1,N2-dimethylethane-1,2-diamine"),
@@ -96,7 +96,7 @@ def test_primary_diamine_unchanged(smiles, expected):
 # ---- GUARDS (a phase Thread A): the superscript flip must NOT regress the
 # COMPLEX (demoted-N / branch-amine) path, which already used superscripts, nor
 # the aromatic diamines, nor the bare-primed MONONUCLEAR-parent name
-# (N,N'-dinitromethanediamine, P-62.2.4.1.2 the Blue Book) -- which is built by a
+# (N,N'-dinitromethanediamine, the Blue Book) -- which is built by a
 # DIFFERENT handler entirely (_assemble_polyamine_name is never reached for it),
 # so this is a cross-handler regression guard, NOT a check of the (currently
 # unreachable) bare-prime branch inside _assemble_polyamine_name. ----

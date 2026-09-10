@@ -15,7 +15,7 @@ IUPAC 2013 chain orientation criteria (applied in order):
     c. Lowest locants for double bonds (if tie with triple bonds)
     d. Lowest locants for substituents (detachable prefixes)
 
-Reference: IUPAC 2013 Blue Book, P-14.4, P-14.6, P-14.7
+Reference: IUPAC 2013 Blue Book,,,
 """
 
 from collections import defaultdict
@@ -28,8 +28,8 @@ from .lambda_convention import nonstandard_bonding_number
 # Element-seniority order for numbering tie-breaks (DD4 / Phase E1).
 #
 # Single source of truth for the IUPAC 2013 element-seniority sequence used in
-# numbering decisions (P-15.4.1.2 / P-15.4.3.2.1 skeletal-replacement; P-44.3.3
-# senior-acyclic-heteroatom; P-25.3.3.1.2(b) fused-ring). Lower rank = SENIOR
+# numbering decisions / skeletal-replacement;
+# senior-acyclic-heteroatom; (b) fused-ring). Lower rank = SENIOR
 # (gets the lower locant when a positional set ties).
 #
 # F < Cl < Br < I < At < O < S < Se < Te < Po < N < P < As < Sb < Bi
@@ -39,9 +39,9 @@ from .lambda_convention import nonstandard_bonding_number
 # (ring_substituents._HETEROATOM_SENIORITY, ring_selection._HETEROATOM_SENIORITY,
 # fusion_descriptors.HETERO_PRIORITY). This constant is the canonical numbering
 # table; the numbering consumer (ring_substituents._HETEROATOM_SENIORITY) is
-# derived from it. ring_selection's table is a genuinely-different P-18
+# derived from it. ring_selection's table is a genuinely-different
 # ring-selection order (lock) and is intentionally left separate.
-# Source: https://iupac.qmul.ac.uk/BlueBook/P1.html P-15.4.1.2; DD4.
+# Source: https://iupac.qmul.ac.uk/BlueBook/P1.html; DD4.
 # ---------------------------------------------------------------------------
 _ELEMENT_NUMBERING_ORDER: List[str] = [
     'F', 'Cl', 'Br', 'I', 'At',
@@ -62,7 +62,7 @@ def element_seniority_rank(symbol: str) -> int:
     """Numbering-seniority rank of an element symbol (lower = senior).
 
     Unlisted symbols return a sentinel rank past every listed element so they
-    sort last in a deterministic, total order. Source: P-15.4.1.2 (DD4).
+    sort last in a deterministic, total order. Source: (DD4).
     """
     return ELEMENT_NUMBERING_SENIORITY.get(symbol, _ELEMENT_SENIORITY_DEFAULT)
 
@@ -76,11 +76,11 @@ _Locant = Union[int, Tuple[int, str]]
 # Bare-string fusion/prime locants ('4a', '10b', "2'") are the canonical form
 # stored in the fused-ring iupac_locants catalog tables (data/fused_heterocycles.py
 # et al.). They reach compare_locant_sets through the ring parent-selection pool
-# (p44_scorer._candidate_locants) UNCOERCED, and the fast-path sorted() below then
+# (p44_scorer._candidate_locants) UNCOERCED, and the fast-path sorted below then
 # raises "'<' not supported between 'str' and 'int'" on a str/int-mixed set --
 # which crashed _classify and abstained N fused polycyclics (measured 2026-09-08).
 # _coerce_bare_locant normalizes them to the declared _Locant contract so the sort
-# is total AND P-14.5.2-correct ('4a' orders between 4 and 5).
+# is total AND -correct ('4a' orders between 4 and 5).
 import re as _re
 _BARE_LOCANT_RE = _re.compile(r"^(\d+)([a-z]*'?)$")
 
@@ -106,7 +106,7 @@ def _assert_homogeneous_locants(locants: List[_Locant]) -> None:
     Per a phase: after coercion, a locant list must be uniformly
     int OR uniformly tuple. Mixed types indicate a caller bug (e.g.,
     ring_info populated only partially) and would cause Python's
-    ``sorted()`` / ``min()`` to raise ``TypeError`` on mixed int/tuple
+    ``sorted`` / ``min`` to raise ``TypeError`` on mixed int/tuple
     comparison.
 
     Empty lists are vacuously homogeneous and return silently.
@@ -119,7 +119,7 @@ def _assert_homogeneous_locants(locants: List[_Locant]) -> None:
                     The message includes the first offending int and the
                     first offending tuple to aid debugging.
 
-    Source: https://iupac.qmul.ac.uk/BlueBook/P1.html P-14.7
+    Source: https://iupac.qmul.ac.uk/BlueBook/P1.html
             (locant set comparison semantics)
     Source: a phase (locant type safety lock-in)
     """
@@ -155,7 +155,7 @@ def build_atom_to_locant(principal_chain: List[int]) -> Dict[int, int]:
     Examples:
         >>> build_atom_to_locant([5, 3, 1, 0])
         {5: 1, 3: 2, 1: 3, 0: 4}
-        >>> build_atom_to_locant([])
+        >>> build_atom_to_locant()
         {}
         >>> build_atom_to_locant([0])
         {0: 1}
@@ -208,13 +208,13 @@ def compare_locant_sets(
         >>> compare_locant_sets([(4, 'a'), (5, '')], [(4, 'b'), (5, '')])
         -1
 
-    Source: https://iupac.qmul.ac.uk/BlueBook/P1.html P-14.5.2, P-14.7
+    Source: https://iupac.qmul.ac.uk/BlueBook/P1.html,
     Source: a phase (locant type safety); a phase /
     """
     # Normalize bare-string fusion/prime locants ('4a' -> (4, 'a'), '5' -> 5)
     # to the int / (int, str) contract BEFORE the type dispatch below. Without
     # this a str/int-mixed set (e.g. [1..7, '3a', '7a']) crashed the fast-path
-    # sorted(). Pure-int and pure-tuple lists contain no str and are untouched,
+    # sorted. Pure-int and pure-tuple lists contain no str and are untouched,
     # so their ordering is byte-identical to before this coercion.
     if any(isinstance(x, str) for x in set_a) or any(isinstance(x, str) for x in set_b):
         set_a = [_coerce_bare_locant(x) for x in set_a]
@@ -222,7 +222,7 @@ def compare_locant_sets(
 
     # a phase: tuple-coercion entry path. If either list contains a
     # tuple locant, coerce all ints to (n, '') tuples in BOTH lists so
-    # Python's sorted()/comparison operators stay type-safe. Pure-int
+    # Python's sorted/comparison operators stay type-safe. Pure-int
     # lists fall through to the back-compat fast path unchanged.
     any_tuple = (
         any(isinstance(x, tuple) for x in set_a)
@@ -261,13 +261,13 @@ def _compare_heteroatom_seniority(
     """Compare two heteroatom (locant, element) lists for numbering.
 
     Implements the skeletal/replacement + fused-ring numbering rule:
-      1. lowest heteroatom locant SET, kind-agnostic (P-15.4.3.2.1 /
-         P-25.3.3.1.2(a)) — via ``compare_locant_sets`` on the positions;
+      1. lowest heteroatom locant SET, kind-agnostic /
+         (a)) — via ``compare_locant_sets`` on the positions;
       2. on a positional tie, the lower locant goes to the element highest in
-         the element-seniority order (P-15.4.1.2 / P-25.3.3.1.2(b)) — compared
+         the element-seniority order / (b)) — compared
          element-by-element from most senior to least.
 
-    Worked example (BlueBook P-15.4.1.2): ``2-oxa-4,6,8-trisilanonane`` — the
+    Worked example (BlueBook: ``2-oxa-4,6,8-trisilanonane`` — the
     locant sets ``{2,4,6,8}`` tie, so O (senior to Si) takes locant 2.
 
     Returns -1 if ``a`` is preferred, +1 if ``b``, 0 if genuinely equivalent.
@@ -297,7 +297,7 @@ def _compare_heteroatom_seniority(
 
 
 def compare_numbering(candidate_a: Dict, candidate_b: Dict) -> int:
-    """Fully-ordered deterministic numbering tie-break (P-14.3.5 + P-14.4 layers).
+    """Fully-ordered deterministic numbering tie-break + layers).
 
     The single shared lowest-locant comparator routed through by all three
     numbering engines (skeletal-replacement, fused-ring/PAH, benzene ring) so
@@ -308,21 +308,21 @@ def compare_numbering(candidate_a: Dict, candidate_b: Dict) -> int:
 
     Each candidate is a dict carrying only the tiers relevant to the call; a
     missing key means that tier is unconstrained (ties). Tiers, applied in the
-    P-59.1.10 order:
+     order:
 
-      'heteroatoms' list of (locant, element) — positional set (P-59.1.10(b)
-                     then element-seniority lowest-locant / P-15.4.1.2)
-      'indicated_h' indicated-hydrogen locant set (P-59.1.10(c))
-      'pcg' principal-characteristic-group locant set (P-59.1.10(d))
-      'substituents' detachable-prefix locant set (P-14.4(f))
-      'alpha' sortable key giving the alphabetically-first (P-14.4(g))
+      'heteroatoms' list of (locant, element) — positional set (b)
+                     then element-seniority lowest-locant /
+      'indicated_h' indicated-hydrogen locant set (c))
+      'pcg' principal-characteristic-group locant set (d))
+      'substituents' detachable-prefix locant set (f))
+      'alpha' sortable key giving the alphabetically-first (g))
                      prefix the lowest locant
 
     Returns -1 if ``candidate_a`` is preferred, +1 if ``candidate_b``, 0 if
     every active tier ties. ``compare_locant_sets`` is reused unchanged as the
     positional primitive — this comparator is additive alongside it.
     """
-    # Tier 1 — heteroatom set (P-59.1.10(b) / P-14.4(b)): positional, then
+    # Tier 1 — heteroatom set (b) / (b)): positional, then
     # element seniority. Heteroatoms are part of the parent hydride and
     # outrank the suffix for numbering.
     a_het, b_het = candidate_a.get('heteroatoms'), candidate_b.get('heteroatoms')
@@ -331,7 +331,7 @@ def compare_numbering(candidate_a: Dict, candidate_b: Dict) -> int:
         if result != 0:
             return result
 
-    # Tier 2 — indicated hydrogen (P-59.1.10(c)): lowest locants for
+    # Tier 2 — indicated hydrogen (c)): lowest locants for
     # indicated hydrogen, before the principal-group suffix tier.
     a_ih, b_ih = candidate_a.get('indicated_h'), candidate_b.get('indicated_h')
     if a_ih is not None or b_ih is not None:
@@ -339,21 +339,21 @@ def compare_numbering(candidate_a: Dict, candidate_b: Dict) -> int:
         if result != 0:
             return result
 
-    # Tier 3 — principal characteristic group (P-59.1.10(d) / P-14.4(d)).
+    # Tier 3 — principal characteristic group (d) / (d)).
     a_pcg, b_pcg = candidate_a.get('pcg'), candidate_b.get('pcg')
     if a_pcg is not None or b_pcg is not None:
         result = compare_locant_sets(a_pcg or [], b_pcg or [])
         if result != 0:
             return result
 
-    # Tier 4 — detachable-substituent set (P-14.4(f)).
+    # Tier 4 — detachable-substituent set (f)).
     a_sub, b_sub = candidate_a.get('substituents'), candidate_b.get('substituents')
     if a_sub is not None or b_sub is not None:
         result = compare_locant_sets(a_sub or [], b_sub or [])
         if result != 0:
             return result
 
-    # Tier 5 — alphabetically-first prefix lowest locant (P-14.4(g)).
+    # Tier 5 — alphabetically-first prefix lowest locant (g)).
     a_alpha, b_alpha = candidate_a.get('alpha'), candidate_b.get('alpha')
     if a_alpha is not None or b_alpha is not None:
         if a_alpha is None:
@@ -384,7 +384,7 @@ def orient_chain(
         b. Lowest locants for multiple bonds (double + triple, as a set)
         c. Lowest locants for double bonds specifically
         d. Lowest locants for substituents (detachable prefixes)
-        e. Lowest locant for alphabetically first substituent (P-14.4(g))
+        e. Lowest locant for alphabetically first substituent (g))
 
     For pure hydrocarbons (no principal group), criterion (a) is skipped.
 
@@ -420,7 +420,7 @@ def orient_chain(
     if principal_group_atoms:
         pg_on_chain = principal_group_atoms & chain_set
         if not pg_on_chain:
-            # P-14.4(a) / P-31.1.4: a principal group whose defining atoms are NOT
+            # (a) /: a principal group whose defining atoms are NOT
             # chain atoms (-SO3H / -PO3H2: the S/P and its O's hang OFF a chain
             # carbon) is located by the CHAIN CARBON that bears it. Without this,
             # criterion (a) was skipped for such groups and a mere substituent stole
@@ -484,10 +484,10 @@ def orient_chain(
             if result == 1:
                 return reverse
 
-    # --- Criterion (d.5): P-14.4(h) nonstandard-valence atom lower locant ---
+    # --- Criterion (d.5): (h) nonstandard-valence atom lower locant ---
     # When the substituent locant SETS tie, the chain position bearing a
     # substituent whose attachment atom is in a NONSTANDARD (λ) valence state
-    # takes the lower locant (BB P-14.4(h), the Blue Book,3334:
+    # takes the lower locant (BB (h), the Blue Book,3334:
     # 'OC(C[PH4])CP' -> '1-(λ5-phosphanyl)-3-phosphanylpropan-2-ol'; the λ5 arm
     # is given C1). Runs BEFORE the alphanumerical criterion (e). Canonical:
     # driven by the perceived λ bonding number, not atom order.
@@ -513,7 +513,7 @@ def orient_chain(
                 return reverse
 
     # --- Criterion (e): Lowest locant for alphabetically first substituent ---
-    # P-14.4(g): when substituent locant sets are identical in both directions,
+    # (g): when substituent locant sets are identical in both directions,
     # prefer the orientation giving the lowest locant to the first-cited prefix
     # (alphabetically first substituent).
     if substituent_positions:
@@ -526,10 +526,10 @@ def orient_chain(
             if rev_alpha < fwd_alpha:
                 return reverse
 
-    # --- Criterion (f): P-14.4(j) CIP-stereodescriptor lowest-locant tie-break ---
+    # --- Criterion (f): (j) CIP-stereodescriptor lowest-locant tie-break ---
     # Reached only when (a)-(e) all tie: the two orientations differ only in the
     # locants their CIP stereodescriptors receive (meso-type / symmetric chains).
-    # BB P-14.4(j) (the Blue Book): the lower locant is assigned to the
+    # BB (j) (the Blue Book): the lower locant is assigned to the
     # PREFERRED descriptor of each pair -- Z over E, R over S, M over P, and r
     # over s (pseudoasymmetry). This REUSES cip_descriptor_rank_key (via
     # _cip_numbering_key) so this numbering decision and the citation tie-break
@@ -658,7 +658,7 @@ def _pick_locant_atom(
         # NEIGHBOR of a match atom, not a member of the match (the recursive
         # $(...) keeps the inorganic-oxoacid distinction). Walk the match atoms'
         # neighbors and return the chain carbon that bears the group so its
-        # suffix locant is cited (P-14.3.4 / P-65.3.1: 'butane-2-sulfinic acid',
+        # suffix locant is cited /: 'butane-2-sulfinic acid',
         # 'butane-2-sulfonic acid' -- not the locant-dropped 'butanesulfinic acid'
         # that mis-names a secondary-carbon attachment as a primary one).
         for atom_idx in match_tuple:
@@ -768,7 +768,7 @@ def _alphabetical_tiebreaker(
         # (sufficient for the alphabetical comparison of simple alkyls)
         for sub_atoms in sub_groups:
             name = None
-            # WS-A task 9 (P-14.5.2): a RING substituent must be compared by
+            # task 9: a RING substituent must be compared by
             # its REAL cited prefix name, not a name fabricated from its
             # carbon count (phenyl is NOT 'hexyl', thiophen-2-yl is NOT
             # 'butyl' — the fabricated keys inverted the orientation of
@@ -851,7 +851,7 @@ def _get_bond_locant_atoms(
 def _cip_numbering_key(chain: List[int], atom_to_locant: Dict[int, int],
                        double_bonds: List[Tuple[int, int]],
                        chain_set: Set[int], mol) -> tuple:
-    """P-14.4(j) rank tuple of a chain's CIP stereodescriptors, in locant order.
+    """(j) rank tuple of a chain's CIP stereodescriptors, in locant order.
 
     Collects every stereodescriptor the assembled name would cite for this
     orientation -- atom stereocentres (R/S/r/s/M/P) and stereogenic double bonds
@@ -861,7 +861,7 @@ def _cip_numbering_key(chain: List[int], atom_to_locant: Dict[int, int],
     one function is deliberate: this numbering tie-break and the citation
     tie-break (``prefix_citation_sort_key`` tier 3) must never disagree -- and a
     plain string comparison silently gets Z-vs-E backwards, because 'Z' is senior
-    to 'E' although 'E' < 'Z' alphabetically (P-14.4(j) /:45363).
+    to 'E' although 'E' < 'Z' alphabetically (j) /:45363).
 
     Returns an empty tuple when the orientation cites no stereodescriptor, so
     achiral chains tie and fall through. Lower tuple sorts first, i.e. is cited

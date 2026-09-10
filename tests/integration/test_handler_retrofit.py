@@ -1,11 +1,11 @@
 """
-Integration tests for Phase 86: Early Return Handler Retrofit.
+Integration tests for a phase: Early Return Handler Retrofit.
 
-Tests the shared _integrate_universal_prefixes() helper and verifies
+Tests the shared _integrate_universal_prefixes helper and verifies
 that retrofitted handlers (acid halide, lactone, lactam, ether) correctly
 discover and name substituents via the universal pipeline.
 
-Reference: IUPAC 2013 Blue Book, P-31.1 (detachable prefixes)
+Reference: IUPAC 2013 Blue Book, (detachable prefixes)
 """
 
 import pytest
@@ -13,12 +13,12 @@ from rdkit import Chem
 
 
 # ============================================================================
-# Helper function tests: _integrate_universal_prefixes()
+# Helper function tests: _integrate_universal_prefixes
 # ============================================================================
 
 
 class TestIntegrateUniversalPrefixes:
-    """Tests for the _integrate_universal_prefixes() helper in composer.py."""
+    """Tests for the _integrate_universal_prefixes helper in composer.py."""
 
     def _get_helper(self):
         """Import the helper function."""
@@ -337,7 +337,7 @@ class TestAmideRetrofit:
 
 
 class TestPolyfunctionalRingAsParent:
-    """Tests for polyfunctional ring-as-parent path (USUB-10)."""
+    """Tests for polyfunctional ring-as-parent path ."""
 
     def test_ring_as_parent_function_exists(self):
         """_name_ring_as_parent_polyfunctional is importable."""
@@ -401,9 +401,9 @@ class TestPolyfunctionalRingAsParent:
 class TestBenzeneRetrofit:
     """Tests for benzene handler with universal C-substituent fallback.
 
-    Phase 86 Plan 03: _identify_substituent() no longer returns None
+    a phase Plan 03: _identify_substituent no longer returns None
     for complex C-substituents (<=10 atoms, non-carbonyl). Uses
-    name_substituent() from universal pipeline as fallback.
+    name_substituent from universal pipeline as fallback.
     """
 
     def test_complex_c_sub_not_none(self):
@@ -552,7 +552,7 @@ class TestBenzeneRetrofit:
     def test_succinimide_not_collapsed_to_carboxamide(self):
         """Succinimide (imide ring) on benzene identified as ring substituent, not amide suffix.
 
-        Phase 86 Plan 03 requirement: when a succinimide ring is attached to
+        a phase Plan 03 requirement: when a succinimide ring is attached to
         benzene via N, the benzene handler must recognize it as an imide ring
         substituent ('succinimidyl'), not collapse it to 'carboxamide' suffix.
         """
@@ -602,54 +602,54 @@ class TestBenzeneRetrofit:
 
 
 # ============================================================================
-# Phase 86 Final Accounting: All Early-Return Handlers in assemble_name()
+# a phase Final Accounting: All Early-Return Handlers in assemble_name
 # ============================================================================
 #
 # Category A — Safe as-is (handler returns None for complex cases → fallthrough):
-#   Line 547: Oxime (_name_oxime_or_hydrazone) — recursive name_compound()
-#   Line 553: Hydrazone (_name_oxime_or_hydrazone) — recursive name_compound()
-#   Line 561: N-oxide (_try_name_n_oxide) — recursive name_compound()
-#   Line 569: Isocyanate (_name_isocyanate) — returns None for complex R
-#   Line 577: Isothiocyanate (_name_isothiocyanate) — returns None for complex R
-#   Line 585: Carbamic acid (_name_carbamic_acid) — retained name, N-subs only
-#   Line 593: Carbamate (_name_carbamate) — returns None for complex R
-#   Line 602: Urea (_try_name_urea) — retained name, N-subs only
-#   Line 610: Guanidine (_try_name_guanidine) — retained name, N-subs only
-#   Line 629: Anhydride (name_anhydride) — dedicated module, full naming
-#   Line 675: Ring-attached ester (_assemble_ring_with_ester_prefixes) — own prefix gen
-#   Line 697: Multi-ester (dicarboxylic/polyol) — dedicated module, full naming
-#   Line 725: Sulfoxide (name_sulfoxide) — returns None for complex R
-#   Line 733: Sulfone (name_sulfone) — returns None for complex R
-#   Line 742: Thioether/Sulfide (name_sulfide) — returns None for complex R
-#   Line 762: Phosphine oxide (name_phosphine_oxide) — returns None for complex R
-#   Line 771: Phosphate ester (name_phosphate_ester) — dedicated module
-#   Line 786: Phosphine (name_phosphine) — returns None for complex R
-#   Line 825: Phosphinic acid (name_phosphinic_acid) — dedicated module
-#   Line 834: Boronic acid (_name_boronic_acid) — returns None for complex R
-#   Line 841: Ring assembly (name_ring_assembly) — own substituent handling
-#   Line 872: Complex ring (_assemble_complex_ring_name) — own substituent pipeline
-#   Line 890: Polycyclic (_assemble_polycyclic_name) — own prefix generation
-#   Line 898: Partial sat carbocycle — own naming pipeline
-#   Line 910: Heterocycle (_assemble_heterocycle_name) — own prefix generation
-#   Line 982: Simple molecule (_name_simple_molecule) — single-atom/trivial
+# Line 547: Oxime (_name_oxime_or_hydrazone) — recursive name_compound
+# Line 553: Hydrazone (_name_oxime_or_hydrazone) — recursive name_compound
+# Line 561: N-oxide (_try_name_n_oxide) — recursive name_compound
+# Line 569: Isocyanate (_name_isocyanate) — returns None for complex R
+# Line 577: Isothiocyanate (_name_isothiocyanate) — returns None for complex R
+# Line 585: Carbamic acid (_name_carbamic_acid) — retained name, N-subs only
+# Line 593: Carbamate (_name_carbamate) — returns None for complex R
+# Line 602: Urea (_try_name_urea) — retained name, N-subs only
+# Line 610: Guanidine (_try_name_guanidine) — retained name, N-subs only
+# Line 629: Anhydride (name_anhydride) — dedicated module, full naming
+# Line 675: Ring-attached ester (_assemble_ring_with_ester_prefixes) — own prefix gen
+# Line 697: Multi-ester (dicarboxylic/polyol) — dedicated module, full naming
+# Line 725: Sulfoxide (name_sulfoxide) — returns None for complex R
+# Line 733: Sulfone (name_sulfone) — returns None for complex R
+# Line 742: Thioether/Sulfide (name_sulfide) — returns None for complex R
+# Line 762: Phosphine oxide (name_phosphine_oxide) — returns None for complex R
+# Line 771: Phosphate ester (name_phosphate_ester) — dedicated module
+# Line 786: Phosphine (name_phosphine) — returns None for complex R
+# Line 825: Phosphinic acid (name_phosphinic_acid) — dedicated module
+# Line 834: Boronic acid (_name_boronic_acid) — returns None for complex R
+# Line 841: Ring assembly (name_ring_assembly) — own substituent handling
+# Line 872: Complex ring (_assemble_complex_ring_name) — own substituent pipeline
+# Line 890: Polycyclic (_assemble_polycyclic_name) — own prefix generation
+# Line 898: Partial sat carbocycle — own naming pipeline
+# Line 910: Heterocycle (_assemble_heterocycle_name) — own prefix generation
+# Line 982: Simple molecule (_name_simple_molecule) — single-atom/trivial
 #
 # Category B — Retrofitted (Plans 86-01, 86-02, 86-03):
-#   Line 619: Acid halide (name_acid_halide) — 86-01: universal pipeline for chain subs
-#   Line 642: Lactone (name_monocyclic_lactone) — 86-01: universal pipeline for ring subs
-#   Line 660: Lactam (name_monocyclic_lactam) — 86-01: universal pipeline for ring subs
-#   Ether (_alcohol_to_alkoxy fallback) — 86-01: name_substituent() fallback for bare oxy
-#   Line 713: Ester (name_ester) — 86-02: universal pipeline for acid-side subs
-#   Line 970: Amide (_assemble_amide_name) — 86-02: fixed double-locant bug
-#   Line 684: Polyfunctional (name_polyfunctional) — 86-02: ring-as-parent path
-#   Line 929: Benzene (_assemble_benzene_name) — 86-03: universal fallback for complex C-subs
-#   Line 963: Ring nitrile (_assemble_ring_nitrile_name) — 86-03: universal pipeline for ring subs
+# Line 619: Acid halide (name_acid_halide) — 86-01: universal pipeline for chain subs
+# Line 642: Lactone (name_monocyclic_lactone) — 86-01: universal pipeline for ring subs
+# Line 660: Lactam (name_monocyclic_lactam) — 86-01: universal pipeline for ring subs
+# Ether (_alcohol_to_alkoxy fallback) — 86-01: name_substituent fallback for bare oxy
+# Line 713: Ester (name_ester) — 86-02: universal pipeline for acid-side subs
+# Line 970: Amide (_assemble_amide_name) — 86-02: fixed double-locant bug
+# Line 684: Polyfunctional (name_polyfunctional) — 86-02: ring-as-parent path
+# Line 929: Benzene (_assemble_benzene_name) — 86-03: universal fallback for complex C-subs
+# Line 963: Ring nitrile (_assemble_ring_nitrile_name) — 86-03: universal pipeline for ring subs
 #
 # Category C — Verified safe (audit in 86-03 Task 2):
-#   Line 530: Ion (assemble_ion_name) — own naming pipeline
-#   Line 976: Amine (_assemble_amine_name) — extensive R-group handling (phenyl, fused het, ring, alkyl)
+# Line 530: Ion (assemble_ion_name) — own naming pipeline
+# Line 976: Amine (_assemble_amine_name) — extensive R-group handling (phenyl, fused het, ring, alkyl)
 #
 # Functional class handlers (isocyanate, isothiocyanate, carbamic acid, carbamate,
-# urea, guanidine, boronic acid) use _name_r_group() which has universal pipeline
+# urea, guanidine, boronic acid) use _name_r_group which has universal pipeline
 # fallback (lines 1489-1500) for complex R-groups that can't be named by simple
 # alkyl/phenyl/benzyl classification.
 #
@@ -666,7 +666,7 @@ class TestBenzeneRetrofit:
 class TestRingNitrileRetrofit:
     """Tests for ring nitrile handler with universal substituent discovery.
 
-    Phase 86-03: _assemble_ring_nitrile_name now uses
+    a phase-03: _assemble_ring_nitrile_name now uses
     _integrate_universal_prefixes to discover ring substituents.
     Previously, ALL substituents on substituted ring nitriles were silently dropped.
     """
@@ -722,9 +722,9 @@ class TestCategoryCHandlerSafety:
     allowing the general pipeline to handle it. This test class verifies
     the pattern works for representative compounds.
 
-    Phase 86-03 audit findings:
+    a phase-03 audit findings:
     - Functional class handlers (isocyanate, isothiocyanate, carbamic acid,
-      carbamate, urea, guanidine, boronic acid) all use _name_r_group() which
+      carbamate, urea, guanidine, boronic acid) all use _name_r_group which
       has a universal pipeline fallback for complex R-groups.
     - Sulfoxide, sulfone, thioether handlers return None for complex R -> fallthrough.
     - Phosphorus handlers have dedicated modules with full naming.

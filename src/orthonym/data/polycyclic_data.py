@@ -13,7 +13,7 @@ IUPAC Naming Rules for PAHs:
 - Use retained names (naphthalene, anthracene, etc.) as parent
 - Substituents are named with their IUPAC locant position
 
-Reference: IUPAC Blue Book 2013, Section P-25 (Fused and Bridged Fused Ring Systems)
+Reference: IUPAC Blue Book 2013, Section (Fused and Bridged Fused Ring Systems)
 
 PAH Classification:
 - Bicyclic: naphthalene
@@ -33,7 +33,7 @@ from typing import Any, Dict, List, Optional, Set, Tuple
 # Key: retained name
 # Value: dict with canonical_smiles, smarts, num_atoms, iupac_numbering, substituent_positions
 POLYCYCLIC_DATA: Dict[str, Dict[str, Any]] = {
-    # Wave2 T4 (P-25.1.2): higher fused-hydrocarbon series members (acene/aphene/
+    # Wave2: higher fused-hydrocarbon series members (acene/aphene/
     # helicene/pleiadene) that were fail-closed 'unknown' at HEAD. Bare-name
     # catalog entries; OPSIN-RT + numbering verified (extendedsmi mapped onto
     # RDKit-canonical, confirmed via methyl-isomer attachment).
@@ -62,7 +62,7 @@ POLYCYCLIC_DATA: Dict[str, Dict[str, Any]] = {
         'num_rings': 6,
     },
     'heptacene': {
-        # Linear 7-fused-ring acene (P-25.1.2, next member of the acene series
+        # Linear 7-fused-ring acene, next member of the acene series
         # after hexacene). AUTHORITATIVE numbering derived 2026-08-18 from
         # OPSIN 2.9.0 `heptacene -o extendedsmi` ($_AV: locants) —
         # C1=CC=CC2=CC3=CC4=CC5=CC6=CC7=CC=CC=C7C=C6C=C5C=C4C=C3C=C12
@@ -83,7 +83,7 @@ POLYCYCLIC_DATA: Dict[str, Dict[str, Any]] = {
         'num_rings': 7,
     },
     # (pentahelicene DEFERRED — [5]helicene's PIN is the fusion name
-    # dibenzo[c,g]phenanthrene, NOT 'pentahelicene': BB P-25.1.2.6 starts the
+    # dibenzo[c,g]phenanthrene, NOT 'pentahelicene': BB starts the
     # helicene series at SIX rings. The fusion name needs the polycomponent
     # (3+-component) fusion engine; a pre-existing tripwire (DD7-fusion-1)
     # already defers this SMILES. Stays fail-closed.)
@@ -104,13 +104,13 @@ POLYCYCLIC_DATA: Dict[str, Dict[str, Any]] = {
         'smarts': 'c1ccc2ccccc2c1',  # For substructure matching
         'num_atoms': 10,
         # IUPAC numbering for naphthalene:
-        #     8  1
-        #    /  \ /
-        #   7    2
-        #   |    |
-        #   6    3
-        #    \  / \
-        #     5  4
+        # 8 1
+        # / \ /
+        # 7 2
+        # | |
+        # 6 3
+        # \ / \
+        # 5 4
         # Maps canonical atom index -> IUPAC position (1-indexed)
         # Note: This mapping is determined empirically based on RDKit's canonical ordering
         # Empirically derived from RDKit canonical SMILES 'c1ccc2ccccc2c1':
@@ -124,11 +124,11 @@ POLYCYCLIC_DATA: Dict[str, Dict[str, Any]] = {
         'num_rings': 2,
     },
     'azulene': {
-        # Retained fused-ring hydrocarbon (IUPAC 2013 P-25.1.1, Table 28.1):
+        # Retained fused-ring hydrocarbon (IUPAC 2013, Table 28.1):
         # a 5-membered ring ortho-fused to a 7-membered ring, fully mancude
         # (aromatic). Carbocyclic, so it is NOT caught by name_fused_heterocycle,
         # and being aromatic it is NOT caught by _name_saturated_fused_carbocyclic
-        # either -- without this entry identify_polycyclic() returns None and the
+        # either -- without this entry identify_polycyclic returns None and the
         # molecule falls through to the acyclic chain catch-all, which emits the
         # malformed empty stem 'ane' (V-1 / theme T10).
         'canonical_smiles': 'c1ccc2cccc-2cc1',
@@ -160,7 +160,7 @@ POLYCYCLIC_DATA: Dict[str, Dict[str, Any]] = {
         'smarts': 'c1ccc2cc3ccccc3cc2c1',
         'num_atoms': 14,
         # IUPAC numbering for anthracene (linear tricyclic). AUTHORITATIVE:
-        # re-derived 2026-06-22 (v23 IH-01) from OPSIN `anthracene -o extendedsmi`
+        # re-derived 2026-06-22  from OPSIN `anthracene -o extendedsmi`
         # ($_AV: locants) mapped onto this canonical SMILES. The prior numbering
         # was INVALID — it placed a *meso* carbon (central-ring atoms 4 & 11) at
         # locant 5 instead of the correct 9/10, so 9-substituted/9,10-dihydro
@@ -194,17 +194,17 @@ POLYCYCLIC_DATA: Dict[str, Dict[str, Any]] = {
     },
     '1H-cyclopenta[a]naphthalene': {
         # Ortho-fused cyclopenta + naphthalene (3-ring cata-fused carbocycle,
-        # P-25.3.1.3). The mancude parent CARRIES an intrinsic indicated hydrogen
+        #. The mancude parent CARRIES an intrinsic indicated hydrogen
         # (the >CH2 at position 1), so the parent-name KEY itself is
         # '1H-cyclopenta[a]naphthalene' (as '1H-indene' is stored in
         # FUSED_HETEROCYCLE_DATA) — the '1H-' is a detachable added-IH cited
-        # before the stem (P-31.1.4). Emitting the bare 'cyclopenta[a]naphthalene'
+        # before the stem. Emitting the bare 'cyclopenta[a]naphthalene'
         # would drop the mandatory indicated hydrogen (a non-conformant PIN).
         # AUTHORITATIVE numbering: OPSIN `1H-cyclopenta[a]naphthalene
         # -o extendedsmi` ($_AV) = C1C=CC=2C1=C1C=CC=CC1=CC2
         # |$1;2;3;3a;9b;9a;9;8;7;6;5a;5;4$|, mapped onto this canonical SMILES
         # (RDKit parses in written order so index i -> the i-th $_AV locant).
-        # 5-ring: 1,2,3,3a,9b ; 6-rings share the 3a/5a/9a/9b fusion carbons.
+        # 5-ring: 1,2,3,3a,9b; 6-rings share the 3a/5a/9a/9b fusion carbons.
         'canonical_smiles': 'C1C=CC=2C1=C1C=CC=CC1=CC2',
         'smarts': 'C1C=CC=2C1=C1C=CC=CC1=CC2',
         'num_atoms': 13,
@@ -220,7 +220,7 @@ POLYCYCLIC_DATA: Dict[str, Dict[str, Any]] = {
         'smarts': 'c1cc2ccc3cccc4ccc(c1)c2c34',
         'num_atoms': 16,
         # IUPAC numbering for pyrene (peri-condensed tetracyclic). AUTHORITATIVE:
-        # re-derived 2026-06-22 (v23 IH-01) from OPSIN `pyrene -o extendedsmi`
+        # re-derived 2026-06-22  from OPSIN `pyrene -o extendedsmi`
         # ($_AV: locants) mapped onto this canonical SMILES. The prior numbering
         # was INVALID (interior/fusion locants '3b'/'10a' instead of the correct
         # peri carbons 10a/10b/10c), so substituted pyrenes were mis-numbered.
@@ -233,7 +233,7 @@ POLYCYCLIC_DATA: Dict[str, Dict[str, Any]] = {
         'num_rings': 4,
     },
     'fluorene': {
-        'indicated_h': '9H',  # P-31.1.4.3.4 (Wave-2 completion): leads substituted names
+        'indicated_h': '9H',  # (Wave-2 completion): leads substituted names
         'canonical_smiles': 'c1ccc2c(c1)Cc1ccccc1-2',  # Has sp3 carbon (position 9)
         'smarts': 'c1ccc2c(c1)Cc1ccccc1-2',
         'num_atoms': 13,
@@ -321,7 +321,7 @@ POLYCYCLIC_DATA: Dict[str, Dict[str, Any]] = {
         'num_rings': 5,
     },
     'picene': {
-        # Angular 5-ring cata-fused PAH (fancene). v23 13B(a) S1: numbering is
+        # Angular 5-ring cata-fused PAH (fancene). 13B(a) S1: numbering is
         # supplied by the deterministic fusion-numbering engine (iupac_numbering
         # left empty); recognition added here so identify_polycyclic resolves it
         # (it contains a chrysene substructure, so it must be checked before
@@ -364,7 +364,7 @@ POLYCYCLIC_DATA: Dict[str, Dict[str, Any]] = {
         'num_rings': 7,
     },
     'benzo[ghi]perylene': {
-        # P-52.2.4.2 large peri-fused PAH (6 rings, 22 atoms). AUTHORITATIVE
+        # large peri-fused PAH (6 rings, 22 atoms). AUTHORITATIVE
         # IUPAC numbering derived 2026-07-09 from OPSIN
         # `benzo[ghi]perylene -o extendedsmi` ($_AV: locants), mapped onto this
         # canonical SMILES via GetSubstructMatch.
@@ -376,7 +376,7 @@ POLYCYCLIC_DATA: Dict[str, Dict[str, Any]] = {
         'num_rings': 6,
     },
     'cyclobuta[1,7]indeno[5,6-b]naphthalene': {
-        # P-25.5.2 three-component ortho/peri-fused PAH (18 atoms, 5 rings incl.
+        # three-component ortho/peri-fused PAH (18 atoms, 5 rings incl.
         # a cyclobuta ring). Less-senior-hydrocarbon-parent fusion name that the
         # bridged constructor delegates here (p5_bridged deferred it). Numbering
         # derived 2026-07-09 from OPSIN
@@ -409,7 +409,7 @@ POLYCYCLIC_DATA: Dict[str, Dict[str, Any]] = {
         'substituent_positions': [1, 2, 3, 4, 5, 6, 7, 8],
         'num_rings': 2,
     },
-    # ── Wave-2 completion C (P-25.3.4.2.1 BB-cited PAH parents;
+    # ── Wave-2 completion C BB-cited PAH parents;
     # locants OPSIN-extendedsmi-derived). ──
     'cyclopenta[ij]pentaleno[2,1,6-cde]azulene': {
         'canonical_smiles': 'c1cc2ccc3cc4cc5ccc1c5c4c23',
@@ -435,9 +435,9 @@ POLYCYCLIC_DATA: Dict[str, Dict[str, Any]] = {
         'substituent_positions': [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22],
         'num_rings': 9,
     },
-    # W2F-P10 (P-25.5.3 core / P-25.3.4.1.2 identical-attached-components).
+    # W2F-P10 core / identical-attached-components).
     # Curated named-fusion-parent catalog entries (same mechanism as
-    # dinaphtho[1,2-c:2',1'-m]picene above, added fad413e7). The general P-25.3
+    # dinaphtho[1,2-c:2',1'-m]picene above, added fad413e7). The general
     # polycomponent orientation/renumbering engine is not built (multi-week
     # subsystem); these fused/bridged PARENT ring systems are cataloged with
     # OPSIN-authoritative numbering (extendedsmi _AV labels mapped onto the
@@ -446,7 +446,7 @@ POLYCYCLIC_DATA: Dict[str, Dict[str, Any]] = {
     # position round-trips through Orthonym's namer). Bare compounds match by
     # exact canonical SMILES (numbering not consulted); substituted derivatives
     # use the numbering with automorphism-min lowest-locant selection.
-    # naphtho[2,3-a]pentaphene: single first-order attached component (P-25.3.1).
+    # naphtho[2,3-a]pentaphene: single first-order attached component.
     "naphtho[2,3-a]pentaphene": {
         'canonical_smiles': 'c1ccc2cc3c(ccc4cc5ccc6cc7ccccc7cc6c5cc43)cc2c1',
         'smarts': 'c1ccc2cc3c(ccc4cc5ccc6cc7ccccc7cc6c5cc43)cc2c1',
@@ -456,8 +456,8 @@ POLYCYCLIC_DATA: Dict[str, Dict[str, Any]] = {
         'num_rings': 7,
     },
     # dinaphtho[2,3-a:2',3'-o]pentaphene: two IDENTICAL first-order attached
-    # naphtho components on pentaphene (P-25.3.4.1.2); the bridge-free CORE of
-    # the P-25.5.3 target (BB:14527).
+    # naphtho components on pentaphene; the bridge-free CORE of
+    # the target (the Blue Book).
     "dinaphtho[2,3-a:2',3'-o]pentaphene": {
         'canonical_smiles': 'c1ccc2cc3c(ccc4cc5ccc6cc7ccc8cc9ccccc9cc8c7cc6c5cc43)cc2c1',
         'smarts': 'c1ccc2cc3c(ccc4cc5ccc6cc7ccc8cc9ccccc9cc8c7cc6c5cc43)cc2c1',
@@ -466,10 +466,10 @@ POLYCYCLIC_DATA: Dict[str, Dict[str, Any]] = {
         'substituent_positions': [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22],
         'num_rings': 9,
     },
-    # Full P-25.5.3 target (BB:14527): the bare bridged-fused parent ring system
+    # Full target (the Blue Book): the bare bridged-fused parent ring system
     # 12,19:13,18-di(metheno)dinaphtho[2,3-a:2',3'-o]pentaphene. Two identical
     # one-carbon metheno bridges over the dinaphtho..pentaphene core; bridge
-    # atoms numbered LAST (23,24) per P-25.4.4. All-aromatic mancude parent.
+    # atoms numbered LAST (23,24) per. All-aromatic mancude parent.
     "12,19:13,18-di(metheno)dinaphtho[2,3-a:2',3'-o]pentaphene": {
         'canonical_smiles': 'c1cc2cc3ccc4cc5ccc6cc7ccc8cc9ccc%10cc1c1cc%10c9cc8c7cc6c5cc4c3cc21',
         'smarts': 'c1cc2cc3ccc4cc5ccc6cc7ccc8cc9ccc%10cc1c1cc%10c9cc8c7cc6c5cc4c3cc21',
@@ -500,7 +500,7 @@ def get_polycyclic_by_smiles(canonical_smiles: str) -> Optional[Dict[str, Any]]:
 
     Example:
         >>> get_polycyclic_by_smiles('c1ccc2ccccc2c1')
-        {'name': 'naphthalene', 'canonical_smiles': 'c1ccc2ccccc2c1', ...}
+        {'name': 'naphthalene', 'canonical_smiles': 'c1ccc2ccccc2c1',...}
     """
     name = _SMILES_TO_NAME.get(canonical_smiles)
     if name is None:
@@ -564,7 +564,7 @@ def match_polycyclic_core(mol) -> Optional[Tuple[str, Dict[int, int]]]:
 
     Example:
         >>> from rdkit import Chem
-        >>> mol = Chem.MolFromSmiles('Cc1ccc2ccccc2c1')  # 2-methylnaphthalene
+        >>> mol = Chem.MolFromSmiles('Cc1ccc2ccccc2c1') # 2-methylnaphthalene
         >>> name, mapping = match_polycyclic_core(mol)
         >>> name
         'naphthalene'
@@ -618,9 +618,9 @@ def get_pah_core_atoms(mol, pah_name: str) -> Optional[Set[int]]:
 
     Example:
         >>> from rdkit import Chem
-        >>> mol = Chem.MolFromSmiles('Cc1ccc2ccccc2c1')  # 2-methylnaphthalene
+        >>> mol = Chem.MolFromSmiles('Cc1ccc2ccccc2c1') # 2-methylnaphthalene
         >>> core = get_pah_core_atoms(mol, 'naphthalene')
-        >>> len(core)  # 10 atoms in naphthalene core
+        >>> len(core) # 10 atoms in naphthalene core
         10
     """
     from rdkit import Chem
@@ -655,9 +655,9 @@ def get_pah_substituent_positions(mol, pah_name: str) -> List[int]:
 
     Example:
         >>> from rdkit import Chem
-        >>> mol = Chem.MolFromSmiles('Cc1ccc2ccccc2c1')  # 2-methylnaphthalene
+        >>> mol = Chem.MolFromSmiles('Cc1ccc2ccccc2c1') # 2-methylnaphthalene
         >>> get_pah_substituent_positions(mol, 'naphthalene')
-        [2]  # Methyl at position 2
+        [2] # Methyl at position 2
     """
 
     core_atoms = get_pah_core_atoms(mol, pah_name)

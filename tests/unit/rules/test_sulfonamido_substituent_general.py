@@ -1,8 +1,8 @@
-"""v30 breadth (task #25 remainder) — the general-engine substituent namer must name an
-N-rooted `-NH-SO2-R` branch as the P-66.1.1.4.3 `{R}sulfonamido` prefix
+""" breadth (task #25 remainder) — the general-engine substituent namer must name an
+N-rooted `-NH-SO2-R` branch as the `{R}sulfonamido` prefix
 (methanesulfonamido / ethanesulfonamido / benzenesulfonamido / cyclohexanesulfonamido),
 NOT the cascade's carbon-rooted `carbamoyl` misroot (which SWAPS S->C and DROPS S,2xO,CH3 —
-a different molecule; SELF-01 suppresses it, so the whole molecule abstains).
+a different molecule; suppresses it, so the whole molecule abstains).
 
 Root cause (hetsweep, same class as the alkoxy fix ffffdab4 and the N-rooted fix 9bb3a532):
 `name_substituent` normalises the attach atom to the N; `_name_amino_branch` (the builder the
@@ -12,7 +12,7 @@ fell through to the cascade -> `carbamoyl`.
 Fix: a shared primitive `sulfonamido_prefix_from_n_branch` reusing the acid-stem sulfonyl
 builder (`_acid_stem_oxide_prefix(..., 'sulfonyl')`) with the suffix rewrite sulfonyl->sulfonamido,
 wired into `_name_amino_branch`. Fails closed (None) for substituted-arene / CF3 / N,N-disubstituted
-R -> no new wrong emission (those keep abstaining). BB authority P-66.1.1.4.3, BlueBookV2.md:32995.
+R -> no new wrong emission (those keep abstaining). BB authority, the Blue Book.
 """
 from rdkit import Chem
 
@@ -63,7 +63,7 @@ def test_helper_methanesulfonamido():
 def test_helper_substituted_arene_now_named():
     # ASSERTION FLIP (was None / fail-closed, task #28): a SUBSTITUTED arene R is now
     # named `{substituted-arene}-<n>-sulfonamido` -- this is the sulfa-drug scaffold and
-    # a BB verbatim PIN class (P-66.1.1.4.3, BlueBookV2.md:33034
+    # a BB verbatim PIN class, the Blue Book
     # `2-(4-aminobenzene-1-sulfonamido)-1,3-thiazole-5-carboxylic acid (PIN)`).
     # The old None was a LIMITATION (`_acid_stem_unsaturated_oxide_prefix` detached only a
     # CARBON parent-side of S; a sulfonamide's other side is the N), not a correctness fact.
@@ -77,7 +77,7 @@ def test_helper_substituted_arene_now_named():
 
 def test_helper_sulfanilamide_arene_named():
     # the canonical sulfa-drug scaffold: R = 4-aminophenyl -> `4-aminobenzene-1-sulfonamido`
-    # (BB verbatim PIN prefix, BlueBookV2.md:33034). RT-EXACT verified end-to-end.
+    # (BB verbatim PIN prefix, the Blue Book). RT-EXACT verified end-to-end.
     m = Chem.MolFromSmiles("Nc1ccc(S(=O)(=O)Nc2ccccc2)cc1")
     assert sulfonamido_prefix_from_n_branch(
         m, 8, {0, 1, 2, 3, 4, 5, 6, 7, 8, 15, 16}, {9, 10, 11, 12, 13, 14}
@@ -102,7 +102,7 @@ def test_helper_naphthalene_arene_named():
 
 
 def test_helper_competing_sulfonic_acid_R_fails_closed():
-    # fable review of 7c621b84: R itself carrying a 2nd -SO3H makes the capped acid a
+    # a review review of 7c621b84: R itself carrying a 2nd -SO3H makes the capped acid a
     # MULTIPLIED name (`ethane-1,2-disulfonic acid`); the suffix-strip then corrupts to
     # `ethane-1,2-disulfonamido` (OPSIN-unparseable wrong constitution). Guard 1 (exactly
     # one S-oxo-acid in the capped fragment) must fail closed -> the cascade names the
@@ -118,9 +118,9 @@ def test_helper_competing_sulfonic_acid_R_fails_closed():
 
 
 def test_helper_acidnamer_migration_R_fails_closed():
-    # fable review: R = cyclohexylmethyl -> the gate-disabled acid namer mis-placed the
+    # a review review: R = cyclohexylmethyl -> the gate-disabled acid namer mis-placed the
     # SO3H onto the ring (`methylcyclohexanesulfonic acid`), a wrong constitution. Guard 2
-    # (run the acid sub-namer gate-ON) makes its own SELF-01 reject it -> fail closed.
+    # (run the acid sub-namer gate-ON) makes its own reject it -> fail closed.
     m = Chem.MolFromSmiles("O=S(=O)(Nc1ccccc1)CC2CCCCC2")  # -NH-SO2-CH2-cyclohexyl
     n_idx = next(a.GetIdx() for a in m.GetAtoms() if a.GetSymbol() == 'N'
                  and any(nb.GetSymbol() == 'S' for nb in a.GetNeighbors()))
@@ -132,7 +132,7 @@ def test_helper_acidnamer_migration_R_fails_closed():
 
 
 def test_helper_acidnamer_drop_R_fails_closed():
-    # fable review: R = acetamidomethyl -> the gate-disabled acid namer DROPPED the
+    # a review review: R = acetamidomethyl -> the gate-disabled acid namer DROPPED the
     # acetamido (`ethanesulfonic acid`). Guard 2 (gate-ON) rejects it -> fail closed.
     m = Chem.MolFromSmiles("O=S(=O)(Nc1ccccc1)CNC(C)=O")  # -NH-SO2-CH2-NHC(=O)CH3
     n_idx = next(a.GetIdx() for a in m.GetAtoms() if a.GetSymbol() == 'N'
@@ -168,8 +168,8 @@ def test_helper_nn_disubstituted_fails_closed():
     assert sulfonamido_prefix_from_n_branch(m, 1, frag, parent) is None
 
 
-# ---- fable-review (b5e4d3da) self-guard holes: a SHARED primitive must fail closed on
-# every non-'-NH-' attachment, since one caller guards only GetSymbol()=='N'.
+# ---- a review-review self-guard holes: a SHARED primitive must fail closed on
+# every non-'-NH-' attachment, since one caller guards only GetSymbol=='N'.
 
 def test_helper_double_bonded_n_fails_closed():
     # =N-SO2R (sulfonimidoyl-like attach): different bond order / H count from -NH-.

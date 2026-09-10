@@ -1,4 +1,4 @@
-"""Heptacene (7-fused-ring linear acene, P-25.1.2) — new POLYCYCLIC_DATA entry.
+"""Heptacene (7-fused-ring linear acene, — new POLYCYCLIC_DATA entry.
 
 Was fail-closed at PIN tier ('unknown organic compound' -- the general fused-ring
 engine has no catalog entry for a 7-ring linear acene) prior to this fix. OPSIN
@@ -25,7 +25,7 @@ positions and its meso edge-CH positions each form a symmetry-equivalent class,
 exactly as for naphthalene's 1=4=5=8 / 2=3=6=7), and
 `get_polycyclic_iupac_locants`'s existing automorphism-based lowest-locant
 selector (already load-bearing for hexacene/pentacene) correctly collapses each
-physical position to its class's lowest member per P-14.3.5 / P-25.3.3.1.2(a).
+physical position to its class's lowest member per / (a).
 This test only asserts positions that are ALREADY their class's lowest member
 (1, 2, 6, 7), so the naive "locant in name" check is a correct oracle here.
 """

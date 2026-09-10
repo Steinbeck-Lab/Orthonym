@@ -1,12 +1,12 @@
-"""v22 Phase-A: PIN-conformance gold packs — schema lock + fast protect tripwire.
+""" Phase-A: PIN-conformance gold packs — schema lock + fast protect tripwire.
 
-The per-class gold packs (benchmarks/pin_oracle/packs/*.json) are the v22 PRIMARY gate
+The per-class gold packs (benchmarks/the gold set/packs/*.json) are the PRIMARY gate
 (scored by scripts/pin_conformance_eval.py). This is the *fast* (OPSIN-free) companion: it
 locks the pack schema, forbids duplicate SMILES across packs (incl. the two legacy files), and
 asserts every NEW-pack PROTECT row keeps producing its expected PIN. (Legacy gold_pins.json /
 among_rings_gold.json protect rows are guarded by their own existing tests.)
 
-See .planning/audit-bluebook-v21/remediation/DD8-validation-without-RT.md.
+See internal notes
 """
 import json
 from pathlib import Path
@@ -38,7 +38,7 @@ def _pack_files():
 
 
 def _all_pack_rows(include_legacy=False):
-    """[(pack_name, row), ...] over the new packs (+ legacy if asked)."""
+    """[(pack_name, row),...] over the new packs (+ legacy if asked)."""
     out = []
     for fp in _pack_files():
         for r in _rows_of(json.loads(fp.read_text(encoding="utf-8"))):
@@ -104,7 +104,7 @@ class TestNoDuplicateSmiles:
         assert not collisions, f"v22 packs re-add SMILES already owned by legacy gold: {collisions}"
 
     def test_no_legacy_internal_duplicates(self):
-        """Legacy gold files must be internally duplicate-free (the v21 dups were cleaned in v22 Phase A)."""
+        """Legacy gold files must be internally duplicate-free (the dups were cleaned in Phase A)."""
         from collections import Counter
         for lf in _LEGACY:
             if not lf.exists():
@@ -125,9 +125,9 @@ class TestProtectRowsStayCorrect:
         accepted = {_norm(row["expected_pin"])} | {_norm(a) for a in row.get("accept_also", [])}
         # A fail-closed protect row (expected = a descriptive fallback such as
         # 'unknown organic compound' / '<metal> compound (not supported)') is
-        # produced ONLY when the production SUB-03 validity gate suppresses a raw
+        # produced ONLY when the production validity gate suppresses a raw
         # candidate. This suite's autouse fixture disables that gate, so an
-        # OPSIN-free name_compound() here returns the un-suppressed raw candidate.
+        # OPSIN-free name_compound here returns the un-suppressed raw candidate.
         # Validate those rows against the PRODUCTION (gate-ON) path instead (they
         # are also guarded by the phase gate's protect_new check). Non-fail-closed
         # rows keep the fast OPSIN-free path.

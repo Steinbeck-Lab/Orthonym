@@ -1,11 +1,11 @@
-"""Integration tests for assembly prefix/suffix correctness (Phase 131)."""
+"""Integration tests for assembly prefix/suffix correctness (a phase)."""
 import pytest
 from orthonym.namer import name_compound
 
 
 @pytest.mark.integration
 class TestASML12DihydroxyMerge:
-    """ASML-12: Identical substituent prefixes merged with multiplicative prefix."""
+    """: Identical substituent prefixes merged with multiplicative prefix."""
 
     def test_dihydroxypentanoic_acid(self):
         result = name_compound("OCC(O)CCC(=O)O")
@@ -21,7 +21,7 @@ class TestASML12DihydroxyMerge:
         assert count == 1, f"Expected 1 'hydroxy' occurrence (in dihydroxy), got {count} in: {result}"
 
     def test_bare_bare_merge_regression(self):
-        """ASML-12 regression: two bare 'hydroxy' (no locants) still merge to 'dihydroxy'.
+        """ regression: two bare 'hydroxy' (no locants) still merge to 'dihydroxy'.
 
         This tests the existing bare-merge behavior is NOT broken by the
         locant-aware merge addition. Bare prefixes are those without locants,
@@ -36,7 +36,7 @@ class TestASML12DihydroxyMerge:
 
 @pytest.mark.integration
 class TestASML13PhenolRouting:
-    """ASML-13: Ring hydroxyl uses suffix form when OH is principal group."""
+    """: Ring hydroxyl uses suffix form when OH is principal group."""
 
     def test_chlorophenol(self):
         result = name_compound("c1cc(O)c(Cl)cc1")
@@ -60,7 +60,7 @@ class TestASML13PhenolRouting:
         """Ethylphenol: should produce ethylphenol not ethylhydroxybenzene.
 
         Note: methylphenol (cresol) is a retained name and does not exercise
-        the ASML-13 suffix routing path. Use ethylphenol instead.
+        the suffix routing path. Use ethylphenol instead.
         """
         result = name_compound("CCc1ccc(O)cc1")
         assert result is not None

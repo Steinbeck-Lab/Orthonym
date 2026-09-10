@@ -1,14 +1,14 @@
 """
 Tests for ring locant coordination between ester prefixes and general substituents.
 
-Phase 102-06: When a ring has both ester prefixes (acyloxy) AND other substituents
+a phase-06: When a ring has both ester prefixes (acyloxy) AND other substituents
 (methyl, chloro, hydroxy, etc.), the locants must be computed from a single unified
-numbering system. Previously, _assemble_ring_with_ester_prefixes() only handled ester
+numbering system. Previously, _assemble_ring_with_ester_prefixes only handled ester
 prefixes and dropped all other substituents.
 
 References:
-    IUPAC 2013 P-31.1.2 (all substituents receive coordinated locants)
-    IUPAC 2013 P-14.4 (alphabetical ordering of detachable prefixes)
+    IUPAC 2013 (all substituents receive coordinated locants)
+    IUPAC 2013 (alphabetical ordering of detachable prefixes)
 """
 import pytest
 from orthonym import name_compound
@@ -79,7 +79,7 @@ class TestLocantConsistency:
         assert "acetyloxy" in result, f"Missing 'acetyloxy' in: {result}"
 
     def test_alphabetical_ordering(self):
-        """Prefixes should be in alphabetical order per IUPAC P-14.4."""
+        """Prefixes should be in alphabetical order per IUPAC."""
         result = name_compound("CC(=O)Oc1ccc(Cl)c(C)c1")
         # acetyloxy < chloro < methyl alphabetically
         assert "acetyloxy" in result, f"Missing 'acetyloxy' in: {result}"

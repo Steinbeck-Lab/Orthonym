@@ -1,4 +1,4 @@
-"""C4 — aromatic / diaryl amines named substitutively (completes task 1.6, P-62.2.2).
+"""C4 — aromatic / diaryl amines named substitutively (completes task 1.6,.
 
 The aliphatic secondary/tertiary amine case (CCCNCCC -> N-propylpropan-1-amine)
 was already substitutive. This cluster fixes the AROMATIC subfamily: an amine N
@@ -88,7 +88,7 @@ def test_c4_guard_iminodibenzoic_acid_stays_multiplicative():
     """4,4'-azanediyldibenzoic acid: fragments carry a senior PCG (CO2H) so the
     _all_fragments_are_simple_carbocycles guard is False -> the -NH- (azanediyl)
     multiplicative bridge is retained (NOT reclassified to an aniline).
-    Wave2 P-35.2.2: the divalent -NH- bridge PIN is 'azanediyl' (was 'imino')."""
+    Wave2: the divalent -NH- bridge PIN is 'azanediyl' (was 'imino')."""
     assert _pin("OC(=O)c1ccc(Nc2ccc(C(=O)O)cc2)cc1") == "4,4'-azanediyldibenzoic acid"
 
 
@@ -100,7 +100,7 @@ def test_c4_guard_amine_prefix_when_senior_group_present():
 
 
 # ---------------------------------------------------------------------------
-# C4b regression fix — N-substituted aromatic DIAMINES (P-62.2.2)
+# C4b regression fix — N-substituted aromatic DIAMINES
 #
 # A benzene ring bearing a free primary -NH2 AND a second, N-substituted
 # amino group. Both amino N's are the principal group -> 'benzene-x,y-diamine'
@@ -108,7 +108,7 @@ def test_c4_guard_amine_prefix_when_senior_group_present():
 # prefixes on that nitrogen (which takes ring position 1 so it reads plain
 # N-/N,N-). C4 promoted BOTH amines to the diamine suffix but DROPPED the
 # N-substituent -> emitted 'benzene-1,4-diamine' (wrong structure) which
-# SELF-01 then suppressed to 'unknown'. All PINs OPSIN round-trip verified.
+# then suppressed to 'unknown'. All PINs OPSIN round-trip verified.
 # ---------------------------------------------------------------------------
 
 @pytest.mark.parametrize("smiles,expected", [
@@ -126,14 +126,14 @@ def test_c4b_n_substituted_aromatic_diamine(smiles, expected):
 def test_c4b_pure_primary_diamine_unchanged():
     """The pure primary diamine (both -NH2, no N-substituent) must stay a valid
     diamine name and NOT regress to unknown. Its exact spelling is env-dependent
-    (prod SELF-01 path yields '1,4-phenylenediamine'; the RT-free unit path
+    (prod path yields '1,4-phenylenediamine'; the RT-free unit path
     yields 'benzene-1,4-diamine') — both are OPSIN-valid PINs/synonyms for the
     same molecule; the C4b fix must not touch it."""
     assert _pin("Nc1ccc(N)cc1") in {"benzene-1,4-diamine", "1,4-phenylenediamine"}
 
 
 # ---------------------------------------------------------------------------
-# P-16.5.1.1 — a COMPOUND N-substituent on the aniline parent takes its own
+# — a COMPOUND N-substituent on the aniline parent takes its own
 # enclosing marks before the italic 'N-' locant (the Blue Book,
 # 4-(2-methylbutyl)-N-(3-methylbutyl)aniline). _name_substituted_aniline used
 # _wrap_n_substituent alone (escalate-only), so a mark-free compound prefix
@@ -143,7 +143,7 @@ def test_c4b_pure_primary_diamine_unchanged():
 # ---------------------------------------------------------------------------
 
 @pytest.mark.parametrize("smiles,expected", [
-    # the Blue Book (P-14.5.4) worked example.
+    # the Blue Book worked example.
     ("CCC(C)Cc1ccc(NCCC(C)C)cc1",
      "4-(2-methylbutyl)-N-(3-methylbutyl)aniline"),
     # A compound N-substituent with no ring locant still needs its marks.

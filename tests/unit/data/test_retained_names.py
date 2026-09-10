@@ -1,7 +1,7 @@
 """
-Tests for retained names data (Phase 14.6 additions).
+Tests for retained names data (a phase additions).
 
-Tests the benzonitrile and thiazolidine entries added to fix BUG-2 and BUG-6.
+Tests the benzonitrile and thiazolidine entries added to fix and.
 """
 
 import pytest
@@ -15,7 +15,7 @@ from orthonym import name_compound
 # =============================================================================
 
 class TestBenzonitrileRetainedName:
-    """Tests for benzonitrile in retained names (BUG-2 fix)."""
+    """Tests for benzonitrile in retained names (fix)."""
 
     @pytest.mark.unit
     def test_benzonitrile_in_retained_names(self):
@@ -51,7 +51,7 @@ class TestBenzonitrileRetainedName:
 # =============================================================================
 
 class TestThiazolidineRetainedNames:
-    """Tests for thiazolidine and isothiazolidine in retained names (BUG-6 fix)."""
+    """Tests for thiazolidine and isothiazolidine in retained names (fix)."""
 
     @pytest.mark.unit
     def test_thiazolidine_in_retained_names(self):
@@ -93,31 +93,31 @@ class TestThiazolidineRetainedNames:
 
     # ----------------------------------------------------------------------
     # Task AA5: the six expectations below asserted the BARE stem, which the
-    # Blue Book prints as NOT the PIN.  Section **P-22.2.1 "Retained names of
-    # heteromonocycles"** (heading ``BlueBookV2.md:8109``), whose lead-in at
+    # Blue Book prints as NOT the PIN. Section ** "Retained names of
+    # heteromonocycles"** (heading ``the Blue Book``), whose lead-in at
     # ``:8117`` reads "Retained names for saturated heteromonocycles are given
-    # in Table 2.3".  Both governing lines are single, non-interleaved lines --
+    # in Table 2.3". Both governing lines are single, non-interleaved lines --
     # no OCR column reconstruction is involved for either name:
     #
-    #   :8182  "oxazolidine 1,3-oxazolidine (PIN) thiazolidine (S instead of O)
-    #           1,3-thiazolidine (PIN) selenazolidine (Se instead of O)"
-    #   :8184  "1,2-oxazolidine (PIN) isothiazolidine (S instead of O)
-    #           1,2-thiazolidine (PIN) isoselenazolidine (Se instead of O) ..."
+    #:8182 "oxazolidine 1,3-oxazolidine (PIN) thiazolidine (S instead of O)
+    # 1,3-thiazolidine (PIN) selenazolidine (Se instead of O)"
+    #:8184 "1,2-oxazolidine (PIN) isothiazolidine (S instead of O)
+    # 1,2-thiazolidine (PIN) isoselenazolidine (Se instead of O)..."
     #
     # Independent corroboration (does NOT use the code under test): OPSIN 2.9.0
     # parses '1,3-thiazolidine' -> C1CSCN1 and '1,2-thiazolidine' -> C1CNSC1, so
-    # the new names denote exactly these molecules.  ⚠ That check confirms
+    # the new names denote exactly these molecules. ⚠ That check confirms
     # VALIDITY only -- OPSIN resolves the old bare names to the same structures,
-    # so it cannot adjudicate PIN-preference.  Preference rests on the Blue Book
-    # lines above, which state it explicitly.  Second corroboration, internal:
+    # so it cannot adjudicate PIN-preference. Preference rests on the Blue Book
+    # lines above, which state it explicitly. Second corroboration, internal:
     # every sibling in the same two table rows already emitted the
     # locant-bearing form (1,3-oxazolidine, 1,3-selenazolidine,
     # 1,3-tellurazolidine, 1,2-oxazole, 1,2-thiazole) -- members of one series
     # that must agree, and did not.
     #
     # What would make this wrong: if the "(PIN)" marker in Table 2.3 attached to
-    # the trivial column rather than the locant-bearing one.  It does not -- both
-    # pairs are printed left-to-right on one line, and Table 2.2's :8135/:8137
+    # the trivial column rather than the locant-bearing one. It does not -- both
+    # pairs are printed left-to-right on one line, and Table 2.2's:8135/:8137
     # print the identical mapping for the mancude analogues.
     # ----------------------------------------------------------------------
 
@@ -150,7 +150,7 @@ class TestThiazolidineRetainedNames:
 
     @pytest.mark.unit
     def test_thiazolidine_naming_e2e(self):
-        """name_compound returns the PIN '1,3-thiazolidine' (BB:8182)."""
+        """name_compound returns the PIN '1,3-thiazolidine' (the Blue Book)."""
         result = name_compound('C1CSCN1')
         assert result == '1,3-thiazolidine', f"Got {result}"
 
@@ -162,7 +162,7 @@ class TestThiazolidineRetainedNames:
 
     @pytest.mark.unit
     def test_isothiazolidine_naming_e2e(self):
-        """name_compound returns the PIN '1,2-thiazolidine' (BB:8184)."""
+        """name_compound returns the PIN '1,2-thiazolidine' (the Blue Book)."""
         result = name_compound('C1CNSC1')
         assert result == '1,2-thiazolidine', f"Got {result}"
 

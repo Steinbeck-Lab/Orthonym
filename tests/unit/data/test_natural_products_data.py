@@ -124,9 +124,9 @@ class TestDerivativeData:
     def test_get_natural_product_name_found(self):
         """get_natural_product_name should return correct names.
 
-        v29 Task E2: this used camphor as its "known entry". Camphor is now an
-        adjudicated non-PIN (P-64.2.1.1 BlueBookV2.md:28297 makes chalcone the ONLY
-        retained ketone PIN; P-64.2.1.2 :28307 is a closed general-nomenclature list
+        : this used camphor as its "known entry". Camphor is now an
+        adjudicated non-PIN the Blue Book makes chalcone the ONLY
+        retained ketone PIN;:28307 is a closed general-nomenclature list
         that excludes it), so this surface correctly returns None for it -- see
         test_get_natural_product_name_camphor_is_demoted below. Switched to
         porphyrin, which is still served here, so the test keeps testing the lookup
@@ -141,7 +141,7 @@ class TestDerivativeData:
 
         The PIN path now emits the Blue Book's own rendering,
         '1,7,7-trimethylbicyclo[2.2.1]heptan-2-one' (printed verbatim at
-        BlueBookV2.md:52648 as '(1R,4R)-1,7,7-trimethylbicyclo[2.2.1]heptan-2-one').
+        the Blue Book as '(1R,4R)-1,7,7-trimethylbicyclo[2.2.1]heptan-2-one').
         """
         camphor_smi = "CC12CCC(CC1=O)C2(C)C"
         assert get_natural_product_name(camphor_smi) is None
@@ -178,7 +178,7 @@ class TestPatternCompilation:
     """Tests for pre-compiled scaffold RDKit Mol patterns."""
 
     def test_patterns_compiled(self):
-        """get_scaffold_patterns() must return a non-empty dict."""
+        """get_scaffold_patterns must return a non-empty dict."""
         patterns = get_scaffold_patterns()
         assert len(patterns) > 0
 

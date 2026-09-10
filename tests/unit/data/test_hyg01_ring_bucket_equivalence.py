@@ -1,4 +1,4 @@
-"""HYG-01 (Phase 173) — HARD equivalence gate.
+""" (a phase) — HARD equivalence gate.
 
 Asserts the new hash-bucketed match_fused_heterocycle_core returns results
 byte-identical to the original O(N) full-scan over: every catalog entry, every

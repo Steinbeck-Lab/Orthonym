@@ -1,13 +1,13 @@
-"""P-74.2.1 semipolar (dative) charges are INTERNAL, not ionic centres.
+""" semipolar (dative) charges are INTERNAL, not ionic centres.
 
-Blue Book, **P-74.2 "DIPOLAR COMPOUNDS"** (heading; ``the Blue Book``):
+Blue Book, ** "DIPOLAR COMPOUNDS"** (heading; ``the Blue Book``):
 
     "Dipolar compounds are electrically neutral molecules carrying a negative
     and a positive charge in at least one of their major canonical resonance
     structures.... 1,2-Dipolar compounds have the opposite charges on adjacent
     atoms."
 
-**P-74.2.1.1 "'Ylides'"** (heading, ``:42509``) states the depiction rule that
+** "'Ylides'"** (heading, ``:42509``) states the depiction rule that
 is the whole origin of this defect -- note the *last* clause, which is the
 decisive one:
 
@@ -17,13 +17,13 @@ decisive one:
     are usually shown, RmX=YRn."
 
 So a second-row cation (N) is *always* drawn charge-separated -- and the module's
-hard-coded P-59 SMARTS cover exactly that case (nitro, N-oxide, azide, diazo).
+hard-coded SMARTS cover exactly that case (nitro, N-oxide, azide, diazo).
 A third/fourth-row cation (P, S, As, Se, Sb, Te, I...) is *usually* drawn
 uncharged, which is precisely why nobody wrote a SMARTS for it -- but nothing
 stops an input from being drawn charge-separated, and when it is, the pair used
 to read as a genuine ionic centre.
 
-**P-74.2.1.4 "Phosphine oxides and chalcogen analogues"** (heading, ``:43041``)
+** "Phosphine oxides and chalcogen analogues"** (heading, ``:43041``)
 settles what such a pair means:
 
     "Phosphine oxides have the generic formula R3P+ -O- <-> R3P=O. Chalcogen
@@ -33,17 +33,17 @@ settles what such a pair means:
 
 The Blue Book's own double-headed arrow says the two depictions are one
 compound, and it makes the NEUTRAL name (a l5-heterone) the PIN. Same verdict
-for amine/imine oxides, **P-74.2.1.2** (heading, ``:43008``): "Method (2) leads
+for amine/imine oxides, **** (heading, ``:43008``): "Method (2) leads
 to preferred IUPAC names when one amine oxide is present.... Hence,
 zwitterionic compounds are never PINs".
 
 THE BOUNDARY -- the Blue Book draws it by the ANION, and both sides matter:
 
-  * anion on CARBON = an ylide. **P-74.2.1.1** ``:42513``: "Method (1) is
+  * anion on CARBON = an ylide. **** ``:42513``: "Method (1) is
     applicable to all 'ylides' and leads to preferred IUPAC names", where
     method (1) is "as zwitterionic compounds". So an ylide's PIN *is* the
     zwitterion name and its charges must stay VISIBLE.
-  * anion on NITROGEN with a nitrogen cation = an amine imide. **P-74.2.1.3**
+  * anion on NITROGEN with a nitrogen cation = an amine imide. ****
     (heading, ``:43022``): "Method (1) leads to preferred IUPAC names", method
     (1) being "as a zwitterion based on hydrazine". Again: stay visible.
   * anion on a CHALCOGEN (O/S/Se/Te) = the oxide / chalcogenide class above.
@@ -77,7 +77,7 @@ def _n_sites(smiles):
 
 
 # ---------------------------------------------------------------------------
-# The class that must be masked: P-74.2.1.2 / P-74.2.1.4 semipolar chalcogenides
+# The class that must be masked: / semipolar chalcogenides
 # ---------------------------------------------------------------------------
 
 SEMIPOLAR = [
@@ -96,7 +96,7 @@ SEMIPOLAR = [
 
 @pytest.mark.parametrize("smiles,neutral,label", SEMIPOLAR, ids=[c[2] for c in SEMIPOLAR])
 def test_semipolar_chalcogenide_reports_no_ionic_site(smiles, neutral, label):
-    """A P-74.2.1.4 semipolar X(+)-A(-) pair is NOT an ionic centre."""
+    """A semipolar X(+)-A(-) pair is NOT an ionic centre."""
     assert _n_sites(smiles) == 0, f"{label}: semipolar pair leaked as an ionic site"
 
 
@@ -114,7 +114,7 @@ def test_semipolar_chalcogenide_atoms_are_marked_internal(smiles, neutral, label
 def test_semipolar_chalcogenide_is_the_same_species_as_its_uncharged_form(
     smiles, neutral, label
 ):
-    """The premise of the mask, stated as an executable claim (P-74.2.1.4 '<->').
+    """The premise of the mask, stated as an executable claim '<->').
 
     If this ever fails, the mask is unsound for that row and must not fire.
     """
@@ -134,11 +134,11 @@ def test_semipolar_chalcogenide_is_a_neutral_species(smiles, neutral, label):
 # ---------------------------------------------------------------------------
 
 GENUINE = [
-    # P-74.2.1.1 ylides -- zwitterion name IS the PIN, charges must stay visible
+    # ylides -- zwitterion name IS the PIN, charges must stay visible
     ("C[P+](C)(C)[CH2-]", "phosphorus ylide (P-74.2.1.1, zwitterion PIN)"),
     ("C[S+](C)[CH2-]", "sulfur ylide (P-74.2.1.1, zwitterion PIN)"),
     ("C[N+](C)(C)[CH2-]", "nitrogen ylide (P-74.2.1.1.1, zwitterion PIN)"),
-    # P-74.2.1.3 amine imide -- zwitterion PIN
+    # amine imide -- zwitterion PIN
     ("C[N+](C)(C)[N-]C", "amine imide (P-74.2.1.3, zwitterion PIN)"),
     # genuine ions / zwitterions
     ("CC(=O)[O-]", "acetate anion"),
@@ -164,7 +164,7 @@ def test_genuine_charges_are_not_masked(smiles, label):
 
 
 # ---------------------------------------------------------------------------
-# The pre-existing P-59 Table 5.1 mask must keep working (no unmasking)
+# The pre-existing mask must keep working (no unmasking)
 # ---------------------------------------------------------------------------
 
 TABLE_5_1 = [

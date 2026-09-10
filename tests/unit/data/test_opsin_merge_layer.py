@@ -13,7 +13,7 @@ class TestMergeLayerBehavior:
     """Tests for merge layer in data/__init__.py."""
 
     def test_hand_curated_wins_conflict(self):
-        """Hand-curated entries take precedence over OPSIN imports (D-11)."""
+        """Hand-curated entries take precedence over OPSIN imports ."""
         from orthonym.data import ALL_RETAINED_NAMES
 
         # benzene is in both hand-curated and OPSIN
@@ -34,13 +34,13 @@ class TestMergeLayerBehavior:
         )
 
     def test_backward_compatible_alias(self):
-        """RETAINED_NAMES is the same object as ALL_RETAINED_NAMES (D-12)."""
+        """RETAINED_NAMES is the same object as ALL_RETAINED_NAMES ."""
         from orthonym.data import RETAINED_NAMES, ALL_RETAINED_NAMES
 
         assert RETAINED_NAMES is ALL_RETAINED_NAMES
 
     def test_get_retained_name_uses_merged(self):
-        """get_retained_name() searches the merged dictionary."""
+        """get_retained_name searches the merged dictionary."""
         from orthonym.data import get_retained_name, ALL_RETAINED_NAMES
         from orthonym.data.retained_names import RETAINED_NAMES as hand_curated
 
@@ -58,7 +58,7 @@ class TestMergeLayerBehavior:
         )
 
     def test_has_retained_name_uses_merged(self):
-        """has_retained_name() checks the merged dictionary."""
+        """has_retained_name checks the merged dictionary."""
         from orthonym.data import has_retained_name, ALL_RETAINED_NAMES
         from orthonym.data.retained_names import RETAINED_NAMES as hand_curated
 
@@ -73,7 +73,7 @@ class TestMergeLayerBehavior:
         assert has_retained_name(opsin_only_smi) is True
 
     def test_all_opsin_entries_have_is_pin_false(self):
-        """All OPSIN import entries have is_pin=False (DATA-20)."""
+        """All OPSIN import entries have is_pin=False ."""
         from orthonym.data.opsin_imports import (
             OPSIN_ARYL_GROUPS,
             OPSIN_SIMPLE_GROUPS,
@@ -119,7 +119,7 @@ class TestMergeLayerBehavior:
         )
 
     def test_register_retained_name_still_works(self):
-        """register_retained_name() modifies ALL_RETAINED_NAMES."""
+        """register_retained_name modifies ALL_RETAINED_NAMES."""
         from orthonym.data import (
             ALL_RETAINED_NAMES,
             register_retained_name,

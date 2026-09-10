@@ -1,13 +1,13 @@
-"""Producer-agnostic coverage verdict for the ``_finish`` choke (v33 Phase 0 L0/L1).
+"""Producer-agnostic coverage verdict for the ``_finish`` choke (a phase L0/L1).
 
 Two carrier-specific proofs feed ONE verdict:
   * ``GeneralEngineResult`` (has ``.bindings``) -> ``certify_general_result``
     (E1 + binding spine, Java-free atom->token partition).
-  * bare ``str`` (PIN handlers) -> reuse the SELF-01 verdict ALREADY computed
+  * bare ``str`` (PIN handlers) -> reuse the verdict ALREADY computed
     by ``_final_opsin_validity_gate`` for this exact name (the CARRIED RULING
-    in ``task-L0-brief.md``: SELF-01 already OPSIN-parses every PIN name, so a
+    in ``task-L0-brief.md``: already OPSIN-parses every PIN name, so a
     second OPSIN call per name would ~2x default-path cost). Only when no
-    SELF-01 result is available for this name (e.g. a tier/path that skipped
+     result is available for this name (e.g. a tier/path that skipped
     the gate) does this fall back to a fresh OPSIN re-anchor
     (``validate_atom_coverage``, the (mol, name) InChIKey-skeleton compare).
 
@@ -15,7 +15,7 @@ This is a coverage AUDIT; L0 runs it SHADOW (telemetry only, never changes the
 returned name), L1 (a later task) turns it into a veto.
 
 HONEST LIMIT: the bare-str path depends on OPSIN (not Java-free); it is the
-de-facto PIN coverage proof SELF-01 already applies. A Java-free PIN
+de-facto PIN coverage proof already applies. A Java-free PIN
 certificate is out of scope (phase4b Gap-1).
 """
 from __future__ import annotations
@@ -36,9 +36,9 @@ class CoverageVerdict:
             heavy atom (and, on the GER path, bond/charge) of the input.
         method: which proof produced this verdict -- one of
             ``"e1_spine"`` (GeneralEngineResult, certify_general_result),
-            ``"self01"`` (bare str, reused SELF-01 verdict -- no extra OPSIN
+            ``"self01"`` (bare str, reused verdict -- no extra OPSIN
             call), ``"reanchor"`` (bare str, a fresh OPSIN re-anchor because
-            no SELF-01 verdict was available), ``"unavailable"`` (no proof
+            no verdict was available), ``"unavailable"`` (no proof
             could be made -- OPSIN absent/erroring; fails OPEN in SHADOW).
         detail: free-text diagnostic, empty on a clean pass.
     """
@@ -59,7 +59,7 @@ def audit_coverage(mol, name: str, result_obj,
         result_obj: the ``GeneralEngineResult`` that produced ``name``, if the
             winner came from the general engine (has a ``.bindings``
             attribute); ``None`` for every bare-str (PIN/T4/etc.) winner.
-        self01_complete: the SELF-01 verdict ALREADY computed for this exact
+        self01_complete: the verdict ALREADY computed for this exact
             ``name`` by ``_final_opsin_validity_gate`` (True = OPSIN re-parsed
             it to the same constitution, False = a verified mismatch), or
             ``None`` when no such verdict exists for this name (a path that
@@ -68,7 +68,7 @@ def audit_coverage(mol, name: str, result_obj,
             IGNORED when ``result_obj`` is not None (the GER path never needs
             it -- E1 is Java-free and strictly more informative: it covers
             bonds/charge, not merely constitution).
-        skip_reanchor: v33 Phase 0 L0 review fix (C1/C2). When ``True`` (and
+        skip_reanchor: a phase L0 review fix (C1/C2). When ``True`` (and
             ``self01_complete`` is ``None``), skip the ``validate_atom_coverage``
             re-anchor ENTIRELY -- no OPSIN subprocess is spawned -- and return
             ``complete=True, method="unavailable"`` directly. Set by the caller
@@ -78,11 +78,11 @@ def audit_coverage(mol, name: str, result_obj,
             disabled/unavailable/not_run means no real gate decision exists to
             reuse or repeat. Ignored when ``self01_complete`` is not ``None``
             (a real verdict always wins) and ignored on the GER path.
-        skip_detail: the :class:`CoverageVerdict` ``detail`` to use when
+        skip_detail: the:class:`CoverageVerdict` ``detail`` to use when
             ``skip_reanchor`` fires; defaults to a generic message.
 
     Returns:
-        A :class:`CoverageVerdict`. Fail-closed (``complete=False``) on an
+        A:class:`CoverageVerdict`. Fail-closed (``complete=False``) on an
         exception in the GER path; fail-OPEN (``complete=True,
         method="unavailable"``) on an exception, OPSIN-unavailable, or
         ``skip_reanchor`` in the bare-str path -- SHADOW must never break a
@@ -97,7 +97,7 @@ def audit_coverage(mol, name: str, result_obj,
             return CoverageVerdict(False, "e1_spine", f"certify raised: {exc}")
         return CoverageVerdict(bool(ok), "e1_spine", "" if ok else "certify failed")
 
-    # bare-str path -- CARRIED RULING: prefer the already-computed SELF-01
+    # bare-str path -- CARRIED RULING: prefer the already-computed
     # verdict over a second OPSIN call.
     if self01_complete is not None:
         return CoverageVerdict(

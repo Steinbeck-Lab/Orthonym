@@ -1,11 +1,11 @@
 """
 Integration tests for compound prefix generation of substituted fused heterocycles.
 
-Phase 78 Plan 03 — When a fused heterocycle ring has its own substituents AND
+a phase Plan 03 — When a fused heterocycle ring has its own substituents AND
 is itself a substituent on a chain parent, the output should be a compound prefix
 like "(5-methyl-1H-indol-3-yl)".
 
-Tests verify FHET-06 requirement.
+Tests verify requirement.
 """
 
 import subprocess
@@ -164,7 +164,7 @@ class TestUnsubstitutedStillWorks:
 
 @pytest.mark.integration
 class TestCompoundPrefixEndToEnd:
-    """End-to-end tests: name_compound() produces compound prefixes for substituted fused het substituents."""
+    """End-to-end tests: name_compound produces compound prefixes for substituted fused het substituents."""
 
     def test_5_methyl_indole_e2e(self):
         """5-methylindole as substituent on diacid chain → compound prefix in name."""

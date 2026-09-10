@@ -71,7 +71,7 @@ def test_substituted_alkoxyl_named_and_rt(smiles):
     assert _radical_rt(name, smiles), f"{name!r} did not -r round-trip for {smiles}"
 
 
-# v36 A2 Task 2 (C2): `_build_ctx` (universal_substituent.py) used to hard-
+# A2 Task 2 (C2): `_build_ctx` (universal_substituent.py) used to hard-
 # abstain on ANY radical electron, so a radical the dedicated
 # radicals.py/route_charged path declines (measured: route_charged's own
 # cumulative-suffix primitive falls through to the broken textual fallback
@@ -87,7 +87,7 @@ CARBON_RADICAL_FLOOR = "[CH2]CO"
 
 @pytest.mark.opsin_gate  # the whole point: the broken 'ethanolyl' fallback
 # candidate must be REJECTED (gate ON, production default) so the pipeline
-# falls through to the T4 floor -- with the suite's gate-off default this
+# falls through to the floor -- with the suite's gate-off default this
 # test would observe the unverified pre-gate candidate instead and miss the
 # rescue entirely (conftest.py's `_opsin_validity_gate_state` autouse fixture).
 def test_carbon_radical_reaches_floor():
@@ -98,7 +98,7 @@ def test_carbon_radical_reaches_floor():
             f"{name!r} not -r-RT for {CARBON_RADICAL_FLOOR}"
 
 
-# v36 A2 FABLE hardening, FIX #1: the pre-fix `_is_plain_alkyl_radical_fragment`
+# A2 FABLE hardening, FIX #1: the pre-fix `_is_plain_alkyl_radical_fragment`
 # checked only aromatic/ring/heteroatom, NOT branching or unsaturation, so a
 # BRANCHED or UNSATURATED alkyl fragment was routed to the linear retained
 # carbon-COUNT contraction and silently misnamed -- e.g. propan-2-yl (isopropyl)
@@ -107,7 +107,7 @@ def test_carbon_radical_reaches_floor():
 # abstain, never shipped wrong -- 0-wrong held, but breadth was lost). All
 # five below are VERIFIED -r-round-trip MATCHES at HEAD after the fix (the
 # tightened shape guard now falls through to the systematic '(<parent>)oxyl'
-# composition -- P-71.3.4 method (1), the PIN -- for every one of them; run
+# composition -- method (1), the PIN -- for every one of them; run
 # confirmed no xfail is needed).
 BRANCHED_UNSATURATED_ALKOXYL = [
     "[O]C(C)C",         # (propan-2-yl)oxyl -- was 'propoxyl' (MISMATCH)
@@ -125,10 +125,10 @@ def test_branched_unsaturated_alkoxyl_named_and_rt(smiles):
     assert _radical_rt(name, smiles), f"{name!r} did not -r round-trip for {smiles}"
 
 
-# v36 A2 FABLE hardening, FIX #2: peroxyl (R-O-O.) was in scope (spec
+# A2 FABLE hardening, FIX #2: peroxyl (R-O-O.) was in scope (spec
 # section C-C1 "aryloxyl/oxyl/peroxyl") but not delivered -- the pre-fix code
 # fell to the non-C-attachment fallback 'oxyl' (which parses back to bare
-# '[OH]', a MISMATCH), needlessly abstaining. P-71.3.4 (BlueBookV2.md:
+# '[OH]', a MISMATCH), needlessly abstaining. (the Blue Book:
 # 40677-40709) names these additively -- 'methylperoxyl', 'tert-butylperoxyl'
 # -- and states in terms "Method (1) generates preferred IUPAC names", so
 # these are the PIN forms, not the systematic '(R)dioxidanyl' alternative.
@@ -146,7 +146,7 @@ def test_peroxyl_named_and_rt(smiles):
     assert _radical_rt(name, smiles), f"{name!r} did not -r round-trip for {smiles}"
 
 
-# v36 A2 FABLE nit: the substituted-aryloxyl generalisation had only been
+# A2 FABLE nit: the substituted-aryloxyl generalisation had only been
 # proven at the default/PIN tier by an external ad hoc probe, never a
 # committed test running the actual PRODUCTION configuration (gate ON, no
 # best-effort tier flags -- `Orthonym(style="pin")`, the same as an

@@ -1,7 +1,7 @@
-"""Integration tests for coverage gate refactor (Phase 81).
+"""Integration tests for coverage gate refactor (a phase).
 
 Verifies that the refactored candidate collection system:
-1. Still returns names for compounds that previously triggered DROP-20
+1. Still returns names for compounds that previously triggered
 2. Non-gated handlers remain unchanged
 3. Candidate collection picks the best handler
 4. Canary compounds remain stable
@@ -12,11 +12,11 @@ from orthonym import name_compound
 
 
 # ---------------------------------------------------------------------------
-# 1. Former DROP-20 compounds still return names
+# 1. Former compounds still return names
 # ---------------------------------------------------------------------------
 
 class TestFormerDrop20Compounds:
-    """Compounds from IMPROVED_COMPOUNDS that previously triggered DROP-20."""
+    """Compounds from IMPROVED_COMPOUNDS that previously triggered."""
 
     def test_large_indole_peptide(self):
         """35-atom molecule with indole should not just return '1H-indole'."""
@@ -47,7 +47,7 @@ class TestFormerDrop20Compounds:
 
 
 # ---------------------------------------------------------------------------
-# 2. DROP-20 compounds have confidence metadata
+# 2. compounds have confidence metadata
 # ---------------------------------------------------------------------------
 
 class TestConfidenceMetadata:
@@ -57,7 +57,7 @@ class TestConfidenceMetadata:
     These tests validate the full API after Task 3 completes.
     """
 
-    # v29 C4 re-derivation of the two tests below.
+    # C4 re-derivation of the two tests below.
     #
     # Both used to assert `result['confidence'] > 0`. Benzene and pyridine
     # both take an early return, so no candidate is ever scored for them --
@@ -165,8 +165,8 @@ CANARY_SPOT_CHECK = [
     ("Cn1c(=O)c2c(ncn2C)n(C)c1=O",
      "1,3,7-trimethyl-3,7-dihydro-1H-purine-2,6-dione"),
     ("O=C(O)c1ccccc1", "benzoic acid"),
-    # v22 Phase B (DD1 Fix 4): triethylamine is general-nomenclature; PIN is the
-    # substitutive N,N-diethylethanamine (P-62.2.1.2).
+    # Phase B (DD1 Fix 4): triethylamine is general-nomenclature; PIN is the
+    # substitutive N,N-diethylethanamine.
     ("CCN(CC)CC", "N,N-diethylethanamine"),
 ]
 

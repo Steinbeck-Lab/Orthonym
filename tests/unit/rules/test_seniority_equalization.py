@@ -8,7 +8,7 @@ from orthonym.rules.seniority import (
 
 
 class TestSeniorityEqualization:
-    """ASML-18: All alcohol/amine subtypes have equal seniority."""
+    """: All alcohol/amine subtypes have equal seniority."""
 
     def test_seniority_parent_map_exists(self):
         """_SENIORITY_PARENT maps all alcohol and amine subtypes."""
@@ -23,7 +23,7 @@ class TestSeniorityEqualization:
         assert _SENIORITY_PARENT["aromatic_amine"] == "amine"
 
     def test_seniority_order_intact(self):
-        """Per D-09: SENIORITY_ORDER list must still contain all subtypes."""
+        """Per: SENIORITY_ORDER list must still contain all subtypes."""
         assert "primary_alcohol" in SENIORITY_ORDER
         assert "secondary_alcohol" in SENIORITY_ORDER
         assert "tertiary_alcohol" in SENIORITY_ORDER

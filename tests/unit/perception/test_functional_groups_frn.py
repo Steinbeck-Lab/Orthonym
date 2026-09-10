@@ -1,10 +1,10 @@
-"""Phase 163 Tier FRN-A..E perception SMARTS unit tests.
+"""a phase Tier FRN-A..E perception SMARTS unit tests.
 
 Asserts the 16 new SMARTS patterns shipped in Plan-02 (commits 163-02-01..05)
 detect their target chalcogen-replacement functional groups AND the 18 new
 suppression-map entries correctly suppress cross-pattern false-positives.
 
-Test pyramid composition per CONTEXT D-12 + RESEARCH §8.1:
+Test pyramid composition per internal notes + RESEARCH:
 - Section A: per-pattern positive detection (16-22 tests)
 - Section B: suppression-map verification (8-10 tests)
 - Section C: edge cases + no-regression on existing patterns (5+ tests)
@@ -14,8 +14,8 @@ Total: >= 30 tests.
 References:
 - src/orthonym/perception/functional_groups.py FUNCTIONAL_GROUP_SMARTS dict
   + _resolve_fg_collisions
-- 163-AUDIT-FRN.md § 2 SMARTS catalog
-- 163-RESEARCH.md §3 (SMARTS spec) + §8.1 (test pyramid spec)
+- internal notes-FRN.md SMARTS catalog
+- internal notes (SMARTS spec) + (test pyramid spec)
 """
 import pytest
 from rdkit import Chem
@@ -24,7 +24,7 @@ from orthonym.perception.functional_groups import (
     detect_functional_groups,
 )
 
-# Alias to mirror CONTEXT/RESEARCH/AUDIT prose naming convention.
+# Alias to mirror internal notes/RESEARCH/AUDIT prose naming convention.
 # The actual source identifier is FUNCTIONAL_GROUP_SMARTS (per Plan-02 SUMMARY
 # Decision 2); audit-time prose used the idealized name PATTERNS.
 PATTERNS = FUNCTIONAL_GROUP_SMARTS
@@ -41,31 +41,31 @@ class TestFRNSelenoicAcidDetection:
         assert "selenoic_Se_acid" in groups
 
     def test_selenoic_O_acid_detected(self):
-        """R-C(=Se)-OH (propaneselenoic O-acid; P-65.3 parallel)."""
+        """R-C(=Se)-OH (propaneselenoic O-acid; parallel)."""
         mol = Chem.MolFromSmiles("CCC(=[Se])O")
         groups = detect_functional_groups(mol)
         assert "selenoic_O_acid" in groups
 
     def test_diselenoic_acid_detected(self):
-        """R-C(=Se)-SeH (propanediselenoic acid; P-65.3 parallel)."""
+        """R-C(=Se)-SeH (propanediselenoic acid; parallel)."""
         mol = Chem.MolFromSmiles("CCC(=[Se])[SeH]")
         groups = detect_functional_groups(mol)
         assert "diselenoic_acid" in groups
 
     def test_telluroic_Te_acid_detected(self):
-        """R-C(=O)-TeH (propanetelluroic Te-acid; P-65.3 parallel)."""
+        """R-C(=O)-TeH (propanetelluroic Te-acid; parallel)."""
         mol = Chem.MolFromSmiles("CCC(=O)[TeH]")
         groups = detect_functional_groups(mol)
         assert "telluroic_Te_acid" in groups
 
     def test_telluroic_O_acid_detected(self):
-        """R-C(=Te)-OH (propanetelluroic O-acid; P-65.3 parallel)."""
+        """R-C(=Te)-OH (propanetelluroic O-acid; parallel)."""
         mol = Chem.MolFromSmiles("CCC(=[Te])O")
         groups = detect_functional_groups(mol)
         assert "telluroic_O_acid" in groups
 
     def test_ditelluroic_acid_detected(self):
-        """R-C(=Te)-TeH (propaneditelluroic acid; P-65.3 parallel)."""
+        """R-C(=Te)-TeH (propaneditelluroic acid; parallel)."""
         mol = Chem.MolFromSmiles("CCC(=[Te])[TeH]")
         groups = detect_functional_groups(mol)
         assert "ditelluroic_acid" in groups
@@ -76,7 +76,7 @@ class TestFRNChalcogenAmideDetection:
     """Tier FRN-B — Chalcogen-on-amide SMARTS detection (7 tests; single-permissive [NX3])."""
 
     def test_thioamide_detected_primary(self):
-        """R-C(=S)-NH2 (P-66.1.4.1.1)."""
+        """R-C(=S)-NH2."""
         mol = Chem.MolFromSmiles("CCC(N)=S")
         assert "thioamide" in detect_functional_groups(mol)
 
@@ -116,22 +116,22 @@ class TestFRNChalcogenCarbonylDetection:
     """Tier FRN-C — Chalcogen-on-aldehyde/ketone SMARTS detection (4 tests)."""
 
     def test_selenoaldehyde_detected(self):
-        """R-C(=Se)H (selenal; P-66.6.3 parallel)."""
+        """R-C(=Se)H (selenal; parallel)."""
         mol = Chem.MolFromSmiles("CCC=[Se]")
         assert "selenoaldehyde" in detect_functional_groups(mol)
 
     def test_telluroaldehyde_detected(self):
-        """R-C(=Te)H (tellural; P-66.6.3 parallel)."""
+        """R-C(=Te)H (tellural; parallel)."""
         mol = Chem.MolFromSmiles("CCC=[Te]")
         assert "telluroaldehyde" in detect_functional_groups(mol)
 
     def test_selenoketone_detected(self):
-        """R-C(=Se)-R' (selone; P-66.6.3 parallel)."""
+        """R-C(=Se)-R' (selone; parallel)."""
         mol = Chem.MolFromSmiles("CC(=[Se])C")
         assert "selenoketone" in detect_functional_groups(mol)
 
     def test_telluroketone_detected(self):
-        """R-C(=Te)-R' (tellone; P-66.6.3 parallel)."""
+        """R-C(=Te)-R' (tellone; parallel)."""
         mol = Chem.MolFromSmiles("CC(=[Te])C")
         assert "telluroketone" in detect_functional_groups(mol)
 
@@ -141,7 +141,7 @@ class TestFRNIminoesterDetection:
     """Tier FRN-D — Iminoester SMARTS detection (4 tests; baseline scope)."""
 
     def test_iminoester_detected_methyl_propanimidate(self):
-        """R-C(=NH)-O-R' (P-65.1.7; "alkyl alkanimidate")."""
+        """R-C(=NH)-O-R'; "alkyl alkanimidate")."""
         mol = Chem.MolFromSmiles("CCC(=N)OC")
         assert "iminoester" in detect_functional_groups(mol)
 
@@ -156,7 +156,7 @@ class TestFRNIminoesterDetection:
         assert "iminoester" not in detect_functional_groups(mol)
 
     def test_iminoester_imidic_acid_free_form_deferred(self):
-        """CONTEXT line 120: R-C(=NH)-OH (free imidic acid) deferred to 163.1."""
+        """internal notes: R-C(=NH)-OH (free imidic acid) deferred to 163.1."""
         mol = Chem.MolFromSmiles("CCC(=N)O")
         assert "iminoester" not in detect_functional_groups(mol)
 
@@ -166,12 +166,12 @@ class TestFRNChalcogenEsterDetection:
     """Tier FRN-E — Chalcogen-ester SMARTS detection (2 tests)."""
 
     def test_selenoester_detected(self):
-        """R-C(=O)-Se-R' (Se-alkyl alkaneselenoate; P-65.6 parallel)."""
+        """R-C(=O)-Se-R' (Se-alkyl alkaneselenoate; parallel)."""
         mol = Chem.MolFromSmiles("CCC(=O)[Se]C")
         assert "selenoester" in detect_functional_groups(mol)
 
     def test_telluroester_detected(self):
-        """R-C(=O)-Te-R' (Te-alkyl alkanetelluroate; P-65.6 parallel)."""
+        """R-C(=O)-Te-R' (Te-alkyl alkanetelluroate; parallel)."""
         mol = Chem.MolFromSmiles("CCC(=O)[Te]C")
         assert "telluroester" in detect_functional_groups(mol)
 
@@ -266,7 +266,7 @@ class TestFRNEdgeCasesAndNoRegression:
                 f"SMARTS for {key} failed to compile: {PATTERNS[key]}"
 
     def test_predicate_purity_perception_no_mutation(self):
-        """D-07 invariant: detect_functional_groups does not mutate the input mol."""
+        """ invariant: detect_functional_groups does not mutate the input mol."""
         smiles = "CCC(N)=S"
         mol1 = Chem.MolFromSmiles(smiles)
         n_atoms_before = mol1.GetNumAtoms()
@@ -280,10 +280,10 @@ class TestFRNEdgeCasesAndNoRegression:
 
         FRN-A SeH/Se SMARTS use [SeX2H1]/[SeX1] (atomic 34); FRN-A TeH/Te
         SMARTS use [TeX2H1]/[TeX1] (atomic 52). These cannot match the
-        v18 thio* SMARTS that use [SX2H1]/[SX1] (atomic 16). Empirical
+         thio* SMARTS that use [SX2H1]/[SX1] (atomic 16). Empirical
         proof: a plain dithioic acid does NOT match any FRN-A SMARTS.
         """
-        mol = Chem.MolFromSmiles("CCC(=S)S")  # dithioic acid (v18 thio*)
+        mol = Chem.MolFromSmiles("CCC(=S)S")  # dithioic acid (thio*)
         groups = detect_functional_groups(mol)
         # The 6 chalcogen-acid keys must NOT spuriously match
         for k in ['selenoic_Se_acid', 'selenoic_O_acid', 'diselenoic_acid',

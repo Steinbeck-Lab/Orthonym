@@ -1,4 +1,4 @@
-"""Tests for malformed suffix form corrections (ASML-17).
+"""Tests for malformed suffix form corrections .
 
 Verifies that parent_to_prefix produces correct IUPAC substituent prefix
 forms for retained names, not naive -yl appendages like 'adenineyl'.
@@ -10,7 +10,7 @@ from orthonym.assembly.substituent_naming import (
 
 @pytest.mark.unit
 class TestRetainedNamePrefixLookup:
-    """ASML-17: Retained names use lookup table for correct prefix forms."""
+    """: Retained names use lookup table for correct prefix forms."""
 
     @pytest.mark.parametrize("parent_name,expected", [
         ("adenine", "adenin-9-yl"),
@@ -37,7 +37,7 @@ class TestRetainedNamePrefixLookup:
 
 @pytest.mark.unit
 class TestAmideFallbackFix:
-    """ASML-17: -amide names produce correct prefix forms, not 'amideyl'."""
+    """: -amide names produce correct prefix forms, not 'amideyl'."""
 
     def test_formamide(self):
         result = parent_to_prefix("formamide", 1, attach_locant=ATTACH_LOCANT_UNKNOWN)
@@ -52,7 +52,7 @@ class TestAmideFallbackFix:
 
 @pytest.mark.unit
 class TestExistingBehaviorPreserved:
-    """ASML-17 regression: existing parent_to_prefix behavior unchanged."""
+    """ regression: existing parent_to_prefix behavior unchanged."""
 
     def test_propane(self):
         result = parent_to_prefix("propane", 3, attach_locant=ATTACH_LOCANT_UNKNOWN)
@@ -63,7 +63,7 @@ class TestExistingBehaviorPreserved:
         assert "pyridinyl" in result, f"Expected pyridinyl, got: {result}"
 
     def test_propanol(self):
-        # v29 residue Task A: the locanted -ol branch borrowed its locant from
+        # residue Task A: the locanted -ol branch borrowed its locant from
         # the CAPPED molecule's numbering and now declines. The unlocanted,
         # one-position form still converts, which is what "existing behavior
         # preserved" means for this converter.

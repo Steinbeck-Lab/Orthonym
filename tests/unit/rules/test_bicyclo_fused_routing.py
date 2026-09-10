@@ -11,7 +11,7 @@ Key rules:
 - True bridged systems (no zero bridge) -> bicyclo[x.y.z] naming
 - bridge_sum + 2 must equal ring_atom_count for all valid descriptors
 
-IUPAC Reference: Blue Book 2013, P-23.2, P-31.1.1
+IUPAC Reference: Blue Book 2013,,
 """
 
 import subprocess

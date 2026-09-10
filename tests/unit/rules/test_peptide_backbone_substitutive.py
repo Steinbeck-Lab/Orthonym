@@ -11,7 +11,7 @@ ADDITIVE, LAST-RESORT fallback tried only when the flat acylamino
 convention and Levers A/B/C have all declined:
 
   - Parent = the C-terminal residue's own free carboxylic acid (must be
-    EXACTLY one free -COOH on that residue's own fragment -- P-41 senior
+    EXACTLY one free -COOH on that residue's own fragment -- senior
     principal group).
   - Every OTHER residue (working N-terminal-ward) is folded in as an
     N-acyl / N-(...amido) substituent, one residue at a time: a STANDARD
@@ -42,7 +42,7 @@ Three witnesses spanning simple -> bigger, per plan:
      building this producer).
   2. Real backlog idx 97 (HA=43, 4 residues, ALL standard-shaped but with
      completely UNDEFINED alpha stereochemistry throughout) -- must
-     ABSTAIN: P-103.1.3.1/P-103.3.4 stereo-honesty already blocks the flat
+     ABSTAIN: / stereo-honesty already blocks the flat
      path, and the resulting systematic parent name (a multiplied
      "x,y-diamino..." glutamine shape) has no single addressable 'amino'
      locant to splice into -- a correct, principled abstention, not a

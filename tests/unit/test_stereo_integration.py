@@ -238,7 +238,7 @@ class TestDescriptorFormat:
 
 
 class TestEZUnification:
-    """Tests verifying E/Z uses _CIPCode exclusively (Phase 92-03)."""
+    """Tests verifying E/Z uses _CIPCode exclusively (a phase-03)."""
 
     def test_no_ez_for_cyclohexene(self):
         """Intraring double bond in cyclohexene gets no E/Z descriptor."""
@@ -310,7 +310,7 @@ class TestSpecificCompounds:
 
 
 # =============================================================================
-# OPSIN Round-Trip Regression Tests (Phase 92-03, QUAL-04)
+# OPSIN Round-Trip Regression Tests (a phase-03,)
 # =============================================================================
 
 import subprocess
@@ -351,7 +351,7 @@ _has_opsin = _opsin_jar is not None
 
 @pytest.mark.skipif(not _has_opsin, reason="OPSIN JAR not found")
 class TestStereoOpsinRoundtrip:
-    """OPSIN round-trip regression tests for stereo naming (QUAL-04)."""
+    """OPSIN round-trip regression tests for stereo naming ."""
 
     @pytest.mark.parametrize("smiles,expected_name", [
         ('C/C=C/C', '(2E)-but-2-ene'),

@@ -1,4 +1,4 @@
-"""Task F (v39 CQ5/QM9 finding) -- ``analyze_spiro_universal`` dispiro
+"""Task F (CQ5/QM9 finding) -- ``analyze_spiro_universal`` dispiro
 descriptor fix for adjacent-spiro small rings, PLUS round 2's determinism
 canonicalization.
 
@@ -10,12 +10,12 @@ unvisited arc as the first middle-ring segment while ``_compute_spiro_segments``
 computations silently disagreed whenever a heteroatom broke the arc-length
 symmetry, so the emitted descriptor's heteroatom locant did not match what
 the descriptor string itself denotes -- an OPSIN round-trip ``inchi_mismatch``
-(confirmed at HEAD `87365346`, CQ5-SPY.md).
+(confirmed at HEAD `87365346`, CQ5-a trace.md).
 
 Round 1 fix: ``_walk_ring_between_spiros`` now selects the arc with FEWER
 unvisited (linking) atoms first, matching ``_compute_spiro_segments``'s
-``min(seg_a, seg_b)``-first convention (P-24.2.2 "Linear polyspiro alicyclic
-ring systems", ``BlueBookV2/BlueBookV2.md:9977``: *"...proceeding
+``min(seg_a, seg_b)``-first convention "Linear polyspiro alicyclic
+ring systems", ``the Blue Book Blue Book``: *"...proceeding
 consecutively, always by the SHORTER path..."*). This alone made both
 witnesses round-trip, but ROUTED them onto pre-existing non-canonical
 heteroatom-locant numbering (``_build_ring_chain``'s ring-order tie-break and
@@ -25,13 +25,13 @@ correct, still round-tripping) varied by input SMILES atom order. Determinism
 is a hard gate independent of 0-wrong, so that is a real defect.
 
 Round 2 fix: ``_dispiro_numbering_candidates`` (new) enumerates every
-P-24.2.2-legal numbering of a 3-ring dispiro chain -- the three genuine free
+-legal numbering of a 3-ring dispiro chain -- the three genuine free
 choices the Blue Book's own construction rules leave unresolved (which
 physical terminal ring is numbered first when the two tie in size; the
 traversal direction within each terminal ring; which middle-ring arc goes
 first when the two tie in length) -- and ``_get_polyspiro_numbering`` picks
-among them DETERMINISTICALLY via P-24.2.4.1.1's lowest-heteroatom-locant rule
-(then P-31.1.4.3.4 lowest free-valence locant for a substituent, then a
+among them DETERMINISTICALLY via 's lowest-heteroatom-locant rule
+(then lowest free-valence locant for a substituent, then a
 canonical-rank tiebreak), mirroring ``get_spiro_numbering``'s monospiro
 sibling. Both witnesses now emit the single lowest-locant PIN
 (``1-oxadispiro[3.0.3.1]nonane`` / ``1-oxadispiro[2.0.2.2]octane``)
@@ -46,7 +46,7 @@ from orthonym.validation.opsin_roundtrip import opsin_roundtrip_check
 
 
 class TestAdjacentSpiroDescriptorFix:
-    """The two CQ5-SPY witnesses: adjacent (directly-bonded) spiro atoms with
+    """The two CQ5-a trace witnesses: adjacent (directly-bonded) spiro atoms with
     a heteroatom in one terminal ring -- previously RT-FAIL, now RT-PASS at
     the deterministic lowest-locant PIN."""
 
@@ -74,7 +74,7 @@ class TestAdjacentSpiroDescriptorFix:
 
     @pytest.mark.unit
     def test_witness1_via_vonbaeyer_universal(self):
-        """analyze_spiro_universal (the T4/best-effort producer CQ5-SPY named)
+        """analyze_spiro_universal (the T4/best-effort producer CQ5-a trace named)
         must ALSO emit an RT-verifying, lowest-locant descriptor -- it feeds
         the same generate_spiro_descriptor/_get_polyspiro_numbering pair.
         Stem computed from ``total_atoms`` (not hardcoded) so this stays
@@ -138,7 +138,7 @@ class TestExistingSpiroFixturesUnchanged:
     @pytest.mark.unit
     def test_polyspiro_substituent_free_valence_lowest_locant_unchanged(self):
         """Round 2 threaded ``suffix_ring_atoms`` (free-valence bias,
-        P-31.1.4.3.4) through ``_get_polyspiro_numbering`` -- previously only
+         through ``_get_polyspiro_numbering`` -- previously only
         the monospiro ``get_spiro_numbering`` had it. Locked in via the
         ``tests/unit/rules/test_v27_p3_spiro_engine.py`` PIN correction
         (dispiro[3.2.3.2]dodecan-5-yl, not the old arbitrary -12-yl -- both
@@ -162,7 +162,7 @@ class TestExistingSpiroFixturesUnchanged:
 class TestDeterminism:
     """Round 2: the emitted NAME STRING (not just RT-pass) must be identical
     across many randomized SMILES atom orders -- the lowest-locant selection
-    in ``_get_polyspiro_numbering`` is a canonical-rank-keyed ``min()`` over
+    in ``_get_polyspiro_numbering`` is a canonical-rank-keyed ``min`` over
     an enumeration that does not depend on input atom order, so the same
     molecule always resolves to the same PIN regardless of how it was
     written. (Round 1 alone could only promise round-trip correctness here;

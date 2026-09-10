@@ -1,9 +1,9 @@
-""" BP-1: mancude ring-heterone seniority + non-PIN nucleobase gating.
+""": mancude ring-heterone seniority + non-PIN nucleobase gating.
 
 Root causes (see internal notes):
  - FIX 2: a ring-carbon exocyclic =O on a mancude ring (a heterone) was invisible
    to functional-group perception (the ketone SMARTS needs two C neighbours), so an
-   amine wrongly won the principal-group slot. BB P-64.7.1 (line 29585): ketones/
+   amine wrongly won the principal-group slot. BB (line 29585): ketones/
    heterones are senior to amines. Registering the heterone makes the =O the suffix
    (-one) and the amine an amino- prefix.
  - FIX 1: uracil/thymine/cytosine/fluorouracil are absent from the Blue Book
@@ -59,7 +59,7 @@ def test_nucleobase_retained_name_gated_out_of_pin_dict():
 
 
 def test_nucleobase_denies_present():
-    """The four monocyclic nucleobases are denied (BP-1 FIX 1)."""
+    """The four monocyclic nucleobases are denied (FIX 1)."""
     from orthonym.data import _PIN_DENY
     for n in ("uracil", "thymine", "cytosine", "fluorouracil"):
         assert n in _PIN_DENY, n

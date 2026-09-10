@@ -5,7 +5,7 @@ internal notes (read-only execution checkpoint,
 jar-PRESENT, default config) found:
 
 - Phase D ("decorated hetero-monocycle" witnesses) is ALREADY SUBSUMED: both
-  a trace-table witnesses emit and round-trip at T1 PIN via the existing small-
+  a trace-table witnesses emit and round-trip at PIN via the existing small-
   ring/HW-nameable path, with no new code needed.
 - Phase C ("name_general returns ENGINE_NONE on a path B4 doesn't cover") is
   REDUNDANT: both of its own named live rescue classes (acyclic hetero-chain,
@@ -34,11 +34,11 @@ def _best_effort_name(smi: str):
 
 
 # ---------------------------------------------------------------------------
-# Phase D — decorated hetero-monocycle witnesses (PHASE-CD-CHECKPOINT.md §1)
+# Phase D — decorated hetero-monocycle witnesses (PHASE-CD-CHECKPOINT.md)
 # ---------------------------------------------------------------------------
 
 _PHASE_D_WITNESSES = [
-    "ClC1CCSC1",              # -> 3-chlorothiolane (T1 pin_path)
+    "ClC1CCSC1",              # -> 3-chlorothiolane (pin_path)
     "ClC1OC(Br)C(F)C1I",      # -> 5-bromo-2-chloro-4-fluoro-3-iodooxolane (T1)
 ]
 
@@ -67,7 +67,7 @@ def test_phase_d_hetero_monocycle_roundtrips(smi):
 
 
 # ---------------------------------------------------------------------------
-# Phase C — redundancy witnesses (PHASE-CD-CHECKPOINT.md §2): both of Phase
+# Phase C — redundancy witnesses (PHASE-CD-CHECKPOINT.md): both of Phase
 # C's own named live classes now emit via the B4 universal rung
 # (`name_universal_substitutive`, the final rung of `t4_coverage.py`'s
 # cascade) rather than needing a separate `name_general` restructure.

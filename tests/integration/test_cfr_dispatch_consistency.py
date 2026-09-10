@@ -1,13 +1,13 @@
 """a phase CFR dispatch consistency — byte-identical vs Plan-01 frozen baseline.
 
-Per CONTEXT + line 230-234: ≥ 33 tests asserting ``Orthonym.name(smi)``
+Per internal notes + line 230-234: ≥ 33 tests asserting ``Orthonym.name(smi)``
 produces the exact ``name_output`` from ``tests/canary/canary_pre_cfr_158.csv``
 (Plan-01 frozen pre-CFR baseline).
 
-Per CONTEXT honest-fail-on-data: any single byte difference is a CFR-04
+Per internal notes honest-fail-on-data: any single byte difference is a
 HARD-gate failure. NO ``@pytest.mark.xfail`` markers; NO special-case
-allowances. The fix is upstream (predicate purity per RL-5 OR priority
-ordering per RL-1) — not relaxation per AP-17 + AP-18 + AP-19.
+allowances. The fix is upstream (predicate purity per OR priority
+ordering per) — not relaxation per + +.
 
 The CSV-diff layer is verified separately by ``verify_cfr_byte_identical.py
 --mode post`` + ``diff -q pre.csv post.csv``. This pytest tier asserts NAME
@@ -44,7 +44,7 @@ CANARY_PRE_CSV = Path(__file__).parent.parent / "canary" / "canary_pre_cfr_158.c
 def _load_pre_canary() -> List[Tuple[str, str, str, str]]:
     """Load ``(canary_tier, fixture_id, smiles, expected_name)`` from frozen baseline.
 
-    Per PATTERNS § 8 anti-pattern "No silent missing-canary-fixture handling":
+    Per PATTERNS anti-pattern "No silent missing-canary-fixture handling":
     raise FileNotFoundError if the frozen baseline is missing — Plan-01 MUST
     have shipped the CSV. If it is absent, the test infrastructure is broken,
     not the CFR substrate.
@@ -104,8 +104,8 @@ CFR_DISPATCH_CANARY: "OrderedDict[StoutClass, Tuple[str, str]]" = OrderedDict([
     (StoutClass.CYCLOPHANE,              ("C1CCc2ccccc2CCCc2ccccc21",
                                           "[3.3]orthocyclophane")),
     #: was 'propyl palmitate'. The ester acyl word follows the PIN
-    # acid stem -- P-65.1.1.1 (the Blue Book) retains only formic/oxalic/
-    # acetic/benzoic/oxamic as PINs, P-65.1.2 (:29860) sends the rest to general
+    # acid stem -- (the Blue Book) retains only formic/oxalic/
+    # acetic/benzoic/oxamic as PINs, (:29860) sends the rest to general
     # nomenclature, and:29787 prints '(PIN)' on 'hexadecanoic acid'. This row
     # pins DISPATCH byte-identity, so the spelling is incidental to its purpose.
     (StoutClass.DECOMPOSITION_PRE_GENERAL,
@@ -121,9 +121,9 @@ CFR_DISPATCH_CANARY: "OrderedDict[StoutClass, Tuple[str, str]]" = OrderedDict([
     ids=[c.name for c in CFR_DISPATCH_CANARY.keys()],
 )
 def test_cfr_dispatch_byte_identical(class_id, smiles, expected_name):
-    """158-AUDIT-CFR.md § 1: name(smi) byte-identical to cascade output.
+    """internal notes-CFR.md: name(smi) byte-identical to cascade output.
 
-    Per CONTEXT: a single byte difference is a CFR-04 HARD-gate failure.
+    Per internal notes: a single byte difference is a HARD-gate failure.
     Fix the upstream cause (predicate purity / priority ordering) — never
     relax this assertion via xfail or special-case allowance.
     """
@@ -141,7 +141,7 @@ def test_cfr_dispatch_byte_identical(class_id, smiles, expected_name):
 #
 # 15 fixtures sampled at regular index strides across the 1282-row corpus
 # to give cross-class coverage (rt75 + connectivity + name_stability tiers).
-# Per CONTEXT line 232: aim ≥ 33 total integration tests; 18 per-class +
+# Per internal notes: aim ≥ 33 total integration tests; 18 per-class +
 # 15 supplementary = 33.
 # ---------------------------------------------------------------------------
 
@@ -165,11 +165,11 @@ def _supplementary_id(row: Tuple[str, str, str, str]) -> str:
 def test_cfr_supplementary_byte_identical(tier, fixture_id, smiles, expected_name):
     """Supplementary fixtures sampled from PRE_CANARY_ROWS for cross-class coverage.
 
-    Per CONTEXT: a single byte difference here is the same CFR-04 HARD-gate
+    Per internal notes: a single byte difference here is the same HARD-gate
     failure as the per-class test above. No xfail; no relaxation.
 
     Note: the pre-CFR baseline records exception output as
-    ``<ERROR: TYPE: msg>``; for ``name_compound()`` invocations here we let the
+    ``<ERROR: TYPE: msg>``; for ``name_compound`` invocations here we let the
     exception propagate naturally (a behavioral change between and CFR
     surfaces as a test error, not a name mismatch). The CSV-diff layer
     (verify_cfr_byte_identical.py --mode post) preserves the exception-as-cell

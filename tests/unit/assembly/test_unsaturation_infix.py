@@ -1,11 +1,11 @@
 """Unit tests for unsaturation infix builder and hydrocarbon name builder.
 
-Tests _build_unsaturation_infix() and _build_hydrocarbon_name() to ensure:
-1. All branch combinations produce correct IUPAC P-14.4 compliant output
+Tests _build_unsaturation_infix and _build_hydrocarbon_name to ensure:
+1. All branch combinations produce correct IUPAC compliant output
 2. No output ever contains doubled hyphens (--)
 3. Special cases (2C, mono-cycloalkene) handled correctly
 
-Phase 105 Plan 02 Task 1: Written before rewrite to serve as characterization tests.
+a phase Plan 02 Task 1: Written before rewrite to serve as characterization tests.
 """
 
 import pytest

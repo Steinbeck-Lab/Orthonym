@@ -1,13 +1,13 @@
-"""Zwitterion (P-74) + salt (P-65.6.2.1) naming — Phase 169.6 Plan 04.
+"""Zwitterion + salt naming — a phase Plan 04.
 
 CHOKE-01 / CHOKE-02 GUARD 4. Every test cites the governing Blue Book P-rule.
 
-GUARD 4 (P-74.0, verbatim): "an anionic center has priority over a cationic
-center in zwitterions ... anionic centers ... become the parent structure, into
+GUARD 4, verbatim): "an anionic center has priority over a cationic
+center in zwitterions... anionic centers... become the parent structure, into
 which the cationic part is substituted." The cation on a DIFFERENT parent
-(P-74.1.3, the betaine quaternary ammonium) is demoted to a structured
+, the betaine quaternary ammonium) is demoted to a structured
 (…azaniumyl) substituent prefix; the cation INSIDE the anion's parent hydride
-(P-74.1.2, a ring N+) is kept on the parent (deferred to the legacy path this
+, a ring N+) is kept on the parent (deferred to the legacy path this
 plan).
 
 OPSIN-FORM NOTE (169.6-04 deviation): the Blue Book PIN for a quaternary
@@ -46,12 +46,12 @@ def _cation_prefix(smiles):
 
 @pytest.mark.unit
 class TestCationToPrefixProducer:
-    """The NEW structured cation-as-substituent prefix producer (P-74.1.3).
+    """The NEW structured cation-as-substituent prefix producer.
 
     substituent_naming.py had ZERO cation-prefix capability before this plan."""
 
     def test_trimethyl_quaternary_ammonium(self):
-        """(CH3)3N+- on an anion parent -> trimethylazaniumyl (P-74.1.3)."""
+        """(CH3)3N+- on an anion parent -> trimethylazaniumyl."""
         assert _cation_prefix("C[N+](C)(C)CC(=O)[O-]") == "trimethylazaniumyl"
 
     def test_mixed_n_substituents_alphabetized_multiplied(self):
@@ -68,12 +68,12 @@ class TestCationToPrefixProducer:
 
 @pytest.mark.unit
 class TestZwitterionGuard4:
-    """route_charged GUARD 4 = the anion-is-parent override (P-74.0)."""
+    """route_charged GUARD 4 = the anion-is-parent override."""
 
     def test_betaine_p74_1_3(self):
         """THE worked target. Betaine (CH3)3N+-CH2-COO- -> the carboxylate is the
-        parent (P-74.0) and the quaternary ammonium is the (trimethylazaniumyl)
-        prefix (P-74.1.3). OPSIN round-trips this to C[N+](C)(C)CC(=O)[O-]."""
+        parent and the quaternary ammonium is the (trimethylazaniumyl)
+        prefix. OPSIN round-trips this to C[N+](C)(C)CC(=O)[O-]."""
         assert _rc("C[N+](C)(C)CC(=O)[O-]") == "(trimethylazaniumyl)acetate"
 
     def test_betaine_homolog_carries_locant(self):
@@ -97,7 +97,7 @@ class TestZwitterionGuard4:
         assert _rc("CC(=O)CC([NH3+])C(=O)[O-]") == ""        # 2-amino-4-oxopentanoate
 
     def test_p74_1_2_ring_cation_implemented(self):
-        """F-T6 (DD3, P-74.1.2): the cation N+ is SKELETAL to the anion's parent
+        """F- (DD3,: the cation N+ is SKELETAL to the anion's parent
         ring (pyridinium-2-carboxylate) -> the cumulative
         ``<ring>-<N-locant>-ium-<carboxyl-locant>-carboxylate`` suffix is now built
         by ``emit_zwitterion_ring_carboxylate`` (was deferred to '' this plan). The
@@ -105,10 +105,10 @@ class TestZwitterionGuard4:
         assert _rc("O=C([O-])c1cccc[n+]1C") == "1-methylpyridin-1-ium-2-carboxylate"
 
     def test_ylide_amine_oxide_honest_fail(self):
-        """P-74.2 dipolar / non-N onium cations are out of scope -> '' (honest-
-        fail, D-06). An amine-oxide (N+-O- directly bonded) is an INTERNAL charge
-        (P-59), so it is not even a zwitterion -> ''."""
-        # Trimethylamine N-oxide: the N+-O- is an internal (P-59) charge, not a
+        """ dipolar / non-N onium cations are out of scope -> '' (honest-
+        fail,). An amine-oxide (N+-O- directly bonded) is an INTERNAL charge
+        , so it is not even a zwitterion -> ''."""
+        # Trimethylamine N-oxide: the N+-O- is an internal charge, not a
         # zwitterion -> route_charged sees no ionic site -> ''.
         assert _rc("C[N+](C)(C)[O-]") == ""
 
@@ -116,7 +116,7 @@ class TestZwitterionGuard4:
 @pytest.mark.unit
 class TestSaltComposition:
     """Salt = cation word(s) (alphabetical) + anion as separate words
-    (P-65.6.2.1). The anion is named via route_charged; the cation word comes
+    . The anion is named via route_charged; the cation word comes
     from data/cation_words.py (reusing namer._METAL_NAMES + NH4->ammonium)."""
 
     def _salt(self, smiles, style="pin"):
@@ -124,13 +124,13 @@ class TestSaltComposition:
         return name_salt(Chem.MolFromSmiles(smiles), style)
 
     def test_potassium_propanoate(self):
-        """THE worked target. CH3CH2COO- K+ -> potassium propanoate (P-65.6.2.1:
+        """THE worked target. CH3CH2COO- K+ -> potassium propanoate:
         cation word + anion, separate words). RT-verified."""
         assert self._salt("CCC(=O)[O-].[K+]") == "potassium propanoate"
 
     def test_two_cations_alphabetical(self):
-        """K+ -OOC-CH2CH2-COO- Na+ -> potassium sodium ... (cations ALPHABETICAL:
-        potassium < sodium; P-65.6.2.1)."""
+        """K+ -OOC-CH2CH2-COO- Na+ -> potassium sodium... (cations ALPHABETICAL:
+        potassium < sodium;."""
         name = self._salt("[K+].[O-]C(=O)CCC(=O)[O-].[Na+]")
         assert name.startswith("potassium sodium ")
 
@@ -139,7 +139,7 @@ class TestSaltComposition:
         assert self._salt("[Ca+2].[O-]C(C)=O.[O-]C(C)=O") == "calcium diacetate"
 
     def test_ammonium_cation_word(self):
-        """NH4+ -> 'ammonium' (P-73.1.1) from the CATION_WORDS table."""
+        """NH4+ -> 'ammonium' from the CATION_WORDS table."""
         name = self._salt("[NH4+].CC(=O)[O-]")
         assert name == "ammonium acetate"
 

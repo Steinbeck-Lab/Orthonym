@@ -1,14 +1,14 @@
-"""Phase 160 anhydride handler — direct-return shim.
+"""a phase anhydride handler — direct-return shim.
 
 1-line wrapper around ``rules.anhydrides.name_anhydride``. Verbatim move
 of composer.py:921-934 dispatch logic.
 
-IUPAC cite: P-66.6.3 (anhydrides; functional class naming).
+IUPAC cite: (anhydrides; functional class naming).
 
 References:
 - composer.py:921-934 (inline dispatch branch; REMOVED at this commit).
 - rules.anhydrides.name_anhydride — chemical-logic body (unchanged).
-- 160-AUDIT-DECOMP.md § 1 row 'anhydride' + § 2.12 purity proof.
+- internal notes-DECOMP.md row 'anhydride' + purity proof.
 """
 from __future__ import annotations
 
@@ -46,7 +46,7 @@ def name_anhydride(
 
     pool = get_current_pool()
     pool.add(anhydride_name, "anhydride", features)
-    # composer.py:943 inline: _inject_stereo_if_missing(features, pool.best().name, atom_to_locant=None)
+    # composer.py:943 inline: _inject_stereo_if_missing(features, pool.best.name, atom_to_locant=None)
     final_name = _inject_stereo_if_missing(
         features, pool.best().name, atom_to_locant=None,
     )

@@ -1,16 +1,16 @@
-"""v30 breadth — partially-saturated (dihydro/tetrahydro) monocyclic heterocycle
+""" breadth — partially-saturated (dihydro/tetrahydro) monocyclic heterocycle
 bearing a principal-group SUFFIX.
 
-Root cause (spy-verified + BB-derived): the parent stem string (saturation prefix +
+Root cause (trace-verified + BB-derived): the parent stem string (saturation prefix +
 indicated-H) was numbered PCG-BLIND, so its dihydro locants disagreed with the
 suffix locant the substituted path appends — `3,6-dihydro-2H-1,4-thiazine` +
 `-3-carboxylic acid` instead of the correct `5,6-dihydro-2H-1,4-thiazine-3-...`.
-SELF-01 caught the mismatch and abstained (0-wrong held), so these molecules named
+ caught the mismatch and abstained (0-wrong held), so these molecules named
 nothing.
 
 Fix: add a principal-characteristic-group locant term to the two heterocyclic
 hydro-name cascade keys, AFTER indicated hydrogen (b) and BEFORE hydro prefixes (e)
-per P-14.4 (BlueBookV2.md:3219): (a) fixed -> (b) indicated-H -> (c) PCG/suffix ->
+per (the Blue Book): (a) fixed -> (b) indicated-H -> (c) PCG/suffix ->
 (e) hydro. Mirrors the carbocyclic sibling (partial_saturation.py:546). Additive:
 `principal_group_atoms=None` (bare rings / substituents) leaves the key unchanged.
 """
@@ -50,14 +50,14 @@ def test_dihydro_heterocycle_suffix_rt_exact():
         (r["smiles"], r.get("verdict"), r.get("name")) for r in rows]
 
 
-# ---- RISK 2: indicated-H OUTRANKS the suffix (P-14.4(b), verbatim
-# `2H-pyran-6-carboxylic acid (PIN)` at BlueBookV2.md:3252) ----
+# ---- RISK 2: indicated-H OUTRANKS the suffix (b), verbatim
+# `2H-pyran-6-carboxylic acid (PIN)` at the Blue Book) ----
 # The mancude parent's indicated hydrogen takes the LOW locant (2H) and FORCES the
 # suffix to the higher locant (6), NOT `2H-pyran-2-...`. Before the stem and suffix
 # numbering were unified onto ONE authority (`_mancude_hydro_numbering`), the stem
 # correctly said 2H while `orient_heterocycle_with_substituents` independently
-# numbered PCG-first (locant 2) -> a self-contradictory name -> SELF-01 abstained.
-# The suffix is read from a single [hetero, indicated_hydrogen, principal, ...]
+# numbered PCG-first (locant 2) -> a self-contradictory name -> abstained.
+# The suffix is read from a single [hetero, indicated_hydrogen, principal,...]
 # keyed map; Orthonym now does the same.
 
 @pytest.mark.parametrize("smi,expected", [
@@ -69,7 +69,7 @@ def test_indicated_h_outranks_suffix(smi, expected):
 
 def test_indicated_h_outranks_suffix_rt_exact():
     """0-wrong: the IH-outranks-suffix class emits a correct name, never a wrong
-    molecule (the abstention it replaces was SELF-01 catching the collision)."""
+    molecule (the abstention it replaces was catching the collision)."""
     import sys
     sys.path.insert(0, "scripts")
     from diagnose import diagnose
@@ -86,7 +86,7 @@ def test_indicated_h_outranks_suffix_rt_exact():
 # are numbered by the heteroatom cascade exactly as before.
 
 @pytest.mark.parametrize("smi,expected", [
-    ("O=C(O)C1=CC=CCO1", "2H-pyran-6-carboxylic acid"),        # verbatim BB :3252
+    ("O=C(O)C1=CC=CCO1", "2H-pyran-6-carboxylic acid"),        # verbatim BB:3252
     ("O=C(O)C1=CC=CCS1", "2H-thiopyran-6-carboxylic acid"),
     ("O=C(O)C1=CN=CCO1", "2H-1,4-oxazine-6-carboxylic acid"),
 ])
@@ -123,10 +123,10 @@ def test_no_regression_bare_and_saturated_rings(smi, expected):
     assert _pin().name(smi) == expected
 
 
-# ---- fable BLOCKER 1/2: decorated symmetric rings need P-14.4(f) + canon tiers ----
+# ---- a review BLOCKER 1/2: decorated symmetric rings need (f) + canon tiers ----
 # When (het, indicated-H, suffix, hydro) TIE (a symmetric ring bearing a plain
 # substituent), the unified numbering must still minimise the substituent locant
-# (P-14.4(f) `:3300`) and break the residual automorphism by an input-invariant
+# (f) `:3300`) and break the residual automorphism by an input-invariant
 # canonical rank. Without those tiers the map fell to ring-atom iteration order:
 # `5-methyl-1,4-dihydropyridine` (non-PIN) and a representation-dependent name.
 
@@ -140,13 +140,13 @@ def test_decorated_tie_ring_uses_lowest_substituent_locant(smi, expected):
 
 def test_decorated_tie_ring_representation_stable():
     """Same molecule (InChIKey VZJRBSCLGISQQW), three SMILES spellings -> ONE name.
-    The canonical tie-break must be input-order-invariant (fable BLOCKER 2)."""
+    The canonical tie-break must be input-order-invariant (a review BLOCKER 2)."""
     p = _pin()
     names = {p.name(s) for s in ("CC1COC=CO1", "CC1OC=COC1", "O1C=COCC1C")}
     assert names == {"2-methyl-2,3-dihydro-1,4-dioxine"}, names
 
 
-# ---- fable-dihydro BLOCKER: -ol/-amine ring-atom suffix over-inclusion (fixed) ----
+# ---- a review-dihydro BLOCKER: -ol/-amine ring-atom suffix over-inclusion (fixed) ----
 
 @pytest.mark.parametrize("smi,expected", [
     # For -ol/-amine the pg tuple carries the RING bearing-carbon; the neighbor

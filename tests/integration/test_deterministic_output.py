@@ -1,22 +1,22 @@
-"""a phase.2 -b: determinism regression suite.
+"""a phase -b: determinism regression suite.
 
 Runs name_compound(smiles) under 5 different PYTHONHASHSEED values via
 subprocess (PYTHONHASHSEED is consumed at Python startup — we cannot
 change it inside a running pytest process). Asserts byte-identical
 output across all 5 seeds per molecule.
 
-WHY: Commit f32206d3 fixed a set() iteration non-determinism bug in
+WHY: Commit f32206d3 fixed a set iteration non-determinism bug in
 _descriptive_fallback that forced correcting 3 baseline CSV cells
 . a phase's grid search is ~4.7M invocations (3,125 configs
 x 500 mol x 3 corpora) — each latent non-det amplifies catastrophically.
 This suite surfaces such bugs BEFORE 146 ships.
 
 CORPUS SIZE: EXACTLY 100 test cases (3 pinned multi-metal regression
-anchors + 97 stratified samples). See `sample_determinism_corpus()` for
+anchors + 97 stratified samples). See `sample_determinism_corpus` for
 the exact arithmetic: the return slice is
 `sampled_unique[:max(0, TOTAL_SAMPLE - len(pinned_smiles))]` so the
 total is always `len(pinned_smiles) + (TOTAL_SAMPLE - len(pinned_smiles))
-= TOTAL_SAMPLE = 100`. The earlier a phase.2 draft documented "103"
+= TOTAL_SAMPLE = 100`. The earlier a phase draft documented "103"
 and returned 100 — REVIEWS.md Plan 02 HIGH #1 flagged this off-by-3;
 the fix unifies docstring + code + CI comment + must_haves on 100.
 
@@ -47,7 +47,7 @@ so local `pytest -m "not slow"` skips it; CI runs it via the
 (added by Task 2 of this plan).
 
 FIX-METHODOLOGY (CLAUDE.md): if a molecule fails non-determinism, fix
-at source (find the set() / dict.keys() / random iteration and make it
+at source (find the set / dict.keys / random iteration and make it
 deterministic). NEVER exclude the molecule from the sample — that is
 exactly the band-aid the a phase grid search would pay for later.
 """
@@ -117,7 +117,7 @@ PINNED_ANCHORS: List[Tuple[str, str]] = [
 ]
 
 # Per-cell targets (must sum to 100 — see RESEARCH.md Q2 matrix).
-# sample_determinism_corpus() slices the resulting pool to
+# sample_determinism_corpus slices the resulting pool to
 # `TOTAL_SAMPLE - len(PINNED_ANCHORS) = 97` entries before prepending
 # the 3 pinned anchors, so the final _CORPUS always has exactly 100.
 STRATUM_TARGETS = {
@@ -185,7 +185,7 @@ def sample_determinism_corpus() -> List[str]:
     with BASELINE_CSV.open() as f:
         # Deviation (Rule 3 — blocking fix): RESEARCH.md Q2 assumed corpus_row_id
         # was an integer but the live baseline CSV stores prefixed string IDs
-        # (e.g., "CHEBI:100247", "PubChem 4242"). Casting to int() raises
+        # (e.g., "CHEBI:100247", "PubChem 4242"). Casting to int raises
         # ValueError. Use stable lexicographic sort on the compound key
         # (source_corpus, corpus_row_id) — still deterministic, still reproducible
         # across runs, still independent of filesystem ordering.
@@ -264,7 +264,7 @@ def _name_under_seed(smiles: str, seed: str, timeout: float = 60.0) -> str:
             f"name_compound subprocess failed for SMILES={smiles!r} "
             f"seed={seed!r}: stderr={result.stderr!r}"
         )
-    # strip exactly one trailing newline from print()
+    # strip exactly one trailing newline from print
     return result.stdout.rstrip("\n")
 
 

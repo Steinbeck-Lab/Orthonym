@@ -1,5 +1,5 @@
 """ no-abstain Phase A: wire `validation.reconstruct.verify_or_none` onto
-the best-effort/T4 UNVERIFIED emission path (`namer.py`
+the best-effort/ UNVERIFIED emission path (`namer.py`
 ``Orthonym._try_general_engine_recovery``, ~:3696-3745).
 
 Before this task, when the general engine's OWN certified name (NOT the T4
@@ -47,7 +47,7 @@ def _force_opsin_rejects(monkeypatch):
 
 
 def test_opsin_unparseable_engine_name_now_abstains(monkeypatch):
-    """The live gap: an OPSIN-unparseable, non-T4 engine name used to ship
+    """The live gap: an OPSIN-unparseable, non- engine name used to ship
     with opsin_status='unverified'. With verify_or_none unable to confirm it
     (the real oracle on an unparseable name+name_facts=None, simulated here so
     the test is fast/deterministic and does not depend on a live JVM) it must

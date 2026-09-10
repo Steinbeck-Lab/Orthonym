@@ -1,14 +1,14 @@
-"""P-66.5.4.1/2 neutral nitrile-chalcogenide functional-class suffix handler (W2F p4).
+"""/2 neutral nitrile-chalcogenide functional-class suffix handler (W2F p4).
 
 A neutral nitrile oxide ``R-C#[N+]-[O-]`` is named by functional-class method (1)
-of P-66.5.4.1 — the separate word ``oxide`` appended to the nitrile name
-(``benzonitrile oxide`` BB:34876, ``acetonitrile oxide`` BB:43285, ``formonitrile
-oxide`` BB:34883), which IS the preferred IUPAC name. Nitrile oxides are "classed
-with zwitterions in the order of compound classes" (P-66.5.4.1), so they are senior
+of — the separate word ``oxide`` appended to the nitrile name
+(``benzonitrile oxide`` the Blue Book, ``acetonitrile oxide`` the Blue Book, ``formonitrile
+oxide`` the Blue Book), which IS the preferred IUPAC name. Nitrile oxides are "classed
+with zwitterions in the order of compound classes", so they are senior
 to acids/esters — a co-present ester/acid demotes to a prefix.
 
 The heavier chalcogen analogues ``R-C#[N+]-[S-]`` / ``[Se-]`` / ``[Te-]`` are named
-the same way (P-74.2.2.2.1.2), substituting the chalcogen word for ``oxide``:
+the same way, substituting the chalcogen word for ``oxide``:
 ``acetonitrile sulfide`` / ``acetonitrile selenide`` / ``acetonitrile telluride``.
 Only the appended word changes; the nitrile parent is derived identically.
 
@@ -17,7 +17,7 @@ salt/anion uses the ``(oxo-λ5-azanylidyne)methyl`` PREFIX path
 (``benzene.py::_nitrile_oxide_prefix``, gated on ``GetFormalCharge < 0``) — the two
 never double-fire.
 
-Mechanism (research ``ring-suffix-trio`` §P-66.5.4.2): strip the ``[O-]`` +
+Mechanism (research ``ring-suffix-trio`` §: strip the ``[O-]`` +
 neutralise the N -> plain nitrile SMILES; re-name it with the nitrile forced as the
 principal group (the ``charged_router._reenter_forced`` pattern); append
 ``" oxide"``. Fail closed (return None) when the nitrile parent cannot be named as a
@@ -26,12 +26,12 @@ when the nitrile-bearing ring is AROMATIC but got mis-named as a saturated
 carbocycle. The BB ester PIN ``4-(methoxycarbonyl)benzonitrile oxide`` stays a
 buildable follow-on: it needs the aromatic-benzene forced-nitrile fix in
 ``_assemble_ring_nitrile_name`` AND enclosing marks for the ``(methoxycarbonyl)``
-compound prefix (P-16.3.3, a general substituent-rendering feature).
+compound prefix, a general substituent-rendering feature).
 
 Registered in inner_dispatch at priority 975 (specialty-intercept tier, before the
 acid/ester handlers so the senior nitrile oxide wins) — predicate-pure +
-direct-return + ``pool.add`` + ``_inject_stereo_if_missing`` (D-25 side_effect
-inventory ()).
+direct-return + ``pool.add`` + ``_inject_stereo_if_missing`` (side_effect
+inventory ).
 """
 from __future__ import annotations
 
@@ -46,7 +46,7 @@ from ..name_tree import NameTreeNode, NamingResult
 # zwitterion matches.
 _NITRILE_CHALCOGENIDE_SMARTS = Chem.MolFromSmarts('[C;+0]#[N+]-[O,S,Se,Te;-]')
 
-# Chalcogen atomic number -> the functional-class word (P-66.5.4.1 / P-74.2.2.2.1.2).
+# Chalcogen atomic number -> the functional-class word /.
 _CHALCOGEN_WORD = {8: "oxide", 16: "sulfide", 34: "selenide", 52: "telluride"}
 
 
@@ -66,7 +66,7 @@ def _nitrile_ring_is_aromatic(mol: Any, nitrile_c_idx: int) -> bool:
 
 
 def _is_nitrile_oxide(features: Any) -> bool:
-    """Predicate (D-07 pure, read-only): a NEUTRAL single-fragment molecule bearing
+    """Predicate (pure, read-only): a NEUTRAL single-fragment molecule bearing
     EXACTLY ONE ``R-C#[N+]-[O-]`` nitrile-oxide group.
 
     Neutral-only (net charge 0) excludes the anion/salt (prefix path owns it).
@@ -85,7 +85,7 @@ def _is_nitrile_oxide(features: Any) -> bool:
 def name_nitrile_oxide(
     features: Any, mol: Any = None, style: str = "pin",
 ) -> Optional[NamingResult]:
-    """Emit ``<nitrile-name> oxide`` (P-66.5.4.1 method (1)) for a neutral nitrile
+    """Emit ``<nitrile-name> oxide`` method (1)) for a neutral nitrile
     oxide. Returns None (defer/fail closed) when the nitrile parent cannot be
     faithfully named."""
     from ..candidate_pool import get_current_pool
@@ -112,7 +112,7 @@ def name_nitrile_oxide(
 
     if not heavy_nbrs:
         # Bare H-C#[N+][O-]: the strip path would mis-name C#N as the retained
-        # 'hydrogen cyanide'; use the retained PIN directly (BB:34883).
+        # 'hydrogen cyanide'; use the retained PIN directly (the Blue Book).
         nitrile_name: Optional[str] = 'formonitrile'
     else:
         # Strip the [O-]; neutralise the triple-N -> plain nitrile skeleton.
@@ -127,7 +127,7 @@ def name_nitrile_oxide(
             return None
         # Force the nitrile as the principal group; the [O-] is gone so the
         # nitrile-oxide predicate cannot re-fire (no recursion). The inner call's
-        # validity gate is disabled (the outer top-level SELF-01 gate is the
+        # validity gate is disabled (the outer top-level gate is the
         # accuracy backstop for the full '... oxide' name).
         from ...namer import Orthonym
         try:

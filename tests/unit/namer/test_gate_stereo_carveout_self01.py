@@ -1,7 +1,7 @@
-"""ARCH-2 — the stereo carve-out must PROVE constitution, not skip the proof.
+""" — the stereo carve-out must PROVE constitution, not skip the proof.
 
 `namer._final_opsin_validity_gate` carries two mechanisms: a parseability gate
-(OPSIN cannot parse -> suppress) and the SELF-01 constitutional check (OPSIN
+(OPSIN cannot parse -> suppress) and the constitutional check (OPSIN
 parses -> re-perceive and compare constitutions). Between them sits the stereo
 carve-out: OPSIN's *generation-side* stereo grammar is narrower than IUPAC's, so
 the verbatim Blue Book PIN ``(1s,4s)-cyclohexane-1,4-diol`` is REJECTED by OPSIN
@@ -9,7 +9,7 @@ even though it is correct. The carve-out asks "does the stereo-STRIPPED form
 parse?" and, if yes, ships the full stereo name.
 
 THE DEFECT this file pins: that branch used to ``return name`` without ever
-running SELF-01, so ANY constitutional defect rode out free as long as the name
+running, so ANY constitutional defect rode out free as long as the name
 happened to carry a stereo prefix OPSIN rejects. Verification was strongest on
 well-formed names and ABSENT on malformed ones -- exactly backwards. Measured
 blast radius on `benchmarks/pubchem_2000.csv` (gates ON): 107 names shipped
@@ -19,12 +19,12 @@ The fix keeps the carve-out doing what it exists for -- not requiring OPSIN to
 parse the stereo LAYER -- while restoring the burden it was never entitled to
 skip: the constitution must be proven. ``_self_consistency_verdict`` compares the
 InChIKey SKELETON block, which excludes stereochemistry by construction
-(namer.py:514-528, ADR-18-07), so it can judge the stereo-STRIPPED parse with no
+(namer.py:514-528, -07), so it can judge the stereo-STRIPPED parse with no
 loss of validity.
 
 WHY A NEW FILE: `tests/unit/test_bbr_gate_stereo.py`'s fixture sets
 ``_SC_MODE = "off"`` and stubs ``_validity_gate_name_to_smiles`` to the constant
-``"CCO"``, deliberately isolating the parseability POLICY from the SELF-01 layer.
+``"CCO"``, deliberately isolating the parseability POLICY from the layer.
 Under that fixture the new behaviour is a no-op, so a green run there is not
 evidence for it. Every OPSIN fact stubbed below was captured from the REAL oracle
 (measurement report D1/D2/D4/D5) and the strip_stereo outputs verified verbatim.
@@ -37,7 +37,7 @@ from orthonym import Orthonym
 # --- The witness (measurement D1/D2) --------------------------------------
 # A dibromo-bicyclic carbamate that shipped as an OPSIN-UNPARSEABLE name for a
 # DIFFERENT molecule (ring + both Br dropped): the stereo carve-out was its ship
-# path (traced stats delta {"gate_stereo_kept": 1}, SELF-01 called 0 times).
+# path (traced stats delta {"gate_stereo_kept": 1}, called 0 times).
 WITNESS_SMILES = "COC(=O)NCC[C@@H]1CC[C@H]2[C@@H]1C2(Br)Br"
 WITNESS_BAD_NAME = "(1S,4S,5R)-methyl N-octylcarbamate"
 WITNESS_STRIPPED_OPSIN_SMILES = "CCCCCCCCNC(=O)OC"  # real OPSIN output, verdict `mismatch`
@@ -65,7 +65,7 @@ PROTECTED = [
 
 
 def _stub_opsin(monkeypatch, parsed_map):
-    """Enable the gate with SELF-01 ON and a REALISTIC OPSIN stub.
+    """Enable the gate with ON and a REALISTIC OPSIN stub.
 
     ``parsed_map`` maps name -> the SMILES the real OPSIN emits for it. A name in
     the map is 'parsed'; every other name is DEFINITIVELY 'rejected' (SMILES
@@ -87,7 +87,7 @@ def _stub_opsin(monkeypatch, parsed_map):
 @pytest.mark.unit
 def test_witness_wrong_molecule_no_longer_ships():
     """The whole point: a name for a DIFFERENT molecule must not ride out on a
-    stereo prefix. Real OPSIN, real SELF-01 mode, gate re-enabled -- the only
+    stereo prefix. Real OPSIN, real mode, gate re-enabled -- the only
     monkeypatch undoes conftest's suite-wide gate disable.
 
     Invariant 11: assert the string that ACTUALLY ships, not merely that the bad
@@ -107,11 +107,11 @@ def test_witness_wrong_molecule_no_longer_ships():
 
 
 # ---------------------------------------------------------------------------
-# 2. The protected class still ships -- end-to-end, SELF-01 ON, realistic stub
+# 2. The protected class still ships -- end-to-end, ON, realistic stub
 # ---------------------------------------------------------------------------
 @pytest.mark.unit
 def test_protected_pin_still_ships_end_to_end(monkeypatch):
-    """DEF-9 gold row (P-93.5 / P-91). With the gate ENABLED, ``_SC_MODE = "on"``
+    """ gold row /. With the gate ENABLED, ``_SC_MODE = "on"``
     and a REALISTIC stripped-parse stub, the verbatim Blue Book PIN must still
     ship with its stereo descriptors intact. This is the assertion
     test_bbr_gate_stereo.py cannot make (it pins ``_SC_MODE = "off"``)."""
@@ -181,7 +181,7 @@ def test_carveout_ships_when_input_smiles_missing(monkeypatch):
 @pytest.mark.unit
 def test_transient_unavailable_still_fails_open(monkeypatch):
     """A stereo name whose OPSIN probe merely TIMED OUT must survive: a transient
-    OPSIN failure must never turn a valid name into a fallback (CR-01)."""
+    OPSIN failure must never turn a valid name into a fallback ."""
     monkeypatch.setattr(nm, "_DISABLE_VALIDITY_GATE", False, raising=False)
     monkeypatch.setattr(nm, "_SC_MODE", "on", raising=False)
     monkeypatch.setattr(nm, "_validity_gate_jar_present", lambda: True, raising=False)
@@ -194,7 +194,7 @@ def test_transient_unavailable_still_fails_open(monkeypatch):
 
 @pytest.mark.unit
 def test_no_jar_still_fails_open(monkeypatch):
-    """JAR absent -> the gate is a no-op for a stereo name too ().
+    """JAR absent -> the gate is a no-op for a stereo name too .
 
     The oracle underneath is stubbed HOSTILE (everything rejected, no SMILES) so
     the JAR guard is the ONLY thing that can save the name. Without this the test
@@ -239,7 +239,7 @@ def test_d5_parsed_but_uncanonicalisable_is_suppressed(monkeypatch):
 
 # ---------------------------------------------------------------------------
 # 7. Tripwire: the carve-out must still be REACHED, i.e. the fix must not have
-# quietly become "suppress every OPSIN-rejected stereo name". If SELF-01 is
+# quietly become "suppress every OPSIN-rejected stereo name". If is
 # OFF (the historical mode, and what test_bbr_gate_stereo.py pins) the
 # carve-out must remain a pure pass-through.
 # ---------------------------------------------------------------------------
@@ -248,7 +248,7 @@ def test_carveout_is_passthrough_when_self01_off(monkeypatch):
     _stub_opsin(monkeypatch, {"methyl N-octylcarbamate": WITNESS_STRIPPED_OPSIN_SMILES})
     monkeypatch.setattr(nm, "_SC_MODE", "off", raising=False)
     stats = {}
-    # SELF-01 disabled -> even the wrong-molecule name ships (mode contract), and
+    # disabled -> even the wrong-molecule name ships (mode contract), and
     # the carve-out counts the ship.
     assert nm._final_opsin_validity_gate(
         WITNESS_BAD_NAME, WITNESS_SMILES, stats) == WITNESS_BAD_NAME
@@ -269,10 +269,10 @@ def test_constitutional_defect_without_stereo_still_suppressed(monkeypatch):
 
 
 # ---------------------------------------------------------------------------
-# 8. ARCH-2-FOLLOWUP: the STRIPPED probe is three-valued too. `unavailable`
+# 8. -FOLLOWUP: the STRIPPED probe is three-valued too. `unavailable`
 # means OPSIN could not be consulted -- it is NOT evidence against the name,
 # so it must fail OPEN exactly as the primary probe already does
-# (namer.py:660-661, CR-01). Lumping it with `rejected` suppressed a name the
+# (namer.py:660-661,). Lumping it with `rejected` suppressed a name the
 # carve-out exists to rescue, on nothing but a subprocess hiccup.
 #
 # WHY THE EXISTING `test_transient_unavailable_still_fails_open` DOES NOT
@@ -283,7 +283,7 @@ def test_constitutional_defect_without_stereo_still_suppressed(monkeypatch):
 # stereo forms) and only the STRIPPED probe hiccups.
 # ---------------------------------------------------------------------------
 def _stub_opsin_3valued(monkeypatch, status_map, smiles_map=None):
-    """Enable the gate with SELF-01 ON and a HOSTILE THREE-VALUED OPSIN stub.
+    """Enable the gate with ON and a HOSTILE THREE-VALUED OPSIN stub.
 
     ``status_map``: name -> ``"parsed"``/``"rejected"``/``"unavailable"``; any name
     NOT listed is ``"rejected"``. ``smiles_map``: name -> the SMILES OPSIN emits;
@@ -349,7 +349,7 @@ def test_stripped_probe_rejected_still_suppressed(monkeypatch):
 
 @pytest.mark.unit
 def test_carveout_suppression_has_its_own_counter(monkeypatch):
-    """Telemetry: the carve-out's SELF-01 suppression must be distinguishable from
+    """Telemetry: the carve-out's suppression must be distinguishable from
     the primary parsed path's, which shares `self_consistency_suppressed`."""
     _stub_opsin_3valued(
         monkeypatch,

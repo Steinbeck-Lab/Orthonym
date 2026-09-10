@@ -1,4 +1,4 @@
-""" a phase (batch 11C3) — P-15 euphony/mancude + charged parents + misc spelling.
+""" a phase (batch 11C3) — euphony/mancude + charged parents + misc spelling.
 
 Eight shipped fixes. Every target below emits its Blue-Book PIN and round-trips
 0-wrong. The traced real sites differed from the brief's guesses for #25 (the
@@ -6,25 +6,25 @@ euphonic-'a' lived in polycyclic._build_parent_with_unsaturation, NOT
 terminal_ring) and #26a (fragment_assembly._amine_to_prefix, NOT sulfonamides),
 recorded in task-11C3-report.md.
 
-#11 multiplicative bridge cited BARE before the multiplier (P-15.3.2.1):
+#11 multiplicative bridge cited BARE before the multiplier:
      '4,4'-oxydi(...)' / '4,4'-methylenedi(...)', not '(oxy)di'/'(methylene)di'.
 #25 euphonic connective 'a' before the FIRST unsaturation ending only when it is
-     MULTIPLIED (P-31.1.4.2): 'cyclooct-3-en-7-yne' (single en+yn, elide) vs
+     MULTIPLIED: 'cyclooct-3-en-7-yne' (single en+yn, elide) vs
      'cycloocta-3,7-diyne' (diyne, retain). The engine had BOTH backwards.
-#34 retained mancude ring 'phosphinine' as an -yl substituent (P-22.2.1), not
+#34 retained mancude ring 'phosphinine' as an -yl substituent, not
      the systematic '1-phosphacyclohexa-1,3,5-trien-4-yl'.
-#27 'benzenylium' — a ring ylium uses the parent-hydride name (P-73.2.2.1,
+#27 'benzenylium' — a ring ylium uses the parent-hydride name,
      the Blue Book 'benzenylium (PIN)'), not the substituent 'phenylium'.
 #28 'hydroxyazanide' — the N-anion of hydroxylamine is built on azane
-     (P-72.2.2.2.4, the Blue Book preselected), not the retained 'hydroxylaminide'.
+     , the Blue Book preselected), not the retained 'hydroxylaminide'.
 #26a 'N-hydroxymethanesulfonamide' — the N-OH prefix is 'hydroxy' not 'hydroxyl'
-     (P-68.3.1).
-#26b '(hydroxyimino)' compound prefix takes enclosing marks (P-16.3.3), even on
+     .
+#26b '(hydroxyimino)' compound prefix takes enclosing marks, even on
      the ring/seniority composer path.
 #26c 'disilylmethyl' — a one-carbon (methyl) substituent parent omits its
-     redundant '1,1' locants (P-14.3.4.2(a)).
+     redundant '1,1' locants (a)).
 #26d 'tetraphenyl-λ5-phosphanyl' — a 5-bonded organyl P carries the λ descriptor
-     (P-14.1.3), routed through the shared LAMBDA constant.
+     , routed through the shared LAMBDA constant.
 """
 import shutil
 import subprocess
@@ -61,7 +61,7 @@ def _name_general_fallback(smiles: str) -> str:
 
 
 # ---------------------------------------------------------------------------
-# #11 — multiplicative bridge cited BARE (P-15.3.2.1)
+# #11 — multiplicative bridge cited BARE
 # ---------------------------------------------------------------------------
 @pytest.mark.parametrize("smiles,expected", [
     ("O=C(O)C1CCC(OC2CCC(C(=O)O)CC2)CC1",
@@ -80,7 +80,7 @@ def test_simple_bridge_cited_bare(smiles, expected):
 
 
 # ---------------------------------------------------------------------------
-# #25 — euphonic connective 'a' (P-31.1.4.2). systematic_verified tier.
+# #25 — euphonic connective 'a'. systematic_verified tier.
 # ---------------------------------------------------------------------------
 @pytest.mark.parametrize("smiles,expected", [
     # single en + single yn -> first ending 'en' vowel-initial -> elide 'a'.
@@ -93,7 +93,7 @@ def test_euphonic_a_first_ending_multiplied(smiles, expected):
 
 
 # ---------------------------------------------------------------------------
-# #34 — retained mancude ring 'phosphinine' as a substituent (P-22.2.1)
+# #34 — retained mancude ring 'phosphinine' as a substituent
 # ---------------------------------------------------------------------------
 def test_phosphinine_substituent():
     assert name_compound("N#Cc1cc(C2CCOC(C#N)C2)ccp1") == \
@@ -120,14 +120,14 @@ def test_saturated_phosphinane_ring_unchanged():
 
 
 # ---------------------------------------------------------------------------
-# #27 — benzenylium (P-73.2.2.1, the Blue Book)
+# #27 — benzenylium, the Blue Book)
 # ---------------------------------------------------------------------------
 def test_benzenylium():
     assert name_compound("[C+]1=CC=CC=C1") == "benzenylium"
 
 
 # ---------------------------------------------------------------------------
-# #28 — hydroxyazanide (P-72.2.2.2.4, the Blue Book preselected)
+# #28 — hydroxyazanide, the Blue Book preselected)
 # ---------------------------------------------------------------------------
 def test_hydroxyazanide():
     assert name_compound("[NH-]O") == "hydroxyazanide"
@@ -145,14 +145,14 @@ def test_neutral_hydroxylamine_and_azanide_unchanged(smiles, expected):
 
 
 # ---------------------------------------------------------------------------
-# #26a — N-hydroxy... not N-hydroxyl... (P-68.3.1)
+# #26a — N-hydroxy... not N-hydroxyl...
 # ---------------------------------------------------------------------------
 def test_n_hydroxy_sulfonamide():
     assert name_compound("CS(=O)(=O)NO") == "N-hydroxymethanesulfonamide"
 
 
 # ---------------------------------------------------------------------------
-# #26b — (hydroxyimino) enclosing marks on the ring/seniority path (P-16.3.3)
+# #26b — (hydroxyimino) enclosing marks on the ring/seniority path
 # ---------------------------------------------------------------------------
 def test_ring_oxime_prefix_enclosed():
     assert name_compound("CC1(C(=O)O)C=CC(=NO)C=C1") == \
@@ -171,7 +171,7 @@ def test_acyclic_oxime_prefix_unchanged(smiles, expected):
 
 
 # ---------------------------------------------------------------------------
-# #26c — one-carbon substituent parent omits redundant locants (P-14.3.4.2(a))
+# #26c — one-carbon substituent parent omits redundant locants (a))
 # ---------------------------------------------------------------------------
 @pytest.mark.parametrize("smiles,expected", [
     ("CCC(CC(C)=O)C([SiH3])[SiH3]", "4-(disilylmethyl)hexan-2-one"),
@@ -183,7 +183,7 @@ def test_one_carbon_parent_omits_locants(smiles, expected):
 
 
 # ---------------------------------------------------------------------------
-# #26d — λ5 on a 5-bonded organyl phosphanyl (P-14.1.3)
+# #26d — λ5 on a 5-bonded organyl phosphanyl
 # ---------------------------------------------------------------------------
 def test_lambda5_phosphanyl():
     assert name_compound(

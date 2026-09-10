@@ -1,9 +1,9 @@
-"""Wave2 T3b — P-63.6 substitutive sulfoxide/sulfone PINs + conservation.
+"""Wave2 — substitutive sulfoxide/sulfone PINs + conservation.
 
 Functional-class 'dimethyl sulfoxide' style names are general nomenclature
 only; the PIN is substitutive with sulfinyl/sulfonyl prefixes built on the
 ACID STEM ('methanesulfinyl', from methanesulfinic acid), the senior R as
-parent, and the multiplicative form for symmetric diaryls (BB P-63.6:
+parent, and the multiplicative form for symmetric diaryls (BB:
 '(methanesulfinyl)methane' 46154, '1-(ethanesulfinyl)butane' 28094,
 "(ethanesulfonyl)ethane" + "1,1'-sulfinyldibenzene" 28110-28115;
 'Multiplication of acyclic hydrocarbons is not permitted').
@@ -66,7 +66,7 @@ class TestPolyfunctionalAcidStemPrefix:
         # locant is explicitly marked "not".
         # the Blue Book `sulfanylacetic acid (PIN)` -- a SULFUR substituent on
         # acetic acid, the direct analogue of this row.
-        # the Blue Book `(1H-indol-1-yl)acetic acid (PIN)`, P-13.1.
+        # the Blue Book `(1H-indol-1-yl)acetic acid (PIN)`,.
         # The old value was thus non-PIN on both counts. Both spellings parse
         # to the same molecule under OPSIN, so this is a spelling correction,
         # not a structural one.
@@ -94,11 +94,11 @@ class TestConservation:
         """The atoms beyond the sulfoxide unit survive — now positively.
 
         History: the old functional-class walk emitted `ethyl methyl sulfoxide`
-        for this, silently losing the `-S-CH3` — a DIFFERENT molecule. T3b made
+        for this, silently losing the `-S-CH3` — a DIFFERENT molecule. made
         it fail closed (`unknown organic compound`) and this test asserted that
         abstention, recording the real PIN as a deferral in its own comment:
         "the PIN 1-(methanesulfinyl)-2-(methylsulfanyl)ethane (BB 18284) needs
-        the thioether principal-group demotion — documented T3b deferral".
+        the thioether principal-group demotion — documented deferral".
 
         CORRECTED 2026-08-02: that deferral has since closed and the producer
         now emits exactly the PIN the comment named. Verified verbatim at
@@ -191,7 +191,7 @@ class TestConservation:
 
 @pytest.mark.unit
 class TestCarbonPathMultipliedAcidGuard:
-    """F6 (): the carbon-path sulfone/sulfoxide PREFIX builder must NOT emit a
+    """F6 : the carbon-path sulfone/sulfoxide PREFIX builder must NOT emit a
     corrupted 'multiplied acid' stem when the R' arm itself carries a SECOND
     S-oxo-acid group. For CS(=O)(=O)CCS(O)(=O)=O (CH3-SO2-CH2CH2-SO3H), capping
     the sulfone S with -OH forms 'ethane-1,2-disulfonic acid'; stripping the
@@ -229,7 +229,7 @@ class TestCarbonPathMultipliedAcidGuard:
 @pytest.mark.unit
 class TestTrivialAndControls:
     def test_sulfide_substitutive_pin(self):
-        # P-63.2.5 (the Blue Book method 1 = PIN; the Blue Book): a sulfide's PIN is the
+        # (the Blue Book method 1 = PIN; the Blue Book): a sulfide's PIN is the
         # substitutive "(R'-sulfanyl)RH", not the functional-class "R R' sulfide".
         # (Migrated from the method-2 forms in the sulfanyl-vs-sulfide slice.)
         assert name_compound("CSC") == "(methylsulfanyl)methane"
@@ -244,7 +244,7 @@ class TestTrivialAndControls:
 
 @pytest.mark.unit
 class TestSeleniumTelluriumOxide:
-    """-6I — P-63.6 Se/Te oxide analogues (the Blue Book "selenium and
+    """-6I — Se/Te oxide analogues (the Blue Book "selenium and
     tellurium... named in the same way"; class names selenoxide/selenone,
     telluroxide/tellurone). The chemical-logic body is the SHARED, element-
     generic name_chalcogen_oxide_substitutive; only the prefix stem differs

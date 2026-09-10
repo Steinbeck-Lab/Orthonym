@@ -1,10 +1,10 @@
-"""Tests for W8-P4: P-65.7 (organic-acid anhydrides — thio/seleno/peroxy/
-mixed/poly) and P-67 (mono-/poly-nuclear noncarbon oxoacid) coverage.
+"""Tests for W8-P4: (organic-acid anhydrides — thio/seleno/peroxy/
+mixed/poly) and (mono-/poly-nuclear noncarbon oxoacid) coverage.
 
 Two families of assertion:
   1. Tractable BUILDS (real names, gated + raw): mixed cyanic anhydride
-     (P-65.7.2), cyclic thio-anhydride dione (P-65.7.7.3), chalcogen
-     di-anhydride bis(thioanhydride) (P-65.7.6.4.1).
+     , cyclic thio-anhydride dione, chalcogen
+     di-anhydride bis(thioanhydride).
   2. Atom-drop SAFETY-FLOOR vetoes (P4-1): structural motifs the RAW (no-Java,
      gate-OFF) namer used to silently drop atoms or mis-perceive the
      constitution for — verified fail-closed (never the old wrong string)
@@ -19,7 +19,7 @@ RAW = Orthonym(_disable_opsin_validity_gate=True)
 
 @pytest.mark.unit
 class TestMixedCyanicAnhydride:
-    """P-65.7.2 / P-65.2.2: BB 30979 'CH3-CO-O-CN acetic cyanic anhydride (PIN)'."""
+    """ /: BB 30979 'CH3-CO-O-CN acetic cyanic anhydride (PIN)'."""
 
     def test_acetic_cyanic_anhydride_gated(self):
         assert name_compound("CC(=O)OC#N") == "acetic cyanic anhydride"
@@ -30,7 +30,7 @@ class TestMixedCyanicAnhydride:
 
 @pytest.mark.unit
 class TestCyclicThioAnhydrideDione:
-    """P-65.7.7.3 method 1 (PIN): thio analogue of phthalic anhydride.
+    """ method 1 (PIN): thio analogue of phthalic anhydride.
 
     BB 32546 verbatim gives the SATURATED benzo form 'hexahydro-2-
     benzothiophene-1,3-dione (PIN)'; the mancude/aromatic form here drops
@@ -53,7 +53,7 @@ class TestCyclicThioAnhydrideDione:
 
 @pytest.mark.unit
 class TestChalcogenDianhydride:
-    """P-65.7.6.4.1: BB 32446 'diacetic butanedioic bis(thioanhydride) (PIN)'."""
+    """: BB 32446 'diacetic butanedioic bis(thioanhydride) (PIN)'."""
 
     def test_bis_thioanhydride_gated(self):
         result = name_compound("CC(=O)SC(=O)CCC(=O)SC(C)=O")
@@ -66,7 +66,7 @@ class TestChalcogenDianhydride:
 
 @pytest.mark.unit
 class TestLinearPolyanhydrideVerify:
-    """P-65.7.6.2: the general-nomenclature method-2 name IS BB-verbatim for
+    """: the general-nomenclature method-2 name IS BB-verbatim for
     this exact structure (BB 32410-32412), so it must NOT be vetoed (it
     describes the correct molecule; only the substitutive method-1 PIN is
     unbuilt this cycle)."""
@@ -83,11 +83,11 @@ class TestAtomDropSafetyFloor:
     ('unknown organic compound') under both the raw and the gated namer."""
 
     @pytest.mark.parametrize("smi,old_wrong", [
-        ("CC(=O)OS", "ethane"),                                    # P-65.1.5.3 thioperoxy acid, drops S+O2
-        ("O=[N+]([O-])NCC(=O)O", "ethanoic acid"),                 # P-67.1.4.3.2 nitramido, drops -NH-NO2
-        ("OC(=O)CCOP(=O)(O)OP(=O)(O)O", "propanoic acid"),         # P-67.2.6 diphosphate substituent, drops diphosphate
-        ("CC(=O)OC(=O)OC(=O)O", "1-(propanoyloxy)methanoic acid"),  # P-67.3.1 wrong constitution
-        ("COS(=O)(=O)OS(=O)(=O)SCC", "1-methanoic anhydridylethanoic anhydride"),  # P-67.2.5.2 partial ester
+        ("CC(=O)OS", "ethane"),                                    # thioperoxy acid, drops S+O2
+        ("O=[N+]([O-])NCC(=O)O", "ethanoic acid"),                 # nitramido, drops -NH-NO2
+        ("OC(=O)CCOP(=O)(O)OP(=O)(O)O", "propanoic acid"),         # diphosphate substituent, drops diphosphate
+        ("CC(=O)OC(=O)OC(=O)O", "1-(propanoyloxy)methanoic acid"),  # wrong constitution
+        ("COS(=O)(=O)OS(=O)(=O)SCC", "1-methanoic anhydridylethanoic anhydride"),  # partial ester
     ])
     def test_leak_fails_closed_raw(self, smi, old_wrong):
         result = RAW.name(smi)

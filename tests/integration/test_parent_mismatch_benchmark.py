@@ -1,21 +1,21 @@
 """
 Parent Mismatch Benchmark: Measures improvement in parent structure selection.
 
-Originally created in Phase 46, targeting parent_mismatch RT failures where OPSIN
+Originally created in a phase, targeting parent_mismatch RT failures where OPSIN
 parses the generated name but InChI doesn't match because the wrong parent structure
 was selected (wrong ring system, wrong ring-vs-chain decision, or wrong principal
 group location).
 
-Phase 118 audit (55 compounds from v13 benchmark) found:
-  - 28 hit P-44.1 cascade (correct parent selection, name wrong for other reasons)
+a phase audit (55 compounds from v13 benchmark) found:
+  - 28 hit cascade (correct parent selection, name wrong for other reasons)
   - 9 no ring systems (acyclic -- parent selection not applicable)
-  - 7 "unclear" fallback (PG separated from ring/chain by 2+ hops -- Phase 119+)
-  - 5 P-44.1(a) chain only
-  - 3 P-44.1(a) ring only
+  - 7 "unclear" fallback (PG separated from ring/chain by 2+ hops -- a phase+)
+  - 5 (a) chain only
+  - 3 (a) ring only
   - 2 hydrocarbon rules
-  - 1 P-44.1(b) PG count comparison
+  - 1 (b) PG count comparison
 
-Phase 118 changes:
+a phase changes:
   - Fixed is_principal_group_on_ring self-check (symmetry with chain counterpart)
   - Fixed _count_pg_on_ring self-check (symmetry with chain counterpart)
   - Moved 5 xpassed compounds from EXPECTED_UNFIXED to EXPECTED_FIXED
@@ -33,11 +33,11 @@ from orthonym import name_compound
 # Parent mismatch compounds: (SMILES, expected_parent_substring, description)
 # ---------------------------------------------------------------------------
 
-# Compounds where Phase 46 is expected to produce correct parent selection.
+# Compounds where a phase is expected to produce correct parent selection.
 # These use firm assertions (no xfail).
 EXPECTED_FIXED = [
     # --- STEROID / TERPENOID ---
-    # Phase 46: P-44.2 ring classification + retained NP names
+    # a phase: ring classification + retained NP names
     (
         "CC(C)CCC1O[C@H]2C[C@H]3[C@@H]4CCC5CCCC[C@]5(C)[C@H]4CC[C@]3(C)[C@H]2[C@@H]1C",
         "cholest",
@@ -80,8 +80,8 @@ EXPECTED_FIXED = [
     ),
 
     # --- PAH / FUSED AROMATIC ---
-    # Phase 46: P-44.2 identifies fused aromatic systems correctly
-    # NOTE: 40-atom PAH moved to EXPECTED_UNFIXED -- Phase 69 PAH size guard
+    # a phase: identifies fused aromatic systems correctly
+    # NOTE: 40-atom PAH moved to EXPECTED_UNFIXED -- a phase PAH size guard
     # correctly prevents naphthalene over-matching. Extended PAH naming needed.
     (
         "CC(C)[C@H]1CC[C@@H](CO)c2c(O)cc(C(=O)O)cc21",
@@ -100,7 +100,7 @@ EXPECTED_FIXED = [
     ),
 
     # --- MONOCYCLIC ---
-    # Phase 46: P-52.2.8 ring-over-chain + correct ring selection
+    # a phase: ring-over-chain + correct ring selection
     (
         "CC1CC=C(N2CCCC2)C1=O",
         "cyclopent",
@@ -123,7 +123,7 @@ EXPECTED_FIXED = [
     ),
 
     # --- FUSED HETEROCYCLE ---
-    # Phase 46: ring_system_score() prefers heterocyclic over carbocyclic
+    # a phase: ring_system_score prefers heterocyclic over carbocyclic
     (
         "Oc1ccc2c(c1)O[C@H](c1ccc(O)c(O)c1)[C@@H](O)[C@@H]2O",
         "chroman",
@@ -156,7 +156,7 @@ EXPECTED_FIXED = [
     ),
 
     # --- BRIDGED POLYCYCLIC ---
-    # Phase 46: ring_system_score selects correct polycyclic parent
+    # a phase: ring_system_score selects correct polycyclic parent
     (
         "CC1(C)C[C@H](O)[C@]23CC[C@@H](O)[C@](C)(CC[C@@H]12)C3",
         "tricyclo",
@@ -169,7 +169,7 @@ EXPECTED_FIXED = [
     ),
 
     # --- ACYCLIC / CHAIN ---
-    # Phase 46: P-44.1 cascade preserves correct chain selection
+    # a phase: cascade preserves correct chain selection
     (
         "CCCCCCCCCCC(C)C(=O)O",
         "dodecanoic",
@@ -187,7 +187,7 @@ EXPECTED_FIXED = [
     ),
 
     # --- SUGAR / GLYCOSIDE ---
-    # Phase 46: ring selection preserves pyranose parent
+    # a phase: ring selection preserves pyranose parent
     (
         "OC[C@H]1O[C@@H](O)[C@H](O)[C@@H](O)[C@@H]1O[C@@H]1OC[C@@H](O)[C@H](O)[C@H]1O",
         "pyran",
@@ -211,27 +211,27 @@ EXPECTED_FIXED = [
         "FusedHet: benzothiophene salt",
     ),
 
-    # --- Phase 118-02: DKP compound with indole (piperazine-2,5-dione retained name added) ---
+    # --- a phase-02: DKP compound with indole (piperazine-2,5-dione retained name added) ---
     (
         "O=C1NC(Cc2c[nH]c3ccccc23)C(=O)N/C1=C/c1cnc[nH]1",
         "piperazin",
         "Diketopiperazine with indole - fixed by Phase 118-02 (piperazine-2,5-dione retained name)",
     ),
 
-    # --- Phase 118-02: Tropane NP naming (numbering map added) ---
+    # --- a phase-02: Tropane NP naming (numbering map added) ---
     (
         "CN1[C@@H]2CC[C@H]1C[C@@H](OC(=O)c1c[nH]c3ccccc13)C2.Cl",
         "tropan",
         "Tropane ester HCl salt - fixed by Phase 118-02 (tropane numbering map)",
     ),
-    # --- Phase 118-02: Ergostene derivative (exact SMILES lookup) ---
+    # --- a phase-02: Ergostene derivative (exact SMILES lookup) ---
     (
         "C=C(CC[C@@H](C)[C@H]1CC[C@@]2(C)C3=C(CC[C@]12C)[C@@]1(C)CC[C@@H](O)[C@@]1(C)CC3)C(C)C",
         "ergost",
         "Steroid: ergostene - fixed by Phase 118-02 (NP derivative lookup)",
     ),
 
-    # --- Phase 118 audit: compounds confirmed fixed by earlier phases (moved from EXPECTED_UNFIXED) ---
+    # --- a phase audit: compounds confirmed fixed by earlier phases (moved from EXPECTED_UNFIXED) ---
     (
         "CC(=O)N[C@@H](CC(C)C)C(=O)N(C)[C@@H](Cc1ccccc1)C(=O)N/C=C\\c1c[nH]c2ccccc12",
         "indol",
@@ -261,23 +261,23 @@ EXPECTED_FIXED = [
 ]
 
 # Compounds where parent selection is NOT expected to be fixed yet.
-# Phase 118 audit: these require work outside parent selection scope
+# a phase audit: these require work outside parent selection scope
 # (NP detection, decomposition, extended FG detection, chain detection).
 # Marked with xfail(strict=False) -- if they pass, great (xpass), if not, expected.
 EXPECTED_UNFIXED = [
-    # --- Extended PAH (Phase 69: PAH size guard correctly rejects naphthalene) ---
+    # --- Extended PAH (a phase: PAH size guard correctly rejects naphthalene) ---
     (
         "c1ccc2cc3c(cc2c1)-c1cc2ccccc2cc1-c1cc2ccccc2cc1-c1cc2ccccc2cc1-3",
         "NOT_naphthalene",
         "PAH: 40-atom 9-ring system needs extended PAH naming (not naphthalene)",
     ),
-    # --- Complex DKP (Phase 119+: indoline fused system beats standalone DKP in ring scoring) ---
+    # --- Complex DKP (a phase+: indoline fused system beats standalone DKP in ring scoring) ---
     (
         "C=C1NC(=O)[C@H]([C@@H](C)[C@]2(O)C(=O)N(C)c3ccccc32)NC1=O",
         "piperazin",
         "DKP with indoline - fused ring system (11 atoms) outscores standalone DKP ring (6 atoms)",
     ),
-    # --- Tropane and ergostene promoted to EXPECTED_FIXED by Phase 118-02 ---
+    # --- Tropane and ergostene promoted to EXPECTED_FIXED by a phase-02 ---
     # --- Morphinan / complex NP ---
     (
         "COC1=CC=C2[C@H]3Cc4ccc(OC)c5c4[C@@]2(C[C@@H](C2=C[C@@]4(O)[C@H]6Cc7ccc(O)c8c7"
@@ -292,7 +292,7 @@ EXPECTED_UNFIXED = [
         "phospho",
         "Phospholipid - multi-fragment naming",
     ),
-    # --- Diketopiperazine (compound 7 promoted to EXPECTED_FIXED by Phase 118-02) ---
+    # --- Diketopiperazine (compound 7 promoted to EXPECTED_FIXED by a phase-02) ---
     # --- Ammonium salts with complex anion ---
     (
         "CCCCCCCCCCCCCCCC(=O)OC[C@H](COP(=O)([O-])OCC[N+](C)(C)C)OC(C)=O",
@@ -309,7 +309,7 @@ PARENT_MISMATCH_COMPOUNDS = EXPECTED_FIXED + [
 
 
 # ---------------------------------------------------------------------------
-# Tests for compounds expected to be fixed by Phase 46
+# Tests for compounds expected to be fixed by a phase
 # ---------------------------------------------------------------------------
 
 @pytest.mark.integration
@@ -378,19 +378,19 @@ def test_parent_mismatch_unfixed(smiles, expected_parent_substring, description)
 def test_parent_mismatch_improvement_count():
     """At least 37/43 parent_mismatch failures should now produce correct parent names.
 
-    Updated by Phase 118-02: 37 EXPECTED_FIXED + 6 EXPECTED_UNFIXED = 43 total.
-    Phase 118-02 promoted tropane + ergostene from EXPECTED_UNFIXED to EXPECTED_FIXED.
+    Updated by a phase-02: 37 EXPECTED_FIXED + 6 EXPECTED_UNFIXED = 43 total.
+    a phase-02 promoted tropane + ergostene from EXPECTED_UNFIXED to EXPECTED_FIXED.
     The self-check fix is a correctness improvement (zero behavioral change for
     all_ring_atoms callers, but ensures symmetry with chain counterparts).
 
-    Phase 118 audit of all 55 v13 parent_mismatch compounds found:
-      - 28 hit P-44.1 cascade (correct parent selection, name wrong for other reasons)
+    a phase audit of all 55 v13 parent_mismatch compounds found:
+      - 28 hit cascade (correct parent selection, name wrong for other reasons)
       - 9 no ring systems (acyclic -- parent selection not applicable)
       - 7 "unclear" fallback (PG separated from ring/chain by 2+ hops -- deferred)
-      - 5 P-44.1(a) chain only
-      - 3 P-44.1(a) ring only
+      - 5 (a) chain only
+      - 3 (a) ring only
       - 2 hydrocarbon rules
-      - 1 P-44.1(b) PG count comparison
+      - 1 (b) PG count comparison
     """
     correct = 0
     total = len(PARENT_MISMATCH_COMPOUNDS)
@@ -419,11 +419,11 @@ def test_parent_mismatch_improvement_count():
 
 
 # ---------------------------------------------------------------------------
-# Phase 88 Integration Tests: P-44.1 Chain Selection Fixes
+# a phase Integration Tests: Chain Selection Fixes
 # ---------------------------------------------------------------------------
 
 class TestPhase88FGInstanceCounting:
-    """PSEL-01: FG instance counting uses distinct instances, not atom overlap."""
+    """: FG instance counting uses distinct instances, not atom overlap."""
 
     @pytest.mark.integration
     def test_diacid_both_groups_on_chain(self):
@@ -436,7 +436,7 @@ class TestPhase88FGInstanceCounting:
 
 
 class TestPhase88RingScoring:
-    """PSEL-06: Ring scoring tuple reorder (P-44.2.1 before P-44.2.2)."""
+    """: Ring scoring tuple reorder before."""
 
     @pytest.mark.integration
     def test_pyridine_is_principal_ring(self):
@@ -454,11 +454,11 @@ class TestPhase88RingScoring:
 
 
 class TestPhase88HydrocarbonGuard:
-    """PSEL-05: Parent selection runs for hydrocarbons."""
+    """: Parent selection runs for hydrocarbons."""
 
     @pytest.mark.integration
     def test_butylcyclohexane_ring_parent(self):
-        """Butylcyclohexane: ring should be parent (P-44.1.2.2)."""
+        """Butylcyclohexane: ring should be parent."""
         name = name_compound("CCCCC1CCCCC1")
         assert name, "Should produce a name"
         assert "cyclohex" in name.lower(), (
@@ -476,7 +476,7 @@ class TestPhase88HydrocarbonGuard:
 
 
 class TestPhase88CascadeCriteria:
-    """PSEL-03: Full P-44.1 cascade criteria 5-9."""
+    """: Full cascade criteria 5-9."""
 
     @pytest.mark.integration
     def test_cyclohexanone_ring_parent(self):

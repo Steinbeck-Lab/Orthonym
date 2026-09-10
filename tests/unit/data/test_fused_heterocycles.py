@@ -102,7 +102,7 @@ class TestTautomerLocants:
     def test_2h_isoindole_has_locant_2(self):
         """2H-isoindole (the aromatic isoindole tautomer) has indicated H at position 2.
 
-        DATA-01: the aromatic isoindole key 'c1ccc2c[nH]cc2c1' was mislabeled
+        : the aromatic isoindole key 'c1ccc2c[nH]cc2c1' was mislabeled
         '1H-isoindole'; the aromatic tautomer is 2H-isoindole (OPSIN-verified).
         """
         mol = Chem.MolFromSmiles('c1ccc2c[nH]cc2c1')
@@ -113,7 +113,7 @@ class TestTautomerLocants:
 
     @pytest.mark.unit
     def test_3h_indole_has_locant_3(self):
-        """DATA-01: the key 'C1=Nc2ccccc2C1' was mislabeled '2H-isoindole'; it is
+        """: the key 'C1=Nc2ccccc2C1' was mislabeled '2H-isoindole'; it is
         actually 3H-indole (indolenine) — N adjacent to a ring-fusion carbon
         (benzo[b]pyrrole skeleton), OPSIN-verified."""
         mol = Chem.MolFromSmiles('C1=Nc2ccccc2C1')
@@ -462,7 +462,7 @@ class TestBenzoFusedOxazolesAndThiazoles:
 
     @pytest.mark.unit
     def test_benzisoxazole(self):
-        """DATA-01: key 'c1ccc2nocc2c1' (N-O-C 5-ring, anthranil skeleton) was
+        """: key 'c1ccc2nocc2c1' (N-O-C 5-ring, anthranil skeleton) was
         mislabeled '1,2-benzisoxazole'; it is 2,1-benzisoxazole (OPSIN-verified).
         The 1,2-benzisoxazole structure is the swap partner 'c1ccc2oncc2c1'."""
         mol = Chem.MolFromSmiles('c1ccc2nocc2c1')
@@ -472,7 +472,7 @@ class TestBenzoFusedOxazolesAndThiazoles:
 
     @pytest.mark.unit
     def test_benzisothiazole(self):
-        """DATA-01: key 'c1ccc2nscc2c1' (N-S-C 5-ring) was mislabeled
+        """: key 'c1ccc2nscc2c1' (N-S-C 5-ring) was mislabeled
         '1,2-benzisothiazole'; it is 2,1-benzothiazole (OPSIN-verified)."""
         mol = Chem.MolFromSmiles('c1ccc2nscc2c1')
         result = get_fused_heterocycle_name(mol)
@@ -487,8 +487,8 @@ class TestSaturatedVariants:
     def test_indoline(self):
         """The indoline ring system is named by its PIN.
 
-        P-54.4.3.2 (BB:24256) names 'indoline' verbatim as NOT a preferred IUPAC
-        name; BB:16992 prints the PIN '2,3-dihydro-1H-indole'.
+         (the Blue Book) names 'indoline' verbatim as NOT a preferred IUPAC
+        name; the Blue Book prints the PIN '2,3-dihydro-1H-indole'.
         """
         mol = Chem.MolFromSmiles('c1ccc2c(c1)CCN2')
         result = get_fused_heterocycle_name(mol)
@@ -498,8 +498,8 @@ class TestSaturatedVariants:
 
     @pytest.mark.unit
     def test_isoindoline(self):
-        """The isoindoline ring system is named by its PIN (P-54.4.3.2,
-        BB:24256; the PIN is printed at BB:16999)."""
+        """The isoindoline ring system is named by its PIN,
+        the Blue Book; the PIN is printed at the Blue Book)."""
         mol = Chem.MolFromSmiles('c1ccc2c(c1)CNC2')
         result = get_fused_heterocycle_name(mol)
         assert result is not None
@@ -515,7 +515,7 @@ class TestSaturatedVariants:
 
     @pytest.mark.unit
     def test_chromane(self):
-        """Chromane ring named by its PIN 3,4-dihydro-2H-1-benzopyran (v23 IH-01h, P-54.4.3.2)."""
+        """Chromane ring named by its PIN 3,4-dihydro-2H-1-benzopyran (,."""
         mol = Chem.MolFromSmiles('c1ccc2c(c1)CCCO2')
         result = get_fused_heterocycle_name(mol)
         assert result is not None
@@ -725,7 +725,7 @@ class TestIUPACLocantMappings:
 
 
 class TestChromeneVariants:
-    """Tests for chromene/coumarin data entries (BUG-4 fix)."""
+    """Tests for chromene/coumarin data entries (fix)."""
 
     @pytest.mark.unit
     def test_coumarin_in_data(self):
@@ -736,7 +736,7 @@ class TestChromeneVariants:
         mol = Chem.MolFromSmiles('O=c1ccc2ccccc2o1')
         canonical = Chem.MolToSmiles(mol)
         assert canonical in FUSED_HETEROCYCLE_DATA, f"Coumarin ({canonical}) not in data"
-        # v23 IH-01f: de-headlined to the PIN (1-benzopyran is the PIN ring parent, P-19(d))
+        #: de-headlined to the PIN (1-benzopyran is the PIN ring parent, (d))
         assert FUSED_HETEROCYCLE_DATA[canonical]['name'] == '2H-1-benzopyran-2-one'
 
     @pytest.mark.unit
@@ -750,7 +750,7 @@ class TestChromeneVariants:
 
     @pytest.mark.unit
     def test_coumarin_e2e(self):
-        """O=c1ccc2ccccc2o1 should return the PIN 2H-1-benzopyran-2-one (v23 IH-01f)."""
+        """O=c1ccc2ccccc2o1 should return the PIN 2H-1-benzopyran-2-one ."""
         from orthonym import name_compound
         result = name_compound('O=c1ccc2ccccc2o1')
         assert result == '2H-1-benzopyran-2-one', f"Got {result}"
@@ -777,7 +777,7 @@ class TestChromeneVariants:
 
     @pytest.mark.unit
     def test_chromane_already_exists(self):
-        """Chromane ring in data, named by its PIN 3,4-dihydro-2H-1-benzopyran (v23 IH-01h)."""
+        """Chromane ring in data, named by its PIN 3,4-dihydro-2H-1-benzopyran ."""
         from rdkit import Chem
         from orthonym.data.fused_heterocycles import FUSED_HETEROCYCLE_DATA
 
@@ -799,7 +799,7 @@ class TestChromeneVariants:
 
     @pytest.mark.unit
     def test_2h_chromene_exists(self):
-        """The 2H-chromene ring is named by its PIN 2H-1-benzopyran (v23 IH-01f, P-19(d))."""
+        """The 2H-chromene ring is named by its PIN 2H-1-benzopyran (, (d))."""
         from orthonym.data.fused_heterocycles import FUSED_HETEROCYCLE_DATA
 
         # 2H-chromene canonical SMILES key; PIN ring parent name is 2H-1-benzopyran
@@ -826,7 +826,7 @@ class TestChromeneVariants:
 
 
 class TestPhase101FixedEntries:
-    """Tests for entries fixed in Phase 101-01 (corrected SMILES keys)."""
+    """Tests for entries fixed in a phase-01 (corrected SMILES keys)."""
 
     @pytest.mark.unit
     def test_phenanthridine_exact_match(self):
@@ -908,7 +908,7 @@ class TestPhase101FixedEntries:
 
 
 class TestPhase101NewEntries:
-    """Tests for new entries added in Phase 101-01."""
+    """Tests for new entries added in a phase-01."""
 
     # --- Xanthone ---
 
@@ -1134,7 +1134,7 @@ class TestPhase101NewEntries:
 
 
 class TestPhase101EndToEndNaming:
-    """End-to-end naming tests for Phase 101 fixed/new entries."""
+    """End-to-end naming tests for a phase fixed/new entries."""
 
     @pytest.mark.unit
     def test_phenanthridine_e2e(self):
@@ -1152,16 +1152,16 @@ class TestPhase101EndToEndNaming:
 
     @pytest.mark.unit
     def test_xanthone_e2e(self):
-        """v23 IH-01g: xanthone -> PIN 9H-xanthen-9-one (xanthene is the PIN ring parent,
-        BB line 11634; 'xanthone' is a non-PIN trivial). Emitted by the cyclic-oxo engine."""
+        """: xanthone -> PIN 9H-xanthen-9-one (xanthene is the PIN ring parent,
+        the Blue Book; 'xanthone' is a non-PIN trivial). Emitted by the cyclic-oxo engine."""
         from orthonym import name_compound
         result = name_compound('O=c1c2ccccc2oc2ccccc12')
         assert result == '9H-xanthen-9-one'
 
     @pytest.mark.unit
     def test_thioxanthone_e2e(self):
-        """Thioxanthone SMILES produces the PIN 9H-thioxanthen-9-one (v23 cyclic-oxo
-        engine; thioxanthene is the PIN ring parent per BB line 11638, 'thioxanthone'
+        """Thioxanthone SMILES produces the PIN 9H-thioxanthen-9-one (cyclic-oxo
+        engine; thioxanthene is the PIN ring parent per the Blue Book, 'thioxanthone'
         is a non-PIN trivial name)."""
         from orthonym import name_compound
         result = name_compound('O=c1c2ccccc2sc2ccccc12')
@@ -1253,7 +1253,7 @@ class TestPhase101ComprehensiveCanonicalConsistency:
         Tautomeric forms of the same compound (e.g., xanthine, guanine,
         adenine, hypoxanthine) have multiple SMILES keys mapping to the
         same retained name. This is intentional for canonicalization
-        robustness (Phase 142).
+        robustness (a phase).
         """
         # Intentional tautomer duplicates (same molecule, different SMILES key)
         allowed_duplicates = {
@@ -1266,14 +1266,14 @@ class TestPhase101ComprehensiveCanonicalConsistency:
 
     @pytest.mark.unit
     def test_dictionary_has_at_least_80_entries(self):
-        """Dictionary should have at least 80 entries after Phase 101 additions."""
+        """Dictionary should have at least 80 entries after a phase additions."""
         assert len(FUSED_HETEROCYCLE_DATA) >= 80, (
             f"Expected >= 80 entries, got {len(FUSED_HETEROCYCLE_DATA)}"
         )
 
 
 # ============================================================================
-# IUPAC Locant Validation Tests (DATA-09)
+# IUPAC Locant Validation Tests
 # Atom-by-atom verification of heteroatom positions for 15 fused heterocycles
 # ============================================================================
 

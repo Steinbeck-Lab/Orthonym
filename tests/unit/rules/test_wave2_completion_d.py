@@ -1,18 +1,18 @@
 """Wave-2 completion pass D — AM/PF amide/amidine/cyanamide investigation rows.
 
 All expected PINs OPSIN-RT verified. Covers:
-  * AM-6 (P-66.1.1.4.3): R-SO2-NH- on a chain -> '(...sulfonamido)' prefix
+  *: R-SO2-NH- on a chain -> '(...sulfonamido)' prefix
     (composer._check_for_acylamino sulfonyl recognizer + polyfunctional
     N-attach FG-prefix skip). S-attached 'sulfamoyl' orientation preserved.
-  * AM-4 (P-66.4.1.3.2): a chain-terminal amidine carbon stays in the chain and
+  *: a chain-terminal amidine carbon stays in the chain and
     is cited amino+imino, NOT 'carbamimidoyl' (ring/off-chain keeps carbamimidoyl).
-  * AM-1 (P-66.1.6.2): NEW cyanamide retained-name subsystem (FG + collision
+  *: NEW cyanamide retained-name subsystem (FG + collision
     suppression + composer._try_name_cyanamide + Tier-B handler).
-  * AM-5 (P-66.4.1.6): conjoined diamidine -> N-imidoyl substituent on the other.
-  * PF-2 (P-66.4.2.3.5): N-attached amidrazone -> 'hydrazonamido' prefix.
+  *: conjoined diamidine -> N-imidoyl substituent on the other.
+  *: N-attached amidrazone -> 'hydrazonamido' prefix.
 
-AM-2 (2-amino-N-(2,3-dihydroxypropyl)-N-methylacetamide) is DEFERRED — two
-central root causes (amide T5b off-chain acyl-substituent drop + a pool discard),
+ (2-amino-N-(2,3-dihydroxypropyl)-N-methylacetamide) is DEFERRED — two
+central root causes (amide off-chain acyl-substituent drop + a pool discard),
 documented in internal notes It stays fail-closed.
 """
 
@@ -91,7 +91,7 @@ class TestAM1Cyanamide:
         ("N#CN1CCCCC1", "piperidine-1-carbonitrile"),
         # S-C#N (no N-C) untouched by the N-anchored cyanamide SMARTS. -3
         # made this the functional-class PIN 'methanesulfonyl cyanide'
-        # (P-66.5.1.3.2, the Blue Book); it is still NOT a cyanamide name, so this
+        #, the Blue Book); it is still NOT a cyanamide name, so this
         # protection still holds.
         ("CS(=O)(=O)C#N", "methanesulfonyl cyanide"),
     ])
@@ -133,9 +133,9 @@ class TestPF2Hydrazonamido:
 @pytest.mark.unit
 class TestFailClosed:
     @pytest.mark.parametrize("smiles", [
-        "O=C(O)CNC#N",     # cyanamide + senior COOH coexistence (AM-1 out of scope)
+        "O=C(O)CNC#N",     # cyanamide + senior COOH coexistence (out of scope)
         # NB: "NN=C(N)CCC(=O)O" was pass-D-fail-closed; plan P1AM Task 6
-        # (P-66.4.2.3.2) now HEALS it to '4-amino-4-hydrazinylidenebutanoic
+        # now HEALS it to '4-amino-4-hydrazinylidenebutanoic
         # acid' (chain-terminal amidrazone amino/hydrazinylidene split) — it
         # is a W2E-P1AM Task-6 heal, no longer a fail-closed case.
         "CC(=N)NCCC(=O)O",  # N-attached amidine sibling (separate row)

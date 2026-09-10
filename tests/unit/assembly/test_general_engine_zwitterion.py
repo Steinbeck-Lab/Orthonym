@@ -1,31 +1,31 @@
-"""P-74.1.2 / P-74.1.1 — zwitterionic ionic centres in the general-engine parent.
+""" / — zwitterionic ionic centres in the general-engine parent.
 
-R7 (v29 residue). A mesoionic zwitterion was emitted by the best-effort tier as a
+R7 (residue). A mesoionic zwitterion was emitted by the best-effort tier as a
 NEUTRAL name: the ring ``[N+]`` was spelled ``aza`` like any neutral ring N, and
 the ``[O-]`` was spelled as a neutral ``oxo`` prefix. The result described a
 molecule that cannot exist (OPSIN: "Atom is in unphysical valency state!
-Element: C valency: 5") and was one of the remaining T6 emitted-but-unparseable
+Element: C valency: 5") and was one of the remaining emitted-but-unparseable
 rows.
 
-Blue Book, ``BlueBookV2/BlueBookV2.md`` (every line pointer below re-verified
+Blue Book, ``the Blue Book Blue Book`` (every line pointer below re-verified
 with ``sed -n '<N>p'``):
 
-* **P-74.1.2 "Zwitterionic compounds with at least one ionic center on a
+* ** "Zwitterionic compounds with at least one ionic center on a
   characteristic group"** (heading ``:42445``) is the GOVERNING case for R7,
   whose shape is a skeletal ring ``-ium`` plus a characteristic-group-derived
   ``-olate``. Sentence ``:42447``: *"Zwitterionic compounds with at least one
   ionic center on a characteristic group may be named by adding the appropriate
-  ionic suffix to the name of the ionic parent hydride.  In names, cationic
-  suffixes are cited before anionic suffixes.  For assignment of lower locants,
+  ionic suffix to the name of the ionic parent hydride. In names, cationic
+  suffixes are cited before anionic suffixes. For assignment of lower locants,
   ionic centers on skeletal atoms of the parent hydride are preferred to the
   locants for positions of attachment of characteristic groups denoted by ionic
-  suffixes."*  Worked (PIN) example ``:42456``:
+  suffixes."* Worked (PIN) example ``:42456``:
   ``1-methyl-4,6-diphenylpyridin-1-ium-2-carboxylate``.
-* **P-74.1.1 "Ionic centers in the same parent structure"** (heading ``:42415``)
+* ** "Ionic centers in the same parent structure"** (heading ``:42415``)
   governs the other branch — both centres skeletal — and supplies the
   construction and elision used by both. ``:42419``: *"For nomenclature
   purposes, zwitterionic compounds having the ionic centers in the same parent
-  structure are not considered as neutral compounds."*  Construction ``:42417``:
+  structure are not considered as neutral compounds."* Construction ``:42417``:
   *"…may be named by combining appropriate cumulative suffixes at the end of the
   name of a parent hydride in the order 'ium', 'ylium', 'ide', 'uide'. … anionic
   suffixes are cited after cationic suffixes … The final letter 'e' of the name
@@ -34,11 +34,11 @@ with ``sed -n '<N>p'``):
 * The Blue Book's own worked example of exactly this defect, ``:42439``:
   ``2-methyl-4-oxo-3,4-dihydro-1H-2-benzoselenopyran-2-ium-3-ide (PIN)``
   *(not ``2-methyl-3,4-dihydro-1H-2-benzoselenopyran-2-ium-3-id-4-one``)*.
-* Elision is **P-16.7 "ELISION OF VOWELS"** (``:7591``), clause
-  **P-16.7.1(a)** (``:7595``) — not P-16.3.3, which is the multiplying-prefix
+* Elision is ** "ELISION OF VOWELS"** (``:7591``), clause
+  **(a)** (``:7595``) — not, which is the multiplying-prefix
   rule ("The basic numerical prefixes 'di', 'tri', 'tetra', etc.").
 
-The fix widens the EXISTING v26-P5 charge-suffix layer
+The fix widens the EXISTING -P5 charge-suffix layer
 (``general_engine._charge_suffix_text`` / ``_append_charge_suffix``), which was
 scoped to NET molecular charge and therefore never saw a zwitterion (net 0).
 """
@@ -60,9 +60,9 @@ MESOIONIC = "CC1=N[N+]2=CC=CC=C2C(=N1)[O-]"
 # MESOIONIC's InChIKey.
 #
 # The heteroatom locants were '3,5,6' until the von Baeyer numbering cascade
-# gained its P-23.3.2.1 term. Of the four numberings the bicyclo[4.4.0]
+# gained its term. Of the four numberings the bicyclo[4.4.0]
 # descriptor permits -- (1,2,4), (1,8,10), (3,5,6), (6,7,9), enumerated by
-# ``test_four_legal_numberings_exist`` below -- P-23.3.2.1 (:9777) *"Low locants
+# ``test_four_legal_numberings_exist`` below -- (:9777) *"Low locants
 # are assigned to the heteroatoms considered together as a set compared in
 # increasing numerical order"* selects (1,2,4). The suffix locants follow the
 # renumbering; the name still returns InChIKey YZYLEZPSMVVLED-UHFFFAOYSA-N from
@@ -83,12 +83,12 @@ def _name(smiles, tier="best-effort"):
 # --------------------------------------------------------------------------
 
 def test_mesoionic_zwitterion_emits_cumulative_ium_olate():
-    """P-74.1.1: the cumulative ``-6-ium-2-olate``, not a neutral ``2-oxo``."""
+    """: the cumulative ``-6-ium-2-olate``, not a neutral ``2-oxo``."""
     assert _name(MESOIONIC) == TARGET
 
 
 def test_mesoionic_zwitterion_no_longer_emits_neutral_oxo():
-    """The specific wrong rendering must be gone (P-74.1.1 :42419)."""
+    """The specific wrong rendering must be gone:42419)."""
     name = _name(MESOIONIC)
     assert "oxo" not in name
     assert name.endswith("-olate")
@@ -151,7 +151,7 @@ def test_plan_declines_on_net_charged_molecule():
     ALONE. Proof: the guard is only redundant-free if every later check passes,
     which requires exactly one genuine cation of +1 and one genuine anion of -1
     (they sum to 0); ``get_ion_sites`` lists EVERY non-zero-charge atom and
-    subtracts only the P-59 internal-charge groups (nitro / N-oxide / azide /
+    subtracts only the internal-charge groups (nitro / N-oxide / azide /
     diazo), and ``_genuine_ion_sites`` subtracts only semipolar ``[X+]-[O-]``
     pairs -- every one of those subtracted sets is itself net 0. So the
     molecular net charge is 0 whenever the later checks pass. The old input
@@ -177,7 +177,7 @@ def test_plan_declines_on_net_charged_molecule():
 
 
 def test_plan_declines_on_internal_p59_charges():
-    """P-59 nitro/azide/N-oxide charges are not ionic centres (get_ion_sites)."""
+    """ nitro/azide/N-oxide charges are not ionic centres (get_ion_sites)."""
     for smi in ("C[N+](=O)[O-]", "[N-]=[N+]=NC", "C[N+]([O-])(C)C"):
         mol = Chem.MolFromSmiles(smi)
         a2l = {a.GetIdx(): a.GetIdx() + 1 for a in mol.GetAtoms()}
@@ -199,7 +199,7 @@ def test_plan_holds_out_the_anionic_oxygen():
 
 
 # --------------------------------------------------------------------------
-# The SKELETAL -ide / -uide branch (P-74.1.1: BOTH centres in the parent hydride)
+# The SKELETAL -ide / -uide branch: BOTH centres in the parent hydride)
 #
 # Code review finding: ``_ZWIT_SKELETAL_ANION_BASES`` shipped exercised by ZERO
 # tests -- the "presence in a lookup table is not evidence the table is reached"
@@ -223,7 +223,7 @@ SKELETAL_ZWITTERIONS = [
     ("C[N+]12CCCCC1[CH-]CCC2",
      "1-methyl-1-azabicyclo[4.4.0]decan-1-ium-5-ide",
      "VUOBCZVBBZNFTE-UHFFFAOYSA-N"),
-    # P-72.3 -uide (hydride ADDITION): a skeletal boranuide.
+    # -uide (hydride ADDITION): a skeletal boranuide.
     ("C[N+]12CC[BH-](CC1)CC2",
      "1-methyl-1-aza-4-borabicyclo[2.2.2]octan-1-ium-4-uide",
      "SKEWLPNITGSBFR-UHFFFAOYSA-N"),
@@ -299,14 +299,14 @@ def test_skeletal_zwitterion_takes_the_skeletal_branch(smiles, expected, inchike
 
 
 def test_skeletal_branch_accepts_a_RING_aminide_declines_an_EXOCYCLIC_one():
-    """P-72.2.2.1: a deprotonated RING nitrogen is a SKELETAL anion (azolide/
+    """: a deprotonated RING nitrogen is a SKELETAL anion (azolide/
     azinide/azanide) and spells ``-ide`` on the ring parent, so the both-skeletal
     zwitterion plan must ACCEPT it -- ``classify_anion`` labels it 'aminide' but
     ``_skeletal_anion_base`` reads a ring N(-) as ``-ide`` (verified round-trip:
     ``C[N+]12[N-]CC(CC1)CC2`` -> ``1-methyl-1,7-diazabicyclo[2.2.2]octan-1-ium-
     7-ide``, full-InChIKey RT True).
 
-    An EXOCYCLIC aminide -- the Blue Book's own :42460
+    An EXOCYCLIC aminide -- the Blue Book's own:42460
     ``1H-1,2,4-triazol-4-ium-3-aminide``, an N-substituted amide anion this
     producer cannot build -- must still fail closed (the aminide N is not in a
     ring, so ``_skeletal_anion_base`` returns None)."""
@@ -333,16 +333,16 @@ def test_skeletal_branch_accepts_a_RING_aminide_declines_an_EXOCYCLIC_one():
 
 
 # --------------------------------------------------------------------------
-# P-74.1.2's locant sentence (:42447), and the numbering it depends on
+# 's locant sentence (:42447), and the numbering it depends on
 # --------------------------------------------------------------------------
 
 def _legal_von_baeyer_numberings(smiles):
     """The heteroatom locant SETS of every numbering the bicyclo[4.4.0]
-    descriptor permits. P-23.2.3 "Numbering bicyclic alicyclic hydrocarbons"
-    (heading :9589), sentence :9591: *"The bicyclic ring system is numbered
+    descriptor permits. "Numbering bicyclic alicyclic hydrocarbons"
+    (heading:9589), sentence:9591: *"The bicyclic ring system is numbered
     starting with one of the bridgeheads and proceeding first along the longer
     segment of the main ring to the second bridgehead, then back to the first
-    bridgehead along the unnumbered segment."*  Both segments are 4 atoms here,
+    bridgehead along the unnumbered segment."* Both segments are 4 atoms here,
     so all four numberings satisfy it."""
     from orthonym.rules.vonbaeyer_universal import analyze_cage_universal
 
@@ -386,29 +386,29 @@ def _legal_von_baeyer_numberings(smiles):
 
 
 def test_p74_1_2_ionic_locant_rule_has_no_freedom_here():
-    """P-74.1.2 :42447: *"For assignment of lower locants, ionic centers on
+    """:42447: *"For assignment of lower locants, ionic centers on
     skeletal atoms of the parent hydride are preferred to the locants for
     positions of attachment of characteristic groups denoted by ionic
-    suffixes."*  The shipped target does NOT violate it -- the rule never gets a
+    suffixes."* The shipped target does NOT violate it -- the rule never gets a
     choice.
 
-    P-23.3.1 (:9765) *"Numbering is determined first by the fixed numbering of
-    the hydrocarbon system"*, then P-23.3.2.1 (:9777) *"Low locants are assigned
+     (:9765) *"Numbering is determined first by the fixed numbering of
+    the hydrocarbon system"*, then (:9777) *"Low locants are assigned
     to the heteroatoms considered together as a set compared in increasing
-    numerical order."*  Heteroatom locants outrank ionic-suffix locants, and the
-    four legal numberings give four DISTINCT heteroatom sets, so P-23.3.2.1
+    numerical order."* Heteroatom locants outrank ionic-suffix locants, and the
+    four legal numberings give four DISTINCT heteroatom sets, so
     decides alone and leaves zero freedom for the ionic criterion. Satisfied
     vacuously.
     """
     _mol, _cage, sets = _legal_von_baeyer_numberings(MESOIONIC)
     assert len(sets) == 4, sets
     assert sorted(sets) == [(1, 2, 4), (1, 8, 10), (3, 5, 6), (6, 7, 9)]
-    # distinct => P-23.3.2.1 is decisive on its own; no tie reaches P-74.1.2.
+    # distinct => is decisive on its own; no tie reaches.
     assert len(set(sets)) == len(sets)
 
 
 def test_von_baeyer_heteroatom_locants_should_be_lowest_set():
-    """P-23.3.2.1 (:9777) — *"Low locants are assigned to the heteroatoms
+    """ (:9777) — *"Low locants are assigned to the heteroatoms
     considered together as a set compared in increasing numerical order. The
     preferred numbering is the lowest set at the first point of difference."*"""
     mol, cage, sets = _legal_von_baeyer_numberings(MESOIONIC)
@@ -426,16 +426,16 @@ def test_von_baeyer_heteroatom_locants_should_be_lowest_set():
 UNCHANGED = [
     ("C[N+](C)(C)C", "N,N,N-trimethylmethanaminium"),   # quaternary ammonium
     ("CC(=O)[O-]", "acetate"),                          # carboxylate
-    ("C[N+](=O)[O-]", "nitromethane"),                  # P-59 nitro
-    ("C[N+]([O-])(C)C", "N,N-dimethylmethanamine N-oxide"),   # P-59 N-oxide
-    ("[N-]=[N+]=NC", "azidomethane"),                   # P-59 azide
+    ("C[N+](=O)[O-]", "nitromethane"),                  # nitro
+    ("C[N+]([O-])(C)C", "N,N-dimethylmethanamine N-oxide"),   # N-oxide
+    ("[N-]=[N+]=NC", "azidomethane"),                   # azide
     ("c1ccccc1[N+]#N", "benzenediazonium"),             # diazonium
     ("CC(=O)O", "acetic acid"),
     ("c1ccccc1", "benzene"),
     ("CCO", "ethanol"),
     ("[NH3+]CC(=O)[O-]", "glycine"),                    # amino-acid zwitterion
     ("C[N+](C)(C)CC(=O)[O-]", "(trimethylazaniumyl)acetate"),      # betaine
-    ("[O-]C(=O)c1ccc[nH+]c1", "pyridin-1-ium-3-carboxylate"),      # P-74.1.2
+    ("[O-]C(=O)c1ccc[nH+]c1", "pyridin-1-ium-3-carboxylate"),      #
 ]
 
 

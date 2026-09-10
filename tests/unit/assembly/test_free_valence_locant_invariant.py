@@ -6,12 +6,12 @@ and a *carbon count*. Neither carries the attachment position, so every locant t
 converter splices into the prefix is borrowed from the CAPPED molecule's own numbering.
 
 That numbering is chosen to favour the capped molecule's principal characteristic group,
-which is exactly the numbering P-46.1.8 forbids for a substituent:
+which is exactly the numbering forbids for a substituent:
 
-    P-46.1 criterion (h) / P-46.1.8 (the Blue Book): "The principal substituent chain has
+     criterion (h) / (the Blue Book): "The principal substituent chain has
     the lowest locants for free valences of any kind."
 
-    P-29.2 "GENERAL METHODOLOGY FOR NAMING SUBSTITUENT GROUPS", method (2): "The locants
+     "GENERAL METHODOLOGY FOR NAMING SUBSTITUENT GROUPS", method (2): "The locants
     for the atoms of free valences are as low as is consistent with any established
     numbering of the parent hydride and, except for mononuclear parent hydrides or the
     suffix 'ylidyne', the locant '1' must be cited."
@@ -89,7 +89,7 @@ R82_PROBE = "CCC(C)(CCCCCCCCC(C(C)C)N)c1ccccc1"
 
 
 def test_amino_branched_alkyl_is_numbered_from_the_free_valence():
-    """P-46.1.8: the free valence takes the lowest locant, so the chain is
+    """: the free valence takes the lowest locant, so the chain is
     numbered from the attachment end and the amine follows -- not the reverse."""
     mol, sub_atoms, attach = _fragment_off_ring(R82_PROBE)
     got = _located_acyclic_alkyl_name(mol, sub_atoms, attach)
@@ -167,7 +167,7 @@ def test_located_branches_fail_closed_without_a_proven_attach_locant(parent, n):
     ("pyridine", 0, "pyridinyl"),
     ("methanol", 1, "hydroxymethyl"),
     ("cyclohexane", 6, "cyclohexyl"),
-    # P-14.3.4.6 gain: a one-position stem drops the locant it could never
+    # gain: a one-position stem drops the locant it could never
     # justify. These were '1-carbamoylmethyl' / '1-cyanomethyl' / '1-oxomethyl'.
     ("acetamide", 2, "carbamoylmethyl"),
     ("acetonitrile", 2, "cyanomethyl"),
@@ -179,7 +179,7 @@ def test_unlocanted_forms_are_unaffected(parent, n, expected):
 
 
 def test_existing_fail_closed_contract_is_preserved():
-    """ BP-2 RC-1 must keep holding through the new signature."""
+    """ must keep holding through the new signature."""
     for bad in ("isothiocyanic acid", "ethyl formate", "prop-2-enal"):
         assert parent_to_prefix(
             bad, chain_length=3, attach_locant=ATTACH_LOCANT_UNKNOWN) is None

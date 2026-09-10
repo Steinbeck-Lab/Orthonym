@@ -1,11 +1,11 @@
-"""Unit tests for discover_substituents() -- universal substituent discovery.
+"""Unit tests for discover_substituents -- universal substituent discovery.
 
 Tests the new unified substituent discovery function that replaces 6 parallel
 systems with a single entry point. Covers ring parents, chain parents,
 auto-detection, completeness invariant, compound fragments, geminal
 substituents, exocyclic bonds, and large substituents.
 
-Phase 84, Plan 01 -- TDD RED: all tests expected to fail initially.
+a phase, Plan 01 -- TDD RED: all tests expected to fail initially.
 """
 
 import pytest

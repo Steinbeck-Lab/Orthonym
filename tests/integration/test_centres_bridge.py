@@ -1,14 +1,14 @@
 #!/usr/bin/env python3
-"""WSB-03 (a phase) coverage for the centres CIP-engine bridge.
+"""-03 (a phase) coverage for the centres CIP-engine bridge.
 
 Covers:
   * centres-ON: with the jar present + Java available, the CIP validation
     suite scores 281/290 via the centres engine (1.2.1 tagged release).
-  * graceful RDKit fallback: when _find_centres_jar() returns None (monkeypatch)
+  * graceful RDKit fallback: when _find_centres_jar returns None (monkeypatch)
     OR Java is absent, centres_label_batch returns None so the caller falls
-    back to RDKit -- a missing JVM never hard-fails ().
+    back to RDKit -- a missing JVM never hard-fails .
   * both-endpoint -> RDKit-bond mapping: centres' per-atom E/Z labels at both
-    endpoints are applied onto the correct DOUBLE bond's _CIPCode ().
+    endpoints are applied onto the correct DOUBLE bond's _CIPCode .
   * label parsing: tetrahedral single label + both-endpoint E/Z token lists.
 
 Tests that need the live jar skip cleanly when Java / the jar is absent.
@@ -44,7 +44,7 @@ def test_find_centres_jar_at_project_root():
     """The vendored jar resolves at PROJECT_ROOT as centres-cli-1.2.1.jar.
 
     CIP-UPDATE (2026-09-07): engine reverted 1.5-SNAPSHOT -> 1.2.1 (tagged
-    release). _find_centres_jar() globs centres-cli-*.jar and
+    release). _find_centres_jar globs centres-cli-*.jar and
     picks the highest version, so this asserts the highest vendored jar.
     """
     jar = _find_centres_jar()
@@ -84,7 +84,7 @@ def test_parse_centres_labels_empty():
 
 
 # ---------------------------------------------------------------------------
-# Bond mapping () -- no JVM needed (synthetic label map)
+# Bond mapping  -- no JVM needed (synthetic label map)
 # ---------------------------------------------------------------------------
 
 
@@ -130,7 +130,7 @@ def test_apply_labels_diene_targets_specific_bond():
 
 
 # ---------------------------------------------------------------------------
-# Graceful fallback () -- monkeypatched jar-absent, no JVM needed
+# Graceful fallback  -- monkeypatched jar-absent, no JVM needed
 # ---------------------------------------------------------------------------
 
 
@@ -153,7 +153,7 @@ def test_mol_label_returns_false_when_jar_absent(monkeypatch):
 
 @pytest.mark.integration
 def test_batch_returns_none_when_no_jvm_at_all(monkeypatch):
-    """Engine unavailable -> centres_label_batch returns None ().
+    """Engine unavailable -> centres_label_batch returns None .
 
     There are now TWO ways to reach a JVM, so both must be absent for the engine
     to count as unavailable: the in-process JVM (``jvm_bridge``, JPype) and the
@@ -176,7 +176,7 @@ def test_batch_returns_none_when_no_jvm_at_all(monkeypatch):
 def test_batch_works_without_java_binary_when_inprocess_jvm_available(monkeypatch):
     """An in-process JVM needs no ``java`` BINARY on PATH.
 
-    JPype loads libjvm into this process, so ``_java_available()`` -- which shells
+    JPype loads libjvm into this process, so ``_java_available`` -- which shells
     out to ``java -version`` -- stopped being the operative availability test. This
     locks the intended new behaviour and would catch a regression that silently
     reintroduced a per-call `java` process launch as a precondition.
@@ -252,7 +252,7 @@ def test_centres_engine_scores_281_on_suite():
     exotic cyclic-cumulene axial M/P labels Orthonym does not consume. See
     test_cip_validation.test_centres_engine_281.
 
-    Single batched JVM invocation () via the shared validation-suite
+    Single batched JVM invocation  via the shared validation-suite
     scorer.
     """
     if not _engine_available():

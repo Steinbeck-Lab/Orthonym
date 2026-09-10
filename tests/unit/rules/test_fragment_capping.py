@@ -1,7 +1,7 @@
 """
 TDD tests for fragment capping in the decomposition engine.
 
-Tests that cleave_and_cap() produces valid H-capped and OH-capped
+Tests that cleave_and_cap produces valid H-capped and OH-capped
 fragment SMILES from a molecule and bond info list.
 """
 
@@ -190,7 +190,7 @@ class TestEdgeCases:
 
 
 # ---------------------------------------------------------------------------
-# DECO-21: Middle fragment OH capping
+#: Middle fragment OH capping
 # ---------------------------------------------------------------------------
 
 class TestMiddleFragmentOHCapping:

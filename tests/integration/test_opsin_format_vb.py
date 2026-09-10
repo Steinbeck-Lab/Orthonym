@@ -1,17 +1,17 @@
 """
-Von Baeyer format OPSIN compatibility verification (FMT-03).
+Von Baeyer format OPSIN compatibility verification .
 
-Per Research Finding 1 (supersedes CONTEXT.md D-07, D-08, D-09):
+Per Research Finding 1 (supersedes internal notes,,):
 All 4 VB secondary bridge locant formats (parenthesized, superscript,
 bracket, bare inline) parse successfully in OPSIN 2.8.0 and 2.9.0.
 The current Orthonym parenthesized format is already OPSIN-compatible.
 
 This test confirms that empirically -- no changes to
-polycyclic.py:_build_descriptor() are needed.
+polycyclic.py:_build_descriptor are needed.
 
 The 10 DEEPER VB compounds that fail even without stereo have
 computational bugs (wrong bridge lengths, impossible valencies) and
-are deferred to Phase 139/142.
+are deferred to a phase/142.
 """
 
 import os
@@ -84,7 +84,7 @@ class TestVBFormatOpsinCompatibility:
     """Verify Von Baeyer parenthesized format parses with OPSIN.
 
     Research Finding 1 confirmed all VB secondary bridge formats work.
-    These tests provide ongoing regression protection for FMT-03.
+    These tests provide ongoing regression protection for.
     """
 
     @skip_no_opsin
@@ -142,7 +142,7 @@ class TestVBFormatOpsinCompatibility:
         )
 
 
-# 10 DEEPER VB compounds with computational bugs, deferred to Phase 139/142.
+# 10 DEEPER VB compounds with computational bugs, deferred to a phase/142.
 # These are NOT expected to pass -- they have wrong bridge lengths,
 # impossible valencies, or garbled naming. Documented here for traceability.
 VB_COMPUTATION_BUGS_DEFERRED = [

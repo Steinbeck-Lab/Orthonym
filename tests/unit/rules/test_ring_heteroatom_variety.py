@@ -1,11 +1,11 @@
 """
 Unit tests for term-by-term heteroatom variety comparison in ring_system_score.
 
-IUPAC P-44.2.1(g): heteroatom variety is compared term-by-term by seniority,
+IUPAC (g): heteroatom variety is compared term-by-term by seniority,
 NOT as a weighted sum. The comparison examines counts of each element in
 seniority order (N, F, Cl, Br, I, O, S, Se, Te, P).
 
-Reference: IUPAC 2013 Blue Book, P-44.2.1(g)
+Reference: IUPAC 2013 Blue Book, (g)
 """
 
 import pytest
@@ -49,7 +49,7 @@ def _make_ring_with_heteroatoms(size: int, heteroatom_positions: dict) -> tuple:
 
 
 class TestHeteroatomVarietyTermByTerm:
-    """Tests for P-44.2.1(g) term-by-term heteroatom variety comparison."""
+    """Tests for (g) term-by-term heteroatom variety comparison."""
 
     def test_two_O_one_Te_beats_one_O_two_S(self):
         """CRITICAL: Ring with 2O+1Te beats 1O+2S at criterion (g).
@@ -168,14 +168,14 @@ class TestHeteroatomVarietyTermByTerm:
         assert score_pyr < score_benz
 
     def test_score_tuple_length(self):
-        """Pin the P-44 score-tuple length (deliberate-change detector).
+        """Pin the score-tuple length (deliberate-change detector).
 
-        Composition: 6 fixed (P-44.2.1 a-f) + 20 heteroatom-variety (g)
-        + type_rank (P-44.2.2) + 2 unsaturation (P-44.4.1) + spiro-fusions
-        + sat-monocyclic + 4 nested P-44.2.2.2.x tiebreakers (spiro-locants,
-        fusion letters, fusion numbers, P-25.8 component) + 4 pre-bridge
-        metrics (P-44.2.2.2.4) = 39. Derived from _HETEROATOM_VARIETY_ORDER so
-        it tracks the variety width; bump the +13 only when the P-44.2.2/P-44.4.1
+        Composition: 6 fixed a-f) + 20 heteroatom-variety (g)
+        + type_rank + 2 unsaturation + spiro-fusions
+        + sat-monocyclic + 4 nested.x tiebreakers (spiro-locants,
+        fusion letters, fusion numbers, component) + 4 pre-bridge
+        metrics = 39. Derived from _HETEROATOM_VARIETY_ORDER so
+        it tracks the variety width; bump the +13 only when the /
         tiebreaker set changes.
         """
         from orthonym.rules.ring_selection import _HETEROATOM_VARIETY_ORDER
@@ -189,10 +189,10 @@ class TestHeteroatomVarietyTermByTerm:
 
     def test_empty_system_sentinel_matches_real_score(self):
         """The empty-system sentinel MUST match a real score tuple in BOTH
-        length and nested-tuple positions — otherwise the min() parent-selection
+        length and nested-tuple positions — otherwise the min parent-selection
         comparison breaks (an int compared against a nested tuple at the same
         index raises or mis-orders). This is the invariant that matters and it
-        stays valid as the P-44 cascade grows, as long as the sentinel is kept
+        stays valid as the cascade grows, as long as the sentinel is kept
         in sync (which is exactly what this guards).
         """
         from orthonym.perception.rings import get_ring_systems

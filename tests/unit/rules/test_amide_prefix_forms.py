@@ -1,7 +1,7 @@
 """
 Tests for amide prefix forms (carbamoyl) in non-principal group context.
 
-IUPAC 2013 P-66.1.1.4 method 2: When a primary amide (-CONH2) is not the
+IUPAC 2013 method 2: When a primary amide (-CONH2) is not the
 principal group, it is expressed as the prefix "carbamoyl".
 
 Note: Secondary and tertiary amides (N-acyl bonds) are already handled
@@ -10,7 +10,7 @@ sec/tert would cause double-naming (e.g., "ethanoylamino" + "carbamoyl").
 Only primary_amide gets the carbamoyl prefix entry.
 
 Covers:
-- Unit tests for get_prefix() returning carbamoyl for primary_amide
+- Unit tests for get_prefix returning carbamoyl for primary_amide
 - Unit tests confirming secondary/tertiary amide prefixes remain None
 - E2E regression tests for compounds with primary amide as non-principal FG
 - OPSIN round-trip validation for carbamoyl-containing names
@@ -52,23 +52,23 @@ class TestCarbamoylPrefixE2E:
     """End-to-end tests: primary amide as non-principal FG produces carbamoyl."""
 
     def test_4_carbamoylbutanoic_acid(self):
-        """NC(=O)CCC(=O)O -> 4-amino-4-oxobutanoic acid (P-65.1.6.1 amino-oxo PIN;
+        """NC(=O)CCC(=O)O -> 4-amino-4-oxobutanoic acid amino-oxo PIN;
         carbamoyl is general-only for the linear-chain terminal primary amide)."""
         result = name_compound("NC(=O)CCC(=O)O")
         assert result == "4-amino-4-oxobutanoic acid"
 
     def test_3_carbamoylpropanoic_acid(self):
-        """NC(=O)CC(=O)O -> 3-amino-3-oxopropanoic acid (P-65.1.6.1 amino-oxo PIN)."""
+        """NC(=O)CC(=O)O -> 3-amino-3-oxopropanoic acid amino-oxo PIN)."""
         result = name_compound("NC(=O)CC(=O)O")
         assert result == "3-amino-3-oxopropanoic acid"
 
     def test_5_carbamoylpentanoic_acid(self):
-        """NC(=O)CCCC(=O)O -> 5-amino-5-oxopentanoic acid (P-65.1.6.1 amino-oxo PIN)."""
+        """NC(=O)CCCC(=O)O -> 5-amino-5-oxopentanoic acid amino-oxo PIN)."""
         result = name_compound("NC(=O)CCCC(=O)O")
         assert result == "5-amino-5-oxopentanoic acid"
 
     def test_6_carbamoylhexanoic_acid(self):
-        """NC(=O)CCCCC(=O)O -> 6-amino-6-oxohexanoic acid (P-65.1.6.1 amino-oxo PIN)."""
+        """NC(=O)CCCCC(=O)O -> 6-amino-6-oxohexanoic acid amino-oxo PIN)."""
         result = name_compound("NC(=O)CCCCC(=O)O")
         assert result == "6-amino-6-oxohexanoic acid"
 
@@ -239,7 +239,7 @@ class TestCarbamoylDoubleCounting:
         """One primary amide (non-principal, linear chain) -> single amino-oxo pair.
 
         Post-wave-3 the non-principal linear-chain terminal primary amide is
-        expressed as the amino-oxo PIN form (P-65.1.6.1), so the double-naming
+        expressed as the amino-oxo PIN form, so the double-naming
         guard is exactly one 'amino' and one 'oxo'.
         """
         result = name_compound("NC(=O)CCC(=O)O")
@@ -300,7 +300,7 @@ class TestNAcylAmideNoCarbamoyl:
     """
 
     def test_n_acetylglycine_no_carbamoyl(self):
-        """CC(=O)NCC(=O)O -> 2-acetamidoethanoic acid, no carbamoyl (P-66.1.1.4.3)."""
+        """CC(=O)NCC(=O)O -> 2-acetamidoethanoic acid, no carbamoyl."""
         result = name_compound("CC(=O)NCC(=O)O")
         assert result is not None
         assert "carbamoyl" not in result, (

@@ -1,10 +1,10 @@
-"""Phase H () — stereo configuration sub-cases (STER-01) + centres CIP (STER-02).
+"""Phase H  — stereo configuration sub-cases  + centres CIP .
 
 A8 discipline: test the NAME OUTPUT and the structural invariant, not a flag.
 
-STER-01: single cyclic double bond on an UNSUBSTITUTED monocyclic cycloalkene
-elides the stereodescriptor locant per P-93.5.1.4.1 (BB '(E)-cyclooctene').
-STER-02: the centres CIP engine is the default, and centres_label_mol maps
+: single cyclic double bond on an UNSUBSTITUTED monocyclic cycloalkene
+elides the stereodescriptor locant per (BB '(E)-cyclooctene').
+: the centres CIP engine is the default, and centres_label_mol maps
 centres' canonical-SMILES-keyed labels back onto the mol's OWN atom indices
 (the output-order remap) so descriptors never land on the wrong atom.
 """
@@ -16,7 +16,7 @@ from orthonym.namer import name_compound
 
 
 # ---------------------------------------------------------------------------
-# STER-01 — single cyclic double bond locant elision (whole-class)
+# — single cyclic double bond locant elision (whole-class)
 # ---------------------------------------------------------------------------
 
 @pytest.mark.parametrize("smiles,expected", [
@@ -87,7 +87,7 @@ def test_is_unsubstituted_monocyclic_cycloalkene(smiles, expect):
 
 
 # ---------------------------------------------------------------------------
-# STER-02 — centres default ON + correct atom-index remap
+# — centres default ON + correct atom-index remap
 # ---------------------------------------------------------------------------
 
 def test_ster02_centres_default_on():

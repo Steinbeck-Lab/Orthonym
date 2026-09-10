@@ -1,7 +1,7 @@
 """Wave-2 completion Tier 2: data/catalog additive wins.
 
 thiourea + pentazolidine retained parents; catenated Group-14/bridge hydrides
-(P-21.2.3/P-52.1.3). All OPSIN-RT probed at build time.
+/. All OPSIN-RT probed at build time.
 """
 
 import pytest
@@ -18,8 +18,8 @@ def _name(smiles):
 
 
 @pytest.mark.parametrize("smiles,expected", [
-    ("NC(=S)N", "thiourea"),         # P-66.1.6.1.3 retained parent
-    ("N1NNNN1", "pentazolidine"),    # P-52.1.5.1 all-N HW-preselected ring
+    ("NC(=S)N", "thiourea"),         # retained parent
+    ("N1NNNN1", "pentazolidine"),    # all-N HW-preselected ring
 ])
 def test_retained_parents(smiles, expected):
     assert _name(smiles) == expected
@@ -50,9 +50,9 @@ def test_catenated_hydride_e2e(smiles, expected):
     assert _name(smiles) == expected
 
 
-# P-21.2.3.1 (BB 26243/23547/16015): a NITROGEN-bridged Group-14 a(ba)n chain is
+# (BB 26243/23547/16015): a NITROGEN-bridged Group-14 a(ba)n chain is
 # NOT named as an '-azane' parent hydride ('disilazane'/'trisilazane' are non-PIN;
-# "disilazane is not a recommended parent hydride, see P-21.2.3.1"). It is named
+# "disilazane is not a recommended parent hydride, see "). It is named
 # substitutively as an amine on the Group-14 hydride 'silane'/'germane':
 # SiH3-NH-SiH3 -> N-silylsilanamine (preselected name, BB 26243)
 # SiH3-NH-SiH2-NH-SiH3 -> N,N'-disilylsilanediamine (BB 23547)

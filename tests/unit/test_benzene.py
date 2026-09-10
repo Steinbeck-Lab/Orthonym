@@ -58,14 +58,14 @@ class TestBenzeneRetainedNames:
     @pytest.mark.unit
     def test_styrene(self):
         """In PIN style the systematic 'ethenylbenzene' is emitted, NOT the retained
-        'styrene' (BBR-HYG, Phase 169.7; P-31.1.3.4, BlueBookV2 line 2002: styrene is
+        'styrene' (BBR-HYG, a phase;, the Blue Book: styrene is
         retained for general nomenclature only, ethenylbenzene is the PIN)."""
         assert name_compound("C=Cc1ccccc1") == "ethenylbenzene"
 
     @pytest.mark.unit
     def test_cumene(self):
-        """F-T9/DD6 RET-01/RET-02: 'cumene' is general-only (P-22.1.3); the PIN is the
-        substitutive '(propan-2-yl)benzene' (enclosing marks per P-16.5.1.3)."""
+        """F-T9/DD6 /: 'cumene' is general-only; the PIN is the
+        substitutive '(propan-2-yl)benzene' (enclosing marks per."""
         assert name_compound("CC(C)c1ccccc1") == "(propan-2-yl)benzene"
 
 
@@ -436,13 +436,13 @@ class TestBenzeneEdgeCases:
 
 
 # =============================================================================
-# Test Benzonitrile Naming (BUG-2 Fix - Phase 14.6)
+# Test Benzonitrile Naming (Fix - a phase)
 # =============================================================================
 
 class TestBenzonitrileNaming:
-    """Tests for benzonitrile naming (BUG-2 fix).
+    """Tests for benzonitrile naming (fix).
 
-    IUPAC 2013 PIN: benzonitrile (not cyanobenzene) per P-66.1.1.1
+    IUPAC 2013 PIN: benzonitrile (not cyanobenzene) per
     Substituents are numbered relative to the nitrile carbon (position 1).
     """
 

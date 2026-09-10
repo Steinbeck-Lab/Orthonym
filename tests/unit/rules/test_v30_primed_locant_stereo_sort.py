@@ -1,9 +1,9 @@
-"""v30 — crash fix (Fable review RISK 6): a PRIMED-locant tuple must not crash the
+""" — crash fix (a review review RISK 6): a PRIMED-locant tuple must not crash the
 stereo-descriptor sort.
 
 `_composite_locant_sort_key` handled int locants and str composite locants ('3a') but
-raised `TypeError: int() argument ... not 'tuple'` on a primed locant `(5, "'")` — the
-tuple form multi-component-ring `atom_to_locant` returns (5', 3', ...). A crash where an
+raised `TypeError: int argument... not 'tuple'` on a primed locant `(5, "'")` — the
+tuple form multi-component-ring `atom_to_locant` returns (5', 3',...). A crash where an
 abstention is correct. Reproducer: a spiro benzofuran-oxane glycoside.
 """
 import pytest

@@ -1,24 +1,23 @@
 """
-Organometallic complex detection + hapticity perception (Phase 161 v19).
+Organometallic complex detection + hapticity perception (a phase).
 
 This module provides RDKit-graph-based detection of metal-organometallic
-complexes per IUPAC 2013 Blue Book §P-69 + IUPAC Red Book §IR-10 + Salzer
+complexes per IUPAC 2013 Blue Book § + IUPAC Red Book § + Salzer
 1999 IUPAC Recommendations.
 
-All functions are PREDICATE-PURE per CONTEXT D-12 + Phase 158 D-26 + Phase
-160 D-25 hard invariant:
+All functions are PREDICATE-PURE per internal notes + a phase + a phase hard invariant:
 - NO mol mutation (no SanitizeMol, no UpdatePropertyCache, no
   AssignStereochemistry, no any other RDKit mutating method).
 - NO module-global state read/write.
 - NO exception swallowing (RDKit exceptions propagate; ValueError raised
-  by compute_hapticity is caught at the handler layer per CONTEXT D-12).
+  by compute_hapticity is caught at the handler layer per internal notes).
 
 The integrity test ``test_side_effect_inventory_is_empty`` parametrized
 over ``list(StoutClass)`` at ``tests/unit/routing/test_dispatch_table.py``
-will auto-extend to ORGANOMETALLIC after Plan-02 ships and assert ``()``
+will auto-extend to ORGANOMETALLIC after Plan-02 ships and assert ````
 for the new entry.
 
-Phase 161 (v19 first scope-expansion phase per ADR-19-07).
+a phase (first scope-expansion phase per -07).
 """
 
 from __future__ import annotations
@@ -30,7 +29,7 @@ from rdkit import Chem
 
 from .molcache import atoms_of, bonds_of  # audit 2026-09-03 (S2): per-call atom/bond tuples
 
-# Allowlist for is_metal_element() per RESEARCH §3.1.
+# Allowlist for is_metal_element per RESEARCH
 # Groups 1-17 metals/semimetals. Hydrogen EXCLUDED (never metal).
 # Compiled from IUPAC periodic table (2023).
 METAL_ELEMENT_SYMBOLS: FrozenSet[str] = frozenset({
@@ -57,27 +56,27 @@ METAL_ELEMENT_SYMBOLS: FrozenSet[str] = frozenset({
     'Ni', 'Pd', 'Pt', 'Ds',
     'Cu', 'Ag', 'Au', 'Rg',
     'Zn', 'Cd', 'Hg', 'Cn',
-    # Lanthanides + Actinides (Phase 161.X scope-deferred but allowlist anyway)
+    # Lanthanides + Actinides (a phase.X scope-deferred but allowlist anyway)
     'Ce', 'Pr', 'Nd', 'Pm', 'Sm', 'Eu', 'Gd', 'Tb', 'Dy', 'Ho', 'Er', 'Tm', 'Yb', 'Lu',
     'Th', 'Pa', 'U', 'Np', 'Pu', 'Am', 'Cm', 'Bk', 'Cf', 'Es', 'Fm', 'Md', 'No', 'Lr',
 })
 
 
-# WSD-04 (RING-06): Group-14/13 metalloids that, when a ring member of a covalent
+# -04 : Group-14/13 metalloids that, when a ring member of a covalent
 # heterocycle, are a Hantzsch-Widman ring parent (silolane/silole/borole/stannole),
 # NOT an organometallic complex. detect_metal_complex defers these to the
 # heterocycle path. Scope per the requirement: Si/Ge/Sn/Pb (Group 14) + B (Group 13).
 # Deliberately EXCLUDES P (a separate phosphine-handler concern) and Al/Ga/In/Tl
-# (kept under organometallic handling — out of WSD-04 scope).
+# (kept under organometallic handling — out of -04 scope).
 _GROUP_14_13_RING_DEFER: FrozenSet[str] = frozenset({'Si', 'Ge', 'Sn', 'Pb', 'B'})
 
 
-# P-69.5 metal classification for mixed-metal covalent compounds:
-#   (1) metals of Groups 1 through 12  -> central-atom eligible;
-#   (2) metals of Groups 13 through 16 -> cited as a substituent group.
+# metal classification for mixed-metal covalent compounds:
+# (1) metals of Groups 1 through 12 -> central-atom eligible;
+# (2) metals of Groups 13 through 16 -> cited as a substituent group.
 # When exactly ONE class-1 metal and >=1 class-2 metalloid are present in a single
 # covalent component, the class-1 metal is the central atom and the class-2
-# metalloid sits inside a ligand (P-69.5.2: e.g. C6H5-Hg-C6H4-Sb(C6H5)2 ->
+# metalloid sits inside a ligand: e.g. C6H5-Hg-C6H4-Sb(C6H5)2 ->
 # [4-(diphenylstibanyl)phenyl](phenyl)mercury). _CLASS_2 = Groups 13-16 metals/
 # metalloids; _CLASS_1 = every other (Groups 1-12) metal in METAL_ELEMENT_SYMBOLS.
 _CLASS_2_METALLOIDS: FrozenSet[str] = frozenset({
@@ -101,7 +100,7 @@ class LigandGroup:
 
 @dataclass(frozen=True)
 class MetallacycleInfo:
-    """W8-P9 Task 9.5 (P-69.4): a metal atom that is itself a RING member.
+    """W8-P9 Task 9.5: a metal atom that is itself a RING member.
 
     ``ring_atom_indices`` lists the ring atoms in TRAVERSAL order starting at
     the metal (index 0), in one of the two possible ring-walk directions
@@ -142,7 +141,7 @@ def detect_metal_complex(mol: "Chem.Mol") -> Optional[MetalComplex]:
     single-component main-group), Tier-2 (dot-separated metal carbonyls),
     and Tier-4 (mixed η-bonded / half-sandwich) topology branches.
 
-    PURE per CONTEXT D-12: no mol mutation; only reads via GetAtoms /
+    PURE per internal notes: no mol mutation; only reads via GetAtoms /
     GetBonds / GetSymbol / GetFormalCharge / GetBondType / GetIsAromatic /
     GetOtherAtomIdx / GetBondTypeAsDouble / GetAtomWithIdx / GetMolFrags.
     NEVER: SanitizeMol, UpdatePropertyCache, AssignStereochemistry.
@@ -168,11 +167,11 @@ def detect_metal_complex(mol: "Chem.Mol") -> Optional[MetalComplex]:
     # (Cp anions for Tier-1, CO ligands for Tier-2).
     frags = Chem.GetMolFrags(mol, asMols=False)
 
-    # P-69.5.2 mixed-class single-centred complex: EXACTLY ONE class-1 (Groups 1-12)
+    # mixed-class single-centred complex: EXACTLY ONE class-1 (Groups 1-12)
     # central metal + >=1 class-2 (Groups 13-16) metalloid, all in ONE covalent
     # component. The class-1 metal is the sole central atom; the class-2 metalloid
     # is named as a substituent inside a ligand. This is NOT a multinuclear bridge
-    # (Phase 161.3 deferred). class-2/class-2 catenated hydrides (0 class-1 metals)
+    # (a phase deferred). class-2/class-2 catenated hydrides (0 class-1 metals)
     # and ionic dot-separated salts (len(frags) > 1) are excluded by construction.
     _class1 = [i for i in metal_atom_indices
                if mol.GetAtomWithIdx(i).GetSymbol() in _CLASS_1_METALS]
@@ -185,7 +184,7 @@ def detect_metal_complex(mol: "Chem.Mol") -> Optional[MetalComplex]:
         and len(_class1) + len(_class2) == len(metal_atom_indices)
     )
 
-    # Phase 161.3 deferred: multinuclear bridged complexes (but NOT the mixed-class
+    # a phase deferred: multinuclear bridged complexes (but NOT the mixed-class
     # single-centred case above, which is genuinely single-centred).
     is_multimetal = len(metal_atom_indices) > 1 and not _mixed_class_central
     if len(frags) >= 2 and not is_multimetal:
@@ -254,7 +253,7 @@ def detect_metal_complex(mol: "Chem.Mol") -> Optional[MetalComplex]:
     # 1 metal atom + N alkyl/aryl ligand atoms directly bonded (single bonds);
     # Grignard topology: 1 organic ligand + 1 halide ligand.
     if len(frags) == 1 and not is_multimetal:
-        # For a P-69.5.2 mixed-class compound the class-1 metal is the sole central
+        # For a mixed-class compound the class-1 metal is the sole central
         # atom and the class-2 metalloid(s) are walked THROUGH into a ligand; for
         # the ordinary single-metal case behaviour is unchanged.
         if _mixed_class_central:
@@ -266,7 +265,7 @@ def detect_metal_complex(mol: "Chem.Mol") -> Optional[MetalComplex]:
             metal_idx = metal_atom_indices[0]
             central_indices = tuple(metal_atom_indices)
             walk_through = frozenset()
-        # WSD-04 (RING-06): a single ring-member Group-14/13 metalloid
+        # -04 : a single ring-member Group-14/13 metalloid
         # (Si/Ge/Sn/Pb/B) in a covalent heterocycle is NOT an organometallic
         # complex — it is a Hantzsch-Widman ring parent (silolane / silole /
         # borole / stannole). Defer to the heterocycle path (CFR cascade-continue)
@@ -317,7 +316,7 @@ def _build_sigma_ligand_groups(mol: "Chem.Mol",
     _HALIDE_SMARTS_KEYS so the rules layer can dispatch Grignard vs alkyl.
 
     Returns None if the topology doesn't match σ-bonded (e.g., aromatic
-    π-bonded ligand attached to metal). Pure per CONTEXT D-12.
+    π-bonded ligand attached to metal). Pure per internal notes.
     """
     metal_atom = mol.GetAtomWithIdx(metal_idx)
     sigma_groups: List[LigandGroup] = []
@@ -356,7 +355,7 @@ def _build_sigma_ligand_groups(mol: "Chem.Mol",
         ligand_atoms = _collect_organic_component(
             mol, neighbor_idx, metal_idx, walk_through)
         # Refuse to collect atoms already in another ligand (e.g., a bridging
-        # carbon would belong to two metals — Phase 161.3 territory)
+        # carbon would belong to two metals — a phase territory)
         if any(a in seen_atoms for a in ligand_atoms):
             return None
         seen_atoms.update(ligand_atoms)
@@ -577,14 +576,14 @@ def compute_hapticity(mol: "Chem.Mol", metal_atom_idx: int,
                       ligand_atom_indices: Tuple[int, ...]) -> int:
     """Compute the hapticity of a ligand group bound to a metal.
 
-    Plan-03 implementation per CONTEXT D-05 hybrid:
+    Plan-03 implementation per internal notes hybrid:
     1. SMARTS-template fast path: consult LIGAND_ETA_DEFAULTS from
        data/organometallics.py; on hit, return catalog value.
     2. Graph-walk fallback (added in 03-04 Tier-4 commit): BFS over
        ligand_atom_indices counting contiguous π-system atoms.
     3. Edge case σ-bonded (single atom or no π-system): return 1.
 
-    PURE per CONTEXT D-12.
+    PURE per internal notes.
     """
     # Lazy import to avoid circular dependency
     from ..data.organometallics import LIGAND_ETA_DEFAULTS
@@ -596,7 +595,7 @@ def compute_hapticity(mol: "Chem.Mol", metal_atom_idx: int,
     if len(ligand_atom_indices) == 1:
         return 1
 
-    # Build the ligand subgraph as a separate mol (PURE per D-12: submol only)
+    # Build the ligand subgraph as a separate mol (PURE per: submol only)
     submol = Chem.RWMol()
     atom_map: dict = {}
     for idx in ligand_atom_indices:
@@ -625,20 +624,20 @@ def compute_hapticity(mol: "Chem.Mol", metal_atom_idx: int,
 
 # W8-P9 Task 9.2: the TRUE-METAL subset of METAL_ELEMENT_SYMBOLS used by
 # has_covalent_metal_carbon_bond — Groups 1, 2, and 3-12 (+ lanthanides/
-# actinides), per BB P-69.0's own three-way split: "(1) elements of Groups 1
+# actinides), per BB 's own three-way split: "(1) elements of Groups 1
 # and 2; (2) elements of Groups 3-12 (the transition metals); (3) elements
 # of Groups 13-16". Deliberately EXCLUDES the Group 13-16 metalloids (B, Al,
 # Ga, In, Tl, Si, Ge, Sn, Pb, As, Sb, Bi, Te, Po): those ALWAYS have a
-# legitimate alternate SUBSTITUTIVE nomenclature system (P-68) that correctly
+# legitimate alternate SUBSTITUTIVE nomenclature system that correctly
 # names the WHOLE molecule via a different CFR class —
 # MONONUCLEAR_HYDRIDE (trimethylarsane/trimethylgallane/trimethylindigane/
-# trimethylthallane), the WSD-04 Hantzsch-Widman ring defer (silole/borole/
+# trimethylthallane), the -04 Hantzsch-Widman ring defer (silole/borole/
 # stannole), FREE_HOMONUCLEAR_G14_HYDRIDE, DINUCLEAR_HYDRIDE, etc. — so a
 # "class_id != organometallic" outcome for one of THOSE elements is not an
 # atom-drop leak; it is the correct alternate path. Restricting the veto's
 # metal scope to true metals (which have NO alternate substitutive system in
 # this codebase) makes the veto SAFE: a true-metal-carbon bond can only be
-# legitimately named via P-69 additive/coordination nomenclature, so any
+# legitimately named via additive/coordination nomenclature, so any
 # other outcome for it genuinely is a structure-loss leak.
 _TRUE_METAL_SYMBOLS_FOR_VETO: FrozenSet[str] = METAL_ELEMENT_SYMBOLS - frozenset({
     'B', 'Al', 'Ga', 'In', 'Tl',       # Group 13
@@ -648,10 +647,10 @@ _TRUE_METAL_SYMBOLS_FOR_VETO: FrozenSet[str] = METAL_ELEMENT_SYMBOLS - frozenset
 })
 
 
-# v43 P1 (levers 1b/1d): alkali + alkaline-earth (Groups 1-2). A net-0 salt or a
-# net-charged assembly of one of these with an organic ion is IN scope (P-12 binary
-# salt / P-14.8 adduct). Any OTHER true metal is out of scope by default (P-69), and
-# any true metal co-present with a carbanion/hydride is P-69 organometallic.
+# (levers 1b/1d): alkali + alkaline-earth (Groups 1-2). A net-0 salt or a
+# net-charged assembly of one of these with an organic ion is IN scope binary
+# salt / adduct). Any OTHER true metal is out of scope by default, and
+# any true metal co-present with a carbanion/hydride is organometallic.
 _ALKALI_ALKALINE_EARTH: FrozenSet[str] = frozenset({
     'Li', 'Na', 'K', 'Rb', 'Cs', 'Fr',       # Group 1
     'Be', 'Mg', 'Ca', 'Sr', 'Ba', 'Ra',      # Group 2
@@ -659,15 +658,15 @@ _ALKALI_ALKALINE_EARTH: FrozenSet[str] = frozenset({
 
 
 def assembly_has_out_of_scope_metal(mol: "Chem.Mol") -> bool:
-    """True if a multi-fragment ionic assembly contains a P-69 out-of-scope true
-    metal, so the v43 P1 best-effort ion/adduct widening must NOT fire (0-wrong:
+    """True if a multi-fragment ionic assembly contains a out-of-scope true
+    metal, so the best-effort ion/adduct widening must NOT fire (0-wrong:
     never render a coordination complex / organometallic as a salt or adduct).
 
     OUT ⇔ (i) any true metal (``_TRUE_METAL_SYMBOLS_FOR_VETO``) that is NOT
     alkali/alkaline-earth (the default boundary), OR (ii) an alkali/alkaline-earth
-    true metal co-present with a carbanion/hydride (P-69 organometallic).
+    true metal co-present with a carbanion/hydride organometallic).
     Metalloids (Si/Ge/Sn/B/As/... — excluded from ``_TRUE_METAL_SYMBOLS_FOR_VETO``)
-    are IN scope (P-68) and never trip this.
+    are IN scope and never trip this.
     """
     true_metals = [a.GetSymbol() for a in mol.GetAtoms()
                    if a.GetSymbol() in _TRUE_METAL_SYMBOLS_FOR_VETO]
@@ -683,14 +682,14 @@ def assembly_has_out_of_scope_metal(mol: "Chem.Mol") -> bool:
 def has_covalent_metal_carbon_bond(mol: "Chem.Mol") -> bool:
     """W8-P9 Task 9.2: True iff a TRUE metal atom (see
     ``_TRUE_METAL_SYMBOLS_FOR_VETO``) shares a DIRECT bond with a carbon atom
-    (same connected fragment) — the structural definition of a P-69
-    organometallic compound (BB P-69.0: "Organometallic compounds are
+    (same connected fragment) — the structural definition of a
+    organometallic compound (BB: "Organometallic compounds are
     compounds having at least one bond between one metal atom and one carbon
     atom"), scoped to metals that have NO legitimate alternate substitutive
     nomenclature system in this codebase.
 
     Deliberately excludes dot-separated ionic topologies (e.g. ferrocene
-    `[Fe+2].c1cc[cH-]c1.c1cc[cH-]c1`): RDKit ``GetBonds()`` only enumerates
+    `[Fe+2].c1cc[cH-]c1.c1cc[cH-]c1`): RDKit ``GetBonds`` only enumerates
     bonds that exist in the graph, so a metal cation and an anionic Cp ring
     in SEPARATE fragments (no bond between them) correctly return False here
     — those compounds legitimately cascade to SALT@100 (ionic complex, no
@@ -699,18 +698,18 @@ def has_covalent_metal_carbon_bond(mol: "Chem.Mol") -> bool:
     Also deliberately excludes Group 13-16 metalloids (Si/Ge/Sn/Pb/B/As/Sb/
     Bi/Ga/In/Tl/Te/Po) even though they ARE metals/semimetals per
     ``is_metal_element`` — those have a legitimate alternate substitutive
-    path (P-68 / MONONUCLEAR_HYDRIDE / WSD-04 heterocycle defer) that names
+    path / MONONUCLEAR_HYDRIDE / -04 heterocycle defer) that names
     the whole molecule via a DIFFERENT CFR class; flagging them here would
     false-positive-suppress correct names like 'trimethylarsane',
     'trimethylgallane', or '1-methyl-1H-silole'.
 
     Used as a source-level (no-OPSIN-required) veto: any compound for which
-    this returns True IS a P-69 organometallic that must be named by the
+    this returns True IS a organometallic that must be named by the
     organometallic handler or fail closed — never silently renamed from a
     decomposed sub-fragment that drops the metal (the `C[Ti](Cl)(Cl)Cl` ->
     'methane' / `Cl[Pt]1(Cl)...` -> '...ole' leaks).
 
-    PURE per CONTEXT D-12: read-only GetBonds/GetBeginAtom/GetEndAtom/
+    PURE per internal notes: read-only GetBonds/GetBeginAtom/GetEndAtom/
     GetSymbol; no mol mutation.
     """
     if mol is None:
@@ -726,9 +725,9 @@ def has_covalent_metal_carbon_bond(mol: "Chem.Mol") -> bool:
 
 
 def has_metal_coordination_bond(mol: "Chem.Mol") -> bool:
-    """v38 (ChEBI 3-way, 2026-08-28): True iff a TRUE metal atom (the SAME
+    """ (ChEBI 3-way, 2026-08-28): True iff a TRUE metal atom (the SAME
     ``_TRUE_METAL_SYMBOLS_FOR_VETO`` set as ``has_covalent_metal_carbon_bond``)
-    is an endpoint of a DATIVE (coordination) bond -- a P-69 coordination
+    is an endpoint of a DATIVE (coordination) bond -- a coordination
     compound whose metal binds via O/N/P dative bonds rather than a covalent
     M-C bond, so the C-bond veto above misses it. Confirmed leaks:
     Gd-DOTA (an MRI agent) -> 'ethanamide', Mo-dinitrogen bis-phosphine ->
@@ -760,7 +759,7 @@ def has_metal_coordination_bond(mol: "Chem.Mol") -> bool:
 
 
 def detect_metallacycle(mol: "Chem.Mol") -> Optional["MetallacycleInfo"]:
-    """W8-P9 Task 9.5 (P-69.4): detect a metallacycle — a metal atom (Group
+    """W8-P9 Task 9.5: detect a metallacycle — a metal atom (Group
     2-12, per ``data.organometallics.METALLACYCLE_A_PREFIX``) that is itself
     a RING member.
 
@@ -777,11 +776,11 @@ def detect_metallacycle(mol: "Chem.Mol") -> Optional["MetallacycleInfo"]:
         out of scope this cycle);
       - the metal carries a formal charge of 0.
 
-    Does NOT collide with the WSD-04 Group-14/13 Hantzsch-Widman ring defer
+    Does NOT collide with the -04 Group-14/13 Hantzsch-Widman ring defer
     (``_GROUP_14_13_RING_DEFER``) — that set (Si/Ge/Sn/Pb/B) is disjoint from
     ``METALLACYCLE_A_PREFIX`` (Group 2-12) by construction.
 
-    PURE per CONTEXT D-12: read-only RingInfo/GetAtoms/GetBonds/GetNeighbors;
+    PURE per internal notes: read-only RingInfo/GetAtoms/GetBonds/GetNeighbors;
     no mol mutation.
     """
     from ..data.organometallics import METALLACYCLE_A_PREFIX
@@ -827,19 +826,19 @@ def detect_metallacycle(mol: "Chem.Mol") -> Optional["MetallacycleInfo"]:
 def enumerate_metal_ligand_groups(mol: "Chem.Mol") -> Tuple[LigandGroup, ...]:
     """For each metal atom in mol, partition coordinated atoms into ligand groups.
 
-    STUB BODY (Plan-02): returns () always. Plan-03 implements per
-    RESEARCH §3.2 lines 549-567.
+    STUB BODY (Plan-02): returns  always. Plan-03 implements per
+    RESEARCH lines 549-567.
 
     Algorithm (Plan-03 implementation):
-    1. Identify all metal atoms via is_metal_element(atom.GetSymbol()).
+    1. Identify all metal atoms via is_metal_element(atom.GetSymbol).
     2. For each metal: collect bond-distance-1 neighbors (ligand-shell).
     3. For each ligand-shell atom: BFS over non-metal bonds to find
        contiguous ligand component.
     4. Each component → LigandGroup with hapticity from compute_hapticity.
 
-    PURE per CONTEXT D-12. O(V+E) per metal.
+    PURE per internal notes. O(V+E) per metal.
     """
-    # Plan-03 implementation lands here per RESEARCH §3.2 + AUDIT § 5
+    # Plan-03 implementation lands here per RESEARCH + AUDIT
     return ()
 
 

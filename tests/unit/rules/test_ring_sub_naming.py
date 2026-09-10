@@ -1,8 +1,8 @@
 """
 Unit tests for ring-as-substituent naming (ring_substituents.py).
 
-Phase 79: Verifies RING_SUBSTITUENT_NAMES dict completeness and that
-identify_ring_system() + get_ring_substituent_name() produce correct
+a phase: Verifies RING_SUBSTITUENT_NAMES dict completeness and that
+identify_ring_system + get_ring_substituent_name produce correct
 substituent prefix names for all monocyclic ring systems.
 """
 
@@ -17,7 +17,7 @@ from orthonym.rules.ring_substituents import (
 
 
 class TestRingSubstituentNamesCompleteness:
-    """Every ring name returned by identify_ring_system() has a RING_SUBSTITUENT_NAMES entry."""
+    """Every ring name returned by identify_ring_system has a RING_SUBSTITUENT_NAMES entry."""
 
     @pytest.mark.parametrize(
         "smiles, expected_ring_name, expected_sub_name",

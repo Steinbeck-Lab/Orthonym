@@ -1,4 +1,4 @@
-"""§P-14.3.4.4 (the Blue Book) — the ISOMER-COUNT licence, end to end.
+"""§ (the Blue Book) — the ISOMER-COUNT licence, end to end.
 
  Phase C Task 11. The rule verbatim::
 
@@ -9,24 +9,24 @@
 ★ WHY THIS IS A DIFFERENT LICENCE, AND WHY IT HAD TO BE BUILT
 
 ``assembly/locant_omission.py`` shipped ``l3_``, ``l5_`` and ``l6_`` and **no
-``l4_``**. P-14.3.4.4 was never implemented, and it is the licence that owns the
-polysulfanes. The three that existed all route through ``substitutable_positions()``,
+``l4_``**. was never implemented, and it is the licence that owns the
+polysulfanes. The three that existed all route through ``substitutable_positions``,
 which applies ``:3007``'s carve-out — *"Except for hydrogen atoms attached to
 chalcogen atoms, such as in acids, alcohols, and to the carbon atoms of formyl groups
 (aldehydes), all hydrogen atoms are considered substitutable"*. Trisulfane is
 ``HS-S-SH``, so **every** hydrogen it has is on a sulfur: that set is EMPTY and all
-three licences deny by construction. Yet §**P-68.4.1.1** *"Compounds with three or
+three licences deny by construction. Yet §**** *"Compounds with three or
 more contiguous identical chalcogen atoms are treated as parent hydrides in
 substitutive nomenclature"* prints, at ``:39335``, ``CH3-S-S-SH methyltrisulfane
 (PIN)``.
 
-P-14.3.4.4 dissolves it: it counts **isomers** and says nothing whatever about which
+ dissolves it: it counts **isomers** and says nothing whatever about which
 hydrogens are "substitutable", so ``:3007`` never enters. And the reason no isomer
 exists is a hydrogen COUNT, not a carve-out — trisulfane's middle sulfur bears **zero**
 hydrogens, so S1/S3 are the only placements and they are one orbit.
 
 ⚠ The ``:3007`` carve-out is NOT loosened to achieve this, and must not be: it is
-load-bearing for P-14.3.4.3, where propanedioic acid's two acid O-H must not count or
+load-bearing for, where propanedioic acid's two acid O-H must not count or
 ``chloropropanedioic acid`` (``:2951``) loses its licence and we ship
 ``2-chloropropanedioic acid``. The trisulfane row was filed under the wrong licence,
 and that is all that was wrong.
@@ -41,19 +41,19 @@ Same length, same shape, opposite answers, and nothing about chalcogens in the
 reasoning. A predicate keyed on symmetry alone, or on ``substitutable_positions``,
 gets one of these two wrong.
 
-★ THE WHOLE EXAMPLE BLOCK OF P-68.4.1.1 (``:39333``-``:39343``) IS LOCANT-FREE, and
+★ THE WHOLE EXAMPLE BLOCK OF (``:39333``-``:39343``) IS LOCANT-FREE, and
 four of its rows are verbatim PINs measured here: ``:39335`` ``methyltrisulfane``,
 ``:39337`` ``dimethyltrioxidane``, ``:39339`` ``dimethyltrisulfane``, ``:39341``
 ``methyl(phenyl)triselane`` (the heterogeneous case). ``:2979``'s
-``(bromodisulfanyl)methane (PIN) (not bromo(methyl)disulfane see P-63.3.1; not
+``(bromodisulfanyl)methane (PIN) (not bromo(methyl)disulfane see; not
 1-bromo-2-methyldisulfane)`` rejects the locanted disulfane form independently.
 
-The locant-free multi-prefix spelling is §**P-16.5.1.3.1** (``:7272``): *"the first
+The locant-free multi-prefix spelling is §**** (``:7272``): *"the first
 cited substituent never has enclosing marks unless it includes a locant. The second and
 further substituents are each enclosed with parentheses even for simple substituents.
 When the simple substituent groups are accompanied by multiplicative prefixes such as
 'di' and 'tri', the multiplicative prefixes are not included in the parentheses."*
-§**P-16.5.1.3.2** (``:7304``) extends it past mononuclear parents, and ``:39341``
+§**** (``:7304``) extends it past mononuclear parents, and ``:39341``
 witnesses it on this very family.
 
 ⚠ THE ``:3005`` EXCEPTIONS ARE THIS LICENCE'S OWN, AND THE SET IS OPEN. Its closing
@@ -105,7 +105,7 @@ def test_licence_omits_the_locants(namer, smiles, expected, bb):
 
 # --------------------------------------------------------------------------- #
 # 2. THE HETEROGENEOUS CASE — 'or by interchanging them between two different #
-# positions', plus the P-16.5.1.3.1 enclosing marks it forces. #
+# positions', plus the enclosing marks it forces. #
 # --------------------------------------------------------------------------- #
 @pytest.mark.parametrize("smiles,expected,why", [
     ("CCSSSC", "ethyl(methyl)trisulfane",
@@ -149,7 +149,7 @@ def test_licence_denies_when_an_isomer_exists(namer, smiles, expected, why):
 # --------------------------------------------------------------------------- #
 # 4. ARCH-a — a licence may not empty a scope it did not evaluate. #
 # internal notes #
-# molecule.md` requires all THREE checks of any new P-14.3.4 licence. #
+# molecule.md` requires all THREE checks of any new licence. #
 # --------------------------------------------------------------------------- #
 @pytest.mark.parametrize("smiles,expected,why", [
     ("[13CH3]SSS", "(13C)1-methyltrisulfane",
@@ -172,7 +172,7 @@ def test_arch_a_scope_guards_hold(namer, smiles, expected, why):
 def test_arch_a_fragment_boundary_guard_declines():
     """★ The THIRD ARCH-a check — and the one no molecule currently exercises.
 
-    A mutation that deletes the ``locant_scope_is_a_name_component()`` call from
+    A mutation that deletes the ``locant_scope_is_a_name_component`` call from
     ``polychalcogen._l4_omits_locants`` SURVIVED every other test in this file,
     because no input measured (``CSSSCCSSSC``, ``SSSCSSS``, ``OCCSSSC``,
     ``OC(=O)CSSSC``, ``CSSSc1ccccc1O``) reaches this producer from inside a
@@ -259,8 +259,8 @@ def test_neighbouring_layers_unchanged(namer, smiles, expected, why):
 
 
 # --------------------------------------------------------------------------- #
-# 7. ★ THE GENERAL-ACYCLIC PARENT SCOPE () — the SAME licence, #
-# wired as a third sibling of P-14.3.4.5/.3 in `handlers/general_acyclic`. #
+# 7. ★ THE GENERAL-ACYCLIC PARENT SCOPE  — the SAME licence, #
+# wired as a third sibling of /.3 in `handlers/general_acyclic`. #
 # Here L4 empties the WHOLE scope, so BOTH the substituent-prefix locants #
 # AND the suffix locants go: `1,2-diphenylethane-1,2-dione` -> #
 # `diphenylethanedione`. Applied via `_fragments_without_locants`. #
@@ -300,12 +300,12 @@ def test_general_acyclic_boundary_keeps_essential_locants(namer, smiles, expecte
 
 
 # --------------------------------------------------------------------------- #
-# 8. ★ THE PARTIAL-SUBSTITUTION BOUNDARY (-3) — P-14.3.4.5 #
+# 8. ★ THE PARTIAL-SUBSTITUTION BOUNDARY (-3) — #
 # (the Blue Book) SECOND paragraph: "In case of partial substitution or #
 # modification, all numerical prefixes must be indicated." When PREFIXES #
 # are present but do not cover every principal-characteristic-group (suffix) #
 # position, the compound is only PARTIALLY substituted, so all locants are #
-# cited (P-14.3.3 deny-default, the Blue Book). The P-14.3.4.4 isomer test alone #
+# cited deny-default, the Blue Book). The isomer test alone #
 # over-omits here: on propane-1,2,3-trione the three =O saturate every #
 # position so NO isomer can be relocated (OPSIN confirms `...propanetrione` #
 # is unambiguous), yet the Blue Book keeps the locants because the MIDDLE carbon #
@@ -350,9 +350,9 @@ def test_general_acyclic_complete_substitution_still_omits(
 
 # --------------------------------------------------------------------------- #
 # 9. ★ BLOCKER-4 — the ASYMMETRIC-diaryl ethanedione RENDERING. #
-# The isomer-count licence (§8 above) correctly omits the C1/C2 attachment #
+# The isomer-count licence (above) correctly omits the C1/C2 attachment #
 # locants of a substituted-arene ethanedione. The two DIFFERENT prefixes #
-# must then render per P-14.3.4.4's own example block, the Blue Book #
+# must then render per 's own example block, the Blue Book #
 # `ethylidene(methylidene)triphosphoxane (PIN)`: the alphanumerically-first #
 # prefix bare (a compound prefix keeps its OWN single-level marks) and every #
 # FURTHER prefix enclosed in parentheses. The producer used to over-enclose #

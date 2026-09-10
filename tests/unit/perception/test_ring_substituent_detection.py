@@ -119,13 +119,13 @@ class TestClassifySubstituent:
         parent_atoms = set(range(6, mol.GetNumAtoms()))
         result = classify_substituent(mol, ring_atoms, parent_atoms)
         assert result['type'] == 'ring'
-        # STALE EXPECTATION CORRECTED 2026-07-30: was `'piperidinyl' in ...lower()`.
-        # Production emits the PIN form `piperidin-3-yl` -- P-29.2 requires the free
+        # STALE EXPECTATION CORRECTED 2026-07-30: was `'piperidinyl' in...lower`.
+        # Production emits the PIN form `piperidin-3-yl` -- requires the free
         # valence to carry its locant, and `ring_substituents.py:508` builds it
         # correctly. Measured: `(piperidin-4-yl)acetic acid`,
         # `3-(piperidin-3-yl)propanoic acid` etc. all OPSIN-clean, so ZERO molecules
         # were mis-named -- only this assertion was.
-        # Asserted EXACTLY, not by substring: the loose `'piperid' in ...` shape used
+        # Asserted EXACTLY, not by substring: the loose `'piperid' in...` shape used
         # at line ~178 is why this went unnoticed, since it passes for both spellings.
         assert result['name'] == 'piperidin-3-yl'
 
@@ -199,8 +199,8 @@ class TestEndToEndRingSubstituents:
     def test_morpholinyl_substituent(self):
         """Morpholinyl substituent should be detected.
 
-        Phase 157 cleanup: removed stale @pytest.mark.xfail. Phase 142
-        retained-name expansion + Phase 150 OPSIN XML import shipped
+        a phase cleanup: removed stale @pytest.mark.xfail. a phase
+        retained-name expansion + a phase OPSIN XML import shipped
         morpholine retained-name lookup; the test passes cleanly.
         """
         result = name_compound('c1ccc(C2COCCN2)cc1')  # phenyl with morpholine
@@ -215,7 +215,7 @@ class TestEdgeCases:
     def test_fused_ring_substituent(self):
         """Test that fused ring systems are handled.
 
-        Phase 157 cleanup: removed stale @pytest.mark.xfail. Phase 142
+        a phase cleanup: removed stale @pytest.mark.xfail. a phase
         ring-as-substituent naming (naphthalene → naphthalen-1-yl)
         shipped; the test passes cleanly.
         """
@@ -228,8 +228,8 @@ class TestEdgeCases:
     def test_multiple_ring_substituents(self):
         """Test multiple ring substituents on same parent.
 
-        Phase 157 cleanup: removed stale @pytest.mark.xfail. Phase 147
-        IUPAC P-44.1 cascade with locants ships ring-ring parent
+        a phase cleanup: removed stale @pytest.mark.xfail. a phase
+        IUPAC cascade with locants ships ring-ring parent
         selection; the test passes cleanly.
         """
         result = name_compound('c1ccc(C2CCCCC2)cc1')  # cyclohexylbenzene
@@ -301,7 +301,7 @@ class TestRingTypeIdentification:
         """Pyridine ring gives the PIN substituent prefix `pyridin-3-yl`.
 
         Docstring corrected 2026-07-30: it said "gives pyridyl". `pyridyl` is the
-        retained/CAS form; P-29.2 requires the free valence to carry its locant, so
+        retained/CAS form; requires the free valence to carry its locant, so
         the PIN is `pyridin-3-yl` -- which is what production emits.
         """
         mol = Chem.MolFromSmiles('c1ccncc1C')  # methylpyridine

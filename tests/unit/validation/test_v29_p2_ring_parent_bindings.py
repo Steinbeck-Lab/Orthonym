@@ -1,4 +1,4 @@
-"""v29 Phase 2 T5: the ring parent emits one binding per token it spells.
+""" a phase T5: the ring parent emits one binding per token it spells.
 
 Before this phase the general ring producer appended a SINGLE binding whose
 token was ``cage.descriptor`` alone -- ``'bicyclo[2.2.1]'`` -- claiming every
@@ -20,7 +20,7 @@ sites sit behind the general engine, which is opt-in and default OFF, so no
 default-path emission records a spine at all. This is a correctness
 prerequisite, not a live-defect fix.
 
-Harness note: the conftest force-disables the production SELF-01 gate
+Harness note: the conftest force-disables the production gate
 suite-wide, so these tests drive the PRODUCER directly (the established
 pattern in ``tests/unit/rules/test_v26_p2_aromatic_vonbaeyer.py``) and assert
 on bindings + ``verify_spine``, never on a round trip.
@@ -86,7 +86,7 @@ NORBORNENE = "C1=CC2CCC1C2"       # bicyclo[2.2.1]hept-2-ene (unsaturated)
 # has to hold here too -- the field contract was previously stated twice and
 # drifted twice (see ``RingAnalysis``).
 OXA_SPIRO = "C1CCC2(C1)OCCCC2"    # 6-oxaspiro[4.5]decane
-DIOXA_SPIRO = "O1CCC2(C1)COCC2"   # 2,7-dioxaspiro[4.4]nonane  (one morpheme x2)
+DIOXA_SPIRO = "O1CCC2(C1)COCC2"   # 2,7-dioxaspiro[4.4]nonane (one morpheme x2)
 OXA_THIA_SPIRO = "O1CCC2(C1)CSCC2"  # 2-oxa-7-thiaspiro[4.4]nonane (two morphemes)
 SPIRO_CARBO = "C1CCC2(C1)CCCCC2"  # spiro[4.5]decane (carbocyclic control)
 # SUBSTITUTED hetero spiros. These are not decoration: the spiro analyzer works
@@ -389,7 +389,7 @@ def test_spiro_no_longer_reports_unbound_replacement_morpheme(smiles, residues):
 # ==========================================================================
 # CANARY: P5's aza blind spot, pinned as it is TODAY.
 #
-# ``af0d7262`` recorded (as a comment only, above at DIAZA_CAGE) that this
+# `` recorded (as a comment only, above at DIAZA_CAGE) that this
 # defect class is invisible for nitrogen: P5's glue lexicon lets 'aza' strip
 # cleanly ('a' + 'z' + 'a', all three in ``_GLUE_MORPHEMES`` -- 'a' is
 # left/right connective glue, 'z' rides in on ``_STEREO_WORDS``), so an
@@ -399,7 +399,7 @@ def test_spiro_no_longer_reports_unbound_replacement_morpheme(smiles, residues):
 # hole. These two tests turn the comment into a living assertion.
 #
 # ``test_canary_*`` deliberately REMOVES the 'aza' replacement bindings the
-# real producer emits (reproducing the exact T5 pre-fix shape -- a parent
+# real producer emits (reproducing the exact pre-fix shape -- a parent
 # claiming every atom with NO binding corroborating the replacement morpheme)
 # and asserts P5 stays silent. If a lexicon change ever makes this fail, that
 # is GOOD NEWS (the blind spot closed) -- re-derive the test against the new
@@ -426,7 +426,7 @@ def test_canary_aza_replacement_binding_omission_is_invisible_to_p5():
     reps = _roles(res, 'replacement')
     assert [b.token for b in reps] == ["aza", "aza"]
 
-    # Deliberately drop the replacement bindings -- the exact T5 pre-fix
+    # Deliberately drop the replacement bindings -- the exact pre-fix
     # shape (parent-only spine) reproduced by construction, not by reverting
     # source. The parent alone still claims every atom, so P1/P2/P3/P7 stay
     # clean; only P5 (name residue) is under test here.
@@ -475,7 +475,7 @@ def test_contrast_oxa_replacement_binding_omission_IS_visible_to_p5():
 #
 # ``RingAnalysis`` makes the field list impossible to diverge (both forms
 # inherit it and add nothing), but declaring a field is not populating one --
-# a third analysis form could inherit ``hetero_per_atom`` and still report ().
+# a third analysis form could inherit ``hetero_per_atom`` and still report .
 # These two tests are the other half of the guarantee and are what fails if
 # either happens again.
 # ==========================================================================
@@ -529,7 +529,7 @@ def test_every_ring_analysis_form_decomposes_its_replacement_prefix(
 
 # ==========================================================================
 # Defence-in-depth: ``_ring_parent_bindings`` reads ``hetero_per_atom`` via
-# ``getattr(cage, 'hetero_per_atom', ())`` rather than a hard attribute
+# ``getattr(cage, 'hetero_per_atom', )`` rather than a hard attribute
 # access. The review verdict: sufficient for present scope (``RingAnalysis``
 # makes the field un-omittable by either real form, and the failure mode
 # degrades to the pre-af0d7262 audit finding, never a wrong name), but a
@@ -543,9 +543,9 @@ def test_ring_parent_bindings_warns_when_hetero_prefix_outruns_hetero_per_atom(
     Neither ``UniversalCage`` nor ``SpiroSystem`` can produce this state (see
     ``test_every_ring_analysis_form_decomposes_its_replacement_prefix``
     above), so it is manufactured with ``dataclasses.replace`` on a REAL
-    ``SpiroSystem`` -- same type, ``hetero_per_atom`` forced back to ``()``
+    ``SpiroSystem`` -- same type, ``hetero_per_atom`` forced back to ````
     -- which is exactly "inherits the field, never fills it". ``name`` and
-    ``parent_block`` are captured from the actual production call via a spy
+    ``parent_block`` are captured from the actual production call via a trace
     rather than reconstructed by hand, so this exercises the real argument
     shapes, not a guess at them.
     """

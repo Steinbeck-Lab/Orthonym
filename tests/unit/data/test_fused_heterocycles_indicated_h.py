@@ -2,7 +2,7 @@
 
 Parametrized over all 153 FUSED_HETEROCYCLE_DATA entries. Each test asserts
 that the catalog's ``tautomer_locant`` matches the audit-derived
-``expected_locant`` per the 155-AUDIT-B.md classification verdict.
+``expected_locant`` per the internal notes-B.md classification verdict.
 
 Verdicts (one per row):
 
@@ -22,7 +22,7 @@ The audit JSON sidecar at ``tests/fixtures/indicated_h/audit_b_results.json``
 is the single source of truth. Re-running ``scripts/audit_indicated_h.py``
 regenerates the sidecar; this test file consumes it.
 
-Source: internal notes,,; 155-AUDIT-B.md classification matrix.
+Source: 155-internal notes,,; internal notes-B.md classification matrix.
 """
 from __future__ import annotations
 
@@ -60,8 +60,8 @@ def _stable_id(row: dict) -> str:
 def test_catalog_entry_tautomer_locant(row):
     """Assert each catalog entry's ``tautomer_locant`` matches the audit verdict.
 
-    OPSIN-UNPARSEABLE rows are xfail-quarantined per CONTEXT and listed
-    in 155-AUDIT-B.md for a phase hand-off.
+    OPSIN-UNPARSEABLE rows are xfail-quarantined per internal notes and listed
+    in internal notes-B.md for a phase hand-off.
     """
     if row["classification"] == "OPSIN-UNPARSEABLE":
         pytest.xfail(
@@ -97,7 +97,7 @@ def test_audit_sidecar_size_matches_catalog():
 
 @pytest.mark.unit
 def test_no_wrong_locant_or_missing_locant_post_fix():
-    """a phase.B acceptance criterion V18-155-AC-2.
+    """a phase.B acceptance criterion V18-155-.
 
     After plan 155-02 ships, no catalog entry classifies as WRONG-locant
     or MISSING-locant in the audit (modulo OPSIN-UNPARSEABLE quarantines).

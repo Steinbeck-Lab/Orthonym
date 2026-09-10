@@ -1,47 +1,47 @@
-"""v29 P3-FIX Item 1 — the widened organyl prefix must EXPRESS its stereo or REFUSE.
+"""-FIX Item 1 — the widened organyl prefix must EXPRESS its stereo or REFUSE.
 
-The Phase 3 organyl migration widened ``rules.substituent_purity.organyl_prefix_name``
-from a hydrocarbon-only walker to the shared 5-tier chokepoint.  The retired walker
+The a phase organyl migration widened ``rules.substituent_purity.organyl_prefix_name``
+from a hydrocarbon-only walker to the shared 5-tier chokepoint. The retired walker
 refused every unsaturated fragment; the chokepoint names them -- but
 ``_add_substituent_stereo`` reads only **atom** ``_CIPCode``, never **bond**
 ``_CIPCode`` (its own sibling says so verbatim at
 ``substituent_naming.py:150-152``), so an E/Z double bond inside the fragment was
-silently dropped.  Both geometric isomers of ``C/C=C/[AsH2]`` therefore emitted the
+silently dropped. Both geometric isomers of ``C/C=C/[AsH2]`` therefore emitted the
 single name ``(prop-1-en-1-yl)arsane`` -- two distinct compounds, one name, and
 neither round-trips.
 
 This module pins BOTH halves of the repair:
 
-**(a) express what is derivable.**  ``_name_unsaturated_chain`` already derives the
-substituent's own numbering (free valence lowest, P-31.1.3.4), so it -- and only it
--- can locate the descriptor.  The located form is the verbatim Blue Book PIN:
+**(a) express what is derivable.** ``_name_unsaturated_chain`` already derives the
+substituent's own numbering (free valence lowest,, so it -- and only it
+-- can locate the descriptor. The located form is the verbatim Blue Book PIN:
 
-* ``## **P-91.3** NAMING OF STEREOISOMERS`` (``BlueBookV2.md:44686``):
+* ``## **** NAMING OF STEREOISOMERS`` (``the Blue Book``):
   ``(5Z)-4-[(1E)-prop-1-en-1-yl]hepta-1,5-diene (PIN)`` -- the token
   ``(1E)-prop-1-en-1-yl`` verbatim.
-* ``### Example 2`` under ``## **P-91.3** NAMING OF STEREOISOMERS``
-  (``BlueBookV2.md:45437``):
+* ``### Example 2`` under ``## **** NAMING OF STEREOISOMERS``
+  (``the Blue Book``):
   ``(2Z,5Z,7S,11Z)-5-[(2E)-but-2-en-1-yl]-9-[(2Z)-but-2-en-1-yl]trideca-2,5,8,11-tetraen-7-ol (PIN)``
   -- the token ``(2E)-but-2-en-1-yl`` verbatim.
-* ``## **P-46.3** PRINCIPAL SUBSTITUENT CHAINS IN COMPOUNDS WITH STEREOGENIC CENTERS``
-  (``BlueBookV2.md:23014``): ``[(2Z,4R,5E)-4-methylhepta-2,5-dien-4-yl]siline (PIN)``
+* ``## **** PRINCIPAL SUBSTITUENT CHAINS IN COMPOUNDS WITH STEREOGENIC CENTERS``
+  (``the Blue Book``): ``[(2Z,4R,5E)-4-methylhepta-2,5-dien-4-yl]siline (PIN)``
   -- a MIXED R/S + E/Z located block on an alkenyl organyl prefix, cited on a
-  mononuclear Group-14 parent hydride: exactly the class this phase widened.  It
+  mononuclear Group-14 parent hydride: exactly the class this phase widened. It
   also fixes the citation ORDER question: descriptors run in LOCANT order (2,4,5),
   not R/S-before-E/Z.
-* ``### P-91.2.1.2.1 Stereodescriptors used in substitutive nomenclature``
-  (``BlueBookV2.md:44624``): "*In preferred IUPAC names, stereodescriptors,
+* ``### Stereodescriptors used in substitutive nomenclature``
+  (``the Blue Book``): "*In preferred IUPAC names, stereodescriptors,
   preceded by a locant, **must be** cited to specify each stereogenic unit*" --
   so the locant is REQUIRED, not optional.
-* ``## **P-92.1.1** Stereogenic units`` (``BlueBookV2.md:44718``): "*In preferred
+* ``## **** Stereogenic units`` (``the Blue Book``): "*In preferred
   IUPAC names, all stereogenic units must be specified, unless an omission is
-  allowed according to P-91.2.2.*"  ``### **P-91.2.2** Omission of
-  stereodescriptors`` (``BlueBookV2.md:44635``) licenses omission ONLY for 3-7
+  allowed according to.*" ``### **** Omission of
+  stereodescriptors`` (``the Blue Book``) licenses omission ONLY for 3-7
   membered unsaturated alicyclics, the 8-ring carve-out, von Baeyer, spiro, fused,
   cyclophane and ring assemblies -- an acyclic side chain is in none of them.
 
-**(b) prove the rest, and fail closed.**  Everything the emitters cannot locate
-(multi-centre acyclic R/S, whose locants the D-09 rule forbids fabricating) must
+**(b) prove the rest, and fail closed.** Everything the emitters cannot locate
+(multi-centre acyclic R/S, whose locants the rule forbids fabricating) must
 make ``organyl_prefix_name`` return None rather than ship a stereo-stripped name.
 The obligation is a COUNT identity, not a pattern: the name must express exactly as
 many descriptor tokens as the fragment defines stereo elements.
@@ -77,7 +77,7 @@ def _organyl(smiles, hub_symbol='As'):
 
 @pytest.fixture
 def ungated_namer(monkeypatch):
-    """A namer with the SELF-01 OPSIN validity gate explicitly DISABLED, so the
+    """A namer with the OPSIN validity gate explicitly DISABLED, so the
     producer's own output is asserted with nothing downstream able to rescue it."""
     import orthonym.namer as _namer
     monkeypatch.setattr(_namer, "_DISABLE_VALIDITY_GATE", True, raising=False)
@@ -96,7 +96,7 @@ def ungated_namer(monkeypatch):
     ("C/C=C/C[AsH2]",  "(2E)-but-2-en-1-yl"),
     ("C/C=C\\C[AsH2]", "(2Z)-but-2-en-1-yl"),
     # Internal attachment: the free valence still takes the lowest locant
-    # (P-31.1.3.4), so the ene locant is 3 and the descriptor rides on it.
+    #, so the ene locant is 3 and the descriptor rides on it.
     ("CC(/C=C/C)[AsH2]",  "(3E)-pent-3-en-2-yl"),
     ("CC(/C=C\\C)[AsH2]", "(3Z)-pent-3-en-2-yl"),
     # Two stereogenic double bonds -> one comma-joined block in locant order.
@@ -126,28 +126,28 @@ def test_mixed_rs_and_ez_share_one_locant_ordered_block(smiles, expected):
 
 
 # --------------------------------------------------------------------------
-# (b) a locatable multi-centre fragment is EXPRESSED (v33 Phase 0 L3-2a)
+# (b) a locatable multi-centre fragment is EXPRESSED (a phase L3-2a)
 # --------------------------------------------------------------------------
 #
-# UPDATED (v33 Phase 0 L3-2a): this pair was NOT a case of "cannot be
+# UPDATED (a phase L3-2a): this pair was NOT a case of "cannot be
 # located" -- it was a case of nobody having wired the existing locator in.
 # `_add_substituent_stereo`'s multi-centre branch now calls
-# `_acyclic_alkyl_located_stereo_name` (the SAME P-46.1.8/.12 chain-position
+# `_acyclic_alkyl_located_stereo_name` (the SAME /.12 chain-position
 # deriver the single-centre branch above already trusted, since it ships
 # `pin_form` in place of the caller's `name`) whenever the fragment is a
 # plain/decorated acyclic alkyl chain. For THIS shape the numbering threads
 # cleanly, so both diastereomers now get distinct, located descriptors
-# instead of an identical stereo-free name -- which is what P-91.2.1.2.1
-# (BlueBookV2.md:44624, "stereodescriptors ... must be cited") and P-92.1.1
+# instead of an identical stereo-free name -- which is what
+# (the Blue Book, "stereodescriptors... must be cited") and
 # (:44718, "all stereogenic units must be specified, unless an omission is
-# allowed according to P-91.2.2") require once the locant is determinable;
-# P-91.2.2 (:44635) licenses omission only for specific ring classes, never
+# allowed according to ") require once the locant is determinable;
+# (:44635) licenses omission only for specific ring classes, never
 # for an acyclic side chain. Verified independently of this codebase: OPSIN
 # parses BOTH `[(2R,3R)-3-methylpentan-2-yl]dimethylarsane` and
 # `[(2S,3R)-3-methylpentan-2-yl]dimethylarsane` back to the exact InChIKey of
 # their respective input SMILES, and the two names are textually distinct
 # (previously both diastereomers collided on the identical, stereo-free
-# `3-methylpentan-2-yl`). The truly-unthreadable case (D-09's "missing beats
+# `3-methylpentan-2-yl`). The truly-unthreadable case ('s "missing beats
 # wrong" fallback) is still covered separately --
 # `tests/unit/assembly/test_substituent_stereo.py::TestMultiCentre`.
 @pytest.mark.parametrize("smiles,expected", [
@@ -242,7 +242,7 @@ def test_branched_alkenyl_geometric_isomers_never_share_a_name():
     ("N[C@@H](C/C=C\\Cl)C(=O)O", 2, 1, "3-chloropropyl"),
     # -CH=CH-Cl is ethenyl, NOT ethyl.
     ("N[C@@H](C/C=C\\Cl)C(=O)O", 3, 2, "2-chloroethyl"),
-    # ...and with the geometry UNDEFINED, where no stereo check can help.
+    #...and with the geometry UNDEFINED, where no stereo check can help.
     ("NC(CC=CCl)C(=O)O", 2, 1, "3-chloropropyl"),
     ("NC(CC=CCl)C(=O)O", 3, 2, "2-chloroethyl"),
 ])
@@ -283,17 +283,17 @@ def test_saturated_halogenated_chain_is_unchanged(smiles, start, excl, expected)
 def test_removing_the_saturation_guard_really_does_delete_the_double_bond():
     """MUTATION PROOF of the guard above — the reproduction nobody had done.
 
-    The two tests above assert only that the guarded function DECLINES.  That is
+    The two tests above assert only that the guarded function DECLINES. That is
     not evidence the guard is load-bearing: a function that declined for some
-    other reason would pass them identically.  This test removes the saturation
+    other reason would pass them identically. This test removes the saturation
     decline from the live source and shows the atom/bond loss appear.
 
     Measured here:
 
-        fragment          guarded (HEAD)   guard removed
-        -CH2-CH=CH-Cl     None             '3-chloropropyl'
-        -CH=CH-Cl         None             '2-chloroethyl'
-        -CH2CH2CH2-Cl     '3-chloropropyl' '3-chloropropyl'   <- CONTROL
+        fragment guarded (HEAD) guard removed
+        -CH2-CH=CH-Cl None '3-chloropropyl'
+        -CH=CH-Cl None '2-chloroethyl'
+        -CH2CH2CH2-Cl '3-chloropropyl' '3-chloropropyl' <- CONTROL
 
     The control is what makes it a collision rather than merely a wrong name:
     `3-chloropropyl` is the CORRECT name of the saturated chain, so without the
@@ -381,11 +381,11 @@ def test_stereo_outside_the_fragment_is_not_the_prefix_obligation():
 
 
 def test_p91_2_2_small_ring_double_bond_is_not_a_demanded_descriptor():
-    """A <8-membered ring double bond is ring-strain-fixed, so P-91.2.2 recommends
+    """A <8-membered ring double bond is ring-strain-fixed, so recommends
     OMITTING its descriptor — it must not be counted as an obligation the prefix
     failed to meet.
 
-    `### **P-91.2.2** Omission of stereodescriptors` (`BlueBookV2.md:44635`):
+    `### **** Omission of stereodescriptors` (`the Blue Book`):
     "*The omission of stereodescriptors specifying double bonds is recommended in
     the case of three- through seven-membered unsaturated alicyclic compounds where
     any double bond has a fixed configuration*".

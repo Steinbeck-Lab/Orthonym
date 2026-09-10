@@ -1,6 +1,6 @@
-"""P-102.6.1.2 *O*-Glycosyl compounds: the glycosidic oxygen is expressed ONCE.
+""" *O*-Glycosyl compounds: the glycosidic oxygen is expressed ONCE.
 
-Blue Book **P-102.6.1.2 "*O*-Glycosyl compounds"** (``the Blue Book Blue Book``):
+Blue Book ** "*O*-Glycosyl compounds"** (``the Blue Book Blue Book``):
 
     "The substituent group formed by removal of a hydrogen atom from the anomeric
     -OH group is considered as a compound substituent group formed by the
@@ -160,7 +160,7 @@ class TestGlycosylSubstituentPrefix:
         assert glycosyl_substituent_prefix(mol, frag, o) is None
 
     def test_refuses_an_oligosaccharide_substituent(self):
-        """A disaccharide substituent needs the P-102 (1->n) linkage notation
+        """A disaccharide substituent needs the (1->n) linkage notation
         INSIDE the prefix, which this primitive does not build."""
         mol, frag, o = _glyco_fragment(
             "C[C@@H]1O[C@@H](O[C@H]2[C@H](Oc3cc(O)c4c(c3)O[C@H](c3ccccc3)CC4=O)"
@@ -168,7 +168,7 @@ class TestGlycosylSubstituentPrefix:
         assert glycosyl_substituent_prefix(mol, frag, o) is None
 
     def test_refuses_when_the_attachment_atom_is_not_the_glycosidic_oxygen(self):
-        """A C-glycosyl (P-102.6.1.4) is a different construction: no 'oxy'."""
+        """A C-glycosyl is a different construction: no 'oxy'."""
         mol, frag, o = _glyco_fragment(
             "O=Cc1ccc(O[C@@H]2O[C@H](CO)[C@@H](O)[C@H](O)[C@H]2O)cc1")
         anomeric = [n.GetIdx() for n in mol.GetAtomWithIdx(o).GetNeighbors()
@@ -208,7 +208,7 @@ class TestGlycosylSubstituentPrefix:
         ``('β', 'D', '2-acetamido-2-deoxy-glucopyranose')`` -- non-uronic, with
         both descriptors -- so only the decorated-base guard can refuse it.
         Concatenating would give 'β--acetamido-2-deoxy-glucopyranosyloxy',
-        whereas P-102.6.1.2 (:53935) requires the decorated glycosyl inside its
+        whereas (:53935) requires the decorated glycosyl inside its
         own enclosing marks before 'oxy'.
         """
         mol, frag, o = _glyco_fragment(
@@ -278,7 +278,7 @@ class TestGlycosylSubstituentPrefix:
 
 
 # --------------------------------------------------------------------------
-# Negatives: the sugar->sugar (oligosaccharide, P-102) path is untouched
+# Negatives: the sugar->sugar (oligosaccharide, path is untouched
 # --------------------------------------------------------------------------
 
 @pytest.mark.unit
@@ -294,6 +294,6 @@ class TestGlycosylSubstituentPrefix:
      "β-D-mannopyranosyl-(1->4)-β-D-galactopyranose"),
 ])
 def test_sugar_to_sugar_linkage_notation_unchanged(smiles, expected):
-    """A glycosidic bond between two SUGARS keeps the P-102 (1->n) form. The
+    """A glycosidic bond between two SUGARS keeps the (1->n) form. The
     glycosyloxy prefix must not capture it -- these are the discriminator."""
     assert _name(smiles) == expected

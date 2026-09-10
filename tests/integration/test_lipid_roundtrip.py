@@ -1,7 +1,7 @@
-"""OPSIN round-trip integration tests for the P-107 lipid assembler (Phase 180).
+"""OPSIN round-trip integration tests for the lipid assembler (a phase).
 
 Generate name → OPSIN parse → compare canonical SMILES to the original. RT is
-the project's accuracy oracle (WSC-01). Stereo-aware where the backbone carries
+the project's accuracy oracle (-01). Stereo-aware where the backbone carries
 defined configuration; the negative guards a non-lipid stays correct.
 
 WAVE 0 CONTRACT: RED until Waves 1-4 build the subsystem.

@@ -5,10 +5,10 @@ acid_halide shim discipline). The acid halide of a sulfonic / sulfinic
 acid is a two-word functional-class name '{stem}sulfonyl {halide}' /
 '{stem}sulfinyl {halide}'.
 
-IUPAC cite: P-67.1.4.4.1 / P-68.5.0 / P-65.3.1 (acyl halides of
-sulfonic/sulfinic acids; BB 'ethanesulfonyl chloride' @39650,
+IUPAC cite: / / (acyl halides of
+sulfonic/sulfinic acids; BB 'ethanesulfonyl chloride',
 'propane-1-sulfonyl chloride', '4-isocyanatobenzene-1-sulfonyl chloride
-(PIN)' @26014).
+(PIN)').
 """
 from __future__ import annotations
 

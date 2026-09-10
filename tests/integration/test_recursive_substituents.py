@@ -7,8 +7,8 @@ utility functions (apply_enclosing_marks, get_bracket_depth, format_substituent_
 Test categories:
 1. Regression guards: simple molecules that MUST NOT change
 2. Branched alkyl substituent detection on chains
-3. Enclosing marks (RSN-02): parentheses, brackets, braces
-4. Compound substituent formatting and multipliers (RSN-03)
+3. Enclosing marks : parentheses, brackets, braces
+4. Compound substituent formatting and multipliers
 5. Utility function behavior (is_complex_substituent, format_substituent_prefix)
 """
 
@@ -145,11 +145,11 @@ class TestBranchedAlkylDetection:
 
 
 # ============================================================================
-# Category 3: Enclosing Marks (RSN-02)
+# Category 3: Enclosing Marks
 # ============================================================================
 
 class TestEnclosingMarks:
-    """Test IUPAC P-16.5.1.1 enclosing mark nesting."""
+    """Test IUPAC enclosing mark nesting."""
 
     @pytest.mark.integration
     def test_parentheses_depth_0(self):
@@ -186,7 +186,7 @@ class TestEnclosingMarks:
 
 
 # ============================================================================
-# Category 4: Compound Substituent Formatting and Multipliers (RSN-03)
+# Category 4: Compound Substituent Formatting and Multipliers
 # ============================================================================
 
 class TestCompoundSubstituentFormatting:
@@ -230,7 +230,7 @@ class TestCompoundSubstituentFormatting:
 
     @pytest.mark.integration
     def test_sec_butyl_parens(self):
-        """sec-butyl is a SIMPLE substituent -> NO enclosing marks (P-16.3.3(b);
+        """sec-butyl is a SIMPLE substituent -> NO enclosing marks (b);
         cf. CLAUDE.md '3-tert-butyl-...'). The old parens-for-any-hyphen rule
         was stale."""
         result = format_substituent_prefix("sec-butyl", [3], 1)
@@ -240,7 +240,7 @@ class TestCompoundSubstituentFormatting:
     def test_already_wrapped_no_double(self):
         """A name carrying an UN-closed enclosing mark (parens around oxan-2-yl,
         bare trailing 'oxy') is a compound substituent; per the enclosing-mark
-        nesting order (P-16.5.4.1) it escalates to the next bracket level ->
+        nesting order it escalates to the next bracket level ->
         '1-[(oxan-2-yl)oxy]', not a bare/double paren. Stale expectation."""
         result = format_substituent_prefix("(oxan-2-yl)oxy", [1], 1)
         assert result == "1-[(oxan-2-yl)oxy]"
@@ -275,13 +275,13 @@ class TestIsComplexSubstituent:
 
     @pytest.mark.integration
     def test_complex_sec_butyl(self):
-        # P-16.3.3(b): sec-butyl is a SIMPLE substituent (the italic 'sec-' is
+        # (b): sec-butyl is a SIMPLE substituent (the italic 'sec-' is
         # not a locant/complexity marker), so it is NOT complex.
         assert is_complex_substituent("sec-butyl") is False
 
     @pytest.mark.integration
     def test_complex_tert_butyl(self):
-        # P-16.3.3(b): tert-butyl is SIMPLE (cf. CLAUDE.md '3-tert-butyl-...').
+        # (b): tert-butyl is SIMPLE (cf. CLAUDE.md '3-tert-butyl-...').
         assert is_complex_substituent("tert-butyl") is False
 
 
@@ -309,7 +309,7 @@ class TestParentToPrefix:
         # residue Task A: (name, count) is not injective over fragments --
         # '-CH2CH2CH2OH' and '-CH(OH)CH2CH3' both cap to 'propan-1-ol' with
         # count 3, and OPSIN 2.9.0 makes the single old answer EXACT for one
-        # and a DIFFERENT MOLECULE for the other. P-46.1.8 (the Blue Book) can only
+        # and a DIFFERENT MOLECULE for the other. (the Blue Book) can only
         # be honoured by a caller holding the molecule, so this declines; the
         # structural namers still give the right whole-molecule name.
         assert parent_to_prefix("propan-2-ol", 3, attach_locant=ATTACH_LOCANT_UNKNOWN) is None
@@ -320,7 +320,7 @@ class TestParentToPrefix:
 
     @pytest.mark.integration
     def test_aldehyde_to_oxo(self):
-        # a phase MBA-02: the absorbed -CHO carbon sits at the terminus opposite
+        # a phase: the absorbed -CHO carbon sits at the terminus opposite
         # the attachment (= chain_length), so oxo is at C3, not the acyl C1.
         # '1-oxopropyl' is NOT a preferred IUPAC prefix (the Blue Book Table-28.1 note m).
         # Task A: `chain_length` is a COUNT, not a proof of chain length -- on

@@ -12,7 +12,7 @@ partition exactly like a saturated carbon; the pyrrole-type NH is aromatic and
 excluded. A fail-closed post-check defers when any N would be cited as
 INDICATED hydrogen (the genuinely ambiguous case).
 
-Governing rules: IUPAC 2013 P-31.1.4 / P-25.7.1.1 (hydro prefixes), P-58.2.
+Governing rules: IUPAC 2013 / (hydro prefixes),.
 """
 import pytest
 from rdkit import Chem

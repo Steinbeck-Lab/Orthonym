@@ -1,7 +1,7 @@
 """ Composition Increment 1a -- O-glycoside of a COMPLEX/retained-named aglycone.
 
 The glycoside namer builds the functional-class ``<aglycone-yl> <sugar>oside`` form
-(P-102.5.6.2.2) and already names simple aglycones (``cyclohexyl``/``menthyl``/
+ and already names simple aglycones (``cyclohexyl``/``menthyl``/
 ``phenyl`` β-D-glucopyranoside). It USED to decline when the aglycone's ``-yl``
 prefix could only be produced by the string rule ``_alcohol_to_alkyl`` and that rule
 FABRICATED an OPSIN-unparseable token -- e.g. the retained alcohol ``borneol`` ->
@@ -14,7 +14,7 @@ set + the glycosidic-oxygen carbon) via the ring-substituent chokepoint
 and RT-gates the whole glycoside (full InChI) before emitting. 0-wrong is absolute:
 a candidate that does not round-trip is never shipped (the molecule abstains).
 
-Governing rule: P-102.5.6.2.2 (functional-class glycoside), P-29.2 (substituent
+Governing rule: (functional-class glycoside), (substituent
 free-valence morphology). Every asserted name string below was confirmed to
 OPSIN-round-trip to the input's InChI before being pinned.
 """
@@ -27,7 +27,7 @@ from orthonym.validation.opsin_roundtrip import opsin_roundtrip_check
 
 # whole-branch review (minor 2): every test here asserts an OPSIN round-trip,
 # so mark the whole module opsin_gate — a Java-free run SKIPS these rather than
-# reporting them as failures (parity with the CP2 / salt / DROP-23 test files).
+# reporting them as failures (parity with the CP2 / salt / test files).
 pytestmark = pytest.mark.opsin_gate
 
 

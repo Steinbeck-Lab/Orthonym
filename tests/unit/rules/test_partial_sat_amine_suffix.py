@@ -1,8 +1,8 @@
 """Ring `-amine` suffix on a partially-saturated (hydro-fused) carbocycle
 (follow-on to DEFECT-hydro-fused-substituent-locants.md).
-`1,2,3,4-tetrahydronaphthalen-1-amine` is a Blue Book PIN (BlueBookV2.md:26489);
+`1,2,3,4-tetrahydronaphthalen-1-amine` is a Blue Book PIN (the Blue Book);
 the `-ol` sibling already worked, this adds the amine. Each emission full-InChIKey
-round-trips; seniority (P-41: amine < alcohol) and 0-wrong are asserted.
+round-trips; seniority: amine < alcohol) and 0-wrong are asserted.
 """
 from rdkit import Chem
 from rdkit.Chem import inchi
@@ -39,7 +39,7 @@ def test_diamine_keeps_terminal_e():
 
 
 def test_alcohol_is_senior_to_amine():
-    # P-41: with both -OH and -NH2, alcohol wins -> the amine path must NOT claim
+    #: with both -OH and -NH2, alcohol wins -> the amine path must NOT claim
     # the suffix. (Conservatively abstains today rather than mis-claim -amine.)
     assert _name("NC1CCc2ccc(O)cc2C1") == "unknown organic compound"
 

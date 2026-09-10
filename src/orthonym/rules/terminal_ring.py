@@ -1,4 +1,4 @@
-"""v30 P3-T1b: the TERMINAL ring namer -- the audited systematic generator that
+"""-T1b: the TERMINAL ring namer -- the audited systematic generator that
 stands where the ``'substituent'`` refusal sentinel used to.
 
 Why this module exists
@@ -23,7 +23,7 @@ already gate every result on a reconstruction audit
 they cannot do -- by definition, at ``vonbaeyer_universal.py:424`` -- is a
 MONOCYCLE, because von Baeyer nomenclature starts at two rings.
 
-So the new code below is the MONOCYCLE branch: P-22.2.3 skeletal ('a')
+So the new code below is the MONOCYCLE branch: skeletal ('a')
 replacement nomenclature over a ``cyclo``-alkane stem, with a locant for every
 non-carbon skeletal atom, λ for hypervalence, and an explicit locant for every
 ring multiple bond -- plus its own reconstruction audit, built to the same
@@ -35,17 +35,17 @@ Scope (stated explicitly, per the task contract)
 ------------------------------------------------
 * **Elements** -- carbon plus the 18 ring 'a'-prefix rows this project admits
   (``ring_replacement.HETEROATOM_PREFIXES``: O S Se Te N P As Sb Bi Si Ge Sn Pb
-  B Al Ga In Tl). The Blue Book's replacement set is Table 1.5 (P-15.4.1.1),
+  B Al Ga In Tl). The Blue Book's replacement set is Table 1.5,
   which is a CLOSED list, so an off-table skeletal element (Zn/Cd/Hg/Fe/…) has no
   morpheme and MUST refuse -- see the ``ring_replacement`` module docstring.
 * **Cycle rank** -- 1 (this module's monocycle branch) and 2..8 (delegated to the
   universal analyzers; 8 is ``vonbaeyer_universal.MAX_CAGE_RINGS``, deliberately
   NOT raised here: its own comment at ``vonbaeyer_universal.py:48`` requires the
-  P-23.2.4 main-bridge selection to be fixed first).
+   main-bridge selection to be fixed first).
 * **Size** -- at most 40 skeletal atoms (``MAX_CAGE_ATOMS``; the monocycle branch
   is additionally bounded by ``data.chain_names.get_chain_prefix``).
 * **Charge** -- a charged skeletal ring atom REFUSES. A ring cation/anion is
-  P-73 (``cation_words`` / ``ion_retained_names``), not replacement
+   (``cation_words`` / ``ion_retained_names``), not replacement
   nomenclature; ``[n+]`` in a ring is a different naming class and inventing a
   neutral 'a'-prefix name for it would name a DIFFERENT species.
 
@@ -57,11 +57,11 @@ reason so the refused count is measurable.
 
 IUPAC references
 ----------------
-* P-22.2.3 "Skeletal replacement ('a') nomenclature" for monocyclic rings.
-* P-15.4.1.1 + Table 1.5 -- the closed replacement-prefix set.
-* P-15.4.1.3 -- λ placement (immediately after the locant, no hyphen).
-* P-31.1.4.2(1) -- ring multiple-bond locant citation.
-* P-29.2 / P-29.3.2 -- the ``-yl`` free valence and its lowest locant.
+* "Skeletal replacement ('a') nomenclature" for monocyclic rings.
+* + Table 1.5 -- the closed replacement-prefix set.
+* -- λ placement (immediately after the locant, no hyphen).
+* (1) -- ring multiple-bond locant citation.
+* / -- the ``-yl`` free valence and its lowest locant.
 """
 from __future__ import annotations
 
@@ -93,13 +93,13 @@ __all__ = [
 class TerminalRingName:
     """One audited terminal ring name.
 
-    ``name``      the emitted string -- the parent hydride when
+    ``name`` the emitted string -- the parent hydride when
                   ``free_valence`` is None, else the ``…-<loc>-yl`` substituent
                   token.
-    ``numbering``  atom idx -> ring locant, the SAME map the name was spelled
+    ``numbering`` atom idx -> ring locant, the SAME map the name was spelled
                   from (never re-derived), so a consumer can place its own
                   substituent locants consistently.
-    ``basis``      which generator + audit produced it: ``'monocycle'``,
+    ``basis`` which generator + audit produced it: ``'monocycle'``,
                   ``'von_baeyer'`` or ``'spiro'``.
     """
 
@@ -172,12 +172,12 @@ def _cycle_order(mol, ring_atoms: Sequence[int]) -> Optional[list]:
 def monocycle_numbering(
     mol, ring_atoms: Sequence[int], free_valence_atom: Optional[int] = None,
 ) -> Optional[Dict[int, int]]:
-    """Deterministic P-14.4-style numbering of a simple monocycle.
+    """Deterministic -style numbering of a simple monocycle.
 
     Lowest-locant key, applied in order: heteroatoms as a SET, then heteroatoms
-    in element-seniority order (P-23.3.1 ranks, shared with the von Baeyer
+    in element-seniority order ranks, shared with the von Baeyer
     prefix builder so the two do not disagree), then the free valence
-    (P-29.3.2), then the ring multiple bonds. Every starting atom and both
+    , then the ring multiple bonds. Every starting atom and both
     directions are enumerated, so the answer is independent of RDKit atom order.
 
     Returns ``None`` only when ``ring_atoms`` is not a single simple cycle.
@@ -229,7 +229,7 @@ def _unsaturation_block(double_locs: Sequence[str], triple_locs: Sequence[str],
     """``''`` (saturated -> caller appends ``an``), ``'-1-en'``,
     ``'a-1,3-dien'``, ``'-2-yn'``, ``'a-1,3-dien-5-yn'`` …
 
-    Elision follows P-16.3.3: a multiplied ending keeps the stem's terminal
+    Elision follows: a multiplied ending keeps the stem's terminal
     ``a`` (``cyclohexa-1,3-diene``); a single ending elides it
     (``cyclohex-1-ene``).
     """
@@ -254,10 +254,10 @@ def build_monocycle_replacement_name(
     mol, ring_atoms: Sequence[int], numbering: Dict[int, int],
     free_valence_locant: Optional[int] = None,
 ) -> Optional[str]:
-    """The P-22.2.3 replacement name for a simple monocycle, or None.
+    """The replacement name for a simple monocycle, or None.
 
     ``mol`` MUST already be kekulized: ``render_ring_unsaturation`` reads
-    ``GetBondType()``, and an aromatic bond is neither DOUBLE nor TRIPLE, so an
+    ``GetBondType``, and an aromatic bond is neither DOUBLE nor TRIPLE, so an
     un-kekulized mancude ring would silently lose every one of its double bonds.
 
     Returns the parent hydride (``1-thiacyclohexane``) when
@@ -305,7 +305,7 @@ def build_monocycle_replacement_name(
     # a second, explicit statement of the same decision.
     #
     # It is deliberately a REFUSAL rather than a citation. Citing it as locant
-    # ``N`` is the usual reading of P-31.1.4.2, but the audit would then have to
+    # ``N`` is the usual reading of, but the audit would then have to
     # apply that same convention to parse it back -- speller and parser sharing an
     # assumption is exactly the shape the audit exists to rule out, so the
     # convention would be unproven rather than verified. Extending the audit to
@@ -320,7 +320,7 @@ def build_monocycle_replacement_name(
     d_locs = sorted(unsat.double_locants, key=int)
     t_locs = sorted(unsat.triple_locants, key=int)
 
-    # P-23.3.1 / P-22.2.3: the 'a'-prefix block attaches DIRECTLY to the ring
+    # /: the 'a'-prefix block attaches DIRECTLY to the ring
     # stem, no hyphen ('1-thiacyclohexane', never '1-thia-cyclohexane').
     head = f"{repl.prefix}cyclo" if repl.prefix else "cyclo"
     body = _unsaturation_block(d_locs, t_locs)
@@ -359,7 +359,7 @@ _UNSAT_TERM_RE = re.compile(
 
 
 def parse_monocycle_replacement_name(name: str):
-    """``'1-thiacyclohexan-4-yl'`` -> ``(6, {1: 'S'}, frozenset(), frozenset(),
+    """``'1-thiacyclohexan-4-yl'`` -> ``(6, {1: 'S'}, frozenset, frozenset,
     4)``: (ring size, {locant: element}, double-bond edges, triple-bond edges,
     free-valence locant or None). ``None`` when the string is not in the closed
     grammar this module emits.
@@ -507,7 +507,7 @@ def audit_monocycle_replacement_name(
         claimed = elements.get(loc, 'C')
         if symbol != claimed:
             return False
-        # a charged skeletal atom is a different naming class (P-73) and no
+        # a charged skeletal atom is a different naming class and no
         # 'a'-prefix name expresses it -> the name would denote the neutral ring
         if mol.GetAtomWithIdx(inv[loc]).GetFormalCharge() != 0:
             return False
@@ -565,7 +565,7 @@ def terminal_ring_name(
 
     ``ring_atoms`` must be the skeletal atoms of a single connected ring system
     (the caller owns the partition). ``free_valence_atom`` makes it a ``-yl``
-    substituent token numbered per P-29.3.2; ``None`` yields the parent hydride.
+    substituent token numbered per; ``None`` yields the parent hydride.
 
     Returns ``None`` only when the ring system is out of the module's stated
     scope (see the module docstring) or when the emitted name FAILS its
@@ -580,7 +580,7 @@ def terminal_ring_name(
         return None
     if free_valence_atom is not None and free_valence_atom not in ring:
         return None
-    # SCOPE: charge. A charged skeletal ring atom is P-73, not replacement
+    # SCOPE: charge. A charged skeletal ring atom is, not replacement
     # nomenclature; naming it neutral would denote a different species.
     for i in ring:
         if mol.GetAtomWithIdx(i).GetFormalCharge() != 0:
@@ -622,7 +622,7 @@ def terminal_ring_name(
 
     if rank > MAX_CAGE_RINGS:
         # Deliberately NOT raised here: vonbaeyer_universal.py:48 requires the
-        # P-23.2.4 main-bridge selection to be fixed first.
+        # main-bridge selection to be fixed first.
         logger.info("terminal_ring: ring count %d > MAX_CAGE_RINGS; refuse",
                     rank)
         return None
@@ -693,7 +693,7 @@ def _spell_ring_analysis(res, free_valence_atom) -> Optional[str]:
     d_locs = list(res.unsaturation.get('double_bonds') or ())
     t_locs = list(res.unsaturation.get('triple_bonds') or ())
     body = _unsaturation_block(d_locs, t_locs) or 'an'
-    # P-23.3.1: the 'a'-prefix block attaches directly to the descriptor
+    #: the 'a'-prefix block attaches directly to the descriptor
     # ('2-oxabicyclo[2.2.2]octane'), exactly as the analyzers' own PIN callers
     # concatenate it -- no separator is inserted here.
     head = f"{res.hetero_prefix}{res.descriptor}"

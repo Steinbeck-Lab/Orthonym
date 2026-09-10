@@ -1,14 +1,14 @@
-"""v26 BP-2 RC-3 — unsaturated substituent chain with an in-chain carbonyl -> oxo.
+""" — unsaturated substituent chain with an in-chain carbonyl -> oxo.
 
 An acyclic all-carbon substituent chain that is UNSATURATED and carries an
 in-chain / terminal aldehyde or ketone fell between two tiers: the pure-alkenyl
 namer declines (the =O is not C) and the saturated polyfunctional builder
 declines (unsaturation + internal attachment). The recursive path then named the
 capped fragment as a free molecule (`prop-2-enal`) and `parent_to_prefix` (post
-RC-1) returned None -> `unknown`. Pre-RC-1 it fabricated `prop-2-enalyl`.
+) returned None -> `unknown`. Pre- it fabricated `prop-2-enalyl`.
 
-RC-3 expresses the carbonyl as the detachable prefix `oxo` on the chain numbered
-from the free valence (P-33 oxo; P-14.4 free valence > unsaturation > oxo), e.g.
+ expresses the carbonyl as the detachable prefix `oxo` on the chain numbered
+from the free valence oxo; free valence > unsaturation > oxo), e.g.
 `-C(=CH2)-CHO` -> `3-oxoprop-1-en-2-yl`. Fail-closed on rings, any heteroatom
 other than a ketone/aldehyde =O, branched/non-single chains, no unsaturation
 (saturated tier owns it), no oxo, or oxo ON the free-valence carbon (acyl).
@@ -42,7 +42,7 @@ def test_full_name_unsaturated_oxo_on_ring():
 # --- builder positive ------------------------------------------------------
 
 def test_builder_prop_en_oxo():
-    # C=C(C=O)C : last C is the parent placeholder; sub = -C(=CH2)-CHO
+    # C=C(C=O)C: last C is the parent placeholder; sub = -C(=CH2)-CHO
     mol, sub, attach = _sub_fragment("C=C(C=O)C")
     assert _name_unsaturated_oxo_substituent(mol, sub, attach, set()) == \
         "3-oxoprop-1-en-2-yl"
@@ -63,8 +63,8 @@ def test_builder_declines_saturated_oxo():
 
 
 def test_builder_declines_acyl_on_attach():
-    # oxo ON the free-valence carbon = acyl -> None (P-66 note (m))
-    # C(=O)C=C  with the attach being the carbonyl carbon
+    # oxo ON the free-valence carbon = acyl -> None note (m))
+    # C(=O)C=C with the attach being the carbonyl carbon
     mol = Chem.MolFromSmiles("O=CC=CC")           # penta? -> acyl at C1
     # attach = the carbonyl C (idx 1), sub = atoms 0..3, parent = last C(4)
     sub = [0, 1, 2, 3]

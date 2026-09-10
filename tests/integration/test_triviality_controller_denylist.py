@@ -1,13 +1,13 @@
-"""Phase 168 Plan-03: deny-list regression corpus (CONTEXT D-11 + Phase 167 HYG-03/HYG-04).
+"""a phase Plan-03: deny-list regression corpus (internal notes + a phase /).
 
-One `class TestXxxNotEmitted` per D-11 deny entry. The correct D-11 invariant is "no pin=false
+One `class TestXxxNotEmitted` per deny entry. The correct invariant is "no pin=false
 form leaks into emission VIA THE CONTROLLER" — so the assertion is DIFFERENTIAL (ON vs OFF): the
 controller must never INTRODUCE a denied form. This is necessary because Orthonym's existing
 retained-name machinery already emits a few of these (resorcinol/hydroquinone/catechol/cumene) in
 OFF mode — those are pre-existing (a separate concern), NOT controller-introduced. The differential
 assertion isolates the controller's contribution (which is 0-fire, so ON == OFF).
 
-Source: 168-CONTEXT.md D-11; RESEARCH section 6.5 + 6.7; analog test_retained_names_pin_cleanup.py.
+Source: 168-internal notes; RESEARCH section 6.5 + 6.7; analog test_retained_names_pin_cleanup.py.
 """
 
 import glob
@@ -54,7 +54,7 @@ def _assert_controller_does_not_introduce(smiles: str, archaic: str):
         )
 
 
-# ---- Phase 167 HYG-03 inheritance (3) ----
+# ---- a phase inheritance (3) ----
 class TestErythreneNotEmitted:
     SMILES, ARCHAIC = "C=CC=C", "erythrene"
     @pytest.mark.integration
@@ -80,7 +80,7 @@ class TestAspirinNotEmitted:
         _assert_controller_does_not_introduce(self.SMILES, self.ARCHAIC)
 
 
-# ---- Phase 167 HYG-04 inheritance (benzhydryl never introduced; diphenylmethoxy preserved) ----
+# ---- a phase inheritance (benzhydryl never introduced; diphenylmethoxy preserved) ----
 class TestBenzhydrylNotEmitted:
     SMILES = "CN(C)CCOC(c1ccccc1)c1ccccc1"
     @pytest.mark.integration
@@ -94,7 +94,7 @@ class TestBenzhydrylNotEmitted:
         assert "diphenylmethoxy" in on, f"diphenylmethoxy lost: {on!r}"
 
 
-# ---- D-11 italic-letter locants (3): never emit o-/m-/p-xylene ----
+# ---- italic-letter locants (3): never emit o-/m-/p-xylene ----
 class TestOXyleneNotEmitted:
     SMILES, ARCHAIC = "Cc1ccccc1C", "o-xylene"
     @pytest.mark.integration
@@ -119,7 +119,7 @@ class TestPXyleneNotEmitted:
         assert self.ARCHAIC not in on, f"italic locant leaked: {on!r}"
 
 
-# ---- D-11 Beilstein house-style (3) ----
+# ---- Beilstein house-style (3) ----
 class TestPhenylamineNotEmitted:
     SMILES, ARCHAIC = "Nc1ccccc1", "phenylamine"
     @pytest.mark.integration
@@ -144,7 +144,7 @@ class TestAcetoxyNotEmitted:
         _assert_controller_does_not_introduce(self.SMILES, self.ARCHAIC)
 
 
-# ---- D-11 P-22.1.3 general-only (3) ----
+# ---- general-only (3) ----
 class TestCumeneNotEmitted:
     SMILES, ARCHAIC = "CC(C)c1ccccc1", "cumene"
     @pytest.mark.integration
@@ -169,7 +169,7 @@ class TestMesityleneNotEmitted:
         _assert_controller_does_not_introduce(self.SMILES, self.ARCHAIC)
 
 
-# ---- D-11 general-only retained names (5) ----
+# ---- general-only retained names (5) ----
 class TestResorcinolNotEmitted:
     SMILES, ARCHAIC = "Oc1cccc(O)c1", "resorcinol"
     @pytest.mark.integration
@@ -210,7 +210,7 @@ class TestSalicylicAcidNotEmitted:
         _assert_controller_does_not_introduce(self.SMILES, self.ARCHAIC)
 
 
-# ---- D-11 P-65.1.1.2.2 general-only acids (3) ----
+# ---- general-only acids (3) ----
 class TestPropionicAcidNotEmitted:
     SMILES, ARCHAIC = "CCC(=O)O", "propionic acid"
     @pytest.mark.integration

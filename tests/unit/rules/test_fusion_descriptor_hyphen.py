@@ -1,5 +1,5 @@
-"""P-16.2.4.3 fusion-descriptor hyphen conformance (Wave-2 P0c Task 10).
-BB BlueBookV2.md:6974: 'Hyphens separate the two parts of a fusion
+""" fusion-descriptor hyphen conformance (Wave-2 P0c Task 10).
+BB the Blue Book: 'Hyphens separate the two parts of a fusion
 descriptor, i.e., numbers and italicized letters.'
 """
 import re

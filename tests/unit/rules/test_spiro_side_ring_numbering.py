@@ -1,7 +1,7 @@
 """Task C increment 2: saturated heteromonocyclic spiro SIDE-RING numbering.
 
 ``rules.spiro._name_side_ring`` used to number a fully-saturated heterocyclic
-side ring (imidazolidine, piperidine, pyrrolidine, 1,3-diazinane, ...) with an
+side ring (imidazolidine, piperidine, pyrrolidine, 1,3-diazinane,...) with an
 independent ring walk that disagreed with the stem name: for imidazolidine it
 placed the two ring nitrogens at locants 1 and 4 (the NAME fixes them at 1,3)
 and handed the spiro CARBON a locant that landed on a nitrogen (``3'``), so the
@@ -9,11 +9,11 @@ assembled ``spiro[chromane-4,3'-imidazolidine]`` was rejected by OPSIN (a spiro
 junction cannot sit on an N) and the molecule abstained.
 
 ``_number_hetero_side_ring`` now numbers the side ring so (a) the heteroatoms
-take their canonical lowest locants consistent with the stem (P-31.1.4.3.3/.4)
-and (b) the spiro junction takes the lowest locant among those (P-24.3.3),
+take their canonical lowest locants consistent with the stem /.4)
+and (b) the spiro junction takes the lowest locant among those,
 DETERMINISTICALLY (independent of RDKit atom order).
 
-Governing rules: IUPAC 2013 P-31.1.4.3.3/.4, P-24.3.3, P-24.5.1.
+Governing rules: IUPAC 2013 /.4,,.
 """
 import pytest
 from rdkit import Chem
@@ -78,7 +78,7 @@ def test_sulfone_side_ring_is_lambda2_skeleton_not_lambda4():
     """A ring S(=O)(=O) side ring: the exocyclic =O are SUBSTITUENTS (composed as
     1,1-dioxo), so the ring S stays a plain divalent thioether -> `1,3-thiazolidine`,
     NOT the mis-valenced `1λ4,3-thiazolidine` the degree-based extraction produced
-    (it turned the sulfone S into [SH2]). Governing: P-22.2 / P-73 (oxide as oxo)."""
+    (it turned the sulfone S into [SH2]). Governing: / (oxide as oxo)."""
     from orthonym.rules.spiro import (
         _name_side_ring, get_spiro_atoms, _classify_rings_around_spiro_center,
     )

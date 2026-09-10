@@ -1,19 +1,19 @@
-"""Phase 160 isocyanate handler — Tier B retained-name (gate 0.40).
+"""a phase isocyanate handler — Tier B retained-name (gate 0.40).
 
 Verbatim lift of composer.py:828-836 (inline branch) +
 composer.py:2180-2190 (_name_isocyanate body) + composer.py:2204-2230
-(shared _name_iso_x_cyanate helper). Per CONTEXT D-24 incremental-
+(shared _name_iso_x_cyanate helper). Per internal notes incremental-
 migration discipline, bodies stay in composer.py until Plan-03 commit
 03-10 thinning.
 
-IUPAC cite: P-66.5.4.3 (isocyanates; functional class naming).
+IUPAC cite: (isocyanates; functional class naming).
 
 References:
 - composer.py:828-836 (inline dispatch branch; REMOVED at this commit).
 - composer.py:2180-2190 (_name_isocyanate body).
 - composer.py:2204-2230 (shared _name_iso_x_cyanate helper).
-- 160-AUDIT-DECOMP.md § 1 row 'isocyanate' + § 2.5 predicate purity proof.
-- 160-PATTERNS.md § 6 (Tier-B lift handler pattern).
+- internal notes-DECOMP.md row 'isocyanate' + predicate purity proof.
+- internal notes (Tier-B lift handler pattern).
 """
 from __future__ import annotations
 
@@ -25,7 +25,7 @@ from ..name_tree import NameTreeNode, NamingResult
 def _is_isocyanate(features: Any) -> bool:
     """Mirrors composer.py:828 (isocyanate FG present AND principal_group is None).
 
-    Pure read-only per CONTEXT D-25 / AP-160-26.
+    Pure read-only per internal notes / -26.
     """
     fg = getattr(features, 'functional_groups', None) or {}
     return bool(fg.get('isocyanate')) and getattr(features, 'principal_group', None) is None
@@ -34,7 +34,7 @@ def _is_isocyanate(features: Any) -> bool:
 def name_isocyanate(
     features: Any, mol: Any = None, style: str = "pin",
 ) -> Optional[NamingResult]:
-    """Phase 160 Tier-B isocyanate handler.
+    """a phase Tier-B isocyanate handler.
 
     Verbatim semantics of composer.py:828-836 (inline branch).
     """
@@ -45,7 +45,7 @@ def name_isocyanate(
         _name_isocyanate,
     )
 
-    # Wave2 T2a (P-61.8): the functional-class 'R isocyanate' form is
+    # Wave2: the functional-class 'R isocyanate' form is
     # general nomenclature only — the PIN is the substitutive isocyanato
     # prefix on the parent hydride (BB VERBATIM 'isocyanatocyclohexane
     # (PIN) cyclohexyl isocyanate'). Decline under PIN style so the

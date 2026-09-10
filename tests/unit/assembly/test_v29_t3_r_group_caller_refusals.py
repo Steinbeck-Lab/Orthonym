@@ -1,7 +1,7 @@
-"""Task T3 -- a ``_name_r_group`` refusal must never be silently dropped.
+"""Task -- a ``_name_r_group`` refusal must never be silently dropped.
 
 ``composer._name_r_group`` returns ``None`` when it cannot PROVE a fragment is
-describable. Since T2 (``) removed the carbon-count fabrication that
+describable. Since (``) removed the carbon-count fabrication that
 used to paper over those cases, that ``None`` is honest and load-bearing.
 
 Eight of the seventeen call sites consumed it as::
@@ -17,7 +17,7 @@ input is not.
 Every test below asserts at the PRODUCER, not at the pipeline output. That is
 deliberate and is the same reasoning as
 ``test_thiourea_bridging_and_parent.py::test_try_name_thiourea_refuses_r3...``:
-on the default path the OPSIN/SELF-01 validity gate suppresses all of these to
+on the default path the OPSIN/ validity gate suppresses all of these to
 ``unknown organic compound``, so a whole-molecule assertion would pass even with
 the defect fully present. The gate must not be what saves us.
 
@@ -52,9 +52,9 @@ CARBAMATE_R3 = "COC(=O)NC1(CCCCC1)N=NC(C)(C)C"
 # (4 heavy atoms), dropping the whole phosphate arm.
 CARBAMIC_PHOSPHATE = "OC(=O)NCCOP(=O)(O)O"
 
-# The phospholipid from TaskT-count-suspects.md. Before T2 its phosphate arm
+# The phospholipid from TaskT-count-suspects.md. Before its phosphate arm
 # was FABRICATED as 'N-tritetracontyl' (a C43 chain the molecule does not
-# contain); after T2 the refusal was honest and this caller deleted the arm,
+# contain); after the refusal was honest and this caller deleted the arm,
 # emitting '...-N-methyl-2-(stearoyloxy)propanamine' -- no phosphorus at all.
 PHOSPHOLIPID = (
     "CCCCC/C=C\\C/C=C\\CCCCCCCCCC(=O)OCC(COP(=O)(O)OCCNC)"
@@ -100,7 +100,7 @@ def _heavy(smiles):
 def test_helper_refuses_rather_than_shortening_the_list():
     """A refused substituent yields None -- NOT a shorter list.
 
-    This is the whole point of the helper: ``[]`` must keep meaning "this
+    This is the whole point of the helper: ```` must keep meaning "this
     nitrogen is genuinely unsubstituted", so the refusal needs its own value.
     """
     mol = Chem.MolFromSmiles(UREA_R3)
@@ -118,7 +118,7 @@ def test_helper_refuses_rather_than_shortening_the_list():
 
 
 def test_helper_returns_empty_list_for_a_genuinely_unsubstituted_nitrogen():
-    """[] and None must not be conflated in the other direction either."""
+    """ and None must not be conflated in the other direction either."""
     mol = Chem.MolFromSmiles("NC(=O)N")           # urea itself
     core_match = mol.GetSubstructMatch(Chem.MolFromSmarts("[NX3][CX3](=O)[NX3]"))
     n1, c, o, n2 = core_match

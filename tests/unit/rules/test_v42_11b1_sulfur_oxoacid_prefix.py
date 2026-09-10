@@ -1,9 +1,9 @@
-""" a phase (P-67.1.4.4.2): sulfur-oxoacid acyl-oxy / -amino substituent prefixes.
+""" a phase: sulfur-oxoacid acyl-oxy / -amino substituent prefixes.
 
 When a sulfur oxoacid group is attached by oxygen or nitrogen to a compound that
 also carries a group senior to the sulfur acid (here a carboxylic acid), the
 sulfur group is cited as a substituent PREFIX, not the parent
-(P-67.1.4.4.2, the Blue Book Blue Book). The Blue Book's verbatim (PIN)
+, the Blue Book Blue Book). The Blue Book's verbatim (PIN)
 examples are pinned below with their line numbers. The generic path names these
 by skeletal ('a') replacement ('…-1,3-dioxa-2λ6-thiapropyl') — a valid,
 round-tripping, but NON-PIN form (RIGHT_MOL_NONPIN). See

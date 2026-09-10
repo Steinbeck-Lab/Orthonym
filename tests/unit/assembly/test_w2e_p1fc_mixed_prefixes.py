@@ -1,4 +1,4 @@
-"""W2E-P1FC Task 13 — P-35.5.1 (BB 18124): mixed substituent prefixes
+"""W2E-P1FC Task 13 — (BB 18124): mixed substituent prefixes
 (substitutive + additive operations combined, with enclosing-mark escalation).
 Examples: (ethoxysulfinyl)amino, (acetylsulfanyl)carbonyl,
 [bis(sulfanyl)phosphoryl]amino.
@@ -11,7 +11,7 @@ OPSIN-round-trip. get_sulfinyl_prefix still handles only C-linked -S(=O)-alkyl;
 the new O-linked alkoxysulfinyl assembler is its complement.
 
 OPSIN-verified target PINs:
-  CCOS(=O)Nc1ccccc1  -> N-(ethoxysulfinyl)aniline
+  CCOS(=O)Nc1ccccc1 -> N-(ethoxysulfinyl)aniline
   SP(=O)(S)Nc1ccccc1 -> N-[bis(sulfanyl)phosphoryl]aniline
 """
 import pytest

@@ -5,10 +5,10 @@ This module implements comprehensive IUPAC naming for ortho-fused heterocyclic s
 including bicyclic lactones and other complex fused ring systems following Blue Book rules.
 
 References:
-- IUPAC 2013 P-25.3.1: ortho-fused polycyclic hydrocarbons
-- IUPAC 2013 P-25.3.3: numbering of fused polycyclic hydrocarbons
-- IUPAC 2013 P-31.1.2: indicated hydrogen in fused ring systems
-- IUPAC 2013 P-31.1.3: von Baeyer nomenclature for bicyclic systems
+- IUPAC 2013: ortho-fused polycyclic hydrocarbons
+- IUPAC 2013: numbering of fused polycyclic hydrocarbons
+- IUPAC 2013: indicated hydrogen in fused ring systems
+- IUPAC 2013: von Baeyer nomenclature for bicyclic systems
 """
 
 from typing import Dict, List, Optional, Tuple
@@ -136,7 +136,7 @@ def identify_fused_rings(mol: Mol) -> List[Tuple[List[int], List[int], List[int]
             # Find shared atoms
             shared = list(ring1 & ring2)
 
-            # IUPAC P-25.3.1.1: ortho-fused = two rings sharing exactly two
+            # IUPAC: ortho-fused = two rings sharing exactly two
             # adjacent atoms (one bond)
             if len(shared) == 2:
                 idx1, idx2 = shared
@@ -150,7 +150,7 @@ def classify_heterocycle_priority(ring_atoms: List[int], mol: Mol) -> int:
     """
     Classify heterocycle priority according to IUPAC rules.
     
-    IUPAC P-25.3.3.2 Priority (highest to lowest):
+    IUPAC Priority (highest to lowest):
     1. Nitrogen-containing heterocycles
     2. Oxygen-containing heterocycles
     3. Sulfur-containing heterocycles
@@ -185,14 +185,14 @@ def determine_base_component(rings: List[Tuple[List[int], List[int], List[int]]]
     """
     Determine the base component (parent ring) for a fused system.
     
-    IUPAC P-25.3.2.4 rules for base component selection:
+    IUPAC rules for base component selection:
     1. Heterocyclic ring preferred over carbocyclic
-    2. Among heterocycles: N > O > S (P-25.3.3.2)
+    2. Among heterocycles: N > O > S
     3. Larger ring preferred
     4. Lactone rings get special consideration
     
     Args:
-        rings: List of fused ring pairs from identify_fused_rings()
+        rings: List of fused ring pairs from identify_fused_rings
         mol: RDKit Mol object
         
     Returns:
@@ -272,7 +272,7 @@ def number_bicyclic_system(base_ring: List[int], attached_ring: List[int],
     """
     Number bicyclic system according to IUPAC bicyclo rules.
     
-    IUPAC P-31.1.3.1 bicyclo numbering:
+    IUPAC bicyclo numbering:
     1. Start at one bridgehead atom
     2. Number along the longest bridge first
     3. Then the second longest bridge
@@ -281,7 +281,7 @@ def number_bicyclic_system(base_ring: List[int], attached_ring: List[int],
     For bicyclo[4.3.0]nonane:
     - Position 1: first bridgehead
     - Positions 2-5: longest bridge (4 atoms)
-    - Position 6: second bridgehead  
+    - Position 6: second bridgehead
     - Positions 7-9: second bridge (3 atoms back to pos 1)
     
     Args:

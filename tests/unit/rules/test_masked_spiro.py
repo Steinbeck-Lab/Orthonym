@@ -2,8 +2,8 @@
 von-Baeyer bridgehead, so it lies in >=3 SSSR rings and ``get_spiro_atoms``
 (which needs EXACTLY 2 SSSR rings) misses it.
 
-Before this lever every such P-24.5 spiro-with-von-Baeyer-component system
-VOIDED: ``get_spiro_atoms`` returned [] so every spiro namer bailed, and
+Before this lever every such spiro-with-von-Baeyer-component system
+VOIDED: ``get_spiro_atoms`` returned  so every spiro namer bailed, and
 ``analyze_cage_universal`` built a whole-system cage descriptor that
 ``audit_von_baeyer_descriptor`` correctly rejected (it is spiro, not a pure
 cage). The best-effort FLOOR then abstained (``unknown organic compound``).
@@ -16,13 +16,13 @@ a von-Baeyer BRIDGEHEAD, not spiro, and is excluded.
 
 Each side (spiro atom included) is then named as a full parent — a von-Baeyer
 bicyclic via ``analyze_cage_universal``, a single ring via the monocycle namer —
-and the P-24.5.1 separable name ``spiro[<sideA>-x,y'-<sideB>]`` assembled.
+and the separable name ``spiro[<sideA>-x,y'-<sideB>]`` assembled.
 
 0-wrong is preserved by the caller's offer full-InChIKey RT gate; the PIN /
 default path stays byte-identical (it still abstains on these witnesses).
 
-Governing rule: IUPAC 2013 P-24.5 (spiro systems with von-Baeyer components),
-P-24.5.1 (separable spiro name).
+Governing rule: IUPAC 2013 (spiro systems with von-Baeyer components),
+ (separable spiro name).
 """
 import pytest
 from rdkit import Chem
@@ -66,7 +66,7 @@ def test_plain_bicyclic_bridgehead_is_not_masked_spiro():
     assert find_masked_spiro_atoms(m) == set()
 
 
-# --- the masked-spiro namer builds the P-24.5.1 separable form ------------
+# --- the masked-spiro namer builds the separable form ------------
 
 def test_masked_spiro_namer_emits_separable_spiro_name():
     """``_name_masked_spiro`` builds a ``spiro[...]`` name whose CORE covers the

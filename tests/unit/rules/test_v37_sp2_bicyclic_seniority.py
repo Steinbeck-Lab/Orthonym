@@ -2,7 +2,7 @@
 BICYCLIC spiro von-Baeyer component (``spiro.py::_name_vonbaeyer_spiro_component``,
 the ``_key`` selection loop).
 
-This is the SPIRO sibling of SP1.5 (commit ``030cc1dd``), which fixed the same
+This is the SPIRO sibling of SP1.5 (commit ``), which fixed the same
 set-vs-vector seniority bug for the NON-spiro ``bicyclo.py`` path. Before this fix
 the spiro bicyclic ``_key`` tuple was ``(spiro_loc, het_SET, ene)`` with no
 element-seniority tier, so a heteroatom locant-SET tie (e.g. ``{2,6}``) fell
@@ -10,8 +10,8 @@ through to candidate/atom-index order -- a SMILES-atom-order artifact. The two
 atom-order permutations below are the SAME molecule and used to emit two different
 names.
 
-P-23.3.2.2 [BBv2:9789]: on a heteroatom locant-SET tie the senior element
-(O > S > Se > Te > N > P > ...) takes the LOWER locant. Pure spelling/PIN-preference
+ [BBv2:9789]: on a heteroatom locant-SET tie the senior element
+(O > S > Se > Te > N > P >...) takes the LOWER locant. Pure spelling/PIN-preference
 fix; both spellings OPSIN-round-trip to the same structure, so 0-wrong holds either
 way (asserted below).
 """
@@ -40,7 +40,7 @@ def test_spiro_bicyclic_seniority_deterministic_across_atom_order():
 
 
 def test_spiro_bicyclic_seniority_senior_o_gets_lower_locant():
-    """O is senior to N (P-23.3.2.2) -> O takes locant 2, N locant 6."""
+    """O is senior to N -> O takes locant 2, N locant 6."""
     name = name_compound(_W_A)
     assert "2-oxa" in name, name  # senior O at the lower locant
     assert "6-aza" in name, name  # N at the higher locant

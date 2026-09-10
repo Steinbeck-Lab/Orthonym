@@ -43,7 +43,7 @@ for the parent TEXT only -- NOT ``general_engine``'s substituent-recursion
 tail, which is exactly the declining machinery this module replaces).
 Isotopes, wildcard atoms and multi-fragment inputs are OUT OF SCOPE and void
 the whole call (``None``). Radicals are OUT OF SCOPE for MORE than one
-free-valence centre (P-71.2.3 multi-site / diradicals / radical ions); a
+free-valence centre multi-site / diradicals / radical ions); a
 SINGLE monovalent/divalent/trivalent centre is IN SCOPE for ``_build_ctx``
 (A2, C2) so ``name_universal_substituent_prefix`` can cite it as a
 ``-yl``/``-ylidene``/``-ylidyne`` substituent prefix -- see that function's
@@ -68,7 +68,7 @@ wrong. Scope, precisely (fail-closed on everything else -- an unspellable
 charge VOIDS the whole call, never mis-names):
 
 * A GENUINE ionic centre (``perception.ions.get_ion_sites``, which already
-  excludes P-59 INTERNAL charges -- nitro, N-oxide, azide, diazo -- these are
+  excludes INTERNAL charges -- nitro, N-oxide, azide, diazo -- these are
   not "ionic centers" needing a suffix) is only ever resolved when it sits on
   the SPINE atoms of *some* level of the recursion (top-level parent or a
   substituent branch's own local parent) -- never as a bare prefix. Every
@@ -86,9 +86,9 @@ charge VOIDS the whole call, never mis-names):
   SCOPE and VOIDS (general_engine's own charged-species PIN path owns those,
   not this general/best-effort producer).
 * Net-0 zwitterions with BOTH ionic centres SKELETAL to the SAME spine
-  (P-74.1.1, ``general_engine._zwitterion_suffix_plan(..., allow_fg_anion=
+  , ``general_engine._zwitterion_suffix_plan(..., allow_fg_anion=
   False)``): resolved the same way. The FG-anchored "-olate" branch
-  (P-74.1.2, an anion hanging off a characteristic group not itself on the
+  , an anion hanging off a characteristic group not itself on the
   spine) is explicitly DISABLED (``allow_fg_anion=False``) -- this producer
   has no functional-group-suffix layer to hold an atom out of substituent
   discovery for it, so it is deferred, not built. A carboxylate-anchored
@@ -96,7 +96,7 @@ charge VOIDS the whole call, never mis-names):
   is out of scope for BOTH the skeletal and the -olate branch of the reused
   primitive (it is owned by the charged-lever's dedicated ester-anion-word
   mechanism, a different, specialized producer this module does not invoke).
-* Nitro (``C-N(+)(=O)[O-]``, P-59 internal charge) is spelled directly as a
+* Nitro (``C-N(+)(=O)[O-]``, internal charge) is spelled directly as a
   dedicated, charge-and-bond-order-VALIDATED leaf shortcut (``_nitro_shortcut``)
   exactly like ``carboxy``/``cyano`` -- never via the genuine-ion machinery
   above. Its nitrogen is also excluded from ordinary chain-spine CONTINUATION
@@ -116,7 +116,7 @@ Fix round 1 (task-review + FABLE adversarial, both on `` -- see
 ``.superpowers/sdd/2026-08-21-no-abstain-universal-namer/
 task-B2b-fixround1-findings.md``): the four bullets above governed only the
 GENUINE ionic centres ``get_ion_sites`` reports. But ``get_ion_sites``
-STRIPS P-59 INTERNAL and P-74.2.1 semipolar charges (N-oxide, azide, diazo,
+STRIPS INTERNAL and semipolar charges (N-oxide, azide, diazo,
 nitrone, nitrile oxide, nitronate, aci-nitro, nitrate ester, thionitro, and
 the charge-drawn S/P-oxides), so those charged atoms were invisible to BOTH
 ``_resolve_spine_charge`` and the charge-coverage assertion -- while the
@@ -129,7 +129,7 @@ BFS seed / branch root, so polynitro mis-named too). The fix is ONE general
 RAW-formal-charge void guard at the top-level entry point: VOID the whole
 result whenever any atom carries a nonzero raw formal charge that was NOT
 consumed by (a) the genuine-ion suffix machinery
-(``cation_sites | anion_sites``, asserted resolved) or (b) a P-59/P-74.2.1
+(``cation_sites | anion_sites``, asserted resolved) or (b) a /
 internal centre actually rendered by a dedicated internal-charge leaf
 (nitro/azido/diazo/..., tracked as
 ``_ComponentResult.internal_atoms``). ``get_ion_sites`` lists every
@@ -246,7 +246,7 @@ class _Ctx:
     budget: _Budget
     canon_rank: Tuple[int, ...]  # atom idx -> canonical rank (numbering-invariant)
     # Task B2b: GENUINE ionic centres only (get_ion_sites already excludes
-    # P-59 internal charges -- nitro, N-oxide, azide, diazo). Computed ONCE
+    # internal charges -- nitro, N-oxide, azide, diazo). Computed ONCE
     # per top-level call and consulted by every recursive ``_name_component``
     # call to decide whether ITS OWN spine needs a charge suffix.
     cation_sites: List[Dict[str, object]]
@@ -304,8 +304,8 @@ class _ComponentResult:
     # coverage assertion, but
     # for CHARGE correctness.
     internal_atoms: FrozenSet[int] = frozenset()  # Task B2b fix round 1 +
-    # M2: atom indices whose P-59
-    # INTERNAL / P-74.2.1 semipolar
+    # M2: atom indices whose
+    # INTERNAL / semipolar
     # formal charge was RENDERED by
     # a dedicated internal-charge
     # leaf (``_nitro_shortcut`` ->
@@ -326,7 +326,7 @@ class _ComponentResult:
     # and would be invisible to such
     # a scan. Consumed by the
     # top-level RAW-formal-charge
-    # void guard: these P-59/P-74.2.1
+    # void guard: these /
     # internal charges are the
     # internal-charge shapes this
     # module can actually spell,
@@ -334,7 +334,7 @@ class _ComponentResult:
     # that guard (get_ion_sites
     # STRIPS them, so they never
     # appear in ``all_charge_ids``).
-    spine_atom_to_locant: Optional[Dict[int, int]] = None  # WS-STEREO: the
+    spine_atom_to_locant: Optional[Dict[int, int]] = None  # STEREO: the
     # atom->locant map of THIS
     # level's OWN spine (chain,
     # monocycle or polycycle),
@@ -378,7 +378,7 @@ def name_universal_substitutive(
          ship a name that omits the charge (the top-level charge-coverage
          assertion, symmetric to the atom-coverage one, catches this even if
          a lower-level construction bug would otherwise have missed it);
-      5. a P-59 INTERNAL / P-74.2.1 semipolar charge (N-oxide, azide, diazo,
+      5. a INTERNAL / semipolar charge (N-oxide, azide, diazo,
          nitrone, nitrile oxide, nitronate, aci-nitro, nitrate ester,
          thionitro, charge-drawn S/P-oxide, or a shredded polynitro) --
          ``get_ion_sites`` strips these, so they never reach reason 4's
@@ -416,7 +416,7 @@ def name_universal_substitutive(
         # M2 inc5: a charge-separated STANDARD-VALENCE chalcogenide the primary
         # path could not spell -- a sulfonyl/sulfone/phosphoryl drawn
         # ``X(+)(=O)[O-]`` (the ``=O`` on the cation makes the ``oxido``/``-ium``
-        # leaf decline, and the raw-charge guard then voids). Such a P-74.2.1
+        # leaf decline, and the raw-charge guard then voids). Such a
         # semipolar chalcogenide has a valid UNCHARGED depiction with the SAME
         # InChIKey; name THAT neutral form. This is NOT an N-oxide (a second-row
         # cation has no uncharged depiction -- ``N=O`` is pentavalent), which the
@@ -482,8 +482,8 @@ def _name_universal_substitutive_unsafe(
     # Task B2b fix round 1: the RAW-formal-charge void guard -- the one
     # general check that closes the whole internal-charge mis-naming class.
     # ``get_ion_sites`` (which ``cation_sites``/``anion_sites`` derive from)
-    # STRIPS P-59 INTERNAL charges (N-oxide, azide, diazo, nitrone, nitrile
-    # oxide, nitronate, aci-nitro, nitrate ester, thionitro, and the P-74.2.1
+    # STRIPS INTERNAL charges (N-oxide, azide, diazo, nitrone, nitrile
+    # oxide, nitronate, aci-nitro, nitrate ester, thionitro, and the
     # semipolar / charge-drawn S/P-oxides), so those charged atoms are
     # invisible to BOTH ``_resolve_spine_charge`` AND the charge-coverage
     # assertion just above -- while the spine builders thread atoms by ELEMENT
@@ -495,7 +495,7 @@ def _name_universal_substitutive_unsafe(
     # atoms are precisely ``{raw-charged} - all_charge_ids``. VOID whenever
     # any atom carries a nonzero raw formal charge that was NOT consumed by
     # (a) the genuine-ion suffix machinery (``all_charge_ids``, asserted
-    # resolved above) or (b) a P-59 internal / P-74.2.1 semipolar centre
+    # resolved above) or (b) a internal / semipolar centre
     # actually rendered by a dedicated internal-charge leaf (nitro / azido /
     # diazo / the ``oxido``+``-ium`` N-/P-/S-oxide pair -- ``comp.internal_atoms``,
     # the internal-charge shapes this module can spell). This also closes
@@ -550,7 +550,7 @@ def _resolve_floor_stereo(ctx: "_Ctx", mol, heavy: FrozenSet[int],
     """ Track A: pick the most stereo-complete floor name that FULL-InChIKey
     verifies, degrading gracefully. Returns the name string to ship.
 
-    Cascade (WS-STEREO extended from top-spine-only to branch-recursive):
+    Cascade (STEREO extended from top-spine-only to branch-recursive):
 
     1. **full** -- rebuild the component tree with ``emit_branch_stereo=True``
        so every recursion level writes its own branch's stereodescriptors
@@ -558,7 +558,7 @@ def _resolve_floor_stereo(ctx: "_Ctx", mol, heavy: FrozenSet[int],
        use), then prepend the top spine's own stereo
        block. Captures a stereocentre no matter how deep in a branch it sits.
     2. **top-only** -- prepend just the top spine's stereo block to the plain
-       ``comp.name`` (the previous WS-STEREO behaviour): recovers the parent
+       ``comp.name`` (the previous STEREO behaviour): recovers the parent
        stereo when a branch centre is CIP-ambiguous and voids the full
        candidate.
     3. **plain** -- ``comp.name`` unchanged (today's block-1 fallback).
@@ -616,7 +616,7 @@ def _resolve_floor_stereo(ctx: "_Ctx", mol, heavy: FrozenSet[int],
         full_name = (top_block + comp_full.name) if top_block else comp_full.name
         if full_name != plain:
             candidates.append(full_name)
-    # rung 1b: RING relative-stereo (cis/trans, P-31.1.4). ``_stereo_prefix``
+    # rung 1b: RING relative-stereo (cis/trans,. ``_stereo_prefix``
     # emits an ABSOLUTE R/S block for the top-spine ring (``(1r,3R)-``), which
     # OPSIN CANNOT parse for a saturated ring -- so rung 1's ``top_block``
     # candidate is unparseable and the whole stereo layer is dropped, abstaining
@@ -634,7 +634,7 @@ def _resolve_floor_stereo(ctx: "_Ctx", mol, heavy: FrozenSet[int],
             if ctx.mol.GetAtomWithIdx(a).IsInRing()
             and ctx.mol.GetAtomWithIdx(a).HasProp("_CIPCode")
         ]
-        # cis/trans (P-31.1.4) is the relation of two substituents on ONE ring.
+        # cis/trans is the relation of two substituents on ONE ring.
         # When the two stereocentres sit in DIFFERENT rings of a fused/spiro spine,
         # a leading cis-/trans- denotes ring-FUSION stereo, not the substituent
         # relation, so it must not be offered there -- guard on same-ring
@@ -655,7 +655,7 @@ def _resolve_floor_stereo(ctx: "_Ctx", mol, heavy: FrozenSet[int],
     # emits the ring's ABSOLUTE pseudoasymmetric block (``(1s,3R)-``) INSIDE the
     # substituent bracket -- OPSIN cannot parse that on a saturated ring, so the
     # whole ``comp_full`` candidate fails RT and the molecule abstains even though
-    # its stereo IS expressible as the relative ``cis``/``trans`` (P-31.1.4).
+    # its stereo IS expressible as the relative ``cis``/``trans``.
     #
     # Mirror rung 1b's mechanism, one level down: for each qualifying substituent
     # ring (saturated 3-6-ring, EXACTLY 2 same-ring stereocentres, >=1
@@ -668,7 +668,7 @@ def _resolve_floor_stereo(ctx: "_Ctx", mol, heavy: FrozenSet[int],
     # The override is scoped per-ring (a dict keyed by the ring's atom set), so an
     # independent absolute centre elsewhere in the name is untouched. Capped at 2
     # relative rings to bound the sense cartesian product (k=1 -> 2 candidates,
-    # k=2 -> 4); 3+ ring stereocentres in one ring -> P-93.5.1.3 r/c/t, skipped by
+    # k=2 -> 4); 3+ ring stereocentres in one ring -> r/c/t, skipped by
     # the exactly-2 requirement.
     if comp_full is not None:
         top_spine_atoms = frozenset(comp.spine_atom_to_locant or ())
@@ -692,7 +692,7 @@ def _resolve_floor_stereo(ctx: "_Ctx", mol, heavy: FrozenSet[int],
                                 else comp_rel.name)
                     if rel_full != plain and rel_full not in candidates:
                         candidates.append(rel_full)
-    # rung 2: top-spine-only stereo (the previous WS-STEREO candidate)
+    # rung 2: top-spine-only stereo (the previous STEREO candidate)
     if top_block:
         top_name = top_block + plain
         if top_name != plain and top_name not in candidates:
@@ -712,7 +712,7 @@ def _resolve_floor_stereo(ctx: "_Ctx", mol, heavy: FrozenSet[int],
 def _detect_relative_substituent_rings(
     mol, top_spine_atoms: FrozenSet[int],
 ) -> List[FrozenSet[int]]:
-    """Rings the spine carries as a SUBSTITUENT that bear a relative (P-31.1.4
+    """Rings the spine carries as a SUBSTITUENT that bear a relative
     cis/trans) 2-centre stereo relation the floor cannot spell absolutely.
 
     A qualifying ring (see rung 1c in ``_resolve_floor_stereo``) is:
@@ -722,7 +722,7 @@ def _detect_relative_substituent_rings(
         (the small-ring cis/trans domain);
       * carrying EXACTLY 2 ring stereocentres (``_CIPCode`` set), and those two
         in the SAME ring (``AreAtomsInSameRing``) -- cis/trans is the relation of
-        a PAIR; 3+ needs the r/c/t reference system (P-93.5.1.3), out of scope;
+        a PAIR; 3+ needs the r/c/t reference system, out of scope;
       * with >=1 pseudoasymmetric centre (a lowercase ``_CIPCode``) -- the signal
         that the absolute block is an OPSIN-unparseable ``(1s,3R)``-style
         descriptor. A ring whose 2 centres are BOTH uppercase is a genuine
@@ -766,7 +766,7 @@ def _detect_relative_substituent_rings(
 
 
 def _neutralize_semipolar_chalcogenides(mol):
-    """Return a copy of *mol* with every PROVEN P-74.2.1 semipolar chalcogenide
+    """Return a copy of *mol* with every PROVEN semipolar chalcogenide
     ``X(+)-[A-]`` pair (A in O/S/Se/Te) rewritten to its uncharged depiction
     ``X=A`` -- or ``None`` if the molecule has no such pair or the rewrite fails.
 
@@ -843,7 +843,7 @@ def _build_ctx(
 
     if len(Chem.GetMolFrags(work)) != 1:
         return None  # multi-fragment: out of scope for this producer
-    # OUT-OF-SCOPE ORGANOMETALLIC (P-69): abstain on a genuine metal/organometal
+    # OUT-OF-SCOPE ORGANOMETALLIC: abstain on a genuine metal/organometal
     # complex, exactly as the PIN/default path does ("<metal> compound (not
     # supported)"). Sn/Pb are in REPLACEMENT_TERMS (`stanna`/`plumba`), so without
     # this guard the best-effort core would build a replacement name whose OPSIN
@@ -863,7 +863,7 @@ def _build_ctx(
     # spelled properly (see the module docstring's charge-scope paragraph
     # and ``_resolve_spine_charge`` below), reusing ``general_engine``'s own
     # charge-suffix primitives so a genuine ionic centre gets a real
-    # ``-ium``/``-ylium``/``-ide``/``-uide`` suffix (or the P-74.1.1
+    # ``-ium``/``-ylium``/``-ide``/``-uide`` suffix (or the
     # cumulative zwitterion form) instead of being refused outright. What
     # remains refused is exactly what falls outside that reused primitive's
     # OWN scope (FG anions/cations, mixed-sign net charge,...) -- see reason
@@ -876,11 +876,11 @@ def _build_ctx(
     # -yl/-ylidene/-ylidyne primitive that itself falls through to a broken
     # textual fallback -- measured: '[CH2]CO' -> the unparseable 'ethanolyl')
     # never even got a chance at this floor. This ctx is now buildable for a
-    # SINGLE P-71 monovalent/divalent/trivalent free-valence centre -- the
+    # SINGLE monovalent/divalent/trivalent free-valence centre -- the
     # one shape ``name_universal_substituent_prefix``'s ``bond_order``
     # parameter (below) knows how to cite as a ``-yl``/``-ylidene``/
     # ``-ylidyne`` suffix at its own attachment locant. A SECOND radical
-    # centre (P-71.2.3 multi-site, diradicals, radical ions,...) stays out
+    # centre multi-site, diradicals, radical ions,...) stays out
     # of scope -- this floor's ``_render_as_substituent`` only ever cites ONE
     # attachment/bond-order pair, so a second centre would need a citation
     # this primitive cannot express; fail closed rather than silently drop
@@ -928,7 +928,7 @@ def _build_ctx(
     canon_rank = tuple(Chem.CanonicalRankAtoms(work, breakTies=True))
 
     # Task B2b: GENUINE ionic centres only -- ``get_ion_sites`` already
-    # excludes P-59 INTERNAL charges (nitro, N-oxide, azide, diazo), which
+    # excludes INTERNAL charges (nitro, N-oxide, azide, diazo), which
     # are spelled directly via ``_nitro_shortcut`` instead (see module
     # docstring). Computed ONCE here; every recursive ``_name_component``
     # call consults it to decide whether ITS OWN spine needs a suffix.
@@ -964,7 +964,7 @@ def name_universal_substituent_prefix(
     not in the branch, the recursive namer voids, or the branch-restricted
     coverage / charge assertions (the analogues of the whole-molecule ones,
     scoped to ``frag_atoms``) fail. The caller gates the returned string
-    through the existing E1 + SELF-01 round-trip net (0-wrong preserved); this
+    through the existing E1 + round-trip net (0-wrong preserved); this
     is a PURE producer and never ships.
     """
     if mol is None:
@@ -1059,7 +1059,7 @@ def _name_component(
     When a branch rendered as a substituent IS one of those rings (its spine's
     atom set equals a key), its branch-stereo prefix is the relative
     ``cis-``/``trans-`` word instead of ``_stereo_prefix``'s absolute
-    pseudoasymmetric block -- expressing the P-31.1.4 relation OPSIN can parse.
+    pseudoasymmetric block -- expressing the relation OPSIN can parse.
     Scoped per-ring, so an independent absolute centre elsewhere is unaffected.
     Threaded unchanged into the recursion so it reaches a ring at any depth.
     ``None`` (the default) -> byte-identical prior behaviour.
@@ -1080,7 +1080,7 @@ def _name_component(
         if shortcut is not None:
             token, atoms = shortcut
             # Task B2b fix round 1 + M2: record an internal-charge leaf's atoms
-            # so the top-level raw-charge guard knows their P-59/P-74.2.1 internal
+            # so the top-level raw-charge guard knows their / internal
             # charges ARE accounted for (exception (b)). Each internal-charge leaf
             # token (nitro / azido / diazo) is produced by exactly one shortcut
             # and covers exactly the internal-charged atoms of that group, so this
@@ -1094,7 +1094,7 @@ def _name_component(
                 internal_atoms=internal_atoms,
             )
 
-        # WS7 (composed-charge): a lone charged TERMINAL atom -- the bare
+        # (composed-charge): a lone charged TERMINAL atom -- the bare
         # ``[O-]``/``[S-]`` an FG anion (carboxylate/sulfonate/phosphonate/
         # alkoxide/thiolate) decomposes to once its ``=O`` is threaded into the
         # skeleton, or a terminal ``-NH3(+)`` -- is rendered with its CHARGED
@@ -1113,7 +1113,7 @@ def _name_component(
                 charged=charged_atoms,
             )
 
-        # WS-NOABSTAIN class 3: a phosphinate P(=O)([O-])(H) unit (P-V, one
+        # NOABSTAIN class 3: a phosphinate P(=O)([O-])(H) unit (P-V, one
         # explicit P-H) -- see ``_phosphinate_oxide_leaf_shortcut``'s
         # docstring for why this MUST be a dedicated leaf rather than the
         # generic chain/hetero-prefix machinery: OPSIN does not validate the
@@ -1149,7 +1149,7 @@ def _name_component(
 
     # ---- M2 inc4: internal semipolar-oxide cation(s) on THIS spine (N-oxide /
     # phosphine oxide / sulfoxide) get a paired ``-ium`` suffix; their ``[O-]``
-    # renders as an ``oxido`` branch leaf. These are P-59/P-74.2.1 INTERNAL
+    # renders as an ``oxido`` branch leaf. These are / INTERNAL
     # charges get_ion_sites strips, so they are disjoint from the genuine-ion
     # charge above -- a spine that carries BOTH a genuine skeletal charge and an
     # internal oxide is a compound zwitterion out of this floor's scope (void).
@@ -1169,7 +1169,7 @@ def _name_component(
     # alkane/cycloalkane class it exists to guard. The
     # parent core's trailing 'e' IS legitimately elided when a charge/ionic
     # suffix is appended below (``_elide_before_ionic_suffix``;
-    # P-16.7.1(a)/P-74.1.1), so ``2-azapropane`` is not a literal substring of
+    # (a)/, so ``2-azapropane`` is not a literal substring of
     # ``...2-azapropan-2-ium`` -- but that elision is tolerated on the
     # TOKEN-IN-NAME axis ALONE, inside ``_verify_partition`` (accepts the stem
     # ``token[:-1]``), NOT by pre-stemming the stored token here.
@@ -1196,7 +1196,7 @@ def _name_component(
         # atom_to_locant`` numbers the branch's own atoms (None for a leaf
         # shortcut -> no block); deeper sub-branch stereo is already baked into
         # ``sub.name`` by the recursion above. ``alpha_sort_key`` strips the
-        # descriptor (resolved P-14.5 noise-strip), so ordering is unaffected,
+        # descriptor (resolved noise-strip), so ordering is unaffected,
         # and ``format_substituent_prefix`` supplies the enclosing marks the
         # now-complex prefix needs (``4-[(3R)-3-hydroxy...yl]``).
         if emit_branch_stereo and sub.spine_atom_to_locant:
@@ -1230,7 +1230,7 @@ def _name_component(
     joined = "-".join(p for _k, p in prefix_parts)
 
     if joined:
-        # P-16.5 hyphen glue: a joining '-' is needed only before a
+        # hyphen glue: a joining '-' is needed only before a
         # locant-initial core (mirrors general_engine._emit_ring_from_analysis).
         glue = "-" if spine_core[:1].isdigit() else ""
         full_name = joined + glue + spine_core
@@ -1242,7 +1242,7 @@ def _name_component(
     # one suffix applies. Appended to the FULLY assembled name (prefixes + parent
     # core), not just ``spine_core`` -- mirrors general_engine's own ordering
     # (``_append_charge_suffix`` is called on the substituent-decorated name), so
-    # P-16.7.1(a)/P-74.1.1 elision targets the parent hydride's own trailing 'e',
+    # (a)/ elision targets the parent hydride's own trailing 'e',
     # never truncates a substituent prefix.
     ionic_suffix = charge_suffix_text if needs_charge else oxide_suffix_text
     if ionic_suffix is not None:
@@ -1264,9 +1264,9 @@ def _resolve_spine_charge(
     what suffix text expresses it (reusing ``general_engine``'s primitives)?
 
     Returns ``(needs_charge, suffix_text, charged_atom_ids)``:
-      * ``(False, None, frozenset())`` -- no genuine ionic centre touches
+      * ``(False, None, frozenset)`` -- no genuine ionic centre touches
         this spine; nothing to do (the overwhelmingly common, uncharged case).
-      * ``(True, None, frozenset())`` -- a genuine ionic centre touches this
+      * ``(True, None, frozenset)`` -- a genuine ionic centre touches this
         spine but is NOT expressible by the reused primitives (an FG anion
         like carboxylate/alkoxide, an FG cation like diazonium/acylium, a
         mixed-sign net-charged species,...) -- the caller MUST void.
@@ -1286,7 +1286,7 @@ def _resolve_spine_charge(
         as "not expressible", never as "no charge here".
       * ``general_engine._zwitterion_suffix_plan(..., allow_fg_anion=False)``
         -- a net-0 zwitterion with BOTH ionic centres skeletal to THIS SAME
-        spine (P-74.1.1). ``allow_fg_anion=False`` disables the P-74.1.2
+        spine. ``allow_fg_anion=False`` disables the
         "-olate" FG-anchored branch: this producer has no functional-group-
         suffix layer to hold an atom out of substituent discovery for it, so
         that branch is deferred, not built (a carboxylate-anchored
@@ -1301,7 +1301,7 @@ def _resolve_spine_charge(
     if not touches:
         return False, None, frozenset()
 
-    # WS7 (): ``parent_only=True`` -- this producer resolves charge PER SPINE
+    # : ``parent_only=True`` -- this producer resolves charge PER SPINE
     # and expresses off-spine charges of the OTHER sign elsewhere (a terminal
     # ``[O-]``/``[NH3+]`` via ``_charged_leaf_shortcut``), so a SKELETAL cation
     # (or anion) on this spine gets its ``-ium``/``-ide`` suffix even in a
@@ -1420,7 +1420,7 @@ def _tree_neighbors(ctx: _Ctx, atom: int, component: FrozenSet[int]) -> List[int
     "aza" carries no trace of (see module docstring's charge-scope
     paragraph).
 
-    WS7 (composed-charge): likewise NOT a singly-charged TERMINAL atom (a
+     (composed-charge): likewise NOT a singly-charged TERMINAL atom (a
     degree-1 ``[O-]``/``[S-]``/``[NH3+]`` etc.). Such an atom is always resolved
     as a branch via ``_charged_leaf_shortcut`` (``oxido``/``sulfido``/
     ``azaniumyl``), which carries its charge -- threading it into the chain
@@ -1430,12 +1430,12 @@ def _tree_neighbors(ctx: _Ctx, atom: int, component: FrozenSet[int]) -> List[int
     backbone (an internal, non-terminal charge stays threadable and is handled
     by ``_resolve_spine_charge``).
 
-    WS-NOABSTAIN class 3: likewise NOT a phosphinate P (``-PH(=O)[O-]``,
+    NOABSTAIN class 3: likewise NOT a phosphinate P (``-PH(=O)[O-]``,
     ``_is_phosphinate_oxide_root``) -- see ``_phosphinate_oxide_leaf_shortcut``
     for why this group must be resolved as a branch (the ``phosphanyl``
     substituent form) rather than woven into the replacement-nomenclature
     chain as a skeletal ``phospha`` atom (measured: even WITH the correct
-    P-15.4.1 lambda citation, OPSIN does not validate that shape)."""
+     lambda citation, OPSIN does not validate that shape)."""
     out = []
     for nb in ctx.mol.GetAtomWithIdx(atom).GetNeighbors():
         j = nb.GetIdx()
@@ -1499,7 +1499,7 @@ def _ring_system_for_component(
     (conventional seniority simplification) -- the LARGEST ring system in
     the component, ties broken by lowest minimum atom index.
     Branch: a ring is the spine ONLY when the branch's own attachment atom
-    IS a ring atom (P-29.2: substituent numbering starts at the free
+    IS a ring atom: substituent numbering starts at the free
     valence) -- otherwise the branch is a chain and any ring further inside
     is itself a deeper branch, discovered recursively.
     """
@@ -1541,7 +1541,7 @@ def _locant_sort_key(loc) -> Tuple[int, int, str]:
     Sort is ``(prime_rank, number, letter)``: all unprimed locants precede all
     single-primed, which precede double-primed; within a prime rank by number;
     and within a number a bare position precedes its lettered ring-FUSION
-    positions (``4 < 4a < 5``, P-14.5.2). This is the ordering P-31.1.4 / OPSIN
+    positions (``4 < 4a < 5``,. This is the ordering / OPSIN
     expect for a spiro locant set, and it lets the SAME ``sorted(...)`` in
     ``_name_component`` handle both the ordinary int-locant spines and the
     mixed-spiro-fused string-locant leaf.
@@ -1594,7 +1594,7 @@ def _mixed_spiro_fused_leaf(
     (``analyze_cage_universal`` voids) nor a plain von-Baeyer spiro
     (``analyze_spiro_universal`` would kekulise the aromatic component into a
     polyene that OPSIN reads as a different constitution).
-    ``name_mixed_spiro_fused`` builds the P-24.5.1 separable name
+    ``name_mixed_spiro_fused`` builds the separable name
     (``spiro[<fused-comp>-x,y'-<comp2>]``) and returns a combined
     atom->locant map whose SECOND-cited component carries primed locants as a
     ``_Locant`` tuple ``(n, "'")``.
@@ -1624,7 +1624,7 @@ def _mixed_spiro_fused_leaf(
     restrict = set(ring_atoms)
     try:
         # allow_vonbaeyer_component: the FLOOR additionally degrades a
-        # spiro-of-bicyclic (the (c)-aliphatic bucket) to the P-24.5.1 separable
+        # spiro-of-bicyclic (the (c)-aliphatic bucket) to the separable
         # ``spiro[bicyclo[...]-x,y'-<comp2>]`` covering name. PIN path is
         # untouched (name_mixed_spiro_fused default keeps the flag off).
         # ``force_vonbaeyer`` (retry path): name a fused spiro component as its
@@ -1638,7 +1638,7 @@ def _mixed_spiro_fused_leaf(
             # both-sides-fused fallback: a monospiro whose BOTH sides are
             # fused/bridged systems (name_mixed_spiro_fused requires one side to
             # be a single ring). Names each side independently and joins the
-            # P-24.5.1 separable form. Floor-only; offer-RT-gated.
+            # separable form. Floor-only; offer-RT-gated.
             res = _name_general_monospiro_fused(
                 ctx.mol, allow_vonbaeyer=True, force_vonbaeyer=fvb,
                 restrict_atoms=restrict)
@@ -1655,7 +1655,7 @@ def _mixed_spiro_fused_leaf(
             # above declines and ``analyze_cage_universal`` builds a whole-system
             # cage descriptor that the von-Baeyer audit correctly REJECTS (it is
             # spiro, not a cage). ``_name_masked_spiro`` detects the true spiro
-            # cut-vertex, splits at it and assembles the P-24.5.1 separable
+            # cut-vertex, splits at it and assembles the separable
             # ``spiro[<sideA>-x,y'-<sideB>]`` covering name. Floor-only;
             # offer-RT-gated (a wrong descriptor voids -> abstain, 0-wrong).
             res = _name_masked_spiro(
@@ -1690,7 +1690,7 @@ def _name_ring_spine(
     ri = mol.GetRingInfo()
     sssr_here = [set(r) for r in ri.AtomRings() if set(r) <= ring_atoms]
     if len(sssr_here) >= 2:
-        # WS-NOABSTAIN: this module is the unconditional best-effort FLOOR
+        # NOABSTAIN: this module is the unconditional best-effort FLOOR
         # (reachable only on the `general_fallback` path -- t4_coverage.py's
         # comment at its call site: "PIN is untouched"), so a fused/mancude
         # aromatic ring system (a charged flavonoid/isoflavone phenolate, a
@@ -1708,7 +1708,7 @@ def _name_ring_spine(
         # mixed-spiro-fused system that neither ``analyze_cage_universal`` nor
         # ``analyze_spiro_universal`` names correctly -- the former voids, the
         # latter kekulises the aromatic component into a polyene of a DIFFERENT
-        # constitution. Offer the P-24.5.1 separable name FIRST; it is
+        # constitution. Offer the separable name FIRST; it is
         # offer-RT-gated by the caller, so a wrong-constitution fusion name is
         # voided rather than shipped. Only when it declines do we fall through
         # to the von-Baeyer spiro floor below (the (c)-bucket covering name).
@@ -1730,7 +1730,7 @@ def _name_ring_spine(
             # / unsaturation / hetero_prefix / cage_atoms / atom_to_locant), so
             # the shared emission tail below is unchanged. ``free_valence_atoms``
             # biases the spiro numbering to give the attachment the lowest
-            # locant (P-29.3, substituent use). best-effort FLOOR only (never
+            # locant, substituent use). best-effort FLOOR only (never
             # reached at PIN tier), so PIN's own spiro producers are untouched.
             fv = [attach_hint] if attach_hint is not None else None
             cage = analyze_spiro_universal(
@@ -1810,7 +1810,7 @@ def _name_ring_spine(
         # Fix round 1, finding 4: a substituent-locant tier (mirroring
         # ``_chain_score``) -- without it, a plain (or symmetrically
         # decorated) carbocycle ties on (hetero, unsat) for EVERY rotation,
-        # and ``min()`` silently falls back to iteration order, which tracks
+        # and ``min`` silently falls back to iteration order, which tracks
         # the RDKit ring-tuple order, which tracks INPUT ATOM NUMBERING (e.g.
         # chlorocyclohexane emitted "5-chlorocyclohexane" from one input
         # numbering and "1-chlorocyclohexane" from another -- both RT-valid,
@@ -1894,7 +1894,7 @@ def _name_chain_spine(
         u = _farthest_from(ctx, seed, component)
         path = _farthest_path_from(ctx, u, component)
         # Free choice of numbering direction: lowest locants to heteroatoms,
-        # then unsaturation, then (P-31 simplified) substituent attachment
+        # then unsaturation, then simplified) substituent attachment
         # points, then a canonical-rank tie-break -- an all-carbon saturated
         # chain ties on the first two, so without the third tier a branch
         # could be numbered from the wrong end (e.g. 2-methylbutane emitted
@@ -2091,11 +2091,11 @@ def _farthest_path_from(ctx: _Ctx, start: int, component: FrozenSet[int]) -> Lis
 
 
 # ===========================================================================
-# Skeletal ('a') replacement prefix (P-15.4.3.1 citation order)
+# Skeletal ('a') replacement prefix citation order)
 # ===========================================================================
 
 def _build_hetero_prefix(mol, spine_order: List[int], atom_to_locant: Dict[int, int]) -> str:
-    # NOTE (WS-NOABSTAIN class 3): a lambda-convention citation was tried
+    # NOTE (NOABSTAIN class 3): a lambda-convention citation was tried
     # here first (a skeletal P/S atom whose actual bonding number exceeds
     # its standard one, e.g. a phosphinate's P or a sulfonic-acid-in-chain
     # S). REVERTED: measured regressions on multiple ALREADY-CORRECT,
@@ -2153,7 +2153,7 @@ _LEAF_DOUBLE = {
 }
 
 
-# M2: leaf tokens whose atoms carry a P-59 internal / P-74.2.1 semipolar formal
+# M2: leaf tokens whose atoms carry a internal / semipolar formal
 # charge that the leaf itself spells (so ``get_ion_sites`` strips those atoms and
 # they never reach the genuine-ion charge machinery). ``_name_component`` records
 # such a leaf's atoms in ``_ComponentResult.internal_atoms`` so the top-level and
@@ -2169,7 +2169,7 @@ def _leaf_shortcut(mol, component: FrozenSet[int], attach_hint: int):
     generic chain/replacement machinery. Returns ``(token, atom_ids)`` or
     ``None`` (fall through to generic construction)."""
     # Task B2b: nitro is checked FIRST, before the generic charge guard just
-    # below -- its charges are P-59 INTERNAL (excluded from
+    # below -- its charges are INTERNAL (excluded from
     # ``perception.ions.get_ion_sites``'s genuine-ion-site perception), so
     # this is the standard neutral-molecule nitro group's own Lewis
     # structure, not a "genuine ionic centre" the charge-suffix machinery
@@ -2178,7 +2178,7 @@ def _leaf_shortcut(mol, component: FrozenSet[int], attach_hint: int):
     if nitro is not None:
         return nitro
 
-    # M2: the other P-59 internal centres this module can spell as a TERMINAL
+    # M2: the other internal centres this module can spell as a TERMINAL
     # substituent leaf -- azide (``azido``) and diazo (``diazo``). Like nitro,
     # their charges are internal (get_ion_sites strips them), so they are
     # checked HERE, before the generic charge guard below, and their atoms are
@@ -2189,19 +2189,19 @@ def _leaf_shortcut(mol, component: FrozenSet[int], attach_hint: int):
     diazo = _diazo_shortcut(mol, component, attach_hint)
     if diazo is not None:
         return diazo
-    # M2 inc2: the nitrate ester ``-O-[N+](=O)[O-]`` (P-67.1.4.3.1 preselected
-    # ``nitrooxy``; its N+/O- are P-59 internal charges get_ion_sites strips).
+    # M2 inc2: the nitrate ester ``-O-[N+](=O)[O-]`` preselected
+    # ``nitrooxy``; its N+/O- are internal charges get_ion_sites strips).
     # Attached via the ester O, exactly the four ester-O/N/=O/O- atoms.
     nitrooxy = _nitrooxy_shortcut(mol, component, attach_hint)
     if nitrooxy is not None:
         return nitrooxy
-    # M2 inc3: the isocyanide ``R-[N+]#[C-]`` (P-66.5.3 ``isocyano``; R-N=C has
-    # no uncharged depiction, so its C-/N+ are P-59 internal -- reclassified as
+    # M2 inc3: the isocyanide ``R-[N+]#[C-]`` ``isocyano``; R-N=C has
+    # no uncharged depiction, so its C-/N+ are internal -- reclassified as
     # such in ``perception.ions`` so ``get_ion_sites`` strips them here).
     isocyano = _isocyano_shortcut(mol, component, attach_hint)
     if isocyano is not None:
         return isocyano
-    # M2 inc4: the anionic oxygen of a P-74.2.1 semipolar oxide (aromatic /
+    # M2 inc4: the anionic oxygen of a semipolar oxide (aromatic /
     # amine N-oxide, phosphine oxide, sulfoxide) -- a lone terminal ``[O-]``
     # single-bonded to an ``N+``/``P+``/``S+`` -- rendered as the ``oxido``
     # prefix (its INTERNAL charge, paired with the cation's ``-ium`` suffix the
@@ -2279,8 +2279,8 @@ def _leaf_shortcut(mol, component: FrozenSet[int], attach_hint: int):
     return None
 
 
-# WS7 (composed-charge): charged terminal-atom substituent prefixes
-# (P-72 anionic / P-73 cationic substituent prefixes). In THIS module's
+# (composed-charge): charged terminal-atom substituent prefixes
+# anionic / cationic substituent prefixes). In THIS module's
 # skeletal-replacement construction the carbonyl/sulfonyl/phosphoryl ``=O`` of a
 # carboxylate/sulfonate/phosphonate is THREADED INTO the parent skeleton (as an
 # ``oxa``/etc. atom + ``-ene``), which leaves the anionic ``[O-]`` as a bare,
@@ -2296,7 +2296,7 @@ def _leaf_shortcut(mol, component: FrozenSet[int], attach_hint: int):
 # ``2-oxido-1-oxabut-1-ene`` -> propanoate anion, ``1-sulfidoethane`` ->
 # ethanethiolate anion, ``1-selenidoethane`` -> ethaneselenolate anion,
 # ``2-azaniumyl-1-oxidoethane`` -> the 2-aminoethanolate zwitterion); the
-# emission is still gated by the caller's SELF-01 round-trip net, so an
+# emission is still gated by the caller's round-trip net, so an
 # unverifiable candidate abstains rather than shipping wrong. (NB the Se prefix
 # is ``selenido``, NOT ``selanido`` -- OPSIN rejects the latter.)
 _ANION_LEAF_SINGLE = {"O": "oxido", "S": "sulfido", "Se": "selenido"}
@@ -2367,7 +2367,7 @@ def _nitro_shortcut(mol, component: FrozenSet[int], attach_hint: int):
     and neutral, the other SINGLE-bonded and -1 -- the real nitro Lewis
     structure, and nothing else can match it.
 
-    Nitro's charges are P-59 INTERNAL (excluded from
+    Nitro's charges are INTERNAL (excluded from
     ``perception.ions.get_ion_sites``), so this leaf is spelled directly,
     never via the genuine-ion charge-suffix machinery in
     ``_resolve_spine_charge`` -- and ``_is_nitro_root``/``_tree_neighbors``
@@ -2423,11 +2423,11 @@ def _nitro_shortcut(mol, component: FrozenSet[int], attach_hint: int):
 #
 # Excluded atoms become off-spine substituent branches (``_discover_branches``
 # -> ``_leaf_shortcut``): a monovalent halogen renders as ``fluoro``/``chloro``/
-# ``bromo``/``iodo`` (P-29.3 / P-35.1); an element with no leaf/branch spelling
+# ``bromo``/``iodo`` /; an element with no leaf/branch spelling
 # fails CLOSED (the whole call voids -> abstain), never a phantom-carbon name.
 # ``SKELETON_ATOMS = {"C", *REPLACEMENT}`` and # carbon-only spine -- SAME pattern, Orthonym's own (organic-only) replacement
-# table (organometallic 'a'-replacement is out of scope, P-69). Blue Book
-# P-15.4 / P-21 ('a'-replacement skeletal-element set).
+# table (organometallic 'a'-replacement is out of scope,. Blue Book
+# / ('a'-replacement skeletal-element set).
 _SKELETAL_SPINE_ELEMENTS = frozenset({"C"}) | frozenset(REPLACEMENT_TERMS)
 
 
@@ -2523,7 +2523,7 @@ def _is_azide_root(mol, j: int) -> bool:
 def _azide_shortcut(mol, component: FrozenSet[int], attach_hint: int):
     """``-N=[N+]=[N-]`` (or its resonance twin) attached via N_alpha, exactly
     the three azide nitrogens -- rendered as the ``azido`` substituent prefix
-    (P-61.5 / P-59 internal charge; OPSIN-RT-verified: ``azidobenzene`` and
+     / internal charge; OPSIN-RT-verified: ``azidobenzene`` and
     ``1-azidohexane`` both parse back to the input constitution). Returns
     ``("azido", atom_ids)`` or ``None`` (fall through)."""
     if len(component) != 3:
@@ -2588,7 +2588,7 @@ def _is_diazo_root(mol, j: int) -> bool:
 
 def _diazo_shortcut(mol, component: FrozenSet[int], attach_hint: int):
     """``=[N+]=[N-]`` (or its resonance twin) attached via N_beta to a parent
-    carbon -- rendered as the ``diazo`` substituent prefix (P-66.4.1.2.1; OPSIN-
+    carbon -- rendered as the ``diazo`` substituent prefix; OPSIN-
     RT-verified: ``ethyl 2-diazoacetate`` and ``(diazomethyl)benzene`` both parse
     back to the input). Returns ``("diazo", atom_ids)`` or ``None``.
 
@@ -2609,7 +2609,7 @@ def _diazo_shortcut(mol, component: FrozenSet[int], attach_hint: int):
 
 
 # ===========================================================================
-# M2 inc2: nitrate ester -O-[N+](=O)[O-] (rendered ``nitrooxy``, P-67.1.4.3.1)
+# M2 inc2: nitrate ester -O-[N+](=O)[O-] (rendered ``nitrooxy``,
 # ===========================================================================
 
 def _nitrooxy_atoms(mol, ester_o_idx: int):
@@ -2667,10 +2667,10 @@ def _is_nitrooxy_root(mol, j: int) -> bool:
 
 def _nitrooxy_shortcut(mol, component: FrozenSet[int], attach_hint: int):
     """``-O-[N+](=O)[O-]`` attached via the ester O, exactly the four nitrate-
-    ester atoms -- rendered as the ``nitrooxy`` substituent prefix (P-67.1.4.3.1
+    ester atoms -- rendered as the ``nitrooxy`` substituent prefix
     preselected; OPSIN-RT-verified: ``nitrooxymethane`` and ``1-(nitrooxy)ethane``
     both parse back to the input constitution). Returns ``("nitrooxy", atom_ids)``
-    or ``None`` (fall through). The N+/O- are P-59 internal charges (tracked as
+    or ``None`` (fall through). The N+/O- are internal charges (tracked as
     ``internal_atoms`` via ``_INTERNAL_CHARGE_LEAF_TOKENS``)."""
     if len(component) != 4:
         return None
@@ -2687,7 +2687,7 @@ def _nitrooxy_shortcut(mol, component: FrozenSet[int], attach_hint: int):
 
 
 # ===========================================================================
-# M2 inc3: isocyanide R-[N+]#[C-] (rendered ``isocyano``, P-66.5.3)
+# M2 inc3: isocyanide R-[N+]#[C-] (rendered ``isocyano``,
 # ===========================================================================
 
 def _isocyanide_atoms(mol, n_idx: int):
@@ -2723,17 +2723,17 @@ def _is_isocyano_root(mol, j: int) -> bool:
     """True if atom *j* is the attachment nitrogen of an isocyanide (see
     ``_isocyanide_atoms``) -- used by ``_tree_neighbors`` to keep it OUT of
     chain-spine continuation, so the two isocyanide atoms are always resolved as
-    ONE ``isocyano`` branch leaf (carrying their P-59 internal charge), never
+    ONE ``isocyano`` branch leaf (carrying their internal charge), never
     threaded into the skeleton as a plain ``aza`` that drops the charge."""
     return _isocyanide_atoms(mol, j) is not None
 
 
 def _isocyano_shortcut(mol, component: FrozenSet[int], attach_hint: int):
     """``R-[N+]#[C-]`` attached via N, exactly the two isocyanide atoms --
-    rendered as the ``isocyano`` substituent prefix (P-66.5.3; OPSIN-RT-verified:
+    rendered as the ``isocyano`` substituent prefix; OPSIN-RT-verified:
     ``isocyanobenzene`` and ``isocyanomethane`` both parse back to the input).
     Returns ``("isocyano", atom_ids)`` or ``None`` (fall through). The C-/N+ are
-    P-59 internal charges (get_ion_sites strips them; tracked as
+     internal charges (get_ion_sites strips them; tracked as
     ``internal_atoms`` via ``_INTERNAL_CHARGE_LEAF_TOKENS``)."""
     if len(component) != 2:
         return None
@@ -2751,11 +2751,11 @@ def _isocyano_shortcut(mol, component: FrozenSet[int], attach_hint: int):
 
 # ===========================================================================
 # M2 inc4: semipolar oxide X(+)-[O-] (X in N/P/S) -- ``oxido`` + ``-ium``
-# aromatic / amine N-oxide, phosphine oxide, sulfoxide (P-74.2.1)
+# aromatic / amine N-oxide, phosphine oxide, sulfoxide
 # ===========================================================================
 
 def _semipolar_oxide_partner(mol, x_idx: int) -> Optional[int]:
-    """If atom *x_idx* is the CATION of a P-74.2.1 semipolar oxide -- an
+    """If atom *x_idx* is the CATION of a semipolar oxide -- an
     ``N``/``P``/``S`` carrying formal charge ``+1`` and a TERMINAL anionic oxygen
     ``[O-]`` (heavy-degree 1, H-free, single-bonded, ``-1``) -- return that
     oxygen's index, else ``None``.
@@ -2811,12 +2811,12 @@ def _semipolar_oxido_shortcut(mol, component: FrozenSet[int], attach_hint: int):
 def _resolve_internal_oxide_suffix(
     ctx: _Ctx, spine_atom_to_locant: Dict[int, int],
 ) -> Tuple[Optional[str], FrozenSet[int]]:
-    """Does THIS spine carry any P-74.2.1 semipolar-oxide cation (an ``N+``/
+    """Does THIS spine carry any semipolar-oxide cation (an ``N+``/
     ``P+``/``S+`` whose terminal ``[O-]`` partner renders as ``oxido``)? If so,
     return the ``-<locants>-[di/tri...]ium`` suffix text and the cation atom ids
     (recorded ``internal_atoms``, NOT ``charged`` -- these are internal charges
     get_ion_sites strips, so they are invisible to ``_resolve_spine_charge``).
-    Returns ``(None, frozenset())`` when the spine carries none.
+    Returns ``(None, frozenset)`` when the spine carries none.
 
     The paired ``oxido`` anions are rendered as ordinary branch leaves
     (``_semipolar_oxido_shortcut``); this only adds the cation's ``-ium``, so the
@@ -2846,15 +2846,15 @@ def _phosphinate_oxide_leaf_shortcut(mol, component: FrozenSet[int], attach_hint
     """``-P(=O)([O-])(H)`` (a phosphinate: P-V, one explicit P-H), attached
     via P to exactly one outside atom by a single bond -- 3 atoms, mirroring
     ``_nitro_shortcut``'s shape. Named directly as the SUBSTITUTIVE
-    ``(oxido(oxo)phosphanyl)`` prefix (P-68 mononuclear-hydride substituent
+    ``(oxido(oxo)phosphanyl)`` prefix mononuclear-hydride substituent
     group ``phosphanyl`` = ``-PH2``, with ``oxo``/``oxido`` replacing two of
     its three H's, one remaining) rather than through the generic chain /
     ``_build_hetero_prefix`` replacement-nomenclature machinery.
 
-    WS-NOABSTAIN class 3 root cause (measured, NOT the brief's original
+    NOABSTAIN class 3 root cause (measured, NOT the brief's original
     "N-simultaneous-leaves composition" hypothesis): OPSIN does not validate
     the equivalent raw skeletal-replacement spelling for this shape even WITH
-    a correct P-15.4.1 lambda citation -- ``2-oxido-1-oxa-2λ5-phosphaprop-
+    a correct lambda citation -- ``2-oxido-1-oxa-2λ5-phosphaprop-
     1-ene`` (the chain builder's own output for ``C[PH](=O)[O-]`` once
     lambda is wired in) still round-trips to the neutral, P-H-less
     ``O=P(=O)C``. The substitutive ``phosphanyl`` spelling, by contrast, IS

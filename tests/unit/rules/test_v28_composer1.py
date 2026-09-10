@@ -69,7 +69,7 @@ def test_decorated_ring_substituent_emits_via_engine(smi):
     now supply `4-(tert-butylsulfanyl)phenyl`, letting the PIN path complete
     instead of falling through to the best-effort engine.
 
-    That is a T4 -> T1 PROMOTION, i.e. the outcome this project wants, so
+    That is a -> PROMOTION, i.e. the outcome this project wants, so
     pinning the source to `general_engine` would be pinning the weaker result.
     The first parameter still exercises the engine path (T3), so engine coverage
     is not lost.
@@ -104,14 +104,14 @@ def test_polycyclic_decorated_substituent_is_named(smi, expected):
     Both expected names are the ones this test's own parametrisation comments
     named from the start, and neither route ever produced the second one before:
 
-    * ``acetic acid`` is the PIN, not ``ethanoic acid``. **P-21.1.1 / Table 28.1
+    * ``acetic acid`` is the PIN, not ``ethanoic acid``. ** / Table 28.1
       context, stated at ``the Blue Book Blue Book``**: *"A special class of
       parent structures having retained names... is called functional parent
       compounds, for example, phenol and acetic acid. These two names are
       preferred IUPAC names; the corresponding systematic alternatives, benzenol
       and ethanoic acid, may be used in general IUPAC nomenclature."*
     * ``adamantan-1-yl`` is the PIN stem, not ``tricyclo[3.3.1.1^3,7]decan-3-yl``.
-      **P-23.7 "RETAINED NAMES FOR VON BAEYER PARENT HYDRIDES"** (``:9879``):
+      ** "RETAINED NAMES FOR VON BAEYER PARENT HYDRIDES"** (``:9879``):
       *"The retained names adamantane and cubane are used in general nomenclature
       and as preferred IUPAC names."* Table 2.6 (``:9885``) prints *"adamantane
       (PIN) tricyclo[3.3.1.1^3,7]decane"* -- retained name PIN, descriptor the
@@ -139,7 +139,7 @@ def test_polycyclic_decorated_substituent_is_named(smi, expected):
 # general-engine code path and nothing else, mirroring the Task 1 primitive test
 # above. (End-to-end value verified out-of-band with ``diagnose.py --complete``:
 # for complex decorations the PIN path silently drops -- e.g.
-# ``OC(=O)Cc1c[nH]c2ccc(OCc3ccc(Cl)cc3)cc12`` -- the PIN name fails the SELF-01
+# ``OC(=O)Cc1c[nH]c2ccc(OCc3ccc(Cl)cc3)cc12`` -- the PIN name fails the
 # round-trip in production and the general engine recovers the full retained
 # name ``2-(5-[(4-chlorophenyl)methoxy]-1H-indol-3-yl)ethanoic acid``.)
 
@@ -207,7 +207,7 @@ def test_fused_heterocycle_decorated_substituent_emits_via_engine(smi):
 # Composer1 Task 3: heteroatom carrier in the RING-ON-CHAIN branch
 # ============================================================================
 #
-# PROVENANCE NOTE (mirrors Task 2c above). This T0 case-4 molecule's PIN path
+# PROVENANCE NOTE (mirrors Task 2c above). This case-4 molecule's PIN path
 # ALREADY fails to name the -CH2-S-(decorated fused-heterocycle) substituent
 # (the all-carbon carrier guard in ``_compound_ring_on_chain_substituent``
 # rejects the sulfur linker), so whether ``name_tiered``'s whole-molecule
@@ -234,7 +234,7 @@ def test_ring_on_chain_heteroatom_carrier_emits_via_engine():
 def test_ring_on_chain_sulfanyl_carrier_direct_composer():
     """Direct function-level test (primary correctness assertion): the
     isolated -CH2-S-(decorated fused-heterocycle) substituent fragment from
-    the T0 case-4 molecule, named directly via
+    the case-4 molecule, named directly via
     ``_compound_ring_on_chain_substituent``. PIN default (allow_mancude=False)
     MUST decline -> byte-identity guard; allow_mancude=True must emit a real
     linker name (never None, never the 'substituent' sentinel, never a
@@ -273,9 +273,9 @@ def test_ring_on_chain_sulfanyl_carrier_direct_composer():
 def test_ring_on_chain_amino_carrier_direct_composer():
     """Mirrors ``test_ring_on_chain_sulfanyl_carrier_direct_composer`` above
     but for the N (amino) connective: an ordinary ``-CH2-NH-(ring)`` secondary
-    amine carrier. Reviewer finding (T3 fix): a neutral, non-aromatic,
+    amine carrier. Reviewer finding (fix): a neutral, non-aromatic,
     degree-2 bridging N ALWAYS carries exactly 1 implicit H (unlike O/S,
-    which carry 0), so the original ``GetTotalNumHs() == 0`` guard applied
+    which carry 0), so the original ``GetTotalNumHs == 0`` guard applied
     uniformly to S/O/N made the 'amino' connective branch permanently
     unreachable dead code. PIN default (allow_mancude=False) MUST decline ->
     byte-identity guard; allow_mancude=True must emit a real linker name
@@ -356,12 +356,12 @@ def test_general_substituent_never_returns_sentinel_when_decomposable():
     name = name_substituent(mol, ring_atoms, attach, allow_mancude=True)
     assert name is None or (name != "substituent" and " " not in name)
     # -T1c: was ``tricyclo[3.3.1.1^3,7]decan-3-yl``. The retained name is
-    # the PIN -- **P-23.7 "RETAINED NAMES FOR VON BAEYER PARENT HYDRIDES"**
+    # the PIN -- ** "RETAINED NAMES FOR VON BAEYER PARENT HYDRIDES"**
     # (``the Blue Book Blue Book``): *"The retained names adamantane and
     # cubane are used in general nomenclature and as preferred IUPAC names."*
     # Table 2.6 (``:9885``) prints *"adamantane (PIN) tricyclo[3.3.1.1^3,7]
     # decane"*, i.e. the descriptor is the ALTERNATIVE. The locant also drops
-    # 3 -> 1 because the free valence now takes the lowest locant (P-29.3.2);
+    # 3 -> 1 because the free valence now takes the lowest locant;
     # OPSIN resolves ``adamantan-N-ol`` and ``tricyclo[3.3.1.1^3,7]decan-N-ol``
     # to the same InChIKey for all N in 1..10, so the two numberings coincide
     # and the stem swap is locant-safe.
@@ -379,7 +379,7 @@ def test_general_substituent_never_returns_sentinel_when_decomposable():
 # (substituents off suffix/FG atoms)
 # ============================================================================
 #
-# T0 case-5 molecule: an N-aryl amide anilide (the 3-fluorophenyl hangs off the
+# case-5 molecule: an N-aryl amide anilide (the 3-fluorophenyl hangs off the
 # amide nitrogen -- a SUFFIX/FG atom, unreachable from the parent-chain walk) PLUS
 # a piperidine-borne fused-heterocycle ring that no honest namer can express. The
 # general-engine chain path partitions parent = chain | suffix and the N-aryl ring
@@ -436,13 +436,13 @@ def test_asm_robustness_instrument_smoke():
     sys.modules[spec.name] = mod  # dataclass decorator needs the module registered
     spec.loader.exec_module(mod)
 
-    # 5 SMILES already used above (T2 / T2b / T4 cases).
+    # 5 SMILES already used above (/ / cases).
     smiles = [
         "C[C@@H](N)c1ccc(OCc2ccc(Cl)cc2)nc1",       # T2
         "CC(C)(C)Sc1ccc(-c2nc3ccccc3c(=O)[nH]2)cc1", # T2
         "OC(=O)Cc1ccc2cc(Cl)ccc2c1",                 # T2b
         "OC(=O)CC12CC3CC(O)(CC(C3)C1)C2",            # T2b
-        "OC(=O)CC12CC3CC(CC(C3)C1)C2",                # T4 (adamantyl-acetic acid)
+        "OC(=O)CC12CC3CC(CC(C3)C1)C2",                # (adamantyl-acetic acid)
     ]
 
     result = mod.measure_assembly_robustness(smiles)

@@ -1,19 +1,19 @@
-"""Phase 160 unit tests for ``orthonym.assembly.name_tree``.
+"""a phase unit tests for ``orthonym.assembly.name_tree``.
 
-Per CONTEXT D-20 + Phase 158 D-17 mirror: >= 30 NameTreeNode dataclass
+Per internal notes + a phase mirror: >= 30 NameTreeNode dataclass
 integrity tests covering the 12-field frozen schema, default values,
-helper functions, and contract invariants. Mirrors the Phase 158
+helper functions, and contract invariants. Mirrors the a phase
 ``tests/unit/routing/test_dispatch_table.py`` pattern (one TestClass per
 concern; parametrized expansion gives generous test count).
 
 Test classes:
-- TestNameTreeNodeIntegrity      - 12-field frozen-dataclass shape
-- TestNameTreeNodeDefaults       - every field's default value
-- TestNamingResultShape          - NamedTuple integrity (3 fields)
-- TestNormalizeLocants           - _normalize_locants sort/dedupe/idempotent
-- TestAlphabetizePrefixes        - _alphabetize_prefixes IUPAC P-13 ordering
+- TestNameTreeNodeIntegrity - 12-field frozen-dataclass shape
+- TestNameTreeNodeDefaults - every field's default value
+- TestNamingResultShape - NamedTuple integrity (3 fields)
+- TestNormalizeLocants - _normalize_locants sort/dedupe/idempotent
+- TestAlphabetizePrefixes - _alphabetize_prefixes IUPAC ordering
 
-Per CONTEXT D-26 honest-fail-on-data: every test must pass green; no
+Per internal notes honest-fail-on-data: every test must pass green; no
 @pytest.mark.xfail markers permitted in this module. All tests run in
 < 5 seconds total (no SMILES or RDKit construction; pure dataclass ops).
 """
@@ -40,33 +40,33 @@ class TestNameTreeNodeIntegrity:
     """160-AUDIT-DECOMP.md § 5 + CONTEXT D-04 12-field schema lock."""
 
     def test_is_dataclass(self):
-        """CONTEXT D-04: NameTreeNode is a dataclass."""
+        """internal notes: NameTreeNode is a dataclass."""
         assert dataclasses.is_dataclass(NameTreeNode)
 
     def test_is_frozen(self):
-        """CONTEXT D-04: frozen=True means immutable instances."""
+        """internal notes: frozen=True means immutable instances."""
         assert NameTreeNode.__dataclass_params__.frozen is True
 
     def test_attempted_mutation_raises(self):
-        """CONTEXT D-04: assigning to an instance attribute raises FrozenInstanceError."""
+        """internal notes: assigning to an instance attribute raises FrozenInstanceError."""
         n = NameTreeNode(parent_stem="ethan")
         with pytest.raises(dataclasses.FrozenInstanceError):
             n.parent_stem = "X"  # type: ignore[misc]
 
     def test_attempted_mutation_locants_raises(self):
-        """CONTEXT D-04: assigning to locants raises FrozenInstanceError."""
+        """internal notes: assigning to locants raises FrozenInstanceError."""
         n = NameTreeNode(parent_stem="ethan")
         with pytest.raises(dataclasses.FrozenInstanceError):
             n.locants = (1,)  # type: ignore[misc]
 
     def test_attempted_mutation_suffix_raises(self):
-        """CONTEXT D-04: assigning to suffix raises FrozenInstanceError."""
+        """internal notes: assigning to suffix raises FrozenInstanceError."""
         n = NameTreeNode(parent_stem="ethan")
         with pytest.raises(dataclasses.FrozenInstanceError):
             n.suffix = "-ol"  # type: ignore[misc]
 
     def test_has_12_fields(self):
-        """CONTEXT D-04: schema is locked at exactly 12 fields."""
+        """internal notes: schema is locked at exactly 12 fields."""
         fields = dataclasses.fields(NameTreeNode)
         assert len(fields) == 12, (
             f"NameTreeNode has {len(fields)} fields, expected 12 per CONTEXT D-04. "
@@ -104,7 +104,7 @@ class TestNameTreeNodeIntegrity:
             NameTreeNode()  # type: ignore[call-arg]
 
     def test_can_construct_with_minimal_args(self):
-        """CONTEXT D-04: only parent_stem is required; all other fields default."""
+        """internal notes: only parent_stem is required; all other fields default."""
         n = NameTreeNode(parent_stem="meth")
         assert n.parent_stem == "meth"
 
@@ -186,7 +186,7 @@ class TestNameTreeNodeDefaults:
 
 
 class TestNamingResultShape:
-    """CONTEXT D-05: NamingResult is a NamedTuple with 3 fields."""
+    """internal notes: NamingResult is a NamedTuple with 3 fields."""
 
     def test_has_three_fields(self):
         """CONTEXT D-05 § 5.2: name + tree + atom_to_locant_hint."""
@@ -204,7 +204,7 @@ class TestNamingResultShape:
         assert r.tree is tree
 
     def test_tree_defaults_to_none(self):
-        """CONTEXT D-05: tree is Optional; defaults to None per first-wave migration."""
+        """internal notes: tree is Optional; defaults to None per first-wave migration."""
         r = NamingResult(name="ethanol")
         assert r.tree is None
 
@@ -294,10 +294,10 @@ class TestAlphabetizePrefixes:
         assert isinstance(result, tuple)
 
     def test_iupac_p13_ignores_di_prefix(self):
-        """P-13: di- prefix IGNORED for alphabetization sort key.
+        """: di- prefix IGNORED for alphabetization sort key.
 
         dimethyl (sort key 'methyl') should still sort by 'methyl', not 'd'.
-        Per CONTEXT D-04 + composer.py:7685 sort discipline.
+        Per internal notes + composer.py:7685 sort discipline.
         """
         # Note: this test relies on alpha_sort_key correctly stripping
         # di-/tri-/bis-/tris- prefixes. The behavior is encoded in

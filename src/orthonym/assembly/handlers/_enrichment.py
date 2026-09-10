@@ -1,7 +1,7 @@
-"""Phase 160 handler enrichment helpers (DECOMP-01).
+"""a phase handler enrichment helpers (DECOMP-01).
 
 Substrate commit 02-00: lazy re-export wrappers around the canonical
-implementations in ``composer.py``. Per CONTEXT D-24 incremental-migration
+implementations in ``composer.py``. Per internal notes incremental-migration
 discipline, composer.py STILL OWNS ``_enrich_handler_name`` (composer.py:191-277)
 and ``_integrate_universal_prefixes`` (composer.py:109-183) at this commit;
 those functions stay until Plan-03 commit 03-10 (composer.py thinning).
@@ -9,7 +9,7 @@ those functions stay until Plan-03 commit 03-10 (composer.py thinning).
 The substrate ships THIS module so handler files can write the
 forward-looking import path::
 
-    from .._enrichment import enrich_handler_name  # eventual public path
+    from.._enrichment import enrich_handler_name # eventual public path
 
 while internally the symbols delegate (via lazy import inside each
 function body) to composer.py. When Plan-03 commit 03-10 lands, the
@@ -18,27 +18,27 @@ function BODIES move here verbatim and composer.py's `_enrich_handler_name`
 shape ensures handler files do NOT need to change import paths at thinning
 time — only this delegation layer flips.
 
-Per PATTERNS § 5 line 474 first-wave guidance: both lazy-from-composer
+Per PATTERNS line 474 first-wave guidance: both lazy-from-composer
 AND eventual-handlers/_enrichment paths work. We choose the lazy-from-
 composer path now to minimize commit-02-00 risk: zero copy of composer.py
 logic; zero risk of stale-closure drift; the byte-identical canary delta
 gate is trivially satisfied.
 
-Anti-pattern hygiene (Phase 158 D-26 inheritance):
-- AP-160-04 banned: pure read-only on ``features``; never mutates
+Anti-pattern hygiene (a phase inheritance):
+- -04 banned: pure read-only on ``features``; never mutates
   ``features.mol`` or ``features.functional_groups``. (The lazy delegate
   inherits composer.py's purity verbatim.)
-- AP-160-23 banned: no regex band-aid / postprocessor on inner-dispatch
+- -23 banned: no regex band-aid / postprocessor on inner-dispatch
   output — the helpers are pure wrappers.
 - ``logger.debug`` for HANDLER_COVERAGE telemetry; default-OFF.
-- IUPAC P-31.1 cite stays in ``_integrate_universal_prefixes`` docstring
+- IUPAC cite stays in ``_integrate_universal_prefixes`` docstring
   in composer.py (unchanged at this commit).
 
 References:
 - composer.py:109-183 (``_integrate_universal_prefixes``) — verbatim source.
 - composer.py:191-277 (``_enrich_handler_name``) — verbatim source.
-- 160-PATTERNS.md § 5 — analog: composer.py:109-277.
-- 160-CONTEXT.md D-24 — incremental-migration discipline.
+- internal notes — analog: composer.py:109-277.
+- 160-internal notes — incremental-migration discipline.
 """
 from __future__ import annotations
 
@@ -52,7 +52,7 @@ def enrich_handler_name(
     """Enrich a handler's base name with non-principal substituents.
 
     Lazy delegate to ``composer.py:_enrich_handler_name`` (composer.py:191-277).
-    Per CONTEXT D-24 + PATTERNS § 5 first-wave guidance, composer.py owns
+    Per internal notes + PATTERNS first-wave guidance, composer.py owns
     the canonical body at this commit; this wrapper provides the
     forward-looking import path ``handlers._enrichment.enrich_handler_name``
     for handler files that want stable paths now.
@@ -93,7 +93,7 @@ def integrate_universal_prefixes(
     """Discover and format all substituents on a parent structure.
 
     Lazy delegate to ``composer.py:_integrate_universal_prefixes``
-    (composer.py:109-183). Per CONTEXT D-24 + PATTERNS § 5 first-wave guidance.
+    (composer.py:109-183). Per internal notes + PATTERNS first-wave guidance.
 
     Args:
         mol: RDKit Mol object.

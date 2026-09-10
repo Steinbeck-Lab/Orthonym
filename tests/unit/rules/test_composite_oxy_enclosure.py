@@ -1,12 +1,12 @@
-"""P-16.5.1.1 — compound '-oxy' / heteroatom substituent prefixes take enclosing marks.
+""" — compound '-oxy' / heteroatom substituent prefixes take enclosing marks.
 
 The general-engine enclosure predicate (_is_complex_prefix) did not consult the
-codebase's canonical needs_brackets(), so compound heteroatom prefixes were emitted
-bare. Now it delegates, so compound prefixes are enclosed (P-16.5.1.1):
+codebase's canonical needs_brackets, so compound heteroatom prefixes were emitted
+bare. Now it delegates, so compound prefixes are enclosed:
 
-    nitrooxy -> (nitrooxy) 3-(nitrooxy)butanoic-acid family (P-61.5.2)
-    thiocyanato -> (thiocyanato) 3-(thiocyanato)propanoic acid (P-16.5.1.2)
-    chloromethoxy -> (chloromethoxy) 1-(chloromethoxy)-4-nitrobenzene (P-63.2.2.2)
+    nitrooxy -> (nitrooxy) 3-(nitrooxy)butanoic-acid family
+    thiocyanato -> (thiocyanato) 3-(thiocyanato)propanoic acid
+    chloromethoxy -> (chloromethoxy) 1-(chloromethoxy)-4-nitrobenzene
 
 Asserted at the PRODUCER level (the enclosure predicates + _mult_prefix rendering)
 rather than full name_tiered: the general-fallback naming path is sensitive to
@@ -24,7 +24,7 @@ def test_compound_prefix_is_complex(prefix):
     """The general engine now classifies these as complex -> enclosed + 'bis'."""
     from orthonym.assembly.general_engine import _is_complex_prefix, _mult_prefix
     assert _is_complex_prefix(prefix) is True, prefix
-    # n==1 => enclosed in marks (P-16.5.1.1)
+    # n==1 => enclosed in marks
     assert _mult_prefix(1, prefix) == f"({prefix})", _mult_prefix(1, prefix)
 
 

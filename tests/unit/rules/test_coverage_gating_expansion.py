@@ -134,16 +134,16 @@ def test_tier_b_high_confidence_passes(smiles, expected_fragment, handler_desc):
 
 @pytest.mark.unit
 def test_confidence_gate_in_composer_source():
-    """Verify the gating contract survives Phase 145.1 refactor.
+    """Verify the gating contract survives a phase refactor.
 
-    Phase 145.1 Plan 03 moved direct `_confidence_gate(handler, conf)`
+    a phase Plan 03 moved direct `_confidence_gate(handler, conf)`
     call sites OUT of composer.py and INTO declarative `HandlerPolicy`
-    entries in candidate_pool.py, consumed internally by pool.add().
+    entries in candidate_pool.py, consumed internally by pool.add.
     The old assertion (source.count("_confidence_gate(") >= 3) is
     obsolete because the direct call-site count fell from ~13 to 0
     when gating became declarative.
 
-    New contract (per 145.1 ISS-010 and REVIEWS.md §Plan 03 MEDIUM #7):
+    New contract (per 145.1 and REVIEWS.md §Plan 03 MEDIUM #7):
       1. composer.py still emits CONFIDENCE_GATE debug log messages for
          observability even though the gating logic itself moved.
       2. candidate_pool.py SOURCE TEXT contains >= 35 HandlerPolicy(
@@ -155,12 +155,12 @@ def test_confidence_gate_in_composer_source():
 
     Both source and runtime checks stay — they are independent
     fail-modes. A tester who accidentally alias-bound HandlerPolicy
-    would pass len() while source-count caught it; a refactor to
-    `HP = HandlerPolicy` + `HP(...)` declarations would pass len()
+    would pass len while source-count caught it; a refactor to
+    `HP = HandlerPolicy` + `HP(...)` declarations would pass len
     but fail the source-count. The belt-and-suspenders pair surfaces
     both deviations.
 
-    Updated via Phase 145.2 D-09-c.1 (deferred-items.md item 3) +
+    Updated via a phase -c.1 (deferred-items.md item 3) +
     REVIEWS §Plan 03 MEDIUM #7 (runtime supplement).
     """
     import inspect
@@ -171,7 +171,7 @@ def test_confidence_gate_in_composer_source():
     pool_src = inspect.getsource(candidate_pool)
 
     # 1. composer.py must still emit CONFIDENCE_GATE debug log messages
-    #    (observability invariant — separate from gating-call-site count).
+    # (observability invariant — separate from gating-call-site count).
     assert "CONFIDENCE_GATE" in composer_src, (
         "composer.py must contain CONFIDENCE_GATE debug log messages "
         "(observability invariant; does not require direct _confidence_gate "
@@ -179,9 +179,9 @@ def test_confidence_gate_in_composer_source():
     )
 
     # 2. candidate_pool.py SOURCE must declare >= 35 HandlerPolicy entries
-    #    (145.1 ISS-010 floor — declarative replacement for the old
-    #    _confidence_gate call sites). Belt check: guards against
-    #    declaration-site removal.
+    # (145.1 floor — declarative replacement for the old
+    # _confidence_gate call sites). Belt check: guards against
+    # declaration-site removal.
     handler_policy_count = pool_src.count("HandlerPolicy(")
     assert handler_policy_count >= 35, (
         f"Expected >= 35 HandlerPolicy entries in candidate_pool.py source "
@@ -192,9 +192,9 @@ def test_confidence_gate_in_composer_source():
     )
 
     # 3. RUNTIME check on the imported dict (REVIEWS.md §Plan 03 MEDIUM #7).
-    #    Suspenders check: guards against refactors (factory methods,
-    #    subclasses, aliases) where source-string count lies about
-    #    actual runtime coverage.
+    # Suspenders check: guards against refactors (factory methods,
+    # subclasses, aliases) where source-string count lies about
+    # actual runtime coverage.
     assert len(HANDLER_POLICIES) >= 35, (
         f"Expected >= 35 entries in HANDLER_POLICIES dict at runtime "
         f"(per 145.1 ISS-010), got {len(HANDLER_POLICIES)}. "
@@ -213,7 +213,7 @@ def test_confidence_gate_in_composer_source():
     "oxime", "boronic_acid", "sulfoxide", "urea", "carbamate",
 ])
 def test_compute_confidence_accepts_tier_b_handler_ids(handler_id):
-    """compute_confidence() works with Tier B handler IDs."""
+    """compute_confidence works with Tier B handler IDs."""
     features = _make_features("CCCO", functional_groups={}, principal_group=None)
     cand = compute_confidence("propan-1-ol", handler_id, features)
     assert isinstance(cand, CandidateName)

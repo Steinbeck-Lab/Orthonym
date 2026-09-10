@@ -1,4 +1,4 @@
-"""v30 sub-lever A: N-rooted secondary-amine substituent with a RING-bearing R.
+""" sub-lever A: N-rooted secondary-amine substituent with a RING-bearing R.
 
 `_name_amino_branch` names alkyl (methylamino) and aryl (anilino) R, but declined a
 saturated-ring or ring-on-chain R, so `-NH-cyclohexyl` / `-NH-CH2Ar` fell through to
@@ -58,7 +58,7 @@ def test_existing_amino_unchanged(smi, expected, am):
 
 
 # DISUBSTITUTED N with a ring-bearing R — the v2 extension (was v1-deferred). The
-# ONE amino-prefix assembler (P-16.5.1.3.1) orders + marks + multiplies the two R
+# ONE amino-prefix assembler orders + marks + multiplies the two R
 # names; each ring R is per-branch re-anchor-verified. OPSIN RT-exact on real
 # molecules (3-(cyclohexyl(methyl)amino)propanoic acid etc.).
 DISUBSTITUTED = [
@@ -76,7 +76,7 @@ def test_disubstituted_n_ring_amino(smi, expected):
 
 # STILL deferred (must NOT fabricate a partial/wrong name): an acyl branch is the
 # amido family; a HETEROATOM-rooted branch is hydrazine/nitroso/hydroxylamine
-# (fable RISK 5 — name_substituent gives OPSIN-lenient INVALID replacement names
+# (a review RISK 5 — name_substituent gives OPSIN-lenient INVALID replacement names
 # like '2-oxa-1-azaeth-1-en-1-yl' for -N=O that the re-anchor accepts). Both must
 # fall through to their own producers, never 'amino' over them.
 @pytest.mark.parametrize("smi", [
@@ -90,10 +90,10 @@ def test_deferred_shapes_fail_closed(smi):
     assert name_substituent(m, frag, fv, allow_mancude=True) is None
 
 
-# Ring-ASSEMBLY R (biphenyl): the v30 blocker fix (3a70c6c0) routes the assembly
+# Ring-ASSEMBLY R (biphenyl): the blocker fix routes the assembly
 # substituent through name_ring_assembly_prefix, so instead of the yl-LESS parent
 # hydride "1,1'-biphenyl" (OPSIN-unparseable — the 8afa533c F1 class it used to
-# fail closed on) it now emits the CORRECT P-28.3 bracketed free-valence form.
+# fail closed on) it now emits the CORRECT bracketed free-valence form.
 # OPSIN RT-exact: 3-(([1,1'-biphenyl]-4-yl)amino)propanoic acid etc.
 @pytest.mark.parametrize("smi,expected", [
     ("[*]Nc1ccc(-c2ccccc2)cc1", "([1,1'-biphenyl]-4-yl)amino"),

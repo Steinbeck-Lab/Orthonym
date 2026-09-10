@@ -1,7 +1,7 @@
 """Unit tests for substituent_naming module.
 
-Tests for name_substituent_fragment(), _is_linear_alkyl(),
-_extract_fragment_smiles(), and parent_to_prefix(, attach_locant=ATTACH_LOCANT_UNKNOWN).
+Tests for name_substituent_fragment, _is_linear_alkyl,
+_extract_fragment_smiles, and parent_to_prefix(, attach_locant=ATTACH_LOCANT_UNKNOWN).
 """
 
 import pytest
@@ -22,7 +22,7 @@ from orthonym.assembly.substituent_naming import (
 
 
 class TestIsLinearAlkyl:
-    """Tests for _is_linear_alkyl()."""
+    """Tests for _is_linear_alkyl."""
 
     def test_propyl_chain_is_linear(self):
         """A straight 3-carbon chain is linear."""
@@ -59,7 +59,7 @@ class TestIsLinearAlkyl:
 
 
 class TestExtractFragmentSmiles:
-    """Tests for _extract_fragment_smiles()."""
+    """Tests for _extract_fragment_smiles."""
 
     def test_methyl_fragment(self):
         """Extract methyl from ethane."""
@@ -106,11 +106,11 @@ class TestParentToPrefix:
 
     def test_alcohol_to_hydroxy(self):
         """propan-2-ol -> 2-hydroxypropyl."""
-        # v29 residue Task A: this converter is handed only a NAME and a CARBON
+        # residue Task A: this converter is handed only a NAME and a CARBON
         # COUNT, and that pair is not injective over fragments -- '-CH2CH2CH2OH'
         # and '-CH(OH)CH2CH3' both cap to 'propan-1-ol' with count 3, and OPSIN
         # 2.9.0 makes the single old answer EXACT for one and a DIFFERENT
-        # MOLECULE for the other. P-46.1.8 (BB:22718, "The principal substituent
+        # MOLECULE for the other. (the Blue Book, "The principal substituent
         # chain has the lowest locants for free valences of any kind") can only
         # be honoured by a caller holding the molecule, so these branches now
         # decline. The correct names are still produced end-to-end by the
@@ -123,11 +123,11 @@ class TestParentToPrefix:
 
     def test_ketone_to_oxo(self):
         """butan-2-one -> 2-oxobutyl."""
-        # v29 residue Task A: this converter is handed only a NAME and a CARBON
+        # residue Task A: this converter is handed only a NAME and a CARBON
         # COUNT, and that pair is not injective over fragments -- '-CH2CH2CH2OH'
         # and '-CH(OH)CH2CH3' both cap to 'propan-1-ol' with count 3, and OPSIN
         # 2.9.0 makes the single old answer EXACT for one and a DIFFERENT
-        # MOLECULE for the other. P-46.1.8 (BB:22718, "The principal substituent
+        # MOLECULE for the other. (the Blue Book, "The principal substituent
         # chain has the lowest locants for free valences of any kind") can only
         # be honoured by a caller holding the molecule, so these branches now
         # decline. The correct names are still produced end-to-end by the
@@ -140,11 +140,11 @@ class TestParentToPrefix:
 
     def test_amine_to_amino(self):
         """propan-1-amine -> 1-aminopropyl."""
-        # v29 residue Task A: this converter is handed only a NAME and a CARBON
+        # residue Task A: this converter is handed only a NAME and a CARBON
         # COUNT, and that pair is not injective over fragments -- '-CH2CH2CH2OH'
         # and '-CH(OH)CH2CH3' both cap to 'propan-1-ol' with count 3, and OPSIN
         # 2.9.0 makes the single old answer EXACT for one and a DIFFERENT
-        # MOLECULE for the other. P-46.1.8 (BB:22718, "The principal substituent
+        # MOLECULE for the other. (the Blue Book, "The principal substituent
         # chain has the lowest locants for free valences of any kind") can only
         # be honoured by a caller holding the molecule, so these branches now
         # decline. The correct names are still produced end-to-end by the
@@ -157,11 +157,11 @@ class TestParentToPrefix:
 
     def test_carboxylic_acid_to_carboxy(self):
         """butanoic acid -> 3-carboxypropyl."""
-        # v29 residue Task A: this converter is handed only a NAME and a CARBON
+        # residue Task A: this converter is handed only a NAME and a CARBON
         # COUNT, and that pair is not injective over fragments -- '-CH2CH2CH2OH'
         # and '-CH(OH)CH2CH3' both cap to 'propan-1-ol' with count 3, and OPSIN
         # 2.9.0 makes the single old answer EXACT for one and a DIFFERENT
-        # MOLECULE for the other. P-46.1.8 (BB:22718, "The principal substituent
+        # MOLECULE for the other. (the Blue Book, "The principal substituent
         # chain has the lowest locants for free valences of any kind") can only
         # be honoured by a caller holding the molecule, so these branches now
         # decline. The correct names are still produced end-to-end by the
@@ -173,12 +173,12 @@ class TestParentToPrefix:
             attach_locant=ATTACH_LOCANT_UNKNOWN) is None
 
     def test_aldehyde_to_oxo(self):
-        """propanal -> 3-oxopropyl (Phase 172 MBA-02 fix).
+        """propanal -> 3-oxopropyl (a phase fix).
 
         The former -CHO carbon sits at the chain terminus opposite the attachment
-        (attachment = locant 1, P-29), so oxo is at C3 (= chain_length), NOT C1.
+        (attachment = locant 1,, so oxo is at C3 (= chain_length), NOT C1.
         '1-oxopropyl' (oxo at the acyl carbon) is explicitly NOT a preferred IUPAC
-        prefix (BlueBookV2.md Table-28.1 note m) -- it is the CAS acyl form.
+        prefix (the Blue Book Table-28.1 note m) -- it is the CAS acyl form.
         """
         # Task A: the oxo locant was `chain_length` -- a COUNT, not a proof of
         # chain length. For the branched '2-methylpropanal' (count 4, stem
@@ -222,7 +222,7 @@ class TestParentToPrefix:
 
 
 class TestNameSubstituentFragment:
-    """End-to-end tests for name_substituent_fragment()."""
+    """End-to-end tests for name_substituent_fragment."""
 
     # --- Linear alkyl (fast path) ---
 
@@ -254,7 +254,7 @@ class TestNameSubstituentFragment:
     # --- Retained branched names ---
 
     def test_isopropyl(self):
-        """CH(CH3)2 -> propan-2-yl (F-T9/DD6 RET-02: 'isopropyl' is P-29.6.2.2 general-only)."""
+        """CH(CH3)2 -> propan-2-yl (F-T9/DD6: 'isopropyl' is general-only)."""
         # 2-methylpropane: CC(C)C
         mol = Chem.MolFromSmiles("CC(C)C")
         # Atom 1 is the branch point attached to some parent
@@ -271,8 +271,8 @@ class TestNameSubstituentFragment:
         assert result == "tert-butyl"
 
     def test_sec_butyl(self):
-        """CH(CH3)(CH2CH3) -> butan-2-yl (F-T9/DD6 RET-02: 'sec-butyl' is P-29.6.3 deprecated)."""
-        # 2-methylbutane: CCC(C)C  -> atoms 0,1,2,3,4
+        """CH(CH3)(CH2CH3) -> butan-2-yl (F-T9/DD6: 'sec-butyl' is deprecated)."""
+        # 2-methylbutane: CCC(C)C -> atoms 0,1,2,3,4
         mol = Chem.MolFromSmiles("CCC(C)C")
         # Atom 2 is attachment point, sub_atoms = [2, 0, 1, 3] with parent=[4]
         # Actually let's construct more carefully
@@ -301,9 +301,9 @@ class TestNameSubstituentFragment:
         assert result == "butan-2-yl"
 
     def test_isobutyl(self):
-        """CH2CH(CH3)2 -> 2-methylpropyl (F-T9/DD6 RET-02: 'isobutyl' is P-29.6.3 deprecated)."""
+        """CH2CH(CH3)2 -> 2-methylpropyl (F-T9/DD6: 'isobutyl' is deprecated)."""
         # parent-CH2-CH(CH3)2 -> CC(C)CC
-        # 0-1(-2)-3-4  where parent=[4], sub_atoms=[3,1,0,2], attach=3
+        # 0-1(-2)-3-4 where parent=[4], sub_atoms=[3,1,0,2], attach=3
         mol = Chem.MolFromSmiles("CC(C)CC")
         # 0-1(-2)-3-4
         # parent_chain=[4], attach_idx=3
@@ -321,7 +321,7 @@ class TestNameSubstituentFragment:
         """
         # 2-methylbutyl = CH2CH(CH3)CH2CH3
         # parent-CH2CH(CH3)CH2CH3 -> CCCC(C)CC
-        # Structure: 0-1-2-3(-4)-5-6 ... this gets complex.
+        # Structure: 0-1-2-3(-4)-5-6... this gets complex.
         # Simpler: CC(C)CCC where parent=[5], sub_atoms through atom 4
         # Let me just verify the function handles a compound case
         pass  # Covered by 2_methylbutyl test below

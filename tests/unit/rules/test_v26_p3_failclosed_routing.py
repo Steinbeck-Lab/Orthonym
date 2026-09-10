@@ -1,4 +1,4 @@
-"""v26 P3: fail-closed routing for default-path substituent-vocab misses.
+""": fail-closed routing for default-path substituent-vocab misses.
 
 Root cause fixed: ``fused_rings.get_fused_heterocycle_substituents`` silently
 ``continue``s past any exocyclic branch ``_identify_fused_substituent`` cannot
@@ -6,7 +6,7 @@ name (``sub_info is None``), so ``name_fused_heterocycle`` can assemble a name
 that DROPS a whole substituent and denotes a DIFFERENT molecule -- a boronate /
 methanesulfonyl / silyl / selanyl group on quinoline collapses to bare
 ``'quinoline'``. On the PIN/default path this group-dropping name is caught
-only by the downstream OPSIN SELF-01 gate, which FAILS OPEN when the jar is
+only by the downstream OPSIN gate, which FAILS OPEN when the jar is
 absent (the wrong name then ships), and it also BLOCKS the general engine from
 being tried (the late-recovery only fires on a clean abstention).
 
@@ -15,7 +15,7 @@ the general-engine tiers (``general_fallback`` set: ``valid`` / ``complete``),
 gated on ``metrics.provenance.general_fallback_ctx`` -- so the PIN default path
 stays BYTE-IDENTICAL. Under ``complete`` the decline re-routes the molecule
 through ``name_general`` (the universal never-None substituent recursion,
-E1 + SELF-01 gated), which either names it faithfully or abstains -- never the
+E1 + gated), which either names it faithfully or abstains -- never the
 group-dropping name.
 
 Reproduce-first (confirmed 2026-07-20, production OPSIN gate on):
@@ -25,7 +25,7 @@ Reproduce-first (confirmed 2026-07-20, production OPSIN gate on):
     (``unknown``) -- never the wrong bare-core name.
   - COVERAGE cases: pin abstains, ``complete`` emits an OPSIN-round-tripping name.
 
-NOTE on the harness: ``conftest`` force-disables the production SELF-01 gate for
+NOTE on the harness: ``conftest`` force-disables the production gate for
 the whole suite (tests assert raw output). The full-namer cases here re-enable it
 via ``production_gate`` (skipped without Java/OPSIN). The gated-routing cases are
 deterministic and gate-independent: they set ``general_fallback_ctx`` directly.
@@ -107,7 +107,7 @@ def _find_opsin_jar():
 
 @pytest.fixture
 def production_gate(monkeypatch):
-    """Re-enable the production SELF-01 OPSIN validity gate (the suite disables
+    """Re-enable the production OPSIN validity gate (the suite disables
     it). Skips when Java/OPSIN are unavailable."""
     if not shutil.which("java") or _find_opsin_jar() is None:
         pytest.skip("OPSIN/Java not available for production-gate semantics")
@@ -230,7 +230,7 @@ def test_coverage_complete_emits(smiles, expected, production_gate):
 
 
 # --------------------------------------------------------------------------
-# SELF-01: every name complete emits round-trips to the input structure.
+#: every name complete emits round-trips to the input structure.
 # --------------------------------------------------------------------------
 @pytest.mark.parametrize("smiles,name", sorted(_RT_NAMES.items()))
 def test_emitted_names_roundtrip(smiles, name, opsin_roundtrip):

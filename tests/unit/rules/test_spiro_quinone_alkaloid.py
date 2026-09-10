@@ -1,4 +1,4 @@
-"""v30 tail #7: spiro-quinone alkaloid (spiro[fused-diazatricyclo, cyclohexa-
+""" tail #7: spiro-quinone alkaloid (spiro[fused-diazatricyclo, cyclohexa-
 dienone]). Two mechanisms:
   1. spiro._name_carbocyclic_monocycle_component now renders an UNSATURATED
      carbocyclic spiro component (cyclohexa-2,5-diene).
@@ -30,7 +30,7 @@ def _be():
 def test_tail7_full_emits_spiro():
     # Full #7 carries a pendant acetate ESTER; the demote-senior-group rescue
     # re-picks the principal group so the spiro ring parent names (acetate ->
-    # (acetyloxy)methyl). It reliably EMITS a SELF-01-gated (0-wrong) spiro name;
+    # (acetyloxy)methyl). It reliably EMITS a -gated (0-wrong) spiro name;
     # named in isolation it full-InChIKey round-trips (asserted in the standalone
     # module docstring / dev probes). The exact winning producer can vary with
     # warm OPSIN-JVM state across a multi-molecule process -- an arbitration

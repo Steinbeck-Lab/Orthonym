@@ -1,17 +1,17 @@
-"""Phase 160 isothiocyanate handler — Tier B retained-name (gate 0.40).
+"""a phase isothiocyanate handler — Tier B retained-name (gate 0.40).
 
 Verbatim lift of composer.py:842-850 (inline branch) +
 composer.py:2192-2202 (_name_isothiocyanate body) + composer.py:2204-2230
-(shared _name_iso_x_cyanate helper). Per CONTEXT D-24, bodies stay in
+(shared _name_iso_x_cyanate helper). Per internal notes, bodies stay in
 composer.py until Plan-03 commit 03-10.
 
-IUPAC cite: P-66.5.4.3 (isothiocyanates; functional class naming).
+IUPAC cite: (isothiocyanates; functional class naming).
 
 References:
 - composer.py:842-850 (inline dispatch branch; REMOVED at this commit).
 - composer.py:2192-2202 (_name_isothiocyanate body).
 - composer.py:2204-2230 (shared _name_iso_x_cyanate helper; identical to isocyanate).
-- 160-AUDIT-DECOMP.md § 1 row 'isothiocyanate' + § 2.6 predicate purity proof.
+- internal notes-DECOMP.md row 'isothiocyanate' + predicate purity proof.
 """
 from __future__ import annotations
 
@@ -29,7 +29,7 @@ def _is_isothiocyanate(features: Any) -> bool:
 def name_isothiocyanate(
     features: Any, mol: Any = None, style: str = "pin",
 ) -> Optional[NamingResult]:
-    """Phase 160 Tier-B isothiocyanate handler.
+    """a phase Tier-B isothiocyanate handler.
 
     Verbatim semantics of composer.py:842-850 (inline branch).
     """
@@ -40,9 +40,9 @@ def name_isothiocyanate(
         _name_isothiocyanate,
     )
 
-    # Wave2 T2a (P-61.8): functional-class 'R isothiocyanate' is general
+    # Wave2: functional-class 'R isothiocyanate' is general
     # nomenclature only — the PIN is the substitutive isothiocyanato prefix
-    # on the parent hydride (parallel to isocyanato; BB P-61.8). Decline
+    # on the parent hydride (parallel to isocyanato; BB. Decline
     # under PIN style; the form stays available under --trivial. SCOPED to
     # non-aromatic attachment (aryl forms keep the RT-valid functional
     # class until the benzene FG-prefix table learns isothiocyanato).

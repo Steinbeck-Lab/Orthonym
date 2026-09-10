@@ -1,7 +1,7 @@
-"""Unit tests for the P-14.8 adduct/hydrate assembler (Wave-2 P0A).
+"""Unit tests for the adduct/hydrate assembler (Wave-2 P0A).
 
-Blue Book P-14.8.1: components joined by em-dash (U+2014) with parenthesized
-solidus proportions; P-14.8.2: organic first, inorganic next, water last.
+Blue Book: components joined by em-dash (U+2014) with parenthesized
+solidus proportions;: organic first, inorganic next, water last.
 All expected names OPSIN-2.9.0 verified 2026-07-09 (plan doc, Oracle table).
 """
 import pytest
@@ -58,7 +58,7 @@ class TestNameComponent:
         # the old NCC(=O)Nc1ccc(OCC)cc1 now names as the engine improved; this
         # silabicyclic ring still abstains at PIN. Do NOT re-pin to the old name --
         # its emitted spelling 'ethanamide' is itself a spelling-layer defect,
-        # should be 'acetamide' per BB P-66.1.1.1.)
+        # should be 'acetamide' per BB.)
         from orthonym.rules.adducts import _name_component
         assert _name_component("c1ccc2c(c1)[SiH2]cc2", "pin") is None
 
@@ -101,7 +101,7 @@ class TestComponentOrdering:
             Chem.CanonSmiles("CN1CCCC1c1cccnc1"), Chem.CanonSmiles("Cl")]
 
     def test_water_cited_last(self):
-        # P-14.8.2 line 4665: 'water (if present), is cited last' — even
+        # line 4665: 'water (if present), is cited last' — even
         # after other inorganics.
         assert self._ordered(["O", "Cl", "CCO"]) == [
             Chem.CanonSmiles("CCO"), Chem.CanonSmiles("Cl"),
@@ -109,7 +109,7 @@ class TestComponentOrdering:
 
 
 class TestNameAdduct:
-    """P-14.8.1 / -b / -c + P-14.8.2 -b: em-dash + (n/m/...) assembly.
+    """ / -b / -c + -b: em-dash + (n/m/...) assembly.
     Every expected name OPSIN-2.9.0 verified (plan Oracle table)."""
 
     @staticmethod
@@ -124,7 +124,7 @@ class TestNameAdduct:
         assert self._name("O.O.OC(=O)C(=O)O") == "oxalic acid—water (1/2)"
 
     def test_organic_pair_em_dash(self):
-        # P-14.8.1 -b: em-dash U+2014, never hyphen
+        # -b: em-dash U+2014, never hyphen
         name = self._name("c1ccccc1.c1ccncc1")
         assert name == "benzene—pyridine (1/1)"
         assert "—" in name and " (1/1)" in name
@@ -193,7 +193,7 @@ class TestAdductDispatch:
         assert self._nc("c1ccccc1.c1ccncc1") == "benzene—pyridine (1/1)"
 
     def test_mixed_hydrochloride(self):
-        # P-14.8.2 pattern (the Blue Book). DIVERGENCE from the plan's stale
+        # pattern (the Blue Book). DIVERGENCE from the plan's stale
         # expected: at this HEAD the organic fragment names to the RETAINED
         # name 'nicotine' (not '3-(1-methylpyrrolidin-2-yl)pyridine'); the
         # resulting 'nicotine—hydrogen chloride (1/1)' OPSIN-RTs cleanly to
@@ -202,12 +202,12 @@ class TestAdductDispatch:
             "nicotine—hydrogen chloride (1/1)")
 
     def test_mixed_phosphoric_1_2(self):
-        # P-14.8.2 -a/-b (the Blue Book pattern; OPSIN verified)
+        # -a/-b (the Blue Book pattern; OPSIN verified)
         assert self._nc("OP(=O)(O)O.OP(=O)(O)O.NCCN") == (
             "ethane-1,2-diamine—phosphoric acid (1/2)")
 
     def test_mixed_three_buckets_water_last(self):
-        # organic -> inorganic -> water (P-14.8.2 -a; OPSIN verified)
+        # organic -> inorganic -> water -a; OPSIN verified)
         assert self._nc("O.Cl.CCO") == (
             "ethanol—hydrogen chloride—water (1/1/1)")
 
@@ -223,7 +223,7 @@ class TestAdductDispatch:
         # (_ORGANOMETALLIC_ADDITIVE_PIN_RE) shipped it bypassing OPSIN. The
         # atom-conservation veto (rules.organometallics._organometallic_conserves)
         # now declines it -> the cascade abstains (organometallics are out of
-        # scope, P-69). ORGANOMETALLIC@50 owns bare-metal dot-SMILES; the adduct
+        # scope,. ORGANOMETALLIC@50 owns bare-metal dot-SMILES; the adduct
         # predicate also declines ([Ni] not in the single-atom table).
         assert self._nc("[Ni].C=CC.C=CC") == "nickel compound (not supported)"
 
@@ -240,7 +240,7 @@ class TestAdductDispatch:
 
 
 class TestHydrateWordForms:
-    """P-14.8.1 -e / P-14.8.2 -c: general-nomenclature hydrate word forms.
+    """ -e / -c: general-nomenclature hydrate word forms.
     OPSIN parses every emitted form (plan Oracle table)."""
 
     @staticmethod
@@ -270,12 +270,12 @@ class TestHydrateWordForms:
             "oxalic acid—ethane-1,2-diamine sesquihydrate")
 
     def test_mixed_inorganic_monohydrate(self):
-        # P-14.8.2 -c (OPSIN verified)
+        # -c (OPSIN verified)
         assert self._nc("O.Cl.CCO") == (
             "ethanol—hydrogen chloride monohydrate")
 
     def test_pin_style_unchanged(self):
-        # P-14.8: PINs MUST use the proportion notation
+        #: PINs MUST use the proportion notation
         assert self._nc("O.OC(=O)C(=O)O", style="pin") == (
             "oxalic acid—water (1/1)")
 

@@ -1,15 +1,15 @@
-"""P-14.3.4.5 -- uniform complete substitution on benzene (v29 Phase C tranche B, Task 1).
+""" -- uniform complete substitution on benzene (Phase C tranche B, Task 1).
 
-Governing rule chain, verbatim from ``BlueBookV2/BlueBookV2.md``:
+Governing rule chain, verbatim from ``the Blue Book Blue Book``:
 
-``P-14.3.3`` "Citation of locants" (``:2869``) is **DENY BY DEFAULT** --
+```` "Citation of locants" (``:2869``) is **DENY BY DEFAULT** --
 
     "In preferred IUPAC names, if any locants are essential for defining the structure
      of the parent structure or of a unit of structure as defined by its appropriate
      enclosing marks, then all locants must be cited for the parent structure or that
      structural unit."
 
-``P-14.3.4.5`` (``:3007``) grants the licence exercised here --
+```` (``:3007``) grants the licence exercised here --
 
     "All locants are omitted in compounds or substituent groups in which all
      substitutable positions are completely substituted or modified, for example, by
@@ -20,7 +20,7 @@ Governing rule chain, verbatim from ``BlueBookV2/BlueBookV2.md``:
     "In case of partial substitution or modification, all numerical prefixes must be
      indicated."
 
-Verbatim ``(PIN)`` witnesses: ``:7625`` ``benzenehexol (PIN, P-63.1.2) (not
+Verbatim ``(PIN)`` witnesses: ``:7625`` ``benzenehexol (PIN, (not
 benzenehexaol)``; the free-valence analogue ``:3021`` ``benzenehexayl``. The three
 prefix targets (``hexamethyl-`` / ``hexafluoro-`` / ``hexachlorobenzene``) are
 **DERIVED** from ``:3007``, not verbatim rows -- derivation F7.
@@ -31,7 +31,7 @@ ring carbon has TWO substitutable H and six OH is therefore only PARTIAL substit
 If ``OC1C(O)C(O)C(O)C(O)C1O`` ever loses its locants, the predicate is counting
 positions instead of hydrogens.
 
-MEASURED CODE PATH (validated call-spy, 2026-07-28 -- see task-pcB1-report.md; line
+MEASURED CODE PATH (validated call-trace, 2026-07-28 -- see task-pcB1-report.md; line
 numbers re-verified 2026-07-28 after drift, function names are the durable anchor):
   * the suffix target is joined at ``rules/benzene.py:3237``
     (``return f"benzene{multiplied}"``) inside ``_assemble_benzene_with_suffix`` --
@@ -44,7 +44,7 @@ numbers re-verified 2026-07-28 after drift, function names are the durable ancho
     ``hexamethylbenzene`` AND zero for the prefix known positive
     ``1,4-dibromobenzene``.
 
-Invariant 11: removing a locant can unmask something worse (in v29 a fail-closed prefix
+Invariant 11: removing a locant can unmask something worse (in a fail-closed prefix
 turned a fabrication into a silent atom drop, four separate times). Every guard below
 asserts the FULL emitted name, never merely that a locant vanished.
 """
@@ -65,7 +65,7 @@ def _name(namer, smiles):
 
 
 # --------------------------------------------------------------------------- #
-# 1. The licence fires -- uniform complete substitution of the benzene ring    #
+# 1. The licence fires -- uniform complete substitution of the benzene ring #
 # --------------------------------------------------------------------------- #
 class TestLicensedOmission:
     @pytest.mark.parametrize("smiles,expected,authority", [
@@ -82,7 +82,7 @@ class TestLicensedOmission:
 
 
 # --------------------------------------------------------------------------- #
-# 2. The deny-default holds -- the mandatory tripwire set                      #
+# 2. The deny-default holds -- the mandatory tripwire set #
 # --------------------------------------------------------------------------- #
 class TestDenyByDefault:
     def test_the_boundary_cyclohexanehexol_keeps_every_locant(self, namer):
@@ -91,7 +91,7 @@ class TestDenyByDefault:
             "cyclohexane-1,2,3,4,5,6-hexol"
 
     def test_partial_ring_substitution_keeps_the_pentol_locants(self, namer):
-        """5 OH + 1 Cl on benzene: complete, but NOT 'in the same way' => BB:3009.
+        """5 OH + 1 Cl on benzene: complete, but NOT 'in the same way' => the Blue Book.
 
         Asserted structurally, NOT as an exact string: the current emission
         ``1-chlorobenzene-2,3,4,5,6-pentol`` is itself a non-PIN (defect N1 -- the
@@ -106,7 +106,7 @@ class TestDenyByDefault:
         assert "chloro" in got, f"the chlorine must not be dropped: {got!r}"
 
     def test_heterogeneous_complete_substitution_keeps_locants(self, namer):
-        """All six positions substituted but not 'in the same way' (BB:3007)."""
+        """All six positions substituted but not 'in the same way' (the Blue Book)."""
         got = _name(namer, "Cc1c(C)c(C)c(C)c(C)c1Cl")
         assert got == "1-chloro-2,3,4,5,6-pentamethylbenzene", got
 
@@ -126,7 +126,7 @@ class TestDenyByDefault:
 
 
 # --------------------------------------------------------------------------- #
-# 3. Predicate level -- the benzene licence helper itself                      #
+# 3. Predicate level -- the benzene licence helper itself #
 # --------------------------------------------------------------------------- #
 class TestBenzeneLicenceHelper:
     """Direct tests of ``benzene._benzene_l5_uniform_licence``.
@@ -165,7 +165,7 @@ class TestBenzeneLicenceHelper:
         assert self._lic("Oc1ccccc1O", {"ol": [1, 2]}, {}) is False
 
     def test_stereodescriptor_denies(self):
-        """P-14.3.3: one essential locant in the scope restores every locant."""
+        """: one essential locant in the scope restores every locant."""
         assert self._lic("Cc1c(C)c(C)c(C)c(C)c1C",
                          {}, {"methyl": [1, 2, 3, 4, 5, 6]},
                          stereo=[{"locant": 1, "descriptor": "E"}]) is False
@@ -177,7 +177,7 @@ class TestBenzeneLicenceHelper:
         Found by mutation testing: disabling the aromatic/carbon confirmation loop
         broke NO test, and the missing witness was the most important molecule in the
         whole class. A cyclohexane ring carbon has TWO substitutable H, so six
-        identical substituents are only PARTIAL (BB:3009, BB:54823) -- but measured
+        identical substituents are only PARTIAL (the Blue Book, the Blue Book) -- but measured
         against benzene's parent hydride they look complete. Without this guard the
         predicate licenses ``hexamethylcyclohexane``, which is wrong.
         """
@@ -222,32 +222,32 @@ class TestBenzeneLicenceHelper:
                          {}, {"methyl": [1, 2, 3, 4, 5, 7]}) is False
 
     def test_isotope_denies(self):
-        """Constraint 10 -- isotopic labels (BB:44180) always cite locants.
+        """Constraint 10 -- isotopic labels (the Blue Book) always cite locants.
 
         ⚠⚠ THIS TEST IS GREEN AND STRUCTURALLY BLIND, and is retained ONLY to pin
         the predicate's own arithmetic. It calls the licence DIRECTLY on a mol built
         from the raw SMILES, so it exercises a path PRODUCTION NEVER TAKES.
 
-        Measured 2026-07-28 (workflow wf_b94d5bc8-3c9, spy validated on 2 known
+        Measured 2026-07-28 (workflow wf_b94d5bc8-3c9, trace validated on 2 known
         positives + 1 known negative): on the real path
         ``rules/isotopes.py:decorate_isotopic_name`` calls ``strip_isotopes`` FIRST,
         names the isotope-FREE skeleton, and splices the descriptor into the finished
         string. So ``_benzene_l5_uniform_licence`` receives a mol with
-        ``isotopes_seen_in_mol == []`` and computes ``has_isotope=False``: the guard
+        ``isotopes_seen_in_mol == `` and computes ``has_isotope=False``: the guard
         this test asserts is **DEAD BY CONSTRUCTION** in production.
 
         Consequence, with a forced-False A/B proving the licence caused it:
         ``Cc1c(C)c(C)c(C)c(C)[13c]1C`` ships ``hexamethyl(13C1)benzene`` where the
-        PIN is ``1,2,3,4,5,6-hexamethyl(13C1)benzene`` (P-82.6.1.1, BB:44180 --
+        PIN is ``1,2,3,4,5,6-hexamethyl(13C1)benzene``, the Blue Book --
         "if isotopic modification requires a locant to specify its position, then all
-        locants must be specified and none are omitted"; BB:44186 prints the elided
+        locants must be specified and none are omitted"; the Blue Book prints the elided
         chain analogue as "[not (2-13C)ethanol]").
 
         The END-TO-END tripwire that actually binds is
         ``TestIsotopeEndToEnd::test_labelled_hexamethylbenzene_keeps_locants`` below.
         Mutation testing did not catch this: mutating the PREDICATE fails this test,
         which made it look load-bearing, but the predicate is not what is broken.
-        See ``.planning/audit-v29/PHASEC-WORKFLOW-FINDINGS.md``.
+        See `internal notes`.
         """
         assert self._lic("[13CH3]c1c(C)c(C)c(C)c(C)c1C",
                          {}, {"methyl": [1, 2, 3, 4, 5, 6]}) is False
@@ -260,20 +260,20 @@ class TestBenzeneLicenceHelper:
 
 # --------------------------------------------------------------------------- #
 class TestIsotopeEndToEnd:
-    """END-TO-END isotope locant behaviour (v29 Phase C).
+    """END-TO-END isotope locant behaviour (Phase C).
 
     THE DEFECT: ``rules/isotopes.py:decorate_isotopic_name`` strips every label, names the
     isotope-FREE skeleton, then splices the descriptor into the finished string. The
-    P-14.3.4 licences therefore saw ``GetIsotope() == 0`` everywhere, every
-    ``has_isotope`` guard was structurally unreachable-True (measured with a spy validated
+     licences therefore saw ``GetIsotope == 0`` everywhere, every
+    ``has_isotope`` guard was structurally unreachable-True (measured with a trace validated
     on 2 positives + 1 negative), and we shipped ``(2-13C1)cyclohexanol``.
 
-    THE FIX: when the descriptor itself needs a locant, **P-82.6.1.1** (``:44180``)
+    THE FIX: when the descriptor itself needs a locant, **** (``:44180``)
     restores the parent's locants -- *"if isotopic modification requires a locant to
     specify its position, then all locants must be specified and none are omitted"* --
     and its own example prints the elided form as the rejected one (``:44186``):
     ``13CH3-CH2-OH (2-13C)ethan-1-ol [not (2-13C)ethanol]``. The decorator re-names the
-    skeleton inside ``locant_omission.forced_locant_scope()``, an ambient P-14.3.3 scope
+    skeleton inside ``locant_omission.forced_locant_scope``, an ambient scope
     the licences consult, so the parent's locants come back.
 
     ★ THE CONDITION IS "THE DESCRIPTOR NEEDS A LOCANT", NOT "AN ISOTOPE IS PRESENT".
@@ -299,8 +299,8 @@ class TestIsotopeEndToEnd:
         assert Orthonym().name("[2H]C1CCCCC1O") == "(2-2H1)cyclohexan-1-ol"
 
     def test_chain_analogue_matches_the_bb_example(self):
-        """BB:44186 verbatim: ``13CH3-CH2-OH (2-13C)ethan-1-ol [not (2-13C)ethanol]``.
-        The count subscript is omitted per P-82.2.1 (FIX-A), matching the BB
+        """the Blue Book verbatim: ``13CH3-CH2-OH (2-13C)ethan-1-ol [not (2-13C)ethanol]``.
+        The count subscript is omitted per (FIX-A), matching the BB
         verbatim ``(2-13C)`` exactly."""
         from orthonym.namer import Orthonym
         assert Orthonym().name("[13CH3]CO") == "(2-13C)ethan-1-ol"
@@ -309,13 +309,13 @@ class TestIsotopeEndToEnd:
 
     def test_hexamethylbenzene_scoped_descriptor_is_correct(self):
         """★ The adversarial sweep reported ``hexamethyl(13C1)benzene`` as a defect and
-        it is NOT one. **P-82.2.1** (``:44182``, verbatim) says the descriptor is inserted
+        it is NOT one. **** (``:44182``, verbatim) says the descriptor is inserted
         *"before the part of the compound that is isotopically substituted"* -- so its
         POSITION carries its scope. Here it precedes ``benzene``, scoping the ring, whose
         six carbons are all equivalent; one isotopomer, no locant required, so
-        P-82.6.1.1's condition is not met and the parent keeps its licensed omission.
+        's condition is not met and the parent keeps its licensed omission.
 
-        ``:7492`` ``1,2-di[(13C)methyl]benzene (PIN. P-82.2.1)`` is the direct witness for
+        ``:7492`` ``1,2-di[(13C)methyl]benzene (PIN. `` is the direct witness for
         scoped descriptors carrying no locant of their own.
 
         Contrast ``:44206`` ``1-(79Br)bromo(2-13C)benzene (PIN)``: bromobenzene's ring
@@ -331,7 +331,7 @@ class TestIsotopeEndToEnd:
         assert Orthonym().name("Fc1c(F)c(F)c(F)c(F)[13c]1F") == "hexafluoro(13C)benzene"
 
     def test_uniformly_equivalent_ring_correctly_omits(self):
-        """P-82.6.1.3 (``:44202``) -- all six ring positions are one orbit, so labelling
+        """ (``:44202``) -- all six ring positions are one orbit, so labelling
         any of them gives the same compound. Must stay locant-free."""
         from orthonym.namer import Orthonym
         assert Orthonym().name("O[13c]1c(O)c(O)c(O)c(O)c1O") == "(13C)benzenehexol"
@@ -341,7 +341,7 @@ class TestIsotopeEndToEnd:
         isotopomer-ambiguity test was built, wired, and REGRESSED this name to
         ``(1-13C1)methyl acetate``. Methyl acetate has three distinct carbons, so a
         whole-molecule test calls it ambiguous -- but the descriptor precedes ``methyl``,
-        whose scope is a single carbon, so the name is already unique (P-82.2.1). The
+        whose scope is a single carbon, so the name is already unique. The
         over-broad test was withdrawn; this row guards against re-introducing it."""
         from orthonym.namer import Orthonym
         assert Orthonym().name("[13CH3]OC(C)=O") == "(13C)methyl acetate"
@@ -366,7 +366,7 @@ class TestIsotopeEndToEnd:
 
 
 class TestForcedLocantScope:
-    """The ambient P-14.3.3 mechanism itself (``assembly/locant_omission.py``)."""
+    """The ambient mechanism itself (``assembly/locant_omission.py``)."""
 
     def test_scope_is_inert_by_default(self):
         from orthonym.assembly.locant_omission import locants_are_forced
@@ -384,7 +384,7 @@ class TestForcedLocantScope:
 
     def test_both_licences_decline_inside_the_scope(self):
         """Wired at two sites; if either stops consulting the scope, the isotope defect
-        returns silently -- SELF-01 cannot see it (`namer.py` states verbatim that it
+        returns silently -- cannot see it (`namer.py` states verbatim that it
         'ignores isotopes')."""
         from rdkit import Chem
 

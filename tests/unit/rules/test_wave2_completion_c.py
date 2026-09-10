@@ -1,15 +1,15 @@
 """Wave-2 completion pass C — FAIL_CLOSED/NA research-pass builds.
 
 All expected names OPSIN-RT verified. Covers:
-  * 13 BB-cited multi-component fusion parents (catalog rows, P-25.3.4-.8).
+  * 13 BB-cited multi-component fusion parents (catalog rows, -.8).
   * Bridged-fused extensions: anthracene/acridine residuals, etheno bridge,
-    hydro-before-bridge citation order (P-25.4.x / P-31.1.4.2.4).
+    hydro-before-bridge citation order.x /.
   * Multiplicative composites: carbonothioyl + ring-N units, methylenebis(oxy),
-    oxybis(azanylylidenemethanylylidene) (P-64.6.2 / P-15.3.1.2.2.x).
+    oxybis(azanylylidenemethanylylidene) /.x).
   * New namers @dispatch 48.3-48.6: azinic derivatives, heterones, sulfines,
-    acyl-on-Si/Ge/P/As pseudoketones (P-61.5.3 / P-64.x).
+    acyl-on-Si/Ge/P/As pseudoketones /.x).
   * Additives: carbonyl dicyanide retained row, diazo/imine collision fix,
-    chalcogenylidene substituent prefix (P-66.5.3.1 / P-61.4 / P-64.7.3).
+    chalcogenylidene substituent prefix / /.
 """
 
 import pytest
@@ -79,7 +79,7 @@ class TestMultiplicativeComposites:
                 == "1,1'-[oxybis(azanylylidenemethanylylidene)]dibenzene")
 
     @pytest.mark.parametrize("smiles,expected", [
-        # v24 W8-P1 R6: PIN is diphenylmethanone (BB 28326 verbatim
+        # W8-P1 R6: PIN is diphenylmethanone (BB 28326 verbatim
         # "benzophenone diphenylmethanone (PIN) (not 1,1′-carbonyldibenzene)").
         # The multiplicative-split protection still holds — the diaryl ketone must
         # NOT become 1,1'-carbonyldibenzene; only the retained→systematic form changed.

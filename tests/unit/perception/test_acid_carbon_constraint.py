@@ -1,8 +1,8 @@
-"""Phase 169.7 BBR-PERC / DEF-4 — acid SMARTS carbon-attachment constraint.
+"""a phase BBR-PERC / — acid SMARTS carbon-attachment constraint.
 
-P-65.3: sulfonic/sulfinic/phosphonic acids are CARBON acids (the S/P bears a
+: sulfonic/sulfinic/phosphonic acids are CARBON acids (the S/P bears a
 C neighbour). The free inorganic oxoacids (sulfamic, phosphoric, sulfuric,
-nitric) and nitrate ESTERS are named differently (P-42/P-67) and must NOT
+nitric) and nitrate ESTERS are named differently / and must NOT
 false-match the carbon-acid classes. The 169.7 fix adds a recursive-env
 ``$(...)`` C-attachment constraint that preserves the match-tuple arity.
 """

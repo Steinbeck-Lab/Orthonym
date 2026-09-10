@@ -5,7 +5,7 @@ Validates that Orthonym generates heterocycle names parseable by OPSIN CLI.
 Specifically tests that 6-membered O unsaturated heterocycles produce "2H-pyran"
 or "4H-pyran" instead of HW systematic "oxine" (which OPSIN cannot parse).
 
-Phase 15.5 Plan 03: OPSIN Format Fixes - Heterocycle Naming
+a phase Plan 03: OPSIN Format Fixes - Heterocycle Naming
 """
 
 import os

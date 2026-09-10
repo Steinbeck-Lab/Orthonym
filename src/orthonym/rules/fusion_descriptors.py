@@ -12,7 +12,7 @@ IUPAC 2013 Fusion Descriptor Rules:
 - Format: child[child_locants-letter]parent (e.g., benzo[a]anthracene)
 - IUPAC 2013: 'o' in fusion prefix is NOT elided before vowels
 
-Reference: IUPAC 2013 Blue Book, Section P-25 (Fused Ring Systems)
+Reference: IUPAC 2013 Blue Book, Section (Fused Ring Systems)
 """
 
 import re
@@ -76,9 +76,9 @@ FUSION_PREFIXES: Dict[str, str] = {
     'pyrazine': 'pyrazino',
     'pyridazine': 'pyridazino',
     'triazine': 'triazino',
-    # 6-membered O/S/Se/Te heterocycles. P-25.3.2.4 (BlueBookV2.md:11905): the
+    # 6-membered O/S/Se/Te heterocycles. (the Blue Book): the
     # attached-component prefix ADDS 'o' when there is no final 'e' -- "pyrano
-    # from pyran". :12030 gives "selenopyrano (from selenopyran, PIN)". These
+    # from pyran".:12030 gives "selenopyrano (from selenopyran, PIN)". These
     # were NOT in this table, so get_fusion_prefix's old general rule truncated
     # '-an' -> 'pyro'/'thiopyro' (OPSIN-unparseable). Cross-checked against
     # OPSIN's own fusionComponents token list (pyrano/thiopyrano/selenopyrano/
@@ -125,7 +125,7 @@ def get_fusion_edge(parent_ring: List[int], atom1: int, atom2: int) -> int:
         0
         >>> get_fusion_edge([0, 1, 2, 3, 4, 5], 1, 2)
         1
-        >>> get_fusion_edge([0, 1, 2, 3, 4, 5], 5, 0)  # wraparound
+        >>> get_fusion_edge([0, 1, 2, 3, 4, 5], 5, 0) # wraparound
         5
     """
     ring_size = len(parent_ring)
@@ -341,23 +341,23 @@ def get_fusion_prefix(ring_name: str) -> str:
     # truncation defect if such a name ever reaches here.
     core = re.sub(r'^\d+[Hh]-', '', ring_name)
 
-    # 1) Curated contracted retained forms (P-25.3.2.2): benzo, furo, thieno,
-    #    pyrido, pyrano, ...
+    # 1) Curated contracted retained forms: benzo, furo, thieno,
+    # pyrido, pyrano,...
     if core in FUSION_PREFIXES:
         return FUSION_PREFIXES[core]
 
     # 2) The authoritative monocyclic registry is the source of truth for the
-    #    attached-component prefix (pyran -> pyrano). This function historically
-    #    kept its OWN lookup table that lacked 'pyran', so the general rule below
-    #    truncated it to the OPSIN-unparseable 'pyro'. Consult the registry the
-    #    rest of the fusion machinery already trusts (get_component_prefix).
+    # attached-component prefix (pyran -> pyrano). This function historically
+    # kept its OWN lookup table that lacked 'pyran', so the general rule below
+    # truncated it to the OPSIN-unparseable 'pyro'. Consult the registry the
+    # rest of the fusion machinery already trusts (get_component_prefix).
     if core in MONOCYCLIC_COMPONENTS:
         return MONOCYCLIC_COMPONENTS[core]['prefix']
 
-    # 3) General rules for names not covered above. P-25.3.2.4
-    #    (BlueBookV2.md:11905): "The names of attached components are formed by
-    #    replacing the last letter 'e' by 'o' ... (or by ADDING the letter 'o'
-    #    when no final letter 'e' is present, i.e., pyrano from pyran)."
+    # 3) General rules for names not covered above.
+    # (the Blue Book): "The names of attached components are formed by
+    # replacing the last letter 'e' by 'o'... (or by ADDING the letter 'o'
+    # when no final letter 'e' is present, i.e., pyrano from pyran)."
     name = core.lower()
     if name.endswith('ene'):
         return name[:-3] + 'o'
@@ -368,7 +368,7 @@ def get_fusion_prefix(ring_name: str) -> str:
     if name.endswith('ane'):
         return name[:-3] + 'o'
     # NOTE: the historical '-an -> -o' truncation was DELETED here -- it produced
-    # the OPSIN-unparseable 'pyro' from 'pyran', violating P-25.3.2.4 ("pyrano
+    # the OPSIN-unparseable 'pyro' from 'pyran', violating ("pyrano
     # from pyran", no final 'e' -> ADD 'o'). 'furan'/'pyran' are contracted /
     # regular forms now resolved by the table + registry above, so a bare '-an'
     # name correctly falls through to the "add 'o'" default below.
@@ -420,7 +420,7 @@ def identify_parent_and_child(
     """
     Determine which ring is parent and which is child for fusion naming.
 
-    Parent selection follows IUPAC 2013 P-25.2.1 seniority:
+    Parent selection follows IUPAC 2013 seniority:
     1. Heterocyclic ring is senior to carbocyclic (regardless of size)
     2. Among heterocyclic: nitrogen-containing > oxygen > sulfur
     3. Among same heteroatom type: larger ring > smaller ring
@@ -436,11 +436,11 @@ def identify_parent_and_child(
 
     Returns:
         Tuple of (parent_name, child_name, parent_ring_list, child_ring_list)
-        Returns ('', '', [], []) if rings cannot be identified
+        Returns ('', '', , ) if rings cannot be identified
     """
-    # Phase 149 D-07: route base-component decision through FR-2.3 cascade.
+    # a phase: route base-component decision through.3 cascade.
     # Source: https://iupac.qmul.ac.uk/fusedring/FR23.html
-    # Source: 149-CONTEXT.md D-07, D-15.
+    # Source: 149-internal notes,.
     from .fused_ring_selection import select_base_component
 
     # Convert sets to lists for ordered operations
@@ -454,7 +454,7 @@ def identify_parent_and_child(
     if not name_a and not name_b:
         return ('', '', [], [])
 
-    # Phase 149 primary: FR-2.3 cascade (D-07).
+    # a phase primary:.3 cascade .
     # The returned base_atoms determines parent/child ordering.
     base_atoms, _others = select_base_component(mol, [set(ring_a), set(ring_b)])
     if base_atoms == set(ring_a):
@@ -462,9 +462,9 @@ def identify_parent_and_child(
     elif base_atoms == set(ring_b):
         return (name_b, name_a, ring_b_list, ring_a_list)
 
-    # Total tie under FR-2.3 (a)-(f) — fall back to numeric seniority
-    # (D-07 preserves get_component_seniority as last-resort tiebreaker;
-    # D-15 reuse-not-rebuild discipline).
+    # Total tie under.3 (a)-(f) — fall back to numeric seniority
+    # (preserves get_component_seniority as last-resort tiebreaker;
+    # reuse-not-rebuild discipline).
     seniority_a = get_component_seniority(name_a) if name_a else 999
     seniority_b = get_component_seniority(name_b) if name_b else 999
     if seniority_a <= seniority_b:
@@ -505,14 +505,14 @@ def _hetero_gap(mol, ring_atoms: List[int], hetero_indices: List[int]) -> int:
         return -1
 
     # Walk from pos0 to pos1 in both directions, count non-hetero atoms
-    # Direction 1: pos0 -> pos0+1 -> ... -> pos1
+    # Direction 1: pos0 -> pos0+1 ->... -> pos1
     gap_cw = 0
     i = (pos0 + 1) % ring_size
     while i != pos1:
         gap_cw += 1
         i = (i + 1) % ring_size
 
-    # Direction 2: pos0 -> pos0-1 -> ... -> pos1
+    # Direction 2: pos0 -> pos0-1 ->... -> pos1
     gap_ccw = 0
     i = (pos0 - 1) % ring_size
     while i != pos1:
@@ -533,7 +533,7 @@ def _identify_ring_name(mol, ring_atoms: List[int]) -> str:
     - 5-membered N+S: thiazole (1,3) vs isothiazole (1,2)
     - 6-membered 2N: pyrimidine (1,3) vs pyridazine (1,2) vs pyrazine (1,4)
 
-    Uses the MONOCYCLIC_COMPONENTS registry via get_component_by_pattern().
+    Uses the MONOCYCLIC_COMPONENTS registry via get_component_by_pattern.
 
     Args:
         mol: RDKit Mol object
@@ -624,7 +624,7 @@ def _get_iupac_ring_order(mol, ring_atoms: List[int]) -> List[int]:
 
     # Collect heteroatoms with their priority
     # Priority: O (highest) > S > N (among common heteroatoms)
-    # Hantzsch-Widman O > S > Se > Te > N (P-25.3.3; Se/Te inserted for the
+    # Hantzsch-Widman O > S > Se > Te > N; Se/Te inserted for the
     # Wave-2 selenazolo class -- same order as _PCF_HET_NUM_SENIORITY).
     HETERO_PRIORITY = {'O': 0, 'S': 1, 'Se': 2, 'Te': 3, 'N': 4}
     hetero_info = []  # (priority, atom_idx)
@@ -767,7 +767,7 @@ def edge_position_to_letter(parent_ring: List[int], edge: Tuple[int, int]) -> st
         edge: Tuple of (atom1, atom2) defining the edge
 
     Returns:
-        Letter designator ('a', 'b', 'c', ...) or empty string if not found
+        Letter designator ('a', 'b', 'c',...) or empty string if not found
 
     Examples:
         >>> edge_position_to_letter([0,1,2,3,4,5], (0, 1))
@@ -794,7 +794,7 @@ def handle_duplicate_edge_fusion(edge_letters: List[str]) -> List[str]:
 
     Returns:
         List of letters with primes applied where needed, sorted canonically
-        Order: a, b, c, ... a', b', ... a'', b'', ...
+        Order: a, b, c,... a', b',... a'', b'',...
 
     Examples:
         >>> handle_duplicate_edge_fusion(['a', 'c'])
@@ -910,8 +910,8 @@ def generate_multi_fusion_descriptor(
     Examples:
         >>> # dibenzo[a,c]anthracene: two benzene rings at edges a and c
         >>> generate_multi_fusion_descriptor('anthracene', [
-        ...     ('benzene', [0,1,2,3,4,5,6,7,8,9,10,11,12,13], {0, 1}),
-        ...     ('benzene', [0,1,2,3,4,5,6,7,8,9,10,11,12,13], {4, 5})
+        ... ('benzene', [0,1,2,3,4,5,6,7,8,9,10,11,12,13], {0, 1}),
+        ... ('benzene', [0,1,2,3,4,5,6,7,8,9,10,11,12,13], {4, 5})
         ... ])
         '[a,c]'
     """
@@ -1003,7 +1003,7 @@ def _get_iupac_ring_order_for_fusion(
     ring_set = set(ring_atoms)
 
     # Collect heteroatoms with priority
-    # Hantzsch-Widman O > S > Se > Te > N (P-25.3.3; Se/Te inserted for the
+    # Hantzsch-Widman O > S > Se > Te > N; Se/Te inserted for the
     # Wave-2 selenazolo class -- same order as _PCF_HET_NUM_SENIORITY).
     HETERO_PRIORITY = {'O': 0, 'S': 1, 'Se': 2, 'Te': 3, 'N': 4}
     hetero_info = []
@@ -1167,7 +1167,7 @@ def _orient_carbocyclic_for_fusion(
 
 # Element order for heteroatom-first ring numbering (senior element -> lowest
 # locant): O > S > Se > Te > N > P > As > Sb > B (Hantzsch-Widman element order;
-# P-25.3.3.1.2(b), BlueBookV2.md:12558). Mirrors _PCF_HET_NUM_SENIORITY in
+# (b), the Blue Book). Mirrors _PCF_HET_NUM_SENIORITY in
 # fused_rings.py so the 2-ring and polycomponent paths agree on child numbering.
 _FUSION_HET_NUM_SENIORITY = {
     'O': 0, 'S': 1, 'Se': 2, 'Te': 3, 'N': 4, 'P': 5, 'As': 6, 'Sb': 7, 'B': 8,
@@ -1182,7 +1182,7 @@ def _cooptimal_child_orderings(
     """Enumerate the co-optimal IUPAC numberings of an attached (child) ring.
 
     A child ring is numbered to give (1) lowest locants to its heteroatoms as a
-    set, senior element first (P-25.3.3.1.2(a) BlueBookV2.md:12543 / (b) :12558),
+    set, senior element first (a) the Blue Book / (b):12558),
     and then (2) lowest locants to the fusion-bond (shared) atoms. This returns
     EVERY ordering tied on both keys.
 
@@ -1192,9 +1192,9 @@ def _cooptimal_child_orderings(
     - Symmetric child (a heteroatom equidistant from the fusion bond): two
       orderings survive tied on both keys, and the caller breaks the remaining
       tie by citing the lower descriptor pair in the direction of the parent
-      lettering (P-25.3.1.3 :11911; P-25.3.4.2.4(d) :13403/:13409).
+      lettering:11911; (d):13403/:13409).
 
-    Returns [] for a non-simple cycle (a bridged/interior atom) so the caller can
+    Returns  for a non-simple cycle (a bridged/interior atom) so the caller can
     fall back to the single-pick numbering and never lose a name it builds today.
     """
     ring_set = set(ring_atoms)
@@ -1247,7 +1247,7 @@ def _cooptimal_child_orderings(
 
 def _fusion_descriptor_citation_key(descriptor: str):
     """Sort key for choosing the lowest fusion descriptor among co-optimal child
-    numberings: edge letter first (P-25.3.1.3 BlueBookV2.md:11911 -- 'the letter
+    numberings: edge letter first the Blue Book -- 'the letter
     as early in the alphabet as possible'), then the child locants IN CITATION
     ORDER (NOT sorted, so a genuinely descending PIN like [3,2-b] is preserved).
     A benzene-child descriptor carries only a letter."""
@@ -1282,8 +1282,8 @@ def generate_systematic_name_for_fused_pair(
         Systematic fusion name, or None if name cannot be generated
 
     Examples:
-        >>> mol = Chem.MolFromSmiles('c1ccc2cc3ccccc3cc2c1')  # anthracene
-        >>> ri = mol.GetRingInfo()
+        >>> mol = Chem.MolFromSmiles('c1ccc2cc3ccccc3cc2c1') # anthracene
+        >>> ri = mol.GetRingInfo
         >>> # Would generate 'benzo[a]naphthalene' for benzene fused to naphthalene
     """
     if len(shared_atoms) != 2:
@@ -1311,8 +1311,8 @@ def generate_systematic_name_for_fused_pair(
     # Enumerate the co-optimal child numberings and pick the fusion descriptor
     # that is lowest in citation order. A SYMMETRIC child (heteroatom equidistant
     # from the fusion bond, e.g. the meta-Se of selenopheno[3,4-b]selenophene)
-    # ties on heteroatom + fusion-bond locants; P-25.3.1.3 (BlueBookV2.md:11911)
-    # / P-25.3.4.2.4(d) (:13403) break that tie by the lower cited pair
+    # ties on heteroatom + fusion-bond locants; (the Blue Book)
+    # / (d) (:13403) break that tie by the lower cited pair
     # ((3,4) < (4,3) -> [3,4-b], not [4,3-b]). A decisive/asymmetric child yields
     # a single ordering, so MATCH rows such as selenopheno[2,3-b]/[3,2-b]selenophene
     # and thieno[2,3-b]furan are byte-identical.
@@ -1365,7 +1365,7 @@ def generate_multi_fusion_name(
     Examples:
         >>> # For dibenzo[a,c]anthracene
         >>> generate_multi_fusion_name(mol, anthracene_atoms, 'anthracene',
-        ...     [(benzene1_atoms, {0,1}), (benzene2_atoms, {4,5})])
+        ... [(benzene1_atoms, {0,1}), (benzene2_atoms, {4,5})])
         'dibenzo[a,c]anthracene'
     """
     if not fused_rings:

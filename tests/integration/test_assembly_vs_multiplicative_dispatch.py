@@ -1,17 +1,17 @@
-"""Phase 154.B D-11 cross-handler dispatch contract.
+"""a phase.B cross-handler dispatch contract.
 
 name_multiplicative and detect_ring_assembly are MUTUALLY EXCLUSIVE by
 topology after Plan 154-02 ships:
-  - single-bond-joined identical rings -> ring_assemblies (Phase 151)
+  - single-bond-joined identical rings -> ring_assemblies (a phase)
   - atom/group-bridged identical units -> multiplicative
 
 This test exercises the FULL name_compound pipeline so a future regression
 in either guard cannot be silently masked by the dispatch order in
-namer.py:935-938.  Pattern from Phase 151-04 BLK-01 closure
+namer.py:935-938. Pattern from a phase-04 closure
 (test_mixed_spiro_fused_dispatch.py).
 
-Source: 154-CONTEXT.md D-11; 151-CONTEXT.md D-15 (path-topology contract);
-        154-PATTERNS.md Pattern S-8.
+Source: 154-internal notes; 151-internal notes (path-topology contract);
+        internal notes Pattern S-8.
 """
 from __future__ import annotations
 
@@ -53,11 +53,11 @@ class TestAssemblyVsMultiplicativeDispatch:
         ],
     )
     def test_single_bond_assembly_routes_to_ring_assemblies(self, smiles):
-        """Single-bond-joined identical rings -> ring_assemblies (Phase 151)."""
+        """Single-bond-joined identical rings -> ring_assemblies (a phase)."""
         mol = Chem.MolFromSmiles(smiles)
         assert mol is not None
 
-        # Multiplicative MUST decline (D-11 topology guard).
+        # Multiplicative MUST decline (topology guard).
         assert name_multiplicative(mol) is None, (
             f"D-11 violation: name_multiplicative accepted single-bond "
             f"assembly {smiles!r}"
@@ -103,7 +103,7 @@ class TestAssemblyVsMultiplicativeDispatch:
     @pytest.mark.parametrize(
         "smiles",
         [
-            # Curated cases per CONTEXT line 47 -- neither handler double-fires
+            # Curated cases per internal notes -- neither handler double-fires
             "c1ccc(-c2ccccc2)cc1",  # biphenyl
             "Nc1ccc(Cc2ccc(N)cc2)cc1",  # methylenedianiline
             "c1ccc(-c2ccc(-c3ccccc3)cc2)cc1",  # terphenyl

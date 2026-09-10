@@ -1,13 +1,13 @@
-"""The SELF-01 log line carries a PAYLOAD, and `_GATE_RES` was throwing it away.
+"""The log line carries a PAYLOAD, and `_GATE_RES` was throwing it away.
 
 `metrics/breadth.py:109` already matches
 
-    SELF-01 suppressed (different molecule): '<name>' (opsin=<smiles>)
+     suppressed (different molecule): '<name>' (opsin=<smiles>)
 
 to attribute the abstention, but its regex has no capture groups, so the built
 candidate and the molecule OPSIN read it as were both discarded. Without them the
 162 `GATE_SUPPRESSED:self01_mismatch` rows can only be counted, never split by
-mechanism -- and v28 built a single-lever fix for a class of that shape and
+mechanism -- and built a single-lever fix for a class of that shape and
 measured 0/231 afterwards.
 
 The apostrophe case is load-bearing: IUPAC names routinely contain primes
@@ -73,9 +73,9 @@ def test_an_unrelated_gate_line_is_not_mistaken_for_self01():
 def test_every_key_is_self01_prefixed_so_the_gate_cannot_be_mistaken():
     """The prefix IS the guard against cross-gate misattribution.
 
-    A molecule can be suppressed by SELF-01 mid-cascade and then terminate at a
+    A molecule can be suppressed by mid-cascade and then terminate at a
     DIFFERENT gate, so a row whose terminal cause is `opsin_unparseable` can still
-    carry a SELF-01 payload from earlier in its own cascade. Under the original
+    carry a payload from earlier in its own cascade. Under the original
     generic key names (`suppressed_name`) that read as "the candidate this row
     died on", and an investigator consuming the 500-row census had to monkeypatch
     `record_suppression` to recover the real candidates. Measured there: 39 of 200

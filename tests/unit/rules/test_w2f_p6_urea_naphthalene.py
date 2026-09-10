@@ -1,8 +1,8 @@
-"""P-66.1.6.1.1.3 - N-substituted urea substituent on a fused-aromatic acid parent
+""" - N-substituted urea substituent on a fused-aromatic acid parent
 (W2F p6 Task 3).
 
-BB P-66.1.6.1.1.3 (BlueBookV2.md:33338,33354); naphthalene fixed fusion numbering
-(alpha 1,4,5,8 / beta 2,3,6,7) + P-31.1.4.3.4 low-locants-to-suffix -> acid=2,
+BB (the Blue Book,33354); naphthalene fixed fusion numbering
+(alpha 1,4,5,8 / beta 2,3,6,7) + low-locants-to-suffix -> acid=2,
 urea-N=1. The plain-amino analog must stay working.
 """
 import orthonym

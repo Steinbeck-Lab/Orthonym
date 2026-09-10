@@ -2,28 +2,28 @@
 
 Given an oriented integer hex-lattice embedding (from ``fusion_orientation``),
 this module assigns IUPAC locants to the peripheral skeletal atoms following
-P-25.3.3.1: start from the uppermost ring (tie -> furthest right), begin at the
+: start from the uppermost ring (tie -> furthest right), begin at the
 most-counterclockwise non-fusion atom, and walk CLOCKWISE assigning integers to
 non-fusion atoms (and fusion heteroatoms), giving each fusion carbon the number
-of the preceding non-fusion atom modified by a Roman letter ('a', 'b', ...).
+of the preceding non-fusion atom modified by a Roman letter ('a', 'b',...).
 
-The lowest-locant cascade P-25.3.3.1.2 is then applied across all surviving
+The lowest-locant cascade is then applied across all surviving
 (orientation, start) candidates using the shared comparison primitives in
 ``rules/locants.py`` (``compare_locant_sets`` / ``_compare_heteroatom_seniority``
 via ``compare_numbering``) — the comparison logic is NEVER reimplemented here.
 
-Fixed-numbering exceptions (P-25.1.1 / P-31.1.4.3.4)
+Fixed-numbering exceptions /
 ----------------------------------------------------
 ``anthracene`` and ``phenanthrene`` are retained names with FIXED, traditional
-numbering ("special numbering" — Blue Book P-25.1.1 entries (11) and (12); also
-P-31.1.4.3.4: "in purine, anthracene, and phenanthrene, this numbering must be
-used").  Their traditional numbers do NOT follow the systematic P-25.3.3
+numbering ("special numbering" — Blue Book entries (11) and (12); also
+: "in purine, anthracene, and phenanthrene, this numbering must be
+used"). Their traditional numbers do NOT follow the systematic
 peripheral walk (anthracene numbers its meso carbons 9,10 last; phenanthrene
-uses 4a,4b/8a,10a fusion labels).  A correct engine must encode these two
+uses 4a,4b/8a,10a fusion labels). A correct engine must encode these two
 exceptions, so ``compute_fused_numbering`` recognises their exact ring graph and
-returns the fixed numbering mapped onto the input atoms.  Every other all-6
+returns the fixed numbering mapped onto the input atoms. Every other all-6
 cata-fused carbocyclic system (naphthalene, tetracene, pentacene, chrysene,
-triphenylene, ...) is numbered systematically by the peripheral walk.
+triphenylene,...) is numbered systematically by the peripheral walk.
 
 Stage 1 scope
 -------------
@@ -35,8 +35,8 @@ Locant shape: ``int`` for ordinary atoms, ``(int, 'a')`` tuples for fusion
 carbons — the existing ``rules.locants._Locant`` type, so downstream consumers
 (``compare_locant_sets``, the cascade) are unchanged.
 
-Source: IUPAC 2013 Blue Book P-25.3.3 (BlueBookV2/BlueBookV2.md ~line 12501);
-        P-25.1.1 / P-31.1.4.3.4 (anthracene/phenanthrene fixed numbering).
+Source: IUPAC 2013 Blue Book (the Blue Book Blue Book ~line 12501);
+         / (anthracene/phenanthrene fixed numbering).
 """
 
 from __future__ import annotations
@@ -52,14 +52,14 @@ from .fusion_orientation import (
 from .locants import _Locant, compare_locant_sets, compare_numbering
 
 # ---------------------------------------------------------------------------
-# Fixed-numbering retained ring systems (P-25.1.1 / P-31.1.4.3.4).
+# Fixed-numbering retained ring systems /.
 #
 # anthracene and phenanthrene have traditional "special" numbering that the
-# systematic P-25.3.3 peripheral walk does NOT reproduce.  Each reference is a
+# systematic peripheral walk does NOT reproduce. Each reference is a
 # SMILES whose atoms are listed in molecule order with their FIXED IUPAC locant
 # (string form), taken verbatim from OPSIN's extended-SMILES ``$_AV`` output
 # (``opsin -o extendedsmi``) — the authoritative source already used to populate
-# data/polycyclic_data.py.  The recognizer maps these onto an input ring system
+# data/polycyclic_data.py. The recognizer maps these onto an input ring system
 # by substructure isomorphism.
 # ---------------------------------------------------------------------------
 _FIXED_NUMBERING_SYSTEMS: Tuple[Tuple[str, str, Tuple[str, ...]], ...] = (
@@ -80,8 +80,8 @@ _FIXED_NUMBERING_SYSTEMS: Tuple[Tuple[str, str, Tuple[str, ...]], ...] = (
     # xanthene chalcogen family (entry 22: xanthene/thioxanthene/selenoxanthene/
     # telluroxanthene, all "special numbering"; PIN of each is the 9H-isomer).
     # Like anthracene/phenanthrene their two central-ring meso atoms take the
-    # HIGHEST locants 9 and 10, which the systematic P-25.3.3 peripheral walk
-    # does NOT reproduce (the walk numbers a meso atom mid-sequence).  Reference
+    # HIGHEST locants 9 and 10, which the systematic peripheral walk
+    # does NOT reproduce (the walk numbers a meso atom mid-sequence). Reference
     # SMILES + locants are OPSIN ``-o extendedsmi $_AV`` output (authoritative).
     (
         'acridine',
@@ -109,10 +109,10 @@ _FIXED_NUMBERING_SYSTEMS: Tuple[Tuple[str, str, Tuple[str, ...]], ...] = (
     ),
     # ----- (5,6)/(5,6,6) heterocycles with retained "special numbering" -----
     # Blue Book Table 2.8: purine (entry 16, "special numbering" — also listed
-    # with anthracene/phenanthrene at P-14.4 (a) as fixed) and carbazole (entry
+    # with anthracene/phenanthrene at (a) as fixed) and carbazole (entry
     # 6, "special numbering"); both number all skeletal atoms without the
     # systematic peripheral walk's choice (purine: fusion C at 4,5 not 4a/9a;
-    # carbazole: NH at 9, fusion 4a/4b/8a/9a).  beta-carboline (the retained
+    # carbazole: NH at 9, fusion 4a/4b/8a/9a). beta-carboline (the retained
     # name for 9H-pyrido[3,4-b]indole) uses carbazole's exact numbering pattern.
     # SMILES + locants are OPSIN ``-o extendedsmi $_AV`` (authoritative).
     (
@@ -132,7 +132,7 @@ _FIXED_NUMBERING_SYSTEMS: Tuple[Tuple[str, str, Tuple[str, ...]], ...] = (
     ),
     # 9H-fluorene — the carbocyclic carbazole-shape (CH2 at 9, no heteroatom to
     # drive the lowest-locant cascade) is a retained PAH with the SAME special
-    # numbering; the systematic walk/scorer mis-selects it (P-25.1.1 retained).
+    # numbering; the systematic walk/scorer mis-selects it retained).
     (
         '9H-fluorene',
         'C1=CC=CC=2C3=CC=CC=C3CC12',
@@ -160,7 +160,7 @@ def _try_fixed_numbering(
     special case (anthracene / phenanthrene); otherwise ``None``.
 
     Uses an exact substructure (graph) match restricted to ``ring_atoms`` so a
-    decorated anthracene still resolves to anthracene's fixed numbering.  The
+    decorated anthracene still resolves to anthracene's fixed numbering. The
     match must cover ALL and ONLY the ring atoms (a same-size bijection) so a
     larger fused system (e.g. tetracene) does not spuriously match the
     anthracene fragment.
@@ -195,8 +195,8 @@ def _peripheral_cycle(
     """Return the peripheral cycle of the fused system in connectivity order.
 
     The periphery of a cata-fused system is the unique cycle formed by every
-    ring bond that bounds exactly ONE ring face (an exterior bond).  Interior
-    (fusion) bonds bound two faces and are excluded.  For a cata-fused (no
+    ring bond that bounds exactly ONE ring face (an exterior bond). Interior
+    (fusion) bonds bound two faces and are excluded. For a cata-fused (no
     interior atom) system every skeletal atom lies on this cycle.
 
     Returns the atoms in cyclic order, or ``None`` if a single closed periphery
@@ -273,10 +273,10 @@ def _start_ring_key(
     graph: Dict[int, Dict[str, object]],
     coords: Dict[int, Tuple[int, int]],
 ) -> int:
-    """Pick the start ring per P-25.3.3.1.1: uppermost, tie -> furthest right.
+    """Pick the start ring per: uppermost, tie -> furthest right.
 
     Ring vertical position uses 6*true_y (= sum of atom y over the 6 atoms);
-    horizontal uses 6*true_x.  Deterministic final tie-break by node key (the
+    horizontal uses 6*true_x. Deterministic final tie-break by node key (the
     ring's minimum atom index) — only reached for genuinely coincident centers,
     which cannot happen for distinct rings, so it is a safety net.
     """
@@ -286,8 +286,8 @@ def _start_ring_key(
         atoms = graph[key]['atoms']  # type: ignore[index]
         sy = sum(coords[a][1] for a in atoms)
         sx = sum(coords[a][0] for a in atoms)
-        # Uppermost = max sy; tie -> furthest right = max sx.  Use negatives so
-        # min() picks the winner; final tie-break by key (ascending).
+        # Uppermost = max sy; tie -> furthest right = max sx. Use negatives so
+        # min picks the winner; final tie-break by key (ascending).
         metric = (-sy, -sx, key)
         if best_metric is None or metric < best_metric:
             best_metric = metric
@@ -316,9 +316,9 @@ def _candidate_starts(
     start_ring_atoms: Set[int],
     fusion_atoms: Set[int],
 ) -> List[Tuple[int, int]]:
-    """Enumerate (start_atom, direction) candidates per P-25.3.3.1.1.
+    """Enumerate (start_atom, direction) candidates per.
 
-    P-25.3.3.1.1: "Numbering starts from the non-fused atom MOST COUNTERCLOCKWISE
+    : "Numbering starts from the non-fused atom MOST COUNTERCLOCKWISE
     in the [uppermost, then rightmost] ring and proceeds in a CLOCKWISE direction."
 
     Exact geometric realisation (validated against OPSIN ``-o extendedsmi``
@@ -326,19 +326,19 @@ def _candidate_starts(
     branched triphenylene, the chrysene / anthracene-fused families): the
     most-counterclockwise non-fusion atom is the non-fusion atom of the start ring
     at the COUNTERCLOCKWISE END of its peripheral non-fusion arc, i.e. the one
-    whose counterclockwise peripheral neighbour is a fusion atom.  Walking
+    whose counterclockwise peripheral neighbour is a fusion atom. Walking
     CLOCKWISE from there enters the start ring's non-fusion arc first, giving it
-    the lowest numbers.  (The earlier "uppermost non-fusion atom" proxy only
+    the lowest numbers. (The earlier "uppermost non-fusion atom" proxy only
     coincided with this for linear acenes and was wrong for every angular or
     branched system — it minimised fusion-carbon locants one position too early.)
 
     For a terminal or angular start ring the non-fusion atoms form a single
     contiguous arc, so there is exactly ONE such atom — deterministic, no cascade
-    needed.  A start ring with two separate non-fusion arcs (a linear-middle ring
+    needed. A start ring with two separate non-fusion arcs (a linear-middle ring
     selected as uppermost-rightmost) yields more than one candidate; all are
-    returned and the P-25.3.3.1.2 lowest-locant cascade in
+    returned and the lowest-locant cascade in
     ``compute_fused_numbering`` discriminates (with the canonical-rank tie-break
-    making symmetric alternatives deterministic).  If the start ring has no
+    making symmetric alternatives deterministic). If the start ring has no
     non-fusion atom at all, no candidate is returned (fail-closed; the rarer
     "advance to the next ring clockwise" case is outside this engine's scope).
 
@@ -367,9 +367,9 @@ def _assign_from_start(
 ) -> Dict[int, _Locant]:
     """Assign locants walking the periphery clockwise from ``start_atom``.
 
-    P-25.3.3.1.1: assign integers to non-fusion atoms AND fusion heteroatoms;
+    : assign integers to non-fusion atoms AND fusion heteroatoms;
     each fusion CARBON is given the number of the immediately preceding
-    non-fusion (numbered) atom, modified by 'a'/'b'/'c'/...  (Stage 1 is
+    non-fusion (numbered) atom, modified by 'a'/'b'/'c'/... (Stage 1 is
     carbocyclic, so fusion heteroatoms do not occur, but the heteroatom branch
     is written for forward-compatibility and is harmless here.)
     """
@@ -427,14 +427,14 @@ def _indicated_h_locants(
     mol: Chem.Mol,
     locants: Dict[int, _Locant],
 ) -> List[_Locant]:
-    """Locants of indicated-hydrogen atoms, for the P-14.4(b) cascade tier.
+    """Locants of indicated-hydrogen atoms, for the (b) cascade tier.
 
     Restricted to AROMATIC heteroatoms bearing H (NH-type — 1H-indole,
     1H-benzimidazole): these are the genuine indicated-H of a mancude ring
-    system.  A fully saturated ring (``-idine``, e.g. pyrrolizidine — every
+    system. A fully saturated ring (``-idine``, e.g. pyrrolizidine — every
     ring atom is an sp3 CH/CH2) has NO indicated hydrogen, and dihydro/sp3
     saturation is a HYDRO feature (a separate, lower cascade tier), so sp3 ring
-    atoms are deliberately NOT counted here.  sp3 indicated-H mancude parents
+    atoms are deliberately NOT counted here. sp3 indicated-H mancude parents
     that the systematic walk cannot reproduce (9H-xanthene, purine, carbazole)
     are handled by ``_FIXED_NUMBERING_SYSTEMS`` instead.
     """
@@ -455,10 +455,10 @@ def compute_fused_numbering(
 
     Returns ``{atom_idx -> locant}`` (``int`` or ``(int, 'a')`` tuple) when the
     ring system is all-six-membered, ortho-(cata-)fused, carbocyclic, and has no
-    interior (peri-fusion) atom.  Returns ``None`` otherwise (the caller then
+    interior (peri-fusion) atom. Returns ``None`` otherwise (the caller then
     keeps its existing numbering path — fail-closed, never a regression).
 
-    The numbering is selected by the IUPAC P-25.3.3 cascade over every
+    The numbering is selected by the IUPAC cascade over every
     (surviving-orientation, start-atom) candidate, compared via the shared
     ``rules.locants`` primitives so the choice is fully deterministic and
     coordinate-free.
@@ -468,18 +468,18 @@ def compute_fused_numbering(
         ring_system_atoms: iterable of atom indices forming the fused ring
             system (the ring atoms of the parent — substituents excluded).
 
-    Source: IUPAC 2013 Blue Book P-25.3.3.1 / P-25.3.3.1.2.
+    Source: IUPAC 2013 Blue Book /.
     """
     ring_atoms = set(ring_system_atoms)
     if len(ring_atoms) < 6:
         return None
 
-    # v23 13B(a) S2a: heteroatoms in the rings are admitted (quinoline/acridine/
-    # phenazine/pteridine/... families).  S2b: mixed 5/6-membered rings are
-    # admitted too (indole/benzofuran/carbazole/...).  The embedding (hex for
+    # 13B(a) S2a: heteroatoms in the rings are admitted (quinoline/acridine/
+    # phenazine/pteridine/... families). S2b: mixed 5/6-membered rings are
+    # admitted too (indole/benzofuran/carbazole/...). The embedding (hex for
     # all-6, regular-polygon for mixed) + peripheral walk are element- and
     # size-agnostic; the heteroatom- then indicated-H-lowest-locant cascade
-    # (P-25.3.3.1.2 / P-14.4) is applied below.  We require ortho-(cata-)fused +
+    # / is applied below. We require ortho-(cata-)fused +
     # connected; ``best_orientations`` fail-closes on non-embeddable systems
     # (7-/8-membered rings = S2b.3, peri-fusion = S4), so this is a superset gate
     # that never regresses the all-6 path.
@@ -488,12 +488,12 @@ def compute_fused_numbering(
         return None
     graph = info['graph']  # type: ignore[assignment]
 
-    # This is a FUSION engine: require at least two ortho-fused rings.  A lone
+    # This is a FUSION engine: require at least two ortho-fused rings. A lone
     # ring (e.g. benzene) is not a fused system and is handled elsewhere.
     if len(graph) < 2:
         return None
 
-    # P-25.1.1 / P-31.1.4.3.4 fixed-numbering exceptions (anthracene,
+    # / fixed-numbering exceptions (anthracene,
     # phenanthrene) — their traditional numbering is NOT the systematic walk.
     fixed = _try_fixed_numbering(mol, ring_atoms)
     if fixed is not None:
@@ -510,11 +510,11 @@ def compute_fused_numbering(
         return None
 
     # Canonical atom ranks (SMILES-order-INDEPENDENT) for the final symmetry
-    # tie-break.  Two numberings tying through the whole P-25.3.3.1.2 cascade are
+    # tie-break. Two numberings tying through the whole cascade are
     # genuinely equivalent (a molecular automorphism relates them); to return ONE
     # deterministic representative regardless of input SMILES order we then
     # prefer the candidate whose locant->canonical-rank assignment is
-    # lexicographically smallest.  This is a graph-canonical decision, never a
+    # lexicographically smallest. This is a graph-canonical decision, never a
     # set/dict iteration-order one.
     canon_rank = list(Chem.CanonicalRankAtoms(mol, breakTies=False))
 
@@ -546,9 +546,9 @@ def compute_fused_numbering(
             if not cand:
                 continue
             # Cascade comparison terms:
-            #   P-25.3.3.1.2(a)/(b): heteroatom set then element seniority;
-            #   P-25.3.3.1.2(c): low locants to fusion carbons;
-            #   P-14.4(b): low locants to indicated hydrogen (1H-indole etc.).
+            # (a)/(b): heteroatom set then element seniority;
+            # (c): low locants to fusion carbons;
+            # (b): low locants to indicated hydrogen (1H-indole etc.).
             het = _heteroatom_pairs(mol, cand)
             fus = _fusion_letters(cand)
             ih = _indicated_h_locants(mol, cand)
@@ -564,7 +564,7 @@ def compute_fused_numbering(
                 # Tier (c): low locants to fusion carbons (the (int,'a') set).
                 cmp = compare_locant_sets(fus, best_fus)
             if cmp == 0:
-                # Tier (b, P-14.4): low locants to indicated hydrogen.
+                # Tier (b,: low locants to indicated hydrogen.
                 cmp = compare_locant_sets(ih, best_ih)
             if cmp == 0:
                 # Genuine symmetry tie -> canonical-rank representative.

@@ -1,14 +1,14 @@
 """
-Phase 8 End-to-End Integration Tests.
+a phase End-to-End Integration Tests.
 
-Tests the complete Phase 8 extended features:
-- EXT-01: Partial saturation detection (dihydro-, tetrahydro-, perhydro-)
-- EXT-02: Ring junction stereochemistry (cis/trans decalin)
-- EXT-03: Complex fusion descriptors ([a,c], [2,3-b])
-- EXT-04: Expanded retained names (150+ entries)
-- EXT-05: Expanded fused heterocycle data (60+ entries)
-- EXT-06: Performance under 100ms for 95th percentile
-- EXT-07: Xanthine derivatives (caffeine, theophylline)
+Tests the complete a phase extended features:
+-: Partial saturation detection (dihydro-, tetrahydro-, perhydro-)
+-: Ring junction stereochemistry (cis/trans decalin)
+-: Complex fusion descriptors ([a,c], [2,3-b])
+-: Expanded retained names (150+ entries)
+-: Expanded fused heterocycle data (60+ entries)
+-: Performance under 100ms for 95th percentile
+-: Xanthine derivatives (caffeine, theophylline)
 """
 
 import sys
@@ -28,7 +28,7 @@ from orthonym.data.retained_names import RETAINED_NAMES
 
 
 class TestEXT01PartialSaturation:
-    """Tests for EXT-01: Partial saturation detection."""
+    """Tests for: Partial saturation detection."""
 
     def test_dihydrofuran(self):
         """Test 2,3-dihydrofuran naming."""
@@ -80,7 +80,7 @@ class TestEXT01PartialSaturation:
 
 
 class TestEXT02RingJunctionStereo:
-    """Tests for EXT-02: Ring junction stereochemistry."""
+    """Tests for: Ring junction stereochemistry."""
 
     def test_cis_decalin(self):
         """Test cis-decalin naming with stereochemistry."""
@@ -112,7 +112,7 @@ class TestEXT02RingJunctionStereo:
 
 
 class TestEXT03FusionDescriptors:
-    """Tests for EXT-03: Complex fusion descriptors."""
+    """Tests for: Complex fusion descriptors."""
 
     def test_naphtho_furan(self):
         """Test naphtho-fused heterocycle naming."""
@@ -151,7 +151,7 @@ class TestEXT03FusionDescriptors:
 
 
 class TestEXT07XanthineDerivatives:
-    """Tests for EXT-07: Xanthine derivative naming."""
+    """Tests for: Xanthine derivative naming."""
 
     def test_caffeine_naming(self):
         """Test caffeine (1,3,7-trimethylxanthine) naming."""
@@ -194,7 +194,7 @@ class TestEXT07XanthineDerivatives:
 
 
 class TestDataExpansion:
-    """Tests for EXT-04 and EXT-05: Data expansion."""
+    """Tests for and: Data expansion."""
 
     def test_fused_heterocycle_count(self):
         """Test that fused heterocycle data has 60+ entries."""
@@ -235,13 +235,13 @@ class TestDataExpansion:
     def test_new_amino_acid_entries(self):
         """Test that amino acid entries exist and are nameable.
 
-        v33 Phase 0 T5 (root-cause architecture change, not a value error):
+         a phase (root-cause architecture change, not a value error):
         `RETAINED_NAMES` used to carry a SECOND, stereo-blind copy of every
         common amino acid's flat SMILES, and it was checked BEFORE the
         stereo-aware `data.amino_acids` path in the naming dispatch order --
         so a genuinely stereo-undefined input matched this dumb copy first and
         silently asserted an implicit L configuration it does not define
-        (P-103.1.3.1, BlueBookV2.md:54291). T5 deleted the 19 duplicate,
+        , the Blue Book). deleted the 19 duplicate,
         alpha-stereocentre-bearing entries here (glycine, the sole achiral one,
         stays); every deleted name is still nameable via
         `data.amino_acids.STANDARD_AMINO_ACIDS`, which this test now also
@@ -271,7 +271,7 @@ class TestDataExpansion:
 
 
 class TestPerformance:
-    """Tests for EXT-06: Performance requirements."""
+    """Tests for: Performance requirements."""
 
     def test_simple_compound_under_10ms(self):
         """Test that simple compounds are named under 10ms."""
@@ -325,7 +325,7 @@ class TestPerformance:
 
 
 class TestPhase8Integration:
-    """Integration tests combining multiple Phase 8 features."""
+    """Integration tests combining multiple a phase features."""
 
     def test_partial_saturation_with_substituent(self):
         """Test partially saturated compound with substituent."""

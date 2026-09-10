@@ -29,7 +29,7 @@ def test_acyloxymethyl_ring_methyl_ester(namer):
 
 @pytest.mark.opsin_gate
 def test_ring_acyloxy_direct(namer):
-    # acyloxy directly on the ring (spy's confirmed clean win)
+    # acyloxy directly on the ring (trace's confirmed clean win)
     smi = "COC(=O)c1ccc(OC(C)=O)cc1"
     name = namer.name(smi)
     assert name and "unknown" not in name, name

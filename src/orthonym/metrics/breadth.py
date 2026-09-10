@@ -1,6 +1,6 @@
-"""v29 breadth metrics — the pinned definitions behind the breadth instrument.
+""" breadth metrics — the pinned definitions behind the breadth instrument.
 
-Why this module exists: every breadth figure quoted before v29 came from an
+Why this module exists: every breadth figure quoted before came from an
 ad-hoc harness in a session scratchpad, and at least one was a ~4x mirage
 because the harness and the production producer disagreed about what counts as
 an emission. These functions are the single definition of each metric, unit
@@ -70,7 +70,7 @@ def ring_systems(mol) -> List[Set[int]]:
 # ------------------------------------------------------------------- outcome
 
 def classify_outcome(result: Dict[str, Any]) -> str:
-    """``EMIT`` or ``ABSTAIN`` for one ``name_tiered()`` result.
+    """``EMIT`` or ``ABSTAIN`` for one ``name_tiered`` result.
 
     Uses the production failure predicate (``errors.is_failure_name``) rather
     than a local truthiness check, because the PIN tier signals abstention with
@@ -123,9 +123,9 @@ _DROP_RE = re.compile(
 # [^|] guard mirrors _DROP_RE so a capture can never run past its own log record.
 _REFUSE_RE = re.compile(r"general_engine_declined:\s*([^|]+?)\s*(?:\(tier|$)")
 
-# v30 P0-T3. The two grammars above see PRODUCER refusals only, and measurement
+# -T3. The two grammars above see PRODUCER refusals only, and measurement
 # showed that is not where these molecules die: of the 11 abstainers that logged
-# no code at all on the v30 P0 best-effort run, NINE were terminated by a
+# no code at all on the best-effort run, NINE were terminated by a
 # post-hoc GATE — the name was built, then suppressed. The gate's own log line
 # was being read as noise (the superseded
 # ``test_parse_refusal_codes_ignores_unrelated_log_noise`` asserted exactly that),
@@ -138,7 +138,7 @@ _REFUSE_RE = re.compile(r"general_engine_declined:\s*([^|]+?)\s*(?:\(tier|$)")
 # ``return name`` (``namer.py:572``), so it is a warning, not a blocker. Same for
 # the stereo backstop, which is detection-only.
 _GATE_RES = (
-    # namer.py:951 — SELF-01 rejected the candidate as a DIFFERENT molecule.
+    # namer.py:951 — rejected the candidate as a DIFFERENT molecule.
     (re.compile(r"self_consistency rejected \(different molecule\)"),
      "self_consistency_rejected:different_molecule"),
     # namer.py:1224 — the pre-emission OPSIN-parse validity gate.
@@ -147,7 +147,7 @@ _GATE_RES = (
 )
 
 
-# The SELF-01 line's payload. ``_GATE_RES`` above matches the same line to
+# The line's payload. ``_GATE_RES`` above matches the same line to
 # ATTRIBUTE the abstention but has no capture groups, so the built candidate and
 # the constitution OPSIN read it as were both discarded -- which is why the 162
 # ``GATE_SUPPRESSED:self01_mismatch`` rows could be counted but never split by
@@ -164,9 +164,9 @@ _SELF01_PAYLOAD_RE = re.compile(
 
 
 def parse_suppressed_candidates(log_lines: Iterable[str]) -> Dict[str, Any]:
-    """The candidate(s) SELF-01 rejected for ONE molecule, from its log lines.
+    """The candidate(s) rejected for ONE molecule, from its log lines.
 
-    Returns ``{}`` when nothing was suppressed, so a caller can ``row.update()``
+    Returns ``{}`` when nothing was suppressed, so a caller can ``row.update``
     it without introducing null keys onto rows the gate never touched.
 
     The LAST suppression is reported as *the* suppressed candidate because the
@@ -176,14 +176,14 @@ def parse_suppressed_candidates(log_lines: Iterable[str]) -> Dict[str, Any]:
     producer kept offering variants of the same wrong structure" need different
     fixes, and only the full list distinguishes them.
 
-    Scope: this reads the SELF-01 line ONLY. The OPSIN validity gate suppresses
+    Scope: this reads the line ONLY. The OPSIN validity gate suppresses
     names too, but for a different reason (unparseable, not wrong molecule), and
     conflating the two would size a grammar defect as a constitution defect.
 
     ⚠ The keys are ``self01_``-prefixed ON PURPOSE, and the prefix is the guard.
-    A molecule can be suppressed by SELF-01 mid-cascade and then terminate at a
+    A molecule can be suppressed by mid-cascade and then terminate at a
     DIFFERENT gate, so a row whose terminal cause is ``opsin_unparseable`` can
-    still carry a SELF-01 payload from earlier in its own cascade. Under the
+    still carry a payload from earlier in its own cascade. Under the
     earlier generic names (``suppressed_name``) that read as "the candidate this
     row died on", and an investigator consuming it had to monkeypatch
     ``record_suppression`` to recover the real one. Measured on the 500-row
@@ -253,7 +253,7 @@ def residual_refusal_code(row: Dict[str, Any]) -> str | None:
 
     * ``SKIP`` — RDKit could not parse the input; the namer never ran.
     * ``EXC`` — an unhandled exception. NOT a refusal: a crash the instrument's
-      own ``except`` turned into an abstainer row. On the v30 P0 run this was one
+      own ``except`` turned into an abstainer row. On the run this was one
       row, ``TypeError: '<' not supported between instances of 'str' and 'int'``.
     * ``TIMEOUT`` — the instrument's own per-molecule SIGALRM, not an engine
       decision.
@@ -287,11 +287,11 @@ def residual_refusal_code(row: Dict[str, Any]) -> str | None:
 
 #: The two attribution bases, and WHY there are two rather than one.
 #:
-#: ``log``      — every producer-refusal-slug / ``producer_refused:*`` / gate
-#:                code scraped from the engine's own log stream for that
-#:                molecule.
+#: ``log`` — every producer-refusal-slug / ``producer_refused:*`` / gate
+#: code scraped from the engine's own log stream for that
+#: molecule.
 #: ``terminal`` — the ONE mechanism the typed abstention channel
-#:                (``metrics.abstention``) recorded as having ended the naming.
+#: (``metrics.abstention``) recorded as having ended the naming.
 _BASES = ("log", "terminal")
 
 #: Prefix for a site attributed by the typed abstention channel.
@@ -301,7 +301,7 @@ _TERM_PREFIX = "TERM:"
 #: inference and a reader must be able to tell the two apart at a glance.
 _TERMGAP_PREFIX = "TERMGAP:"
 #: Prefix for a site attributed from the LOG because the channel was never read
-#: for that row at all (a pre-T4 run, or a crash/timeout). A THIRD prefix, not a
+#: for that row at all (a pre- run, or a crash/timeout). A THIRD prefix, not a
 #: reuse of TERMGAP:, because "the instrument did not look" and "the engine did
 #: not record" are different findings and only the second is an engine gap.
 _TERMUNMEASURED_PREFIX = "TERMGAP-UNMEASURED:"
@@ -318,11 +318,11 @@ def terminal_site(row: Dict[str, Any]) -> str | None:
     function exists for::
 
         [I-](CCO)c1ccccc1
-          log codes : substituent_is_bare_functional_group:fg_only,
+          log codes: substituent_is_bare_functional_group:fg_only,
                       ring_fragment_declined_by_ring_engine:ring_fragment_declined…,
                       n_branch_ring_substituent_unnameable,
                       producer_refused:branch unnameable
-          terminal  : GATE_SUPPRESSED / charge_dropped   (namer.py:3916)
+          terminal: GATE_SUPPRESSED / charge_dropped (namer.py:3916)
 
     A name WAS built for that molecule; a structure-conservation veto removed
     it. On the log basis four innocent sites collect ``first``/``ONLY`` credit
@@ -344,7 +344,7 @@ def terminal_site(row: Dict[str, Any]) -> str | None:
        record, because the candidate's existence proves generation completed.
     2. It is coarse — five ``AbstentionCode`` values. ``detail`` is therefore
        part of the site key, which splits ``GATE_SUPPRESSED`` into the six
-       structure-conservation vetoes plus SELF-01 and the OPSIN validity gate.
+       structure-conservation vetoes plus and the OPSIN validity gate.
     3. Not every post-generation termination is instrumented. The general
        engine's inline E1-certificate rejection (``namer.py:3586``) and its
        no-jar / dropped-stereo discards (``namer.py:3634``) throw a generated
@@ -379,9 +379,9 @@ def terminal_site(row: Dict[str, Any]) -> str | None:
 #: censuses cannot drift into two vocabularies for the same axis:
 #:
 #: * ``needs_engine`` — the pipeline produced NO candidate. Only new naming
-#:   CAPABILITY recovers these.
-#: * ``suppressed``   — a candidate WAS built and a gate/downgrade removed it.
-#: * ``other``        — the channel fired but named no specific mechanism.
+#: CAPABILITY recovers these.
+#: * ``suppressed`` — a candidate WAS built and a gate/downgrade removed it.
+#: * ``other`` — the channel fired but named no specific mechanism.
 #: * ``uninstrumented`` — no channel record; the site came from the log stream.
 #:
 #: ⚠ ``suppressed`` is NOT the same as "recoverable by re-emitting". A
@@ -412,7 +412,7 @@ def terminal_basis_available(rows: Sequence[Dict[str, Any]]) -> bool:
     """True when ``rows`` were measured with the abstention channel wired.
 
     Checked explicitly rather than inferred from "are there any terminal
-    codes": a run recorded before T4 carries none, and censusing it on the
+    codes": a run recorded before carries none, and censusing it on the
     terminal basis would print a clean-looking all-residual zero — the
     project's standing "a PERFECT harness result means it did not RUN"
     failure mode. ``run_worker`` stamps ``terminal_measured`` on every row it
@@ -444,7 +444,7 @@ def row_attribution(row: Dict[str, Any],
     if term is None and log_codes:
         # No channel observation at all, but the log named something. Attribute
         # to the log's first code under a DISTINCT prefix so it can never be
-        # mistaken for a channel attribution: this is the pre-T4 shape (a run
+        # mistaken for a channel attribution: this is the pre- shape (a run
         # recorded before the channel was wired) and the crash/timeout shape.
         term = f"{_TERMUNMEASURED_PREFIX}{log_codes[0]}"
     if term is None:
@@ -474,9 +474,9 @@ def refusal_structure(rows: Sequence[Dict[str, Any]],
     promoted to a defect class):
 
     * ``touched`` — abstainers on which the site fired at all. NOT additive.
-    * ``first``   — abstainers where it fired first. Systematically over-credits
+    * ``first`` — abstainers where it fired first. Systematically over-credits
       whichever site happens to sit earliest in the pipeline.
-    * ``only``    — abstainers naming this site and NO other. The honest ceiling
+    * ``only`` — abstainers naming this site and NO other. The honest ceiling
       of a one-site fix.
 
     ``single_site_ceiling`` = ``(emitted + Σ only) / n`` and is an OPTIMISTIC
@@ -485,12 +485,12 @@ def refusal_structure(rows: Sequence[Dict[str, Any]],
     "total_refuse=1 does NOT mean single-blocked … 1 of 10 emitted").
 
     Depth-0 abstainers are reported as ``uncoded_abstainers`` and attributed
-    separately via :func:`residual_refusal_code`. They are NEVER folded into
+    separately via:func:`residual_refusal_code`. They are NEVER folded into
     ``only`` or the ceiling: uncoded is the opposite of known-single, and
     counting them would inflate the ceiling with rows whose blocker is unknown.
 
-    ``basis`` (v30 P0-T4) selects the ATTRIBUTION source; see
-    :func:`row_attribution` and :func:`terminal_site` for why there are two.
+    ``basis`` (-T4) selects the ATTRIBUTION source; see
+    :func:`row_attribution` and:func:`terminal_site` for why there are two.
 
     * ``"log"`` (default, unchanged) — every code the engine logged. ``first``
       and ``ONLY`` therefore go to whichever EXPLORATORY producer code fired
@@ -513,8 +513,8 @@ def refusal_structure(rows: Sequence[Dict[str, Any]],
     abst = [r for r in rows if r.get("outcome") != "EMIT"]
     n_ab = len(abst)
 
-    # Parallel to `abst` by INDEX, not keyed by id(): a caller may legitimately
-    # pass the same row dict twice, and an id() key would silently merge them.
+    # Parallel to `abst` by INDEX, not keyed by id: a caller may legitimately
+    # pass the same row dict twice, and an id key would silently merge them.
     attributions = [row_attribution(r, basis) for r in abst]
 
     # DISTINCT sites per molecule, over the UNION. Must use the same dedup'd
@@ -631,8 +631,8 @@ def molecule_components(mol) -> List[Dict[str, Any]]:
 
     ring_atoms = {a for s in systems for a in s}
     # Heavy atoms only. RDKit keeps ISOTOPIC hydrogens as explicit graph atoms
-    # (unlike implicit H), so on a deuterated input GetAtoms() and
-    # GetNumHeavyAtoms() disagree; without this filter the partition silently
+    # (unlike implicit H), so on a deuterated input GetAtoms and
+    # GetNumHeavyAtoms disagree; without this filter the partition silently
     # covers H nodes and breaks this function's documented contract.
     heavy = {a.GetIdx() for a in mol.GetAtoms() if a.GetAtomicNum() > 1}
     acyclic = [i for i in sorted(heavy) if i not in ring_atoms]
@@ -744,16 +744,16 @@ def aggregate(rows: Sequence[Dict[str, Any]],
         # T6: emitted names OPSIN could not parse at all.
         "opsin_unparseable": sum(1 for r in rows if r.get("opsin_unparseable")),
         # Tracked APART from structure_wrong: a mobile-H tautomer difference is
-        # not a wrong structure. The first v29 baseline reported 2 "wrong"
+        # not a wrong structure. The first baseline reported 2 "wrong"
         # names that were both tautomers (benzimidazole NH, guanidine); folding
-        # those into T3 would manufacture phantom 0-wrong violations.
+        # those into would manufacture phantom 0-wrong violations.
         "tautomer_differs": sum(1 for r in rows if r.get("tautomer_differs")),
         "refusal_census": dict(census.most_common()),
         "refusal_census_abstain": dict(census_abstain.most_common()),
-        # v30 P0-T2: the ONLY-ranked structure. Carried into the run JSON so the
+        # -T2: the ONLY-ranked structure. Carried into the run JSON so the
         # build order is queryable without re-running a 675 s measurement.
         "refusal_structure": refusal_structure(rows),
-        # v30 P0-T4: the same structure on TERMINAL attribution. `None`, not an
+        # -T4: the same structure on TERMINAL attribution. `None`, not an
         # empty-looking structure, when the rows were measured before the
         # abstention channel was wired -- a zero here would be indistinguishable
         # from "the channel found nothing".

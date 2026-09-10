@@ -1,10 +1,10 @@
 """Unit tests for CandidatePool, HandlerPolicy, HANDLER_POLICIES, and the
-thread-local pool store (Phase 145.1 SC-1).
+thread-local pool store (a phase).
 
 Tests behavior-preserving extraction of composer.py handler cascade.
 Critical regression tests:
 - test_pool_add_does_NOT_pass_parent_atom_indices_* proves Risk 1 mitigation
-- test_module_level_parent_correctness_binding proves ISS-005 remediation
+- test_module_level_parent_correctness_binding proves remediation
 """
 
 import inspect
@@ -36,7 +36,7 @@ from orthonym.namer import MolecularFeatures
 # ---------------------------------------------------------------------------
 
 def _make_features(smiles, functional_groups=None, principal_group=None):
-    """Create a minimal MolecularFeatures for testing pool.add()."""
+    """Create a minimal MolecularFeatures for testing pool.add."""
     mol = Chem.MolFromSmiles(smiles)
     f = MolecularFeatures(mol=mol, smiles=smiles)
     if functional_groups is not None:
@@ -54,7 +54,7 @@ class TestHandlerPolicy:
     def test_handler_policy_creation(self):
         """Test 1: HandlerPolicy dataclass instantiation with defaults.
 
-        Phase 146 SC-8: cascade_ratio_min, min_ratio_accept, gate_threshold
+        a phase: cascade_ratio_min, min_ratio_accept, gate_threshold
         fields REMOVED from the dataclass. Only handler_id / tier /
         priority / direct_return remain.
         """
@@ -63,7 +63,7 @@ class TestHandlerPolicy:
         assert p.tier == 'ring_a'
         assert p.priority == 4
         assert p.direct_return is False
-        # Phase 146 SC-8: the three gate fields must no longer exist on
+        # a phase: the three gate fields must no longer exist on
         # the dataclass (removed from HandlerPolicy definition).
         from dataclasses import fields
         field_names = {f.name for f in fields(HandlerPolicy)}
@@ -90,7 +90,7 @@ class TestHandlerPolicy:
     def test_handler_policies_complex_ring_is_tier_a(self):
         """Test 3: complex_ring is Tier A with correct tier/priority/direct_return.
 
-        Phase 146 SC-8: cascade_ratio_min and min_ratio_accept fields removed
+        a phase: cascade_ratio_min and min_ratio_accept fields removed
         from HandlerPolicy; the 0.40/0.30 constants no longer live on the
         policy. Their V17-soak semantics are preserved via an inline guard
         in composer.py (selection_mode-gated). Tier A membership assertions
@@ -109,7 +109,7 @@ class TestHandlerPolicy:
     def test_handler_policies_tier_b_shape(self, handler_id):
         """Test 4: All 13 Tier B handlers are direct-return with tier='ring_b'.
 
-        Phase 146 SC-8: gate_threshold field removed from HandlerPolicy; the
+        a phase: gate_threshold field removed from HandlerPolicy; the
         0.40 confidence-gate threshold is now enforced only via the
         handler-internal call to _confidence_gate(CONFIDENCE_GATE_THRESHOLD).
         Per-policy assertions collapse to tier/direct_return membership.
@@ -117,7 +117,7 @@ class TestHandlerPolicy:
         p = HANDLER_POLICIES[handler_id]
         # CONFIDENCE_GATE_THRESHOLD is unchanged (still 0.40) — retain the
         # imported symbol reference so test coverage of the module-level
-        # constant survives the SC-8 cleanup.
+        # constant survives the cleanup.
         assert CONFIDENCE_GATE_THRESHOLD == 0.40, (
             "CONFIDENCE_GATE_THRESHOLD must remain 0.40 post-SC-8"
         )
@@ -125,9 +125,9 @@ class TestHandlerPolicy:
         assert p.tier == 'ring_b'
 
     def test_handler_policies_chain_priority_raised_to_ring_a_equal(self):
-        """Test 5: chain policy-priority raised to 4 (ring_a-peer) per SC-5.
+        """Test 5: chain policy-priority raised to 4 (ring_a-peer) per.
 
-        Phase 146 SC-5: chain becomes a first-class peer of ring_a handlers
+        a phase: chain becomes a first-class peer of ring_a handlers
         in the two-tier selector. HANDLER_PRIORITY['chain']=1 is UNCHANGED
         (so V17 select_best_candidate tiebreak stays byte-identical); only
         the HANDLER_POLICIES-level priority is promoted to 4 for the
@@ -144,19 +144,19 @@ class TestHandlerPolicy:
         )
 
     @pytest.mark.parametrize("handler_id", [
-        # 'chain' intentionally EXCLUDED per Phase 146 SC-5: its policy-level
+        # 'chain' intentionally EXCLUDED per a phase: its policy-level
         # priority is promoted to 4 while HANDLER_PRIORITY['chain'] remains 1.
         'complex_ring', 'heterocycle', 'benzene', 'oxime',
         'polycyclic', 'n_oxide', 'amine', 'polyfunctional',
     ])
     def test_handler_policies_priority_pulled_from_handler_priority(self, handler_id):
-        """Test 18 (ISS-002 REGRESSION): every priority pulled from HANDLER_PRIORITY
-        EXCEPT chain (intentional SC-5 divergence).
+        """Test 18 (REGRESSION): every priority pulled from HANDLER_PRIORITY
+        EXCEPT chain (intentional divergence).
 
         Includes n_oxide, amine, polyfunctional which Plan 02 Task 2 added to
         HANDLER_PRIORITY. Proves single-source-of-truth invariant — no
         hardcoded priority literals in HANDLER_POLICIES except the intentional
-        chain=4 promotion documented in Phase 146 SC-5.
+        chain=4 promotion documented in a phase.
         """
         assert HANDLER_POLICIES[handler_id].priority == HANDLER_PRIORITY[handler_id]
 
@@ -198,7 +198,7 @@ class TestCandidatePoolSelection:
     def test_pool_first_applicable_returns_first_added(self):
         """Test 9: first_applicable returns first-added regardless of confidence."""
         pool = CandidatePool(selection_mode='first_applicable')
-        # Add three candidates manually (bypassing add() to control confidence)
+        # Add three candidates manually (bypassing add to control confidence)
         c1 = CandidateName(name="ethanol", handler='chain', confidence=0.4)
         c2 = CandidateName(name="ethyl alcohol", handler='chain', confidence=0.9)
         c3 = CandidateName(name="hydroxyethane", handler='chain', confidence=0.7)
@@ -217,7 +217,7 @@ class TestCandidatePoolSelection:
         assert best is c2, "score_based returns highest-confidence candidate"
 
     def test_pool_best_empty_returns_none(self):
-        """pool.best() with no candidates returns None."""
+        """pool.best with no candidates returns None."""
         pool = CandidatePool()
         assert pool.best() is None
 
@@ -231,12 +231,12 @@ class TestCandidatePoolSelection:
 
 
 # ---------------------------------------------------------------------------
-# CandidatePool.add() — gate behavior + post-hoc parent_atom_indices
+# CandidatePool.add — gate behavior + post-hoc parent_atom_indices
 # ---------------------------------------------------------------------------
 
 class TestCandidatePoolAdd:
     def test_pool_add_returns_candidate_for_non_gated_handler(self):
-        """pool.add() with non-Tier-B handler stores and returns candidate."""
+        """pool.add with non-Tier-B handler stores and returns candidate."""
         features = _make_features("CCO")
         pool = CandidatePool()
         cand = pool.add("ethanol", "chain", features)
@@ -321,7 +321,7 @@ class TestCandidatePoolAdd:
 
 class TestPoolLifecycle:
     def test_clear_pool_resets(self):
-        """Test 14: clear_pool() resets thread-local state."""
+        """Test 14: clear_pool resets thread-local state."""
         features = _make_features("CCO")
         clear_pool()
         pool = get_current_pool()
@@ -332,7 +332,7 @@ class TestPoolLifecycle:
         assert len(new_pool.all_candidates()) == 0
 
     def test_get_current_pool_lazy_init(self):
-        """get_current_pool() creates pool on first access in a fresh thread."""
+        """get_current_pool creates pool on first access in a fresh thread."""
         # Reset by deleting the attribute (simulates fresh thread)
         if hasattr(_pool_store, 'pool'):
             delattr(_pool_store, 'pool')
@@ -366,7 +366,7 @@ class TestPoolLifecycle:
 
 
 # ---------------------------------------------------------------------------
-# ISS-005 module-level binding regression test
+# module-level binding regression test
 # ---------------------------------------------------------------------------
 
 class TestModuleLevelImportBinding:
@@ -382,8 +382,8 @@ class TestModuleLevelImportBinding:
             f"Binding must be class or None; got {cp_module.ParentCorrectnessScorer!r}"
 
     def test_pool_add_does_not_re_import_inside_body(self):
-        """Test 21 follow-up (ISS-005 REGRESSION): pool.add() body must NOT
-        contain a per-call `from ..rules.parent_correctness import` statement.
+        """Test 21 follow-up (REGRESSION): pool.add body must NOT
+        contain a per-call `from..rules.parent_correctness import` statement.
         That would defeat the module-level binding optimization."""
         src = inspect.getsource(CandidatePool.add)
         # Must not have a per-call import inside the method body
@@ -399,14 +399,14 @@ class TestModuleLevelImportBinding:
 
 
 # ---------------------------------------------------------------------------
-# RATIO_REJECT_FLOOR sanity gate tests (Phase 145.2 D-09-a.2)
+# RATIO_REJECT_FLOOR sanity gate tests (a phase -a.2)
 # ---------------------------------------------------------------------------
 
 import logging
 
 
 class TestRatioRejectFloor:
-    """Phase 145.2 D-09-a.2: RATIO_REJECT_FLOOR sanity gate in pool.add()."""
+    """a phase -a.2: RATIO_REJECT_FLOOR sanity gate in pool.add."""
 
     def test_floor_constant_value(self):
         """RATIO_REJECT_FLOOR module-level constant equals 0.10."""
@@ -486,6 +486,6 @@ class TestRatioRejectFloor:
             'orthonym.assembly.candidate_pool.compute_confidence',
             return_value=cand,
         ):
-            # Must not KeyError — .get('ratio') returns None → accepted
+            # Must not KeyError —.get('ratio') returns None → accepted
             result = pool.add(name="hybrid", handler_id="chain", features=features)
         assert result is not None

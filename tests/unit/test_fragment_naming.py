@@ -2,7 +2,7 @@
 
 Tests the thread-safe visited-set cycle detection infrastructure in
 orthonym.assembly.fragment_naming. This module prevents infinite loops
-when fragment naming calls name_compound() recursively.
+when fragment naming calls name_compound recursively.
 """
 import threading
 
@@ -43,18 +43,18 @@ class TestVisitedSetTracking:
         assert get_naming_depth() == 0
 
     def test_naming_depth_returns_visited_size(self):
-        """get_naming_depth() returns the size of the visited set."""
+        """get_naming_depth returns the size of the visited set."""
         visited = _get_visited()
         visited.add("AAA")
         visited.add("BBB")
         assert get_naming_depth() == 2
 
     def test_is_top_level_when_visited_empty(self):
-        """is_top_level_naming() returns True when visited set is empty."""
+        """is_top_level_naming returns True when visited set is empty."""
         assert is_top_level_naming()
 
     def test_not_top_level_when_visited_nonempty(self):
-        """is_top_level_naming() returns False when visited set has entries."""
+        """is_top_level_naming returns False when visited set has entries."""
         _get_visited().add("CCO")
         assert not is_top_level_naming()
 
@@ -101,7 +101,7 @@ class TestCycleDetection:
         assert result == "ethanol"
 
     def test_safety_net_uses_pipeline_fallback(self):
-        """When visited set reaches _MAX_VISITED_SIZE, pipeline fallback is tried (Phase 127)."""
+        """When visited set reaches _MAX_VISITED_SIZE, pipeline fallback is tried (a phase)."""
         visited = _get_visited()
         for i in range(_MAX_VISITED_SIZE):
             visited.add(f"FAKE_SMILES_{i}")
@@ -140,7 +140,7 @@ class TestLegacyConstants:
         assert MAX_NAMING_DEPTH == 7
 
     def test_max_visited_size_is_fifty(self):
-        """Safety-net limit should be 50 (Phase 127: raised from 30)."""
+        """Safety-net limit should be 50 (a phase: raised from 30)."""
         assert _MAX_VISITED_SIZE == 50
 
 
@@ -186,13 +186,13 @@ class TestSessionManagement:
     """Test naming session start/end lifecycle."""
 
     def test_start_session_initializes_cache(self):
-        """start_naming_session() should create a runtime cache."""
+        """start_naming_session should create a runtime cache."""
         assert getattr(_fragment_guard, 'cache', None) is None
         start_naming_session()
         assert _fragment_guard.cache == {}
 
     def test_end_session_clears_cache(self):
-        """end_naming_session() should clear the runtime cache."""
+        """end_naming_session should clear the runtime cache."""
         start_naming_session()
         _fragment_guard.cache["test"] = "value"
         end_naming_session()

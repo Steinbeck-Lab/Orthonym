@@ -6,7 +6,7 @@ Tests the three pure-Python helpers in
 * ``decide_grid_reduction`` — KEEP/DROP decision logic (rules).
 * ``_aggregate_per_handler`` — group-by + quantile fallback for low n.
 * ``_compute_multiple_bond_count_normalized`` — parent-only bond density
-  with substituent-exclusion semantics (Blue Book P-44.4.1.2).
+  with substituent-exclusion semantics (Blue Book.
 
 The script lives in the project ``scripts/`` directory (not on the package
 import path), so we add it to ``sys.path`` and use ``importlib`` to load.
@@ -25,11 +25,11 @@ fd = importlib.import_module("phase146_factor_distributions")
 
 
 # ============================================================================
-# TestDecideGridReduction — KEEP/DROP decision logic ()
+# TestDecideGridReduction — KEEP/DROP decision logic
 # ============================================================================
 
 class TestDecideGridReduction:
-    """Validate the KEEP/DROP decision rules per CONTEXT.md / RESEARCH §3.3.
+    """Validate the KEEP/DROP decision rules per internal notes / RESEARCH
 
     Rules:
       * KEEP iff at least one handler has n >= MIN_HANDLER_N AND
@@ -153,7 +153,7 @@ class TestAggregatePerHandler:
 class TestComputeMultipleBondCountNormalized:
     """Validate _compute_multiple_bond_count_normalized.
 
-    Blue Book P-44.4.1.2 reads "ring system or chain" — i.e., the parent
+    Blue Book reads "ring system or chain" — i.e., the parent
     skeleton. Substituent multiple bonds (e.g., a nitrile C#N attached to
     a chain) do NOT count when their endpoints are outside the parent
     atom set.

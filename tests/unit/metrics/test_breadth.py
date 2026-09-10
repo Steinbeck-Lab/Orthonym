@@ -149,7 +149,7 @@ def test_parse_refusal_codes_ignores_log_lines_that_do_not_refuse():
 
 
 def test_parse_refusal_codes_captures_the_self01_gate_suppression():
-    """SELF-01 is a REFUSAL SITE, and the census was blind to it.
+    """ is a REFUSAL SITE, and the census was blind to it.
 
     Measured on the best-effort run, one fresh process per molecule: 8 of
     the 11 abstainers that logged no refusal code died here — a name was built and
@@ -174,7 +174,7 @@ def test_parse_refusal_codes_captures_the_opsin_validity_gate():
 
 
 def test_parse_refusal_codes_dedups_a_gate_that_fires_on_several_candidates():
-    """SELF-01 rejecting four candidates is still ONE blocker for the molecule."""
+    """ rejecting four candidates is still ONE blocker for the molecule."""
     line = ("orthonym.namer|self_consistency rejected (different molecule): 'x' (opsin=C)")
     assert parse_refusal_codes([line, line, line, line]) == [
         "self_consistency_rejected:different_molecule"]
@@ -208,9 +208,9 @@ def test_molecule_components_covers_every_heavy_atom_exactly_once():
 def test_molecule_components_excludes_explicit_isotopic_hydrogens():
     """RDKit keeps isotopic H as explicit graph atoms, unlike implicit H.
 
-    For DMSO-d6-style input GetNumHeavyAtoms() and GetAtoms() disagree, so a
-    partition over GetAtoms() breaks the documented "heavy atoms" contract.
-    Isotopes are a real, tracked category here (P-82), not a hypothetical.
+    For DMSO-d6-style input GetNumHeavyAtoms and GetAtoms disagree, so a
+    partition over GetAtoms breaks the documented "heavy atoms" contract.
+    Isotopes are a real, tracked category here, not a hypothetical.
     """
     mol = Chem.MolFromSmiles("[2H]C([2H])([2H])C([2H])([2H])O")
     comps = molecule_components(mol)
@@ -359,7 +359,7 @@ def test_aggregate_counts_tautomer_differences_apart_from_wrong_structures():
 
     The first baseline reported structure_wrong=2; both were mobile-H
     tautomers (a benzimidazole NH hop and a guanidine), adjudicated as correct
-    names. Mobile-H is ubiquitous, so folding tautomers into T3 would manufacture
+    names. Mobile-H is ubiquitous, so folding tautomers into would manufacture
     phantom 0-wrong violations on the project's #1 invariant.
     """
     rows = [
@@ -389,7 +389,7 @@ def test_aggregate_handles_empty_input_without_dividing_by_zero():
 
 
 def test_aggregate_carries_the_only_ranked_structure_into_the_summary():
-    """-T2 item 5: queryable from the run JSON without re-measuring.
+    """- item 5: queryable from the run JSON without re-measuring.
 
     The measurement costs ~675 s, so a census that lives only in stdout is a
     census whose numbers cannot be re-checked.
@@ -458,7 +458,7 @@ def test_residual_refusal_code_never_displaces_a_producer_attributed_site():
 
 
 def test_refusal_structure_attributes_every_uncoded_abstainer():
-    """T3 acceptance: unattributed abstainers -> 0, and a leftover is LOUD."""
+    """ acceptance: unattributed abstainers -> 0, and a leftover is LOUD."""
     rows = [_row("EMIT", "pin_verified"),
             {"outcome": "ABSTAIN", "refusal_codes": [],
              "limit_code": "UNSUPPORTED_ELEMENT", "smiles": "[Pd+2]"},
@@ -748,7 +748,7 @@ def test_terminal_attribution_never_leaks_between_consecutive_rows():
 
 
 def test_terminal_basis_is_refused_for_rows_measured_without_the_channel():
-    """A pre-T4 run must NOT silently census as an empty terminal basis.
+    """A pre- run must NOT silently census as an empty terminal basis.
 
     `aggregate` returns None for the terminal structure rather than a
     zero-looking one: an all-residual census over unstamped rows is

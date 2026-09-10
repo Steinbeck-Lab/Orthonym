@@ -1,20 +1,20 @@
 """terminal_fragment: an UNSATURATED replacement-chain substituent with DEFINED
 backbone C=C geometry now emits a leading (nE)/(nZ) descriptor instead of
-refusing (v30 internal-C=C acyl breadth lever).
+refusing (internal-C=C acyl breadth lever).
 
 The producer already names a stereo-FREE unsaturated backbone
 (``2-oxo-1-azapent-3-en-1-yl`` for ``-N-C(=O)-CH=CH-CH3``); the only blocker was
 ``_has_defined_stereo``, which refused any fragment with a defined double-bond
 configuration because the module emitted no stereodescriptor. It now emits one
-for a BACKBONE C=C (numbered from the free valence, P-29.2), so the amido /
+for a BACKBONE C=C (numbered from the free valence,, so the amido /
 acyloxy enamide + unsaturated-fatty-acyl class stops aborting the whole molecule.
 
 Every expected token below is OPSIN-round-trip-verified IN A PARENT (a bare
 token does not parse):
-  ``2-[(3E)-2-oxo-1-azapent-3-en-1-yl]acetic acid``      -> C/C=C/C(=O)NCC(=O)O
-  ``2-[(3Z)-2-oxo-1-azapent-3-en-1-yl]acetic acid``      -> C/C=C\\C(=O)NCC(=O)O
-  ``2-[(3E)-2-oxo-1-oxapent-3-en-1-yl]ethanol``          -> OCCOC(=O)/C=C/C
-  ``2-[(3E)-2-oxo-1-oxaoct-3-en-1-yl]ethanol``           -> OCCOC(=O)/C=C/CCCC
+  ``2-[(3E)-2-oxo-1-azapent-3-en-1-yl]acetic acid`` -> C/C=C/C(=O)NCC(=O)O
+  ``2-[(3Z)-2-oxo-1-azapent-3-en-1-yl]acetic acid`` -> C/C=C\\C(=O)NCC(=O)O
+  ``2-[(3E)-2-oxo-1-oxapent-3-en-1-yl]ethanol`` -> OCCOC(=O)/C=C/C
+  ``2-[(3E)-2-oxo-1-oxaoct-3-en-1-yl]ethanol`` -> OCCOC(=O)/C=C/CCCC
 
 Reached ONLY under ``allow_mancude`` (best-effort tier): the single caller,
 ``substituent_enumerator.py:2218``, sits inside ``if allow_mancude`` -> the PIN

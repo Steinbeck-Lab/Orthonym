@@ -1,12 +1,12 @@
-"""Ring-chalcogen oxide namer (P-25.6 / P-74.3.1.3, Wave-2 completion).
+"""Ring-chalcogen oxide namer /, Wave-2 completion).
 
 A NEUTRAL ring sulfur/selenium/tellurium bearing 1-2 exocyclic terminal =O
 is named additively on the intact ring parent — the S-oxide sibling of the
 established ``pyridine 1-oxide`` N-oxide path::
 
-    O=S1c2ccccc2-c2ccccc21        -> dibenzo[b,d]thiophene 5-oxide
-    O=S1(=O)c2ccccc2-c2ccccc21    -> dibenzo[b,d]thiophene 5,5-dioxide
-    O=S1CCCC1                     -> thiolane 1-oxide
+    O=S1c2ccccc2-c2ccccc21 -> dibenzo[b,d]thiophene 5-oxide
+    O=S1(=O)c2ccccc2-c2ccccc21 -> dibenzo[b,d]thiophene 5,5-dioxide
+    O=S1CCCC1 -> thiolane 1-oxide
 
 SCOPE (fail-closed, accuracy-first): a single oxidised ring chalcogen; every
 non-ring heavy atom of the molecule is one of its oxide oxygens (bare ring
@@ -32,13 +32,13 @@ _HW_RING_SIZES = frozenset(range(3, 11))
 
 
 def _name_sultone(mol) -> Optional[str]:
-    """P-65.6.3.5.2 sultone (method 1 = PIN): the intramolecular ester of a
+    """ sultone (method 1 = PIN): the intramolecular ester of a
     hydroxy sulfonic acid — a saturated monocyclic ring with an ester O adjacent
     to a ring S(=O)2 — named on the Hantzsch-Widman oxathiolane/oxathiane parent
     bearing the λ6 convention on the S and a ``-2,2-dione`` suffix::
 
-        O=S1(=O)CCCO1        -> 1,2lambda6-oxathiolane-2,2-dione
-        CC1CCCS(=O)(=O)O1    -> 3-methyl-1,2lambda6-oxathiane-2,2-dione
+        O=S1(=O)CCCO1 -> 1,2lambda6-oxathiolane-2,2-dione
+        CC1CCCS(=O)(=O)O1 -> 3-methyl-1,2lambda6-oxathiane-2,2-dione
 
     This is the PREFERRED form; the additive functional-class '1,2-oxathiolane
     2,2-dioxide' (method 3) is BB's explicit non-PIN alternative.
@@ -196,7 +196,7 @@ def name_ring_chalcogen_oxide(mol) -> Optional[str]:
     if mol is None:
         return None
 
-    # P-65.6.3.5.2 sultone (cyclic ester of a hydroxy sulfonic acid): the
+    # sultone (cyclic ester of a hydroxy sulfonic acid): the
     # λ6-dione PIN takes precedence over the additive '...dioxide' form.
     sultone = _name_sultone(mol)
     if sultone is not None:

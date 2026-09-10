@@ -1,5 +1,5 @@
 """
-Tests for stereo locant plumbing fixes (Phase 124-01).
+Tests for stereo locant plumbing fixes (a phase-01).
 
 Validates:
 - _generate_stereodescriptors accepts atom_to_locant_override parameter

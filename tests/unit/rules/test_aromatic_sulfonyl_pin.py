@@ -1,6 +1,6 @@
 """ a review-1 — ring-attached sulfone/sulfoxide substituent is the acid-stem PIN.
 
-P-65.3.1: a ring-attached ``R-SO2-`` / ``R-SO-`` substituent is named as the
+: a ring-attached ``R-SO2-`` / ``R-SO-`` substituent is named as the
 acid-stem oxide form (``methanesulfonyl`` / ``benzenesulfonyl`` / ``methanesulfinyl``),
 NOT the ``alkyl``+``sulfonyl`` concatenation (``methylsulfonyl``). The benzene-parent
 path already did this via name_chalcogen_oxide_substitutive; benzene.py's

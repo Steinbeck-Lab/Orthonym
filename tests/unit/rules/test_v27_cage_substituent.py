@@ -1,11 +1,11 @@
-"""v27 Phase 1 — unify parent/substituent recursion: von-Baeyer cages as `-yl`.
+""" a phase — unify parent/substituent recursion: von-Baeyer cages as `-yl`.
 
 Tests the new ``_universal_cage_substituent_name`` (routes a detached ring
 system through the audited ``analyze_cage_universal`` engine + free-valence
 numbering) and its opt-in wiring through ``name_substituent`` /
 ``get_ring_substituent_name`` behind ``allow_mancude``.
 
-Root-cause target (Blue Book P-29.2 / P-29.3.3-5): the cage engine names any
+Root-cause target (Blue Book / -5): the cage engine names any
 fused/bridged polycyclic as a PARENT; before P1 it was unreachable when the
 ring system is a SUBSTITUENT (``_vonbaeyer_substituent_name`` only handles a
 2-bridgehead bicyclo, ``_polycyclic_substituent_name`` then fails closed), so
@@ -70,9 +70,9 @@ def test_adamantane_cage_substituent():
     ``_vonbaeyer_substituent_name`` (not ``is_bicyclo_system``); the universal
     namer names it -- and for adamantane it must use the RETAINED PIN stem.
 
-    v30 P3-T1c: was ``"tricyclo[3.3.1.1^3,7]decan-2-yl"``.
-    **P-23.7 "RETAINED NAMES FOR VON BAEYER PARENT HYDRIDES"**
-    (``BlueBookV2/BlueBookV2.md:9879``): *"The retained names adamantane and
+    -T1c: was ``"tricyclo[3.3.1.1^3,7]decan-2-yl"``.
+    ** "RETAINED NAMES FOR VON BAEYER PARENT HYDRIDES"**
+    (``the Blue Book Blue Book``): *"The retained names adamantane and
     cubane are used in general nomenclature and as preferred IUPAC names."*
     Table 2.6 (``:9885``) prints *"adamantane (PIN) tricyclo[3.3.1.1^3,7]decane"*
     -- retained name PIN, descriptor the ALTERNATIVE. The LOCANT is unchanged (2,
@@ -106,7 +106,7 @@ def test_bicyclo_cage_substituent():
 # ---------------------------------------------------------------------------
 
 def test_bridgehead_ene_cage_substituent():
-    """The P-29.2 PIN skeleton: a bridgehead ene must keep its `n(m)` locant,
+    """The PIN skeleton: a bridgehead ene must keep its `n(m)` locant,
     the terminal `e` of the parent stem is elided before the `-yl` suffix, and
     the free-valence locant is cited."""
     sub, attach = _detach("C12(CCCCCCC(CCCCCC1)=C2)CCO")
@@ -149,7 +149,7 @@ def test_retained_aromatic_precedence_over_polyene():
 # ---------------------------------------------------------------------------
 
 def test_spiro_fragment_fails_closed():
-    """analyze_cage_universal refuses spiro (< 2 bridgeheads) — Phase 3 scope —
+    """analyze_cage_universal refuses spiro (< 2 bridgeheads) — a phase scope —
     so the universal cage namer abstains rather than guessing."""
     sub, attach = _detach("C1CCC2(C1)CCC(CC2)CCO")  # spiro[4.5]decane carrier
     assert _universal_cage_substituent_name(sub, attach, allow_mancude=False) is None
@@ -174,9 +174,9 @@ def test_name_substituent_default_declines_cage():
 def test_name_substituent_complete_names_cage():
     """Complete tier (``allow_mancude=True``): the cage substituent is named.
 
-    v30 P3-T1c: was ``"tricyclo[3.3.1.1^3,7]decan-2-yl"``; adamantane's retained
-    name is the PIN per **P-23.7 "RETAINED NAMES FOR VON BAEYER PARENT HYDRIDES"**
-    (``BlueBookV2/BlueBookV2.md:9879``, Table 2.6 at ``:9885``). Same locant, same
+    -T1c: was ``"tricyclo[3.3.1.1^3,7]decan-2-yl"``; adamantane's retained
+    name is the PIN per ** "RETAINED NAMES FOR VON BAEYER PARENT HYDRIDES"**
+    (``the Blue Book Blue Book``, Table 2.6 at ``:9885``). Same locant, same
     structure -- see ``test_adamantane_cage_substituent`` for the full
     justification and the OPSIN locant-equivalence evidence.
     """
@@ -189,9 +189,9 @@ def test_name_ring_system_substituent_threads_flag():
     """The FLAG THREADING is the property under test here -- ``allow_mancude=False``
     must decline and ``True`` must name -- so the route assertion stays.
 
-    v30 P3-T1c: the expected name was ``"tricyclo[3.3.1.1^3,7]decan-2-yl"``;
-    adamantane's retained name is the PIN per **P-23.7 "RETAINED NAMES FOR VON
-    BAEYER PARENT HYDRIDES"** (``BlueBookV2/BlueBookV2.md:9879``, Table 2.6 at
+    -T1c: the expected name was ``"tricyclo[3.3.1.1^3,7]decan-2-yl"``;
+    adamantane's retained name is the PIN per ** "RETAINED NAMES FOR VON
+    BAEYER PARENT HYDRIDES"** (``the Blue Book Blue Book``, Table 2.6 at
     ``:9885``). See ``test_adamantane_cage_substituent`` for the evidence.
     """
     mol, frag, attach = _ring_frag("C12C(C3CC(CC(C1)C3)C2)CCO")

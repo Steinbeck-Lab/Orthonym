@@ -4,7 +4,7 @@
 substituted aryl ring — including a BRANCHED alkyl bearing a CIP stereodescriptor
 (`4-[(1S)-1-chloroethyl]phenyl`), which the v1 simple-substituent table refused.
 This core feeds the O-linked (phenoxy, Task 3/4) and N-linked (N-aryl, Task 5/6)
-paths. BB P-45.6 (BlueBookV2.md:22585/22603), P-45.5.
+paths. BB (the Blue Book),.
 
 Fail-closed: an un-nameable ring substituent (nested ring) must return None so no
 partially-described / structure-dropping name can leak.

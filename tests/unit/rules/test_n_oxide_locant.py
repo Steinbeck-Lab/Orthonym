@@ -9,7 +9,7 @@ N is symmetry-equivalent, so "1" is unambiguous by construction). It is NOT
 harmless for a substituted, symmetry-broken diazine: the reduced parent's own
 independently-chosen numbering does not always place the oxidised nitrogen
 at position 1, so the hardcoded "1" produced a name with a real locant
-mismatch -- caught downstream by SELF-01 (different molecule) and demoted to
+mismatch -- caught downstream by (different molecule) and demoted to
 a total abstention, rather than degrading to a correct-but-uglier name.
 
 a trace: internal notes
@@ -25,9 +25,9 @@ from rdkit.Chem import inchi
 from orthonym import name_compound
 from orthonym.validation.opsin_roundtrip import opsin_parse
 
-# This module is directly ABOUT the OPSIN validity/SELF-01 gate's interaction
+# This module is directly ABOUT the OPSIN validity/ gate's interaction
 # with the N-oxide handler (the old hardcoded-locant bug was rescued from
-# 0-wrong only by SELF-01 catching the wrong molecule downstream -- see the
+# 0-wrong only by catching the wrong molecule downstream -- see the
 # a trace doc). Per tests/conftest.py's documented convention, the gate is
 # suite-wide OFF by default and must be explicitly re-enabled here, or the
 # "abstains honestly" / "was rescued to abstain" claims below would be
@@ -122,7 +122,7 @@ class TestAsymmetricRingNOxideNowNamesCorrectly:
         # confirming "1" is genuinely wrong here -- while opsin_parse(
         # "2-methylpyrazine 4-oxide") reparses back to THIS exact SMILES
         # (full InChIKey match). Before the fix this abstained entirely
-        # (SELF-01 caught the wrong-locant "2-methylpyrazine 1-oxide" and
+        # (caught the wrong-locant "2-methylpyrazine 1-oxide" and
         # suppressed it to the sentinel).
         smi = "Cc1c[n+]([O-])ccn1"
         name = name_compound(smi)

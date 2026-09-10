@@ -59,7 +59,7 @@ def test_best_effort_superset_of_complete_candidate_production():
         assert be[key] or not comp[key], key
 
 
-# Composer1 Task 5 regression: name_tiered's honest T5 "clean abstain"
+# Composer1 Task 5 regression: name_tiered's honest "clean abstain"
 # contract (name=None under general_fallback, see namer.name_tiered) was
 # shipped without updating cli.main's plain-text print branch, which did
 # `print(row["name"])` unconditionally -> printed the literal string
@@ -68,12 +68,12 @@ def test_best_effort_superset_of_complete_candidate_production():
 # disables the OPSIN validity gate for the whole test suite, so this
 # does not spawn an OPSIN subprocess/JVM).
 #
-# CHANGE-ASSERTED-VALUE UPDATE (T4 final review): this molecule was an
+# CHANGE-ASSERTED-VALUE UPDATE (final review): this molecule was an
 # abstainer when the test was written, but the best-effort engine has since
 # improved and now NAMES it (below). The naming is CORRECT, not a wrong
 # emission: the name OPSIN-parses back to the input's exact InChIKey
 # HCWJBNSAHCVPQL-UHFFFAOYSA-N (verified, scratchpad/verify_fix2.py -- identical
-# canonical SMILES). It is NOT a T4 emission -- T4 fires 0x for it, and the
+# canonical SMILES). It is NOT a emission -- fires 0x for it, and the
 # name carries a `-propanamide` principal-group suffix that T4's PG-suppressing
 # cascade structurally cannot produce; it is the pre-existing best-effort
 # engine. The two tests below now assert that verified named output. The CLI's

@@ -1,4 +1,4 @@
-"""v37 Task CT.2 — HW / partial-saturation heteromonocycle component namer.
+""".2 — HW / partial-saturation heteromonocycle component namer.
 
 Sub-lever C (cross-ref SP2.4a). Two signatures for a partially-saturated
 heteromonocycle spiro component:
@@ -8,7 +8,7 @@ heteromonocycle spiro component:
   (2) the ring unsaturation / spiro locant scrambled so the built name denotes
       a DIFFERENT constitution (the thiazoline ``C=N`` case).
 
-Root cause (VERIFIED CT.2 spy, HEAD 6ceb6a71): in the ``mixed-spiro-fused``
+Root cause (VERIFIED CT.2 trace, HEAD 6ceb6a71): in the ``mixed-spiro-fused``
 assembly path, ``_name_side_ring`` builds the component NAME via
 ``name_heterocycle`` (correct: ``4,5-dihydro-1,3-thiazole``) but takes the spiro
 locant from an INDEPENDENT ``_walk_side_ring_locants`` walk that can disagree

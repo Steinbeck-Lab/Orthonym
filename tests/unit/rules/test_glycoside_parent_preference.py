@@ -37,7 +37,7 @@ def _rt(smiles: str, name: str, full: bool) -> bool:
 
 def test_saponin_rows_emit_zero_wrong():
     # All three saponin tail rows EMIT a name (no abstention). Every emission is
-    # SELF-01 round-trip verified (0-wrong) by the pipeline itself, so a shipped
+    # round-trip verified (0-wrong) by the pipeline itself, so a shipped
     # name is never a wrong constitution. #11 additionally carries a 28-O-glycosyl
     # ESTER whose functional-class vs substitutive form is producer-arbitration-
     # dependent, so only its emission is asserted here.
@@ -50,7 +50,7 @@ def test_saponin_rows_emit_zero_wrong():
 
 def test_ether_glycosides_emit():
     # #12/#13 are pure ether-glycosides and reliably EMIT (never abstain). Every
-    # emission is SELF-01 round-trip gated (0-wrong). In isolation they emit the
+    # emission is round-trip gated (0-wrong). In isolation they emit the
     # full-stereo von-Baeyer aglycone-parent name and full-InChIKey round-trip
     # (see the module docstring); the exact winning producer, and thus whether the
     # full-stereo or a connectivity-only form ships, can vary with warm OPSIN-JVM

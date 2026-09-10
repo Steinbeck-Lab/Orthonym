@@ -1,20 +1,20 @@
-"""WS-A task 9 — point fixes H/F/G (among-rings gold reds, investigated
+""" task 9 — point fixes H/F/G (among-rings gold reds, investigated
 root causes; see the workflow findings in the task-9 session).
 
-H — cycloalkyl morphology: P-29.2 drops '-ane' entirely for carbocycles
+H — cycloalkyl morphology: drops '-ane' entirely for carbocycles
     (cyclododecyl), the old fallback kept 'an' ('cyclododecanyl') for every
     all-carbon monocycle >= 9. Hantzsch-Widman '-ane' heterocycles keep the
     final-'e' elision (azepanyl).
 
-F — P-14.5.2 chain-orientation alphabetical tie-break compared FABRICATED
+F — chain-orientation alphabetical tie-break compared FABRICATED
     carbon-count names (phenyl as 'hexyl', thiophen-2-yl as 'butyl'),
     inverting the locants of 1-phenyl-4-(thiophen-2-yl)butane-1,4-dione.
     Ring substituents now compare by their real cited prefix name.
 
 G — ketone PG-location semantics: the ketone SMARTS leads with a flanking
-    carbon and there is no exocyclic '-one' suffix (P-66.6.1), so an aryl
+    carbon and there is no exocyclic '-one' suffix, so an aryl
     ketone's PG was "on ring" and select_parent mis-parented
-    O=C(c1ccccc1)Cc1cnc[nH]1 to bare 'benzene'. PG_ATTACHMENT_INDICES gains
+    O=CCc1cnc[nH]1 to bare 'benzene'. PG_ATTACHMENT_INDICES gains
     the ketone family; on-ring checks are membership-only for skeletal
     suffixes.
 """
@@ -130,7 +130,7 @@ class TestKetonePGLocationProtect:
 
 @pytest.mark.unit
 class TestExocyclicDecorationPrefixGold:
-    """B — P-66.6.1.2: an exocyclic -CHO on a ring whose senior group is the
+    """B —: an exocyclic -CHO on a ring whose senior group is the
     acid must be 'formyl', never the ring-ketone 'oxo' (which describes a
     structurally DIFFERENT molecule)."""
 
@@ -184,11 +184,11 @@ class TestExocyclicDecorationProtect:
 
 @pytest.mark.unit
 class TestRingNitrogenNotAmineGold:
-    """E — P-66.6.1: a ring N is a skeletal heteroatom, never an amine FG.
+    """E —: a ring N is a skeletal heteroatom, never an amine FG.
     The amine SMARTS matched ring N, made it the principal group, and the
     amine emitter CUT the ring open ('N,N-dibutyl-N-cyclohexylcyclohexan-1-
     amine' for cyclohexylmorpholine). N-substituents on N-heterocycles cite
-    the numeric ring locant (PIN, P-14.3.2)."""
+    the numeric ring locant (PIN,."""
 
     def test_cyclohexylmorpholine(self):
         assert (
@@ -218,9 +218,9 @@ class TestRingNitrogenNotAmineGold:
 class TestRingNitrogenNotAmineProtect:
     """Acyclic amines and bare N-heterocycle parents must not move."""
 
-    # v22 Phase B (DD1 Fix 4 / H5): triethylamine/trimethylamine are
+    # Phase B (DD1 Fix 4 / H5): triethylamine/trimethylamine are
     # general-nomenclature functional-class names; the PINs are the substitutive
-    # forms (P-62.2.1.2). The ethane amine-suffix locant is elided per P-14.3.4.4
+    # forms. The ethane amine-suffix locant is elided per
     # ('ethanamine' not 'ethan-1-amine'), matching 'ethanol'/'ethanethiol'.
     CASES = [
         ("CCN(CC)CC", "N,N-diethylethanamine"),
@@ -241,7 +241,7 @@ class TestRingNitrogenNotAmineProtect:
 @pytest.mark.unit
 class TestEsterChainAcidWithRingGold:
     """Ester acid-part routing: 'Xcarboxylate' applies ONLY when the
-    carbonyl C is directly bonded to the ring (P-65.1.7); a ring further
+    carbonyl C is directly bonded to the ring; a ring further
     down the chain makes it a chain acid with a ring substituent."""
 
     def test_methyl_cyclohexylbutanoate(self):
@@ -276,7 +276,7 @@ class TestEsterChainAcidWithRingGold:
 
 @pytest.mark.unit
 class TestNoPGReplacementChainGold:
-    """P-44.3 + P-51.4/P-15.4: with no PG, a heteroatom skeletal chain
+    """ + /: with no PG, a heteroatom skeletal chain
     admissible for replacement nomenclature (>=4 hetero units) is senior to
     an all-carbon ring, and the chain stem cites the oxa locants."""
 
@@ -290,6 +290,6 @@ class TestNoPGReplacementChainGold:
         assert name_compound("CCCCOC1CCCCC1").strip() == "butoxycyclohexane"
 
     def test_hydrocarbon_ring_seniority_protect(self):
-        # DEF-1 (Phase 171): heptylbenzene, never 1-phenylheptane.
+        # (a phase): heptylbenzene, never 1-phenylheptane.
         assert name_compound("CCCCCCCc1ccccc1").strip() == "heptylbenzene"
         assert name_compound("CCCCCCCCCC1CCCCC1").strip() == "nonylcyclohexane"

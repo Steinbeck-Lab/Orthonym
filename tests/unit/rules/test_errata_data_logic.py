@@ -1,5 +1,5 @@
 """
-Tests for IUPAC Blue Book errata corrections applied in Phase 137.
+Tests for IUPAC Blue Book errata corrections applied in a phase.
 
 Covers:
 - ERRATA-01: Expanded heteroatom seniority tables (20 elements)
@@ -17,7 +17,7 @@ import pytest
 
 
 # ============================================================================
-# ERRATA-01: Heteroatom seniority expansion (P-18(b) + P-44.2.1)
+# ERRATA-01: Heteroatom seniority expansion (b) +
 # ============================================================================
 
 
@@ -44,7 +44,7 @@ class TestErrataHeteroatomSeniority:
         assert set(_HETEROATOM_SENIORITY.keys()) == expected
 
     def test_seniority_ordering_p18b(self):
-        """P-18(b) ordering: N > P > As > Sb > Bi > Si > Ge > Sn > Pb > B > Al > Ga."""
+        """(b) ordering: N > P > As > Sb > Bi > Si > Ge > Sn > Pb > B > Al > Ga."""
         from orthonym.rules.ring_selection import _HETEROATOM_SENIORITY
 
         p18b_order = ['N', 'P', 'As', 'Sb', 'Bi', 'Si', 'Ge', 'Sn', 'Pb', 'B', 'Al', 'Ga']
@@ -57,7 +57,7 @@ class TestErrataHeteroatomSeniority:
             )
 
     def test_seniority_halogens_preserved(self):
-        """Halogens must remain in seniority dict for P-44.2.1 ring comparison."""
+        """Halogens must remain in seniority dict for ring comparison."""
         from orthonym.rules.ring_selection import _HETEROATOM_SENIORITY
 
         for halogen in ['F', 'Cl', 'Br', 'I']:
@@ -80,10 +80,10 @@ class TestErrataHeteroatomSeniority:
         assert set(_HETEROATOM_VARIETY_ORDER) == set(_HETEROATOM_SENIORITY.keys())
 
     def test_variety_order_in_seniority_order(self):
-        """_HETEROATOM_VARIETY_ORDER uses P-44.2.1.8 criterion (g) order, NOT P-18(b).
+        """_HETEROATOM_VARIETY_ORDER uses criterion (g) order, NOT (b).
 
-        P-44.2.1.8 criterion (g): F>Cl>Br>I>O>S>Se>Te>N>P>... (halogens first).
-        This differs from _HETEROATOM_SENIORITY (P-18(b), N most senior).
+         criterion (g): F>Cl>Br>I>O>S>Se>Te>N>P>... (halogens first).
+        This differs from _HETEROATOM_SENIORITY (b), N most senior).
         They serve different selection criteria. See Wave 1 R9 fix.
         """
         from orthonym.rules.ring_selection import (
@@ -94,7 +94,7 @@ class TestErrataHeteroatomSeniority:
         assert set(_HETEROATOM_VARIETY_ORDER) == set(_HETEROATOM_SENIORITY.keys()), (
             "VARIETY_ORDER element set must match SENIORITY keys"
         )
-        # P-44.2.1.8: first element is F, N comes after Te.
+        #: first element is F, N comes after Te.
         assert _HETEROATOM_VARIETY_ORDER[0] == 'F', (
             f"P-44.2.1.8: VARIETY_ORDER[0] must be 'F', got '{_HETEROATOM_VARIETY_ORDER[0]}'"
         )
@@ -116,7 +116,7 @@ class TestErrataHWPriority:
         assert 'Ga' in HETEROATOM_PRIORITY, "Ga must be in HETEROATOM_PRIORITY"
 
     def test_hw_priority_ordering_preserved(self):
-        """HW ordering: O>S>Se>Te>N>P>As>Sb>Bi>Si>Ge>Sn>Pb>B>Al>Ga (NOT P-18(b) order)."""
+        """HW ordering: O>S>Se>Te>N>P>As>Sb>Bi>Si>Ge>Sn>Pb>B>Al>Ga (NOT (b) order)."""
         from orthonym.data.hw_heteroatoms import HETEROATOM_PRIORITY
 
         hw_order = ['O', 'S', 'Se', 'Te', 'N', 'P', 'As', 'Sb', 'Bi',

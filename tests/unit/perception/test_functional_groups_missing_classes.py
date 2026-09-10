@@ -1,7 +1,7 @@
-"""Phase 169.7 BBR-PERC / DEF-2 — previously-missing neutral classes.
+"""a phase BBR-PERC / — previously-missing neutral classes.
 
-Hydroxylamine (P-68.3), selenide/telluride/tellurol (P-63.6), and the free
-inorganic oxoacids (P-67) were silently dropped or mis-cast before 169.7.
+Hydroxylamine, selenide/telluride/tellurol, and the free
+inorganic oxoacids were silently dropped or mis-cast before 169.7.
 Each new SMARTS ships with positive + negative tests (the broadening-SMARTS
 false-positive guard per MEMORY feedback_smarts_and_seniority).
 """
@@ -41,7 +41,7 @@ def test_hydroxylamine_negatives(smi):
 
 @pytest.mark.unit
 def test_hydroxylamine_naming(namer):
-    # gold DEF-5 target
+    # gold target
     assert namer.name("CCCNO") == "N-propylhydroxylamine"
     assert namer.name("CN(C)O") == "N,N-dimethylhydroxylamine"
 
@@ -67,7 +67,7 @@ def test_chalcogen_ether_negatives(smi):
 
 @pytest.mark.unit
 def test_selenide_ships_and_round_trips(namer):
-    # 169.7 delivered perception + (methylselanyl) naming + locant; Phase 171 BBR-ASM
+    # 169.7 delivered perception + (methylselanyl) naming + locant; a phase BBR-ASM
     # added the gold-exact enclosing parens (selanyl/tellanyl now classed complex).
     from orthonym.validation.opsin_roundtrip import opsin_roundtrip_check
     name = namer.name("CCC[Se]C")
@@ -75,7 +75,7 @@ def test_selenide_ships_and_round_trips(namer):
     assert opsin_roundtrip_check("CCC[Se]C", name)["passed"]
 
 
-# --- free inorganic oxoacids (perceived; naming is P-67, downstream) ---
+# --- free inorganic oxoacids (perceived; naming is, downstream) ---
 @pytest.mark.unit
 @pytest.mark.parametrize("smi,fg", [
     ("OP(=O)(O)O", "phosphoric_acid"),
@@ -89,7 +89,7 @@ def test_free_oxoacids_perceived(smi, fg):
 
 @pytest.mark.unit
 def test_carbonic_acid_not_carboxylic(namer):
-    # HO-C(=O)-OH is a P-65.2.1 functional parent, NOT a carboxylic acid
+    # HO-C(=O)-OH is a functional parent, NOT a carboxylic acid
     assert "carboxylic_acid" not in _fgs("OC(=O)O")
     # a real carboxylic acid is unaffected
     assert "carboxylic_acid" in _fgs("CC(=O)O") and "carbonic_acid" not in _fgs("CC(=O)O")

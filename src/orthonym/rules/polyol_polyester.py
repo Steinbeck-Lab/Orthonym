@@ -1,22 +1,22 @@
-"""Best-effort T4 producer for the acyclic polyol / polyether / polyester class.
+"""Best-effort producer for the acyclic polyol / polyether / polyester class.
 
 The composer names a pure polyol (`1,5,6-tris(2,3-dihydroxypropoxy)hexane-2,3,4-triol`)
 cleanly because its only characteristic group is the alcohol. When the SAME polyol
-carries one or more esters (v30 tail #21, a hexitol tris-methacrylate), the ester
-is senior (P-41), so parent selection commits to the ester and `name_ester`
+carries one or more esters (tail #21, a hexitol tris-methacrylate), the ester
+is senior, so parent selection commits to the ester and `name_ester`
 LINEARISES the 23-carbon polyol OR side into a wrong 'tricosyl 2-methylpropanoate'
-(SELF-01-suppressed), and the multiplicative-ester PIN neither reference builds.
+(-suppressed), and the multiplicative-ester PIN neither reference builds.
 
-This producer supplies the T4 degrade P-65.6.3.2 method (2) licenses: DEMOTE every
+This producer supplies the degrade method (2) licenses: DEMOTE every
 ester to an ``(Racyloxy)`` prefix, choose the polyol carbon chain as the parent, and
 cite the free hydroxyls as the ``-ol`` suffix -- a valid, round-trippable
 (non-PIN) systematic name:
 
     1,5,6-tris[2-hydroxy-3-(2-methylprop-2-enoyloxy)propoxy]hexane-2,3,4-triol
 
-It runs ONLY on the best-effort T4 lane (after the PIN/ester path has abstained),
+It runs ONLY on the best-effort lane (after the PIN/ester path has abstained),
 each emission E1-covered by construction (every atom is bound to the parent, a
-free-OH suffix, or a named arm) and SELF-01 round-trip verified downstream, so the
+free-OH suffix, or a named arm) and round-trip verified downstream, so the
 0-wrong net is unchanged.
 
 Scope (fail closed -> None outside it): a SINGLE acyclic component whose only
@@ -36,7 +36,7 @@ from rdkit import Chem
 
 
 def name_acyclic_polyol_polyester(mol) -> Optional[str]:
-    """Return the T4 polyol-polyester name for ``mol`` or ``None`` (fail closed)."""
+    """Return the polyol-polyester name for ``mol`` or ``None`` (fail closed)."""
     if mol is None or mol.GetNumAtoms() == 0:
         return None
     ri = mol.GetRingInfo()
@@ -54,12 +54,12 @@ def name_acyclic_polyol_polyester(mol) -> Optional[str]:
         return None
 
     # --- Classify every oxygen. ---
-    # free_oh[core_c]           -> a -OH on that core carbon
-    # ether_arm[(core_c, o)]    -> a bridging ether O to an arm (alkoxy prefix)
-    # acyloxy[(core_c, o, cc)]  -> an -O-C(=O)- ester (acyloxy prefix)
+    # free_oh[core_c] -> a -OH on that core carbon
+    # ether_arm[(core_c, o)] -> a bridging ether O to an arm (alkoxy prefix)
+    # acyloxy[(core_c, o, cc)] -> an -O-C(=O)- ester (acyloxy prefix)
     # Any oxygen that does not fit exactly one role -> decline.
     # --- Ester carbonyl carbons (-C(=O)-O-): excluded from the parent carbon
-    #     skeleton so an arm's ester O separates the arm from the core cleanly. ---
+    # skeleton so an arm's ester O separates the arm from the core cleanly. ---
     def _is_ester_carbonyl(a) -> bool:
         if a.GetSymbol() != 'C':
             return False
@@ -114,9 +114,9 @@ def name_acyclic_polyol_polyester(mol) -> Optional[str]:
         return None  # branched core beyond a single chain -> decline (v1)
 
     # --- Classify EACH CORE CARBON's own substituents. Arm-internal oxygens
-    #     (an -OH or ester INSIDE an arm) are named by name_substituent on the
-    #     arm, never classified here -- only the O directly bonded to a core
-    #     carbon is a core role (suffix -ol / alkoxy prefix / acyloxy prefix). ---
+    # (an -OH or ester INSIDE an arm) are named by name_substituent on the
+    # arm, never classified here -- only the O directly bonded to a core
+    # carbon is a core role (suffix -ol / alkoxy prefix / acyloxy prefix). ---
     core_set = set(core)
     prefix_on: Dict[int, List[str]] = {}
     suffix_carbons: Set[int] = set()
@@ -265,7 +265,7 @@ def _acyloxy_name(mol, carbonyl_c: int, ester_o: int) -> Optional[str]:
 def _number_parent(parent: List[int], suffix_carbons: Set[int],
                    prefix_on: Dict[int, List[str]]) -> Optional[Dict[int, int]]:
     """Return atom->locant for the numbering that gives the -ol suffix set the
-    lowest locants (P-31.1.4), tie-broken by the prefix set."""
+    lowest locants, tie-broken by the prefix set."""
     def score(order):
         pos = {a: i + 1 for i, a in enumerate(order)}
         suf = sorted(pos[a] for a in suffix_carbons)

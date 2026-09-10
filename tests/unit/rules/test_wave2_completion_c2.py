@@ -3,17 +3,17 @@
 All expected names OPSIN-RT verified. Covers:
   * organometallic silane ligand extension: O-attached (R-oxy) + branched
     alkyl ligands via the substituent chokepoint, with join enclosing marks
-    (P-44.1.2 Si-senior parents).
+     Si-senior parents).
   * decorated-aryloxy recognizer + locant-blind decomposition-join decline
-    (P-45.2.1 2-(3-cyanophenoxy)-4-(propan-2-yl)benzonitrile BB verbatim).
+     2-(3-cyanophenoxy)-4-(propan-2-yl)benzonitrile BB verbatim).
   * isothiocyanate/isocyanate attach-via-N guard + enclosing marks
-    (P-15.2.1.1 (isothiocyanatomethyl)benzene BB verbatim).
+     (isothiocyanatomethyl)benzene BB verbatim).
   * O-attach recursion in name_substituent_fragment (one-level nested
     alkoxy; deeper nesting fails closed).
-  * carbonic-family composite-N exact-SMILES rows (P-66.4.1.5/.2.2/.3.3).
-  * isocyanide prefix-only principal (P-61.9 isocyanomethane).
-  * nitroso N-branch recognizer (P-61.5.2 N-methyl-N-nitrosourea BB verbatim).
-  * mixed primary+secondary diamine union (P-62.2.4.1.2).
+  * carbonic-family composite-N exact-SMILES rows /.2.2/.3.3).
+  * isocyanide prefix-only principal isocyanomethane).
+  * nitroso N-branch recognizer N-methyl-N-nitrosourea BB verbatim).
+  * mixed primary+secondary diamine union.
 """
 
 import pytest
@@ -99,7 +99,7 @@ class TestNestedAlkoxy:
         assert name_compound(smiles) == expected
 
     def test_depth_two_heals(self, _validity_gate_on):
-        # Wave2-P1ChainsA Task 12 (P-57.1.6.2 / P-46.1.3): the get_alkoxy_prefix
+        # Wave2-P1ChainsA Task 12 /: the get_alkoxy_prefix
         # + _name_ether_substituted_chain recursion now expresses depth-2 nesting
         # for an ether-bearing R side. -O-CH2-O-CH2-O-CH3 on heptadecane-C9 ->
         # '9-[(methoxymethoxy)methoxy]heptadecane' (OPSIN-RT verified). Was
@@ -144,7 +144,7 @@ class TestNitrosoUrea:
 
     @pytest.mark.parametrize("smiles,expected", [
         ("NC(N)=O", "urea"),
-        # Monosubstituted urea omits the italic-N locant (P-14.3.4.3,:2943);
+        # Monosubstituted urea omits the italic-N locant,:2943);
         # the disubstituted form keeps both (:33327).
         ("CNC(N)=O", "methylurea"),
         ("CNC(=O)NC", "N,N'-dimethylurea"),
@@ -156,8 +156,8 @@ class TestNitrosoUrea:
 @pytest.mark.unit
 class TestMixedDiamines:
     @pytest.mark.parametrize("smiles,expected", [
-        # a phase Thread A (P-62.2.4.1.2, the Blue Book) + the low-locant
-        # tie-break (P-31.1.4.3.4 / P-14.5.2): a single N-substituent on a
+        # a phase Thread A, the Blue Book) + the low-locant
+        # tie-break /: a single N-substituent on a
         # symmetric terminal diamine takes numeric-superscript N1 (the reversal
         # is a legal tie-break that gives the cited prefix the lowest locant),
         # not the non-lowest N2/N3 the old numbering left. Each still OPSIN
@@ -172,7 +172,7 @@ class TestMixedDiamines:
     @pytest.mark.parametrize("smiles,expected", [
         ("NCCCN", "propane-1,3-diamine"),
         ("NCCN", "ethane-1,2-diamine"),
-        # a phase Thread A (P-62.2.4.1.2, the Blue Book): simple
+        # a phase Thread A, the Blue Book): simple
         # polyamines use numeric-superscript italic-N locants, not bare primes.
         ("CNCCNC", "N1,N2-dimethylethane-1,2-diamine"),
         ("CCNCCCNC", "N1-ethyl-N3-methylpropane-1,3-diamine"),
@@ -185,7 +185,7 @@ class TestMixedDiamines:
         assert name_compound(smiles) == expected
 
     def test_complex_polyamine_now_heals(self, _validity_gate_on):
-        # NC-10 (P-62.2.4.1.3 parent-choice cascade) HEALED in Wave-3: the
+        # parent-choice cascade) HEALED in Wave-3: the
         # polyamine parent-selection now emits the exact Blue Book PIN
         # (BBv2 L26381 'N1-(aminomethyl)ethane-1,2-diamine (PIN)'); OPSIN-RT
         # clean. Was previously fail-closed (deferred) — no longer.

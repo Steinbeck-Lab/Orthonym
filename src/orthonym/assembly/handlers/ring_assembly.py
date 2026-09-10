@@ -1,14 +1,14 @@
-"""Phase 160 ring_assembly handler — direct-return shim.
+"""a phase ring_assembly handler — direct-return shim.
 
 1-line wrapper around ``rules.ring_assemblies.name_ring_assembly``. Verbatim
 move of composer.py:979-993 dispatch logic.
 
-IUPAC cite: P-28 (ring assemblies / biaryls / multi-ring linked systems).
+IUPAC cite: (ring assemblies / biaryls / multi-ring linked systems).
 
 References:
 - composer.py:979-993 (inline ring_assembly branch; REMOVED at this commit).
 - rules.ring_assemblies.name_ring_assembly — chemical-logic body.
-- 160-AUDIT-DECOMP.md § 1 row 'ring_assembly' + § 2.24 purity proof.
+- internal notes-DECOMP.md row 'ring_assembly' + purity proof.
 """
 from __future__ import annotations
 
@@ -60,7 +60,7 @@ def name_ring_assembly(
 
     pool = get_current_pool()
     pool.add(assembly_name, "ring_assembly", features)
-    # composer.py:993 inline: _inject_stereo_if_missing(features, pool.best().name)
+    # composer.py:993 inline: _inject_stereo_if_missing(features, pool.best.name)
     final_name = _inject_stereo_if_missing(features, pool.best().name)
     return NamingResult(
         name=final_name,

@@ -1,6 +1,6 @@
 """ a phase: diacylglycerol-shape ester-vs-hydroxy parent-selection fix.
 
-the Blue Book P-41 Table 4.1 "General compound classes listed in decreasing
+the Blue Book "General compound classes listed in decreasing
 order of seniority" (:18158+): class 9 Esters -- "functional class names are
 given to noncyclic esters" -- outranks class 17 Hydroxy compounds. A
 partially-esterified acyclic polyol carrying >=2 DIFFERENT noncyclic esters
@@ -12,7 +12,7 @@ an 'acyloxy' prefix and the free -OH to 'hydroxy' -- never by the junior
 Bug + derivation: internal notes.
 Fix site: `rules/esters.py::name_polyfunctional_diester_free_hydroxy`, wired
 into `rules/polyfunctional.py::name_polyfunctional` just before the legacy
-EL-02 ester-demotion fallback.
+ ester-demotion fallback.
 """
 import pytest
 from rdkit import Chem
@@ -48,11 +48,11 @@ WITNESS_INCHIKEY = "OALWFBDEUFFROY-KBMTVBSSSA-N"
 
 
 def test_diacylglycerol_unsaturated_asymmetric_names_by_senior_ester():
-    """The senior (C18, more carbons -- P-44.3) acid stays the '...oate'
+    """The senior (C18, more carbons -- acid stays the '...oate'
     parent; the junior C15 acid demotes to an acyloxy prefix; the free -OH
     is a hydroxy prefix. Before the fix this named
     '(2S)-2-[(9Z)-octadec-9-enoyloxy]-1-[(9Z)-pentadec-9-enoyloxy]propan-3-ol'
-    -- the junior hydroxy class promoted to principal, inverting P-41."""
+    -- the junior hydroxy class promoted to principal, inverting."""
     assert inchi.MolToInchiKey(Chem.MolFromSmiles(WITNESS)) == WITNESS_INCHIKEY
 
     name = Orthonym().name(WITNESS)
@@ -82,7 +82,7 @@ def test_1_3_diacylglycerol_different_acyls_names_by_senior_ester():
     an acyloxy prefix; the free -OH is a hydroxy prefix. This exercises the
     TERMINAL-attachment (k=1, plain 'propyl', no 'an-k-yl' locant) branch of
     the new numbering, complementing the witness's non-terminal (k=2,
-    'propan-2-yl') branch -- P-65.6.3.3.4.2's own worked example
+    'propan-2-yl') branch -- 's own worked example
     ('2-(acetyloxy)ethyl methyl butanedioate (PIN)') is exactly this shape."""
     smi = "CC(=O)OCC(O)COC(=O)CCCCC"
     name = Orthonym().name(smi)
@@ -92,7 +92,7 @@ def test_1_3_diacylglycerol_different_acyls_names_by_senior_ester():
 
 def test_1_3_diacylglycerol_identical_acyls_stays_multiplicative_diyl_form():
     """Regression lock, NOT a target of this fix: two IDENTICAL acyl groups
-    (hexanoate + hexanoate) + a free -OH is P-65.6.3.3.4.1's own symmetric
+    (hexanoate + hexanoate) + a free -OH is 's own symmetric
     multiplicative form ('di<acid>oate' on a decorated diyl group), produced
     by the pre-existing `rules.lipids.name_lipid` path -- it never reaches
     `name_polyfunctional_diester_free_hydroxy` at all (that function

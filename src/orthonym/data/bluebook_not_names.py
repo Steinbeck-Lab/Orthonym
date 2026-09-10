@@ -1,28 +1,28 @@
 """Blue Book tier-3 corpus: names the Blue Book marks ``not`` (discarded).
 
-GENERATED — do not hand-edit.  Regenerate with::
+GENERATED — do not hand-edit. Regenerate with::
 
     .venv/bin/python scripts/extract_bluebook_not_corpus.py \
         --out src/orthonym/data/bluebook_not_names.py
 
-Authority: ``BlueBookV2/BlueBookV2.md``, the sole PIN authority for this repo.
+Authority: ``the Blue Book Blue Book``, the sole PIN authority for this repo.
 
-    BB:1982 — P-16.1 — "All preferred IUPAC names for organic compounds are
+    the Blue Book — — "All preferred IUPAC names for organic compounds are
     identified by the parenthetical abbreviation '(PIN)' following the name.
     **Names used in the past, but now discarded or no longer recommended, are
     placed in parentheses and preceded by the word 'not'.**"
 
-These are therefore NOT merely non-preferred: BB:1938 grants unmarked
+These are therefore NOT merely non-preferred: the Blue Book grants unmarked
 alternatives the status of a "general IUPAC name", while a ``not``-marked name
 is "discarded or no longer recommended" and has no acceptable status at all.
 Emitting one is an accuracy defect, so ``rules.parent_ranking`` uses this table
 as a fail-closed veto on general-nomenclature fall-through emissions.
 
-The table is an EXACT-MATCH veto over lowercase/whitespace-collapsed names.  It
+The table is an EXACT-MATCH veto over lowercase/whitespace-collapsed names. It
 may only ever suppress, so every extraction compromise is in the safe direction:
 rows damaged by OCR or surviving markup are DROPPED (a false negative — the veto
 does not fire), never loosened into a prefix or substring match (which could
-veto a correct name).  See the extractor's docstring for the four hazards.
+veto a correct name). See the extractor's docstring for the four hazards.
 
 Counts at generation time: candidates=839, dropped_prose=17, dropped_short=2, raw_clauses=837, unique_unusable_markup_or_ocr=68, unique_usable=718
 """

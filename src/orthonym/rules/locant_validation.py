@@ -13,7 +13,7 @@ Key problem addressed:
     suffix and prefix locants colliding on the same atom (e.g., ketone at C-3
     and chloro at C-3 on cyclohexanone producing an impossible valence).
 
-Reference: IUPAC 2013 Blue Book, P-14.4, P-31.1
+Reference: IUPAC 2013 Blue Book,,
 """
 
 from typing import Any, List, Optional, Tuple
@@ -69,7 +69,7 @@ def detect_locant_collisions(
 
     A collision occurs when a suffix locant (functional group position) and
     a prefix locant (substituent position) share the same numeric value on
-    a **ring** system.  On chains, suffix and prefix atoms at the same
+    a **ring** system. On chains, suffix and prefix atoms at the same
     locant number can coexist (different chemistry), so chain systems are
     skipped entirely.
 
@@ -78,7 +78,7 @@ def detect_locant_collisions(
             group suffix (e.g., [1] for cyclohexan-1-one).
         prefix_locant_groups: List of locant lists, one per prefix substituent
             group (e.g., [[3], [5]] for 3-chloro-5-methyl-).
-        parent_type: ``"ring"`` or ``"chain"``.  Chain systems skip detection.
+        parent_type: ``"ring"`` or ``"chain"``. Chain systems skip detection.
         parent_size: Number of atoms in the parent (currently informational;
             reserved for future resolution strategies).
 
@@ -90,7 +90,7 @@ def detect_locant_collisions(
         >>> detect_locant_collisions([3], [[3]], parent_type="ring", parent_size=6)
         [(0, 3)]
         >>> detect_locant_collisions([1], [[3]], parent_type="chain", parent_size=5)
-        []
+        
     """
     if parent_type != "ring":
         return []
@@ -122,7 +122,7 @@ def validate_stereo_locants(
     - Locant (if integer) exceeds parent_size
 
     String locants like ``'4a'`` are kept if their numeric base
-    (leading digits) parses to a value <= parent_size.  This covers
+    (leading digits) parses to a value <= parent_size. This covers
     fused ring systems where positional labels include letter suffixes.
 
     Args:
@@ -157,7 +157,7 @@ def reconcile_multiplier_count(
     Ensure multiplier count matches locant count.
 
     OPSIN requires exact agreement between the multiplier prefix
-    (di, tri, tetra) and the number of locants cited.  This function
+    (di, tri, tetra) and the number of locants cited. This function
     forces them to agree by using ``len(locants)`` as the canonical
     count.
 
@@ -175,7 +175,7 @@ def reconcile_multiplier_count(
     Examples:
         >>> reconcile_multiplier_count(count=3, locants=[1, 3])
         2
-        >>> reconcile_multiplier_count(count=2, locants=[])
+        >>> reconcile_multiplier_count(count=2, locants=)
         2
     """
     if not locants:
@@ -210,7 +210,7 @@ def _is_valid_locant(locant: Any, parent_size: int) -> bool:
             return 0 < base_num <= parent_size
         return False
 
-    # v36-A2: a PRIMED multi-component locant (n, "'"/"''") — the 2nd component
+    # -A2: a PRIMED multi-component locant (n, "'"/"''") — the 2nd component
     # of a spiro/fused name (e.g. (11, "'") for the tricyclo side of
     # spiro[oxolane-2,12'-tricyclo…]). It is numbered by its OWN component's
     # namer, so it must NOT be range-checked against parent_size, which reflects
@@ -237,7 +237,7 @@ def _extract_base_number(locant_str: str) -> Optional[int]:
         4
         >>> _extract_base_number('10b')
         10
-        >>> _extract_base_number('abc')  # no leading digits
+        >>> _extract_base_number('abc') # no leading digits
     """
     digits = []
     for ch in locant_str:

@@ -1,10 +1,10 @@
-"""W2F-P10 (P-25.5.3): polycomponent fusion + metheno-bridge parent ring systems.
+"""W2F-P10: polycomponent fusion + metheno-bridge parent ring systems.
 
 These fused/bridged PARENT ring systems are cataloged in POLYCYCLIC_DATA with
 OPSIN-authoritative numbering (the same curated-catalog mechanism as the sibling
-dinaphtho[1,2-c:2',1'-m]picene entry; a general P-25.3/P-25.5 orientation engine
+dinaphtho[1,2-c:2',1'-m]picene entry; a general / orientation engine
 is not built). Bare compounds match by exact canonical SMILES; substituted
-derivatives use the stored numbering. Also locks the P-16.3.3 fix that sets a
+derivatives use the stored numbering. Also locks the fix that sets a
 digit-initial parent stem off from a letter-ending substituent prefix with a
 hyphen.
 
@@ -17,13 +17,13 @@ from orthonym.namer import name_compound
 
 # Canonical SMILES -> expected PIN (the Blue Book for the full target)
 BARE = {
-    # single first-order attached component (P-25.3.1)
+    # single first-order attached component
     "c1ccc2cc3c(ccc4cc5ccc6cc7ccccc7cc6c5cc43)cc2c1":
         "naphtho[2,3-a]pentaphene",
-    # two identical attached components on pentaphene (P-25.3.4.1.2) — the core
+    # two identical attached components on pentaphene — the core
     "c1ccc2cc3c(ccc4cc5ccc6cc7ccc8cc9ccccc9cc8c7cc6c5cc43)cc2c1":
         "dinaphtho[2,3-a:2',3'-o]pentaphene",
-    # full P-25.5.3 target: di(metheno) bridges over the core
+    # full target: di(metheno) bridges over the core
     "c1cc2cc3ccc4cc5ccc6cc7ccc8cc9ccc%10cc1c1cc%10c9cc8c7cc6c5cc4c3cc21":
         "12,19:13,18-di(metheno)dinaphtho[2,3-a:2',3'-o]pentaphene",
 }
@@ -58,7 +58,7 @@ def test_full_target_substituent_hyphen():
 
 @pytest.mark.unit
 def test_regression_digit_initial_parent_hyphen():
-    """The same P-16.3.3 fix corrects the pre-existing '2-methyl9,10-...' bug."""
+    """The same fix corrects the pre-existing '2-methyl9,10-...' bug."""
     # 2-methyl-9,10-dihydroanthracene
     assert name_compound("CC1=CC=2CC3=CC=CC=C3CC2C=C1") == \
         "2-methyl-9,10-dihydroanthracene"
@@ -73,6 +73,6 @@ def test_letter_initial_parent_unchanged():
 
 # NB: the fail-closed boundary for uncataloged polycomponent systems (e.g.
 # dibenzo[a,c]anthracene) is locked by the W2F-P10 `protect` gold in
-# benchmarks/the gold set/packs/rings_numbering.json — it relies on the SELF-01
+# benchmarks/the gold set/packs/rings_numbering.json — it relies on the
 # OPSIN round-trip gate and so is exercised in the OPSIN-backed the gold set eval,
 # not in this OPSIN-free unit module.

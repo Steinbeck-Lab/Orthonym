@@ -1,16 +1,16 @@
-"""F-T6 (DD3) — charged-species suffix generalization, rule-family coverage.
+"""F- (DD3) — charged-species suffix generalization, rule-family coverage.
 
 Tests the OUTPUT of the whole class (A8: not literal canary rows), via the public
-``Orthonym().name`` surface so the routing + emitter + suffix composition are all
+``Orthonym.name`` surface so the routing + emitter + suffix composition are all
 exercised end to end:
 
-  * P-73.1.1.2 ring-N -ium (protonated + N-substituted aromatic demote) with
+  * ring-N -ium (protonated + N-substituted aromatic demote) with
     'e' elision and the cationic-centre locant.
-  * P-72.2.2.1 ring carbanion -ide.
-  * P-72.2.2.1 acyclic Group-14/15 heteroatom -ide (P/As/Sb/Si/Ge).
-  * P-73.1.2.1 aryl amine -ium 'e' elision (anilinium).
-  * P-72.2.2.2 azanide preselected anion word.
-  * P-74.1.2 zwitterion cumulative -ium-...-carboxylate.
+  * ring carbanion -ide.
+  * acyclic Group-14/15 heteroatom -ide (P/As/Sb/Si/Ge).
+  * aryl amine -ium 'e' elision (anilinium).
+  * azanide preselected anion word.
+  * zwitterion cumulative -ium-...-carboxylate.
 
 Plus byte-identity protect families (the acyclic-carbon carbanion/radical path,
 carboxylate/alkoxide/thiolate/selenolate, and neutral parents) that MUST NOT
@@ -27,7 +27,7 @@ def namer():
     return Orthonym(style="pin")
 
 
-# --- P-73.1.1.2: protonated ring-N -ium (in-place neutralization) -------------
+# ---: protonated ring-N -ium (in-place neutralization) -------------
 @pytest.mark.parametrize("smiles,expected", [
     ("c1cc[nH+]cc1", "pyridin-1-ium"),
     ("[nH+]1ccccc1", "pyridin-1-ium"),            # different SMILES spelling -> same name
@@ -41,13 +41,13 @@ def test_protonated_ring_nitrogen_ium(namer, smiles, expected):
 
 def test_imidazolium_locant_and_elision(namer):
     # Indicated hydrogen is a neutral-ring-namer limitation; the cationic-centre
-    # locant + elision are what F-T6 owns and must be correct.
+    # locant + elision are what F- owns and must be correct.
     out = namer.name("c1c[nH]c[nH+]1")
     assert out in ("1H-imidazol-3-ium", "imidazol-3-ium")
     assert out.endswith("-3-ium")
 
 
-# --- P-73.1.1.2: N-substituted aromatic ring-N (0 H) demote -------------------
+# ---: N-substituted aromatic ring-N (0 H) demote -------------------
 @pytest.mark.parametrize("smiles,expected", [
     ("C[n+]1ccccc1", "1-methylpyridin-1-ium"),
     ("CC[n+]1ccccc1", "1-ethylpyridin-1-ium"),
@@ -56,12 +56,12 @@ def test_n_substituted_aromatic_ring_demote(namer, smiles, expected):
     assert namer.name(smiles) == expected
 
 
-# --- P-72.2.2.1: ring carbanion -ide ------------------------------------------
+# ---: ring carbanion -ide ------------------------------------------
 def test_ring_carbanion_ide(namer):
-    assert namer.name("[CH-]1CCCCC1") == "cyclohexanide"  # locant omitted, P-14.3.4.2(c) the Blue Book
+    assert namer.name("[CH-]1CCCCC1") == "cyclohexanide"  # locant omitted, (c) the Blue Book
 
 
-# --- P-72.2.2.2.3: imine anion -iminide, WITH P-14.3.4 locant omission ---------
+# ---: imine anion -iminide, WITH locant omission ---------
 @pytest.mark.parametrize("smiles,expected", [
     # the Blue Book butaniminide (PIN) -- the imine-position locant is OMITTED
     # (not butan-1-iminide); the =N- anion has no substitutable N-H.
@@ -69,7 +69,7 @@ def test_ring_carbanion_ide(namer):
     ("CCC=[N-]", "propaniminide"),
     ("CC=[N-]", "ethaniminide"),
     # the Blue Book trimethyl-λ5-phosphaniminide (PIN) -- the P,P,P substituent
-    # locants are OMITTED (P-14.3.4.3, only one kind of substitutable H on the
+    # locants are OMITTED, only one kind of substitutable H on the
     # sole heteroatom centre); contrast the NEUTRAL As,As,As-... which keeps them.
     ("CP(C)(C)=[N-]", "trimethyl-λ5-phosphaniminide"),
 ])
@@ -84,7 +84,7 @@ def test_iminide_internal_keeps_locant(namer):
     assert namer.name("CC(=[N-])CC") == "butan-2-iminide"
 
 
-# --- P-72.2.2.1: acyclic heteroatom -ide (the nameable heterane families) -----
+# ---: acyclic heteroatom -ide (the nameable heterane families) -----
 @pytest.mark.parametrize("smiles,expected", [
     ("C[P-]C", "dimethylphosphanide"),        # P -> phosphane
     ("C[Si-](C)C", "trimethylsilanide"),      # Si -> silane (3-methyl, the -ide)
@@ -103,18 +103,18 @@ def test_unnameable_heterane_fails_closed_not_garbage(namer):
     assert not out.endswith("ide") or "arsan" in out
 
 
-# --- P-73.1.2.1: aryl amine -ium 'e' elision ----------------------------------
+# ---: aryl amine -ium 'e' elision ----------------------------------
 @pytest.mark.parametrize("smiles", ["c1ccccc1[NH3+]", "[NH3+]c1ccccc1"])
 def test_anilinium_elision(namer, smiles):
     assert namer.name(smiles) in ("anilinium", "benzenaminium")
 
 
-# --- P-72.2.2.2: azanide preselected anion word -------------------------------
+# ---: azanide preselected anion word -------------------------------
 def test_azanide(namer):
     assert namer.name("[NH2-]") == "azanide"
 
 
-# --- P-74.1.2: zwitterion cumulative -ium-...-carboxylate ---------------------
+# ---: zwitterion cumulative -ium-...-carboxylate ---------------------
 @pytest.mark.parametrize("smiles,expected", [
     ("[O-]C(=O)c1ccc[nH+]c1", "pyridin-1-ium-3-carboxylate"),       # meta (nicotinate)
     ("O=C([O-])c1cccc[nH+]1", "pyridin-1-ium-2-carboxylate"),       # ortho (picolinate)
@@ -152,12 +152,12 @@ def test_neutral_parents_unchanged(namer, smiles, expected):
     assert namer.name(smiles) == expected
 
 
-# --- Code-review hardening (CR-03 valence gate, CR-01/CR-02 fail-closed, WR-01) -
+# --- Code-review hardening (valence gate, / fail-closed,) -
 @pytest.mark.parametrize("smiles,expected", [
-    # 4-coordinate (over-coordinated) Group-14 metalloid anion = the P-72.3 -uide
+    # 4-coordinate (over-coordinated) Group-14 metalloid anion = the -uide
     # family, NOT a parent-hydride -ide. The valence gate (degree+H+1 == valence)
     # must EXCLUDE it so it stays on the neutral organometallic path and keeps its
-    # structure-preserving name — never charge-dropped to '' (the CR-03 regression).
+    # structure-preserving name — never charge-dropped to '' (the regression).
     ("C[Si-](C)(C)C", "tetramethylsilane"),
     ("C[Sn-](C)(C)C", "tetramethylstannane"),
 ])
@@ -188,7 +188,7 @@ def test_valence_gate_excludes_invalid_arities():
 
 
 def test_heteroatom_hydride_anide_is_the_pin():
-    """P-72.2.2.1 (BB 39765 'dimethylarsanido'): a Group-15 heteroatom-hydride anion
+    """ (BB 39765 'dimethylarsanido'): a Group-15 heteroatom-hydride anion
     (loss of H+ from dimethylarsane/dimethylstibane) IS named with the '-anide'
     parent-hydride suffix — dimethylarsanide / dimethylstibanide are the PINs, NOT
     garbage. The heterane-stem guard only fails closed when the neutral hydride
@@ -245,12 +245,12 @@ def test_triazolium_deterministic(namer, smiles):
 
 
 @pytest.mark.parametrize("smiles,expected", [
-    ("C[B-](C)(C)C", "tetramethylboranuide"),          # P-72.3 -uide / borate
+    ("C[B-](C)(C)C", "tetramethylboranuide"),          # -uide / borate
     ("CC[B-](CC)(CC)CC", "tetraethylboranuide"),
     ("[B-](F)(F)(F)F", "tetrafluoroboranuide"),
 ])
 def test_group13_uide_borate(namer, smiles, expected):
-    """P-72.3 (DD3 Fix 5): a Group-13 centre one bond above its standard valence
+    """ (DD3 Fix 5): a Group-13 centre one bond above its standard valence
     bearing the -1 charge is the ate-complex / -uide (tetramethylboranuide,
     tetrafluoroboranuide), named via the substituted-'-uide'-parent emitter."""
     assert namer.name(smiles) == expected
@@ -264,9 +264,9 @@ def test_overcoordinated_silicon_has_no_uide(namer):
 
 
 def test_fg_substituted_ring_cation_fails_closed():
-    """WR-01: the ring -ium emitter must NOT compose a malformed
+    """: the ring -ium emitter must NOT compose a malformed
     `<ring>-<locant>-ol-<locant>-ium` for a ring cation that also bears a
-    principal-group FG (-ol/-al). It fails closed (the FG case is P-73.1.1/P-74
+    principal-group FG (-ol/-al). It fails closed (the FG case is /
     territory). Direct emitter check: returns '' rather than a malformed string."""
     from rdkit import Chem
     from orthonym.rules.ions import _emit_ring_cumulative_suffix

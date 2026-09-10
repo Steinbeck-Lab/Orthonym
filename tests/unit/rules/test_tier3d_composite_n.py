@@ -1,4 +1,4 @@
-"""Wave2 T3d — composite-N families (amidrazone / hydrazidine / amidoxime /
+"""Wave2 — composite-N families (amidrazone / hydrazidine / amidoxime /
 sulfinimidamide / thiohydrazide / hydrazide N-N' / hydrazinecarboxylic /
 amidine-as-prefix), built per the adversarially-verified research specs.
 
@@ -17,20 +17,20 @@ from orthonym import name_compound
 @pytest.mark.unit
 class TestCompositeNSuffixes:
     @pytest.mark.parametrize("smiles,expected", [
-        # sulfinimidamide (P-66.1.1 item 25) — SX3, disjoint from SX4 sulfonimidamide
+        # sulfinimidamide item 25) — SX3, disjoint from SX4 sulfonimidamide
         ("CS(=N)N", "methanesulfinimidamide"),
         ("CCS(=N)N", "ethanesulfinimidamide"),
-        # amidrazone / hydrazonamide (P-66.4.2)
+        # amidrazone / hydrazonamide
         ("CC(N)=NN", "ethanehydrazonamide"),
         ("NC(=NN)c1ccccc1", "benzenecarbohydrazonamide"),
-        # hydrazidine / hydrazonohydrazide (P-66.4.3)
+        # hydrazidine / hydrazonohydrazide
         ("CC(=NN)NN", "ethanehydrazonohydrazide"),
         ("C(=NN)(NN)c1ccccc1", "benzenecarbohydrazonohydrazide"),
-        # amidoxime (P-66.4.4) — N'-hydroxy amidine
+        # amidoxime — N'-hydroxy amidine
         ("CC(=NO)N", "N'-hydroxyethanimidamide"),
         ("NC(=NO)c1ccccc1", "N'-hydroxybenzenecarboximidamide"),
         ("CCON=C(N)C", "N'-ethoxyethanimidamide"),
-        # thiohydrazide (P-66.3.4)
+        # thiohydrazide
         ("CC(=S)NN", "ethanethiohydrazide"),
         ("CCC(=S)NN", "propanethiohydrazide"),
         ("NNC(=S)c1ccccc1", "benzenecarbothiohydrazide"),
@@ -45,7 +45,7 @@ class TestHydrazideNNPrefixes:
         ("CNNC(C)=O", "N'-methylethanehydrazide"),
         ("CN(N)C(C)=O", "N-methylethanehydrazide"),
         ("CNNC(=S)C", "N'-methylethanethiohydrazide"),
-        # hydrazinecarboxylic acid (P-66.3.5.1) — carbamic_acid SMARTS tightened
+        # hydrazinecarboxylic acid — carbamic_acid SMARTS tightened
         ("NNC(=O)O", "hydrazinecarboxylic acid"),
         ("CNNC(=O)O", "N'-methylhydrazinecarboxylic acid"),
     ])
@@ -64,14 +64,14 @@ class TestAmidineAsPrefix:
     @pytest.mark.parametrize("smiles,expected", [
         # RING-attached amidine stays carbamimidoyl (PIN for ring/off-chain, BB 34332)
         ("N=C(N)c1ccc(C(=O)O)cc1", "4-carbamimidoylbenzoic acid"),
-        # AM-4 (P-66.4.1.3.2, BB 34338): chain-terminal amidine -> amino+imino
+        #, BB 34338): chain-terminal amidine -> amino+imino
         ("N=C(N)CCC(=O)O", "4-amino-4-iminobutanoic acid"),
         # amido family unaffected (C=O branch)
         ("CC(=O)Nc1ccc(C(=O)O)cc1", "4-acetamidobenzoic acid"),
         # Schiff base (imino N on ring) must NOT be captured as imidamido
         ("CC=Nc1ccc(C(=O)O)cc1", "4-ethaniminylbenzoic acid"),
         # guanidine must NOT be captured (aryl guanidino demoted to the PIN
-        # prefix carbamimidoylamino per P-66.4.1.2.1.3 / BBv2 L1700; Wave-3 heal)
+        # prefix carbamimidoylamino per / BBv2 L1700; Wave-3 heal)
         ("N=C(N)Nc1ccc(C(=O)O)cc1", "4-(carbamimidoylamino)benzoic acid"),
     ])
     def test_amidine_prefix_controls(self, smiles, expected):
@@ -89,7 +89,7 @@ class TestNoPerceptionRegression:
         ("CC=NO", "N-hydroxyethanimine"),
         ("CCC=NO", "N-hydroxypropan-1-imine"),
         ("CC(C)=NO", "N-hydroxypropan-2-imine"),
-        # Wave-3: substitutive ylidene-hydrazine is PIN (P-68.3.1.2.2);
+        # Wave-3: substitutive ylidene-hydrazine is PIN;
         # 'acetophenone hydrazone' is functional-class / general-only.
         ("CC(=NN)c1ccccc1", "(1-phenylethylidene)hydrazine"),
         ("CCC(N)=N", "propanimidamide"),

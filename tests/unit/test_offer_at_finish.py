@@ -1,5 +1,5 @@
 # tests/unit/test_offer_at_finish.py
-"""v33 Phase 0 Task L2.2: `select_offer` passthrough wired at `namer.py::_finish`.
+""" a phase Task L2.2: `select_offer` passthrough wired at `namer.py::_finish`.
 
 L2 builds the whole-molecule Offer + rank_offers/select_offer selector
 (`assembly/offer_pool.py`, task L2.1) and wires a ONE-offer pool at `_finish`:
@@ -64,7 +64,7 @@ class TestOnePassthroughIsIdentity:
 
 
 class TestNameTieredHonoursWinningOffer:
-    """v33 Phase 0 cleanup T1: `name_tiered` must label a row from the
+    """ a phase cleanup T1: `name_tiered` must label a row from the
     OFFER THAT ACTUALLY WON, not the process-wide provenance contextvar
     (which still describes whichever producer ran LAST -- the losing
     primary, on a floor win).

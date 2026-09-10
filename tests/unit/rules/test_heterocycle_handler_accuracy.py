@@ -25,7 +25,7 @@ HETEROCYCLE_ACCURACY_CASES = [
     ("O=c1[nH]c(=O)c2[nH]cnc2[nH]1", "xanthine"),
     ("Nc1ncnc2[nH]cnc12", "adenine"),
     ("O=c1[nH]cnc2[nH]cnc12", "hypoxanthine"),
-    # BP-1: uracil is NOT a BB retained name (0 grep hits) -> the PIN is the
+    #: uracil is NOT a BB retained name (0 grep hits) -> the PIN is the
     # systematic pyrimidinedione; the retained 'uracil' is served only via --trivial.
     ("O=c1cc[nH]c(=O)[nH]1", "pyrimidine-2,4(1H,3H)-dione"),
 
@@ -47,9 +47,9 @@ HETEROCYCLE_ACCURACY_CASES = [
     ("c1ccc2c(c1)[nH]c1ccccc12", "9H-carbazole"),
     ("c1ccc2c(c1)cnc1ccccc12", "phenanthridine"),
 
-    # ---: retained tricyclic As/Sb/P/Se ring parents (P-25.2.1 /
-    # P-25.2.2.3), each a BB verbatim-(PIN). In scope (P-25 organic ring
-    # nomenclature; only P-69 organometallics is out of scope). OPSIN-RT clean.
+    # ---: retained tricyclic As/Sb/P/Se ring parents /
+    #, each a BB verbatim-(PIN). In scope organic ring
+    # nomenclature; only organometallics is out of scope). OPSIN-RT clean.
     ("C1=c2ccccc2=c2ccccc2=[As]1", "arsanthridine"),      # the Blue Book (PIN)
     ("C1=c2ccccc2=[As]c2ccccc21", "acridarsine"),         # the Blue Book (PIN)
     ("c1ccc2pc3ccccc3cc2c1", "acridophosphine"),          # the Blue Book (PIN)
@@ -57,21 +57,21 @@ HETEROCYCLE_ACCURACY_CASES = [
     # The 4 X-H members carry the mandatory indicated hydrogen 10H- (the X-H
     # sits at ring position 10), exactly as the N-cases emit 10H-phenoxazine /
     # 10H-phenothiazine. the Blue Book print the "10H-isomer shown";
-    # P-25.7.1.3 (the Blue Book) "all indicated hydrogen atoms must be cited".
+    # (the Blue Book) "all indicated hydrogen atoms must be cited".
     ("c1ccc2c(c1)Oc1ccccc1P2", "10H-phenoxaphosphinine"),   # the Blue Book (PIN)
     ("c1ccc2c(c1)Oc1ccccc1[AsH]2", "10H-phenoxarsinine"),   # the Blue Book (PIN)
     ("c1cc[c]2c(c1)Oc1cccc[c]1[SbH]2", "10H-phenoxastibinine"),  # the Blue Book (PIN)
     ("c1ccc2c(c1)Sc1ccccc1[AsH]2", "10H-phenothiarsinine"),  # the Blue Book (PIN)
     # phenoxathiine — the S member of the same family (was mis-spelled
-    # 'phenoxathiin'); PIN keeps the terminal 'e' (P-25.2.2.3, the Blue Book).
+    # 'phenoxathiin'); PIN keeps the terminal 'e', the Blue Book).
     ("c1ccc2c(c1)Oc1ccccc1S2", "phenoxathiine"),
 
     # --- Basic monocyclic heterocycles (regression checks) ---
     ("c1ccncc1", "pyridine"),
-    ("c1cc[nH]c1", "1H-pyrrole"),  # IH-01: leading indicated-H
+    ("c1cc[nH]c1", "1H-pyrrole"),  #: leading indicated-H
     ("c1ccoc1", "furan"),
     ("c1ccsc1", "thiophene"),
-    ("c1c[nH]cn1", "1H-imidazole"),  # IH-01: leading indicated-H
+    ("c1c[nH]cn1", "1H-imidazole"),  #: leading indicated-H
     ("c1cncnc1", "pyrimidine"),
     ("c1cnccn1", "pyrazine"),
 
@@ -80,8 +80,8 @@ HETEROCYCLE_ACCURACY_CASES = [
     ("c1ccc2cnccc2c1", "isoquinoline"),
     ("c1ccc2[nH]ccc2c1", "1H-indole"),
     ("c1ccc2[nH]cnc2c1", "1H-benzimidazole"),
-    ("c1ccc2occc2c1", "1-benzofuran"),      #: PIN locant (P-25.2.2.4, the Blue Book)
-    ("c1ccc2sccc2c1", "1-benzothiophene"),  #: PIN locant (P-25.2.2.4, the Blue Book)
+    ("c1ccc2occc2c1", "1-benzofuran"),      #: PIN locant, the Blue Book)
+    ("c1ccc2sccc2c1", "1-benzothiophene"),  #: PIN locant, the Blue Book)
     ("c1ccc2ncncc2c1", "quinazoline"),
 ]
 

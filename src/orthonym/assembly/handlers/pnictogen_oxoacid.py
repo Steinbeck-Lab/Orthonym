@@ -1,4 +1,4 @@
-"""P-67 organo-oxoacid handlers for the heavier pnictogens (As, Sb).
+""" organo-oxoacid handlers for the heavier pnictogens (As, Sb).
 
 Exact analogues of ``handlers.phosphonic_acid`` / ``handlers.phosphinic_acid``.
 The Blue Book gives all four as PRESELECTED names (BB L36051-36054)::
@@ -10,7 +10,7 @@ and the substituent-prefix PIN forms verbatim -- ``ethylstibinic acid``
 (BB L36064), ``methyl(phenyl)arsinic acid`` (BB L36066),
 ``(4-acetamido-3-methylphenyl)arsonic acid`` (BB L33010).
 
-An arsonic acid is NOT an organometallic: P-69 never applies to it. Without
+An arsonic acid is NOT an organometallic: never applies to it. Without
 these handlers an organyl As/Sb oxoacid perceives no principal group at all,
 falls through the whole cascade, and is reported by the descriptive fallback --
 which is why ``C[As](=O)(O)O`` used to come back as "inorganic compound".
@@ -50,7 +50,7 @@ _PNICTOGEN_OXOACIDS = {
 
 
 def _make_pnictogen_oxoacid_handlers(fg_name: str) -> Tuple[Callable, Callable]:
-    """Build the (predicate, handler) pair for one P-67 pnictogen oxoacid."""
+    """Build the (predicate, handler) pair for one pnictogen oxoacid."""
     rules_fn_name, cite = _PNICTOGEN_OXOACIDS[fg_name]
 
     def _predicate(features: Any) -> bool:

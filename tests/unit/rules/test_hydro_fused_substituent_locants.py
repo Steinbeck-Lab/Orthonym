@@ -11,7 +11,7 @@ and atom 1 -- the methyl-bearing sp3 carbon -- is locant **2**. The producer
 used to return only the name string, so the map died there; the composer's
 enrichment pass then RE-DERIVED a numbering from `features` and placed the
 methyl at locant 1, naming a different molecule (`CC1CCCc2ccccc21`) that
-SELF-01 suppressed -- so a correct name was lost to an abstention.
+ suppressed -- so a correct name was lost to an abstention.
 
 The fix threads the producer's own map into enrichment. Two numberings for one
 name is the defect; there is now exactly one, and the same map also spells the
@@ -19,19 +19,19 @@ principal-characteristic-group suffix.
 
 Governing rules, quoted with their section headings:
 
-* **P-58.2.5 "Nondetachable hydro prefixes *vs*. indicated hydrogen"**
-  (`BlueBookV2/BlueBookV2.md:24890`), on the PIN example
+* ** "Nondetachable hydro prefixes *vs*. indicated hydrogen"**
+  (`the Blue Book Blue Book`), on the PIN example
   `5,8-dioxo-5,6,7,8-tetrahydronaphthalene-2-carboxylic acid (PIN)`:
   "detachable but nonalphabetized hydro prefixes **do not have precedence over
   the principal characteristic group for low numbering**, but has precedence
   over other detachable prefixes." So low locants go to the suffix FIRST, then
   to hydro, then to the detachable prefixes.
-* **P-63.1 "HYDROXY COMPOUNDS AND CHALCOGEN ANALOGUES"**
-  (`BlueBookV2/BlueBookV2.md:26880`): "(1) 5,6,7,8-tetrahydronaphthalen-2-ol
+* ** "HYDROXY COMPOUNDS AND CHALCOGEN ANALOGUES"**
+  (`the Blue Book Blue Book`): "(1) 5,6,7,8-tetrahydronaphthalen-2-ol
   (PIN)" -- verbatim, and the load-bearing test in this file: the hydroxy
   suffix pulls the numbering onto the AROMATIC ring (2, not 6), which only
   happens if the suffix and the hydro prefix read the SAME map.
-* **P-16.7.1(a)** terminal-'e' elision: `naphthalen-2-ol` but
+* **(a)** terminal-'e' elision: `naphthalen-2-ol` but
   `naphthalene-1,3-diol` (the BB prints both forms at `:26866` /`:26880`).
 
 Every expected name in this file was checked name -> OPSIN 2.9.0 -> canonical
@@ -71,7 +71,7 @@ UNCHANGED = [
 
 # The rest of the class the same single map unlocks.
 CLASS = [
-    # P-63.1 (:26880) BB-verbatim PIN. The suffix pulls the numbering onto the
+    # (:26880) BB-verbatim PIN. The suffix pulls the numbering onto the
     # aromatic ring, so hydro becomes 5,6,7,8 -- one map, or this is impossible.
     ("Oc1ccc2c(c1)CCCC2", "5,6,7,8-tetrahydronaphthalen-2-ol"),
     ("OC1CCCc2ccccc21", "1,2,3,4-tetrahydronaphthalen-1-ol"),
@@ -226,7 +226,7 @@ def test_handler_publishes_the_map_as_its_locant_hint():
 
 
 def test_ring_fusion_atom_substituent_still_declines():
-    """P-58.2.2.3 / R12: neither the producer nor enrichment can place a
+    """ / R12: neither the producer nor enrichment can place a
     substituent on a ring-FUSION atom, so the producer must keep failing
     closed there rather than dropping the atom."""
     from orthonym.rules.polycyclics import (
@@ -255,7 +255,7 @@ def test_exocyclic_hydroxy_is_not_a_ring_ol_suffix():
 
 
 def test_ol_suffix_yields_to_the_senior_carboxylic_acid():
-    """P-41 seniority: a ring -COOH outranks a ring -OH, so the acid keeps the
+    """ seniority: a ring -COOH outranks a ring -OH, so the acid keeps the
     suffix and the hydroxy stays a detachable prefix (never two suffixes)."""
     from orthonym.rules.polycyclics import (
         name_partially_saturated_carbocycle_with_locants,

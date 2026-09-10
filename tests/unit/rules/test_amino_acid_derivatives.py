@@ -1,20 +1,20 @@
-"""v24 W8 P3 — amino-acid retained-name derivatives (P-103).
+""" W8 P3 — amino-acid retained-name derivatives.
 
 Accuracy-first scope: only the derivative classes whose retained PIN form is
 UNAMBIGUOUS in the Blue Book are built here. The substituted-derivative retained
 forms (5-hydroxytryptophan, N6-acetyl-lysine, O-phospho-serine, hydroxyproline
-base) are DEFERRED — P-103 carries no `(PIN)` markers, several BB examples list
+base) are DEFERRED — carries no `(PIN)` markers, several BB examples list
 the *systematic* name first, and the project's existing golds already name
 substituted/non-standard amino acids systematically. Emitting a retained form
 where the systematic is the PIN would regress a correct name, so those keep the
 (already-correct) systematic output.
 
 Built classes:
-  * 3.1 `allo` diastereomers of threonine/isoleucine (P-103.1.3.2.2 — 'allo' is a
+  * 3.1 `allo` diastereomers of threonine/isoleucine — 'allo' is a
         MANDATED modifier of the retained name; threonine/isoleucine are PIN
         retained names, so their C-3 epimer's PIN is `allo-<name>`). The map also
         covers the D-/D-allo- forms (all 8 OPSIN-RT verified).
-  * 3.2 esters (P-103.2.6, BB 54595-54608): `methyl <descriptor><name>ate` for the
+  * 3.2 esters, BB 54595-54608): `methyl <descriptor><name>ate` for the
         single-alpha-stereocentre monocarboxylic standard AAs + glycine. The
         L-implicit-vs-explicit policy is now RESOLVED for esters: BB 54601 shows
         `methyl L-alaninate` with an EXPLICIT descriptor (unlike the bare AA, which
@@ -23,19 +23,19 @@ Built classes:
         positional ester locants) and 2-stereocentre AAs (threonine/isoleucine --
         allo entanglement) are OUT of scope and fall through to the pre-existing
         systematic ester name (no regression).
-  * 3.7 non-standard-AA zwitterion (P-103.2.4.4 / P-74.2.1.2, BB 54554-54569):
-        the P-103.2.4.1 "convenient neutral form" dispensation is licensed ONLY
+  * 3.7 non-standard-AA zwitterion /, BB 54554-54569):
+        the "convenient neutral form" dispensation is licensed ONLY
         for the monoamino monocarboxylic acids retained in Table 10.4 (the 20
-        canonical STANDARD_AMINO_ACIDS). BB's own P-103.2.4.4 example
+        canonical STANDARD_AMINO_ACIDS). BB's own example
         (S-methyl-L-cysteine zwitterion) shows the PIN for a NON-standard amino-acid
-        zwitterion is the P-74.2.1.2 Method-1 IONIC form -- the anion is the parent,
+        zwitterion is the Method-1 IONIC form -- the anion is the parent,
         the protonated amine an `azaniumyl` prefix.
-        UPDATED (v33 charged Slice B, `charged_router` GUARD 4 ->
+        UPDATED (charged Slice B, `charged_router` GUARD 4 ->
         `_name_primary_amine_azaniumyl_zwitterion`): Orthonym now BUILDS that
         ionic PIN on the DEFAULT path -- `(2R)-2-azaniumyl-3-(methylsulfanyl)-
         propanoate` -- correcting the intermediate 4782742f over-reach that shipped
         the NON-PIN neutral `(2R)-2-amino-3-(methylsulfanyl)propanoic acid` on the
-        PIN path (P-74.2.1.2: a zwitterion's neutral form is not its PIN). The
+        PIN path: a zwitterion's neutral form is not its PIN). The
         alpha stereocentre survives because the builder neutralizes IN PLACE and
         re-expresses the amino prefix (it does not sever/cap the stereocentre), and
         every emission is full-InChIKey RT-gated (charges + stereo). The neutral
@@ -46,8 +46,8 @@ Built classes:
 Deferred (documented, accuracy-first — do NOT emit a retained form where the PIN
 is uncertain, to avoid regressing a correct systematic name):
   * 3.3-3.6 substituted-derivative retained forms (5-hydroxytryptophan,
-        N6-acetyl-lysine, O-phospho-serine, hydroxyproline base): P-103 carries NO
-        `(PIN)` markers, several P-103.2.3 examples list the systematic name FIRST,
+        N6-acetyl-lysine, O-phospho-serine, hydroxyproline base): carries NO
+        `(PIN)` markers, several examples list the systematic name FIRST,
         and the project's existing golds name substituted/non-standard AAs
         systematically (e.g. S-ethylcysteine -> 2-amino-3-(ethylsulfanyl)propanoic
         acid). Keeping the (already-correct) systematic avoids a wrong-PIN regression.
@@ -61,16 +61,16 @@ G = Orthonym()
 RAW = Orthonym(_disable_opsin_validity_gate=True)  # gate-off: proves the raw namer
 
 
-# --- 3.1 allo diastereomers (P-103.1.3.2.2) -------------------------------
-# v29 P3-REGRESSION I12: the L forms below expected the BARE retained name, because
-# the producer suppressed 'L-'. That suppression is `### **P-103.3.4** Indication of
-# configuration in peptides` (BlueBookV2.md:54715) applied outside its scope — and
-# `## **P-103.1.3.2.2** Use of the prefix 'allo'` (:54320), the section this pack was
-# built on, writes all four forms WITH the descriptor at :54324-54330:
-#   L-isoleucine (symbols 'Ile',' I')   (2S,3S)-2-amino-3-methylpentanoic acid
-#   L-alloisoleucine (symbol 'aIle')    (2S,3R)-2-amino-3-methylpentanoic acid
-#   L-threonine (symbols 'Thr','T')     (2S,3R)-2-amino-3-hydroxybutanoic acid
-#   L-allothreonine (symbol 'aThr')     (2S,3S)-2-amino-3-hydroxybutanoic acid
+# --- 3.1 allo diastereomers -------------------------------
+# -REGRESSION I12: the L forms below expected the BARE retained name, because
+# the producer suppressed 'L-'. That suppression is `### **** Indication of
+# configuration in peptides` (the Blue Book) applied outside its scope — and
+# `## **** Use of the prefix 'allo'` (:54320), the section this pack was
+# built on, writes all four forms WITH the descriptor at:54324-54330:
+# L-isoleucine (symbols 'Ile',' I') (2S,3S)-2-amino-3-methylpentanoic acid
+# L-alloisoleucine (symbol 'aIle') (2S,3R)-2-amino-3-methylpentanoic acid
+# L-threonine (symbols 'Thr','T') (2S,3R)-2-amino-3-hydroxybutanoic acid
+# L-allothreonine (symbol 'aThr') (2S,3S)-2-amino-3-hydroxybutanoic acid
 # The D rows are unchanged, which is the point: only the L was being lost.
 @pytest.mark.parametrize("smiles,expected", [
     # L-allothreonine = (2S,3S) [CIP-verified]; C-3 epimer of L-Thr (2S,3R).
@@ -84,7 +84,7 @@ def test_allo_amino_acids(smiles, expected):
 
 @pytest.mark.parametrize("smiles,expected", [
     # All 8 stereoisomers of Thr/Ile emit their retained name (OPSIN-RT verified).
-    # These are retained names, NOT PINs: `### **P-100 INTRODUCTION**` (:50943) —
+    # These are retained names, NOT PINs: `### ** INTRODUCTION**` (:50943) —
     # "Preferred IUPAC names (PINs) are not identified for the compounds in this
     # Chapter."
     ("C[C@@H](O)[C@H](N)C(=O)O", "L-threonine"),      # L-Thr (2S,3R)
@@ -98,10 +98,10 @@ def test_thr_ile_stereoisomers(smiles, expected):
     assert G.name(smiles) == expected
 
 
-# --- 3.2 amino-acid esters (P-103.2.6, BB 54595-54608) --------------------
+# --- 3.2 amino-acid esters, BB 54595-54608) --------------------
 @pytest.mark.parametrize("smiles,expected", [
     # BB 54601 verbatim example. (The parenthetical "unlike the bare AA's implicit L"
-    # was removed in v29 P3-REGRESSION I12: the bare AA now carries its L too.)
+    # was removed in -REGRESSION I12: the bare AA now carries its L too.)
     ("COC(=O)[C@H](C)N", "methyl L-alaninate"),
     # Glycine is achiral -- no descriptor.
     ("COC(=O)CN", "methyl glycinate"),
@@ -130,14 +130,14 @@ def test_amino_acid_esters_out_of_scope_falls_through(smiles):
     assert "unknown" not in name
 
 
-# --- 3.7 non-standard-AA zwitterion: azaniumyl ionic PIN (P-103.2.4.4 /
-# P-74.2.1.2, v33 charged Slice B) ---------------------------------------
+# --- 3.7 non-standard-AA zwitterion: azaniumyl ionic PIN /
+#, charged Slice B) ---------------------------------------
 @pytest.mark.opsin_gate
 def test_non_standard_zwitterion_builds_azaniumyl_pin():
     # S-methylcysteine-family zwitterion: BB's OWN example (S-methyl-L-cysteine
-    # zwitterion, P-103.2.4.4) shows the PIN for a NON-standard amino-acid
-    # zwitterion is the P-74.2.1.2 Method-1 IONIC form -- anion is the parent,
-    # the protonated amine is an `azaniumyl` prefix. v33 charged Slice B now
+    # zwitterion, shows the PIN for a NON-standard amino-acid
+    # zwitterion is the Method-1 IONIC form -- anion is the parent,
+    # the protonated amine is an `azaniumyl` prefix. charged Slice B now
     # BUILDS it on the DEFAULT path (route_charged GUARD 4 ->
     # `_name_primary_amine_azaniumyl_zwitterion`), correcting the 4782742f
     # over-reach that shipped the NON-PIN neutral `...propanoic acid` here.
@@ -146,13 +146,13 @@ def test_non_standard_zwitterion_builds_azaniumyl_pin():
     # emission, so this is 0-wrong (the input's InChIKey
     # IDIDJDIHTAOVLG-VKHMYHEASA-N -- (2R), NOT (2S) as an early note guessed --
     # is reproduced by OPSIN-parsing the name). RAW (gate off) proves the
-    # producer's OWN RT gate, not the namer's SELF-01.
+    # producer's OWN RT gate, not the namer's.
     from rdkit import Chem
     from orthonym.validation.opsin_roundtrip import opsin_parse
     smi = "CSC[C@H]([NH3+])C(=O)[O-]"
     name = RAW.name(smi)
     assert name == "(2R)-2-azaniumyl-3-(methylsulfanyl)propanoate"
-    # must NOT be the non-PIN neutral acid on the default path (P-74.2.1.2)
+    # must NOT be the non-PIN neutral acid on the default path
     assert "propanoic acid" not in name
     g = opsin_parse(name)
     assert g and Chem.MolToInchiKey(Chem.MolFromSmiles(g)) == \
@@ -160,7 +160,7 @@ def test_non_standard_zwitterion_builds_azaniumyl_pin():
 
 
 @pytest.mark.parametrize("smiles,expected", [
-    # Standard-AA zwitterions (Table 10.4, P-103.2.4.1 dispensation) are
+    # Standard-AA zwitterions (Table 10.4, dispensation) are
     # UNCHANGED by the veto.
     ("[NH3+]CC(=O)[O-]", "glycine"),
     ("C[C@H]([NH3+])C(=O)[O-]", "L-alanine"),

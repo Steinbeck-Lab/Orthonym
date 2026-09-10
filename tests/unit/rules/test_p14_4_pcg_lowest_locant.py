@@ -1,26 +1,26 @@
-"""P-14.4(c) outranks P-14.4(f): the principal characteristic group takes the low locant.
+"""(c) outranks (f): the principal characteristic group takes the low locant.
 
-§**P-14.4 "NUMBERING"** (``BlueBookV2/BlueBookV2.md:3219``) verbatim:
+§** "NUMBERING"** (``the Blue Book Blue Book``) verbatim:
 
     When several structural features appear in cyclic and acyclic compounds, low
     locants are assigned to them in the following decreasing order of seniority:
 
 and the ordered criteria, each on its own line:
 
-    :3227  (a) fixed numbering in chains, rings, or ring systems
-    :3246  (b) indicated hydrogen for unsubstituted compounds
-    :3256  (c) principal characteristic groups and free valences (suffixes);
-    :3270  (d) 'added indicated hydrogen'
-    :3288  (e) saturation/unsaturation
-    :3301  (f) detachable alphabetized prefixes, all considered together in a
+    :3227 (a) fixed numbering in chains, rings, or ring systems
+    :3246 (b) indicated hydrogen for unsubstituted compounds
+    :3256 (c) principal characteristic groups and free valences (suffixes);
+    :3270 (d) 'added indicated hydrogen'
+    :3288 (e) saturation/unsaturation
+    :3301 (f) detachable alphabetized prefixes, all considered together in a
            series of increasing numerical order;
-    :3307  (g) lowest locants for the substituent cited first as a prefix
-    :3320  (h) nonstandard valence state
+    :3307 (g) lowest locants for the substituent cited first as a prefix
+    :3320 (h) nonstandard valence state
 
 Benzene has no fixed numbering (a) and no indicated hydrogen (b), so **(c)
 decides**, four places above (f).
 
-The defect these tests pin: ``orient_benzene``'s P-14.4(c) tier was reached but
+The defect these tests pin: ``orient_benzene``'s (c) tier was reached but
 handed an EMPTY set, because the caller derived the principal-characteristic-group
 ring atoms from the ``is_suffix`` marker alone. A phenolic -OH is still spelled as
 the *prefix* ``hydroxy`` at orientation time and is promoted to the ``-ol`` suffix
@@ -30,7 +30,7 @@ only later, so criterion (c) never ran and the chloro prefix took locant 1.
 ``1-chloro-2,3,4,5,6-pentamethylbenzene``: the same six-substituent shape as the
 defect but with **no principal characteristic group at all**, so (c) is vacuous and
 (f)+(g) legitimately govern. A "fix" that also moved this row would have
-implemented "lowest locant to the ring's first substituent", not P-14.4(c).
+implemented "lowest locant to the ring's first substituent", not (c).
 """
 
 import pytest
@@ -46,7 +46,7 @@ pytestmark = pytest.mark.unit
 
 
 # --------------------------------------------------------------------------
-# Whole-name assertions. Session invariant 11: "the locant moved" is NOT a pass
+# Whole-name assertions. Session a project rule: "the locant moved" is NOT a pass
 # condition -- a change that stops a bad path can emit something worse -- so
 # every row below asserts the COMPLETE emitted name.
 # --------------------------------------------------------------------------
@@ -71,14 +71,14 @@ P14_4_C_TARGETS = [
     # substituent for position 1". Here 'hydroxy' < 'iodo', so the pre-fix numberer
     # already gave locant 1 to a hydroxy -- and was STILL wrong, because nothing
     # minimised the suffix SET: it emitted '2-iodobenzene-1,3,4,5,6-pentol', suffix
-    # {1,3,4,5,6}. P-14.4(c) requires the whole set to be lowest, {1,2,3,4,5}.
+    # {1,3,4,5,6}. (c) requires the whole set to be lowest, {1,2,3,4,5}.
     ("Oc1c(O)c(O)c(O)c(O)c1I", "6-iodobenzene-1,2,3,4,5-pentol"),
 ]
 
 
 @pytest.mark.parametrize("smiles,expected", P14_4_C_TARGETS)
 def test_pcg_takes_the_low_locant(smiles, expected):
-    """P-14.4(c): the suffix locant set is minimised BEFORE the prefixes."""
+    """(c): the suffix locant set is minimised BEFORE the prefixes."""
     assert name_compound(smiles) == expected
 
 
@@ -110,24 +110,24 @@ P14_4_NEGATIVES = [
     ("Oc1c(O)c(O)cc(Cl)c1", "5-chlorobenzene-1,2,3-triol"),
     ("Oc1cc(Cl)cc(O)c1O", "5-chlorobenzene-1,2,3-triol"),
     ("Oc1c(C)c(O)c(C)c(O)c1C", "2,4,6-trimethylbenzene-1,3,5-triol"),
-    # P-41: -ol outranks -thiol, so the SH stays a sulfanyl prefix. The numbering
+    #: -ol outranks -thiol, so the SH stays a sulfanyl prefix. The numbering
     # hint must agree with that (it did not before: the tier anchored the THIOL).
     ("Oc1ccccc1S", "2-sulfanylphenol"),
-    # P-41: thiol outranks amine.
+    #: thiol outranks amine.
     ("Nc1ccccc1S", "2-aminobenzenethiol"),
     ("Sc1ccc(Cl)cc1", "4-chlorobenzenethiol"),
     # A suffix SENIOR to -ol is present, so the OH stays a hydroxy prefix.
     ("Oc1ccc(C(=O)O)cc1", "4-hydroxybenzoic acid"),
     ("Oc1ccc(N)cc1", "4-aminophenol"),
     ("Oc1ccc(Cl)c(Cl)c1", "3,4-dichlorophenol"),
-    # Uniform complete substitution: P-14.3.4 licence, no locants at all.
+    # Uniform complete substitution: licence, no locants at all.
     ("Oc1c(O)c(O)c(O)c(O)c1O", "benzenehexol"),
 ]
 
 
 @pytest.mark.parametrize("smiles,expected", P14_4_NEGATIVES)
 def test_negatives_do_not_move(smiles, expected):
-    """Rows correct before the P-14.4(c) fix and still correct after it."""
+    """Rows correct before the (c) fix and still correct after it."""
     assert name_compound(smiles) == expected
 
 
@@ -160,7 +160,7 @@ GOLD_DERIVED = [
     # 'N1-(4-aminophenyl)-N4-phenylbenzene-1,4-diamine'; the emitted form drops the
     # '1' from the first italic-N locant. The ASSIGNMENT is what Task 9b is
     # responsible for and it is correct -- '(4-aminophenyl)' is on the LOWER
-    # nitrogen, as P-14.4(g) requires ('aminoanilino' is cited before 'anilino') --
+    # nitrogen, as (g) requires ('aminoanilino' is cited before 'anilino') --
     # so this row is here to catch the assignment flipping, which it did once
     # during Task 9b before the italic-N prefixes were fed to the (g) tier.
     ("Nc1ccc(Nc2ccc(Nc3ccccc3)cc2)cc1",
@@ -181,7 +181,7 @@ def test_gold_derived_names_unchanged(smiles, expected):
 
 
 # --------------------------------------------------------------------------
-# The P-41 re-anchor branch, through the NAME. Task 9b: the branch had
+# The re-anchor branch, through the NAME. Task 9b: the branch had
 # name-visible consequences that no test asserted -- 'Oc1ccccc1S' ->
 # '2-sulfanylphenol' passes with the feature fully reverted, so it was not a
 # witness for anything.
@@ -205,7 +205,7 @@ P41_REANCHOR_NAMES = [
 
 @pytest.mark.parametrize("smiles,expected", P41_REANCHOR_NAMES)
 def test_p41_reanchor_is_name_visible(smiles, expected):
-    """P-41 seniority decides which group is the suffix -- asserted as a NAME."""
+    """ seniority decides which group is the suffix -- asserted as a NAME."""
     assert name_compound(smiles) == expected
 
 
@@ -214,7 +214,7 @@ def test_p41_reanchor_is_name_visible(smiles, expected):
 # --------------------------------------------------------------------------
 
 def _pcg_atoms(smiles):
-    """The P-14.4(c) ring-atom set the production wiring actually computes."""
+    """The (c) ring-atom set the production wiring actually computes."""
     from rdkit import Chem
     from orthonym.perception.functional_groups import detect_functional_groups
     from orthonym.rules.seniority import get_principal_group
@@ -252,7 +252,7 @@ def test_discriminator_empty_when_no_suffix_and_no_promotable_group():
 
 
 def test_discriminator_picks_only_the_senior_group_p41():
-    """P-41: with -ol and -thiol both present only the -ol is the PCG.
+    """: with -ol and -thiol both present only the -ol is the PCG.
 
     Before this change the set was the THIOL's ring atom (the only ``is_suffix``
     one), i.e. the numbering hint contradicted the emitted ``2-sulfanylphenol``.
@@ -299,14 +299,14 @@ def test_discriminator_ignores_hydroxy_when_a_senior_suffix_is_present():
 
 
 def test_discriminator_excludes_a_co_occurring_junior_SUFFIX_p41():
-    """★ P-41: with -carboxylic acid AND -sulfonic acid both already ``is_suffix``,
+    """★: with -carboxylic acid AND -sulfonic acid both already ``is_suffix``,
     only the SENIOR one is the principal characteristic group.
 
     The pre-existing callers passed the UNION of every ``is_suffix`` ring atom, so
     the numberer minimised a set that included a group the name does not spell as
     the suffix. No currently emitted name differs (``3,4-disulfobenzoic acid``
     re-anchors the acid to position 1 downstream regardless), so this contract is
-    pinned HERE rather than through a name -- otherwise the P-41 filter would be
+    pinned HERE rather than through a name -- otherwise the filter would be
     silently unprotected and any future junior ring suffix could reintroduce the
     union behaviour undetected.
     """
@@ -326,10 +326,10 @@ def test_discriminator_falls_back_to_legacy_without_a_principal_group():
     """Fail toward current behaviour: no principal group -> the legacy is_suffix set.
 
     ⚠ Task 9b repair: this used to run on the PENTOL, whose legacy answer is ALSO
-    ``set()``, so ``== set()`` was tautological -- it passed whether the fallback
+    ``set``, so ``== set`` was tautological -- it passed whether the fallback
     returned the legacy union or nothing at all. It now runs on a molecule whose
     legacy ``is_suffix`` union is NON-empty and asserts that exact set, so a
-    fallback that returned ``set()`` instead would fail.
+    fallback that returned ``set`` instead would fail.
     """
     from rdkit import Chem
     from orthonym.perception.functional_groups import detect_functional_groups
@@ -377,8 +377,8 @@ def test_discriminator_respects_the_functional_class_guard():
     because ``'azide'`` was a dead key the detector could never emit). It is now
     labelled for what it is: a snapshot of a KNOWN DEFECT.
 
-    Derived at source, not guessed: ``BlueBookV2/BlueBookV2.md:1710`` item (p)
-    records that the -N=C=O group "and its chalcogen analogues ... have been added
+    Derived at source, not guessed: ``the Blue Book Blue Book`` item (p)
+    records that the -N=C=O group "and its chalcogen analogues... have been added
     to the list of characteristic groups that are ALWAYS cited as prefixes in
     substitutive nomenclature"; ``:26003`` repeats it for isocyanates; and
     ``:26014`` gives ``4-isocyanatobenzene-1-sulfonyl chloride (PIN)`` --
@@ -399,7 +399,7 @@ def test_discriminator_respects_the_functional_class_guard():
 def test_the_azide_twin_is_treated_the_OTHER_way_and_that_is_correct():
     """★ The row the dead ``'azide'`` key made accidentally green.
 
-    §**P-61.7 "AZIDES"** (``BlueBookV2/BlueBookV2.md:25991``): azides "are named
+    §** "AZIDES"** (``the Blue Book Blue Book``): azides "are named
     using substitutive nomenclature and the prefix 'azido'. This method gives
     preferred IUPAC names rather than names based on the class name 'azido' in
     functional class nomenclature", with ``:25997``
@@ -420,7 +420,7 @@ def _parent_selection_locant_hint(smiles):
 
     ⚠ Task 9b repair: this helper used to ASSIGN ``features.principal_group``
     itself, which concealed the fact that the whole anchor was a NO-OP for every
-    external caller -- ``compute_features()`` runs ``_perceive`` only, so the
+    external caller -- ``compute_features`` runs ``_perceive`` only, so the
     attribute is ``None`` there. Nothing is assigned now; the production fallback
     inside ``_build_ring_info_for_parent_selection`` has to do the work.
     """
@@ -451,7 +451,7 @@ def test_locant_hint_agrees_with_the_emitted_name():
     """The parent-selection locant HINT and the emitted NAME must agree.
 
     namer.py Branch 3 publishes an independent benzene numbering used for parent
-    selection and stereo locants. It derived its P-14.4(c) anchor from ``is_suffix``
+    selection and stereo locants. It derived its (c) anchor from ``is_suffix``
     too, so for a phenol it disagreed with the name the composer emitted. Both now
     consult ``principal_group_ring_atoms``. Without this the two could drift apart
     silently -- no name-level test can see it.
@@ -495,9 +495,9 @@ def test_locant_hint_is_computed_for_molecules_production_actually_uses(
 def test_discriminator_is_wired_into_the_live_orientation_call(monkeypatch):
     """The set reaches ``orient_benzene`` -- the tier is fed, not just computed.
 
-    Guards the failure mode of session invariant 12: a helper that is correct but
+    Guards the failure mode of session a project rule: a helper that is correct but
     never called. Validated against a known positive (the pentol) AND a known
-    negative (the pentamethyl guard) in the same run, so a spy that recorded
+    negative (the pentamethyl guard) in the same run, so a trace that recorded
     nothing could not pass.
     """
     seen = []

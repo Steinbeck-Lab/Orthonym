@@ -1,8 +1,8 @@
-"""P-66.1.6.1.1.3 - acyclic N-substituted urea substituent end-to-end (W2F p6 Task 2).
+""" - acyclic N-substituted urea substituent end-to-end (W2F p6 Task 2).
 
-BB P-66.1.6.1.1.3 (BlueBookV2.md:33338,33354): the urea substituent is
+BB (the Blue Book,33354): the urea substituent is
 '(R-carbamoyl)amino'; the bracket escalation [(methylcarbamoyl)amino] follows
-the enclosing-marks nesting rule (P-16.5.1.1). The shipped unsubstituted analog
+the enclosing-marks nesting rule. The shipped unsubstituted analog
 '3-(carbamoylamino)propanoic acid' must stay working.
 """
 import orthonym

@@ -1,4 +1,4 @@
-"""v30 breadth — the general-engine substituent namer must name an N-rooted substituent
+""" breadth — the general-engine substituent namer must name an N-rooted substituent
 `-NH-R` / `-N(R)R'` / `-NH-C(=O)R` as the amino/amido PREFIX, NOT the cascade's carbon-rooted
 misroot.
 
@@ -20,7 +20,7 @@ def _sub(smi, frag, root):
 
 
 def test_methylamino():
-    # OC(=O)c1ccc(NC)cc1 ... but name_substituent takes the fragment; build -NH-CH3 on benzene
+    # OC(=O)c1ccc(NC)cc1... but name_substituent takes the fragment; build -NH-CH3 on benzene
     m = Chem.MolFromSmiles("CNc1ccccc1")   # C0-N1-c2(ring); frag {C0,N1}, root N1
     assert name_substituent(m, {0, 1}, 1, allow_mancude=True) == "methylamino"
 

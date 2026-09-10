@@ -1,6 +1,6 @@
-"""v29 Phase 3B (Job 1) — the italicized-prefix carve-out, decided in ONE place.
+""" a phase (Job 1) — the italicized-prefix carve-out, decided in ONE place.
 
-Phase 3A (``2f1c36dd``) unified five open-coded copies of the compound-hyphen
+a phase (``) unified five open-coded copies of the compound-hyphen
 predicate behind ``assembly.naming_utils.has_structural_hyphen`` and added a
 structural tripwire. A review then found the unification INCOMPLETE and the
 tripwire unable to have caught the survivors: it searched only for
@@ -10,32 +10,32 @@ tripwire unable to have caught the survivors: it searched only for
 * ``startswith('tert-')`` in its single-argument form,
 * ``for skip in ('tert-', 'sec-')`` loop forms,
 * character-set membership tests whose class contains a hyphen
-  (``any(c in nm for c in '-()[]0123456789')``),
+  (``any(c in nm for c in '-0123456789')``),
 * and a SECOND hand-written carve-out list (``r_name not in ('tert-butyl',
   'sec-butyl')``), the one construct guaranteed to drift from the primitive.
 
 Two of the survivors were shipping defects: ``(tert-butyl)(tert-butyl)zinc`` and
 the outright malformed ``ditert-butylzinc`` / ``ditert-butylmethylsilane``.
 
-**P-16.3.3(b)/P-16.2.4.1(d) / P-29.6.1** — the hyphen of a leading italicized structural prefix is
-part of a SIMPLE retained name. Verbatim, on-disk ``BlueBookV2.md``:
+**(b)/(d) / ** — the hyphen of a leading italicized structural prefix is
+part of a SIMPLE retained name. Verbatim, on-disk ``the Blue Book``:
 
 * ``:16282`` "The retained name '*tert*-butyl' has never been recommended for
-  further substitution ... Acceptable locants have never been adopted for this
+  further substitution... Acceptable locants have never been adopted for this
   name." — so its hyphen can never be a locant boundary.
 * ``:16286`` ``*tert*-butyldi(methyl)phosphane (PIN)`` — cited BARE.
 * ``:18929`` ``*tert*-butyldi(methyl)(oxiranylmethoxy)silane (PIN)``.
 * ``:25717`` ``1,2-di-*tert*-butylbenzene (PIN)`` — ``di-``, hyphenated; not
   ``bis(tert-butyl)`` and certainly not ``ditert-butyl``.
-* ``:3507``  ``1-(butan-2-yl)-3-*tert*-butylbenzene (PIN)`` — a bare ``tert-``
+* ``:3507`` ``1-(butan-2-yl)-3-*tert*-butylbenzene (PIN)`` — a bare ``tert-``
   beside an ENCLOSED ``butan-2-yl``, and ``tert-`` ignored in the ordering.
 
-**P-63.2.2.2** (``:27665``) — the retained ``R-O–`` contractions, "used both as
+**** (``:27665``) — the retained ``R-O–`` contractions, "used both as
 preferred IUPAC prefixes" and "considered as simple prefixes requiring the
-numerical prefixes 'di', 'tri'", listing ``(CH3)3C-O–  *tert*-butoxy (preferred
+numerical prefixes 'di', 'tri'", listing ``(CH3)3C-O– *tert*-butoxy (preferred
 prefix) (no substitution)``. The index rejects the alternatives by name:
-``:55662`` ``tert-butoxy* (unsubstituted) = ... (not tert-butyloxy)`` and
-``:55646`` ``(butan-2-yl)oxy* ... (not sec-butoxy; not sec-butyloxy)``.
+``:55662`` ``tert-butoxy* (unsubstituted) =... (not tert-butyloxy)`` and
+``:55646`` ``(butan-2-yl)oxy*... (not sec-butoxy; not sec-butyloxy)``.
 
 Every namer assertion runs with the OPSIN validity gate explicitly DISABLED —
 the no-JRE mode where the gate fails OPEN and nothing downstream can rescue a
@@ -65,7 +65,7 @@ from orthonym.namer import Orthonym
 
 @pytest.fixture
 def ungated_namer(monkeypatch):
-    """A namer with the SELF-01 OPSIN validity gate explicitly DISABLED.
+    """A namer with the OPSIN validity gate explicitly DISABLED.
 
     The gate fails OPEN when no JRE is present, so every safety property here is
     asserted in the mode where nothing downstream can suppress a wrong producer
@@ -82,24 +82,24 @@ def ungated_namer(monkeypatch):
 
 @pytest.mark.parametrize("name", ["tert-butyl", "sec-butyl"])
 def test_italicized_led_simple_name_is_bare(name):
-    """P-16.3.4: no marks, SIMPLE multiplier, and the hyphen is not structural."""
+    """: no marks, SIMPLE multiplier, and the hyphen is not structural."""
     assert has_structural_hyphen(name) is False
     assert italicized_prefix_is_bare(name) is True
     assert needs_brackets(name) is False
     assert is_complex_substituent(name) is False
     assert enclose_if_compound(name) == name        # cited BARE (BB 16286)
-    # v29 P3-FIX Item 4: the P-16.2.4.1(d) hyphen is now part of the
+    # -FIX Item 4: the (d) hyphen is now part of the
     # multiplied TOKEN and is produced by this one primitive, so the
     # multiplier comes back as `di-`. The assertion's point is unchanged:
-    # the SIMPLE `di` and not the derived `bis` (P-16.3.2(a)).
+    # the SIMPLE `di` and not the derived `bis` (a)).
     assert get_multiplier_prefix(2, name) == "di-"
     assert not get_multiplier_prefix(2, name).startswith("bis")
     assert multiplier_needs_hyphen(name) is True    # 'di-tert-butyl'
 
 
 @pytest.mark.parametrize("name", [
-    "tert-butylsulfanyl",        # compound chalcogen prefix (P-16.3.3)
-    "tert-butylamino",           # compound two-prefix name (P-31.1.2)
+    "tert-butylsulfanyl",        # compound chalcogen prefix
+    "tert-butylamino",           # compound two-prefix name
     "tert-butyl-dimethylsilyl",  # a SECOND, genuinely structural hyphen
     "2-tert-butyl",              # a locant
 ])
@@ -109,7 +109,7 @@ def test_the_carve_out_never_swallows_a_compound_name(name):
     This is the property that keeps the fix narrower than the open-code it
     replaced: 'tert-butyl' reduces to the simple 'butyl' and is cited bare, but
     'tert-butylsulfanyl' reduces to 'butylsulfanyl' — still compound under the
-    P-16.5.1.1 chalcogen rule, so it keeps its marks exactly as '(methylsulfanyl)'
+     chalcogen rule, so it keeps its marks exactly as '(methylsulfanyl)'
     does.
     """
     assert italicized_prefix_is_bare(name) is False
@@ -164,7 +164,7 @@ def test_mononuclear_multi_prefix_transform_survives_a_tert_butyl(ungated_namer)
     """Sites 1+2: the raw hyphen test corrupted EVERY prefix, not just the tert- one.
 
     ``_is_simple_prefix`` feeds an ``all(...)``, so classing 'tert-butyl' compound
-    flipped the whole guard False and silently switched OFF the P-16.5.1.3.1
+    flipped the whole guard False and silently switched OFF the
     first-bare/rest-enclosed transform for every prefix in the name. BB 16286
     writes the directly analogous phosphane as
     '*tert*-butyldi(methyl)phosphane' (PIN): first group bare, each later group
@@ -178,7 +178,7 @@ def test_mononuclear_multiplied_italicized_prefix_is_not_malformed(ungated_namer
     """The multiplier leg, live and MALFORMED before this phase.
 
     ``CC(C)(C)[SiH](C)C(C)(C)C`` shipped 'ditert-butylmethylsilane' — 'di' fused
-    straight onto 'tert-' with no boundary at all. P-16.3.3(b)/P-16.2.4.1(d) requires the hyphen:
+    straight onto 'tert-' with no boundary at all. (b)/(d) requires the hyphen:
     'di-tert-butyl'. OPSIN-exact (C(C)(C)(C)[SiH](C)C(C)(C)C).
     """
     assert (ungated_namer.name("CC(C)(C)[SiH](C)C(C)(C)C")
@@ -199,7 +199,7 @@ def test_apply_mononuclear_enclosing_is_the_one_implementation():
     exercised ``apply_mononuclear_enclosing`` -- the very function the pair was
     collapsed into. This calls it directly, which is also the only way to show the
     damage the raw hyphen did: ``_is_simple_prefix`` feeds an ``all(...)``, so ONE
-    italicized prefix turned the P-16.5.1.3.1 transform off for EVERY prefix.
+    italicized prefix turned the transform off for EVERY prefix.
     """
     from orthonym.assembly.composition_primitives import (
         apply_mononuclear_enclosing as encl,
@@ -208,7 +208,7 @@ def test_apply_mononuclear_enclosing_is_the_one_implementation():
     assert encl(["tert-butyl", "methyl", "chloro"], True) == [
         "tert-butyl", "(methyl)", "(chloro)"]
     assert encl(["sec-butyl", "methyl"], True) == ["sec-butyl", "(methyl)"]
-    # ... and the carve-out stays narrow: a COMPOUND remainder is still compound,
+    #... and the carve-out stays narrow: a COMPOUND remainder is still compound,
     # so the transform correctly does not fire for it
     assert encl(["tert-butylsulfanyl", "methyl"], True) == [
         "tert-butylsulfanyl", "methyl"]
@@ -221,12 +221,12 @@ def test_apply_mononuclear_enclosing_is_the_one_implementation():
 
 
 def test_alkoxy_prefix_fails_closed_on_a_revoked_contraction(monkeypatch):
-    """Direct witness for the P-63.2.2.2 fail-closed leg.
+    """Direct witness for the fail-closed leg.
 
     ``sec-butyl`` cannot reach ``_alkoxy_prefix`` today -- the substituent namer
     returns the locanted ``butan-2-yl``, which is the PIN -- so a mutation run
     showed the guard had no test that could fail. The guard still has to exist:
-    P-63.2.2.2 revokes BOTH ``sec-butoxy`` and ``sec-butyloxy`` by name, so if any
+     revokes BOTH ``sec-butoxy`` and ``sec-butyloxy`` by name, so if any
     producer ever hands this function an italicized-led R that is not in the
     retained table, the only correct spelling is one this function cannot build.
     Refuse rather than invent a rejected contraction.
@@ -252,14 +252,14 @@ def test_alkoxy_prefix_fails_closed_on_a_revoked_contraction(monkeypatch):
 
 
 # ==========================================================================
-# part C: site 3, the alkoxy prefix (P-63.2.2.2)
+# part C: site 3, the alkoxy prefix
 # ==========================================================================
 
 def test_tert_butyl_oxy_prefix_is_the_blue_book_contraction(ungated_namer):
-    """P-63.2.2.2: '(CH3)3C-O–  *tert*-butoxy (preferred prefix) (no substitution)'.
+    """: '(CH3)3C-O– *tert*-butoxy (preferred prefix) (no substitution)'.
 
     ``_alkoxy_prefix`` used a raw ``"-" in alkyl`` and emitted '(tert-butyl)oxy'.
-    The Blue Book rejects both that and 'tert-butyloxy' by name (index :55662,
+    The Blue Book rejects both that and 'tert-butyloxy' by name (index:55662,
     :55671). OPSIN-exact: 'N-tert-butoxymethanamine' -> C(C)(C)(C)ONC.
     """
     assert ungated_namer.name("CC(C)(C)ONC") == "N-tert-butoxymethanamine"
@@ -267,11 +267,11 @@ def test_tert_butyl_oxy_prefix_is_the_blue_book_contraction(ungated_namer):
 
 
 @pytest.mark.parametrize("smiles,expected", [
-    # PROTECT: the other five P-63.2.2.2 contractions must not move.
+    # PROTECT: the other five contractions must not move.
     ("CNOC", "N-methoxymethanamine"),
     ("CCONCC", "N-ethoxyethanamine"),
     ("CCCCONC", "N-butoxymethanamine"),
-    # and a locanted R stays ENCLOSED — P-63.2.2.2 revokes 'sec-butoxy' and gives
+    # and a locanted R stays ENCLOSED — revokes 'sec-butoxy' and gives
     # '(butan-2-yl)oxy' as the PIN, which is what the substituent namer produces.
     ("CCC(C)ONC", "N-(butan-2-yl)oxymethanamine"),
     ("CC(C)ONC", "N-(propan-2-yl)oxymethanamine"),
@@ -282,7 +282,7 @@ def test_the_other_retained_alkoxy_contractions_are_unchanged(
 
 
 def test_an_italicized_alkyl_with_no_retained_contraction_fails_closed():
-    """P-63.2.2.2 revokes 'sec-butoxy' AND 'sec-butyloxy' (index :55646).
+    """ revokes 'sec-butoxy' AND 'sec-butyloxy' (index:55646).
 
     So an italicized-led R that is not in the retained table has no spelling this
     function is entitled to emit, and the carve-out must not be read as licence
@@ -326,7 +326,7 @@ def test_simple_organometallic_names_are_unchanged(ungated_namer, smiles, expect
 def test_alphabetization_copies_now_cover_sec_as_well():
     """``organometallics._alphabetize_simple_ligands`` open-coded
     ``name[5:] if name.startswith('tert-')`` — it handled 'tert-' and silently
-    MISSED 'sec-', so 'sec-butyl' sorted at 's' instead of 'b' (P-14.5.2).
+    MISSED 'sec-', so 'sec-butyl' sorted at 's' instead of 'b'.
     """
     from orthonym.rules.organometallics import _alphabetize_simple_ligands
     got = _alphabetize_simple_ligands([(1, "sec-butyl"), (1, "methyl")])
@@ -371,7 +371,7 @@ def test_general_engine_multiplier_and_enclosure_agree_on_an_italicized_prefix()
     ("CC(C)(C)c1cccc(C(C)(C)C)c1O", "2,6-di-tert-butylphenol"),
     ("CC(C)(C)P(=O)(O)O", "tert-butylphosphonic acid"),
     ("CC(C)(C)P(C)(=O)O", "tert-butyl(methyl)phosphinic acid"),
-    # and the compound remainder still takes its P-16.5.1.1 marks
+    # and the compound remainder still takes its marks
     ("CC(C)(C)Sc1ccccc1", "(tert-butylsulfanyl)benzene"),
 ])
 def test_converted_sites_stay_byte_identical(ungated_namer, smiles, expected):
@@ -395,12 +395,12 @@ _TRIPWIRE_PATTERNS = {
     # any `'tert-'` / `"sec-"` literal, in ANY shape: startswith(x), startswith((
     # x, y)), `for skip in (x, y)`, a membership list, a slice constant
     'italic_literal': re.compile(r"""['"](?:tert|sec)-['"]"""),
-    # `any(c in nm for c in '-()[]0123456789')` - a character class holding a hyphen
+    # `any(c in nm for c in '-0123456789')` - a character class holding a hyphen
     'charclass_iter': re.compile(r"""\bfor\s+\w+\s+in\s+['"][^'"]*-[^'"]*['"]"""),
 }
 
 # (path relative to the package root, exact stripped source line) -> why it is OK.
-# "GUARDED" = the raw test survives but the P-16.3.4 carve-out is applied to the
+# "GUARDED" = the raw test survives but the carve-out is applied to the
 # same expression via the shared primitive. "NOT THE DECISION" = the hyphen is
 # not a compoundness test at all.
 _TRIPWIRE_ALLOWLIST = {

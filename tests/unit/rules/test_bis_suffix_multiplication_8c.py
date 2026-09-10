@@ -1,15 +1,15 @@
 """ — a phase Item 3 Case A: bis-suffix multiplication for >= 2
-identical charged skeletal centres on ONE parent (P-73.5.1 / P-73.2.2.1.1).
+identical charged skeletal centres on ONE parent /.
 
 Case A is suffix multiplication (the charged atom is the skeletal / characteristic
 group of ONE parent) -> ``parent-<locants>-bis(SUFFIX)``:
 
-  * ylium (carbenium hydride-loss, P-73.2.2.1.1, the Blue Book "bis(ylium)" NOT
+  * ylium (carbenium hydride-loss,, the Blue Book "bis(ylium)" NOT
     "diylium") — acyclic all-carbon parent.
-  * nitrilium (protonated nitrile, P-73.5.1.2) — routed through the poly-aminium
+  * nitrilium (protonated nitrile, — routed through the poly-aminium
     branch (classify_cation lumps the protonated-nitrile N as 'aminium'); the
     neutral-name ending 'dinitrile' disambiguates it from a real poly-amine.
-  * diazonium (terminal -N#N+, P-73.5.1.1) — ring parent, attachment locants.
+  * diazonium (terminal -N#N+, — ring parent, attachment locants.
 
 The ring ylium (``c1c[cH+][cH+]1`` -> cyclobut-3-ene-1,2-bis(ylium)) is deferred
 to Task 8E (it needs the Item-4 ring-cation numbering); it must ABSTAIN here.
@@ -39,11 +39,11 @@ def _abstains(name: str) -> bool:
 # === Case A shipped rows (verified abstain -> required PIN) ====================
 
 SHIPPED = {
-    "[CH2+]C[CH2+]": "propane-1,3-bis(ylium)",          # P-73.2.2.1.1 / the Blue Book
-    "[CH2+][CH2+]": "ethane-1,2-bis(ylium)",            # P-73.2.1
+    "[CH2+]C[CH2+]": "propane-1,3-bis(ylium)",          # / the Blue Book
+    "[CH2+][CH2+]": "ethane-1,2-bis(ylium)",            #
     "[CH2+]CC[CH2+]": "butane-1,4-bis(ylium)",          # general acyclic
-    "[NH+]#CCCC#[NH+]": "butanebis(nitrilium)",         # P-73.5.1.2
-    "N#[N+]c1ccc([N+]#N)cc1": "benzene-1,4-bis(diazonium)",   # P-73.5.1.1 (para)
+    "[NH+]#CCCC#[NH+]": "butanebis(nitrilium)",         #
+    "N#[N+]c1ccc([N+]#N)cc1": "benzene-1,4-bis(diazonium)",   # (para)
     "N#[N+]c1ccccc1[N+]#N": "benzene-1,2-bis(diazonium)",     # ortho
     "N#[N+]c1cccc([N+]#N)c1": "benzene-1,3-bis(diazonium)",   # meta
     "N#[N+]c1cc([N+]#N)cc([N+]#N)c1": "benzene-1,3,5-tris(diazonium)",  # tris

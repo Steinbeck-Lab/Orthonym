@@ -1,7 +1,7 @@
-"""Phase 147 Plan 02 Task 4: tests for cascade step 6 gate semantics.
+"""a phase Plan 02 Task 4: tests for cascade step 6 gate semantics.
 
-Source: https://iupac.qmul.ac.uk/BlueBook/P4.html P-44.4.1.4+
-Source: Phase 147 CONTEXT D-02 (cascade gate), D-06 (spiro/VB stub
+Source: https://iupac.qmul.ac.uk/BlueBook/P4.html +
+Source: a phase internal notes (cascade gate), (spiro/VB stub
         semantics — None drops to Tier-2).
 """
 
@@ -9,10 +9,10 @@ import pytest
 
 
 def test_step6_skipped_when_any_candidate_ring_info_is_none_stub():
-    """D-06: _has_iupac_locants returns False on None stub -> step 6 no-op.
+    """: _has_iupac_locants returns False on None stub -> step 6 no-op.
 
-    Source: https://iupac.qmul.ac.uk/BlueBook/P4.html P-44.1
-    Source: Phase 147 CONTEXT D-06.
+    Source: https://iupac.qmul.ac.uk/BlueBook/P4.html
+    Source: a phase internal notes.
     """
     from orthonym.assembly.coverage_scoring import CandidateName
     from orthonym.assembly.candidate_pool import _has_iupac_locants
@@ -28,11 +28,11 @@ def test_step6_skipped_when_any_candidate_ring_info_is_none_stub():
 
 
 def test_step6_skipped_when_any_candidate_ring_info_missing():
-    """D-02: _has_iupac_locants returns False if any candidate has
+    """: _has_iupac_locants returns False if any candidate has
     ring_info=None -> step 6 no-op.
 
-    Source: https://iupac.qmul.ac.uk/BlueBook/P4.html P-44.1
-    Source: Phase 147 CONTEXT D-02.
+    Source: https://iupac.qmul.ac.uk/BlueBook/P4.html
+    Source: a phase internal notes.
     """
     from orthonym.assembly.coverage_scoring import CandidateName
     from orthonym.assembly.candidate_pool import _has_iupac_locants
@@ -45,11 +45,11 @@ def test_step6_skipped_when_any_candidate_ring_info_missing():
 
 
 def test_step6_active_when_all_candidates_populated():
-    """D-02 inverse: when ALL candidates have iupac_locants populated,
+    """ inverse: when ALL candidates have iupac_locants populated,
     cascade step 6 IS active.
 
-    Source: https://iupac.qmul.ac.uk/BlueBook/P4.html P-44.1
-    Source: Phase 147 CONTEXT D-02.
+    Source: https://iupac.qmul.ac.uk/BlueBook/P4.html
+    Source: a phase internal notes.
     """
     from orthonym.assembly.coverage_scoring import CandidateName
     from orthonym.assembly.candidate_pool import _has_iupac_locants
@@ -73,8 +73,8 @@ def test_step6_dispatch_in_best_two_tier_skipped_for_spiro():
     candidates is determined by Tier-2 weighted-sum (selection differs
     based on confidence), not by step 6 (which would be skipped anyway).
 
-    Source: https://iupac.qmul.ac.uk/BlueBook/P4.html P-44.1
-    Source: Phase 147 CONTEXT D-06.
+    Source: https://iupac.qmul.ac.uk/BlueBook/P4.html
+    Source: a phase internal notes.
     """
     from orthonym.assembly.coverage_scoring import CandidateName
     from orthonym.assembly.candidate_pool import (
@@ -89,7 +89,7 @@ def test_step6_dispatch_in_best_two_tier_skipped_for_spiro():
         ring_info={'iupac_locants': None},
     )
     # _has_iupac_locants must return False, so _best_two_tier's step 6
-    # branch (`if ... and _has_iupac_locants(candidates)`) does NOT call
+    # branch (`if... and _has_iupac_locants(candidates)`) does NOT call
     # _filter_lowest_locants.
     assert _has_iupac_locants([a_stub, b_stub]) is False
     # Direct call to _filter_lowest_locants on bail-out candidates
@@ -100,16 +100,16 @@ def test_step6_dispatch_in_best_two_tier_skipped_for_spiro():
 
 
 def test_step6_skipped_for_branch_6_5_base_component_atoms_key():
-    """Phase 149 D-09 / SC-7: Branch 6.5 emits 'base_component_atoms' key,
+    """a phase /: Branch 6.5 emits 'base_component_atoms' key,
     NOT 'iupac_locants'. _has_iupac_locants returns False -> cascade
     step 6 stays GATED for non-cataloged fused systems.
 
-    This is the carry-forward lock from Phase 147 D-06 (cascade step 6
-    conservative gate) extended to Phase 149's new dict key.
+    This is the carry-forward lock from a phase (cascade step 6
+    conservative gate) extended to a phase's new dict key.
 
-    Source: https://iupac.qmul.ac.uk/BlueBook/P4.html P-44.4.1.4+
-    Source: 149-CONTEXT.md D-09; SC-7.
-    Source: 147-CONTEXT.md D-06.
+    Source: https://iupac.qmul.ac.uk/BlueBook/P4.html +
+    Source: 149-internal notes;.
+    Source: 147-internal notes.
     """
     from orthonym.assembly.coverage_scoring import CandidateName
     from orthonym.assembly.candidate_pool import _has_iupac_locants
@@ -133,10 +133,10 @@ def test_step6_skipped_for_branch_6_5_base_component_atoms_key():
 
 
 def test_step6_skipped_when_only_branch_6_5_candidate():
-    """Phase 149 D-09: even if every candidate has 'base_component_atoms',
+    """a phase: even if every candidate has 'base_component_atoms',
     cascade step 6 stays GATED because none has 'iupac_locants'.
 
-    Source: 149-CONTEXT.md D-09; SC-7.
+    Source: 149-internal notes;.
     """
     from orthonym.assembly.coverage_scoring import CandidateName
     from orthonym.assembly.candidate_pool import _has_iupac_locants

@@ -1,7 +1,7 @@
 """
 Unit tests for benzene functionalized chain detection.
 
-Tests the _identify_functionalized_chain() and _detect_chain_functional_group()
+Tests the _identify_functionalized_chain and _detect_chain_functional_group
 functions that detect chains with functional groups attached to benzene rings.
 """
 
@@ -40,7 +40,7 @@ def _get_benzene_ring_and_chain_start(smiles):
 
 
 class TestIdentifyFunctionalizedChain:
-    """Test _identify_functionalized_chain() function."""
+    """Test _identify_functionalized_chain function."""
 
     def test_carboxylic_acid_chain_detected(self):
         """Detect butanoic acid chain on benzene with proper substituent name."""
@@ -98,7 +98,7 @@ class TestIdentifyFunctionalizedChain:
 
 
 class TestDetectChainFunctionalGroup:
-    """Test _detect_chain_functional_group() function."""
+    """Test _detect_chain_functional_group function."""
 
     def test_detect_carboxylic_acid(self):
         """Carboxylic acid C(=O)O pattern detected."""

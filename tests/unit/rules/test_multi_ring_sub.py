@@ -1,9 +1,9 @@
 """
-Unit tests for multi-ring substituent prefix generation (Phase 82).
+Unit tests for multi-ring substituent prefix generation (a phase).
 
 Tests cover:
-- Ring assembly substituent prefixes (IUPAC P-28.3): [1,1'-biphenyl]-4-yl format
-- Mixed-ring compound substituent prefixes (IUPAC P-31): senior ring as parent
+- Ring assembly substituent prefixes (IUPAC: [1,1'-biphenyl]-4-yl format
+- Mixed-ring compound substituent prefixes (IUPAC: senior ring as parent
 - Multi-ring fragment grouping: _merge_connected_ring_groups correctness
 - Regression: single ring and fused het substituents still work
 """
@@ -22,7 +22,7 @@ from orthonym.assembly.composer import _merge_connected_ring_groups
 
 
 # ============================================================================
-# Ring Assembly Prefix Tests (IUPAC P-28.3)
+# Ring Assembly Prefix Tests (IUPAC
 # ============================================================================
 
 
@@ -53,7 +53,7 @@ def test_biphenyl_substituent_format():
     assert "[" in name and "]-" in name, (
         f"Expected square bracket enclosing in name, got: {name}"
     )
-    # Must have parentheses around the entire prefix per P-16.5.1.1
+    # Must have parentheses around the entire prefix per
     assert "([" in name, (
         f"Expected parenthesized bracket prefix, got: {name}"
     )
@@ -73,7 +73,7 @@ def test_bipyridyl_on_chain():
 
 @pytest.mark.unit
 def test_ring_assembly_prefix_function_directly():
-    """Unit test name_ring_assembly_prefix() with a biphenyl molecule."""
+    """Unit test name_ring_assembly_prefix with a biphenyl molecule."""
     mol = Chem.MolFromSmiles("OC(=O)CCCc1ccc(-c2ccccc2)cc1")
     ri = mol.GetRingInfo()
     rings = ri.AtomRings()
@@ -110,7 +110,7 @@ def test_ring_assembly_prefix_function_directly():
 
 
 # ============================================================================
-# Mixed-Ring Compound Prefix Tests (IUPAC P-31)
+# Mixed-Ring Compound Prefix Tests (IUPAC
 # ============================================================================
 
 
@@ -146,7 +146,7 @@ def test_phenyl_pyridyl_chain_on_pyridine():
 
 @pytest.mark.unit
 def test_mixed_ring_prefix_function_directly():
-    """Unit test name_mixed_ring_prefix() with a phenyl-pyridyl molecule."""
+    """Unit test name_mixed_ring_prefix with a phenyl-pyridyl molecule."""
     mol = Chem.MolFromSmiles("OC(=O)CCCCCc1ccnc(-c2ccccc2)c1")
     ri = mol.GetRingInfo()
     rings = ri.AtomRings()

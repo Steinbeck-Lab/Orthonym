@@ -1,4 +1,4 @@
-"""OPSIN round-trip integration tests for the steroid α/β assembler (a phase, WSC-02).
+"""OPSIN round-trip integration tests for the steroid α/β assembler (a phase, -02).
 
 Generate name → OPSIN parse → compare canonical SMILES to the original. RT is the
 project's accuracy oracle. The 9 gold exemplars are conjugate-free so the RT-flip is

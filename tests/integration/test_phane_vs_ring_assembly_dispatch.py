@@ -12,7 +12,7 @@ Each test exercises both the topology-gate predicates directly AND the
 full ``name_compound`` pipeline so a future regression in either guard
 cannot be silently masked by the dispatch order in namer.py.
 
-Source: internal notes / /;
+Source: 155-internal notes / /;
         tests/integration/test_assembly_vs_multiplicative_dispatch.py
         (a phase pattern).
 """
@@ -52,7 +52,7 @@ class TestPhaneVsRingAssemblyDispatch:
     def test_cyclophane_routes_to_phane_handler(self, smiles, label) -> None:
         """Cyclophane SMILES -> phane handler; multiplicative + ring_assembly decline.
 
-        Wave-8 P8: `name_cyclophane` now emits the P-26 simplified-skeletal
+        Wave-8 P8: `name_cyclophane` now emits the simplified-skeletal
         PIN (`...phane`, e.g. `1,4(1,4)-dibenzenacyclohexaphane`) for this
         class rather than the legacy semi-systematic bracket-prefix form
         (`[2.2]paracyclophane`) -- assert the generic `...phane` suffix
@@ -173,7 +173,7 @@ class TestPhaneVsRingAssemblyDispatch:
     def test_name_compound_full_dispatch_lands_on_phane(
         self, smiles, expected_pin, label
     ) -> None:
-        """End-to-end name_compound EMITS the P-26 PIN (Wave-8 P8, Task 8.12).
+        """End-to-end name_compound EMITS the PIN (Wave-8 P8, Task 8.12).
 
         The phane handler classifies + composes (asserted above); production
         now ships the verified `build_phane_pin` PIN for the monocyclic

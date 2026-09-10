@@ -1,7 +1,7 @@
-"""v33 Phase 1 (C3): SELF-01 gate backstop rejects OPSIN-parseable stereo
+""" a phase (C3): gate backstop rejects OPSIN-parseable stereo
 FABRICATION (nb > na) while still tolerating the achiral case (na == nb == 0).
 
-See .superpowers/sdd/2026-08-16-v33-phase1-stereo-honesty/task-5-brief.md.
+See.superpowers/sdd/2026-08-16--phase1-stereo-honesty/task-5-brief.md.
 """
 from orthonym.namer import _self_consistency_verdict
 

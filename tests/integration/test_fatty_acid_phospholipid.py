@@ -1,5 +1,5 @@
 """
-Integration tests for Phase 41-03: Fatty acid retained names and phospholipid FG detection.
+Integration tests for a phase-03: Fatty acid retained names and phospholipid FG detection.
 
 Tests:
 - Fatty acid trivial name lookups (acylate, acyloxy)
@@ -24,10 +24,10 @@ from orthonym.perception.functional_groups import detect_functional_groups
 class TestFattyAcidLookups:
     """Fatty acid retained names in acylate and acyloxy tables.
 
-    NOTE (v29 Task J2): these assert a SPELLING conversion, stem -> acyl word,
-    and are NOT an endorsement of the trivial name as a PIN. P-65.1.1.2.2
-    (BlueBookV2.md:29745) retains these "for general nomenclature with
-    functionalization ... the formation of esters leads to names such as methyl
+    NOTE : these assert a SPELLING conversion, stem -> acyl word,
+    and are NOT an endorsement of the trivial name as a PIN.
+    (the Blue Book) retains these "for general nomenclature with
+    functionalization... the formation of esters leads to names such as methyl
     butyrate", so the conversion itself is legitimate general nomenclature.
     The PIN decision belongs at the STEM PRODUCER, not here: no PIN-path
     producer hands 'palmitic' to this table any more. See
@@ -94,23 +94,23 @@ class TestFattyAcidEsterNaming:
 
     This class formerly asserted the opposite -- "Methyl esters of fatty acids
     use trivial acid names" -- and so codified a non-PIN emission as the spec.
-    Corrected by v29 Task J2.
+    Corrected by.
 
-    P-65.1.1.1 "Retained names as preferred IUPAC names" (BlueBookV2.md:29715)
+     "Retained names as preferred IUPAC names" (the Blue Book)
     -- "Only the following five carboxylic acids retained names and are also
     preferred IUPAC names": formic, oxalic, acetic, benzoic, oxamic. No fatty
     acid is among them.
 
-    P-65.1.2 "Systematic names" (heading :29858, rule :29860) -- "Except for
-    formic acid, acetic acid, oxalic acid (see P-65.1.1.1), and oxamic acid
-    (see P-65.1.1.1), systematically formed names are preferred IUPAC names;
-    the names given in P-65.1.1.2 are retained names for use in general
+     "Systematic names" (heading:29858, rule:29860) -- "Except for
+    formic acid, acetic acid, oxalic acid (see, and oxamic acid
+    (see, systematically formed names are preferred IUPAC names;
+    the names given in are retained names for use in general
     nomenclature."
 
-    The book prints the marker on the systematic side: :29787 "palmitic acid
-    hexadecanoic acid (PIN)", :29791 "stearic acid  octadecanoic acid (PIN)".
+    The book prints the marker on the systematic side::29787 "palmitic acid
+    hexadecanoic acid (PIN)",:29791 "stearic acid octadecanoic acid (PIN)".
 
-    P-65.6.3.2.1 (:31659) -- "All preferred IUPAC names for esters are named by
+     (:31659) -- "All preferred IUPAC names for esters are named by
     functional class nomenclature" -- takes the acyl word from the PIN acid,
     which is why it prints "ethyl methyl butanedioate (PIN)" and not
     "succinate" even though succinic acid is a retained name.

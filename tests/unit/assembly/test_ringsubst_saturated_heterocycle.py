@@ -1,11 +1,11 @@
-"""v28 ring-substituent tranche T3 — decorated saturated N/O-heterocycle
+""" ring-substituent tranche — decorated saturated N/O-heterocycle
 substituents number + name via the recursive composer.
 
 `_monocycle_position_map` (and `_monocycle_core_tail`) treated a SATURATED
 ring's N-H atoms as ambiguous indicated hydrogen (`len(ih) > 1 -> None`), but
 indicated hydrogen is a mancude-ring concept — a saturated ring has none. So a
 decorated piperazinyl (two ring N-H) failed to number -> the recursion declined.
-T3 scopes the indicated-H accounting to aromatic/mancude cores.
+ scopes the indicated-H accounting to aromatic/mancude cores.
 
 Producers are called DIRECTLY (unit tests disable the OPSIN gate); the recursion
 is reached only under allow_mancude=True -> PIN default byte-identical.

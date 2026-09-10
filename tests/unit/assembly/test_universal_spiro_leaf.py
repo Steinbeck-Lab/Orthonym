@@ -1,7 +1,7 @@
 """The universal substitutive core must name spiro ring systems as a branch
 parent, not void on them.
 
-Root cause (spy 2026-08-30): ``universal_substituent._name_ring_spine`` wired
+Root cause (trace 2026-08-30): ``universal_substituent._name_ring_spine`` wired
 only ``analyze_cage_universal`` (von-Baeyer) for polycyclic ring parents, so a
 spiro ring -- which is NOT a von-Baeyer cage -- made the cage analyzer void and
 the "unconditional" core ``return None``, voiding on EVERY spiro-ring branch.
@@ -10,7 +10,7 @@ spiro descriptor / numbering for ~74% of the spiro abstention residual). This is
 the best-effort FLOOR (reachable only on the general-fallback path); the PIN
 path is untouched.
 
-Governing rules: P-24.2 (von-Baeyer/spiro ring numbering), P-29.3 (a free
+Governing rules: (von-Baeyer/spiro ring numbering), (a free
 valence takes the lowest locant for substituent use). 0-wrong is enforced by the
 offer pool's full-InChIKey RT gate; these tests pin PRODUCTION (the core no
 longer voids) and the whole-molecule round-trip.

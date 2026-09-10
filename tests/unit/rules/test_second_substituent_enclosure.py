@@ -1,12 +1,12 @@
-"""P-16.5.1.3.1/.3.2 — first cited substituent bare, each subsequent one enclosed.
+"""/.3.2 — first cited substituent bare, each subsequent one enclosed.
 
 On a single-substitutable retained parent (acetic acid) or a mononuclear parent
 hydride (silane), 2+ substituents are cited first-bare / second-and-further-enclosed;
 a multiplicative prefix stays OUTSIDE the marks:
 
-    anilino(oxo)acetic acid (P-16.5.1.3.2, the Blue Book)
+    anilino(oxo)acetic acid, the Blue Book)
     hydroxydi(phenyl)acetic acid (the Blue Book -- 'di' outside, not '(diphenyl)')
-    (R)-methyl(propyl)silanol (P-16.5.1.3.1, cf. ethyl(methyl)(propyl)phosphane:7282)
+    (R)-methyl(propyl)silanol, cf. ethyl(methyl)(propyl)phosphane:7282)
 
 Every emitted name OPSIN-round-trips.
 """
@@ -48,7 +48,7 @@ def test_expected_pins_round_trip(smiles, expected):
 
 @pytest.mark.parametrize("smiles,expected", [
     # single substituent -> unaffected (needs >= 2 to trigger the enclose pass);
-    # the acetic parent omits the alpha locant (P-14.3.4.6)
+    # the acetic parent omits the alpha locant
     ("OC(=O)CO", "hydroxyacetic acid"),
     # multiplied single ligand on silane stays as the plain multiplier form
     ("C[Si](C)(C)C", "tetramethylsilane"),

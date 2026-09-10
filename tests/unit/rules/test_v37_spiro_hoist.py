@@ -1,6 +1,6 @@
-"""v37 spiro-hoist — cross-boundary substituent HOISTING made locant-correct.
+""" spiro-hoist — cross-boundary substituent HOISTING made locant-correct.
 
-STEP-1 finding (invariant 17, corenum-premise re-scope): cross-spiro-boundary
+ finding (a project rule, corenum-premise re-scope): cross-spiro-boundary
 substituent hoisting ALREADY EXISTS (primed component substituents like
 ``3',6'-dihydroxy`` on the xanthene half emit correctly via
 ``composer._integrate_universal_prefixes`` consuming the ``combined_locants``
@@ -93,13 +93,13 @@ def test_clean_spiro_vb_canary_byte_identical(smi, expected):
     assert got == expected, f"CANARY REGRESSION {smi}: {got!r} != {expected!r}"
 
 
-# --- NAMED 0-WRONG BLOCKER (RESOLVED by v38 CP2): decorated spiro-of-fused ----
+# --- NAMED 0-WRONG BLOCKER (RESOLVED by CP2): decorated spiro-of-fused ----
 # The dominant real residual was decorated spiro-of-fused TERPENOIDS (spiro-epoxide
-# on an acylated decalin), MULTI-BLOCKED (invariant 15) by:
+# on an acylated decalin), MULTI-BLOCKED (a project rule) by:
 # (a) the systematic decalin component being numbered plain 1..10 (no 4a/8a fusion
-#     locants) so the descriptor/substituent locants were OPSIN-invalid, AND
+# locants) so the descriptor/substituent locants were OPSIN-invalid, AND
 # (b) the complex_ring path being stereo LOG-ONLY.
-# v38 CP2 (fused-atom numbering, P-31.1.4 '4a'/'8a' fusion locants +
+# CP2 (fused-atom numbering, '4a'/'8a' fusion locants +
 # _enrich_complex_ring_with_subs mixed-locant plumbing) closed BOTH: this witness
 # now names a determinate, full-InChIKey-RT-verified best-effort name (0-wrong).
 @pytest.mark.opsin_gate

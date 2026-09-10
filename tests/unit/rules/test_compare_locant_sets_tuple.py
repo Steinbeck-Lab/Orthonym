@@ -1,7 +1,7 @@
 """
 Tests for tuple-aware compare_locant_sets and _assert_homogeneous_locants.
 
-a phase Plan 01 Task 1 (SC-2, SC-7 evidence).
+a phase Plan 01 Task 1 (, evidence).
 
 These tests cover:
 - Pure-int back-compat (the existing 3 doctests must also pass byte-identical)
@@ -12,14 +12,14 @@ These tests cover:
   lists with a ValueError whose message mentions both "mixed" and the offending types
 
 IUPAC source: https://iupac.qmul.ac.uk/BlueBook/P1.html
-  - P-14.5.2 First-point-of-difference rule
-  - P-14.7 Locant set comparison
-  - P-14.4(g) Lowest locants for substituents (alphabetical tiebreaker context)
+  - First-point-of-difference rule
+  - Locant set comparison
+  - (g) Lowest locants for substituents (alphabetical tiebreaker context)
 
 Project source: a phase (locant type safety lock-in);
-                a phase CONTEXT, (tuple encoding + coercion strategy);
-                a phase RESEARCH §3 Risk 3 (min() hazard downstream).
-AUTONOM-1990 §3 (criterion-order comparison after permutation generation).
+                a phase internal notes, (tuple encoding + coercion strategy);
+                a phase RESEARCH Risk 3 (min hazard downstream).
+AUTONOM-1990 (criterion-order comparison after permutation generation).
 """
 
 import pytest
@@ -38,8 +38,8 @@ from orthonym.rules.locants import (
 def test_pure_int_first_point_of_difference_a_wins():
     """Pure-int fast path: a=[2,3,5] vs b=[3,4,6] → a wins at position 0.
 
-    IUPAC first-point-of-difference rule (P-14.5.2).
-    Source: https://iupac.qmul.ac.uk/BlueBook/P1.html P-14.5.2
+    IUPAC first-point-of-difference rule.
+    Source: https://iupac.qmul.ac.uk/BlueBook/P1.html
     Also the first existing doctest — MUST preserve byte-identical.
     """
     assert compare_locant_sets([2, 3, 5], [3, 4, 6]) == -1
@@ -48,7 +48,7 @@ def test_pure_int_first_point_of_difference_a_wins():
 def test_pure_int_first_point_of_difference_b_wins():
     """Pure-int fast path: a=[2,4,5] vs b=[2,3,5] → b wins at position 1.
 
-    Source: https://iupac.qmul.ac.uk/BlueBook/P1.html P-14.5.2
+    Source: https://iupac.qmul.ac.uk/BlueBook/P1.html
     Second existing doctest — back-compat gate.
     """
     assert compare_locant_sets([2, 4, 5], [2, 3, 5]) == 1
@@ -57,7 +57,7 @@ def test_pure_int_first_point_of_difference_b_wins():
 def test_pure_int_identical_sets():
     """Pure-int fast path: identical sets return 0.
 
-    Source: https://iupac.qmul.ac.uk/BlueBook/P1.html P-14.7
+    Source: https://iupac.qmul.ac.uk/BlueBook/P1.html
     Third existing doctest — back-compat gate.
     """
     assert compare_locant_sets([2, 3], [2, 3]) == 0
@@ -73,7 +73,7 @@ def test_pure_tuple_equivalent_to_pure_int_when_all_empty_suffix():
 
     a=[(2,''),(3,''),(5,'')] vs b=[(3,''),(4,''),(6,'')] → a wins at position 0.
 
-    Source: https://iupac.qmul.ac.uk/BlueBook/P1.html P-14.5.2
+    Source: https://iupac.qmul.ac.uk/BlueBook/P1.html
     a phase (locant type safety).
     """
     a = [(2, ''), (3, ''), (5, '')]
@@ -87,8 +87,8 @@ def test_fusion_atom_empty_string_sorts_before_letter():
     a=[(4,''),(5,'')] vs b=[(4,'a'),(5,'')] → a wins at position 0.
 
     IUPAC convention: plain locant 4 is "lower" than fusion locant 4a.
-    Source: https://iupac.qmul.ac.uk/BlueBook/P1.html P-14.5.2
-    a phase CONTEXT (tuple encoding with empty-string-prefix ordering).
+    Source: https://iupac.qmul.ac.uk/BlueBook/P1.html
+    a phase internal notes (tuple encoding with empty-string-prefix ordering).
     """
     a = [(4, ''), (5, '')]
     b = [(4, 'a'), (5, '')]
@@ -100,8 +100,8 @@ def test_fusion_letters_order_a_before_b():
 
     a=[(4,'a'),(5,'')] vs b=[(4,'b'),(5,'')] → a wins at position 0.
 
-    Source: https://iupac.qmul.ac.uk/BlueBook/P1.html P-14.5.2
-    AUTONOM-1990 §3 (criterion-order comparison).
+    Source: https://iupac.qmul.ac.uk/BlueBook/P1.html
+    AUTONOM-1990 (criterion-order comparison).
     """
     a = [(4, 'a'), (5, '')]
     b = [(4, 'b'), (5, '')]
@@ -113,8 +113,8 @@ def test_fusion_base_beats_next_integer():
 
     a=[(4,'b'),(5,'')] vs b=[(5,''),(5,'')] → a wins at position 0.
 
-    Source: https://iupac.qmul.ac.uk/BlueBook/P1.html P-14.5.2
-    a phase CONTEXT (tuple encoding).
+    Source: https://iupac.qmul.ac.uk/BlueBook/P1.html
+    a phase internal notes (tuple encoding).
     """
     a = [(4, 'b'), (5, '')]
     b = [(5, ''), (5, '')]
@@ -122,11 +122,11 @@ def test_fusion_base_beats_next_integer():
 
 
 def test_shorter_tuple_set_wins_on_prefix_tie():
-    """Shorter set wins when all shared positions are equal (P-14.7).
+    """Shorter set wins when all shared positions are equal.
 
     a=[(2,''),(3,'')] vs b=[(2,''),(3,''),(5,'')] → a wins (fewer locants).
 
-    Source: https://iupac.qmul.ac.uk/BlueBook/P1.html P-14.7
+    Source: https://iupac.qmul.ac.uk/BlueBook/P1.html
     Back-compat contract for the tuple path (matches pure-int semantics).
     """
     a = [(2, ''), (3, '')]
@@ -145,8 +145,8 @@ def test_mixed_ints_with_one_tuple_coerces_via_empty_string_a_wins():
     a=[1,2,(3,'a')] vs b=[1,2,(3,'b')] → coerce to a'=[(1,''),(2,''),(3,'a')]
     and b'=[(1,''),(2,''),(3,'b')]; a wins at position 2 because 'a' < 'b'.
 
-    Source: https://iupac.qmul.ac.uk/BlueBook/P1.html P-14.5.2
-    a phase CONTEXT (coercion path).
+    Source: https://iupac.qmul.ac.uk/BlueBook/P1.html
+    a phase internal notes (coercion path).
     """
     a = [1, 2, (3, 'a')]
     b = [1, 2, (3, 'b')]
@@ -161,8 +161,8 @@ def test_mixed_coerces_both_directions_to_identical():
 
     Reverse direction also holds.
 
-    Source: https://iupac.qmul.ac.uk/BlueBook/P1.html P-14.7
-    a phase CONTEXT (symmetric coercion).
+    Source: https://iupac.qmul.ac.uk/BlueBook/P1.html
+    a phase internal notes (symmetric coercion).
     """
     a = [1, (2, 'a'), 3]
     b = [(1, ''), (2, 'a'), (3, '')]
@@ -188,7 +188,7 @@ def test_assert_homogeneous_all_tuple_ok():
     """_assert_homogeneous_locants accepts all-tuple list silently (returns None).
 
     Source: a phase (locant type safety lock-in).
-    Source: https://iupac.qmul.ac.uk/BlueBook/P1.html P-14.7
+    Source: https://iupac.qmul.ac.uk/BlueBook/P1.html
     """
     assert _assert_homogeneous_locants([(1, ''), (2, ''), (3, 'a')]) is None
 

@@ -1,14 +1,14 @@
 """Two spelling-layer PIN fixes handed over from the 2026-09-03 engine-hygiene
 pass (internal notes).
 
-Q1 (P-16.3.3): a substituted alkyl whose substituent is itself a '-yl' group
+Q1: a substituted alkyl whose substituent is itself a '-yl' group
    ('cyclohexylmethyl' = cyclohexyl + methyl) is a compound substituent and takes
    enclosing marks. `needs_brackets` used to miss it (no digit/hyphen), so the
    fallback path shipped it unenclosed. NOTE: the main chain path builds
    '<organyl>amino' as one atomic string via a separate producer that is NOT yet
    fixed -- this test pins the PREDICATE + the fallback consumer only.
 
-Q2 (P-14.3.3): the plain-ring branch of the N-attached fallback dropped the
+Q2: the plain-ring branch of the N-attached fallback dropped the
    heterocycle attach locant ('oxanylamino' for oxan-4-yl); oxan-2-yl != oxan-4-yl,
    so the locant is essential. Now passes the attachment point -> 'oxan-4-yl...'.
 """

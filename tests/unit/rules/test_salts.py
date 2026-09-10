@@ -50,7 +50,7 @@ class TestNameSalt:
         """Test alkali metal with alkoxide anion.
 
         169.6-04: the anion now routes through route_charged, which emits the
-        IUPAC-2013 PIN -olate form (``methanolate``, P-63.8.1) rather than the
+        IUPAC-2013 PIN -olate form (``methanolate``, rather than the
         retained ``methoxide``. Both are valid (the Blue Book lists ``sodium
         methoxide`` (PIN) AND ``sodium methanolate``); ``lithium methanolate``
         round-trips in OPSIN to C[O-].[Li+] (RT-verified strict equivalent)."""
@@ -80,7 +80,7 @@ class TestNameZwitterion:
     def test_glycine_zwitterion_systematic(self):
         """Test glycine zwitterion with systematic naming.
 
-        v33 charged Slice B (P-74.2.1.2): with style='systematic' the retained-name
+         charged Slice B: with style='systematic' the retained-name
         lookup is skipped and route_charged GUARD 4 ->
         ``_name_primary_amine_azaniumyl_zwitterion`` produces the ionic anion-is-
         parent form -- the anion (``acetate``) is the parent, the protonated amine
@@ -95,7 +95,7 @@ class TestNameZwitterion:
         low = name.lower()
         is_systematic = 'amino' in low and ('acid' in low or 'anoic' in low)
         is_retained = low == 'glycine'
-        # P-74 ionic: an azaniumyl prefix on a carboxylate anion parent
+        # ionic: an azaniumyl prefix on a carboxylate anion parent
         # (systematic -oate/-anoate OR the retained -acetate).
         is_p74_ionic = 'azaniumyl' in low and low.endswith('ate')
         assert is_systematic or is_retained or is_p74_ionic, \
@@ -210,12 +210,12 @@ class TestStoichiometricPrefix:
 
 
 # ============================================================================
-# Phase 169.5 SUB-01/D-03 — zwitterion (P-74 inner salt) naming (Wave 0)
+# a phase / — zwitterion inner salt) naming (Wave 0)
 #
 # Retained amino-acid zwitterions (glycine/betaine) MUST stay (assert NOW).
 # Non-retained zwitterions currently strip the charge and name the neutral
-# form (GABA -> '4-aminobutanoic acid'), losing the P-74 ionic character.
-# The SUB-01 target names the whole skeleton carrying BOTH centres
+# form (GABA -> '4-aminobutanoic acid'), losing the ionic character.
+# The target names the whole skeleton carrying BOTH centres
 # (azaniumyl... substituent + -oate suffix) — xfail until Plan 02.
 # ============================================================================
 
@@ -226,21 +226,21 @@ class TestSUB01ZwitterionNegativeCanary:
     """Retained / structured zwitterion names."""
 
     def test_glycine_retained(self):
-        """Glycine retained name (P-74 allows it; OPSIN-parseable) is preserved
-        FIRST per D-06 (amino-acid zwitterions sequenced ahead of GUARD 4)."""
+        """Glycine retained name allows it; OPSIN-parseable) is preserved
+        FIRST per (amino-acid zwitterions sequenced ahead of GUARD 4)."""
         assert name_compound("[NH3+]CC(=O)[O-]") == "glycine"
 
     def test_betaine_structured_p74_1_3(self):
         """169.6-04: the hardcoded ``betaine`` literal was DELETED (it is NOT
         OPSIN-parseable — the validity gate suppressed it to 'unknown organic
-        compound'). route_charged GUARD 4 now produces the structured P-74.1.3
+        compound'). route_charged GUARD 4 now produces the structured
         (trimethylazaniumyl)acetate, which round-trips in OPSIN to
         C[N+](C)(C)CC(=O)[O-] (RT=1, a strict improvement over RT=0)."""
         assert name_compound("C[N+](C)(C)CC(=O)[O-]") == "(trimethylazaniumyl)acetate"
 
 
 class TestSUB01Zwitterion:
-    """Non-retained zwitterion -> whole-skeleton azaniumyl...oate (D-03)."""
+    """Non-retained zwitterion -> whole-skeleton azaniumyl...oate ."""
 
     @pytest.mark.xfail(reason="DEFERRED (169.5, honest-fail): charge-stripped '4-aminobutanoic acid' already RT-correct at connectivity (InChI-L1 ignores charge), so the D-03 azaniumyl...oate compositional path is precision-only / zero-RT / high-risk new-logic. Deferred over the higher-value anion fix.", strict=False)
     def test_gaba_zwitterion_whole_skeleton(self):

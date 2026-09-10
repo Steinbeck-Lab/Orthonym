@@ -1,8 +1,8 @@
 """
 OPSIN round-trip diagnostic tool.
 
-FMT-06: Provides opsin_parse(), opsin_roundtrip_check(), and
-opsin_parse_both_versions() for validating generated IUPAC names
+: Provides opsin_parse, opsin_roundtrip_check, and
+opsin_parse_both_versions for validating generated IUPAC names
 against the OPSIN parser.
 
 Uses subprocess to invoke the OPSIN CLI JAR. Requires Java runtime

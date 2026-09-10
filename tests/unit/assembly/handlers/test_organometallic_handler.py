@@ -1,15 +1,15 @@
-"""Phase 161 unit tests for organometallic handler (P-69 + IR-10 + Salzer 1999).
+"""a phase unit tests for organometallic handler + + Salzer 1999).
 
 Mirrors tests/unit/assembly/handlers/test_simple_molecule.py — the FIRST and
-ONLY tree-emitting handler test from Phase 160.2 Plan-10 DECOMP-02. ORGM is
-the SECOND tree-emitting handler in Orthonym per CONTEXT D-11.
+ONLY tree-emitting handler test from a phase Plan-10 DECOMP-02. ORGM is
+the SECOND tree-emitting handler in Orthonym per internal notes.
 
-CONTEXT D-11 BYTE-IDENTICAL CONTRACT: name_tree_to_string(result.tree) ==
+internal notes BYTE-IDENTICAL CONTRACT: name_tree_to_string(result.tree) ==
 result.name for ALL non-None returns. These tests verify the contract holds
 per-tier (Tier-1 retained + Tier-2 carbonyl + Tier-3 σ-bonded + Tier-4
 mixed η-bonded).
 
-NEVER uses @pytest.mark.xfail (CONTEXT D-29) — honest-fail-on-data.
+NEVER uses @pytest.mark.xfail (internal notes) — honest-fail-on-data.
 """
 import inspect
 import pytest
@@ -29,7 +29,7 @@ from orthonym.routing.dispatch_table import DISPATCH_TABLE, StoutClass
 
 @pytest.mark.unit
 class TestNameOrganometallicSignature:
-    """Per CONTEXT D-04 + D-11: name_organometallic(features, mol, style='pin') -> Optional[NamingResult]."""
+    """Per internal notes +: name_organometallic(features, mol, style='pin') -> Optional[NamingResult]."""
 
     def test_signature_shape(self):
         """Handler has (features, mol, style) signature."""
@@ -78,7 +78,7 @@ class TestNameOrganometallicSignature:
 
 @pytest.mark.unit
 class TestTier1Retained:
-    """Tier-1 unsubstituted parent metallocenes per CONTEXT D-01."""
+    """Tier-1 unsubstituted parent metallocenes per internal notes."""
 
     def test_ferrocene_pin(self):
         mol = Chem.MolFromSmiles('[Fe+2].c1cc[cH-]c1.c1cc[cH-]c1')
@@ -255,13 +255,13 @@ class TestTier3SigmaBonded:
 
 
 # ---------------------------------------------------------------------------
-# Class 5 — TestNameTreeRoundTrip (≥ 5 tests per CONTEXT D-11)
+# Class 5 — TestNameTreeRoundTrip (≥ 5 tests per internal notes)
 # ---------------------------------------------------------------------------
 
 
 @pytest.mark.unit
 class TestNameTreeRoundTrip:
-    """CONTEXT D-11 byte-identical contract: name_tree_to_string(tree) == result.name."""
+    """internal notes byte-identical contract: name_tree_to_string(tree) == result.name."""
 
     def test_ferrocene_round_trip(self):
         mol = Chem.MolFromSmiles('[Fe+2].c1cc[cH-]c1.c1cc[cH-]c1')
@@ -302,7 +302,7 @@ class TestNameTreeRoundTrip:
         assert name_tree_to_string(result.tree) == result.name
 
     def test_iupac_section_cite_populated(self):
-        """All ORGM trees include iupac_section_cite per CONTEXT D-11."""
+        """All ORGM trees include iupac_section_cite per internal notes."""
         mol = Chem.MolFromSmiles('[Fe+2].c1cc[cH-]c1.c1cc[cH-]c1')
         result = name_organometallic(None, mol)
         assert result.tree.iupac_section_cite is not None
@@ -317,11 +317,11 @@ class TestNameTreeRoundTrip:
         assert result == 'ferrocene'
 
     def test_dispatch_entry_priority_50(self):
-        """ORGM CFR entry is priority 50 per CONTEXT D-02."""
+        """ORGM CFR entry is priority 50 per internal notes."""
         entry = DISPATCH_TABLE[StoutClass.ORGANOMETALLIC]
         assert entry.priority == 50
 
     def test_dispatch_entry_side_effect_inventory_empty(self):
-        """CONTEXT D-12 hard invariant: side_effect_inventory=() for ORGM."""
+        """internal notes hard invariant: side_effect_inventory= for ORGM."""
         entry = DISPATCH_TABLE[StoutClass.ORGANOMETALLIC]
         assert entry.side_effect_inventory == ()

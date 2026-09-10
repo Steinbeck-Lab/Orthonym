@@ -1,10 +1,10 @@
-"""Unit tests for the mononuclear parent-hydride namer (v23 Phase 6 + 7).
+"""Unit tests for the mononuclear parent-hydride namer (a phase + 7).
 
-P-68 / P-21.1 / P-31.1.4.2. Two substituent regimes:
+ / /. Two substituent regimes:
   * all-halogen hub on S/Se/Te/P/As/Sb/Bi/I -> ``<halo>[-lambda<n>-]<stem>``
-    (Phase 6 added the λ forms; Phase 7 dropped the "λ required" gate so
+    (a phase added the λ forms; a phase dropped the "λ required" gate so
     standard-valence PCl3/SF2/AsCl3 name too);
-  * organyl / bare Group-15 As/Sb/Bi hub -> ``<organyl><stem>`` (Phase 7).
+  * organyl / bare Group-15 As/Sb/Bi hub -> ``<organyl><stem>`` (a phase).
 
 Fail-closed: every guard narrows; oxoacids, oxo-halides, interhalogens,
 di-nuclear species, branched/cyclic/unsaturated organyls, carbon-substituted
@@ -55,7 +55,7 @@ class TestStandardValenceHalides:
 
 
 class TestGroup15OrganylAndBare:
-    """Phase 7: organyl / bare Group-15 As/Sb/Bi parent hydrides."""
+    """a phase: organyl / bare Group-15 As/Sb/Bi parent hydrides."""
     @pytest.mark.parametrize("smiles,expected", [
         ("C[As](C)C", "trimethylarsane"),
         ("C[Sb](C)C", "trimethylstibane"),
@@ -87,7 +87,7 @@ class TestGroup14Halides:
         assert _name(smiles) == expected
 
     def test_group14_mixed_organyl_halide_names(self):
-        """Wave-3: mixed organyl+halide Group-14 hub now NAMES (P-67.1.2.5.2).
+        """Wave-3: mixed organyl+halide Group-14 hub now NAMES.
 
         C[Si](F)(F)F -> trifluoro(methyl)silane (OPSIN-RT ok). Previously this
         was expected to fail-closed; the element-hydride namer now builds the
@@ -142,21 +142,21 @@ class TestFailClosedDecline:
     def test_branched_cyclic_and_unsaturated_organyls_are_now_NAMED(
         self, smiles, expected, fabricated,
     ):
-        """These four were `test_declines` rows until v29 Phase 3.
+        """These four were `test_declines` rows until a phase.
 
         Their stated reasons -- "branched/internal attachment", "cyclic alkyl",
         "benzyl mislabel risk", "unsaturated alkyl" -- were artefacts of the
         private carbon-skeleton walker behind the old organyl guard, which
         miscounted a ring or branch as a linear chain (cyclohexyl -> 'hexyl',
-        benzyl -> 'heptyl', propan-2-yl -> 'propyl').  Refusing was the correct
+        benzyl -> 'heptyl', propan-2-yl -> 'propyl'). Refusing was the correct
         response to THAT walker; the four refusals were never nomenclature.
 
         The guard now routes to the audited shared chokepoint
         (`rules.substituent_purity.organyl_prefix_name` ->
         `assembly.substituent_enumerator.name_substituent`), which spells all four
-        classes correctly, so the class is NAMED instead of declined.  The
+        classes correctly, so the class is NAMED instead of declined. The
         underlying safety property is unchanged and is asserted positively here:
-        no fabricated linear chain may appear.  All four names are OPSIN-exact
+        no fabricated linear chain may appear. All four names are OPSIN-exact
         against the input structure.
         """
         mol = Chem.MolFromSmiles(smiles)

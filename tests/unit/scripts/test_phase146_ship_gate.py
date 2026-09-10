@@ -3,7 +3,7 @@
 Covers each Tier-1 ship-gate function (G2/G3/G4/G5), the paired Wilson
 95%-lower-bound math, and the diagnostic disclosure enumerator.
 
-Authority: CONTEXT.md (thresholds) + (disclosure).
+Authority: internal notes (thresholds) + (disclosure).
 Source: https://iupac.qmul.ac.uk/BlueBook/P4.html
 
 Dependencies: ``numpy`` + ``pytest`` only (pandas is NOT a project
@@ -386,7 +386,7 @@ class TestDiagnosticDisclosure:
 
 
 # ---------------------------------------------------------------------------
-# Phase history persistence ()
+# Phase history persistence
 # ---------------------------------------------------------------------------
 
 

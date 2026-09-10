@@ -1,8 +1,8 @@
-"""Phase 169 Plan-02 Wave-0 unit suite — group-splitting polyfunctional rescue.
+"""a phase Plan-02 Wave-0 unit suite — group-splitting polyfunctional rescue.
 
 Covers: per-rule split (ester → oxo + R-oxy, thioester → oxo + R-sulfanyl),
-the deny-path (functional-class FGs stay dropped — D-03), the FAIL-CLOSED
-per-split RT reject (D-05), and the Stage-A flag-OFF no-op (D-05).
+the deny-path (functional-class FGs stay dropped —), the FAIL-CLOSED
+per-split RT reject , and the Stage-A flag-OFF no-op .
 
 Mirrors tests/unit/assembly/test_retained_substitution.py (class-per-concern,
 real-perception inputs — never hand-encoded atom tuples that drift).
@@ -15,7 +15,7 @@ from orthonym.assembly.group_splitting import split_composite_fg, SplitComponent
 
 RDLogger.logger().setLevel(RDLogger.ERROR)
 
-# OPSIN-RT-verified targets (169-RESEARCH § Code Examples).
+# OPSIN-RT-verified targets (internal notes § Code Examples).
 ESTER_LOSER_SMILES = "OC(=O)CCC(=O)OCC"      # monoethyl succinate -> 4-ethoxy-4-oxobutanoic acid
 THIOESTER_LOSER_SMILES = "OC(=O)CCC(=O)SCC"  # S-ethyl monothiosuccinate -> 4-(ethylsulfanyl)-4-oxobutanoic acid
 
@@ -40,7 +40,7 @@ class _RejectOracle:
 
 @pytest.mark.unit
 class TestDenyFunctionalClass:
-    """D-03: genuine functional-class FGs are NOT in the split table -> stay dropped."""
+    """: genuine functional-class FGs are NOT in the split table -> stay dropped."""
 
     @pytest.mark.parametrize("fg", [
         "secondary_amide", "tertiary_amide", "phosphate_diester",
@@ -54,7 +54,7 @@ class TestDenyFunctionalClass:
 
 @pytest.mark.unit
 class TestEsterSplit:
-    """POLY-01: ester loser -C(=O)-O-R decomposes to oxo + R-oxy (alkoxy)."""
+    """: ester loser -C(=O)-O-R decomposes to oxo + R-oxy (alkoxy)."""
 
     def test_ester_loser_yields_oxo_plus_alkoxy(self):
         mol, match = _first_match(ESTER_LOSER_SMILES, _ESTER_SMARTS)
@@ -69,7 +69,7 @@ class TestEsterSplit:
 
 @pytest.mark.unit
 class TestThioesterSplit:
-    """POLY-01: thioester loser -C(=O)-S-R decomposes to oxo + R-sulfanyl."""
+    """: thioester loser -C(=O)-S-R decomposes to oxo + R-sulfanyl."""
 
     def test_thioester_loser_yields_oxo_plus_sulfanyl(self):
         mol, match = _first_match(THIOESTER_LOSER_SMILES, _THIOESTER_SMARTS)
@@ -82,30 +82,30 @@ class TestThioesterSplit:
 
 @pytest.mark.unit
 class TestRtReject:
-    """D-05: an RT-unsafe split (oracle.rt_safe -> False / FAIL-CLOSED) is rejected."""
+    """: an RT-unsafe split (oracle.rt_safe -> False / FAIL-CLOSED) is rejected."""
 
     def test_rt_unsafe_split_rejected(self):
         mol, match = _first_match(ESTER_LOSER_SMILES, _ESTER_SMARTS)
-        # With a rejecting oracle, the split must be refused -> None (caller behaves as DROP-23).
+        # With a rejecting oracle, the split must be refused -> None (caller behaves as).
         assert split_composite_fg("ester", mol, match, None, oracle=_RejectOracle()) is None
 
 
 @pytest.mark.unit
 class TestStageAInvariants:
-    """D-05 Stage A: W2F-P2 retired the flag-OFF byte-identity guarantee for the
-    narrow P-65.6.3.3.5 class (PG=carboxylic_acid + ester/thioester) — that class
+    """ Stage A: W2F-P2 retired the flag-OFF byte-identity guarantee for the
+    narrow class (PG=carboxylic_acid + ester/thioester) — that class
     now splits by default, per-candidate OPSIN-RT gated. Non-class FGs stay
     dropped flag-OFF (covered by TestFunctionalClassNotSplit / TestDenyFunctionalClass)."""
 
-    # A REAL DROP-23 ester case (measured): the whole ester+diacid is dropped,
-    # leaving just the short acid. (monoethyl succinate is NOT a DROP-23 case —
+    # A REAL ester case (measured): the whole ester+diacid is dropped,
+    # leaving just the short acid. (monoethyl succinate is NOT a case —
     # it is named "ethoxycarbonyl" via get_alkoxycarbonyl_prefix; RESEARCH Pitfall 4.)
     DROP23_ESTER_SMILES = "O=C(O)CCCC(=O)OCCCO"   # W2F-P2: now heals by default
 
     # W2F-P2: Stage-A flag-OFF byte-identity is intentionally RETIRED for the
-    # narrow P-65.6.3.3.5 class (PG=carboxylic_acid + ester/thioester): the
+    # narrow class (PG=carboxylic_acid + ester/thioester): the
     # split now runs by default, per-candidate OPSIN-RT gated. This molecule
-    # was the measured DROP-23 witness ("pentanoic acid"); it now names fully.
+    # was the measured witness ("pentanoic acid"); it now names fully.
     def test_default_split_heals_measured_drop23_witness(self):
         out = name_compound(self.DROP23_ESTER_SMILES)  # no flag
         assert out == "5-(3-hydroxypropoxy)-5-oxopentanoic acid", out
@@ -113,7 +113,7 @@ class TestStageAInvariants:
 
 @pytest.mark.unit
 class TestDecomposeChainMembershipGuard:
-    """W2F-P2 Task 2 (P-65.6.3.3.5): the decomposition's oxo locant is only
+    """W2F-P2 Task 2: the decomposition's oxo locant is only
     meaningful for a CHAIN-MEMBER carbonyl. With a chain provided, off-chain
     carbonyls decline; principal_chain=None keeps pure-decomposition mode."""
 
@@ -136,7 +136,7 @@ class TestDecomposeChainMembershipGuard:
 @pytest.mark.unit
 class TestDefaultOracle:
     """W2F-P2 Task 2: lazy module-level OpsinOracle for the narrow default-ON
-    split branch (Task 3). Jar-missing -> rt_safe False -> fail-closed (CR-03)."""
+    split branch (Task 3). Jar-missing -> rt_safe False -> fail-closed ."""
 
     def test_singleton_identity(self):
         from orthonym.assembly.group_splitting import _get_default_oracle

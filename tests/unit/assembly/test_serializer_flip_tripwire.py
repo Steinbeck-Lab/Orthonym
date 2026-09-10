@@ -1,4 +1,4 @@
-"""Phase 179 (WSA-03 / D-06) — standing regression tripwire for the
+"""a phase (-03 /) — standing regression tripwire for the
 name-tree-serializer production flip.
 
 JVM-free, frozen-snapshot guard (mirrors tests/unit/rules/test_among_rings_gold.py):
@@ -8,7 +8,7 @@ every FLIPPED-class row this asserts that the EXPLICIT-field serializer path
 (``_assemble_explicit_fields`` — NOT ``name_tree_to_string``, which would
 short-circuit on a str carrier) reproduces the frozen production name
 byte-for-byte. If a future change ever makes a flipped class diverge, this
-FAILS — that is the D-06 regression guard.
+FAILS — that is the regression guard.
 
 It also asserts the carrier manifest is stable: each carrier-anchor row's
 class_id is NOT in ``SERIALIZER_PRODUCTION_CLASSES`` (an accidental future flip
@@ -41,7 +41,7 @@ from orthonym.assembly.name_tree_to_string import (
 RDLogger.DisableLog("rdApp.*")
 
 _SNAPSHOT = (
-    pathlib.Path(__file__).resolve().parents[2]  # .../tests
+    pathlib.Path(__file__).resolve().parents[2]  #.../tests
     / "fixtures" / "serializer_flip_snapshot.csv"
 )
 

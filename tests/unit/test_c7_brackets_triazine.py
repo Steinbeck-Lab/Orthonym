@@ -2,12 +2,12 @@
 Tests for C7 gap-fix cluster: enclosing marks + 1,2,4-triazine naming.
 
 BB rules:
-  P-16.5.1.1  — enclosing marks cycle; a substituent already containing
+    — enclosing marks cycle; a substituent already containing
               parentheses must be enclosed in square brackets when it is not
-              fully enclosed (e.g. (pyrimidin-5-yl)methyl needs []).
-  P-16.5.1.1  — compound substituent prefixes must be parenthesized.
-  P-31.1.4.2 — 1,2,4-triazine PIN for 6-membered ring N@1,2,4.
-  P-31.1.4.3.3 — numbering direction picks lowest heteroatom locant set.
+              fully enclosed (e.g. (pyrimidin-5-yl)methyl needs ).
+    — compound substituent prefixes must be parenthesized.
+   — 1,2,4-triazine PIN for 6-membered ring N@1,2,4.
+   — numbering direction picks lowest heteroatom locant set.
 """
 
 import pytest
@@ -19,7 +19,7 @@ from orthonym import name_compound
 # ---------------------------------------------------------------------------
 
 class TestEnclosingMarks:
-    """P-16.5.1.1: (arylmethyl) substituents must be wrapped in square brackets."""
+    """: (arylmethyl) substituents must be wrapped in square brackets."""
 
     @pytest.mark.unit
     def test_pyrimidinyl_methyl_morpholine(self):
@@ -69,7 +69,7 @@ class TestEnclosingMarks:
 # ---------------------------------------------------------------------------
 
 class TestTriazine:
-    """P-31.1.4.2 / P-31.1.4.3.3: triazine PIN names and locants."""
+    """ /: triazine PIN names and locants."""
 
     @pytest.mark.unit
     def test_124_triazine_bare(self):
@@ -90,7 +90,7 @@ class TestTriazine:
     def test_124_triazine_morpholinomethyl(self):
         """c1nncc(CN2CCOCC2)n1 -> 5-[(morpholin-4-yl)methyl]-1,2,4-triazine.
 
-        Note: 1,2,4-triazine (3 N) is senior to morpholine (N+O) per P-44.2.1(f)
+        Note: 1,2,4-triazine (3 N) is senior to morpholine (N+O) per (f)
         heteroatom count, so triazine is the parent ring. Both names are OPSIN-verified;
         parent-ring seniority rules pick triazine.
         """

@@ -19,7 +19,7 @@ from orthonym.perception.rings import classify_ring
 # ============================================================================
 
 class TestRingClassification:
-    """Tests for classify_ring() function."""
+    """Tests for classify_ring function."""
 
     @pytest.mark.unit
     def test_classify_cyclopropane(self):
