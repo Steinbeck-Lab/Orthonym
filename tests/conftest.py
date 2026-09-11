@@ -42,21 +42,15 @@ FIXTURES_DIR = Path(__file__).parent / "fixtures"
 _PLANNING_DIR = PROJECT_ROOT / ".planning"
 
 FIXTURE_DEPENDENT = {
-    # reads internal notes canary + exceptions
-    # files via `assert path.exists` and `EXCEPTIONS_FILE.read_text` (unguarded).
-    "test_orgm_byte_identical_v18_canary.py",
-    # reads internal notes via `audit.read_text` (unguarded).
-    "test_frn_byte_identical_v18_canary.py",
-    # build_ledger reads internal notes and
-    # internal notes cluster files (unguarded).
-    "test_build_ledger.py",
-    # reads internal notes via
-    # `pathlib.Path(...).read_text` (unguarded).
-    "test_m2_substituent_routing.py",
     # exec's a temp dir/asm_robustness.py via importlib.spec_from_file_location
     # (unguarded); the other tests in this module do not need the fixture, but
     # the guard is applied at module granularity.
     "test_v28_composer1.py",
+    # NOTE (2026-09-11): test_orgm/test_frn byte-identical canaries and
+    # test_build_ledger now carry their OWN module-level skip/skipif (retired /
+    # fixtures pruned), and test_m2_substituent_routing skips only its single
+    # fixture-reading test — so they no longer need this dir-level guard (which
+    # would over-skip m2's still-valid routing tests in the public repo).
 }
 
 
