@@ -9,7 +9,7 @@ ring substituent, so the whole candidate fails round-trip and is suppressed.
 M2.3 will instead emit an OPSIN-parseable *relative* ``cis``/``trans`` on that
 ring, reclaiming each at 0-wrong.
 
-Each ``ref_name`` below is reference name (— it
+Each ``ref_name`` below is the reference name (— it
 is the acceptance ORACLE, not shipped output). Every ref_name was pre-verified
 in a fresh process:
 

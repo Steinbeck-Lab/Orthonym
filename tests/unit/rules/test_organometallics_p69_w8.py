@@ -1,6 +1,6 @@
 """Wave-8 Phase P9 unit tests for organometallic additive nomenclature.
 
-Covers docs/superpowers/plans/2026-07-16-wave8-p9-organometallics.md Tasks
+Covers docs/the workflow tooling/plans/2026-07-16-wave8-p9-organometallics.md Tasks
 9.1-9.6. Every test targets a live reproduce-first finding (verified at HEAD
 both gated and gate-off raw per the plan's verified-scope table).
 

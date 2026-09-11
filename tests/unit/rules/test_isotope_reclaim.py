@@ -34,8 +34,13 @@ RECLAIM_CASES = [
     # front-placed. The old locant-free `3-(2H1)oxatricyclo…` was Blue-Book-wrong
     # (it only round-tripped via OPSIN's default placement on this asymmetric cage);
     # positions 2 and 4 are inequivalent so the locant cannot be omitted.
+    # v47: the single-nuclide count subscript is OMITTED in the PIN form — the BB
+    # writes `1-chloro-3-fluoro(2-2H)benzene (PIN)` (the Blue Book), and
+    # test_isotopes.py already pins `(2-2H)` (lines 115/116/345/346). FIX-A
+    # (2026-09-05) made the emitter prefer the omitted-subscript form; this stale
+    # `(2-2H1)` expectation was the last outlier. HEAD emits `(2-2H)`.
     ("[2H][C@@]12[C@@H](O1)CCC3=CC=CC=C23",
-     "(2R,4S)-(2-2H1)-3-oxatricyclo[5.4.0.0^2,4]undeca-1(11),7,9-triene"),
+     "(2R,4S)-(2-2H)-3-oxatricyclo[5.4.0.0^2,4]undeca-1(11),7,9-triene"),
 ]
 
 

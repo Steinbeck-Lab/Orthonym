@@ -46,7 +46,7 @@ BUILD 2 — recursive-fragment retained-table reach (C4 glycan aglycone + C3 Sit
         already-working class + the reach wiring, and a 0-wrong guard on the
         witnesses.
 
-Fresh process per witness (warm-cache hazard, CLAUDE.md). Run ONLY this file:
+Fresh process per witness (warm-cache hazard, the contributor guide). Run ONLY this file:
     ``.venv/bin/python -m pytest tests/unit/rules/test_c_waveB_v36.py -q``
 (the whole suite deadlocks on an OPSIN pipe).
 """

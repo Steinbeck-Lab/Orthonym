@@ -2,7 +2,7 @@
 OPSIN re-perceives it to the input's FULL InChIKey (constitution AND stereo AND
 charge), else abstains. A stereo-incomplete, OPSIN-unparseable, or wrong-valence
 name is NOT a lesser name -- it is a WRONG name and must abstain (user-directed
-2026-08-30; FABLE precision-leak + the 1500-mol head-to-head).
+2026-08-30; a review precision-leak + the 1500-mol head-to-head).
 
 The PIN/default tier is UNCHANGED (its correct-by-construction OPSIN-unparseable
 carve-outs -- inositol / np-stereoparent / thioperoxol /... -- still ship), so

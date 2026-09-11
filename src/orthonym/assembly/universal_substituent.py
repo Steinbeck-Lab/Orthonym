@@ -112,8 +112,8 @@ charge VOIDS the whole call, never mis-names):
   EVERY genuine ionic-centre atom index was actually resolved by some level's
   suffix, not merely trusted to be, before returning a name.
 
-Fix round 1 (task-review + FABLE adversarial, both on `` -- see
-``.superpowers/sdd/2026-08-21-no-abstain-universal-namer/
+Fix round 1 (task-review + a review adversarial, both on `` -- see
+``.the workflow tooling/sdd/2026-08-21-no-abstain-universal-namer/
 task-B2b-fixround1-findings.md``): the four bullets above governed only the
 GENUINE ionic centres ``get_ion_sites`` reports. But ``get_ion_sites``
 STRIPS INTERNAL and semipolar charges (N-oxide, azide, diazo,
@@ -156,6 +156,7 @@ from dataclasses import dataclass
 from typing import Dict, FrozenSet, List, Optional, Tuple
 
 from rdkit import Chem
+from rdkit.Chem import inchi
 
 from ..perception.ions import get_ion_sites
 from ..perception.rings import get_ring_systems
@@ -638,13 +639,18 @@ def _resolve_floor_stereo(ctx: "_Ctx", mol, heavy: FrozenSet[int],
         # When the two stereocentres sit in DIFFERENT rings of a fused/spiro spine,
         # a leading cis-/trans- denotes ring-FUSION stereo, not the substituent
         # relation, so it must not be offered there -- guard on same-ring
-        # membership (FABLE review #6). The offer full-InChIKey gate would still
+        # membership (a review review #6). The offer full-InChIKey gate would still
         # veto a wrong sense, but a coincidental match could ship an ill-defined
         # name; this keeps the descriptor semantically correct by construction.
         same_ring = (len(ring_stereo_centres) == 2
                      and ctx.mol.GetRingInfo().AreAtomsInSameRing(
                          ring_stereo_centres[0], ring_stereo_centres[1]))
-        if same_ring:
+        # v47: only offer cis/trans where it is COMPLETE. rung 1b was previously
+        # unguarded (protected only by full-first ordering); a true-pair top ring
+        # whose absolute `full` spelling fails RT would otherwise ship an
+        # under-specified relative name -- the same latent hole rung 1c had.
+        if same_ring and _ring_cistrans_is_complete(
+                ctx.mol, ring_stereo_centres[0], ring_stereo_centres[1]):
             for rel in ("cis-", "trans-"):
                 rel_name = rel + comp_full.name
                 if rel_name not in candidates:
@@ -658,10 +664,10 @@ def _resolve_floor_stereo(ctx: "_Ctx", mol, heavy: FrozenSet[int],
     # its stereo IS expressible as the relative ``cis``/``trans``.
     #
     # Mirror rung 1b's mechanism, one level down: for each qualifying substituent
-    # ring (saturated 3-6-ring, EXACTLY 2 same-ring stereocentres, >=1
-    # pseudoasymmetric lowercase ``_CIPCode`` -- the lowercase gate is REQUIRED,
-    # it keeps a genuine absolute pair like a ``(3S,4S)`` pyrrolidine on its
-    # absolute descriptor, which cis/trans cannot express), re-render the whole
+    # ring (saturated 3-6-ring, EXACTLY 2 same-ring stereocentres for which
+    # cis/trans is COMPLETE -- _ring_cistrans_is_complete: flip both centres ->
+    # same molecule; a true chiral pair keeps its absolute block on the ``full``
+    # candidate above, verified first), re-render the whole
     # component with that ring's descriptor OVERRIDDEN to ``cis-``/``trans-`` and
     # offer BOTH senses. The full-InChIKey gate below keeps whichever round-trips,
     # so offering both is 0-wrong by construction (a wrong sense fails the gate).
@@ -673,6 +679,16 @@ def _resolve_floor_stereo(ctx: "_Ctx", mol, heavy: FrozenSet[int],
     if comp_full is not None:
         top_spine_atoms = frozenset(comp.spine_atom_to_locant or ())
         relative_rings = _detect_relative_substituent_rings(ctx.mol, top_spine_atoms)
+        # k=2 joint-completeness (0-wrong ABSOLUTE): a name carrying TWO relative
+        # ring descriptors is complete only if flipping ALL centres of BOTH rings
+        # also returns the same molecule. Per-ring completeness (each ring passed
+        # ``_ring_cistrans_is_complete``) does not formally imply this when a
+        # symmetry couples the two rings, and the RT gate cannot backstop a
+        # relative descriptor. If the pair is not jointly complete, offer no 2-ring
+        # relative candidate (the molecule keeps its absolute/plain name).
+        if len(relative_rings) == 2 and not _rings_jointly_complete(
+                ctx.mol, relative_rings):
+            relative_rings = []
         if 1 <= len(relative_rings) <= 2:
             for senses in itertools.product(("cis", "trans"),
                                             repeat=len(relative_rings)):
@@ -709,6 +725,82 @@ def _resolve_floor_stereo(ctx: "_Ctx", mol, heavy: FrozenSet[int],
     return plain
 
 
+def _ring_cistrans_is_complete(mol, a: int, b: int) -> bool:
+    """True iff a relative ``cis``/``trans`` descriptor is a COMPLETE, enantiospecific
+    label for the ring stereocentres ``a`` and ``b`` -- i.e. flipping BOTH of them
+    yields the SAME molecule, ``(up,up) ≅ (down,down)``. Then the ring carries no
+    independent absolute handedness and ``cis``/``trans`` loses nothing.
+    When they are DISTINCT the ring is a true chiral pair (e.g. 1,2-cyclohexane, or
+    a ring bearing opposite-sense pendant stereo on mirror-paired arc atoms) whose
+    absolute ``(R,S)`` block ``cis``/``trans`` cannot express -- excluded here,
+    kept on rung 1's ``full`` candidate.
+
+    Stereo-AWARE by construction (unlike a stereo-blind arc-rank test, which is a
+    local invariant, not a 3D automorphism, and admits the diazinane leak). Uses
+    the full stereo InChIKey; no OPSIN. Failure direction is safe: a
+    canonicalisation glitch can only make this REJECT (lost breadth), never admit
+    (a wrong emission). Both centres must be defined stereocentres (they carry
+    ``_CIPCode``); an undefined tag returns False (cannot certify -> keep absolute).
+    """
+    m = Chem.RWMol(mol)
+    for idx in (a, b):
+        at = m.GetAtomWithIdx(idx)
+        t = at.GetChiralTag()
+        if t == Chem.ChiralType.CHI_TETRAHEDRAL_CW:
+            at.SetChiralTag(Chem.ChiralType.CHI_TETRAHEDRAL_CCW)
+        elif t == Chem.ChiralType.CHI_TETRAHEDRAL_CCW:
+            at.SetChiralTag(Chem.ChiralType.CHI_TETRAHEDRAL_CW)
+        else:
+            return False
+    try:
+        orig = inchi.MolToInchiKey(mol)
+        flipped = inchi.MolToInchiKey(m.GetMol())
+    except Exception:
+        return False  # InChI failure -> cannot certify -> keep absolute (safe)
+    return bool(orig) and orig == flipped
+
+
+def _rings_jointly_complete(mol, rings: List[FrozenSet[int]]) -> bool:
+    """True iff a SINGLE relative name over ALL ``rings`` is complete -- i.e.
+    flipping EVERY ring stereocentre of EVERY ring at once yields the SAME
+    molecule.
+
+    Rung 1c can emit up to TWO relative rings in one name. Such a name denotes
+    the set ``{X, fb1(X), fb2(X), fb1fb2(X)}`` (each ``fb_i`` flips ring i's two
+    centres). ``_ring_cistrans_is_complete`` certifies each ring individually
+    (``fb_i(X) ≅ X``), but a two-descriptor name is 0-wrong only if the COMBINED
+    flip also holds (``fb1fb2(X) ≅ X``) -- per-ring symmetry does not formally
+    imply joint symmetry when a molecular automorphism couples the two rings, and
+    the OPSIN round-trip gate cannot backstop a relative descriptor (it
+    false-confirms one member). This checks the joint condition directly: flip
+    all centres of all rings on one copy, require the full-stereo InChIKey to be
+    unchanged. Same reject-safe failure directions as
+    ``_ring_cistrans_is_complete`` (undefined tag / InChI failure / empty key ->
+    False -> keep absolute). Belt-and-suspenders: empirically unreached on the
+     cluster (dominantly single-ring), but 0-wrong is ABSOLUTE.
+    """
+    centres = [a for rs in rings
+               for a in rs if mol.GetAtomWithIdx(a).HasProp("_CIPCode")]
+    if not centres:
+        return False
+    m = Chem.RWMol(mol)
+    for idx in centres:
+        at = m.GetAtomWithIdx(idx)
+        t = at.GetChiralTag()
+        if t == Chem.ChiralType.CHI_TETRAHEDRAL_CW:
+            at.SetChiralTag(Chem.ChiralType.CHI_TETRAHEDRAL_CCW)
+        elif t == Chem.ChiralType.CHI_TETRAHEDRAL_CCW:
+            at.SetChiralTag(Chem.ChiralType.CHI_TETRAHEDRAL_CW)
+        else:
+            return False
+    try:
+        orig = inchi.MolToInchiKey(mol)
+        flipped = inchi.MolToInchiKey(m.GetMol())
+    except Exception:
+        return False
+    return bool(orig) and orig == flipped
+
+
 def _detect_relative_substituent_rings(
     mol, top_spine_atoms: FrozenSet[int],
 ) -> List[FrozenSet[int]]:
@@ -723,11 +815,16 @@ def _detect_relative_substituent_rings(
       * carrying EXACTLY 2 ring stereocentres (``_CIPCode`` set), and those two
         in the SAME ring (``AreAtomsInSameRing``) -- cis/trans is the relation of
         a PAIR; 3+ needs the r/c/t reference system, out of scope;
-      * with >=1 pseudoasymmetric centre (a lowercase ``_CIPCode``) -- the signal
-        that the absolute block is an OPSIN-unparseable ``(1s,3R)``-style
-        descriptor. A ring whose 2 centres are BOTH uppercase is a genuine
-        absolute pair (e.g. a ``(3S,4S)`` pyrrolidine); its absolute descriptor
-        DOES round-trip and cis/trans would MIS-describe it, so it is excluded.
+      * COMPLETE for cis/trans (``_ring_cistrans_is_complete``): flipping BOTH ring
+        centres yields the SAME molecule, so cis/trans loses no absolute info.
+        (v47: the old gate used a lowercase ``_CIPCode`` as the proxy for this --
+        SOUND but INCOMPLETE: a chiral ring substituent labels a COMPLETE symmetric
+        ring's centres UPPERCASE, stranding 674/697 ZINC-head rows. A stereo-blind
+        arc-symmetry test was also tried and is UNSOUND -- it admits a ring with
+        opposite-sense pendant stereo on mirror arc atoms. The flip-both InChIKey
+        test is stereo-aware and exact.) A true chiral pair (flip-both gives a
+        DISTINCT molecule) keeps its absolute block via rung 1's ``full`` candidate
+        (verified FIRST). See a trace-cistrans-substituent-ring-drop-site.md.
 
     Returns the qualifying rings as ``frozenset(atom_ids)``, deterministically
     ordered. ``mol`` must already carry ``_CIPCode`` (set in ``_build_ctx`` via
@@ -756,10 +853,9 @@ def _detect_relative_substituent_rings(
             continue
         if not ri.AreAtomsInSameRing(centres[0], centres[1]):
             continue
-        if not any(
-            mol.GetAtomWithIdx(a).GetProp("_CIPCode").islower() for a in centres
-        ):
-            continue  # both absolute: keep the absolute descriptor (rung 1)
+        if not _ring_cistrans_is_complete(mol, centres[0], centres[1]):
+            continue  # true chiral pair: cis/trans is UNDER-SPECIFIED, keep the
+                      # absolute descriptor (rung 1's full candidate, verified first)
         out.append(ring_set)
     out.sort(key=lambda s: sorted(s))
     return out
@@ -1551,7 +1647,7 @@ def _locant_sort_key(loc) -> Tuple[int, int, str]:
     ``(prime_rank, number)`` form collided ``8a`` with ``8'`` (both rank 1) and
     raised ``ValueError`` on ``("8a", "'")`` (``int("8a")``) -- a wrong
     substituent citation order the full-InChIKey offer gate cannot see, plus a
-    crash that fell through to abstain (FABLE review #17).
+    crash that fell through to abstain (a review review #17).
     """
     def _split(base: str) -> Tuple[int, str]:
         # split a bare position string ("8" / "8a" / "12b") into (number, letter)

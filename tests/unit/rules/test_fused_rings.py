@@ -742,7 +742,7 @@ class TestFunctionalizedSubstituents:
         the v17 'cyanomethyl'/'acetonitrile' prefix). Both renderings are
         IUPAC-acceptable; v17 was ring-as-parent violation), is
         chain-as-parent compliant). Updated assertion to accept the
-        post-148 form per.claude/skills/fix-methodology.md.
+        post-148 form per internal notes
         """
         from orthonym import name_compound
 
@@ -773,7 +773,7 @@ class TestFunctionalizedSubstituents:
         the v17 'carboxymethyl'/'acetic' prefix). Both renderings are
         IUPAC-acceptable; v17 was ring-as-parent violation), is
         chain-as-parent compliant). Updated assertion to accept the
-        post-148 form per.claude/skills/fix-methodology.md.
+        post-148 form per internal notes
         """
         from orthonym import name_compound
 

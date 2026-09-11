@@ -3,10 +3,18 @@ granularity.
 
 Root-cause logic under test:
   * ``Orthonym._stereo_emit_decision`` — ONE policy call shared by both
-    general-engine emission sites. complete/valid/pin ABSTAIN on dropped stereo
-    : PINs specify every stereogenic unit; is stereo-blind);
-    best-effort ships a CONSTITUTION-ONLY name flagged ``stereo_unexpressed``
-     sanctions omission for exactly the polycyclic classes it emits).
+    general-engine emission sites. Since the 2026-08-31 accurate-or-abstain
+    directive (``namer.py:4056-4067``, commit ``) EVERY tier —
+    pin/valid/complete AND best-effort — ABSTAINS on un-completable dropped
+    stereo: a stereo-stripped name fails the full-InChIKey round-trip, so it is
+    scored a MISS and gains 0 breadth over abstaining while leaking precision
+    : PINs specify every stereogenic unit; is stereo-blind).
+    Completable stereo still ships FULL descriptors (``general_engine_stereo_
+    complete`` → the ``(True, False)`` branch). The old
+    ship-a-CONSTITUTION-ONLY-name-flagged-``stereo_unexpressed`` behaviour is
+    retained only behind ``ORTHONYM_BE_STRIP_STEREO=1`` (measurement/back-
+    compat); the tests below exercise that path under the env so the flagged
+    emission + compare stay covered.
   * ``Orthonym._rt_match`` — round-trip compare at the granularity the
     name asserts: stereo-STRIPPED for a flagged emission, exact isomeric
     otherwise. Never credits a stereo-bearing parse for a flagged name.
@@ -44,15 +52,29 @@ def test_decision_dropped_stereo_by_tier():
     """A defined stereocentre + a stereo-free candidate name."""
     mol = Chem.MolFromSmiles("C[C@H](O)CCC")  # (2R/S)-pentan-2-ol, real centre
     cand = "pentan-2-ol"                        # constitution only, no descriptor
-    # complete/valid/pin abstain (fail-closed)
+    # 2026-08-31 accurate-or-abstain: EVERY tier fail-closes on un-completable
+    # dropped stereo -- best-effort no longer ships stripped by default (a
+    # stereo-stripped name fails full-InChIKey round-trip; namer.py:4056-4067).
+    for tier in ("pin", "valid", "complete", "best-effort"):
+        permitted, flagged = _mk(tier)._stereo_emit_decision(mol, cand)
+        assert permitted is False, tier
+        assert flagged is False, tier
+
+
+def test_decision_dropped_stereo_best_effort_strip_env(monkeypatch):
+    """Back-compat: ORTHONYM_BE_STRIP_STEREO=1 restores the old best-effort
+    ship-a-constitution-only-name-flagged behaviour (namer.py:4068-4072). The
+    env only affects best-effort; the PIN tiers still fail-close."""
+    monkeypatch.setenv("ORTHONYM_BE_STRIP_STEREO", "1")
+    mol = Chem.MolFromSmiles("C[C@H](O)CCC")
+    cand = "pentan-2-ol"
+    permitted, flagged = _mk("best-effort")._stereo_emit_decision(mol, cand)
+    assert permitted is True
+    assert flagged is True
     for tier in ("pin", "valid", "complete"):
         permitted, flagged = _mk(tier)._stereo_emit_decision(mol, cand)
         assert permitted is False, tier
         assert flagged is False, tier
-    # best-effort ships flagged (constitution-only)
-    permitted, flagged = _mk("best-effort")._stereo_emit_decision(mol, cand)
-    assert permitted is True
-    assert flagged is True
 
 
 def test_decision_stereo_free_molecule_all_tiers():
@@ -122,18 +144,25 @@ def _patch_engine(monkeypatch, name=_CONSTITUTION_NAME):
         lambda *a, **k: True)
 
 
-def test_complete_abstains_best_effort_flags(monkeypatch):
-    """T6.2 end-to-end (gate disabled): complete abstains on dropped stereo,
-    best-effort ships the flagged constitution-only name."""
+def test_stereo_incomplete_abstains_default_strip_env_ships_flagged(monkeypatch):
+    """T6.2 end-to-end (gate disabled), under the 2026-08-31 policy: BOTH
+    complete AND best-effort abstain on dropped stereo by default; the flagged
+    constitution-only ship fires only under ORTHONYM_BE_STRIP_STEREO=1."""
     _patch_engine(monkeypatch)
     from orthonym.metrics import provenance as pv
 
     comp = _mk("complete")
     assert comp._try_general_engine_recovery(_STEREO_SMI) is None
 
-    pv.clear_provenance()
+    # default best-effort now abstains too (no stripped ship)
     be = _mk("best-effort")
-    out = be._try_general_engine_recovery(_STEREO_SMI)
+    assert be._try_general_engine_recovery(_STEREO_SMI) is None
+
+    # env-restored: best-effort ships the flagged constitution-only name
+    monkeypatch.setenv("ORTHONYM_BE_STRIP_STEREO", "1")
+    pv.clear_provenance()
+    be2 = _mk("best-effort")
+    out = be2._try_general_engine_recovery(_STEREO_SMI)
     assert out == _CONSTITUTION_NAME
     assert not is_failure_name(out)
     prov = pv.get_provenance()
@@ -154,8 +183,11 @@ def test_best_effort_stereo_free_not_flagged(monkeypatch):
 
 def test_flagged_self01_constitution_matches_ships(monkeypatch):
     """T6.3 (gate active): a flagged name whose CONSTITUTION round-trips ships,
-    marked opsin-verified."""
+    marked opsin-verified. Under the 2026-08-31 default best-effort abstains at
+    ``_stereo_emit_decision`` BEFORE the constitution-granularity, so we
+    set ORTHONYM_BE_STRIP_STEREO=1 to actually reach the flagged-ship branch."""
     _patch_engine(monkeypatch)
+    monkeypatch.setenv("ORTHONYM_BE_STRIP_STEREO", "1")
     import orthonym.namer as N
     from orthonym.metrics import provenance as pv
     monkeypatch.setattr(N, "_validity_gate_jar_present", lambda: True)
@@ -172,8 +204,12 @@ def test_flagged_self01_constitution_matches_ships(monkeypatch):
 
 def test_flagged_self01_wrong_constitution_abstains(monkeypatch):
     """T6.3 (gate active): a flagged name whose stereo-stripped parse is a
-    DIFFERENT constitution must fail-closed (never ship a wrong constitution)."""
+    DIFFERENT constitution must fail-closed (never ship a wrong constitution).
+    Set ORTHONYM_BE_STRIP_STEREO=1 so best-effort actually SHIPS the flagged
+    name into ``_rt_match`` -- otherwise it abstains earlier at the stereo
+    decision and this would pass for the wrong reason (green-but-blind)."""
     _patch_engine(monkeypatch)
+    monkeypatch.setenv("ORTHONYM_BE_STRIP_STEREO", "1")
     import orthonym.namer as N
     monkeypatch.setattr(N, "_validity_gate_jar_present", lambda: True)
     # OPSIN parses to a DIFFERENT constitution (pentan-1-ol)

@@ -14,7 +14,7 @@ selection is ``first_applicable`` at pool size 1, each skip is terminal and
 So the lever is not a fix list. It is one fallback that always accounts for every
 atom -- the generalisation of the doctrine ``rules/terminal_ring.py`` already
 states: *a table miss degrades to an UGLIER name instead of a refusal*
-(CLAUDE.md a project rule, clause).
+(the contributor guide a project rule, clause).
 
 Contract
 --------

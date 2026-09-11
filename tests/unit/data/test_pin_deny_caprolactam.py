@@ -34,7 +34,7 @@ citation was wrong and is corrected by this change.
 Producer-level assertions only. Whole-molecule assertions are unsound in this
 suite -- ``conftest`` disables the OPSIN gate suite-wide, so ``name_tiered`` can
 select a different producer than the CLI does. User-visible CLI behaviour is
-recorded in ``.superpowers/sdd/-residue/TaskAB-report.md``.
+recorded in ``.the workflow tooling/sdd/-residue/TaskAB-report.md``.
 """
 
 import json
@@ -77,7 +77,7 @@ def test_caprolactam_is_withdrawn_from_the_pin_surface():
 
 
 def test_caprolactam_is_demoted_not_deleted():
-    """CLAUDE.md: deny rows are DEMOTED. The name must survive on the
+    """the contributor guide: deny rows are DEMOTED. The name must survive on the
     general-only companion surface, exactly as glycerol and catechol do."""
     import orthonym.data as data_pkg
 
@@ -85,7 +85,7 @@ def test_caprolactam_is_demoted_not_deleted():
 
 
 def test_systematic_producer_supplies_the_pin():
-    """CLAUDE.md a project rule -- removing a wrong output must not unmask a worse
+    """the contributor guide a project rule -- removing a wrong output must not unmask a worse
     generator. The seven-membered ring's PIN must come from the same producer
     that already serves its four siblings."""
     from orthonym.rules.lactams import name_lactam_ring

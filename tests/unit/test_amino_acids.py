@@ -180,7 +180,7 @@ class TestNonStandardAminoAcids:
         an instance of the measured class where the 0-wrong margin is the GATE
         rather than the producers. Gating sarcosine did not create the bad
         candidate; it removed the trivial-name short-circuit that used to hide it
-        (CLAUDE.md a project rule -- removing a wrong output can unmask a worse
+        (the contributor guide a project rule -- removing a wrong output can unmask a worse
         generator). Asserting the gate-off value here would encode a wrong molecule
         as the expectation, so the marker is the correct resolution and the
         underlying producer defect is recorded for its own task.

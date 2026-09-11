@@ -1733,7 +1733,7 @@ def name_noncarbon_ester(mol, match: tuple) -> Optional[str]:
 # non-PIN rows would therefore change no emitted name, and would make this
 # function strictly WORSE for a direct caller, because the generic '-ic' ->
 # '-yloxy' rule below FABRICATES rather than failing closed:
-# 'palmitic' -> 'palmityloxy', 'oleic' -> 'oleyloxy'. That is CLAUDE.md #9
+# 'palmitic' -> 'palmityloxy', 'oleic' -> 'oleyloxy'. That is the contributor guide #9
 # ("removing a wrong output can unmask a worse generator") at function level.
 #
 # ⚠ DO NOT ADD A ROW KEYED ON A SYSTEMATIC STEM. Five such rows

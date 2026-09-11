@@ -69,7 +69,7 @@ def test_refuses_every_shape_a_count_cannot_express(smiles, label, forbidden):
 
 
 # --------------------------------------------------------------------------
-# CLAUDE.md #9 -- the honest cases must KEEP working. A refusal that also
+# the contributor guide #9 -- the honest cases must KEEP working. A refusal that also
 # refuses the shapes the count DOES determine is an over-correction.
 # --------------------------------------------------------------------------
 @pytest.mark.parametrize(

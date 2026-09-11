@@ -59,9 +59,9 @@ def test_added_carbon_substituent_path_declines_complex_substituents():
         assert "tricarboxylic" not in n, f"my added-carbon path must decline, got {n}"
 
 
-# ---- a review review 7daf8b68 findings, now fixed ----
+# ---- review review 7daf8b68 findings, now fixed ----
 
-def test_fable_b1_isomer_constitution_guard():
+def test_review_b1_isomer_constitution_guard():
     """BLOCKER 1: name_substituent's symbols-only fallback mis-named a nitrite
     -O-N=O as 'nitro' (same {N,O,O} count). The gate-independent constitution
     re-anchor must reject it -> the added-carbon path does NOT emit a nitro name."""
@@ -70,7 +70,7 @@ def test_fable_b1_isomer_constitution_guard():
         assert "nitropropane" not in n and "tricarboxylic" not in n, n
 
 
-def test_fable_b2_p14_4_g_tiebreak_deterministic():
+def test_review_b2_p14_4_g_tiebreak_deterministic():
     """BLOCKER 2: (g) — lowest locant to the alphabetically-first substituent;
     the same molecule must get ONE name regardless of SMILES atom order."""
     a = _pin().name("NC(C(=O)O)C(C(=O)O)C(O)C(=O)O")
@@ -97,14 +97,14 @@ def test_off_chain_stereo_fails_closed():
     assert "tricarboxylic" not in n, n
 
 
-def test_fable_r6_mononuclear_locant_omitted():
+def test_review_r6_mononuclear_locant_omitted():
     """RISK 6 / (a): locant '1' omitted on a substituted mononuclear core."""
     assert _pin().name("OC(C(=O)O)(C(=O)O)C(=O)O") == "hydroxymethanetricarboxylic acid"
 
 
-# ---- stereo a review review findings, now fixed ----
+# ---- stereo review review findings, now fixed ----
 
-def test_stereo_fable_b1_p14_4_j_tiebreak():
+def test_stereo_review_b1_p14_4_j_tiebreak():
     """BLOCKER: (j) — when suffix/substituent locants tie, the lower locant goes
     to the preferred CIP descriptor (R over S). A meso molecule must get ONE PIN name
     regardless of input atom order (was nondeterministic (2S,3R) vs (2R,3S))."""
@@ -151,7 +151,7 @@ def test_saturated_added_carbon_unchanged_by_unsaturated_branch():
 
 
 def test_dinuclear_ethene_core_omits_ene_locant():
-    """a review BLOCKER: a 2-carbon (dinuclear) unsaturated core must be `ethene-...`,
+    """review BLOCKER: a 2-carbon (dinuclear) unsaturated core must be `ethene-...`,
     NOT `eth-1-ene-...`. For a dinuclear chain the double-bond locant is structurally
     redundant deny-by-default; BB `ethene-1,1,2-triyl`, `eth-1-ene` 0x).
     The OPSIN re-anchor cannot catch it (both spellings parse to one InChIKey), so it

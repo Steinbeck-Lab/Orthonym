@@ -2910,7 +2910,7 @@ def get_ring_substituent_name(
         # prints '1,3-thiazolidine (PIN)' at the Blue Book and
         # '1,2-thiazolidine (PIN)' at:8184) therefore turned ten correct names
         # into abstentions -- '(thiazolidin-4-yl)methanol' became 'unknown'.
-        # That is the CLAUDE.md invariant-9 trap: removing a wrong output
+        # That is the the contributor guide invariant-9 trap: removing a wrong output
         # unmasked a worse one. The parent path never had this gap because it
         # reaches the Hantzsch-Widman namer directly.
         #

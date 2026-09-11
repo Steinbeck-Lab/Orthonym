@@ -1,6 +1,6 @@
 """Wave-8 P8 unit tests: the phane PIN subsystem.
 
-Per docs/superpowers/plans/2026-07-16-wave8-p8-phane.md: OPSIN 2.9 cannot
+Per docs/the workflow tooling/plans/2026-07-16-wave8-p8-phane.md: OPSIN 2.9 cannot
 parse ANY phane name (verified 2026-07-16 -- neither the /.3
 simplified-skeletal PIN nor the legacy bracket-prefix
 '[2.2]paracyclophane'), so there is no round-trip oracle for this

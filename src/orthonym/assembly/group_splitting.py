@@ -20,7 +20,7 @@ caller appends each component to ``all_prefixes`` so they re-enter the EXISTING
 resolved through the EXISTING authority — ``oxo`` via ``seniority.get_prefix``,
 the alkoxy/sulfanyl forms via ``assembly.substituent_prefix_forms`` — NEVER
 hardcoded and NEVER a string-rewrite (no regex substitution, no string-replace
-call, no postprocessor pass; ``.claude/skills/fix-methodology.md``). The
+call, no postprocessor pass; `internal notes`). The
 decomposition acts at the FG-prefix-resolution layer and returns structured
 components.
 

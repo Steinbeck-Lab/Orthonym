@@ -4,7 +4,7 @@ Blue-Book PIN and cites its governing line. Grouped by the brief's item numbers.
 
 The two ``general_fallback`` targets (#16, #23 full-molecule) abstain on the
 default (PIN-only) config and are named through the bb_conformance config, which
-is where the fix is measured (the CLAUDE.md invariant-16 config gap).
+is where the fix is measured (the the contributor guide invariant-16 config gap).
 """
 import pytest
 

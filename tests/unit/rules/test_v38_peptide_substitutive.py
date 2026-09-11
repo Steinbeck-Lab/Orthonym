@@ -151,7 +151,7 @@ class TestNonStandardLinearPeptides:
 @pytest.mark.unit
 class TestDeterminism:
     """The same molecule named from randomized SMILES atom orderings must give
-    byte-identical output (CLAUDE.md a project rule: determinism)."""
+    byte-identical output (the contributor guide a project rule: determinism)."""
 
     @pytest.mark.parametrize(
         "smi,expected",

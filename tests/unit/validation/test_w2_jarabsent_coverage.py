@@ -60,7 +60,7 @@ class TestVerifyAtomCoverage:
 # End-to-end: witnesses + by-construction guard, jar-present AND jar-absent
 # --------------------------------------------------------------------------
 def _force_jar_absent(monkeypatch):
-    """Simulate the FABLE default-tier no-Java config (the hole this task closes)."""
+    """Simulate the a review default-tier no-Java config (the hole this task closes)."""
     import orthonym.namer as namer_mod
     import orthonym.validation.atom_coverage as ac_mod
     import orthonym.validation.opsin_roundtrip as rt_mod

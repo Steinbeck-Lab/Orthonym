@@ -98,7 +98,7 @@ def test_best_effort_keeps_the_retained_name_when_systematic_does_not_rt(retaine
 
 @pytest.mark.parametrize("retained", KEEPS)
 def test_kept_row_provenance_is_not_mislabelled_general_engine(retained):
-    """FABLE regression: the RT-probe runs the general-engine recovery,
+    """a review regression: the RT-probe runs the general-engine recovery,
     which stamps `source="general_engine"` before the RT gate can decline it. A
     KEPT retained name must NOT inherit that label (it would skew the cohort /
     refusal-census attribution the project ranks levers by).

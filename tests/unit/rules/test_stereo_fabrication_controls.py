@@ -8,7 +8,7 @@ and a fully STEREO-DEFINED input of the same family that must still get its
 correct, specific PIN -- proving the guard is not overbroad and did not regress
 a real positive into an abstention.
 
-Reference:.superpowers/sdd/2026-08-16--phase1-stereo-honesty/task-6-brief.md
+Reference:.the workflow tooling/sdd/2026-08-16--phase1-stereo-honesty/task-6-brief.md
 """
 import logging
 

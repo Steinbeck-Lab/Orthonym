@@ -20,7 +20,7 @@ it means a new NAME_EXACT_NP_PARENTS entry was added with a flat (stereo-undefin
 SMILES key -- a real latent 0-wrong hole (a flat input could dict-match and emit a
 config-implying, OPSIN-unparseable name that C3 can never catch).
 
-Reference:.superpowers/sdd/2026-08-16--phase1-stereo-honesty/task-6-brief.md
+Reference:.the workflow tooling/sdd/2026-08-16--phase1-stereo-honesty/task-6-brief.md
 """
 from orthonym.data.natural_products import (
     NATURAL_PRODUCT_DERIVATIVES,

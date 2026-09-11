@@ -306,7 +306,7 @@ def test_t4_routes_around_ester_decline():
 
 
 # --- Task 6: polyfunctional complete-or-abstain invariant locks ---------------
-# Task 6 diagnosis (scratchpad/diag_t6*.py, measured 2026-08-11): name_general is
+# Task 6 diagnosis (a temp dir/diag_t6*.py, measured 2026-08-11): name_general is
 # ALL-OR-NOTHING (no partial-with-remainder to route), and the only feature-
 # override levers are principal_group / chain_is_parent, whose full toggle space
 # the rung 0-2 cascade already covers -- a chain_is_parent=True variant converts
@@ -607,7 +607,7 @@ def test_t4_backbone_acceptance_probe():
 
 
 # --- Fix 4 (final review): rung 2 is a UNIQUE producer, not dead code ---------
-# Measured 2026-08-11 (scratchpad/probe_rung2_wide.py, 400-molecule pubchem_2000
+# Measured 2026-08-11 (a temp dir/probe_rung2_wide.py, 400-molecule pubchem_2000
 # sample, short-circuited so rung 2 fires only when rungs 0 AND 1 both decline):
 # cascade rung 2 (suppress PG only, KEEP the perceived chain parent) is the SOLE
 # producer for 5/400 molecules -- the ring-less / chain-preferred class where

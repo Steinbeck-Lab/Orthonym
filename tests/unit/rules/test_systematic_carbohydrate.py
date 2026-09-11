@@ -17,7 +17,7 @@ for the Pitfall-3 non-catalog assertion) go INSIDE each test body, NOT at module
 level, so `pytest --collect-only` succeeds while the engine is RED at run time
 until Wave-1 (Plan 183-01) lands. `RDLogger.DisableLog("rdApp.*")` at module top.
 
-Root-cause-only (CLAUDE.md): every assertion is structural (physical
+Root-cause-only (the contributor guide): every assertion is structural (physical
 idealization, fingerprint recovery, fail-closed None) — never string surgery on
 a derived base name.
 

@@ -2,10 +2,10 @@
 phosphane) name as adduct partners instead of forcing the whole
 multi-component row to abstain.
 
-Root cause (FABLE full-census): `SINGLE_ATOM_COMPONENT_NAMES` held only
+Root cause (a review full-census): `SINGLE_ATOM_COMPONENT_NAMES` held only
 O/F/Cl/Br/I, so a bare C/S/P fragment made `_name_component` return None and
 `name_adduct` decline the entire row -- a table-miss-degrades-to-refusal
-defect (CLAUDE.md a project rule). CH4/H2S/PH3 are neutral molecular species and
+defect (the contributor guide a project rule). CH4/H2S/PH3 are neutral molecular species and
 legitimate adduct components; each name is OPSIN-2.9.0-parseable in
 em-dash adduct notation ("benzene—methane (1/1)").
 

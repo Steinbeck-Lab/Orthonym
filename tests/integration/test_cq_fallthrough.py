@@ -51,7 +51,7 @@ WITNESSES = [
 # first, disagreeing with the descriptor string's own shorter-arc-first
 # convention) that did NOT round-trip, so it correctly stayed abstained
 # (0-wrong; a project rule). Task F (CQ5/QM9 finding,
-# `.superpowers/sdd/CQ1-IMPL-PLAN/task-F-report.md`) fixed that root cause in
+# `.the workflow tooling/sdd/CQ1-IMPL-PLAN/task-F-report.md`) fixed that root cause in
 # ``rules/spiro.py`` directly, so this molecule now NAMES correctly
 # at both tiers -- see ``test_dispiro_now_converts_after_taskF_descriptor_fix``
 # below, which supersedes the old "stays abstained" assertion.

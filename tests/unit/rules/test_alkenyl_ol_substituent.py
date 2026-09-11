@@ -76,7 +76,7 @@ def test_no_regression_vinyl_and_alkyl(smi, expected):
     assert _pin().name(smi) == expected
 
 
-# ---- a review-b2 review findings (all resolved) ----
+# ---- review-b2 review findings (all resolved) ----
 
 @pytest.mark.parametrize("smi", [
     "CO/C=C/c1ccc(O)cc1",             # enol ether -CH=CH-OMe
@@ -84,7 +84,7 @@ def test_no_regression_vinyl_and_alkyl(smi, expected):
     "CS/C=C/c1ccc(O)cc1",             # vinyl thioether
 ])
 def test_blocker1_stereo_completeness_never_drops_ez(smi):
-    """fable-b2 BLOCKER 1 / invariant 9: a substituent with a DEFINED-stereo C=C
+    """review-b2 BLOCKER 1 / invariant 9: a substituent with a DEFINED-stereo C=C
     must NEVER ship a name that DROPS the E/Z descriptor (the legacy `Xethenyl`
     tier — a wrong-molecule name). The invariant is 0-wrong, and it is now met two
     ways: an abstention (`unknown organic compound`) OR a stereo-COMPLETE name that
@@ -126,7 +126,7 @@ def test_blocker1_nitrovinyl_now_names_with_stereo():
 
 
 def test_blocker2_benzonitrile_brackets_complex_substituent():
-    """a review-b2 BLOCKER 2: a monosubstituted benzonitrile must bracket a complex
+    """review-b2 BLOCKER 2: a monosubstituted benzonitrile must bracket a complex
     substituent, not ship the markless `4-(1E)-...ylbenzonitrile`."""
     assert _pin().name("N#Cc1ccc(/C=C/CO)cc1") == "4-[(1E)-3-hydroxyprop-1-en-1-yl]benzonitrile"
     # simple substituents unchanged
@@ -135,7 +135,7 @@ def test_blocker2_benzonitrile_brackets_complex_substituent():
 
 
 @pytest.mark.parametrize("smi,expected", [
-    # a review-b2 RISK 3: a chain R/S centre with an UNDEFINED-geometry core C=C names
+    # review-b2 RISK 3: a chain R/S centre with an UNDEFINED-geometry core C=C names
     # (the descriptor-less name lets _stereo_route add the R/S).
     ("C[C@H](O)C=Cc1ccc(O)cc1", "4-[(S)-3-hydroxybut-1-en-1-yl]phenol"),
 ])
@@ -172,10 +172,10 @@ def test_polyene_rt_exact():
         (r["smiles"], r.get("verdict"), r.get("name")) for r in rows]
 
 
-# ---- a review-polyene review BLOCKERs, resolved ----
+# ---- review-polyene review BLOCKERs, resolved ----
 
 def test_polyene_blocker2_two_stereocentres_fail_closed():
-    """a review-polyene BLOCKER 2 / a project rule: >=2 chain R/S centres + undefined C=C
+    """review-polyene BLOCKER 2 / a project rule: >=2 chain R/S centres + undefined C=C
     geometry would ship a stereo-DROPPED wrong molecule (_stereo_route drops multi-
     centre R/S). Must fail closed (abstain), not emit the stereo-bare name."""
     import sys
@@ -192,7 +192,7 @@ def test_polyene_blocker2_two_stereocentres_fail_closed():
 
 
 @pytest.mark.parametrize("name,count,want", [
-    # a review-polyene BLOCKER 1 / (a): a SUBSTITUTED polyene prefix takes bis
+    # review-polyene BLOCKER 1 / (a): a SUBSTITUTED polyene prefix takes bis
     ("5-hydroxypenta-1,3-dien-1-yl", 2, "bis"),
     ("6-hydroxyhexa-2,4-dien-1-yl", 2, "bis"),
     # (b): the UNSUBSTITUTED polyene keeps di (the trap — must not flip)

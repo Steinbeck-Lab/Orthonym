@@ -1,4 +1,4 @@
-""" no-abstain Phase A fix-round-1, Finding 4 (HIGH, FABLE adversarial
+""" no-abstain Phase A fix-round-1, Finding 4 (HIGH, a review adversarial
 0-wrong review): the INLINE G1 emission lane (`namer.py::_name_impl`, the
 `if self._general_fallback and (not name or is_failure_name(name)):` block)
 consumed `_stereo_emit_decision`'s flag but never checked a flagged emission
@@ -36,7 +36,7 @@ INSIDE the inline-G1 block, before ever setting `name = _eng.name`) ensures.
 The fix routes a FLAGGED (best-effort, `_stereo_emit_decision`'s
 `(True, True)`) emission through the SAME `_rt_match` superset gate the
 late-recovery lane already uses (proven omission-safe / conflict-rejecting,
-FABLE's Q1, `scratchpad/probe_rtmatch_semantics.py`) before it may ship,
+a review's Q1, `a temp dir/probe_rtmatch_semantics.py`) before it may ship,
 without touching the unflagged (already stereo-complete) path at all.
 """
 from unittest import mock
@@ -48,7 +48,7 @@ from orthonym.assembly.general_engine import GeneralEngineResult
 
 pytestmark = [pytest.mark.unit, pytest.mark.opsin_gate]
 
-# 2 real stereocentres (confirmed via scratchpad/probe_finding4_g1_stereo.py).
+# 2 real stereocentres (confirmed via a temp dir/probe_finding4_g1_stereo.py).
 SMILES_2_CENTRES = "C[C@@H](O)[C@@H](N)C"
 
 # Omits the butan-2-ol centre entirely and asserts the WRONG (negated) value
@@ -84,7 +84,7 @@ def _run_inline_g1_isolated(monkeypatch, stub_name: str) -> str:
 
 
 def test_stereo_conflict_does_not_ship_from_inline_g1(monkeypatch):
-    """FABLE Finding 4's reproduction, isolated at `_name_impl`: a stubbed
+    """a review Finding 4's reproduction, isolated at `_name_impl`: a stubbed
     engine result that OMITS one stereocentre and CONFLICTS on the other
     must NOT ship straight out of the inline-G1 lane."""
     out = _run_inline_g1_isolated(monkeypatch, CONFLICT_NAME)

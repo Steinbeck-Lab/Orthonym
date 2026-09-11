@@ -187,7 +187,7 @@ def test_h_plus_controls_unchanged(namer):
 
 
 # ---------------------------------------------------------------------------
-# FABLE #1 (determinism BLOCKER): _protonate_amines_with_h_plus must choose
+# a review #1 (determinism BLOCKER): _protonate_amines_with_h_plus must choose
 # the protonation site(s) by a canonical-rank order (not raw atom index /
 # SMARTS-match order), and backtrack over the alternatives, so that every
 # spelling of the SAME molecule gives the SAME result. RED before the fix:
@@ -227,7 +227,7 @@ def test_h_plus_protonation_site_choice_is_spelling_deterministic(namer):
 
 
 # ---------------------------------------------------------------------------
-# FABLE #3 (hardening nit): dispatch_table._handle_poly_anion's name_anion
+# a review #3 (hardening nit): dispatch_table._handle_poly_anion's name_anion
 # fallback is now wrapped in the same _full_inchikey_rt_ok check the
 # MIXED_SIGN_ZWITTERION door already applies to its identical fallback.
 # Regression only -- confirm the RT gate does not break the working

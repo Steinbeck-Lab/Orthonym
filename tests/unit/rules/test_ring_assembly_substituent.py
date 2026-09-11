@@ -84,7 +84,7 @@ def test_fused_polycycle_is_not_an_assembly():
     ("Cc1ccc(-c2cccs2)s1", "[2,2'-bithiophen]-5-yl"),
 ])
 def test_heteroaromatic_assembly_free_valence_not_on_junction(smi, expected):
-    """a review BLOCKER 1: the -yl locant must use the junction-aware per-system
+    """review BLOCKER 1: the -yl locant must use the junction-aware per-system
     numbering, not orient_heterocycle-in-isolation which placed it ON the 2,2'
     junction ('[2,2'-bithiophen]-2-yl'). Correct is 5-yl (the far position)."""
     m = Chem.MolFromSmiles(smi)
@@ -98,7 +98,7 @@ def test_heteroaromatic_assembly_free_valence_not_on_junction(smi, expected):
 
 
 def test_fused_component_assembly_fails_closed():
-    """Fable BLOCKER 3: a MULTI-RING FUSED assembly component (binaphthalene)
+    """review BLOCKER 3: a MULTI-RING FUSED assembly component (binaphthalene)
     degrades the per-system numbering to the unreliable per-atom fallback and
     emitted a PARSEABLE-WRONG '[1,1'-binaphthalen]-2-yl' (a 2,2'-binaphthalene).
     Never guess a fused-system attachment locant — fail closed."""
@@ -128,7 +128,7 @@ def test_saturated_assembly_component_is_parenthesised(smi, expected):
     NON-retained (cycloalkane / von Baeyer) assembly component takes parentheses
     in the SUBSTITUENT prefix too, mirroring the parent path's _enclose_component
     — not the buggy paren-less '[1,1'-bicyclohexan]-2-yl' (RT-valid, so it was
-    invisible to every gate; the spelling-layer blind spot, a review-found)."""
+    invisible to every gate; the spelling-layer blind spot, review-found)."""
     m = Chem.MolFromSmiles(smi)
     ri = m.GetRingInfo()
     ring = tuple(a.GetIdx() for a in m.GetAtoms() if ri.NumAtomRings(a.GetIdx()) > 0)

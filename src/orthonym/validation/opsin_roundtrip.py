@@ -191,7 +191,7 @@ def opsin_atom_locant_map(
     injector's accepted format) or None when it cannot be built (OPSIN
     unavailable/rejecting, atom-count/parse mismatch, or no isomorphism).
 
-    This is the ``re-anchor + audit`` primitive (CLAUDE.md a project rule): the
+    This is the ``re-anchor + audit`` primitive (the contributor guide a project rule): the
     map is derived FROM the name+structure, never trusted from a builder's
     internal numbering, and the caller RT-verifies any name decorated with it.
     """

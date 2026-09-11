@@ -4871,7 +4871,7 @@ def parent_to_prefix(parent_name: str, chain_length: int, *, attach_locant) -> s
     # (parent 'dioxidane') became the OPSIN-unparseable 'dioxidyl' instead of 'dioxidanyl'.
     # ⚠ Group 14 (Si/Ge/Sn/Pb) is EXCLUDED: keeps them on method (1) -- the
     # retained silyl/germyl/stannyl/plumbyl (elide the whole 'ane'), NOT silanyl/stannanyl
-    # (FABLE 5.1: silane->silanyl et al. is a PIN regression). Multiplied forms share the
+    # (a review 5.1: silane->silanyl et al. is a PIN regression). Multiplied forms share the
     # stem, so match on the stem suffix.
     if name.endswith(('oxidane', 'sulfane', 'selane', 'tellane', 'azane',
                       'phosphane', 'arsane', 'stibane', 'bismuthane', 'borane',
@@ -7079,7 +7079,7 @@ def name_substituent_fragment(
     # substituent. Measured: a real choline-phosphate compound substituent
     # came out '(2-phosphonooxy-N,N,N-trimethylethan-1-aminium)yl',
     # -suppressed (a 0-wrong defect this project's PIN tiers must not
-    # rely on the OPSIN backstop alone to catch, CLAUDE.md a project rule).
+    # rely on the OPSIN backstop alone to catch, the contributor guide a project rule).
     #
     # cation_to_prefix, the existing structured primitive, wired
     # previously only at charged_router.py:478 / rules/ions.py:4305) builds
@@ -7207,7 +7207,7 @@ def needs_recursive_naming(mol, sub_atoms: List[int]) -> bool:
 # `(trimethylazaniumyl)acetate` -> `C[N+](C)(C)CC(=O)[O-]` (and the multi-N-
 # substituent variants). Both name the SAME cation lists
 # `(trimethylammoniumyl)`/azanium as the accepted equivalent). Accuracy is the
-# #1 priority (CLAUDE.md) and the byte-identical/RT gate forbids shipping an
+# #1 priority (the contributor guide) and the byte-identical/RT gate forbids shipping an
 # OPSIN-unparseable string when a round-tripping equivalent exists, so the
 # producer emits the azane-based `…azaniumyl` form (RT=1) — a strict
 # improvement over the old `betaine`->`unknown organic compound` (RT=0).

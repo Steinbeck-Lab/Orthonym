@@ -131,7 +131,7 @@ def test_suffixed_form_is_not_double_locanted(smiles, expected):
 # ``identify_ring_system`` has no branch for a two-heteroatom saturated
 # five-ring, so before Task AA5 the substituent path's ONLY answer for these
 # rings was the retained bare stem. Withdrawing it turned ten correct names
-# into ``unknown organic compound`` -- textbook CLAUDE.md a project rule. Every
+# into ``unknown organic compound`` -- textbook the contributor guide a project rule. Every
 # expectation below was confirmed against OPSIN 2.9.0: each name round-trips to
 # exactly the input SMILES.
 RING_AS_SUBSTITUENT = [

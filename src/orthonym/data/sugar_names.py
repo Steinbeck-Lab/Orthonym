@@ -1259,7 +1259,7 @@ def uronic_free_acid_name(
 
     This is the FREE-acid sibling of:func:`uronic_glycoside_head` (which emits
     the ``-osiduronic acid`` *glycoside* head). Both are implemented as explicit
-    maps (NOT string surgery — CLAUDE.md root-cause; avoids the ``gluc`` ->
+    maps (NOT string surgery — the contributor guide root-cause; avoids the ``gluc`` ->
     ``gluco`` edge cases). ``URONIC_ACID_NAMES`` keeps its base value
     ``glucuronopyranose`` UNCHANGED so ``uronic_glycoside_head``'s
     ``UREONIC_HEAD`` key still matches (Pitfall 5 coupling — must not
@@ -1324,7 +1324,7 @@ def uronic_free_acid_name(
 # OH/H/CH2OH fingerprint (deoxy / amino / N-acetyl / uronic / C-modified,
 # per). The fingerprint -> tuple map is built once from the catalog so
 # the deriver remains a general structural map, NOT a per-molecule shortcut
-# (CLAUDE.md root-cause mandate).
+# (the contributor guide root-cause mandate).
 #
 # alpha/beta is the configuration-RELATIVE anomeric relationship of
 # — it is NOT the raw anomeric CIP label (which inverts between
@@ -1606,7 +1606,7 @@ def recognize_sugar_skeleton(
 # (anomer, config, base) from the gate-proven _SKELETON_FINGERPRINT_INDEX, and
 # re-applies the modifications as detachable prefixes / the -uronic acid suffix
 # with STRUCTURALLY-derived locants — never string surgery on a derived base
-# (CLAUDE.md root-cause). Fail-closed : any unrecognized modification,
+# (the contributor guide root-cause). Fail-closed : any unrecognized modification,
 # out-of-scope ring, or unindexed (C7+) fingerprint returns None so the existing
 # pipeline (catalog / oxane / decomposition / acyclic) stays byte-identical.
 
@@ -2110,7 +2110,7 @@ def _classify_sugar_positions(mol, ring, ring_oxygen, anomeric_idx):
                 # distinct (out-of-scope) regime: its decoration is invisible to
                 # the ring-CIP fingerprint, so classifying it as plain `amino`
                 # would silently DROP the substituent and ship a wrong name
-                # . Fail closed instead (CLAUDE.md fail-closed mandate):
+                # . Fail closed instead (the contributor guide fail-closed mandate):
                 # the structure cascade-continues to the catalog / decomposition.
                 # Bare -NH2 == the N's only heavy-atom neighbour is this ring
                 # carbon (heavy degree 1), neutral, and carries its two H.

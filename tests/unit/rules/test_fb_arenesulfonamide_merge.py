@@ -143,7 +143,7 @@ def test_primary_disulfonamide_names():
     assert name_compound("NS(=O)(=O)c1ccc(S(=O)(=O)N)cc1") == "benzene-1,4-disulfonamide"
 
 
-# 0-WRONG regression guard (a review-caught): a MULTI-instance sulfonamide carrying
+# 0-WRONG regression guard (review-caught): a MULTI-instance sulfonamide carrying
 # N-substituents needs the N^1/N^3 superscript locants (not built) — the benzene
 # producer must FAIL CLOSED, never emit `benzene-1,4-disulfonamide` (which silently
 # drops the N-methyls, a wrong constitution).
@@ -157,7 +157,7 @@ def test_multi_instance_n_substituted_sulfonamide_fails_closed(smiles):
     assert out is None or "disulfonamide" not in out or "N" in out
 
 
-# Adversarial N-substituent shapes (a review pre-empt) — each must name RT-exact
+# Adversarial N-substituent shapes (review pre-empt) — each must name RT-exact
 # end-to-end (some route through the F-B benzene producer, some through a sibling
 # handler; the end-to-end contract is what matters). Each string is OPSIN-verified,
 # and the F-B producer that cannot claim one (e.g. N-acyl, where the acyl competes
@@ -174,7 +174,7 @@ def test_adversarial_n_substituent_shapes(smiles, expected):
 
 
 # --------------------------------------------------------------------------
-# 0-WRONG blockers found by the cross-model FABLE review (the deterministic
+# 0-WRONG blockers found by the cross-model review review (the deterministic
 # sweep missed all four). The F-B producer must FAIL CLOSED on each — a
 # gate-independent OPSIN InChIKey re-anchor (8afa533c precedent) rejects any
 # merged name that denotes a different molecule, plus a fused-ring guard.
@@ -187,7 +187,7 @@ def test_adversarial_n_substituent_shapes(smiles, expected):
     # B3: an N-substituent bearing a functional group mis-named (-COOH -> formyl).
     ("Cc1ccc(S(=O)(=O)N(C)C(=O)O)cc1", "N-branch -COOH mis-named formyl"),
 ])
-def test_fable_blockers_producer_fails_closed(smiles, why):
+def test_review_blockers_producer_fails_closed(smiles, why):
     """The F-B producer must never emit a wrong molecule for these (0-wrong)."""
     assert _producer(smiles) is None, why
 

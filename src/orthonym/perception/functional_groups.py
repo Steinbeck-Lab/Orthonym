@@ -558,7 +558,7 @@ FUNCTIONAL_GROUP_SMARTS = {
     # (1-cyano-1-isocyanoethyl)phosphonate). Phosphonate diesters were otherwise
     # unperceived; the free-acid 'phosphonic_acid' row (2 OH) does not match.
     "phosphonate_diester": "[PX4;$([PX4][#6])](=O)([OX2][#6])[OX2][#6]",
-    # 11-FABLEFIX class 9): the phosphinic/arsinic/stibinic
+    # a review class 9): the phosphinic/arsinic/stibinic
     # acid ESTER R2E(=O)(OR') -- TWO E-C bonds, one =O, one ester -O-C. This is the
     # exact shape the multiplicative pnictogen guard declines (two identical/aryl
     # C-E bonds), so declining the multiplicative name (1,1'-(methoxyphosphoryl)-

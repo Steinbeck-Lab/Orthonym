@@ -66,7 +66,7 @@ class TestCompareLocantSetsBareString:
 # ── Part 2: the perf-budget rescue recovers a real giant, 0-wrong ─────────
 
 # A 100-heavy-atom / 10-ring Si-free tetra-fused-heteroaromatic peptide-tail molecule
-# (scratchpad/r1.smi). Its main path exhausts the op budget; the rescue names it via
+# (a temp dir/r1.smi). Its main path exhausts the op budget; the rescue names it via
 # name_t4_complete and it round-trips full-InChIKey. Recovered from a clean abstain.
 _GIANT = ("C1[C@@H](C2=C(N1C(=O)C3=CC4=C(N3)C=CC(=C4)NC(=O)C5=CC6=CC=CC=C6N5)"
           "C=C(C7=CC=CC=C72)OC(=O)OCCSSC[C@H](C(=O)O)NCCC[C@H](C(=O)O)NC(=O)"

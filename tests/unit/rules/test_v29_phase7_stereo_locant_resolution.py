@@ -53,7 +53,7 @@ EXPECTED_2A = "[(1R,2R)-2-methylcyclopropyl]methanol"
 # 2b: parent is `prop-2-enoic acid` — three carbons, stereogenic double bond C2=C3, so the
 # descriptor locant is 2 (the lower locant of the bond). The emitted `5` was an index from
 # the cyclopentadienyl substituent's ring numbering. The descriptor VALUE is E, taken from
-# `rdCIPLabeler.AssignCIPLabels` (never the legacy labeller — CLAUDE.md).
+# `rdCIPLabeler.AssignCIPLabels` (never the legacy labeller — the contributor guide).
 SMILES_2B = "C/C(=C\\C1C=CC=C1)/C(=O)O"
 EXPECTED_2B = "(2E)-3-(cyclopenta-2,4-dien-1-yl)-2-methylprop-2-enoic acid"
 
@@ -88,7 +88,7 @@ def test_2b_full_name(namer):
 
 
 def test_2b_descriptor_value_matches_the_cip_labeller():
-    """E vs Z is DERIVED, not assumed: rdCIPLabeler is the authority (CLAUDE.md)."""
+    """E vs Z is DERIVED, not assumed: rdCIPLabeler is the authority (the contributor guide)."""
     from rdkit import Chem
     from rdkit.Chem import rdCIPLabeler
 
@@ -178,7 +178,7 @@ def test_fails_closed_rather_than_citing_an_unresolvable_locant(namer):
     at parent scope, which OPSIN parsed as a DIFFERENT stereoisomer. There is no parent
     locant these bonds can legitimately take puts them on the prefix), so the
     parent block is dropped: the constitution stays right and the stereo is simply not
-    asserted. Per CLAUDE.md #9 this is pinned so the fallback cannot silently drift into
+    asserted. Per the contributor guide #9 this is pinned so the fallback cannot silently drift into
     a fabricated descriptor.
     """
     smiles = "C1CCC/C=C(\\CCCC1)/CC(C(=O)[O-])(/C/2=C/CCCCCCCC2)/C/3=C/CCCCCCCC3"
@@ -235,7 +235,7 @@ def test_descriptor_block_is_decided_by_the_map_it_is_given():
 # `prop-2-enamide` has THREE carbons; the emitted `(1R,2R)` came from the cyclopropyl
 # substituent's own numbering. The parent genuinely does have a stereogenic C2=C3 bond, so
 # the correct parent block is `(2E)` — the fix ADDS a right descriptor, it does not merely
-# delete a wrong one (CLAUDE.md #9).
+# delete a wrong one (the contributor guide #9).
 SMILES_CE1 = "C[C@@H]1C[C@H]1/C=C/C(N)=O"
 EXPECTED_CE1 = "(2E)-3-[(1R,2R)-2-methylcyclopropyl]prop-2-enamide"
 
@@ -281,7 +281,7 @@ def _ce1_features(principal_chain):
     from rdkit.Chem import rdCIPLabeler
 
     mol = Chem.MolFromSmiles(SMILES_CE1)
-    rdCIPLabeler.AssignCIPLabels(mol)       # never the legacy labeller (CLAUDE.md)
+    rdCIPLabeler.AssignCIPLabels(mol)       # never the legacy labeller (the contributor guide)
     return SimpleNamespace(
         mol=mol,
         stereocenters=[1, 3],
@@ -348,7 +348,7 @@ def _opsin_smiles(jar: str, name: str):
 
     NOTE: the shared `opsin_to_smiles` fixture passes the name as a trailing CLI
     argument, which the OPSIN CLI interprets as an input FILE, so it returns None for
-    every name including valid ones (CLAUDE.md: a harness that always fails is as
+    every name including valid ones (the contributor guide: a harness that always fails is as
     useless as one that always passes). Stdin is the working interface.
     """
     import subprocess
@@ -592,7 +592,7 @@ def test_ring_ester_declares_ring_only_when_the_alcohol_is_the_ring():
 
 
 # --------------------------------------------------------------------------
-# Collateral, found by verifying WHAT IS EMITTED after the fix (CLAUDE.md #9):
+# Collateral, found by verifying WHAT IS EMITTED after the fix (the contributor guide #9):
 # `_build_acyl_name`'s `unsaturation` parameter had NO caller, so every acyl
 # halide was spelled saturated and its C=C silently dropped.
 # --------------------------------------------------------------------------

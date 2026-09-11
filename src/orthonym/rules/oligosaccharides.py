@@ -30,7 +30,7 @@ when Java/OPSIN is absent on the PIN/default tier (unchanged), fail-CLOSED on th
 best-effort tier (.1: that tier has no downstream backstop, so
 this gate is the only thing standing between an unverified name and output).
 
-Root-cause-only (CLAUDE.md): no postprocessor, no regex / string surgery on any
+Root-cause-only (the contributor guide): no postprocessor, no regex / string surgery on any
 derived base, no per-molecule hardcode. Every gate failure returns ``None`` so the
 molecule cascade-continues to the existing pipeline (fail-closed,). The input
 mol is never mutated (the unit split copies via the reused capper).
@@ -1589,7 +1589,7 @@ def _split_decorated_sugar_base(base: str) -> Tuple[str, str]:
 # fails). The BB glycosyl-donor citation of a uronic acid instead keeps the
 # "-osyl" ending on the UN-contracted pyranose stem, with "uronic acid"
 # appended (``"glucopyranosyluronic acid"``, VERIFIED round-trips as a
-# mid-chain "-(1->c')-" donor). Explicit map (CLAUDE.md Warning 2), mirroring
+# mid-chain "-(1->c')-" donor). Explicit map (the contributor guide Warning 2), mirroring
 # ``sugar_names._URONIC_STEM_MAP``'s own keys.
 _URONIC_CATALOG_TO_GLYCOSYL_TAIL = {
     "alluronopyranose": "allopyranosyluronic acid",

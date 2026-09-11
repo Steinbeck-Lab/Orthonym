@@ -8,7 +8,7 @@ matches and spins (measured 63.1s, `internal notes
 hang.md``). Fix: bound the call (``maxMatches=1, uniquify=True`` -- behaviour-preserving,
 only ``matches[0]`` is ever read) AND add an all-carbon giant-ring-count scope guard so a
 fullerene declines FAST instead of spinning (fullerenes are explicitly out-of-scope,
-project CLAUDE.md). An in-scope mixed cage (aspidosperma-shaped,
+project the contributor guide). An in-scope mixed cage (aspidosperma-shaped,
 ``c1cc2c(c3c1CNC3)O[C@@]1(CCC[C@H]3CCCC[C@@H]31)C2``, VERIFIED 1.9s -> abstain) must keep
 naming/abstaining exactly as today, just fast.
 

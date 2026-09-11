@@ -14,7 +14,7 @@ molecule, which the gate correctly rejects (measured: '4-sulfobenzoate'
 
 All targets below are verified round-trip-exact (OPSIN 2.9.0 + InChIKey) by
 the implementing session; see the report at
-.superpowers/sdd/2026-08-17--phase3-acid-ester-anion/multianion-report.md.
+.the workflow tooling/sdd/2026-08-17--phase3-acid-ester-anion/multianion-report.md.
 """
 import pytest
 from orthonym import Orthonym

@@ -869,7 +869,7 @@ def inject_stereo_reanchored_rt_gated(
     input_smiles: Optional[str] = None,
 ) -> str:
     """Inject a stereo block on *base_name*, RT-gating the LOCANT numbering
-    (CLAUDE.md a project rule — offer numberings, keep the one that round-trips).
+    (the contributor guide a project rule — offer numberings, keep the one that round-trips).
 
     Candidate A uses ``builder_map`` (the handler's own numbering) exactly as
     ``inject_stereo_from_locant_map`` does. If A full-round-trips (name -> OPSIN

@@ -6,7 +6,7 @@ grammar, called by BOTH the legacy fragment assembler
 serializer (``name_tree_to_string._assemble_explicit_fields``). There is ONE
 implementation of each rule — not two — so the legacy path and the production
 flip path cannot drift (; the no-band-aid mandate in
-``.claude/skills/fix-methodology.md``).
+`internal notes`).
 
 The five core helpers (``_estimate_parent_size_from_name``,
 ``_build_unsaturation_infix``, ``_build_hydrocarbon_name``, ``_join_prefixes``,

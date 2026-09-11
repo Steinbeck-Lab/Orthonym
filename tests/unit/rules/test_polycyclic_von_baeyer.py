@@ -468,7 +468,7 @@ class TestRoundTripViaOPSIN:
 
 class TestNarrowExceptionsWR10:
     """a phase-04: bare except Exception eliminated per
-    CLAUDE.md /.claude/skills/fix-methodology.md no-band-aid policy."""
+    the contributor guide / internal notes no-band-aid policy."""
 
     @pytest.mark.unit
     def test_no_bare_except_exception_in_module(self):
@@ -485,7 +485,7 @@ class TestNarrowExceptionsWR10:
         assert "except Exception:" not in non_comment, (
             "WR-10 regression: bare 'except Exception:' reintroduced in "
             "polycyclic_von_baeyer.py. Use narrow exceptions per "
-            "CLAUDE.md / .claude/skills/fix-methodology.md."
+            "the contributor guide / internal notes."
         )
 
     @pytest.mark.unit

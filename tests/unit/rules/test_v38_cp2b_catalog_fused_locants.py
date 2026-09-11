@@ -110,7 +110,7 @@ def test_zero_wrong_sweep_rt_or_abstain(smiles):
 
 
 # --- PIN / no-regression controls: byte-identical to HEAD -------------------
-# Captured on HEAD 5b0562dd before the fix (scratchpad probe_cp2b_head.py). The
+# Captured on HEAD 5b0562dd before the fix (a temp dir probe_cp2b_head.py). The
 # undecorated catalog core spiro[oxirane-2,3'-quinolizidine] is the load-bearing
 # control -- it exercises the SAME catalog branch but carries no decoration on a
 # fusion atom, so it must stay byte-identical.

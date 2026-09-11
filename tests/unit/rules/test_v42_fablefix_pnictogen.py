@@ -1,4 +1,4 @@
-""" 11-FABLEFIX — two spelling-layer defects a cross-model (a review) review found.
+""" a review — two spelling-layer defects a cross-model (a review) review found.
 
 BLOCKER 1 — the multiplicative pnictogen-oxoacid guard was too narrow (it declined
 only NAKED diaryl rings). A SUBSTITUTED diaryl phosphinic/arsinic acid, and a

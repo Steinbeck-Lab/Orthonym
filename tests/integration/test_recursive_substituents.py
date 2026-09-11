@@ -231,7 +231,7 @@ class TestCompoundSubstituentFormatting:
     @pytest.mark.integration
     def test_sec_butyl_parens(self):
         """sec-butyl is a SIMPLE substituent -> NO enclosing marks (b);
-        cf. CLAUDE.md '3-tert-butyl-...'). The old parens-for-any-hyphen rule
+        cf. the contributor guide '3-tert-butyl-...'). The old parens-for-any-hyphen rule
         was stale."""
         result = format_substituent_prefix("sec-butyl", [3], 1)
         assert result == "3-sec-butyl"
@@ -281,7 +281,7 @@ class TestIsComplexSubstituent:
 
     @pytest.mark.integration
     def test_complex_tert_butyl(self):
-        # (b): tert-butyl is SIMPLE (cf. CLAUDE.md '3-tert-butyl-...').
+        # (b): tert-butyl is SIMPLE (cf. the contributor guide '3-tert-butyl-...').
         assert is_complex_substituent("tert-butyl") is False
 
 

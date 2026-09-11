@@ -15,7 +15,7 @@ ammonium cation substituent is the `-aminiumyl` form
 (`(N,N-dimethylmethanaminiumyl)acetate`). OPSIN 2.9.0 does NOT parse the
 `-aminiumyl` substituent suffix but DOES round-trip the equivalent azane-based
 PIN `(trimethylazaniumyl)acetate` -> `C[N+](C)(C)CC(=O)[O-]`. Accuracy is the #1
-priority (CLAUDE.md) and the byte-identical / RT gate forbids shipping an
+priority (the contributor guide) and the byte-identical / RT gate forbids shipping an
 unparseable name when a round-tripping equivalent exists, so the producer emits
 the `…azaniumyl` form (RT=1, a strict improvement over the old betaine ->
 'unknown organic compound').
@@ -78,7 +78,7 @@ class TestZwitterionGuard4:
 
     def test_betaine_homolog_carries_locant(self):
         """A longer-chain betaine homolog cites the attachment locant (PIN cites
-        all locants — CLAUDE.md pitfall 3). 4-carbon -> 4-(trimethylazaniumyl)
+        all locants — the contributor guide pitfall 3). 4-carbon -> 4-(trimethylazaniumyl)
         butanoate (RT-verified)."""
         assert _rc("C[N+](C)(C)CCCC(=O)[O-]") == "4-(trimethylazaniumyl)butanoate"
 

@@ -46,7 +46,7 @@ so local `pytest -m "not slow"` skips it; CI runs it via the
 `determinism_subset` job in.github/workflows/benchmark_subset.yml
 (added by Task 2 of this plan).
 
-FIX-METHODOLOGY (CLAUDE.md): if a molecule fails non-determinism, fix
+FIX-METHODOLOGY (the contributor guide): if a molecule fails non-determinism, fix
 at source (find the set / dict.keys / random iteration and make it
 deterministic). NEVER exclude the molecule from the sample — that is
 exactly the band-aid the a phase grid search would pay for later.
@@ -97,7 +97,7 @@ TOTAL_SAMPLE = 100
 # expected strings below MUST be updated IN THE SAME COMMIT as the
 # output-format change. Drift here is a signal, not noise — do not
 # update the expected strings to match the new output without also
-# verifying the change is intentional (CLAUDE.md root-cause rule).
+# verifying the change is intentional (the contributor guide root-cause rule).
 #
 # Each MUST produce its documented "(not supported)" output on all 5 seeds.
 PINNED_ANCHORS: List[Tuple[str, str]] = [
@@ -257,7 +257,7 @@ def _name_under_seed(smiles: str, seed: str, timeout: float = 60.0) -> str:
             f"SMILES={smiles!r} seed={seed!r}. This may indicate a "
             f"naming-loop hang or extremely slow fused-ring path — "
             f"investigate at source, do NOT increase the timeout as "
-            f"a band-aid (CLAUDE.md root-cause rule)."
+            f"a band-aid (the contributor guide root-cause rule)."
         )
     if result.returncode != 0:
         raise RuntimeError(
@@ -301,7 +301,7 @@ def test_determinism_across_hash_seeds(smiles: str) -> None:
             f"  seed={HASH_SEEDS[i]!r} -> {out!r}\n"
             f"Fix at source (find the set() / dict iteration and make "
             f"it deterministic). Do NOT exclude this molecule — that is "
-            f"the band-aid CLAUDE.md root-cause rule prohibits."
+            f"the band-aid the contributor guide root-cause rule prohibits."
         )
 
 

@@ -249,7 +249,7 @@ def test_internally_charged_species_now_named_not_voided():
     (nitro's charges are INTERNAL, excluded from
     ``perception.ions.get_ion_sites``'s genuine-ion-site perception, so this
     is spelled directly as a leaf, never via the charge-suffix machinery).
-    This is the CLAUDE.md-mandated regression check: an internally
+    This is the the contributor guide-mandated regression check: an internally
     charge-separated net-0 species must now be NAMED when it can be spelled
     correctly and verified, never silently left void."""
     result, verified = _name_and_verify("CC[N+](=O)[O-]")
@@ -511,7 +511,7 @@ def test_charged_substituent_on_neutral_parent_carries_on_branch_name():
 # ===========================================================================
 # Task B2b fix round 1: the RAW-formal-charge void guard -- the whole
 # internal-charge class VOIDS (never mis-names). See
-# ``.superpowers/sdd/2026-08-21-no-abstain-universal-namer/
+# ``.the workflow tooling/sdd/2026-08-21-no-abstain-universal-namer/
 # task-B2b-fixround1-findings.md``.
 # ===========================================================================
 
@@ -805,7 +805,7 @@ def test_atom_coverage_assertion_voids_a_rigged_double_count(monkeypatch):
 
 
 # ===========================================================================
-# Fix round 1 (task-review + FABLE adversarial review of commit cad511fd)
+# Fix round 1 (task-review + a review adversarial review of commit cad511fd)
 # ===========================================================================
 
 def test_nitro_shortcut_removed_no_wrong_constitution():

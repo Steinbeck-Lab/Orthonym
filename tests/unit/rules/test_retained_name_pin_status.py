@@ -117,7 +117,7 @@ class TestTheSuffixPromotionHalf:
 
 
 class TestDenyMechanismIsReached:
-    """★ CLAUDE.md a project rule, applied to the deny table itself.
+    """★ the contributor guide a project rule, applied to the deny table itself.
 
     A ``pin: false`` row only suppresses a name on the surfaces the deny-set filters.
     ``indane`` proved this the hard way: it had a row AND still emitted ``indane``.

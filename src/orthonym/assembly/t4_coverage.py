@@ -98,7 +98,7 @@ def name_t4_complete(mol, features) -> Optional[str]:
     fixed (Task 2b, ``name_morphemes.py::_evaluate``'s multiplier short-circuit
     now also skips zero-atom REPL segments) and the a dev split best-effort
     before/after re-measurement is BYTE-IDENTICAL emit/rt_exact -- see
-    `.superpowers/sdd/2026-08-12-phase0c-coverage-certificate-and-locant/task-2-report.md`.
+    `.the workflow tooling/sdd/2026-08-12-phase0c-coverage-certificate-and-locant/task-2-report.md`.
     """
     candidate = _best_effort_candidate(mol, features)
     if candidate is None:
@@ -305,7 +305,7 @@ def _best_effort_candidate(mol, features) -> Optional[_Candidate]:
 
     Task 6 (measured 2026-08-11) -- WHY the cascade STOPS at rung 2, and where
     the remaining polyfunctional breadth lives. Two facts were established, not
-    assumed (probes in scratchpad/diag_t6*.py):
+    assumed (probes in a temp dir/diag_t6*.py):
 
       1. ``name_general`` is ALL-OR-NOTHING: it returns a complete E1-passing
          result or ``None``, NEVER a partial with a leftover remainder. So the
@@ -389,7 +389,7 @@ def _best_effort_candidate(mol, features) -> Optional[_Candidate]:
              chain_is_parent=False),
         # rung 2: keep the perceived parent, PG suppressed (ring-less /
         # chain-preferred esters+amides). NOT redundant with rung 1: measured
-        # (final review, scratchpad/probe_rung2_wide.py, 400-molecule
+        # (final review, a temp dir/probe_rung2_wide.py, 400-molecule
         # pubchem_2000 sample) rung 2 is the SOLE producer for 5/400 molecules
         # where rung 1's chain_is_parent=False forces a ring parent the engine
         # cannot host -- e.g. cid 266765 CC(C)(CC(=O)NC1CCCCC1)CBr ->

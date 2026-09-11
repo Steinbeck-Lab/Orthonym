@@ -866,7 +866,7 @@ _register_inner(
     side_effect_inventory=(),
 )
 
-# --- 11-FABLEFIX: pnictogen -inate ester (P/As/Sb) R2E(=O)(OR').
+# --- a review: pnictogen -inate ester (P/As/Sb) R2E(=O)(OR').
 # principal_group in {phosphinate_ester, arsinate_ester, stibinate_ester}.
 from .handlers.pnictogen_inate_ester import (  # noqa: E402
     _is_pnictogen_inate_ester,

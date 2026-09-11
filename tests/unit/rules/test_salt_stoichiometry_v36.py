@@ -87,8 +87,8 @@ def test_w7_ester_salt_round_trips():
     assert opsin_roundtrip_check(W7_ESTER_SALT, name)["passed"], name
 
 
-# === -A1 FABLE finding: the di-collision oxoanion class ==================
-# FABLE cross-model review BLOCKER: for a bare mononuclear oxoanion X, ``di``+X
+# === -A1 review finding: the di-collision oxoanion class ==================
+# review cross-model review BLOCKER: for a bare mononuclear oxoanion X, ``di``+X
 # is a REAL OPSIN word for a DIFFERENT (pyro/condensed) species. Ca3(PO4)2 emitted
 # 'tricalcium diphosphate' -> OPSIN reads calcium PYROPHOSPHATE (P2O7) ->
 # suppresses (0-wrong safe) -> the salt needlessly ABSTAINS, even though
@@ -104,7 +104,7 @@ def test_di_collision_word_forces_enclosing(name):
     assert _ion_needs_enclosing_multiplier(name) is True
 
 
-# Predicate unit (no OPSIN): the FABLE-cited seed words, spelled out explicitly.
+# Predicate unit (no OPSIN): the review-cited seed words, spelled out explicitly.
 @pytest.mark.parametrize("name", [
     "phosphate", "sulfate", "carbonate", "chromate", "sulfite",
 ])
@@ -127,7 +127,7 @@ def test_collision_word_wraps_with_enclosing_multiplier():
     assert _apply_stoichiometric_prefix("carbonate", 2) == "bis(carbonate)"
 
 
-# --- Integration RED->GREEN (OPSIN): the FABLE witness Ca3(PO4)2 -----------
+# --- Integration RED->GREEN (OPSIN): the review witness Ca3(PO4)2 -----------
 # RED (pre-fix, captured in fix1-report.md): name_compound emitted the
 # not-supported placeholder 'calcium compound (not supported)' because
 # 'tricalcium diphosphate' (= pyrophosphate) was -suppressed and did NOT
@@ -135,9 +135,9 @@ def test_collision_word_wraps_with_enclosing_multiplier():
 CA3_PO4_2 = "[O-]P(=O)([O-])[O-].[O-]P(=O)([O-])[O-].[Ca+2].[Ca+2].[Ca+2]"
 
 
-def test_fable_witness_ca3_po4_2_round_trips():
+def test_review_witness_ca3_po4_2_round_trips():
     name = name_compound(CA3_PO4_2, style="pin")
-    assert name, "abstained on the FABLE witness Ca3(PO4)2"
+    assert name, "abstained on the review witness Ca3(PO4)2"
     # must not emit the colliding 'diphosphate' word
     assert "diphosphate" not in name, f"still emits collision word: {name!r}"
     result = opsin_roundtrip_check(CA3_PO4_2, name)

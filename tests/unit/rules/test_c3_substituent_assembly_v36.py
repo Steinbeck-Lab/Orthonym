@@ -14,7 +14,7 @@ build ``chebi_full_ost.jsonl``, from which the trace drew its 2,147 abstainers):
 the plan's Task-2 premise (a fail-closed guard in
 ``assembly/substituent_naming.py`` is THE dominant decline site and re-anchoring
 the whole-molecule ring namer ahead of it closes the category-(a) witnesses)
-is OFF-PATH for every named flagship witness. This is CLAUDE.md a project rule
+is OFF-PATH for every named flagship witness. This is the contributor guide a project rule
 ("the named choke point is off the path") holding again.
 
 The re-anchor mechanism the plan asks for ALREADY EXISTS and already works at the
@@ -179,7 +179,7 @@ def test_c3_reanchor_mechanism_already_works_at_milestone_tier():
     substituent role') ALREADY EXISTS: a complex cage ring in the substituent
     role names + round-trips at the milestone tier via allow_mancude. This is
     the evidence that a fresh re-anchor in assembly/ would be dead code
-    (CLAUDE.md a project rule)."""
+    (the contributor guide a project rule)."""
     name, passed = _c3_rt(ADAMANTYL_BENZOIC)
     assert not is_failure_name(name), f"cage substituent regressed: {name!r}"
     assert passed, f"cage substituent no longer round-trips: {name!r}"

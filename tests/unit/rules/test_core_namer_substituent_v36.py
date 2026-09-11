@@ -29,7 +29,7 @@ input InChIKey (0-wrong).
 
 Every witness below was A/B-verified with ``scripts/an A/B check`` to ABSTAIN at
 HEAD and to NAME + round-trip with the fix. Fresh process per witness
-(warm-cache hazard -- CLAUDE.md).
+(warm-cache hazard -- the contributor guide).
 """
 import json
 import subprocess
@@ -70,7 +70,7 @@ def _cn_rt(smiles):
 
     Returns ``{"name": str|None, "tier": str, "rt": bool|None}``. A subprocess
     per call is deliberate: the fragment memo cache is per-process and warm-cache
-    state has repeatedly produced false greens in this project (CLAUDE.md).
+    state has repeatedly produced false greens in this project (the contributor guide).
     """
     out = subprocess.run(
         [sys.executable, __file__, smiles],

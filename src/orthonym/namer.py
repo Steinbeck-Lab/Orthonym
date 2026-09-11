@@ -1216,7 +1216,7 @@ def _self_consistency_verdict(input_smiles: str, opsin_smiles: str,
     # as a chiral substructure query into the input. This covers tetrahedral R/S AND
     # double-bond E/Z. The prior RegistrationHash TAUTOMER_HASH layer was E/Z-BLIND on
     # conjugated systems (fumarate vs maleate hashed EQUAL), so it silently shipped a
-    # wrong geometric isomer. Probes: scratchpad/risk3_stereo_probe*.py; audit and
+    # wrong geometric isomer. Probes: a temp dir/risk3_stereo_probe*.py; audit and
     # derivation: internal notes (RISK 3 / C6).
     _mi2, _mo2 = Chem.Mol(mi), Chem.Mol(mo)
     Chem.RemoveStereochemistry(_mi2)
@@ -1309,14 +1309,14 @@ def _final_opsin_validity_gate(name: str, smiles: Optional[str],
     leaves name/name_with_confidence; inside the is_top_level_naming guard
     so it never fires on decomposition fragments.
 
-    ``besteffort_unverified`` (task-JAR-ABSENT, FABLE 0-wrong hole): the four
+    ``besteffort_unverified`` (task-JAR-ABSENT, a review 0-wrong hole): the four
     name/name_with_confidence call sites pass ``self._general_fallback_unverified``.
     When True AND the OPSIN jar is GENUINELY absent (a no-Java deployment), the
      jar-absent fail-OPEN below is replaced by a fail-CLOSED suppression:
     at best-effort tier we cannot constitutionally verify ANY name without OPSIN
     (the Wave-0 reconstructor has no NameFacts extractor for an arbitrary emitted
     name yet -- ``verify_or_none(name, smiles, name_facts=None)`` is provably None
-    on every jar-absent call), and FABLE proved this branch ships WRONG-molecule
+    on every jar-absent call), and a review proved this branch ships WRONG-molecule
     names at best-effort in a no-Java env (``COS(=O)(=O)O`` -> ``methane``). 0-wrong
     is ABSOLUTE, so an unverifiable best-effort emission must abstain, not ship.
     Default False keeps the historical jar-absent fail-OPEN for the PIN/default
@@ -1346,13 +1346,13 @@ def _final_opsin_validity_gate(name: str, smiles: Optional[str],
         pass
     # fail-OPEN: probe the JAR FIRST.
     if not _validity_gate_jar_present():
-        # task-JAR-ABSENT (FABLE 0-wrong hole): a GENUINELY absent jar means no
+        # task-JAR-ABSENT (a review 0-wrong hole): a GENUINELY absent jar means no
         # constitutional verification is possible for this name -- no OPSIN, and
         # the Wave-0 reconstructor needs a NameFacts extractor that does not yet
         # exist for an arbitrary emitted name (verify_or_none(name_facts=None) is
         # provably None on every jar-absent call). At BEST-EFFORT tier
         # (general_fallback_unverified) that unverified branch is exactly the
-        # class FABLE showed ships WRONG-molecule names in a no-Java deployment
+        # class a review showed ships WRONG-molecule names in a no-Java deployment
         # (COS(=O)(=O)O -> methane; ClP(Cl)(=O)OC1=CC=CC=C1 ->
         # (phosphonooxy)benzene, Cl2 silently swapped for (OH)2). 0-wrong is
         # ABSOLUTE, so fail CLOSED to the honest fallback rather than ship it.
@@ -1471,7 +1471,7 @@ def _final_opsin_validity_gate(name: str, smiles: Optional[str],
     # RT-verified tiers a correct-but-OPSIN-unparseable name is an honest abstain,
     # never a stereo-stripped or unparseable emission (accuracy #1: a name that
     # does not round-trip is not a shippable name). Closes the precision leak that
-    # let 5/1435 OPSIN-unparseable names ship at best-effort (FABLE + the 1500-mol
+    # let 5/1435 OPSIN-unparseable names ship at best-effort (a review + the 1500-mol
     # head-to-head). PIN path untouched.
     if general_fallback_tier:
         #: EXEMPT the construction-verified NP stereoparent carve-out
@@ -1767,7 +1767,7 @@ def _offer_rt_ok(name: str, input_smiles: Optional[str]) -> bool:
     compare all return True. This predicate must never be the reason
     `select_rt_passing` empties the whole offer pool.
 
-     no-abstain Phase A fix-round-1 (Findings 1+2, FABLE adversarial
+     no-abstain Phase A fix-round-1 (Findings 1+2, a review adversarial
     review): `skip_reanchor` bundles FOUR distinct outcomes as though they all
     meant "no check is possible or worth attempting" -- but `unavailable` /
     `not_run` mean only "no gate call was recorded for THIS EXACT STRING
@@ -1776,7 +1776,7 @@ def _offer_rt_ok(name: str, input_smiles: Optional[str]) -> bool:
     PIN class -- thioperoxol/inositol/...) or `gate_disabled` (the whole
     verification layer is deliberately off). Fail-opening all four alike let a
     stubbed producer ship a WRONG-MOLECULE name via a `t4_floor` offer with
-    ZERO gates firing end-to-end: `scratchpad/probe_whitebox_floor.py` stubbed
+    ZERO gates firing end-to-end: `a temp dir/probe_whitebox_floor.py` stubbed
     `t4_coverage.name_t4_complete` to return `"ethanol"` for an unrelated
     abstainer (`CC(=O)C1=C(C)S[C@@H](C)CC1=O`) and the genuine
     `_finish`/`_maybe_append_t4_floor_offer`/`_offer_rt_ok`/`select_rt_passing`
@@ -4114,7 +4114,7 @@ class Orthonym:
         the old constitution-only guard (NEW-accepts ⊆ OLD-accepts, verified), so
         it can never introduce a wrong-acceptance — only reject more. Derivation
         and probes: `internal notes` (RISK 3),
-        ``scratchpad/risk3_stereo_probe*.py``.
+        ``a temp dir/risk3_stereo_probe*.py``.
 
         For every other emission use the EXACT isomeric comparison (byte-
         identical to the pre-P6 ``Chem.CanonSmiles`` == ``Chem.CanonSmiles``).
@@ -4398,10 +4398,10 @@ class Orthonym:
             #: explicit verification ladder. verified = OPSIN parsed
             # the name AND it round-trips to the input structure. A parsed-
             # but-MISMATCHED name is NEVER shipped, at any tier. task-JAR-ABSENT
-            # (FABLE 0-wrong hole): the no-jar best-effort branch below no
+            # (a review 0-wrong hole): the no-jar best-effort branch below no
             # longer ships unverified -- the old claim that "no-jar transience
             # ships ONLY behind the opt-in... a genuine environment gap,
-            # not a proof gap" mischaracterized the hole (FABLE's witnesses were
+            # not a proof gap" mischaracterized the hole (a review's witnesses were
             # demonstrably WRONG-molecule, not merely-unprovable-but-correct),
             # so the branch now routes through `verify_or_none` and abstains.
             # no-abstain Phase A: when the jar IS present but OPSIN
@@ -4413,12 +4413,12 @@ class Orthonym:
             elif not _validity_gate_jar_present():
                 if not self._general_fallback_unverified:
                     return None
-                # no-abstain / task-JAR-ABSENT (FABLE 0-wrong hole): a
+                # no-abstain / task-JAR-ABSENT (a review 0-wrong hole): a
                 # jar-absent best-effort emission must NOT ship `cand`
                 # unverified. Before this fix control fell straight through
                 # this whole if/elif/else to the emit at the bottom with
                 # opsin_status="unverified" and ZERO verification of any kind
-                # -- FABLE measured 7/7 WRONG-molecule ships in a no-Java
+                # -- a review measured 7/7 WRONG-molecule ships in a no-Java
                 # deployment (`COS(=O)(=O)O`->`methane`;
                 # `ClP(Cl)(=O)OC1=CC=CC=C1`->`(phosphonooxy)benzene` with Cl2
                 # silently swapped for (OH)2, a wrong constitution). Route
@@ -6034,7 +6034,7 @@ class Orthonym:
                         # name flagged stereo_unexpressed.
                         #
                         # no-abstain Phase A fix-round-1, Finding 4 (HIGH,
-                        # FABLE adversarial review): the OLD comment here claimed
+                        # a review adversarial review): the OLD comment here claimed
                         # the downstream `_final_opsin_validity_gate` "verifies at
                         # the granularity [a flagged emission] asserts" -- WRONG.
                         # That gate is CONSTITUTIONAL ONLY (InChIKey skeleton +
@@ -6045,15 +6045,15 @@ class Orthonym:
                         # where the name cites only 1 centre and gets it
                         # negated) has the SAME skeleton and would ship as a
                         # WRONG STEREOISOMER unverified. Reproduced directly
-                        # (`scratchpad/probe_finding4_g1_stereo.py`):
+                        # (`a temp dir/probe_finding4_g1_stereo.py`):
                         # `C[C@@H](O)[C@@H](N)C` + candidate
                         # `(3R)-3-aminobutan-2-ol` -- skeleton matches, full
                         # InChIKey differs, and this lane shipped it with no
                         # check at all. Route a FLAGGED emission through the
                         # SAME `_rt_match` superset gate the late-recovery site
                         # (`_try_general_engine_recovery`) already uses for this
-                        # exact purpose -- proven (FABLE's Q1,
-                        # `scratchpad/probe_rtmatch_semantics.py`, 13/14 probed
+                        # exact purpose -- proven (a review's Q1,
+                        # `a temp dir/probe_rtmatch_semantics.py`, 13/14 probed
                         # cases) to ACCEPT a genuine omission while REJECTING a
                         # conflict/fabrication/wrong-enantiomer. An unflagged
                         # emission (`_stereo_flagged=False`, already fully
@@ -6062,7 +6062,7 @@ class Orthonym:
                         # jar-PRESENT-only; the jar-ABSENT best-effort case no
                         # longer fail-opens -- see the task-JAR-ABSENT
                         # verify_or_none gate just before the emit below, which
-                        # closed the FABLE 0-wrong hole here.)
+                        # closed the a review 0-wrong hole here.)
                         _permitted, _stereo_flagged = self._stereo_emit_decision(
                             mol, _eng.name)
                         if (_permitted and _stereo_flagged
@@ -6074,7 +6074,7 @@ class Orthonym:
                                     or not self._rt_match(
                                         smiles, _g1_opsin_smi, True)):
                                 _permitted = False
-                        # task-JAR-ABSENT (FABLE 0-wrong hole, inline-G1
+                        # task-JAR-ABSENT (a review 0-wrong hole, inline-G1
                         # sibling of the late-recovery ladder site above):
                         # `_no_jar_abstain` only fires for the COMPLETE tier
                         # (`allow_aromatic_general and not
@@ -6144,7 +6144,7 @@ class Orthonym:
         # BEFORE the `conf_handler != 'unknown'` check people assumed was
         # responsible.
         #
-        # MEASURED before changing (scripts/../scratchpad widen probe, the
+        # MEASURED before changing (scripts/../a temp dir widen probe, the
         # COMPLETE affected population -- all 714 rows of
         # benchmarks/pubchem_2000.csv with heavy_atoms <= 15, 0 timeouts):
         # 593 molecules are newly admitted (class GENERAL, HA <= 15)

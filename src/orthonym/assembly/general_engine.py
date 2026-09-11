@@ -522,7 +522,7 @@ _ZWIT_CATION_BASES = {
 }
 # / SKELETAL anionic suffix bases, keyed by ``classify_anion``.
 # This is the branch (BOTH ionic centres skeletal to the parent hydride)
-# and it is REACHED -- not a lookup table nobody visits (CLAUDE.md #10). Entry
+# and it is REACHED -- not a lookup table nobody visits (the contributor guide #10). Entry
 # point: ``name_general_ring``/``name_general_spiro`` -> ``_emit_ring_from_analysis``.
 # Five cage zwitterions exercise it, every emitted name OPSIN-round-tripped to the
 # input InChIKey; they are the parametrised cases in
@@ -2474,7 +2474,7 @@ def _name_terminal_ring_parent(
     # a phase Task 3 LEAD (raised by the Task 1 trace): ``terminal_ring_name``
     # calls no ``_stereo_prefix`` at all, so ``stereo_atom_to_locant`` is left
     # at its empty default here -- NOT an oversight, a measured non-fix.
-    # Witnessed (this task, scratchpad probes): called directly, this
+    # Witnessed (this task, a temp dir probes): called directly, this
     # function's underlying namer DOES silently drop real, RDKit-detected
     # ring stereo it structurally cannot express -- e.g. a bare
     # 8/9-membered-ring endocyclic C=C carries a genuine defined E/Z

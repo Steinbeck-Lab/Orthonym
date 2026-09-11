@@ -1,6 +1,6 @@
 """ a phase Task 1.1 — RT-gate the best-effort glycan path fail-CLOSED.
 
-Census (PHASE0-GLYCAN-DECLINE-CENSUS.md, `scratchpad/glycan_census.py` pass B over
+Census (PHASE0-GLYCAN-DECLINE-CENSUS.md, `a temp dir/glycan_census.py` pass B over
 the 413-row glycan backlog): the best-effort tier shipped 44 WRONG + 46
 opsin_unparseable names because `_sugar_name_rt_ok`'s "cannot determine" branches
 (missing jar, or ANY exception during the OPSIN check) returned ``True`` -- i.e.
@@ -14,7 +14,7 @@ an unverified glycan name and best-effort output.
 ⚠ a trace FINDING (a project rule, "choke point off path" -- recorded here so the next
 session does not re-open this): none of the 44 wrong / 46 unparseable census
 witnesses actually reach this function. Structural signal
-(`scratchpad/pass_a_signals.json`, `oligo_cascade_name`) shows `name_disaccharide`
+(`a temp dir/pass_a_signals.json`, `oligo_cascade_name`) shows `name_disaccharide`
 returns ``None`` for ALL 413 backlog rows (`_classify_units` fails first, the
 documented root symptom) -- composing a name is a precondition for calling
 `_sugar_name_rt_ok`, so it is never invoked with a candidate for this corpus at

@@ -27,7 +27,7 @@ capped fragment canonicalizes to a ``URONIC_ACID_NAMES`` key — NO string surge
 sugar head (RESEARCH Open Q2 RESOLVED). The uronic head form comes from the explicit
 ``data.sugar_names.uronic_glycoside_head`` map (BB).
 
-Root-cause-only (CLAUDE.md): no postprocessor, no regex on any existing name string,
+Root-cause-only (the contributor guide): no postprocessor, no regex on any existing name string,
 no neutralize-then-rename, no per-molecule hardcode. All logic is RDKit atom/bond
 walks + dict lookups + set math; the function is pure (no global state, no mol
 mutation — the NP dispatch calls the path twice, Pitfall 5).

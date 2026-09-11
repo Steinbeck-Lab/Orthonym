@@ -211,7 +211,7 @@ def test_italic_n_fallback_is_untouched():
 
 
 # ---------------------------------------------------------------------------
-# 3. Cross-path controls -- other producers must not move (CLAUDE.md #9)
+# 3. Cross-path controls -- other producers must not move (the contributor guide #9)
 # ---------------------------------------------------------------------------
 
 @pytest.mark.unit

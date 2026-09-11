@@ -13,7 +13,7 @@ the ``isolated_naming_session`` warm-cache hazard (memory
 a witness can emit a correct name in a WARM process and abstain COLD. The RED
 baseline is only trustworthy measured in a fresh interpreter per witness, so
 ``_c4_rt`` shells out to a one-shot ``python -c`` child (its own JVM, its own
-empty cache) exactly as CLAUDE.md's "-m orthonym one-shot" guidance
+empty cache) exactly as the contributor guide's "-m orthonym one-shot" guidance
 prescribes. Result is memoised per SMILES so each witness spawns exactly one
 child regardless of how many tests read it.
 

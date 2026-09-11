@@ -180,7 +180,7 @@ class TestPhaneVsRingAssemblyDispatch:
         all-benzene-homophane class -- OPSIN still cannot parse ANY phane
         form, but `_PHANE_PIN_RE` (namer.py) carves this correct-by-
         construction, formula-veto-guarded PIN out of the validity gate
-        (see docs/superpowers/plans/2026-07-16-wave8-p8-phane.md)."""
+        (see docs/the workflow tooling/plans/2026-07-16-wave8-p8-phane.md)."""
         result = name_compound(smiles)
         assert result == expected_pin, (
             f"name_compound({label}) returned {result!r}; expected the "

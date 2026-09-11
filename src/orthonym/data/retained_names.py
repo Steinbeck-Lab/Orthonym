@@ -221,7 +221,7 @@ RETAINED_NAMES = {
     # 4H-quinolizine"; (the Blue Book) + (the Blue Book) require the
     # indicated H to be cited. The bare "phosphinolizine (PIN)" in Table 2.9 is
     # shorthand (as "quinolizine (PIN)" is). OPSIN parses 4H-phosphinolizine to the
-    # identical structure (RT-verified). 11-FABLEFIX.
+    # identical structure (RT-verified). a review.
     "C1=CCP2C=CC=CC2=C1": "4H-phosphinolizine",  # the Blue Book / the Blue Book (6+6 quinolizine analogue)
     "c1ccc2[nH]cnc2c1": "1H-benzimidazole",  # 1H-benzimidazole is IUPAC 2013 PIN
     # (the Blue Book) "for preferred IUPAC names locants must be

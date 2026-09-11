@@ -28,7 +28,7 @@ Group 3 — catalog adds for von-Baeyer-emitting retained parents:
   * 4H-phosphinolizine the Blue Book Table 2.9 shorthand "phosphinolizine (PIN)"; the
                        6+6 QUINOLIZINE analogue carries indicated H like its N
                        parent (the Blue Book "the PIN is 4H-quinolizine";
-                       the Blue Book + the Blue Book). 11-FABLEFIX.
+                       the Blue Book + the Blue Book). a review.
 
 Group 4 — retained nitrile names:
   * formonitrile the Blue Book "HCN formonitrile(PIN)... hydrogen cyanide"
@@ -62,7 +62,7 @@ _ENGINE_CHANGED = [
     ("c1cccc2ccccccc-2cc1", "octalene"),         # G3, the Blue Book
     ("C1=CC2=CC=C[As]2C=C1", "arsindolizine"),   # G3, the Blue Book
     ("c1ccp2cccc2c1", "phosphindolizine"),       # G3, the Blue Book
-    ("C1=CCP2C=CC=CC2=C1", "4H-phosphinolizine"),  # G3, the Blue Book (6+6 quinolizine analogue; 11-FABLEFIX)
+    ("C1=CCP2C=CC=CC2=C1", "4H-phosphinolizine"),  # G3, the Blue Book (6+6 quinolizine analogue; a review)
     ("C#N", "formonitrile"),                     # G4, the Blue Book
     ("N#CC#N", "oxalonitrile"),                  # G4, the Blue Book
 ]

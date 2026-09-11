@@ -2,7 +2,7 @@
 
 a trace: internal notes (the classifier-veto
 premise was REFUTED; these are the 3 measured WRONG-guess producers instead,
-each independently RT-validated). Plan: docs/superpowers/plans/
+each independently RT-validated). Plan: docs/the workflow tooling/plans/
 2026-08-12-phase3-correctness-tail-hardening.md Sec 3A.
 
 3A-a: rules/salts.py -- is_salt/name_salt must require the disconnected

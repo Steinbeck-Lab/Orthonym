@@ -1,6 +1,6 @@
 """-A3: name_with_confidence must honour the isotope decorator hook.
 
-FABLE cross-model review #1 found a 0-wrong hole: name / name_tiered are
+a review cross-model review #1 found a 0-wrong hole: name / name_tiered are
 protected by an isotope hook (namer.py:2938) that routes an isotope-labeled
 mol through the fail-closed decorator BEFORE _name_impl strips the label, but
 name_with_confidence (namer.py) called _name_impl directly and skipped it.

@@ -56,7 +56,7 @@ def test_inorganic_salt_fails_closed():
     # literal sentinel string: namer.py's documented " Composer1 Task 5
     # best-effort clean-abstain contract" (name_tiered, ~:2939-2949)
     # deliberately nulls out ANY failure name under general_fallback to avoid
-    # leaking a descriptive fallback as if it were a real name (CLAUDE.md
+    # leaking a descriptive fallback as if it were a real name (the contributor guide
     # a project rule, the sentinel-leak defect class). Verified this molecule's
     # raw fallback text is actually 'beryllium compound (not supported)'
     # (errors.py::classify_failure_limit's UNSUPPORTED_ELEMENT branch), not

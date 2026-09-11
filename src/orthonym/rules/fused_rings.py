@@ -1063,7 +1063,7 @@ def _name_ortho_fused_generate_and_test(mol) -> Optional[str]:
     InChI before it can be returned).
 
     Fusion nomenclature is not derived de-novo here; instead — matching what do (an offline OPSIN-validated template index) and
-    CLAUDE.md a project rule (OFFER many, keep the one that round-trips) — a bounded
+    the contributor guide a project rule (OFFER many, keep the one that round-trips) — a bounded
     candidate set is generated from the actual ring components (a max-ring retained
     BASE named from a fused sub-core per, plus the remaining monocycle as a
     fusion PREFIX with enumerated attachment locants/letters) and each is OPSIN-

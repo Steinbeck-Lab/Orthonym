@@ -164,7 +164,7 @@ def test_bb_g_worked_examples_on_benzene(smiles, expected):
 # identical so the italics decide. ``alpha_sort_key`` implements this; raw string
 # order does not ('c' < 't').
 #
-# ⚠ NOTE FOR THE READER: ``CLAUDE.md`` states "INCLUDE for alphabetization: iso-,
+# ⚠ NOTE FOR THE READER: ``the contributor guide`` states "INCLUDE for alphabetization: iso-,
 # neo-, cyclo-, sec-, tert-". That is right for the nonitalic iso/neo/cyclo and
 # WRONG for the italicized sec-/tert-, per above.
 # --------------------------------------------------------------------------

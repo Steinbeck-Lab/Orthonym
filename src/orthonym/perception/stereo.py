@@ -77,7 +77,7 @@ def _fill_missing_bond_cip_from_rdkit(mol) -> None:
         # propagate. A narrower clause let an unlisted exception escape to
         # assign_stereochemistry's outer ``except Exception``, which re-ran the
         # RDKit-only labeller on a mol centres had ALREADY labelled -- silently
-        # downgrading it from the 281/290 engine to 235/290 (FABLE review #3).
+        # downgrading it from the 281/290 engine to 235/290 (a review review #3).
         return
 
 

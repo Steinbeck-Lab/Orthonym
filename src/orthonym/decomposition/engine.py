@@ -383,7 +383,7 @@ def _name_is_proven_complete(name: str, mol) -> bool:
 
     2. **It answers CONSTITUTION, not PIN-preference.** A True here means "the
        same atoms, bonded the same way" and nothing more -- OPSIN proves a name
-       VALID, never PREFERRED (CLAUDE.md). ``ethyl stearate`` is proven
+       VALID, never PREFERRED (the contributor guide). ``ethyl stearate`` is proven
        complete by this function and is NOT the PIN (``the Blue Book``
        puts ``(PIN)`` on ``octadecanoic acid``). That is acceptable *here* only
        because this predicate's question is "should we DECOMPOSE this

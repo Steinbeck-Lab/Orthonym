@@ -797,7 +797,7 @@ class TestAcylPrefixUsesPinAcidStem:
     @pytest.mark.parametrize("smiles,expected,withdrawn", SATURATED + UNSATURATED)
     def test_no_withdrawn_prefix_became_an_abstention(self, smiles, expected,
                                                       withdrawn):
-        """CLAUDE.md #9: withdrawing a wrong name must not fail closed instead."""
+        """the contributor guide #9: withdrawing a wrong name must not fail closed instead."""
         name = name_compound(smiles)
         assert name, f"empty name for {smiles}"
         assert "unknown" not in name.lower(), (

@@ -105,7 +105,7 @@ _STEREO_UNEXPRESSED = contextvars.ContextVar(
 # So the suffix is REQUIRED and these names omit it; OPSIN tolerates them and
 # they denote the right structure, but they are not valid IUPAC.
 #
-# Shipped deliberately on ONLY, where the alternative is silence (CLAUDE.md
+# Shipped deliberately on ONLY, where the alternative is silence (the contributor guide
 # a project rule: for an abstention is a DEFECT and a table miss must degrade to
 # an uglier name). Recorded per row rather than merely counted, because a number
 # in a report is not recoverable and a field is: this is precisely the spelling

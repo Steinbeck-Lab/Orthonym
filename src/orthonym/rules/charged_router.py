@@ -1097,7 +1097,7 @@ def _route_zwitterion(mol, sites, style: str) -> str:
         return ''
 
     # 3. Compute the attachment locant on the anion parent chain (PIN cites all
-    # locants — CLAUDE.md pitfall 3). For a carboxylate parent C1 is the carboxyl
+    # locants — the contributor guide pitfall 3). For a carboxylate parent C1 is the carboxyl
     # carbon; the locant of the cation-substituent carbon = its bond distance
     # from the carboxyl carbon + 1. Omit only when the parent is too short for an
     # ambiguity (a 1-carbon attach on a 2-carbon acetate, where OPSIN's default

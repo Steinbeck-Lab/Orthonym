@@ -162,7 +162,7 @@ def test_newly_named_rows(namer, smiles, expected):
 
 # The malformed-splice signature: a letter immediately followed by a digit, which
 # is what `1-methyl` + `4-methyl` -> `1-methyl4-methyl` produced. Computed over ALL
-# emitted rows and not just the failures (CLAUDE.md #14), so it cannot be a
+# emitted rows and not just the failures (the contributor guide #14), so it cannot be a
 # signature that also matches passing rows.
 _WELDED_LOCANT = re.compile(r"[a-z]\d")
 

@@ -1032,7 +1032,7 @@ def _handle_poly_anion(mol, smiles, canonical_smiles, features=None, *,
     # falling into the carboxylate-specific neutralize-recurse rebuild below.
     # Zero new producer code; this only reaches species route_charged already
     # declined on.
-    # FABLE #3 (hardening): mirror the SAME full-InChIKey RT gate the
+    # a review #3 (hardening): mirror the SAME full-InChIKey RT gate the
     # MIXED_SIGN_ZWITTERION door applies to this identical name_anion
     # fallback (_handle_mixed_sign_zwitterion,:832-835 / its predicate
     #:359-361) -- in-handler, not relying solely on the outer gate
@@ -1189,7 +1189,7 @@ def _handle_multi_component_neutral(mol, smiles, canonical_smiles, features=None
     # round-trips to the input full InChIKey (verified). It is byte-identical on the
     # PIN path, so no PIN-tier / labelling change. (An earlier revision emitted a
     # em-dash 'A—A (1/1)' form here on the false premise that the space-join
-    # did not parse; the FABLE review refuted that -- 'ethanol ethanol' RTs FULL --
+    # did not parse; the a review review refuted that -- 'ethanol ethanol' RTs FULL --
     # and the em-dash form wrongly asserts an adduct relation excludes for
     # identical entities and shipped labelled PIN, so it was reverted.)
     return ' '.join([frag_name] * len(frags))

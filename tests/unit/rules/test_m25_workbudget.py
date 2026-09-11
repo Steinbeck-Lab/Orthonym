@@ -10,7 +10,7 @@ Two per-top-level budgets (``fragment_naming._PERF_BUDGET`` inner ops +
 exhaustion ``PerfBudgetExceeded`` unwinds to the outermost ``name`` and the
 whole molecule abstains CLEANLY (inv 9 — never a partial / atom-dropped name).
 
-Measured sizing (M2.5 Task 2B, ``.superpowers/sdd/M2-STEREO-PLAN/task-m25b-report.md``):
+Measured sizing (M2.5 Task 2B, ``.the workflow tooling/sdd/M2-STEREO-PLAN/task-m25b-report.md``):
 
   * hang witnesses: Ni/Fe-corrin ~7-12M inner ops; cob(III)yrinate 553 analyze
     calls; vancomycin/thiopeptide ~1000+ fused-matcher calls (all growing without
@@ -39,7 +39,7 @@ pytestmark = [pytest.mark.slow, pytest.mark.integration]
 _WALL_KILL_S = 55
 
 # ── HANG witnesses that must now abstain CLEANLY (was: >20-min SIGKILL) ──────
-# InChIKey / ChEBI provenance in scratchpad; SMILES pinned here as the contract.
+# InChIKey / ChEBI provenance in a temp dir; SMILES pinned here as the contract.
 _NI_CORRIN = ("C[C@@]1(CC(=O)[O-])C2=CC3=[N+]4C(=Cc5c(CC(=O)[O-])c(CCC(=O)[O-])c6"
               "[n]5[Ni-2]45[N]2C(=CC2=[N+]5C(=C6)C(CCC(=O)[O-])=C2CC(=O)[O-])"
               "[C@H]1CCC(=O)[O-])[C@@](C)(CC(=O)[O-])[C@@H]3CCC(=O)[O-]")

@@ -1,7 +1,7 @@
 """M2 Task 1 — tier propagation for ``name_substituent`` (best-effort scope only).
 
 Measured (internal notes,
-`.superpowers/sdd/M1-PLAN/m2-task-1-report.md`): 75/166 pubchem10k rows hit the
+`.the workflow tooling/sdd/M1-PLAN/m2-task-1-report.md`): 75/166 pubchem10k rows hit the
 substituent cascade's ``substituent``/``unknown`` placeholder internally under the
 best-effort tier. Of the 71 unique declined root fragments, 37 (mapping to 38
 molecule rows) name ONLY at best-effort (never at PIN default) when tested
@@ -152,7 +152,7 @@ def test_m4_fold_besteffort_roundtrips(eng, tag, smi):
 # =============================================================================
 #
 # Measured (internal notes,
-# `.superpowers/sdd/M1-PLAN/m2-task-2-report.md`): after Task 1, 28 of the
+# `.the workflow tooling/sdd/M1-PLAN/m2-task-2-report.md`): after Task 1, 28 of the
 # original 38 tier-propagation candidates still abstain because the cascade
 # DECLINES a ring/cage fragment that the whole-molecule general engine
 # already names standalone. `_route_fragment_to_general_engine`
@@ -345,7 +345,7 @@ def test_placeholder_never_splices(eng):
     weave 'substituent'/'unknown' into an otherwise-real name.
 
     Measured (this task, fresh-process probe over all 166 rows, gate ON,
-    ``scratchpad/probe_task3.py``): 140 rows abstain with the exact honest
+    ``a temp dir/probe_task3.py``): 140 rows abstain with the exact honest
     sentinel 'unknown organic compound' (not an offender -- see
     ``_is_whole_name_abstention``); 0 timeouts; 0 exceptions; 0 rows where the
     placeholder is embedded in a longer/different constructed name reach the

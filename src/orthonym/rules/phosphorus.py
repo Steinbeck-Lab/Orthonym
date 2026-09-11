@@ -543,7 +543,7 @@ def _name_pnictogen_inic_acid(
     shared substituent chokepoint, so the cyclic substituent is NAMED rather than
     refused -- ``benzyl(methyl)phosphinic acid``.
 
-     11-FABLEFIX: substituents are named through
+     a review: substituents are named through
     :func:`_organyl_or_junior_prefix`, which falls back to the full-fragment
     enumerator for an aryl bearing a group JUNIOR to the acid, so
     ``bis(4-hydroxyphenyl)phosphinic acid`` / ``bis(4-aminophenyl)phosphinic

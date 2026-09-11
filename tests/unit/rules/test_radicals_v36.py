@@ -98,7 +98,7 @@ def test_carbon_radical_reaches_floor():
             f"{name!r} not -r-RT for {CARBON_RADICAL_FLOOR}"
 
 
-# A2 FABLE hardening, FIX #1: the pre-fix `_is_plain_alkyl_radical_fragment`
+# A2 a review hardening, FIX #1: the pre-fix `_is_plain_alkyl_radical_fragment`
 # checked only aromatic/ring/heteroatom, NOT branching or unsaturation, so a
 # BRANCHED or UNSATURATED alkyl fragment was routed to the linear retained
 # carbon-COUNT contraction and silently misnamed -- e.g. propan-2-yl (isopropyl)
@@ -125,7 +125,7 @@ def test_branched_unsaturated_alkoxyl_named_and_rt(smiles):
     assert _radical_rt(name, smiles), f"{name!r} did not -r round-trip for {smiles}"
 
 
-# A2 FABLE hardening, FIX #2: peroxyl (R-O-O.) was in scope (spec
+# A2 a review hardening, FIX #2: peroxyl (R-O-O.) was in scope (spec
 # section C-C1 "aryloxyl/oxyl/peroxyl") but not delivered -- the pre-fix code
 # fell to the non-C-attachment fallback 'oxyl' (which parses back to bare
 # '[OH]', a MISMATCH), needlessly abstaining. (the Blue Book:
@@ -146,7 +146,7 @@ def test_peroxyl_named_and_rt(smiles):
     assert _radical_rt(name, smiles), f"{name!r} did not -r round-trip for {smiles}"
 
 
-# A2 FABLE nit: the substituted-aryloxyl generalisation had only been
+# A2 a review nit: the substituted-aryloxyl generalisation had only been
 # proven at the default/PIN tier by an external ad hoc probe, never a
 # committed test running the actual PRODUCTION configuration (gate ON, no
 # best-effort tier flags -- `Orthonym(style="pin")`, the same as an

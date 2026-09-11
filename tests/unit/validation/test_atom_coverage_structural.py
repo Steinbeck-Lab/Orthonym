@@ -197,7 +197,7 @@ def test_inchi_failure_is_fail_closed(monkeypatch):
 
 
 # ---------------------------------------------------------------------------
-# 4. the exact case must keep working (CLAUDE.md #9 -- do not unmask worse)
+# 4. the exact case must keep working (the contributor guide #9 -- do not unmask worse)
 # ---------------------------------------------------------------------------
 
 

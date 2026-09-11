@@ -223,7 +223,7 @@ class TestImidateEdgeCases:
 #: _is_imidate failing to consult principal_group on mixed-PG inputs
 #: _name_alkyl_fragment dropping branching/substitution on R' (R'-O-)
 #: _name_chain_with_imidate_suffix dropping branching/substitution on R
-# Aligned with.claude/skills/fix-methodology.md "root cause, not band-aid".
+# Aligned with internal notes "root cause, not band-aid".
 # =============================================================================
 
 

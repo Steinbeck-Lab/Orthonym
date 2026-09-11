@@ -2937,7 +2937,7 @@ def name_polyfunctional(features: Any) -> Optional[str]:
                 # '(stearoyloxy)propanamine' -- a molecule with no phosphate at
                 # all. Before the same arm was FABRICATED as
                 # 'N-tritetracontyl', a C43 chain; removing the fabrication made
-                # the refusal honest and exposed this caller (CLAUDE.md #9).
+                # the refusal honest and exposed this caller (the contributor guide #9).
                 return None
             _n_sub_names.append(_rn)
         if _n_sub_names:

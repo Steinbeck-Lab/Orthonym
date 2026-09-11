@@ -205,7 +205,7 @@ class TestNMethylNTerminus:
 
 @pytest.mark.unit
 class TestSideChainTrapAbstains:
-    """CLAUDE.md-flagged risk: a Glu/Asp side-chain acid, or an Asn/Gln
+    """the contributor guide-flagged risk: a Glu/Asp side-chain acid, or an Asn/Gln
     side-chain amide, sitting alongside a genuine C-terminal amide cap must
     never be misread as (or compete with) that cap. Both must ABSTAIN
     rather than emit a guessed/misplaced name."""

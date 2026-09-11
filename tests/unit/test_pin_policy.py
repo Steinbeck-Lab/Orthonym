@@ -14,7 +14,7 @@ a phosgene -> carbonyl-dichloride retained-PIN rename, an oxalic-acid
 canonical-key fix, and an oxamic-acid retained-PIN add. The demoted trivial
 strings remain reachable only via the ``--trivial`` fallback.
 
-See.superpowers/sdd/task-1.9-1.10-context.md for the controller resolutions
+See.the workflow tooling/sdd/task-1.9-1.10-context.md for the controller resolutions
 and the empirically-verified demote table.
 """
 

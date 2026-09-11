@@ -1,7 +1,7 @@
 """ breadth metrics — the pinned definitions behind the breadth instrument.
 
 Why this module exists: every breadth figure quoted before came from an
-ad-hoc harness in a session scratchpad, and at least one was a ~4x mirage
+ad-hoc harness in a session a temp dir, and at least one was a ~4x mirage
 because the harness and the production producer disagreed about what counts as
 an emission. These functions are the single definition of each metric, unit
 tested in ``tests/unit/metrics/test_breadth.py``, so a number measured in one

@@ -158,11 +158,11 @@ def test_integration_failclosed_never_wrong_inorganic(namer):
     # B3: this input is carbon-free (O/P/H only), so it now correctly
     # abstains via errors.py's structural honesty floor to the HONEST
     # "inorganic compound (not supported)" message instead of the
-    # CLAUDE.md-flagged-dishonest "unknown organic compound" sentinel --
+    # the contributor guide-flagged-dishonest "unknown organic compound" sentinel --
     # this assertion was updated deliberately, not because the old string
     # "looked wrong": the input has zero carbon atoms (verified: no 'C' in
     # "OP(=O)([O-])OP(=O)([O-])[O-]"), and the project's own stated policy
-    # (CLAUDE.md a project rule / V36-a trace-B3 a) is that a carbon-free
+    # (the contributor guide a project rule / V36-a trace-B3 a) is that a carbon-free
     # fragment must never surface the organic sentinel. 0-wrong is
     # unaffected either way (both strings are abstentions, never a shipped
     # name); only the honesty of the abstention message changed.

@@ -1,4 +1,4 @@
-""" no-abstain Phase A fix-round-1, Finding 1 (HIGH, FABLE adversarial 0-wrong
+""" no-abstain Phase A fix-round-1, Finding 1 (HIGH, review adversarial 0-wrong
 review): the `t4_floor` offer used to fail-open on `gate_outcome=not_run`.
 
 Mechanism: `resolve_gate_outcome` returns `not_run` whenever no gate call was
@@ -11,7 +11,7 @@ be treated exactly like `carveout:*`/`gate_disabled` (a "no check is possible"
 outcome) inside `_offer_rt_ok`, so a `t4_floor` offer with NO recorded
 verdict at all could win `select_rt_passing` with ZERO verification.
 
-FABLE proved this end-to-end (`scratchpad/probe_whitebox_floor.py`): stubbing
+review proved this end-to-end (`a temp dir/probe_whitebox_floor.py`): stubbing
 ONLY the producer (`t4_coverage.name_t4_complete`) to return `"ethanol"`
 for the real `not_run` abstainer `CC(=O)C1=C(C)S[C@@H](C)CC1=O`, the genuine
 `_finish`/`_maybe_append_t4_floor_offer`/`_offer_rt_ok`/`select_rt_passing`
@@ -39,8 +39,8 @@ def _best_effort_namer() -> Orthonym:
                       allow_aromatic_general=True)
 
 
-def test_wrong_molecule_stub_does_not_ship_fable_reproduction(monkeypatch):
-    """FABLE's exact white-box mechanism proof, as a real test: stubbing ONLY
+def test_wrong_molecule_stub_does_not_ship_review_reproduction(monkeypatch):
+    """review's exact white-box mechanism proof, as a real test: stubbing ONLY
     the producer to return a wrong-but-real name for a genuine not_run
     abstainer must NOT ship it. This is the reproduction FIRST, on the
     fixed code -- if this test is red, the hole is still open."""
@@ -73,7 +73,7 @@ def test_wrong_molecule_stub_does_not_ship_fable_reproduction(monkeypatch):
     # PLAIN best-effort (no stub) ships the ring-parent form
     # `(6S)-2,6-di(methan-1-yl)-4-oxo-3-(1-oxoethan-1-yl)-1-thiacyclohex-2-ene` --
     # both verified full-InChIKey RT-correct 2026-08-29. So the honest outcome is
-    # now a CORRECT name, not silence -- but the FABLE 0-wrong invariant is
+    # now a CORRECT name, not silence -- but the review 0-wrong invariant is
     # unchanged and is what this test guards: the stubbed WRONG t4_floor offer must
     # never win, and whatever DOES ship must round-trip. Encoding 0-wrong directly
     # is strictly stronger than the old "must abstain" (which rested on the

@@ -539,7 +539,7 @@ def _build_composite_locant(
 # molecule outside the verified scope. OPSIN 2.9 cannot parse ANY phane name
 # (verified 2026-07-16) so there is no RT oracle; verification is BB-name-
 # exact fixtures + the `_phane_formula_veto` source-level atom-conservation
-# guard (Task 8.12) -- see docs/superpowers/plans/2026-07-16-wave8-p8-phane.md.
+# guard (Task 8.12) -- see docs/the workflow tooling/plans/2026-07-16-wave8-p8-phane.md.
 
 
 class SkeletonClass(Enum):
@@ -1162,7 +1162,7 @@ def name_cyclophane(mol: Optional[Chem.Mol]) -> Optional[str]:
     Returns None for None input or non-cyclophane topology.
 
     Source: 155-internal notes +; internal notes-A.md +;
-    docs/superpowers/plans/2026-07-16-wave8-p8-phane.md Task 8.7.
+    docs/the workflow tooling/plans/2026-07-16-wave8-p8-phane.md Task 8.7.
     """
     if mol is None:
         return None

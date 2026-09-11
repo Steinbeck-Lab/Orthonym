@@ -8,7 +8,7 @@ citation must then distinguish:
 and must not CRASH on the `_Locant` tuple form of a lettered locant
 (`('8a', "'")`). The old `(prime_count, number)` key collided `8a` with `8'` and
 raised ValueError on `('8a', "'")` -- a wrong substituent order that the
-full-InChIKey offer gate cannot see (FABLE review #17, the spelling-layer blind
+full-InChIKey offer gate cannot see (a review review #17, the spelling-layer blind
 spot). Finding: internal notes.
 """
 from orthonym.assembly.universal_substituent import _locant_sort_key

@@ -72,7 +72,7 @@ def test_best_effort_superset_of_complete_candidate_production():
 # abstainer when the test was written, but the best-effort engine has since
 # improved and now NAMES it (below). The naming is CORRECT, not a wrong
 # emission: the name OPSIN-parses back to the input's exact InChIKey
-# HCWJBNSAHCVPQL-UHFFFAOYSA-N (verified, scratchpad/verify_fix2.py -- identical
+# HCWJBNSAHCVPQL-UHFFFAOYSA-N (verified, a temp dir/verify_fix2.py -- identical
 # canonical SMILES). It is NOT a emission -- fires 0x for it, and the
 # name carries a `-propanamide` principal-group suffix that T4's PG-suppressing
 # cascade structurally cannot produce; it is the pre-existing best-effort

@@ -5,8 +5,8 @@ it: it computes which heavy atoms the parent actually accounts for, isolates the
 remainder, and (in a later step) names that remainder as substituent prefixes and composes a
 whole-molecule name.
 
-Design + provenance: ``docs/superpowers/specs/2026-08-05-best-effort-composition-tier-design.md``
-and ``docs/superpowers/plans/2026-08-05-best-effort-composition-slice1.md``. The covered-atom
+Design + provenance: ``docs/the workflow tooling/specs/2026-08-05-best-effort-composition-tier-design.md``
+and ``docs/the workflow tooling/plans/2026-08-05-best-effort-composition-slice1.md``. The covered-atom
 source was settled by the Task-1/2 trace: ``features.principal_chain`` ALONE undercounts (it misses
 the ``-ol`` oxygen of ``propan-1-ol`` → 3/4), so coverage must also include the principal-group
 atoms. Every function here is pure (no OPSIN, no I/O).

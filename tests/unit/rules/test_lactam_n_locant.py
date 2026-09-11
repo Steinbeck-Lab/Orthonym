@@ -163,7 +163,7 @@ def test_same_molecule_two_smiles_one_name():
 
 
 # --------------------------------------------------------------------------- #
-# 5. CONTROLS -- must stay byte-identical (CLAUDE.md #9: check what is EMITTED).#
+# 5. CONTROLS -- must stay byte-identical (the contributor guide #9: check what is EMITTED).#
 # --------------------------------------------------------------------------- #
 
 @pytest.mark.parametrize(

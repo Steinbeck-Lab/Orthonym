@@ -34,7 +34,7 @@ BUILD 2 — general N-component ortho/ortho-peri-fused mancude construction
     OPSIN names ``pyrimido[4,5-b]quinoline``) had NO construction path -> abstain.
     See the BUILD 2 section below for the reached component count + named blocker.
 
-Fresh process per witness (warm-cache hazard, CLAUDE.md). Run ONLY this file:
+Fresh process per witness (warm-cache hazard, the contributor guide). Run ONLY this file:
     ``.venv/bin/python -m pytest tests/unit/rules/test_c_waveC_v36.py -q``
 (the whole suite deadlocks on an OPSIN pipe).
 """

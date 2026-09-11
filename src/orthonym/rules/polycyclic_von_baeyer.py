@@ -212,8 +212,8 @@ def name_higher_polycyclo(mol) -> Optional[str]:
             return f"{prefix}{descriptor}{parent_name}"
         return f"{descriptor}{parent_name}"
     except (ValueError, KeyError, IndexError) as e:
-        # a phase-04: narrowed exception clause per CLAUDE.md /
-        #.claude/skills/fix-methodology.md. Real bugs (AttributeError,
+        # a phase-04: narrowed exception clause per the contributor guide /
+        # internal notes Real bugs (AttributeError,
         # TypeError) propagate so they surface during testing instead
         # of being silently masked.
         logger.debug(
@@ -270,8 +270,8 @@ def get_higher_polycyclo_iupac_locants(mol) -> Optional[Dict[int, _Locant]]:
         # for some downstream uses; the cascade gate cares about ring set).
         return {idx: numbering[idx] for idx in ring_atoms if idx in numbering}
     except (ValueError, KeyError, IndexError) as e:
-        # a phase-04: narrowed exception clause per CLAUDE.md /
-        #.claude/skills/fix-methodology.md.
+        # a phase-04: narrowed exception clause per the contributor guide /
+        # internal notes
         logger.debug(
             "get_higher_polycyclo_iupac_locants declined %s: %s",
             Chem.MolToSmiles(mol, canonical=True), e,

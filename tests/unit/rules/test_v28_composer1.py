@@ -413,7 +413,7 @@ def test_substituent_off_amide_nitrogen_is_partitioned():
 # Composer1 Task C1-T6: assembly-robustness instrument smoke test
 # ============================================================================
 #
-# TINY shape-only smoke test for ``scratchpad/asm_robustness.py`` -- the
+# TINY shape-only smoke test for ``a temp dir/asm_robustness.py`` -- the
 # offline, hang-safe per-fragment naming-success measurement instrument (NOT
 # gated production; see the module docstring there for the decomposition
 # method + success criterion). This test only asserts the returned dict's

@@ -21,7 +21,7 @@ convention and Levers A/B/C have all declined:
     (prepend) or amido (splice) prefix via the SAME helpers Lever A/B
     already use (`_acid_to_acyl` / `acid_name_to_amido_prefix` /
     `_swap_amino_for_amido`).
-  - The **side-chain-acid trap** (CLAUDE.md; 57/226 backlog rows carry >=2
+  - The **side-chain-acid trap** (the contributor guide; 57/226 backlog rows carry >=2
     free -COOH): a Glu/Asp side-chain acid on any NON-parent residue is a
     genuine competing principal group this producer must never misplace --
     it ABSTAINS rather than guess. Likewise a capped (amide/ester/aldehyde)

@@ -732,7 +732,7 @@ class NameFragment:
     #: A producer that bakes locants into ``text`` therefore also supplies the
     #: locant-free spelling HERE, produced by the same renderer from ``name`` and
     #: ``count`` -- never by editing the formatted string, which would be the
-    #: string band-aid ``.claude/skills/fix-methodology.md`` forbids and would be
+    #: string band-aid `internal notes` forbids and would be
     #: wrong on the complement (``2-methylpentanedioic acid`` legitimately keeps
     #: its locant). ``None`` means "``text`` cites no locants of its own".
     text_without_locants: Optional[str] = None

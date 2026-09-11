@@ -13,7 +13,7 @@ carbonyl O becomes an `oxo`, so no acyl vocabulary is needed (the reference
 The tokens are the module's REPLACEMENT-nomenclature spelling (a ring via
 `terminal_ring` -> `cyclohexa-1,3,5-trien-1-yl` for benzene, the carbonyl O as a
 backbone `oxa`) -- ugly but RT-CORRECT, exactly the best-effort contract
-(CLAUDE.md a project rule: a table miss degrades to an uglier name, never a
+(the contributor guide a project rule: a table miss degrades to an uglier name, never a
 refusal). Prettier RETAINED ring names (phenyl / piperidin-1-yl) would come from
 recursing the ring decoration through the full retained namer -- a follow-on.
 

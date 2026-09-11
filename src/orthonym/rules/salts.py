@@ -104,7 +104,7 @@ COMPLEX_STOICHIOMETRIC_PREFIXES: Dict[int, str] = {
 # salt needlessly ABSTAINS even though ``bis(W)`` round-trips).
 #
 # COMPLETE + EXACT-MATCH set — every entry VERIFIED 2026-08-23 by
-# internal notes + scratchpad
+# internal notes + a temp dir
 # probe_di_collision_complete.py: for each W, opsin_parse("di"+W) returns a SINGLE
 # connected RDKit fragment (a distinct condensed species). Probed the full
 # candidate universe = every INORGANIC_ANIONS value + every single-word oxoanion
@@ -362,7 +362,7 @@ def _protonate_amines_with_h_plus(mol, n_protons: int):
     basic amine nitrogens, yielding EVERY reconstructed (charge-balanced) mol
     that results from a distinct choice of which amine site(s) to protonate.
 
-    FABLE #1 (determinism fix): ``GetSubstructMatches`` returns matches in
+    a review #1 (determinism fix): ``GetSubstructMatches`` returns matches in
     ATOM-INDEX order, which is a PARSE-order artifact -- two SMILES spellings
     of the identical canonical molecule can enumerate the same amine sites in
     different orders, so a single ``[:n_protons]`` slice used to make the
@@ -603,7 +603,7 @@ def name_salt(mol, style: str = 'pin', *,
     # neutral compound). A disconnected-fragment set carrying a NET charge
     # (e.g. ``CC(=O)[O-].[Pd+2]``, net +1: one acetate anion + a bare Pd2+
     # cation) is NOT a neutral salt -- it is an unbalanced ionic assembly / a
-    # charged coordination complex (out of CLAUDE.md's declared scope,
+    # charged coordination complex (out of the contributor guide's declared scope,
     # organometallics. Naming it with the ordinary "cation anion" salt
     # grammar silently implies balanced stoichiometry the input does not have:
     # measured, this shipped ``palladium(II) acetate``, which OPSIN round-trips
@@ -661,7 +661,7 @@ def name_salt(mol, style: str = 'pin', *,
     # on the reconstructed (charge-balanced) salt, which then routes each cation
     # through the ordinary cation loop. The recursive name_salt + top-level gate
     # verify the result, so a mis-protonation fails closed (0-wrong preserved).
-    # FABLE #1: try EVERY candidate protonation-site combination (in a
+    # a review #1: try EVERY candidate protonation-site combination (in a
     # canonical, spelling-invariant order) and BACKTRACK to the next one if
     # the first fails to name -- never give up after a single try, and never
     # let the choice depend on which N happened to appear first in the input

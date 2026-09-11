@@ -293,7 +293,7 @@ SENIORITY_ORDER = [
     # otherwise UNPERCEIVED (no matching FG) -> garbage / abstain.
     "phosphonate_diester",
 
-    # 11-FABLEFIX: the ester of a phosphinic/arsinic/stibinic acid
+    # a review: the ester of a phosphinic/arsinic/stibinic acid
     # R2E(=O)(OR') class 9, senior to a ring's hydroxy/amine).
     # Functional-class named via name_pnictogen_inate_ester ('methyl
     # diphenylphosphinate' / 'methyl diphenylarsinate'). Kept beside the other
@@ -749,7 +749,7 @@ SUFFIX_FORMS = {
     "phosphate_monoester": None, # IUPAC: substitutive prefix only (phosphonooxy)
     "phosphite_triester": None,  # IUPAC: functional class naming (... phosphite)
     "phosphonate_diester": None, # IUPAC: functional class naming (... phosphonate)
-    # 11-FABLEFIX: functional-class ester names (no suffix form)
+    # a review: functional-class ester names (no suffix form)
     "phosphinate_ester": None,   # IUPAC (... phosphinate)
     "arsinate_ester": None,      # IUPAC (... arsinate)
     "stibinate_ester": None,     # IUPAC (... stibinate)
@@ -996,7 +996,7 @@ PREFIX_FORMS = {
     "phosphate_monoester": "phosphonooxy",  # IUPAC
     "phosphite_triester": None,  # IUPAC: functional class naming
     "phosphonate_diester": None,  # IUPAC: functional class naming
-    # 11-FABLEFIX: functional-class ester (no prefix form)
+    # a review: functional-class ester (no prefix form)
     "phosphinate_ester": None,   # IUPAC functional class naming
     "arsinate_ester": None,      # IUPAC functional class naming
     "stibinate_ester": None,     # IUPAC functional class naming

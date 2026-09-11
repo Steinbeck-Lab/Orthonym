@@ -10,7 +10,7 @@ One param per reachable handler_id (loaded from
 
 At Plan-01 ship this suite is RED for every handler except ``simple_molecule``
 (the one already-tree-emitting reference handler). Each handler green-flips when
-its tree is populated in Plans 02/03/04. Per CLAUDE.md / fix-methodology: NO
+its tree is populated in Plans 02/03/04. Per the contributor guide / fix-methodology: NO
 expected-failure or skip markers anywhere in this module — RED is the expected,
 recorded TDD starting state.
 

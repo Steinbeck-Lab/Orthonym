@@ -12,7 +12,7 @@ Task 2 lands the module. `uronic_glycoside_head` is added to `data/sugar_names.p
 Task 2, so `test_uronic_head` / `test_glucuronide_fragment_caps_to_catalog` flip GREEN
 after Task 2.
 
-Root-cause-only (CLAUDE.md): the asserted behaviour is structural — charge counting,
+Root-cause-only (the contributor guide): the asserted behaviour is structural — charge counting,
 atom-level glycosidic-bond capping (no string surgery), explicit uronic head map.
 """
 

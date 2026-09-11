@@ -99,7 +99,7 @@ def test_reproducers_deterministic_across_atom_orders(smiles, target):
 
 
 # --- PIN / no-regression controls: byte-identical to HEAD -------------------
-# Captured on HEAD 224cb242 before the fix (scratchpad cp2_baseline.py). The
+# Captured on HEAD 224cb242 before the fix (a temp dir cp2_baseline.py). The
 # undecorated core is the load-bearing control: it exercises the SAME synthetic
 # fused-locant path but carries no decoration, so it must stay byte-identical.
 

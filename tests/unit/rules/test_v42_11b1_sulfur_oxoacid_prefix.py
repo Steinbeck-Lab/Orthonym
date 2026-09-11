@@ -7,7 +7,7 @@ sulfur group is cited as a substituent PREFIX, not the parent
 examples are pinned below with their line numbers. The generic path names these
 by skeletal ('a') replacement ('…-1,3-dioxa-2λ6-thiapropyl') — a valid,
 round-tripping, but NON-PIN form (RIGHT_MOL_NONPIN). See
-.superpowers/sdd/IMPLEMENTATION-PLAN-/task-11B1-report.md.
+.the workflow tooling/sdd/IMPLEMENTATION-PLAN-/task-11B1-report.md.
 """
 import pytest
 from rdkit import Chem
@@ -178,7 +178,7 @@ def test_acyl_contractions_and_bases():
 # bb_conformance measure (all 6 def_id 67.1.4.4.2 rows flip to MATCH,
 # 0 losses; see task-11B1-report.md), not repeated here because the engine's
 # internal OPSIN grammar gate is flaky under pytest (the documented OPSIN-pipe
-# hazard in CLAUDE.md).
+# hazard in the contributor guide).
 
 def test_cascade_routes_o_linked_fragment():
     from orthonym.assembly.substituent_enumerator import name_substituent

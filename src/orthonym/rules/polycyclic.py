@@ -1683,7 +1683,7 @@ class VonBaeyerAnalyzer:
         way ``_order_and_number_secondary_bridges`` Steps 1-2 number them (main ring
         1..n in order, then the main bridge). Lets the branched-component tie-break
         rank endpoints by their LOCANT rather than by raw atom index.
-         M4#2 Fix A (FABLE point 1)."""
+         M4#2 Fix A (a review point 1)."""
         loc = {}
         for i, a in enumerate(main_ring):
             loc.setdefault(a, i + 1)
@@ -1714,7 +1714,7 @@ class VonBaeyerAnalyzer:
         returns ``None`` if it cannot, so the caller degrades rather than silently
         dropping an atom -- the old bug this replaces).
 
-        Trunk tie-break (FABLE point 1): among equal-length trunks the winner is the
+        Trunk tie-break (a review point 1): among equal-length trunks the winner is the
         one whose two endpoints have the LOWEST locants, computed from
         the main-ring/main-bridge numbering; atom index is only the final determinism
         backstop. Because the locant of an endpoint depends on the main-ring
@@ -2933,7 +2933,7 @@ def get_polycyclic_substituents(
             # (acetate -O-C(=O)-CH3 -> 'ethoxy', dropping the carbonyl O; -OOH -> dropped) --
             # a WRONG CONSTITUTION that then abstained on.
             #
-            # SCOPE (FABLE 5.1): fires ONLY at the BEST-EFFORT tier and ONLY on O-attached
+            # SCOPE (a review 5.1): fires ONLY at the BEST-EFFORT tier and ONLY on O-attached
             # acyloxy/peroxy branches, so it can NEVER change a default/PIN-tier name.
             # - best-effort gate: at the PIN tier these cages correctly ABSTAIN (a
             # substituent-prefix form of an ester/hydroperoxy is not the PIN); F3 must

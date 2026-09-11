@@ -116,7 +116,7 @@ def _select_primary_name(names):
 # round-trip cases get xfail-with-citation markers. Each entry was identified
 # during Plan 02 SUMMARY review (internal notes
 # 150-02-SUMMARY.md "Plan 03 Unblock" + docs/retained_name_conflicts.md +
-# docs/known_opsin_limitations.md). Per CLAUDE.md root-cause discipline these
+# docs/known_opsin_limitations.md). Per the contributor guide root-cause discipline these
 # are NOT silenced — each xfail reason explains the OPSIN data-source bug.
 #
 # Strict=False because the OPSIN parser may improve in a future release; if a

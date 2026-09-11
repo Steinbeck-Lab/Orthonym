@@ -732,10 +732,21 @@ def should_omit_locant_one(
     # 'propan-2-one'), so a ketone on ethane must NOT elide. methane
     # (chain_length==1) is covered unconditionally by Rule 1; multi-instance
     # suffixes (ethane-1,2-diamine) keep locants (is_monosubstituted is False).
+    #
+    # (the Blue Book, example:44186 '(2-13C)ethan-1-ol [not (2-13C)ethanol]'):
+    # when an isotopic modification forces a locant in the current scope, ALL
+    # locants must be specified and none omitted — so the ethane suffix locant is
+    # restored (C[13CH2][15NH2] -> (1-13C,15N)ethan-1-amine, not...ethanamine).
+    # This is the chain-suffix analogue of the ring guard at
+    # handlers/_handler_shared.py:440. Keyed on locants_are_forced (NOT the
+    # broader scope_has_isotopic_modification) so a single-atom label whose
+    # descriptor is itself locant-free — (15N)ethanamine — still elides.
     if (context == "suffix" and not is_ring
             and chain_length == 2 and is_monosubstituted
             and fg_type in _ETHANE_SUFFIX_ELIDE_FGS):
-        return True
+        from .locant_omission import locants_are_forced  # local: avoid import cycle
+        if not locants_are_forced():
+            return True
 
     # Rule 4: Monosubstituted rings. -06: the ring callers now pass
     # `is_monosubstituted` = `is_only_one_substitutable_position(parent_hydride)`

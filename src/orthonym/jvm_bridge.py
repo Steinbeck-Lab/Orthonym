@@ -43,7 +43,7 @@ Rather than re-parse anything, the OPSIN entry point returns the exact bytes the
 have written to stdout, so each caller keeps its own existing output handling unchanged and
 merely receives it from a cheaper source.
 
-Validation (scratchpad harnesses, denominators asserted): 217 distinct real names x both
+Validation (a temp dir harnesses, denominators asserted): 217 distinct real names x both
 shipped configs = 434 pairs, **0 mismatches** vs the real CLI; centres 508 SMILES as one
 batch plus 60 single calls, **0 mismatches**.
 

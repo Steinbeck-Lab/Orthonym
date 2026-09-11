@@ -123,7 +123,7 @@ def test_cyclophane_name_compound(fixture):
 
     Wave-8 P8: fixtures carrying an ``expected_pin`` field (monocyclic
     all-benzene-homophane class -- `build_phane_pin` verified BB-name-exact,
-    see docs/superpowers/plans/2026-07-16-wave8-p8-phane.md Task 8.7/8.12)
+    see docs/the workflow tooling/plans/2026-07-16-wave8-p8-phane.md Task 8.7/8.12)
     now EMIT that simplified-skeletal PIN in production. Every other
     non-quarantined fixture (a topology `build_phane_pin` doesn't cover yet)
     still hits the fail-closed refusal ('unknown organic compound') --

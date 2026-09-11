@@ -2,7 +2,7 @@
 
 Pins the ledger rows that were reproduced live at HEAD and confirmed to
 already emit the PIN (Clusters 1-3 of
-docs/superpowers/plans/2026-07-16-wave8-p11-needs-example-sweep.md).
+docs/the workflow tooling/plans/2026-07-16-wave8-p11-needs-example-sweep.md).
 These are verification/regression-lock tests, not red->green TDD: the
 rows were confirmed WORKING before this file was written. See that plan
 doc + internal notes for the full row-by-row

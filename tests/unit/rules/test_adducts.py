@@ -216,7 +216,7 @@ class TestAdductDispatch:
         assert self._nc("[Na+].[Cl-]") == "sodium chloride"
 
     def test_organometallic_not_swallowed(self):
-        # (item 4, FABLE -P1 review I3): the ORGANOMETALLIC handler used to
+        # (item 4, a review -P1 review I3): the ORGANOMETALLIC handler used to
         # name [Ni].C=CC.C=CC as bis(η³-prop-2-en-1-yl)nickel (C6H10Ni) for a
         # C6H12Ni input -- data/organometallics.py maps neutral propene 'C=CC' to
         # the η³-allyl ligand (C3H5, drops 1 H per ligand) and the carve-out

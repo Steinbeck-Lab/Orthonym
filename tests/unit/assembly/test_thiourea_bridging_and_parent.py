@@ -377,7 +377,7 @@ def test_chalcogen_urea_retained_parents(namer, smiles, expected):
 
 
 # ---------------------------------------------------------------------------
-# 5. The oxo sibling must be BYTE-IDENTICAL (CLAUDE.md #9: check what is
+# 5. The oxo sibling must be BYTE-IDENTICAL (the contributor guide #9: check what is
 # emitted afterwards, not merely that the bad path stopped firing).
 # ---------------------------------------------------------------------------
 

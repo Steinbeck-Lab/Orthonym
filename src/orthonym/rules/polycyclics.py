@@ -57,7 +57,7 @@ from .locants import compare_locant_sets as _compare_locant_sets  #
 #...) is an all-carbon mancude cage with 20-40+ SSSR rings and an automorphism group
 # so large that matching a cataloged PAH SMARTS against it enumerates a combinatorial
 # number of automorphic matches (measured 63.1s on C70). Fullerenes are explicitly
-# out-of-scope (project CLAUDE.md Scope section); decline fast rather than spin. The
+# out-of-scope (project the contributor guide Scope section); decline fast rather than spin. The
 # threshold sits far above any cataloged/realistic substituted-PAH ring count and far
 # below a fullerene's, so no in-scope molecule can trip it.
 _GIANT_CAGE_RING_THRESHOLD = 20

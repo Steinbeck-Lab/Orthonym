@@ -7,7 +7,7 @@ populating the structured ``NameTreeNode`` fields for SCORE-02 / a phase
 while ALSO carrying ``fragment_legacy`` (the pre-assembled final string) so
 ``name_tree_to_string`` round-trips byte-identically (dual-carry).
 
-Per CLAUDE.md / fix-methodology: NO ``@pytest.mark.xfail`` in this module.
+Per the contributor guide / fix-methodology: NO ``@pytest.mark.xfail`` in this module.
 """
 from __future__ import annotations
 

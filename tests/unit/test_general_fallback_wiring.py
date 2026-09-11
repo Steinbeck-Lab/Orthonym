@@ -120,7 +120,7 @@ def test_best_effort_no_java_never_ships_valence_illegal():
 
 
 # ---------------------------------------------------------------------------
-# task-JAR-ABSENT (FABLE 0-wrong hole): the general-engine RECOVERY lanes
+# task-JAR-ABSENT (a review 0-wrong hole): the general-engine RECOVERY lanes
 # (`_try_general_engine_recovery` late-recovery ladder + the inline-G1 lane in
 # `name`) previously shipped a best-effort candidate UNVERIFIED when the OPSIN
 # jar is absent -- there was no `else: return None`, so control fell through to
@@ -130,7 +130,7 @@ def test_best_effort_no_java_never_ships_valence_illegal():
 # ABSTAIN. These tests guard THAT lane.
 #
 # NOTE (measured, see task-jar-absent-report.md): in the *natural* config
-# (assemble_name NOT mocked) the 7 FABLE witnesses do NOT reach these recovery
+# (assemble_name NOT mocked) the 7 a review witnesses do NOT reach these recovery
 # lanes -- assemble_name returns a wrong-but-non-failure name (e.g. `methane` for
 # `COS(=O)(=O)O`), so the fallback guard `not name or is_failure_name(name)` is
 # False and the lanes never fire. Those witnesses ship via the THIRD site,
@@ -170,7 +170,7 @@ def _jar_absent_patches():
 
 
 def test_jar_absent_besteffort_recovery_lane_never_ships_unverified():
-    """The FABLE 0-wrong hole, for the lane the fix covers: with the jar absent
+    """The a review 0-wrong hole, for the lane the fix covers: with the jar absent
     and best-effort ON, once a recovery lane is engaged (assemble_name abstains)
     every witness must ABSTAIN -- never a wrong-molecule name shipped unverified.
     Before the fix these shipped `methane`, `(phosphonooxy)benzene`, etc."""
@@ -243,7 +243,7 @@ def test_jar_present_witnesses_unchanged_by_fix():
 
 @pytest.mark.opsin_gate
 def test_jar_absent_besteffort_natural_config_witnesses_never_ship_wrong():
-    """THE task deliverable: the 7 FABLE witnesses in the NATURAL config
+    """THE task deliverable: the 7 a review witnesses in the NATURAL config
     (assemble_name NOT mocked) at best-effort + genuinely-absent jar. These ship
     their WRONG names (`methane` for `COS(=O)(=O)O`, `(phosphonooxy)benzene` for
     the phenyl phosphorodichloridate, etc.) NOT via the recovery lanes -- the

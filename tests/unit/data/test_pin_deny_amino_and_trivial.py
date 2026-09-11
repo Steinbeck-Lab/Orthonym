@@ -5,7 +5,7 @@ Producer-level assertions only. Whole-molecule assertions are unsound in this
 suite: ``conftest`` disables the OPSIN gate suite-wide, so ``name_tiered`` can
 select a different producer than the CLI does. User-visible behaviour for these
 names is verified through the CLI, recorded in
-``.superpowers/sdd/-residue/TaskE-report.md``.
+``.the workflow tooling/sdd/-residue/TaskE-report.md``.
 
 Blue Book basis (each row also carries its citation in
 ``data/iupac_2013_pin_list.json``):
@@ -154,7 +154,7 @@ class TestNaturalProductSurfaceIsGated:
 
     A runtime trace showed ``camphor`` was emitted by this surface, not by the
     retained-names dict where it is ALSO keyed -- so a deny row alone was inert
-    until this module was wired. CLAUDE.md a project rule: presence in a lookup
+    until this module was wired. the contributor guide a project rule: presence in a lookup
     table is not evidence the table is reached.
     """
 
@@ -307,7 +307,7 @@ class TestFattyAcidEsterStemsAreOutOfDenyListReach:
     governs -- it is built from a CARBON-COUNT map, FATTY_ACID_TRIVIAL_BY_STRUCTURE,
     a local dict inside get_acid_fragment_name in rules/esters.py, which never
     consults data/iupac_2013_pin_list.json. Adding the row anyway would create a
-    second no-op like the documented 'indane' row (CLAUDE.md a project rule:
+    second no-op like the documented 'indane' row (the contributor guide a project rule:
     presence in a lookup table is not evidence the table is reached).
 
     RESOLVED for the SATURATED straight-chain rows by. The analysis

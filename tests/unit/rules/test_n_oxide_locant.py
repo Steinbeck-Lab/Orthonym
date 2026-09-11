@@ -13,7 +13,7 @@ mismatch -- caught downstream by (different molecule) and demoted to
 a total abstention, rather than degrading to a correct-but-uglier name.
 
 a trace: internal notes
-Plan: docs/superpowers/plans/2026-08-12-phase3-correctness-tail-hardening.md sec 3C
+Plan: docs/the workflow tooling/plans/2026-08-12-phase3-correctness-tail-hardening.md sec 3C
 
 Every "was WRONG / now correct" case below was hand round-trip-verified
 (name -> OPSIN -> InChIKey == input) before being asserted here; see the

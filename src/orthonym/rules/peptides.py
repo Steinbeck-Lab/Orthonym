@@ -1206,7 +1206,7 @@ _PRIMARY_CARBOXAMIDE_SMARTS = "[CX3](=O)[NX3H2]"
 # the true parent suffix, and the flat acylamino convention has no way to
 # express that (it would need a `carbamoyl`-prefix construction instead of
 # a suffix swap). Explicitly excluded rather than relying solely on the
-# RT-gate to catch the resulting wrong-shaped name (the CLAUDE.md-flagged
+# RT-gate to catch the resulting wrong-shaped name (the the contributor guide-flagged
 # "side-chain-acid trap"). Asparagine/glutamine are listed defensively too
 # (their OWN side-chain amide already makes `_strip_terminal_amide` decline
 # via the two-match ambiguity above; this is belt-and-suspenders).
@@ -1332,7 +1332,7 @@ def _try_capped_termini(mol) -> Optional[str]:
     if amide_applied:
         cterm_name = named[-1]['name']
         if cterm_name in _COMPETING_SIDE_CHAIN_AMINO_ACIDS:
-            # Side-chain-acid trap (CLAUDE.md): the free side-chain acid/
+            # Side-chain-acid trap (the contributor guide): the free side-chain acid/
             # amide would outrank a suffix-amide swap under seniority.
             # Abstain rather than misplace.
             return None
@@ -1388,7 +1388,7 @@ def _try_capped_termini(mol) -> Optional[str]:
 # another residue conservatively ABSTAINS rather than guess; this is the
 # SAME conservative behaviour Lever B already has, reused unchanged).
 #
-# Side-chain-acid trap (CLAUDE.md; 57/226 backlog carry >=2 free -COOH): the
+# Side-chain-acid trap (the contributor guide; 57/226 backlog carry >=2 free -COOH): the
 # parent must carry EXACTLY one free -COOH, and every OTHER residue's own
 # isolated fragment must ALSO show exactly one (the one `_extract_residues`
 # artificially frees at its own alpha-carboxyl cut point) -- an ADDITIONAL

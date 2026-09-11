@@ -1,6 +1,6 @@
 """Simple N-acyl-taurine / acyl-amino-sulfonate anion naming (a phase).
 
-a trace finding (see.superpowers/sdd/2026-08-17--phase3-acid-ester-anion/
+a trace finding (see.the workflow tooling/sdd/2026-08-17--phase3-acid-ester-anion/
 acyltaurine-report.md for the full trace): the primary target,
 N-acetyltaurine anion (``CC(=O)NCCS(=O)(=O)[O-]``), was measured as an
 abstention in an earlier session but is ALREADY NAMED CORRECTLY at this

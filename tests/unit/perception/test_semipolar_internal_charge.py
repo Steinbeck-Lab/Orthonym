@@ -154,7 +154,7 @@ GENUINE = [
 
 @pytest.mark.parametrize("smiles,label", GENUINE, ids=[c[1] for c in GENUINE])
 def test_genuine_charges_are_not_masked(smiles, label):
-    """The mask must not swallow a real ionic centre (CLAUDE.md #9)."""
+    """The mask must not swallow a real ionic centre (the contributor guide #9)."""
     mol = Chem.MolFromSmiles(smiles)
     assert mol is not None, smiles
     internal = _get_internal_charge_atoms(mol)
@@ -206,7 +206,7 @@ def test_general_engine_reads_the_same_perception():
 
 
 def test_semipolar_pair_still_hidden_from_the_general_engine():
-    """...while the pair the workaround existed for stays hidden (CLAUDE.md #9:
+    """...while the pair the workaround existed for stays hidden (the contributor guide #9:
     removing a guard must not unmask what it was covering)."""
     from orthonym.assembly.general_engine import _genuine_ion_sites, _has_ionic_centres
 

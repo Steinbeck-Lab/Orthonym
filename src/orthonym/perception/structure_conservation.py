@@ -12,7 +12,7 @@ UNCONDITIONALLY from ``namer.py::Orthonym._name_impl`` -- i.e. NOT gated by
 ``self._disable_opsin_validity_gate`` -- so they protect the raw path too.
 
 Design principle (accuracy-first, precision-over-recall, per
-``.claude/skills/fix-methodology.md``): every check here is scoped as
+`internal notes`): every check here is scoped as
 NARROWLY as the evidence supports. A check that cannot be made precise
 (false-veto risk on a currently-correct name) is deliberately left
 unimplemented rather than shipped -- see the docstring on

@@ -203,7 +203,7 @@ def test_plan_holds_out_the_anionic_oxygen():
 #
 # Code review finding: ``_ZWIT_SKELETAL_ANION_BASES`` shipped exercised by ZERO
 # tests -- the "presence in a lookup table is not evidence the table is reached"
-# pattern (CLAUDE.md #10, 8-for-8). It IS reached: entry point
+# pattern (the contributor guide #10, 8-for-8). It IS reached: entry point
 # ``name_general_ring`` -> ``_emit_ring_from_analysis``. Each row below was
 # constructed for this review, run through the engine, and the emitted name fed
 # to ``opsin-cli-2.9.0 -r -osmi``; the parsed structure's RDKit InChIKey equals
@@ -454,7 +454,7 @@ def test_charged_species_unchanged_best_effort_tier(smiles, expected):
 # --------------------------------------------------------------------------
 
 def test_semipolar_phosphoryl_oxide_keeps_its_neutral_name():
-    """CLAUDE.md #9 regression guard, caught by measurement during R7.
+    """the contributor guide #9 regression guard, caught by measurement during R7.
 
     ``[PH+]...[O-]`` is the charge-separated depiction of a NEUTRAL ``P=O``.
     RDKit/InChI agree: ``CC1CO[PH+](C1)[O-]`` and OPSIN's parse of
@@ -481,7 +481,7 @@ def test_genuine_zwitterion_is_an_ionic_centre():
 
 
 def test_unexpressible_zwitterion_is_refused_not_neutralised():
-    """CLAUDE.md #9 — verify what is EMITTED, not just that the bad path stopped.
+    """the contributor guide #9 — verify what is EMITTED, not just that the bad path stopped.
 
     An ionic centre the parent cannot carry must abstain, never ship a neutral
     name that describes a different (uncharged) species.

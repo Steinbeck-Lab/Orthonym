@@ -94,7 +94,7 @@ def _build_retained_names() -> Dict[str, str]:
             # of acenaphthoquinone et al. falls back to systematic naming
             # until a future phase implements OPSIN-style addGroup
             # materialisation. Source: internal notes +
-            # CLAUDE.md fix-methodology.md (root-cause-only fixes).
+            # the contributor guide fix-methodology.md (root-cause-only fixes).
             if "||" in key:
                 continue
             smiles = meta.get("smiles", key)

@@ -160,7 +160,7 @@ class TestPhosphonicAcidNaming:
     def test_junior_group_organyl_is_named(self):
         """A JUNIOR-group-bearing organyl IS named as a detachable prefix.
 
-        v42 11-FABLEFIX: the phosphonic acid (P-41 Table 4.1 class 7c) is the
+        v42 11-reviewfix: the phosphonic acid (P-41 Table 4.1 class 7c) is the
         principal group, so a substituent hydroxy (class 17) is JUNIOR and a mere
         detachable prefix. The narrow C/H/halogen ``organyl_prefix_name`` guard
         fail-closes on it, so ``_organyl_or_junior_prefix`` falls back to the full

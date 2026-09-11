@@ -3195,7 +3195,7 @@ def _descriptive_fallback(mol, frag_atoms, attach_idx):
             # (name_substituent:2944, allow_mancude=False) and the best-effort
             # ladder (:2917) BEFORE its own terminal/chain composers run, so a
             # record here is first-writer-wins-set by an exploratory PIN attempt
-            # or by a branch the chain composer goes on to name (FABLE label-leak
+            # or by a branch the chain composer goes on to name (a review label-leak
             # finding). The record now fires only at the best-effort ladder's TRUE
             # exhaustion in name_substituent (after the chain composer), so
             # blocker_detail reflects the real best-effort blocker.

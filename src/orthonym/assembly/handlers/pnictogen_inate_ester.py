@@ -1,4 +1,4 @@
-""" 11-FABLEFIX pnictogen -inate ester handler — direct-return shim.
+""" a review pnictogen -inate ester handler — direct-return shim.
 
 Functional-class ester of a phosphinic / arsinic / stibinic acid, R2E(=O)(OR')
 (``methyl diphenylphosphinate``, ``methyl diphenylarsinate``). This is the exact

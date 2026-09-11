@@ -17,7 +17,7 @@ of the not-yet-built `name_disaccharide` go INSIDE each test body, NOT at module
 level, so `pytest --collect-only` succeeds while the engine is RED at run time
 until Wave-2 (Plan 183-02) lands. `RDLogger.DisableLog("rdApp.*")` at module top.
 
-Root-cause-only (CLAUDE.md): assertions are structural (unit recognition,
+Root-cause-only (the contributor guide): assertions are structural (unit recognition,
 reducing-end detection, completeness invariant, fail-closed None) — the (1->4)
 arrow and trailing-parent checks pin the emitted form, not a string transform.
 
@@ -283,7 +283,7 @@ class TestAminoSugarOligosaccharideChain:
 
 
 class TestV33Engine2DecoratedUnitVocabulary:
-    """ giants-engine Engine 2 (docs/superpowers/plans/2026-08-19--giants-
+    """ giants-engine Engine 2 (docs/the workflow tooling/plans/2026-08-19--giants-
     engine.md): extends ``name_monosaccharide_systematic``'s modification
     vocabulary to O-sulfate / O-phosphate-MONOester / N-sulfonate esters (BB
       /), so a decorated GAG-style unit

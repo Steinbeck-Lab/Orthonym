@@ -89,7 +89,7 @@ def test_default_pin_path_still_abstains(smi, _stereo):
 
     Run in a FRESH subprocess: a pre-existing ``complex_ring`` handler ships a
     stereo-incomplete covering name for one witness only when OPSIN/CIP state is
-    warm (the state-accumulation hazard documented in CLAUDE.md), which would
+    warm (the state-accumulation hazard documented in the contributor guide), which would
     make an in-process assertion order-dependent. A clean process shows the true
     default behaviour, and confirms this masked-spiro lever is floor-only."""
     import subprocess, sys

@@ -353,49 +353,74 @@ def _placement_quality(skel: str, off: int) -> int:
     return 1
 
 
-def _placement_unambiguous(skel: str, off: int, keys, n_pos: int) -> bool:
+def _isotopomer_key(cand: str) -> Optional[str]:
+    """The distinct-structure key OPSIN assigns a candidate name (isotope-aware
+    InChIKey, SMILES fallback); None when it does not parse. Shared by the
+    uniqueness oracle so the seed and the probes are compared at one layer."""
+    smi = _opsin_parse(cand)
+    if not smi:
+        return None
+    m = Chem.MolFromSmiles(smi)
+    if m is None:
+        return None
+    try:
+        from rdkit.Chem import inchi as _inchi
+        return _inchi.MolToInchiKey(m) or Chem.MolToSmiles(m)
+    except Exception:
+        return Chem.MolToSmiles(m)
+
+
+def _placement_unambiguous(skel: str, off: int, keys, n_pos: int,
+                           accepted_cand: str) -> bool:
     """: may the isotope descriptor's locant be OMITTED at this
-    placement? True iff, splicing every explicit locant ``1..n_pos`` into the
-    SAME descriptor slot, OPSIN accepts at most ONE distinct isotopomer.
+    placement? True iff no OTHER isotopomer can be expressed at the same slot by
+    stating a locant on ANY ONE nuclide group -- i.e. the omitted form denotes a
+    unique structure.
 
     Verbatim (the Blue Book): "if isotopic modification requires a locant
     to specify its position, then all locants must be specified and none are
-    omitted." A locant-free descriptor that merely round-trips is not proof the
-    position is unique -- OPSIN's *default* placement of an unlocanted label can
-    coincidentally land on the true atom (measured: ``3-(2H1)oxatricyclo…`` on an
-    asymmetric cage). This test asks the real question the way the module already
-    adjudicates everything -- via the OPSIN oracle -- by counting how many
-    DISTINCT structures the same slot can express when the locant is stated.
+    omitted"; (:44202) "Locants are not omitted when there is a
+    possibility of isomers". A locant-free descriptor that merely round-trips is
+    not proof of uniqueness -- OPSIN's *default* placement can coincidentally
+    match the true atom on an asymmetric parent (``3-(2H1)oxatricyclo…``).
 
-    Scope-correct WITHOUT parsing the name's grammar: OPSIN rejects a locant that
-    falls outside the modified unit's OWN numbering (``methyl`` has no position 2,
-    an ``O`` cannot carry ``13C``), so a substituent-scoped descriptor
-    (``(13C1)methyl acetate``) or a 1-atom parent (``(2H3)methanol``) is trivially
-    unique, while an asymmetric parent yields two or more distinct isotopomers.
-    This is deliberately NOT a whole-molecule heavy-atom symmetry count -- that
-    over-broadening is the WITHDRAWN-2026-07-28 trap (it would force a locant on
-    the documented ``(13C1)methyl acetate`` positive control).
-    """
-    seen: set = set()
-    for n in range(1, n_pos + 1):
-        groups_n = [(n, mass, el, count, maxpos)
-                    for (mass, el), count, maxpos in keys]
-        desc_n = format_isotope_descriptor(groups_n)
-        cand = skel[:off] + desc_n + skel[off:]
-        smi = _opsin_parse(cand)
-        if not smi:
-            continue
-        m = Chem.MolFromSmiles(smi)
-        if m is None:
-            continue
-        try:
-            from rdkit.Chem import inchi as _inchi
-            key = _inchi.MolToInchiKey(m) or Chem.MolToSmiles(m)
-        except Exception:
-            key = Chem.MolToSmiles(m)
-        seen.add(key)
-        if len(seen) > 1:
-            return False
+    Two corrections over the prior shared-single-locant version (which spliced the
+    SAME locant into EVERY nuclide group and so, for a MULTI-nuclide descriptor,
+    built a form OPSIN rejects for all n -- ``(n-13C,n-15N)`` -- leaving ``seen``
+    empty and FAILING OPEN via ``len(∅) <= 1``):
+      1. SEED ``seen`` with the structure the accepted OMITTED-locant candidate
+         actually denotes (``accepted_cand``, the string that just round-tripped to
+         ``original`` in the caller). It must be the caller's exact candidate, not
+         a re-rendered one: the omitted subscript form ``(2H)benzene`` parses to a
+         DIFFERENT structure than the force-show ``(2H1)benzene`` the engine emits,
+         so re-rendering the seed mis-anchored it (over-cited monodeuterobenzene).
+         An empty probe set then means "no distinct alternative" -> unique -> omit
+         (correct for ``(2H6)benzene``, ``(2H3)methanol``, ``(13C1)methyl
+         acetate``), not fail-open.
+      2. Probe each nuclide group INDEPENDENTLY (only that group carries the
+         locant, the others stay None -- the mixed form ``(1-13C,15N)`` the builder
+         must emit) in the force-show subscript spelling (maximally parseable; the
+         InChIKey is spelling-independent). Any distinct isotopomer -> ambiguous ->
+         keep the locant.
+
+    For a single-nuclide descriptor this is the seed + a per-locant sweep, so
+    single-nuclide omit/keep decisions are unchanged. Still NOT a whole-molecule
+    symmetry count (the WITHDRAWN-2026-07-28 over-broadening trap): a
+    substituent-scoped or 1-atom-parent descriptor stays trivially unique because
+    OPSIN rejects an out-of-scope locant, adding nothing beyond the seed."""
+    seed = _isotopomer_key(accepted_cand)
+    seen: set = {seed} if seed else set()
+    for gi in range(len(keys)):
+        for n in range(1, n_pos + 1):
+            groups_n = [(n if j == gi else None, mass, el, count, maxpos)
+                        for j, ((mass, el), count, maxpos) in enumerate(keys)]
+            desc_n = format_isotope_descriptor(groups_n, force_show=True)
+            key = _isotopomer_key(skel[:off] + desc_n + skel[off:])
+            if key is None:
+                continue
+            seen.add(key)
+            if len(seen) > 1:
+                return False
     return len(seen) <= 1
 
 
@@ -538,7 +563,8 @@ def _find_best_placement(
                     # _decorate_distinct_multi_locant). (Was gated to depth 0, which
                     # shipped the ambiguous nested form -- a review review 2026-09-08.)
                     if (locant is None
-                            and not _placement_unambiguous(skel, off, keys, n_pos)):
+                            and not _placement_unambiguous(
+                                skel, off, keys, n_pos, candidate)):
                         continue
                     won.append((p4542, loc_rank, sub_rank,
                                 _placement_quality(skel, off), off, desc, candidate))
@@ -1308,6 +1334,108 @@ def _cip_labeled_count(mol: Chem.Mol) -> int:
     return sum(1 for a in m.GetAtoms() if a.HasProp("_CIPCode"))
 
 
+_MIXED_LOCANT_COMBO_CAP = 256  # (n_pos+1)**n_groups product bound; fail closed above
+
+
+def _decorate_mixed_locant(skeleton: str, keys, original: Chem.Mol,
+                           n_pos: int, stripped_smiles: str,
+                           namer) -> Optional[str]:
+    """ mixed descriptor: a multi-nuclide label where SOME nuclides
+    need a locant and others do not — an ambiguous nuclide beside a unique one,
+    e.g. ``C[13CH2][15NH2]`` -> ``(1-13C,15N)`` (¹³C ambiguous among the two ring/
+    chain carbons, ¹⁵N unique). ``_find_best_placement`` shares ONE locant across
+    every nuclide group, so it can build only the all-None ``(13C,15N)`` (ambiguous,
+    now rejected by the uniqueness oracle) or the all-same ``(1-13C,1-15N)`` (OPSIN
+    rejects the ¹⁵N locant); neither is the mixed form. This enumerates an
+    INDEPENDENT locant per nuclide group (each None or 1..n_pos), RT-gated,
+    lowest-locants-first. Bounded / fail-closed on a large product.
+
+    Isolated fallback: only reached from the ``best is None`` cascade AFTER the
+    single-descriptor and distinct-multi-locant paths return None, and only for a
+    MULTI-nuclide descriptor, so it cannot change any row those paths already
+    name."""
+    if len(keys) < 2:
+        return None
+    if (n_pos + 1) ** len(keys) > _MIXED_LOCANT_COMBO_CAP:
+        return None  # fail closed rather than spend minutes on a large product
+    from itertools import product
+    # A mixed descriptor ALWAYS cites at least one locant, so forces
+    # the parent to restore its own omitted locants too (…ethan-1-amine, not
+    # …ethanamine). Re-name the skeleton inside the forced-locant scope, as the
+    # single-descriptor path does at the restoration block below; keep
+    # the free-elided skeleton as a fallback if the re-render fails.
+    from ..assembly.locant_omission import forced_locant_scope
+    with forced_locant_scope("isotope"):
+        skel_forced = _flagged_systematic_namer(namer).name(stripped_smiles)
+    if skel_forced and "unknown" not in skel_forced.lower():
+        skeleton = skel_forced
+    seen_off: set = set()
+    offs = [o for o in ([0] + _insertion_offsets(skeleton))
+            if not (o in seen_off or seen_off.add(o))]
+    choices = [[None] + list(range(1, n_pos + 1)) for _ in keys]
+    winners = []
+    for combo in product(*choices):
+        # all-None and all-same forms are already covered by _find_best_placement;
+        # this pass contributes only genuinely MIXED assignments.
+        if len(set(combo)) <= 1:
+            continue
+        groups_desc = [(loc, mass, el, count, maxpos)
+                       for loc, ((mass, el), count, maxpos) in zip(combo, keys)]
+        # Subscript axis (as in _find_best_placement): the BB-preferred omitted-
+        # subscript form (sub_rank 0, `(1-13C,15N)`) is tried first; the force-show
+        # form (sub_rank 1, `(1-13C1,15N1)`) is a parseability fallback.
+        desc_pref = format_isotope_descriptor(groups_desc)
+        desc_force = format_isotope_descriptor(groups_desc, force_show=True)
+        variants = [(0, desc_pref)]
+        if desc_force != desc_pref:
+            variants.append((1, desc_force))
+        for sub_rank, desc in variants:
+            for off in offs:
+                cand = skeleton[:off] + desc + skeleton[off:]
+                if _isotope_round_trips(cand, original):
+                    cited = sorted(c for c in combo if c is not None)
+                    winners.append((cited, sub_rank, off, cand))
+    if not winners:
+        return None
+    # lowest locants -> BB-preferred subscript -> deterministic offset/string
+    winners.sort(key=lambda w: (w[0], w[1], w[2], w[3]))
+    return winners[0][3]
+
+
+_STEREO_TOKEN_RE = re.compile(r"(\d*)([a-z]?)('{0,2})([RSrsEZez])$")
+
+
+def _stereo_token_key(tok: str):
+    """Total order over stereodescriptor tokens by ASCENDING locant
+    'cited according to the ascending order of their corresponding locants').
+    Key: (int locant, letter suffix e.g. 'a' in 7a, prime count, descriptor)."""
+    m = _STEREO_TOKEN_RE.match(tok)
+    if not m:
+        return (float("inf"), "", 0, tok)
+    num, letter, primes, desc = m.groups()
+    return (int(num) if num else 0, letter, len(primes), desc)
+
+
+def _merge_leading_stereo(induced, base: str) -> str:
+    """: merge the isotope-INDUCED stereodescriptors with any genuine
+    stereodescriptor group already leading ``base`` into ONE parenthesised group,
+    cited in ascending locant order — ``(1S)-`` + ``(2R)-…`` -> ``(1S,2R)-…``.
+    ``induced`` is a list of ``(int_locant, 'R'|'S')``. When ``base`` carries no
+    leading stereo group the result is byte-identical to the old ``prefix+base``,
+    so single-induced rows (``(1R)-(1-2H1)ethan-1-ol``) are unchanged. The isotope
+    descriptor ``(1-2H1)`` is NOT a stereodescriptor and never matches
+    ``_STEREO_PREFIX_RE``, so it is never swept into the merge."""
+    from .stereochemistry import _STEREO_PREFIX_RE  # lazy: avoid import cycle
+    m = _STEREO_PREFIX_RE.match(base)
+    base_tokens, rest = [], base
+    if m:
+        base_tokens = m.group(0)[1:-2].split(",")  # strip '(' and ')-'
+        rest = base[m.end():]
+    induced_tokens = [f"{loc}{cfg}" for loc, cfg in induced]
+    merged = sorted(base_tokens + induced_tokens, key=_stereo_token_key)
+    return "(" + ",".join(merged) + ")-" + rest
+
+
 def _decorate_isotope_stereo(skeleton, keys, original, stripped, n_pos,
                              extra_locants) -> Optional[str]:
     """: an isotope-INDUCED stereocentre -- a centre that is a stereocentre
@@ -1363,8 +1491,10 @@ def _decorate_isotope_stereo(skeleton, keys, original, stripped, n_pos,
     winners = []
     for locs in combinations(range(1, n_pos + 1), k):
         for cfg in product("RS", repeat=k):
-            prefix = "(" + ",".join(f"{L}{c}" for L, c in zip(locs, cfg)) + ")-"
-            cand = prefix + base
+            #: merge the induced descriptors with any genuine
+            # stereo group `base` already carries into ONE ascending-locant
+            # group (`(1S,2R)-`), not two adjacent `(1S)-(2R)-` groups.
+            cand = _merge_leading_stereo(list(zip(locs, cfg)), base)
             if _isotope_round_trips(cand, original):  # FULL stereo + isotope
                 winners.append((locs, cfg, cand))
     if not winners:
@@ -1580,6 +1710,14 @@ def _decorate_isotopic_name_inner(smiles, style, namer, original, stripped,
         ml = _decorate_distinct_multi_locant(skeleton, keys, original, label_map, n_pos)
         if ml is not None:
             return ml
+        # (b'') MIXED per-nuclide locants: an ambiguous nuclide that
+        # needs a locant beside a unique one that does not -- (1-13C,15N) -- which
+        # neither the single-shared-locant enumeration nor the same-nuclide
+        # distinct-multi-locant path above can express.
+        mx = _decorate_mixed_locant(skeleton, keys, original, n_pos,
+                                    stripped_smiles, namer)
+        if mx is not None:
+            return mx
         alt_skeleton = _systematic_parent_fallback(stripped)
         if alt_skeleton and alt_skeleton != skeleton:
             alt_demux = _decorate_demultiplied(alt_skeleton, keys, original, stripped)

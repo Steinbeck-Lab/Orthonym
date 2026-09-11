@@ -303,7 +303,7 @@ class TestDenyByDefault:
         "smiles,expected,why",
         [
             # A formal charge on the scope: the helper's own GetFormalCharge guard
-            # is load-bearing here (unlike the sibling no-op guards CLAUDE.md warns
+            # is load-bearing here (unlike the sibling no-op guards the contributor guide warns
             # about), because _name_saturated_substituted_chain has no charge check.
             ("[NH3+]CCC(F)(F)C(F)(F)c1ccccc1",
              "3,3,4,4-tetrafluoro-4-phenylbutan-1-aminium",
@@ -321,7 +321,7 @@ class TestDenyByDefault:
     ):
         """Charge coverage, added after review found it verified-but-untested.
 
-        CLAUDE.md records that on a sibling predicate **both** ``GetFormalCharge``
+        the contributor guide records that on a sibling predicate **both** ``GetFormalCharge``
         guards were measured to be **no-ops**, because the molecule arrives
         neutralised. These two rows pin the behaviour that was measured to be correct
         here, so that a future neutralisation change cannot silently make this
