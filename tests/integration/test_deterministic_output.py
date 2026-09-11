@@ -177,9 +177,16 @@ def sample_determinism_corpus() -> List[str]:
     contribution by 3.
     """
     if not BASELINE_CSV.exists():
+        # allow_module_level=True: this helper is also called at import time
+        # (``_CORPUS = sample_determinism_corpus`` builds the parametrize list
+        # once at module load), so without the flag a missing baseline raises a
+        # collection ERROR instead of skipping. The baseline lives under the
+        # local-only.planning/ tree and is absent in the published repo; a
+        # clean module-level skip is the intended degrade.
         pytest.skip(
             f"Baseline CSV not found at {BASELINE_CSV}. "
-            "This test requires the Phase 145 baseline to be committed."
+            "This test requires the Phase 145 baseline to be committed.",
+            allow_module_level=True,
         )
     rng = random.Random(SAMPLE_SEED)
     with BASELINE_CSV.open() as f:

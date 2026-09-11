@@ -15,6 +15,72 @@ FIXTURES_DIR = Path(__file__).parent / "fixtures"
 
 
 # ============================================================================
+# Public-repo fixture guard — skip tests that read local-only.planning /
+# a temp dir working directories.
+# ============================================================================
+# The published repository does NOT ship the local `.planning/` and
+# `a temp dir/` working trees. A small set of tests reads real files from under
+# them (dev baselines, audit docs, an offline measurement instrument) and would
+# raise FileNotFoundError at run time when those files are absent.
+#
+# This single hook fixes that WITHOUT touching any test:
+# * `.planning/` present (local dev) -> no-op, every test runs unchanged.
+# * `.planning/` absent (public repo) -> every test in a fixture-dependent
+# module is SKIPPED, not errored.
+#
+# `.planning/` presence is the proxy for "this is the local working tree": when
+# it is gone, so is `a temp dir/`, so the single check also covers the
+# a temp dir reader.
+#
+# `FIXTURE_DEPENDENT` is deliberately MINIMAL — only modules that actually READ
+# a file under `.planning/` or `a temp dir/` at run time (and would therefore
+# fail if it were absent) are listed. Modules that merely MENTION such a path in
+# a comment, docstring or assert-message string read nothing and are excluded.
+# All reads below are inside test functions/methods (never at import time), so a
+# collection-time skip is sufficient — no module fails to import when the files
+# are gone.
+_PLANNING_DIR = PROJECT_ROOT / ".planning"
+
+FIXTURE_DEPENDENT = {
+    # reads internal notes canary + exceptions
+    # files via `assert path.exists` and `EXCEPTIONS_FILE.read_text` (unguarded).
+    "test_orgm_byte_identical_v18_canary.py",
+    # reads internal notes via `audit.read_text` (unguarded).
+    "test_frn_byte_identical_v18_canary.py",
+    # build_ledger reads internal notes and
+    # internal notes cluster files (unguarded).
+    "test_build_ledger.py",
+    # reads internal notes via
+    # `pathlib.Path(...).read_text` (unguarded).
+    "test_m2_substituent_routing.py",
+    # exec's a temp dir/asm_robustness.py via importlib.spec_from_file_location
+    # (unguarded); the other tests in this module do not need the fixture, but
+    # the guard is applied at module granularity.
+    "test_v28_composer1.py",
+}
+
+
+def pytest_collection_modifyitems(config, items):
+    """Skip fixture-dependent modules when the local `.planning/` tree is absent.
+
+    No-op in local development (where `.planning/` exists and the fixtures are
+    present). In the published repo the working directories are not shipped, so
+    the run-time FileNotFoundError those modules would raise is turned into a
+    clean skip. See the `FIXTURE_DEPENDENT` note above.
+    """
+    if _PLANNING_DIR.exists():
+        return
+    skip_marker = pytest.mark.skip(
+        reason="requires local .planning/scratchpad fixtures (not published)"
+    )
+    for item in items:
+        # nodeid is "<relpath>::<test>"; take the module file's basename.
+        basename = Path(item.nodeid.split("::", 1)[0]).name
+        if basename in FIXTURE_DEPENDENT:
+            item.add_marker(skip_marker)
+
+
+# ============================================================================
 # Molecule Fixtures
 # ============================================================================
 

@@ -31,6 +31,7 @@ from rdkit import Chem
 from orthonym import name_compound
 from orthonym.rules.sulfonamides import n_substituted_sulfonamide_name
 from orthonym.rules.benzene import name_benzene_derivative
+from orthonym.validation.reconstruct import verify_or_none
 
 
 def _producer(smiles: str):
@@ -184,12 +185,23 @@ def test_adversarial_n_substituent_shapes(smiles, expected):
     ("Clc1ccccc1NS(=O)(=O)c1cc2ccccc2cc1Cl", "fused arene, not benzene"),
     # B2: a benzylic stereocentre the fragment namer drops -> re-anchor rejects.
     ("C[C@H](c1ccccc1)NS(=O)(=O)c1ccc(C)cc1", "benzylic stereodescriptor dropped"),
-    # B3: an N-substituent bearing a functional group mis-named (-COOH -> formyl).
-    ("Cc1ccc(S(=O)(=O)N(C)C(=O)O)cc1", "N-branch -COOH mis-named formyl"),
 ])
 def test_review_blockers_producer_fails_closed(smiles, why):
     """The F-B producer must never emit a wrong molecule for these (0-wrong)."""
     assert _producer(smiles) is None, why
+
+
+def test_review_b3_n_carboxy_producer_now_round_trips():
+    """v47: the old 'B3' (an N-branch -COOH once mis-named as formyl) is no longer
+    a fail-closed case -- the producer now emits `N-carboxy-N,4-dimethylbenzene-1-
+    sulfonamide`, which round-trips to the input (OPSIN InChIKey == input, so it
+    denotes the RIGHT molecule; 0-wrong holds). The engine's shipped PIN is the
+    senior carbamic-acid parent. Was in the fail-closed list; moved here once the
+    producer stopped mis-naming it."""
+    smi = "Cc1ccc(S(=O)(=O)N(C)C(=O)O)cc1"
+    n = _producer(smi)
+    assert n is not None, "producer should now name this (no longer fails closed)"
+    assert verify_or_none(n, smi) == n, f"producer name must round-trip (0-wrong): {n!r}"
 
 
 @pytest.mark.opsin_gate

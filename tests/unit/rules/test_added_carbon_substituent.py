@@ -10,6 +10,7 @@ Un-nameable substituents still fail closed (0-wrong).
 import pytest
 
 from orthonym import Orthonym
+from orthonym.validation.reconstruct import verify_or_none
 
 pytestmark = pytest.mark.unit
 
@@ -56,7 +57,16 @@ def test_added_carbon_substituent_path_declines_complex_substituents():
     for smi in ("OC(=O)CC(OP(=O)(O)O)(CC(=O)O)C(=O)O",
                 "OC(=O)CC(NS(=O)(=O)c1ccc(N)cc1)(CC(=O)O)C(=O)O"):
         n = _pin().name(smi) or ""
-        assert "tricarboxylic" not in n, f"my added-carbon path must decline, got {n}"
+        # v47: the phosphonooxy case is now correctly named
+        # `2-(phosphonooxy)propane-1,2,3-tricarboxylic acid` -- it genuinely IS a
+        # propanetricarboxylic acid and the name round-trips (OPSIN InChIKey ==
+        # input). So a `tricarboxylic` name is no longer per se a mis-name; the
+        # invariant is 0-wrong: IF one is emitted it MUST round-trip. A mis-forced
+        # (wrong-molecule) tricarboxylic name still fails this. (Was: assert
+        # "tricarboxylic" not in n -- stale once the correct name became reachable.)
+        if "tricarboxylic" in n:
+            assert verify_or_none(n, smi) == n, \
+                f"a tricarboxylic name must round-trip to the input (0-wrong): {n}"
 
 
 # ---- review review 7daf8b68 findings, now fixed ----
