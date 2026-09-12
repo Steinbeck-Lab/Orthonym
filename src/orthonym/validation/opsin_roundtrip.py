@@ -16,6 +16,7 @@ from pathlib import Path
 from typing import Dict, Optional, Tuple, Union
 
 from orthonym.jvm_flags import JVM_HYGIENE_FLAGS
+from ..jvm_bridge import REJECTED, opsin_extended_smiles  # Lever A: module-level so tests can monkeypatch
 
 # Project root: 4 levels up from this file
 # (src/orthonym/validation/opsin_roundtrip.py -> project root)
@@ -153,18 +154,24 @@ def _parse_av_token(tok: str) -> Optional[Locant]:
 
 
 def _extended_smiles(name: str, jar_version: str = "2.9.0") -> Optional[str]:
-    """OPSIN ``-o extendedsmi`` output line for *name* (in-process fast path,
-    subprocess fallback), or None if OPSIN rejected/was unavailable."""
+    """OPSIN ``-o extendedsmi`` output line for *name* (in-process fast path;
+    subprocess fallback only when the in-process path cannot serve the call), or
+    None if OPSIN rejected the name / was unavailable. Memoised per name inside the
+    naming scope (Lever A, 2026-09-12): the stereo re-anchor asks for the same name
+    several times per molecule, and a definitive rejection used to start a fresh
+    3.5 s Java process that printed the same empty line."""
+    from ..assembly.memo import cache_or_compute
+    return cache_or_compute("opsin_extended_smiles", (name, jar_version),
+                            lambda: _extended_smiles_uncached(name, jar_version))
+
+
+def _extended_smiles_uncached(name: str, jar_version: str = "2.9.0") -> Optional[str]:
     jar_path = _find_opsin_jar(jar_version)
     if jar_path is None:
         return None
-    try:
-        from ..jvm_bridge import opsin_extended_smiles
-        text, served = opsin_extended_smiles(name, jar_path=jar_path)
-        if served:
-            return text
-    except ImportError:  # pragma: no cover - jvm_bridge always present
-        pass
+    text, served = opsin_extended_smiles(name, jar_path=jar_path)   # module-level import (monkeypatchable)
+    if served:
+        return None if text == REJECTED else text
     try:
         result = subprocess.run(
             ["java", *JVM_HYGIENE_FLAGS, "-jar", jar_path, "-o", "extendedsmi"],

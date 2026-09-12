@@ -289,6 +289,25 @@ def centres_available() -> bool:
 
 def opsin_stdout(name: str, allow_radicals: bool,
                  jar_path: Optional[str] = None) -> Tuple[Optional[str], bool]:
+    """Memoising front of:func:`_opsin_stdout_uncached` (Lever I, 2026-09-12): within one
+    naming scope the same (name, allow_radicals, jar_path) is parsed once; a served result is
+    a pure function of the name, so the memo is exact. Unserved results are never cached, and
+    nothing is cached outside a scope or in ORTHONYM_MEMO=verify mode."""
+    from .assembly.memo import _MODE as _memo_mode, _cache_var
+    cache = _cache_var.get() if _memo_mode == "on" else None
+    if cache is not None:
+        ck = ("opsin_stdout", (name, allow_radicals, jar_path))
+        hit = cache.get(ck)
+        if hit is not None:
+            return hit
+    res = _opsin_stdout_uncached(name, allow_radicals, jar_path)
+    if cache is not None and res[1]:
+        cache[ck] = res
+    return res
+
+
+def _opsin_stdout_uncached(name: str, allow_radicals: bool,
+                           jar_path: Optional[str] = None) -> Tuple[Optional[str], bool]:
     """Exactly what ``java -jar opsin [-r] -osmi`` would write to stdout for ONE name.
 
     Returns ``(stdout_text, True)`` on success — ``"<smiles>\\n"``, or ``"\\n"`` when
@@ -329,15 +348,20 @@ def opsin_stdout(name: str, allow_radicals: bool,
     return ("\n" if smiles is None else str(smiles) + "\n"), True
 
 
+REJECTED = "__opsin_rejected__"   # sentinel: OPSIN parsed the request and definitively rejected the name (Lever A, 2026-09-12)
+
+
 def opsin_extended_smiles(name: str,
                           jar_path: Optional[str] = None) -> Tuple[Optional[str], bool]:
     """Exactly what ``java -jar opsin -o extendedsmi`` writes for ONE name.
 
     Returns ``(extended_smiles, True)`` on success — the ``"<smiles> |$_AV:...$|"``
-    line with per-atom locant annotations — or ``(None, False)`` when the in-process
-    path cannot serve this call (jpype/jar absent, wrong jar version, embedded
-    newline, definitive OPSIN rejection, or a Java-side error), so the caller MUST
-    fall back to its subprocess path. Never raises. Mirrors ``opsin_stdout`` but for
+    line with per-atom locant annotations — ``(REJECTED, True)`` when OPSIN parsed
+    the request and definitively rejected the name (the CLI would print an empty
+    line, so there is nothing a subprocess could add), or ``(None, False)`` only when
+    the in-process path cannot serve this call (jpype/jar absent, wrong jar version,
+    embedded newline, or a Java-side error), so the caller MUST fall back to its
+    subprocess path. Never raises. Mirrors ``opsin_stdout`` but for
     the extended-SMILES output mode; used by the stereo-locant re-anchor
     (``validation.opsin_roundtrip.opsin_atom_locant_map``)."""
     if not name:
@@ -360,7 +384,7 @@ def opsin_extended_smiles(name: str,
         logger.debug("in-process OPSIN extendedsmi failed for %r: %s", name, exc)
         return None, False
     if ext is None:
-        return None, False  # definitive rejection -> no locants to serve
+        return REJECTED, True  # definitive rejection: served, and there are no locants
     return str(ext), True
 
 

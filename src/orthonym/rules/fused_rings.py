@@ -47,6 +47,7 @@ from .stereochemistry import (
     get_bridgehead_atoms,
     get_junction_locants_for_fused_system,
 )
+from ..perception.smarts_cache import compiled as _compiled_smarts
 
 # Simple multiplicative prefixes for substituent naming
 SIMPLE_MULTIPLIERS = {
@@ -2656,7 +2657,7 @@ def _identify_functionalized_substituent(
                             }
 
     # Check for carboxylic acid terminus: C(=O)[OH] or C(=O)[O-]
-    acid_pattern = Chem.MolFromSmarts('[CX3](=O)[OX2H1,OX1-]')
+    acid_pattern = _compiled_smarts('[CX3](=O)[OX2H1,OX1-]')
     if acid_pattern:
         matches = mol.GetSubstructMatches(acid_pattern)
         for match in matches:
@@ -2702,7 +2703,7 @@ def _identify_functionalized_substituent(
                     }
 
     # Check for aldehyde terminus: [CH]=O
-    aldehyde_pattern = Chem.MolFromSmarts('[CX3H1](=O)')
+    aldehyde_pattern = _compiled_smarts('[CX3H1](=O)')
     if aldehyde_pattern:
         matches = mol.GetSubstructMatches(aldehyde_pattern)
         for match in matches:
@@ -2727,7 +2728,7 @@ def _identify_functionalized_substituent(
 
     # Check for hydroxyl terminus: -CH2-OH or -CH(-OH)-
     # Handles hydroxymethyl (-CH2OH), 2-hydroxyethyl (-CH2CH2OH), etc.
-    hydroxyl_pattern = Chem.MolFromSmarts('[OX2H1]')
+    hydroxyl_pattern = _compiled_smarts('[OX2H1]')
     if hydroxyl_pattern:
         matches = mol.GetSubstructMatches(hydroxyl_pattern)
         for match in matches:
@@ -2759,7 +2760,7 @@ def _identify_functionalized_substituent(
     # Handles aminomethyl (-CH2NH2), 2-aminoethyl (-CH2CH2NH2), etc.
     # Only match when the chain between ring and NH2 is purely carbon
     # (avoids misidentifying complex chains through ribose/phosphate as "aminoalkyl")
-    amino_pattern = Chem.MolFromSmarts('[NX3H2;!$([NX3H2][CX3]=O)]')
+    amino_pattern = _compiled_smarts('[NX3H2;!$([NX3H2][CX3]=O)]')
     if amino_pattern:
         matches = mol.GetSubstructMatches(amino_pattern)
         for match in matches:
@@ -2804,7 +2805,7 @@ def _identify_functionalized_substituent(
 
     # Check for acetyl/acyl terminus: -C(=O)-R on ring
     # Handles acetyl (-C(=O)-CH3), etc.
-    acyl_pattern = Chem.MolFromSmarts('[CX3](=O)[#6]')
+    acyl_pattern = _compiled_smarts('[CX3](=O)[#6]')
     if acyl_pattern:
         matches = mol.GetSubstructMatches(acyl_pattern)
         for match in matches:
@@ -2827,7 +2828,7 @@ def _identify_functionalized_substituent(
                     }
 
     # Check for ester group: -C(=O)-O-R (suffix: carboxylate/carboxylic acid)
-    ester_pattern = Chem.MolFromSmarts('[CX3](=O)[OX2][#6]')
+    ester_pattern = _compiled_smarts('[CX3](=O)[OX2][#6]')
     if ester_pattern:
         matches = mol.GetSubstructMatches(ester_pattern)
         for match in matches:

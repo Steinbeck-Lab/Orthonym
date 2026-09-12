@@ -360,6 +360,7 @@ _PIN_HETEROARYL_STEMS: Dict[str, str] = {
 # ring-heteroatom-relevant here), so behaviour is unchanged — the divergence is
 # eliminated for the numbering consumer. A unit test pins the equality.
 from .locants import ELEMENT_NUMBERING_SENIORITY as _ELEMENT_NUMBERING_SENIORITY
+from ..perception.smarts_cache import compiled as _compiled_smarts
 
 _HETEROATOM_SENIORITY: Dict[str, int] = {
     sym: rank
@@ -2061,7 +2062,7 @@ def _phthalimido_substituent_name(mol, frag_set: Set[int],
     a = mol.GetAtomWithIdx(attach_idx)
     if a.GetAtomicNum() != 7:
         return None
-    patt = Chem.MolFromSmarts("O=C1N([*])C(=O)c2ccccc21")
+    patt = _compiled_smarts("O=C1N([*])C(=O)c2ccccc21")
     if patt is None:
         return None
     for match in mol.GetSubstructMatches(patt):
@@ -3149,7 +3150,7 @@ def _get_polycyclic_attachment_locant(
             from .polycyclics import POLYCYCLIC_DATA, _map_pah_atoms_to_iupac
             pah_data = POLYCYCLIC_DATA.get(ring_name)
             if pah_data:
-                pattern = Chem.MolFromSmarts(pah_data['smarts'])
+                pattern = _compiled_smarts(pah_data['smarts'])
                 if pattern is not None:
                     ring_atom_set = set(ring_atoms)
                     best_locant: Optional[int] = None

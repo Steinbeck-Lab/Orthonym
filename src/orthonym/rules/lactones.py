@@ -35,6 +35,7 @@ from ..perception.molcache import (  # audit 2026-09-03 (S2): per-call atom/bond
     bonds_of,
 )
 from ..rules.heterocycles import build_hw_name
+from ..perception.smarts_cache import compiled as _compiled_smarts
 
 # ---------------------------------------------------------------------------
 # Lactone detection
@@ -73,7 +74,7 @@ def is_monocyclic_lactone(mol) -> Optional[Dict]:
     # match[0] = carbonyl carbon
     # match[1] = carbonyl chalcogen (=O/=S/=Se/=Te, exocyclic)
     # match[2] = ester oxygen (-O-, must be in ring)
-    pattern = Chem.MolFromSmarts("[CX3](=[O,S,#34,#52])[OX2]")
+    pattern = _compiled_smarts("[CX3](=[O,S,#34,#52])[OX2]")
     matches = mol.GetSubstructMatches(pattern)
 
     if not matches:

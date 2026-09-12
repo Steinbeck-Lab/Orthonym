@@ -44,6 +44,41 @@ RECLAIM_CASES = [
 ]
 
 
+# v47 P3 (_INTERIOR_LOCANT_STEM_RE) — a nuclide on an interior sub-parent that is
+# introduced by its OWN locant set (`-1,4-dioxane`, `-1,3-diazaspiro`) had no
+# insertion offset before that digit-led locant set, so the isotope label failed
+# closed though the stripped skeleton names. These name at the PIN tier (the
+# stripped skeletons are PIN-nameable with NO best-effort flags), so they are a
+# strict PIN reclaim, not a best-effort one. Descriptors are PIN-correct:
+# (2H2) — locant OMITTED per: both ring methine positions (3,6) carry
+# D, and 2 D on the 2 available parent positions admit no isomer.
+# (4-11C) — locant KEPT: position 4 is one of several equivalent-looking carbons.
+# HEAD (before the offset fix) abstained on all of these.
+PIN_TIER_INTERIOR_LOCANT_CASES = [
+    ("[2H]C1(C(=O)OC(C(=O)O1)([2H])C)C",
+     "3,6-dimethyl(2H2)-1,4-dioxane-2,5-dione"),
+    ("C1CCCC2(CCC1)[11C](=O)NC(=O)N2",
+     "2,4-dioxo(4-11C)-1,3-diazaspiro[4.7]dodecane"),
+]
+
+
+@pytest.mark.roundtrip
+@pytest.mark.parametrize("smiles,expected", PIN_TIER_INTERIOR_LOCANT_CASES)
+def test_interior_locant_subparent_reclaimed_at_pin_tier(smiles, expected):
+    """The descriptor places before an interior locant-introduced sub-parent, names
+    at the PIN tier (no best-effort flags), is byte-identical to the expected PIN,
+    and full-InChIKey round-trips to the exact isotopologue (0-wrong)."""
+    with jvm_slots(1, purpose="v47-p3-interior-locant-test"):
+        name = Orthonym(style="pin").name(smiles)
+        assert name == expected
+        rt = opsin_roundtrip_check(smiles, name)
+        assert rt.get("passed"), f"{name!r} did not round-trip: {rt.get('error')}"
+        opsin_mol = Chem.MolFromSmiles(rt["opsin_smiles"])
+        assert opsin_mol is not None
+        assert (inchi.MolToInchiKey(opsin_mol)
+                == inchi.MolToInchiKey(Chem.MolFromSmiles(smiles)))
+
+
 @pytest.mark.roundtrip
 @pytest.mark.parametrize("smiles,expected", RECLAIM_CASES)
 def test_isotope_skeleton_reclaimed_at_best_effort(smiles, expected):

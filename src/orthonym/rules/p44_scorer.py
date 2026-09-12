@@ -35,6 +35,7 @@ from __future__ import annotations
 import logging
 from dataclasses import dataclass
 from typing import List, Optional, Tuple
+from ..perception.molcache import bonds_of
 
 logger = logging.getLogger(__name__)
 
@@ -181,7 +182,7 @@ def _n_multiple_bonds(mol, atom_set) -> Tuple[int, int]:
     bonds -- GetBondTypeAsDouble returns 1.5 for aromatic, > 1.0 counts.
     """
     n_mult = n_dbl = 0
-    for b in mol.GetBonds():
+    for b in bonds_of(mol):
         if b.GetBeginAtomIdx() in atom_set and b.GetEndAtomIdx() in atom_set:
             v = b.GetBondTypeAsDouble()
             if v > 1.0:
@@ -419,7 +420,7 @@ def compare_with_reason(mol, a: ParentCandidate, b: ParentCandidate, *,
     def _unsat_atoms(cand):
         cset = set(cand.atoms)
         out = set()
-        for bnd in mol.GetBonds():
+        for bnd in bonds_of(mol):
             if (bnd.GetBeginAtomIdx() in cset and bnd.GetEndAtomIdx() in cset
                     and bnd.GetBondTypeAsDouble() > 1.0):
                 out.update((bnd.GetBeginAtomIdx(), bnd.GetEndAtomIdx()))

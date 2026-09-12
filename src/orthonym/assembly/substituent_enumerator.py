@@ -41,11 +41,12 @@ from rdkit.Chem import RWMol
 from ..metrics.candidate_ledger import Scope as _LedgerScope
 from ..metrics.candidate_ledger import Stage as _LedgerStage
 from ..metrics.candidate_ledger import record_candidate as _ledger_record
-from ..perception.molcache import bonds_of  # audit 2026-09-03 (S2): per-call atom/bond tuples
+from ..perception.molcache import atoms_of, bonds_of  # audit 2026-09-03 (S2): per-call atom/bond tuples
 from ..rules.seniority import get_prefix
 from .naming_utils import SIMPLE_MULTIPLIERS, get_alkyl_name
 from .substituent_naming import _name_aryl_methyl_ether, name_substituent_fragment
 from .substituent_prefix_forms import _check_substituent_prefix_form
+from ..perception.smarts_cache import compiled as _compiled_smarts
 
 logger = logging.getLogger(__name__)
 
@@ -305,7 +306,7 @@ def _verify_completeness(mol, parent_atoms, substituents,
         all_sub_atoms.update(sub.frag_atoms)
 
     expected = set()
-    for atom in mol.GetAtoms():
+    for atom in atoms_of(mol):
         if atom.GetAtomicNum() > 1 and atom.GetIdx() not in parent_set:
             expected.add(atom.GetIdx())
 
@@ -1015,6 +1016,9 @@ def _route_fragment_to_general_engine(mol, frag_atoms, attach_idx):
     return yl_name
 
 
+_ORDER_INT_RE = re.compile(r"\d+")   # Lever G: parse RDKit's '[0,1,2,]' output-order prop
+
+
 def _substituent_memo_key(mol, frag_atoms, attach_idx, allow_mancude,
                           best_effort_val):
     """Complete cache key for:func:`name_substituent` (M1 Lever C1).
@@ -1049,11 +1053,12 @@ def _substituent_memo_key(mol, frag_atoms, attach_idx, allow_mancude,
         if b.GetOtherAtom(_a).GetIdx() not in frag_set)
     if not mol.HasProp('_smilesAtomOutputOrder'):
         return None
-    _order = [int(x) for x in mol.GetProp('_smilesAtomOutputOrder')
-              .strip('[]').replace(' ', '').split(',') if x != '']
+    _order = [int(x) for x in _ORDER_INT_RE.findall(mol.GetProp('_smilesAtomOutputOrder'))]
+    # Lever G (2026-09-12): one materialised atom tuple instead of two GetAtomWithIdx calls per
+    # atom here and two per external bond below. Same atoms, same values, same tuple.
+    _atoms = atoms_of(mol)
     atom_cips = tuple(
-        (mol.GetAtomWithIdx(i).GetProp('_CIPCode')
-         if mol.GetAtomWithIdx(i).HasProp('_CIPCode') else None)
+        (_atoms[i].GetProp('_CIPCode') if _atoms[i].HasProp('_CIPCode') else None)
         for i in _order)
     _rank = {idx: pos for pos, idx in enumerate(_order)}
     _bond_items = []
@@ -1075,8 +1080,8 @@ def _substituent_memo_key(mol, frag_atoms, attach_idx, allow_mancude,
     ext_bond_orders = tuple(
         tuple(sorted(
             b.GetBondTypeAsDouble()
-            for b in mol.GetAtomWithIdx(i).GetBonds()
-            if b.GetOtherAtom(mol.GetAtomWithIdx(i)).GetIdx() not in frag_set))
+            for b in _atoms[i].GetBonds()
+            if b.GetOtherAtomIdx(i) not in frag_set))
         for i in _order)
     # Item-1 fix, round 3 (, a review C1): the fragment SMILES + external-bond
     # ORDERS still describe only the fragment and the multiplicities of its
@@ -1505,7 +1510,7 @@ def name_substituent(mol, frag_atoms, attach_idx, allow_mancude: bool = False):
                                           Chem.BondStereo.STEREOTRANS)
                     and b.GetBeginAtomIdx() in frag_atoms_set
                     and b.GetEndAtomIdx() in frag_atoms_set
-                    for b in mol.GetBonds()):
+                    for b in bonds_of(mol)):
                 logger.debug("B2 stereo-completeness: refused %r (defined C=C, no E/Z)",
                              token)
                 return None if allow_mancude else "substituent"
@@ -2333,7 +2338,7 @@ def _name_substituent_cascade(mol, frag_atoms, attach_idx,
     # fragment is EXACTLY {S, C, N} anchored at the divalent S; any extra
     # decoration falls through -> fail closed.
     if attach_idx is not None and len(frag_atoms_set) == 3:
-        _tc_pat = Chem.MolFromSmarts('[SX2][CX2]#[NX1]')
+        _tc_pat = _compiled_smarts('[SX2][CX2]#[NX1]')
         if _tc_pat is not None:
             for _m in mol.GetSubstructMatches(_tc_pat):
                 if set(_m) == frag_atoms_set and _m[0] == attach_idx:
@@ -4632,7 +4637,7 @@ def _name_fg_only(mol, frag_mol, frag_atoms):
     if frag_mol is not None:
         from ..perception.functional_groups import FUNCTIONAL_GROUP_SMARTS
         for fg_name, smarts_str in FUNCTIONAL_GROUP_SMARTS.items():
-            pattern = Chem.MolFromSmarts(smarts_str)
+            pattern = _compiled_smarts(smarts_str)
             if pattern and frag_mol.HasSubstructMatch(pattern):
                 prefix = get_prefix(fg_name)
                 if prefix:

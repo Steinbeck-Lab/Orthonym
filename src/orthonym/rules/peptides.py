@@ -75,6 +75,7 @@ from ..data.amino_acids import (
     get_amino_acid_name,
 )
 from ..perception.stereo import assign_stereochemistry
+from ..perception.smarts_cache import compiled as _compiled_smarts
 
 # SMARTS patterns
 # Peptide bond: carbonyl_C - amide_N. H1 is the ordinary secondary-amide backbone
@@ -254,19 +255,19 @@ def _is_valid_peptide(mol) -> bool:
     This prevents N-acyl amino acids (e.g., N-acetylglycine) from being
     misrouted: they have a peptide bond pattern but no NH2 on the acyl side.
     """
-    peptide_pattern = Chem.MolFromSmarts(_PEPTIDE_BOND_SMARTS)
+    peptide_pattern = _compiled_smarts(_PEPTIDE_BOND_SMARTS)
     if not peptide_pattern or not mol.GetSubstructMatches(peptide_pattern):
         return False
 
-    nh2_pattern = Chem.MolFromSmarts(_TERMINAL_NH2_SMARTS)
+    nh2_pattern = _compiled_smarts(_TERMINAL_NH2_SMARTS)
     if not nh2_pattern or not mol.GetSubstructMatches(nh2_pattern):
         return False
 
-    cooh_pattern = Chem.MolFromSmarts(_TERMINAL_COOH_SMARTS)
+    cooh_pattern = _compiled_smarts(_TERMINAL_COOH_SMARTS)
     if not cooh_pattern or not mol.GetSubstructMatches(cooh_pattern):
         return False
 
-    aa_core = Chem.MolFromSmarts(_ALPHA_AA_CORE_SMARTS)
+    aa_core = _compiled_smarts(_ALPHA_AA_CORE_SMARTS)
     if not aa_core or not mol.HasSubstructMatch(aa_core):
         return False
 
@@ -333,7 +334,7 @@ def _extract_residues(mol) -> Optional[List[str]]:
     ordered N-terminal to C-terminal.
     """
     # Find the peptide bond C-N single bonds to cleave
-    peptide_pat = Chem.MolFromSmarts(_PEPTIDE_BOND_SMARTS)
+    peptide_pat = _compiled_smarts(_PEPTIDE_BOND_SMARTS)
     if peptide_pat is None:
         return None
     matches = mol.GetSubstructMatches(peptide_pat)
@@ -653,7 +654,7 @@ def _alpha_stereo_undefined(mol: Chem.Mol, aa_name: str) -> bool:
     """
     if aa_name == "glycine":
         return False
-    alpha_pattern = Chem.MolFromSmarts("[NX3][CX4][CX3](=O)")
+    alpha_pattern = _compiled_smarts("[NX3][CX4][CX3](=O)")
     if alpha_pattern is None:
         return True
     matches = mol.GetSubstructMatches(alpha_pattern)
@@ -691,7 +692,7 @@ def _get_stereo_prefix(mol: Chem.Mol, aa_name: str) -> str:
     # Find the alpha-carbon: sp3 carbon bonded to both N and C(=O)
     # SMARTS: [NX3][CX4][CX3](=O)
     # Match indices: [0]=N, [1]=alpha-C, [2]=carbonyl-C, [3]=O
-    alpha_pattern = Chem.MolFromSmarts("[NX3][CX4][CX3](=O)")
+    alpha_pattern = _compiled_smarts("[NX3][CX4][CX3](=O)")
     if alpha_pattern is None:
         return ""
 
@@ -908,13 +909,13 @@ def _try_n_acyl_cap(mol) -> Optional[str]:
     not compete with it). Returns an UNVERIFIED candidate string; the caller
     (``name_peptide``) gates it through ``_rt_verified``.
     """
-    peptide_pat = Chem.MolFromSmarts(_PEPTIDE_BOND_SMARTS)
+    peptide_pat = _compiled_smarts(_PEPTIDE_BOND_SMARTS)
     if peptide_pat is None:
         return None
     matches = mol.GetSubstructMatches(peptide_pat)
     if not matches:
         return None
-    cooh_pattern = Chem.MolFromSmarts(_TERMINAL_COOH_SMARTS)
+    cooh_pattern = _compiled_smarts(_TERMINAL_COOH_SMARTS)
     if not cooh_pattern or not mol.GetSubstructMatches(cooh_pattern):
         return None
 
@@ -1073,7 +1074,7 @@ def _find_single_nonalpha_bond(mol) -> Optional[Tuple[int, int]]:
     chebi 371, produces >=2 non-alpha-adjacent matches or is excluded upstream
     via the N-cap already being handled by Lever A) -- declines rather than
     guess which one is the intended gamma/beta donor link."""
-    peptide_pat = Chem.MolFromSmarts(_PEPTIDE_BOND_SMARTS)
+    peptide_pat = _compiled_smarts(_PEPTIDE_BOND_SMARTS)
     if peptide_pat is None:
         return None
     matches = mol.GetSubstructMatches(peptide_pat)
@@ -1224,7 +1225,7 @@ def _strip_mono_n_methyl(smi: str) -> Tuple[str, bool]:
     mol = Chem.MolFromSmiles(smi)
     if mol is None:
         return smi, False
-    pattern = Chem.MolFromSmarts(_MONO_N_METHYL_SMARTS)
+    pattern = _compiled_smarts(_MONO_N_METHYL_SMARTS)
     if pattern is None:
         return smi, False
     matches = mol.GetSubstructMatches(pattern)
@@ -1250,7 +1251,7 @@ def _strip_terminal_amide(smi: str) -> Tuple[str, bool]:
     mol = Chem.MolFromSmiles(smi)
     if mol is None:
         return smi, False
-    pattern = Chem.MolFromSmarts(_PRIMARY_CARBOXAMIDE_SMARTS)
+    pattern = _compiled_smarts(_PRIMARY_CARBOXAMIDE_SMARTS)
     if pattern is None:
         return smi, False
     matches = mol.GetSubstructMatches(pattern)
@@ -1505,7 +1506,7 @@ def _name_ester_parent_systematic(parent_frag) -> Optional[str]:
     retained ester name). Returns None on any failure / out-of-scope shape
     (a non-'oic acid' acid stem, a compound O-alkyl, etc.); the caller's
     ``_rt_verified`` gate is the final backstop (0-wrong ABSOLUTE)."""
-    ester_pat = Chem.MolFromSmarts(_ESTER_GROUP_SMARTS)
+    ester_pat = _compiled_smarts(_ESTER_GROUP_SMARTS)
     if ester_pat is None:
         return None
     ematches = parent_frag.GetSubstructMatches(ester_pat)
@@ -1624,8 +1625,8 @@ def _try_backbone_substitutive(mol) -> Optional[str]:
     if len(residues) > _BACKBONE_SUBSTITUTIVE_MAX_RESIDUES:
         return None
 
-    cooh_pattern = Chem.MolFromSmarts(_TERMINAL_COOH_SMARTS)
-    ester_pattern = Chem.MolFromSmarts(_ESTER_GROUP_SMARTS)
+    cooh_pattern = _compiled_smarts(_TERMINAL_COOH_SMARTS)
+    ester_pattern = _compiled_smarts(_ESTER_GROUP_SMARTS)
 
     # Parent scope: the C-terminal residue is the parent skeleton and must
     # carry EXACTLY one senior acid-class group -- either one free carboxylic

@@ -33,6 +33,7 @@ from __future__ import annotations
 from typing import Dict, List, Optional, Set
 
 from rdkit import Chem
+from ..perception.smarts_cache import compiled as _compiled_smarts
 
 
 def name_acyclic_polyol_polyester(mol) -> Optional[str]:
@@ -169,7 +170,7 @@ def name_acyclic_polyol_polyester(mol) -> Optional[str]:
     # prefix above) OR inside an arm (named within name_substituent) -- either
     # way it is what blocks the composer's alcohol-parent path (ester seniority).
     if not have_ester:
-        _ester_smarts = Chem.MolFromSmarts('[CX3](=O)[OX2][#6]')
+        _ester_smarts = _compiled_smarts('[CX3](=O)[OX2][#6]')
         if _ester_smarts is not None and mol.HasSubstructMatch(_ester_smarts):
             have_ester = True
     if not have_ester:

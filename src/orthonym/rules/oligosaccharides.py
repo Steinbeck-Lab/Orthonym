@@ -46,6 +46,7 @@ import logging
 from typing import Dict, List, Optional, Set, Tuple
 
 from rdkit import Chem
+from ..perception.smarts_cache import compiled as _compiled_smarts
 
 logger = logging.getLogger(__name__)
 
@@ -268,7 +269,7 @@ def _classify_units(mol) -> Optional[Dict]:
     if ri.NumRings() < 2:
         return None  # a single ring is a monosaccharide / monoglycoside, not a disaccharide
 
-    smarts = Chem.MolFromSmarts(_GLYCOSIDIC_SMARTS)
+    smarts = _compiled_smarts(_GLYCOSIDIC_SMARTS)
     if smarts is None:
         return None
     matches = mol.GetSubstructMatches(smarts)

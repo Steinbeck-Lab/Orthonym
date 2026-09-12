@@ -29,6 +29,7 @@ from typing import Dict, Optional, Tuple
 
 from rdkit import Chem
 from rdkit.Chem import rdCIPLabeler
+from ..perception.molcache import canon_smiles
 
 logger = logging.getLogger(__name__)
 
@@ -1839,7 +1840,7 @@ def _o_acyl_word(mol, sugar_c: int, ester_o: int, acyl_c: int) -> Optional[str]:
     try:
         Chem.SanitizeMol(rw)
         acid = Chem.RemoveHs(rw)
-        acid_canon = Chem.CanonSmiles(Chem.MolToSmiles(acid))
+        acid_canon = canon_smiles(Chem.MolToSmiles(acid))
     except Exception:
         return None
     from orthonym import name_compound  # lazy: data -> namer is acyclic at runtime
@@ -1894,7 +1895,7 @@ def _n_acyl_amido_word(mol, ring_n: int, acyl_c: int) -> Optional[str]:
     try:
         Chem.SanitizeMol(rw)
         acid = Chem.RemoveHs(rw)
-        acid_canon = Chem.CanonSmiles(Chem.MolToSmiles(acid))
+        acid_canon = canon_smiles(Chem.MolToSmiles(acid))
     except Exception:
         return None
     from orthonym import name_compound  # lazy: data -> namer is acyclic at runtime
@@ -3057,7 +3058,7 @@ def _acyl_to_ate_word(mol, acyl_c, ester_o, sugar_c):
     try:
         Chem.SanitizeMol(rw)
         acid = Chem.RemoveHs(rw)
-        acid_canon = Chem.CanonSmiles(Chem.MolToSmiles(acid))
+        acid_canon = canon_smiles(Chem.MolToSmiles(acid))
     except Exception:
         return None
     from orthonym import name_compound  # lazy: data -> namer is acyclic at runtime
@@ -3124,7 +3125,7 @@ def _name_sugar_acyl_ester(mol) -> Optional[str]:
     try:
         Chem.SanitizeMol(rw)
         residual = Chem.RemoveHs(rw)
-        residual_canon = Chem.CanonSmiles(Chem.MolToSmiles(residual))
+        residual_canon = canon_smiles(Chem.MolToSmiles(residual))
     except Exception:
         return None
     residual_mol = Chem.MolFromSmiles(residual_canon)
@@ -3218,7 +3219,7 @@ def name_sugar_ester(mol, canonical_smiles: str) -> Optional[str]:
     try:
         Chem.SanitizeMol(rw)
         residual = Chem.RemoveHs(rw)
-        residual_canon = Chem.CanonSmiles(Chem.MolToSmiles(residual))
+        residual_canon = canon_smiles(Chem.MolToSmiles(residual))
     except Exception:
         return None
     residual_mol = Chem.MolFromSmiles(residual_canon)
@@ -3388,7 +3389,7 @@ def name_aldonate_ester(mol, canonical_smiles: str) -> Optional[str]:
     try:
         Chem.SanitizeMol(rw)
         residual = Chem.RemoveHs(rw)
-        residual_canon = Chem.CanonSmiles(Chem.MolToSmiles(residual))
+        residual_canon = canon_smiles(Chem.MolToSmiles(residual))
     except Exception:
         return None
     residual_mol = Chem.MolFromSmiles(residual_canon)
@@ -3610,6 +3611,27 @@ def _is_c_substituted_sugar_shape(mol) -> bool:
 
 
 def name_c_substituted_sugar(mol, canonical_smiles: str) -> Optional[str]:
+    """Memoising front of:func:`_name_c_substituted_sugar_impl` (Lever M, 2026-09-12).
+
+    The impl enumerates every stereoisomer of the reconstructed parent and OPSIN-checks each
+    candidate name; on the 60 slowest molecules of a 7,000-row sample it ran 321 times and
+    enumerated 61,083 isomers (15 % of that time). Its result depends only on the input
+    structure, so within one naming scope the same molecule (canonical isomeric SMILES) is
+    named once. Outside a scope, or when the key cannot be built, the impl runs directly."""
+    if mol is None:
+        return None
+    try:
+        from ..assembly.memo import _cache_var, cache_or_compute
+        if _cache_var.get() is None:
+            return _name_c_substituted_sugar_impl(mol, canonical_smiles)
+        key = (Chem.MolToSmiles(mol), canonical_smiles)
+    except Exception:
+        return _name_c_substituted_sugar_impl(mol, canonical_smiles)
+    return cache_or_compute("sugar_c_substituted", key,
+                            lambda: _name_c_substituted_sugar_impl(mol, canonical_smiles))
+
+
+def _name_c_substituted_sugar_impl(mol, canonical_smiles: str) -> Optional[str]:
     """C-substituted monosaccharide (BB /.3.2).
 
     A non-terminal ring carbon bearing an extra C-substituent (or a halogen):
@@ -3825,7 +3847,7 @@ def name_amino_deoxy_open_sugar(mol, canonical_smiles: str) -> Optional[str]:
     try:
         Chem.SanitizeMol(rw)
         parent = Chem.RemoveHs(rw)
-        parent_canon = Chem.CanonSmiles(Chem.MolToSmiles(parent))
+        parent_canon = canon_smiles(Chem.MolToSmiles(parent))
     except Exception:
         return None
     parent_mol = Chem.MolFromSmiles(parent_canon)
@@ -3986,7 +4008,7 @@ def name_glycosyloxy_aglycone(mol, canonical_smiles: str) -> Optional[str]:
             at.SetNumExplicitHs(3)
     try:
         Chem.SanitizeMol(rw)
-        aglycone_ether = Chem.CanonSmiles(Chem.MolToSmiles(Chem.RemoveHs(rw)))
+        aglycone_ether = canon_smiles(Chem.MolToSmiles(Chem.RemoveHs(rw)))
     except Exception:
         return None
     from orthonym import name_compound
@@ -4171,7 +4193,7 @@ def name_c_glycosyl_aglycone(mol, canonical_smiles: str) -> Optional[str]:
                 at.SetNumExplicitHs(3)
         try:
             Chem.SanitizeMol(rw)
-            agl_methyl = Chem.CanonSmiles(Chem.MolToSmiles(Chem.RemoveHs(rw)))
+            agl_methyl = canon_smiles(Chem.MolToSmiles(Chem.RemoveHs(rw)))
         except Exception:
             return None
         from orthonym import name_compound
@@ -4368,7 +4390,7 @@ def name_sugar_o_methyl(mol, canonical_smiles: str) -> Optional[str]:
         rw.RemoveAtom(m_idx)
     try:
         Chem.SanitizeMol(rw)
-        residual_canon = Chem.CanonSmiles(Chem.MolToSmiles(Chem.RemoveHs(rw)))
+        residual_canon = canon_smiles(Chem.MolToSmiles(Chem.RemoveHs(rw)))
     except Exception:
         return None
     residual_mol = Chem.MolFromSmiles(residual_canon)
@@ -4515,7 +4537,7 @@ def name_glycosylamine(mol, canonical_smiles: str) -> Optional[str]:
     rmol = Chem.MolFromSmiles(residual)
     if rmol is None:
         return None
-    sugar = name_free_sugar(rmol, Chem.CanonSmiles(residual))
+    sugar = name_free_sugar(rmol, canon_smiles(residual))
     if not sugar or not sugar.endswith("ose"):
         return None
     candidate = sugar[:-1] + "ylamine"  # -ose -> -osylamine
@@ -4590,7 +4612,7 @@ def name_glycosyl_halide(mol, canonical_smiles: str) -> Optional[str]:
     rmol = Chem.MolFromSmiles(residual)
     if rmol is None:
         return None
-    sugar = name_free_sugar(rmol, Chem.CanonSmiles(residual))
+    sugar = name_free_sugar(rmol, canon_smiles(residual))
     if not sugar or not sugar.endswith("ose"):
         return None
     candidate = f"{sugar[:-1]}yl {word}"  # -ose -> -osyl <halide>

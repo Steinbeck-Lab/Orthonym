@@ -24,6 +24,7 @@ from ..perception.molcache import (  # audit 2026-09-03 (S2): per-call atom/bond
     atoms_of,
     bonds_of,
 )
+from ..perception.molcache import canon_smiles
 
 # ---------------------------------------------------------------------------
 # Saturation/modification prefixes that must not be preceded by "di"
@@ -92,7 +93,7 @@ _MULTI_BRIDGE_NAMES: Dict[Tuple[str, int, int], str] = {
 # single source of truth (a phase reuse pattern). See
 # internal notes-B.md for the registry-coverage verification that confirms
 # all 4 previously-hardcoded SMILES are present in the registry when
-# accessed via Chem.CanonSmiles(...).
+# accessed via canon_smiles(...).
 
 
 def _resolve_parent_name(canon_smiles: str) -> Optional[Tuple[str, int]]:
@@ -591,7 +592,7 @@ def _try_acyclic_heteroatom_bridge(mol) -> Optional[str]:
         if fragments is None:
             continue
         smi_a, smi_b, _conn_a, _conn_b = fragments
-        if Chem.CanonSmiles(smi_a) != Chem.CanonSmiles(smi_b):
+        if canon_smiles(smi_a) != canon_smiles(smi_b):
             continue
 
         # Amine arms only for the chalcogen bridges (BB "2,2'-oxydi(ethan-1-
@@ -844,8 +845,8 @@ def _try_group14_hydride_bridge(mol) -> Optional[str]:
         if fragments is None:
             continue
         smi_a, smi_b, _ca, _cb = fragments
-        canon_a = Chem.CanonSmiles(smi_a)
-        if canon_a != Chem.CanonSmiles(smi_b):
+        canon_a = canon_smiles(smi_a)
+        if canon_a != canon_smiles(smi_b):
             continue
         unit = _group14_hydride_unit_name(canon_a)
         if unit is None:
@@ -990,7 +991,7 @@ def _try_triyl_two_atom_bridge(mol, ring_atoms: set) -> Optional[str]:
     Fail-closed: both bridge carbons non-ring/neutral, ring-attachment
     pattern (2,1), no other heavy substituents, all three fragments
     identical, all three attachment locants equal."""
-    for bond in mol.GetBonds():
+    for bond in bonds_of(mol):
         a1, a2 = bond.GetBeginAtom(), bond.GetEndAtom()
         if a1.GetSymbol() != 'C' or a2.GetSymbol() != 'C':
             continue
@@ -1037,7 +1038,7 @@ def _try_triyl_two_atom_bridge(mol, ring_atoms: set) -> Optional[str]:
                                      sanitizeFrags=True)
         if len(frag_mols) != 3:
             continue
-        canon_set = {Chem.CanonSmiles(Chem.MolToSmiles(f)) for f in frag_mols}
+        canon_set = {canon_smiles(Chem.MolToSmiles(f)) for f in frag_mols}
         if len(canon_set) != 1:
             continue
         parent_name = _name_parent(canon_set.pop())
@@ -1097,8 +1098,8 @@ def _try_methylenebis_oxy_bridge(mol, ring_atoms: set) -> Optional[str]:
         if fragments is None:
             continue
         smi_a, smi_b, _ca, _cb = fragments
-        canon_a = Chem.CanonSmiles(smi_a)
-        if canon_a != Chem.CanonSmiles(smi_b):
+        canon_a = canon_smiles(smi_a)
+        if canon_a != canon_smiles(smi_b):
             continue
         result = _resolve_unit_and_assemble(
             mol, [o.GetIdx() for o in heavy], ring_conns, [idx],
@@ -1168,8 +1169,8 @@ def _try_oxybis_azanylylidenemethanylylidene_bridge(
         if fragments is None:
             continue
         smi_a, smi_b, _ca, _cb = fragments
-        canon_a = Chem.CanonSmiles(smi_a)
-        if canon_a != Chem.CanonSmiles(smi_b):
+        canon_a = canon_smiles(smi_a)
+        if canon_a != canon_smiles(smi_b):
             continue
         result = _resolve_unit_and_assemble(
             mol, bridge_idxs, ring_conns, [],
@@ -1233,8 +1234,8 @@ def _try_chalcogenbis_methylene_bridge(mol, ring_atoms: set) -> Optional[str]:
         if fragments is None:
             continue
         smi_a, smi_b, _ca, _cb = fragments
-        canon_a = Chem.CanonSmiles(smi_a)
-        if canon_a != Chem.CanonSmiles(smi_b):
+        canon_a = canon_smiles(smi_a)
+        if canon_a != canon_smiles(smi_b):
             continue
         result = _resolve_unit_and_assemble(
             mol, [c.GetIdx() for c in heavy], ring_conns, [idx],
@@ -1284,8 +1285,8 @@ def _try_silanediyl_methylene_bridge(mol, ring_atoms: set) -> Optional[str]:
         if fragments is None:
             continue
         smi_a, smi_b, _ca, _cb = fragments
-        canon_a = Chem.CanonSmiles(smi_a)
-        if canon_a != Chem.CanonSmiles(smi_b):
+        canon_a = canon_smiles(smi_a)
+        if canon_a != canon_smiles(smi_b):
             continue
         result = _resolve_unit_and_assemble(
             mol, [c.GetIdx() for c in heavy], ring_conns, [idx],
@@ -1806,8 +1807,8 @@ def _try_single_atom_bridges(mol, ring_atoms: set) -> Optional[str]:
         frag_smiles_a, frag_smiles_b, conn_atom_a, conn_atom_b = fragments
 
         # Check if fragments are identical
-        canon_a = Chem.CanonSmiles(frag_smiles_a)
-        canon_b = Chem.CanonSmiles(frag_smiles_b)
+        canon_a = canon_smiles(frag_smiles_a)
+        canon_b = canon_smiles(frag_smiles_b)
         if canon_a != canon_b:
             continue
 
@@ -2169,7 +2170,7 @@ def _resolve_unit_and_assemble(
 
 def _try_two_atom_bridges(mol, ring_atoms: set) -> Optional[str]:
     """Try to find two-atom bridges (e.g., CH2-CH2 ethylene) between identical ring systems."""
-    for bond in mol.GetBonds():
+    for bond in bonds_of(mol):
         a1 = bond.GetBeginAtom()
         a2 = bond.GetEndAtom()
         idx1 = a1.GetIdx()
@@ -2214,8 +2215,8 @@ def _try_two_atom_bridges(mol, ring_atoms: set) -> Optional[str]:
         frag_smiles_a, frag_smiles_b = fragments
 
         # Check if fragments are identical
-        canon_a = Chem.CanonSmiles(frag_smiles_a)
-        canon_b = Chem.CanonSmiles(frag_smiles_b)
+        canon_a = canon_smiles(frag_smiles_a)
+        canon_b = canon_smiles(frag_smiles_b)
         if canon_a != canon_b:
             continue
 
@@ -2737,7 +2738,7 @@ def _try_multi_atom_bridges(mol, ring_atoms: set) -> Optional[str]:
 
         # Check all fragments are identical
         canon_smiles_list = [Chem.MolToSmiles(f) for f in frag_mols]
-        canon_set = set(Chem.CanonSmiles(s) for s in canon_smiles_list)
+        canon_set = set(canon_smiles(s) for s in canon_smiles_list)
         if len(canon_set) != 1:
             continue  # Non-identical fragments
 

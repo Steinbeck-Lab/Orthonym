@@ -66,6 +66,7 @@ from .naming_utils import (
     get_multiplier_prefix,
     is_complex_substituent,
 )
+from ..perception.smarts_cache import compiled as _compiled_smarts
 
 # Lazy import of SEED_TABLE / SubstitutionType inside function bodies (Pattern S3)
 # to avoid circular-import risk if data/ initialization is not finished.
@@ -595,7 +596,7 @@ def _type_2b_check(
             return False
         matched = False
         for smarts in smarts_list:
-            pattern = Chem.MolFromSmarts(smarts)
+            pattern = _compiled_smarts(smarts)
             if pattern is not None and prefix_mol.HasSubstructMatch(pattern):
                 matched = True
                 break

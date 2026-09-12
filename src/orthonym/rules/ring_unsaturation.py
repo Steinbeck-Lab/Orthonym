@@ -61,6 +61,7 @@ from dataclasses import dataclass
 from typing import Dict, List, Optional, Tuple
 
 from rdkit import Chem
+from ..perception.molcache import bonds_of
 
 #: Whether a non-consecutively-numbered triple bond may be cited with the compound
 #: ``x(y)`` locant. Must stay False: (1) grants the compound locant to
@@ -117,7 +118,7 @@ def render_ring_unsaturation(
     double_pairs: List[Tuple[int, int]] = []
     triple_pairs: List[Tuple[int, int]] = []
 
-    for bond in mol.GetBonds():
+    for bond in bonds_of(mol):
         i, j = bond.GetBeginAtomIdx(), bond.GetEndAtomIdx()
         if i not in numbering or j not in numbering:
             continue

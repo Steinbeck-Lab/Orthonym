@@ -25,6 +25,7 @@ from ..assembly.naming_utils import get_alkyl_name
 from ..data.chain_names import get_acid_stem, get_chain_prefix
 from ..data.chain_names import get_alkyl_name as _chain_alkyl_name
 from ..data.trivial_acids import get_acylate_name
+from ..perception.smarts_cache import compiled as _compiled_smarts
 
 logger = logging.getLogger(__name__)
 
@@ -1568,7 +1569,7 @@ def find_ester_match(mol) -> Optional[tuple]:
     Returns:
         Tuple of atom indices for the ester, or None if no ester found
     """
-    pattern = Chem.MolFromSmarts("[CX3](=O)[OX2][#6]")
+    pattern = _compiled_smarts("[CX3](=O)[OX2][#6]")
     matches = mol.GetSubstructMatches(pattern)
     if matches:
         return matches[0]
@@ -1993,7 +1994,7 @@ def detect_exocyclic_esters(mol) -> List[dict]:
             "ring_attach_atom_idx": 3, "acyloxy_prefix": "acetyloxy"}]
         For ethyl acetate: returns  (no ring attachment)
     """
-    pattern = Chem.MolFromSmarts("[CX3](=O)[OX2][#6]")
+    pattern = _compiled_smarts("[CX3](=O)[OX2][#6]")
     matches = mol.GetSubstructMatches(pattern)
 
     results = []

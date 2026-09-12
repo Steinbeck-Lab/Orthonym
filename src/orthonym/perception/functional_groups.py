@@ -11,6 +11,7 @@ from collections import defaultdict
 from typing import Dict, List, Set, Tuple
 
 from rdkit import Chem
+from .molcache import atoms_of
 
 # SMARTS patterns ordered by IUPAC seniority to
 # First match = highest priority = principal group
@@ -641,6 +642,90 @@ for _fg_name, _smarts in FUNCTIONAL_GROUP_SMARTS.items():
         _COMPILED_FG_SMARTS[_fg_name] = _pat
 
 
+# ---- Lever C (2026-09-12): conservative element pre-filter for the SMARTS search ----------
+# A pattern can only match if every element it REQUIRES is present in the molecule. The
+# requirement is derived conservatively from the SMARTS text: an atom contributes an element
+# only when it names exactly one element with no OR (','), no NOT ('!') and no wildcard, and
+# every recursive SMARTS group ``$(...)`` is stripped first (it may be negated or OR-ed). So the
+# filter can only skip patterns that cannot match. ORTHONYM_FGFILTER=off disables it;
+# =verify also runs the skipped patterns and raises FGFilterMismatchError if one matches.
+import os as _os
+import re as _re
+from typing import Dict as _Dict, FrozenSet as _FrozenSet
+
+_FG_MODE = _os.environ.get("ORTHONYM_FGFILTER", "on").strip().lower()
+if _FG_MODE not in ("on", "off", "verify"):
+    _FG_MODE = "on"
+
+
+class FGFilterMismatchError(AssertionError):
+    """Verify mode: the element pre-filter would have skipped a pattern that matches."""
+
+
+_ORGANIC_Z = {"B": 5, "C": 6, "N": 7, "O": 8, "P": 15, "S": 16, "F": 9, "Cl": 17, "Br": 35, "I": 53}
+_BRACKET_RE = _re.compile(r"\[([^\]]*)\]")
+_PLAIN_RE = _re.compile(r"Cl|Br|[BCNOPSFI]|[cnops]")
+_ELEM_RE = _re.compile(r"(Cl|Br|Si|Se|Te|As|Ge|Sn|Pb|Sb|Bi|Al|Ga|In|Tl|[BCNOPSFI]|[cnops])")
+
+
+def _strip_recursive_smarts(s: str) -> str:
+    """Remove every ``$(...)`` group (balanced parentheses), whatever its sign."""
+    out = []
+    i = 0
+    while i < len(s):
+        if s.startswith("$(", i):
+            depth = 0
+            j = i + 1
+            while j < len(s):
+                if s[j] == "(":
+                    depth += 1
+                elif s[j] == ")":
+                    depth -= 1
+                    if depth == 0:
+                        break
+                j += 1
+            i = j + 1
+        else:
+            out.append(s[i])
+            i += 1
+    return "".join(out)
+
+
+def _required_elements(smarts: str) -> _FrozenSet[int]:
+    """Atomic numbers every match of *smarts* must contain (conservative, see above)."""
+    s = _strip_recursive_smarts(smarts)
+    req = set()
+    pt = Chem.GetPeriodicTable()
+    for m in _BRACKET_RE.finditer(s):
+        body = m.group(1)
+        if any(t in body for t in (",", "!", "*")):
+            continue
+        prim = body.split(";")[0].split("&")[0]
+        mm = _re.match(r"#(\d+)", prim)
+        if mm:
+            req.add(int(mm.group(1)))
+            continue
+        mm = _ELEM_RE.match(prim)
+        if mm:
+            sym = mm.group(1)
+            req.add(_ORGANIC_Z.get(sym.capitalize(), pt.GetAtomicNumber(sym.capitalize())))
+    rest = _BRACKET_RE.sub(" ", s)
+    if "*" in rest:
+        return frozenset(req)
+    for sym in _PLAIN_RE.findall(rest):
+        req.add(_ORGANIC_Z[sym.capitalize()])
+    return frozenset(req)
+
+
+_REQUIRED_ELEMENTS: _Dict[str, _FrozenSet[int]] = {
+    _n: _required_elements(FUNCTIONAL_GROUP_SMARTS[_n]) for _n in _COMPILED_FG_SMARTS
+}
+
+
+def _mol_elements(mol) -> _FrozenSet[int]:
+    return frozenset(a.GetAtomicNum() for a in atoms_of(mol))
+
+
 # W3-P06 / /: anhydride BRIDGE variants whose bridge
 # is NOT the carbon/O-only single O of the base ANHYDRIDE_SMARTS
 # ([CX3](=O)[OX2][CX3](=O)). Each match is FOLDED into the 'anhydride'
@@ -753,7 +838,12 @@ def _detect_functional_groups_impl(mol) -> Dict[str, List[Tuple[int, ...]]]:
     """
     results = defaultdict(list)
 
+    have = _mol_elements(mol) if _FG_MODE != "off" else None
     for fg_name, pattern in _COMPILED_FG_SMARTS.items():
+        if have is not None and not _REQUIRED_ELEMENTS[fg_name] <= have:
+            if _FG_MODE == "verify" and mol.GetSubstructMatches(pattern, uniquify=True):
+                raise FGFilterMismatchError(fg_name)
+            continue
         matches = mol.GetSubstructMatches(pattern, uniquify=True)
         for match in matches:
             results[fg_name].append(match)
@@ -940,7 +1030,7 @@ def _reclassify_ring_heterols(mol, results) -> None:
     # (c) -OOH on a ring heteroatom (no carbon-only SMARTS covers it) -> hydroperoxide
     # -peroxol. Detect structurally: a terminal O(H)-O- whose inner O is bonded to
     # a ring N/S/... heteroatom. hydroperoxide tuple is (O_outer, O_inner, bearer).
-    for atom in mol.GetAtoms():
+    for atom in atoms_of(mol):
         if atom.GetSymbol() != 'O' or atom.GetTotalNumHs() != 1 or atom.IsInRing():
             continue
         nbrs = [nb for nb in atom.GetNeighbors()]
@@ -990,12 +1080,39 @@ def detect_functional_groups(mol) -> Dict[str, List[Tuple[int, ...]]]:
     """
     cached = _FG_CACHE.get(mol)
     if cached is None:
-        cached = _detect_functional_groups_impl(mol)
+        cached = _detect_by_structure(mol)
         try:
             _FG_CACHE[mol] = cached
         except TypeError:                     # mol not weakref-able (defensive) — skip cache
             return cached
     return {k: list(v) for k, v in cached.items()}
+
+
+def _detect_by_structure(mol):
+    """Lever K (2026-09-12): a second cache level keyed by the fragment's canonical SMILES plus
+    RDKit's atom output order, i.e. by the IDENTICAL indexed graph (the same argument the
+    fused_core memo uses). Fragment mols are new objects on every cut, so the weak-key level
+    above misses; two objects with the same indexed graph get the same index tuples. Scope =
+    one naming call (assembly.memo). RWMol is never cached. FGFILTER verify mode recomputes and
+    compares on a hit."""
+    if _FG_MODE == "off" or isinstance(mol, Chem.RWMol):
+        return _detect_functional_groups_impl(mol)
+    try:
+        from ..assembly.memo import cache_or_compute, _cache_var
+        if _cache_var.get() is None:
+            return _detect_functional_groups_impl(mol)
+        smi = Chem.MolToSmiles(mol)
+        key = (smi, mol.GetProp("_smilesAtomOutputOrder") if mol.HasProp("_smilesAtomOutputOrder") else None)
+        if key[1] is None:
+            return _detect_functional_groups_impl(mol)
+    except Exception:
+        return _detect_functional_groups_impl(mol)
+    result = cache_or_compute("fg_detect", key, lambda: _detect_functional_groups_impl(mol))
+    if _FG_MODE == "verify":
+        fresh = _detect_functional_groups_impl(mol)
+        if dict(fresh) != dict(result):
+            raise FGFilterMismatchError(("fg_detect cache", key[0]))
+    return result
 
 
 def detect_features(mol) -> Dict[str, List[Tuple[int, ...]]]:

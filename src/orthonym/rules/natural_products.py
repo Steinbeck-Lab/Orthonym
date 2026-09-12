@@ -289,6 +289,15 @@ def name_natural_product(mol) -> Optional[str]:
     if exact_name is not None:
         return exact_name
 
+    # Step 2b: carotene parent retained name (β,γ,ε,κ,φ,χ,ψ end-group
+    # pairs) by exact InChIKey. Stereo-exact -> only the fundamental all-E parent
+    # matches; cis/modified carotenoids fall through to systematic (fail-closed).
+    # The Greek name is OPSIN-RT gated downstream, so a mismatch cannot ship.
+    from ..data.natural_products import get_carotene_parent_name
+    carotene_name = get_carotene_parent_name(mol)
+    if carotene_name is not None:
+        return carotene_name
+
     # Step 3: Scaffold substructure match
     scaffold_info = detect_natural_product(mol)
     if scaffold_info is None:

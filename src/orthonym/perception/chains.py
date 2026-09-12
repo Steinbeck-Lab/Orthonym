@@ -12,6 +12,7 @@ from typing import Dict, List, Optional, Set, Tuple
 from rdkit import Chem
 
 from ..rules.lambda_convention import nonstandard_bonding_number
+from .molcache import atoms_of
 
 # a phase (heteroatom-only-suffix acids): characteristic-heteroatom
 # (atomic number) for FG classes whose SMARTS matches S/P + O with NO carbon
@@ -121,7 +122,7 @@ def find_all_carbon_chains(
         visited.discard(atom_idx)
 
     # Start DFS from each carbon atom to find all possible chains
-    for atom in mol.GetAtoms():
+    for atom in atoms_of(mol):
         if atom.GetSymbol() == 'C' and atom.GetIdx() not in exclude:
             dfs(atom.GetIdx(), set(), [])
 
@@ -304,7 +305,7 @@ def find_longest_skeletal_chain(
         visited.discard(atom_idx)
 
     results: List[List[int]] = [[]]
-    for atom in mol.GetAtoms():
+    for atom in atoms_of(mol):
         if atom.GetAtomicNum() in _SKELETAL_ATOMS and atom.GetIdx() not in exclude:
             dfs(atom.GetIdx(), set(), [], results)
 

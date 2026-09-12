@@ -51,6 +51,7 @@ from .naming_utils import (
     enclose_if_compound,
     get_alkyl_name,
 )
+from ..perception.smarts_cache import compiled as _compiled_smarts
 
 # Chain prefixes for ether alkoxy naming (match ALKYL_NAMES pattern).
 # Lifted from rules/polyfunctional.py:52-63 verbatim.
@@ -2026,7 +2027,7 @@ def _ensure_patterns_cached() -> None:
 
         for fg_name in _PREFIX_FORM_FG_NAMES:
             if fg_name in FUNCTIONAL_GROUP_SMARTS:
-                _PREFIX_FORM_PATTERNS[fg_name] = Chem.MolFromSmarts(
+                _PREFIX_FORM_PATTERNS[fg_name] = _compiled_smarts(
                     FUNCTIONAL_GROUP_SMARTS[fg_name]
                 )
 

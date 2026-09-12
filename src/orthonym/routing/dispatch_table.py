@@ -59,6 +59,7 @@ logger = logging.getLogger(__name__)
 # ``orthonym.routing -> orthonym.rules -> orthonym.namer -> orthonym.routing``
 # load order. ``rdkit.Chem`` is a third-party module so eager import is safe.
 from rdkit import Chem  # noqa: F401 -- type annotation only
+from ..perception.molcache import inchikey_of
 
 # ---------------------------------------------------------------------------
 # Section 2: StoutClass(StrEnum)
@@ -916,7 +917,7 @@ def _handle_anion_small(mol, smiles, canonical_smiles, features=None, *,
         back = opsin_parse(ester_anion)
         if back:
             bm = Chem.MolFromSmiles(back)
-            if bm is not None and Chem.MolToInchiKey(bm) == Chem.MolToInchiKey(mol):
+            if bm is not None and Chem.MolToInchiKey(bm) == inchikey_of(mol):
                 validated = _validate_anion_name(mol, ester_anion)
                 if validated:
                     return validated
@@ -1014,7 +1015,7 @@ def _handle_poly_anion(mol, smiles, canonical_smiles, features=None, *,
         back = opsin_parse(ester_anion)
         if back:
             bm = Chem.MolFromSmiles(back)
-            if bm is not None and Chem.MolToInchiKey(bm) == Chem.MolToInchiKey(mol):
+            if bm is not None and Chem.MolToInchiKey(bm) == inchikey_of(mol):
                 from orthonym.rules.ions import _validate_anion_name
                 validated = _validate_anion_name(mol, ester_anion)
                 if validated:            # FINDING 3: _validate_anion_name may return
@@ -1425,7 +1426,7 @@ def _rt_full_match(name: str, mol) -> bool:
         om = Chem.MolFromSmiles(osmi)
         if om is None:
             return False
-        return Chem.MolToInchiKey(om) == Chem.MolToInchiKey(mol)
+        return Chem.MolToInchiKey(om) == inchikey_of(mol)
     except Exception:
         return False
 

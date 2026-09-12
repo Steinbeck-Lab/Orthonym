@@ -375,6 +375,7 @@ def _spiro_atom_locant_set(mol: Chem.Mol, system_atoms: Set[int]) -> Tuple[int, 
 
 
 import re as _re
+from ..perception.molcache import atoms_of, bonds_of, cached_by_key
 
 # Fixed width for the fusion-descriptor letter / number terms. Padded with a
 # high sentinel so a system WITH (lower) descriptor letters/numbers wins the tie
@@ -551,6 +552,24 @@ def ring_system_score(
     mol: Chem.Mol,
     system_atoms: Set[int]
 ) -> tuple:
+    """Memoised per (mol object, ring-system atom set) within one naming call (Lever E,
+    2026-09-12). The key also carries what the score reads from the live molecule (element,
+    aromatic flag and charge of the system's atoms; type and aromatic flag of its bonds), so an
+    in-place edit forces a recompute. See:func:`_ring_system_score_impl` for the scoring."""
+    sys_atoms = tuple(sorted(system_atoms))
+    sset = system_atoms if isinstance(system_atoms, (set, frozenset)) else set(system_atoms)
+    atoms = atoms_of(mol)
+    sig_atoms = tuple((atoms[i].GetAtomicNum(), atoms[i].GetIsAromatic(), atoms[i].GetFormalCharge()) for i in sys_atoms)
+    sig_bonds = tuple((int(b.GetBondType()), b.GetIsAromatic()) for b in bonds_of(mol)
+                      if b.GetBeginAtomIdx() in sset and b.GetEndAtomIdx() in sset)
+    return cached_by_key(mol, "ring_selection.score", (sys_atoms, mol.GetNumAtoms(), sig_atoms, sig_bonds),
+                         lambda: _ring_system_score_impl(mol, system_atoms))
+
+
+def _ring_system_score_impl(
+    mol: Chem.Mol,
+    system_atoms: Set[int]
+) -> tuple:
     """Score a ring system for principal ring system selection.
 
     Returns a scoring tuple where ALL values are arranged so that
@@ -650,7 +669,7 @@ def ring_system_score(
     # so AROMATIC must count as multiple or an aromatic ring scores zero.
     num_multiple_bonds = 0
     num_double_bonds = 0
-    for bond in mol.GetBonds():
+    for bond in bonds_of(mol):
         a, b = bond.GetBeginAtomIdx(), bond.GetEndAtomIdx()
         if a not in system_atoms or b not in system_atoms:
             continue
@@ -731,7 +750,7 @@ def _ylidene_linked_parent_ring(
         return None
 
     matches: List[Tuple[int, int]] = []  # (double_ring_idx, single_ring_idx)
-    for atom in mol.GetAtoms():
+    for atom in atoms_of(mol):
         if atom.GetSymbol() != 'C' or atom.IsInRing():
             continue
         if atom.GetFormalCharge() != 0:

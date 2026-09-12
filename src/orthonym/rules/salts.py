@@ -28,6 +28,7 @@ from ..errors import is_failure_name
 from ..perception.ions import get_ion_sites, parse_salt_fragments
 from ..perception.metals import assembly_has_out_of_scope_metal
 from .ions import name_anion, name_cation
+from ..perception.smarts_cache import compiled as _compiled_smarts
 
 # B2: basic (protonatable) amine nitrogen -- an sp3 N that is not an amide,
 # sulfonamide, N-oxide/N-N/N-halide, nitro, or already-charged/aromatic N. Used
@@ -1052,7 +1053,7 @@ def _is_amino_acid_zwitterion(mol) -> bool:
     """
     # Check alpha, beta, and gamma patterns
     for smarts in (ALPHA_AA_ZWITTERION, BETA_AA_ZWITTERION, GAMMA_AA_ZWITTERION):
-        pattern = Chem.MolFromSmarts(smarts)
+        pattern = _compiled_smarts(smarts)
         if pattern is not None and mol.HasSubstructMatch(pattern):
             return True
 

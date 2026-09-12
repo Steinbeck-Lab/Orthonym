@@ -29,6 +29,7 @@ from typing import Any, Dict, List, Optional, Set, Tuple, Union
 from rdkit import Chem
 
 from ..perception.molcache import atoms_of  # audit 2026-09-03 (S2): per-call atom/bond tuples
+from ..perception.smarts_cache import compiled as _compiled_smarts
 
 # Saturation prefix mapping based on number of added hydrogens
 # Each sp3 carbon in ring adds 2 hydrogens vs aromatic parent
@@ -1302,7 +1303,7 @@ def name_hydro_fused_chalcogen_suffix(mol: Chem.Mol) -> Optional[str]:
     for atom in atoms_of(mol):
         if atom.GetFormalCharge() != 0 or atom.GetNumRadicalElectrons() != 0:
             return None
-    patt = Chem.MolFromSmarts("[OX2H][OX2][CX4;R]")
+    patt = _compiled_smarts("[OX2H][OX2][CX4;R]")
     matches = mol.GetSubstructMatches(patt)
     if len(matches) != 1:
         return None

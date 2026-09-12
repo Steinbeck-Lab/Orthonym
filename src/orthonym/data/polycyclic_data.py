@@ -28,6 +28,7 @@ Partially saturated PAHs:
 """
 
 from typing import Any, Dict, List, Optional, Set, Tuple
+from ..perception.smarts_cache import compiled as _compiled_smarts
 
 # Polycyclic aromatic hydrocarbon data
 # Key: retained name
@@ -581,7 +582,7 @@ def match_polycyclic_core(mol) -> Optional[Tuple[str, Dict[int, int]]]:
 
     for pah_name, pah_data in pah_by_size:
         smarts = pah_data['smarts']
-        pattern = Chem.MolFromSmarts(smarts)
+        pattern = _compiled_smarts(smarts)
         if pattern is None:
             continue
 
@@ -630,7 +631,7 @@ def get_pah_core_atoms(mol, pah_name: str) -> Optional[Set[int]]:
 
     pah_data = POLYCYCLIC_DATA[pah_name]
     smarts = pah_data['smarts']
-    pattern = Chem.MolFromSmarts(smarts)
+    pattern = _compiled_smarts(smarts)
 
     if pattern is None:
         return None

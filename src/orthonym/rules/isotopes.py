@@ -233,7 +233,7 @@ def _isotope_round_trips(candidate_name: str, original_mol: Chem.Mol,
         # genuinely unavailable for a side (no regression).
         from rdkit.Chem import inchi as _inchi
         _ik_p = _inchi.MolToInchiKey(parsed)
-        _ik_o = _inchi.MolToInchiKey(original_mol)
+        _ik_o = inchikey_of(original_mol)
         if _ik_p and _ik_o:
             return _ik_p == _ik_o
         return True
@@ -253,6 +253,20 @@ _INDICATED_H_PREFIX_RE = re.compile(r"-\d+H-")
 #: fused-ring substituent (indol-2-yl carrying ¹³C) had nowhere legal to place its
 #: descriptor and failed closed (a review review 2026-09-08).
 _BRACKET_INDICATED_H_RE = re.compile(r"[(\[{]\d+H-")
+
+#: An interior sub-parent introduced by its OWN locant set, e.g. the ``-1,4-`` of
+#: ``3,6-dimethyl-1,4-dioxane-2,5-dione`` or the ``-1,3-`` of
+#: ``2,4-dioxo-1,3-diazaspiro[4.7]dodecane``. A nuclide ON that sub-parent puts its
+#: descriptor immediately before the sub-parent: "inserted before the
+#: part... that is isotopically substituted"), replacing the introducing hyphen:
+#: ``3,6-dimethyl`` + ``(2H2)`` + ``-1,4-dioxane-2,5-dione``. That slot begins with
+#: a digit, so it was covered by neither the alphabetic-start rule nor the
+#: indicated-H rules, and a labelled interior ring failed closed. More targeted
+#: than "every hyphen before a digit": the locant set must itself be followed by a
+#: hyphen and a stem letter (``[\d,]+-[a-z]``), so a plain substituent locant like
+#: the ``-2-`` of ``prop-2-en`` is not offered. Every candidate stays OPSIN-RT
+#: gated by the caller, so any surplus offset can only be discarded, never shipped.
+_INTERIOR_LOCANT_STEM_RE = re.compile(r"-(?=[\d,]+-[a-z])")
 
 
 def _insertion_offsets(skel: str) -> List[int]:
@@ -282,6 +296,10 @@ def _insertion_offsets(skel: str) -> List[int]:
     offer is the hyphen's own index: ``1-methyl-2-nitro`` + ``(3-2H1)`` +
     ``-1H-pyrrole``.
 
+    A third gap is an interior sub-parent introduced by its own locant set
+    (``-1,4-dioxane``): a nuclide on that ring needs the slot before its locant
+    set, which begins with a digit -- see ``_INTERIOR_LOCANT_STEM_RE``.
+
     Every candidate built from these offsets is still OPSIN-round-trip gated by
     the caller, so a surplus offset can only ever be discarded, never shipped.
     """
@@ -291,6 +309,10 @@ def _insertion_offsets(skel: str) -> List[int]:
     # (before the digit), so '(1H-indol-2-yl)…' can take '((desc)-1H-indol-2-yl)…'
     # -> escalated to '[(desc)-1H-indol-2-yl]…'.
     offsets.extend(m.start() + 1 for m in _BRACKET_INDICATED_H_RE.finditer(skel))
+    # An interior sub-parent introduced by its own locant set: offer the slot at
+    # the introducing hyphen so a nuclide on that ring can place its descriptor
+    # (e.g. '3,6-dimethyl' + '(2H2)' + '-1,4-dioxane-2,5-dione'). RT-gated.
+    offsets.extend(m.start() for m in _INTERIOR_LOCANT_STEM_RE.finditer(skel))
     return sorted(set(offsets))
 
 
@@ -445,6 +467,7 @@ _LEADING_STEREO_PREFIX_RE = re.compile(r"^(?:\([^)]*\)-|rel-|rac-|cis-|trans-)*"
 # set is taken from HW_PREFIXES so it stays in sync with the data (all end in 'a',
 # so they cannot false-match the common detachable prefixes oxo-/azido-/thio-).
 from ..data.hw_heteroatoms import HW_PREFIXES as _HW_PREFIXES
+from ..perception.molcache import inchikey_of
 _A_PREFIX_ALT = "|".join(sorted(set(_HW_PREFIXES.values()), key=len, reverse=True))
 _LEADING_SKELETAL_LOCANT_RE = re.compile(
     r"^\d+(?:,\d+)*-(?:di|tri|tetra|penta|hexa|hepta|octa|nona|deca)?"

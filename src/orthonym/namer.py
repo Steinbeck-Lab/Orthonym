@@ -965,7 +965,7 @@ def _self_consistency_skeleton(smiles: str) -> Optional[str]:
         if mol is None:
             return None
         from rdkit.Chem import inchi
-        ik = inchi.MolToInchiKey(mol)
+        ik = inchikey_of(mol)
         return ik.split("-")[0] if ik else None
     except Exception:
         return None
@@ -990,7 +990,7 @@ def _self_consistency_full_key(smiles: str) -> Optional[str]:
         if mol is None:
             return None
         from rdkit.Chem import inchi
-        return inchi.MolToInchiKey(mol) or None
+        return inchikey_of(mol) or None
     except Exception:
         return None
 
@@ -1867,11 +1867,11 @@ def _get_sugar_smarts():
     global _PYRANOSE_SMARTS, _FURANOSE_SMARTS, _RING_OH_SMARTS
     if _PYRANOSE_SMARTS is None:
         # 6-membered ring with 1 O and 5 C (pyranose)
-        _PYRANOSE_SMARTS = Chem.MolFromSmarts("[OX2;r6]1[CX4][CX4][CX4][CX4][CX4]1")
+        _PYRANOSE_SMARTS = _compiled_smarts("[OX2;r6]1[CX4][CX4][CX4][CX4][CX4]1")
         # 5-membered ring with 1 O and 4 C (furanose)
-        _FURANOSE_SMARTS = Chem.MolFromSmarts("[OX2;r5]1[CX4][CX4][CX4][CX4]1")
+        _FURANOSE_SMARTS = _compiled_smarts("[OX2;r5]1[CX4][CX4][CX4][CX4]1")
         # OH group on a ring carbon
-        _RING_OH_SMARTS = Chem.MolFromSmarts("[C;r]([OX2H])")
+        _RING_OH_SMARTS = _compiled_smarts("[C;r]([OX2H])")
     return _PYRANOSE_SMARTS, _FURANOSE_SMARTS, _RING_OH_SMARTS
 
 
@@ -2523,6 +2523,8 @@ def validate_binding_proof(value: str) -> str:
 
 
 import functools as _functools
+from .perception.molcache import inchikey_of, bonds_of
+from .perception.smarts_cache import compiled as _compiled_smarts
 
 
 def _budget_scope(fn):
@@ -7332,7 +7334,7 @@ class Orthonym:
     def _find_double_bonds(self, mol) -> List[tuple]:
         """Find all C=C double bonds."""
         double_bonds = []
-        for bond in mol.GetBonds():
+        for bond in bonds_of(mol):
             if bond.GetBondType() == Chem.BondType.DOUBLE:
                 begin = bond.GetBeginAtom()
                 end = bond.GetEndAtom()
@@ -7347,7 +7349,7 @@ class Orthonym:
     def _find_triple_bonds(self, mol) -> List[tuple]:
         """Find all C≡C triple bonds."""
         triple_bonds = []
-        for bond in mol.GetBonds():
+        for bond in bonds_of(mol):
             if bond.GetBondType() == Chem.BondType.TRIPLE:
                 begin = bond.GetBeginAtom()
                 end = bond.GetEndAtom()
@@ -7707,7 +7709,7 @@ def _coordination_retained_name(smiles: str) -> Optional[str]:
         mol = Chem.MolFromSmiles(smiles)
         if mol is None:
             return None
-        return COORDINATION_RETAINED.get(Chem.MolToInchiKey(mol))
+        return COORDINATION_RETAINED.get(inchikey_of(mol))
     except Exception:  # pragma: no cover - a lookup must never break naming
         return None
 

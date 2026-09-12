@@ -461,6 +461,67 @@ def get_natural_product_name(canonical_smiles: str) -> Optional[str]:
 
 
 # ---------------------------------------------------------------------------
+# carotene parent retained names (semisystematic PINs)
+# ---------------------------------------------------------------------------
+# The 28 fundamental C40 carotene parents are all unordered pairs (with repetition)
+# of the seven Greek end groups; their names ARE the preferred IUPAC names for these
+# structures, the Blue Book). Keyed by full InChIKey (NOT canonical
+# SMILES like NATURAL_PRODUCT_DERIVATIVES) because carotene parents are stereo-heavy
+# all-E polyenes: the key is stereo-EXACT, so only the fundamental all-E parent
+# matches and any cis/Z isomer or otherwise-modified carotenoid falls through to
+# systematic nomenclature (fail-closed). Each structure was derived from OPSIN 2.9.0
+# by parsing the retained name (the BB end-group figure is an OCR'd image, unreliable);
+# the emitted Greek name is OPSIN-round-trip gated downstream, so 0-wrong holds. The
+# end-group citation order β,γ,ε,κ,φ,χ,ψ was verified via OPSIN (it accepts
+# `gamma,epsilon-carotene` and rejects `epsilon,gamma-carotene`), which differs from
+# the BB figure-caption listing order. See a temp dir/carotene/ + internal notes
+CAROTENE_PARENT_INCHIKEYS: Dict[str, str] = {
+    "OENHQHLEOONYIE-JLTXGRSLSA-N": "β,β-carotene",  # C40H56
+    "AFQPSLVGGMCBOR-JLTXGRSLSA-N": "β,γ-carotene",  # C40H56
+    "ANVAOWXLWRTKGA-JLTXGRSLSA-N": "β,ε-carotene",  # C40H56
+    "YXPMTDBJGFHTAJ-VAHQMLLPSA-N": "β,κ-carotene",  # C40H58
+    "NMMZEYGYFYIADS-FOHJNKRASA-N": "β,φ-carotene",  # C40H52
+    "OBKAGPREMGURQY-GEWAIPMNSA-N": "β,χ-carotene",  # C40H52
+    "HRQKOYFGHJYEFS-BXOLYSJBSA-N": "β,ψ-carotene",  # C40H56
+    "UPYKUZBSLRQECL-JLTXGRSLSA-N": "γ,γ-carotene",  # C40H56
+    "HKIXSNKDGQIDMV-JLTXGRSLSA-N": "γ,ε-carotene",  # C40H56
+    "AKXHDOAEVLMWTJ-VAHQMLLPSA-N": "γ,κ-carotene",  # C40H58
+    "FKIFRECORUWNMO-FOHJNKRASA-N": "γ,φ-carotene",  # C40H52
+    "MLVWTMMDBYMZPK-GEWAIPMNSA-N": "γ,χ-carotene",  # C40H52
+    "BXGTZBNZDLKFGE-BXOLYSJBSA-N": "γ,ψ-carotene",  # C40H56
+    "QABFXOMOOYWZLZ-JLTXGRSLSA-N": "ε,ε-carotene",  # C40H56
+    "GUTQDIRQVYYCJD-VAHQMLLPSA-N": "ε,κ-carotene",  # C40H58
+    "XOGZFNHWNGWVBE-FOHJNKRASA-N": "ε,φ-carotene",  # C40H52
+    "JEFZSYHRXABKHJ-GEWAIPMNSA-N": "ε,χ-carotene",  # C40H52
+    "WGIYGODPCLMGQH-BXOLYSJBSA-N": "ε,ψ-carotene",  # C40H56
+    "YCVYBZPMNIFPBZ-KPCBSDJXSA-N": "κ,κ-carotene",  # C40H60
+    "GZGFCGQLOHSKAZ-TUMRVAJASA-N": "κ,φ-carotene",  # C40H54
+    "XRXXINNNOIEVJK-NHLGBAGNSA-N": "κ,χ-carotene",  # C40H54
+    "DKSMVHFABUSFKT-WUPHXZDJSA-N": "κ,ψ-carotene",  # C40H58
+    "ZCIHMQAPACOQHT-YSEOPJLNSA-N": "φ,φ-carotene",  # C40H48
+    "JYXWNSQXDWWFEW-DPIQMXNXSA-N": "φ,χ-carotene",  # C40H48
+    "VJASLAGEYVTOGS-IQAIWTHGSA-N": "φ,ψ-carotene",  # C40H52
+    "UKQDELXQDGFRFW-RIRRTMASSA-N": "χ,χ-carotene",  # C40H48
+    "WKDQYJFDVOVZMD-OHHJBUOSSA-N": "χ,ψ-carotene",  # C40H52
+    "OAIJSZIZWZSQBC-GYZMGTAESA-N": "ψ,ψ-carotene",  # C40H56
+}
+
+
+def get_carotene_parent_name(mol) -> Optional[str]:
+    """Retained carotene parent name for ``mol`` by exact InChIKey, or None.
+
+    Stereo-exact: only the all-E fundamental parent matches; a Z-isomer or a modified
+    carotenoid returns None and is named systematically (fail-closed). The Greek name
+    is OPSIN-round-trip gated by the caller, so a mismatch can never ship."""
+    from rdkit.Chem import inchi
+    try:
+        ik = inchi.MolToInchiKey(mol)
+    except Exception:
+        return None
+    return CAROTENE_PARENT_INCHIKEYS.get(ik) if ik else None
+
+
+# ---------------------------------------------------------------------------
 # 4. Pre-compiled RDKit Mol objects for substructure matching
 # ---------------------------------------------------------------------------
 

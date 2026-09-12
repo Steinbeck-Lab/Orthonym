@@ -26,6 +26,7 @@ from typing import Optional
 from rdkit import Chem
 
 from ..data.chain_names import get_chain_prefix
+from ..perception.smarts_cache import compiled as _compiled_smarts
 
 # Anhydride core SMARTS: C(=O)-O-C(=O)
 ANHYDRIDE_SMARTS = "[CX3](=O)[OX2][CX3](=O)"
@@ -89,7 +90,7 @@ def name_anhydride(features) -> Optional[str]:
         return _mi
 
     # Detect anhydride core: C(=O)-O-C(=O)
-    pattern = Chem.MolFromSmarts(ANHYDRIDE_SMARTS)
+    pattern = _compiled_smarts(ANHYDRIDE_SMARTS)
     if pattern is None:
         return None
 
@@ -214,7 +215,7 @@ def _name_sulfonic_anhydride(mol) -> Optional[str]:
     '{acid} anhydride' (benzenesulfonic anhydride); mixed -> alphabetical two
     words; symmetric-substituted (a heteroatom substituent on R) -> bis(...)
     . Returns None (fall through) when no S-O-S core is present."""
-    pat = Chem.MolFromSmarts(_SULFONIC_ANHYDRIDE_SMARTS)
+    pat = _compiled_smarts(_SULFONIC_ANHYDRIDE_SMARTS)
     if pat is None:
         return None
     matches = mol.GetSubstructMatches(pat, uniquify=True)
@@ -486,7 +487,7 @@ def _name_mixed_inorganic_anhydride(mol) -> Optional[str]:
     cycle. Returns None (fall through) when no acyl-[O,S]-C#N core is present,
     or when the acyl side cannot be named."""
     for inorganic_word, smarts in _MIXED_INORGANIC_ANHYDRIDE_SMARTS.items():
-        pat = Chem.MolFromSmarts(smarts)
+        pat = _compiled_smarts(smarts)
         if pat is None:
             continue
         matches = mol.GetSubstructMatches(pat, uniquify=True)
@@ -509,7 +510,7 @@ def _name_chalcogen_anhydride(mol) -> Optional[str]:
     class term is thio/seleno/telluroanhydride per the bridge element. Symmetric
     -> '{acid} thioanhydride' (benzoic thioanhydride); mixed -> alphabetical two
     words. Returns None when no -CO-X-CO- core is present."""
-    pat = Chem.MolFromSmarts(_CHALCOGEN_ANHYDRIDE_SMARTS)
+    pat = _compiled_smarts(_CHALCOGEN_ANHYDRIDE_SMARTS)
     if pat is None:
         return None
     matches = mol.GetSubstructMatches(pat, uniquify=True)
@@ -650,7 +651,7 @@ def _name_thioacyl_anhydride(mol) -> Optional[str]:
       * a CYCLIC -C(=X)-Y-C(=X)- (a chalcogen analogue of a cyclic anhydride ->
         a phase ring-fusion/dione nomenclature);
       * any component it cannot build (fail-closed, never a wrong name)."""
-    pat = Chem.MolFromSmarts(_THIOACYL_ANHYDRIDE_SMARTS)
+    pat = _compiled_smarts(_THIOACYL_ANHYDRIDE_SMARTS)
     if pat is None:
         return None
     matches = mol.GetSubstructMatches(pat, uniquify=True)
@@ -791,7 +792,7 @@ def _name_peroxy_anhydride(mol) -> Optional[str]:
     replaced by 'peroxyanhydride'. Symmetric -> '{acid} peroxyanhydride' (acetic
     peroxyanhydride); mixed -> alphabetical two words. Returns None when no
     -CO-OO-CO- core is present."""
-    pat = Chem.MolFromSmarts(_PEROXY_ANHYDRIDE_SMARTS)
+    pat = _compiled_smarts(_PEROXY_ANHYDRIDE_SMARTS)
     if pat is None:
         return None
     matches = mol.GetSubstructMatches(pat, uniquify=True)

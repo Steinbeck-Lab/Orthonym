@@ -157,7 +157,7 @@ def _clear_nonexpressible_amine_n_cip(mol) -> None:
     quaternary N+ and amine N-oxides (degree 4 or non-zero charge) ARE citable
     and ARE retained by InChI, and are excluded by the degree/charge pre-filter.
     """
-    cand = [a for a in mol.GetAtoms()
+    cand = [a for a in atoms_of(mol)
             if a.GetSymbol() == 'N' and a.HasProp('_CIPCode')
             and a.GetFormalCharge() == 0 and a.GetDegree() == 3
             and not a.GetIsAromatic()]
@@ -199,7 +199,7 @@ def get_stereocenters(mol) -> List[Dict]:
     assign_stereochemistry(mol)
 
     centers = []
-    for atom in mol.GetAtoms():
+    for atom in atoms_of(mol):
         if atom.HasProp('_CIPCode'):
             cip_code = atom.GetProp('_CIPCode')
             # Preserve CIP code as-is: uppercase R/S for normal stereocenters,
@@ -232,7 +232,7 @@ def get_double_bond_stereo(mol) -> List[Dict]:
         - atoms: (begin_atom_idx, end_atom_idx)
     """
     stereo_bonds = []
-    for bond in mol.GetBonds():
+    for bond in bonds_of(mol):
         if bond.GetBondType() == Chem.BondType.DOUBLE:
             if bond.HasProp('_CIPCode'):
                 cip_code = bond.GetProp('_CIPCode')

@@ -29,6 +29,7 @@ from ..data.ion_retained_names import (
 )
 from ..perception.ions import get_ion_sites
 from ..perception.molcache import atoms_of  # audit 2026-09-03 (S2): per-call atom/bond tuples
+from ..perception.molcache import inchikey_of
 
 # F- (DD3,: skeletal heteroatom-hydride anions named with the
 # -anide ending on the parent hydride. element -> the neutral parent-hydride
@@ -1023,7 +1024,7 @@ def name_anion(mol, style: str = 'pin', _depth: int = 0, retained_only: bool = F
             back = opsin_parse(ester_anion)
             if back:
                 bm = Chem.MolFromSmiles(back)
-                if bm is not None and Chem.MolToInchiKey(bm) == Chem.MolToInchiKey(mol):
+                if bm is not None and Chem.MolToInchiKey(bm) == inchikey_of(mol):
                     validated = _validate_anion_name(mol, ester_anion)
                     if validated:
                         return validated
@@ -1113,7 +1114,7 @@ def name_anion(mol, style: str = 'pin', _depth: int = 0, retained_only: bool = F
         back = opsin_parse(ester_anion)
         if back:
             bm = Chem.MolFromSmiles(back)
-            if bm is not None and Chem.MolToInchiKey(bm) == Chem.MolToInchiKey(mol):
+            if bm is not None and Chem.MolToInchiKey(bm) == inchikey_of(mol):
                 validated = _validate_anion_name(mol, ester_anion)
                 if validated:
                     return validated
@@ -1185,7 +1186,7 @@ def name_anion(mol, style: str = 'pin', _depth: int = 0, retained_only: bool = F
                         if back:
                             bm = Chem.MolFromSmiles(back)
                             if (bm is not None and
-                                    Chem.MolToInchiKey(bm) == Chem.MolToInchiKey(mol)):
+                                    Chem.MolToInchiKey(bm) == inchikey_of(mol)):
                                 return validated
         return _validate_anion_name(mol, neutral_name)
 

@@ -19,6 +19,7 @@ from typing import Any, Dict, List, Set
 from rdkit import Chem
 
 from .molcache import atoms_of, bonds_of  # audit 2026-09-03 (S2): per-call atom/bond tuples
+from .molcache import inchikey_of
 
 # IUPAC: prefix-only groups with internal formal charges.
 # These are bonding features, NOT ionic charges.
@@ -145,7 +146,7 @@ def _semipolar_chalcogenide_atoms(mol) -> Set[int]:
         return set()
 
     try:
-        reference_key = Chem.MolToInchiKey(mol)
+        reference_key = inchikey_of(mol)
     except Exception:  # noqa: BLE001 -- perception must never raise
         return set()
     if not reference_key:
@@ -543,7 +544,7 @@ def get_ion_sites(mol, exclude_internal=True) -> Dict[str, List[Dict[str, Any]]]
     if mol is None:
         return result
 
-    for atom in mol.GetAtoms():
+    for atom in atoms_of(mol):
         charge = atom.GetFormalCharge()
 
         if charge == 0:

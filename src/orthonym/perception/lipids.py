@@ -24,6 +24,7 @@ from typing import Optional
 
 from rdkit import Chem
 from rdkit.Chem import rdCIPLabeler
+from .smarts_cache import compiled as _compiled_smarts
 
 logger = logging.getLogger(__name__)
 
@@ -214,7 +215,7 @@ def _classify_head_group(mol, p_idx, backbone_o_idx):
 
 
 def _is_glycerol_headgroup(mol, o_idx):
-    patt = Chem.MolFromSmarts("[OX2][CH2X4][CHX4]([OX2H1])[CH2X4][OX2H1]")
+    patt = _compiled_smarts("[OX2][CH2X4][CHX4]([OX2H1])[CH2X4][OX2H1]")
     if patt is None:
         return False
     return any(m and m[0] == o_idx for m in mol.GetSubstructMatches(patt))

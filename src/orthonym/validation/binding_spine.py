@@ -119,6 +119,7 @@ from orthonym.rules.stereochemistry import (
     collect_stereodescriptors,
 )
 from orthonym.validation.name_morphemes import free_valence_morphology, token_arity
+from ..perception.molcache import atoms_of, bonds_of
 
 # --------------------------------------------------------------------------
 # Finding codes. Each constant's value equals its name so a code can be
@@ -564,10 +565,10 @@ def _p2_bond_totality(mol, spine, mode, findings, stats):
     binding owns this endpoint" is meaningless and every bond would produce a
     second, derivative finding. ``stats["p2_skipped"]`` records that.
     """
-    heavy = {a.GetIdx() for a in mol.GetAtoms() if a.GetAtomicNum() > 1}
+    heavy = {a.GetIdx() for a in atoms_of(mol) if a.GetAtomicNum() > 1}
     in_scope = {}
     hydrogen_bonds = 0
-    for bond in mol.GetBonds():
+    for bond in bonds_of(mol):
         i, j = bond.GetBeginAtomIdx(), bond.GetEndAtomIdx()
         if i in heavy and j in heavy:
             in_scope[bond.GetIdx()] = (i, j)
@@ -1301,7 +1302,7 @@ def _p7_free_valence(mol, spine, findings, stats) -> None:
     Only a confidently-read morphology that DISAGREES with a single, integer-
     ordered linkage bond is an error.
     """
-    heavy = {a.GetIdx() for a in mol.GetAtoms() if a.GetAtomicNum() > 1}
+    heavy = {a.GetIdx() for a in atoms_of(mol) if a.GetAtomicNum() > 1}
     confident = 0
     unverified = 0
     for binding in spine.walk():
@@ -1320,7 +1321,7 @@ def _p7_free_valence(mol, spine, findings, stats) -> None:
                 "info"))
             continue
         linkage = [
-            bond for bond in mol.GetBonds()
+            bond for bond in bonds_of(mol)
             if (bond.GetBeginAtomIdx() in heavy
                 and bond.GetEndAtomIdx() in heavy
                 and (bond.GetBeginAtomIdx() in subtree)
@@ -1833,7 +1834,7 @@ def _p8b_substituent_stereo(mol, spine: BindingSpine, mode: str,
             continue
         internal_ez = [
             bond.GetProp('_CIPCode')
-            for bond in mol.GetBonds()
+            for bond in bonds_of(mol)
             if bond.HasProp('_CIPCode') and bond.GetProp('_CIPCode') in ('E', 'Z')
             and bond.GetBeginAtomIdx() in atoms and bond.GetEndAtomIdx() in atoms
         ]

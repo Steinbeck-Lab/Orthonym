@@ -20,6 +20,7 @@ from rdkit import Chem
 
 from ..perception.functional_groups import detect_functional_groups
 from ..rules.seniority import SENIORITY_ORDER, get_principal_group
+from ..perception.molcache import atoms_of
 
 # Sentinel rank for fragments with no detectable principal group
 _NO_FG_RANK = 999
@@ -87,7 +88,7 @@ def _heteroatom_rank(mol) -> int:
     has_n = False
     has_o = False
     has_s = False
-    for atom in mol.GetAtoms():
+    for atom in atoms_of(mol):
         anum = atom.GetAtomicNum()
         if anum == 7:
             has_n = True

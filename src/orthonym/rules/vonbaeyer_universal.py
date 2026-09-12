@@ -22,6 +22,7 @@ from dataclasses import dataclass
 from typing import Dict, Optional, Tuple
 
 from rdkit import Chem
+from ..perception.molcache import bonds_of
 
 logger = logging.getLogger(__name__)
 
@@ -256,7 +257,7 @@ def _cage_edges_in_locant_space(mol, cage_atoms, numbering: Dict[int, int]):
     None when a cage atom is unnumbered or two bonded atoms share a locant."""
     cage = set(cage_atoms)
     out = set()
-    for bond in mol.GetBonds():
+    for bond in bonds_of(mol):
         i, j = bond.GetBeginAtomIdx(), bond.GetEndAtomIdx()
         if i in cage and j in cage:
             li, lj = numbering.get(i), numbering.get(j)

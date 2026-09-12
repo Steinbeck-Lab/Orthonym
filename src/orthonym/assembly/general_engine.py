@@ -22,6 +22,7 @@ from typing import Dict, List, Optional, Tuple
 from rdkit import Chem
 
 from ..errors import is_refusal_sentinel
+from ..perception.molcache import atoms_of
 
 logger = logging.getLogger(__name__)
 
@@ -281,9 +282,9 @@ def _common_refusal(mol, allow_charged: bool = False) -> Optional[str]:
         return "net charge (G3 scope)"
     if len(Chem.GetMolFrags(mol)) > 1:
         return "multi-fragment (G3 scope)"
-    if any(a.GetNumRadicalElectrons() for a in mol.GetAtoms()):
+    if any(a.GetNumRadicalElectrons() for a in atoms_of(mol)):
         return "radical"
-    if any(a.GetIsotope() for a in mol.GetAtoms()):
+    if any(a.GetIsotope() for a in atoms_of(mol)):
         return "isotope"
     return None
 
@@ -778,7 +779,7 @@ def name_general_chain(
     if reason:
         return _refuse(reason)
 
-    ring_atoms = {a.GetIdx() for a in mol.GetAtoms() if a.IsInRing()}
+    ring_atoms = {a.GetIdx() for a in atoms_of(mol) if a.IsInRing()}
     chain = list(getattr(features, 'principal_chain', None) or ())
     if ring_atoms and not getattr(features, 'chain_is_parent', False):
         return _refuse("ring parent (ring path owns it)")

@@ -26,6 +26,8 @@ from typing import Dict, List, Optional, Set, Tuple
 
 from rdkit import Chem
 
+from ..assembly.fragment_naming import _fragment_guard  # Lever N: budget replay on a memo hit
+from ..perception.molcache import cached_by_key
 from ..assembly.fragment_naming import (  # M2.5 macrocycle-hang budgets
     spend_analysis_call,
     spend_perf_work,
@@ -124,7 +126,7 @@ def von_baeyer_ring_count(mol, cage_atoms) -> Optional[int]:
         return None
     edges = 0
     adj = {i: set() for i in cage}
-    for bond in mol.GetBonds():
+    for bond in bonds_of(mol):
         a, b = bond.GetBeginAtomIdx(), bond.GetEndAtomIdx()
         if a in cage and b in cage:
             edges += 1
@@ -878,6 +880,42 @@ class VonBaeyerAnalyzer:
         bridgeheads: Set[int],
         return_candidates: bool = False,
     ) -> Tuple[List[int], Tuple[int, int]]:
+        """Memoising front of:meth:`_find_main_ring_impl` (Lever N, 2026-09-12).
+
+        The main-ring search is called twice per ring system (``_analyze_impl`` and
+        ``_choose_lowest_locant_numbering``) and is the costliest step for bridged cages
+        (47 s of a 350 s tail profile). Within one naming scope the result for
+        (mol object, ring atoms, bridgeheads) is computed once; the memo entry also
+        records how many perf-budget units the computation charged, and a hit charges
+        the SAME units again, so the budget trajectory (and any PerfBudgetExceeded
+        abstention) is unchanged. RWMol and calls outside a scope run the impl directly.
+        """
+        key = (frozenset(ring_atoms), frozenset(bridgeheads))
+        state = {"hit": True}
+
+        def _fresh():
+            state["hit"] = False
+            before = getattr(_fragment_guard, "perf_budget", None)
+            ring, bhp, oriented = self._find_main_ring_impl(mol, ring_atoms, bridgeheads, return_candidates=True)
+            after = getattr(_fragment_guard, "perf_budget", None)
+            units = (before - after) if (before is not None and after is not None and before > after) else 0
+            return (tuple(ring) if ring else ring, bhp, tuple((tuple(r), b) for r, b in oriented), units)
+
+        val = cached_by_key(mol, "polycyclic.main_ring", key, _fresh)
+        if state["hit"] and val[3]:
+            spend_perf_work(val[3])
+        ring = list(val[0]) if val[0] else val[0]
+        if return_candidates:
+            return ring, val[1], [(list(r), b) for r, b in val[2]]
+        return ring, val[1]
+
+    def _find_main_ring_impl(
+        self,
+        mol,
+        ring_atoms: Set[int],
+        bridgeheads: Set[int],
+        return_candidates: bool = False,
+    ) -> Tuple[List[int], Tuple[int, int]]:
         """
         : Find the main ring -- the largest ring in the system.
 
@@ -1424,7 +1462,7 @@ class VonBaeyerAnalyzer:
                     continue
                 prefixes.append(loc)
                 break
-        for bond in mol.GetBonds():
+        for bond in bonds_of(mol):
             a, b = bond.GetBeginAtomIdx(), bond.GetEndAtomIdx()
             if a in ring_atoms and b in ring_atoms and \
                     bond.GetBondTypeAsDouble() > 1.0:
@@ -2563,6 +2601,7 @@ from .ring_replacement import (  # noqa: E402,F401 (re-export)
 from .ring_replacement import (
     build_replacement_prefix as _build_ring_replacement_prefix,
 )
+from ..perception.smarts_cache import compiled as _compiled_smarts
 
 
 def get_heteroatom_replacement_prefix(
@@ -2678,7 +2717,7 @@ def detect_polycyclic_lactone(mol, ring_system_atoms: Set[int]) -> Optional[Dict
 
     # SMARTS for ester/lactone core: carbonyl carbon with =O and -O-
     # [CX3](=O)[OX2] matches: match[0]=carbonyl C, match[1]=carbonyl O, match[2]=ester O
-    pattern = Chem.MolFromSmarts("[CX3](=O)[OX2]")
+    pattern = _compiled_smarts("[CX3](=O)[OX2]")
     matches = mol.GetSubstructMatches(pattern)
 
     if not matches:
@@ -3289,7 +3328,7 @@ def _detect_ring_functional_groups(
     # --- 3. Detect -COOH attached to ring carbons (carboxylic acid) ---
     # Pattern: ring-C bonded to C(=O)(OH) where C is NOT in ring
     carbox_locants = []
-    carbox_pattern = Chem.MolFromSmarts('[CX3](=O)[OX2H1]')
+    carbox_pattern = _compiled_smarts('[CX3](=O)[OX2H1]')
     if carbox_pattern is not None:
         matches = mol.GetSubstructMatches(carbox_pattern)
         for match in matches:
@@ -3323,7 +3362,7 @@ def _detect_ring_functional_groups(
     # --- 4. Detect -CHO attached to ring carbons (aldehyde) ---
     # Pattern: ring-C bonded to C(=O)H where C is NOT in ring
     aldehyde_locants = []
-    aldehyde_pattern = Chem.MolFromSmarts('[CX3H1](=O)')
+    aldehyde_pattern = _compiled_smarts('[CX3H1](=O)')
     if aldehyde_pattern is not None:
         matches = mol.GetSubstructMatches(aldehyde_pattern)
         for match in matches:
@@ -3406,7 +3445,7 @@ def _detect_ring_functional_groups(
     # Mirrors the aldehyde block: the nitrile carbon is exocyclic; the suffix
     # attaches to the ring carbon it is bonded to.
     nitrile_locants = []
-    nitrile_pattern = Chem.MolFromSmarts('[CX2]#[NX1]')
+    nitrile_pattern = _compiled_smarts('[CX2]#[NX1]')
     if nitrile_pattern is not None:
         for match in mol.GetSubstructMatches(nitrile_pattern):
             c_idx, n_idx = match[0], match[1]

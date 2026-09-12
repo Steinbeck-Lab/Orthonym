@@ -13,6 +13,7 @@ import re
 from dataclasses import dataclass
 
 from rdkit import Chem
+from ..perception.molcache import atoms_of
 
 
 @dataclass(frozen=True)
@@ -116,7 +117,7 @@ def _verify_partition(mol, name, pairs, allow_charged: bool = False,
     """
     pairs = list(pairs)
     if atoms is None:
-        heavy = {a.GetIdx() for a in mol.GetAtoms() if a.GetAtomicNum() > 1}
+        heavy = {a.GetIdx() for a in atoms_of(mol) if a.GetAtomicNum() > 1}
     else:
         heavy = set(atoms)
     seen = {}

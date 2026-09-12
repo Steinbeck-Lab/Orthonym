@@ -741,7 +741,7 @@ def _full_inchikey_rt_ok(mol, name: str) -> bool:
     if parsed is None:
         return False
     try:
-        return Chem.MolToInchiKey(parsed) == Chem.MolToInchiKey(mol)
+        return Chem.MolToInchiKey(parsed) == inchikey_of(mol)
     except Exception:
         return False
 
@@ -1837,7 +1837,7 @@ def _cation_name_rt_ok(name: str, mol) -> bool:
         pm = Chem.MolFromSmiles(parsed)
         if pm is None:
             return False
-        return MolToInchiKey(pm) == MolToInchiKey(mol)
+        return MolToInchiKey(pm) == inchikey_of(mol)
     except Exception:
         return False
 
@@ -1935,6 +1935,7 @@ def _apply_guard3_reorder(mol, sites):
 
 
 import threading as _threading
+from ..perception.molcache import inchikey_of
 
 _route_reentry = _threading.local()
 # Legitimate route_charged nesting (a zwitterion -> its anion parent -> the
@@ -2110,7 +2111,7 @@ def _uronium_rt_ok(name: str, mol) -> bool:
         if op_mol is None:
             return False
         op_ik = inchi.MolToInchiKey(op_mol)
-        mol_ik = inchi.MolToInchiKey(mol)
+        mol_ik = inchikey_of(mol)
         return bool(op_ik) and op_ik == mol_ik
     except Exception:
         return False

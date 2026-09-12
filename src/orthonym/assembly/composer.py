@@ -123,6 +123,7 @@ from .substituent_enumerator import (
     extract_ring_substituents,
 )
 from .substituent_naming import _name_aryl_methyl_ether, name_substituent_fragment
+from ..perception.smarts_cache import compiled as _compiled_smarts
 
 # _coverage_gate_threshold removed in a phase: replaced by
 # graduated confidence scoring in coverage_scoring.py
@@ -1543,12 +1544,12 @@ def _try_name_n_oxide(features: Any) -> Optional[str]:
     mol = features.mol
 
     # Check for aromatic N-oxide: [n+][O-]
-    aromatic_pat = Chem.MolFromSmarts('[n+][O-]')
-    aliphatic_pat = Chem.MolFromSmarts('[NX4+]([#6])([#6])([#6])[O-]')
+    aromatic_pat = _compiled_smarts('[n+][O-]')
+    aliphatic_pat = _compiled_smarts('[NX4+]([#6])([#6])([#6])[O-]')
     # W4-I4 /: imine (aldo-/keto-nitrone) N-oxide, an sp2 N+
     # double-bonded to C and single-bonded to a terminal O-. Named by functional
     # class as '<imine> N-oxide' (CH3)2C=N+(CH3)-O- -> N-methylpropan-2-imine N-oxide.
-    imine_pat = Chem.MolFromSmarts('[NX2,NX3;+](=[#6])[OX1-]')
+    imine_pat = _compiled_smarts('[NX2,NX3;+](=[#6])[OX1-]')
 
     aromatic_matches = mol.GetSubstructMatches(aromatic_pat) if aromatic_pat else ()
     aliphatic_matches = mol.GetSubstructMatches(aliphatic_pat) if aliphatic_pat else ()
@@ -2401,7 +2402,7 @@ def _try_name_semicarbazone(features: Any) -> Optional[str]:
     ylidene fragment must name via the substituent pipeline as an '-ylidene'."""
     from rdkit import Chem
     mol = features.mol
-    patt = Chem.MolFromSmarts("[CX3](=[NX2][NX3H1][CX3](=[OX1])[NX3H2])")
+    patt = _compiled_smarts("[CX3](=[NX2][NX3H1][CX3](=[OX1])[NX3H2])")
     matches = mol.GetSubstructMatches(patt)
     if len(matches) != 1:
         return None
@@ -2477,7 +2478,7 @@ def _try_name_hydrazone_substitutive(features: Any) -> Optional[str]:
     '-ylidene'; and it must account for every non-core atom."""
     from rdkit import Chem
     mol = features.mol
-    patt = Chem.MolFromSmarts("[CX3]=[NX2][NX3H2]")
+    patt = _compiled_smarts("[CX3]=[NX2][NX3H2]")
     matches = mol.GetSubstructMatches(patt)
     if len(matches) != 1:
         return None

@@ -26,6 +26,7 @@ from typing import Any, List, Optional, Set, Tuple
 
 from ..name_tree import NameTreeNode, NamingResult
 from ..naming_utils import strip_italicized_structural_prefix
+from ...perception.molcache import atoms_of, bonds_of
 
 logger = logging.getLogger(__name__)
 
@@ -62,12 +63,12 @@ def no_disub_hydroxylamine_core(mol) -> Optional[Tuple[int, int]]:
     from rdkit import Chem
     if mol is None or len(Chem.GetMolFrags(mol)) != 1:
         return None
-    n_atoms = [a for a in mol.GetAtoms() if a.GetSymbol() == "N"]
-    o_atoms = [a for a in mol.GetAtoms() if a.GetSymbol() == "O"]
+    n_atoms = [a for a in atoms_of(mol) if a.GetSymbol() == "N"]
+    o_atoms = [a for a in atoms_of(mol) if a.GetSymbol() == "O"]
     if len(n_atoms) != 1 or len(o_atoms) != 1:
         return None
     # N and O are the only heteroatoms; everything else must be carbon.
-    for a in mol.GetAtoms():
+    for a in atoms_of(mol):
         if a.GetSymbol() not in ("C", "N", "O"):
             return None
         if a.GetFormalCharge() != 0 or a.GetNumRadicalElectrons() != 0:
@@ -79,7 +80,7 @@ def no_disub_hydroxylamine_core(mol) -> Optional[Tuple[int, int]]:
     if bond is None or bond.GetBondType() != Chem.BondType.SINGLE:
         return None
     # No double bond anywhere touching N or O (would be oxime/nitroso/etc.).
-    for b in mol.GetBonds():
+    for b in bonds_of(mol):
         if b.GetBondType() != Chem.BondType.SINGLE:
             syms = {b.GetBeginAtom().GetSymbol(), b.GetEndAtom().GetSymbol()}
             if syms & {"N", "O"}:

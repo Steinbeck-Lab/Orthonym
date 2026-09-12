@@ -50,6 +50,7 @@ from ..perception.rings import (
     is_aromatic_ring,
 )
 from .locants import compare_locant_sets as _compare_locant_sets  #
+from ..perception.smarts_cache import compiled as _compiled_smarts
 
 # C5 giant-cage scope guard (identify_polycyclic): no entry in POLYCYCLIC_DATA
 # exceeds ~10 fused rings (max cataloged num_atoms is 40, a cata-fused chain -- see
@@ -194,7 +195,7 @@ def get_polycyclic_core_atoms(mol, pah_name: str) -> Optional[Set[int]]:
 
     pah_data = POLYCYCLIC_DATA[pah_name]
     smarts = pah_data['smarts']
-    pattern = Chem.MolFromSmarts(smarts)
+    pattern = _compiled_smarts(smarts)
 
     if pattern is None:
         return None
@@ -272,7 +273,7 @@ def get_polycyclic_substituents(mol, pah_name: str,
 
     # Get the SMARTS match for atom ordering
     smarts = pah_data.get('smarts', '')
-    pattern = Chem.MolFromSmarts(smarts)
+    pattern = _compiled_smarts(smarts)
     if pattern is None:
         return {}
 
@@ -1105,7 +1106,7 @@ def _identify_pah_functionalized_chain(
     chain_set = set(chain_atoms)
 
     # Check for carboxylic acid (-COOH): C(=O)(OH) where C is start_idx
-    acid_pattern = Chem.MolFromSmarts('[CX3](=O)[OX2H1]')
+    acid_pattern = _compiled_smarts('[CX3](=O)[OX2H1]')
     if acid_pattern:
         matches = mol.GetSubstructMatches(acid_pattern)
         for match in matches:
@@ -1115,7 +1116,7 @@ def _identify_pah_functionalized_chain(
 
     # Check for aldehyde (-CHO): C(=O)H where C is start_idx
     # CX3H1 because C is bonded to ring, O (double), and H
-    ald_pattern = Chem.MolFromSmarts('[CX3H1](=O)')
+    ald_pattern = _compiled_smarts('[CX3H1](=O)')
     if ald_pattern:
         matches = mol.GetSubstructMatches(ald_pattern)
         for match in matches:
@@ -1124,7 +1125,7 @@ def _identify_pah_functionalized_chain(
                         'is_suffix': True, 'suffix_type': 'aldehyde'}
 
     # Check for amide (-CONH2): C(=O)(NH2)
-    amide_pattern = Chem.MolFromSmarts('[CX3](=O)[NX3H2]')
+    amide_pattern = _compiled_smarts('[CX3](=O)[NX3H2]')
     if amide_pattern:
         matches = mol.GetSubstructMatches(amide_pattern)
         for match in matches:
@@ -1133,7 +1134,7 @@ def _identify_pah_functionalized_chain(
                         'is_suffix': True, 'suffix_type': 'primary_amide'}
 
     # Check for nitrile (-C≡N)
-    nitrile_pattern = Chem.MolFromSmarts('[CX2]#[NX1]')
+    nitrile_pattern = _compiled_smarts('[CX2]#[NX1]')
     if nitrile_pattern:
         matches = mol.GetSubstructMatches(nitrile_pattern)
         for match in matches:
@@ -1153,7 +1154,7 @@ def _identify_pah_functionalized_chain(
                 break
 
     if not carbonyl_on_start:
-        hydroxyl_pattern = Chem.MolFromSmarts('[OX2H1]')
+        hydroxyl_pattern = _compiled_smarts('[OX2H1]')
         if hydroxyl_pattern:
             matches = mol.GetSubstructMatches(hydroxyl_pattern)
             for match in matches:
@@ -1209,7 +1210,7 @@ def name_substituted_polycyclic(
     # heuristic only when the PAH has no populated iupac_numbering.
     pah_data = POLYCYCLIC_DATA.get(pah_name, {})
     smarts = pah_data.get('smarts', '')
-    pattern = Chem.MolFromSmarts(smarts) if smarts else None
+    pattern = _compiled_smarts(smarts) if smarts else None
     atom_to_locant = {}
     if pattern:
         matches = mol.GetSubstructMatches(pattern)

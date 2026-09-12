@@ -19,6 +19,7 @@ from rdkit import Chem
 
 from ..data.amino_acids import get_amino_acid_name
 from ..data.amino_acids import is_standard_amino_acid  # noqa: F401 re-exported: imported FROM this module by rules/salts.py, tests/unit/test_amino_acids.py
+from ..perception.smarts_cache import compiled as _compiled_smarts
 
 # SMARTS for alpha-amino acid pattern
 # [NX3;H2,H1] - primary or secondary amine nitrogen
@@ -136,7 +137,7 @@ def count_peptide_bonds(mol) -> int:
     Returns:
         Number of peptide bond matches found
     """
-    pattern = Chem.MolFromSmarts(PEPTIDE_BOND_SMARTS)
+    pattern = _compiled_smarts(PEPTIDE_BOND_SMARTS)
     if pattern is None:
         return 0
     matches = mol.GetSubstructMatches(pattern)
@@ -163,9 +164,9 @@ def is_peptide(mol) -> bool:
     # of silently falling through to "unknown organic compound".: OR in the
     # ester-C-terminus alternative too, for the same reason (a '...oate'
     # C-terminus that _try_backbone_substitutive now names systematically).
-    amide_pattern = Chem.MolFromSmarts(_TERMINAL_PRIMARY_AMIDE_ALPHA_SMARTS)
+    amide_pattern = _compiled_smarts(_TERMINAL_PRIMARY_AMIDE_ALPHA_SMARTS)
     has_amide_alpha = amide_pattern is not None and mol.HasSubstructMatch(amide_pattern)
-    ester_pattern = Chem.MolFromSmarts(_TERMINAL_ESTER_ALPHA_SMARTS)
+    ester_pattern = _compiled_smarts(_TERMINAL_ESTER_ALPHA_SMARTS)
     has_ester_alpha = ester_pattern is not None and mol.HasSubstructMatch(ester_pattern)
     if not (detect_amino_acid(mol) or has_amide_alpha or has_ester_alpha):
         return False
@@ -184,7 +185,7 @@ def detect_amino_acid(mol) -> bool:
     Returns:
         True if molecule contains alpha-amino acid pattern
     """
-    pattern = Chem.MolFromSmarts(ALPHA_AMINO_ACID_SMARTS)
+    pattern = _compiled_smarts(ALPHA_AMINO_ACID_SMARTS)
     if pattern is None:
         return False
     return mol.HasSubstructMatch(pattern)
@@ -204,7 +205,7 @@ def get_amino_acid_atoms(mol) -> Optional[Tuple[int, int, int, int, int]]:
     Returns:
         Tuple of (N, alpha_C, carbonyl_C, carbonyl_O, acid_O) atom indices, or None
     """
-    pattern = Chem.MolFromSmarts(ALPHA_AMINO_ACID_SMARTS)
+    pattern = _compiled_smarts(ALPHA_AMINO_ACID_SMARTS)
     if pattern is None:
         return None
 
@@ -233,7 +234,7 @@ def _has_extra_functional_groups(mol) -> bool:
         True if extra functional groups found
     """
     for smarts in _EXTRA_FG_SMARTS:
-        pat = Chem.MolFromSmarts(smarts)
+        pat = _compiled_smarts(smarts)
         if pat is not None and mol.HasSubstructMatch(pat):
             return True
     return False
@@ -433,7 +434,7 @@ def _name_amino_acid_systematic(mol) -> str:
         return None
 
     # Count primary amine groups - if more than one, let general pipeline handle
-    amine_pattern = Chem.MolFromSmarts('[NX3;H2;!$([NX3][CX3]=O)]')
+    amine_pattern = _compiled_smarts('[NX3;H2;!$([NX3][CX3]=O)]')
     if amine_pattern:
         amine_matches = mol.GetSubstructMatches(amine_pattern)
         if len(amine_matches) > 1:
@@ -442,7 +443,7 @@ def _name_amino_acid_systematic(mol) -> str:
     #: Multiple COOH groups -> polyfunctional pipeline
     # Dicarboxylic amino acids (aspartic, glutamic) need "dioic acid" suffix
     # which the specialized handler can't produce (it hardcodes mono-acid).
-    cooh_pattern = Chem.MolFromSmarts('[CX3](=O)[OX2H1]')
+    cooh_pattern = _compiled_smarts('[CX3](=O)[OX2H1]')
     if cooh_pattern:
         cooh_matches = mol.GetSubstructMatches(cooh_pattern)
         if len(cooh_matches) >= 2:
@@ -580,7 +581,7 @@ def is_n_substituted_amino_acid(mol) -> bool:
     Check if amino acid has N-substituents (like sarcosine = N-methylglycine).
     """
     # Look for secondary amine in amino acid context
-    pattern = Chem.MolFromSmarts("[NX3;H1]([CX4])[CX4][CX3](=O)[OX2H1]")
+    pattern = _compiled_smarts("[NX3;H1]([CX4])[CX4][CX3](=O)[OX2H1]")
     if pattern is None:
         return False
     return mol.HasSubstructMatch(pattern)

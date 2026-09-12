@@ -34,6 +34,7 @@ from ..assembly.naming_utils import SIMPLE_MULTIPLIERS
 from ..data.chain_names import get_chain_prefix
 from ..perception.chains import find_longest_carbon_chain
 from .seniority import SUFFIX_FORMS
+from ..perception.molcache import inchikey_of
 
 # Principal-group FG names that take an added-carbon ``carbo*`` suffix form and
 # whose match tuple carries the carbonyl/nitrile carbon at index 0. The value is
@@ -156,7 +157,7 @@ def _whole_name_stereo_ok(mol, name: str) -> bool:
     if parsed is None:
         return False
     try:
-        return Chem.MolToInchiKey(parsed) == Chem.MolToInchiKey(mol)
+        return Chem.MolToInchiKey(parsed) == inchikey_of(mol)
     except Exception:
         return False
 

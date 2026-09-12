@@ -37,6 +37,8 @@ from ..perception.rings import (
     is_aromatic_ring,
     is_saturated_ring,
 )
+from ..perception.smarts_cache import compiled as _compiled_smarts
+from ..perception.molcache import bonds_of
 
 # Simple multiplicative prefixes for HW naming
 SIMPLE_MULTIPLIERS = {
@@ -1420,7 +1422,7 @@ def _mancude_hydro_select(mol, ring_set: Set[int],
     # The molecule's own ring double bonds, as ring-edge start positions.
     mol_edges: Set[int] = set()
     unsat_pos: Set[int] = set()
-    for bond in mol.GetBonds():
+    for bond in bonds_of(mol):
         if bond.GetBondType() != Chem.BondType.DOUBLE:
             continue
         i, j = bond.GetBeginAtomIdx(), bond.GetEndAtomIdx()
@@ -3390,14 +3392,14 @@ def _identify_suffix_fg(mol, start_idx: int, sub_atoms, ring_set) -> Optional[Di
         return None
 
     # Check for carboxylic acid: C(=O)(OH)
-    acid_pat = Chem.MolFromSmarts('[CX3](=O)[OX2H1]')
+    acid_pat = _compiled_smarts('[CX3](=O)[OX2H1]')
     if acid_pat:
         for match in mol.GetSubstructMatches(acid_pat):
             if match[0] == start_idx:
                 return {'suffix_name': 'carboxylic acid'}
 
     # Check for aldehyde: C(=O)H attached to ring
-    ald_pat = Chem.MolFromSmarts('[CX3H1](=O)')
+    ald_pat = _compiled_smarts('[CX3H1](=O)')
     if ald_pat:
         for match in mol.GetSubstructMatches(ald_pat):
             if match[0] == start_idx:
@@ -3405,7 +3407,7 @@ def _identify_suffix_fg(mol, start_idx: int, sub_atoms, ring_set) -> Optional[Di
 
     # Check for hydroxamic acid: C(=O)(NH-OH) — before primary amide because
     # N has H1 bonded to O, not H2, so the primary amide pattern would not match.
-    hydroxamic_pat = Chem.MolFromSmarts('[CX3](=O)[NX3;H1][OX2H]')
+    hydroxamic_pat = _compiled_smarts('[CX3](=O)[NX3;H1][OX2H]')
     if hydroxamic_pat:
         for match in mol.GetSubstructMatches(hydroxamic_pat):
             if match[0] == start_idx:
@@ -3415,14 +3417,14 @@ def _identify_suffix_fg(mol, start_idx: int, sub_atoms, ring_set) -> Optional[Di
     # Checked BEFORE the amide pattern: the hydrazide N is bonded to another N so
     # the amide SMARTS never matches it (pyridine-4-carbohydrazide,
     # furan-2-carbohydrazide).
-    hydrazide_pat = Chem.MolFromSmarts('[CX3](=O)[NX3][NX3]')
+    hydrazide_pat = _compiled_smarts('[CX3](=O)[NX3][NX3]')
     if hydrazide_pat:
         for match in mol.GetSubstructMatches(hydrazide_pat):
             if match[0] == start_idx:
                 return {'suffix_name': 'carbohydrazide'}
 
     # Check for primary amide: C(=O)(NH2)
-    amide_pat = Chem.MolFromSmarts('[CX3](=O)[NX3H2]')
+    amide_pat = _compiled_smarts('[CX3](=O)[NX3H2]')
     if amide_pat:
         for match in mol.GetSubstructMatches(amide_pat):
             if match[0] == start_idx:
@@ -3437,7 +3439,7 @@ def _identify_suffix_fg(mol, start_idx: int, sub_atoms, ring_set) -> Optional[Di
     # name, so a mismatch with the N's real branch count declines the whole
     # suffix record (missing-beats-wrong) rather than dropping a substituent.
     for _pat_smarts in ('[CX3](=O)[NX3;H1][#6]', '[CX3](=O)[NX3;H0]([#6])[#6]'):
-        _pat = Chem.MolFromSmarts(_pat_smarts)
+        _pat = _compiled_smarts(_pat_smarts)
         if _pat is None:
             continue
         for match in mol.GetSubstructMatches(_pat):
@@ -3467,7 +3469,7 @@ def _identify_suffix_fg(mol, start_idx: int, sub_atoms, ring_set) -> Optional[Di
             return {'suffix_name': 'carboxamide', 'n_substituents': n_subs}
 
     # Check for nitrile: C#N
-    nitrile_pat = Chem.MolFromSmarts('[CX2]#[NX1]')
+    nitrile_pat = _compiled_smarts('[CX2]#[NX1]')
     if nitrile_pat:
         for match in mol.GetSubstructMatches(nitrile_pat):
             if match[0] == start_idx:

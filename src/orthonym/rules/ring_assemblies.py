@@ -22,6 +22,7 @@ from typing import Any, Dict, List, Optional, Set, Tuple, Union
 
 from rdkit import Chem
 from rdkit.Chem import rdchem
+from ..perception.molcache import bonds_of
 
 
 # a phase.B: detect indicated-H prefix in a ring stem name like
@@ -702,7 +703,7 @@ def _find_inter_system_bonds(
     # Atoms in multiple systems (spiro centers) -- skip bonds involving these
     shared_atoms = {idx for idx, systems in atom_to_systems.items() if len(systems) > 1}
 
-    for bond in mol.GetBonds():
+    for bond in bonds_of(mol):
         a1 = bond.GetBeginAtomIdx()
         a2 = bond.GetEndAtomIdx()
 

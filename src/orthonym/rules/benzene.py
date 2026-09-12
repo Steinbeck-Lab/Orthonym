@@ -34,6 +34,8 @@ from ..assembly.naming_utils import (
     should_omit_locant_one,
 )
 from .locants import compare_locant_sets as _compare_locant_sets  #
+from ..perception.molcache import inchikey_of
+from ..perception.smarts_cache import compiled as _compiled_smarts
 
 # Mapping from substituent atom symbol/pattern to prefix name
 # Key: (symbol, hybridization/bond_info) or simple symbol
@@ -730,7 +732,7 @@ def _identify_suffix_fg_on_benzene(
                         'is_suffix': True, 'atoms': sub_atoms,
                     }
 
-        _guanidine_patt = Chem.MolFromSmarts('[NX3][CX3](=[NX2])[NX3]')
+        _guanidine_patt = _compiled_smarts('[NX3][CX3](=[NX2])[NX3]')
         for match in mol.GetSubstructMatches(_BENZENE_FG_SMARTS['amidine']):
             if match[0] != start_idx:
                 continue
@@ -4889,7 +4891,7 @@ def _reanchor_name_to_mol(mol, name: Optional[str]) -> Optional[str]:
     if not name:
         return None
     try:
-        ref_key = Chem.MolToInchiKey(mol)
+        ref_key = inchikey_of(mol)
         if not ref_key:
             return None
         from ..namer import _validity_gate_name_to_smiles

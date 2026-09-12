@@ -12,6 +12,7 @@ Handles detection of:
 from typing import Dict, List, Set, Tuple
 
 from rdkit import Chem
+from .molcache import bonds_of
 
 
 def get_ring_info(mol) -> Dict:
@@ -231,7 +232,7 @@ def count_ring_double_bonds(mol, ring_atoms) -> int:
     ring_set = set(ring_atoms)
     count = 0
 
-    for bond in mol.GetBonds():
+    for bond in bonds_of(mol):
         begin_idx = bond.GetBeginAtomIdx()
         end_idx = bond.GetEndAtomIdx()
 

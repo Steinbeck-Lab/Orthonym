@@ -32,6 +32,7 @@ from rdkit import Chem
 from ..perception.stereo import assign_stereochemistry
 from .fragment_naming import name_fragment_recursively
 from .naming_utils import SIMPLE_MULTIPLIERS, alpha_sort_key, get_alkyl_name, simple_multiplier_word
+from ..perception.smarts_cache import compiled as _compiled_smarts
 
 logger = logging.getLogger(__name__)
 
@@ -6594,7 +6595,7 @@ def name_substituent_fragment(
         )
         from ..rules.seniority import get_prefix as _pseudo_get_prefix
         for _fg, _sm in _PSEUDOHALIDES:
-            _pat = Chem.MolFromSmarts(_sm)
+            _pat = _compiled_smarts(_sm)
             if _pat is None:
                 continue
             for _m in mol.GetSubstructMatches(_pat):
