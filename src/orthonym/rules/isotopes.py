@@ -27,7 +27,7 @@ def has_isotopes(mol: Optional[Chem.Mol]) -> bool:
     """True iff any atom of ``mol`` carries a non-zero isotope label."""
     if mol is None:
         return False
-    return any(a.GetIsotope() != 0 for a in mol.GetAtoms())
+    return any(a.GetIsotope() != 0 for a in atoms_of(mol))
 
 
 def strip_isotopes(mol: Chem.Mol) -> Tuple[Chem.Mol, Dict[int, int]]:
@@ -467,7 +467,7 @@ _LEADING_STEREO_PREFIX_RE = re.compile(r"^(?:\([^)]*\)-|rel-|rac-|cis-|trans-)*"
 # set is taken from HW_PREFIXES so it stays in sync with the data (all end in 'a',
 # so they cannot false-match the common detachable prefixes oxo-/azido-/thio-).
 from ..data.hw_heteroatoms import HW_PREFIXES as _HW_PREFIXES
-from ..perception.molcache import inchikey_of
+from ..perception.molcache import atoms_of, inchikey_of
 _A_PREFIX_ALT = "|".join(sorted(set(_HW_PREFIXES.values()), key=len, reverse=True))
 _LEADING_SKELETAL_LOCANT_RE = re.compile(
     r"^\d+(?:,\d+)*-(?:di|tri|tetra|penta|hexa|hepta|octa|nona|deca)?"

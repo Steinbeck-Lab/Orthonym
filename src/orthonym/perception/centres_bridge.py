@@ -84,8 +84,13 @@ def _centres_jar_version_key(path: Path):
     return tuple(int(p) for p in m.group(1).split("."))
 
 
+@lru_cache(maxsize=8)
 def _find_centres_jar(version: Optional[str] = None) -> Optional[str]:
-    """Find the vendored centres CLI jar at the project root.
+    """Find the vendored centres CLI jar at the project root (cached per process).
+
+    Perf lever A5 (2026-09-13): this ran a ``PROJECT_ROOT.glob`` on EVERY centres call
+    (1,960 directory scans per 300 molecules, ~1 % of naming time). The set of vendored
+    jars does not change while a process runs, so the lookup is cached per argument.
 
     Parallel to ``opsin_roundtrip._find_opsin_jar``.
 

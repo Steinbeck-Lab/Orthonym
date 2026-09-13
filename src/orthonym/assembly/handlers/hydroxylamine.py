@@ -113,11 +113,11 @@ def _is_pure_aminooxy_hydroxylamine(features: Any) -> bool:
         return False
     # Exactly one N and one O forming the hydroxylamine core, both neutral,
     # acyclic, single-bonded to each other; no ring anywhere; no other hetero.
-    n_atoms = [a for a in mol.GetAtoms() if a.GetSymbol() == "N"]
-    o_atoms = [a for a in mol.GetAtoms() if a.GetSymbol() == "O"]
+    n_atoms = [a for a in atoms_of(mol) if a.GetSymbol() == "N"]
+    o_atoms = [a for a in atoms_of(mol) if a.GetSymbol() == "O"]
     if len(n_atoms) != 1 or len(o_atoms) != 1:
         return False
-    for a in mol.GetAtoms():
+    for a in atoms_of(mol):
         if a.GetSymbol() not in ("C", "N", "O"):
             return False
         if a.IsInRing() or a.GetFormalCharge() != 0:
@@ -128,7 +128,7 @@ def _is_pure_aminooxy_hydroxylamine(features: Any) -> bool:
     if bond is None or bond.GetBondType() != Chem.BondType.SINGLE:
         return False
     # No C=O / C=N (would be a senior oxime/amide territory).
-    for b in mol.GetBonds():
+    for b in bonds_of(mol):
         if b.GetBondType() == Chem.BondType.DOUBLE:
             syms = {b.GetBeginAtom().GetSymbol(), b.GetEndAtom().GetSymbol()}
             if syms & {"N", "O"}:

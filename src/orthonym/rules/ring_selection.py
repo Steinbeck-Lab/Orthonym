@@ -338,7 +338,7 @@ def _is_saturated_monocyclic_spiro(mol: Chem.Mol, system_atoms: Set[int]) -> boo
         for j, rb in enumerate(rings_in):
             if i != j and len(ra & rb) >= 2:
                 return False  # fused component, not monocyclic
-    for bond in mol.GetBonds():
+    for bond in bonds_of(mol):
         a, b = bond.GetBeginAtomIdx(), bond.GetEndAtomIdx()
         if a in system_atoms and b in system_atoms:
             if (bond.GetIsAromatic()
@@ -538,7 +538,7 @@ def _bridged_fused_prebridge_metrics(
         1 for i in system_atoms if mol.GetAtomWithIdx(i).GetAtomicNum() != 6
     )
     num_double = 0
-    for bond in mol.GetBonds():
+    for bond in bonds_of(mol):
         a, b = bond.GetBeginAtomIdx(), bond.GetEndAtomIdx()
         if a in system_atoms and b in system_atoms:
             if bond.GetIsAromatic() or bond.GetBondType() == Chem.BondType.DOUBLE:

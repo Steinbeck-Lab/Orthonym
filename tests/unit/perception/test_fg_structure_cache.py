@@ -1,7 +1,17 @@
 """Lever K (round 2): two distinct mol objects with the same indexed graph share one FG detection."""
+import pytest
 from rdkit import Chem
 from orthonym.assembly import memo
 from orthonym.perception import functional_groups as fg
+
+
+@pytest.fixture(autouse=True)
+def _isolate_process_cache():
+    """These tests count calls to the impl, so they must not see entries another test left
+    in the process-wide pure cache (perf lever A8, 2026-09-13)."""
+    memo.clear_process_cache()
+    yield
+    memo.clear_process_cache()
 
 
 def test_same_structure_different_objects_share_result(monkeypatch):

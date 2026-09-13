@@ -208,7 +208,7 @@ def _classify_halogens(mol, hub) -> Optional[dict]:
     terminal halogen single-bonded to the hub, else None."""
     hub_idx = hub.GetIdx()
     halo_counts: dict = {}
-    for atom in mol.GetAtoms():
+    for atom in atoms_of(mol):
         if atom.GetSymbol() == 'H' or atom.GetIdx() == hub_idx:
             continue
         symbol = atom.GetSymbol()
@@ -808,12 +808,12 @@ def name_heteroimine(mol) -> Optional[str]:
         return None
     if mol.GetRingInfo().NumRings() > 0:
         return None
-    for atom in mol.GetAtoms():
+    for atom in atoms_of(mol):
         if atom.GetFormalCharge() != 0 or atom.GetNumRadicalElectrons() != 0:
             return None
     # Exactly one terminal =N (degree-1, double-bonded to the hub): the =NH
     # imine group. An N-substituted =N-R (degree 2) fails this guard.
-    imine_n = [a for a in mol.GetAtoms()
+    imine_n = [a for a in atoms_of(mol)
                if a.GetAtomicNum() == 7 and a.GetDegree() == 1
                and a.GetBonds()[0].GetBondType() == Chem.BondType.DOUBLE]
     if len(imine_n) != 1:
@@ -838,7 +838,7 @@ def name_heteroimine(mol) -> Optional[str]:
     # No stray heteroatom beyond the hub + the imine N.
     if any(a.GetSymbol() not in ('C', 'H')
            and a.GetIdx() not in (hub.GetIdx(), imine_n[0].GetIdx())
-           for a in mol.GetAtoms()):
+           for a in atoms_of(mol)):
         return None
     if not organyls:
         return f"{stem}imine"

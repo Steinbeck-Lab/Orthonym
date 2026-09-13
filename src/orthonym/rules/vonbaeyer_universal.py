@@ -22,7 +22,7 @@ from dataclasses import dataclass
 from typing import Dict, Optional, Tuple
 
 from rdkit import Chem
-from ..perception.molcache import bonds_of
+from ..perception.molcache import atoms_of, bonds_of
 
 logger = logging.getLogger(__name__)
 
@@ -725,7 +725,7 @@ def _extract_spiro_submol(mol, cage_set):
     rw = Chem.RWMol()
     for m in order:
         rw.AddAtom(Chem.Atom(mol.GetAtomWithIdx(m).GetAtomicNum()))
-    for b in mol.GetBonds():
+    for b in bonds_of(mol):
         i, j = b.GetBeginAtomIdx(), b.GetEndAtomIdx()
         if i in mol_to_sub and j in mol_to_sub:
             rw.AddBond(mol_to_sub[i], mol_to_sub[j], b.GetBondType())
@@ -765,7 +765,7 @@ def analyze_spiro_universal(
     if mol is None:
         return None
 
-    ring_atoms_mol = {a.GetIdx() for a in mol.GetAtoms() if a.IsInRing()}
+    ring_atoms_mol = {a.GetIdx() for a in atoms_of(mol) if a.IsInRing()}
     if not ring_atoms_mol:
         return None
     cage_set = set(cage_atoms) if cage_atoms is not None else set(ring_atoms_mol)

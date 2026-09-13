@@ -1515,7 +1515,7 @@ def _has_metal(mol) -> bool:
     """True if the molecule contains any metallic/inorganic element -- i.e. any
     atom outside the organic non-metal/metalloid allowlist (_ORGANIC_NONMETALS).
     Complete by construction (catches Tc/U/f-block, unlike the legacy metal list)."""
-    for atom in mol.GetAtoms():
+    for atom in atoms_of(mol):
         if atom.GetSymbol() not in _ORGANIC_NONMETALS:
             return True
     return False

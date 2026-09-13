@@ -513,9 +513,12 @@ def get_carotene_parent_name(mol) -> Optional[str]:
     Stereo-exact: only the all-E fundamental parent matches; a Z-isomer or a modified
     carotenoid returns None and is named systematically (fail-closed). The Greek name
     is OPSIN-round-trip gated by the caller, so a mismatch can never ship."""
-    from rdkit.Chem import inchi
+    # Perf lever A6 (2026-09-13): the InChIKey of the INPUT was recomputed here on every
+    # pipeline pass (2,334 direct RDKit calls per 300 molecules, 1.5 s). molcache.inchikey_of
+    # memoises it per Mol object within the naming scope with a structure signature guard.
     try:
-        ik = inchi.MolToInchiKey(mol)
+        from ..perception.molcache import inchikey_of
+        ik = inchikey_of(mol)
     except Exception:
         return None
     return CAROTENE_PARENT_INCHIKEYS.get(ik) if ik else None

@@ -1406,7 +1406,7 @@ def name_general_ring(
     reason = _common_refusal(mol, allow_charged=allow_charged)
     if reason:
         return _refuse(reason)
-    ring_atoms = {a.GetIdx() for a in mol.GetAtoms() if a.IsInRing()}
+    ring_atoms = {a.GetIdx() for a in atoms_of(mol) if a.IsInRing()}
     if not ring_atoms:
         return _refuse("acyclic (chain path owns it)")
     if getattr(features, 'chain_is_parent', False):
@@ -2254,7 +2254,7 @@ def name_general_spiro(
     reason = _common_refusal(mol, allow_charged=allow_charged)
     if reason:
         return _refuse(reason)
-    ring_atoms = {a.GetIdx() for a in mol.GetAtoms() if a.IsInRing()}
+    ring_atoms = {a.GetIdx() for a in atoms_of(mol) if a.IsInRing()}
     if not ring_atoms:
         return _refuse("acyclic (chain path owns it)")
     if getattr(features, 'chain_is_parent', False):
@@ -2342,7 +2342,7 @@ def _spiro_vonbaeyer_component_fallback(mol) -> Optional[GeneralEngineResult]:
     int_a2l = {a: l for a, l in a2l.items() if isinstance(l, int)}
     name = _stereo_prefix(mol, int_a2l) + name
     all_heavy = tuple(sorted(
-        a.GetIdx() for a in mol.GetAtoms() if a.GetAtomicNum() > 1))
+        a.GetIdx() for a in atoms_of(mol) if a.GetAtomicNum() > 1))
     bindings = (TokenBinding(all_heavy, core_name, 'parent'),)
     return GeneralEngineResult(name=name, bindings=bindings,
                                stereo_atom_to_locant=int_a2l)
@@ -2424,13 +2424,13 @@ def _name_terminal_ring_parent(
     # ``1lambda2-aluminacyclohexane``, which round-trips through OPSIN to the
     # input. A radical on a skeletal CARBON is a genuine radical and belongs to
     # radical nomenclature, which this tier does not build, so it refuses.
-    if any(a.GetIsotope() for a in mol.GetAtoms()):
+    if any(a.GetIsotope() for a in atoms_of(mol)):
         return _refuse("isotope (a parent hydride expresses none)")
     if any(a.GetNumRadicalElectrons() and a.GetAtomicNum() == 6
-           for a in mol.GetAtoms()):
+           for a in atoms_of(mol)):
         return _refuse("radical on a skeletal carbon (P-71, not this tier)")
 
-    heavy = {a.GetIdx() for a in mol.GetAtoms() if a.GetAtomicNum() > 1}
+    heavy = {a.GetIdx() for a in atoms_of(mol) if a.GetAtomicNum() > 1}
     ring_info = mol.GetRingInfo()
     ring = {i for i in heavy if ring_info.NumAtomRings(i) > 0}
     if not ring:
@@ -2564,10 +2564,10 @@ def _name_terminal_ring_assembly(
     if _pg and not allow_suffix_free:
         return _refuse("suffix-free prefix name is T4-only (P-41 requires the "
                        "principal characteristic group as suffix)")
-    if any(a.GetIsotope() for a in mol.GetAtoms()):
+    if any(a.GetIsotope() for a in atoms_of(mol)):
         return _refuse("isotope (assembly tier expresses none)")
     if any(a.GetNumRadicalElectrons() and a.GetAtomicNum() == 6
-           for a in mol.GetAtoms()):
+           for a in atoms_of(mol)):
         return _refuse("radical on a skeletal carbon (P-71, not this tier)")
     if len(Chem.GetMolFrags(mol)) > 1:
         return _refuse("multi-fragment (adduct namer's scope)")
@@ -2666,7 +2666,7 @@ def name_general(
     still refused -> byte-identical to pre-P5.
     """
     allow_charged = allow_aromatic_general
-    ring_atoms = any(a.IsInRing() for a in mol.GetAtoms()) if mol else False
+    ring_atoms = any(a.IsInRing() for a in atoms_of(mol)) if mol else False
     if not ring_atoms or getattr(features, 'chain_is_parent', False):
         return name_general_chain(mol, features, allow_charged=allow_charged,
                                   allow_mancude=allow_aromatic_general)

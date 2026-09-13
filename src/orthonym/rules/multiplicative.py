@@ -24,7 +24,7 @@ from ..perception.molcache import (  # audit 2026-09-03 (S2): per-call atom/bond
     atoms_of,
     bonds_of,
 )
-from ..perception.molcache import canon_smiles
+from ..perception.molcache import atoms_of, canon_smiles
 
 # ---------------------------------------------------------------------------
 # Saturation/modification prefixes that must not be preceded by "di"
@@ -366,7 +366,7 @@ def _try_central_arene_acyclic_arms(mol) -> Optional[str]:
     parent_name, attach_locant = parents[0]
 
     # the whole molecule must be exactly ring + arms (no stray heavy atoms)
-    heavy = {a.GetIdx() for a in mol.GetAtoms() if a.GetAtomicNum() > 1}
+    heavy = {a.GetIdx() for a in atoms_of(mol) if a.GetAtomicNum() > 1}
     if (ring_atoms | all_arm_atoms) != heavy:
         return None
 
@@ -904,10 +904,10 @@ def _try_methylene_bis_polychalcogen(mol) -> Optional[str]:
         return None
     if mol.GetRingInfo().NumRings() > 0:
         return None
-    for atom in mol.GetAtoms():
+    for atom in atoms_of(mol):
         if atom.GetFormalCharge() != 0 or atom.GetNumRadicalElectrons() != 0:
             return None
-    for atom in mol.GetAtoms():
+    for atom in atoms_of(mol):
         if atom.GetSymbol() != 'C' or atom.GetTotalNumHs() != 2 or atom.IsInRing():
             continue
         heavy = [n for n in atom.GetNeighbors() if n.GetAtomicNum() > 1]
@@ -925,7 +925,7 @@ def _try_methylene_bis_polychalcogen(mol) -> Optional[str]:
             continue
         covered = {atom.GetIdx()} | set(s1) | set(s2)
         if any(a.GetIdx() not in covered
-               for a in mol.GetAtoms() if a.GetAtomicNum() > 1):
+               for a in atoms_of(mol) if a.GetAtomicNum() > 1):
             continue
         stem = _CHALCOGEN_STEMS.get(e1)
         mult = _MULTIPLIER.get(n1)
@@ -945,7 +945,7 @@ def _try_azanediyl_methylene_phosphonic(mol) -> Optional[str]:
     bonded to a clean neutral P(=O)(OH)2, and nothing else in the molecule."""
     if mol.GetNumAtoms() != 11:
         return None
-    for atom in mol.GetAtoms():
+    for atom in atoms_of(mol):
         if atom.GetSymbol() != 'N' or atom.GetTotalNumHs() != 1:
             continue
         if atom.IsInRing() or atom.GetFormalCharge() != 0:
@@ -1068,7 +1068,7 @@ def _try_methylenebis_oxy_bridge(mol, ring_atoms: set) -> Optional[str]:
     Fail-closed: central non-ring neutral CH2 with exactly two non-ring
     ether-O neighbours, each attached to exactly one ring atom; identical
     fragments; unit resolution via the shared _resolve_unit_and_assemble."""
-    for atom in mol.GetAtoms():
+    for atom in atoms_of(mol):
         if atom.GetSymbol() != 'C' or atom.GetTotalNumHs() != 2:
             continue
         idx = atom.GetIdx()
@@ -1122,7 +1122,7 @@ def _try_oxybis_azanylylidenemethanylylidene_bridge(
     double-bonded to a CH that attaches to exactly one ring atom; any
     ASSIGNED C=N stereo declines (the composite bridge name cannot carry
     stereo descriptors); identical fragments."""
-    for atom in mol.GetAtoms():
+    for atom in atoms_of(mol):
         if atom.GetSymbol() != 'O' or atom.GetTotalNumHs() != 0:
             continue
         idx = atom.GetIdx()
@@ -1203,7 +1203,7 @@ def _try_chalcogenbis_methylene_bridge(mol, ring_atoms: set) -> Optional[str]:
     locant-identity requirement via the shared _resolve_unit_and_assemble
     (its per-connection locant equality check is what rejects a 3-OH/4-OH
     pair whose free fragments are canon-identical phenols)."""
-    for atom in mol.GetAtoms():
+    for atom in atoms_of(mol):
         bridge_name = _CHALCOGEN_BIS_METHYLENE.get(atom.GetSymbol())
         if bridge_name is None or atom.GetTotalNumHs() != 0:
             continue
@@ -1255,7 +1255,7 @@ def _try_silanediyl_methylene_bridge(mol, ring_atoms: set) -> Optional[str]:
     Fail-closed: central non-ring neutral SiH2 with exactly two non-ring CH2
     neighbours, each attached to exactly one ring atom; identical fragments;
     equal attachment locants."""
-    for atom in mol.GetAtoms():
+    for atom in atoms_of(mol):
         if atom.GetSymbol() != 'Si' or atom.GetTotalNumHs() != 2:
             continue
         idx = atom.GetIdx()
@@ -1482,7 +1482,7 @@ def _try_group14_hydride_substituted_chain(mol) -> Optional[str]:
     if len(set(attach_carbons)) != len(attach_carbons):
         return None  # two units on one carbon (methanediyl-type) -> out of scope
 
-    heavy = {a.GetIdx() for a in mol.GetAtoms() if a.GetAtomicNum() > 1}
+    heavy = {a.GetIdx() for a in atoms_of(mol) if a.GetAtomicNum() > 1}
     central = heavy - unit_atoms_all
     if not central or any(mol.GetAtomWithIdx(i).GetSymbol() != 'C'
                           for i in central):
@@ -1582,7 +1582,7 @@ def _try_central_arene_group14_arms(mol) -> Optional[str]:
         return None
     unit_name = next(iter(unit_names))
 
-    heavy = {a.GetIdx() for a in mol.GetAtoms() if a.GetAtomicNum() > 1}
+    heavy = {a.GetIdx() for a in atoms_of(mol) if a.GetAtomicNum() > 1}
     if (ring_atoms | unit_atoms_all) != heavy:
         return None
 
@@ -1768,7 +1768,7 @@ def _bridge_units_config_mismatch(mol, bridge_idx: int, conn_atoms: List[int]) -
 
 def _try_single_atom_bridges(mol, ring_atoms: set) -> Optional[str]:
     """Try to find single-atom bridges between identical ring systems."""
-    for atom in mol.GetAtoms():
+    for atom in atoms_of(mol):
         idx = atom.GetIdx()
         if idx in ring_atoms:
             continue  # Bridge atoms are NOT in rings
@@ -2682,7 +2682,7 @@ def _try_multi_atom_bridges(mol, ring_atoms: set) -> Optional[str]:
         'Si', 'Ge', 'Sn', 'Pb', 'S', 'Se', 'Te',
     })
 
-    for atom in mol.GetAtoms():
+    for atom in atoms_of(mol):
         idx = atom.GetIdx()
         if idx in ring_atoms:
             continue  # Bridge atoms are NOT in rings

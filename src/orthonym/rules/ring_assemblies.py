@@ -454,7 +454,7 @@ def _system_signature(mol, system_atoms: Set[int]) -> Tuple:
 
     double_bonds = 0
     triple_bonds = 0
-    for bond in mol.GetBonds():
+    for bond in bonds_of(mol):
         a1, a2 = bond.GetBeginAtomIdx(), bond.GetEndAtomIdx()
         if a1 in system_atoms and a2 in system_atoms:
             bt = bond.GetBondType()
@@ -522,7 +522,7 @@ def _is_replacement_assembly_candidate(
             return False  # >1 heteroatom per ring -> outside this narrow class
         total_hetero += het
         # No ring double bonds (saturated replacement ring).
-        for b in mol.GetBonds():
+        for b in bonds_of(mol):
             i, j = b.GetBeginAtomIdx(), b.GetEndAtomIdx()
             if i in sys_atoms and j in sys_atoms and \
                     b.GetBondType() == rdchem.BondType.DOUBLE:
@@ -1118,7 +1118,7 @@ def _get_ring_parent_name(mol, system_atoms: Set[int]) -> Optional[str]:
         # Check saturation
         has_double_bond = False
         ring_set = set(ring)
-        for bond in mol.GetBonds():
+        for bond in bonds_of(mol):
             a1 = bond.GetBeginAtomIdx()
             a2 = bond.GetEndAtomIdx()
             if a1 in ring_set and a2 in ring_set:
@@ -1559,7 +1559,7 @@ def _get_substituent_locant(
     # Build adjacency for the ring
     ring_set = set(ring_list)
     adj = {idx: [] for idx in ring_list}
-    for bond in mol.GetBonds():
+    for bond in bonds_of(mol):
         a1 = bond.GetBeginAtomIdx()
         a2 = bond.GetEndAtomIdx()
         if a1 in ring_set and a2 in ring_set:
@@ -1651,7 +1651,7 @@ def _reassign_carbocyclic_locants(mol, ring_systems, connections, substituents):
             continue
         rset = set(ring)
         adj: Dict[int, List[int]] = {i: [] for i in ring}
-        for b in mol.GetBonds():
+        for b in bonds_of(mol):
             x, y = b.GetBeginAtomIdx(), b.GetEndAtomIdx()
             if x in rset and y in rset:
                 adj[x].append(y)

@@ -47,6 +47,7 @@ from .naming_utils import SIMPLE_MULTIPLIERS, get_alkyl_name
 from .substituent_naming import _name_aryl_methyl_ether, name_substituent_fragment
 from .substituent_prefix_forms import _check_substituent_prefix_form
 from ..perception.smarts_cache import compiled as _compiled_smarts
+from ..metrics.provenance import best_effort_ctx  # perf lever A10 (2026-09-13): hoisted (14,478 executions per 300 molecules)
 
 logger = logging.getLogger(__name__)
 
@@ -476,7 +477,7 @@ def _carbon_ylidene_prefix(mol, frag_atoms, attach_idx, free_valence):
             # system, whose parent hydride this constructor does not build.
             if ring_info.NumAtomRings(idx) != 1:
                 return None
-    for bond in mol.GetBonds():
+    for bond in bonds_of(mol):
         i, j = bond.GetBeginAtomIdx(), bond.GetEndAtomIdx()
         if i in frag and j in frag:
             if bond.GetBondType() != Chem.BondType.SINGLE:
@@ -1154,7 +1155,6 @@ def name_substituent(mol, frag_atoms, attach_idx, allow_mancude: bool = False):
     # Honor the ambient context here, once, so every caller inherits it.
     # DEFAULT/PIN tier is unchanged: ``best_effort_ctx`` is unset there, so
     # ``.get`` is falsy and this is byte-identical to the prior behaviour.
-    from ..metrics.provenance import best_effort_ctx
     _best_effort_val = best_effort_ctx.get()
     allow_mancude = allow_mancude or bool(_best_effort_val)
 
@@ -1462,7 +1462,7 @@ def name_substituent(mol, frag_atoms, attach_idx, allow_mancude: bool = False):
                     if mol.GetAtomWithIdx(_i).GetChiralTag()
                     != Chem.ChiralType.CHI_UNSPECIFIED
                 ) + sum(
-                    1 for b in mol.GetBonds()
+                    1 for b in bonds_of(mol)
                     if b.GetStereo() in (Chem.BondStereo.STEREOE,
                                          Chem.BondStereo.STEREOZ,
                                          Chem.BondStereo.STEREOCIS,
@@ -2237,7 +2237,7 @@ def _name_substituent_cascade(mol, frag_atoms, attach_idx,
             _a = mol.GetAtomWithIdx(_i)
             if _a.HasProp('_CIPCode'):
                 return True
-        for _b in mol.GetBonds():
+        for _b in bonds_of(mol):
             if (_b.GetBeginAtomIdx() in frag_atoms_set
                     and _b.GetEndAtomIdx() in frag_atoms_set
                     and _b.HasProp('_CIPCode')):
@@ -3837,7 +3837,7 @@ def _prepend_ring_substituent_stereo(mol, pos, token, frag_set=None):
         descr = list(collect_stereodescriptors(mol, pos))
         _seen = {loc for loc, _ in descr}
         if frag_set is not None:
-            for bond in mol.GetBonds():
+            for bond in bonds_of(mol):
                 if not (bond.HasProp('_CIPCode')
                         and bond.GetProp('_CIPCode') in ('E', 'Z')):
                     continue

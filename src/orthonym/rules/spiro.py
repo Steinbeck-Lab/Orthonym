@@ -51,7 +51,7 @@ from ..data.hw_heteroatoms import (
     get_heteroatom_priority,
     sort_heteroatoms_by_priority,
 )
-from ..perception.molcache import bonds_of  # audit 2026-09-03 (S2): per-call atom/bond tuples
+from ..perception.molcache import atoms_of, bonds_of  # audit 2026-09-03 (S2): per-call atom/bond tuples
 from ..perception.rings import get_spiro_atoms
 from ..rules.lambda_convention import (
     LAMBDA as _LAMBDA,
@@ -1014,7 +1014,7 @@ def get_spiro_numbering(
     mult_bonds = [
         (b.GetBeginAtomIdx(), b.GetEndAtomIdx(),
          b.GetBondType() == Chem.BondType.DOUBLE)
-        for b in mol.GetBonds()
+        for b in bonds_of(mol)
         if b.GetBeginAtomIdx() in ring_atom_set
         and b.GetEndAtomIdx() in ring_atom_set
         and b.GetBondType() in (Chem.BondType.DOUBLE, Chem.BondType.TRIPLE)
@@ -1243,7 +1243,7 @@ def name_spiro_system(mol):
     # plain consecutive locants fails closed — never a silently-saturated
     # '-ane' for an unsaturated system.
     ring_mult_bonds = []
-    for bond in mol.GetBonds():
+    for bond in bonds_of(mol):
         a_idx, b_idx = bond.GetBeginAtomIdx(), bond.GetEndAtomIdx()
         if a_idx not in ring_atoms_to_check or b_idx not in ring_atoms_to_check:
             continue
@@ -2403,7 +2403,7 @@ def _name_side_ring(
         # Detect at least one double bond inside the ring
         has_double = False
         ring_set = set(side_ring)
-        for bond in mol.GetBonds():
+        for bond in bonds_of(mol):
             a, b = bond.GetBeginAtomIdx(), bond.GetEndAtomIdx()
             if a in ring_set and b in ring_set:
                 if bond.GetBondType() == Chem.BondType.DOUBLE:
@@ -3094,7 +3094,7 @@ def find_masked_spiro_atoms(
             cnt[a] = cnt.get(a, 0) + 1
     # ring-atom-induced adjacency (ring bonds only, within scope)
     adj: Dict[int, Set[int]] = {a: set() for a in ring_atoms}
-    for b in mol.GetBonds():
+    for b in bonds_of(mol):
         u, v = b.GetBeginAtomIdx(), b.GetEndAtomIdx()
         if u in ring_atoms and v in ring_atoms and b.IsInRing():
             adj[u].add(v)
@@ -3171,7 +3171,7 @@ def _name_masked_spiro(
     for r in sssr:
         ring_atoms.update(r)
     adj: Dict[int, Set[int]] = {a: set() for a in ring_atoms}
-    for b in mol.GetBonds():
+    for b in bonds_of(mol):
         u, v = b.GetBeginAtomIdx(), b.GetEndAtomIdx()
         if u in ring_atoms and v in ring_atoms and b.IsInRing():
             adj[u].add(v)
@@ -4046,7 +4046,7 @@ def _name_spirobi_core(mol):
         all_ring_atoms.update(r)
     # Fail-closed on substituted spirobi: every heavy atom must be a ring atom
     # (substituted-spirobi prime/locant selection is a documented follow-on).
-    for atom in mol.GetAtoms():
+    for atom in atoms_of(mol):
         if atom.GetAtomicNum() > 1 and atom.GetIdx() not in all_ring_atoms:
             return None
 
@@ -4172,13 +4172,13 @@ def _name_spiroter_core(mol):
     all_ring_atoms: Set[int] = set()
     for r in all_rings:
         all_ring_atoms |= r
-    for atom in mol.GetAtoms():  # unsubstituted only
+    for atom in atoms_of(mol):  # unsubstituted only
         if atom.GetAtomicNum() > 1 and atom.GetIdx() not in all_ring_atoms:
             return None
 
     # Locate the unique λ spiro atom in >=3 rings.
     spiro_center = None
-    for atom in mol.GetAtoms():
+    for atom in atoms_of(mol):
         idx = atom.GetIdx()
         if sum(1 for r in all_rings if idx in r) < 3:
             continue
@@ -4303,13 +4303,13 @@ def _name_spiro_named_components_core(mol):
     all_ring_atoms: Set[int] = set()
     for r in all_rings:
         all_ring_atoms |= r
-    for atom in mol.GetAtoms():  # unsubstituted only
+    for atom in atoms_of(mol):  # unsubstituted only
         if atom.GetAtomicNum() > 1 and atom.GetIdx() not in all_ring_atoms:
             return None
 
     # Locate the unique λ spiro atom in >=3 rings (identical to _name_spiroter).
     spiro_center = None
-    for atom in mol.GetAtoms():
+    for atom in atoms_of(mol):
         idx = atom.GetIdx()
         if sum(1 for r in all_rings if idx in r) < 3:
             continue
@@ -4439,7 +4439,7 @@ def _name_dispiroter_core(mol):
     for r in all_rings:
         all_ring_atoms.update(r)
     # Unsubstituted only.
-    for atom in mol.GetAtoms():
+    for atom in atoms_of(mol):
         if atom.GetAtomicNum() > 1 and atom.GetIdx() not in all_ring_atoms:
             return None
 
@@ -4653,7 +4653,7 @@ def _name_unbranched_polyspiro_different_core(mol):
     all_ring_atoms: Set[int] = set()
     for r in all_rings:
         all_ring_atoms.update(r)
-    for atom in mol.GetAtoms():  # unsubstituted only
+    for atom in atoms_of(mol):  # unsubstituted only
         if atom.GetAtomicNum() > 1 and atom.GetIdx() not in all_ring_atoms:
             return None
 
@@ -4982,7 +4982,7 @@ def is_lambda_multiring_spiro(mol) -> bool:
         return False
     ri = mol.GetRingInfo()
     rings = [set(r) for r in ri.AtomRings()]
-    for atom in mol.GetAtoms():
+    for atom in atoms_of(mol):
         idx = atom.GetIdx()
         in_rings = sum(1 for r in rings if idx in r)
         if in_rings < 3:
@@ -5877,7 +5877,7 @@ def _cage_side_ene(mol, cage_a: Set[int], cage_b: Set[int],
     cage_all = cage_a | cage_b
     la: List[int] = []
     lb: List[int] = []
-    for bond in mol.GetBonds():
+    for bond in bonds_of(mol):
         x, y = bond.GetBeginAtomIdx(), bond.GetEndAtomIdx()
         if x not in cage_all or y not in cage_all:
             continue

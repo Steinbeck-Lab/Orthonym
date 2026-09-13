@@ -11,7 +11,7 @@ from collections import defaultdict
 from typing import Dict, List, Set, Tuple
 
 from rdkit import Chem
-from .molcache import atoms_of
+from .molcache import atoms_of, bonds_of
 
 # SMARTS patterns ordered by IUPAC seniority to
 # First match = highest priority = principal group
@@ -959,7 +959,7 @@ def _detect_functional_groups_impl(mol) -> Dict[str, List[Tuple[int, ...]]]:
             # aromatic ring, or a ring-internal C=C not part of a carbonyl.
             _res = any(mol.GetAtomWithIdx(i).GetIsAromatic() for i in _ring_atoms)
             if not _res:
-                for _b in mol.GetBonds():
+                for _b in bonds_of(mol):
                     _i, _j = _b.GetBeginAtomIdx(), _b.GetEndAtomIdx()
                     if (_b.GetBondTypeAsDouble() == 2.0
                             and _i in _ring_atoms and _j in _ring_atoms
@@ -1098,7 +1098,7 @@ def _detect_by_structure(mol):
     if _FG_MODE == "off" or isinstance(mol, Chem.RWMol):
         return _detect_functional_groups_impl(mol)
     try:
-        from ..assembly.memo import cache_or_compute, _cache_var
+        from ..assembly.memo import cache_or_compute, pure_cache_or_compute, _cache_var
         if _cache_var.get() is None:
             return _detect_functional_groups_impl(mol)
         smi = Chem.MolToSmiles(mol)
@@ -1107,7 +1107,11 @@ def _detect_by_structure(mol):
             return _detect_functional_groups_impl(mol)
     except Exception:
         return _detect_functional_groups_impl(mol)
-    result = cache_or_compute("fg_detect", key, lambda: _detect_functional_groups_impl(mol))
+    # Perf lever A8: the key is the canonical SMILES + atom output order, so the value is
+    # a pure function of the structure and survives the naming scope. The dict is copied on
+    # every return because callers may mutate the per-class match lists.
+    result = pure_cache_or_compute("fg_detect", key, lambda: _detect_functional_groups_impl(mol))
+    result = {k: list(v) for k, v in result.items()}
     if _FG_MODE == "verify":
         fresh = _detect_functional_groups_impl(mol)
         if dict(fresh) != dict(result):

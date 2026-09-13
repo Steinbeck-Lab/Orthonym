@@ -160,9 +160,10 @@ def _extended_smiles(name: str, jar_version: str = "2.9.0") -> Optional[str]:
     naming scope (Lever A, 2026-09-12): the stereo re-anchor asks for the same name
     several times per molecule, and a definitive rejection used to start a fresh
     3.5 s Java process that printed the same empty line."""
-    from ..assembly.memo import cache_or_compute
-    return cache_or_compute("opsin_extended_smiles", (name, jar_version),
-                            lambda: _extended_smiles_uncached(name, jar_version))
+    # Perf lever A8: a pure function of (name, jar_version) -> process-wide.
+    from ..assembly.memo import pure_cache_or_compute
+    return pure_cache_or_compute("opsin_extended_smiles", (name, jar_version),
+                                 lambda: _extended_smiles_uncached(name, jar_version))
 
 
 def _extended_smiles_uncached(name: str, jar_version: str = "2.9.0") -> Optional[str]:

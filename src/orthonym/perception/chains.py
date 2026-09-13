@@ -13,6 +13,7 @@ from rdkit import Chem
 
 from ..rules.lambda_convention import nonstandard_bonding_number
 from .molcache import atoms_of
+from ..rules.locants import compare_locant_sets  # perf lever A10 (2026-09-13): hoisted (23,785 executions per 300 molecules)
 
 # a phase (heteroatom-only-suffix acids): characteristic-heteroatom
 # (atomic number) for FG classes whose SMARTS matches S/P + O with NO carbon
@@ -171,7 +172,7 @@ def find_longest_carbon_chain(
         visited.discard(atom_idx)
 
     results = [[]]
-    for atom in mol.GetAtoms():
+    for atom in atoms_of(mol):
         if atom.GetSymbol() == 'C' and atom.GetIdx() not in exclude:
             dfs(atom.GetIdx(), set(), [], results)
 
@@ -725,7 +726,6 @@ def find_principal_chain(
         re-minimizing (the old ``max(fwd, rev)`` evaluated a fictional
         orientation and mis-ranked chains tying on the higher criteria).
         """
-        from ..rules.locants import compare_locant_sets
         cset = set(chain)
         rev = list(reversed(chain))
 

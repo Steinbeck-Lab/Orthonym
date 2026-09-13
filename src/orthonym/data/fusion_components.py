@@ -126,6 +126,42 @@ MONOCYCLIC_COMPONENTS: Dict[str, Dict[str, Any]] = {
         'aromatic': True,
     },
 
+    # ---- 5-membered 3-heteroatom (N,N,N) ----
+    # task-123 (2026-09-12): added to close the abstain on 2-component
+    # triazole-fused systems (c1cnc2ncnn2c1 -> [1,2,4]triazolo[1,5-a]pyrimidine,
+    # c1cnc2[nH]nnc2c1 -> [1,2,3]triazolo[4,5-b]pyridine) -- _identify_ring_name
+    # returned '' for these rings with no entry to match, so
+    # generate_systematic_name_for_fused_pair declined outright.
+    # Both isomers contract to the SAME prefix 'triazolo', so
+    # 's "locants that describe structural features of components...
+    # are kept with the name of the component and are enclosed within square
+    # brackets" (the Blue Book) requires citing the isomer as
+    # [1,2,3]triazolo / [1,2,4]triazolo; 'cite_locants' flags that.
+    # 'seniority' here is ASSUMED, placed just after pyrazole(51) by simple
+    # extension of this table's own "more heteroatoms > fewer" ordering
+    # (module docstring line 19); in practice.3(d) (heteroatom COUNT,
+    # fused_ring_selection.py) already ranks a real triazole ahead of any
+    # diazole before this fallback is ever consulted, so the exact value does
+    # not decide any case task-123's anchors exercise.
+    '1,2,3-triazole': {
+        'prefix': 'triazolo',
+        'ring_size': 5,
+        'heteroatoms': ['N', 'N', 'N'],
+        'hetero_positions': [1, 2, 3],
+        'cite_locants': True,
+        'seniority': 52,
+        'aromatic': True,
+    },
+    '1,2,4-triazole': {
+        'prefix': 'triazolo',
+        'ring_size': 5,
+        'heteroatoms': ['N', 'N', 'N'],
+        'hetero_positions': [1, 2, 4],
+        'cite_locants': True,
+        'seniority': 53,
+        'aromatic': True,
+    },
+
     # ---- 5-membered 2-heteroatom (N,O) ----
     'oxazole': {
         'prefix': 'oxazolo',

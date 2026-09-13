@@ -181,8 +181,8 @@ def _final_stereo_check(
     # descriptor for a ring/chain carbon that requires a numeric locant.
     # DETERMINISTIC: the CIP code is engine-assigned (order-independent) and
     # there is no locant to compute.
-    _rs_atoms = [a for a in mol.GetAtoms() if a.HasProp('_CIPCode')]
-    _bond_stereo = sum(1 for b in mol.GetBonds() if b.HasProp('_CIPCode'))
+    _rs_atoms = [a for a in atoms_of(mol) if a.HasProp('_CIPCode')]
+    _bond_stereo = sum(1 for b in bonds_of(mol) if b.HasProp('_CIPCode'))
     if (
         len(_rs_atoms) == 1
         and _bond_stereo == 0
@@ -193,8 +193,8 @@ def _final_stereo_check(
             return f"({_cip})-{name}"
 
     # Predicate said True but no authoritative injection happened -> log gap.
-    n_atom_stereo = sum(1 for a in mol.GetAtoms() if a.HasProp('_CIPCode'))
-    n_bond_stereo = sum(1 for b in mol.GetBonds() if b.HasProp('_CIPCode'))
+    n_atom_stereo = sum(1 for a in atoms_of(mol) if a.HasProp('_CIPCode'))
+    n_bond_stereo = sum(1 for b in bonds_of(mol) if b.HasProp('_CIPCode'))
     # -CLOSEOUT Item D:...unless the name expresses its configuration
     # through a descriptor channel `needs_stereo_injection` cannot see, in which
     # case this warning is a FALSE POSITIVE and the name is already complete.
@@ -2523,7 +2523,7 @@ def validate_binding_proof(value: str) -> str:
 
 
 import functools as _functools
-from .perception.molcache import inchikey_of, bonds_of
+from .perception.molcache import atoms_of, bonds_of, inchikey_of
 from .perception.smarts_cache import compiled as _compiled_smarts
 
 
@@ -2710,6 +2710,10 @@ class Orthonym:
                 Anything else raises ValueError: a typo must not silently
                 disable the proof.
         """
+        # Perf lever A1/A11 (2026-09-13): opt-in process tuning for batch workers
+        # (ORTHONYM_GC_TUNE=on). A no-op unless the variable is set; see runtime_tuning.py.
+        from .runtime_tuning import maybe_tune_from_env
+        maybe_tune_from_env()
         #: validate eagerly. A misspelled mode that silently degraded to
         # "off" would present as a clean run with the proof never executing --
         # the one failure mode an audit flag must not have.
@@ -4783,7 +4787,7 @@ class Orthonym:
             if ri.NumRings() < 1:
                 return None
             acyclic_c = sum(
-                1 for a in mol.GetAtoms()
+                1 for a in atoms_of(mol)
                 if a.GetAtomicNum() == 6 and not a.IsInRing())
             if acyclic_c < 2:
                 return None

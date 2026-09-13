@@ -27,7 +27,7 @@ from typing import Dict, List, Optional, Set, Tuple
 from rdkit import Chem
 
 from ..assembly.fragment_naming import _fragment_guard  # Lever N: budget replay on a memo hit
-from ..perception.molcache import cached_by_key
+from ..perception.molcache import atoms_of, bonds_of, cached_by_key
 from ..assembly.fragment_naming import (  # M2.5 macrocycle-hang budgets
     spend_analysis_call,
     spend_perf_work,
@@ -1991,7 +1991,7 @@ class VonBaeyerAnalyzer:
         if needed_more > 0:
             # Find bonds between ring atoms that are not accounted for
             zero_length_candidates = []
-            for bond in mol.GetBonds():
+            for bond in bonds_of(mol):
                 a_idx = bond.GetBeginAtomIdx()
                 b_idx = bond.GetEndAtomIdx()
                 if a_idx in ring_atoms and b_idx in ring_atoms:
@@ -3544,7 +3544,7 @@ def name_polycyclic_complete(mol, features=None):
     ring_atoms_all = set()
     for ring in ri.AtomRings():
         ring_atoms_all.update(ring)
-    all_heavy = {a.GetIdx() for a in mol.GetAtoms()}
+    all_heavy = {a.GetIdx() for a in atoms_of(mol)}
     if all_heavy == ring_atoms_all:
         # Pure ring system -- check retained name lookups
         from ..data.bicyclo_systems import get_retained_bicyclo_name

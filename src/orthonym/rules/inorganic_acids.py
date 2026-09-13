@@ -35,7 +35,7 @@ from typing import Optional
 
 from rdkit import Chem
 
-from ..perception.molcache import atoms_of  # audit 2026-09-03 (S2): per-call atom/bond tuples
+from ..perception.molcache import atoms_of, bonds_of  # audit 2026-09-03 (S2): per-call atom/bond tuples
 from .functional_replacement import (
     build_acyl_halide_name,
     build_frn_acid_name,
@@ -2042,14 +2042,14 @@ def name_hydrazinecarboxamide(mol) -> Optional[str]:
     centers = _hzc_find_centers(mol)
     if not centers:
         return None
-    total_heavy = {a.GetIdx() for a in mol.GetAtoms() if a.GetAtomicNum() > 1}
+    total_heavy = {a.GetIdx() for a in atoms_of(mol) if a.GetAtomicNum() > 1}
 
     # Seniority guard: the carboxamide is only the PIN parent when nothing
     # senior is present. A carbon carbonyl / nitrile / an S or P oxoacid OUTSIDE
     # the center skeleton(s) would outrank the carboxamide, so fail closed and let
     # the general seniority machinery own the molecule (avoids a wrong parent).
     _center_c = {c['C'] for c in centers}
-    for bond in mol.GetBonds():
+    for bond in bonds_of(mol):
         a, b = bond.GetBeginAtom(), bond.GetEndAtom()
         dbl = bond.GetBondTypeAsDouble()
         for x, y in ((a, b), (b, a)):
@@ -2057,7 +2057,7 @@ def name_hydrazinecarboxamide(mol) -> Optional[str]:
                     and ((y.GetSymbol() in ('O', 'S') and dbl == 2.0)
                          or (y.GetSymbol() == 'N' and dbl == 3.0))):
                 return None
-    if any(at.GetSymbol() in ('S', 'P') for at in mol.GetAtoms()):
+    if any(at.GetSymbol() in ('S', 'P') for at in atoms_of(mol)):
         return None
 
     if len(centers) == 1:

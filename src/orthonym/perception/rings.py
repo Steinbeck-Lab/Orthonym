@@ -300,6 +300,21 @@ def is_heterocyclic(mol, ring_atoms) -> bool:
 
 
 def get_spiro_atoms(mol) -> Set[int]:
+    """Memoising front of:func:`_get_spiro_atoms_impl` (perf lever A7, 2026-09-13).
+
+    Ring-classification helpers (``is_spiro_system``, ``classify_ring_system_type``,
+    ``is_bicyclo_system``, ``_spiro_fusion_count``,...) call this about 11 times per
+    pipeline pass on the same Mol (26,161 calls per 300 molecules, 2.2 s). Ring membership
+    depends on bonds only, which cannot change on a ``Chem.Mol`` without an RWMol (never
+    cached), so the key is the Mol identity. A fresh ``set`` is returned on every call
+    because some callers mutate the result.
+    """
+    from .molcache import cached_by_key
+    cached = cached_by_key(mol, "spiro_atoms", None, lambda: frozenset(_get_spiro_atoms_impl(mol)))
+    return set(cached)
+
+
+def _get_spiro_atoms_impl(mol) -> Set[int]:
     """
     Find atoms that are spiro centers (shared by exactly 2 rings).
     

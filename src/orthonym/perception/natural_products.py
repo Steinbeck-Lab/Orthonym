@@ -118,6 +118,29 @@ def _bfs_substituent(mol, start_idx: int, exclude_set: set) -> list:
 # ---------------------------------------------------------------------------
 
 def detect_natural_product(mol) -> Optional[Dict]:
+    """Memoising front of:func:`_detect_natural_product_impl` (perf lever A7, 2026-09-13).
+
+    ``classify_compound_class``, ``name_natural_product`` and ``select_parent_unified`` each
+    call this on the same Mol in one pipeline pass (5,787 calls per 300 molecules, 1.2 s).
+    The flexible scaffold queries are bond-generic and stereo-free, so the match depends on
+    the atoms' elements and charges (editable in place) and on connectivity (not editable on
+    a ``Chem.Mol``); the element/charge tuple is the memo key. The dict is copied on every
+    call (its ``non_scaffold_atoms`` set is mutable); ``matched_atoms`` is a tuple.
+    """
+    if mol is None:
+        return None
+    try:
+        from .molcache import atoms_of, cached_by_key
+        sig = tuple((a.GetAtomicNum(), a.GetFormalCharge()) for a in atoms_of(mol))
+    except Exception:
+        return _detect_natural_product_impl(mol)
+    hit = cached_by_key(mol, "natural_product", sig, lambda: _detect_natural_product_impl(mol))
+    if hit is None:
+        return None
+    return {**hit, "non_scaffold_atoms": set(hit["non_scaffold_atoms"])}
+
+
+def _detect_natural_product_impl(mol) -> Optional[Dict]:
     """Detect natural product scaffold in a molecule via substructure matching.
 
     Uses flexible (bond-generic, stereo-free) query patterns so that both

@@ -25,6 +25,7 @@ Dependency-light on purpose (``contextvars`` + ``os`` only).
 """
 import contextvars
 import os
+from collections import OrderedDict
 
 #: verify-mode mismatch log (process-global, across scopes). A ``MemoMismatch`` is
 #: RAISED as a loud failure, but the recursive naming cascade wraps the hot loops in
@@ -96,6 +97,73 @@ def pop_scope(token):
     token (nested re-entry) is a no-op, so only the outermost frame tears down."""
     if token is not None:
         _cache_var.reset(token)
+
+
+# ---------------------------------------------------------------------------
+# Perf lever A8 (2026-09-13): process-wide cache for the PURE namespaces
+# ---------------------------------------------------------------------------
+# The scope cache above dies with each top-level ``name`` call, so work that is a
+# pure function of a STRUCTURE or a NAME is redone for every molecule. Measured over
+# 300 fixed-seed molecules: of the values computed inside a scope, 34 % of
+# ``fg_detect``, 32 % of ``sugar_c_substituted`` and 26 % of the in-process OPSIN
+# parses had already been computed for an earlier molecule.
+#
+# ONLY namespaces whose key is complete may use this. ``name_substituent`` and
+# ``fused_core`` are deliberately EXCLUDED: their keys carry no tier/breadth flags
+# (2026-09-12 lever-B finding, one ChEBI row flipped pin_unverified -> pin_verified),
+# so a value cached under one engine configuration must never be served to another.
+# In ``verify`` mode nothing is served from here; the value is recomputed and compared
+# exactly as in:func:`cache_or_compute`.
+_PROCESS_MAX = int(os.environ.get("ORTHONYM_PROCESS_CACHE", "20000") or 0)
+_process_cache: "OrderedDict[tuple, object]" = OrderedDict()
+
+
+def process_cache_stats() -> dict:
+    """``{"size", "maxsize", "hits", "misses"}`` for the process-wide pure cache."""
+    return {"size": len(_process_cache), "maxsize": _PROCESS_MAX,
+            "hits": _PROCESS_HITS[0], "misses": _PROCESS_MISSES[0]}
+
+
+_PROCESS_HITS = [0]
+_PROCESS_MISSES = [0]
+
+
+def clear_process_cache() -> None:
+    """Drop every process-wide entry (tests; a worker that changes engine flags)."""
+    _process_cache.clear()
+    _PROCESS_HITS[0] = _PROCESS_MISSES[0] = 0
+
+
+def pure_cache_or_compute(namespace, key, compute_fn):
+    """Memoise a value that is a pure function of ``key`` for the LIFE OF THE PROCESS.
+
+    Same contract as:func:`cache_or_compute` except that the entry outlives the naming
+    scope. Bounded LRU (``ORTHONYM_PROCESS_CACHE`` entries, default 20,000; ``0``
+    disables). ``ORTHONYM_MEMO=off``/``verify`` bypass it exactly as they bypass the
+    scope cache. The caller guarantees the key determines the value.
+    """
+    if _MODE != "on" or _PROCESS_MAX <= 0:
+        return cache_or_compute(namespace, key, compute_fn)
+    ck = (namespace, key)
+    try:
+        val = _process_cache[ck]
+    except KeyError:
+        pass
+    except TypeError:  # unhashable key -> scope semantics
+        return cache_or_compute(namespace, key, compute_fn)
+    else:
+        _process_cache.move_to_end(ck)
+        _PROCESS_HITS[0] += 1
+        return val
+    val = cache_or_compute(namespace, key, compute_fn)
+    _PROCESS_MISSES[0] += 1
+    try:
+        _process_cache[ck] = val
+        if len(_process_cache) > _PROCESS_MAX:
+            _process_cache.popitem(last=False)
+    except TypeError:
+        pass
+    return val
 
 
 def cache_or_compute(namespace, key, compute_fn):

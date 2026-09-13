@@ -28,7 +28,7 @@ from typing import Any, Dict, List, Optional, Set, Tuple, Union
 
 from rdkit import Chem
 
-from ..perception.molcache import atoms_of  # audit 2026-09-03 (S2): per-call atom/bond tuples
+from ..perception.molcache import atoms_of, bonds_of  # audit 2026-09-03 (S2): per-call atom/bond tuples
 from ..perception.smarts_cache import compiled as _compiled_smarts
 
 # Saturation prefix mapping based on number of added hydrogens
@@ -647,7 +647,7 @@ def _partial_sat_pcg(
     # Every heteroatom in the molecule must be one of those hydroxy oxygens,
     # and the species must be neutral and non-radical — otherwise -ol is not
     # provably the senior group and this path must not claim the suffix.
-    for atom in mol.GetAtoms():
+    for atom in atoms_of(mol):
         if atom.GetFormalCharge() != 0 or atom.GetNumRadicalElectrons() != 0:
             return (None, set())
         if atom.GetAtomicNum() != 6 and atom.GetIdx() not in ol_oxygens:
@@ -677,7 +677,7 @@ def _partial_sat_pcg_amine(
             am_nitrogens.add(nitrogen)
     if not am_ring or len(am_nitrogens) != len(am_ring):
         return (None, set())
-    for atom in mol.GetAtoms():
+    for atom in atoms_of(mol):
         if atom.GetFormalCharge() != 0 or atom.GetNumRadicalElectrons() != 0:
             return (None, set())
         if atom.GetAtomicNum() != 6 and atom.GetIdx() not in am_nitrogens:
@@ -837,7 +837,7 @@ def detect_carbocyclic_partial_saturation(
     # Residual non-aromatic ring C=C double bonds — needed both to choose the
     # lowest-locant numbering and to recognise full saturation.
     ring_double_bonds: List[Tuple[int, int]] = []
-    for bond in mol.GetBonds():
+    for bond in bonds_of(mol):
         if bond.GetBondType() != Chem.BondType.DOUBLE or bond.GetIsAromatic():
             continue
         a, b = bond.GetBeginAtomIdx(), bond.GetEndAtomIdx()
@@ -1176,7 +1176,7 @@ def name_hydrogenated_fused_carbocycle(mol: Chem.Mol) -> Optional[str]:
 
     # Residual ring double bonds (non-aromatic C=C with both atoms in the ring).
     ring_double_bonds: List[Tuple[int, int]] = []
-    for bond in mol.GetBonds():
+    for bond in bonds_of(mol):
         if bond.GetBondType() != Chem.BondType.DOUBLE or bond.GetIsAromatic():
             continue
         a, b = bond.GetBeginAtomIdx(), bond.GetEndAtomIdx()
@@ -1484,7 +1484,7 @@ def _mancude_ring_parent(mol, ring_atoms):
     old_to_new = {}
     for idx in sorted(ring):
         old_to_new[idx] = em.AddAtom(Chem.Atom(mol.GetAtomWithIdx(idx).GetAtomicNum()))
-    for bond in mol.GetBonds():
+    for bond in bonds_of(mol):
         i, j = bond.GetBeginAtomIdx(), bond.GetEndAtomIdx()
         if i in ring and j in ring:
             em.AddBond(old_to_new[i], old_to_new[j], Chem.BondType.AROMATIC)
@@ -1836,7 +1836,7 @@ def name_cyclic_oxo_compound(mol: Chem.Mol) -> Optional[str]:
             if (bond.GetBondType() == Chem.BondType.DOUBLE and o.GetSymbol() == suffix_symbol
                     and o.GetIdx() not in ring_set and o.GetDegree() == 1):
                 carbonyl_oxygens.add(o.GetIdx())
-    substituent_atoms = {a.GetIdx() for a in mol.GetAtoms()
+    substituent_atoms = {a.GetIdx() for a in atoms_of(mol)
                          if a.GetIdx() not in ring_set and a.GetIdx() not in carbonyl_oxygens}
     substituted = bool(substituent_atoms)
     if substituted:
@@ -1880,7 +1880,7 @@ def name_cyclic_oxo_compound(mol: Chem.Mol) -> Optional[str]:
     # Residual unsaturation required (else fully-saturated lactam/lactone/ketone).
     has_residual = any(mol.GetAtomWithIdx(i).GetIsAromatic() for i in ring_set)
     if not has_residual:
-        for bond in mol.GetBonds():
+        for bond in bonds_of(mol):
             if bond.GetBondType() == Chem.BondType.DOUBLE:
                 i, j = bond.GetBeginAtomIdx(), bond.GetEndAtomIdx()
                 if (i in ring_set and j in ring_set
@@ -1916,7 +1916,7 @@ def name_cyclic_oxo_compound(mol: Chem.Mol) -> Optional[str]:
            if i not in carbonyls and i not in mol_ring_db
            and mol.GetAtomWithIdx(i).GetSymbol() in ('C', 'N')}
     adj = {i: set() for i in sat}
-    for bond in mol.GetBonds():
+    for bond in bonds_of(mol):
         i, j = bond.GetBeginAtomIdx(), bond.GetEndAtomIdx()
         if i in sat and j in sat:
             adj[i].add(j)

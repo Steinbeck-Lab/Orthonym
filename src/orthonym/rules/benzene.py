@@ -34,7 +34,7 @@ from ..assembly.naming_utils import (
     should_omit_locant_one,
 )
 from .locants import compare_locant_sets as _compare_locant_sets  #
-from ..perception.molcache import inchikey_of
+from ..perception.molcache import atoms_of, inchikey_of
 from ..perception.smarts_cache import compiled as _compiled_smarts
 
 # Mapping from substituent atom symbol/pattern to prefix name
@@ -5265,7 +5265,7 @@ def _benzene_l5_uniform_licence(
     else:
         stereo_text = 'stereo' if stereo_descriptors else ''
 
-    has_isotope = any(a.GetIsotope() for a in mol.GetAtoms())
+    has_isotope = any(a.GetIsotope() for a in atoms_of(mol))
 
     if scope_forces_locants(
         prefix_locants=all_prefix_locants,

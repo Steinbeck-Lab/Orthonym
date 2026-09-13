@@ -53,10 +53,27 @@ from typing import List, Optional, Sequence
 #: ``-XX:-UsePerfData`` no /tmp/hsperfdata file -> the contamination class
 #: above becomes structurally impossible.
 #: ``-Djava.awt.headless`` no display is ever available; avoids an AWT probe.
-JVM_HYGIENE_FLAGS: List[str] = [
+JVM_CORE_HYGIENE_FLAGS: List[str] = [
     "-XX:-UsePerfData",
     "-Djava.awt.headless=true",
 ]
+
+#: Perf lever A2 (2026-09-13). Every worker process runs its own JVM; with the default G1
+#: collector each held 8 parallel + 10 concurrent GC threads, and 40-56 workers on 60 vCPUs
+#: spent ~10 % of their CPU in JVM helper threads. Measured on this host (OPSIN in-process
+#: parse, 1,200 names): SerialGC starts the JVM in 1.7 s instead of 2.6 s and parses faster
+#: on a loaded box; C1-only (TieredStopAtLevel=1) warms up fastest at no steady-state loss
+#: (OPSIN parsing is ~3 % of naming time). Neither flag changes any result.
+#: ``ORTHONYM_JVM_PERF_FLAGS=off`` drops them (A/B measurements).
+JVM_PERF_FLAGS: List[str] = [
+    "-XX:+UseSerialGC",
+    "-XX:TieredStopAtLevel=1",
+]
+if __import__("os").environ.get("ORTHONYM_JVM_PERF_FLAGS", "on").strip().lower() in ("off", "0", "false"):
+    JVM_PERF_FLAGS = []
+
+#: Flags applied to every JVM this project launches (hygiene first, then the perf flags).
+JVM_HYGIENE_FLAGS: List[str] = [*JVM_CORE_HYGIENE_FLAGS, *JVM_PERF_FLAGS]
 
 
 def java_cmd(*args: str, heap: Optional[str] = None) -> List[str]:

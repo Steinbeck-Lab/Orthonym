@@ -407,9 +407,22 @@ def build_systematic_fusion_name(
     # Get fusion prefix for the child ring
     prefix = get_fusion_prefix(child_name)
 
-    # Assemble: prefix + descriptor + parent
+    # (the Blue Book): "Locants that describe structural
+    # features of components, such as positions of heteroatoms, are kept with
+    # the name of the component and are enclosed within square brackets."
+    # Some components share an identical contracted prefix for more than one
+    # heteroatom arrangement (both 1,2,3-triazole and 1,2,4-triazole -> the
+    # ambiguous prefix 'triazolo'); MONOCYCLIC_COMPONENTS flags these
+    # 'cite_locants' so the isomer is disambiguated, e.g.
+    # [1,2,4]triazolo[1,5-a]pyrimidine.
+    loc_prefix = ''
+    info = MONOCYCLIC_COMPONENTS.get(child_name)
+    if info and info.get('cite_locants'):
+        loc_prefix = '[' + ','.join(str(p) for p in info['hetero_positions']) + ']'
+
+    # Assemble: [locants]prefix + descriptor + parent
     # Note: IUPAC 2013 does NOT elide 'o' before vowels
-    return f"{prefix}{descriptor}{parent_name}"
+    return f"{loc_prefix}{prefix}{descriptor}{parent_name}"
 
 
 def identify_parent_and_child(
@@ -570,6 +583,25 @@ def _identify_ring_name(mol, ring_atoms: List[int]) -> str:
 
     # Heterocyclic rings: use registry with gap disambiguation
     sorted_symbols = sorted(hetero_symbols)
+
+    # 5-membered ring, 3 N: 1,2,3-triazole vs 1,2,4-triazole. The generic
+    # gap-based disambiguation below only handles EXACTLY 2 heteroatoms
+    # (get_component_by_pattern's 2-position cascade), so it can never match
+    # a triazole; this was the confirmed root cause of task-123's abstains on
+    # c1cnc2ncnn2c1 / c1cnc2[nH]nnc2c1 (child_name came back '' -> the whole
+    # 2-component descriptor path declined). Mirrors the identical, already-
+    # verified adjacency test in rules/ring_substituents.py:253-259
+    # retained triazoles): 1,2,3-triazole has a MIDDLE N bonded to two ring
+    # N's (the N1-N2-N3 run); 1,2,4-triazole has no N with two N neighbours.
+    if ring_size == 5 and sorted_symbols == ['N', 'N', 'N']:
+        ring_set = set(ring_atoms)
+        has_nnn = any(
+            mol.GetAtomWithIdx(i).GetSymbol() == 'N'
+            and sum(1 for nb in mol.GetAtomWithIdx(i).GetNeighbors()
+                    if nb.GetIdx() in ring_set and nb.GetSymbol() == 'N') == 2
+            for i in ring_atoms
+        )
+        return '1,2,3-triazole' if has_nnn else '1,2,4-triazole'
 
     # Compute gap for 2-heteroatom rings
     gap = None
@@ -1174,28 +1206,15 @@ _FUSION_HET_NUM_SENIORITY = {
 }
 
 
-def _cooptimal_child_orderings(
-    mol,
-    ring_atoms: List[int],
-    shared_atoms: Set[int],
-) -> List[List[int]]:
-    """Enumerate the co-optimal IUPAC numberings of an attached (child) ring.
+def _het_tied_ring_orderings(mol, ring_atoms: List[int]) -> List[List[int]]:
+    """Enumerate every full cyclic ordering of ``ring_atoms`` tied for lowest
+    heteroatom locants as a set, senior element first (a)
+    the Blue Book / (b):12558) -- the isolated-ring IUPAC numbering
+    criterion shared by BOTH the parent and the child of a fusion pair.
 
-    A child ring is numbered to give (1) lowest locants to its heteroatoms as a
-    set, senior element first (a) the Blue Book / (b):12558),
-    and then (2) lowest locants to the fusion-bond (shared) atoms. This returns
-    EVERY ordering tied on both keys.
-
-    - Asymmetric child (a heteroatom adjacent to the fusion bond): exactly one
-      ordering survives, so the caller's descriptor is forced -- a genuinely
-      descending citation such as [3,2-b] is preserved.
-    - Symmetric child (a heteroatom equidistant from the fusion bond): two
-      orderings survive tied on both keys, and the caller breaks the remaining
-      tie by citing the lower descriptor pair in the direction of the parent
-      lettering:11911; (d):13403/:13409).
-
-    Returns  for a non-simple cycle (a bridged/interior atom) so the caller can
-    fall back to the single-pick numbering and never lose a name it builds today.
+    Returns  for a non-simple cycle (a bridged/interior atom) so callers can
+    fall back to the single-pick numbering and never lose a name that builds
+    today.
     """
     ring_set = set(ring_atoms)
     adj = {}
@@ -1230,7 +1249,35 @@ def _cooptimal_child_orderings(
         return tuple(sorted(items))
 
     best_het = min((het_key(o) for o in orderings), default=())
-    het_min = [o for o in orderings if het_key(o) == best_het]
+    return [o for o in orderings if het_key(o) == best_het]
+
+
+def _cooptimal_child_orderings(
+    mol,
+    ring_atoms: List[int],
+    shared_atoms: Set[int],
+) -> List[List[int]]:
+    """Enumerate the co-optimal IUPAC numberings of an attached (child) ring.
+
+    A child ring is numbered to give (1) lowest locants to its heteroatoms as a
+    set, senior element first (a) the Blue Book / (b):12558),
+    and then (2) lowest locants to the fusion-bond (shared) atoms. This returns
+    EVERY ordering tied on both keys.
+
+    - Asymmetric child (a heteroatom adjacent to the fusion bond): exactly one
+      ordering survives, so the caller's descriptor is forced -- a genuinely
+      descending citation such as [3,2-b] is preserved.
+    - Symmetric child (a heteroatom equidistant from the fusion bond): two
+      orderings survive tied on both keys, and the caller breaks the remaining
+      tie by citing the lower descriptor pair in the direction of the parent
+      lettering:11911; (d):13403/:13409).
+
+    Returns  for a non-simple cycle (a bridged/interior atom) so the caller can
+    fall back to the single-pick numbering and never lose a name it builds today.
+    """
+    het_min = _het_tied_ring_orderings(mol, ring_atoms)
+    if not het_min:
+        return []
 
     def shared_key(order):
         return tuple(sorted(order.index(s) + 1 for s in shared_atoms
@@ -1245,6 +1292,39 @@ def _cooptimal_child_orderings(
     return result
 
 
+def _cooptimal_parent_orderings(
+    mol,
+    ring_atoms: List[int],
+) -> List[List[int]]:
+    """Enumerate the co-optimal IUPAC numberings of a PARENT (base) ring:
+    every full ordering tied for lowest heteroatom locants as a set, senior
+    element first -- exactly the isolated-ring numbering criterion, with NO
+    further tie-break here.
+
+    Unlike the child (whose remaining tie-break is "lowest fusion-bond
+    locants", safely proxied by sorted shared-atom position), the parent's
+    remaining tie-break is 's "letter as early in the alphabet as
+    possible" (the Blue Book). Sorted shared-atom position is NOT a
+    safe proxy for lowest LETTER: get_fusion_edge gives the wraparound bond
+    (positions 1,n) the HIGHEST edge index even though its sorted position
+    pair (1,n) looks lowest by naive tuple comparison. So this function
+    returns every heteroatom-tied ordering un-filtered, and the caller (
+    generate_systematic_name_for_fused_pair) picks the true lowest-letter,
+    OPSIN-verified candidate via the real edge letter
+    (_fusion_descriptor_citation_key), not a position proxy.
+
+    This is the confirmed root cause of task-123's Symptom A (the spelling
+    lottery): a parent with a symmetric heteroatom arrangement (e.g.
+    pyrimidine's N1<->N3 mirror) has TWO such tied orderings, and the old
+    single-pick _get_iupac_ring_order_for_fusion(is_child=False) chose
+    whichever physical atom happened to sort first by RDKit atom index -- an
+    artifact of input SMILES atom order, not chemistry.
+
+    Returns  for a non-simple cycle, mirroring _cooptimal_child_orderings.
+    """
+    return _het_tied_ring_orderings(mol, ring_atoms)
+
+
 def _fusion_descriptor_citation_key(descriptor: str):
     """Sort key for choosing the lowest fusion descriptor among co-optimal child
     numberings: edge letter first the Blue Book -- 'the letter
@@ -1257,6 +1337,48 @@ def _fusion_descriptor_citation_key(descriptor: str):
         nums = tuple(int(p) for p in locs.split(','))
         return (letter,) + nums
     return (inner,)
+
+
+def _bare_core_inchikey(mol, core_atoms: Set[int]) -> Optional[str]:
+    """InChIKey of the bare 2-ring core spanned by ``core_atoms``, with any
+    exocyclic substituents stripped (RDKit fills the resulting open valences
+    with implicit H) -- i.e. the exact structure a fusion descriptor NAMES,
+    independent of whatever substituents decorate it afterward. Used to
+    affirmatively OPSIN-verify a candidate descriptor (task-123 Step 2:
+    "do not rely on ", the contributor guide 0-wrong invariant).
+
+    Returns None (verification skipped by the caller, which then falls back
+    to the pre-task-123 unverified pick) when:
+    - the fragment cannot be isolated/sanitized (e.g. an exocyclic double
+      bond would leave a dangling valence), or
+    - the core is not FULLY aromatic in ``mol``. generate_fusion_descriptor
+      is aromaticity-agnostic by design (a phase): it names the mancude
+      (maximally-unsaturated) parent regardless of the real molecule's
+      saturation state, and _try_partial_saturation_name wraps the result in
+      a locanted 'dihydro-' etc. prefix afterward. A partially-saturated
+      core's OWN InChIKey (real single bonds, sp3 ring carbons) can never
+      match the mancude descriptor name OPSIN parses back to, so comparing
+      them here would wrongly veto every candidate for that whole class
+      (measured: 22 dihydro-/spiro-fused regression failures without this
+      guard). Verification is therefore scoped to what it can safely check:
+      bare, fully-aromatic 2-ring cores (task-123's 4 anchors and the general
+      mancude case)."""
+    from rdkit import Chem as _Chem
+
+    if not all(mol.GetAtomWithIdx(i).GetIsAromatic() for i in core_atoms):
+        return None
+
+    bond_idxs = [b.GetIdx() for b in mol.GetBonds()
+                 if b.GetBeginAtomIdx() in core_atoms
+                 and b.GetEndAtomIdx() in core_atoms]
+    if not bond_idxs:
+        return None
+    try:
+        core = _Chem.PathToSubmol(mol, bond_idxs)
+        _Chem.SanitizeMol(core)
+        return _Chem.MolToInchiKey(core)
+    except Exception:
+        return None
 
 
 def generate_systematic_name_for_fused_pair(
@@ -1297,16 +1419,23 @@ def generate_systematic_name_for_fused_pair(
     if not parent_name or not child_name:
         return None
 
-    # Get IUPAC-ordered parent ring for correct descriptor generation.
-    parent_iupac = _get_iupac_ring_order_for_fusion(
-        mol, parent_ring, shared_atoms, is_child=False
-    )
-
     # For carbocyclic child (all positions equivalent), omit child locants
     # benzene -> [b], cyclopentadiene -> [b], cycloheptadiene -> [b]
     CARBOCYCLIC_CHILDREN = {'benzene', 'cyclopentadiene', 'cyclopentene',
                             'cycloheptadiene', 'cycloheptene', 'cyclohexene'}
     child_is_carbo = child_name in CARBOCYCLIC_CHILDREN
+
+    # Enumerate the co-optimal PARENT numberings too -- see
+    # _cooptimal_parent_orderings for why this is a distinct function from
+    # the child's (a shared-position proxy is unsafe for letter minimisation
+    # in the wraparound case). The true lowest-letter, OPSIN-verified pick
+    # among these happens below via _fusion_descriptor_citation_key.
+    parent_orders = _cooptimal_parent_orderings(mol, parent_ring)
+    if not parent_orders:
+        # Non-simple cycle (bridged/interior atom): fall back to the single
+        # pick so nothing that names today can start returning None.
+        parent_orders = [_get_iupac_ring_order_for_fusion(
+            mol, parent_ring, shared_atoms, is_child=False)]
 
     # Enumerate the co-optimal child numberings and pick the fusion descriptor
     # that is lowest in citation order. A SYMMETRIC child (heteroatom equidistant
@@ -1323,22 +1452,50 @@ def generate_systematic_name_for_fused_pair(
         child_orders = [_get_iupac_ring_order_for_fusion(
             mol, child_ring, shared_atoms, is_child=True)]
 
-    best = None  # (citation_key, descriptor)
-    for child_iupac in child_orders:
-        cand = generate_fusion_descriptor(
-            parent_iupac, child_iupac, shared_atoms, child_is_benzene=child_is_carbo
-        )
-        if not cand:
-            continue
-        key = _fusion_descriptor_citation_key(cand)
-        if best is None or key < best[0]:
-            best = (key, cand)
-    if best is None:
-        return None
-    descriptor = best[1]
+    # Affirmative OPSIN round-trip target: the bare 2-ring core this call is
+    # naming (never the whole molecule -- a substituted system's descriptor
+    # still only names its unsubstituted parent; substituents are decorated
+    # on afterward by the caller). None means the core could not be isolated/
+    # sanitized (rare; e.g. an exocyclic double bond) -- verification is then
+    # skipped for this call and the pre-task-123 unverified pick is kept, so
+    # this change cannot regress a case it cannot safely check.
+    target_inchikey = _bare_core_inchikey(mol, set(ring1) | set(ring2))
 
-    # Build the systematic name
-    return build_systematic_fusion_name(parent_name, child_name, descriptor)
+    best = None  # (citation_key, name) among candidates tried in key order
+    opsin_parse = None
+    if target_inchikey is not None:
+        from ..validation.opsin_roundtrip import opsin_parse as _opsin_parse
+        opsin_parse = _opsin_parse
+
+    # Try every (parent, child) numbering combination. Candidates are only
+    # ever REPLACED by a strictly lower citation key: lowest
+    # letter, then lowest locants), so the loop is insensitive to iteration
+    # order -- deterministic regardless of input atom order/SMILES spelling.
+    for parent_iupac in parent_orders:
+        for child_iupac in child_orders:
+            cand = generate_fusion_descriptor(
+                parent_iupac, child_iupac, shared_atoms,
+                child_is_benzene=child_is_carbo
+            )
+            if not cand:
+                continue
+            key = _fusion_descriptor_citation_key(cand)
+            if best is not None and key >= best[0]:
+                continue  # cannot improve on the current best; skip the OPSIN call
+            name = build_systematic_fusion_name(parent_name, child_name, cand)
+            if opsin_parse is not None:
+                from rdkit import Chem as _Chem
+                parsed_smiles = opsin_parse(name)
+                if not parsed_smiles:
+                    continue
+                parsed_mol = _Chem.MolFromSmiles(parsed_smiles)
+                if parsed_mol is None:
+                    continue
+                if _Chem.MolToInchiKey(parsed_mol) != target_inchikey:
+                    continue
+            best = (key, name)
+
+    return best[1] if best is not None else None
 
 
 def generate_multi_fusion_name(

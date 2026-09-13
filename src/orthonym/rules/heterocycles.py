@@ -913,7 +913,7 @@ def _mancude_monocycle_parent(mol, ring_atoms):
                 atom.SetNumExplicitHs(1)
                 atom.SetNoImplicit(True)
             old_to_new[idx] = em.AddAtom(atom)
-        for bond in mol.GetBonds():
+        for bond in bonds_of(mol):
             i, j = bond.GetBeginAtomIdx(), bond.GetEndAtomIdx()
             if i in ring and j in ring:
                 em.AddBond(old_to_new[i], old_to_new[j], Chem.BondType.AROMATIC)
@@ -1675,7 +1675,7 @@ def _mancude_parent_suffix_numbering(mol, ring_set: Set[int],
     pos_of = {a: k for k, a in enumerate(ordered)}
     db_atoms: Set[int] = set()
     d = 0
-    for bond in mol.GetBonds():
+    for bond in bonds_of(mol):
         if bond.GetBondType() != Chem.BondType.DOUBLE:
             continue
         i, j = bond.GetBeginAtomIdx(), bond.GetEndAtomIdx()
@@ -1968,7 +1968,7 @@ def name_partially_saturated_monocyclic_heterocycle(
     # Ring atoms still unsaturated in the MOLECULE (ring double bond or aromatic)
     # — these are NOT hydro positions.
     mol_unsat: Set[int] = set()
-    for bond in mol.GetBonds():
+    for bond in bonds_of(mol):
         if bond.GetBondType() == Chem.BondType.DOUBLE:
             i, j = bond.GetBeginAtomIdx(), bond.GetEndAtomIdx()
             if i in ring_set and j in ring_set:
@@ -2447,7 +2447,7 @@ def _monocycle_indicated_h_prefix(mol, oriented: List[int], info) -> str:
 
     # Actual ring double bonds (the aromatic case was excluded above).
     db_pairs = []
-    for bond in mol.GetBonds():
+    for bond in bonds_of(mol):
         if bond.GetBondType() == Chem.BondType.DOUBLE:
             i, j = bond.GetBeginAtomIdx(), bond.GetEndAtomIdx()
             if i in ring_set and j in ring_set:

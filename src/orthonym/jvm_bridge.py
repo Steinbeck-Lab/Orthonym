@@ -78,7 +78,7 @@ import os
 import threading
 from typing import Optional, Sequence, Tuple
 
-from orthonym.jvm_flags import JVM_HYGIENE_FLAGS
+from orthonym.jvm_flags import JVM_CORE_HYGIENE_FLAGS, JVM_HYGIENE_FLAGS
 
 logger = logging.getLogger(__name__)
 
@@ -176,12 +176,17 @@ def _start(pid: int) -> bool:
         # /tmp/hsperfdata_<user>/<pid> file, which is what lets a later JVM print
         # a warning onto stdout. See orthonym/jvm_flags.py for the mechanism.
         base = [f"-Xmx{xmx}", *JVM_HYGIENE_FLAGS]
+        # Perf lever A2: JVM_HYGIENE_FLAGS now ends with JVM_PERF_FLAGS (SerialGC, C1-only).
+        # Both are accepted by every supported JDK, but a start-up failure must never be
+        # caused by a performance flag, so the ladder retries without them last.
+        base_core = [f"-Xmx{xmx}", *JVM_CORE_HYGIENE_FLAGS]
         # JDK 24+ prints a 4-line "restricted method... System::load" warning to
         # stderr for JPype's own native load. Harmless, but every worker process
         # would emit it, so silence it where supported. The flag is UNKNOWN to
         # JDK < 24 and would abort start-up there, hence the retry without it --
         # a cosmetic flag must never be the reason the JVM fails to come up.
-        for opts in ([*base, "--enable-native-access=ALL-UNNAMED"], base):
+        for opts in ([*base, "--enable-native-access=ALL-UNNAMED"], base,
+                     [*base_core, "--enable-native-access=ALL-UNNAMED"], base_core):
             try:
                 jpype.startJVM(*opts, classpath=classpath)
                 break
@@ -293,16 +298,32 @@ def opsin_stdout(name: str, allow_radicals: bool,
     naming scope the same (name, allow_radicals, jar_path) is parsed once; a served result is
     a pure function of the name, so the memo is exact. Unserved results are never cached, and
     nothing is cached outside a scope or in ORTHONYM_MEMO=verify mode."""
-    from .assembly.memo import _MODE as _memo_mode, _cache_var
-    cache = _cache_var.get() if _memo_mode == "on" else None
+    from .assembly.memo import _MODE as _memo_mode, _cache_var, _process_cache, _PROCESS_MAX
+    if _memo_mode != "on":
+        return _opsin_stdout_uncached(name, allow_radicals, jar_path)
+    ck = ("opsin_stdout", (name, allow_radicals, jar_path))
+    # Perf lever A8 (2026-09-13): the same candidate names recur ACROSS molecules
+    # (26 % of the parses in one scope were already repeats), and a served parse is a
+    # pure function of the name, so the entry outlives the scope. Unserved results
+    # (the JVM could not answer) are still never cached.
+    if _PROCESS_MAX > 0:
+        hit = _process_cache.get(ck)
+        if hit is not None:
+            _process_cache.move_to_end(ck)
+            return hit
+    cache = _cache_var.get()
     if cache is not None:
-        ck = ("opsin_stdout", (name, allow_radicals, jar_path))
         hit = cache.get(ck)
         if hit is not None:
             return hit
     res = _opsin_stdout_uncached(name, allow_radicals, jar_path)
-    if cache is not None and res[1]:
-        cache[ck] = res
+    if res[1]:
+        if cache is not None:
+            cache[ck] = res
+        if _PROCESS_MAX > 0:
+            _process_cache[ck] = res
+            if len(_process_cache) > _PROCESS_MAX:
+                _process_cache.popitem(last=False)
     return res
 
 

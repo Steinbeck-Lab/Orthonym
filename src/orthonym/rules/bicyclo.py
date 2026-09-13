@@ -565,7 +565,7 @@ def get_bicyclo_numbering(mol, suffix_ring_atoms: Optional[Set[int]] = None) -> 
     hetero = {i for i in ring_atoms if mol.GetAtomWithIdx(i).GetSymbol() != 'C'}
     ring_multibonds = []
     ring_double_bonds = []
-    for b in mol.GetBonds():
+    for b in bonds_of(mol):
         a1, a2 = b.GetBeginAtomIdx(), b.GetEndAtomIdx()
         if a1 in ring_atoms and a2 in ring_atoms:
             order = b.GetBondTypeAsDouble()
@@ -892,7 +892,7 @@ def detect_bicyclo_unsaturation(mol, ring_atoms: Set[int]) -> Dict:
     double_bonds: List[Tuple[int, int]] = []
     triple_bonds: List[Tuple[int, int]] = []
 
-    for bond in mol.GetBonds():
+    for bond in bonds_of(mol):
         begin_idx = bond.GetBeginAtomIdx()
         end_idx = bond.GetEndAtomIdx()
 

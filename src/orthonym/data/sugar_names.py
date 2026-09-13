@@ -29,7 +29,7 @@ from typing import Dict, Optional, Tuple
 
 from rdkit import Chem
 from rdkit.Chem import rdCIPLabeler
-from ..perception.molcache import canon_smiles
+from ..perception.molcache import atoms_of, bonds_of, canon_smiles
 
 logger = logging.getLogger(__name__)
 
@@ -1358,10 +1358,10 @@ def _is_clean_sugar_ring(mol, ring) -> bool:
     if len(ringset) not in (5, 6):
         return False
     # No nitrogen anywhere (amino / N-acetyl sugars).
-    if any(a.GetSymbol() == "N" for a in mol.GetAtoms()):
+    if any(a.GetSymbol() == "N" for a in atoms_of(mol)):
         return False
     # No double bonds anywhere (carbonyl / carboxyl uronic acids, glycals).
-    if any(b.GetBondTypeAsDouble() == 2.0 for b in mol.GetBonds()):
+    if any(b.GetBondTypeAsDouble() == 2.0 for b in bonds_of(mol)):
         return False
     ring_oxygens = [i for i in ringset if mol.GetAtomWithIdx(i).GetSymbol() == "O"]
     if len(ring_oxygens) != 1:
@@ -2785,7 +2785,7 @@ def _find_sugar_oxoacid_ester(mol):
     # Find the ester linker(s): an O with no H bonded to a sugar carbon AND to a
     # P or S acid centre. 1-3 -> named; else fail-closed.
     esters = []  # (sugar_carbon_idx, ester_o_idx, central_idx)
-    for atom in mol.GetAtoms():
+    for atom in atoms_of(mol):
         if atom.GetAtomicNum() != 8 or atom.GetTotalNumHs() > 0:
             continue
         nbrs = list(atom.GetNeighbors())
@@ -2877,7 +2877,7 @@ def _find_sugar_acyl_esters(mol):
     if locants is None:
         return None
     esters = []
-    for atom in mol.GetAtoms():
+    for atom in atoms_of(mol):
         if atom.GetAtomicNum() != 8 or atom.GetTotalNumHs() > 0:
             continue
         nbrs = list(atom.GetNeighbors())
@@ -2973,7 +2973,7 @@ def _is_uncataloged_ulosonic_acid(mol, canonical_smiles):
     # defined stereocentre there is nothing to drop, so the general name is valid
     # -> do NOT veto (review W6B finding: avoid refusing a stereo-free ulosonic).
     if not any(a.GetChiralTag() != Chem.ChiralType.CHI_UNSPECIFIED
-               for a in mol.GetAtoms()):
+               for a in atoms_of(mol)):
         return False
     ri = mol.GetRingInfo()
     ketal_acid = False
@@ -3010,7 +3010,7 @@ def _is_uncataloged_ulosonic_acid(mol, canonical_smiles):
     # Require an exocyclic polyol side chain: >=2 non-ring carbons (other than the
     # carboxyl carbon) that each bear an -OH (KDO tail=2, KDN tail=3).
     polyol_c = 0
-    for atom in mol.GetAtoms():
+    for atom in atoms_of(mol):
         if atom.GetSymbol() != "C" or atom.IsInRing():
             continue
         if any(b.GetBondType() == Chem.BondType.DOUBLE
@@ -3309,7 +3309,7 @@ def name_aldonate_ester(mol, canonical_smiles: str) -> Optional[str]:
     # Locate ester group(s): ester O (no H, degree 2) between a carbonyl C and an
     # alkyl C.
     esters = []  # (carbonyl_c, carbonyl_o, ester_o, alkyl_c)
-    for atom in mol.GetAtoms():
+    for atom in atoms_of(mol):
         if atom.GetAtomicNum() != 8 or atom.GetTotalNumHs() > 0:
             continue
         nbrs = list(atom.GetNeighbors())
@@ -3347,7 +3347,7 @@ def name_aldonate_ester(mol, canonical_smiles: str) -> Optional[str]:
     # Count free carboxylic acids (C(=O)-OH) in the input: 0 -> aldonate,
     # 1 -> aldarate partial ester; anything else -> fail-closed.
     free_cooh = 0
-    for a in mol.GetAtoms():
+    for a in atoms_of(mol):
         if a.GetAtomicNum() != 6:
             continue
         has_dO = any(b.GetBondType() == Chem.BondType.DOUBLE
@@ -3490,7 +3490,7 @@ def name_glycosyloxy_yl_parent(mol, canonical_smiles: str) -> Optional[str]:
             break
     # single non-anomeric ring-O ether to a non-ring parent carbon
     links = []
-    for a in mol.GetAtoms():
+    for a in atoms_of(mol):
         if a.GetSymbol() != "O" or a.GetTotalNumHs() > 0 or a.GetDegree() != 2:
             continue
         rc = [n.GetIdx() for n in a.GetNeighbors() if n.GetIdx() in ring]
@@ -3621,14 +3621,15 @@ def name_c_substituted_sugar(mol, canonical_smiles: str) -> Optional[str]:
     if mol is None:
         return None
     try:
-        from ..assembly.memo import _cache_var, cache_or_compute
+        from ..assembly.memo import _cache_var, pure_cache_or_compute
         if _cache_var.get() is None:
             return _name_c_substituted_sugar_impl(mol, canonical_smiles)
         key = (Chem.MolToSmiles(mol), canonical_smiles)
     except Exception:
         return _name_c_substituted_sugar_impl(mol, canonical_smiles)
-    return cache_or_compute("sugar_c_substituted", key,
-                            lambda: _name_c_substituted_sugar_impl(mol, canonical_smiles))
+    # Perf lever A8: key = (canonical SMILES, canonical_smiles) -> pure; process-wide.
+    return pure_cache_or_compute("sugar_c_substituted", key,
+                                 lambda: _name_c_substituted_sugar_impl(mol, canonical_smiles))
 
 
 def _name_c_substituted_sugar_impl(mol, canonical_smiles: str) -> Optional[str]:
@@ -3736,7 +3737,7 @@ def _has_open_chain_acid_ester(mol) -> bool:
     if mol is None or mol.GetRingInfo().NumRings() > 0:
         return False
     n_ester = 0
-    for atom in mol.GetAtoms():
+    for atom in atoms_of(mol):
         if atom.GetAtomicNum() != 8 or atom.GetTotalNumHs() > 0:
             continue
         nbrs = list(atom.GetNeighbors())
@@ -3756,7 +3757,7 @@ def _has_open_chain_acid_ester(mol) -> bool:
     if n_ester != 1:
         return False
     oh_c = sum(
-        1 for a in mol.GetAtoms()
+        1 for a in atoms_of(mol)
         if a.GetAtomicNum() == 6
         and any(nb.GetAtomicNum() == 8 and nb.GetTotalNumHs() > 0
                 for nb in a.GetNeighbors())
@@ -3781,7 +3782,7 @@ def name_amino_deoxy_open_sugar(mol, canonical_smiles: str) -> Optional[str]:
     # C1 = the terminal aldehyde carbon (CHO): acyclic C, one =O (terminal), one C
     # neighbour, >=1 H.
     aldehyde = None
-    for a in mol.GetAtoms():
+    for a in atoms_of(mol):
         if a.GetAtomicNum() != 6:
             continue
         dO = [b.GetOtherAtom(a) for b in a.GetBonds()
@@ -4297,15 +4298,15 @@ def _has_open_chain_amino_aldose(mol) -> bool:
         and any(b.GetBondType() == Chem.BondType.DOUBLE
                 and b.GetOtherAtom(a).GetAtomicNum() == 8
                 and b.GetOtherAtom(a).GetDegree() == 1 for b in a.GetBonds())
-        for a in mol.GetAtoms()
+        for a in atoms_of(mol)
     )
     has_nh_alkyl = any(
         a.GetAtomicNum() == 7 and not a.IsInRing() and a.GetTotalNumHs() >= 1
         and sum(1 for nb in a.GetNeighbors() if nb.GetAtomicNum() == 6) in (1, 2)
-        for a in mol.GetAtoms()
+        for a in atoms_of(mol)
     )
     oh_c = sum(
-        1 for a in mol.GetAtoms()
+        1 for a in atoms_of(mol)
         if a.GetAtomicNum() == 6
         and any(nb.GetAtomicNum() == 8 and nb.GetTotalNumHs() > 0
                 for nb in a.GetNeighbors())
@@ -4353,7 +4354,7 @@ def name_sugar_o_methyl(mol, canonical_smiles: str) -> Optional[str]:
     # to a bare -CH3). Any O-substituent that is NOT a bare -CH3 -> fail-closed.
     methyl_locants = []
     methyl_atoms = []  # (ester_o_idx, methyl_c_idx)
-    for atom in mol.GetAtoms():
+    for atom in atoms_of(mol):
         if atom.GetAtomicNum() != 8 or atom.GetTotalNumHs() > 0:
             continue
         nbrs = list(atom.GetNeighbors())
@@ -4439,7 +4440,7 @@ def _has_o_methyl_sugar(mol) -> bool:
     locants = _sugar_carbon_locants(mol, ring, ring_oxygen, anomeric_idx)
     if locants is None:
         return False
-    for atom in mol.GetAtoms():
+    for atom in atoms_of(mol):
         if atom.GetAtomicNum() != 8 or atom.GetTotalNumHs() > 0:
             continue
         nbrs = list(atom.GetNeighbors())

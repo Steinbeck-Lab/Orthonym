@@ -389,7 +389,7 @@ def _p1_atom_partition(mol, spine, allow_charged, findings, stats):
     P3, not here; keeping it in the signature keeps the proof helpers
     uniform for the later phases.
     """
-    heavy = {a.GetIdx() for a in mol.GetAtoms() if a.GetAtomicNum() > 1}
+    heavy = {a.GetIdx() for a in atoms_of(mol) if a.GetAtomicNum() > 1}
     owner = {}
     for b in spine.walk():
         for idx in b.atom_ids:
@@ -734,7 +734,7 @@ def _p3_charge_totality(mol, spine, mode, allow_charged, findings, stats):
         return any(nb.GetAtomicNum() > 1 and nb.GetFormalCharge() == -q
                    for nb in atom.GetNeighbors())
 
-    charged = {a.GetIdx() for a in mol.GetAtoms()
+    charged = {a.GetIdx() for a in atoms_of(mol)
                if a.GetAtomicNum() > 1 and a.GetFormalCharge() != 0
                and not _internally_balanced(a)}
     owner: Dict[int, str] = {}
@@ -773,7 +773,7 @@ def _p3_charge_totality(mol, spine, mode, allow_charged, findings, stats):
     stats["charges_total"] = len(charged)
     stats["charges_claimed"] = len(set(owner) & charged)
 
-    net_charge = sum(a.GetFormalCharge() for a in mol.GetAtoms())
+    net_charge = sum(a.GetFormalCharge() for a in atoms_of(mol))
     stats["net_charge"] = net_charge
     if not allow_charged and net_charge != 0:
         findings.append(Finding(

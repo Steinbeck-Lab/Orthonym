@@ -250,7 +250,7 @@ def _get_internal_charge_atoms_impl(mol) -> Set[int]:
     substituent is an ester oxygen, not carbon) -- verified regression risk,
     caught empirically before this fix shipped.
     """
-    if not any(atom.GetAtomicNum() == 6 for atom in mol.GetAtoms()):
+    if not any(atom.GetAtomicNum() == 6 for atom in atoms_of(mol)):
         return set()
     internal: Set[int] = set()
     for pat in _INTERNAL_CHARGE_SMARTS:
@@ -293,6 +293,26 @@ def _resonance_twin_internal_atoms(mol) -> Set[int]:
 
 
 def detect_species_type(mol) -> str:
+    """Memoising front of:func:`_detect_species_type_impl` (perf lever A7, 2026-09-13).
+
+    The dispatch predicates (``_is_salt``, ``_is_zwitterion``, ``_is_organometallic``,
+    ``_is_cation_quaternary``,...) and ``_perceive`` call this about 13 times per pipeline
+    pass on the SAME Mol (30,038 calls per 300 molecules, 3.5 s). The value depends on the
+    atoms' formal charges and radical electrons, which can be edited in place on a
+    ``Chem.Mol``, so that live signature is part of the memo key; connectivity cannot change
+    without an RWMol, which molcache never caches. Outside a naming scope this is a plain call.
+    """
+    try:
+        from .molcache import cached_by_key
+        sig = tuple((a.GetIdx(), a.GetFormalCharge(), a.GetNumRadicalElectrons())
+                    for a in atoms_of(mol)
+                    if a.GetFormalCharge() != 0 or a.GetNumRadicalElectrons() > 0)
+    except Exception:
+        return _detect_species_type_impl(mol)
+    return cached_by_key(mol, "species_type", sig, lambda: _detect_species_type_impl(mol))
+
+
+def _detect_species_type_impl(mol) -> str:
     """
     Detect the type of charged/radical species.
 
@@ -605,7 +625,7 @@ def get_radical_sites(mol) -> List[Dict[str, Any]]:
         3: 'trivalent'
     }
 
-    for atom in mol.GetAtoms():
+    for atom in atoms_of(mol):
         n_radical = atom.GetNumRadicalElectrons()
 
         if n_radical == 0:
