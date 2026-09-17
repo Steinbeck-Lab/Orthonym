@@ -1,4 +1,4 @@
-""" no-abstain Phase A fix-round-1, Finding 1 (HIGH, review adversarial 0-wrong
+""" no-abstain Phase A fix-a performance pass, Finding 1 (HIGH, review adversarial 0-wrong
 review): the `t4_floor` offer used to fail-open on `gate_outcome=not_run`.
 
 Mechanism: `resolve_gate_outcome` returns `not_run` whenever no gate call was

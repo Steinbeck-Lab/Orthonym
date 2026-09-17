@@ -5,7 +5,7 @@ Producer-level assertions only. Whole-molecule assertions are unsound in this
 suite: ``conftest`` disables the OPSIN gate suite-wide, so ``name_tiered`` can
 select a different producer than the CLI does. User-visible behaviour for these
 names is verified through the CLI, recorded in
-``.the workflow tooling/sdd/-residue/TaskE-report.md``.
+`internal notes`.
 
 Blue Book basis (each row also carries its citation in
 ``data/iupac_2013_pin_list.json``):

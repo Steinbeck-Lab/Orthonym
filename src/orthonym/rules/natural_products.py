@@ -304,7 +304,7 @@ def name_natural_product(mol) -> Optional[str]:
         return None
 
     # a phase (C2a) STEREO HONESTY -- STEROID-SCOPED, FULLY-FLAT-ONLY (coordinator
-    # ruling, 2026-08-16, fix round 2). The scaffold match is stereo-RELAXED
+    # ruling, 2026-08-16, fix a performance pass). The scaffold match is stereo-RELAXED
     # (perception/natural_products.py:40-67), so a stereo-UNDEFINED steroid matches a
     # config-defined scaffold. A FULLY stereo-undefined steroid (no matched-scaffold
     # stereocentre defined at all) then gets the bare retained parent name (cholest-/
@@ -328,20 +328,20 @@ def name_natural_product(mol) -> Optional[str]:
     # belt, not the full guarantee: it declines the fully-flat scaffold outright (no
     # matched centre defined at all); C3 catches the ring-flat/side-chain-defined
     # rest. (A follow-up ticket may tighten this guard to key on RING centres
-    # specifically rather than any matched centre -- out of scope here.) Round 1
+    # specifically rather than any matched centre -- out of scope here.) a performance pass
     # declined whenever ANY matched stereocentre was undefined
     # (with a Blue-Book-cited C-5 exception, /the Blue Book, for the one
     # ring position steroid names leave free); that broke -02-shaped partially-defined
     # steroids. Measured (coordinator a trace): all 25 fabrication witnesses have ZERO
     # matched-scaffold stereocentres defined -- so the correct, measured criterion is
     # "zero defined AND at least one undefined", not "any undefined". This criterion
-    # SUBSUMES the round-1 C-5 exception: a bare androstane/gonane/estrane test SMILES
+    # SUBSUMES the a performance pass C-5 exception: a bare androstane/gonane/estrane test SMILES
     # leaves only C-5 undefined but has C-8/9/10/13/14 defined, so `scaffold_defined` is
     # non-empty and the guard already keeps the name without special-casing C-5 (verified
     # empirically against the full required test list before removing that special case
     # -- no dead code kept).
     #
-    # Scoped to scaffold_class == "steroid" ONLY (fix round 1, unchanged): a coordinator
+    # Scoped to scaffold_class == "steroid" ONLY (fix a performance pass, unchanged): a coordinator
     # a trace found ALL 25 fabrication witnesses in this codebase are steroid-class and ZERO
     # are alkaloid-class. Alkaloid retained names (tropane, berberine, ajmaline,...) are
     # constitutional parents that do not assert the flagged ring configuration (e.g.

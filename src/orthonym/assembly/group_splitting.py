@@ -74,19 +74,8 @@ def _get_default_oracle():
         with _DEFAULT_ORACLE_LOCK:
             if _DEFAULT_ORACLE is None:
                 from .retained_substitution import OpsinOracle  # Pattern-S3
-                jar = None
-                try:
-                    import sys
-                    from pathlib import Path
-                    _scripts = str(
-                        Path(__file__).resolve().parent.parent.parent.parent / "scripts"
-                    )
-                    if _scripts not in sys.path:
-                        sys.path.insert(0, _scripts)
-                    from validate_retained_names import find_opsin_jar
-                    jar = find_opsin_jar() or None
-                except Exception:
-                    jar = None
+                from ..validation.opsin_roundtrip import _find_opsin_jar  # absolute, cwd-independent (R1)
+                jar = _find_opsin_jar()
                 _DEFAULT_ORACLE = OpsinOracle(opsin_jar=jar)
     return _DEFAULT_ORACLE
 

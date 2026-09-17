@@ -13,7 +13,7 @@ witnesses shipped this way, e.g.
     -> (1S,6R)-8-chloro-2,5,7-trioxospiro[...pentaene] (OPSIN cannot parse it)
 
 The fix routes this exact branch through ``verify_or_none`` before shipping:
-non-None -> ship (opsin_status="verified" -- fix-round-1 Finding 3 corrected
+non-None -> ship (opsin_status="verified" -- fix-a performance pass Finding 3 corrected
 this from the originally-shipped "verified_reconstructor", since name_facts=None
 means the only reachable success is a genuine OPSIN match); None -> abstain.
 ``name_facts`` is None at this call site (no name->NameFacts extractor exists
@@ -76,7 +76,7 @@ def test_opsin_unparseable_engine_name_now_abstains(monkeypatch):
 def test_opsin_unparseable_engine_name_ships_when_verify_or_none_confirms(
         monkeypatch):
     """Wiring contract: a non-None verify_or_none return DOES ship, tagged
-    opsin='verified' (fix-round-1 Finding 3: with name_facts=None the only
+    opsin='verified' (fix-a performance pass Finding 3: with name_facts=None the only
     reachable success is a genuine OPSIN verification, never the bare
     'unverified' claim, and never mislabeled 'verified_reconstructor')."""
     import orthonym.namer as namer_mod

@@ -334,3 +334,14 @@ class TestSubstitutedPartiallySaturatedCarbocycles:
         result = detect_carbocyclic_partial_saturation(mol, ring_atoms)
         # Should detect partial saturation
         # Note: substituents outside ring system may affect ring atom set
+
+
+def test_mancude_parents_by_size_is_cached_and_immutable():
+    from orthonym.rules import partial_saturation as ps
+    ps._carbocyclic_mancude_parents_by_size.cache_clear()
+    a = ps._carbocyclic_mancude_parents_by_size(10)
+    b = ps._carbocyclic_mancude_parents_by_size(10)
+    assert a is b                       # served from the cache
+    assert isinstance(a, tuple)         # callers cannot mutate the shared value
+    assert "naphthalene" in a and "azulene" in a
+    assert ps._carbocyclic_mancude_parents_by_size.cache_info().hits >= 1

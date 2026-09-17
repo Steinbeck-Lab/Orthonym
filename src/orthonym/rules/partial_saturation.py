@@ -24,6 +24,7 @@ Key Rules:
 Reference: IUPAC 2013 Blue Book
 """
 
+from functools import lru_cache
 from typing import Any, Dict, List, Optional, Set, Tuple, Union
 
 from rdkit import Chem
@@ -426,7 +427,8 @@ def get_ring_saturation_level(
 # =============================================================================
 
 
-def _carbocyclic_mancude_parents_by_size(n_ring_atoms: int) -> List[str]:
+@lru_cache(maxsize=None)
+def _carbocyclic_mancude_parents_by_size(n_ring_atoms: int) -> Tuple[str, ...]:
     """All-carbon mancude parents in ``POLYCYCLIC_DATA`` that carry a populated
     ``iupac_numbering`` and are a *pure* ring system of exactly ``n_ring_atoms``
     atoms.
@@ -451,7 +453,7 @@ def _carbocyclic_mancude_parents_by_size(n_ring_atoms: int) -> List[str]:
         if any(a.GetSymbol() != 'C' for a in cmol.GetAtoms()):
             continue
         out.append(name)
-    return out
+    return tuple(out)
 
 
 def _match_mancude_parent_numbering(

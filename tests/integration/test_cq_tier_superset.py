@@ -9,7 +9,7 @@ test. This file PINS the property (not the implementation): best-effort must nev
 emit a WORSE result than the complete tier where the complete tier produced an
 RT-verified name. If a later change re-narrows the fall-through gate, this fails.
 
-See ``.the workflow tooling/sdd/CQ1-IMPL-PLAN/task-E-report.md`` and CQ1-CQ5-a review-REVIEW.md RISK 8.
+See `internal notes` and CQ1-CQ5-a review-REVIEW.md RISK 8.
 """
 import pytest
 from rdkit import Chem

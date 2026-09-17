@@ -23,7 +23,7 @@ exact bare core, never a hand-guessed name) before being added:
 Both the bare parents and small substituted derivatives are pinned, plus two
 of the real corpus witnesses that measurably converted from
 ``unknown organic compound`` to a full OPSIN-round-tripping name once the
-catalog held their core (see.the workflow tooling/sdd/M1-PLAN/m6-kindc-report.md for
+catalog held their core (see internal notes for
 the full before/after and the two witnesses that still abstain for reasons
 unrelated to this catalog addition).
 """

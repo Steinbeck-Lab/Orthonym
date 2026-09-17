@@ -67,7 +67,7 @@ CONTROLS = [
     ("O=C1NCCN1c1ccccc1", "1-phenylimidazolidin-2-one"),
 ]
 
-# v51 wins from R1/R2/R3/R1-FIX/BORON that must not regress.
+# v51 wins from a lever/a lever-FIX/BORON that must not regress.
 V51_WINS = [
     ("OC(=O)N1CCCC1", "pyrrolidine-1-carboxylic acid"),
     ("OC(=O)N1CCCCC1", "piperidine-1-carboxylic acid"),

@@ -1,4 +1,4 @@
-""" no-abstain Phase A fix-round-1, Finding 4 (HIGH, a review adversarial
+""" no-abstain Phase A fix-a performance pass, Finding 4 (HIGH, a review adversarial
 0-wrong review): the INLINE G1 emission lane (`namer.py::_name_impl`, the
 `if self._general_fallback and (not name or is_failure_name(name)):` block)
 consumed `_stereo_emit_decision`'s flag but never checked a flagged emission

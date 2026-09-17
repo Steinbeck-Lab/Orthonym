@@ -37,7 +37,7 @@ Coverage:
     full-InChIKey verified, never voided or mis-named
   * a live regression test that actually exercises the public entry point's
     broad ``except Exception`` guard (monkeypatch-injected error), since the
-    original fix-round-1 giant-chain witness is now short-circuited by the
+    original fix-a performance pass giant-chain witness is now short-circuited by the
     ``_MAX_ATOMS_FOR_PERCEPTION`` cap before that code path is reached
 
 Targeted-file run only (per project convention -- avoid the OPSIN-pipe
@@ -509,9 +509,9 @@ def test_charged_substituent_on_neutral_parent_carries_on_branch_name():
 
 
 # ===========================================================================
-# Task B2b fix round 1: the RAW-formal-charge void guard -- the whole
+# Task B2b fix a performance pass: the RAW-formal-charge void guard -- the whole
 # internal-charge class VOIDS (never mis-names). See
-# ``.the workflow tooling/sdd/2026-08-21-no-abstain-universal-namer/
+# `internal notes
 # task-B2b-fixround1-findings.md``.
 # ===========================================================================
 
@@ -536,7 +536,7 @@ _INTERNAL_CHARGE_VOID_WITNESSES = [
     ids=[w[0] for w in _INTERNAL_CHARGE_VOID_WITNESSES],
 )
 def test_internal_charge_classes_void_never_misname(label, smiles):
-    """Fix round 1: an internal-charge class the module cannot spell must VOID
+    """Fix a performance pass: an internal-charge class the module cannot spell must VOID
     (return None), never emit a coverage-complete name of a different molecule.
     This is the fail-closed regression suite for the residual class.
 
@@ -580,7 +580,7 @@ def test_m2_semipolar_oxide_family_now_named(smiles, expected):
 
 
 def test_np_ylide_zwitterion_names_and_verifies():
-    """Fix round 1 keep-green: a skeletal zwitterion (both ionic
+    """Fix a performance pass keep-green: a skeletal zwitterion (both ionic
     centres genuine and on the same spine) is IN scope and must still emit +
     verify -- the raw-charge guard allows it because both charged atoms are
     genuine ion sites (``cation_sites | anion_sites``) the suffix machinery
@@ -597,7 +597,7 @@ def test_np_ylide_zwitterion_names_and_verifies():
     ids=["nitrite-ester", "oxime", "nitroso", "N,N-dihydroxyheptanamine"],
 )
 def test_internal_charge_neutral_analogues_stay_correct(smiles):
-    """Fix round 1 keep-green: the NEUTRAL analogues of the voided classes
+    """Fix a performance pass keep-green: the NEUTRAL analogues of the voided classes
     (drawn without formal charges) carry no raw charge, so the guard never
     fires on them -- they must still name completely and verify, exactly as
     before the fix. Guards against an over-broad guard that keys on the wrong
@@ -639,7 +639,7 @@ def test_charged_species_determinism_across_permutations():
 def test_broad_except_guard_actually_fires_on_an_injected_error(monkeypatch):
     """The public entry point's broad ``except Exception: return None`` (its
     own docstring reason 5) needs a regression test that actually exercises
-    it -- the fix round 1 witness (a 10,000-atom chain) is now
+    it -- the fix a performance pass witness (a 10,000-atom chain) is now
     short-circuited by the ``_MAX_ATOMS_FOR_PERCEPTION`` size cap BEFORE the
     code path the broad except was added for is ever reached, making that
     test vacuous for THIS guard specifically (it still correctly tests the
@@ -709,7 +709,7 @@ def test_giant_deep_branching_trips_budget_despite_modest_atom_count():
     """A moderately-sized (420-atom) 'comb' structure with a DELIBERATELY
     small custom budget is refused, fast.
 
-    NOTE (fix round 1, finding 6): this specific case (420 atoms > the
+    NOTE (fix a performance pass, finding 6): this specific case (420 atoms > the
     budget of 300) is actually caught by the top-level SIZE guard, not the
     per-call recursive charge -- see
     ``test_cumulative_recursive_charge_trips_when_size_guard_would_not``
@@ -776,7 +776,7 @@ def test_atom_coverage_assertion_voids_a_rigged_gap(monkeypatch):
 
 
 def test_atom_coverage_assertion_voids_a_rigged_double_count(monkeypatch):
-    """Fix round 1, finding 5: the disjointness assertion
+    """Fix a performance pass, finding 5: the disjointness assertion
     (``sum(len(ids)) == len(heavy)``) catches a DOUBLE-COUNT (two bindings
     sharing an atom) that a union-only check cannot see, because the union
     of an overlapping set is still the full atom set. Rig one atom into TWO
@@ -805,11 +805,11 @@ def test_atom_coverage_assertion_voids_a_rigged_double_count(monkeypatch):
 
 
 # ===========================================================================
-# Fix round 1 (task-review + a review adversarial review of commit cad511fd)
+# Fix a performance pass (task-review + a review adversarial review of commit cad511fd)
 # ===========================================================================
 
 def test_nitro_shortcut_removed_no_wrong_constitution():
-    """Fix round 1, finding 1 (CRITICAL): the deleted ``nitro`` leaf
+    """Fix a performance pass, finding 1 (CRITICAL): the deleted ``nitro`` leaf
     shortcut checked NO bond orders, so it fired on N(OH)2 (real neutral
     nitro is refused upstream by the per-atom charge guard, and a
     pentavalent-N-with-two-double-bonds shape never sanitizes) and named it
@@ -828,7 +828,7 @@ def test_nitro_shortcut_removed_no_wrong_constitution():
 
 
 def test_never_raises_on_unexpected_exception():
-    """Fix round 1, finding 2: a pure ``Optional``-contracted producer must
+    """Fix a performance pass, finding 2: a pure ``Optional``-contracted producer must
     NEVER raise. MEASURED before the fix: a 10,000-carbon chain reached
     ``data/chain_names.py``'s "chain length outside supported range
     (1-9999)" ``ValueError`` uncaught (the entry point only caught
@@ -842,7 +842,7 @@ def test_never_raises_on_unexpected_exception():
 
 
 def test_never_segfaults_on_repeated_large_molecule_calls():
-    """Fix round 1 follow-up (found verifying finding 2): a raw linear chain
+    """Fix a performance pass (found verifying finding 2): a raw linear chain
     crashes the PROCESS (segfault, not a Python exception -- no try/except
     can catch it) inside CIP assignment past a few thousand atoms, and
     MEASURED worse: calling this module TWICE in one process on moderately
@@ -862,7 +862,7 @@ def test_never_segfaults_on_repeated_large_molecule_calls():
 
 
 def test_large_atom_work_budget_cannot_reenable_the_crash():
-    """Fix round 1: a caller passing a large ``atom_work_budget`` legitimately
+    """Fix a performance pass: a caller passing a large ``atom_work_budget`` legitimately
     raises the cumulative RECURSIVE-work ceiling (for generous branch
     allowance) but must NOT be able to re-enable the raw-size safety
     ceiling that guards against the measured CIP segfault -- the effective
@@ -874,7 +874,7 @@ def test_large_atom_work_budget_cannot_reenable_the_crash():
 
 
 def test_monocycle_scan_is_budget_charged_not_blind():
-    """Fix round 1, finding 3: monocycle numbering search scores O(n)
+    """Fix a performance pass, finding 3: monocycle numbering search scores O(n)
     candidates for O(n) rotations -- O(n^2) work that used to run AFTER the
     one up-front atom-count charge, so it was budget-blind (measured: 87.5s
     at 4,001 atoms, ~550s projected at 9,999). It must now be charged BEFORE
@@ -902,7 +902,7 @@ def test_monocycle_still_names_within_the_hard_size_ceiling():
 
 
 def test_cumulative_recursive_charge_trips_when_size_guard_would_not():
-    """Fix round 1, finding 6 (test gap): the EXISTING giant/comb test
+    """Fix a performance pass, finding 6 (test gap): the EXISTING giant/comb test
     (``test_giant_deep_branching_trips_budget_despite_modest_atom_count``)
     trips the top-level SIZE guard (420 atoms > budget 300), never
     exercising the per-call RECURSIVE charging mechanism at all. This test
@@ -917,7 +917,7 @@ def test_cumulative_recursive_charge_trips_when_size_guard_would_not():
 
 
 def test_determinism_across_equivalent_smiles_permutations():
-    """Fix round 1, finding 4: the SAME molecule from differently-numbered
+    """Fix a performance pass, finding 4: the SAME molecule from differently-numbered
     (but structurally identical) SMILES must produce the IDENTICAL name --
     every tie-break in this module must key on ``Chem.CanonicalRankAtoms``
     (numbering-invariant), never a raw RDKit atom index. MEASURED before the
@@ -958,7 +958,7 @@ def test_determinism_across_equivalent_smiles_permutations():
 
 
 def test_single_heavy_atom_top_level_input_no_raise():
-    """Fix round 1, finding 7: a bare single-heavy-atom molecule at the top
+    """Fix a performance pass, finding 7: a bare single-heavy-atom molecule at the top
     level (water / ammonia / hydrogen sulfide) skips the leaf-shortcut table
     (branches only) and falls into the generic chain-spine path as a
     length-1 chain. Assert it either produces a coverage-complete result or
@@ -1044,7 +1044,7 @@ def test_phase_e_charged_species_still_names_no_elision_false_positive(smi):
     cation/zwitterion still NAMES rather than being over-voided."""
     result = name_universal_substitutive(Chem.MolFromSmiles(smi))
     assert result is not None and result.name
-    # the FULL parent token is stored (fix round 1: not pre-stemmed)
+    # the FULL parent token is stored (fix a performance pass: not pre-stemmed)
     assert result.bindings[0][0].endswith("e"), result.bindings[0][0]
     # and the shared core certifies its own output (self-consistent)
     assert e1._verify_partition(Chem.MolFromSmiles(smi), result.name,
@@ -1052,7 +1052,7 @@ def test_phase_e_charged_species_still_names_no_elision_false_positive(smi):
 
 
 def test_phase_e_f_e1_is_live_for_all_carbon_spine_through_real_path(monkeypatch):
-    """Fix round 1: the FULL spine token is stored, so E1's element_soundness all-carbon
+    """Fix a performance pass: the FULL spine token is stored, so E1's element_soundness all-carbon
     classifier is LIVE for the alkane/cycloalkane/retained-ring class it
     guards (a pre-stemmed ``cyclohexan`` would be unclassifiable -> element_soundness
     inert). Two parts, both through the REAL producer (not a hand-built

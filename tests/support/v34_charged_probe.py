@@ -23,7 +23,7 @@
                   it). All three are an unusable round-trip, so all three fold into
                   this one bucket per the 5-way spec.
 
-    ⚠ Falsy-key guard (fixed 2026-08-22 review round 1): ``Chem.MolToInchiKey`` can
+    ⚠ Falsy-key guard (fixed 2026-08-22 review a performance pass): ``Chem.MolToInchiKey`` can
     return ``''`` for a structure it cannot key (e.g. any wildcard/dummy-atom SMILES)
     without raising. Comparing ``'' == ''`` would misclassify two unrelated
     wildcard-bearing structures as a "full" match -- exactly the false-positive this

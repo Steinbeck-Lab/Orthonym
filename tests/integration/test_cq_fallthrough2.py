@@ -12,7 +12,7 @@ witness ``COP(=O)(C=C(F)F)C=C(F)F`` reached namer.py:3388, the fall-through fire
 and it STILL returned None, so the molecule abstained even though a fresh top-level
 call names it and OPSIN-round-trips it.
 
-Fix (trace-confirmed, a project rule — ``.the workflow tooling/sdd/CQ1-IMPL-PLAN/task1-report.md``):
+Fix (trace-confirmed, a project rule — `internal notes`):
 ``isolated_naming_session(reset_cache=True)`` installs a fresh empty memo cache for
 the isolated body and restores the original on exit; the clean fall-through opts in.
 This is the SAME site Task A opened (no new decline site exists -- the recoverable

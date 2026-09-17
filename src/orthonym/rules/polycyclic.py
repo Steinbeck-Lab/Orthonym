@@ -19,6 +19,7 @@ Reference: IUPAC 2013 Blue Book, through.
 """
 
 import logging
+import re
 from collections import deque
 from dataclasses import dataclass, field
 from itertools import combinations
@@ -27,6 +28,7 @@ from typing import Dict, List, Optional, Set, Tuple
 from rdkit import Chem
 
 from ..assembly.fragment_naming import _fragment_guard  # Lever N: budget replay on a memo hit
+from ..assembly.memo import cache_or_compute  # R2(a): structure-keyed main-ring memo
 from ..perception.molcache import atoms_of, bonds_of, cached_by_key
 from ..assembly.fragment_naming import (  # M2.5 macrocycle-hang budgets
     spend_analysis_call,
@@ -34,6 +36,10 @@ from ..assembly.fragment_naming import (  # M2.5 macrocycle-hang budgets
 )
 
 logger = logging.getLogger(__name__)
+
+# R2(a): integer extractor for RDKit's ``_smilesAtomOutputOrder`` prop (e.g. "[0,1,2,...]"),
+# used to build the atom-order component of the von Baeyer main-ring structure key.
+_ORDER_INT_RE = re.compile(r"\d+")
 
 
 # ============================================================================
@@ -303,13 +309,50 @@ def find_longest_path(mol, start: int, end: int, allowed_atoms: Set[int]) -> Lis
     return best_path
 
 
-def _find_all_simple_paths(mol, start: int, end: int, allowed_atoms: Set[int]) -> List[List[int]]:
+def _find_all_simple_paths(mol, start: int, end: int, allowed_atoms: Set[int],
+                           adj: Optional[Dict[int, List[int]]] = None) -> List[List[int]]:
+    """Memoising front of:func:`_find_all_simple_paths_impl` (a performance pass, a lever).
+
+    Within one naming scope the same ``(mol object, start, end, allowed)`` enumeration is
+    computed once; 90 % of the 24,450 enumerations on 300 a holdout split molecules were repeats.
+    The entry records the perf-budget units the DFS charged and a hit charges the SAME
+    units again, so the budget trajectory (and any ``PerfBudgetExceeded`` abstention) is
+    unchanged. Callers receive fresh list copies (they filter and slice the result).
+
+    ``cached_by_key`` returns ``_fresh`` unchanged outside a scope or for an ``RWMol``,
+    so behaviour without a scope is identical; a ``PerfBudgetExceeded`` raised inside the
+    DFS propagates before anything is stored. Mirrors the ``_find_main_ring`` memo front,
+    reusing the module-level ``cached_by_key`` / ``_fragment_guard`` / ``spend_perf_work``.
+    """
+    state = {"hit": True}
+
+    def _fresh():
+        state["hit"] = False
+        before = getattr(_fragment_guard, "perf_budget", None)
+        paths = _find_all_simple_paths_impl(mol, start, end, allowed_atoms, adj)
+        after = getattr(_fragment_guard, "perf_budget", None)
+        units = (before - after) if (before is not None and after is not None and before > after) else 0
+        return (tuple(tuple(p) for p in paths), units)
+
+    val = cached_by_key(mol, "polycyclic.simple_paths", (start, end, frozenset(allowed_atoms)), _fresh)
+    if state["hit"] and val[1]:
+        spend_perf_work(val[1])
+    return [list(p) for p in val[0]]
+
+
+def _find_all_simple_paths_impl(mol, start: int, end: int, allowed_atoms: Set[int],
+                                adj: Optional[Dict[int, List[int]]] = None) -> List[List[int]]:
     """
     Find all simple paths from start to end through allowed atoms.
 
     Returns list of paths, each a list of atom indices. The enumeration is
     bounded by ``_MAX_DFS_EXPANSIONS``  — on a pathological dense graph
     it returns the paths found before the cap rather than hanging.
+
+    ``adj`` (a lever): an optional precomputed ``Dict[int, List[int]]`` of
+    neighbour indices in ``GetNeighbors`` order, keyed by every atom this
+    DFS may visit. When given, the DFS walks it instead of re-calling
+    ``GetNeighbors`` live on every step -- order-identical, just cheaper.
     """
     if start == end:
         return [[start]]
@@ -327,9 +370,11 @@ def _find_all_simple_paths(mol, start: int, end: int, allowed_atoms: Set[int]) -
             all_paths.append(path[:])
             return
 
-        atom = mol.GetAtomWithIdx(current)
-        for neighbor in atom.GetNeighbors():
-            nbr_idx = neighbor.GetIdx()
+        if adj is not None:
+            nbrs = adj[current]                      # GetNeighbors order, precomputed (a lever)
+        else:
+            nbrs = [n.GetIdx() for n in mol.GetAtomWithIdx(current).GetNeighbors()]
+        for nbr_idx in nbrs:
             if nbr_idx in allowed_atoms and nbr_idx not in visited:
                 visited.add(nbr_idx)
                 path.append(nbr_idx)
@@ -901,7 +946,32 @@ class VonBaeyerAnalyzer:
             units = (before - after) if (before is not None and after is not None and before > after) else 0
             return (tuple(ring) if ring else ring, bhp, tuple((tuple(r), b) for r, b in oriented), units)
 
-        val = cached_by_key(mol, "polycyclic.main_ring", key, _fresh)
+        # R2(a): an OUTER memo keyed by molecular STRUCTURE, not by mol object. Two
+        # different mol objects parsed from the same SMILES with the SAME atom output
+        # order (and same ring atoms / bridgeheads) share the result within one scope;
+        # a different atom order -> different key -> recompute (indices differ, so the
+        # answer does). The per-object ``cached_by_key`` stays as the INNER layer, so a
+        # repeat on the SAME object skips the ``_find_main_ring_impl`` work — but note
+        # ``_struct_key`` still computes the canonical SMILES on EVERY non-RWMol call
+        # (including same-object repeats); the inner memo saves the search, not the
+        # SMILES. RWMol (and a mol whose output order is unavailable) falls back to the
+        # per-object memo only.
+        def _struct_key():
+            smi = Chem.MolToSmiles(mol, canonical=True)
+            if not mol.HasProp('_smilesAtomOutputOrder'):
+                return None
+            order = tuple(int(x) for x in _ORDER_INT_RE.findall(mol.GetProp('_smilesAtomOutputOrder')))
+            bonds = tuple((b.GetBeginAtomIdx(), b.GetEndAtomIdx(), b.GetBondTypeAsDouble()) for b in bonds_of(mol))
+            return (smi, order, bonds, frozenset(ring_atoms), frozenset(bridgeheads))
+
+        def _by_object():
+            return cached_by_key(mol, "polycyclic.main_ring", key, _fresh)
+
+        skey = None if isinstance(mol, Chem.RWMol) else _struct_key()
+        if skey is None:
+            val = _by_object()
+        else:
+            val = cache_or_compute("polycyclic.main_ring_struct", skey, _by_object)
         if state["hit"] and val[3]:
             spend_perf_work(val[3])
         ring = list(val[0]) if val[0] else val[0]
@@ -942,6 +1012,9 @@ class VonBaeyerAnalyzer:
         for idx in ring_atoms:
             atom = mol.GetAtomWithIdx(idx)
             adj[idx] = set(n.GetIdx() for n in atom.GetNeighbors() if n.GetIdx() in ring_atoms)
+
+        adj_list = {idx: [n.GetIdx() for n in mol.GetAtomWithIdx(idx).GetNeighbors()]
+                    for idx in ring_atoms}          # R2(c): GetNeighbors order, built once
 
         # Spelling-invariant tie-break key: RDKit canonical atom ranks are
         # identical for every SMILES spelling of the same molecule. breakTies=
@@ -996,7 +1069,7 @@ class VonBaeyerAnalyzer:
             direct edge so a 0-atom main bridge keeps the rest as the main ring.
             Deterministic: ties broken by the lowest canon-rank tuple.
             """
-            all_paths = _find_all_simple_paths(mol, bh1, bh2, allowed)
+            all_paths = _find_all_simple_paths(mol, bh1, bh2, allowed, adj=adj_list)
             if exclude_direct:
                 all_paths = [p for p in all_paths if len(p) >= 3]
             if len(all_paths) < 2:
@@ -1073,7 +1146,7 @@ class VonBaeyerAnalyzer:
             # never a regression).
             if not getattr(self, "_allow_multiatom_bridge", True):
                 continue
-            all_paths = _find_all_simple_paths(mol, bh1, bh2, ring_atoms)
+            all_paths = _find_all_simple_paths(mol, bh1, bh2, ring_atoms, adj=adj_list)
             interiors = [set(p[1:-1]) for p in all_paths]
             npaths = len(all_paths)
             for i in range(npaths):

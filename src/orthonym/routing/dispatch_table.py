@@ -914,7 +914,7 @@ def _handle_anion_small(mol, smiles, canonical_smiles, features=None, *,
     (route_charged already returns '' for all four; this pre-check computes the
     same string name_anion's internal fallback would have produced anyway).
     """
-    # charged Slice A fix-round 2 (class closure): this is the ester-anion
+    # charged Slice A fix-a performance pass (class closure): this is the ester-anion
     # producer's 0-wrong gate. name_acid_ester_anion is NOT fail-closed at the
     # producer -- a cyclitol/inositol owner whose stereo OPSIN 2.9.0 cannot
     # CIP-verify (e.g. the phosphate/sulfate MONOanion of a hexahydroxycyclohexane)

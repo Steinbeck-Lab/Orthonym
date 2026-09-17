@@ -3062,7 +3062,14 @@ def _acyl_to_ate_word(mol, acyl_c, ester_o, sugar_c):
     except Exception:
         return None
     from orthonym import name_compound  # lazy: data -> namer is acyclic at runtime
-    acid_name = name_compound(acid_canon)
+    from orthonym.assembly.nested_memo import cached_nested_call
+    from orthonym.metrics.provenance import (allow_aromatic_general_ctx, best_effort_ctx,
+                                             full_coverage_ctx, general_fallback_ctx)
+    # R3: the same acid is re-named on every pass (4x on the slowest a holdout split molecule,
+    # 15.6 of 16.2 s); the replay-memo keeps tier and budget trajectory identical.
+    _key = (acid_canon, "pin", general_fallback_ctx.get(), best_effort_ctx.get(),
+            allow_aromatic_general_ctx.get(), full_coverage_ctx.get())
+    acid_name = cached_nested_call("sugar_acyl_acid_name", _key, lambda: name_compound(acid_canon))
     if not acid_name or "unknown" in acid_name:
         return None
     if acid_name.endswith("oic acid"):

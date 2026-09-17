@@ -310,8 +310,8 @@ def test_p8a_not_blinded_by_foreign_word_when_parent_block_is_wrong():
 
 
 def test_p8a_not_masked_when_parent_block_is_fabricated_and_foreign_word_overlaps():
-    """Task 4 FIX-ROUND 2 (reviewer-found, MORE SEVERE than the round-1
-    regression): the round-1 fix selected the candidate block by MAXIMUM
+    """Task 4 FIX-a performance pass (reviewer-found, MORE SEVERE than the a performance pass
+    regression): the a performance pass fix selected the candidate block by MAXIMUM
     OVERLAP against ``expected_set``. That is exploitable: locants are
     small ints and CIP is binary, so a foreign word can coincidentally
     share a real ``(locant, cip)`` pair with the parent's true centres. If
@@ -319,7 +319,7 @@ def test_p8a_not_masked_when_parent_block_is_fabricated_and_foreign_word_overlap
     overlap than a foreign word's, overlap-based selection would pick the
     foreign word and the genuine ``STEREO_DESCRIPTOR_MISMATCH`` would never
     fire -- SILENTLY HIDING a wrong name under the gate that is supposed to
-    BE the 0-wrong backstop (strictly worse than round 1's bug, which only
+    BE the 0-wrong backstop (strictly worse than a performance pass's bug, which only
     voided a correct name into a safe abstain).
 
     Reviewer's exact witness: real centres are ``{(2,'S'),(3,'R')}``; the
@@ -342,8 +342,8 @@ def test_p8a_not_masked_when_parent_block_is_fabricated_and_foreign_word_overlap
 
 
 # ---------------------------------------------------------------------------
-# Task 4 FIX-ROUND 3 (re-review-found residual, SAFE-SIDE false-abstain): a
-# chiral resolving group esterified to an ACHIRAL acid -- round 2's
+# Task 4 FIX-a performance pass (re-review-found residual, SAFE-SIDE false-abstain): a
+# chiral resolving group esterified to an ACHIRAL acid -- a performance pass's
 # "rightmost candidate at or before the parent's span" rule wrongly picked
 # the pentyl word's own descriptor for the achiral parent (it was the ONLY
 # candidate anywhere, since the achiral parent has none of its own), raising

@@ -241,7 +241,7 @@ _OPSIN_NON_PIN_EXCLUSIONS = _PIN_DENY
 # ON: 3-[(hexadec-1-en-1-yl)oxy]propane-1,2-diyl oleate ethyl phosphatium
 # The ON name silently loses the trimethylammonium group entirely.
 #
-# That is the same failure mode the PA1 R2/R3 tranche measured 8 times over:
+# That is the same failure mode the PA1 a lever tranche measured 8 times over:
 # withdrawing a trivial name only helps when the systematic engine derives the
 # correct PIN in its place, and deny-only produced "methane" for N=C=N,
 # "methanamine" for thiuram monosulfide, and a 1,2,3-triol for pentaerythritol.

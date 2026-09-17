@@ -1,4 +1,4 @@
-"""Lever K (round 2): two distinct mol objects with the same indexed graph share one FG detection."""
+"""Lever K (a performance pass): two distinct mol objects with the same indexed graph share one FG detection."""
 import pytest
 from rdkit import Chem
 from orthonym.assembly import memo

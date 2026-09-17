@@ -1,8 +1,8 @@
 """Task F (CQ5/QM9 finding) -- ``analyze_spiro_universal`` dispiro
-descriptor fix for adjacent-spiro small rings, PLUS round 2's determinism
+descriptor fix for adjacent-spiro small rings, PLUS a performance pass's determinism
 canonicalization.
 
-Round 1 bug: for a linear dispiro system whose middle ring's two spiro atoms
+a performance pass bug: for a linear dispiro system whose middle ring's two spiro atoms
 are directly bonded (one spiro-to-spiro arc has 0 linking atoms, the other
 has 1+), ``_walk_ring_between_spiros`` (``rules/spiro.py``) picked the LONGER
 unvisited arc as the first middle-ring segment while ``_compute_spiro_segments``
@@ -12,7 +12,7 @@ symmetry, so the emitted descriptor's heteroatom locant did not match what
 the descriptor string itself denotes -- an OPSIN round-trip ``inchi_mismatch``
 (confirmed at HEAD `87365346`, CQ5-a trace.md).
 
-Round 1 fix: ``_walk_ring_between_spiros`` now selects the arc with FEWER
+a performance pass fix: ``_walk_ring_between_spiros`` now selects the arc with FEWER
 unvisited (linking) atoms first, matching ``_compute_spiro_segments``'s
 ``min(seg_a, seg_b)``-first convention "Linear polyspiro alicyclic
 ring systems", ``the Blue Book Blue Book``: *"...proceeding
@@ -24,7 +24,7 @@ neighbour/ring order, not a canonical rank) -- so the emitted locant (still
 correct, still round-tripping) varied by input SMILES atom order. Determinism
 is a hard gate independent of 0-wrong, so that is a real defect.
 
-Round 2 fix: ``_dispiro_numbering_candidates`` (new) enumerates every
+a performance pass fix: ``_dispiro_numbering_candidates`` (new) enumerates every
 -legal numbering of a 3-ring dispiro chain -- the three genuine free
 choices the Blue Book's own construction rules leave unresolved (which
 physical terminal ring is numbered first when the two tie in size; the
@@ -105,7 +105,7 @@ class TestAdjacentSpiroDescriptorFix:
 class TestExistingSpiroFixturesUnchanged:
     """Non-regression: pre-existing dispiro fixtures (symmetric arcs, or
     all-carbon adjacent-spiro) must emit the SAME string as before either
-    round of the fix -- the bug (and the round-2 canonicalization) is
+    round of the fix -- the bug (and the a performance pass canonicalization) is
     invisible to them by construction (isomorphism / symmetry / no
     heteroatom), so this locks that in rather than assuming it."""
 
@@ -137,7 +137,7 @@ class TestExistingSpiroFixturesUnchanged:
 
     @pytest.mark.unit
     def test_polyspiro_substituent_free_valence_lowest_locant_unchanged(self):
-        """Round 2 threaded ``suffix_ring_atoms`` (free-valence bias,
+        """a performance pass threaded ``suffix_ring_atoms`` (free-valence bias,
          through ``_get_polyspiro_numbering`` -- previously only
         the monospiro ``get_spiro_numbering`` had it. Locked in via the
         ``tests/unit/rules/test_v27_p3_spiro_engine.py`` PIN correction
@@ -160,14 +160,14 @@ class TestExistingSpiroFixturesUnchanged:
 
 
 class TestDeterminism:
-    """Round 2: the emitted NAME STRING (not just RT-pass) must be identical
+    """a performance pass: the emitted NAME STRING (not just RT-pass) must be identical
     across many randomized SMILES atom orders -- the lowest-locant selection
     in ``_get_polyspiro_numbering`` is a canonical-rank-keyed ``min`` over
     an enumeration that does not depend on input atom order, so the same
     molecule always resolves to the same PIN regardless of how it was
-    written. (Round 1 alone could only promise round-trip correctness here;
+    written. (a performance pass alone could only promise round-trip correctness here;
     see git history for that weaker version -- this supersedes it now that
-    round 2 canonicalizes the locant choice itself.)"""
+    a performance pass canonicalizes the locant choice itself.)"""
 
     N_ORDERS = 6
 

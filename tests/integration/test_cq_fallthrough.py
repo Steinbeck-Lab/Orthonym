@@ -51,7 +51,7 @@ WITNESSES = [
 # first, disagreeing with the descriptor string's own shorter-arc-first
 # convention) that did NOT round-trip, so it correctly stayed abstained
 # (0-wrong; a project rule). Task F (CQ5/QM9 finding,
-# `.the workflow tooling/sdd/CQ1-IMPL-PLAN/task-F-report.md`) fixed that root cause in
+# internal notes) fixed that root cause in
 # ``rules/spiro.py`` directly, so this molecule now NAMES correctly
 # at both tiers -- see ``test_dispiro_now_converts_after_taskF_descriptor_fix``
 # below, which supersedes the old "stays abstained" assertion.
@@ -135,7 +135,7 @@ def test_dispiro_now_converts_after_taskF_descriptor_fix():
 
 
 def test_negative_rt_mismatch_stays_abstained():
-    """ round 2, smaller finding 1: this file's original negative
+    """ a performance pass, smaller finding 1: this file's original negative
     witness (a QM9 dispiro whose name_general output carried a WRONG
     descriptor) was CONSUMED when Task F fixed that root cause -- the
     molecule now correctly converts (see

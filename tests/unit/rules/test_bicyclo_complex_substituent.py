@@ -9,7 +9,7 @@ bare halogen/hydroxy/amino/pure-hydrocarbon.
 Layer 1 (commit 8217684f) fixed `is_bicyclo_system`'s pendant-ring scope bug
 so the bicyclo composer is REACHED for penicillin-G-shaped molecules; this
 layer fixes what it does once reached. a trace (see
-`.the workflow tooling/sdd/2026-08-17--phase3-acid-ester-anion/trace-betalactam-full.md`)
+internal notes)
 named `name_substituent`/`_enrich_complex_ring_with_subs` as the candidate
 reuse target. Direct probing found a REFINEMENT: `name_substituent` alone
 returns the `'substituent'` sentinel for a branched/ring-containing acyl in

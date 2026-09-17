@@ -226,7 +226,7 @@ class TestOfferRtOkPredicate:
 
     def test_no_recorded_verdict_transient_unavailable_fails_closed(
             self, monkeypatch):
-        """ fix round 1 (0-wrong, coordinator CRITICAL): a `(None, False, "")`
+        """ fix a performance pass (0-wrong, coordinator CRITICAL): a `(None, False, "")`
         lookup means NO positive verdict for THIS exact string
         (`bypassed`/`suppressed`/`inconclusive` -- e.g. a fresh floor offer). When
         OPSIN cannot re-perceive it (`name_to_smiles`->None) under a transient

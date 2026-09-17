@@ -876,7 +876,7 @@ def _get_polyspiro_numbering(
     if ring_chain is None:
         return None
 
-    # round 2: choose DETERMINISTICALLY among every -legal
+    # a performance pass: choose DETERMINISTICALLY among every -legal
     # numbering (see _dispiro_numbering_candidates) by lowest
     # heteroatom locants, then a canonical-rank tiebreak -- same selection
     # shape as ``get_spiro_numbering``'s monospiro ``_key``. Falls back to the

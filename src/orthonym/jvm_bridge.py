@@ -327,6 +327,20 @@ def opsin_stdout(name: str, allow_radicals: bool,
     return res
 
 
+def _same_jar(jar_path: str) -> bool:
+    """True when ``jar_path`` names the jar the JVM was started with, in any spelling
+    (relative, symlinked,...). a performance pass R1: a relative spelling used to be
+    refused, sending every oracle check to a fresh ``java -jar`` subprocess."""
+    if _OPSIN_JAR is None:
+        return False
+    if jar_path == _OPSIN_JAR:
+        return True
+    try:
+        return os.path.realpath(jar_path) == os.path.realpath(_OPSIN_JAR)
+    except (OSError, ValueError):
+        return False
+
+
 def _opsin_stdout_uncached(name: str, allow_radicals: bool,
                            jar_path: Optional[str] = None) -> Tuple[Optional[str], bool]:
     """Exactly what ``java -jar opsin [-r] -osmi`` would write to stdout for ONE name.
@@ -351,7 +365,7 @@ def _opsin_stdout_uncached(name: str, allow_radicals: bool,
         return None, False
     if not _ensure_jvm() or _N2S_CLS is None:
         return None, False
-    if jar_path is not None and jar_path != _OPSIN_JAR:
+    if jar_path is not None and not _same_jar(jar_path):
         return None, False
     # Faithful to Cli.interactiveSmilesOutput: parse only up to the first TAB.
     tab = name.find("\t")
@@ -391,7 +405,7 @@ def opsin_extended_smiles(name: str,
         return None, False
     if not _ensure_jvm() or _N2S_CLS is None:
         return None, False
-    if jar_path is not None and jar_path != _OPSIN_JAR:
+    if jar_path is not None and not _same_jar(jar_path):
         return None, False
     tab = name.find("\t")
     if tab >= 0:

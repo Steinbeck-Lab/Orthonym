@@ -88,7 +88,7 @@ def test_r1_wins_preserved(smiles, expected):
 
 @pytest.mark.unit
 @pytest.mark.parametrize("smiles,expected", [
-    # R2/R3 ring-S oxoacid + anion wins (separate committed tasks) — sanity.
+    # a lever ring-S oxoacid + anion wins (separate committed tasks) — sanity.
     ("OS(=O)N1CCCCC1", "piperidine-1-sulfinic acid"),
 ])
 def test_r2_r3_wins_preserved(smiles, expected):

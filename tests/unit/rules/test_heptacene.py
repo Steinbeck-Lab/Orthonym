@@ -15,7 +15,7 @@ the OPSIN-ordered parse and the RDKit-canonical parse).
 
 Per-position round-trip verification (18/18 peripheral integer locants, done in
 a a temp dir script before this entry was added -- see
-`.the workflow tooling/sdd/heptacene-fix-report.md`): a mono-methyl derivative was built
+internal notes): a mono-methyl derivative was built
 at every one of heptacene's 18 cataloged peripheral atoms, named via Orthonym,
 and round-tripped through OPSIN to the exact input InChIKey. All 18 positions
 matched (0-wrong). Several physical positions (3,4,8,9,...) come back renamed to

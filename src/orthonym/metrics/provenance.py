@@ -170,8 +170,54 @@ _GATE_OUTCOME = contextvars.ContextVar(
 _GATE_OUTCOME_NAME = contextvars.ContextVar(
     "orthonym_prov_gate_outcome_name", default=None)
 
+# a performance pass (a lever replay-memo hardening): a scope-bound log of WHICH
+# provenance vars a nested naming call TOUCHED (wrote), so the replay-memo can
+# reproduce the EXACT provenance state the call left — including a var written to
+# a value it already held, or written A->B->A, which a before/after DELTA misses.
+# Armed only around a memoised nested call (assembly/nested_memo). A STACK (list
+# of sets) so a nested memoised call captures its own touches AND propagates them
+# to every enclosing armed call (each setter, and a hit's replay via
+# ``note_touched``, adds to every set currently on the stack).
+_TOUCHED = contextvars.ContextVar("orthonym_prov_touched", default=None)
+
+
+def _touch(*names: str) -> None:
+    stack = _TOUCHED.get()
+    if stack:
+        for s in stack:
+            s.update(names)
+
+
+def note_touched(*names: str) -> None:
+    """Public: record that ``names`` were written by a path that bypasses the
+    setter functions (a replay-memo HIT writes the ContextVars directly). Lets an
+    enclosing touched-log still capture them."""
+    _touch(*names)
+
+
+def push_touched_log() -> set:
+    """Arm a fresh touched-var log for the current nested call and return it.
+    Pair with:func:`pop_touched_log` in a try/finally (LIFO)."""
+    stack = _TOUCHED.get()
+    if stack is None:
+        stack = []
+        _TOUCHED.set(stack)
+    s: set = set()
+    stack.append(s)
+    return s
+
+
+def pop_touched_log() -> set:
+    """Disarm the innermost touched-var log and return it (LIFO)."""
+    stack = _TOUCHED.get()
+    if stack:
+        return stack.pop()
+    return set()
+
 
 def clear_provenance() -> None:
+    _touch("source", "opsin", "stereo_unexpressed", "gate_outcome",
+           "gate_outcome_name", "general_ring_prefix", "suffix_free_prefix_name")
     _SOURCE.set(None)
     _OPSIN.set(None)
     _STEREO_UNEXPRESSED.set(False)
@@ -204,12 +250,16 @@ def restore_provenance(snapshot: dict) -> None:
     _GATE_OUTCOME_NAME.set(snapshot.get("gate_outcome_name"))
     _GENERAL_RING_PREFIX.set(bool(snapshot.get("general_ring_prefix")))
     _SUFFIX_FREE_PREFIX_NAME.set(bool(snapshot.get("suffix_free_prefix_name")))
+    _touch("source", "opsin", "stereo_unexpressed", "gate_outcome",
+           "gate_outcome_name", "general_ring_prefix", "suffix_free_prefix_name")
 
 
 def record_source(source: str, opsin: Optional[str] = None) -> None:
     _SOURCE.set(source)
+    _touch("source")
     if opsin is not None:
         _OPSIN.set(opsin)
+        _touch("opsin")
 
 
 def record_stereo_unexpressed(flag: bool) -> None:
@@ -217,6 +267,7 @@ def record_stereo_unexpressed(flag: bool) -> None:
     defined on the input but not expressed in the name). Set at the flagged
     best-effort ship site; read by ``name_tiered``."""
     _STEREO_UNEXPRESSED.set(bool(flag))
+    _touch("stereo_unexpressed")
 
 
 def record_suffix_free_prefix_name(flag: bool) -> None:
@@ -225,6 +276,7 @@ def record_suffix_free_prefix_name(flag: bool) -> None:
     comment). Set only at the PG-suppressed assembly site; read by
     ``name_tiered`` and surfaced per row so can enumerate the debt."""
     _SUFFIX_FREE_PREFIX_NAME.set(bool(flag))
+    _touch("suffix_free_prefix_name")
 
 
 def record_gate_outcome(outcome: str, name: Optional[str]) -> None:
@@ -238,6 +290,7 @@ def record_gate_outcome(outcome: str, name: Optional[str]) -> None:
     """
     _GATE_OUTCOME.set(outcome)
     _GATE_OUTCOME_NAME.set(name)
+    _touch("gate_outcome", "gate_outcome_name")
 
 
 def carveout_outcome(slug: str) -> str:
@@ -294,6 +347,7 @@ def record_general_ring_prefix() -> None:
     deliberately one-way (never cleared) for the duration of a naming call.
     """
     _GENERAL_RING_PREFIX.set(True)
+    _touch("general_ring_prefix")
 
 
 def get_provenance() -> dict:

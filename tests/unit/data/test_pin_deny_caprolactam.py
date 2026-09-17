@@ -34,7 +34,7 @@ citation was wrong and is corrected by this change.
 Producer-level assertions only. Whole-molecule assertions are unsound in this
 suite -- ``conftest`` disables the OPSIN gate suite-wide, so ``name_tiered`` can
 select a different producer than the CLI does. User-visible CLI behaviour is
-recorded in ``.the workflow tooling/sdd/-residue/TaskAB-report.md``.
+recorded in `internal notes`.
 """
 
 import json

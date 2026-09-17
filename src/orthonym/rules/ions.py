@@ -1023,7 +1023,7 @@ def name_anion(mol, style: str = 'pin', _depth: int = 0, retained_only: bool = F
         # paths would emit the NEUTRAL word (a different molecule). Placed before
         # route_charged so a monoester monoanion / sulfate ester anion is named.
         #
-        # charged Slice A fix-round 2 (class closure): this is the ester-anion
+        # charged Slice A fix-a performance pass (class closure): this is the ester-anion
         # producer's 0-wrong gate. name_acid_ester_anion is NOT fail-closed at the
         # producer -- a cyclitol/inositol owner whose stereo OPSIN 2.9.0 cannot
         # CIP-verify (e.g. the phosphate/sulfate MONOanion of a hexahydroxycyclohexane)

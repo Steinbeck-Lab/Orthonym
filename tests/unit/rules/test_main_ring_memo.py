@@ -1,4 +1,4 @@
-"""Lever N (round 2): the von Baeyer main-ring search is computed once per (mol, ring system) in a scope,
+"""Lever N (a performance pass): the von Baeyer main-ring search is computed once per (mol, ring system) in a scope,
 returns the same value as the impl, and a memo hit charges the same perf-budget units."""
 from rdkit import Chem
 from orthonym.assembly import memo

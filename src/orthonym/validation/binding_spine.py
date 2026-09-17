@@ -158,7 +158,7 @@ STEREO_DESCRIPTOR_MISMATCH = "STEREO_DESCRIPTOR_MISMATCH"
 SUBSTITUENT_STEREO_UNVERIFIED = "SUBSTITUENT_STEREO_UNVERIFIED"
 SUBSTITUENT_STEREO_MISSING = "SUBSTITUENT_STEREO_MISSING"
 SUBSTITUENT_STEREO_MISMATCH = "SUBSTITUENT_STEREO_MISMATCH"
-# Task 4 fix-round 2: 2+ candidate leading-stereo-block positions exist (a
+# Task 4 fix-a performance pass: 2+ candidate leading-stereo-block positions exist (a
 # multi-word functional-class name) and the PARENT binding's own P4 span
 # could not be resolved to positionally anchor which one is its block --
 # unproven, not disproven (mirrors CHARGE_UNVERIFIED/STEREO_UNVERIFIED
@@ -1420,7 +1420,7 @@ def _parse_leading_stereo_block(text: str) -> List[Tuple[Any, str]]:
 # anchored at index 0 finds nothing and P8a misreports every real centre as
 # MISSING.
 #
-# Task 4 FIX-ROUND 1 (reviewer-found regression): "first non-empty block
+# Task 4 FIX-a performance pass (reviewer-found regression): "first non-empty block
 # wins" is wrong, not merely incomplete. The word preceding the parent is
 # not always a BARE identifier -- a chiral ester alkyl group built by the
 # fully general substituent namer can carry its OWN leading ``(nR)/(nS)``
@@ -1430,7 +1430,7 @@ def _parse_leading_stereo_block(text: str) -> List[Tuple[Any, str]]:
 # read the parent's 3 real centres as MISSING and, once escalated to error,
 # VOIDED a fully correct candidate.
 #
-# Task 4 FIX-ROUND 2 (reviewer-found, MORE SEVERE): round 1's fix selected
+# Task 4 FIX-a performance pass (reviewer-found, MORE SEVERE): a performance pass's fix selected
 # the candidate with the largest OVERLAP against ``expected_set``. That is
 # an identity CORRELATION, not an identity PROOF -- locants are small ints
 # and CIP is binary, so a foreign word can coincidentally share a real
@@ -1447,8 +1447,8 @@ def _parse_leading_stereo_block(text: str) -> List[Tuple[Any, str]]:
 # parent binding's own real character span is already known from P4
 # (``_p4_token_spans``, which always runs before P8).
 #
-# Task 4 FIX-ROUND 3 (re-review-found residual, SAFE-SIDE false-abstain):
-# round 2's "rightmost candidate whose start does not exceed
+# Task 4 FIX-a performance pass (re-review-found residual, SAFE-SIDE false-abstain):
+# a performance pass's "rightmost candidate whose start does not exceed
 # parent_span_start" rule (plus its unconditional single-candidate
 # shortcut) still misattributes a FOREIGN word's block to the parent when
 # the PARENT ITSELF has NO leading block of its own. Shape: a chiral
@@ -1457,7 +1457,7 @@ def _parse_leading_stereo_block(text: str) -> List[Tuple[Any, str]]:
 # boundary, so the ONLY candidate anywhere in the string is the pentyl
 # word's own ``(2S)``, at position 0 -- "some candidate exists whose start
 # is <= parent_span_start" is trivially true for EVERY earlier word's
-# candidate, not just the parent's own, so round 2 wrongly attributed
+# candidate, not just the parent's own, so a performance pass wrongly attributed
 # ``(2S)`` to the achiral parent and raised a false
 # ``STEREO_DESCRIPTOR_MISMATCH`` on a fully correct name (safe-side --
 # abstain, not mis-ship -- but a real breadth false-abstain on a common
@@ -1552,7 +1552,7 @@ _STEREO_BLOCK_AMBIGUOUS = object()
 def _find_leading_stereo_pairs(name: str, parent_span_start: Optional[int]):
     """P8a's forward-parse entry point: the PARENT-scope leading
     stereodescriptor block, selected by ADJACENCY to the parent's own word
-    (Task 4 fix-round 3 -- see the comment above this function for the two
+    (Task 4 fix-a performance pass -- see the comment above this function for the two
     prior selection strategies this superseded and why each was unsafe).
 
     The word boundary that begins the SAME word/name-region the parent
@@ -1673,26 +1673,26 @@ def _p8_stereo(mol, spine: BindingSpine, name: str, mode: str,
     name (``"methyl (1R,...)-...-carboxylate"``) resolves its block after
     the alkyl word instead of reporting every real centre MISSING.
 
-    Task 4 FIX-ROUND 2: ``_find_leading_stereo_pairs`` selects the PARENT's
+    Task 4 FIX-a performance pass: ``_find_leading_stereo_pairs`` selects the PARENT's
     candidate block POSITIONALLY now (anchored to the PARENT binding's own
     resolved P4 ``spans`` entry, via ``_parent_binding_span``), never by
-    identity overlap against ``expected_set`` -- round 1's overlap-based
+    identity overlap against ``expected_set`` -- a performance pass's overlap-based
     selection could be fooled by a foreign word that coincidentally shared
     a real ``(locant, cip)`` pair with the parent's true centres, which
     would SUPPRESS a genuine ``STEREO_DESCRIPTOR_MISMATCH`` on a fabricated
-    parent block -- strictly worse than round 1's own bug (a false void is
+    parent block -- strictly worse than a performance pass's own bug (a false void is
     a safe abstain; a suppressed mismatch is a masked wrong name under the
     gate that is supposed to BE the 0-wrong backstop).
 
-    Task 4 FIX-ROUND 3: round 2's "rightmost candidate at or before the
+    Task 4 FIX-a performance pass: a performance pass's "rightmost candidate at or before the
     parent's span" rule still misattributed a FOREIGN word's block to an
     ACHIRAL parent that has none of its own (e.g. ``"(2S)-pentyl
     butanoate"`` -- a real, safe-side breadth false-abstain). Selection now
     requires ADJACENCY: the candidate must sit at EXACTLY the word boundary
     that begins the parent's own word/name-region, never merely at or
     before it. See the comment above ``_iter_leading_stereo_candidates``
-    for the full derivation and all three witnesses (the round-1
-    regression, the round-2 mask hole, and the round-3 false-abstain).
+    for the full derivation and all three witnesses (the a performance pass
+    regression, the a performance pass mask hole, and the a performance pass false-abstain).
     When the parent's span cannot be resolved AND at least one candidate
     block exists anywhere, ``_find_leading_stereo_pairs`` returns
     ``_STEREO_BLOCK_AMBIGUOUS`` and this function reports
@@ -1953,7 +1953,7 @@ def verify_spine(mol, spine: BindingSpine, name: str, *,
     # needs nothing from the global atom partition (it reads the mol's real
     # stereo properties and the threaded locant map directly), so it still
     # runs when P1 has failed. P8a additionally reuses P4's already-computed
-    # `spans` (Task 4 fix-round 2) to positionally anchor the parent's own
+    # `spans` (Task 4 fix-a performance pass) to positionally anchor the parent's own
     # leading stereo block -- P4 always runs above, so `spans` is available
     # here regardless of whether P1 failed.
     _p8_stereo(mol, spine, name or "", mode, spans, findings, stats)

@@ -100,7 +100,7 @@ def test_pin_dispiro_return_arc_symmetric_unchanged():
         "C1CC12CC1(CC1)C2": "dispiro[2.1.2.1]octane",
         "C1CCCC12CCC1(CCCC1)CC2": "dispiro[4.2.4.2]tetradecane",
         "C1CC12C1(CC1)C2": "dispiro[2.0.2.1]heptane",
-        # CQ5 hetero witnesses (round-1 first-arc fix) must stay put too.
+        # CQ5 hetero witnesses (a performance pass first-arc fix) must stay put too.
         "C1C2(CCC2)C11CCO1": "1-oxadispiro[3.0.3.1]nonane",
         "C1CC11CCC11CO1": "1-oxadispiro[2.0.2.2]octane",
     }

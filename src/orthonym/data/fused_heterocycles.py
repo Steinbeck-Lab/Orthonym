@@ -27,6 +27,12 @@ from ..perception.molcache import (  # audit 2026-09-03 (S2): per-call atom/bond
     atoms_of,
     bonds_of,
 )
+from ..metrics.provenance import (  # a lever: breadth flags enter the fused_core memo key
+    allow_aromatic_general_ctx,
+    best_effort_ctx,
+    full_coverage_ctx,
+    general_fallback_ctx,
+)
 
 # Fused heterocycle data - canonical SMILES verified with RDKit
 # Format: canonical_smiles -> {name, tautomer_locant, ring_system, parent_atoms, iupac_locants}
@@ -2589,6 +2595,36 @@ def match_fused_heterocycle_core(
     return result
 
 
+def _fused_core_memo_key(mol: Chem.Mol) -> tuple:
+    """The complete memo key for the ``fused_core`` cache (extracted so it is
+    independently testable).
+
+     (a review P3 Crit-1): the non-canonical SMILES ALONE does NOT pin the
+    index->atom correspondence -- RDKit's non-canonical writer DFS-walks from
+    atom 0 taking the lowest-index neighbour, so any two labelings that make
+    the same branch choices produce the SAME string with DIFFERENT atom
+    numbers. The result's ``atom_mapping`` is index-keyed, so a bare-string hit
+    would ship the FIRST caller's mapping to a differently-labeled mol -- a
+    WRONG LOCANT (measured: a PubChem-ordered quinazolinone got locant 4 vs 3;
+    the engine presents one molecule as both MolFromSmiles(input) and
+    MolFromSmiles(canonical) within one scope). Pin the labeling with the atom
+    OUTPUT ORDER ``MolToSmiles`` just recorded -- same key construction the
+     M1 substituent memo uses (assembly/substituent_enumerator.py). Same
+    string + same output order == identical indexed graph.
+
+    a lever: also carry the four breadth flags. The matched result's index-keyed
+    ``atom_mapping``/locants can differ by tier when a breadth flag enables a
+    producer the strict path lacks, so a value cached at one engine configuration
+    must never be served to another (the strict PIN twin runs with all four OFF and,
+    under B2, shares this run's memo scope). A finer key means only MORE misses
+    (recompute), never a false hit => byte-identity-safe.
+    """
+    _smi = Chem.MolToSmiles(mol, canonical=False)
+    return (_smi, mol.GetProp("_smilesAtomOutputOrder"),
+            general_fallback_ctx.get(), best_effort_ctx.get(),
+            allow_aromatic_general_ctx.get(), full_coverage_ctx.get())
+
+
 def _match_fused_heterocycle_core_impl(
     mol: Chem.Mol
 ) -> Optional[Tuple[str, Dict[int, Union[int, str]], str]]:
@@ -2622,20 +2658,7 @@ def _match_fused_heterocycle_core_impl(
         return None
     from ..assembly.memo import cache_or_compute
     try:
-        _smi = Chem.MolToSmiles(mol, canonical=False)
-        # (a review P3 Crit-1): the non-canonical SMILES ALONE does NOT pin the
-        # index->atom correspondence -- RDKit's non-canonical writer DFS-walks from
-        # atom 0 taking the lowest-index neighbour, so any two labelings that make
-        # the same branch choices produce the SAME string with DIFFERENT atom
-        # numbers. The result's ``atom_mapping`` is index-keyed, so a bare-string hit
-        # would ship the FIRST caller's mapping to a differently-labeled mol -- a
-        # WRONG LOCANT (measured: a PubChem-ordered quinazolinone got locant 4 vs 3;
-        # the engine presents one molecule as both MolFromSmiles(input) and
-        # MolFromSmiles(canonical) within one scope). Pin the labeling with the atom
-        # OUTPUT ORDER ``MolToSmiles`` just recorded -- same key construction the
-        # M1 substituent memo uses (assembly/substituent_enumerator.py). Same
-        # string + same output order == identical indexed graph.
-        key = (_smi, mol.GetProp("_smilesAtomOutputOrder"))
+        key = _fused_core_memo_key(mol)
     except Exception:
         # An unkeyable mol (should not happen) -> recompute, never cache-corrupt.
         return _match_fused_heterocycle_core_compute(mol)

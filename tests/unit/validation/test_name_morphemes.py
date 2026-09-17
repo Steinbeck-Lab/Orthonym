@@ -155,7 +155,7 @@ def test_multiplier_scope_is_never_confidently_wrong(token, truth):
 ])
 def test_multiplier_before_a_replacement_prefix_adds_no_atoms(token, truth):
     """The false-positive this fix repairs (a phase Task 2b): see
-    ``.the workflow tooling/sdd/2026-08-12-phase0c-coverage-certificate-and-locant/task-2-report.md``.
+    `internal notes`.
     """
     est = token_arity(token, BindingKind.PREFIX)
     assert (not est.confident) or est.heavy_atoms == truth, (

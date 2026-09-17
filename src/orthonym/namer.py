@@ -1781,7 +1781,7 @@ def _offer_rt_ok(name: str, input_smiles: Optional[str]) -> bool:
     compare all return True. This predicate must never be the reason
     `select_rt_passing` empties the whole offer pool.
 
-     no-abstain Phase A fix-round-1 (Findings 1+2, a review adversarial
+     no-abstain Phase A fix-a performance pass (Findings 1+2, a review adversarial
     review): `skip_reanchor` bundles FOUR distinct outcomes as though they all
     meant "no check is possible or worth attempting" -- but `unavailable` /
     `not_run` mean only "no gate call was recorded for THIS EXACT STRING
@@ -1846,7 +1846,7 @@ def _offer_rt_ok(name: str, input_smiles: Optional[str]) -> bool:
         # positive verdict (`self01_complete is True`) -- re-looking up a
         # previously-VERIFIED name and hitting a transient blip must not lose it.
         #
-        # fix round 1 (coordinator CRITICAL, 0-wrong): for a string with NO
+        # fix a performance pass (coordinator CRITICAL, 0-wrong): for a string with NO
         # positive verdict (`self01_complete is None` -- `bypassed` / `suppressed`
         # / `inconclusive`, e.g. a FRESH floor/alternative offer whose exact
         # string the gate NEVER verified), a None here means the offer is
@@ -2848,18 +2848,9 @@ class Orthonym:
         self._triv_oracle = None
         if self._enable_triviality_controller:
             try:
-                import sys
-                from pathlib import Path
-
                 from .assembly.retained_substitution import OpsinOracle
-                _scripts = str(Path(__file__).resolve().parent.parent.parent / "scripts")
-                if _scripts not in sys.path:
-                    sys.path.insert(0, _scripts)
-                try:
-                    from validate_retained_names import find_opsin_jar
-                    _jar = find_opsin_jar() or None
-                except ImportError:
-                    _jar = None
+                from .validation.opsin_roundtrip import _find_opsin_jar
+                _jar = _find_opsin_jar()
                 self._triv_oracle = OpsinOracle(opsin_jar=_jar)
             except Exception as exc:
                 logger.warning(
@@ -2876,18 +2867,9 @@ class Orthonym:
         self._split_oracle = None
         if self._enable_group_splitting:
             try:
-                import sys
-                from pathlib import Path
-
                 from .assembly.retained_substitution import OpsinOracle
-                _gs_scripts = str(Path(__file__).resolve().parent.parent.parent / "scripts")
-                if _gs_scripts not in sys.path:
-                    sys.path.insert(0, _gs_scripts)
-                try:
-                    from validate_retained_names import find_opsin_jar
-                    _gs_jar = find_opsin_jar() or None
-                except ImportError:
-                    _gs_jar = None
+                from .validation.opsin_roundtrip import _find_opsin_jar
+                _gs_jar = _find_opsin_jar()
                 self._split_oracle = OpsinOracle(opsin_jar=_gs_jar)
             except Exception as exc:
                 logger.warning(
@@ -3795,6 +3777,22 @@ class Orthonym:
         certification) is reserved. Default construction (no flags) keeps
         today's PIN-or-abstain behavior byte-identically.
         """
+        # B2: open ONE memo scope around BOTH the primary name and the strict PIN
+        # twin (_strict_pin_twin_name -> tw.name), so the twin reuses this run's
+        # breadth-INDEPENDENT memo entries instead of recomputing them. The two
+        # breadth-SENSITIVE namespaces (fused_core, name_substituent) carry the four
+        # breadth flags in their keys (a lever), so the twin's flags-OFF lookups miss
+        # the primary's flags-ON entries and recompute at the correct configuration.
+        # push_scope returns None inside name's own push (a nested no-op), so both
+        # engines share THIS scope; only this frame tears it down.
+        from .assembly.memo import pop_scope as _memo_pop, push_scope as _memo_push
+        _tier_scope = _memo_push()
+        try:
+            return self._name_tiered_impl(smiles)
+        finally:
+            _memo_pop(_tier_scope)
+
+    def _name_tiered_impl(self, smiles: str) -> dict:
         from .metrics import provenance as _pv
         from .metrics.provenance import clear_provenance, get_provenance
         clear_provenance()
@@ -4570,7 +4568,7 @@ class Orthonym:
                     # This TIGHTENS the tier (measured before/after in
                     # task-A-report.md); it does not add a stereo-omission
                     # degrade path.
-                    # fix-round-1 Finding 3: with `name_facts=None`, the ONLY
+                    # fix-a performance pass Finding 3: with `name_facts=None`, the ONLY
                     # reachable success inside `verify_or_none` is its OPSIN
                     # full-InChIKey branch (the reconstructor branch requires
                     # `name_facts is not None`, unreachable here) -- so a
@@ -6112,7 +6110,7 @@ class Orthonym:
                         # dropped stereo; best-effort ships a constitution-only
                         # name flagged stereo_unexpressed.
                         #
-                        # no-abstain Phase A fix-round-1, Finding 4 (HIGH,
+                        # no-abstain Phase A fix-a performance pass, Finding 4 (HIGH,
                         # a review adversarial review): the OLD comment here claimed
                         # the downstream `_final_opsin_validity_gate` "verifies at
                         # the granularity [a flagged emission] asserts" -- WRONG.
@@ -7600,6 +7598,59 @@ def name_with_tree(smiles: str, style: str = "pin"):
 
 
 def name_compound(smiles: str, style: str = "pin",
+                   include_confidence: bool = False,
+                   *,
+                   enable_triviality_controller: bool = False,
+                   enable_group_splitting: bool = False,
+                   trivial_fallback: bool = False,
+                   general_fallback: Optional[bool] = None,
+                   general_fallback_unverified: Optional[bool] = None,
+                   allow_aromatic_general: Optional[bool] = None,
+                   full_coverage: Optional[bool] = None,
+                   raise_on_limit: bool = False,
+                   binding_proof: str = "off"):
+    """Public entry: generate an IUPAC name from SMILES.
+
+    Thin front over:func:`_name_compound_impl`. a performance pass a lever: when this is
+    a NESTED plain-string call (an outer ``name`` is on the stack) route it
+    through the R3 replay-memo (``assembly.nested_memo.cached_nested_call``) so a
+    fragment named more than once inside one molecule re-runs the engine only
+    once; the memo replays the provenance delta and budget units the outer
+    molecule reads. TOP-LEVEL calls and ``include_confidence=True`` are NEVER
+    memoised. The key carries every result-changing kwarg (12) plus the four
+    breadth ctx-vars, so a hit can never return a name computed under different
+    flags. ``raise_on_limit=True`` raises through ``cached_nested_call`` uncached
+    (exceptions propagate) -- the existing behaviour. See the brief
+    `internal notes`.
+    """
+    if not include_confidence:
+        from .assembly.fragment_naming import is_top_level_naming
+        if not is_top_level_naming():
+            from .assembly.nested_memo import cached_nested_call
+            from .metrics.provenance import (allow_aromatic_general_ctx, best_effort_ctx,
+                                             full_coverage_ctx, general_fallback_ctx)
+            _key = (smiles, style, enable_triviality_controller, enable_group_splitting,
+                    trivial_fallback, general_fallback, general_fallback_unverified,
+                    allow_aromatic_general, full_coverage, raise_on_limit, binding_proof,
+                    general_fallback_ctx.get(), best_effort_ctx.get(),
+                    allow_aromatic_general_ctx.get(), full_coverage_ctx.get())
+            return cached_nested_call("name_compound_nested", _key, lambda: _name_compound_impl(
+                smiles, style, include_confidence,
+                enable_triviality_controller=enable_triviality_controller,
+                enable_group_splitting=enable_group_splitting, trivial_fallback=trivial_fallback,
+                general_fallback=general_fallback, general_fallback_unverified=general_fallback_unverified,
+                allow_aromatic_general=allow_aromatic_general, full_coverage=full_coverage,
+                raise_on_limit=raise_on_limit, binding_proof=binding_proof))
+    return _name_compound_impl(
+        smiles, style, include_confidence,
+        enable_triviality_controller=enable_triviality_controller,
+        enable_group_splitting=enable_group_splitting, trivial_fallback=trivial_fallback,
+        general_fallback=general_fallback, general_fallback_unverified=general_fallback_unverified,
+        allow_aromatic_general=allow_aromatic_general, full_coverage=full_coverage,
+        raise_on_limit=raise_on_limit, binding_proof=binding_proof)
+
+
+def _name_compound_impl(smiles: str, style: str = "pin",
                    include_confidence: bool = False,
                    *,
                    enable_triviality_controller: bool = False,

@@ -98,7 +98,7 @@ def name_t4_complete(mol, features) -> Optional[str]:
     fixed (Task 2b, ``name_morphemes.py::_evaluate``'s multiplier short-circuit
     now also skips zero-atom REPL segments) and the a dev split best-effort
     before/after re-measurement is BYTE-IDENTICAL emit/rt_exact -- see
-    `.the workflow tooling/sdd/2026-08-12-phase0c-coverage-certificate-and-locant/task-2-report.md`.
+    internal notes.
     """
     candidate = _best_effort_candidate(mol, features)
     if candidate is None:

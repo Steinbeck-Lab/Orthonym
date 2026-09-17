@@ -28,3 +28,50 @@ def test_no_name_substituent_verify_mismatches_on_carbamoyl_witness():
         pass  # a naming failure is fine; we only assert on the verify counter
     ns = sum(1 for (n, k) in memo._VERIFY_MISMATCHES if n == "name_substituent")
     assert ns == 0, f"name_substituent memo key still collides ({ns} events)"
+
+
+def test_substituent_memo_key_separates_breadth_flags():
+    # a lever: a value cached at one breadth configuration must never be served to
+    # another (the strict PIN twin runs with the four flags OFF). The key must carry
+    # the three flags that are not already present (best_effort is best_effort_val).
+    from orthonym.assembly.substituent_enumerator import _substituent_memo_key
+    from orthonym.metrics.provenance import (
+        general_fallback_ctx, allow_aromatic_general_ctx, full_coverage_ctx)
+    mol = Chem.MolFromSmiles("CCc1ccccc1"); frag = {0, 1}; attach = 1
+    keys = set()
+    for gf, aag, fc in [(False, False, False), (True, False, False),
+                        (True, True, False), (True, True, True)]:
+        t1 = general_fallback_ctx.set(gf)
+        t2 = allow_aromatic_general_ctx.set(aag)
+        t3 = full_coverage_ctx.set(fc)
+        try:
+            keys.add(_substituent_memo_key(
+                mol, frag, attach, allow_mancude=True, best_effort_val=False))
+        finally:
+            full_coverage_ctx.reset(t3)
+            allow_aromatic_general_ctx.reset(t2)
+            general_fallback_ctx.reset(t1)
+    assert len(keys) == 4
+
+
+def test_fused_core_memo_key_separates_breadth_flags():
+    # a lever mirror: the fused_core memo key must carry the same three flags, for
+    # the same reason -- a match's index-keyed atom_mapping can differ by tier when a
+    # breadth flag enables a producer the strict path lacks (2026-09-12 a lever).
+    from orthonym.data.fused_heterocycles import _fused_core_memo_key
+    from orthonym.metrics.provenance import (
+        general_fallback_ctx, allow_aromatic_general_ctx, full_coverage_ctx)
+    mol = Chem.MolFromSmiles("c1ccc2[nH]ccc2c1")  # indole
+    keys = set()
+    for gf, aag, fc in [(False, False, False), (True, False, False),
+                        (True, True, False), (True, True, True)]:
+        t1 = general_fallback_ctx.set(gf)
+        t2 = allow_aromatic_general_ctx.set(aag)
+        t3 = full_coverage_ctx.set(fc)
+        try:
+            keys.add(_fused_core_memo_key(mol))
+        finally:
+            full_coverage_ctx.reset(t3)
+            allow_aromatic_general_ctx.reset(t2)
+            general_fallback_ctx.reset(t1)
+    assert len(keys) == 4

@@ -1,4 +1,4 @@
-"""Lever M (round 2): name_c_substituted_sugar runs its expensive body once per structure within a scope."""
+"""Lever M (a performance pass): name_c_substituted_sugar runs its expensive body once per structure within a scope."""
 from rdkit import Chem
 from orthonym.assembly import memo
 from orthonym.data import sugar_names as sn

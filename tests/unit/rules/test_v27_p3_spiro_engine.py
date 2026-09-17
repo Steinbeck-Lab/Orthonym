@@ -188,7 +188,7 @@ def _ring_frag_attach(mol):
 @pytest.mark.parametrize("smi,expected", [
     # hetero spiro substituent (was carbocyclic-only -> "substituent")
     ("C1OCCC12CCC(CC2)CC(=O)O", "2-oxaspiro[4.5]decan-8-yl"),
-    # polyspiro substituent. round 2: this dispiro skeleton's two
+    # polyspiro substituent. a performance pass: this dispiro skeleton's two
     # equal-length middle-ring arcs (both 2 carbons) are a genuine
     # numbering tie the descriptor/spiro-atom-locant rules do not resolve
     # (same descriptor "dispiro[3.2.3.2]", same spiro-atom locants {4,7}

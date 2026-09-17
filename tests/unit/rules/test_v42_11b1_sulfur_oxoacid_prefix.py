@@ -7,7 +7,7 @@ sulfur group is cited as a substituent PREFIX, not the parent
 examples are pinned below with their line numbers. The generic path names these
 by skeletal ('a') replacement ('…-1,3-dioxa-2λ6-thiapropyl') — a valid,
 round-tripping, but NON-PIN form (RIGHT_MOL_NONPIN). See
-.the workflow tooling/sdd/IMPLEMENTATION-PLAN-/task-11B1-report.md.
+internal notes
 """
 import pytest
 from rdkit import Chem

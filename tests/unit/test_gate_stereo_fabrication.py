@@ -1,7 +1,7 @@
 """ a phase (C3): gate backstop rejects OPSIN-parseable stereo
 FABRICATION (nb > na) while still tolerating the achiral case (na == nb == 0).
 
-See.the workflow tooling/sdd/2026-08-16--phase1-stereo-honesty/task-5-brief.md.
+See internal notes
 """
 from orthonym.namer import _self_consistency_verdict
 

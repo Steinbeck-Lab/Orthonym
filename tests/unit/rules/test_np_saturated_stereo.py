@@ -1,6 +1,6 @@
 """a phase Fix 1 — ring stereo emission for SATURATED bare steroid scaffolds.
 
-Root cause (verified in the brief, `.the workflow tooling/sdd/2026-08-12-phase0b-descriptor-kind-
+Root cause (verified in the brief, internal notes
 degradation/fix-1-brief.md`): `name_natural_product`'s Step 4 bare-scaffold branch only
 calls the alpha/beta stereo collector `_collect_np_stereo` inside the UNSATURATED
 (`ene`/`yne`) arm. A fully-saturated bare scaffold with a non-natural ring stereocentre

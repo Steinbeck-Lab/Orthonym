@@ -90,7 +90,7 @@ def test_cyclitol_phosphate_dianion_floor_backstops_constitution_only():
     smi = "O=P([O-])([O-])O[C@@H]1[C@H](O)[C@H](O)[C@@H](O)[C@H](O)[C@H]1O"
     _floor_constitution_charge_only(smi)
 
-# --- fix round 2 (class closure): the SAME defect class on the single-anion sibling
+# --- fix a performance pass (class closure): the SAME defect class on the single-anion sibling
 # sites (ions.py:975-978, dispatch_table.py::_handle_anion_small). The strict gate
 # must NEVER abstain a name that is correct + OPSIN-parseable -- verify plain ester
 # monoanions still ship and full-InChIKey round-trip (RT computed, not hardcoded).

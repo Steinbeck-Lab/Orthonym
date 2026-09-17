@@ -10,7 +10,7 @@ Two per-top-level budgets (``fragment_naming._PERF_BUDGET`` inner ops +
 exhaustion ``PerfBudgetExceeded`` unwinds to the outermost ``name`` and the
 whole molecule abstains CLEANLY (inv 9 — never a partial / atom-dropped name).
 
-Measured sizing (M2.5 Task 2B, ``.the workflow tooling/sdd/M2-STEREO-PLAN/task-m25b-report.md``):
+Measured sizing (M2.5 Task 2B, `internal notes`):
 
   * hang witnesses: Ni/Fe-corrin ~7-12M inner ops; cob(III)yrinate 553 analyze
     calls; vancomycin/thiopeptide ~1000+ fused-matcher calls (all growing without

@@ -99,6 +99,40 @@ def pop_scope(token):
         _cache_var.reset(token)
 
 
+# Scope-bound SIDE store (a performance pass a lever verify-honesty). The nested replay-memo
+# needs to keep per-key metadata (the provenance vars a call touched + the budget
+# units it charged) that is internal notes-RELATIVE, so it must NOT go through
+# ``cache_or_compute`` (``verify`` mode would recompute and flag it as a mismatch
+# even though the emitted NAME is identical). It lives here instead: a plain dict
+# kept inside the scope cache under a reserved non-tuple key, so it is torn down
+# with the scope and is never compared by ``verify`` (which only ever inspects the
+# ``(namespace, key)`` tuple keys it was called with). Absent a scope, there is no
+# side store and no cache hit ever occurs, so a replay is never needed.
+_SIDE_KEY = "__nested_memo_side__"
+
+
+def side_get(namespace, key):
+    """Return the scope-bound side value for ``(namespace, key)``, or ``None``."""
+    cache = _cache_var.get()
+    if cache is None:
+        return None
+    side = cache.get(_SIDE_KEY)
+    return None if side is None else side.get((namespace, key))
+
+
+def side_put(namespace, key, value) -> None:
+    """Store a scope-bound side value for ``(namespace, key)`` (no verify compare).
+    A no-op with no active scope (fail-open: no scope -> no hit -> no replay)."""
+    cache = _cache_var.get()
+    if cache is None:
+        return
+    side = cache.get(_SIDE_KEY)
+    if side is None:
+        side = {}
+        cache[_SIDE_KEY] = side
+    side[(namespace, key)] = value
+
+
 # ---------------------------------------------------------------------------
 # Perf lever A8 (2026-09-13): process-wide cache for the PURE namespaces
 # ---------------------------------------------------------------------------
@@ -109,9 +143,12 @@ def pop_scope(token):
 # parses had already been computed for an earlier molecule.
 #
 # ONLY namespaces whose key is complete may use this. ``name_substituent`` and
-# ``fused_core`` are deliberately EXCLUDED: their keys carry no tier/breadth flags
-# (2026-09-12 lever-B finding, one ChEBI row flipped pin_unverified -> pin_verified),
-# so a value cached under one engine configuration must never be served to another.
+# ``fused_core`` are NOT promoted here. Their keys USED to carry no tier/breadth flags
+# (2026-09-12 a lever finding, one ChEBI row flipped pin_unverified -> pin_verified);
+# a performance pass a lever added ``general_fallback`` / ``allow_aromatic_general`` /
+# ``full_coverage`` (and ``best_effort``) to both keys, so the completeness bar is now
+# met — but promoting them to this cross-molecule cache is a separate, unmeasured
+# optimization left for later; they stay scope-only for now.
 # In ``verify`` mode nothing is served from here; the value is recomputed and compared
 # exactly as in:func:`cache_or_compute`.
 _PROCESS_MAX = int(os.environ.get("ORTHONYM_PROCESS_CACHE", "20000") or 0)

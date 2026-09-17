@@ -2023,24 +2023,8 @@ def _quaternary_rt_ok(name: str, mol) -> bool:
         # Resolve the OPSIN jar the same way the namer does (a phase/169
         # precedent); if it cannot be found the oracle's _jar stays None and
         # _invoke_opsin raises -> the outer except fails OPEN (jar-missing).
-        _jar = None
-        try:
-            import sys
-            from pathlib import Path
-            # ``scripts/`` sits at the REPO ROOT (Project/scripts), four parents up
-            # from this file (rules -> orthonym -> src -> Project). The earlier
-            # three-parent path pointed at the non-existent ``src/scripts`` -> the
-            # import below always raised -> ``_jar`` stayed None -> this gate silently
-            # failed OPEN (never validated). Corrected to the real scripts directory.
-            _scripts = str(
-                Path(__file__).resolve().parent.parent.parent.parent / "scripts"
-            )
-            if _scripts not in sys.path:
-                sys.path.insert(0, _scripts)
-            from validate_retained_names import find_opsin_jar
-            _jar = find_opsin_jar() or None
-        except ImportError:
-            _jar = None
+        from ..validation.opsin_roundtrip import _find_opsin_jar
+        _jar = _find_opsin_jar()
         oracle = OpsinOracle(opsin_jar=_jar)
         if oracle._jar is None:
             return True  # jar missing -> fail OPEN (CI without OPSIN must not block)
@@ -2082,19 +2066,8 @@ def _uronium_rt_ok(name: str, mol) -> bool:
         return False
     try:
         from ..assembly.retained_substitution import OpsinOracle
-        _jar = None
-        try:
-            import sys
-            from pathlib import Path
-            _scripts = str(
-                Path(__file__).resolve().parent.parent.parent.parent / "scripts"
-            )
-            if _scripts not in sys.path:
-                sys.path.insert(0, _scripts)
-            from validate_retained_names import find_opsin_jar
-            _jar = find_opsin_jar() or None
-        except ImportError:
-            _jar = None
+        from ..validation.opsin_roundtrip import _find_opsin_jar
+        _jar = _find_opsin_jar()
         oracle = OpsinOracle(opsin_jar=_jar)
         if oracle._jar is None:
             return True  # jar missing -> fail OPEN

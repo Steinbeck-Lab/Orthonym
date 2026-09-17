@@ -83,7 +83,7 @@ def test_sulfonate_ester_positive_control_unchanged():
     assert name_compound("CCOS(=O)(=O)c1ccccc1") == "ethyl benzenesulfonate"
 
 
-# Round-1 review fix: an owner whose ester-oxygen carbon is a carbonyl carbon
+# a performance pass review fix: an owner whose ester-oxygen carbon is a carbonyl carbon
 # (an acyl group) is a mixed carboxylic/sulfuric ANHYDRIDE, not a
 # sulfate ester — 's ester owners are alkyl/aryl groups only. The
 # SMARTS is intentionally broad enough to still MATCH these (so the class is

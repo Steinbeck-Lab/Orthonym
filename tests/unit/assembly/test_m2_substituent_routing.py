@@ -1,7 +1,7 @@
 """M2 Task 1 — tier propagation for ``name_substituent`` (best-effort scope only).
 
 Measured (internal notes,
-`.the workflow tooling/sdd/M1-PLAN/m2-task-1-report.md`): 75/166 pubchem10k rows hit the
+internal notes): 75/166 pubchem10k rows hit the
 substituent cascade's ``substituent``/``unknown`` placeholder internally under the
 best-effort tier. Of the 71 unique declined root fragments, 37 (mapping to 38
 molecule rows) name ONLY at best-effort (never at PIN default) when tested
@@ -152,7 +152,7 @@ def test_m4_fold_besteffort_roundtrips(eng, tag, smi):
 # =============================================================================
 #
 # Measured (internal notes,
-# `.the workflow tooling/sdd/M1-PLAN/m2-task-2-report.md`): after Task 1, 28 of the
+# internal notes): after Task 1, 28 of the
 # original 38 tier-propagation candidates still abstain because the cascade
 # DECLINES a ring/cage fragment that the whole-molecule general engine
 # already names standalone. `_route_fragment_to_general_engine`

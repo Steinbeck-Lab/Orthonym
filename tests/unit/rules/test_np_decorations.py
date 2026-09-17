@@ -54,7 +54,7 @@ class TestNPDecorationEnumeration:
         Has -OH at C-17 (prefix when ketone present), =O at C-3 (suffix),
         and C=C between C-4 and C-5 (ene suffix).
 
-         a phase (C2a stereo honesty, fix round 1): re-keyed from a flat
+         a phase (C2a stereo honesty, fix a performance pass): re-keyed from a flat
         (stereo-undefined) input to a fully stereo-defined one -- the flat form
         is now correctly declined by name_natural_product's steroid stereo-honesty
         guard (it fabricated the natural ring configuration). RT-full verified
@@ -69,7 +69,7 @@ class TestNPDecorationEnumeration:
 
         Has two ketone groups (C-3 and C-20) and one double bond (C-4,5).
 
-         a phase (C2a stereo honesty, fix round 1): re-keyed from a flat
+         a phase (C2a stereo honesty, fix a performance pass): re-keyed from a flat
         (stereo-undefined) input to a fully stereo-defined one (a valid
         diastereomer distinct from the exact-derivative 'progesterone' lookup
         entry, so this test still exercises scaffold-based decoration
@@ -82,7 +82,7 @@ class TestNPDecorationEnumeration:
     def test_androstanedione_decoration(self):
         """Androst-4-ene-3,17-dione: two ketones + one double bond.
 
-         a phase (C2a stereo honesty, fix round 1): re-keyed from a flat
+         a phase (C2a stereo honesty, fix a performance pass): re-keyed from a flat
         (stereo-undefined) input to a fully stereo-defined one (natural ring
         config; C-4=C-5 is an enone double bond so C-5 is not a stereocentre
         here). RT-full verified. Also corrects a stale expected value: the
@@ -99,7 +99,7 @@ class TestNPDecorationEnumeration:
         Aromatic ring A is now detected via Kekulized copy (a phase-02),
         producing ene locants for the aromatic C=C bonds.
 
-         a phase (C2a stereo honesty, fix round 1): re-keyed from a flat
+         a phase (C2a stereo honesty, fix a performance pass): re-keyed from a flat
         (stereo-undefined) input to a fully stereo-defined one (matches the
         W5-A2 gold row re-assertion). RT-full verified.
         """
@@ -137,7 +137,7 @@ class TestNPDecorationEnumeration:
 
         Saturated steroid with single -OH and no ketone uses -ol suffix.
 
-         a phase (C2a stereo honesty, fix round 1): re-keyed from a flat
+         a phase (C2a stereo honesty, fix a performance pass): re-keyed from a flat
         (stereo-undefined) input -- the flat form is now correctly declined
         (it fabricated the natural ring configuration + the new C-3 stereo-
         centre). RT-full verified.
@@ -168,7 +168,7 @@ class TestNPDecorationEdgeCases:
     def test_ketone_only_saturated(self):
         """Saturated steroid with only ketone decoration.
 
-         a phase (C2a stereo honesty, fix round 1): re-keyed from a flat
+         a phase (C2a stereo honesty, fix a performance pass): re-keyed from a flat
         (non-stereo) input to a fully stereo-defined one -- flat is now
         correctly declined (fabricated the natural ring configuration).
         RT-full verified.
@@ -189,7 +189,7 @@ class TestNPDecorationEdgeCases:
     def test_multiple_hydroxyls(self):
         """Steroid with multiple -OH groups.
 
-         a phase (C2a stereo honesty, fix round 1): re-keyed from a flat
+         a phase (C2a stereo honesty, fix a performance pass): re-keyed from a flat
         (stereo-undefined) input -- flat is now correctly declined (fabricated
         the natural ring configuration + both new stereocentres). RT-full
         verified.

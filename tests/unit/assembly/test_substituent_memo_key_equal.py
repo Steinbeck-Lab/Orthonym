@@ -72,7 +72,7 @@ def _reference_key(mol, frag_atoms, attach_idx, allow_mancude,
             for b in mol.GetAtomWithIdx(i).GetBonds()
             if b.GetOtherAtom(mol.GetAtomWithIdx(i)).GetIdx() not in frag_set))
         for i in _order)
-    # Item-1 fix, round 3 (, a review C1): the fragment SMILES + external-bond
+    # Item-1 fix, a performance pass (, a review C1): the fragment SMILES + external-bond
     # ORDERS still describe only the fragment and the multiplicities of its
     # outward bonds -- NOT what those bonds lead to. Producers on the cascade read
     # BEYOND the fragment: ``_name_amino_branch`` walks the acyl carbon's external

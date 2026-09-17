@@ -106,7 +106,7 @@ def test_rows_have_required_keys_and_statuses():
 # ---------------------------------------------------------------------------
 
 def test_no_legitimate_rows_dropped():
-    """Total ledger row count must be well above the broken round-1 total of 2208."""
+    """Total ledger row count must be well above the broken a performance pass total of 2208."""
     rows = build_ledger(
         matrix_path=".planning/audit-bluebook-v21/CONFORMANCE-MATRIX.md",
         cluster_dir=".planning/audit-bluebook-v23",

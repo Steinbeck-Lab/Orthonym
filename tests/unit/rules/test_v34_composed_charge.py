@@ -28,7 +28,7 @@ def test_composed_charge_controls_unchanged(smi, expected):
 
 
 # --------------------------------------------------------------------------
-# review round 1 — synthetic branch coverage for v34_charged_probe.probe's
+# review a performance pass — synthetic branch coverage for v34_charged_probe.probe's
 # RT classifier. The real charged corpus backlog measured B=0 (no wrong/
 # unparseable rows), so the `wrong` and `unparseable` branches — and the
 # falsy-InChIKey fail-closed guard the Critical finding was about — are
@@ -67,7 +67,7 @@ def test_probe_classifies_opsin_unparseable_name_as_unparseable(monkeypatch):
 
 
 def test_probe_wildcard_input_never_classified_full(monkeypatch):
-    """Exact regression test for the Critical finding (review round 1).
+    """Exact regression test for the Critical finding (review a performance pass).
 
     ``Chem.MolToInchiKey(Chem.MolFromSmiles('*CC'))`` returns ``''`` — falsy,
     NOT an exception, NOT ``None`` — for any wildcard/dummy-atom structure. The
@@ -384,7 +384,7 @@ def test_ws7_control_betaine_still_prefers_route_charged_pin():
 
 
 # --------------------------------------------------------------------------
-# fix round 1 (dual review) — the offers-lane 0-wrong fail-open + the
+# fix a performance pass (dual review) — the offers-lane 0-wrong fail-open + the
 # selanido/sulfido/azaniumyl cleanup.
 # --------------------------------------------------------------------------
 

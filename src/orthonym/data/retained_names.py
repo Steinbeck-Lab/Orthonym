@@ -343,7 +343,7 @@ RETAINED_NAMES = {
     # iupac_2013_pin_list.json (--trivial). Canonical key of N=NC(=O)N=N.
     "N=NC(=O)N=N": "bis(diazenyl)methanone",
 
-    # === PA1 R2/R3/R4/R8: PIN word-forms for the deprecated-trivial replacements
+    # === PA1 a lever/a lever: PIN word-forms for the deprecated-trivial replacements
     # (phosgene model). Each trivial name below is denied in
     # iupac_2013_pin_list.json with its verbatim Blue Book citation. REPRODUCE-
     # FIRST FINDING that made these entries mandatory rather than optional:

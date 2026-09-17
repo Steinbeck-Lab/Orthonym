@@ -48,6 +48,11 @@ from .substituent_naming import _name_aryl_methyl_ether, name_substituent_fragme
 from .substituent_prefix_forms import _check_substituent_prefix_form
 from ..perception.smarts_cache import compiled as _compiled_smarts
 from ..metrics.provenance import best_effort_ctx  # perf lever A10 (2026-09-13): hoisted (14,478 executions per 300 molecules)
+from ..metrics.provenance import (  # a lever: breadth flags enter the name_substituent memo key
+    allow_aromatic_general_ctx,
+    full_coverage_ctx,
+    general_fallback_ctx,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -1084,7 +1089,7 @@ def _substituent_memo_key(mol, frag_atoms, attach_idx, allow_mancude,
             for b in _atoms[i].GetBonds()
             if b.GetOtherAtomIdx(i) not in frag_set))
         for i in _order)
-    # Item-1 fix, round 3 (, a review C1): the fragment SMILES + external-bond
+    # Item-1 fix, a performance pass (, a review C1): the fragment SMILES + external-bond
     # ORDERS still describe only the fragment and the multiplicities of its
     # outward bonds -- NOT what those bonds lead to. Producers on the cascade read
     # BEYOND the fragment: ``_name_amino_branch`` walks the acyl carbon's external
@@ -1109,9 +1114,16 @@ def _substituent_memo_key(mol, frag_atoms, attach_idx, allow_mancude,
     # did (it separates even symmetric fragments a rank collapses), so the key is
     # only FINER -> a false HIT can become only a MISS (recompute) -> byte-identity
     # preserved.
+    # a lever: the strict PIN twin (namer.py) runs with the four breadth flags OFF,
+    # so a value cached at one configuration must never be served to another when the
+    # twin shares this run's memo scope. ``best_effort_val`` is already the
+    # ``best_effort_ctx`` bit; append the other three. Finer key => only MORE misses
+    # (recompute), never a false hit => byte-identity-safe.
     return (smi, attach_in_frag, ext_free_valence,
             bool(allow_mancude), best_effort_val, atom_cips, bond_cips,
-            ext_bond_orders, frozenset(frag_atoms), attach_idx)
+            ext_bond_orders, frozenset(frag_atoms), attach_idx,
+            general_fallback_ctx.get(), allow_aromatic_general_ctx.get(),
+            full_coverage_ctx.get())
 
 
 def name_substituent(mol, frag_atoms, attach_idx, allow_mancude: bool = False):

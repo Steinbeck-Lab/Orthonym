@@ -62,7 +62,7 @@ with real charge PERCEPTION, reusing ``assembly.general_engine``'s existing
 charge-suffix primitives (``_charge_suffix_text`` / ``_zwitterion_suffix_plan``
 / ``_elide_before_ionic_suffix``) so charge is spelled the SAME way as the
 rest of the codebase, never reinvented. This is backstopped by a general
-RAW-formal-charge void guard (fix round 1 below) so that a charge the reused
+RAW-formal-charge void guard (fix a performance pass below) so that a charge the reused
 primitives cannot spell always VOIDS the whole call rather than being spelled
 wrong. Scope, precisely (fail-closed on everything else -- an unspellable
 charge VOIDS the whole call, never mis-names):
@@ -112,8 +112,8 @@ charge VOIDS the whole call, never mis-names):
   EVERY genuine ionic-centre atom index was actually resolved by some level's
   suffix, not merely trusted to be, before returning a name.
 
-Fix round 1 (task-review + a review adversarial, both on `` -- see
-``.the workflow tooling/sdd/2026-08-21-no-abstain-universal-namer/
+Fix a performance pass (task-review + a review adversarial, both on `` -- see
+`internal notes
 task-B2b-fixround1-findings.md``): the four bullets above governed only the
 GENUINE ionic centres ``get_ion_sites`` reports. But ``get_ion_sites``
 STRIPS INTERNAL and semipolar charges (N-oxide, azide, diazo,
@@ -197,7 +197,7 @@ from .naming_utils import (
 #: ceiling on raw atom count; see ``_MAX_ATOMS_FOR_PERCEPTION`` below.
 DEFAULT_ATOM_WORK_BUDGET = 20_000
 
-#: Fix round 1 follow-up (found while VERIFYING finding 2's fix -- the broad
+#: Fix a performance pass (found while VERIFYING finding 2's fix -- the broad
 #: except alone was not enough): a raw linear chain segfaults inside
 #: ``assign_stereochemistry`` (CIP; the vendored ``centres`` bridge, gated
 #: by ``ORTHONYM_USE_CENTRES_CIP``, default on) somewhere between 18,000 and
@@ -304,7 +304,7 @@ class _ComponentResult:
     # symmetric to the atom-
     # coverage assertion, but
     # for CHARGE correctness.
-    internal_atoms: FrozenSet[int] = frozenset()  # Task B2b fix round 1 +
+    internal_atoms: FrozenSet[int] = frozenset()  # Task B2b fix a performance pass +
     # M2: atom indices whose
     # INTERNAL / semipolar
     # formal charge was RENDERED by
@@ -383,14 +383,14 @@ def name_universal_substitutive(
          nitrone, nitrile oxide, nitronate, aci-nitro, nitrate ester,
          thionitro, charge-drawn S/P-oxide, or a shredded polynitro) --
          ``get_ion_sites`` strips these, so they never reach reason 4's
-         machinery; the top-level RAW-formal-charge void guard (fix round 1;
-         see module docstring's fix-round-1 paragraph) voids any atom whose
+         machinery; the top-level RAW-formal-charge void guard (fix a performance pass;
+         see module docstring's fix-a performance pass paragraph) voids any atom whose
          nonzero raw formal charge was NOT consumed by the genuine-ion suffix
          machinery or a rendered ``_nitro_shortcut``, so an internal charge
          this module cannot spell VOIDS rather than being absorbed into the
          skeleton as if neutral (a coverage-complete name of a DIFFERENT
          molecule -- the whole defect this fix round closes);
-      6. ANY other unexpected exception (fix round 1, finding 2). This is a
+      6. ANY other unexpected exception (fix a performance pass, finding 2). This is a
          pure ``Optional``-contracted producer: it must never raise. Measured
          holes this closes: a spine longer than 9,999 atoms reaches
          ``data/chain_names.py``'s "chain length outside supported range
@@ -449,7 +449,7 @@ def _name_universal_substitutive_unsafe(
     # ring-system perception all run UNCONDITIONALLY on the whole molecule,
     # before the first recursive call/charge ever happens, and are NOT
     # guaranteed safe at arbitrary size -- measured: a 25,000-atom linear
-    # chain segfaults inside that pipeline, and (fix round 1 follow-up) so
+    # chain segfaults inside that pipeline, and (fix a performance pass) so
     # does a ~20,000-atom one, specifically inside CIP assignment. A process
     # crash is NOT a Python exception, so no try/except (including the broad
     # one added this round) can catch it -- the cap below is therefore
@@ -480,7 +480,7 @@ def _name_universal_substitutive_unsafe(
     if comp.charged != all_charge_ids:
         return None  # void: a genuine ionic centre was not expressed
 
-    # Task B2b fix round 1: the RAW-formal-charge void guard -- the one
+    # Task B2b fix a performance pass: the RAW-formal-charge void guard -- the one
     # general check that closes the whole internal-charge mis-naming class.
     # ``get_ion_sites`` (which ``cation_sites``/``anion_sites`` derive from)
     # STRIPS INTERNAL charges (N-oxide, azide, diazo, nitrone, nitrile
@@ -513,7 +513,7 @@ def _name_universal_substitutive_unsafe(
     # duplicate), REPLACING the hand-rolled two-sided ``covers != heavy or
     # total_bound != len(heavy)`` self-check that lived here. That self-check
     # re-derived E1's P1 atom-partition -- GAP via ``covers != heavy``,
-    # DOUBLE-COUNT via ``total_bound`` (fix round 1, finding 5) -- but LACKED
+    # DOUBLE-COUNT via ``total_bound`` (fix a performance pass, finding 5) -- but LACKED
     # E1's token-in-name and element_soundness chemistry-soundness checks, which this now
     # gains for free. ``UniversalResult.bindings`` is already E1's
     # ``(token, atom_ids)`` pairs shape, so no adapter is needed.
@@ -1014,7 +1014,7 @@ def _build_ctx(
         for a in atoms:
             ring_system_of[a] = i
 
-    # Fix round 1, finding 4: EVERY tie-break in this module keys on
+    # Fix a performance pass, finding 4: EVERY tie-break in this module keys on
     # ``canon_rank`` (``Chem.CanonicalRankAtoms``, invariant to input atom
     # numbering), never a raw RDKit atom index -- a raw-index tie-break made
     # the SAME molecule from differently-numbered SMILES emit DIFFERENT (both
@@ -1175,7 +1175,7 @@ def _name_component(
         shortcut = _leaf_shortcut(mol, component, attach_hint)
         if shortcut is not None:
             token, atoms = shortcut
-            # Task B2b fix round 1 + M2: record an internal-charge leaf's atoms
+            # Task B2b fix a performance pass + M2: record an internal-charge leaf's atoms
             # so the top-level raw-charge guard knows their / internal
             # charges ARE accounted for (exception (b)). Each internal-charge leaf
             # token (nitro / azido / diazo) is produced by exactly one shortcut
@@ -1256,7 +1256,7 @@ def _name_component(
 
     # ---- branches: every off-spine atom, named by RE-ENTERING this SAME
     # function on its own (strictly smaller) subgraph. NO depth cap. -------
-    # Phase E (fix round 1): store the FULL, unstemmed ``spine_core`` token
+    # Phase E (fix a performance pass): store the FULL, unstemmed ``spine_core`` token
     # (``hexane``/``cyclohexane``/``2-azapropane``...). E1's element_soundness
     # all-carbon classifier and P1 partition both need the true token --
     # element_soundness's grammar only recognises the FULL suffix form
@@ -1273,7 +1273,7 @@ def _name_component(
         (spine_core, frozenset(spine_atoms)),
     ]
     charged_accum: set = set(charge_ids)
-    internal_accum: set = set(oxide_ids)  # Task B2b fix round 1 + M2: rendered
+    internal_accum: set = set(oxide_ids)  # Task B2b fix a performance pass + M2: rendered
     # internal-charge atoms (nitro/azido/diazo/...)
     # plus M2 inc4 semipolar-oxide cations whose
     # ``-ium`` this spine appends (their ``[O-]``
@@ -1880,7 +1880,7 @@ def _name_ring_spine(
     if not cands:
         return None
 
-    # Fix round 1, finding 3: scoring every candidate is O(len(cands) * n) --
+    # Fix a performance pass, finding 3: scoring every candidate is O(len(cands) * n) --
     # for the free-numbering (``attach_hint is None``) case ``len(cands) ==
     # 2n``, so this is O(n^2) work that happened AFTER the one up-front
     # ``ctx.budget.charge(len(component))`` at call entry, i.e. budget-blind.
@@ -1903,7 +1903,7 @@ def _name_ring_spine(
             bt = round(bond.GetBondTypeAsDouble())
             if bt >= 2:
                 unsat.append(i + 1)
-        # Fix round 1, finding 4: a substituent-locant tier (mirroring
+        # Fix a performance pass, finding 4: a substituent-locant tier (mirroring
         # ``_chain_score``) -- without it, a plain (or symmetrically
         # decorated) carbocycle ties on (hetero, unsat) for EVERY rotation,
         # and ``min`` silently falls back to iteration order, which tracks
@@ -1965,7 +1965,7 @@ def _name_chain_spine(
         # Two-BFS tree-diameter technique: BFS from an arbitrary atom finds
         # one end (u) of a longest path; BFS from u finds the other end and,
         # via parent pointers, the path itself. The seed atom is chosen by
-        # CANONICAL rank (fix round 1, finding 4), not raw atom index, so the
+        # CANONICAL rank (fix a performance pass, finding 4), not raw atom index, so the
         # SAME molecule from a differently-numbered SMILES starts from the
         # same graph-invariant seed.
         # Seed the diameter from the LARGEST spine-walkable piece, not from a
@@ -2060,7 +2060,7 @@ def _chain_score(ctx: _Ctx, order: List[int], component: Optional[FrozenSet[int]
                 if nb.GetAtomicNum() > 1 and j in component and j not in spine_set:
                     branch_locants.append(i + 1)
         branch_locants.sort()
-    # Fix round 1, finding 4: final canonical-rank tie-break -- resolves a
+    # Fix a performance pass, finding 4: final canonical-rank tie-break -- resolves a
     # fully symmetric remaining tie the SAME way regardless of input atom
     # numbering (never falls back to raw atom index / iteration order).
     canon_tie = tuple(ctx.canon_rank[a] for a in order)
@@ -2143,7 +2143,7 @@ def _walkable_pieces(ctx: _Ctx, eligible: FrozenSet[int],
 
 def _farthest_from(ctx: _Ctx, start: int, component: FrozenSet[int]) -> int:
     """BFS from *start* over chain-tree neighbors; returns the farthest atom
-    reached (ties broken by CANONICAL rank -- fix round 1, finding 4 -- never
+    reached (ties broken by CANONICAL rank -- fix a performance pass, finding 4 -- never
     raw atom index, so the result is invariant to input atom numbering)."""
     dist = {start: 0}
     order_seen = [start]
@@ -2451,9 +2451,9 @@ def _nitro_shortcut(mol, component: FrozenSet[int], attach_hint: int):
     """``-N(+)(=O)[O-]`` attached via N, exactly 3 atoms -- the standard
     neutral-molecule nitro group.
 
-    Task B2b (this replaces the shortcut fix round 1 DELETED rather than
+    Task B2b (this replaces the shortcut fix a performance pass DELETED rather than
     fixed-in-place, per that round's own note -- see the comment this
-    function's call site now precedes): fix round 1's nitro shortcut checked
+    function's call site now precedes): fix a performance pass's nitro shortcut checked
     NO bond order or charge at all (keyed only on "N bonded to two terminal
     O's"), so it fired on N(OH)2 too and named it "nitro" -- a DIFFERENT,
     wrong-constitution molecule (measured: ``CCCC(CCC)N(O)O`` ->

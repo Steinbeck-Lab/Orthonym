@@ -1,4 +1,4 @@
-"""Lever I (round 2): identical in-process OPSIN parses within one naming scope are served from the memo."""
+"""Lever I (a performance pass): identical in-process OPSIN parses within one naming scope are served from the memo."""
 from orthonym import jvm_bridge
 from orthonym.assembly import memo
 
