@@ -794,6 +794,20 @@ def _handle_radical(mol, smiles, canonical_smiles, features=None, *,
     is deleted); fall through to name_radical (which keeps the acyl/oxyl/aryl
     structured helpers + the retained-name lookup) on ''.
     """
+    # Task M1 (v51): a radical-SPELLED WHOLE molecule that carries a retained
+    # name resolves to it. O2 written as the diradical `[O][O]` is the same
+    # molecule (identical InChIKey MYMOFIZGZYHOMD) as `O=O`, which
+    # RETAINED_NAME already names 'dioxygen' -- but the RADICAL class
+    # (priority 200) claims any radical species FIRST, so without this consult
+    # `[O][O]` fell through the substituent-radical machinery to '' and abstained
+    # ("inorganic compound (not supported)") while `O=O` named. Keyed by the
+    # WHOLE-molecule canonical SMILES, so a substituent radical (`[CH3]` etc.,
+    # never a whole-molecule retained key) is unaffected; the emission is still
+    # RT-gated downstream (0-wrong).
+    from orthonym.data import ALL_RETAINED_NAMES
+    _retained = ALL_RETAINED_NAMES.get(canonical_smiles)
+    if _retained:
+        return _retained
     from orthonym.rules.charged_router import route_charged
     routed = route_charged(mol, style)
     if routed:

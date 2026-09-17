@@ -44,6 +44,7 @@ def name_hydrazone(
         _enrich_handler_name,
         _inject_stereo_if_missing,
         _name_oxime_or_hydrazone,
+        _try_name_acylhydrazone,
         _try_name_hydrazone_substitutive,
         _try_name_semicarbazone,
     )
@@ -55,6 +56,15 @@ def name_hydrazone(
     # functional-class rebuild (which drops the carbamoyl -> a different
     # molecule). Fail-closed -> falls through to the plain hydrazone path.
     hydrazone_name = _try_name_semicarbazone(features)
+    # + (the Blue Book): an acylhydrazone R'2C=N-NH-C(=O)-R
+    # is a hydrazide (the senior acyl group is the parent) with an N'-ylidene
+    # substituent -> 'N'-({ylidene}){acyl}hydrazide', NOT an 'ylidene'-hydrazine
+    # nor a functional-class hydrazone. Tried after the semicarbazone builder
+    # (whose acyl-C-on-N motif this one excludes: acyl C on carbon) and before
+    # the bare-hydrazine substitutive path (whose [NX3H2] guard the acylated
+    # terminal N already fails). Fail-closed -> the substitutive/functional path.
+    if not hydrazone_name:
+        hydrazone_name = _try_name_acylhydrazone(features)
     # (W3-P15): a bare hydrazone R2C=N-NH2 -> the SUBSTITUTIVE PIN
     # ('propylidenehydrazine'), an 'ylidene' derivative of hydrazine (method (1)
     # = PIN), NOT the functional-class 'propanal hydrazone'. Tried after the

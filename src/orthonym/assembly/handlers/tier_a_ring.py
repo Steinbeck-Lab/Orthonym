@@ -155,7 +155,10 @@ def name_tier_a_ring(
     # prefix (heterocyclic). This recognizer is tightly scoped + fail-closed
     # (returns None for everything else), so it preempts only the cases it names
     # correctly and never touches the pool for any other molecule.
-    from ...rules.partial_saturation import name_ring_ketone_with_added_indicated_h
+    from ...rules.partial_saturation import (
+        name_hydro_mancude_fused_carbocycle,
+        name_ring_ketone_with_added_indicated_h,
+    )
     from ..candidate_pool import get_current_pool
     from ..composer import (
         _assemble_benzene_name,
@@ -181,6 +184,24 @@ def name_tier_a_ring(
             tree=NameTreeNode(
                 parent_stem=_kih_name, class_id="tier_a_ring",
                 iupac_section_cite="P-31.1.4.2.4", fragment_legacy=_kih_name,
+            ),
+            atom_to_locant_hint=None,
+        )
+
+    # B1b /: the suffix-free sibling of the KIH preempt above.
+    # A bare, unsubstituted, all-carbon fused ring system that is a hydro form of
+    # a mancude parent carrying INTRINSIC indicated hydrogen — e.g.
+    # 10,11-dihydro-5H-dibenzo[a,d][7]annulene (the amitriptyline core),
+    # 6,7-dihydro-5H-benzo[7]annulene. Tightly scoped + fail-closed (returns None
+    # for everything else), so it preempts only the cases it names correctly and
+    # never touches the pool for any other molecule.
+    _hydro_name = name_hydro_mancude_fused_carbocycle(features.mol)
+    if _hydro_name:
+        return NamingResult(
+            name=_hydro_name,
+            tree=NameTreeNode(
+                parent_stem=_hydro_name, class_id="tier_a_ring",
+                iupac_section_cite="P-31.1.4", fragment_legacy=_hydro_name,
             ),
             atom_to_locant_hint=None,
         )

@@ -13,7 +13,9 @@ def _rt(smi, name):
 
 @pytest.mark.opsin_gate
 @pytest.mark.parametrize("smi,expected", [
-    ("O=C1CCCCCCC/C=C/CCO1", "(10E)-oxacyclotridec-10-en-2-one"),
+    # /: the ene + '-2-one' locants force the 'oxa'
+    # replacement locant '1' to be cited (same structure, spelling fix).
+    ("O=C1CCCCCCC/C=C/CCO1", "(10E)-1-oxacyclotridec-10-en-2-one"),
     ("O=C1OC=CC1", "furan-2(3H)-one"),
     ("O=C1CCC=CO1", "3,4-dihydro-2H-pyran-2-one"),
 ])

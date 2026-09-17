@@ -866,6 +866,24 @@ _register_inner(
     side_effect_inventory=(),
 )
 
+# --- v50 B2: sulfate ester (esters of sulfuric acid).
+# principal_group in {sulfate_diester, sulfate_monoester}. The sulfur analogue
+# of phosphate_ester; abstained before v50 B2.
+from .handlers.sulfate_ester import (  # noqa: E402
+    _is_sulfate_ester,
+    name_sulfate_ester,
+)
+
+_register_inner(
+    handler_id="sulfate_ester",
+    priority=2205,
+    predicate=_is_sulfate_ester,
+    handler=name_sulfate_ester,
+    iupac_section="P-67.1.3.2",
+    description="Sulfate ester (di / monoester of sulfuric acid) naming",
+    side_effect_inventory=(),
+)
+
 # --- a review: pnictogen -inate ester (P/As/Sb) R2E(=O)(OR').
 # principal_group in {phosphinate_ester, arsinate_ester, stibinate_ester}.
 from .handlers.pnictogen_inate_ester import (  # noqa: E402

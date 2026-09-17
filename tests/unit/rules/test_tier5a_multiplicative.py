@@ -161,8 +161,9 @@ def test_tier5a_regression_controls(smiles, expected):
         ("OC(=O)COC(C)C(=O)O", "asymmetric arms (methyl-branched side)"),
         ("O(/C=C/C(=O)O)/C=C/C(=O)O",
          "unsaturated arms: the saturated-chain arm name would drop C=C"),
-        ("OC(=O)CN(CC(=O)O)CCN(CC(=O)O)CC(=O)O",
-         "EDTA: composite diyldinitrilo bridge — deferred, fail closed"),
+        # EDTA (the composite diyldinitrilo bridge) is no longer deferred: it is
+        # built by _try_diamine_dinitrilo_bridge and covered with an OPSIN
+        # round-trip in tests/unit/rules/test_edta.py.
         ("OCCOCCOCCOCCO",
          "tetraethylene glycol: arm carries a second ether O — deferred"),
     ],

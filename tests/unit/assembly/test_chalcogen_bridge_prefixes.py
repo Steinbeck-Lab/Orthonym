@@ -427,8 +427,12 @@ def test_is_dichalcogen_bridge_attach(
         ("CC(C)(C)OSCCO", [0, 1, 2, 3, 4, 5], 5, {6}, "(tert-butoxysulfanyl)"),
         ("COSCCO", [0, 1, 2], 2, {3}, "(methoxysulfanyl)"),
         ("CC(C)OSCCO", [0, 1, 2, 3, 4], 4, {5}, "[(propan-2-yl)oxysulfanyl]"),
-        # Attached through O with an inner S -> ends in 'oxy'. Pre-existing path,
-        # asserted here so the redirect above cannot silently capture it.
+        # Attached through O with an inner S -> ends in 'oxy'. The producer returns
+        # the BARE compound prefix '(ethylsulfanyl)oxy'; the CITATION path adds the
+        # escalating outer bracket / -- both the locanted
+        # ('2-[(ethylsulfanyl)oxy]ethan-1-ol') and the unlocanted
+        # ('CCOSC -> [(methylsulfanyl)oxy]ethane') paths enclose the compound
+        # prefix, so self-marking here would double-enclose the many NESTED callers.
         ("CCSOCCO", [0, 1, 2, 3], 3, {4}, "(ethylsulfanyl)oxy"),
         # A DI-chalcogen inner stays on the cascade: '(methylperoxy)sulfanyl'.
         ("CSOOC", [1, 2, 3, 4], 1, {0}, "(methylperoxy)sulfanyl"),

@@ -4843,9 +4843,26 @@ def parent_to_prefix(parent_name: str, chain_length: int, *, attach_locant) -> s
     if name in _ACID_TO_ACYL_PREFIX:
         return _ACID_TO_ACYL_PREFIX[name]
 
+    # Mononuclear-hydride stems whose '-yl' elides ONLY the final 'e'.
+    # Defined here so the 'cyclo...ane' branch below can EXCLUDE them: a parent
+    # hydride like 'cyclopentyl(methyl)-λ3-iodane' contains 'cyclo' (in a
+    # substituent) and ends with 'ane', so the loose `'cyclo' in name` test used to
+    # false-match it and strip the whole 'ane' -> the OPSIN-unparseable
+    # 'cyclopentyl(methyl)-λ3-iodyl'. The parent is 'iodane', not a carbocycle, so
+    # it must elide only 'e' -> 'iodanyl'. (Task-0 producer trace, reclaim P2/A1.)
+    _HYDRIDE_ELIDE_E_STEMS = (
+        'oxidane', 'sulfane', 'selane', 'tellane', 'azane',
+        'phosphane', 'arsane', 'stibane', 'bismuthane', 'borane',
+        'alumane', 'gallane', 'indigane', 'thallane',
+        'iodane', 'bromane', 'chlorane', 'fluorane',
+    )
+
     # ---- Cyclic names: cyclo...ane -> cyclo...yl ---- (IUPAC
-    # e.g., "cyclohexane" -> "cyclohexyl", "cyclopentane" -> "cyclopentyl"
-    if 'cyclo' in name and name.endswith('ane'):
+    # e.g., "cyclohexane" -> "cyclohexyl", "cyclopentane" -> "cyclopentyl".
+    # EXCLUDE mononuclear-hydride parents (…-λN-iodane etc.): a cyclo-substituent on
+    # a heteroatom hydride is not a carbocyclic ring parent.
+    if ('cyclo' in name and name.endswith('ane')
+            and not name.endswith(_HYDRIDE_ELIDE_E_STEMS)):
         stem = name[:-3]  # remove "ane"
         return f"{stem}yl"
 
@@ -4874,9 +4891,26 @@ def parent_to_prefix(parent_name: str, chain_length: int, *, attach_locant) -> s
     # retained silyl/germyl/stannyl/plumbyl (elide the whole 'ane'), NOT silanyl/stannanyl
     # (a review 5.1: silane->silanyl et al. is a PIN regression). Multiplied forms share the
     # stem, so match on the stem suffix.
-    if name.endswith(('oxidane', 'sulfane', 'selane', 'tellane', 'azane',
-                      'phosphane', 'arsane', 'stibane', 'bismuthane', 'borane',
-                      'alumane', 'gallane', 'indigane', 'thallane')):
+    #
+    # Reclaim P2/A1 (2026-09-14): the halogen mononuclear hydrides are in
+    # _HYDRIDE_ELIDE_E_STEMS above. A hypervalent (λ-convention) iodine SUBSTITUENT is
+    # built on the parent hydride 'iodane': [IH3] is 'λ3-iodane'), e.g.
+    # 'methylidene-λ3-iodane' (the ylide C6H5-I=CH2), 'dimethyl-λ3-iodane' (Ar-I(CH3)2).
+    # Without the halogen stems it stripped the whole 'ane' -> the OPSIN-unparseable
+    # 'methylidene-λ3-iodyl' and the molecule abstained; elides only the final
+    # 'e' -> 'iodanyl'. Task-0 producer trace (2026-09-14): the NEUTRAL iodine(III/V)
+    # class routes through parent_to_prefix via TWO branches -- this elide check AND the
+    # 'cyclo...ane' branch above (a cyclo-substituent parent); both are now covered. The
+    # only OTHER 'iodyl' emitter is charged_router._apply_radical_suffix, which fires on
+    # the CHARGED iodanuide (net -1) class -- out of scope here and kept abstaining by
+    # the RT/InChIKey gate. bromane/chlorane/fluorane are added for parity: no
+    # RDKit-sanitizable input forms a neutral hypervalent Br/Cl/F PARENT (they are
+    # monovalent 'bromo/chloro/fluoro' PREFIXES, never a 'bromane'/'chlorane' parent),
+    # so the additions are inert on real corpora and the round-trip/InChIKey gate makes
+    # any emission a correct reclaim. NB the -XO2 oxidised 'iodyl/chloryl/bromyl'
+    # tokens are built elsewhere (rules/benzene.py) and never route an '...iodane'
+    # string through here, so they are unaffected.
+    if name.endswith(_HYDRIDE_ELIDE_E_STEMS):
         return name[:-1] + "yl"  # elide only 'e' -> '...oxidan' + 'yl' = '...oxidanyl'
 
     # ---- Alkane: -ane or -e ending ----

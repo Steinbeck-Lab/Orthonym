@@ -148,10 +148,14 @@ class TestNameLactoneRing:
         assert name_lactone_ring(51) is None
 
     def test_macrolide_ring_sizes(self):
-        """Ring sizes 11+ use oxacyclo replacement nomenclature."""
-        assert name_lactone_ring(11) == "oxacycloundecan-2-one"
-        assert name_lactone_ring(13) == "oxacyclotridecan-2-one"
-        assert name_lactone_ring(15) == "oxacyclopentadecan-2-one"
+        """Ring sizes 11+ use replacement nomenclature and cite the 'oxa'
+        locant '1' deny-default: the '-2-one' suffix cites locant 2,
+        so the skeletal-replacement heteroatom locant is cited too --
+        . OPSIN parses these to the same structure as the un-cited
+        forms; this is a spelling-conformance fix."""
+        assert name_lactone_ring(11) == "1-oxacycloundecan-2-one"
+        assert name_lactone_ring(13) == "1-oxacyclotridecan-2-one"
+        assert name_lactone_ring(15) == "1-oxacyclopentadecan-2-one"
 
     def test_3_membered_ring(self):
         """3-membered lactone (oxiran-2-one) should work if requested."""
@@ -280,29 +284,31 @@ class TestSubstitutedLactones:
         assert result == "3-methyloxan-2-one", f"Got '{result}'"
 
     def test_macrolide_11_membered(self):
-        """11-membered macrolide -> oxacycloundecan-2-one."""
+        """11-membered macrolide -> 1-oxacycloundecan-2-one /:
+        the '-2-one' suffix locant forces the 'oxa' replacement locant '1')."""
         mol = Chem.MolFromSmiles("O=C1CCCCCCCCCO1")
         result = name_monocyclic_lactone(mol)
-        assert result == "oxacycloundecan-2-one", f"Got '{result}'"
+        assert result == "1-oxacycloundecan-2-one", f"Got '{result}'"
 
     def test_macrolide_13_membered(self):
-        """13-membered macrolide -> oxacyclotridecan-2-one."""
+        """13-membered macrolide -> 1-oxacyclotridecan-2-one."""
         mol = Chem.MolFromSmiles("O=C1CCCCCCCCCCCO1")
         result = name_monocyclic_lactone(mol)
-        assert result == "oxacyclotridecan-2-one", f"Got '{result}'"
+        assert result == "1-oxacyclotridecan-2-one", f"Got '{result}'"
 
     def test_macrolide_15_membered(self):
-        """15-membered macrolide -> oxacyclopentadecan-2-one."""
+        """15-membered macrolide -> 1-oxacyclopentadecan-2-one."""
         mol = Chem.MolFromSmiles("O=C1CCCCCCCCCCCCCO1")
         result = name_monocyclic_lactone(mol)
-        assert result == "oxacyclopentadecan-2-one", f"Got '{result}'"
+        assert result == "1-oxacyclopentadecan-2-one", f"Got '{result}'"
 
     def test_substituted_macrolide(self):
-        """Substituted 11-membered macrolide includes substituent prefix."""
+        """Substituted 11-membered macrolide includes substituent prefix,
+        hyphenated against the locant-initial parent."""
         mol = Chem.MolFromSmiles("O=C1CC(C)CCCCCCCO1")
         result = name_monocyclic_lactone(mol)
         assert "methyl" in result, f"Expected 'methyl' in '{result}'"
-        assert "oxacycloundecan-2-one" in result, f"Expected macrolide parent in '{result}'"
+        assert "1-oxacycloundecan-2-one" in result, f"Expected macrolide parent in '{result}'"
 
     def test_amino_lactone(self):
         """3-Amino-gamma-butyrolactone -> 3-aminooxolan-2-one."""

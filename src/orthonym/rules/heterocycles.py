@@ -241,11 +241,6 @@ def orient_heterocycle(mol, ring_atoms) -> Tuple[List[int], Dict[int, int]]:
 #: test below; naming the elements states the chemistry rather than relying on it.
 _INDICATED_H_ELEMENTS = frozenset({7, 15, 33, 51, 83})  # N, P, As, Sb, Bi
 
-#: Group-14 ring heteroatoms whose mancude saturated position keeps its indicated
-#: hydrogen even when substitution has displaced every H, the
-#: ``1,1-dibutyl-1H-germole`` case). Consumed by ``_monocycle_indicated_h_prefix``.
-_GROUP14_INDICATED_H = frozenset({14, 32, 50})  # Si, Ge, Sn
-
 
 def _occupies_indicated_h_position(mol, idx: int, ring_set: Set[int]) -> bool:
     """Does this ring atom hold the ring's indicated-hydrogen position?
@@ -273,8 +268,31 @@ def _occupies_indicated_h_position(mol, idx: int, ring_set: Set[int]) -> bool:
     atom with no hydrogen and exactly ONE exocyclic SINGLE bond has had exactly
     one hydrogen's worth of valence taken from it. Nothing here consults a ring
     size or a heteroatom count.
+
+    R1-FIX / a review-B "Indicated hydrogen"): indicated hydrogen is a
+    MANCUDE-ring concept -- it names the sp3 position of a ring that carries the
+    maximum number of noncumulative double bonds. A FULLY SATURATED ring has no
+    indicated hydrogen at all, so no atom occupies that position. Without this
+    gate a saturated ring N-H (piperazine's second nitrogen) counted as
+    indicated-H via ``GetTotalNumHs >= 1`` and out-ranked the SUFFIX-bearing
+    nitrogen for locant 1, giving ``piperazine-4-carboxylic acid`` where
+     NUMBERING (``the Blue Book``) criterion (c) "principal
+    characteristic groups and free valences (suffixes)" — which outranks (f)
+    "detachable alphabetized prefixes" — requires ``piperazine-1-carboxylic
+    acid``. Partially-saturated
+    mancude rings never reach here -- the ``_mancude_*`` numbering short-circuits
+    ahead of the heteroatom sort in ``orient_heterocycle_with_substituents`` -- so
+    the rings that survive to this test are either aromatic (unsaturated) or fully
+    saturated; the gate flips only the fully-saturated ones.
     """
     atom = mol.GetAtomWithIdx(idx)
+    ring_unsaturated = any(
+        b.GetBondType() != Chem.BondType.SINGLE
+        for b in mol.GetBonds()
+        if b.GetBeginAtomIdx() in ring_set and b.GetEndAtomIdx() in ring_set
+    )
+    if not ring_unsaturated:
+        return False
     if atom.GetTotalNumHs() >= 1:
         return True
     if not atom.GetIsAromatic() or atom.GetFormalCharge() != 0:
@@ -388,7 +406,8 @@ def orient_heterocycle_with_substituents(
         return ring_list, atom_to_locant
 
     # Find the best (priority, indicated-H tier) from sorted heteroatoms.
-    #: heteroatom bearing indicated H (pyrrole-type) takes
+    # NUMBERING (the Blue Book) criterion (b) "indicated hydrogen":
+    # a heteroatom bearing indicated H (pyrrole-type) takes
     # the lower locant; (a) element priority, (b) indicated-H tier
     # (lower=better), (c) canonical rank for deterministic tiebreaking.
     #
@@ -2481,17 +2500,27 @@ def _monocycle_indicated_h_prefix(mol, oriented: List[int], info) -> str:
     ]
     if h_bearing:
         # An H-bearing saturated position exists -> this is the historical path,
-        # byte-identical to before (the Group-14 branch below never runs), so no
-        # ring that already cited an indicated H can change.
+        # byte-identical to before (the displaced-H branch below never runs), so
+        # no ring that already cited an indicated H can change.
         sp3h = h_bearing
     else:
-        # No saturated position still bears an H. A Group-14 (Si/Ge/Sn) mancude
-        # atom whose indicated H has been fully displaced by substitution still
-        # cites it -- ``1,1-diethyl-1H-silole`` / ``1,1-dibutyl-1H-germole``.
+        # No saturated position still bears an H, i.e. a substituent has fully
+        # displaced the indicated hydrogen. The indicated-H position is a
+        # property of the mancude PARENT, ``the Blue Book``:
+        # "any ring atom with a bonding number of three or higher connected to
+        # adjacent ring atoms by single bonds only, and carrying one or more
+        # hydrogen atoms"), so it is still cited when a substituent stands in the
+        # H's place. ``eligible[pos]`` already proves bonding number
+        # >= 3 (a standard divalent chalcogen is ineligible; a lambda atom is
+        # eligible only at >= 3) and ``idx not in db_atoms`` proves the
+        # single-ring-bonds-only clause, so this holds for EVERY element that can
+        # occupy the position -- Group-14 ``1,1-dibutyl-1H-germole`` and equally
+        # boron ``2-(methylsulfanyl)-2H-1,3,2-oxathiaborepine`` (the boron sits
+        # between the divalent ring O and S). The ``len(sp3h) != 1`` guard below
+        # keeps this to the unambiguous single-indicated-H ring.
         sp3h = [
             idx for pos, idx in enumerate(oriented)
             if idx not in db_atoms and eligible[pos]
-            and mol.GetAtomWithIdx(idx).GetAtomicNum() in _GROUP14_INDICATED_H
         ]
     if len(sp3h) != 1:
         return ""
@@ -2874,6 +2903,111 @@ def _is_cyclic_imide_carbonyl(mol, carbonyl_c_idx, ring_set) -> bool:
     return False
 
 
+def ring_principal_suffix_atoms(
+    mol, ring_atoms, principal_group, functional_groups=None
+) -> Set[int]:
+    """RING atom indices that carry the principal characteristic group as a
+    SUFFIX on this heterocycle parent, so numbering gives them the lowest
+    locants.
+
+    IUPAC NUMBERING (``the Blue Book``): "low locants are assigned
+    to them in the following decreasing order of seniority" —... (c) "principal
+    characteristic groups and free valences (suffixes)";... (f) "detachable
+    alphabetized prefixes". Criterion (c) — the ``-dione`` / ``-sulfonic acid``
+    SUFFIX — outranks (f), the ``methyl`` prefix. (For a heterocycle the ring
+    heteroatoms are numbered first, change note (1) at ``the Blue Book``; the
+    heteroatom set ties in both directions in these cases, so the suffix
+    decides.) ``orient_heterocycle_with_substituents`` receives this set as
+    ``principal_group_atoms``.
+
+    The generic prefix-class anchor in ``namer.py`` keys on
+    ``get_prefix(principal_group)`` and only anchors a CARBON-centred appended
+    suffix, so it MISSES two families whose suffix decision lives in
+    ``get_heterocycle_substituents`` below:
+
+      A. Pseudoketone ring carbons named ``-one``/``-dione``/``-thione`` — a ring
+         carbon bearing an exocyclic ``=O``/``=S``/``=Se``/``=Te`` whose
+         molecule-level principal group is a lactam-declined amide, a cyclic
+         imide, a lactone-declined ester, or a thioamide. ``get_prefix`` of
+         those principal groups is ``None`` (or ``carbamoyl``), never ``oxo``, so
+         the ring carbonyl carbons were never anchored and the (f)
+         substituent set put a SUBSTITUTED ring atom at locant 1
+         (``CN1C(=O)CNC1=O`` -> ``1-methyl...-2,5-dione`` where (c) requires
+         ``3-methyl...-2,4-dione``). Mirrors the ``ring_ketone_suffix`` /
+         ``ring_imide_suffix`` / ``ring_lactone_suffix`` / ``ring_thioamide_suffix``
+         gates in ``get_heterocycle_substituents`` exactly, but needs no
+         orientation (those gates are locant-independent).
+
+      B. The ring atom (typically the ring N) bearing an exocyclic
+         SULFUR-oxoacid / sulfonamide appended suffix (``-sulfonic acid`` /
+         ``-sulfinic acid`` / ``-sulfonamide``). Its central atom is sulfur, not
+         carbon, so ``namer.py``'s carbon-only anchor skipped it and the
+         substituted ring N took locant 1 (``OS(=O)(=O)N1CCN(C)CC1`` ->
+         ``1-methylpiperazine-4-sulfonic acid`` where (c) requires
+         ``4-methylpiperazine-1-sulfonic acid``). The ring atom bonded to the
+         suffix sulfur is the anchor — the sulfur analogue of the ring-N
+         carboxylic-acid anchor the carbon path already feeds.
+    """
+    from ..perception.rings import get_containing_ring_system
+
+    ring_set = set(get_containing_ring_system(mol, ring_atoms))
+    principal_ring = set(ring_atoms)
+    anchors: Set[int] = set()
+
+    def _exocyclic_double(c_idx, symbols) -> bool:
+        """Ring carbon with an exocyclic double bond to a chalcogen in symbols."""
+        atom = mol.GetAtomWithIdx(c_idx)
+        if atom.GetSymbol() != 'C':
+            return False
+        return any(
+            b.GetBondTypeAsDouble() == 2.0
+            and b.GetOtherAtom(atom).GetSymbol() in symbols
+            and b.GetOtherAtom(atom).GetIdx() not in ring_set
+            for b in atom.GetBonds()
+        )
+
+    # ---- A. pseudoketone ring carbons (-one/-dione/-thione) ----
+    if principal_group == 'imide':
+        for a in principal_ring:
+            if _is_cyclic_imide_carbonyl(mol, a, ring_set):
+                anchors.add(a)
+    elif (principal_group in ('secondary_amide', 'tertiary_amide')
+          and _is_monocyclic_lactam(mol) is None):
+        for a in principal_ring:
+            if (_exocyclic_double(a, ('O',))
+                    and _ring_has_extra_heteroatom(mol, ring_set, a)):
+                anchors.add(a)
+    elif principal_group == 'ester' and _is_monocyclic_lactone(mol) is None:
+        for a in principal_ring:
+            if _exocyclic_double(a, ('O',)):
+                anchors.add(a)
+    elif principal_group in ('thioamide', 'selenoamide', 'telluroamide'):
+        _chal = {'thioamide': 'S', 'selenoamide': 'Se',
+                 'telluroamide': 'Te'}[principal_group]
+        for a in principal_ring:
+            if _exocyclic_double(a, (_chal,)):
+                anchors.add(a)
+
+    # ---- B. exocyclic sulfur-oxoacid / sulfonamide suffix on a ring atom ----
+    _S_SUFFIX_PGS = {
+        'sulfonic_acid', 'sulfinic_acid',
+        'primary_sulfonamide', 'secondary_sulfonamide', 'tertiary_sulfonamide',
+    }
+    if principal_group in _S_SUFFIX_PGS and functional_groups:
+        for match in functional_groups.get(principal_group, ()):
+            for midx in match:
+                if midx in ring_set:
+                    continue
+                s_atom = mol.GetAtomWithIdx(midx)
+                if s_atom.GetSymbol() != 'S':
+                    continue
+                for nbr in s_atom.GetNeighbors():
+                    if nbr.GetIdx() in principal_ring:
+                        anchors.add(nbr.GetIdx())
+
+    return anchors
+
+
 def get_heterocycle_substituents(
     mol,
     ring_atoms,
@@ -3014,7 +3148,27 @@ def get_heterocycle_substituents(
                     for b in _nbr_atom.GetBonds()
                 )
                 if _is_acyl:
-                    continue
+                    # R1, the Blue Book;, the Blue Book): a
+                    # -C(=O)-OH / -C(=O)-NH2 / -C(=O)-NR2 directly on a ring N is
+                    # NOT an N-acyl amide of some acyl parent — it is the ring-N
+                    # principal-group SUFFIX (``pyrrolidine-1-carboxylic acid``,
+                    # ``piperidine-1-carboxamide``), senior to the carbamic/urea
+                    # (carbonic acid derivative) re-framing (the Blue Book). Let it fall
+                    # through to _identify_suffix_fg so it is attached as a ring
+                    # suffix. Scoped to a carboxylic-acid / carboxamide FG that is
+                    # the molecule-level principal group: a genuine N-acyl group
+                    # (acetyl, a longer acyl chain — captopril's N-acyl) has no
+                    # -carboxylic-acid/-carboxamide suffix form, so _identify_suffix_fg
+                    # returns None there and the task 9 skip still applies.
+                    _ring_n_suffix = _identify_suffix_fg(
+                        mol, nbr_idx, sub_atoms, ring_set)
+                    if not (_ring_n_suffix
+                            and _ring_n_suffix.get('suffix_name') in (
+                                'carboxylic acid', 'carboxamide')
+                            and principal_group in (
+                                'carboxylic_acid', 'primary_amide',
+                                'secondary_amide', 'tertiary_amide')):
+                        continue
 
             # C4 /: an N-substituted exocyclic amine on a
             # ring CARBON, when the amine is the molecule-level principal group,
@@ -3257,9 +3411,24 @@ def get_heterocycle_substituents(
             # NOT an 'oxo' prefix (the lactam/carboxamide name is unavailable).
             # Single-heteroatom lactams route through the lactam handler and
             # never reach here, so they are untouched.
+            #
+            # R1-FIX / a review-A "Pseudoketones: (a) cyclic compounds in
+            # which a carbonyl group in a ring is bonded to one or two skeletal
+            # heteroatoms" -> named with the '-one' SUFFIX; cf. the Blue Book
+            # `imidazolidine-2,4-dione (PIN)`): a TERTIARY (N-substituted) cyclic
+            # urea / ring amide is the same pseudoketone. When R1 stopped
+            # perceiving cyclic ureas as urea (its `!R` on both N slots), the
+            # N-substituted ones (`CN1CCN(C)C1=O`) perceived a tertiary_amide with
+            # NO lactam name and fell through to the 'oxo' PREFIX
+            # (`1,3-dimethyl-2-oxoimidazolidine`, non-PIN). The N-H cyclic ureas
+            # already reach the '-one' suffix here via secondary_amide, so admit
+            # tertiary_amide on the identical gate (lactam-declined multi-heteroatom
+            # ring, ring carbonyl). Single-N tertiary lactams (N-methyl-2-
+            # piperidinone) still route through the lactam handler (it accepts an
+            # N-substituent) and never reach here.
             ring_ketone_suffix = (
                 not is_principal_suffix
-                and principal_group == 'secondary_amide'
+                and principal_group in ('secondary_amide', 'tertiary_amide')
                 and hetero_sub_name == 'oxo'
                 and _is_monocyclic_lactam(mol) is None
                 and _ring_has_extra_heteroatom(mol, ring_set, ring_atom_idx)
@@ -3584,6 +3753,47 @@ def _identify_hetero_substituent(mol, sub_atoms, ring_set) -> Optional[str]:
     if symbol == 'S' and h_count == 1:
         return 'sulfanyl'
 
+    # R2, the Blue Book + Table 6.2, the Blue Book): a sulfur-oxo-acid or a
+    # primary sulfonamide whose S is directly attached to the ring is the ring
+    # principal-group SUFFIX. Returning the matching preselected prefix
+    # (Table 6.2: 'sulfo' / 'sulfino';: 'sulfamoyl') lets the ring-suffix
+    # path recognise it (hetero_sub_name == pg_prefix) and attach the
+    # '-sulfonic acid' / '-sulfinic acid' / '-sulfonamide' suffix on the ring
+    # parent, exactly the hydroperoxy -> '-peroxol' mechanism above. Without it
+    # this no-carbon S group is flagged 'unnameable' and the whole heterocycle
+    # candidate declines (piperidine-4-sulfonic acid, and the ring-N forms
+    # piperidine-1-sulfonic/sulfinic acid). Scoped to a NEUTRAL S bearing =O and
+    # a terminal -OH (acid) or a terminal primary -NH2 (sulfonamide), all inside
+    # this substituent; a free oxoacid never reaches here (its S is not a ring
+    # substituent), and an acyclic N stays a noncarbon oxoacid upstream.
+    if symbol == 'S' and h_count == 0 and first_atom.GetFormalCharge() == 0:
+        _sub_set = set(sub_atoms)
+        _dbl_o = sum(
+            1 for b in first_atom.GetBonds()
+            if b.GetBondTypeAsDouble() == 2.0
+            and b.GetOtherAtom(first_atom).GetSymbol() == 'O'
+            and b.GetOtherAtom(first_atom).GetIdx() in _sub_set
+        )
+        _oh = any(
+            n.GetSymbol() == 'O' and n.GetTotalNumHs() == 1
+            and n.GetIdx() in _sub_set
+            and mol.GetBondBetweenAtoms(
+                first_atom.GetIdx(), n.GetIdx()).GetBondTypeAsDouble() == 1.0
+            for n in first_atom.GetNeighbors()
+        )
+        _nh2 = any(
+            n.GetSymbol() == 'N' and n.GetTotalNumHs() == 2
+            and n.GetFormalCharge() == 0 and n.GetDegree() == 1
+            and n.GetIdx() in _sub_set
+            for n in first_atom.GetNeighbors()
+        )
+        if _oh and _dbl_o == 2:
+            return 'sulfo'        # -S(=O)(=O)-OH (sulfonic acid,
+        if _oh and _dbl_o == 1:
+            return 'sulfino'      # -S(=O)-OH (sulfinic acid,
+        if _nh2 and not _oh and _dbl_o == 2:
+            return 'sulfamoyl'    # -S(=O)(=O)-NH2 (sulfonamide,
+
     # Oxo (=O) - check if double-bonded to ring carbon
     if symbol == 'O' and h_count == 0 and len(sub_atoms) == 1:
         for bond in first_atom.GetBonds():
@@ -3777,6 +3987,7 @@ def name_substituted_heterocycle(
     from ..assembly.naming_utils import (
         _join_multiplied_suffix,  # / multiplier-'a' elision (tetraol->tetrol)
         alpha_sort_key,
+        prefix_citation_sort_key,
         # a phase: the italic-N substituent of a ring-amine /
         # ring-carboxamide suffix is enclosed iff it is a COMPOUND or COMPLEX
         # prefix. _wrap_n_substituent only ESCALATES a name that already carries
@@ -4125,9 +4336,18 @@ def name_substituted_heterocycle(
             name, sorted(locants), count, omit_locants=_l3_omit_prefix_locant)
         prefix_parts.append((prefix, name))
 
-    # Sort alphabetically by the base substituent name
-    # (ignoring N-, locants, multipliers)
-    prefix_parts.sort(key=lambda x: alpha_sort_key(x[1]))
+    # Sort in alphanumerical order by the base substituent name.
+    # ⚠ Must be `prefix_citation_sort_key`, NOT raw `alpha_sort_key`: the latter
+    # returns a flat string that KEEPS the substituent's internal locants, so a
+    # compound substituent whose name begins with a locant digit (e.g.
+    # `(1,3-oxazol-5-yl)methyl` -> key `1,3-oxazol-5-ylmethyl`, leading `1`) sorts
+    # ahead of every letter-initial prefix (`chloro`) -- ASCII `1` (49) < `c` (99).
+    # (the Blue Book) orders "Nonitalic Roman letters... first"; digits
+    # are only a tie-break. `prefix_citation_sort_key` implements that as a
+    # tuple (letters-only, then own-locants, then CIP), so `chloro` < `(1,3-oxazol-
+    # 5-yl)methyl` again. `x[1]` is the BARE substituent name (the parent locant lives
+    # in `x[0]`), so the default `parent_locants=False` convention is correct here.
+    prefix_parts.sort(key=lambda x: prefix_citation_sort_key(x[1]))
 
     # Join prefixes
     # Closing brackets ],), } all act as word boundaries needing hyphens

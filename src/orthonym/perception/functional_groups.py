@@ -57,13 +57,25 @@ FUNCTIONAL_GROUP_SMARTS = {
     # ``!$([NX3]~[OX1])`` excludes any N bearing a terminal =O/[O-] (nitro, N-oxide).
     # Both constraints are inside atom-1's brackets, so the 4-atom match tuple is
     # unchanged. Nitroformic acid is named by its own exact-SMILES @40 key.
-    "carbamic_acid": "[NX3;+0;!$([NX3][NX3]);!$([NX3]~[OX1])][CX3](=O)[OX2H1]",  # R2N-C(=O)-OH -> carbamic acid
+    # R1, the Blue Book + the Blue Book): a carbamic N that is a RING atom is
+    # excluded (``!R``). A -C(=O)-OH on a ring nitrogen is a ring-N carboxylic acid
+    # (``pyrrolidine-1-carboxylic acid (PIN)``), and "the carboxylic acid is senior
+    # to the carbonic acid derivative" (the Blue Book). Acyclic carbamic acids (the
+    # carbamate free-acid class) keep the carbamic name; only a ring N is reclaimed.
+    "carbamic_acid": "[NX3;+0;!R;!$([NX3][NX3]);!$([NX3]~[OX1])][CX3](=O)[OX2H1]",  # R2N-C(=O)-OH -> carbamic acid
     # functional-group perception fix/ (169.7): require a C neighbour on S/P: sulfonic/phosphonic
     # are CARBON acids). Recursive-env `$(...)` adds the constraint WITHOUT changing the
     # match-tuple arity, so inorganic oxoacids (sulfamic NS(=O)(=O)O, phosphoric OP(=O)(O)O)
     # stop false-matching while C-attached acids still match. Free inorganic oxoacids are
     # perceived by their own keys below and named as functional parents /.
-    "sulfonic_acid": "[SX4;$([SX4][#6])](=O)(=O)[OX2H1]",
+    # R2, the Blue Book + Table 6.2, the Blue Book): a sulfonic acid whose S is
+    # linked to a RING nitrogen is a ring-N substitutive sulfonic acid
+    # (``piperidine-1-sulfonic acid``), parallel to the ring-N carboxylic acid
+    # (the Blue Book). Widen the C-neighbour guard to ``C OR ring-N`` so the ring-N
+    # form is perceived. An ACYCLIC N stays excluded: ``H2N-SO2-OH`` (sulfamic
+    # acid) is a NONCARBON oxoacid whose whole molecule has no carbon, so
+    # it keeps the noncarbon-oxoacid framework, not a substitutive sulfonic name.
+    "sulfonic_acid": "[SX4;$([SX4][#6]),$([SX4][#7;R])](=O)(=O)[OX2H1]",
     # W3-P04 / /: FRN-modified sulfur-oxo-acid
     # suffix acids. Each is a C-attached ([#6] guard) sulfonic/sulfinic acid whose
     # -OH oxygen or =O is functionally replaced, so the generic sulfonic_acid/
@@ -88,7 +100,11 @@ FUNCTIONAL_GROUP_SMARTS = {
     # -S(=O)(=NH)-NH2. The N may itself bear an -OH (=N-OH): that is the
     # N-hydroxy hydroximic derivative, handled downstream.
     "sulfonimidic_acid": "[SX4;$([SX4][#6])](=O)(=[NX2])[OX2H1]",
-    "sulfinic_acid": "[SX3;$([SX3][#6])](=O)[OX2H1]",
+    # R2, the Blue Book + Table 6.2, the Blue Book): ring-N sulfinic acid
+    # (``piperidine-1-sulfinic acid``) — widen the C-neighbour guard to
+    # ``C OR ring-N`` exactly as for sulfonic_acid above; an acyclic N stays
+    # excluded (noncarbon-oxoacid,, a sulfinamide by the required [OX2H1].
+    "sulfinic_acid": "[SX3;$([SX3][#6]),$([SX3][#7;R])](=O)[OX2H1]",
     "sulfenic_acid": "[SX2]([OX2H])[#6]",  #: IUPAC R-S-OH
     # a phase / Table 6.2): selenium & tellurium analogues of the
     # sulfonic/sulfinic suffix acids, C-attached (parallel [#6] guard) so the
@@ -335,7 +351,13 @@ FUNCTIONAL_GROUP_SMARTS = {
     "carbamate": "[NX3][CX3](=O)[OX2][#6]",
 
     # === UREA (must check before amides -- N-C(=O)-N is more specific) ===
-    "urea": "[NX3][CX3](=O)[NX3]",
+    # R1, the Blue Book + the Blue Book parallel): both urea nitrogens must be
+    # NON-ring (``!R``). A -C(=O)-NH2 (or -C(=O)-NR2) on a ring nitrogen is a ring-N
+    # carboxamide (``piperidine-1-carboxamide (PIN)``), senior to the urea (carbonic
+    # diamide) re-framing — exactly as the ring-N carboxylic acid is senior to
+    # carbamic acid (the Blue Book). Acyclic ureas (both N exocyclic, incl. phenylurea)
+    # are unchanged; a ring-N urea reframes to the ring-carboxamide suffix instead.
+    "urea": "[NX3;!R][CX3](=O)[NX3;!R]",
 
     # === THIOUREA (Wave-2 completion,: thio-analogue of urea,
     # N-C(=S)-N. Prefix form 'carbamothioylamino' (mirror of urea's
@@ -570,6 +592,17 @@ FUNCTIONAL_GROUP_SMARTS = {
     "phosphinate_ester": "[PX4]([#6])([#6])(=O)[OX2][#6]",
     "arsinate_ester": "[AsX4]([#6])([#6])(=O)[OX2][#6]",
     "stibinate_ester": "[SbX4]([#6])([#6])(=O)[OX2][#6]",
+    # v50 B2: esters of sulfuric acid H2SO4 (a mononuclear noncarbon
+    # oxoacid, -- R-O-SO2-O-R' / R-O-SO2-OH. The S(VI) bears two =O and
+    # its remaining single bonds are all to O; there is NO S-C bond (an S-C bond
+    # is a sulfonate ester 'ethyl benzenesulfonate', already owned by
+    # 'sulfonic_ester' above). Diester = two ester -O-C (0 free -OH) -> 'dialkyl
+    # sulfate'; monoester = one ester -O-C + one free -OH -> 'alkyl hydrogen
+    # sulfate' (BB:35968 'methyl hydrogen sulfate'). These shapes were UNPERCEIVED
+    # (pg=None -> abstain / a garbage skeletal-replacement name). name_sulfate_ester
+    # (rules/sulfur_oxoacid.py) is the functional-class namer they reach.
+    "sulfate_diester": "[SX4](=O)(=O)([OX2][#6])[OX2][#6]",
+    "sulfate_monoester": "[SX4](=O)(=O)([OX2][#6])[OX2H1]",
     # Phosphine oxide: R3P=O - three C attached to P(V)
     "phosphine_oxide": "[PX4](=O)([#6])([#6])[#6]",
     # Phosphines (P(III)) - check last as parent hydride
@@ -1520,6 +1553,21 @@ def _resolve_fg_collisions(results):
                     ]
                     if not results[fg_generic]:
                         del results[fg_generic]
+
+    # v50 B2: the fully-esterified sulfate (diester, 0 free -OH)
+    # suppresses the partial-ester read on the same S. A pure diester carries no
+    # -OX2H1, so the monoester SMARTS cannot structurally match it; suppress by S
+    # atom (S is the first atom in both SMARTS) defensively so a future broadening
+    # cannot double-perceive the same sulfur.
+    if 'sulfate_diester' in results:
+        _sulfate_s_atoms = {m[0] for m in results['sulfate_diester']}
+        if 'sulfate_monoester' in results:
+            results['sulfate_monoester'] = [
+                m for m in results['sulfate_monoester']
+                if m[0] not in _sulfate_s_atoms
+            ]
+            if not results['sulfate_monoester']:
+                del results['sulfate_monoester']
 
     return results
 

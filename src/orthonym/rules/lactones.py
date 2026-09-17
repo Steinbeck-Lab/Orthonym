@@ -326,10 +326,21 @@ def name_lactone_ring(ring_size: int, extra_o_locant: Optional[int] = None,
         return None
 
     if not ene_locants:
-        # Build: oxacyclo + {prefix} + an-2-{suffix}
+        # Build: 1-oxacyclo + {prefix} + an-2-{suffix}
         # The chain prefix already provides the stem (e.g., "undec" for 11);
         # 'oxacyclo...an' ends in a consonant so no elision applies.
-        return f"oxacyclo{chain_prefix}an-2-{suffix}"
+        #
+        # "Citation of locants" (the Blue Book) is deny-by-default: once any
+        # locant in a scope is essential, every locant in that scope is cited.
+        # The '-2-one'/'-2-thione' suffix cites locant 2, so the skeletal-
+        # replacement 'oxa' locant '1' MUST be cited too -> '1-oxacyclododecan-
+        # 2-one' (PIN), not 'oxacyclododecan-2-one'. None of the six
+        # "Omission of locants" (the Blue Book) licences reaches a heterogeneous
+        # replacement ring that bears a numbered suffix. (Contrast the BARE
+        # parent hydride 'oxacyclododecane', where the single heteroatom's '1'
+        # is omitted because nothing else is numbered.) OPSIN parses both forms
+        # to the identical structure, so this is a pure spelling-conformance fix.
+        return f"1-oxacyclo{chain_prefix}an-2-{suffix}"
 
     # a phase (A): unsaturated macrocyclic lactone. Replace the
     # saturated '...an' stem with the standard cycloalkENE construction
@@ -342,7 +353,11 @@ def name_lactone_ring(ring_size: int, extra_o_locant: Optional[int] = None,
     mult = {1: "", 2: "di", 3: "tri", 4: "tetra", 5: "penta", 6: "hexa"}.get(len(locs))
     if mult is None:
         return None  # more double bonds than this namer enumerates -> fail closed
-    ene_stem = f"oxacyclo{chain_prefix}-{loc_str}-{mult}ene"
+    # deny-by-default (the Blue Book): the ene locants and the '-2-one'
+    # suffix are cited, so the 'oxa' replacement locant '1' is cited too
+    # (e.g. '1-oxacyclotridec-10-en-2-one'). Same rule as the saturated
+    # branch above; OPSIN parses both forms to the identical structure.
+    ene_stem = f"1-oxacyclo{chain_prefix}-{loc_str}-{mult}ene"
     return _join_lactone_suffix(ene_stem, 2, suffix)
 
 
@@ -469,7 +484,13 @@ def name_monocyclic_lactone(mol) -> Optional[str]:
             return f"{stereo_prefix}{parent_name}"
         return parent_name
 
-    name = f"{prefix_str}{parent_name}"
+    # IUPAC hyphenates a letter-to-locant boundary: when the parent
+    # hydride name itself begins with a locant -- '1-oxacyclododecan-2-one',
+    # '1,3-dioxan-2-one' -- a substituent prefix must be separated from it by a
+    # hyphen ('3-methyl-1-oxacyclododecan-2-one', not '3-methyl1-oxa...').
+    sep = "-" if (prefix_str and parent_name[:1].isdigit()
+                  and not prefix_str.endswith("-")) else ""
+    name = f"{prefix_str}{sep}{parent_name}"
 
     # Prepend stereo prefix if descriptors exist
     if stereo_descriptors:

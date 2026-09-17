@@ -2003,3 +2003,178 @@ def name_cyclic_oxo_compound(mol: Chem.Mol) -> Optional[str]:
 # the general cyclic-oxo engine.
 def name_ring_ketone_with_added_indicated_h(mol: Chem.Mol) -> Optional[str]:
     return name_cyclic_oxo_compound(mol)
+
+
+# =============================================================================
+# Hydro forms of an intrinsic-indicated-H mancude fused carbocycle /
+# — the suffix-free sibling of name_cyclic_oxo_compound
+# =============================================================================
+
+
+def name_hydro_mancude_fused_carbocycle(mol: Chem.Mol) -> Optional[str]:
+    """Name an UNSUBSTITUTED all-carbon FUSED ring system that is a hydro
+    (part- or more-saturated) form of a mancude parent carrying INTRINSIC
+    indicated hydrogen.
+
+    Worked targets (all OPSIN-2.9.0 round-trip verified):
+        ``c1ccc2c(c1)CCc1ccccc1C2`` -> ``10,11-dihydro-5H-dibenzo[a,d][7]annulene``
+            (dibenzosuberane; the amitriptyline / nortriptyline / protriptyline core)
+        ``C1=Cc2ccccc2CCC1`` -> ``6,7-dihydro-5H-benzo[7]annulene``
+        ``c1ccc2c(c1)CCCCC2`` -> ``6,7,8,9-tetrahydro-5H-benzo[7]annulene``
+            (benzosuberane; the benzsuberone precursor)
+
+    This is the suffix-free sibling of:func:`name_cyclic_oxo_compound`: it
+    reuses the SAME mancude-parent resolution (:func:`_resolve_oxo_parent`), but
+    with NO ring characteristic group. The added 'hydro' positions are the sp3
+    ring carbons that are NOT the parent's intrinsic indicated hydrogen, cited by
+    lowest locants (b) then (e)) — they need not be an adjacent
+    reduced-C=C pair, so no max-matching is used here. The mancude parent already
+    spells its own intrinsic
+    indicated hydrogen in its name (``5H-...``, (the Blue Book) /
+     (:3721)); this function prepends the detachable, nonalphabetized
+    ``x,y-dihydro`` hydro prefix / (:1682)), placed just before
+    the indicated hydrogen and numbered by lowest locants AFTER it. Order:
+    ``[hydro]-[indicated H]-[parent]``.
+
+    Tightly fail-closed (returns None — never a wrong name):
+      * one fragment, neutral, non-radical;
+      * the WHOLE molecule is one edge-fused ring system: every heavy atom is a
+        ring carbon and no ring atom bears an off-ring heavy neighbour, so the
+        bare-parent name accounts for every atom (0 silent drop). A substituted
+        drug (amitriptyline) therefore declines here and abstains — never wrong;
+      * the mancude parent must resolve with a NON-EMPTY intrinsic indicated-H
+        locant set — this scopes the path to the annulene / cyclopenta class and
+        leaves the naphthalene-family tetralin path (no intrinsic IH) untouched;
+      * there must be REAL added hydro (>= 1 reduced ring C=C); the bare mancude
+        parent itself is named on the fused-heterocycle path (B1), not here;
+      * the parent's declared indicated-H locant(s) must land on sp3 (>CH2)
+        ring atoms of the molecule, so the parent name's ``zH-`` already accounts
+        for them and no moved / extra added-indicated hydrogen is needed (that
+        more general case is deferred, fail closed).
+    """
+    from ..data.retained_names import get_retained_name
+
+    if mol is None:
+        return None
+    if len(Chem.GetMolFrags(mol)) != 1:
+        return None
+    for atom in atoms_of(mol):
+        if atom.GetFormalCharge() != 0 or atom.GetNumRadicalElectrons() != 0:
+            return None
+
+    # Specified stereo (any @ or /\ in the input): this bare-parent path spells
+    # no stereodescriptors, so it would silently OMIT them (a stereo-incomplete
+    # name the RT gate would then abstain). Fail closed — never drop stereo.
+    for atom in atoms_of(mol):
+        if atom.GetChiralTag() != Chem.ChiralType.CHI_UNSPECIFIED:
+            return None
+    for bond in bonds_of(mol):
+        if bond.GetStereo() != Chem.BondStereo.STEREONONE:
+            return None
+
+    rings = mol.GetRingInfo().AtomRings()
+    if len(rings) < 2:
+        return None
+    ring_set: Set[int] = set()
+    for r in rings:
+        ring_set.update(r)
+
+    # WHOLE-molecule bare carbocycle: every heavy atom is a ring carbon, and no
+    # ring atom carries an off-ring heavy neighbour (atom-conservation, 0 drop).
+    for atom in atoms_of(mol):
+        if atom.GetAtomicNum() <= 1:
+            continue
+        if atom.GetIdx() not in ring_set or atom.GetSymbol() != 'C':
+            return None
+
+    # The rings must all merge into ONE ortho-/peri-fused system (>= 2 rings
+    # sharing an edge) — this rejects biphenyl-type single-bond-linked rings and
+    # spiro (1 shared atom) systems, which are not one bare fused parent.
+    if _fused_ring_system_atoms(rings, ring_set) != ring_set:
+        return None
+
+    # A retained-name molecule owns its own name (belt-and-braces).
+    if get_retained_name(Chem.MolToSmiles(mol)):
+        return None
+
+    candidates = _resolve_oxo_parent(mol, ring_set)
+    if not candidates:
+        return None
+
+    # SAT = ring carbons NOT in a ring double bond of the kekulised molecule (the
+    # sp3 "hydro" / indicated-H positions), exactly as name_cyclic_oxo_compound.
+    kek = Chem.Mol(mol)
+    try:
+        Chem.Kekulize(kek, clearAromaticFlags=True)
+    except Exception:
+        return None
+    mol_ring_db: Set[int] = set()
+    for bond in kek.GetBonds():
+        if bond.GetBondType() == Chem.BondType.DOUBLE:
+            i, j = bond.GetBeginAtomIdx(), bond.GetEndAtomIdx()
+            if i in ring_set and j in ring_set:
+                mol_ring_db.add(i)
+                mol_ring_db.add(j)
+    # Residual unsaturation is REQUIRED: a fully-saturated (perhydro) fused
+    # carbocycle — hydrindane (octahydro-1H-indene), decalin
+    # (decahydronaphthalene) — has NO ring double bond and is named in COUNT form
+    # (no per-position hydro locants) with stereo by the existing perhydro path.
+    # This path is only for HYDRO forms that retain mancude (aromatic or residual
+    # C=C) character. Without this guard the producer over-fires on perhydro rings
+    # and emits a locant-form, stereo-dropping name (the hydrindane regression).
+    if not mol_ring_db:
+        return None
+    sat = {i for i in ring_set
+           if i not in mol_ring_db and mol.GetAtomWithIdx(i).GetSymbol() == 'C'}
+    if not sat:
+        return None
+
+    # The sp3 ring carbons `sat` are the parent's own intrinsic indicated-H
+    # position(s) PLUS the added-'hydro' positions. Each candidate parent
+    # declares its indicated-H locants (`ih_locants`); a numbering is valid only
+    # when those locants land on sp3 (`sat`) atoms — the parent name's `zH-`
+    # >CH2 must be a real sp3 position in the molecule. The remaining sp3 atoms
+    # are the added hydro. The hydro positions need NOT be an adjacent
+    # (reduced-C=C) pair: a non-adjacent 'added hydrogen' set is standard
+    # (1,4-dihydronaphthalene (PIN), the Blue Book), so the hydro locants
+    # are chosen directly by lowest-locant sets, NOT by a max-matching (which
+    # only realises adjacent pairs and so mis-numbered the 1,4-type isomer).
+    # NUMBERING (the Blue Book) assigns low locants in decreasing
+    # seniority: (b) indicated hydrogen for unsubstituted compounds (:3246) then
+    # (e)(i) 'hydro'/'dehydro' prefixes (:3288). So rank by (ih locants, hydro
+    # locants) and take the minimum.
+    best = None
+    for parent_name, pairs, ih_locants in candidates:
+        if not ih_locants:
+            continue  # scoped to intrinsic-indicated-H parents only
+        ih_key = {_locant_key(loc) for loc in ih_locants}
+        for loc, _parentH in pairs:
+            ih_atoms = {a for a in ring_set if _locant_key(loc[a]) in ih_key}
+            # The parent's declared indicated hydrogen must be a real sp3 >CH2 in
+            # the molecule; otherwise this parent/orientation cannot describe it
+            # with pure hydro prefixes (a moved/added-indicated H is deferred).
+            if not ih_atoms.issubset(sat):
+                continue
+            hydro = sat - ih_atoms
+            if not hydro:
+                continue  # no added hydro -> the bare parent (named by B1)
+            # Hydro atoms come in even multiples (each 'dihydro' = 2 H); an odd
+            # count means this is not a clean hydro form of the parent -> skip.
+            if len(hydro) not in SATURATION_PREFIXES:
+                continue
+            key = (tuple(sorted(_locant_key(loc[a]) for a in ih_atoms)),
+                   tuple(sorted(_locant_key(loc[a]) for a in hydro)))
+            if best is None or key < best[0]:
+                best = (key, loc, hydro, parent_name)
+    if best is None:
+        return None
+    _, loc, hydro, parent_name = best
+
+    prefix = SATURATION_PREFIXES.get(len(hydro))
+    if prefix is None:
+        return None
+    hy_sorted = sorted(hydro, key=lambda a: _locant_key(loc[a]))
+    hy = ','.join(_locant_display(loc[a]) for a in hy_sorted)
+    # A hyphen before a digit-initial parent (the intrinsic-IH `5H-...` stem).
+    sep = '-' if parent_name[:1].isdigit() else ''
+    return f"{hy}-{prefix}{sep}{parent_name}"

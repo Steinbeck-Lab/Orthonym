@@ -80,6 +80,7 @@ from .ring_assembly import name_ring_assembly  # commit 02-22
 from .ring_ester import name_ring_ester  # commit 03-04
 from .ring_nitrile import name_ring_nitrile  # commit 03-01
 from .simple_molecule import name_simple_molecule  # commit 02-25
+from .sulfate_ester import name_sulfate_ester  # v50 B2
 from .sulfone import name_sulfone  # commit 02-16
 from .sulfoxide import name_sulfoxide  # commit 02-15 (renumbered; polyfunctional deferred)
 from .thioether import name_thioether  # commit 02-17
@@ -115,6 +116,7 @@ __all__ = [
     "name_thioether",  # 02-17
     "name_phosphine_oxide",  # 02-18
     "name_phosphate_ester",  # 02-19
+    "name_sulfate_ester",  # v50 B2
     "name_phosphine",  # 02-20
     "name_phosphinic_acid",  # 02-21
     "name_ring_assembly",  # 02-22

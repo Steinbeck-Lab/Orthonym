@@ -386,15 +386,31 @@ def _try_partial_saturation_name(mol, ring_atom_set: Set[int], mancude_parent: s
     if not mancude_parent:
         return None
 
-    # --- 1. Saturated-carbon set + heteroatom validation (case b enabler) ---
-    SP3 = Chem.HybridizationType.SP3
+    # --- 1. Saturated-position set + heteroatom validation (case b enabler) ---
     sat = []
     for a in ring_atom_set:
         at = mol.GetAtomWithIdx(a)
         if at.GetIsAromatic():
             continue
-        if at.GetHybridization() != SP3:        # SP2/SP -> remaining unsaturation
-            continue
+        # A saturated ring position carries NO remaining unsaturation at the atom
+        # note (a), the Blue Book -- "positions that are saturated,
+        # i.e., where there are two ring bonds and sufficient exo bonds to satisfy
+        # the bonding number of the atom"). Test that STRUCTURALLY, by
+        # participation in any double bond, NOT by the RDKit hybridization proxy:
+        # a conjugated pyridine-type ring -NH- that becomes saturated is marked
+        # SP2 by RDKit (its lone pair delocalises into the adjacent aromatic
+        # ring), so `hybridization != SP3` wrongly dropped that saturated N from
+        # `sat`, emitting one hydro/indicated-H short (6,7-dihydro-5H- instead of
+        # 4,5,6,7-tetrahydro-) -> OPSIN reconstructed a different, more-aromatic
+        # skeleton and the gate abstained. The double-bond test admits the
+        # conjugated NH while still skipping a genuine residual ring C=C / C=N;
+        # and, exactly as the old proxy did, it skips an exocyclic-double-bond
+        # position (oxo / =NR / ylidene), which is added-hydrogen
+        # territory the substituent branch below fails closed on. (An sp3 atom
+        # has no double bond, so this changes nothing for the byte-identical
+        # saturated-carbon path.)
+        if any(b.GetBondType() == Chem.BondType.DOUBLE for b in at.GetBonds()):
+            continue                            # remaining unsaturation -> not a hydro pos
         sym = at.GetSymbol()
         if sym == 'C':
             sat.append(a)
@@ -411,9 +427,9 @@ def _try_partial_saturation_name(mol, ring_atom_set: Set[int], mancude_parent: s
         # =N- of the mancude parent becomes -NH- under the ring saturation, so
         # it belongs in the max-double-bond partition exactly like a saturated
         # carbon. The pyrrole-type NH the old comment worried about is AROMATIC
-        # (excluded at line 398), so a NON-aromatic sp3 N reaching here was
-        # pyridine-type. Admit a neutral sp3 N as a hydro candidate; a
-        # charged/hypervalent N still defers. A post-check below fails closed if
+        # (excluded by the `GetIsAromatic` check above), so a NON-aromatic N
+        # reaching here was pyridine-type. Admit a neutral N as a hydro candidate;
+        # a charged/hypervalent N still defers. A post-check below fails closed if
         # any N would be cited as INDICATED hydrogen (the genuinely ambiguous
         # case), so only the unambiguous all-N-hydro partition proceeds.
         if sym == 'N' and at.GetFormalCharge() == 0:
@@ -2859,6 +2875,37 @@ def _identify_functionalized_substituent(
     return None
 
 
+# (the Blue Book): class 17 "Hydroxy compounds and chalcogen
+# analogues (includes alcohols and phenols)". These are the alcohol-class subtypes
+# in seniority.SENIORITY_ORDER; a molecule whose principal characteristic group is
+# one of them has NO group senior to its hydroxy.
+_ALCOHOL_CLASS_PCG = frozenset({
+    "primary_alcohol", "secondary_alcohol", "tertiary_alcohol",
+    "phenol", "enol", "alcohol",
+})
+
+
+def _has_group_senior_to_hydroxy(mol) -> bool:
+    """True when the molecule carries a characteristic group SENIOR to hydroxy.
+
+    /: only the senior-most characteristic group is the principal one
+    (the suffix). ``get_principal_group`` returns exactly that group over the whole
+    molecule using the shared ``SENIORITY_ORDER`` table, so if it returns anything
+    other than an alcohol-class group that OUT-ranks hydroxy (class 17 -- amides 11,
+    nitriles 14, aldehydes 15, ketones 16, acids/esters/acyl-halides higher), the
+    hydroxy cannot be promoted to the ``-ol`` suffix. A group junior to hydroxy
+    (amine, thiol,...) or no group returns False -- hydroxy stays eligible.
+    """
+    from ..perception.functional_groups import detect_functional_groups
+    from .seniority import get_principal_group, compare_seniority
+
+    pcg_name, _ = get_principal_group(mol, detect_functional_groups(mol))
+    if pcg_name is None or pcg_name in _ALCOHOL_CLASS_PCG:
+        return False
+    # compare_seniority(pcg, 'alcohol') < 0 <=> pcg ranks above the alcohol tier.
+    return compare_seniority(pcg_name, "alcohol") < 0
+
+
 def _assemble_fused_heterocycle_name(
     mol,
     core_name: str,
@@ -2892,6 +2939,45 @@ def _assemble_fused_heterocycle_name(
     assign_stereochemistry(mol)
     stereo_descriptors = collect_stereodescriptors(mol, atom_mapping)
     stereo_prefix = format_stereodescriptor_string(stereo_descriptors) if stereo_descriptors else ""
+
+    # /: a hydroxy is the PRINCIPAL characteristic group -- and so the
+    # `-ol` SUFFIX, not a `hydroxy-` prefix -- when no senior suffixable group is
+    # present on the fused parent. Table 4.1 (the Blue Book "Table 4.1 General
+    # compound classes listed in decreasing order of seniority") ranks, in
+    # decreasing seniority, 11 amides (:18184), 14 nitriles (:18187), 15 aldehydes
+    # (:18188), 16 ketones (:18189), then 17 hydroxy compounds (:18190). So when
+    # hydroxy is present with none of {suffix_groups, oxo, amino} it is the senior
+    # group and must hold the suffix: `quinolin-8-ol`, not `8-hydroxyquinoline`
+    # (both are the same molecule; the PIN is the suffix form, the Blue Book).
+    # `_build_fused_suffix` only ever handled oxo/amino, so this class shipped no
+    # suffix at all. (Combined hydroxy+amino, where the alcohol should demote the
+    # amine, is left to the existing amino-suffix path and not addressed here.)
+    #
+    # The `not oxo`/`not amino`/`not suffix_groups` guard is NOT sufficient: a
+    # carbamoyl / cyano / acyl group DIRECTLY on the ring arrives as a
+    # `c_substituents` PREFIX string (the fused collector routes it through the
+    # general substituent-namer, never into `suffix_groups`), so those gates do not
+    # see it and the promotion over-fired -- `5-carbamoylquinolin-8-ol` wrongly
+    # asserted hydroxy as the principal group over a senior carboxamide class
+    # 11 > 17). Consult the shared seniority table over the WHOLE molecule: promote
+    # only when the molecule's principal characteristic group is itself an
+    # alcohol-class group (i.e. no group senior to hydroxy is present anywhere). The
+    # PIN then names the carboxamide/nitrile as the suffix on its own parent, or the
+    # name degrades to the all-prefix form -- never a wrong principal group.
+    hydroxy_ol_suffix = ""
+    c_subs = substituents.get('c_substituents', {})
+    if ('hydroxy' in c_subs
+            and not substituents.get('suffix_groups')
+            and not substituents.get('oxo_substituents')
+            and not substituents.get('amino_substituents')
+            and not _has_group_senior_to_hydroxy(mol)):
+        hydroxy_locants = list(c_subs['hydroxy'])
+        # hydroxy becomes the suffix, so drop it from the prefix set
+        substituents = dict(substituents)
+        substituents['c_substituents'] = {
+            k: v for k, v in c_subs.items() if k != 'hydroxy'
+        }
+        hydroxy_ol_suffix = _format_suffix('ol', hydroxy_locants)
 
     prefix_parts = []
 
@@ -2988,8 +3074,11 @@ def _assemble_fused_heterocycle_name(
         name = _join_prefix_to_parent(prefix_str, core_name) + suffix_part
         return f"{stereo_prefix}{name}" if stereo_prefix else name
 
-    # Handle suffix-forming groups (oxo and amino only, no detachable suffixes)
-    suffix_str = _build_fused_suffix(substituents, core_name)
+    # Handle suffix-forming groups (oxo and amino only, no detachable suffixes).
+    # When hydroxy was promoted above (the gated senior-alcohol case) there is by
+    # construction no oxo/amino, so `_build_fused_suffix` is empty and the `-ol`
+    # suffix is used instead.
+    suffix_str = _build_fused_suffix(substituents, core_name) or hydroxy_ol_suffix
 
     if suffix_str:
         # Apply suffix to core name with vowel elision

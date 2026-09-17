@@ -394,6 +394,13 @@ SENIORITY_ORDER = [
     "phosphate_diester",
     "phosphate_monoester",
     "phosphite_triester",
+    # v50 B2: esters of sulfuric acid, functional-class named
+    # ('dimethyl sulfate' / 'methyl hydrogen sulfate'). Kept beside the phosphate
+    # esters (the sulfur analogue of an inorganic-oxoacid ester) so the whole
+    # oxoacid-ester class ranks together and below the carbon acids: a sulfate
+    # ester that co-occurs with a senior carboxylic acid is demoted (sulfooxy).
+    "sulfate_diester",
+    "sulfate_monoester",
     "tertiary_phosphine",
     "secondary_phosphine",
     "primary_phosphine",
@@ -749,6 +756,9 @@ SUFFIX_FORMS = {
     "phosphate_monoester": None, # IUPAC: substitutive prefix only (phosphonooxy)
     "phosphite_triester": None,  # IUPAC: functional class naming (... phosphite)
     "phosphonate_diester": None, # IUPAC: functional class naming (... phosphonate)
+    # v50 B2: sulfuric-acid esters -> functional-class naming (no chain suffix)
+    "sulfate_diester": None,     # IUPAC ('dialkyl sulfate')
+    "sulfate_monoester": None,   # IUPAC ('alkyl hydrogen sulfate')
     # a review: functional-class ester names (no suffix form)
     "phosphinate_ester": None,   # IUPAC (... phosphinate)
     "arsinate_ester": None,      # IUPAC (... arsinate)
@@ -996,6 +1006,12 @@ PREFIX_FORMS = {
     "phosphate_monoester": "phosphonooxy",  # IUPAC
     "phosphite_triester": None,  # IUPAC: functional class naming
     "phosphonate_diester": None,  # IUPAC: functional class naming
+    # v50 B2: sulfuric-acid esters. Functional-class named as a whole molecule;
+    # a demoted sulfate ester on a senior parent is a 'sulfooxy'-type oxy prefix
+    # emitted by the dedicated rules/sulfur_oxoacid.py path, NOT a naive per-FG
+    # string here (which cannot carry the ester organyl / attachment). Kept None.
+    "sulfate_diester": None,      # IUPAC functional class naming
+    "sulfate_monoester": None,    # IUPAC functional class naming
     # a review: functional-class ester (no prefix form)
     "phosphinate_ester": None,   # IUPAC functional class naming
     "arsinate_ester": None,      # IUPAC functional class naming

@@ -303,3 +303,127 @@ class TestTask96DimetalClass1Class2:
         # contains both the stibanyl ligand and mercury.
         assert "not supported" not in name and "unknown" not in name, name
         assert "diphenylstibanyl" in name and "mercury" in name, name
+
+
+# ---------------------------------------------------------------------------
+# σ-ligand namer 0-wrong fail-closed (branched / unsaturated ligands)
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.unit
+class TestSigmaLigandNamerFailsClosed:
+    """``_ligand_name_from_atoms`` classified alkyl ligands by INTERNAL DEGREE
+    ONLY, so it could not tell an n-alkyl attached at a chain END (propyl) from
+    a branched isomer attached at an INTERNAL carbon (isopropyl, sec-butyl) —
+    both give the degree pattern {1, 1, 2,...} — and it never inspected bond
+    order, so an allyl / propargyl backbone read as the saturated n-alkyl. It
+    therefore named isopropyl-/allyl-/sec-butyl-metal fragments as the linear
+    n-alkyl, silently dropping the branch or the C=C/C#C: a DIFFERENT molecule.
+    Since OPSIN cannot round-trip these additive names, no gate caught it. The
+    σ-alkyl branch now fails closed unless the fragment is a genuine all-single-
+    bond chain whose metal-attached atom is a terminus (out of scope →
+    abstain, never a wrong constitution). These assertions need no JVM."""
+
+    @staticmethod
+    def _lig(smi):
+        from orthonym.rules.organometallics import _ligand_name_from_atoms
+        m = Chem.MolFromSmiles(smi)
+        idxs = tuple(a.GetIdx() for a in m.GetAtoms() if a.GetSymbol() == 'C')
+        return _ligand_name_from_atoms(m, idxs)
+
+    def test_keeps_linear_terminal_alkyls(self):
+        assert self._lig("C[Ti]") == "methyl"
+        assert self._lig("CC[Ti]") == "ethyl"
+        assert self._lig("CCC[Ti]") == "propyl"
+        assert self._lig("CCCC[Ti]") == "butyl"
+
+    def test_fails_closed_on_internal_attachment(self):
+        assert self._lig("CC(C)[Ti]") is None      # isopropyl (attach = middle C)
+        assert self._lig("CCC(C)[Ti]") is None      # sec-butyl (attach = internal C)
+
+    def test_fails_closed_on_unsaturation(self):
+        assert self._lig("C=CC[Ti]") is None        # allyl (C=C was dropped → propyl)
+        assert self._lig("C#CC[Ti]") is None        # propargyl (C#C was dropped)
+
+    @pytest.mark.parametrize("smi", [
+        "CC(C)[Ti](Cl)(Cl)Cl",   # isopropyl-TiCl3 (was → trichlorido(propyl)titanium)
+        "C=CC[Ti](Cl)(Cl)Cl",    # allyl (was → …(propyl)…, C=C dropped)
+        "C#CC[Ti](Cl)(Cl)Cl",    # propargyl (was → …(propyl)…, C#C dropped)
+        "CCC(C)[Ti](Cl)(Cl)Cl",  # sec-butyl (was → (butyl)trichloridotitanium)
+        "CC(C)[Fe]Cl",           # class fires across whitelisted metals
+        "CC(C)[V](Cl)Cl",
+    ])
+    def test_wrong_constitution_witnesses_abstain_raw(self, smi):
+        # Even gate-off (no OPSIN), the producer declines rather than fabricate
+        # a wrong-constitution additive name.
+        assert _raw().name(smi).endswith("(not supported)")
+
+    def test_correct_sigma_alkyls_still_ship_raw(self):
+        # The clean terminal σ-alkyls remain the standard additive PINs
+        # — the fix must not suppress them.
+        assert _raw().name("C[Ti](Cl)(Cl)Cl") == "trichlorido(methyl)titanium"
+        assert _raw().name("CC[Ti](Cl)(Cl)Cl") == "trichlorido(ethyl)titanium"
+        assert _raw().name("CCC[Ti](Cl)(Cl)Cl") == "trichlorido(propyl)titanium"
+
+
+# ---------------------------------------------------------------------------
+# Transition-metal additive-branch σ-ligand conservation certificate (0-wrong)
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.unit
+class TestSigmaAdditiveConservationCertificate:
+    """The transition-metal additive name (``trichlorido(methyl)titanium``)
+    ships UNVERIFIED past OPSIN via the carve-out, and the builder assumed
+    "σ-ligands conserve by construction". They do not: a charged/hydrido metal, a
+    charged/radical σ-carbon, or a ligand bonded to the metal at two atoms all
+    shipped a WRONG constitution. ``_sigma_additive_ligands_certified`` now fails
+    the branch closed on each. These abstain even gate-off (the guard is in the
+    producer, not the OPSIN gate), so they need no JVM. abstain
+    on every one; these organometallics are out of scope."""
+
+    @pytest.mark.parametrize("smi,why", [
+        ("c1ccc2c(c1)[Ti]2(Cl)Cl", "W1 benzyne: 2-point ring named (phenyl)=C6H5 vs C6H4"),
+        ("c1ccc2c(c1)[Pt]2(Cl)Cl", "W1 benzyne on Pt"),
+        ("C1=C[Ti]1(Cl)Cl",        "W1 metallacyclopropene named (ethenyl)"),
+        ("[CH2-][Ti](Cl)(Cl)Cl",   "W2 methanide carbanion named neutral (methyl)"),
+        ("[CH2][Ti](Cl)(Cl)Cl",    "W2 methyl radical named (methyl)"),
+        ("[CH2-]C[Ti](Cl)(Cl)Cl",  "W2 charged β-carbon in an ethyl ligand"),
+        ("C[Ti+](Cl)(Cl)Cl",       "W3 cationic metal, Ewens-Bassett number dropped"),
+        ("C[Ti-](Cl)(Cl)(Cl)Cl",   "W3 anionic metal"),
+        ("C[TiH](Cl)Cl",           "W4 metal-bound H (hydrido) dropped"),
+        ("C[TiH2]Cl",              "W4 two metal-bound H dropped"),
+    ])
+    def test_wrong_constitution_classes_abstain_raw(self, smi, why):
+        assert _raw().name(smi).endswith("(not supported)"), (smi, why)
+
+    def test_correct_additive_names_still_ship_raw(self):
+        # Neutral, monodentate, radical-free σ-ligands on a neutral metal with no
+        # metal-H still ship their BB-cited additive PIN.
+        raw = _raw()
+        assert raw.name("C[Ti](Cl)(Cl)Cl") == "trichlorido(methyl)titanium"
+        assert raw.name("c1ccccc1[Ti](Cl)(Cl)Cl") == "trichlorido(phenyl)titanium"
+        assert raw.name("C=C[Ti](Cl)(Cl)Cl") == "trichlorido(ethenyl)titanium"
+
+    def test_certificate_predicate_directly(self):
+        # Unit-level: the structural predicate on (metal_complex, mol, ligs).
+        from orthonym.perception.metals import detect_metal_complex
+        from orthonym.rules.organometallics import (
+            _sigma_additive_ligands_certified,
+        )
+
+        def certify(smi):
+            mol = Chem.MolFromSmiles(smi)
+            mc = detect_metal_complex(mol)
+            if mc is None or mc.is_multimetal:
+                return None
+            organic = [
+                lg for lg in mc.ligand_groups
+                if lg.ligand_smarts_key not in ('[Cl]', '[Br]', '[F]', '[I]')
+            ]
+            return _sigma_additive_ligands_certified(mc, mol, organic)
+
+        assert certify("C[Ti](Cl)(Cl)Cl") is True        # clean methyl
+        assert certify("[CH2-][Ti](Cl)(Cl)Cl") is False  # charged ligand carbon
+        assert certify("C[Ti+](Cl)(Cl)Cl") is False       # charged metal
+        assert certify("C[TiH](Cl)Cl") is False           # metal-bound H

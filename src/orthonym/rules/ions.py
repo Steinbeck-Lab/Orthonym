@@ -178,7 +178,21 @@ def classify_anion(mol, anion_site: Dict[str, Any]) -> str:
             # them on the existing path so the sulfated-glycolipid / phospho-
             # lipid canaries do not regress. /.
             nb_has_carbon = any(nn.GetSymbol() == 'C' for nn in nb.GetNeighbors())
-            if nb.GetSymbol() == 'S' and nb_has_carbon:
+            # R3 (v51,: a RING-NITROGEN-anchored S-oxoacid [O-]
+            # (piperidine-1-sulfinate — S bonded to the ring N, no carbon on S)
+            # is a genuine sulfinate/sulfonate acid anion too. Its neutral
+            # ring-N-sulfinic/sulfonic acid became nameable in R2, so the
+            # neutralize -> re-name -> re-suffix seam now yields '…-sulfinate'.
+            # Scoped to a RING nitrogen exactly as R2 scoped the neutral
+            # perception widening: an ACYCLIC N (sulfamic acid, H2N-SO2-OH,
+            # keeps its own preselected name and stays excluded here (it falls
+            # through to 'alkoxide' as before). A sulfate ester (S-O only, no
+            # carbon and no ring-N on S) is likewise unaffected.
+            nb_has_ring_n = any(
+                nn.GetSymbol() == 'N' and nn.IsInRing()
+                for nn in nb.GetNeighbors()
+            )
+            if nb.GetSymbol() == 'S' and (nb_has_carbon or nb_has_ring_n):
                 double_o = sum(
                     1 for nn in nb.GetNeighbors()
                     if nn.GetSymbol() == 'O' and nn.GetIdx() != atom_idx

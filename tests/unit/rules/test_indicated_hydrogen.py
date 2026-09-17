@@ -202,6 +202,50 @@ class TestGroup14HeteroleIndicatedH:
         assert name_compound(smiles) == expected
 
 
+class TestSubstitutedMancudeIndicatedH:
+    """A mancude HW ring keeps its indicated hydrogen when a substituent has
+    displaced the H at the sole saturated skeletal position -- for EVERY
+    element that holds that position, not just Group-14 (Si/Ge/Sn).
+
+     (``the Blue Book``): after the maximum number of
+    noncumulative double bonds is assigned, "any ring atom with a bonding
+    number of three or higher connected to adjacent ring atoms by single bonds
+    only" is the indicated-hydrogen position. In ``1,3,2-oxathiaborepine`` the
+    boron (bonding number 3) sits between the divalent ring O and S -- both
+    single-bond-only neighbours -- so it is that position. The bare parent
+    ``B1OC=CC=CS1`` already names as ``2H-1,3,2-oxathiaborepine`` via the
+    H-bearing path; when the boron's H is replaced by a substituent the ``2H``
+    must still be cited: a substituent stands in the indicated
+    hydrogen's place, it does not remove it).
+    """
+
+    @pytest.mark.unit
+    @pytest.mark.parametrize("smiles,expected", [
+        # boron indicated-H displaced by -S-CH3 -> 2H still cited (the fix)
+        ("CSB1OC=CC=CS1", "2-(methylsulfanyl)-2H-1,3,2-oxathiaborepine"),
+    ])
+    def test_substituted_boron_ring_keeps_indicated_h(self, smiles, expected):
+        assert name_compound(smiles) == expected
+
+    @pytest.mark.unit
+    @pytest.mark.parametrize("smiles,expected", [
+        # regression pin: the H-bearing parent already worked and must be
+        # byte-identical after the fix.
+        ("B1OC=CC=CS1", "2H-1,3,2-oxathiaborepine"),
+    ])
+    def test_h_bearing_boron_ring_unchanged(self, smiles, expected):
+        assert name_compound(smiles) == expected
+
+    @pytest.mark.roundtrip
+    @pytest.mark.parametrize("smiles", ["CSB1OC=CC=CS1"])
+    def test_substituted_boron_ring_roundtrips(self, smiles, opsin_to_smiles):
+        """The emitted name must parse back (OPSIN) to the input structure."""
+        name = name_compound(smiles)
+        parsed = opsin_to_smiles(name)
+        assert parsed is not None, f"OPSIN could not parse {name!r}"
+        assert Chem.CanonSmiles(parsed) == Chem.CanonSmiles(smiles)
+
+
 class TestDictionaryCompleteness:
     """Test that all fused heterocycle dictionary entries have complete
     iupac_locants covering all ring atoms."""

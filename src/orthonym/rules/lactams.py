@@ -237,8 +237,20 @@ def name_lactam_ring(ring_size: int) -> Optional[str]:
     except ValueError:
         return None
 
-    # Build: azacyclo + {prefix} + an-2-one
-    return f"azacyclo{chain_prefix}an-2-one"
+    # Build: 1-azacyclo + {prefix} + an-2-one
+    #
+    # "Citation of locants" (the Blue Book) is deny-by-default: once any
+    # locant in a scope is essential, every locant in that scope is cited. The
+    # '-2-one' suffix cites locant 2, so the skeletal-replacement 'aza' locant
+    # '1' MUST be cited too -> '1-azacyclotridecan-2-one' (PIN), not
+    # 'azacyclotridecan-2-one'. None of the six "Omission of locants"
+    # (the Blue Book) licences reaches a heterogeneous replacement ring that bears a
+    # numbered suffix. (Contrast the BARE parent 'azacyclotridecane', where the
+    # single heteroatom's '1' is omitted because nothing else is numbered; and
+    # contrast the Hantzsch-Widman range 3-10 above, where the stem itself fixes
+    # the heteroatom at position 1 so no locant is cited -- 'azepan-2-one'.)
+    # OPSIN parses both forms to the identical structure: a pure spelling fix.
+    return f"1-azacyclo{chain_prefix}an-2-one"
 
 
 # ---------------------------------------------------------------------------
@@ -454,7 +466,13 @@ def name_monocyclic_lactam(mol) -> Optional[str]:
 
     # Join prefix parts
     prefix = "-".join(prefix_parts)
-    name = f"{prefix}{parent_name}"
+    # IUPAC hyphenates a letter-to-locant boundary: when the parent
+    # itself begins with a locant ('1-azacyclotridecan-2-one'), a substituent
+    # prefix must be separated from it by a hyphen ('4-methyl-1-azacyclo...',
+    # not '4-methyl1-azacyclo...').
+    sep = "-" if (prefix and parent_name[:1].isdigit()
+                  and not prefix.endswith("-")) else ""
+    name = f"{prefix}{sep}{parent_name}"
 
     # Prepend stereo prefix if descriptors exist
     if stereo_descriptors:

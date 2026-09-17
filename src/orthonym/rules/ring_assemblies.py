@@ -93,8 +93,8 @@ _VON_BAEYER_NAME_RE = re.compile(
 # those whose mancude position can hold an indicated hydrogen (they are part of
 # the double-bond framework in the parent): C, B, N, Si, P, Ge, As, Sn, Sb, Bi.
 # Divalent O/S/Se/Te are always saturated ring linkers and never bear an
-# indicated hydrogen, so they are excluded — matching the group split used by
-# ``heterocycles._INDICATED_H_ELEMENTS`` / ``_GROUP14_INDICATED_H``.
+# indicated hydrogen, so they are excluded — the same bonding-number >= 3 split
+# ``heterocycles._monocycle_indicated_h_prefix`` applies.
 _INDICATED_H_ATOM_ELEMENTS = frozenset({5, 6, 7, 14, 15, 32, 33, 50, 51, 83})
 
 

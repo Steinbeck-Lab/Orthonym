@@ -156,6 +156,111 @@ def name_sulfur_oxoacid_oxy_substituent(
     return f"({acyl})oxy"            # (chlorosulfonyl)oxy, …
 
 
+def name_sulfate_ester(mol, sulfur_idx: int) -> Optional[str]:
+    """Functional-class name for a neutral ester of sulfuric acid.
+
+    Sulfuric acid H2SO4 is a dibasic mononuclear noncarbon oxoacid; its
+    esters are named like esters of organic acids,
+    ``the Blue Book Blue Book``): the organyl group(s) are cited as
+    separate words, in alphanumerical order when more than one, followed by the
+    anion name of the acid ('sulfate'); a partial (mono) ester of the dibasic acid
+    inserts the word 'hydrogen' (or 'dihydrogen') for a remaining acidic -OH. The
+    governing PIN example is ``CH3-O-SO2-OH methyl hydrogen sulfate (PIN)``
+    (:35968).
+
+        (RO)2SO2 -> 'dialkyl sulfate' (di-ester, 0 free -OH)
+        RO-SO2-OH -> 'alkyl hydrogen sulfate' (mono-ester, 1 free -OH)
+
+    This is the SULFUR analogue of:func:`rules.phosphorus.name_phosphate_ester`
+    and reuses its owner/multiplier/hydrogen-word helpers. It is distinct from a
+    sulfonate ester (R-SO2-O-R', an S-C bond, already handled by 'sulfonic_ester'
+    -> ``rules.esters.name_noncarbon_ester``): a sulfate ester has NO S-C bond.
+
+    Requires a neutral, acyclic S(VI) with EXACTLY two terminal =O, at least one
+    -O-C ester owner, and NO S-C bond. Fails closed (``None``) off that shape, or
+    if any organyl owner is unspellable, or the name would not cover every atom;
+    the top-level /OPSIN validity gate is the 0-wrong backstop on whatever
+    is emitted.
+    """
+    from .phosphorus import (
+        _HYDROGEN_MULT,
+        _assemble_p_owner_text,
+        _p_ester_owner_group,
+    )
+
+    if mol is None or sum(a.GetFormalCharge() for a in mol.GetAtoms()) != 0:
+        return None
+    s = mol.GetAtomWithIdx(sulfur_idx)
+    if s.GetSymbol() != "S" or s.GetFormalCharge() != 0 or s.IsInRing():
+        return None
+
+    accounted = {sulfur_idx}
+    ester_oxygens: List[int] = []
+    oh_count = 0
+    dbl_oxo = 0
+    for b in s.GetBonds():
+        nb = b.GetOtherAtom(s)
+        bt = b.GetBondType()
+        sym = nb.GetSymbol()
+        if bt == Chem.BondType.DOUBLE and sym == "O":
+            dbl_oxo += 1
+            accounted.add(nb.GetIdx())
+            continue
+        if bt != Chem.BondType.SINGLE:
+            return None                         # S=C / S=N / thio -> defer
+        if sym == "C":
+            return None                         # S-C -> sulfonate ester (other class)
+        if sym != "O" or nb.GetFormalCharge() != 0:
+            return None                         # S-N / charged O -> defer
+        others = [x for x in nb.GetNeighbors() if x.GetIdx() != sulfur_idx]
+        if not others and nb.GetTotalNumHs() >= 1:
+            oh_count += 1
+            accounted.add(nb.GetIdx())
+        elif len(others) == 1 and others[0].GetSymbol() == "C":
+            owner_c = others[0]
+            if any(ob.GetBondType() == Chem.BondType.DOUBLE
+                   and ob.GetOtherAtom(owner_c).GetSymbol() == "O"
+                   for ob in owner_c.GetBonds()):
+                # The owner root is a carbonyl carbon -> an ACYL group
+                # (R-C(=O)-O-SO2-OR'). That is a mixed carboxylic/sulfuric
+                # ANHYDRIDE, not a sulfate ester -- 's
+                # ester owners are alkyl/aryl groups only. Fail closed on
+                # the whole molecule rather than mis-name it as a sulfate
+                # ester ('acetyl methyl sulfate'); this defers to whatever
+                # producer (if any) covers the mixed-anhydride class.
+                return None
+            ester_oxygens.append(nb.GetIdx())
+            accounted.add(nb.GetIdx())
+        else:
+            return None                         # S-O-S bridge / O-heteroatom owner -> defer
+
+    if dbl_oxo != 2 or not ester_oxygens:
+        return None                             # not a sulfuric-acid ester (or a free acid)
+
+    owner_tokens: List[str] = []
+    for o_idx in ester_oxygens:
+        got = _p_ester_owner_group(mol, o_idx, sulfur_idx)
+        if got is None:
+            return None
+        token, frag = got
+        owner_tokens.append(token)
+        accounted |= frag
+    owner_text = _assemble_p_owner_text(owner_tokens)
+
+    # Every heavy atom must be covered, or this is not a whole-molecule name.
+    if accounted != set(range(mol.GetNumAtoms())):
+        return None
+
+    hyd = _HYDROGEN_MULT.get(oh_count)
+    if hyd is None:
+        return None                             # >2 free -OH is not an ester shape
+    pieces = [owner_text]
+    if hyd:
+        pieces.append(hyd)
+    pieces.append("sulfate")
+    return " ".join(pieces)
+
+
 def name_sulfur_oxoacid_acyl_for_amino(
         mol, s_idx: int, frag_atoms: set) -> Optional[str]:
     """N-linked ``-NH-S(oxoacid)``: the acyl prefix for the amino wrapper.

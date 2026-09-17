@@ -207,11 +207,24 @@ def orient_cycloalkane(
         for direction in [1, -1]:  # 1 = clockwise, -1 = counterclockwise
             oriented = _build_oriented_ring(ring_list, start_pos, direction)
 
-            # Calculate locants for this orientation
+            # Calculate locants for this orientation.
+            # (f) (the Blue Book): the detachable alphabetized prefixes are
+            # "all considered together in a series of increasing numerical
+            # order" -- i.e. WITH multiplicity, so a gem-disubstituted carbon
+            # contributes its locant twice. (the Blue Book) then picks the
+            # set that is lower at the first point of difference; only if that
+            # ties does (g) (lowest locant to the prefix cited first)
+            # decide. Collapsing each atom to one locant made {1,1,3} and
+            # {1,3,3} both reduce to {1,3}, so the gem-dimethyl direction was
+            # (wrongly) decided by the (g) alpha tie-break instead of
+            # -- giving '1,3,3-trimethylcyclohexane' for
+            # CC1CCCC(C)(C)C1 where the PIN is '1,1,3-trimethylcyclohexane'.
+            # This mirrors the already-multiplicity-aware PG path
+            # (_orient_cycloalkane_with_pg, which iterates substituent lists).
             locants = []
             for i, atom_idx in enumerate(oriented):
-                if atom_idx in substituted_atom_indices:
-                    locants.append(i + 1)  # Locants are 1-indexed
+                for _sub in substituent_positions.get(atom_idx, ()):
+                    locants.append(i + 1)  # one locant per substituent
 
             locants.sort()
 

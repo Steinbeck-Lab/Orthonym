@@ -152,6 +152,34 @@ def _ligand_name_from_atoms(mol: Any, atom_indices: Tuple[int, ...]) -> Optional
         # Linear chain: exactly 2 atoms with degree 1; rest with degree 2
         deg_counts = list(internal_degrees.values())
         if deg_counts.count(1) == 2 and deg_counts.count(2) == n_atoms - 2:
+            # 0-wrong guard: the internal-degree multiset alone does NOT tell an
+            # n-alkyl attached at a chain END (propyl) apart from a branched
+            # isomer attached at an INTERNAL carbon (isopropyl, sec-butyl) — both
+            # give the pattern {1, 1, 2,...}. Nor does it inspect bond order, so
+            # an allyl / propargyl / butenyl backbone (all internal degree 2) read
+            # as a saturated n-alkyl and the C=C / C#C was silently dropped. Both
+            # cases fabricated a name for a DIFFERENT molecule. Fail closed unless
+            # the fragment is a genuine all-single-bond chain whose metal-attached
+            # atom is a terminus. (Any single ligand bond that is not order 1 also
+            # excludes an aromatic ring here, but aromatics are handled above.)
+            has_multiple_bond = any(
+                b.GetBondTypeAsDouble() != 1.0
+                for idx in atom_indices
+                for b in mol.GetAtomWithIdx(idx).GetBonds()
+                if b.GetOtherAtomIdx(idx) in idx_set
+            )
+            if has_multiple_bond:
+                return None
+            # The metal-attached ligand atom is the one with a heavy neighbour
+            # OUTSIDE the ligand subgraph (a clean σ-alkyl has exactly one — the
+            # metal). Require it to be a chain terminus (internal degree 1).
+            attach = [
+                idx for idx in atom_indices
+                if any(nb.GetAtomicNum() != 1 and nb.GetIdx() not in idx_set
+                       for nb in mol.GetAtomWithIdx(idx).GetNeighbors())
+            ]
+            if len(attach) != 1 or internal_degrees[attach[0]] != 1:
+                return None
             return {2: 'ethyl', 3: 'propyl', 4: 'butyl',
                     5: 'pentyl', 6: 'hexyl', 7: 'heptyl',
                     8: 'octyl'}.get(n_atoms)
@@ -420,9 +448,13 @@ def _organometallic_conserves(metal_complex: Any, mol: Any) -> bool:
     (``_PI_LIGAND_REFERENCE_FORMULA``). A mismatch means the emitted name would
     describe a different constitution than the input (measured lossy rows: allyl,
     cycloheptatrienyl) → return False so the assembler declines and the cascade
-    abstains. σ-ligands and unrecognised π-ligand names are not vetoed here
-    (σ-ligands conserve by construction; an unknown name has no reference formula
-    to check and must not force a false abstain on a conserving complex)."""
+    abstains. σ-ligands and unrecognised π-ligand names are not vetoed here (an
+    unknown name has no reference formula to check and must not force a false
+    abstain on a conserving complex). NB the old claim that "σ-ligands conserve
+    by construction" is FALSE for the transition-metal additive branch — a
+    charged/hydrido metal, a charged/radical σ-carbon, or a 2-point ligand
+    mis-named as monodentate all ship a wrong constitution; that branch now
+    carries its own guard, ``_sigma_additive_ligands_certified``."""
     for lg in getattr(metal_complex, 'ligand_groups', ()) or ():
         hap = getattr(lg, 'hapticity_n', 1)
         if hap is None or hap <= 1:
@@ -434,6 +466,58 @@ def _organometallic_conserves(metal_complex: Any, mol: Any) -> bool:
         if want is None:
             continue
         if _fragment_formula(mol, lg.ligand_atom_indices) != want:
+            return False
+    return True
+
+
+def _sigma_additive_ligands_certified(metal_complex: Any, mol: Any,
+                                      organic_ligs) -> bool:
+    """0-wrong certificate for the transition-metal additive σ-coordination
+    branch (``trichlorido(methyl)titanium``). That name is emitted
+    ONLY here and ships UNVERIFIED past OPSIN (the carve-out bypasses the RT
+    gate), so every structural feature the name asserts must be proven here or
+    the branch declines. This refutes the old ``_organometallic_conserves``
+    premise that "σ-ligands conserve by construction" — for a σ-ligand the name
+    also asserts the metal has no other bonds, the ligand is a NEUTRAL,
+    radical-free, MONODENTATE group, and the metal carries neither charge nor a
+    hydride, none of which the additive builder checked. Four measured wrong
+    constitutions shipped as a result:
+    - metal-bound H (M–H) is never rendered ('hydrido'); RDKit folds an implicit
+      metal H into the metal's H-count, so ``C[TiH](Cl)Cl`` shipped
+      'dichlorido(methyl)titanium' (a hydrido dropped). Abstain if the metal
+      carries any H.
+    - a charged metal needs an Ewens-Bassett number we do not emit
+      (the IUPAC recommendations' own '...osmium(1+)' additive example), so
+      ``C[Ti+](Cl)(Cl)Cl`` dropped the charge. Abstain if the metal is charged.
+    - a σ-ligand atom that is charged or a radical is not the neutral group the
+      name implies: ``[CH2-][Ti](Cl)(Cl)Cl`` (methanide) and ``[CH2][Ti]...``
+      (radical) both shipped as neutral '(methyl)'. Abstain on either.
+    - a ligand bonded to the metal at MORE than one atom is chelating/2-point,
+      mis-named as monodentate: benzyne ``c1ccc2c(c1)[Ti]2(Cl)Cl`` → '(phenyl)'
+      (C6H4 named C6H5), metallacyclopropene ``C1=C[Ti]1(Cl)Cl`` → '(ethenyl)'.
+      Abstain unless every σ-ligand touches the metal at exactly one atom.
+    abstain on all of these; these organometallics are out of
+    scope, so declining (→ cascade abstains) is correct, never a wrong
+    constitution."""
+    metal_idxs = set(metal_complex.metal_atom_indices)
+    for mi in metal_idxs:
+        matom = mol.GetAtomWithIdx(mi)
+        if matom.GetTotalNumHs() != 0:                       # metal-bound H
+            return False
+    if any(c != 0 for c in metal_complex.formal_charges):    # charged metal
+        return False
+    for lg in organic_ligs:
+        idxs = list(lg.ligand_atom_indices)
+        for i in idxs:                                        # neutral, no radical
+            a = mol.GetAtomWithIdx(i)
+            if a.GetFormalCharge() != 0 or a.GetNumRadicalElectrons() != 0:
+                return False
+        m_bonds = sum(                                       # monodentate: 1 M–L bond
+            1 for i in idxs
+            for nb in mol.GetAtomWithIdx(i).GetNeighbors()
+            if nb.GetIdx() in metal_idxs
+        )
+        if m_bonds != 1:
             return False
     return True
 
@@ -826,6 +910,13 @@ def assemble_organometallic_name(metal_complex: Any, mol: Any,
             if halide_ligs and organic_ligs and metal_symbol in _TRANSITION_METAL_DIRECT_SYMBOLS:
                 if any(lg.ligand_smarts_key not in LIGAND_NAMES for lg in halide_ligs):
                     return None  # fail closed: unrecognised anionic ligand
+                # 0-wrong certificate: this additive name bypasses OPSIN, so a
+                # charged/hydrido metal, a charged/radical σ-ligand atom, or a
+                # 2-point (chelating) ligand mis-named as monodentate would ship
+                # a wrong constitution unchecked. Fail closed on any of these.
+                if not _sigma_additive_ligands_certified(
+                        metal_complex, mol, organic_ligs):
+                    return None
                 halide_names = [LIGAND_NAMES[lg.ligand_smarts_key] for lg in halide_ligs]
                 # organic_names is already fully resolved + None-checked above.
                 halide_grouped = _group_ligand_counts(halide_names)
@@ -850,27 +941,43 @@ def assemble_organometallic_name(metal_complex: Any, mol: Any,
                 ]
                 return (full_name, metal_name, ligand_tree_nodes)
 
-            # Determine ligand_class for Stock lookup
-            if halide_ligs and metal_symbol == 'Mg':
-                ligand_class = 'alkyl_halide'
-            elif metal_symbol in ('Zn', 'Cd', 'Hg') and len(organic_ligs) == 2:
-                ligand_class = 'alkyl2'
-            elif metal_symbol == 'Al' and len(organic_ligs) == 3:
-                ligand_class = 'alkyl3'
-            elif metal_symbol in ('Li', 'Na', 'K') and len(organic_ligs) == 1:
-                ligand_class = 'alkyl'
+            # Task M1 (v51): route the σ-bonded metal_direct topology to a
+            # ligand_class. The pre-M1 dispatch enumerated the metal one by one
+            # (Mg-Grignard / Zn|Cd|Hg-alkyl2 / Al-alkyl3 / Li|Na|K-alkyl) and
+            # dropped EVERY other metal at `else: return None` -- which is why
+            # `C[Mg]C` (dimethylmagnesium), `C[Ca]C`, `C[Be]C` and `C[U]`
+            # (methyluranium) abstained though `C[Zn]C` named. The classes are
+            # now topology-driven, not metal-hard-coded:
+            # * Grignard `alkyl_halide`: exactly one halide + one organic
+            # σ-ligand on a NON-transition metal_direct metal (transition
+            # metals with halide+organic are owned by the additive branch
+            # above; if it declined, such a compound still cascades here);
+            # * `alkyl_sigma`: any all-organic σ-complex on a metal_direct
+            # metal (Groups 1/2/12/13 + Group-3/lanthanide/actinide added to
+            # METAL_NAMES in M1), built as `{multiplied-prefix}{metal}`.
+            # Every emission is OPSIN round-trip-gated downstream, so a form that
+            # does not round-trip abstains (0-wrong ABSOLUTE) rather than ship.
+            if halide_ligs:
+                if (len(halide_ligs) == 1 and len(organic_ligs) == 1
+                        and metal_symbol not in _TRANSITION_METAL_DIRECT_SYMBOLS):
+                    ligand_class = 'alkyl_halide'
+                else:
+                    # multi-halide / halide-only (MgCl2) / a transition-metal
+                    # halide the additive branch declined -> cascade to SALT@100
+                    return None
+            elif organic_ligs:
+                ligand_class = 'alkyl_sigma'
             else:
-                # Unknown combination — cascade to SALT@100
+                # no σ-ligand at all (bare metal atom) -> cascade to SALT@100
                 return None
 
-            hints = METAL_OXIDATION_STATE_HINTS.get((metal_symbol, ligand_class))
-            if hints is None:
-                return None
-
-            include_stock = (
-                hints['stock_required_systematic'] if style == 'systematic'
-                else hints['stock_required_pin']
-            )
+            # Stock notation: every metal_direct row in METAL_OXIDATION_STATE_HINTS
+            # is stock-free for BOTH styles (Grignard, dialkylzinc, trialkyl-
+            # aluminium, alkyllithium all cite no Stock number), and the M1
+            # best-effort metals default to no-Stock too. So include_stock is
+            # uniformly False here -- byte-identical to the pre-M1 lookup for the
+            # existing metals, which never emitted a Stock number.
+            include_stock = False
 
             # Grignard: space-separated "ethylmagnesium bromide" form
             if ligand_class == 'alkyl_halide':
@@ -953,11 +1060,9 @@ def assemble_organometallic_name(metal_complex: Any, mol: Any,
                 _join_mult(count, name) for count, name in sorted_groups
             )
 
-            if include_stock:
-                oxidation = metal_charge if metal_charge != 0 else hints['default_state']
-                stock_str = f"({_to_roman(oxidation)})"
-            else:
-                stock_str = ""
+            # metal_direct σ-organometallics carry no Stock number in this scope
+            # (include_stock is uniformly False here -- see the dispatch above).
+            stock_str = ""
 
             full_name = f"{ligand_prefix}{metal_name}{stock_str}"
             metal_name_part = f"{metal_name}{stock_str}"

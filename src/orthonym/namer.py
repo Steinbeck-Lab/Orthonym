@@ -1010,6 +1010,20 @@ def _self_consistency_net_charge(smiles: str) -> Optional[int]:
         return None
 
 
+#: Phase-1 reclaim (Adv1 guard): a bare RELATIVE stereo descriptor is 50/50-
+#: ambiguous on a true enantiomeric pair — OPSIN picks one enantiomer, so BOTH the
+#: full-InChIKey and the exact-CanonSmiles compare false-confirm it. Match only
+#: descriptor positions (start / after ([ { space tab -). Absolute (nR)/(nZ) blocks
+#: and D-/L-/alpha-/beta- config tokens are deliberately NOT matched.
+_RELATIVE_STEREO_RE = re.compile(
+    r"(?:^|[-([{ \t])(?:cis|trans|rel|rac|syn|anti)-"
+    r"|\brel-|[±]|R\*|S\*|\((?:RS|SR|±)\)", re.IGNORECASE)
+
+
+def _has_relative_stereo_token(name: str) -> bool:
+    return bool(name) and _RELATIVE_STEREO_RE.search(name) is not None
+
+
 #: a phase kill-switch for the general-fallback stereo-omission reclaim path
 #: (default ON). ``ORTHONYM_STEREO_OMISSION_RECLAIM=0`` restores the pre-
 #: suppress-always behaviour — used for A/B measurement and as a safety valve.
@@ -4025,57 +4039,107 @@ class Orthonym:
                 "retained structural preference error (kept general): %s", e)
         return None
 
-    def _stereo_emit_decision(self, mol, cand):
-        """ T6.2: ONE shared stereo-policy decision for BOTH general-
-        engine emission sites (the inline G1 fallback in ``_name_impl`` and the
-        late-recovery ladder in ``_try_general_engine_recovery``).
+    def _stereo_emit_decision(self, mol, cand, smiles):
+        """ T6.2 / Phase-1 reclaim: ONE shared stereo-policy decision for
+        the general-engine emission sites (the inline G1 fallback in ``_name_impl``
+        and the recovery/rescue ladder in ``_try_general_engine_recovery`` & the
+        alternate/demote/ rescues).
 
-        Returns ``(permitted, flagged)``:
-          * ``(True, False)`` — the name already expresses every stereo element
-            the input carries (or the input has none) -> ship as-is, no flag.
-          * ``(True, True)`` — best-effort (``_general_fallback_unverified``):
-            ship a CONSTITUTION-ONLY name and mark it ``stereo_unexpressed``.
-            This is honest and NOT a wrong stereoisomer — it names a superset
-            (BB sanctions omitting stereodescriptors for exactly the
-            von-Baeyer/spiro/fused polycyclic classes best-effort emits;
-            : descriptors are an additive layer over a complete name).
-          * ``(False, False)`` — pin/valid/complete: ABSTAIN on dropped stereo.
-             is stereo-blind, so a stereo-dropped name would pass it and
-            could ship a WRONG stereoisomer under the PIN contract:
-            PINs must specify every stereogenic unit). Fail-closed is correct.
+        Returns the 3-tuple ``(permitted, flagged, name_out)``, where ``name_out``
+        is the name the caller must EMIT and RT-verify (possibly the input's stereo
+        COMPOSED onto ``cand``):
+          * ``(True, False, cand)`` — count matches -> offer AS-IS, unflagged.
+          * ``(True, False, composed)`` — Phase-1 reclaim: the count-mismatch
+            candidate is either already-complete-but-miscounted (symmetric ``bis``/
+            multiplied names) or a stereo-OMISSION whose descriptor was composed
+            back on via the RT-gated re-anchor. Emitted UNFLAGGED so the
+            caller's exact-isomeric ``_rt_match(flagged=False)`` (CanonSmiles ==
+            CanonSmiles AND full-InChIKey, InChI-STRONGER than a bare InChIKey) is
+            the emission authority. 0-wrong ABSOLUTE.
+          * ``(True, True, cand)`` — jar-dead measurement escape hatch only
+            (``ORTHONYM_BE_STRIP_STEREO=1``): ship CONSTITUTION-ONLY, flagged.
+          * ``(False, False, None)`` — ABSTAIN: a genuine stereo CONFLICT, an
+            unexpressible element (axial), a bare RELATIVE descriptor (Adv1), a
+            wrong-constitution candidate, or a jar-dead reclaim it cannot verify.
 
-        Root-cause: replaces the two inline ``needs_stereo_injection`` branches
-        that previously fail-closed at both sites, so best-effort no longer
-        inherits the complete-tier fail-close (roadmap a phase stereo policy).
-
-         Phase S Task 1 (accuracy keystone): uses the per-element
-        ``general_engine_stereo_complete`` predicate — NOT the coarse
-        ``needs_stereo_injection`` name-side boolean — so a PARTIAL-stereo name
-        (some elements expressed, one dropped) is treated as INCOMPLETE and
-        never ships in complete (all-or-nothing;. This closes the
-        verified partial-stereo wrong-ship hole (the old boolean returned False
-        on any name with a stereo block, shipping partials past).
+        Phase-1 replaces the raw count identity as the ABSTAIN authority. A count
+        ``count_expressed == count_defined`` fails in BOTH directions (under-counts
+        symmetric/multiplied names; and it can never be TRUE for a name that dropped
+        a descriptor) and is blind to CORRECTNESS. So the count survives only as a
+        cheap FAST-ACCEPT (STEP 1); the completeness-and-correctness authority moves
+        to the exact-isomeric ``_rt_match`` at each caller — mirroring v47
+        ``_ring_cistrans_is_complete`` replacing a proxy count with an exact
+        predicate. Governing rule: (the Blue Book) — "In
+        preferred IUPAC names, stereodescriptors, preceded by a locant, must be
+        cited to specify each stereogenic unit"; an exocyclic ylidene C=C is not a
+         omission class, so its descriptor is REQUIRED.
         """
         from .rules.stereochemistry import general_engine_stereo_complete
+
+        # STEP 0 — RELATIVE-DESCRIPTOR GUARD (Adv1). A bare relative token
+        # (cis/trans/rel/rac/syn/anti/R*/S*/(RS)/±) is 50/50-ambiguous on a true
+        # enantiomeric pair: OPSIN picks one enantiomer, so BOTH the full-InChIKey
+        # and the exact-CanonSmiles compare false-confirm it. Never permit or
+        # compose such a candidate; abstain. NON-REGRESSING: the count grammar
+        # (_STEREO_EMBEDDED_RE = [RSEZrsez] only) already scores cis/trans as 0, so
+        # today's count veto already abstains these — the guard only makes the
+        # invariant explicit and closes a latent rel-(R,S) hole for ~0 breadth.
+        if _has_relative_stereo_token(cand):
+            return (False, False, None)
+
+        # STEP 1 — CHEAP FAST-ACCEPT. Count identity -> offer as-is, UNFLAGGED. The
+        # caller's exact-isomeric _rt_match(flagged=False) still verifies it, so a
+        # conflict that happens to match the count is rejected downstream (unchanged
+        # from today). Every currently-passing emission takes this branch.
         if general_engine_stereo_complete(mol, cand):
-            return (True, False)
-        # User directive 2026-08-31 (accurate-or-abstain, scoped to the ROUND-TRIP
-        # metric): a name that OMITS stereo the input asserts does NOT round-trip to
-        # the exact input stereoisomer -- under full standard InChIKey it is a FAIL,
-        # not a valid superset (it also cannot BEAT a reference that emits full
-        # stereo). So best-effort must ABSTAIN a stereo-incomplete name exactly like
-        # the complete tier, never ship it stripped. The completable classes already
-        # returned (True, False) above (general_engine_stereo_complete); only
-        # genuinely unexpressible/incomplete stereo (e.g. OPSIN-unparseable
-        # pseudo-asymmetric) reaches here, and stripping it was the precision leak
-        # surfaced by the 4-corpus head-to-head (tropan-3-ol etc.). Set
-        # ORTHONYM_BE_STRIP_STEREO=1 to restore the old ship-stripped
-        # behaviour (measurement/back-compat only).
-        import os as _os
-        if self._general_fallback_unverified and _os.environ.get(
-                "ORTHONYM_BE_STRIP_STEREO") == "1":
-            return (True, True)
-        return (False, False)
+            return (True, False, cand)
+
+        # STEP 2 — RECLAIM REQUIRES A LIVE OPSIN VERIFIER. Without it we cannot
+        # verify a composed/as-is completion, so keep the conservative count-based
+        # behaviour (never ship a stripped/omitted name unverified). The
+        # ORTHONYM_BE_STRIP_STEREO measurement escape hatch is preserved verbatim
+        # for the jar-dead path only (user directive 2026-08-31;).
+        if self._disable_opsin_validity_gate or not _validity_gate_jar_present():
+            import os as _os
+            if (self._general_fallback_unverified
+                    and _os.environ.get("ORTHONYM_BE_STRIP_STEREO") == "1"):
+                return (True, True, cand)      # legacy ship-stripped
+            return (False, False, None)
+
+        # STEP 3 — CONSTITUTION PRECHECK. Only complete stereo onto a base whose
+        # constitution already matches the input (skeleton InChIKey equal). A
+        # wrong-constitution candidate is a wrong molecule -> abstain (composition
+        # never reached). The skeleton prefilter also keeps compose off the giant
+        # wrong-constitution suppressions (no new hang surface).
+        in_skel = _self_consistency_skeleton(smiles)
+        cand_smi = _validity_gate_name_to_smiles(cand)
+        cand_skel = _self_consistency_skeleton(cand_smi) if cand_smi else None
+        if in_skel is None or cand_skel != in_skel:
+            return (False, False, None)
+
+        # STEP 4a — AS-IS COMPLETE-BUT-MISCOUNTED (symmetric bis-/multiplied names).
+        # cand may already express every element; the count merely under-counted it
+        # (the bis(...) multiplier doubles the DEFINED units on mol). Verify with the
+        # EXACT-ISOMERIC gate (NOT the count, NOT a bare InChIKey): _rt_match(
+        # flagged=False), whose CanonSmiles == CanonSmiles branch is InChI-STRONGER
+        # (catches C=N/ylidene the InChIKey is blind to — Adv3).
+        if cand_smi is not None and self._rt_match(smiles, cand_smi, False):
+            return (True, False, cand)         # e.g. CID 101644479
+
+        # STEP 4b — OMISSION -> COMPOSE the input's stereo onto the flat/partial base
+        # via the EXISTING RT-gated re-anchor. Returns the composed name only if
+        # it recomputes to the input's full key; returns None on a genuine conflict /
+        # unexpressible element. Emitted UNFLAGGED so the caller's exact-isomeric
+        # _rt_match is the authority (, Adv3). Gated by the kill switch.
+        in_key = _self_consistency_full_key(smiles)
+        composed = (_try_compose_input_stereo(cand, smiles, in_key)
+                    if (in_key and _STEREO_OMISSION_RECLAIM) else None)
+        if composed:
+            return (True, False, composed)     # e.g. CID 122493921 -> (1Z)-...
+
+        # STEP 5 — genuine CONFLICT / unexpressible (axial, InChI-invisible tail that
+        # composition cannot express) -> ABSTAIN all-or-nothing).
+        return (False, False, None)
 
     @staticmethod
     def _rt_match(input_smiles: str, opsin_smiles: str,
@@ -4397,10 +4461,11 @@ class Orthonym:
             # stereoisomer).
             _stereo_flagged = False
             if cand:
-                _permitted, _stereo_flagged = self._stereo_emit_decision(
-                    mol, cand)
+                _permitted, _stereo_flagged, _name_out = self._stereo_emit_decision(
+                    mol, cand, smiles)
                 if not _permitted:
                     return None
+                cand = _name_out          # adopt composed/as-is reclaim
             #: explicit verification ladder. verified = OPSIN parsed
             # the name AND it round-trips to the input structure. A parsed-
             # but-MISMATCHED name is NEVER shipped, at any tier. task-JAR-ABSENT
@@ -4662,9 +4727,11 @@ class Orthonym:
                 cand = name_t4_complete(mol, None)
             if not cand or is_failure_name(cand):
                 return None
-            _permitted, _flagged = self._stereo_emit_decision(mol, cand)
+            _permitted, _flagged, _name_out = self._stereo_emit_decision(
+                mol, cand, smiles)
             if not _permitted:
                 return None
+            cand = _name_out          # adopt composed/as-is reclaim
             if self._disable_opsin_validity_gate:
                 return cand
             _smi = _validity_gate_name_to_smiles(cand)
@@ -4718,9 +4785,11 @@ class Orthonym:
             cand = inner.name(smiles)
             if not cand or is_failure_name(cand):
                 return None
-            _permitted, _flagged = self._stereo_emit_decision(mol, cand)
+            _permitted, _flagged, _name_out = self._stereo_emit_decision(
+                mol, cand, smiles)
             if not _permitted:
                 return None
+            cand = _name_out          # adopt composed/as-is reclaim
             if self._disable_opsin_validity_gate:
                 return cand
             smi = _validity_gate_name_to_smiles(cand)
@@ -4812,8 +4881,10 @@ class Orthonym:
                     if cand and not is_failure_name(cand):
                         # RT gate (load-bearing, 0-wrong) -- identical shape to
                         # the demote-senior-group rescue above.
-                        _permitted, _flagged = self._stereo_emit_decision(mol, cand)
+                        _permitted, _flagged, _name_out = self._stereo_emit_decision(
+                            mol, cand, smiles)
                         if _permitted:
+                            cand = _name_out          # adopt composed/as-is reclaim
                             smi = _validity_gate_name_to_smiles(cand)
                             if smi is not None and self._rt_match(smiles, smi, _flagged):
                                 return cand
@@ -4860,9 +4931,11 @@ class Orthonym:
             return None
         if not cand or is_failure_name(cand):
             return None
-        _permitted, _flagged = self._stereo_emit_decision(mol, cand)
+        _permitted, _flagged, _name_out = self._stereo_emit_decision(
+            mol, cand, smiles)
         if not _permitted:
             return None
+        cand = _name_out          # adopt composed/as-is reclaim
         if self._disable_opsin_validity_gate:
             return (cand, _flagged)  # test/internal mode
         smi = _validity_gate_name_to_smiles(cand)
@@ -6069,8 +6142,8 @@ class Orthonym:
                         # longer fail-opens -- see the task-JAR-ABSENT
                         # verify_or_none gate just before the emit below, which
                         # closed the a review 0-wrong hole here.)
-                        _permitted, _stereo_flagged = self._stereo_emit_decision(
-                            mol, _eng.name)
+                        _permitted, _stereo_flagged, _g1_name = self._stereo_emit_decision(
+                            mol, _eng.name, smiles)
                         if (_permitted and _stereo_flagged
                                 and not self._disable_opsin_validity_gate
                                 and _validity_gate_jar_present()):
@@ -6079,6 +6152,23 @@ class Orthonym:
                             if (_g1_opsin_smi is None
                                     or not self._rt_match(
                                         smiles, _g1_opsin_smi, True)):
+                                _permitted = False
+                        # Phase-1 reclaim: a COMPOSED name (_g1_name != _eng.name) is
+                        # UNFLAGGED and so skips the flagged-True block above. Unlike
+                        # the late-recovery ladder sites, this inline G1 lane has no
+                        # exact _rt_match(flagged=False) before the emit -- the
+                        # downstream _final_opsin_validity_gate is stereo-TOLERANT at
+                        # some tiers (the contributor guide live defect: BBR-GATE ships a name
+                        # whose stereo-stripped form parses). So verify a composed
+                        # reclaim EXACT-ISOMERIC inline before adopting. Scoped to
+                        # composed names only => every currently-passing emission
+                        # (fast-accept: _g1_name == _eng.name) stays byte-identical.
+                        if (_permitted and _g1_name != _eng.name
+                                and not self._disable_opsin_validity_gate
+                                and _validity_gate_jar_present()):
+                            _g1_c_smi = _validity_gate_name_to_smiles(_g1_name)
+                            if (_g1_c_smi is None
+                                    or not self._rt_match(smiles, _g1_c_smi, False)):
                                 _permitted = False
                         # task-JAR-ABSENT (a review 0-wrong hole, inline-G1
                         # sibling of the late-recovery ladder site above):
@@ -6109,7 +6199,7 @@ class Orthonym:
                                     name_facts=None) is None:
                                 _permitted = False
                         if not _no_jar_abstain and _permitted:
-                            name = _eng.name
+                            name = _g1_name          # adopt composed/as-is reclaim
                             #: observation-only provenance (the emission
                             # still flows through the normal downstream gates).
                             from .metrics.provenance import record_source, record_stereo_unexpressed
@@ -6978,6 +7068,7 @@ class Orthonym:
                         classify_heterocycle,
                         get_heterocycle_substituents,
                         orient_heterocycle_with_substituents,
+                        ring_principal_suffix_atoms,
                     )
 
                     features.heterocycle_info = classify_heterocycle(
@@ -7086,6 +7177,26 @@ class Orthonym:
                                                 and nbr.GetSymbol() != 'C'):
                                             pg_ring_atoms.add(atom_idx)
                                             break
+
+                    # (c) NUMBERING (the Blue Book): a principal
+                    # characteristic group expressed as a SUFFIX takes the lowest
+                    # locant BEFORE a detachable prefix (f). The same-prefix loop
+                    # above anchors only a CARBON-centred appended suffix, so it
+                    # MISSES two ring-suffix families whose suffix decision lives
+                    # in get_heterocycle_substituents: (A) the pseudoketone
+                    # -one/-dione/-thione ring carbons (principal group is a
+                    # lactam-declined amide / cyclic imide / lactone-declined
+                    # ester / thioamide, whose get_prefix is None) and (B) a ring
+                    # atom bearing an exocyclic SULFUR-oxoacid suffix (S is not a
+                    # carbon). Without these the (f) substituent set decided
+                    # and put the SUBSTITUTED ring atom at locant 1
+                    # (1-methylimidazolidine-2,5-dione, 1-methylpiperazine-4-
+                    # sulfonic acid). Feed the suffix atoms exactly as the carboxy
+                    # path does so (c) governs.
+                    pg_ring_atoms |= ring_principal_suffix_atoms(
+                        features.mol, features.principal_ring,
+                        features.principal_group, features.functional_groups
+                    )
 
                     # Orient considering heteroatoms, the principal group, then
                     # other substituents for lowest locants order).

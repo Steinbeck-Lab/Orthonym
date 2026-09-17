@@ -2515,6 +2515,106 @@ def _try_name_hydrazone_substitutive(features: Any) -> Optional[str]:
     return f"{ylidene}hydrazine"
 
 
+def _try_name_acylhydrazone(features: Any) -> Optional[str]:
+    """ +: an ACYLHYDRAZONE R'2C=N-NH-C(=O)-R ->
+    ``N'-({R'2C}ylidene){acyl}hydrazide`` (PIN).
+
+    Verbatim BB (PIN) example for exactly this class (the Blue Book-38962):
+        CH3-CO-NH-N=CH-N=N-C6H5
+        N'-[(phenyldiazenyl)methylidene]acetohydrazide (PIN)
+
+    The acyl group makes the hydrazide the SENIOR characteristic group
+    , carboxamide family), so the acyl-hydrazide is the parent and the
+    =CR'2 fragment is an 'ylidene' substituent on the terminal (former -NH2)
+    nitrogen, which carries the locant N' -- (the Blue Book): "the
+    locants 'N' for -NH- and 'N'' for -NH2". So R'2C=N-NH-CO-R is NOT named
+    as an 'ylidene'-hydrazine (the bare-hydrazone class, and
+    NOT as a functional-class hydrazone.
+
+    Mirrors ``_try_name_semicarbazone`` but the acyl carbon is bonded to a
+    CARBON (an acyl R), not the amide N of a carbamoyl -- that C/N split is
+    what separates an acylhydrazone (-> hydrazide parent) from a
+    semicarbazone (-> hydrazine-1-carboxamide parent).
+
+    Method: name the acyl-hydrazide parent by rebuilding the virtual hydrazide
+    R-C(=O)-NH-NH2 (delete the ylidene fragment; the imino N re-caps to -NH2)
+    and naming it recursively (-> 'acetohydrazide', 'benzohydrazide'); name the
+    =CR'2 fragment via the substituent pipeline (-> 'ethylidene', 'benzylidene')
+    and cite it at N'.
+
+    Fail-closed (returns None -> the caller's hydrazone fallbacks; the outer
+    OPSIN round-trip gate voids any composition that does not describe the
+    input): exactly one motif; the imino N carries only the =C and the -NH-;
+    the ylidene C's only external bond is the =N; and the recursive parent must
+    be a bare (unsubstituted) acid-derived hydrazide, so the sole detachable
+    substituent is the N'-ylidene we add (an N-substituent or a locanted acyl
+    prefix on the parent would need the ordering machinery not built
+    here)."""
+    from rdkit import Chem
+    from rdkit.Chem import RWMol
+    mol = features.mol
+    # R'2C=N-NH-C(=O)-[#6]: the acyl carbon is bonded to a carbon (an acyl R),
+    # which is what distinguishes this from the semicarbazone (acyl C on N).
+    patt = _compiled_smarts("[CX3]=[NX2][NX3H1][CX3](=[OX1])[#6]")
+    matches = mol.GetSubstructMatches(patt)
+    if len(matches) != 1:
+        return None
+    c, n2, n1, c_acyl, o, _r = matches[0]
+    # The imino N (n2) must carry ONLY the =C and the -NH- (degree 2): no branch
+    # that would make this a different (N-substituted imino) class.
+    if mol.GetAtomWithIdx(n2).GetDegree() != 2:
+        return None
+    # BFS the ylidene fragment from the sp2 C, never crossing the imino N.
+    frag = {c}
+    _stack = [c]
+    while _stack:
+        _i = _stack.pop()
+        for _nb in mol.GetAtomWithIdx(_i).GetNeighbors():
+            _j = _nb.GetIdx()
+            if _j != n2 and _j not in frag:
+                frag.add(_j)
+                _stack.append(_j)
+    # The ylidene C's only bond leaving the fragment must be the =N2 (double);
+    # and the fragment must not have wandered onto the acyl side via a ring.
+    c_atom = mol.GetAtomWithIdx(c)
+    _ext = [nb.GetIdx() for nb in c_atom.GetNeighbors() if nb.GetIdx() not in frag]
+    if _ext != [n2] or n1 in frag or c_acyl in frag:
+        return None
+    # Rebuild the virtual acyl-hydrazide R-C(=O)-NH-NH2: delete the ylidene
+    # fragment (its atoms), leaving the imino N (n2) to re-cap to -NH2 on
+    # sanitize. n2 keeps only its single bond to n1.
+    rw = RWMol(mol)
+    for aidx in sorted(frag, reverse=True):
+        rw.RemoveAtom(aidx)
+    try:
+        vhydr = rw.GetMol()
+        Chem.SanitizeMol(vhydr)
+        vsmiles = Chem.MolToSmiles(vhydr, canonical=True)
+    except Exception:
+        return None
+    from .fragment_naming import name_fragment_recursively
+    try:
+        parent = name_fragment_recursively(vsmiles)
+    except Exception:
+        return None
+    # The recursive parent must be a bare acid-derived hydrazide: all lowercase
+    # letters ending in 'hydrazide' (e.g. 'acetohydrazide', 'benzohydrazide',
+    # 'propanehydrazide'). A digit/hyphen/italic-N would signal a further
+    # substituent whose ordering against the N'-ylidene is not built
+    # here -> fail closed.
+    if not parent or not parent.endswith("hydrazide"):
+        return None
+    if not (parent.isalpha() and parent.islower()):
+        return None
+    from .naming_utils import is_complex_substituent
+    ylidene = _double_bonded_carbon_prefix(mol, frag, c)
+    if ylidene is None:
+        return None
+    if is_complex_substituent(ylidene):
+        ylidene = f"({ylidene})"
+    return f"N'-{ylidene}{parent}"
+
+
 def _urea_substituent_has_heteroatom_h(mol, n_indices, urea_core) -> bool:
     """True if any substituent hanging off these urea nitrogens carries a
     substitutable heteroatom-hydrogen (an N-H, O-H, or S-H).
@@ -8914,7 +9014,20 @@ def _render_prefix_without_locants(name: str, count: int) -> str:
     # enclosed at one level, so return it unchanged (idempotent).
     if _is_fully_enclosed(name):
         return _mult + name
-    if is_complex_substituent(name) or _has_stereo_prefix(name):
+    # A compound prefix that carries an INNER enclosing mark but no locant/hyphen
+    # (e.g. '(methylsulfanyl)oxy', 'cyclohexyl(methyl)amino') is still compound and
+    # still needs an OUTER escalating mark when its locant is elided -- /
+    #, BB 27914 '[(methylsulfanyl)oxy]ethane (PIN)'. ``is_complex_
+    # substituent`` misses it (no digit, no structural hyphen), so the unlocanted
+    # path dropped the outer bracket ('CCOSC -> (methylsulfanyl)oxyethane').
+    # The residual-inner-mark test is the third arm of ``enclose_if_compound``'s
+    # union: after the ``_is_fully_enclosed`` early return above, any remaining
+    # '([{' is a genuine inner mark (leading indicated-H/stereo/fusion all carry a
+    # digit and are already caught), and ``apply_enclosing_marks(depth=-1)`` ignores
+    # non-nesting brackets so the escalation is correct. The LOCANTED
+    # and NESTED citation paths enclose elsewhere, so this only newly fires here.
+    if (is_complex_substituent(name) or _has_stereo_prefix(name)
+            or any(_m in name for _m in '([{')):
         return _mult + apply_enclosing_marks(name, depth=-1)
     return _mult + name
 

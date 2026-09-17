@@ -50,13 +50,16 @@ def _mk(tier, *, disable_gate=True):
 
 def test_decision_dropped_stereo_by_tier():
     """A defined stereocentre + a stereo-free candidate name."""
-    mol = Chem.MolFromSmiles("C[C@H](O)CCC")  # (2R/S)-pentan-2-ol, real centre
-    cand = "pentan-2-ol"                        # constitution only, no descriptor
+    smi = "C[C@H](O)CCC"
+    mol = Chem.MolFromSmiles(smi)               # (2R/S)-pentan-2-ol, real centre
+    cand = "pentan-2-ol"                         # constitution only, no descriptor
     # 2026-08-31 accurate-or-abstain: EVERY tier fail-closes on un-completable
     # dropped stereo -- best-effort no longer ships stripped by default (a
-    # stereo-stripped name fails full-InChIKey round-trip; namer.py:4056-4067).
+    # stereo-stripped name fails full-InChIKey round-trip). Phase-1 reclaim: with
+    # the validity gate DISABLED (_mk default) the reclaim self-suppresses (STEP 2),
+    # so the decision still abstains here — a composed completion needs a live gate.
     for tier in ("pin", "valid", "complete", "best-effort"):
-        permitted, flagged = _mk(tier)._stereo_emit_decision(mol, cand)
+        permitted, flagged, _out = _mk(tier)._stereo_emit_decision(mol, cand, smi)
         assert permitted is False, tier
         assert flagged is False, tier
 
@@ -66,13 +69,14 @@ def test_decision_dropped_stereo_best_effort_strip_env(monkeypatch):
     ship-a-constitution-only-name-flagged behaviour (namer.py:4068-4072). The
     env only affects best-effort; the PIN tiers still fail-close."""
     monkeypatch.setenv("ORTHONYM_BE_STRIP_STEREO", "1")
-    mol = Chem.MolFromSmiles("C[C@H](O)CCC")
+    smi = "C[C@H](O)CCC"
+    mol = Chem.MolFromSmiles(smi)
     cand = "pentan-2-ol"
-    permitted, flagged = _mk("best-effort")._stereo_emit_decision(mol, cand)
+    permitted, flagged, _out = _mk("best-effort")._stereo_emit_decision(mol, cand, smi)
     assert permitted is True
     assert flagged is True
     for tier in ("pin", "valid", "complete"):
-        permitted, flagged = _mk(tier)._stereo_emit_decision(mol, cand)
+        permitted, flagged, _out = _mk(tier)._stereo_emit_decision(mol, cand, smi)
         assert permitted is False, tier
         assert flagged is False, tier
 
@@ -81,17 +85,18 @@ def test_decision_stereo_free_molecule_all_tiers():
     """No CIP stereo -> every tier ships, no flag (byte-identical behaviour)."""
     mol = Chem.MolFromSmiles("CCO")
     for tier in ("pin", "valid", "complete", "best-effort"):
-        permitted, flagged = _mk(tier)._stereo_emit_decision(mol, "ethanol")
+        permitted, flagged, _out = _mk(tier)._stereo_emit_decision(mol, "ethanol", "CCO")
         assert permitted is True, tier
         assert flagged is False, tier
 
 
 def test_decision_stereo_already_expressed_all_tiers():
     """When the name already carries the descriptor, no over-abstention."""
-    mol = Chem.MolFromSmiles("C[C@H](O)CCC")
+    smi = "C[C@H](O)CCC"
+    mol = Chem.MolFromSmiles(smi)
     cand = "(2R)-pentan-2-ol"  # Pattern-A prefix -> needs_stereo_injection False
     for tier in ("pin", "valid", "complete", "best-effort"):
-        permitted, flagged = _mk(tier)._stereo_emit_decision(mol, cand)
+        permitted, flagged, _out = _mk(tier)._stereo_emit_decision(mol, cand, smi)
         assert permitted is True, tier
         assert flagged is False, tier
 
@@ -181,33 +186,36 @@ def test_best_effort_stereo_free_not_flagged(monkeypatch):
     assert pv.get_provenance()["stereo_unexpressed"] is False
 
 
-def test_flagged_self01_constitution_matches_ships(monkeypatch):
-    """T6.3 (gate active): a flagged name whose CONSTITUTION round-trips ships,
-    marked opsin-verified. Under the 2026-08-31 default best-effort abstains at
-    ``_stereo_emit_decision`` BEFORE the constitution-granularity, so we
-    set ORTHONYM_BE_STRIP_STEREO=1 to actually reach the flagged-ship branch."""
+def test_live_jar_supersedes_strip_env_with_reclaim(monkeypatch):
+    """Phase-1 reclaim (spec): with a LIVE jar the ORTHONYM_BE_STRIP_STEREO
+    escape hatch no longer ships a flagged constitution-only name — it is confined
+    to the jar-dead path (``_stereo_emit_decision`` STEP 2). With the jar live the
+    reclaim governs, and a name whose dropped stereo cannot be verify-COMPOSED
+    against the input abstains (0-wrong). Here the mocked OPSIN strips stereo from
+    every name, so the composed name never recomputes to the input's full key ->
+    abstain (None). The POSITIVE reclaim path — where composition succeeds and ships
+    an UNFLAGGED completed name — is covered end-to-end in
+    tests/unit/rules/test_reclaim_stereo.py."""
     _patch_engine(monkeypatch)
     monkeypatch.setenv("ORTHONYM_BE_STRIP_STEREO", "1")
     import orthonym.namer as N
     from orthonym.metrics import provenance as pv
     monkeypatch.setattr(N, "_validity_gate_jar_present", lambda: True)
-    # OPSIN parses the constitution-only name to the right CONSTITUTION (no stereo)
+    # OPSIN parses every name to a stereo-STRIPPED SMILES, so no composition can
+    # recompute the input's stereo-bearing full key -> the reclaim abstains.
     monkeypatch.setattr(N, "_validity_gate_name_to_smiles", lambda name: "CCCC(C)O")
     pv.clear_provenance()
     be = _mk("best-effort", disable_gate=False)
     out = be._try_general_engine_recovery(_STEREO_SMI)
-    assert out == _CONSTITUTION_NAME
-    prov = pv.get_provenance()
-    assert prov["opsin"] == "verified"
-    assert prov["stereo_unexpressed"] is True
+    assert out is None  # BE_STRIP is superseded; unverifiable stereo -> abstain
 
 
 def test_flagged_self01_wrong_constitution_abstains(monkeypatch):
-    """T6.3 (gate active): a flagged name whose stereo-stripped parse is a
-    DIFFERENT constitution must fail-closed (never ship a wrong constitution).
-    Set ORTHONYM_BE_STRIP_STEREO=1 so best-effort actually SHIPS the flagged
-    name into ``_rt_match`` -- otherwise it abstains earlier at the stereo
-    decision and this would pass for the wrong reason (green-but-blind)."""
+    """T6.3 (gate active): a name whose OPSIN parse is a DIFFERENT constitution must
+    fail-closed (never ship a wrong constitution). Phase-1: with a live jar this now
+    abstains at the reclaim STEP 3 constitution precheck (skeleton InChIKey unequal),
+    BEFORE any composition — a strictly stronger guard than the old flagged
+    ``_rt_match`` path. BE_STRIP is set but inert here (live jar supersedes it)."""
     _patch_engine(monkeypatch)
     monkeypatch.setenv("ORTHONYM_BE_STRIP_STEREO", "1")
     import orthonym.namer as N

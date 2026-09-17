@@ -527,6 +527,13 @@ RETAINED_NAMES = {
     "O=S=O": "sulfur dioxide",
     "N#N": "dinitrogen",
     "O=O": "dioxygen",
+    # Task M1 (v51): O2 written as a diradical (`[O][O]`) is a DISTINCT
+    # RDKit-canonical SMILES from `O=O` (same InChIKey MYMOFIZGZYHOMD), so the
+    # exact-SMILES lookup above missed it and it abstained ("inorganic compound
+    # (not supported)"). OPSIN parses `dioxygen` -> O=O (identical skeleton),
+    # so this diradical spelling round-trips too. Root cause: the table carried
+    # only one of the two canonical spellings of the same molecule.
+    "[O][O]": "dioxygen",
 
     # === INORGANIC ACIDS (a phase fix) ===
     "O=[N+]([O-])O": "nitric acid",

@@ -244,7 +244,12 @@ def test_carbonyl_dicyanide_retained_pin(_validity_gate_on):
 
 @pytest.mark.unit
 @pytest.mark.parametrize("smiles,expected", [
-    ("CCOSC", "(methylsulfanyl)oxyethane"),
+    # /: the compound '(methylsulfanyl)oxy' prefix already
+    # carries parentheses, so its citation mark escalates to brackets even when
+    # the single-substituent locant '1' is omitted -- BB 27914
+    # '[(methylsulfanyl)oxy]ethane (PIN)'. The bare '(methylsulfanyl)oxyethane'
+    # was a dropped-outer-bracket defect on the unlocanted citation path.
+    ("CCOSC", "[(methylsulfanyl)oxy]ethane"),
     # (item 2): COSC now names via the (methoxysulfanyl) parent (both the
     # old and new spellings round-trip to the same structure; RT-verified
     # 2026-09-04, ITEM2-VERIFICATION.md).

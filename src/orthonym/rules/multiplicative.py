@@ -666,6 +666,143 @@ def _try_acyclic_nitrilo_bridge(mol) -> Optional[str]:
     return None
 
 
+def _try_diamine_dinitrilo_bridge(mol) -> Optional[str]:
+    """Two trivalent-N hubs joined by an unbranched alkanediyl chain, each hub
+    bearing two identical acyclic functional-parent arms (EDTA family).
+
+    The composite central group is ``{alkane}-1,m-diyldinitrilo``; the four
+    identical arms are the multiplied parent:
+
+        EDTA OC(=O)CN(CC(=O)O)CCN(CC(=O)O)CC(=O)O ->
+            2,2',2'',2'''-(ethane-1,2-diyldinitrilo)tetraacetic acid
+        PDTA OC(=O)CN(CC(=O)O)CCCN(CC(=O)O)CC(=O)O ->
+            2,2',2'',2'''-(propane-1,3-diyldinitrilo)tetraacetic acid
+
+    This is the four-fold multiplicative name, and is the PIN by DERIVATION:
+     (the Blue Book) makes multiplicative nomenclature senior to
+    substitutive for repeated senior parents; (the Blue Book)
+    multiplies the MORE numerous parent (four acetic-acid units, not two
+    glycine units), and its own worked example (the Blue Book) is EDTA.
+    Note: the BB gives this name as its worked example but attaches NO explicit
+    (PIN) tag in any of its four occurrences (:7669/:21586/:29809/:29970), and
+    always pairs it with the glycine-based ``N,N'-(ethane-1,2-diyl)bis[N-
+    (carboxymethyl)glycine]``. So the PIN status here is DERIVED from the two
+    rules above, not read from a verbatim (PIN)-tagged string.
+
+    Fail-closed (never a wrong name): exactly two bare uncharged non-ring N
+    atoms, each with three acyclic-carbon neighbours; the two N are linked by a
+    single unbranched all-CH2 chain (m>=1) attached at its two TERMINI; the two
+    remaining arms on each N all resolve to the SAME (parent, locant) via the
+    strict linear-arm namer (acid/ol only -- amine arms decline, the
+    polyamine-parent trap of; and the whole molecule is exactly
+    {2 N + chain + 4 arms}. Anything else -> None.
+    """
+    ring_atoms = set()
+    for ring in mol.GetRingInfo().AtomRings():
+        ring_atoms.update(ring)
+
+    # Exactly two trivalent-N hubs (bare, uncharged, non-ring, 3 carbon arms).
+    hubs = []
+    for atom in atoms_of(mol):
+        if atom.GetSymbol() != 'N' or atom.GetTotalNumHs() != 0:
+            continue
+        if atom.GetIdx() in ring_atoms or atom.GetFormalCharge() != 0:
+            continue
+        heavy_nbrs = [n for n in atom.GetNeighbors() if n.GetAtomicNum() > 1]
+        if len(heavy_nbrs) != 3:
+            continue
+        if any(n.GetIdx() in ring_atoms or n.GetSymbol() != 'C'
+               for n in heavy_nbrs):
+            continue
+        hubs.append(atom.GetIdx())
+    if len(hubs) != 2:
+        return None
+    n1, n2 = hubs
+
+    # The connecting chain is the shortest path between the two hubs; the arms
+    # are dead-ends, so this path IS the alkanediyl bridge.
+    path = list(Chem.GetShortestPath(mol, n1, n2))
+    if len(path) < 3 or path[0] != n1 or path[-1] != n2:
+        return None
+    chain = path[1:-1]  # intermediate carbons only
+    m = len(chain)
+    if m < 1:
+        return None
+
+    # Every chain atom is a plain -CH2- link: carbon, non-ring, uncharged, and
+    # carrying NO heavy substituent off the chain (only its path neighbours).
+    path_set = set(path)
+    for i, c in enumerate(chain):
+        catom = mol.GetAtomWithIdx(c)
+        if catom.GetSymbol() != 'C' or catom.IsInRing():
+            return None
+        if catom.GetFormalCharge() != 0 or catom.GetNumRadicalElectrons() != 0:
+            return None
+        heavy = [nb.GetIdx() for nb in catom.GetNeighbors()
+                 if nb.GetAtomicNum() > 1]
+        # Each chain carbon touches only its two path neighbours (the N hubs at
+        # the ends, adjacent chain carbons in the middle) -- no branch.
+        if any(h not in path_set for h in heavy):
+            return None
+        if len(heavy) != 2:
+            return None
+
+    # The two arms on each hub (its neighbours not on the connecting path).
+    arm_carbons = []
+    for hub in (n1, n2):
+        exo = [nb.GetIdx() for nb in mol.GetAtomWithIdx(hub).GetNeighbors()
+               if nb.GetAtomicNum() > 1 and nb.GetIdx() not in path_set]
+        if len(exo) != 2:
+            return None
+        arm_carbons.extend((hub, ac) for ac in exo)
+    if len(arm_carbons) != 4:
+        return None
+
+    # All four arms must resolve to the SAME (parent, locant). Amine arms
+    # never allowed (polyamine-parent trap, -- allow_amine=False.
+    resolved = [
+        _acyclic_arm_parent_and_locant(mol, ac, hub, allow_amine=False)
+        for hub, ac in arm_carbons
+    ]
+    if resolved[0] is None or any(r != resolved[0] for r in resolved[1:]):
+        return None
+    parent_name, attach_locant = resolved[0]
+
+    # Whole-molecule coverage: {2 N + chain + 4 arms} == every heavy atom, so
+    # no atom is silently dropped by the name.
+    covered = {n1, n2} | set(chain)
+    for hub, ac in arm_carbons:
+        stack = [ac]
+        while stack:
+            a = stack.pop()
+            if a in covered or a == hub:
+                continue
+            covered.add(a)
+            for nb in mol.GetAtomWithIdx(a).GetNeighbors():
+                ni = nb.GetIdx()
+                if nb.GetAtomicNum() > 1 and ni not in covered and ni != hub:
+                    stack.append(ni)
+    heavy_all = {a.GetIdx() for a in atoms_of(mol) if a.GetAtomicNum() > 1}
+    if covered != heavy_all:
+        return None
+
+    # Compose the composite central group name. The two hubs sit on the two
+    # termini of the m-carbon chain, so the alkanediyl locants are the lowest
+    # set {1, m}: ethane-1,2-diyl, propane-1,3-diyl, butane-1,4-diyl.
+    stem = get_chain_prefix(m)
+    if stem is None:
+        return None
+    if m == 1:
+        # >N-CH2-N< is 'methylenedinitrilo' (the Blue Book), not an
+        # 'ane-1,1-diyl' form -- out of this handler's scope; fail closed.
+        return None
+    bridge_name = f"{stem}ane-1,{m}-diyldinitrilo"
+
+    return _assemble_multiplicative_name(
+        attach_locant, bridge_name, parent_name, unit_count=4
+    )
+
+
 def _group14_hydride_unit_name(canon_smiles: str) -> Optional[str]:
     """Name a FREE homonuclear Group-14 catenated hydride unit:
     [SiH3][SiH3] -> 'disilane'. Fail-closed: one element from Si/Ge/Sn/Pb,
@@ -726,6 +863,18 @@ _G14_MONONUCLEAR_HYDRIDE_PARENTS = frozenset(
     mp + stem
     for stem in _G14_HYDRIDE_STEMS.values()
     for mp in _METHYL_UNIT_PREFIXES
+)
+
+# v50 A4 / (a) Note, the Blue Book): a MONONUCLEAR Group-15
+# (pnictogen) hydride cited as a multiplicative parent unit ('phosphane',
+# 'arsane',...) likewise takes bis/tris, NOT di/tri — 'diphosphane'/'triphosphane'
+# already name the CATENATED hydrides (H2P-PH2, H2P-PH-PH2), so the complex prefix
+# is mandatory: (butane-1,2,4-triyl)tris(phosphane) (PIN, the Blue Book),
+# (1,2-phenylene)bis(arsane) (PIN, the Blue Book).
+_PNICTOGEN_HYDRIDE_STEMS = {'P': 'phosphane', 'As': 'arsane',
+                            'Sb': 'stibane', 'Bi': 'bismuthane'}
+_PNICTOGEN_MONONUCLEAR_HYDRIDE_PARENTS = frozenset(
+    _PNICTOGEN_HYDRIDE_STEMS.values()
 )
 
 
@@ -1595,6 +1744,196 @@ def _try_central_arene_group14_arms(mol) -> Optional[str]:
     return f"({central}){multiplier}({unit_name})"
 
 
+def _pnictogen_mononuclear_hydride_unit(mol, x_idx: int, attach_idx: int):
+    """Name a BARE mononuclear Group-15 (pnictogen) hydride substituent unit
+    attached to a central multiplicative group at ``attach_idx``
+    ; the Blue Book verbatim):
+
+        -PH2 -> ("phosphane", {P})
+        -AsH2 -> ("arsane", {As})
+
+    Returns ``(unit_name, unit_atom_idxs)`` or ``None`` (fail closed) for a
+    catenated hydride (P-P), any organyl substituent (dimethylphosphane is out
+    of this bare scope), a charge / radical, a non-standard valence, a
+    non-single attachment bond, or a ring atom. Tight by design so the handler
+    only fires for the whole-molecule {central skeleton + bare pnictogen units}
+    shape the BB cites as the multiplicative PIN.
+    """
+    x = mol.GetAtomWithIdx(x_idx)
+    stem = _PNICTOGEN_HYDRIDE_STEMS.get(x.GetSymbol())
+    if stem is None:
+        return None
+    if (x.GetFormalCharge() != 0 or x.GetNumRadicalElectrons() != 0
+            or x.IsInRing() or x.GetTotalValence() != 3):
+        return None  # standard trivalent pnictogen only (no lambda-5)
+    bond = mol.GetBondBetweenAtoms(x_idx, attach_idx)
+    if bond is None or bond.GetBondType() != Chem.BondType.SINGLE:
+        return None
+    heavy = [nb.GetIdx() for nb in x.GetNeighbors() if nb.GetAtomicNum() > 1]
+    if heavy != [attach_idx]:
+        return None  # bare -XH2: the ONLY heavy neighbour is the attachment
+    if x.GetTotalNumHs() != 2:
+        return None  # attach(1) + H(2) fills the trivalent valence
+    return stem, {x_idx}
+
+
+def _try_pnictogen_hydride_substituted_chain(mol) -> Optional[str]:
+    """A saturated carbon CHAIN central group bearing >=2 IDENTICAL bare
+    mononuclear pnictogen hydride units on DISTINCT carbons
+     / (b); the Blue Book verbatim)::
+
+        PCCC(P)CP -> (butane-1,2,4-triyl)tris(phosphane)
+
+    A carbon-only chain cannot be a multiplied parent (b)), so it is
+    the central group and the phosphanes are the identical parents. Pnictogen
+    sibling of ``_try_group14_hydride_substituted_chain``; fail closed unless:
+    one acyclic fragment; every P/As/Sb/Bi is a clean bare mononuclear unit
+    (``_pnictogen_mononuclear_hydride_unit``); >=2 units, all identically named,
+    on distinct carbons; the non-unit heavy atoms are all carbon forming a
+    single unbranched chain; chain + units cover every heavy atom.
+    """
+    if mol is None or len(Chem.GetMolFrags(mol)) != 1:
+        return None
+    if mol.GetRingInfo().NumRings() != 0:
+        return None
+
+    _PN = set(_PNICTOGEN_HYDRIDE_STEMS)
+    unit_atoms_all: set = set()
+    units: List[Tuple[str, int]] = []  # (unit_name, attach_carbon_idx)
+    for atom in atoms_of(mol):
+        if atom.GetSymbol() not in _PN:
+            continue
+        heavy = [nb for nb in atom.GetNeighbors() if nb.GetAtomicNum() > 1]
+        if len(heavy) != 1 or heavy[0].GetSymbol() != 'C':
+            return None
+        res = _pnictogen_mononuclear_hydride_unit(mol, atom.GetIdx(),
+                                                  heavy[0].GetIdx())
+        if res is None:
+            return None
+        unit_name, uatoms = res
+        units.append((unit_name, heavy[0].GetIdx()))
+        unit_atoms_all |= uatoms
+
+    if len(units) < 2 or len({u for u, _ in units}) != 1:
+        return None
+    unit_name = units[0][0]
+    attach_carbons = [c for _, c in units]
+    if len(set(attach_carbons)) != len(attach_carbons):
+        return None  # two units on one carbon -> out of scope
+
+    heavy = {a.GetIdx() for a in atoms_of(mol) if a.GetAtomicNum() > 1}
+    central = heavy - unit_atoms_all
+    if not central or any(mol.GetAtomWithIdx(i).GetSymbol() != 'C'
+                          for i in central):
+        return None  # central skeleton must be all-carbon
+    if set(attach_carbons) - central:
+        return None
+
+    # the central carbons must form a single unbranched chain (a simple path)
+    ends: List[int] = []
+    adj: Dict[int, List[int]] = {}
+    for i in central:
+        nbrs = [nb.GetIdx() for nb in mol.GetAtomWithIdx(i).GetNeighbors()
+                if nb.GetIdx() in central]
+        if len(nbrs) > 2:
+            return None  # branched central skeleton -> out of tight scope
+        adj[i] = nbrs
+        if len(nbrs) <= 1:
+            ends.append(i)
+    if len(central) < 2 or len(ends) != 2:
+        return None
+
+    order = [ends[0]]
+    prev, cur = None, ends[0]
+    while True:
+        nxt = [j for j in adj[cur] if j != prev]
+        if not nxt:
+            break
+        if len(nxt) != 1:
+            return None
+        prev, cur = cur, nxt[0]
+        order.append(cur)
+    if len(order) != len(central):
+        return None  # disconnected central skeleton
+
+    locs = _lowest_chain_attach_locants(order, set(attach_carbons))
+    if len(locs) != len(units):
+        return None
+    stem = get_chain_prefix(len(order))
+    yl = SIMPLE_MULTIPLIERS.get(len(units))
+    multiplier = _select_multiplier(unit_name, len(units))
+    if stem is None or yl is None or multiplier is None:
+        return None
+    central_name = f"{stem}ane-{','.join(str(x) for x in locs)}-{yl}yl"
+    return f"({central_name}){multiplier}({unit_name})"
+
+
+def _try_central_arene_pnictogen_arms(mol) -> Optional[str]:
+    """A bare benzene central group bearing >=2 IDENTICAL bare mononuclear
+    pnictogen hydride units; the Blue Book verbatim)::
+
+        [AsH2]c1ccccc1[AsH2] -> (1,2-phenylene)bis(arsane)
+
+    The single benzene ring is the central multiplicative group; the pnictogen
+    hydrides are the identical parents. Pnictogen sibling of
+    ``_try_central_arene_group14_arms``; fail closed unless: exactly one
+    6-membered all-carbon aromatic ring; >=2 ring carbons each bearing a clean
+    bare mononuclear pnictogen unit; all units identically named; ring + units
+    cover every heavy atom.
+    """
+    if mol is None:
+        return None
+    ring_info = mol.GetRingInfo()
+    if ring_info.NumRings() != 1:
+        return None
+    from ..perception.rings import get_ring_systems
+    systems = get_ring_systems(mol)
+    if len(systems) != 1 or len(systems[0]) != 6:
+        return None
+    ring_atoms = set(systems[0])
+    for a in ring_atoms:
+        atom = mol.GetAtomWithIdx(a)
+        if atom.GetSymbol() != 'C' or not atom.GetIsAromatic():
+            return None
+    ring_cyclic = list(ring_info.AtomRings()[0])
+    if set(ring_cyclic) != ring_atoms:
+        return None
+
+    attach_ring_atoms: set = set()
+    unit_atoms_all: set = set()
+    unit_names: set = set()
+    for ra in ring_atoms:
+        exo = [nb.GetIdx() for nb in mol.GetAtomWithIdx(ra).GetNeighbors()
+               if nb.GetIdx() not in ring_atoms and nb.GetAtomicNum() > 1]
+        if not exo:
+            continue
+        if len(exo) > 1:
+            return None
+        res = _pnictogen_mononuclear_hydride_unit(mol, exo[0], ra)
+        if res is None:
+            return None
+        unit_name, uatoms = res
+        attach_ring_atoms.add(ra)
+        unit_atoms_all |= uatoms
+        unit_names.add(unit_name)
+
+    if len(attach_ring_atoms) < 2 or len(unit_names) != 1:
+        return None
+    unit_name = next(iter(unit_names))
+
+    heavy = {a.GetIdx() for a in atoms_of(mol) if a.GetAtomicNum() > 1}
+    if (ring_atoms | unit_atoms_all) != heavy:
+        return None
+
+    central = _central_arene_substituent_name(ring_cyclic, attach_ring_atoms)
+    if central is None:
+        return None
+    multiplier = _select_multiplier(unit_name, len(attach_ring_atoms))
+    if multiplier is None:
+        return None
+    return f"({central}){multiplier}({unit_name})"
+
+
 def name_multiplicative(mol) -> Optional[str]:
     """Detect and name multiplicative nomenclature cases.
 
@@ -1625,6 +1964,13 @@ def name_multiplicative(mol) -> Optional[str]:
     # Trivalent-N star over acyclic arms (Wave2 T5a):
     # NTA -> 2,2',2''-nitrilotriacetic acid.
     result = _try_acyclic_nitrilo_bridge(mol)
+    if result is not None:
+        return result
+
+    # Two trivalent-N hubs joined by an alkanediyl chain, each with two
+    # identical acyclic arms (EDTA family; /:
+    # EDTA -> 2,2',2'',2'''-(ethane-1,2-diyldinitrilo)tetraacetic acid.
+    result = _try_diamine_dinitrilo_bridge(mol)
     if result is not None:
         return result
 
@@ -1665,6 +2011,19 @@ def name_multiplicative(mol) -> Optional[str]:
     # (silane). Runs before the >=2-ring gate (benzene is a single ring acting
     # as the central multiplicative group, not a parent).
     result = _try_central_arene_group14_arms(mol)
+    if result is not None:
+        return result
+
+    # v50 A4: pnictogen siblings of the two Group-14 handlers above
+    #: a carbon-chain central group bearing >=2 bare phosphane/
+    # arsane units -> (butane-1,2,4-triyl)tris(phosphane); a benzene central
+    # group bearing >=2 bare units -> (1,2-phenylene)bis(arsane). Both run
+    # before the >=2-ring gate (the central group is acyclic / a single ring).
+    result = _try_pnictogen_hydride_substituted_chain(mol)
+    if result is not None:
+        return result
+
+    result = _try_central_arene_pnictogen_arms(mol)
     if result is not None:
         return result
 
@@ -1841,6 +2200,18 @@ def _try_single_atom_bridges(mol, ring_atoms: set) -> Optional[str]:
         # '1,1'-carbonyldibenzene'. Units bearing a senior PCG (the
         # 4,4'-carbonyldibenzoic acid rings) keep the multiplicative name —
         # there the bridge C=O is correctly a mere bridge.
+        #
+        # NOTE (v50 A4, BLOCKED): also makes a =S/=O over two BARE
+        # HETEROARENES the thione/ketone parent — 'di(1H-imidazol-1-yl)-
+        # methanethione' (the Blue Book), not '1,1'-carbonothioylbis(1H-imidazole)'.
+        # Broadening this guard to `_canon_unit_is_bare_ring(canon_a)` correctly
+        # DECLINES, but the substitutive builder cannot place an N-attached
+        # azolyl on the methanethione parent (it perceives an N-C(=S)-N
+        # thiourea) and ABSTAINS — trading a valid non-PIN name for silence.
+        # Blocked until that producer gap is closed; the multiplicative name is
+        # retained (RIGHT_MOL_NONPIN, round-trips correct). C-attached bare
+        # rings (diphenyl / di-C-pyridyl / di-C-imidazolyl) already reach the
+        # substitutive ketone/thione namer, so no assembly-layer change helps.
         if (bridge_type in ('carbonyl', 'carbonothioyl')
                 and _all_fragments_are_simple_carbocycles(
                     mol, idx, extra_remove=extra_remove)):
@@ -3144,6 +3515,12 @@ def _select_multiplier(parent_name: str, unit_count: int) -> Optional[str]:
     if parent_name in _G14_MONONUCLEAR_HYDRIDE_PARENTS:
         return COMPLEX_MULTIPLIERS.get(unit_count)
 
+    # v50 A4 (a) Note): the Group-15 pnictogen mononuclear hydride
+    # parents ('phosphane'/'arsane'/...) take bis/tris to avoid the catenated
+    # 'diphosphane'/'triphosphane' ambiguity.
+    if parent_name in _PNICTOGEN_MONONUCLEAR_HYDRIDE_PARENTS:
+        return COMPLEX_MULTIPLIERS.get(unit_count)
+
     # default for clean parent names.
     return SIMPLE_MULTIPLIERS.get(unit_count)
 
@@ -3210,6 +3587,41 @@ def _insert_ring_pg_locant(parent_name: str, locant: int = 1) -> Optional[str]:
     return None
 
 
+# (c): skeletal replacement ('a') prefixes. A multiplied unit whose
+# name BEGINS with one of these + 'cyclo...' (a single-heteroatom replacement
+# monocycle, e.g. 'azacyclododecane') must take 'bis'/'tris' with enclosing
+# marks and carry its heteroatom locant '1-', because 'di<a>...' would read as a
+# replacement-atom count: the Blue Book "bis(azacyclododecane)... whereas the name
+# diazacyclododecane describes a cyclododecane ring with two nitrogen atoms".
+_A_REPLACEMENT_PREFIXES = (
+    "oxa", "thia", "selena", "tellura", "aza", "phospha", "arsa", "stiba",
+    "bisma", "sila", "germa", "stanna", "plumba", "bora", "alumina", "galla",
+    "inda", "thalla",
+)
+
+
+def _normalize_replacement_monocycle_unit(parent_name: str) -> str:
+    """(c): give a single-'a'-prefix replacement monocycle unit its
+    heteroatom locant ('azacyclododecane' -> '1-azacyclododecane').
+
+    A unit name that starts with exactly one skeletal replacement prefix
+    immediately followed by 'cyclo' and carries NO locant of its own denotes a
+    single heteroatom, which IUPAC numbers as position 1 (lowest locant).
+    Prefixing '1-' makes the leading-digit test in ``_select_multiplier`` /
+    ``_assemble_multiplicative_name`` route it to 'bis'/'tris' + parentheses.
+    Any other name (already locanted, multiplied 'di<a>...', non-cyclo) is
+    returned unchanged.
+    """
+    import re
+
+    if re.match(r"^\d", parent_name):
+        return parent_name  # already carries a leading locant
+    for pref in _A_REPLACEMENT_PREFIXES:
+        if parent_name.startswith(pref + "cyclo"):
+            return f"1-{parent_name}"
+    return parent_name
+
+
 def _assemble_multiplicative_name(
     locant: Optional[int], bridge_name: str, parent_name: str, unit_count: int = 2
 ) -> Optional[str]:
@@ -3242,6 +3654,11 @@ def _assemble_multiplicative_name(
         saturation prefix that would produce unparseable multiplier+prefix
         output OR the multiplier table has no entry for unit_count.
     """
+    # (c): a single-'a'-prefix replacement monocycle unit
+    # ('azacyclododecane') gets its heteroatom locant so the leading-digit
+    # tests below route it to 'bis'/'tris' + parentheses ('1-azacyclododecane').
+    parent_name = _normalize_replacement_monocycle_unit(parent_name)
+
     # Check for saturation/modification prefixes in the parent name
     # that would produce unparseable "di+prefix" concatenation
     parent_lower = parent_name.lower()

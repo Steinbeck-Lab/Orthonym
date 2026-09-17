@@ -51,10 +51,14 @@ METAL_NAMES: Dict[str, Dict[str, Optional[str]]] = {
     'K':  {'direct': 'potassium', 'hydride_parent': None, 'naming_system': 'metal_direct'},
     'Rb': {'direct': 'rubidium',  'hydride_parent': None, 'naming_system': 'metal_direct'},
     'Cs': {'direct': 'caesium',   'hydride_parent': None, 'naming_system': 'metal_direct'},
+    'Fr': {'direct': 'francium',  'hydride_parent': None, 'naming_system': 'metal_direct'},
     # Group 2 alkaline earths (metal-direct; +2)
     'Be': {'direct': 'beryllium', 'hydride_parent': None, 'naming_system': 'metal_direct'},
     'Mg': {'direct': 'magnesium', 'hydride_parent': None, 'naming_system': 'metal_direct'},
     'Ca': {'direct': 'calcium',   'hydride_parent': None, 'naming_system': 'metal_direct'},
+    'Sr': {'direct': 'strontium', 'hydride_parent': None, 'naming_system': 'metal_direct'},
+    'Ba': {'direct': 'barium',    'hydride_parent': None, 'naming_system': 'metal_direct'},
+    'Ra': {'direct': 'radium',    'hydride_parent': None, 'naming_system': 'metal_direct'},
     # Group 13 (metal-direct except B which uses hydride-parent 'borane')
     'B':  {'direct': 'boron',     'hydride_parent': 'borane',    'naming_system': 'hydride_parent'},
     'Al': {'direct': 'aluminum',  'hydride_parent': None, 'naming_system': 'metal_direct'},
@@ -90,6 +94,45 @@ METAL_NAMES: Dict[str, Dict[str, Optional[str]]] = {
     'Ti': {'direct': 'titanium',   'hydride_parent': None, 'naming_system': 'metal_direct'},
     'Zr': {'direct': 'zirconium',  'hydride_parent': None, 'naming_system': 'metal_direct'},
     'Hf': {'direct': 'hafnium',    'hydride_parent': None, 'naming_system': 'metal_direct'},
+    # Task M1 (v51): Group 3 + lanthanides + actinides (metal-direct). These are
+    # BEST-EFFORT σ-organometallic parents, no PIN derivation); every
+    # `methyl<metal>` was verified to OPSIN-`-r` round-trip to `C[<sym>]`, and
+    # any emission is round-trip-gated downstream, so a metal whose alkyl does
+    # not round-trip simply abstains. Group 3 (Sc/Y/La/Ac):
+    'Sc': {'direct': 'scandium',   'hydride_parent': None, 'naming_system': 'metal_direct'},
+    'Y':  {'direct': 'yttrium',    'hydride_parent': None, 'naming_system': 'metal_direct'},
+    'La': {'direct': 'lanthanum',  'hydride_parent': None, 'naming_system': 'metal_direct'},
+    'Ac': {'direct': 'actinium',   'hydride_parent': None, 'naming_system': 'metal_direct'},
+    # Lanthanides (Ce..Lu):
+    'Ce': {'direct': 'cerium',       'hydride_parent': None, 'naming_system': 'metal_direct'},
+    'Pr': {'direct': 'praseodymium', 'hydride_parent': None, 'naming_system': 'metal_direct'},
+    'Nd': {'direct': 'neodymium',    'hydride_parent': None, 'naming_system': 'metal_direct'},
+    'Pm': {'direct': 'promethium',   'hydride_parent': None, 'naming_system': 'metal_direct'},
+    'Sm': {'direct': 'samarium',     'hydride_parent': None, 'naming_system': 'metal_direct'},
+    'Eu': {'direct': 'europium',     'hydride_parent': None, 'naming_system': 'metal_direct'},
+    'Gd': {'direct': 'gadolinium',   'hydride_parent': None, 'naming_system': 'metal_direct'},
+    'Tb': {'direct': 'terbium',      'hydride_parent': None, 'naming_system': 'metal_direct'},
+    'Dy': {'direct': 'dysprosium',   'hydride_parent': None, 'naming_system': 'metal_direct'},
+    'Ho': {'direct': 'holmium',      'hydride_parent': None, 'naming_system': 'metal_direct'},
+    'Er': {'direct': 'erbium',       'hydride_parent': None, 'naming_system': 'metal_direct'},
+    'Tm': {'direct': 'thulium',      'hydride_parent': None, 'naming_system': 'metal_direct'},
+    'Yb': {'direct': 'ytterbium',    'hydride_parent': None, 'naming_system': 'metal_direct'},
+    'Lu': {'direct': 'lutetium',     'hydride_parent': None, 'naming_system': 'metal_direct'},
+    # Actinides (Th..Lr):
+    'Th': {'direct': 'thorium',      'hydride_parent': None, 'naming_system': 'metal_direct'},
+    'Pa': {'direct': 'protactinium', 'hydride_parent': None, 'naming_system': 'metal_direct'},
+    'U':  {'direct': 'uranium',      'hydride_parent': None, 'naming_system': 'metal_direct'},
+    'Np': {'direct': 'neptunium',    'hydride_parent': None, 'naming_system': 'metal_direct'},
+    'Pu': {'direct': 'plutonium',    'hydride_parent': None, 'naming_system': 'metal_direct'},
+    'Am': {'direct': 'americium',    'hydride_parent': None, 'naming_system': 'metal_direct'},
+    'Cm': {'direct': 'curium',       'hydride_parent': None, 'naming_system': 'metal_direct'},
+    'Bk': {'direct': 'berkelium',    'hydride_parent': None, 'naming_system': 'metal_direct'},
+    'Cf': {'direct': 'californium',  'hydride_parent': None, 'naming_system': 'metal_direct'},
+    'Es': {'direct': 'einsteinium',  'hydride_parent': None, 'naming_system': 'metal_direct'},
+    'Fm': {'direct': 'fermium',      'hydride_parent': None, 'naming_system': 'metal_direct'},
+    'Md': {'direct': 'mendelevium',  'hydride_parent': None, 'naming_system': 'metal_direct'},
+    'No': {'direct': 'nobelium',     'hydride_parent': None, 'naming_system': 'metal_direct'},
+    'Lr': {'direct': 'lawrencium',   'hydride_parent': None, 'naming_system': 'metal_direct'},
 }
 
 

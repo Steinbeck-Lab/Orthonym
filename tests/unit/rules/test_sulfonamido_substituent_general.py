@@ -144,10 +144,14 @@ def test_helper_acidnamer_drop_R_fails_closed():
     assert sulfonamido_prefix_from_n_branch(m, n_idx, frag, benz) is None
 
 
-def test_helper_unnameable_hetarene_fails_closed():
-    # pyridine-3-sulfonyl: the acid namer returns `unknown organic compound` (not a clean
-    # `... sulfonic acid`), so the stem builder fails closed -> None. No wrong/atom-dropped
-    # emission for an R the engine cannot honestly name.
+def test_helper_hetarene_now_names_after_v51_r2():
+    # v51 R2, Table 6.2): the acid namer used to return `unknown organic
+    # compound` for `pyridine-3-sulfonic acid`, so this stem builder failed closed
+    # (-> None). R2 wired the sulfonic-acid suffix onto a heterocyclic ring parent,
+    # so `pyridine-3-sulfonic acid` now names and the helper correctly builds the
+    # `pyridine-3-sulfonamido` prefix. change-asserted-value: the new value is
+    # OPSIN-verified below to describe the exact frag (no atom drop / wrong
+    # constitution), so this is a capability gain, not a stale relaxation.
     m = Chem.MolFromSmiles("O=S(=O)(Nc1ccccc1)c2cccnc2")  # -NH-SO2-(pyridin-3-yl)
     n_idx = next(a.GetIdx() for a in m.GetAtoms() if a.GetSymbol() == 'N'
                  and any(nb.GetSymbol() == 'S' for nb in a.GetNeighbors()))
@@ -157,7 +161,15 @@ def test_helper_unnameable_hetarene_fails_closed():
                 and all(m.GetAtomWithIdx(i).GetSymbol() == 'C' for i in r)
                 and any(nb.GetIdx() in r for nb in m.GetAtomWithIdx(n_idx).GetNeighbors()))
     frag = set(range(m.GetNumAtoms())) - benz
-    assert sulfonamido_prefix_from_n_branch(m, n_idx, frag, benz) is None
+    prefix = sulfonamido_prefix_from_n_branch(m, n_idx, frag, benz)
+    assert prefix == "pyridine-3-sulfonamido"
+    # Independent check (OPSIN, not the code under test): the prefix on benzene
+    # parses back to the exact input structure (0-wrong).
+    from rdkit.Chem import inchi
+    from orthonym.validation.opsin_roundtrip import opsin_parse
+    parsed = opsin_parse(f"({prefix})benzene")
+    assert parsed and (inchi.MolToInchiKey(Chem.MolFromSmiles(parsed))
+                       == inchi.MolToInchiKey(m))
 
 
 def test_helper_nn_disubstituted_fails_closed():

@@ -667,8 +667,18 @@ FUSED_HETEROCYCLE_DATA: Dict[str, Dict[str, Any]] = {
         'name': '2,3-dihydro-1H-isoindole',
         'tautomer_locant': None,
         'ring_system': 'benzo-5-saturated',
+        # (a) fixed numbering (the Blue Book): in isoindole C1 bonds
+        # C7a and C3 bonds C3a. The two benzylic carbons (frag atoms 6 and 8) used
+        # to be labelled 1/3 SWAPPED relative to their fusion neighbours — atom 6
+        # (bonded to the '3a' fusion atom 4) was called 1 and atom 8 (bonded to the
+        # '7a' fusion atom 3) was called 3, so loc 1 bonded 3a. Invisible on a
+        # symmetric (unsubstituted) isoindoline, but on a benzo-substituted or
+        # asymmetric-spiro isoindoline it puts the ring substituent on a mirror-wrong
+        # position (a different constitution the OPSIN-RT gate then abstains). loc 1
+        # must sit on the benzylic bonded to 7a (atom 8) and loc 3 on the one bonded
+        # to 3a (atom 6). (reclaim-2026-09-14 B2)
         'parent_atoms': 9,
-        'iupac_locants': {0: 5, 1: 6, 2: 7, 3: '7a', 4: '3a', 5: 4, 6: 1, 7: 2, 8: 3},
+        'iupac_locants': {0: 5, 1: 6, 2: 7, 3: '7a', 4: '3a', 5: 4, 6: 3, 7: 2, 8: 1},
     },
     # 1,2,3,4-tetrahydroquinoline
     'c1ccc2c(c1)CCCN2': {
@@ -1371,6 +1381,179 @@ FUSED_HETEROCYCLE_DATA: Dict[str, Dict[str, Any]] = {
         'ring_system': 'non-benzenoid',
         'parent_atoms': 12,
         'iupac_locants': {0: 3, 1: 4, 2: 5, 3: '5a', 4: 6, 5: 7, 6: 8, 7: 9, 8: 10, 9: '10a', 10: 1, 11: 2},
+    },
+    # ===================================================================
+    # Aromatic [n]annulene benzo/dibenzo-fused parents, fusion
+    # nomenclature). A monocyclic mancude component of ring size > 6 is named
+    # as an [n]annulene "Monocyclic hydrocarbons (annulenes)",
+    # the Blue Book-11968: "Monocyclic parent components are named as
+    # [n]annulenes where n represent the number of carbon atoms. The series
+    # starts at n = 7, because the retained name 'benzene' is preferred for
+    # n = 6."). When the annulene has an ODD number of ring carbons its C_nH_n+1
+    # formula carries one indicated hydrogen, assigned the lowest locant
+    #, the Blue Book). These entries join the SAME lookup that
+    # names heptalene (7-7) and 1H-cyclopenta[8]annulene (5-8) above -- a
+    # data-only addition, no rule change. Every key is the RDKit-canonical
+    # SMILES and every iupac_locants map + tautomer_locant was derived from
+    # OPSIN 2.9.0's own `<name> -o extendedsmi` $_AV locants, mapped onto the
+    # canonical atom order via GetSubstructMatch, and RT-verified (name ->
+    # OPSIN -> InChIKey == the keyed structure). See
+    # tests/unit/rules/test_benzo_annulene.py.
+    #
+    # benzo[8]annulene -- 6-8 ortho-fused, 12 C, EVEN -> fully mancude, no
+    # indicated H. Verbatim (PIN) at the Blue Book
+    # (6,9-epoxy-1,4-methanobenzo[8]annulene) and:2662.
+    'C1=CC=Cc2ccccc2C=C1': {
+        'name': 'benzo[8]annulene',
+        'tautomer_locant': None,
+        'ring_system': 'benzo-annulene',
+        'parent_atoms': 12,
+        'iupac_locants': {0: 7, 1: 8, 2: 9, 3: 10, 4: '10a', 5: 1, 6: 2, 7: 3, 8: 4, 9: '4a', 10: 5, 11: 6},
+    },
+    # benzo[7]annulene -- 6-7 ortho-fused, 11 C, ODD -> one indicated H
+    #. Three distinct tautomers (1H, 5H(=9H by symmetry), 7H), each
+    # its own molecule and its own entry; the skeleton numbering (1..4,4a on the
+    # benzo ring; 5..9 on the 7-ring; 9a the second fusion atom) is fixed. Bare
+    # "benzo[7]annulene" is the 1H tautomer (OPSIN default). PIN parent
+    # component per.
+    'C1=CC=C2CC=CC=C2C=C1': {
+        'name': '1H-benzo[7]annulene',
+        'tautomer_locant': 1,
+        'ring_system': 'benzo-annulene',
+        'parent_atoms': 11,
+        'iupac_locants': {0: 7, 1: 8, 2: 9, 3: '9a', 4: 1, 5: 2, 6: 3, 7: 4, 8: '4a', 9: 5, 10: 6},
+    },
+    'C1=CCc2ccccc2C=C1': {
+        'name': '5H-benzo[7]annulene',
+        'tautomer_locant': 5,
+        'ring_system': 'benzo-annulene',
+        'parent_atoms': 11,
+        'iupac_locants': {0: 7, 1: 6, 2: 5, 3: '4a', 4: 4, 5: 3, 6: 2, 7: 1, 8: '9a', 9: 9, 10: 8},
+    },
+    'C1=Cc2ccccc2C=CC1': {
+        'name': '7H-benzo[7]annulene',
+        'tautomer_locant': 7,
+        'ring_system': 'benzo-annulene',
+        'parent_atoms': 11,
+        'iupac_locants': {0: 8, 1: 9, 2: '9a', 3: 1, 4: 2, 5: 3, 6: 4, 7: '4a', 8: 5, 9: 6, 10: 7},
+    },
+    # 5H-dibenzo[a,d][7]annulene -- 6-7-6 ortho-fused (two benzo rings on the a
+    # and d edges of a central [7]annulene), 15 C, indicated H at 5 (the central
+    # -CH2- of the seven-membered ring). The mancude core of the tricyclic
+    # antidepressant / antihistamine scaffolds (imipramine, amitriptyline,
+    # cyproheptadine, loratadine, dibenzosuberone). PIN parent per;
+    # the [a,d] fusion descriptor + numbering are OPSIN-authoritative and
+    # RT-verified (== 5H-dibenzo[a,d]cycloheptene).
+    'C1=Cc2ccccc2Cc2ccccc21': {
+        'name': '5H-dibenzo[a,d][7]annulene',
+        'tautomer_locant': 5,
+        'ring_system': 'dibenzo-annulene',
+        'parent_atoms': 15,
+        'iupac_locants': {0: 10, 1: 11, 2: '11a', 3: 1, 4: 2, 5: 3, 6: 4, 7: '4a', 8: 5, 9: '5a', 10: 6, 11: 7, 12: 8, 13: 9, 14: '9a'},
+    },
+    # ===================================================================
+    # Boron fused-ring parents fusion + 'bora' skeletal
+    # replacement). Orthonym had ZERO boron entries in this catalog, so every
+    # boron-heterocyclic parent fail-closed ('unknown organic compound') even
+    # though OPSIN names and round-trips them. These join the SAME lookup that
+    # names heptalene / benzo[8]annulene / every retained heterocycle above -- a
+    # data-only addition, no rule change (the fused-core matcher accepts a boron
+    # ring atom unchanged).
+    #
+    # Ring names: the O,O,B heterocyclic ring is a Hantzsch-Widman ring --
+    # 'oxa' (O) + 'bora' (B, the 'a'-term for boron,,
+    # heteroatoms cited in element-seniority order O-before-B /:
+    # O > S >... > B), so the locant set '1,3,2' = O(1),O(3),B(2). Ring size
+    # gives the HW stem: 5-ring '-ole' (dioxaborole), 6-ring '-inine'
+    # (dioxaborinine / oxaborinine), 7-ring '-epine' (dioxaborepine). Each is
+    # ortho-/peri-fused to a benzo/naphtho/phenanthro carbocyclic component by
+    # fusion nomenclature (the bracketed fusion descriptor -- [d,f],
+    # [1,8-de], [4,5-def], [b,e], [b,d] -- and the ring numbering are OPSIN-
+    # authoritative). 9-borafluorene is 'bora' skeletal replacement of
+    # C9 in the retained fusion parent fluorene (a dibenzo[b,d]borole).
+    #
+    # INDICATED HYDROGEN, the Blue Book): "In names, the indicated
+    # hydrogen... must be used to describe... the preferred IUPAC name." The
+    # boron of an O-B-O / C-B / O-B ring is the single sp3 (saturated) atom the
+    # mancude parent needs, so its position carries the cited indicated H
+    # (2H-/5H-/6H-/10H-). The H-LESS spelling (e.g. '1,3,2-benzodioxaborole') is
+    # GENERAL nomenclature only (the Blue Book); the PIN cites the nH- (verbatim BB
+    # examples: '2-phenyl-2H,4H-[1,3,2]dioxaborolo[4,5-d]imidazole (PIN)' the Blue Book;
+    # '5H-dibenzo[b,d]borole (PIN)' the Blue Book,. The indicated H is at
+    # the boron in every entry here and is retained when that position is
+    # substituted (2-methyl-2H-1,3,2-benzodioxaborole), exactly as the Blue Book keeps
+    # 2H with a 2-phenyl. Every canonical-SMILES key + every iupac_locants map was
+    # derived from OPSIN 2.9.0's own `<name> -o extendedsmi` $_AV locants and
+    # RT-verified (name -> OPSIN -> InChIKey == the keyed structure). See
+    # tests/unit/rules/test_boron_fused_heterocycles.py.
+    #
+    # 1,3,2-benzodioxaborole -- 6-5 ortho-fused; O-B-O five-membered ring (the
+    # boronic-ester catechol core, e.g. arylboronic-acid pinacol/catechol esters).
+    'B1Oc2ccccc2O1': {
+        'name': '2H-1,3,2-benzodioxaborole',
+        'tautomer_locant': 2,
+        'ring_system': 'benzodioxaborole',
+        'parent_atoms': 9,
+        'iupac_locants': {0: 2, 1: 1, 2: '7a', 3: 7, 4: 6, 5: 5, 6: 4, 7: '3a', 8: 3},
+    },
+    # dibenzo[d,f][1,3,2]dioxaborepine -- 6-7-6; an O-B-O bridge closing a
+    # seven-membered ring across a biphenyl (dibenzaboroles / dioxaborepine cores).
+    'B1Oc2ccccc2-c2ccccc2O1': {
+        'name': '6H-dibenzo[d,f][1,3,2]dioxaborepine',
+        'tautomer_locant': 6,
+        'ring_system': 'dibenzodioxaborepine',
+        'parent_atoms': 15,
+        'iupac_locants': {0: 6, 1: 5, 2: '4a', 3: 4, 4: 3, 5: 2, 6: 1, 7: '11b', 8: '11a', 9: 11, 10: 10, 11: 9, 12: 8, 13: '7a', 14: 7},
+    },
+    # naphtho[1,8-de][1,3,2]dioxaborinine -- peri-fused; the O-B-O six-membered
+    # ring bridges the 1,8 (peri) positions of naphthalene.
+    'B1Oc2cccc3cccc(c23)O1': {
+        'name': '2H-naphtho[1,8-de][1,3,2]dioxaborinine',
+        'tautomer_locant': 2,
+        'ring_system': 'naphthodioxaborinine',
+        'parent_atoms': 13,
+        'iupac_locants': {0: 2, 1: 1, 2: '9a', 3: 9, 4: 8, 5: 7, 6: '6a', 7: 6, 8: 5, 9: 4, 10: '3a', 11: '9b', 12: 3},
+    },
+    # phenanthro[4,5-def][1,3,2]dioxaborepine -- the O-B-O seven-membered ring
+    # bridges the 4,5 bay positions of phenanthrene.
+    'B1Oc2cccc3ccc4cccc(c4c23)O1': {
+        'name': '5H-phenanthro[4,5-def][1,3,2]dioxaborepine',
+        'tautomer_locant': 5,
+        'ring_system': 'phenanthrodioxaborepine',
+        'parent_atoms': 17,
+        'iupac_locants': {0: 5, 1: 4, 2: '3a', 3: 3, 4: 2, 5: 1, 6: '11a', 7: 11, 8: 10, 9: '9a', 10: 9, 11: 8, 12: 7, 13: '6a', 14: '11b', 15: '11c', 16: 6},
+    },
+    # 5H-dibenzo[b,d]borole -- the dibenzoborole fusion parent (a benzo-fused
+    # borole ortho-fused a second benzo on the [b] and [d] edges). This is the
+    # PIN: the Blue Book bb_conformance gold row for this structure
+    # (def 68.1.1.3.4, B1c2ccccc2-c2ccccc21) is '5H-dibenzo[b,d]borole', NOT the
+    # 'bora'-replacement synonym 9-borafluorene (both parse in OPSIN to the same
+    # structure and round-trip, but the fusion name is preferred, over the
+    # skeletal-replacement synonym). Indicated H at 5 (the boron, B-H).
+    'B1c2ccccc2-c2ccccc21': {
+        'name': '5H-dibenzo[b,d]borole',
+        'tautomer_locant': 5,
+        'ring_system': 'dibenzoborole',
+        'parent_atoms': 13,
+        'iupac_locants': {0: 5, 1: '4a', 2: 4, 3: 3, 4: 2, 5: 1, 6: '9b', 7: '9a', 8: 9, 9: 8, 10: 7, 11: 6, 12: '5a'},
+    },
+    # 10H-dibenzo[b,e][1,4]oxaborinine -- 6-6-6; the O and B occupy the 1,4
+    # positions of a central six-membered ring (an 'oxaborinine' HW ring:
+    # oxa O + bora B, O-before-B seniority => O(5),B(10)) ortho-fused a benzo on
+    # each of the [b] and [e] edges. The dibenzo-1,4-oxaborine core of the
+    # dibenzoxaborininone / phenoxaborin drug scaffolds. Indicated H at 10 (the
+    # boron). ⚠ The Blue Book spells this ring 'phenoxaborinine' (the Blue Book,
+    # the O,B analogue of phenoxazine's von-Baeyer-free retained fusion name),
+    # but OPSIN 2.9.0 REJECTS 'phenoxaborinine'/'10H-phenoxaborinine' -> we emit
+    # the systematic 'dibenzo[b,e][1,4]oxaborinine' fusion spelling, which OPSIN
+    # parses and RTs to the identical structure (systematic_verified tier, not
+    # byte-PIN). Numbering + fusion descriptor are OPSIN-authoritative.
+    'B1c2ccccc2Oc2ccccc21': {
+        'name': '10H-dibenzo[b,e][1,4]oxaborinine',
+        'tautomer_locant': 10,
+        'ring_system': 'dibenzoxaborinine',
+        'parent_atoms': 14,
+        'iupac_locants': {0: 10, 1: '10a', 2: 1, 3: 2, 4: 3, 5: 4, 6: '4a', 7: 5, 8: '5a', 9: 6, 10: 7, 11: 8, 12: 9, 13: '9a'},
     },
     # 1H-pyrazolo[3,4-b]pyridine
     'c1cnc2[nH]ncc2c1': {
