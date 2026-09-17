@@ -56,7 +56,7 @@ carry the SAME standard InChIKey), because an element list cannot tell a
 semipolar oxide from a genuine oxoanion.
 
 Regression anchor: ``CC1CO[PH+](C1)[O-]`` and OPSIN's ``CC1CP(OC1)=O`` share
-InChIKey ``DWXZAVJWXATXAG-UHFFFAOYSA-N``; treating that pair as an ionic centre
+InChIKey ``an InChIKey``; treating that pair as an ionic centre
 once destroyed the correct name ``4-methyl-2-oxo-1,2-oxaphospholane``.
 """
 import pytest

@@ -69,7 +69,7 @@ HYDRO_TARGETS = [
     # NON-ADJACENT ("1,4-type") dihydro: the two hydro positions are separated
     # by the residual ring C=C, so they are NOT a reduced-C=C adjacent pair
     # (7=8 stays). PIN is the lowest-locant set {6,9}, NOT {8,9} (a review-2 fix).
-    # C11H12, InChIKey an InChIKey.
+    # C11H12, an InChIKey.
     ("C1CC=CCc2ccccc21", "6,9-dihydro-5H-benzo[7]annulene"),
 ]
 

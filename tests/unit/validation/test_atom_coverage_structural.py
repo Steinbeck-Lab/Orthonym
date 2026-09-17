@@ -107,8 +107,8 @@ def test_same_formula_different_constitution_is_rejected():
 
     These are different molecules with the SAME molecular formula and the
     SAME heavy-atom element multiset (C3 N1 O2, 6 heavy atoms):
-      input InChIKey FSYKKLYZXJSNPZ-UHFFFAOYSA-N
-      parsed InChIKey QNAYBMKLOCPYGJ-UHFFFAOYSA-N
+      input an InChIKey
+      parsed an InChIKey
     No count-based and no formula-based check can separate them; only
     constitution can. This is the test that a formula comparison fails.
     """

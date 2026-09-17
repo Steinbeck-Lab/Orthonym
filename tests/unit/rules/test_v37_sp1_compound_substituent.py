@@ -49,7 +49,7 @@ class TestMixedEtherAmineProduction:
     @pytest.mark.opsin_gate
     def test_mixed_ether_amine_n_substituent_no_atom_drop(self):
         # COCCNCCC = CH3-O-CH2CH2-NH-CH2CH2CH3; PIN N-(2-methoxyethyl)propan-1-amine
-        # (UDZCEFCJEGGQOJ-UHFFFAOYSA-N)
+        # (an InChIKey)
         name = name_compound('COCCNCCC')
         assert name != 'N-propylpropan-1-amine'
         assert name == 'N-(2-methoxyethyl)propan-1-amine'

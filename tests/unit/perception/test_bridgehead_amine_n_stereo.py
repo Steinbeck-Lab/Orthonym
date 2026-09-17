@@ -18,7 +18,7 @@ the tag-free form) plus descriptor-presence for the must-not-strip witnesses.
 
 Cite: pyramidal amine inversion (a neutral trivalent amine N is not a
 configurationally citable stereogenic unit); standard InChI + OPSIN both treat it
-as non-stereogenic. All three quinine forms share InChIKey LOUPRKONTZGTKE-WZBLMQSHSA-N.
+as non-stereogenic. All three quinine forms share an InChIKey.
 """
 import pytest
 

@@ -196,7 +196,7 @@ def _ring_frag_attach(mol):
     # picks locant 5 over the old code's arbitrary 12. Both denote the
     # IDENTICAL molecule (confirmed: OPSIN-parsing "dispiro[3.2.3.2]dodecan-
     # 5-yl"acetic acid and the -12-yl form give the same InChIKey,
-    # HCHGJBAWDHMYAZ-UHFFFAOYSA-N -- a real molecular symmetry, not a bug),
+    # an InChIKey -- a real molecular symmetry, not a bug),
     # so this is a PIN correction, not a behavior regression.
     ("C1CCC12CCC1(CCC1)CC2CC(=O)O", "dispiro[3.2.3.2]dodecan-5-yl"),
 ])

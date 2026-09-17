@@ -22,11 +22,11 @@ Correctness is grounded two ways so the absence of an RT oracle is not a hole:
   Wikidata + the chemical literature for the D/L-chiro assignment, cis / neo
   (the two highest-symmetry meso isomers: cis is all-cis, the only all-carbons-
   equivalent isomer besides all-trans scyllo). myo-inositol's key
-  ``CDAISMWEOUEBRE-GPIVLXJGSA-N`` matches NIST CAS 87-89-8.
+  ``an InChIKey`` matches NIST CAS 87-89-8.
 
 Fail-closed: ``name_inositol`` returns ``None`` for anything that is not
 EXACTLY one of the nine fully-stereodefined cyclohexanehexols. An undefined- or
-partial-stereo hexol (flat InChIKey ``CDAISMWEOUEBRE-UHFFFAOYSA-N``) is not in
+partial-stereo hexol (flat InChIKey ``an InChIKey``) is not in
 the table, so it keeps the systematic ``cyclohexane-1,2,3,4,5,6-hexol`` name; a
 substituted/deoxy/larger ring never reaches the table.
 """

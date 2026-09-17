@@ -241,8 +241,8 @@ class TestAminoAcidZwitterionNaming:
     def test_d_valine_zwitterion(self):
         """ charged B1: this SMILES is the R (D) enantiomer, not L -- the
         table used to mislabel it 'L-valine'. VERIFIED via OPSIN: the input's
-        InChIKey (KZSNJWFQEVHDMF-SCSAIBSYSA-N) matches opsin_parse('D-valine'),
-        not opsin_parse('L-valine') (KZSNJWFQEVHDMF-BYPYZUCNSA-N)."""
+        InChIKey (an InChIKey) matches opsin_parse('D-valine'),
+        not opsin_parse('L-valine') (an InChIKey)."""
         result = name_compound('CC(C)[C@@H]([NH3+])C([O-])=O')
         assert result == 'D-valine', f"Expected D-valine, got: {result}"
 
@@ -250,7 +250,7 @@ class TestAminoAcidZwitterionNaming:
         """ charged B1: this SMILES is the R (D) enantiomer, not L -- the
         table used to mislabel it 'L-leucine' (the original a trace finding).
         VERIFIED via OPSIN: the input's InChIKey
-        (ROHFNLRQFUQHCH-RXMQYKEDSA-N) matches opsin_parse('D-leucine')."""
+        (an InChIKey) matches opsin_parse('D-leucine')."""
         result = name_compound('CC(C)C[C@@H]([NH3+])C([O-])=O')
         assert result == 'D-leucine', f"Expected D-leucine, got: {result}"
 

@@ -136,7 +136,7 @@ BUCKET_A = [
     ("24215632", r"CC\1=C(SS/C1=C\2/C(=C(SS2)C3=CC=CC=C3)C)C4=CC=CC=C4"),
     # 173868686 — fix-spec DEVIATION: labeled a conflict ("over-specification"),
     # but verified (2026-09-14) a genuine 0-wrong reclaim -> (1Z,3R,5S)-... which
-    # FULL round-trips (input==recon InChIKey an InChIKey). All its
+    # FULL round-trips (input==recon an InChIKey). All its
     # centres ARE specified in the input; the reclaim completes them, not over-cites.
     ("173868686",
      r"CCC1=C(C=CC(=C1)NC(=NC)C2=NC=C(N2C)C(=C)C(C)[C@@H](C)/C(=C(\C)/F)/OC)"

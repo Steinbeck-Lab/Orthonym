@@ -382,7 +382,7 @@ class TestV33Engine2CappedTerminusChain:
         """A real heparin-fragment pentasaccharide (methyl-capped GlcNS6S --
         IdoA2S -- GlcNS3,6S -- GlcA -- GlcNS6S, all-N-sulfonate/O-sulfate, no
         N-acyl) -- the exact a trace positive that motivated this engine. Full
-        InChIKey round-trip verified this session (KANJSNBRCNMZMV-ABRZTLGGSA-N)."""
+        InChIKey round-trip verified this session (an InChIKey)."""
         from orthonym import name_compound
         from orthonym.validation.opsin_roundtrip import opsin_roundtrip_check
 

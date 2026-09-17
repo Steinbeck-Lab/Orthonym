@@ -108,7 +108,7 @@ def test_r3_abstains_rather_than_emitting_a_wrong_constitution():
 
         N-tert-butyl-N'-[1-(tert-butyldiazenyl)cyclohexyl]thiourea
 
-    (OPSIN 2.9.0 -> FJFCAHBBIQSNCA-UHFFFAOYSA-N, C15H30N4S, identical to the
+    (OPSIN 2.9.0 -> an InChIKey, C15H30N4S, identical to the
     input). Reaching it needs the N'-substituent ``1-(tert-butyldiazenyl)
     cyclohexyl`` to be nameable, and this tree cannot yet name ANY
     1,1-disubstituted cycloalkyl substituent -- see the blocker test below.

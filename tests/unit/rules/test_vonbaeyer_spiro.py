@@ -142,7 +142,7 @@ class TestExistingSpiroFixturesUnchanged:
         the monospiro ``get_spiro_numbering`` had it. Locked in via the
         ``tests/unit/rules/test_v27_p3_spiro_engine.py`` PIN correction
         (dispiro[3.2.3.2]dodecan-5-yl, not the old arbitrary -12-yl -- both
-        denote the identical molecule, InChIKey HCHGJBAWDHMYAZ-UHFFFAOYSA-N,
+        denote the identical molecule, an InChIKey,
         confirmed via OPSIN); re-asserted here as the module-level regression
         guard for this file's scope."""
         from orthonym.rules.ring_substituents import _universal_spiro_substituent_name

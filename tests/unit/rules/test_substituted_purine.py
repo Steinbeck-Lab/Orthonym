@@ -31,7 +31,7 @@ def test_26_diaminopurine():
     # c/n_substituents/other/suffix_groups check -> it used to fall through to
     # the wrong retained-core path. Indicated H is derived per structure (this
     # engine never hardcodes 9H): the two SMILES below are the 7H and 9H
-    # tautomers of the SAME molecule (RDKit InChIKey MSSXOMSJDRHRMC-UHFFFAOYSA-N
+    # tautomers of the SAME molecule (RDKit an InChIKey
     # for both -- confirmed by RDKit InChI's mobile-H layer, exactly like
     # adenine's own 7H/9H pair below), and OPSIN round-trips EACH engine output
     # back to that identical InChIKey (verified via in-process opsin_stdout).

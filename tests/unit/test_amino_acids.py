@@ -13,8 +13,8 @@ always resolves a bare amino-acid retained name to that ONE defined
 stereocentre, so asserting it against an undefined-stereo input is impossible
 to round-trip BY CONSTRUCTION: the input's full InChIKey has no stereo layer
 while OPSIN's parse of the bare name always has one (verified for asparagine:
-input `DCXYFEDJOCDNAF-UHFFFAOYSA-N` vs OPSIN('asparagine')
-`DCXYFEDJOCDNAF-REOHCLBHSA-N` -- same skeleton, stereo layer present only on
+input `an InChIKey` vs OPSIN('asparagine')
+`an InChIKey` -- same skeleton, stereo layer present only on
 the wrong side). Each new expected value below is the Blue Book's OWN
 systematic name for that amino acid (Table 10.4, the Blue Book-54245)
 and OPSIN-round-trips exactly to the stereo-free input (verified independently

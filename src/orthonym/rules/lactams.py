@@ -412,7 +412,7 @@ def name_monocyclic_lactam(mol) -> Optional[str]:
     # RING-ATOM test (`:347`), not a locant-KIND test. That split gave each side its
     # own `count = len(locants)`, which is why the two methyls could never meet. It
     # also made the name INPUT-ORDER DEPENDENT: `CN1C(C)CC1=O` and `CC1CC(=O)N1C`
-    # are the same molecule (both InChIKey IYTPSDMCQSELPF-UHFFFAOYSA-N) yet gave
+    # are the same molecule (both an InChIKey) yet gave
     # `N-methyl-4-methyl...` and `4-methyl-N-methyl...` respectively.
     #
     # A ring-N group is merged into the shared numeric bucket only when it actually

@@ -153,7 +153,7 @@ def test_non_identical_substituents_do_not_collapse(smiles, expected):
 # --------------------------------------------------------------------------- #
 # 4. The merge removes an input-order nondeterminism. #
 # `CN1C(C)CC1=O` and `CC1CC(=O)N1C` are the SAME molecule (verified: #
-# both InChIKey IYTPSDMCQSELPF-UHFFFAOYSA-N) and used to yield #
+# both an InChIKey) and used to yield #
 # `N-methyl-4-methyl...` vs `4-methyl-N-methyl...`. #
 # --------------------------------------------------------------------------- #
 

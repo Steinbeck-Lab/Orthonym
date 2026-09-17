@@ -118,7 +118,7 @@ RETAINED_NAMES = {
     # `_is_complete_name('chalcon')` is False. Hand-curated wins the merge
     # (`ALL_RETAINED_NAMES = {**_OPSIN_NAMES, **_HAND_CURATED_GATED}`), so this
     # row is what ships. OPSIN 2.9.0 parses `chalcone` -> InChIKey
-    # DQFBYFPFKXHELB-VAWYXSNFSA-N, identical to the input's (round-trip verified).
+    # an InChIKey, identical to the input's (round-trip verified).
     "O=C(/C=C/c1ccccc1)c1ccccc1": "chalcone",
     "CC(=O)c1ccccc1": "acetophenone",
     "O=C(c1ccccc1)c1ccccc1": "benzophenone",

@@ -203,8 +203,8 @@ class TestPeptideEdgeCases:
         grammar always resolves a bare amino-acid retained name to that ONE
         defined stereocentre -- so asserting it against this input is provably
         impossible to round-trip: input full InChIKey
-        `DCXYFEDJOCDNAF-UHFFFAOYSA-N` (no stereo layer) vs OPSIN's parse of
-        'asparagine' `DCXYFEDJOCDNAF-REOHCLBHSA-N` (defined stereo layer) --
+        `an InChIKey` (no stereo layer) vs OPSIN's parse of
+        'asparagine' `an InChIKey` (defined stereo layer) --
         same skeleton, different (missing-vs-present) stereo layer, so a
         byte-identical full round-trip is impossible by construction, not by
         chance. `2,4-diamino-4-oxobutanoic acid` is the Blue Book's OWN

@@ -113,7 +113,7 @@ def _semipolar_chalcogenide_atoms(mol) -> Set[int]:
        element list cannot tell a semipolar oxide from an oxoanion, whereas this
        proof is exactly the claim being relied on -- that naming the neutral
        form names the input molecule. ``CC1CO[PH+](C1)[O-]`` and
-       ``CC1CP(OC1)=O`` share ``DWXZAVJWXATXAG-UHFFFAOYSA-N``, which is why
+       ``CC1CP(OC1)=O`` share ``an InChIKey``, which is why
        ``4-methyl-2-oxo-1,2-oxaphospholane`` is the correct name for it.
 
     Fails closed: any parse/sanitise/InChI failure leaves the charges visible.

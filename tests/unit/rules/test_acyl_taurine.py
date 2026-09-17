@@ -34,7 +34,7 @@ into `fg_atoms` so criterion 1 -- "chain contains the PCG" -- picks the
 correct, acid-bearing chain instead of tying at 0 and falling through to
 "longest chain"). The propanoyl-taurine anion below now names correctly as
 ``2-propanamidoethane-1-sulfonate`` (RT-verified,
-InChIKey CIPJBOMLFKUUEH-UHFFFAOYSA-M on both sides) --
+an InChIKey on both sides) --
 `test_integration_longer_acyl_chain_failclosed_not_wrong` below was updated
 to assert the new correct name in place of the stale abstain assertion. The
 carbamoyl-direction shape (carboxylate senior parent, taurine as a
@@ -99,6 +99,6 @@ def test_integration_longer_acyl_chain_now_named(namer):
     # selection defect -- see module docstring). a phase lead a fixed
     # that defect (perception/chains.py::find_principal_chain now registers
     # the sulfonic acid's bearing carbon), so this now names correctly.
-    # RT-verified: InChIKey CIPJBOMLFKUUEH-UHFFFAOYSA-M on both sides.
+    # RT-verified: an InChIKey on both sides.
     smi = "CCC(=O)NCCS(=O)(=O)[O-]"
     assert namer.name(smi) == "2-propanamidoethane-1-sulfonate"

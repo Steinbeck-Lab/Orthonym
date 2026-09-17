@@ -198,9 +198,9 @@ RETAINED_AMINO_ACID_ZWITTERIONS = {
     # "The stereodescriptors 'D' and 'L'"), a bare retained
     # amino-acid name denotes ONLY the defined (L) configuration -- OPSIN's
     # grammar always resolves 'alanine' to the L stereocentre (verified:
-    # opsin_parse('alanine') -> InChIKey QNAYBMKLOCPYGJ-REOHCLBHSA-N), which
+    # opsin_parse('alanine') -> an InChIKey), which
     # provably differs from the stereo-undefined input's InChIKey
-    # (QNAYBMKLOCPYGJ-UHFFFAOYSA-N) -- a different, more specific claim than
+    # (an InChIKey) -- a different, more specific claim than
     # the input supports. Same defect class already fixed for the NEUTRAL
     # form (see tests/unit/test_amino_acids.py module docstring); the deleted
     # entry now falls through to `_name_amino_acid_zwitterion`'s existing

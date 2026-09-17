@@ -56,7 +56,7 @@ RDLogger.DisableLog("rdApp.*")
 MESOIONIC = "CC1=N[N+]2=CC=CC=C2C(=N1)[O-]"
 
 # Coordinator-verified, re-verified in this session: fed to opsin-cli-2.9.0 the
-# returned structure has InChIKey YZYLEZPSMVVLED-UHFFFAOYSA-N, identical to
+# returned structure has an InChIKey, identical to
 # MESOIONIC's InChIKey.
 #
 # The heteroatom locants were '3,5,6' until the von Baeyer numbering cascade
@@ -65,7 +65,7 @@ MESOIONIC = "CC1=N[N+]2=CC=CC=C2C(=N1)[O-]"
 # ``test_four_legal_numberings_exist`` below -- (:9777) *"Low locants
 # are assigned to the heteroatoms considered together as a set compared in
 # increasing numerical order"* selects (1,2,4). The suffix locants follow the
-# renumbering; the name still returns InChIKey YZYLEZPSMVVLED-UHFFFAOYSA-N from
+# renumbering; the name still returns an InChIKey from
 # opsin-cli-2.9.0, i.e. the same molecule, re-lettered.
 TARGET = ("3-methyl-1,2,4-triazabicyclo[4.4.0]deca-1(10),2,4,6,8-"
           "pentaen-1-ium-5-olate")
@@ -459,7 +459,7 @@ def test_semipolar_phosphoryl_oxide_keeps_its_neutral_name():
     ``[PH+]...[O-]`` is the charge-separated depiction of a NEUTRAL ``P=O``.
     RDKit/InChI agree: ``CC1CO[PH+](C1)[O-]`` and OPSIN's parse of
     ``4-methyl-2-oxo-1,2-oxaphospholane`` (``CC1CP(OC1)=O``) share InChIKey
-    ``DWXZAVJWXATXAG-UHFFFAOYSA-N``. A first cut of the fail-closed guard
+    ``an InChIKey``. A first cut of the fail-closed guard
     treated the pair as a zwitterion and destroyed this correct,
     round-tripping name.
     """

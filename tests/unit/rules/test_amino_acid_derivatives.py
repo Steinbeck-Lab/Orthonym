@@ -144,7 +144,7 @@ def test_non_standard_zwitterion_builds_azaniumyl_pin():
     # The alpha stereocentre survives (neutralize-in-place, not sever), so the
     # descriptor is spelled: the builder full-InChIKey RT-gates its own
     # emission, so this is 0-wrong (the input's InChIKey
-    # IDIDJDIHTAOVLG-VKHMYHEASA-N -- (2R), NOT (2S) as an early note guessed --
+    # an InChIKey -- (2R), NOT (2S) as an early note guessed --
     # is reproduced by OPSIN-parsing the name). RAW (gate off) proves the
     # producer's OWN RT gate, not the namer's.
     from rdkit import Chem

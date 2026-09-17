@@ -262,7 +262,7 @@ def test_s2_taurine_amide_names_correctly_end_to_end(ungated_namer):
     this molecule now names via the same acylamido form as its siblings in
     test_acyl_taurine.py (2-acetamidoethane-1-sulfonate,
     2-formamidoethane-1-sulfonate, 2-propanamidoethane-1-sulfonate).
-    RT-verified: InChIKey LMIJIHJZVURGQK-UHFFFAOYSA-M on both sides.
+    RT-verified: an InChIKey on both sides.
     """
     out = ungated_namer.name("CCCCCCCCCCCCCCCCCC(=O)NCCS(=O)(=O)[O-]")
     assert out == "2-octadecanamidoethane-1-sulfonate", out

@@ -15,7 +15,7 @@ then reads each decoration's locant off that same one numbering.
 
 Target verified by OPSIN round-trip (`a temp dir/piece2_spy_verify.py`):
 `2-(6-methoxynaphthalen-2-yl)acetic acid` canonicalises to the InChIKey of
-`COc1ccc2cc(CC(=O)O)ccc2c1` (`PHJFLPMVEFKEPL-UHFFFAOYSA-N`).
+`COc1ccc2cc(CC(=O)O)ccc2c1` (`an InChIKey`).
 """
 import pytest
 from rdkit import Chem
