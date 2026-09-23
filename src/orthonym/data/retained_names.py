@@ -255,15 +255,17 @@ RETAINED_NAMES = {
     # catalog value is fixed in lockstep for the substituted/fused path.
     "c1ccc2c(c1)Oc1ccccc1S2": "phenoxathiine",         # the Blue Book phenoxathiine (PIN)
     "c1ccc2c(c1)Oc1ccccc1[Se]2": "phenoxaselenine",    # the Blue Book phenoxaselenine (PIN)
-    # The 4 X-H (P/As/Sb) tricyclics carry a saturated X-H at ring position 10, so
-    # their PIN cites the mandatory indicated hydrogen 10H- (the Blue Book
-    # print the "10H-isomer shown"; (the Blue Book) "all indicated hydrogen atoms
-    # must be cited"), exactly as the isostructural N-cases emit 10H-phenoxazine /
-    # 10H-phenothiazine. (phenoxaselenine/phenoxathiine have divalent Se/S = no H.)
-    "c1ccc2c(c1)Oc1ccccc1P2": "10H-phenoxaphosphinine",    # the Blue Book 10H-phenoxaphosphinine (PIN)
-    "c1ccc2c(c1)Oc1ccccc1[AsH]2": "10H-phenoxarsinine",    # the Blue Book 10H-phenoxarsinine (PIN)
-    "c1cc[c]2c(c1)Oc1cccc[c]1[SbH]2": "10H-phenoxastibinine",  # the Blue Book 10H-phenoxastibinine (PIN)
-    "c1ccc2c(c1)Sc1ccccc1[AsH]2": "10H-phenothiarsinine",  # the Blue Book 10H-phenothiarsinine (PIN)
+    # The 4 X-H (P/As/Sb) tricyclics carry a saturated X-H at ring position 10, but the
+    # BB prints these as "<name> (PIN, 10H-isomer shown)" (the Blue Book) —
+    # "10H-isomer shown" says which drawn isomer the PIN denotes, it is NOT part of the
+    # PIN string. Contrast the isostructural N-cases, which spell it out explicitly as
+    # "the PIN is 10H-phenoxazine" / "the PIN is 10H-phenothiazine" (the Blue Book) — a
+    # different phrasing for a different fact. So the P/As/Sb PINs are the bare parent
+    # names, no 10H- prefix. (phenoxaselenine/phenoxathiine have divalent Se/S = no H.)
+    "c1ccc2c(c1)Oc1ccccc1P2": "phenoxaphosphinine",    # the Blue Book phenoxaphosphinine (PIN, 10H-isomer shown)
+    "c1ccc2c(c1)Oc1ccccc1[AsH]2": "phenoxarsinine",    # the Blue Book phenoxarsinine (PIN, 10H-isomer shown)
+    "c1cc[c]2c(c1)Oc1cccc[c]1[SbH]2": "phenoxastibinine",  # the Blue Book phenoxastibinine (PIN, 10H-isomer shown)
+    "c1ccc2c(c1)Sc1ccccc1[AsH]2": "phenothiarsinine",  # the Blue Book phenothiarsinine (PIN, 10H-isomer shown)
 
     # === UNSATURATED 6-MEMBERED O-HETEROCYCLES (pyrans) ===
     # IUPAC 2013 prefers "2H-pyran" / "4H-pyran" over HW systematic "oxine"

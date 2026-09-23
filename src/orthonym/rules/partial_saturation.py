@@ -1283,6 +1283,250 @@ def name_hydrogenated_fused_carbocycle(mol: Chem.Mol) -> Optional[str]:
 
 
 # =============================================================================
+# Added-indicated-hydrogen -ol / -amine suffix on a mancude naphthalene
+# / — the -ol/-amine sibling of name_cyclic_oxo_compound
+# =============================================================================
+
+# Suffix word by PCG kind + count. -ol/-amine are vowel-initial (a)
+# elides the parent's terminal 'e' at count 1); the multiplied 'di-/tri-' forms
+# are consonant-initial (keep it) — the two BB PINs are `naphthalen-4a(2H)-ol`
+# and `naphthalene-4a,8a-diol` (the Blue Book).
+_ADDED_H_SUFFIX_WORDS: Dict[str, Dict[int, str]] = {
+    'ol':    {1: 'ol', 2: 'diol', 3: 'triol', 4: 'tetrol'},
+    'amine': {1: 'amine', 2: 'diamine', 3: 'triamine', 4: 'tetramine'},
+}
+
+
+def name_added_h_fused_carbocycle_suffix(mol: Chem.Mol) -> Optional[str]:
+    """Name a mancude naphthalene bearing an -ol/-amine (di-) suffix that needs
+    'added indicated hydrogen' /, e.g. ``naphthalen-4a(2H)-ol``,
+    ``naphthalen-4a(2H)-amine``, ``naphthalene-2,4a(2H)-diamine``,
+    ``naphthalene-4a,8a-diol``.
+
+    The Blue Book gives these the added-indicated-hydrogen form as the PIN
+    (the Blue Book), NOT the equivalent hydro form
+    (``2,4a-dihydronaphthalen-4a-ol``); both parse to the same structure through
+    OPSIN, so the round-trip gate cannot choose between them and this producer
+    must spell the PIN directly.
+
+    This is the -ol/-amine sibling of:func:`name_cyclic_oxo_compound`: the -one
+    suffix carbon is sp2 (exocyclic C=O) whereas the -ol/-amine suffix carbon is
+    itself sp3, but the added-indicated-hydrogen mechanism max
+    noncumulative double bonds; a pair of suffixes that removes a
+    double bond needs no added H) is the same, so the maximum matching of the
+    reduced ring atoms is reused.
+
+    Scope (fail-closed -> None otherwise): a single neutral non-radical fragment,
+    no specified stereo, whose ring system is exactly the naphthalene skeleton
+    (two ortho-fused 6-membered all-carbon rings, 10 atoms), NON-aromatic (an
+    aromatic ring routes to the PAH partial-saturation path). The senior ring PCG
+    must be an -ol or -amine (via:func:`_partial_sat_pcg`, which already scopes
+    fail-closed to molecules whose only heteroatoms are the suffix O/N). Every sp2
+    ring atom must be covered by an intra-ring C=C (no exocyclic unsaturation),
+    every suffix carbon must be sp3, and there must be NO hydro prefix (every
+    reduced adjacent pair is a suffix pair removing a double bond) — the
+    hydro-prefixed forms are a separate build.
+
+    Numbering + added-indicated-H: the reduced (sp3) ring atoms are matched
+     adjacent pair = removed double bond -> no added H); an unmatched
+    reduced atom needs one added/indicated hydrogen, cited ``(nH)`` after the
+    suffix locant(s), UNLESS it is a ring-fusion carbon already bearing the suffix
+    (its hydrogen is consumed by the suffix and marked only by the suffix locant).
+    The naphthalene fixed numbering is chosen to give lowest locants to the suffix,
+    then to the added indicated hydrogen. Fail-closed on any indeterminacy
+    (the downstream / round-trip gate is the constitution backstop).
+    """
+    from ..data.polycyclic_data import POLYCYCLIC_DATA
+
+    if mol is None:
+        return None
+    if len(Chem.GetMolFrags(mol)) != 1:
+        return None
+    for atom in atoms_of(mol):
+        if atom.GetFormalCharge() != 0 or atom.GetNumRadicalElectrons() != 0:
+            return None
+    # Specified stereo would be silently dropped by this bare-numbering path.
+    for atom in atoms_of(mol):
+        if atom.GetChiralTag() != Chem.ChiralType.CHI_UNSPECIFIED:
+            return None
+    for bond in bonds_of(mol):
+        if bond.GetStereo() != Chem.BondStereo.STEREONONE:
+            return None
+
+    ri = mol.GetRingInfo()
+    atom_rings = ri.AtomRings()
+    # Exactly the naphthalene skeleton: two ortho-fused 6-rings, 10 ring atoms.
+    if len(atom_rings) != 2:
+        return None
+    if any(len(r) != 6 for r in atom_rings):
+        return None
+    if len(set(atom_rings[0]) & set(atom_rings[1])) != 2:  # ortho fusion = 1 shared edge
+        return None
+    ring_atoms: Set[int] = set()
+    for r in atom_rings:
+        ring_atoms.update(r)
+    if len(ring_atoms) != 10:
+        return None
+    # Carbocyclic, non-aromatic (an aromatic ring routes to the PAH partial-sat path).
+    for idx in ring_atoms:
+        atom = mol.GetAtomWithIdx(idx)
+        if atom.GetSymbol() != 'C' or atom.GetIsAromatic():
+            return None
+
+    # The senior ring PCG must be an -ol or -amine /. The helper
+    # scopes fail-closed to molecules whose only heteroatoms are the suffix O/N
+    # (one per ring carbon, neutral non-radical), so the suffix choice is safe.
+    pcg_kind, pcg_ring_atoms = _partial_sat_pcg(mol, ring_atoms)
+    if pcg_kind not in ('ol', 'amine') or not pcg_ring_atoms:
+        return None
+    suffix_atoms = set(pcg_ring_atoms)
+
+    # This producer renders ONLY the bare naphthalene parent + the -ol/-amine
+    # suffix; it cannot render a substituent. So every OFF-ring heavy atom must be
+    # a suffix heteroatom (the -ol O / -amine N on a suffix ring carbon). Any other
+    # off-ring heavy atom — e.g. a ring methyl — would be SILENTLY DROPPED (0-wrong
+    # would rest only on the downstream gate). Fail closed. (_partial_sat_pcg
+    # only guarantees no non-suffix HETEROatom exists; a carbon substituent, and a
+    # substituent on an sp2 ring atom, both slip past the sp3-only check below.)
+    suffix_hetero: Set[int] = set()
+    for c in suffix_atoms:
+        for nb in mol.GetAtomWithIdx(c).GetNeighbors():
+            if nb.GetIdx() not in ring_atoms and nb.GetSymbol() in ('O', 'N'):
+                suffix_hetero.add(nb.GetIdx())
+    for atom in atoms_of(mol):
+        idx = atom.GetIdx()
+        if atom.GetAtomicNum() <= 1 or idx in ring_atoms or idx in suffix_hetero:
+            continue
+        return None  # off-ring heavy atom that is not a suffix O/N -> would be dropped
+
+    # Residual ring C=C required; every double bond involving a ring atom must be
+    # intra-ring (no exocyclic =CH2/=O — keeps the mancude interpretation).
+    ring_double_bonds: List[Tuple[int, int]] = []
+    for bond in bonds_of(mol):
+        if bond.GetBondType() != Chem.BondType.DOUBLE:
+            continue
+        a, b = bond.GetBeginAtomIdx(), bond.GetEndAtomIdx()
+        a_in, b_in = a in ring_atoms, b in ring_atoms
+        if a_in != b_in:
+            return None  # exocyclic double bond on a ring atom -> out of scope
+        if a_in and b_in:
+            ring_double_bonds.append((a, b))
+    if not ring_double_bonds:
+        return None
+
+    # Reduced (sp3) ring atoms: suffix carbons + plain hydrocarbon >CH2 / >CH-.
+    sp3_atoms = {
+        idx for idx in ring_atoms
+        if mol.GetAtomWithIdx(idx).GetHybridization() == Chem.HybridizationType.SP3
+    }
+    # Every suffix carbon must be a reduced (sp3) position (an sp2 enol/enamine
+    # =C(OH)- is a different, non-added-H case -> fail closed).
+    if not suffix_atoms.issubset(sp3_atoms):
+        return None
+    # Every sp2 ring atom is covered by an intra-ring C=C (no stray unsaturation).
+    sp2_atoms = ring_atoms - sp3_atoms
+    if len(sp2_atoms) != 2 * len(ring_double_bonds):
+        return None
+    # A plain (non-suffix) sp3 ring atom must be a pure hydrocarbon (no off-ring
+    # heavy neighbour) — _partial_sat_pcg already guarantees no non-suffix
+    # heteroatom exists, so this is belt-and-braces.
+    for idx in sp3_atoms - suffix_atoms:
+        for nb in mol.GetAtomWithIdx(idx).GetNeighbors():
+            if nb.GetIdx() not in ring_atoms and nb.GetAtomicNum() > 1:
+                return None
+
+    # --- naphthalene fixed numbering (bond-order-agnostic automorphism match) ---
+    parent = _HYDRO_FUSED_PARENT_BY_SIZE.get(len(ring_atoms))
+    if parent is None:
+        return None
+    entry = POLYCYCLIC_DATA.get(parent)
+    if entry is None:
+        return None
+    numbering = entry.get('iupac_numbering') or {}
+    canonical_smiles = entry.get('canonical_smiles')
+    if not numbering or not canonical_smiles:
+        return None
+    canonical_mol = Chem.MolFromSmiles(canonical_smiles)
+    if canonical_mol is None:
+        return None
+    params = Chem.AdjustQueryParameters.NoAdjustments()
+    params.makeBondsGeneric = True
+    params.aromatizeIfPossible = False
+    params.adjustDegree = False
+    query = Chem.AdjustQueryProperties(canonical_mol, params)
+    matches = mol.GetSubstructMatches(query, uniquify=False)
+    if not matches:
+        return None
+    n_canonical = canonical_mol.GetNumAtoms()
+
+    # Ring degree: a fusion carbon carries 3 ring bonds. A suffix on such a carbon
+    # (0 mancude H) consumes its added hydrogen, so it is not itself cited as (nH).
+    ring_degree = {
+        idx: sum(1 for nb in mol.GetAtomWithIdx(idx).GetNeighbors()
+                 if nb.GetIdx() in ring_atoms)
+        for idx in ring_atoms
+    }
+
+    # Adjacency among the reduced set (for the maximum matching,.
+    sat_adj: Dict[int, Set[int]] = {i: set() for i in sp3_atoms}
+    for bond in bonds_of(mol):
+        i, j = bond.GetBeginAtomIdx(), bond.GetEndAtomIdx()
+        if i in sp3_atoms and j in sp3_atoms:
+            sat_adj[i].add(j)
+            sat_adj[j].add(i)
+
+    best_key = None
+    best: Optional[Tuple[List[Any], List[Any]]] = None
+    for match in matches:
+        if len(match) != n_canonical:
+            continue
+        loc = {match[c]: l for c, l in numbering.items() if c < len(match)}
+        if set(loc) != ring_atoms:
+            continue
+        # Maximum matching of the reduced ring atoms: matched adjacent pairs remove
+        # a ring double bond -> no added H); unmatched atoms each need
+        # one added/indicated H.
+        matched, unmatched = _max_oxo_matching(sat_adj, sp3_atoms, loc)
+        # A matched (double-bond-removing) pair must be TWO suffix carbons; a
+        # matched plain atom is a 'hydro' (dihydro) form -> a separate build.
+        if any(a not in suffix_atoms for a in matched):
+            continue
+        # Added indicated hydrogen: an unmatched reduced atom, EXCEPT a ring-fusion
+        # carbon that bears the suffix (its hydrogen is consumed by the suffix).
+        added_ih = {a for a in unmatched
+                    if not (ring_degree[a] >= 3 and a in suffix_atoms)}
+        # Any unmatched atom NOT cited as added-IH must be a suffix carbon (a
+        # fusion suffix) — otherwise a saturated position is unexplained.
+        if any(a not in suffix_atoms for a in (unmatched - added_ih)):
+            continue
+        suffix_locs = sorted((loc[a] for a in suffix_atoms), key=_locant_key)
+        ih_locs = sorted((loc[a] for a in added_ih), key=_locant_key)
+        key = (
+            [_locant_key(x) for x in suffix_locs],
+            len(ih_locs),
+            [_locant_key(x) for x in ih_locs],
+        )
+        if best_key is None or key < best_key:
+            best_key = key
+            best = (suffix_locs, ih_locs)
+    if best is None:
+        return None
+    suffix_locs, ih_locs = best
+
+    count = len(suffix_atoms)
+    words = _ADDED_H_SUFFIX_WORDS.get(pcg_kind)
+    suffix_word = words.get(count) if words else None
+    if suffix_word is None:
+        return None
+    # (a): elide the parent's terminal 'e' only before a vowel-initial
+    # suffix (single -ol/-amine); the multiplied di-/tri- forms keep it.
+    stem = parent[:-1] if (parent.endswith('e') and suffix_word[0] in 'aeiou') else parent
+    sloc = ','.join(_locant_display(x) for x in suffix_locs)
+    ih_str = ('(' + ','.join(f"{_locant_display(x)}H" for x in ih_locs) + ')') if ih_locs else ''
+    return f"{stem}-{sloc}{ih_str}-{suffix_word}"
+
+
+# =============================================================================
 # Ring peroxol suffix on a partially-saturated fused carbocycle
 # =============================================================================
 
@@ -1361,14 +1605,20 @@ def _ring_carbonyl_carbons(mol, ring_set: Set[int]) -> List[int]:
     return out
 
 
-def _ring_imine_carbons(mol, ring_set: Set[int]) -> List[int]:
-    """Ring carbons bearing an exocyclic bare imine =NH, suitable for
-    the -imine / -diimine suffix with the same added-indicated-H numbering as -one.
+def _ring_imine_carbons(mol, ring_set: Set[int],
+                        include_nsub: bool = False) -> List[int]:
+    """Ring carbons bearing an exocyclic imine =NH / =N-R, suitable
+    for the -imine / -diimine suffix with the same added-indicated-H numbering as
+    -one.
 
-    The nitrogen must be exocyclic, double-bonded, degree 1 (no N-substituent) and
-    neutral: an N-substituted =NR or a charged =N(+) is outside the v1 scope and
-    the imine branch declines (fail closed) — the degree-1 requirement here is the
-    gate that keeps N-methyl ring imines from reaching the suffix engine."""
+    The nitrogen must be exocyclic, double-bonded and neutral. By default only a
+    BARE imine (degree 1, =NH) qualifies — the degree-1 requirement is the gate
+    that keeps N-substituted ring imines off the bare-imine path. With
+    ``include_nsub=True`` an N-substituted imine (degree 2, =N-R where the single
+    non-ring neighbour is a carbon substituent) also qualifies; the N-substituent
+    is then rendered by the caller as an ``N``-locanted prefix
+    (``N1,N4-dimethylnaphthalene-1,4-diimine``, /. A charged
+    =N(+) is out of scope in both modes (fail closed)."""
     out: List[int] = []
     for idx in ring_set:
         atom = mol.GetAtomWithIdx(idx)
@@ -1376,13 +1626,20 @@ def _ring_imine_carbons(mol, ring_set: Set[int]) -> List[int]:
             continue
         for bond in atom.GetBonds():
             o = bond.GetOtherAtom(atom)
-            if (bond.GetBondType() == Chem.BondType.DOUBLE
+            if not (bond.GetBondType() == Chem.BondType.DOUBLE
                     and o.GetSymbol() == 'N'
                     and o.GetIdx() not in ring_set
-                    and o.GetDegree() == 1
                     and o.GetFormalCharge() == 0):
+                continue
+            if o.GetDegree() == 1:
                 out.append(idx)
                 break
+            if include_nsub and o.GetDegree() == 2 and o.GetTotalNumHs() == 0:
+                others = [nb for nb in o.GetNeighbors() if nb.GetIdx() != idx]
+                if (len(others) == 1 and others[0].GetSymbol() == 'C'
+                        and others[0].GetIdx() not in ring_set):
+                    out.append(idx)
+                    break
     return out
 
 
@@ -1441,6 +1698,23 @@ def _fused_ring_system_atoms(rings, seed_atoms) -> Set[int]:
         if atoms & seed_atoms:
             return atoms
     return set()
+
+
+def _collect_subtree(mol, start: int, blocked: Set[int]) -> Set[int]:
+    """BFS the connected atoms reachable from ``start`` without crossing any atom
+    in ``blocked``. Used to gather an exocyclic N-substituent subtree (the imine
+    N is the blocked cut point), so the group can be named on its own."""
+    seen: Set[int] = set()
+    stack = [start]
+    while stack:
+        i = stack.pop()
+        if i in seen or i in blocked:
+            continue
+        seen.add(i)
+        for nb in mol.GetAtomWithIdx(i).GetNeighbors():
+            if nb.GetIdx() not in blocked:
+                stack.append(nb.GetIdx())
+    return seen
 
 
 def _elide_terminal_e(stem: str) -> str:
@@ -1783,10 +2057,20 @@ def name_cyclic_oxo_compound(mol: Chem.Mol) -> Optional[str]:
                 suffix_table = _tab
                 suffix_hetero_name = _hn
                 break
+    nsub_imine_mode = False
     if not all_carbonyls:
         all_carbonyls = set(_ring_imine_carbons(mol, all_ring_atoms))
         if not all_carbonyls:
-            return None
+            # N-substituted ring imine (=N-R), rendered with an N-locant prefix
+            # (N1,N4-dimethylnaphthalene-1,4-diimine, /. The
+            # quinoid-diimine mirror of the =O quinone path above; the -imine
+            # suffix machinery is suffix-agnostic and the N-substituent(s) are
+            # rendered after the base name below.
+            all_carbonyls = set(_ring_imine_carbons(mol, all_ring_atoms,
+                                                    include_nsub=True))
+            if not all_carbonyls:
+                return None
+            nsub_imine_mode = True
         suffix_symbol = 'N'
         suffix_table = {1: 'imine', 2: 'diimine', 3: 'triimine'}
         suffix_hetero_name = 'imino'
@@ -1795,7 +2079,7 @@ def name_cyclic_oxo_compound(mol: Chem.Mol) -> Optional[str]:
         if suffix_symbol == 'O':
             return _ring_carbonyl_carbons(mol, rs)
         if suffix_symbol == 'N':
-            return _ring_imine_carbons(mol, rs)
+            return _ring_imine_carbons(mol, rs, include_nsub=nsub_imine_mode)
         return _ring_chalcogenone_carbons(mol, rs, suffix_symbol)
 
     ring_set: Set[int] = _fused_ring_system_atoms(rings, all_carbonyls)
@@ -1838,9 +2122,58 @@ def name_cyclic_oxo_compound(mol: Chem.Mol) -> Optional[str]:
             if (bond.GetBondType() == Chem.BondType.DOUBLE and o.GetSymbol() == suffix_symbol
                     and o.GetIdx() not in ring_set and o.GetDegree() == 1):
                 carbonyl_oxygens.add(o.GetIdx())
+    # N-substituted ring imine: the imine N is degree-2 (not caught by the
+    # degree-1 loop above), so add it to the suffix-atom set and collect its
+    # exocyclic substituent subtree for N-locant prefix rendering. nsub_by_carbon
+    # maps each imine C -> (N idx, frozenset(substituent atoms), attach C).
+    nsub_by_carbon: Dict[int, tuple] = {}
+    nsub_all: Set[int] = set()
+    if nsub_imine_mode:
+        for c in carbonyls:
+            ca = mol.GetAtomWithIdx(c)
+            n_atom = None
+            for bond in ca.GetBonds():
+                o = bond.GetOtherAtom(ca)
+                if (bond.GetBondType() == Chem.BondType.DOUBLE
+                        and o.GetSymbol() == 'N' and o.GetIdx() not in ring_set
+                        and o.GetFormalCharge() == 0):
+                    n_atom = o
+                    break
+            if n_atom is None:
+                return None
+            carbonyl_oxygens.add(n_atom.GetIdx())
+            if n_atom.GetDegree() == 1:
+                continue  # a bare =NH mixed in — no N-substituent to render
+            attach = [nb for nb in n_atom.GetNeighbors() if nb.GetIdx() != c]
+            if (len(attach) != 1 or attach[0].GetSymbol() != 'C'
+                    or attach[0].GetIdx() in ring_set):
+                return None
+            sub_atoms = _collect_subtree(mol, attach[0].GetIdx(),
+                                         blocked={n_atom.GetIdx()})
+            if sub_atoms & (all_ring_atoms | carbonyl_oxygens):
+                return None  # substituent loops back into the ring / another suffix N
+            # (the Blue Book): an ACYL (or any heteroatom-bearing)
+            # N-substituent makes a group SENIOR to the ring imine — =N-C(=O)R is an
+            # N-ylidene amide (amide class 11 > imine class 20), not an N-imine
+            # prefix. Only a plain alkyl/alkenyl (all-carbon) N-substituent is an
+            # N-prefix here; fail closed on anything else, else the -imine suffix
+            # would falsely outrank the senior amide (correct N-acyl->amide naming
+            # is a buildable follow-on).
+            if any(mol.GetAtomWithIdx(a).GetSymbol() != 'C' for a in sub_atoms):
+                return None
+            nsub_by_carbon[c] = (n_atom.GetIdx(), frozenset(sub_atoms),
+                                 attach[0].GetIdx())
+            nsub_all |= sub_atoms
     substituent_atoms = {a.GetIdx() for a in atoms_of(mol)
-                         if a.GetIdx() not in ring_set and a.GetIdx() not in carbonyl_oxygens}
+                         if a.GetIdx() not in ring_set
+                         and a.GetIdx() not in carbonyl_oxygens
+                         and a.GetIdx() not in nsub_all}
     substituted = bool(substituent_atoms)
+    # v1 N-substituted-imine scope: the ONLY substituents are on the imine
+    # nitrogen(s). A ring substituent alongside them is a buildable follow-on —
+    # fail closed (the general renderer would silently drop the N-substituents).
+    if nsub_imine_mode and substituted:
+        return None
     if substituted:
         # Substituted ring-ketones (monocyclic OR fused): the engine fires only
         # when the ring ketone(s) IS the principal characteristic group, verified
@@ -1976,6 +2309,40 @@ def name_cyclic_oxo_compound(mol: Chem.Mol) -> Optional[str]:
         hy_sorted = sorted(hydro, key=lambda a: _locant_key(loc[a]))
         sep = '-' if name[:1].isdigit() else ''  # hyphen before a digit-initial parent (1H-inden...)
         name = f"{','.join(_locant_display(loc[a]) for a in hy_sorted)}-{prefix}{sep}{name}"
+
+    # N-substituted ring imine: render each N-substituent as an N-locant prefix
+    # (N1,N4-dimethylnaphthalene-1,4-diimine), grouped by name with N-locants
+    # sorted and groups alphabetized. v1 scope: simple (pure-alpha)
+    # N-substituents only, and no hydro parent (the detachable-vs-hydro front
+    # ordering is a buildable follow-on) — fail closed on either, keeping 0-wrong.
+    if nsub_imine_mode and nsub_by_carbon:
+        if hydro:
+            return None
+        from ..assembly.substituent_enumerator import name_substituent
+        from ..assembly.naming_utils import get_multiplier_prefix, alpha_sort_key
+        from collections import defaultdict
+        #: the N-locant carries a number only to distinguish among
+        # several imine nitrogens (N1,N4-dimethyl...); a single imine N is cited
+        # as the bare italic 'N' (N-methylnaphthalen-2(1H)-imine).
+        number_n = len(carbonyls) >= 2
+        by_name: Dict[str, List[str]] = defaultdict(list)
+        for c, (_n_idx, sub_atoms, attach_idx) in nsub_by_carbon.items():
+            sub_name = name_substituent(mol, set(sub_atoms), attach_idx)
+            if not sub_name or not sub_name.isalpha():
+                return None  # complex N-substituent: out of v1 scope, fail closed
+            nloc = f"N{_locant_display(loc[c])}" if number_n else "N"
+            by_name[sub_name].append(nloc)
+        parts = []
+        for nm in sorted(by_name, key=alpha_sort_key):
+            nlocs = sorted(by_name[nm], key=lambda s: _locant_key(s[1:]))
+            parts.append(','.join(nlocs) + '-'
+                         + get_multiplier_prefix(len(nlocs), nm) + nm)
+        # (a) (the Blue Book): a hyphen separates the prefix from a
+        # DIGIT-initial parent ('N-methyl' + '1H-inden-1-imine' ->
+        # 'N-methyl-1H-inden-1-imine'); no hyphen before a letter-initial parent
+        # ('N1,N4-dimethyl' + 'naphthalene-1,4-diimine'). Mirrors the hydro render.
+        sep = '-' if name[:1].isdigit() else ''
+        name = '-'.join(parts) + sep + name
 
     # Substituents (monocyclic, hydrocarbon/halogen): render them as alphabetized
     # prefixes against THIS numbering, with the carbonyl 'oxo' excluded (it is the

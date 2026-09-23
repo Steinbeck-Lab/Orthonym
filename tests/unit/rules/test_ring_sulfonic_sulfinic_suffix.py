@@ -51,8 +51,21 @@ RING_N_TARGETS = [
 
 # Positive controls — the existing, correct paths MUST stay working.
 CONTROLS = [
-    # carbocyclic sulfonic (cycloalkane path, not the heterocycle namer)
-    ("OS(=O)(=O)C1CCCCC1", "cyclohexane-1-sulfonic acid"),
+    # carbocyclic sulfonic (cycloalkane path, not the heterocycle namer).
+    # change-asserted-value (v52 P1 a review-fix a performance pass, Task D2): this used
+    # to assert 'cyclohexane-1-sulfonic acid', which (c)
+    # (the Blue Book) "the locant '1' is omitted... (c) in
+    # monosubstituted homogeneous monocyclic rings" forbids as a PIN — the
+    # verbatim worked example for the SAME sulfonic-acid suffix family is
+    # 'benzenesulfonic acid (PIN)' (the Blue Book), unlocanted, and
+    # 'cyclohexanecarboxylic acid (PIN)' (the Blue Book,:29888) is
+    # the same licence on the same ring for a different multi-atom appended
+    # suffix. Confirmed by a mutation test (reverting the D2 fix reproduces
+    # the old 'cyclohexane-1-sulfonic acid' value exactly) and by internal
+    # consistency with this engine's own pre-existing, independently-authored
+    # `rules/benzene.py` branch, which already omits the locant for this
+    # identical suffix family on the aromatic monocyclic ring.
+    ("OS(=O)(=O)C1CCCCC1", "cyclohexanesulfonic acid"),
     # chain sulfinic (C-anchored; the widening must not disturb it)
     ("CCS(=O)O", "ethanesulfinic acid"),
     # R1 ring-N carboxylic acid must be unaffected

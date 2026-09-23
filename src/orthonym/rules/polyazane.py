@@ -26,8 +26,15 @@ from rdkit import Chem
 from ..perception.molcache import atoms_of  # audit 2026-09-03 (S2): per-call atom/bond tuples
 from .substituent_purity import organyl_prefix_name
 
-# Saturated homogeneous N-chain PINs. n=2 is the retained "hydrazine".
-_SAT_MULT = {3: 'tri', 4: 'tetra', 5: 'penta', 6: 'hexa', 7: 'hepta', 8: 'octa'}
+# Saturated homogeneous N-chain PINs /. n=2 is the
+# retained "hydrazine"; n>=3 is "<numerical prefix>azane".
+# (the Blue Book): "The final 'a' of a numerical prefix is not elided
+# before 'azane'" -- so nona+azane = "nonaazane" (both a's), built by the
+# `f"{mult}azane"` join in `_saturated_parent` (which never elides). The 9..12
+# prefixes are the basic multiplying prefixes (nona/deca/undeca/dodeca);
+# each `<mult>azane` was OPSIN-round-trip verified before adding (0-wrong).
+_SAT_MULT = {3: 'tri', 4: 'tetra', 5: 'penta', 6: 'hexa', 7: 'hepta', 8: 'octa',
+             9: 'nona', 10: 'deca', 11: 'undeca', 12: 'dodeca'}
 _SUB_MULTIPLIER = {1: '', 2: 'di', 3: 'tri', 4: 'tetra'}
 
 
@@ -174,6 +181,20 @@ def _format_n2_substituents(subs: List[Tuple[int, str]],
         prefix_citation_sort_key,
     )
     if len(subs) == 1:
+        # (the Blue Book, "Locants are not omitted when there is a
+        # possibility of isomers"): a positional isotopic label on the OTHER nitrogen
+        # of the 2-N parent breaks the symmetry that licensed the single substituent's
+        # omitted locant, so it is restored -- ``1-phenyl(2-15N)hydrazine``, not
+        # ``phenyl(2-15N)hydrazine``. The label is stripped before this parent is
+        # named; the fact is carried down by the ambient parent-positional isotope
+        # scope that ``rules/isotopes.py`` enters ONLY when a labelled atom sits on the
+        # PARENT (here the hydrazine N). The detachable prefix is numbered first, so it
+        # takes locant 1 (the label then falls on N2). Off the isotope path the flag is
+        # unset and the licensed omission stands (``phenylhydrazine``). Diazene's single
+        # substituent keeps its omission (each N is =N-, one substitutable valence).
+        from ..assembly.locant_omission import parent_scope_has_positional_isotope
+        if not is_diazene and parent_scope_has_positional_isotope():
+            return f"1-{enclose_if_compound(subs[0][1])}"
         return enclose_if_compound(subs[0][1])
 
     if is_diazene:

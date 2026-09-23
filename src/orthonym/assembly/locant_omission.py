@@ -65,6 +65,8 @@ __all__ = [
     "forced_locant_reason",
     "isotopic_naming_scope",
     "scope_has_isotopic_modification",
+    "isotope_parent_positional_scope",
+    "parent_scope_has_positional_isotope",
 ]
 
 #: ``:3007`` -- "Except for hydrogen atoms attached to chalcogen atoms, such as in
@@ -702,6 +704,50 @@ def scope_has_isotopic_modification() -> bool:
     above for why this is separate from:func:`locants_are_forced`.
     """
     return _ISOTOPIC_NAMING_SCOPE.get() is not None
+
+
+# --------------------------------------------------------------------------------- #
+# "THE PARENT HYDRIDE ITSELF CARRIES A POSITIONAL ISOTOPE" -- stronger than #
+# forced_locant_scope, for the licences that restore a PARENT's OWN omitted locant #
+# --------------------------------------------------------------------------------- #
+# ⚠ MEASURED 2026-09-22 (v52 a phase Task 4).:func:`locants_are_forced` above is
+# TRUE whenever ANY locant in the whole naming is forced -- including a locant that a
+# label buried in a SUBSTITUENT needs (``(1,1,2,2,2-pentafluoro(1-13C)ethyl)benzene``:
+# the ¹³C sits on the ethyl's C1, so ``forced_locant_scope`` is entered, yet the
+# benzene ring is symmetric and its monosubstituted-prefix locant must stay omitted).
+# The licences that only ever restore a SUFFIX/ambient locant already in the parent's
+# own scope (L3, L4, ``handlers/_handler_shared.py:440``, ``should_omit_locant_one``
+# Rule 3b) may consult the weaker:func:`locants_are_forced`. But a licence that
+# restores the PARENT's OWN substituent-position locant -- ``should_omit_locant_one``
+# Rule 4 (monosubstituted carbocyclic ring) and the ylidene-hydrazine handler -- must
+# fire ONLY when the isomerism is real, i.e. when the PARENT SKELETON ITSELF carries
+# the positional label, ``:44202`` "Locants are not omitted when there is a
+# possibility of isomers"): ``1-(79Br)bromo(2-13C)benzene`` (ring carbon labelled) but
+# NOT ``(pentafluoro(1-13C)ethyl)benzene`` (substituent carbon labelled). This flag is
+# entered by ``rules/isotopes.py`` alongside ``forced_locant_scope``, but ONLY when a
+# labelled atom sits on the parent skeleton (see ``_parent_carries_positional_isotope``).
+_ISOTOPE_PARENT_POSITIONAL: "contextvars.ContextVar[Optional[str]]" = (
+    contextvars.ContextVar("orthonym_isotope_parent_positional", default=None))
+
+
+@contextlib.contextmanager
+def isotope_parent_positional_scope(reason: str = "isotope"):
+    """Declare that the PARENT skeleton being named carries a positional isotope
+    label. Entered by ``rules/isotopes.py`` alongside
+    :func:`forced_locant_scope`, and only when a labelled atom sits on the parent
+    hydride itself, so a licence that restores the parent's OWN
+    substituent-position locant can decline without over-citing the cases where the
+    label sits in a substituent (see the module comment above)."""
+    token = _ISOTOPE_PARENT_POSITIONAL.set(reason)
+    try:
+        yield
+    finally:
+        _ISOTOPE_PARENT_POSITIONAL.reset(token)
+
+
+def parent_scope_has_positional_isotope() -> bool:
+    """True when an enclosing:func:`isotope_parent_positional_scope` is active."""
+    return _ISOTOPE_PARENT_POSITIONAL.get() is not None
 
 
 def scope_forces_locants(

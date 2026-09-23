@@ -87,6 +87,7 @@ from ..naming_utils import (
     format_suffix_with_locants,
     get_suffix_multiplier_prefix,
     should_omit_locant_one,
+    strip_chalcogen_acid_locant,
 )
 
 logger = logging.getLogger(__name__)
@@ -573,6 +574,108 @@ def _ring_suffix_locant_is_trivial(features, oriented_ring, ring_idx_to_locant,
     return True
 
 
+def _sulfur_oxoacid_ring_suffix_locant_is_trivial(
+        features, oriented_ring, ring_idx_to_locant,
+        suffix_ring_atoms=None) -> bool:
+    """(c): may a ring -sulfonic/-sulfinic acid suffix drop its locant?
+
+    v52 P1 a review-fix a performance pass (Task D2). Sibling of `_ring_suffix_locant_is_trivial`
+    above, licensing the SAME "monosubstituted homogeneous ring" omission
+    (c), the Blue Book: "the locant '1' is omitted in
+    monosubstituted homogeneous monocyclic rings") for a MULTI-ATOM exocyclic
+    suffix group (S + its =O/-OH ligands), which the sibling's "ring + exactly
+    ONE extra heavy atom" heavy-atom-count test structurally cannot admit: a
+    free sulfonic acid is always ring + 4 atoms (S, =O, =O, -OH); sulfinic is
+    ring + 3 (S, =O, -OH). BB-verbatim unlocanted sulfur stem:
+    '4-(cyclohexanesulfinyl)morpholine-2-carboxylic acid (PIN)'
+    (the Blue Book) — the acyl prefix is built by stripping this SAME
+    '...sulfinic acid' suffix (`rules.sulfur.name_sulfonyl_halide` /
+    `_acid_stem_unsaturated_oxide_prefix` cap-and-rename), so fixing the acid
+    suffix here also fixes 'cyclohexanesulfinyl chloride'.
+
+    DENY-BY-DEFAULT, the Blue Book), same discipline as the sibling
+    function — every clause below must hold, and each is independently
+    load-bearing (mirrors the sibling's documented over-determination):
+      * `features.principal_group` is exactly 'sulfonic_acid' or
+        'sulfinic_acid' — narrow class list, nothing wider (a sulfonamide or
+        sulfonate ester is a different suffix shape and is NOT covered);
+      * the ring is monocyclic, all-carbon, non-aromatic, uncharged, and every
+        ring bond is SINGLE — any ring unsaturation makes positions distinct
+        and denies (D3's 'cyclohex-3-ene-1-sulfonic acid' keeps its locant);
+      * the WHOLE molecule is nothing but the ring plus the atoms of the ONE
+        principal-group match — any OTHER substituent, on the ring or hanging
+        off the acid group itself (a substituted sulfonyl halide's halogen is
+        a DIFFERENT match shape and is excluded structurally, since halide
+        acids are named via the acid-name rewrite, never reach this function
+        directly), denies;
+      * exactly one match atom (the S) bonds into the ring, at the position
+        the caller is deciding the locant for.
+    """
+    mol = getattr(features, 'mol', None)
+    if mol is None or not oriented_ring:
+        return False
+    from ..locant_omission import locants_are_forced
+    if locants_are_forced():
+        return False
+    if getattr(features, 'principal_group', None) not in (
+            'sulfonic_acid', 'sulfinic_acid'):
+        return False
+    pg_atoms = getattr(features, 'principal_group_atoms', None)
+    if not pg_atoms or len(pg_atoms) != 1:
+        return False
+    match_set = set(pg_atoms[0])
+
+    ring = list(oriented_ring)
+    ring_set = set(ring)
+
+    ring_info = mol.GetRingInfo()
+    # Monocyclic only: every ring atom belongs to exactly one ring, and the
+    # perceived parent is the whole of that ring system.
+    for idx in ring:
+        try:
+            if ring_info.NumAtomRings(idx) != 1:
+                return False
+        except Exception:
+            return False
+    if not any(set(r) == ring_set for r in ring_info.AtomRings()):
+        return False
+
+    from rdkit import Chem as _Chem
+    # All-carbon, uncharged, and every ring bond single.
+    for idx in ring:
+        atom = mol.GetAtomWithIdx(idx)
+        if atom.GetSymbol() != 'C' or atom.GetIsAromatic():
+            return False
+        if atom.GetFormalCharge() != 0:
+            return False
+    for bond in mol.GetBonds():
+        a, b = bond.GetBeginAtomIdx(), bond.GetEndAtomIdx()
+        if a in ring_set and b in ring_set:
+            if bond.GetBondType() != _Chem.BondType.SINGLE:
+                return False
+
+    # Whole-molecule condition, generalised for a multi-atom suffix: nothing
+    # outside the ring except EXACTLY this one acid group's own atoms.
+    outside = {a.GetIdx() for a in mol.GetAtoms() if a.GetIdx() not in ring_set}
+    if outside != match_set:
+        return False
+
+    # Exactly one match atom (the S) bonds into the ring, and it is the ring
+    # atom the caller says the locant is being decided for.
+    anchors = set()
+    for idx in match_set:
+        atom = mol.GetAtomWithIdx(idx)
+        for nbr in atom.GetNeighbors():
+            if nbr.GetIdx() in ring_set:
+                anchors.add(nbr.GetIdx())
+    if len(anchors) != 1:
+        return False
+    if suffix_ring_atoms and anchors != set(suffix_ring_atoms):
+        return False
+
+    return True
+
+
 def _generate_suffix(features: Any) -> Optional["NameFragment"]:
     """Generate suffix fragment for principal group.
 
@@ -599,6 +702,23 @@ def _generate_suffix(features: Any) -> Optional["NameFragment"]:
 
     if not suffix_text:
         return None
+
+    # "Functional replacement in systematic names of carboxylic
+    # acids" (the Blue Book Blue Book;:30215): "... Normally, these
+    # [italic O/S/Se/Te] locants are omitted, because the exact position of
+    # chalcogen atoms is not known or important in acids; such letter
+    # locants are used mainly in naming esters." The Blue Book's own worked
+    # examples split by chalcogen on THIS (simple/handler, no other FG on
+    # the molecule) path: Se/Te drop the designator -- 'hexaneselenoic acid
+    # (PIN)' (:30235), 'benzenecarboselenoic acid (PIN)' (:30293) -- while S
+    # (thio) KEEPS it -- 'hexanethioic O-acid (PIN)' (:30225), 'ethanethioic
+    # O-acid (PIN)' (:30291), 'methanethioic S-acid (PIN)' (:30295). So the
+    # omission here is scoped to Se/Te ONLY: thioic_O_acid/thioic_S_acid are
+    # UNCHANGED, and so are the *_S_acid/*_Se_acid tautomer keys (out of
+    # scope per the SP4 scope guard -- those denote the OTHER tautomer,
+    # whose bare spelling would parse to the wrong structure).
+    if fg_name in ("selenoic_O_acid", "telluroic_O_acid"):
+        suffix_text = strip_chalcogen_acid_locant(suffix_text)
 
     # Get locants for functional group positions on the chain
     locants = ()
@@ -782,7 +902,22 @@ def _generate_suffix(features: Any) -> Optional["NameFragment"]:
                         break
                 if other_subs_exist:
                     break
-            if fg_count > 1 or other_subs_exist:
+            # v52 a review-fix a performance pass D1 "Citation of locants",
+            # the Blue Book): deny-by-default -- if ANY locant in the
+            # scope is essential, ALL locants (incl. the suffix '1') must be
+            # cited. A ring double/triple bond makes the ring's own numbering
+            # essential (the 'ene'/'yne' locant must be cited), so the
+            # appended-suffix locant can no longer be omitted either, even on
+            # an otherwise-monosubstituted ring. Verbatim BB example:
+            # "cyclohexa-2,5-diene-1-carboxylic acid (PIN)" (:29966).
+            # `ring_double_bond_locants` is populated only for `ring_type ==
+            # 'cycloalkene'` (namer.py), i.e. exactly this monocyclic
+            # non-fused scope -- checking it here does not reach into fused
+            # or heterocyclic paths, which take other branches entirely.
+            ring_has_essential_locant = bool(
+                getattr(features, 'ring_double_bond_locants', None)
+            )
+            if fg_count > 1 or other_subs_exist or ring_has_essential_locant:
                 locants = tuple(anchored_locants)
 
     elif (not features.principal_chain
@@ -879,9 +1014,21 @@ def _generate_suffix(features: Any) -> Optional["NameFragment"]:
             _suffix_ring_atoms = {
                 _a for _a, _loc in ring_idx_to_locant.items() if _loc in _wanted
             }
-            if len(fg_locants) == 1 and _ring_suffix_locant_is_trivial(
+            # v52 P1 a review-fix a performance pass Task D2: the sulfur-oxoacid suffixes
+            # (-sulfonic acid / -sulfinic acid) are a MULTI-ATOM exocyclic
+            # group (S + its =O/-OH ligands), so they can never satisfy
+            # `_ring_suffix_locant_is_trivial`'s "ring + exactly one extra
+            # heavy atom" test even once added to its class allowlist --
+            # `_sulfur_oxoacid_ring_suffix_locant_is_trivial` is the sibling
+            # licence sized for that shape.
+            if len(fg_locants) == 1 and (
+                _ring_suffix_locant_is_trivial(
                     features, oriented_ring, ring_idx_to_locant,
-                    suffix_ring_atoms=_suffix_ring_atoms):
+                    suffix_ring_atoms=_suffix_ring_atoms)
+                or _sulfur_oxoacid_ring_suffix_locant_is_trivial(
+                    features, oriented_ring, ring_idx_to_locant,
+                    suffix_ring_atoms=_suffix_ring_atoms)
+            ):
                 locants = ()
 
     # Final safety: reconcile multiplier count with actual locants

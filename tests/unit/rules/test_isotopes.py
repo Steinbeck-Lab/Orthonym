@@ -240,7 +240,14 @@ class TestDeMultiplicationP4542:
         ("[2H]C([2H])([2H])Oc1ccccc1", "(2H3)methoxybenzene"),
         ("[12CH](Cl)(Cl)Cl",        "trichloro(12C)methane"),  # 'tri' but NO leading locant -> inert
         ("[13CH3]OC(C)=O",          "(13C)methyl acetate"),    # front descriptor path
-        ("CC[18OH]",                "(18O)ethan-1-ol"),        # parent-front, unaffected
+        # A locant-free O nuclide on the ``-ol`` suffix stays at the FRONT of the
+        # parent restores the parent locant under isotopic modification:
+        # ``(2-13C)ethan-1-ol [not (2-13C)ethanol]``, the Blue Book). Gold protect pin
+        # W2F-P5-P4 ("parent-front descriptor", OPSIN-RT verified) requires the front
+        # form; the Phase-07 suffix-adjacent spelling ``ethan-1-(18O)ol`` regressed it
+        # and is reverted (only the ``-thiol``/``-selenol``/``-tellurol`` chalcogen
+        # suffixes keep the adjacent slot). Both round-trip to CC[18OH] (0-wrong).
+        ("CC[18OH]",                "(18O)ethan-1-ol"),        # gold W2F-P5-P4, front
     ])
     def test_existing_isotope_placements_unaffected(self, smiles, expected):
         from orthonym.namer import name_compound
@@ -366,11 +373,14 @@ class TestFixACountSubscriptOmission:
 
     def test_trifluoroethane_keeps_subscript_on_ch3(self):
         # REGRESSION PIN: the D sits on the CH3 (C2 of 1,1,1-trifluoroethane, 3 H)
-        # so the subscript is KEPT. (The locant is a separate, pre-existing
-        # omission -- this row remains RIGHT_MOL_NONPIN, so pin only the subscript.)
+        # so the subscript is KEPT. a phase Task 2 ALSO restored the
+        # position locant `2-` -- C2 is a distinguishable position of the parent
+        # hydride, not a symmetric orbit, so requires the locant. The
+        # pre-fix `(2H1)` (no locant) was the Sub-pattern-A defect this task fixes;
+        # the full PIN is now emitted.
         from orthonym.namer import name_compound
         got = name_compound("[2H]CC(F)(F)F", style="systematic")
-        assert "(2H1)" in got, f"subscript must be kept: {got!r}"
+        assert got == "1,1,1-trifluoro(2-2H1)ethane", f"got {got!r}"
 
     def test_fixb_amide_nitrogen_letter_locant(self):
         # FIX-B, the Blue Book): a D on the amide nitrogen takes the letter
@@ -440,7 +450,11 @@ class TestFixACountSubscriptOmission:
         # An O-bound single D before an -oic acid suffix: the omitted (2H) spelling
         # is not parseable by OPSIN 2.9.0, so the placement search falls back to the
         # forced (2H1) form rather than abstaining -- right molecule, non-preferred
-        # spelling, never silence. The two CH2/NH2 groups (count 2) keep (2H2).
+        # spelling, never silence. The NH2 group (count 2) keeps its (2H2) subscript;
+        # the alpha CH2 keeps BOTH subscript and locants -> (2,2-2H2), restored by
+        # a phase Task 2: C2 is a distinguishable position of the
+        # ethanoic-acid parent, exactly like (2,2,2-2H3)ethan-1-ol). Both the
+        # locanted and omitted spellings round-trip to the same molecule (verified).
         #
         # + the Blue Book ((2R)-1-(131I)iodo-3-iodopropan-2-ol): the descriptor is
         # inserted directly before the PART it labels (locant -> descriptor -> affix),
@@ -452,7 +466,7 @@ class TestFixACountSubscriptOmission:
         n = Orthonym(style="pin", general_fallback=True,
                       general_fallback_unverified=True, allow_aromatic_general=True)
         got = n.name_tiered("[2H]OC(=O)C([2H])([2H])N([2H])[2H]").get("name")
-        assert got == "2-(2H2)amino(2H2)ethan(2H1)oic acid", f"got {got!r}"
+        assert got == "2-(2H2)amino(2,2-2H2)ethan(2H1)oic acid", f"got {got!r}"
 
 
 class TestIsotopeDescriptorPlacementAndNestedBracket:

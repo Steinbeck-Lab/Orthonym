@@ -151,9 +151,25 @@ def name_anhydride(features) -> Optional[str]:
         dione = _name_cyclic_anhydride_dione(mol, c1_idx, c2_idx, bridge_o, ring_set)
         if dione:
             return dione
-        # Fallback: general-nomenclature '{diacid} anhydride' (non-PIN, NOT the
-        # wrong molecule for a simple all-carbon ring) for anything the dione namer
-        # declines.
+        # Fallback: general-nomenclature '{diacid} anhydride' (non-PIN) is only a
+        # valid decomposition when the ring holds nothing but the bridge O, the
+        # two carbonyl carbons and ordinary chain carbons -- i.e. a REAL diacid.
+        # A ring heteroatom besides the bridge O (e.g. the ring N of the cyclic
+        # imide/anhydride hybrid 1,3-oxazetidine-2,4-dione,, where the
+        # SMARTS core also matches because the ring O happens to bridge both
+        # carbonyls directly) is not part of any diacid and `total_chain_length`
+        # (a plain count of ring carbons) silently DROPS it -- 'ethanedioic
+        # anhydride' for a molecule that has a ring N is a wrong-molecule
+        # emission, not a degrade. Decline instead, so principal-group
+        # resolution can fall through to the next-senior group (imide) and its
+        # dione-suffix path.
+        extra_ring_hetero = any(
+            idx not in (bridge_o, c1_idx, c2_idx)
+            and mol.GetAtomWithIdx(idx).GetSymbol() != 'C'
+            for idx in ring_set
+        )
+        if extra_ring_hetero:
+            return None
         return _name_cyclic_anhydride(total_chain_length)
 
     # W3-P06 Task 3: the diacyl halide of dicarbonic acid,

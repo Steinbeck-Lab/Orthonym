@@ -1589,6 +1589,63 @@ def emit_secondary_amine_azanide(mol, anion_idx: int, style: str) -> str:
     return name
 
 
+def emit_primary_amine_anide(mol, anion_idx: int, style: str) -> str:
+    """ (the Blue Book, ``benzenaminide (PIN)``): a PRIMARY
+    amine anion R-[NH-] named on the SYSTEMATIC amine parent, converting the
+    ``-amine`` suffix to ``-aminide``.
+
+    The default ionize seam converts ``amine``->``aminide`` on the re-entered
+    NEUTRAL name; that already covers a CHAIN amine (``methanaminide``,
+    ``ethanaminide``, because the neutral is the systematic ``methanamine`` etc.).
+    But an AROMATIC / ring primary amine re-enters as the RETAINED headline
+    ``aniline`` -- which carries no ``-amine`` suffix token to convert, and the
+    engine never emits the systematic ``benzenamine`` (``rules/benzene.py`` returns
+    ``aniline``; ``rules/radicals.py`` fails closed on exactly this gap). So build
+    the systematic amine parent here: delete the amine N, name the remaining parent
+    hydride (`` -> ``benzene``), append ``amine`` (eliding the parent's
+    trailing ``e``), then convert ``amine``->``aminide``.
+
+    FULL-InChIKey RT-gated (0-wrong): a substituted / heteroatom parent whose
+    bare (locant-omitted) amine spelling does NOT round-trip -- ``toluenamine``,
+    ``pyridinamine`` -- is REJECTED and the caller abstains. Scope: a single
+    ACYCLIC primary-amine N (charge -1, exactly one H, exactly one heavy
+    neighbour, a carbon) whose parent fragment (N removed) is one connected
+    component the pipeline can name. Fail-closed ('') otherwise. Placed AFTER the
+    ionize seam so it only ever converts a would-be ABSTAIN (never renames an
+    already-valid aminide)."""
+    a = mol.GetAtomWithIdx(anion_idx)
+    if (a.GetSymbol() != 'N' or a.GetFormalCharge() != -1
+            or a.GetTotalNumHs() != 1 or a.IsInRing() or a.GetIsAromatic()):
+        return ''
+    heavy = [nb for nb in a.GetNeighbors() if nb.GetSymbol() != 'H']
+    if len(heavy) != 1 or heavy[0].GetSymbol() != 'C':
+        return ''
+    rw = Chem.RWMol(mol)
+    rw.RemoveAtom(anion_idx)
+    frag = rw.GetMol()
+    try:
+        Chem.SanitizeMol(frag)
+    except (RuntimeError, ValueError):
+        return ''
+    if len(Chem.GetMolFrags(frag)) != 1:
+        return ''
+    frag_smi = Chem.MolToSmiles(frag)
+    if not frag_smi:
+        return ''
+    try:
+        parent = _reenter(frag_smi, style)
+    except (RecursionError, ValueError, RuntimeError):
+        return ''
+    if not parent or _is_malformed_parent(parent):
+        return ''
+    from .ions import apply_ion_suffix_to_name
+    amine_name = (parent[:-1] if parent.endswith('e') else parent) + 'amine'
+    aminide = apply_ion_suffix_to_name(amine_name, -1)
+    if aminide and _full_inchikey_rt_ok(mol, aminide):
+        return aminide
+    return ''
+
+
 def emit_acylium(mol, cation_idx: int, style: str) -> str:
     """ (BB 41623 PIN): name an acylium cation R-C(+)=O.
 
@@ -2149,6 +2206,23 @@ def route_charged(mol, style: str = 'pin') -> str:
     from ..perception.ions import get_radical_sites
     radical_sites = get_radical_sites(mol)
 
+    # The common neutralize/ionize TAIL (Step 4+) is shared by the cation and anion
+    # single-sign branches. One late anion-only tail fallback reads ``_single``, which
+    # is assigned ONLY inside the `elif n_anions and not n_cations` branch. A
+    # single-CATION shape that falls through to the tail with a falsy ``ionized`` hit
+    # ``if _single == {'aminide'} …`` with ``_single`` UNBOUND -> an UnboundLocalError
+    # (surfaced on a silicon cation; caught upstream as an abstain, so 0-wrong held,
+    # but a caught crash is a latent robustness defect). Seed ``_single`` with a no-op
+    # default so a cation reaches the final ``return ''`` cleanly. ``anion_is_iminide``
+    # and ``anion_override_fg`` ALREADY have safe defaults further down before any tail
+    # read; they are re-seeded here only for locality/symmetry (harmless no-ops).
+    # Behaviour-preserving: the anion branch overwrites ``_single``, and the only tail
+    # branch that EMITS is gated on ``anion_override_fg is not None`` -> a no-op for a
+    # cation. No new emission.
+    _single: set = set()
+    anion_is_iminide = False
+    anion_override_fg = None
+
     if n_anions == 0 and n_cations == 0 and not radical_sites:
         return ''  # nothing charged/radical here (internal-only charge -> neutral)
 
@@ -2170,7 +2244,12 @@ def route_charged(mol, style: str = 'pin') -> str:
         if cc == 'onium':
             from .ions import emit_chalcogen_ylium
             cy = emit_chalcogen_ylium(mol, sites['cations'][0]['atom_idx'])
-            if cy:
+            # 0-wrong RT gate (mirrors the emit_halogen_onium / emit_onium_hydride_parent
+            # siblings below): emit_chalcogen_ylium names its carbon substituent via the
+            # shared classify_substituent, so a mis-named ligand (e.g. the cyano fix
+            # widening what that helper returns) must be full-InChIKey verified before
+            # shipping. [S+]C#N -> cyanosulfanylium is now proven, not lucky.
+            if cy and _cation_name_rt_ok(cy, mol):
                 return cy
 
     # (the Blue Book): a disubstituted halogen(III) cation R2X+ (diaryl-
@@ -2199,6 +2278,43 @@ def route_charged(mol, style: str = 'pin') -> str:
         ur = emit_uronium(mol, sites)
         if ur and _uronium_rt_ok(ur, mol):
             return ur
+
+    # (the Blue Book, "ethylideneoxidanium (PIN)":41463, "acetyloxidanium
+    # (PIN)":41474): a SUBSTITUTED mononuclear chalcogen cation R(n)X+ (X = O/S/Se/
+    # Te, +1, not in a ring, not bonded to another chalcogen) is named on the parent
+    # hydride oxidane/sulfane/selane/tellane + '-ium' with alkyl / acyl / alkylidene
+    # substituent prefixes -- the systematic PIN, NOT the '-a'/'-onia'-replacement
+    # spelling (CC=[OH+] -> ethylideneoxidanium, not 1-oxaprop-1-en-1-ium). The
+    # neutralize/re-enter path cannot build it (the neutral chalcogen is a different
+    # constitution), so emit_onium_hydride_parent owns it directly. Tightly scoped
+    # (mononuclear chalcogen, +1) and RT-gated (0-wrong): a mis-built name fails
+    # CLOSED. Runs after the ylidene/halogen/uronium onium carve-outs above so those
+    # narrower classes win first.
+    if n_cations == 1 and not n_anions:
+        from .ions import emit_onium_hydride_parent
+        oh = emit_onium_hydride_parent(mol, sites['cations'][0]['atom_idx'])
+        if oh and _cation_name_rt_ok(oh, mol):
+            return oh
+
+    # (the Blue Book): a single carbon bearing a DOUBLE (or higher) positive
+    # charge is the geminal, one-atom degenerate of the poly-carbenium — two -ylium
+    # free valences on ONE skeletal carbon (C[C+2]C -> propane-2,2-bis(ylium)).
+    # get_ion_sites reports it as a SINGLE +2 cation, so the >=2-CENTRE poly-ylium
+    # branch (in the n_cations>=2 block below) never sees it and the generic
+    # neutralize/re-enter seam drops a charge (-> 'propylium', a wrong +1 molecule).
+    # emit_poly_cation_ylium (generalized to a per-centre charge multiplicity) builds
+    # the bis(ylium) form. RT-gated (0-wrong): a mis-built name fails CLOSED; the
+    # emitter itself fails closed on rings / substituted / non-carbon shapes, so
+    # every existing single-cation class (onium/ylium carve-outs above, ordinary +1
+    # ylium below) is untouched (a +1 carbon does not enter this >=2-charge branch).
+    if n_cations == 1 and not n_anions:
+        _c0_idx = sites['cations'][0]['atom_idx']
+        _c0_atom = mol.GetAtomWithIdx(_c0_idx)
+        if _c0_atom.GetSymbol() == 'C' and _c0_atom.GetFormalCharge() >= 2:
+            from .ions import emit_poly_cation_ylium
+            _py = emit_poly_cation_ylium(mol, [_c0_idx])
+            if _py and _cation_name_rt_ok(_py, mol):
+                return _py
 
     # a phase (a trace internal notes Q4): the SAME
     # RDKit valence-model artifact documented above for R-S+/R-Se+ also hits
@@ -2286,7 +2402,15 @@ def route_charged(mol, style: str = 'pin') -> str:
                 return ''
             from .ions import emit_parent_hydride_polyvalent_suffixes
             centers = [(s['atom_idx'], s['n_electrons']) for s in radical_sites]
-            return emit_parent_hydride_polyvalent_suffixes(mol, centers) or ''
+            # 0-wrong RT gate: this emitter names substituents via the shared
+            # classify_substituent (widened by the cyano fix) and has no atom-drop
+            # veto of its own, so full-InChIKey verify before shipping; '' on
+            # failure. Every in-scope diyl/triyl/diylidene name round-trips, so no
+            # existing polyvalent radical regresses.
+            poly = emit_parent_hydride_polyvalent_suffixes(mol, centers)
+            if poly and _full_inchikey_rt_ok(mol, poly):
+                return poly
+            return ''
         from .radicals import classify_radical
         rinfo = classify_radical(mol, radical_sites[0])
         if rinfo['subtype'] in ('acyl', 'oxyl', 'aryl', 'aminyl', 'thiyl', 'benzylic'):
@@ -2410,6 +2534,21 @@ def route_charged(mol, style: str = 'pin') -> str:
                 spiro_ium = name_charged_spiro_system(mol, cat_idx)
                 if spiro_ium and _cation_name_rt_ok(spiro_ium, mol):
                     return spiro_ium
+            # (the Blue Book "General rule for systematically naming cationic
+            # centers in parent hydrides";:41388 "1,2,3-trimethyltrisulfan-2-ium
+            # (PIN)",:41390 "2,2-dichloro-1,1,1-trimethyldiphosphan-1-ium (PIN)",
+            #:41429/:41474 dioxidane family): a CATENATED homonuclear chalcogen /
+            # pnictogen cation (trisulfan-2-ium, diphosphan-1-ium, dioxidan-1-ium)
+            # or a substituted MONONUCLEAR pnictogen cation (chlorotri(methyl)-
+            # phosphanium) is named on the parent hydride + '-ium', NOT the
+            # '-a'/'-onia'-replacement form. The emitter declines ('') for
+            # a ring / chalcogen-mononuclear / out-of-scope centre, so the existing
+            # onium path is byte-identical on decline. RT-gate: ship only on a
+            # full-InChIKey match.
+            from .ions import emit_parent_hydride_cumulative_suffix
+            ph_ium = emit_parent_hydride_cumulative_suffix(mol, cat_idx, 'ium')
+            if ph_ium and _cation_name_rt_ok(ph_ium, mol):
+                return ph_ium
         # (R-S+/R-Se+ sulfanylium is intercepted earlier, before the radical-ion
         # bail, because RDKit flags the 1-coordinate chalcogen cation as a radical.)
         #.1 + Table 7.4): a QUATERNARY ammonium N (0 H, degree
@@ -2446,6 +2585,17 @@ def route_charged(mol, style: str = 'pin') -> str:
                 spiro_ium = name_charged_spiro_system(mol, cat_idx)
                 if spiro_ium and _cation_name_rt_ok(spiro_ium, mol):
                     return spiro_ium
+            # (the Blue Book "pentamethylhydrazinium (PIN)"): a CATENATED
+            # homonuclear N cation (a hydrazinium) is named on the retained N-N
+            # parent hydride + '-ium', NOT LINEARIZED by name_quaternary_aminium
+            # (CN(C)[N+](C)(C)C -> pentamethylhydrazinium, not the diazabutan-ium
+            # replacement). The emitter declines ('') for a mononuclear / ring /
+            # out-of-scope N, so the aminium path below is byte-identical on
+            # decline. RT-gate: ship only on a full-InChIKey match.
+            from .ions import emit_parent_hydride_cumulative_suffix
+            q_ium = emit_parent_hydride_cumulative_suffix(mol, cat_idx, 'ium')
+            if q_ium and _cation_name_rt_ok(q_ium, mol):
+                return q_ium
             from .ions import name_quaternary_aminium
             result = name_quaternary_aminium(mol, sites['cations'][0])
             if not result:
@@ -2539,9 +2689,14 @@ def route_charged(mol, style: str = 'pin') -> str:
             # ([CH-]1CCCCC1 -> cyclohexan-1-ide), so ring carbanions are named
             # here too instead of dropping their charge (DD3 Defect C).
             carbanion_name = emit_parent_hydride_cumulative_suffix(mol, center_idx, 'ide')
-            if carbanion_name:
+            # 0-wrong RT gate: the carbanion emitter names substituents on the
+            # index-preserving parent, and a mis-named substituent would ship a
+            # WRONG molecule (`N#C[C-](C#N)C#N` -> `1,1,1-trimethylmethanide`
+            # before the cyano fix). Full-InChIKey verify every emission; on a
+            # mismatch fall through to the systematic tier (never a wrong name).
+            if carbanion_name and _full_inchikey_rt_ok(mol, carbanion_name):
                 return carbanion_name
-            return ''   # primitive declined (out of scope) -> legacy fallthrough
+            return ''   # declined / RT-rejected -> legacy fallthrough
         # W4-I2: a MULTI-carbanion on one acyclic all-carbon parent
         # hydride -> the '-di/tri-ide' PIN ([C-]#[C-] -> ethynediide, BB 40918).
         # HEAD dropped the charge (-> the retained general 'acetylide'/'acetylene').
@@ -2803,6 +2958,14 @@ def route_charged(mol, style: str = 'pin') -> str:
             mol, sites['anions'][0]['atom_idx'], style)
         if az:
             return az
+        #: the ionize seam also declines for a PRIMARY aromatic/ring
+        # amine anion whose neutral is the RETAINED `aniline` (no `-amine` suffix
+        # token to convert). Build the systematic amine parent (`benzenamine`) and
+        # convert to `benzenaminide`, RT-gated. Only converts a would-be abstain.
+        pa = emit_primary_amine_anide(
+            mol, sites['anions'][0]['atom_idx'], style)
+        if pa:
+            return pa
 
     # (a phase): the first re-entry let a SENIOR neutral acid (carboxylic,
     # take the principal slot, so the anion's S/P-oxoacid suffix never appeared

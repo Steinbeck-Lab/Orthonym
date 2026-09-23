@@ -191,8 +191,15 @@ def name_pseudoketone(features: Any, style: str = "pin") -> Optional[str]:
         return None
 
     length = len(chain)
-    base = f"{get_chain_prefix(length)}ane"  # 'ethane', 'propane',...
-    joined = apply_vowel_elision(base, ketone_suffix)  # 'ethanone' / 'ethanethione'
+    base = f"{get_chain_prefix(length)}ane"  # 'methane', 'ethane', 'propane',...
+    joined = apply_vowel_elision(base, ketone_suffix)  # 'methanone' / 'ethanethione'
+    if length == 1:
+        # (a) (the Blue Book): "The locant '1' is omitted...
+        # (a) in substituted mononuclear parent hydrides" (cf. CH3Cl ->
+        # chloromethane). A one-carbon stem is methane, so BOTH the ketone
+        # locant and the ring-substituent locant drop:
+        # '(pyrrolidin-1-yl)methanethione', not '1-(...)methane-1-thione'.
+        return f"({ringyl}){joined}"
     stem_part = joined[: len(joined) - len(ketone_suffix)]  # 'ethan' / 'ethane'
     parent = f"{stem_part}-1-{ketone_suffix}"  # 'ethan-1-one' / 'ethane-1-thione'
 

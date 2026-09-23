@@ -30,8 +30,21 @@ def namer():
 @pytest.mark.unit
 def test_propylhydroxylamine_perceived(namer):
     #: hydroxylamine (R-NH-OH) is a recognised class. FIXED in
-    # 169.7 Plan-02 (hydroxylamine SMARTS + handler). Permanent green tripwire.
-    assert namer.name("CCCNO") == "N-propylhydroxylamine"
+    # 169.7 Plan-02 (hydroxylamine SMARTS + handler). Permanent green tripwire
+    # against the ORIGINAL defect (the N-O silently dropped -> 'propane',
+    # a wrong molecule) -- structure-correctness only.
+    #
+    # v52 P2, BB:38308/:38314) supersedes this row's
+    # original expected string: R-NH-OH is named as an N-derivative of the
+    # SENIOR AMINE, not the functional-class 'N-propylhydroxylamine' the
+    # gold row asserted under the more general citation --
+    # BB verbatim for the CH3 case, 'N-hydroxymethanamine (PIN)
+    # N-methylhydroxylamine'. benchmarks/the gold set/gold_pins.json's
+    # row (def_id, bluebook_ref carries the SAME stale
+    # value and needs the identical correction -- flagged to the team lead
+    # rather than edited here (shared gate-controlling file, outside this
+    # task's file list).
+    assert namer.name("CCCNO") == "N-hydroxypropan-1-amine"
 
 
 @pytest.mark.unit

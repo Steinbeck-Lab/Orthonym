@@ -55,13 +55,15 @@ def test_isotope_label_not_dropped_and_roundtrips(namer):
         assert result["handler"] == "isotope"
 
 
-def test_decorator_fail_closed_abstains_not_skeleton(namer):
-    """Fail-closed: an isotope mol the decorator cannot name must abstain to the
-    descriptive fallback, NEVER fall through to the unlabeled skeleton name.
+def test_decorator_never_emits_unlabeled_skeleton(namer):
+    """Invariant: the isotope decorator must NEVER fall through to the bare
+    unlabeled skeleton name for a labelled molecule. It either emits a correct
+    LABELLED name (round-trip-verified) or abstains to the descriptive fallback.
 
-    [2H]O[2H] (deuterated water) makes decorate_isotopic_name return None
-    (verified via a quick probe). The unlabeled skeleton would be 'oxidane' /
-    'water'; the hook must instead return the descriptive fallback.
+    [2H]O[2H] (deuterated water): the decorator now names it correctly as the
+    LABELLED '(2H2)water' via the isotope hook; OPSIN-RT-verified to the
+    input). Earlier this molecule abstained; the durable invariant tested here is
+    the anti-skeleton guard (never bare 'water'/'oxidane'), which holds either way.
     """
     from orthonym.jvm_budget import jvm_slots
 
@@ -70,18 +72,21 @@ def test_decorator_fail_closed_abstains_not_skeleton(namer):
         result = namer.name_with_confidence(smiles)
         name = result["name"]
 
-        # Must NOT emit the unlabeled skeleton (the label-drop failure mode).
+        # Core invariant: NEVER the bare unlabeled skeleton (the label-drop failure mode).
         assert name not in ("oxidane", "water", "dihydridooxygen"), (
-            f"fail-closed path emitted the unlabeled skeleton {name!r}"
+            f"decorator emitted the unlabeled skeleton {name!r}"
         )
-        # It is an abstention/descriptive-fallback record, not a scored name.
-        assert result["handler"] == "fallback"
-        assert result["abstention"] is not None
-        # is_failure_name recognises the descriptive fallback as a non-name.
-        from orthonym.errors import is_failure_name
-        assert is_failure_name(name), (
-            f"expected a descriptive-fallback name, got {name!r}"
-        )
+        if result["handler"] == "isotope":
+            # Named correctly as the labelled form (the isotope hook only emits a
+            # name that passed its internal OPSIN round-trip gate -> 0-wrong).
+            assert name == "(2H2)water", f"unexpected D2O name {name!r}"
+        else:
+            # If it ever abstains again, it must be a descriptive fallback, never a skeleton.
+            assert result["abstention"] is not None
+            from orthonym.errors import is_failure_name
+            assert is_failure_name(name), (
+                f"expected a descriptive-fallback name, got {name!r}"
+            )
 
 
 def test_non_isotope_input_byte_identical(namer):

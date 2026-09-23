@@ -265,7 +265,35 @@ def name_ester_family(
                 name_dicarboxylic_diester,
                 name_independent_esters,
                 name_polyol_polyester,
+                name_symmetric_multiplicative_diacid_diester,
             )
+            # Task 7: a fully-esterified SYMMETRIC diacid
+            # diester (two identical dibasic acids bridged by one central
+            # symmetric divalent diol, capped by identical monovalent alcohols)
+            # is the functional-class multiplicative PIN 'dimethyl ethane-1,2-
+            # diyl dibutanedioate', senior to the substitutive bis(acyloxy)
+            # form. Tried FIRST -- its shape gate is strict and its own OPSIN
+            # RT gate fails closed to the cascade below. It only reaches here
+            # when principal_group == "ester" (no senior suffix survives), so it
+            # cannot flip a surviving-suffix acyloxy-prefix row.
+            multiplicative_name = name_symmetric_multiplicative_diacid_diester(
+                features.mol, all_esters
+            )
+            if multiplicative_name:
+                if logger.isEnabledFor(logging.DEBUG):
+                    _ha = features.mol.GetNumHeavyAtoms()
+                    logger.debug(
+                        "HANDLER_COVERAGE: handler=%s coverage=NA accounted=NA/%d name=%s",
+                        "multi_ester", _ha, multiplicative_name[:60],
+                    )
+                pool = get_current_pool()
+                pool.add(multiplicative_name, "multi_ester", features)
+                _nm = pool.best().name
+                return NamingResult(
+                    name=_nm,
+                    tree=NameTreeNode(parent_stem=_nm, class_id="ester_family", iupac_section_cite="P-65.6.3.3.4.1", fragment_legacy=_nm),
+                    atom_to_locant_hint=None,
+                )
             ester_type = classify_multi_ester(features.mol, all_esters)
             # a phase Plan-03-01: all multi_ester sub-paths mirror
             # the pre-amendment inline cascade verbatim — pool.best.name

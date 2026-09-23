@@ -2,7 +2,7 @@
   "version": "1.0.0",
   "generated_at": "2026-04-29T07:45:00Z",
   "source": "150-RESEARCH.md section 6 (sub-tables 6.1 carbocyclic, 6.2 mancude heterocycle, 6.3 saturated heterocycle, 6.4 von Baeyer, 6.5 deprecated) + carry-forward from _OPSIN_NON_PIN_EXCLUSIONS per CONTEXT CD-02. Citations point to the QMUL Blue Book (https://iupac.qmul.ac.uk/BlueBook).",
-  "total_entries": 245,
+  "total_entries": 247,
   "total_entries_note": "PA1: this field was already stale before the PA1 tranche (it read 168 against 176 actual rows). It is advisory only -- nothing reads it; the loader in data/__init__.py counts `entries` directly. Corrected to the true row count and kept in sync from here.",
   "entries": [
     {"name": "benzene", "smiles": "c1ccccc1", "pin": true, "citation": "P-22.1.3", "note": "PIN for the simplest aromatic carbocycle"},
@@ -135,6 +135,8 @@
     {"name": "indan", "smiles": "c1ccc2c(c1)CCC2", "pin": false, "citation": "P-22.1.3", "note": "Bare 'indan' is OPSIN stem; HC retained name is 'indane'. Phase 149 byte-identical lock requires 'indane' form."},
     {"name": "phenoxazine", "smiles": "c1ccc2c(c1)Nc1ccccc1O2", "pin": false, "citation": "P-25.3.1.3", "note": "Bare 'phenoxazine' not PIN; PIN is 10H-phenoxazine with indicated hydrogen per P-25.3.1.3."},
     {"name": "phenothiazine", "smiles": "c1ccc2c(c1)Nc1ccccc1S2", "pin": false, "citation": "P-25.3.1.3", "note": "Bare 'phenothiazine' not PIN; PIN is 10H-phenothiazine with indicated hydrogen per P-25.3.1.3."},
+    {"name": "phenoselenazine", "smiles": "c1ccc2c(c1)Nc1ccccc1[Se]2", "pin": false, "citation": "P-25.2.2.3", "note": "v52 Fable-fix round 1 D4: bare 'phenoselenazine' not PIN; PIN is 10H-phenoselenazine with indicated hydrogen (BlueBookV2.md:11785 'X = Se phenoselenazine (10H-isomer shown; the PIN is 10H-phenoselenazine)'), an N-case exactly like phenoxazine/phenothiazine above (contrast the P/As/Sb O-cases in retained_names.py, whose PIN IS the bare parent -- 'X-isomer shown' there is descriptive only). Denying the name-keyed OPSIN import here lets FUSED_HETEROCYCLE_DATA's 10H-phenoselenazine entry win, same mechanism as the phenoxazine/phenothiazine rows above."},
+    {"name": "phenotellurazine", "smiles": "c1ccc2c(c1)Nc1ccccc1[Te]2", "pin": false, "citation": "P-25.2.2.3", "note": "v52 Fable-fix round 1 D4: bare 'phenotellurazine' not PIN; PIN is 10H-phenotellurazine with indicated hydrogen (BlueBookV2.md:11787 'X = Te ... the PIN is 10H-phenotellurazine'), an N-case exactly like phenoxazine/phenothiazine above (contrast the P/As/Sb O-cases in retained_names.py, whose PIN IS the bare parent -- 'X-isomer shown' there is descriptive only). Denying the name-keyed OPSIN import here lets FUSED_HETEROCYCLE_DATA's 10H-phenotellurazine entry win, same mechanism as the phenoxazine/phenothiazine rows above."},
     {"name": "betacarboline", "smiles": "c1ccc2c(c1)[nH]c1cnccc12", "pin": false, "citation": "P-25.3.1.3", "note": "Bare 'betacarboline' not PIN; PIN is 9H-beta-carboline with indicated hydrogen per P-25.3.1.3 (also: hyphen and 'beta' formatting)."},
     {"name": "isoindol", "smiles": "c1ccc2c[nH]cc2c1", "pin": false, "citation": "P-25.3.1.3", "note": "Stem missing -e; PIN is 1H-isoindole with indicated hydrogen per P-25.3.1.3."},
     {"name": "piazthiol", "smiles": "c1ccc2nsnc2c1", "pin": false, "citation": "P-22.2.1", "note": "Non-PIN trivial; PIN is 2,1,3-benzothiadiazole per Hantzsch-Widman fusion nomenclature."},

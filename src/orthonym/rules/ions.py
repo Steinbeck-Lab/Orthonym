@@ -113,6 +113,21 @@ CATION_SUFFIXES = {
 
 # === ANION CLASSIFICATION ===
 
+def _occupied_valence(atom) -> int:
+    """The centre's occupied bonding number = sum of bond ORDERS to heavy/H
+    neighbours + attached H count. Unlike ``GetDegree`` (a neighbour count),
+    this counts a double bond as 2 and a triple bond as 3, so the -ide/-uide
+    valence gate is correct for a multiply-bonded skeletal heteroatom anion
+    (``C#[Si-]`` -> occupied valence 3, one below Si's standard 4). An aromatic
+    bond (order 1.5) contributes ``int(1.5) == 1`` — i.e. exactly one per
+    neighbour — so an all-aromatic centre yields the SAME value the previous
+    ``GetDegree`` gate did (VERIFIED: int(1.5)==1); this change only ever
+    RECOVERS a centre carrying a genuine double/triple bond, never alters an
+    aromatic or all-single-bond one."""
+    order = sum(int(b.GetBondTypeAsDouble()) for b in atom.GetBonds())
+    return order + atom.GetTotalNumHs()
+
+
 def classify_anion(mol, anion_site: Dict[str, Any]) -> str:
     """
     Classify anion type based on the anionic atom environment.
@@ -299,7 +314,16 @@ def classify_anion(mol, anion_site: Dict[str, Any]) -> str:
     # the organometallic-decline into a charge-dropped '' regression. Also excludes
     # a 3-coordinate P (not a clean phosphanide — no P-H was lost).
     elif element in _HETEROATOM_HYDRIDE_IDE_VALENCE:
-        dh = atom.GetDegree() + atom.GetTotalNumHs()
+        # BOND-ORDER sum (NOT GetDegree): the -ide/-uide valence gate compares
+        # the centre's occupied bonding number to the element's standard valence,
+        # and a MULTIPLE bond occupies more than one valence per neighbour.
+        # GetDegree counts neighbours only, so it undercounts a multiply-bonded
+        # centre — `C#[Si-]` (methylidynesilanide, has degree 1 but a
+        # triple bond, giving occupied valence 3; degree+H+1 = 2 wrongly missed
+        # the -ide gate and the anion fell through to 'unknown'. Summing bond
+        # orders is identical to GetDegree for all-single-bond centres (every
+        # existing control), so this only RECOVERS the multiply-bonded ones.
+        dh = _occupied_valence(atom)
         #: -ide (H+ LOSS) — one bond BELOW standard valence.
         if dh + 1 == _HETEROATOM_HYDRIDE_IDE_VALENCE[element]:
             return 'heteroatom_hydride_anion'
@@ -1959,8 +1983,13 @@ def emit_parent_hydride_cumulative_suffix(mol, center_idx: int, suffix: str) -> 
             body = f"{mult}({sub_name})"
         else:
             body = f"{mult}{sub_name}"
+        #: a single-atom parent (methane) has only ONE substitutable
+        # position, so its substituent locants are OMITTED (`tricyanomethanide`,
+        # not `1,1,1-tricyanomethanide`). Every other chain keeps first-class
+        # locants (`3-methylbutan-2-ide`).
+        rendered = body if chain_len == 1 else f"{loc_str}-{body}"
         prefix_parts.append((alpha_sort_key(sub_name), locants_sorted[0],
-                             f"{loc_str}-{body}"))
+                             rendered))
     prefix_parts.sort(key=lambda t: (t[0], t[1]))
     #: detachable prefixes join one another and the parent stem directly
     # (the locant-hyphen is INTERNAL to each prefix block); '3-methyl' + 'butan-2-ide'
@@ -2233,8 +2262,8 @@ def emit_parent_hydride_polyvalent_suffixes(mol, centers: List[Tuple[int, int]])
     # --- 4. Orientation + chain choice typed free-valence key) ----
     from ..assembly.naming_utils import (
         alpha_sort_key,
+        enclose_if_compound,
         get_multiplier_prefix,
-        is_complex_substituent,
     )
     from ..data.chain_names import get_chain_prefix
     from .locants import build_atom_to_locant
@@ -2292,10 +2321,17 @@ def emit_parent_hydride_polyvalent_suffixes(mol, centers: List[Tuple[int, int]])
         count = len(locants_sorted)
         mult = get_multiplier_prefix(count, sub_name)
         loc_str = ','.join(str(l) for l in locants_sorted)
-        if is_complex_substituent(sub_name) and count > 1:
-            body = f"{mult}({sub_name})"
-        else:
-            body = f"{mult}{sub_name}"
+        # /: a complex/compound substituent prefix (a
+        # ``4-methylcyclohexyl`` / ``2-chlorophenyl`` ring substituent, cited ONCE
+        # or MULTIPLIED) takes enclosing marks — BB ``2-(propan-2-yl)…`` (PIN). The
+        # old ``and count > 1`` guard dropped the marks on a count-1 complex prefix,
+        # shipping ``2-4-methylcyclohexylpropane-1,3-diyl`` (the ``2-4`` locant run
+        # is unparseable, but OPSIN cannot read a bare diyl name so the RT gate is
+        # blind here — a live spelling defect). Route through the shared
+        # ``enclose_if_compound`` primitive (idempotent, escalates (-> [ -> {), so a
+        # SIMPLE prefix (methyl/cyclohexyl) stays bare and a multiplied complex
+        # prefix keeps its di/bis + marks unchanged.
+        body = f"{mult}{enclose_if_compound(sub_name)}"
         prefix_parts.append((alpha_sort_key(sub_name), locants_sorted[0],
                              f"{loc_str}-{body}"))
     prefix_parts.sort(key=lambda t: (t[0], t[1]))
@@ -2467,46 +2503,58 @@ def emit_poly_carbanion_ide(mol, centers: List[int]) -> str:
 
 def emit_poly_cation_ylium(mol, centers: List[int]) -> str:
     """ (the Blue Book): a MULTI-carbenium on one acyclic all-carbon parent
-    hydride — >= 2 carbon -ylium centres (each a ring-free carbon that lost a
-    hydride H-) — named with the '-ylium' compound suffix multiplied by
-    'bis'/'tris' (the Blue Book note: 'bis(ylium)' NOT 'diylium', so the COMPLEX
-    multiplier series, mirroring the poly-aminium 'bis(aminium)' rule,
-    not the basic 'di' the -ide anion uses). ``centers`` = the carbenium atom
-    indices. Returns e.g. ``ethane-1,2-bis(ylium)`` ([CH2+][CH2+]),
-    ``propane-1,3-bis(ylium)`` ([CH2+]C[CH2+]), or '' on any out-of-scope shape
-    (fail closed -> caller abstains, never a wrong bis-name).
+    hydride — carbon -ylium free valences totalling >= 2 across ring-free carbons
+    that each lost a hydride H- — named with the '-ylium' compound suffix
+    multiplied by 'bis'/'tris' (the Blue Book note: 'bis(ylium)' NOT 'diylium', so the
+    COMPLEX multiplier series, mirroring the poly-aminium 'bis(aminium)'
+    rule, not the basic 'di' the -ide anion uses). ``centers`` = the carbenium atom
+    indices; a centre bearing charge +2 counts as TWO -ylium valences on one atom
+    (the geminal degenerate, C[C+2]C). Returns e.g. ``ethane-1,2-bis(ylium)``
+    ([CH2+][CH2+]), ``propane-1,3-bis(ylium)`` ([CH2+]C[CH2+]),
+    ``propane-2,2-bis(ylium)`` (C[C+2]C), or '' on any out-of-scope shape (fail
+    closed -> caller abstains, never a wrong bis-name).
 
-    Mirrors ``emit_poly_carbanion_ide`` (saturate every centre +1 H on one
-    index-preserving RWMol -> longest chain carrying ALL centres -> orient for
-    lowest locants to the -ylium set), but the ending is
+    Mirrors ``emit_poly_carbanion_ide`` (saturate every centre — +1 H per unit of
+    positive charge — on one index-preserving RWMol -> longest chain carrying ALL
+    centres -> orient for lowest locants to the -ylium set), but the ending is
     '-<locs>-<bis/tris>(ylium)'. Unlike the -ide anion, the ylium locants are
     ALWAYS cited (never elided): the examples keep them even when the
     set covers every carbon (``ethane-1,2-bis(ylium)``, not ``ethanebis(ylium)``)."""
-    if mol is None or len(centers) < 2 or len(set(centers)) != len(centers):
+    if mol is None or not centers or len(set(centers)) != len(centers):
         return ''
     try:
         atoms = [mol.GetAtomWithIdx(i) for i in centers]
     except (RuntimeError, IndexError, OverflowError):
         return ''
+    # Each centre is a ring-free carbon carrying >= 1 positive charge. A +2 on ONE
+    # carbon is the geminal (one-atom) degenerate: TWO -ylium free valences on that
+    # single atom (C[C+2]C -> propane-2,2-bis(ylium)). The -ylium multiplicity is
+    # the SUM of the centre charges (each carbon's charge = the hydrides it lost),
+    # which must total >= 2 for a poly/bis(ylium) name, the Blue Book).
+    charges = []
     for a in atoms:
-        if a.GetSymbol() != 'C' or a.GetFormalCharge() != 1 or a.IsInRing():
+        c = a.GetFormalCharge()
+        if a.GetSymbol() != 'C' or c < 1 or a.IsInRing():
             return ''
+        charges.append(c)
+    if sum(charges) < 2:
+        return ''
     try:
         if len(Chem.GetMolFrags(mol)) != 1:
             return ''
     except Exception:
         return ''
 
-    # Saturate every carbenium centre (+1 H each — re-add the lost hydride) on ONE
-    # index-preserving RWMol.
+    # Saturate every carbenium centre — re-add the lost hydride(s): +1 H per unit of
+    # positive charge, so a +2 carbon regains 2 H — on ONE index-preserving RWMol.
     work = Chem.RWMol(mol)
     try:
-        for idx in centers:
+        for idx, chg in zip(centers, charges):
             a = work.GetAtomWithIdx(idx)
             a.SetFormalCharge(0)
             a.SetNumRadicalElectrons(0)
             a.SetNoImplicit(True)
-            a.SetNumExplicitHs(a.GetTotalNumHs() + 1)
+            a.SetNumExplicitHs(a.GetTotalNumHs() + chg)
         work_mol = work.GetMol()
         Chem.SanitizeMol(work_mol)
     except (RuntimeError, ValueError):
@@ -2569,7 +2617,12 @@ def emit_poly_cation_ylium(mol, centers: List[int]) -> str:
         joiner = 'a' if tmult else ''
         unsat += f"{joiner}-{','.join(map(str, t_locs))}-{tmult}yn"
 
-    yl_locs = sorted(loc_map[i] for i in centers)
+    # Each centre contributes its locant ONCE PER unit of positive charge, so a
+    # geminal +2 carbon yields the doubled locant set (propane-2,2-bis(ylium)).
+    yl_locs = []
+    for i, chg in zip(centers, charges):
+        yl_locs.extend([loc_map[i]] * chg)
+    yl_locs.sort()
     mult = COMPLEX_MULTIPLIERS.get(len(yl_locs))
     if not mult:
         return ''
@@ -2624,6 +2677,13 @@ def _emit_heteroatom_cumulative_suffix(mol, center_idx: int, suffix: str) -> str
     the neutral hydride (dimethylphosphane, trimethylsilane), (3) append the
     -anide ending with 'e' elision via the element-keyed _heteroatom_ide_name
     guard. Returns '' on any decline (caller falls through to legacy)."""
+    if suffix == 'ium':
+        #: an acyclic heteroatom-hydride CATION (catenated homonuclear
+        # chain, or a substituted mononuclear pnictogen) -> the parent hydride +
+        # '-ium' at the cationic locant. Delegated to the dedicated direct emitter
+        # (neutralize-re-enter is structurally impossible for a 0-H fully-
+        # substituted centre -- see emit_catenated_hydride_cation).
+        return emit_catenated_hydride_cation(mol, center_idx)
     if suffix != 'ide':
         # Only the -ide (anion, loss of H+) heteroatom path lives here. Acyclic
         # heteroatom radicals/cations keep their existing structured handlers.
@@ -2654,9 +2714,95 @@ def _emit_heteroatom_cumulative_suffix(mol, center_idx: int, suffix: str) -> str
             style='pin', _disable_opsin_validity_gate=True).name(neutral_smi)
     except (RecursionError, ValueError, RuntimeError):
         return ''
-    if not neutral_name or 'unknown' in neutral_name.lower():
+    ide = ''
+    if neutral_name and 'unknown' not in neutral_name.lower():
+        ide = _heteroatom_ide_name(neutral_name, symbol)
+    if ide:
+        return ide
+    # Re-entry declined: the neutral hydride's parent selection kept the SENIOR
+    # carbon as the parent, so the name does not end in the heteroatom stem
+    # (`C#[Si-]` -> the engine names the neutral `silylmethane`, never the needed
+    # `methylidynesilane`). Per the anionic centre is the principal
+    # characteristic group and MUST be the parent hydride, so name the anion
+    # DIRECTLY on the heteroatom stem instead. RT-gated inside; '' on decline.
+    return _emit_mononuclear_heteroatom_ide_direct(mol, center_idx)
+
+
+def _rt_ok_full_inchikey(mol, name: str) -> bool:
+    """Local 0-wrong RT gate (kept in ions.py to avoid a charged_router import
+    cycle): OPSIN-parse ``name`` and require its FULL standard InChIKey to equal
+    ``mol``'s. Fails CLOSED on a parse failure / mismatch / missing jar. Mirrors
+    charged_router._full_inchikey_rt_ok."""
+    if not name:
+        return False
+    try:
+        from ..validation.opsin_roundtrip import opsin_parse
+        parsed = opsin_parse(name)
+        if not parsed:
+            return False
+        pm = Chem.MolFromSmiles(parsed)
+        if pm is None:
+            return False
+        return Chem.MolToInchiKey(pm) == Chem.MolToInchiKey(mol)
+    except Exception:
+        return False
+
+
+def _emit_mononuclear_heteroatom_ide_direct(mol, center_idx: int) -> str:
+    """: name a MONONUCLEAR Group-14/15 heteroatom ``-ide`` anion
+    DIRECTLY on its parent-hydride stem, for the cases the neutralize->re-enter
+    path (_emit_heteroatom_cumulative_suffix) cannot reach because the neutral
+    hydride's parent selection keeps the senior CARBON as the parent
+    (`C#[Si-]` -> `silylmethane`, not the required `methylidynesilane`).
+
+    The anionic centre IS the principal characteristic group and MUST be the
+    parent hydride, so: parent stem + ``ide``; each heavy neighbour
+    a substituent prefix named via ``name_substituent_fragment`` — which, unlike
+    ``classify_substituent`` (a carbon-count that would mis-name the MULTIPLY-
+    bonded `≡CH` as 'methyl'), names it 'methylidyne'. A bare halogen ligand is
+    mapped to its prefix directly (``name_substituent_fragment`` returns None for
+    a single-atom halogen). Atom-drop veto (every heavy atom must be represented)
+    + full-InChIKey RT gate = 0-wrong. Returns '' on any decline."""
+    center = mol.GetAtomWithIdx(center_idx)
+    stem = _HETEROATOM_HYDRIDE_IDE_STEMS.get(center.GetSymbol())
+    if not stem:
         return ''
-    return _heteroatom_ide_name(neutral_name, symbol)
+    from ..assembly.naming_utils import (alpha_sort_key, enclose_if_compound,
+                                         get_multiplier_prefix)
+    from ..assembly.substituent_naming import name_substituent_fragment
+    _HALOGEN_PREFIX = {'F': 'fluoro', 'Cl': 'chloro', 'Br': 'bromo', 'I': 'iodo'}
+    covered = {center_idx}
+    name_to_count: Dict[str, int] = {}
+    for nb in center.GetNeighbors():
+        if nb.GetSymbol() == 'H':
+            continue
+        if nb.GetSymbol() in _HALOGEN_PREFIX and nb.GetDegree() == 1:
+            sub_name = _HALOGEN_PREFIX[nb.GetSymbol()]
+            covered.add(nb.GetIdx())
+        else:
+            sub_atoms = _collect_substituent_atoms(mol, center_idx, nb.GetIdx(), set())
+            if sub_atoms is None:
+                return ''
+            sub_name = name_substituent_fragment(
+                mol, sorted(sub_atoms), nb.GetIdx(), [center_idx])
+            if not sub_name:
+                return ''
+            covered |= set(sub_atoms)
+        name_to_count[sub_name] = name_to_count.get(sub_name, 0) + 1
+    if not name_to_count:
+        return ''   # a bare heteroatom-hydride anion -> re-entry path owns it
+    if len(covered) != mol.GetNumHeavyAtoms():
+        return ''   # a ligand's atoms were dropped -> never ship the drop
+    parts = []
+    for sub_name, count in name_to_count.items():
+        mult = get_multiplier_prefix(count, sub_name)
+        body = f"{mult}{enclose_if_compound(sub_name)}"
+        parts.append((alpha_sort_key(sub_name), body))
+    parts.sort(key=lambda t: t[0])
+    name = f"{''.join(p[1] for p in parts)}{_elide_terminal_e(stem)}ide"
+    if not _rt_ok_full_inchikey(mol, name):
+        return ''
+    return name
 
 
 def _emit_group13_uide(mol, center_idx: int) -> str:
@@ -2746,7 +2892,7 @@ def _emit_group13_uide(mol, center_idx: int) -> str:
 # halogen parent hydride with the '-ium' suffix — the SYSTEMATIC PIN (iodane+ium),
 # NOT the Table-7.3 retained '-onium' spelling: (C6H5)2I+ -> diphenyliodanium (PIN).
 # The cation mirror of _UIDE_STEMS on the anion side (diphenyliodanuide).
-_HALOGEN_ONIUM_STEMS = {'I': 'iodane', 'Br': 'bromane', 'Cl': 'chlorane'}
+_HALOGEN_ONIUM_STEMS = {'I': 'iodane', 'Br': 'bromane', 'Cl': 'chlorane', 'F': 'fluorane'}
 
 
 def emit_halogen_onium(mol, center_idx: int) -> str:
@@ -2760,7 +2906,7 @@ def emit_halogen_onium(mol, center_idx: int) -> str:
 
     Scope (fail closed, so a mono-coordinate halonium / a genuine radical cation /
     any non-halogen never matches): the centre is a halogen in ``_HALOGEN_ONIUM_STEMS``
-    (I/Br/Cl), formal charge +1, and degree >= 2 (a hypervalent halonium — a
+    (I/Br/Cl/F), formal charge +1, and degree >= 2 (a hypervalent halonium — a
     1-coordinate R-X+ is a distinct sulfanylium-style species and is excluded). Every
     heavy atom must be covered by the emitted ligand set (atom-drop veto, identical to
     the uide emitter — ``classify_substituent`` names carbon groups by carbon count and
@@ -2777,46 +2923,56 @@ def emit_halogen_onium(mol, center_idx: int) -> str:
         return ''
     if center.GetFormalCharge() != 1 or center.GetDegree() < 2:
         return ''
-    from ..assembly.naming_utils import alpha_sort_key, enclose_if_compound, get_multiplier_prefix
     from ..perception.chains import classify_substituent
+    from .mononuclear_hydrides import _build_mixed_substituent_string
     _HALOGEN_PREFIX = {'F': 'fluoro', 'Cl': 'chloro', 'Br': 'bromo', 'I': 'iodo'}
     parent_atoms = {center_idx}
-    name_to_count: Dict[str, int] = {}
+    names: List[str] = []
     covered_atoms = {center_idx}
     for nb in center.GetNeighbors():
         if nb.GetSymbol() == 'H':
             continue
         # A bare halogen ligand -> its simple prefix (classify_substituent only
-        # names carbon groups). Otherwise the carbon substituent, with the same
-        # heteroatom-drop veto _emit_group13_uide uses.
+        # names carbon groups).
         if nb.GetSymbol() in _HALOGEN_PREFIX and nb.GetDegree() == 1:
-            sub_name = _HALOGEN_PREFIX[nb.GetSymbol()]
+            names.append(_HALOGEN_PREFIX[nb.GetSymbol()])
             covered_atoms.add(nb.GetIdx())
+            continue
+        sub_atoms = _collect_substituent_atoms(mol, center_idx, nb.GetIdx(), set())
+        if sub_atoms is None:
+            return ''
+        # An acyl carbon R-C(=O)- -> the acyl prefix (acetyl / benzoyl). The
+        # helper is centre-agnostic (its "chalcogen" argument is only used to
+        # locate the bond), so it names the R-CO- on a halonium too: C[Cl+]C(C)=O
+        # -> acetyl. classify_substituent would mis-name the acyl carbon by count.
+        if _is_acyl_on_chalcogen(mol, nb, center_idx):
+            sub_name = _acyl_on_chalcogen_prefix(mol, nb.GetIdx(), center_idx)
         else:
-            sub_atoms = _collect_substituent_atoms(mol, center_idx, nb.GetIdx(), set())
-            if sub_atoms is None:
-                return ''
             info = classify_substituent(mol, sorted(sub_atoms), parent_atoms)
             sub_name = info.get('name')
+            # classify_substituent's 'alkyl' branch names by carbon count and
+            # silently swallows a heteroatom in the branch -> decline (atom drop).
             if info.get('type') == 'alkyl' and any(
                     mol.GetAtomWithIdx(i).GetSymbol() != 'C' for i in sub_atoms):
                 return ''
-            covered_atoms |= set(sub_atoms)
         if not sub_name:
             return ''
-        name_to_count[sub_name] = name_to_count.get(sub_name, 0) + 1
+        covered_atoms |= set(sub_atoms)
+        names.append(sub_name)
     if len(covered_atoms) != mol.GetNumHeavyAtoms():
         return ''
-    if not name_to_count:
+    if not names:
         return ''  # bare H2I+ is the retained 'iodanium' (handled by the table)
-    suffix = f"{_elide_terminal_e(stem)}ium"
-    parts = []
-    for sub_name, count in name_to_count.items():
-        mult = get_multiplier_prefix(count, sub_name)
-        body = f"{mult}{enclose_if_compound(sub_name)}"
-        parts.append((alpha_sort_key(sub_name), body))
-    parts.sort(key=lambda t: t[0])
-    return f"{''.join(p[1] for p in parts)}{suffix}"
+    # /: assemble the halogen+organyl+acyl prefix block through
+    # the SHARED mononuclear-hydride assembler, which alone applies the enclosing
+    # marks that disambiguate a halogeno+alkyl pair (the Blue Book "chloro(methyl)silane
+    # would describe Cl-SiH2-CH3"): chloro(methyl)fluoranium (the Blue Book),
+    # acetyl(methyl)chloranium (the Blue Book), diphenyliodanium (the Blue Book). Re-spelling
+    # that rule here would drift from the neutral trichloro(methyl)silane path.
+    block = _build_mixed_substituent_string(names)
+    if not block:
+        return ''
+    return f"{block}{_elide_terminal_e(stem)}ium"
 
 
 # (W4-I3): R-S+ / R-Se+ chalcogen ylium (sulfanylium / selanylium).
@@ -2856,6 +3012,485 @@ def emit_chalcogen_ylium(mol, center_idx: int) -> str:
     return f"{sub_name}{stem}"
 
 
+# (the Blue Book): a SUBSTITUTED mononuclear chalcogen cation named on the
+# parent hydride oxidane/sulfane/selane/tellane + '-ium' (the systematic PIN),
+# NOT the Table-7.3 '-onium' retained spelling nor the '-a'/'-onia'-replacement form.
+_ONIUM_HYDRIDE_STEMS = {'O': 'oxidane', 'S': 'sulfane', 'Se': 'selane', 'Te': 'tellane'}
+
+
+def _is_acyl_on_chalcogen(mol, nb, center_idx: int) -> bool:
+    """True iff neighbour ``nb`` (single-bonded to the chalcogen centre) is an acyl
+    carbon -- a carbon carrying a terminal =O (the ``R-C(=O)-X+`` shape)."""
+    if nb.GetSymbol() != 'C':
+        return False
+    if (mol.GetBondBetweenAtoms(center_idx, nb.GetIdx()).GetBondType()
+            != Chem.BondType.SINGLE):
+        return False
+    return any(b.GetBondType() == Chem.BondType.DOUBLE
+               and b.GetOtherAtom(nb).GetSymbol() == 'O'
+               and b.GetOtherAtom(nb).GetDegree() == 1
+               for b in nb.GetBonds())
+
+
+def _acyl_on_chalcogen_prefix(mol, acyl_c: int, chalcogen_idx: int):
+    """The acyl-prefix name for an ``R-C(=O)-`` group bonded to the chalcogen
+    centre, or ``None``. Two tiers, both delegating to shared authorities:
+
+    1. ``substituent_prefix_forms._acyl_on_chalcogen_name`` -- the v1 authority
+       for retained / linear acyl (acetyl / benzoyl / formyl / alkanoyl);
+    2. for an acyl whose R falls outside that scope (a RING R -> the '-carbonyl'
+       class, cyclohexanecarbonyl), transmute the acyl->chalcogen bond into a
+       neutral ``-OH``, isolate the resulting acid fragment, name it, and convert
+       acid -> acyl. Mirrors ``_name_acyl_azanide`` (the sanctioned acyl-prefix
+       route: neutral-acid -> name -> ``_acid_to_acyl``), and
+       ``decomposition.fragment_assembly._acid_to_acyl`` is used because it maps
+       ``carboxylic acid -> carbonyl`` (the ``lipids`` sibling does not)."""
+    from ..assembly.substituent_prefix_forms import _acyl_on_chalcogen_name
+    quick = _acyl_on_chalcogen_name(mol, acyl_c, chalcogen_idx)
+    if quick:
+        return quick
+    try:
+        rw = Chem.RWMol(mol)
+        rw.RemoveBond(acyl_c, chalcogen_idx)
+        o_new = rw.AddAtom(Chem.Atom(8))
+        rw.AddBond(acyl_c, o_new, Chem.BondType.SINGLE)
+        frag_mol = rw.GetMol()
+        Chem.SanitizeMol(frag_mol)
+    except (RuntimeError, ValueError):
+        return None
+    acid_mol = None
+    for m, idxs in zip(Chem.GetMolFrags(frag_mol, asMols=True, sanitizeFrags=True),
+                       Chem.GetMolFrags(frag_mol, asMols=False)):
+        if acyl_c in idxs:
+            acid_mol = m
+            break
+    if acid_mol is None:
+        return None
+    from ..assembly.fragment_naming import name_fragment_recursively
+    from ..decomposition.fragment_assembly import _acid_to_acyl
+    acid_name = name_fragment_recursively(Chem.MolToSmiles(acid_mol))
+    if not acid_name:
+        return None
+    return _acid_to_acyl(acid_name)
+
+
+def emit_onium_hydride_parent(mol, center_idx: int) -> str:
+    """ (the Blue Book "Cationic compounds derived from... suffixes";
+    "ethylideneoxidanium (PIN)":41463, "acetyloxidanium (PIN)":41474): a single
+    mononuclear chalcogen cation centre (O/S/Se/Te, +1, NOT in a ring, NOT bonded
+    to another chalcogen) carrying substituents (alkyl / acyl / alkylidene) +
+    optional remaining H is named on the mononuclear parent hydride
+    oxidane/sulfane/selane/tellane + '-ium', its substituents cited as detachable
+    prefixes -- the systematic PIN, NOT the Table-7.3 '-onium' spelling
+    , general only) nor the '-a'/'-onia'-replacement form:
+    CC=[OH+] -> ethylideneoxidanium, not 1-oxaprop-1-en-1-ium.
+
+    Mirrors ``emit_halogen_onium`` / ``_emit_group13_uide`` in SHAPE: substituents
+    named by TYPE from the bond order to the centre (``classify_substituent``
+    mis-names the ylidene =CHCH3 and the acyl CH3CO- both 'ethyl'), an atom-drop
+    veto over the whole heavy-atom count, and '' on ANY decline so the caller's
+    RT gate can never be handed a mis-built name. The substituent-prefix assembly
+    (citation order, multipliers, and the enclosing marks that make
+    'benzoyldi(methyl)sulfanium', BB 16286 'tert-butyldi(methyl)phosphane') follows
+    the same rules as ``catenated_hydrides._try_aba_parent`` (called from
+    ``name_heterochalcogen_aba``) -- the sibling substituent-prefix assembler -- via
+    the shared naming_utils primitives, so no ordering or marking rule is re-spelled
+    here; the ~18-line assembly loop below is a PARALLEL implementation of that
+    sequence (generalized from its local count table to get_multiplier_prefix), not a
+    call into shared code -- part of the deferred locant/prefix-render duplication
+    (internal notes). A catenated
+    chalcogen-chalcogen cation (dioxidane, disulfane; the '-C(=O)-O-[OH2+]' ->
+    dioxidan-1-ium family) is out of scope and declines. Returns '' on any decline."""
+    center = mol.GetAtomWithIdx(center_idx)
+    stem = _ONIUM_HYDRIDE_STEMS.get(center.GetSymbol())
+    if not stem or center.GetFormalCharge() != 1 or center.IsInRing():
+        return ''
+    heavy = [nb for nb in center.GetNeighbors() if nb.GetSymbol() != 'H']
+    # A chalcogen neighbour means a CATENATED chalcogen-chalcogen parent hydride
+    # (dioxidane / disulfane, e.g. Ph-CO-O-[OH2+] -> 2-benzoyldioxidan-1-ium): a
+    # DIFFERENT parent (out of scope here), and naming it on 'oxidane' would ship a
+    # wrong-PIN '(benzoyloxy)oxidanium' the InChIKey RT gate cannot catch. Decline.
+    if any(nb.GetSymbol() in _ONIUM_HYDRIDE_STEMS for nb in heavy):
+        return ''
+    # A 0-H, single-bond, one-carbon R-S+/R-Se+ is the sulfanylium/selanylium
+    # family, emit_chalcogen_ylium): defer to it.
+    if (center.GetSymbol() in ('S', 'Se') and center.GetTotalNumHs() == 0
+            and len(heavy) == 1
+            and mol.GetBondBetweenAtoms(center_idx, heavy[0].GetIdx()).GetBondType()
+                == Chem.BondType.SINGLE):
+        return ''
+    from collections import Counter
+
+    from ..assembly.naming_utils import (
+        apply_enclosing_marks,
+        enclose_if_compound,
+        get_multiplier_prefix,
+        multiplier_needs_hyphen,
+        prefix_citation_sort_key,
+    )
+    from ..assembly.substituent_enumerator import (
+        name_ylidene_substituent,
+        name_ylidyne_substituent,
+    )
+    from ..perception.chains import classify_substituent
+    subs: List[str] = []
+    covered = {center_idx}
+    for nb in heavy:
+        bond = mol.GetBondBetweenAtoms(center_idx, nb.GetIdx())
+        sub_atoms = _collect_substituent_atoms(mol, center_idx, nb.GetIdx(), set())
+        if sub_atoms is None:
+            return ''
+        if bond.GetBondType() == Chem.BondType.TRIPLE and nb.GetSymbol() == 'C':
+            # A TRIPLE bond to a carbon neighbour is a #CR ylidyne substituent
+            #, the Blue Book "CH3-C#O(+)... ethylidyneoxidanium (PIN)"): the
+            # shared ylidyne namer. classify_substituent would mis-count it
+            # as 'ethyl' (a wrong +1 constitution the RT gate catches, but which
+            # never reaches this branch once the bond order is read here).
+            sub_name = name_ylidyne_substituent(mol, sorted(sub_atoms), nb.GetIdx())
+        elif bond.GetBondType() == Chem.BondType.DOUBLE and nb.GetSymbol() == 'C':
+            # A DOUBLE bond to a carbon neighbour is an =CR2 alkylidene substituent
+            # (ethylidene, propan-2-ylidene): the shared ylidene namer.
+            sub_name = name_ylidene_substituent(mol, sorted(sub_atoms), nb.GetIdx())
+        elif _is_acyl_on_chalcogen(mol, nb, center_idx):
+            # A single-bonded acyl carbon R-C(=O)- -> the acyl prefix (acetyl,
+            # benzoyl, cyclohexanecarbonyl). classify_substituent would mis-name it.
+            sub_name = _acyl_on_chalcogen_prefix(mol, nb.GetIdx(), center_idx)
+        else:
+            info = classify_substituent(mol, sorted(sub_atoms), {center_idx})
+            sub_name = info.get('name')
+            # classify_substituent's 'alkyl' branch names by carbon count and
+            # silently swallows a heteroatom in the branch -> decline (atom drop).
+            if info.get('type') == 'alkyl' and any(
+                    mol.GetAtomWithIdx(i).GetSymbol() != 'C' for i in sub_atoms):
+                return ''
+        if not sub_name:
+            return ''
+        covered |= set(sub_atoms)
+        subs.append(sub_name)
+    if len(covered) != mol.GetNumHeavyAtoms():
+        return ''   # atom-drop veto
+    suffix = f"{_elide_terminal_e(stem)}ium"
+    if not subs:
+        return suffix
+    counts = Counter(subs)
+    uniq = sorted(counts, key=prefix_citation_sort_key)
+    parts = []
+    for i, nm in enumerate(uniq):
+        mult = get_multiplier_prefix(counts[nm], nm)
+        marked = enclose_if_compound(nm)
+        # (BB 16286 '*tert*-butyldi(methyl)phosphane' (PIN)): in a name
+        # with >= 2 prefix types, a multiplied SIMPLE prefix that is not cited
+        # first takes enclosing marks -> 'benzoyldi(methyl)sulfanium', never
+        # 'benzoyldimethylsulfanium'. Same rule as catenated_hydrides._try_aba_parent.
+        if len(uniq) >= 2 and i > 0 and marked == nm:
+            marked = apply_enclosing_marks(nm, -1)
+        if mult and marked == nm and multiplier_needs_hyphen(nm):
+            token = f"{mult}-{marked}"          # (b) di-tert-butyl
+        else:
+            token = f"{mult}{marked}"
+        parts.append(token)
+    return f"{''.join(parts)}{suffix}"
+
+
+# (the Blue Book-41390): a CATENATED homonuclear parent-hydride cation
+# (pentamethylhydrazinium, 1,2,3-trimethyltrisulfan-2-ium,
+# 2,2-dichloro-1,1,1-trimethyldiphosphan-1-ium, 2-benzoyldioxidan-1-ium) or a
+# SUBSTITUTED mononuclear pnictogen cation (chlorotri(methyl)phosphanium) is named
+# on the parent hydride + '-ium' at the cationic-centre locant -- the systematic
+# PIN, NOT the '-a'/'-onia'-replacement form and NOT the linearized
+# name_quaternary_aminium spelling. The N/O/S/... element set is the chain
+# ELEMENT; the mononuclear branch is restricted to P/As (a chalcogen mononuclear
+# onium is owned by emit_onium_hydride_parent, a mononuclear N by the aminium path).
+_CATENATED_IUM_ELEMENTS = {'N', 'P', 'As', 'O', 'S', 'Se', 'Te'}
+_MONONUCLEAR_IUM_PNICTOGENS = {'P', 'As'}
+
+
+def _homonuclear_single_chain(mol, center_idx, element):
+    """Ordered atom-index list of the maximal unbranched, single-bonded path of
+    ``element`` atoms through ``center_idx`` (deterministic: it starts at the
+    lowest-index endpoint), or None for a branch / ring / fork / non-single bond
+    inside the homonuclear component. A lone centre returns ``[center_idx]``."""
+    comp = set()
+    stack = [center_idx]
+    while stack:
+        x = stack.pop()
+        if x in comp:
+            continue
+        comp.add(x)
+        for nb in mol.GetAtomWithIdx(x).GetNeighbors():
+            if nb.GetSymbol() != element:
+                continue
+            bond = mol.GetBondBetweenAtoms(x, nb.GetIdx())
+            if bond.GetBondType() != Chem.BondType.SINGLE:
+                return None
+            if nb.GetIdx() not in comp:
+                stack.append(nb.GetIdx())
+    if len(comp) == 1:
+        return [center_idx]
+    adj: Dict[int, list] = {i: [] for i in comp}
+    for i in comp:
+        for nb in mol.GetAtomWithIdx(i).GetNeighbors():
+            if nb.GetIdx() in comp:
+                adj[i].append(nb.GetIdx())
+    if any(len(adj[i]) > 2 for i in comp):
+        return None                              # branch -> not a simple chain
+    endpoints = sorted(i for i in comp if len(adj[i]) == 1)
+    if len(endpoints) != 2:
+        return None                              # ring / degenerate
+    order = [endpoints[0]]
+    prev, cur = -1, endpoints[0]
+    while True:
+        nxts = [j for j in adj[cur] if j != prev]
+        if not nxts:
+            break
+        prev, cur = cur, nxts[0]
+        order.append(cur)
+    return order if len(order) == len(comp) else None
+
+
+def _bare_parent_hydride_name(element: str, n: int) -> str:
+    """Name the neutral UNSUBSTITUTED homonuclear chain of ``n`` ``element`` atoms
+    by re-entering the neutral namer (Phase-2 producers) -- 'trisulfane' /
+    'hydrazine' / 'diphosphane' / 'dioxidane' / 'phosphane'. Reusing the producer
+    means no hard-coded multiplier / retained-name table lives here. Returns '' on
+    any decline / multi-word / 'unknown' result."""
+    try:
+        rw = Chem.RWMol()
+        for _ in range(n):
+            rw.AddAtom(Chem.Atom(element))
+        for i in range(n - 1):
+            rw.AddBond(i, i + 1, Chem.BondType.SINGLE)
+        pm = rw.GetMol()
+        Chem.SanitizeMol(pm)
+        smi = Chem.MolToSmiles(pm)
+    except (RuntimeError, ValueError):
+        return ''
+    try:
+        from ..namer import Orthonym
+        name = Orthonym(
+            style='pin', _disable_opsin_validity_gate=True).name(smi)
+    except (RecursionError, ValueError, RuntimeError):
+        return ''
+    if not name or 'unknown' in name.lower() or ' ' in name:
+        return ''
+    return name
+
+
+def _catenated_ium_substituent(mol, chain_atom: int, nb, covered: set) -> str:
+    """Prefix name for one non-chain heavy neighbour ``nb`` of ``chain_atom``
+    (halogen -> the simple prefix; an acyl carbon on a CHALCOGEN chain atom ->
+    the acyl prefix; otherwise an organyl), updating ``covered`` with every atom
+    the prefix accounts for. Returns '' on any decline so the caller's atom-drop
+    veto + RT gate can never be handed a mis-built name."""
+    _HALOGEN_PREFIX = {'F': 'fluoro', 'Cl': 'chloro', 'Br': 'bromo', 'I': 'iodo'}
+    if nb.GetSymbol() in _HALOGEN_PREFIX and nb.GetDegree() == 1:
+        covered.add(nb.GetIdx())
+        return _HALOGEN_PREFIX[nb.GetSymbol()]
+    sub_atoms = _collect_substituent_atoms(mol, chain_atom, nb.GetIdx(), set())
+    if sub_atoms is None:
+        return ''
+    from .substituent_purity import organyl_prefix_name
+    name = ''
+    if (mol.GetAtomWithIdx(chain_atom).GetSymbol() in _ONIUM_HYDRIDE_STEMS
+            and _is_acyl_on_chalcogen(mol, nb, chain_atom)):
+        name = _acyl_on_chalcogen_prefix(mol, nb.GetIdx(), chain_atom) or ''
+    if not name:
+        name = organyl_prefix_name(mol, nb.GetIdx(), chain_atom) or ''
+    if not name:
+        return ''
+    covered |= set(sub_atoms)
+    return name
+
+
+def _assemble_unlocanted_ium(subs: List[str], parent: str) -> str:
+    """No-locant substituent-prefix assembly for a MONONUCLEAR parent-hydride
+    cation chlorotri(methyl)phosphanium). Byte-for-byte the assembly
+    loop of ``emit_onium_hydride_parent`` enclosing marks: a multiplied
+    simple prefix not cited first takes marks -> 'tri(methyl)')."""
+    from collections import Counter
+
+    from ..assembly.naming_utils import (
+        apply_enclosing_marks,
+        enclose_if_compound,
+        get_multiplier_prefix,
+        multiplier_needs_hyphen,
+        prefix_citation_sort_key,
+    )
+    suffix = f"{_elide_terminal_e(parent)}ium"
+    if not subs:
+        return suffix
+    counts = Counter(subs)
+    uniq = sorted(counts, key=prefix_citation_sort_key)
+    parts = []
+    for i, nm in enumerate(uniq):
+        mult = get_multiplier_prefix(counts[nm], nm)
+        marked = enclose_if_compound(nm)
+        if len(uniq) >= 2 and i > 0 and marked == nm:
+            marked = apply_enclosing_marks(nm, -1)
+        if mult and marked == nm and multiplier_needs_hyphen(nm):
+            token = f"{mult}-{marked}"
+        else:
+            token = f"{mult}{marked}"
+        parts.append(token)
+    return f"{''.join(parts)}{suffix}"
+
+
+def emit_catenated_hydride_cation(mol, center_idx: int) -> str:
+    """ (the Blue Book "General rule for systematically naming cationic
+    centers in parent hydrides"; examples:41386-41390): a CATENATED homonuclear
+    parent-hydride cation, or a SUBSTITUTED mononuclear pnictogen cation, named on
+    the parent hydride + '-ium' at the cationic-centre locant.
+
+        CN(C)[N+](C)(C)C -> pentamethylhydrazinium (PIN)
+        CS[S+](C)SC -> 1,2,3-trimethyltrisulfan-2-ium (PIN)
+        C[P+](C)(C)Cl -> chlorotri(methyl)phosphanium (PIN)
+        C[P+](C)(C)P(Cl)Cl -> 2,2-dichloro-1,1,1-trimethyldiphosphan-1-ium (PIN)
+        O=C(O[OH2+])c1ccccc1 -> 2-benzoyldioxidan-1-ium (PIN)
+
+    Approach (a trace-confirmed: neutralize-re-enter is structurally impossible for a
+    0-H fully-substituted onium/quaternary centre, and even where a neutral is
+    formable the neutral namer names a DIFFERENT parent -- benzenecarboperoxoic
+    acid, not benzoyldioxidane): name the BARE homonuclear parent chain by
+    re-entering the neutral namer (``_bare_parent_hydride_name`` -> trisulfane /
+    hydrazine / diphosphane / dioxidane / phosphane -- so the multiplier / retained
+    tables are NOT re-spelled here), number the chain giving the cationic centre
+    the lowest locant /, cite the substituents as
+    detachable prefixes, and append '-{loc}-ium' with 'e'-elision. Substituents
+    named by TYPE (halogen / acyl-on-chalcogen / organyl) with a whole-heavy-atom
+    drop veto; '' on ANY decline so the caller's RT gate never sees a mis-built
+    name. A chalcogen MONONUCLEAR onium is out of scope (emit_onium_hydride_parent
+    owns it) as is a mononuclear N (the aminium path).
+
+    The hydrazine (retained N-N parent) fully-substituted cation omits all locants
+    per the example 'pentamethylhydrazinium (PIN)' (and: every
+    substitutable position of hydrazinium bears the one identical group)."""
+    center = mol.GetAtomWithIdx(center_idx)
+    if center.GetFormalCharge() != 1 or center.IsInRing():
+        return ''
+    element = center.GetSymbol()
+    if element not in _CATENATED_IUM_ELEMENTS:
+        return ''
+    chain = _homonuclear_single_chain(mol, center_idx, element)
+    if chain is None:
+        return ''
+    n = len(chain)
+    chain_set = set(chain)
+
+    # --- MONONUCLEAR substituted pnictogen (chlorotri(methyl)phosphanium) --------
+    if n == 1:
+        if element not in _MONONUCLEAR_IUM_PNICTOGENS:
+            return ''
+        heavy = [nb for nb in center.GetNeighbors() if nb.GetSymbol() != 'H']
+        if not heavy:
+            return ''                             # bare PH4+ -> retained table
+        parent = _bare_parent_hydride_name(element, 1)
+        if not parent:
+            return ''
+        covered = {center_idx}
+        subs: List[str] = []
+        for nb in heavy:
+            nm = _catenated_ium_substituent(mol, center_idx, nb, covered)
+            if not nm:
+                return ''
+            subs.append(nm)
+        if len(covered) != mol.GetNumHeavyAtoms():
+            return ''
+        return _assemble_unlocanted_ium(subs, parent)
+
+    # --- CATENATED homonuclear chain (n >= 2) ------------------------------------
+    parent = _bare_parent_hydride_name(element, n)
+    if not parent:
+        return ''
+    center_pos = chain.index(center_idx)
+    subs_by_pos: Dict[int, List[str]] = {}
+    covered = set(chain)
+    for pos, idx in enumerate(chain):
+        for nb in mol.GetAtomWithIdx(idx).GetNeighbors():
+            if nb.GetIdx() in chain_set or nb.GetSymbol() == 'H':
+                continue
+            nm = _catenated_ium_substituent(mol, idx, nb, covered)
+            if not nm:
+                return ''
+            subs_by_pos.setdefault(pos, []).append(nm)
+    if len(covered) != mol.GetNumHeavyAtoms():
+        return ''
+
+    from ..assembly.naming_utils import (
+        alpha_sort_key,
+        enclose_if_compound,
+        get_multiplier_prefix,
+        is_complex_substituent,
+    )
+
+    # Orientation.: lowest locant to the cationic centre first, then
+    # the lowest substituent-locant SET. On a tie of BOTH, "lowest locants
+    # to the substituent cited first in alphanumerical order" — compared as the
+    # per-NAME sorted locant tuples taken in alphanumerical citation order, NOT the
+    # flattened numeric list and NEVER RDKit atom index (SMILES input order). The
+    # name key ``(alpha_sort_key(nm), nm)`` is a strict TOTAL order over the
+    # distinct substituent names present, so a residual tie (``kf == kt``) can only
+    # be a genuinely symmetric numbering that yields the IDENTICAL name either way
+    # (e.g. 1,2,3-trimethyltrisulfan-2-ium) — deterministic, never an atom-index
+    # pick. Because the projection is totally ordered, "no total order" never
+    # arises; an atom-order-reversed SMILES of the same molecule gives the same PIN.
+    def _loc(pos, flip):
+        return (n - pos) if flip else (pos + 1)
+
+    def _key(flip):
+        cat = _loc(center_pos, flip)
+        by_name: Dict[str, List[int]] = {}
+        for p, names in subs_by_pos.items():
+            for nm in names:
+                by_name.setdefault(nm, []).append(_loc(p, flip))
+        flat = sorted(l for locs in by_name.values() for l in locs)
+        name_locs = [tuple(sorted(by_name[nm]))
+                     for nm in sorted(by_name, key=lambda x: (alpha_sort_key(x), x))]
+        return (cat, flat, name_locs)
+
+    flip = _key(True) < _key(False)
+    cat_locant = _loc(center_pos, flip)
+    name_to_locants: Dict[str, List[int]] = {}
+    for pos, names in subs_by_pos.items():
+        for nm in names:
+            name_to_locants.setdefault(nm, []).append(_loc(pos, flip))
+
+    stem = _elide_terminal_e(parent)
+
+    # example 'pentamethylhydrazinium (PIN)': the retained N-N parent's
+    # fully-substituted single-cation form omits all locants when every position
+    # bears the one identical group. trisulfane/diphosphane (systematic
+    # multiplier parents) keep their locants, so this is scoped to hydrazine.
+    if (element == 'N' and parent == 'hydrazine'
+            and len(name_to_locants) == 1
+            and all(mol.GetAtomWithIdx(i).GetTotalNumHs() == 0 for i in chain)):
+        nm, locs = next(iter(name_to_locants.items()))
+        if not is_complex_substituent(nm):
+            mult = get_multiplier_prefix(len(locs), nm)
+            return f"{mult}{nm}{stem}ium"
+
+    prefix_parts = []                             # (alpha_key, min_locant, text)
+    for nm, locs in name_to_locants.items():
+        locs_sorted = sorted(locs)
+        mult = get_multiplier_prefix(len(locs_sorted), nm)
+        loc_str = ','.join(str(l) for l in locs_sorted)
+        # / enclosing marks: a complex/compound substituent
+        # prefix (a detachable ``propan-2-yl``, ``bromomethyl``, …) is enclosed
+        # whether cited ONCE or MULTIPLIED — BB ``2-methyl-5-(propan-2-yl)phenol``
+        # (PIN,:26792) and ``1,4-di(propan-2-yl)cyclohexane`` (PIN,:25719). Route
+        # through the shared ``enclose_if_compound`` primitive (idempotent, escalates
+        # (-> [ -> {) exactly as the sibling onium assemblers do, so a SIMPLE prefix
+        # (methyl/ethyl) stays bare and the multiplied ``di(propan-2-yl)`` form is
+        # kept. The old ``and len(locs_sorted) > 1`` guard dropped the marks on a
+        # count-1 complex prefix (…-1-propan-2-yldisulfan-1-ium).
+        body = f"{mult}{enclose_if_compound(nm)}"
+        prefix_parts.append((alpha_sort_key(nm), locs_sorted[0],
+                             f"{loc_str}-{body}"))
+    prefix_parts.sort(key=lambda t: (t[0], t[1]))
+    prefix_str = '-'.join(p[2] for p in prefix_parts)
+    core = f"{stem}-{cat_locant}-ium"
+    return _join_prefix_stem(prefix_str, core)
+
+
 def _ring_iupac_locants(ring_mol):
     """Reuse the namer's authoritative ring-locant supplier on an INDEX-PRESERVING
     mol (heterocycle/benzene/PAH/fused). Returns the atom_idx -> locant dict (the
@@ -2868,6 +3503,78 @@ def _ring_iupac_locants(ring_mol):
     except (RecursionError, ValueError, RuntimeError, KeyError):
         return None
     return (ri or {}).get('iupac_locants')
+
+
+def _lowest_cation_locant_renumbering(bare_ring_mol, locants, center, subst_atoms=()):
+    """P-73.5.3.2 (heading **P-73.5.3 "Cationic characteristic groups on parent
+    cations"**, ``BlueBookV2.md:42207``; rule ``:42219``): *"Where there is a
+    choice, low locants for skeletal cationic centers are determined before
+    considering locants for cationic suffixes. This is consistent with the choice
+    of lowest locants for corresponding neutral compounds (see P-14.4)."*  The
+    book's worked example (``:42288``) is a SYMMETRIC di-hetero ring —
+    ``N,N,N,2-tetramethyl-2,6-naphthyridin-2-ium-5-aminium`` (PIN), *not* the
+    ``…-6-ium-…`` form — the cationic ring N taking the LOWER of the symmetric
+    ``{2,6}`` locant pair.
+
+    ``_ring_iupac_locants`` numbers the NEUTRAL parent ring and is blind to which
+    ring atom carries the charge, so on a symmetric parent (norbornane-type
+    ``1,4-diazabicyclo[2.2.1]heptane``: both bridgehead N equivalent) it may hand
+    the cationic centre the HIGH locant (``…heptan-4-ium``).  Given that base
+    numbering and the ring index ``center`` of the skeletal cationic centre, this
+    returns the numbering — chosen among all graph-automorphism-equivalent
+    numberings of the bare parent — that gives the cationic centre the lowest
+    locant, breaking any residual tie by the substituent-atom locant set
+    (``subst_atoms``, ranked AFTER the cation per P-14.4) then a deterministic
+    canonical-rank key.
+
+    A graph automorphism of the bare parent maps like-atom to like-atom, so every
+    candidate numbering assigns the heteroatoms the IDENTICAL locant set — the
+    P-31.1.4.3.2/.3 heteroatom-set / senior-heteroatom minimisation the base
+    numbering already fixed is never disturbed (verified: the two N stay ``{1,4}``,
+    only the cation moves 4->1).  This is why the criterion is applied as a
+    post-pass over automorphisms rather than by re-ranking the neutral numbering.
+
+    ``locants`` / ``center`` / ``subst_atoms`` are all keyed to ``bare_ring_mol``'s
+    atom indices.  Returns a possibly-relabelled dict with the SAME keys, or
+    ``locants`` unchanged when no equivalent numbering lowers the cation locant
+    (the common asymmetric case — automorphism group is trivial)."""
+    if center not in locants:
+        return locants
+    try:
+        autos = bare_ring_mol.GetSubstructMatches(
+            bare_ring_mol, uniquify=False, maxMatches=5000)
+    except (RuntimeError, ValueError):
+        return locants
+    if len(autos) <= 1:
+        return locants
+    try:
+        canon = list(Chem.CanonicalRankAtoms(bare_ring_mol, breakTies=True))
+    except (RuntimeError, ValueError):
+        return locants
+    keys = list(locants.keys())
+    target = sorted(locants.values())
+    subst = [s for s in subst_atoms if s in locants]
+    best_key, best = None, locants
+    for auto in autos:
+        new_loc = {}
+        ok = True
+        for a in keys:
+            b = auto[a]
+            if b not in locants:
+                ok = False
+                break
+            new_loc[a] = locants[b]
+        # An automorphism restricted to the ring atoms must still be a bijection
+        # over the same locant set; skip anything that is not (defensive).
+        if not ok or sorted(new_loc.values()) != target:
+            continue
+        cation_locant = new_loc[center]
+        subst_key = tuple(sorted(new_loc[s] for s in subst))
+        canon_key = tuple(canon[auto[a]] for a in keys)
+        key = (cation_locant, subst_key, canon_key)
+        if best_key is None or key < best_key:
+            best_key, best = key, new_loc
+    return best
 
 
 def _indicated_hydrogen_prefix(indicated_h_locant, parent, ring_system, mol):
@@ -3299,6 +4006,19 @@ def _emit_ring_cumulative_suffix(mol, center_idx: int, suffix: str) -> str:
             # low-locant / indicated-H handling, but a valid name beats a charge drop).
             locants = _ring_iupac_locants(ring_mol)
             indicated_h = None
+            # (the Blue Book): the general supplier is blind to the charge,
+            # so a symmetric bridged di-N parent (protonated 1,4-diazabicyclo-
+            # [2.2.1]heptane / DABCO) hands the cation the HIGH locant
+            # (…heptan-4-ium). Re-choose the automorphism-equivalent numbering that
+            # gives the skeletal cation the lowest locant. SCOPED to a BARE ring
+            # (no off-ring substituent): then the independent `parent` name below
+            # carries no substituent locants, so the renumbered `center_locant`
+            # composes consistently. A substituted bridged case keeps the old
+            # numbering (its two-numbering composition is OPSIN-gated already).
+            if (locants and center_idx in locants
+                    and not _ring_has_off_ring_substituent(ring_mol, ring_system)):
+                locants = _lowest_cation_locant_renumbering(
+                    ring_mol, locants, center_idx)
         if not locants or center_idx not in locants:
             return ''
         center_locant = locants[center_idx]
@@ -3399,13 +4119,30 @@ def _emit_ring_cumulative_suffix(mol, center_idx: int, suffix: str) -> str:
     # code already proved for a BARE fused ring cation (1-methylquinolin-1-ium).
     locants, _indicated_h = _charged_ring_locants(mol, ring_system, center_idx)
     if locants is None:
+        # (the Blue Book): the general/von-Baeyer supplier is blind to the
+        # charge, so on a SYMMETRIC parent (both bridgehead N of
+        # 1,4-diazabicyclo[2.2.1]heptane equivalent) it may hand the cationic centre
+        # the HIGH locant (…heptan-4-ium). To recover the low-locant choice the
+        # automorphism search must see the TRULY BARE ring skeleton, so sever EVERY
+        # off-ring substituent bond (not just the centre's): a substituent elsewhere
+        # (`C[N+]12CC(Cl)N(CC1)C2`) would otherwise collapse the ring's symmetry to
+        # the trivial automorphism and mask the cation's choice. The substituent
+        # LOCANTS then read off the chosen numbering on the untouched original mol
+        # (`_p74_ring_substituent_prefix` below).
+        rs_set = set(ring_system)
         work = Chem.RWMol(mol)
         try:
-            for e in exo:
-                work.RemoveBond(center_idx, e)
-            a = work.GetAtomWithIdx(center_idx)
-            a.SetFormalCharge(0)
-            a.SetNoImplicit(False)
+            for idx in ring_system:
+                for nb in mol.GetAtomWithIdx(idx).GetNeighbors():
+                    if nb.GetIdx() not in rs_set and nb.GetSymbol() != 'H':
+                        work.RemoveBond(idx, nb.GetIdx())
+            work.GetAtomWithIdx(center_idx).SetFormalCharge(0)
+            # A ring atom that just lost a heavy neighbour must be allowed to top up
+            # its implicit H on sanitize (the RemoveBond noImplicit hazard, as in
+            # `_p74_bare_ring_stem`); scoped to ring atoms so the discarded
+            # substituent fragments are untouched.
+            for idx in ring_system:
+                work.GetAtomWithIdx(idx).SetNoImplicit(False)
             severed = work.GetMol()
             frag_mols = Chem.GetMolFrags(severed, asMols=True, sanitizeFrags=True)
             frag_idxs = Chem.GetMolFrags(severed, asMols=False, sanitizeFrags=True)
@@ -3419,6 +4156,20 @@ def _emit_ring_cumulative_suffix(mol, center_idx: int, suffix: str) -> str:
         frag_locants = _ring_iupac_locants(ring_frag)
         if not frag_locants:
             return ''
+        # Re-choose, among the automorphism-equivalent numberings of the bare ring,
+        # the one giving the skeletal cation the LOWEST locant (heteroatom-set
+        # minimisation preserved — an automorphism maps N->N). Ties broken by the
+        # substituent set (ranked AFTER the cation, then a canonical key.
+        orig_to_frag = {o: f for f, o in enumerate(ring_orig)}
+        subst_frag = {
+            orig_to_frag[o] for o in ring_system if o in orig_to_frag
+            and any(nb.GetIdx() not in rs_set and nb.GetSymbol() != 'H'
+                    for nb in mol.GetAtomWithIdx(o).GetNeighbors())
+        }
+        frag_center = orig_to_frag.get(center_idx)
+        if frag_center is not None:
+            frag_locants = _lowest_cation_locant_renumbering(
+                ring_frag, frag_locants, frag_center, subst_frag)
         # Remap the fragment-space numbering back onto the ORIGINAL mol's atom
         # indices, so the trio below can be driven off the untouched mol/ring_system.
         locants = {ring_orig[k]: v for k, v in frag_locants.items()}

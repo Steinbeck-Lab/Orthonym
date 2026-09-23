@@ -91,8 +91,12 @@ class TestProtectedNeighbors:
         # IN the chain -> amino+imino (was '4-carbamimidoylbutanoic acid'; the
         # new form is OPSIN-RT canonical-equal to the same SMILES).
         ("N=C(N)CCCC(=O)O", "5-amino-5-iminopentanoic acid"),
-        # hydroxylamine as PARENT (senior path untouched by the prefix row)
-        ("CCNO", "N-ethylhydroxylamine"),
+        # hydroxylamine as PARENT (senior path untouched by the prefix row).
+        # v52 P2, BB:38308/:38314): R-NH-OH is named as
+        # an N-derivative of the senior amine ('N-hydroxymethanamine (PIN)
+        # N-methylhydroxylamine' for the CH3 case), not the old
+        # functional-class 'N-ethylhydroxylamine' direction.
+        ("CCNO", "N-hydroxyethanamine"),
         # Wave2 supersedes the original 'butyl isocyanate' control here:
         # substitutive isocyanato is the PIN (BB VERBATIM
         # 'isocyanatocyclohexane (PIN) cyclohexyl isocyanate'); the

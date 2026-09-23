@@ -140,6 +140,20 @@ WITNESSES = [
 
 _IDS = [f"{wid}-{linker}" for wid, linker, _ in WITNESSES]
 
+# Witnesses split by CURRENT measured round-trip status (fresh process per
+# SMILES, re-measured 2026-09-22). The -C4 baseline was "all 22 ABSTAIN";
+# later milestones made 21 of them name AND OPSIN-round-trip to the CORRECT
+# molecule (RT-OK -- the child compares OPSIN's InChI of the emitted name against
+# the input's InChI, so RT-OK is an independent correct-constitution check, not a
+# claim about the code under test). Per this file's own protocol, a witness that
+# flips to RT-OK is promoted from the abstain baseline to a plain round-trip
+# assert. Only w21 (a substituted spiro-lactone ring assembly) still abstains.
+_ABSTAIN_IDS = {"w21"}
+RT_OK_WITNESSES = [w for w in WITNESSES if w[0] not in _ABSTAIN_IDS]
+ABSTAIN_WITNESSES = [w for w in WITNESSES if w[0] in _ABSTAIN_IDS]
+_RT_OK_TEST_IDS = [f"{wid}-{linker}" for wid, linker, _ in RT_OK_WITNESSES]
+_ABSTAIN_TEST_IDS = [f"{wid}-{linker}" for wid, linker, _ in ABSTAIN_WITNESSES]
+
 
 def test_harness_validates_against_a_known_positive():
     """Guard against a silently-broken harness (``feedback_harness_that_
@@ -148,22 +162,32 @@ def test_harness_validates_against_a_known_positive():
     assert _c4_rt("C(c1ccccc1)Sc1ccccc1") == "RT-OK"  # benzyl phenyl sulfide
 
 
-@pytest.mark.parametrize("wid,linker,smiles", WITNESSES, ids=_IDS)
+@pytest.mark.parametrize("wid,linker,smiles", RT_OK_WITNESSES, ids=_RT_OK_TEST_IDS)
+def test_c4_witness_names_and_round_trips(wid, linker, smiles):
+    """-C4 PROGRESS: these witnesses now name to a full-InChI OPSIN round-trip
+    (RT-OK). Promoted from the original "all 22 abstain" baseline as later
+    milestones composed ring-across-linker. The OPSIN round-trip (name -> InChI,
+    compared to the input's InChI) is the correctness check, independent of the
+    naming code -- so this asserts a correct constitution, not merely a non-empty
+    string. A witness that stops round-tripping fails here (teeth)."""
+    assert _c4_rt(smiles) == "RT-OK"
+
+
+@pytest.mark.parametrize("wid,linker,smiles", ABSTAIN_WITNESSES, ids=_ABSTAIN_TEST_IDS)
 def test_c4_witness_abstains_today(wid, linker, smiles):
-    """BASELINE (measured 2026-08-24, fresh process): every C4 witness emits
-    ``unknown organic compound`` -> ABSTAIN. This documents and guards the
-    starting point; a change that flips any of these to RT-OK is real C4
-    progress and should promote the matching xfail below to a plain assert."""
+    """BASELINE remnant: this witness still emits ``unknown organic compound``
+    -> ABSTAIN (fail closed, 0-wrong). A change that flips it to RT-OK is real C4
+    progress and should move it into ``RT_OK_WITNESSES`` above."""
     assert _c4_rt(smiles) == "ABSTAIN"
 
 
-@pytest.mark.parametrize("wid,linker,smiles", WITNESSES, ids=_IDS)
+@pytest.mark.parametrize("wid,linker,smiles", ABSTAIN_WITNESSES, ids=_ABSTAIN_TEST_IDS)
 @pytest.mark.xfail(
     reason="v36-C4 target: compose ring-across-linker to a full-RT name. "
     "Deep core-namer gap (weave lever refuted off-path); abstains at HEAD.",
     strict=False,
 )
 def test_c4_witness_names_and_round_trips_TARGET(wid, linker, smiles):
-    """TARGET end-state: each witness names to a full-InChI OPSIN round-trip.
-    xfail at HEAD (all abstain); turns xpass witness-by-witness as C4 lands."""
+    """TARGET end-state for the still-abstaining witness: name to a full-InChI
+    OPSIN round-trip. xfail while it abstains; xpasses when C4 reaches it."""
     assert _c4_rt(smiles) == "RT-OK"

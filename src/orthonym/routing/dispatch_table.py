@@ -148,6 +148,7 @@ class StoutClass(_StrEnumBase):
     HETEROCHALCOGEN_ABA = "heterochalcogen_aba"      # W3-P14 / pure-chalcogen a[ba]n parent hydride: HS-O-SH -> dithioxane, CH3-S-O-SH -> methyldithioxane; priority 47.55 — after CATENATED_HYDRIDE@47.5, BEFORE SKELETAL_REPLACEMENT so the preselected dithioxane parent pre-empts the '3-oxa-2,4-dithiapentane' skeletal name)
     HOMONUCLEAR_PNICTOGEN_CHAIN = "homonuclear_pnictogen_chain"  # W3-P14 homonuclear Group-15 catenated hydride: PP -> diphosphane, pentaarsane, dibismuthane; priority 47.6 — pnictogen analogue of POLYAZANE@47)
     PNICTOGEN_CARBOXYLIC_ACID = "pnictogen_carboxylic_acid"  # W3-P14 added-carbon -carboxylic acid on a P/As/Sb parent hydride: H2P-COOH -> phosphanecarboxylic acid; priority 47.65 — ahead of the generic acid namer in GENERAL)
+    MONONUCLEAR_HYDRIDE_ADDED_CARBON = "mononuclear_hydride_added_carbon"  # v52 P3 / added-carbon -carbaldehyde/-carbonitrile on a bare Si/Ge/Sn/Pb/P/As/Sb/Bi parent hydride: H2P-CHO -> phosphanecarbaldehyde, H3Si-CN -> silanecarbonitrile; priority 47.66 — right after PNICTOGEN_CARBOXYLIC_ACID@47.65, ahead of the generic chain namer in GENERAL)
     INOSITOL = "inositol"                          # a phase follow-on cyclitol retained names myo-/scyllo-/.../chiro-inositol; name-exact, OPSIN-unparseable; priority 1700 — above CYCLOPHANE, below DECOMP_PRE_GENERAL; no free dense slot)
     NUCLEOSIDE = "nucleoside"                       # a phase / decorated nucleosides/nucleotides: 5'-mono/di/tri-phosphate + O-acyl ester; priority 1800 — after RETAINED so bare nucleosides + AMP/adenylic stay retained; before DECOMP_PRE_GENERAL; strip-and-recognise, OPSIN-RT, fail-closed)
     # a phase FRN attaches via SENIORITY_ORDER extension (for chalcogen
@@ -2011,8 +2012,9 @@ def _handle_nitramide_substituted(mol, smiles, canonical_smiles, features=None, 
 
 def _is_catenated_hydride(mol, smiles, canonical_smiles, features=None, **kwargs) -> bool:
     """Wave-2 completion /; priority 47.5. An alternating
-    homonuclear Group-14/bridge catenated hydride (disiloxane/trisiloxane/
-    disilazane). PURE graph classifier, fail-closed."""
+    homonuclear Group-14 OR Group-15 hub + bridge catenated hydride
+    (disiloxane/trisiloxane/disilazane/diphosphaselenane). PURE graph
+    classifier, fail-closed."""
     if mol is None:
         return False
     from orthonym.rules.catenated_hydrides import name_catenated_hydride
@@ -2020,7 +2022,8 @@ def _is_catenated_hydride(mol, smiles, canonical_smiles, features=None, **kwargs
 
 
 def _handle_catenated_hydride(mol, smiles, canonical_smiles, features=None, **kwargs) -> Optional[str]:
-    """Return the catenated Group-14/bridge hydride PIN, else None."""
+    """Return the catenated Group-14/Group-15 hub + bridge hydride PIN
+    , else None."""
     from orthonym.rules.catenated_hydrides import name_catenated_hydride
     return name_catenated_hydride(mol)
 
@@ -2074,6 +2077,25 @@ def _handle_pnictogen_carboxylic_acid(mol, smiles, canonical_smiles, features=No
     (cascade-continuation)."""
     from orthonym.rules.phosphorus import name_phosphane_carboxylic_acid
     return name_phosphane_carboxylic_acid(mol)
+
+
+def _is_mononuclear_hydride_added_carbon(mol, smiles, canonical_smiles, features=None, **kwargs) -> bool:
+    """v52 P3 /; priority 47.66. An added-carbon
+    -carbaldehyde/-carbonitrile on a bare Si/Ge/Sn/Pb/P/As/Sb/Bi parent hydride
+    (H2P-CHO -> phosphanecarbaldehyde, H3Si-CN -> silanecarbonitrile). PURE
+    graph classifier, fail-closed."""
+    if mol is None:
+        return False
+    from orthonym.rules.mononuclear_hydrides import name_mononuclear_hydride_added_carbon
+    return name_mononuclear_hydride_added_carbon(mol) is not None
+
+
+def _handle_mononuclear_hydride_added_carbon(mol, smiles, canonical_smiles, features=None, **kwargs) -> Optional[str]:
+    """Return the added-carbon -carbaldehyde/-carbonitrile PIN on a bare
+    Group-14/-15 parent hydride /, else None
+    (cascade-continuation)."""
+    from orthonym.rules.mononuclear_hydrides import name_mononuclear_hydride_added_carbon
+    return name_mononuclear_hydride_added_carbon(mol)
 
 
 def _handle_organometallic(mol, smiles, canonical_smiles, features=None, *,
@@ -2182,19 +2204,20 @@ _register_dispatch(
 
 
 # --- Wave-2 completion: CATENATED_HYDRIDE at priority 47.5 (after POLYAZANE@47, ---
-# before DINUCLEAR_HYDRIDE@48 / ORGM@50). Alternating homonuclear Group-14/bridge
-# catenated parent hydride /: [SiH3]O[SiH3] -> disiloxane,
-# [SiH3]O[SiH2]O[SiH3] -> trisiloxane, [SiH3]N[SiH3] -> disilazane, [SnH3]O[SnH3]
-# -> distannoxane. These are exactly what skeletal_replacement Gate 3b declines
-# (terminal Group-14) to avoid the dimethoxysilane structure-loss. Graph
-# classifier, fail-closed; cascade-continuation on None. ---
+# before DINUCLEAR_HYDRIDE@48 / ORGM@50). Alternating homonuclear Group-14 OR
+# Group-15/bridge catenated parent hydride /: [SiH3]O[SiH3]
+# -> disiloxane, [SiH3]O[SiH2]O[SiH3] -> trisiloxane, [SiH3]N[SiH3] -> disilazane,
+# [SnH3]O[SnH3] -> distannoxane, P[Se]P -> diphosphaselenane (BB 8020 PIN). These
+# are exactly what skeletal_replacement Gate 3b declines (terminal Group-14/15)
+# to avoid the dimethoxysilane structure-loss. Graph classifier, fail-closed;
+# cascade-continuation on None. ---
 _register_dispatch(
     class_id=StoutClass.CATENATED_HYDRIDE, priority=47.5, tier=1,
     predicate=_is_catenated_hydride, handler=_handle_catenated_hydride,
-    iupac_section="Blue Book P-21.2.3 / P-52.1.3",
-    description="Alternating Group-14/bridge catenated parent hydride "
-                "(disiloxane / trisiloxane / disilazane / distannoxane); "
-                "graph classifier, fail-closed",
+    iupac_section="Blue Book P-21.2.3.1 / P-52.1.3",
+    description="Alternating Group-14/Group-15 hub + bridge catenated parent "
+                "hydride (disiloxane / trisiloxane / disilazane / distannoxane / "
+                "diphosphaselenane); graph classifier, fail-closed",
 )
 
 
@@ -2251,6 +2274,26 @@ _register_dispatch(
     iupac_section="Blue Book P-68.3.2.3.1",
     description="Added-carbon -carboxylic acid on a P/As/Sb parent hydride "
                 "(phosphanecarboxylic acid); graph classifier, fail-closed",
+)
+
+
+# --- v52 P3 T6: MONONUCLEAR_HYDRIDE_ADDED_CARBON at priority 47.66 (right ---
+# after PNICTOGEN_CARBOXYLIC_ACID@47.65, before FREE_HOMONUCLEAR_G14_HYDRIDE@47.7).
+# An added-carbon -carbaldehyde/-carbonitrile on a bare Si/Ge/Sn/Pb/P/As/Sb/Bi
+# parent hydride the Blue Book / the Blue Book): H2P-CHO ->
+# phosphanecarbaldehyde, H3Si-CN -> silanecarbonitrile. Runs AHEAD of the
+# generic chain namer (GENERAL), which otherwise picks the CHO/CN carbon
+# as a one-carbon parent and emits the non-PIN '1-phosphanylmethanal' /
+# 'silylmethanenitrile'. Graph classifier, fail-closed; cascade-continuation
+# on None. ---
+_register_dispatch(
+    class_id=StoutClass.MONONUCLEAR_HYDRIDE_ADDED_CARBON, priority=47.66, tier=1,
+    predicate=_is_mononuclear_hydride_added_carbon,
+    handler=_handle_mononuclear_hydride_added_carbon,
+    iupac_section="Blue Book P-66.6.1.1.3 / P-66.5.1.1.3",
+    description="Added-carbon -carbaldehyde/-carbonitrile on a bare "
+                "Si/Ge/Sn/Pb/P/As/Sb/Bi parent hydride (phosphanecarbaldehyde / "
+                "silanecarbonitrile); graph classifier, fail-closed",
 )
 
 

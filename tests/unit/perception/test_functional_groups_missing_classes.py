@@ -41,9 +41,14 @@ def test_hydroxylamine_negatives(smi):
 
 @pytest.mark.unit
 def test_hydroxylamine_naming(namer):
-    # gold target
-    assert namer.name("CCCNO") == "N-propylhydroxylamine"
-    assert namer.name("CN(C)O") == "N,N-dimethylhydroxylamine"
+    # gold target (structure-correctness only -- the N-O must not be
+    # silently dropped). v52 P2, BB:38308/:38314)
+    # supersedes the DIRECTION: R-NH-OH / RR'N-OH is named as an N-derivative
+    # of the senior amine, not the functional-class 'N-alkylhydroxylamine' --
+    # BB verbatim '(CH3)2N-OH -> N-hydroxy-N-methylmethanamine (PIN)
+    # N,N-dimethylhydroxylamine'.
+    assert namer.name("CCCNO") == "N-hydroxypropan-1-amine"
+    assert namer.name("CN(C)O") == "N-hydroxy-N-methylmethanamine"
 
 
 # --- selenide / telluride / tellurol (Se/Te ether analogues) ---

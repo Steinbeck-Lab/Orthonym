@@ -293,33 +293,35 @@ class TestGlycosideAssembly:
         )
         assert result is None
 
-    def test_glycoside_with_acid_alkyl_keys(self):
-        """Assembler accepts 'acid'/'alkyl' key convention from engine."""
+    def test_glycoside_acid_alkyl_keys_fail_closed_without_smiles(self):
+        """Engine 'acid'/'alkyl' keys, no fragment SMILES: the functional-class
+        flip cannot fire and the legacy substitutive '(glycosyloxy)aglycone'
+        fallback was REMOVED (it doubled the glycosidic oxygen and carried no
+        attachment locant -> constitution_mismatch; 0/19 correct on a dev split --
+        fragment_assembly.py:1089-1120). The assembler now fails CLOSED (None) so
+        the general pipeline names the glycoside correctly."""
         result = assemble_fragment_name(
             "glycosidic",
             {"acid": "β-D-glucopyranosyloxy", "alkyl": "phenol"},
         )
-        assert result is not None
-        assert "glucopyranosyloxy" in result
-        assert "phenol" in result
+        assert result is None
 
-    def test_glycoside_with_sugar_aglycone_keys(self):
-        """Assembler accepts 'sugar'/'aglycone' key convention."""
+    def test_glycoside_sugar_aglycone_keys_fail_closed_without_smiles(self):
+        """Same fail-closed via the explicit 'sugar'/'aglycone' key convention."""
         result = assemble_fragment_name(
             "glycosidic",
             {"sugar": "β-D-glucopyranosyloxy", "aglycone": "phenol"},
         )
-        assert result is not None
-        assert "glucopyranosyloxy" in result
-        assert "phenol" in result
+        assert result is None
 
-    def test_glycoside_produces_parenthesized_prefix(self):
-        """Glycoside assembly produces '(prefix)aglycone' format."""
+    def test_glycoside_legacy_parenthesized_prefix_removed(self):
+        """The buggy legacy '(β-D-glucopyranosyloxy)aglycone' prefix form is gone
+        (fragment_assembly.py:1089-1120) -- the assembler no longer emits it."""
         result = assemble_fragment_name(
             "glycosidic",
             {"acid": "β-D-glucopyranosyloxy", "alkyl": "phenol"},
         )
-        assert "(β-D-glucopyranosyloxy)" in result
+        assert result is None
 
 
 # ============================================================================
@@ -502,25 +504,26 @@ class TestAmideAssemblyHyphenation:
 # ============================================================================
 
 class TestGlycosideAssemblyHyphenation:
-    """Tests that glycoside assembly uses proper hyphenation."""
+    """The legacy substitutive '(glycosyloxy)aglycone' form (and its paren
+    hyphenation) was REMOVED as provably wrong (fragment_assembly.py:1089-1120);
+    these guard that it does not return. The glycoside is now named by the
+    general pipeline, which owns the enclosure + attachment-locant logic."""
 
-    def test_paren_digit_gets_hyphen(self):
-        """When aglycone starts with digit, hyphen after closing paren."""
+    def test_paren_digit_prefix_form_removed(self):
+        """The digit-initial aglycone legacy prefix form is gone -> fail closed."""
         result = assemble_fragment_name(
             "glycosidic",
             {"sugar": "β-D-glucopyranosyloxy", "aglycone": "5,6-dibutylphenol"},
         )
-        assert result is not None
-        assert ")-5" in result, f"Expected hyphen after paren: {result}"
+        assert result is None
 
-    def test_paren_letter_no_hyphen(self):
-        """When aglycone starts with lowercase letter, no extra hyphen."""
+    def test_paren_letter_prefix_form_removed(self):
+        """The letter-initial aglycone legacy prefix form is gone -> fail closed."""
         result = assemble_fragment_name(
             "glycosidic",
             {"sugar": "β-D-glucopyranosyloxy", "aglycone": "phenol"},
         )
-        assert result is not None
-        assert "(β-D-glucopyranosyloxy)phenol" == result
+        assert result is None
 
 
 # ============================================================================

@@ -286,7 +286,18 @@ FUNCTIONAL_GROUP_SMARTS = {
     # CR-fix (post-merge regression closure): require explicit C neighbor on the chalcogen-carbonyl
     # carbon so thiocarbamates (R-O-C(=S)-N-, R-S-C(=S)-N-) and chalcogen-ureas (N-C(=S)-N) route
     # through their own pathways rather than over-matching as thio-/seleno-/telluro-amides.
-    "thioamide": "[CX3;$([CX3]([#6])(=S)[NX3])](=S)[NX3]",     # R-C(=S)-N(H,R), R=C only
+    # Task 3 (v52 P3,: admit R=H (the C1 case, H-C(=S)-NH2 = methanethioamide).
+    # First attempt dropped the positive carbon-neighbor requirement entirely and relied only on
+    # the two negative $(...) guards below -- that also admitted a halogen/hetero-substituted
+    # acyl C (Cl-C(=S)-NH2 etc.), a false PIN: those are acid halides of thiocarbamic acid
+    #, senior to amides per, not thioamides, and must abstain as before.
+    # Fix a performance pass: require the acyl C be EITHER H1 (atom's own total-H count, which correctly
+    # counts an implicit H -- unlike a bonded-neighbor "[#1]" branch, which needs an explicit H
+    # atom object and never matches implicit H) OR carbon-substituted ($([CX3][#6])); a
+    # halide/O/S-substituted acyl C matches neither positive branch and is excluded. The two
+    # negative guards still exclude thiourea (2 N neighbors on the acyl C) and thiocarbamate
+    # (an ether/thioether O or S neighbor).
+    "thioamide": "[CX3;H1,$([CX3][#6]);!$([CX3]([NX3])[NX3]);!$([CX3]([OX2,SX2])[NX3])](=[SX1])[NX3]",  # R-C(=S)-N(H,R), R=C or H
     "selenoamide": "[CX3;$([CX3]([#6])(=[SeX1])[NX3])](=[SeX1])[NX3]",  # R-C(=Se)-N, R=C only
     "telluroamide": "[CX3;$([CX3]([#6])(=[TeX1])[NX3])](=[TeX1])[NX3]", # R-C(=Te)-N, R=C only parallel)
 
@@ -949,6 +960,36 @@ def _detect_functional_groups_impl(mol) -> Dict[str, List[Tuple[int, ...]]]:
             results["anhydride"].append(_bm)
             _seen_anh.add(_fs)
 
+    # v52 P3T5: a 4-membered ring where the two ring carbonyls are
+    # bridged BOTH by the anhydride's O (this match, atoms C1-O-C2-...) AND,
+    # independently, by a ring N (the base 'imide' SMARTS C1-N-C2) is a
+    # cyclic-imide/anhydride TOPOLOGICAL COINCIDENCE, not a real diacid
+    # anhydride: there is no carbon chain on either side of the O bridge (both
+    # ring bonds off each carbonyl carbon terminate directly at a heteroatom),
+    # so decomposing it as '{diacid} anhydride' silently drops the ring N (a
+    # wrong-molecule emission -- measured: 'ethanedioic anhydride' for
+    # O=C1NC(=O)O1, which actually round-trips to a different structure). The
+    # Blue Book lists this exact shape, 1,3-oxazetidine-2,4-dione, as an IMIDE
+    # example directly beside pyrrolidine-2,5-dione and 1H-pyrrole-2,5-dione
+    #, the Blue Book) -- not as an anhydride. Drop the anhydride match
+    # whenever a base 'imide' match (5-tuple C1,O,N,C2,O) shares its
+    # carbonyl-carbon pair with it; imide then wins seniority unopposed. A
+    # genuine cyclic anhydride (malonic/succinic/glutaric/...) has its second
+    # ring bridge made of CARBON, so 'imide' never matches it and this is a
+    # no-op there (verified: oxetane-2,4-dione, oxolane-2,5-dione unaffected).
+    if results.get("imide") and results.get("anhydride"):
+        _imide_carbon_pairs = {
+            frozenset((m[0], m[3])) for m in results["imide"] if len(m) == 5
+        }
+        _kept_anh = [
+            m for m in results["anhydride"]
+            if not (len(m) == 5 and frozenset((m[0], m[3])) in _imide_carbon_pairs)
+        ]
+        if _kept_anh:
+            results["anhydride"] = _kept_anh
+        else:
+            del results["anhydride"]
+
     # Post-processing: remove generic FG matches that overlap with more-specific FGs
     results = _resolve_fg_collisions(results)
 
@@ -1287,7 +1328,11 @@ def _resolve_fg_collisions(results):
         # a phase Tier FRN-B: chalcogen-amide suppressions (AUDIT-FRN + RESEARCH).
         # Single-permissive [NX3] match captures =[S,Se,Te]-N(H,R) at all 3 N-degrees;
         # downstream N-degree inspection happens at assembly time.
-        ('thioamide', ['thioketone', 'primary_amine', 'secondary_amine', 'tertiary_amine']),
+        # Task 3 (v52 P3): thioamide SMARTS now admits R=H (methanethioamide,;
+        # that H-substituted acyl C also matches the broad thioaldehyde SMARTS [CX3H1](=S),
+        # so suppress thioaldehyde here -- mirrors 'primary_amide' -> 'aldehyde' at:1353
+        # on the oxygen side.
+        ('thioamide', ['thioketone', 'thioaldehyde', 'primary_amine', 'secondary_amine', 'tertiary_amine']),
         ('selenoamide', ['selenoketone', 'primary_amine', 'secondary_amine', 'tertiary_amine']),
         ('telluroamide', ['telluroketone', 'primary_amine', 'secondary_amine', 'tertiary_amine']),
         # a phase Tier FRN-C: chalcogen-aldehyde/ketone suppressions (AUDIT-FRN + RESEARCH).

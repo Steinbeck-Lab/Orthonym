@@ -156,6 +156,7 @@ def name_tier_a_ring(
     # (returns None for everything else), so it preempts only the cases it names
     # correctly and never touches the pool for any other molecule.
     from ...rules.partial_saturation import (
+        name_added_h_fused_carbocycle_suffix,
         name_hydro_mancude_fused_carbocycle,
         name_ring_ketone_with_added_indicated_h,
     )
@@ -184,6 +185,24 @@ def name_tier_a_ring(
             tree=NameTreeNode(
                 parent_stem=_kih_name, class_id="tier_a_ring",
                 iupac_section_cite="P-31.1.4.2.4", fragment_legacy=_kih_name,
+            ),
+            atom_to_locant_hint=None,
+        )
+
+    # v52 P4 /: the -ol/-amine sibling of the KIH preempt. A
+    # mancude naphthalene bearing an -ol/-amine (di-) suffix that requires 'added
+    # indicated hydrogen' — naphthalen-4a(2H)-ol, naphthalene-2,4a(2H)-diamine,
+    # naphthalene-4a,8a-diol. The default carbocyclic paths fail closed (the bare
+    # hydro producer cannot express the suffix), so these otherwise abstain.
+    # Tightly scoped + fail-closed (returns None for everything else), so it
+    # preempts only the cases it names correctly and never touches the pool.
+    _added_h_name = name_added_h_fused_carbocycle_suffix(features.mol)
+    if _added_h_name:
+        return NamingResult(
+            name=_added_h_name,
+            tree=NameTreeNode(
+                parent_stem=_added_h_name, class_id="tier_a_ring",
+                iupac_section_cite="P-14.7.2", fragment_legacy=_added_h_name,
             ),
             atom_to_locant_hint=None,
         )

@@ -26,13 +26,14 @@ import re
 import threading
 from collections import deque, namedtuple
 from dataclasses import dataclass
-from typing import Optional
+from typing import List, Optional
 
 # a phase Plan-04-02 closure: removed unused
 # ``from typing import List, Optional, Set, Dict`` — none of the four
 # names are referenced anywhere in 1608 LOC (verified via AST scan;
 # they appeared only in docstrings, not annotations). Re-add narrowly
-# scoped imports here when real annotations are added.
+# scoped imports here when real annotations are added. (v52: ``List`` re-added
+# for the chalcogen-chain walk in ``_name_disulfanyl_branch``.)
 from rdkit import Chem
 from rdkit.Chem import RWMol
 
@@ -5763,43 +5764,87 @@ def _name_peroxy_branch(mol, frag_atoms, attach_idx, parent_atoms):
     return f"{r_name}peroxy"
 
 
-def _name_disulfanyl_branch(mol, frag_atoms, attach_idx, parent_atoms):
-    """DD2 Fix B (Phase D, (1) /: name a disulfanyl branch
-    -S-S-R -> (R)disulfanyl; terminal -S-SH -> disulfanyl.
+# substituent-chain multipliers for a homogeneous contiguous chalcogen
+# chain named ``...<mult>sulfanyl``: k=2 disulfanyl, k=3 trisulfanyl,... Capped at
+# octa (each verified OPSIN-parseable, 2026-09-23); a longer chain fails closed.
+_CHALCOGEN_CHAIN_SUB_MULT = {
+    2: 'di', 3: 'tri', 4: 'tetra', 5: 'penta',
+    6: 'hexa', 7: 'hepta', 8: 'octa',
+}
 
-    Mirrors ``_name_peroxy_branch`` for the S-S linkage:
-      -S-S-CH3 -> methyldisulfanyl
-      -S-SH -> disulfanyl (terminal; the H-bearing S carries no R)
+
+def _name_disulfanyl_branch(mol, frag_atoms, attach_idx, parent_atoms):
+    """§**** (BB:39325/:39327) / (1) /: name a
+    homogeneous contiguous S-chain substituent, MAXIMISING the chain.
+
+    *"Compounds with three or more contiguous identical chalcogen atoms are treated
+    as parent hydrides in substitutive nomenclature"* — so the whole run of
+    contiguous divalent sulfurs is ONE chain named ``<mult>sulfanyl`` (di-, tri-,
+    tetra-, …), never split into a nested sulfanyl on a shorter chain::
+
+      -S-S-CH3 -> methyldisulfanyl -S-SH -> disulfanyl
+      -S-S-S-CH3 -> methyltrisulfanyl -S-S-SH -> trisulfanyl
+      -S-S-S-S-C2H5 -> ethyltetrasulfanyl
+
+    (Before this maximisation ``-S-S-S-CH2CH3`` was split into
+    ``(ethylsulfanyl)disulfanyl`` — the RIGHT molecule, a non-PIN spelling.)
+
+    Fail-closed (None) on a branched / hypervalent chain atom, a >1-substituent
+    terminus, or a chain longer than the octa multiplier table. Mirrors
+    :func:`_name_peroxy_branch`, which keeps the 2-atom -O-O-R peroxy form.
     """
     frag_set = set(frag_atoms)
     s1 = mol.GetAtomWithIdx(attach_idx)
     if s1.GetSymbol() != 'S' or not _is_divalent_chalcogen_atom(s1):
         return None
-    s2_idx = None
-    for nbr in s1.GetNeighbors():
-        nbr_idx = nbr.GetIdx()
-        if nbr_idx in parent_atoms or nbr_idx not in frag_set:
+    # Walk the maximal contiguous linear chain of divalent S atoms, moving AWAY
+    # from the parent (the parent-side neighbour is not in frag_set). Every atom
+    # before the terminus must continue to EXACTLY one further chain S and carry no
+    # other in-fragment heavy neighbour; a branch or hypervalent hub fails closed.
+    chain = [attach_idx]
+    prev = None
+    cur = attach_idx
+    while True:
+        cur_atom = mol.GetAtomWithIdx(cur)
+        onward_s: List[int] = []
+        other_heavy: List[int] = []
+        for n in cur_atom.GetNeighbors():
+            ni = n.GetIdx()
+            if ni == prev or ni not in frag_set or n.GetSymbol() == 'H':
+                continue
+            if n.GetSymbol() == 'S' and _is_divalent_chalcogen_atom(n):
+                onward_s.append(ni)
+            else:
+                other_heavy.append(ni)
+        if len(onward_s) == 1 and not other_heavy:
+            prev, cur = cur, onward_s[0]
+            chain.append(cur)
             continue
-        if nbr.GetSymbol() == 'S' and _is_divalent_chalcogen_atom(nbr):
-            s2_idx = nbr_idx
-            break
-    if s2_idx is None:
-        return None
-    s2 = mol.GetAtomWithIdx(s2_idx)
+        if len(onward_s) == 0:
+            break                              # terminus (other_heavy is R or empty)
+        return None                            # forked / branched S hub -> decline
+    k = len(chain)
+    mult = _CHALCOGEN_CHAIN_SUB_MULT.get(k)
+    if mult is None:
+        return None                            # k<2 (unreachable via Tier 1.7) or >8
+    stem = f"{mult}sulfanyl"
+    # R on the terminal chain atom (at most one non-S heavy neighbour); none -> a
+    # terminal -S…S-H, the bare <mult>sulfanyl.
+    last = mol.GetAtomWithIdx(chain[-1])
     r_start = None
-    for nbr in s2.GetNeighbors():
-        nbr_idx = nbr.GetIdx()
-        if nbr_idx == attach_idx or nbr_idx not in frag_set:
+    for n in last.GetNeighbors():
+        ni = n.GetIdx()
+        if ni == chain[-2] or ni not in frag_set or n.GetSymbol() == 'H':
             continue
-        r_start = nbr_idx
-        break
+        if r_start is not None:
+            return None                        # >1 terminal substituent -> decline
+        r_start = ni
     if r_start is None:
-        # Terminal -S-SH: no R group -> bare disulfanyl.
-        return "disulfanyl"
-    r_name = _name_peroxy_or_disulfanyl_R(mol, r_start, {attach_idx, s2_idx}, frag_set)
+        return stem
+    r_name = _name_peroxy_or_disulfanyl_R(mol, r_start, set(chain), frag_set)
     if not r_name:
         return None
-    return f"{r_name}disulfanyl"
+    return f"{r_name}{stem}"
 
 
 def _name_mixed_chalcogen_branch(mol, frag_atoms, attach_idx, parent_atoms):

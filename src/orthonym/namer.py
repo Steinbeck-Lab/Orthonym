@@ -7278,6 +7278,26 @@ class Orthonym:
                                             pg_ring_atoms.add(atom_idx)
                                             break
 
+                    # v52 P1 Task D3 (c), the Blue Book): the loops
+                    # above only anchor a CARBON-rooted appended suffix
+                    # (-carboxylic acid, -carbaldehyde,...) -- ``atom.GetSymbol
+                    # != 'C': continue`` skips every atom of a sulfonic_acid /
+                    # sulfinic_acid match, whose root is S, not C. So a ring
+                    # bearing -SO3H / -SO2H never got its suffix atom anchored
+                    # and (f) (the substituent set) decided numbering
+                    # instead, giving 'cyclohex-1-ene-4-sulfonic acid' where
+                    # (c) requires the suffix at locant 1
+                    # ('cyclohex-3-ene-1-sulfonic acid'). Reuse the SAME
+                    # ring_principal_suffix_atoms anchor the heterocycle branch
+                    # above already feeds for this exact family (its case B) --
+                    # not a new mechanism, the shared one applied to the
+                    # non-benzene/non-heterocyclic ring path too.
+                    from .rules.heterocycles import ring_principal_suffix_atoms
+                    pg_ring_atoms |= ring_principal_suffix_atoms(
+                        features.mol, features.principal_ring,
+                        features.principal_group, features.functional_groups
+                    )
+
                     # Orient the ring based on type
                     if features.ring_type == 'cycloalkane':
                         features.oriented_ring = orient_cycloalkane(

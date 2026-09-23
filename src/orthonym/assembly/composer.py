@@ -647,13 +647,36 @@ TERMINAL_GROUPS = {
     # branch, so we shipped `cyclohexane-1-carboperoxoic acid` against the verbatim
     # `cyclohexanecarboperoxoic acid (PIN)` at the Blue Book.
     #
-    # ⚠ ONLY `peroxy_acid` is added. The other five asymmetric classes include
-    # `hydrazonamide` and `imidic_acid`, which have substitutable suffix NITROGENS, and
-    # the terminal branch's per-scope check reads `features.ring_substituents` only --
-    # it does NOT see a substituent on the suffix heteroatom. That is the exact hole
-    # that shipped `N-hydroxycyclohexanimine` in tranche A. Add those only together
-    # with a real per-scope prefix check.
+    # ⚠ ONLY `peroxy_acid` was added here originally. The remaining asymmetric classes
+    # (`hydrazonamide`, `imidic_acid`, `hydrazonic_acid`, `hydrazidine`,
+    # `thiohydrazide`) have suffix NITROGENS that COULD be substitutable, and the
+    # terminal branch's per-scope check reads `features.ring_substituents` only -- it
+    # does NOT see a substituent on the suffix heteroatom. That is the exact hole
+    # that shipped `N-hydroxycyclohexanimine` in tranche A. Add a class here only
+    # together with a real per-scope prefix check, UNLESS its perception SMARTS
+    # structurally forbids a substituent on that nitrogen (see below).
     "peroxy_acid",      # Always at chain end: propaneperoxoic acid)
+    # v52 P1 Task 2 (c), SP1): `imidic_acid` / `hydrazonic_acid` are SAFE
+    # to add despite the caution above -- their perception SMARTS
+    # (`perception/functional_groups.py`: `imidic_acid` requires `=[NX2H1]`,
+    # `hydrazonic_acid` requires the terminal amino N to be `[NX3H2]`) both demand an
+    # UNSUBSTITUTED suffix nitrogen; a substituted variant (`CN=C(O)C1CCCCC1`,
+    # `CNN=C(O)C1CCCCC1`) simply does not match either FG at all -- perception routes
+    # it to a different principal_group entirely (`imine` / `carboxylic_acid`), which
+    # is independently self-consistency-gated. The N-hydroxy sibling (hydroximic acid)
+    # is its OWN FG (`hydroximic_acid`, SUFFIX_FORMS -> None) built by a dedicated
+    # handler that never reaches TERMINAL_GROUPS, so it cannot hit this branch either.
+    # The suffix-N hole is therefore structurally unreachable for these two classes.
+    # Without this membership, ring-attached imidic/hydrazonic acid fell through to
+    # the NON-terminal branch's `_ring_suffix_locant_is_trivial`, whose own allowlist
+    # (`_P14_3_4_RING_SUFFIX_CLASSES`) additionally requires a SINGLE heteroatom
+    # hanging directly off the ring (ketone/alcohol/thiol/amine shape) -- it can never
+    # licence an appended-carbon suffix (`-C(=NH)OH` / `-C(=NNH2)OH`) regardless of
+    # allowlist membership, so the locant was always kept, wrongly, for
+    # `cyclohexanecarboximidic acid` / `cyclohexanecarbohydrazonic acid` (BB
+    # verbatim: no locant -- (c), the Blue Book).
+    "imidic_acid",       # Always at chain end: ethanimidic acid)
+    "hydrazonic_acid",   # Always at chain end: methanehydrazonic acid)
     "carbamic_acid",    # Retained name, terminal (locant 1)
     # D-FOLLOWON item 8: amidine/imidamide characteristic C is terminal.
     "amidine",          # Always at chain end (locant 1)
@@ -2512,6 +2535,19 @@ def _try_name_hydrazone_substitutive(features: Any) -> Optional[str]:
         return None
     if is_complex_substituent(ylidene):
         ylidene = f"({ylidene})"
+    # (the Blue Book, "Locants are not omitted when there is a possibility of
+    # isomers"): a positional isotopic label on the 2-N PARENT (an N of the hydrazine)
+    # breaks the symmetry that made the lone ylidene's position unambiguous, so its
+    # locant '1' is restored -- '1-propylidene(1-15N)hydrazine', not
+    # 'propylidene(1-15N)hydrazine'. The label is stripped before this parent is named,
+    # so the fact is carried down by the ambient parent-positional isotope scope that
+    # rules/isotopes.py enters ONLY when a labelled atom sits on the PARENT skeleton; it
+    # is the narrow parent-positional flag, NOT locants_are_forced, so a positional
+    # locant a label needs inside the ylidene substituent does not spuriously locant the
+    # ylidene. Every candidate stays OPSIN-round-trip-gated in the isotope decorator.
+    from .locant_omission import parent_scope_has_positional_isotope
+    if parent_scope_has_positional_isotope():
+        return f"1-{ylidene}hydrazine"
     return f"{ylidene}hydrazine"
 
 

@@ -55,8 +55,12 @@ def test_heterol_pins_round_trip(smiles, expected):
     ("ONc1ccc(O)cc1", "4-(hydroxyamino)phenol"),               # phenol senior, N not in ring
     # acyclic hydroxylamine / sulfinimidic acid -> untouched (not ring heteroatoms)
     ("CS(=N)O", "methanesulfinimidic acid"),
-    ("CNO", "N-methylhydroxylamine"),
-    ("CCNO", "N-ethylhydroxylamine"),
+    # v52 P2, BB:38308/:38314): R-NH-OH is named as an
+    # N-derivative of the senior amine ('N-hydroxymethanamine (PIN)
+    # N-methylhydroxylamine' for the CH3 case), not the old functional-class
+    # 'N-alkylhydroxylamine' direction.
+    ("CNO", "N-hydroxymethanamine"),
+    ("CCNO", "N-hydroxyethanamine"),
     # ordinary ring-carbon alcohols / peroxols -> unchanged
     ("OC1CCCCC1", "cyclohexanol"),
     ("OOC1CCCCC1", "cyclohexane-1-peroxol"),

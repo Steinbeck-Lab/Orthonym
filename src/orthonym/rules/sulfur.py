@@ -314,13 +314,20 @@ def name_sulfonyl_halide(features, style: str = "pin") -> Optional[str]:
         # rewrite cannot safely handle) -> fail closed.
         return None
 
-    # The retained benzene stem carries no locant ('benzenesulfonic acid'), but
-    # the PIN sulfonyl-halide form takes the '-1-' locant (BB
-    # '...benzene-1-sulfonyl chloride'). Insert it for the bare-benzene stem.
-    if acyl == "benzenesulfonyl":
-        acyl = "benzene-1-sulfonyl"
-    elif acyl == "benzenesulfinyl":
-        acyl = "benzene-1-sulfinyl"
+    # v52 P1 Task 2 (c), SP1): the two lines below used to
+    # UNCONDITIONALLY insert '-1-' for the bare-benzene stem, on the theory that the
+    # acyl (halide) form always needs the locant the acid form omits. That is
+    # backwards: `acid_name` already applies (c) correctly (monosubstituted
+    # 'benzenesulfonic acid' / 'benzenesulfinic acid' omit '1'; a disubstituted ring
+    # like '4-isocyanatobenzene-1-sulfonic acid' already keeps it, per
+    # deny-default), and `acyl` is derived from `acid_name` by a pure suffix swap, so
+    # it always inherits the SAME locant presence/absence -- there is no shape where
+    # the acyl form needs a locant the acid form lacks. The BB verbatim monosubstituted
+    # PIN is 'benzenesulfinyl chloride' (the Blue Book), NOT
+    # 'benzene-1-sulfinyl chloride'; the '-1-' form (the Blue Book,
+    # '4-isocyanatobenzene-1-sulfonyl chloride') only occurs already-disubstituted,
+    # which this rewrite never touches (its `acyl == "benzenesulfonyl"` string match
+    # only fires on the bare, monosubstituted stem in the first place).
 
     return f"{acyl} {halide_word}"
 

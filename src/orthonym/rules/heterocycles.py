@@ -2903,6 +2903,53 @@ def _is_cyclic_imide_carbonyl(mol, carbonyl_c_idx, ring_set) -> bool:
     return False
 
 
+def _is_cyclic_anhydride_carbonyl(mol, carbonyl_c_idx, ring_set) -> bool:
+    """True iff ``carbonyl_c_idx`` is a ring carbon of a CYCLIC anhydride motif:
+    it bears an exocyclic ``=O`` and is bonded to a ring O that is itself bonded
+    to a SECOND ring carbon which also bears an exocyclic ``=O`` — the anhydride
+    oxygen bridging two ring carbonyls (in-ring ``-CO-O-CO-``). BOTH carbonyls
+    satisfy this, so both are reclassified to the ``-one`` suffix, yielding the
+    ring ``-dione`` name. method (1) ("as heterocyclic pseudoketones")
+    "generates preferred IUPAC names" (the Blue Book; cf. ``oxolane-2,5-dione
+    (PIN)``:29318, ``1,4-dioxane-2,5-dione (PIN)``:32173). Mirrors
+    ``_is_cyclic_imide_carbonyl`` with an O bridge in place of the imide N.
+
+    The bridging-O + second-carbonyl requirement confines this to the genuine
+    in-ring anhydride: a cyclic carbonate (``O=C1OCCO1``, one ring C=O whose two
+    flanking ring O's each lead to a CH2, not a second carbonyl) does NOT match,
+    so it stays ``1,3-dioxolan-2-one``. Single-ring-O cyclic anhydrides
+    (succinic -> ``oxolane-2,5-dione``) are perceived as an ester and named via
+    the lactone-declined branch; this branch only handles the multi-heteroatom
+    ring that perceives as ``anhydride`` (``2,6-dioxo-1,4-dioxane`` was the bug)."""
+    c = mol.GetAtomWithIdx(carbonyl_c_idx)
+    if carbonyl_c_idx not in ring_set or c.GetSymbol() != 'C':
+        return False
+
+    def _has_exocyclic_carbonyl_o(atom):
+        return any(
+            b.GetBondTypeAsDouble() == 2.0
+            and b.GetOtherAtom(atom).GetSymbol() == 'O'
+            and b.GetOtherAtom(atom).GetIdx() not in ring_set
+            for b in atom.GetBonds()
+        )
+
+    if not _has_exocyclic_carbonyl_o(c):
+        return False
+    for nb in c.GetNeighbors():
+        # the anhydride bridge is a RING O single-bonded to this carbonyl carbon
+        if nb.GetIdx() not in ring_set or nb.GetSymbol() != 'O':
+            continue
+        bond = mol.GetBondBetweenAtoms(carbonyl_c_idx, nb.GetIdx())
+        if bond is None or bond.GetBondTypeAsDouble() != 1.0:
+            continue
+        for nn in nb.GetNeighbors():
+            if (nn.GetIdx() in ring_set and nn.GetIdx() != carbonyl_c_idx
+                    and nn.GetSymbol() == 'C'
+                    and _has_exocyclic_carbonyl_o(nn)):
+                return True
+    return False
+
+
 def ring_principal_suffix_atoms(
     mol, ring_atoms, principal_group, functional_groups=None
 ) -> Set[int]:
@@ -2970,6 +3017,14 @@ def ring_principal_suffix_atoms(
     if principal_group == 'imide':
         for a in principal_ring:
             if _is_cyclic_imide_carbonyl(mol, a, ring_set):
+                anchors.add(a)
+    elif principal_group == 'anhydride':
+        #: a CYCLIC anhydride with an extra ring heteroatom perceives
+        # as 'anhydride' (a single-ring-O one perceives as 'ester'); its two ring
+        # carbonyls are pseudoketone -dione anchors, exactly like the imide N
+        # case (an O bridge in place of the imide N).
+        for a in principal_ring:
+            if _is_cyclic_anhydride_carbonyl(mol, a, ring_set):
                 anchors.add(a)
     elif (principal_group in ('secondary_amide', 'tertiary_amide')
           and _is_monocyclic_lactam(mol) is None):
@@ -3455,6 +3510,26 @@ def get_heterocycle_substituents(
                 and _is_cyclic_imide_carbonyl(mol, ring_atom_idx, ring_set)
             )
 
+            # (the Blue Book, method (1) "generates preferred IUPAC
+            # names"): a CYCLIC anhydride whose ring carries an extra skeletal
+            # heteroatom perceives as principal_group 'anhydride' (a single-ring-O
+            # cyclic anhydride perceives as 'ester' and is handled by
+            # ring_lactone_suffix). Its two ring carbonyls, bridged by the
+            # anhydride O, are pseudoketones named with the -DIONE suffix, NOT
+            # '2,6-dioxo-' detachable prefixes: O=C1COCC(=O)O1 ->
+            # 1,4-dioxane-2,6-dione (not 2,6-dioxo-1,4-dioxane). Mirrors the
+            # imide branch with an O bridge; _is_cyclic_anhydride_carbonyl keeps
+            # it to the genuine in-ring anhydride (a cyclic carbonate, one ring
+            # C=O between two ring O's, does not match -> stays -one).
+            ring_anhydride_suffix = (
+                not is_principal_suffix
+                and not ring_ketone_suffix
+                and not ring_imide_suffix
+                and principal_group == 'anhydride'
+                and hetero_sub_name == 'oxo'
+                and _is_cyclic_anhydride_carbonyl(mol, ring_atom_idx, ring_set)
+            )
+
             # a phase (A fix, review finding): a ring carbonyl whose
             # principal group is an ESTER that the lactone handler DECLINED
             # (is_monocyclic_lactone returns None -- a dione, or an
@@ -3516,7 +3591,8 @@ def get_heterocycle_substituents(
             if is_principal_suffix:
                 sub_info['is_suffix'] = True
                 sub_info['suffix_name'] = pg_ring_suffix
-            elif ring_ketone_suffix or ring_lactone_suffix or ring_imide_suffix:
+            elif (ring_ketone_suffix or ring_lactone_suffix or ring_imide_suffix
+                  or ring_anhydride_suffix):
                 sub_info['is_suffix'] = True
                 sub_info['suffix_name'] = 'one'
             elif ring_thioamide_suffix:
@@ -3598,6 +3674,51 @@ def _identify_suffix_fg(mol, start_idx: int, sub_atoms, ring_set) -> Optional[Di
         for match in mol.GetSubstructMatches(amide_pat):
             if match[0] == start_idx:
                 return {'suffix_name': 'carboxamide'}
+
+    #: chalcogen primary-amide analogues on a ring -> added-carbon
+    # suffix -carbothioamide / -carboselenoamide / -carbotelluroamide. Mirrors the
+    # primary-amide block above; the =S/=Se/=Te double bond distinguishes it.
+    # Like carboxamides:33143/:33163), the N-SUBSTITUTED forms
+    # (C(=S)NHR / C(=S)NR2) keep the -carbothioamide suffix with N-substituent
+    # prefixes (N-methylpyridine-2-carbothioamide), so both the primary and the
+    # N-substituted patterns are matched here — mirroring the carboxamide block
+    # below, including its fail-closed N-branch count check.
+    for _chal, _suf in (("S", "carbothioamide"),
+                        ("Se", "carboselenoamide"),
+                        ("Te", "carbotelluroamide")):
+        _pat = _compiled_smarts(f'[CX3](=[{_chal}X1])[NX3H2]')
+        if _pat:
+            for match in mol.GetSubstructMatches(_pat):
+                if match[0] == start_idx:
+                    return {'suffix_name': _suf}
+        for _pat_smarts in (f'[CX3](=[{_chal}X1])[NX3;H1][#6]',
+                            f'[CX3](=[{_chal}X1])[NX3;H0]([#6])[#6]'):
+            _pat = _compiled_smarts(_pat_smarts)
+            if _pat is None:
+                continue
+            for match in mol.GetSubstructMatches(_pat):
+                if match[0] != start_idx:
+                    continue
+                # exclude hydrazide/hydroxamic shapes (N single-bonded to N/O)
+                _n_atom = next(
+                    (mol.GetAtomWithIdx(i) for i in match
+                     if mol.GetAtomWithIdx(i).GetSymbol() == 'N'), None)
+                if _n_atom is None or any(
+                    nb.GetSymbol() in ('N', 'O') for nb in _n_atom.GetNeighbors()
+                    if nb.GetIdx() != start_idx
+                    and mol.GetBondBetweenAtoms(
+                        _n_atom.GetIdx(), nb.GetIdx()).GetBondTypeAsDouble() == 1.0
+                ):
+                    continue
+                from .benzene import _detect_n_substituents
+                n_subs = _detect_n_substituents(mol, match, set(ring_set))
+                _expected = sum(
+                    1 for nb in _n_atom.GetNeighbors()
+                    if nb.GetAtomicNum() > 1 and nb.GetIdx() != start_idx
+                )
+                if not n_subs or len(n_subs) != _expected:
+                    return None  # unnameable N-branch -> decline (fail-closed)
+                return {'suffix_name': _suf, 'n_substituents': n_subs}
 
     # Wave2: N-SUBSTITUTED ring carboxamides — secondary
     # C(=O)NHR and tertiary C(=O)NR2. The benzene path has handled these
@@ -4387,6 +4508,7 @@ def name_substituted_heterocycle(
         _SUFFIX_PRIORITY = [
             'carboxylic acid', 'carboxamide', 'carbohydrazide',
             'carbonitrile', 'carbaldehyde',
+            'carbothioamide', 'carboselenoamide', 'carbotelluroamide',
         ]
         chosen_suffix = None
         chosen_locants = []
@@ -4519,7 +4641,8 @@ def name_substituted_heterocycle(
                     combined = f"{_n_prefix}-{combined}"
                 else:
                     combined = f"{_n_prefix}{combined}"
-        elif chosen_suffix in ('amine', 'carboxamide') \
+        elif chosen_suffix in ('amine', 'carboxamide', 'carbothioamide',
+                               'carboselenoamide', 'carbotelluroamide') \
                 and chosen_suffix in suffix_n_substituents:
             _n_subs = suffix_n_substituents[chosen_suffix]
             _n_prefix = ""
@@ -4553,6 +4676,9 @@ def name_substituted_heterocycle(
             'carboxamide': 'carbamoyl',
             'carbohydrazide': 'hydrazinecarbonyl',  # C1
             'carbonitrile': 'cyano',
+            'carbothioamide': 'carbamothioyl',
+            'carboselenoamide': 'carbamoselenoyl',
+            'carbotelluroamide': 'carbamotelluroyl',
         }
         for suf_name, suf_locants in suffix_fg.items():
             if suf_name == chosen_suffix:

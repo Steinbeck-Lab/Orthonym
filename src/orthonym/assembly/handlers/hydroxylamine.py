@@ -30,6 +30,14 @@ from ...perception.molcache import atoms_of, bonds_of
 
 logger = logging.getLogger(__name__)
 
+# Sentinel returned by ``_name_n_carbon_hydroxylamine_as_amine`` for an N-carbon
+# hydroxylamine core (R-NH-OH / RR'N-OH) it RECOGNISES but must fail closed on
+# (a base amine name carrying a leading stereodescriptor -- D1). It means
+# "abstain the WHOLE handler", distinct from ``None`` ("try the next branch"):
+# returning ``None`` would fall through to the functional-class branch, which
+# ships the same malformed / double-descriptor stereo name the fix removes.
+_ABSTAIN = object()
+
 
 def _is_hydroxylamine(features: Any) -> bool:
     """Fire when hydroxylamine is the principal characteristic group, OR when the
@@ -99,9 +107,17 @@ def no_disub_hydroxylamine_core(mol) -> Optional[Tuple[int, int]]:
 
 def _is_pure_aminooxy_hydroxylamine(features: Any) -> bool:
     """True when the molecule is exactly a hydroxylamine derivative perceived
-    only as 'aminooxy' (H2N-O-R): a single N-O bond, N and O neutral acyclic,
-    every other heavy atom reachable through a carbon substituent, and NO other
-    functional group / no more-senior PCG. Fail-closed for anything richer."""
+    only as 'aminooxy' (H2N-O-R): a single N-O bond, N neutral acyclic (the
+    'aminooxy' SMARTS [NX3H2][OX2][#6] fixes N as bare -NH2, so ALL
+    substitution is on the O side), O itself acyclic, and NO other functional
+    group / no more-senior PCG. Fail-closed for anything richer.
+
+     (BB:5005) keeps the hydroxylamine parent for the
+    O-substituted-only form even when R is an aryl group (O-phenylhydroxylamine
+    for H2N-O-C6H5) -- so a ring reachable ONLY through the O-substituent is
+    allowed, provided it is a genuine AROMATIC benzo ring (checked via
+    ``GetIsAromatic``, not merely 'in a ring'), never the non-aromatic
+    Kekule-drawn fallback some upstream SMILES could produce."""
     if getattr(features, "principal_group", None) is not None:
         return False
     fgs = getattr(features, "functional_groups", None) or {}
@@ -111,8 +127,8 @@ def _is_pure_aminooxy_hydroxylamine(features: Any) -> bool:
     mol = getattr(features, "mol", None)
     if mol is None:
         return False
-    # Exactly one N and one O forming the hydroxylamine core, both neutral,
-    # acyclic, single-bonded to each other; no ring anywhere; no other hetero.
+    # Exactly one N and one O forming the hydroxylamine core, both neutral;
+    # no other hetero.
     n_atoms = [a for a in atoms_of(mol) if a.GetSymbol() == "N"]
     o_atoms = [a for a in atoms_of(mol) if a.GetSymbol() == "O"]
     if len(n_atoms) != 1 or len(o_atoms) != 1:
@@ -120,13 +136,30 @@ def _is_pure_aminooxy_hydroxylamine(features: Any) -> bool:
     for a in atoms_of(mol):
         if a.GetSymbol() not in ("C", "N", "O"):
             return False
-        if a.IsInRing() or a.GetFormalCharge() != 0:
+        if a.GetFormalCharge() != 0:
             return False
-    n_idx, o_idx = n_atoms[0].GetIdx(), o_atoms[0].GetIdx()
+    n_atom, o_atom = n_atoms[0], o_atoms[0]
+    # N (bare -NH2 per the SMARTS) and O themselves are never ring atoms; any
+    # ring present belongs entirely to the O-substituent R (e.g. O-phenyl).
+    if n_atom.IsInRing() or o_atom.IsInRing():
+        return False
+    n_idx, o_idx = n_atom.GetIdx(), o_atom.GetIdx()
     bond = mol.GetBondBetweenAtoms(n_idx, o_idx)
     from rdkit import Chem
     if bond is None or bond.GetBondType() != Chem.BondType.SINGLE:
         return False
+    # Every ring present must be a genuine aromatic benzo ring -- the
+    # O-substituent namer (_named_substituents -> name_substituent_fragment)
+    # only knows how to spell a real aromatic phenyl/aryl, never a
+    # non-aromatic Kekule-drawn carbocycle.
+    ring_info = mol.GetRingInfo()
+    for ring in ring_info.AtomRings():
+        if len(ring) != 6 or not all(
+            mol.GetAtomWithIdx(i).GetSymbol() == "C"
+            and mol.GetAtomWithIdx(i).GetIsAromatic()
+            for i in ring
+        ):
+            return False
     # No C=O / C=N (would be a senior oxime/amide territory).
     for b in bonds_of(mol):
         if b.GetBondType() == Chem.BondType.DOUBLE:
@@ -175,8 +208,16 @@ def _named_substituents(mol, center_idx: int, other_center_idx: int) -> List[str
 
 def _format_locant_block(names: List[str], locant: str) -> List[Tuple[str, str]]:
     """Group identical substituents into ``(sort_key, "locant,locant-prefixname")``
-    tuples with the simple multiplying affix (di/tri/...)."""
+    tuples with the simple multiplying affix (di/tri/...).
+
+    : a COMPOUND/substituted substituent prefix (``4-methylphenyl``)
+    takes enclosing marks; a SIMPLE one (``phenyl``, ``methyl``) does not --
+    reuse the shared ``enclose_if_compound`` primitive rather than hand-roll
+    the distinction (BB ``O-(4-methylphenyl)hydroxylamine``, not
+    ``O-4-methylphenylhydroxylamine``). The sort key stays the bare,
+    unenclosed name."""
     from ..naming_utils import SIMPLE_MULTIPLIERS  # {2: 'di', 3: 'tri',...}
+    from ..naming_utils import enclose_if_compound
 
     out: List[Tuple[str, str]] = []
     # Count duplicates preserving first-seen order.
@@ -184,12 +225,13 @@ def _format_locant_block(names: List[str], locant: str) -> List[Tuple[str, str]]
     for n in names:
         counts[n] = counts.get(n, 0) + 1
     for sub_name, count in counts.items():
+        enclosed = enclose_if_compound(sub_name)
         locs = ",".join([locant] * count)
         if count > 1:
             mult = SIMPLE_MULTIPLIERS.get(count, "")
-            term = f"{locs}-{mult}{sub_name}"
+            term = f"{locs}-{mult}{enclosed}"
         else:
-            term = f"{locant}-{sub_name}"
+            term = f"{locant}-{enclosed}"
         out.append((sub_name, term))
     return out
 
@@ -319,16 +361,188 @@ def _name_no_disub_hydroxylamine(features: Any) -> Optional[NamingResult]:
     )
 
 
+def _name_n_carbon_hydroxylamine_as_amine(features: Any):
+    """ (BB:38308): R-NH-OH or RR'N-OH (the N bears >=1 carbon --
+    the perceived 'hydroxylamine' FG SMARTS [OX2H1][NX3...][#6] guarantees this
+    for every match) is named as an *N*-derivative of the senior AMINE, NOT by
+    hydroxylamine functional-class nomenclature:
+
+        CNO -> N-hydroxymethanamine (:38314, PIN)
+        CN(C)O -> N-hydroxy-N-methylmethanamine (:38316, PIN)
+        ONCCl -> chloro-N-hydroxymethanamine alpha order)
+
+    Returns a ``NamingResult``, or ``None`` ("not my case -> try the next
+    branch"), or the module ``_ABSTAIN`` sentinel ("this IS an N-carbon
+    hydroxylamine but no well-formed PIN can be built -- abstain the whole
+    handler, never fall through to the functional-class branch"; see the
+    leading-stereodescriptor case below).
+
+    Built by the SAME recursive re-entry the sibling builder
+    (``_name_no_disub_hydroxylamine`` above) and the oxime handler's
+    substitutive builder (``oxime.py::_substitutive_oxime_name``) already use:
+    delete the -OH oxygen, re-derive the PIN of the resulting plain amine
+    through the FULL namer (only it knows chain/ring parent selection), then
+    insert the 'N-hydroxy' prefix -- RE-ANCHORED against an independently
+    computed candidate substituent name, never a blind string edit.
+
+    Routing this through the general amine N-substituent walker instead
+    (``composer.py::_walk_amine_n_substituents``) is NOT safe (a project rule
+    probe): that walker silently DROPS any N-substituent fragment with zero
+    carbons -- a bare -OH on N vanishes from its returned list with no ``None``
+    sentinel (measured: chain_set=set on 'CNO' returns ``['methyl']``, the
+    oxygen branch simply missing) -- which would emit the structure-wrong
+    'methanamine' for CNO with the -OH silently gone. A wrong-direction
+    hydroxylamine name is bad; a silent atom drop is worse, so this handler
+    builds the amine name itself rather than declining into that walker.
+
+    FAIL-CLOSED scope (returns None -> caller's existing, non-worse fallback):
+    more than one hydroxylamine FG match; the O does not carry exactly 1 H;
+    N bears 0 or >2 carbons (excluded by the trivalent-N/single-O-H bond
+    structure, kept as defense); the O-deleted fragment fails to (re-)name or
+    names as a failure sentinel; a lone-carbon (primary-amine) base with a
+    leading locant (e.g. '2-chloroethanamine' -- longer chain / ring, ordering
+    deferred) or a compound / enclosed-mark C-prefix; or (2-carbon,
+    secondary-amine base) neither independently-named candidate N-substituent is
+    found as the base name's leading token.
+
+    ABSTAIN scope (returns ``_ABSTAIN`` -> whole handler abstains): a lone-carbon
+    base carrying a LEADING (or nested) stereodescriptor -- prepending 'N-hydroxy'
+    there yields a malformed / unparseable / double-descriptor name, and the
+    functional-class fallback ships the same, so neither may fire (D1).
+    """
+    matches = features.functional_groups.get("hydroxylamine", [])
+    if not matches:
+        return None
+    # SMARTS [OX2H1][NX3...][#6] binds once per carbon neighbour of N, so an
+    # RR'N-OH core yields TWO raw matches (one per R) sharing one (O, N) pair
+    # -- dedupe on that pair and require exactly one hydroxylamine core.
+    on_pairs = {(m[0], m[1]) for m in matches}
+    if len(on_pairs) != 1:
+        return None
+    mol = features.mol
+    o_idx, n_idx = next(iter(on_pairs))
+    o = mol.GetAtomWithIdx(o_idx)
+    n = mol.GetAtomWithIdx(n_idx)
+    if o.GetSymbol() != "O" or n.GetSymbol() != "N" or o.GetTotalNumHs() != 1:
+        return None
+    n_carbons = [nb.GetIdx() for nb in n.GetNeighbors() if nb.GetSymbol() == "C"]
+    if len(n_carbons) not in (1, 2):
+        return None
+
+    from rdkit import Chem
+    try:
+        rw = Chem.RWMol(mol)
+        rw.RemoveAtom(o_idx)
+        frag_mol = rw.GetMol()
+        Chem.SanitizeMol(frag_mol)
+    except Exception:
+        return None
+    pieces = Chem.GetMolFrags(frag_mol, asMols=True, sanitizeFrags=True)
+    amine_piece = None
+    for p in pieces:
+        if any(a.GetSymbol() == "N" for a in p.GetAtoms()):
+            amine_piece = p
+            break
+    if amine_piece is None:
+        return None
+    from ...namer import name_compound as _name_compound
+    try:
+        base = _name_compound(Chem.MolToSmiles(amine_piece))
+    except Exception:
+        return None
+    if not base or "unknown" in base or "not supported" in base:
+        return None
+
+    if len(n_carbons) == 1:
+        from ..naming_utils import alpha_sort_key
+        from ...rules.stereochemistry import strip_stereo
+        # D1 / 0-wrong: a base carrying a leading (or nested) stereodescriptor
+        # cannot be spelled by prepending 'N-hydroxy' without a malformed /
+        # OPSIN-unparseable / double-descriptor name -- the correct
+        # '(nS)-N-hydroxy-...' PIN needs proper stereo placement (a broad
+        # refactor, deferred). Fail closed for the WHOLE handler (via _ABSTAIN):
+        # returning None would fall through to the functional-class branch, which
+        # ships the same malformed stereo. ON[C@@H](C)CC, ON[C@@H](C)c1ccccc1.
+        if strip_stereo(base) != base:
+            return _ABSTAIN
+        # (the Blue Book): 'N-hydroxy' (an N-locanted detachable prefix) and a
+        # leading C-substituent prefix are cited in alphanumerical order. The
+        # only substituted primary amine whose C-prefix locant is fully omitted
+        # (a)) is 'methanamine' -- every longer chain / ring gives the
+        # base a leading locant -- so a non-bare base of the form
+        # '{simple-prefix}methanamine' is merged here (ONCCl -> chloro < hydroxy
+        # -> 'chloro-N-hydroxymethanamine'); anything richer defers.
+        _PARENT = "methanamine"
+        if base != _PARENT and base.endswith(_PARENT):
+            cprefix = base[:-len(_PARENT)]
+            if (not cprefix[:1].isalpha()) or any(
+                    ch in "([{0123456789" for ch in cprefix):
+                return None  # locanted / compound C-prefix -- ordering deferred
+            if alpha_sort_key(cprefix) < alpha_sort_key("hydroxy"):
+                # C-prefix cited first; the following 'N-' locant takes a hyphen.
+                name = f"{cprefix}-N-hydroxy{_PARENT}"
+            else:
+                # 'N-hydroxy' cited first; the C-prefix starts with a letter and
+                # juxtaposes with no hyphen (N-hydroxyphenylmethanamine).
+                name = f"N-hydroxy{cprefix}{_PARENT}"
+        elif base[:1].isdigit():
+            return None  # leading locant (longer chain / ring) -- ordering deferred
+        else:
+            name = f"N-hydroxy{base}"
+    else:
+        from ..naming_utils import _wrap_n_substituent, alpha_sort_key, enclose_if_compound
+
+        name = None
+        for cand in dict.fromkeys(_named_substituents(mol, n_idx, o_idx)):
+            token = f"N-{_wrap_n_substituent(enclose_if_compound(cand))}"
+            if base.startswith(token):
+                parent = base[len(token):]
+                if alpha_sort_key("hydroxy") <= alpha_sort_key(cand):
+                    name = f"N-hydroxy-{token}{parent}"
+                else:
+                    name = f"{token}-N-hydroxy{parent}"
+                break
+        if name is None:
+            return None
+
+    from ..candidate_pool import get_current_pool
+    from ..composer import _inject_stereo_if_missing
+    pool = get_current_pool()
+    pool.add(name, "hydroxylamine", features)
+    final_name = _inject_stereo_if_missing(features, pool.best().name)
+    return NamingResult(
+        name=final_name,
+        tree=NameTreeNode(
+            parent_stem=base, fragment_legacy=final_name,
+            class_id="hydroxylamine", iupac_section_cite="P-68.3.1.1.1.1",
+        ),
+        atom_to_locant_hint=None,
+    )
+
+
 def name_hydroxylamine(
     features: Any, mol: Any = None, style: str = "pin",
 ) -> Optional[NamingResult]:
     """Name a substituted hydroxylamine on the ``hydroxylamine`` parent, or an
-    N,O-disubstituted hydroxylamine as an O-substituted amine."""
+    N,O-disubstituted hydroxylamine as an O-substituted amine,
+    or an N-carbon-substituted hydroxylamine as an N-hydroxy amine derivative
+    ."""
     #: N,O-disubstituted hydroxylamine -> O-substituted amine
     # (skeletal 'a'-replacement forbidden). Try this first; fail-closed otherwise.
     _no_disub = _name_no_disub_hydroxylamine(features)
     if _no_disub is not None:
         return _no_disub
+    #: R-NH-OH / RR'N-OH -> N-hydroxy derivative of the senior
+    # amine, NOT the hydroxylamine functional class. Try before the
+    # functional-class branch below (which would otherwise wrongly claim this
+    # same FG match and emit the non-PIN 'N-methylhydroxylamine' direction).
+    _amine_form = _name_n_carbon_hydroxylamine_as_amine(features)
+    if _amine_form is _ABSTAIN:
+        return None  # N-carbon core with a stereo-descriptor base: abstain, do
+        # NOT fall through to the functional-class branch (which ships malformed
+        # / double-descriptor stereo -- D1).
+    if _amine_form is not None:
+        return _amine_form
     m = features.mol
     matches = features.functional_groups.get("hydroxylamine", [])
     if matches:

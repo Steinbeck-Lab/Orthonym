@@ -223,8 +223,11 @@ class TestP15RetainedNameSubstitution:
         assert name_compound("NO") == "hydroxylamine"
 
     def test_n_hydroxylamine_unchanged(self):
-        # N-substituent case (existing handler path) must stay correct.
-        assert name_compound("CCCNO") == "N-propylhydroxylamine"
+        # v52 P2, BB:38308/:38314): R-NH-OH is named as
+        # an N-derivative of the senior amine ('N-hydroxymethanamine (PIN)
+        # N-methylhydroxylamine' for the CH3 case), not the old
+        # functional-class 'N-propylhydroxylamine'.
+        assert name_compound("CCCNO") == "N-hydroxypropan-1-amine"
 
 
 @pytest.mark.unit

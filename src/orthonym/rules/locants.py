@@ -254,6 +254,45 @@ def compare_locant_sets(
     return 0  # Identical
 
 
+def compound_aware_multibond_set(
+    a2l: Dict[int, int],
+    bonds,
+) -> Tuple[Tuple[int, int], ...]:
+    """(1)/(2) [the Blue Book,:16683] multi-bond / double-
+    bond-only locant-SET comparator, for use ONLY when a ring triple bond is
+    present alongside ring double bond(s) (bi-/polycyclic von Baeyer systems
+    with mixed unsaturation).
+
+    Unlike (2)'s explicit "any number in parentheses is ignored"
+    (:16657 -- a NAIVE cited-locant compare, i.e. ``compare_locant_sets`` on
+    ``sorted(min(a2l[a], a2l[b]) for a, b in bonds)``), 's own
+    worked example for this criterion (bicyclo[8.3.1]tetradeca-4,6,10-
+    trien-2-yne, PIN,:16693) is a COUNTER-EXAMPLE to that naive reading:
+    the REJECTED numbering (``...-1(13),4,6-trien-8-yne``) has a lower
+    NAIVE cited-locant set (``{1,4,6,8}`` < ``{2,4,6,10}``) yet loses. Each
+    bond is therefore ranked by ``(is_compound, cited_locant)`` before
+    sorting, so a bond needing a compound locant never wins a rank
+    position on the strength of its numerically-low cited half -- "the
+    seniority of single locants over compound locants... extended to von
+    Baeyer systems" (BBv2 Note at:16639) applied as the tie-break within
+    this SET.
+
+    Returns a tuple of ``(is_compound, cited_locant)`` pairs, sorted --
+    directly comparable with plain tuple ``<``/``==`` (same first-point-of-
+    difference semantics as ``compare_locant_sets``, since every produced
+    tuple here has the same shape: 2-tuples of ints, never a bare int or a
+    fusion ``(int, str)`` locant).
+
+    Shared by ``bicyclo.py::get_bicyclo_numbering`` (bicyclic
+    and ``polycyclic.py::VonBaeyerAnalyzer._unsaturation_locant_key``
+    (tri-/polycyclic so the two engines apply one rule, not two.
+    """
+    return tuple(sorted(
+        (0 if abs(a2l[a] - a2l[b]) == 1 else 1, min(a2l[a], a2l[b]))
+        for a, b in bonds if a in a2l and b in a2l
+    ))
+
+
 def _compare_heteroatom_seniority(
     a_pairs: List[Tuple[_Locant, str]],
     b_pairs: List[Tuple[_Locant, str]],

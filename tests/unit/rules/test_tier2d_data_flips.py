@@ -70,7 +70,11 @@ class TestBareParents:
         ("N", "ammonia"),
         ("O", "water"),
         ("NN", "hydrazine"),
-        ("CCNO", "N-ethylhydroxylamine"),
+        # v52 P2, BB:38308/:38314): R-NH-OH is named as
+        # an N-derivative of the senior amine, not the old functional-class
+        # 'N-ethylhydroxylamine' -- BB verbatim for the CH3 case:
+        # 'N-hydroxymethanamine (PIN) N-methylhydroxylamine'.
+        ("CCNO", "N-hydroxyethanamine"),
     ])
     def test_neighbors_unchanged(self, smiles, expected):
         assert name_compound(smiles) == expected

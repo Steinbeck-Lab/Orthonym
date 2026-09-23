@@ -91,11 +91,48 @@ RED, re-bucketed to spiro-stereo / ring-program milestones.
 Regenerate the witness data in minutes via the trace's method
 (`internal notes` "Method").
 """
+import subprocess
+import sys
+from functools import lru_cache
+from pathlib import Path
+
 import pytest
 
 from orthonym.errors import is_failure_name
 from orthonym.namer import name_compound
 from orthonym.validation.opsin_roundtrip import opsin_roundtrip_check
+
+_REPO_ROOT = Path(__file__).resolve().parents[3]
+
+# Fresh-process RT probe (one child per SMILES). The in-process ``_c3_rt`` below
+# is warm-cache-sensitive (memory ``feedback_spy_before_you_refute``): a witness
+# can round-trip in a fresh interpreter but abstain in a warm one depending on
+# test order, so a milestone-status assertion is only trustworthy measured cold.
+_C3_CHILD = r'''
+import sys, logging
+logging.disable(logging.CRITICAL)
+from orthonym import name_compound
+from orthonym.errors import is_failure_name
+from orthonym.validation.opsin_roundtrip import opsin_roundtrip_check
+smi = sys.argv[1]
+nm = name_compound(smi, general_fallback=True, general_fallback_unverified=True)
+if is_failure_name(nm):
+    print("ABSTAIN")
+else:
+    print("RT-OK" if bool(opsin_roundtrip_check(smi, nm).get("passed")) else "RT-FAIL")
+'''
+
+
+@lru_cache(maxsize=None)
+def _c3_rt_fresh(smiles: str) -> str:
+    """Milestone-tier name + OPSIN round-trip status in a FRESH process.
+    Returns RT-OK | RT-FAIL | ABSTAIN. Memoised: one child per distinct SMILES."""
+    proc = subprocess.run(
+        [sys.executable, "-c", _C3_CHILD, smiles],
+        cwd=str(_REPO_ROOT), capture_output=True, text=True, timeout=180,
+    )
+    lines = [ln for ln in proc.stdout.strip().splitlines() if ln.strip()]
+    return lines[-1] if lines else ("NO-OUTPUT: " + proc.stderr[-200:])
 
 
 # --- witnesses (trace representatives, spanning categories a / d / b) ----------
@@ -117,9 +154,10 @@ C3_CATEGORY_B_WITNESSES = {"catb3": CATB3, "catb6": CATB6}
 
 # The category-(a)/(d) witnesses the plan's Task-2 was meant to close.
 # estramustine GRADUATED to GREEN (-C3 Task 2', see the steroid-ester tests
-# below) — it is named + round-trips today via the rules/natural_products.py
-# steroid-ester fix, so it is no longer part of the RED baseline. w0/w13/w16
-# remain RED, re-bucketed to spiro-stereo / ring-program milestones.
+# below). w0/w13/w16 have since ALSO graduated: measured cold (fresh process,
+# 2026-09-22) all three now name AND OPSIN-round-trip to the correct molecule,
+# closed by later spiro/ring-engine milestones. The RED baseline is retired; this
+# set now guards that they KEEP round-tripping (see the round-trip test below).
 C3_TARGET_WITNESSES = {
     "w0": W0,
     "w13": W13,
@@ -162,16 +200,15 @@ def _c3_rt(smiles: str):
 # gate suppresses the near-miss candidate → abstain; with the gate off the namer
 # emits a candidate that fails OPSIN-RT here — either way, no 0-wrong name).
 @pytest.mark.parametrize("key,smiles", sorted(C3_TARGET_WITNESSES.items()))
-def test_c3_witness_has_no_roundtripping_name_today_RED(key, smiles):
-    """RED baseline: each C3 target witness has NO name that OPSIN-round-trips
-    today. When a re-bucketed ring/scaffold-engine fix lands and a witness
-    starts naming correctly, this fails LOUDLY — the signal to promote it into
-    the GREEN ``xfail(strict=True)`` targets below."""
-    name, passed = _c3_rt(smiles)
-    assert not passed, (
-        f"{key} now produces a round-tripping name: {name!r} — promote it to a "
-        f"GREEN target."
-    )
+def test_c3_target_witnesses_now_round_trip(key, smiles):
+    """-C3 PROGRESS (was ``..._has_no_roundtripping_name_today_RED``): every
+    former RED target (w0/w13/w16) now names AND OPSIN-round-trips to the correct
+    molecule, closed by later spiro/ring-engine milestones. RT-OK is the
+    independent correct-constitution check (OPSIN name->InChI vs input InChI), not
+    a claim about the naming code. Measured COLD (fresh process) to avoid the
+    warm-cache flip that made the in-process check order-dependent
+    (feedback_spy_before_you_refute)."""
+    assert _c3_rt_fresh(smiles) == "RT-OK"
 
 
 def test_c3_reanchor_mechanism_already_works_at_milestone_tier():
@@ -271,43 +308,15 @@ def test_c3_steroid_ester_class_names_and_round_trips(key, smiles):
     assert passed, f"{key} did not OPSIN-round-trip: {name!r}"
 
 
-@pytest.mark.xfail(strict=True, reason=(
-    "w0 abstains only because a stereodescriptor is OMITTED from an otherwise-"
-    "correct spiro candidate (right constitution) — RE-BUCKETED to spiro/ring "
-    "stereo completion, not a substituent-assembly gap."
-))
-def test_c3_w0_names_GREEN():
-    name, passed = _c3_rt(W0)
-    assert passed, f"w0 did not name+round-trip: {name!r}"
-
-
-@pytest.mark.xfail(strict=True, reason=(
-    "w16 needs the WHOLE spiro system routed through complex_ring/spiro naming "
-    "with a ketone principal group + phenol — a ring-engine capability, "
-    "RE-BUCKETED to C1/C2. Abstains cleanly today (0-wrong via SELF-01)."
-))
-def test_c3_w16_names_GREEN():
-    name, passed = _c3_rt(W16)
-    assert passed, f"w16 did not name+round-trip: {name!r}"
-
-
-# --- Task 6: category-(b) two-ring-linker witnesses → coordinate with C4 ------
+# --- Task 6: category-(b) two-ring-linker witnesses (now closed by C4) --------
 @pytest.mark.parametrize("key,smiles", sorted(C3_CATEGORY_B_WITNESSES.items()))
-def test_c3_categoryb_abstains_cleanly_defer_to_C4(key, smiles):
+def test_c3_categoryb_now_round_trips(key, smiles):
     """Category-(b): two independently-nameable ring systems joined by an
-    ester/ether/carbamate linker. That linker-composition step overlaps C4's
-    charter — do NOT duplicate it in C3. Each must abstain CLEANLY (0-wrong: an
-    abstention, never a wrong/atom-dropped molecule) until C4 owns it. The 2
-    bis-indole peptide-shaped spy witnesses are EXCLUDED from C3 entirely
-    (unowned peptide-backbone gap, per the spy).
-
-    Gate-independent 0-wrong check (as in the RED baseline): C3 must not emit a
-    name that round-trips. At the milestone tier the SELF-01/OPSIN gate makes
-    this an outright abstention; with the gate off, the namer may emit an
-    atom-dropped near-name (e.g. catb6 → ``2-benzofuran-1(3H)-one``, only one
-    ring) that fails OPSIN-RT — never a 0-wrong emission either way."""
-    name, passed = _c3_rt(smiles)
-    assert not passed, (
-        f"{key} now produces a round-tripping name {name!r} — if intentional, "
-        f"this belongs to C4, not C3."
-    )
+    ester/ether/carbamate linker. The baseline expected these to ABSTAIN in
+    C3 and defer the linker composition to C4 (was
+    ``..._abstains_cleanly_defer_to_C4``). C4's ring-across-linker composition
+    has since landed, so both catb3/catb6 now name AND OPSIN-round-trip to the
+    correct molecule (measured cold, 2026-09-22) -- as best-effort degrades
+    (correct constitution, non-PIN). RT-OK is the independent correct-
+    constitution check; measured COLD to avoid the warm-cache flip."""
+    assert _c3_rt_fresh(smiles) == "RT-OK"

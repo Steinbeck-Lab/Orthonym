@@ -3216,6 +3216,237 @@ def _try_functional_class_diol_diester(mol, ester_matches: list) -> Optional[str
     return f"{diyl} di{anions[0]}"
 
 
+def _ester_cut_components(mol, ester_matches: list):
+    """Split the molecule at every ester ``carbonyl_C -- ester_O`` single bond
+    and return the connected components (each a ``set`` of atom indices).
+
+    The ester oxygen stays on the ALCOHOL side of the cut (it is the alcohol's
+    former -OH oxygen); the carbonyl oxygen (=O) stays on the ACID side. So a
+    component that contains one or more carbonyl carbons and no ester oxygen is
+    an *acid unit*; one that contains one or more ester oxygens and no carbonyl
+    carbon is an *alcohol unit*. Deterministic (iterates atom indices in order).
+    """
+    cut = set()
+    for m in ester_matches:
+        cut.add((m[0], m[2]))
+        cut.add((m[2], m[0]))
+    seen = set()
+    comps = []
+    for a in range(mol.GetNumAtoms()):
+        if a in seen:
+            continue
+        stack = [a]
+        comp = set()
+        while stack:
+            x = stack.pop()
+            if x in seen:
+                continue
+            seen.add(x)
+            comp.add(x)
+            for nbr in mol.GetAtomWithIdx(x).GetNeighbors():
+                nid = nbr.GetIdx()
+                if (x, nid) in cut:
+                    continue
+                if nid not in seen:
+                    stack.append(nid)
+        comps.append(comp)
+    return comps
+
+
+def name_symmetric_multiplicative_diacid_diester(
+    mol, ester_matches: list
+) -> Optional[str]:
+    """ -- functional-class MULTIPLICATIVE ester name for a fully
+    esterified, SYMMETRIC di-ester built from two identical DIBASIC acid units
+    bridged by one central symmetric divalent diol and capped by two identical
+    monovalent alcohols, e.g.
+
+        CH3-O-CO-CH2-CH2-CO-O-CH2-CH2-O-CO-CH2-CH2-CO-O-CH3
+        -> 'dimethyl ethane-1,2-diyl dibutanedioate' (PIN)
+
+     (the Blue Book) "Polyester names formed by using
+    functional class multiplicative nomenclature": "Symmetrical esters are named
+    by including the organyl constituent in the multiplied anion component
+    name." The bi-/polyvalent central group is cited as the LAST organyl group,
+    as a separate word immediately before the multiplied anion name,
+    the Blue Book); the monovalent terminal organyl groups are cited first.
+
+    This is the PIN ONLY because no senior characteristic group survives -- every
+    acid is esterified, so the seniority layer sets principal_group == "ester"
+    and the molecule reaches the ester dispatcher at all. When a free -COOH (or
+    any group senior to the ester) survives, principal_group is that group, the
+    molecule never reaches here, and the substitutive acyloxy-prefix name stays
+    the PIN, the Blue Book). This builder therefore cannot
+    flip a surviving-suffix ester row.
+
+    Fail-closed scope (returns None -> caller falls through to the existing
+    substitutive/independent cascade UNCHANGED): anything but exactly two
+    identical clean-linear-saturated dibasic acid units + exactly one clean
+    acyclic symmetric divalent diol bridging them + exactly two identical
+    monovalent terminal alcohols. The constructed name is finally RT-gated
+    (OPSIN offer): only returned when it round-trips to the input structure, so
+    it is 0-wrong and never relaxes anything without a working OPSIN.
+    """
+    if len(ester_matches) != 4:
+        return None
+
+    carbonyl_cs = {m[0] for m in ester_matches}
+    ester_os = {m[2] for m in ester_matches}
+    exclude = carbonyl_cs | ester_os
+
+    comps = _ester_cut_components(mol, ester_matches)
+    acid_units = []
+    alcohol_units = []
+    for comp in comps:
+        has_cc = bool(comp & carbonyl_cs)
+        has_eo = bool(comp & ester_os)
+        if has_cc and not has_eo:
+            acid_units.append(comp)
+        elif has_eo and not has_cc:
+            alcohol_units.append(comp)
+        elif has_cc and has_eo:
+            # A single component holding both an acid and an alcohol end is not
+            # the clean multiplicative shape (e.g. a spectator ring/ether links
+            # them) -- decline.
+            return None
+
+    # --- Acid units: exactly two identical clean saturated DIBASIC acids ------
+    if len(acid_units) != 2:
+        return None
+    dioate_name = None
+    for comp in acid_units:
+        ccs = sorted(comp & carbonyl_cs)
+        if len(ccs) != 2:
+            return None  # not dibasic
+        backbone = _find_backbone_carbons(mol, ccs[0], ccs[1], ester_os)
+        if backbone is None:
+            return None
+        comp_carbons = {
+            i for i in comp if mol.GetAtomWithIdx(i).GetSymbol() == 'C'
+        }
+        if comp_carbons != set(backbone):
+            return None  # branched / substituted diacid -> decline
+        comp_oxygens = [
+            i for i in comp if mol.GetAtomWithIdx(i).GetSymbol() == 'O'
+        ]
+        if len(comp_oxygens) != 2:
+            return None  # only the two carbonyl =O may remain
+        for i in comp:
+            if mol.GetAtomWithIdx(i).GetSymbol() not in ('C', 'O'):
+                return None  # heteroatom in the acid backbone -> decline
+        # Saturated backbone only (_get_dioate_name ignores unsaturation, so a
+        # fumarate/maleate diester would otherwise be mis-stemmed; RT would
+        # catch it, but decline early).
+        bset = set(backbone)
+        for bond in mol.GetBonds():
+            a1, a2 = bond.GetBeginAtomIdx(), bond.GetEndAtomIdx()
+            if a1 in bset and a2 in bset and bond.GetBondTypeAsDouble() != 1.0:
+                return None
+        name = _get_dioate_name(len(backbone))
+        if dioate_name is None:
+            dioate_name = name
+        elif dioate_name != name:
+            return None  # the two acids differ -> not multiplicative
+
+    # --- Alcohol units: one central divalent diol + two monovalent terminals --
+    central = [c for c in alcohol_units if len(c & ester_os) >= 2]
+    terminals = [c for c in alcohol_units if len(c & ester_os) == 1]
+    if len(central) != 1 or len(terminals) != 2:
+        return None
+    central_comp = central[0]
+    if len(central_comp & ester_os) != 2:
+        return None  # only a DIvalent central group is handled here
+
+    # The central diol must BRIDGE the two different acid units (one bond to
+    # each) -- otherwise it is not the symmetric multiplicative topology.
+    central_matches = [m for m in ester_matches if m[2] in central_comp]
+    bridged = set()
+    for m in central_matches:
+        for ai, comp in enumerate(acid_units):
+            if m[0] in comp:
+                bridged.add(ai)
+    if len(bridged) != 2:
+        return None
+
+    # Name the central diol as a clean acyclic '-diyl' group (reuses the diol
+    # logic of _try_functional_class_diol_diester).
+    backbone_start = [m[3] for m in central_matches]
+    diol_bb = _find_polyol_backbone(mol, backbone_start, exclude)
+    if diol_bb is None or len(diol_bb) < 2:
+        return None
+    ordered = _order_backbone_chain(mol, diol_bb, exclude)
+    if ordered is None:
+        return None
+    bset = set(ordered)
+    allowed = bset | ester_os
+    for idx in ordered:
+        atom = mol.GetAtomWithIdx(idx)
+        if atom.GetSymbol() != 'C':
+            return None
+        for nbr in atom.GetNeighbors():
+            if nbr.GetAtomicNum() <= 1:
+                continue
+            if nbr.GetIdx() not in allowed:
+                return None  # substituted / hetero central group -> decline
+    n = len(ordered)
+    diol_prefix = get_chain_prefix(n)
+    if not diol_prefix:
+        return None
+    fwd = {idx: i + 1 for i, idx in enumerate(ordered)}
+    rev = {idx: n - i for i, idx in enumerate(ordered)}
+    attach = [m[3] for m in central_matches]
+    fwd_locs = sorted(fwd[a] for a in attach)
+    rev_locs = sorted(rev[a] for a in attach)
+    locs = fwd_locs if fwd_locs <= rev_locs else rev_locs
+    diyl = f"{diol_prefix}ane-{','.join(str(x) for x in locs)}-diyl"
+
+    # Name the two terminal monovalent alcohols; require them IDENTICAL
+    # (symmetric case). name_independent_esters / handle the
+    # unsymmetrical case; keep this builder narrow.
+    term_names = []
+    for comp in terminals:
+        tmatch = next(m for m in ester_matches if m[2] in comp)
+        _acid_atoms, alkyl_atoms = parse_ester_fragments(mol, tmatch)
+        if not alkyl_atoms:
+            return None
+        tname = get_alkyl_fragment_name(mol, alkyl_atoms)
+        if not tname:
+            return None
+        term_names.append(tname)
+    if len(set(term_names)) != 1:
+        return None  # unsymmetrical terminals -> out of this builder's scope
+
+    # Multipliers: the terminal-organyl multiplier follows / and
+    # the hyphen/enclosure rules, so route it through the shared
+    # multiplied_component helper rather than a bare 'di' concat: 'dimethyl'
+    # (simple), 'di-tert-butyl' (italic-led, hyphen, no parens),
+    # 'di(propan-2-yl)' (locanted -> enclosed), 'bis(2-methylpropyl)'
+    # (substituted -> bis + enclosed). BB: 'di(propan-2-yl) disulfite' (:36921),
+    # 'bis(2-methylpropyl)...' (:41118). The acid-side 'di' stays a plain concat
+    # (the diacid stem is a simple word). Two acids, two identical terminals.
+    from ..assembly.naming_utils import (
+        enclose_if_compound as _enclose_if_compound,
+        multiplied_component as _multiplied_component,
+    )
+    _term = _multiplied_component(
+        2, term_names[0], _enclose_if_compound(term_names[0]))
+    candidate = f"{_term} {diyl} di{dioate_name}"
+
+    # RT gate (offer): only route to functional-class when the name round-trips
+    # to the input structure. Fail closed (no JVM / unparseable / mismatch)
+    # so the caller keeps the current substitutive output. See.
+    try:
+        from ..validation.opsin_roundtrip import opsin_roundtrip_check
+        smiles = Chem.MolToSmiles(mol)
+        if not smiles:
+            return None
+        if opsin_roundtrip_check(smiles, candidate).get("passed") is True:
+            return candidate
+    except Exception:  # fail-closed: never emit an unverified functional-class name
+        return None
+    return None
+
+
 def name_polyol_polyester(mol, ester_matches: list) -> Optional[str]:
     """
     Name a fully-esterified polyol compound using acyloxy prefixes.

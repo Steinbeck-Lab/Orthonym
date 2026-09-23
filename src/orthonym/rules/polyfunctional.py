@@ -3109,6 +3109,27 @@ def name_polyfunctional(features: Any) -> Optional[str]:
     if not suffix:
         return None
 
+    # (the Blue Book Blue Book): this producer only fires
+    # when the acid carbon shares the molecule with ANOTHER functional
+    # group needing its own prefix (the polyfunctional dispatch condition).
+    # v52 a review-fix a performance pass D5 (REGRESSION FIX): a prior version of this
+    # branch also stripped the O-acid designator for `thioic_O_acid`, on the
+    # premise that '3-amino-2,3-dioxopropanethioic acid (PIN)' (:30297)
+    # generalizes to "polyfunctional thio -> drop designator". That premise
+    # is REFUTED by BB counter-examples that KEEP the designator on a
+    # SPECIFIED =S,-OH tautomer: "[(thiocarboxy)oxy]methanethioic O-acid
+    # (PIN)" (:31093), "2-(thiocarboxy)benzene-1-carbothioic S-acid (PIN)"
+    # (:30309), "carbonobromidothioic O-acid (PIN)" (:30846). The real BB
+    # distinction is the DRAWING TAUTOMER (unspecified {O/S} -> drop;
+    # specified -> keep), which a SMILES cannot recover -- so the safe rule
+    # is to KEEP the thio designator here, matching the bare/simple-acid
+    # path (assembly/handlers/_handler_shared.py::_generate_suffix, which
+    # already keeps it per:30225/:30291/:30295). The Se/Te strip is
+    # UNREFUTED (no counter-example found) and stays.
+    if principal_group in ("selenoic_O_acid", "telluroic_O_acid"):
+        from ..assembly.naming_utils import strip_chalcogen_acid_locant
+        suffix = strip_chalcogen_acid_locant(suffix)
+
     # Get locants for principal group.
     #: count ONLY the principal-group instances that actually sit on the
     # PARENT CHAIN. An instance wholly off the chain (all its atoms outside

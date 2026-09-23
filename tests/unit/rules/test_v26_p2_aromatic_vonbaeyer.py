@@ -49,8 +49,24 @@ pytestmark = pytest.mark.unit
 AROMATIC_FUSED_CASES = [
     ("C1=CC=CC2=CC=CC=CC=C12",          # heptalene
      "bicyclo[6.4.0]dodeca-1,3,5,7,9,11-hexaene"),
+    # v52 a phase Task 3 (SP2): was asserted as '...-1(13),2,5,7,9,11-hexaene'.
+    # Both numberings are legal tricyclo[7.4.0.0^3,7] hydrocarbon numberings
+    # (either fusion carbon may be locant 1; both tie on 's
+    # secondary-bridge-locant tiers AND on the number of compound locants,
+    # 1 each). (the Blue Book) criterion (2) [:16657] then
+    # decides: "when comparing double bond locants that also include
+    # compound locants, any number in parentheses is ignored" -- the CITED
+    # locant set '1,2,4,7,9,11' is lower than '1,2,5,7,9,11' (same rule,
+    # applied the same way as the hexadeca-triene worked example at
+    #:16657-16671: "the set of locants '1,11,13'... is lower than
+    # '4,5,7'"). Both strings round-trip via OPSIN 2.9.0 to the identical
+    # InChIKey (an InChIKey) as the input -- this is a pure
+    # locant-choice correction, not a wrong-molecule fix. The old expectation
+    # predates the compound-locant-count/cited-set tiers in
+    # ``VonBaeyerAnalyzer._unsaturation_locant_key`` (polycyclic.py) and was
+    # an arbitrary atom-index backstop pick.
     ("C1=Cc2cc3ccccc3cc2C1",            # as-indacene
-     "tricyclo[7.4.0.0^3,7]trideca-1(13),2,5,7,9,11-hexaene"),
+     "tricyclo[7.4.0.0^3,7]trideca-1(13),2,4,7,9,11-hexaene"),
     #: was asserted as '8-oxa...-1(13),2,4,6,9,11-hexaene'. Both
     # numberings are legal bicyclo[7.4.0] hydrocarbon numberings (either fusion
     # carbon may be locant 1), so "When there is a choice for numbering"

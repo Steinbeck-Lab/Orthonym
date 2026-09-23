@@ -66,7 +66,7 @@ from ..metrics.provenance import best_effort_ctx
 from ..perception.molcache import atoms_of  # audit 2026-09-03 (S2): per-call atom/bond tuples
 from .lambda_convention import LAMBDA, nonstandard_bonding_number
 from .phosphorus import _build_substituent_string
-from .substituent_purity import organyl_prefix_name
+from .substituent_purity import _fragment_atoms, organyl_prefix_name
 
 # Hub element -> parent-hydride stem / substitutive parent hydrides).
 _HUB_STEMS = {
@@ -626,6 +626,168 @@ def name_mononuclear_hydride(mol) -> Optional[str]:
             return diester
 
     return None
+
+
+# --- (BB:34941) / (BB:34720) / +
+# (BB 39117): an added-carbon -carbaldehyde/-carbonitrile/
+# -carboxylic acid suffix on a Group-14/-15 parent hydride hub is named on the
+# hydride parent, not as a phosphanyl/silyl PREFIX on a one-carbon
+# methanal/methanenitrile/methanoic-acid chain (the generic chain namer's
+# non-PIN '1-phosphanylmethanal' / 'silylmethanenitrile' / 'silylmethanoic acid'):
+#
+# H2P-CHO -> phosphanecarbaldehyde (PIN,
+# H3Si-CN -> silanecarbonitrile (PIN,
+# H3Si-COOH -> silanecarboxylic acid (PIN,
+# CC[SiH2]-COOH -> ethylsilanecarboxylic acid (PIN; ethyl is an organyl PREFIX
+# on the silane parent,
+#
+# seniority is encoded by dispatch position: this producer runs at
+# priority 47.66 -- AHEAD of ORGANOMETALLIC@50 and GENERAL -- so the Group-14
+# parent-hydride candidate is OFFERED and PREFERRED over the C1 methanoic-acid
+# parent the general substitutive namer would otherwise build: the
+# carboxy carbon is an ADDED carbon on the senior parent hydride, not a C1 parent
+# bearing a silyl substituent). The pnictogen P/As/Sb -carboxylic acid bare/chain
+# forms are already owned by rules.phosphorus.name_phosphane_carboxylic_acid at
+# priority 47.65 (ahead of this producer); this producer therefore names them
+# only in the substituted-hub shapes that one declines (fail-closed, no double-
+# claim of an emitted name).
+#
+# Restricted to Si/Ge/Sn/Pb/P/As/Sb/Bi -- deliberately excludes chalcogens
+# (S/Se/Te), halogens (I) and N, each of which already owns a distinct
+# functional class when bonded straight to a carbonyl/nitrile/carboxyl carbon
+# (thio-acid, acid halide, thiocyanate, cyanamide/carbamic respectively), so
+# folding them in here would silently mis-name a different class rather than
+# degrade.
+_ADDED_CARBON_HUB_STEMS = {sym: _HUB_STEMS[sym]
+                           for sym in ('P', 'As', 'Sb', 'Bi', 'Si', 'Ge', 'Sn', 'Pb')}
+
+
+def _added_carbon_group(mol, atom) -> Optional[tuple]:
+    """If ``atom`` is a terminal added carbon carrying a single characteristic
+    group, return ``(hub_neighbour, suffix)``; else None. Three shapes:
+
+      * aldehyde -- degree-2 heavy, one terminal ``=O`` + 1 H -> 'carbaldehyde'
+      * nitrile -- degree-2 heavy, one terminal ``#N`` + 0 H -> 'carbonitrile'
+      * carboxylic acid -- degree-3 heavy, one terminal ``=O`` +
+        one terminal ``-OH`` + 0 H (a bare ``-C(=O)OH``) -> 'carboxylic acid'
+
+    The hub is the added carbon's sole heavy neighbour that is NOT the
+    characteristic-group O/N: the carboxy/carbonyl/cyano carbon is an
+    ADDED carbon on the hub parent hydride)."""
+    if atom.GetSymbol() != 'C':
+        return None
+    deg = atom.GetDegree()
+    nbrs = list(atom.GetNeighbors())
+    if deg == 2:
+        for i, n in enumerate(nbrs):
+            other = nbrs[1 - i]
+            bond = mol.GetBondBetweenAtoms(atom.GetIdx(), n.GetIdx())
+            if (n.GetSymbol() == 'O' and n.GetDegree() == 1
+                    and bond.GetBondTypeAsDouble() == 2.0
+                    and atom.GetTotalNumHs() == 1):
+                return other, 'carbaldehyde'
+            if (n.GetSymbol() == 'N' and n.GetDegree() == 1
+                    and bond.GetBondTypeAsDouble() == 3.0
+                    and atom.GetTotalNumHs() == 0):
+                return other, 'carbonitrile'
+        return None
+    if deg == 3 and atom.GetTotalNumHs() == 0:
+        # A bare carboxyl carbon: exactly one terminal =O, one terminal -OH, and
+        # one non-oxygen hub neighbour. An ester (-O-R, degree-2 O), a second
+        # carbonyl, or an anhydride each fail a guard and cascade onward.
+        o_double = o_single = hub = None
+        for n in nbrs:
+            bond = mol.GetBondBetweenAtoms(atom.GetIdx(), n.GetIdx())
+            bd = bond.GetBondTypeAsDouble()
+            if n.GetSymbol() == 'O' and n.GetDegree() == 1 and bd == 2.0:
+                o_double = n
+            elif (n.GetSymbol() == 'O' and n.GetDegree() == 1
+                    and n.GetTotalNumHs() >= 1 and bd == 1.0):
+                o_single = n
+            else:
+                hub = n
+        if o_double is not None and o_single is not None and hub is not None:
+            return hub, 'carboxylic acid'
+    return None
+
+
+def name_mononuclear_hydride_added_carbon(mol) -> Optional[str]:
+    """ / /: added-carbon
+    -carbaldehyde/-carbonitrile/-carboxylic acid on a Group-14/-15 parent
+    hydride (see module comment above the lookup tables for the worked examples,
+    the seniority rationale, and the element-scope rationale).
+
+    Exactly analogous to the added-carbon -carboxylic acid on a pnictogen
+    parent hydride (:func:`rules.phosphorus.name_phosphane_carboxylic_acid`)
+    and to the ring added-carbon suffixes (cyclohexanecarboxylic acid /
+    cyclohexanecarbaldehyde / cyclohexanecarbonitrile).
+
+    Scope (fail-closed graph classifier, NOT SMARTS): exactly ONE hub atom
+    restricted to ``_ADDED_CARBON_HUB_STEMS``, standard bonding number (no
+    lambda), one of whose heavy neighbours is a single terminal aldehyde,
+    nitrile or bare carboxyl carbon; every OTHER heavy hub-neighbour is a pure
+    detachable organyl prefix: ethyl -> ethylsilanecarboxylic acid),
+    and the whole molecule is nothing but the hub, its hydrogens, the
+    added-carbon group and those organyl substituents. A ring, charge, radical,
+    a non-organyl hub substituent (a silyl/germyl hub-chain, a stray
+    heteroatom), a nonstandard hub valence, or more than one candidate
+    added-carbon group each fail a guard and cascade onward -- zero false
+    positives. Pure: no mol mutation.
+    """
+    if mol is None or len(Chem.GetMolFrags(mol)) != 1:
+        return None
+    for atom in atoms_of(mol):
+        if atom.GetFormalCharge() != 0 or atom.GetNumRadicalElectrons() != 0:
+            return None
+    if mol.GetRingInfo().NumRings() > 0:
+        return None
+
+    carbon_idx = hub_idx = suffix = None
+    for atom in atoms_of(mol):
+        found = _added_carbon_group(mol, atom)
+        if found is None:
+            continue
+        other, this_suffix = found
+        if other.GetSymbol() not in _ADDED_CARBON_HUB_STEMS:
+            continue
+        if carbon_idx is not None:
+            return None  # more than one candidate -- ambiguous, cascade onward
+        carbon_idx, hub_idx, suffix = atom.GetIdx(), other.GetIdx(), this_suffix
+
+    if carbon_idx is None:
+        return None
+
+    hub = mol.GetAtomWithIdx(hub_idx)
+    if nonstandard_bonding_number(mol, hub_idx) is not None:
+        return None  # lambda hub -- out of scope, cascade onward
+
+    # Every OTHER heavy hub-neighbour must be a pure detachable organyl prefix
+    #. A bare hub has none -> empty prefix block. A non-organyl
+    # neighbour (a silyl/germyl hub-chain -> multinuclear, or a stray hetero
+    # substituent) fail-closes: the shape is not a simple substituted mononuclear
+    # hydride and cascades onward (0 false positives).
+    covered = {hub_idx, carbon_idx} | {
+        n.GetIdx() for n in mol.GetAtomWithIdx(carbon_idx).GetNeighbors()
+    }
+    sub_names: List[str] = []
+    for nbr in hub.GetNeighbors():
+        if nbr.GetIdx() == carbon_idx or nbr.GetSymbol() == 'H':
+            continue
+        pref = organyl_prefix_name(mol, nbr.GetIdx(), hub_idx)
+        frag = _fragment_atoms(mol, nbr.GetIdx(), hub_idx)
+        if pref is None or frag is None:
+            return None
+        sub_names.append(pref)
+        covered.update(frag)
+
+    # Atom coverage: every heavy atom must be the hub, the added-carbon group, or
+    # part of a named organyl substituent. A stray heavy atom fail-closes.
+    for atom in atoms_of(mol):
+        if atom.GetSymbol() != 'H' and atom.GetIdx() not in covered:
+            return None
+
+    prefix = _build_substituent_string(sub_names) if sub_names else ""
+    return f"{prefix}{_ADDED_CARBON_HUB_STEMS[hub.GetSymbol()]}{suffix}"
 
 
 def _classify_phosphane_subs(mol, hub) -> Optional[List[str]]:
@@ -1356,4 +1518,4 @@ def name_dinuclear_hydride(mol) -> Optional[str]:
 
 
 __all__ = ["name_mononuclear_hydride", "name_dinuclear_hydride",
-           "name_lambda_sulfane_imine_oxide"]
+           "name_lambda_sulfane_imine_oxide", "name_mononuclear_hydride_added_carbon"]

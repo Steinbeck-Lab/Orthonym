@@ -134,9 +134,14 @@ def test_hydroxyazanide():
 
 
 @pytest.mark.parametrize("smiles,expected", [
-    # regression: the NEUTRAL retained hydroxylamine names must stay.
+    # regression: the NEUTRAL retained hydroxylamine name must stay (bare
+    # parent, no N-carbon substituent).
     ("NO", "hydroxylamine"),
-    ("CNO", "N-methylhydroxylamine"),
+    # v52 P2, BB:38308/:38314): R-NH-OH is named as an
+    # N-derivative of the senior amine ('N-hydroxymethanamine (PIN)
+    # N-methylhydroxylamine' for the CH3 case), not the old functional-class
+    # 'N-methylhydroxylamine' direction.
+    ("CNO", "N-hydroxymethanamine"),
     # regression: the bare azanide anion is unchanged.
     ("[NH2-]", "azanide"),
 ])

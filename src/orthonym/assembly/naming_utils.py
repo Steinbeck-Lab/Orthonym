@@ -755,6 +755,23 @@ def should_omit_locant_one(
     if context == "prefix" and is_ring and is_monosubstituted:
         if is_heterocyclic:
             return False  # Position matters in heterocycles
+        # (the Blue Book, "Locants are not omitted when there is a possibility
+        # of isomers"): a positional isotopic label ON THE RING breaks the symmetry
+        # that licensed the monosubstituted omission, so the substituent locant is
+        # restored -- the Blue Book '1-(79Br)bromo(2-13C)benzene', not
+        # '(79Br)bromo(2-13C)benzene'. The label is stripped before this ring is named,
+        # so the fact is carried down by the ambient parent-positional isotope scope
+        # rules/isotopes.py enters ONLY when a labelled atom sits on the PARENT ring
+        # (loc_rank >= 1 AND parent-labelled). It is DELIBERATELY the narrow
+        # parent-positional flag, NOT locants_are_forced: a positional locant a label
+        # needs INSIDE A SUBSTITUENT -- '(1,1,2,2,2-pentafluoro(1-13C)ethyl)benzene',
+        # the ¹³C on the ethyl -- leaves the ring symmetric and must NOT restore a ring
+        # locant, and locant-free descriptors ('(2H3)methoxybenzene', '(2H6)benzene')
+        # still elide. This is the ring-prefix analogue of Rule 3b above.
+        from .locant_omission import (  # local: avoid import cycle
+            parent_scope_has_positional_isotope)
+        if parent_scope_has_positional_isotope():
+            return False
         return True  # Symmetric carbocyclic: omit
 
     # Rule 5: Monosubstituted hydrocarbon chain at position 1.
@@ -1884,6 +1901,37 @@ def _normalise_suffix_token(suffix: str) -> str:
     token = ' '.join(suffix.strip().split())
     token = _CHALCOGEN_LOCANT_INFIX_RE.sub('', token)
     return ' '.join(token.split()).lower()
+
+
+def strip_chalcogen_acid_locant(suffix: str) -> str:
+    """Drop the italic O/S/Se/Te tautomer-locant infix from a chalcogen
+    carboxylic-acid suffix word-form, preserving the rest of the spelling.
+
+     "Functional replacement in systematic names of carboxylic
+    acids" (`the Blue Book Blue Book`; sentence at `:30215`): "In
+    names, tautomeric groups in mixed chalcocarboxylic acids... are
+    distinguished by prefixing italic element symbols, such as *O* or *S*
+    ... to the term 'acid'... **Normally, these locants are omitted,
+    because the exact position of chalcogen atoms is not known or
+    important in acids; such letter locants are used mainly in naming
+    esters.**"
+
+    This is a pure STRING transform -- callers decide WHEN the bare
+    spelling is the PIN for a given molecule (the Blue Book's own worked
+    examples do NOT drop the designator uniformly: a bare, otherwise
+    unsubstituted thioic acid keeps it -- 'hexanethioic O-acid (PIN)'
+    :30225 -- while a bare selenoic/telluroic acid, or a thioic acid that
+    shares the molecule with another functional group, drops it --
+    'hexaneselenoic acid (PIN)':30235, '3-amino-2,3-dioxopropanethioic
+    acid (PIN)':30297). Never call this unconditionally.
+
+        >>> strip_chalcogen_acid_locant("selenoic O-acid")
+        'selenoic acid'
+        >>> strip_chalcogen_acid_locant("carbothioic S-acid")
+        'carbothioic acid'
+    """
+    token = ' '.join(suffix.strip().split())
+    return ' '.join(_CHALCOGEN_LOCANT_INFIX_RE.sub('', token).split())
 
 
 def suffix_takes_derived_multiplier(suffix_name: str) -> bool:

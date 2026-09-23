@@ -13,6 +13,7 @@ Two families of assertion:
 import pytest
 
 from orthonym.namer import Orthonym, name_compound
+from orthonym.validation.opsin_roundtrip import opsin_roundtrip_check
 
 RAW = Orthonym(_disable_opsin_validity_gate=True)
 
@@ -80,12 +81,23 @@ class TestLinearPolyanhydrideVerify:
 class TestAtomDropSafetyFloor:
     """P4-1: verified WRONG/DROP leaks in the RAW (gate-OFF) path must ship
     NEITHER the old wrong string NOR any new wrong string -- fail-closed
-    ('unknown organic compound') under both the raw and the gated namer."""
+    ('unknown organic compound') under both the raw and the gated namer.
+
+    NOTE (2026-09-19): two original floor rows became obsolete because the
+    engine's behaviour on them changed -- the change PREDATES v52 (measured
+    identical at pre-v52 cb2f3807f, Phase-2-end 35bd65ec9 and HEAD; both rows
+    were still fail-closed at the floor's birth a469b6b80). They are handled in
+    dedicated methods below and removed from the source-level veto lists:
+      * O=[N+]([O-])NCC(=O)O -> now correctly named '(carboxymethyl)nitramide'
+        (RT-verified, no atom drop) -> see test_nitramido_acetic_acid_named.
+      * OC(=O)CCOP(=O)(O)OP(=O)(O)O -> GATED namer abstains (0-wrong holds);
+        only the RAW gate-OFF path emits a benign mixture-split the gate rejects
+        -> see test_carboxypropyl_diphosphate_gated_abstains.
+    The three genuine source-level fail-closed rows remain below.
+    """
 
     @pytest.mark.parametrize("smi,old_wrong", [
         ("CC(=O)OS", "ethane"),                                    # thioperoxy acid, drops S+O2
-        ("O=[N+]([O-])NCC(=O)O", "ethanoic acid"),                 # nitramido, drops -NH-NO2
-        ("OC(=O)CCOP(=O)(O)OP(=O)(O)O", "propanoic acid"),         # diphosphate substituent, drops diphosphate
         ("CC(=O)OC(=O)OC(=O)O", "1-(propanoyloxy)methanoic acid"),  # wrong constitution
         ("COS(=O)(=O)OS(=O)(=O)SCC", "1-methanoic anhydridylethanoic anhydride"),  # partial ester
     ])
@@ -95,9 +107,11 @@ class TestAtomDropSafetyFloor:
         assert result is None or result.startswith("unknown")
 
     @pytest.mark.parametrize("smi", [
+        # These fail closed at the SOURCE level (the producer itself returns
+        # None/unknown), so they hold under the suite-default gate-OFF too.
+        # B2 (OC(=O)CCOP...) is NOT here: it only fails closed with the gate ON
+        # -- see the gate-marked test_carboxypropyl_diphosphate_gated_abstains.
         "CC(=O)OS",
-        "O=[N+]([O-])NCC(=O)O",
-        "OC(=O)CCOP(=O)(O)OP(=O)(O)O",
         "CC(=O)OC(=O)OC(=O)O",
         "COS(=O)(=O)OS(=O)(=O)SCC",
     ])
@@ -106,14 +120,57 @@ class TestAtomDropSafetyFloor:
         assert result is None or result.startswith("unknown")
 
     def test_gated_matches_raw_for_gated_vetoes(self):
-        """Every veto must fire identically gated vs raw (source-level, not
-        an OPSIN-dependent suppression)."""
+        """Every veto in THIS list must fire identically gated vs raw
+        (source-level, not an OPSIN-dependent suppression). B2 is excluded: its
+        gated abstention is OPSIN-dependent (rejects the raw mixture-
+        split), so raw != gated by design -- see the dedicated B2 method."""
         for smi in [
-            "CC(=O)OS", "O=[N+]([O-])NCC(=O)O",
-            "OC(=O)CCOP(=O)(O)OP(=O)(O)O", "CC(=O)OC(=O)OC(=O)O",
+            "CC(=O)OS", "CC(=O)OC(=O)OC(=O)O",
             "COS(=O)(=O)OS(=O)(=O)SCC",
         ]:
             assert RAW.name(smi) == name_compound(smi)
+
+    @pytest.mark.opsin_gate
+    def test_nitramido_acetic_acid_named(self):
+        """B1 (was a fail-closed floor row, raw+gated): the substitutive
+        nitramide producer now names O2N-NH-CH2-COOH in FULL. The floor no
+        longer applies -- it existed for when this could ONLY leak the atom-
+        dropped 'ethanoic acid'. The producer change predates v52 (routing was
+        already live by; the N- locant was dropped at caa7fd7b1 under
+        , giving the current bare '(carboxymethyl)nitramide').
+
+        Runs under the PRODUCTION gate (opsin_gate): the gate ACCEPTS this valid
+        name, so production ships it. Load-bearing safety property: RT-match
+        proves the name denotes the EXACT input structure -- no atom drop. The
+        exact string is the current gate-approved emission (also emitted raw)."""
+        smi = "O=[N+]([O-])NCC(=O)O"
+        result = name_compound(smi)
+        assert result != "ethanoic acid"          # never the old atom-dropped leak
+        assert result == "(carboxymethyl)nitramide"
+        assert RAW.name(smi) == "(carboxymethyl)nitramide"
+        rt = opsin_roundtrip_check(smi, result)
+        assert rt["passed"], f"round-trip failed (atom-drop guard): {rt}"
+
+    @pytest.mark.opsin_gate
+    def test_carboxypropyl_diphosphate_gated_abstains(self):
+        """B2 (was a fail-closed floor row, raw+gated): under the PRODUCTION
+        gate (opsin_gate) the namer correctly ABSTAINS -- 0-wrong holds, the
+        load-bearing guard. (The suite default is gate-OFF, under which
+        name_compound == raw and would ship the split; hence the marker.)
+
+        Only the RAW gate-OFF namer emits a mixture-split
+        ('3-hydroxypropanoic acid diphosphoric acid') for this CONNECTED input;
+        OPSIN parses that name to a DISCONNECTED 2-fragment structure, so the
+        production gate's rejects it as a different molecule. Per project
+        guidance a gate-OFF wrongness is not a real deployment (production always
+        gates), so the raw split is documented, not chased. Change predates v52."""
+        smi = "OC(=O)CCOP(=O)(O)OP(=O)(O)O"
+        gated = name_compound(smi)
+        assert gated is None or gated.startswith("unknown")   # production: fail-closed
+        raw = RAW.name(smi)
+        assert raw != "propanoic acid"            # never the old atom-dropped leak
+        # Raw gate-OFF emits the mixture-split the production gate rejects.
+        assert raw == "3-hydroxypropanoic acid diphosphoric acid"
 
 
 @pytest.mark.unit

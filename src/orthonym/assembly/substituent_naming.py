@@ -4548,6 +4548,28 @@ def parent_to_prefix(parent_name: str, chain_length: int, *, attach_locant) -> s
             )
             return None
 
+    # v52 P2: an N-carbon-substituted hydroxylamine
+    # (R-NH-OH / RR'N-OH) now recurses to an *amine* PIN with a leading
+    # italic-'N-hydroxy' prefix ('N-hydroxymethanamine',
+    # 'N-hydroxy-N-methylmethanamine') instead of the old
+    # '<N-sub>hydroxylamine' functional-class shape the ending-table row above
+    # already declines. Same defect class, different shape: this converter has
+    # no '-yl' form for it either (the Blue Book composed prefix is
+    # '[hydroxy(alkyl)amino]', not built here — see substituent_prefix_forms.py's
+    # 'hydroxylamine' row). Detect on the leading marker rather than the
+    # ending: the check is anchored to the literal italic-N token so it can
+    # never capture an unrelated '...amine' parent, and 'amine' (not 'imine')
+    # keeps this disjoint from the oxime N-hydroxy-imine substitutive PIN
+    # (oxime.py's '_substitutive_oxime_name'), which this converter DOES know
+    # how to express via the '-imine' suffix cascade below.
+    if name.startswith("N-hydroxy") and name_lower.endswith("amine"):
+        logger.debug(
+            "C3 fail-closed: %r is an N-hydroxy amine derivative with no "
+            "'-yl' form; the Blue Book uses a composed [hydroxy(alkyl)amino] "
+            "prefix (P-68.3.1.1.1.1), not built here", name,
+        )
+        return None
+
     # ---- Carboxylic acids: -oic acid / -anoic acid ----
     # e.g., "butanoic acid" -> "3-carboxypropyl"
     m_oic = re.match(r'^(.+?)(?:an)?oic acid$', name)

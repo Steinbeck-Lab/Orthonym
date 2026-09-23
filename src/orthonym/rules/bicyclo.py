@@ -27,7 +27,7 @@ from rdkit.Chem import BondType
 
 from ..perception.molcache import bonds_of  # audit 2026-09-03 (S2): per-call atom/bond tuples
 from ..perception.rings import find_ring_bridgeheads, get_spiro_atoms
-from .locants import compare_locant_sets
+from .locants import compare_locant_sets, compound_aware_multibond_set
 
 logger = logging.getLogger(__name__)
 
@@ -565,6 +565,7 @@ def get_bicyclo_numbering(mol, suffix_ring_atoms: Optional[Set[int]] = None) -> 
     hetero = {i for i in ring_atoms if mol.GetAtomWithIdx(i).GetSymbol() != 'C'}
     ring_multibonds = []
     ring_double_bonds = []
+    ring_triple_bonds = []
     for b in bonds_of(mol):
         a1, a2 = b.GetBeginAtomIdx(), b.GetEndAtomIdx()
         if a1 in ring_atoms and a2 in ring_atoms:
@@ -573,6 +574,8 @@ def get_bicyclo_numbering(mol, suffix_ring_atoms: Optional[Set[int]] = None) -> 
                 ring_multibonds.append((a1, a2))
             if order == 2.0:
                 ring_double_bonds.append((a1, a2))
+            elif order == 3.0:
+                ring_triple_bonds.append((a1, a2))
     sub_bearing = set()
     for i in ring_atoms:
         if i in suffix_set:
@@ -621,6 +624,31 @@ def get_bicyclo_numbering(mol, suffix_ring_atoms: Optional[Set[int]] = None) -> 
         sub = sorted(a2l[i] for i in sub_bearing if i in a2l)
         return (het, suf, ene, dbl, sub)
 
+    def _n_compound_dbl(a2l):
+        # (1) [BBv2:16635] / (3) [:16689]: a double bond
+        # needs a COMPOUND locant when its endpoints' locants do not differ
+        # by exactly one ("the higher locant is cited in parentheses").
+        # Minimizing this COUNT is a numbering criterion in its own right --
+        # distinct from `ene`/`dbl` above, which compare the locant SET with
+        # any parenthetical partner ignored (2) [:16657]).
+        return sum(
+            1 for a, b in ring_double_bonds
+            if a in a2l and b in a2l and abs(a2l[a] - a2l[b]) != 1
+        )
+
+    # (1)/(2) compound-aware SET comparator -- shared with
+    # polycyclic.py's VonBaeyerAnalyzer._unsaturation_locant_key so the two
+    # engines apply one rule, not two (see locants.compound_aware_multibond_set
+    # docstring for the full derivation, incl. the counter-example that rules
+    # out a naive cited-locant compare here).
+    _tb_set = compound_aware_multibond_set
+
+    # (:16675) applies -- and its criterion order DIFFERS from
+    # -- only when a ring triple bond is present alongside the
+    # double bond(s); gate on that, not on ring_multibonds (which also
+    # includes plain double-bond-only systems).
+    has_triple = bool(ring_triple_bonds)
+
     def _cmp(x, y):
         kx, ky = _key_lists(x), _key_lists(y)
         # Tier 0: heteroatom locant SET.
@@ -631,11 +659,42 @@ def get_bicyclo_numbering(mol, suffix_ring_atoms: Optional[Set[int]] = None) -> 
         vx, vy = _sen_vector(x), _sen_vector(y)
         if vx != vy:
             return -1 if vx < vy else 1
-        # Tiers 2-4: suffix -> ene/yne -> substituents (all locant SETS).
-        for sx, sy in zip(kx[1:], ky[1:]):
-            c = compare_locant_sets(sx, sy)
-            if c != 0:
-                return c
+        # Tier 2: suffix locant SET.
+        c = compare_locant_sets(kx[1], ky[1])
+        if c != 0:
+            return c
+        if not has_triple:
+            # (1) [:16635]: minimum number of compound double-bond
+            # locants -- criterion (1), ABOVE the ene/dbl locant-SET tiers
+            # (which implement criterion (2),:16657).
+            cx, cy = _n_compound_dbl(x), _n_compound_dbl(y)
+            if cx != cy:
+                return -1 if cx < cy else 1
+        # Tiers 3-4: ene/yne -> double-only (locant SETS).
+        if has_triple:
+            # (1)/(2): compound-aware SET compare (see `_tb_set`).
+            tx, ty = _tb_set(x, ring_multibonds), _tb_set(y, ring_multibonds)
+            if tx != ty:
+                return -1 if tx < ty else 1
+            tx, ty = _tb_set(x, ring_double_bonds), _tb_set(y, ring_double_bonds)
+            if tx != ty:
+                return -1 if tx < ty else 1
+        else:
+            for sx, sy in zip(kx[2:4], ky[2:4]):
+                c = compare_locant_sets(sx, sy)
+                if c != 0:
+                    return c
+        if has_triple:
+            # (3) [:16689]: compound locants kept to a minimum --
+            # criterion (3), BELOW the multi-bond-set (1) and double-bond-set
+            # (2) tiers just compared.
+            cx, cy = _n_compound_dbl(x), _n_compound_dbl(y)
+            if cx != cy:
+                return -1 if cx < cy else 1
+        # Tier 5: substituents (locant SET).
+        c = compare_locant_sets(kx[4], ky[4])
+        if c != 0:
+            return c
         return 0
 
     candidates.sort(key=cmp_to_key(_cmp))

@@ -1248,6 +1248,28 @@ def classify_substituent(mol, sub_atoms: List[int], parent_atoms: Set[int]) -> D
             'ring_atoms': contained_ring,
         }
 
+    # A nitrile substituent -C#N (attached through the carbon) is the detachable
+    # prefix 'cyano', NOT an alkyl carbon-count. The carbon-count
+    # fallback below sees only the ONE carbon of -C#N and silently drops the N,
+    # mis-naming it 'methyl' -> a WRONG MOLECULE (e.g. the tricyanomethanide
+    # carbanion `N#C[C-](C#N)C#N` emitted '1,1,1-trimethylmethanide'). Detect the
+    # exact -C#N shape here and return 'cyano'.
+    if len(sub_set) == 2:
+        a0 = mol.GetAtomWithIdx(sub_atoms[0])
+        a1 = mol.GetAtomWithIdx(sub_atoms[1])
+        c_at = a0 if a0.GetSymbol() == 'C' else (a1 if a1.GetSymbol() == 'C' else None)
+        n_at = a0 if a0.GetSymbol() == 'N' else (a1 if a1.GetSymbol() == 'N' else None)
+        if c_at is not None and n_at is not None:
+            cn = mol.GetBondBetweenAtoms(c_at.GetIdx(), n_at.GetIdx())
+            # cyano: C#N with a terminal N (degree 1, no H) and the carbon carrying
+            # the bond back to the parent (i.e. attachment is THROUGH the carbon).
+            c_to_parent = any(nb.GetIdx() in parent_atoms
+                              for nb in c_at.GetNeighbors())
+            if (cn is not None and cn.GetBondType() == Chem.BondType.TRIPLE
+                    and n_at.GetDegree() == 1 and n_at.GetTotalNumHs() == 0
+                    and c_to_parent):
+                return {'type': 'alkyl', 'name': 'cyano', 'atoms': sub_atoms}
+
     # Not a ring - count carbons for alkyl naming
     carbon_count = sum(
         1 for idx in sub_atoms

@@ -271,6 +271,33 @@ FUSED_HETEROCYCLE_DATA: Dict[str, Dict[str, Any]] = {
         'parent_atoms': 14,
         'iupac_locants': {0: 2, 1: 3, 2: 4, 3: '4a', 4: '10a', 5: 1, 6: 10, 7: '9a', 8: 9, 9: 8, 10: 7, 11: 6, 12: '5a', 13: 5},
     },
+    # v52 a review-fix a performance pass D4 table, the Blue Book,
+    #:11787): "X = Se phenoselenazine (10H-isomer shown; the PIN is
+    # 10H-phenoselenazine)", "X = Te... the PIN is 10H-phenotellurazine".
+    # These are N-cases exactly like phenoxazine/phenothiazine above (10H-
+    # IS part of the PIN) -- contrast the P/As/Sb O-cases just above
+    # (phenoxaphosphinine/phenoxarsinine/phenoxastibinine/phenothiarsinine),
+    # where "10H-isomer shown" is descriptive of the drawing only and the
+    # PIN itself is bare. Same skeleton/atom ordering as 10H-phenothiazine
+    # (only the ring chalcogen symbol differs), so iupac_locants is
+    # identical. OPSIN 2.9.0 round-trips both bare forms to the input
+    # InChIKey.
+    # 10H-phenoselenazine
+    'c1ccc2c(c1)Nc1ccccc1[Se]2': {
+        'name': '10H-phenoselenazine',
+        'tautomer_locant': 10,
+        'ring_system': 'tricyclic',
+        'parent_atoms': 14,
+        'iupac_locants': {0: 2, 1: 3, 2: 4, 3: '4a', 4: '10a', 5: 1, 6: 10, 7: '9a', 8: 9, 9: 8, 10: 7, 11: 6, 12: '5a', 13: 5},
+    },
+    # 10H-phenotellurazine
+    'c1ccc2c(c1)Nc1ccccc1[Te]2': {
+        'name': '10H-phenotellurazine',
+        'tautomer_locant': 10,
+        'ring_system': 'tricyclic',
+        'parent_atoms': 14,
+        'iupac_locants': {0: 2, 1: 3, 2: 4, 3: '4a', 4: '10a', 5: 1, 6: 10, 7: '9a', 8: 9, 9: 8, 10: 7, 11: 6, 12: '5a', 13: 5},
+    },
     # 9H-xanthene
     'c1ccc2c(c1)Cc1ccccc1O2': {
         'name': '9H-xanthene',

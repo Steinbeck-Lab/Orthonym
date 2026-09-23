@@ -18,8 +18,12 @@ from typing import Dict, List, Optional, Tuple
 from rdkit import Chem
 from rdkit.Chem import RWMol
 
-from ..assembly.naming_utils import SIMPLE_MULTIPLIERS
-from ..data.chain_names import get_chain_prefix
+from ..assembly.naming_utils import (
+    SIMPLE_MULTIPLIERS,
+    get_alkyl_name,
+    simple_multiplier_word,
+)
+from ..data.chain_names import get_chain_name, get_chain_prefix
 from ..perception.molcache import (  # audit 2026-09-03 (S2): per-call atom/bond tuples
     atoms_of,
     bonds_of,
@@ -846,8 +850,16 @@ def _group14_hydride_unit_name(canon_smiles: str) -> Optional[str]:
 
 _G14_HYDRIDE_STEMS = {'Si': 'silane', 'Ge': 'germane',
                       'Sn': 'stannane', 'Pb': 'plumbane'}
+# seniority of Group-14 parent hydrides (the Blue Book-18205):
+# Si > Ge > Sn > Pb (most senior first). Lower rank value = MORE senior.
+_G14_SENIORITY_RANK = {'Si': 0, 'Ge': 1, 'Sn': 2, 'Pb': 3}
 _G14_CHAIN_MULT = {2: 'di', 3: 'tri', 4: 'tetra', 5: 'penta', 6: 'hexa',
-                   7: 'hepta', 8: 'octa', 9: 'nona', 10: 'deca'}
+                   7: 'hepta', 8: 'octa', 9: 'nona', 10: 'deca',
+                   # v52 P02T2 (Table 28.1): basic multiplying prefixes past
+                   # deca, no terminal-vowel elision before the consonant
+                   # stem ('trideca' + 'stannane' -> 'tridecastannane').
+                   11: 'undeca', 12: 'dodeca', 13: 'trideca', 14: 'tetradeca',
+                   15: 'pentadeca'}
 
 # a phase (a)): a MONONUCLEAR Group-14 hydride cited as a
 # multiplicative parent unit ('silane', 'trimethylsilane',...) takes bis/tris,
@@ -890,40 +902,59 @@ def name_free_homonuclear_group14_hydride(mol) -> Optional[str]:
         [GeH2]=[GeH2] -> digermene, BB 38147)
         [SiH2]=[SiH2] -> disilene
 
-    Fail-closed (returns None) for any carbon / halide / stray heteroatom, a
-    branch, a ring, a charge / radical, a non-standard valence, a single hub
-    (bare mononuclear hydride, handled elsewhere), or unsaturation on a chain
-    longer than 2 atoms (locant machinery not built here — never a wrong name).
-    Pure: no mol mutation.
+    v52 P02T2, the Blue Book verbatim "1-methyltridecastannane (PIN)"):
+    simple unbranched-alkyl substituents on the backbone are also admitted,
+    e.g. [CH3][SnH2]x12[SnH3] -> 1-methyltridecastannane. The parent is still
+    the longest homogeneous Group-14 chain (backbone shape/branch/unsaturation
+    checks run over Group-14-Group-14 bonds only, ignoring alkyl branches);
+    each carbon substituent must itself be a clean unbranched saturated chain
+    (get_alkyl_name) attached by a single bond at one backbone atom.
+
+    Fail-closed (returns None) for any non-carbon heteroatom / halide, a
+    branched or hetero substituent, a backbone branch, a ring anywhere in the
+    molecule, a charge / radical, a non-standard valence, a single hub (bare
+    mononuclear hydride, handled elsewhere), or unsaturation combined with a
+    substituent or on a chain longer than 2 atoms (locant machinery not built
+    here — never a wrong name). Pure: no mol mutation.
     """
     if mol is None:
         return None
     if len(Chem.GetMolFrags(mol)) != 1:
         return None
+    if mol.GetRingInfo().NumRings() != 0:
+        return None
     heavy = [a for a in atoms_of(mol) if a.GetSymbol() != 'H']
     if len(heavy) < 2:
         return None
-    syms = {a.GetSymbol() for a in heavy}
-    if len(syms) != 1:
+
+    g14_atoms = [a for a in heavy if a.GetSymbol() in _G14_HYDRIDE_STEMS]
+    other_atoms = [a for a in heavy if a.GetSymbol() not in _G14_HYDRIDE_STEMS]
+    if not g14_atoms:
         return None
-    stem = _G14_HYDRIDE_STEMS.get(next(iter(syms)))
-    if stem is None:
+    g14_syms = {a.GetSymbol() for a in g14_atoms}
+    if len(g14_syms) != 1:
         return None
-    n = len(heavy)
+    stem = _G14_HYDRIDE_STEMS[next(iter(g14_syms))]
+    # Any non-carbon substituent atom is out of this producer's scope.
+    if any(a.GetSymbol() != 'C' for a in other_atoms):
+        return None
+
+    n = len(g14_atoms)
     mult = _G14_CHAIN_MULT.get(n)
     if mult is None:
         return None
 
     from .lambda_convention import nonstandard_bonding_number
-    idxs = {a.GetIdx() for a in heavy}
+    g14_idxs = {a.GetIdx() for a in g14_atoms}
     deg = {}
-    for a in heavy:
-        if (a.GetFormalCharge() != 0 or a.GetNumRadicalElectrons() != 0
-                or a.IsInRing()):
+    for a in g14_atoms:
+        if a.GetFormalCharge() != 0 or a.GetNumRadicalElectrons() != 0:
             return None
         if nonstandard_bonding_number(mol, a.GetIdx()) is not None:
             return None
-        d = sum(1 for nb in a.GetNeighbors() if nb.GetIdx() in idxs)
+        # Degree counted over Group-14-Group-14 bonds only: an alkyl branch
+        # on a backbone atom is a substituent, not a chain branch.
+        d = sum(1 for nb in a.GetNeighbors() if nb.GetIdx() in g14_idxs)
         if d > 2:
             return None  # branch
         deg[a.GetIdx()] = d
@@ -932,12 +963,12 @@ def name_free_homonuclear_group14_hydride(mol) -> Optional[str]:
     if len(ends) != 2:
         return None  # ring (no degree-1 atom) or malformed
 
-    # Walk the chain from one end to order the atoms 1..n.
+    # Walk the backbone from one end to order the Group-14 atoms 1..n.
     order = [ends[0]]
     prev, cur = None, ends[0]
     while True:
         nxts = [nb.GetIdx() for nb in mol.GetAtomWithIdx(cur).GetNeighbors()
-                if nb.GetIdx() in idxs and nb.GetIdx() != prev]
+                if nb.GetIdx() in g14_idxs and nb.GetIdx() != prev]
         if not nxts:
             break
         if len(nxts) != 1:
@@ -947,7 +978,7 @@ def name_free_homonuclear_group14_hydride(mol) -> Optional[str]:
     if len(order) != n:
         return None  # defensive: ring / disconnected
 
-    # unsaturation along the chain.
+    # unsaturation along the backbone.
     n_double = n_triple = 0
     for j in range(n - 1):
         bt = mol.GetBondBetweenAtoms(order[j], order[j + 1]).GetBondType()
@@ -958,12 +989,157 @@ def name_free_homonuclear_group14_hydride(mol) -> Optional[str]:
         elif bt != Chem.BondType.SINGLE:
             return None
     total_unsat = n_double + n_triple
-    if total_unsat == 0:
-        return f"{mult}{stem}"
-    if n != 2 or total_unsat != 1:
-        return None  # only the 2-atom -ene/-yne is built (no locant needed)
-    base = stem[:-3]  # 'sil' / 'germ' / 'stann' / 'plumb'
-    return f"{mult}{base}{'ene' if n_double else 'yne'}"
+
+    if not other_atoms:
+        if total_unsat == 0:
+            return f"{mult}{stem}"
+        if n != 2 or total_unsat != 1:
+            return None  # only the 2-atom -ene/-yne is built (no locant needed)
+        base = stem[:-3]  # 'sil' / 'germ' / 'stann' / 'plumb'
+        return f"{mult}{base}{'ene' if n_double else 'yne'}"
+
+    # v52 P02T2: substituted homogeneous chain. The ene/yne modification is
+    # not composed with substitution here -- fail closed on any unsaturation.
+    if total_unsat != 0:
+        return None
+
+    c_idxs = {a.GetIdx() for a in other_atoms}
+    visited: set = set()
+    substituents: List[Tuple[int, str]] = []  # (backbone attach idx, alkyl name)
+    for a in other_atoms:
+        if a.GetIdx() in visited:
+            continue
+        # Collect this substituent's connected carbon-only component.
+        comp = []
+        stack = [a.GetIdx()]
+        seen = {a.GetIdx()}
+        while stack:
+            cur_i = stack.pop()
+            comp.append(cur_i)
+            for nb in mol.GetAtomWithIdx(cur_i).GetNeighbors():
+                if nb.GetIdx() in c_idxs and nb.GetIdx() not in seen:
+                    seen.add(nb.GetIdx())
+                    stack.append(nb.GetIdx())
+        visited |= seen
+
+        # Exactly one bond from this component to the backbone, from exactly
+        # one component atom to exactly one backbone atom (a single, simple
+        # attachment point -- anything else is out of scope).
+        attach_backbone: set = set()
+        attach_carbon = None
+        for i in comp:
+            for nb in mol.GetAtomWithIdx(i).GetNeighbors():
+                if nb.GetIdx() in g14_idxs:
+                    attach_backbone.add(nb.GetIdx())
+                    if attach_carbon is None:
+                        attach_carbon = i
+                    elif attach_carbon != i:
+                        return None  # two attachment points -> not simple
+        if len(attach_backbone) != 1 or attach_carbon is None:
+            return None
+
+        # Every atom in the component must be a clean, saturated, standard-
+        # valence carbon, and the component must be a single unbranched chain
+        # rooted at attach_carbon "simple unbranched alkyl" --
+        # branched substituents fail closed).
+        comp_set = set(comp)
+        c_deg = {}
+        for i in comp:
+            atom = mol.GetAtomWithIdx(i)
+            if atom.GetFormalCharge() != 0 or atom.GetNumRadicalElectrons() != 0:
+                return None
+            if nonstandard_bonding_number(mol, i) is not None:
+                return None
+            d_in = sum(1 for nb in atom.GetNeighbors() if nb.GetIdx() in comp_set)
+            if d_in > 2:
+                return None  # branched substituent
+            c_deg[i] = d_in
+
+        if len(comp) == 1:
+            if c_deg[attach_carbon] != 0:
+                return None
+        else:
+            c_ends = [i for i, d in c_deg.items() if d <= 1]
+            if attach_carbon not in c_ends or len(c_ends) != 2:
+                return None
+            walk = [attach_carbon]
+            prev_i, cur_i = None, attach_carbon
+            while True:
+                nxt = [nb.GetIdx() for nb in mol.GetAtomWithIdx(cur_i).GetNeighbors()
+                       if nb.GetIdx() in comp_set and nb.GetIdx() != prev_i]
+                if not nxt:
+                    break
+                if len(nxt) != 1:
+                    return None
+                prev_i, cur_i = cur_i, nxt[0]
+                walk.append(cur_i)
+            if len(walk) != len(comp):
+                return None  # not a single unbranched path
+
+        # Every bond in the substituent, and the attach bond itself, must be
+        # a plain single bond (a saturated alkyl substituent).
+        for i in comp:
+            for nb in mol.GetAtomWithIdx(i).GetNeighbors():
+                if nb.GetIdx() in comp_set:
+                    bt = mol.GetBondBetweenAtoms(i, nb.GetIdx()).GetBondType()
+                    if bt != Chem.BondType.SINGLE:
+                        return None
+        backbone_atom = next(iter(attach_backbone))
+        if (mol.GetBondBetweenAtoms(attach_carbon, backbone_atom).GetBondType()
+                != Chem.BondType.SINGLE):
+            return None
+
+        substituents.append((backbone_atom, get_alkyl_name(len(comp))))
+
+    # Lowest locants to the substituent set, over both backbone
+    # numbering directions. A genuine tie on that locant SET falls to
+    # (g) (the Blue Book "3-ethyl-5-methylheptane (PIN) not
+    # 5-ethyl-3-methylheptane"): lowest locant to the substituent cited first
+    # alphabetically -- so build the citation-order locant sequence with the
+    # SAME sort key used below for the prefix block (sorted(by_name)) and use
+    # it as a tie-break, never as the primary key.
+    best_key = None
+    best_dir = order
+    for seq in (order, list(reversed(order))):
+        locant_of = {idx: i + 1 for i, idx in enumerate(seq)}
+        locs = sorted(locant_of[b] for b, _ in substituents)
+        by_name_seq: Dict[str, List[int]] = {}
+        for b, sub_name in substituents:
+            by_name_seq.setdefault(sub_name, []).append(locant_of[b])
+        cite = tuple(loc for sub_name in sorted(by_name_seq)
+                     for loc in sorted(by_name_seq[sub_name]))
+        key = (locs, cite)
+        if best_key is None or key < best_key:
+            best_key, best_dir = key, seq
+    locant_of = {idx: i + 1 for i, idx in enumerate(best_dir)}
+
+    by_name: Dict[str, List[int]] = {}
+    for backbone_atom, sub_name in substituents:
+        by_name.setdefault(sub_name, []).append(locant_of[backbone_atom])
+    for locs in by_name.values():
+        locs.sort()
+
+    # (b) (the Blue Book verbatim "The locant '1' is omitted:... (b) in
+    # monosubstituted homogeneous chains consisting of only two identical
+    # atoms"). A 2-atom Group-14 chain bearing exactly ONE substituent is that
+    # case: methyldisilane, NOT 1-methyldisilane. 3+-atom chains and 2-atom
+    # MULTI-substituted chains keep every locant deny-default).
+    omit_locant_one = (n == 2 and len(substituents) == 1)
+
+    prefix_parts = []
+    for sub_name in sorted(by_name):
+        locs = by_name[sub_name]
+        loc_str = ','.join(str(x) for x in locs)
+        if len(locs) > 1:
+            m = SIMPLE_MULTIPLIERS.get(len(locs))
+            if m is None:
+                return None
+            prefix_parts.append(f"{loc_str}-{m}{sub_name}")
+        elif omit_locant_one and locs == [1]:
+            prefix_parts.append(sub_name)
+        else:
+            prefix_parts.append(f"{loc_str}-{sub_name}")
+    return f"{'-'.join(prefix_parts)}{mult}{stem}"
 
 
 def _try_group14_hydride_bridge(mol) -> Optional[str]:
@@ -1127,6 +1303,97 @@ def _try_azanediyl_methylene_phosphonic(mol) -> Optional[str]:
                 break
         if ok:
             return "[azanediylbis(methylene)]bis(phosphonic acid)"
+    return None
+
+
+def _try_phosphanetriyl_methylene_oxoacid(mol) -> Optional[str]:
+    """ / (the Blue Book, verbatim (PIN)):
+    P(CH2-P(=O)(OH)2)3 -> [phosphanetriyltris(methylene)]tris(phosphonic acid).
+
+    The tris-P analogue of the bis-N _try_azanediyl_methylene_phosphonic
+    ([azanediylbis(methylene)]bis(phosphonic acid), the Blue Book): an acyclic
+    trivalent phosphorus HUB whose three neighbours are each a -CH2-
+    (methylene) leading to an identical neutral phosphonic-acid terminus
+    -P(=O)(OH)2.
+
+    Why a dedicated handler and not _try_acyclic_nitrilo_bridge: in
+    phosphanetriyltriacetic acid (P(CH2COOH)3) the arm CH2 is absorbed as
+    C2 of the *acetic-acid* parent, so the central group is the bare
+    'phosphanetriyl'. Here the parent is *phosphonic acid* -- a single-P
+    parent that CANNOT absorb the carbon -- so each CH2 must surface in the
+    composite central group as a 'methylene' concatenation:
+    'phosphanetriyl' + group-multiplier + 'methylene'), which
+    _try_acyclic_nitrilo_bridge never emits.
+
+    Exact-shape fail-closed recognizer (0-wrong): a bare uncharged non-ring
+    trivalent P hub bonded to exactly three CH2 arms, each CH2 bonded only to
+    the hub and to a neutral P(=O)(OH)2, with those atoms accounting for
+    every heavy atom in the molecule. Any other hub/arm shape -> None."""
+    from ..assembly.naming_utils import COMPLEX_MULTIPLIERS
+
+    heavy_all = {a.GetIdx() for a in atoms_of(mol) if a.GetAtomicNum() > 1}
+
+    for atom in atoms_of(mol):
+        # Hub: bare uncharged non-ring trivalent P, three carbon neighbours.
+        if atom.GetSymbol() != 'P' or atom.GetTotalNumHs() != 0:
+            continue
+        if atom.IsInRing() or atom.GetFormalCharge() != 0:
+            continue
+        arms = [n for n in atom.GetNeighbors() if n.GetAtomicNum() > 1]
+        if len(arms) != 3 or any(c.GetSymbol() != 'C' for c in arms):
+            continue
+
+        covered = {atom.GetIdx()}
+        ok = True
+        for c in arms:
+            # Arm: a plain CH2 bonded only to the hub and to one P.
+            if c.GetSymbol() != 'C' or c.GetTotalNumHs() != 2:
+                ok = False
+                break
+            if c.IsInRing() or c.GetFormalCharge() != 0:
+                ok = False
+                break
+            p_nbrs = [n for n in c.GetNeighbors() if n.GetAtomicNum() > 1
+                      and n.GetIdx() != atom.GetIdx()]
+            if len(p_nbrs) != 1 or p_nbrs[0].GetSymbol() != 'P':
+                ok = False
+                break
+            p = p_nbrs[0]
+            if p.GetFormalCharge() != 0 or p.IsInRing():
+                ok = False
+                break
+            # Terminus: a clean neutral phosphonic acid -P(=O)(OH)2.
+            o_nbrs = [n for n in p.GetNeighbors() if n.GetIdx() != c.GetIdx()]
+            if len(o_nbrs) != 3 or any(o.GetSymbol() != 'O' for o in o_nbrs):
+                ok = False
+                break
+            oxo = [o for o in o_nbrs if o.GetTotalNumHs() == 0]
+            oh = [o for o in o_nbrs if o.GetTotalNumHs() == 1]
+            if len(oxo) != 1 or len(oh) != 2:
+                ok = False
+                break
+            covered.update({c.GetIdx(), p.GetIdx()}
+                           | {o.GetIdx() for o in o_nbrs})
+        if not ok:
+            continue
+        # Whole-molecule coverage: the hub + 3 arms account for every heavy
+        # atom, so nothing is silently dropped (fail-closed on anything else).
+        if covered != heavy_all:
+            continue
+
+        mult = COMPLEX_MULTIPLIERS.get(len(arms))  # 3 arms -> 'tris'
+        if mult is None:
+            return None
+        #: central group = 'phosphanetriyl' + group-multiplier
+        # + 'methylene'; the composite (parenthesised) central group moves up
+        # to square brackets. The phosphonic-acid parent unit
+        # takes the group multiplier in parentheses / (e)).
+        # No space: the ']' and 'tris(' join directly, matching the unspaced
+        # plain-text sibling the Blue Book ([azanediylbis(methylene)]bis(phosphonic
+        # acid)); the space at the Blue Book is a LaTeX \begin{array}
+        # OCR artifact (census: 0 spaced vs 37 unspaced '] bis/tris/tetrakis(').
+        return (f"[phosphanetriyl{mult}(methylene)]"
+                f"{mult}(phosphonic acid)")
     return None
 
 
@@ -1396,6 +1663,575 @@ def _try_chalcogenbis_methylene_bridge(mol, ring_atoms: set) -> Optional[str]:
     return None
 
 
+def _bare_phenyl_ring_atoms(mol, ipso_atom, exclude: int):
+    """Return the frozenset of the six ring-atom indices of a BARE
+    (unsubstituted) monosubstituted benzene whose attachment ('ipso') carbon is
+    ``ipso_atom`` — attached, outside the ring, to exactly the single heavy atom
+    ``exclude`` and nothing else — or ``None`` (fail closed).
+
+    Establishes the retained 'phenyl' substituent / benzyl arm: only a
+    lone six-membered all-carbon aromatic ring carrying no substituent other than
+    the one attachment qualifies (a fused/spiro, hetero, charged, or otherwise
+    decorated ring returns ``None`` so the caller declines rather than emit an
+    unverified spelling)."""
+    if not ipso_atom.GetIsAromatic() or ipso_atom.GetSymbol() != 'C':
+        return None
+    ring_info = mol.GetRingInfo()
+    target = None
+    for r in ring_info.AtomRings():
+        if ipso_atom.GetIdx() in r:
+            if target is not None:
+                return None  # fused / spiro -- out of scope
+            target = r
+    if target is None or len(target) != 6:
+        return None
+    ring_set = set(target)
+    for a in target:
+        at = mol.GetAtomWithIdx(a)
+        if (not at.GetIsAromatic() or at.GetSymbol() != 'C'
+                or at.GetFormalCharge() != 0
+                or at.GetNumRadicalElectrons() != 0):
+            return None
+        ext = [n.GetIdx() for n in at.GetNeighbors()
+               if n.GetIdx() not in ring_set and n.GetAtomicNum() > 1]
+        if a == ipso_atom.GetIdx():
+            if ext != [exclude]:
+                return None  # ipso carries an extra substituent -- not bare
+        elif ext:
+            return None      # a non-ipso ring carbon is substituted -- not bare
+    return frozenset(target)
+
+
+def _try_bis_sulfanediylmethylene_arene_bridge(
+    mol, ring_atoms: set,
+) -> Optional[str]:
+    """Composite ``(phenylmethylene)bis(sulfanediylmethylene)`` central bridge
+    joining two identical ring parents "Concatenated
+    multiplicative groups" /:
+
+        PhCH2-S-CH(Ph)-S-CH2Ph ->
+            1,1'-[(phenylmethylene)bis(sulfanediylmethylene)]dibenzene
+
+    The central group is the aryl-substituted methine ``-CH(Ph)-``
+    ('phenylmethylene', retained 'phenyl'); each ``-S-CH2-`` arm toward a
+    parent is a 'sulfanediylmethylene', so the concatenated bridge is
+    ``(phenylmethylene)bis(sulfanediylmethylene)`` (its inner parentheses escalate
+    the outer enclosure to square brackets in ``_bridge_token``). Sibling of
+    ``_try_chalcogenbis_methylene_bridge`` (ring-CH2-S-CH2-ring) with the single
+    central chalcogen replaced by an S-CH(Ph)-S core.
+
+    Fail-closed: central non-ring neutral 0-radical CH (exactly one H, degree 3)
+    bearing exactly two divalent 0-H sulfanediyl arms and exactly one bare-phenyl
+    substituent; each S bonded to the central C and to a non-ring CH2 that in turn
+    reaches exactly one ring atom; identical ring fragments; unit + attachment
+    locant resolved through the shared ``_resolve_unit_and_assemble``. Anything
+    outside this shape returns ``None`` (0-wrong)."""
+    for atom in atoms_of(mol):
+        if (atom.GetSymbol() != 'C' or atom.GetTotalNumHs() != 1
+                or atom.GetFormalCharge() != 0
+                or atom.GetNumRadicalElectrons() != 0):
+            continue
+        cidx = atom.GetIdx()
+        if cidx in ring_atoms:
+            continue
+        heavy = [n for n in atom.GetNeighbors() if n.GetAtomicNum() > 1]
+        if len(heavy) != 3:
+            continue
+        s_arms = [n for n in heavy if n.GetSymbol() == 'S']
+        subs = [n for n in heavy if n.GetSymbol() != 'S']
+        if len(s_arms) != 2 or len(subs) != 1:
+            continue
+
+        # the lone non-S substituent must be a bare phenyl -> 'phenylmethylene'.
+        phenyl_atoms = _bare_phenyl_ring_atoms(mol, subs[0], cidx)
+        if phenyl_atoms is None:
+            continue
+
+        ch2_idxs: List[int] = []
+        ring_conns: List[int] = []
+        ok = True
+        for s in s_arms:
+            if (s.GetTotalNumHs() != 0 or s.GetFormalCharge() != 0
+                    or s.GetNumRadicalElectrons() != 0
+                    or s.GetIdx() in ring_atoms):
+                ok = False
+                break
+            s_heavy = [n for n in s.GetNeighbors() if n.GetAtomicNum() > 1]
+            if len(s_heavy) != 2:
+                ok = False
+                break
+            ch2 = [n for n in s_heavy if n.GetIdx() != cidx]
+            if len(ch2) != 1:
+                ok = False
+                break
+            ch2 = ch2[0]
+            if (ch2.GetSymbol() != 'C' or ch2.GetTotalNumHs() != 2
+                    or ch2.GetFormalCharge() != 0
+                    or ch2.GetNumRadicalElectrons() != 0
+                    or ch2.GetIdx() in ring_atoms):
+                ok = False
+                break
+            rn = [n for n in ch2.GetNeighbors() if n.GetAtomicNum() > 1
+                  and n.GetIdx() != s.GetIdx()]
+            if len(rn) != 1 or rn[0].GetIdx() not in ring_atoms:
+                ok = False
+                break
+            ch2_idxs.append(ch2.GetIdx())
+            ring_conns.append(rn[0].GetIdx())
+        if not ok:
+            continue
+
+        # Remove the whole central group (central CH + both S + the bare phenyl)
+        # plus the second CH2 so exactly the two terminal ring parents remain.
+        central = [cidx] + [s.GetIdx() for s in s_arms] + list(phenyl_atoms)
+        fragments = _split_at_bridge(
+            mol, ch2_idxs[0], ring_conns,
+            extra_remove=ch2_idxs[1:] + central)
+        if fragments is None:
+            continue
+        smi_a, smi_b, _ca, _cb = fragments
+        canon_a = canon_smiles(smi_a)
+        if canon_a != canon_smiles(smi_b):
+            continue
+
+        result = _resolve_unit_and_assemble(
+            mol, ch2_idxs, ring_conns, central,
+            "(phenylmethylene)bis(sulfanediylmethylene)", ring_atoms, canon_a,
+        )
+        if result is not None:
+            return result
+        continue
+    return None
+
+
+def _try_substituted_alkanediyl_arene_bridge(
+    mol, ring_atoms: set,
+) -> Optional[str]:
+    """A central quaternary carbon bearing FOUR identical CH2-arene arms, named
+    as a substituted ``propane-1,3-diyl`` bridge over two of the arenes with the
+    other two cited as substituents on the central (C2) carbon
+     "a maximum number of identical parent structures must be
+    expressed" + "the more numerous / lowest-locant set"):
+
+        C(CH2C6H5)4 -> 1,1'-(2,2-dibenzylpropane-1,3-diyl)dibenzene
+
+    Two of the four benzyl arms become the multiplicative ``propane-1,3-diyl``
+    (C1=CH2, C2=central quaternary carbon, C3=CH2, joining the two multiplied
+    benzenes); the remaining two are the C2 substituents 'dibenzyl'
+     retained 'benzyl' = bare -CH2C6H5; permits
+    substitution on a simple multiplicative group).
+
+    Determinism (the multiplied-set choice): all four arms are proven
+    structurally identical (each is a CH2 on a BARE phenyl ring, verified by
+    ``_bare_phenyl_ring_atoms`` + an identical-fragment split), so EVERY
+    2-of-4 partition yields the identical multiset {2 'benzene' parents,
+    2 'benzyl' substituents} and the identical lowest bridge locants {1,3}
+    . The emitted name is therefore invariant to which two arms are
+    chosen — i.e. independent of RDKit atom / iteration order by construction;
+    the arms are additionally sorted by atom index before the split so the
+    selection itself is reproducible.
+
+    Fail-closed: central non-ring neutral 0-H, 0-radical carbon of degree 4 whose
+    four heavy neighbours are each a non-ring CH2 reaching a single bare phenyl
+    ring; anything else returns ``None`` (0-wrong)."""
+    for atom in atoms_of(mol):
+        if (atom.GetSymbol() != 'C' or atom.GetTotalNumHs() != 0
+                or atom.GetFormalCharge() != 0
+                or atom.GetNumRadicalElectrons() != 0):
+            continue
+        cidx = atom.GetIdx()
+        if cidx in ring_atoms:
+            continue
+        heavy = [n for n in atom.GetNeighbors() if n.GetAtomicNum() > 1]
+        if len(heavy) != 4:
+            continue
+
+        arms: List[Tuple[int, int, frozenset]] = []
+        ok = True
+        for ch2 in heavy:
+            if (ch2.GetSymbol() != 'C' or ch2.GetTotalNumHs() != 2
+                    or ch2.GetFormalCharge() != 0
+                    or ch2.GetNumRadicalElectrons() != 0
+                    or ch2.GetIdx() in ring_atoms):
+                ok = False
+                break
+            other = [n for n in ch2.GetNeighbors() if n.GetAtomicNum() > 1
+                     and n.GetIdx() != cidx]
+            if len(other) != 1 or other[0].GetIdx() not in ring_atoms:
+                ok = False
+                break
+            phenyl = _bare_phenyl_ring_atoms(mol, other[0], ch2.GetIdx())
+            if phenyl is None:
+                ok = False
+                break
+            arms.append((ch2.GetIdx(), other[0].GetIdx(), phenyl))
+        if not ok or len(arms) != 4:
+            continue
+
+        # Deterministic partition: sort arms by atom index (the choice is
+        # name-invariant because all four are identical), take the first two as
+        # the propane-1,3-diyl parents, the last two as the C2 'benzyl' subs.
+        arms.sort(key=lambda a: a[0])
+        parent_ch2 = [arms[0][0], arms[1][0]]
+        parent_ipso = [arms[0][1], arms[1][1]]
+        sub_atoms: List[int] = [cidx]
+        for _c, _i, _ph in arms[2:]:
+            sub_atoms.append(_c)
+            sub_atoms.extend(_ph)
+
+        # Identity split: strip the central carbon, all four CH2 and the two
+        # substituent phenyls; exactly the two multiplied benzenes must remain.
+        fragments = _split_at_bridge(
+            mol, parent_ch2[0], parent_ipso,
+            extra_remove=[parent_ch2[1]] + sub_atoms)
+        if fragments is None:
+            continue
+        smi_a, smi_b, _ca, _cb = fragments
+        canon_a = canon_smiles(smi_a)
+        if canon_a != canon_smiles(smi_b):
+            continue
+
+        # Two identical bare -CH2C6H5 substituents on C2 -> '2,2-dibenzyl'
+        # retained 'benzyl'), prefixed to the simple 'propane-1,3-diyl'.
+        bridge_name = "2,2-dibenzylpropane-1,3-diyl"
+
+        result = _resolve_unit_and_assemble(
+            mol, parent_ch2, parent_ipso, sub_atoms,
+            bridge_name, ring_atoms, canon_a,
+        )
+        if result is not None:
+            return result
+        continue
+    return None
+
+
+def _walk_oxa_ether_linker(mol, o_start_idx: int, ring_c_start_idx: int,
+                           ring_atoms: set):
+    """Walk a strictly LINEAR acyclic ether chain from a ring-side ether O
+    toward another ring system, following the single non-back-track heavy
+    neighbour at each step.
+
+    Returns ``(path_idxs, ring_c_end_idx)`` where ``path_idxs`` is the ordered
+    linker atom list ``[o_start,...internal..., o_end]`` (the two ring carbons
+    excluded), or ``None`` (fail closed) if the chain branches, dead-ends, or
+    never reaches a second ring atom."""
+    path = [o_start_idx]
+    prev = ring_c_start_idx
+    cur = o_start_idx
+    for _ in range(64):  # generous acyclic-linker bound
+        nxt = [n for n in mol.GetAtomWithIdx(cur).GetNeighbors()
+               if n.GetIdx() != prev and n.GetAtomicNum() > 1]
+        if len(nxt) != 1:
+            return None  # branch / terminal -- not a clean linear linker
+        nb = nxt[0]
+        if nb.GetIdx() in ring_atoms:
+            return path, nb.GetIdx()
+        path.append(nb.GetIdx())
+        prev, cur = cur, nb.GetIdx()
+    return None
+
+
+def _oxa_composite_bridge_name(mol, path: List[int],
+                               ring_atoms: set) -> Optional[str]:
+    """Classify a walked ether linker (``path = [o_start,...internal..., o_end]``)
+    into its concatenated multiplicative bridge name, or ``None``
+    (fail closed).
+
+    Only the two Blue-Book-cited shapes are built, every methylene run being
+    exactly ``-CH2CH2-`` "Concatenated multiplicative groups")::
+
+        -O-CH2CH2-O- -> 'ethane-1,2-diylbis(oxy)'
+        -O-CH2CH2-O-CH2CH2-O- -> 'oxybis(ethane-2,1-diyloxy)'
+
+    Any other run length, a non-CH2/non-ether interior atom, a charge/radical, an
+    aromatic/ring atom, or a terminal oxygen that is not ring-attached returns
+    ``None`` -- the caller then declines rather than emit an unverified name."""
+    def _is_ether_o(a, ring_side: bool) -> bool:
+        if (a.GetSymbol() != 'O' or a.GetTotalNumHs() != 0
+                or a.GetFormalCharge() != 0 or a.GetNumRadicalElectrons() != 0
+                or a.GetIsAromatic() or a.GetIdx() in ring_atoms
+                or a.GetDegree() != 2):
+            return False
+        n_ring = sum(1 for n in a.GetNeighbors() if n.GetIdx() in ring_atoms)
+        return n_ring == (1 if ring_side else 0)
+
+    def _is_ch2(a) -> bool:
+        return (a.GetSymbol() == 'C' and a.GetTotalNumHs() == 2
+                and a.GetFormalCharge() == 0 and a.GetNumRadicalElectrons() == 0
+                and not a.GetIsAromatic() and a.GetIdx() not in ring_atoms
+                and a.GetDegree() == 2)
+
+    atoms = [mol.GetAtomWithIdx(i) for i in path]
+    # both ends must be ring-attached ether oxygens
+    if not _is_ether_o(atoms[0], True) or not _is_ether_o(atoms[-1], True):
+        return None
+    # tokenize the interior into methylene runs separated by internal ether O's
+    runs: List[int] = []
+    run = 0
+    for a in atoms[1:-1]:
+        if _is_ch2(a):
+            run += 1
+        elif _is_ether_o(a, False):
+            runs.append(run)
+            run = 0
+        else:
+            return None  # foreign interior atom -- fail closed
+    runs.append(run)
+    # every methylene run must be an ethylene (-CH2CH2-)
+    if any(r != 2 for r in runs):
+        return None
+    if len(runs) == 1:          # -O-CH2CH2-O- (two ether oxygens)
+        return "ethane-1,2-diylbis(oxy)"
+    if len(runs) == 2:          # -O-CH2CH2-O-CH2CH2-O- (three ether oxygens)
+        return "oxybis(ethane-2,1-diyloxy)"
+    return None                 # longer chains not in the enumerated set
+
+
+def _try_ring_oxa_composite_bridge(mol, ring_atoms: set) -> Optional[str]:
+    """Composite oxa ether bridge -O-CH2CH2-(O-CH2CH2-)*O- joining two identical
+    ring parents (BB "Preferred IUPAC multiplicative names"; the two
+    verbatim examples ``4,4'-[ethane-1,2-diylbis(oxy)]dibenzoic acid`` and
+    ``4,4'-[oxybis(ethane-2,1-diyloxy)]dibenzoic acid``):
+
+        HOOC-C6H4-O-CH2CH2-O-C6H4-COOH ->
+            4,4'-[ethane-1,2-diylbis(oxy)]dibenzoic acid
+        HOOC-C6H4-O-CH2CH2-O-CH2CH2-O-C6H4-COOH ->
+            4,4'-[oxybis(ethane-2,1-diyloxy)]dibenzoic acid
+
+    Sibling of ``_try_chalcogenbis_methylene_bridge`` (:1511), but the central
+    bridge is a composite ether LINKER walked between the two ring systems
+    instead of a single central chalcogen. From each ring-attached ether oxygen
+    it traverses a strictly linear, acyclic, uncharged
+    ``-O-(CH2)2-(O-(CH2)2-)*O-`` chain to the other ring
+    (``_walk_oxa_ether_linker``), classifies its concatenated bridge name
+    (``_oxa_composite_bridge_name``, "Concatenated multiplicative
+    groups"), then reuses the shared ``_split_at_bridge`` +
+    ``_resolve_unit_and_assemble`` tail -- the same resolver that builds the
+    single-O ``4,4'-oxydibenzoic acid`` and two-C ``4,4'-(ethane-1,2-diyl)-
+    dibenzoic acid`` analogues, so the ring-unit name and its attachment locant
+    are established the identical, proven way.
+
+    Fail-closed: only the two enumerated linker shapes are built; any other run
+    length, a branch, a charge/radical, a ring/aromatic atom inside the linker,
+    or non-identical ring fragments returns ``None`` so the caller degrades to
+    substitutive naming rather than emit an unverified concatenation (0-wrong)."""
+    for o_start in atoms_of(mol):
+        if o_start.GetSymbol() != 'O' or o_start.GetTotalNumHs() != 0:
+            continue
+        idx = o_start.GetIdx()
+        if idx in ring_atoms or o_start.GetFormalCharge() != 0:
+            continue
+        if o_start.GetNumRadicalElectrons() != 0 or o_start.GetIsAromatic():
+            continue
+        heavy = [n for n in o_start.GetNeighbors() if n.GetAtomicNum() > 1]
+        ring_nbrs = [n for n in heavy if n.GetIdx() in ring_atoms]
+        # a ring-side ether O: exactly one ring neighbour + one chain neighbour
+        if len(heavy) != 2 or len(ring_nbrs) != 1:
+            continue
+
+        walked = _walk_oxa_ether_linker(
+            mol, idx, ring_nbrs[0].GetIdx(), ring_atoms)
+        if walked is None:
+            continue
+        path, ring_c_end = walked
+        bridge_name = _oxa_composite_bridge_name(mol, path, ring_atoms)
+        if bridge_name is None:
+            continue
+
+        ring_conns = [ring_nbrs[0].GetIdx(), ring_c_end]
+        ring_side_os = [path[0], path[-1]]     # the two ring-side ether oxygens
+        internal = path[1:-1]                  # CH2's + any internal ether O's
+
+        fragments = _split_at_bridge(
+            mol, path[0], ring_conns, extra_remove=path[1:])
+        if fragments is None:
+            continue
+        smi_a, smi_b, _ca, _cb = fragments
+        canon_a = canon_smiles(smi_a)
+        if canon_a != canon_smiles(smi_b):
+            continue
+
+        result = _resolve_unit_and_assemble(
+            mol, ring_side_os, ring_conns, internal,
+            bridge_name, ring_atoms, canon_a,
+        )
+        if result is not None:
+            return result
+        continue
+    return None
+
+
+def _walk_oxa_diyl_chain(mol, c_start_idx: int, ring_c_start_idx: int,
+                         ring_atoms: set):
+    """Walk a strictly LINEAR acyclic C/O chain from a ring-attached CARBON
+    (a diyl end) toward another ring system, following the single
+    non-back-track heavy neighbour at each step.
+
+    Sibling of ``_walk_oxa_ether_linker`` (:1898), but the linker ENDS are
+    carbons bonded to the ring (the two free valences of the ``-diyl`` bridge)
+    rather than ring-side ether oxygens.
+
+    Returns ``(path_idxs, ring_c_end_idx)`` where ``path_idxs`` is the ordered
+    linker atom list ``[c_start,...internal..., c_end]`` (both ring carbons
+    excluded), or ``None`` (fail closed) if the chain branches, dead-ends, or
+    never reaches a second ring atom."""
+    path = [c_start_idx]
+    prev = ring_c_start_idx
+    cur = c_start_idx
+    for _ in range(128):  # generous acyclic-linker bound
+        nxt = [n for n in mol.GetAtomWithIdx(cur).GetNeighbors()
+               if n.GetIdx() != prev and n.GetAtomicNum() > 1]
+        if len(nxt) != 1:
+            return None  # branch / terminal -- not a clean linear linker
+        nb = nxt[0]
+        if nb.GetIdx() in ring_atoms:
+            return path, nb.GetIdx()
+        path.append(nb.GetIdx())
+        prev, cur = cur, nb.GetIdx()
+    return None
+
+
+def _oxa_diyl_chain_bridge_name(mol, path: List[int],
+                                ring_atoms: set) -> Optional[str]:
+    """Build the skeletal-replacement DIVALENT (``-1,n-diyl``) name for a walked
+    linear C/O linker ``path = [c_end,...internal..., c_end]`` whose two ends
+    are the free valences.
+
+    Rules: BB ("a") skeletal-replacement nomenclature applied INSIDE a
+    divalent substituent chain (legitimate here because the bridge is a
+    substituent GROUP, not the parent hydride --; BB
+    "skeletal replacement ('a') nomenclature is used when the conditions for its
+    use are met"; BB "low locants are assigned first to the free
+    valences" -- here the two ring-attached end carbons, always {1, n}.
+
+    The parent hydride is numbered over ALL skeletal atoms (C + O), so the stem
+    is the ``n``-atom alkane (``get_chain_name``) and the oxygens become 'oxa'
+    replacement prefixes at their 1-based positions::
+
+        -CH2CH2-(O-CH2CH2)4- (14 atoms: 10 C + 4 O)
+            -> '3,6,9,12-tetraoxatetradecane-1,14-diyl'
+
+    Fail-closed (returns ``None``): a non-C/O backbone atom, a branch, a
+    charge/radical, an aromatic/ring atom, an end that is not a carbon,
+    fewer than 4 oxa, no carbon, or a NON-symmetric (non-palindromic) oxa
+    pattern -- so the two numbering directions are not equivalent and lowest
+    locants would be ambiguous. Only the symmetric, enumerated shape the
+    multiplicative caller needs is built."""
+    n = len(path)
+    oxa_positions: List[int] = []
+    n_carbon = 0
+    for pos, idx in enumerate(path, start=1):
+        a = mol.GetAtomWithIdx(idx)
+        if (idx in ring_atoms or a.GetFormalCharge() != 0
+                or a.GetNumRadicalElectrons() != 0 or a.GetIsAromatic()):
+            return None
+        sym = a.GetSymbol()
+        if sym == 'C':
+            # a linear skeletal CH2 (degree 2, exactly two H)
+            if a.GetTotalNumHs() != 2 or a.GetDegree() != 2:
+                return None
+            n_carbon += 1
+        elif sym == 'O':
+            # a linear ether O (degree 2, no H)
+            if a.GetTotalNumHs() != 0 or a.GetDegree() != 2:
+                return None
+            oxa_positions.append(pos)
+        else:
+            return None  # foreign backbone atom -- fail closed
+    # Both free-valence ends must be carbons.
+    if (mol.GetAtomWithIdx(path[0]).GetSymbol() != 'C'
+            or mol.GetAtomWithIdx(path[-1]).GetSymbol() != 'C'):
+        return None
+    n_oxa = len(oxa_positions)
+    # Enumerated set: this task builds only the >=4-oxa symmetric diyl bridge.
+    if n_oxa < 4 or n_carbon < 1:
+        return None
+    # Symmetric (palindromic) oxa pattern: numbering from either diyl end gives
+    # the same locant set, so the free valences at {1, n} are already the lowest
+    # locants and the 'a'-prefix tie is a wash. Fail closed otherwise.
+    mirror = sorted(n + 1 - p for p in oxa_positions)
+    if mirror != sorted(oxa_positions):
+        return None
+    stem = get_chain_name(n)             # 14 -> 'tetradecane'
+    multi = simple_multiplier_word(n_oxa)  # 4 -> 'tetra'
+    if not stem or not multi:
+        return None
+    oxa_locs = ",".join(str(p) for p in sorted(oxa_positions))
+    return f"{oxa_locs}-{multi}oxa{stem}-1,{n}-diyl"
+
+
+def _try_ring_oxa_diyl_chain_bridge(mol, ring_atoms: set) -> Optional[str]:
+    """Carbon-anchored long oxa-diyl chain bridge joining two identical ring
+    parents (BB multiplicative names carrying a skeletal-replacement
+    bridge; BB "a" nomenclature in a divalent substituent chain):
+
+        HOOC-C6H4(o)-CH2CH2-(O-CH2CH2)4-C6H4(o)-COOH ->
+            2,2'-(3,6,9,12-tetraoxatetradecane-1,14-diyl)dibenzoic acid
+
+    Sibling of ``_try_ring_oxa_composite_bridge`` (:1980) -- but here the two
+    rings are bonded to CARBON (the chain ENDS are carbons and the oxa atoms sit
+    INSIDE the diyl chain), so the bridge is a single skeletal-replacement
+    ``-1,n-diyl`` group named by ``_oxa_diyl_chain_bridge_name`` rather than a
+    concatenated ``bis(oxy)`` linker. The ring-unit name and its attachment
+    locant reuse the shared ``_split_at_bridge`` + ``_resolve_unit_and_assemble``
+    tail (the same resolver that establishes ``4,4'-oxydibenzoic acid``), so the
+    ORTHO benzoic-acid attachment resolves to locant 2 the identical, proven way.
+
+    Cannot shadow / be shadowed by ``_try_ring_oxa_composite_bridge``: this
+    handler is entered only from a ring-attached CARBON (Task 3's rings attach
+    via ether O, so no such carbon exists there), and it is placed AFTER Task 3
+    in the cascade. Its ``n_oxa >= 4`` gate also excludes the plain
+    ``ethane-1,2-diyl`` / two-atom bridges owned earlier in the cascade.
+
+    Fail-closed: only a linear, symmetric, uncharged, all-C/O chain with
+    ``n_oxa >= 4`` and both ends carbons over two IDENTICAL ring fragments is
+    built; anything else returns ``None`` so the caller degrades to substitutive
+    naming rather than emit an unverified name (0-wrong)."""
+    for c_start in atoms_of(mol):
+        if c_start.GetSymbol() != 'C' or c_start.GetIdx() in ring_atoms:
+            continue
+        if (c_start.GetFormalCharge() != 0
+                or c_start.GetNumRadicalElectrons() != 0
+                or c_start.GetIsAromatic()):
+            continue
+        # a diyl END carbon: exactly one ring neighbour + one chain neighbour
+        heavy = [n for n in c_start.GetNeighbors() if n.GetAtomicNum() > 1]
+        ring_nbrs = [n for n in heavy if n.GetIdx() in ring_atoms]
+        if len(heavy) != 2 or len(ring_nbrs) != 1:
+            continue
+
+        walked = _walk_oxa_diyl_chain(
+            mol, c_start.GetIdx(), ring_nbrs[0].GetIdx(), ring_atoms)
+        if walked is None:
+            continue
+        path, ring_c_end = walked
+        bridge_name = _oxa_diyl_chain_bridge_name(mol, path, ring_atoms)
+        if bridge_name is None:
+            continue
+
+        ring_conns = [ring_nbrs[0].GetIdx(), ring_c_end]
+        bridge_ends = [path[0], path[-1]]   # the two ring-attached end carbons
+        internal = path[1:-1]               # CH2's + internal ether O's
+
+        fragments = _split_at_bridge(
+            mol, path[0], ring_conns, extra_remove=path[1:])
+        if fragments is None:
+            continue
+        smi_a, smi_b, _ca, _cb = fragments
+        canon_a = canon_smiles(smi_a)
+        if canon_a != canon_smiles(smi_b):
+            continue
+
+        result = _resolve_unit_and_assemble(
+            mol, bridge_ends, ring_conns, internal,
+            bridge_name, ring_atoms, canon_a,
+        )
+        if result is not None:
+            return result
+        continue
+    return None
+
+
 def _try_silanediyl_methylene_bridge(mol, ring_atoms: set) -> Optional[str]:
     """Composite CH2-SiH2-CH2 central bridge joining two identical ring
     parents: HOOC-C6H4-CH2-SiH2-CH2-C6H4-COOH ->
@@ -1579,6 +2415,139 @@ def _lowest_chain_attach_locants(chain_order: List[int], attach_atoms: set) -> L
         if best is None or locs < best:
             best = locs
     return best or []
+
+
+def _try_group14_silanediyl_diethylene_bridge(mol) -> Optional[str]:
+    """A composite acyclic bridge ``-CH2CH2-[XH2]-CH2CH2-`` joining two identical
+    mononuclear Group-14 hydride PARENTS through a central divalent Group-14
+    hydride hub /::
+
+        [SiH3]CC[SiH2]CC[SiH3] -> [silanediyldi(ethane-2,1-diyl)]bis(silane)
+
+    The two terminal ``SiH3`` units are the identical multiplied parents; the
+    composite central bridge is the divalent hub ``silanediyl`` + ``di`` +
+    ``ethane-2,1-diyl`` (the two ethylene arms toward the parents), enclosed in
+    square brackets because it already contains parentheses.
+
+    Sibling of ``_try_group14_hydride_substituted_chain``, which fails closed on
+    this topology because the central hub carries TWO non-terminal chain
+    neighbours (its ``len(attach) != 1`` guard) rather than one. Here the hub is
+    promoted to a third atom role -- a bridging Group-14 hub that becomes the
+    central ``silanediyl`` token of the bridge, not a ``silane`` parent unit.
+
+    Fail-closed (return None) unless the whole molecule is exactly: one acyclic
+    fragment; a SINGLE uncharged, radical-free, non-ring Group-14 hub atom
+    bearing EXACTLY two heavy neighbours (both carbons) with the rest of its
+    valence filled by H only (a bare ``-XH2-`` dihydride hub); each hub neighbour
+    the start of an ``-CH2-CH2-`` arm (exactly two clean, uncharged, acyclic
+    methylene carbons) ending in a mononuclear Group-14 hydride unit
+    (``_group14_mononuclear_hydride_unit``); both terminal units identically
+    named; hub + arms + units cover every heavy atom. Any other central atom,
+    arm length (1 C / >2 C), asymmetry, or stray substituent declines.
+    """
+    if mol is None or len(Chem.GetMolFrags(mol)) != 1:
+        return None
+    if mol.GetRingInfo().NumRings() != 0:
+        return None
+
+    _G14 = _G14_HYDRIDE_STEMS
+
+    # Locate the single bare divalent Group-14 hub: -XH2- with exactly two
+    # (carbon) chain neighbours and the balance of valence 4 filled by H.
+    hubs: List = []
+    for atom in atoms_of(mol):
+        if atom.GetSymbol() not in _G14:
+            continue
+        if (atom.GetFormalCharge() != 0 or atom.GetNumRadicalElectrons() != 0
+                or atom.IsInRing() or atom.GetTotalValence() != 4):
+            continue
+        heavy = [nb for nb in atom.GetNeighbors() if nb.GetAtomicNum() > 1]
+        if len(heavy) == 2 and atom.GetTotalNumHs() == 2:
+            hubs.append((atom, heavy))
+    if len(hubs) != 1:
+        return None
+    hub, hub_heavy = hubs[0]
+    hub_stem = _G14[hub.GetSymbol()]
+
+    covered = {hub.GetIdx()}
+    unit_names: List[str] = []
+    term_syms: List[str] = []
+    for c0 in hub_heavy:
+        # inner arm carbon: a clean CH2 bonded to the hub and one outer carbon
+        if (c0.GetSymbol() != 'C' or c0.GetTotalNumHs() != 2
+                or c0.GetFormalCharge() != 0 or c0.GetNumRadicalElectrons() != 0
+                or c0.IsInRing()):
+            return None
+        b0 = mol.GetBondBetweenAtoms(hub.GetIdx(), c0.GetIdx())
+        if b0 is None or b0.GetBondType() != Chem.BondType.SINGLE:
+            return None
+        c0_out = [nb for nb in c0.GetNeighbors()
+                  if nb.GetAtomicNum() > 1 and nb.GetIdx() != hub.GetIdx()]
+        if len(c0_out) != 1:
+            return None
+        c1 = c0_out[0]
+        # outer arm carbon: a clean CH2 bonded to the inner carbon and one
+        # terminal Group-14 unit -> the arm is exactly two carbons (ethane).
+        if (c1.GetSymbol() != 'C' or c1.GetTotalNumHs() != 2
+                or c1.GetFormalCharge() != 0 or c1.GetNumRadicalElectrons() != 0
+                or c1.IsInRing()):
+            return None
+        b1 = mol.GetBondBetweenAtoms(c0.GetIdx(), c1.GetIdx())
+        if b1 is None or b1.GetBondType() != Chem.BondType.SINGLE:
+            return None
+        c1_out = [nb for nb in c1.GetNeighbors()
+                  if nb.GetAtomicNum() > 1 and nb.GetIdx() != c0.GetIdx()]
+        if len(c1_out) != 1:
+            return None
+        term = c1_out[0]
+        if term.GetSymbol() not in _G14:
+            return None
+        res = _group14_mononuclear_hydride_unit(mol, term.GetIdx(), c1.GetIdx())
+        if res is None:
+            return None
+        unit_name, uatoms = res
+        unit_names.append(unit_name)
+        term_syms.append(term.GetSymbol())
+        covered |= {c0.GetIdx(), c1.GetIdx()} | uatoms
+
+    # Two identically named terminal parents (the hub has exactly two arms).
+    if len(unit_names) != 2 or len(set(unit_names)) != 1:
+        return None
+    unit_name = unit_names[0]
+
+    # /: multiplicative nomenclature multiplies identical
+    # SENIOR parents around a central group; the central hub must NOT be senior
+    # to the multiplied terminal parents, else the SENIOR element is the parent
+    # hydride and the molecule is named substitutively (e.g. [GeH3]CC[SiH2]CC-
+    # [GeH3] is bis(2-germylethyl)silane, NOT [silanediyl...]bis(germane)).
+    # Fail closed (return None) when the hub is senior to the terminal element
+    # so control falls through to the correct substitutive namer. Equal
+    # elements (all-Si target D) and a junior hub (silane parents around a
+    # germanediyl bridge) remain legitimate multiplicative forms and still fire.
+    hub_rank = _G14_SENIORITY_RANK.get(hub.GetSymbol())
+    term_rank = _G14_SENIORITY_RANK.get(term_syms[0])
+    if hub_rank is None or term_rank is None:
+        return None
+    if hub_rank < term_rank:            # hub MORE senior than terminal -> decline
+        return None
+
+    # Full coverage: hub + arms + terminal units == every heavy atom.
+    heavy_all = {a.GetIdx() for a in atoms_of(mol) if a.GetAtomicNum() > 1}
+    if covered != heavy_all:
+        return None
+
+    # Assemble: [<hub>diyl di (ethane-2,1-diyl)] <bis> (<unit>).
+    # ethane-2,1-diyl is the (symmetric) two-carbon arm; the composite bridge
+    # moves to SQUARE brackets via _bridge_token because it contains '('.
+    central_diyl = f"{hub_stem}diyl"                 # 'silane' -> 'silanediyl'
+    arm_multiplier = SIMPLE_MULTIPLIERS.get(2)       # 'di'
+    if arm_multiplier is None:
+        return None
+    bridge_name = f"{central_diyl}{arm_multiplier}(ethane-2,1-diyl)"
+    unit_multiplier = _select_multiplier(unit_name, 2)  # 'silane' -> 'bis'
+    if unit_multiplier is None:
+        return None
+    return f"{_bridge_token(bridge_name)}{unit_multiplier}({unit_name})"
 
 
 def _try_group14_hydride_substituted_chain(mol) -> Optional[str]:
@@ -1998,6 +2967,22 @@ def name_multiplicative(mol) -> Optional[str]:
     if result is not None:
         return result
 
+    # Composite P(-CH2-)3 hub over phosphonic-acid units (v52 a phase,
+    # /: [phosphanetriyltris(methylene)]tris(phosphonic
+    # acid) (the Blue Book). The tris-P analogue of the bis-N handler above.
+    result = _try_phosphanetriyl_methylene_oxoacid(mol)
+    if result is not None:
+        return result
+
+    # v52 a phase /: a composite -CH2CH2-[XH2]-CH2CH2-
+    # central bridge over two identical mononuclear Group-14 hydride parents ->
+    # [silanediyldi(ethane-2,1-diyl)]bis(silane). Runs before the plain
+    # carbon-chain handler below, which fails closed on the bridging hub (two
+    # non-terminal chain neighbours) rather than claiming it.
+    result = _try_group14_silanediyl_diethylene_bridge(mol)
+    if result is not None:
+        return result
+
     # a phase: an ACYCLIC carbon chain central group bearing >=2 identical
     # mononuclear Group-14 hydride units /: (propane-1,2-
     # diyl)bis(trimethylsilane), (ethane-1,2-diyl)bis(silane). Runs before the
@@ -2085,6 +3070,38 @@ def name_multiplicative(mol) -> Optional[str]:
 
     # --- Composite CH2-O-CH2 / CH2-S-CH2 bridge (w2f p1, ---
     result = _try_chalcogenbis_methylene_bridge(mol, ring_atoms)
+    if result is not None:
+        return result
+
+    # --- Composite (phenylmethylene)bis(sulfanediylmethylene) bridge over two
+    # benzenes (v52 P6, concatenation /:
+    # 1,1'-[(phenylmethylene)bis(sulfanediylmethylene)]dibenzene ---
+    result = _try_bis_sulfanediylmethylene_arene_bridge(mol, ring_atoms)
+    if result is not None:
+        return result
+
+    # --- Substituted propane-1,3-diyl central over two benzenes, the other two
+    # benzyl arms cited as C2 substituents (v52 P6, /:
+    # 1,1'-(2,2-dibenzylpropane-1,3-diyl)dibenzene ---
+    result = _try_substituted_alkanediyl_arene_bridge(mol, ring_atoms)
+    if result is not None:
+        return result
+
+    # --- Composite oxa ether bridge -O-CH2CH2-(O-CH2CH2-)*O- over ring units
+    # (v52 P6, /:
+    # 4,4'-[ethane-1,2-diylbis(oxy)]dibenzoic acid,
+    # 4,4'-[oxybis(ethane-2,1-diyloxy)]dibenzoic acid. ---
+    result = _try_ring_oxa_composite_bridge(mol, ring_atoms)
+    if result is not None:
+        return result
+
+    # --- Carbon-anchored long oxa-DIYL chain bridge over two ring units
+    # (v52 P6, /: the two rings bonded to CARBON with the
+    # oxa atoms INSIDE the -1,n-diyl chain ->
+    # 2,2'-(3,6,9,12-tetraoxatetradecane-1,14-diyl)dibenzoic acid.
+    # Runs AFTER _try_ring_oxa_composite_bridge (ether-O-anchored) so the two
+    # cannot shadow each other. ---
+    result = _try_ring_oxa_diyl_chain_bridge(mol, ring_atoms)
     if result is not None:
         return result
 
@@ -3682,15 +4699,19 @@ def _assemble_multiplicative_name(
 
     # (e): a multiplied functionalized parent hydride whose systematic
     # characteristic-group suffix takes a ring locant is enclosed in parentheses
-    # after the multiplier, with the suffix locant made explicit, and the bridge
-    # is parenthesised too:
+    # after the multiplier, with the suffix locant made explicit:
     # 1,1'-(disulfanediyl)di(cyclohexane-1-carboxylic acid)
-    # (This precedes the generic space/digit assembly below; it fires only when
-    # the parent carries no substituent-prefix locant of its own, i.e. the PG
-    # sits at ring position 1 — the multiplied attachment carbon.)
+    # 4,4'-[ethane-1,2-diylbis(oxy)]di(cyclohexane-1-carboxylic acid)
+    # The enclosing-marks decision KEYS ON THE PARENT needing them,
+    # NOT on the bridge: whether the bridge is simple ('oxy') or composite
+    # ('ethane-1,2-diylbis(oxy)') is orthogonal — _bridge_token handles the
+    # bridge's own enclosure (bare / parens / square brackets) independently.
+    # (Fires only when the parent carries no substituent-prefix locant of its
+    # own, i.e. the PG sits at ring position 1 — the multiplied attachment
+    # carbon. A retained parent with no locant, e.g. 'benzoic acid', does not
+    # match _needs_p1634_parens and stays 'dibenzoic acid' with no marks.)
     if (_needs_p1634_parens(parent_name)
-            and not _unit_name_is_substituted(parent_name)
-            and "(" not in bridge_name):
+            and not _unit_name_is_substituted(parent_name)):
         unit_with_locant = _insert_ring_pg_locant(parent_name, 1)
         if unit_with_locant is not None:
             #: a simple unsubstituted bridge (oxy, methylene) is

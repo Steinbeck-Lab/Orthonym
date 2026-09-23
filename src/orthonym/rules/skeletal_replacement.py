@@ -1699,10 +1699,25 @@ def _try_cyclic_replacement_name(mol: Chem.Mol, ring_info) -> Optional[str]:
     # (1-azacyclopentadeca-2,4,6,8,10,12,14-heptaene, NOT azacyclopentadeca-...).
     elide_single = total_hetero == 1 and all_single
 
+    # "Homogeneous heteromonocyclic parent hydrides" (:8848) via
+    # (:3007): "All locants are omitted in compounds... in which
+    # all substitutable positions are completely substituted or modified...
+    # in the same way." When EVERY ring skeletal atom is the SAME single
+    # replacement element (a homogeneous ring, not merely one heteroatom) and
+    # the ring is fully saturated (no unsaturation locant to anchor), the
+    # whole locant set is omitted: "dodecasilacyclododecane (preselected
+    # name)" (:8882), no locants at all despite 12 silicon atoms. A mixed
+    # ring (more than one element present) is NOT "the same way" and keeps
+    # full locants -- confirmed on the O+Si mixed-ring a trace positive.
+    omit_all_locants = (
+        all_single and len(sorted_groups) == 1 and total_hetero == ring_size
+    )
+    omit_locants = elide_single or omit_all_locants
+
     parts = []
     for symbol, locants in sorted_groups:
         term = REPLACEMENT_TERMS[symbol]
-        locant_str = '' if elide_single else ','.join(str(loc) for loc in locants)
+        locant_str = '' if omit_locants else ','.join(str(loc) for loc in locants)
         count = len(locants)
 
         if count == 1:
@@ -1712,7 +1727,7 @@ def _try_cyclic_replacement_name(mol: Chem.Mol, ring_info) -> Optional[str]:
         else:
             multiplier = SIMPLE_MULTIPLIERS.get(count, f'{count}')
 
-        sep = '' if elide_single else '-'
+        sep = '' if omit_locants else '-'
         parts.append(f'{locant_str}{sep}{multiplier}{term}')
 
     replacement_prefix = '-'.join(parts)

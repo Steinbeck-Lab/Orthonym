@@ -1,9 +1,9 @@
-"""Catenated Group-14 / chalcogen(+N) hydride namer /.
+"""Catenated Group-14/Group-15 / chalcogen(+N) hydride namer /.
 
 Alternating homonuclear a(ba)n catenated parent hydrides — a chain of identical
-Group-14 atoms {Si, Ge, Sn, Pb} linked by identical bridge heteroatoms
-{O, N, S, Se, Te}, terminated at both ends by a Group-14 atom, everything else
-saturated with hydrogen::
+Group-14 {Si, Ge, Sn, Pb} OR Group-15 {P, As, Sb, Bi} hub atoms linked by
+identical bridge heteroatoms {O, N, S, Se, Te}, terminated at both ends by a hub
+atom, everything else saturated with hydrogen::
 
     [SiH3]O[SiH3] -> disiloxane (2 Si, 1 O)
     [SiH3]O[SiH2]O[SiH3] -> trisiloxane (3 Si, 2 O)
@@ -11,20 +11,24 @@ saturated with hydrogen::
     [SiH3]S[SiH3] -> disilathiane (S bridge; linking 'a')
     [SnH3]O[SnH3] -> distannoxane (Sn)
     [GeH3]O[GeH3] -> digermoxane (Ge)
+    P[Se]P -> diphosphaselenane (Group-15 hub, BB 8020 PIN)
 
 A nitrogen bridge is the exception: an '-azane' parent hydride is non-PIN for
 these, so N-bridged chains are named substitutively as amines on the
-Group-14 hydride ('silane') -- see ``_name_nitrogen_bridged_group14``.
+hub hydride ('silane') -- see ``_name_nitrogen_bridged_group14``. That amine
+renderer is documented only for the Group-14 family, so a Group-15 hub with an
+N bridge falls through it and returns ``None`` (fail-closed, cascade-continuation).
 
 Every emitted name round-trips through OPSIN 2.9.0.
 
 SCOPE (fail-closed, accuracy-first): a single unbranched chain that strictly
-alternates one Group-14 element with one bridge element, terminated by two
-Group-14 atoms, all H-saturated, neutral, non-radical, acyclic, single fragment.
-ANY carbon, branch, mixed Group-14 kind, mixed bridge kind, or extra substituent
-fails a guard and returns None (cascade-continuation). This is the boundary the
-skeletal-replacement engine deliberately declines (Gate 3b) — pure homonuclear
-Si-O-Si chains route here; mixed Si-O-C-S chains stay with skeletal 'a'.
+alternates one hub element (Group-14 or Group-15) with one bridge element,
+terminated by two hub atoms, all H-saturated, standard bonding number, neutral,
+non-radical, acyclic, single fragment. ANY carbon, branch, mixed hub kind, mixed
+bridge kind, nonstandard valence (lambda), or extra substituent fails a guard and
+returns None (cascade-continuation). This is the boundary the skeletal-replacement
+engine deliberately declines (Gate 3b) — pure homonuclear Si-O-Si chains route
+here; mixed Si-O-C-S chains stay with skeletal 'a'.
 
 Graph/atom classifier — no SMARTS broadening; pure (no mol mutation).
 """
@@ -37,6 +41,13 @@ from ..assembly.naming_utils import get_multiplier_prefix
 from .substituent_purity import organyl_prefix_name
 
 _GROUP14_STEM = {'Si': 'sil', 'Ge': 'germ', 'Sn': 'stann', 'Pb': 'plumb'}
+# Group-15 (pnictogen) hub stems, bare (trailing 'a' of the full 'a' term
+# phospha/arsa/stiba/bisma stripped) so the SAME stem+link+suffix elision
+# scheme below applies unmodified BB 8020: PH2-Se-PH2 ->
+# diphosphaselenane; 'phospha' + 'selenane' with no elision needed since
+# 'selenane' begins with a consonant -> stem 'phosph' + link 'a' + 'selenane').
+_GROUP15_STEM = {'P': 'phosph', 'As': 'ars', 'Sb': 'stib', 'Bi': 'bism'}
+_HUB_STEM = {**_GROUP14_STEM, **_GROUP15_STEM}
 _BRIDGE_SUFFIX = {
     'O': 'oxane', 'N': 'azane', 'S': 'thiane', 'Se': 'selenane', 'Te': 'tellurane',
 }
@@ -44,7 +55,8 @@ _VOWELS = frozenset('aeiou')
 
 
 def name_catenated_hydride(mol) -> Optional[str]:
-    """Return the catenated Group-14/bridge hydride PIN, else ``None``."""
+    """Return the catenated Group-14/Group-15 hub + bridge hydride PIN, else
+    ``None``."""
     if mol is None:
         return None
     if len(Chem.GetMolFrags(mol)) != 1:
@@ -55,35 +67,35 @@ def name_catenated_hydride(mol) -> Optional[str]:
         if atom.GetFormalCharge() != 0 or atom.GetNumRadicalElectrons() != 0:
             return None
 
-    g14_atoms = []
+    hub_atoms = []
     bridge_atoms = []
     for atom in mol.GetAtoms():
         sym = atom.GetSymbol()
         if sym == 'H':
             continue
-        if sym in _GROUP14_STEM:
-            g14_atoms.append(atom)
+        if sym in _HUB_STEM:
+            hub_atoms.append(atom)
         elif sym in _BRIDGE_SUFFIX:
             bridge_atoms.append(atom)
         else:
             return None  # any carbon / other element -> not this class
 
-    # Need >= 2 Group-14 atoms and exactly one fewer bridge (a-b-a-b-...-a).
-    if len(g14_atoms) < 2 or len(bridge_atoms) != len(g14_atoms) - 1:
+    # Need >= 2 hub atoms and exactly one fewer bridge (a-b-a-b-...-a).
+    if len(hub_atoms) < 2 or len(bridge_atoms) != len(hub_atoms) - 1:
         return None
 
     # Homogeneous element kinds.
-    g14_sym = g14_atoms[0].GetSymbol()
-    if any(a.GetSymbol() != g14_sym for a in g14_atoms):
+    hub_sym = hub_atoms[0].GetSymbol()
+    if any(a.GetSymbol() != hub_sym for a in hub_atoms):
         return None
     bridge_sym = bridge_atoms[0].GetSymbol()
     if any(a.GetSymbol() != bridge_sym for a in bridge_atoms):
         return None
 
-    # Strict alternation + unbranched: every Group-14 atom bonds ONLY to bridge
+    # Strict alternation + unbranched: every hub atom bonds ONLY to bridge
     # atoms (1 if terminal, 2 if internal); every bridge atom bonds ONLY to two
-    # Group-14 atoms. No Group-14--Group-14 or bridge--bridge bonds.
-    for a in g14_atoms:
+    # hub atoms. No hub--hub or bridge--bridge bonds.
+    for a in hub_atoms:
         heavy = [n for n in a.GetNeighbors() if n.GetAtomicNum() > 1]
         if not heavy or len(heavy) > 2:
             return None
@@ -91,26 +103,38 @@ def name_catenated_hydride(mol) -> Optional[str]:
             return None
     for b in bridge_atoms:
         heavy = [n for n in b.GetNeighbors() if n.GetAtomicNum() > 1]
-        if len(heavy) != 2 or any(n.GetSymbol() != g14_sym for n in heavy):
+        if len(heavy) != 2 or any(n.GetSymbol() != hub_sym for n in heavy):
             return None
 
-    # (BB 26243/23547/16015): a NITROGEN-bridged Group-14 a(ba)n chain
-    # is NOT named as an '-azane' parent hydride — 'disilazane'/'trisilazane' are
+    # Standard bonding number only — a lambda-convention hub (e.g. a
+    # hypervalent P) is not a plain a(ba)n hydride; fail closed rather than
+    # mis-stem it. (Only the Group-15 hubs are checked: this dict is empty of
+    # Group-14 symbols, so the long-standing Group-14 anchor is untouched.)
+    if hub_sym in _GROUP15_STEM:
+        from .lambda_convention import nonstandard_bonding_number
+        for a in hub_atoms:
+            if nonstandard_bonding_number(mol, a.GetIdx()) is not None:
+                return None
+
+    # (BB 26243/23547/16015): a NITROGEN-bridged hub a(ba)n chain is
+    # NOT named as an '-azane' parent hydride — 'disilazane'/'trisilazane' are
     # explicitly non-PIN ("disilazane is not a recommended parent hydride, see
     # "). Nitrogen carries the amine functionality, so the PIN is built
-    # substitutively on the Group-14 hydride 'silane'/'germane'/...:
+    # substitutively on the hub hydride 'silane'/'germane'/...:
     # SiH3-NH-SiH3 -> N-silylsilanamine (preselected name, BB 26243)
     # SiH3-NH-SiH2-NH-SiH3 -> N,N'-disilylsilanediamine (BB 23547)
+    # (Documented only for the Group-14 family; a Group-15 hub falls through
+    # this renderer's dict lookups and returns None, cascade-continuation.)
     if bridge_sym == 'N':
-        return _name_nitrogen_bridged_group14(g14_sym, len(g14_atoms))
+        return _name_nitrogen_bridged_group14(hub_sym, len(hub_atoms))
 
-    stem = _GROUP14_STEM[g14_sym]
+    stem = _HUB_STEM[hub_sym]
     suffix = _BRIDGE_SUFFIX[bridge_sym]
     # Linking 'a' when the bridge suffix begins with a consonant (silathiane,
     # not silthiane; siloxane keeps no linker — vowel-initial).
     link = '' if suffix[0] in _VOWELS else 'a'
     base = f"{stem}{link}{suffix}"
-    multiplier = get_multiplier_prefix(len(g14_atoms), base)
+    multiplier = get_multiplier_prefix(len(hub_atoms), base)
     return f"{multiplier}{base}"
 
 
@@ -265,71 +289,21 @@ def _join_aterms(terms) -> str:
     return out
 
 
-def name_heterochalcogen_aba(mol) -> Optional[str]:
-    """Return the PIN for a pure-chalcogen a[ba]n parent hydride /
-    : dithioxane / methyldithioxane / dimethyldithioxane), else ``None``
-    (fail-closed cascade-continuation). Pure: no mol mutation.
-
-    Scope (a graph classifier, NOT SMARTS): a single unbranched chain of >=3
-    chalcogen atoms strictly alternating between EXACTLY two distinct elements,
-    both termini the SAME element and that element JUNIOR (later in O>S>Se>Te) to
-    the central element; every internal chalcogen H-only; terminal chalcogens bear
-    one H or one pure organyl; neutral, non-radical, acyclic, single fragment; the
-    only non-chalcogen heavy atoms are terminal organyl carbons. A homogeneous
-    chalcogen chain (-> chalcogen_chain), a carbon-in-backbone chain
-    (-> skeletal_replacement), a Group-14 a[ba]n (-> catenated_hydride), a ring,
-    an ion, or a radical fails a guard and cascades onward.
+def _try_aba_parent(mol, order, chal_set) -> Optional[str]:
+    """Attempt the direct a[ba]n PARENT match / over an
+    already-ordered single unbranched chalcogen chain: exactly two distinct
+    elements strictly alternating, both termini the same JUNIOR element,
+    terminal organyls only (internal atoms H-only). Returns the parent name
+    (dithioxane / methyldithioxane / dimethyldithioxane...), or ``None`` if
+    ``order`` does not itself describe a bare or organyl-substituted a[ba]n
+    parent. ``chal_set`` is every chalcogen atom index in the WHOLE molecule
+    (not just ``order``) so a chain-internal chalcogen bonded to a
+    caller-truncated neighbour (see the ``-ol`` peel in
+    :func:`name_heterochalcogen_aba`) is never mistaken for an organyl
+    substituent. Pure: no mol mutation.
     """
-    if mol is None:
+    if len(order) < 3:
         return None
-    if len(Chem.GetMolFrags(mol)) != 1:
-        return None
-    if mol.GetRingInfo().NumRings() > 0:
-        return None
-    for atom in mol.GetAtoms():
-        if atom.GetFormalCharge() != 0 or atom.GetNumRadicalElectrons() != 0:
-            return None
-
-    # Every heavy atom is a chalcogen or a carbon (organyl); collect chalcogens.
-    chal = []
-    for atom in mol.GetAtoms():
-        sym = atom.GetSymbol()
-        if sym == 'H':
-            continue
-        if sym in _CHALCOGEN_ATERM:
-            chal.append(atom.GetIdx())
-        elif sym != 'C':
-            return None                          # stray heteroatom -> not this class
-    if len(chal) < 3:
-        return None
-    chal_set = set(chal)
-
-    # The chalcogens must form one unbranched single-bonded path.
-    adj = {i: [] for i in chal}
-    for i in chal:
-        for nbr in mol.GetAtomWithIdx(i).GetNeighbors():
-            j = nbr.GetIdx()
-            if j in chal_set:
-                bond = mol.GetBondBetweenAtoms(i, j)
-                if bond.GetBondType() != Chem.BondType.SINGLE:
-                    return None
-                adj[i].append(j)
-    if any(len(adj[i]) > 2 for i in chal):
-        return None
-    endpoints = [i for i in chal if len(adj[i]) == 1]
-    if len(endpoints) != 2:
-        return None                              # ring / forked / disconnected
-    order = [endpoints[0]]
-    prev, cur = -1, endpoints[0]
-    while True:
-        nxts = [j for j in adj[cur] if j != prev]
-        if not nxts:
-            break
-        prev, cur = cur, nxts[0]
-        order.append(cur)
-    if len(order) != len(chal):
-        return None
-
     syms = [mol.GetAtomWithIdx(i).GetSymbol() for i in order]
     # Exactly two distinct elements, strictly alternating along the chain.
     if len(set(syms)) != 2:
@@ -414,6 +388,128 @@ def name_heterochalcogen_aba(mol) -> Optional[str]:
             token = f"{m}{marked}"
         parts.append(token)
     return f"{''.join(parts)}{parent}"
+
+
+def name_heterochalcogen_aba(mol) -> Optional[str]:
+    """Return the PIN for a pure-chalcogen a[ba]n parent hydride /
+    : dithioxane / methyldithioxane / dimethyldithioxane), or that
+    same parent bearing a terminal ``-ol`` suffix: HO-S-O-SH ->
+    dithioxanol) when exactly one terminal chalcogen is a bare ``-OH``
+    principal group, else ``None`` (fail-closed cascade-continuation). Pure: no
+    mol mutation.
+
+    Scope (a graph classifier, NOT SMARTS): a single unbranched chain of >=3
+    chalcogen atoms strictly alternating between EXACTLY two distinct elements,
+    both termini the SAME element and that element JUNIOR (later in O>S>Se>Te) to
+    the central element; every internal chalcogen H-only; terminal chalcogens bear
+    one H or one pure organyl; neutral, non-radical, acyclic, single fragment; the
+    only non-chalcogen heavy atoms are terminal organyl carbons. A homogeneous
+    chalcogen chain (-> chalcogen_chain), a carbon-in-backbone chain
+    (-> skeletal_replacement), a Group-14 a[ba]n (-> catenated_hydride), a ring,
+    an ion, or a radical fails a guard and cascades onward.
+
+    The ``-ol`` suffix fires only for a BARE parent (no organyl
+    substituent anywhere) with exactly one terminal ``-OH`` and no other
+    decoration: the OH's own oxygen is itself a chalcogen so it walks straight
+    into the contiguous-chalcogen chain above (HO-S-O-SH is the 4-atom chain
+    O-S-O-S, termini O/S mismatched), so a single terminal atom is peeled and
+    the remainder re-tested as a bare a[ba]n parent. A second ``-OH`` leaves an
+    even-length remainder whose mismatched termini are rejected the same way; a
+    combined organyl+``-OH`` decoration is deferred (fails closed), not built
+    here — see -noncarbon Task 7.
+    """
+    if mol is None:
+        return None
+    if len(Chem.GetMolFrags(mol)) != 1:
+        return None
+    if mol.GetRingInfo().NumRings() > 0:
+        return None
+    for atom in mol.GetAtoms():
+        if atom.GetFormalCharge() != 0 or atom.GetNumRadicalElectrons() != 0:
+            return None
+
+    # Every heavy atom is a chalcogen or a carbon (organyl); collect chalcogens.
+    chal = []
+    for atom in mol.GetAtoms():
+        sym = atom.GetSymbol()
+        if sym == 'H':
+            continue
+        if sym in _CHALCOGEN_ATERM:
+            chal.append(atom.GetIdx())
+        elif sym != 'C':
+            return None                          # stray heteroatom -> not this class
+    if len(chal) < 3:
+        return None
+    chal_set = set(chal)
+
+    # The chalcogens must form one unbranched single-bonded path.
+    adj = {i: [] for i in chal}
+    for i in chal:
+        for nbr in mol.GetAtomWithIdx(i).GetNeighbors():
+            j = nbr.GetIdx()
+            if j in chal_set:
+                bond = mol.GetBondBetweenAtoms(i, j)
+                if bond.GetBondType() != Chem.BondType.SINGLE:
+                    return None
+                adj[i].append(j)
+    if any(len(adj[i]) > 2 for i in chal):
+        return None
+    endpoints = [i for i in chal if len(adj[i]) == 1]
+    if len(endpoints) != 2:
+        return None                              # ring / forked / disconnected
+    order = [endpoints[0]]
+    prev, cur = -1, endpoints[0]
+    while True:
+        nxts = [j for j in adj[cur] if j != prev]
+        if not nxts:
+            break
+        prev, cur = cur, nxts[0]
+        order.append(cur)
+    if len(order) != len(chal):
+        return None
+
+    direct = _try_aba_parent(mol, order, chal_set)
+    if direct is not None:
+        return direct
+
+    # -ol suffix: exactly ONE terminal chalcogen of a BARE a[ba]n
+    # parent bears -OH as the principal group (HO-S-O-SH -> dithioxanol). The
+    # OH's own oxygen is itself a chalcogen, so it already walked into `order`
+    # above as an extra link (HO-S-O-SH is the 4-atom chain O-S-O-S, termini
+    # O/S mismatched -> `_try_aba_parent` above declines it). Peel ONE end and
+    # re-test the remainder as a bare a[ba]n parent. Fail closed -- single
+    # peel only, `O` element only, a bare -OH (no organyl on that atom), and NO
+    # organyl anywhere on the remaining parent -- on any other decoration: a
+    # second -OH leaves an even-length remainder whose mismatched termini
+    # `_try_aba_parent` rejects the same way, and a combined organyl+-OH
+    # decoration is deferred (not attempted) rather than guessed at.
+    for strip_left in (True, False):
+        if strip_left:
+            endpt, neigh, remaining = 0, 1, order[1:]
+        else:
+            endpt, neigh, remaining = len(order) - 1, len(order) - 2, order[:-1]
+        if len(remaining) < 3:
+            continue
+        oh_atom = mol.GetAtomWithIdx(order[endpt])
+        if oh_atom.GetSymbol() != 'O':
+            continue                              # only -ol (O) is in scope here
+        if oh_atom.GetSymbol() == mol.GetAtomWithIdx(order[neigh]).GetSymbol():
+            continue                              # part of a run, not a bare suffix
+        if oh_atom.GetTotalNumHs() != 1:
+            continue                              # not a bare -OH
+        if any(n.GetIdx() not in chal_set and n.GetSymbol() != 'H'
+               for n in oh_atom.GetNeighbors()):
+            continue                              # organyl on the OH oxygen -> decline
+        if any(any(n.GetIdx() not in chal_set and n.GetSymbol() != 'H'
+                   for n in mol.GetAtomWithIdx(remaining[p]).GetNeighbors())
+               for p in (0, len(remaining) - 1)):
+            continue                              # substituent + -ol combo -> deferred
+        parent = _try_aba_parent(mol, remaining, chal_set)
+        if parent is None:
+            continue
+        from ..assembly.naming_utils import apply_vowel_elision
+        return apply_vowel_elision(parent, 'ol')   # dithioxane -> dithioxanol
+    return None
 
 
 __all__ = ["name_catenated_hydride", "name_homonuclear_pnictogen_chain",

@@ -1171,7 +1171,7 @@ def _get_ring_parent_name(mol, system_atoms: Set[int]) -> Optional[str]:
 
 def _get_connection_locant(
     mol, connecting_atom: int, system_atoms: Set[int]
-) -> int:
+) -> Optional[int]:
     """
     Determine the IUPAC locant for a connecting atom within its ring system.
 
@@ -1179,8 +1179,12 @@ def _get_connection_locant(
     direction chosen to give the LOWEST locant at the connection point
     (IUPAC lowest-locant rule for assemblies).
 
-    For carbocyclic rings, position 1 is the connecting atom itself
-    (for unsubstituted benzene, all positions are equivalent).
+    For a genuine carbocyclic MONOCYCLE, position 1 is the connecting atom
+    itself (for unsubstituted benzene, all positions are equivalent). For a
+    multi-ring FUSED carbocycle (e.g. the naphthalene component of a
+    binaphthalene assembly), positions are NOT all equivalent --
+    fixes the numbering, so the connecting atom's locant is looked up in
+    that fixed numbering instead (v52 P4 T2).
 
     Args:
         mol: RDKit Mol object
@@ -1188,7 +1192,10 @@ def _get_connection_locant(
         system_atoms: Set of atom indices in the ring system
 
     Returns:
-        IUPAC locant number (1-indexed)
+        IUPAC locant number (1-indexed), or ``None`` if a multi-ring fused
+        system's junction locant cannot be resolved with confidence (fail
+        closed -- callers must drop the assembly offer rather than invent a
+        locant; never emit a wrong molecule).
     """
     # Get the individual ring(s) containing this atom
     ri = mol.GetRingInfo()
@@ -1247,10 +1254,163 @@ def _get_connection_locant(
 
         return best_locant
 
-    # Carbocyclic: for unsubstituted benzene, connection atom = position 1
-    # For substituted, we need to number from connection point to give lowest
-    # locants. Start with connection = 1.
+    # Carbocyclic: a genuine MONOCYCLE (the whole ring system is this one
+    # ring, e.g. unsubstituted benzene) has all positions equivalent, so the
+    # connecting atom can always be called position 1.
+    #
+    # A MULTI-RING, FULLY MANCUDE (every ring atom aromatic) fused carbocycle
+    # -- e.g. the naphthalene component of 2,2'-binaphthalene -- is NOT
+    # symmetric that way: fixes its numbering, and treating every
+    # atom as "1" silently produced "1,1'-binaphthalene" for a 2,2'-junction.
+    # caught the mismatch against OPSIN and voided the candidate,
+    # degrading the whole molecule to a von Baeyer name instead of just
+    # fixing the locant. v52 P4 T2.
+    #
+    # Restricted to FULLY aromatic systems on purpose: a system carrying its
+    # own indicated hydrogen (e.g. 1H-indene, a 5/6 fused system with one sp3
+    # ring atom) needs the indicated-H-lowest-locant numbering that
+    # ``_try_algorithmic_fusion_name``/``_get_ring_parent_name`` already apply
+    # when naming the component -- ``compute_fused_numbering`` alone does NOT
+    # reproduce that renumbering (measured: it gives 1H-indene's own CH2 the
+    # raw locant 3, not the indicated-H locant 1), so applying it here
+    # regressed a biindene gold test (1,1'- -> 3,3'-). Falling through to the
+    # existing ``return 1`` leaves that (pre-existing, untouched-by-T2)
+    # behaviour exactly as it was.
+    system_rings = [r for r in ri.AtomRings() if set(r) <= system_atoms]
+    is_fully_aromatic = all(
+        mol.GetAtomWithIdx(i).GetIsAromatic() for i in system_atoms
+    )
+    if len(system_rings) > 1 and is_fully_aromatic:
+        return _fused_component_connection_locant(
+            mol, connecting_atom, system_atoms
+        )
+
     return 1
+
+
+def _fused_component_locant_map(
+    mol, system_atoms: Set[int]
+) -> Optional[Dict[int, int]]:
+    """ /: ONE numbering for a MULTI-RING fully-aromatic fused
+    carbocyclic ring-assembly component, chosen JOINTLY over all of the
+    component's points of interest -- v52 P4 D4/D5.
+
+    The T2/ v1 minimised each junction and each substituent atom's locant
+    INDEPENDENTLY (per-atom). That is correct only when the junction has a
+    trivial automorphism stabiliser (naphthalene). For a component whose
+    junction stabiliser is non-trivial (anthracene 9/10, pyrene, pentacene) two
+    substituents were numbered under DIFFERENT symmetry-related numberings, e.g.
+    ``[9,9'-bianthracene]-1,4-diol`` (a NON-numbering) instead of ``-1,5-diol``;
+    and a middle naphthalene linked at two positions got BOTH junctions locant 2
+    (``2,2':2',2''`` instead of ``2,2':6',2''``). voided the wrong
+    constitution and the whole molecule degraded to von Baeyer.
+
+    The fix chooses a SINGLE numbering per component: among the numberings
+    related by the ring system's own symmetry (``_ring_system_automorphisms``
+    over the one canonical ``compute_fused_numbering`` map), pick the one giving
+    the lowest SORTED TUPLE of the junction locants first ring-assembly
+    bonds get lowest locants), then of the substituent/suffix locants
+    . Every junction and substituent locant is then read off THIS
+    map, so they are mutually consistent by construction.
+
+    A point of interest is a ring atom with an exocyclic heavy-atom bond: to
+    another ring (an assembly junction) or to a non-ring atom (a substituent /
+    suffix). Returns ``atom_idx -> int locant`` for the whole system, or ``None``
+    (fail closed) when the fused-numbering engine declines the system or when any
+    point of interest lands only on a fusion ('4a'-style) locant under every
+    symmetry -- callers must then drop the assembly offer, never invent a locant.
+    """
+    from .fused_rings import _ring_system_automorphisms
+    from .fusion_numbering import compute_fused_numbering
+
+    canonical = compute_fused_numbering(mol, system_atoms)
+    if not canonical:
+        return None
+
+    junction_atoms: Set[int] = set()
+    substituent_atoms: Set[int] = set()
+    for idx in system_atoms:
+        atom = mol.GetAtomWithIdx(idx)
+        for nb in atom.GetNeighbors():
+            if nb.GetIdx() in system_atoms or nb.GetAtomicNum() <= 1:
+                continue
+            if nb.IsInRing():
+                junction_atoms.add(idx)   # inter-ring-system (assembly) bond
+            else:
+                substituent_atoms.add(idx)  # substituent / suffix attachment
+    j_sorted = sorted(junction_atoms)
+    s_sorted = sorted(substituent_atoms)
+
+    perms = _ring_system_automorphisms(mol, system_atoms)
+    best_key: Optional[Tuple[List[int], List[int]]] = None
+    best_map: Optional[Dict[int, int]] = None
+    for perm in perms:
+        jl: List[int] = []
+        sl: List[int] = []
+        ok = True
+        for poi, bucket in ((j_sorted, jl), (s_sorted, sl)):
+            for a in poi:
+                img = perm.get(a)
+                loc = canonical.get(img) if img is not None else None
+                if not isinstance(loc, int):
+                    ok = False
+                    break
+                bucket.append(loc)
+            if not ok:
+                break
+        if not ok:
+            continue
+        key = (sorted(jl), sorted(sl))
+        if best_key is None or key < best_key:
+            best_key = key
+            best_map = {
+                a: canonical[perm[a]]
+                for a in system_atoms
+                if perm.get(a) in canonical
+                and isinstance(canonical[perm[a]], int)
+            }
+
+    return best_map
+
+
+def _fused_component_connection_locant(
+    mol, connecting_atom: int, system_atoms: Set[int]
+) -> Optional[int]:
+    """ junction locant for a MULTI-RING fused carbocyclic assembly
+    component (e.g. naphthalene, anthracene) -- v52 P4 T2, per-component D5.
+
+    Reads the connecting atom's locant off the single per-component numbering
+    (:func:`_fused_component_locant_map`), so it is consistent with every OTHER
+    junction and substituent locant on the same component. Returns ``None`` (fail
+    closed) when the numbering cannot be resolved or the atom lands only on a
+    fusion ('4a'-style) locant.
+    """
+    loc_map = _fused_component_locant_map(mol, system_atoms)
+    if not loc_map:
+        return None
+    return loc_map.get(connecting_atom)
+
+
+def _fused_component_substituent_locant(
+    mol, sub_atom: int, connecting_atom: int, system_atoms: Set[int]
+) -> Optional[int]:
+    """ / locant for a substituent (or suffix-bearing atom)
+    on a MULTI-RING fused carbocyclic ring-assembly component -- v52 P4 T3,
+    per-component D4.
+
+    Reads the substituent atom's locant off the single per-component numbering
+    (:func:`_fused_component_locant_map`), which is chosen jointly over ALL the
+    component's junctions and substituents, so two substituents on a
+    high-symmetry component (anthracene) are numbered under the SAME numbering
+    (``-1,5-diol``, not the per-atom non-numbering ``-1,4-diol``).
+    ``connecting_atom`` is retained for API compatibility. Returns ``None`` (fail
+    closed) when the numbering cannot be resolved or the atom lands only on a
+    fusion ('4a'-style) locant.
+    """
+    loc_map = _fused_component_locant_map(mol, system_atoms)
+    if not loc_map:
+        return None
+    return loc_map.get(sub_atom)
 
 
 def _number_carbocyclic_from_anchor(
@@ -1498,13 +1658,19 @@ def _compute_per_system_ring_locants(
                         sys_map = fallback
             result.append(sys_map)
         else:
-            # Multi-ring fused: defer to absolute numbering via
-            # _get_connection_locant per atom. Coverage may be partial
-            # for some catalogue entries; the supplier checks coverage
-            # downstream and returns None if incomplete.
+            # Multi-ring fused: defer to absolute (fixed) numbering via
+            # _get_connection_locant per atom. It fails closed (None) on an
+            # atom it cannot place (e.g. a fusion '4a'-style position, or a
+            # ring system the fused-numbering engine declines) -- omit that
+            # atom rather than store a None "locant", so coverage is judged
+            # by KEY presence as the downstream supplier's contract expects
+            # (v52 P4 T2: the old unconditional ``sys_map[atom_idx] = loc``
+            # stored a bogus locant 1 for every atom, which was always
+            # "complete" coverage even though every value was wrong).
             for atom_idx in sys_atoms:
                 loc = _get_connection_locant(mol, atom_idx, sys_atoms)
-                sys_map[atom_idx] = loc
+                if loc is not None:
+                    sys_map[atom_idx] = loc
             result.append(sys_map)
 
     return result
@@ -1513,12 +1679,16 @@ def _compute_per_system_ring_locants(
 def _get_substituent_locant(
     mol, sub_atom: int, ring_atom: int, system_atoms: Set[int],
     connecting_atom: int
-) -> int:
+) -> Optional[int]:
     """
     Determine the IUPAC locant for a substituent attached to a ring in an assembly.
 
-    For carbocyclic rings, numbering starts from the connection point (locant 1)
-    and follows the direction giving the lowest locants for substituents.
+    For a carbocyclic MONOCYCLE, numbering starts from the connection point
+    (locant 1) and follows the direction giving the lowest locants for
+    substituents. For a MULTI-RING FULLY MANCUDE fused carbocycle (e.g. the
+    naphthalene component of a binaphthalene), the numbering is FIXED
+    and the locant is read off that fixed numbering, consistent with the junction
+    locant (v52 P4 T3).
 
     For heterocyclic rings, standard IUPAC numbering is used.
 
@@ -1530,7 +1700,9 @@ def _get_substituent_locant(
         connecting_atom: Atom index of the inter-ring connection in this system
 
     Returns:
-        IUPAC locant (1-indexed)
+        IUPAC locant (1-indexed), or ``None`` (fail closed) when a multi-ring
+        fused component's numbering cannot be resolved -- callers must drop the
+        assembly offer rather than invent a locant (never emit a wrong molecule).
     """
     ri = mol.GetRingInfo()
     atom_ring = None
@@ -1541,6 +1713,24 @@ def _get_substituent_locant(
 
     if atom_ring is None:
         return 1
+
+    # v52 P4 T3: a MULTI-RING, FULLY MANCUDE (every ring atom aromatic) fused
+    # carbocyclic component (e.g. the naphthalene of a binaphthalene-diol) does
+    # NOT number from the junction as locant 1 -- fixes its numbering
+    # and pins the junction to the lowest locant (2 for 2,2'-
+    # binaphthalene). The substituent/suffix locant must be read off THAT SAME
+    # fixed numbering (the OH sits at 1, or at 4/8, not the walk-from-junction 2).
+    # Same guard as the junction locant in _get_connection_locant (T2), so the
+    # two are consistent; a non-fully-aromatic system (indene-type, carrying its
+    # own indicated hydrogen) falls through to the pre-existing walk unchanged.
+    system_rings = [r for r in ri.AtomRings() if set(r) <= system_atoms]
+    is_fully_aromatic = all(
+        mol.GetAtomWithIdx(i).GetIsAromatic() for i in system_atoms
+    )
+    if len(system_rings) > 1 and is_fully_aromatic:
+        return _fused_component_substituent_locant(
+            mol, sub_atom, connecting_atom, system_atoms
+        )
 
     ring_list = list(atom_ring)
     ring_size = len(ring_list)
@@ -1623,6 +1813,17 @@ def _reassign_carbocyclic_locants(mol, ring_systems, connections, substituents):
         if len(subs) < 2:
             continue  # single substituent: per-atom min is already correct
         sys_atoms = ring_systems[sys_idx]
+        # v52 P4 T3: a MULTI-RING fully-mancude fused component is numbered by
+        # the FIXED numbering in _get_substituent_locant, not by walking
+        # one of its 6-rings from the junction. Skip it here so this
+        # monocycle-only set-lowest renumber cannot overwrite those fixed locants
+        # with a within-one-ring walk (which would desync the suffix from the
+        # junction and could re-introduce a wrong-molecule name).
+        _sys_rings = [r for r in ri.AtomRings() if set(r) <= sys_atoms]
+        if len(_sys_rings) > 1 and all(
+            mol.GetAtomWithIdx(i).GetIsAromatic() for i in sys_atoms
+        ):
+            continue
         # ALL inter-system junction atoms for this system. A MIDDLE ring in a
         # linear assembly has TWO junctions; either may be numbered locant 1
         # when the flanking rings are equivalent, so both must be enumerated
@@ -1767,12 +1968,19 @@ def _get_substituent_info(
             if not conn_atoms:
                 conn_atoms = [atom_idx]
 
-            locant = min(
+            # v52 P4 T3: _get_substituent_locant returns None (fail closed) for a
+            # fused component whose fixed numbering the engine could not resolve.
+            # Keep the substituent locant None in that case (drop the None
+            # candidates first) so name_ring_assembly drops the whole offer and
+            # degrades -- never substitute a guessed integer.
+            _locant_cands = [
                 _get_substituent_locant(
                     mol, atom_idx, atom_idx, ring_systems[sys_idx], c
                 )
                 for c in conn_atoms
-            )
+            ]
+            _locant_cands = [x for x in _locant_cands if x is not None]
+            locant = min(_locant_cands) if _locant_cands else None
 
             substituents.append({
                 'system_idx': sys_idx,
@@ -2409,9 +2617,34 @@ def name_ring_assembly(
             return per_system[sys_idx][atom_idx]
         return _get_connection_locant(mol, atom_idx, sys_atoms)
 
+    # v52 P4 T2: a multi-ring fused component (e.g. naphthalene) whose
+    # junction ``_get_connection_locant``/``_lookup_locant`` cannot resolve
+    # returns None rather than inventing "1" (see that function's docstring).
+    # Fail closed HERE, before any of the connection locants below are sorted
+    # or compared (a bare None would either crash a `<`/`sorted` comparison
+    # against an int, or silently render as the literal text "None") -- drop
+    # this assembly name so the cascade degrades to a von Baeyer name instead.
+    for _a1, _a2, _s1, _s2 in connections:
+        if (
+            _lookup_locant(per_system_locants, _s1, _a1, ring_systems[_s1])
+            is None
+            or _lookup_locant(per_system_locants, _s2, _a2, ring_systems[_s2])
+            is None
+        ):
+            return None
+
     # Substituents on the assembly, computed once and reused below (the ylidene
     # branch, the citation-order tiebreak, and the prefix builder).
     substituent_list = _get_substituent_info(mol, ring_systems, connections)
+
+    # v52 P4 T3: a fused-component substituent whose locant the fixed-numbering
+    # engine could not resolve carries locant None (see _get_substituent_info).
+    # Fail closed HERE -- before any s['locant'] is sorted/compared below (a None
+    # would crash a sorted/`<` against an int, or render as the literal text
+    # "None") -- so the whole assembly offer is dropped and the cascade degrades
+    # to a von Baeyer name. Mirrors the connection-locant None guard above (T2).
+    if any(s.get('locant') is None for s in substituent_list):
+        return None
 
     # ⚠ Do NOT hoist a ``s['name'] is None`` abstention to here. ``s['name']``
     # is ONE producer's opinion (``_name_substituent``), not the question
@@ -2884,6 +3117,12 @@ def name_ring_assembly_prefix(
     for a1, a2, s1, s2 in sorted_connections:
         loc1 = _lookup_locant(s1, a1, ring_systems[s1])
         loc2 = _lookup_locant(s2, a2, ring_systems[s2])
+        # v52 P4 T2: a multi-ring fused component (e.g. naphthalene) whose
+        # junction can't be resolved returns None (fail closed, see
+        # `_get_connection_locant`) -- never splice that into the string as
+        # the literal text "None"; drop this substituent-prefix offer.
+        if loc1 is None or loc2 is None:
+            return None
         connection_parts.append(
             f"{loc1}{_format_prime(s1)},{loc2}{_format_prime(s2)}")
     connection_str = ":".join(connection_parts)
@@ -3125,6 +3364,24 @@ def name_mixed_ring_prefix(
         # Standard IUPAC numbering from _get_connection_locant
         connection_locant = _get_connection_locant(mol, parent_conn_atom, parent_atoms)
         attach_locant = _get_connection_locant(mol, attachment_atom_idx, parent_atoms)
+        # v52 P4 fix a performance pass: `parent_has_het` only means the WHOLE
+        # `parent_atoms` system contains a heteroatom somewhere (e.g. a
+        # quinoline parent) -- the specific atom passed in can still sit on
+        # an all-carbon ring of that fused system, where
+        # `_get_connection_locant` takes the carbocyclic multi-ring branch
+        # and can now return None (fail closed) if the fused-numbering
+        # engine declines. Never splice None into the f-strings below as
+        # the literal text "None"; drop this mixed-ring-prefix offer.
+        if connection_locant is None or attach_locant is None:
+            return None
+
+    # v52 P4 T3: the carbocyclic path above uses _get_substituent_locant, which
+    # now returns None (fail closed) for a MULTI-RING fused carbocyclic parent
+    # whose fixed numbering the engine declines. Never splice None into the
+    # f-strings below as the literal text "None"; drop this mixed-ring-prefix
+    # offer. (The heterocyclic branch already guards its own None just above.)
+    if connection_locant is None or attach_locant is None:
+        return None
 
     # Build compound prefix
     # Format: "(connection_locant-sub_displaystem-attach_locant-yl)"

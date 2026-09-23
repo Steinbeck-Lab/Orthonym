@@ -30,6 +30,7 @@ from rdkit import Chem
 from ..assembly.fragment_naming import _fragment_guard  # Lever N: budget replay on a memo hit
 from ..assembly.memo import cache_or_compute  # R2(a): structure-keyed main-ring memo
 from ..perception.molcache import atoms_of, bonds_of, cached_by_key
+from .locants import compound_aware_multibond_set  # (1)/(2), shared w/ bicyclo.py
 from ..assembly.fragment_naming import (  # M2.5 macrocycle-hang budgets
     spend_analysis_call,
     spend_perf_work,
@@ -1332,10 +1333,15 @@ class VonBaeyerAnalyzer:
         secondary) FIXED and only varies which main bridgehead becomes locant 1
         and the traversal direction, then keeps the orientation whose secondary
         bridges get the lowest superscript locants as an ascending set
-        , then the lowest citation sequence, with a
-        deterministic atom-index backstop. Both main bridgeheads stay the main
-        bridgeheads, so the main bridge is unchanged and the cage is unchanged
-        -- only the numbering moves.
+        , then the lowest citation sequence, then
+        the /.3 double-(and triple-)bond locant criteria
+        (``_unsaturation_locant_key``, SP2), with a deterministic atom-index
+        backstop. Both main bridgeheads stay the main bridgeheads, so the main
+        bridge is unchanged and the cage is unchanged -- only the numbering
+        moves. The tiers fix the descriptor's OWN numbering first;
+         then breaks any REMAINING choice using the unsaturation
+        locants -- exactly the residual-freedom case its own text names ("if
+        there is a choice of names and numbering").
         """
         bh1, bh2 = bh_pair
         ring_set = set(main_ring)
@@ -1343,6 +1349,20 @@ class VonBaeyerAnalyzer:
             return main_ring
         n = len(main_ring)
         BIG = 10 ** 6
+
+        # (:16635) / (:16675): ring double/triple bonds,
+        # derived once from mol/ring_atoms (candidate-independent -- only the
+        # NUMBERING varies per candidate below).
+        ring_double_bonds = []
+        ring_triple_bonds = []
+        for b in bonds_of(mol):
+            a1, a2 = b.GetBeginAtomIdx(), b.GetEndAtomIdx()
+            if a1 in ring_atoms and a2 in ring_atoms:
+                order = b.GetBondTypeAsDouble()
+                if order == 2.0:
+                    ring_double_bonds.append((a1, a2))
+                elif order == 3.0:
+                    ring_triple_bonds.append((a1, a2))
 
         candidates = []
         seen = set()
@@ -1403,13 +1423,92 @@ class VonBaeyerAnalyzer:
                     pairs.append((min(l1, l2), max(l1, l2)))
             flat_set = tuple(sorted(x for pr in pairs for x in pr))       #
             citation = tuple(x for pr in pairs for x in pr)               #
+            unsat_key = self._unsaturation_locant_key(
+                numbering, ring_double_bonds, ring_triple_bonds)          # /.3
             idx_backstop = tuple(cand_ring)
-            key = (flat_set, citation, idx_backstop)
+            key = (flat_set, citation, unsat_key, idx_backstop)
             if best_key is None or key < best_key:
                 best_key = key
                 best_ring = cand_ring
                 best_bhp = cand_bhp
         return best_ring, best_bhp
+
+    @staticmethod
+    def _unsaturation_locant_key(numbering, ring_double_bonds, ring_triple_bonds):
+        """ (:16633) / (:16675) numbering criteria for
+        double-(and triple-)bond locants, as a sort key (lower wins).
+
+         "If there is a choice of names and numbering...":
+          (1) (:16635) a minimum number of COMPOUND locants -- a double bond
+              needs a compound locant when its endpoints' locants do not
+              differ by exactly one;
+          (2) (:16657) comparing double-bond locants with any parenthetical
+              (compound) partner IGNORED;
+          (3) (:16674) "if there is still a choice, low locants are selected
+              considering ALL locants (including those in parentheses) as a
+              set" -- verbatim example ``tetracyclo[7.7.1.1^3,7.1^11,15]
+              nonadeca-3,11(18)-diene [not...-3(19),11-diene; the locant
+              set '3,11,18' is lower than '3,11,19']``.
+         (:16675, both double AND triple bonds present):
+          (1) (:16679) lower locants to the combined multiple-bond set;
+          (2) (:16683) lower locants to the double bonds (ignoring the
+              triple-bond locants);
+          (3) (:16689) compound locants kept to a minimum.
+
+        Criteria (1)/(2) here are compound-AWARE (``compound_aware_
+        multibond_set``, shared with ``bicyclo.py``'s own
+        branch), NOT the naive cited-locant compare (2) uses --
+        BB's own worked example for this criterion (bicyclo[8.3.1]tetradeca-
+        4,6,10-trien-2-yne, PIN,:16693) is a counter-example to naive
+        cited-locant comparison: the rejected numbering has a numerically
+        LOWER naive cited set despite needing a compound locant. See that
+        helper's docstring (locants.py) for the full derivation.
+        """
+        def cited(bonds):
+            # The single "cited" (non-parenthetical) locant per bond -- the
+            # lower of its two endpoints, matching the compound-locant
+            # convention "the higher locant is cited in parentheses" (:16637).
+            # Used ONLY by the no-triple branch below --
+            # (2) explicitly says "any number in parentheses is
+            # ignored" (:16657), a genuinely naive compare (verified against
+            # the hexadeca-triene worked example there), unlike (1)/(2) of
+            # just above.
+            return tuple(sorted(
+                min(numbering[a], numbering[b])
+                for a, b in bonds if a in numbering and b in numbering
+            ))
+
+        def compound_count():
+            return sum(
+                1 for a, b in ring_double_bonds
+                if a in numbering and b in numbering
+                and abs(numbering[a] - numbering[b]) != 1
+            )
+
+        if ring_triple_bonds:
+            return (
+                compound_aware_multibond_set(
+                    numbering, ring_double_bonds + ring_triple_bonds),  # (1)
+                compound_aware_multibond_set(
+                    numbering, ring_double_bonds),                     # (2)
+                compound_count(),                                       # (3)
+            )
+
+        # (3): non-compound bonds contribute only their single
+        # (lower) locant; compound bonds contribute BOTH endpoints.
+        full = []
+        for a, b in ring_double_bonds:
+            if a not in numbering or b not in numbering:
+                continue
+            lo, hi = min(numbering[a], numbering[b]), max(numbering[a], numbering[b])
+            full.append(lo)
+            if hi - lo != 1:
+                full.append(hi)
+        return (
+            compound_count(),           # (1)
+            cited(ring_double_bonds),   # (2)
+            tuple(sorted(full)),        # (3)
+        )
 
     #: Cap on the number of alternative numberings ranked by
     #: ``_choose_lowest_locant_numbering``. Symmetric cages can present many
