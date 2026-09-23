@@ -53,10 +53,16 @@ def test_covered_includes_all_carboxyl_atoms():
 
 
 def test_atom_short_parent_leaves_the_dropped_substituent_uncovered():
-    """COS(=O)(=O)O names 'methane' (covers only the methyl C); the sulfate is the remainder."""
-    mol, feats = _features("COS(=O)(=O)O")
-    covered = parent_covered_atoms(mol, feats)
-    assert covered == {0}, f"methane parent covers only atom 0, got {covered}"
+    """An atom-short parent leaves its dropped substituent as one connected remainder.
+
+    COS(=O)(=O)O is now fully named (`methyl hydrogen sulfate`), so its parent is
+    no longer atom-short. The remainder-finding pure function is exercised here
+    with a SYNTHETIC atom-short cover -- pretend a `methane` parent covers only
+    the methyl carbon -- so the test no longer rests on the obsolete
+    parent-selection premise; the expected remainder is unchanged.
+    """
+    mol = Chem.MolFromSmiles("COS(=O)(=O)O")
+    covered = {0}  # a `methane` parent would cover only the methyl carbon
 
     frags = uncovered_fragments(mol, covered)
     assert len(frags) == 1, f"the sulfate is one connected remainder, got {frags}"
@@ -83,8 +89,10 @@ def test_uncovered_fragments_are_disjoint_and_complete():
 
 
 def test_fragment_attachment_atom_is_inside_the_fragment_and_bonds_outward():
-    mol, feats = _features("COS(=O)(=O)O")
-    frags = uncovered_fragments(mol, parent_covered_atoms(mol, feats))
+    # Synthetic atom-short cover (see the note above): a `methane` parent covers
+    # only atom 0, leaving the sulfate {1,2,3,4,5} as the remainder.
+    mol = Chem.MolFromSmiles("COS(=O)(=O)O")
+    frags = uncovered_fragments(mol, {0})
     att = fragment_attachment_atom(mol, frags[0])
     assert att in frags[0]
     # it must bond to an atom outside the fragment (the methyl carbon, atom 0)

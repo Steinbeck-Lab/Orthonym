@@ -68,3 +68,49 @@ P44_CASES = [
 @pytest.mark.parametrize("smiles,expected", P44_CASES)
 def test_senior_parent_hydride_suffix(smiles, expected):
     assert name_compound(smiles) == expected
+
+
+# v52 follow-up (2026-09-23, Batch B) — breadth builds on top of the Phase-6
+# multiplicative handlers. Each row ABSTAINED before the build and each expected
+# string was verified to round-trip through OPSIN 2.9.0 to the input InChIKey
+# (0-wrong: ABSTAIN -> MATCH), so nothing regressed.
+V52_FOLLOWUP_MULTIPLICATIVE_CASES = [
+    # B1. trivalent-N hub, tris(methylene) over phosphonic-acid units — the N
+    # sibling of the P hub (ATMP, aminotris(methylenephosphonic acid)).
+    # / /; central group 'nitrilo' (Table 15.1).
+    ("O=P(O)(O)CN(CP(=O)(O)O)CP(=O)(O)O",
+     "[nitrilotris(methylene)]tris(phosphonic acid)"),
+    # B2. 4-oxygen composite ether bridge [2,2,2] over two benzoic-acid rings.
+    # / (cf. the Blue Book the same 3-oxa family).
+    ("O=C(O)c1ccc(OCCOCCOCCOc2ccc(C(=O)O)cc2)cc1",
+     "4,4'-[ethane-1,2-diylbis(oxyethane-2,1-diyloxy)]dibenzoic acid"),
+    # B3. silanediyl hub with 3-carbon (propane-3,1-diyl) arms — the n-carbon
+    # generalisation of the ethane-2,1-diyl arm. Per (the Blue Book) the
+    # arm's free valence NEAREST the multiplied parent takes the LOW locant '1'
+    # and is cited LAST -> '{stem}ane-{n},1-diyl' (cf. 'oxydi(tetradecane-14,1-
+    # diyl)' the Blue Book, 'silanediyldi(ethane-2,1-diyl)' the Blue Book).
+    ("[SiH3]CCC[SiH2]CCC[SiH3]",
+     "[silanediyldi(propane-3,1-diyl)]bis(silane)"),
+    # B3b. same hub, 4-carbon (butane-4,1-diyl) arms — the {n},1 convention past
+    # n=3.
+    ("[SiH3]CCCC[SiH2]CCCC[SiH3]",
+     "[silanediyldi(butane-4,1-diyl)]bis(silane)"),
+    # B4. tertiary central carbon (3 CH2-phenyl arms + 1 H): two benzene parents,
+    # one benzyl substituent. / (2 parents max, the Blue Book).
+    ("c1ccc(CC(Cc2ccccc2)Cc2ccccc2)cc1",
+     "1,1'-(2-benzylpropane-1,3-diyl)dibenzene"),
+    # B5. trivalent Si hub, tris(ethane-2,1-diyl) over three silane parents.
+    # /; central group 'silanetriyl': Si=Si).
+    ("[SiH](CC[SiH3])(CC[SiH3])CC[SiH3]",
+     "[silanetriyltri(ethane-2,1-diyl)]tris(silane)"),
+    # B5b. same trivalent Si hub, 3-carbon (propane-3,1-diyl) arms — the {n},1
+    # arm-locant convention on the triyl sibling, parent-side
+    # locant '1' cited last).
+    ("[SiH](CCC[SiH3])(CCC[SiH3])CCC[SiH3]",
+     "[silanetriyltri(propane-3,1-diyl)]tris(silane)"),
+]
+
+
+@pytest.mark.parametrize("smiles,expected", V52_FOLLOWUP_MULTIPLICATIVE_CASES)
+def test_v52_followup_multiplicative_pin(smiles, expected):
+    assert name_compound(smiles) == expected

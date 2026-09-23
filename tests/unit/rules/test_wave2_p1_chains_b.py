@@ -58,7 +58,7 @@ class TestP16ParensMultipliedComponent:
     def test_disulfanediyl_di_cyclohexanecarboxylic_acid(self):
         # (e): functionalized parent hydride WITH LOCANT -> di(cyclohexane-1-carboxylic acid)
         assert name_compound("OC(=O)C1(SSC2(C(=O)O)CCCCC2)CCCCC1") == \
-            "1,1'-(disulfanediyl)di(cyclohexane-1-carboxylic acid)"
+            "1,1'-disulfanediyldi(cyclohexane-1-carboxylic acid)"
 
 
 @pytest.mark.unit

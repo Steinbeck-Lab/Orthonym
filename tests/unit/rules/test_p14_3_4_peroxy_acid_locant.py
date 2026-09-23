@@ -51,13 +51,19 @@ class TestTheTwoTablesAgree:
         missing_here = set(TERMINAL_FG_TYPES) - set(TERMINAL_GROUPS)
         missing_there = set(TERMINAL_GROUPS) - set(TERMINAL_FG_TYPES)
 
-        # Five classes remain deliberately absent from TERMINAL_GROUPS: they have
+        # Three classes remain deliberately absent from TERMINAL_GROUPS: they have
         # substitutable suffix nitrogens, and the terminal branch's per-scope check
         # cannot see a substituent on the suffix heteroatom (the hole that shipped
         # `N-hydroxycyclohexanimine`). Documented, not accidental.
+        #
+        # v52 P1 (c)): `imidic_acid` and `hydrazonic_acid` were MOVED
+        # into TERMINAL_GROUPS. Their perception requires an UNsubstituted suffix
+        # nitrogen (functional_groups.py: `imidic_acid` demands `=[NX2H1]`,
+        # `hydrazonic_acid` demands a terminal `[NX3H2]`), so the N-substituted
+        # hole shape is never detected as these types and cannot reach this branch
+        # (RT-verified: `N-hydroxyethanimidic acid`, `benzenecarbohydrazonic acid`).
         assert missing_here == {
-            "hydrazidine", "hydrazonamide", "hydrazonic_acid",
-            "imidic_acid", "thiohydrazide",
+            "hydrazidine", "hydrazonamide", "thiohydrazide",
         }, f"terminal-group tables diverged: {sorted(missing_here)}"
         assert missing_there == set(), sorted(missing_there)
 

@@ -79,7 +79,7 @@ PARENT_HYDRIDE_POSITIVES = [
     ("C1CC[Ga]CC[Ga]C1", "1λ2,4λ2-digallacyclooctane"),
     ("C1CC[Sb]CC[Sb]C1", "1λ2,4λ2-distibacyclooctane"),
     ("C1CC2CCC1[Al]2", "7λ2-aluminabicyclo[2.2.1]heptane"),
-    ("C1[Al]C2CC[Al]1CC2", "1,8λ2-dialuminabicyclo[2.2.2]octane"),
+    ("C1[Al]C2CC[Al]1CC2", "1,3λ2-dialuminabicyclo[2.2.2]octane"),
 ]
 
 
@@ -272,9 +272,19 @@ ASSEMBLY_POSITIVES = [
     # brackets -- '3-[(1Z)-...]', not the doubled-parens '3-((1Z)-...)'.
     # Golden updated (change-asserted-value: RT-verified by this test's own
     # InChIKey assertion above).
+    #
+    # D3: the ring/chain methyls now spell as the retained short prefix
+    # 'methyl'/'dimethyl', not the mechanical 'methan-1-yl'/'di(methan-1-yl)'.
+    # The compound substituent is therefore '3,5-dimethylhept-1-en-1-yl'; by
+    # (the Blue Book) it is alphabetized at the first letter of its
+    # COMPLETE name -- 'd' (dimethyl...), which precedes 'h'(ydroxy), 'm'(ethyl)
+    # and 'o'(xo). The BB gives this verbatim: '7-(2,4-dimethylpentyl)-5-
+    # ethyltridecane (PIN)' (:3491, "'dimethylpentyl' begins with 'd'") and
+    # '7-(1,2-difluorobutyl)-5-ethyltridecane (PIN)' (:3483). The prior golden's
+    # order (compound cited last) was non-conformant; corrected to lead with it.
     ("CCC(C)CC(C)/C=C\\[C@@H]1O[C@H]2[C@H](C(=O)O[C@H]2C)[C@H](O)[C@H]1O",
-     "(1S,3S,4R,5S,6R,9S)-4,5-dihydroxy-9-methyl-7-oxo-3-[(1Z)-3,5-"
-     "dimethylhept-1-en-1-yl]-2,8-dioxabicyclo[4.3.0]nonane"),
+     "(1S,3S,4R,5S,6R,9S)-3-[(1Z)-3,5-dimethylhept-1-en-1-yl]-4,5-"
+     "dihydroxy-9-methyl-7-oxo-2,8-dioxabicyclo[4.3.0]nonane"),
     ("CCN1CC(=O)Nc2ccccc2C(=O)Nc2ccccc2C(=O)O[C@H](Cc2ccccc2)C1=O",
      "(7R)-7-benzyl-5-ethyl-3,6,9,17-tetraoxo-8-oxa-2,5,16-triazatricyclo"
      "[16.4.0.0^10,15]docosa-1(22),10,12,14,18,20-hexaene"),

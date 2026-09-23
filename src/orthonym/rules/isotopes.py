@@ -581,6 +581,64 @@ def _single_label_is_immaterial(original: Chem.Mol, mass: int, el: str,
     return True
 
 
+def _split_yields_distinct_isomer(original: Chem.Mol, mass: int, el: str,
+                                  carrier: int, orbit: set) -> bool:
+    """ ("Locants are not omitted when there is a possibility of
+    isomers", ``the Blue Book Blue Book``): True iff SPLITTING a
+    count>=2 nuclide group that all sits on ONE carrier across its symmetric
+    orbit -- moving one nuclide to a symmetric partner (1,1 -> 1,2) -- yields
+    an isotopomer with a DISTINCT isotope-aware ``InChIKey`` from the
+    all-on-carrier arrangement.
+
+    :func:`_single_label_is_immaterial` only tests moving the WHOLE group to a
+    partner (2,0 -> 0,2), which reproduces the molecule on a symmetric orbit and
+    so wrongly licensed omission for e.g. ``(2H2)ethane-1,2-diyl``. But
+    ``(1,1-2H2)`` and ``(1,2-2H2)`` are DISTINCT isotopomers, so more than one
+    isotopomer of that count exists and the locant is required. A gem-vs-vicinal
+    split is a constitutional isotope difference, so this fires for the diol /
+    linker / dibromoethane family while an all-collapse split (which never
+    produces a distinct key) is NOT over-cited -- the decision is gated on the
+    actual InChIKey comparison, never on the mere presence of a symmetric partner.
+
+    A count-1 group cannot be split (there is nothing to move partially), so this
+    returns False for it and the caller's whole-move test governs the single-label
+    case. Heavy nuclides (13C, 18O,...) hold one atom per position, so their
+    carrier count is 1 and this is likewise a no-op for them. RDKit only (no OPSIN).
+    """
+    try:
+        oh = Chem.AddHs(original)
+        key0 = Chem.MolToInchiKey(oh)
+    except Exception:
+        return False
+    if el == "H":
+        lab = [nb.GetIdx() for nb in oh.GetAtomWithIdx(carrier).GetNeighbors()
+               if nb.GetSymbol() == "H" and nb.GetIsotope() == mass]
+    else:
+        lab = [carrier]
+    if len(lab) < 2:
+        return False                              # nothing to split (count 1)
+    for other in orbit:
+        if other == carrier:
+            continue
+        moved = Chem.RWMol(oh)
+        moved.GetAtomWithIdx(lab[0]).SetIsotope(0)   # remove one nuclide from carrier
+        if el == "H":
+            avail = [nb.GetIdx()
+                     for nb in oh.GetAtomWithIdx(other).GetNeighbors()
+                     if nb.GetSymbol() == "H" and nb.GetIsotope() == 0]
+        else:
+            avail = [other]
+        if not avail:
+            continue
+        moved.GetAtomWithIdx(avail[0]).SetIsotope(mass)  # place it on the partner
+        try:
+            if Chem.MolToInchiKey(moved.GetMol()) != key0:
+                return True                       # 1,1 vs 1,2 distinct -> cite
+        except Exception:
+            continue
+    return False
+
+
 def _placement_unambiguous(original: Chem.Mol,
                            complete_sub_omission: bool = False) -> bool:
     """: may the isotope descriptor's position-locant(s) be OMITTED?
@@ -722,11 +780,21 @@ def _placement_unambiguous(original: Chem.Mol,
         orbit = {c for c in scope if ranks[c] == next(iter(lab_ranks))}
         if len(orbit) < 2:                        # unique singleton position -> cite
             return False
-        if len(carriers) == 1:                    # cl.1: symmetric, 1 label
+        if len(carriers) == 1:                    # all labels on ONE carrier of a symmetric orbit
             carrier = next(iter(carriers))
-            if _single_label_is_immaterial(original, mass, el, carrier, orbit):
-                continue
-            return False                          # label desymmetrises -> cite
+            # cl.1: a label whose orbit member is immaterial (moving the
+            # WHOLE group to a symmetric partner reproduces the molecule) may omit
+            # its locant; a label that DESYMMETRISES the orbit must cite it.
+            if not _single_label_is_immaterial(original, mass, el, carrier, orbit):
+                return False                      # whole-group move desymmetrises -> cite
+            # (the Blue Book): even when the whole-group move collapses, a
+            # count>=2 group SPLIT across the orbit (1,1 -> 1,2) can give a DISTINCT
+            # isotopomer -- a possibility of isomers that requires the locant. Gated
+            # on an actual distinct-InChIKey test so all-collapse cases are not
+            # over-cited. ``(2H2)ethane-1,2-diyl`` -> ``(1,1-2H2)ethane-1,2-diyl``.
+            if _split_yields_distinct_isomer(original, mass, el, carrier, orbit):
+                return False                      # split gives a distinct isomer -> cite
+            continue
         if orbit != carriers:                     # partial fill of orbit -> isomers
             return False
         # else: complete orbit, entirely labelled ->

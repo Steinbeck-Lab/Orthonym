@@ -158,6 +158,7 @@ from typing import Dict, FrozenSet, List, Optional, Tuple
 from rdkit import Chem
 from rdkit.Chem import inchi
 
+from ..data.chain_names import get_alkyl_name, get_chain_name
 from ..perception.ions import get_ion_sites
 from ..perception.rings import get_ring_systems
 from ..perception.stereo import assign_stereochemistry
@@ -1441,6 +1442,21 @@ def _render_as_substituent(sub: _ComponentResult, bond_order: int) -> str:
     if sub.is_prefix_ready:
         return sub.name
     name = sub.name
+    # "Retained substituent prefix names" /: an UNBRANCHED
+    # saturated all-carbon chain whose free valence is at position 1 and which
+    # attaches by a single bond takes the retained short prefix (``methyl``,
+    # ``ethyl``, ``propyl``, ``butyl``) or its systematically-elided extension
+    # (``pentyl``, ``hexyl``,...), with NO locant -- a ``-yl`` free valence at
+    # C1 of an unbranched chain is unambiguous. The mechanical ``-{loc}-yl``
+    # rewrite below is always VALID but over-spells these as ``methan-1-yl`` /
+    # ``propan-1-yl``, which is not the PIN. Detected structurally: the parent
+    # name IS the plain alkane of the covered carbon count (any branch,
+    # heteroatom or unsaturation changes the name and is left to the mechanical
+    # form), and the attachment is at spine locant 1.
+    if bond_order == 1 and (sub.attach_locant is None or sub.attach_locant == 1):
+        n = len(sub.covers)
+        if n >= 1 and name == get_chain_name(n):
+            return get_alkyl_name(n)
     stem = name[:-1] if name.endswith("e") else name
     suffix = {1: "yl", 2: "ylidene", 3: "ylidyne"}.get(bond_order, "yl")
     loc = sub.attach_locant if sub.attach_locant is not None else 1

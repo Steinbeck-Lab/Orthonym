@@ -8,6 +8,7 @@ chain should be the parent structure based on principal group location.
 import pytest
 from rdkit import Chem
 
+from orthonym import name_compound
 from orthonym.rules.parent_selection import (
     ParentSelectionResult,
     select_parent,
@@ -676,46 +677,30 @@ class TestP441Cascade:
         )
 
     def test_p44_1_ring_size_wins_on_tie(self):
-        """When PG count ties but ring is larger than chain, ring wins.
+        """When PG count ties, the ring is the parent: a ring is
+        senior to a chain for a PIN).
 
-        O=C1CCCCCCC1CCC(=O)C: cyclooctanone (8-atom ring) + 3-carbon chain
-        with ketone. PG = ketone, 1 on ring + 1 on chain (tied).
-        Ring (8) > chain (6 non-ring atoms) -> ring wins by ring-size.
+        O=C1CCCCCCC1CCC(=O)C: cyclooctanone ring + 3-carbon chain ketone, one
+        ketone on each -> the ring is the parent and the chain becomes an
+        oxo-substituted prefix.
+
+        End-to-end: the earlier white-box form fed ``select_parent`` a
+        hand-computed ``chain`` that included the ring ketone's exocyclic oxygen,
+        which the rewritten comparator scores differently; the real path
+        (perception -> select_parent -> name) yields the correct PIN.
         """
-        smiles = 'O=C1CCCCCCC1CCC(=O)C'
-        mol = Chem.MolFromSmiles(smiles)
-        ring_systems = get_ring_systems(mol)
-        fg = detect_functional_groups(mol)
-        pg_name, pg_atoms = get_principal_group(mol, fg)
+        assert name_compound('O=C1CCCCCCC1CCC(=O)C') == \
+            '2-(3-oxobutyl)cyclooctan-1-one'
 
-        all_ring = set()
-        for r in ring_systems:
-            all_ring.update(r)
-        chain = [i for i in range(mol.GetNumAtoms()) if i not in all_ring]
+    def test_p44_1_2_2_ring_senior_to_chain_regardless_of_multiple_bonds(self):
+        """A ring is senior to a chain for a PIN / the Blue Book: "a ring
+        is always selected as the parent hydride to construct a preferred IUPAC
+        name"), so a chain does NOT win by carrying more multiple bonds.
 
-        result = select_parent(
-            mol=mol,
-            ring_systems=ring_systems,
-            principal_chain=chain,
-            principal_group=pg_name,
-            principal_group_atoms=pg_atoms
-        )
-
-        assert result.parent_type == 'ring', (
-            f"Ring ({len(all_ring)}) > chain ({len(chain)}): ring should win. "
-            f"Got: {result.reasoning}"
-        )
-        # Could be ring-size or ring-wins-by-PG-count depending on PG detection
-        assert 'ring' in result.reasoning.lower(), (
-            f"Reasoning should indicate ring wins. Got: {result.reasoning}"
-        )
-
-    def test_p44_1_multiple_bonds_chain_wins(self):
-        """When PG count and length both tie, chain with more multiple bonds wins.
-
-        Tests _count_multiple_bonds helper directly and verifies the cascade
-        logic since constructing a natural molecule with all criteria tied except
-        bonds is difficult.
+        The earlier form of this test asserted the opposite (chain-wins-on-bonds),
+        which is an IUPAC-2013-wrong premise; it is inverted here to the
+        ring-senior truth. The ``_count_multiple_bonds`` helper is still
+        exercised directly (it has no other test).
         """
         # Test _count_multiple_bonds on a chain with double bonds
         smiles = 'C=CC=CC'  # penta-1,3-diene
@@ -753,14 +738,11 @@ class TestP441Cascade:
             f"Cyclohexene should have 1 double bond, got {cene_count}"
         )
 
-        # Verify cascade logic: if chain_mult > ring_mult and PG+length tied,
-        # chain should win. Use cyclohexanone with 6-carbon chain ketone,
-        # passing carbon-only chain to get length=6 (tied with ring=6).
-        # Chain ketone C=O has O outside carbon chain -> chain_mult=0.
-        # Ring ketone C=O has O outside ring -> ring_mult=0.
-        # Both 0 -> ring wins (tested in test_p44_1_all_tied_ring_wins_p52_2_8).
-        # To test bond tiebreaker, we need chain to have extra C=C double bond.
-        # Use O=C1CCCCC1C=CCCC(=O)C: cyclohexanone + 6-carbon chain with C=C and ketone.
+        # The ring stays senior even when the chain carries MORE multiple bonds.
+        # O=C1CCCCC1C=CCCC(=O)C: cyclohexanone (6-ring, 0 C=C in ring) + a
+        # carbon-6 chain bearing a C=C and a ketone. Pass the carbon-only chain so
+        # chain_len == ring_size (6 == 6); the chain then has strictly more
+        # multiple bonds than the ring, yet makes the ring the parent.
         bond_smiles = 'O=C1CCCCC1C=CCCC(=O)C'
         bond_mol = Chem.MolFromSmiles(bond_smiles)
         bond_ring_systems = get_ring_systems(bond_mol)
@@ -783,21 +765,20 @@ class TestP441Cascade:
             principal_group_atoms=bond_pg_atoms
         )
 
-        # Chain has C=C (1 double bond in carbon chain), ring has 0 -> chain wins
-        if len(bond_chain) == len(list(bond_all_ring)):
-            # Only assert if lengths actually tied (which they should)
-            chain_mult_test = _count_multiple_bonds(bond_mol, set(bond_chain))
-            ring_mult_test = _count_multiple_bonds(bond_mol, bond_all_ring)
-            if chain_mult_test > ring_mult_test:
-                assert bond_result.parent_type == 'chain', (
-                    f"Chain with more multiple bonds should win. "
-                    f"chain_mult={chain_mult_test}, ring_mult={ring_mult_test}. "
-                    f"Got: {bond_result.reasoning}"
-                )
-                assert 'P-44.1' in bond_result.reasoning, (
-                    f"Reasoning should cite P-44.1 cascade. "
-                    f"Got: {bond_result.reasoning}"
-                )
+        # The chain has strictly more multiple bonds, but the ring is senior.
+        chain_mult_test = _count_multiple_bonds(bond_mol, set(bond_chain))
+        ring_mult_test = _count_multiple_bonds(bond_mol, bond_all_ring)
+        assert chain_mult_test > ring_mult_test, (
+            f"precondition: chain_mult={chain_mult_test} should exceed "
+            f"ring_mult={ring_mult_test}")
+        assert bond_result.parent_type == 'ring', (
+            f"Ring is senior to chain (P-44.1.2.2) even with fewer multiple "
+            f"bonds. Got: {bond_result.reasoning}"
+        )
+        assert 'ring' in bond_result.reasoning.lower(), (
+            f"Reasoning should indicate the ring wins. "
+            f"Got: {bond_result.reasoning}"
+        )
 
     def test_p44_1_all_tied_ring_wins_p52_2_8(self):
         """When PG count, length, and multiple bonds all tie, ring wins as
@@ -917,37 +898,20 @@ class TestP441Cascade:
         assert others == [], "No other ring systems for single-ring molecule"
 
     def test_ring_wins_by_pg_count_unchanged(self):
-        """When ring has strictly more PGs than chain, ring wins (unchanged behavior).
+        """When the ring carries strictly more principal groups than the chain,
+        the ring is the parent.
 
         O=C1CC(=O)CCC1CCCCC(=O)C: cyclohexane-1,3-dione (2 ketones on ring) +
-        chain ketone (1 ketone). Ring has 2 PGs > chain has 1 PG -> ring wins
-        by PG count. This path is NOT affected by the cascade.
+        chain ketone (1) -> the ring (2 PGs) is the parent and the chain becomes
+        an oxo-substituted prefix.
+
+        End-to-end: the earlier white-box form fed ``select_parent`` a
+        hand-computed ``chain`` polluted with the ring diketone's two exocyclic
+        oxygens, which the rewritten comparator scored as a 9-atom chain; the real
+        path yields the correct PIN.
         """
-        smiles = 'O=C1CC(=O)CCC1CCCCC(=O)C'
-        mol = Chem.MolFromSmiles(smiles)
-        ring_systems = get_ring_systems(mol)
-        fg = detect_functional_groups(mol)
-        pg_name, pg_atoms = get_principal_group(mol, fg)
-
-        all_ring = set()
-        for r in ring_systems:
-            all_ring.update(r)
-        chain = [i for i in range(mol.GetNumAtoms()) if i not in all_ring]
-
-        result = select_parent(
-            mol=mol,
-            ring_systems=ring_systems,
-            principal_chain=chain,
-            principal_group=pg_name,
-            principal_group_atoms=pg_atoms
-        )
-
-        assert result.parent_type == 'ring', (
-            f"Ring with more PGs should always win. Got: {result.reasoning}"
-        )
-        assert 'P-44.1(b)' in result.reasoning or 'PG count' in result.reasoning, (
-            f"Reasoning should indicate PG count. Got: {result.reasoning}"
-        )
+        assert name_compound('O=C1CC(=O)CCC1CCCCC(=O)C') == \
+            '4-(5-oxohexyl)cyclohexane-1,3-dione'
 
 
 @pytest.mark.unit

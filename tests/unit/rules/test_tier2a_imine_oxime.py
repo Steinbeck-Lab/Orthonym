@@ -87,7 +87,7 @@ class TestSubstitutiveOximes:
         assert name_compound("C/C=N/O") == "(E)-acetaldehyde oxime"
 
     def test_oxime_prefix_on_senior_parent_unchanged(self):
-        assert name_compound("ON=CCCC(=O)O") == "4-hydroxyiminobutanoic acid"
+        assert name_compound("ON=CCCC(=O)O") == "4-(hydroxyimino)butanoic acid"
 
 
 @pytest.mark.unit

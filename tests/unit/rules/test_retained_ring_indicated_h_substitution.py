@@ -178,19 +178,27 @@ def test_isotopic_descriptor_reaches_an_indicated_hydrogen_parent():
     """The descriptor sits between the prefixes and the ``1H-`` parent.
 
      (item 3,: the descriptor carries its REQUIRED locant
-    ``(3-2H1)``. The old locant-free ``(2H1)`` was Blue-Book-wrong -- it only
+    ``(3-2H)``. The old locant-free ``(2H)`` was Blue-Book-wrong -- it only
     round-tripped because OPSIN's default placement of an unlocanted single
     label lands on position 3; locants 4/5 parse to genuinely different real
     structures, so the position is not unique and the locant cannot be omitted
     (RT-verified, internal notes).
+
+    The count subscript is omitted per (a single label needs no
+    ``1``): ``(3-2H)``, not ``(3-2H1)``.
     """
     assert name_compound("[2H]C1=C(N(C=C1)C)[N+](=O)[O-]") == \
-        "1-methyl-2-nitro(3-2H1)-1H-pyrrole"
+        "1-methyl-2-nitro(3-2H)-1H-pyrrole"
 
 
 def test_isotopic_front_placement_unchanged():
-    """No substituent prefix -> the front offset already covered it."""
-    assert name_compound("[2H]c1cc[nH]c1") == "(3-2H1)1H-pyrrole"
+    """No substituent prefix -> the front offset already covered it.
+
+    A hyphen joins the descriptor to the ``1H-`` prefix, matching the Blue Book
+    pattern ``(2,3-2H2,15N)-1H-indole`` (``:43796``); the count subscript is
+    dropped per.
+    """
+    assert name_compound("[2H]c1cc[nH]c1") == "(3-2H)-1H-pyrrole"
 
 
 # --------------------------------------------------------------------------

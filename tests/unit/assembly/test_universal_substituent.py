@@ -226,7 +226,11 @@ def test_stereo_bearing_perindopril_now_full_ws_stereo_win():
     result = name_universal_substitutive(mol)
     assert result is not None
     assert result.covers == _heavy_atoms(smi)
-    assert result.name == ("(3R,5S)-3-(methan-1-yl)-6-oxo-5-(propan-1-yl)-"
+    # D3: an unbranched C1-attached alkyl leaf takes the retained
+    # short prefix -- 'methyl'/'propyl', not the mechanical 'methan-1-yl'/
+    # 'propan-1-yl' (OPSIN parses both identically, so the RT assertion below
+    # is unaffected; this is a pure spelling correction).
+    assert result.name == ("(3R,5S)-3-methyl-6-oxo-5-propyl-"
                             "1,7-dioxa-4-azanon-1-ene")
     cov = validate_atom_coverage(mol, result.name)
     assert cov.constitution_match is True
@@ -1004,7 +1008,8 @@ def test_phase_e_branch_prefix_routes_through_verify_partition(monkeypatch):
     core, scoped to the fragment. Force reject -> None; real core -> ships."""
     mol = Chem.MolFromSmiles("CCCCC")
     frag = frozenset(a.GetIdx() for a in mol.GetAtoms())
-    assert us.name_universal_substituent_prefix(mol, frag, 0, 1) == "pentan-1-yl"
+    # D3: unbranched pentane attached at C1 -> retained 'pentyl'.
+    assert us.name_universal_substituent_prefix(mol, frag, 0, 1) == "pentyl"
 
     monkeypatch.setattr(e1, "_verify_partition",
                         lambda *a, **k: e1.E1Verdict(False, "rigged reject"))

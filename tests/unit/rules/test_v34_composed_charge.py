@@ -286,7 +286,9 @@ def test_ws7_net_anion_dithiocarbamate_carboxylate_names_and_full_rt():
     on the FULL InChIKey (constitution + charge; no stereo to omit)."""
     smi = "CN(C)C(=S)SCCC(=O)[O-]"
     name, verified = _floor_name_and_verify(smi)
-    assert name == ("7-(methan-1-yl)-2-oxido-6-sulfanylidene-"
+    # D3: plain C1 methyl -> retained 'methyl', not 'methan-1-yl'
+    # (RT-identical InChIKey; pure spelling).
+    assert name == ("7-methyl-2-oxido-6-sulfanylidene-"
                     "1-oxa-5-thia-7-azaoct-1-ene")
     assert verified == name
 
@@ -332,7 +334,8 @@ def test_ws7_stereo_carboxylate_now_ships_full_stereo_ws_stereo_win():
     smi = ("C=C[C@]1(C)CC[C@@H]2C(=CC[C@@H]3[C@]2(C)CCC[C@]3(C)"
            "C(=O)[O-])C1")
     name, verified = _floor_name_and_verify(smi)
-    assert name == ("(1R,2R,5R,10R,11S)-5-(eth-1-en-1-yl)-1,5,11-tri(methan-1-yl)-"
+    # D3: plain C1 methyls -> retained 'trimethyl', not 'tri(methan-1-yl)'.
+    assert name == ("(1R,2R,5R,10R,11S)-5-(eth-1-en-1-yl)-1,5,11-trimethyl-"
                      "11-(1-oxido-2-oxaeth-1-en-1-yl)tricyclo[8.4.0.0^2,7]tetradec-7-ene")
     assert verified == name  # full-InChIKey CONFIRMED (constitution+stereo+charge)
     got = opsin_parse(name)
@@ -508,8 +511,11 @@ def test_ws_stereo_bicyclic_carnitine_ester_converts_block1_to_full():
     the with-stereo candidate full-RT-verifies and block1 -> full."""
     smi = "CCCCOC(=O)C[N+](C)(C)CCO[C@H]1C[C@H]2CC[C@@]1(C2(C)C)C"
     name, verified = _floor_name_and_verify(smi)
-    assert name == ("(1R,2S,4R)-2-[4,4-di(methan-1-yl)-6-oxo-1,7-dioxa-4-azaundecan-"
-                     "4-ium-1-yl]-1,7,7-tri(methan-1-yl)bicyclo[2.2.1]heptane")
+    # D3: plain C1 methyls -> 'dimethyl'/'trimethyl'; with the inner
+    # parens gone the outer enclosure de-escalates  -> .
+    # RT-verified identical InChIKey.
+    assert name == ("(1R,2S,4R)-2-(4,4-dimethyl-6-oxo-1,7-dioxa-4-azaundecan-"
+                     "4-ium-1-yl)-1,7,7-trimethylbicyclo[2.2.1]heptane")
     assert verified == name
 
 
@@ -519,8 +525,10 @@ def test_ws_stereo_cyclohexene_ammonium_ester_converts_block1_to_full():
     SPINE atoms (`_name_ring_spine`'s own atom_to_locant) -> block1 -> full."""
     smi = "CC[N+](C)(CC)CC(=O)OC[C@H]1[C@@H](CC(=C[C@@H]1C)C)C"
     name, verified = _floor_name_and_verify(smi)
-    assert name == ("(3S,4S,5R)-4-[5-(ethan-1-yl)-5-(methan-1-yl)-3-oxo-2-oxa-5-"
-                     "azaheptan-5-ium-1-yl]-1,3,5-tri(methan-1-yl)cyclohex-1-ene")
+    # D3: plain C1 ethyl/methyls -> 'ethyl'/'methyl'/'trimethyl'; the
+    # outer enclosure de-escalates  -> . RT-verified identical.
+    assert name == ("(3S,4S,5R)-4-(5-ethyl-5-methyl-3-oxo-2-oxa-5-"
+                     "azaheptan-5-ium-1-yl)-1,3,5-trimethylcyclohex-1-ene")
     assert verified == name
 
 
@@ -534,8 +542,10 @@ def test_ws_stereo_long_chain_phosphocholine_thioester_converts_block1_to_full()
     smi = ("CCCCC/C=C\\C/C=C\\C/C=C\\C/C=C\\CCCC(=O)S[C@H](COCCCCCCCCCCCCCCCC)"
            "COP(=O)(O)OCC[N+](C)(C)C")
     name, verified = _floor_name_and_verify(smi)
-    assert name == ("(19R,25Z,28Z,31Z,34Z)-19-[3-hydroxy-7,7-di(methan-1-yl)-3-oxo-"
-                     "2,4-dioxa-7-aza-3-phosphaoctan-7-ium-1-yl]-21-oxo-17-oxa-"
+    # D3: plain C1 methyls -> 'dimethyl'; outer enclosure de-escalates
+    #  -> . RT-verified identical InChIKey.
+    assert name == ("(19R,25Z,28Z,31Z,34Z)-19-(3-hydroxy-7,7-dimethyl-3-oxo-"
+                     "2,4-dioxa-7-aza-3-phosphaoctan-7-ium-1-yl)-21-oxo-17-oxa-"
                      "20-thiatetraconta-25,28,31,34-tetraene")
     assert verified == name
 
@@ -934,6 +944,7 @@ def test_ws_noabstain_p74_end_to_end_still_ships_full_via_floor():
     smi = "C[NH+]1CCC[C@H]1C(=O)[O-]"
     r = name_universal_substitutive(Chem.MolFromSmiles(smi))
     assert r is not None
-    assert r.name == ("(2S)-1-(methan-1-yl)-2-(1-oxido-2-oxaeth-1-en-1-yl)"
+    # D3: plain C1 methyl -> retained 'methyl'.
+    assert r.name == ("(2S)-1-methyl-2-(1-oxido-2-oxaeth-1-en-1-yl)"
                        "-1-azacyclopentan-1-ium")
     assert verify_or_none(r.name, smi) == r.name  # full-InChIKey CONFIRMED

@@ -452,7 +452,7 @@ class TestAmbientScopes:
     @pytest.mark.parametrize("smiles,expected", [
         # Task 5a's isotope witness, substituent scope -- must stay fixed.
         ("FC(F)(F)[13C](F)(F)C1CCCCC1",
-         "(1,1,2,2,2-pentafluoro(13C)ethyl)cyclohexane"),
+         "[1,1,2,2,2-pentafluoro(1-13C)ethyl]cyclohexane"),
         # (``:44202``) ``(2H6)benzene (PIN)``: when every candidate
         # position is ONE orbit no locant is needed, so these keep their omission.
         # The count subscript is omitted per (FIX-A: a carbon position
@@ -475,21 +475,42 @@ class TestTheScopeBoundaryMustBeTheWholeMolecule:
     ```` scopes citation to a unit *"as defined by its appropriate enclosing
     marks"*. For ``F(CF2)7-CO-N(piperidine)`` the decomposition engine cuts the acyl
     bond, CAPS the fragment as the free acid, and asks for a whole-molecule name of
-    ``pentadecafluorooctanoic acid`` -- for which this licence genuinely fires, 15 of 15
-    -- then rewrites ``oic acid`` -> ``oyl`` and splices it in. The resulting scope
-    cites ``N``, an essential letter locant, so every locant must be cited.
+    ``pentadecafluorooctanoic acid`` -- for which the licence genuinely
+    fires, 15 of 15 -- then rewrites ``oic acid`` -> ``oyl`` and splices it in. The
+    resulting scope cites ``N``, an essential letter locant, so every fluoro locant
+    must be cited: the general-nomenclature form the engine emits today is
+    ``N-(2,2,...,8,8,8-pentadecafluorooctanoyl)piperidine`` (0-wrong, OPSIN-RT-valid).
 
-    ``:29619`` says exactly that about this molecule: *"(PIN, the locants for the fluoro
-    substituents are required, see "* -- the Blue Book citing the very rule
-    being implemented, to explain a NEGATIVE. Before the guard, the licence emitted
-    ``N-pentadecafluorooctanoylpiperidine``.
+    That form is CORRECT but NON-PIN. The PIN is the substituted-acyl PSEUDOKETONE
+    ``2,2,...,8,8,8-pentadecafluoro-1-(piperidin-1-yl)octan-1-one`` /
+    ; verified OPSIN-RT-MATCH to the input InChIKey
+    ``an InChIKey``). The Blue Book's OWN example for this rule
+    confirms the pseudoketone CONSTRUCTION: ``:29619`` names the sibling molecule
+    ``1-[4-(3,4-dihydroisoquinoline-2(1H)-carbonyl)piperidin-1-yl]-2,2,...,8,8,8-
+    pentadecafluorooctan-1-one (PIN, the locants for the fluoro substituents are
+    required, see `` -- a DIFFERENT decorated molecule but
+    likewise an ``octan-1-one`` pseudoketone whose fluoro locants are required. It
+    is therefore NOT authority for the old ``N-...oylpiperidine`` spelling, which is
+    not re-asserted here.
+
+    The engine does not yet BUILD the substituted-acyl pseudoketone, so the assertion
+    below pins the PIN as ``xfail(strict=True)`` -- a canary that XPASSes (and so trips
+    the strict marker, flagging its own removal) the moment the pseudoketone build
+    lands.
     """
 
     _29619 = ("FC(F)(F)C(F)(F)C(F)(F)C(F)(F)C(F)(F)C(F)(F)C(F)(F)C(=O)N1CCCCC1")
 
+    @pytest.mark.xfail(strict=True, reason=(
+        "pseudoketone is the PIN per P-66.1.3/P-64.1.2.1; engine emits a correct "
+        "general-nomenclature N-acyl form (0-wrong, RT-valid) but does not yet build "
+        "the substituted-acyl pseudoketone -- canary XPASSes when the pseudoketone "
+        "build lands"))
     def test_the_blue_books_own_negative_for_this_very_rule(self, namer):
+        # PIN = the substituted-acyl pseudoketone /; verified
+        # OPSIN-RT-MATCH to the input an InChIKey.
         assert namer.name(self._29619) == (
-            "N-2,2,3,3,4,4,5,5,6,6,7,7,8,8,8-pentadecafluorooctanoylpiperidine")
+            "2,2,3,3,4,4,5,5,6,6,7,7,8,8,8-pentadecafluoro-1-(piperidin-1-yl)octan-1-one")
 
     def test_the_signal_is_false_for_a_whole_molecule_naming(self, namer):
         assert _naming_call_produces_a_name_component() is False

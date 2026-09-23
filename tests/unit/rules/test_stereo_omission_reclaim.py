@@ -40,9 +40,14 @@ RECLAIM_CASES = [
      "(5R,9aR)-3-(1,1-diphenylmethylidene)-5-methylquinolizidin-5-ium bromide"),
     ("[B-](/C/1=C/C=C\\C/C=C\\C1)(C2=CC=CC=C2)(C3=CC=CC=C3)C4=CC=CC=C4",
      "(1Z,3Z,6Z)-(cycloocta-1,3,6-trien-1-yl)triphenylboranuide"),
+    # D3: the plain C1 methyl is spelled 'methyl' (not 'methan-1-yl');
+    # with its inner parens gone the enclosure de-escalates one level ({} ->
+    # ), and 'methyl' vs 'methan' flips the alphanumerical order
+    # so '6-methyl' now precedes the methyl-bearing complex prefix.
+    # RT-verified identical InChIKey (checked below by _validity_gate_name_to_smiles).
     ("CC1=NC(=C(C=C1)/C(=N/O)/N(C)C2CCN(CC2)C)OC3=CC=CC(=C3)C(C)C",
-     "(1Z)-3-{2-[4-(methan-1-yl)-4-azacyclohexan-1-yl]-1-(2-oxa-1-azaethan-1-ylidene)"
-     "-2-azapropan-1-yl}-6-methyl-2-[3-(propan-2-yl)phenoxy]pyridine"),
+     "(1Z)-6-methyl-3-[2-(4-methyl-4-azacyclohexan-1-yl)-1-(2-oxa-1-azaethan-1-ylidene)"
+     "-2-azapropan-1-yl]-2-[3-(propan-2-yl)phenoxy]pyridine"),
 ]
 
 

@@ -1277,36 +1277,42 @@ def _assemble_name_impl(features: Any, style: str = "pin", _composing_ion: bool 
         pg_count = len(features.principal_group_atoms) if features.principal_group_atoms else 1
         if pg_count == 1:
             _amide_name = _assemble_amide_name(features, style)
-            if logger.isEnabledFor(logging.DEBUG):
-                _ha = features.mol.GetNumHeavyAtoms()
-                logger.debug(
-                    "HANDLER_COVERAGE: handler=%s coverage=NA accounted=NA/%d name=%s",
-                    "amide", _ha, (_amide_name or "")[:60],
-                )
-            # a phase: route through pool.add — direct_return handler.
-            pool = get_current_pool()
-            pool.add(_amide_name, "amide", features)
-            _best = pool.best()
-            # PHASE 168 STAGE B CUTOVER (internal notes): flag ON -> render from the rewritten tree;
-            # flag OFF -> fall through to pool.best.name (byte-identical Stage A).
-            if (getattr(pool, '_enable_triviality_controller', False) and _best is not None
-                    and getattr(_best, 'tree_rewritten', None) is not None):
-                try:
-                    from .name_tree_to_string import name_tree_to_string
-                    _rw = name_tree_to_string(_best.tree_rewritten, style=style)
-                    if _rw:
-                        return _rw
-                except Exception as exc:
-                    # (code review 2026-05-30): fail SAFE (fall back to the systematic
-                    # name) but never SILENT — a bare except-pass hid genuine controller/
-                    # serializer logic errors and made a broken controller look like a clean
-                    # no-op. Correctness against malformed-but-valid strings comes from the
-                    # RT-gate  + _build_rewrite (/), not from swallowing here.
-                    logger.warning(
-                        "Phase 168 Stage-B re-render failed on amide surface: %s; "
-                        "falling back to systematic name", exc,
+            # / hidden-amide fail-closed: mirror the direct-return handler
+            # (handlers/amide.py:134). _assemble_amide_name returns a FALSY value
+            # for an acyl-on-ring-N "hidden amide" it must not name substitutively
+            # (see its fail-closed guard); fall through to the general safety net
+            # (which abstains cleanly) rather than pool.add a wrong candidate.
+            if _amide_name:
+                if logger.isEnabledFor(logging.DEBUG):
+                    _ha = features.mol.GetNumHeavyAtoms()
+                    logger.debug(
+                        "HANDLER_COVERAGE: handler=%s coverage=NA accounted=NA/%d name=%s",
+                        "amide", _ha, (_amide_name or "")[:60],
                     )
-            return pool.best().name
+                # a phase: route through pool.add — direct_return handler.
+                pool = get_current_pool()
+                pool.add(_amide_name, "amide", features)
+                _best = pool.best()
+                # PHASE 168 STAGE B CUTOVER (internal notes): flag ON -> render from the rewritten tree;
+                # flag OFF -> fall through to pool.best.name (byte-identical Stage A).
+                if (getattr(pool, '_enable_triviality_controller', False) and _best is not None
+                        and getattr(_best, 'tree_rewritten', None) is not None):
+                    try:
+                        from .name_tree_to_string import name_tree_to_string
+                        _rw = name_tree_to_string(_best.tree_rewritten, style=style)
+                        if _rw:
+                            return _rw
+                    except Exception as exc:
+                        # (code review 2026-05-30): fail SAFE (fall back to the systematic
+                        # name) but never SILENT — a bare except-pass hid genuine controller/
+                        # serializer logic errors and made a broken controller look like a clean
+                        # no-op. Correctness against malformed-but-valid strings comes from the
+                        # RT-gate  + _build_rewrite (/), not from swallowing here.
+                        logger.warning(
+                            "Phase 168 Stage-B re-render failed on amide surface: %s; "
+                            "falling back to systematic name", exc,
+                        )
+                return pool.best().name
 
     # complete: Amine handler uses _assemble_amine_name which adds
     # N-alkyl prefixes and generates chain/ring substituent prefixes.
@@ -6346,6 +6352,26 @@ def _assemble_amide_name(features: Any, style: str) -> str:
 
     if not amide_atoms:
         return "amide"
+
+    # FAIL-CLOSED — acyl-on-ring-N "hidden amide" is a PSEUDOKETONE, never a
+    # substitutive amide, the Blue Book: "an N-acyl group attached
+    # to a nitrogen atom of a heterocyclic system is now named as a pseudoketone
+    #...; the [substituent] method... is retained but only for general
+    # nomenclature"; pseudoketone definition the Blue Book gives
+    # "1-(piperidin-1-yl)ethan-1-one"). The clean-acyl-chain case is already
+    # emitted by the pseudoketone gate (composer.py:_name_pseudoketone) BEFORE
+    # this function is reached; arriving here means the acyl chain is SUBSTITUTED
+    # (e.g. perfluoro), for which the substituted-acyl pseudoketone PIN is not yet
+    # built. The substitutive-amide path below calls get_n_substituents, which
+    # BFS-walks BOTH of the ring nitrogen's ring bonds and splits the ring into
+    # two acyclic substituents (piperidine -> N,N-dipentyl), emitting a
+    # constitutionally WRONG molecule. Decline (empty string -> caller falls
+    # through to the general safety net, which abstains cleanly) rather than
+    # generate that wrong candidate. Building the substituted-acyl pseudoketone
+    # PIN (1-(piperidin-1-yl)-...oxo... with acyl-chain prefixes) is deferred.
+    from ..rules.pseudoketones import is_hidden_amide as _is_hidden_amide
+    if _is_hidden_amide(mol, amide_atoms) is not None:
+        return ""
 
     # Ring-attached amides use -carboxamide suffix via name_amide
     # (ring systems rarely have E/Z issues; existing path is correct)

@@ -2,7 +2,7 @@
 
     CC(=O)NC1CCCCC1 -> N-cyclohexylacetamide works
     CC1(CCCCC1)NC(C)=O -> unknown organic compound GAP A
-    NC(=O)NC1CCCCC1 -> N-cyclohexylurea works
+    NC(=O)NC1CCCCC1 -> cyclohexylurea works
     NC(=S)NC1CCCCC1 -> unknown organic compound GAP B
 
 An inherited framing said *"no 1,1-disubstituted cycloalkyl substituent is
@@ -276,7 +276,11 @@ def test_gap_b_handler_does_not_enrich_a_complete_name():
 
     corrupted = _enrich_handler_name(
         features, "N-cyclohexylthiourea", "thiourea")
-    assert corrupted.startswith("1-(carbamothioylamino)"), corrupted
+    # Enrichment STILL corrupts (re-spells the handler's own core as a prefix);
+    # the core is now emitted in its fully systematic form rather than the
+    # `carbamothioyl` contraction, but the point -- the skip is load-bearing --
+    # is unchanged.
+    assert corrupted.startswith("1-{[amino(sulfanylidene)methyl]amino}"), corrupted
 
 
 def test_gap_b_urea_sibling_enrichment_is_unchanged():
@@ -305,8 +309,12 @@ def test_gap_b_family_ring_sizes_3_to_8(namer, smiles, expected):
     # prefix numbered against a parent (urea) that has no atom 1 or 4 at all
     # -- `1-methylN-(1-methylcyclohexyl)urea` -- which suppressed.
     ("NC(=S)NC1(C)CCCCC1",  "N-(1-methylcyclohexyl)thiourea"),
-    ("NC(=O)NC1(C)CCCCC1",  "N-(1-methylcyclohexyl)urea"),
-    ("NC(=O)NC1CCC(C)CC1",  "N-(4-methylcyclohexyl)urea"),
+    # (the Blue Book `methylurea (PIN)`): a MONO-substituted urea omits the
+    # N-locant -- urea's four N-H are one orbit (one kind of substitutable H).
+    # (The thiourea rows below KEEP N-: (the Blue Book) mandates the
+    # letter locants N/N' for chalcogen analogues -- `N-(butan-2-yl)selenourea (PIN)`.)
+    ("NC(=O)NC1(C)CCCCC1",  "(1-methylcyclohexyl)urea"),
+    ("NC(=O)NC1CCC(C)CC1",  "(4-methylcyclohexyl)urea"),
     ("NC(=S)NC1CCC(C)CC1",  "N-(4-methylcyclohexyl)thiourea"),
 ])
 def test_decorated_ring_on_a_retained_urea_parent(namer, smiles, expected):
@@ -383,9 +391,9 @@ def test_retained_tert_butyl_never_names_a_ring():
 
 
 @pytest.mark.parametrize("smiles,expected", [
-    ("NC(=O)NC1(C)CC1",  "N-(1-methylcyclopropyl)urea"),
+    ("NC(=O)NC1(C)CC1",  "(1-methylcyclopropyl)urea"),
     ("NC(=S)NC1(C)CC1",  "N-(1-methylcyclopropyl)thiourea"),
-    ("CC(C)(C)NC(=O)N",  "N-tert-butylurea"),
+    ("CC(C)(C)NC(=O)N",  "tert-butylurea"),
     ("CC(C)(C)NC(=S)N",  "N-tert-butylthiourea"),
 ])
 def test_cyclopropyl_is_not_flattened_to_tert_butyl(namer, smiles, expected):
@@ -462,7 +470,7 @@ def test_no_unresolvable_locant_on_a_retained_parent(namer, smiles, expected):
 
 @pytest.mark.parametrize("smiles,expected", [
     ("CC(=O)NC1CCCCC1",   "N-cyclohexylacetamide"),
-    ("NC(=O)NC1CCCCC1",   "N-cyclohexylurea"),
+    ("NC(=O)NC1CCCCC1",   "cyclohexylurea"),  # (the Blue Book): urea omits N-
     ("CC(=O)NC",          "N-methylacetamide"),
     ("CC(=O)NC(C)C",      "N-(propan-2-yl)acetamide"),
     ("NC(=S)N",           "thiourea"),

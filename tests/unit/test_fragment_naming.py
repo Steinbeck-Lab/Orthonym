@@ -24,12 +24,22 @@ from orthonym.assembly.fragment_naming import (
 
 @pytest.fixture(autouse=True)
 def _reset_fragment_guard():
-    """Reset thread-local state before and after each test."""
+    """Reset thread-local state before and after each test.
+
+    ``session_depth`` MUST be reset too: it is now an explicit counter (a test
+    that calls ``start_naming_session`` without a matching ``end`` leaves it > 0),
+    and a leaked non-zero depth makes the next test's ``start_naming_session``
+    skip the depth-1 cache allocation, so ``_fragment_guard.cache`` stays ``None``
+    and the next ``cache[...] =...`` raises ``TypeError`` -- the compounding
+    failure seen across TestSessionManagement in a group run.
+    """
     _fragment_guard.visited = set()
     _fragment_guard.cache = None
+    _fragment_guard.session_depth = 0
     yield
     _fragment_guard.visited = set()
     _fragment_guard.cache = None
+    _fragment_guard.session_depth = 0
 
 
 @pytest.mark.unit
@@ -208,13 +218,19 @@ class TestSessionManagement:
         assert "parent" in _fragment_guard.cache
 
     def test_nested_end_preserves_parent(self):
-        """Ending while visited set is non-empty should not clear."""
-        start_naming_session()
+        """Ending a NESTED session must not clear the parent's cache.
+
+        "Nested" is now an explicit ``session_depth`` counter, not
+        ``len(visited)``: only the OUTERMOST ``end_naming_session`` (depth 1 -> 0)
+        clears; a nested end (depth 2 -> 1) must preserve the parent state.
+        """
+        start_naming_session()                 # outermost: depth 0 -> 1
         _fragment_guard.cache["parent"] = "value"
-        _get_visited().add("PARENT_SMILES")
-        end_naming_session()
-        # Cache should still exist because visited set is non-empty
+        start_naming_session()                 # nested: depth 1 -> 2
+        end_naming_session()                   # nested end: depth 2 -> 1
+        # Not the outermost end, so the parent cache must survive.
         assert _fragment_guard.cache is not None
+        assert "parent" in _fragment_guard.cache
 
 
 @pytest.mark.unit

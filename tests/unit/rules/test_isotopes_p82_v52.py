@@ -139,6 +139,49 @@ def test_p82_regression_guards(smiles, expected):
 
 
 # --------------------------------------------------------------------------- #
+# SPLIT-ISOMER LOCANT — "Locants are not omitted when there is a
+# possibility of isomers" ("", the Blue Book Blue Book).
+#
+# When a count>=2 nuclide group sits ENTIRELY on ONE carrier atom whose symmetry
+# orbit has another host, moving the WHOLE group to the partner reproduces the
+# molecule (2,0 -> 0,2 collapses on a symmetric orbit), but SPLITTING the group
+# (1,1 -> 1,2) yields a DISTINCT isotopomer. Two isotopomers of the same count
+# therefore exist, so the locant MUST be cited even though the carrier orbit is
+# symmetric. The prior code tested only the whole-group move and wrongly omitted
+# the locant (``(2H2)ethane-1,2-diyl`` for ``(1,1-2H2)ethane-1,2-diyl``).
+#
+# The GAIN rows below must now carry the locant; the OMIT rows exercise the same
+# clause and MUST stay bare -- a scope of one host atom or a completely
+# substituted single-position methyl has no split partner. OPSIN reads
+# an unlocanted ``(2H2)`` as the 1,1 form, so BOTH spellings round-trip; this is a
+# PIN-spelling lock, not a round-trip test.
+P82_SPLIT_ISOMER_LOCANT = [
+    # GAIN the locant (a distinct 1,2 isotopomer exists -> cite).
+    ("O=C(O)c1ccc(OC([2H])([2H])COc2ccc(C(=O)O)cc2)cc1",
+     "4,4'-[(1,1-2H2)ethane-1,2-diylbis(oxy)]dibenzoic acid"),
+    ("[2H]C([2H])(O)CO", "(1,1-2H2)ethane-1,2-diol"),
+    ("BrC([2H])([2H])CBr", "1,2-dibromo(1,1-2H2)ethane"),
+    # OMIT the locant (no split partner -> /.
+    ("[2H]C([2H])(Cl)Cl", "dichloro(2H2)methane"),      # sole C in scope
+    ("[2H]C([2H])([2H])O", "(2H3)methanol"),            # sole C in scope
+    ("[2H]C([2H])([2H])C#N", "(2H3)acetonitrile"),      # complete single-position CH3
+    ("[2H]c1c([2H])c([2H])c([2H])c([2H])c1[2H]", "(2H6)benzene"),  # complete orbit
+]
+
+
+@pytest.mark.unit
+@pytest.mark.parametrize(
+    "smiles,expected",
+    P82_SPLIT_ISOMER_LOCANT,
+    ids=[smi for smi, _exp in P82_SPLIT_ISOMER_LOCANT],
+)
+def test_p82_6_1_4_split_isomer_locant(smiles, expected):
+    """ (the Blue Book): a count>=2 group on one carrier of a symmetric orbit
+    cites its locant iff a 1,1->1,2 split yields a distinct isotopomer."""
+    assert _best_effort().name(smiles) == expected
+
+
+# --------------------------------------------------------------------------- #
 # Task 6 (sub-pattern E) LOCK — (the Blue Book): "When the nuclide is
 # located at a position in a retained name that is not numbered a systematic
 # name that identifies separately the relevant atom is used for the IUPAC

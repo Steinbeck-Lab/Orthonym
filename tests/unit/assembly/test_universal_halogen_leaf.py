@@ -97,7 +97,7 @@ def test_bromo_and_iodo_terminus_roundtrip():
 def test_plain_methyl_unchanged():
     r, verified = _name_and_verify("Cc1ccccc1")
     assert verified == r.name
-    assert "methan-1-yl" in r.name  # CH3 stays a 1-carbon leaf
+    assert "methyl" in r.name  # CH3 stays a 1-carbon leaf, spelled per (D3)
 
 
 def test_ring_halogen_unchanged():
