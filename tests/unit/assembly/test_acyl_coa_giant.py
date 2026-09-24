@@ -16,10 +16,9 @@ from rdkit.Chem import inchi
 
 from orthonym import Orthonym
 from orthonym.jvm_flags import JVM_HYGIENE_FLAGS
+from tests.support.jars import jar_or_skip
 
 pytestmark = pytest.mark.opsin_gate
-
-_JAR = str(__import__("pathlib").Path(__file__).resolve().parents[3] / "opsin-cli-2.9.0-jar-with-dependencies.jar")
 
 # best-effort breadth tier (the documented RT-full tier — name_general all-or-none).
 # 0-wrong is delivered by applying the OPSIN full-InChIKey RT gate to its output: a
@@ -43,7 +42,7 @@ def _opsin_inchikey(name):
         p = fh.name
     try:
         out = subprocess.run(
-            ["java", *JVM_HYGIENE_FLAGS, "-jar", _JAR, "-osmi", p],
+            ["java", *JVM_HYGIENE_FLAGS, "-jar", jar_or_skip(), "-osmi", p],
             capture_output=True, text=True, timeout=180,
         ).stdout.strip()
     finally:

@@ -17,6 +17,7 @@ IUPAC Reference: Blue Book 2013,,
 import subprocess
 import pytest
 from rdkit import Chem
+from tests.support.jars import jar_or_skip
 
 from orthonym import name_compound
 from orthonym.rules.bicyclo import (
@@ -235,12 +236,11 @@ class TestEndToEndFusedRouting:
         """OPSIN should parse decahydronaphthalene successfully."""
         try:
             result = subprocess.run(
-                ['java', '-jar', 'opsin-cli-2.9.0-jar-with-dependencies.jar', '-osmi'],
+                ['java', '-jar', jar_or_skip(), '-osmi'],
                 input='decahydronaphthalene',
                 capture_output=True,
                 text=True,
                 timeout=10,
-                cwd=str(__import__('pathlib').Path(__file__).resolve().parents[3])
             )
             output = result.stdout.strip()
             # Filter out the "Run the jar..." header line
@@ -260,12 +260,11 @@ class TestEndToEndFusedRouting:
         """OPSIN should parse octahydropentalene successfully."""
         try:
             result = subprocess.run(
-                ['java', '-jar', 'opsin-cli-2.9.0-jar-with-dependencies.jar', '-osmi'],
+                ['java', '-jar', jar_or_skip(), '-osmi'],
                 input='octahydropentalene',
                 capture_output=True,
                 text=True,
                 timeout=10,
-                cwd=str(__import__('pathlib').Path(__file__).resolve().parents[3])
             )
             output = result.stdout.strip()
             lines = [l for l in output.split('\n') if not l.startswith('Run')]

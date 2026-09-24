@@ -61,10 +61,11 @@ from pathlib import Path
 
 from rdkit import Chem, RDLogger
 
+from orthonym.jars import find_jar  # raises JarUnavailable when the jar is missing
+
 RDLogger.DisableLog("rdApp.*")
 
 PROJECT_ROOT = Path(__file__).resolve().parents[3]
-OPSIN_JAR = PROJECT_ROOT / "opsin-cli-2.9.0-jar-with-dependencies.jar"
 
 # ---------------------------------------------------------------------------
 # Documented exclusions. Every exclusion is explicit and reasoned -- there are no
@@ -183,7 +184,7 @@ def _inchikey(smiles):
 def build_structures(names):
     """Independently construct each name's structure. One JVM for the batch."""
     proc = subprocess.run(
-        ["java", "-jar", str(OPSIN_JAR), "-o", "smi"],
+        ["java", "-jar", find_jar("opsin"), "-o", "smi"],
         input="\n".join(names) + "\n",
         capture_output=True, text=True, timeout=3600,
     )

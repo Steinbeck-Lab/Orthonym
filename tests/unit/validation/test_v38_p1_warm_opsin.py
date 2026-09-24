@@ -22,10 +22,10 @@ from orthonym.validation import atom_coverage
 from orthonym.validation.atom_coverage import (
     _opsin_cli_stdout,
     _parse_name_with_opsin_uncached,
-    find_opsin_jar,
 )
+from tests.support.jars import jar_or_none
 
-_JAR = find_opsin_jar()
+_JAR = jar_or_none()
 _HAVE_OPSIN = _JAR is not None and shutil.which("java") is not None
 
 pytestmark = pytest.mark.skipif(

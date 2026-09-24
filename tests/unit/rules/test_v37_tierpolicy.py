@@ -43,7 +43,7 @@ from rdkit.Chem import inchi
 
 from orthonym import Orthonym, errors
 from orthonym.jvm_budget import jvm_slots
-from orthonym.validation.opsin_roundtrip import _find_opsin_jar
+from tests.support.jars import jar_or_skip
 from orthonym.assembly.retained_substitution import OpsinOracle
 import orthonym.assembly.t4_coverage as t4_coverage
 
@@ -61,7 +61,7 @@ def _jvm_slot():
 
 @pytest.fixture(scope="module")
 def _oracle():
-    return OpsinOracle(opsin_jar=_find_opsin_jar())
+    return OpsinOracle(opsin_jar=jar_or_skip())
 
 
 def _alarm(seconds=120):

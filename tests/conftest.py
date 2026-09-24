@@ -9,6 +9,10 @@ from typing import List, Dict
 
 from rdkit import Chem
 
+# Shared jar helpers (the jars live outside the repo; see orthonym.jars).
+# Re-exported here; tests import them from ``tests.support.jars``.
+from tests.support.jars import REQUIRE_JARS, jar_or_none, jar_or_skip, jar_unavailable  # noqa: F401
+
 # Paths
 PROJECT_ROOT = Path(__file__).parent.parent
 FIXTURES_DIR = Path(__file__).parent / "fixtures"
@@ -148,15 +152,24 @@ def opsin_jar() -> str:
     and "the parse helper can use a jar" cannot disagree.
 
     A hand-rolled ``glob`` over five patterns used to stand here. It could
-    resolve a jar (e.g. under ``opsin/opsin-cli/target/``) that ``_find_opsin_jar``
-    would NOT return, which would have made ``opsin_to_smiles`` skip-free but
-    silently None-returning — the exact blind state this file exists to prevent.
+    resolve a jar that ``_find_opsin_jar`` would NOT return, which would have
+    made ``opsin_to_smiles`` skip-free but silently None-returning — the exact
+    blind state this file exists to prevent.
+
+    ``_find_opsin_jar`` now delegates to ``orthonym.jars.find_jar`` and RAISES
+    ``JarUnavailable`` when the pinned jar is missing; that maps to None here,
+    except under ``ORTHONYM_REQUIRE_JARS=1``, where it fails the test.
     """
     try:
         from orthonym.validation.opsin_roundtrip import _find_opsin_jar
-        return _find_opsin_jar()
-    except Exception:
+        jar = _find_opsin_jar()
+    except Exception as exc:
+        if REQUIRE_JARS:
+            pytest.fail(f"ORTHONYM_REQUIRE_JARS=1 but the OPSIN jar is unavailable: {exc}")
         return None
+    if jar is None and REQUIRE_JARS:
+        pytest.fail("ORTHONYM_REQUIRE_JARS=1 but the OPSIN jar is unavailable (reduced mode)")
+    return jar
 
 
 @pytest.fixture
@@ -413,7 +426,7 @@ def _opsin_jar_present() -> bool:
     try:
         from orthonym.validation.opsin_roundtrip import _find_opsin_jar
         return _find_opsin_jar() is not None
-    except Exception:
+    except Exception:  # incl. orthonym.jars.JarUnavailable
         return False
 
 
@@ -467,10 +480,11 @@ def pytest_runtest_call(item):
     fail-OPEN) and the test asserts nothing about the gate.
     """
     if _gate_is_on() and not _opsin_jar_present():
-        pytest.skip(
+        # jar_unavailable skips -- or FAILS under ORTHONYM_REQUIRE_JARS=1.
+        jar_unavailable(
             "OPSIN jar absent: the validity gate fails OPEN without it (D-13), "
-            "so this gate-enabled test would be green-but-blind. Build/fetch "
-            "the OPSIN jar to run it."
+            "so this gate-enabled test would be green-but-blind. Fetch the "
+            "OPSIN jar (`orthonym --fetch-jars`) to run it."
         )
     return (yield)
 

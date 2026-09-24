@@ -315,21 +315,12 @@ class TestSpecificCompounds:
 
 import subprocess
 import os
-import glob as glob_module
 
 
 def _find_opsin_jar():
-    """Find OPSIN JAR file."""
-    project_root = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-    patterns = [
-        os.path.join(project_root, "opsin-cli-*-jar-with-dependencies.jar"),
-        os.path.join(project_root, "opsin", "opsin-cli", "target", "opsin-cli-*-jar-with-dependencies.jar"),
-    ]
-    for pat in patterns:
-        matches = glob_module.glob(pat)
-        if matches:
-            return matches[0]
-    return None
+    """The pinned OPSIN jar via orthonym.jars (tests.support.jars), or None."""
+    from tests.support.jars import jar_or_none
+    return jar_or_none()
 
 
 def _opsin_parse(name, opsin_jar):

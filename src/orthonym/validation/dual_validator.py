@@ -155,33 +155,13 @@ def _parse_batch_with_opsin(
 
 
 def _find_opsin_jar() -> Optional[str]:
-    """Find OPSIN JAR file in project root or standard locations."""
-    import glob as glob_mod
+    """Path to the pinned OPSIN jar (``orthonym.jars``), or None without a Java runtime."""
     import shutil
 
     if not shutil.which("java"):
         return None
-
-    project_root = Path(__file__).parent.parent.parent.parent
-
-    search_patterns = [
-        str(project_root / "opsin-cli-*-jar-with-dependencies.jar"),
-        str(project_root / "opsin-cli-*.jar"),
-        str(project_root / "opsin.jar"),
-        str(
-            project_root
-            / "opsin"
-            / "opsin-cli"
-            / "target"
-            / "opsin-cli-*-jar-with-dependencies.jar"
-        ),
-    ]
-
-    for pattern in search_patterns:
-        matches = glob_mod.glob(pattern)
-        if matches:
-            return matches[0]
-    return None
+    from ..jars import find_jar
+    return find_jar("opsin")
 
 
 def validate_compound(

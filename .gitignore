@@ -157,3 +157,6 @@ benchmarks/*/hh_10k_*.json
 
 # Stray leftover test-data snippet (unreferenced)
 /test.tsv
+
+# Third-party jars are downloaded at install, never committed
+*.jar

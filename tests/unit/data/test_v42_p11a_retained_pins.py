@@ -42,9 +42,10 @@ from rdkit import Chem
 
 from orthonym import name_compound
 from orthonym.data import ALL_RETAINED_NAMES
+from tests.support.jars import jar_or_none
 
-_OPSIN_JAR = Path(__file__).resolve().parents[3] / "opsin-cli-2.9.0-jar-with-dependencies.jar"
-_OPSIN_OK = shutil.which("java") is not None and _OPSIN_JAR.is_file()
+_OPSIN_JAR = jar_or_none()
+_OPSIN_OK = shutil.which("java") is not None and _OPSIN_JAR is not None
 
 # Group 1 — gold-defect rows: engine already emits the indicated-H PIN.
 _GROUP1 = [

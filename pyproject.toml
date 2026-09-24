@@ -90,12 +90,20 @@ jvm = [
 orthonym = "orthonym.cli:main"
 
 [project.urls]
-Homepage = "https://github.com/Kohulan/Orthonym"
-Documentation = "https://github.com/Kohulan/Orthonym#readme"
-Repository = "https://github.com/Kohulan/Orthonym"
+Homepage = "https://github.com/Beilstein-Institut/Orthonym"
+Documentation = "https://github.com/Beilstein-Institut/Orthonym#readme"
+Repository = "https://github.com/Beilstein-Institut/Orthonym"
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/orthonym"]
+
+# Install-time prefetch of the pinned OPSIN / centres jars into the user cache
+# (hatch_build.py). The jars are never put into the wheel or the sdist.
+[tool.hatch.build.targets.wheel.hooks.custom]
+path = "hatch_build.py"
+
+[tool.hatch.build.targets.sdist]
+exclude = ["*.jar"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

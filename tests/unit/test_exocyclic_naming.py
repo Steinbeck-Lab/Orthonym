@@ -13,6 +13,7 @@ import subprocess
 import pytest
 from rdkit import Chem
 from rdkit.Chem import rdCIPLabeler
+from tests.support.jars import jar_or_skip
 
 
 # =============================================================================
@@ -342,14 +343,11 @@ class TestExocyclicEndToEnd:
 # OPSIN round-trip tests (Task 2)
 # =============================================================================
 
-OPSIN_JAR = "opsin/opsin-cli-2.9.0-jar-with-dependencies.jar"
-
-
 def _opsin_name_to_smiles(name):
     """Parse an IUPAC name with OPSIN, return SMILES or None."""
     try:
         result = subprocess.run(
-            ['java', '-jar', OPSIN_JAR, '-osmi'],
+            ['java', '-jar', jar_or_skip(), '-osmi'],
             input=name, capture_output=True, text=True, timeout=15
         )
         smi = result.stdout.strip()

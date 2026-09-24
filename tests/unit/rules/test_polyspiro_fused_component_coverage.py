@@ -27,10 +27,9 @@ import subprocess
 
 import pytest
 from rdkit import Chem
+from tests.support.jars import jar_or_skip
 
 pytestmark = [pytest.mark.unit]
-
-JAR = "/home/kohulan/OpenSTOUT/Orthonym/opsin/opsin-cli-2.9.0-jar-with-dependencies.jar"
 
 # chromane(=3,4-dihydro-2H-1-benzopyran) --spiro-- cyclohexane --spiro-- cyclopentane,
 # with a hydroxyl (and 1 stereocentre) on the benzopyran ring.
@@ -40,7 +39,7 @@ WITNESS_DISPIRO_FUSED = "O[C@@H]1CC2(CCC3(CCCC3)CC2)Oc2ccccc21"
 def _opsin_to_smiles(name):
     if not shutil.which("java"):
         pytest.skip("no JVM on PATH")
-    p = subprocess.run(["java", "-jar", JAR, "-o", "smi"],
+    p = subprocess.run(["java", "-jar", jar_or_skip(), "-o", "smi"],
                        input=name + "\n", capture_output=True, text=True)
     out = p.stdout.strip()
     return out or None

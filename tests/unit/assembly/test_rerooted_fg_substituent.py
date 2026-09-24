@@ -74,16 +74,14 @@ def test_pantetheine_fragment_rt_exact(_best_effort):
     # The pantetheine-acyl half named as a substituent rooted at the C14 terminus
     # must round-trip to the identical structure (constitution + stereo).
     from orthonym.validation.atom_coverage import _parse_name_with_opsin_uncached as opsin
-    import glob
-    jar = (glob.glob('opsin*.jar') + glob.glob('*/opsin*.jar'))
-    if not jar:
-        pytest.skip('no OPSIN jar')
+    from tests.support.jars import jar_or_skip
+    jar = jar_or_skip()
     frag = 'CCCCCCCCCCCCCC[C@@H](O)C(=O)SCCNC(=O)CCN'
     m = _mol(frag)
     name = name_substituent_fragment(m, list(range(m.GetNumHeavyAtoms())), 0, [])
     assert name is not None
     tn = ('[' + name + ']' if not name[0].isdigit() else '(' + name + ')') + 'benzene'
-    s = opsin(tn, jar[0])
+    s = opsin(tn, jar)
     assert s is not None
     tgt = Chem.MolToInchiKey(Chem.MolFromSmiles('c1ccccc1' + frag))
     assert Chem.MolToInchiKey(Chem.MolFromSmiles(s)) == tgt

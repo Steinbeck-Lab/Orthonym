@@ -25,6 +25,7 @@ from typing import Any
 
 import pytest
 from rdkit import Chem
+from tests.support.jars import jar_or_none
 
 
 # ---------------------------------------------------------------------------
@@ -32,14 +33,11 @@ from rdkit import Chem
 # parents[3]: tests/unit/rules/test_X.py -> project root.
 # ---------------------------------------------------------------------------
 
-_OPSIN_JAR = (
-    Path(__file__).resolve().parents[3]
-    / "opsin-cli-2.9.0-jar-with-dependencies.jar"
-)
+_OPSIN_JAR = jar_or_none()
 
 
 def _opsin_available() -> bool:
-    return _OPSIN_JAR.exists() and shutil.which("java") is not None
+    return _OPSIN_JAR is not None and shutil.which("java") is not None
 
 
 _OPSIN_BATCH_CACHE: dict[str, str | None] = {}

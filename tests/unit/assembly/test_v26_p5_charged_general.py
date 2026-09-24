@@ -40,6 +40,7 @@ from orthonym.assembly.general_engine import name_general
 from orthonym.validation import binding_spine as bs
 from orthonym.validation.binding_spine import BindingSpine, verify_spine
 from orthonym.validation.e1_certificate import verify_certificate
+from tests.support.jars import jar_or_none
 
 
 pytestmark = pytest.mark.unit
@@ -124,12 +125,8 @@ _RT_NAMES = dict(FULL_NAMER_CASES)
 # Fixtures (mirror test_v26_p3_failclosed_routing)
 # --------------------------------------------------------------------------
 def _find_opsin_jar():
-    for pat in ("opsin-cli-*-jar-with-dependencies.jar", "opsin-cli-*.jar",
-                "opsin.jar"):
-        m = glob.glob(pat)
-        if m:
-            return m[0]
-    return None
+    """The pinned OPSIN jar via orthonym.jars (tests.support.jars), or None."""
+    return jar_or_none()
 
 
 @pytest.fixture

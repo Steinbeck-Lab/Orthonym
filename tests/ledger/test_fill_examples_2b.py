@@ -16,8 +16,9 @@ from __future__ import annotations
 import pytest
 from typing import Optional
 
+from tests.support.jars import jar_or_none
+
 from scripts.ledger.fill_examples_2b import (
-    OPSIN_JAR,
     _mech_a_recover,
     _is_prose,
     _gather_name_candidates,
@@ -160,7 +161,7 @@ class TestMechanismA:
 # ---------------------------------------------------------------------------
 
 # Skip if no JVM or OPSIN jar available
-_opsin_available = OPSIN_JAR is not None
+_opsin_available = jar_or_none() is not None
 
 @pytest.mark.skipif(not _opsin_available, reason="OPSIN jar not found — skipping OPSIN tests")
 class TestMechanismBOpsin:

@@ -12,6 +12,9 @@ on:
     branches: [main]
   workflow_dispatch:
 
+env:
+  ORTHONYM_REQUIRE_JARS: "1"   # a missing jar fails tests instead of skipping them
+
 jobs:
   build-and-smoke:
     name: Install + naming smoke test
@@ -32,13 +35,15 @@ jobs:
           distribution: temurin
           java-version: '17'
 
-      - name: Verify bundled OPSIN jar present
-        run: test -f opsin-cli-2.9.0-jar-with-dependencies.jar
-
       - name: Install package
         run: |
           python -m pip install --upgrade pip
           pip install -e ".[dev]"
+
+      - name: Fetch and verify the OPSIN and centres jars
+        # The jars are not in the repository; this downloads them from their
+        # official releases and checks the pinned SHA-256 (fails the job otherwise).
+        run: orthonym --fetch-jars
 
       - name: Naming smoke test
         run: |

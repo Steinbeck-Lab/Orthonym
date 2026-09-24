@@ -241,6 +241,14 @@ def main(args: List[str] = None) -> int:
     )
 
     parser.add_argument(
+        "--fetch-jars",
+        action="store_true",
+        help=(
+            "Download (if needed) and verify the pinned OPSIN and centres jars, "
+            "print where they are, and exit (non-zero on failure)."
+        ),
+    )
+    parser.add_argument(
         "--binding-proof",
         dest="binding_proof",
         choices=["off", "audit", "enforce"],
@@ -255,6 +263,22 @@ def main(args: List[str] = None) -> int:
     )
 
     parsed = parser.parse_args(args)
+
+    from orthonym.jars import JarUnavailable, fetch_all, require_all
+    if parsed.fetch_jars:
+        try:
+            fetch_all(verbose=True)
+        except JarUnavailable as exc:
+            print(f"orthonym: {exc}", file=sys.stderr)
+            return 1
+        return 0
+    try:
+        require_all()
+    except JarUnavailable as exc:
+        print(f"orthonym: {exc}\n"
+              "orthonym: to name without the jars (no OPSIN check, RDKit stereo labels), "
+              "set ORTHONYM_ALLOW_REDUCED=1", file=sys.stderr)
+        return 2
 
     # Batch processing mode
     if parsed.batch:

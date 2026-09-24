@@ -27,6 +27,7 @@ from pathlib import Path
 
 import pytest
 from rdkit import Chem
+from tests.support.jars import jar_or_none
 
 _PROJECT_ROOT = Path(__file__).resolve().parent.parent.parent
 CANARY_PATH = _PROJECT_ROOT / "tests" / "canary" / "canary_functional_replacement.csv"
@@ -117,16 +118,8 @@ def test_tier_a_name_string_equality(row):
 
 
 def _find_opsin_jar():
-    """Mirror scripts/verify_orgm_canary.py jar finder."""
-    candidates = list(_PROJECT_ROOT.glob("opsin/opsin-cli-*.jar"))
-    if not candidates:
-        # Symlinks resolve via Path.glob; if symlinks point to absent files,
-        # fall back to the resolved path.
-        return None
-    jar = candidates[0]
-    if not jar.exists():
-        return None
-    return str(jar)
+    """The pinned OPSIN jar via orthonym.jars (tests.support.jars), or None."""
+    return jar_or_none()
 
 
 def _opsin_parse(name):

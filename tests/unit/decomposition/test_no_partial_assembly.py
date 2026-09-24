@@ -49,11 +49,12 @@ from orthonym.assembly.fragment_naming import (
 )
 from orthonym.errors import is_failure_name
 from orthonym.namer import Orthonym, name_compound
-from orthonym.validation.opsin_roundtrip import _find_opsin_jar, opsin_parse
+from orthonym.validation.opsin_roundtrip import opsin_parse
+from tests.support.jars import jar_or_none
 
 pytestmark = [
     pytest.mark.skipif(
-        _find_opsin_jar() is None,
+        jar_or_none() is None,
         reason="round-trip assertions need the OPSIN jar; without it the "
                "invariant cannot be measured (it would be vacuously true)",
     ),

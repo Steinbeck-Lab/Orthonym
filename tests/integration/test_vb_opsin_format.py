@@ -29,9 +29,9 @@ from orthonym.rules.polycyclic import (
 # The hardcoded "opsin-cli-2.8.0-jar-with-dependencies.jar" was dead since
 # the project upgraded to 2.9.0; the helper falls back gracefully if no
 # JAR is available, and tests skip rather than emit misleading parse errors.
-from orthonym.validation.opsin_roundtrip import _find_opsin_jar
+from tests.support.jars import jar_or_none
 
-OPSIN_JAR = _find_opsin_jar()
+OPSIN_JAR = jar_or_none()
 
 
 def _opsin_parse(name: str) -> str:

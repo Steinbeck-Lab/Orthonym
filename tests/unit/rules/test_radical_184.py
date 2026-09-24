@@ -31,7 +31,7 @@ from rdkit import Chem
 
 from orthonym.namer import Orthonym
 from orthonym.assembly.retained_substitution import OpsinOracle
-from orthonym.validation.opsin_roundtrip import _find_opsin_jar
+from tests.support.jars import jar_or_skip
 
 
 @pytest.mark.unit
@@ -74,9 +74,7 @@ class TestOracleAdditivityBaseline:
         names; it never alters an existing parse. Anchor on a plain alkane:
         ``hexane`` -> a non-None SMILES via the same oracle namer builds for the
         validity gate (OpsinOracle(opsin_jar=_find_opsin_jar))."""
-        jar = _find_opsin_jar()
-        if jar is None:
-            pytest.skip("OPSIN jar not available; additivity baseline skipped")
+        jar = jar_or_skip()  # OPSIN jar not available -> additivity baseline skipped
         oracle = OpsinOracle(opsin_jar=jar)
         smi = oracle.name_to_smiles("hexane")
         assert smi is not None

@@ -17,9 +17,9 @@ def opsin_parse(name: str) -> str | None:
     canonical helper). The hardcoded `opsin-cli-2.8.0-...jar` was dead
     since the project upgraded to opsin-cli-2.9.0.
     """
-    from orthonym.validation.opsin_roundtrip import _find_opsin_jar
+    from tests.support.jars import jar_or_none
 
-    opsin_jar = _find_opsin_jar()
+    opsin_jar = jar_or_none()
     if opsin_jar is None:
         return None
     try:

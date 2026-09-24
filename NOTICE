@@ -1,94 +1,66 @@
-Orthonym — Third-Party Vendored Artifacts
-==========================================
+Orthonym — Third-Party Components
+=================================
 
-This file records the provenance and licensing of third-party binary artifacts
-shipped in this repository and invoked at runtime as unmodified standalone jars
-via subprocess. Orthonym does NOT statically link, embed, or modify these jars;
-its own source remains under the MIT License. However, two of the shipped jars
-are shaded "fat jars" that bundle third-party components under copyleft licenses
-(LGPL / GPL-with-Classpath-exception). Those components are redistributed here in
-binary form, unmodified, and their license terms and source-availability
-obligations travel with them — see each entry below. Their presence does not and
-cannot relicense Orthonym's own MIT-licensed source, because they are invoked as
-separate programs, not linked.
+Orthonym's own source is released under the MIT License.
+
+Orthonym uses two third-party Java programs. They are NOT part of this
+repository and are NOT included in any Orthonym package. They are downloaded
+from their official releases, on `pip install` or by `orthonym --fetch-jars`,
+into the user's cache, and each download is checked against the SHA-256
+below before it is used. Each jar keeps its own licence terms, listed here.
+
+Orthonym runs them unmodified, as separate programs on the Java virtual
+machine (by default in one in-process JVM via JPype, or as a `java -jar`
+subprocess). If either jar is missing, Orthonym stops with an error rather than
+naming with less validation; setting ORTHONYM_ALLOW_REDUCED=1 opts in to naming
+without them.
 
 
-opsin-cli-2.9.0-jar-with-dependencies.jar
------------------------------------------
-- Component:  OPSIN (Open Parser for Systematic IUPAC Nomenclature)
-- Project:    University of Cambridge, Centre for Molecular Informatics
+OPSIN — opsin-cli-2.9.0-jar-with-dependencies.jar
+-------------------------------------------------
+- Component:  OPSIN (Open Parser for Systematic IUPAC Nomenclature), name -> structure
 - Version:    2.9.0
-- License:    MIT (OPSIN itself; Copyright (c) Daniel Lowe and contributors)
-- Bundled-in: This fat jar also shades several dependencies, all freely
-              redistributable: automaton, xsdlib, stax2-api (BSD family);
+- Download:   https://github.com/dan2097/opsin/releases/download/2.9.0/opsin-cli-2.9.0-jar-with-dependencies.jar
+- SHA-256:    c2e29326c281f87b59a05d934d8589adac6e9d17b95b984931b3e739111b360f
+- License:    MIT (OPSIN itself; Copyright (c) Daniel Lowe and contributors).
+              The jar also bundles automaton, xsdlib, stax2-api (BSD family);
               woodstox, commons-io, commons-cli, log4j (Apache-2.0); isorelax
               (MIT); jna-inchi (LGPL-2.1) wrapping the IUPAC InChI library
-              (IUPAC-InChI-Trust Licence — freely redistributable). Their
-              notices are carried inside the jar's META-INF.
-- Usage:      Invoked out-of-process via subprocess for name->structure
-              round-trip validation and the OPSIN grammar validity gate.
-              Vendored unmodified; used as a standalone executable jar.
+              (IUPAC-InChI-Trust Licence). Their notices are inside the jar's
+              META-INF.
+- Used for:   round-trip validation of every candidate name.
 - Source:     https://github.com/dan2097/opsin
 
 
-centres-cli-1.2.1.jar   (optional — CIP stereo descriptor labeller)
--------------------------------------------------------------------
-- Component:  centres (Cahn-Ingold-Prelog stereo descriptor labeller;
-              reference implementation of Hanson et al. 2018), with a CDK backend.
-- Project:    SiMolecule / centres
-- Version:    1.2.1 — the TAGGED public release
-              (https://github.com/SiMolecule/centres/releases/tag/1.2.1), a shaded
-              fat-jar bundling CDK, downloaded UNMODIFIED (not locally built). A
-              tagged release is reproducible: a rebuild fetches the same bytes,
-              verifiable against the SHA-256 below. (This replaces the earlier
-              1.5-SNAPSHOT `develop @ d4b3cf0`, an UNRELEASED local build that
-              nobody could reproduce and that scored 2 molecules LOWER on the CIP
-              suite — see the Suite line.)
-- Main-Class: com.simolecule.centres.LabelCip
-- Size:       2,291,742 bytes.
+centres — centres-cli-1.2.1.jar
+-------------------------------
+- Component:  centres, a Cahn-Ingold-Prelog stereo descriptor labeller (reference
+              implementation of Hanson et al. 2018), with a CDK backend
+- Version:    1.2.1 (tagged release; saved under the name centres-cli-1.2.1.jar)
+- Download:   https://github.com/SiMolecule/centres/releases/download/1.2.1/centres.jar
 - SHA-256:    6c5d5cafa9393ed7b667a2340222348cd15a9bbdd0d1b92518229f26cc5e87fb
-- License (centres itself): BSD-2-Clause (Copyright (c) 2020, John Mayfield).
-              For the 1.2.1 tagged release the upstream LICENSE, source headers,
-              and GitHub all state BSD-2-Clause unambiguously (the pom-vs-LICENSE
-              disagreement that forced a conservative LGPL-3.0 reading was specific
-              to the unreleased develop snapshot). NOTE: the effective terms of the
-              redistributed FAT-JAR are still governed by its bundled copyleft
-              dependencies (next section), not by centres' own permissive licence.
-- Bundled copyleft components (the decisive point): as a shaded fat-jar this
-              artifact REDISTRIBUTES, in binary form:
+- Size:       2,291,742 bytes; Main-Class com.simolecule.centres.LabelCip
+- License:    BSD-2-Clause (centres itself; Copyright (c) 2020, John Mayfield).
+              As a shaded jar it also bundles, in binary form:
                 * CDK (Chemistry Development Kit) — LGPL-2.1-or-later
-                * javax.vecmath — GPLv2 WITH the Classpath exception
-                * Beam (uk.ac.ebi.beam) — permissive (BSD/MIT family)
-              These licenses' terms and source-availability / relink obligations
-              apply to the redistributed binaries. Corresponding source:
-                * CDK:       https://github.com/cdk/cdk
-                * vecmath:   https://github.com/hharrison/vecmath  (javax.vecmath)
-                * Beam:      https://github.com/johnmay/beam
-                * centres:   https://github.com/SiMolecule/centres
-              LGPL/GPL-with-Classpath both permit unmodified redistribution and
-              use of the jar as a separate invoked program; the Classpath
-              exception on vecmath specifically permits this without extending its
-              terms to the calling work.
-- Usage:      Invoked out-of-process as an unmodified standalone jar via subprocess
-              (`java -jar centres-cli-1.2.1.jar ...`) by
-              src/orthonym/perception/centres_bridge.py. Orthonym does NOT link
-              against, statically embed, or modify the jar.
-- Optional:   Adoption is env-gated (ORTHONYM_USE_CENTRES_CIP, default ON). When
-              the jar or a Java runtime is absent, Orthonym falls back to RDKit's
-              rdCIPLabeler and never hard-fails a name on a missing JVM. Because it
-              is optional and carries copyleft dependencies, a future release may
-              move it to an on-demand download rather than shipping it in-tree.
-- Suite:      centres 1.2.1 scores 281/290 on the Hanson 2018 CIP Validation Suite
-              (vs 235 for RDKit's rdCIPLabeler) — 2 higher than the 1.5-SNAPSHOT,
-              which regressed 2 cyclic-cumulene axial M/P labels (VS078, VS287).
-              Every R/S / E/Z label is identical between the two jars, and Orthonym
-              does not consume centres' cumulene M/P (axial CIP is computed
-              independently in perception.stereo), so production naming is unchanged
-              either way (verified: 0/300 stereo names differ). The score is
-              asserted by tests/integration/test_cip_validation.py so a future jar
-              swap cannot silently regress it.
+                  (source: https://github.com/cdk/cdk)
+                * javax.vecmath — GPLv2 with the Classpath exception
+                  (source: https://github.com/hharrison/vecmath)
+                * Beam (uk.ac.ebi.beam) — BSD/MIT family
+                  (source: https://github.com/johnmay/beam)
+- Used for:   R/S and E/Z stereo descriptors. On the Hanson 2018 CIP Validation
+              Suite it labels 281/290 correctly (RDKit's rdCIPLabeler: 235/290);
+              tests/integration/test_cip_validation.py asserts the score.
 - Source:     https://github.com/SiMolecule/centres
 
-RDKit (a runtime dependency installed via pip, BSD-3-Clause) is NOT redistributed
-by this repository and so is not listed here; its license governs the user's own
-installed copy.
+
+Included file from OPSIN
+------------------------
+- src/orthonym/data/opsin_imports/regex_tokens_xml.json holds OPSIN 2.9.0's
+  resource uk/ac/cam/ch/wwmm/opsin/resources/regexTokens.xml, byte-identical to
+  the entry in the jar above (SHA-256 recorded in the file). OPSIN is MIT
+  licensed (Copyright (c) Daniel Lowe and contributors). It lets the name-grammar
+  check load without the jar.
+
+RDKit and the other Python dependencies are installed by pip under their own
+licences and are not redistributed by this repository.

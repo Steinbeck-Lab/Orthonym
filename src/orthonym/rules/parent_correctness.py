@@ -63,28 +63,14 @@ from ..assembly.coverage_scoring import CandidateName
 
 logger = logging.getLogger(__name__)
 
-# OPSIN jar lives at repo root. Resolve via glob so any version
-# (e.g., opsin-cli-2.9.0..., opsin-cli-2.10.0...) is picked up.
-#: previously hardcoded to 2.9.0, breaking when a newer JAR
-# replaced it. Pattern matches validation/atom_coverage.py:62.
-_REPO_ROOT = Path(__file__).parent.parent.parent.parent
 
 def _resolve_opsin_jar() -> Path:
-    """Return path to the first matching OPSIN CLI JAR at repo root.
+    """Path to the pinned OPSIN jar (``orthonym.jars``); raises JarUnavailable if missing."""
+    from ..jars import JARS, find_jar
+    jar = find_jar("opsin")
+    return Path(jar) if jar else Path(JARS["opsin"].filename)
 
-    Falls back to the canonical 2.9.0 filename if no match is found, so
-    the FileNotFoundError raised by ``_opsin_to_smi`` (caught at line 122)
-    still names a meaningful path in logs.
-    """
-    candidates = sorted(glob.glob(
-        str(_REPO_ROOT / "opsin-cli-*-jar-with-dependencies.jar")
-    ))
-    if candidates:
-        # Prefer highest-versioned (sort by name, take last).
-        return Path(candidates[-1])
-    return _REPO_ROOT / "opsin-cli-2.9.0-jar-with-dependencies.jar"
-
-OPSIN_JAR = _resolve_opsin_jar()
+# Resolved lazily at first use (no jar lookup at import time).
 
 # Match a phase / benchmark_multi_corpus.py:DEFAULT_OPSIN_TIMEOUT
 OPSIN_TIMEOUT: float = 10.0
@@ -126,7 +112,7 @@ def _opsin_to_smi(name: str) -> Optional[str]:
     """
     try:
         p = subprocess.run(
-            ["java", *JVM_HYGIENE_FLAGS, "-jar", str(OPSIN_JAR), "-o", "smi"],
+            ["java", *JVM_HYGIENE_FLAGS, "-jar", str(_resolve_opsin_jar()), "-o", "smi"],
             input=name + "\n",
             capture_output=True,
             text=True,

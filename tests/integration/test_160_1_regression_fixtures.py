@@ -192,24 +192,9 @@ class TestOxygenAttachedCarbamateBranchB:
         smiles = "O=C(N)OCCCC(=O)O"
         name = name_compound(smiles, style="pin")
 
-        # Locate the OPSIN jar shipping in the repo opsin/ tree (relative
-        # path; opsin/opsin-cli-2.9.0-jar-with-dependencies.jar per
-        # a phase pinned version).
-        opsin_jar_candidates = [
-            "opsin/opsin-cli-2.9.0-jar-with-dependencies.jar",
-            os.path.join(
-                os.path.dirname(__file__), "..", "..", "opsin",
-                "opsin-cli-2.9.0-jar-with-dependencies.jar",
-            ),
-        ]
-        opsin_jar = None
-        for candidate in opsin_jar_candidates:
-            if os.path.isfile(candidate):
-                opsin_jar = candidate
-                break
-        if opsin_jar is None:
-            import pytest as _pytest
-            _pytest.skip("OPSIN jar not found in repo; skipping round-trip")
+        # The pinned OPSIN 2.9.0 jar (a phase), via orthonym.jars.
+        from tests.support.jars import jar_or_skip
+        opsin_jar = jar_or_skip()
 
         result = subprocess.run(
             ["java", "-jar", opsin_jar, "-osmi"],
@@ -274,21 +259,8 @@ class TestNSubstitutedCarbamateBranchB:
         import os
         from rdkit import Chem
 
-        opsin_jar_candidates = [
-            "opsin/opsin-cli-2.9.0-jar-with-dependencies.jar",
-            os.path.join(
-                os.path.dirname(__file__), "..", "..", "opsin",
-                "opsin-cli-2.9.0-jar-with-dependencies.jar",
-            ),
-        ]
-        opsin_jar = None
-        for candidate in opsin_jar_candidates:
-            if os.path.isfile(candidate):
-                opsin_jar = candidate
-                break
-        if opsin_jar is None:
-            import pytest as _pytest
-            _pytest.skip("OPSIN jar not found in repo; skipping round-trip")
+        from tests.support.jars import jar_or_skip
+        opsin_jar = jar_or_skip()
 
         for smiles, _expected in self._CASES:
             name = name_compound(smiles, style="pin")

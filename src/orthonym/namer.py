@@ -2724,6 +2724,12 @@ class Orthonym:
                 Anything else raises ValueError: a typo must not silently
                 disable the proof.
         """
+        # Front door for the pinned OPSIN / centres jars: resolved once per process.
+        # Missing -> JarUnavailable here, before any naming path can quietly fall back
+        # to a weaker mode (no OPSIN check, a different CIP labeller). Opt out with
+        # ORTHONYM_ALLOW_REDUCED=1.
+        from .jars import require_all
+        require_all()
         # Perf lever A1/A11 (2026-09-13): opt-in process tuning for batch workers
         # (ORTHONYM_GC_TUNE=on). A no-op unless the variable is set; see runtime_tuning.py.
         from .runtime_tuning import maybe_tune_from_env

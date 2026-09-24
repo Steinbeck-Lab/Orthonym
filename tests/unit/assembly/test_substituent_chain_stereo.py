@@ -42,6 +42,7 @@ from orthonym.rules.ring_substituents import (
     _compound_ring_on_chain_substituent,
     name_ring_system_substituent,
 )
+from tests.support.jars import jar_or_none
 
 
 pytestmark = pytest.mark.unit
@@ -59,12 +60,8 @@ CHEBI_2364 = (
 
 
 def _find_opsin_jar():
-    for pat in ("opsin-cli-*-jar-with-dependencies.jar", "opsin-cli-*.jar",
-                "opsin.jar"):
-        m = glob.glob(pat)
-        if m:
-            return m[0]
-    return None
+    """The pinned OPSIN jar via orthonym.jars (tests.support.jars), or None."""
+    return jar_or_none()
 
 
 @pytest.fixture

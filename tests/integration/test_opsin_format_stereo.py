@@ -37,6 +37,7 @@ import subprocess
 import pytest
 
 from orthonym.namer import name_compound
+from tests.support.jars import jar_or_none
 
 
 # -----------------------------------------------------------------------
@@ -56,10 +57,8 @@ def _java_available():
 
 
 def _opsin_jar_path():
-    """Return path to OPSIN 2.9.0 JAR or None."""
-    project_root = os.path.dirname(os.path.dirname(os.path.dirname(__file__)))
-    jar = os.path.join(project_root, "opsin-cli-2.9.0-jar-with-dependencies.jar")
-    return jar if os.path.exists(jar) else None
+    """The pinned OPSIN jar via orthonym.jars (tests.support.jars), or None."""
+    return jar_or_none()
 
 
 JAVA_OK = _java_available()

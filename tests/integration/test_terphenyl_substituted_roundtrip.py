@@ -27,12 +27,8 @@ UNSUBSTITUTED_TERPHENYL_SMI = "c1ccc(-c2ccc(-c3ccccc3)cc2)cc1"
 def _opsin_available():
     """Match the helper pattern from tests/integration/test_canary_rt75.py."""
     import shutil
-    return (
-        Path(__file__).resolve().parents[2].joinpath(
-            "opsin-cli-2.9.0-jar-with-dependencies.jar"
-        ).exists()
-        and shutil.which("java") is not None
-    )
+    from tests.support.jars import jar_or_none
+    return jar_or_none() is not None and shutil.which("java") is not None
 
 
 class TestSubstitutedTerphenylRoundTrip:

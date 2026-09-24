@@ -49,6 +49,7 @@ from rdkit import Chem
 
 import orthonym
 from orthonym.validation import opsin_roundtrip
+from tests.support.jars import jar_or_skip
 
 
 # One representative per ring family. Every one is a ring carbon carrying an
@@ -147,8 +148,7 @@ def _is_abstention(name):
 def test_exocyclic_ylidene_never_names_a_different_molecule(
         family, smiles, expected_pin, mode, monkeypatch):
     """Every ring family: name it right or abstain -- never name it wrong."""
-    if not opsin_roundtrip._find_opsin_jar():
-        pytest.skip("OPSIN jar required to verify the emitted structure")
+    jar_or_skip()  # OPSIN jar required to verify the emitted structure
 
     name = _name_under(mode, smiles, monkeypatch)
     monkeypatch.undo()
@@ -179,8 +179,7 @@ def test_exocyclic_ylidene_reaches_its_known_pin(
     """Families whose PIN this phase constructs must actually reach it."""
     if expected_pin is None:
         pytest.skip(f"{family}: no PIN undertaken by this phase")
-    if not opsin_roundtrip._find_opsin_jar():
-        pytest.skip("OPSIN jar required")
+    jar_or_skip()  # OPSIN jar required
 
     name = _name_under("no_jvm", smiles, monkeypatch)
     monkeypatch.undo()
@@ -202,8 +201,7 @@ def test_known_out_of_class_leaks_are_still_wrong(label, smiles, why,
     fixing the underlying defect turns this into a loud XPASS rather than
     quietly rotting. Each one abstains correctly with a JVM present.
     """
-    if not opsin_roundtrip._find_opsin_jar():
-        pytest.skip("OPSIN jar required")
+    jar_or_skip()  # OPSIN jar required
     name = _name_under("no_jvm", smiles, monkeypatch)
     monkeypatch.undo()
     assert not _is_abstention(name)
@@ -219,8 +217,7 @@ def test_known_out_of_class_leaks_are_still_wrong(label, smiles, why,
 def test_known_out_of_class_leaks_abstain_in_production(label, smiles, why,
                                                         monkeypatch):
     """...and with a JVM present, catches every one of them."""
-    if not opsin_roundtrip._find_opsin_jar():
-        pytest.skip("OPSIN jar required")
+    jar_or_skip()  # OPSIN jar required
     name = _name_under("jar_present", smiles, monkeypatch)
     monkeypatch.undo()
     assert _is_abstention(name), (

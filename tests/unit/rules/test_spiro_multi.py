@@ -23,18 +23,16 @@ from orthonym.rules.spiro import (
     name_spiro_system,
     get_spiro_atoms,
 )
+from tests.support.jars import jar_or_none
 
 
 # OPSIN round-trip helpers — same shape as 151-01 plan / canary infra.
 # parents[3]: tests/unit/rules/test_X.py -> parents[3] is project root.
-_OPSIN_JAR = (
-    Path(__file__).resolve().parents[3]
-    / "opsin-cli-2.9.0-jar-with-dependencies.jar"
-)
+_OPSIN_JAR = jar_or_none()
 
 
 def _opsin_available() -> bool:
-    return _OPSIN_JAR.exists() and shutil.which("java") is not None
+    return _OPSIN_JAR is not None and shutil.which("java") is not None
 
 
 def _opsin_parse_one(name: str) -> str | None:

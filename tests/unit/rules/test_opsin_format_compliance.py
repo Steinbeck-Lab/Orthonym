@@ -14,12 +14,11 @@ import subprocess
 import pytest
 
 from orthonym.namer import name_compound
+from tests.support.jars import jar_or_none
 
 # Check OPSIN availability for round-trip tests
-OPSIN_JAR = os.path.join(
-    os.path.dirname(__file__), "..", "..", "..", "opsin-cli-2.9.0-jar-with-dependencies.jar"
-)
-OPSIN_AVAILABLE = os.path.isfile(OPSIN_JAR)
+OPSIN_JAR = jar_or_none()
+OPSIN_AVAILABLE = OPSIN_JAR is not None
 
 
 def opsin_parses(name: str) -> bool:

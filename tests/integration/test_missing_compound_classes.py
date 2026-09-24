@@ -17,14 +17,12 @@ import subprocess
 import pytest
 
 from orthonym import name_compound
+from tests.support.jars import jar_or_skip
 
 
 # ---------------------------------------------------------------------------
 # Helper: OPSIN round-trip
 # ---------------------------------------------------------------------------
-
-OPSIN_JAR = "opsin-cli-2.9.0-jar-with-dependencies.jar"
-
 
 def _opsin_name_to_smiles(name: str) -> str | None:
     """Parse an IUPAC name to SMILES via the local OPSIN JAR.
@@ -33,7 +31,7 @@ def _opsin_name_to_smiles(name: str) -> str | None:
     """
     try:
         result = subprocess.run(
-            ["java", "-jar", OPSIN_JAR, "-osmi"],
+            ["java", "-jar", jar_or_skip(), "-osmi"],
             input=name,
             capture_output=True,
             text=True,

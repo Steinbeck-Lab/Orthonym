@@ -170,8 +170,9 @@ class TestP28RingAssemblyBeyondSix:
         from orthonym.namer import name_compound
         from rdkit import Chem
         import subprocess
+        from tests.support.jars import jar_or_skip
         name = name_compound(self.UNDECI_SMILES)
-        jar = "opsin-cli-2.9.0-jar-with-dependencies.jar"
+        jar = jar_or_skip()
         out = subprocess.run(["java", "-jar", jar, "-o", "smi"],
                              input=name + "\n", capture_output=True, text=True)
         opsin_smi = out.stdout.strip().splitlines()[0] if out.stdout.strip() else ""

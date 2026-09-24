@@ -104,6 +104,7 @@ from rdkit import Chem
 
 import orthonym.namer as _namer_mod
 from orthonym.namer import Orthonym, is_failure_name
+from tests.support.jars import jar_or_none
 
 
 pytestmark = pytest.mark.unit
@@ -140,12 +141,8 @@ _RT_NAMES = {name: smi for smi, name, _ in ACCEPT_CASES}
 # Fixtures (mirror test_v26_p5_charged_general.py)
 # --------------------------------------------------------------------------
 def _find_opsin_jar():
-    for pat in ("opsin-cli-*-jar-with-dependencies.jar", "opsin-cli-*.jar",
-                "opsin.jar"):
-        m = glob.glob(pat)
-        if m:
-            return m[0]
-    return None
+    """The pinned OPSIN jar via orthonym.jars (tests.support.jars), or None."""
+    return jar_or_none()
 
 
 @pytest.fixture

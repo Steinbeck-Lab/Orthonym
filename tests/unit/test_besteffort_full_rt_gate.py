@@ -17,8 +17,8 @@ from rdkit.Chem import inchi
 
 sys.path.insert(0, "/home/kohulan/OpenSTOUT/Orthonym/src")
 from orthonym.jvm_flags import java_cmd  # noqa: E402
+from tests.support.jars import jar_or_skip
 
-JAR = "/home/kohulan/OpenSTOUT/Orthonym/opsin-cli-2.9.0-jar-with-dependencies.jar"
 PROJ = "/home/kohulan/OpenSTOUT/Orthonym"
 
 
@@ -48,7 +48,7 @@ def _abstains(name):
 def _full_rt(name, smiles):
     if _abstains(name):
         return False
-    p = subprocess.run(java_cmd() + ["-jar", JAR, "-o", "smi"],
+    p = subprocess.run(java_cmd() + ["-jar", jar_or_skip(), "-o", "smi"],
                        input=name + "\n", capture_output=True, text=True)
     out = p.stdout.strip().splitlines()
     out = out[0] if out else ""

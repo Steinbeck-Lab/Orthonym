@@ -30,13 +30,12 @@ def _find_opsin_jar(version: str = "2.9.0") -> Optional[str]:
         version: OPSIN version string (e.g., "2.9.0", "2.8.0").
 
     Returns:
-        Path to JAR file, or None if not found.
+        Path to the pinned, checksummed jar (see ``orthonym.jars``); None for a
+        version other than the pinned one, or in opt-in reduced mode. Raises
+        ``orthonym.jars.JarUnavailable`` when the pinned jar is missing.
     """
-    jar_name = f"opsin-cli-{version}-jar-with-dependencies.jar"
-    jar_path = PROJECT_ROOT / jar_name
-    if jar_path.exists():
-        return str(jar_path)
-    return None
+    from ..jars import find_jar
+    return find_jar("opsin", version)
 
 
 @lru_cache(maxsize=1)

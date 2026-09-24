@@ -27,6 +27,7 @@ from orthonym.data.opsin_imports import (
     OPSIN_CYCLIC_GROUPS,
     OPSIN_NATURAL_PRODUCTS,
 )
+from tests.support.jars import jar_or_none
 
 
 # ---------------------------------------------------------------------------
@@ -45,14 +46,8 @@ def _java_available() -> bool:
 
 
 def _opsin_jar_path():
-    candidates = [
-        "opsin-cli-2.9.0-jar-with-dependencies.jar",
-        "opsin/opsin-cli-2.9.0-jar-with-dependencies.jar",
-    ]
-    for c in candidates:
-        if os.path.isfile(c):
-            return c
-    return None
+    """The pinned OPSIN jar via orthonym.jars (tests.support.jars), or None."""
+    return jar_or_none()
 
 
 def _opsin_name_to_smiles(name: str, jar_path: str) -> str:

@@ -107,32 +107,13 @@ class CoverageResult:
 
 
 def find_opsin_jar() -> Optional[str]:
-    """Find OPSIN JAR file in project root or standard locations.
+    """Path to the pinned OPSIN jar (``orthonym.jars``).
 
-    Uses the same search patterns as ``scripts/benchmark_chebi500.py``.
+    Raises ``orthonym.jars.JarUnavailable`` when it is missing; None in opt-in
+    reduced mode.
     """
-    # Determine project root (go up from src/orthonym/validation/)
-    this_dir = os.path.dirname(os.path.abspath(__file__))
-    project_root = os.path.abspath(os.path.join(this_dir, "..", "..", ".."))
-
-    search_patterns = [
-        os.path.join(project_root, "opsin-cli-*-jar-with-dependencies.jar"),
-        os.path.join(project_root, "opsin-cli-*.jar"),
-        os.path.join(project_root, "opsin.jar"),
-        os.path.join(
-            project_root,
-            "opsin",
-            "opsin-cli",
-            "target",
-            "opsin-cli-*-jar-with-dependencies.jar",
-        ),
-    ]
-
-    for pattern in search_patterns:
-        matches = glob_mod.glob(pattern)
-        if matches:
-            return matches[0]
-    return None
+    from ..jars import find_jar
+    return find_jar("opsin")
 
 
 # giant-molecule hang fix: memoize OPSIN parse results. Parsing a name to a

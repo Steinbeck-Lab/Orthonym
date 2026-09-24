@@ -43,6 +43,7 @@ from pathlib import Path
 
 import pytest
 from rdkit import Chem
+from tests.support.jars import jar_or_none
 
 
 # Lazy imports inside test bodies so test collection succeeds even when
@@ -71,14 +72,11 @@ def _ra_topology_import():
 
 # OPSIN oracle . The jar lives at the worktree root via symlink to
 # parent project's jar. Path resolution depth is parents[3] for tests/unit/rules/.
-_OPSIN_JAR = (
-    Path(__file__).resolve().parents[3]
-    / "opsin-cli-2.9.0-jar-with-dependencies.jar"
-)
+_OPSIN_JAR = jar_or_none()
 
 
 def _opsin_available() -> bool:
-    return _OPSIN_JAR.exists() and shutil.which("java") is not None
+    return _OPSIN_JAR is not None and shutil.which("java") is not None
 
 
 def _opsin_parse(name: str) -> str | None:

@@ -14,9 +14,9 @@ import subprocess
 
 import pytest
 
-from orthonym.validation.opsin_roundtrip import _find_opsin_jar
+from tests.support.jars import jar_or_none
 
-_OPSIN_JAR = _find_opsin_jar()
+_OPSIN_JAR = jar_or_none()
 _HAS_JAVA = True
 try:
     subprocess.run(["java", "-version"], capture_output=True, timeout=10)

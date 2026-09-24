@@ -57,9 +57,9 @@ def test_two_branches_on_the_nitrogen_are_declined_not_double_counted():
 def test_end_to_end_ring_branch_names_and_round_trips():
     from orthonym import Orthonym
     from orthonym.errors import is_failure_name
-    from orthonym.validation.opsin_roundtrip import _find_opsin_jar, opsin_parse
-    if _find_opsin_jar() is None:
-        pytest.skip("no OPSIN jar")
+    from orthonym.validation.opsin_roundtrip import opsin_parse
+    from tests.support.jars import jar_or_skip
+    jar_or_skip()
     smi = "N#CCCNCC1CCCCC1"
     name = Orthonym(style="pin").name(smi)
     assert not is_failure_name(name), name

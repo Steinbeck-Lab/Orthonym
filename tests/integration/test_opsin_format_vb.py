@@ -20,6 +20,8 @@ import subprocess
 
 import pytest
 
+from tests.support.jars import jar_or_none
+
 
 def _java_available() -> bool:
     """Check if Java runtime is available."""
@@ -35,24 +37,24 @@ def _java_available() -> bool:
         return False
 
 
-def _opsin_jar_path(version: str = "2.9.0") -> str:
-    """Get path to OPSIN JAR."""
-    project_root = os.path.join(os.path.dirname(__file__), "..", "..")
-    return os.path.join(
-        project_root,
-        f"opsin-cli-{version}-jar-with-dependencies.jar",
-    )
+def _opsin_jar_path(version: str = "2.9.0"):
+    """The pinned OPSIN jar via orthonym.jars, or None (always None for a
+    version other than the pinned one: only pinned jars are ever used)."""
+    from orthonym.jars import JARS
+    if version != JARS["opsin"].version:
+        return None
+    return jar_or_none()
 
 
 def _opsin_available(version: str = "2.9.0") -> bool:
     """Check if OPSIN JAR and Java are both available."""
-    return _java_available() and os.path.isfile(_opsin_jar_path(version))
+    return _java_available() and _opsin_jar_path(version) is not None
 
 
 def _opsin_parse(name: str, version: str = "2.9.0") -> str:
     """Parse a name with OPSIN CLI and return SMILES or empty string."""
     jar_path = _opsin_jar_path(version)
-    if not os.path.isfile(jar_path):
+    if jar_path is None:
         return ""
     try:
         result = subprocess.run(
@@ -131,15 +133,8 @@ class TestVBFormatOpsinCompatibility:
         smiles = _opsin_parse("norbornane")
         assert smiles, "OPSIN failed to parse norbornane"
 
-    @skip_no_opsin
-    def test_vb_v28_compatibility(self):
-        """Parenthesized VB format also works with OPSIN 2.8.0."""
-        if not _opsin_available("2.8.0"):
-            pytest.skip("OPSIN 2.8.0 JAR not available")
-        smiles = _opsin_parse("tricyclo[3.3.1.1(3,7)]decane", version="2.8.0")
-        assert smiles, (
-            "OPSIN 2.8.0 failed to parse tricyclo[3.3.1.1(3,7)]decane"
-        )
+    # test_vb_v28_compatibility (OPSIN 2.8.0) removed: only the pinned 2.9.0
+    # jar is available (orthonym.jars), so it could only ever skip.
 
 
 # 10 DEEPER VB compounds with computational bugs, deferred to a phase/142.

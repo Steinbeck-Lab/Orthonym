@@ -19,8 +19,9 @@ from pathlib import Path
 import pytest
 from rdkit import Chem
 
+from tests.support.jars import jar_or_none, jar_or_skip
+
 from orthonym.perception.centres_bridge import (
-    PROJECT_ROOT,
     _find_centres_jar,
     _java_available,
     apply_centres_labels,
@@ -31,7 +32,7 @@ from orthonym.perception.centres_bridge import (
 
 
 def _engine_available() -> bool:
-    return _find_centres_jar() is not None and _java_available()
+    return jar_or_none("centres") is not None and _java_available()
 
 
 # ---------------------------------------------------------------------------
@@ -40,19 +41,25 @@ def _engine_available() -> bool:
 
 
 @pytest.mark.integration
-def test_find_centres_jar_at_project_root():
-    """The vendored jar resolves at PROJECT_ROOT as centres-cli-1.2.1.jar.
+def test_find_centres_jar_is_the_pinned_jar():
+    """_find_centres_jar resolves the pinned centres 1.2.1 jar (orthonym.jars).
 
     CIP-UPDATE (2026-09-07): engine reverted 1.5-SNAPSHOT -> 1.2.1 (tagged
-    release). _find_centres_jar globs centres-cli-*.jar and
-    picks the highest version, so this asserts the highest vendored jar.
+    release). The jar is no longer vendored: it is pinned to one version and
+    one in ``orthonym.jars`` and resolved from the jar cache, so this
+    asserts the pinned file (checksum, not the old vendored byte size).
     """
-    jar = _find_centres_jar()
-    assert jar is not None, "centres jar not vendored at project root"
-    assert Path(jar).name == "centres-cli-1.2.1.jar"
-    assert Path(jar).parent == PROJECT_ROOT
-    # Vendored unmodified -> exact byte size (T-177-03 provenance).
-    assert Path(jar).stat().st_size == 2291742
+    import hashlib
+    import os
+    from orthonym.jars import JARS
+
+    jar = jar_or_skip("centres")
+    assert _find_centres_jar() == jar
+    spec = JARS["centres"]
+    assert spec.version == "1.2.1"
+    if not os.environ.get(spec.env_var):  # an explicit override is not checksummed
+        assert Path(jar).name == spec.filename
+        assert hashlib.sha256(Path(jar).read_bytes()).hexdigest() == spec.sha256
 
 
 @pytest.mark.integration

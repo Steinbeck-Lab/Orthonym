@@ -20,9 +20,10 @@ import pytest
 from rdkit import Chem
 
 from orthonym.data.fused_heterocycles import FUSED_HETEROCYCLE_DATA
-from orthonym.validation.opsin_roundtrip import _find_opsin_jar, _java_available
+from orthonym.validation.opsin_roundtrip import _java_available
+from tests.support.jars import jar_or_none
 
-_OPSIN_JAR = _find_opsin_jar()
+_OPSIN_JAR = jar_or_none()
 _OPSIN_OK = _java_available() and _OPSIN_JAR is not None
 
 pytestmark = pytest.mark.skipif(

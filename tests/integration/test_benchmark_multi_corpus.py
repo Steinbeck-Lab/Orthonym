@@ -14,14 +14,15 @@ import sys
 from pathlib import Path
 
 import pytest
+from tests.support.jars import jar_or_none
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
 SCRIPT = PROJECT_ROOT / "scripts" / "benchmark_multi_corpus.py"
 FIXTURE_DIR = PROJECT_ROOT / "tests" / "fixtures" / "phase_145"
-OPSIN_JAR = PROJECT_ROOT / "opsin-cli-2.9.0-jar-with-dependencies.jar"
+OPSIN_JAR = jar_or_none()
 
 pytestmark = pytest.mark.skipif(
-    not OPSIN_JAR.exists(), reason="OPSIN jar required for integration test"
+    OPSIN_JAR is None, reason="OPSIN jar required for integration test"
 )
 
 

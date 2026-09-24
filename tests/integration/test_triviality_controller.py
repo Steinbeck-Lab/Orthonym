@@ -36,6 +36,7 @@ from rdkit import Chem  # noqa: E402
 from orthonym.assembly.name_tree import NameTreeNode, _alphabetize_prefixes  # noqa: E402
 from orthonym.assembly.name_tree_to_string import name_tree_to_string  # noqa: E402
 from orthonym.assembly.retained_substitution import apply_triviality_controller  # noqa: E402
+from tests.support.jars import jar_or_none
 
 
 class TestRetainedNameMultiplierTransitions:
@@ -258,13 +259,8 @@ class TestMultiplierAlphabetization:
 
 
 def _p168_find_opsin_jar():
-    import glob
-    for pat in ("opsin-cli-*-jar-with-dependencies.jar",
-                "opsin/opsin-cli-*-jar-with-dependencies.jar"):
-        m = glob.glob(pat)
-        if m:
-            return m[0]
-    return None
+    """The pinned OPSIN jar via orthonym.jars (tests.support.jars), or None."""
+    return jar_or_none()
 
 
 _P168_OPSIN_JAR = _p168_find_opsin_jar()

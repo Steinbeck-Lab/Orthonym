@@ -131,11 +131,9 @@ def test_expected_names_denote_the_input_molecule(smiles, expected):
     the SAME constitution as the input. A formula match is NOT sufficient --
     the headline defect preserved the formula exactly."""
     from orthonym.assembly.retained_substitution import OpsinOracle
-    from orthonym.validation.opsin_roundtrip import _find_opsin_jar
+    from tests.support.jars import jar_or_skip
 
-    jar = _find_opsin_jar()
-    if not jar:
-        pytest.skip("OPSIN jar absent -- round-trip cannot be verified")
+    jar = jar_or_skip()  # OPSIN jar absent -- round-trip cannot be verified
     parsed = OpsinOracle(opsin_jar=jar).name_to_smiles(expected)
     assert parsed, f"OPSIN could not parse {expected!r}"
     got = Chem.MolToInchiKey(Chem.MolFromSmiles(parsed)).split("-")[0]

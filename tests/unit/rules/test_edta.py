@@ -37,9 +37,10 @@ import pytest
 from rdkit import Chem
 
 from orthonym import name_compound
-from orthonym.validation.dual_validator import _find_opsin_jar, _parse_name_with_opsin
+from orthonym.validation.dual_validator import _parse_name_with_opsin
+from tests.support.jars import jar_or_none
 
-_OPSIN = _find_opsin_jar()
+_OPSIN = jar_or_none()
 
 
 def _inchikey(smiles):

@@ -30,6 +30,7 @@ import pytest
 pytestmark = pytest.mark.skip(reason="v18-era byte-identical canary RETIRED 2026-09-11: superseded by the v22 phase gate (the live PIN-regression detector, which passes). The engine legitimately evolved v18->v47 (e.g. 312/1406 RT rows drifted to correct, round-tripping names), so these frozen snapshots no longer anchor a current state. Revive = remove this mark + regenerate.")
 
 from orthonym import name_compound
+from tests.support.jars import jar_or_none
 
 
 # ---------------------------------------------------------------------------
@@ -3036,12 +3037,12 @@ def test_canary_rt312(smiles, expected_name):
 # Single JVM invocation for all 202 canary names (batch mode)
 # ---------------------------------------------------------------------------
 
-_OPSIN_JAR = Path(__file__).resolve().parents[2] / "opsin-cli-2.9.0-jar-with-dependencies.jar"
+_OPSIN_JAR = jar_or_none()
 
 
 def _opsin_available() -> bool:
     """Check if OPSIN JAR and Java runtime are available."""
-    return _OPSIN_JAR.exists() and shutil.which("java") is not None
+    return _OPSIN_JAR is not None and shutil.which("java") is not None
 
 
 def _opsin_parse_batch(names: list[str]) -> dict[str, str | None]:

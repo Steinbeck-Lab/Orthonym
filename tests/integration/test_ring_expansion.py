@@ -12,22 +12,18 @@ from pathlib import Path
 import pytest
 from rdkit import Chem
 from orthonym.namer import name_compound
+from tests.support.jars import jar_or_skip
 
 
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
 
-OPSIN_JAR = str(
-    Path(__file__).resolve().parents[2] / "opsin-cli-2.9.0-jar-with-dependencies.jar"
-)
-
-
 def _opsin_parse(name: str) -> str | None:
     """Send a name to OPSIN and return the SMILES, or None on failure."""
     try:
         result = subprocess.run(
-            ["java", "-jar", OPSIN_JAR, "-osmi"],
+            ["java", "-jar", jar_or_skip(), "-osmi"],
             input=name,
             capture_output=True,
             text=True,

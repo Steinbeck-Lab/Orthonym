@@ -4,12 +4,12 @@ from orthonym import Orthonym
 from orthonym.cli import _emit_tier_flags
 from orthonym.jvm_budget import jvm_slots
 from orthonym.jvm_bridge import opsin_stdout
-from orthonym.validation.opsin_roundtrip import _find_opsin_jar
+from tests.support.jars import jar_or_skip
 
 
 def _radical_rt(name: str, target_smiles: str) -> bool:
     """OPSIN round-trip WITH allowRadicals (opsin_roundtrip_check is radical-blind)."""
-    jar = _find_opsin_jar("2.9.0")
+    jar = jar_or_skip()
     txt, _ = opsin_stdout(name, allow_radicals=True, jar_path=jar)
     if not txt:
         return False

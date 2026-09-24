@@ -174,8 +174,10 @@ def test_a_gold_radical_pin_is_not_reported_unparseable(diag):
     """
     import shutil
 
-    if not diag.OPSIN_JAR.exists() or shutil.which("java") is None:
-        pytest.skip("OPSIN jar or java absent — refusing to report a false pass")
+    from tests.support.jars import jar_or_skip
+    jar_or_skip()  # jar absent -> skip (fail under ORTHONYM_REQUIRE_JARS=1)
+    if shutil.which("java") is None:
+        pytest.skip("java absent — refusing to report a false pass")
     if diag._gate_running():
         pytest.skip("gate running — never a second OPSIN job")
 

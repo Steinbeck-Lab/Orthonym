@@ -27,6 +27,7 @@ import pytest
 from rdkit import Chem
 
 from orthonym import name_compound
+from tests.support.jars import jar_or_none
 
 
 # ---------------------------------------------------------------------------
@@ -281,11 +282,8 @@ class TestNamingNeverCrashes:
 # ---------------------------------------------------------------------------
 
 JAVA_AVAILABLE = shutil.which("java") is not None
-OPSIN_JAR = os.path.join(
-    os.path.dirname(__file__), "..", "..", "opsin-cli-2.9.0-jar-with-dependencies.jar"
-)
-OPSIN_JAR = os.path.normpath(OPSIN_JAR)
-OPSIN_AVAILABLE = JAVA_AVAILABLE and os.path.isfile(OPSIN_JAR)
+OPSIN_JAR = jar_or_none()
+OPSIN_AVAILABLE = JAVA_AVAILABLE and OPSIN_JAR is not None
 
 
 def _opsin_parse(name: str) -> str:

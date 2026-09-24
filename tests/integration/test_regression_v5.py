@@ -324,7 +324,8 @@ class TestFattyAcidIdentification:
             r"(COP(=O)(O)OCCNC)OC(=O)CCCCCCCCC/C=C\C/C=C\CCCCC"
         )
         name = name_compound(smiles)
-        jar = str(__import__("pathlib").Path(__file__).resolve().parents[2] / "opsin-cli-2.9.0-jar-with-dependencies.jar")
+        from tests.support.jars import jar_or_skip
+        jar = jar_or_skip()
         result = subprocess.run(
             ["java", "-jar", jar, "-osmi"],
             input=name,

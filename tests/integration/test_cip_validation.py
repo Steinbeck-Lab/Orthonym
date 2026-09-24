@@ -249,10 +249,10 @@ def score_suite_centres(cip_data: List[Dict]) -> Optional[int]:
     """
     from orthonym.perception.centres_bridge import (
         centres_label_batch,
-        _find_centres_jar,
         _java_available,
     )
-    if _find_centres_jar() is None or not _java_available():
+    from tests.support.jars import jar_or_none
+    if jar_or_none("centres") is None or not _java_available():
         return None
 
     todo: List[Tuple[str, Dict[int, str]]] = []

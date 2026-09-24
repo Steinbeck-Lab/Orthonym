@@ -43,6 +43,7 @@ from typing import Any, Dict, List
 
 import pytest
 from rdkit import Chem
+from tests.support.jars import jar_or_none
 
 # Wave-0 / RED state: the new module
 # (src/orthonym/rules/polycyclic_von_baeyer.py) does not exist yet.
@@ -398,14 +399,11 @@ class TestPublicAPI:
 # ============================================================================
 
 
-_OPSIN_JAR = (
-    Path(__file__).resolve().parents[2]
-    / "opsin-cli-2.9.0-jar-with-dependencies.jar"
-)
+_OPSIN_JAR = jar_or_none()
 
 
 def _opsin_available() -> bool:
-    return _OPSIN_JAR.exists() and shutil.which("java") is not None
+    return _OPSIN_JAR is not None and shutil.which("java") is not None
 
 
 def _opsin_parse_one(name: str) -> str | None:

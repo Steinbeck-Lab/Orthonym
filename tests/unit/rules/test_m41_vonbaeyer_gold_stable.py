@@ -23,11 +23,11 @@ import re
 import pytest
 
 from orthonym import name_compound
-from orthonym.validation.atom_coverage import find_opsin_jar
+from tests.support.jars import jar_or_none
 
 pytestmark = [
     pytest.mark.roundtrip,
-    pytest.mark.skipif(find_opsin_jar() is None,
+    pytest.mark.skipif(jar_or_none() is None,
                        reason="von-Baeyer gold stability is defined against OPSIN"),
 ]
 

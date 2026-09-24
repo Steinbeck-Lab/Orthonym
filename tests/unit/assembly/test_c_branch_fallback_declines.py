@@ -31,9 +31,9 @@ def test_c_attached_ring_fallback_declines_instead_of_fabricating():
 def test_witness_keeps_its_name_end_to_end():
     from orthonym import Orthonym
     from orthonym.errors import is_failure_name
-    from orthonym.validation.opsin_roundtrip import _find_opsin_jar, opsin_parse
-    if _find_opsin_jar() is None:
-        pytest.skip("no OPSIN jar")
+    from orthonym.validation.opsin_roundtrip import opsin_parse
+    from tests.support.jars import jar_or_skip
+    jar_or_skip()
     name = Orthonym(style="pin").name(WITNESS)
     assert not is_failure_name(name), name
     back = opsin_parse(name)

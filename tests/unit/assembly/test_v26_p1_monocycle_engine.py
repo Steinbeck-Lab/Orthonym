@@ -39,6 +39,7 @@ import orthonym.namer as _namer_mod
 from orthonym.namer import Orthonym, is_failure_name
 from orthonym.assembly.general_engine import name_general_monocycle
 from orthonym.validation.e1_certificate import verify_certificate
+from tests.support.jars import jar_or_none
 
 
 pytestmark = pytest.mark.unit
@@ -122,12 +123,8 @@ UNCHANGED_CASES = [
 # Fixtures / helpers
 # --------------------------------------------------------------------------
 def _find_opsin_jar():
-    for pat in ("opsin-cli-*-jar-with-dependencies.jar", "opsin-cli-*.jar",
-                "opsin.jar"):
-        m = glob.glob(pat)
-        if m:
-            return m[0]
-    return None
+    """The pinned OPSIN jar via orthonym.jars (tests.support.jars), or None."""
+    return jar_or_none()
 
 
 @pytest.fixture

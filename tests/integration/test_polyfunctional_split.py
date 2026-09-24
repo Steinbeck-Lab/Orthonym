@@ -28,6 +28,7 @@ from rdkit import Chem, RDLogger
 
 from orthonym import name_compound
 from orthonym.assembly.group_splitting import split_composite_fg
+from tests.support.jars import jar_or_none
 
 RDLogger.logger().setLevel(RDLogger.ERROR)
 
@@ -36,15 +37,8 @@ _ESTER_SMARTS = Chem.MolFromSmarts("[CX3](=O)[OX2][#6]")
 
 
 def _find_jar():
-    cand = _PROJECT_ROOT / "opsin-cli-2.9.0-jar-with-dependencies.jar"
-    if cand.exists():
-        return str(cand)
-    try:
-        sys.path.insert(0, str(_PROJECT_ROOT / "scripts"))
-        from validate_retained_names import find_opsin_jar
-        return find_opsin_jar() or None
-    except Exception:
-        return None
+    """The pinned OPSIN jar via orthonym.jars (tests.support.jars), or None."""
+    return jar_or_none()
 
 
 _JAR = _find_jar()

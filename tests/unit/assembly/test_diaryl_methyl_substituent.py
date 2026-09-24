@@ -25,19 +25,12 @@ import subprocess
 import pytest
 
 from orthonym import name_compound
+from tests.support.jars import jar_or_none
 
 
 def _find_opsin_jar():
-    for pat in (
-        "opsin-cli-*-jar-with-dependencies.jar",
-        "opsin.jar",
-        "opsin/opsin-cli-*-jar-with-dependencies.jar",
-        "opsin/opsin-cli/target/opsin-cli-*-jar-with-dependencies.jar",
-    ):
-        matches = glob.glob(pat)
-        if matches:
-            return matches[0]
-    return None
+    """The pinned OPSIN jar via orthonym.jars (tests.support.jars), or None."""
+    return jar_or_none()
 
 
 _OPSIN_JAR = _find_opsin_jar()

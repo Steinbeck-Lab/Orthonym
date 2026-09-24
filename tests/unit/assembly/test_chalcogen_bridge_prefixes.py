@@ -66,9 +66,10 @@ from orthonym.assembly.substituent_enumerator import (
     composed_chalcogen_group_prefix,
     is_dichalcogen_bridge_attach,
 )
+from tests.support.jars import jar_or_none
 
 PROJECT_ROOT = Path(__file__).resolve().parents[3]
-OPSIN_JAR = PROJECT_ROOT / "opsin-cli-2.9.0-jar-with-dependencies.jar"
+OPSIN_JAR = jar_or_none()
 
 
 # ---------------------------------------------------------------------------
@@ -213,7 +214,7 @@ def _assert_family_invariant(family, min_size):
 
 
 @pytest.mark.skipif(
-    not OPSIN_JAR.exists(), reason="OPSIN jar required for the structural invariant"
+    OPSIN_JAR is None, reason="OPSIN jar required for the structural invariant"
 )
 def test_no_emitted_name_describes_fewer_heavy_atoms_than_the_molecule():
     """No name may account for fewer heavy atoms than were drawn.
@@ -241,7 +242,7 @@ _R_GROUPS_RING = (
 
 
 @pytest.mark.skipif(
-    not OPSIN_JAR.exists(), reason="OPSIN jar required for the structural invariant"
+    OPSIN_JAR is None, reason="OPSIN jar required for the structural invariant"
 )
 def test_ring_bearing_bridge_branch_refuses_rather_than_dropping_atoms():
     """A branch no owner can name must fail the molecule closed, not vanish.
@@ -261,7 +262,7 @@ def test_ring_bearing_bridge_branch_refuses_rather_than_dropping_atoms():
 
 
 @pytest.mark.skipif(
-    not OPSIN_JAR.exists(), reason="OPSIN jar required for the injectivity invariant"
+    OPSIN_JAR is None, reason="OPSIN jar required for the injectivity invariant"
 )
 def test_distinct_molecules_never_share_one_name():
     """Two different molecules must not receive the same name.

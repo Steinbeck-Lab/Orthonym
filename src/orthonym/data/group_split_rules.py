@@ -152,10 +152,15 @@ def _opsin_rt_validate_examples(entries) -> None:
     if shutil.which("java") is None:
         logger.warning("java not on PATH; skipping D-04 OPSIN-RT re-confirmation.")
         return
-    jar = Path(__file__).resolve().parents[3] / "opsin-cli-2.9.0-jar-with-dependencies.jar"
-    if not jar.exists():
+    from ..jars import JarUnavailable, find_jar
+    try:
+        _jar = find_jar("opsin")
+    except JarUnavailable:
+        _jar = None
+    if _jar is None:
         logger.warning("OPSIN jar not found; skipping D-04 OPSIN-RT re-confirmation.")
         return
+    jar = Path(_jar)
     for raw in entries:
         # Pull the documented example name out of the notes ("-> <name> (").
         note = raw.get("notes", "")

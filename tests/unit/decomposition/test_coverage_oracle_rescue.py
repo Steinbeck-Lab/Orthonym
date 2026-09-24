@@ -27,10 +27,10 @@ from orthonym.decomposition.engine import (
     _name_is_proven_complete,
     _name_quality_is_acceptable,
 )
-from orthonym.validation.atom_coverage import find_opsin_jar
+from tests.support.jars import jar_or_none
 
 pytestmark = pytest.mark.skipif(
-    find_opsin_jar() is None,
+    jar_or_none() is None,
     reason="the coverage oracle needs the OPSIN jar; without it it fails "
            "CLOSED and no rescue happens (which is the designed behaviour, "
            "but makes these assertions vacuous)",

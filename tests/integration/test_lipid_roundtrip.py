@@ -14,13 +14,14 @@ import pytest
 from rdkit import Chem
 
 from orthonym import name_compound
+from tests.support.jars import jar_or_none
 
 PROJECT_ROOT = Path(__file__).parent.parent.parent
-OPSIN_JAR = PROJECT_ROOT / "opsin-cli-2.9.0-jar-with-dependencies.jar"
+OPSIN_JAR = jar_or_none()
 
 
 def _opsin_available() -> bool:
-    if not OPSIN_JAR.exists():
+    if OPSIN_JAR is None:
         return False
     try:
         proc = subprocess.run(["java", "-version"], capture_output=True, text=True, timeout=5)
@@ -30,7 +31,7 @@ def _opsin_available() -> bool:
 
 
 def _opsin_parse(name: str) -> str:
-    if not name or not OPSIN_JAR.exists():
+    if not name or OPSIN_JAR is None:
         return ""
     try:
         proc = subprocess.run(["java", "-jar", str(OPSIN_JAR), "-osmi"],

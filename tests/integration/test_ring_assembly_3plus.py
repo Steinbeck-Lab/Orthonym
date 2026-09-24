@@ -22,16 +22,14 @@ from pathlib import Path
 
 import pytest
 from rdkit import Chem
+from tests.support.jars import jar_or_none
 
 
-_OPSIN_JAR = (
-    Path(__file__).resolve().parents[2]
-    / "opsin-cli-2.9.0-jar-with-dependencies.jar"
-)
+_OPSIN_JAR = jar_or_none()
 
 
 def _opsin_available() -> bool:
-    return _OPSIN_JAR.exists() and shutil.which("java") is not None
+    return _OPSIN_JAR is not None and shutil.which("java") is not None
 
 
 def _opsin_parse(name: str) -> str | None:
@@ -132,5 +130,5 @@ def test_ring_assembly_opsin_roundtrip_inchi_l1(fixture, request):
 @pytest.mark.skipif(not _opsin_available(), reason="OPSIN/Java not available")
 @pytest.mark.integration
 def test_opsin_jar_resolves():
-    """Sanity: jar path resolves at the worktree root."""
-    assert _OPSIN_JAR.exists(), f"OPSIN jar not found at {_OPSIN_JAR}"
+    """Sanity: the pinned jar resolves via orthonym.jars.find_jar."""
+    assert _OPSIN_JAR is not None and Path(_OPSIN_JAR).is_file(), f"OPSIN jar not resolved: {_OPSIN_JAR}"

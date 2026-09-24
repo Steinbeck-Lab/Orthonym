@@ -112,9 +112,11 @@ def test_ster02_centres_labels_land_on_correct_atoms(smiles):
     centres label landing on an atom RDKit does not flag is a wrong/spurious
     descriptor — the pre-Phase-H bug the output-order remap fixes.
     """
-    from orthonym.perception.centres_bridge import centres_label_mol, _find_centres_jar, _java_available
-    if _find_centres_jar() is None or not _java_available():
-        pytest.skip("centres jar / Java unavailable")
+    from orthonym.perception.centres_bridge import centres_label_mol, _java_available
+    from tests.support.jars import jar_or_skip
+    jar_or_skip("centres")
+    if not _java_available():
+        pytest.skip("Java unavailable")
 
     m_rd = Chem.MolFromSmiles(smiles)
     rdCIPLabeler.AssignCIPLabels(m_rd)

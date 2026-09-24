@@ -12,6 +12,7 @@ import pytest
 from rdkit import Chem
 
 from orthonym import name_compound
+from tests.support.jars import jar_or_none
 
 
 # ============================================================================
@@ -21,18 +22,8 @@ from orthonym import name_compound
 _OPSIN_JAR = None
 
 def _find_opsin_jar():
-    """Find the OPSIN JAR file."""
-    import glob
-    patterns = [
-        "opsin-cli-*-jar-with-dependencies.jar",
-        "opsin-cli-*.jar",
-        "opsin.jar",
-    ]
-    for p in patterns:
-        matches = glob.glob(p)
-        if matches:
-            return matches[0]
-    return None
+    """The pinned OPSIN jar via orthonym.jars (tests.support.jars), or None."""
+    return jar_or_none()
 
 
 def _opsin_to_smiles(name: str) -> str:

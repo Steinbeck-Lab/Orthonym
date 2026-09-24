@@ -40,13 +40,13 @@ def test_render_keeps_letter_and_prime():
 def test_witness_no_longer_raises_and_never_ships_a_wrong_molecule(monkeypatch):
     from orthonym import Orthonym
     from orthonym.errors import is_failure_name
-    from orthonym.validation.opsin_roundtrip import _find_opsin_jar, opsin_parse
+    from orthonym.validation.opsin_roundtrip import opsin_parse
+    from tests.support.jars import jar_or_skip
     monkeypatch.setenv("ORTHONYM_STRICT", "1")          # a TypeError would surface here
     name = Orthonym(style="pin").name(WITNESS)
     if is_failure_name(name):
         return                                             # an honest abstention is allowed
-    if _find_opsin_jar() is None:
-        pytest.skip("no OPSIN jar")
+    jar_or_skip()
     back = opsin_parse(name)
     assert back, name
     key = lambda s: Chem.MolToInchiKey(Chem.MolFromSmiles(s)).split("-")[0]

@@ -12,9 +12,9 @@ from rdkit import Chem
 
 from orthonym.validation.atom_coverage import (
     CoverageResult,
-    find_opsin_jar,
     validate_atom_coverage,
 )
+from tests.support.jars import jar_or_none
 
 
 # ---------------------------------------------------------------------------
@@ -100,7 +100,7 @@ class TestCoverageResult:
 # ---------------------------------------------------------------------------
 
 # Detect OPSIN availability once
-_OPSIN_JAR = find_opsin_jar()
+_OPSIN_JAR = jar_or_none()
 _JAVA_AVAILABLE = shutil.which("java") is not None
 _OPSIN_AVAILABLE = _OPSIN_JAR is not None and _JAVA_AVAILABLE
 

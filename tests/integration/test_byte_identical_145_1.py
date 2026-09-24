@@ -37,6 +37,7 @@ import sys
 from pathlib import Path
 
 import pytest
+from tests.support.jars import jar_or_none
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
 SCRIPT = PROJECT_ROOT / "scripts" / "check_byte_identical.py"
@@ -44,10 +45,10 @@ BASELINE_CSV = (
     PROJECT_ROOT
     / ".planning/phases/145-multi-corpus-benchmark-foundation/baseline_v17_all_corpora.csv"
 )
-OPSIN_JAR = PROJECT_ROOT / "opsin-cli-2.9.0-jar-with-dependencies.jar"
+OPSIN_JAR = jar_or_none()
 
 pytestmark = pytest.mark.skipif(
-    not OPSIN_JAR.exists() or not BASELINE_CSV.exists(),
+    OPSIN_JAR is None or not BASELINE_CSV.exists(),
     reason="OPSIN jar + Phase 145 baseline required for byte-identical tests",
 )
 

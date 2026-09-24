@@ -40,6 +40,7 @@ pytest_benchmark = pytest.importorskip("pytest_benchmark")
 from orthonym.namer import Orthonym
 from orthonym.validation.opsin_grammar import OpsinGrammar
 from orthonym.validation.opsin_roundtrip import opsin_roundtrip_check
+from tests.support.jars import jar_or_none
 
 
 def _java_available() -> bool:
@@ -51,15 +52,8 @@ def _java_available() -> bool:
 
 
 def _opsin_jar_path():
-    #: v2.9.0 ONLY (older JAR absent on this host per internal notes).
-    candidates = [
-        "opsin-cli-2.9.0-jar-with-dependencies.jar",
-        "opsin/opsin-cli-2.9.0-jar-with-dependencies.jar",
-    ]
-    for c in candidates:
-        if os.path.isfile(c):
-            return c
-    return None
+    """The pinned OPSIN jar via orthonym.jars (tests.support.jars), or None."""
+    return jar_or_none()
 
 
 _SKIP = pytest.mark.skipif(

@@ -107,25 +107,27 @@ _PLACEHOLDER_RE = re.compile(r"%([A-Za-z]+)%")
 _REGEX_TOKENS_JAR_ENTRY = "uk/ac/cam/ch/wwmm/opsin/resources/regexTokens.xml"
 
 
+_VENDORED_REGEX_TOKENS = Path(__file__).resolve().parent.parent / "data" / "opsin_imports" / "regex_tokens_xml.json"
+
+
 def _read_regex_tokens_xml() -> bytes:
-    """regexTokens.xml bytes from the OPSIN submodule if present, else the bundled jar."""
+    """regexTokens.xml bytes: the OPSIN source checkout if present, else the vendored copy.
+
+    The vendored copy (data/opsin_imports/regex_tokens_xml.json, OPSIN 2.9.0, MIT) is
+    byte-identical to the jar entry, so importing this module never needs the jar.
+    """
     if _REGEX_TOKENS_PATH.exists():
         return _REGEX_TOKENS_PATH.read_bytes()
-    import glob as _glob
-    import zipfile as _zip
-    for _pat in (str(_PROJECT_ROOT / "opsin-cli-*-jar-with-dependencies.jar"),
-                 str(_PROJECT_ROOT / "opsin-cli-*.jar")):
-        for _jar in sorted(_glob.glob(_pat)):
-            try:
-                with _zip.ZipFile(_jar) as _z:
-                    return _z.read(_REGEX_TOKENS_JAR_ENTRY)
-            except (KeyError, _zip.BadZipFile):
-                continue
-    raise ImportError(
-        "OPSIN grammar XML (regexTokens.xml) not found in the OPSIN submodule or "
-        "the bundled opsin-cli jar. A source checkout with the OPSIN submodule, or "
-        "the bundled opsin-cli-*.jar at the project root, is required."
-    )
+    import hashlib as _hashlib
+    import json as _json
+    try:
+        payload = _json.loads(_VENDORED_REGEX_TOKENS.read_text(encoding="utf-8"))
+        data = payload["xml"].encode("utf-8")
+    except (OSError, ValueError, KeyError) as exc:
+        raise ImportError(f"vendored OPSIN grammar XML unreadable: {_VENDORED_REGEX_TOKENS}") from exc
+    if _hashlib.sha256(data).hexdigest() != payload.get("_sha256"):
+        raise ImportError(f"vendored OPSIN grammar XML fails its checksum: {_VENDORED_REGEX_TOKENS}")
+    return data
 
 
 def _load_opsin_token_regexes() -> Dict[str, "re.Pattern[str]"]:
@@ -222,8 +224,8 @@ def _check_jar_version_drift() -> None:
     load. Wrapped in try/except to enforce that contract.
     """
     try:
-        from .opsin_roundtrip import _find_opsin_jar  # local import — see boundary
-        jar = _find_opsin_jar(OPSIN_GRAMMAR_VERSION)
+        from ..jars import find_jar  # local import — see boundary
+        jar = find_jar("opsin", OPSIN_GRAMMAR_VERSION, download=False)  # never downloads at import
         if jar is None:
             logger.warning(
                 "OPSIN JAR version %s not found at project root; "

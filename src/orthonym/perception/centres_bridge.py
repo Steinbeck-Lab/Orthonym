@@ -86,7 +86,7 @@ def _centres_jar_version_key(path: Path):
 
 @lru_cache(maxsize=8)
 def _find_centres_jar(version: Optional[str] = None) -> Optional[str]:
-    """Find the vendored centres CLI jar at the project root (cached per process).
+    """Find the pinned centres CLI jar via ``orthonym.jars`` (cached per process).
 
     Perf lever A5 (2026-09-13): this ran a ``PROJECT_ROOT.glob`` on EVERY centres call
     (1,960 directory scans per 300 molecules, ~1 % of naming time). The set of vendored
@@ -95,21 +95,15 @@ def _find_centres_jar(version: Optional[str] = None) -> Optional[str]:
     Parallel to ``opsin_roundtrip._find_opsin_jar``.
 
     Args:
-        version: if given, resolve that exact ``centres-cli-<version>.jar``.
-            If None (the default), GLOB ``centres-cli-*.jar`` and return the
-            HIGHEST version present — so a freshly-vendored newer engine jar is
-            picked up with no code change (the centres-engine update path).
+        version: None (the pinned version) or a version string; a version other
+            than the pinned one returns None.
 
     Returns:
-        Absolute path to the jar, or None if it is not present.
+        Absolute path to the pinned jar; None in opt-in reduced mode. Raises
+        ``orthonym.jars.JarUnavailable`` when it is missing.
     """
-    if version is not None:
-        jar_path = PROJECT_ROOT / f"centres-cli-{version}.jar"
-        return str(jar_path) if jar_path.exists() else None
-    candidates = sorted(
-        PROJECT_ROOT.glob("centres-cli-*.jar"), key=_centres_jar_version_key
-    )
-    return str(candidates[-1]) if candidates else None
+    from ..jars import find_jar
+    return find_jar("centres", version)
 
 
 @lru_cache(maxsize=1)

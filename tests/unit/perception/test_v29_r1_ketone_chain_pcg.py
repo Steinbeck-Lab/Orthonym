@@ -92,11 +92,9 @@ def _opsin_formula(name: str):
     Invoked with a temp FILE, never the name as a CLI argument -- OPSIN reads a
     bare argument as a filename and silently yields nothing.
     """
-    from orthonym.validation.opsin_roundtrip import _find_opsin_jar
+    from tests.support.jars import jar_or_skip
 
-    jar = _find_opsin_jar()
-    if jar is None:
-        pytest.skip("OPSIN jar not available")
+    jar = jar_or_skip()
     with tempfile.NamedTemporaryFile("w", suffix=".txt", delete=False) as fh:
         fh.write(name + "\n")
         path = fh.name

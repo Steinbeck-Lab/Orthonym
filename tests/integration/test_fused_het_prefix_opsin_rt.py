@@ -17,17 +17,18 @@ from orthonym.data.fused_heterocycles import (
     FUSED_HETEROCYCLE_PREFIX_STEMS,
     match_fused_heterocycle_core,
 )
+from tests.support.jars import jar_or_none
 
 
 # === OPSIN Setup ===
 
 PROJECT_ROOT = Path(__file__).parent.parent.parent
-OPSIN_JAR = PROJECT_ROOT / "opsin-cli-2.9.0-jar-with-dependencies.jar"
+OPSIN_JAR = jar_or_none()
 
 
 def _opsin_available() -> bool:
     """Check if OPSIN CLI JAR is available and Java is installed."""
-    if not OPSIN_JAR.exists():
+    if OPSIN_JAR is None:
         return False
     try:
         proc = subprocess.run(
@@ -41,7 +42,7 @@ def _opsin_available() -> bool:
 
 def _opsin_parse(name: str) -> str:
     """Parse an IUPAC name through OPSIN and return SMILES (or empty string)."""
-    if not name or not OPSIN_JAR.exists():
+    if not name or OPSIN_JAR is None:
         return ""
     try:
         proc = subprocess.run(
