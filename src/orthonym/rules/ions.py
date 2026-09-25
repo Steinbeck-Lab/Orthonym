@@ -970,6 +970,16 @@ def name_anion(mol, style: str = 'pin', _depth: int = 0, retained_only: bool = F
         >>> name_anion(mol)
         'acetate'
     """
+    #: a radical ion whose charge and radical sit on one atom is named from
+    # its ionic parent hydride ('propyloxidaniumyl', 'methylazaniumyl'), not as a
+    # closed-shell ion ('methanaminium' would be a different molecule).
+    if mol is not None and any(a.GetFormalCharge() and a.GetNumRadicalElectrons()
+                               for a in mol.GetAtoms()):
+        from .radicals import _name_mononuclear_radical_ion
+        _radical_ion = _name_mononuclear_radical_ion(mol)
+        if _radical_ion:
+            return _radical_ion
+
     if mol is None:
         return '' if not retained_only else None
 
@@ -1274,6 +1284,16 @@ def name_cation(mol, style: str = 'pin', _depth: int = 0, retained_only: bool = 
         >>> name_cation(mol)
         'ammonium'
     """
+    #: a radical ion whose charge and radical sit on one atom is named from
+    # its ionic parent hydride ('propyloxidaniumyl', 'methylazaniumyl'), not as a
+    # closed-shell ion ('methanaminium' would be a different molecule).
+    if mol is not None and any(a.GetFormalCharge() and a.GetNumRadicalElectrons()
+                               for a in mol.GetAtoms()):
+        from .radicals import _name_mononuclear_radical_ion
+        _radical_ion = _name_mononuclear_radical_ion(mol)
+        if _radical_ion:
+            return _radical_ion
+
     if mol is None:
         return '' if not retained_only else None
 

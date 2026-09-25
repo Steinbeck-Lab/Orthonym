@@ -2210,6 +2210,13 @@ def route_charged(mol, style: str = 'pin') -> str:
     n_cations = len(sites['cations'])
     from ..perception.ions import get_radical_sites
     radical_sites = get_radical_sites(mol)
+    #: a radical ion whose charge and radical sit on one atom of a
+    # mononuclear ionic parent ('trimethylboranuidyl', 'propyloxidaniumyl').
+    if n_anions or n_cations:
+        from .radicals import _name_mononuclear_radical_ion
+        _radical_ion = _name_mononuclear_radical_ion(mol)
+        if _radical_ion:
+            return _radical_ion
 
     # The common neutralize/ionize TAIL (Step 4+) is shared by the cation and anion
     # single-sign branches. One late anion-only tail fallback reads ``_single``, which

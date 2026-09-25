@@ -582,14 +582,19 @@ def _aminoxyl_prefix_string(prefixes: List[str]) -> str:
     from collections import Counter
     from ..assembly.naming_utils import alpha_sort_key, enclose_if_compound
     counts = Counter(prefixes)
+    simple = {2: 'di', 3: 'tri', 4: 'tetra'}
+    compound_mult = {2: 'bis', 3: 'tris', 4: 'tetrakis'}
     out = []
     for i, p in enumerate(sorted(counts, key=alpha_sort_key)):
         compound = enclose_if_compound(p) != p
-        if counts[p] == 2:
+        n = counts[p]
+        if n > 1:
+            if n not in simple:
+                return ''
             if compound:
-                out.append(f"bis({p})")
+                out.append(f"{compound_mult[n]}({p})")
             else:
-                out.append("di" + ("-" if p.startswith(("tert-", "sec-")) else "") + p)
+                out.append(simple[n] + ("-" if p.startswith(("tert-", "sec-")) else "") + p)
         elif compound or i:
             out.append(f"({p})")
         else:
@@ -1215,6 +1220,230 @@ def _name_multicentre_radical(mol, sites) -> str:
     return ''
 
 
+def _name_nitrene(mol, idx: int) -> str:
+    """Nitrenes R-N: (a neutral N with two radical electrons and one heavy
+    neighbour), / /:
+      - on a hydrazine N: '(CH3)2N-N: dimethylhydrazinylidene (PIN)'
+        (the Blue Book) -- the parent hydride hydrazine + 'ylidene';
+      - on an imidoyl carbon: '(N-methylethanimidoyl)azanylidene (PIN)' (:43362),
+        the acyl group from its acid;
+      - otherwise the PIN is an '-aminylidene' / '-amidylidene' name
+        ('benzenaminylidene (PIN)':40570, 'acetamidylidene (PIN)':40649) that
+        OPSIN cannot parse, so the PIN tier gives no name and a general tier ships
+        the parseable '<R>azanylidene' (method (2)) with a non-PIN label."""
+    n = mol.GetAtomWithIdx(idx)
+    if (n.GetSymbol() != 'N' or n.GetNumRadicalElectrons() != 2 or n.GetFormalCharge()
+            or n.GetDegree() != 1 or n.GetTotalNumHs()):
+        return ''
+    y = n.GetNeighbors()[0]
+    general = _tier_is_general()
+    from ..assembly.naming_utils import enclose_if_compound
+    if y.GetSymbol() == 'N':
+        if (y.GetFormalCharge() or y.GetNumRadicalElectrons() or y.GetIsAromatic()
+                or any(b.GetBondType() != Chem.BondType.SINGLE for b in y.GetBonds())):
+            return ''
+        prefixes = []
+        for sub in y.GetNeighbors():
+            if sub.GetIdx() == idx:
+                continue
+            if (sub.GetSymbol() != 'C' or sub.GetFormalCharge() or sub.GetNumRadicalElectrons()
+                    or _is_acyl_atom(mol, sub.GetIdx())):
+                return ''
+            frag = _collect_fragment_excluding(mol, sub.GetIdx(), {idx, y.GetIdx()})
+            prefix, wide = _n_substituent_prefix(mol, frag, sub.GetIdx(), general)
+            if not prefix or wide:
+                return ''
+            prefixes.append(prefix)
+        return _ship(mol, _aminoxyl_prefix_string(prefixes) + 'hydrazinylidene', False)
+    if y.GetSymbol() != 'C' or y.GetFormalCharge() or y.GetNumRadicalElectrons():
+        return ''
+    imidoyl = any(b.GetBondType() == Chem.BondType.DOUBLE and b.GetOtherAtom(y).GetSymbol() == 'N'
+                  for b in y.GetBonds())
+    if imidoyl:
+        acyl = _acyl_from_acid_name(_acid_name_with_oh_at_nitrene(mol, idx))
+        if acyl:
+            return _ship(mol, f"{enclose_if_compound(acyl)}azanylidene", False)
+        return ''
+    if not general:
+        return ''
+    if _is_acyl_atom(mol, y.GetIdx()):
+        acyl = _acyl_from_acid_name(_acid_name_with_oh_at_nitrene(mol, idx))
+        prefix = acyl
+    else:
+        frag = _collect_fragment_excluding(mol, y.GetIdx(), {idx})
+        prefix, _ = _n_substituent_prefix(mol, frag, y.GetIdx(), True)
+    if not prefix:
+        return ''
+    return _ship(mol, f"{enclose_if_compound(prefix)}azanylidene", True)
+
+
+def _acid_name_with_oh_at_nitrene(mol, idx: int) -> str:
+    """The acid made by turning the nitrene N into OH (for the acyl group on it)."""
+    work = Chem.RWMol(mol)
+    try:
+        a = work.GetAtomWithIdx(idx)
+        a.SetAtomicNum(8)
+        a.SetNumRadicalElectrons(0)
+        a.SetNoImplicit(True)
+        a.SetNumExplicitHs(1)
+        acid = work.GetMol()
+        Chem.SanitizeMol(acid)
+    except (RuntimeError, ValueError):
+        return ''
+    name = _reenter_neutral_name(acid)
+    return name if name.endswith('acid') else ''
+
+
+# ionic parent hydrides (mononuclear) that a radical centre can sit on.
+_IONIC_PARENT = {
+    ('N', -1): 'azanide', ('N', 1): 'azanium', ('O', 1): 'oxidanium',
+    ('S', 1): 'sulfanium', ('Se', 1): 'selanium', ('B', -1): 'boranuide',
+    ('P', 1): 'phosphanium', ('P', -1): 'phosphanide', ('As', 1): 'arsanium',
+    ('C', 1): 'methylium', ('C', -1): 'methanide',
+}
+
+
+def _name_mononuclear_radical_ion(mol) -> str:
+    """ "Radical ions derived from parent hydrides" (the Blue Book-
+    43422): the ionic parent hydride's name + 'yl'/'ylidene', "with elision of
+    the final letter 'e'", substituents as prefixes: trimethylboranuidyl (PIN,
+    :43430), (methoxycarbonyl)methanidylidene (PIN,:43439), methyliumyl (PIN,
+    :43443), propyloxidaniumyl (PIN,:43515), acetylazanidyl (PIN,:43517).
+    Scope: one fragment, exactly one charged atom, which also carries the only
+    radical electrons (1 or 2); a carbon centre only when no substituent is a
+    plain carbon group (a carbon chain would be the parent instead)."""
+    if len(Chem.GetMolFrags(mol)) != 1:
+        return ''
+    charged = [a for a in mol.GetAtoms() if a.GetFormalCharge()]
+    radical = [a for a in mol.GetAtoms() if a.GetNumRadicalElectrons()]
+    if len(charged) != 1 or len(radical) != 1 or charged[0].GetIdx() != radical[0].GetIdx():
+        return ''
+    x = charged[0]
+    if x.GetFormalCharge() > 0 and x.GetNumRadicalElectrons() == 2:
+        # RDKit counts the EMPTY orbital of an '-ylium' cation (C[O+], [NH2+],
+        # c1ccccc1[S+]) as two radical electrons. Those are cations --
+        # 'methoxylium (PIN)', 'azanylium', '1H-pyrrole-2-carboxamidylium (PIN)'
+        # -- not radical ions, and the SMILES cannot tell the two readings
+        # apart, so no round trip can either. They belong to the separate
+        # build (user decision Q2 = A); this producer leaves them alone.
+        return ''
+    parent = _IONIC_PARENT.get((x.GetSymbol(), x.GetFormalCharge()))
+    suffix = {1: 'yl', 2: 'ylidene'}.get(x.GetNumRadicalElectrons())
+    if parent is None or suffix is None:
+        return ''
+    general = _tier_is_general()
+    prefixes = []
+    for sub in x.GetNeighbors():
+        if sub.GetSymbol() != 'C':
+            return ''
+        if _is_acyl_atom(mol, sub.GetIdx()):
+            acid = _acid_name_with_oh_replacing(mol, x.GetIdx())
+            acyl = _acyl_from_acid_name(acid) if acid else ''
+            if acyl:
+                prefixes.append(acyl)
+                continue
+        if x.GetSymbol() == 'C' and not any(
+                b.GetBondType() != Chem.BondType.SINGLE
+                and b.GetOtherAtom(sub).GetSymbol() in ('O', 'S', 'N')
+                for b in sub.GetBonds()):
+            return ''  # a plain carbon group: the chain is the parent, not methane
+        frag = _collect_fragment_excluding(mol, sub.GetIdx(), {x.GetIdx()})
+        prefix, wide = _n_substituent_prefix(mol, frag, sub.GetIdx(), general)
+        if not prefix or wide:
+            return ''
+        prefixes.append(prefix)
+    name = _aminoxyl_prefix_string(prefixes) + parent[:-1] + suffix if parent.endswith('e') \
+        else _aminoxyl_prefix_string(prefixes) + parent + suffix
+    return _ship(mol, name, False)
+
+
+def _acid_name_with_oh_replacing(mol, idx: int) -> str:
+    """The acid made by replacing atom ``idx`` (and its charge and radical) with
+    OH -- the formal parent of the acyl group on a radical-ion centre."""
+    work = Chem.RWMol(mol)
+    try:
+        a = work.GetAtomWithIdx(idx)
+        a.SetAtomicNum(8)
+        a.SetFormalCharge(0)
+        a.SetNumRadicalElectrons(0)
+        a.SetNoImplicit(True)
+        a.SetNumExplicitHs(1)
+        acid = work.GetMol()
+        Chem.SanitizeMol(acid)
+    except (RuntimeError, ValueError):
+        return ''
+    name = _reenter_neutral_name(acid)
+    return name if name.endswith('acid') else ''
+
+
+_METHANE_RADICAL = {1: 'methyl', 2: 'methylidene', 3: 'methylidyne'}
+
+
+def _name_methane_centred_radical(mol, idx: int) -> str:
+    """A carbon radical centre all of whose neighbours are ring atoms: the
+    parent is methane (no chain can extend through it), the ring groups are
+    prefixes, the suffix is methyl / methylidene / methylidyne,
+    : 'diphenylmethylidene (PIN)' (the Blue Book,
+    triphenylmethyl, cyclohexyl(phenyl)methyl."""
+    c = mol.GetAtomWithIdx(idx)
+    suffix = _METHANE_RADICAL.get(c.GetNumRadicalElectrons())
+    if (c.GetSymbol() != 'C' or suffix is None or c.GetFormalCharge() or c.IsInRing()
+            or c.GetDegree() < 2 or any(not n.IsInRing() for n in c.GetNeighbors())):
+        return ''
+    general = _tier_is_general()
+    prefixes = []
+    for n in c.GetNeighbors():
+        frag = _collect_fragment_excluding(mol, n.GetIdx(), {idx})
+        prefix, wide = _n_substituent_prefix(mol, frag, n.GetIdx(), general)
+        if not prefix or wide:
+            return ''
+        prefixes.append(prefix)
+    return _ship(mol, _aminoxyl_prefix_string(prefixes) + suffix, False)
+
+
+# Unbranched homogeneous heteroatom chains: 2 -> hydrazine/disilane...
+_HOMOGENEOUS_STEM = {'Si': 'silane', 'Ge': 'germane', 'Sn': 'stannane', 'P': 'phosphane',
+                     'S': 'sulfane', 'N': 'azane'}
+
+
+def _name_homogeneous_chain_radical(mol, sites) -> str:
+    """Radical centres (one electron each) on an UNSUBSTITUTED, unbranched chain
+    of one heteroatom kind, named from the parent hydride with the lowest
+    locants for the free valences,: 'trisilan-2-yl (PIN)',
+    'hydrazine-1,2-diyl (PIN)' (the Blue Book,."""
+    atoms = list(mol.GetAtoms())
+    el = atoms[0].GetSymbol()
+    if (len(atoms) < 2 or any(a.GetSymbol() != el for a in atoms) or el not in _HOMOGENEOUS_STEM
+            or any(a.GetFormalCharge() for a in atoms) or mol.GetRingInfo().NumRings()
+            or any(a.GetDegree() > 2 for a in atoms)
+            or any(b.GetBondType() != Chem.BondType.SINGLE for b in mol.GetBonds())
+            or any(s['n_electrons'] != 1 for s in sites)):
+        return ''
+    n = len(atoms)
+    parent = 'hydrazine' if (el == 'N' and n == 2) else (
+        ('di' if n == 2 else _get_chain_prefix(n)[:-1] + 'a' if n > 4 else {3: 'tri', 4: 'tetra'}[n])
+        + _HOMOGENEOUS_STEM[el])
+    end = [a.GetIdx() for a in atoms if a.GetDegree() <= 1][0]
+    order = [end]
+    while len(order) < n:
+        order.append([x.GetIdx() for x in mol.GetAtomWithIdx(order[-1]).GetNeighbors()
+                      if x.GetIdx() not in order][0])
+    centres = [s['atom_idx'] for s in sites]
+    if len(centres) == 1 and mol.GetAtomWithIdx(centres[0]).GetDegree() <= 1:
+        # A single free valence at a chain end: the Blue Book writes such prefixes
+        # without a locant ('hydrazinyl', 'disilanyl'), a spelling not derived
+        # here -- left to the other producers.
+        return ''
+    best = min(tuple(sorted(o.index(c) + 1 for c in centres)) for o in (order, order[::-1]))
+    k = len(centres)
+    mult = {1: '', 2: 'di', 3: 'tri'}.get(k)
+    if mult is None:
+        return ''
+    tail = f"-{','.join(map(str, best))}-{mult}yl"
+    name = (parent[:-1] if not mult and parent.endswith('e') else parent) + tail
+    return _ship(mol, name, False)
+
+
 def _compose_oxyl_name(mol, parent: str, additive_suffix: str, systematic_suffix: str) -> str:
     """ (VERIFIED, the Blue Book-40709): a radical formed by
     removing the hydrogen of a hydroxy/peroxy characteristic group is named
@@ -1713,8 +1942,12 @@ def name_radical(mol, style: str = 'pin') -> str:
         acyl = _name_acyl_radical_from_acid(mol, site['atom_idx'])
         if acyl:
             return acyl
+        chain = _name_homogeneous_chain_radical(mol, sites)
+        if chain:
+            return chain
         # chalcogen analogues and ring-N radicals.
-        for producer in (_name_chalcogen_radical, _name_ring_n_radical, _name_carbon_radical):
+        for producer in (_name_chalcogen_radical, _name_ring_n_radical, _name_carbon_radical,
+                         _name_nitrene, _name_methane_centred_radical):
             named = producer(mol, site['atom_idx'])
             if named:
                 return named
@@ -1749,7 +1982,7 @@ def name_radical(mol, style: str = 'pin') -> str:
         return route_charged(mol, style)
 
     # / / multi-centre producers first (strict round trip).
-    multi = _name_multicentre_radical(mol, sites)
+    multi = _name_multicentre_radical(mol, sites) or _name_homogeneous_chain_radical(mol, sites)
     if multi:
         return multi
 
