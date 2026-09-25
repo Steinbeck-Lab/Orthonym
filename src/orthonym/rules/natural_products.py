@@ -651,17 +651,6 @@ def name_natural_product_with_substituents(
     if conjugates and esters:
         return None
 
-    # If no decorations found, return bare scaffold name. a phase : also require
-    # `not conjugates` so a scaffold carrying ONLY a conjugate (and no other decoration)
-    # still enters assembly instead of short-circuiting to the bare scaffold name.
-    if (not hydroxyls and not ketones and not methyls and not halogens
-            and not unsaturation["ene"] and not unsaturation["yne"]
-            and not epoxy_bridges and not n_alkyls and not methoxys
-            and not conjugates and not glycosyloxys):
-        if modification_prefix:
-            return modification_prefix + scaffold_name
-        return scaffold_name
-
     # a phase (-03,): no-silent-drop completeness invariant. Runs ONLY when a
     # conjugate fired (— non-conjugate inputs are entirely untouched), so it can never
     # false-fail a name that does not go through the conjugate path. Assert every heavy atom
@@ -670,63 +659,89 @@ def name_natural_product_with_substituents(
     # name omitting atoms. Asserted over `substituent_atoms` (the get_scaffold_substituents
     # subgraphs), NEVER raw `non_scaffold_atoms` — the cholestane C20-C27 side chain folds
     # into the stem and would otherwise trigger a false honest-fail (Pitfall 3).
-    if conjugates or glycosyloxys:
-        # WARNING-4 atom exposure: the OH/ketone/methyl/methoxy/halogen/n_alkyl finders return
-        # locants, not atom sets. Recompute each kind's consumed atoms locally from the SAME
-        # get_scaffold_substituents subgraphs, claiming a sub's atoms only when it structurally
-        # matches a decoration the corresponding finder actually reported. This is additive
-        # (the finders' returns are untouched) and reuses the already-excluded membership, so
-        # `claimed` can never disagree with `all_exclude`.
-        hydroxyl_atoms: set = set()
-        ketone_atoms: set = set()
-        methyl_atoms: set = set()
-        methoxy_atoms: set = set()
-        halogen_atoms: set = set()
-        n_alkyl_atoms: set = set()
-        _hydroxyl_locs = set(hydroxyls)
-        _ketone_locs = set(ketones)
-        _methyl_locs = set(methyls)
-        _methoxy_locs = set(methoxys)
-        _halogen_locs = {loc for loc, _ in halogens}
-        _n_alkyl_locs = {loc for loc, _ in n_alkyls}
-        _HALOGEN_Z = {9, 17, 35, 53}
-        all_subs = get_scaffold_substituents(mol, scaffold_info["matched_atoms"])
-        for sub in all_subs:
-            attach = sub["attachment_atom"]
-            loc = numbering.get(attach)
-            if loc is None:
-                continue
-            atoms = set(sub["substituent_atoms"])
-            first_idx = sub["first_atom"]
-            fa = mol.GetAtomWithIdx(first_idx)
-            single_atom = len(atoms) == 1
-            if single_atom and fa.GetAtomicNum() == 8 and fa.GetTotalNumHs() >= 1 \
-                    and loc in _hydroxyl_locs:
-                hydroxyl_atoms |= atoms
-            elif single_atom and fa.GetAtomicNum() == 8 and fa.GetTotalNumHs() == 0 \
-                    and loc in _ketone_locs:
-                ketone_atoms |= atoms
-            elif single_atom and fa.GetAtomicNum() == 6 and loc in _methyl_locs:
-                methyl_atoms |= atoms
-            elif single_atom and fa.GetAtomicNum() in _HALOGEN_Z and loc in _halogen_locs:
-                halogen_atoms |= atoms
-            elif fa.GetAtomicNum() == 8 and loc in _methoxy_locs:
-                methoxy_atoms |= atoms
-            elif fa.GetAtomicNum() == 6 and loc in _n_alkyl_locs \
-                    and mol.GetAtomWithIdx(attach).GetAtomicNum() == 7:
-                n_alkyl_atoms |= atoms
+    #
+    # 2026-09-25 (pre-existing-failures plan, Task 4, TRIAGE row 93): the invariant
+    # now runs for EVERY decorated scaffold, not only the conjugate paths. A
+    # decoration no finder recognises was otherwise silently dropped: the 4-carboxy
+    # group of '(3S,4S,5R,8S,10S,11R,13R,14S,17R,20R)-3-hydroxy-4-methyl-7-oxo-
+    # ergosta-9,24-dien-11-yl acetate' (OPSIN-unparseable, and not the molecule).
+    # "SUBSTITUTIVE NOMENCLATURE" (the Blue Book): every substituent is
+    # cited as a prefix or suffix. A scaffold with only an ester still reaches it.
+    # WARNING-4 atom exposure: the OH/ketone/methyl/methoxy/halogen/n_alkyl finders return
+    # locants, not atom sets. Recompute each kind's consumed atoms locally from the SAME
+    # get_scaffold_substituents subgraphs, claiming a sub's atoms only when it structurally
+    # matches a decoration the corresponding finder actually reported. This is additive
+    # (the finders' returns are untouched) and reuses the already-excluded membership, so
+    # `claimed` can never disagree with `all_exclude`.
+    hydroxyl_atoms: set = set()
+    ketone_atoms: set = set()
+    methyl_atoms: set = set()
+    methoxy_atoms: set = set()
+    halogen_atoms: set = set()
+    n_alkyl_atoms: set = set()
+    _hydroxyl_locs = set(hydroxyls)
+    _ketone_locs = set(ketones)
+    _methyl_locs = set(methyls)
+    _methoxy_locs = set(methoxys)
+    _halogen_locs = {loc for loc, _ in halogens}
+    _n_alkyl_locs = {loc for loc, _ in n_alkyls}
+    _HALOGEN_Z = {9, 17, 35, 53}
+    all_subs = get_scaffold_substituents(mol, scaffold_info["matched_atoms"])
+    for sub in all_subs:
+        attach = sub["attachment_atom"]
+        loc = numbering.get(attach)
+        if loc is None:
+            continue
+        atoms = set(sub["substituent_atoms"])
+        first_idx = sub["first_atom"]
+        fa = mol.GetAtomWithIdx(first_idx)
+        single_atom = len(atoms) == 1
+        if single_atom and fa.GetAtomicNum() == 8 and fa.GetTotalNumHs() >= 1 \
+                and loc in _hydroxyl_locs:
+            hydroxyl_atoms |= atoms
+        elif single_atom and fa.GetAtomicNum() == 8 and fa.GetTotalNumHs() == 0 \
+                and loc in _ketone_locs:
+            ketone_atoms |= atoms
+        elif single_atom and fa.GetAtomicNum() == 6 and loc in _methyl_locs:
+            methyl_atoms |= atoms
+        elif single_atom and fa.GetAtomicNum() in _HALOGEN_Z and loc in _halogen_locs:
+            halogen_atoms |= atoms
+        elif fa.GetAtomicNum() == 8 and loc in _methoxy_locs:
+            methoxy_atoms |= atoms
+        elif fa.GetAtomicNum() == 6 and loc in _n_alkyl_locs \
+                and mol.GetAtomWithIdx(attach).GetAtomicNum() == 7:
+            n_alkyl_atoms |= atoms
 
-        claimed = (ester_consumed_atoms | epoxy_consumed | conjugate_consumed_atoms
-                   | glycosyloxy_consumed
-                   | hydroxyl_atoms | ketone_atoms | methyl_atoms | methoxy_atoms
-                   | halogen_atoms | n_alkyl_atoms)
-        substituent_atoms = set()
-        for s in all_subs:
-            substituent_atoms |= set(s["substituent_atoms"])
-        heavy_unclaimed = {a for a in substituent_atoms - claimed
-                           if mol.GetAtomWithIdx(a).GetAtomicNum() > 1}
-        if heavy_unclaimed:
-            return None  # honest-fail → systematic pipeline; NEVER emit a name omitting atoms
+    claimed = (ester_consumed_atoms | epoxy_consumed | conjugate_consumed_atoms
+               | glycosyloxy_consumed
+               | hydroxyl_atoms | ketone_atoms | methyl_atoms | methoxy_atoms
+               | halogen_atoms | n_alkyl_atoms)
+    substituent_atoms = set()
+    for s in all_subs:
+        substituent_atoms |= set(s["substituent_atoms"])
+    heavy_unclaimed = {a for a in substituent_atoms - claimed
+                       if mol.GetAtomWithIdx(a).GetAtomicNum() > 1}
+    if heavy_unclaimed:
+        return None  # honest-fail → systematic pipeline; NEVER emit a name omitting atoms
+
+    # If no decorations found, return bare scaffold name. a phase : also require
+    # `not conjugates` so a scaffold carrying ONLY a conjugate (and no other decoration)
+    # still enters assembly instead of short-circuiting to the bare scaffold name.
+    #
+    # 2026-09-25 (pre-existing-failures plan, Task 4): `esters` was missing from
+    # this test, so a scaffold whose ONLY decoration is an ester returned the bare
+    # scaffold name and dropped the ester: 'tropane' for tropisetron's
+    # 8-methyl-8-azabicyclo[3.2.1]octan-3-yl 1H-indole-3-carboxylate
+    # (C8H15N for C17H20N2O2; canary call 182). This test now also runs AFTER the
+    # completeness invariant, so a decoration no finder recognises declines the
+    # name instead of reaching the bare scaffold name.
+    if (not hydroxyls and not ketones and not methyls and not halogens
+            and not unsaturation["ene"] and not unsaturation["yne"]
+            and not epoxy_bridges and not n_alkyls and not methoxys
+            and not conjugates and not glycosyloxys and not esters):
+        if modification_prefix:
+            return modification_prefix + scaffold_name
+        return scaffold_name
 
     # 4/5. Assemble the name. `ring_ab` non-empty ⇒ the steroid α/β path fired; we ship α/β
     # ONLY if it OPSIN-round-trips, else fall back to the whole-graph R/S name (a phase).
@@ -1956,6 +1971,15 @@ def _find_ester_decorations(
             mol, carbonyl_idx, first_idx, matched_set
         )
         if acylate_name is None:
+            # 2026-09-25 (pre-existing-failures plan, Task 4): a carbon count names
+            # an UNBRANCHED SATURATED acyl chain only. For any other acid it named a
+            # different molecule: 'nonanoate' for tropisetron's
+            # 1H-indole-3-carboxylate (canary call 182). Such an ester is left
+            # unrecorded, so its atoms stay unclaimed and the completeness
+            # invariant below declines the whole name, the Blue Book).
+            if not _acid_fragment_is_unbranched_alkanoyl(
+                    mol, carbonyl_idx, first_idx, matched_set):
+                continue
             # Count carbon atoms in the acid fragment
             # The acid fragment = carbonyl carbon + everything bonded to it
             # (except the ester oxygen back to scaffold)
@@ -2046,6 +2070,47 @@ def _find_glycosyl_conjugates(
     conjugates (RESEARCH Pattern 3); the `word` is the glycoside head
     (e.g. `beta-D-glucopyranosiduronic acid`)."""
     return _find_conjugates_of_kind(mol, scaffold_info, numbering, "glycoside")
+
+
+def _acid_fragment_is_unbranched_alkanoyl(
+    mol, carbonyl_idx: int, ester_oxy_idx: int, scaffold_atoms: set
+) -> bool:
+    """True when the acid fragment is CH3-(CH2)n-C(=O)- (or H-C(=O)-): the
+    carbonyl carbon with its =O and an unbranched, saturated, acyclic carbon
+    chain -- the only shape a carbon-count acylate name describes."""
+    visited = {carbonyl_idx, ester_oxy_idx}
+    visited.update(scaffold_atoms)
+    frag = []
+    queue = deque([carbonyl_idx])
+    while queue:
+        current = queue.popleft()
+        frag.append(current)
+        for nbr in mol.GetAtomWithIdx(current).GetNeighbors():
+            if nbr.GetIdx() not in visited:
+                visited.add(nbr.GetIdx())
+                queue.append(nbr.GetIdx())
+    frag_set = set(frag)
+    carbonyl_o = 0
+    for idx in frag:
+        atom = mol.GetAtomWithIdx(idx)
+        if atom.GetIsAromatic() or atom.IsInRing():
+            return False
+        if idx != carbonyl_idx and atom.GetAtomicNum() == 8:
+            bond = mol.GetBondBetweenAtoms(idx, carbonyl_idx)
+            if bond is None or bond.GetBondType() != Chem.BondType.DOUBLE:
+                return False
+            carbonyl_o += 1
+            continue
+        if atom.GetAtomicNum() != 6:
+            return False
+        if idx != carbonyl_idx:
+            nbrs = [n for n in atom.GetNeighbors() if n.GetIdx() in frag_set]
+            if len(nbrs) > 2:
+                return False
+            for b in atom.GetBonds():
+                if b.GetBondType() != Chem.BondType.SINGLE:
+                    return False
+    return carbonyl_o == 1
 
 
 def _count_acid_fragment_carbons(

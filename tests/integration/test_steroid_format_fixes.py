@@ -127,11 +127,14 @@ class TestSteroidScaffoldCoverage:
 BENCHMARK_STEROIDS = [
     pytest.param(
         "O=C1C[C@@H](O)[C@]2(C)C3=CC=C4C[C@@H](O)CC[C@@]4(C)[C@H]3CC[C@]12[C@@H](C)CC[C@H](C)C(C)C",
-        "androst",  # matched as androstane (not ergostane -- see comment)
-        "(3S,9R,10S,13R,14R,15R,18S)-3,15-dihydroxy-14,18-dimethylandrosta-5,7-dien-17-one",
-        "opsin_valency_error",
-        # Ergostane derivative but C17=O breaks ergostane substructure match.
-        # Matched as androstane instead. Extra methyls now enumerated.
+        # Task 4 continuation (2026-09-25): was stem "androst" and the baseline
+        # '(3S,9R,10S,13R,14R,15R,18S)-3,15-dihydroxy-14,18-dimethylandrosta-5,7-
+        # dien-17-one', an androstane that DROPPED the C8 side chain (OPSIN cannot
+        # parse it; C28H44O3 input). The NP producer now declines
+        #:4722), so this row asserts the tier contract (test_tier_contract).
+        None,
+        None,
+        "tier_contract",
         id="compound_1_ergost_derivative",
     ),
     pytest.param(
@@ -143,10 +146,13 @@ BENCHMARK_STEROIDS = [
     ),
     pytest.param(
         "O=C1CC[C@@]2(C)[C@H]3CCC4CCCC[C@]4(C)[C@H]3CC[C@]12[C@@H](C)CCC(=O)SCCNC(=O)CCNC(=O)O",
-        "androst",  # CoA thioester derivative
-        None,  # Name contains steroid stem but has complex decorations
-        "not_steroid_name",
-        # CoA thioester derivative -- naming falls back to systematic
+        # Task 4 continuation (2026-09-25): was stem "androst", met only by the
+        # NP name '(8S,9S,10S,13R,14S,18S)-14,18-dimethylandrostan-17-one', which
+        # DROPPED the whole thioester arm (C30H48N2O5S input). The NP producer
+        # now declines:4722): tier contract (test_tier_contract).
+        None,
+        None,
+        "tier_contract",
         id="compound_41_gonane_thioester",
     ),
     pytest.param(
@@ -166,9 +172,14 @@ BENCHMARK_STEROIDS = [
     ),
     pytest.param(
         "O=COC1C[C@@H](O)[C@]2(C)C3=CC=C4C[C@@H](O)CC[C@@]4(C)[C@H]3CC[C@]12[C@@H](C)CC[C@H](C)C(C)C",
-        "androst",  # Ester derivative, matched as androstane
-        "(3S,9R,10S,13R,14R,15R,18S)-3,15-dihydroxy-14,18-dimethylandrost-5,7-dien-17-yl formate",
-        "complex_format",
+        # Task 4 continuation (2026-09-25): was stem "androst", met only by the
+        # NP name '(3S,9R,10S,13R,14R,15R,18S)-3,15-dihydroxy-14,18-dimethyl-
+        # androsta-5,7-dien-17-yl formate', which DROPPED the C8 side chain
+        # (C29H46O4 input). The NP producer now declines:4722): tier
+        # contract (test_tier_contract).
+        None,
+        None,
+        "tier_contract",
         id="compound_58_ester_formate",
     ),
     pytest.param(
@@ -266,6 +277,20 @@ class TestBenchmarkSteroidRegression:
         assert name == expected_name, (
             f"Baseline changed: expected '{expected_name}', got '{name}'"
         )
+
+    @pytest.mark.opsin_gate
+    @pytest.mark.parametrize(
+        "smiles,expected_stem,expected_name,opsin_status",
+        [p for p in BENCHMARK_STEROIDS if p.values[3] == "tier_contract"],
+    )
+    def test_tier_contract(self, smiles, expected_stem, expected_name, opsin_status):
+        """Rows whose old baseline was an NP name that dropped atoms (Task 4
+        continuation). No NP-parent name is a PIN, the Blue Book);
+        the PIN tier has no other producer and fails closed, as it already did
+        in production. The tier contract (tests/support/rt_assert.py), gate ON:
+        the best-effort name round-trips to the full InChIKey."""
+        from tests.support.rt_assert import assert_tier_contract
+        assert_tier_contract(smiles)
 
 
 # ===================================================================

@@ -138,7 +138,16 @@ def _name_component(frag_smi: str, style: str, *,
     # (no JAR / transient OPSIN error) exactly as the production gate does.
     from orthonym.namer import _validity_gate_status
     if _validity_gate_status(name) == "rejected":
-        return None
+        # 2026-09-25 (pre-existing-failures plan, Task 4 continuation): OPSIN
+        # 2.9.0 rejects EVERY name with a pseudoasymmetric (lowercase r/s)
+        # descriptor, e.g. tropisetron's '(1R,3r,5S)-tropan-3-yl
+        # 1H-indole-3-carboxylate'. Such a component is accepted when the
+        # stripped-form full-InChIKey round trip plus the centres labeller verify
+        # it (namer._pseudoasymmetric_name_verified); refusing it dropped the
+        # whole adduct, and a later path then named the drug and lost the HCl.
+        from orthonym.namer import _pseudoasymmetric_name_verified
+        if not _pseudoasymmetric_name_verified(name, frag_smi):
+            return None
     return name
 
 

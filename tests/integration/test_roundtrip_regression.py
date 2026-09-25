@@ -578,7 +578,14 @@ PHASE24_WAVE2_FIXES = [
     # D1: Lowercase r/s for pseudoasymmetric centers per IUPAC
     (
         "CC(C)[C@@H]1CC[C@H](C)CCC[C@H](C)CC1",
-        "(1S,4s,7R)-4-isopropyl-1,7-dimethylcyclodecane",
+        # 2026-09-25 (pre-existing-failures plan, Task 4 continuation; controller
+        # ruling): the PIN tier ships the gold np_stereoparent name 'germacrane'
+        # (gold row P14C-, "(c)"; BB:51413), by design
+        # although OPSIN 2.9.0 cannot parse it. The old '(1S,4s,7R)-4-isopropyl-
+        # 1,7-dimethylcyclodecane' was neither that nor the systematic spelling
+        # ('propan-2-yl'; (j):3346 gives R the lower locant). The
+        # best-effort systematic name is checked in test_pseudoasymmetric_best_effort.
+        "germacrane",
         "stereo-lowercase-pseudoasymmetric",
     ),
 
@@ -733,6 +740,24 @@ PHASE24_PARSE_FIXES = [
         "stability-acetyloxy-unchanged",
     ),
 ]
+
+
+class TestPseudoasymmetricBestEffort:
+    """germacrane at the best-effort tier: the VERIFIED systematic name
+    (controller ruling 2026-09-25). OPSIN 2.9.0 parses no lowercase
+    pseudoasymmetric descriptor, so the check is the stereo-stripped full-InChIKey
+    round trip plus the centres labeller (namer._pseudoasymmetric_name_verified)."""
+
+    @pytest.mark.integration
+    @pytest.mark.opsin_gate
+    def test_pseudoasymmetric_best_effort(self):
+        from orthonym import Orthonym
+        from orthonym.cli import _emit_tier_flags
+        from orthonym.namer import _pseudoasymmetric_name_verified
+        smiles = "CC(C)[C@@H]1CC[C@H](C)CCC[C@H](C)CC1"
+        be = Orthonym(style="pin", **_emit_tier_flags("best-effort")).name(smiles)
+        assert be == "(1R,4s,7S)-1,7-dimethyl-4-(propan-2-yl)cyclodecane"
+        assert _pseudoasymmetric_name_verified(be, smiles)
 
 
 class TestPhase24ParseFixes:

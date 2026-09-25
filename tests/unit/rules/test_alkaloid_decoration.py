@@ -147,12 +147,25 @@ class TestAlkaloidCIRegression:
         assert "16,22-epoxy" in result
         assert "cholestane" in result
 
+    @pytest.mark.opsin_gate
     def test_steroid_ester_not_methoxy(self):
-        """Methyl ester on steroid side chain should NOT be detected as methoxy."""
+        """Methyl ester on steroid side chain should NOT be detected as methoxy.
+
+        Task 4 continuation (2026-09-25): the PIN tier used to pass this with the
+        NP name '(3R,...,20R)-3,7,15-trihydroxycholan-24-one', which dropped the
+        ester's O-methyl (OPSIN: C24H40O4; the input is C25H42O5).
+        (the Blue Book): every substituent is cited. The NP producer now
+        declines, and no NP-parent name is a PIN,:50943), so the PIN tier
+        fails closed (it already did in production). The tier contract holds
+        with the gate ON, and the test's intent is checked on the best-effort
+        name, which cites the ester as 'methyl...pentanoate', never 'methoxy'.
+        """
+        from tests.support.rt_assert import assert_tier_contract
         # m16_HA30: cholane with methyl ester at C-24
-        result = name_compound(
+        _pin, result = assert_tier_contract(
             "COC(=O)CC[C@@H](C)[C@H]1C[C@@H](O)[C@H]2[C@@H]3"
             "[C@H](O)C[C@@H]4C[C@H](O)CC[C@]4(C)[C@H]3CC[C@@]21C"
         )
         assert "methoxy" not in result
         assert "trihydroxy" in result
+        assert result.startswith("methyl ")

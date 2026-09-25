@@ -275,8 +275,66 @@ def orient_cycloalkane(
             return 'zzzzz'
         return alpha_sort_key(pos1_sub)
 
-    best_candidates.sort(key=sort_key)
+    # 2026-09-25 (pre-existing-failures plan, Task 4 continuation): when the
+    # position-1 name also ties, the remaining candidates used to be decided by
+    # enumeration order (i.e. by the input atom order). Break that tie by the rest
+    # of instead: the full first-cited-prefix comparison (the same key the
+    # principal-group path uses), then (j) (the Blue Book): "the lower
+    # locant is assigned to CIP stereodescriptors Z, R, M, and r (pseudoasymmetry)
+    # that are preferred to E, S, P, and s". For germacrane's cyclodecane this
+    # gives '(1R,4s,7S)', as the Blue Book's own '13-norgermacrane
+    # (1R,4s,7S)-4-ethyl-1,7-dimethylcyclodecane' (:51471), not '(1S,4s,7R)'.
+    def full_key(item):
+        oriented, _pos1_sub = item
+        return (sort_key(item),
+                _alpha_citation_key(mol, oriented, substituent_positions, ring_list),
+                _cip_orientation_key(mol, oriented))
+
+    best_candidates.sort(key=full_key)
     return best_candidates[0][0]
+
+
+def _alpha_citation_key(mol, oriented: List[int],
+                        substituent_positions: Dict[int, List[List[int]]],
+                        ring_list: List[int]) -> list:
+    """ first-cited-prefix key: the (name, locant) entries of every prefix,
+    in alphanumerical order, so the first-cited name's locant decides first."""
+    entries = []
+    for i, atom_idx in enumerate(oriented):
+        for sub_atoms in substituent_positions.get(atom_idx, ()):
+            name = _prefix_name_for_sort(mol, sub_atoms, ring_list)
+            entries.append((alpha_sort_key(name) if name else 'zzzzz', i + 1))
+    entries.sort()
+    return entries
+
+
+def _cip_orientation_key(mol, oriented: List[int]) -> tuple:
+    """ (j) rank tuple of the ring's CIP stereodescriptors in locant order.
+
+    Reuses ``naming_utils.cip_descriptor_rank_key`` (the table the chain
+    numbering in ``rules.locants._cip_numbering_key`` and the citation order
+    share), so R/r/Z/M take the lower locant. Labels come from the canonical
+    ``perception.stereo.assign_stereochemistry`` (idempotent). Empty for an
+    orientation without descriptors, so achiral rings tie and keep their order.
+    """
+    if not any(a.GetChiralTag() != Chem.ChiralType.CHI_UNSPECIFIED
+               for a in mol.GetAtoms()):
+        return ()
+    try:
+        from ..perception.stereo import assign_stereochemistry
+        from ..assembly.naming_utils import cip_descriptor_rank_key
+        assign_stereochemistry(mol)
+        items = []
+        for pos, idx in enumerate(oriented):
+            atom = mol.GetAtomWithIdx(idx)
+            if atom.HasProp('_CIPCode'):
+                items.append((pos + 1, atom.GetProp('_CIPCode')))
+        if not items:
+            return ()
+        block = '(' + ','.join('%d%s' % (loc, code) for loc, code in items) + ')'
+        return cip_descriptor_rank_key(block)
+    except Exception:
+        return ()
 
 
 def _orient_cycloalkane_with_pg(
@@ -346,7 +404,9 @@ def _orient_cycloalkane_with_pg(
         entries.sort()
         return entries
 
-    tied.sort(key=alpha_citation_key)
+    # (j) (the Blue Book) decides a tie that survives (g).
+    tied.sort(key=lambda cand: (alpha_citation_key(cand),
+                                _cip_orientation_key(mol, cand[0])))
     return tied[0][0]
 
 

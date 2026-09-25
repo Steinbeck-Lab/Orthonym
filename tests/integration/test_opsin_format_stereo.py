@@ -69,7 +69,37 @@ _TIER_CONTRACT = {
     # enclosing marks {}).
     "CC(=O)[C@@H](C)Nc1ccccc1C(=O)O":
         "PIN tier abstains; best-effort spelling breaks P-16.5.4 nesting",
+    # the 20,24-epoxydammarane ketone (medium-stereo m11; Task 4 continuation,
+    # 2026-09-25). With the gate off the PIN tier used to ship the natural-
+    # product name '(5R,8R,9R,10R,13R,14R,17S)-4,4,8,10,14-pentamethylgonan-3-one',
+    # which silently dropped the 2-(2-hydroxypropan-2-yl)-5-methyloxolan-5-yl side
+    # chain, the Blue Book: every substituent is cited as a prefix
+    # or suffix). The NP producer now declines; no NP-parent name is a PIN,
+    #:50943, "Preferred IUPAC names (PINs) are not identified for the compounds
+    # in this Chapter"), and the PIN tier has no other producer, so it fails
+    # closed (it already did in production). Best-effort, RT-exact:
+    # '(2S,5S)-2-(2-hydroxypropan-2-yl)-5-methyl-5-{(1R,2R,7R,10R,11R,14S,15R)-
+    # 2,6,6,10,11-pentamethyl-5-oxotetracyclo[8.7.0.0^2,7.0^11,15]heptadecan-
+    # 14-yl}oxolane'.
+    ("CC(C)(O)[C@@H]1CC[C@@](C)([C@H]2CC[C@]3(C)[C@@H]2CC"
+     "[C@@H]2[C@@]4(C)CCC(=O)C(C)(C)[C@@H]4CC[C@]23C)O1"):
+        "NP name dropped the oxolane side chain; the PIN tier fails closed (P-100)",
 }
+
+# germacrane (TRIAGE rows 33, 36, 92; controller ruling 2026-09-25). The PIN tier
+# ships 'germacrane', a gold-validated np_stereoparent name (gold row
+# P14C-, "(c)"; BB:51413 lists it), by design although
+# OPSIN cannot parse it (the np_stereoparent carve-out of the validity gate).
+# Applying 's "PINs are not identified" (:50943) to the class would cost
+# up to 53 gold passes, so the PIN tier keeps it and these OPSIN-format checks of
+# the PIN name are strict xfails. The best-effort tier gives the verified
+# systematic name instead (TestStereoFormatGermacrane below).
+GERMACRANE = "CC(C)[C@@H]1CC[C@H](C)CCC[C@H](C)CC1"
+_GERMACRANE_XFAIL = (
+    "OPSIN 2.9.0 cannot parse the germacrane parent or a lowercase "
+    "pseudoasymmetric descriptor; the PIN tier ships the gold np_stereoparent "
+    "name by design"
+)
 
 
 # -----------------------------------------------------------------------
@@ -181,6 +211,8 @@ class TestStereoFormatPseudoasymmetric:
         for smiles in smiles_list:
             if smiles in _TIER_CONTRACT:
                 continue  # TestStereoFormatTierContract
+            if smiles == GERMACRANE:
+                continue  # TestStereoFormatGermacrane (strict xfail)
             name = name_compound(smiles)
             stripped = strip_stereo(name)
             result = opsin_parse(stripped)
@@ -248,6 +280,8 @@ class TestStereoFormatRetainedNames:
              "[C@@H]2[C@@]4(C)CCC(=O)C(C)(C)[C@@H]4CC[C@]23C)O1"),
         ]
         for smiles in smiles_list:
+            if smiles in _TIER_CONTRACT:
+                continue  # TestStereoFormatTierContract
             name = name_compound(smiles)
             stripped = strip_stereo(name)
             result = opsin_parse(stripped)
@@ -512,7 +546,9 @@ class TestStereoFormatAllCompounds:
     ]
 
     @pytest.mark.parametrize("smiles", [
-        pytest.param(s, marks=pytest.mark.opsin_gate) if s in _TIER_CONTRACT else s
+        pytest.param(s, marks=pytest.mark.opsin_gate) if s in _TIER_CONTRACT
+        else pytest.param(s, marks=pytest.mark.xfail(strict=True, reason=_GERMACRANE_XFAIL))
+        if s == GERMACRANE else s
         for s in ALL_STEREO_SMILES])
     def test_stereo_stripped_opsin_parses(self, smiles):
         """After stripping stereo descriptors, OPSIN can parse the name.
@@ -602,3 +638,31 @@ class TestStereoFormatTierContract:
     def test_tier_contract(self, smiles):
         _pin, be = assert_tier_contract(smiles)
         assert opsin_parse(strip_stereo(be)) is not None, be
+
+
+@pytest.mark.skipif(not CAN_RUN, reason=SKIP_REASON)
+@pytest.mark.integration
+class TestStereoFormatGermacrane:
+    """germacrane: the PIN-tier name stays OPSIN-unparseable by design (strict
+    xfail), and the best-effort tier gives the VERIFIED systematic name
+    '(1R,4s,7S)-1,7-dimethyl-4-(propan-2-yl)cyclodecane': its stereo-stripped
+    form round-trips through OPSIN to the full InChIKey (the pseudoasymmetric
+    centre unspecified) and the centres labeller gives C-4 's'
+    (namer._pseudoasymmetric_name_verified). (j) (the Blue Book)
+    gives R the lower locant, as in '13-norgermacrane (1R,4s,7S)-4-ethyl-1,7-
+    dimethylcyclodecane' (:51471)."""
+
+    @pytest.mark.xfail(strict=True, reason=_GERMACRANE_XFAIL)
+    def test_germacrane_pin_name_stripped_parses(self):
+        name = name_compound(GERMACRANE)
+        assert opsin_parse(strip_stereo(name)) is not None, name
+
+    @pytest.mark.opsin_gate
+    def test_germacrane_best_effort_name_is_verified(self):
+        from orthonym import Orthonym
+        from orthonym.cli import _emit_tier_flags
+        from orthonym.namer import _pseudoasymmetric_name_verified
+        be = Orthonym(style="pin", **_emit_tier_flags("best-effort")).name(GERMACRANE)
+        assert be == "(1R,4s,7S)-1,7-dimethyl-4-(propan-2-yl)cyclodecane"
+        assert _pseudoasymmetric_name_verified(be, GERMACRANE)
+        assert opsin_parse(strip_stereo(be)) is not None

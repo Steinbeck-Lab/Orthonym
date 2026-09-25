@@ -996,6 +996,109 @@ def _self_consistency_full_key(smiles: str) -> Optional[str]:
         return None
 
 
+#: One descriptor inside a stereodescriptor block: an optional locant (digits,
+#: an optional letter like '3a', primes) and the CIP code.
+_STEREO_BLOCK_TOKEN_RE = re.compile(r"^(\d+[a-z]?['′]*)?([RSrsEZMP])$")
+_STEREO_BLOCK_RE = re.compile(r"\(([^()]*)\)(-?)")
+
+
+def _drop_pseudoasymmetric_descriptors(name: str):
+    """``name`` with every lowercase r/s (pseudoasymmetric) descriptor removed from
+    its stereodescriptor blocks, and the removed codes; ``(name, )`` if none.
+
+    '(1R,4s,7S)-1,7-dimethyl-4-(propan-2-yl)cyclodecane' ->
+    ('(1R,7S)-1,7-dimethyl-4-(propan-2-yl)cyclodecane', ['s']). A block left
+    empty is removed with its hyphen. Only blocks whose every comma-separated
+    token is a descriptor are touched, so a substituent in parentheses is never
+    edited.
+    """
+    removed = []
+
+    def _edit(m):
+        tokens = [t.strip() for t in m.group(1).split(',')]
+        parsed = [_STEREO_BLOCK_TOKEN_RE.match(t) for t in tokens]
+        if not tokens or not all(parsed):
+            return m.group(0)
+        kept = []
+        for t, p in zip(tokens, parsed):
+            if p.group(2) in ('r', 's'):
+                removed.append(p.group(2))
+            else:
+                kept.append(t)
+        if len(kept) == len(tokens):
+            return m.group(0)
+        if not kept:
+            return ''
+        return '(' + ','.join(kept) + ')' + m.group(2)
+
+    return _STEREO_BLOCK_RE.sub(_edit, name), removed
+
+
+def _pseudoasymmetric_name_verified(name: str, smiles: Optional[str]) -> bool:
+    """Verify a name that OPSIN rejects only for its pseudoasymmetric descriptors.
+
+    OPSIN 2.9.0 parses NO name with a lowercase r/s (pseudoasymmetric) CIP
+    descriptor, so '(1R,4s,7S)-1,7-dimethyl-4-(propan-2-yl)cyclodecane' can
+    never round-trip, although it is the systematic name (the Blue Book's own
+    '13-norgermacrane (1R,4s,7S)-4-ethyl-1,7-dimethylcyclodecane', the Blue Book:
+    51471). It is verified in two independent parts:
+
+    1. OPSIN round trip of the name WITHOUT its pseudoasymmetric descriptors,
+       compared by FULL InChIKey with the input whose pseudoasymmetric centres are
+       made unspecified: constitution, every true stereocentre and every E/Z are
+       confirmed by OPSIN.
+    2. The removed codes against the canonical CIP labeller
+       (``perception.stereo.assign_stereochemistry``, the centres engine): the
+       input must have exactly as many pseudoasymmetric centres as the name has
+       codes, all with ONE and the same code. With (1) fixing every other centre,
+       each pseudoasymmetric centre has exactly two configurations, r and s, so
+       equal codes on both sides fix it too. Mixed r/s codes would need the
+       locant of each centre, so they are NOT verified here (fail closed).
+    """
+    if not name or not smiles:
+        return False
+    reduced, codes = _drop_pseudoasymmetric_descriptors(name)
+    if not codes or reduced == name:
+        return False
+    try:
+        mol = Chem.MolFromSmiles(smiles)
+        if mol is None:
+            return False
+        from .perception.stereo import assign_stereochemistry
+        assign_stereochemistry(mol)
+        pseudo = [a for a in mol.GetAtoms()
+                  if a.HasProp('_CIPCode') and a.GetProp('_CIPCode') in ('r', 's')]
+        input_codes = sorted(a.GetProp('_CIPCode') for a in pseudo)
+        if input_codes != sorted(codes) or len(set(codes)) != 1:
+            return False
+        for a in pseudo:
+            a.SetChiralTag(Chem.ChiralType.CHI_UNSPECIFIED)
+        in_key = _self_consistency_full_key(Chem.MolToSmiles(mol))
+        opsin_smiles = _validity_gate_name_to_smiles(reduced)
+        if in_key is None or opsin_smiles is None:
+            return False
+        return _self_consistency_full_key(opsin_smiles) == in_key
+    except Exception:
+        return False
+
+
+#: Pseudoasymmetric names the general-tier gate verified but did NOT ship,
+#: keyed by the full InChIKey of the input they name (callers pass the SMILES
+#: in different spellings). A name is adopted from here only as the LAST
+#: resort, when the naming would otherwise abstain (Orthonym._finish), so an
+#: OPSIN-round-trippable alternative (e.g. 'cis-4-hydroxy-1-methylcyclohexane')
+#: always wins. One store per OUTERMOST Orthonym.name call (a contextvar set
+#: there and reset on exit): the rescues run isolated naming sessions that look
+#: "top-level", and they must add to the store, not wipe it.
+_PSEUDO_VERIFIED_CTX = contextvars.ContextVar(
+    "orthonym_pseudo_verified_candidates", default=None)
+
+
+def _pseudo_candidate_store() -> dict:
+    store = _PSEUDO_VERIFIED_CTX.get()
+    return store if store is not None else {}
+
+
 def _self_consistency_net_charge(smiles: str) -> Optional[int]:
     """Net formal charge of ``smiles`` (None if unparseable). The InChIKey skeleton
     block used by _self_consistency_skeleton EXCLUDES the charge/protonation layer
@@ -1507,6 +1610,21 @@ def _final_opsin_validity_gate(name: str, smiles: Optional[str],
             _np_exact_hit = name in _NP_EXACT
         except Exception:
             _np_exact_hit = False
+        # 2026-09-25 (pre-existing-failures plan, Task 4 continuation): a name
+        # OPSIN rejects ONLY for its pseudoasymmetric (lowercase r/s)
+        # descriptors is verified by the stripped-form full-InChIKey round trip
+        # plus the centres labeller (_pseudoasymmetric_name_verified). It is
+        # still suppressed here, so the rescues below can find an
+        # OPSIN-round-trippable name, but it is kept as the last resort that
+        # Orthonym.name adopts instead of abstaining.
+        if (not _np_exact_hit and smiles is not None
+                and _pseudoasymmetric_name_verified(name, smiles)):
+            _key = _self_consistency_full_key(smiles)
+            _store = _PSEUDO_VERIFIED_CTX.get()
+            if _key and _store is not None and _key not in _store:
+                # keep the producer's provenance, so an adopted name is
+                # attributed to the producer that built it
+                _store[_key] = (name, _pv.get_provenance())
         if not _np_exact_hit:
             from .metrics.abstention import AbstentionCode, record_suppression
             record_suppression(
@@ -2567,6 +2685,10 @@ def _budget_scope(fn):
             exit_name_scope,
         )
         depth = enter_name_scope()
+        # Task 4 continuation: one pseudoasymmetric-candidate store per OUTERMOST
+        # name call (see _PSEUDO_VERIFIED_CTX), shared by every nested and
+        # isolated re-entry, reset on every exit path by the finally below.
+        _ps_tok = _PSEUDO_VERIFIED_CTX.set({}) if depth == 1 else None
         try:
             return fn(self, *args, **kwargs)
         except PerfBudgetExceeded:
@@ -2625,6 +2747,8 @@ def _budget_scope(fn):
                 self._suppress_floor_offer = False
         finally:
             exit_name_scope()
+            if _ps_tok is not None:
+                _PSEUDO_VERIFIED_CTX.reset(_ps_tok)
     return _wrapper
 
 
@@ -3794,12 +3918,19 @@ class Orthonym:
         """: name + honest tier/provenance labels (observation-only).
 
         Returns ``{name, tier, is_pin, source, opsin, gates_passed}`` where
-        tier is ``pin_verified`` (PIN path) / ``systematic_verified`` (engine
-        or trivial-retained, RT-verified) / ``best_effort`` (engine,
-        E1-only, unverified — requires the ``general_fallback_unverified``
-        opt-in) / ``abstain``. ``pin_unverified`` (systematic-PIN
-        certification) is reserved. Default construction (no flags) keeps
-        today's PIN-or-abstain behavior byte-identically.
+        tier is one of:
+
+        - ``pin_verified``: the strict PIN path built the name and verified it.
+        - ``pin_unverified``: a PIN-form name that only a breadth producer
+          built; it round-trips, but its preferred status is not certified.
+        - ``systematic_verified``: a verified systematic name that is not the
+          PIN.
+        - ``best_effort``: a general-engine name, round-trip verified at the
+          full InChIKey.
+        - ``abstain``: no name.
+
+        Default construction (no flags) keeps today's PIN-or-abstain behavior
+        byte-identically.
         """
         # B2: open ONE memo scope around BOTH the primary name and the strict PIN
         # twin (_strict_pin_twin_name -> tw.name), so the twin reuses this run's
@@ -5239,6 +5370,28 @@ class Orthonym:
             # nothing fired yet, the L1 fallback if veto fired and the
             # exception came after, etc.), never a half-applied one.
             logger.info("coverage audit failed (shadow, ignored): %s", _cae)
+        # Task 4 continuation (pre-existing-failures plan): the general tiers'
+        # LAST resort before an abstention, after every rescue and offer above --
+        # a name the validity gate verified through
+        # `_pseudoasymmetric_name_verified` (OPSIN 2.9.0 parses no lowercase r/s
+        # descriptor) but held back so an OPSIN-round-trippable name could win.
+        # Nested sessions use it too, so a component of an adduct can be named.
+        try:
+            if (is_failure_name(name) and self._general_fallback
+                    and not self._disable_opsin_validity_gate and smiles):
+                _entry = _pseudo_candidate_store().get(
+                    _self_consistency_full_key(smiles) or '')
+                if _entry and _pseudoasymmetric_name_verified(_entry[0], smiles):
+                    from .metrics import provenance as _pv_last
+                    _pv_last.restore_provenance(_entry[1])
+                    _record_gate_outcome(
+                        _pv_last.carveout_outcome("pseudoasymmetric_verified"),
+                        _entry[0])
+                    # no offer won: name_tiered must read the producer's labels
+                    self._last_selected_offer = None
+                    name = _entry[0]
+        except Exception as _pse:  # pragma: no cover - defensive
+            logger.info("pseudoasymmetric last resort failed (ignored): %s", _pse)
         try:
             if self._binding_proof == "off":
                 return name

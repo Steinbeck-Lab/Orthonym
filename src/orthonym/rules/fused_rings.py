@@ -2592,6 +2592,36 @@ def _identify_alkyl_substituent(
         return None
 
 
+def _chain_is_unbranched_alkanoyl(mol, chain_atoms, acyl_c: int) -> bool:
+    """True when ``chain_atoms`` is exactly CH3-(CH2)n-C(=O)- with ``acyl_c`` the
+    carbonyl carbon: one oxygen, double-bonded to ``acyl_c``; every other atom an
+    acyclic sp3 carbon; an unbranched, singly bonded chain. The only shape an
+    'acetyl'/'propanoyl' carbon count describes."""
+    chain = set(chain_atoms)
+    oxygens = 0
+    for idx in chain:
+        atom = mol.GetAtomWithIdx(idx)
+        if atom.IsInRing():
+            return False
+        if atom.GetAtomicNum() == 8:
+            bond = mol.GetBondBetweenAtoms(idx, acyl_c)
+            if bond is None or bond.GetBondType() != Chem.BondType.DOUBLE:
+                return False
+            oxygens += 1
+            continue
+        if atom.GetAtomicNum() != 6:
+            return False
+        chain_nbrs = [n.GetIdx() for n in atom.GetNeighbors() if n.GetIdx() in chain]
+        carbon_nbrs = [n for n in chain_nbrs
+                       if mol.GetAtomWithIdx(n).GetAtomicNum() == 6]
+        if len(carbon_nbrs) > (1 if idx == acyl_c else 2):
+            return False
+        for n in carbon_nbrs:
+            if mol.GetBondBetweenAtoms(idx, n).GetBondType() != Chem.BondType.SINGLE:
+                return False
+    return oxygens == 1
+
+
 def _identify_functionalized_substituent(
     mol,
     start_idx: int,
@@ -2837,7 +2867,16 @@ def _identify_functionalized_substituent(
         for match in matches:
             acyl_c = match[0]
             if acyl_c in chain_atoms and acyl_c == start_idx:
-                # Acyl group directly on ring
+                # Acyl group directly on ring. 2026-09-25 (pre-existing-failures
+                # plan, Task 4 continuation): the SMARTS' [#6] also matches the
+                # RING carbon, so an ester -C(=O)-O-CH3 (two carbons) was named
+                # 'acetyl' -- '3-acetyl-1H-indole' for methyl
+                # 1H-indole-3-carboxylate, a different molecule. 'acetyl' is
+                # CH3-CO- (the Blue Book, "acyl groups are formed by
+                # subtracting all -OH groups from oxoacids for example 'acetyl',
+                # CH3-CO-"), so the branch now requires exactly that shape.
+                if not _chain_is_unbranched_alkanoyl(mol, chain_atoms, acyl_c):
+                    continue
                 if carbon_count == 2:
                     return {
                         'name': 'acetyl',
@@ -2853,35 +2892,16 @@ def _identify_functionalized_substituent(
                         'type': 'functionalized'
                     }
 
-    # Check for ester group: -C(=O)-O-R (suffix: carboxylate/carboxylic acid)
-    ester_pattern = _compiled_smarts('[CX3](=O)[OX2][#6]')
-    if ester_pattern:
-        matches = mol.GetSubstructMatches(ester_pattern)
-        for match in matches:
-            ester_c = match[0]
-            if ester_c in chain_atoms and ester_c == start_idx:
-                # Ester directly on ring: e.g., -C(=O)OCH3 → "methoxycarbonyl" or
-                # treated as suffix "carboxylate" / "carboxylic acid" depending on context
-                o_idx = match[2]
-                alkyl_atom = match[3]
-                # Check alkyl part
-                alkyl_atoms = _bfs_alkyl_from(mol, alkyl_atom, excluded | set(chain_atoms) - {alkyl_atom})
-                if alkyl_atoms is not None:
-                    alkyl_c_count = sum(1 for idx in alkyl_atoms
-                                        if mol.GetAtomWithIdx(idx).GetSymbol() == 'C')
-                    _ALKYL = {1: 'methyl', 2: 'ethyl', 3: 'propyl'}
-                    alkyl_name = _ALKYL.get(alkyl_c_count)
-                    if alkyl_name:
-                        # Return as suffix: "methyl ester" -> suffix_name used in assembly
-                        return {
-                            'name': 'carboxylic acid',
-                            'atoms': chain_atoms,
-                            'functional_group': 'ester',
-                            'type': 'suffix',
-                            'suffix_name': 'carboxylic acid',
-                            'ester_alkyl': alkyl_name,
-                        }
-
+    # An ester -C(=O)-O-R directly on the ring is NOT recognised here.
+    # 2026-09-25 (pre-existing-failures plan, Task 4 continuation): this branch
+    # returned the suffix 'carboxylic acid' with an 'ester_alkyl' word that no
+    # assembler reads, so methyl 1H-indole-3-carboxylate came out as
+    # '1H-indole-3-carboxylic acid', a different molecule. Declining here hands
+    # the group to the general substituent namer ('methoxycarbonyl', the prefix
+    # form of,:31696) or, when that declines, to the decomposition
+    # route, which builds the functional-class PIN form ('ethyl
+    # 1H-indole-3-carboxylate';,:31663, "All preferred IUPAC names
+    # for esters are named by functional class nomenclature").
     return None
 
 

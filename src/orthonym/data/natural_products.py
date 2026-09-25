@@ -457,7 +457,23 @@ def get_natural_product_name(canonical_smiles: str) -> Optional[str]:
     """
     if canonical_smiles in GENERAL_ONLY_NATURAL_PRODUCTS:
         return None
-    return NATURAL_PRODUCT_DERIVATIVES.get(canonical_smiles)
+    name = NATURAL_PRODUCT_DERIVATIVES.get(canonical_smiles)
+    # 2026-09-25 (pre-existing-failures plan, Task 4 continuation, controller
+    # ruling): a NAME_EXACT parent ('germacrane',...) is kept at the PIN tier (a
+    # gold-validated semisystematic name OPSIN cannot parse, shipped by design).
+    # The general tiers promise a VERIFIED name, so there it gives way to the
+    # systematic name, which the validity gate verifies (a pseudoasymmetric
+    # descriptor through namer._pseudoasymmetric_name_verified).
+    # (the Blue Book): "Preferred IUPAC names (PINs) are not identified for
+    # the compounds in this Chapter."
+    if name in NAME_EXACT_NP_PARENTS:
+        try:
+            from ..metrics.provenance import general_fallback_ctx
+            if general_fallback_ctx.get():
+                return None
+        except Exception:
+            pass
+    return name
 
 
 # ---------------------------------------------------------------------------

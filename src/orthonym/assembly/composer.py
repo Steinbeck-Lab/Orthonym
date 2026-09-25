@@ -4565,6 +4565,17 @@ def _assemble_ring_with_ester_prefixes(features, exocyclic_esters) -> Optional[s
         if attach_atom not in ring:
             continue
 
+        # 2026-09-25 (pre-existing-failures plan, Task 4 continuation): the ring
+        # parent names ONE ring, so it must be a whole monocyclic ring system
+        #, the Blue Book; the same guard as
+        # _handler_shared._generate_ring_parent). For tropisetron it picked the
+        # piperidine ring of the 8-azabicyclo[3.2.1]octane and named the other
+        # bridge as an open chain: '2-(ethan-1-yl)-1-methyl-4-(nonanoyloxy)-
+        # piperidine', a different molecule.
+        from .handlers._handler_shared import _is_monocyclic_ring_system
+        if not _is_monocyclic_ring_system(mol, ring):
+            return None
+
         ring_size = len(ring)
         ring_set = set(ring)
 

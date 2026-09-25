@@ -19,6 +19,11 @@ name: pypi-release
 # This is a separate top-level workflow, not a reusable one, because Trusted
 # Publishing cannot be used from within a reusable workflow.
 #
+# PyPI is switched on separately: every job also requires the repository variable
+# PYPI_ENABLED == 'true'. Until the maintainer sets it (after the PyPI setup), a
+# Release made by release-please skips this whole workflow. To upload an existing
+# tag later: set PYPI_ENABLED=true, then run this workflow from that tag (see above).
+#
 # Run in ONE home only: every job requires the repository variable
 # RELEASE_HOME == 'true', which is set in the release home only: exactly one
 # home, the one the maintainer's local publish tooling pushes first (see
@@ -76,7 +81,7 @@ env:
 jobs:
   build:
     name: Build and check the distributions
-    if: vars.RELEASE_HOME == 'true'
+    if: vars.RELEASE_HOME == 'true' && vars.PYPI_ENABLED == 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 30
     steps:
@@ -217,7 +222,7 @@ jobs:
     needs: build
     # A published Release, or a manual run with target=pypi.
     if: >-
-      vars.RELEASE_HOME == 'true' &&
+      vars.RELEASE_HOME == 'true' && vars.PYPI_ENABLED == 'true' &&
       (github.event_name == 'release' ||
        (github.event_name == 'workflow_dispatch' && inputs.target == 'pypi'))
     runs-on: ubuntu-latest
@@ -261,7 +266,7 @@ jobs:
     name: Upload to TestPyPI
     needs: build
     if: >-
-      vars.RELEASE_HOME == 'true' &&
+      vars.RELEASE_HOME == 'true' && vars.PYPI_ENABLED == 'true' &&
       github.event_name == 'workflow_dispatch' && inputs.target == 'testpypi'
     runs-on: ubuntu-latest
     timeout-minutes: 15

@@ -119,12 +119,30 @@ class TestTropaneNPNaming:
         assert "ol" in name.lower(), f"Expected 'ol' in name. Got: {name}"
 
     @pytest.mark.integration
+    @pytest.mark.opsin_gate
     def test_tropane_ester_compound3_free_base(self):
-        """Compound 3 free base (tropane-3-yl indole-3-carboxylate) contains 'tropan'."""
-        mol = Chem.MolFromSmiles("CN1[C@@H]2CC[C@H]1C[C@@H](OC(=O)c1c[nH]c3ccccc13)C2")
-        name = name_natural_product(mol)
-        assert name is not None, "Tropane ester should produce a name"
-        assert "tropan" in name.lower(), f"Expected 'tropan' in name. Got: {name}"
+        """Compound 3 free base (tropisetron): the NP scaffold producer declines,
+        and the shipped name is the verified ester name.
+
+        Task 4 continuation (2026-09-25; TRIAGE row 36, canary call 182). The
+        producer used to return the bare 'tropane' (OPSIN: C8H15N; the input is
+        C17H20N2O2): its "no decorations" test omitted `esters`.
+        (the Blue Book): every substituent is cited, so it now declines and
+        the decomposition names the ester by functional class,
+        (:31663): "All preferred IUPAC names for esters are named by functional
+        class nomenclature." The alcohol's descriptor set is the Blue Book's own
+        for this alcohol, '(1R,3r,5S)-8-methyl-8-azabicyclo[3.2.1]octan-3-yl
+        (2S)-3-hydroxy-2-phenylpropanoate... tropan-3α-yl...' (:48828).
+        OPSIN 2.9.0 parses no lowercase r/s, so the name is verified by the
+        stereo-stripped full-InChIKey round trip plus the centres labeller
+        (namer._pseudoasymmetric_name_verified; the controller's ruling of
+        2026-09-25)."""
+        from orthonym.namer import _pseudoasymmetric_name_verified
+        smiles = "CN1[C@@H]2CC[C@H]1C[C@@H](OC(=O)c1c[nH]c3ccccc13)C2"
+        assert name_natural_product(Chem.MolFromSmiles(smiles)) is None
+        name = name_compound(smiles)
+        assert name == "(1R,3r,5S)-tropan-3-yl 1H-indole-3-carboxylate", name
+        assert _pseudoasymmetric_name_verified(name, smiles)
 
     @pytest.mark.integration
     def test_tropanone(self):

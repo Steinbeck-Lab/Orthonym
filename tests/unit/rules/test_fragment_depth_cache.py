@@ -394,6 +394,21 @@ assert _RT_BREADTH_GAPS <= {p.id for p in DEPTH_LIMIT_COMPOUNDS}, (
 )
 
 
+# Task 4 continuation (2026-09-25): 018's old name was the natural-product name
+# '(3S,10R,11S,13S,14R)-3,11-dihydroxyandrosta-5,8-diene-7,17-dione', which
+# DROPPED the fused furan (OPSIN reads it as C19H24O4; the input is C20H22O5).
+# (the Blue Book): every substituent is cited. The NP producer now
+# declines; no NP-parent name is a PIN,:50943) and the PIN tier has no
+# other producer, so it fails closed (as it already did in production). The row
+# asserts the tier contract (tests/support/rt_assert.py), gate ON: best-effort
+# '(1R,3S,5S,9R,16S)-3,16-dihydroxy-1,5-dimethyl-13-oxapentacyclo[10.6.1.
+# 0^2,10.0^5,9.0^15,19]nonadeca-2(10),12(19),14-triene-6,11-dione', RT-exact.
+_TIER_CONTRACT_IDS = {"018_steroid_furanone"}
+_TIER_CONTRACT_SMILES = {p.values[0] for p in DEPTH_LIMIT_COMPOUNDS
+                         if p.id in _TIER_CONTRACT_IDS}
+assert len(_TIER_CONTRACT_SMILES) == len(_TIER_CONTRACT_IDS)
+
+
 class TestDepthLimitCompounds:
     """Regression tests for compounds that previously hit depth_limit_reached.
 
@@ -401,9 +416,18 @@ class TestDepthLimitCompounds:
     verifies that naming completes without producing None or 'unknown'.
     """
 
-    @pytest.mark.parametrize("smiles", DEPTH_LIMIT_COMPOUNDS)
+    @pytest.mark.parametrize("smiles", [
+        pytest.param(p.values[0], id=p.id, marks=pytest.mark.opsin_gate)
+        if p.id in _TIER_CONTRACT_IDS else p
+        for p in DEPTH_LIMIT_COMPOUNDS])
     def test_naming_completes(self, smiles):
-        """Compound should produce a valid name (not None, not 'unknown')."""
+        """Compound should produce a valid name (not None, not 'unknown').
+
+        A _TIER_CONTRACT_IDS row asserts the tier contract instead."""
+        if smiles in _TIER_CONTRACT_SMILES:
+            from tests.support.rt_assert import assert_tier_contract
+            assert_tier_contract(smiles)
+            return
         result = name_compound(smiles)
         assert result is not None, f"name_compound returned None for {smiles}"
         assert "unknown" not in result.lower(), f"Name contains unknown: {result}"

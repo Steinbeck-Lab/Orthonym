@@ -306,7 +306,16 @@ def get_acid_fragment_name(mol, acid_atoms: List[int]) -> str:
         ring_name = get_ring_acid_name(mol, acid_atoms)
         if ring_name:
             return ring_name
-        # If ring naming fails, fall through to carbon-count (imperfect but safe)
+
+    # 2026-09-25 (pre-existing-failures plan, Task 4 continuation): the carbon
+    # count below names an acyclic chain acid. It was 'imperfect but safe' only on
+    # paper: for a ring acid the ring naming declined (or a chain acid carrying a
+    # ring) it named a DIFFERENT acid -- 'nonanoic' for tropisetron's
+    # 1H-indole-3-carboxylic acid (9 carbons). names such an acid from its
+    # ring or ring-substituted chain, never by a carbon count, so return '' and
+    # let the caller decline (every caller treats a falsy name as "cannot name").
+    if any(mol.GetAtomWithIdx(idx).IsInRing() for idx in acid_atoms):
+        return ""
 
     # Count carbons in acid fragment
     carbon_count = sum(
@@ -1381,6 +1390,8 @@ def _build_ester_acid_word(
                 else:
                     acid_prefix_str = extra_str
 
+    if not acid_name:
+        return None  # an acid get_acid_fragment_name cannot name (e.g. ring-bearing)
     acylate_name = get_acylate_name(acid_name)
 
     # a phase (C), nit-1: "Citation of locants" is
@@ -1911,6 +1922,8 @@ def name_ester_as_prefix(mol, ester_match: tuple) -> Optional[str]:
     # Only fall through to branched-chain analysis when the standard path
     # would produce an incorrect stem from total carbon count.
     acid_name = get_acid_fragment_name(mol, acid_atoms)
+    if not acid_name:
+        return None  # an acid get_acid_fragment_name cannot name (e.g. ring-bearing)
 
     # IUPAC: For branched acid fragments where total carbon
     # count differs from principal chain length, use the principal chain
@@ -3547,6 +3560,8 @@ def name_polyol_polyester(mol, ester_matches: list) -> Optional[str]:
         # Get acid fragment for this ester
         acid_atoms = _bfs_fragment(mol, carbonyl_c, exclude_atom=ester_o)
         acid_name = get_acid_fragment_name(mol, acid_atoms)
+        if not acid_name:
+            return None
         acyloxy = get_acyloxy_prefix(acid_name)
 
         # Get locant for attachment
@@ -3586,6 +3601,8 @@ def name_polyol_polyester(mol, ester_matches: list) -> Optional[str]:
         # Reuse same acyloxy prefix
         acid_atoms = _bfs_fragment(mol, match[0], exclude_atom=match[2])
         acid_name = get_acid_fragment_name(mol, acid_atoms)
+        if not acid_name:
+            return None
         acyloxy = get_acyloxy_prefix(acid_name)
         reverse_info.append((locant, acyloxy))
 

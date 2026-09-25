@@ -37,6 +37,26 @@ import re
 import pytest
 
 from orthonym import name_compound
+from tests.support.rt_assert import assert_tier_contract
+
+# Baselines that described a DIFFERENT molecule (pre-existing-failures plan,
+# Task 4 continuation, 2026-09-25). With the gate off, the PIN tier shipped the
+# natural-product scaffold name, which silently dropped a decoration its finders
+# do not recognise: m11 lost its 2-(2-hydroxypropan-2-yl)-5-methyloxolan-5-yl
+# side chain (the C30H50O3 input named as a bare 'pentamethylgonan-3-one'), m16
+# lost the ester's O-methyl ('...cholan-24-one', which OPSIN reads as C24H40O4
+# for the C25H42O5 input).
+# (the Blue Book): every substituent is cited as a prefix or suffix. The NP
+# producer now declines (its completeness invariant runs for every decorated
+# scaffold); no NP-parent name is a PIN,:50943), the PIN tier has no
+# other producer and fails closed, as it already did in production. These rows
+# assert the tier contract instead (tests/support/rt_assert.py), gate ON.
+_TIER_CONTRACT = {
+    "CC(C)(O)[C@@H]1CC[C@@](C)([C@H]2CC[C@]3(C)[C@@H]2CC[C@@H]2[C@@]4(C)CCC"
+    "(=O)C(C)(C)[C@@H]4CC[C@]23C)O1",
+    "COC(=O)CC[C@@H](C)[C@H]1C[C@@H](O)[C@H]2[C@@H]3[C@H](O)C[C@@H]4C[C@H](O)"
+    "CC[C@]4(C)[C@H]3CC[C@@]21C",
+}
 
 
 # ---------------------------------------------------------------------------
@@ -131,12 +151,14 @@ MEDIUM_STEREO_COMPOUNDS = [
     ('CC12CCC(=O)C=C1C=CC1[C@@H]2CCC2(C)[C@H]1CCC21CCC(=O)O1', '(9S,14S)-pregna-4,6-dien-3-one'),
     ('C=C(C)[C@H]1CC[C@]2(C)[C@@H]1CC[C@]1(C)C/C=C(\\C)CC/C=C(\\C)CC[C@H]12', '(1R,3E,7E,11R,12R,15S,16R)-1,4,8,12-tetramethyl-15-prop-1-en-2-yl-tricyclo[9.7.0.0(12,16)]octadeca-3,7-diene'),
     ('C/C(=C\\CC/C(C)=C/C/C=C(/CC(=O)c1cc(O)ccc1O)C(=O)O)CO', '(2Z,5E,9E)-2-(1-oxo1-(2,5-dihydroxyphenyl)ethyl)-11-hydroxy-6,10-dimethylundeca-2,5,9-trienoic acid'),  # NEWLY_RT
-    ('CC(C)(O)[C@@H]1CC[C@@](C)([C@H]2CC[C@]3(C)[C@@H]2CC[C@@H]2[C@@]4(C)CCC(=O)C(C)(C)[C@@H]4CC[C@]23C)O1', '(5R,8R,9R,10R,13R,14R,17S)-4,4,8,10,14-pentamethylgonan-3-one'),
+    # _TIER_CONTRACT (was '...-4,4,8,10,14-pentamethylgonan-3-one', side chain dropped)
+    ('CC(C)(O)[C@@H]1CC[C@@](C)([C@H]2CC[C@]3(C)[C@@H]2CC[C@@H]2[C@@]4(C)CCC(=O)C(C)(C)[C@@H]4CC[C@]23C)O1', None),
     ('C/C1=C/C[C@H](O[C@@H]2O[C@H](CO)[C@@H](O)[C@H](O)[C@H]2O)/C(C)=C/[C@H]2OC(=O)[C@H](C)[C@@H]2CC1', '(β-D-glucopyranosyloxy)(1S,2E,4S,6Z,10S)-4-hydroxy-3,7-dimethylcyclodeca-2,6-dien-1-carboxylate'),
     ('CC1(C)OC[C@]2(C)[C@@H](CC[C@@]3(C)[C@H]2[C@@H](O)C[C@H]2C[C@@H]4C[C@@]23CC[C@]4(O)CO)O1', '(1S,2S,5R,6R,8R,10S,11R,12R,17R)-1,5,12,15,15-pentamethyl-14,16-dioxa-pentacyclo[9.8.0.1(2,6).0(2,8).0(12,17)]icosan-5,10-diol'),  # Updated P72: IUPAC citation order
     ('COC(=O)[C@@H]1CC23CCCN4CC[C@@]5(c6ccccc6N(C)C15CC2)[C@@H]43', '(1R,10R,21S)-10-ethyl-12-methyl-4,12-diaza-hexacyclo[9.7.0.2(8,11).1(4,8).0(13,18).0(1,21)]henicosane'),  # Updated P72: IUPAC citation order
     ('COc1cc2c(cc1OC)[C@H]1Cc3ccc(OC)c(OC)c3CN1CC2', 'berberine'),  # Updated a phase: alkaloid scaffold match
-    ('COC(=O)CC[C@@H](C)[C@H]1C[C@@H](O)[C@H]2[C@@H]3[C@H](O)C[C@@H]4C[C@H](O)CC[C@]4(C)[C@H]3CC[C@@]21C', '(3R,5S,7R,8R,9S,10S,13R,14S,15R,17R,20R)-3,7,15-trihydroxycholan-24-one'),
+    # _TIER_CONTRACT (was '...-3,7,15-trihydroxycholan-24-one', the ester O-methyl dropped)
+    ('COC(=O)CC[C@@H](C)[C@H]1C[C@@H](O)[C@H]2[C@@H]3[C@H](O)C[C@@H]4C[C@H](O)CC[C@]4(C)[C@H]3CC[C@@]21C', None),
     ('C/C=C(/CC[C@@H](C)[C@H]1CC[C@H]2C3=CC[C@H]4C[C@@H](O)CC[C@]4(C)[C@H]3CC[C@]12C)C(C)C', '(3S,5S,9R,10S,13R,14R,17R,20R,24Z)-stigmasta-7,24-dien-3-ol'),
     ('C=C(CC[C@@H](C)[C@H]1CC[C@@]2(C)C3=C(CC[C@]12C)[C@@]1(C)CC[C@H](O)C(C)(C)[C@@H]1CC3)C(C)C', '(3S,5R,10S,13R,14R,17R,20R)-4,4,14-trimethylergosta-8,24-dien-3-ol'),
     ('C=C(CC[C@@H](C)[C@H]1CC[C@H]2C3=CC[C@H]4[C@H](C)C(=O)CC[C@]4(C)C3=C[C@@H](O)[C@]12C)C(C)C', '(4S,5S,10S,11R,13R,14S,17R,20R)-11-hydroxy-4-methylergosta-7,9,24-trien-3-one'),
@@ -211,12 +233,19 @@ def test_small_stereo_baseline(smiles, expected_name):
     )
 
 
-@pytest.mark.parametrize("smiles,expected_name", MEDIUM_STEREO_COMPOUNDS, ids=_MEDIUM_IDS)
+@pytest.mark.parametrize("smiles,expected_name", [
+    pytest.param(smi, exp, marks=pytest.mark.opsin_gate) if smi in _TIER_CONTRACT
+    else (smi, exp)
+    for smi, exp in MEDIUM_STEREO_COMPOUNDS], ids=_MEDIUM_IDS)
 def test_medium_stereo_baseline(smiles, expected_name):
     """Track stereo naming for medium (21-40 HA) benchmark compounds.
 
-    Same purpose as test_small_stereo_baseline but for medium molecules.
+    Same purpose as test_small_stereo_baseline but for medium molecules. A
+    _TIER_CONTRACT row asserts the tier contract instead.
     """
+    if smiles in _TIER_CONTRACT:
+        assert_tier_contract(smiles)
+        return
     result = name_compound(smiles)
     assert result == expected_name, (
         f"STEREO BASELINE CHANGED: {smiles}\n"

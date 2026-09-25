@@ -1073,7 +1073,9 @@ def _name_acyl_acid(mol, carbonyl_c: int, bridge_o: int, carbonyl_o: int):
     if acid_is_ring_acid(mol, frag_list) or (
         not is_branched and not non_c_non_carbonyl_o
     ):
-        return get_acid_fragment_name(mol, frag_list), False
+        # '' (get_acid_fragment_name cannot name it) -> None, the decline
+        # value every caller of _name_acyl_acid checks.
+        return (get_acid_fragment_name(mol, frag_list) or None), False
 
     # Branched or has heteroatom substituents: use _integrate_universal_prefixes
     # per to discover and name substituents on the acyl chain.

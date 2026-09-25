@@ -97,14 +97,22 @@ class TestNPScaffoldCoverageGate:
     """Tests that NP scaffold coverage gates reject bare names for oversized molecules."""
 
     def test_large_molecule_small_np_scaffold_with_numbering_names_substituents(self):
-        """Tropane (9 atoms) in a 25-atom molecule with numbering map -> names substituents.
+        """Tropane (9 atoms) in a 25-atom molecule: the NP producer never drops
+        the substituent it cannot name, and the shipped name is RT-exact.
 
-        CN1C2CCCC1CC2 is detected as tropane scaffold (9 heavy atoms).
-        Adding a C16 chain yields 25 heavy atoms, coverage = 9/25 = 0.36.
-        With tropane numbering map (a phase-02), the NP pipeline can enumerate
-        substituents instead of falling through the coverage gate.
+        CN1C2CCCC1CC2 is detected as tropane scaffold (9 heavy atoms); a C16
+        chain yields 25 heavy atoms. Task 4 continuation (2026-09-25): the NP
+        producer's finders recognise no C-alkyl chain, so it returned the bare
+        'tropane' (OPSIN: C8H15N; the input is C24H47N), which this test
+        accepted. (the Blue Book): every substituent is cited. Its
+        completeness invariant now runs for every decorated scaffold, so it
+        declines, and the von Baeyer route names the whole molecule
+        ('6-hexadecyl-8-methyl-8-azabicyclo[3.2.1]octane', OPSIN full-InChIKey
+        exact).
         """
+        from orthonym import name_compound
         from orthonym.rules.natural_products import name_natural_product
+        from tests.support.rt_assert import name_is_rt_exact
 
         # Tropane core + C16 chain (25 heavy atoms, 9 matched)
         smiles = "CN1C2CCCC1CC2CCCCCCCCCCCCCCCC"
@@ -114,10 +122,9 @@ class TestNPScaffoldCoverageGate:
         total_heavy = mol.GetNumHeavyAtoms()
         assert total_heavy > 10, f"Expected >10 heavy atoms, got {total_heavy}"
 
-        result = name_natural_product(mol)
-        # With numbering map, tropane names substituents instead of hitting coverage gate
-        assert result is not None, "Tropane with numbering map should name substituents"
-        assert "tropan" in result.lower(), f"Expected 'tropan' in: {result}"
+        assert name_natural_product(mol) is None
+        name = name_compound(smiles)
+        assert name_is_rt_exact(name, smiles), name
 
     def test_np_scaffold_covering_most_of_molecule_returns_name(self):
         """Pure tropane scaffold (coverage = 1.0) -> returns 'tropane'."""

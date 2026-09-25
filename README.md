@@ -1,47 +1,59 @@
 <div align="center">
 
-<a id="top"></a>
 <picture>
-  <source media="(prefers-color-scheme: dark)" srcset="assets/orthonym-logo-dark.png">
-  <img src="assets/orthonym-logo.png" alt="Orthonym" width="620">
+  <source media="(max-width: 700px)" srcset="assets/readme-banner-narrow.svg">
+  <img src="assets/readme-banner.svg" alt="Orthonym engine. Preferred IUPAC Names for chemical structures. Deterministic, rule-based, following the IUPAC 2013 recommendations." width="100%">
 </picture>
 
-### Structure in. The one correct IUPAC name out.
-*A deterministic, rule-based engine that turns a SMILES string into its Preferred IUPAC Name.*
+<br>
 
-<br/>
+<a href="https://orthonym.decimer.ai"><img src="assets/readme-try.svg" alt="Try it online" height="48"></a>&nbsp;&nbsp;<a href="#quick-start"><img src="assets/readme-start.svg" alt="Quick start" height="48"></a>
 
-[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg?style=flat-square)](LICENSE)
-[![Python 3.10+](https://img.shields.io/badge/Python-3.10%2B-3776AB?style=flat-square&logo=python&logoColor=white)](https://www.python.org/)
-[![IUPAC 2013](https://img.shields.io/badge/IUPAC-2013%20Recommendations-0A2540?style=flat-square)](https://doi.org/10.1039/9781849733069)
-[![RDKit](https://img.shields.io/badge/RDKit-perception-2E8B57?style=flat-square)](https://www.rdkit.org/)
-[![OPSIN 2.9.0](https://img.shields.io/badge/OPSIN%202.9.0-round--trip%20validated-C71A36?style=flat-square)](https://github.com/dan2097/opsin)
-[![Java 11+](https://img.shields.io/badge/Java-11%2B-007396?style=flat-square&logo=openjdk&logoColor=white)](https://openjdk.org/)
+<br>
 
+**A SMILES string goes in. Its Preferred IUPAC Name comes out, or a clear "no". Never a guess.**
+
+[![Licence: MIT](https://img.shields.io/badge/licence-MIT-1a1a1a?style=flat-square)](LICENSE)
+[![Python 3.10+](https://img.shields.io/badge/python-3.10%2B-1a1a1a?style=flat-square)](https://www.python.org/)
+[![IUPAC 2013](https://img.shields.io/badge/IUPAC-2013%20recommendations-2f6b28?style=flat-square)](https://doi.org/10.1039/9781849733069)
 [![CI](https://github.com/Beilstein-Institut/Orthonym/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/Beilstein-Institut/Orthonym/actions/workflows/ci.yml)
-[![Deterministic](https://img.shields.io/badge/output-deterministic-4B5563?style=flat-square)](#-how-it-works)
-[![Citation](https://img.shields.io/badge/cite-CITATION.cff-FE5196?style=flat-square)](CITATION.cff)
-
-[Quick Start](#-quick-start) ·
-[Install](#-installation) ·
-[How it works](#-how-it-works) ·
-[Citing](#-citing-orthonym) ·
-[Contributing](CONTRIBUTING.md)
 
 </div>
 
----
+## How every name is checked
 
-## ✨ What is Orthonym?
+<picture>
+  <source media="(max-width: 700px)" srcset="assets/readme-roundtrip-narrow.svg">
+  <img src="assets/readme-roundtrip.svg" alt="The round trip for caffeine. Orthonym writes the name 1,3,7-trimethyl-3,7-dihydro-1H-purine-2,6-dione. OPSIN reads that name back into a structure. The InChIKey of your structure and the InChIKey of what OPSIN read are both RYYVLZVUVIJVGH-UHFFFAOYSA-N, so the name is a verified Preferred IUPAC Name. Below, the four tiers a name can land on: PIN, fallback, best effort and no name, with the engine's tier ids." width="100%">
+</picture>
 
-**Orthonym** reads a molecule's structure and writes its name — the **Preferred IUPAC Name (PIN)**
-defined by the IUPAC 2013 recommendations, the "Blue Book". It is the structure → name
-counterpart of [OPSIN](https://github.com/dan2097/opsin), which goes name → structure.
+**Deterministic.** Orthonym builds every name from the nomenclature rules of the IUPAC 2013
+recommendations, the "Blue Book". There is no neural network and no sampling: the same structure
+always gets the same name.
 
-Every name is **built from the nomenclature rules**, not looked up and not predicted by a model.
-In the default tier, every name is parsed back with OPSIN and checked against the input structure
-before it leaves the engine. When Orthonym cannot produce a name it can verify, it **declines instead of guessing**:
-a clear "I don't know" is safer than a confident wrong name.
+**Checked.** In the default tier, every name is handed to [OPSIN](https://github.com/dan2097/opsin),
+which never saw your structure, and parsed back. The two structures are compared by full InChIKey,
+and an atom-coverage check confirms that every atom is named. `--provenance` reports the outcome
+for each name in its `verified` field.
+
+**Honest.** `--provenance` reports the tier each name landed on: `pin_verified`, `pin_unverified`,
+`systematic_verified`, `best_effort` or `abstain`. A tier says how a name was built; whether OPSIN
+read it back is its own field, `verified`. The pictures here draw the tiers with the web app's
+four marks. The shape of a mark carries the tier and the colour only agrees, so the marks stay
+distinct in greyscale.
+
+## See it working
+
+<picture>
+  <source media="(max-width: 700px)" srcset="assets/readme-specimen-narrow.svg">
+  <img src="assets/readme-specimen.svg" alt="Five commands and what they print. orthonym CCO prints ethanol, tier pin_verified. Ibuprofen prints (2R)-2-[4-(2-methylpropyl)phenyl]propanoic acid, pin_verified. With --emit-tier valid, sphingosine prints sphingosine, pin_unverified, and retinol prints (2E,4E,6E,8E)-3,7-dimethyl-9-(2,6,6-trimethylcyclohex-1-en-1-yl)nona-2,4,6,8-tetraen-1-ol, best_effort. Uranium trioxide prints inorganic compound (not supported), abstain." width="100%">
+</picture>
+
+<sub>Real output. The command line prints the plain line; the mark under it and the tier at its right
+come from the same command run with <code>--provenance</code>. The pictures are generated from the
+engine's own output, so they show what it prints.</sub>
+
+The same from Python:
 
 ```python
 >>> from orthonym import name_compound
@@ -49,18 +61,34 @@ a clear "I don't know" is safer than a confident wrong name.
 '(2R)-2-[4-(2-methylpropyl)phenyl]propanoic acid'
 ```
 
-## 🔬 Features
+## When it cannot name a molecule
 
-- 🎯 **PIN-first** — targets the Preferred IUPAC Name of the 2013 recommendations, not just *a* valid name
-- 🔁 **Deterministic** — the same structure always gives the same name; no model, no training data, no randomness
-- ✅ **Round-trip validated** — in the default tier, every name is parsed back with OPSIN and compared to the input structure
-- 🛑 **Declines rather than guesses** — a name that cannot be verified is not returned
-- 🧬 **Broad organic chemistry** — chains, rings, Hantzsch–Widman heterocycles, fused, bridged (von Baeyer) and spiro systems, and the characteristic-group families (acids, esters, amides, amines, nitriles, …)
-- 🌀 **Stereochemistry** — R/S and E/Z descriptors from a high-accuracy CIP labeller
-- 🧾 **Provenance on request** — the tier, the validation outcome and the source of every name
-- 🧰 **Python API and CLI** — one call for one molecule, batch mode for files
+It says so. The plain call returns a label in place of a name, such as
+`inorganic compound (not supported)`, and `--provenance` marks the row `abstain` and says why:
 
-## 🚀 Quick Start
+```console
+$ orthonym "O=[U](=O)=O" --provenance | python -m json.tool
+{
+    "name": "inorganic compound (not supported)",
+    "tier": "abstain",
+    "is_pin": false,
+    "source": "abstain",
+    "opsin": "n/a",
+    "gates_passed": [],
+    "gate_outcome": "suppressed",
+    "formula": "O3U",
+    "limit_code": "UNSUPPORTED_ELEMENT",
+    "stereo_unexpressed": false,
+    "suffix_free_prefix_name": false,
+    "verified": "unverified"
+}
+```
+
+In code, `orthonym.errors.is_failure_name(name)` tells such a label from a name.
+
+## Quick start
+
+Needs Python 3.10+ and a Java 11+ runtime on your `PATH` (see [Installation](#installation)).
 
 ```bash
 pip install "git+https://github.com/Beilstein-Institut/Orthonym.git"
@@ -86,22 +114,27 @@ orthonym --batch molecules.smi -o names.txt   # one SMILES per line
 python -m orthonym "c1ccccc1"                 # module form
 ```
 
-## 📦 Installation
+## What's inside
 
-### Requirements
+| Part | What it does |
+|:--|:--|
+| **Perception** | RDKit reads the structure; Orthonym finds rings, characteristic groups and stereocentres, with CIP descriptors from the centres labeller. |
+| **Rules** | Seniority, the parent hydride, locants, alphanumerical order and spelling, built as whole nomenclature classes from the Blue Book, never as per-molecule special cases. |
+| **Assembly** | Chains, rings, Hantzsch–Widman heterocycles, fused, bridged (von Baeyer) and spiro systems, and the characteristic-group families: acids, esters, amides, amines, nitriles and more. |
+| **Validation** | The OPSIN round trip and the atom-coverage check that decide whether a name leaves the engine. |
+
+Built on the [IUPAC 2013 recommendations](https://doi.org/10.1039/9781849733069) ·
+[RDKit](https://www.rdkit.org/) · [OPSIN 2.9.0](https://github.com/dan2097/opsin) ·
+[centres 1.2.1](https://github.com/SiMolecule/centres)
+
+## Installation
 
 | Requirement | Why |
-|---|---|
+|:--|:--|
 | **Python 3.10+** | the engine |
 | **Java runtime 11+** on your `PATH` | OPSIN round-trip validation and the CIP labeller run on the JVM |
 
-### From GitHub
-
-```bash
-pip install "git+https://github.com/Beilstein-Institut/Orthonym.git"
-```
-
-### From a clone (for development)
+Install from GitHub as in [Quick start](#quick-start), or from a clone, for development:
 
 ```bash
 git clone https://github.com/Beilstein-Institut/Orthonym.git
@@ -116,71 +149,54 @@ Orthonym does **not** ship any Java jars. It uses two, and downloads them from t
 releases, checking each against a pinned SHA-256 checksum:
 
 | Jar | Version | Used for | Licence |
-|---|---|---|---|
+|:--|:--|:--|:--|
 | [OPSIN](https://github.com/dan2097/opsin) `opsin-cli-2.9.0-jar-with-dependencies.jar` | 2.9.0 | round-trip validation of every name | MIT (the jar bundles jna-inchi, LGPL-2.1, and others) |
 | [centres](https://github.com/SiMolecule/centres) `centres.jar` | 1.2.1 | CIP stereo descriptors (R/S, E/Z) | BSD-2-Clause (the jar bundles CDK, LGPL-2.1+) |
 
-`pip install` tries to fetch them for you. To fetch or re-check them at any time:
-
-```bash
-orthonym --fetch-jars
-```
-
-If a jar is missing, Orthonym **stops with a clear error** rather than quietly naming with less
-validation. For offline machines, point Orthonym at jars you copied yourself:
+`pip install` tries to fetch them for you. To fetch or re-check them at any time, run
+`orthonym --fetch-jars`. If a jar is missing, Orthonym **stops with a clear error** rather than
+quietly naming with less validation. For offline machines, point Orthonym at jars you copied
+yourself:
 
 | Setting | Effect |
-|---|---|
+|:--|:--|
 | `ORTHONYM_OPSIN_JAR=/path/to/opsin-cli-2.9.0-jar-with-dependencies.jar` | use this OPSIN jar |
 | `ORTHONYM_CENTRES_JAR=/path/to/centres-cli-1.2.1.jar` | use this centres jar |
 | `ORTHONYM_JAR_DIR=/path/to/dir` | where downloaded jars are kept (default: your user cache) |
 
 Licences and sources of the third-party components are listed in [`NOTICE`](NOTICE).
 
-## 🧭 How it works
-
-```mermaid
-flowchart LR
-    A["SMILES"] --> B["Perceive<br/>rings · characteristic groups · CIP stereo"]
-    B --> C["Apply the IUPAC 2013 rules<br/>seniority · parent · locants · spelling"]
-    C --> D["Assemble the name"]
-    D --> E{"Validate<br/>OPSIN round-trip ·<br/>atom-coverage check"}
-    E -- "verified" --> F["Preferred IUPAC Name"]
-    E -- "not verified" --> G["decline — no guess"]
-```
-
-1. **Perceive.** RDKit reads the structure; Orthonym finds rings, characteristic groups and stereocentres.
-2. **Apply the rules.** Seniority, the parent hydride, locants, alphanumerical order and spelling
-   follow the Blue Book, built as whole nomenclature classes rather than per-molecule special cases.
-3. **Validate.** The candidate name is parsed back with OPSIN and compared to the input structure,
-   and an atom-coverage check confirms that every atom is accounted for.
-4. **Emit or decline.** A verified name is returned. Otherwise Orthonym degrades to a
-   less-preferred but still correct systematic name, or declines.
-
-### Output tiers
+## Output tiers
 
 The default is strict. Wider tiers are opt-in with `--emit-tier`:
 
-| Tier | Returns |
-|---|---|
+| `--emit-tier` | Returns |
+|:--|:--|
 | `pin` *(default)* | the Preferred IUPAC Name, or nothing |
 | `valid` | adds round-trip-verified general names |
 | `complete` | adds round-trip-verified names from the wider general fallbacks (non-PIN allowed) |
 | `best-effort` | adds names that pass the atom-coverage check but are not verified by OPSIN |
 
-## 📐 How accuracy is measured
+Whatever the tier, `--provenance` says what each name is: `pin_verified` (the strict PIN path built
+and verified it), `pin_unverified` (a PIN-form name whose preferred status is not certified),
+`systematic_verified` (verified, not the PIN), `best_effort` (the general engine built all or part
+of it) or `abstain` (no name). The tier says how a name was built. The `verified` field says
+whether OPSIN read it back to the same molecule; `--emit-tier best-effort` is the tier that adds
+names OPSIN has not confirmed.
+
+## How accuracy is measured
 
 Orthonym is judged by what it gets **exactly right** and by what it gets **wrong**:
 
-- **Round-trip exact match** — name the structure, parse the name with OPSIN, and compare the full
+- **Round-trip exact match.** Name the structure, parse the name with OPSIN, and compare the full
   InChIKey with the input's. Every molecule counts; a declined molecule counts as a miss.
-- **Wrong structures** — any emitted name that parses to a different molecule. The design target is zero.
-- **Preferred-name conformance** — names checked character-for-character against molecules the
+- **Wrong structures.** Any emitted name that parses to a different molecule. The design target is zero.
+- **Preferred-name conformance.** Names checked character for character against molecules the
   Blue Book itself marks as the preferred name.
 
 Benchmark results will be published with the accompanying paper.
 
-## 🛠️ Development
+## Development
 
 Run the tests on targeted file sets (the OPSIN-backed tests need a Java runtime and the jars):
 
@@ -189,7 +205,9 @@ python -m pytest tests/unit/assembly -q
 python -m pytest tests/unit/rules/test_multiplicative.py -q
 ```
 
-Test markers (`unit`, `integration`, `roundtrip`, `slow`, `benchmark`) are defined in `pyproject.toml`.
+Test markers (`unit`, `integration`, `roundtrip`, `slow`, `benchmark`) are defined in
+`pyproject.toml`. [`CONTRIBUTING.md`](CONTRIBUTING.md) covers setup and how to add a compound class:
+add a test that pins the expected name and cites the governing IUPAC rule.
 
 ```
 Orthonym/
@@ -202,30 +220,16 @@ Orthonym/
 └── tests/            # unit and integration tests
 ```
 
-## 📚 Documentation
+Release notes are in [`CHANGELOG.md`](CHANGELOG.md), vulnerability reports go by
+[`SECURITY.md`](SECURITY.md), and the community standards are in
+[`CODE_OF_CONDUCT.md`](CODE_OF_CONDUCT.md). Questions and bug reports:
+[open an issue](https://github.com/Beilstein-Institut/Orthonym/issues/new/choose).
 
-| Doc | Purpose |
-|---|---|
-| [`CONTRIBUTING.md`](CONTRIBUTING.md) | Development setup, tests, and how to add a compound class |
-| [`CHANGELOG.md`](CHANGELOG.md) | Release notes |
-| [`NOTICE`](NOTICE) | Third-party components and their licences |
-| [`SECURITY.md`](SECURITY.md) | How to report a vulnerability |
-| [`CODE_OF_CONDUCT.md`](CODE_OF_CONDUCT.md) | Community standards |
-| [`CITATION.cff`](CITATION.cff) | Citation metadata |
+## How to cite
 
-## 🤝 Contributing
-
-Contributions are welcome. Please read [`CONTRIBUTING.md`](CONTRIBUTING.md) first.
-
-1. [Fork](https://docs.github.com/en/pull-requests/collaborating-with-pull-requests/working-with-forks/fork-a-repo) the repository
-2. Create a feature branch off `main`
-3. Add a test that pins the expected name, citing the governing IUPAC rule
-4. Open a [pull request](https://docs.github.com/en/pull-requests/collaborating-with-pull-requests/proposing-changes-to-your-work-with-pull-requests/creating-a-pull-request)
-
-## 📖 Citing Orthonym
-
-If you use Orthonym in published work, please cite it using the metadata in
-[`CITATION.cff`](CITATION.cff), or the BibTeX entry below:
+A paper describing Orthonym is in preparation. Until it is published, please cite the software:
+GitHub's **Cite this repository** button, built from [`CITATION.cff`](CITATION.cff), gives the
+entry in APA and BibTeX. In BibTeX:
 
 ```bibtex
 @software{orthonym,
@@ -236,14 +240,6 @@ If you use Orthonym in published work, please cite it using the metadata in
   url     = {https://github.com/Beilstein-Institut/Orthonym}
 }
 ```
-
-## 📜 License
-
-Orthonym is released under the **[MIT License](LICENSE)**. The OPSIN and centres jars are not part
-of this repository; they are downloaded from their official releases and keep their own licences
-(see [`NOTICE`](NOTICE)).
-
-## 🙏 Acknowledgments
 
 Orthonym stands on the IUPAC 2013 recommendations and on open cheminformatics software:
 
@@ -260,21 +256,23 @@ Orthonym stands on the IUPAC 2013 recommendations and on open cheminformatics so
 > for Machine Implementation. *J. Chem. Inf. Model.* **2018**, 58 (9), 1755–1765.
 > [doi:10.1021/acs.jcim.8b00324](https://doi.org/10.1021/acs.jcim.8b00324)
 
-[RDKit](https://www.rdkit.org/) handles molecular perception, and
-[centres](https://github.com/SiMolecule/centres) assigns CIP descriptors.
+## Licence
 
-## 💬 Feedback
-
-Open a [GitHub issue](https://github.com/Beilstein-Institut/Orthonym/issues/new/choose).
+MIT, see [LICENSE](LICENSE). The OPSIN and centres jars are not part of this repository; they are
+downloaded from their official releases and keep their own licences (see [`NOTICE`](NOTICE)).
 
 <div align="center">
-
----
-
-Made with ☕ by [Kohulan Rajan](https://www.kohulanr.com/) at the
-[Beilstein-Institut](https://www.beilstein-institut.de/en/), in collaboration with the
-[Steinbeck Lab](https://cheminf.uni-jena.de/)
-
-[Back to top ↑](#top)
-
+<br>
+<sub>Made with <img src="assets/readme-cup.svg" alt="coffee" height="14"> by <a href="https://www.kohulanr.com/">Kohulan Rajan</a> at</sub>
+<br><br>
+<a href="https://www.beilstein-institut.de/en/"><img src="assets/readme-beilstein.svg" alt="Beilstein-Institut" height="44"></a>
+<img src="assets/readme-brush-x.svg" alt="and" height="44">
+<a href="https://cheminf.uni-jena.de"><img src="assets/readme-steinbeck.svg" alt="Steinbeck Lab, Friedrich Schiller University Jena" height="44"></a>
+<br><br>
+<picture>
+  <source media="(max-width: 700px) and (prefers-color-scheme: dark)" srcset="assets/readme-collab-line-narrow-dark.svg">
+  <source media="(max-width: 700px)" srcset="assets/readme-collab-line-narrow.svg">
+  <source media="(prefers-color-scheme: dark)" srcset="assets/readme-collab-line-dark.svg">
+  <img src="assets/readme-collab-line.svg" alt="An official collaboration for open science" width="560">
+</picture>
 </div>
