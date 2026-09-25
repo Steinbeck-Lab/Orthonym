@@ -741,9 +741,14 @@ def _full_inchikey_rt_ok(mol, name: str) -> bool:
     if parsed is None:
         return False
     try:
-        return Chem.MolToInchiKey(parsed) == inchikey_of(mol)
+        if Chem.MolToInchiKey(parsed) != inchikey_of(mol):
+            return False
     except Exception:
         return False
+    # An equal full key is not enough for a radical (it encodes neither radical
+    # electrons nor bond order): validation/radical_identity.py.
+    from ..validation.radical_identity import radical_identity_verdict
+    return radical_identity_verdict(Chem.MolToSmiles(mol), smi) != "mismatch"
 
 
 def _iminide_omit_locants(name: str, mol) -> str:
@@ -2871,11 +2876,15 @@ def route_charged(mol, style: str = 'pin') -> str:
         from .ions import emit_parent_hydride_cumulative_suffix
         emitted = emit_parent_hydride_cumulative_suffix(
             mol, _radical_center_idx, radical_suffix)
-        if emitted:
+        # The same round-trip gate as the carbanion call site: the emitter and
+        # the textual fallback both build a name the gate has not seen, and a
+        # wrong radical site shares the input's full InChIKey.
+        if emitted and _full_inchikey_rt_ok(mol, emitted):
             return emitted
-        # Fail-closed fallback: the primitive declined (out of its parent-hydride
-        # scope) -> keep the proven textual form rather than regress.
-        return _apply_radical_suffix(neutral_name, radical_suffix)
+        # Fallback: the primitive declined or its name did not round-trip ->
+        # the textual form, verified the same way.
+        textual = _apply_radical_suffix(neutral_name, radical_suffix)
+        return textual if textual and _full_inchikey_rt_ok(mol, textual) else ''
 
     # (CARBOXYLATE anions are deferred to the proven path earlier; they never
     # reach this point — see the carboxylate guard in Step 3.)

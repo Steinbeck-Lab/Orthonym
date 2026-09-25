@@ -482,52 +482,205 @@ def _name_oxyl_parent_group(mol, radical_idx: int, attach_idx: int) -> str:
 
 
 def _radical_name_round_trips(mol, name: str) -> bool:
-    """Best-effort ``-r`` (allowRadicals) OPSIN round-trip check for a
-    radical-name CANDIDATE against ``mol``'s own structure. Two uses in this
-    module: (a) belt-and-suspenders over the shape guards above (never trust
-    a retained/contracted candidate on shape alone -- confirm it actually
-    parses back to the same molecule); (b) the tie-break between 's
+    """``-r`` (allowRadicals) OPSIN round-trip check for a radical-name
+    CANDIDATE against ``mol``'s own structure. Two uses in this module: (a)
+    belt-and-suspenders over the shape guards above (never trust a retained or
+    contracted candidate on shape alone); (b) the tie-break between 's
     two composition methods in ``_compose_oxyl_name`` below.
 
-    Fails OPEN (True -- trust the candidate) whenever OPSIN cannot be
-    reached at all: jar absent, JVM unavailable, or a transient parse
-    failure. A no-Java deployment is not a real one here (OPSIN spawns
-    unconditionally elsewhere in this pipeline -- see
-    ``feedback_no_synthetic_no_java_chase``), and the outer OPSIN-validity /
-     gate re-verifies the FINAL emitted name downstream regardless,
-    abstaining on any genuine mismatch -- so this local check only needs to
-    catch a DEFINITE rejection or a DEFINITE wrong-structure parse; it is not
-    the sole gate. Fails CLOSED (False) only on such a definite outcome."""
+    True only when OPSIN parses the name to the input's full InChIKey AND to the
+    same radical graph (validation/radical_identity.py): the full key alone
+    cannot separate a radical from a closed-shell or differently placed twin.
+    Fails CLOSED -- no jar, no JVM, an unserved or rejected parse, or an InChI
+    failure all return False, so a candidate this check cannot confirm is never
+    shipped from here."""
     if not name:
         return False
     try:
         from ..jvm_bridge import opsin_stdout
         from ..validation.opsin_roundtrip import _find_opsin_jar
-    except ImportError:  # pragma: no cover - jvm_bridge/opsin_roundtrip always present
-        return True
-    try:
+        from ..validation.radical_identity import radical_identity_verdict
         jar = _find_opsin_jar("2.9.0")
-    except Exception:
-        return True
-    if not jar:
-        return True
-    try:
+        if not jar:
+            return False
         txt, served = opsin_stdout(name, allow_radicals=True, jar_path=jar)
     except Exception:
-        return True
+        return False
     if not served:
-        return True  # transient/unavailable -- defer to the outer gate
+        return False
     smi = (txt or "").strip()
-    if not smi:
-        return False  # OPSIN definitively rejected the name
-    parsed = Chem.MolFromSmiles(smi)
+    parsed = Chem.MolFromSmiles(smi) if smi else None
     if parsed is None:
         return False
     try:
-        return (Chem.InchiToInchiKey(Chem.MolToInchi(parsed))
-                == Chem.InchiToInchiKey(Chem.MolToInchi(mol)))
+        if (Chem.InchiToInchiKey(Chem.MolToInchi(parsed))
+                != Chem.InchiToInchiKey(Chem.MolToInchi(mol))):
+            return False
     except Exception:
-        return True  # an InChI failure is not evidence of a wrong name
+        return False
+    return radical_identity_verdict(Chem.MolToSmiles(mol), smi) != "mismatch"
+
+
+def _radical_identity_round_trips(mol, name: str) -> bool:
+    """Strict ``-r`` OPSIN round trip for a radical name candidate: True only
+    when OPSIN parses ``name`` to exactly ``mol``, radical electrons, charges
+    and hydrogen counts included (canonical isomeric SMILES equality).
+
+    The full InChIKey alone does not decide this: it encodes neither radical
+    electrons nor bond order, so an N-oxyl radical and a closed-shell or
+    charge-separated twin can share a key. Fails CLOSED when OPSIN cannot be
+    reached -- a producer that uses this check never ships an unverified
+    name."""
+    if not name:
+        return False
+    try:
+        from ..jvm_bridge import opsin_stdout
+        from ..validation.opsin_roundtrip import _find_opsin_jar
+        jar = _find_opsin_jar("2.9.0")
+        if not jar:
+            return False
+        txt, served = opsin_stdout(name, allow_radicals=True, jar_path=jar)
+    except Exception:
+        return False
+    if not served:
+        return False
+    parsed = Chem.MolFromSmiles((txt or "").strip())
+    if parsed is None:
+        return False
+    try:
+        return Chem.MolToSmiles(parsed) == Chem.MolToSmiles(mol)
+    except Exception:
+        return False
+
+
+_ACYL_HETERO = {'O', 'S', 'Se', 'Te', 'N'}
+
+
+def _aminoxyl_prefix_string(prefixes: List[str]) -> str:
+    """The substituent prefixes of a substituted aminoxyl, as in the Blue Book's
+    'bis(chloromethyl)aminoxyl (PIN)', the Blue Book):
+    alphanumerical order, ``alpha_sort_key``), 'di'/'bis' multiplying
+    prefixes /: 'bis' and enclosing marks for a compound
+    prefix), a hyphen between a multiplier and an italic 'tert-'/'sec-'
+    prefix, and enclosing marks around every prefix after the first so that
+    'methyl(phenyl)' cannot be read as one prefix."""
+    from collections import Counter
+    from ..assembly.naming_utils import alpha_sort_key, enclose_if_compound
+    counts = Counter(prefixes)
+    out = []
+    for i, p in enumerate(sorted(counts, key=alpha_sort_key)):
+        compound = enclose_if_compound(p) != p
+        if counts[p] == 2:
+            if compound:
+                out.append(f"bis({p})")
+            else:
+                out.append("di" + ("-" if p.startswith(("tert-", "sec-")) else "") + p)
+        elif compound or i:
+            out.append(f"({p})")
+        else:
+            out.append(p)
+    return "".join(out)
+
+
+def _n_substituent_prefix(mol, frag: List[int], attach_idx: int, general: bool):
+    """(prefix, from_general_route) for one group on an N-oxyl nitrogen, or
+    (None, False). The PIN route gets first refusal -- the ring-system
+    substituent namer for a ring attachment, the substituent enumerator for a
+    chain -- exactly as the composer does (assembly/composer.py, 'ADDITIVE-ONLY:
+    the PIN route gets first refusal'). The wider route (allow_mancude, which
+    can build skeletal-replacement forms such as '1-oxa-3-azacyclopentan-3-yl'
+    for 1,3-oxazolidin-3-yl) is tried only when ``general`` is set, and its
+    result is reported so the caller can demote the tier."""
+    from ..assembly.substituent_enumerator import name_substituent
+    from .ring_substituents import name_ring_system_substituent
+
+    def _one(allow_mancude):
+        if mol.GetAtomWithIdx(attach_idx).IsInRing():
+            got = name_ring_system_substituent(mol, sorted(frag), attach_idx,
+                                               allow_mancude=allow_mancude)
+        else:
+            got = name_substituent(mol, frag, attach_idx, allow_mancude=allow_mancude)
+        return got if got and got.endswith('yl') else None
+
+    prefix = _one(False)
+    if prefix:
+        return prefix, False
+    if general:
+        prefix = _one(True)
+        if prefix:
+            return prefix, True
+    return None, False
+
+
+def _name_n_oxyl_radical(mol, radical_idx: int, n_atom) -> str:
+    """: name an N-oxyl (aminoxyl) radical R2N-O. -- the free valence
+    on an oxygen whose only neighbour is a neutral, saturated amine nitrogen.
+
+    VERIFIED, (the Blue Book-40705): the radical is named
+    '(1) additively, using the term oxyl', and "Method (1) generates preferred
+    IUPAC names"; 'aminoxyl' (H2N-O.) is a retained contraction of aminooxyl
+    (:40681,:40699), and its substituted form is the PIN
+    '(ClCH2)2N-O. bis(chloromethyl)aminoxyl (PIN)' (:40703). So:
+      - H2N-O.: 'aminoxyl';
+      - an acyclic N with carbon substituents: '<prefixes>aminoxyl';
+      - a ring N: method (1), the ring-N substituent prefix + 'oxyl', e.g.
+        '(2,2,6,6-tetramethylpiperidin-1-yl)oxyl', enclosed as a compound
+        prefix like '(chloroacetyl)oxyl (PIN)'.
+    Ruling: the CATION example '(CH3)2N-O+ N-methylmethanaminoxylium
+    (PIN)' (:41652) uses an amine parent instead; for radicals the radical
+    section's own example (:40703) governs.
+
+    Prefixes come from the PIN route first; a prefix only the wider route can
+    build is used only at a general tier and demotes the name out of
+    pin_verified (``record_general_ring_prefix``), so a non-PIN form never
+    ships as a PIN.
+
+    Out of this producer, returning '' (no name): a charged, radical,
+    aromatic or multiply bonded N (iminoxyl, N-oxide), a non-carbon
+    substituent on N, and an acyl substituent (a hydroxamic-acid radical,
+    which needs the amide rules). Every candidate must pass the strict
+    radical-identity round trip, so nothing unverified ships."""
+    if (n_atom.GetFormalCharge() or n_atom.GetNumRadicalElectrons()
+            or n_atom.GetIsAromatic()
+            or any(b.GetBondType() != Chem.BondType.SINGLE for b in n_atom.GetBonds())):
+        return ''
+    from ..metrics.provenance import general_fallback_ctx, record_general_ring_prefix
+    try:
+        general = bool(general_fallback_ctx.get())
+    except Exception:  # a tier read must never break naming
+        general = False
+    n_idx = n_atom.GetIdx()
+    used_general = False
+    if n_atom.IsInRing():
+        frag = _collect_fragment_excluding(mol, n_idx, {radical_idx})
+        parent, used_general = _n_substituent_prefix(mol, frag, n_idx, general)
+        if not parent:
+            return ''
+        from ..assembly.naming_utils import enclose_if_compound
+        candidate = f"{enclose_if_compound(parent)}oxyl"
+    else:
+        prefixes = []
+        for sub in n_atom.GetNeighbors():
+            if sub.GetIdx() == radical_idx:
+                continue
+            if sub.GetSymbol() != 'C' or sub.GetFormalCharge() or sub.GetNumRadicalElectrons():
+                return ''
+            if any(b.GetBondType() != Chem.BondType.SINGLE
+                   and b.GetOtherAtom(sub).GetSymbol() in _ACYL_HETERO
+                   for b in sub.GetBonds()):
+                return ''  # acyl on N: hydroxamic-acid radical, not this producer
+            frag = _collect_fragment_excluding(mol, sub.GetIdx(), {n_idx, radical_idx})
+            prefix, wide = _n_substituent_prefix(mol, frag, sub.GetIdx(), general)
+            if not prefix:
+                return ''
+            used_general = used_general or wide
+            prefixes.append(prefix)
+        candidate = _aminoxyl_prefix_string(prefixes) + 'aminoxyl'
+    if not _radical_identity_round_trips(mol, candidate):
+        return ''
+    if used_general:
+        record_general_ring_prefix()
+    return candidate
 
 
 def _compose_oxyl_name(mol, parent: str, additive_suffix: str, systematic_suffix: str) -> str:
@@ -639,6 +792,13 @@ def name_oxyl_radical(mol, radical_site: Dict[str, Any]) -> str:
         if peroxyl_name:
             return peroxyl_name
         return 'oxyl'
+
+    if neighbor.GetSymbol() == 'N':
+        # R2N-O. aminoxyl radicals. When the producer declines, the
+        # answer is '' (no name), never the bare 'oxyl': that string denotes
+        # HO-less O. and drops the whole N side, and with the OPSIN gate off it
+        # used to ship as a pin_verified name.
+        return _name_n_oxyl_radical(mol, radical_idx, neighbor)
 
     if neighbor.GetSymbol() != 'C':
         return 'oxyl'

@@ -1276,6 +1276,14 @@ def _self_consistency_verdict(input_smiles: str, opsin_smiles: str,
     # in the RegistrationHash TAUTOMER layer, so the stereo fallback below wrongly
     # returned "mismatch" (na>0 skips the na==0 short-circuit). Applies to the
     # ignore_stereo carve-out too: equal keys are the same molecule there as well.
+    # Radical identity BEFORE the full-key shortcut: the full InChIKey encodes
+    # neither radical electrons nor bond order, so '[CH2][CH2]' and 'C=C' (or an
+    # aminoxyl and its charge form) share one key. When either side carries a
+    # chemical radical, the parse must be the same radical graph
+    # (validation/radical_identity.py).
+    from .validation.radical_identity import radical_identity_verdict
+    if radical_identity_verdict(input_smiles, opsin_smiles) == "mismatch":
+        return "mismatch"
     ka = _self_consistency_full_key(input_smiles)
     kb = _self_consistency_full_key(opsin_smiles)
     if ka is not None and kb is not None and ka == kb:
@@ -1523,8 +1531,11 @@ def _final_opsin_validity_gate(name: str, smiles: Optional[str],
                 # OPSIN output is itself RDKit-unparseable (an organo-metal valence
                 # artifact — _out_key None) OR it computes to a DIFFERENT full key
                 # (wrong molecule / stereo-incomplete). Only a computable, EQUAL key
-                # ships at the RT-verified tier.
-                if _out_key is None or _out_key != _in_key:
+                # ships at the RT-verified tier. An equal key is not enough when a
+                # radical is involved (validation/radical_identity.py).
+                from .validation.radical_identity import radical_identity_verdict
+                _radical_bad = radical_identity_verdict(smiles, opsin_smiles) == "mismatch"
+                if _out_key is None or _out_key != _in_key or _radical_bad:
                     # a phase stereo-OMISSION reclaim (0-wrong ABSOLUTE). When the
                     # difference is stereo-ONLY — the CONSTITUTION round-trips (skeleton
                     # InChIKey equal) but the flat name dropped the input's stereo — try
@@ -1535,7 +1546,7 @@ def _final_opsin_validity_gate(name: str, smiles: Optional[str],
                     # a genuine stereo-CONFLICT never composes to _in_key and still
                     # suppresses. Same 0-wrong bar as the RT-verified tier.
                     _in_skel = _self_consistency_skeleton(smiles)
-                    if (_STEREO_OMISSION_RECLAIM
+                    if (_STEREO_OMISSION_RECLAIM and not _radical_bad
                             and _out_key is not None and _in_skel is not None
                             and _in_skel == _self_consistency_skeleton(opsin_smiles)):
                         _composed = _try_compose_input_stereo(name, smiles, _in_key)

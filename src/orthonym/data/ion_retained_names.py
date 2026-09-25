@@ -317,6 +317,28 @@ INORGANIC_ANIONS = {
     'O=P([O-])([O-])[O-]': 'phosphate',
     'O=P([O-])([O-])O': 'hydrogen phosphate',
     'O=P([O-])(O)O': 'dihydrogen phosphate',
+    # Anions of arsoric acid, As(O)(OH)3 (preselected,,
+    # the Blue Book). "Salts of mononuclear noncarbon
+    # oxoacids" (:35900): "Names of anions are formed by changing the 'ic acid'
+    # ending to 'ate'"; the hydrogen words follow the phosphate examples
+    # ('methyl dihydrogen phosphate (PIN)',:35940). Each OPSIN-parses to
+    # exactly this anion. Without these rows a hydrogen arsorate salt fell
+    # through to a neutral-acid name ('lead(II) arsoric acid', a different
+    # molecule).
+    'O=[As]([O-])([O-])[O-]': 'arsorate',
+    'O=[As]([O-])([O-])O': 'hydrogen arsorate',
+    'O=[As]([O-])(O)O': 'dihydrogen arsorate',
+    # The same rule for the two other oxoacids that leaked a
+    # neutral-acid name ('stiboric acid', 'silicic acid') through the same
+    # multi-anion fallback: stiboric acid Sb(O)(OH)3 and silicic acid Si(OH)4
+    # (the Blue Book). Each OPSIN-parses to exactly this anion.
+    'O=[Sb]([O-])([O-])[O-]': 'stiborate',
+    'O=[Sb]([O-])([O-])O': 'hydrogen stiborate',
+    'O=[Sb]([O-])(O)O': 'dihydrogen stiborate',
+    '[O-][Si]([O-])([O-])[O-]': 'silicate',
+    '[O-][Si]([O-])([O-])O': 'hydrogen silicate',
+    '[O-][Si]([O-])(O)O': 'dihydrogen silicate',
+    '[O-][Si](O)(O)O': 'trihydrogen silicate',
     # B3 (e): genuine missing row -- the fully-deprotonated dianion of
     # phosphonic acid's P-H tautomer (HPO3(2-)). Verified RT:
     # opsin_roundtrip_check('O=[PH]([O-])[O-]', 'phosphonate') passes.

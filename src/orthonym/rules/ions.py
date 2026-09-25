@@ -1227,7 +1227,15 @@ def name_anion(mol, style: str = 'pin', _depth: int = 0, retained_only: bool = F
                             if (bm is not None and
                                     Chem.MolToInchiKey(bm) == inchikey_of(mol)):
                                 return validated
-        return _validate_anion_name(mol, neutral_name)
+        # 0-wrong: the multi-anion sibling of the a phase-c single-anion
+        # decline above. `neutral_name` names the RE-PROTONATED skeleton, a
+        # different (neutral) molecule, and no anionic suffix could be applied
+        # to it. Returning it made 'O=[As]([O-])([O-])O.[Pb+2]' ship as
+        # 'lead(II) arsoric acid' (OPSIN: [As](O)(O)(O)=O.[Pb+2]), and
+        # passed it because a neutral salt input is exempt from its net-charge
+        # guard. Decline; an anion that has a real name gets it from the
+        # anion table or a producer above.
+        return ''
 
     # Fallback: name first anion site only
     anion_site = anions[0]
