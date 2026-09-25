@@ -391,11 +391,13 @@ def _assemble_by_bond_type(
                     fn = {"acid": acid_name, "alkyl": alk_name}
 
                 result = assemble_fragment_name(bt, fn, style, fragment_smiles=fs)
-                if result:
-                    assembled_parts.append(result)
-                else:
-                    # Fall back: space-join this pair
-                    assembled_parts.append(f"{alk_name} {acid_name}")
+                if not result:
+                    # The bond-type assembler cannot combine this pair. The old
+                    # fallback blank-joined 'alk_name acid_name': two standalone
+                    # names, not a name of the connected input. Void the whole
+                    # assembly instead (Task 3, 2026-09-25).
+                    return None
+                assembled_parts.append(result)
 
     # Add any untyped fragments
     for _, name in untyped:
@@ -407,8 +409,15 @@ def _assemble_by_bond_type(
     if len(assembled_parts) == 1:
         return assembled_parts[0]
 
-    # Join multiple assembled parts with space (functional class style)
-    return " ".join(assembled_parts)
+    # More than one part. The groups above are keyed on the bond type that was
+    # CUT, not on how the parts connect, so nothing here knows how to join them
+    # into ONE name. The old code blank-joined them "functional class style";
+    # a functional class name has a fixed grammar, that
+    # a list of independently assembled names does not follow. Measured on the
+    # GPI mannoside: 4 parts glued into a string OPSIN reads as a different
+    # formula (C38H75N2O31PS vs the input's C38H71N2O28PS). Void the assembly;
+    # the molecule then gets its name from the next candidate.
+    return None
 
 
 # ============================================================================
@@ -627,6 +636,22 @@ def _assemble_ester(fragment_names: Dict[str, str], style: str) -> Optional[str]
     return f"{alkyl_prefix} {ate_name}"
 
 
+#: Suffix spellings of an acid with MORE than one acid group. Its acyl prefix
+#: ('butanedioyl') and its amide ('butanediamide') convert EVERY acid group, so a
+#: decomposition that cut only ONE of them names a different molecule.
+_POLY_ACID_NAME_MARKERS = (
+    "dicarboxylic acid", "tricarboxylic acid", "tetracarboxylic acid",
+    "pentacarboxylic acid", "dioic acid", "trioic acid", "tetraoic acid",
+    "pentaoic acid",
+)
+
+
+def _is_poly_acid_name(acid_name: str) -> bool:
+    """True when ``acid_name`` names an acid with two or more acid groups."""
+    low = (acid_name or "").lower()
+    return any(m in low for m in _POLY_ACID_NAME_MARKERS)
+
+
 def _expand_n_locant_for_multiplier(prefix: str) -> str:
     """Expand N-locant based on multiplier prefix on an N-substituent name.
 
@@ -687,6 +712,17 @@ def _assemble_amide(fragment_names: Dict[str, str], style: str,
     amine_name = fragment_names.get("amine")
 
     if not acid_name or not amine_name:
+        return None
+
+    # 2026-09-25 (pre-existing-failures plan, Task 4): both forms below convert
+    # EVERY acid group of the acid fragment, but the decomposition cut ONE amide
+    # bond. 'butanedioyl' is the DIVALENT group -CO-CH2-CH2-CO-,
+    # the Blue Book), so the free CH2-COOH vanished:
+    # 'N-({(2S)-2-[...]butanedioyl})(2S)-2-aminopropanoic acid' (TRIAGE row 17,
+    # CHEBI:139249); 'butanediamide' makes the free acid an amide. The same guard
+    # as the ester assembler's: the free acid is the senior class,
+    #:18158, class 7 acids above amides), so neither amide form is the name.
+    if _is_poly_acid_name(acid_name):
         return None
 
     result = None
@@ -1311,19 +1347,62 @@ def _assemble_phosphodiester(fragment_names: Dict[str, str], style: str) -> Opti
     Returns:
         Phosphodiester name, or None.
 
+     "Esters of mononuclear noncarbon oxoacids" (BB:35918): "Partial
+    acid esters of polybasic acids are named by citing alkyl groups, aryl
+    groups, etc. as separate words, in alphanumeric order if more than one,
+    followed by the word 'hydrogen' (with the appropriate multiplying prefix, as
+    necessary) also cited as a separate word, and the name of the appropriate
+    anion." BB:35940 'methyl dihydrogen phosphate (PIN)' (one ester group) and
+    :35944 'sodium methyl hydrogen phosphate (PIN)' (two groups, one H).
+
+    So the acid fragment must itself be the monoester '<R> dihydrogen
+    phosphate', and the diester is '<A> <B> hydrogen phosphate'. Anything else
+    is declined (None). The old body put the alkyl word in front of whatever
+    the acid fragment was called: 'methyl methyl dihydrogen phosphate' (its
+    own docstring example; OPSIN cannot parse it) or, for an acid fragment
+    named substitutively, a glue of two standalone names --
+    'ethyl 2-(phosphonooxy)ethan-1-amine', which OPSIN parses to a DIFFERENT
+    molecule (C(C)C(COP(=O)(O)O)N; the GPI mannoside's single-bond
+    decomposition, TRIAGE T3). Two identical groups take the multiplying
+    prefix: (BB:4857) "Identical simple substituent groups are
+    indicated by multiplicative prefixes, such as 'di', 'tri', etc.... For
+    compound or complex substituent groups... the multiplicative prefixes
+    'bis', 'tris', 'tetrakis-', etc.... are used"; BB:35946 'dimethyl
+    phosphonate (PIN)'.
+
     Examples:
+        >>> _assemble_phosphodiester({"acid": "methyl dihydrogen phosphate", "alkyl": "ethanol"}, "pin")
+        'ethyl methyl hydrogen phosphate'
         >>> _assemble_phosphodiester({"acid": "methyl dihydrogen phosphate", "alkyl": "methanol"}, "pin")
-        'methyl methyl dihydrogen phosphate'
+        'dimethyl hydrogen phosphate'
+        >>> _assemble_phosphodiester({"acid": "2-(phosphonooxy)ethan-1-amine", "alkyl": "ethanol"}, "pin") is None
+        True
     """
+    from ..assembly.naming_utils import alpha_sort_key
+
     acid_name = fragment_names.get("acid")
     alkyl_name = fragment_names.get("alkyl")
     if not acid_name or not alkyl_name:
         return None
 
-    alkyl_prefix = _alcohol_to_alkyl(alkyl_name)
-    if alkyl_prefix and acid_name:
-        return f"{alkyl_prefix} {acid_name}"
-    return None
+    monoester_word = " dihydrogen phosphate"
+    if not acid_name.endswith(monoester_word):
+        return None
+    first = acid_name[:-len(monoester_word)]
+    # `_alcohol_to_alkyl` returns its input unchanged when it matches no
+    # alcohol pattern, so both words must BE group words ('...yl'), or the
+    # glue comes back by another route.
+    second = _alcohol_to_alkyl(alkyl_name)
+    if (not first or not second or " " in first or " " in second
+            or not first.endswith("yl") or not second.endswith("yl")
+            or is_refusal_sentinel(first) or is_refusal_sentinel(second)):
+        return None
+    if first == second:
+        enclosed = enclose_if_compound(first)
+        groups = f"di{first}" if enclosed == first else f"bis{enclosed}"
+    else:
+        groups = " ".join(sorted((first, second), key=alpha_sort_key))
+    return f"{groups} hydrogen phosphate"
 
 
 def _assemble_sulfonamide(fragment_names: Dict[str, str], style: str) -> Optional[str]:

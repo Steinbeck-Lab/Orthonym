@@ -8,6 +8,7 @@ comparison, fatty acid identification).
 """
 import pytest
 from orthonym import name_compound
+from tests.support.rt_assert import assert_tier_contract
 
 
 class TestCoverageGateWhitelist:
@@ -174,6 +175,7 @@ class TestDecompositionQuality:
     """Regressions 1, 2, 4: decomposition should not produce worse names."""
 
     @pytest.mark.integration
+    @pytest.mark.opsin_gate
     def test_regression_1_indole_peptide_no_garbled(self):
         """Multi-amide peptide should not produce 'cycloanedicarboxamide'.
 
@@ -181,12 +183,20 @@ class TestDecompositionQuality:
         final quality gate in namer.py should detect the garbled token
         and fall back to the fragment naming result, which correctly
         identifies the 1H-indole core with amide substituents.
+
+        2026-09-25 (pre-existing-failures plan, Task 4, TRIAGE row 62): with
+        the gate off the PIN tier shipped 'N-[(1Z)-2-(1H-indol-3-yl)eth-1-en-
+        1-yl](2S)-3-phenylpropanamide', which drops the acetyl-leucyl-N-methyl
+        part (a residual gate-off producer, TRIAGE.md, Task 4). Checked here
+        under the tier contract with the gate ON: the PIN tier, which has no
+        producer for this peptide's substitutive PIN, fails closed, and the
+        best-effort name is RT-exact (full InChIKey).
         """
         smiles = (
             "CC(=O)N[C@@H](CC(C)C)C(=O)N(C)[C@@H](Cc1ccccc1)"
             r"C(=O)N/C=C\c1c[nH]c2ccccc12"
         )
-        name = name_compound(smiles)
+        _pin, name = assert_tier_contract(smiles)
         assert "cycloanedicarboxamide" not in name, (
             f"Garbled token in: '{name}'"
         )
@@ -366,31 +376,39 @@ class TestFattyAcidIdentification:
         )
 
     @pytest.mark.integration
+    @pytest.mark.opsin_gate
     def test_regression_6_triglyceride(self):
         """Triglyceride fatty acid chains should use correct names.
 
         This regression was already fixed by prior phases -- the current
         name parses in OPSIN. Verify it stays fixed.
+
+        2026-09-25 (pre-existing-failures plan, Task 4, TRIAGE row 66):
+        - The C20:4 chain here is (8Z,11Z,14Z,17Z)-icosa-8,11,14,17-tetraenoyl,
+          not arachidonoyl (5Z,8Z,11Z,14Z), and trivial acyl prefixes are not
+          PIN prefixes anyway (plan ruling R20:, the Blue Book,
+          'stearic acid octadecanoic acid (PIN)':29791). So the old
+          'arachidonoyloxy' expectation is dropped and a trivial acyl prefix is
+          refused instead.
+        - With the gate off the glyceride producer ships the
+          method (1) form without the enclosing marks around its stereo-bearing
+          anions, which OPSIN cannot parse (a residual, TRIAGE.md, Task 4). The
+          shipped name (gate ON) is checked under the tier contract: RT-exact
+          by full InChIKey at both tiers.
         """
         smiles = (
             r"CC/C=C\C/C=C\C/C=C\C/C=C\CCCCCCC(=O)OC"
             r"[C@H](COC(=O)CCCCCCCCCCCCCCCCCCCCCC)"
             r"OC(=O)CCCCCCCC/C=C\C/C=C\C/C=C\CC"
         )
-        name = name_compound(smiles)
-        assert name is not None and name != "unknown"
-        # Should use arachidonoyloxy for C20:4 (correct trivial name)
-        assert "arachidonoyloxy" in name, (
-            f"Expected 'arachidonoyloxy' for C20:4 chain: '{name}'"
-        )
+        name, _be = assert_tier_contract(smiles)
         # C23:0 should use systematic name tricosanoyloxy
         assert "tricosanoyloxy" in name, (
             f"Expected 'tricosanoyloxy' for C23:0 chain: '{name}'"
         )
-        # Should NOT use wrong trivial names
-        assert "arachidoyloxy" not in name, (
-            f"Wrong trivial name 'arachidoyloxy' (C20:0) for C20:4 chain: '{name}'"
-        )
+        # No trivial fatty-acyl prefix (R20)
+        for trivial in ("arachid", "linole", "palmitoyl", "stearoyl", "oleoyl"):
+            assert trivial not in name, f"trivial acyl prefix {trivial!r} in: '{name}'"
 
     @pytest.mark.integration
     def test_fatty_acid_trivial_names_via_fragment(self):

@@ -10,13 +10,17 @@ only by the downstream OPSIN gate, which FAILS OPEN when the jar is
 absent (the wrong name then ships), and it also BLOCKS the general engine from
 being tried (the late-recovery only fires on a clean abstention).
 
-P3 makes ``name_fused_heterocycle`` fail closed at the source -- but ONLY under
-the general-engine tiers (``general_fallback`` set: ``valid`` / ``complete``),
-gated on ``metrics.provenance.general_fallback_ctx`` -- so the PIN default path
-stays BYTE-IDENTICAL. Under ``complete`` the decline re-routes the molecule
-through ``name_general`` (the universal never-None substituent recursion,
-E1 + gated), which either names it faithfully or abstains -- never the
-group-dropping name.
+P3 made ``name_fused_heterocycle`` fail closed at the source, first ONLY under
+the general-engine tiers (``general_fallback`` set: ``valid`` / ``complete``), so
+the PIN default path stayed byte-identical -- which meant the PIN path kept
+returning the group-dropping ``'quinoline'``. Since 2026-09-25 (pre-existing-
+failures plan, Task 4, TRIAGE row 88: '5-hydroxy-2,3-dihydro-1H-isoindole-1,3-
+dione' for 5-hydroxythalidomide) it fails closed at EVERY tier:
+"SUBSTITUTIVE NOMENCLATURE" (the Blue Book) cites every substituent as a
+prefix or suffix, and a dropped branch is a different molecule. Under
+``complete`` the decline re-routes the molecule through ``name_general`` (the
+universal never-None substituent recursion, E1 + gated), which either
+names it faithfully or abstains -- never the group-dropping name.
 
 Reproduce-first (confirmed 2026-07-20, production OPSIN gate on):
   - DROP cases below: default pin RAW output (gate off) drops the substituent
@@ -137,17 +141,27 @@ def _nfh(smiles):
 
 
 # --------------------------------------------------------------------------
-# PIN BYTE-IDENTITY (the sharpest constraint): the gated guard is a strict
-# no-op when general_fallback is OFF. name_fused_heterocycle returns EXACTLY
-# the legacy output on the PIN path for both DROP and GOOD cases.
-# Deterministic, no Java.
+# PIN PATH: the GOOD cases are byte-identical, and the DROP cases fail closed
+# (None) instead of the group-dropping legacy 'quinoline' (OPSIN reads
+# 'quinoline' as C9H7N, a different molecule from each input). Deterministic,
+# no Java.
 # --------------------------------------------------------------------------
-@pytest.mark.parametrize("smiles,legacy", DROP_CASES + GOOD_CASES)
+@pytest.mark.parametrize("smiles,legacy", GOOD_CASES)
 def test_pin_path_byte_identical(smiles, legacy):
     tok = general_fallback_ctx.set(False)  # PIN default path
     try:
         assert _nfh(smiles) == legacy, (
             f"PIN path changed for {smiles!r}: {_nfh(smiles)!r} != {legacy!r}")
+    finally:
+        general_fallback_ctx.reset(tok)
+
+
+@pytest.mark.parametrize("smiles,wrong", DROP_CASES)
+def test_drop_fails_closed_on_pin_path(smiles, wrong):
+    tok = general_fallback_ctx.set(False)  # PIN default path
+    try:
+        assert _nfh(smiles) is None, (
+            f"PIN path shipped the group-dropping {_nfh(smiles)!r} for {smiles!r}")
     finally:
         general_fallback_ctx.reset(tok)
 

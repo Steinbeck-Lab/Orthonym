@@ -24,6 +24,7 @@ from .data import (
 )
 from .diagnostics import strict_mode as _strict_mode
 from .errors import (
+    _DESCRIPTIVE_FALLBACK_NAMES,
     _METAL_NAMES,  # noqa: F401 re-exported: imported FROM this module by data/cation_words.py, rules/salts.py
     _ORGANIC_ELEMENTS,  # noqa: F401 re-exported: imported FROM this module by tests/unit/test_hyg02_error_catalog.py
     OrthonymLimitError,
@@ -3541,7 +3542,24 @@ class Orthonym:
             # generator or a silent atom drop. So this can only turn a welded
             # non-name into either a REAL name (recovery succeeds) or an honest
             # labelled abstention, never into silence.
-            if result and is_refusal_sentinel(result) and not is_failure_name(result):
+            #
+            # 2026-09-25 (pre-existing-failures plan, Task 3): "already caught"
+            # above was true of the recovery TRIGGERS only. Every rescue below
+            # keys on `is_failure_name`, so a welded 'unknown…' did get its
+            # rescues -- but when they all declined, the welded string itself
+            # was what this method returned: '(2E)-2-methyl-5-unknownpent-2-enoic
+            # acid' (CHEBI:131506) shipped from name and name_tiered whenever
+            # the OPSIN validity gate was off. The producer that built it now
+            # voids its candidate (errors.UnnameableSubstituentError); this is
+            # the exit-side half of the same invariant, for every family: a
+            # result that carries a sentinel but is not a WHOLE descriptive
+            # fallback is not a name. Bare 'unknown' is the legacy whole
+            # UNNAMEABLE message and is left as it is. The rescues' triggers are
+            # unchanged (both strings are failures), and the four breadth
+            # baselines of the plan hold 0 such rows (checked 2026-09-25).
+            if (result and is_refusal_sentinel(result)
+                    and result not in _DESCRIPTIVE_FALLBACK_NAMES
+                    and result.strip().lower() != 'unknown'):
                 result = _descriptive_fallback(smiles)
             # (opt-in): a candidate suppressed by a downstream gate
             # (/ vetoes) left only the failure sentinel; give the

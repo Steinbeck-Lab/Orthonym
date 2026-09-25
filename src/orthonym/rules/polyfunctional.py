@@ -2870,7 +2870,13 @@ def name_polyfunctional(features: Any) -> Optional[str]:
     # --- Generate ring substituent prefixes (when chain is parent) ---
     if getattr(features, 'chain_is_parent', False):
         from ..assembly.composer import _generate_ring_substituent_prefixes
-        ring_prefixes = _generate_ring_substituent_prefixes(features)
+        from ..errors import UnnameableSubstituentError
+        try:
+            ring_prefixes = _generate_ring_substituent_prefixes(features)
+        except UnnameableSubstituentError:
+            # A ring branch with no correct prefix: fail closed exactly as the
+            # alkyl-prefix gate below does (None), never weld a placeholder.
+            return None
         for ring_prefix in ring_prefixes:
             all_prefixes.append(ring_prefix.text)
 

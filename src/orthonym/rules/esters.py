@@ -655,6 +655,35 @@ def _alkyl_name_via_substituent_primitive(mol, alkyl_set: set) -> Optional[str]:
     return None
 
 
+def _is_phenyl_on_unbranched_chain(mol, alkyl_set, ring) -> bool:
+    """True when ``alkyl_set`` is exactly the ring ``ring`` plus an unbranched,
+    acyclic, all-carbon chain (possibly empty) that joins the ring to the ester
+    oxygen, and the ring carries nothing else.
+
+    The shape the count-based ester alkyl words ('phenyl', 'benzyl',
+    '2-phenylethyl', 'n-phenylalkyl') describe; checked from the graph.
+    """
+    ring_set = set(ring)
+    chain = set(alkyl_set) - ring_set
+    for idx in chain:
+        atom = mol.GetAtomWithIdx(idx)
+        if atom.GetSymbol() != 'C' or atom.IsInRing():
+            return False
+        if sum(1 for nb in atom.GetNeighbors() if nb.GetIdx() in alkyl_set) > 2:
+            return False
+    # every fragment neighbour of a ring atom is a ring atom, or the single
+    # chain atom that carries the ring
+    exo = [nb.GetIdx() for r in ring_set
+           for nb in mol.GetAtomWithIdx(r).GetNeighbors()
+           if nb.GetIdx() in alkyl_set and nb.GetIdx() not in ring_set]
+    if chain:
+        if len(exo) != 1:
+            return False
+    elif exo:
+        return False
+    return True
+
+
 def get_alkyl_fragment_name(mol, alkyl_atoms: List[int]) -> str:
     """
     Get the alkyl name from the alkyl fragment.
@@ -725,6 +754,13 @@ def get_alkyl_fragment_name(mol, alkyl_atoms: List[int]) -> str:
             ring_in_fragment = all(r in alkyl_set for r in ring)
             if not ring_in_fragment:
                 continue
+            # The count-based forms below ('benzyl', 'n-phenylalkyl') describe ONE
+            # undecorated phenyl at the end of an unbranched acyclic chain. Any
+            # other shape made them name a different molecule -- '12-phenyldodecyl'
+            # for a 2-hydroxy-3,6-diphenylcyclohexyl group (canary call 354): the
+            # second phenyl and the cyclohexane were counted as 'chain' carbons.
+            if not _is_phenyl_on_unbranched_chain(mol, alkyl_set, ring):
+                continue
             if len(ring) == 6:
                 all_aromatic = all(mol.GetAtomWithIdx(r).GetIsAromatic() for r in ring)
                 all_carbon = all(mol.GetAtomWithIdx(r).GetSymbol() == 'C' for r in ring)
@@ -748,9 +784,13 @@ def get_alkyl_fragment_name(mol, alkyl_atoms: List[int]) -> str:
                     except ValueError:
                         pass
 
-        # Fallback: try naming the full fragment as a simple ring substituent
-        # Count only non-ring carbons if ring naming is too complex
-        pass
+        # (the Blue Book) /: a ring is named as a ring. The
+        # carbon count below names an ACYCLIC chain, so for a ring fragment the
+        # primitive and the phenyl forms above declined it gives a different
+        # molecule ('octyl acetate' for 1-methylbicyclo[2.2.1]heptan-2-yl
+        # acetate, 'decyl acetate' for bornyl acetate). Decline: name_ester
+        # defers to the general pipeline.
+        return ""
 
     # Simple alkyl chain (no ring)
     carbon_atoms = [

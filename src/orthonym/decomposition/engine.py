@@ -1791,32 +1791,23 @@ def _try_iterative_mixed_decompose(
 
     assembled = _assemble_by_bond_type(named_fragments, used_bond_types, style)
 
+    # Task 3 (2026-09-25): no space-join fallback. Both fallbacks that used to
+    # sit here blank-joined the fragment NAMES when the bond-type assembler
+    # declined or lost a fragment. That string names the fragments, not the
+    # connected input -- for the GPI mannoside, 4 names glued into one string
+    # that OPSIN reads as C38H75N2O31PS (input C38H71N2O28PS; TRIAGE T3). Only
+    # held it back; with that gate off the same class of glue reached
+    # the public output (its phosphodiester sibling, TRIAGE " producer
+    # sites"). Declining here voids this candidate only: `try_decompose` keeps
+    # its other strategies, and the molecule goes on to the general engine,
+    # which names the GPI mannoside RT-exact at the best-effort tier.
     if not assembled:
-        # Fallback: join with spaces (functional class style)
-        sorted_named = sorted(
-            named_fragments,
-            key=lambda pair: len(pair[1]),
-            reverse=True,
-        )
-        if len(sorted_named) <= 1:
-            return None
-        parts = [name for _, name in sorted_named]
-        assembled = " ".join(parts)
+        return None
 
     # Token validation : reject if assembly lost a fragment
     fragment_names = [name for _, name in named_fragments]
     if not _validate_assembly_tokens(assembled, fragment_names):
-        # Bond-type assembly lost a fragment -- try space-join fallback
-        sorted_named = sorted(
-            named_fragments,
-            key=lambda pair: len(pair[1]),
-            reverse=True,
-        )
-        parts = [name for _, name in sorted_named]
-        assembled = " ".join(parts)
-        # Re-validate the fallback
-        if not _validate_assembly_tokens(assembled, fragment_names):
-            return None  # Assembly lost a fragment -- reject
+        return None  # Assembly lost a fragment -- reject
 
     # Quality gate: the assembled name must be acceptable
     if not _name_quality_is_acceptable(assembled, mol):

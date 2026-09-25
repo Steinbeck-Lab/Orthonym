@@ -27,6 +27,7 @@ from ..data.ion_retained_names import (
     get_anion_name,
     get_cation_name,
 )
+from ..errors import UnnameableSubstituentError  # a voided candidate (Task 3)
 from ..perception.ions import get_ion_sites
 from ..perception.molcache import atoms_of  # audit 2026-09-03 (S2): per-call atom/bond tuples
 from ..perception.molcache import inchikey_of
@@ -6087,7 +6088,10 @@ def name_quaternary_aminium(mol, cation_site: Dict) -> str:
         if not aminium or 'aminium' not in aminium:
             return ''
         return aminium
-    except (RecursionError, ValueError, RuntimeError, KeyError, AttributeError):
+    except (RecursionError, ValueError, RuntimeError, KeyError, AttributeError,
+            UnnameableSubstituentError):
+        # UnnameableSubstituentError: `_assemble_amine_name` voided the
+        # candidate on a branch with no correct prefix -- same '' decline.
         return ''
 
 

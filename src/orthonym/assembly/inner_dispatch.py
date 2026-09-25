@@ -51,7 +51,10 @@ from collections import OrderedDict
 from dataclasses import dataclass
 from typing import Any, Callable, Dict, Optional, Tuple
 
-from ..errors import OrthonymLimitError  # G0 fail-closed refusal (DD7 S1)
+from ..errors import (  # G0 fail-closed refusal (DD7 S1); a voided candidate (Task 3)
+    OrthonymLimitError,
+    UnnameableSubstituentError,
+)
 
 # Forward-reference NamingResult by string so we can keep the import
 # lazy (avoid name_tree -> inner_dispatch cycle at import time).
@@ -379,6 +382,12 @@ def dispatch_inner(
             # Re-raise un-wrapped per. namer.name_compound's broad
             # except clause handles these as descriptive-fallback signals.
             raise
+        except UnnameableSubstituentError:
+            # A prefix producer found a branch with no correct name and voided
+            # this handler's CANDIDATE (errors.UnnameableSubstituentError).
+            # That is a gate-fail under -04, exactly like `result is
+            # None` below: move on to the next-priority entry.
+            continue
         except Exception as exc:
             raise RuntimeError(
                 f"dispatch_inner: handler {entry.handler_id!r} "

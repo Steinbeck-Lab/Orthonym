@@ -28,6 +28,75 @@ from rdkit import Chem
 
 from orthonym import name_compound
 from tests.support.jars import jar_or_none
+from tests.support.rt_assert import assert_tier_contract
+
+
+# Rows whose PIN the PIN tier cannot build (pre-existing-failures plan, Task 4).
+# For these the literal expectation is replaced by the tier contract
+# (tests/support/rt_assert.py::assert_tier_contract): the best-effort name is
+# RT-exact (full InChIKey) and the PIN tier ships an RT-exact name or fails
+# closed. Each value says why the PIN is out of reach, with its Blue Book rule.
+_TIER_CONTRACT = {
+    # rt-25: an ortho-fused pentacyclic triterpenoid acid. Its PIN is a hydro
+    # fusion name, (the Blue Book) "Preferred IUPAC names for
+    # the partially saturated and fully saturated compounds are formed by using
+    # 'hydro' prefixes" ("decahydronaphthalene (PIN) bicyclo[4.4.0]decane",
+    #:24233), so the von Baeyer name is not the PIN. The PIN tier has no
+    # producer for it and fails closed; best-effort names it RT-exact. Before
+    # the whole-ring-system guard (the Blue Book) the PIN tier shipped
+    # '1-henicosylhydroxy-4,4-dimethyloxocyclohexane-1-carboxylic acid'
+    # (C30H56O4 for C30H46O4, a different molecule).
+    "CC1(C)CCC2(C(=O)O)CCC3(C)C(=CCC4C5(C)CC(O)C(=O)C(C)(C)C5CCC43C)C2C1":
+        "fused pentacycle: PIN is a hydro-fusion name (P-54.4.3.1)",
+    # isoindoline-hydroxy-dione-format (TRIAGE row 88): 5-hydroxythalidomide.
+    # The old expectation '6-hydroxyisoindoline-1,3-dione' drops the
+    # 2-(2,6-dioxopiperidin-3-yl) group (a different molecule), and so did the
+    # gate-off PIN name '5-hydroxy-2,3-dihydro-1H-isoindole-1,3-dione' until the
+    # fused-catalog path failed closed on an unnameable branch,
+    # the Blue Book). The PIN tier has no producer for the decorated
+    # saturated heteroring prefix '2,6-dioxopiperidin-3-yl' and fails closed;
+    # best-effort names it RT-exact
+    # ('2-(2,6-dioxopiperidin-3-yl)-5-hydroxy-2,3-dihydro-1H-isoindole-1,3-dione',
+    # not the PIN spelling: BB:33853 '2-phenyl-1H-isoindole-1,3(2H)-dione (PIN)').
+    "O=C1CCC(N2C(=O)c3ccc(O)cc3C2=O)C(=O)N1":
+        "no PIN producer for the 2,6-dioxopiperidin-3-yl prefix",
+    # steroid-prefix-hyphen (TRIAGE row 93): a 4-carboxy-4-methyl ergostane-type
+    # acid. The old expectation '(3S,...)-3-hydroxy-4-methyl-7-oxoergost-9,24-
+    # dien-11-yl acetate' and the gate-off PIN name '...-ergosta-9,24-dien-11-yl
+    # acetate' are both OPSIN-unparseable AND wrong four ways: the acetate is on
+    # C-12, the ring double bond is 9(11), the side-chain one 24(28), and the
+    # 4-carboxy group is missing. That gate-off name comes from the NP scaffold
+    # producer, whose completeness invariant runs only for conjugates (a named
+    # residual in TRIAGE.md, Task 4); with the gate ON it is voided. (:50943):
+    # "Preferred IUPAC names (PINs) are not identified for the compounds in this
+    # Chapter", and the semisystematic ergostane name cannot be built here, so the
+    # PIN tier fails closed; best-effort names it RT-exact (a von Baeyer name).
+    "C=C(CC[C@@H](C)[C@H]1CC[C@H]2[C@@H]3C(=O)C[C@H]4[C@](C)(C(=O)O)[C@@H](O)CC[C@]4(C)C3=C[C@@H](OC(C)=O)[C@]12C)C(C)C":
+        "NP scaffold name cannot express the 4-carboxy group; no PIN (P-100)",
+    # oxy-dimethyl-benzene-oxanyloxy (TRIAGE row 77, D-abstain). The old
+    # expectation '2,3-dimethylphenol' names a different molecule (TRIAGE
+    # expected_rt wrong). A fused benzodioxinone carrying an oxiranyl group that
+    # bears a partially hydrogenated naphthalenyl: the PIN needs fusion parents
+    # and a hydro-fusion prefix, the Blue Book) that the PIN
+    # tier cannot build, so it fails closed; best-effort is RT-exact.
+    "Cc1c(O)cc2c(c1C)C(=O)O[C@@H]([C@@]1([C@@H]3CC=C4CCC[C@H](C)[C@@]4(C)C3)CO1)O2":
+        "fused bicycles: PIN needs fusion / hydro-fusion names (P-54.4.3.1)",
+    # oxy-glycoside-benzene (TRIAGE row 80, D-abstain). The old expectation
+    # '(rhamnopyranosyloxy)-4-(1-methoxy-1-(methylamino)methyl)phenol' names a
+    # different molecule (it has no C=S). The PIN needs the O-methyl
+    # carbamothioate and a (6-deoxyhexopyranosyl)oxy prefix the PIN tier cannot
+    # build, so it fails closed; best-effort (gate ON) is RT-exact.
+    "COC(=S)NCc1ccc(OC2OC(C)C(O)C(O)C2O)cc1":
+        "no PIN producer for the thiocarbamate O-ester + glycosyloxy prefix",
+}
+
+
+def _tier_params(rows):
+    """Parametrize rows, running each tier-contract row with the OPSIN validity
+    gate ON (`opsin_gate`): the contract is about what SHIPS. The ids stay
+    positional, so no other row's id moves."""
+    return [pytest.param(*row, marks=pytest.mark.opsin_gate)
+            if row[0] in _TIER_CONTRACT else row for row in rows]
 
 
 # ---------------------------------------------------------------------------
@@ -206,10 +275,13 @@ class TestRoundTripRegression:
     """
 
     @pytest.mark.integration
-    @pytest.mark.parametrize("smiles,expected_name", ROUNDTRIP_VERIFIED,
+    @pytest.mark.parametrize("smiles,expected_name", _tier_params(ROUNDTRIP_VERIFIED),
                              ids=[f"rt-{i}" for i in range(len(ROUNDTRIP_VERIFIED))])
     def test_roundtrip_verified(self, smiles, expected_name):
         """Verify round-trip confirmed names never regress."""
+        if smiles in _TIER_CONTRACT:
+            assert_tier_contract(smiles)
+            return
         name = name_compound(smiles)
         assert name == expected_name, (
             f"REGRESSION: {smiles}\n"
@@ -550,11 +622,14 @@ class TestPhase24Wave2Fixes:
     @pytest.mark.integration
     @pytest.mark.parametrize(
         "smiles,expected_name,test_id",
-        PHASE24_WAVE2_FIXES,
+        _tier_params(PHASE24_WAVE2_FIXES),
         ids=[t[2] for t in PHASE24_WAVE2_FIXES],
     )
     def test_wave2_fixes(self, smiles, expected_name, test_id):
         """Verify a phase Wave 2 fixes never regress."""
+        if smiles in _TIER_CONTRACT:
+            assert_tier_contract(smiles)
+            return
         name = name_compound(smiles)
         assert isinstance(name, str), (
             f"Expected string for {test_id}, got {type(name)}"
@@ -672,11 +747,14 @@ class TestPhase24ParseFixes:
     @pytest.mark.integration
     @pytest.mark.parametrize(
         "smiles,expected_name,test_id",
-        PHASE24_PARSE_FIXES,
+        _tier_params(PHASE24_PARSE_FIXES),
         ids=[t[2] for t in PHASE24_PARSE_FIXES],
     )
     def test_parse_fixes(self, smiles, expected_name, test_id):
         """Verify a phase parse fixes never regress."""
+        if smiles in _TIER_CONTRACT:
+            assert_tier_contract(smiles)
+            return
         name = name_compound(smiles)
         assert isinstance(name, str), (
             f"Expected string for {test_id}, got {type(name)}"
@@ -880,11 +958,14 @@ class TestPhase24RTImprovements:
     @pytest.mark.integration
     @pytest.mark.parametrize(
         "smiles,expected_name,test_id",
-        PHASE24_RT_IMPROVEMENTS,
+        _tier_params(PHASE24_RT_IMPROVEMENTS),
         ids=[t[2] for t in PHASE24_RT_IMPROVEMENTS],
     )
     def test_rt_improvements(self, smiles, expected_name, test_id):
         """Verify a phase Plan 04 fixes never regress."""
+        if smiles in _TIER_CONTRACT:
+            assert_tier_contract(smiles)
+            return
         name = name_compound(smiles)
         assert isinstance(name, str), (
             f"Expected string for {test_id}, got {type(name)}"

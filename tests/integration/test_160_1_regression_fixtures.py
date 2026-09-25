@@ -10,7 +10,26 @@ Audit spot-checks confirm the canary re-baseline policy:
 * `name_stability_265` is a documented pre-existing environmental drift
   (per 160.1-01-SUMMARY.md); NOT introduced by a phase.
 """
+import pytest
+
 from orthonym import name_compound
+from tests.support.rt_assert import assert_tier_contract
+
+# The a phase fixture below (pre-existing-failures plan, Task 4, TRIAGE rows 1
+# and 2). Its PIN rests on the decorated ring prefix
+# '4-methyl-2,5-dioxo-2,5-dihydrofuran-3-yl': (the Blue Book)
+# "Preferred IUPAC names for heteromonocyclic rings with no more than ten ring
+# members are Hantzsch-Widman names". The PIN tier has no producer for a
+# decorated non-aromatic heteroring prefix (the CHEBI:131506 blocker, TRIAGE.md)
+# and fails closed; best-effort names the molecule RT-exact, with the
+# methoxycarbonyl prefix of "Esters cited as prefixes" (:31698,
+# "'alkoxycarbonyl'... for the group -CO-OR'"), but spells the ring by skeletal
+# replacement ('1-oxacyclopent-3-en'), so it is not the PIN. The fixture's
+# assertions are checked on that best-effort name, under the tier contract
+# (tests/support/rt_assert.py) with the OPSIN validity gate ON (what ships).
+_FIXTURE_160_1 = (
+    "COC(=O)/C(CC(=O)O)=C(\\CCCCCCCCCCCCCCCCC1=C(C)C(=O)OC1=O)C(=O)O"
+)
 
 
 # ====================================================================
@@ -21,12 +40,10 @@ from orthonym import name_compound
 class TestRegressionFixture:
     """The canonical Phase 160.1 regression fixture from CONTEXT + RESEARCH §3."""
 
+    @pytest.mark.opsin_gate
     def test_regression_fixture_methoxycarbonyl_present(self):
         """a phase regression fixture names with methoxycarbonyl."""
-        smi = (
-            "COC(=O)/C(CC(=O)O)=C(\\CCCCCCCCCCCCCCCCC1=C(C)C(=O)OC1=O)C(=O)O"
-        )
-        n = name_compound(smi)
+        _pin, n = assert_tier_contract(_FIXTURE_160_1)
         # The 3-position methyl-ester substituent must be named with the
         # IUPAC-canonical alkoxycarbonyl prefix form per.
         assert "methoxycarbonyl" in n, (
@@ -49,12 +66,10 @@ class TestRegressionFixture:
 class TestAuditSection3SpotChecks:
     """Each canary fixture from audit §3 is verified for its expected post-fix name."""
 
+    @pytest.mark.opsin_gate
     def test_audit_row1_name_stability_373(self):
         """Audit §3 row 1: -C(=O)OCH3 substituent → methoxycarbonyl."""
-        smi = (
-            "COC(=O)/C(CC(=O)O)=C(\\CCCCCCCCCCCCCCCCC1=C(C)C(=O)OC1=O)C(=O)O"
-        )
-        n = name_compound(smi)
+        _pin, n = assert_tier_contract(_FIXTURE_160_1)
         assert "methoxycarbonyl" in n
 
     def test_audit_row2_name_stability_4_no_regression(self):

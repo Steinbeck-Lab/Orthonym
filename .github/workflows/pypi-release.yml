@@ -1,0 +1,282 @@
+name: pypi-release
+
+# Builds the sdist and the wheel from a release tag, checks them, and uploads them
+# to PyPI with Trusted Publishing (OpenID Connect; no API token secret exists).
+#
+# Started by the GitHub Release that release-please.yml creates. That Release is
+# created with the RELEASE_PLEASE_TOKEN personal access token, so its
+# `release: published` event DOES start this workflow; a Release created with the
+# built-in GITHUB_TOKEN would not (events caused by GITHUB_TOKEN start no new
+# workflow runs).
+#
+# A manual run (workflow_dispatch) rebuilds a given tag and uploads it to TestPyPI
+# by default, or to PyPI when target is `pypi`. A manual PyPI upload must be
+# started FROM the release tag ("Use workflow from: tag vX.Y.Z", or
+# `gh workflow run pypi-release.yml --ref vX.Y.Z -f tag=vX.Y.Z -f target=pypi`):
+# the publish-pypi job refuses any other ref, so a run from a branch (whose copy
+# of this file may differ) can never upload to PyPI.
+#
+# This is a separate top-level workflow, not a reusable one, because Trusted
+# Publishing cannot be used from within a reusable workflow.
+#
+# Run in ONE home only: every job requires the repository variable
+# RELEASE_HOME == 'true', which is set in the release home only: exactly one
+# home, the one the maintainer's local publish tooling pushes first (see
+# release-please.yml).
+#
+# The approval gate. There is NO human approval step inside this workflow while
+# the repository is private: required reviewers on an environment need a PUBLIC
+# repository on GitHub Free, Pro and Team plans. The human gate is merging the
+# release PR (release-please.yml); the Release that merge produces uploads at
+# once. The `pypi` environment is still used, because the PyPI trusted publisher
+# is bound to it. While the repository is private, restrict the `pypi`
+# environment to the deployment tag rule `v*` (Settings -> Environments ->
+# Deployment branches and tags -> Selected branches and tags; available for
+# private repositories on a user-owned Pro plan; an organization on GitHub Free
+# cannot create environments for a private repository at all). Once the
+# repository is public, add required reviewers to `pypi` as well.
+#
+# One-time setup, outside this file: create the `pypi` and `testpypi`
+# environments first (a workflow that names a missing environment creates it
+# without any protection rules). Then add a (pending) trusted publisher for
+# project `orthonym` on PyPI and, with a separate account, on TestPyPI, naming
+# this repository's owner and name, this workflow file (pypi-release.yml) and the
+# environment (`pypi`, `testpypi`).
+#
+# The upload also publishes digital attestations (on by default with Trusted
+# Publishing); they name the source repository, workflow and commit in a public
+# transparency log, even while the repository is private.
+
+on:
+  release:
+    types: [published]
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: 'Release tag to build, e.g. v1.1.0'
+        required: true
+        type: string
+      target:
+        description: 'Where to upload the build'
+        required: true
+        default: testpypi
+        type: choice
+        options:
+          - testpypi
+          - pypi
+
+permissions:
+  contents: read
+
+env:
+  # The tag to build: the published Release's tag, or the dispatch input. It is
+  # only ever read through this variable (never pasted into a script).
+  RELEASE_TAG: ${{ github.event_name == 'release' && github.event.release.tag_name || inputs.tag }}
+
+jobs:
+  build:
+    name: Build and check the distributions
+    if: vars.RELEASE_HOME == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - name: Check the tag name
+        run: |
+          if ! printf '%s\n' "$RELEASE_TAG" | grep -Eq '^v[0-9]+\.[0-9]+\.[0-9]+([.+-][0-9A-Za-z.+-]+)?$'; then
+            echo "::error::'$RELEASE_TAG' is not a release tag of the form vX.Y.Z"
+            exit 1
+          fi
+          echo "building tag $RELEASE_TAG"
+
+      - uses: actions/checkout@v5
+        with:
+          ref: refs/tags/${{ env.RELEASE_TAG }}
+          persist-credentials: false
+
+      - name: Set up Python 3.12
+        uses: actions/setup-python@v6
+        with:
+          python-version: '3.12'
+
+      - name: Set up Java 17 (for the OPSIN round-trip in the smoke test)
+        uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Install the build tools
+        run: |
+          python -m pip install --upgrade pip
+          pip install build twine
+
+      - name: Build the sdist and the wheel
+        env:
+          # The build hook would otherwise download the jars into the runner's
+          # cache. They are never part of the distributions either way.
+          ORTHONYM_SKIP_JAR_PREFETCH: "1"
+        run: python -m build
+
+      - name: twine check
+        run: twine check --strict dist/*
+
+      - name: No jar inside the wheel or the sdist
+        run: |
+          shopt -s nullglob
+          wheels=(dist/*.whl)
+          sdists=(dist/*.tar.gz)
+          if [ "${#wheels[@]}" -ne 1 ] || [ "${#sdists[@]}" -ne 1 ]; then
+            echo "::error::expected exactly one wheel and one sdist, got: $(ls dist)"
+            exit 1
+          fi
+          python -c 'import sys, zipfile; print("\n".join(zipfile.ZipFile(sys.argv[1]).namelist()))' \
+            "${wheels[0]}" > "$RUNNER_TEMP/wheel-files.txt"
+          tar -tzf "${sdists[0]}" > "$RUNNER_TEMP/sdist-files.txt"
+          echo "wheel: $(wc -l < "$RUNNER_TEMP/wheel-files.txt") files; sdist: $(wc -l < "$RUNNER_TEMP/sdist-files.txt") files"
+          if grep -Ei '\.jar$' "$RUNNER_TEMP/wheel-files.txt" "$RUNNER_TEMP/sdist-files.txt"; then
+            echo "::error::a jar is inside a distribution; the jars must never be redistributed"
+            exit 1
+          fi
+          echo "no jar in either archive"
+
+      - name: Versions agree (tag, pyproject.toml, wheel, sdist)
+        run: |
+          python - <<'PY'
+          import os, sys, tarfile, tomllib, zipfile
+          from pathlib import Path
+          from packaging.version import Version
+
+          tag = os.environ["RELEASE_TAG"]
+          want = tag[1:]                      # the tag without its leading "v"
+          project = tomllib.loads(Path("pyproject.toml").read_text())["project"]["version"]
+
+          def field(text, name):
+              for line in text.splitlines():
+                  if line.startswith(name + ": "):
+                      return line.split(": ", 1)[1].strip()
+              raise SystemExit(f"no {name} field")
+
+          whl = next(Path("dist").glob("*.whl"))
+          with zipfile.ZipFile(whl) as z:
+              meta = next(n for n in z.namelist() if n.endswith(".dist-info/METADATA"))
+              wheel_version = field(z.read(meta).decode(), "Version")
+          sd = next(Path("dist").glob("*.tar.gz"))
+          with tarfile.open(sd) as t:
+              info = next(m for m in t.getmembers() if m.name.count("/") == 1 and m.name.endswith("/PKG-INFO"))
+              sdist_version = field(t.extractfile(info).read().decode(), "Version")
+
+          print(f"tag {tag} -> {want}; pyproject {project}; wheel {wheel_version}; sdist {sdist_version}")
+          bad = []
+          if project != want:
+              bad.append(f"pyproject.toml version {project!r} != tag without v {want!r}")
+          for label, v in (("wheel", wheel_version), ("sdist", sdist_version)):
+              if Version(v) != Version(want):
+                  bad.append(f"{label} version {v!r} != {want!r}")
+          if bad:
+              sys.exit("VERSION MISMATCH: " + "; ".join(bad))
+          print("versions agree")
+          PY
+
+      - name: Install the wheel into a fresh venv, fetch the jars, smoke test
+        run: |
+          python -m venv "$RUNNER_TEMP/fresh"
+          FRESH="$RUNNER_TEMP/fresh/bin"
+          "$FRESH/python" -m pip install --upgrade pip
+          "$FRESH/python" -m pip install "$GITHUB_WORKSPACE"/dist/*.whl
+          # Run outside the checkout so nothing is imported from the source tree.
+          cd "$RUNNER_TEMP"
+          "$FRESH/orthonym" --fetch-jars
+          "$FRESH/python" - <<'PY'
+          from orthonym import name_compound
+          cases = {
+              "CCO": "ethanol",
+              "CC(=O)O": "acetic acid",
+              "c1ccccc1": "benzene",
+              "CCN": "ethanamine",
+          }
+          fails = []
+          for smi, want in cases.items():
+              got = name_compound(smi)
+              print(f"{smi:12s} -> {got!r}  (want {want!r})")
+              if got != want:
+                  fails.append((smi, got, want))
+          if fails:
+              raise SystemExit(f"smoke test failed: {fails}")
+          print("smoke OK")
+          PY
+          "$FRESH/python" -c 'import os, orthonym; v = os.environ["RELEASE_TAG"][1:]; assert orthonym.__version__ == v, (orthonym.__version__, v); print("orthonym.__version__ ==", v)'
+
+      - name: Upload the distributions
+        uses: actions/upload-artifact@v6
+        with:
+          name: dist
+          path: dist/
+          if-no-files-found: error
+
+  publish-pypi:
+    name: Upload to PyPI
+    needs: build
+    # A published Release, or a manual run with target=pypi.
+    if: >-
+      vars.RELEASE_HOME == 'true' &&
+      (github.event_name == 'release' ||
+       (github.event_name == 'workflow_dispatch' && inputs.target == 'pypi'))
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    environment:
+      name: pypi
+      url: https://pypi.org/p/orthonym
+    permissions:
+      id-token: write   # Trusted Publishing; no token secret
+    steps:
+      # A manual run must be started from the tag it uploads, so a run from a
+      # branch can never reach PyPI. (This guard lives in the workflow file, which
+      # a branch could change; the `v*` deployment tag rule on the `pypi`
+      # environment is the check GitHub enforces. Neither stops someone with
+      # write access from creating a new v* tag on any commit and uploading from
+      # it: only a tag ruleset limiting who may create v* tags, or required
+      # reviewers once the repository is public, closes that.)
+      - name: Refuse unless running from the release tag
+        env:
+          REF: ${{ github.ref }}
+        run: |
+          case "$REF" in
+            refs/tags/v*) ;;
+            *) echo "::error::this run is on '$REF'; a PyPI upload must run from the release tag (refs/tags/v...)"; exit 1 ;;
+          esac
+          if [ "$REF" != "refs/tags/$RELEASE_TAG" ]; then
+            echo "::error::this run is on '$REF' but uploads '$RELEASE_TAG'; start it from refs/tags/$RELEASE_TAG"
+            exit 1
+          fi
+          echo "running from $REF"
+
+      - uses: actions/download-artifact@v7
+        with:
+          name: dist
+          path: dist/
+
+      - name: Publish to PyPI
+        uses: pypa/gh-action-pypi-publish@v1.14.2
+
+  publish-testpypi:
+    name: Upload to TestPyPI
+    needs: build
+    if: >-
+      vars.RELEASE_HOME == 'true' &&
+      github.event_name == 'workflow_dispatch' && inputs.target == 'testpypi'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    environment:
+      name: testpypi
+      url: https://test.pypi.org/p/orthonym
+    permissions:
+      id-token: write   # Trusted Publishing; no token secret
+    steps:
+      - uses: actions/download-artifact@v7
+        with:
+          name: dist
+          path: dist/
+
+      - name: Publish to TestPyPI
+        uses: pypa/gh-action-pypi-publish@v1.14.2
+        with:
+          repository-url: https://test.pypi.org/legacy/

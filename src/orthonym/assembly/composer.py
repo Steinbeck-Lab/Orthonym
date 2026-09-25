@@ -47,7 +47,11 @@ class HandlerResult:
 
 from ..data.chain_names import get_chain_prefix
 from ..data.partial_saturation_refs import get_aromatic_reference, get_reference_smiles
-from ..errors import OrthonymLimitError, is_refusal_sentinel  # G0 fail-closed refusal (DD7 S1)
+from ..errors import (  # G0 fail-closed refusal (DD7 S1); a voided candidate (Task 3)
+    OrthonymLimitError,
+    UnnameableSubstituentError,
+    is_refusal_sentinel,
+)
 
 # Ion/radical naming imports - deferred to avoid circular imports
 # These are imported inside functions that need them
@@ -921,6 +925,13 @@ def assemble_name(features: Any, style: str = "pin", _composing_ion: bool = Fals
     push_pool(features)  #: bind a phase controller flag/oracle at pool construction
     try:
         return _assemble_name_impl(features, style, _composing_ion)
+    except UnnameableSubstituentError:
+        # A prefix producer voided the candidate OUTSIDE dispatch_inner (the
+        # inline cascade, or the general_acyclic safety net's direct call).
+        # No candidate was built: return the documented "truly empty result"
+        # below, which every caller already treats as a failure -- never a
+        # name with the failure welded into it.
+        return ""
     finally:
         pop_pool()
 
@@ -8538,31 +8549,40 @@ def _generate_ring_substituent_prefixes(features: Any) -> List[NameFragment]:
             if base_name is not None:
                 _pv_general_ring_prefix()
         # a phase SUBST-01: a None base_name (unnameable ring) must not reach the
-        # string assembly below — emit the honest fallback marker so the molecule
-        # surfaces as unknown rather than crashing / dropping the ring.
+        # string assembly below, and must not drop the ring either.
+        #
+        # 2026-09-25 (pre-existing-failures plan, Task 3): this used to write
+        # the literal 'unknown' as the prefix text, and the handler welded it
+        # into the name -- '(2E)-2-methyl-5-unknownpent-2-enoic acid' for
+        # CHEBI:131506 -- which Orthonym.name / name_tiered SHIPPED whenever
+        # the OPSIN validity gate was off. A failure is never a name component:
+        # raise the typed void signal so the consumer drops THIS candidate and
+        # the molecule goes on to the next one (errors.UnnameableSubstituentError).
         if base_name is None:
             # Task 0.1: an unnameable ring BRANCH is the root cause of
             # the eventual abstention (the recursive-substituent-namer census bucket).
             from ..metrics.abstention import AbstentionCode, record_abstention
             record_abstention(AbstentionCode.BRANCH_UNNAMEABLE,
                               detail='ring_substituent_unnameable')
-            base_name = 'unknown'
+            raise UnnameableSubstituentError('ring_substituent_unnameable')
 
         # Detect substituents on the ring itself
         sub_name = _build_substituted_ring_name(
             features.mol, ring_atoms, chain_set, base_name
         )
         # Wave2 conservation: None = the ring carries branches this
-        # machinery cannot express — emit the honest fallback marker so the
-        # molecule surfaces as unknown rather than dropping the branch atoms
-        # (same convention as the unnameable-ring marker above).
+        # machinery cannot express -- never drop the branch atoms. Same void
+        # signal as the unnameable-ring case above (trace 2026-09-25: both T3
+        # sentinel molecules, CHEBI:131506 and canary call 171, reach THIS
+        # branch -- a decorated saturated ring the PIN route has no producer
+        # for; the general tier names both through allow_mancude above).
         if sub_name is None:
             # Task 0.1: decorated-ring branch the machinery cannot
             # express — same census bucket as the unnameable-ring marker.
             from ..metrics.abstention import AbstentionCode, record_abstention
             record_abstention(AbstentionCode.BRANCH_UNNAMEABLE,
                               detail='ring_substituent_branches_unnameable')
-            sub_name = 'unknown'
+            raise UnnameableSubstituentError('ring_substituent_branches_unnameable')
 
         ring_sub_groups[sub_name].append(locant)
         ring_sub_group_atoms[sub_name].append(frozenset(ring_atom_set))

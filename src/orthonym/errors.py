@@ -219,6 +219,36 @@ def is_failure_name(name: Optional[str]) -> bool:
     return 'unknown' in low or '(not supported)' in low
 
 
+class UnnameableSubstituentError(Exception):
+    """A branch of the CANDIDATE being built has no correct substituent name.
+
+    Raised by a prefix producer INSTEAD of writing a failure sentinel into the
+    prefix. The old convention wrote the literal ``'unknown'`` as the prefix
+    text (``composer._generate_ring_substituent_prefixes``), and the handler
+    then welded it into a real-looking name --
+    ``(2E)-2-methyl-5-unknownpent-2-enoic acid`` -- which ``Orthonym.name`` and
+    ``name_tiered`` shipped whenever the OPSIN validity gate was off.
+
+    The consumer voids that CANDIDATE, never the molecule. ``dispatch_inner``
+    treats the signal as the handler's gate-fail (-04: the next handler
+    is tried); ``assemble_name`` returns its documented empty result when the
+    signal escapes the inline cascade or the general_acyclic safety net; and a
+    consumer with its own decline value returns that (``name_polyfunctional``
+    None, ``name_quaternary_aminium`` ''). The whole-molecule failure path --
+    the general engine lane and every late rescue in ``Orthonym.name`` -- then
+    runs exactly as it did for the welded string (all of it keyed on
+    ``is_failure_name``, which reads '' and the welded string alike).
+
+    Deliberately NOT an ``OrthonymLimitError`` (that one aborts ``_name_impl``
+    and skips the late rescues) and NOT a ``ValueError`` (``name_compound``
+    re-raises ``ValueError`` as "invalid SMILES").
+    """
+
+    def __init__(self, detail: str = ''):
+        super().__init__(detail)
+        self.detail = detail
+
+
 # The substituent cascade's placeholder. `assembly.substituent_enumerator`'s
 # tiers return this bare word as an absolute last resort, meaning "there is a
 # substituent here and I could not name it". It is a REFUSAL, not a name, but it

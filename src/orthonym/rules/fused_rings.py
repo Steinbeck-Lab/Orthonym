@@ -1749,11 +1749,21 @@ def name_fused_heterocycle(mol):
     # recursion, +E1 gated) instead of shipping — or being blocked by — a
     # group-dropping catalog name. ``_exocyclic_atoms_accounted`` re-runs the same
     # read-only traversal and returns False on any unnameable branch or unaccounted
-    # heavy atom. Gated on ``general_fallback_ctx`` so the PIN path is
-    # byte-identical (the check never runs when the flag is off).
-    from ..metrics.provenance import general_fallback_ctx
-    if general_fallback_ctx.get() and not _exocyclic_atoms_accounted(
-            mol, set(atom_mapping)):
+    # heavy atom. It used to be gated on ``general_fallback_ctx`` (PIN path
+    # byte-identical).
+    #
+    # 2026-09-25 (pre-existing-failures plan, Task 4, TRIAGE row 88): the PIN
+    # tier now fails closed here too. "SUBSTITUTIVE NOMENCLATURE"
+    # (the Blue Book): the parent's substitutable hydrogen atoms "are
+    # substituted by nomenclaturally significant structural fragments represented
+    # either by prefixes and/or suffixes" -- a branch with no prefix is simply not
+    # in the name. With the gate off the PIN tier shipped
+    # '5-hydroxy-2,3-dihydro-1H-isoindole-1,3-dione' (C8H5NO3) for
+    # 5-hydroxythalidomide (C13H10N2O5): the 2-(2,6-dioxopiperidin-3-yl) branch,
+    # which only the best-effort substituent namer can build, was dropped. With
+    # the gate on the same candidate was voided, so no shipped PIN name changes;
+    # a declined catalog match lets the next producer try instead.
+    if not _exocyclic_atoms_accounted(mol, set(atom_mapping)):
         return None
 
     if not substituents:

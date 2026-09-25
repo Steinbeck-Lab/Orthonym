@@ -290,6 +290,30 @@ def _generate_chain_parent(features: Any) -> "NameFragment":
     )
 
 
+def _is_monocyclic_ring_system(mol: Any, ring_atoms: Any) -> bool:
+    """True when ``ring_atoms`` is a WHOLE monocyclic ring system of ``mol``.
+
+    The atoms must form exactly one cycle (the bonds among them number the
+    atoms), and none of them may carry a ring bond to an atom outside the set;
+    either would mean the ring shares atoms or bonds with another ring (a fused,
+    bridged or spiro system). Structural only. With no molecule to inspect the
+    answer is True, so an un-instrumented caller keeps its old behaviour.
+    """
+    if mol is None:
+        return True
+    ring_set = set(ring_atoms)
+    internal_bonds = 0
+    for idx in ring_set:
+        atom = mol.GetAtomWithIdx(idx)
+        for bond in atom.GetBonds():
+            other = bond.GetOtherAtomIdx(idx)
+            if other in ring_set:
+                internal_bonds += 1
+            elif bond.IsInRing():
+                return False
+    return internal_bonds // 2 == len(ring_set)
+
+
 def _generate_ring_parent(features: Any) -> "NameFragment":
     """
     Generate parent name for cyclic compounds.
@@ -318,6 +342,18 @@ def _generate_ring_parent(features: Any) -> "NameFragment":
     if not principal_ring:
         # Fallback: no ring identified -- return empty parent to avoid
         # generating garbled 'cycloane' (cyclo + ane with no stem)
+        return NameFragment(text="", fragment_type="parent")
+
+    # (the Blue Book) builds 'cyclo' + stem for a MONOCYCLIC hydrocarbon only.
+    # When `principal_ring` is one ring of a polycyclic ring system (fused,
+    # bridged or spiro), a 'cycloalkane' parent would name the other rings'
+    # atoms as open-chain substituents and lose their ring bonds -- a different
+    # molecule ('1-henicosylhydroxy-4,4-dimethyloxocyclohexane' for a
+    # pentacyclic triterpenoid, '6-nonylcyclonona-1,5-diene' for a tricyclic
+    # sesquiterpene). Such a ring system is named as a whole von Baeyer,
+    # spiro, fusion), so return the empty parent: every caller reads
+    # an empty stem as "this ring needs its specialised handler".
+    if not _is_monocyclic_ring_system(getattr(features, 'mol', None), principal_ring):
         return NameFragment(text="", fragment_type="parent")
 
     ring_size = len(principal_ring)

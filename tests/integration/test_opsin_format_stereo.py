@@ -38,6 +38,38 @@ import pytest
 
 from orthonym.namer import name_compound
 from tests.support.jars import jar_or_none
+from tests.support.rt_assert import assert_tier_contract
+
+
+# Compounds whose PIN the PIN tier cannot build (pre-existing-failures plan,
+# Task 4, TRIAGE D-abstain rows 34, 35 and 37). The PIN tier fails closed, so a
+# "the stripped PIN name parses" check has no name to check. They are moved out of
+# the stripped-parse loops into TestStereoFormatTierContract, which asserts the
+# stronger tier contract (tests/support/rt_assert.py): the best-effort name
+# round-trips to the full InChIKey, stereo included, and the PIN tier ships an
+# RT-exact name or fails closed. Each value says why the PIN is out of reach.
+_TIER_CONTRACT = {
+    # glycoluril (rows 34, 36): an ortho-fused bicycle of two 5-rings, so its PIN
+    # is a hydro-fusion name, the Blue Book, "Fusion
+    # nomenclature gives preferred IUPAC names only to compounds having at least
+    # two rings of at least five or more members";,:24221, 'hydro'
+    # prefixes), an imidazo[4,5-d]imidazole-2,5-dione the PIN tier cannot build.
+    # Best-effort: 'cis-3,7-dioxo-2,4,6,8-tetraazabicyclo[3.3.0]octane'.
+    "O=C1N[C@H]2NC(=O)N[C@H]2N1":
+        "fused 5-5 bicycle: PIN is a hydro-fusion name (P-52.2.4.1, P-54.4.3.1)",
+    # the bis(furofuran) cyclobutane (row 35): its 2,8-dioxabicyclo[3.3.0]octane
+    # units are ortho-fused 5-5 bicycles too (same rules), out of reach.
+    ("CC[C@H]1O[C@@H]2O[C@H](/C=C/C=C/C3C(c4oc(=O)cc(OC)c4C)"
+     "C(/C=C/C=C/[C@H]4O[C@H]5O[C@H](CC)[C@](C)(O)[C@@]5(C)"
+     "[C@H]4O)C3c3oc(=O)cc(OC)c3C)[C@H](O)[C@]2(C)[C@@]1(C)O"):
+        "fused 5-5 bicycles: PIN needs hydro-fusion names (P-54.4.3.1)",
+    # 2-{[(2R)-3-oxobutan-2-yl]amino}benzoic acid (row 37): the PIN tier
+    # abstains; best-effort gives '2-[((2R)-3-oxobutan-2-yl)amino]benzoic acid',
+    # RT-exact but not the PIN spelling, the Blue Book, nests
+    # enclosing marks {}).
+    "CC(=O)[C@@H](C)Nc1ccccc1C(=O)O":
+        "PIN tier abstains; best-effort spelling breaks P-16.5.4 nesting",
+}
 
 
 # -----------------------------------------------------------------------
@@ -147,6 +179,8 @@ class TestStereoFormatPseudoasymmetric:
             "O=C1N[C@H]2NC(=O)N[C@H]2N1",
         ]
         for smiles in smiles_list:
+            if smiles in _TIER_CONTRACT:
+                continue  # TestStereoFormatTierContract
             name = name_compound(smiles)
             stripped = strip_stereo(name)
             result = opsin_parse(stripped)
@@ -347,6 +381,8 @@ class TestStereoFormatComplexMultiCenter:
              "[C@H]4O)C3c3oc(=O)cc(OC)c3C)[C@H](O)[C@]2(C)[C@@]1(C)O"),
         ]
         for smiles in smiles_list:
+            if smiles in _TIER_CONTRACT:
+                continue  # TestStereoFormatTierContract
             name = name_compound(smiles)
             stripped = strip_stereo(name)
             result = opsin_parse(stripped)
@@ -433,6 +469,8 @@ class TestStereoFormatSpecificPatterns:
             "O=C1O/C(=C/c2ccccc2)C(Cc2ccccc2)=C1Cc1ccccc1",
         ]
         for smiles in smiles_list:
+            if smiles in _TIER_CONTRACT:
+                continue  # TestStereoFormatTierContract
             name = name_compound(smiles)
             stripped = strip_stereo(name)
             result = opsin_parse(stripped)
@@ -473,12 +511,18 @@ class TestStereoFormatAllCompounds:
         "O=C1NC(Cc2c[nH]c3ccccc23)C(=O)N/C1=C/c1cnc[nH]1",
     ]
 
-    @pytest.mark.parametrize("smiles", ALL_STEREO_SMILES)
+    @pytest.mark.parametrize("smiles", [
+        pytest.param(s, marks=pytest.mark.opsin_gate) if s in _TIER_CONTRACT else s
+        for s in ALL_STEREO_SMILES])
     def test_stereo_stripped_opsin_parses(self, smiles):
         """After stripping stereo descriptors, OPSIN can parse the name.
 
         This confirms the stereo descriptor is the SOLE OPSIN blocker.
+        A _TIER_CONTRACT compound is checked by the tier contract instead.
         """
+        if smiles in _TIER_CONTRACT:
+            assert_tier_contract(smiles)
+            return
         name = name_compound(smiles)
         stripped = strip_stereo(name)
         result = opsin_parse(stripped)
@@ -544,3 +588,17 @@ class TestStereoFormatCorrectness:
             assert re.search(pattern, name), (
                 f"Name lacks stereo descriptor pattern {pattern}: {name}"
             )
+
+
+@pytest.mark.skipif(not CAN_RUN, reason=SKIP_REASON)
+@pytest.mark.integration
+@pytest.mark.opsin_gate
+class TestStereoFormatTierContract:
+    """The compounds of _TIER_CONTRACT: the tier contract, with the OPSIN
+    validity gate ON (what ships), and the best-effort name's stereo-stripped
+    form still parses (the check the loops above make)."""
+
+    @pytest.mark.parametrize("smiles", sorted(_TIER_CONTRACT))
+    def test_tier_contract(self, smiles):
+        _pin, be = assert_tier_contract(smiles)
+        assert opsin_parse(strip_stereo(be)) is not None, be

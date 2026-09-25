@@ -1,0 +1,85 @@
+name: release-please
+
+# release-please keeps ONE pull request open that accumulates the next release:
+# the CHANGELOG.md entry, .release-please-manifest.json and the version bump in
+# pyproject.toml ([project] version) and src/orthonym/__init__.py (__version__). The
+# python strategy updates both version files by itself; the `extra-files` entry in
+# release-please-config.json also rewrites the __init__ line through its
+# `x-release-please-version` marker. Merging that PR makes release-please create
+# the tag (vX.Y.Z) and the GitHub Release on the next run.
+#
+# CHANGELOG.md: release-please inserts each release above the previous one, below
+# the file's preamble, in its own format (`## [X.Y.Z](compare link) (date)` and
+# `### Features` / `### Bug Fixes` / ...), not in the Keep a Changelog layout the
+# preamble describes. The first release's compare link points at `v1.0.0`, which
+# is not a tag on GitHub, so that one link does not resolve.
+#
+# Nothing is built or deployed from this workflow. The PyPI upload is a separate
+# workflow (pypi-release.yml), started by the GitHub Release this one creates.
+# Merging the release PR is the human gate for a release: a required-reviewer
+# approval on the `pypi` environment is only available once the repository is
+# public (see pypi-release.yml).
+#
+# Run in ONE home only. The same history is pushed to two repositories
+# (Kohulan/Orthonym and Beilstein-Institut/Orthonym). Only the home whose
+# repository variable RELEASE_HOME is 'true' runs this job, so the other home
+# never opens a release PR and never tags. Set that variable in exactly one home,
+# and it must be the home that the maintainer's local publish tooling pushes
+# first.
+#
+# Versions come from the Conventional Commit types of the commits after
+# `bootstrap-sha` (release-please-config.json) until the first release exists, and
+# after the last release from then on: `!` or a BREAKING CHANGE footer -> major;
+# feat -> minor; fix, perf, deps, revert and docs -> patch (all five appear in the
+# python changelog); chore, ci, build, test, style and refactor alone -> no release.
+# The maintainer's local publish tooling writes those messages; they carry the
+# release type only.
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+# The action works only with the personal access token passed as `token` below;
+# it never uses the built-in GITHUB_TOKEN, so that token gets read access only.
+permissions:
+  contents: read
+
+jobs:
+  release-please:
+    if: vars.RELEASE_HOME == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    outputs:
+      # For the record only: pypi-release.yml starts on the `release: published`
+      # event, not from these outputs.
+      release_created: ${{ steps.release.outputs.release_created }}
+      tag_name: ${{ steps.release.outputs.tag_name }}
+    steps:
+      - uses: googleapis/release-please-action@v5
+        id: release
+        with:
+          config-file: release-please-config.json
+          manifest-file: .release-please-manifest.json
+          # A personal access token is REQUIRED here. Both homes report
+          # can_approve_pull_request_reviews=false and default_workflow_permissions=read,
+          # so the built-in GITHUB_TOKEN cannot open the release PR. A Release made
+          # with the PAT also starts pypi-release.yml; one made with GITHUB_TOKEN
+          # would not (events caused by GITHUB_TOKEN start no new workflow runs).
+          #
+          # A fine-grained PAT limited to this one repository, with these
+          # repository permissions:
+          #   Contents: Read and write       (release branch, tag, Release)
+          #   Pull requests: Read and write  (the release PR and its labels)
+          #   Workflows: Read and write      (a tag or Release on a commit that
+          #                                   changes .github/workflows/ needs it)
+          #   Issues: Read and write         (optional; labels also work through
+          #                                   Pull requests)
+          #   Metadata: Read                 (added automatically)
+          # Its resource owner must be the repository's owner. For an organization
+          # repository, an organization member creates it (an outside collaborator
+          # cannot), and by default an organization owner must approve it before it
+          # can write. It expires (organizations default to at most 366 days):
+          # renew it before then. A secret name cannot start with GITHUB_, hence
+          # RELEASE_PLEASE_TOKEN.
+          token: ${{ secrets.RELEASE_PLEASE_TOKEN }}

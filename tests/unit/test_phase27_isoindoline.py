@@ -42,7 +42,14 @@ class TestIsoindolineDioneLocants:
         N-substituent ON that axis, and takes the lower locant. Recorded
         so nobody credits the rename with a locant fix it did not make.
         """
-        name = name_compound("O=C1CCC(N2C(=O)c3ccc(O)cc3C2=O)C(=O)N1")
+        # 2026-09-25 (pre-existing-failures plan, Task 4, TRIAGE row 88): the
+        # PIN tier used to pass this with '5-hydroxy-2,3-dihydro-1H-isoindole-
+        # 1,3-dione', which DROPS the 2-(2,6-dioxopiperidin-3-yl) group
+        # (C8H5NO3 for C13H10N2O5). The PIN tier now fails closed on that
+        # branch, the Blue Book), so the locant rule is checked on
+        # the best-effort name, which is RT-exact (full InChIKey) and complete.
+        from tests.support.rt_assert import assert_tier_contract
+        _pin, name = assert_tier_contract("O=C1CCC(N2C(=O)c3ccc(O)cc3C2=O)C(=O)N1")
         assert "5-hydroxy" in name, name
         assert "isoindole-1,3-dione" in name, name
         assert "6-hydroxy" not in name, f"6 is the higher equivalent locant: {name}"

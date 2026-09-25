@@ -98,6 +98,15 @@ GPI_FAILING_FRAGMENT = (
     "N[C@H]1[C@H](OCCCCCCS)O[C@H](CO)[C@@H](O[C@H]2O[C@H](CO)[C@@H](O)"
     "[C@H](O)[C@@H]2O)[C@@H]1O"
 )
+# 2026-09-25: GPI_FAILING_FRAGMENT's name above is STALE -- both PIN rungs now
+# name it (see test_fragment_fails_pin_tier_alone). This one still fails both:
+# the PIN tier has no producer for a DECORATED SATURATED ring-yl prefix (here
+# 2,2,5,5-tetramethyl-1,3-dioxolan-4-yl; `rules.ring_substituents.
+# _decorated_heteroaryl_substituent_name` is aromatic-monocycle-only), while
+# the rung names it '(3R)-3,7-dimethyl-9-(2,2,5,5-tetramethyl-1,3-dioxolan-
+# 4-yl)nona-1,6-dien-3-ol', RT-exact (measured 2026-09-25). It is the canary
+# call 171 molecule of TRIAGE.md " known cases".
+PIN_TIER_FAILING_FRAGMENT = "C=C[C@](C)(O)CCC=C(C)CCC1OC(C)(C)OC1(C)C"
 
 # 74-heavy-atom lipopeptide (fatty-acyl N-cap + 6 amide-linked residues,
 # non-standard/branched residues). VERIFIED (this session, monkeypatch trace):
@@ -216,16 +225,36 @@ class TestT4RescueMechanism:
     """
 
     def test_fragment_fails_pin_tier_alone(self):
-        """Sanity anchor: the isolated GlcN-thioether fragment genuinely
-        fails BOTH PIN-tier rungs on their own (so the rescue rung is
-        actually doing new work, not merely duplicating an existing success).
+        """Sanity anchor: a fragment that genuinely fails BOTH PIN-tier rungs
+        on its own, so the rescue rung is doing new work, not merely
+        duplicating an existing success.
+
+        Re-scoped 2026-09-25 (pre-existing-failures plan, Task 3; TRIAGE.csv
+        row for this test, class D-spelling, owner T3). Its premise went STALE:
+        both PIN rungs now name GPI_FAILING_FRAGMENT, and the name round-trips
+        to the fragment's full InChIKey (TRIAGE got_rt=exact; re-measured
+        2026-09-25). So the test now asserts (a) that measured truth for
+        GPI_FAILING_FRAGMENT, and (b) the anchor's original claim on
+        PIN_TIER_FAILING_FRAGMENT, which still fails both PIN rungs and which
+        the rung names RT-exact. The GPI fragment's spelling
+        '(6-sulfanylhexyloxy)' (an enclosing-mark defect) is Task 5's, so no
+        spelling is pinned here -- only round-trip identity.
         """
         from orthonym.assembly.fragment_naming import name_fragment_recursively
         from orthonym.namer import name_pipeline_only
 
-        assert not name_fragment_recursively(GPI_FAILING_FRAGMENT)
-        pin_only = name_pipeline_only(GPI_FAILING_FRAGMENT)
-        assert not pin_only or "unknown" in str(pin_only).lower()
+        # (a) the GPI fragment is now PIN-nameable on both rungs, RT-exact.
+        for rung in (name_fragment_recursively, name_pipeline_only):
+            got = rung(GPI_FAILING_FRAGMENT)
+            assert got and not is_failure_name(got), (rung.__name__, got)
+            assert _full_rt(GPI_FAILING_FRAGMENT, got), (rung.__name__, got)
+
+        # (b) a fragment that fails both PIN rungs; the rung names it.
+        assert not name_fragment_recursively(PIN_TIER_FAILING_FRAGMENT)
+        pin_only = name_pipeline_only(PIN_TIER_FAILING_FRAGMENT)
+        assert not pin_only or is_failure_name(pin_only), pin_only
+        rescued = _name_fragment_t4_rescue(PIN_TIER_FAILING_FRAGMENT)
+        assert rescued and _full_rt(PIN_TIER_FAILING_FRAGMENT, rescued), rescued
 
     def test_t4_rescue_names_the_previously_unnameable_fragment(self):
         """`_name_fragment_t4_rescue` succeeds where PIN tier failed. This
@@ -258,20 +287,33 @@ class TestT4RescueMechanism:
 
     def test_iterative_mixed_decompose_achieves_atom_complete_assembly(self):
         """Direct call (real molecule, real fragment naming, no mocks):
-        `_try_iterative_mixed_decompose` on the GPI mannoside now accounts
-        for ALL 4 cut fragments (thanks to the rescue rung), where before
-        this fix it silently dropped the failing one and shipped a 3/4
-        "partial assembly". The returned string must mention every
-        fragment's structural content (mannopyranosyl appears for BOTH
-        sugar arms, the phosphonooxyethanamine arm, and the rescued
-        GlcN-thioether unit's own descriptive tokens) -- i.e. the assembler
-        no longer drops the previously-failing fragment's atoms into the
-        void, even though a SEPARATE, out-of-scope limitation (weaving a
-        standalone compound name into a glycoside prefix position) means
-        the resulting string does not yet compose into ONE connected IUPAC
-        name (it falls back to the pre-existing naive space-join and is
-        correctly -rejected as a whole -- see
-        `test_gpi_mannoside_honestly_abstains_not_partial`).
+        `_try_iterative_mixed_decompose` on the GPI mannoside must return
+        either ONE name of the WHOLE input -- OPSIN full-InChIKey exact -- or
+        None. It must never return a partial (3/4 fragments, the a phase
+        defect) and never a glue of fragment names.
+
+        Re-scoped 2026-09-25 (pre-existing-failures plan, Task 3; TRIAGE.csv
+        row for this test, class D-wrong, owner T3). The old assertion wanted a
+        non-None result carrying the rescued fragment's tokens, and the
+        docstring said why that result was not one connected name: the flat
+        weaver fell back to a "naive space-join". Measured: that string --
+        '2-(phosphonooxy)ethan-1-amine (2R,3R,4R,5S,6R)-3-amino-...-oxan-4-ol
+        α-D-mannopyranosyloxy α-D-mannopyranosyl-(1->2)-α-D-mannopyranose' --
+        OPSIN parses to C38H75N2O31PS, the input is C38H71N2O28PS (TRIAGE
+        got_rt=wrong). Blue Book: separate words in a name are the class term
+        of a functional class name (GLOSSARY, "Functional class nomenclature",
+        BB:1816: "the principal characteristic group is expressed as a class
+        term... written as a separate word or words"), and even separate
+        molecular entities are joined by em dashes with a ratio
+        "Organic adducts", BB:4651). A blank-joined list of four component
+        names is neither. The glue is gone (`fragment_assembly.
+        _assemble_by_bond_type` and this function's two fallbacks now decline),
+        so the flat assembler voids the candidate; weaving a ring-hub star into
+        one name is out of `decomposition/weave.py`'s v1 scope, which says so.
+
+        Voiding the candidate declines no molecule: the best-effort tier names
+        the GPI mannoside RT-exact (asserted below; plan Global Constraints,
+        "breadth never drops").
         """
         mol = Chem.MolFromSmiles(GPI_MANNOSIDE)
         bonds = find_cleavable_bonds(mol)
@@ -281,16 +323,19 @@ class TestT4RescueMechanism:
         finally:
             end_naming_session()
 
-        assert result is not None, (
-            "with the T4 rescue rung, all 4 fragments should name "
-            "successfully and the assembler should stop declining"
-        )
-        # The previously-dropped fragment's rescued name carries these
-        # tokens (verified this session): thia/oxa-octyl chain + oxane ring.
-        assert "thia" in result.lower() or "oxane" in result.lower(), (
-            f"assembled result does not appear to include the rescued "
-            f"fragment's content: {result!r}"
-        )
+        if result is not None:
+            assert _full_rt(GPI_MANNOSIDE, result), (
+                f"the mixed decomposition returned a string that is not a "
+                f"name of the whole input (a partial or a glue): {result!r}"
+            )
+
+        from orthonym.cli import _emit_tier_flags
+
+        best_effort = Orthonym(
+            style="pin", **_emit_tier_flags("best-effort")
+        ).name_tiered(GPI_MANNOSIDE)["name"]
+        assert best_effort and not is_failure_name(best_effort), best_effort
+        assert _full_rt(GPI_MANNOSIDE, best_effort), best_effort
 
     def test_fail_closed_guard_present_in_both_assemblers(self):
         """Static confirmation the fail-closed `return None` guard (added
