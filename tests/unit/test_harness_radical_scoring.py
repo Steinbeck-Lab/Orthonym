@@ -12,7 +12,11 @@ import pytest
 
 from tests.support.jars import jar_or_skip
 
-sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "eval"))
+_EVAL = Path(__file__).resolve().parents[2] / "eval"
+sys.path.insert(0, str(_EVAL))
+# The eval harness is a development tool that is not part of every checkout.
+pytestmark = pytest.mark.skipif(not (_EVAL / "harness.py").exists(),
+                                reason="eval/harness.py is not in this checkout")
 
 
 @pytest.mark.parametrize("smiles,name,outcome", [

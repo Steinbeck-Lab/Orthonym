@@ -395,7 +395,15 @@ class TestArylRadicals:
             sites = get_radical_sites(mol)
             if sites:
                 name = name_aryl_radical(mol, sites[0])
-                assert name == 'phenyl'
+                # Changed from 'phenyl' (2026-09-25, user decision Q1 = A). Evidence:
+                # (1) (1) (the Blue Book) "the preferred IUPAC name for a
+                # radical may not be the same as the preferred prefix", with its
+                # own examples 2-methylpropan-2-yl (:40453), benzene-1,4-diyl
+                # (:40540) and the cation benzenylium (PIN) (:41537); the book
+                # prints no C6H5. radical, so this rests on that pattern.
+                # (2) OPSIN reads 'benzenyl' back to exactly [c]1ccccc1 (-r).
+                # (3) With the change reverted this assertion fails.
+                assert name == 'benzenyl'
 
 
 # =============================================================================
@@ -520,4 +528,6 @@ class TestRetainedRadicalCanonicalKeys:
     def test_benzyl_pin(self):
         from orthonym.rules.radicals import name_radical
         from rdkit import Chem
-        assert name_radical(Chem.MolFromSmiles("[CH2]c1ccccc1"), style="pin") == "benzyl"
+        # Changed from 'benzyl' (Q1 = A, same evidence as test_name_aryl_radical:
+        # (1) pattern; OPSIN reads 'phenylmethyl' back exactly; fails reverted).
+        assert name_radical(Chem.MolFromSmiles("[CH2]c1ccccc1"), style="pin") == "phenylmethyl"

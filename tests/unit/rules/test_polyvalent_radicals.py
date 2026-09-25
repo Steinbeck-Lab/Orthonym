@@ -80,9 +80,22 @@ class TestRouteChargedMultiSite:
         assert route_charged(Chem.MolFromSmiles(smiles), "pin") == ""
 
     def test_name_radical_no_structure_dropping_oxyl(self):
-        # deleted shortcut: [O]CC[O] must NOT return 'ethoxyl' (structure-dropping)
+        # deleted shortcut: [O]CC[O] must NOT return 'ethoxyl' (structure-dropping).
+        # It now gets its assembly name. Evidence for the changed value:
+        # (1) "ASSEMBLIES OF PARENT RADICALS" (the Blue Book-40741):
+        # identically derived radical centres in different parts of the structure
+        # are named as assemblies of identical units linked by a multivalent
+        # substituent -- worked example '(2,4-dimethylpentane-2,4-diyl)bis(oxyl)
+        # (PIN)' (:40749); the book is silent on this exact molecule.
+        # (2) OPSIN (independent) reads the name back to exactly [O]CC[O], radical
+        # dots included. (3) With the multi-centre producer reverted the name is
+        # '' again and this test fails.
+        # Would be wrong if required a different spelling for a two-carbon
+        # linker (none is printed).
         from orthonym.rules.radicals import name_radical
-        assert name_radical(Chem.MolFromSmiles("[O]CC[O]"), style="pin") == ""
+        name = name_radical(Chem.MolFromSmiles("[O]CC[O]"), style="pin")
+        assert name != "ethoxyl"
+        assert name == "(ethane-1,2-diyl)bis(oxyl)"
 
     def test_single_site_radical_unchanged(self):
         # PROTECT: single-site path (route_charged -> emit_parent_hydride_cumulative_suffix) byte-identical

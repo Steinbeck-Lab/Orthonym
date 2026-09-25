@@ -61,9 +61,15 @@ RETAINED_RADICALS = {
     # Trivalent radicals
     '[CH]': 'methylidyne',
 
-    # Aryl radicals
-    '[c]1ccccc1': 'phenyl',
-    '[CH2]c1ccccc1': 'benzyl',
+    # Aryl radicals. (1) (the Blue Book): "the preferred IUPAC name
+    # for a radical may not be the same as the preferred prefix" -- its own
+    # examples are '2-methylpropan-2-yl (PIN)' not tert-butyl (:40453),
+    # 'benzene-1,4-diyl (PIN)' not 1,4-phenylene (:40540), and the cation
+    # 'benzenylium (PIN)' not phenylium (:41537). The book prints no C6H5. or
+    # C6H5CH2. radical; by that pattern they are benzenyl and phenylmethyl
+    # (user decision Q1 = A, 2026-09-25).
+    '[c]1ccccc1': 'benzenyl',
+    '[CH2]c1ccccc1': 'phenylmethyl',
 
     # Acyl radicals (carbonyl radicals)
     '[CH]=O': 'formyl',
@@ -71,10 +77,19 @@ RETAINED_RADICALS = {
     'CC[C]=O': 'propanoyl',
     'O=[C]c1ccccc1': 'benzoyl',
 
-    # Oxyl radicals (oxygen-centered)
+    # Oxyl radicals (oxygen-centered). (the Blue Book): "The
+    # names methoxyl, ethoxyl, propoxyl, butoxyl, tert-butoxyl, phenoxyl, and
+    # aminoxyl... are retained and are preferred IUPAC names" -- a closed list.
     'C[O]': 'methoxyl',
     'CC[O]': 'ethoxyl',
+    'CCC[O]': 'propoxyl',
+    'CCCC[O]': 'butoxyl',
+    'CC(C)(C)[O]': 'tert-butoxyl',
     '[O]c1ccccc1': 'phenoxyl',
+    # (the Blue Book): "the IUPAC preferred name for HO. is
+    # 'hydroxyl'... and... for HOO. is 'hydroperoxyl'" (not to be substituted).
+    '[OH]': 'hydroxyl',
+    '[O]O': 'hydroperoxyl',
 }
 
 
@@ -603,13 +618,45 @@ def _n_substituent_prefix(mol, frag: List[int], attach_idx: int, general: bool):
         return got if got and got.endswith('yl') else None
 
     prefix = _one(False)
-    if prefix:
+    if prefix and _indicated_h_kept(mol, frag, attach_idx, prefix):
         return prefix, False
     if general:
-        prefix = _one(True)
+        prefix = prefix or _one(True)
         if prefix:
             return prefix, True
     return None, False
+
+
+def _fragment_parent_name(mol, frag: List[int], attach_idx: int) -> str:
+    """The name of the fragment as a neutral parent: every bond from
+    ``attach_idx`` to an atom outside ``frag`` becomes a hydrogen."""
+    import re as _re  # noqa: F401 (kept local; this module imports lazily)
+    work = Chem.RWMol(mol)
+    keep = set(frag)
+    try:
+        a = work.GetAtomWithIdx(attach_idx)
+        lost = sum(1 for n in a.GetNeighbors() if n.GetIdx() not in keep)
+        a.SetNumRadicalElectrons(0)
+        a.SetNoImplicit(True)
+        a.SetNumExplicitHs(a.GetTotalNumHs() + lost)
+        for i in sorted((i for i in range(work.GetNumAtoms()) if i not in keep), reverse=True):
+            work.RemoveAtom(i)
+        parent = work.GetMol()
+        Chem.SanitizeMol(parent)
+    except (RuntimeError, ValueError):
+        return ''
+    return _reenter_neutral_name(parent)
+
+
+def _indicated_h_kept(mol, frag: List[int], attach_idx: int, prefix: str) -> bool:
+    """: a substituent prefix of a ring that needs indicated
+    hydrogen cites it -- '(1H-indol-1-yl)acetic acid (PIN)' (the Blue Book.
+    The shared prefix namer can drop it ('pyrrol-1-yl' for 1H-pyrrol-1-yl), so a
+    prefix whose parent's own name carries indicated hydrogen must carry one
+    too; otherwise it is not a PIN-route prefix."""
+    import re
+    parent = _fragment_parent_name(mol, frag, attach_idx)
+    return not (re.search(r"\d+H-", parent) and not re.search(r"\d+H", prefix))
 
 
 def _name_n_oxyl_radical(mol, radical_idx: int, n_atom) -> str:
@@ -681,6 +728,491 @@ def _name_n_oxyl_radical(mol, radical_idx: int, n_atom) -> str:
     if used_general:
         record_general_ring_prefix()
     return candidate
+
+
+def _acyl_from_acid_name(acid: str) -> str:
+    """The acyl group name of an acid name,,: the
+    shared converter plus the forms it gets wrong -- 'carbamic acid' ->
+    'carbamoyl', 'butanimidic acid' ->
+    'butanimidoyl (PIN)' and 'dimethylphosphinic acid' -> 'dimethylphosphinoyl
+    (PIN)', the Blue Book-40610), and a thioic acid ->
+    '...thioyl' ('ethanethioyl (PIN)'). '' if the name is not an acid name."""
+    import re
+    if not acid:
+        return ''
+    # 'carbamoyl (preferred prefix)' (the Blue Book); the shared converter
+    # gives the obsolete 'carbamyl'.
+    for end, acyl in (("carbamic acid", "carbamoyl"),
+                      ("imidic acid", "imidoyl"), ("phosphinic acid", "phosphinoyl"),
+                      ("phosphonic acid", "phosphonoyl"), ("arsinic acid", "arsinoyl"),
+                      ("arsonic acid", "arsonoyl")):
+        if acid.endswith(end):
+            return acid[:-len(end)] + acyl
+    m = re.match(r"^(.*thio)ic (?:[OS]-)?acid$", acid)
+    if m:
+        return m.group(1) + "yl"
+    from ..decomposition.fragment_assembly import _acid_to_acyl
+    return _acid_to_acyl(acid) or ''
+
+
+def _acid_name_with_oh_at(mol, idx: int) -> str:
+    """Name the acid made by putting OH on atom ``idx`` in place of its radical
+    electron -- the formal parent of an acyl radical or of an
+    acyl-oxyl R-CO-O. (then ``idx`` is the radical oxygen, which becomes the
+    acid's OH). '' on failure."""
+    work = Chem.RWMol(mol)
+    try:
+        a = work.GetAtomWithIdx(idx)
+        if a.GetSymbol() == 'O':
+            a.SetNumRadicalElectrons(0)
+            a.SetNoImplicit(True)
+            a.SetNumExplicitHs(1)
+        else:
+            a.SetNumRadicalElectrons(a.GetNumRadicalElectrons() - 1)
+            o = work.AddAtom(Chem.Atom(8))
+            work.AddBond(idx, o, Chem.BondType.SINGLE)
+            a.SetNoImplicit(True)
+        acid = work.GetMol()
+        Chem.SanitizeMol(acid)
+    except (RuntimeError, ValueError):
+        return ''
+    name = _reenter_neutral_name(acid)
+    return name if name.endswith('acid') else ''
+
+
+def _is_acyl_atom(mol, idx: int, exclude: int = -1) -> bool:
+    """True when atom ``idx`` has a double bond to O/S/Se/Te/N (other than to
+    ``exclude``): the radical centre of an acyl radical, or the
+    carbonyl carbon of an acyl-oxyl."""
+    atom = mol.GetAtomWithIdx(idx)
+    return any(b.GetBondType() == Chem.BondType.DOUBLE
+               and b.GetOtherAtom(atom).GetSymbol() in ('O', 'S', 'Se', 'Te', 'N')
+               and b.GetOtherAtomIdx(idx) != exclude
+               for b in atom.GetBonds())
+
+
+def _name_acyl_radical_from_acid(mol, idx: int) -> str:
+    """ "Acyl radicals": named from the acid (hexanoyl, benzoyl,
+    dimethylphosphinoyl, ethanethioyl, butanimidoyl -- the Blue Book-
+    40612). A monovalent radical on an atom with a double bond to a chalcogen or
+    N; the name is kept only if it passes the strict radical round trip."""
+    atom = mol.GetAtomWithIdx(idx)
+    if atom.GetNumRadicalElectrons() != 1 or atom.GetFormalCharge() or not _is_acyl_atom(mol, idx):
+        return ''
+    acyl = _acyl_from_acid_name(_acid_name_with_oh_at(mol, idx))
+    return acyl if acyl and _radical_identity_round_trips(mol, acyl) else ''
+
+
+def _name_acyl_oxyl_radical(mol, radical_idx: int, attach_idx: int) -> str:
+    """ method (1) for R-CO-O.: the acyl group name + 'oxyl', e.g.
+    '(chloroacetyl)oxyl (PIN)', 'butanoyloxyl (PIN)' (the Blue Book,
+    :40711). The acyl name comes from the acid R-CO-OH; strict round trip."""
+    if not _is_acyl_atom(mol, attach_idx, exclude=radical_idx):
+        return ''
+    acyl = _acyl_from_acid_name(_acid_name_with_oh_at(mol, radical_idx))
+    if not acyl:
+        return ''
+    candidate = f"{_enclose_acyl(mol, acyl, attach_idx, {radical_idx})}oxyl"
+    return candidate if _radical_identity_round_trips(mol, candidate) else ''
+
+
+def _acyl_is_substituted(mol, acyl_idx: int, exclude: set) -> bool:
+    """True when the acyl group R-C(=X)- rooted at ``acyl_idx`` (``exclude``: the
+    atoms on the far side, e.g. the radical O) carries a substituent: any
+    heteroatom other than the acyl's own =X, a branch in its chain, or a ring
+    atom with a side group. A substituted acyl group is a compound prefix and
+    takes enclosing marks: '(chloroacetyl)oxyl (PIN)'
+    (the Blue Book; '(chloroacetyl)' 4 of 4 English occurrences) and
+    '(chloroethanethioyl)sulfanyl', but 'butanoyloxyl (PIN)'."""
+    frag = set(_collect_fragment_excluding(mol, acyl_idx, set(exclude)))
+    acyl = mol.GetAtomWithIdx(acyl_idx)
+    x_atoms = {b.GetOtherAtomIdx(acyl_idx) for b in acyl.GetBonds()
+               if b.GetBondType() == Chem.BondType.DOUBLE
+               and b.GetOtherAtom(acyl).GetSymbol() in ('O', 'S', 'Se', 'Te', 'N')}
+    body = frag - x_atoms
+    for i in body:
+        a = mol.GetAtomWithIdx(i)
+        if i != acyl_idx and a.GetSymbol() != 'C':
+            return True
+        nbrs = [n.GetIdx() for n in a.GetNeighbors() if n.GetIdx() in body]
+        if not a.IsInRing() and len(nbrs) > 2:
+            return True
+        if a.IsInRing() and any(not mol.GetAtomWithIdx(n).IsInRing() and n != acyl_idx
+                                for n in nbrs):
+            return True
+    return False
+
+
+def _enclose_acyl(mol, acyl: str, acyl_idx: int, exclude: set) -> str:
+    from ..assembly.naming_utils import enclose_if_compound
+    enclosed = enclose_if_compound(acyl)
+    if enclosed == acyl and _acyl_is_substituted(mol, acyl_idx, exclude):
+        enclosed = f"({acyl})"
+    return enclosed
+
+
+def _placeholder_prefix(mol, idx: int, general: bool):
+    """(prefix, from_general_route) for the whole molecule named as a
+    substituent group attached at the radical atom ``idx`` -- a
+    radical formed by removing one H is named like the substituent prefix of
+    the same group ('piperidin-1-yl', 'naphthalen-2-yl'). The substituent
+    namers expect a satisfied valence at the attachment, so a methyl
+    placeholder takes the radical electron's place and is left out of the
+    named fragment (the N-oxyl producer does the same with its O)."""
+    work = Chem.RWMol(mol)
+    try:
+        a = work.GetAtomWithIdx(idx)
+        a.SetNumRadicalElectrons(a.GetNumRadicalElectrons() - 1)
+        c = work.AddAtom(Chem.Atom(6))
+        work.AddBond(idx, c, Chem.BondType.SINGLE)
+        a.SetNoImplicit(True)
+        surrogate = work.GetMol()
+        Chem.SanitizeMol(surrogate)
+    except (RuntimeError, ValueError):
+        return None, False
+    frag = [i for i in range(mol.GetNumAtoms())]
+    return _n_substituent_prefix(surrogate, frag, idx, general)
+
+
+def _tier_is_general() -> bool:
+    from ..metrics.provenance import general_fallback_ctx
+    try:
+        return bool(general_fallback_ctx.get())
+    except Exception:  # a tier read must never break naming
+        return False
+
+
+def _ship(mol, candidate: str, used_general: bool) -> str:
+    """Strict radical round trip; a name built by the wide route is demoted
+    out of pin_verified (the composer's contract)."""
+    if not candidate or not _radical_identity_round_trips(mol, candidate):
+        return ''
+    import re
+    if re.search(r"\((?:\d+)?[RSEZrs](?:,|\))", candidate):
+        # Stereodescriptors inside a radical's prefix: their PIN placement is
+        # brief item B10, not yet derived, so such a name is never shipped as a
+        # PIN -- no name at the PIN tier, a demoted name at a general tier.
+        if not _tier_is_general():
+            return ''
+        used_general = True
+    if used_general:
+        from ..metrics.provenance import record_general_ring_prefix
+        record_general_ring_prefix()
+    return candidate
+
+
+_CHALCOGEN_RADICAL = {'S': 'sulfanyl', 'Se': 'selanyl', 'Te': 'tellanyl'}
+
+
+def _name_chalcogen_radical(mol, idx: int) -> str:
+    """ chalcogen analogues (the Blue Book): "named on the basis of
+    preselected parent radical names, such as 'sulfanyl', 'selanyl',
+    'disulfanyl'": 'phenylsulfanyl (PIN)' (:40727), 'CH3-Se. methylselanyl (PIN)'
+    (:40733), 'tert-butyldisulfanyl (PIN)' (:40737), and with an acyl group
+    '(chloroethanethioyl)sulfanyl'. A monovalent, neutral S/Se/Te radical with
+    one carbon (or one same-element chalcogen, then carbon) neighbour."""
+    x = mol.GetAtomWithIdx(idx)
+    parent = _CHALCOGEN_RADICAL.get(x.GetSymbol())
+    if (parent is None or x.GetNumRadicalElectrons() != 1 or x.GetFormalCharge()
+            or x.GetDegree() != 1 or x.GetTotalNumHs()):
+        return ''
+    y = x.GetNeighbors()[0]
+    exclude = {idx}
+    if y.GetSymbol() == x.GetSymbol():
+        others = [n for n in y.GetNeighbors() if n.GetIdx() != idx]
+        if (y.GetFormalCharge() or y.GetNumRadicalElectrons() or len(others) != 1
+                or others[0].GetSymbol() != 'C'):
+            return ''
+        exclude.add(y.GetIdx())
+        parent = 'di' + parent
+        attach = others[0]
+    elif y.GetSymbol() == 'C':
+        attach = y
+    else:
+        return ''
+    if attach.GetFormalCharge() or attach.GetNumRadicalElectrons():
+        return ''
+    general = _tier_is_general()
+    if len(exclude) == 1 and _is_acyl_atom(mol, attach.GetIdx()):
+        # R-C(=X)-S.: the acyl group comes from the acid R-C(=X)-OH.
+        work = Chem.RWMol(mol)
+        try:
+            w = work.GetAtomWithIdx(idx)
+            w.SetAtomicNum(8)
+            w.SetNumRadicalElectrons(0)
+            w.SetNoImplicit(True)
+            w.SetNumExplicitHs(1)
+            acid = work.GetMol()
+            Chem.SanitizeMol(acid)
+        except (RuntimeError, ValueError):
+            return ''
+        acid_name = _reenter_neutral_name(acid)
+        acyl = _acyl_from_acid_name(acid_name) if acid_name.endswith('acid') else ''
+        if not acyl:
+            return ''
+        return _ship(mol, _enclose_acyl(mol, acyl, attach.GetIdx(), exclude) + parent, False)
+    frag = _collect_fragment_excluding(mol, attach.GetIdx(), exclude)
+    prefix, wide = _n_substituent_prefix(mol, frag, attach.GetIdx(), general)
+    if not prefix:
+        return ''
+    from ..assembly.naming_utils import enclose_if_compound
+    return _ship(mol, enclose_if_compound(prefix) + parent, wide)
+
+
+def _name_ring_n_radical(mol, idx: int) -> str:
+    """A radical on a ring nitrogen that carries no H: named as the
+    ring's N-yl substituent group, e.g. '2,5-dioxopyrrolidin-1-yl (PIN)'
+    (the Blue Book), piperidin-1-yl, 9H-carbazol-9-yl."""
+    n = mol.GetAtomWithIdx(idx)
+    if (n.GetSymbol() != 'N' or n.GetNumRadicalElectrons() != 1 or n.GetFormalCharge()
+            or not n.IsInRing() or n.GetTotalNumHs()):
+        return ''
+    prefix, wide = _placeholder_prefix(mol, idx, _tier_is_general())
+    return _ship(mol, prefix or '', wide)
+
+
+# Contracted preferred prefixes that are NOT '<parent hydride>yl'. (1):
+# "the preferred IUPAC name for a radical may not be the same as the preferred
+# prefix" (the Blue Book) -- e.g. (CH3)3C. is '2-methylpropan-2-yl (PIN)'
+# (:40453), not 'tert-butyl'. A radical whose placeholder prefix ends in one of
+# these is left to the other producers; the phenyl/benzyl choice is open
+# question Q1 of the radical brief.
+_CONTRACTED_PREFIX_ENDINGS = (
+    'tert-butyl', 'sec-butyl', 'isopropyl', 'isobutyl', 'neopentyl', 'phenyl',
+    'benzyl', 'tolyl', 'xylyl', 'mesityl', 'naphthyl', 'anthryl', 'phenanthryl',
+    'vinyl', 'allyl', 'phenethyl', 'trityl', 'benzhydryl', 'cumyl', 'furyl',
+    'thienyl', 'pyridyl')
+
+
+def _name_carbon_radical(mol, idx: int) -> str:
+    """: a monovalent carbon radical formed by removing one H is named
+    like the substituent group of the whole molecule attached at the radical
+    carbon, e.g. naphthalen-2-yl (PIN, the Blue Book), pyridin-4-yl,
+    cyclohexa-2,4-dien-1-yl, 1-carboxyethyl and 2-hydroxyethyl: every
+    characteristic group is cited as a prefix,:40526), cyanomethyl. Skips acyl
+    radicals (named from their acid) and names that end in a contracted prefix."""
+    c = mol.GetAtomWithIdx(idx)
+    if (c.GetSymbol() != 'C' or c.GetNumRadicalElectrons() != 1 or c.GetFormalCharge()
+            or _is_acyl_atom(mol, idx)):
+        return ''
+    prefix, wide = _placeholder_prefix(mol, idx, _tier_is_general())
+    if not prefix:
+        return ''
+    if prefix == 'benzyl':
+        prefix = 'phenylmethyl'
+    elif prefix.endswith('phenyl') and c.GetIsAromatic() and '(' not in prefix:
+        # phenyl is exactly benzen-1-yl (same numbering, attachment at 1); with a
+        # substituent every locant is cited: 4-methylbenzen-1-yl.
+        base = prefix[:-len('phenyl')]
+        prefix = f"{base}benzen-1-yl" if base else 'benzenyl'
+    if prefix.rstrip(')]}').endswith(_CONTRACTED_PREFIX_ENDINGS):
+        return ''
+    import re
+    m = re.search(r"([\da-z,]+)-(?:di|tetra|hexa|octa|deca)hydro.*-(\d+[a-z]?)-yl$", prefix)
+    if m and m.group(2) in m.group(1).split(','):
+        # The radical sits on a position the hydro prefix itself adds H to: the
+        # Blue Book uses 'added hydrogen' there -- '(C60-Ih)[5,6]fulleren-1(9H)-yl
+        # (PIN)' vs '1,9-dihydro...fulleren-1-yl' (the Blue Book), so the
+        # hydro form is not shipped as a PIN.
+        if not _tier_is_general():
+            return ''
+        wide = True
+    return _ship(mol, prefix, wide)
+
+
+# === MULTI-CENTRE RADICALS,, ===
+
+_SIMPLE_MULT = {2: 'di', 3: 'tri', 4: 'tetra'}
+
+
+def _ring_polyvalent_name(frag, centers: List[int]) -> str:
+    """'<ring>-<locants>-diyl' for k monovalent centres on an UNSUBSTITUTED
+    carbocyclic monocycle (cyclopropane... or benzene), locants as low as
+    possible over every numbering of the ring, e.g. 'benzene-1,4-diyl
+    (PIN)' (the Blue Book), 'cyclopropane-1,2-diyl'. '' otherwise
+    (substituted, hetero, fused or partly unsaturated rings are not built here)."""
+    ri = frag.GetRingInfo()
+    if ri.NumRings() != 1:
+        return ''
+    ring = list(ri.AtomRings()[0])
+    if len(ring) != frag.GetNumAtoms() or any(frag.GetAtomWithIdx(i).GetSymbol() != 'C' for i in ring):
+        return ''
+    n = len(ring)
+    aromatic = all(frag.GetAtomWithIdx(i).GetIsAromatic() for i in ring)
+    if aromatic and n == 6:
+        parent = 'benzene'
+    elif not any(frag.GetAtomWithIdx(i).GetIsAromatic() for i in ring) and all(
+            b.GetBondType() == Chem.BondType.SINGLE for b in frag.GetBonds()):
+        parent = 'cyclo' + _get_chain_prefix(n) + 'ane'
+    else:
+        return ''
+    # ring atoms in cyclic order
+    order = [ring[0]]
+    while len(order) < n:
+        nxt = [nb.GetIdx() for nb in frag.GetAtomWithIdx(order[-1]).GetNeighbors()
+               if nb.GetIdx() in ring and nb.GetIdx() not in order]
+        if not nxt:
+            return ''
+        order.append(nxt[0])
+    best = None
+    for start in range(n):
+        for step in (1, -1):
+            pos = {order[(start + step * k) % n]: k + 1 for k in range(n)}
+            locs = tuple(sorted(pos[c] for c in centers))
+            if best is None or locs < best:
+                best = locs
+    k = len(centers)
+    mult = _SIMPLE_MULT.get(k)
+    if mult is None:
+        return ''
+    return f"{parent}-{','.join(map(str, best))}-{mult}yl"
+
+
+def _polyvalent_central_name(frag, centers: List[int]) -> str:
+    from .ions import emit_parent_hydride_polyvalent_suffixes
+    try:
+        name = emit_parent_hydride_polyvalent_suffixes(frag, [(c, 1) for c in centers])
+    except Exception:
+        name = ''
+    return name or _ring_polyvalent_name(frag, centers)
+
+
+def _terminal_radical_group(mol, idx: int):
+    """(term, compound, terminal_atoms, attach_idx) for a radical centre that is
+    the free end of a terminal group on a carbon: oxyl, peroxyl, sulfanyl,
+    disulfanyl, methyl (an exocyclic CH2.). None otherwise."""
+    a = mol.GetAtomWithIdx(idx)
+    if a.GetNumRadicalElectrons() != 1 or a.GetFormalCharge() or a.GetDegree() != 1:
+        return None
+    y = a.GetNeighbors()[0]
+    sym = a.GetSymbol()
+    if sym == 'C' and a.GetTotalNumHs() == 2 and y.GetSymbol() == 'C':
+        return ('methyl', False, {idx}, y.GetIdx())
+    if sym in ('O', 'S') and not a.GetTotalNumHs():
+        base = {'O': 'oxyl', 'S': 'sulfanyl'}[sym]
+        if y.GetSymbol() == 'C' and not _is_acyl_atom(mol, y.GetIdx()):
+            return (base, True, {idx}, y.GetIdx())
+        if y.GetSymbol() == sym and y.GetDegree() == 2 and not y.GetFormalCharge():
+            z = [nb for nb in y.GetNeighbors() if nb.GetIdx() != idx][0]
+            if z.GetSymbol() == 'C':
+                return ({'O': 'peroxyl', 'S': 'disulfanyl'}[sym], True, {idx, y.GetIdx()}, z.GetIdx())
+    return None
+
+
+def _name_multiplied_terminal_radicals(mol, sites) -> str:
+    """: identical terminal radical groups on a multivalent central group
+    are named multiplicatively: '(cyclopropane-1,2-diyl)dimethyl (PIN)',
+    '(2,4-dimethylpentane-2,4-diyl)bis(oxyl) (PIN)', '(cyclobutane-1,3-diyl)
+    bis(peroxyl) (PIN)', '(naphthalene-2,6-diyl)bis(disulfanyl) (PIN)'
+    (the Blue Book-40751): 'di' before 'methyl', 'bis(...)' before the
+    compound radical terms."""
+    groups = [_terminal_radical_group(mol, s['atom_idx']) for s in sites]
+    if any(g is None for g in groups) or len({g[0] for g in groups}) != 1:
+        return ''
+    attach = [g[3] for g in groups]
+    terminal = set().union(*(g[2] for g in groups))
+    if len(set(attach)) != len(attach) or terminal & set(attach):
+        return ''
+    work = Chem.RWMol(mol)
+    for c in attach:
+        work.GetAtomWithIdx(c).SetIntProp('_mc', 1)
+    for i in sorted(terminal, reverse=True):
+        work.RemoveAtom(i)
+    frag = work.GetMol()
+    centers = []
+    for a in frag.GetAtoms():
+        if a.HasProp('_mc'):
+            a.SetNumRadicalElectrons(1)
+            a.SetNoImplicit(True)
+            a.SetNumExplicitHs(max(0, a.GetTotalNumHs()))
+            a.ClearProp('_mc')
+            centers.append(a.GetIdx())
+    try:
+        Chem.SanitizeMol(frag)
+    except (RuntimeError, ValueError):
+        return ''
+    central = _polyvalent_central_name(frag, centers)
+    if not central:
+        return ''
+    term, compound = groups[0][0], groups[0][1]
+    k = len(sites)
+    mult = (_COMPOUND_MULTIPLIER if compound else _SIMPLE_MULT).get(k)
+    if mult is None:
+        return ''
+    tail = f"{mult}({term})" if compound else f"{mult}{term}"
+    return _ship(mol, f"({central}){tail}", False)
+
+
+def _name_multi_acyl_radical(mol, sites) -> str:
+    """ with several acyl radical centres: named from the polyacid,
+    'benzene-1,4-dicarbonyl (PIN)', 'benzene-1,4-disulfinyl (PIN)'
+    (the Blue Book-40618)."""
+    idxs = [s['atom_idx'] for s in sites]
+    if any(mol.GetAtomWithIdx(i).GetNumRadicalElectrons() != 1 or mol.GetAtomWithIdx(i).GetFormalCharge()
+           or not _is_acyl_atom(mol, i) for i in idxs):
+        return ''
+    work = Chem.RWMol(mol)
+    try:
+        for i in idxs:
+            a = work.GetAtomWithIdx(i)
+            a.SetNumRadicalElectrons(0)
+            o = work.AddAtom(Chem.Atom(8))
+            work.AddBond(i, o, Chem.BondType.SINGLE)
+            a.SetNoImplicit(True)
+        acid = work.GetMol()
+        Chem.SanitizeMol(acid)
+    except (RuntimeError, ValueError):
+        return ''
+    acid_name = _reenter_neutral_name(acid)
+    acyl = _acyl_from_acid_name(acid_name) if acid_name.endswith('acid') else ''
+    return _ship(mol, acyl, False)
+
+
+def _name_multiplied_amidyl_iminyl(mol, sites) -> str:
+    """: compound suffixes on a polyamide / polyimine parent take 'bis'
+    and enclosing marks: 'methanebis(iminyl) (PIN)', 'benzene-1,2-bis(carbox-
+    amidyl) (PIN)', 'butanebis(amidyl) (PIN)' (the Blue Book-40670). Each
+    centre is a monovalent N whose parent is the N-H form of an amide or imine."""
+    idxs = [s['atom_idx'] for s in sites]
+    k = len(idxs)
+    if any(mol.GetAtomWithIdx(i).GetSymbol() != 'N' or mol.GetAtomWithIdx(i).GetNumRadicalElectrons() != 1
+           or mol.GetAtomWithIdx(i).GetFormalCharge() for i in idxs):
+        return ''
+    work = Chem.RWMol(mol)
+    try:
+        for i in idxs:
+            a = work.GetAtomWithIdx(i)
+            a.SetNumRadicalElectrons(0)
+            a.SetNoImplicit(True)
+            a.SetNumExplicitHs(a.GetTotalNumHs() + 1)
+        neutral_mol = work.GetMol()
+        Chem.SanitizeMol(neutral_mol)
+    except (RuntimeError, ValueError):
+        return ''
+    neutral = _reenter_neutral_name(neutral_mol)
+    mult = _SIMPLE_MULT.get(k)
+    cmult = _COMPOUND_MULTIPLIER.get(k)
+    if not neutral or not mult or not cmult:
+        return ''
+    for base, term in (('carboxamide', 'carboxamidyl'), ('amide', 'amidyl'), ('imine', 'iminyl')):
+        end = mult + base
+        if neutral.endswith(end):
+            return _ship(mol, neutral[:-len(end)] + f"{cmult}({term})", False)
+    return ''
+
+
+def _name_multicentre_radical(mol, sites) -> str:
+    for producer in (_name_multi_acyl_radical, _name_multiplied_amidyl_iminyl,
+                     _name_multiplied_terminal_radicals):
+        named = producer(mol, sites)
+        if named:
+            return named
+    # several monovalent centres on one unsubstituted carbocycle: 'benzene-1,4-diyl'
+    idxs = [s['atom_idx'] for s in sites]
+    if all(mol.GetAtomWithIdx(i).GetNumRadicalElectrons() == 1 and mol.GetAtomWithIdx(i).GetSymbol() == 'C'
+           for i in idxs):
+        return _ship(mol, _ring_polyvalent_name(mol, idxs), False)
+    return ''
 
 
 def _compose_oxyl_name(mol, parent: str, additive_suffix: str, systematic_suffix: str) -> str:
@@ -832,20 +1364,24 @@ def name_oxyl_radical(mol, radical_site: Dict[str, Any]) -> str:
     # over the shape guard): on a mismatch it falls through to the
     # systematic '(<parent>)oxyl'/'(<parent>)oxidanyl' composition below
     # instead of shipping an unverified name.
+    acyl_oxyl = _name_acyl_oxyl_radical(mol, radical_idx, attach_idx)
+    if acyl_oxyl:
+        return acyl_oxyl
+
     if _is_plain_alkyl_radical_fragment(mol, radical_idx, attach_idx):
         carbon_count = _count_chain_carbons(mol, attach_idx, {radical_idx})
 
+        # The retained contractions are a CLOSED list,:40681):
+        # a longer chain takes method (1), '<R>oxyl' ('pentyloxyl'), below.
         ALKOXY_NAMES = {
             1: 'methoxyl',
             2: 'ethoxyl',
             3: 'propoxyl',
             4: 'butoxyl',
-            5: 'pentoxyl',
-            6: 'hexoxyl',
         }
 
-        retained = ALKOXY_NAMES.get(carbon_count) or (_get_chain_prefix(carbon_count) + 'oxyl')
-        if _radical_name_round_trips(mol, retained):
+        retained = ALKOXY_NAMES.get(carbon_count)
+        if retained and _radical_name_round_trips(mol, retained):
             return retained
         # shape guard passed but the candidate still failed to verify --
         # fall through to the systematic branch below.
@@ -907,18 +1443,13 @@ def name_aryl_radical(mol, radical_site: Dict[str, Any]) -> str:
         >>> name_aryl_radical(mol, sites[0])
         'phenyl'
     """
-    # Count aromatic carbons to determine ring system
-    aromatic_count = sum(1 for atom in mol.GetAtoms()
-                         if atom.GetIsAromatic() and atom.GetSymbol() == 'C')
-
-    if aromatic_count == 6:
-        return 'phenyl'
-    elif aromatic_count == 10:
-        return 'naphthyl'
-    elif aromatic_count == 14:
-        return 'anthryl'
-    else:
-        return 'aryl'
+    # Only exact C6H5. is named here (1): 'benzenyl', see
+    # RETAINED_RADICALS). Counting aromatic carbons named a tolyl radical
+    # 'phenyl' and naphthalen-2-yl 'naphthyl' -- wrong molecules only the gate
+    # stopped; ring radicals are named by _name_carbon_radical instead.
+    if Chem.MolToSmiles(mol) == '[c]1ccccc1':
+        return 'benzenyl'
+    return ''
 
 
 # === HETEROATOM-CENTRED RADICALS / / / ===
@@ -1012,10 +1543,26 @@ def _name_amine_family_radical(mol, radical_site: Dict[str, Any]) -> str:
     neutral = _reenter_neutral_name(wm)
     if not neutral:
         return ''
+    # (the Blue Book): 'benzenaminyl (PIN)... (not anilino)'. The
+    # retained parent 'aniline' denotes exactly 'benzenamine', which carries the
+    # -amine suffix the radical suffix needs; the result is still verified by
+    # the strict round trip below / at the gate.
+    if neutral.endswith('aniline'):
+        neutral = neutral[:-len('aniline')] + 'benzenamine'
     # '-carboxamide'/'-amide'/'-imine'/'-amine' -> elide final 'e' + cumulative suffix.
     for base in ('carboxamide', 'amide', 'imine', 'amine'):
         if neutral.endswith(base):
-            return neutral[:-1] + cum
+            name = neutral[:-1] + cum
+            #: on an =N. radical the N carries no substitutable H, so the
+            # substituent locants on the sole heteroatom centre drop, as in
+            # '(CH3)3P=N. trimethyl-lambda5-phosphaniminyl (PIN)' (the Blue Book)
+            # and the iminide anion (charged_router._iminide_omit_locants). Kept
+            # only when the shorter name still passes the strict round trip.
+            import re
+            short = re.sub(r'^([A-Z][a-z]?)(?:,\1)*-', '', name)
+            if short != name and _radical_identity_round_trips(mol, short):
+                return short
+            return name
     return ''
 
 
@@ -1160,6 +1707,17 @@ def name_radical(mol, style: str = 'pin') -> str:
         site = sites[0]
         info = classify_radical(mol, site)
         subtype = info['subtype']
+        #: an acyl radical (C, P, S... with a double bond to a
+        # chalcogen or N) is named from its acid; the older producers below
+        # remain the fallback.
+        acyl = _name_acyl_radical_from_acid(mol, site['atom_idx'])
+        if acyl:
+            return acyl
+        # chalcogen analogues and ring-N radicals.
+        for producer in (_name_chalcogen_radical, _name_ring_n_radical, _name_carbon_radical):
+            named = producer(mol, site['atom_idx'])
+            if named:
+                return named
 
         # Route to appropriate naming function. The acyl/oxyl/aryl heteroatom-
         # context subtypes keep their structured helpers (they are NOT plain
@@ -1189,6 +1747,11 @@ def name_radical(mol, style: str = 'pin') -> str:
         # carbon-counted misname).
         from .charged_router import route_charged
         return route_charged(mol, style)
+
+    # / / multi-centre producers first (strict round trip).
+    multi = _name_multicentre_radical(mol, sites)
+    if multi:
+        return multi
 
     # Multiple radicals: delegate to route_charged multi-site free-valence
     # namer). No first-site oxyl/acyl shortcut — it produced structure-dropping names

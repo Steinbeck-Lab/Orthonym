@@ -388,6 +388,14 @@ def _detect_species_type_impl(mol) -> str:
         internal_atoms = _get_internal_charge_atoms(mol)
         all_charged = {a.GetIdx() for a in atoms_of(mol) if a.GetFormalCharge() != 0}
         if all_charged and all_charged.issubset(internal_atoms):
+            # A real radical elsewhere (a radical electron on an UNCHARGED atom)
+            # makes it a radical that happens to carry a nitro/N-oxide/azide group:
+            # '[CH2]c1ccc(cc1)[N+](=O)[O-]' is (4-nitrophenyl)methyl, not a
+            # closed-shell nitrotoluene candidate. Radical names are verified by
+            # the radical-identity rule (validation/radical_identity.py).
+            if any(a.GetNumRadicalElectrons() and not a.GetFormalCharge()
+                   for a in atoms_of(mol)):
+                return 'radical'
             return 'neutral'
 
     # 169.6-04 (Task 3): the >20-HA quaternary-N zwitterion size-cutoff band-aid

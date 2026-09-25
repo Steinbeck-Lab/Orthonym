@@ -2855,6 +2855,20 @@ def route_charged(mol, style: str = 'pin') -> str:
     # --- Step 6: re-apply the class-correct ionic / radical suffix.
     if radical_suffix is not None:
         _radical_center_idx = radical_sites[0]['atom_idx']
+        #: an acyl radical (a radical centre with a double bond to a
+        # chalcogen or N, e.g. (CH3)2P(=O). 'dimethylphosphinoyl (PIN)',
+        # the Blue Book) is named from its acid, not by a suffix on the
+        # neutral name ('dimethyl-lambda5-phosphanonyl'). Strict round trip inside.
+        from .radicals import _name_acyl_radical_from_acid, _name_carbon_radical
+        _acyl_name = _name_acyl_radical_from_acid(mol, _radical_center_idx)
+        if _acyl_name:
+            return _acyl_name
+        #: a monovalent carbon radical is named like its substituent
+        # group ('cyanomethyl', not 'cyanomethanyl'); strict round trip inside.
+        if radical_suffix == 'yl':
+            _c_name = _name_carbon_radical(mol, _radical_center_idx)
+            if _c_name:
+                return _c_name
         # / Table 3.4: radicals are named as SUBSTITUENT GROUPS. A SIMPLE
         # unbranched terminal radical keeps the contracted retained form WITHOUT a
         # locant — the Blue Book lists 'CH3-CH2• ethyl (PIN)' (the Blue Book
@@ -3048,6 +3062,13 @@ def _apply_radical_suffix(neutral_name: str, radical_suffix: str) -> str:
     if not neutral_name:
         return ''
     name = neutral_name
+    # (the Blue Book): other parent hydrides take 'yl' "eliding
+    # the final letter 'e'", so 'methylborane' -> 'methylboranylidene'
+    # ('boranylidene (preselected prefix) (not borylidene)',:15884). Only the
+    # Group-14 hydrides and alkanes drop the whole 'ane' (silyl, methyl).
+    from .radicals import _ELIDE_E_HYDRIDE_RADICAL
+    if any(name.endswith(h) for h in _ELIDE_E_HYDRIDE_RADICAL.values()):
+        return name[:-1] + radical_suffix
     if name.endswith('ane'):
         return name[:-3] + radical_suffix       #: methane->methyl
     if name.endswith('e'):
