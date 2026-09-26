@@ -141,7 +141,7 @@ When Orthonym cannot name a molecule, the plain call returns a label in place of
 
 ## More
 
-- [How it works](guide/how-it-works.md): the four parts of the engine, and what it is built on.
+- [How it works](guide/how-it-works.md): the four parts of the engine and the source layout.
 - [Declines](guide/declines.md): what a "no" looks like, and how to tell one from a name in code.
 - [How accuracy is measured](guide/accuracy.md): the three measures the engine is judged by.
 - [Contributing](CONTRIBUTING.md): development install, tests, source layout, how to add a compound class.
@@ -163,6 +163,26 @@ entry in APA and BibTeX. In BibTeX:
   url     = {https://github.com/Beilstein-Institut/Orthonym}
 }
 ```
+
+## Built on
+
+Orthonym stands on the IUPAC 2013 recommendations and on open cheminformatics software:
+[RDKit](https://www.rdkit.org/) reads the structure, [OPSIN 2.9.0](https://github.com/dan2097/opsin)
+reads every name back, and [centres 1.2.1](https://github.com/SiMolecule/centres) assigns the CIP
+descriptors. Without them there would be no Orthonym.
+
+> Favre, H. A.; Powell, W. H. *Nomenclature of Organic Chemistry: IUPAC Recommendations and
+> Preferred Names 2013*. Royal Society of Chemistry, **2013**.
+> [doi:10.1039/9781849733069](https://doi.org/10.1039/9781849733069)
+>
+> Lowe, D. M.; Corbett, P. T.; Murray-Rust, P.; Glen, R. C. Chemical Name to Structure: OPSIN,
+> an Open Source Solution. *J. Chem. Inf. Model.* **2011**, 51 (3), 739–753.
+> [doi:10.1021/ci100384d](https://doi.org/10.1021/ci100384d)
+>
+> Hanson, R. M.; Musacchio, S.; Mayfield, J. W.; Vainio, M. J.; Yerin, A.; Redkin, D. Algorithmic
+> Analysis of Cahn–Ingold–Prelog Rules of Stereochemistry: Proposals for Revised Rules and a Guide
+> for Machine Implementation. *J. Chem. Inf. Model.* **2018**, 58 (9), 1755–1765.
+> [doi:10.1021/acs.jcim.8b00324](https://doi.org/10.1021/acs.jcim.8b00324)
 
 ## Licence
 

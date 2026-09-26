@@ -23,19 +23,5 @@ src/orthonym/
 
 ## Built on
 
-Orthonym stands on the IUPAC 2013 recommendations and on open cheminformatics software:
-[RDKit](https://www.rdkit.org/) · [OPSIN 2.9.0](https://github.com/dan2097/opsin) ·
-[centres 1.2.1](https://github.com/SiMolecule/centres)
-
-> Favre, H. A.; Powell, W. H. *Nomenclature of Organic Chemistry: IUPAC Recommendations and
-> Preferred Names 2013*. Royal Society of Chemistry, **2013**.
-> [doi:10.1039/9781849733069](https://doi.org/10.1039/9781849733069)
->
-> Lowe, D. M.; Corbett, P. T.; Murray-Rust, P.; Glen, R. C. Chemical Name to Structure: OPSIN,
-> an Open Source Solution. *J. Chem. Inf. Model.* **2011**, 51 (3), 739–753.
-> [doi:10.1021/ci100384d](https://doi.org/10.1021/ci100384d)
->
-> Hanson, R. M.; Musacchio, S.; Mayfield, J. W.; Vainio, M. J.; Yerin, A.; Redkin, D. Algorithmic
-> Analysis of Cahn–Ingold–Prelog Rules of Stereochemistry: Proposals for Revised Rules and a Guide
-> for Machine Implementation. *J. Chem. Inf. Model.* **2018**, 58 (9), 1755–1765.
-> [doi:10.1021/acs.jcim.8b00324](https://doi.org/10.1021/acs.jcim.8b00324)
+RDKit, OPSIN and centres, on the IUPAC 2013 recommendations. The credits and references are in the
+README, under [Built on](../README.md#built-on).
