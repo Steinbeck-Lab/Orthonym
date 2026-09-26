@@ -83,11 +83,11 @@ from ..naming_utils import (
     BRANCH_HANDLED_FGS,
     SIMPLE_MULTIPLIERS,
     alpha_sort_key,
+    cip_descriptor_rank_key,
     enclose_if_compound,
     format_suffix_with_locants,
     get_suffix_multiplier_prefix,
     should_omit_locant_one,
-    strip_chalcogen_acid_locant,
 )
 
 logger = logging.getLogger(__name__)
@@ -740,21 +740,19 @@ def _generate_suffix(features: Any) -> Optional["NameFragment"]:
         return None
 
     # "Functional replacement in systematic names of carboxylic
-    # acids" (the Blue Book Blue Book;:30215): "... Normally, these
-    # [italic O/S/Se/Te] locants are omitted, because the exact position of
-    # chalcogen atoms is not known or important in acids; such letter
-    # locants are used mainly in naming esters." The Blue Book's own worked
-    # examples split by chalcogen on THIS (simple/handler, no other FG on
-    # the molecule) path: Se/Te drop the designator -- 'hexaneselenoic acid
-    # (PIN)' (:30235), 'benzenecarboselenoic acid (PIN)' (:30293) -- while S
-    # (thio) KEEPS it -- 'hexanethioic O-acid (PIN)' (:30225), 'ethanethioic
-    # O-acid (PIN)' (:30291), 'methanethioic S-acid (PIN)' (:30295). So the
-    # omission here is scoped to Se/Te ONLY: thioic_O_acid/thioic_S_acid are
-    # UNCHANGED, and so are the *_S_acid/*_Se_acid tautomer keys (out of
-    # scope per the SP4 scope guard -- those denote the OTHER tautomer,
-    # whose bare spelling would parse to the wrong structure).
-    if fg_name in ("selenoic_O_acid", "telluroic_O_acid"):
-        suffix_text = strip_chalcogen_acid_locant(suffix_text)
+    # acids" (the Blue Book Blue Book;:30215): the italic O/S/Se/Te
+    # designator is "normally" omitted "because the exact position of chalcogen
+    # atoms is not known". A SMILES always fixes that position (which atom
+    # carries the H), so the designator is kept for every chalcogen, exactly as
+    # the Blue Book does for a drawn tautomer: 'hexanethioic O-acid (PIN)'
+    # (-CS-OH,:30225) and '1,3-dithiodicarbonic S1,S3-acid (PIN)' (:31083),
+    # against '1,3-dithiodicarbonic acid (PIN; the location of the sulfur atoms
+    # is unknown)' (:31081). 'hexaneselenoic acid (PIN)' (:30235) is drawn
+    # C{O/Se}H -- the undetermined tautomer -- so it does not license dropping
+    # the designator for the determined C(=Se)-OH: that is 'propaneselenoic
+    # O-acid' (R13). The designator comes from the FG class, i.e. from the
+    # structure, never from a round trip (a full InChIKey cannot tell the
+    # C(=Se)O / C(=O)[SeH] tautomers apart).
 
     # Get locants for functional group positions on the chain
     locants = ()
@@ -802,24 +800,22 @@ def _generate_suffix(features: Any) -> Optional["NameFragment"]:
         # are counted nowhere here (BB VERBATIM 'N-methylethanimine' stays).
         _suffix_chain_len = len(features.principal_chain)
         _other_subs = 0
-        # Wave2 determinism fix: the _other_subs tightening (cite the suffix
-        # locant when a substituent is present) is scoped to NEUTRAL parents.
-        # For a CHARGED principal group (aminium/-ium) the numbering follows
-        # and HEAD deterministically ELIDED the suffix locant
-        # ('2-hydroxy-N,N,N-trimethylethanaminium'); forcing the locant there
-        # exposed an order-dependent charged-species numbering
-        # ('1-hydroxy…ethan-2-aminium' vs '2-hydroxy…ethan-1-aminium'). The
-        # motivating imine/selenol cases (1-cyclohexylethan-1-imine,
-        # 2-chloroethane-1-selenol) are all neutral, so this scope keeps them.
-        _is_charged = features.mol is not None and any(
-            a.GetFormalCharge() != 0 for a in features.mol.GetAtoms()
-        )
+        # The _other_subs tightening (cite the suffix locant when a substituent
+        # is present) applies to charged parents as well.
+        # (the Blue Book): "the omission of the locant '1' in
+        # 2-chloroethanol... is not allowed in preferred IUPAC names, thus the
+        # name 2-chloroethan-1-ol is the PIN"; '2-aminoethan-1-aminium chloride
+        # (PIN)' (:43572). It used to be scoped to NEUTRAL parents because forcing
+        # the locant on a charged one exposed an order-dependent numbering
+        # ('1-hydroxy...ethan-2-aminium' vs '2-hydroxy...ethan-1-aminium'); the
+        # quaternary-aminium producer has since oriented its chain from the
+        # N-carbon (ions.name_quaternary_aminium,, and the
+        # elided form shipped as a PIN ('2-hydroxy-N,N,N-trimethylethanaminium',
+        # wp7 verification panel).
         _pg_match_atoms: set = set()
         for _m in (features.principal_group_atoms or []):
             _pg_match_atoms.update(_m)
-        # Charged parents keep HEAD behavior (_other_subs stays 0 ->
-        # is_monosubstituted = fg_count == 1); the tightening is neutral-only.
-        if not _is_charged:
+        if True:
             if features.substituents:
                 # The chain-finder records the principal FG's own heteroatom(s)
                 # as a pseudo-substituent branch (imine =N on 'CC=N' shows up as
@@ -2165,7 +2161,8 @@ def _fragments_without_locants(
     from ..composition_primitives import _MULTIPLIER_PREFIXES
     prefix_idxs = [i for i, f in enumerate(out) if f.fragment_type == "prefix"]
     if not is_mononuclear_parent and len(prefix_idxs) >= 2:
-        order = sorted(prefix_idxs, key=lambda i: alpha_sort_key(out[i].text))
+        order = sorted(prefix_idxs, key=lambda i: (alpha_sort_key(out[i].text),
+                                                   cip_descriptor_rank_key(out[i].text)))
         for rank, i in enumerate(order):
             if rank == 0:
                 continue  # first cited prefix keeps its natural enclosing
@@ -2769,8 +2766,13 @@ def _assemble_fragments(
                     prefixes = adjusted
 
     # Alkyl prefixes are already sorted by _generate_alkyl_prefixes.
-    # For non-alkyl prefixes added later, sort all together.
-    prefixes.sort(key=lambda f: alpha_sort_key(f.text))
+    # For non-alkyl prefixes added later, sort all together. Two prefixes that
+    # differ only in configuration tie on alpha_sort_key excludes the
+    # descriptors, the Blue Book); (:22606) then orders them by the
+    # descriptors, R before S -- '1-[(2R)-butan-2-yl]-3-[(2S)-butan-2-yl]benzene
+    # (PIN)' (:3390ff). Without that tier the input order decided.
+    prefixes.sort(key=lambda f: (alpha_sort_key(f.text),
+                                 cip_descriptor_rank_key(f.text)))
 
     # Build prefix strings with locants
     # IUPAC rule: hyphens separate locants from names, and are needed

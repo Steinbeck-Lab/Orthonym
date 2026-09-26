@@ -86,7 +86,10 @@ def _pin_name(smiles):
     ("[N+](C)(C)(C)CCCC(=O)O", "3-carboxy-N,N,N-trimethylpropan-1-aminium"),
     # Bug B: the amine chain must win parent selection over the competing
     # phenol ring (ChEBI CHEBI:3350, candicine cation).
-    ("C[N+](C)(C)CCc1ccc(O)cc1", "2-(4-hydroxyphenyl)-N,N,N-trimethylethanaminium"),
+    # wp7 change-asserted-value: (the Blue Book) -- the substituted ethane
+    # parent keeps its locant '1' (':43572' '2-aminoethan-1-aminium chloride (PIN)'). Was
+    # '...-N,N,N-trimethylethanaminium'. OPSIN 2.9.0 full-InChIKey exact.
+    ("C[N+](C)(C)CCc1ccc(O)cc1", "2-(4-hydroxyphenyl)-N,N,N-trimethylethan-1-aminium"),
 ])
 def test_quaternary_aminium_bug_fixes_rt_exact(smiles, expected):
     name = _pin_name(smiles)
@@ -102,7 +105,9 @@ def test_quaternary_aminium_bug_fixes_rt_exact(smiles, expected):
     ("C[N+](C)(C)C", "N,N,N-trimethylmethanaminium"),
     ("c1cccc[n+]1C", "1-methylpyridin-1-ium"),
     ("C[N+](C)(C)CCCC(=O)[O-]", "4-(trimethylazaniumyl)butanoate"),
-    ("C[N+](C)(C)CCCCCC[N+](C)(C)C", "hexane-1,6-diylbis(trimethylazanium)"),
+    # / substitutive '-bis(aminium)' PIN (the Blue Book,:42366)
+    ("C[N+](C)(C)CCCCCC[N+](C)(C)C",
+     "N1,N1,N1,N6,N6,N6-hexamethylhexane-1,6-bis(aminium)"),
 ])
 def test_quaternary_aminium_regressions_unchanged(smiles, expected):
     name = _pin_name(smiles)

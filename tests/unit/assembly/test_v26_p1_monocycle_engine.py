@@ -40,6 +40,7 @@ from orthonym.namer import Orthonym, is_failure_name
 from orthonym.assembly.general_engine import name_general_monocycle
 from orthonym.validation.e1_certificate import verify_certificate
 from tests.support.jars import jar_or_none
+from tests.support.rt_assert import assert_full_rt
 
 
 pytestmark = pytest.mark.unit
@@ -53,13 +54,20 @@ NEWCOV_CASES = [
     # (trifluoromethyl)/(pentafluoroethyl) verbatim). The multiplied-fluoro
     # locants are omitted when unambiguous, all positions substituted:
     # 'pentafluoroethoxy' not '1,1,2,2,2-pentafluoroethoxy'). All RT-exact.
-    ("FC(F)(F)Oc1ccccc1", "1-(trifluoromethoxy)benzene"),
-    ("FC(F)(F)COc1ccccc1", "1-(2,2,2-trifluoroethoxy)benzene"),
-    ("FC(F)Oc1ccccc1", "1-(difluoromethoxy)benzene"),
-    ("FC(F)(F)C(F)(F)Oc1ccccc1", "1-(pentafluoroethoxy)benzene"),
-    ("ClCCOc1ccccc1", "1-(2-chloroethoxy)benzene"),
-    ("FCCOc1ccccc1", "1-(2-fluoroethoxy)benzene"),
-    ("FC(F)(F)CCOc1ccccc1", "1-(3,3,3-trifluoropropoxy)benzene"),
+    #
+    # 2026-09-25 (pre-existing-failures plan, Task 5, R15) change-asserted-value:
+    # the monosubstituted rows drop the '1-'. "The locant '1' is omitted:"
+    # (the Blue Book) "(c) in monosubstituted homogeneous monocyclic rings"
+    # (:2913), e.g. "bromobenzene (PIN)" (:2919) and "(cyclohexyloxy)benzene (PIN)"
+    # (:27768). OPSIN RT exact (test_names_opsin_roundtrip below). The disubstituted
+    # row keeps its locants.
+    ("FC(F)(F)Oc1ccccc1", "(trifluoromethoxy)benzene"),
+    ("FC(F)(F)COc1ccccc1", "(2,2,2-trifluoroethoxy)benzene"),
+    ("FC(F)Oc1ccccc1", "(difluoromethoxy)benzene"),
+    ("FC(F)(F)C(F)(F)Oc1ccccc1", "(pentafluoroethoxy)benzene"),
+    ("ClCCOc1ccccc1", "(2-chloroethoxy)benzene"),
+    ("FCCOc1ccccc1", "(2-fluoroethoxy)benzene"),
+    ("FC(F)(F)CCOc1ccccc1", "(3,3,3-trifluoropropoxy)benzene"),
     ("FC(F)(F)COc1ccc(F)cc1F", "2,4-difluoro-1-(2,2,2-trifluoroethoxy)benzene"),
 ]
 
@@ -79,9 +87,13 @@ DIRECT_ENGINE_CASES = [
     ("Cc1cncnc1", "5-methylpyrimidine"),
     ("Cc1ccnnc1", "4-methylpyridazine"),
     ("Cc1cnccn1", "2-methylpyrazine"),
-    ("C1CCCCC1C1CCCCC1", "1-cyclohexylcyclohexane"),
-    ("c1ccc(cc1)C1CCCCC1", "1-cyclohexylbenzene"),
-    ("O=C1CCCCC1", "cyclohexan-1-one"),
+    # R15 change-asserted-value (c),:2913): "cyclohexylbenzene (PIN)"
+    # (:17085); "cyclohexanone" (c) suffix case, the Blue Book). The first
+    # row is the engine's own substitutive form; the full namer's PIN for it is
+    # the ring assembly '1,1'-bi(cyclohexane)'. OPSIN RT exact.
+    ("C1CCCCC1C1CCCCC1", "cyclohexylcyclohexane"),
+    ("c1ccc(cc1)C1CCCCC1", "cyclohexylbenzene"),
+    ("O=C1CCCCC1", "cyclohexanone"),
     ("Oc1ccncc1", "pyridin-4-ol"),
     ("OC(=O)c1ccncc1", "pyridine-4-carboxylic acid"),
 ]
@@ -95,7 +107,7 @@ FAIL_CLOSED = {
     "fused cage (naphthalene)": "c1ccc2ccccc2c1",
     #: the "tier-5 ring-on-ring" entry was REMOVED — the ring-assembly
     # substituent namer (task #39) now names c1ccc(cc1)C1CCC(CC1)C1CCCCC1 as
-    # `1-([1,1'-bi(cyclohexan)]-4-yl)benzene` (RT-verified, E1-clean), exactly as
+    # `([1,1'-bi(cyclohexan)]-4-yl)benzene` (RT-verified, E1-clean), exactly as
     # test_complete_tier_names_spiro_acid was updated when gained spiro
     # naming. See test_complete_tier_names_ring_assembly_substituent below.
     # critical-defect fix: a spiro co-ring is perceived as a
@@ -232,11 +244,29 @@ def test_complete_tier_names_ring_assembly_substituent(production_gate):
     the ring-assembly substituent namer (task #39). The emission is RT-valid and
     E1-clean, so complete NAMES it rather than abstaining -- mirroring
     test_complete_tier_names_spiro_acid, updated when gained spiro naming."""
+    # 2026-09-25 change-asserted-value (preexisting-triage T6, ruling R16):
+    # * no '1-': "The locant '1' is omitted:... (c) in
+    # monosubstituted homogeneous monocyclic rings" (the Blue Book,
+    #:2913).
+    # * '(' not '{': "the square brackets of... ring assembly...
+    # names are ignored" (:7469), and (heading:7444) "the presence
+    # of square brackets and/or parentheses that are an integral part of the
+    # name of a parent structure does not affect the nesting order" (:7446),
+    # so the component parentheses of 'bi(cyclohexan)' do not count
+    # either. The Blue Book's own substitutive name encloses this substituent
+    # in parentheses: '4-[4-([1,1′-bi(cyclohexan)]-4-yl)phenyl]-4′-phenyl-
+    # 1,1′-bi(cyclohexane) (substitutive name)' (:17102).
+    # This is the SUBSTITUTIVE name, not the PIN. The PIN is the hydro-polyphenyl
+    # assembly name of (a) (:17079; example:50157
+    # '...-1^1,1^2,...,2^6-dodecahydro-1^1,2^1:2^4,3^1-terphenyl (PIN)'), which
+    # the engine does not build yet (open item, TRIAGE.md T6): the PIN tier
+    # abstains on this molecule and the complete tier ships this correct
+    # substitutive name.
     comp = Orthonym(style="pin", general_fallback=True,
                      allow_aromatic_general=True)
     out = comp.name(Chem.CanonSmiles("c1ccc(cc1)C1CCC(CC1)C1CCCCC1"))
-    assert out == "1-([1,1'-bi(cyclohexan)]-4-yl)benzene", (
-        f"expected the ring-assembly substituent PIN, got {out!r}")
+    assert out == "([1,1'-bi(cyclohexan)]-4-yl)benzene", (
+        f"expected the ring-assembly substitutive name, got {out!r}")
 
 
 def test_complete_tier_names_spiro_acid(production_gate):
@@ -266,11 +296,19 @@ def test_flag_off_monocycle_inert(smiles, _expected):
 
 
 @pytest.mark.parametrize("smiles,_expected", NEWCOV_CASES)
-def test_flag_off_full_namer_abstains(smiles, _expected, production_gate):
-    # With allow_aromatic_general OFF, complete-style namer still abstains on
-    # the NEWCOV cases (monocycle path inert; cage/chain paths do not fire).
+def test_flag_off_full_namer_rt_exact(smiles, _expected, production_gate):
+    # With allow_aromatic_general OFF (the 'valid' tier) the monocycle path stays
+    # inert (test_flag_off_monocycle_inert), but the namer no longer abstains on
+    # the NEWCOV cases: another producer names them. Pre-existing-failures plan,
+    # Task 9 (TRIAGE.csv rows 109-116; the test was test_flag_off_full_namer_abstains),
+    # user decision D-b (plan 'User decisions (answered 2026-09-24)'): "D-b -> the
+    # policy wins: where a wider-tier name round-trips EXACTLY, change the test to
+    # assert an exact round-trip." So the assertion is the full-InChIKey round
+    # trip, not a spelling (the PIN tier still abstains on these). The old
+    # accepted value (a failure name) was mutation-checked.
     nm = Orthonym(style="pin", general_fallback=True)
-    assert is_failure_name(nm.name(Chem.CanonSmiles(smiles)))
+    canon = Chem.CanonSmiles(smiles)
+    assert_full_rt(nm.name(canon), canon, what="valid tier: ")
 
 
 # --------------------------------------------------------------------------

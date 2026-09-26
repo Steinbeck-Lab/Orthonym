@@ -46,11 +46,14 @@ class TestQuaternaryAminium:
     def test_choline_quaternary(self):
         """ +: 2-hydroxyethyl-trimethyl quaternary cation ->
         ``2-hydroxy-N,N,N-trimethylethan-1-aminium`` (``choline`` is a non-PIN
-        biological trivial). Accept the elided locant-1 variant."""
-        assert Orthonym().name("OCC[N+](C)(C)C") in {
-            "2-hydroxy-N,N,N-trimethylethan-1-aminium",
-            "2-hydroxy-N,N,N-trimethylethanaminium",
-        }
+        biological trivial).
+
+         wp7 change-asserted-value: the elided '...ethanaminium' is no longer
+        accepted -- (the Blue Book) "the omission of the locant '1'
+        in 2-chloroethanol... is not allowed in preferred IUPAC names"; the
+        engine now cites it. OPSIN full-InChIKey exact."""
+        assert Orthonym().name("OCC[N+](C)(C)C") == \
+            "2-hydroxy-N,N,N-trimethylethan-1-aminium"
 
     def test_ethyldimethyl_quaternary(self):
         """: N-substituent alphabetization (ethyl < methyl, di-

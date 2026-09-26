@@ -410,11 +410,20 @@ class TestMultiplierFeedback:
 
     @pytest.mark.unit
     def test_complex_substituent_uses_bis(self):
+        # (Test id kept.) An UNSUBSTITUTED retained component such as '1,2-xylene' takes
+        # 'di', not 'bis' (no plan ruling; derived from the quoted rules): "General
+        # methodology" "(a)... Simple components are unsubstituted parent hydrides...; or
+        # retained names, such as acetic acid. All of these are multiplied by the
+        # multiplicative prefixes 'di', 'tri', etc." the Blue Book; "(c) any component
+        # which is substituted automatically requires use of the multiplicative forms 'bis',
+        # 'tris', etc.":7035; "1,4-di(propan-2-yl)cyclohexane (PIN)":25719 against
+        # "1,2-bis(bromomethyl)benzene (PIN)":25811 (the predicate is 'substituted', see
+        # _recompute_multiplicative_prefix). Non-name assert: no round trip applies.
         from orthonym.assembly.retained_substitution import _build_rewrite
         from orthonym.data.triviality_controller_seed import SEED_TABLE
         entry = SEED_TABLE[Chem.CanonSmiles("Cc1ccccc1C")]
         out = _build_rewrite(NameTreeNode(parent_stem="x", multiplicative_prefix="di"), entry, ())
-        assert out.multiplicative_prefix == "bis"
+        assert out.multiplicative_prefix == "di"
 
 
 class TestMidNameSwapBeforeAlpha:

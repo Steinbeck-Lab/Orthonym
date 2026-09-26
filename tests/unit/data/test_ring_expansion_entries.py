@@ -227,15 +227,19 @@ class TestTerpenoidNPEntries:
 # =========================================================================
 
 class TestNorborneneEntry:
-    """Norbornene: bicyclo[2.2.1]hept-2-ene."""
+    """Norbornene: bicyclo[2.2.1]hept-2-ene. Not a retained name."""
 
-    def test_entry_exists(self):
+    def test_entry_absent(self):
+        # PIN per R11: "RETAINED NAMES FOR VON BAEYER PARENT HYDRIDES" the Blue Book "The retained names adamantane and cubane are used in general nomenclature and as preferred IUPAC names."; "bicyclo[2.2.1]heptane (PIN)":2038; OPSIN RT exact.
+        # 'norbornene' is not retained, so the table must not carry it.
         can = _canonical('C1=CC2CCC1C2')
-        assert can in BICYCLO_RETAINED_NAMES
+        assert can not in BICYCLO_RETAINED_NAMES
 
     def test_name(self):
+        # PIN per R11 (as above): the von Baeyer name, OPSIN RT exact.
+        from orthonym import name_compound
         can = _canonical('C1=CC2CCC1C2')
-        assert BICYCLO_RETAINED_NAMES[can] == 'norbornene'
+        assert name_compound(can) == 'bicyclo[2.2.1]hept-2-ene'
 
     def test_canonical_roundtrip(self):
         can = _canonical('C1=CC2CCC1C2')

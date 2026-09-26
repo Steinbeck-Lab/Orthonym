@@ -91,12 +91,71 @@ _TIER_CONTRACT = {
 }
 
 
+# Rows whose PIN needs a producer of the paused large-polycycle plan
+# (docs/the workflow tooling/plans/2026-09-24-large_polycycles-large-polycycles.md), pre-existing-
+# failures plan Task 5, TRIAGE rows 89, 90, 101, 102. Both skeletons contain an
+# ortho-fused pair of six-membered rings, so their PIN is a (hydro) bridged fused
+# name, not von Baeyer: (the Blue Book) "the bridged fused ring
+# name is preferred to the von Baeyer name", and (:19532) ranks
+# "(d) bridged fused ring system" above "(e) nonfused bridged ring system". The
+# PIN tier still labels the von Baeyer name a PIN; large-polycycle Task 6a refuses it
+# there and routes the class to the hydro-fusion producers. The rows are
+# xfail(strict) on that PIN contract, so the day Task 6a lands they XPASS and
+# must be unmarked; the best-effort name stays RT-exact
+# (test_large_polycycle_blocked_rows_best_effort_rt_exact below, not xfail).
+_LARGE_POLYCYCLE_BLOCKED = {
+    "CC1(C)C(O)C(O)CC2(C)C1CCC13CC(CCC21)C1(C)OC31":
+        "needs large-polycycle Task 6a: hydro bridged-fused PIN "
+        "(P-52.2.5.2; the von Baeyer name is not the PIN)",
+    # Also mis-numbered as a von Baeyer name: (:9685) "The
+    # superscript locants for the secondary bridges must be as low as possible
+    # when considered as a set" -- 0^1,6 beats the shipped 0^4,9 (large-polycycle
+    # Task 10, descriptor selection across tied decompositions).
+    "CC1(C)CC=C[C@]2(C)OO[C@@H]3C[C@@]12CC[C@H]3O":
+        "needs large-polycycle Task 6a: hydro bridged-fused PIN (P-52.2.5.2); "
+        "Task 10: P-23.2.6.2.4 von Baeyer superscript locants",
+}
+
+
+def _assert_large_polycycles_pin_contract(smiles):
+    """What large-polycycle Task 6a delivers for a blocked row: the PIN tier never
+    ships the von Baeyer name as the PIN -- it names the bridged fused PIN or
+    fails closed -- and whatever it ships is RT-exact."""
+    from orthonym.errors import is_failure_name
+    from tests.support.rt_assert import name_is_rt_exact
+    pin = name_compound(smiles)
+    assert is_failure_name(pin) or (
+        "cyclo[" not in pin and name_is_rt_exact(pin, smiles)), (
+        f"PIN tier ships a von Baeyer name for {smiles}: {pin!r}")
+
+
 def _tier_params(rows):
     """Parametrize rows, running each tier-contract row with the OPSIN validity
     gate ON (`opsin_gate`): the contract is about what SHIPS. The ids stay
-    positional, so no other row's id moves."""
-    return [pytest.param(*row, marks=pytest.mark.opsin_gate)
-            if row[0] in _TIER_CONTRACT else row for row in rows]
+    positional, so no other row's id moves. An large-polycycle-blocked row is also
+    xfail(strict) with the blocking task as its reason."""
+    params = []
+    for row in rows:
+        if row[0] in _LARGE_POLYCYCLE_BLOCKED:
+            params.append(pytest.param(*row, marks=[
+                pytest.mark.opsin_gate,
+                pytest.mark.xfail(strict=True, reason=_LARGE_POLYCYCLE_BLOCKED[row[0]]),
+            ]))
+        elif row[0] in _TIER_CONTRACT:
+            params.append(pytest.param(*row, marks=pytest.mark.opsin_gate))
+        else:
+            params.append(row)
+    return params
+
+
+@pytest.mark.integration
+@pytest.mark.opsin_gate
+@pytest.mark.parametrize("smiles", sorted(_LARGE_POLYCYCLE_BLOCKED))
+def test_large_polycycle_blocked_rows_best_effort_rt_exact(smiles):
+    """Breadth never drops while a row waits on large-polycycle: best-effort names it
+    and the name round-trips to the full InChIKey."""
+    from tests.support.rt_assert import assert_rt_exact
+    assert_rt_exact(smiles)
 
 
 # ---------------------------------------------------------------------------
@@ -115,15 +174,44 @@ ROUNDTRIP_VERIFIED = [
     ("CCCCCCCCCCCC/C=C/C(=O)O", "(2E)-pentadec-2-enoic acid"),
     ("CCCCCCC#CCCCC(=O)O", "dodec-5-ynoic acid"),
     ("CC/C=C\\C/C=C\\C/C=C\\CC#CCCCCC(=O)O", "(9Z,12Z,15Z)-octadeca-9,12,15-trien-6-ynoic acid"),
-    ("CCCCCCCCCCCCCCCCCCOCC(O)CO", "3-octadecyloxy-2-hydroxypropan-1-ol"),
+    # PIN (no plan ruling; derived from the quoted rule): "Substitutive nomenclature, prefix mode" "Hydroxy groups are indicated by the
+    # prefix 'hydroxy' when: (1) a group having priority for citation as the principal
+    # characteristic group is present; or (2) a hydroxy group cannot be denoted by a suffix."
+    # the Blue Book-27260 -- neither holds for an -OH on the parent chain, and
+    # "The senior parent structure has the maximum number of substituents corresponding to
+    # the principal characteristic group (suffix)" (:18875); cf.
+    # "3-(1-hydroxycyclohexyl)propane-1,2-diol (PIN)":27268. OPSIN RT exact (TRIAGE.csv;
+    # re-checked in Task 7/8).
+    ("CCCCCCCCCCCCCCCCCCOCC(O)CO", "3-(octadecyloxy)propane-1,2-diol"),
     ("CC/C(C)=C\\CC/C(C)=C/CC(C)C(C)CC=O", "(6E,10Z)-3,4,7,11-tetramethyltrideca-6,10-dienal"),
     ("O=C(O)CCCCCCCCCCCCCCCCCCCCCCCCCCCCCCO", "31-hydroxyhentriacontanoic acid"),
     ("CCCCCCCCCC/C=C/CCCCCCCCCC(=O)O", "(11E)-docos-11-enoic acid"),
     ("CC/C=C/C=C\\CCCCCC(=O)O", "(7Z,9E)-dodeca-7,9-dienoic acid"),
     ("CCCCCCCCCCCCCC(O)CC", "hexadecan-3-ol"),
-    ("CCCCCCCCCCCCCC=CC(O)C(N)CO", "2-amino-3-hydroxyoctadec-4-en-1-ol"),
-    ("OC/C=C/C#CC#C/C=C/C=C/C(O)CCO", "(2E,8E,10E)-12-hydroxytetradeca-2,8,10-trien-4,6-diyne-1,14-diol"),
-    ("CCCCCCCCCCCCCCC(O)[C@@H](O)[C@@H](N)CO", "(2S,3S)-2-amino-3,4-dihydroxyoctadecan-1-ol"),
+    # PIN (no plan ruling; derived from the quoted rule): "Substitutive nomenclature, prefix mode" "Hydroxy groups are indicated by the
+    # prefix 'hydroxy' when: (1) a group having priority for citation as the principal
+    # characteristic group is present; or (2) a hydroxy group cannot be denoted by a suffix."
+    # the Blue Book-27260 -- neither holds for an -OH on the parent chain, and
+    # "The senior parent structure has the maximum number of substituents corresponding to
+    # the principal characteristic group (suffix)" (:18875); the Blue Book's
+    # own systematic form "(2S,3R,4E)-2-aminooctadec-4-ene-1,3-diol":55235.
+    # OPSIN RT exact (TRIAGE.csv; re-checked in Task 7/8).
+    ("CCCCCCCCCCCCCC=CC(O)C(N)CO", "2-aminooctadec-4-ene-1,3-diol"),
+    # 2026-09-25 (pre-existing-failures plan, Task 5, TRIAGE row 95) change-asserted-value:
+    # every -OH is the principal characteristic group:18875, maximum number of
+    # principal groups), and "NUMBERING" (:3219) gives "(c) principal characteristic
+    # groups and free valences (suffixes)" (:3256) low locants before "(e) saturation/
+    # unsaturation" (:3288): {1,3,14} < {1,12,14}. OPSIN RT exact.
+    ("OC/C=C/C#CC#C/C=C/C=C/C(O)CCO", "(4E,6E,12E)-tetradeca-4,6,12-trien-8,10-diyne-1,3,14-triol"),
+    # PIN (no plan ruling; derived from the quoted rule): "Substitutive nomenclature, prefix mode" "Hydroxy groups are indicated by the
+    # prefix 'hydroxy' when: (1) a group having priority for citation as the principal
+    # characteristic group is present; or (2) a hydroxy group cannot be denoted by a suffix."
+    # the Blue Book-27260 -- neither holds for an -OH on the parent chain, and
+    # "The senior parent structure has the maximum number of substituents corresponding to
+    # the principal characteristic group (suffix)" (:18875); cf.
+    # "(2S,3S)-2-aminooctadecane-1,3-diol":55239. OPSIN RT exact (TRIAGE.csv;
+    # re-checked in Task 7/8).
+    ("CCCCCCCCCCCCCCC(O)[C@@H](O)[C@@H](N)CO", "(2S,3S)-2-aminooctadecane-1,3,4-triol"),
     (
         "CCCCCC(O)CC(=O)CCCCCC(O)CC(=O)CCCCCC(O)CC(=O)CCCCCC(O)CC(O)CC(C)O",
         "6,14,22,30,32,34-hexahydroxypentatriacontane-8,16,24-trione",
@@ -133,19 +221,42 @@ ROUNDTRIP_VERIFIED = [
     ("C/C=C/CCCCCCCCC", "(2E)-dodec-2-ene"),
 
     # Aromatic compounds
-    ("Cc1ccc(N)cc1N", "2,4-diamino-1-methylbenzene"),
+    # PIN (no plan ruling; derived from the quoted rule): "When all amino groups
+    # cannot be expressed as suffixes, or when the –NH2 group is not the principal
+    # characteristic group, the prefix 'amino' is used in preferred IUPAC names."
+    # the Blue Book -- neither holds, so both -NH2 are the suffix; cf.
+    # "3,3′-dimethyl[1,1′-biphenyl]-4,4′-diamine (PIN)":26344; suffix locants {1,3} first, then methyl 4
+    # (c), (f)). OPSIN RT exact (TRIAGE.csv; re-checked in Task 7/8).
+    ("Cc1ccc(N)cc1N", "4-methylbenzene-1,3-diamine"),
     ("OCc1ccc(O)cc1", "4-(hydroxymethyl)phenol"),  #: phenol suffix routing
-    ("CN(C)c1ccc(N)cc1", "1-amino-4-(N,N-dimethylamino)benzene"),
+    # 2026-09-25 (pre-existing-failures plan, Task 5, TRIAGE row 98) change-asserted-value:
+    # both amino N are the principal group (benzene-1,4-diamine parent,, and
+    # (:7739) differentiates the N atoms of a diamine by superscript parent
+    # locants ("N1-(4-aminophenyl)-N4-phenylbenzene-1,4-diamine (PIN)":26404). OPSIN RT exact.
+    ("CN(C)c1ccc(N)cc1", "N1,N1-dimethylbenzene-1,4-diamine"),
 
     # Fused aromatic — a phase Plan 02 Task 03: (a) cascade unblock.
     # Pre-148 ring-as-parent (`3-carboxymethyl-5-chloro-1H-indole`) placed acid
     # PG on ring-substituent prefix violation); post-148 cascade picks
     # chain (acid PG); indole rendered as `1H-indol-3-yl` substituent.
     # Acceptable churn — new name OPSIN-roundtrip-verified.
-    ("O=C(O)Cc1c[nH]c2ccc(Cl)cc12", "2-(5-chloro-1H-indol-3-yl)ethanoic acid"),  # (a) chain wins (acid PG)
+    # PIN per R3: "Retained names as preferred IUPAC names" "Only the following five carboxylic acids
+    # retained names and are also preferred IUPAC names. All can be functionalized, but only
+    # acetic acid, benzoic acid, and oxamic acid can be substituted" the Blue Book,
+    # "acetic acid (PIN) ethanoic acid":29725; "All locants are omitted for parent
+    # compounds when all substitutable hydrogen atoms have the same locant.":3031;
+    # "(1H-indol-1-yl)acetic acid (PIN)":2039. OPSIN RT exact (TRIAGE.csv; re-checked in
+    # Task 7/8).
+    ("O=C(O)Cc1c[nH]c2ccc(Cl)cc12", "(5-chloro-1H-indol-3-yl)acetic acid"),  # (a) chain wins (acid PG)
 
     # Heterocyclic
-    ("C1=CN1", "azirene"),
+    # PIN (no plan ruling for the stem; derived from the quoted rules): "The
+    # stem 'irine' is used in place of 'irene' for rings only containing nitrogen
+    # heteroatoms; otherwise the stem 'irene' is used." the Blue Book:
+    # "used as follows to generate preferred IUPAC names":8384); the '1H' per R1:
+    # "in preferred IUPAC names indicated hydrogen must always be cited":24639. OPSIN RT
+    # exact (TRIAGE.csv; re-checked in Task 7/8).
+    ("C1=CN1", "1H-azirine"),
 
     # Polycyclic (von Baeyer)
     (
@@ -161,10 +272,17 @@ ROUNDTRIP_VERIFIED = [
         "8-hydroxy-1,2,6,6,10,17,17-heptamethyl-7-oxo-pentacyclo[12.8.0.0(2,11).0(5,10).0(15,20)]docos-13-ene-20-carboxylic acid",  # Updated P72: IUPAC citation order
     ),
 
-    # Steroid (natural product, with stereodescriptors)
+    # Steroid (natural product; the stereoparent implies the descriptors)
+    # Controller ruling (plan 'Controller rulings'; TRIAGE.md): a stereoparent name is
+    # kept at the PIN tier when it round-trips exactly "Preferred IUPAC names (PINs)
+    # are not identified for the compounds in this Chapter." the Blue Book).
+    # "Stereochemical configuration of parent structures" "The name of a
+    # fundamental parent structure usually implies the absolute configuration of all
+    # chirality centers... without further specification.":51047. Reasoning-backed (no
+    # plan ruling R-n). OPSIN RT exact, full InChIKey (TRIAGE.csv; re-checked in Task 7/8).
     (
         "CC(C)C(=O)CC[C@@H](C)[C@H]1CC[C@H]2[C@@H]3CCC4=CCCC[C@]4(C)[C@H]3CC[C@]12C",
-        "(8S,9S,10R,13R,14S,17R,20R)-cholest-4-en-24-one",
+        "cholest-4-en-24-one",
     ),
 ]
 
@@ -229,7 +347,10 @@ CORE_NAMING = [
     # Retained heterocyclic names
     ("c1ccncc1", "pyridine"),
     ("c1ccoc1", "furan"),
-    ("c1cc[nH]c1", "pyrrole"),
+    # PIN per R1: "in preferred IUPAC names indicated hydrogen must always be
+    # cited when present in the corresponding structure" the Blue Book; "1H-pyrrole
+    # (PIN)":24645. OPSIN RT exact (TRIAGE.csv; re-checked in Task 7/8).
+    ("c1cc[nH]c1", "1H-pyrrole"),
     ("c1ccsc1", "thiophene"),
 
     # Simple ethers
@@ -259,11 +380,21 @@ CORE_NAMING = [
 
     # Sulfur compounds
     ("CS", "methanethiol"),
-    ("CS(=O)(=O)C", "dimethyl sulfone"),
+    # PIN per R8: "SULFOXIDES AND SULFONES" "(1) substitutively, by prefixing the name
+    # of the acyl group R′-SO– or R′-SO2– to the name of the parent hydride" the Blue Book;
+    # "Methods (1) and (3) generate preferred names.":28088; "the preferred
+    # prefixes are enclosed in parentheses even though they are simple prefixes":31262;
+    # "(methanesulfinyl)methane (PIN)":46154. OPSIN RT exact (TRIAGE.csv; re-checked in
+    # Task 7/8).
+    ("CS(=O)(=O)C", "(methanesulfonyl)methane"),
 
-    # Retained names
-    ("OCCO", "ethylene glycol"),
-    ("OCC(O)CO", "glycerol"),
+    # Retained names are general-nomenclature only; the PINs are systematic.
+    # PIN per R2: (under "Retained names") "The following names are
+    # retained but only for general nomenclature and only when unsubstituted."
+    # the Blue Book; "ethylene glycol ethane-1,2-diol (PIN)":26774; "glycerol
+    # propane-1,2,3-triol (PIN)":26776. OPSIN RT exact (TRIAGE.csv; re-checked in Task 7/8).
+    ("OCCO", "ethane-1,2-diol"),
+    ("OCC(O)CO", "propane-1,2,3-triol"),
 ]
 
 
@@ -279,6 +410,9 @@ class TestRoundTripRegression:
                              ids=[f"rt-{i}" for i in range(len(ROUNDTRIP_VERIFIED))])
     def test_roundtrip_verified(self, smiles, expected_name):
         """Verify round-trip confirmed names never regress."""
+        if smiles in _LARGE_POLYCYCLE_BLOCKED:
+            _assert_large_polycycles_pin_contract(smiles)
+            return
         if smiles in _TIER_CONTRACT:
             assert_tier_contract(smiles)
             return
@@ -668,7 +802,15 @@ PHASE24_PARSE_FIXES = [
     # A2: hydroxymethyl + chloro on benzene
     (
         "OCc1ccc(Cl)cc1",
-        "1-chloro-4-(hydroxymethyl)benzene",
+        # PIN (no plan ruling; derived from the quoted rules): "Hydroxy groups are indicated
+        # by the prefix 'hydroxy' when: (1) a group having priority for citation as the principal
+        # characteristic group is present; or (2) a hydroxy group cannot be denoted by a suffix."
+        # the Blue Book-27260 -- neither holds; "The senior parent structure has the
+        # maximum number of substituents corresponding to the principal characteristic group
+        # (suffix)" (:18875), so the -OH carbon is the parent (methanol); cf.
+        # "cyclopropyl(phenyl)methanol (PIN)":7302. OPSIN RT exact (TRIAGE.csv; re-checked in
+        # Task 7/8).
+        "(4-chlorophenyl)methanol",
         "bracket-chloro-hydroxymethyl",
     ),
     # A3: (a) chain-as-parent on indole (a phase Plan 02 Task 03)
@@ -685,25 +827,36 @@ PHASE24_PARSE_FIXES = [
     # B1: Biphenyl ether -> phenoxy (was bare "oxy")
     (
         "COc1cc(O)cc(C)c1Oc1cc(C)cc(O)c1O",
-        "3-methoxy-5-methyl-4-phenoxyphenol",  #: phenol suffix routing
+        # 2026-09-25 (pre-existing-failures plan, Task 5, TRIAGE rows 75/85) change-asserted-value: (the Blue Book) "The senior parent structure has the maximum number of substituents corresponding to the principal characteristic group (suffix)": the ring with two -OH is the parent. The old value named a different molecule. OPSIN RT exact.
+        "3-(4-hydroxy-2-methoxy-6-methylphenoxy)-5-methylbenzene-1,2-diol",
         "oxy-biphenyl-ether-phenoxy",
     ),
     # B2: Glycoside on benzene -> (oxan-2-yl)oxy (was hexosyloxy, originally bare "oxy")
     (
         "Cc1ccc(O[C@H]2O[C@@H](C(=O)O)C(O)[C@@H](O)C2O)c(O)c1",
-        "((2R,4R,6S)-3,4,5,6-tetrahydroxyoxane-2-carboxylic acid)-4-methylbenzene-1,2-diol",  #: phenol suffix routing + decomposition
+        # PIN (no plan ruling; derived from the quoted rules): "SENIORITY ORDER FOR CLASSES"
+        # (the Blue Book) ranks "7 Acids" (:18170) above "17 Hydroxy compounds" (:18190), so
+        # the carboxylic acid is the suffix and every -OH a prefix "(1) a group having
+        # priority for citation as the principal characteristic group is present":27259); oxane
+        # O1, COOH at C2; "The name of a prefix for a substituent is considered to begin
+        # with the first letter of its complete name.":3477 ('hydroxy' before 'hydroxymethylphenoxy').
+        # The old value named a different molecule (TRIAGE expected_rt 'wrong'). OPSIN RT exact,
+        # full InChIKey (TRIAGE.csv; re-checked in Task 7/8).
+        "(2R,4R,6R)-3,4,5-trihydroxy-6-(2-hydroxy-4-methylphenoxy)oxane-2-carboxylic acid",
         "oxy-glycoside-oxanyloxy",
     ),
     # B3: Galloyl ester chain -> tetradecoxy (was bare "oxy")
     (
         "O=C(O)c1cc(O)c(O)c(OC(=O)c2cc(O)c(O)c(OC(=O)c3cc(O)c(O)c(O)c3)c2)c1",
-        "3-tetradecoxy-4,5-dihydroxybenzoic acid",
+        # 2026-09-25 (pre-existing-failures plan, Task 5, TRIAGE rows 79/86) change-asserted-value:: a compound acyl/organyl is cited inside its own marks with "oxy" outside ("4-[(3-ethoxy-3-oxopropanoyl)oxy]phenyl..." the Blue Book, "4-[(4-carboxycyclohexyl)oxy]":23198); nesting "{[({})]}" (:7446); alphanumerical order by the complete name (:3477) and (g) lowest locants to the prefix cited first (:3307). The old value named a different molecule. OPSIN RT exact.
+        "3-({3,4-dihydroxy-5-[(3,4,5-trihydroxybenzoyl)oxy]benzoyl}oxy)-4,5-dihydroxybenzoic acid",
         "oxy-galloyl-ester-tetradecoxy",
     ),
     # B4: Complex ether chain -> decoxy (was bare "oxy")
     (
         "C=CCN(C)CCCCCCOc1ccc(C(=O)c2ccc(Br)cc2)c(F)c1",
-        "1-decoxy-3-fluorobenzene",
+        # 2026-09-25 (pre-existing-failures plan, Task 5, TRIAGE rows 76/84) change-asserted-value:: a compound acyl/organyl is cited inside its own marks with "oxy" outside ("4-[(3-ethoxy-3-oxopropanoyl)oxy]phenyl..." the Blue Book, "4-[(4-carboxycyclohexyl)oxy]":23198); nesting "{[({})]}" (:7446); alphanumerical order by the complete name (:3477) and (g) lowest locants to the prefix cited first (:3307). The old value named a different molecule. OPSIN RT exact.
+        "(4-bromophenyl)[2-fluoro-4-({6-[methyl(prop-2-en-1-yl)amino]hexyl}oxy)phenyl]methanone",
         "oxy-complex-ether-decoxy",
     ),
     # B5: Sugar glycoside on benzene -> rhamnopyranosyloxy (was hexosyloxy, then oxan-2-yl)
@@ -716,7 +869,13 @@ PHASE24_PARSE_FIXES = [
     # B6: Fused ring system -> xanthone (correctly identified after a phase xanthone entry)
     (
         "COc1cc(OC)c2c(=O)c3c(O)cc(C)cc3oc2c1",
-        "8-hydroxy-1,3-dimethoxy-6-methylxanthone",  # a phase: xanthone core now recognized
+        # 2026-09-25 (pre-existing-failures plan, Task 5, TRIAGE row 78, R18)
+        # change-asserted-value: (the Blue Book) names the ketone
+        # on the PIN parent xanthene (:11634), '9H-xanthen-9-one', not 'xanthone';
+        # the locant sets {1,3,6,8} tie, so "(g) lowest locants for the
+        # substituent cited first as a prefix in the name" (:3307) gives hydroxy 1.
+        # OPSIN RT exact.
+        "1-hydroxy-6,8-dimethoxy-3-methyl-9H-xanthen-9-one",
         "oxy-fused-ring-phenoxy",
     ),
     # B7: Dimethyl benzene with glycoside -> (oxan-2-yl)oxy (was hexosyloxy)
@@ -733,10 +892,13 @@ PHASE24_PARSE_FIXES = [
         "anisole",
         "stability-anisole-retained-name",
     ),
-    # S2: acetyloxybenzene stays correct
+    # S2: phenyl acetate (the ester is the principal class)
     (
         "CC(=O)Oc1ccccc1",
-        "acetyloxybenzene",
+        # PIN per R5: "All preferred IUPAC names for esters are named by functional
+        # class nomenclature." the Blue Book; "ethyl acetate (PIN)":31667;
+        # "acetic acid (PIN)":29725. OPSIN RT exact (TRIAGE.csv; re-checked in Task 7/8).
+        "phenyl acetate",
         "stability-acetyloxy-unchanged",
     ),
 ]
@@ -806,25 +968,36 @@ PHASE24_PARSE_FIXES_ROUNDTRIP = [
     # RT2: phenoxy parses in OPSIN (was bare "oxy" - OPSIN failed)
     (
         "COc1cc(O)cc(C)c1Oc1cc(C)cc(O)c1O",
-        "3-methoxy-5-methyl-4-phenoxyphenol",  #: phenol suffix routing
+        # 2026-09-25 (pre-existing-failures plan, Task 5, TRIAGE rows 75/85) change-asserted-value: (the Blue Book) "The senior parent structure has the maximum number of substituents corresponding to the principal characteristic group (suffix)": the ring with two -OH is the parent. The old value named a different molecule. OPSIN RT exact.
+        "3-(4-hydroxy-2-methoxy-6-methylphenoxy)-5-methylbenzene-1,2-diol",
         "rt-phenoxy-biphenyl-ether",
     ),
     # RT3: tetradecoxy parses in OPSIN (was bare "oxy" - OPSIN failed)
     (
         "O=C(O)c1cc(O)c(O)c(OC(=O)c2cc(O)c(O)c(OC(=O)c3cc(O)c(O)c(O)c3)c2)c1",
-        "3-tetradecoxy-4,5-dihydroxybenzoic acid",
+        # 2026-09-25 (pre-existing-failures plan, Task 5, TRIAGE rows 79/86) change-asserted-value:: a compound acyl/organyl is cited inside its own marks with "oxy" outside ("4-[(3-ethoxy-3-oxopropanoyl)oxy]phenyl..." the Blue Book, "4-[(4-carboxycyclohexyl)oxy]":23198); nesting "{[({})]}" (:7446); alphanumerical order by the complete name (:3477) and (g) lowest locants to the prefix cited first (:3307). The old value named a different molecule. OPSIN RT exact.
+        "3-({3,4-dihydroxy-5-[(3,4,5-trihydroxybenzoyl)oxy]benzoyl}oxy)-4,5-dihydroxybenzoic acid",
         "rt-tetradecoxy-galloyl",
     ),
     # RT4: decoxy parses in OPSIN (was bare "oxy" - OPSIN failed)
     (
         "C=CCN(C)CCCCCCOc1ccc(C(=O)c2ccc(Br)cc2)c(F)c1",
-        "1-decoxy-3-fluorobenzene",
+        # 2026-09-25 (pre-existing-failures plan, Task 5, TRIAGE rows 76/84) change-asserted-value:: a compound acyl/organyl is cited inside its own marks with "oxy" outside ("4-[(3-ethoxy-3-oxopropanoyl)oxy]phenyl..." the Blue Book, "4-[(4-carboxycyclohexyl)oxy]":23198); nesting "{[({})]}" (:7446); alphanumerical order by the complete name (:3477) and (g) lowest locants to the prefix cited first (:3307). The old value named a different molecule. OPSIN RT exact.
+        "(4-bromophenyl)[2-fluoro-4-({6-[methyl(prop-2-en-1-yl)amino]hexyl}oxy)phenyl]methanone",
         "rt-decoxy-complex-ether",
     ),
     # RT5: chloro + hydroxymethyl with brackets parses in OPSIN
     (
         "OCc1ccc(Cl)cc1",
-        "1-chloro-4-(hydroxymethyl)benzene",
+        # PIN (no plan ruling; derived from the quoted rules): "Hydroxy groups are indicated
+        # by the prefix 'hydroxy' when: (1) a group having priority for citation as the principal
+        # characteristic group is present; or (2) a hydroxy group cannot be denoted by a suffix."
+        # the Blue Book-27260 -- neither holds; "The senior parent structure has the
+        # maximum number of substituents corresponding to the principal characteristic group
+        # (suffix)" (:18875), so the -OH carbon is the parent (methanol); cf.
+        # "cyclopropyl(phenyl)methanol (PIN)":7302. OPSIN RT exact (TRIAGE.csv; re-checked in
+        # Task 7/8).
+        "(4-chlorophenyl)methanol",
         "rt-chloro-hydroxymethyl",
     ),
 ]
@@ -883,7 +1056,12 @@ PHASE24_RT_IMPROVEMENTS = [
     # Isoindoline dione format (phthalimide) -- normalized to isoindoline-1,3-dione
     (
         "Cc1cc(N2C(=O)c3ccccc3C2=O)n(C)n1",
-        "isoindoline-1,3-dione",
+        # 2026-09-25 (pre-existing-failures plan, Task 5, TRIAGE row 87)
+        # change-asserted-value: R21: (the Blue Book) "Cyclic imides are preferably named as heterocyclic pseudoketones"; "2-phenyl-1H-isoindole-1,3(2H)-dione (PIN)... N-phenylphthalimide" (:33853); (:24689) added indicated hydrogen is preferred over hydro prefixes for PINs; (:24256) 'isoindoline' is not
+        # used in PINs; the pyrazolyl keeps its indicated hydrogen;
+        # '(1H-indol-1-yl)acetic acid (PIN)':2039). The old value was a fragment
+        # of the name. OPSIN RT exact.
+        "2-(1,3-dimethyl-1H-pyrazol-5-yl)-1H-isoindole-1,3(2H)-dione",
         "isoindoline-dione-format",
     ),
     # Isoindoline dione with prefix -- normalized to isoindoline-1,3-dione
@@ -988,6 +1166,9 @@ class TestPhase24RTImprovements:
     )
     def test_rt_improvements(self, smiles, expected_name, test_id):
         """Verify a phase Plan 04 fixes never regress."""
+        if smiles in _LARGE_POLYCYCLE_BLOCKED:
+            _assert_large_polycycles_pin_contract(smiles)
+            return
         if smiles in _TIER_CONTRACT:
             assert_tier_contract(smiles)
             return

@@ -55,8 +55,14 @@ class TestCationToPrefixProducer:
         assert _cation_prefix("C[N+](C)(C)CC(=O)[O-]") == "trimethylazaniumyl"
 
     def test_mixed_n_substituents_alphabetized_multiplied(self):
-        """N-ethyl-N,N-dimethyl -> ethyldimethylazaniumyl (alphabetical + di-)."""
-        assert _cation_prefix("CC[N+](C)(C)CC(=O)[O-]") == "ethyldimethylazaniumyl"
+        """N-ethyl-N,N-dimethyl -> ethyldi(methyl)azaniumyl (alphabetical + di-).
+
+         (the Blue Book), mononuclear parent: the first cited
+        substituent is bare, "The second and further substituents are each
+        enclosed with parentheses even for simple substituents", the multiplier
+        outside -- 'ethyldi(methyl)phosphane (PIN)' (:7290),
+        'methyldi(phenyl)phosphaniumyl' inside a PIN (:42468)."""
+        assert _cation_prefix("CC[N+](C)(C)CC(=O)[O-]") == "ethyldi(methyl)azaniumyl"
 
     def test_bare_protonated_nitrogen(self):
         """The producer itself yields ``azaniumyl`` for a bare [NH3+]- (no

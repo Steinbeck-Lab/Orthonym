@@ -285,8 +285,6 @@ def name_added_carbon_parent(features: Any, style: str = "pin") -> Optional[str]
         p = pos[atom_idx]
         return (length - 1 - p) + 1 if reverse else p + 1
 
-    subs_alpha = sorted(named_subs, key=lambda t: alpha_sort_key(t[1]))
-
     # Stereo — computed BEFORE numbering so (j) can break a locant tie (a review
     # review of a4240802). The core is saturated (unsaturation rejected above), so this
     # is R/S CHAIN stereocentres. Fail CLOSED if any DEFINED stereocentre is off the
@@ -298,6 +296,7 @@ def name_added_carbon_parent(features: Any, style: str = "pin") -> Optional[str]
     # a project rule); NOT hardened here because clearing _CIPCode breaks assign's
     # repopulation. Tracked as a follow-up.)
     from ..perception.stereo import assign_stereochemistry
+    from ..assembly.naming_utils import cip_locant_rank_key
     assign_stereochemistry(mol)
     # A stereogenic double bond ON the parent chain is EXPRESSED as (locant)E/Z; any
     # OTHER stereo bond (inside a substituent) cannot be mapped to a chain locant ->
@@ -332,9 +331,6 @@ def name_added_carbon_parent(features: Any, style: str = "pin") -> Optional[str]
             return None  # pseudo-asymmetric (r/s) / axial (M/P) -> fail closed
         chain_cip[aidx] = cip
 
-    _CIP_RANK = {"R": 0, "S": 1}  # (j): R preferred (lower) over S
-    _EZ_RANK = {"Z": 0, "E": 1}   # (j): Z preferred (lower) over E
-
     def _db_loc(a_idx, b_idx, reverse):
         return min(loc(a_idx, reverse), loc(b_idx, reverse))
 
@@ -345,14 +341,20 @@ def name_added_carbon_parent(features: Any, style: str = "pin") -> Optional[str]
         suf = sorted(loc(attach[ac], reverse) for ac in added)
         ene = ene_locants(reverse)          # (e)(i): ene after suffix (c)
         sub = sorted(loc(ca, reverse) for ca, _ in named_subs)
-        alpha = [loc(ca, reverse) for ca, _ in subs_alpha]  # (g)
-        # (j): lowest locants to the preferred stereodescriptor; R/S and E/Z
-        # descriptors ordered together by locant.
-        st_items = [(loc(x, reverse), _CIP_RANK[chain_cip[x]]) for x in chain_cip]
-        st_items += [(_db_loc(a, b, reverse), _EZ_RANK[db_cip[(a, b)]])
-                     for (a, b) in db_cip]
-        stereo = [r for _, r in sorted(st_items)]
-        return (suf, ene, sub, alpha, stereo)
+        # (g): the (name, locant) entries in alphanumerical order, so the
+        # first-cited name's LOWEST locant decides first. A plain locant list in
+        # alphabetical-name order kept identical names (two 'chloro') in INPUT order, so
+        # [2,4] vs [4,2] decided the direction by SMILES spelling before (j).
+        alpha = sorted((alpha_sort_key(nm), loc(ca, reverse)) for ca, nm in named_subs)
+        # (j) (the Blue Book): lowest locants to the preferred
+        # stereodescriptor; R/S and E/Z descriptors ordered together by locant.
+        # The LOCANTS are part of the key (naming_utils.cip_locant_rank_key, shared
+        # with the ring and chain numberings): ranking the codes alone tied
+        # '(2R)-' with '(4R)-2,4-dichloropentane-1,3,5-tricarboxylic acid' (one
+        # specified centre) and the input direction decided.
+        st_items = [(loc(x, reverse), chain_cip[x]) for x in chain_cip]
+        st_items += [(_db_loc(a, b, reverse), db_cip[(a, b)]) for (a, b) in db_cip]
+        return (suf, ene, sub, alpha, cip_locant_rank_key(st_items))
 
     reverse = key_for(True) < key_for(False)
     suffix_locants = sorted(loc(attach[ac], reverse) for ac in added)

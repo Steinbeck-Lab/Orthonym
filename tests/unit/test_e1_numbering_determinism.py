@@ -151,7 +151,9 @@ class TestSkeletalReplacementSeniority:
 
     def test_distinct_positional_set_protect(self, namer):
         # Distinct positional set -> the element tier never fires (byte-identical).
-        assert _name(namer, "OCCOCCOCCOC") == "3,6,9-trioxadecan-1-ol"
+        # fix a performance pass (was '3,6,9-trioxadecan-1-ol'): three ether O are below the
+        # four heterounits of (the Blue Book); substitutive PIN.
+        assert _name(namer, "OCCOCCOCCOC") == "2-[2-(2-methoxyethoxy)ethoxy]ethan-1-ol"
 
     @pytest.mark.parametrize("smiles", ["COCSC", "CSCOC", "COCNC", "CNCOC"])
     def test_deterministic_across_respellings(self, namer, smiles):

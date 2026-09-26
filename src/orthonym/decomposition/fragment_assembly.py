@@ -142,6 +142,22 @@ _TRIVIAL_ACID_TO_ACYL = {
     "benzoic acid": "benzoyl",
 }
 
+# Acid-name endings whose acyl group ends in '-oyl' although the acid ends in
+# '-ic' (not '-oic'), so the generic '-ic acid' -> '-yl' step would misspell
+# them ('carbamyl', 'sulfamyl', 'butanimidyl'). Blue Book 2013:
+# prefix list, "H2N-CO- carbamoyl (preferred prefix)"
+# (the Blue Book); "H2N-C(=NH)- carbamimidoyl (preferred prefix)"
+# (:17772); "H2N-CO-CO- oxamoyl (preferred prefix)" (:17784);
+# "sulfamoyl (preselected prefix)" (:31330);
+# "butanimidoyl (PIN)" (:40610).
+# Shared by rules.lipids._acid_to_acyl and rules.radicals._acyl_from_acid_name.
+ACID_ENDINGS_TO_OYL_ACYL = (
+    ("carbamic acid", "carbamoyl"),
+    ("sulfamic acid", "sulfamoyl"),
+    ("oxamic acid", "oxamoyl"),
+    ("imidic acid", "imidoyl"),
+)
+
 # ---------------------------------------------------------------------------
 # OPSIN-expanded acid transformation tables
 # ---------------------------------------------------------------------------
@@ -204,6 +220,10 @@ _TRIVIAL_ALCOHOL_TO_ALKYL = {
     "octan-1-ol": "octyl",
     "phenol": "phenyl",
     "cyclohexanol": "cyclohexyl",
+    # (the Blue Book): "C6H5-CH2- benzyl (preferred prefix)
+    # phenylmethyl" -- the unsubstituted benzyl alcohol's organyl is 'benzyl'
+    # ('phenylmethyl 2-(...)ethanoate' read worse and is not the preferred form).
+    "phenylmethanol": "benzyl",
 }
 
 # Alcohol/parent -> alkoxy prefix (retained alkoxy names per IUPAC
@@ -2066,6 +2086,19 @@ def _acid_to_amide(acid_name: str) -> Optional[str]:
 
 
 def _acid_to_acyl(acid_name: str) -> Optional[str]:
+    """Acyl prefix form of ``acid_name`` (see ``_acid_to_acyl_impl``). An acid name
+    that carries a recorded non-PIN fragment (e.g. a retained peptide name,
+    'phenylalanylglutamic acid') keeps that status in its acyl form
+    ('phenylalanylglutamyl'), so the name that cites the acyl group is labelled the
+    same way (``metrics.provenance.record_derived_non_pin_fragment``)."""
+    acyl = _acid_to_acyl_impl(acid_name)
+    if acyl and acid_name:
+        from ..metrics.provenance import record_derived_non_pin_fragment
+        record_derived_non_pin_fragment(acid_name, acyl)
+    return acyl
+
+
+def _acid_to_acyl_impl(acid_name: str) -> Optional[str]:
     """Convert acid name to acyl prefix form.
 
     Used for N-acyl naming of amides with complex amines.
@@ -2164,6 +2197,12 @@ def _acid_to_acyl(acid_name: str) -> Optional[str]:
             else:
                 # "propanedioate" -> "propanedio" -> "propanedioyl"
                 return stem + "oyl"
+
+    # '-amic' / '-imidic' acids take '-oyl' (ACID_ENDINGS_TO_OYL_ACYL):
+    # 'N-methylcarbamic acid' -> 'N-methylcarbamoyl', never '...carbamyl'.
+    for end, acyl in ACID_ENDINGS_TO_OYL_ACYL:
+        if name.endswith(end):
+            return name[:-len(end)] + acyl
 
     # Handle "carboxylic acid" -> "carbonyl"
     if name.endswith("carboxylic acid"):

@@ -58,7 +58,7 @@ class TestBridgedFusedExtensions:
         ("C1=CC=CC2=C3C4=CC=CC=C4C(=C12)CC3", "9,10-ethanoanthracene"),
         ("C12=CC=C(C3=CC=CC=C13)O2", "1,4-epoxynaphthalene"),
         ("C1Cc2cccc3cccc1c23", "acenaphthene"),
-        ("c1ccc2c(c1)Cc1ccccc12", "fluorene"),
+        ("c1ccc2c(c1)Cc1ccccc12", "9H-fluorene"),  # (the Blue Book) 'the PIN is 9H-fluorene'
     ])
     def test_protections(self, smiles, expected):
         assert name_compound(smiles) == expected

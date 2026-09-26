@@ -233,8 +233,10 @@ class TestBP3ClusterRDecoratedRingSubstituent:
         ("OC(=O)c1ccc(-c2cc[nH]n2)cc1", "4-(1H-pyrazol-3-yl)benzoic acid"),
         ("OC(=O)c1ccc(-c2ccn[nH]2)cc1", "4-(1H-pyrazol-5-yl)benzoic acid"),
         # decorated pyrazolyl — cluster R recursion
+        # 2026-09-25 (pre-existing-failures plan, Task 5) change-asserted-value:
+        # cites indicated hydrogen for the mancude parent whatever sits on the pyrrole-type atom; a substituent group keeps it: "(1H-indol-1-yl)acetic acid (PIN)" (the Blue Book). OPSIN RT exact.
         ("OC(=O)c1ccc(-c2cc(C)n(C)n2)cc1",
-         "4-(1,5-dimethylpyrazol-3-yl)benzoic acid"),
+         "4-(1,5-dimethyl-1H-pyrazol-3-yl)benzoic acid"),
         # genuine imidazole unchanged (non-adjacent N)
         ("OC(=O)c1ccc(-c2cnc[nH]2)cc1", "4-(1H-imidazol-5-yl)benzoic acid"),
         # bare pyridinyl unchanged
@@ -248,13 +250,17 @@ class TestBP3ClusterRDecoratedRingSubstituent:
         # diaryl-ketone flagship: decorated heteroaryl substituent on a methanone
         # (routes through the composer ring-substituent-prefix path, now funneled
         # to the chokepoint). Was `unknown`.
+        # 2026-09-25 (pre-existing-failures plan, Task 5) change-asserted-value:
+        # cites indicated hydrogen for the mancude parent whatever sits on the pyrrole-type atom; a substituent group keeps it: "(1H-indol-1-yl)acetic acid (PIN)" (the Blue Book). OPSIN RT exact.
         ("O=C(c1ccccc1)c1cc(C)n(C)n1",
-         "(1,5-dimethylpyrazol-3-yl)phenylmethanone"),
+         "(1,5-dimethyl-1H-pyrazol-3-yl)phenylmethanone"),
         # (item 2): — a one-carbon `methanone` has a single
         # position, so the `-1-` locant is omitted (matches the sibling rows
         # above; RT-verified 2026-09-04, ITEM2-VERIFICATION.md).
+        # 2026-09-25 (pre-existing-failures plan, Task 5) change-asserted-value:
+        # cites indicated hydrogen for the mancude parent whatever sits on the pyrrole-type atom; a substituent group keeps it: "(1H-indol-1-yl)acetic acid (PIN)" (the Blue Book). OPSIN RT exact.
         ("Cc1nn(C)c(O)c1C(=O)c1ccc(Cl)cc1Cl",
-         "(2,4-dichlorophenyl)(5-hydroxy-1,3-dimethylpyrazol-4-yl)methanone"),
+         "(2,4-dichlorophenyl)(5-hydroxy-1,3-dimethyl-1H-pyrazol-4-yl)methanone"),
         # bare heteroaryl methanones unchanged (regression guard)
         ("O=C(c1ccccc1)c1ccncc1", "phenyl(pyridin-4-yl)methanone"),
         ("O=C(c1ccccc1)c1cccnc1", "phenyl(pyridin-3-yl)methanone"),
@@ -296,4 +302,4 @@ class TestBP3ClusterRDecoratedRingSubstituent:
                 frag.add(ni)
         assert _decorated_heteroaryl_substituent_name(
             mol, tuple(frag), tuple(pyr), attach
-        ) == "5-hydroxy-1,3-dimethylpyrazol-4-yl"
+        ) == "5-hydroxy-1,3-dimethyl-1H-pyrazol-4-yl"  # indicated H: see the rows above

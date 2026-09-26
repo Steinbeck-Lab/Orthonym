@@ -1137,7 +1137,13 @@ def _handle_poly_anion(mol, smiles, canonical_smiles, features=None, *,
                     full = _full_name_anion(mol, style)
                     if full:
                         return full
-                return neutral_name
+                # 0-wrong: `neutral_name` names the RE-PROTONATED skeleton, a
+                # different (neutral) molecule; no anionic suffix was applied to
+                # it, the Blue Book: the anion replaces the
+                # 'ic acid' ending by 'ate'; the acid name never denotes the
+                # anion). Same decline as ions.name_anion's multi-anion branch:
+                # fall through instead of returning it.
+                return None
     except (ValueError, RuntimeError, KeyError, IndexError, RecursionError) as exc:
         # Expected operational fall-through, matching ions.py's explicit lists.
         logger.debug("poly_anion handler fell through: %s: %s",
@@ -1493,7 +1499,17 @@ def _handle_peptide(mol, smiles, canonical_smiles, features=None, *,
                 return _subst
         except Exception:
             _PEPTIDE_SUBST_ACTIVE = False
-    return name_peptide(mol)
+    _retained = name_peptide(mol)
+    if _retained and not is_failure_name(_retained):
+        # The retained acyl-prefix peptide name ('prolylalanylalanine') is kept
+        # for breadth, but it is not a PIN: controller ruling (2026-09-24, TRIAGE.md
+        # 'Controller rulings'): "D-a does NOT extend to peptides... the PIN is the
+        # substitutive name"; (the Blue Book) identifies no PIN for
+        # Chapter. Name-scoped record: a shipped name that carries this string
+        # is labelled below pin_verified; the name itself is unchanged.
+        from orthonym.metrics.provenance import record_non_pin_fragment
+        record_non_pin_fragment(_retained)
+    return _retained
 
 
 def _handle_retained_name(mol, smiles, canonical_smiles, features=None, *,

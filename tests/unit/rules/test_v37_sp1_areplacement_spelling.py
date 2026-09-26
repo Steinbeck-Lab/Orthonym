@@ -88,5 +88,9 @@ def test_besteffort_prefers_marked_substitutive_and_rts(smi, opsin_gate):
 # --- COLLATERAL: genuine skeletal-replacement chain PINs unbroken -------------
 def test_genuine_chain_areplacement_pins_unbroken():
     from orthonym import name_compound
-    assert name_compound('COCCOCCOC') == '2,5,8-trioxanonane'
+    # fix a performance pass: (the Blue Book) needs four heterounits;
+    # '(1) 1-methoxy-2-(2-methoxyethoxy)ethane (PIN)' (:27756), '(4) 2,5,8,11-
+    # tetraoxadodecane (PIN)' (:27762). Was '2,5,8-trioxanonane'.
+    assert name_compound('COCCOCCOC') == '1-methoxy-2-(2-methoxyethoxy)ethane'
+    assert name_compound('COCCOCCOCCOC') == '2,5,8,11-tetraoxadodecane'
     assert name_compound('COCOCOCOC') == '2,4,6,8-tetraoxanonane'

@@ -166,7 +166,16 @@ BENCHMARK_STEROIDS = [
     pytest.param(
         "CC(C)CCC[C@@H](C)[C@H]1CC[C@H]2C3=CC=C4C[C@@H](O)CC[C@]4(C)[C@H]3CC[C@]12C",
         "cholest",
-        "(3S,9S,10R,13R,14R,17R,20R)-cholesta-5,7-dien-3-ol",
+        # Task 12 fix a performance pass (wp6-tests), change-asserted-value (was the whole-graph
+        # CIP list '(3S,9S,10R,13R,14R,17R,20R)-cholesta-5,7-dien-3-ol'): the
+        # stereoparent implies its configuration and the changed centre takes the
+        # alpha/beta form, 'Stereochemical configuration of parent
+        # structures' (the Blue Book,:51047 "The name of a fundamental parent
+        # structure usually implies the absolute configuration"), BB style
+        # '5α-cholestane-3β,6α-diol' (:31979); kept at the PIN tier by the controller
+        # ruling on stereoparents (TRIAGE.md 'Controller rulings'). OPSIN 2.9.0
+        # full-InChIKey exact (an InChIKey).
+        "cholesta-5,7-dien-3β-ol",
         "confirmed_success",
         id="compound_55_cholest_dien_ol",
     ),
@@ -318,21 +327,30 @@ class TestTerminalEElision:
         )
         assert result == "gonan-3-ol"
 
+    # Task 12 fix a performance pass (wp6-tests), change-asserted-value (were
+    # 'androstan-3,17-dione' / 'androstan-3,17-diol', whose docstrings had the rule
+    # backwards): (a) (heading ' ELISION OF VOWELS',
+    # the Blue Book,:7595) elides the terminal 'e' only "when followed by a
+    # suffix... beginning with 'a', 'e', 'i', 'o', 'u', or 'y'"; '-dione' and
+    # '-diol' begin with 'd', so the 'e' stays: '5α-cholestane-3β,6α-diol' (:31979),
+    # 'undeca-2,9-diene-4,8-diol (PIN)' (:3403). String-assembler tests (no
+    # molecule); the elided '...androstan-3-one' case is
+    # test_saturated_hydroxy_ketone_elision.
     def test_saturated_dione_elision(self):
-        """androstan-3,17-dione: -dione derives from -one (vowel)."""
+        """androstane-3,17-dione: '-dione' begins with a consonant, the 'e' stays."""
         result = _assemble_np_name(
             "androst", "androstane", hydroxyls=[], ketones=[3, 17],
             unsaturation={"ene": [], "yne": []},
         )
-        assert result == "androstan-3,17-dione"
+        assert result == "androstane-3,17-dione"
 
     def test_saturated_diol_elision(self):
-        """androstan-3,17-diol: -diol derives from -ol (vowel)."""
+        """androstane-3,17-diol: '-diol' begins with a consonant, the 'e' stays."""
         result = _assemble_np_name(
             "androst", "androstane", hydroxyls=[3, 17], ketones=[],
             unsaturation={"ene": [], "yne": []},
         )
-        assert result == "androstan-3,17-diol"
+        assert result == "androstane-3,17-diol"
 
     def test_saturated_bare_name_keeps_e(self):
         """gonane (bare saturated): keep terminal 'e' when no suffix."""

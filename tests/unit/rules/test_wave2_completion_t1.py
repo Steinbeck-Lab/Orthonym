@@ -82,7 +82,9 @@ SKELETAL_ENE = [
     ("C[SiH2]C[SiH2]C[SiH2]C[SiH2]C=C", "2,4,6,8-tetrasiladec-9-ene"),
     ("C=CCOCCOCCOCCOC", "2,5,8,11-tetraoxatetradec-13-ene"),
     ("C#CCOCCOCCOCCOC", "2,5,8,11-tetraoxatetradec-13-yne"),
-    ("COCCOCCOCC=C", "2,5,8-trioxaundec-10-ene"),
+    # fix a performance pass (was 2,5,8-trioxaundec-10-ene): three heterounits, no 'a' PIN
+    #, the Blue Book); see test_three_unit_ene_is_substitutive.
+    ("COCCOCCOCC=C", None),
 ]
 
 
@@ -98,13 +100,23 @@ def test_skeletal_ene_e2e(smiles, expected):
 
 
 def test_skeletal_saturated_protect():
-    # Byte-identical saturated behaviour (pre-existing goldens).
-    assert try_skeletal_replacement_name(
-        Chem.MolFromSmiles("COCCOCCOCC")) == "2,5,8-trioxadecane"
-    assert try_skeletal_replacement_name(
-        Chem.MolFromSmiles("OCCOCCOCC")) == "3,6-dioxaoctan-1-ol"
-    assert try_skeletal_replacement_name(
-        Chem.MolFromSmiles("COCSCOC")) == "2,6-dioxa-4-thiaheptane"
+    # fix a performance pass: these chains carry 3, 2 and 3 heterounits, so the 'a' name
+    # is not the PIN, the Blue Book: "four or more heterounits";
+    # "(1) 1-methoxy-2-(2-methoxyethoxy)ethane (PIN)":27756). Were
+    # '2,5,8-trioxadecane', '3,6-dioxaoctan-1-ol', '2,6-dioxa-4-thiaheptane'.
+    assert try_skeletal_replacement_name(Chem.MolFromSmiles("COCCOCCOCC")) is None
+    assert try_skeletal_replacement_name(Chem.MolFromSmiles("OCCOCCOCC")) is None
+    assert try_skeletal_replacement_name(Chem.MolFromSmiles("COCSCOC")) is None
+    # The substitutive PINs (OPSIN 2.9.0 full-InChIKey RT: exact):
+    assert _name("COCCOCCOCC") == "1-ethoxy-2-(2-methoxyethoxy)ethane"
+    assert _name("OCCOCCOCC") == "2-(2-ethoxyethoxy)ethan-1-ol"
+    assert _name("COCSCOC") == "methoxy[(methoxymethyl)sulfanyl]methane"
+
+
+def test_three_unit_ene_is_substitutive():
+    # fix a performance pass (was '2,5,8-trioxaundec-10-ene'): (:23348);
+    # the longest chain carrying the double bond is the parent. OPSIN RT exact.
+    assert _name("COCCOCCOCC=C") == "3-[2-(2-methoxyethoxy)ethoxy]prop-1-ene"
 
 
 def test_skeletal_ene_fail_closed():

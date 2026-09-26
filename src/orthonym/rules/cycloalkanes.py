@@ -284,55 +284,161 @@ def orient_cycloalkane(
     # that are preferred to E, S, P, and s". For germacrane's cyclodecane this
     # gives '(1R,4s,7S)', as the Blue Book's own '13-norgermacrane
     # (1R,4s,7S)-4-ethyl-1,7-dimethylcyclodecane' (:51471), not '(1S,4s,7R)'.
+    #
+    # 2026-09-26 (fix a performance pass): then the descriptors INSIDE the prefixes, at
+    # their attachment locants ('1-[(2R)-butan-2-yl]-3-[(2S)-butan-2-yl]benzene
+    # (PIN)', the Blue Bookff: R takes locant 1), then the canonical atom
+    # ranks, so the SMILES atom order never decides.
+    #
+    # When EVERY prefix on the ring can be named, (g) (the Blue Book)
+    # is applied in full and the legacy position-1 heuristic is dropped: that
+    # heuristic named hydrocarbon prefixes only, so a halogen sorted last and
+    # 'ClC1CCCC(C)C1' came out '3-chloro-1-methylcyclohexane' at pin_verified,
+    # where (g) gives the first-cited 'chloro' the lower locant:
+    # '1-chloro-3-methylcyclohexane' ('1-methyl-4-nitronaphthalene (PIN)',:3318).
+    canon = _canonical_ranks(mol)
+    names = _ring_prefix_sort_names(mol, substituent_positions, ring_list)
+    all_named = all(nm is not None for nm in names.values())
+
     def full_key(item):
         oriented, _pos1_sub = item
-        return (sort_key(item),
-                _alpha_citation_key(mol, oriented, substituent_positions, ring_list),
-                _cip_orientation_key(mol, oriented))
+        g_key = _alpha_citation_key(mol, oriented, substituent_positions, ring_list,
+                                    names=names)
+        tail = (_cip_orientation_key(mol, oriented),
+                _substituent_cip_key(mol, oriented, substituent_positions),
+                tuple(canon[a] for a in oriented))
+        if all_named:
+            return (g_key,) + tail
+        return (sort_key(item), g_key) + tail
 
     best_candidates.sort(key=full_key)
     return best_candidates[0][0]
 
 
+def _canonical_ranks(mol) -> List[int]:
+    """Canonical atom ranks (stereo-aware): the last, engineering-only tie-break
+    that stops the input atom order from choosing between fully tied numberings."""
+    try:
+        return list(Chem.CanonicalRankAtoms(mol, breakTies=True))
+    except Exception:
+        return [0] * mol.GetNumAtoms()
+
+
+def _substituent_cip_key(mol, oriented: List[int],
+                         substituent_positions: Dict[int, List[List[int]]]) -> tuple:
+    """ (j) over the stereodescriptors cited INSIDE the ring's prefixes.
+
+    Each prefix's descriptor is placed at the ring locant of its attachment
+    ('1-[(2R)-butan-2-yl]-3-[(2S)-butan-2-yl]benzene (PIN)', the Blue Bookff).
+    Consulted after the ring's own descriptors (``_cip_orientation_key``). Only
+    exact when every prefix carries at most ONE stereo unit (atom or double
+    bond): the cited order of several descriptors inside one prefix follows that
+    prefix's own numbering, which is not known here, so a ring with such a prefix
+    gets ```` (no preference) rather than a guess.
+    """
+    if not substituent_positions:
+        return ()
+    if not (any(a.GetChiralTag() != Chem.ChiralType.CHI_UNSPECIFIED
+                for a in mol.GetAtoms())
+            or any(b.GetStereo() != Chem.BondStereo.STEREONONE
+                   for b in mol.GetBonds())):
+        return ()
+    try:
+        from ..perception.stereo import assign_stereochemistry
+        from ..assembly.naming_utils import cip_locant_rank_key
+        assign_stereochemistry(mol)
+        items = []
+        for pos, idx in enumerate(oriented):
+            for sub_atoms in substituent_positions.get(idx, ()):
+                sub_set = set(sub_atoms)
+                codes = [mol.GetAtomWithIdx(a).GetProp('_CIPCode')
+                         for a in sub_set
+                         if mol.GetAtomWithIdx(a).HasProp('_CIPCode')]
+                # A double bond is the prefix's own when both ends lie in the
+                # prefix or on its attachment atom (an ylidene's exocyclic bond).
+                own = sub_set | {idx}
+                for bond in mol.GetBonds():
+                    b1, b2 = bond.GetBeginAtomIdx(), bond.GetEndAtomIdx()
+                    if (b1 in own and b2 in own and (b1 in sub_set or b2 in sub_set)
+                            and bond.HasProp('_CIPCode')):
+                        codes.append(bond.GetProp('_CIPCode'))
+                if len(codes) > 1:
+                    return ()
+                items.extend((pos + 1, c) for c in codes)
+        return cip_locant_rank_key(items)
+    except Exception:
+        return ()
+
+
 def _alpha_citation_key(mol, oriented: List[int],
                         substituent_positions: Dict[int, List[List[int]]],
-                        ring_list: List[int]) -> list:
+                        ring_list: List[int], names=None) -> list:
     """ first-cited-prefix key: the (name, locant) entries of every prefix,
-    in alphanumerical order, so the first-cited name's locant decides first."""
+    in alphanumerical order, so the first-cited name's locant decides first.
+    ``names`` (from ``_ring_prefix_sort_names``) avoids re-naming each prefix
+    for every candidate orientation."""
     entries = []
     for i, atom_idx in enumerate(oriented):
         for sub_atoms in substituent_positions.get(atom_idx, ()):
-            name = _prefix_name_for_sort(mol, sub_atoms, ring_list)
+            if names is not None and tuple(sub_atoms) in names:
+                name = names[tuple(sub_atoms)]
+            else:
+                name = _prefix_name_for_sort(mol, sub_atoms, ring_list)
             entries.append((alpha_sort_key(name) if name else 'zzzzz', i + 1))
     entries.sort()
     return entries
 
 
-def _cip_orientation_key(mol, oriented: List[int]) -> tuple:
-    """ (j) rank tuple of the ring's CIP stereodescriptors in locant order.
+def _ring_prefix_sort_names(mol, substituent_positions, ring_list) -> dict:
+    """``{tuple(sub_atoms): name or None}`` for every prefix on the ring."""
+    names = {}
+    for subs in (substituent_positions or {}).values():
+        for sub_atoms in subs:
+            key = tuple(sub_atoms)
+            if key not in names:
+                names[key] = _prefix_name_for_sort(mol, sub_atoms, ring_list)
+    return names
 
-    Reuses ``naming_utils.cip_descriptor_rank_key`` (the table the chain
-    numbering in ``rules.locants._cip_numbering_key`` and the citation order
-    share), so R/r/Z/M take the lower locant. Labels come from the canonical
-    ``perception.stereo.assign_stereochemistry`` (idempotent). Empty for an
-    orientation without descriptors, so achiral rings tie and keep their order.
+
+def _cip_orientation_key(mol, oriented: List[int],
+                         double_bond_atoms=()) -> tuple:
+    """ (j) key of the ring's CIP stereodescriptors WITH their locants.
+
+    Uses ``naming_utils.cip_locant_rank_key`` (shared with the chain numbering in
+    ``rules.locants._cip_numbering_key``), so R/r/Z/M take the lower locant and a
+    lone descriptor takes the lowest locant it can: '(1r)-1,3,5-trimethyl-
+    cyclohexane', never '(3r)-' or '(5r)-' by SMILES spelling. Ring atoms carry
+    R/S/r/s; each ring double bond in ``double_bond_atoms`` carries its Z/E at
+    its ring locant (``ring_double_bond_locant``), which is how the Blue Book's
+    '(1Z,3E)-cyclododeca-1,3-diene (PIN)' (the Blue Book) is numbered.
+    Labels come from the canonical ``perception.stereo.assign_stereochemistry``
+    (idempotent). Empty for an orientation without descriptors, so achiral rings
+    tie and keep their order.
     """
-    if not any(a.GetChiralTag() != Chem.ChiralType.CHI_UNSPECIFIED
-               for a in mol.GetAtoms()):
+    if not (any(a.GetChiralTag() != Chem.ChiralType.CHI_UNSPECIFIED
+                for a in mol.GetAtoms())
+            or any(b.GetStereo() != Chem.BondStereo.STEREONONE
+                   for b in mol.GetBonds())):
         return ()
     try:
         from ..perception.stereo import assign_stereochemistry
-        from ..assembly.naming_utils import cip_descriptor_rank_key
+        from ..assembly.naming_utils import cip_locant_rank_key
         assign_stereochemistry(mol)
         items = []
+        pos_of = {idx: pos for pos, idx in enumerate(oriented)}
         for pos, idx in enumerate(oriented):
             atom = mol.GetAtomWithIdx(idx)
             if atom.HasProp('_CIPCode'):
                 items.append((pos + 1, atom.GetProp('_CIPCode')))
-        if not items:
-            return ()
-        block = '(' + ','.join('%d%s' % (loc, code) for loc, code in items) + ')'
-        return cip_descriptor_rank_key(block)
+        n = len(oriented)
+        for a1, a2 in double_bond_atoms or ():
+            if a1 not in pos_of or a2 not in pos_of:
+                continue
+            bond = mol.GetBondBetweenAtoms(a1, a2)
+            if bond is not None and bond.HasProp('_CIPCode'):
+                items.append((ring_double_bond_locant(pos_of[a1], pos_of[a2], n),
+                              bond.GetProp('_CIPCode')))
+        return cip_locant_rank_key(items)
     except Exception:
         return ()
 
@@ -404,10 +510,26 @@ def _orient_cycloalkane_with_pg(
         entries.sort()
         return entries
 
-    # (j) (the Blue Book) decides a tie that survives (g).
+    # (j) (the Blue Book) decides a tie that survives (g): the ring's
+    # own descriptors, then those inside the prefixes, then the canonical ranks.
+    canon = _canonical_ranks(mol)
     tied.sort(key=lambda cand: (alpha_citation_key(cand),
-                                _cip_orientation_key(mol, cand[0])))
+                                _cip_orientation_key(mol, cand[0]),
+                                _substituent_cip_key(mol, cand[0], substituent_positions),
+                                tuple(canon[a] for a in cand[0])))
     return tied[0][0]
+
+
+def _substituent_locant_multiset(oriented: List[int],
+                                 substituent_positions) -> List[int]:
+    """Sorted locants of every substituent on ``oriented`` -- one per substituent,
+    so a gem-disubstituted atom counts twice (f), the Blue Book)."""
+    locants = []
+    for i, atom_idx in enumerate(oriented):
+        for _sub in (substituent_positions or {}).get(atom_idx, ()):
+            locants.append(i + 1)
+    locants.sort()
+    return locants
 
 
 def ring_double_bond_locant(pos1: int, pos2: int, n: int) -> int:
@@ -426,11 +548,24 @@ def ring_double_bond_locant(pos1: int, pos2: int, n: int) -> int:
     return lo + 1
 
 
+def _attached_by_multiple_bond(mol, attach_idx: int, ring_list: List[int]) -> bool:
+    """True when ``attach_idx`` is bonded to the ring by a double or triple bond
+    (an '-ylidene' prefix such as methylidene, which the carbon-count alkyl name
+    would call 'methyl')."""
+    ring_set = set(ring_list)
+    for bond in mol.GetAtomWithIdx(attach_idx).GetBonds():
+        if (bond.GetOtherAtomIdx(attach_idx) in ring_set
+                and bond.GetBondType() != Chem.BondType.SINGLE):
+            return True
+    return False
+
+
 def _prefix_name_for_sort(mol, sub_atoms: List[int], ring_list: List[int]) -> Optional[str]:
     """Best-effort prefix name for alphabetic tie-breaking (tier (g)).
 
-    Mirrors the legacy pos1 naming: recursive fragment naming for branched
-    all-C/H substituents, straight alkyl name by carbon count otherwise.
+    Hydrocarbon prefixes: recursive fragment naming for branched all-C/H
+    substituents, straight alkyl name by carbon count otherwise (the legacy pos1
+    naming). Any other prefix: ``substituent_enumerator.name_substituent``.
     Returns None when no name can be derived (sorts last).
     """
     if not sub_atoms:
@@ -447,8 +582,15 @@ def _prefix_name_for_sort(mol, sub_atoms: List[int], ring_list: List[int]) -> Op
     if all_c_h and len(sub_atoms) > 1:
         from ..assembly.substituent_naming import name_substituent_fragment
         name = name_substituent_fragment(mol, sub_atoms, sub_atoms[0], ring_list)
-    if name is None and all_c_h:
+    if name is None and all_c_h and not _attached_by_multiple_bond(mol, sub_atoms[0], ring_list):
         name = _get_alkyl_name(carbon_count)
+    if name is None:
+        # A heteroatom-bearing prefix (chloro, hydroxy, methoxy,...): the shared
+        # substituent namer, in its side-effect-free form (a sort key must not
+        # change the real naming). sub_atoms[0] is the attachment atom (BFS start
+        # in get_ring_substituents). The unnameable sentinel stays None.
+        from ..assembly.substituent_enumerator import name_substituent_for_ordering
+        name = name_substituent_for_ordering(mol, sorted(sub_atoms), sub_atoms[0])
     return name
 
 
@@ -488,9 +630,6 @@ def orient_cycloalkene(
         # No double bonds - just return as-is (shouldn't happen for cycloalkene)
         return ring_list
 
-    # Get substituent atom indices
-    sub_atom_indices = set(substituent_positions.keys()) if substituent_positions else set()
-
     # --- Path A: Principal group on ring -> PG gets lowest locant ---
     if principal_group_atoms:
         candidates = []
@@ -516,18 +655,28 @@ def orient_cycloalkene(
                         db_locants.append(ring_double_bond_locant(pos1, pos2, n))
                 db_locants.sort()
 
-                # Calculate substituent locants
-                sub_locants = sorted(
-                    i + 1 for i, atom in enumerate(oriented)
-                    if atom in sub_atom_indices
-                )
+                # Calculate substituent locants: one per substituent (f)
+                # "all considered together", with multiplicity, as in the
+                # saturated paths above)
+                sub_locants = _substituent_locant_multiset(
+                    oriented, substituent_positions)
 
                 candidates.append((oriented, pg_locants, db_locants, sub_locants))
 
-        # Sort: lowest PG locants, then lowest DB locants, then lowest sub locants
+        # Sort: lowest PG locants (c), then lowest DB locants (e), then lowest
+        # prefix locants (f), then the first-cited prefix (g), then (j)
+        # (the Blue Book). Without (g)/(j) a tie went to candidate order,
+        # i.e. to the SMILES atom order.
+        canon = _canonical_ranks(mol)
+
         def sort_key(item):
-            _, pg, db, sub = item
-            return (pg, db, sub)
+            oriented, pg, db, sub = item
+            return (pg, db, sub,
+                    _alpha_citation_key(mol, oriented, substituent_positions or {},
+                                        ring_list),
+                    _cip_orientation_key(mol, oriented, double_bond_atoms),
+                    _substituent_cip_key(mol, oriented, substituent_positions or {}),
+                    tuple(canon[a] for a in oriented))
 
         candidates.sort(key=sort_key)
         return candidates[0][0]
@@ -559,13 +708,9 @@ def orient_cycloalkene(
                 if oriented[1] != other_atom:
                     continue
 
-                # Calculate locants for substituents
-                sub_locants = []
-                for i, atom_idx in enumerate(oriented):
-                    if atom_idx in sub_atom_indices:
-                        sub_locants.append(i + 1)
-
-                sub_locants.sort()
+                # Calculate locants for substituents (one per substituent)
+                sub_locants = _substituent_locant_multiset(
+                    oriented, substituent_positions)
 
                 # Calculate locants for all double bonds (wrap-aware)
                 db_locants = []
@@ -603,12 +748,21 @@ def orient_cycloalkene(
         if best_sub_locants is None or _compare_locant_sets(sub_locants, best_sub_locants) < 0:
             best_sub_locants = sub_locants
 
-    # Return first orientation with best locants
-    for oriented, sub_locants in filtered:
-        if sub_locants == best_sub_locants:
-            return oriented
-
-    return filtered[0][0]
+    tied = [oriented for oriented, sub_locants in filtered
+            if sub_locants == best_sub_locants]
+    if not tied:
+        return filtered[0][0]
+    # Third and fourth criteria: the first-cited prefix (g)), then the CIP
+    # stereodescriptors (j), the Blue Book). The first orientation
+    # found used to win, so '(1Z,3E)-cyclododeca-1,3-diene (PIN)' (:3366) came out
+    # as '(1E,3Z)-' for half of the SMILES spellings.
+    canon = _canonical_ranks(mol)
+    tied.sort(key=lambda o: (
+        _alpha_citation_key(mol, o, substituent_positions or {}, ring_list),
+        _cip_orientation_key(mol, o, double_bond_atoms),
+        _substituent_cip_key(mol, o, substituent_positions or {}),
+        tuple(canon[a] for a in o)))
+    return tied[0]
 
 
 def select_ring_or_chain_parent(

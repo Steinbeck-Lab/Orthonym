@@ -30,7 +30,12 @@ _VARS = {
     "source": _pv._SOURCE, "opsin": _pv._OPSIN, "stereo_unexpressed": _pv._STEREO_UNEXPRESSED,
     "gate_outcome": _pv._GATE_OUTCOME, "gate_outcome_name": _pv._GATE_OUTCOME_NAME,
     "general_ring_prefix": _pv._GENERAL_RING_PREFIX, "suffix_free_prefix_name": _pv._SUFFIX_FREE_PREFIX_NAME,
+    "non_pin_fragments": _pv._NON_PIN_FRAGMENTS,
 }
+# Accumulators: a hit MERGES the fresh call's recorded entries into the current
+# value instead of overwriting it -- an overwrite would drop entries recorded
+# after the fresh call (in this ambient context) that the snapshot never saw.
+_ACCUMULATORS = frozenset({"non_pin_fragments"})
 _BUDGETS = ("perf_budget", "analysis_budget", "work_budget")
 
 
@@ -58,7 +63,11 @@ def _replay_budgets(units: Tuple[int, int, int]) -> None:
 def _apply(replay: dict, units: tuple) -> None:
     """Reproduce a fresh call's provenance + budget side effects on a memo hit."""
     for k, v in replay.items():
-        _VARS[k].set(v)
+        if k in _ACCUMULATORS:
+            cur = _VARS[k].get()
+            _VARS[k].set(cur + tuple(x for x in (v or ()) if x not in cur))
+        else:
+            _VARS[k].set(v)
     # These direct.set writes bypass the provenance setters, so an ENCLOSING
     # touched-log would miss them; note them explicitly so an outer memoised call
     # still records that this nested hit wrote these vars.

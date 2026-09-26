@@ -55,11 +55,15 @@ def test_pin_tier(smiles, expected):
 
 
 @pytest.mark.opsin_gate
-def test_prefix_without_indicated_hydrogen_is_not_a_pin():
-    # The shared prefix namer gives 'pyrrol-1-yl'; the PIN form keeps indicated
-    # hydrogen ('(1H-indol-1-yl)acetic acid (PIN)'). The PIN tier abstains and the
-    # best-effort tier ships it with a non-PIN label.
-    assert _name("[N]1C=CC=C1")["tier"] == "abstain"
-    be = _name("[N]1C=CC=C1", "best-effort")
-    assert be["tier"] not in ("abstain", "pin_verified")
-    assert _strict_rt(be["name"], "[N]1C=CC=C1")
+def test_ring_n_radical_keeps_indicated_hydrogen():
+    # 2026-09-25 (pre-existing-failures plan, Task 5) change-asserted-value. This
+    # test pinned the shared prefix namer's 'pyrrol-1-yl' (no indicated hydrogen)
+    # as a non-PIN that the PIN tier had to decline. The namer now keeps it:
+    # names a ring-N radical as the ring's N-yl group
+    # ('2,5-dioxopyrrolidin-1-yl (PIN)', the Blue Book), and cites
+    # the indicated hydrogen whatever sits on that N ('(1H-indol-1-yl)acetic acid
+    # (PIN)',:2039). So both tiers ship the PIN '1H-pyrrol-1-yl'; strict radical RT.
+    for tier in ("pin", "best-effort"):
+        row = _name("[N]1C=CC=C1", tier)
+        assert row["name"] == "1H-pyrrol-1-yl" and row["tier"] != "abstain"
+    assert _strict_rt("1H-pyrrol-1-yl", "[N]1C=CC=C1")

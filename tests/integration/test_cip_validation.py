@@ -11,6 +11,7 @@ Paper: Hanson et al., "Algorithmic Analysis of Cahn-Ingold-Prelog Rules
 """
 
 import datetime
+import os
 import re
 from collections import defaultdict
 from pathlib import Path
@@ -26,7 +27,15 @@ from rdkit.Chem import rdCIPLabeler
 # ---------------------------------------------------------------------------
 
 CIP_DATA = Path(__file__).parent.parent / "data" / "cip_validation" / "compounds.smi"
+# The COMMITTED reference copy of the results report. A normal test run writes its
+# report to the test's tmp_path and never touches this tracked file. It is
+# rewritten only on purpose, either by
+# ORTHONYM_REGENERATE_CIP_RESULTS=1 pytest tests/integration/test_cip_validation.py
+# or by scripts/run_cip_validation_suite.py (which also regenerates the docs).
 RESULTS_FILE = CIP_DATA.parent / "rdkit_cip_results.txt"
+REGENERATE_RESULTS = os.environ.get("ORTHONYM_REGENERATE_CIP_RESULTS", "").strip().lower() in (
+    "1", "true", "yes", "on",
+)
 
 
 # ---------------------------------------------------------------------------
@@ -293,8 +302,9 @@ def write_results_file(
     no_expected_count: int,
     failures_by_type: Dict[str, int],
     failure_details: List[str],
+    path: Path = RESULTS_FILE,
 ):
-    """Write CIP validation results to a text file for a phase reference."""
+    """Write CIP validation results to ``path`` (default: the committed reference)."""
     timestamp = datetime.datetime.now(datetime.timezone.utc).strftime(
         "%Y-%m-%d %H:%M:%S UTC"
     )
@@ -338,8 +348,8 @@ def write_results_file(
     for detail in failure_details:
         lines.append(f"  {detail}")
 
-    RESULTS_FILE.parent.mkdir(parents=True, exist_ok=True)
-    with open(RESULTS_FILE, "w", encoding="utf-8") as f:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    with open(path, "w", encoding="utf-8") as f:
         f.write("\n".join(lines) + "\n")
 
 
@@ -371,12 +381,13 @@ class TestCIPValidationSuite:
             f"Expected >= 280 compounds in CIP Validation Suite, got {count}"
         )
 
-    def test_cip_assignments(self, cip_data):
+    def test_cip_assignments(self, cip_data, tmp_path):
         """Test RDKit CIP assignments against expected labels for all 300 molecules.
 
         This test documents RDKit CIP accuracy rather than failing on mismatches.
         CIP failures are known RDKit limitations, not Orthonym bugs.
-        Results are written to rdkit_cip_results.txt for a phase reference.
+        The report goes to tmp_path; the committed reference
+        rdkit_cip_results.txt is rewritten only with ORTHONYM_REGENERATE_CIP_RESULTS=1.
         """
         pass_count = 0
         fail_count = 0
@@ -446,7 +457,11 @@ class TestCIPValidationSuite:
         if len(failure_details) > 50:
             print(f"  ... and {len(failure_details) - 50} more")
 
-        # Write results file for a phase reference
+        # Write the results report . A normal run must not rewrite the
+        # tracked reference: its header carries a timestamp, so every run would
+        # leave the working tree dirty.
+        out = RESULTS_FILE if REGENERATE_RESULTS else tmp_path / RESULTS_FILE.name
+        reference_before = RESULTS_FILE.read_bytes() if RESULTS_FILE.exists() else None
         write_results_file(
             total=total,
             pass_count=pass_count,
@@ -455,8 +470,16 @@ class TestCIPValidationSuite:
             no_expected_count=no_expected_count,
             failures_by_type=dict(failures_by_type),
             failure_details=failure_details,
+            path=out,
         )
-        print(f"\nResults written to: {RESULTS_FILE}")
+        print(f"\nResults written to: {out}")
+        assert f"  Pass:                  {pass_count}" in out.read_text(encoding="utf-8")
+        if not REGENERATE_RESULTS:
+            reference_after = RESULTS_FILE.read_bytes() if RESULTS_FILE.exists() else None
+            assert reference_after == reference_before, (
+                f"{RESULTS_FILE} is a committed reference; a normal test run must not "
+                "rewrite it (set ORTHONYM_REGENERATE_CIP_RESULTS=1 to regenerate on purpose)"
+            )
 
         # Soft assertion: we expect most compounds to pass
         # Do NOT fail on CIP mismatches -- they are RDKit limitations

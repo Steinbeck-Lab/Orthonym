@@ -727,8 +727,9 @@ _MULTIPLICATIVE_PREFIX = {2: 'bis', 3: 'tris', 4: 'tetrakis',
 
 def _full_inchikey_rt_ok(mol, name: str) -> bool:
     """0-wrong gate for the azaniumyl builder: OPSIN-parse ``name`` and require
-    its FULL standard InChIKey (constitution + charge + stereo) to equal the
-    input's. Fail CLOSED on a missing jar / parse failure / any mismatch. This is
+    its FULL standard InChIKey (constitution + net charge + stereo) to equal the
+    input's, the same radical graph, and the same protonation sites (the key's
+    mobile /p layer does not place a hydron). Fail CLOSED on a missing jar / parse failure / any mismatch. This is
     the producer's OWN backstop, independent of the namer's gate (which is
     constitution-only on the default path and would miss a wrong descriptor or a
     neutralised net charge) -- mirrors ``added_carbon_parent._whole_name_stereo_ok``.
@@ -746,9 +747,14 @@ def _full_inchikey_rt_ok(mol, name: str) -> bool:
     except Exception:
         return False
     # An equal full key is not enough for a radical (it encodes neither radical
-    # electrons nor bond order): validation/radical_identity.py.
+    # electrons nor bond order): validation/radical_identity.py; nor for a
+    # protonated atom (the key's /p layer does not say which atom carries the
+    # hydron): validation/protonation_identity.py.
+    from ..validation.protonation_identity import protonation_site_verdict
     from ..validation.radical_identity import radical_identity_verdict
-    return radical_identity_verdict(Chem.MolToSmiles(mol), smi) != "mismatch"
+    in_smi = Chem.MolToSmiles(mol)
+    return (radical_identity_verdict(in_smi, smi) != "mismatch"
+            and protonation_site_verdict(in_smi, smi) != "mismatch")
 
 
 def _iminide_omit_locants(name: str, mol) -> str:
@@ -1115,8 +1121,11 @@ def _route_zwitterion(mol, sites, style: str) -> str:
         locant_prefix = f'{attach_locant}-'
 
     # 4. Compose: {locant}-(cation-prefix)anion-parent — prefix the
-    # cation to the anionic parent). Enclosing marks per (complex prefix).
-    composed = f'{locant_prefix}({cat_prefix}){parent_anion_name}'
+    # cation to the anionic parent). Enclosing marks per (complex
+    # prefix), in the nesting order when the prefix carries its own
+    # marks: '[ethyldi(methyl)azaniumyl]acetate' (the Blue Book).
+    from ..assembly.naming_utils import apply_enclosing_marks
+    composed = f'{locant_prefix}{apply_enclosing_marks(cat_prefix, -1)}{parent_anion_name}'
 
     # Defensive: never ship a malformed composition where the prefix glues
     # directly onto a parent locant with no separator ('(...)2-hydroxy...'). If
@@ -1899,7 +1908,13 @@ def _cation_name_rt_ok(name: str, mol) -> bool:
         pm = Chem.MolFromSmiles(parsed)
         if pm is None:
             return False
-        return MolToInchiKey(pm) == inchikey_of(mol)
+        if MolToInchiKey(pm) != inchikey_of(mol):
+            return False
+        # The full key cannot place a hydron on a protonated atom (its /p layer
+        # is mobile): '2-(dimethylamino)ethan-1-aminium' parses to the primary
+        # aminium for the protonated tertiary amine C[NH+](C)CCN.
+        from ..validation.protonation_identity import protonation_site_verdict
+        return protonation_site_verdict(Chem.MolToSmiles(mol), parsed) != "mismatch"
     except Exception:
         return False
 
@@ -2027,6 +2042,11 @@ def _reentry_guarded(fn):
     return _wrapped
 
 
+# A neutral oxoacid OH (carboxylic, sulfur or phosphorus oxoacid).
+_OXOACID_OH = Chem.MolFromSmarts(
+    "[OX2H1]-[$([CX3]=O),$([SX4](=O)=O),$([SX3]=O),$([PX4]=O)]")
+
+
 def _aminium_or_azaniumyl(neutral_name: str, n_cation_sites: int) -> str:
     """Protonated-amine cation: '-aminium' suffix vs 'azaniumyl' prefix.
 
@@ -2059,7 +2079,26 @@ def _aminium_or_azaniumyl(neutral_name: str, n_cation_sites: int) -> str:
     is_principal = (low == 'ammonia' or low.endswith('amine')
                     or low.endswith('amin') or low.endswith('ane'))
     if (not is_principal) and n_cation_sites == 1 and low.count('amino') == 1:
-        return neutral_name.replace('amino', 'azaniumyl', 1)
+        swapped = neutral_name.replace('amino', 'azaniumyl', 1)
+        # Valid (the caller round-trips it) but never a PIN: a cation is senior
+        # to every neutral class that can own the suffix here --
+        # lists '6 Cations' before '7 Acids' (the Blue Book-18170), and a
+        # carboxylic acid then becomes the 'carboxy' prefix "When another group
+        # is present that has priority for citation as suffix"
+        #:29910; '4-carboxy-1-methylpyridin-1-ium chloride (PIN)':29914). So
+        # the PIN is aminium-principal ('2-carboxy-N-methylethan-1-aminium'),
+        # not '3-(methylazaniumyl)propanoic acid'; a carbon-substituted
+        # azaniumyl prefix is not a PIN prefix either:42296/:42299).
+        # Name-scoped label: a shipped name is demoted when it contains the
+        # swapped prefix word ('methylazaniumyl', 'azaniumyl') -- also after a
+        # later step rebuilds the parent around it (an amide made from the
+        # swapped acid name).
+        start = swapped.index('azaniumyl')
+        while start > 0 and swapped[start - 1].isalpha():
+            start -= 1
+        from ..metrics.provenance import record_non_pin_fragment
+        record_non_pin_fragment(swapped[start:swapped.index('azaniumyl') + len('azaniumyl')])
+        return swapped
     return name_aminium_cation(neutral_name) or ''
 
 
@@ -2391,7 +2430,9 @@ def route_charged(mol, style: str = 'pin') -> str:
         # path runs unchanged (W4-I1).
         from .radicals import name_heteroatom_radical
         _het = name_heteroatom_radical(mol, radical_sites, style)
-        if _het:
+        # Second layer over the producers' own strict round trip: a heteroatom
+        # radical name must parse back to the input (full key + radical graph).
+        if _het and _full_inchikey_rt_ok(mol, _het):
             return _het
         # Radicals funnel through the chokepoint too (kill radicals.py alkyl
         # carbon counting): neutralize -> re-enter -> append the -yl/
@@ -2495,8 +2536,15 @@ def route_charged(mol, style: str = 'pin') -> str:
             # azanium). emit_bis_quaternary_ammonium fails closed ('') on
             # anything asymmetric / ring-borne / branched-bridge, falling
             # through unchanged to the legacy path below.
+            # The substitutive '-bis(aminium)' PIN comes first,
+            #; emit_bis_quaternary_aminium, full-InChIKey RT-gated); the
+            # multiplicative azanium name is its verified general-tier fallback
+            # (cation_to_prefix labels it: record_amine_cation_prefix).
             if ccls == 'quaternary' and len(sites['cations']) == 2:
-                from .ions import emit_bis_quaternary_ammonium
+                from .ions import emit_bis_quaternary_aminium, emit_bis_quaternary_ammonium
+                bis_aminium = emit_bis_quaternary_aminium(mol, sites['cations'])
+                if bis_aminium:
+                    return bis_aminium
                 biq = emit_bis_quaternary_ammonium(mol, sites['cations'])
                 if biq:
                     return biq
@@ -2884,7 +2932,13 @@ def route_charged(mol, style: str = 'pin') -> str:
         # those. It is ALSO the correct path for the single-carbon -ylidene/-ylidyne
         # (methylidene/methylidyne) the primitive would over-spell 'methanylidene'.
         if _is_simple_terminal_radical(mol, _radical_center_idx):
-            return _apply_radical_suffix(neutral_name, radical_suffix)
+            # Verified like every other exit of this branch: the contraction is
+            # textual, so an isotope label keeps the NEUTRAL's locant
+            # ([CH2]C[13CH3] -> '(1-13C)propyl', the label at the wrong end). On
+            # a failed round trip, fall through to the locant primitive below.
+            simple = _apply_radical_suffix(neutral_name, radical_suffix)
+            if simple and _full_inchikey_rt_ok(mol, simple):
+                return simple
         # NON-terminal / branched / unsaturated radical: the centre needs a
         # first-class locant / lowest-locant for the free
         # valence, competing with unsaturation/substituents per / —
@@ -2945,8 +2999,26 @@ def route_charged(mol, style: str = 'pin') -> str:
         # function CAN still return an unverified acyclic name in a jar-absent
         # config; the 0-wrong backstop for that path is the top-level gate,
         # NOT this branch (which only ever ships an RT-verified re-derivation).
+        # wp7: also re-derive when the naive name is the 'amino' ->
+        # 'azaniumyl' swap (a senior neutral group kept the suffix). That swap is a
+        # valid name but never the PIN: the cation is senior to every neutral class
+        #, '6 Cations', the Blue Book), so the PIN is
+        # aminium-principal ('1,3-dihydroxy-2-(hydroxymethyl)propan-2-aminium',
+        # '2-carboxyethan-1-aminium'). The retained neutral 'trometamol' used to
+        # reach this re-derivation by failing as 'trometamolium'; with the trivial
+        # name out of the PIN lookup the systematic neutral name took the
+        # swap instead. A re-derived name ships only if it round-trips and is itself
+        # aminium-principal; otherwise the demoted swap stays.
+        # Not when the cation also carries a neutral oxoacid group: the charged
+        # router builds a zwitterion by re-entering exactly this cation and then
+        # ionizing its acid SUFFIX ('(1S)-1-azaniumylethane-1-phosphonate'); an
+        # aminium-principal name has no acid suffix left to ionize, so the
+        # zwitterion would abstain. Those keep the demoted swap (wp3).
+        _naive_is_swap = (bool(naive) and 'azaniumyl' in naive
+                          and 'azaniumyl' not in neutral_name
+                          and not mol.HasSubstructMatch(_OXOACID_OH))
         if (len(sites['cations']) == 1 and naive
-                and not _cation_name_rt_ok(naive, mol)):
+                and (_naive_is_swap or not _cation_name_rt_ok(naive, mol))):
             cat = mol.GetAtomWithIdx(sites['cations'][0]['atom_idx'])
             n_c = sum(1 for nb in cat.GetNeighbors() if nb.GetSymbol() == 'C')
             amine_fg = {1: 'primary_amine', 2: 'secondary_amine',
@@ -2960,7 +3032,11 @@ def route_charged(mol, style: str = 'pin') -> str:
                 if sys_neutral and not _is_malformed_parent(sys_neutral):
                     rederived = _aminium_or_azaniumyl(
                         sys_neutral, len(sites['cations'])) or ''
-                    if rederived and _cation_name_rt_ok(rederived, mol):
+                    if (rederived and 'azaniumyl' not in rederived
+                            and _cation_name_rt_ok(rederived, mol)):
+                        return rederived
+                    if (rederived and not _naive_is_swap
+                            and _cation_name_rt_ok(rederived, mol)):
                         return rederived
         return naive
 
@@ -2975,6 +3051,24 @@ def route_charged(mol, style: str = 'pin') -> str:
         # licences the omission the neutral could not claim. RT-audited.
         if anion_is_iminide:
             ionized = _iminide_omit_locants(ionized, mol)
+        # 0-wrong: a MIXED multi-anion (a sulfonate/phosphonate plus an
+        # olate/thiolate) reaches the suffix seam with allowed_suffixes=None, and
+        # the seam ionizes only the parent suffix -- the junior -O-/-S- stays the
+        # neutral 'hydroxy'/'sulfanyl', so the name denotes a species with fewer
+        # charges ('5-hydroxybenzene-1,3-disulfonate' is the dianion; the input
+        # is the trianion). When the salt's cations do not balance the name's
+        # charge OPSIN cannot duplicate the anion, and 'trisodium 5-hydroxy...'
+        # shipped as pin_verified. (the Blue Book): the other
+        # anionic centres are "expressed as anionic substituent group(s)". Build
+        # that name (RT-gated inside), or keep the seam's name only when it
+        # round-trips exactly; never return the charge-dropping name.
+        if (total_charge < 0 and len(sites['anions']) >= 2
+                and len({classify_anion(mol, a) for a in sites['anions']}) > 1):
+            from .ions import express_junior_anionic_chalcogens
+            full = express_junior_anionic_chalcogens(mol, sites['anions'], ionized)
+            if full:
+                return full
+            return ionized if _full_inchikey_rt_ok(mol, ionized) else ''
         return ionized
 
     # M4: the suffix-swap above has no ``-amine``/``-imine``

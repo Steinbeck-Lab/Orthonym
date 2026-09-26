@@ -37,7 +37,7 @@ class TestPerceptionLayerAccessibility:
         # Test with norbornane
         mol = Chem.MolFromSmiles('C1CC2CCC1C2')
         assert is_bicyclo_system(mol) == True
-        assert name_bicyclo_system(mol) == 'norbornane'
+        assert name_bicyclo_system(mol) == 'bicyclo[2.2.1]heptane'  # R11 (2026-09-25, pre-existing-failures plan, Task 5)::9881, only adamantane/cubane are retained; "bicyclo[2.2.1]heptane (PIN)":2038
 
     @pytest.mark.integration
     def test_spiro_functions_accessible(self):
@@ -94,7 +94,7 @@ class TestCOMPLEX01:
     @pytest.mark.integration
     @pytest.mark.parametrize("smiles,expected", [
         # Norbornane - bicyclo[2.2.1]heptane - has retained name
-        ("C1CC2CCC1C2", "norbornane"),
+        ("C1CC2CCC1C2", "bicyclo[2.2.1]heptane"),  # R11 (2026-09-25, pre-existing-failures plan, Task 5)::9881, only adamantane/cubane are retained; "bicyclo[2.2.1]heptane (PIN)":2038
         # Bicyclo[2.2.2]octane - systematic name only
         ("C1CC2CCC1CC2", "bicyclo[2.2.2]octane"),
     ])
@@ -104,10 +104,10 @@ class TestCOMPLEX01:
 
     @pytest.mark.integration
     def test_norbornane_retained_name(self):
-        """Test that norbornane uses retained name, not systematic."""
+        """Norbornane is NOT a retained name: the von Baeyer name is the PIN."""
         result = name_compound("C1CC2CCC1C2")
-        assert result == "norbornane"
-        assert "bicyclo" not in result  # Should use retained name
+        # R11 (2026-09-25, pre-existing-failures plan, Task 5)::9881, only adamantane/cubane are retained; "bicyclo[2.2.1]heptane (PIN)":2038
+        assert result == "bicyclo[2.2.1]heptane"
 
     @pytest.mark.integration
     def test_bicyclo_systematic_when_no_retained(self):
@@ -266,7 +266,8 @@ class TestComplexRingRouting:
         """Test bicyclo detected before simple cycloalkane classification."""
         # Norbornane could be misclassified as cycloalkane
         result = name_compound("C1CC2CCC1C2")
-        assert result == "norbornane"
+        # R11 (2026-09-25, pre-existing-failures plan, Task 5)::9881, only adamantane/cubane are retained; "bicyclo[2.2.1]heptane (PIN)":2038
+        assert result == "bicyclo[2.2.1]heptane"
         # If it were misclassified, it might be named as a substituted cyclopentane
         assert "cyclopentane" not in result
 

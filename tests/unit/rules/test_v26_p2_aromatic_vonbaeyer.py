@@ -77,10 +77,8 @@ AROMATIC_FUSED_CASES = [
     # follows it. The old expectation was the higher-locant form.
     ("O1C=CC=CC=Cc2ccccc21",            # 1-benzoxonine (O fused to benzene)
      "2-oxabicyclo[7.4.0]trideca-1(13),3,5,7,9,11-hexaene"),
-    ("C1=CC=Cc2ccccc2C1",               # benzocycloheptene (benzene + 7-ring enes)
-     "bicyclo[5.4.0]undeca-1(11),3,5,7,9-pentaene"),
-    ("C1CCCc2ccccc2C1",                 # benzosuberane (benzene + saturated 7-ring)
-     "bicyclo[5.4.0]undeca-1(11),7,9-triene"),
+    # benzocycloheptene and benzosuberane used to be here: see
+    # BENZO7_FUSION_CASES (their fusion names are the PINs).
     ("S1C=CC=CC=Cc2ccccc21",            # 1-benzothionine (S fused to benzene)
      #: same (:9777) low-locant-to-heteroatom correction
      # as the oxa sibling above.
@@ -88,6 +86,41 @@ AROMATIC_FUSED_CASES = [
     ("C1=CC=CC=Cc2ccccc2C1",            # benzocyclooctene
      "bicyclo[7.4.0]trideca-1(13),2,4,6,9,11-hexaene"),
 ]
+
+# Benzene ortho-fused to a seven-membered ring: FUSION nomenclature gives the
+# PIN, so the full namer names both at BOTH tiers with the fusion PIN (not the
+# von Baeyer polyene, and no abstention). Pre-existing-failures plan, Task 9
+# (TRIAGE.csv rows 133-137), ruling R22, change-asserted-value (was: pin
+# abstains; complete 'bicyclo[5.4.0]undeca-1(11),3,5,7,9-pentaene' /
+# 'bicyclo[5.4.0]undeca-1(11),7,9-triene'). "Five-membered ring
+# requirement" (the Blue Book): "Fusion nomenclature gives preferred IUPAC
+# names only to compounds having at least two rings of at least five or more
+# members.... When fusion names are not allowed, unsaturated von Baeyer ring
+# system names are preferred IUPAC names" (here both rings have >= 5 members, so
+# the fusion name is allowed). (:24221): "Preferred IUPAC names for
+# the partially saturated and fully saturated compounds are formed by using
+# 'hydro' prefixes"; "Polycyclic mancude compounds" (:17024),
+# "6,7-dihydro-5H-benzo[7]annulene (PIN)" (:17032). OPSIN 2.9.0 RT exact (full
+# InChIKey; test_names_opsin_roundtrip); the old values were mutation-checked.
+# (SMILES, fusion PIN).
+BENZO7_FUSION_CASES = [
+    ("C1=CC=Cc2ccccc2C1", "5H-benzo[7]annulene"),      # benzocycloheptene
+    ("C1CCCc2ccccc2C1",                                # benzosuberane
+     "6,7,8,9-tetrahydro-5H-benzo[7]annulene"),
+]
+
+# What ``name_general_ring`` itself returns for the two BENZO7 cages (never
+# shipped: the full namer names both with the fusion PIN first). The mancude cage
+# now comes back with its fusion name (row 135, R22 as above, was the von Baeyer
+# pentaene); the saturated one still comes back as the von Baeyer polyene (RT
+# exact, unchanged).
+BENZO7_ENGINE_CASES = [
+    ("C1=CC=Cc2ccccc2C1", "5H-benzo[7]annulene"),
+    ("C1CCCc2ccccc2C1", "bicyclo[5.4.0]undeca-1(11),7,9-triene"),
+]
+
+# Every aromatic fused cage the primitive / flag-gate tests run on.
+ALL_AROMATIC_CAGES = AROMATIC_FUSED_CASES + BENZO7_FUSION_CASES
 
 # Saturated / isolated-ene cages named by the von-Baeyer VALID tier already:
 # complete MUST equal pin (the audit runs on the valid tier too; no regression).
@@ -143,6 +176,10 @@ FAIL_CLOSED_ENGINE = {
 # --------------------------------------------------------------------------
 # Fixtures / helpers (mirror the P1 test module)
 # --------------------------------------------------------------------------
+# Every (SMILES, name) a test here asserts as emitted; each must OPSIN-round-trip.
+_RT_CASES = AROMATIC_FUSED_CASES + BENZO7_FUSION_CASES + BENZO7_ENGINE_CASES[1:]
+
+
 def _find_opsin_jar():
     """The pinned OPSIN jar via orthonym.jars (tests.support.jars), or None."""
     return jar_or_none()
@@ -165,7 +202,7 @@ def opsin_roundtrip():
     jar = _find_opsin_jar()
     if not shutil.which("java") or jar is None:
         pytest.skip("OPSIN/Java not available")
-    names = [name for _s, name in AROMATIC_FUSED_CASES]
+    names = [name for _s, name in _RT_CASES]
     proc = subprocess.run(
         ["java", "-jar", jar, "-r", "-o", "smi"],
         input="\n".join(names) + "\n", capture_output=True, text=True,
@@ -193,7 +230,8 @@ def _engine_ring(smiles, flag=True):
 # Direct-engine: exact von-Baeyer polyene string + complete E1 partition
 # (deterministic; gate-independent).
 # --------------------------------------------------------------------------
-@pytest.mark.parametrize("smiles,expected", AROMATIC_FUSED_CASES)
+@pytest.mark.parametrize("smiles,expected",
+                         AROMATIC_FUSED_CASES + BENZO7_ENGINE_CASES)
 def test_engine_exact_string_and_e1(smiles, expected):
     mol, res = _engine_ring(smiles)
     assert res is not None, f"engine refused aromatic cage {smiles!r}"
@@ -206,7 +244,7 @@ def test_engine_exact_string_and_e1(smiles, expected):
 # The lifted refusal: analyze_cage_universal marks the cage mancude and yields
 # a descriptor only when allow_mancude=True; None (byte-identical) when False.
 # --------------------------------------------------------------------------
-@pytest.mark.parametrize("smiles,_expected", AROMATIC_FUSED_CASES)
+@pytest.mark.parametrize("smiles,_expected", ALL_AROMATIC_CAGES)
 def test_mancude_flag_gates_primitive(smiles, _expected):
     mol = Chem.MolFromSmiles(smiles)
     assert analyze_cage_universal(mol, allow_mancude=False) is None, (
@@ -248,7 +286,7 @@ def test_edge_audit_known_good_and_bad():
 def test_edge_audit_accepts_aromatic_cage():
     """The audit must ACCEPT a correct mancude cage (else it would only lose
     coverage). Every emitted case must pass it."""
-    for smiles, _expected in AROMATIC_FUSED_CASES:
+    for smiles, _expected in ALL_AROMATIC_CAGES:
         mol = Chem.MolFromSmiles(smiles)
         cage = analyze_cage_universal(mol, allow_mancude=True)
         assert cage is not None, f"cage refused pre-audit for {smiles!r}"
@@ -281,7 +319,7 @@ def test_engine_emits_retained_pin_for_coronene():
 # --------------------------------------------------------------------------
 # Flag OFF: the engine is inert on an aromatic cage (default byte-identity).
 # --------------------------------------------------------------------------
-@pytest.mark.parametrize("smiles,_expected", AROMATIC_FUSED_CASES)
+@pytest.mark.parametrize("smiles,_expected", ALL_AROMATIC_CAGES)
 def test_engine_flag_off_inert(smiles, _expected):
     _mol, res = _engine_ring(smiles, flag=False)
     assert res is None, f"flag-off engine must refuse aromatic cage {smiles!r}"
@@ -290,7 +328,7 @@ def test_engine_flag_off_inert(smiles, _expected):
 # --------------------------------------------------------------------------
 #: every emitted von-Baeyer polyene OPSIN-parses back to the input.
 # --------------------------------------------------------------------------
-@pytest.mark.parametrize("smiles,expected", AROMATIC_FUSED_CASES)
+@pytest.mark.parametrize("smiles,expected", _RT_CASES)
 def test_names_opsin_roundtrip(smiles, expected, opsin_roundtrip):
     back = opsin_roundtrip.get(expected)
     assert back, f"OPSIN could not parse {expected!r}"
@@ -314,6 +352,24 @@ def test_pin_abstains(smiles, _expected, production_gate):
 # --------------------------------------------------------------------------
 @pytest.mark.parametrize("smiles,expected", AROMATIC_FUSED_CASES)
 def test_complete_tier_emits(smiles, expected, production_gate):
+    comp = Orthonym(style="pin", general_fallback=True,
+                     allow_aromatic_general=True)
+    out = comp.name(Chem.CanonSmiles(smiles))
+    assert out == expected, f"{smiles}: complete gave {out!r} != {expected!r}"
+
+
+# --------------------------------------------------------------------------
+# R22: the benzo[7]annulene cages get their fusion PIN at BOTH tiers.
+# --------------------------------------------------------------------------
+@pytest.mark.parametrize("smiles,expected", BENZO7_FUSION_CASES)
+def test_benzo7_pin_tier_names_fusion_pin(smiles, expected, production_gate):
+    out = Orthonym(style="pin").name(Chem.CanonSmiles(smiles))
+    assert out == expected, f"{smiles}: pin gave {out!r} != {expected!r}"
+
+
+@pytest.mark.parametrize("smiles,expected", BENZO7_FUSION_CASES)
+def test_benzo7_complete_tier_names_fusion_pin(smiles, expected,
+                                               production_gate):
     comp = Orthonym(style="pin", general_fallback=True,
                      allow_aromatic_general=True)
     out = comp.name(Chem.CanonSmiles(smiles))

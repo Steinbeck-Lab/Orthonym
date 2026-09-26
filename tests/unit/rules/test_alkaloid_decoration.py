@@ -38,7 +38,12 @@ class TestMorphinanE2E:
         assert "4,5-epoxy" in result
         assert "17-methyl" in result
         assert "morphin" in result
-        assert "-7-en-" in result
+        # fix a performance pass (wp6-tests), change-asserted-value (was '-7-en-'): the 'e'
+        # of 'ene' is elided only before a vowel, (a) (the Blue Book),
+        # and '-diol' begins with 'd': 'undeca-2,9-diene-4,8-diol (PIN)' (:3403). Full
+        # name '(5R,6S,9S,13S,14S)-4,5-epoxy-17-methylmorphin-7-ene-3,6-diol', OPSIN
+        # 2.9.0 full-InChIKey exact (an InChIKey).
+        assert "-7-ene-3,6-diol" in result
         assert "3,6-diol" in result
 
     def test_codeine_decoration(self):
@@ -139,13 +144,24 @@ class TestAlkaloidCIRegression:
     """Guard tests for compounds that must not regress."""
 
     def test_ci008_epoxycholestane(self):
-        """ci-008: 16,22-epoxy bridge detected in cholestane derivative."""
+        """ci-008: the 16,22-epoxy bridge makes the cholestane skeleton furostan.
+
+         fix a performance pass (wp6-tests), change-asserted-value (was '16,22-epoxy' +
+        'cholestane' in the name): the ring-E ether is the Table 10.1 stereoparent
+        'furostan', (the Blue Book "Semisystematic names of
+        recommended parent structures are listed in Table 10.1"; furostan at:51409),
+        kept at the PIN tier by the controller ruling on stereoparents
+        (TRIAGE.md 'Controller rulings'); OPSIN 2.9.0 full-InChIKey exact
+        (an InChIKey). Open (recorded in internal notes
+        wp6): the input leaves C-5 undefined, and (:51047) says "with a
+        steroid the stereochemistry at 'C-5', when relevant, is indicated by α, β or
+        ξ", i.e. '5ξ-furostan'; OPSIN 2.9.0 reads the bare name with C-5 undefined, so
+        the round trip cannot tell the two apart."""
         result = name_compound(
             "CC(C)CCC1O[C@H]2C[C@H]3[C@@H]4CCC5CCCC[C@]5(C)"
             "[C@H]4CC[C@]3(C)[C@H]2[C@@H]1C"
         )
-        assert "16,22-epoxy" in result
-        assert "cholestane" in result
+        assert result == "furostan", result
 
     @pytest.mark.opsin_gate
     def test_steroid_ester_not_methoxy(self):

@@ -201,6 +201,7 @@ def _detect_natural_product_impl(mol) -> Optional[Dict]:
     if best_match is None:
         return None
 
+    best_match = _canonical_scaffold_match(mol, patterns[best_smiles], best_smiles, best_match)
     scaffold_info = NATURAL_PRODUCT_SCAFFOLDS[best_smiles]
     non_scaffold = get_non_scaffold_atoms(mol, best_match)
 
@@ -212,6 +213,145 @@ def _detect_natural_product_impl(mol) -> Optional[Dict]:
         "matched_atoms": best_match,
         "non_scaffold_atoms": non_scaffold,
     }
+
+
+# classes of one scaffold decoration, in the order the NP assembler
+# (rules/natural_products.py) expresses them: an ester makes the scaffold the
+# '-yl' of the ester name (free valence, `_assemble_np_ester_name`); otherwise a
+# ketone is the '-one' suffix with hydroxy demoted to a prefix; otherwise a
+# hydroxy is the '-ol' suffix.
+_NP_SUFFIX_RANK = {'fv': 0, 'one': 1, 'ol': 2}
+_NP_DEMOTED_PREFIX = {'one': 'oxo', 'ol': 'hydroxy'}
+_NP_HALOGEN_PREFIX = {9: 'fluoro', 17: 'chloro', 35: 'bromo', 53: 'iodo'}
+
+
+def _np_decoration_kind(mol, idx: int, nbr, in_scaffold: set) -> Optional[str]:
+    """Class of the decoration ``nbr`` on scaffold atom ``idx``: a suffix class
+    ('fv' / 'one' / 'ol'), a prefix name the NP assembler cites (fluoro, chloro,
+    bromo, iodo, methyl, methoxy), or ``None`` for any other prefix (still a
+    detachable prefix for (f); unnamed, so it blocks the (g) tier)."""
+    from rdkit import Chem as _Chem
+    bond = mol.GetBondBetweenAtoms(idx, nbr.GetIdx())
+    z = nbr.GetAtomicNum()
+    if z == 8:
+        if bond.GetBondType() == _Chem.BondType.DOUBLE:
+            return 'one'
+        others = [x for x in nbr.GetNeighbors() if x.GetIdx() != idx]
+        if not others:
+            return 'ol'
+        if any(x.GetIdx() in in_scaffold for x in others):
+            return None  # an O bridging two scaffold atoms
+        for x in others:
+            if x.GetAtomicNum() in (6, 15, 16) and any(
+                    y.GetAtomicNum() in (8, 16)
+                    and mol.GetBondBetweenAtoms(x.GetIdx(), y.GetIdx()).GetBondType()
+                    == _Chem.BondType.DOUBLE
+                    for y in x.GetNeighbors()):
+                return 'fv'  # O-acyl / O-sulfonyl / O-phosphoryl: the scaffold is the '-yl'
+        if (len(others) == 1 and others[0].GetAtomicNum() == 6
+                and others[0].GetDegree() == 1):
+            return 'methoxy'
+        return None
+    if z in _NP_HALOGEN_PREFIX and bond.GetBondType() == _Chem.BondType.SINGLE:
+        return _NP_HALOGEN_PREFIX[z]
+    if (z == 6 and nbr.GetDegree() == 1
+            and bond.GetBondType() == _Chem.BondType.SINGLE):
+        return 'methyl'
+    return None
+
+
+def _canonical_scaffold_match(mol, query_mol, scaffold_smiles: str, first_match: tuple) -> tuple:
+    """Choose the scaffold match by the numbering rules, not by atom order.
+
+    ``GetSubstructMatch`` returns the FIRST match RDKit finds, and for a
+    symmetric scaffold (tropane: C1<->C5, C2<->C4, C6<->C7) which match comes
+    first depends on how the input SMILES is written, so the same molecule got
+    '(1R,3r,5S)-tropan-3-yl...' or '(1S,3r,5R)-tropan-3-yl...' (full gate,
+    determinism). The derivative is named by the rules of to
+    , the Blue Book), so among all matches pick by
+    ``### **** NUMBERING`` (:3219), in order:
+
+      (c):3256 the suffix / free valence -- the senior of ester '-yl', '-one',
+          '-ol' present, exactly as the NP assembler chooses it;
+      (e):3288 "low locants are given first to multiple bonds as a set and then
+          to double bonds";
+      (f):3301 the detachable prefixes "all considered together" (a demoted
+          ketone/hydroxy counts as oxo/hydroxy here);
+      (g):3307 the prefix cited first, by alphanumerical name (only when every
+          prefix has a known name, so a partial list never ranks against the rule);
+      (j):3346 the CIP stereodescriptors with their locants
+          (``naming_utils.cip_locant_rank_key``);
+      then the canonical atom ranks, which do not depend on the input spelling
+      (any match still tied here gives the same name).
+
+    Lumping the suffix in with the prefixes (the old first tier) put the prefix
+    first: '(1R,2S,5S,7S)-2-methyltropan-7-ol' where (c) gives
+    '(1S,4S,5R,6S)-4-methyltropan-6-ol'.
+    """
+    try:
+        from orthonym.data.natural_products import get_scaffold_numbering
+        numbering = get_scaffold_numbering(scaffold_smiles)
+        matches = mol.GetSubstructMatches(query_mol, uniquify=False, maxMatches=256)
+    except Exception:
+        return first_match
+    if not numbering or len(matches) < 2:
+        return first_match
+    try:
+        from rdkit import Chem as _Chem
+        from orthonym.perception.stereo import assign_stereochemistry
+        from orthonym.assembly.naming_utils import cip_locant_rank_key
+        assign_stereochemistry(mol)
+        ranks = list(_Chem.CanonicalRankAtoms(mol, breakTies=True))
+    except Exception:
+        return first_match
+
+    def _loc_key(loc):
+        s = str(loc)
+        digits = ''.join(ch for ch in s if ch.isdigit())
+        return (int(digits) if digits else 0, s)
+
+    def key(match):
+        in_scaffold = set(match)
+        loc = {idx: numbering.get(pos) for pos, idx in enumerate(match)}
+        decos = []  # (kind, locant key), one per scaffold -> outside bond
+        for idx in match:
+            if loc.get(idx) is None:
+                continue
+            for nbr in mol.GetAtomWithIdx(idx).GetNeighbors():
+                if nbr.GetIdx() not in in_scaffold and nbr.GetAtomicNum() > 1:
+                    decos.append((_np_decoration_kind(mol, idx, nbr, in_scaffold),
+                                  _loc_key(loc[idx])))
+        present = [_NP_SUFFIX_RANK[k] for k, _ in decos if k in _NP_SUFFIX_RANK]
+        top = min(present) if present else None
+        principal = tuple(sorted(l for k, l in decos
+                                 if top is not None and _NP_SUFFIX_RANK.get(k) == top))
+        multiple, double = [], []
+        for bond in mol.GetBonds():
+            a, b = bond.GetBeginAtomIdx(), bond.GetEndAtomIdx()
+            if (a in in_scaffold and b in in_scaffold
+                    and loc.get(a) is not None and loc.get(b) is not None
+                    and not bond.GetIsAromatic()
+                    and bond.GetBondType() in (_Chem.BondType.DOUBLE,
+                                               _Chem.BondType.TRIPLE)):
+                pair = tuple(sorted((_loc_key(loc[a]), _loc_key(loc[b]))))
+                multiple.append(pair)
+                if bond.GetBondType() == _Chem.BondType.DOUBLE:
+                    double.append(pair)
+        prefixes = [(_NP_DEMOTED_PREFIX.get(k, k), l) for k, l in decos
+                    if top is None or _NP_SUFFIX_RANK.get(k) != top]
+        prefix_locs = tuple(sorted(l for _, l in prefixes))
+        first_cited = ()
+        if prefixes and all(isinstance(p, str) and p not in _NP_SUFFIX_RANK
+                            for p, _ in prefixes):
+            first_cited = tuple(sorted(prefixes))
+        cip = [(_loc_key(loc[idx]), mol.GetAtomWithIdx(idx).GetProp('_CIPCode'))
+               for idx in match
+               if loc.get(idx) is not None and mol.GetAtomWithIdx(idx).HasProp('_CIPCode')]
+        return (principal, tuple(sorted(multiple)), tuple(sorted(double)),
+                prefix_locs, first_cited, cip_locant_rank_key(cip),
+                tuple(ranks[i] for i in match))
+
+    return min(matches, key=key)
 
 
 def get_non_scaffold_atoms(mol, matched_atoms: tuple) -> set:

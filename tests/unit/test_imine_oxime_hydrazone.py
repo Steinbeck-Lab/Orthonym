@@ -218,7 +218,8 @@ class TestSeniorityData:
             "isocyanate": "isocyanato",
             "isothiocyanate": "isothiocyanato",
             "urea": "carbamoylamino",
-            "guanidine": "guanidino",
+            # (the Blue Book) carbamimidoylamino (preferred prefix)
+            "guanidine": "carbamimidoylamino",
             "boronic_acid": "borono",  # preselected prefix)
             "hydrazone": "hydrazinylidene",
         }

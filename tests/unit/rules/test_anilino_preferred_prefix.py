@@ -132,7 +132,9 @@ class TestAnilinoPreferredPrefixHelper:
         assert alpha_sort_key(preferred) == "chloroanilino"
         #... and it now sorts AFTER 'bromo', which the general form did not.
         assert alpha_sort_key("bromo") < alpha_sort_key(preferred)
-        assert alpha_sort_key("bromo") > alpha_sort_key("(4-chlorophenyl)amino")
+        # 2026-09-25 (pre-existing-failures plan, Task 5) change-asserted-value: a prefix "is considered to begin with the first letter of its complete name" (the Blue Book) -- the general form '(4-chlorophenyl)amino' now
+        # also keys at 'c' (it used to key at its inner locant '4', before every letter).
+        assert alpha_sort_key("(4-chlorophenyl)amino") == "chlorophenylamino"
 
 
 # --------------------------------------------------------------------------- #

@@ -50,7 +50,8 @@ class TestVonBaeyerControlsByteIdentical:
     and MUST stay byte-identical (the PIN-never-regresses guard)."""
 
     def test_norbornane_unchanged(self):
-        assert name_compound("C1CC2CCC1C2") == "norbornane"
+        # R11 (2026-09-25, pre-existing-failures plan, Task 5)::9881, only adamantane/cubane are retained; "bicyclo[2.2.1]heptane (PIN)":2038
+        assert name_compound("C1CC2CCC1C2") == "bicyclo[2.2.1]heptane"
 
     def test_bicyclo222octane_unchanged(self):
         assert name_compound("C1CC2CCC1CC2") == "bicyclo[2.2.2]octane"

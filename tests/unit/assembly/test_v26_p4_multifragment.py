@@ -35,9 +35,10 @@ bounded probe process -- see ``scripts/diagnose.py``-style batched-JVM RT):
     on identical-component input), complete reproduces it EXACTLY -- P4 is a
     strict no-op there.
   - FAIL-CLOSED cases: a 3-fragment charged mixture the salt router can't
-    resolve (``[NH4+].[Cl-].c1ccccc1``) and a neutral-but-unnameable
-    organoiron component (``diphenyliron``) both stay byte-identical
-    failure signals under complete -- never a wrong/partial joined name.
+    resolve (``[NH4+].[Cl-].c1ccccc1``) stays a byte-identical failure signal
+    under complete -- never a wrong/partial joined name. (The organoiron
+    hydrate ``diphenyliron``.water used to be the second case; its component
+    is now nameable and complete names it RT-exact, decision D-b, 2026-09-26.)
 
 NOTE on the harness: ``conftest`` force-disables the production gate
 for the whole suite (tests assert raw output). The full-namer cases here
@@ -56,6 +57,7 @@ import orthonym.namer as _namer_mod
 from orthonym.namer import Orthonym, is_failure_name
 from orthonym.rules.adducts import _name_component, name_adduct
 from tests.support.jars import jar_or_none
+from tests.support.rt_assert import assert_full_rt
 
 
 pytestmark = pytest.mark.unit
@@ -99,6 +101,17 @@ BYTE_IDENTICAL_CASES = [
 # adduct rather than dropping/placeholder-ing the Fe component).
 FAIL_CLOSED_CASES = [
     ("[NH4+].[Cl-].c1ccccc1", "unknown organic compound"),
+    # [Fe]c1ccccc1.O used to be here: see COMPLETE_NAMES_PIN_DECLINES.
+]
+
+# The PIN tier still declines these, and the complete tier now NAMES them.
+# Pre-existing-failures plan, Task 9 (TRIAGE.csv row 117), user decision D-b
+# (plan 'User decisions (answered 2026-09-24)'): "D-b -> the policy wins: where a
+# wider-tier name round-trips EXACTLY, change the test to assert an exact
+# round-trip." The diphenyliron component is now nameable, so the complete tier
+# emits 'diphenyliron—water (1/1)', OPSIN 2.9.0 RT exact (full InChIKey); the
+# test asserts the round trip, not that spelling. (SMILES, the PIN-tier failure.)
+COMPLETE_NAMES_PIN_DECLINES = [
     ("[Fe](c1ccccc1)c1ccccc1.O", "iron compound (not supported)"),
 ]
 
@@ -224,6 +237,19 @@ def test_fail_closed_never_ships_partial_name(smiles, expected_failure,
         f"expected={expected_failure!r}")
 
 
+@pytest.mark.parametrize("smiles,pin_failure", COMPLETE_NAMES_PIN_DECLINES)
+def test_complete_names_what_pin_declines(smiles, pin_failure, production_gate):
+    """D-b (TRIAGE row 117, was test_fail_closed_never_ships_partial_name[...]):
+    complete ships a name that round-trips to the input's full InChIKey (never a
+    wrong or partial joined name); the PIN tier still gives its failure signal."""
+    canon = Chem.CanonSmiles(smiles)
+    comp_out = _complete().name(canon)
+    assert_full_rt(comp_out, canon, what="complete tier: ")
+    pin_out = _pin().name(canon)
+    assert pin_out == pin_failure, (
+        f"{smiles}: pin={pin_out!r} expected={pin_failure!r}")
+
+
 # --------------------------------------------------------------------------
 # Single-fragment input is untouched by the P4 branch.
 # --------------------------------------------------------------------------
@@ -239,17 +265,28 @@ def test_single_fragment_path_unaffected(smiles, expected, production_gate):
 # --------------------------------------------------------------------------
 # 'valid' tier (general_fallback=True, allow_aromatic_general=False) must
 # NOT engage the P4 multi-fragment recovery -- only 'complete'
-# (allow_aromatic_general=True) does. Deterministic (no Java): pins the
+# (allow_aromatic_general=True) does. Pins the
 # `if not self._allow_aromatic_general: return None` gate in
-# `_name_multifragment_complete` (namer.py:2132).
+# `_name_multifragment_complete` (namer.py, `def _name_multifragment_complete`).
+#
+# Pre-existing-failures plan, Task 9 (TRIAGE.csv row 118), user decision D-b
+# (plan 'User decisions (answered 2026-09-24)'): "D-b -> the policy wins: where a
+# wider-tier name round-trips EXACTLY, change the test to assert an exact
+# round-trip." The valid tier now names this hydrate through the regular
+# multi-component handler (`_handle_multi_component_neutral` -> `name_adduct`
+# with allow_aromatic_general=False; trace 2026-09-26: 0 calls of
+# `_name_multifragment_complete`), so its abstention no longer witnesses the
+# gate. The gate is now asserted directly, and the valid-tier name
+# ('2-silylpyridine—water (1/1)', OPSIN 2.9.0 RT exact) by its round trip.
 # --------------------------------------------------------------------------
 def test_multifragment_recovery_is_complete_tier_only():
     valid_tier = Orthonym(style="pin", general_fallback=True,
                           allow_aromatic_general=False)
-    out = valid_tier.name(Chem.CanonSmiles("[SiH3]c1ccccn1.O"))
-    assert (not out) or is_failure_name(out), (
-        f"'valid' tier must not run the complete-only multi-fragment "
-        f"recovery, got {out!r}")
+    smi = Chem.CanonSmiles("[SiH3]c1ccccn1.O")
+    assert valid_tier._name_multifragment_complete(
+        Chem.MolFromSmiles(smi), smi) is None, (
+        "'valid' tier must not run the complete-only multi-fragment recovery")
+    assert_full_rt(valid_tier.name(smi), smi, what="valid tier: ")
 
 
 # --------------------------------------------------------------------------
@@ -274,9 +311,37 @@ def test_name_adduct_pin_default_declines_general_only_component():
         allow_aromatic_general=True) == "2-silylpyridine—water (1/1)"
 
 
-def test_name_adduct_fails_closed_on_unnameable_component():
-    mol = Chem.MolFromSmiles(Chem.CanonSmiles(
-        "[Fe](c1ccccc1)c1ccccc1.O"))
+def test_name_adduct_names_organoiron_component_under_complete():
+    """Pre-existing-failures plan, Task 9 (TRIAGE.csv row 119; the test was
+    test_name_adduct_fails_closed_on_unnameable_component), user decision D-b
+    (plan 'User decisions (answered 2026-09-24)'): "D-b -> the policy wins: where
+    a wider-tier name round-trips EXACTLY, change the test to assert an exact
+    round-trip." The diphenyliron component is no longer unnameable, so the
+    complete-tier kwargs give 'diphenyliron—water (1/1)' (OPSIN 2.9.0 RT exact);
+    the test asserts the round trip, not the spelling."""
+    smi = Chem.CanonSmiles("[Fe](c1ccccc1)c1ccccc1.O")
+    out = name_adduct(
+        Chem.MolFromSmiles(smi), style="pin", general_fallback=True,
+        allow_aromatic_general=True)
+    assert_full_rt(out, smi, what="name_adduct (complete kwargs): ")
+
+
+# Task 12 fix a performance pass (wp6-tests; TRIAGE.md ' outcome', follow-up 2): Task 9
+# moved the old witness of this refusal (diphenyliron, now nameable) to the test
+# above, so the unnameable-NEUTRAL-component branch of name_adduct ('ANY component
+# the single-component pipeline cannot name' -> None, never a dropped or
+# placeholder component) had no test. XeF2 and dimethyldimercury are neutral,
+# multi-atom, and the per-component namer declines them even with the complete
+# kwargs (probe 2026-09-26), so the whole adduct must be refused.
+@pytest.mark.parametrize("component", ["F[Xe]F", "C[Hg][Hg]C"])
+def test_name_adduct_fails_closed_on_unnameable_neutral_component(component):
+    comp = Chem.CanonSmiles(component)
+    assert _name_component(
+        comp, "pin", general_fallback=True, allow_aromatic_general=True) is None, (
+        f"precondition: {component} must be unnameable as a component")
+    mol = Chem.MolFromSmiles(Chem.CanonSmiles(component + ".O"))
+    assert Chem.GetFormalCharge(mol) == 0
+    assert name_adduct(mol, style="pin") is None
     assert name_adduct(
         mol, style="pin", general_fallback=True,
         allow_aromatic_general=True) is None

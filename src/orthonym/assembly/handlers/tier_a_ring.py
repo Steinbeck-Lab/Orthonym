@@ -604,6 +604,26 @@ def name_tier_a_ring(
                                 candidate_name, features.mol, atom_to_locant,
                                 include_near_parent_ez=_inpe,
                             )
+            # (the Blue Book): "All preferred IUPAC names for
+            # esters are named by functional class nomenclature"; the acyloxy /
+            # alkoxycarbonyl prefixes are for an ester beside a senior group
+            #,:31698). No producer in this ring cascade builds
+            # the functional class name, so when the whole molecule's principal
+            # group is an exocyclic ester, this name cites it as a prefix: valid,
+            # not preferred ('3-[(3-hydroxy-2-phenylpropanoyl)oxy]-8-methyl-8-
+            # azabicyclo[3.2.1]octane'). It ships at the general tier, never as
+            # pin_verified -- the same demotion as a general-only ring prefix.
+            if (getattr(features, 'principal_group', None) == 'ester'
+                    and is_top_level_naming()):
+                from ...perception.smarts_cache import compiled as _smarts
+                _mol = features.mol
+                # an ester whose C(=O)-O bond is not a ring bond (a lactone is
+                # named as a ring '-one', which IS its PIN form)
+                if any(not _mol.GetBondBetweenAtoms(_m[0], _m[2]).IsInRing()
+                       for _m in _mol.GetSubstructMatches(
+                           _smarts("[CX3](=O)[OX2][#6]"))):
+                    from ...metrics.provenance import record_general_ring_prefix
+                    record_general_ring_prefix()
             return NamingResult(
                 name=candidate_name,
                 tree=NameTreeNode(parent_stem=candidate_name, class_id="tier_a_ring", iupac_section_cite="P-25", fragment_legacy=candidate_name),

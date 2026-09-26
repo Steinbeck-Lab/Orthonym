@@ -903,8 +903,10 @@ def get_retained_name(canonical_smiles: str) -> Optional[str]:
         Retained name string, or None if not found
     """
     try:
-        from orthonym.data import ALL_RETAINED_NAMES
-        return ALL_RETAINED_NAMES.get(canonical_smiles)
+        # wp7: the shared accessor also serves an OPSIN-import trivial name
+        # without PIN evidence, recorded as a non-PIN fragment.
+        from orthonym.data import get_retained_name as _merged_get
+        return _merged_get(canonical_smiles)
     except ImportError:
         return RETAINED_NAMES.get(canonical_smiles)
 

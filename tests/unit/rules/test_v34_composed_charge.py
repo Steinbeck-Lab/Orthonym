@@ -13,6 +13,8 @@ from rdkit import Chem
 from orthonym import Orthonym
 from orthonym.errors import is_failure_name
 from orthonym.validation.opsin_roundtrip import opsin_parse
+from tests.support.jars import jar_or_skip
+from tests.support.rt_assert import assert_full_rt
 
 BE = dict(general_fallback=True, general_fallback_unverified=True, allow_aromatic_general=True)
 
@@ -369,11 +371,20 @@ def test_ws_stereo_branch_buried_stereocentre_still_omits_not_wrong():
     # -- this is not a "no stereo at all" vacuous case.
     assert _stereo_prefix(ctx.mol, comp.spine_atom_to_locant) == "(5S)-"
 
+    # fix a performance pass (wp6-tests), change-asserted-value (was the stereo-omitted
+    # '5-[1-(methan-1-yl)propan-1-yl]-2,4-dioxo-3-(1-oxoethan-1-yl)-1-azacyclopentan-
+    # 3-ide' with verified None, and a guard that the name must not start with
+    # '(5S)-'). The floor now emits the COMPLETE descriptor set -- the branch centre
+    # too ('(1S)-1-methylpropan-1-yl') -- and verify_or_none confirms it. The guard's
+    # 0-wrong intent (never ship a PARTIAL descriptor) is met by a complete one:
+    # OPSIN 2.9.0 (fresh call, outside the engine) gives the input's full InChIKey.
+    # A producer-level best-effort name, not a PIN claim. The test id is kept.
     name, verified = _floor_name_and_verify(smi)
-    assert name == ("5-[1-(methan-1-yl)propan-1-yl]-2,4-dioxo-3-(1-oxoethan-1-yl)-"
+    assert name == ("(5S)-5-[(1S)-1-methylpropan-1-yl]-2,4-dioxo-3-(1-oxoethan-1-yl)-"
                      "1-azacyclopentan-3-ide")
-    assert not name.startswith("(5S)-")   # the unverified descriptor was DISCARDED
-    assert verified is None               # block1: safe omission, never shipped wrong
+    assert verified == name               # verified, with every stereocentre cited
+    jar_or_skip()
+    assert_full_rt(name, smi)
 
 
 def test_ws7_control_betaine_still_prefers_route_charged_pin():
@@ -609,8 +620,11 @@ def test_ws_noabstain_isoflavone_phenolate_mancude_cage_names_full_rt():
     + phenolate) mancude bicyclic anion. Same fix as witness 1."""
     smi = "COc1cc2c(=O)c(-c3cc4c(cc3OC)OCO4)coc2cc1[O-]"
     name, verified = _floor_name_and_verify(smi)
-    assert name == ("4-[4-(1-oxaethan-1-yl)-7,9-dioxabicyclo[4.3.0]nona-1,3,5-"
-                     "trien-3-yl]-8-(1-oxaethan-1-yl)-9-oxido-5-oxo-2-oxabicyclo"
+    # 2026-09-25 (pre-existing-failures plan, Task 5) change-asserted-value: a prefix "is considered to begin with the first letter of its complete name" (the Blue Book): '(1-oxaethan-1-yl)' keys at 'oxaethanyl'
+    # and '[4-(1-oxaethan-1-yl)-7,9-dioxabicyclo...-3-yl]' at 'oxaethanyldioxa...'
+    # (it keyed at its inner locant '4', before every letter). OPSIN RT exact.
+    assert name == ("8-(1-oxaethan-1-yl)-4-[4-(1-oxaethan-1-yl)-7,9-dioxabicyclo"
+                     "[4.3.0]nona-1,3,5-trien-3-yl]-9-oxido-5-oxo-2-oxabicyclo"
                      "[4.4.0]deca-1(10),3,6,8-tetraene")
     assert verified == name  # full-InChIKey CONFIRMED
 
@@ -627,17 +641,18 @@ def test_ws_noabstain_protonated_purine_mancude_cage_block1_safe_omission():
     `test_ws_stereo_branch_buried_stereocentre_still_omits_not_wrong`'s
     pattern."""
     smi = "C=CC(=O)N1C[C@H](Nc2[nH+]cnc3[nH]ccc23)CC[C@@H]1C"
+    # fix a performance pass (wp6-tests), change-asserted-value (was the stereo-omitted name
+    # with verified None and 'have != want'): the floor now cites both branch centres
+    # ('(1R,4S)-') and verify_or_none confirms the name; OPSIN 2.9.0 (fresh call,
+    # outside the engine) gives the input's full InChIKey (an InChIKey).
+    # A producer-level best-effort name, not a PIN claim. The test id is kept.
     name, verified = _floor_name_and_verify(smi)
-    assert name == ("5-{1-[4-(methan-1-yl)-3-(1-oxoprop-2-en-1-yl)-3-"
+    assert name == ("5-{1-[(1R,4S)-4-methyl-3-(1-oxoprop-2-en-1-yl)-3-"
                      "azacyclohexan-1-yl]-1-azamethan-1-yl}-2,4,9-"
                      "triazabicyclo[4.3.0]nona-1,3,5,7-tetraen-4-ium")
-    assert verified is None  # block1: safe stereo-omission, never shipped wrong
-    got = opsin_parse(name)
-    assert got, f"OPSIN could not parse {name!r}"
-    have = Chem.MolToInchiKey(Chem.MolFromSmiles(got))
-    want = Chem.MolToInchiKey(Chem.MolFromSmiles(smi))
-    assert have[:14] == want[:14]  # constitution matches (block1)
-    assert have != want            # stereo genuinely omitted, not wrong
+    assert verified == name
+    jar_or_skip()
+    assert_full_rt(name, smi)
 
 
 def test_ws_noabstain_naphthalene_mancude_cage_no_longer_voids():
@@ -830,20 +845,19 @@ def test_ws_noabstain_reverse_prenyl_indole_zwitterion_block1_safe_omission():
     """NOABSTAIN class 4 (a dev split): a tryptophan-like zwitterion decorated
     with a prenyl substituent on the fused indole ring."""
     smi = "CC(C)=CCc1cccc2c(C[C@H]([NH3+])C(=O)[O-])c[nH]c12"
+    # fix a performance pass (wp6-tests), change-asserted-value (was the stereo-omitted name
+    # with verified None and 'have != want'): the floor now cites the branch centre
+    # ('(2S)-') and verify_or_none confirms the name; OPSIN 2.9.0 (fresh call, outside
+    # the engine) gives the input's full InChIKey (an InChIKey). A
+    # producer-level best-effort name, not a PIN claim. The test id is kept.
     name, verified = _floor_name_and_verify(smi)
-    assert name == ("9-(2-azaniumyl-3-oxido-4-oxabut-3-en-1-yl)-5-[3-"
-                     "(methan-1-yl)but-2-en-1-yl]-7-azabicyclo[4.3.0]"
+    assert name == ("9-[(2S)-2-azaniumyl-3-oxido-4-oxabut-3-en-1-yl]-5-"
+                     "(3-methylbut-2-en-1-yl)-7-azabicyclo[4.3.0]"
                      "nona-1,3,5,8-tetraene")
     assert "pentyl" not in name  # NOT the brief-feared saturated mis-spelling
-    assert verified is None  # block1: safe stereo-omission, never shipped wrong
-    got = opsin_parse(name)
-    assert got, f"OPSIN could not parse {name!r}"
-    have = Chem.MolToInchiKey(Chem.MolFromSmiles(got))
-    want = Chem.MolToInchiKey(Chem.MolFromSmiles(smi))
-    assert have[:14] == want[:14]  # constitution matches (block1) --
-    # the reverse-prenyl arm IS correctly unsaturated, not the feared defect
-    assert have != want            # the branch stereocentre is genuinely
-    # omitted, not wrong
+    assert verified == name
+    jar_or_skip()
+    assert_full_rt(name, smi)
 
 
 def test_ws_stereo_achiral_floor_name_unaffected_no_stereo_block():

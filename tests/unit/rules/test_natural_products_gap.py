@@ -26,10 +26,19 @@ class TestDKPRetainedName:
 
     @pytest.mark.unit
     def test_bare_dkp_ring_retained_name(self):
-        """Bare piperazine-2,5-dione ring returns retained name from lookup."""
-        canonical = Chem.CanonSmiles("O=C1CNCC(=O)N1")
-        name = get_retained_name(canonical)
-        assert name == "piperazine-2,5-dione", f"Expected 'piperazine-2,5-dione', got: {name}"
+        """Piperazine-2,5-dione is named by the ring-ketone path, not a lookup row.
+
+         fix a performance pass (wp6-tests), TEST-BUG: "O=C1CNCC(=O)N1" is piperazine-2,6-dione
+        (both carbonyls on one ring N; InChIKey CYJAWBVQRMVFEO); its wrong-structure
+        'piperazine-2,5-dione' lookup row was deleted on purpose (8a0a9bc0e,
+        data/retained_names.py PA1 sweep), so the lookup correctly returns None. The
+        2,5-dione (glycine anhydride) is O=C1CNC(=O)CN1. Both engine names are OPSIN
+        2.9.0 full-InChIKey exact ring-ketone suffix names). The test id is
+        kept."""
+        assert get_retained_name(Chem.CanonSmiles("O=C1CNCC(=O)N1")) is None
+        assert get_retained_name(Chem.CanonSmiles("O=C1CNC(=O)CN1")) is None
+        assert name_compound("O=C1CNC(=O)CN1") == "piperazine-2,5-dione"
+        assert name_compound("O=C1CNCC(=O)N1") == "piperazine-2,6-dione"
 
     @pytest.mark.integration
     def test_dkp_compound7_contains_piperazin(self):
@@ -139,10 +148,35 @@ class TestTropaneNPNaming:
         2026-09-25)."""
         from orthonym.namer import _pseudoasymmetric_name_verified
         smiles = "CN1[C@@H]2CC[C@H]1C[C@@H](OC(=O)c1c[nH]c3ccccc13)C2"
-        assert name_natural_product(Chem.MolFromSmiles(smiles)) is None
         name = name_compound(smiles)
         assert name == "(1R,3r,5S)-tropan-3-yl 1H-indole-3-carboxylate", name
         assert _pseudoasymmetric_name_verified(name, smiles)
+        # fix a performance pass (wp6-tests), change-asserted-value (was: the NP producer
+        # returns None). 286a491c8 made tropisetron nameable on purpose (the NP
+        # producer declined, the decomposition named the ester); 28e1d520b (esters.py:
+        # name_ester names a fused ring acid via name_polyfunctional_ester_via_acid)
+        # later let the NP producer build the SAME complete string itself (archive
+        # bisect, rest-of-suite research item 29). (the Blue Book, no
+        # decoration dropped) is what the old 'is None' guarded, so the producer may
+        # decline, or return exactly the verified complete name.
+        np = name_natural_product(Chem.MolFromSmiles(smiles))
+        assert np is None or (np == name and _pseudoasymmetric_name_verified(np, smiles)), np
+
+    @pytest.mark.integration
+    @pytest.mark.xfail(strict=True, reason=(
+        "DEFECT (non-PIN at pin_verified): the shipped '(1R,3r,5S)-tropan-3-yl ...' "
+        "uses the natural-product parent 'tropane' (P-100, BlueBookV2.md:50943: no PINs "
+        "for the P-10 chapter), and OPSIN 2.9.0 cannot parse its 'r' (verified only by "
+        "the stereo-stripped round trip + the centres labeller, controller ruling "
+        "2026-09-25). The Blue Book writes this alcohol's ester "
+        "'(1R,3r,5S)-8-methyl-8-azabicyclo[3.2.1]octan-3-yl ...' first, before "
+        "'tropan-3α-yl ...' (P-93.5.2.2.1, :48828). Needs the substituted von Baeyer "
+        "ring-yl ester producer (.planning/TODO-2026-09-24.md section J; 'Open from T12 "
+        "fix round 2 (wp6)')."))
+    def test_tropane_ester_compound3_systematic_pin(self):
+        smiles = "CN1[C@@H]2CC[C@H]1C[C@@H](OC(=O)c1c[nH]c3ccccc13)C2"
+        assert name_compound(smiles) == (
+            "(1R,3r,5S)-8-methyl-8-azabicyclo[3.2.1]octan-3-yl 1H-indole-3-carboxylate")
 
     @pytest.mark.integration
     def test_tropanone(self):

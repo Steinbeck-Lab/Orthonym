@@ -87,8 +87,11 @@ def test_phase3_choline_sulfate_unchanged(namer):
 
 @pytest.mark.opsin_gate
 def test_phase3_bis_quaternary_ammonium_unchanged(namer):
+    # /: the substitutive '-bis(aminium)' name is the PIN
+    # (the Blue Book,:42160-42162,:42366); the multiplicative
+    # 'hexane-1,6-diylbis(trimethylazanium)' is its general-tier fallback.
     assert namer.name("C[N+](C)(C)CCCCCC[N+](C)(C)C") == \
-        "hexane-1,6-diylbis(trimethylazanium)"
+        "N1,N1,N1,N6,N6,N6-hexamethylhexane-1,6-bis(aminium)"
 
 
 @pytest.mark.opsin_gate

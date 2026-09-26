@@ -113,7 +113,12 @@ class TestRegressionLockAlreadyCorrectCases:
     fix edited."""
 
     def test_monoester_monool_fragment(self):
-        assert Orthonym().name("CC(=O)OCCO") == "2-hydroxyethyl ethanoate"
+        # PIN per R5: "acetic acid (PIN)" (the Blue Book); an ester
+        # takes the acid's PIN anion word, "ethyl acetate (PIN)" (:31667) -- the same
+        # word as test_monoester_free_diol below. OPSIN RT exact. (Was 'ethanoate':
+        # the polyfunctional ester path named the acid analog without the retained
+        # name.)
+        assert Orthonym().name("CC(=O)OCCO") == "2-hydroxyethyl acetate"
 
     def test_monoester_free_diol(self):
         assert Orthonym().name("CC(=O)OCC(O)CO") == "2,3-dihydroxypropyl acetate"

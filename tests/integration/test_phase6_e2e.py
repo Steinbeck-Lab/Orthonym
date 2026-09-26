@@ -28,7 +28,7 @@ class TestCOMPLEX01_Bicyclo_Hydrocarbons:
     @pytest.mark.integration
     @pytest.mark.parametrize("smiles,expected", [
         # Norbornane - uses retained name
-        ("C1CC2CCC1C2", "norbornane"),
+        ("C1CC2CCC1C2", "bicyclo[2.2.1]heptane"),  # R11 (2026-09-25, pre-existing-failures plan, Task 5)::9881, only adamantane/cubane are retained; "bicyclo[2.2.1]heptane (PIN)":2038
         # Bicyclo[2.2.2]octane - systematic name
         ("C1CC2CCC1CC2", "bicyclo[2.2.2]octane"),
         # Bicyclo[3.2.1]octane
@@ -42,10 +42,10 @@ class TestCOMPLEX01_Bicyclo_Hydrocarbons:
 
     @pytest.mark.integration
     def test_norbornane_uses_retained_name(self):
-        """Verify norbornane uses retained name, not systematic bicyclo[2.2.1]heptane."""
+        """Norbornane is NOT retained: the PIN is the von Baeyer name bicyclo[2.2.1]heptane."""
         result = name_compound("C1CC2CCC1C2")
-        assert result == "norbornane"
-        assert "bicyclo[2.2.1]" not in result
+        # R11 (2026-09-25, pre-existing-failures plan, Task 5)::9881, only adamantane/cubane are retained; "bicyclo[2.2.1]heptane (PIN)":2038
+        assert result == "bicyclo[2.2.1]heptane"
 
     @pytest.mark.integration
     def test_bicyclo_descriptor_format(self):
@@ -309,18 +309,24 @@ class TestCOMPLEX05_TautomerLocants:
 class TestCOMPLEX05_SubstitutedFusedHeterocycles:
     """Substituted fused heterocycle naming - known limitations."""
 
+    # Task 12 fix a performance pass (wp6-tests): the non-strict xfail on the whole test was
+    # stale for 2-methylindole (it XPASSed) and hid a live defect for
+    # 4-methylquinoline, which was named 'lepidine' at pin_verified: a trivial name
+    # imported from the OPSIN resource tables with is_pin False
+    # (data/opsin_imports/aryl_groups.py), returned by the retained-name lookup
+    # (routing/dispatch_table._handle_retained_name -> ALL_RETAINED_NAMES), 0 Blue
+    # Book hits. Quinoline is a retained PIN parent, so the PIN is
+    # '4-methylquinoline' (OPSIN 2.9.0 full-InChIKey exact, as is 'lepidine').
+    # wp7: FIXED -- an OPSIN-import name enters the PIN lookup only with Blue
+    # Book PIN evidence (data._OPSIN_IMPORT_PIN_EVIDENCE); the strict xfail is gone.
     @pytest.mark.integration
-    @pytest.mark.xfail(reason="Substituted fused heterocycle naming not fully implemented - edge case")
-    @pytest.mark.parametrize("smiles,expected_contains", [
-        # 2-methylindole - substituent on indole
-        ("Cc1cc2ccccc2[nH]1", "indole"),
-        # 4-methylquinoline - substituent on quinoline
-        ("Cc1ccnc2ccccc12", "quinoline"),
+    @pytest.mark.parametrize("smiles,expected", [
+        ("Cc1cc2ccccc2[nH]1", "2-methyl-1H-indole"),
+        ("Cc1ccnc2ccccc12", "4-methylquinoline"),
     ])
-    def test_substituted_fused_heterocycles(self, smiles, expected_contains):
-        """Test substituted fused heterocycle naming (known limitation)."""
-        result = name_compound(smiles)
-        assert expected_contains in result
+    def test_substituted_fused_heterocycles(self, smiles, expected):
+        """Substituted fused heterocycle naming."""
+        assert name_compound(smiles) == expected
 
 
 # =============================================================================
@@ -460,9 +466,13 @@ class TestPhase3Regression:
         ("C1CCNC1", "pyrrolidine"),
         # 5-membered aromatic
         ("c1ccoc1", "furan"),
-        ("c1cc[nH]c1", "pyrrole"),
+        # Task 12 fix a performance pass (wp6-tests), change-asserted-value (were 'pyrrole'
+        # and 'imidazole'): (the Blue Book) cites indicated
+        # hydrogen in parent hydrides, '1H-pyrrole (PIN)' (:24645),
+        # '1-(trimethylsilyl)-1H-imidazole (PIN)' (:18940). OPSIN RT exact.
+        ("c1cc[nH]c1", "1H-pyrrole"),
         ("c1ccsc1", "thiophene"),
-        ("c1c[nH]cn1", "imidazole"),
+        ("c1c[nH]cn1", "1H-imidazole"),
         # 6-membered saturated
         ("C1CCOCC1", "oxane"),
         ("C1CCNCC1", "piperidine"),
@@ -529,7 +539,8 @@ class TestComplexRingRouting:
     def test_bicyclo_detected_before_simple_cyclic(self):
         """Bicyclo systems should be detected before simple cycloalkane."""
         result = name_compound("C1CC2CCC1C2")
-        assert result == "norbornane"
+        # R11 (2026-09-25, pre-existing-failures plan, Task 5)::9881, only adamantane/cubane are retained; "bicyclo[2.2.1]heptane (PIN)":2038
+        assert result == "bicyclo[2.2.1]heptane"
         assert "cyclopentane" not in result
         assert "cyclohexane" not in result
 
@@ -622,18 +633,43 @@ class TestKnownLimitations:
     """Document known limitations (expected failures)."""
 
     @pytest.mark.integration
-    @pytest.mark.xfail(reason="Dispiro systems not yet supported")
     def test_dispiro_not_supported(self):
-        """Dispiro systems are documented as unsupported."""
-        # This would be something like dispiro[2.1.2.1]octane
-        # Not implemented in a phase
+        """Dispiro systems are named (the old 'not supported' marker was stale).
+
+        Task 12 fix a performance pass (wp6-tests): the non-strict xfail XPASSed. The engine
+        names the system 'dispiro[2.1.3.2]decane' (pin_verified), which OPSIN
+        2.9.0 parses to the input's full InChIKey, so this asserts the round
+        trip. The Blue Book spelling carries the superscripts:
+        (the Blue Book) "Each time a spiro atom is reached for the second
+        time its locant... is cited as a superscript number", e.g.
+        'dispiro[3.2.3^7.2^4]dodecane (PIN)' (:9981); see the strict xfail below.
+        The test id is kept."""
+        from tests.support.jars import jar_or_skip
+        from tests.support.rt_assert import assert_full_rt
+        jar_or_skip()
         result = name_compound("C1CC2(C1)CC3(CC2)CC3")
         assert "dispiro" in result
+        assert_full_rt(result, "C1CC2(C1)CC3(CC2)CC3")
 
     @pytest.mark.integration
-    @pytest.mark.xfail(reason="9H-carbazole/dibenzofuran matching needs enhancement")
+    @pytest.mark.xfail(strict=True, reason=(
+        "DEFECT (PIN spelling, class): polyspiro descriptors omit the superscript "
+        "locants of spiro atoms reached a second time (P-24.2.2, BlueBookV2.md:9977; "
+        "'dispiro[3.2.3^7.2^4]dodecane (PIN)' :9981). rules/spiro.py builds "
+        "'dispiro[a.b.c.d]' and passing tests lock that form "
+        "(tests/unit/rules/test_spiro.py, test_vonbaeyer_spiro.py, "
+        "test_dispiro_return_arc_numbering.py). .planning/TODO-2026-09-24.md "
+        "'Open from T12 fix round 2 (wp6)'."))
+    def test_dispiro_descriptor_carries_superscripts(self):
+        assert name_compound("C1CC2(C1)CC3(CC2)CC3") == "dispiro[2.1.3^5.2^3]decane"
+
+    @pytest.mark.integration
     def test_carbazole_detection(self):
-        """9H-carbazole detection may need enhancement."""
+        """9H-carbazole is detected (the non-strict xfail marker was stale: the
+        test XPASSed; Task 12 fix a performance pass, wp6-tests). Carbazole is a retained
+        PIN parent with its indicated hydrogen: '(special numbering;
+        9H-isomer shown; the PIN is 9H-carbazole)' (the Blue Book). OPSIN
+        RT exact."""
         result = name_compound("c1ccc2c(c1)[nH]c1ccccc12")
         assert result == "9H-carbazole"
 

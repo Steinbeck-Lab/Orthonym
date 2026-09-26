@@ -62,8 +62,12 @@ class TestPrefixAndFrnClasses:
         assert name_compound("CCC(=O)OO") == "propaneperoxoic acid"
 
     def test_cyclohexanecarboperoxoic_acid(self):
+        # fix a performance pass (wp6-tests), change-asserted-value (was
+        # 'cyclohexane-1-carboperoxoic acid'): (the Blue Book) and the
+        # BB's own 'cyclohexanecarboperoxoic acid (PIN)' (:30184); a single suffix on a
+        # ring of identical positions takes no locant. OPSIN 2.9.0 full-InChIKey exact.
         assert (name_compound("OOC(=O)C1CCCCC1")
-                == "cyclohexane-1-carboperoxoic acid")
+                == "cyclohexanecarboperoxoic acid")
 
     def test_carbonoperoxoic_protected(self):
         # [#6]-guard: the inorganic exact-SMILES entry keeps ownership.
@@ -102,8 +106,13 @@ class TestPrefixAndFrnClasses:
 @pytest.mark.unit
 class TestFusedRingRows:
     def test_selenazolothiazole(self):
+        # fix a performance pass (wp6-tests), change-asserted-value (was
+        # 'selenazolo[5,4-d]thiazole'): 'Seniority criteria for selecting the
+        # parent component' (the Blue Book) and the BB's own
+        # '[1,3]selenazolo[5,4-d][1,3]thiazole (PIN) (S,N senior to Se,N)' (:12311).
+        # OPSIN 2.9.0 full-InChIKey exact.
         assert (name_compound("c1nc2[se]cnc2s1")
-                == "selenazolo[5,4-d]thiazole")
+                == "[1,3]selenazolo[5,4-d][1,3]thiazole")
 
     def test_thiazolothiazole_unchanged(self):
         assert name_compound("c1nc2scnc2s1") == "thiazolo[5,4-d]thiazole"
@@ -123,10 +132,11 @@ class TestFusedRingRows:
                 == "9-methyl-9H-fluorene")
 
     def test_bare_fluorene_retained(self):
-        assert name_compound("c1ccc2c(c1)Cc1ccccc12") == "fluorene"
+        # (the Blue Book-11400): '(9H-isomer shown; the PIN is 9H-fluorene)'
+        assert name_compound("c1ccc2c(c1)Cc1ccccc12") == "9H-fluorene"
 
     @pytest.mark.parametrize("smiles,expected", [
-        ("C1CC2CCC1C2", "norbornane"),
+        ("C1CC2CCC1C2", "bicyclo[2.2.1]heptane"),  # R11 (2026-09-25, pre-existing-failures plan, Task 5)::9881, only adamantane/cubane are retained; "bicyclo[2.2.1]heptane (PIN)":2038
         ("C12C3C4C1C5C2C3C45", "cubane"),
         ("C1Cc2cccc3cccc1c23", "acenaphthene"),
     ])

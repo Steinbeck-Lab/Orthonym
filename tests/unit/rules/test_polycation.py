@@ -79,10 +79,20 @@ def namer():
     return Orthonym()
 
 
+# The PIN is the SUBSTITUTIVE '-bis(aminium)' name (emit_bis_quaternary_aminium):
+# names a carbon-substituted N+ by the 'aminium' suffix
+# ('N,N,N-trimethylmethanaminium (PIN)', the Blue Book, not
+# 'tetramethylazanium':41354); 'N1,N1,N3,N3,N3-hexamethylpropane-
+# bis(amidium) (PIN)' (:42154) and 'butanebis(nitrilium) (PIN)' beside the non-PIN
+# 'butanediylidynebis(azanium)' (:42160-42162); '3-(azaniumylmethyl)pentane-
+# 1,5-bis(aminium) (PIN)' (:42366). The multiplicative builder above stays as the
+# verified general-tier fallback.
 @pytest.mark.opsin_gate
 @pytest.mark.parametrize("smi,expected", [
-    ("C[N+](C)(C)CCCCCC[N+](C)(C)C", "hexane-1,6-diylbis(trimethylazanium)"),
-    ("C[N+](C)(C)CCCCCCCCCC[N+](C)(C)C", "decane-1,10-diylbis(trimethylazanium)"),
+    ("C[N+](C)(C)CCCCCC[N+](C)(C)C",
+     "N1,N1,N1,N6,N6,N6-hexamethylhexane-1,6-bis(aminium)"),
+    ("C[N+](C)(C)CCCCCCCCCC[N+](C)(C)C",
+     "N1,N1,N1,N10,N10,N10-hexamethyldecane-1,10-bis(aminium)"),
 ])
 def test_integration_bis_quaternary_ammonium(namer, smi, expected):
     assert namer.name(smi) == expected

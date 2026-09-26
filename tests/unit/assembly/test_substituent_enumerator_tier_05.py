@@ -215,6 +215,42 @@ class TestTier05DispatcherIntegration:
         assert result is None
 
 
+class TestTier05CarbonAttachedChalcogenEther:
+    """ fix a performance pass. The 'thioether' SMARTS is '[SX2]([#6])[#6]' (the
+    chalcogen at match[0], exactly like 'ether'), so the O-ether attach guard
+    applies to S/Se/Te too: a fragment -CH2-S-CH3 attached through its CARBON
+    is not a '(R)sulfanyl' prefix. Unguarded, get_sulfanyl_prefix named the far
+    side and returned 'methylsulfanyl', DROPPING the attachment carbon -- a
+    different molecule (it surfaced as the self-consistency-rejected candidate
+    '[(methylsulfanyl)disulfanyl]ethane' for CCSSCSC). composes the
+    right prefix, '[(methylsulfanyl)methyl]', as in the Blue Book's
+    '2-{[(methylsulfanyl)methyl]sulfanyl}-1-[...]propane' (the Blue Book)."""
+
+    def test_carbon_attached_thioether_is_not_a_sulfanyl_prefix(self):
+        mol = Chem.MolFromSmiles("CCSSCSC")      # CH2(4)-S(5)-CH3(6) on S(3)
+        assert _check_substituent_prefix_form(mol, {4, 5, 6}, 4) is None
+        assert name_substituent(mol, {4, 5, 6}, 4) == "(methylsulfanyl)methyl"
+
+    def test_chalcogen_attached_thioether_still_matches(self):
+        # The synthetic whole-match call attached through S keeps its prefix form.
+        mol = Chem.MolFromSmiles("CSC")
+        assert _check_substituent_prefix_form(mol, {0, 1, 2}, 1) == "methylsulfanyl"
+
+    def test_end_to_end_names_round_trip(self, opsin_gate):
+        from orthonym import name_compound
+        from tests.support.rt_assert import assert_full_rt
+        for smiles, expected in (
+            # was '4-ethyl-2-thiahexane' (general tier): one heterounit, so the
+            # substitutive name is the PIN, the Blue Book).
+            ("CCC(CSC)CC", "3-[(methylsulfanyl)methyl]pentane"),
+            # was '2,4,5-trithiaheptane' (general tier): three heterounits.
+            ("CCSSCSC", "{[(methylsulfanyl)methyl]disulfanyl}ethane"),
+        ):
+            name = name_compound(smiles)
+            assert name == expected
+            assert_full_rt(name, smiles)
+
+
 # ====================================================================
 # Exception-tolerant fall-through
 # ====================================================================

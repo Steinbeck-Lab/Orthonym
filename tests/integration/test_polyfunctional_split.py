@@ -255,10 +255,8 @@ class TestAcylSulfanylWholeMolecule:
     @pytest.mark.roundtrip
     @pytest.mark.parametrize("smiles", [
         "OCC(=O)SCCC(=O)O",   # substituted acyl -> v1 refuses (research §E Q4)
-        "CC(=O)SC(=O)C",      # symmetric thioanhydride: class = anhydride
-                              #, no free acid -> substitutive naming
-                              # would be WRONG-class; thioanhydride namer not
-                              # built -> must refuse
+        # CC(=O)SC(=O)C (symmetric thioanhydride) used to be here; the
+        # thioanhydride namer now exists -> test_symmetric_thioanhydride_pin.
     ])
     def test_fail_closed_boundaries(self, smiles, monkeypatch):
         # These molecules fail-close via the PRODUCTION OPSIN validity gate /
@@ -268,6 +266,25 @@ class TestAcylSulfanylWholeMolecule:
         import orthonym.namer as _namer
         monkeypatch.setattr(_namer, "_DISABLE_VALIDITY_GATE", False, raising=False)
         assert name_compound(smiles) == "unknown organic compound"
+
+    @_opsin_rt
+    @pytest.mark.roundtrip
+    @pytest.mark.opsin_gate
+    def test_symmetric_thioanhydride_pin(self):
+        # Pre-existing-failures plan, Task 9 (TRIAGE.csv row 60; no plan ruling,
+        # derived from the quoted rule) change-asserted-value. This molecule was
+        # asserted to fail closed while no thioanhydride namer existed; the class
+        # is an anhydride, not a thioester, and the namer now builds its PIN.
+        # "Thioanhydrides and other chalcogen analogues"
+        # (the Blue Book): "Chalcogen analogues of anhydrides having the
+        # general structure -CO-X-CO-... where X is -S-, -Se-, or -Te-, are named
+        # using the class names 'thioanhydride', 'selenoanhydride', or
+        # 'telluroanhydride'"; "C6H5-CO-S-CO-C6H5 benzoic thioanhydride (PIN)"
+        # (:32292) and "CH3-CO-Se-CO-CH3 acetic selenoanhydride (PIN)" (:32302).
+        # OPSIN 2.9.0 RT exact (full InChIKey). The old fail-closed value was
+        # mutation-checked (scripts/mutation_check.py exit 0). Runs with the
+        # production OPSIN validity gate on (the opsin_gate marker).
+        assert name_compound("CC(=O)SC(=O)C") == "acetic thioanhydride"
 
 
 @pytest.mark.integration

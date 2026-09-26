@@ -198,6 +198,19 @@ def _start(pid: int) -> bool:
             _log_unavailable_once(f"startJVM failed: {last}")
             return False
         _STARTED_PID = pid
+        # The thread that calls startJVM becomes the JVM's creating thread, a
+        # USER thread. When that is a worker thread (first use from a
+        # per-molecule ThreadPoolExecutor timeout thread), it exits without
+        # detaching, and DestroyJavaVM at interpreter exit waits for it forever
+        # (see _attach_thread). Re-attach it as a daemon like every other
+        # thread. The Python main thread keeps its attachment: it is the thread
+        # that runs DestroyJavaVM at exit.
+        if threading.current_thread() is not threading.main_thread():
+            try:
+                jpype.java.lang.Thread.detach()
+                jpype.java.lang.Thread.attachAsDaemon()
+            except Exception as exc:  # pragma: no cover - never block start-up
+                logger.debug("could not re-attach the JVM creating thread as daemon: %s", exc)
 
     try:
         if opsin_jar:
@@ -253,11 +266,22 @@ def _ensure_jvm() -> bool:
 
 
 def _attach_thread() -> None:
-    """Attach the calling thread to the JVM if it is not already (JPype req.)."""
+    """Attach the calling thread to the JVM as a DAEMON if it is not attached yet.
+
+    Daemon, never a user thread. JPype does not detach a Python thread when it
+    ends, so a worker thread (e.g. the per-molecule ``ThreadPoolExecutor``
+    timeout thread in ``scripts/benchmark_multi_corpus.py``) attached as a USER
+    thread stays alive in the JVM's view after it has exited. At interpreter exit
+    JPype's atexit hook (``_JTerminate``) destroys the JVM, and ``DestroyJavaVM``
+    waits for every user thread to finish, so the process hung forever there.
+    Measured: jstack showed the dead workers as non-daemon ``Thread-1..4`` with
+    ``DestroyJavaVM`` waiting on them. JPype's own automatic attach is daemon
+    (``java.lang.Thread.attachAsDaemon`` docstring), so this matches it.
+    """
     try:
         import jpype
         if not jpype.java.lang.Thread.isAttached():
-            jpype.attachThreadToJVM()
+            jpype.java.lang.Thread.attachAsDaemon()
     except Exception:  # pragma: no cover - auto-attach covers modern JPype
         pass
 

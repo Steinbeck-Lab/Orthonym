@@ -952,7 +952,8 @@ def _spiro_ring_traversals(
 
 
 def get_spiro_numbering(
-    mol, spiro_center: int, suffix_ring_atoms: Optional[Set[int]] = None
+    mol, spiro_center: int, suffix_ring_atoms: Optional[Set[int]] = None,
+    prefix_ring_atoms: Optional[List[int]] = None,
 ) -> Dict[int, int]:
     """
     Generate IUPAC numbering for a monospiro system.
@@ -1006,6 +1007,7 @@ def get_spiro_numbering(
 
     canon = list(Chem.CanonicalRankAtoms(mol, breakTies=True))
     suffix_set = set(suffix_ring_atoms or ())
+    prefix_list = list(prefix_ring_atoms or ())
 
     # Wave2: ring multiple bonds of the spiro system, so the
     # numbering choice can give them low locants. Computed once — every
@@ -1032,6 +1034,22 @@ def get_spiro_numbering(
             (get_heteroatom_priority(mol.GetAtomWithIdx(a).GetSymbol()), loc)
             for a, loc in heteros
         )
+        # (2b) (the Blue Book, '## Spiro ring systems
+        # containing atoms with nonstandard bonding numbers'): "Heteroatoms having
+        # nonstandard bonding numbers receive lowest locants in accordance with the
+        # numbering of the corresponding spiro ring system", and
+        # (:10857): "If there is a choice, lower locants are assigned to
+        # heteroatoms with the higher bonding number" -- '2λ6,4λ4-dithiaspiro[5.5]
+        # undecane (PIN)' (:10863). Part of the parent hydride numbering, so it
+        # follows the heteroatom tiers, as does for von Baeyer rings
+        # (bicyclo.get_bicyclo_numbering). Sorted (locant, -bonding number): the
+        # λ atoms' locant set first, then λ6 before λ4 on a positional tie. Empty
+        # without λ atoms, so their ordering is unchanged. Same λ read as the one
+        # the spiro name cites (_nonstandard_bonding_number).
+        lam_locs = sorted(
+            (loc, -lam) for a, loc in heteros
+            for lam in (_nonstandard_bonding_number(mol, a),) if lam is not None
+        )
         # (3) a phase SUBST-01: lowest locants to the free-valence / suffix atoms
         # (after heteroatoms) so a symmetric spiro SUBSTITUENT is minimal AND
         # deterministic (spiro[5.5]undecan-3-yl, never -9-yl).
@@ -1047,11 +1065,17 @@ def get_spiro_numbering(
         unsat_dbl = sorted(
             min(mapping[a], mapping[b]) for a, b, is_dbl in mult_bonds if is_dbl
         )
+        # (3c) (the Blue Book) "(f) detachable alphabetized prefixes,
+        # all considered together in a series of increasing numerical order"
+        # (:3301), after the suffixes and the 'ene'/'yne' endings. ``prefix_ring_atoms``
+        # lists each prefix-bearing ring atom once per prefix (empty when the
+        # caller has none, so the ordering is unchanged there).
+        prefix_locs = sorted(mapping[a] for a in prefix_list if a in mapping)
         # (4) deterministic, spelling-independent tiebreak for symmetric rings
         seq = [a for a, _loc in sorted(mapping.items(), key=lambda kv: kv[1])]
         canon_seq = tuple(canon[a] for a in seq)
-        return (het_locs, het_by_seniority, suffix_locs, unsat_all, unsat_dbl,
-                canon_seq)
+        return (het_locs, het_by_seniority, lam_locs, suffix_locs, unsat_all,
+                unsat_dbl, prefix_locs, canon_seq)
 
     return min(candidates, key=_key)
 

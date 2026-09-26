@@ -239,9 +239,12 @@ def _charged_arm_alkyl_prefix(mol, chain_atoms: List[int], onium_idx: int) -> Op
     stem = get_chain_prefix(n)
     if not stem:
         return None
+    # nesting order when the prefix carries its own marks (the Blue Book)
+    from ..assembly.naming_utils import apply_enclosing_marks
+    enclosed = apply_enclosing_marks(cat_prefix, -1)
     if n == 1:
-        return f"({cat_prefix}){stem}yl"
-    return f"{n}-({cat_prefix}){stem}yl"
+        return f"{enclosed}{stem}yl"
+    return f"{n}-{enclosed}{stem}yl"
 
 
 def _try_charged_arm(mol, frag_atoms: Set[int], core_atom: int) -> Optional[str]:
@@ -390,7 +393,13 @@ def _phosphoryloxy_name(mol, core_set: Set[int], p_idx: int, near_o_idx: int) ->
 
     if not head_name or ' ' in head_name:
         return None
-    return f"[({head_name})hydroxyphosphoryl]oxy"
+    # '[(2-aminoethoxy)hydroxyphosphoryl]oxy' (the Blue Book) -- the head is
+    # enclosed in front of the 'hydroxyphosphoryl' unit and the marks ESCALATE
+    # past any inside it,:7446): '[2-(methylamino)ethoxy]', never
+    # '(2-(methylamino)ethoxy)' (TRIAGE row 65).
+    from ..assembly.naming_utils import _is_fully_enclosed, apply_enclosing_marks
+    head = head_name if _is_fully_enclosed(head_name) else apply_enclosing_marks(head_name, -1)
+    return apply_enclosing_marks(f"{head}hydroxyphosphoryl", -1) + "oxy"
 
 
 # ---------------------------------------------------------------------------
@@ -448,7 +457,12 @@ def _number_parent(parent: List[int], suffix_carbons: Set[int],
         pos = {a: i + 1 for i, a in enumerate(order)}
         suf = sorted(pos[a] for a in suffix_carbons)
         pre = sorted(pos[a] for a in prefix_on)
-        return (suf, pre)
+        # (g) (the Blue Book): then "lowest locants for the
+        # substituent cited first as a prefix in the name" (and so on down the
+        # citation order) -- without it a tie kept the input's chain direction.
+        alpha = sorted((alpha_sort_key(t), pos[a])
+                       for a, toks in prefix_on.items() for t in toks)
+        return (suf, pre, alpha)
     fwd = parent
     rev = list(reversed(parent))
     best = min((fwd, rev), key=score)
@@ -467,15 +481,25 @@ def _assemble(mol, parent: List[int], numbering: Dict[int, int],
         for t in toks:
             groups.setdefault(t, []).append(numbering[c])
     parts: List[str] = []
+    from ..assembly.naming_utils import _is_fully_enclosed, apply_enclosing_marks
     for tok in sorted(groups, key=alpha_sort_key):
         locs = sorted(groups[tok])
-        compound = tok.startswith('(') or tok.startswith('[')
+        compound = tok[:1] in '([{'
+        # A composed prefix whose marks do not cover it whole ('[(...)
+        # hydroxyphosphoryl]oxy') is enclosed as one unit when cited, the marks
+        # escalated past those inside /, the Blue Book):
+        # '3-{[(2-aminoethoxy)hydroxyphosphoryl]oxy}' (:55180), never the bare
+        # '3-[(...)hydroxyphosphoryl]oxy-2-...'.
+        if compound and not _is_fully_enclosed(tok):
+            tok_cited = apply_enclosing_marks(tok, -1)
+        else:
+            tok_cited = tok
         table = COMPLEX_MULTIPLIERS if compound else SIMPLE_MULTIPLIERS
         mult = '' if len(locs) == 1 else table.get(len(locs))
         if mult is None:
             return None
         loc_str = ','.join(str(x) for x in locs)
-        parts.append(f"{loc_str}-{mult}{tok}")
+        parts.append(f"{loc_str}-{mult}{tok_cited}")
     prefix_str = '-'.join(parts)
 
     if suffix_carbons:
@@ -488,7 +512,11 @@ def _assemble(mol, parent: List[int], numbering: Dict[int, int],
     else:
         suffix = ""
 
-    name = f"{prefix_str}{stem}ane{suffix}" if prefix_str else f"{stem}ane{suffix}"
+    # (a) (the Blue Book): the parent's final 'e' is elided before a suffix
+    # beginning with a vowel -- 'propan-1-ol', but 'propane-1,2-diol' (the
+    # multiplier keeps it). The weave used to write 'propane-1-ol'/'propane-2-ol'.
+    base = f"{stem}an" if suffix and not ol_mult else f"{stem}ane"
+    name = f"{prefix_str}{base}{suffix}" if prefix_str else f"{base}{suffix}"
     name = name.replace('--', '-').lstrip('-')
 
     # Core stereocentre(s): the acyl/ether/phospho arms' OWN internal

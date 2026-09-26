@@ -33,11 +33,33 @@ def _name(smiles):
     ("[CH2+]", "methyliumyl"),                                # (PIN):43443
     ("CCC[OH+]", "propyloxidaniumyl"),                        # (PIN):43515
     ("CC(=O)[N-]", "acetylazanidyl"),                         # (PIN):43517
-    ("C[NH2+]", "methylazaniumyl"),
+    ("[NH-]", "azanidyl"),                                    # (preselected):43426
 ])
 def test_radical_ion(smiles, expected):
     row = _name(smiles)
-    assert row["name"] == expected and row["tier"] != "abstain"
+    assert row["name"] == expected and row["tier"] == "pin_verified" and row["is_pin"]
+    assert _strict_rt(expected, smiles)
+
+
+# "Radical ions on ionic suffix groups" (the Blue Book): "When ions
+# may be named by using modified suffixes (see and, the
+# suffixes denoting radical centers are added to the name of the cationic or anionic
+# parent hydride" -- 'benzenaminiumyl (PIN)' (:43501), 'methanaminidyl (PIN)' (:43503),
+# 'methanaminiumyl (PIN)' (:17608); an acyl group on N+ gives an amide cation
+# (Table 7.4:41421 'amidium'). The round-trip parser reads none of those PINs, so they
+# cannot be verified: the verified azanium/azanide name ships, never as pin_verified.
+@pytest.mark.opsin_gate
+@pytest.mark.parametrize("smiles,expected", [
+    ("C[NH2+]", "methylazaniumyl"),          # PIN methanaminiumyl (:17608)
+    ("[NH2+]c1ccccc1", "phenylazaniumyl"),   # PIN benzenaminiumyl (:43501)
+    ("C[N+](C)C", "trimethylazaniumyl"),     # PIN N,N-dimethylmethanaminiumyl
+    ("CC(=O)[NH2+]", "acetylazaniumyl"),     # amidium-based PIN (Table 7.4)
+    ("C[N-]", "methylazanidyl"),             # PIN methanaminidyl (:43503)
+])
+def test_suffix_parent_radical_ion_is_not_pin_verified(smiles, expected):
+    row = _name(smiles)
+    assert row["name"] == expected
+    assert row["tier"] not in ("pin_verified", "abstain") and not row["is_pin"]
     assert _strict_rt(expected, smiles)
 
 

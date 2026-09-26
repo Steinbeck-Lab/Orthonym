@@ -156,15 +156,13 @@ GOLD_DERIVED = [
     ("Nc1ccc(S(=O)(=O)O)cc1", "4-aminobenzene-1-sulfonic acid"),
     ("CCc1ccc(cc1)S(=O)(=O)OC", "methyl 4-ethylbenzene-1-sulfonate"),
     ("Cc1ccc(cc1)S(=O)(=O)O", "4-methylbenzene-1-sulfonic acid"),
-    # ⚠ KNOWN-DEFECT SNAPSHOT, not a gold PIN. The gold row is
-    # 'N1-(4-aminophenyl)-N4-phenylbenzene-1,4-diamine'; the emitted form drops the
-    # '1' from the first italic-N locant. The ASSIGNMENT is what Task 9b is
-    # responsible for and it is correct -- '(4-aminophenyl)' is on the LOWER
-    # nitrogen, as (g) requires ('aminoanilino' is cited before 'anilino') --
-    # so this row is here to catch the assignment flipping, which it did once
-    # during Task 9b before the italic-N prefixes were fed to the (g) tier.
+    # The gold PIN (was a KNOWN-DEFECT SNAPSHOT with a bare 'N-'). 2026-09-25
+    # (pre-existing-failures plan, Task 5) change-asserted-value: (the Blue Book): "Superscript arabic numbers, which are the locants of the parent structure, are used to differentiate the nitrogen atoms of di- and polyamines"; "N1-(4-aminophenyl)-N4-phenylbenzene-1,4-diamine (PIN)" (:26404). The
+    # ASSIGNMENT is what Task 9b is responsible for -- '(4-aminophenyl)' on the
+    # LOWER nitrogen, as (g) requires ('aminoanilino' is cited before
+    # 'anilino') -- so this row still catches the assignment flipping. OPSIN RT exact.
     ("Nc1ccc(Nc2ccc(Nc3ccccc3)cc2)cc1",
-     "N-(4-aminophenyl)-N4-phenylbenzene-1,4-diamine"),
+     "N1-(4-aminophenyl)-N4-phenylbenzene-1,4-diamine"),
     # ⚠ The 17th mandated row, absent from the Task 9 file. Its actual current
     # output is a REFUSAL, which is a real tripwire: the day it becomes nameable
     # this row must be re-derived rather than silently accepting whatever appears.

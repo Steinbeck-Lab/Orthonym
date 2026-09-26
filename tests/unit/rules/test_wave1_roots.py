@@ -126,7 +126,9 @@ def test_r3_amine_not_aza_replacement():
     must not be affected."""
     assert name_compound("CCCNCCC", style="pin") == "N-propylpropan-1-amine"   # was 4-azaheptane
     # REGRESSION GUARDS — these must stay correct:
-    assert name_compound("OCCOCCOCC", style="pin") == "3,6-dioxaoctan-1-ol"     # ether replacement OK
+    # fix a performance pass (was '3,6-dioxaoctan-1-ol'): (the Blue Book) -- two ether
+    # O are below the four heterounits an 'a' PIN needs; the -OH is the suffix, not a unit.
+    assert name_compound("OCCOCCOCC", style="pin") == "2-(2-ethoxyethoxy)ethan-1-ol"
     assert name_compound("NNN", style="pin") == "triazane"                       # polyazane OK (N–N bonded)
 
 
@@ -146,8 +148,9 @@ def test_r4_simple_ethers_substitutive():
     """
     assert name_compound("CCOCCC", style="pin") == "1-ethoxypropane"      # was 3-oxahexane
     assert name_compound("COCCOC", style="pin") == "1,2-dimethoxyethane"  # was 2,5-dioxahexane
-    # REGRESSION GUARD: genuine replacement chain (terminal -ol) must NOT change:
-    assert name_compound("OCCOCCOCC", style="pin") == "3,6-dioxaoctan-1-ol"
+    # fix a performance pass (was '3,6-dioxaoctan-1-ol'): (the Blue Book) -- two ether
+    # O are below the four heterounits an 'a' PIN needs; the -OH is the suffix, not a unit.
+    assert name_compound("OCCOCCOCC", style="pin") == "2-(2-ethoxyethoxy)ethan-1-ol"
 
 
 # ---------------------------------------------------------------------------

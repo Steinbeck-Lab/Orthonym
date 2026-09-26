@@ -5,11 +5,13 @@ Implements IUPAC 2013 replacement nomenclature where heteroatoms
 embedded in a carbon chain backbone are named using replacement terms
 (oxa, aza, thia, etc.) rather than substitutive prefixes (methoxy, amino, etc.).
 
-Examples:
-    COCCOCCOC -> 2,5,8-trioxanonane (3 O: skeletal replacement)
-    CCNCCC -> 3-azahexane (N: amine gate blocks; substitutive N-ethylpropan-1-amine)
-    COCCOC -> None (2 O, no -ol: R4 routes substitutive -> 1,2-dimethoxyethane)
-    OCCOCCOCC -> 3,6-dioxaoctan-1-ol (2 O with terminal -ol: skeletal + suffix)
+Examples: the 'a' name is the PIN only with >= 4 heterounits):
+    COCCOCCOCCOC -> 2,5,8,11-tetraoxadodecane (4 O; BB:27762)
+    OCCOCCOCCOCCOCC -> 3,6,9,12-tetraoxatetradecan-1-ol (4 O + -ol suffix)
+    COCCOCCOC -> None (3 O: the substitutive PIN is
+                        1-methoxy-2-(2-methoxyethoxy)ethane, BB:27756)
+    OCCOCCOCC -> None (2 O: 2-(2-ethoxyethoxy)ethan-1-ol)
+    CCNCCC -> None (amine gate; substitutive N-ethylpropan-1-amine)
 
 Scope: Chain-only (acyclic). Rings <= 10 atoms are handled by
 Hantzsch-Widman naming in the heterocycles module.
@@ -70,82 +72,108 @@ _ALLOWED_HETERO_TERMINATORS = {'P', 'As', 'Sb', 'Bi',
                                'Si', 'Ge', 'Sn', 'Pb', 'B'}
 
 
+# heterounits (the Blue Book): "A heterounit is a set of
+# heteroatoms having a name of its own such as, -SS-, disulfanediyl;
+# -SiH2-O-SiH2-, disiloxane-1,3-diyl; -SOS-, dithioxanediyl (not -OSiH2O- nor
+# -OSO- that correspond to three consecutive units 'oxysilanediyloxy' and
+# 'oxysulfanediyloxy', respectively)." A same-element pair (-OO-, -SS-, -NN-,
+# -SiSi-,...) is one unit; the two named triads are one unit each.
+_NAMED_HETEROUNIT_TRIADS = {('Si', 'O', 'Si'), ('S', 'O', 'S')}
+
+
+def _heterounits_in_run(run: List[str]) -> Optional[int]:
+    """Heterounits in one maximal run of consecutive chain heteroatoms, or None
+    when the run is not a countable sequence of units (fail closed)."""
+    if len(run) == 1:
+        return 1
+    if len(run) == 2:
+        # -XX- has a name of its own (disulfanediyl, dioxidanediyl, diazanediyl,
+        # disilanediyl); two different atoms are two units (2-oxa-4-thia-1,5-
+        # disilapentane (PIN),:23436: Si-O is silyl + oxy).
+        return 1 if run[0] == run[1] else 2
+    if len(run) == 3:
+        if tuple(run) in _NAMED_HETEROUNIT_TRIADS:
+            return 1
+        if len(set(run)) == 1:
+            # "trisulfane, HS-S-SH, is a parent hydride and is not allowed to be
+            # a heterounit" (:23385): no 'a' name for this chain.
+            return None
+        if run[0] == run[2]:
+            return 3  # -OSiH2O-, -OSO-: "three consecutive units" (:23350)
+    return None
+
+
+def _count_chain_heterounits(mol, backbone: List[int]) -> Optional[int]:
+    """Heterounits in the unbranched chain ``backbone``, or None
+    when a heteroatom run cannot be counted. 0 for an all-carbon chain."""
+    syms = [mol.GetAtomWithIdx(i).GetSymbol() for i in backbone]
+    units = 0
+    run: List[str] = []
+    for sym in syms + ['C']:
+        if sym != 'C':
+            run.append(sym)
+            continue
+        if run:
+            n = _heterounits_in_run(run)
+            if n is None:
+                return None
+            units += n
+            run = []
+    return units
+
+
+def _general_tier_active() -> bool:
+    """True on the valid / complete / best-effort tiers (the published
+    ``general_fallback`` flag), False on the PIN tier. A tier read never breaks
+    naming."""
+    try:
+        from ..metrics.provenance import general_fallback_ctx
+        return bool(general_fallback_ctx.get())
+    except Exception:  # noqa: BLE001
+        return False
+
+
 def _qualifies_for_pin_skeletal_replacement(
     backbone: List[int], mol,
 ) -> Tuple[bool, str]:
-    """a phase.A: lock PIN trigger to strict IUPAC.
+    """: is the skeletal replacement ('a') name the PIN of this chain?
 
-    Three accept branches per IUPAC Blue Book:
-      (a) >= 4 same-kind embedded heteroatoms in the chain backbone
-      (b) >= 3 mixed-kind embedded heteroatoms (>= 2 distinct elements)
-      (c) substitutive expression would require >= 5 prefix units
-          ("undue complexity"; conservative threshold for -- equivalent
-          to >= 5 embedded heteroatoms total regardless of kind diversity)
+    Blue Book 2013, ``## **** Skeletal replacement ('a') nomenclature
+    in acyclic chains``, (the Blue Book): "Skeletal
+    replacement ('a') nomenclature rather than substitutive or multiplicative
+    names must be used to generate preferred IUPAC names for acyclic
+    structures when four or more heterounits are present in a unbranched chain
+    containing at least one carbon atom and when none of the heteroatoms
+    constitute all or part of the principal characteristic group of the
+    compound." The Blue Book's own boundary rows: "(1) 1-methoxy-2-(2-
+    methoxyethoxy)ethane (PIN)" for three ether O (:27756) against "(4)
+    2,5,8,11-tetraoxadodecane (PIN)" for four (:27762); "13-amino-N-(2-{[2-
+    ({2-[(2-aminoethyl)amino]ethyl}amino)ethyl]amino}ethyl)-2,5,8,11-
+    tetraazatridecanamide (PIN... since only three heteroatoms are present in
+    the N-substituent group, it must be named substitutively)" (:23419-23423); "[not
+    3,4-dioxa-1,2,6,7-tetrasilaheptane; four hetero units are required...]"
+    (:6365). Below four heterounits the substitutive namers give the PIN.
 
-    Falls through to the legacy gate-5 semantics: a single embedded heteroatom
-    in a backbone of length < 6 is REJECTED (substitutive form preferred:
-    methoxymethane / ethoxyethane / etc.). A single embedded heteroatom in a
-    backbone of length >= 6 is ACCEPTED (substitutive form becomes awkward).
+    (The labels this function used to return -- '>=3-mixed-kind',
+    'single-hetero-long-chain', 'two-hetero-substitutive-equivalent' -- had no
+    Blue Book basis and shipped '2,5,8-trioxanonane' / '3,6-dioxaoctan-1-ol' /
+    '4-thiaheptane' at the PIN tier.)
 
-    Two-heteroatom cases that do not trip branches (a/b/c) are ACCEPTED
-    (preserves the legacy "diether and similar" behavior for compounds like
-    3,6-dioxaoctan-1-ol).
-
-    Args:
-        backbone: ordered list of atom indices forming the principal chain
-                  (output of _find_replacement_chain).
-        mol: RDKit Mol object.
-
-    Returns:
-        (True, branch_label) where branch_label in
-            {">=4-same-kind", ">=3-mixed-kind", "undue-complexity",
-             "single-hetero-long-chain", "two-hetero-substitutive-equivalent"}
-        (False, reason) where reason in
-            {"no-heteroatoms", "single-hetero-short-chain"}.
-
-    Source: IUPAC Blue Book 2013.
-    Source: 154-internal notes; internal notes-A.md gap inventory; internal notes
+    Returns ``(True, ">=4-heterounits")`` or ``(False, reason)`` with reason in
+    {"no-heteroatoms", "fewer-than-4-heterounits", "no-carbon",
+    "heterounits-not-countable"}.
     """
-    from collections import Counter
-    embedded = []
-    for i, atom_idx in enumerate(backbone):
-        if i == 0 or i == len(backbone) - 1:
-            continue  # skip terminal positions
-        symbol = mol.GetAtomWithIdx(atom_idx).GetSymbol()
-        if symbol in REPLACEMENT_TERMS:
-            embedded.append(symbol)
-
-    if not embedded:
+    syms = [mol.GetAtomWithIdx(i).GetSymbol() for i in backbone]
+    if 'C' not in syms:
+        return (False, "no-carbon")
+    units = _count_chain_heterounits(mol, backbone)
+    if units is None:
+        return (False, "heterounits-not-countable")
+    if units == 0:
         return (False, "no-heteroatoms")
-
-    counts = Counter(embedded)
-    same_kind_max = max(counts.values())
-    distinct_kinds = len(counts)
-    total = sum(counts.values())
-
-    # Branch (a): >= 4 same-kind heteroatoms
-    if same_kind_max >= 4:
-        return (True, ">=4-same-kind")
-
-    # Branch (b): >= 3 mixed-kind heteroatoms
-    if distinct_kinds >= 2 and total >= 3:
-        return (True, ">=3-mixed-kind")
-
-    # Branch (c): "undue complexity" -- conservative >= 5 total threshold
-    if total >= 5:
-        return (True, "undue-complexity")
-
-    # Fall-through: single heteroatom -- preserve legacy gate-5 semantics.
-    if total == 1 and len(backbone) < 6:
-        return (False, "single-hetero-short-chain")
-
-    # Single heteroatom in a long chain (>= 6): accept (legacy gate-5 behavior).
-    if total == 1:
-        return (True, "single-hetero-long-chain")
-
-    # Two heteroatoms not covered by branches (a/b/c): accept (preserves
-    # current behavior for diethers, etc. -- e.g., 3,6-dioxaoctan-1-ol).
-    return (True, "two-hetero-substitutive-equivalent")
+    if units >= 4:
+        return (True, ">=4-heterounits")
+    return (False, "fewer-than-4-heterounits")
 
 
 # IUPAC: Order of citation for replacement terms
@@ -665,89 +693,42 @@ def try_skeletal_replacement_name(mol: Chem.Mol) -> Optional[str]:
         return None
 
     # ----------------------------------------------------------------
-    # R4 / /: simple O-ether chains are named substitutively
-    # (alkoxy prefix), NOT by skeletal 'oxa' replacement.
-    #
-    # A single embedded O (no terminal-OH suffix) is always a plain ether ->
-    # the substitutive namer produces '1-ethoxypropane', '1-ethoxybutane', etc.
-    # (The chain-length threshold for "single-hetero-long-chain" in
-    # _qualifies_for_pin_skeletal_replacement is a legacy gate for
-    # non-O heteroatoms; O-ethers are explicitly substitutive per.)
-    #
-    # Similarly, exactly 2 embedded O-ethers with no terminal-OH -> substitutive
-    # ('1,2-dimethoxyethane', '1,2-diethoxyethane'). A 2-O chain that DOES
-    # carry a principal characteristic group (terminal -ol) keeps replacement
-    # ('3,6-dioxaoctan-1-ol') because the suffix anchors the replacement parent.
-    #
-    # Non-O single heteroatom (thia, aza, sila,...) and >= 3 O-ethers keep
-    # the existing skeletal-replacement path.
-    # ----------------------------------------------------------------
-    # NEW-class qualification: a suffix-bearing, heteroatom-
-    # terminated, or substituted heterochain is the PIN class ONLY with >=4
-    # heterounits alongside at least one chain carbon — anything short of
-    # that belongs to the substitutive namers and fails closed here. The
-    # classic unsubstituted embedded-heteroatom path below keeps its
-    # established gates byte-identically.
+    # PIN qualification, (the Blue Book): the 'a' name is the
+    # PIN only with FOUR OR MORE heterounits in the unbranched chain, at least
+    # one chain carbon, and no heteroatom in the principal characteristic
+    # group; below that the substitutive namers own the PIN ('1-methoxy-2-(2-
+    # methoxyethoxy)ethane (PIN)',:27756; '1,2-dimethoxyethane (PIN)',:27754).
+    # This one gate replaces the former R4 (1-2 ether O) and DD5 (2 mixed
+    # chalcogens) carve-outs, which were narrower cases of the same rule.
+    # * special modes (acid suffix, heteroatom-terminated, alkyl-substituted):
+    # the conservative _strict_heterounit_chain_ok (same-element pairs fail
+    # closed there);
+    # * the classic path (-ol suffix or none): _qualifies_for_pin_skeletal_
+    # replacement, which counts heterounits as:23350 defines them.
     # ----------------------------------------------------------------
     _special_mode = acid_mode or hetero_terminal_mode or substituted_mode
     if _special_mode and not _strict_heterounit_chain_ok(mol, backbone):
         return None
-
-    if not has_terminal_oh and not _special_mode:
-        _emb_elements = [sym for _, sym in embedded_heteroatoms]
-        _emb_O_count = _emb_elements.count('O')
-        _all_O = (_emb_O_count == len(_emb_elements))
-        _has_carbon = any(
-            mol.GetAtomWithIdx(a).GetAtomicNum() == 6 for a in backbone
-        )
-        if _has_carbon and _all_O and _emb_O_count in (1, 2):
-            return None
-
-    # ----------------------------------------------------------------
-    # DD5 / Fix C cls 40 > 41/42;: a carbon
-    # skeleton is SENIOR to ether/sulfide. For a plain acyclic chain with EXACTLY
-    # TWO embedded heteroatoms, both divalent chalcogen ether/sulfide links
-    # (O/S/Se/Te), a carbon present to be the parent, and NO terminal-OH suffix
-    # integration, the substitutive carbon-parent name is the PIN
-    # (COCSC -> methoxy(methylsulfanyl)methane; glyme COCCOC -> 1,2-dimethoxyethane),
-    # NOT skeletal replacement.
-    #
-    # SCOPED to exactly-2 MIXED chalcogens (>= 2 DISTINCT elements), carbon-bearing:
-    # - the carbon-over-ether/sulfide PIN is unambiguous for a MIXED chain
-    # (COCSC O+S -> methoxy(methylsulfanyl)methane);
-    # - 1 heteroatom keeps single-hetero-long-chain (4-thiaheptane);
-    # - >= 3 keeps skeletal (2,5,8-trioxanonane / triglyme);
-    # - a non-chalcogen replacement driver (N/P/Si/Ge/... -> 2-oxa-4-azapentane,
-    # silyl cages) keeps skeletal;
-    # - a carbon-less chain ([O-]SS[O-]) has no carbon parent -> keeps skeletal;
-    # - terminal-OH polyether-ol (3,6,9-trioxadecan-1-ol, has_terminal_oh) exempt.
-    # - homogeneous 1-O or 2-O chain (ether/diether) handled by R4 block above.
-    if not has_terminal_oh and not _special_mode and len(embedded_heteroatoms) == 2:
-        _CHALCOGEN_LINK = {'O', 'S', 'Se', 'Te'}
-        _elements = {sym for _, sym in embedded_heteroatoms}
-        _has_carbon = any(
-            mol.GetAtomWithIdx(a).GetAtomicNum() == 6 for a in backbone
-        )
-        if (_has_carbon and len(_elements) >= 2
-                and _elements <= _CHALCOGEN_LINK):
-            return None
-
-    # ----------------------------------------------------------------
-    # Gate 5 (a phase.A): strict IUPAC PIN trigger.
-    # Replaces the legacy single-hetero chain-len < 6 reject with explicit
-    # branch labels. Rationale string is for debug logging + internal notes-A.md
-    # evidence trail.
-    # ----------------------------------------------------------------
     if not _special_mode:
         qualifies, _rationale = _qualifies_for_pin_skeletal_replacement(
             backbone, mol)
         if not qualifies:
-            return None
-    # NOTE: _rationale (">=4-same-kind", ">=3-mixed-kind", "undue-complexity",
-    # "single-hetero-long-chain", "two-hetero-substitutive-equivalent") is
-    # currently unused but available for debug logging via:
-    # logger.debug("skeletal_replacement: trigger_branch=%s smiles=%s",
-    # _rationale, Chem.MolToSmiles(mol))
+            # General-tier fallback, never the PIN: a chain whose heteroatom has a
+            # non-standard bonding number ('9λ2-stannaheptadecane' for
+            # CCCCCCCC[Sn]CCCCCCCC) has a substitutive PIN on a lambda parent
+            # hydride ("SnH2 λ2-stannane (preselected name, see ",
+            # the Blue Book: 'dioctyl-λ2-stannane'), which this engine does
+            # not build (it refuses the tin compound). So on the general tiers
+            # only, the RT-exact 'a' name is kept and marked general
+            # (record_general_ring_prefix -> not is_pin); the PIN tier declines.
+            if not (_rationale == "fewer-than-4-heterounits"
+                    and _general_tier_active()
+                    and any(nonstandard_bonding_number(mol, i) is not None
+                            for i in backbone
+                            if mol.GetAtomWithIdx(i).GetSymbol() != 'C')):
+                return None
+            from ..metrics.provenance import record_general_ring_prefix
+            record_general_ring_prefix()
 
     # ----------------------------------------------------------------
     # Number the chain: for -ol suffix, the OH end gets locant 1.
@@ -939,10 +920,12 @@ def _has_terminal_functional_group(
 
 # DD2 Fix A.1 (Phase D, /: chalcogens whose mutual single bond is a
 # peroxide / disulfide / thioperoxol linkage (-O-O-, -S-S-, -Se-Se-, -Te-Te-, and the
-# mixed -S-O- / -O-S- of the thioperoxol family). Such a bond is a characteristic
-# group (named substitutively or with the -peroxol/-thioperoxol suffix, /,
-# NEVER two adjacent skeletal `oxa`/`thia` replacement atoms — so skeletal replacement
-# must not walk it (e.g. CCCCOO -> wrong '2-oxahexane'; PIN 'butane-1-peroxol').
+# mixed -S-O- / -O-S- of the thioperoxol family). The set is the veto candidate list
+# for _find_replacement_chain, which since fix a performance pass vetoes only the MIXED
+# pairs: a same-element pair is one heterounit and the 'a' PIN is built
+# across it when four or more heterounits are present ('2,4,5,8,11-pentathiadodecane
+# (PIN)', the Blue Book); below four the classic path declines on the count.
+# A terminal -OOH still fails the terminator gate (CCCCOO -> 'butane-1-peroxol').
 _CHALCOGEN_ATOMIC_NUMS = frozenset({8, 16, 34, 52})  # O, S, Se, Te
 
 
@@ -1054,12 +1037,24 @@ def _find_replacement_chain(
     if num_atoms - len(exclude_atoms) < 3:
         return None
 
-    # DD2 Fix A.1: never traverse a peroxide/disulfide/thioperoxol
-    # chalcogen-chalcogen bond — it is a characteristic group, not a skeletal
-    # `oxa`/`thia` linkage. Omitting it from the adjacency stops the longest
-    # skeletal chain at the first chalcogen, leaving the group intact for the
-    # substitutive / -peroxol suffix path.
-    _veto_bonds = _dichalcogen_bond_set(mol)
+    # DD2 Fix A.1, narrowed to the MIXED thioperoxide bond (-O-S-, -S-Se-,...).
+    # A SAME-element pair (-OO-, -SS-, -SeSe-, -TeTe-) is walked:
+    # (the Blue Book, '## Skeletal replacement ('a') nomenclature
+    # in acyclic chains') names it ONE heterounit -- "A heterounit is a set of
+    # heteroatoms having a name of its own such as, -SS-, disulfanediyl" -- and
+    # method (4) (:27861,:27866) builds the 'a' PIN straight across it:
+    # "(4) 2,4,5,8,11-pentathiadodecane (PIN)" (:27894), "(3) 2,4,5,8-tetrathia-
+    # 11-selenadodecane (PIN)" (:27927). The heterounit count then decides:
+    # below four the classic path declines and the substitutive (R)disulfanyl /
+    # (R)peroxy name is the PIN, "(1) (methyldisulfanyl)methane (PIN)" (:27874).
+    # A terminal -OOH / -SSH still ends the chain on a chalcogen and fails the
+    # terminator gate (Gate 3b), so 'butane-1-peroxol' keeps its suffix path.
+    # The mixed pair stays unwalked (unchanged): (:27900) gives no 'a'
+    # example across an -O-S- bond to fix its heterounit count, so fail closed.
+    _veto_bonds = {
+        b for b in _dichalcogen_bond_set(mol)
+        if len({mol.GetAtomWithIdx(i).GetAtomicNum() for i in b}) == 2
+    }
 
     adj: Dict[int, List[int]] = defaultdict(list)
     for bond in mol.GetBonds():

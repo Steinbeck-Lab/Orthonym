@@ -80,15 +80,17 @@ class TestSubstitutedPolycyclicE2E:
 class TestHeteroatomReplacementE2E:
     """Tests for "a" nomenclature (oxa-, aza-, thia-)."""
 
-    @pytest.mark.xfail(reason="Bicyclo heteroatom naming uses bicyclo module, not polycyclic")
     def test_7_oxabicyclo_221_heptane(self):
-        """7-oxabicyclo[2.2.1]heptane: oxygen in norbornane framework."""
-        # 7-oxabicyclo[2.2.1]heptane (oxygen bridge)
-        # NOTE: This requires bicyclo module to support oxa- prefix, not polycyclic
+        """7-oxabicyclo[2.2.1]heptane: oxygen in norbornane framework.
+
+        Task 12 fix a performance pass (wp6-tests): the non-strict xfail marker ('Bicyclo
+        heteroatom naming uses bicyclo module') was stale -- the test XPASSed. It
+        now asserts the name: the von Baeyer numbering is fixed by the hydrocarbon
+        and the heteroatom takes the one-atom bridge, 7, the Blue Book
+        "Numbering is determined first by the fixed numbering of the hydrocarbon
+        system"). OPSIN 2.9.0 full-InChIKey exact."""
         result = name_compound('C1CC2CCC1O2')
-        assert 'oxa' in result.lower() or 'oxabicyclo' in result.lower(), \
-            f"Expected oxa prefix, got: {result}"
-        assert 'bicyclo' in result.lower(), f"Expected bicyclo, got: {result}"
+        assert result == '7-oxabicyclo[2.2.1]heptane', result
 
     def test_azabicyclo_system_recognized(self):
         """Azabicyclo system: at minimum recognized as bicyclo."""
@@ -117,15 +119,17 @@ class TestHeteroatomReplacementE2E:
 class TestPolycyclicLactoneE2E:
     """Tests for polycyclic lactone naming (ring ester -> oxa + one)."""
 
-    @pytest.mark.xfail(reason="Bicyclic lactone naming requires bicyclo module integration, not polycyclic")
     def test_bicyclic_lactone_full(self):
-        """Bicyclic lactone: 3-oxabicyclo[3.2.1]octan-2-one pattern."""
-        # Lactone in a bicyclic framework
-        # NOTE: Full lactone naming for bicyclo requires bicyclo module changes
+        """Bicyclic lactone: ring O as an 'oxa' prefix, the C=O as the '-one' suffix.
+
+        Task 12 fix a performance pass (wp6-tests): the non-strict xfail marker was stale (the
+        test XPASSed). It now asserts the name: heteroatoms take the lowest
+        locants the fixed numbering allows, the Blue Book "Low
+        locants are assigned to the heteroatoms considered together as a set"; cf.
+        '2-oxabicyclo[2.2.1]hept-5-ene (PIN)':16705), so O is 2 and the suffix 3.
+        OPSIN 2.9.0 full-InChIKey exact."""
         result = name_compound('O=C1OC2CCC1CC2')
-        # Should have oxa prefix and -one suffix
-        assert 'oxa' in result.lower() or 'one' in result.lower() or 'lactone' in result.lower(), \
-            f"Expected oxa/-one/lactone pattern, got: {result}"
+        assert result == '2-oxabicyclo[2.2.2]octan-3-one', result
 
     def test_bicyclic_lactone_recognized_as_bicyclo(self):
         """Bicyclic lactone: at minimum recognized as bicyclo framework."""
@@ -307,21 +311,36 @@ class TestDescriptorFormats:
         assert 'bicyclo[2.2.2]' in result.lower(), f"Expected bicyclo[2.2.2], got: {result}"
 
     def test_tricyclo_secondary_bridge_locants(self):
-        """Tricyclo with parenthesized locants for secondary bridges (OPSIN-compatible).
+        """Tricyclo with superscript locants for the secondary bridge.
 
         Adamantane now returns retained name; test VB format via generate_polycyclic_name.
+        Task 12 fix a performance pass (wp6-tests), change-asserted-value (was the
+        parenthesized '1(3,7)'): (the Blue Book) cites the
+        attachment locants "as a pair of superscript arabic numbers (lower number is
+        cited first) separated by a comma", written '1^3,7' in plain text. OPSIN
+        2.9.0 parses 'tricyclo[3.3.1.1^3,7]decane' to an InChIKey
+        (adamantane), full InChIKey exact.
         """
         from rdkit import Chem
         from orthonym.rules.polycyclic import generate_polycyclic_name
         mol = Chem.MolFromSmiles('C1C2CC3CC1CC(C2)C3')  # adamantane
         base_name = generate_polycyclic_name(mol)
-        assert '1(3,7)' in base_name or '1(7,3)' in base_name, \
-            f"Expected parenthesized locants '1(3,7)' in {base_name}"
+        assert 'tricyclo[3.3.1.1^3,7]' in base_name, base_name
 
 
 class TestEdgeCases:
     """Edge cases for polycyclic routing."""
 
+    @pytest.mark.xfail(strict=True, reason=(
+        "DEFECT (API contract), pre-existing at 4e0e5c29b: name_compound("
+        "'invalid_smiles_xyz') returns 'unknown'. _name_impl raises "
+        "ValueError('Invalid SMILES') (namer.py), but the catch-all 'except "
+        "Exception' in Orthonym.name (added by 1a0eb0e18, v30 Phase1 B5, so a VALID "
+        "input never crashes) turns it into the descriptive fallback, against the "
+        "code's own comments ('re-raise ValueError (invalid SMILES)', 'matches name() "
+        "contract'). Fix: raise for an unparseable SMILES before the producer try, "
+        "without letting producer ValueErrors escape. .planning/TODO-2026-09-24.md, "
+        "'Open from T12 fix round 2 (wp6)'."))
     def test_invalid_smiles_raises_error(self):
         """Invalid SMILES raises ValueError."""
         # name_compound raises ValueError for invalid SMILES
@@ -406,10 +425,16 @@ class TestClassificationFixes:
             "Norbornane must still be classified as bicyclo"
 
     def test_camphor_still_bicyclo(self):
-        """Camphor must still be named 'camphor' via retained names (regression guard)."""
+        """Camphor is named on its bicyclo skeleton (regression guard).
+
+        Task 12 fix a performance pass (wp6-tests), change-asserted-value (was the trivial
+        'camphor'): (the Blue Book) "Preferred IUPAC names (PINs) are
+        not identified for the compounds in this Chapter"; the Blue Book gives
+        '(1R,4R)-bornan-2-one (+)-camphor' with the systematic
+        '(1R,4R)-1,7,7-trimethylbicyclo[2.2.1]heptan-2-one',:52646-52648).
+        OPSIN 2.9.0 full-InChIKey exact for this stereo-free input."""
         result = name_compound('CC1(C)C2CCC1(C)C(=O)C2')
-        assert result.lower() == 'camphor', \
-            f"Expected camphor, got: {result}"
+        assert result == '1,7,7-trimethylbicyclo[2.2.1]heptan-2-one', result
 
     def test_pentacyclic_reaches_polycyclic_path(self):
         """Pentacyclic lactone must be recognized by is_polycyclic_system."""
@@ -469,25 +494,30 @@ class TestPolycyclicFunctionalGroups:
         result = name_compound('C1C2CC3CC1CC(C2)C3')
         assert result == 'adamantane', f"Expected adamantane, got: {result}"
 
-    def test_norbornane_retained_name_preserved(self):
-        """Norbornane retained name not broken by FG changes."""
+    def test_norbornane_systematic_name_preserved(self):
+        """Bicyclo[2.2.1]heptane keeps its von Baeyer PIN (no retained name)."""
+        # PIN per R11: "RETAINED NAMES FOR VON BAEYER PARENT HYDRIDES" the Blue Book "The retained names adamantane and cubane are used in general nomenclature and as preferred IUPAC names."; "bicyclo[2.2.1]heptane (PIN)":2038; OPSIN RT exact.
         result = name_compound('C1CC2CC1CC2')
-        assert 'norbornane' in result.lower(), f"Expected norbornane, got: {result}"
+        assert result == 'bicyclo[2.2.1]heptane', f"Expected bicyclo[2.2.1]heptane, got: {result}"
 
     def test_camphor_retained_name_preserved(self):
-        """Camphor retained name not broken by FG changes."""
+        """Camphor's name is not broken by FG changes.
+
+        Task 12 fix a performance pass (wp6-tests), change-asserted-value (was 'camphor'):
+        the systematic name, as in test_camphor_still_bicyclo:50943;
+        :52646-52648). OPSIN full-InChIKey exact."""
         result = name_compound('CC1(C)C2CCC1(C)C(=O)C2')
-        assert result.lower() == 'camphor', f"Expected camphor, got: {result}"
+        assert result == '1,7,7-trimethylbicyclo[2.2.1]heptan-2-one', result
 
 
 class TestOPSINCompatibleVBFormat:
-    """Regression tests ensuring VB descriptors use OPSIN-parseable format.
+    """Regression tests ensuring VB descriptors use an OPSIN-parseable format.
 
-    OPSIN accepts secondary bridge locants in parenthesized format:
-    e.g. '1(3,7)' (bridge length followed by parenthesized locants).
-    This is unambiguous for multi-digit locants and OPSIN-compatible.
-
-    This class guards against regression back to old format.
+    The secondary-bridge locants are superscripts, the Blue Book:
+    "cited as a pair of superscript arabic numbers... separated by a comma"),
+    written in plain text with a caret: '1^3,7'. OPSIN parses it (and the older
+    parenthesized '1(3,7)' as well; both give an InChIKey for
+    adamantane's descriptor). This class guards against the LaTeX '^{...}' form.
     """
 
     def test_adamantane_opsin_format(self):
@@ -552,10 +582,10 @@ class TestOPSINCompatibleVBFormat:
         # Verify one secondary bridge
         secondary = [b for b in desc.bridge_info_list if b.is_secondary]
         assert len(secondary) == 1, f"Expected 1 secondary bridge, got {len(secondary)}"
-        # Descriptor must use parenthesized OPSIN format
-        assert '(3,7)' in desc.descriptor_string or '(7,3)' in desc.descriptor_string, \
-            f"Expected parenthesized locants in {desc.descriptor_string}"
-        assert '(' in desc.descriptor_string, \
-            f"Expected parenthesized format: {desc.descriptor_string}"
-        assert '^' not in desc.descriptor_string, \
-            f"Found caret in descriptor: {desc.descriptor_string}"
+        # Task 12 fix a performance pass (wp6-tests), change-asserted-value (was the
+        # parenthesized '(3,7)' and 'no caret', the phase-28 form of e418b259c):
+        # the superscript pair is written '^3,7', the Blue Book),
+        # the project's plain-text superscript that other passing tests assert
+        # ('tricyclo[3.3.1.1^3,7]decane-1-carboxylate'); OPSIN 2.9.0 parses it.
+        assert desc.descriptor_string == 'tricyclo[3.3.1.1^3,7]', desc.descriptor_string
+        assert '^{' not in desc.descriptor_string

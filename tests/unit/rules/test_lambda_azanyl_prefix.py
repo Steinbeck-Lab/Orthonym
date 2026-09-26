@@ -66,8 +66,14 @@ def test_two_oxide_bluebook_pin():
 @pytest.mark.unit
 def test_single_oxide_protect():
     # method (1) path unchanged (recorded at HEAD, OPSIN-RT clean)
+    # wp7 change-asserted-value: the N- and C-prefixes are ONE alphanumerical order
+    # the Blue Book; '4-(2-methylbutyl)-N-(3-methylbutyl)aniline (PIN)':3523),
+    # 'methyl' < 'phenyl'. The BB's own N-oxide PIN at:26646 cites its C-prefix first only
+    # because it begins with 'd' ('2-(3-{[dimethyl(oxo)-...]methyl}phenyl)-N,N-dimethyl-
+    # ethan-1-amine N-oxide (PIN)'). Was '2-phenyl-N,N-dimethylethan-1-amine N-oxide'.
+    # OPSIN 2.9.0 full-InChIKey exact.
     assert name_compound("C[N+](C)([O-])CCc1ccccc1") == \
-        "2-phenyl-N,N-dimethylethan-1-amine N-oxide"
+        "N,N-dimethyl-2-phenylethan-1-amine N-oxide"
 
 
 @pytest.mark.unit

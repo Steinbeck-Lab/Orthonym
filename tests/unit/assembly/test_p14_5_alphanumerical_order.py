@@ -82,7 +82,9 @@ class TestEnclosingMarksAreNotAlphanumerical:
     """Defect 3: marks are typography, never sort-key content."""
 
     @pytest.mark.parametrize("raw,expected", [
-        ("4-[(1R)-1-chloroethyl]phenoxy", "1-chloroethylphenoxy"),
+        # 2026-09-25 (pre-existing-failures plan, Task 5) change-asserted-value: a prefix "is considered to begin with the first letter of its complete name" (the Blue Book): the inner locant is not a letter, as for the
+        # fully enclosed row below.
+        ("4-[(1R)-1-chloroethyl]phenoxy", "chloroethylphenoxy"),
         # fully enclosed: the branch also drops the INNER locant, since
         # a locant is not a letter -- so this reduces past the marks to 'chloroethyl'
         ("(2-chloroethyl)", "chloroethyl"),

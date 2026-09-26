@@ -108,9 +108,18 @@ class TestNameImidateBranchCoverage:
         """FRN-: CCC(=N)OCC -> ethyl propanimidate."""
         self._run("CCC(=N)OCC", "ethyl propanimidate")
 
-    def test_FRN_D_04_methyl_benzimidate(self):
-        """FRN-: C(=N)OC -> methyl benzimidate."""
-        self._run("C(=N)(c1ccccc1)OC", "methyl benzimidate")
+    def test_FRN_D_04_methyl_benzenecarboximidate(self):
+        """FRN-: C(=N)OC -> methyl benzenecarboximidate.
+
+         fix a performance pass (was 'methyl benzimidate'). Carboximidic
+        acids (the Blue Book): "Preferred names of imidic acids are those
+        derived from systematic substitutive preferred IUPAC names of carboxylic
+        acids.":29986 "The use of systematic substitutive names for imidic
+        acids is a change for formic acid, acetic acid, benzoic acid, and oxalic
+        acid.":30000 "benzenecarboximidic acid (PIN) benzimidic acid".
+         (:31983) derives the ester from that acid name. OPSIN
+        2.9.0 full-InChIKey round trip: exact."""
+        self._run("C(=N)(c1ccccc1)OC", "methyl benzenecarboximidate")
 
     def test_FRN_D_05_methyl_pentanimidate(self):
         """FRN-: CCCCC(=N)OC -> methyl pentanimidate."""

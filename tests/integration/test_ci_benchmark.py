@@ -253,7 +253,9 @@ CI_BENCHMARK = [
         "C[NH2+][C@@H](C)[C@@H](O)c1ccccc1",
         "(1S,2S)-2-(methylamino)-1-phenylpropan-1-ol",
     ),
-    ("CSCCSC", "2,5-dithiahexane"),
+    # fix a performance pass (was 2,5-dithiahexane): (the Blue Book), two
+    # heterounits -> substitutive, the analog of "1,2-dimethoxyethane (PIN)" (:27754).
+    ("CSCCSC", "1,2-bis(methylsulfanyl)ethane"),
     (
         "CCCCCc1oc(CCCCCCCCCCCCC(=O)OC[C@H](COP(=O)([O-])OCC"
         "[N+](C)(C)C)OC(=O)CCC/C=C\\C[C@H]2[C@@H](O)CC(O)O"

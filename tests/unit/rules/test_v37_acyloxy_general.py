@@ -57,11 +57,13 @@ def _name_besteffort(smi: str) -> str:
 # so it abstained on HEAD; my fix supplies the '<acyl>oxy' PIN prefix.)
 # --------------------------------------------------------------------------- #
 # (smiles, acyl-oxy substring that MUST appear in the preferred name)
+# 2026-09-25 (pre-existing-failures plan, Task 5) change-asserted-value: (a compound organyl is cited inside its own marks, the composing suffix outside: "4-[(3-ethoxy-3-oxopropanoyl)oxy]phenyl" the Blue Book, "4-[(4-carboxycyclohexyl)oxy]":23198): the substituted acyl sits inside its own
+# marks, so the marker is '(3-hydroxy-3-methylbutanoyl)oxy'. OPSIN RT exact.
 DEFAULT_WITNESSES = [
     # a benzene-ring parent with a systematic acyloxy on the ring
-    ("OC(=O)c1ccc(OC(=O)CC(C)(C)O)cc1", "3-hydroxy-3-methylbutanoyloxy"),
+    ("OC(=O)c1ccc(OC(=O)CC(C)(C)O)cc1", "(3-hydroxy-3-methylbutanoyl)oxy"),
     # a saturated ring parent
-    ("O=C(O)C1CCC(OC(=O)CC(C)(C)O)CC1", "3-hydroxy-3-methylbutanoyloxy"),
+    ("O=C(O)C1CCC(OC(=O)CC(C)(C)O)CC1", "(3-hydroxy-3-methylbutanoyl)oxy"),
 ]
 
 
@@ -82,7 +84,8 @@ def test_default_tier_systematic_acyloxy_is_named_and_rt_exact(smi, acyloxy):
 # acyl (descriptor must survive) + a halo acyl.
 # --------------------------------------------------------------------------- #
 BEST_EFFORT_WITNESSES = [
-    ("OC(=O)CCCCCOC(=O)CC(C)(C)O", "3-hydroxy-3-methylbutanoyloxy"),  # chain
+    # (the enclosed acyl marker: see DEFAULT_WITNESSES)
+    ("OC(=O)CCCCCOC(=O)CC(C)(C)O", "(3-hydroxy-3-methylbutanoyl)oxy"),  # chain
     ("OC(=O)CCCCCOC(=O)[C@](C)(O)CCl", "chloro"),   # stereo acyl
     ("OC(=O)CCCCOC(=O)CCl", "chloro"),              # chloroacetyloxy
 ]
@@ -93,7 +96,10 @@ def test_besteffort_systematic_acyloxy_prefers_acyloxy_form(smi, frag):
     name = _name_besteffort(smi)
     assert _rt_exact(smi, name), f"{smi} -> {name!r} not RT-exact"
     assert frag in name, f"{smi} -> {name!r} lacks expected acyloxy marker {frag!r}"
-    assert "oyloxy" in name or "acetyloxy" in name, \
+    # the acyloxy form: '<acyl>oyloxy' for a simple acyl, '(<acyl>oyl)oxy' /
+    # '[...oyl]oxy' for a compound one.
+    assert ("oyloxy" in name or "acetyloxy" in name
+            or "oyl)oxy" in name or "oyl]oxy" in name), \
         f"{smi} -> {name!r} not in acyloxy form"
     assert not _OXA_CHAIN.search(name), f"{smi} -> {name!r} still an oxa-chain"
 
@@ -113,7 +119,9 @@ def test_never_wrong_default_and_besteffort(smi):
 # CONTROLS — retained acyls + pure-ether a-replacement stay BYTE-IDENTICAL
 # --------------------------------------------------------------------------- #
 BYTE_IDENTICAL = [
-    ("COCCOCCOC", "2,5,8-trioxanonane"),                 # a-replacement PIN (no carbonyl)
+    # fix a performance pass (was 2,5,8-trioxanonane): (the Blue Book), three O
+    # heterounits -> substitutive PIN, "1-methoxy-2-(2-methoxyethoxy)ethane (PIN)" (:27756).
+    ("COCCOCCOC", "1-methoxy-2-(2-methoxyethoxy)ethane"),  # pure ether (no carbonyl)
     ("CC(=O)OCC", "ethyl acetate"),                      # retained acyl, functional class
     ("CC(=O)Oc1ccccc1", "phenyl acetate"),
     ("O=C(Oc1ccccc1)c1ccccc1", "phenyl benzoate"),

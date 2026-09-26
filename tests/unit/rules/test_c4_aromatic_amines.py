@@ -111,13 +111,16 @@ def test_c4_guard_amine_prefix_when_senior_group_present():
 # then suppressed to 'unknown'. All PINs OPSIN round-trip verified.
 # ---------------------------------------------------------------------------
 
+# 2026-09-25 (pre-existing-failures plan, Task 5, TRIAGE row 98) change-asserted-value:
+# (the Blue Book): "Superscript arabic numbers, which are the locants of the parent structure, are used to differentiate the nitrogen atoms of di- and polyamines"; "N1-(4-aminophenyl)-N4-phenylbenzene-1,4-diamine (PIN)" (:26404). Every substituted N of a diamine carries its ring locant, so 'N1-', never a
+# bare 'N-'. OPSIN full-InChIKey RT exact.
 @pytest.mark.parametrize("smiles,expected", [
-    ("Nc1ccc(Nc2ccccc2)cc1", "N-phenylbenzene-1,4-diamine"),
-    ("Nc1ccccc1Nc1ccccc1", "N-phenylbenzene-1,2-diamine"),
-    ("CNc1ccc(N)cc1", "N-methylbenzene-1,4-diamine"),
-    ("Nc1ccc(NC)cc1", "N-methylbenzene-1,4-diamine"),
-    ("Nc1ccc(N(C)C)cc1", "N,N-dimethylbenzene-1,4-diamine"),
-    ("CNc1ccccc1N", "N-methylbenzene-1,2-diamine"),
+    ("Nc1ccc(Nc2ccccc2)cc1", "N1-phenylbenzene-1,4-diamine"),
+    ("Nc1ccccc1Nc1ccccc1", "N1-phenylbenzene-1,2-diamine"),
+    ("CNc1ccc(N)cc1", "N1-methylbenzene-1,4-diamine"),
+    ("Nc1ccc(NC)cc1", "N1-methylbenzene-1,4-diamine"),
+    ("Nc1ccc(N(C)C)cc1", "N1,N1-dimethylbenzene-1,4-diamine"),
+    ("CNc1ccccc1N", "N1-methylbenzene-1,2-diamine"),
 ])
 def test_c4b_n_substituted_aromatic_diamine(smiles, expected):
     assert _pin(smiles) == expected

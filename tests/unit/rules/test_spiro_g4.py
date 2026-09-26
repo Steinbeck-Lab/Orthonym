@@ -275,7 +275,8 @@ class TestSpiroPAHFluoreneP24_5:
         assert name_compound("O1c2ccccc2Oc2ccccc21") == "oxanthrene"
         # Bare xanthene / fluorene keep their catalog names.
         assert name_compound("c1ccc2c(c1)Cc1ccccc1O2") == "9H-xanthene"
-        assert name_compound("c1ccc2c(c1)Cc3ccccc3-2") == "fluorene"
+        # (the Blue Book-11400): '(9H-isomer shown; the PIN is 9H-fluorene)'
+        assert name_compound("c1ccc2c(c1)Cc3ccccc3-2") == "9H-fluorene"
 
     def test_spirobifluorene_determinism(self):
         mol = Chem.MolFromSmiles(

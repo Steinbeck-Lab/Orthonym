@@ -857,6 +857,15 @@ def _try_ion_aspect_composition(features, style='pin'):
     if not fg_name:
         return None
 
+    # A radical ion is not its closed-shell parent's ion: the suffix swap below
+    # knows nothing of the radical electron, and named the radical cation C[NH2+]
+    # 'methanaminium' (the closed-shell CH3-NH3+) whenever the radical producers,
+    # which ship only a round-tripped name, could not verify theirs (the opt-in
+    # jar-absent mode). / name radical ions on their own; decline.
+    from ..validation.radical_identity import radical_profile
+    if radical_profile(mol):
+        return None
+
     # Resolve suffix to check if ion modification would apply
     suffix_info = resolve_suffix(features, parent_info)
     modified_suffix = apply_ion_suffix_modification(suffix_info, features)
@@ -864,6 +873,23 @@ def _try_ion_aspect_composition(features, style='pin'):
     # Only proceed if we have a clear suffix transformation
     if not modified_suffix or modified_suffix.text == suffix_info.text:
         return None  # No transformation available, fall back
+
+    # (the Blue Book) / Table 7.4 (:41417): 'aminium', 'amidium',
+    # 'nitrilium',... is the cationic form OF the suffix group, so the name puts
+    # a hydron on each SUFFIX nitrogen. The swap above reads the suffix text only;
+    # when the charge sits elsewhere (C[NH2+]CCC(=O)NC: the amine is protonated,
+    # the amide is the suffix) it named a protonation isomer
+    # ('N-methyl-3-(methylamino)propanamidium'), and the full InChIKey cannot
+    # tell them apart. Proceed only when every cationic atom is a suffix nitrogen
+    # and there is one per suffix; otherwise the cation path names it.
+    if suffix_info.text and getattr(features, 'total_charge', 0) > 0:
+        _suffix_n = {
+            i for grp in (getattr(features, 'principal_group_atoms', None) or [])
+            for i in grp if mol.GetAtomWithIdx(i).GetAtomicNum() == 7}
+        _cationic = [a.GetIdx() for a in mol.GetAtoms() if a.GetFormalCharge() > 0]
+        if (not _cationic or any(i not in _suffix_n for i in _cationic)
+                or len(_cationic) != (suffix_info.count or 1)):
+            return None
 
     # Get the neutral name using recursion guard
     original_species_type = features.species_type
@@ -3985,8 +4011,14 @@ def _assemble_complex_ring_name(mol, features):
                 _pah_locants = get_polycyclic_iupac_locants(mol, _pah_name)
                 if (_pah_locants is not None
                         and len(_pah_locants) == mol.GetNumAtoms()):
+                    # (the Blue Book-11400): 'the PIN is 9H-fluorene';
+                    # a catalog PAH that needs indicated hydrogen cites it on the
+                    # bare parent (POLYCYCLIC_DATA 'indicated_h').
+                    from ..data.polycyclic_data import POLYCYCLIC_DATA as _PAH_DATA
+                    _pah_ih = _PAH_DATA.get(_pah_name, {}).get('indicated_h')
                     return ComplexRingResult(
-                        _pah_name, tuple(_core), _pah_locants, True)
+                        f"{_pah_ih}-{_pah_name}" if _pah_ih else _pah_name,
+                        tuple(_core), _pah_locants, True)
 
         # Wave-2 P5 fused (Task 8): likewise an exact-match cataloged fused
         # HETEROCYCLE (FUSED_HETEROCYCLE_DATA) parent must be nameable even when
@@ -5363,6 +5395,38 @@ def _build_bicyclo_principal_suffix(
     return suffix_str, (not multiplier)
 
 
+def _heteromonocycle_oxo_prefix_ring(features: Any) -> Optional[Set[int]]:
+    """The principal ring's atoms when it is an UNSATURATED heteromonocycle
+    carrying a ring C=O while the principal characteristic group is senior to
+    ketones, i.e. when the C=O must be cited as an 'oxo' prefix; else None. A
+    fully saturated ring keeps its saturated parent name ('4-oxopiperidine-2-
+    carboxylic acid') and is not selected."""
+    from rdkit import Chem
+    from ..rules.fused_rings import _senior_group_outside_ring
+    from ..rules.partial_saturation import _ring_carbonyl_carbons
+    from ..rules.seniority import compare_seniority
+    mol = features.mol
+    ring = set(features.principal_ring or ())
+    if not ring:
+        return None
+    if any(set(r) != ring and len(set(r) & ring) >= 2
+           for r in mol.GetRingInfo().AtomRings()):
+        return None  # fused: not a monocycle
+    carbonyls = set(_ring_carbonyl_carbons(mol, ring))
+    if not carbonyls:
+        return None
+    # the senior group must lie outside the ring: a ring lactone / lactam is
+    # itself the '-one' pseudoketone even when perceived as 'ester' / 'amide'
+    senior = _senior_group_outside_ring(mol, ring)
+    if not senior or compare_seniority(senior, 'ketone') >= 0:
+        return None
+    unsaturated = any(
+        b.GetBondType() in (Chem.BondType.DOUBLE, Chem.BondType.AROMATIC)
+        and b.GetBeginAtomIdx() in ring and b.GetEndAtomIdx() in ring
+        for b in mol.GetBonds())
+    return ring if unsaturated else None
+
+
 def _assemble_heterocycle_name(features: Any, style: str) -> str:
     """
     Assemble name for heterocyclic compounds.
@@ -5428,6 +5492,24 @@ def _assemble_heterocycle_name(features: Any, style: str) -> str:
             features.canonical_smiles, named_atom_count,
         )
 
+    # A ring C=O on an unsaturated heteromonocycle whose principal characteristic
+    # group is SENIOR to ketones, the Blue Book: acids 7,
+    # amides 11, nitriles 14, aldehydes 15 > ketones and pseudoketones 16) is an
+    # 'oxo' PREFIX, and the parent hydride then carries its indicated hydrogen /
+    # hydro prefixes:24862;:24639 "in preferred IUPAC
+    # names indicated hydrogen must always be cited"): '4-oxo-4H-pyran-2-
+    # carboxylic acid', '6-oxo-1,6-dihydropyridine-3-carboxylic acid' ('5-oxo-
+    # 2,5-dihydrofuran-2-carboxylic acid (PIN)',:29276). The generic path below
+    # emits the mancude parent without them ('4-oxopyran-2-carboxylic acid',
+    # '6-oxo-1H-pyridine-3-carboxylic acid'); when the builder cannot place them
+    # the name is kept but not labelled a PIN.
+    oxo_prefix_ring = _heteromonocycle_oxo_prefix_ring(features)
+    if oxo_prefix_ring:
+        from ..rules.fused_rings import _assemble_oxo_prefix_name
+        built = _assemble_oxo_prefix_name(features.mol, oxo_prefix_ring)
+        if built:
+            return built
+
     if substituents and atom_to_locant:
         # Generate substituted name with N-locants and C-locants.
         # / ring-suffix fix: pass the principal group so a senior FG on the ring is
@@ -5446,6 +5528,9 @@ def _assemble_heterocycle_name(features: Any, style: str) -> str:
 
     if result is None:
         return None
+    if oxo_prefix_ring:
+        from ..metrics.provenance import record_non_pin_fragment
+        record_non_pin_fragment(result)
 
     # ── task-W2 Witness-A: jar-independent atom-coverage close ──────────────
     # get_heterocycle_substituents (rules/heterocycles.py) can SILENTLY OMIT an
@@ -7125,8 +7210,9 @@ def _assemble_amine_name(features: Any, style: str) -> Optional[str]:
     # Build N-prefix (same logic as amide N-substitution)
     from collections import Counter
     sub_counts = Counter(n_subs)
-    n_prefix_parts = []
-    for name in sorted(sub_counts.keys()):
+    # key, rendered N-prefix): merged with the C-prefixes below.
+    n_prefix_items = []
+    for name in sorted(sub_counts.keys(), key=lambda n: (alpha_sort_key(n), n)):
         count = sub_counts[name]
         # /: a COMPOUND N-substituent
         # ('2-methoxyethyl', 'cyclohexylmethyl') takes its own enclosing marks
@@ -7138,13 +7224,11 @@ def _assemble_amine_name(features: Any, style: str) -> Optional[str]:
         # N,N-dimethyl and N-ethyl... stay byte-identical.
         wrapped = _wrap_n_substituent(enclose_if_compound(name))
         if count == 1:
-            n_prefix_parts.append(f"N-{wrapped}")
+            n_prefix_items.append((alpha_sort_key(name), f"N-{wrapped}"))
         else:
             mult = get_multiplier_prefix(count, name)
             n_locants = ",".join(["N"] * count)
-            n_prefix_parts.append(f"{n_locants}-{mult}{wrapped}")
-
-    n_prefix = "-".join(n_prefix_parts)
+            n_prefix_items.append((alpha_sort_key(name), f"{n_locants}-{mult}{wrapped}"))
 
     # Get base amine name from the general assembly
     # Build name using standard fragments. a phase.1: the parent + suffix
@@ -7184,7 +7268,7 @@ def _assemble_amine_name(features: Any, style: str) -> Optional[str]:
     # Generate non-N (C-substituent) prefixes (halogens, hydroxy, etc.) as their
     # own alphabetized block, mirroring the amide handler's prefix rendering.
     other_prefixes = _generate_prefixes(features)
-    c_prefix_parts = []
+    c_prefix_items = []
     for p in sorted(other_prefixes, key=lambda x: alpha_sort_key(x.text)):
         # (a phase assembly/parenthesisation fix,): _generate_prefixes is inconsistent —
         # alkyl prefixes embed the locant in.text ('3-methyl') while FG prefixes
@@ -7192,16 +7276,36 @@ def _assemble_amine_name(features: Any, style: str) -> Optional[str]:
         # text lacks a leading digit (same shape as amide handler composer.py:3713).
         if p.locants and not str(p.text)[:1].isdigit():
             _loc = ",".join(str(_l) for _l in p.locants)
-            c_prefix_parts.append(f"{_loc}-{p.text}")
+            c_prefix_items.append((alpha_sort_key(p.text), f"{_loc}-{p.text}"))
         else:
-            c_prefix_parts.append(p.text)
+            c_prefix_items.append((alpha_sort_key(p.text), p.text))
 
-    # Merge: C-substituent prefixes (alphabetized) + N-locant prefix block + base.
-    # Insert a hyphen before the N-locant block (it starts with 'N'/'N,N-').
-    if c_prefix_parts:
-        c_prefix_str = "-".join(c_prefix_parts)
-        return f"{c_prefix_str}-{n_prefix}{base_name}"
-    return f"{n_prefix}{base_name}"
+    # Merge the C- and N-prefixes into ONE alphanumerical order,
+    # the Blue Book; the N-substituent sorts among the C-prefixes in
+    # '4-(2-methylbutyl)-N-(3-methylbutyl)aniline (PIN)',:3523). The C block was
+    # always cited first: '2-fluoro-N,N,N-triethylethan-1-aminium' for
+    # 'N,N,N-triethyl-2-fluoroethan-1-aminium'. A tie keeps C before N (stable).
+    # A hyphen separates a LOCANT from what precedes it (naming_utils.
+    # starts_with_locant): 'cyano-N,N-dimethylmethanamine N-oxide (PIN)'
+    # (:36580). A locant-less C-prefix (the only position of a methanamine) cited
+    # after another prefix takes parentheses: (:7304) "Enclosing marks
+    # are used with second and subsequent simple substituents" ('bromo(chloro)acetic
+    # acid (PIN)'), so 'N,N-dimethyl(phenyl)methanamine'.
+    from .naming_utils import _is_fully_enclosed as _fully_enclosed
+    from .naming_utils import apply_enclosing_marks as _enclose
+    from .naming_utils import starts_with_locant as _starts_with_locant
+    c_texts = {id(item) for item in c_prefix_items}
+    merged = sorted(c_prefix_items + n_prefix_items, key=lambda t: t[0])
+    out = ""
+    for i, item in enumerate(merged):
+        part = item[1]
+        if i and id(item) in c_texts and not _starts_with_locant(part) \
+                and not _fully_enclosed(part):
+            part = _enclose(part, -1)
+        if i:
+            out += "-" if _starts_with_locant(part) else ""
+        out += part
+    return out + base_name
 
 
 def _assemble_polyamine_name(
@@ -9745,8 +9849,13 @@ def _assemble_decorated_amino_prefix(branch_entries, enclose: bool = True) -> Op
             return None
         if compound:
             cited.append(f"{mult}{marked}")
+        elif i == 0:
+            # (d) (the Blue Book): a hyphen separates the italic
+            # letters from the multiplier -- 'di-tert-butyl', never 'ditert-butyl'.
+            from .naming_utils import multiplier_needs_hyphen
+            cited.append(f"{mult}{'-' if multiplier_needs_hyphen(bname) else ''}{bname}")
         else:
-            cited.append(f"{mult}{bname}" if i == 0 else f"{mult}({bname})")
+            cited.append(f"{mult}({bname})")
     core = "".join(cited) + "amino"
     return apply_enclosing_marks(core, -1) if enclose else core
 

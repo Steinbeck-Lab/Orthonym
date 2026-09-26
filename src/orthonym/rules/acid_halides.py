@@ -183,13 +183,13 @@ def _name_carbamoyl_acyl(mol, match, class_word) -> Optional[str]:
     if not class_atoms:
         return None
     # The acyl carbon's remaining neighbour (not =O, not the class group) must be
-    # a bare primary amide -NH2.
+    # the amide N: a bare -NH2, or an N carrying one or two carbon-only groups.
     n_amide = None
     for nb in a.GetNeighbors():
         if nb.GetIdx() == carbonyl_o or nb.GetIdx() in class_atoms:
             continue
-        if (nb.GetSymbol() == 'N' and nb.GetTotalNumHs() == 2
-                and nb.GetDegree() == 1 and nb.GetFormalCharge() == 0):
+        if (nb.GetSymbol() == 'N' and nb.GetFormalCharge() == 0
+                and not nb.GetIsAromatic() and not nb.IsInRing()):
             if n_amide is not None:
                 return None
             n_amide = nb.GetIdx()
@@ -197,12 +197,64 @@ def _name_carbamoyl_acyl(mol, match, class_word) -> Optional[str]:
             return None                    # any other neighbour -> out of scope
     if n_amide is None:
         return None
-    # Total heavy-atom accounting: exactly {acyl_c, =O, class atoms, amide N}.
-    accounted = {acyl_c, carbonyl_o, n_amide} | class_atoms
     heavy = {at.GetIdx() for at in mol.GetAtoms() if at.GetAtomicNum() > 1}
-    if accounted != heavy:
+    n_atom = mol.GetAtomWithIdx(n_amide)
+    if n_atom.GetTotalNumHs() == 2 and n_atom.GetDegree() == 1:
+        # Total heavy-atom accounting: exactly {acyl_c, =O, class atoms, amide N}.
+        accounted = {acyl_c, carbonyl_o, n_amide} | class_atoms
+        if accounted != heavy:
+            return None
+        return f"carbamoyl {class_word}"
+    acyl = _n_substituted_carbamoyl(mol, acyl_c, n_amide,
+                                    heavy - ({acyl_c, carbonyl_o, n_amide} | class_atoms))
+    if acyl is None:
         return None
-    return f"carbamoyl {class_word}"
+    return f"{acyl} {class_word}"
+
+
+def _n_substituted_carbamoyl(mol, acyl_c, n_amide, rest) -> Optional[str]:
+    """'dimethylcarbamoyl', 'di-tert-butylcarbamoyl', 'methyl(phenyl)carbamoyl' for an
+    amide N carrying one or two carbon-only groups (``rest`` = every other heavy atom,
+    which those groups must cover exactly), else None.
+
+    The substituted acyl group of carbamic acid is 'carbamoyl' with its N-substituents
+    cited like those of an amino prefix, with no locant: '4-(dimethylcarbamoyl)benzoic
+    acid (PIN)' (the Blue Book), '5-methyl-2-[methyl(phenyl)carbamoyl]benzoic acid
+    (PIN)' (:32957), '(dimethylcarbamoyl)hydrazinylidene (preferred prefix)' (:24611,
+    'carbamoyl' is preferred to 'carbonyl',:24613). The ordering and marks
+    come from the one amino-prefix assembler,:7272)."""
+    n_atom = mol.GetAtomWithIdx(n_amide)
+    branches = [nb.GetIdx() for nb in n_atom.GetNeighbors() if nb.GetIdx() != acyl_c]
+    if not branches or len(branches) > 2 or n_atom.GetTotalNumHs() != 2 - len(branches):
+        return None
+    from ..assembly.composer import _assemble_decorated_amino_prefix
+    from ..assembly.substituent_naming import name_substituent_fragment
+    covered = set()
+    entries = []
+    for b in branches:
+        if mol.GetAtomWithIdx(b).GetAtomicNum() != 6:
+            return None
+        atoms, stack = set(), [b]
+        while stack:
+            i = stack.pop()
+            if i in atoms or i == n_amide:
+                continue
+            atoms.add(i)
+            stack.extend(nb.GetIdx() for nb in mol.GetAtomWithIdx(i).GetNeighbors()
+                         if nb.GetAtomicNum() > 1)
+        if any(mol.GetAtomWithIdx(i).GetAtomicNum() != 6 for i in atoms) or atoms & covered:
+            return None
+        covered |= atoms
+        name = name_substituent_fragment(mol, sorted(atoms), b, [n_amide])
+        if not name:
+            return None
+        entries.append((name, False))
+    if covered != rest:
+        return None
+    core = _assemble_decorated_amino_prefix(entries, enclose=False)
+    if not core or not core.endswith("amino"):
+        return None
+    return core[:-len("amino")] + "carbamoyl"
 
 
 #: the acid-anion word of a mono-ester of carbonic acid, keyed by the

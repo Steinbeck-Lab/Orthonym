@@ -72,7 +72,12 @@ class TestInlineRingSuffixGetsLowestLocant:
         ("O=C1C=CC=CC1=O", "cyclohexa-3,5-diene-1,2-dione"),
         # Saturated diketone and monoketone.
         ("O=C1CCC(=O)CC1", "cyclohexane-1,4-dione"),
-        ("O=C1CCCCC1", "cyclohexan-1-one"),
+        # 2026-09-25 (pre-existing-failures plan, Task 5, R15) change-asserted-value:
+        # "The locant '1' is omitted:" (the Blue Book) "(c) in
+        # monosubstituted homogeneous monocyclic rings" (:2913); "cyclohexanethiol
+        # (PIN)" (:2917), "cyclohexanone (PIN)" (:14916), "(1) cyclopentanol (PIN)"
+        # (:26854). OPSIN RT exact.
+        ("O=C1CCCCC1", "cyclohexanone"),
         ("CC1CCC(=O)CC1", "4-methylcyclohexan-1-one"),
     ])
     def test_ketone_numbering(self, smiles, expected):
@@ -131,14 +136,19 @@ class TestAlreadyCorrectFamiliesUnchanged:
         ("Oc1ccccc1", "benzen-1-ol"),
         ("Nc1ccccc1", "benzen-1-amine"),
         ("OC1=CC=CC=C1O", "benzene-1,2-diol"),
-        ("OC1CCCCC1", "cyclohexan-1-ol"),
-        ("NC1CCCCC1", "cyclohexan-1-amine"),
-        ("SC1CCCCC1", "cyclohexane-1-thiol"),
+        # 2026-09-25 (pre-existing-failures plan, Task 5, R15) change-asserted-value:
+        # "The locant '1' is omitted:" (the Blue Book) "(c) in
+        # monosubstituted homogeneous monocyclic rings" (:2913); "cyclohexanethiol
+        # (PIN)" (:2917), "cyclohexanone (PIN)" (:14916), "(1) cyclopentanol (PIN)"
+        # (:26854). OPSIN RT exact.
+        ("OC1CCCCC1", "cyclohexanol"),
+        ("NC1CCCCC1", "cyclohexanamine"),
+        ("SC1CCCCC1", "cyclohexanethiol"),
         ("c1ccccc1", "benzene"),
         # No principal group at all -- the anchor logic must not fire.
-        # (The absent '1' locant is a separate question, out of scope
-        # here; recorded as the measured baseline so a change trips this test.)
-        ("CC1CCCCC1", "1-methylcyclohexane"),
+        # (The absent '1' locant was a separate question, recorded as the
+        # measured baseline so a change trips this test. It tripped: R15 above.)
+        ("CC1CCCCC1", "methylcyclohexane"),
     ])
     def test_unchanged(self, smiles, expected):
         assert _engine(smiles) == expected

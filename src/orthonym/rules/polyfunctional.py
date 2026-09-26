@@ -436,9 +436,8 @@ def format_fg_prefix(prefix_form: str, locants: List[int], count: int) -> str:
         # detection; simple prefixes (methoxy/methyl/chloro) stay bare -> the
         # single-simple-prefix case is byte-identical.
         _partially_enclosed = (
-            (')' in prefix_form or ']' in prefix_form)
-            and not (prefix_form.startswith(('(', '['))
-                     and prefix_form.endswith((')', ']')))
+            (')' in prefix_form or ']' in prefix_form or '}' in prefix_form)
+            and not _is_fully_enclosed(prefix_form)
         )
         # -FINAL I13: `is_substituted_substituent` is consulted TOO, so the
         # enclosing marks are no longer held by the multiplier WORD. Before this,
@@ -500,10 +499,11 @@ def format_fg_prefix(prefix_form: str, locants: List[int], count: int) -> str:
     # fully wrapped (e.g. '(methylcarbamoyl)amino', the N-substituted urea
     # prefix, W2F-P6) is compound and needs an ESCALATED outer enclosure
     # ('[(methylcarbamoyl)amino]') per the nesting order ( -> ).
+    # A '{...}' prefix (a producer that escalates by nesting depth,
+    # is fully enclosed too; the old '(' / '[' test re-wrapped it as '({...})'.
     _partially_enclosed = (
-        (')' in prefix_form or ']' in prefix_form)
-        and not (prefix_form.startswith(('(', '['))
-                 and prefix_form.endswith((')', ']')))
+        (')' in prefix_form or ']' in prefix_form or '}' in prefix_form)
+        and not _is_fully_enclosed(prefix_form)
     )
     # -FINAL I13 (see the no-locant branch above for the full reasoning):
     # ask the substituted predicate as well, so the marks are not held by the
@@ -2339,7 +2339,18 @@ def name_polyfunctional(features: Any) -> Optional[str]:
                 from .ring_substituents import anilino_preferred_prefix
                 _amino_prefix = anilino_preferred_prefix(_r_name)
                 if _amino_prefix is None:
-                    _amino_prefix = f'({_r_name}amino)'
+                    # /: an N-substituent whose name carries
+                    # locants takes its own marks inside the '(...amino)' unit,
+                    # one level in: '2-[di(butan-2-yl)amino]butan-2-ol (PIN)'
+                    # (the Blue Book). The bare glue shipped
+                    # '3-(propan-2-ylamino)-3-oxo...' at pin_verified.
+                    from ..assembly.naming_utils import (
+                        apply_enclosing_marks as _enc_marks,
+                        needs_brackets as _needs_br,
+                    )
+                    _r_inner = (_enc_marks(_r_name, -1)
+                                if _needs_br(_r_name) else _r_name)
+                    _amino_prefix = _enc_marks(f'{_r_inner}amino', -1)
                 # Collect the whole N-side branch (N + R subtree), never crossing
                 # the amide C, to exclude it from the alkyl substituent walk.
                 _seen = {_sac}
@@ -3099,6 +3110,8 @@ def name_polyfunctional(features: Any) -> Optional[str]:
             _desc = collect_stereodescriptors(mol, atom_to_locant)
             if _desc:
                 _name = f"{format_stereodescriptor_string(_desc)}{_name}"
+        if _esters_demoted:
+            _record_el02_ester_prefix_name(_name)
         return _name
 
     # --- Build the name ---
@@ -3115,26 +3128,17 @@ def name_polyfunctional(features: Any) -> Optional[str]:
     if not suffix:
         return None
 
-    # (the Blue Book Blue Book): this producer only fires
-    # when the acid carbon shares the molecule with ANOTHER functional
-    # group needing its own prefix (the polyfunctional dispatch condition).
-    # v52 a review-fix a performance pass D5 (REGRESSION FIX): a prior version of this
-    # branch also stripped the O-acid designator for `thioic_O_acid`, on the
-    # premise that '3-amino-2,3-dioxopropanethioic acid (PIN)' (:30297)
-    # generalizes to "polyfunctional thio -> drop designator". That premise
-    # is REFUTED by BB counter-examples that KEEP the designator on a
-    # SPECIFIED =S,-OH tautomer: "[(thiocarboxy)oxy]methanethioic O-acid
-    # (PIN)" (:31093), "2-(thiocarboxy)benzene-1-carbothioic S-acid (PIN)"
-    # (:30309), "carbonobromidothioic O-acid (PIN)" (:30846). The real BB
-    # distinction is the DRAWING TAUTOMER (unspecified {O/S} -> drop;
-    # specified -> keep), which a SMILES cannot recover -- so the safe rule
-    # is to KEEP the thio designator here, matching the bare/simple-acid
-    # path (assembly/handlers/_handler_shared.py::_generate_suffix, which
-    # already keeps it per:30225/:30291/:30295). The Se/Te strip is
-    # UNREFUTED (no counter-example found) and stays.
-    if principal_group in ("selenoic_O_acid", "telluroic_O_acid"):
-        from ..assembly.naming_utils import strip_chalcogen_acid_locant
-        suffix = strip_chalcogen_acid_locant(suffix)
+    # (the Blue Book Blue Book): the italic O/S/Se/Te acid
+    # designator is KEPT here for every chalcogen. v52 a review-fix a performance pass D5
+    # restored it for thio after BB counter-examples that keep it on a
+    # SPECIFIED tautomer: "[(thiocarboxy)oxy]methanethioic O-acid (PIN)"
+    # (:31093), "2-(thiocarboxy)benzene-1-carbothioic S-acid (PIN)" (:30309),
+    # "carbonobromidothioic O-acid (PIN)" (:30846). The same distinction holds
+    # for Se/Te: the Blue Book drops the designator only where "the location of
+    # the sulfur atoms is unknown" (:31081 vs:31083 '1,3-dithiodicarbonic
+    # S1,S3-acid (PIN)'), and 'hexaneselenoic acid (PIN)' (:30235) is drawn
+    # C{O/Se}H. A SMILES fixes the tautomer, so C(=Se)-OH keeps 'selenoic
+    # O-acid' (R13), decided by the FG class (the structure), never by RT.
 
     # Get locants for principal group.
     #: count ONLY the principal-group instances that actually sit on the
@@ -3388,7 +3392,25 @@ def name_polyfunctional(features: Any) -> Optional[str]:
     if is_refusal_sentinel(name):
         return None
 
+    if _esters_demoted:
+        _record_el02_ester_prefix_name(name)
     return name
+
+
+def _record_el02_ester_prefix_name(name: str) -> None:
+    """ names an ester-principal molecule with its esters as 'acyloxy' prefixes and
+    a JUNIOR group (or none) as the suffix: '(2R)-1-(octadecanoyloxy)-2-[(9Z)-octadec-9-
+    enoyloxy]propan-3-ol'. (the Blue Book) ranks esters (class 9,:18182) above
+    hydroxy compounds (class 17,:18190), and (:31696,:31698) cites an ester
+    as a prefix only "when [...] another group is present that has priority for citation
+    as the principal group or when all ester groups cannot be described by the methods
+    prescribed for naming esters"; a partial ester of a polyol has such a method
+     :31836, method (1) gives the PIN). The name is valid and round-trip
+    verified, so it still ships; this marks it as a non-PIN fragment (name-scoped), so it
+    is not labelled pin_verified. The name is unchanged."""
+    if name:
+        from ..metrics.provenance import record_non_pin_fragment
+        record_non_pin_fragment(name)
 
 
 # (BB 27858): the divalent-chalcogen BRIDGE functional groups, whose

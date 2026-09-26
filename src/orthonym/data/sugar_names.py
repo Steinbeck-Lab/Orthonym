@@ -3923,7 +3923,13 @@ def _escalate_enclosing_marks(name: str, token: str, replacement: str) -> Option
     if close_i is None:
         return None
     inner = pat.sub(replacement, name[open_i + 1:close_i])
-    return name[:open_i] + "[" + inner + "]" + name[close_i + 1:]
+    # The spliced group now carries the replacement's marks, so it and every
+    # group enclosing it move up the order (the Blue Book); a
+    # fixed '[' left '3-[[3-(...)decanoyl]oxy]' once the enclosing composed
+    # prefix was itself bracketed.
+    from ..assembly.naming_utils import renest_group_and_ancestors
+    return renest_group_and_ancestors(
+        name[:open_i] + "(" + inner + ")" + name[close_i + 1:], open_i)
 
 
 def name_glycosyloxy_aglycone(mol, canonical_smiles: str) -> Optional[str]:

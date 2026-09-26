@@ -2125,8 +2125,8 @@ def _identify_nitrogen_group(mol, n_idx: int, ring_atoms: Set[int]) -> Optional[
                 },
             }
 
-    # N,N-dialkyl amino (-NR2): 0 H, 2 carbon neighbors
-    # IUPAC 2013: (N,N-dialkylamino) (e.g., (N,N-dimethylamino))
+    # N,N-dialkyl amino (-NR2): 0 H, 2 carbon neighbors -> '(dimethylamino)',
+    # '[ethyl(methyl)amino]' (no italic N locants on an amino prefix).
     if h_count == 0 and len(neighbors) == 2:
         c_neighbors = [n for n in neighbors if n.GetSymbol() == 'C']
         if len(c_neighbors) == 2:
@@ -2148,14 +2148,20 @@ def _identify_nitrogen_group(mol, n_idx: int, ring_atoms: Set[int]) -> Optional[
                 alkyl_names_list.append(aname)
                 all_sub_atoms.extend(alkyl_atoms)
             else:
-                # Both identified - build name with N,N- locants
+                # Both identified. The amino prefix takes NO italic N locants: the
+                # nitrogen is a mononuclear parent, (the Blue Book)
+                # 'the first cited substituent never has enclosing marks unless it
+                # includes a locant. The second and further substituents are each
+                # enclosed with parentheses'; 'bis(dimethylamino) (preferred prefix)'
+                #, '4-(dimethylamino)-2-methylbutane-2-peroxol (PIN)'
+                # (:27955), '5-methyl-2-[methyl(phenyl)carbamoyl]benzoic acid (PIN)'
+                # (:32957). The ONE amino-prefix assembler owns order and marks.
                 alkyl_names_list.sort()
-                if alkyl_names_list[0] == alkyl_names_list[1]:
-                    from ..assembly.naming_utils import get_multiplier_prefix
-                    mp = get_multiplier_prefix(2, alkyl_names_list[0])
-                    prefix_name = f'(N,N-{mp}{alkyl_names_list[0]}amino)'
-                else:
-                    prefix_name = f'(N-{alkyl_names_list[0]}-N-{alkyl_names_list[1]}amino)'
+                from ..assembly.composer import _assemble_decorated_amino_prefix
+                prefix_name = _assemble_decorated_amino_prefix(
+                    [(alkyl_names_list[0], False), (alkyl_names_list[1], False)])
+                if not prefix_name:
+                    return None
                 return {
                     'name': prefix_name,
                     'atoms': all_sub_atoms,
@@ -2431,7 +2437,7 @@ def _identify_oxygen_group(mol, o_idx: int, ring_atoms: Set[int]) -> Optional[Di
                              if r_name.endswith('yl') else r_name + 'oxy')
                     if r_oxy is None:
                         return None
-                    return {'name': apply_enclosing_marks(r_oxy, 0),
+                    return {'name': apply_enclosing_marks(r_oxy, -1),
                             'atoms': [o_idx] + r_side,
                             'is_complex': True}
                 return None  # ether-bearing R not nameable -> fail closed (never drop a hetero)
@@ -4589,21 +4595,29 @@ def _name_substituted_benzenediamine(
     _key, new_amines, new_ring, new_n_map = best
 
     # --- N-substituent prefix entries (alpha_key, rendered) ---
-    n_prefix_entries: List[Tuple[str, str]] = []
-    lowest_sub_n = min(new_n_map) if new_n_map else None
+    # (the Blue Book): "Superscript arabic numbers, which are the
+    # locants of the parent structure, are used to differentiate the nitrogen
+    # atoms of di- and polyamines... except for geminal amines" -- so EVERY
+    # substituted N of a benzene poly-amine carries its ring locant, e.g.
+    # 'N1-(4-aminophenyl)-N4-phenylbenzene-1,4-diamine (PIN)' (:26404),
+    # 'N4-(7-chloroquinolin-4-yl)-N1,N1-diethylpentane-1,4-diamine' (:4675).
+    # The producer used to cite the lowest substituted N with a bare 'N'
+    # ('N,N-dimethylbenzene-1,4-diamine', 'N-methyl-N4-methyl...'). Identical
+    # substituent names are multiplied across the N atoms:
+    # 'N1,N4-dimethyl', 'N1,N1-dimethyl'. A compound substituent takes its own
+    # enclosing marks first, as in the aniline producer above.
+    from ..assembly.naming_utils import enclose_if_compound
+    n_locs_by_name: Dict[str, List[int]] = {}
     for n_loc in sorted(new_n_map):
-        names = new_n_map[n_loc]
-        # The lowest-locant substituted N is cited with a bare 'N'; any
-        # further substituted N uses its numeric ring locant.
-        n_tag = "N" if n_loc == lowest_sub_n else f"N{n_loc}"
-        if len(names) == 2 and names[0] == names[1]:
-            mp = get_multiplier_prefix(2, names[0])
-            rendered = f"{n_tag},{n_tag}-{mp}{_wrap_n_substituent(names[0])}"
-            n_prefix_entries.append((alpha_sort_key(names[0]), rendered))
-        else:
-            for nm in names:
-                rendered = f"{n_tag}-{_wrap_n_substituent(nm)}"
-                n_prefix_entries.append((alpha_sort_key(nm), rendered))
+        for nm in new_n_map[n_loc]:
+            n_locs_by_name.setdefault(nm, []).append(n_loc)
+    n_prefix_entries: List[Tuple[str, str]] = []
+    for nm, locs in n_locs_by_name.items():
+        locs = sorted(locs)
+        tags = ",".join(f"N{loc}" for loc in locs)
+        body = _wrap_n_substituent(enclose_if_compound(nm))
+        mp = get_multiplier_prefix(len(locs), nm) if len(locs) > 1 else ""
+        n_prefix_entries.append((alpha_sort_key(nm), f"{tags}-{mp}{body}"))
 
     # --- Ring-substituent prefix entries ---
     ring_prefix_entries: List[Tuple[str, str]] = []
@@ -5497,7 +5511,8 @@ def _join_benzene_prefixes(prefixes: List[str]) -> str:
     return result
 
 
-def _select_benzene_parent_ring(mol) -> Optional[Tuple[int, ...]]:
+def _select_benzene_parent_ring(mol, principal_group_atoms=None,
+                                principal_group=None) -> Optional[Tuple[int, ...]]:
     """Deterministically select the benzene ring to use as the parent.
 
      C- (V-3): ``get_benzene_ring`` returns the FIRST benzene ring in SSSR
@@ -5539,14 +5554,32 @@ def _select_benzene_parent_ring(mol) -> Optional[Tuple[int, ...]]:
             if nbr.GetIdx() not in ring_set and nbr.GetAtomicNum() > 1
         )
 
+    def _pcg_count(ring: Tuple[int, ...]) -> int:
+        # (the Blue Book): "The senior parent structure has the
+        # maximum number of substituents corresponding to the principal
+        # characteristic group (suffix)". It comes BEFORE every ring criterion
+        # below: COc1cc(O)cc(C)c1Oc1cc(C)cc(O)c1O is named on the ring with two
+        # -OH ('3-(4-hydroxy-2-methoxy-6-methylphenoxy)-5-methylbenzene-1,2-diol'),
+        # not '4-(2,3-dihydroxy-5-methylphenoxy)-3-methoxy-5-methylphenol', which
+        # the equal substituent counts left to the canonical-rank tie-break
+        # (TRIAGE rows 75, 85). Counted per principal-group instance.
+        if not principal_group_atoms:
+            return 0
+        from .parent_selection import is_principal_group_on_ring
+        ring_set = set(ring)
+        return sum(1 for m in principal_group_atoms
+                   if is_principal_group_on_ring(mol, ring_set, [m], principal_group))
+
     def _key(ring: Tuple[int, ...]):
-        # carbon-linked first (0 < 1); then (Wave-2 C2): the ring
-        # with the GREATER number of substituent attachments is the parent
-        # (the BB dicyano-phenoxy example — this tier also killed a genuine
-        # spelling-dependence: the old rank-only tie-break flipped parent
-        # rings with the input SMILES order); then lowest canonical-rank
-        # tuple (a structure-derived, spelling-independent total order).
-        return (0 if _carbon_linked(ring) else 1,
+        # first (above); then carbon-linked (0 < 1); then
+        # (Wave-2 C2): the ring with the GREATER number of substituent
+        # attachments is the parent (the BB dicyano-phenoxy example — this tier
+        # also killed a genuine spelling-dependence: the old rank-only tie-break
+        # flipped parent rings with the input SMILES order); then lowest
+        # canonical-rank tuple (a structure-derived, spelling-independent total
+        # order).
+        return (-_pcg_count(ring),
+                0 if _carbon_linked(ring) else 1,
                 -_substituent_count(ring),
                 tuple(sorted(ranks[a] for a in ring)))
 

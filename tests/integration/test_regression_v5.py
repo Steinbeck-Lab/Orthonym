@@ -8,7 +8,7 @@ comparison, fatty acid identification).
 """
 import pytest
 from orthonym import name_compound
-from tests.support.rt_assert import assert_tier_contract
+from tests.support.rt_assert import assert_full_rt, assert_tier_contract
 
 
 class TestCoverageGateWhitelist:
@@ -39,25 +39,27 @@ class TestCoverageGateWhitelist:
         )
 
     @pytest.mark.integration
-    @pytest.mark.xfail(reason="Pre-existing: decomposition returns None for this CoA, pipeline falls back to adenine")
+    @pytest.mark.opsin_gate
     def test_regression_9_coa_thioester(self):
-        """CoA thioester (HA=65): coverage guard rejects 'adenine'
-        (ratio 0.11), decomposition produces more descriptive name."""
+        """CoA thioester (HA=65): the coverage guard rejects 'adenine' (ratio 0.11),
+        and the molecule is named by the tier contract.
+
+        Task 12 fix a performance pass (wp6-tests): the non-strict xfail XPASSed, but vacuously:
+        the raw output is the failure sentinel 'unknown organic compound', which
+        passed every old assertion (!= 'unknown', != 'adenine', longer than
+        'adenine'). The PIN tier abstains (no CoA-thioester PIN producer) and the
+        best-effort tier names it RT-exact (systematic_verified; probe 2026-09-26),
+        so the test asserts the tier contract, gate ON (tests/support/rt_assert.py),
+        and keeps the coverage-guard check."""
         smiles = (
             r"CCC/C=C\C/C=C\CCCCCCCC(=O)SCCNC(=O)CCNC(=O)"
             r"[C@H](O)C(C)(C)COP(=O)(O)OP(=O)(O)OC[C@H]1OC"
             r"(n2cnc3c(N)ncnc32)[C@H](O)[C@@H]1OP(=O)(O)O"
         )
-        name = name_compound(smiles)
-        assert name != "unknown"
+        pin, be = assert_tier_contract(smiles)
         # a phase-03: 'adenine' (7 chars) for 65-HA molecule = ratio 0.11
-        # Below 0.25 threshold -> decomposition attempted
-        assert name != "adenine", (
-            "Coverage guard should reject 'adenine' for HA=65 (ratio 0.11)"
-        )
-        assert len(name) > len("adenine"), (
-            f"Decomposition result should be longer than 'adenine', got: {name}"
-        )
+        assert pin != "adenine" and be != "adenine", (
+            "Coverage guard should reject 'adenine' for HA=65 (ratio 0.11)")
 
     @pytest.mark.integration
     def test_whitelist_does_not_weaken_gate_for_small_rings(self):
@@ -100,14 +102,35 @@ class TestCoverageGateWhitelist:
 
     @pytest.mark.integration
     def test_adenine_monophosphate_produces_adenine(self):
-        """AMP-like molecule should produce 'adenine' via nucleobase bypass.
+        """AMP hydrate: the whole molecule is named, never the bare nucleobase.
 
-        The.O (water) is a single-atom fragment which falls through to the
-        normal pipeline rather than splitting via dot-disconnected handling.
+        The old expectation 'adenine' described a different molecule (it drops the
+        ribose phosphate and the water; OPSIN full InChIKey: wrong).
         """
         smiles = "Nc1ncnc2c1ncn2[C@@H]1O[C@H](COP(=O)(O)O)[C@@H](O)[C@H]1O.O"
         name = name_compound(smiles)
-        assert name == "adenine", f"Expected 'adenine', got '{name}'"
+        # 2026-09-26 (pre-existing-failures plan, Task 11 carry, TRIAGE row 61)
+        # change-asserted-value. Controller ruling, option A (-09-24 'From T10'):
+        # the retained nucleotide name stays at the PIN tier, the same as the D-a ruling
+        # for sugars and amino acids. Blue Book: "## **** RETAINED NAMES" --
+        # "The following are traditional names for esters of nucleosides with phosphoric
+        # acid." (the Blue Book heading,:55005 sentence), listing 5'-adenylic acid (:55007); and
+        # "### ** INTRODUCTION**" (:50939) -- "Preferred IUPAC names (PINs) are not identified
+        # for the compounds in this Chapter." (:50943). Consistent with the three AMP gold
+        # rows (DD7-natprod-2, -protect-amp, P14-NUC-AMP-PROTECT). OPSIN 2.9.0 full
+        # InChIKey exact (an InChIKey), checked in Task 11 with a batch
+        # OPSIN call outside the engine; the round trip is also asserted below.
+        # Task 12 fix a performance pass (wp6-tests; whole-branch review items 13 and 17): this is
+        # NOT a Blue Book ruling that the name is a PIN. (:50943) identifies no
+        # PIN for the chapter, and (:7954) says "no PIN label will be
+        # assigned in names including" water. The name is kept at the PIN tier by
+        # decision (controller option A, like D-a): "no PIN identified, kept by
+        # decision D-a". The test id ('..._produces_adenine') is kept so the TRIAGE row
+        # still joins; it no longer describes the test, which asserts that the bare
+        # nucleobase is NOT the answer.
+        assert name == "5'-adenylic acid—water (1/1)", (
+            f"Expected \"5'-adenylic acid—water (1/1)\", got '{name}'")
+        assert_full_rt(name, smiles, "AMP hydrate: ")
 
 
 class TestBracketHyphenation:
@@ -210,6 +233,14 @@ class TestDecompositionQuality:
         )
 
     @pytest.mark.integration
+    @pytest.mark.xfail(strict=True, reason=(
+        "DEFECT (breadth + raw 0-wrong), pre-existing at 4e0e5c29b: the raw (gate-off) "
+        "decomposition drops the inositol phosphodiester and the unsaturated sphingoid "
+        "chain ('N-[(2S)-2-hydroxytetracosanoyl](1R,2R,3S,4S,5R,6S)-aminocyclohexane-"
+        "1,2,3,4,5-pentol', OPSIN-unparseable); with the gate on the PIN tier AND the "
+        "best-effort tier abstain, so no tier names this molecule (probe 2026-09-26). "
+        "Needs a ceramide-phosphoinositol build. .planning/TODO-2026-09-24.md 'Open "
+        "from T12 fix round 2 (wp6)'."))
     def test_regression_2_sphingolipid_fallback(self):
         """Sphingolipid should produce a meaningful name without garbled tokens.
 
@@ -306,52 +337,39 @@ class TestFattyAcidIdentification:
     """Regressions 3, 6: fatty acid chain identification."""
 
     @pytest.mark.integration
-    @pytest.mark.xfail(
-        reason="OPSIN cannot parse linolenoyloxy/icosadienoyloxy; "
-        "systematic naming is correct IUPAC but OPSIN vocabulary limit. "
-        "⚠ STALE AS OF v29 Task J3: 'linolenoyloxy' is no longer emitted at all "
-        "-- the acyl prefix now comes from the PIN acid stem "
-        "((9Z,12Z,15Z)-octadeca-9,12,15-trienoyloxy), which OPSIN DOES parse, "
-        "and this test flips XFAIL->XPASS because of that fix. The marker is a "
-        "candidate for removal, but it also XPASSes without J3 when this file is "
-        "run alone, i.e. the outcome is test-ORDER dependent -- resolve that "
-        "before unmarking. See .planning/audit-v29/TaskJ3-acyl-prefix-pin.md."
-    )
     def test_regression_3_phospholipid_opsin_parse(self):
-        """Phospholipid fatty acid chains: correct IUPAC but OPSIN-unparseable.
+        """Phospholipid fatty acid chains: the name OPSIN-parses back to the molecule.
 
         v4 used wrong trivial names (arachidoyl=C20:0 for C20:2, stearoyl=C18:0
         for C18:3). v5+ correctly identifies unsaturation: C18:3=linolenic,
-        C20:2=icosa-11,14-dienoic. OPSIN cannot parse these acyloxy forms.
+        C20:2=icosa-11,14-dienoic.
 
-        This is marked xfail because no trivial name exists for C20:2 and
-        OPSIN cannot parse the correct systematic 'icosa-11,14-dienoyloxy'.
+        Task 12 fix a performance pass (wp6-tests): the non-strict xfail ('OPSIN cannot parse
+        linolenoyloxy/icosadienoyloxy') was stale -- made the acyl
+        prefixes come from the PIN acid stems, which OPSIN parses, and the test
+        XPASSed. The order dependence its reason warned about was checked: the test
+        passes alone and inside the file (2026-09-26). The assertion is strengthened
+        from "OPSIN parses it" to the full-InChIKey round trip (independent OPSIN
+        call). The spelling is not pinned: whether this acyloxy-on-propane /
+        hydroxyphosphoryl form is the PIN is open (the 'hydrogen phosphate' form for
+        phospholipids, TRIAGE.md ' outcome').
         """
-        import subprocess
-
         smiles = (
             r"CC/C=C\C/C=C\C/C=C\CCCCCCCC(=O)OCC"
             r"(COP(=O)(O)OCCNC)OC(=O)CCCCCCCCC/C=C\C/C=C\CCCCC"
         )
         name = name_compound(smiles)
         from tests.support.jars import jar_or_skip
-        jar = jar_or_skip()
-        result = subprocess.run(
-            ["java", "-jar", jar, "-osmi"],
-            input=name,
-            capture_output=True,
-            text=True,
-            timeout=30,
-        )
-        assert result.stdout.strip(), f"OPSIN cannot parse: '{name}'"
+        jar_or_skip()
+        assert_full_rt(name, smiles, "phospholipid: ")
 
     @pytest.mark.integration
     def test_regression_3_correct_fatty_acid_names(self):
         """Phospholipid should use correct fatty acid identification.
 
-        C18:3 should be identified as linolenic (trivial name exists).
-        C20:2 should use systematic naming (no trivial name for C20:2).
-        Neither should use saturated trivial names (arachidoyl, stearoyl).
+        Both chains use systematic acyl prefixes (C18:3 octadeca-9,12,15-trienoyl,
+        C20:2 icosa-11,14-dienoyl); no retained or saturated trivial names
+        (linolenoyl, arachidoyl, stearoyl).
         """
         smiles = (
             r"CC/C=C\C/C=C\C/C=C\CCCCCCCC(=O)OCC"
@@ -366,13 +384,21 @@ class TestFattyAcidIdentification:
         assert "stearoyloxy" not in name, (
             f"Wrong trivial name 'stearoyloxy' (C18:0) for C18:3 chain: '{name}'"
         )
-        # Should use linolenoyloxy for C18:3 (correct trivial)
-        assert "linolenoyloxy" in name, (
-            f"Expected 'linolenoyloxy' for C18:3 chain: '{name}'"
+        # 2026-09-25 (pre-existing-failures plan, Task 5, TRIAGE row 65, ruling
+        # R20): the retained fatty-acid names are not used in PINs --
+        # (the Blue Book), "stearic acid... octadecanoic acid (PIN)" (:29791)
+        # -- so no 'linolenoyl'. Each acyl is cited in its own marks with 'oxy'
+        # outside: '3-[(pyridine-3-carbonyl)oxy]propanoic acid (PIN)',
+        #:31723), and the stereo-led acyl takes '[' then '{' by the order
+        # (:7446). OPSIN round trip of the whole name: full-InChIKey exact.
+        assert "linolenoyl" not in name, (
+            f"Retained 'linolenoyl' is not a PIN acyl prefix (R20): '{name}'"
         )
-        # C20:2 has no trivial name -- systematic 'icosa-11,14-dienoyloxy' is correct
-        assert "dienoyloxy" in name, (
-            f"Expected systematic dienoyloxy for C20:2: '{name}'"
+        assert "{[(9Z,12Z,15Z)-octadeca-9,12,15-trienoyl]oxy}" in name, (
+            f"Expected systematic C18:3 acyloxy prefix: '{name}'"
+        )
+        assert "{[(11Z,14Z)-icosa-11,14-dienoyl]oxy}" in name, (
+            f"Expected systematic C20:2 acyloxy prefix: '{name}'"
         )
 
     @pytest.mark.integration
@@ -414,9 +440,9 @@ class TestFattyAcidIdentification:
     def test_fatty_acid_trivial_names_via_fragment(self):
         """Verify fatty acid identification via get_acid_fragment_name.
 
-        Tests that the correct trivial names are returned for known
-        carbon count / double bond count combinations, and that
-        unknown combinations fall through to systematic naming.
+        The acid stems are the systematic PIN stems (plan ruling R20), not the
+        trivial 'stearic'/'arachidonic'. The get_acyloxy_prefix asserts below test
+        a spelling converter on its own input and are unchanged.
         """
         from rdkit import Chem
         from orthonym.rules.esters import get_acid_fragment_name, parse_ester_fragments
@@ -426,13 +452,23 @@ class TestFattyAcidIdentification:
         pattern = Chem.MolFromSmarts("[CX3](=O)[OX2][#6]")
         matches = mol.GetSubstructMatches(pattern)
         acid_atoms, _ = parse_ester_fragments(mol, matches[0])
-        assert get_acid_fragment_name(mol, acid_atoms) == "stearic"
+        # PIN per R20: "The following names are retained for general
+        # nomenclature with functionalization but no substitution is allowed."
+        # the Blue Book; "stearic acid octadecanoic acid (PIN)":29791. OPSIN RT
+        # exact: 'octadecanoic acid' -> CCCCCCCCCCCCCCCCCC(=O)O, full InChIKey (Task 7/8).
+        assert get_acid_fragment_name(mol, acid_atoms) == "octadecanoic"
 
         # Test C20:4 arachidonic (simple ester with 4 double bonds)
         mol2 = Chem.MolFromSmiles(r"CCCCC/C=C\C/C=C\C/C=C\C/C=C\CCCC(=O)OC")
         matches2 = mol2.GetSubstructMatches(pattern)
         acid_atoms2, _ = parse_ester_fragments(mol2, matches2[0])
-        assert get_acid_fragment_name(mol2, acid_atoms2) == "arachidonic"
+        # PIN per R20: 'arachidonic acid' is not even a retained name in the Blue Book (0
+        # hits); "Only the following five carboxylic acids retained names and are
+        # also preferred IUPAC names." the Blue Book; stereo format as in "oleic acid
+        # (9Z)-octadec-9-enoic acid (PIN)":29785. OPSIN RT exact:
+        # '(5Z,8Z,11Z,14Z)-icosa-5,8,11,14-tetraenoic acid' -> the acid of this ester, full
+        # InChIKey (Task 7/8).
+        assert get_acid_fragment_name(mol2, acid_atoms2) == "(5Z,8Z,11Z,14Z)-icosa-5,8,11,14-tetraenoic"
 
         # Test that acyloxy conversion works for these
         from orthonym.rules.esters import get_acyloxy_prefix

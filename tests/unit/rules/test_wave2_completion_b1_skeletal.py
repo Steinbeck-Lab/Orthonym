@@ -66,7 +66,11 @@ class TestCitationSeniorityOrder:
 
     def test_oxa_thia_order_unchanged(self):
         # Established behaviour where seniority and locant order coincide.
-        assert _skel("COCSCOC") == "2,6-dioxa-4-thiaheptane"
+        # fix a performance pass: COCSCOC ('2,6-dioxa-4-thiaheptane') has three heterounits
+        # and is no longer an 'a' PIN, the Blue Book); the
+        # four-unit homolog keeps the oxa-before-thia citation.
+        assert _skel("COCSCOC") is None
+        assert _skel("COCSCOCOC") == "2,4,8-trioxa-6-thianonane"
 
 
 @pytest.mark.unit
@@ -154,8 +158,8 @@ class TestCyclicSeniorityNumbering:
 @pytest.mark.unit
 class TestClassicPathsByteIdentical:
     @pytest.mark.parametrize("smiles,expected", [
-        ("COCCOCCOC", "2,5,8-trioxanonane"),
-        ("OCCOCCOCC", "3,6-dioxaoctan-1-ol"),
+        # fix a performance pass: COCCOCCOC and OCCOCCOCC (3 and 2 heterounits) moved to
+        # the blocked list below, the Blue Book).
         ("C[SiH2]C[SiH2]C[SiH2]C[SiH2]C=C", "2,4,6,8-tetrasiladec-9-ene"),
         ("COCCOCCOCCOC", "2,5,8,11-tetraoxadodecane"),
     ])
@@ -167,6 +171,8 @@ class TestClassicPathsByteIdentical:
         "COCCOC",    # 1,2-dimethoxyethane
         "CCNCCC",    # amine Gate 2c
         "CCCCOO",    # peroxol
+        "COCCOCCOC",  # 3 heterounits: 1-methoxy-2-(2-methoxyethoxy)ethane (PIN,:27756)
+        "OCCOCCOCC",  # 2 heterounits + -ol: 2-(2-ethoxyethoxy)ethan-1-ol
     ])
     def test_blocked_classes_stay_blocked(self, smiles):
         assert _skel(smiles) is None

@@ -39,6 +39,33 @@ class TestVerdict:
         assert nm._self_consistency_verdict("CCO", "this is not smiles!!!") == "inconclusive"
         assert nm._self_consistency_verdict("?!?", "CCO") == "inconclusive"
 
+    def test_charge_balanced_salt_named_as_net_charged_species_is_mismatch(self):
+        # fix a performance pass (wp1): a neutral SALT input is not the neutral-molecule
+        # exemption. (the Blue Book) "Neutral salts of acids are
+        # named by citing the name of the cation(s) followed by the name of the
+        # anion": the name must denote a charge-balanced assembly. These are the
+        # OPSIN 2.9.0 parses of 'trisodium 5-hydroxybenzene-1,3-disulfonate' and
+        # 'trisodium (4-hydroxyphenyl)phosphonate' (net +1), which shipped as
+        # pin_verified for the trianion salts.
+        assert nm._self_consistency_verdict(
+            "[O-]c1cc(cc(c1)S([O-])(=O)=O)S([O-])(=O)=O.[Na+].[Na+].[Na+]",
+            "OC=1C=C(C=C(C1)S(=O)(=O)[O-])S(=O)(=O)[O-].[Na+].[Na+].[Na+]",
+        ) == "mismatch"
+        assert nm._self_consistency_verdict(
+            "[O-]c1ccc(cc1)P(=O)([O-])[O-].[Na+].[Na+].[Na+]",
+            "OC1=CC=C(C=C1)P([O-])([O-])=O.[Na+].[Na+].[Na+]",
+        ) == "mismatch"
+
+    def test_neutral_input_keeps_the_protonation_exemption(self):
+        # 'methyl phosphate' round-trips to the dianion; the input has no formal
+        # charge, so this is protonation ambiguity, not a wrong molecule.
+        assert nm._self_consistency_verdict(
+            "COP(=O)(O)O", "COP(=O)([O-])[O-]") == "ok"
+        # a correct salt / zwitterion / hydrochloride name still passes
+        assert nm._self_consistency_verdict(
+            "CC(=O)[O-].[Na+]", "CC(=O)[O-].[Na+]") == "ok"
+        assert nm._self_consistency_verdict("CC[NH3+].[Cl-]", "CCN.Cl") == "ok"
+
     def test_skeleton_stereo_insensitive(self):
         # the skeleton block is identical regardless of stereo descriptors
         assert nm._self_consistency_skeleton("C[C@H](O)CC") == nm._self_consistency_skeleton("CC(O)CC")

@@ -77,7 +77,7 @@ def test_bridged_fused_deterministic(smiles, expected):
 PROTECT = [
     ("c1ccc2ccccc2c1", "naphthalene"),
     ("C1CCCc2ccccc12", "1,2,3,4-tetrahydronaphthalene"),  # tetralin (residual core)
-    ("C1CC2CCC1C2", "norbornane"),                        # norbornane (pure von Baeyer, retained)
+    ("C1CC2CCC1C2", "bicyclo[2.2.1]heptane"),  # R11 (2026-09-25, pre-existing-failures plan, Task 5)::9881, only adamantane/cubane are retained; "bicyclo[2.2.1]heptane (PIN)":2038
     ("C1C2CC3CC1CC(C2)C3", "adamantane"),                 # pure polycyclic-bridged
 ]
 

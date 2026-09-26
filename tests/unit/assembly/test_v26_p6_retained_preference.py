@@ -186,15 +186,38 @@ def test_recognizer_finds_retained_name(smiles, expected, _general):
 
 
 @pytest.mark.parametrize("smiles,expected,_general", FAILCLOSED_CASES)
-def test_recognizer_finds_a_name_even_though_it_will_fail_closed(
+def test_recognizer_finds_no_catalog_name_for_the_lambda4_ring(
         smiles, expected, _general):
-    """The recognizer itself has no awareness -- it is expected to
-    return the catalog name here; the CALLER (_try_general_engine_recovery)
-    is what fails closed when this name does not round-trip standalone."""
+    """2026-09-25 (pre-existing-failures plan, Task 5, TRIAGE row 126) --
+    change-asserted-value, non-name assertion.
+
+    This used to assert that the recognizer returns '[1,3,2]benzodioxathiole'
+    for the lambda4-sulfur ring, because the catalog row was KEYED on the
+    lambda4 form while its name denotes the DIVALENT-sulfur ring (OPSIN reads it
+    as c1ccc2c(c1)OSO2) -- a key/name pair describing two different molecules.
+     "Nonstandard bonding numbers" (the Blue Book): "A nonstandard
+    bonding number of a neutral skeletal atom of a parent hydride is indicated by
+    the symbol 'lambda n', cited in conjunction with an appropriate locant" -- a
+    name without it denotes the standard bonding number. The row is now keyed on
+    the divalent parent (its true structure); the lambda4 ring has no catalog
+    entry, so the recognizer returns None and the caller keeps the general
+    lambda name. The spiro PINs are unaffected: (:10909) puts the
+    lambda symbol in front of the complete spiro name ('2lambda4,2'-spirobi
+    [[1,3,2]benzodioxathiole] (PIN)',:10913), so the component stays the
+    standard-valence parent. Code-level mutation: restoring the lambda4 key makes
+    this test fail."""
     nm = Orthonym(style="pin")
     mol = Chem.MolFromSmiles(Chem.CanonSmiles(smiles))
     got = nm._retained_structural_preference(mol)
-    assert got == expected, f"{smiles}: {got!r} != {expected!r}"
+    assert got is None, f"{smiles}: {got!r} (the catalog name is the divalent-S ring)"
+
+
+def test_recognizer_names_the_divalent_sulfur_ring():
+    """The catalog row's own structure: '[1,3,2]benzodioxathiole' is the
+    divalent-sulfur ring (OPSIN RT exact)."""
+    nm = Orthonym(style="pin")
+    mol = Chem.MolFromSmiles(Chem.CanonSmiles("c1ccc2c(c1)OSO2"))
+    assert nm._retained_structural_preference(mol) == "[1,3,2]benzodioxathiole"
 
 
 @pytest.mark.parametrize("smiles,expected", CONTROL_CASES)

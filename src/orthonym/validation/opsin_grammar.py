@@ -452,6 +452,7 @@ class OpsinGrammar:
         from orthonym.assembly.naming_utils import (
             _FUSION_BRACKET_RE,
             _INDICATED_H_RE,
+            _RING_ASSEMBLY_BRACKET_RE,
             _STEREO_PAREN_RE,
         )
         # Strip non-nesting brackets + +
@@ -459,6 +460,9 @@ class OpsinGrammar:
         # NO bracket characters so the consecutive-opener check sees
         # only nesting-relevant brackets.
         working = _INDICATED_H_RE.sub("__IH__", name)
+        # A ring-assembly enclosure with its integral component marks
+        # ('[1,1'-bi(cyclohexan)]') is non-nesting too,.
+        working = _RING_ASSEMBLY_BRACKET_RE.sub("__RA__", working)
         working = _FUSION_BRACKET_RE.sub("__FB__", working)
         working = _STEREO_PAREN_RE.sub("__SP__", working)
 

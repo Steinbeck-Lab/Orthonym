@@ -417,6 +417,32 @@ class TestRoundTripGate:
 # ---------------------------------------------------------------------------
 
 
+def _true_p99(benchmark, what: str) -> float:
+    """TRUE p99 (not max, which is p100) from pytest-benchmark's raw timings.
+
+    pytest-benchmark switches itself off under xdist ("Benchmarks are
+    automatically disabled because xdist plugin is active") and under
+    --benchmark-disable. It then calls the target ONCE, records no timings and
+    leaves ``benchmark.stats`` None, so there is no latency to gate. The caller's
+    functional assertions have already run on that one call; the p99 gate is
+    skipped with the reason and runs in a session where the plugin measures
+    (serial, no -n).
+    """
+    if benchmark.disabled:
+        pytest.skip(
+            f"{what} p99 gate needs pytest-benchmark timings, and the plugin is "
+            "disabled in this session (xdist -n, or --benchmark-disable); "
+            "run this test serially to measure it"
+        )
+    data = list(benchmark.stats.stats.data)
+    if len(data) >= 100:
+        return statistics.quantiles(data, n=100)[98]
+    # Small sample: sorted-percentile fallback (still NOT max).
+    data_sorted = sorted(data)
+    idx = max(0, int(round(0.99 * (len(data_sorted) - 1))))
+    return data_sorted[idx]
+
+
 class TestPerfBenchmark:
     """ / hard gate: < 50ms TRUE p99 for the grammar layer.
 
@@ -440,15 +466,7 @@ class TestPerfBenchmark:
         # Benchmark the validate hot path on a canonical name.
         result = benchmark(g.validate, "ethanol")
         assert result is True
-        # TRUE p99 from raw timing data (NOT max which is p100):
-        data = list(benchmark.stats.stats.data)
-        if len(data) >= 100:
-            p99 = statistics.quantiles(data, n=100)[98]
-        else:
-            # Small sample: use sorted-percentile fallback (still NOT max).
-            data_sorted = sorted(data)
-            idx = max(0, int(round(0.99 * (len(data_sorted) - 1))))
-            p99 = data_sorted[idx]
+        p99 = _true_p99(benchmark, "validate")
         assert p99 < 0.050, (
             f"validate p99 {p99 * 1000:.3f}ms > 50ms "
             f"(SC-4 / D-16 HARD gate)"
@@ -464,13 +482,7 @@ class TestPerfBenchmark:
         # Confirm the repair fired.
         assert result[0] is not None
         assert result[1] == "bracket"
-        data = list(benchmark.stats.stats.data)
-        if len(data) >= 100:
-            p99 = statistics.quantiles(data, n=100)[98]
-        else:
-            data_sorted = sorted(data)
-            idx = max(0, int(round(0.99 * (len(data_sorted) - 1))))
-            p99 = data_sorted[idx]
+        p99 = _true_p99(benchmark, "suggest_fix")
         assert p99 < 0.050, (
             f"suggest_fix p99 {p99 * 1000:.3f}ms > 50ms "
             f"(SC-4 / D-16 HARD gate)"

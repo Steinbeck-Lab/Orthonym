@@ -83,13 +83,15 @@ class TestCLS01Acetals:
 
     @pytest.mark.integration
     def test_lactol_hydroxy_oxane(self):
-        """Lactol (hemiacetal): hydroxy on oxane ring."""
+        """Lactol (hemiacetal): the ring -OH is the principal group (suffix)."""
         name = name_compound("OC1CCCCO1")
-        assert "hydroxy" in name, f"Expected 'hydroxy' in '{name}'"
-        # Should be named as an oxane/oxane derivative
-        assert "pyran" in name or "oxan" in name, (
-            f"Expected ring parent (pyran or oxan) in '{name}'"
-        )
+        # PIN (no plan ruling; derived from the quoted rule): "Substitutive
+        # nomenclature, prefix mode" "Hydroxy groups are indicated by the prefix 'hydroxy'
+        # when: (1) a group having priority for citation as the principal characteristic
+        # group is present; or (2) a hydroxy group cannot be denoted by a suffix."
+        # the Blue Book-27260 -- neither holds, so the -OH is the '-ol' suffix;
+        # OPSIN RT exact (TRIAGE.csv; re-checked in Task 7/8).
+        assert name == "oxan-2-ol", f"Expected 'oxan-2-ol', got '{name}'"
 
     @pytest.mark.integration
     def test_dimethoxy_butane(self):
@@ -144,12 +146,19 @@ class TestCLS02Disulfides:
     @pytest.mark.integration
     def test_trithiaheptane(self):
         """Symmetric trisulfide: CCSSSCC."""
-        assert name_compound("CCSSSCC") == "3,4,5-trithiaheptane"
+        # PIN per R9: "Compounds with three or more contiguous identical
+        # chalcogen atoms are treated as parent hydrides in substitutive nomenclature."
+        # the Blue Book; "dimethyltrisulfane (PIN) dimethyl trisulfide":39339;
+        # OPSIN RT exact (TRIAGE.csv; re-checked in Task 7/8).
+        assert name_compound("CCSSSCC") == "diethyltrisulfane"
 
     @pytest.mark.integration
     def test_trithiaoctane_asymmetric(self):
         """Asymmetric trisulfide: CCSSSCCC."""
-        assert name_compound("CCSSSCCC") == "3,4,5-trithiaoctane"
+        # PIN per R9: (the Blue Book, as above); "methyl(phenyl)triselane
+        # (PIN) methyl phenyl triselenide":39341 (the second prefix in parentheses);
+        # OPSIN RT exact (TRIAGE.csv; re-checked in Task 7/8).
+        assert name_compound("CCSSSCCC") == "ethyl(propyl)trisulfane"
 
     @pytest.mark.integration
     def test_diphenyl_disulfide(self):
@@ -214,18 +223,27 @@ class TestCLS03CyclicImides:
 
     @pytest.mark.integration
     def test_succinimide(self):
-        """Retained name: succinimide."""
-        assert name_compound("O=C1CCC(=O)N1") == "succinimide"
+        """Succinimide: the PIN is the heterocyclic pseudoketone."""
+        # PIN per R7: "Cyclic imides are preferably named as heterocyclic
+        # pseudoketones." the Blue Book; "pyrrolidine-2,5-dione (PIN) succinimide"
+        #:33584; OPSIN RT exact (TRIAGE.csv; re-checked in Task 7/8).
+        assert name_compound("O=C1CCC(=O)N1") == "pyrrolidine-2,5-dione"
 
     @pytest.mark.integration
     def test_maleimide(self):
-        """Retained name: maleimide."""
-        assert name_compound("O=C1C=CC(=O)N1") == "maleimide"
+        """Maleimide: the PIN is the heterocyclic pseudoketone."""
+        # 2026-09-26 (pre-existing-failures plan, Task 12 fix a performance pass, item 4) change-asserted-value:
+        # (the Blue Book) "Cyclic imides are preferably named as heterocyclic pseudoketones";
+        # "1H-pyrrole-2,5-dione (PIN) pyrrole-2,5-dione" (:33843); (:24721) added indicated
+        # hydrogen is not cited when the suffix pair only removes ring double bonds. OPSIN 2.9.0 RT exact.
+        assert name_compound("O=C1C=CC(=O)N1") == "1H-pyrrole-2,5-dione"
 
     @pytest.mark.integration
     def test_phthalimide_retained(self):
-        """Phthalimide -> retained name (IUPAC."""
-        assert name_compound("O=C1NC(=O)c2ccccc21") == "phthalimide"
+        """Phthalimide is general nomenclature only; the PIN is the pseudoketone."""
+        # 2026-09-25 (pre-existing-failures plan, Task 5) change-asserted-value:
+        # R21: (the Blue Book) "Cyclic imides are preferably named as heterocyclic pseudoketones"; "2-phenyl-1H-isoindole-1,3(2H)-dione (PIN)... N-phenylphthalimide" (:33853); (:24689) added indicated hydrogen is preferred over hydro prefixes for PINs. OPSIN RT exact.
+        assert name_compound("O=C1NC(=O)c2ccccc21") == "1H-isoindole-1,3(2H)-dione"
 
     @pytest.mark.integration
     def test_methyl_succinimide_derivative(self):
@@ -300,8 +318,13 @@ class TestCLS04ThiocarboxylicAcids:
 
     @pytest.mark.integration
     def test_ethanedithioic_acid(self):
-        """Dithioic acid: C(=S)SH -> ethanedithioic acid."""
-        assert name_compound("CC(=S)S") == "ethanedithioic acid"
+        """Dithioic acid: C(=S)SH -> ethane(dithioic acid)."""
+        # PIN per R12 (worked-example analogue; no general sentence found):
+        # "Functional replacement in systematic names of carboxylic acids", example
+        # "3-amino-3-(ethylsulfanyl)prop-2-ene(dithioic acid) (PIN)" the Blue Book;
+        # "sodium propane(dithioate) (PIN)":31569; OPSIN RT exact (TRIAGE.csv;
+        # re-checked in Task 7/8).
+        assert name_compound("CC(=S)S") == "ethane(dithioic acid)"
 
     @pytest.mark.integration
     def test_propanethioic_s_acid(self):

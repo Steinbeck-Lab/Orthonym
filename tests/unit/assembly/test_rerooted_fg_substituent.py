@@ -66,7 +66,54 @@ def test_hetero_root_amino(_best_effort):
 def test_fg_enclose():
     assert _fg_enclose('hydroxy') == 'hydroxy'          # simple stays bare
     assert _fg_enclose('2-hydroxyethyl') == '(2-hydroxyethyl)'   # locant -> enclosed
-    assert _fg_enclose('[x]oxy') == '[x]oxy'            # already enclosed
+    assert _fg_enclose('(2-hydroxyethyl)') == '(2-hydroxyethyl)'  # already enclosed
+    # fix a performance pass: a token that only STARTS with a mark is a compound organyl
+    # and takes its own marks, the Blue Book "Parentheses are
+    # used around compound... and complex... prefixes"; '2-{[(methylsulfanyl)
+    # methyl]sulfanyl}-...':27838; the same two tokens _is_fully_enclosed's own
+    # docstring lists as "still need an OUTER enclosing mark"). The old row here,
+    # '[x]oxy' -> '[x]oxy' "already enclosed", encoded the defect that spelled
+    # -S-S-CH2-S-CH3 '(methylsulfanyl)methylsulfanylsulfanyl'.
+    assert _fg_enclose('(methylsulfanyl)methyl') == '[(methylsulfanyl)methyl]'
+    assert _fg_enclose('(oxan-2-yl)oxy') == '[(oxan-2-yl)oxy]'
+
+
+def _frag(smiles, first):
+    # The fragment is every heavy atom from index ``first`` on; atom ``first``
+    # is the attachment atom and the atoms before it are the parent.
+    m = _mol(smiles)
+    return m, list(range(first, m.GetNumHeavyAtoms())), first
+
+
+@pytest.mark.parametrize("smiles,first,expected", [
+    # ('## Peroxides, disulfides, diselenides, and
+    # ditellurides', the Blue Book), method (1) (:27858): "combining the
+    # prefix name for R' additively with 'peroxy' giving the prefixes 'R'-peroxy'
+    # (not R'-dioxy), 'R'-disulfanyl', 'R'-diselanyl' or 'R'-ditellanyl'" --
+    # '(1) (methyldisulfanyl)methane (PIN)' (:27874).
+    ('CCSSCSC', 2, '[(methylsulfanyl)methyl]disulfanyl'),   # was '(methylsulfanyl)methylsulfanylsulfanyl'
+    ('CCSSC', 2, 'methyldisulfanyl'),                       # was 'methylsulfanylsulfanyl'
+    ('CCOOC', 2, 'methylperoxy'),                           # was 'methoxyoxy'
+    # With no R: 'hydroperoxy', -OOH; 'disulfanyl', -SSH,:28006).
+    ('CCOO', 2, 'hydroperoxy'),                             # was 'hydroxyoxy'
+    ('CCSS', 2, 'disulfanyl'),                              # was 'sulfanylsulfanyl'
+    # Three contiguous S are a parent hydride chain,:39327).
+    ('CCSSSC', 2, 'methyltrisulfanyl'),                     # was 'methylsulfanylsulfanylsulfanyl'
+])
+def test_hetero_root_chalcogen_run_is_one_prefix(_best_effort, smiles, first, expected):
+    m, sub, attach = _frag(smiles, first)
+    assert _located_fg_hetero_root(m, sub, attach) == expected
+
+
+@pytest.mark.opsin_gate
+@pytest.mark.parametrize("smiles,expected", [
+    ('CCOCSSC', '[(methyldisulfanyl)methoxy]ethane'),        # was '[(methylsulfanylsulfanyl)methoxy]ethane'
+])
+def test_hetero_root_chalcogen_run_end_to_end(smiles, expected):
+    from tests.support.rt_assert import assert_full_rt, name_best_effort
+    name = name_best_effort(smiles)['name']
+    assert name == expected
+    assert_full_rt(name, smiles)
 
 
 @pytest.mark.slow

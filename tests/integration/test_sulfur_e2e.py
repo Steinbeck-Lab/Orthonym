@@ -148,12 +148,12 @@ class TestSulfurAdditionalCompounds:
     """Additional E2E tests for sulfur compounds."""
 
     def test_dipropyl_sulfide(self):
-        """CCCSCCC -> 4-thiaheptane (IUPAC replacement nomenclature)"""
-        assert name_compound("CCCSCCC") == "4-thiaheptane"
+        """CCCSCCC -> 1-(propylsulfanyl)propane (was 4-thiaheptane). fix a performance pass: (the Blue Book) needs four heterounits for a skeletal replacement PIN; the ether analog is "methoxyethane (PIN)" (:27745). OPSIN 2.9.0 RT: exact."""
+        assert name_compound("CCCSCCC") == "1-(propylsulfanyl)propane"
 
     def test_dibutyl_sulfide(self):
-        """CCCCSCCCC -> 5-thianonane (IUPAC replacement nomenclature)"""
-        assert name_compound("CCCCSCCCC") == "5-thianonane"
+        """CCCCSCCCC -> 1-(butylsulfanyl)butane (was 5-thianonane). fix a performance pass: (the Blue Book) needs four heterounits for a skeletal replacement PIN; the ether analog is "methoxyethane (PIN)" (:27745). OPSIN 2.9.0 RT: exact."""
+        assert name_compound("CCCCSCCCC") == "1-(butylsulfanyl)butane"
 
     def test_dipropyl_sulfoxide(self):
         """CCCS(=O)CCC -> dipropyl sulfoxide"""
@@ -164,8 +164,8 @@ class TestSulfurAdditionalCompounds:
         assert name_compound("CCCS(=O)(=O)CCC") == "dipropyl sulfone"
 
     def test_butyl_methyl_sulfide(self):
-        """CCCCSC -> 2-thiahexane (IUPAC replacement nomenclature)"""
-        assert name_compound("CCCCSC") == "2-thiahexane"
+        """CCCCSC -> 1-(methylsulfanyl)butane (was 2-thiahexane). fix a performance pass: (the Blue Book) needs four heterounits for a skeletal replacement PIN; the ether analog is "methoxyethane (PIN)" (:27745). OPSIN 2.9.0 RT: exact."""
+        assert name_compound("CCCCSC") == "1-(methylsulfanyl)butane"
 
     def test_butyl_methyl_sulfoxide(self):
         """CCCCS(=O)C -> butyl methyl sulfoxide"""

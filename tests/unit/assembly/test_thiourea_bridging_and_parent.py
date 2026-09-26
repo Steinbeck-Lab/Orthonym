@@ -101,6 +101,7 @@ def test_r3_thiourea_unit_is_not_spelled_twice(namer):
     assert name.count("carbamothioylamino") <= 1, name
 
 
+@pytest.mark.opsin_gate
 def test_r3_abstains_rather_than_emitting_a_wrong_constitution():
     """R3 must produce NO name in production rather than a wrong molecule.
 
@@ -117,13 +118,13 @@ def test_r3_abstains_rather_than_emitting_a_wrong_constitution():
     instead of dropping it.
     """
     from orthonym import Orthonym as _OS
+    # The gate is on through the opsin_gate marker (the supported form; the
+    # hand-rolled save/set/restore it replaced is refused by the ratchet in
+    # tests/unit/test_opsin_gate_test_harness.py -- Task 12 fix a performance pass,
+    # wp6-tests; TRIAGE.md ' outcome').
     import orthonym.namer as _n
-    saved = getattr(_n, "_DISABLE_VALIDITY_GATE", False)
-    _n._DISABLE_VALIDITY_GATE = False
-    try:
-        row = _OS(style="pin").name_tiered(R3_SMILES)
-    finally:
-        _n._DISABLE_VALIDITY_GATE = saved
+    assert _n._DISABLE_VALIDITY_GATE is False
+    row = _OS(style="pin").name_tiered(R3_SMILES)
     # PIN tier spells an abstention as the sentinel + gate_outcome='suppressed';
     # what must never happen is a real name describing a different molecule.
     assert row.get("gate_outcome") == "suppressed", row

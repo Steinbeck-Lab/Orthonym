@@ -39,7 +39,10 @@ LARGE_NEUTRALS = {
     "octadecanoic acid":     ("CCCCCCCCCCCCCCCCCC(=O)O", "octadecanoic acid"),
     "icosan-1-ol":           ("CCCCCCCCCCCCCCCCCCCCO", "icosan-1-ol"),
     "phenanthrene":          ("c1ccc2c(c1)ccc1ccccc12", "phenanthrene"),
-    "pristane":              ("CC(C)CCCC(C)CCCC(C)CCCC(C)C", "pristane"),
+    # 2026-09-26 (wp7) change-asserted-value: 'pristane' is an OPSIN-import trivial
+    # name with no Blue Book PIN evidence (0 BB hits); it left the PIN lookup, and the
+    # substitutive alkane name ships branched alkanes). OPSIN full-InChIKey exact.
+    "pristane":              ("CC(C)CCCC(C)CCCC(C)CCCC(C)C", "2,6,10,14-tetramethylpentadecane"),
     "hexadecan-1-amine":     ("CCCCCCCCCCCCCCCCN", "hexadecan-1-amine"),
 }
 

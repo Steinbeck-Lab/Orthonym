@@ -360,8 +360,9 @@ def orient_heterocycle_with_substituents(
     # numbered by ONE authority carrying the ladder (a)-(f) + a canonical
     # tie-break — heteroatom cascade -> (b) indicated H `:3246` -> (c) suffix
     # `:3256` -> (e) hydro `:3288` -> (f) detachable prefixes `:3300` -> canon.
-    # (g) `:3306` first-cited-prefix is NOT encoded — a KNOWN pre-existing
-    # gap shared with orient's own cascade tail; see risk2-numbering-unification.md.)
+    # (g) `:3306` first-cited-prefix is NOT encoded in the mancude
+    # authorities below — a KNOWN pre-existing gap; see risk2-numbering-unification.md.
+    # The heteroatom cascade further down now carries (g) and (j).)
     # The
     # heteroatom cascade below carried (c)/(f) but NOT the indicated-H (b) or
     # hydro (e) tiers, so it disagreed with the stem builder (which numbers with
@@ -450,19 +451,49 @@ def orient_heterocycle_with_substituents(
         hetero = sorted(loc_map[idx] for idx, _ in heteroatoms if idx != start_idx)
         pg = sorted(loc_map[idx] for idx in pg_set if idx in loc_map)
         sub = sorted(loc_map[idx] for idx in substituent_positions if idx in loc_map)
-        canon = [_canon_rank[a] for a in oriented_r]
-        return (hetero, pg, sub, canon), oriented_r
+        return (hetero, pg, sub), oriented_r
 
-    best_key = None
-    best_oriented = None
+    cands = []
     for start_idx in start_candidates:
         for direction in (1, -1):
             key, oriented_r = _candidate_key(start_idx, direction)
-            if best_key is None or key < best_key:
-                best_key = key
-                best_oriented = oriented_r
+            cands.append((key, oriented_r))
+    best_base = min(key for key, _ in cands)
+    tied = [o for key, o in cands if key == best_base]
 
-    oriented = best_oriented
+    # (g) "lowest locants for the substituent cited first as a prefix"
+    # (the Blue Book), then (j) CIP stereodescriptors (:3346), then the
+    # canonical ranks (determinism only). Before (g)/(j) the canonical ranks
+    # decided every tie, so a meso ring came out as '(3S,5R)-3,5-dimethyl-
+    # piperidine' where (j) gives the lower locant to R: '(3R,5S)-'. (g) is
+    # consulted only when every prefix on the ring can be named; a partial
+    # (g) could order the named prefixes against the rule, so it is skipped
+    # instead, and so is (j): a tie (g) would have broken must not go to (j)
+    # (the canonical ranks decide, as before). Both are also skipped where this
+    # cascade does not model an EARLIER tier -- element seniority among several
+    # heteroatom elements or hydro / indicated hydrogen on a
+    # partially unsaturated ring (b), (d), (e)) -- because there a tie in
+    # (hetero, pg, sub) is not a tie of the Blue Book ladder, and letting (g)
+    # decide it gave '2,5-dichloro-3,6-dioxo-3,6-dihydropyridine' (hydro locants
+    # {3,6}, not the lower {2,5}).
+    prefix_names = (_ring_prefix_names(mol, ring_set, substituent_positions, pg_set)
+                    if len(tied) > 1 and _cascade_models_every_earlier_tier(
+                        mol, ring_list, heteroatoms)
+                    else None)
+    if prefix_names is not None:
+        def _tie_key(oriented_r):
+            loc_map = {atom_idx: pos for pos, atom_idx in enumerate(oriented_r, 1)}
+            g_key = tuple(sorted(
+                (name, loc_map[idx])
+                for idx, names in prefix_names.items() if idx in loc_map
+                for name in names))
+            return (g_key, _ring_cip_locant_key(mol, oriented_r),
+                    [_canon_rank[a] for a in oriented_r])
+
+        tied.sort(key=_tie_key)
+    else:
+        tied.sort(key=lambda o: [_canon_rank[a] for a in o])
+    oriented = tied[0]
 
     atom_to_locant = {atom_idx: locant for locant, atom_idx in enumerate(oriented, 1)}
     return oriented, atom_to_locant
@@ -502,6 +533,127 @@ def get_heteroatom_locants(oriented_ring: List[int], mol) -> List[Tuple[int, str
 # ---------------------------------------------------------------------------
 # Internal helpers
 # ---------------------------------------------------------------------------
+
+
+def _cascade_models_every_earlier_tier(mol, ring_list: List[int], heteroatoms) -> bool:
+    """True when ``orient_heterocycle_with_substituents``' (hetero, pg, sub) key
+    already carries every tier that precedes (g) for this ring, so a tie
+    there is a real tie and (g)/(j) may decide it:
+
+    * the heteroatoms other than the start atom are all ONE element (with two or
+      more elements left, their seniority order,, is not in the key);
+    * the ring is fully saturated (exocyclic double bonds allowed), or fully
+      aromatic with no exocyclic double bond -- no hydro prefix, added or
+      indicated hydrogen can then depend on the numbering (b), (d), (e)).
+    """
+    elements = sorted(sym for _idx, sym in heteroatoms)
+    if not elements:
+        return False
+    from ..data.hw_heteroatoms import get_heteroatom_priority
+    senior = min(elements, key=get_heteroatom_priority)
+    rest = list(elements)
+    rest.remove(senior)
+    if len(set(rest)) > 1:
+        return False
+    ring_set = set(ring_list)
+    n = len(ring_list)
+    ring_bonds = []
+    for k, a in enumerate(ring_list):
+        bond = mol.GetBondBetweenAtoms(a, ring_list[(k + 1) % n])
+        if bond is None:
+            return False
+        ring_bonds.append(bond)
+    if all(b.GetBondType() == Chem.BondType.SINGLE for b in ring_bonds):
+        return True
+    if not all(mol.GetAtomWithIdx(a).GetIsAromatic() for a in ring_list):
+        return False
+    for a in ring_list:
+        for bond in mol.GetAtomWithIdx(a).GetBonds():
+            if (bond.GetOtherAtomIdx(a) not in ring_set
+                    and bond.GetBondType() == Chem.BondType.DOUBLE):
+                return False
+    return True
+
+
+def _ring_prefix_names(mol, ring_set: Set[int], positions, pg_set) -> Optional[Dict[int, List[str]]]:
+    """Alphanumerical sort keys of the prefix(es) on each substituted ring atom.
+
+    For the (g) tier of ``orient_heterocycle_with_substituents``. At a
+    principal-group ring atom a HETEROATOM-rooted branch is the suffix (C-OH,
+    C=O, C-NH2) and is skipped, as in ``cycloalkanes._orient_cycloalkane_with_pg``.
+    Returns ``None`` when any branch cannot be named or loops back into the ring
+    (a bridge), so the caller never ranks a partial set of prefixes; a dict (empty
+    when the ring carries no prefix) when every prefix is named.
+    """
+    try:
+        from ..assembly.naming_utils import alpha_sort_key
+        from ..assembly.substituent_enumerator import name_substituent_for_ordering
+    except Exception:
+        return None
+    names: Dict[int, List[str]] = {}
+    for idx in sorted(positions or ()):
+        if idx not in ring_set:
+            continue
+        lst: List[str] = []
+        for nb in mol.GetAtomWithIdx(idx).GetNeighbors():
+            j = nb.GetIdx()
+            if j in ring_set or nb.GetAtomicNum() <= 1:
+                continue
+            if idx in pg_set and nb.GetAtomicNum() != 6:
+                continue
+            frag = {j}
+            stack = [j]
+            while stack:
+                a = stack.pop()
+                for nn in mol.GetAtomWithIdx(a).GetNeighbors():
+                    k = nn.GetIdx()
+                    if k in ring_set:
+                        if k != idx:
+                            return None  # a bridge back into the ring
+                        if a != j:
+                            return None  # a second bond to the same ring atom
+                        continue
+                    if k not in frag:
+                        frag.add(k)
+                        stack.append(k)
+            nm = name_substituent_for_ordering(mol, sorted(frag), j)
+            if not nm:
+                return None
+            lst.append(alpha_sort_key(nm))
+        names[idx] = lst
+    return names
+
+
+def _ring_cip_locant_key(mol, oriented_r: List[int]) -> tuple:
+    """ (j) key (``naming_utils.cip_locant_rank_key``) of one ring numbering:
+    each ring atom's R/S/r/s and each ring double bond's Z/E at its locant."""
+    if not (any(a.GetChiralTag() != Chem.ChiralType.CHI_UNSPECIFIED
+                for a in mol.GetAtoms())
+            or any(b.GetStereo() != Chem.BondStereo.STEREONONE
+                   for b in mol.GetBonds())):
+        return ()
+    try:
+        from ..assembly.naming_utils import cip_locant_rank_key
+        from ..perception.stereo import assign_stereochemistry
+        assign_stereochemistry(mol)
+        n = len(oriented_r)
+        pos_of = {a: k for k, a in enumerate(oriented_r)}
+        items = []
+        for k, a in enumerate(oriented_r):
+            atom = mol.GetAtomWithIdx(a)
+            if atom.HasProp('_CIPCode'):
+                items.append((k + 1, atom.GetProp('_CIPCode')))
+        for k, a in enumerate(oriented_r):
+            b_idx = oriented_r[(k + 1) % n]
+            bond = mol.GetBondBetweenAtoms(a, b_idx)
+            if (bond is not None and bond.GetBondType() == Chem.BondType.DOUBLE
+                    and bond.HasProp('_CIPCode')):
+                lo, hi = sorted((pos_of[a], pos_of[b_idx]))
+                items.append((n if (lo == 0 and hi == n - 1) else lo + 1,
+                              bond.GetProp('_CIPCode')))
+        return cip_locant_rank_key(items)
+    except Exception:
+        return ()
 
 
 def _rotate_ring(ring_list: List[int], start_pos: int, direction: int) -> List[int]:
@@ -3326,7 +3478,7 @@ def get_heterocycle_substituents(
                         _eth_name = None
                         if _arm:
                             if is_complex_substituent(_arm):
-                                _arm = apply_enclosing_marks(_arm, 0)
+                                _arm = apply_enclosing_marks(_arm, -1)
                             _eth_name = \
                                 f"{_arm}{_ETHER_SUFFIX[_eth_root.GetSymbol()]}"
                     if _eth_name:
@@ -3373,7 +3525,7 @@ def get_heterocycle_substituents(
                             and _n_anchored_substituent_covers(
                                 mol, _sx_name, sub_atoms)):
                         if is_complex_substituent(_sx_name):
-                            _sx_name = apply_enclosing_marks(_sx_name, 0)
+                            _sx_name = apply_enclosing_marks(_sx_name, -1)
                         substituents.setdefault(locant, []).append({
                             'atoms': sub_atoms,
                             'is_on_nitrogen': False,

@@ -81,6 +81,29 @@ CHAIN_TO_ACYLATE = {
 }
 
 
+# "Retained names as preferred IUPAC names" (the Blue Book):
+# "Only the following five carboxylic acids retained names and are also
+# preferred IUPAC names. All can be functionalized..." (:29717): formic acid
+# (PIN):29719, oxalic acid (PIN), acetic acid (PIN):29725, benzoic acid (PIN),
+# oxamic acid (PIN). The list is closed, so this is the whole table, keyed by
+# the RDKit canonical SMILES of the UNSUBSTITUTED acid. An ester is a
+# functionalization: its anion word comes from this PIN ('ethyl acetate (PIN)'
+#:31667; 'methylene acetate formate (PIN)':31840), never from the systematic
+# 'ethanoic'/'methanoic' stem a composer builds for the bare acid.
+RETAINED_PIN_CARBOXYLIC_ACIDS = {
+    "O=CO": "formic acid",
+    "O=C(O)C(=O)O": "oxalic acid",
+    "CC(=O)O": "acetic acid",
+    "O=C(O)c1ccccc1": "benzoic acid",
+    "NC(=O)C(=O)O": "oxamic acid",
+}
+
+
+def retained_pin_carboxylic_acid(canonical_smiles: str):
+    """The retained PIN for an EXACT unsubstituted acid, else None."""
+    return RETAINED_PIN_CARBOXYLIC_ACIDS.get(canonical_smiles)
+
+
 def get_acylate_name(acid_name: str) -> str:
     """
     Convert an acid name to its acylate (ester suffix) form.

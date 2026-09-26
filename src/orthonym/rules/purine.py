@@ -389,7 +389,7 @@ def name_purine_substituent(mol, frag_atoms, attach_idx) -> Optional[str]:
         # `base` always ends in the bare parent hydride "...purine". If a
         # future guard edit ever lets a suffix leak through anyway, fail
         # closed here rather than string-surger a truncated name.
-        if not base.endswith("purine"):
+        if not base or not base.endswith("purine"):
             return None  # a suffix leaked (guard drift) -> fail closed, never string-surger
         # base is e.g. "6-amino-9H-purine"; convert to "6-amino-9H-purin-9-yl".
         stem = base[:-1] if base.endswith('e') else base

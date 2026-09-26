@@ -129,7 +129,7 @@ class TestVonBaeyerByteIdenticalRegression:
     """
 
     CASES = [
-        ("C1CC2CCC1C2", "norbornane"),
+        ("C1CC2CCC1C2", "bicyclo[2.2.1]heptane"),  # R11 (2026-09-25, pre-existing-failures plan, Task 5)::9881, only adamantane/cubane are retained; "bicyclo[2.2.1]heptane (PIN)":2038
         (
             "OC(=O)C1N2C(=O)CC2SC1(C)C",
             "3,3-dimethyl-7-oxo-4-thia-1-azabicyclo[3.2.0]heptane-2-carboxylic acid",

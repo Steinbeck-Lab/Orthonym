@@ -26,10 +26,16 @@ class TestSpiroSubstituents:
 
     @pytest.mark.integration
     def test_spiro_hydroxy(self):
-        """Hydroxy-substituted spiro -- OH should appear as hydroxy prefix."""
+        """Hydroxy-substituted spiro -- the OH is the principal characteristic
+        group, so it is cited as the suffix '-ol', not as a 'hydroxy' prefix.
+
+        Task 12 fix a performance pass (wp6-tests), change-asserted-value (was: 'hydroxy' in
+        the name). 'Systematic names of alcohols, phenols, enols, and
+        ynols' (the Blue Book): "(1) substitutively, using the suffix 'ol'
+        ... Method (1) generates preferred IUPAC names" (:26834); parent
+        'spiro[4.4]nonane (PIN)' (:9973). OPSIN 2.9.0 full-InChIKey exact."""
         result = name_compound('OC1CCC2(CCCC2)C1')
-        assert 'hydroxy' in result, f"hydroxy missing from spiro: {result}"
-        assert 'spiro' in result, f"spiro missing: {result}"
+        assert result == 'spiro[4.4]nonan-2-ol', result
 
     @pytest.mark.integration
     def test_spiro_dimethyl(self):
@@ -125,7 +131,7 @@ class TestRegressionSuite:
     @pytest.mark.parametrize("smiles,expected_fragment", [
         ('C1CCC2(CC1)CCCC2', 'spiro'),           # plain spiro
         ('c1ccc2[nH]ccc2c1', 'indole'),           # plain indole
-        ('C1CC2CCC1C2', 'norbornan'),              # norbornane (retained name)
+        ('C1CC2CCC1C2', 'bicyclo[2.2.1]heptan'),   # R11 (2026-09-25, pre-existing-failures plan, Task 5)::9881, only adamantane/cubane are retained; "bicyclo[2.2.1]heptane (PIN)":2038
         ('C1CCC2CCCCC2C1', ''),                   # decalin (any name ok)
     ])
     def test_plain_ring_systems_unchanged(self, smiles, expected_fragment):

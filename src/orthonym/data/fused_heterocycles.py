@@ -60,6 +60,22 @@ FUSED_HETEROCYCLE_DATA: Dict[str, Dict[str, Any]] = {
         'parent_atoms': 9,
         'iupac_locants': {0: 5, 1: 6, 2: 7, 3: '7a', 4: 1, 5: 2, 6: 3, 7: '3a', 8: 4},
     },
+    # 1H-isoindole: the indicated-hydrogen tautomer that carries a suffix at C1.
+    # (the Blue Book) names "1H-isoindole" among the retained
+    # mancude parents, and (b) moves indicated hydrogen "to accommodate a
+    # substituent suffix", so the phthalimide skeleton is "1H-isoindole-1,3(2H)-
+    # dione", e.g. "2-phenyl-1H-isoindole-1,3(2H)-dione (PIN)" (:33853). Without
+    # this tautomer entry the added-indicated-hydrogen ketone engine had only
+    # 2H-isoindole (indicated H on N2, where no carbonyl can sit) and declined.
+    # Numbering C1 (CH2), N2, C3, C3a, C4-C7, C7a; OPSIN reads '1H-isoindole' as
+    # C1N=CC2=CC=CC=C12 (this key).
+    'C1=NCc2ccccc21': {
+        'name': '1H-isoindole',
+        'tautomer_locant': 1,
+        'ring_system': 'benzo-5-membered',
+        'parent_atoms': 9,
+        'iupac_locants': {2: 1, 1: 2, 0: 3, 8: '3a', 7: 4, 6: 5, 5: 6, 4: 7, 3: '7a'},
+    },
     # 3H-indole
     'C1=Nc2ccccc2C1': {
         'name': '3H-indole',
@@ -140,11 +156,17 @@ FUSED_HETEROCYCLE_DATA: Dict[str, Dict[str, Any]] = {
         'parent_atoms': 9,
         'iupac_locants': {0: 5, 1: 6, 2: 7, 3: '7a', 4: 1, 5: 2, 6: 3, 7: '3a', 8: 4},
     },
-    # [1,3,2]benzodioxathiole (spiro-component form; the ring S is the spiro
-    # atom, cited with a λ token in the spiro PIN —. Canonical key uses
-    # the λ4 [SH2] valence as it appears in the extracted spiro component.
+    # [1,3,2]benzodioxathiole: the DIVALENT-sulfur parent ring, which is what the
+    # name denotes (OPSIN reads it as c1ccc2c(c1)OSO2). It is also the component
+    # of the λ spiro PINs: cites the nonstandard bonding number in front
+    # of the spiro locant ('2λ4,2'-spirobi[[1,3,2]benzodioxathiole]', BB rows in
+    # rings_numbering.json), so the component name itself stays the standard-
+    # valence parent. The key used to be the λ4 form 'c1ccc2c(c1)O[SH2]O2', which
+    # mapped a λ4 key to a name OPSIN reads as divalent S (a different molecule;
+    # test_fused_het_data_integrity, TRIAGE row 126). The substructure matcher
+    # ignores hydrogen counts, so the λ spiro component still matches this row.
     # OPSIN numbering: O1, S2, O3, C3a, C4-C7, C7a (verified via -o extendedsmi).
-    'c1ccc2c(c1)O[SH2]O2': {
+    'c1ccc2c(c1)OSO2': {
         'name': '[1,3,2]benzodioxathiole',
         'tautomer_locant': None,
         'ring_system': 'benzo-5-membered',
@@ -230,6 +252,26 @@ FUSED_HETEROCYCLE_DATA: Dict[str, Dict[str, Any]] = {
         'ring_system': 'naphthyridine',
         'parent_atoms': 10,
         'iupac_locants': {0: 3, 1: 2, 2: 1, 3: '8a', 4: 8, 5: 7, 6: 6, 7: 5, 8: '4a', 9: 4},
+    },
+    # row (11) (the Blue Book-11563): "naphthyridine
+    # (1,5-isomer shown; the PIN is 1,5-naphthyridine; other isomers are 1,6-;
+    # 1,7-; 1,8-; 2,6-; 2,7-)". Without these two entries the algorithmic fusion
+    # path named them 'pyrido[2,3-b]pyridine' / 'pyrido[4,3-c]pyridine'.
+    # 1,8-naphthyridine
+    'c1cnc2ncccc2c1': {
+        'name': '1,8-naphthyridine',
+        'tautomer_locant': None,
+        'ring_system': 'naphthyridine',
+        'parent_atoms': 10,
+        'iupac_locants': {0: 3, 1: 2, 2: 1, 3: '8a', 4: 8, 5: 7, 6: 6, 7: 5, 8: '4a', 9: 4},
+    },
+    # 2,6-naphthyridine
+    'c1cc2cnccc2cn1': {
+        'name': '2,6-naphthyridine',
+        'tautomer_locant': None,
+        'ring_system': 'naphthyridine',
+        'parent_atoms': 10,
+        'iupac_locants': {0: 3, 1: 4, 2: '4a', 3: 5, 4: 6, 5: 7, 6: 8, 7: '8a', 8: 1, 9: 2},
     },
     # 9H-carbazole
     'c1ccc2c(c1)[nH]c1ccccc12': {
@@ -1021,13 +1063,16 @@ FUSED_HETEROCYCLE_DATA: Dict[str, Dict[str, Any]] = {
         'parent_atoms': 13,
         'iupac_locants': {0: 7, 1: 6, 2: 5, 3: '4b', 4: '8a', 5: 8, 6: 9, 7: '9a', 8: 1, 9: 2, 10: 3, 11: 4, 12: '4a'},
     },
-    # acridone
+    # acridone. (the Blue Book) acridine keeps its traditional
+    # numbering: C9 between C8a and C9a, N10 between C4a and C10a. The map had
+    # both benzo rings reflected (the atoms next to C9 labelled 4a/10a, those
+    # next to N10 labelled 9a/8a), so a C4 substituent read as C1.
     'O=c1c2ccccc2[nH]c2ccccc12': {
         'name': 'acridone',
         'tautomer_locant': 10,
         'ring_system': 'tricyclic',
         'parent_atoms': 15,
-        'iupac_locants': {0: '=O', 1: 9, 2: '4a', 3: 4, 4: 3, 5: 2, 6: 1, 7: '9a', 8: 10, 9: '8a', 10: 8, 11: 7, 12: 6, 13: 5, 14: '10a'},
+        'iupac_locants': {0: '=O', 1: 9, 2: '9a', 3: 1, 4: 2, 5: 3, 6: 4, 7: '4a', 8: 10, 9: '10a', 10: 5, 11: 6, 12: 7, 13: 8, 14: '8a'},
         'is_retained_name': True,
     },
     # dibenzofuran
@@ -1114,6 +1159,7 @@ FUSED_HETEROCYCLE_DATA: Dict[str, Dict[str, Any]] = {
     # quinolizidine
     'C1CCN2CCCCC2C1': {
         'name': 'quinolizidine',
+        'non_pin': True,  # not a Blue Book name; see _build_core_result
         'tautomer_locant': None,
         'ring_system': 'bridgehead',
         'parent_atoms': 10,
@@ -1133,7 +1179,10 @@ FUSED_HETEROCYCLE_DATA: Dict[str, Dict[str, Any]] = {
         'tautomer_locant': None,
         'ring_system': 'tricyclic',
         'parent_atoms': 15,
-        'iupac_locants': {0: '=O', 1: 9, 2: '9a', 3: 1, 4: 2, 5: 3, 6: 4, 7: '4a', 8: '10a', 9: '4b', 10: 5, 11: 6, 12: 7, 13: 8, 14: '8a'},
+        # the ring chalcogen is position 10, flanked by C4a and C10a,
+        #:12493, traditional xanthene numbering); it was labelled '10a' and its
+        # fusion neighbour '4b'
+        'iupac_locants': {0: '=O', 1: 9, 2: '9a', 3: 1, 4: 2, 5: 3, 6: 4, 7: '4a', 8: 10, 9: '10a', 10: 5, 11: 6, 12: 7, 13: 8, 14: '8a'},
         'is_retained_name': True,
     },
     # thioxanthone
@@ -1142,7 +1191,10 @@ FUSED_HETEROCYCLE_DATA: Dict[str, Dict[str, Any]] = {
         'tautomer_locant': None,
         'ring_system': 'tricyclic',
         'parent_atoms': 15,
-        'iupac_locants': {0: '=O', 1: 9, 2: '9a', 3: 1, 4: 2, 5: 3, 6: 4, 7: '4a', 8: '10a', 9: '4b', 10: 5, 11: 6, 12: 7, 13: 8, 14: '8a'},
+        # the ring chalcogen is position 10, flanked by C4a and C10a,
+        #:12493, traditional xanthene numbering); it was labelled '10a' and its
+        # fusion neighbour '4b'
+        'iupac_locants': {0: '=O', 1: 9, 2: '9a', 3: 1, 4: 2, 5: 3, 6: 4, 7: '4a', 8: 10, 9: '10a', 10: 5, 11: 6, 12: 7, 13: 8, 14: '8a'},
         'is_retained_name': True,
     },
     # 1,10-phenanthroline
@@ -1743,6 +1795,7 @@ FUSED_HETEROCYCLE_DATA: Dict[str, Dict[str, Any]] = {
     # pyrrolizidine
     'C1CC2CCCN2C1': {
         'name': 'pyrrolizidine',
+        'non_pin': True,  # not a Blue Book name; see _build_core_result
         'tautomer_locant': None,
         'ring_system': 'bridgehead',
         'parent_atoms': 8,
@@ -1751,6 +1804,7 @@ FUSED_HETEROCYCLE_DATA: Dict[str, Dict[str, Any]] = {
     # indolizidine
     'C1CCN2CCCC2C1': {
         'name': 'indolizidine',
+        'non_pin': True,  # not a Blue Book name; see _build_core_result
         'tautomer_locant': None,
         'ring_system': 'bridgehead',
         'parent_atoms': 9,
@@ -1768,9 +1822,12 @@ FUSED_HETEROCYCLE_DATA: Dict[str, Dict[str, Any]] = {
         'parent_atoms': 14,
         'iupac_locants': {0: 3, 1: 2, 2: 1, 3: '10a', 4: '4a', 5: 4, 6: 10, 7: '5a', 8: 6, 9: 7, 10: 8, 11: 9, 12: '9a', 13: 5},
     },
-    # benzofuro[3,2-b]pyridine
+    # [1]benzofuro[3,2-b]pyridine. (the Blue Book): "Locants
+    # that describe structural features of components, such as positions of
+    # heteroatoms, are kept with the name of the component and are enclosed
+    # within square brackets" -- '[1]benzopyrano[2,3-c]pyrrole (PIN)' (:12157).
     'c1ccc2c(c1)oc1cccnc12': {
-        'name': 'benzofuro[3,2-b]pyridine',
+        'name': '[1]benzofuro[3,2-b]pyridine',
         'tautomer_locant': None,
         'ring_system': 'tricyclic',
         'parent_atoms': 13,
@@ -2975,6 +3032,45 @@ def _select_lowest_locant_match(mol, matches, iupac_locants):
     return best if best is not None else matches[0]
 
 
+def core_numberings(
+    mol: Chem.Mol, core_smiles: str, atom_mapping: Dict[int, Union[int, str]]
+) -> List[Tuple[List[int], Dict[int, Union[int, str]], str]]:
+    """Every established numbering of an already-matched catalog core, over the
+    SAME molecule atoms: ``[(match, atom_mapping, core_name),...]``.
+
+    ``match_fused_heterocycle_core`` picks one automorphism by the substituent
+    locant set and the alphanumerical tier (``_select_lowest_locant_match``); it
+    cannot see which exocyclic group will be the principal characteristic group,
+    so a caller that knows that (c), suffixes before prefixes) re-selects
+    among these. Each core name is re-checked with
+    ``_correct_indicated_h_tautomer`` for its numbering; a numbering it rejects is
+    left out. Empty for an unknown core.
+    """
+    _build_pattern_index()
+    rec = _REC_BY_SMILES.get(core_smiles)
+    if rec is None or not atom_mapping:
+        return []
+    atom_set = set(atom_mapping)
+    out = []
+    for match in mol.GetSubstructMatches(rec.pattern, uniquify=False, maxMatches=64):
+        if set(match) != atom_set:
+            continue
+        res = _build_core_result(rec.name, list(match), core_smiles)
+        if res is None:
+            continue
+        name = _correct_indicated_h_tautomer(mol, res[0], res[1])
+        if name is None:
+            continue
+        out.append((list(match), res[1], name))
+    return out
+
+
+def select_lowest_locant_match(mol, matches, core_smiles: str):
+    """Public entry to ``_select_lowest_locant_match`` for one catalog core."""
+    iul = FUSED_HETEROCYCLE_DATA[core_smiles].get('iupac_locants') or {}
+    return _select_lowest_locant_match(mol, matches, iul)
+
+
 def _build_core_result(
     name: str, match_atoms: List[int], core_smiles: str
 ) -> Optional[Tuple[str, Dict[int, Union[int, str]], str]]:
@@ -2985,6 +3081,19 @@ def _build_core_result(
     of the original implementation.
     """
     data = FUSED_HETEROCYCLE_DATA[core_smiles]
+
+    if data.get('non_pin'):
+        # 'quinolizidine', 'pyrrolizidine', 'indolizidine': 0 hits in the Blue Book. The
+        # parents are quinolizine (the Blue Book-11584, 'the PIN is 4H-quinolizine'),
+        # pyrrolizine (the Blue Book, 'the PIN is 1H-pyrrolizine') and indolizine (the Blue Book),
+        # and saturated compounds take 'hydro' prefixes, the Blue Book;
+        # '(3aR,7aS)-octahydro-1H-indole (PIN)' the Blue Book). The PIN forms (octahydro-2H-
+        # quinolizine,...) are not built here, so a name that carries the catalog
+        # name is labelled below pin_verified (name-scoped provenance record). The
+        # record drops the final 'e', which elides before a vowel suffix
+        # ('quinolizidin-1-yl', 'quinolizidin-1-one').
+        from ..metrics.provenance import record_non_pin_fragment
+        record_non_pin_fragment(name[:-1] if name.endswith('e') else name)
 
     # Get pre-computed IUPAC locant mapping
     iupac_locants = data.get('iupac_locants')

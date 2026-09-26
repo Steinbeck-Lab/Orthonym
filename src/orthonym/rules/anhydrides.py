@@ -170,6 +170,19 @@ def name_anhydride(features) -> Optional[str]:
         )
         if extra_ring_hetero:
             return None
+        # '{diacid} anhydride' names the ring carbons as an unbranched saturated
+        # chain and nothing else: a ring C=C / aromatic bond or any substituent on the
+        # ring would be dropped (a different molecule). Decline those instead.
+        heavy = {a.GetIdx() for a in mol.GetAtoms() if a.GetAtomicNum() > 1}
+        carbonyl_os = {nb.GetIdx() for c in (c1_idx, c2_idx)
+                       for nb in mol.GetAtomWithIdx(c).GetNeighbors()
+                       if nb.GetIdx() not in ring_set}
+        ring_unsaturated = any(
+            (b.GetIsAromatic() or b.GetBondType() == Chem.BondType.DOUBLE)
+            for b in mol.GetBonds()
+            if b.GetBeginAtomIdx() in ring_set and b.GetEndAtomIdx() in ring_set)
+        if ring_unsaturated or heavy != (ring_set | carbonyl_os):
+            return None
         return _name_cyclic_anhydride(total_chain_length)
 
     # W3-P06 Task 3: the diacyl halide of dicarbonic acid,
@@ -1172,6 +1185,20 @@ def _name_cyclic_anhydride_dione(mol, c1: int, c2: int, bridge_o: int, ring) -> 
     rn = get_retained_name(Chem.MolToSmiles(mol))
     if rn and rn.endswith("dione"):
         return rn
+
+    # (a2) A SUBSTITUTED mancude / unsaturated anhydride ring (bromomaleic, methyl-
+    # maleic, dichloromaleic anhydride) has no retained entry; the cyclic-oxo engine
+    # builds its dione PIN: '3-bromofuran-2,5-dione (PIN) bromomaleic anhydride'
+    # (the Blue Book), next to 'furan-2,5-dione (PIN) maleic anhydride' (:32490).
+    # (Before, this fell through to the method (2) '{diacid} anhydride', which drops
+    # the ring C=C and the substituent: 'butanedioic anhydride', a different molecule
+    # that the validity gate had to reject.)
+    ring_set = set(ring)
+    if any((b.GetIsAromatic() or b.GetBondType() == Chem.BondType.DOUBLE)
+           for b in mol.GetBonds()
+           if b.GetBeginAtomIdx() in ring_set and b.GetEndAtomIdx() in ring_set):
+        from .partial_saturation import name_cyclic_oxo_compound
+        return name_cyclic_oxo_compound(mol)
 
     # (b) Saturated monocyclic oxa-heterocycle dione (succinic/glutaric/...).
     return _name_saturated_oxa_dione(mol, c1, c2, bridge_o, ring)

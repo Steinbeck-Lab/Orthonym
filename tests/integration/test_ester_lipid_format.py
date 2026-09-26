@@ -92,33 +92,59 @@ class TestPolyfunctionalEsterDemotion:
     """: Esters demoted to acyloxy prefixes in polyfunctional compounds."""
 
     def test_glycerol_diacetate_no_dioate(self):
-        """Glycerol diacetate: acyloxy prefix + -ol suffix, NOT -dioate."""
+        """Glycerol diacetate: a diyl diacetate ester, NOT '-dioate' and NOT an '-ol' name."""
         result = name_compound("CC(=O)OCC(O)COC(=O)C")
         assert result is not None
         assert "oate" not in result, f"Got '-oate' suffix in polyfunctional ester: {result}"
-        assert "ol" in result, f"Expected '-ol' suffix for alcohol principal group: {result}"
+        # PIN per R5: "SENIORITY ORDER FOR CLASSES" (the Blue Book) ranks "9 Esters"
+        # (:18182) above "17 Hydroxy compounds" (:18190), so the ester is the principal class,
+        # not an acyloxy prefix; "When anions are identical functional class
+        # multiplicative nomenclature is used." (:31819); "ethane-1,2-diyl diacetate (PIN)"
+        # (:31823), "propane-1,2,3-triyl triacetate (PIN)" (:31827). OPSIN RT exact
+        # (TRIAGE.csv; re-checked in Task 7/8).
+        assert result == "2-hydroxypropane-1,3-diyl diacetate", result
 
     def test_glycerol_diacetate_has_acyloxy(self):
-        """Glycerol diacetate should contain acyloxy prefix."""
+        """Glycerol diacetate: the esters are the principal class, not acyloxy prefixes."""
         result = name_compound("CC(=O)OCC(O)COC(=O)C")
-        assert "acetyloxy" in result or "ethanoyloxy" in result
+        # PIN per R5: "SENIORITY ORDER FOR CLASSES" (the Blue Book) ranks "9 Esters"
+        # (:18182) above "17 Hydroxy compounds" (:18190), so the ester is the principal class,
+        # not an acyloxy prefix; "When anions are identical functional class
+        # multiplicative nomenclature is used." (:31819); "ethane-1,2-diyl diacetate (PIN)"
+        # (:31823), "propane-1,2,3-triyl triacetate (PIN)" (:31827). OPSIN RT exact
+        # (TRIAGE.csv; re-checked in Task 7/8).
+        assert result == "2-hydroxypropane-1,3-diyl diacetate", result
+
+    # 2026-09-25 (pre-existing-failures plan, Task 5, TRIAGE rows 10/11)
+    # change-asserted-value. The old premise ('-ol' suffix, both acids as acyloxy
+    # prefixes) is not a Blue Book name: the ester is the principal class,
+    # the Blue Book "9 Esters" above:18190 "17 Hydroxy compounds") and a
+    # polyester of one 'alcoholic' component with different anions is named by
+    # (:31831) "When anions are different, two methods are used";
+    # "Method (1) generates preferred IUPAC names but names formed by using method
+    # (2) are acceptable in general nomenclature" (:31836). The method (1) PIN,
+    # '(2S)-2-hydroxypropane-1,3-diyl 1-decanoate 3-docosanoate', cannot be verified
+    # (OPSIN 2.9.0 does not parse it), so it is not shipped (named blocker); the
+    # method (2) name ships, round-trip exact, at the general tier -- never as
+    # pin_verified. The senior anion is the longer chain.
+    DIGLYCERIDE = "CCCCCCCCCCCCCCCCCCCCCC(=O)OC[C@@H](O)COC(=O)CCCCCCCCC"
+    DIGLYCERIDE_METHOD_2 = "(2S)-3-(decanoyloxy)-2-hydroxypropyl docosanoate"
 
     def test_diglyceride_mixed_acids(self):
-        """Mixed-acid diglyceride: two different acyloxy + -ol suffix."""
-        result = name_compound(
-            "CCCCCCCCCCCCCCCCCCCCCC(=O)OC[C@@H](O)COC(=O)CCCCCCCCC"
-        )
-        assert result is not None
-        assert "oate" not in result, f"Got '-oate' suffix: {result}"
-        assert "ol" in result, f"Expected '-ol' suffix: {result}"
+        """Mixed-acid diglyceride: functional class ester, method (2) of."""
+        from orthonym import Orthonym
+        from tests.support.rt_assert import name_is_rt_exact
+        res = Orthonym(style="pin").name_tiered(self.DIGLYCERIDE)
+        assert res["name"] == self.DIGLYCERIDE_METHOD_2
+        assert name_is_rt_exact(res["name"], self.DIGLYCERIDE)
+        assert res["tier"] != "pin_verified", res
 
     def test_diglyceride_has_acyloxy_prefixes(self):
-        """Mixed-acid diglyceride should have acyloxy prefixes for both acids."""
-        result = name_compound(
-            "CCCCCCCCCCCCCCCCCCCCCC(=O)OC[C@@H](O)COC(=O)CCCCCCCCC"
-        )
+        """Method (2): the junior ester is an acyloxy prefix of the organyl, the
+        senior one the anion."""
+        result = name_compound(self.DIGLYCERIDE)
         assert "decanoyloxy" in result
-        assert "docosanoyloxy" in result
+        assert result.endswith(" docosanoate"), result
 
     def test_monoglyceride_no_oate(self):
         """Monoglyceride: one acyloxy, NOT -oate suffix."""
@@ -139,16 +165,26 @@ class TestPolyfunctionalEsterDemotion:
         assert name_compound("CCCOC(C)=O") == "propyl acetate"
 
     def test_ester_plus_amine(self):
-        """Ester + amine: ester becomes acyloxy prefix, amine becomes suffix."""
+        """Ester + amine: the ester is senior, named by functional class."""
+        # PIN per R5: "SENIORITY ORDER FOR CLASSES" (the Blue Book) ranks
+        # "9 Esters" (:18182) above "17 Hydroxy compounds" (:18190) and "19 Amines"
+        # (:18192), so the ester is the principal characteristic group, named by
+        # functional class, e.g. "2-hydroxypropyl (2-aminoethyl)carbamate (PIN)" (:30766);
+        # "acetic acid (PIN)" (:29725) gives the anion word, "ethyl acetate
+        # (PIN)" (:31667). OPSIN RT exact (TRIAGE rows 12-13).
         result = name_compound("CC(=O)OCC(N)C")
-        assert result is not None
-        assert "oate" not in result
+        assert result == "2-aminopropyl acetate"
 
-    def test_ester_plus_alcohol_produces_ol(self):
-        """Ester + alcohol: alcohol becomes -ol suffix."""
+    def test_ester_plus_alcohol_is_hydroxyalkyl_ester(self):
+        """Ester + alcohol: the ester is senior; the OH is a hydroxy prefix."""
+        # PIN per R5: "SENIORITY ORDER FOR CLASSES" (the Blue Book) ranks
+        # "9 Esters" (:18182) above "17 Hydroxy compounds" (:18190) and "19 Amines"
+        # (:18192), so the ester is the principal characteristic group, named by
+        # functional class, e.g. "2-hydroxypropyl (2-aminoethyl)carbamate (PIN)" (:30766);
+        # "acetic acid (PIN)" (:29725) gives the anion word, "ethyl acetate
+        # (PIN)" (:31667). OPSIN RT exact (TRIAGE rows 12-13).
         result = name_compound("CC(=O)OCCO")
-        assert result is not None
-        assert "ol" in result
+        assert result == "2-hydroxyethyl acetate"
 
 
 # ===========================================================================
@@ -238,12 +274,17 @@ class TestEsterOPSINRoundTrip:
         assert "(propanoyloxy)" in name
 
     def test_format_diacetate_has_multiplier(self):
-        """Glycerol diacetate uses complex multiplier prefix bis per IUPAC."""
+        """Glycerol diacetate: the multiplied anion takes 'di'."""
         name = name_compound("CC(=O)OCC(O)COC(=O)C")
         assert name is not None
-        assert "bis" in name or "di" in name, f"Expected multiplier in '{name}'"
-        assert "acetyloxy" in name
-        assert "ol" in name
+        # PIN per R5: "SENIORITY ORDER FOR CLASSES" (the Blue Book) ranks "9 Esters"
+        # (:18182) above "17 Hydroxy compounds" (:18190), so the ester is the principal class,
+        # not an acyloxy prefix; "When anions are identical functional class
+        # multiplicative nomenclature is used." (:31819); "ethane-1,2-diyl diacetate (PIN)"
+        # (:31823), "propane-1,2,3-triyl triacetate (PIN)" (:31827). OPSIN RT exact
+        # (TRIAGE.csv; re-checked in Task 7/8). (:31819): "Multiplicative prefixes 'di', 'tri', etc.
+        # are used when anions are unsubstituted".
+        assert name == "2-hydroxypropane-1,3-diyl diacetate", name
 
 
 # ===========================================================================

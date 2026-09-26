@@ -403,7 +403,27 @@ assert _RT_BREADTH_GAPS <= {p.id for p in DEPTH_LIMIT_COMPOUNDS}, (
 # asserts the tier contract (tests/support/rt_assert.py), gate ON: best-effort
 # '(1R,3S,5S,9R,16S)-3,16-dihydroxy-1,5-dimethyl-13-oxapentacyclo[10.6.1.
 # 0^2,10.0^5,9.0^15,19]nonadeca-2(10),12(19),14-triene-6,11-dione', RT-exact.
-_TIER_CONTRACT_IDS = {"018_steroid_furanone"}
+#
+# Task 12 fix a performance pass (wp6-tests; t12-research rest-of-suite items 26 and 27), the same
+# tier contract for five more rows, re-checked in a fresh process (raw gate-off, PIN
+# tier gate-on, best-effort; OPSIN 2.9.0 batch outside the engine, all best-effort
+# names full-InChIKey exact):
+# 002_penicillin_like, 003_terpene_dioxolane, 005_steroid_polyol, 012_biaryl_ether:
+# D-abstain, pre-existing at 4e0e5c29b -- raw and PIN tier give the whole failure
+# sentinel, best-effort names them (002 systematic_verified, 003/012
+# pin_unverified, 005 best_effort). A sentinel is never accepted as a value
+# (TRIAGE.md 'Exit criteria').
+# 021_udp_sugar: new failure on this branch. At base the raw producer glued two
+# fragment names with a blank ("2-acetamido-2-deoxy-D-galactopyranose uridine
+# 5'-(trihydrogen diphosphate)"), which OPSIN reads as a two-component mixture, a
+# different molecule (self-consistency also rejected it). 16f45443a (Task 3:
+# "never splice a failure sentinel or loose fragments into an emitted name") made
+# the glue decline on purpose (archive bisect over the src commits). The base pass
+# was a pass on a wrong name and is not restored; best-effort (systematic_verified)
+# is RT-exact. Stereo row m22 of test_stereo_benchmark.py is the same SMILES.
+_TIER_CONTRACT_IDS = {"018_steroid_furanone", "002_penicillin_like",
+                      "003_terpene_dioxolane", "005_steroid_polyol", "012_biaryl_ether",
+                      "021_udp_sugar"}
 _TIER_CONTRACT_SMILES = {p.values[0] for p in DEPTH_LIMIT_COMPOUNDS
                          if p.id in _TIER_CONTRACT_IDS}
 assert len(_TIER_CONTRACT_SMILES) == len(_TIER_CONTRACT_IDS)

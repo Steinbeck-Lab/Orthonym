@@ -147,7 +147,9 @@ def test_bare_substituted_methylidene_leak_rejected():
     ("CCCCCCCCCCCCOS(=O)(=O)[O-]", "dodecyl sulfate"),
     ("C[N+]1=CC=CC=C1", "1-methylpyridin-1-ium"),
     ("CC(S)=NOS(=O)(=O)[O-]", "[(1-sulfanylethylidene)amino] sulfate"),
-    ("C[N+](C)(C)CCCCCC[N+](C)(C)C", "hexane-1,6-diylbis(trimethylazanium)"),
+    # / substitutive '-bis(aminium)' PIN (the Blue Book,:42366)
+    ("C[N+](C)(C)CCCCCC[N+](C)(C)C",
+     "N1,N1,N1,N6,N6,N6-hexamethylhexane-1,6-bis(aminium)"),
     ("[O-]C(=O)CCC(=O)[O-]", "butanedioate"),
 ])
 def test_seven_regressions_unchanged(namer, smi, expected):

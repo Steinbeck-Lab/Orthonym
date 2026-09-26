@@ -33,7 +33,8 @@ class TestClaimedAtomMask:
         ("O=C=NCCCCCCCC(=O)O", "8-isocyanatooctanoic acid"),
         ("S=C=NCCCCCCCC(=O)O", "8-isothiocyanatooctanoic acid"),
         ("[C-]#[N+]CCCCCCCC(=O)O", "8-isocyanooctanoic acid"),
-        ("NC(=N)NCCCC(=O)O", "4-guanidinobutanoic acid"),
+        # (the Blue Book-34268): 'carbamimidoylamino (preferred prefix)'; 7. Prefixes (g) (:1700) 'guanidino' is no longer acceptable in PINs
+        ("NC(=N)NCCCC(=O)O", "4-(carbamimidoylamino)butanoic acid"),
     ])
     def test_fg_prefix_alone_no_phantom(self, smiles, expected):
         assert name_compound(smiles) == expected

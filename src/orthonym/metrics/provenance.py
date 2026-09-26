@@ -163,6 +163,11 @@ full_coverage_ctx = contextvars.ContextVar(
 # only be produced by the GENERAL tier -- see ``record_general_ring_prefix``.
 _GENERAL_RING_PREFIX = contextvars.ContextVar(
     "orthonym_prov_general_ring_prefix", default=False)
+# Name fragments a producer built that are valid but never part of a PIN -- see
+# ``record_non_pin_fragment``. A tuple (ordered, duplicate-free); it only grows
+# during a naming call and resets with the rest of the provenance.
+_NON_PIN_FRAGMENTS = contextvars.ContextVar(
+    "orthonym_prov_non_pin_fragments", default=())
 # T1: the validity gate's per-name outcome, and the name string it was
 # recorded FOR. Defaults fail closed (NOT_RUN / no name).
 _GATE_OUTCOME = contextvars.ContextVar(
@@ -217,7 +222,8 @@ def pop_touched_log() -> set:
 
 def clear_provenance() -> None:
     _touch("source", "opsin", "stereo_unexpressed", "gate_outcome",
-           "gate_outcome_name", "general_ring_prefix", "suffix_free_prefix_name")
+           "gate_outcome_name", "general_ring_prefix", "suffix_free_prefix_name",
+           "non_pin_fragments")
     _SOURCE.set(None)
     _OPSIN.set(None)
     _STEREO_UNEXPRESSED.set(False)
@@ -231,6 +237,7 @@ def clear_provenance() -> None:
     #: same reason again -- a suffix-free flag left from the previous
     # molecule would tag this one's name as ill-formed when it is not.
     _SUFFIX_FREE_PREFIX_NAME.set(False)
+    _NON_PIN_FRAGMENTS.set(())
 
 
 def restore_provenance(snapshot: dict) -> None:
@@ -250,8 +257,10 @@ def restore_provenance(snapshot: dict) -> None:
     _GATE_OUTCOME_NAME.set(snapshot.get("gate_outcome_name"))
     _GENERAL_RING_PREFIX.set(bool(snapshot.get("general_ring_prefix")))
     _SUFFIX_FREE_PREFIX_NAME.set(bool(snapshot.get("suffix_free_prefix_name")))
+    _NON_PIN_FRAGMENTS.set(tuple(snapshot.get("non_pin_fragments") or ()))
     _touch("source", "opsin", "stereo_unexpressed", "gate_outcome",
-           "gate_outcome_name", "general_ring_prefix", "suffix_free_prefix_name")
+           "gate_outcome_name", "general_ring_prefix", "suffix_free_prefix_name",
+           "non_pin_fragments")
 
 
 def record_source(source: str, opsin: Optional[str] = None) -> None:
@@ -350,6 +359,47 @@ def record_general_ring_prefix() -> None:
     _touch("general_ring_prefix")
 
 
+def record_non_pin_fragment(fragment: str) -> None:
+    """Record a name fragment that a producer built and that is valid (the whole
+    name is still round-trip verified) but is never part of a PIN -- e.g. a
+    carbon-substituted N+ cited as 'trimethylazaniumyl', whose PIN form
+    '...methanaminiumyl' cannot be verified.
+
+    Unlike ``record_general_ring_prefix`` this is NAME-SCOPED: ``name_tiered``
+    demotes the shipped name only if it CONTAINS a recorded fragment. A producer
+    that runs speculatively (a // sort key naming a prefix) or
+    whose candidate is discarded (a later gate rejects it and another path names
+    the molecule) therefore cannot demote a name that does not carry its
+    fragment."""
+    if not fragment:
+        return
+    cur = _NON_PIN_FRAGMENTS.get()
+    if fragment not in cur:
+        _NON_PIN_FRAGMENTS.set(cur + (fragment,))
+    _touch("non_pin_fragments")
+
+
+def record_derived_non_pin_fragment(source: str, derived: str) -> None:
+    """Record ``derived`` as a non-PIN fragment when ``source`` contains a recorded one:
+    a form built from a non-PIN name by a string conversion (an acid name turned into
+    its acyl prefix) keeps the source's status, since the recorded substring does not
+    survive the conversion."""
+    if not source or not derived:
+        return
+    if any(f in source for f in _NON_PIN_FRAGMENTS.get()):
+        record_non_pin_fragment(derived)
+
+
+def name_carries_non_pin_part(prov: dict, name: Optional[str]) -> bool:
+    """True when ``name`` must not be labelled a PIN: the whole-call
+    ``general_ring_prefix`` flag, or a recorded non-PIN fragment it contains."""
+    if prov.get("general_ring_prefix"):
+        return True
+    if not name:
+        return False
+    return any(f in name for f in (prov.get("non_pin_fragments") or ()))
+
+
 def get_provenance() -> dict:
     return {
         "source": _SOURCE.get(),
@@ -359,4 +409,5 @@ def get_provenance() -> dict:
         "gate_outcome_name": _GATE_OUTCOME_NAME.get(),
         "general_ring_prefix": _GENERAL_RING_PREFIX.get(),
         "suffix_free_prefix_name": _SUFFIX_FREE_PREFIX_NAME.get(),
+        "non_pin_fragments": _NON_PIN_FRAGMENTS.get(),
     }

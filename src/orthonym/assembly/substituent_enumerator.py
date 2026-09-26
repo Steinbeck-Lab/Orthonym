@@ -1127,6 +1127,49 @@ def _substituent_memo_key(mol, frag_atoms, attach_idx, allow_mancude,
             full_coverage_ctx.get())
 
 
+def name_substituent_for_ordering(mol, frag_atoms, attach_idx):
+    """:func:`name_substituent` for a SORT KEY only -- it leaves no trace.
+
+    A numbering tie-break (g): the prefix cited first takes the lower
+    locant) needs each prefix's name BEFORE the real assembly names it. A plain
+    ``name_substituent`` call there is not free of side effects: it writes the
+    scope memo, the fragment memo cache (which is context-dependent), the
+    per-molecule polyfunctional memo and the molecule's SMILES output-order props,
+    and it spends the work budgets -- measured: one such call changed a later,
+    unrelated prefix name of the same molecule. This wrapper runs the call against
+    copies of all of them and restores them, so the real naming is exactly what it
+    would have been without the speculative call. Returns ``None`` for the
+    unnameable sentinel.
+    """
+    from . import substituent_naming as _sn
+    from .fragment_naming import speculative_fragment_naming
+    from .memo import pop_sandbox, push_sandbox
+    saved_props = {}
+    for prop in ('_smilesAtomOutputOrder', '_smilesBondOutputOrder'):
+        saved_props[prop] = mol.GetProp(prop) if mol.HasProp(prop) else None
+    saved_poly = (_sn._POLYFUNC_MEMO_MOL, _sn._POLYFUNC_MEMO_CACHE)
+    if saved_poly[0] is mol:
+        _sn._POLYFUNC_MEMO_CACHE = dict(saved_poly[1])
+    token = push_sandbox()
+    try:
+        with speculative_fragment_naming():
+            name = name_substituent(mol, frag_atoms, attach_idx)
+    except Exception:  # noqa: BLE001 -- a sort key never fails the naming
+        name = None
+    finally:
+        pop_sandbox(token)
+        _sn._POLYFUNC_MEMO_MOL, _sn._POLYFUNC_MEMO_CACHE = saved_poly
+        for prop, value in saved_props.items():
+            if value is None:
+                if mol.HasProp(prop):
+                    mol.ClearProp(prop)
+            else:
+                mol.SetProp(prop, value)
+    if not name or name == 'substituent':
+        return None
+    return name
+
+
 def name_substituent(mol, frag_atoms, attach_idx, allow_mancude: bool = False):
     """Name a substituent fragment with the free-valence morphology requires.
 
@@ -1891,7 +1934,14 @@ def composed_alkoxy_prefix(token):
             # '2-methylpropyl' -> '2-methyl' + 'propoxy' = '2-methylpropoxy'
             return token[:-len(stem)] + contracted
     # C5+ and cycloalkyls keep the whole name ('pentyloxy', 'cyclopropyloxy').
-    return f"{token}oxy"
+    # A SUBSTITUTED one is a compound organyl, cited inside its own marks with
+    # the 'oxy' outside; cite_organyl_in_composed_prefix): the Blue Book
+    # '4-[(4-carboxycyclohexyl)oxy]cyclohexane-1-carboxylic acid', so
+    # '(6-sulfanylhexyl)oxy', never '6-sulfanylhexyloxy' (TRIAGE row 127). The
+    # contracted methoxy..butoxy family above stays directly substitutable
+    # ('2-methylpropoxy (preferred prefix)', BB 27691).
+    cited = cite_organyl_in_composed_prefix(token)
+    return f"{cited}oxy" if cited else None
 
 
 def alkoxy_prefix_from_substituent(token):

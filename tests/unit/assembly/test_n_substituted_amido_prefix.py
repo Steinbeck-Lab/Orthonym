@@ -130,20 +130,44 @@ def test_helper_thioacyl_R_fails_closed():
                                            {0, 1, 2, 3, 4}) is None
 
 
-def test_helper_misnamed_R_reanchor_fails_closed():
-    # a review RE-review BLOCKER: name_substituent mis-names -CH2-S-CH3 as `methylsulfanyl`
-    # (drops the CH2 -- pre-existing fragment-namer defect). The gate-INDEPENDENT OPSIN
-    # re-anchor (build the amide, require same InChIKey as the capped fragment) must fail
-    # closed so the general fallback names it instead of shipping a wrong molecule.
-    m = _frag("OC(=O)CCN(CSC)C(C)=O")  # R' = -CH2-S-CH3
-    assert n_substituted_acyl_amido_prefix(m, 5, set(range(m.GetNumAtoms())) - {0, 1, 2, 3, 4},
-                                           {0, 1, 2, 3, 4}) is None
+# a review RE-review BLOCKER: name_substituent used to mis-name -CH2-S-CH3 as
+# `methylsulfanyl` (the attachment CH2 dropped). The gate-INDEPENDENT OPSIN re-anchor
+# (build the amide, require the same InChIKey as the capped fragment) must fail closed
+# on such a name so the general fallback names it instead of shipping a wrong molecule.
+# fix a performance pass fixed that namer at its source (substituent_prefix_forms: the
+# carbon-attached S/Se/Te ether is no '(R)sulfanyl' prefix), so the two witnesses now
+# get their correct prefix, and the re-anchor is exercised by injecting the old wrong
+# R' name instead.
+_MISNAMED_R_WITNESSES = (
+    # R' = -CH2-S-CH3 / -CH2-Se-CH3; compound prefix, as in the Blue Book's
+    # '2-{[(methylsulfanyl)methyl]sulfanyl}-1-[...]propane' (the Blue Book).
+    ("OC(=O)CCN(CSC)C(C)=O", "methylsulfanyl", "N-[(methylsulfanyl)methyl]acetamido"),
+    ("OC(=O)CCN(C[Se]C)C(C)=O", "methylselanyl", "N-[(methylselanyl)methyl]acetamido"),
+)
 
 
-def test_helper_misnamed_R_selena_reanchor_fails_closed():
-    m = _frag("OC(=O)CCN(C[Se]C)C(C)=O")  # R' = -CH2-Se-CH3, same defect shape
-    assert n_substituted_acyl_amido_prefix(m, 5, set(range(m.GetNumAtoms())) - {0, 1, 2, 3, 4},
-                                           {0, 1, 2, 3, 4}) is None
+def test_helper_misnamed_R_reanchor_fails_closed(monkeypatch):
+    import orthonym.rules.amides as amides
+    for smiles, wrong_r, _good in _MISNAMED_R_WITNESSES:
+        monkeypatch.setattr(amides, "_name_n_substituent",
+                            lambda mol, atoms, n, _w=wrong_r: _w)
+        m = _frag(smiles)
+        assert n_substituted_acyl_amido_prefix(
+            m, 5, set(range(m.GetNumAtoms())) - {0, 1, 2, 3, 4}, {0, 1, 2, 3, 4}) is None
+
+
+def test_helper_misnamed_R_witnesses_now_named_correctly():
+    from tests.support.rt_assert import _independent_parse
+    for smiles, _wrong, good in _MISNAMED_R_WITNESSES:
+        m = _frag(smiles)
+        sub = set(range(m.GetNumAtoms())) - {0, 1, 2, 3, 4}
+        got = n_substituted_acyl_amido_prefix(m, 5, sub, {0, 1, 2, 3, 4})
+        assert got == good
+        # Independent OPSIN parse of the amide against the N-capped fragment.
+        capped = Chem.MolFromSmiles(Chem.MolFragmentToSmiles(m, atomsToUse=sorted(sub)))
+        parsed = _independent_parse(got[:-1] + "e")
+        assert parsed and (Chem.MolToInchiKey(Chem.MolFromSmiles(parsed))
+                           == Chem.MolToInchiKey(capped))
 
 
 def test_helper_sentinel_R_fails_closed():

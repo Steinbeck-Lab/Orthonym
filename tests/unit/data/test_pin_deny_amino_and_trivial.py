@@ -41,7 +41,10 @@ GATED_AMINO_ACIDS = ["sarcosine", "taurine", "homotaurine", "statine",
 
 GATED_RETAINED = ["nicotinamide", "picolinic acid", "vanillin",
                   "vanillic acid", "benzhydrol", "phloroglucinol", "durene",
-                  "mesityl oxide"]
+                  "mesityl oxide",
+                  # Task 12 fix a performance pass (wp5): gated once the guanidine prefix
+                  # was fixed; replacement '(carbamimidoylamino)acetic acid'.
+                  "glycocyamine"]
 
 GATED_NATURAL_PRODUCTS = ["camphor"]
 
@@ -226,8 +229,6 @@ class TestNotOverGated:
         "morphine",           # fallback uses 'morphin-7-ene', but the BB's own
                               # renderings (the Blue Book, the Blue Book) both use
                               # '7,8-didehydromorphinan' -- replacement unverified
-        "glycocyamine",       # fallback 'guanidinoacetic acid' uses a prefix the
-                              # BB deprecates for PINs
     ])
     def test_no_verified_replacement_means_not_gated(self, name):
         """data/__init__.py:263 -- a deny row needs 'a Blue Book citation AND a
@@ -252,18 +253,16 @@ class TestNotOverGated:
         used in general nomenclature; the preferred prefix is
         'carbamimidoylamino'."
 
-        Orthonym still emits it -- rules/seniority.py maps guanidine ->
-        'guanidino'. That is a SEPARATE live defect, deliberately left to its own
-        task: its sibling was already corrected in place (the same dict maps
-        amidine -> 'carbamimidoyl' with the note '(was "amidino" - wrong per BB
-        '), so the fix is in-class but out of scope here. This test
-        pins the fact so the next session does not have to re-derive it.
+        Task 12 fix a performance pass (wp5) fixed the prefix (rules/seniority.py and the
+        tautomer-aware substituent_prefix_forms.get_guanidine_prefix), as this
+        test's old message asked, and gated glycocyamine: its fallback is now
+        '(carbamimidoylamino)acetic acid' (OPSIN 2.9.0 full-InChIKey exact).
         """
         from orthonym.rules.seniority import PREFIX_FORMS
-        assert PREFIX_FORMS.get("guanidine") == "guanidino", (
-            "guanidino prefix defect appears fixed -- retire this test and gate "
-            "glycocyamine, whose fallback 'guanidinoacetic acid' then becomes "
-            "'carbamimidoylaminoacetic acid'")
+        assert PREFIX_FORMS.get("guanidine") == "carbamimidoylamino"
+        denied = {e["name"].lower() for e in _pin_list()["entries"]
+                  if e.get("pin") is False}
+        assert "glycocyamine" in denied
 
 
 @pytest.mark.unit

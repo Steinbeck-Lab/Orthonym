@@ -74,8 +74,13 @@ def spiro_45_decane():
 
 @pytest.fixture
 def quinuclidine():
-    """1-Azabicyclo[2.2.2]octane - heterobicyclic with retained name."""
-    return Chem.MolFromSmiles("C1CC2CCC1CN2")
+    """Quinuclidine, 1-azabicyclo[2.2.2]octane (InChIKey SBYHFKPVCBCYGV).
+
+     fix a performance pass (wp6-tests), TEST-BUG: the fixture was "C1CC2CCC1CN2", which is
+    2-azabicyclo[2.2.2]octane (isoquinuclidine, KPUSZZFAYGWAHZ), the wrong-structure
+    key whose retained-name row was deleted on purpose (data/bicyclo_systems.py, PA1
+    R6)."""
+    return Chem.MolFromSmiles("C1CN2CCC1CC2")
 
 
 # ============================================================================
@@ -306,10 +311,11 @@ class TestNameBicycloSystem:
     """Test full bicyclo system naming."""
 
     @pytest.mark.unit
-    def test_norbornane_retained_name(self, norbornane):
-        """Norbornane should use retained name 'norbornane'."""
+    def test_norbornane_systematic_name(self, norbornane):
+        """Bicyclo[2.2.1]heptane has no retained PIN: only adamantane and cubane do."""
+        # PIN per R11: "RETAINED NAMES FOR VON BAEYER PARENT HYDRIDES" the Blue Book "The retained names adamantane and cubane are used in general nomenclature and as preferred IUPAC names."; "bicyclo[2.2.1]heptane (PIN)":2038; OPSIN RT exact.
         name = name_bicyclo_system(norbornane)
-        assert name == "norbornane"
+        assert name == "bicyclo[2.2.1]heptane"
 
     @pytest.mark.unit
     def test_bicyclo_222_systematic_name(self, bicyclo_222_octane):
@@ -332,9 +338,19 @@ class TestNameBicycloSystem:
 
     @pytest.mark.unit
     def test_quinuclidine_retained_name(self, quinuclidine):
-        """Quinuclidine (heterobicyclo) should use retained name."""
-        name = name_bicyclo_system(quinuclidine)
-        assert name == "quinuclidine"
+        """Quinuclidine is NOT a PIN: the hydrocarbon bicyclo namer declines the
+        heterobicycle, and the engine gives the von Baeyer 'a' name.
+
+         fix a performance pass (wp6-tests), TEST-BUG + change-asserted-value (was
+        'quinuclidine'): (the Blue Book) "The name quinuclidine is
+        retained for general nomenclature only"; "quinuclidine
+        1-azabicyclo[2.2.2]octane (PIN)" (:9893). OPSIN 2.9.0 full-InChIKey exact.
+        The test id is kept."""
+        assert name_bicyclo_system(quinuclidine) is None
+        from orthonym import name_compound
+        assert name_compound("C1CN2CCC1CC2") == "1-azabicyclo[2.2.2]octane"
+        # the old fixture's molecule, isoquinuclidine
+        assert name_compound("C1CC2CCC1CN2") == "2-azabicyclo[2.2.2]octane"
 
     @pytest.mark.unit
     def test_cyclohexane_returns_none(self, cyclohexane):
@@ -366,22 +382,28 @@ class TestRetainedNames:
 
     @pytest.mark.unit
     def test_norbornane_canonical_lookup(self):
-        """Norbornane should be found by canonical SMILES."""
+        """Bicyclo[2.2.1]heptane is NOT in the retained table."""
+        # PIN per R11: "RETAINED NAMES FOR VON BAEYER PARENT HYDRIDES" the Blue Book "The retained names adamantane and cubane are used in general nomenclature and as preferred IUPAC names."; "bicyclo[2.2.1]heptane (PIN)":2038; OPSIN RT exact.
         canonical = "C1CC2CCC1C2"
         name = get_retained_bicyclo_name(canonical)
-        assert name == "norbornane"
+        assert name is None
 
     @pytest.mark.unit
     def test_quinuclidine_canonical_lookup(self):
-        """Quinuclidine should be found by canonical SMILES."""
-        canonical = "C1CC2CCC1CN2"
-        name = get_retained_bicyclo_name(canonical)
-        assert name == "quinuclidine"
+        """Quinuclidine is not in the PIN retained-bicyclo table, under either key.
+
+         fix a performance pass (wp6-tests), TEST-BUG: the old key "C1CC2CCC1CN2" is
+        2-azabicyclo[2.2.2]octane, and its 'quinuclidine' row was deleted on purpose
+        (data/bicyclo_systems.py, PA1 R6: wrong structure, and
+        the Blue Book retains quinuclidine for general nomenclature only)."""
+        assert get_retained_bicyclo_name("C1CC2CCC1CN2") is None
+        assert get_retained_bicyclo_name("C1CN2CCC1CC2") is None
 
     @pytest.mark.unit
-    def test_is_retained_true_for_norbornane(self):
-        """is_retained_bicyclo should return True for norbornane."""
-        assert is_retained_bicyclo("C1CC2CCC1C2") is True
+    def test_is_retained_false_for_norbornane(self):
+        """is_retained_bicyclo is False for bicyclo[2.2.1]heptane."""
+        # PIN per R11: "RETAINED NAMES FOR VON BAEYER PARENT HYDRIDES" the Blue Book "The retained names adamantane and cubane are used in general nomenclature and as preferred IUPAC names."; "bicyclo[2.2.1]heptane (PIN)":2038; OPSIN RT exact.
+        assert is_retained_bicyclo("C1CC2CCC1C2") is False
 
     @pytest.mark.unit
     def test_is_retained_false_for_unknown(self):
@@ -497,9 +519,9 @@ class TestBicycloNamingIntegration:
         descriptor = generate_bicyclo_descriptor(norbornane)
         assert descriptor == "bicyclo[2.2.1]"
 
-        # Full name (retained)
+        # Full name (systematic; no retained PIN per:9881, R11)
         name = name_bicyclo_system(norbornane)
-        assert name == "norbornane"
+        assert name == "bicyclo[2.2.1]heptane"
 
     @pytest.mark.unit
     def test_bicyclo_222_full_workflow(self, bicyclo_222_octane):

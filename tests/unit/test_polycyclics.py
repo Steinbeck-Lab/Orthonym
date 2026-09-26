@@ -134,8 +134,8 @@ class TestPolycyclicRetainedNames:
         assert name_compound('c1cc2ccc3cccc4ccc(c1)c2c34') == 'pyrene'
 
     def test_fluorene_retained(self):
-        """Fluorene -> fluorene"""
-        assert name_compound('c1ccc2c(c1)Cc1ccccc1-2') == 'fluorene'
+        """Fluorene -> 9H-fluorene: (the Blue Book-11400): '(9H-isomer shown; the PIN is 9H-fluorene)'."""
+        assert name_compound('c1ccc2c(c1)Cc1ccccc1-2') == '9H-fluorene'
 
     def test_acenaphthene_retained(self):
         """Acenaphthene -> acenaphthene"""

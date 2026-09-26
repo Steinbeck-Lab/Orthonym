@@ -42,8 +42,11 @@ def test_diphosphate_bridge_recursive_phosphoryl():
 def test_triphosphate_bridge_nests():
     m, o, c = _o_and_parent('OCCOP(=O)(O)OP(=O)(O)OP(=O)(O)O')
     out = name_pa(m, o, c)
-    # two levels of nesting, terminal contracts to phosphonooxy
-    assert out.endswith('phosphoryl]oxy')
+    # two levels of nesting, terminal contracts to phosphonooxy.
+    # 2026-09-25 (pre-existing-failures plan, Task 5) change-asserted-value: nesting order "{[({})]}" (the Blue Book): the inner composed prefix is enclosed as a
+    # unit '{[...]oxy}', so the outer pair is the fourth level, '(' --
+    # '(hydroxy{[hydroxy(phosphonooxy)phosphoryl]oxy}phosphoryl)oxy'.
+    assert out.endswith('phosphoryl)oxy')
     assert 'phosphonooxy' in out
     assert out.count('phosphoryl') == 2
 
@@ -97,9 +100,10 @@ def test_phosphoxane_compound_bracketed_ester_branch_is_enclosed():
         'OCCOP(=O)(O)OP(=O)(O)OCC(C)(C)C(O)C(=O)NCCC(=O)NCCSC(=O)C')
     out = name_px(m, o, c)
     assert '3-4-[' not in out
+    # 2026-09-25 (pre-existing-failures plan, Task 5) change-asserted-value: nesting order "{[({})]}" (the Blue Book): the old '(3-(4-[...' put '(' directly around '('.
     assert out.startswith(
-        '(3-(4-[(3-{[2-(acetylsulfanyl)ethyl]amino}-3-oxopropyl)amino]'
-        '-3-hydroxy-2,2-dimethyl-4-oxobutoxy)-1,3-dihydroxy')
+        '(3-{4-[(3-{[2-(acetylsulfanyl)ethyl]amino}-3-oxopropyl)amino]'
+        '-3-hydroxy-2,2-dimethyl-4-oxobutoxy}-1,3-dihydroxy')
 
 
 @pytest.mark.slow

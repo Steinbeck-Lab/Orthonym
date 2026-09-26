@@ -133,8 +133,8 @@ UNCHANGED = {
     "[PH-]C": "methylphosphanide",
     "C[Si-](C)C": "trimethylsilanide",
     "CC(=O)[NH-]": "acetylazanide",                  # single acyl azanide
-    "C[N+](C)(C)CCCCCC[N+](C)(C)C":
-        "hexane-1,6-diylbis(trimethylazanium)",      # emit_bis_quaternary_ammonium
+    "C[N+](C)(C)CCCCCC[N+](C)(C)C":                 # emit_bis_quaternary_aminium:
+        "N1,N1,N1,N6,N6,N6-hexamethylhexane-1,6-bis(aminium)",  # PIN (:42154)
     "[NH3+]CC[NH3+]": "ethane-1,2-bis(aminium)",     # poly-aminium suffix path
     "[NH-]CC[NH-]": "ethane-1,2-bis(aminide)",       # poly-aminide suffix path
     "[O-]CC[O-]": "ethane-1,2-bis(olate)",           # poly-olate suffix path

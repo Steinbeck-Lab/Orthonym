@@ -46,13 +46,28 @@ POST_148_2_BASELINE_NAMES = {
     'C1=Cc2ccccc2CO1': '1H-2-benzopyran',
     'C1=Cc2ccccc2OC1': '2H-1-benzopyran',
     'C1=Cc2ccccc2SC1': '2H-1-benzothiopyran',
-    'C1=Cn2cccc2C1': 'pyrrolizine',
+    # fix a performance pass (wp6-tests), change-asserted-value (was 'pyrrolizine', which the
+    # engine still ships at pin_verified): Table 2.8 '(21) pyrrolizine (1H-isomer shown;
+    # the PIN is 1H-pyrrolizine)' (the Blue Book). OPSIN 2.9.0 full-InChIKey exact.
+    # Strict xfail below until the catalog spells the indicated hydrogen.
+    'C1=Cn2cccc2C1': '1H-pyrrolizine',
     'C1=NCc2ccccc2C1': '1,4-dihydroisoquinoline',
     'C1=Nc2cccc3cccc(c23)N1': '1H-perimidine',
     'C1=Nc2ccccc2C1': '3H-indole',
-    'C1CC2CCCN2C1': 'pyrrolizidine',
-    'C1CCN2CCCC2C1': 'indolizidine',
-    'C1CCN2CCCCC2C1': 'decahydroisoquinoline',
+    # fix a performance pass (wp6-tests), change-asserted-value (were 'pyrrolizidine' and
+    # 'indolizidine'; 0 Blue Book hits, labelled below pin_verified since wp5): the
+    # fully saturated parents take hydro prefixes, the Blue Book)
+    # on the PIN parents '1H-pyrrolizine' (:11628) and 'indolizine (PIN)' (:11709).
+    # OPSIN 2.9.0 full-InChIKey exact. Strict xfail below until the PINs are built
+    # (the same class as the quinolizidine row).
+    'C1CC2CCCN2C1': 'hexahydro-1H-pyrrolizine',
+    'C1CCN2CCCC2C1': 'octahydroindolizine',
+    # fix a performance pass (wp5): the frozen 'decahydroisoquinoline' was a different molecule
+    # (the row was deleted on purpose, retained_names.py). The PIN is 'octahydro-2H-quinolizine'
+    # (quinolizine the Blue Book-11584; hydro prefixes the Blue Book; OPSIN 2.9.0 full-InChIKey
+    # exact); the catalog still says 'quinolizidine', now labelled below pin_verified. Strict
+    # xfail below until the PIN is built.
+    'C1CCN2CCCCC2C1': 'octahydro-2H-quinolizine',
     'Nc1nc(=O)c2[nH]cnc2[nH]1': 'guanine',
     'Nc1nc2[nH]cnc2c(=O)[nH]1': 'guanine',
     'Nc1ncnc2[nH]cnc12': 'adenine',
@@ -125,11 +140,16 @@ POST_148_2_BASELINE_NAMES = {
     'c1ccc2c(c1)ccc1sccc12': 'naphtho[2,1-b]thiophene',
     'c1ccc2c(c1)cnc1ccccc12': 'phenanthridine',
     'c1ccc2c(c1)oc1ccccc12': 'dibenzo[b,d]furan',
-    'c1ccc2c(c1)oc1cccnc12': 'benzofuro[3,2-b]pyridine',
+    # 2026-09-25 (pre-existing-failures plan, Task 5) change-asserted-value:
+    # (the Blue Book) keeps a component's heteroatom locants in
+    # square brackets, '[1]benzopyrano[2,3-c]pyrrole (PIN)' (:12157). OPSIN RT exact.
+    'c1ccc2c(c1)oc1cccnc12': '[1]benzofuro[3,2-b]pyridine',
     'c1ccc2c(c1)sc1ccccc12': 'dibenzo[b,d]thiophene',
     'c1ccc2c[nH]cc2c1': '2H-isoindole',
     'c1ccc2cc3[nH]ccc3cc2c1': '1H-naphtho[2,3-b]pyrrole',
-    'c1ccc2cc3cc4ccccc4cc3cc2c1': 'naphthacene',
+    # fix a performance pass (wp6-tests), change-asserted-value (was 'naphthacene'):
+    # 'tetracene (PIN) (formerly naphthacene)' (the Blue Book). OPSIN RT exact.
+    'c1ccc2cc3cc4ccccc4cc3cc2c1': 'tetracene',
     'c1ccc2cc3cnccc3cc2c1': 'benzo[g]isoquinoline',
     'c1ccc2cc3ncccc3cc2c1': 'benzo[g]quinoline',
     'c1ccc2cc3occc3cc2c1': 'naphtho[2,3-b]furan',
@@ -197,9 +217,28 @@ POST_148_2_BASELINE_NAMES = {
 }
 
 
+_PIN_NOT_BUILT = {
+    'C1CCN2CCCCC2C1': "needs the hydro + indicated-hydrogen quinolizine parent "
+                      "(octahydro-2H-quinolizine); the catalog name 'quinolizidine' is "
+                      "not a Blue Book name and ships labelled below pin_verified",
+    'C1CC2CCCN2C1': "needs the hydro + indicated-hydrogen pyrrolizine parent "
+                    "(hexahydro-1H-pyrrolizine); the catalog name 'pyrrolizidine' is not a "
+                    "Blue Book name and ships labelled below pin_verified",
+    'C1CCN2CCCC2C1': "needs the hydro indolizine parent (octahydroindolizine); the "
+                     "catalog name 'indolizidine' is not a Blue Book name and ships "
+                     "labelled below pin_verified",
+    'C1=Cn2cccc2C1': "DEFECT (non-PIN at pin_verified): the catalog spells the mancude "
+                     "system 'pyrrolizine' without its indicated hydrogen; BB Table 2.8 "
+                     "(21) 'the PIN is 1H-pyrrolizine' (:11628). .planning/"
+                     "TODO-2026-09-24.md 'Open from T12 fix round 2 (wp6)'",
+}
+
+
 @pytest.mark.parametrize(
     "smiles,expected_name",
-    list(POST_148_2_BASELINE_NAMES.items()),
+    [pytest.param(k, v, marks=pytest.mark.xfail(strict=True, reason=_PIN_NOT_BUILT[k]))
+     if k in _PIN_NOT_BUILT else (k, v)
+     for k, v in POST_148_2_BASELINE_NAMES.items()],
     ids=list(POST_148_2_BASELINE_NAMES.keys()),
 )
 def test_catalog_byte_identical(smiles, expected_name):
@@ -216,10 +255,13 @@ def test_catalog_byte_identical(smiles, expected_name):
 
 
 def test_baseline_table_size():
-    """Sanity check: baseline must cover all 153 catalog entries."""
-    assert len(POST_148_2_BASELINE_NAMES) == len(FUSED_HETEROCYCLE_DATA), (
-        f"Baseline coverage gap: baseline has "
-        f"{len(POST_148_2_BASELINE_NAMES)} "
-        f"entries but FUSED_HETEROCYCLE_DATA has "
-        f"{len(FUSED_HETEROCYCLE_DATA)}"
-    )
+    """Sanity check: every frozen baseline key is still a catalog entry.
+
+     fix a performance pass (wp6-tests), TEST-BUG: this asserted len(baseline) ==
+    len(FUSED_HETEROCYCLE_DATA), which could only hold at capture time (157 then; the
+    catalog has grown to 219 entries since, with no baseline key missing). The frozen
+    table is a snapshot of the entries that existed then; what it can check is that
+    none of them has left the catalog. The newer entries are covered by the catalog
+    round-trip tests (tests/unit/data/test_fused_het_data_integrity.py)."""
+    missing = sorted(set(POST_148_2_BASELINE_NAMES) - set(FUSED_HETEROCYCLE_DATA))
+    assert not missing, f"frozen baseline keys no longer in FUSED_HETEROCYCLE_DATA: {missing}"

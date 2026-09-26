@@ -58,6 +58,47 @@ def test_verifier_rejects(name):
     assert not _pseudoasymmetric_name_verified(name, GERMACRANE)
 
 
+# fix a performance pass (wp2): the verifier compared only the MULTISET of r/s codes, so a
+# descriptor at the wrong locant (a CH2, out of range, or a second descriptor on
+# a chiral centre) passed. Each removed (locant, code) must now land, in the
+# parsed name's own numbering (OPSIN's per-atom locants for the reduced name), on
+# a distinct pseudoasymmetric centre of the input with that code.
+# (d) (the Blue Book): "Lower case stereodescriptors are used to
+# describe pseudoasymmetric stereogenic units"; (:48107).
+NORGERMACRANE = "CC[C@@H]1CC[C@H](C)CCC[C@H](C)CC1"   # BB:51471 (1R,4s,7S) isomer
+CIS_14_DIOL = "O[C@H]1CC[C@@H](O)CC1"                 # (1s,4s)-cyclohexane-1,4-diol
+TRIMETHYL_135 = "C[C@H]1C[C@H](C)C[C@@H](C)C1"        # (1r)-1,3,5-trimethylcyclohexane
+
+
+@pytest.mark.parametrize("name,smiles", [
+    ("(1R,2s,7S)-1,7-dimethyl-4-(propan-2-yl)cyclodecane", GERMACRANE),
+    ("(1R,7S,9s)-1,7-dimethyl-4-(propan-2-yl)cyclodecane", GERMACRANE),
+    ("(1R,2s,7S)-4-ethyl-1,7-dimethylcyclodecane", NORGERMACRANE),
+    ("(1R,7S,9s)-4-ethyl-1,7-dimethylcyclodecane", NORGERMACRANE),
+    ("(1R,1s,7S)-4-ethyl-1,7-dimethylcyclodecane", NORGERMACRANE),
+    ("(1s,3s)-cyclohexane-1,4-diol", CIS_14_DIOL),
+    ("(2r)-1,3,5-trimethylcyclohexane", TRIMETHYL_135),
+])
+def test_verifier_rejects_a_misplaced_pseudoasymmetric_locant(name, smiles):
+    assert not _pseudoasymmetric_name_verified(name, smiles)
+
+
+@pytest.mark.parametrize("name,smiles", [
+    ("(1R,4s,7S)-4-ethyl-1,7-dimethylcyclodecane", NORGERMACRANE),
+    ("(1s,4s)-cyclohexane-1,4-diol", CIS_14_DIOL),
+    ("(1r)-1,3,5-trimethylcyclohexane", TRIMETHYL_135),
+    # a legitimate alternative numbering of the same molecule still verifies
+    ("(3r)-1,3,5-trimethylcyclohexane", TRIMETHYL_135),
+])
+def test_verifier_accepts_a_correctly_placed_pseudoasymmetric_locant(name, smiles):
+    assert _pseudoasymmetric_name_verified(name, smiles)
+
+
+def test_verifier_fails_closed_on_a_descriptor_without_locant():
+    assert not _pseudoasymmetric_name_verified(
+        "(s)-2,4,6-trimethyl-1,3,5-trioxane", "C[C@H]1O[C@@H](C)O[C@H](C)O1")
+
+
 def test_verifier_fails_closed_on_mixed_codes():
     # 4-methylcyclohexan-1-ol has pseudoasymmetric centres of ONE code per
     # isomer; a name that claims both codes cannot be mapped without locants.

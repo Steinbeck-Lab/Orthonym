@@ -386,7 +386,13 @@ _HYDRIDE_STEM_ROOTS = tuple(
 )
 
 # Used by alpha_sort_key — pre-compiled regex patterns
-_LOCANT_PREFIX_RE = re.compile(r'^[\d,]+-')
+# A leading locant set: arabic numerals, each optionally with a letter (4a) and
+# primes (3', 2'') -- the primed locants of a spiro / ring-assembly parent are
+# locants like any other and never letters preamble, the Blue Book:
+# letters are compared "unless used as locants"). Without the primes, the
+# rendered prefix "3',4,4'-trihydroxy" kept its locants and its multiplier, and
+# keyed at "t" (or, as a raw string, at the digit "3").
+_LOCANT_PREFIX_RE = re.compile(r"^\d+[a-z]?['\u2032\u2033]*(?:,\d+[a-z]?['\u2032\u2033]*)*-")
 _N_LOCANT_PREFIX_RE = re.compile(r'^[nN],?[nN]?-')
 # Leading indicated-hydrogen descriptor (e.g. '1H-', '2H-'). Like a locant, the
 # italic indicated H is IGNORED for alphabetization (IUPAC, so
@@ -1226,6 +1232,31 @@ _INDICATED_H_RE = re.compile(r'\(\d+[a-z]?H\)')
 #: Fusion/spiro/ring-assembly/von Baeyer brackets -- [2,3-b],
 # [4.5], [2.2.1], [1,1'-biphenyl] (ring-assembly enclosures carry primes)
 _FUSION_BRACKET_RE = re.compile(r"\[[0-9a-z,.'\-]+\]")
+# (the Blue Book) "the square brackets of... ring assembly
+#... names are ignored", with (heading:7444) "the presence of square
+# brackets and/or parentheses that are an integral part of the name of a parent
+# structure does not affect the nesting order" (:7446). _FUSION_BRACKET_RE's
+# character class cannot see three spellings of a ring-assembly enclosure the
+# builders emit: the component parentheses
+# ('[1,1'-bi(cyclohexan)]', also around a von Baeyer component
+# '[2,2'-bi(bicyclo[2.2.1]heptan)]'), colon-separated locant sets
+# ('[1,1':4',1''-terphenyl]') and replicated indicated hydrogen
+# ('[1H,1'H-2,2'-biindol]'). Counting those marks put a ring-assembly prefix one
+# or two levels too deep: '{[1,1'-bi(cyclohexan)]-4-yl}benzene', where the BB
+# writes '4-[4-([1,1'-bi(cyclohexan)]-4-yl)phenyl]-...' (:17102) and
+# '3,5-di([1,1':3',1''-terphenyl]-3-yl)pyridine' (:23917). The match is anchored
+# on the assembly form itself -- a locant set of >= 2 locants, '-', a
+# multiplying prefix (ASSEMBLY_MULTIPLIERS in rules/ring_assemblies.py) and a
+# component that closes the bracket -- so a nesting bracket such as
+# '[3,5-bis(trifluoromethyl)phenyl]' ('bis', a multiplier) never
+# matches. (name_comparison's alphanumerical keys keep _FUSION_BRACKET_RE.)
+_RA_LOCANT = r"\d+[a-z]?['′″]*"
+_RING_ASSEMBLY_BRACKET_RE = re.compile(
+    r"\[(?:" + _RA_LOCANT + r"H,)*(?:" + _RA_LOCANT + r"H-)?"
+    + _RA_LOCANT + r"(?:[,:]" + _RA_LOCANT + r")+-"
+    + r"(?:bi|ter|quater|quinque|sexi|septi|octi|novi|deci|undeci|dodeci)"
+    + r"(?:[a-z]+|\((?:[^()\[\]{}]|\[[^\[\]{}]*\])+\))\]"
+)
 #: Stereo descriptors -- (R), (S), (E), (Z), (1R,2S), etc.
 _STEREO_PAREN_RE = re.compile(r'\((?:\d+[a-z]?,)*[RSEZ](?:,\d+[a-z]?[RSEZ]?)*\)')
 
@@ -1256,17 +1287,28 @@ def compute_nesting_depth(name: str) -> int:
     # Remove indicated hydrogen parentheses
     working = _INDICATED_H_RE.sub('__IH__', working)
 
-    # Remove fusion/spiro/von Baeyer square brackets
+    # Remove ring-assembly enclosures, with their integral component marks
+    # +, then fusion/spiro/von Baeyer square brackets
+    #
+    working = _RING_ASSEMBLY_BRACKET_RE.sub('__RA__', working)
     working = _FUSION_BRACKET_RE.sub('__FB__', working)
 
-    # Now count remaining bracket types to determine depth
+    # Now measure how deep the remaining (nesting-relevant) marks actually nest.
+    # (the Blue Book) cycles "{[({})]}": after { } comes
+    #  again, then , so the depth is the NESTING depth, not "which mark
+    # types occur". The old type test capped at 3, so a name already four levels
+    # deep ('2-fluoro-4-({6-[methyl(prop-2-en-1-yl)amino]hexyl}oxy)phenyl') was
+    # enclosed in '(' again -- '(' directly around '(' -- instead of '['.
+    # For names up to three levels this equals the old type test (the marks are
+    # added innermost-first in the ([ { order).
+    level = 0
     max_depth = 0
-    if '(' in working:
-        max_depth = 1
-    if '[' in working:
-        max_depth = 2
-    if '{' in working:
-        max_depth = 3
+    for ch in working:
+        if ch in '([{':
+            level += 1
+            max_depth = max(max_depth, level)
+        elif ch in ')]}':
+            level = max(0, level - 1)
 
     return max_depth
 
@@ -1324,8 +1366,10 @@ def apply_enclosing_marks(name: str, depth: int = 0) -> str:
             elif _STEREO_PAREN_RE.match(name):
                 leading_is_nesting = True
         elif open_mark == '[':
-            # Check for fusion/spiro brackets: [2,3-b], [4.5]
-            if _FUSION_BRACKET_RE.match(name):
+            # Check for fusion/spiro brackets: [2,3-b], [4.5], and a leading
+            # ring-assembly enclosure: [1,1'-bi(cyclohexan)]
+            if (_FUSION_BRACKET_RE.match(name)
+                    or _RING_ASSEMBLY_BRACKET_RE.match(name)):
                 leading_is_nesting = False
 
         if leading_is_nesting:
@@ -1333,6 +1377,52 @@ def apply_enclosing_marks(name: str, depth: int = 0) -> str:
             open_mark, close_mark = MARKS[depth % 3]
 
     return f"{open_mark}{name}{close_mark}"
+
+
+def renest_group_and_ancestors(name: str, open_idx: int) -> str:
+    """Re-derive the enclosing mark of the group opening at ``open_idx``
+    and of every group that encloses it, innermost first.
+
+    For a producer that SPLICES a substituent into an already-marked prefix: the
+    spliced group gets deeper, and every enclosing group must move up the
+    "{[({})]}" order (the Blue Book) with it. Re-marking only the
+    spliced group left '3-[[3-(alpha-L-rhamnopyranosyloxy)decanoyl]oxy]' with a
+    bracket directly inside a bracket. Each group's mark is what
+    ``apply_enclosing_marks(content, -1)`` gives its content, the same rule every
+    other producer uses, including the consecutive-mark step.
+    Groups outside the chain are left untouched.
+    """
+    pairs = {'(': ')', '[': ']', '{': '}'}
+    i = open_idx
+    while i is not None and 0 <= i < len(name) and name[i] in pairs:
+        depth = 0
+        close = None
+        for j in range(i, len(name)):
+            if name[j] in '([{':
+                depth += 1
+            elif name[j] in ')]}':
+                depth -= 1
+                if depth == 0:
+                    close = j
+                    break
+        if close is None:
+            return name
+        content = name[i + 1:close]
+        marked = apply_enclosing_marks(content, -1)
+        name = name[:i] + marked[0] + content + marked[-1] + name[close + 1:]
+        # the enclosing opener of position i
+        depth = 0
+        parent = None
+        for j in range(i - 1, -1, -1):
+            if name[j] in ')]}':
+                depth += 1
+            elif name[j] in '([{':
+                if depth == 0:
+                    parent = j
+                    break
+                depth -= 1
+        i = parent
+    return name
 
 
 def enclose_if_compound(name: str) -> str:
@@ -1901,37 +1991,6 @@ def _normalise_suffix_token(suffix: str) -> str:
     token = ' '.join(suffix.strip().split())
     token = _CHALCOGEN_LOCANT_INFIX_RE.sub('', token)
     return ' '.join(token.split()).lower()
-
-
-def strip_chalcogen_acid_locant(suffix: str) -> str:
-    """Drop the italic O/S/Se/Te tautomer-locant infix from a chalcogen
-    carboxylic-acid suffix word-form, preserving the rest of the spelling.
-
-     "Functional replacement in systematic names of carboxylic
-    acids" (`the Blue Book Blue Book`; sentence at `:30215`): "In
-    names, tautomeric groups in mixed chalcocarboxylic acids... are
-    distinguished by prefixing italic element symbols, such as *O* or *S*
-    ... to the term 'acid'... **Normally, these locants are omitted,
-    because the exact position of chalcogen atoms is not known or
-    important in acids; such letter locants are used mainly in naming
-    esters.**"
-
-    This is a pure STRING transform -- callers decide WHEN the bare
-    spelling is the PIN for a given molecule (the Blue Book's own worked
-    examples do NOT drop the designator uniformly: a bare, otherwise
-    unsubstituted thioic acid keeps it -- 'hexanethioic O-acid (PIN)'
-    :30225 -- while a bare selenoic/telluroic acid, or a thioic acid that
-    shares the molecule with another functional group, drops it --
-    'hexaneselenoic acid (PIN)':30235, '3-amino-2,3-dioxopropanethioic
-    acid (PIN)':30297). Never call this unconditionally.
-
-        >>> strip_chalcogen_acid_locant("selenoic O-acid")
-        'selenoic acid'
-        >>> strip_chalcogen_acid_locant("carbothioic S-acid")
-        'carbothioic acid'
-    """
-    token = ' '.join(suffix.strip().split())
-    return ' '.join(_CHALCOGEN_LOCANT_INFIX_RE.sub('', token).split())
 
 
 def suffix_takes_derived_multiplier(suffix_name: str) -> bool:
@@ -2970,8 +3029,11 @@ def format_substituent_prefix(name: str, locants: List[int], count: int) -> str:
         complex = True
     if _has_stereo_prefix(name):
         # Name has a CIP stereo descriptor prefix (e.g., "(R)-sec-butyl"):
-        # use square brackets per the IUPAC nesting order (BB 7444)
-        formatted_name = f"[{name}]"
+        # the descriptor's parentheses count, the Blue Book),
+        # so the next mark of the order (BB 7444) -- '[' for a name no
+        # deeper than the descriptor, '{' once it carries its own '[...]':
+        # '{(2S)-1-[4-(5-carboxypentyl)phenyl]-...-2-ylamino}', not '[(2S)-1-[...'.
+        formatted_name = apply_enclosing_marks(name, -1)
     elif ('(' in name or '[' in name) and not _is_fully_enclosed(name):
         # (W2E-P1FC Task 8, generalized by w2f p1 per
         # /: the name CARRIES an enclosing mark
@@ -3066,6 +3128,20 @@ def _numeral_chain_stems() -> frozenset:
 _NUMERAL_CHAIN_STEMS = _numeral_chain_stems()
 
 
+def _strip_leading_marks_and_locants(text: str) -> str:
+    """Drop every leading enclosing mark, locant and indicated-hydrogen token of a
+    composed prefix, so the key starts at the first LETTER of its complete name
+    : '[(2-aminoethoxy)hydroxyphosphoryl]oxy' -> 'aminoethoxy)...',
+    '(3,4,5-trihydroxybenzoyl)oxy' -> 'trihydroxybenzoyl)oxy'. The remaining marks
+    are removed by alpha_sort_key."""
+    while True:
+        new = text.lstrip('([{')
+        new = _INDICATED_H_PREFIX_RE.sub('', _LOCANT_PREFIX_RE.sub('', new))
+        if new == text:
+            return text
+        text = new
+
+
 def _alpha_sort_key_core(substituent_name: str) -> str:
     """Generate an alphabetization sort key for IUPAC prefix ordering.
 
@@ -3149,7 +3225,21 @@ def _alpha_sort_key_core(substituent_name: str) -> str:
         inner = _INDICATED_H_PREFIX_RE.sub('', inner)  # and a leading '1H-' descriptor
         if (inner.startswith('(') and inner.endswith(')')) or (inner.startswith('[') and inner.endswith(']')):
             inner = inner[1:-1]
+        elif inner[:1] in '([{':
+            # an enclosed COMPOSED prefix, '[(2-chloroethyl)amino]': see below
+            inner = _strip_leading_marks_and_locants(inner)
         return inner  # complete name; internal multiplying prefix NOT stripped
+
+    # again, for a COMPOSED prefix whose organyl sits in its own marks
+    # with the composing suffix outside them -- '(3,4,5-trihydroxybenzoyl)oxy',
+    # '(6-sulfanylhexyl)oxy', '(2-chloroethyl)sulfanyl'. It too
+    # "is considered to begin with the first letter of its complete name"
+    # (the Blue Book): 't', 's', 'c' -- never the inner locant, which used to lead the
+    # key once the marks were dropped, sorting '3,4,5-trihydroxybenzoyloxy'
+    # ahead of every lettered prefix ('hydroxy'). Complete name: the internal
+    # multiplying prefix is kept.
+    if text[:1] in '([{':
+        return _strip_leading_marks_and_locants(text)
 
     # ---- Simple (non-enclosed) prefix: ----
     # Strip N-locant prefixes (N- or N,N-)
@@ -3174,6 +3264,24 @@ def _alpha_sort_key_core(substituent_name: str) -> str:
             remainder = text[len(prefix):]
             # Only strip if there is a remainder (avoid stripping entire word)
             if remainder:
+                # 'di-tert-butyl': a multiplier on an italicized-prefix name. Both
+                # are ignored -- (:3448) the multiplier, /
+                # (:3477/:3495) the italic 'tert' -- so it keys at
+                # 'butyl', like the bare 'tert-butyl' above ('4-butyl-4-tert-
+                # butylcyclohexan-1-ol (PIN)',:3465). The remainder '-tert-butyl'
+                # used to be returned as the key.
+                if remainder.startswith('-'):
+                    _it_rest, _it_had = strip_italicized_structural_prefix(remainder[1:])
+                    if _it_had:
+                        return _it_rest
+                # 'di(prop-1-en-2-yl)', 'bis(2-chloroethyl)': the multiplier
+                # multiplies the WHOLE enclosed unit, so (:3448)
+                # ignores it and the unit keys by its own complete name
+                #,:3477) -- 'propenyl', 'chloroethyl'. The '(' guard
+                # below is for a multiplier carved out of the MIDDLE of a
+                # compound name; a fully enclosed remainder is not that.
+                if _is_fully_enclosed(remainder):
+                    return _alpha_sort_key_core(remainder)
                 # -FIX Item 7: a numeral that is part of the substituent's
                 # own STEM is not a multiplicative prefix. `pentan-2-yl` is
                 # `pent` + `an-2-yl`, not `penta` + `n-2-yl`; stripping gave the
@@ -3269,6 +3377,116 @@ def _alpha_sort_key_core(substituent_name: str) -> str:
 _ENCLOSING_MARKS_RE = re.compile(r'[()\[\]{}]')
 
 
+# Letters that are not tier-1 letters: the italic structural prefixes
+# 'sec'/'tert' /,:3477/:3495, '1-(butan-2-yl)-3-tert-
+# butylbenzene (PIN)') and an ISOLATED single letter -- a letter locant or
+# italic element ('N', '4a', '1H', 's-indacene'), which the preamble
+# (:3442) excludes: letters are considered first "unless used as locants or
+# part of a compound or composite locant". No word of a substituent name is a
+# single letter, so an isolated letter is always one of these.
+_NON_TIER1_LETTERS_RE = re.compile(
+    r"(?<![a-z])(?:sec|tert)(?=-)|(?<![a-z])[a-z](?![a-z])", re.IGNORECASE)
+
+
+def _key_letters(text: str) -> str:
+    """The Roman LETTERS of a sort-key text, in order tier 1)."""
+    return ''.join(ch for ch in _NON_TIER1_LETTERS_RE.sub('', text) if ch.isalpha())
+
+
+class AlphaKey(str):
+    """The text of a sort key, ORDERED letters first.
+
+    ``### **** ALPHANUMERICAL ORDER`` (``the Blue Book``):
+    "*Nonitalic Roman letters are considered first... When all the Roman
+    letters are identical, the set of locants... are compared*"; ``****``
+    (``:3477``): "*The name of a prefix for a substituent is considered to begin
+    with the first letter of its complete name*". A plain string comparison of
+    the key text lets a hyphen or a digit decide against a letter, because both
+    sort below every lowercase letter in ASCII: ``'prop-1-en-2-yl'`` <
+    ``'propan-2-ylidene'`` (``'-'`` < ``'a'``), although the letters say
+    ``propanylidene`` < ``propenyl``; ``'hydroxy-4-methylpentyl'`` <
+    ``'hydroxymethyl'``, although ``hydroxymethyl`` is an initial segment of
+    ``hydroxymethylpentyl`` and comes first (``:21663``,
+    ``4-methyl-3-methylidenehexanoic acid (PIN)``). The Blue Book's own
+    ``5-(butan-2-yl)-5-butylhentriacontane (PIN)`` (``:3461``) is the
+    letter-by-letter reading.
+
+    The value IS the key text (so ``alpha_sort_key('dimethyl') == 'methyl'``
+    and every inspection of the text is unchanged); only the ORDER differs from
+    ``str``, tier by tier:
+
+    1. the Roman letters (``_key_letters``) -- (:3442), (:3477);
+    2. the italic structural prefixes of the ORIGINAL name, absence first --
+       ``****`` (:3495) "When... Roman letters do not permit a
+       decision..., italicized letters are considered": '4-butyl-4-tert-
+       butylcyclohexan-1-ol (PIN)' (:3465). The key text of 'butyl' and
+       'tert-butyl' is 'butyl' for both, so without this tier ``sorted``
+       kept the input order and one molecule got both spellings;
+    3. the key text, which carries the locants when the letters tie
+       ,:3517);
+    4. the original name -- not a rule, it only keeps the order total.
+
+    ``prefix_citation_sort_key`` tier 1 is the same letters string. Python gives
+    a subclass's reflected comparison priority, so a plain-string sentinel on
+    the left (``'zzzzz' < key``) is ordered the same way. Equality with a plain
+    string is string equality (``alpha_sort_key('tert-butyl') == 'butyl'``);
+    two keys are equal only when every tier is.
+    """
+
+    def __new__(cls, text: str, original: str = ''):
+        obj = super().__new__(cls, text)
+        obj._original = original
+        return obj
+
+    def _order(self):
+        orig = self._original
+        return (_key_letters(self), _italic_prefixes(orig), str(self), orig)
+
+    @staticmethod
+    def _other_order(other):
+        if isinstance(other, AlphaKey):
+            return other._order()
+        if isinstance(other, str):
+            return (_key_letters(other), (), other, other)
+        return None
+
+    def __lt__(self, other):
+        o = self._other_order(other)
+        return NotImplemented if o is None else self._order() < o
+
+    def __le__(self, other):
+        o = self._other_order(other)
+        return NotImplemented if o is None else self._order() <= o
+
+    def __gt__(self, other):
+        o = self._other_order(other)
+        return NotImplemented if o is None else self._order() > o
+
+    def __ge__(self, other):
+        o = self._other_order(other)
+        return NotImplemented if o is None else self._order() >= o
+
+    def __eq__(self, other):
+        if isinstance(other, AlphaKey):
+            return self._order() == other._order()
+        return str.__eq__(self, other)
+
+    def __ne__(self, other):
+        eq = self.__eq__(other)
+        return eq if eq is NotImplemented else not eq
+
+    __hash__ = str.__hash__
+
+
+_ITALIC_PREFIX_RE = re.compile(r"(?<![a-z])(sec|tert)-")
+
+
+def _italic_prefixes(name: str) -> tuple:
+    """The italic structural prefixes ('sec', 'tert') of a substituent name, in
+    order of appearance,:3495)."""
+    return tuple(_ITALIC_PREFIX_RE.findall(name.lower())) if name else ()
+
+
 def alpha_sort_key(substituent_name: str) -> str:
     """ alphanumerical sort key for a substituent prefix.
 
@@ -3289,15 +3507,23 @@ def alpha_sort_key(substituent_name: str) -> str:
     The key is only ever COMPARED, never reconstructed into a name, so dropping
     marks cannot affect any emitted string.
 
+    The result is an:class:`AlphaKey`: its text is the key, its ORDER is
+    's (letters first, then the text), so ``'propan-2-ylidene'`` sorts
+    before ``'prop-1-en-2-yl'`` and ``'hydroxymethyl'`` before
+    ``'1-hydroxy-4-methylpentyl'``.
+
     Examples:
         >>> alpha_sort_key('4-[(1R)-1-chloroethyl]phenoxy')
         'chloroethylphenoxy'
         >>> alpha_sort_key('(2-chloroethyl)')
-        '2-chloroethyl'
+        'chloroethyl'
         >>> alpha_sort_key('methyl')
         'methyl'
+        >>> alpha_sort_key('propan-2-ylidene') < alpha_sort_key('prop-1-en-2-yl')
+        True
     """
-    return _ENCLOSING_MARKS_RE.sub('', _alpha_sort_key_core(substituent_name))
+    return AlphaKey(_ENCLOSING_MARKS_RE.sub('', _alpha_sort_key_core(substituent_name)),
+                    strip_alphanumerical_noise(substituent_name.lower()))
 
 
 # ---------------------------------------------------------------------------
@@ -3388,6 +3614,63 @@ def cip_descriptor_rank_key(prefix: str) -> tuple:
     return tuple(ranks)
 
 
+def cip_locant_rank_key(items) -> tuple:
+    """(j) NUMBERING key of ONE candidate numbering: descriptors WITH locants.
+
+    ``items`` is an iterable of ``(locant, code)`` pairs, one per stereodescriptor
+    the name would cite under that numbering (atom ``_CIPCode`` values R/S/r/s/M/P,
+    bond ``_CIPCode`` values Z/E). ``locant`` may be any sortable value, as long as
+    one call site passes one kind (ints for rings and chains, ``(int, str)`` for
+    natural-product locants such as ``3a`` or ``4'``). Lower key = preferred
+    numbering.
+
+    Why a second key next to:func:`cip_descriptor_rank_key`: that one ranks the
+    CODES of one prefix in order of appearance -- right for citation order
+    , where the locants are already equal. As a NUMBERING key it throws
+    the locants away, so a lone descriptor ties across every numbering and the
+    input atom order decides (``(1r)-``, ``(3r)-`` and ``(5r)-1,3,5-trimethyl-
+    cyclohexane`` for one molecule, one per SMILES spelling).
+
+    ``### **** NUMBERING`` clause (j) (``the Blue Book``): "*the lower
+    locant is assigned to CIP stereodescriptors Z, R, M, and r (pseudoasymmetry)
+    that are preferred to E, S, P, and s, respectively*". Two tiers:
+
+    1. the ``(locant, rank)`` pairs in locant order, compared at the first point of
+       difference, so a descriptor at a lower locant wins and, at an equal locant,
+       the preferred member of its pair wins. The Blue Book's own reading of "first
+       point of difference": ``(2Z,4S,8R,9E)-undeca-2,9-diene-4,8-diol (PIN)``
+       (``:3403``) "*the choice is between 'E' and 'Z' for position '2', not
+       between 'R' and 'S' for position '4'*". With equal locant sets this orders
+       exactly as the rank tuple of:func:`cip_descriptor_rank_key` did.
+    2. only when tier 1 ties exactly: chiral (upper-case) before pseudoasymmetric
+       (lower-case) at the first point of difference -- Sequence Rule 4a,
+       ``****`` (``:45459``) "*Chiral stereogenic units precede
+       pseudoasymmetric stereogenic units*"; this reproduces hexachlorocyclohexane
+       isomer 2, ``(1R,2R,3r,4S,5S,6s)`` (``:48131``), not ``(1r,2R,3R,4s,5S,6S)``.
+
+    Returns ```` when no item carries a known descriptor, so stereo-free
+    numberings tie exactly as before.
+
+    Examples:
+        >>> cip_locant_rank_key([(1, 'r')]) < cip_locant_rank_key([(3, 'r')])
+        True
+        >>> cip_locant_rank_key([(2, 'Z'), (4, 'S'), (8, 'R'), (9, 'E')]) < \
+cip_locant_rank_key([(2, 'E'), (4, 'R'), (8, 'S'), (9, 'Z')])
+        True
+        >>> cip_locant_rank_key()
+        
+    """
+    rows = sorted(
+        (loc, _CIP_DESCRIPTOR_RANK[code.lower()], 0 if code[:1].isupper() else 1)
+        for loc, code in items
+        if code and code.lower() in _CIP_DESCRIPTOR_RANK
+    )
+    if not rows:
+        return ()
+    return (tuple((loc, rank) for loc, rank, _kind in rows),
+            tuple(kind for _loc, _rank, kind in rows))
+
+
 def prefix_citation_sort_key(prefix: str, *,
                              parent_locants: bool = False) -> tuple:
     """ alphanumerical order for citation, as a TOTAL order.
@@ -3447,7 +3730,7 @@ def prefix_citation_sort_key(prefix: str, *,
     )`` apiece.
     """
     from .name_comparison import _LOCANT_TOKEN_FINDER, locant_sort_key
-    alpha_letters = ''.join(ch for ch in alpha_sort_key(prefix) if ch.isalpha())
+    alpha_letters = _key_letters(alpha_sort_key(prefix))
     body = _LOCANT_PREFIX_RE.sub('', prefix) if parent_locants else prefix
     locs = tuple(locant_sort_key(t)
                  for t in _LOCANT_TOKEN_FINDER.findall(body))

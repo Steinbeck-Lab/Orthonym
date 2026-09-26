@@ -115,6 +115,20 @@ class TestValidateBracket:
         # `[methyl]` so the adjacency scan does not see `[[`.
         assert ok is True
 
+    def test_BR_ring_assembly_with_component_parens_is_non_nesting(self):
+        # (BB 7469) + (BB 7446): a ring-assembly
+        # enclosure -- including the component parentheses of
+        # 'bi(cyclohexan)' -- is not a nesting mark, so the '[[' of the BB
+        # '10,10'-[[1,1'-biphenyl]-4,4'-diylbis(oxy)]di(decanoic acid)' shape
+        # is legal for the bi(cyclohexane) analogue too.
+        # (Called on the strict layer directly: the format_validator
+        # pre-screen has its own, unrelated 'bare_oxy' heuristic.)
+        g = OpsinGrammar()
+        ok, msg = g._check_bracket_hierarchy_strict(
+            "10,10'-[[1,1'-bi(cyclohexan)]-4,4'-diylbis(oxy)]di(decanoic acid)"
+        )
+        assert ok is True, msg
+
     def test_BR_double_curly_bracket_invalid(self):
         # forbids consecutive `{{`. Curly brackets are NOT
         # stripped by the fusion-bracket regex, so the strict check

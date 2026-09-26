@@ -800,6 +800,9 @@ def _identify_pah_substituent(mol, start_idx: int, core_atoms: Set[int]) -> Opti
         alkyl = _identify_pah_alkyl_group(mol, start_idx, core_atoms)
         if alkyl:
             return alkyl
+        _prefix_only = _identify_pah_prefix_only_chain(mol, start_idx, _frag_atoms)
+        if _prefix_only:
+            return _prefix_only
         # Try functionalized chain (hydroxymethyl, carboxymethyl, etc.)
         return _identify_pah_functionalized_chain(mol, start_idx, core_atoms)
 
@@ -840,7 +843,9 @@ def _identify_pah_substituent(mol, start_idx: int, core_atoms: Set[int]) -> Opti
             ]
             return {'name': 'sulfonic acid', 'atoms': _sulfo_atoms,
                     'is_suffix': True, 'suffix_type': 'sulfonic_acid'}
-        return None  # other S groups outside this narrow class -> fail closed
+        # A sulfide / sulfinyl / sulfonyl group is prefix-only ('methylsulfanyl',
+        # 'methanesulfonyl'); anything else stays fail-closed.
+        return _identify_pah_prefix_only_chain(mol, start_idx, _frag_atoms)
 
     return None
 
@@ -878,27 +883,68 @@ def _identify_pah_alkyl_group(mol, start_idx: int, core_atoms: Set[int]) -> Opti
             # Contains heteroatom - not a simple alkyl
             return None
 
-    # Get alkyl name from carbon count
-    alkyl_names = {
-        1: 'methyl',
-        2: 'ethyl',
-        3: 'propyl',
-        4: 'butyl',
-        5: 'pentyl',
-        6: 'hexyl',
-        7: 'heptyl',
-        8: 'octyl',
-        9: 'nonyl',
-        10: 'decyl',
-    }
+    # Name it by its STRUCTURE through the shared substituent namer: the
+    # substituent's own longest chain through the free valence; 'propan-2-yl',
+    # 'butan-2-yl', '2-methylpropyl', 'ethenyl'). The old carbon-count table named
+    # every branched or unsaturated group as the unbranched alkyl of the same size
+    # ('2-propylnaphthalene' for 2-(propan-2-yl)naphthalene), a different molecule
+    # that only the validity gate caught (the PIN tier then abstained).
+    if carbon_count == 0:
+        return None
+    from ..assembly.substituent_naming import name_substituent_fragment
+    name = name_substituent_fragment(mol, all_atoms, start_idx, list(core_atoms))
+    if not name:
+        return None
+    return {'name': name, 'atoms': all_atoms}
 
-    if carbon_count in alkyl_names:
-        return {
-            'name': alkyl_names[carbon_count],
-            'atoms': all_atoms
-        }
 
-    return None
+def _identify_pah_prefix_only_chain(mol, start_idx: int, frag_atoms) -> Optional[Dict]:
+    """A chain whose only heteroatoms are ether/sulfide chalcogens, sulfinyl/sulfonyl
+    groups between two carbons, and halogens, i.e. groups that are only ever cited as
+    prefixes,,: 'methoxy', 'methylsulfanyl', 'methanesulfonyl';
+    halogens, named by the shared substituent namer ('2-methoxyethyl'). Such a chain carries no characteristic group that could be
+    the principal one, so citing it as a prefix of the ring parent is what the rules
+    ask for. Anything else returns None (the caller tries the functional-chain
+    identifier)."""
+    def _sulfinyl_sulfonyl(at):
+        # R-S(=O)-R' / R-S(=O)2-R' between two carbons: 'methanesulfinyl',
+        # 'methanesulfonyl', prefix-only classes.
+        if at.GetAtomicNum() != 16 or at.GetFormalCharge() != 0:
+            return False
+        c_single = [b for b in at.GetBonds() if b.GetBondType() == Chem.BondType.SINGLE
+                    and b.GetOtherAtom(at).GetAtomicNum() == 6]
+        oxo = [b for b in at.GetBonds() if b.GetBondType() == Chem.BondType.DOUBLE
+               and b.GetOtherAtom(at).GetAtomicNum() == 8
+               and b.GetOtherAtom(at).GetDegree() == 1]
+        return len(c_single) == 2 and 1 <= len(oxo) <= 2 \
+            and len(c_single) + len(oxo) == at.GetDegree()
+
+    for i in frag_atoms:
+        at = mol.GetAtomWithIdx(i)
+        z = at.GetAtomicNum()
+        if z == 6:
+            if any(b.GetBondType() != Chem.BondType.SINGLE
+                   and b.GetOtherAtom(at).GetAtomicNum() != 6 for b in at.GetBonds()):
+                return None
+            continue
+        if z in (9, 17, 35, 53):
+            continue
+        if z in (8, 16) and at.GetTotalNumHs() == 0 and at.GetFormalCharge() == 0 \
+                and at.GetDegree() == 2 \
+                and all(nb.GetAtomicNum() == 6 for nb in at.GetNeighbors()) \
+                and all(b.GetBondType() == Chem.BondType.SINGLE for b in at.GetBonds()):
+            continue
+        if _sulfinyl_sulfonyl(at):
+            continue
+        if z == 8 and at.GetDegree() == 1 and _sulfinyl_sulfonyl(at.GetNeighbors()[0]):
+            continue
+        return None
+    from ..assembly.substituent_naming import name_substituent_fragment
+    ring_or_core = [a.GetIdx() for a in mol.GetAtoms() if a.GetIdx() not in set(frag_atoms)]
+    name = name_substituent_fragment(mol, list(frag_atoms), start_idx, ring_or_core)
+    if not name:
+        return None
+    return {'name': name, 'atoms': list(frag_atoms)}
 
 
 def _identify_pah_nitrogen_group(mol, n_idx: int, core_atoms: Set[int]) -> Optional[Dict]:
@@ -1196,7 +1242,28 @@ def name_substituted_polycyclic(
     - Functional groups as suffixes: parent-locant-suffix (e.g., naphthalene-2-carboxylic acid)
     """
     if not substituents:
-        return pah_name
+        # (the Blue Book-11400): '(14) fluorene (9H-isomer shown; the PIN
+        # is 9H-fluorene)'; the indicated hydrogen is part of the bare parent's name
+        # too, as in the substituted branches below ('9-methyl-9H-fluorene').
+        _ih = POLYCYCLIC_DATA.get(pah_name, {}).get('indicated_h')
+        return f"{_ih}-{pah_name}" if _ih else pah_name
+
+    # A ring C=O on the PAH parent (a fluoren-9-one core) reaches this producer
+    # only when a senior group holds the suffix (the cyclic-oxo engine names the
+    # ketone-principal case). The =O is then an 'oxo' PREFIX on the indicated-
+    # hydrogen parent, (the Blue Book) and
+    # (:24862): '9-oxo-9H-fluorene-2-carboxylic acid'. The substituent scan
+    # below has no oxo entry, so it DROPPED the =O ('9H-fluorene-2-carboxylic
+    # acid', a different molecule held back only by): build the oxo
+    # prefix name or decline.
+    _core_smarts = POLYCYCLIC_DATA.get(pah_name, {}).get('smarts', '')
+    _core_pat = _compiled_smarts(_core_smarts) if _core_smarts else None
+    _core_hits = mol.GetSubstructMatches(_core_pat) if _core_pat else ()
+    if _core_hits:
+        from .partial_saturation import _ring_carbonyl_carbons
+        if _ring_carbonyl_carbons(mol, set(_core_hits[0])):
+            from .fused_rings import _assemble_oxo_prefix_name
+            return _assemble_oxo_prefix_name(mol, set(_core_hits[0]))
 
     # Collect stereodescriptors for chiral substituents on PAH
     from ..perception.stereo import assign_stereochemistry
@@ -1499,7 +1566,7 @@ def name_substituted_polycyclic(
         # (Wave-2 completion): the indicated hydrogen attaches
         # to the parent stem, after any substituent prefixes -- 9H-fluorene-
         # 9-carboxylic acid / 9-methyl-9H-fluorene. The bare-parent early
-        # return keeps the retained short form ('fluorene').
+        # return cites it too ('9H-fluorene').
         _ih = POLYCYCLIC_DATA.get(pah_name, {}).get('indicated_h')
         _stem = f"{_ih}-{pah_name}" if _ih else pah_name
         # (a): elide the parent stem's terminal 'e' before a suffix that

@@ -248,13 +248,15 @@ SEN02_CARBON_OVER_ETHER = [
 # "2,5-dioxahexane" but R4 / now routes it substitutive ->
 # '1,2-dimethoxyethane'. Removed from this invariant set.
 SEN02_INVARIANT = [
-    ("CSCSC", "2,4-dithiapentane"),      # homogeneous dithioether -> skeletal kept
+    # fix a performance pass (was 2,4-dithiapentane / 3,6,9-trioxadecan-1-ol):
+    # (the Blue Book) needs four heterounits; below that the substitutive PIN.
+    ("CSCSC", "bis(methylsulfanyl)methane"),      # homogeneous dithioether
     # (the Blue Book method 1 = PIN; the Blue Book): a simple sulfide's PIN is the
     # substitutive form, not the functional-class "R R' sulfide" (sulfanyl slice).
     ("CSC", "(methylsulfanyl)methane"),   # was 'dimethyl sulfide' (the Blue Book)
     ("CSCC", "(methylsulfanyl)ethane"),   # was 'ethyl methyl sulfide'
     ("CS(=O)C", "(methanesulfinyl)methane"),   # Wave2 T3b: substitutive PIN (was functional-class 'dimethyl sulfoxide', now --trivial)
-    ("OCCOCCOCCOC", "3,6,9-trioxadecan-1-ol"),  # terminal-OH polyether -> skeletal kept
+    ("OCCOCCOCCOC", "2-[2-(2-methoxyethoxy)ethoxy]ethan-1-ol"),  # terminal-OH polyether
 ]
 
 

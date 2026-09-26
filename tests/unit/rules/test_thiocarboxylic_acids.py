@@ -138,8 +138,13 @@ class TestThiocarboxylicAcidNaming:
         assert name_compound("CC(=S)O") == "ethanethioic O-acid"
 
     def test_ethanedithioic_acid(self):
-        """CC(=S)S -> ethanedithioic acid"""
-        assert name_compound("CC(=S)S") == "ethanedithioic acid"
+        """CC(=S)S -> ethane(dithioic acid)"""
+        # PIN per R12 (worked-example analogue; no general sentence found):
+        # "Functional replacement in systematic names of carboxylic acids", example
+        # "3-amino-3-(ethylsulfanyl)prop-2-ene(dithioic acid) (PIN)" the Blue Book;
+        # "sodium propane(dithioate) (PIN)":31569; OPSIN RT exact (TRIAGE.csv; re-checked in
+        # Task 7/8).
+        assert name_compound("CC(=S)S") == "ethane(dithioic acid)"
 
     def test_propanethioic_S_acid(self):
         """CCC(=O)S -> propanethioic S-acid"""

@@ -69,3 +69,147 @@ def test_integration_failclosed_never_wrong(namer):
     out = namer.name("O=P([O-])([O-])c1ccc(C(=O)[O-])cc1")  # triple mixed anion
     assert "sulfo" not in out
     assert "phosphono" not in out
+
+
+# ---------------------------------------------------------------------------
+# fix a performance pass (wp1-zero-wrong): an S/P-oxoacid parent anion with junior
+# anionic chalcogen centres (-O- / -S-).
+#
+# "ANIONIC CENTERS IN BOTH PARENT COMPOUNDS AND SUBSTITUENT GROUPS"
+# (the Blue Book): "one anion must be chosen as the parent anion and the
+# other expressed as anionic substituent group(s)". "Prefixes for
+# anionic chalcogens": "–O– oxido (preselected prefix)" (:41223), "–S– sulfido
+# (preselected prefix)" (:41225). "CHOICE OF AN ANIONIC PARENT
+# STRUCTURE" (:41261): (a) "parent with the maximum number of anionic centers,
+# including anionic suffixes" (:41265); (d) "N > P >... > O > S" (:41281);
+# (e) the suffix seniority of (:41289), as in "3-oxidonaphthalene-2-
+# carboxylate (PIN) (carboxylate senior to olate)" (:41295). Salt words:
+# "Salts" (:31563) "Neutral salts of acids are named by citing the
+# name of the cation(s) followed by the name of the anion".
+#
+# The first four rows shipped a WRONG molecule as pin_verified before this fix
+# ('trisodium 5-hydroxybenzene-1,3-disulfonate': OPSIN parses a dianion + 3 Na+,
+# net +1). Every expected name below is OPSIN 2.9.0 full-InChIKey exact
+# (independent batch call; TRIAGE.md ' fix a performance pass -- wp1-zero-wrong').
+# ---------------------------------------------------------------------------
+from tests.support.rt_assert import name_is_rt_exact  # noqa: E402
+
+_JUNIOR_CHALCOGEN_PINS = [
+    # previously WRONG molecule at pin_verified
+    ("[O-]c1cc(cc(c1)S([O-])(=O)=O)S([O-])(=O)=O.[Na+].[Na+].[Na+]",
+     "trisodium 5-oxidobenzene-1,3-disulfonate"),
+    ("[O-]c1cc(cc(c1)S([O-])(=O)=O)S([O-])(=O)=O.[K+].[K+].[K+]",
+     "tripotassium 5-oxidobenzene-1,3-disulfonate"),
+    ("[O-]c1cc(cc(c1)S([O-])(=O)=O)S([O-])(=O)=O.[Na+].[Ca+2]",
+     "calcium sodium 5-oxidobenzene-1,3-disulfonate"),
+    ("[O-]c1ccc(cc1)P(=O)([O-])[O-].[Na+].[Na+].[Na+]",
+     "trisodium (4-oxidophenyl)phosphonate"),
+    # previously abstained at the PIN tier
+    ("[O-]S(=O)(=O)CC[O-].[Na+].[Na+]", "disodium 2-oxidoethane-1-sulfonate"),
+    ("[S-]CCS(=O)(=O)[O-].[Na+].[Na+]", "disodium 2-sulfidoethane-1-sulfonate"),
+    ("[O-]c1ccc(cc1)S([O-])(=O)=O.[Na+].[Na+]",
+     "disodium 4-oxidobenzene-1-sulfonate"),
+    ("[O-]CCS([O-])=O.[Na+].[Na+]", "disodium 2-oxidoethane-1-sulfinate"),
+    ("[O-]S(=O)(=O)CC[O-].[Ca+2]", "calcium 2-oxidoethane-1-sulfonate"),
+    ("[O-]c1ccc(cc1)S([O-])(=O)=O.[K+].[K+]",
+     "dipotassium 4-oxidobenzene-1-sulfonate"),
+    # the bare dianion (was 'unknown organic compound' at the PIN tier)
+    ("[O-]S(=O)(=O)CC[O-]", "2-oxidoethane-1-sulfonate"),
+]
+
+
+@pytest.mark.opsin_gate
+@pytest.mark.parametrize("smi,expected", _JUNIOR_CHALCOGEN_PINS)
+def test_junior_anionic_chalcogen_is_oxido_or_sulfido(namer, smi, expected):
+    res = namer.name_tiered(smi)
+    assert res["name"] == expected
+    assert res["tier"] == "pin_verified"
+    assert name_is_rt_exact(expected, smi)
+
+
+@pytest.mark.opsin_gate
+@pytest.mark.parametrize("smi", [s for s, _ in _JUNIOR_CHALCOGEN_PINS[:4]])
+def test_mixed_multi_anion_never_drops_a_charge(namer, smi):
+    # the charge-dropping neutral prefix must never ship, at any tier
+    for tier_namer in (namer, _best_effort()):
+        out = tier_namer.name(smi)
+        assert "hydroxy" not in out, out
+        assert not name_is_rt_exact(out.replace("oxido", "hydroxy"), smi)
+
+
+def _best_effort():
+    from orthonym.cli import _emit_tier_flags
+    return Orthonym(style="pin", **_emit_tier_flags("best-effort"))
+
+
+@pytest.mark.opsin_gate
+def test_p72_7a_boundary_is_not_pin_verified(namer):
+    # Two olate centres vs one sulfonate: (a) makes the bis(olate) the
+    # parent ('trisodium 3-sulfonatopropane-1,2-bis(olate)'); both that name and
+    # 'trisodium 2,3-dioxidopropane-1-sulfonate' round-trip, so only the rule can
+    # choose. The oxoacid-parent producer must decline (never pin_verified).
+    res = namer.name_tiered("[O-]CC([O-])CS(=O)(=O)[O-].[Na+].[Na+].[Na+]")
+    assert res["tier"] != "pin_verified"
+    assert "dioxidopropane" not in (res["name"] or "")
+
+
+@pytest.mark.opsin_gate
+def test_chain_phosphonate_suffix_form_is_demoted(namer):
+    # The name is the right molecule, but the chain phosphonic acid comes from
+    # the neutral namer's suffix form; the PIN is the functional-parent form,
+    # the Blue Book "ethylphosphonic acid (PIN) (not ethanephosphonic
+    # acid)" -> '(2-oxidoethyl)phosphonate'. Not pin_verified.
+    smi = "[O-]CCP(=O)([O-])[O-].[Na+].[Na+].[Na+]"
+    res = namer.name_tiered(smi)
+    assert name_is_rt_exact(res["name"], smi)
+    assert res["tier"] != "pin_verified"
+    assert res["is_pin"] is False
+
+
+# (the Blue Book) "Simple prefixes... are arranged
+# alphabetically"; (g) (:3306) "lowest locants for the substituent cited
+# first as a prefix in the name", e.g. "1-methyl-4-nitronaphthalene (PIN) (not
+# 4-methyl-1-nitronaphthalene)" (:3317). The 'hydroxy' -> 'oxido' swap moves
+# the prefix past 'methyl' without re-ordering it, so these names are the right
+# molecule but NOT the PIN (PINs: disodium 3-methyl-5-oxidobenzoate, 3-methyl-
+# 5-oxidohexanoate, 5-methyl-2-oxidobenzoate, 2-methyl-3-oxidopropanoate; all
+# RT-exact). Until the producer re-orders them, they must not be pin_verified.
+@pytest.mark.opsin_gate
+@pytest.mark.parametrize("smi", [
+    "[O-]c1cc(C)cc(C([O-])=O)c1.[Na+].[Na+]",
+    "CC([O-])CC(C)CC([O-])=O.[Na+].[Na+]",
+    "Cc1ccc([O-])c(C([O-])=O)c1.[Na+].[Na+]",
+    "[O-]CC(C)C([O-])=O.[Na+].[Na+]",
+])
+def test_rank_changing_oxido_swap_is_not_pin_verified(namer, smi):
+    res = namer.name_tiered(smi)
+    assert name_is_rt_exact(res["name"], smi)
+    assert res["tier"] != "pin_verified"
+    assert res["is_pin"] is False
+
+
+@pytest.mark.opsin_gate
+@pytest.mark.parametrize("smi,expected", [
+    # no sibling sorts between 'hydroxy' and 'oxido': the swap keeps the PIN
+    ("[O-]c1ccc(Cl)cc1C([O-])=O.[Na+].[Na+]", "disodium 5-chloro-2-oxidobenzoate"),
+    ("[O-]c1cc2ccccc2cc1C([O-])=O.[Na+].[Na+]",
+     "disodium 3-oxidonaphthalene-2-carboxylate"),
+    ("[O-]c1ccccc1C([O-])=O.[Na+].[Na+]", "disodium 2-oxidobenzoate"),
+])
+def test_rank_preserving_oxido_swap_stays_pin_verified(namer, smi, expected):
+    res = namer.name_tiered(smi)
+    assert res["name"] == expected
+    assert res["tier"] == "pin_verified"
+
+
+def test_rank_guard_unit():
+    from orthonym.rules.ions import _prefix_swap_may_change_rank as g
+    assert g("3-oxido-5-methylbenzoate", "hydroxy", "oxido")
+    assert g("2-[(2-oxidoethyl)]-5-nitrobenzoate", "hydroxy", "oxido")
+    assert not g("5-chloro-2-oxidobenzoate", "hydroxy", "oxido")
+    assert not g("3-oxidonaphthalene-2-carboxylate", "hydroxy", "oxido")
+    assert not g("5-oxidobenzene-1,3-disulfonate", "hydroxy", "oxido")
+    assert not g("(4-oxidophenyl)phosphonate", "hydroxy", "oxido")
+    # a multiplied sibling is alphabetized without its multiplier
+    assert g("2-oxido-3,5-dimethylbenzoate", "hydroxy", "oxido")
+    assert not g("2-sulfido-4-sulfonatobenzoate", "sulfanyl", "sulfido")

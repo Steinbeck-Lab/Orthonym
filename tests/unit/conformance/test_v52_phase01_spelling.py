@@ -108,10 +108,23 @@ class TestSP4ChalcogenAcidLocantOmission:
     because the exact position of chalcogen atoms is not known or important
     in acids; such letter locants are used mainly in naming esters."
     (the Blue Book Blue Book,:30215, ex.:30235).
+
+    2026-09-25 (pre-existing-failures plan, Task 5, R13): the omission applies
+    where the position is NOT known (ex.:30235 is drawn C{O/Se}H;:31081
+    "the location of the sulfur atoms is unknown"). A SMILES fixes it, so the
+    determined C(=Se)-OH keeps the designator, like "hexanethioic O-acid (PIN)"
+    (:30225). The SP4 rows now pin the designator.
     """
 
     def test_sp4_hexaneselenoic_acid(self):
-        assert _name_or_tiered("CCCCCC(O)=[Se]") == "hexaneselenoic acid"
+    # PIN per R13::30215 designates the tautomer with an italic element
+    # symbol; the designator is dropped only where "the location of the sulfur atoms is
+    # unknown" (:31081 vs "1,3-dithiodicarbonic S1,S3-acid (PIN)":31083); the
+    # determined -CS-OH is "hexanethioic O-acid (PIN)" (:30225), and "hexaneselenoic acid
+    # (PIN)" (:30235) is drawn C{O/Se}H (undetermined). C(=Se)-OH is determined, so the
+    # PIN keeps "O-acid". OPSIN RT exact (constitution; the tautomer is fixed by the FG
+    # class, not by RT).
+        assert _name_or_tiered("CCCCCC(O)=[Se]") == "hexaneselenoic O-acid"
 
     def test_sp4_amino_dioxopropanethioic_acid(self):
         # v52 a review-fix a performance pass D5: the polyfunctional strip that used to drop
@@ -171,9 +184,16 @@ class TestD5PolyfunctionalThioAcidDesignatorKept:
     def test_d5_oxobutanethioic_o_acid(self):
         assert _name_or_tiered("CC(=O)CC(O)=S") == "3-oxobutanethioic O-acid"
 
-    def test_d5_guard_selenoic_o_acid_still_bare(self):
-        # Se/Te strip is unrefuted -- must stay bare (no designator).
-        assert _name_or_tiered("CCCCCC(O)=[Se]") == "hexaneselenoic acid"
+    def test_d5_guard_selenoic_o_acid_keeps_designator(self):
+        # The Se/Te strip is refuted by the same specified-tautomer reading as thio.
+    # PIN per R13::30215 designates the tautomer with an italic element
+    # symbol; the designator is dropped only where "the location of the sulfur atoms is
+    # unknown" (:31081 vs "1,3-dithiodicarbonic S1,S3-acid (PIN)":31083); the
+    # determined -CS-OH is "hexanethioic O-acid (PIN)" (:30225), and "hexaneselenoic acid
+    # (PIN)" (:30235) is drawn C{O/Se}H (undetermined). C(=Se)-OH is determined, so the
+    # PIN keeps "O-acid". OPSIN RT exact (constitution; the tautomer is fixed by the FG
+    # class, not by RT).
+        assert _name_or_tiered("CCCCCC(O)=[Se]") == "hexaneselenoic O-acid"
 
 
 class TestD3SulfurRingSuffixNumberingOutranksEne:

@@ -21,13 +21,24 @@ whenever the input or the parse carries a chemical radical:
      identity over element, charge, hydrogen count, isotope, bond order and
      radical placement. Stereo is left to the caller's own stereo logic.
 
-Radical electrons on METAL atoms are not counted: RDKit's valence model assigns
-them to bare cations such as [Pb+2] or [Sn+2] and to covalent metal centres, and
-they are not chemical radicals in the sense of. One named whole-molecule
-exemption: dioxygen, the retained name for O2 (data/retained_names.py), whose
-ground state is the triplet [O][O] while OPSIN draws O=O; says radical
-names "do not indicate nor imply an electronic structure or spin multiplicity"
-(the Blue Book).
+Radical electrons on most METAL atoms are not counted: RDKit's valence model
+assigns them to bare cations such as [Pb+2] or [Sn+2] and to covalent metal
+centres, and they are not chemical radicals in the sense of. The p-block
+metals Al, Ga, In, Sn, Tl, Pb, Bi and Po are the exception, because names
+radicals on them ('stannyl' the Blue Book, 'plumbyl':38069, 'alumanyl'
+:15900) and the key cannot place them either: [SnH2][SnH2][SnH3]
+(tristannan-1-yl) and [SnH3][SnH][SnH3] (tristannan-2-yl) share one InChIKey. A
+radical electron on one of these counts unless the atom is drawn as a salt: a
+bare ion (no neighbour, no hydrogen, charged) or an atom with no hydrogen whose
+neighbours are all salt-like (N, O, F, S, Cl, Se, Br, Te, I) -- so 'tin(II)
+dichloride' ([Sn+2].2[Cl-], parsed as Cl[Sn]Cl) stays "n/a". Transition metals
+and groups 1/2 stay excluded (Cu+2, Mn+2 and Cl[Mg] carry RDKit radical
+counts).
+
+One named whole-molecule exemption: dioxygen, the retained name for O2
+(data/retained_names.py), whose ground state is the triplet [O][O] while OPSIN
+draws O=O; says radical names "do not indicate nor imply an electronic
+structure or spin multiplicity" (the Blue Book).
 """
 from typing import Tuple
 
@@ -40,16 +51,42 @@ _NONMETALS = frozenset({
     51, 52, 53, 54, 85, 86,
 })
 
+# p-block metals whose radicals names (stannyl, plumbyl, alumanyl,...):
+# Al, Ga, In, Sn, Tl, Pb, Bi, Po. Counted unless drawn as a salt (see below).
+_P_BLOCK_METALS = frozenset({13, 31, 49, 50, 81, 82, 83, 84})
+# Neighbours that make a hydrogen-free p-block metal a salt-like (ionic or
+# covalent-salt) drawing rather than a radical centre.
+_SALT_LIKE_NEIGHBOURS = frozenset({7, 8, 9, 16, 17, 34, 35, 52, 53})
+
 # (input canonical SMILES, parse canonical SMILES) pairs accepted by name.
 _EXEMPT_PAIRS = frozenset({("[O][O]", "O=O")})
 
 
+def _is_radical_centre(atom) -> bool:
+    """Does this atom's radical electron count as a chemical radical?"""
+    if not atom.GetNumRadicalElectrons():
+        return False
+    z = atom.GetAtomicNum()
+    if z in _NONMETALS:
+        return True
+    if z not in _P_BLOCK_METALS:
+        return False
+    if atom.GetTotalNumHs():
+        return True
+    if atom.GetDegree() == 0:
+        return atom.GetFormalCharge() == 0   # a bare ion is a salt drawing
+    return not all(nb.GetAtomicNum() in _SALT_LIKE_NEIGHBOURS
+                   for nb in atom.GetNeighbors())
+
+
 def radical_profile(mol) -> Tuple[Tuple[str, int], ...]:
-    """Sorted (element, radical electrons) of every non-metal radical atom."""
+    """Sorted (element, radical electrons) of every radical centre: each
+    non-metal radical atom, and each p-block-metal radical atom not drawn as a
+    salt."""
     return tuple(sorted(
         (a.GetSymbol(), a.GetNumRadicalElectrons())
         for a in mol.GetAtoms()
-        if a.GetNumRadicalElectrons() and a.GetAtomicNum() in _NONMETALS))
+        if _is_radical_centre(a)))
 
 
 def _stereo_free_smiles(mol) -> str:

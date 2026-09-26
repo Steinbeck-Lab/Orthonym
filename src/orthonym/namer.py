@@ -1012,6 +1012,14 @@ def _drop_pseudoasymmetric_descriptors(name: str):
     token is a descriptor are touched, so a substituent in parentheses is never
     edited.
     """
+    reduced, tokens = _drop_pseudoasymmetric_tokens(name)
+    return reduced, [code for _loc, code in tokens]
+
+
+def _drop_pseudoasymmetric_tokens(name: str):
+    """As:func:`_drop_pseudoasymmetric_descriptors`, but each removed descriptor
+    comes with its locant: ``[('4', 's')]``; the locant is ``None`` for a bare
+    ``(s)``."""
     removed = []
 
     def _edit(m):
@@ -1022,7 +1030,7 @@ def _drop_pseudoasymmetric_descriptors(name: str):
         kept = []
         for t, p in zip(tokens, parsed):
             if p.group(2) in ('r', 's'):
-                removed.append(p.group(2))
+                removed.append((p.group(1), p.group(2)))
             else:
                 kept.append(t)
         if len(kept) == len(tokens):
@@ -1054,11 +1062,21 @@ def _pseudoasymmetric_name_verified(name: str, smiles: Optional[str]) -> bool:
        each pseudoasymmetric centre has exactly two configurations, r and s, so
        equal codes on both sides fix it too. Mixed r/s codes would need the
        locant of each centre, so they are NOT verified here (fail closed).
+    3. WHERE each removed descriptor sits (``_pseudo_locants_map_to_centres``):
+       read in the parsed name's own numbering, every removed token's locant must
+       land on a distinct pseudoasymmetric centre of the input with that code.
+       Without it the code multiset alone let '(1R,2s,7S)-' and '(1R,7S,9s)-'
+       (a descriptor on a CH2) pass for the (1R,4s,7S) isomer, and
+       '(1s,3s)-cyclohexane-1,4-diol' pass for the cis-1,4-diol. A token with no
+       locant fails closed.
     """
     if not name or not smiles:
         return False
-    reduced, codes = _drop_pseudoasymmetric_descriptors(name)
+    reduced, tokens = _drop_pseudoasymmetric_tokens(name)
+    codes = [code for _loc, code in tokens]
     if not codes or reduced == name:
+        return False
+    if any(not loc for loc, _code in tokens):
         return False
     try:
         mol = Chem.MolFromSmiles(smiles)
@@ -1071,15 +1089,65 @@ def _pseudoasymmetric_name_verified(name: str, smiles: Optional[str]) -> bool:
         input_codes = sorted(a.GetProp('_CIPCode') for a in pseudo)
         if input_codes != sorted(codes) or len(set(codes)) != 1:
             return False
+        pseudo_codes = {a.GetIdx(): a.GetProp('_CIPCode') for a in pseudo}
         for a in pseudo:
             a.SetChiralTag(Chem.ChiralType.CHI_UNSPECIFIED)
         in_key = _self_consistency_full_key(Chem.MolToSmiles(mol))
         opsin_smiles = _validity_gate_name_to_smiles(reduced)
         if in_key is None or opsin_smiles is None:
             return False
-        return _self_consistency_full_key(opsin_smiles) == in_key
+        if _self_consistency_full_key(opsin_smiles) != in_key:
+            return False
+        return _pseudo_locants_map_to_centres(reduced, mol, tokens, pseudo_codes)
     except Exception:
         return False
+
+
+def _pseudo_locants_map_to_centres(reduced: str, mol, tokens, pseudo_codes) -> bool:
+    """True iff some reading of ``reduced`` onto ``mol`` puts every removed
+    ``(locant, code)`` token on a distinct pseudoasymmetric centre with that code.
+
+    OPSIN parses the REDUCED name (no lowercase descriptor left), and its
+    ``-o extendedsmi`` output labels every atom with the locant it read
+    (``$_AV``). Substituent atoms reuse plain numbers (an ethyl's '1', '2'), and
+    the constitutional isomorphism onto ``mol`` need not be unique, so the check
+    is existential over the isomorphisms and requires the input CIP code at the
+    mapped atom: a locant on a CH2 or out of range finds no such atom. Primes are
+    stripped on both sides so a descriptor inside a substituent prefix is judged
+    by the same rule.
+    """
+    from .validation.opsin_roundtrip import _AV_LINE_RE, _extended_smiles
+    ext = _extended_smiles(reduced)
+    if not ext:
+        return False
+    m = _AV_LINE_RE.match(ext.strip())
+    if not m:
+        return False
+    labels = [t.strip() for t in m.group(2).split(';')]
+    omol = Chem.MolFromSmiles(m.group(1))
+    if omol is None or omol.GetNumAtoms() != len(labels):
+        return False
+
+    def _norm(loc) -> str:
+        return str(loc).replace("'", '').replace('′', '')
+
+    need: Dict[Tuple[str, str], int] = {}
+    for loc, code in tokens:
+        need[(_norm(loc), code)] = need.get((_norm(loc), code), 0) + 1
+    matches = mol.GetSubstructMatches(omol, useChirality=False, uniquify=False,
+                                      maxMatches=10_000)
+    for match in matches:
+        if len(match) != omol.GetNumAtoms():
+            continue
+        have: Dict[Tuple[str, str], int] = {}
+        for opsin_idx, mol_idx in enumerate(match):
+            code = pseudo_codes.get(mol_idx)
+            if code is not None:
+                k = (_norm(labels[opsin_idx]), code)
+                have[k] = have.get(k, 0) + 1
+        if all(have.get(k, 0) >= n for k, n in need.items()):
+            return True
+    return False
 
 
 #: Pseudoasymmetric names the general-tier gate verified but did NOT ship,
@@ -1112,6 +1180,16 @@ def _self_consistency_net_charge(smiles: str) -> Optional[int]:
         return sum(a.GetFormalCharge() for a in mol.GetAtoms())
     except Exception:
         return None
+
+
+def _self_consistency_has_formal_charge(smiles: str) -> bool:
+    """Does ``smiles`` carry any formally charged atom (a salt or zwitterion,
+    as opposed to a neutral molecule)? False if unparseable."""
+    try:
+        mol = Chem.MolFromSmiles(smiles)
+        return mol is not None and any(a.GetFormalCharge() for a in mol.GetAtoms())
+    except Exception:
+        return False
 
 
 #: Phase-1 reclaim (Adv1 guard): a bare RELATIVE stereo descriptor is 50/50-
@@ -1225,6 +1303,18 @@ def _registration_stereo_layer(smiles: str):
         return None
 
 
+# Al, Ga, In, Tl: the Blue Book /:2062 -- their compounds' names carry no PIN
+# status (the organic-vs-inorganic decision "has not yet been reached").
+_NO_PIN_STATUS_ELEMENTS = frozenset({13, 31, 49, 81})
+
+
+def _has_no_pin_status_element(smiles: str) -> bool:
+    """True iff the structure contains aluminium, gallium, indium or thallium."""
+    mol = Chem.MolFromSmiles(smiles) if smiles else None
+    return mol is not None and any(
+        a.GetAtomicNum() in _NO_PIN_STATUS_ELEMENTS for a in mol.GetAtoms())
+
+
 def _specified_stereo_count(mol) -> int:
     """Count of EXPLICITLY-specified stereo features (assigned chiral centres +
     directional double bonds). Used to tell a stereo CONFLICT (same count, different
@@ -1284,6 +1374,14 @@ def _self_consistency_verdict(input_smiles: str, opsin_smiles: str,
     from .validation.radical_identity import radical_identity_verdict
     if radical_identity_verdict(input_smiles, opsin_smiles) == "mismatch":
         return "mismatch"
+    # Protonation site BEFORE the full-key shortcut too: the standard InChI moves
+    # an onium atom's hydrons into one mobile /p layer, so a name that puts the
+    # '-ium' on the wrong nitrogen ('N-methyl-3-(methylamino)propanamidium' for
+    # C[NH2+]CCC(=O)NC) shares the input's full key
+    # (validation/protonation_identity.py).
+    from .validation.protonation_identity import protonation_site_verdict
+    if protonation_site_verdict(input_smiles, opsin_smiles) == "mismatch":
+        return "mismatch"
     ka = _self_consistency_full_key(input_smiles)
     kb = _self_consistency_full_key(opsin_smiles)
     if ka is not None and kb is not None and ka == kb:
@@ -1303,6 +1401,17 @@ def _self_consistency_verdict(input_smiles: str, opsin_smiles: str,
     # names are protonation-ambiguous in OPSIN (e.g. 'methyl phosphate' round-trips
     # to the -2 phosphate dianion) — that is not a wrong-molecule error.
     if ca is not None and cb is not None and ca != 0 and ca != cb:
+        return "mismatch"
+    # A neutral SALT is not that exemption. Its input carries formal charges that
+    # balance, the Blue Book: "Neutral salts of acids are named
+    # by citing the name of the cation(s) followed by the name of the anion"), so
+    # a name whose parse is a NET-CHARGED assembly denotes a different species:
+    # 'trisodium 5-hydroxybenzene-1,3-disulfonate' parses to three Na+ and a
+    # dianion (net +1) for a trianion salt, and the skeleton block cannot see it.
+    # Scoped to inputs with charged atoms, so 'methyl phosphate' (no formal
+    # charge) keeps its exemption.
+    if (ca == 0 and cb is not None and cb != 0
+            and _self_consistency_has_formal_charge(input_smiles)):
         return "mismatch"
     if ignore_stereo:
         return "ok"
@@ -1683,6 +1792,12 @@ def _final_opsin_validity_gate(name: str, smiles: Optional[str],
         from .data.natural_products import NAME_EXACT_NP_PARENTS
         if name in NAME_EXACT_NP_PARENTS:
             _record_gate_outcome(_pv.carveout_outcome("np_stereoparent"), name)
+            # Shipped by design (controller ruling 2026-09-25, data/natural_products
+            #.get_natural_product_name), but OPSIN cannot parse it, so it is not
+            # verified, and (the Blue Book) identifies no PIN for these
+            # parents: the name must not be LABELLED pin_verified. Name-scoped record;
+            # the name itself is unchanged.
+            _pv.record_non_pin_fragment(name)
             return name
     except Exception:
         pass
@@ -4029,13 +4144,16 @@ class Orthonym:
         elif source == "trivial_retained":
             tier, is_pin = SYSTEMATIC_VERIFIED, False
             opsin = gate_opsin_label
-        elif prov.get("general_ring_prefix"):
+        elif _pv.name_carries_non_pin_part(prov, name):
             # -T1c: a composer name carrying a ring substituent prefix only
             # the GENERAL tier could build (a systematic replacement / von Baeyer
             # substituent form). Valid, but not PREFERRED -- the ring PIN may be a
             # retained name -- so it must not ship as pin_verified/is_pin. Demoted on
             # the same verified/unverified split the general engine uses, so the tier
-            # still means what it means everywhere else.
+            # still means what it means everywhere else. The same demotion applies
+            # to a name that contains a recorded non-PIN fragment
+            # (``record_non_pin_fragment``, e.g. a carbon-substituted
+            # '...azaniumyl' prefix).
             opsin = gate_opsin_label
             tier = SYSTEMATIC_VERIFIED if opsin == "verified" else BEST_EFFORT
             is_pin = False
@@ -4093,6 +4211,28 @@ class Orthonym:
             if _strict_name != name:
                 tier = PIN_UNVERIFIED
                 is_pin = False
+        # wp7 (verification panel RISK 2): no oracle ran for this name. The
+        # gate records UNAVAILABLE when it cannot consult OPSIN -- the opt-in
+        # reduced mode without a jar (ORTHONYM_ALLOW_REDUCED, jars.py), or a
+        # transient OPSIN failure it fails OPEN on -- and the name then ships
+        # unverified. A pin_verified label claims a verification that did not
+        # happen ('methanaminium' for the radical cation C[NH2+] shipped so), so
+        # such a name is at most pin_unverified. The PIN tier's names and the
+        # breadth are unchanged; only the label is honest.
+        if tier == PIN_VERIFIED and gate_outcome == _pv.GATE_OUTCOME_UNAVAILABLE:
+            tier = PIN_UNVERIFIED
+            is_pin = False
+        # wp7 (verification panel NIT): the Blue Book gives no PIN for these
+        # elements' compounds. the Blue Book "Names of organic compounds based
+        # on aluminium, gallium, indium, and thallium are not followed by the
+        # parenthetical abbreviation (PIN), because the decision to choose between
+        # a name based on organic or inorganic principles has not yet been
+        # reached";:2062 names based on alumane, gallane, indigane and thallane
+        # "currently do not have PIN status". 'dimethylaluminum' for C[Al]C shipped
+        # pin_verified. Such a name is a verified systematic name at most.
+        if tier in (PIN_VERIFIED, PIN_UNVERIFIED) and _has_no_pin_status_element(smiles):
+            tier = SYSTEMATIC_VERIFIED if opsin == "verified" else BEST_EFFORT
+            is_pin = False
         gates = []
         if source == "general_engine":
             gates.append("atom_coverage")
@@ -5305,6 +5445,8 @@ class Orthonym:
                             and getattr(_offer_ger, "name", None) == name
                             else None)
                         from .metrics.provenance import get_provenance as _offer_get_prov
+                        from .metrics.provenance import (
+                            name_carries_non_pin_part as _offer_name_carries_non_pin_part)
                         _offer_prov = _offer_get_prov()
                         _offer_source = _offer_prov.get("source") or "pin_path"
                         if _offer_source == "general_engine":
@@ -5315,7 +5457,7 @@ class Orthonym:
                                 else BEST_EFFORT)
                         elif _offer_source == "trivial_retained":
                             _offer_is_pin, _offer_tier = False, SYSTEMATIC_VERIFIED
-                        elif _offer_prov.get("general_ring_prefix"):
+                        elif _offer_name_carries_non_pin_part(_offer_prov, name):
                             _offer_is_pin = False
                             _offer_tier = (
                                 SYSTEMATIC_VERIFIED
@@ -5661,16 +5803,21 @@ class Orthonym:
         """Task 1.9 (PIN-policy --trivial fallback).
 
         Returns ``result`` unchanged unless ALL of these hold:
-          - ``self._trivial_fallback`` is set (opt-in), AND
           - naming produced only the failure signal (``is_failure_name``), AND
-          - a general-only (PIN-denied) retained name exists for the molecule.
-        In that single case the general-only trivial name is returned. This is
+          - a general-only (PIN-denied) retained name exists for the molecule and
+            ``self._trivial_fallback`` is set (opt-in), OR an OPSIN-import trivial
+            name without PIN evidence exists (default, wp7).
+        In that case the trivial name is returned. This is
         a fallback for an underivable PIN, never a downgrade of a derived PIN
         (a real name is never a failure name, so this can never fire on one).
         Applied only at the top level so recursive fragment calls are unaffected.
         """
-        if not self._trivial_fallback:
-            return result
+        # wp7: a promoted OPSIN-import trivial name without Blue Book PIN
+        # evidence (data.OPSIN_UNVERIFIED_RETAINED_NAMES: 'lepidine', 'nicotine',
+        #...) is no longer a PIN-tier lookup; it is this DEFAULT last resort, so a
+        # molecule the systematic pipeline cannot name keeps the name it had, now
+        # labelled non-PIN (source 'trivial_retained'). The general-only
+        # (PIN-denied) names stay behind the opt-in flag.
         from .assembly.fragment_naming import is_top_level_naming
         if not is_top_level_naming():
             return result
@@ -5679,9 +5826,12 @@ class Orthonym:
         mol = Chem.MolFromSmiles(smiles)
         if mol is None:
             return result
-        from .data import get_general_retained_name
+        from .data import get_general_retained_name, get_unverified_retained_name
         canonical_smiles = Chem.MolToSmiles(mol, canonical=True)
-        trivial = get_general_retained_name(canonical_smiles)
+        trivial = (get_general_retained_name(canonical_smiles)
+                   if self._trivial_fallback else None)
+        if not trivial:
+            trivial = get_unverified_retained_name(canonical_smiles)
         if trivial:
             from .metrics.provenance import record_source
             record_source("trivial_retained")
@@ -7170,7 +7320,11 @@ class Orthonym:
                                 is_benzene_ring as _ibr,
                             )
                             if all(_ibr(features.mol, r) for r in atom_rings):
-                                _det_ring = _sbpr(features.mol)
+                                #: the ring with more principal-group
+                                # instances wins before any substituent count.
+                                _det_ring = _sbpr(features.mol,
+                                                  features.principal_group_atoms,
+                                                  features.principal_group)
                         features.principal_ring = (
                             _det_ring if _det_ring is not None
                             else atom_rings[0]
@@ -7542,7 +7696,21 @@ class Orthonym:
                         SKELETAL_SUFFIX_PGS,
                         _pg_attachment_atoms,
                     )
-                    for match in features.functional_groups[features.principal_group]:
+                    # (c) (the Blue Book): the principal characteristic
+                    # group gets the lowest locants, and that group is the WHOLE
+                    # equal-seniority class the suffix cites -- DD5
+                    # already unions primary/secondary/tertiary -ol (and the amine
+                    # classes) into features.principal_group_atoms, which the suffix
+                    # locants are counted from. Orienting on the principal SUBTYPE's
+                    # matches alone left a secondary -OH out of criterion (a), so
+                    # OCC=CCC(O)CCO tied {1,7}/{1,7} and fell to the ene locant:
+                    # 'hept-2-ene-1,5,7-triol' (PIN 'hept-5-ene-1,3,7-triol',
+                    # {1,3,7} < {1,5,7}; TRIAGE row 95 rt-14). Non-union groups have
+                    # principal_group_atoms == their own matches (unchanged).
+                    _pg_matches = (features.principal_group_atoms
+                                   or features.functional_groups[features.principal_group])
+                    _chain_set = set(features.principal_chain)
+                    for match in _pg_matches:
                         if features.principal_group in SKELETAL_SUFFIX_PGS:
                             # task 9: the -one family's locant atom is
                             # the carbonyl carbon (PG_ATTACHMENT_INDICES);
@@ -7550,13 +7718,29 @@ class Orthonym:
                             # carbon) made orientation criterion (a) tie at
                             # {1,2} both ways for 2-carbon ketone chains and
                             # fall through to alphabetics ('...ethan-2-one').
-                            pg_atom_set.update(
-                                _pg_attachment_atoms(
-                                    features.principal_group, match
-                                )
-                            )
+                            _match_atoms = set(_pg_attachment_atoms(
+                                features.principal_group, match))
                         else:
-                            pg_atom_set.update(match)
+                            _match_atoms = set(match)
+                        pg_atom_set.update(_match_atoms)
+                        # normalizes a match to (heteroatom, bearing C), and
+                        # for an N-substituted amine that bearing C can be an
+                        # N-alkyl carbon OFF the chain, leaving the instance
+                        # invisible to criterion (a): CCN(CC)CCCC(C)N shipped
+                        # 'N5,N5-diethylpentane-2,5-diamine' (PIN 'N1,N1-diethyl-
+                        # pentane-1,4-diamine', cf. BB:4675). The suffix locant of
+                        # such an instance is the chain atom bonded to its
+                        # heteroatom, so anchor there. Only the heteroatom's own
+                        # chain neighbours count (an -OH on a side-branch carbon
+                        # is a substituent, never anchored).
+                        if not (_match_atoms | set(match)) & _chain_set:
+                            for _a in match:
+                                _atom = features.mol.GetAtomWithIdx(_a)
+                                if _atom.GetAtomicNum() in (1, 6):
+                                    continue
+                                pg_atom_set.update(
+                                    nb.GetIdx() for nb in _atom.GetNeighbors()
+                                    if nb.GetIdx() in _chain_set)
 
                 # Get initial substituents for orientation criterion (d)
                 # This is needed BEFORE orientation to apply lowest-locant rule

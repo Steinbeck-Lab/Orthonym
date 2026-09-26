@@ -74,33 +74,39 @@ class TestReplacementTerms:
 
 @pytest.mark.unit
 class TestPinTrigger:
-    """: strict IUPAC PIN trigger function tests.
+    """The PIN trigger `_qualifies_for_pin_skeletal_replacement(backbone, mol)`.
 
-    Tests `_qualifies_for_pin_skeletal_replacement(backbone, mol)` which
-    replaces the legacy single-hetero chain-len < 6 inline reject with
-    explicit branch labels per IUPAC Blue Book.
-
-    Source: 154-internal notes; internal notes; internal notes-A.md
-    Source: IUPAC Blue Book 2013.
+     fix a performance pass (change-asserted-value): the trigger now counts
+    heterounits. Blue Book 2013, `## **** Skeletal replacement ('a')
+    nomenclature in acyclic chains`, (the Blue Book):
+    "Skeletal replacement ('a') nomenclature rather than substitutive or
+    multiplicative names must be used to generate preferred IUPAC names for
+    acyclic structures when four or more heterounits are present in a
+    unbranched chain containing at least one carbon atom...". A heterounit is
+    "a set of heteroatoms having a name of its own such as, -SS-,
+    disulfanediyl; -SiH2-O-SiH2-, disiloxane-1,3-diyl; -SOS-, dithioxanediyl"
+    (:23350). Boundary rows: "(1) 1-methoxy-2-(2-methoxyethoxy)ethane (PIN)"
+    (:27756, three O) vs "(4) 2,5,8,11-tetraoxadodecane (PIN)" (:27762). The
+    old labels ('>=3-mixed-kind' for CSCNCOC, 'single-hetero-long-chain' for
+    CCCOCCCC) had no Blue Book basis. Code-level mutation: against the
+    task-start src these rows fail.
     """
 
     @pytest.mark.parametrize("smiles,backbone_indices,expected_qualifies,expected_branch", [
-        # Branch (a): >= 4 same-kind heteroatoms
-        # COCOCOCOC: positions 0=C, 1=O, 2=C, 3=O, 4=C, 5=O, 6=C, 7=O, 8=C
-        # Embedded (skip 0 and 8): O O O O at positions 1,3,5,7 -- 4 same-kind
-        ("COCOCOCOC", [0, 1, 2, 3, 4, 5, 6, 7, 8], True, ">=4-same-kind"),
-        # Branch (b): >= 3 mixed-kind heteroatoms
-        # CSCNCOC: 0=C, 1=S, 2=C, 3=N, 4=C, 5=O, 6=C (S+N+O = 3 distinct)
-        ("CSCNCOC", [0, 1, 2, 3, 4, 5, 6], True, ">=3-mixed-kind"),
-        # Single hetero long chain (legacy gate-5 accept):
-        # CCCOCCCC: 0..7, embedded O at index 3, len=8 >= 6
-        ("CCCOCCCC", [0, 1, 2, 3, 4, 5, 6, 7], True, "single-hetero-long-chain"),
-        # Single hetero short chain (legacy gate-5 reject):
-        # COC: 0=C, 1=O, 2=C, embedded O at index 1, len=3 < 6
-        ("COC", [0, 1, 2], False, "single-hetero-short-chain"),
-        # No heteroatoms in embedded positions:
-        # CCCCC: 0=C, 1=C, 2=C, 3=C, 4=C
+        # four O heterounits
+        ("COCOCOCOC", [0, 1, 2, 3, 4, 5, 6, 7, 8], True, ">=4-heterounits"),
+        # three heterounits (S, N, O): substitutive (was '>=3-mixed-kind')
+        ("CSCNCOC", [0, 1, 2, 3, 4, 5, 6], False, "fewer-than-4-heterounits"),
+        # one heterounit (was 'single-hetero-long-chain')
+        ("CCCOCCCC", [0, 1, 2, 3, 4, 5, 6, 7], False, "fewer-than-4-heterounits"),
+        ("COC", [0, 1, 2], False, "fewer-than-4-heterounits"),
         ("CCCCC", [0, 1, 2, 3, 4], False, "no-heteroatoms"),
+        # -SS- is ONE heterounit (disulfanediyl): SS + O + O + O = 4
+        ("CSSCCOCCOCCOC", list(range(13)), True, ">=4-heterounits"),
+        # -SiH2-O-SiH2- is ONE heterounit (disiloxane-1,3-diyl): 1 + 3 O = 4
+        ("C[SiH2]O[SiH2]CCOCCOCCOC", list(range(13)), True, ">=4-heterounits"),
+        # -SSS-: "trisulfane... is not allowed to be a heterounit" (:23385)
+        ("CCSSSCC", list(range(7)), False, "heterounits-not-countable"),
     ])
     def test_branch_assignment(self, smiles, backbone_indices, expected_qualifies, expected_branch):
         from orthonym.rules.skeletal_replacement import _qualifies_for_pin_skeletal_replacement
@@ -116,18 +122,12 @@ class TestPinTrigger:
 
 @pytest.mark.unit
 class TestPinTriggerEndToEnd:
-    """ end-to-end: confirm helper is wired into try_skeletal_replacement_name.
-
-    Verifies the helper is called from the gate-5 position in
-    `try_skeletal_replacement_name` (replacing the inline reject) and that
-    the existing happy-path semantics are preserved.
-    """
+    """The trigger is wired into try_skeletal_replacement_name."""
 
     @pytest.mark.parametrize("smiles,expected_name", [
-        # branch (a) >= 4 same-kind oxygens
         ("COCOCOCOC", "2,4,6,8-tetraoxanonane"),
-        # two-hetero accept path with terminal-OH suffix
-        ("OCCOCCOCC", "3,6-dioxaoctan-1-ol"),
+        ("COCCOCCOCCOC", "2,5,8,11-tetraoxadodecane"),       # BB:27762
+        ("OCCOCCOCCOCCOCC", "3,6,9,12-tetraoxatetradecan-1-ol"),
     ])
     def test_accepts(self, smiles, expected_name):
         from orthonym.rules.skeletal_replacement import try_skeletal_replacement_name
@@ -135,9 +135,16 @@ class TestPinTriggerEndToEnd:
         assert try_skeletal_replacement_name(mol) == expected_name
 
     @pytest.mark.parametrize("smiles", [
-        "COC",     # single-hetero-short-chain reject
-        "CCC",     # no-heteroatoms reject
-        "CCCCC",   # no-heteroatoms reject (longer)
+        "COC",     # one heterounit
+        "CCC",     # no heteroatoms
+        "CCCCC",   # no heteroatoms (longer)
+        # fix a performance pass: fewer than four heterounits -> substitutive PIN
+        #,:23348). Was '3,6-dioxaoctan-1-ol', '2,5,8-trioxanonane',
+        # '4-thiaheptane', '2,5-dithiahexane'.
+        "OCCOCCOCC",
+        "COCCOCCOC",
+        "CCCSCCC",
+        "CSCCSC",
     ])
     def test_rejects(self, smiles):
         from orthonym.rules.skeletal_replacement import try_skeletal_replacement_name
@@ -305,14 +312,24 @@ class TestDioxaChains:
         assert try_skeletal_replacement_name(mol) is None
 
     def test_trioxanonane(self):
-        """COCCOCCOC -> 2,5,8-trioxanonane"""
+        """COCCOCCOC: three heterounits -> no skeletal name (fix a performance pass; was
+        '2,5,8-trioxanonane'). (the Blue Book): skeletal replacement names are PINs only "when
+        four or more heterounits are present in a unbranched chain"; "(1) 1-methoxy-2-(2-
+        methoxyethoxy)ethane (PIN)" (:27756) for three ether O. OPSIN 2.9.0 full-InChIKey
+        round trip of the new name: exact."""
         mol = Chem.MolFromSmiles('COCCOCCOC')
-        assert try_skeletal_replacement_name(mol) == '2,5,8-trioxanonane'
+        assert try_skeletal_replacement_name(mol) is None
+        assert name_compound('COCCOCCOC') == '1-methoxy-2-(2-methoxyethoxy)ethane'
 
     def test_trioxaundecane(self):
-        """CCOCCOCCOCC -> 3,6,9-trioxaundecane"""
+        """CCOCCOCCOCC: three heterounits -> substitutive (fix a performance pass; was
+        '3,6,9-trioxaundecane'). (the Blue Book): skeletal replacement names are PINs only "when
+        four or more heterounits are present in a unbranched chain"; "(1) 1-methoxy-2-(2-
+        methoxyethoxy)ethane (PIN)" (:27756) for three ether O. OPSIN 2.9.0 full-InChIKey
+        round trip of the new name: exact."""
         mol = Chem.MolFromSmiles('CCOCCOCCOCC')
-        assert try_skeletal_replacement_name(mol) == '3,6,9-trioxaundecane'
+        assert try_skeletal_replacement_name(mol) is None
+        assert name_compound('CCOCCOCCOCC') == '1-ethoxy-2-(2-ethoxyethoxy)ethane'
 
 
 # ============================================================================
@@ -353,9 +370,11 @@ class TestThiaChains:
     """Test replacement naming for chains with embedded sulfur atoms."""
 
     def test_dithiahexane(self):
-        """CSCCSC -> 2,5-dithiahexane"""
+        """CSCCSC: two heterounits -> no skeletal name (fix a performance pass; was
+        '2,5-dithiahexane'). (the Blue Book) needs four
+        heterounits; the O analog is '1,2-dimethoxyethane (PIN)' (:27754)."""
         mol = Chem.MolFromSmiles('CSCCSC')
-        assert try_skeletal_replacement_name(mol) == '2,5-dithiahexane'
+        assert try_skeletal_replacement_name(mol) is None
 
 
 # ============================================================================
@@ -484,8 +503,12 @@ class TestEndToEnd:
         assert name_compound('CCOCCOCC') == '1,2-diethoxyethane'
 
     def test_trioxanonane_e2e(self):
-        """name_compound('COCCOCCOC') -> '2,5,8-trioxanonane'"""
-        assert name_compound('COCCOCCOC') == '2,5,8-trioxanonane'
+        """name_compound('COCCOCCOC') -> '1-methoxy-2-(2-methoxyethoxy)ethane' (PIN,
+         fix a performance pass; was '2,5,8-trioxanonane'). (the Blue Book): skeletal replacement names are PINs only "when
+        four or more heterounits are present in a unbranched chain"; "(1) 1-methoxy-2-(2-
+        methoxyethoxy)ethane (PIN)" (:27756) for three ether O. OPSIN 2.9.0 full-InChIKey
+        round trip of the new name: exact."""
+        assert name_compound('COCCOCCOC') == '1-methoxy-2-(2-methoxyethoxy)ethane'
 
     @pytest.mark.opsin_gate
     def test_mixed_oxa_aza_e2e(self):
@@ -516,8 +539,12 @@ class TestEndToEnd:
         assert name_compound('CCO') == 'ethanol'
 
     def test_dithiahexane_e2e(self):
-        """name_compound('CSCCSC') -> '2,5-dithiahexane'"""
-        assert name_compound('CSCCSC') == '2,5-dithiahexane'
+        """name_compound('CSCCSC') -> '1,2-bis(methylsulfanyl)ethane' (fix a performance pass;
+        was '2,5-dithiahexane'). (the Blue Book): two heterounits
+        are below the four the 'a' name needs; the sulfide analog of '1,2-
+        dimethoxyethane (PIN)' (:27754), 'bis' for the compound prefix methylsulfanyl
+        . OPSIN 2.9.0 full-InChIKey round trip: exact."""
+        assert name_compound('CSCCSC') == '1,2-bis(methylsulfanyl)ethane'
 
 
 # ============================================================================
@@ -622,11 +649,92 @@ class TestTerminalGroup14Gate:
     @pytest.mark.parametrize("smiles,expected", [
         # INTERIOR Group-14 stays a skeletal replacement (terminal atoms are C).
         ("C[SiH2]CC[SiH2]CC[SiH2]CC[SiH2]C", "2,5,8,11-tetrasiladodecane"),
-        # R4 /: 2-O diether without terminal -ol -> substitutive (None from skeletal).
-        # COCCOC -> None (substitutive gives '1,2-dimethoxyethane'). Updated pre-R4 '2,5-dioxahexane'.
-        # 3-O triether stays skeletal (>= 3 O falls through R4 gate).
-        ("COCCOCCOC", "2,5,8-trioxanonane"),
+        # An ether chain with four heterounits stays a skeletal replacement name
+        # (fix a performance pass: was the 3-O COCCOCCOC, now substitutive by,
+        # the Blue Book; "(4) 2,5,8,11-tetraoxadodecane (PIN)":27762).
+        ("COCCOCCOCCOC", "2,5,8,11-tetraoxadodecane"),
     ])
     def test_interior_and_ether_unaffected(self, smiles, expected):
         mol = Chem.MolFromSmiles(smiles)
         assert try_skeletal_replacement_name(mol) == expected
+
+
+@pytest.mark.unit
+class TestBelowThresholdLambdaChainGeneralTier:
+    """ fix a performance pass: a chain below four heterounits is not an 'a' PIN
+    , the Blue Book). For a lambda heteroatom chain the
+    substitutive PIN needs a lambda parent hydride ('dioctyl-λ2-stannane';
+    "SnH2 λ2-stannane (preselected name, see ",:7968), which the engine
+    does not build, so the PIN tier declines and the best-effort tier keeps the
+    RT-exact 'a' name, labelled general (not is_pin). Breadth never drops (the
+    m1500 dioctyltin adduct row stays RT-exact at best-effort)."""
+
+    # What SHIPS: gate on. (Gate off, a pre-existing producer offers the wrong
+    # molecule 'dioctylstannane' at the PIN tier, before and after this change;
+    # the validity gate voids it -- the recorded gate-off latent class.)
+    @pytest.mark.opsin_gate
+    @pytest.mark.parametrize("smiles,a_name", [
+        ("CCCCCCCC[Sn]CCCCCCCC", "9λ2-stannaheptadecane"),
+        ("CCC[Sn]CCC", "4λ2-stannaheptane"),
+    ])
+    def test_pin_tier_declines_best_effort_keeps_general_name(self, smiles, a_name):
+        from tests.support.rt_assert import name_best_effort, name_is_rt_exact
+        assert try_skeletal_replacement_name(Chem.MolFromSmiles(smiles)) is None
+        res = name_best_effort(smiles)
+        assert res["name"] == a_name
+        assert res["is_pin"] is False
+        assert name_is_rt_exact(res["name"], smiles)
+
+
+@pytest.mark.unit
+class TestSameElementDichalcogenHeterounit:
+    """ fix a performance pass (BB-measure losses /. A same-element
+    chalcogen pair is ONE heterounit -- ('## Skeletal
+    replacement ('a') nomenclature in acyclic chains', the Blue Book): "A
+    heterounit is a set of heteroatoms having a name of its own such as, -SS-,
+    disulfanediyl" -- and ('## Peroxides, disulfides,
+    diselenides, and ditellurides',:27854) method (4), skeletal replacement,
+    "generate[s] preferred IUPAC names when the conditions for their use are
+    satisfied" (:27866), with the worked PINs "(4) 2,4,5,8,11-pentathiadodecane
+    (PIN)" (:27894) and "(3) 2,4,5,8-tetrathia-11-selenadodecane (PIN)" (:27927),
+    each four heterounits with -SS- counted once. The classic path used to veto
+    every chalcogen-chalcogen bond, so the chain stopped at the first S and the
+    engine shipped '1-(methylsulfanyl)-2-({2-[(methylsulfanyl)methylsulfanyl
+    sulfanyl]ethyl}sulfanyl)ethane' once 5620d69f2 let that name round-trip.
+    Below four heterounits the substitutive name stays the PIN: "(1)
+    (methyldisulfanyl)methane (PIN)" (:27874)."""
+
+    @pytest.mark.parametrize("smiles,expected", [
+        # BB:27894 and:27927, both SMILES orientations (determinism).
+        ("CSCCSCCSSCSC", "2,4,5,8,11-pentathiadodecane"),
+        ("CSCSSCCSCCSC", "2,4,5,8,11-pentathiadodecane"),
+        ("CSCSSCCSCC[Se]C", "2,4,5,8-tetrathia-11-selenadodecane"),
+        ("C[Se]CCSCCSSCSC", "2,4,5,8-tetrathia-11-selenadodecane"),
+        # The peroxide analogue covers R-OO-R' too): four heterounits.
+        ("COCCOCCOOCCOC", "2,5,6,9,12-pentaoxatridecane"),
+    ])
+    def test_four_heterounits_across_a_dichalcogen_pair(self, smiles, expected):
+        assert try_skeletal_replacement_name(Chem.MolFromSmiles(smiles)) == expected
+
+    @pytest.mark.parametrize("smiles", [
+        "CSSC",        # 1 unit: '(methyldisulfanyl)methane (PIN)':27874
+        "CSCCSSC",     # 2 units: '1-(methyldisulfanyl)-2-(methylsulfanyl)ethane'
+        "CSCSSCSC",    # 3 units (S, SS, S): substitutive
+        "COCCOOCCOC",  # 3 units (O, OO, O): substitutive
+        "CCCCOO",      # terminal -OOH ends on O: 'butane-1-peroxol' keeps its suffix
+        "CCCCSS",      # terminal -SSH: 'butane-1-dithioperoxol'
+        "CSCCOSCCSC",  # mixed -O-S- pair stays unwalked (unchanged, fail closed)
+    ])
+    def test_below_four_or_terminal_or_mixed_declines(self, smiles):
+        assert try_skeletal_replacement_name(Chem.MolFromSmiles(smiles)) is None
+
+    @pytest.mark.opsin_gate
+    @pytest.mark.parametrize("smiles,expected", [
+        ("CSCCSCCSSCSC", "2,4,5,8,11-pentathiadodecane"),
+        ("CSCSSCCSCC[Se]C", "2,4,5,8-tetrathia-11-selenadodecane"),
+    ])
+    def test_pin_tier_ships_the_bb_pin(self, smiles, expected):
+        from tests.support.rt_assert import assert_full_rt
+        name = name_compound(smiles)
+        assert name == expected
+        assert_full_rt(name, smiles)

@@ -41,6 +41,60 @@ class TestP1654_1_2_FusionSpiroAssemblyBracketsIgnored:
         assert apply_enclosing_marks("[1,1'-biphenyl]-4,4'-diylbis(oxy)", -1) == \
             "[[1,1'-biphenyl]-4,4'-diylbis(oxy)]"
 
+    # (BB 7444/7446): "square brackets and/or parentheses that are an
+    # integral part of the name of a parent structure does not affect the
+    # nesting order" -- the component parentheses of a ring assembly
+    # ('bi(cyclohexan)') are integral to it, like its square brackets (7469).
+    def test_ring_assembly_with_parenthesized_component_ignored(self):
+        # BB 17102: 4-[4-([1,1'-bi(cyclohexan)]-4-yl)phenyl]-4'-phenyl-...
+        assert compute_nesting_depth("[1,1'-bi(cyclohexan)]-4-yl") == 0
+        assert apply_enclosing_marks("[1,1'-bi(cyclohexan)]-4-yl", -1) == \
+            "([1,1'-bi(cyclohexan)]-4-yl)"
+
+    def test_ring_assembly_with_substituent_and_component_parens(self):
+        # BB 24163: [4-(4'-phenyl[1,1'-bi(cyclohexan)]-4-yl)phenyl]
+        assert apply_enclosing_marks(
+            "4'-phenyl[1,1'-bi(cyclohexan)]-4-yl", -1) == \
+            "(4'-phenyl[1,1'-bi(cyclohexan)]-4-yl)"
+
+    def test_ring_assembly_with_colon_locant_sets_ignored(self):
+        # BB 23917: 3,5-di([1,1':3',1''-terphenyl]-3-yl)pyridine
+        assert apply_enclosing_marks("[1,1':3',1''-terphenyl]-3-yl", -1) == \
+            "([1,1':3',1''-terphenyl]-3-yl)"
+        assert apply_enclosing_marks(
+            "[1,1':4',1''-ter(cyclohexan)]-4-yl", -1) == \
+            "([1,1':4',1''-ter(cyclohexan)]-4-yl)"
+
+    def test_ring_assembly_with_von_baeyer_component_ignored(self):
+        assert compute_nesting_depth(
+            "[2,2'-bi(bicyclo[2.2.1]heptan)]-3-yl") == 0
+
+    def test_ring_assembly_with_indicated_hydrogen_ignored(self):
+        assert compute_nesting_depth("[1H,1'H-2,2'-biindol]-5-yl") == 0
+
+    def test_stereo_before_ring_assembly_still_counts(self):
+        # BB 50452: 1-[(1r,1'S,4S)-[1,1'-bi(cyclohexan)]-3'-en-4-yl]-...
+        assert apply_enclosing_marks(
+            "(1r,1'S,4S)-[1,1'-bi(cyclohexan)]-3'-en-4-yl", -1) == \
+            "[(1r,1'S,4S)-[1,1'-bi(cyclohexan)]-3'-en-4-yl]"
+
+    def test_leading_ring_assembly_with_component_parens_is_not_consecutive(self):
+        # As the BB 7469 '[[1,1'-biphenyl]-4,4'-diylbis(oxy)]' example: a
+        # leading ring-assembly bracket is not a nesting mark, so '[' goes
+        # directly around it.
+        assert apply_enclosing_marks(
+            "[1,1'-bi(cyclohexan)]-4,4'-diylbis(oxy)", -1) == \
+            "[[1,1'-bi(cyclohexan)]-4,4'-diylbis(oxy)]"
+
+    def test_multiplied_substituent_is_not_a_ring_assembly(self):
+        # Negative control: 'bis(' is a multiplier, not a ring
+        # assembly component -- its parentheses keep counting.
+        assert apply_enclosing_marks("3,5-bis(trifluoromethyl)phenyl", -1) == \
+            "[3,5-bis(trifluoromethyl)phenyl]"
+        #...and a nesting bracket around it is never taken for an assembly.
+        assert compute_nesting_depth(
+            "4-[3,5-bis(trifluoromethyl)phenyl]butyl") == 2
+
 
 class TestP1654_1_3_CountedParentheses:
     # BB 7478: compound locants, stereo descriptors etc. ARE counted.

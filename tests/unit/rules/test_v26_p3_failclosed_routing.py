@@ -48,6 +48,7 @@ from orthonym.rules.fused_rings import (
 )
 from orthonym.metrics.provenance import general_fallback_ctx
 from tests.support.jars import jar_or_none
+from tests.support.rt_assert import assert_full_rt
 
 
 pytestmark = pytest.mark.unit
@@ -68,34 +69,81 @@ GOOD_CASES = [
     ("Cc1ccc2ccccc2n1", "2-methylquinoline"),
     ("COc1ccc2ccccc2n1", "2-methoxyquinoline"),
     ("O=C(O)c1ccc2ccccc2n1", "quinoline-2-carboxylic acid"),
-    ("CN(C)c1ccc2ccccc2n1", "2-(dimethylamino)quinoline"),
+    # PIN (no plan ruling; derived from the quoted rules): "(1) substitutively
+    # using the retained name 'aniline' or the suffix 'amine' and the name of a parent
+    # hydride with further N-substitution" the Blue Book, "Method (1) generates
+    # preferred IUPAC names.":26231; "N,N-dimethylpent-1-yn-3-amine (PIN)":26278;
+    # uses the prefix 'amino' only "when the –NH2 group is not the principal characteristic
+    # group":26298. OPSIN RT exact (TRIAGE.csv; re-checked in Task 7/8). The test ids are now
+    # '...-N,N-dimethylquinolin-2-amine'.
+    ("CN(C)c1ccc2ccccc2n1", "N,N-dimethylquinolin-2-amine"),
     ("c1ccc2[nH]ccc2c1", "1H-indole"),
     ("Cc1nc2ccccc2[nH]1", "2-methyl-1H-benzimidazole"),
 ]
 
-# Under complete: DROP case -> either fail closed ('unknown') or a general-engine
-# name that OPSIN-round-trips. (SMILES, expected complete name or None=abstain).
+# Under complete: a DROP case is never the group-dropping name. (SMILES,
+# expected complete name, or RT_EXACT = any name that round-trips to the input's
+# full InChIKey.)
+#
+# Pre-existing-failures plan, Task 9 (TRIAGE.csv rows 138-141):
+# * The first three were asserted to fail closed. User decision D-b (plan 'User
+# decisions (answered 2026-09-24)'): "D-b -> the policy wins: where a
+# wider-tier name round-trips EXACTLY, change the test to assert an exact
+# round-trip." complete now names all three, OPSIN 2.9.0 RT exact (full
+# InChIKey; the selanyl radical with OPSIN -r), so the test asserts the
+# round trip, not the spellings: two are von Baeyer names of a quinoline
+# (best-effort names; the fusion name would be the PIN,
+# the Blue Book) and the radical is '(quinolin-2-yl)selanyl'.
+# * The silyl row (no plan ruling; derived from the quoted rule), was
+# '4-silyl-5-aza...': "Bi- and polycyclic von Baeyer heterocycles
+# named by skeletal replacement ('a') nomenclature" (:16697) "low locants
+# are assigned to heteroatoms, in accord with the fixed numbering of the
+# system, then to unsaturated sites": N is next to a bridgehead, so it takes
+# locant 2, not 5, and the silyl carbon 3. RT exact; old value
+# mutation-checked. test_v26_p4_multifragment.py already asserts this
+# spelling for the same fragment.
+RT_EXACT = "<any name that round-trips exactly>"
 COMPLETE_EXPECT = {
-    "CB(O)Oc1ccc2ccccc2n1": None,                  # general engine also declines
-    "CS(=O)(=O)c1ccc2ccccc2n1": None,
-    "[Se]c1ccc2ccccc2n1": None,
+    "CB(O)Oc1ccc2ccccc2n1": RT_EXACT,
+    "CS(=O)(=O)c1ccc2ccccc2n1": RT_EXACT,
+    "[Se]c1ccc2ccccc2n1": RT_EXACT,
     "[SiH3]c1ccc2ccccc2n1":
-        "4-silyl-5-azabicyclo[4.4.0]deca-1(10),2,4,6,8-pentaene",  # CORRECTED
+        "3-silyl-2-azabicyclo[4.4.0]deca-1(10),2,4,6,8-pentaene",
 }
 
 # COVERAGE (C): pin abstains cleanly, complete emits an RT-OK general name.
+#
+# Pre-existing-failures plan, Task 9 (TRIAGE.csv rows 142, 143; no plan ruling,
+# derived from the quoted rule) change-asserted-value, was '4-(...)': the ene
+# locant set is '1(10),2,4,6,8' in both numberings, so NUMBERING
+# (the Blue Book) criterion "(f) detachable alphabetized prefixes, all
+# considered together in a series of increasing numerical order" (:3301)
+# decides: 3 < 4. OPSIN 2.9.0 RT exact (full InChIKey); old values
+# mutation-checked. These are best-effort von Baeyer names of a substituted
+# naphthalene (the fusion name would be the PIN,:23710; the PIN
+# tier abstains, test_coverage_pin_abstains).
 COVERAGE_CASES = [
     ("[SiH3]c1ccccn1", "2-silylpyridine"),
-    ("CCC(C)c1ccc2ccccc2c1",
-     "4-(butan-2-yl)bicyclo[4.4.0]deca-1(10),2,4,6,8-pentaene"),
-    ("COCCc1ccc2ccccc2c1",
-     "4-(2-methoxyethyl)bicyclo[4.4.0]deca-1(10),2,4,6,8-pentaene"),
+]
+
+# fix a performance pass (wp5) change-asserted-value: the two naphthalenes above now get
+# their fusion PIN at the PIN tier (they used to abstain there: the PAH substituent
+# identifier named 'butan-2-yl' as 'butyl' by carbon count and dropped the
+# 2-methoxyethyl group, and the gate rejected both). (:23710) the fusion
+# name is the PIN; / 'butan-2-yl (preferred prefix)';
+# ethers as prefixes. OPSIN 2.9.0 full-InChIKey round trip: exact. A decline that
+# becomes an RT-exact name: the test asserts the name (TRIAGE.md 'User decisions' D-b).
+# The complete tier takes the same PIN-tier name.
+PIN_NOW_NAMED = [
+    ("CCC(C)c1ccc2ccccc2c1", "2-(butan-2-yl)naphthalene"),
+    ("COCCc1ccc2ccccc2c1", "2-(2-methoxyethyl)naphthalene"),
 ]
 
 # Names emitted under complete that must OPSIN-round-trip to their input.
 _RT_NAMES = {smi: COMPLETE_EXPECT[smi] for smi in COMPLETE_EXPECT
-             if COMPLETE_EXPECT[smi]}
+             if COMPLETE_EXPECT[smi] != RT_EXACT}
 _RT_NAMES.update(dict(COVERAGE_CASES))
+_RT_NAMES.update(dict(PIN_NOW_NAMED))
 
 
 # --------------------------------------------------------------------------
@@ -204,8 +252,9 @@ def test_drop_cases_are_unaccounted(smiles, _legacy):
 
 # --------------------------------------------------------------------------
 # complete-tier full namer: a DROP case is NEVER the wrong bare-core name -- it
-# is corrected by the general engine (RT-OK) or fails closed ('unknown').
-# Needs the production gate (else the suite ships unverified names).
+# is named RT-exact (the general engine or another producer) or, where no
+# producer can, fails closed ('unknown'). Needs the production gate (else the
+# suite ships unverified names).
 # --------------------------------------------------------------------------
 @pytest.mark.parametrize("smiles,wrong", DROP_CASES)
 def test_complete_never_ships_the_dropped_name(smiles, wrong, production_gate):
@@ -214,9 +263,8 @@ def test_complete_never_ships_the_dropped_name(smiles, wrong, production_gate):
     out = comp.name(Chem.CanonSmiles(smiles))
     assert out != wrong, f"{smiles}: complete shipped the group-dropping {out!r}"
     expected = COMPLETE_EXPECT[smiles]
-    if expected is None:
-        assert is_failure_name(out), (
-            f"{smiles}: expected fail-closed, got {out!r}")
+    if expected == RT_EXACT:
+        assert_full_rt(out, Chem.CanonSmiles(smiles), what="complete tier: ")
     else:
         assert out == expected, f"{smiles}: {out!r} != {expected!r}"
 
@@ -238,6 +286,15 @@ def test_coverage_complete_emits(smiles, expected, production_gate):
                      allow_aromatic_general=True)
     out = comp.name(Chem.CanonSmiles(smiles))
     assert out == expected, f"{smiles}: complete gave {out!r} != {expected!r}"
+
+
+@pytest.mark.parametrize("smiles,expected", PIN_NOW_NAMED)
+def test_pin_tier_now_names_the_fusion_pin(smiles, expected, production_gate):
+    for namer in (Orthonym(style="pin"),
+                  Orthonym(style="pin", general_fallback=True,
+                           allow_aromatic_general=True)):
+        out = namer.name(Chem.CanonSmiles(smiles))
+        assert out == expected, f"{smiles}: {out!r} != {expected!r}"
 
 
 # --------------------------------------------------------------------------

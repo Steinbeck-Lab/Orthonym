@@ -40,8 +40,11 @@ def _rt_full(smi, name):
 @pytest.mark.opsin_gate
 @pytest.mark.parametrize("smi,expected", [
     # carbachol / bethanechol: acyclic QUATERNARY aminium -- already correct
+    # wp7 change-asserted-value: (the Blue Book) keeps the locant '1' on a
+    # substituted ethane parent ('2-aminoethan-1-aminium chloride (PIN)':43572). Was
+    # '2-(carbamoyloxy)-N,N,N-trimethylethanaminium chloride'. OPSIN full-InChIKey exact.
     ("C[N+](C)(C)CCOC(N)=O.[Cl-]",
-     "2-(carbamoyloxy)-N,N,N-trimethylethanaminium chloride"),
+     "2-(carbamoyloxy)-N,N,N-trimethylethan-1-aminium chloride"),
     ("CC(C[N+](C)(C)C)OC(N)=O.[Cl-]",
      "2-(carbamoyloxy)-N,N,N-trimethylpropan-1-aminium chloride"),
     ("CCO", "ethanol"),

@@ -57,9 +57,15 @@ def _phospho_frag(smiles: str):
 # MEASURED default-tier breadth win (abstain -> RT-valid emit with the fix).
 # Nicotinic acid mononucleotide-class (charged pyridinium nucleotide).
 PYRIDINIUM_NT = "O=C(O)c1ccc[n+]([C@@H]2O[C@H](COP(=O)(O)O)[C@@H](O)[C@H]2O)c1"
+# 2026-09-25 (pre-existing-failures plan, Task 5) change-asserted-value: the
+# oxolanyl prefix holds its stereodescriptor parentheses (counted,,
+# the Blue Book) AND its own '[(phosphonooxy)methyl]', so it is enclosed
+# in braces by the order "{[({})]}" (:7446), as in
+# '10-{[(3S)-1-phosphabicyclo[2.2.2]octan-3-yl]methyl}-10H-phenoxazine (PIN)'
+# (:7489); the old '[' put a bracket directly around a bracket. OPSIN RT exact.
 PYRIDINIUM_NT_NAME = (
-    "3-carboxy-1-[(2R,3R,4S,5R)-3,4-dihydroxy-5-[(phosphonooxy)methyl]"
-    "oxolan-2-yl]pyridin-1-ium"
+    "3-carboxy-1-{(2R,3R,4S,5R)-3,4-dihydroxy-5-[(phosphonooxy)methyl]"
+    "oxolan-2-yl}pyridin-1-ium"
 )
 
 # Original brief witnesses — need an additional composition step; pinned here

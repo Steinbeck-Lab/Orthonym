@@ -412,7 +412,7 @@ def name_natural_product(mol) -> Optional[str]:
                 # instead of shipping a bare/unsaturated name that misrepresents the ene/yne
                 # position or an unverified stereoisomer.
                 if ring_ab and not _alpha_beta_rt_ok(mol, name_ab):
-                    wg_name = _assemble_unsat(_whole_graph_rs_prefix(mol, numbering), {})
+                    wg_name = _assemble_unsat(_whole_graph_rs_prefix(mol, numbering, scaffold_info), {})
                     if _alpha_beta_rt_ok(mol, wg_name):
                         return wg_name
                     return None  # Fall through to systematic naming
@@ -458,7 +458,7 @@ def name_natural_product(mol) -> Optional[str]:
                     # wrong '(5S,8S,9S,10S,13R,14S)-pregnane' pre-fix). Neither candidate
                     # round-tripping -> fall through to the bare-name path below;
                     # catches the resulting stereo omission downstream (never a wrong molecule).
-                    wg_name = _assemble_sat(_whole_graph_rs_prefix(mol, numbering), {})
+                    wg_name = _assemble_sat(_whole_graph_rs_prefix(mol, numbering, scaffold_info), {})
                     if _alpha_beta_rt_ok(mol, wg_name):
                         return wg_name
                 # no stereo to emit, or no stereo candidate round-tripped -> fall through to the
@@ -758,18 +758,21 @@ def name_natural_product_with_substituents(
         # single conjugate; mixed conjugate+ester is honest-failed upstream (/ >1 guard).
         joined = esters + conjugates
         if joined:
-            return _assemble_np_ester_name(
+            out = _assemble_np_ester_name(
                 scaffold_stem, scaffold_name, hydroxyls, ketones,
                 unsaturation, joined, stereo_prefix=sp,
                 methyls=methyls, halogens=halogens, ring_ab=rab,
             )
-        return _assemble_np_name(
-            scaffold_stem, scaffold_name, hydroxyls, ketones, unsaturation,
-            stereo_prefix=sp, methyls=methyls, halogens=halogens,
-            epoxy_bridges=epoxy_bridges, n_alkyls=n_alkyls, methoxys=methoxys,
-            modification_prefix=modification_prefix, ring_ab=rab,
-            glycosyloxys=glycosyloxys,
-        )
+        else:
+            out = _assemble_np_name(
+                scaffold_stem, scaffold_name, hydroxyls, ketones, unsaturation,
+                stereo_prefix=sp, methyls=methyls, halogens=halogens,
+                epoxy_bridges=epoxy_bridges, n_alkyls=n_alkyls, methoxys=methoxys,
+                modification_prefix=modification_prefix, ring_ab=rab,
+                glycosyloxys=glycosyloxys,
+            )
+        _record_if_acid_as_prefixes(out, hydroxyls, ketones)
+        return out
 
     # tail #13: a generic glycosyloxy decoration is cited with a plain
     # numeric substituent locant, which the steroid α/β assembly does not compose
@@ -780,7 +783,7 @@ def name_natural_product_with_substituents(
     # net); honest-fail if it does not (never ship a name that drops or
     # mis-locates the sugar). Fail-OPEN when OPSIN is absent.
     if glycosyloxys:
-        name_rs = _assemble_steroid(_whole_graph_rs_prefix(mol, numbering), {})
+        name_rs = _assemble_steroid(_whole_graph_rs_prefix(mol, numbering, scaffold_info), {})
         return name_rs if _alpha_beta_rt_ok(mol, name_rs) else None
 
     name_ab = _assemble_steroid(stereo_prefix, ring_ab)
@@ -788,7 +791,7 @@ def name_natural_product_with_substituents(
         # Steroid α/β did not OPSIN-round-trip → fall back to the whole-graph R/S name
         # (a phase). This single check covers the conjugate path too, since the
         # conjugate name carries α/β when ring_ab is present.
-        fallback = _assemble_steroid(_whole_graph_rs_prefix(mol, numbering), {})
+        fallback = _assemble_steroid(_whole_graph_rs_prefix(mol, numbering, scaffold_info), {})
         # a phase : for a conjugate we must NEVER ship a name that does not RT —
         # prior behaviour on these rows is already RT-False (the conjugate was dropped), so a
         # non-RT R/S fallback is no better. If the R/S conjugate name also fails RT, honest-fail
@@ -874,15 +877,59 @@ def _collect_np_stereo(mol, numbering: Dict[int, int], scaffold_info: Optional[D
 
     descriptors = collect_stereodescriptors(mol, numbering)
     leading = format_stereodescriptor_string(descriptors) if descriptors else ""
+    _record_if_implied_steroid_centres(descriptors, scaffold_info, leading)
     return leading, {}
 
 
-def _whole_graph_rs_prefix(mol, numbering: Dict[int, int]) -> str:
+def _whole_graph_rs_prefix(mol, numbering: Dict[int, int],
+                          scaffold_info: Optional[Dict] = None) -> str:
     """Build the legacy whole-graph R/S leading block (the α/β fallback name, Phase 181)."""
     from ..rules.stereochemistry import collect_stereodescriptors, format_stereodescriptor_string
 
     descriptors = collect_stereodescriptors(mol, numbering)
-    return format_stereodescriptor_string(descriptors) if descriptors else ""
+    prefix = format_stereodescriptor_string(descriptors) if descriptors else ""
+    _record_if_implied_steroid_centres(descriptors, scaffold_info, prefix)
+    return prefix
+
+
+#: "Stereochemical configuration of parent structures" (the Blue Book,
+#::51047): "The name of a fundamental parent structure usually implies the absolute
+#: configuration of all chirality centers [...] the implied configurations shown define the
+#: attached hydrogen atoms and methyl groups at positions '8', '10', and '13' as 'β', and at
+#: positions '9' and '14' as 'α'".
+_STEROID_IMPLIED_CENTRES = frozenset({"8", "9", "10", "13", "14"})
+
+
+def _record_if_implied_steroid_centres(descriptors, scaffold_info, prefix) -> None:
+    """A whole-graph R/S block on a steroid stereoparent cites CIP descriptors for the
+    centres its parent name already implies (C-8, 9, 10, 13, 14;:51047). The
+     form states only the configurations that differ or must be specified, with
+    'α'/'β' ("This method is preferred",:51053) and 'R'/'S' only for the
+    rest:51373). Such a name is valid and round-trip verified, so it
+    still ships; this marks the block as a non-PIN fragment (name-scoped), so a shipped
+    name that carries it is not labelled pin_verified. The name is unchanged."""
+    if (not prefix or not descriptors or not scaffold_info
+            or scaffold_info.get("scaffold_class") != "steroid"):
+        return
+    try:
+        if any(str(d[0]) in _STEROID_IMPLIED_CENTRES for d in descriptors):
+            from ..metrics.provenance import record_non_pin_fragment
+            record_non_pin_fragment(prefix)
+    except Exception:  # a label helper must never break naming
+        pass
+
+
+def _record_if_acid_as_prefixes(name, hydroxyls, ketones) -> None:
+    """A stereoparent carbon that carries both an '-OH' and an '=O' decoration is a
+    carboxylic acid carbon (a carbon cannot bear a third bond to either and stay neutral
+    with two skeletal neighbours), written here as '26-hydroxy...-26-one' or '21-hydroxy
+    -21-oxo'. The acid is the senior class and is expressed as the suffix: "Seniority
+    order for classes" (the Blue Book; 7a carboxylic acids:18172, 17 alcohols);
+    ('-oic acid'). The name is valid and round-trip verified, so it still ships; this marks
+    it as a non-PIN fragment (name-scoped). The name is unchanged."""
+    if name and hydroxyls and ketones and set(hydroxyls) & set(ketones):
+        from ..metrics.provenance import record_non_pin_fragment
+        record_non_pin_fragment(name)
 
 
 def _alpha_beta_rt_ok(mol, name: str) -> bool:

@@ -42,10 +42,15 @@ class TestSkeletalReplacementE2E:
     @pytest.mark.parametrize(
         "smiles,expected",
         [
-            ("COCCOC", "2,5-dioxahexane"),
-            ("CCOCCOCC", "3,6-dioxaoctane"),
-            ("COCCOCCOC", "2,5,8-trioxanonane"),
-            ("CCOCCOCCOCC", "3,6,9-trioxaundecane"),
+            # PIN per R10: skeletal replacement ('a') names are PINs only "when four
+            # or more heterounits are present in a unbranched chain" the Blue Book;
+            # "(1) 1,2-dimethoxyethane (PIN)":27754; OPSIN RT exact (TRIAGE.csv;
+            # re-checked in Task 7/8).
+            ("COCCOC", "1,2-dimethoxyethane"),
+            ("CCOCCOCC", "1,2-diethoxyethane"),
+            # fix a performance pass: (the Blue Book) skeletal replacement names are PINs only "when four or more heterounits are present in a unbranched chain"; "(1) 1-methoxy-2-(2-methoxyethoxy)ethane (PIN)":27756 (three O), "(4) 2,5,8,11-tetraoxadodecane (PIN)":27762. OPSIN 2.9.0 full-InChIKey RT of the new name: exact.
+            ("COCCOCCOC", "1-methoxy-2-(2-methoxyethoxy)ethane"),  # was 2,5,8-trioxanonane
+            ("CCOCCOCCOCC", "1-ethoxy-2-(2-ethoxyethoxy)ethane"),  # was 3,6,9-trioxaundecane
         ],
         ids=["dioxahexane", "dioxaoctane", "trioxanonane", "trioxaundecane"],
     )
@@ -57,8 +62,9 @@ class TestSkeletalReplacementE2E:
     @pytest.mark.parametrize(
         "smiles,expected",
         [
-            ("OCCOCCOCC", "3,6-dioxaoctan-1-ol"),
-            ("OCCOCCOCCOCC", "3,6,9-trioxaundecan-1-ol"),
+            # fix a performance pass: (the Blue Book) skeletal replacement names are PINs only "when four or more heterounits are present in a unbranched chain"; "(1) 1-methoxy-2-(2-methoxyethoxy)ethane (PIN)":27756 (three O), "(4) 2,5,8,11-tetraoxadodecane (PIN)":27762. OPSIN 2.9.0 full-InChIKey RT of the new name: exact. The -OH is the suffix, not a chain heterounit.
+            ("OCCOCCOCC", "2-(2-ethoxyethoxy)ethan-1-ol"),  # was 3,6-dioxaoctan-1-ol
+            ("OCCOCCOCCOCC", "2-[2-(2-ethoxyethoxy)ethoxy]ethan-1-ol"),  # was 3,6,9-trioxaundecan-1-ol
         ],
         ids=["dioxaoctanol", "trioxaundecanol"],
     )
@@ -74,9 +80,12 @@ class TestSkeletalReplacementE2E:
 
     @pytest.mark.integration
     def test_sulfide_replacement(self):
-        """Sulfide chains use replacement naming (thia)."""
+        """A one-sulfur chain is named substitutively (was asserted to contain
+        'thia'; the engine gave '4-thiaoctane'). fix a performance pass:
+        (the Blue Book) needs four heterounits for the 'a' name; the ether
+        analog is 'methoxyethane (PIN)' (:27745). OPSIN 2.9.0 RT: exact."""
         result = name_compound("CCCSCCCC")
-        assert "thia" in result
+        assert result == "1-(propylsulfanyl)butane"
 
     @pytest.mark.integration
     def test_branched_chain_defers(self):
@@ -115,9 +124,13 @@ class TestRingAssemblyE2E:
 
     @pytest.mark.integration
     def test_biphenyl_full_name(self):
-        """Unsubstituted biphenyl produces 'biphenyl' (retained name per."""
+        """Unsubstituted biphenyl: the PIN cites the ring-assembly locants."""
         result = name_compound("c1ccc(-c2ccccc2)cc1")
-        assert result == "biphenyl"
+        # PIN per R6: "Citation of locants" "In preferred IUPAC names, if any
+        # locants are essential for defining the structure of the parent structure...
+        # then all locants must be cited" the Blue Book; "1,1′-biphenyl (PIN)
+        # biphenyl":2000; OPSIN RT exact (TRIAGE.csv; re-checked in Task 7/8).
+        assert result == "1,1'-biphenyl"
 
     @pytest.mark.integration
     def test_substituted_biphenyl(self):
@@ -233,7 +246,10 @@ class TestPhase23Regressions:
             ("COC", "methoxymethane"),
             # Simple heterocycles
             ("c1ccoc1", "furan"),
-            ("c1cc[nH]c1", "pyrrole"),
+            # PIN per R1: "in preferred IUPAC names indicated hydrogen must always
+            # be cited when present in the corresponding structure" the Blue Book;
+            # "1H-pyrrole (PIN)":24645; OPSIN RT exact (TRIAGE.csv; re-checked in Task 7/8).
+            ("c1cc[nH]c1", "1H-pyrrole"),
             ("c1ccsc1", "thiophene"),
         ],
         ids=[
@@ -273,16 +289,22 @@ def _opsin_parse(name: str) -> str:
 
 # Skeletal replacement names for OPSIN round-trip
 SKELETAL_REPLACEMENT_ROUNDTRIP = [
-    ("COCCOC", "2,5-dioxahexane"),
-    ("CCOCCOCC", "3,6-dioxaoctane"),
-    ("COCCOCCOC", "2,5,8-trioxanonane"),
-    ("CCOCCOCCOCC", "3,6,9-trioxaundecane"),
+    # PIN per R10: skeletal replacement ('a') names are PINs only "when four or
+    # more heterounits are present in a unbranched chain" the Blue Book;
+    # "(1) 1,2-dimethoxyethane (PIN)":27754; OPSIN RT exact (TRIAGE.csv; re-checked in
+    # Task 7/8).
+    ("COCCOC", "1,2-dimethoxyethane"),
+    ("CCOCCOCC", "1,2-diethoxyethane"),
+    # fix a performance pass: (the Blue Book) skeletal replacement names are PINs only "when four or more heterounits are present in a unbranched chain"; "(1) 1-methoxy-2-(2-methoxyethoxy)ethane (PIN)":27756 (three O), "(4) 2,5,8,11-tetraoxadodecane (PIN)":27762. OPSIN 2.9.0 full-InChIKey RT of the new name: exact.
+    ("COCCOCCOC", "1-methoxy-2-(2-methoxyethoxy)ethane"),  # was 2,5,8-trioxanonane
+    ("CCOCCOCCOCC", "1-ethoxy-2-(2-ethoxyethoxy)ethane"),  # was 3,6,9-trioxaundecane
 ]
 
 # Skeletal replacement with terminal OH suffix
 SKELETAL_REPLACEMENT_OH_ROUNDTRIP = [
-    ("OCCOCCOCC", "3,6-dioxaoctan-1-ol"),
-    ("OCCOCCOCCOCC", "3,6,9-trioxaundecan-1-ol"),
+    # fix a performance pass: (the Blue Book) skeletal replacement names are PINs only "when four or more heterounits are present in a unbranched chain"; "(1) 1-methoxy-2-(2-methoxyethoxy)ethane (PIN)":27756 (three O), "(4) 2,5,8,11-tetraoxadodecane (PIN)":27762. OPSIN 2.9.0 full-InChIKey RT of the new name: exact.
+    ("OCCOCCOCC", "2-(2-ethoxyethoxy)ethan-1-ol"),  # was 3,6-dioxaoctan-1-ol
+    ("OCCOCCOCCOCC", "2-[2-(2-ethoxyethoxy)ethoxy]ethan-1-ol"),  # was 3,6,9-trioxaundecan-1-ol
 ]
 
 # Lactam names for OPSIN round-trip
@@ -295,7 +317,11 @@ LACTAM_ROUNDTRIP = [
 
 # Ring assembly names for OPSIN round-trip
 RING_ASSEMBLY_ROUNDTRIP = [
-    ("c1ccc(-c2ccccc2)cc1", "biphenyl"),
+    # PIN per R6: "Citation of locants" "In preferred IUPAC names, if any locants
+    # are essential for defining the structure of the parent structure... then all locants
+    # must be cited" the Blue Book; "1,1′-biphenyl (PIN) biphenyl":2000; OPSIN RT
+    # exact (TRIAGE.csv; re-checked in Task 7/8).
+    ("c1ccc(-c2ccccc2)cc1", "1,1'-biphenyl"),
 ]
 
 

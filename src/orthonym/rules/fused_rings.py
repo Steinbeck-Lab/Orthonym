@@ -1095,6 +1095,7 @@ def _name_ortho_fused_generate_and_test(mol) -> Optional[str]:
     component counts, peri-fused interior atoms, substituted cores and carbocyclic
     parents are a NAMED follow-on (see test_c_waveC_v36.py Build-2 xfail)."""
     import itertools
+    import re
     from collections import Counter as _Counter
 
     from rdkit.Chem.inchi import MolToInchi
@@ -1133,9 +1134,283 @@ def _name_ortho_fused_generate_and_test(mol) -> Optional[str]:
     from ..validation.opsin_roundtrip import opsin_parse
     from .fusion_descriptors import _identify_ring_name, get_fusion_prefix
 
-    candidates: Set[str] = set()
+    # (the Blue Book): "Locants that describe structural
+    # features of components, such as positions of heteroatoms, are kept with
+    # the name of the component and are enclosed within square brackets" --
+    # '[1]benzopyrano[2,3-c]pyrrole (PIN)' (:12157). And (:11982):
+    # the 1,2-/1,3-azoles are components only by their Hantzsch-Widman names.
+    _HW_COMPONENT = {'oxazole': '[1,3]oxazole', 'isoxazole': '[1,2]oxazole',
+                     'thiazole': '[1,3]thiazole', 'isothiazole': '[1,2]thiazole'}
+
+    def _component(name: str) -> str:
+        # a component's own indicated hydrogen is not cited: the fused system
+        # gets its own, added below
+        core = re.sub(r'^\d+[a-z]?H-', '', name)
+        m = re.match(r'^(\d+(?:,\d+)*)-(.+)$', core)
+        return f"[{m.group(1)}]{m.group(2)}" if m else _HW_COMPONENT.get(core, core)
+
+    def _attached_prefix(name: str) -> Optional[str]:
+        core = re.sub(r'^\d+[a-z]?H-', '', name)
+        m = re.match(r'^(\d+(?:,\d+)*)-(.+)$', core)
+        if m:
+            inner = get_fusion_prefix(m.group(2))
+            return f"[{m.group(1)}]{inner}" if inner else None
+        if core in _HW_COMPONENT:
+            inner = get_fusion_prefix(_HW_COMPONENT[core].split(']', 1)[1])
+            return _HW_COMPONENT[core].split(']', 1)[0] + ']' + inner if inner else None
+        return get_fusion_prefix(core) or None
+
+    # "Seniority criteria for selecting the parent component"
+    # (the Blue Book): "If there is a choice for selecting the parent
+    # component, the following criteria are considered, in order, until a
+    # decision can be made":
+    # (a) (:12139) "a component containing at least one of the heteroatoms
+    # occurring earlier in the following order: N > F > Cl > Br > I > O > S
+    # > Se > Te > P > As > Sb > Bi > Si > Ge > Sn > Pb > B > Al > Ga > In >
+    # Tl" ('[1]benzopyrano[2,3-c]pyrrole (PIN)',:12157);
+    # (b) (:12163) "a component containing the greater number of rings"
+    # ('6H-pyrazino[2,3-b]carbazole (PIN)');
+    # (c) (:12234) "A component containing the larger ring at the first point
+    # of difference when comparing rings in order of decreasing size"
+    # ('2H-furo[3,2-b]pyran (PIN) [pyran (6 ring) preferred to furan (5
+    # ring)]',:12246);
+    # (d) (:12260) "A component containing the greater number of heteroatoms
+    # of any kind" ('5H-pyrido[2,3-d][1,2]oxazine (PIN)');
+    # (e) (:12282) "A component containing the greater variety of heteroatoms";
+    # (f) (:12298) "A component containing the greater number of heteroatoms
+    # most senior when considered in the order: F > Cl > Br > I > O > S >
+    # Se > Te > N > P > As > Sb > Bi > Si > Ge > Sn > Pb > B > Al > Ga > In
+    # > Tl" ('[1,3]selenazolo[5,4-d][1,3]thiazole (PIN) (S,N senior to
+    # Se,N)').
+    # (h) (:12336) "A component with the lower locants for heteroatoms"
+    # ('pyrazino[2,3-d]pyridazine (PIN) (locants '1,2' of pyridazine
+    # preferred to locants '1,4' of pyrazine)');
+    # (i) (:12341) the lower locants for the heteroatoms "considered in the
+    # order: F > Cl > Br > I > O > S > Se > Te > N > P >...".
+    # (g) (rings in a horizontal row) never separates the one- and two-ring
+    # components met here; (j) (fusion-carbon locants) is not computed: when two
+    # DIFFERENT components still tie, the parent is undecided and nothing is
+    # returned (never a string order).
+    # Only (a) and (b) were applied before, so a tie on them fell to the letter
+    # and then the shorter string: 'pyrazino[2,3-g]quinoline' (quinoxaline has
+    # two heteroatoms, (d): 'pyrido[2,3-g]quinoxaline') and '3H-pyrido[3,2-e]
+    # indole' (quinoline 6,6 is senior to indole 6,5, (c): '3H-pyrrolo[3,2-f]
+    # quinoline') shipped as pin_verified.
+    _HETERO_ORDER = ('N', 'F', 'Cl', 'Br', 'I', 'O', 'S', 'Se', 'Te', 'P', 'As',
+                     'Sb', 'Bi', 'Si', 'Ge', 'Sn', 'Pb', 'B', 'Al', 'Ga', 'In', 'Tl')
+    _HETERO_ORDER_F = ('F', 'Cl', 'Br', 'I', 'O', 'S', 'Se', 'Te', 'N', 'P', 'As',
+                       'Sb', 'Bi', 'Si', 'Ge', 'Sn', 'Pb', 'B', 'Al', 'Ga', 'In',
+                       'Tl')
+
+    def _parent_key(atoms: Set[int], rings: List[Set[int]]):
+        syms = [mol.GetAtomWithIdx(a).GetSymbol() for a in atoms]
+        het = [s for s in syms if s != 'C']
+        ranks = [_HETERO_ORDER.index(s) for s in het if s in _HETERO_ORDER]
+        counts = _Counter(het)
+        return (
+            min(ranks) if ranks else len(_HETERO_ORDER),              # (a)
+            -len(rings),                                              # (b)
+            tuple(-len(r) for r in sorted(rings, key=len, reverse=True)),  # (c)
+            -len(het),                                                # (d)
+            -len(counts),                                             # (e)
+            tuple(-counts.get(e, 0) for e in _HETERO_ORDER_F),        # (f)
+        )
+
+    def _mono_het_locants(ring: List[int]):
+        # (h)/(i) key of a monocycle: its heteroatom locants in its own
+        # numbering (heteroatoms as low as possible, then by the (i) order)
+        from .heterocycles import _macrocycle_ordered_ring
+        order = _macrocycle_ordered_ring(mol, set(ring))
+        if not order:
+            return None
+        n = len(order)
+        best = None
+        for start in range(n):
+            for step in (1, -1):
+                seq = [order[(start + step * k) % n] for k in range(n)]
+                het = [(i + 1, mol.GetAtomWithIdx(a).GetSymbol())
+                       for i, a in enumerate(seq)
+                       if mol.GetAtomWithIdx(a).GetSymbol() != 'C']
+                h = tuple(sorted(l for l, _ in het))
+                i_key = tuple(l for l, e in sorted(
+                    het, key=lambda t: (_HETERO_ORDER_F.index(t[1])
+                                        if t[1] in _HETERO_ORDER_F else 99, t[0])))
+                if best is None or (h, i_key) < best:
+                    best = (h, i_key)
+        return best
+
+    def _pair_het_locants(name: str):
+        # (h)/(i) key of a named two-ring component, from its catalog numbering
+        from ..data.fused_heterocycles import FUSED_HETEROCYCLE_DATA
+        for cs, entry in FUSED_HETEROCYCLE_DATA.items():
+            if entry.get('name') != name or not entry.get('iupac_locants'):
+                continue
+            cm = Chem.MolFromSmiles(cs)
+            if cm is None:
+                return None
+            het = []
+            for a, l in entry['iupac_locants'].items():
+                if a >= cm.GetNumAtoms() or not isinstance(l, int):
+                    continue
+                at = cm.GetAtomWithIdx(a)
+                if at.IsInRing() and at.GetSymbol() != 'C':
+                    het.append((l, at.GetSymbol()))
+            h = tuple(sorted(l for l, _ in het))
+            i_key = tuple(l for l, e in sorted(
+                het, key=lambda t: (_HETERO_ORDER_F.index(t[1])
+                                    if t[1] in _HETERO_ORDER_F else 99, t[0])))
+            return (h, i_key)
+        return None
+
+    # row (2) (the Blue Book-11523): "phenanthroline
+    # (1,7-isomer shown; the PIN is 1,7-phenanthroline; other isomers are: 1,8-;
+    # 1,9-; 1,10-; 2,7-; 2,8-; 2,9-; 3,7-; 3,8-; 4,7-)". Every angular 6-6-6
+    # system with one pyridine-type N in each terminal ring is a phenanthroline:
+    # its PIN is the retained name, never a pyrido-quinoline fusion name. Only
+    # 1,10-phenanthroline is in the catalog, so the others are not named here.
+    if (all(len(r) == 6 for r in atom_rings)
+            and sum(1 for a in ring_atom_set
+                    if mol.GetAtomWithIdx(a).GetSymbol() != 'C') == 2
+            and all(mol.GetAtomWithIdx(a).GetSymbol() in ('C', 'N')
+                    for a in ring_atom_set)):
+        central = [r for r in ring_sets
+                   if sum(1 for o in ring_sets if o is not r and len(o & r) >= 2) == 2]
+        if len(central) == 1:
+            outer = [r for r in ring_sets if r is not central[0]]
+            fus = [central[0] & o for o in outer]
+            # angular (phenanthrene-like): the two fusion bonds of the central
+            # ring are joined by one bond; linear (anthracene-like): they are not
+            angular = any(mol.GetBondBetweenAtoms(x, y) is not None
+                          for x in fus[0] for y in fus[1])
+            n_outer = [sum(1 for a in o - central[0]
+                           if mol.GetAtomWithIdx(a).GetSymbol() == 'N')
+                       for o in outer]
+            if angular and n_outer == [1, 1]:
+                return None
+
+    # (:11885) the parent component is a ring or ring system with a
+    # retained or systematic (monocycle, Hantzsch-Widman, benzo) name; a name
+    # that itself carries a fusion descriptor ('thieno[3,2-b]thiophene',
+    # 'furo[3,2-b]furan') is a fused system of two components, not one
+    # component. As a parent it violated (a)/(b) ('pyrido[3,2-d]thieno[3,2-b]
+    # thiophene' for a pyridine-containing system whose PIN is
+    # "thieno[2',3':4,5]thieno[2,3-b]pyridine" with primed higher-order locants,
+    #, which this namer does not build); as an attached component
+    # it needs those primes too. Such a pair is skipped in both orientations.
+    _FUSION_DESCRIPTOR = re.compile(r"\[[^\]]*[a-z][^\]]*\]")
+
+    def _is_single_component(name: str) -> bool:
+        return not _FUSION_DESCRIPTOR.search(name)
+
+    candidates: Dict[str, tuple] = {}
     tried = 0
     _CAP = 1200  # hard bound on OPSIN probes (safety; the class is small)
+
+    # A ring NH needs the fused system's indicated hydrogen,
+    # '9H-pyrido[2,3-b]indole'); a name without it only round-trips because the
+    # parser supplies the hydrogen itself. Offer each position and keep the one
+    # that round-trips (the contributor guide a project rule), lowest locant first.
+    needs_ih = any(mol.GetAtomWithIdx(a).GetAtomicNum() != 6
+                   and mol.GetAtomWithIdx(a).GetTotalNumHs() > 0
+                   for a in ring_atom_set)
+    n_ring_atoms = len(ring_atom_set)
+
+    target_smiles = Chem.MolToSmiles(mol)
+
+    def _skeleton(inchi: str):
+        # formula + connection layers: the constitution without its hydrogen
+        # layer, so a name the parser completes with a CH2 instead of the NH
+        # ('pyrrolo[3,2-g]quinoline') still counts as the right ring system
+        parts = inchi.split('/')
+        return tuple(parts[1:3])
+
+    target_skeleton = _skeleton(target_inchi)
+
+    def _rt(nm: str, mode: str = 'full') -> bool:
+        nonlocal tried
+        tried += 1
+        s = opsin_parse(nm)
+        if not s:
+            return False
+        om = Chem.MolFromSmiles(s)
+        if om is None:
+            return False
+        if mode == 'tautomer':
+            # the standard InChI merges mobile-H tautomers ('1H-' and '9H-
+            # pyrido[2,3-b]indole' share it), so the hydrogen position is
+            # checked on the canonical SMILES
+            return Chem.MolToSmiles(om) == target_smiles
+        got = MolToInchi(om)
+        if not got:
+            return False
+        if mode == 'skeleton':
+            return _skeleton(got) == target_skeleton
+        return got == target_inchi
+
+    def _probe(prefix: str, pairs, letters: str, base: str, parent: str) -> None:
+        for pair in pairs:
+            for L in letters:
+                if tried >= _CAP:
+                    return
+                # (:11911): "To the letter... are prefixed, if
+                # necessary, the numbers of the positions of attachment of the
+                # other component" -- never for benzo ('benzo[g]isoquinoline',
+                #:11909), whose attachment positions are all alike
+                if pair is None:
+                    nm = f"{prefix}[{L}]{base}"
+                    x_y = ()
+                else:
+                    nm = f"{prefix}[{pair[0]},{pair[1]}-{L}]{base}"
+                    x_y = tuple(pair)
+                if not needs_ih:
+                    if not _rt(nm):
+                        continue
+                    # (:11911): the letter "as early in the alphabet
+                    # as possible", then the attachment locants "as low as is
+                    # consistent with the numbering of the compound"
+                    candidates[nm] = (parent, L, x_y)
+                    continue
+                # With a ring NH only the skeleton is checked first: the parser
+                # may complete the hydrogen-free name with a CH2, whose standard
+                # InChI differs, and the indicated-hydrogen name then never got
+                # offered ('1H-pyrrolo[3,2-g]quinoline').
+                if not _rt(nm, 'skeleton'):
+                    continue
+                for loc in range(1, n_ring_atoms + 1):
+                    if tried >= _CAP:
+                        return
+                    ih = f"{loc}H-{nm}"
+                    if _rt(ih, 'tautomer'):
+                        candidates[ih] = (parent, L, x_y, loc)
+                        break
+
+    # "Heteromonocyclic rings fused to a benzene ring" (:13435):
+    # a benzene + heteromonocycle pair is one component unit (a
+    # 'benzoheterocycle') only "in which the benzene ring is not part of a system
+    # having a retained name such as quinoline or naphthalene", and "this
+    # approach is not used if it disrupts a multiparent system",
+    # 'benzo[1,2-b:4,5-c']difuran (PIN) (not furo[3,4-f][1]benzofuran');
+    # "Retained names are senior to names of benzoheterocycles" ('6H-dibenzo
+    # [b,d]pyran (PIN) (not 6H-benzo[c][1]benzopyran'). So '3H-benzo[1,2-e]
+    # benzimidazole' (the benzene is part of naphthalene) was not a PIN.
+    _BENZO_NAME = re.compile(r'^(?:\d+[a-z]?H-)?(?:\d+(?:,\d+)*-)?benz')
+
+    def _is_benzene(ring: Set[int]) -> bool:
+        return len(ring) == 6 and all(
+            mol.GetAtomWithIdx(a).GetSymbol() == 'C' for a in ring)
+
+    # Every component a parent can be: the three monocycles and each ortho-
+    # fused pair that is ONE component (retained / benzo name). The winner must
+    # have the senior one as its parent.
+    components: Dict[str, tuple] = {}
+    het_locant_keys: Dict[str, Optional[tuple]] = {}
+    for r in atom_rings:
+        rname = _identify_ring_name(mol, list(r))
+        if not rname:
+            return None
+        components[_component(rname)] = _parent_key(set(r), [set(r)])
+        het_locant_keys[_component(rname)] = _mono_het_locants(list(r))
+
     for i, j in itertools.combinations(range(3), 2):
         if len(ring_sets[i] & ring_sets[j]) < 2:
             continue  # rings i,j are not ortho-fused to each other
@@ -1144,36 +1419,77 @@ def _name_ortho_fused_generate_and_test(mol) -> Optional[str]:
         attached_ring = list(atom_rings[k])
         if len(set(attached_ring) & pair_atoms) < 2:
             continue  # the third ring is not fused to this pair -> wrong base pair
-        base = _name_base_subcore(mol, pair_atoms)
-        if not base:
+        pair_name = _name_base_subcore(mol, pair_atoms)
+        if (pair_name is None and _is_benzene(ring_sets[i])
+                and _is_benzene(ring_sets[j])):
+            # the heterocycle namer does not name carbocycles; two benzene rings
+            # are the retained component naphthalene, Table 2.7,
+            # the Blue Book)
+            pair_name = 'naphthalene'
+        if not pair_name or not _is_single_component(pair_name):
             continue
-        attached_name = _identify_ring_name(mol, attached_ring)
-        if not attached_name:
-            continue
-        prefix = get_fusion_prefix(attached_name)
-        if not prefix:
+        if _BENZO_NAME.match(pair_name):
+            benzene = next((r for r in (i, j) if _is_benzene(ring_sets[r])), None)
+            if benzene is not None and len(ring_sets[benzene] & ring_sets[k]) >= 2:
+                # the benzene ring is fused to the third ring too
+                hetero = ({i, j} - {benzene}).pop()
+                other = _name_base_subcore(mol, ring_sets[benzene] | ring_sets[k])
+                if not other or not _BENZO_NAME.match(other):
+                    continue  # part of a retained-name system (naphthalene, quinoline)
+                if (_identify_ring_name(mol, list(atom_rings[k]))
+                        == _identify_ring_name(mol, list(atom_rings[hetero]))):
+                    return None  # a multiparent name ('benzo[...]difuran'), not built
+        pair_component = _component(pair_name)
+        pair_key = _parent_key(pair_atoms, [ring_sets[i], ring_sets[j]])
+        if components.get(pair_component, pair_key) != pair_key:
+            return None  # one name, two different components: do not guess
+        components[pair_component] = pair_key
+        het_locant_keys[pair_component] = _pair_het_locants(pair_name)
+        mono_name = _identify_ring_name(mol, attached_ring)
+        if not mono_name:
             continue
         rs = len(attached_ring)
-        loc_pairs = []
+        mono_pairs = []
         for a in range(1, rs + 1):
             b = a + 1 if a < rs else 1
-            loc_pairs.append((a, b))
-            loc_pairs.append((b, a))
-        for (x, y) in loc_pairs:
-            for L in 'abcdefghij':
-                if tried >= _CAP:
-                    break
-                nm = f"{prefix}[{x},{y}-{L}]{base}"
-                tried += 1
-                s = opsin_parse(nm)
-                if not s:
-                    continue
-                om = Chem.MolFromSmiles(s)
-                if om is not None and MolToInchi(om) == target_inchi:
-                    candidates.add(nm)
+            mono_pairs.append((a, b))
+            mono_pairs.append((b, a))
+        if mono_name == 'benzene':
+            mono_pairs = [None]
+        # (1) the fused pair is the parent, the monocycle the attached prefix
+        #: '[1,3]oxazolo', its heteroatom locants in brackets)
+        prefix = _attached_prefix(mono_name)
+        if prefix:
+            _probe(prefix, mono_pairs, 'abcdefghij', pair_component,
+                   pair_component)
+        # (2) the monocycle is the parent, the fused pair the attached prefix
+        pair_prefix = _attached_prefix(pair_name)
+        if pair_prefix:
+            n_pair = len(pair_atoms)
+            pair_pairs = []
+            for a in range(1, n_pair + 1):
+                for b in (a - 1, a + 1):
+                    if 1 <= b <= n_pair:
+                        pair_pairs.append((a, b))
+            _probe(pair_prefix, pair_pairs, 'abcdefghij'[:rs],
+                   _component(mono_name), _component(mono_name))
     if not candidates:
         return None
-    return sorted(candidates, key=lambda n: (len(n), n))[0]
+    best_key = min(components.values())
+    senior = [c for c, key in components.items() if key == best_key]
+    if len(senior) > 1:
+        # (h), (i): heteroatom locants of each tied component
+        hk = {c: het_locant_keys.get(c) for c in senior}
+        if any(v is None for v in hk.values()):
+            return None
+        best_h = min(hk.values())
+        senior = [c for c in senior if hk[c] == best_h]
+    if len(senior) != 1:
+        return None  # (j) would decide: not computed here
+    kept = {nm: key for nm, key in candidates.items() if key[0] == senior[0]}
+    if not kept:
+        return None  # the senior component's name was never generated
+    return min(kept, key=lambda n: (kept[n][1:], len(n), n))
 
 
 # Naphthalene has exactly two symmetry-distinct peripheral fusion bonds — the
@@ -1769,8 +2085,15 @@ def name_fused_heterocycle(mol):
     if not substituents:
         return (core_name, ring_atoms, atom_mapping, True)
 
-    # Build the substituted name
+    # (c): number the core so the suffix gets the lowest locants.
+    core_name, atom_mapping, substituents = _renumber_core_for_suffix(
+        mol, core_name, _core_smiles, atom_mapping, substituents)
+
+    # Build the substituted name (None: the principal characteristic group could
+    # not be expressed correctly on this core -- decline)
     name = _assemble_fused_heterocycle_name(mol, core_name, substituents, atom_mapping)
+    if name is None:
+        return None
     return (name, ring_atoms, atom_mapping, True)
 
 
@@ -2672,6 +2995,51 @@ def _identify_functionalized_substituent(
     carbon_count = sum(1 for idx in chain_atoms
                        if mol.GetAtomWithIdx(idx).GetSymbol() == 'C')
 
+    # A -C(=O)NH2 or -C#N bonded directly to the ring is a SUFFIX group, like
+    # the -COOH / -CHO below: (the Blue Book) "The suffix
+    # 'carboxamide' is always used to name amides with the -CO-NH2 group
+    # attached to a ring, ring system, or to a heteroacyclic parent", and
+    # (:34720) "The suffix 'carbonitrile' is always used to name
+    # nitriles having the -CN group attached to a ring or ring system". Both
+    # used to reach the general substituent namer
+    # and ship as the 'carbamoyl' / 'cyano' PREFIX with no suffix at all:
+    # '3-cyanoquinoline' (PIN 'quinoline-3-carbonitrile'), '5-carbamoyl-1H-
+    # indole' (PIN '1H-indole-5-carboxamide'), at pin_verified.
+    # (:18162) ranks amides (11) and nitriles (14) above ketones (16), so they
+    # also take the suffix over a ring -one.
+    if carbon_count == 1 and len(chain_atoms) in (2, 3):
+        c_atom = mol.GetAtomWithIdx(start_idx)
+        others = [mol.GetAtomWithIdx(i) for i in chain_atoms if i != start_idx]
+        if (c_atom.GetSymbol() == 'C' and c_atom.GetFormalCharge() == 0
+                and all(o.GetFormalCharge() == 0 and o.GetDegree() == 1
+                        for o in others)):
+            bonds = {o.GetSymbol(): mol.GetBondBetweenAtoms(start_idx, o.GetIdx())
+                     for o in others}
+            if (len(others) == 1 and 'N' in bonds
+                    and bonds['N'].GetBondType() == Chem.BondType.TRIPLE):
+                # 'name' is the PREFIX form: ring_substituents cites it as a
+                # decoration of a ring substituent ('3-cyanopyridin-2-yl');
+                # 'suffix_name' is what the parent ring's suffix uses
+                return {
+                    'name': 'cyano',
+                    'atoms': chain_atoms,
+                    'functional_group': 'nitrile',
+                    'type': 'suffix',
+                    'suffix_name': 'carbonitrile',
+                }
+            if (len(others) == 2 and set(bonds) == {'N', 'O'}
+                    and bonds['O'].GetBondType() == Chem.BondType.DOUBLE
+                    and bonds['N'].GetBondType() == Chem.BondType.SINGLE
+                    and next(o for o in others if o.GetSymbol() == 'N')
+                    .GetTotalNumHs() == 2):
+                return {
+                    'name': 'carbamoyl',
+                    'atoms': chain_atoms,
+                    'functional_group': 'amide',
+                    'type': 'suffix',
+                    'suffix_name': 'carboxamide',
+                }
+
     # Check for nitrile terminus (N with triple bond to C)
     for idx in chain_atoms:
         atom = mol.GetAtomWithIdx(idx)
@@ -2936,6 +3304,241 @@ def _has_group_senior_to_hydroxy(mol) -> bool:
     return compare_seniority(pcg_name, "alcohol") < 0
 
 
+# Priority of the detachable ring suffixes in _assemble_fused_heterocycle_name:
+# (the Blue Book) "7 Acids" (:18172) > "11 Amides" (:18184)
+# > "14 Nitriles" (:18187) > "15 Aldehydes" (:18188). (The list had the aldehyde
+# second; that never mattered while amides and nitriles were never suffixes.)
+_FUSED_SUFFIX_PRIORITY = ['carboxylic acid', 'carboxamide', 'carbonitrile', 'carbaldehyde']
+
+
+def _fused_principal_locants(mol, substituents: Dict) -> List:
+    """Locants of the group _assemble_fused_heterocycle_name cites as the SUFFIX.
+
+    Mirrors that assembler's own choice, in its order: a detachable suffix group
+    (by _FUSED_SUFFIX_PRIORITY), else amino / oxo (_build_fused_suffix), else a
+    hydroxy that becomes '-ol'. Used only to number the core so the suffix gets
+    the lowest locants (c)).
+    """
+    suffix_groups = substituents.get('suffix_groups') or {}
+    if suffix_groups:
+        for suf in _FUSED_SUFFIX_PRIORITY:
+            if suf in suffix_groups:
+                return list(suffix_groups[suf])
+        return list(next(iter(suffix_groups.values())))
+    amino = substituents.get('amino_substituents') or []
+    oxo = substituents.get('oxo_substituents') or []
+    c_subs = substituents.get('c_substituents') or {}
+    hydroxy_principal = ('hydroxy' in c_subs and not oxo
+                         and not _has_group_senior_to_hydroxy(mol))
+    if amino and not hydroxy_principal:
+        return list(amino)
+    if oxo:
+        return list(oxo)
+    if hydroxy_principal:
+        return list(c_subs['hydroxy'])
+    return []
+
+
+def _renumber_core_for_suffix(mol, core_name, core_smiles, atom_mapping, substituents):
+    """ "NUMBERING" (the Blue Book): "(c) principal characteristic
+    groups and free valences (suffixes)" (:3256) take low locants BEFORE the
+    detachable prefixes "(f)" (:3301). The catalog matcher chose the core's
+    automorphism by the prefix-and-suffix locant set alone, so CC1NC(=O)c2ccccc21
+    got '1-methyl-2,3-dihydro-1H-isoindol-3-one' (both sets {1,3}; methyl < oxo
+    alphabetically) where the PIN is '3-methyl-2,3-dihydro-1H-isoindol-1-one',
+    cf. '3-imino-2,3-dihydro-1H-isoindol-1-one (PIN)' (:29609).
+
+    Returns ``(core_name, atom_mapping, substituents)`` for the numbering whose
+    suffix locants are lowest; among those the matcher's own criteria decide
+    (the current numbering is kept whenever it is already among them)."""
+    from ..data.fused_heterocycles import (
+        _coerce_locant_for_compare, core_numberings, select_lowest_locant_match)
+    from .locants import compare_locant_sets
+
+    def _key(subs):
+        locs = [_coerce_locant_for_compare(x) for x in _fused_principal_locants(mol, subs)]
+        if any(x is None for x in locs):
+            return None
+        return sorted(locs, key=lambda v: (v, '') if isinstance(v, int) else v)
+
+    current_key = _key(substituents)
+    if not current_key:
+        return core_name, atom_mapping, substituents
+    options = []
+    for match, mapping, name in core_numberings(mol, core_smiles, atom_mapping):
+        subs = get_fused_heterocycle_substituents(mol, mapping)
+        key = _key(subs)
+        if key is None or len(key) != len(current_key):
+            continue
+        options.append((key, match, mapping, name, subs))
+    if len(options) < 2:
+        return core_name, atom_mapping, substituents
+    best_key = options[0][0]
+    for opt in options[1:]:
+        if compare_locant_sets(opt[0], best_key) < 0:
+            best_key = opt[0]
+    if compare_locant_sets(best_key, current_key) >= 0:
+        return core_name, atom_mapping, substituents
+    tied = [opt for opt in options if compare_locant_sets(opt[0], best_key) == 0]
+    chosen = select_lowest_locant_match(mol, [opt[1] for opt in tied], core_smiles)
+    for _key_, match, mapping, name, subs in tied:
+        if match == list(chosen):
+            return name, mapping, subs
+    return core_name, atom_mapping, substituents
+
+
+# The class each fused suffix expresses, as a seniority.SENIORITY_ORDER entry
+#, the Blue Book): 7 acids, 11 amides, 14 nitriles,
+# 15 aldehydes, 16 ketones/pseudoketones, 17 hydroxy compounds, 19 amines. For
+# '-ol' / '-amine' the FIRST entry of the class is used, so any group of the
+# same class never counts as senior.
+_SUFFIX_EXPRESSED_CLASS = {
+    'carboxylic acid': 'carboxylic_acid',
+    'carboxamide': 'primary_amide',
+    'carbonitrile': 'nitrile',
+    'carbaldehyde': 'aldehyde',
+    'one': 'ketone',
+    'ol': 'primary_alcohol',
+    'amine': 'hydroxylamine',
+}
+
+
+def _senior_group_outside_ring(mol, ring_atoms: Set[int]) -> Optional[str]:
+    """The most senior suffix-capable characteristic group of the molecule that
+    is not part of the ring system itself (seniority.SENIORITY_ORDER name), or
+    None. A lactone / lactam / cyclic imide whose characteristic atoms (its
+    heteroatoms and its C=O carbon) are all ring atoms or ring C=O oxygens is a
+    pseudoketone named with '-one' class 16,:18189), so it is not counted
+    even though the perception module labels it 'ester' / 'imide' /
+    'tertiary_amide' (phthalide, N-methylphthalimide, a 1-methylquinoline-2,4-
+    dione, whose amide match also lists the N-methyl carbon)."""
+    from ..perception.functional_groups import detect_functional_groups
+    from .seniority import SENIORITY_ORDER, _PREFIX_ONLY_PRINCIPAL
+    inside = set(ring_atoms)
+    for a in ring_atoms:
+        at = mol.GetAtomWithIdx(a)
+        for b in at.GetBonds():
+            o = b.GetOtherAtom(at)
+            if (b.GetBondType() == Chem.BondType.DOUBLE and o.GetSymbol() == 'O'
+                    and o.GetDegree() == 1):
+                inside.add(o.GetIdx())
+
+    def _plain_carbon(idx: int) -> bool:
+        # a carbon of an R group: no double / triple bond to a heteroatom
+        at = mol.GetAtomWithIdx(idx)
+        return at.GetSymbol() == 'C' and not any(
+            b.GetBondType() in (Chem.BondType.DOUBLE, Chem.BondType.TRIPLE)
+            and b.GetOtherAtom(at).GetSymbol() != 'C' for b in at.GetBonds())
+
+    fgs = detect_functional_groups(mol)
+    for fg in SENIORITY_ORDER:
+        if fg in _PREFIX_ONLY_PRINCIPAL:
+            continue
+        for inst in fgs.get(fg) or ():
+            atoms = set(inst) if isinstance(inst, (tuple, list, set, frozenset)) else {inst}
+            if any(a not in inside and not _plain_carbon(a) for a in atoms):
+                return fg
+    return None
+
+
+def _name_cites_senior_group_as_prefix(mol, ring_atoms: Set[int], expressed: Optional[str]) -> bool:
+    """True when a characteristic group SENIOR to the one the name expresses as
+    its suffix (``expressed``: a key of _SUFFIX_EXPRESSED_CLASS, or None for a
+    suffix-free name) is present, so the name cites the principal
+    characteristic group as a prefix,. Such a name can round-
+    trip, but it is not a PIN."""
+    from .seniority import compare_seniority
+    senior = _senior_group_outside_ring(mol, ring_atoms)
+    if senior is None:
+        return False
+    if expressed is None:
+        return True
+    return compare_seniority(senior, _SUFFIX_EXPRESSED_CLASS[expressed]) < 0
+
+
+def _assemble_oxo_prefix_name(mol, ring_atoms: Set[int]) -> Optional[str]:
+    """A ring C=O cited as the 'oxo' PREFIX because a senior group takes the
+    suffix: '4-oxo-4H-1-benzopyran-2-carboxylic acid', '1-ethyl-4-oxo-1,4-
+    dihydroquinoline-3-carboxylic acid', '9-oxo-9H-xanthene-2-carboxylic acid'.
+
+     (the Blue Book): acids (7a,:18172), amides (11),
+    nitriles (14) and aldehydes (15) are senior to ketones and pseudoketones
+    (16,:18189), so the ring C=O cannot keep its '-one'. (:24862):
+    "After the introduction of indicated and 'added indicated hydrogen' atoms,
+    all substituent groups not expressed as suffixes are cited as prefixes";
+    the parent hydride (indicated hydrogen + hydro prefixes,:24639,
+     comes from partial_saturation.oxo_prefix_parent_numberings.
+    (PIN) pattern: '9,10-dioxo-9,10-dihydroanthracene-2-carboxylic acid'
+    (:29471), '5,8-dioxo-5,6,7,8-tetrahydronaphthalene-2-carboxylic acid'
+    (:24890), '2,2-dimethyl-1,3-dioxo-2,3-dihydro-1H-isoindol-2-ium' (:41447).
+
+    The assembler glued the two suffixes instead ('benzo[b]pyran-4-one2-
+    carboxylic acid' at pin_verified, parsed only leniently; the NH quinolone
+    'quinolin-4-one3-carboxylic acid' parsed to a different tautomer), or put a
+    senior suffix on a ketone core name ('xanthone-2-carboxylic acid',
+    unparseable; '2H-1-benzopyran-2-one-3-carboxylic acid').
+
+    Numbering, (:3219): (b) indicated hydrogen, (c) the suffix, (e)
+    hydro prefixes, (f) all detachable prefixes together, (g) the prefix cited
+    first. Returns None (fail closed) when the parent does not resolve, the
+    suffix sits on a fusion atom (it would need added indicated hydrogen), an
+    exocyclic amine carries N-substituents, or two numberings still tie with
+    different names.
+    """
+    from .partial_saturation import oxo_prefix_parent_numberings, _locant_key
+
+    ring_atoms = set(ring_atoms)
+    if not _exocyclic_atoms_accounted(mol, ring_atoms):
+        return None  # a branch no prefix can name would be dropped
+    options = []
+    for parent, loc, ih_atoms, hydro in oxo_prefix_parent_numberings(mol, ring_atoms):
+        subs = get_fused_heterocycle_substituents(mol, loc)
+        suffix_groups = subs.get('suffix_groups') or {}
+        if not suffix_groups or not subs.get('oxo_substituents'):
+            return None  # no senior suffix / no ring C=O: not this builder's case
+        chosen = next((s for s in _FUSED_SUFFIX_PRIORITY if s in suffix_groups),
+                      next(iter(suffix_groups)))
+        suf_locs = list(suffix_groups[chosen])
+        if any(not isinstance(l, int) for l in suf_locs):
+            continue
+        amino = list(subs.get('amino_substituents') or [])
+        if amino and subs.get('n_substituents'):
+            return None  # an N-substituted amine prefix is not built here
+        c_subs = {k: list(v) for k, v in (subs.get('c_substituents') or {}).items()}
+        c_subs['oxo'] = list(subs['oxo_substituents'])
+        if amino:
+            c_subs.setdefault('amino', []).extend(amino)
+        new_subs = dict(subs)
+        new_subs['c_substituents'] = c_subs
+        new_subs['oxo_substituents'] = []
+        new_subs['amino_substituents'] = []
+        prefixes = []  # (alpha key, locants) for (f)/(g)
+        for nm, locs in c_subs.items():
+            prefixes.append((alpha_sort_key(nm), sorted(locs, key=_locant_key)))
+        for other in subs.get('other') or []:
+            prefixes.append((alpha_sort_key(other['name']), [other['locant']]))
+        for suf, locs in suffix_groups.items():
+            if suf != chosen:
+                prefixes.append((alpha_sort_key(suf), sorted(locs, key=_locant_key)))
+        all_prefix_locs = sorted((_locant_key(l) for _, ls in prefixes for l in ls))
+        citation = tuple(tuple(_locant_key(l) for l in ls)
+                         for _, ls in sorted(prefixes, key=lambda p: p[0]))
+        key = (sorted(_locant_key(loc[a]) for a in ih_atoms),
+               sorted(_locant_key(l) for l in suf_locs),
+               sorted(_locant_key(loc[a]) for a in hydro),
+               all_prefix_locs,
+               citation)
+        options.append((key, parent, loc, new_subs))
+    if not options:
+        return None
+    best_key = min(o[0] for o in options)
+    names = {_assemble_fused_heterocycle_name(mol, parent, new_subs, loc)
+             for key, parent, loc, new_subs in options if key == best_key}
+    if len(names) != 1 or None in names:
+        return None
+    return names.pop()
+
+
 def _assemble_fused_heterocycle_name(
     mol,
     core_name: str,
@@ -2969,6 +3572,45 @@ def _assemble_fused_heterocycle_name(
     assign_stereochemistry(mol)
     stereo_descriptors = collect_stereodescriptors(mol, atom_mapping)
     stereo_prefix = format_stereodescriptor_string(stereo_descriptors) if stereo_descriptors else ""
+
+    # (the Blue Book) routing of the principal characteristic
+    # group before any suffix is written:
+    # * a senior suffix group (acid / amide / nitrile / aldehyde) with a ring
+    # C=O -- an oxo substituent, or the =O of a ketone catalog core such as
+    # 'xanthone' / '2H-1-benzopyran-2-one' -- makes the C=O an 'oxo' prefix on
+    # the indicated-hydrogen/hydro parent (_assemble_oxo_prefix_name). The
+    # glued '-one' + '-carboxylic acid' ('benzo[b]pyran-4-one2-carboxylic
+    # acid') is never written again; None when that parent cannot be built.
+    # * an amine with a ring C=O: ketones (16) are senior to amines (19), but
+    # _build_fused_suffix gave the amine the suffix and dropped the oxo (an atom
+    # drop). Fail closed.
+    # * an amine beside a senior suffix group or a principal hydroxy is an
+    # 'amino' prefix: acids (7) and hydroxy compounds (17) are senior to amines
+    # (19) -- '2-aminoquinoline-3-carboxylic acid', not the unparseable
+    # 'quinolin-2-amine3-carboxylic acid'.
+    ring_atoms = {a for a in atom_mapping if mol.GetAtomWithIdx(a).IsInRing()}
+    suffix_groups0 = substituents.get('suffix_groups') or {}
+    oxo0 = substituents.get('oxo_substituents') or []
+    amino0 = substituents.get('amino_substituents') or []
+    ketone_core = any(not mol.GetAtomWithIdx(a).IsInRing()
+                      and mol.GetAtomWithIdx(a).GetSymbol() == 'O'
+                      for a in atom_mapping)
+    if suffix_groups0 and (oxo0 or ketone_core):
+        return _assemble_oxo_prefix_name(mol, ring_atoms)
+    if amino0 and (oxo0 or ketone_core):
+        return None
+    if amino0:
+        c_subs0 = substituents.get('c_substituents') or {}
+        hydroxy_principal = ('hydroxy' in c_subs0
+                             and not _has_group_senior_to_hydroxy(mol))
+        if suffix_groups0 or hydroxy_principal:
+            if substituents.get('n_substituents'):
+                return None  # the N-substituted amine would need a compound prefix
+            substituents = dict(substituents)
+            c_new = {k: list(v) for k, v in c_subs0.items()}
+            c_new.setdefault('amino', []).extend(amino0)
+            substituents['c_substituents'] = c_new
+            substituents['amino_substituents'] = []
 
     # /: a hydroxy is the PRINCIPAL characteristic group -- and so the
     # `-ol` SUFFIX, not a `hydroxy-` prefix -- when no senior suffixable group is
@@ -3051,7 +3693,7 @@ def _assemble_fused_heterocycle_name(
     if suffix_groups:
         # Detachable suffixes (carboxylic acid, carbaldehyde, etc.)
         # These append to the ring name: quinoline-2-carboxylic acid
-        _SUFFIX_PRIORITY = ['carboxylic acid', 'carbaldehyde', 'carboxamide', 'carbonitrile']
+        _SUFFIX_PRIORITY = _FUSED_SUFFIX_PRIORITY
         _SUFFIX_TO_PREFIX = {
             'carboxylic acid': 'carboxy',
             'carbaldehyde': 'formyl',
@@ -3095,13 +3737,10 @@ def _assemble_fused_heterocycle_name(
         prefix_parts.sort(key=lambda x: alpha_sort_key(x[1]))
         prefix_str = _join_fused_prefixes([p[0] for p in prefix_parts])
 
-        # Also handle oxo/amino as additional suffixes or prefixes
-        oxo_amino_suffix = _build_fused_suffix(substituents, core_name)
-        if oxo_amino_suffix:
-            modified_core = _apply_suffix_to_core(core_name, oxo_amino_suffix)
-            name = _join_prefix_to_parent(prefix_str, modified_core) + suffix_part.lstrip('-')
-            return f"{stereo_prefix}{name}" if stereo_prefix else name
+        # oxo and amino never reach here (routed above): the suffix group is the
+        # only suffix.
         name = _join_prefix_to_parent(prefix_str, core_name) + suffix_part
+        _record_if_senior_group_prefixed(mol, ring_atoms, chosen_suffix, name)
         return f"{stereo_prefix}{name}" if stereo_prefix else name
 
     # Handle suffix-forming groups (oxo and amino only, no detachable suffixes).
@@ -3109,15 +3748,39 @@ def _assemble_fused_heterocycle_name(
     # construction no oxo/amino, so `_build_fused_suffix` is empty and the `-ol`
     # suffix is used instead.
     suffix_str = _build_fused_suffix(substituents, core_name) or hydroxy_ol_suffix
+    if substituents.get('amino_substituents'):
+        expressed = 'amine'
+    elif substituents.get('oxo_substituents') or ketone_core:
+        expressed = 'one'
+    elif hydroxy_ol_suffix:
+        expressed = 'ol'
+    else:
+        expressed = None
 
     if suffix_str:
         # Apply suffix to core name with vowel elision
         modified_core = _apply_suffix_to_core(core_name, suffix_str)
         name = _join_prefix_to_parent(prefix_str, modified_core)
+        _record_if_senior_group_prefixed(mol, ring_atoms, expressed, name)
         return f"{stereo_prefix}{name}" if stereo_prefix else name
 
     name = _join_prefix_to_parent(prefix_str, core_name)
+    _record_if_senior_group_prefixed(mol, ring_atoms, expressed, name)
     return f"{stereo_prefix}{name}" if stereo_prefix else name
+
+
+def _record_if_senior_group_prefixed(mol, ring_atoms, expressed, name) -> None:
+    """Mark ``name`` as not a PIN when a characteristic group senior to the one
+    it expresses as the suffix is cited as a prefix or sits in a substituent
+    , the Blue Book;: '2-(methylcarbamoyl)-...-
+    4-one' (amide 11 > ketone 16), '3-(carboxymethyl)quinoline'. The name is
+    kept (it still has to round-trip), but NAME-SCOPED: only a shipped name that
+    contains it is labelled below the PIN tier (provenance.record_non_pin_fragment),
+    so a speculative call never demotes another producer's name."""
+    if not name or not _name_cites_senior_group_as_prefix(mol, ring_atoms, expressed):
+        return
+    from ..metrics.provenance import record_non_pin_fragment
+    record_non_pin_fragment(name)
 
 
 def _join_prefix_to_parent(prefix_str: str, parent_name: str) -> str:
@@ -3155,8 +3818,9 @@ def _build_fused_suffix(substituents: Dict, core_name: str) -> str:
     """
     Build suffix string for oxo (-one) and amino (-amine) groups.
 
-    For IUPAC 2013, when amino or oxo are present, they use suffix naming.
-    Amino takes precedence (higher seniority) over oxo for suffix position.
+    Used only when the amine or the ring C=O is the principal characteristic
+    group (no senior suffix group, no principal hydroxy; routed by
+    _assemble_fused_heterocycle_name).
 
     Args:
         substituents: Dict with 'oxo_substituents' and 'amino_substituents'
@@ -3165,28 +3829,20 @@ def _build_fused_suffix(substituents: Dict, core_name: str) -> str:
     Returns:
         Suffix string like '-6-amine' or '-2,6-dione' or '' if no suffix groups
     """
-    suffix_parts = []
-
-    # Amino has higher seniority than oxo in IUPAC
-    # When both present, amino is suffix, oxo becomes prefix
-    # For simplicity, handle amino as suffix first
-
     amino_locants = substituents.get('amino_substituents', [])
     oxo_locants = substituents.get('oxo_substituents', [])
 
+    # (the Blue Book): ketones (16) are senior to amines
+    # (19). _assemble_fused_heterocycle_name never passes both (it fails closed
+    # on that combination); the amine suffix used to win here and the oxo was
+    # silently dropped.
+    if amino_locants and oxo_locants:
+        return ''
     if amino_locants:
-        # Amino suffix: -amine, -diamine, etc.
-        suffix_parts.append(_format_suffix('amine', amino_locants))
-
+        return _format_suffix('amine', amino_locants)
     if oxo_locants:
-        # If amino is present, oxo should be prefix (handled elsewhere)
-        # If no amino, oxo is suffix: -one, -dione, etc.
-        if not amino_locants:
-            suffix_parts.append(_format_suffix('one', oxo_locants))
-        # Note: When amino is suffix, oxo should be "oxo" prefix
-        # This would require more complex logic; for now, just use suffix
-
-    return ''.join(suffix_parts)
+        return _format_suffix('one', oxo_locants)
+    return ''
 
 
 def _format_suffix(suffix_base: str, locants: List) -> str:
@@ -3307,9 +3963,16 @@ def _join_fused_prefixes(prefixes: List[str]) -> str:
             # Check if hyphen needed between prefixes
             last_char = result[-1]
             first_char = p[0]
-            if (last_char.isalpha() or last_char == ')') and first_char.isdigit():
+            # (b) (the Blue Book, "Hyphens are used in substitutive
+            # names:... after parentheses, if the closing parenthesis is followed
+            # by a locant"): the rule is about the closing ENCLOSING MARK, and a
+            # prefix escalated to  or { },:7446) closes with ']' or
+            # '}'. Testing only ')' glued the next locant on:
+            # '7-[(1R,...)-...-9-yl]3-(...)-1H-indole'.
+            closes_enclosure = last_char in ')]}'
+            if (last_char.isalpha() or closes_enclosure) and first_char.isdigit():
                 result += "-"
-            elif (last_char.isalpha() or last_char == ')') and first_char == 'N':
+            elif (last_char.isalpha() or closes_enclosure) and first_char == 'N':
                 result += "-"
         result += p
 

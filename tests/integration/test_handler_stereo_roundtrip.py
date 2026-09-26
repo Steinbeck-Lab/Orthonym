@@ -21,7 +21,7 @@ from rdkit import Chem
 
 from orthonym import name_compound
 from tests.support.jars import jar_or_none
-from tests.support.rt_assert import assert_tier_contract
+from tests.support.rt_assert import assert_full_rt, assert_tier_contract
 
 JAVA_AVAILABLE = shutil.which("java") is not None
 OPSIN_JAR = jar_or_none()
@@ -84,6 +84,8 @@ def _assert_handler_roundtrip(case: dict, handler: str):
     smiles = case["smiles"]
     if case.get("source_id") in _TIER_CONTRACT:
         return _assert_tier_contract_case(case, handler)
+    if case.get("source_id") in _EXPECTED_NAME:
+        return _assert_expected_name_case(case, handler)
     name = name_compound(smiles)
 
     # ---- ALWAYS-RUN GATES (fix) ----
@@ -161,6 +163,73 @@ _TIER_CONTRACT = {
     # methyl-2-oxo-1-oxacyclodeca-3,6-diene' (not the PIN), E/Z block included.
     "CHEBI:190592": "10-ring lactone: PIN is a Hantzsch-Widman oxecinone (P-52.2.2.2)",
 }
+
+
+# Cases whose PIN-tier name is asserted EXACTLY, with a full-InChIKey OPSIN round
+# trip (tests/support/rt_assert.py::assert_full_rt). For these ids the fixture's
+# `expected_stereo_prefix_pattern` and `comment` are superseded: they predate the
+# decisions below. Pre-existing-failures plan, Task 9 (TRIAGE.csv rows 18, 21-26),
+# change-asserted-value: each value is OPSIN 2.9.0 RT exact (full standard
+# InChIKey against the input, run outside the engine), and each old accepted
+# value was mutation-checked (scripts/mutation_check.py exit 0; TRIAGE.md 'T9
+# outcome').
+#
+# Rows 21-25, user decision D-a (plan 'User decisions (answered 2026-09-24)'):
+# "D-a -> keep the semisystematic names for sugars and amino acids in the PIN
+# tier (alpha-L-xylopyranose, D-proline). Update the 6 TestHeterocycle stereo
+# tests to accept them; do NOT change the code." Blue Book basis (ruling R25):
+# INTRODUCTION (the Blue Book) "Preferred IUPAC names (PINs) are not
+# identified for the compounds in this Chapter."; "Stereodescriptors
+# used in the nomenclature of natural products (see Chapter " (:44626), (i)
+# "The descriptors 'D' and 'L' are used to describe the configuration of
+# carbohydrates (ref. 27 and, amino acids and peptides (ref. 18 and
+# ". The stereo is carried by D/L and alpha/beta, so the CIP-prefix
+# pattern of the fixture does not apply to these names.
+#
+# Row 26 (no plan ruling; derived from the quoted rules): NUMBERING
+# (:3219), criterion "(c) principal characteristic groups and free valences
+# (suffixes)" (:3256): the ring O is locant 1 either way, so the ketone takes 3,
+# not 4, and the hydroxy carbon becomes C-2 ('(2S)', not the fixture's '(5S)');
+# the added hydrogen is cited as in "pyridin-2(1H)-one (PIN)" (:21316).
+#
+# Row 18 (controller ruling, plan 'Controller rulings (2026-09-24, Task 1)'): "D-a
+# does NOT extend to peptides (CHEBI:141425). The user-directed 2026-08-27 verdict
+# stands: peptides are not PINs; the PIN is the substitutive name."
+# (:54164) leaves peptide names to ref. 18. The substitutive name: the acid is the
+# principal characteristic group; "Substituents of the types -NH-CO-R
+# and -NH-SO2-R" (:32991) "Method (1) generates preferred IUPAC names" (the
+# 'amido' prefix); "Amic acids" (:30369),:30373 "The combination of
+# the prefixes 'amino' and 'oxo' is used for describing the -CO-NH2 at the end of
+# an acyclic chain in preferred IUPAC names" ('4-amino-4-oxobutanoic acid (PIN)',
+#:30384); the substituent's stereodescriptor sits inside its own enclosing marks
+# "NAMING OF STEREOISOMERS",:44639; "[(1R)-1-chloropropyl]benzene (PIN)",
+#:44668). 'L-asparaginyl-L-tryptophan' also round-trips exactly but is not the
+# PIN.
+_EXPECTED_NAME = {
+    "CHEBI:145628": "6-deoxy-β-D-allopyranose",   # row 21, D-a
+    "CHEBI:149357": "α-L-xylopyranose",            # row 22, D-a
+    "CHEBI:152156": "6-deoxy-β-D-glucopyranose",   # row 23, D-a
+    "CHEBI:16313": "D-proline",                    # row 24, D-a
+    "CHEBI:17535": "L-arabinopyranose",            # row 25, D-a
+    "CHEBI:214844": "(2S)-2-hydroxy-4-methyl-5-propylfuran-3(2H)-one",  # row 26
+    "CHEBI:141425": (                              # row 18, peptide
+        "(2S)-2-[(2S)-2,4-diamino-4-oxobutanamido]-3-(1H-indol-3-yl)"
+        "propanoic acid"),
+}
+
+
+def _assert_expected_name_case(case: dict, handler: str) -> str:
+    """The PIN tier (name_compound, the default) ships exactly the name in
+    ``_EXPECTED_NAME``, and it round-trips to the input's full InChIKey (every
+    stereodescriptor checked)."""
+    smiles = case["smiles"]
+    expected = _EXPECTED_NAME[case["source_id"]]
+    name = name_compound(smiles)
+    assert name == expected, (
+        f"{smiles}: PIN tier gave {name!r}, expected {expected!r} "
+        f"(handler={handler}, source={case.get('source_corpus')}/{case.get('source_id')})")
+    assert_full_rt(name, smiles, what=f"handler={handler}: ")
+    return name
 
 
 def _assert_tier_contract_case(case: dict, handler: str) -> str:

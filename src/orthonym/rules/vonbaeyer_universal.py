@@ -739,6 +739,7 @@ def _extract_spiro_submol(mol, cage_set):
 
 def analyze_spiro_universal(
     mol, cage_atoms=None, allow_mancude: bool = False, free_valence_atoms=None,
+    prefix_atoms=None,
 ) -> Optional[SpiroSystem]:
     """Deterministic universal spiro analysis; None on any refusal.
 
@@ -808,10 +809,15 @@ def analyze_spiro_universal(
     if free_valence_atoms:
         fv_sub = {mol_to_sub[a] for a in free_valence_atoms if a in mol_to_sub}
 
+    prefix_sub = None
+    if prefix_atoms:
+        # one entry per prefix (original indices), mapped onto the cage submol
+        prefix_sub = [mol_to_sub[a] for a in prefix_atoms if a in mol_to_sub]
+
     if len(spiro_sub) == 1:
         center = next(iter(spiro_sub))
         numbering = get_spiro_numbering(
-            sub, center, suffix_ring_atoms=fv_sub)
+            sub, center, suffix_ring_atoms=fv_sub, prefix_ring_atoms=prefix_sub)
     else:
         numbering = _get_polyspiro_numbering(
             sub, spiro_sub, suffix_ring_atoms=fv_sub)

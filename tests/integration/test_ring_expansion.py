@@ -104,21 +104,43 @@ class TestFusedHeterocycleNaming:
 # ---------------------------------------------------------------------------
 
 class TestFlavonoidNaming:
-    """Tests that flavonoid entries produce retained names."""
+    """Flavonoid skeletons get the systematic 1-benzopyran PINs (R19), not retained names."""
 
     def test_flavone(self):
         name = name_compound("O=c1cc(-c2ccccc2)oc2ccccc12")
-        assert "flavone" in name.lower() or "chromen" in name.lower()
+        # PIN per R19: "(d) Systematic 'benzo' names, for example 2H-1-benzopyran, are preferred
+        # IUPAC names for chromene, isochromene, chromane, isochromane" the Blue Book
+        # (under "11. Polycyclic ring systems"); Table 2.8 "the PIN is 2H-1-benzopyran":11656;
+        # the ketone replaces the 4H >CH2 as in test_chromone.
+        # OPSIN RT exact (TRIAGE.csv; re-checked in Task 7/8).
+        # The unlowered name is compared (ledger carry: a lowered compare breaks the mutation check).
+        assert name == "2-phenyl-4H-1-benzopyran-4-one", f"Got {name}"
         assert not _has_vb_notation(name)
 
     def test_flavanone(self):
         name = name_compound("O=C1CC(c2ccccc2)Oc2ccccc21")
-        assert "flavanone" in name.lower() or "chroman" in name.lower()
+        # PIN per R19: "(d) Systematic 'benzo' names, for example 2H-1-benzopyran, are preferred
+        # IUPAC names for chromene, isochromene, chromane, isochromane" the Blue Book
+        # (under "11. Polycyclic ring systems"); Table 2.8 "the PIN is 2H-1-benzopyran":11656;
+        # the ketone replaces the 4H >CH2 as in test_chromone.
+        # Hydro prefixes: "In names, they are cited immediately before the name of
+        # the parent compound, after those of detachable substituent prefixes arranged in
+        # alphanumerical order.":25364; cf. "3-imino-2,3-dihydro-1H-isoindol-1-one (PIN)"
+        #:29609 and test_chromanone's "2,3-dihydro-4H-1-benzopyran-4-one".
+        # OPSIN RT exact (TRIAGE.csv; re-checked in Task 7/8).
+        # The unlowered name is compared (ledger carry: a lowered compare breaks the mutation check).
+        assert name == "2-phenyl-2,3-dihydro-4H-1-benzopyran-4-one", f"Got {name}"
         assert not _has_vb_notation(name)
 
     def test_isoflavone(self):
         name = name_compound("O=c1c(-c2ccccc2)coc2ccccc12")
-        assert "isoflavone" in name.lower() or "chromen" in name.lower()
+        # PIN per R19: "(d) Systematic 'benzo' names, for example 2H-1-benzopyran, are preferred
+        # IUPAC names for chromene, isochromene, chromane, isochromane" the Blue Book
+        # (under "11. Polycyclic ring systems"); Table 2.8 "the PIN is 2H-1-benzopyran":11656;
+        # the ketone replaces the 4H >CH2 as in test_chromone.
+        # OPSIN RT exact (TRIAGE.csv; re-checked in Task 7/8).
+        # The unlowered name is compared (ledger carry: a lowered compare breaks the mutation check).
+        assert name == "3-phenyl-4H-1-benzopyran-4-one", f"Got {name}"
         assert not _has_vb_notation(name)
 
     def test_chromanone(self):

@@ -15,6 +15,7 @@ Nothing here tests nomenclature. It tests the thing the nomenclature tests
 stand on.
 """
 
+import os
 import subprocess
 import sys
 from pathlib import Path
@@ -26,12 +27,21 @@ from orthonym.errors import _DESCRIPTIVE_FALLBACK_NAMES
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
 
-# The canary. Its first-matching naming class produces `(5-carbamoylpentyl)-
-# oxirane`, which OPSIN parses to NC(=O)CCCCCC1CO1 — a DIFFERENT molecule than
-# the input. Only catches that; no other gate in the stack does. So this
-# molecule's output is a direct readout of whether the gate is live.
-CANARY = "CC(=O)N(CC1CO1)C(C)C"
-CANARY_UNGATED_NAME = "(5-carbamoylpentyl)oxirane"
+# The canary. With the gate off its naming path produces `N-hydroxyacetamide`,
+# which OPSIN parses to CC(=O)NO -- a DIFFERENT molecule than the input (the
+# 4-butoxyphenyl carrier is dropped: C2H5NO2 for C12H17NO3). Only catches
+# that; with the gate on the PIN tier abstains. So this molecule's output is a
+# direct readout of whether the gate is live.
+#
+# Task 12 fix a performance pass (wp6-tests; TRIAGE.md ' outcome'): the previous canary,
+# CC(=O)N(CC1CO1)C(C)C ('(5-carbamoylpentyl)oxirane' ungated), is now named
+# correctly with the gate off ('N-(oxiranylmethyl)-N-(propan-2-yl)acetamide'), so
+# the pair stopped disagreeing and this file went red, as designed. The new one is
+# canary call 678 of tests/integration/test_canary_rt75.py (DK-NOTEXACT, a known
+# gate-off 0-wrong producer that the gate voids; probe 2026-09-26). When it is
+# fixed, pick another row whose ungated name is a wrong molecule.
+CANARY = "CCCCOc1ccc(CC(=O)NO)cc1"
+CANARY_UNGATED_NAME = "N-hydroxyacetamide"
 
 
 # ---------------------------------------------------------------------------
@@ -118,10 +128,15 @@ def test_a_gate_test_without_a_jar_is_skipped_not_passed():
         "def test_must_not_run_blind():\n"
         "    assert False, 'this body must never execute without a jar'\n"
     )
+    # The probe must see the jar-absent SKIP path. Under ORTHONYM_REQUIRE_JARS=1
+    # (the CI setting) conftest turns a missing jar into pytest.fail instead
+    # (tests/support/jars.py), so the variable is dropped for the probe only
+    # (Task 12 fix a performance pass, wp6-tests; TRIAGE.md ' outcome').
+    env = {k: v for k, v in os.environ.items() if k != "ORTHONYM_REQUIRE_JARS"}
     try:
         r = subprocess.run(
             [sys.executable, "-m", "pytest", str(probe), "-q", "--no-header", "-p", "no:cacheprovider"],
-            cwd=PROJECT_ROOT, capture_output=True, text=True, timeout=300,
+            cwd=PROJECT_ROOT, capture_output=True, text=True, timeout=300, env=env,
         )
         combined = r.stdout + r.stderr
         assert "1 skipped" in combined, (

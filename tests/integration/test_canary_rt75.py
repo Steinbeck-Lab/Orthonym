@@ -47,6 +47,124 @@ from tests.support.jars import jar_or_none
 # + 28 from a phase (v12.0 canary expansion: newly RT-matching from benchmark)
 # ---------------------------------------------------------------------------
 
+# ---------------------------------------------------------------------------
+# 2026-09-26 (pre-existing-failures plan, Task 11) change-asserted-value: canary re-baseline.
+# The live consumer is tests/unit/rules/test_opsin_format_compliance.py::TestCanaryRegression
+# (this module itself stays retired, see pytestmark). 317 of the 703 rows name differently
+# at the current engine (name_compound, gate off, fixture order). Evidence per row:
+# internal notes summary: TRIAGE.md ' outcome'.
+# - 97 rows are re-baselined here: a targeted edit of the expected name only, each line
+# tagged '# <class> (<R-id / controller ruling / BB rule>); was <old>'. Each new name is OPSIN 2.9.0
+# full-InChIKey exact (batch OPSIN call outside the engine, scripts/triage_preexisting.py
+# helpers) and was checked first against the non-PIN classes (peptide names, method (2)
+# polyol esters, von Baeyer names of ortho-fused systems, adamantane as tricyclo...decane,
+# acids written as hydroxy + oxo, missing enclosing marks, ties, CIP descriptors on
+# stereoparents). Rows tagged 'RT-exact, no BB ruling' are reasoning-backed (93; 536 and 599
+# moved to the known-defect list in Task 12 fix a performance pass, see below).
+# - 220 rows are NOT re-baselined (31 not RT-exact, 189 RT-exact but not the PIN): they keep
+# their old value here and are listed, with the current name and the reason, in
+# CANARY_KNOWN_DEFECTS in the test module; they go to the Task 12 fix round.
+# 2026-09-26 (Task 12 fix a performance pass) change-asserted-value: 3 more rows re-baselined, tagged
+# '# RB-P5141...; was <old>' (calls 47, 211, 586; evidence in CANARY.csv, summary in TRIAGE.md
+# ' fix a performance pass'). Each new name is OPSIN 2.9.0 full-InChIKey exact (batch call outside the engine).
+# 2026-09-26 (Task 12 fix a performance pass, wp2-numbering) change-asserted-value: 3 rows re-baselined,
+# tagged '# RB-P14G / RB-P14C...; was <old>' (calls 113, 301 and the pyrazine row; the ring
+# numbering now finishes with (g) and a complete prefix naming). Each new name is OPSIN 2.9.0
+# full-InChIKey exact (fresh java run outside the engine); evidence in the wp2 report.
+# RB-P14G "### **** NUMBERING" (g) "lowest locants for the substituent cited first as a
+# prefix in the name" (:3307); "1-methyl-4-nitronaphthalene (PIN) (not 4-methyl-1-
+# nitronaphthalene)" (:3318).
+# RB-P14C (c) "principal characteristic groups and free valences (suffixes)" (:3256)
+# take the lowest locants: -2,3,4,5-tetrol, not -3,4,5,6-tetrol.
+# 2026-09-26 (Task 12 fix a performance pass, wp5-nonpin-classes) change-asserted-value: 2 rows re-baselined,
+# tagged '# RB-P66412 / RB-P2511...; was <old>' (call 493, the guanidine prefix fix; call 360,
+# the bare fluorene row, which now cites its indicated hydrogen). The new name is
+# OPSIN 2.9.0 full-InChIKey exact (fresh java run outside the engine); evidence in CANARY.csv.
+# RB-P2511 retained fusion names, '(14) fluorene (9H-isomer shown; the PIN is
+# 9H-fluorene)' (:11398-11400); fixed with the same package (call 360).
+# RB-P66412 (:34266) "In the presence of a characteristic group having seniority
+# over guanidine [...], the following prefixes are used. The prefix guanidino may be
+# used in general nomenclature." 'carbamimidoylamino (preferred prefix)' (:34268).
+# 2026-09-26 (Task 12 fix a performance pass, wp6-tests) change-asserted-value: rows 536 and 599 were
+# 'RT-exact, no BB ruling' re-baselines, but their von Baeyer numbering breaks the Blue Book
+# (whole-branch review F5): 599's secondary-bridge superscripts are not the lowest
+# "### Selection of the main bridge and secondary bridges",
+# the Blue Book "The superscript locants for the secondary bridges must be as low as
+# possible": {5,8} < {14,17}), and in 536 every ring criterion ties so (g) (:3307) gives
+# the first-cited prefix, ethyl, the lower locant (5, not 32). They now hold the BB-derived name
+# here (tagged '# DK-VBNUM target'; OPSIN 2.9.0 full-InChIKey exact, fresh java run outside
+# the engine) and their CURRENT name is recorded in CANARY_KNOWN_DEFECTS (class DK-VBNUM), so
+# the canary test flags them when the numbering is fixed. Producer:
+# rules/polycyclic.VonBaeyerAnalyzer._choose_lowest_locant_numbering (drops the
+# lower-superscript candidate by descriptor-string equality) and _locant_criteria_key (no (g)
+# tier). 599 may even be a phane (1):23828, ASSUMED), in which case the von Baeyer
+# target is a correct spelling but not the PIN.
+# Citation corrections (whole-branch review nit 14): RB-ZWIT and RB-P1434 below now cite the
+# rules that apply; RB-Da says what D-a is (no PIN identified, a decision).
+# 2026-09-26 (Task 12 fix a performance pass, wp7-verify-fixes) change-asserted-value: call 296 (the DK-ALPHA
+# row) re-baselined, tagged '# RB-P145...; was <old>'. The shared key now compares the
+# Roman letters first (naming_utils.AlphaKey), so a hyphen or a locant can no longer outrank a
+# letter. OPSIN 2.9.0 full-InChIKey exact (fresh java run outside the engine).
+# RB-P145 "### **** ALPHANUMERICAL ORDER": "Nonitalic Roman letters are considered
+# first" (:3442); "The name of a prefix for a substituent is considered to
+# begin with the first letter of its complete name" (:3477); '5-(butan-2-yl)-5-
+# butylhentriacontane (PIN)' (:3461). 'propanylidene' < 'propenyl'.
+# RB-P5141 "## Skeletal replacement ('a') nomenclature in acyclic chains",:
+# the 'a' name is the PIN only "when four or more heterounits are present in a
+# unbranched chain" (:23348); "(1) 1-methoxy-2-(2-methoxyethoxy)ethane (PIN)" (:27756).
+# Classes (Blue Book = the Blue Book Blue Book; R<n> = plan ruling table):
+# RB-R1..R24 the plan ruling R<n> (its heading, sentence and line are in the plan table).
+# RB-Da user decision D-a: semisystematic sugar names stay at the PIN tier. No PIN is
+# identified for them:50943 "Preferred IUPAC names (PINs) are not identified
+# for the compounds in this Chapter";:29836 keeps carbohydrate acids for
+# general nomenclature): no PIN identified, kept by decision D-a -- not a Blue Book
+# PIN ruling.
+# RB-PEP controller ruling (peptides are not PINs; the PIN is the substitutive name).
+# RB-P101 controller ruling stereoparent names kept when RT-exact); "###
+# Stereochemical configuration of parent structures": "The name of a fundamental
+# parent structure usually implies the absolute configuration of all chirality
+# centers" (:51047).
+# RB-P29 "### ": "The prefixes isopropyl, isopropylidene, and trityl are
+# retained for use in general nomenclature" (:16334); "## Retained
+# prefixes no longer recommended": "2-methylpropyl (preferred prefix) (not
+# isobutyl)" (:16412); "": "tert-butyl (preferred prefix)" (:24412).
+# RB-P16 "### ENCLOSING MARKS": "Parentheses are used around compound
+#... and complex... prefixes" (:7232);: "Parentheses are used around
+# simple substituent prefixes... to separate locants" (:7255).
+# RB-SFX "### Substitutive nomenclature, prefix mode": "Hydroxy groups are
+# indicated by the prefix 'hydroxy' when:" (:27257; neither case holds);
+# "maximum number of substituents corresponding to the principal characteristic
+# group (suffix)" (:18875); (:26298); aniline (:26139).
+# RB-P14 "### NUMBERING" (:3219): (c) suffixes (:3256), (f) prefixes together
+# (:3301), (g) "lowest locants for the substituent cited first as a prefix" (:3307).
+# RB-P1434 the substituent locant: "The locant is omitted in monosubstituted
+# symmetrical parent hydrides or parent compounds where there is only one kind of
+# substitutable hydrogen" (:2939), 'chloropropanedioic acid (PIN)' (:2951);
+# the diacid's own locants: "Terminal locants are not cited in names for
+# mono- and dicarboxylic acids" (:2877), 'chlorobutanedioic acid (PIN)' (:2883).
+# RB-AMIC "## Amic acids" (:30369): "The combination of the prefixes 'amino'
+# and 'oxo' is used for describing the -CO-NH2 at the end of an acyclic chain in
+# preferred IUPAC names" (:30373); "4-amino-4-oxobutanoic acid (PIN)" (:30384).
+# RB-TRIC "If an unbranched chain is linked to more than two carboxy groups,
+# all carboxy groups are named... 'carboxylic acid'" (:29878).
+# RB-HW "Preferred IUPAC names for heteromonocyclic rings with no more than ten
+# ring members are Hantzsch-Widman names, including the locants '1,2' and '1,3'"
+# (:23682); "Lowest possible locants are assigned to heteroatoms" (:8265).
+# RB-ZWIT "## INTRODUCTION": "an anionic center has priority over a cationic center
+# in zwitterions... anionic centers... become the parent structure, into which the
+# cationic part is substituted" (:42411); "zwitterionic compounds having
+# the ionic centers in the same parent structure are not considered as neutral
+# compounds" (:42419); 'azaniumylacetate glycine zwitterion' (:54561),
+# '(2S)-2-azaniumyl-3-(methylsulfanyl)propanoate' (:54569). is about centres
+# on DIFFERENT parent structures, and:54518 prefers the neutral form for
+# the conventional amino-acid name; neither was the right citation.)
+# RB-VB "### Five-membered ring requirement": "Fusion nomenclature gives
+# preferred IUPAC names only to compounds having at least two rings of at least
+# five or more members" (:23710) (epoxide on a cyclohexane: von Baeyer);
+# (c) 'tetrol' (:7619, "benzenehexol (PIN)":7625).
+# Spelling rules shared by several rows: (a) 'e' elided only before a vowel (:7595);
+# 'a' inserted before 'diene' etc. (:7703); (:16497).
+# ---------------------------------------------------------------------------
 CANARY_COMPOUNDS = [
     (
         "COc1cc(CC(=O)C(=O)c2c(O)cc(O)c(OC)c2O)cc(OC)c1O",
@@ -58,7 +176,7 @@ CANARY_COMPOUNDS = [
     ),
     (
         "Cc1ccc(C(=O)O)s1",
-        "2-methylthiophene-5-carboxylic acid",
+        "5-methylthiophene-2-carboxylic acid",  # RB-R24 (R24); was '2-methylthiophene-5-carboxylic acid'
     ),
     (
         "COC(/C=C/c1ccccc1)[C@@H](C)C(OC)[C@@H](C)/C=C/C(C)=C/C(N)=O",
@@ -82,7 +200,7 @@ CANARY_COMPOUNDS = [
     ),
     (
         "C[C@]12CC[C@@H](O)C[C@H]1CC[C@@H]1[C@@H]2CC[C@]2(C)[C@H](O)CC[C@@H]12",
-        "(3R,5R,8R,9S,10S,13S,14S,17R)-androstan-3,17-diol",
+        "5β-androstane-3α,17α-diol",  # RB-P101 (controller ruling); was '(3R,5R,8R,9S,10S,13S,14S,17R)-androstan-3,17-diol'
     ),
     (
         "CC(C)C[C@H](N)C(=O)N[C@@H](CO)C(=O)NCC(=O)O",
@@ -134,7 +252,7 @@ CANARY_COMPOUNDS = [
     ),
     (
         "COc1cc(C=CC(=O)O)cc(O)c1O",
-        "3-(4,5-dihydroxy-3-methoxyphenyl)prop-2-enoic acid",
+        "3-(3,4-dihydroxy-5-methoxyphenyl)prop-2-enoic acid",  # RB-P14 (BB rule); was '3-(4,5-dihydroxy-3-methoxyphenyl)prop-2-enoic acid'
     ),
     (
         "C[C@H]1C/C=C\\[C@H]2[C@@H]3O[C@]3(C)[C@@H](C)[C@H]3[C@H](Cc4ccccc4)NC(=O)[C@@]32OC(=O)/C=C\\[C@@](C)(O)C1=O",
@@ -158,7 +276,7 @@ CANARY_COMPOUNDS = [
     ),
     (
         "CCCc1nc(C)c(C)nc1C",
-        "2,3,6-trimethyl-5-propylpyrazine",
+        "2,3,5-trimethyl-6-propylpyrazine",  # RB-P14G (g):3307); was '2,3,6-trimethyl-5-propylpyrazine'
     ),
     (
         "Cc1ccc(O)cc1C",
@@ -210,7 +328,7 @@ CANARY_COMPOUNDS = [
     ),
     (
         "CCCCCCCCCc1cc(=O)c2ccccc2n1C",
-        "N-methyl-2-nonylquinolin-4-one",
+        "1-methyl-2-nonylquinolin-4(1H)-one",  # RB-R21 (R21); was 'N-methyl-2-nonylquinolin-4-one'
     ),
     (
         "CC(C)[C@H](N)C(=O)N[C@@H](Cc1ccc(O)cc1)C(=O)N[C@@H](CC(=O)O)C(=O)O",
@@ -230,7 +348,7 @@ CANARY_COMPOUNDS = [
     ),
     (
         "Oc1ccnc2ccccc12",
-        "4-hydroxyquinoline",
+        "quinolin-4-ol",  # RB-SFX (BB rule); was '4-hydroxyquinoline'
     ),
     (
         "CCCCCCC#CCCCCCC(=O)O",
@@ -238,7 +356,7 @@ CANARY_COMPOUNDS = [
     ),
     (
         "CCCCCCCCCCCCOCCO",
-        "3-oxapentadecan-1-ol",
+        "2-(dodecyloxy)ethan-1-ol",  # RB-P5141:23348); was '3-oxapentadecan-1-ol'
     ),
     (
         "C[C@H]1C(=O)O[C@@H]2CCN3CC=C(COC(=O)[C@](C)(O)[C@]1(C)O)[C@H]23",
@@ -258,15 +376,15 @@ CANARY_COMPOUNDS = [
     ),
     (
         "O=C(O)c1ccc[nH]1",
-        "pyrrole-2-carboxylic acid",
+        "1H-pyrrole-2-carboxylic acid",  # RB-R1 (R1); was 'pyrrole-2-carboxylic acid'
     ),
     (
         "O=C(O)C(O)c1ccc(O)cc1O",
-        "2-(2,4-dihydroxyphenyl)-2-hydroxyethanoic acid",
+        "(2,4-dihydroxyphenyl)(hydroxy)acetic acid",  # RB-R3 (R3); was '2-(2,4-dihydroxyphenyl)-2-hydroxyethanoic acid'
     ),
     (
         "OC[C@H](O)c1ccccc1",
-        "(2R)-2-phenylethan-1-ol",  #: diol no longer polyfunctional (same parent class)
+        "(1R)-1-phenylethane-1,2-diol",  # RB-P14 (BB rule); was '(2R)-2-phenylethan-1-ol' | earlier note:: diol no longer polyfunctional (same parent class)
     ),
     (
         "O=[N+]([O-])OO",
@@ -274,7 +392,7 @@ CANARY_COMPOUNDS = [
     ),
     (
         "CCCCCCCCCCCCCCCC(=O)OC(CCCCC)CCCCCCCCCCCC(=O)[O-]",
-        "13-(palmitoyloxy)octadecanoate",
+        "13-(hexadecanoyloxy)octadecanoate",  # RB-R20 (R20); was '13-(palmitoyloxy)octadecanoate'
     ),
     (
         "CC(C)CCCCCCCCCCCCCCCCCCCCCCCCC(=O)O",
@@ -294,7 +412,7 @@ CANARY_COMPOUNDS = [
     ),
     (
         "O=C(O)[C@@H]1OC(O)[C@H](O)[C@@H](O)[C@H]1O",
-        "(2R,3R,4S,5R)-3,4,5,6-tetrahydroxyoxane-2-carboxylic acid",
+        "L-altropyranuronic acid",  # RB-Da (R25/D-a); was '(2R,3R,4S,5R)-3,4,5,6-tetrahydroxyoxane-2-carboxylic acid'
     ),
     (
         "CC[C@H](C)[C@H](NC(=O)[C@@H](N)C(C)C)C(=O)N[C@H](C(=O)O)[C@@H](C)O",
@@ -334,7 +452,7 @@ CANARY_COMPOUNDS = [
     ),
     (
         "COc1c(-c2ccccc2)c2ccc(O)cc2[nH]c1=O",
-        "7-hydroxy-3-methoxy-4-phenylquinolin-2-one",
+        "7-hydroxy-3-methoxy-4-phenylquinolin-2(1H)-one",  # RB-R21 (R21); was '7-hydroxy-3-methoxy-4-phenylquinolin-2-one'
     ),
     (
         "CCCCCCCC/C=C\\CCCCCCO",
@@ -376,7 +494,7 @@ CANARY_COMPOUNDS = [
     ),
     (
         "CCSSSCC",
-        "3,4,5-trithiaheptane",
+        "diethyltrisulfane",  # RB-R9 (R9); was '3,4,5-trithiaheptane'
     ),
     #: Cyclic Imides
     (
@@ -387,7 +505,7 @@ CANARY_COMPOUNDS = [
     ),
     (
         "O=C1NC(=O)c2ccccc21",
-        "phthalimide",
+        "1H-isoindole-1,3(2H)-dione",  # RB-R21 (R21); was 'phthalimide'
     ),
     #: Thiocarboxylic Acids
     (
@@ -396,7 +514,7 @@ CANARY_COMPOUNDS = [
     ),
     (
         "CC(=S)S",
-        "ethanedithioic acid",
+        "ethane(dithioic acid)",  # RB-R12 (R12); was 'ethanedithioic acid'
     ),
     #: Carbamic Acid
     (
@@ -444,7 +562,7 @@ CANARY_COMPOUNDS = [
     ),
     (
         r"CC(=O)/C=C(\C)C",
-        "mesityl oxide",
+        "4-methylpent-3-en-2-one",  # RB-NORULE (RT-exact, no BB ruling); was 'mesityl oxide'
     ),
     (
         "C=CC/C=C/CCC(=O)OC",
@@ -460,11 +578,11 @@ CANARY_COMPOUNDS = [
     ),
     (
         "CC(=O)OC1CCCCC1",
-        "acetyloxycyclohexane",
+        "cyclohexyl acetate",  # RB-R5 (R5); was 'acetyloxycyclohexane'
     ),
     (
         "OCC(O)CO",
-        "glycerol",
+        "propane-1,2,3-triol",  # RB-R2 (R2); was 'glycerol'
     ),
     (
         "c1cc(-c2ccco2)oc1",
@@ -476,7 +594,7 @@ CANARY_COMPOUNDS = [
     ),
     (
         "CC(=O)OCC(COC(C)=O)OC(C)=O",
-        "1,2,3-tris(acetyloxy)propane",
+        "propane-1,2,3-triyl triacetate",  # RB-R5 (R5); was '1,2,3-tris(acetyloxy)propane'
     ),
     (
         r"O=C(O)CCCC/C=C\CCCCCCCCCC",
@@ -484,7 +602,7 @@ CANARY_COMPOUNDS = [
     ),
     (
         "CC(C)Cc1cccc(CC(C)C)c1O",
-        "2,6-diisobutylphenol",  #: phenol suffix routing
+        "2,6-bis(2-methylpropyl)phenol",  # RB-P29 (BB rule); was '2,6-diisobutylphenol' | earlier note:: phenol suffix routing
     ),
     (
         "CCCCCCCCCCCCCCCCCCCC(=O)OC1CCCCC1",
@@ -524,7 +642,7 @@ CANARY_COMPOUNDS = [
     ),
     (
         "CC1(C)CC(=O)c2c(O)cc(O)cc2O1",
-        "5,7-dihydroxy-2,2-dimethylchroman-4-one",
+        "5,7-dihydroxy-2,2-dimethyl-2,3-dihydro-4H-1-benzopyran-4-one",  # RB-R19 (R19); was '5,7-dihydroxy-2,2-dimethylchroman-4-one'
     ),
     (
         "O=C(O)CC(=O)CC(=O)O",
@@ -532,7 +650,7 @@ CANARY_COMPOUNDS = [
     ),
     (
         "CC1OC(O)C(O)C(O)C1O",
-        "rhamnopyranose",
+        "6-methyloxane-2,3,4,5-tetrol",  # RB-P14C (c):3256; was DK-OXANE, call 113); was 'rhamnopyranose'
     ),
     (
         r"CCC/C=C\C/C=C\CCCCCCCC(=O)O",
@@ -576,7 +694,7 @@ CANARY_COMPOUNDS = [
     ),
     (
         "CC(C)(C)c1ccc(CC(=O)O)cc1",
-        "2-(4-tert-butylphenyl)ethanoic acid",  # (b)/(d) (a phase): tert-butyl is simple, no enclosing marks
+        "(4-tert-butylphenyl)acetic acid",  # RB-R3 (R3); was '2-(4-tert-butylphenyl)ethanoic acid' | earlier note: (b)/(d) (a phase): tert-butyl is simple, no enclosing marks
     ),
     (
         r"CCCCC/C=C\C/C=C\C/C=C\CCCCCCCC(=O)O",
@@ -608,7 +726,7 @@ CANARY_COMPOUNDS = [
     ),
     (
         "OCC(O)C(O)C(O)C(O)CO",
-        "2,3,4,5-tetrahydroxyhexane-1,6-diol",
+        "hexane-1,2,3,4,5,6-hexol",  # RB-SFX (BB rule); was '2,3,4,5-tetrahydroxyhexane-1,6-diol'
     ),
     # --- a phase: Stereochemistry Accuracy RT Fixes (9 compounds) ---
     (
@@ -625,7 +743,7 @@ CANARY_COMPOUNDS = [
     ),
     (
         "O=C(O)/C=C/c1ccc(OS(=O)(=O)O)cc1",
-        "(2E)-3-(4-(sulfooxy)phenyl)prop-2-enoic acid",
+        "(2E)-3-[4-(sulfooxy)phenyl]prop-2-enoic acid",  # RB-P16 (BB rule); was '(2E)-3-(4-(sulfooxy)phenyl)prop-2-enoic acid'
     ),
     (
         "C=CC/C=C/CCC(=O)OC",
@@ -641,11 +759,11 @@ CANARY_COMPOUNDS = [
     ),
     (
         "CCC[C@@H]1OCc2c(O)cccc2[C@H]1O",
-        "(3S,4R)-4,8-dihydroxy-3-propylisochromane",
+        "(3S,4R)-3-propyl-3,4-dihydro-1H-2-benzopyran-4,8-diol",  # RB-R19 (R19); was '(3S,4R)-4,8-dihydroxy-3-propylisochromane'
     ),
     (
         "C[C@@H]1Cc2cc(O)cc(O)c2CO1",
-        "(3R)-6,8-dihydroxy-3-methylisochromane",
+        "(3R)-3-methyl-3,4-dihydro-1H-2-benzopyran-6,8-diol",  # RB-R19 (R19); was '(3R)-6,8-dihydroxy-3-methylisochromane'
     ),
     # a phase: Medium Molecule Completeness (2 compounds)
     (
@@ -663,7 +781,7 @@ CANARY_COMPOUNDS = [
     # --- a phase: v7.0 Final Benchmark (15 compounds) ---
     (
         "CC1CC=C(N2CCCC2)C1=O",
-        "5-methyl-2-pyrrolidinylcyclopent-2-en-1-one",
+        "5-methyl-2-(pyrrolidin-1-yl)cyclopent-2-en-1-one",  # RB-P16 (BB rule); was '5-methyl-2-pyrrolidinylcyclopent-2-en-1-one'
     ),
     (
         "O=C([O-])/C=C/C(=O)O.[Na+]",
@@ -675,11 +793,11 @@ CANARY_COMPOUNDS = [
     ),
     (
         "CCN(C(C)C)C(C)C",
-        "N-ethyl-N-isopropylpropan-2-amine",
+        "N-ethyl-N-(propan-2-yl)propan-2-amine",  # RB-P29 (BB rule); was 'N-ethyl-N-isopropylpropan-2-amine'
     ),
     (
         "COc1cc(CC(O)C(=O)O)ccc1OS(=O)(=O)O",
-        "2-hydroxy-3-(3-methoxy-4-(sulfooxy)phenyl)propanoic acid",
+        "2-hydroxy-3-[3-methoxy-4-(sulfooxy)phenyl]propanoic acid",  # RB-P16 (BB rule); was '2-hydroxy-3-(3-methoxy-4-(sulfooxy)phenyl)propanoic acid'
     ),
     (
         "CCN(CC)Cc1ccccc1",
@@ -695,7 +813,7 @@ CANARY_COMPOUNDS = [
     ),
     (
         "NCCc1c[nH]c2ccc(O)cc12",
-        "3-(2-aminoethyl)-5-hydroxy-1H-indole",
+        "3-(2-aminoethyl)-1H-indol-5-ol",  # RB-SFX (BB rule); was '3-(2-aminoethyl)-5-hydroxy-1H-indole'
     ),
     (
         "O=C([O-])CC=CC(=O)C(=O)[O-]",
@@ -715,11 +833,11 @@ CANARY_COMPOUNDS = [
     ),
     (
         "CC[C@@H](C)c1ncc(C(C)C)[nH]c1=O",
-        "3-[(R)-sec-butyl]-6-isopropyl-2-oxo-1,4-diazine",
+        "3-[(2R)-butan-2-yl]-6-(propan-2-yl)pyrazin-2(1H)-one",  # RB-R21 (R21); was '3-[(R)-sec-butyl]-6-isopropyl-2-oxo-1,4-diazine'
     ),
     (
         "O=C(O)CCc1cc(O)c(OS(=O)(=O)O)c(O)c1",
-        "3-(3,5-dihydroxy-4-(sulfooxy)phenyl)propanoic acid",
+        "3-[3,5-dihydroxy-4-(sulfooxy)phenyl]propanoic acid",  # RB-P16 (BB rule); was '3-(3,5-dihydroxy-4-(sulfooxy)phenyl)propanoic acid'
     ),
     # --- a phase: v8.0 Closure (25 compounds) ---
     # v8.0 phase improvement canaries: a phase charge routing fixes (8 compounds)
@@ -759,7 +877,7 @@ CANARY_COMPOUNDS = [
     (
         "NC(=O)CCCC(=O)O",  # a phase: carbamoyl prefix linear acid
         # a phase-03: chain tiebreaker changes shorten parent chain
-        "4-carbamoylbutanoic acid",
+        "5-amino-5-oxopentanoic acid",  # RB-AMIC (BB rule); was '4-carbamoylbutanoic acid'
     ),
     (
         "NC(=O)c1ccc(C(=O)O)cc1",  # a phase: carbamoyl prefix aromatic acid
@@ -768,12 +886,12 @@ CANARY_COMPOUNDS = [
     (
         "NC(=O)CCC(=O)O",  # a phase: carbamoyl prefix short chain
         # a phase-03: chain tiebreaker changes shorten parent chain
-        "3-carbamoylpropanoic acid",
+        "4-amino-4-oxobutanoic acid",  # RB-AMIC (BB rule); was '3-carbamoylpropanoic acid'
     ),
     (
         "NC(=O)CC(=O)O",  # a phase: carbamoyl prefix minimal chain
         # a phase-03: chain tiebreaker changes shorten parent chain
-        "2-carbamoylethanoic acid",
+        "3-amino-3-oxopropanoic acid",  # RB-AMIC (BB rule); was '2-carbamoylethanoic acid'
     ),
     # Failure taxonomy sentinels: substituent_loss (3 compounds)
     (
@@ -823,7 +941,7 @@ CANARY_COMPOUNDS = [
     # Failure taxonomy sentinels: fragment_loss (3 compounds)
     (
         "O=C(O)Cc1cc(O)ccc1Nc1c(Cl)cccc1Cl",  # Sentinel: fragment_loss - dichloroanilino phenylacetic
-        "2-(3-hydroxyphenyl)ethanoic acid",
+        "[2-(2,6-dichloroanilino)-5-hydroxyphenyl]acetic acid",  # RB-R3 (R3); was '2-(3-hydroxyphenyl)ethanoic acid'
     ),
     (
         "CCCCCCCCCc1ccc(OCCO)cc1",  # was fragment_loss ('2-phenoxyethan-1-ol', nonyl dropped); aryloxy decorator now carries the ring
@@ -852,7 +970,7 @@ CANARY_COMPOUNDS = [
     ),
     (
         "NC(C(=O)O)C(CCC(N)C(=O)O)C(=O)O",  # Sentinel: opsin_vocab - triamino triacid
-        "2,6-diamino-3-(hydroxymethyl)heptanetrioic acid",
+        "1,5-diaminopentane-1,2,5-tricarboxylic acid",  # RB-TRIC (BB rule); was '2,6-diamino-3-(hydroxymethyl)heptanetrioic acid'
     ),
     # --- a phase: v9.0 canary expansion (19 compounds) ---
     # 4 from a phase (fused heterocycle prefix generation)
@@ -882,7 +1000,7 @@ CANARY_COMPOUNDS = [
     ),
     (
         "Oc1ccc2ncccc2c1",
-        "6-hydroxyquinoline",
+        "quinolin-6-ol",  # RB-SFX (BB rule); was '6-hydroxyquinoline'
     ),
     # a phase: Ring-as-substituent naming (non-phenyl rings on chain parents)
     (
@@ -908,11 +1026,11 @@ CANARY_COMPOUNDS = [
     # a phase: Polyfunctional routing (3+ functional groups)
     (
         "OC(=O)C(O)CC(=O)O",
-        "2-hydroxybutanedioic acid",
+        "hydroxybutanedioic acid",  # RB-P1434 (BB rule); was '2-hydroxybutanedioic acid'
     ),
     (
         "OC(=O)C(=O)CC(=O)O",
-        "2-oxobutanedioic acid",
+        "oxobutanedioic acid",  # RB-P1434 (BB rule); was '2-oxobutanedioic acid'
     ),
     (
         "OC(=O)CCCC(=O)O",
@@ -943,7 +1061,7 @@ CANARY_COMPOUNDS = [
     # Benchmark regression anchors (from a phase 500-sample benchmark)
     (
         "CCCCCC=CC1=C(CO)C(=O)C[C@H](O)[C@@H]1O",
-        "(4R,5S)-3-(hept-1-en-1-yl)-4,5-dihydroxy-2-hydroxymethylcyclohex-2-en-1-one",
+        "(4R,5S)-3-(hept-1-en-1-yl)-4,5-dihydroxy-2-(hydroxymethyl)cyclohex-2-en-1-one",  # RB-P16 (BB rule); was '(4R,5S)-3-(hept-1-en-1-yl)-4,5-dihydroxy-2-hydroxymethylcyclohex-2-en-1-one'
     ),
     (
         r"C=C(C)[C@H]1CC[C@]2(C)[C@@H]1CC[C@]1(C)C/C=C(\C)CC/C=C(\C)CC[C@H]12",
@@ -959,7 +1077,7 @@ CANARY_COMPOUNDS = [
         # -01 (a phase) re-baseline: the four -OH are now the principal
         # characteristic group expressed as the '-tetraol' SUFFIX c),
         # not a 'tetrahydroxy' prefix. RT-neutral (both forms OPSIN-L1-match).
-        "(1R,2R,3S,4S,5R,6S)-7-oxa-bicyclo[4.1.0]heptane-2,3,4,5-tetraol",
+        "(1R,2R,3S,4S,5R,6S)-7-oxabicyclo[4.1.0]heptane-2,3,4,5-tetrol",  # RB-VB (BB rule); was '(1R,2R,3S,4S,5R,6S)-7-oxa-bicyclo[4.1.0]heptane-2,3,4,5-tetraol'
     ),
     # --- a phase-04: v11.0 canary expansion (80 newly identified RT-matching compounds) ---
     (
@@ -980,7 +1098,7 @@ CANARY_COMPOUNDS = [
     ),
     (
         "C1CSSCS1",
-        "1,3,4-trithiane",
+        "1,2,4-trithiane",  # RB-HW (BB rule); was '1,3,4-trithiane'
     ),
     (
         "[Ag+].[Cl-]",
@@ -988,7 +1106,7 @@ CANARY_COMPOUNDS = [
     ),
     (
         "CSCCSC",
-        "2,5-dithiahexane",
+        "1,2-bis(methylsulfanyl)ethane",  # RB-P5141:23348); was '2,5-dithiahexane'
     ),
     (
         "CCCCCCCCCCCCCCCCCCCCCCC(=O)O",
@@ -1042,7 +1160,7 @@ CANARY_COMPOUNDS = [
     ),
     (
         "Nc1ccc(-c2ccco2)cc1",
-        "1-amino-4-(furan-2-yl)benzene",
+        "4-(furan-2-yl)aniline",  # RB-SFX (BB rule); was '1-amino-4-(furan-2-yl)benzene'
     ),
     (
         "O=C(O)CCC/C=C\\CCCC(=O)O",
@@ -1054,7 +1172,7 @@ CANARY_COMPOUNDS = [
     ),
     (
         "CCCc1coc(C)n1",
-        "2-methyl-4-propyloxazole",
+        "2-methyl-4-propyl-1,3-oxazole",  # RB-HW (BB rule); was '2-methyl-4-propyloxazole'
     ),
     (
         "CCCCCCCCCC/C=C/CCCC(=O)O",
@@ -1158,7 +1276,7 @@ CANARY_COMPOUNDS = [
     ),
     (
         "CC#CC#CC#CC(O)C(O)CO",
-        "2,3-dihydroxydeca-4,6,8-triyn-1-ol",
+        "deca-4,6,8-triyne-1,2,3-triol",  # RB-SFX (BB rule); was '2,3-dihydroxydeca-4,6,8-triyn-1-ol'
     ),
     (
         "C[C@H](N)C(=O)N[C@@H](Cc1c[nH]c2ccccc12)C(=O)N[C@H](C(=O)O)[C@@H](C)O",
@@ -1230,7 +1348,7 @@ CANARY_COMPOUNDS = [
     ),
     (
         "CC(C)CCC[C@@H](C)[C@H]1CC[C@H]2C3=CCC4CCCC[C@]4(C)[C@H]3CC[C@]12C",
-        "(9R,10S,13R,14R,17R,20R)-cholest-7-ene",
+        "cholest-7-ene",  # RB-P101 (controller ruling); was '(9R,10S,13R,14R,17R,20R)-cholest-7-ene'
     ),
     (
         "O=C(O)C(=O)Cc1cccc(O)c1",
@@ -1261,7 +1379,7 @@ CANARY_COMPOUNDS = [
     ),
     (
         "CCC1CC=C(N2CCCC2)C1=O",
-        "5-ethyl-2-pyrrolidinylcyclopent-2-en-1-one",
+        "5-ethyl-2-(pyrrolidin-1-yl)cyclopent-2-en-1-one",  # RB-P16 (BB rule); was '5-ethyl-2-pyrrolidinylcyclopent-2-en-1-one'
     ),
     (
         "CCCCCCC[C@@H](O)[C@H](O)CC#CC#C[C@@H](O)CC",
@@ -1277,7 +1395,7 @@ CANARY_COMPOUNDS = [
     ),
     (
         "COc1ccc(C(O)C(=O)O)cc1OC",
-        "2-(3,4-dimethoxyphenyl)-2-hydroxyethanoic acid",
+        "(3,4-dimethoxyphenyl)(hydroxy)acetic acid",  # RB-R3 (R3); was '2-(3,4-dimethoxyphenyl)-2-hydroxyethanoic acid'
     ),
     (
         "O=C(/C=C/c1ccc(Cl)cc1)c1ccccc1",
@@ -1316,12 +1434,12 @@ CANARY_COMPOUNDS = [
     #: skeletal replacement large ring - RT validated
     (
         "C1CCOCCO1",
-        "1,4-dioxacycloheptane",
+        "1,4-dioxepane",  # RB-HW (BB rule); was '1,4-dioxacycloheptane'
     ),
     #: mixed heteroatom large ring - RT validated
     (
         "C1CCNCCOC1",
-        "1-oxa-4-azacyclooctane",
+        "1,4-oxazocane",  # RB-HW (BB rule); was '1-oxa-4-azacyclooctane'
     ),
     #: zwitterion beta-alanine - RT validated
     (
@@ -1343,7 +1461,7 @@ CANARY_COMPOUNDS = [
     ),
     (
         "C=C[C@]1(C)CCC(=C(C)C)C[C@H]1C(=C)C",
-        "(1S,2S)-1-ethenyl-4-isopropylidene-1-methyl-2-(prop-1-en-2-yl)cyclohexane",
+        "(1S,2S)-1-ethenyl-1-methyl-4-(propan-2-ylidene)-2-(prop-1-en-2-yl)cyclohexane",  # RB-P145:3442/:3477; was DK-ALPHA, call 296); was '(1S,2S)-1-ethenyl-4-isopropylidene-1-methyl-2-(prop-1-en-2-yl)cyclohexane'
     ),
     (
         "CC/C=C\\CC(O)C(O)/C=C/C(O)CCCCCCCC(=O)O",
@@ -1363,11 +1481,11 @@ CANARY_COMPOUNDS = [
     ),
     (
         "C=C1C=C[C@H](C(C)C)CC1",
-        "(3S)-3-isopropyl-6-methylidenecyclohex-1-ene",
+        "(6S)-3-methylidene-6-(propan-2-yl)cyclohex-1-ene",  # RB-P14G (g):3307; was DK-P14G, call 301); was '(3S)-3-isopropyl-6-methylidenecyclohex-1-ene'
     ),
     (
         "Cc1ccc(OC(=O)C(C)C)cc1",
-        "1-((2-methylpropanoyl)oxy)-4-methylbenzene",
+        "4-methylphenyl 2-methylpropanoate",  # RB-R5 (R5); was '1-((2-methylpropanoyl)oxy)-4-methylbenzene'
     ),
     (
         "CCCC/C=C\\CCCCCCCCCOC(C)=O",
@@ -1383,7 +1501,7 @@ CANARY_COMPOUNDS = [
     ),
     (
         "NC(=O)CCCC(N)C(=O)O",
-        "2-amino-5-carbamoylpentanoic acid",
+        "2,6-diamino-6-oxohexanoic acid",  # RB-AMIC (BB rule); was '2-amino-5-carbamoylpentanoic acid'
     ),
     (
         "CC/C=C(\\C)CC/C=C(\\C)CCC=C(C)C",
@@ -1415,7 +1533,7 @@ CANARY_COMPOUNDS = [
     ),
     (
         "COc1cc(OC)c2c(=O)c3c(O)cc(C)cc3oc2c1",
-        "8-hydroxy-1,3-dimethoxy-6-methylxanthone",
+        "1-hydroxy-6,8-dimethoxy-3-methyl-9H-xanthen-9-one",  # RB-R18 (R18); was '8-hydroxy-1,3-dimethoxy-6-methylxanthone'
     ),
     (
         "CCCCC/C=C\\C/C=C\\CCCCCCCCCC(=O)OC(COC(=O)CCCCCCC/C=C\\C/C=C\\CCCCC)COC(=O)CCCCCCC/C=C\\C/C=C\\CCCCC",
@@ -1590,7 +1708,7 @@ CANARY_COMPOUNDS = [
         "C[C@H]1O[C@@H](O)[C@H](O)[C@H](O)[C@@H]1O",  # heterocycle,small,carbohydrate
         # a phase : the 4 ring -OH are the principal group -> -tetraol
         # SUFFIX, not hydroxy prefixes. OPSIN-RT verified.
-        "(2R,3S,4R,5R,6R)-2-methyloxane-3,4,5,6-tetraol",
+        "6-deoxy-β-D-allopyranose",  # RB-Da (R25/D-a); was '(2R,3S,4R,5R,6R)-2-methyloxane-3,4,5,6-tetraol'
     ),
     (
         "CC1(C)[C@@H](Br)CC=C(C(Cl)CCl)[C@@H]1Cl",  # small
@@ -1602,7 +1720,7 @@ CANARY_COMPOUNDS = [
     ),
     (
         "c1ccc2c(c1)Cc1ccccc1-2",  # aromatic,fused-ring,small
-        "fluorene",
+        "9H-fluorene",  # RB-P2511:11400); was 'fluorene'
     ),
     (
         "CC(=O)c1ccc(O)cc1O",  # aromatic,small
@@ -1659,7 +1777,7 @@ CANARY_COMPOUNDS = [
     ),
     (
         "O=C1C[C@](O)(CO)CC(O)=C1O",  # small
-        "(5S)-2,3,5-trihydroxy-5-hydroxymethylcyclohex-2-en-1-one",
+        "(5S)-2,3,5-trihydroxy-5-(hydroxymethyl)cyclohex-2-en-1-one",  # RB-P16 (BB rule); was '(5S)-2,3,5-trihydroxy-5-hydroxymethylcyclohex-2-en-1-one'
     ),
     (
         "CC(C)[C@H](NC(=O)[C@@H]1CCCN1)C(=O)N[C@@H](CCCCN)C(=O)O",  # heterocycle,polyfunctional,medium
@@ -1679,7 +1797,7 @@ CANARY_COMPOUNDS = [
     ),
     (
         "CC[C@H](C)[C@H](N)C(=O)N[C@@H](Cc1ccccc1)C(=O)O",  # aromatic,polyfunctional,medium
-        "L-isoleucyl-L-phenylalanine",
+        "(2S)-2-[(2S,3S)-2-amino-3-methylpentanamido]-3-phenylpropanoic acid",  # RB-PEP (controller ruling); was 'L-isoleucyl-L-phenylalanine'
     ),
     (
         "NC(=O)CC[C@H](NC(=O)[C@@H](N)CCC(=O)O)C(=O)N[C@@H](Cc1cnc[nH]1)C(=O)O",  # aromatic,heterocycle,polyfunctional,medium
@@ -1723,7 +1841,7 @@ CANARY_COMPOUNDS = [
     ),
     (
         "Nc1cc(N)cc(N)c1",  # aromatic,small
-        "1,3,5-triaminobenzene",
+        "benzene-1,3,5-triamine",  # RB-SFX (BB rule); was '1,3,5-triaminobenzene'
     ),
     (
         "C=C[C@@]1(C)CCC(=O)C[C@H]1C(=C)C",  # small
@@ -1734,7 +1852,7 @@ CANARY_COMPOUNDS = [
     ),
     (
         "O=C1C(CO)=C[C@@H](O)[C@@H](O)[C@H]1Br",  # small
-        "(4R,5R,6R)-6-bromo-4,5-dihydroxy-2-hydroxymethylcyclohex-2-en-1-one",
+        "(4R,5R,6R)-6-bromo-4,5-dihydroxy-2-(hydroxymethyl)cyclohex-2-en-1-one",  # RB-P16 (BB rule); was '(4R,5R,6R)-6-bromo-4,5-dihydroxy-2-hydroxymethylcyclohex-2-en-1-one'
     ),
     (
         "CCCCCCCCCCCCCCCCCCCCCC(=O)CC(=O)CCCCCC",  # acyclic,large
@@ -1754,7 +1872,7 @@ CANARY_COMPOUNDS = [
     ),
     (
         "CCCCCCCCCCCCCCCC(=O)OC(CCCCCCCCCC)CCCCCCC(=O)[O-]",  # acyclic,charged,large
-        "8-(palmitoyloxy)octadecanoate",
+        "8-(hexadecanoyloxy)octadecanoate",  # RB-R20 (R20); was '8-(palmitoyloxy)octadecanoate'
     ),
     (
         "CC(C)[C@H](NC(=O)[C@H](CC(N)=O)NC(=O)[C@@H](N)Cc1cnc[nH]1)C(=O)O",  # aromatic,heterocycle,polyfunctional,medium
@@ -1766,7 +1884,7 @@ CANARY_COMPOUNDS = [
     ),
     (
         "CC(C)c1cccc(O)c1O",  # aromatic,small
-        "3-isopropylbenzene-1,2-diol",
+        "3-(propan-2-yl)benzene-1,2-diol",  # RB-P29 (BB rule); was '3-isopropylbenzene-1,2-diol'
     ),
     (
         "NC(=O)CC[C@H](NC(=O)[C@H](Cc1ccccc1)NC(=O)[C@@H](N)CCC(N)=O)C(=O)O",  # aromatic,polyfunctional,medium
@@ -1782,7 +1900,7 @@ CANARY_COMPOUNDS = [
     ),
     (
         "CCCCCCCCCCCCCCCC(=O)NCC(=O)[O-]",  # acyclic,charged,medium
-        "2-hexadecanamidoethanoate",
+        "hexadecanamidoacetate",  # RB-R3 (R3); was '2-hexadecanamidoethanoate'
     ),
     (
         "COc1cc(CC(C)N)c(OC)cc1I",  # aromatic,small
@@ -1850,7 +1968,7 @@ CANARY_COMPOUNDS = [
     ),
     (
         "CC(=O)OCCC(N)C(=O)O",  # acyclic,polyfunctional,small
-        "2-amino-4-(ethanoyloxy)butanoic acid",
+        "4-(acetyloxy)-2-aminobutanoic acid",  # RB-R4 (R4); was '2-amino-4-(ethanoyloxy)butanoic acid'
     ),
     (
         "C[C@H]1C[C@H]2[C@@H]3CCC4=CC(=O)C=C[C@]4(C)[C@@]3(Cl)[C@@H](O)C[C@]2(C)[C@@]1(O)C(=O)CO",  # fused-ring,medium,steroid
@@ -1916,7 +2034,7 @@ CANARY_COMPOUNDS = [
     ),
     (
         "C[C@]12CCC(=O)C(O)=C1CC[C@@H]1[C@@H]2CC[C@]2(C)C(=O)CC[C@@H]12",  # fused-ring,medium,steroid
-        "(8R,9S,10R,13S,14S)-4-hydroxyandrost-4-en-3,17-dione",
+        "4-hydroxyandrost-4-ene-3,17-dione",  # RB-P101 (controller ruling); was '(8R,9S,10R,13S,14S)-4-hydroxyandrost-4-en-3,17-dione'
     ),
     (
         "CC(C)C[C@H](NC(=O)[C@H](CC(=O)O)NC(=O)[C@@H](N)CC(=O)O)C(=O)O",  # acyclic,polyfunctional,medium
@@ -1956,7 +2074,7 @@ CANARY_COMPOUNDS = [
     ),
     (
         "O=c1[nH]c(=O)c2ccccc2[nH]1",  # aromatic,heterocycle,fused-ring,small
-        "quinazoline-2,4-dione",
+        "quinazoline-2,4(1H,3H)-dione",  # RB-R21 (R21); was 'quinazoline-2,4-dione'
     ),
     (
         "CCCC/C=C/C(C)O",  # acyclic,small
@@ -1986,7 +2104,7 @@ CANARY_COMPOUNDS = [
         "CCCc1cc(O)c(CC)c(=O)o1",  # aromatic,heterocycle,small
         # a phase : ring -OH expressed as the -ol SUFFIX.
         # OPSIN-RT verified (the 2-oxo remains a prefix as before).
-        "3-ethyl-2-oxo-6-propyl-2H-pyran-4-ol",
+        "3-ethyl-4-hydroxy-6-propyl-2H-pyran-2-one",  # RB-SFX (BB rule); was '3-ethyl-2-oxo-6-propyl-2H-pyran-4-ol'
     ),
     (
         "NCCCC[C@H](N)C(=O)N[C@@H](CCC(=O)O)C(=O)N[C@@H](CCC(=O)O)C(=O)O",  # acyclic,polyfunctional,medium
@@ -1994,7 +2112,7 @@ CANARY_COMPOUNDS = [
     ),
     (
         "C/C(=C/C=C\\C=C\\C(O)c1cnco1)C(O)C(C)(C)C(N)=O",  # aromatic,heterocycle,medium
-        "(4Z,6Z,8E)-3,10-dihydroxy-2,2,4-trimethyl-10-(oxazol-5-yl)deca-4,6,8-trienamide",
+        "(4Z,6Z,8E)-3,10-dihydroxy-2,2,4-trimethyl-10-(1,3-oxazol-5-yl)deca-4,6,8-trienamide",  # RB-HW (BB rule); was '(4Z,6Z,8E)-3,10-dihydroxy-2,2,4-trimethyl-10-(oxazol-5-yl)deca-4,6,8-trienamide'
     ),
     (
         "C=C(CC(=O)[O-])C(=O)[O-]",  # acyclic,charged,small
@@ -2018,7 +2136,7 @@ CANARY_COMPOUNDS = [
     ),
     (
         "O=c1c2cccc(O)c2oc2ccc(O)c(O)c12",  # aromatic,heterocycle,fused-ring,medium
-        "4,7,8-trihydroxyxanthone",
+        "1,2,5-trihydroxy-9H-xanthen-9-one",  # RB-R18 (R18); was '4,7,8-trihydroxyxanthone'
     ),
     (
         "CC(=O)CCC(=O)CCCCC(=O)O",  # acyclic,polyfunctional,small
@@ -2026,7 +2144,7 @@ CANARY_COMPOUNDS = [
     ),
     (
         "O=C(O)[C@H]1OC(O)[C@H](O)[C@H](O)[C@H]1O",  # heterocycle,small,carbohydrate
-        "(2S,3R,4R,5R)-3,4,5,6-tetrahydroxyoxane-2-carboxylic acid",
+        "D-gulopyranuronic acid",  # RB-Da (R25/D-a); was '(2S,3R,4R,5R)-3,4,5,6-tetrahydroxyoxane-2-carboxylic acid'
     ),
     (
         "CCCC(C)CCCCCCCCCCCC(=O)O",  # acyclic,medium
@@ -2066,7 +2184,7 @@ CANARY_COMPOUNDS = [
     ),
     (
         "N[C@@H](Cc1ccc(O)cc1)C(=O)N[C@@H](CS)C(=O)O",  # aromatic,polyfunctional,medium
-        "L-tyrosyl-L-cysteine",
+        "(2R)-2-[(2S)-2-amino-3-(4-hydroxyphenyl)propanamido]-3-sulfanylpropanoic acid",  # RB-PEP (controller ruling); was 'L-tyrosyl-L-cysteine'
     ),
     (
         "NCCCC[C@H](NC(=O)[C@@H]1CCCN1)C(=O)N[C@@H](CC(=O)O)C(=O)O",  # heterocycle,polyfunctional,medium
@@ -2074,7 +2192,7 @@ CANARY_COMPOUNDS = [
     ),
     (
         "NC(=O)CC[C@H](N)C(=O)N[C@@H](Cc1ccc(O)cc1)C(=O)O",  # aromatic,polyfunctional,medium
-        "L-glutaminyl-L-tyrosine",
+        "(2S)-2-[(2S)-2,5-diamino-5-oxopentanamido]-3-(4-hydroxyphenyl)propanoic acid",  # RB-PEP (controller ruling); was 'L-glutaminyl-L-tyrosine'
     ),
     (
         "N[C@@H](CC(=O)O)C(=O)N[C@@H](Cc1ccc(O)cc1)C(=O)N[C@@H](Cc1cnc[nH]1)C(=O)O",  # aromatic,heterocycle,polyfunctional,large
@@ -2098,7 +2216,7 @@ CANARY_COMPOUNDS = [
     ),
     (
         "Cc1c(N)cc(N)cc1N",  # aromatic,small
-        "1,3,5-triamino-2-methylbenzene",
+        "2-methylbenzene-1,3,5-triamine",  # RB-SFX (BB rule); was '1,3,5-triamino-2-methylbenzene'
     ),
     (
         "CO[C@H](C=C(C)C)C[C@H](C)[C@@H]1CC[C@]2(C)C3=CC[C@H]4C(C)(C)C(=O)CC[C@]4(C)[C@H]3CC[C@@]12C",  # fused-ring,large,steroid
@@ -2132,7 +2250,7 @@ CANARY_COMPOUNDS = [
     ),
     (
         "CC(C)Cc1ccc([C@@H](C)C(=O)O)cc1",  # aromatic,small
-        "(2R)-2-(4-isobutylphenyl)propanoic acid",
+        "(2R)-2-[4-(2-methylpropyl)phenyl]propanoic acid",  # RB-P29 (BB rule); was '(2R)-2-(4-isobutylphenyl)propanoic acid'
     ),
     (
         "O=C([O-])C=CCC(=O)[O-]",  # acyclic,charged,small
@@ -2148,7 +2266,7 @@ CANARY_COMPOUNDS = [
     ),
     (
         "N=C(N)NCCS(=O)O",  # acyclic,small
-        "hypotaurocyamine",
+        "2-(carbamimidoylamino)ethane-1-sulfinic acid",  # RB-P66412:34268); was 'hypotaurocyamine'
     ),
     (
         "C[C@H](NC(=O)[C@H](CCC(=O)O)NC(=O)[C@@H](N)CCC(N)=O)C(=O)O",  # acyclic,polyfunctional,medium
@@ -2232,7 +2350,7 @@ CANARY_COMPOUNDS = [
     ),
     (
         "CC([NH3+])C(=O)CCCCCC(=O)[O-]",  # acyclic,small
-        "8-amino-7-oxononanoic acid",
+        "8-azaniumyl-7-oxononanoate",  # RB-ZWIT (BB rule); was '8-amino-7-oxononanoic acid'
     ),
     (
         "CC(C)C[C@H](NC(=O)[C@H](CCCCN)NC(=O)[C@@H](N)CC(C)C)C(=O)O",  # acyclic,polyfunctional,medium
@@ -2252,7 +2370,7 @@ CANARY_COMPOUNDS = [
     ),
     (
         "C[C@H](CCCC(C)(C)O)[C@H]1CC[C@H]2[C@@H]3[C@H](O)C[C@@H]4CC(=O)CC[C@]4(C)[C@H]3CC[C@]12C",  # fused-ring,medium,steroid
-        "(5R,7R,8R,9S,10S,13R,14S,17R,20R)-7,25-dihydroxycholestan-3-one",
+        "7α,25-dihydroxy-5β-cholestan-3-one",  # RB-P101 (controller ruling); was '(5R,7R,8R,9S,10S,13R,14S,17R,20R)-7,25-dihydroxycholestan-3-one'
     ),
     (
         "CC(C)C[C@H](NC(=O)[C@@H](N)Cc1ccc(O)cc1)C(=O)NCC(=O)O",  # aromatic,polyfunctional,medium
@@ -2260,7 +2378,7 @@ CANARY_COMPOUNDS = [
     ),
     (
         "CCCC(=O)OCC(O)COC(=O)CCC",  # acyclic,medium
-        "1,3-bis(butanoyloxy)propan-2-ol",
+        "2-hydroxypropane-1,3-diyl dibutanoate",  # RB-R5 (R5); was '1,3-bis(butanoyloxy)propan-2-ol'
     ),
     (
         "C[C@H](CC[C@H](O)C(C)(C)O)[C@H]1CC[C@@]2(C)C3=C(CC[C@]12C)[C@@]1(C)CC[C@H](O)C(C)(C)[C@@H]1CC3",  # fused-ring,large,steroid
@@ -2320,7 +2438,7 @@ CANARY_COMPOUNDS = [
     ),
     (
         "CCC1CC2CCC(O2)C(C)C(=O)OC(C)CC2CCC(O2)C(C)C(=O)OC(C)CC2CCC(O2)C(C)C(=O)OC(C)CC2CCC(O2)C(C)C(=O)O1",  # heterocycle,fused-ring,large
-        "3-ethyl-6,11,14,19,22,27,30-heptamethyl-4,8,12,16,20,24,28,34-octaoxa-pentacyclo[29.2.1.2(7,9).2(15,17).2(23,25)]tetracontan-5,13,21,29-tetraone",
+        "5-ethyl-2,11,14,20,23,29,32-heptamethyl-4,13,22,31,37,38,39,40-octaoxapentacyclo[32.2.1.1^7,10.1^16,19.1^25,28]tetracontane-3,12,21,30-tetrone",  # DK-VBNUM target (g):3307); current '32-ethyl-2,5,11,14,20,23,29-heptamethyl-...' is in CANARY_KNOWN_DEFECTS; was RB-NORULE; was '3-ethyl-6,11,14,19,22,27,30-heptamethyl-4,8,12,16,20,24,28,34-octaoxa-pentacyclo[29.2.1.2(7,9).2(15,17).2(23,25)]tetracontan-5,13,21,29-tetraone'
     ),
     (
         "CCCCC(C)CCCCCCCC(C)CCCCC(=O)O",  # acyclic,medium
@@ -2344,7 +2462,7 @@ CANARY_COMPOUNDS = [
     ),
     (
         "CSc1ccc(N)cc1",  # aromatic,small
-        "1-amino-4-(methylsulfanyl)benzene",
+        "4-(methylsulfanyl)aniline",  # RB-SFX (BB rule); was '1-amino-4-(methylsulfanyl)benzene'
     ),
     (
         "NC(=O)C[C@H](N)C(=O)N[C@@H](Cc1cnc[nH]1)C(=O)N[C@@H](CS)C(=O)O",  # aromatic,heterocycle,polyfunctional,medium
@@ -2402,7 +2520,7 @@ CANARY_COMPOUNDS = [
     ),
     (
         "O=C(O)[C@H](O)[C@H](O)[C@H](O)[C@@H](O)C(=O)O",  # acyclic,small
-        "(2R,3S,4R,5R)-2,3,4,5-tetrahydroxyhexanedioic acid",
+        "L-altraric acid",  # RB-Da (R25/D-a); was '(2R,3S,4R,5R)-2,3,4,5-tetrahydroxyhexanedioic acid'
     ),
     (
         "COc1c(O)ccc(C(=O)O)c1OC",  # aromatic,small
@@ -2414,15 +2532,15 @@ CANARY_COMPOUNDS = [
     ),
     (
         "NCCCC[C@H](NC(=O)[C@@H](N)Cc1ccccc1)C(=O)O",  # aromatic,polyfunctional,medium
-        "L-phenylalanyl-L-lysine",
+        "(2S)-6-amino-2-[(2S)-2-amino-3-phenylpropanamido]hexanoic acid",  # RB-PEP (controller ruling); was 'L-phenylalanyl-L-lysine'
     ),
     (
         "NC(C(=O)O)c1ccccc1F",  # aromatic,polyfunctional,small
-        "2-amino-2-(2-fluorophenyl)ethanoic acid",
+        "amino(2-fluorophenyl)acetic acid",  # RB-R3 (R3); was '2-amino-2-(2-fluorophenyl)ethanoic acid'
     ),
     (
         "CC(C)C(O)CC[C@@H](C)[C@H]1CC[C@H]2[C@@H]3[C@H](O)C[C@@H]4CC(=O)CC[C@]4(C)[C@H]3CC[C@]12C",  # fused-ring,medium,steroid
-        "(5R,7R,8R,9S,10S,13R,14S,17R,20R)-7,24-dihydroxycholestan-3-one",
+        "7α,24-dihydroxy-5β-cholestan-3-one",  # RB-P101 (controller ruling); was '(5R,7R,8R,9S,10S,13R,14S,17R,20R)-7,24-dihydroxycholestan-3-one'
     ),
     (
         "NC(=O)C[C@H](NC(=O)[C@H](CCC(=O)O)NC(=O)[C@@H](N)Cc1cnc[nH]1)C(=O)O",  # aromatic,heterocycle,polyfunctional,medium
@@ -2454,7 +2572,7 @@ CANARY_COMPOUNDS = [
     ),
     (
         "N[C@@H](Cc1ccc(O)c(OS(=O)(=O)O)c1)C(=O)O",  # aromatic,polyfunctional,medium
-        "(2S)-2-amino-3-(4-hydroxy-3-(sulfooxy)phenyl)propanoic acid",
+        "(2S)-2-amino-3-[4-hydroxy-3-(sulfooxy)phenyl]propanoic acid",  # RB-P16 (BB rule); was '(2S)-2-amino-3-(4-hydroxy-3-(sulfooxy)phenyl)propanoic acid'
     ),
     (
         "O=CC(=O)C[C@H](O)CO",  # acyclic,polyfunctional,small
@@ -2470,11 +2588,11 @@ CANARY_COMPOUNDS = [
     ),
     (
         "OCC(O)C(O)C(O)C(O)C(O)C(O)CO",  # acyclic,medium
-        "2,3,4,5,6,7-hexahydroxyoctane-1,8-diol",
+        "octane-1,2,3,4,5,6,7,8-octol",  # RB-SFX (BB rule); was '2,3,4,5,6,7-hexahydroxyoctane-1,8-diol'
     ),
     (
         "CC(=O)OCC/C(C)=C/C(=O)O",  # acyclic,polyfunctional,small
-        "(2E)-5-(ethanoyloxy)-3-methylpent-2-enoic acid",
+        "(2E)-5-(acetyloxy)-3-methylpent-2-enoic acid",  # RB-R4 (R4); was '(2E)-5-(ethanoyloxy)-3-methylpent-2-enoic acid'
     ),
     (
         "C#N",  # acyclic,small
@@ -2489,7 +2607,7 @@ CANARY_COMPOUNDS = [
     ),
     (
         "C=CC(C)(O)CC/C=C(\\C)CCC(O)C(C)(O)CCCC(C)(O)CCCC(C)(O)CCCC(C)(O)CCCC(C)(O)CCCC(C)(O)CCCC(C)(O)CCCC(C)(O)CCCC(C)(O)CCCC(C)(O)CCCC(C)(O)CCC=C(C)C",  # acyclic,large
-        "(6E)-3,7,11,15,19,23,27,31,35,39,43,47,51,55-tetradecamethyl-3,11,15,19,23,27,31,35,39,43,47,51-dodecahydroxyhexapentaconta-1,6,54-trien-10-ol",
+        "(6E)-3,7,11,15,19,23,27,31,35,39,43,47,51,55-tetradecamethylhexapentaconta-1,6,54-triene-3,10,11,15,19,23,27,31,35,39,43,47,51-tridecol",  # RB-SFX (BB rule); was '(6E)-3,7,11,15,19,23,27,31,35,39,43,47,51,55-tetradecamethyl-3,11,15,19,23,27,31,35,39,43,47,51-dodecahydroxyhexapentaconta-1,6,54-trien-10-ol'
     ),
     (
         "CCC=CC(=O)[O-]",  # acyclic,charged,small
@@ -2529,7 +2647,7 @@ CANARY_COMPOUNDS = [
     ),
     (
         "CCOCCCO",  # acyclic,small
-        "4-oxahexan-1-ol",
+        "3-ethoxypropan-1-ol",  # RB-P5141:23348); was '4-oxahexan-1-ol'
     ),
     (
         "NCCCC(=O)C(=O)O",  # acyclic,polyfunctional,small
@@ -2577,11 +2695,11 @@ CANARY_COMPOUNDS = [
     ),
     (
         "C[C@H](CCCC(C)(C)O)[C@H]1CC[C@H]2[C@@H]3[C@H](O)CC4=CC(=O)CC[C@]4(C)[C@H]3C[C@H](O)[C@]12C",  # fused-ring,large,steroid
-        "(7R,8R,9S,10R,12S,13R,14S,17R,20R)-7,12,25-trihydroxycholest-4-en-3-one",
+        "7α,12α,25-trihydroxycholest-4-en-3-one",  # RB-P101 (controller ruling); was '(7R,8R,9S,10R,12S,13R,14S,17R,20R)-7,12,25-trihydroxycholest-4-en-3-one'
     ),
     (
         "CCC12C=C/C(C)=C\\C(C)(O)CCC(OC)C(C)C(O)C(C)C(O)C3OC(=CC3=O)CC(=O)OC(C1)C(C)C(=O)O2",  # heterocycle,fused-ring,polyfunctional,large
-        "(4Z)-1-ethyl-6,11,13-trihydroxy-9-methoxy-4,6,10,12,22-pentamethyl-20,24,26-trioxa-tricyclo[19.3.1.1(14,17)]hexacosa-2,4,16-trien-15,19,23-trione",
+        "(17Z)-21-ethyl-9,11,16-trihydroxy-13-methoxy-10,12,16,18,24-pentamethyl-2,22,26-trioxatricyclo[19.3.1.1^5,8]hexacosa-5,17,19-triene-3,7,23-trione",  # DK-VBNUM target:9685, superscripts {5,8} < {14,17}); current '(4Z)-1-ethyl-...-tricyclo[19.3.1.1^14,17]...' is in CANARY_KNOWN_DEFECTS; was RB-NORULE; was '(4Z)-1-ethyl-6,11,13-trihydroxy-9-methoxy-4,6,10,12,22-pentamethyl-20,24,26-trioxa-tricyclo[19.3.1.1(14,17)]hexacosa-2,4,16-trien-15,19,23-trione'
     ),
     (
         "COC1OC2(OC)CC3CCC(O)C(C)C3(C)C(OC)C2=C1C",  # heterocycle,fused-ring,medium
@@ -2611,7 +2729,7 @@ CANARY_COMPOUNDS = [
         "Cc1cnc(N)c(C)n1",  # aromatic,heterocycle,small
         # a phase : ring -NH2 is the principal group -> -amine SUFFIX
         #, not an amino prefix. OPSIN-RT verified.
-        "2,6-dimethylpyrazin-3-amine",
+        "3,5-dimethylpyrazin-2-amine",  # RB-P14 (BB rule); was '2,6-dimethylpyrazin-3-amine'
     ),
     (
         "CCCCCCCCCCCCCO",  # acyclic,small
@@ -2659,7 +2777,7 @@ CANARY_COMPOUNDS = [
     ),
     (
         "COc1c(C)c(O)cc2c1C(=O)CC(c1ccccc1)O2",  # aromatic,heterocycle,fused-ring,medium
-        "7-hydroxy-5-methoxy-6-methyl-2-phenylchroman-4-one",
+        "7-hydroxy-5-methoxy-6-methyl-2-phenyl-2,3-dihydro-4H-1-benzopyran-4-one",  # RB-R19 (R19); was '7-hydroxy-5-methoxy-6-methyl-2-phenylchroman-4-one'
     ),
     (
         "CCCCC[C@H](O)/C=C/C=C\\C=C\\C=C\\[C@@H](O)[C@@H](O)CCCC(=O)O",  # acyclic,medium
@@ -2723,7 +2841,7 @@ CANARY_COMPOUNDS = [
     ),
     (
         "O=C[C@@H](O)[C@H](O)CO",  # acyclic,small
-        "(2S,3R)-2,3,4-trihydroxybutanal",
+        "D-threose",  # RB-Da (R25/D-a); was '(2S,3R)-2,3,4-trihydroxybutanal'
     ),
     (
         "C[C@H](NC(=O)[C@H](Cc1c[nH]c2ccccc12)NC(=O)[C@@H](N)Cc1ccccc1)C(=O)O",  # aromatic,heterocycle,fused-ring,polyfunctional,large
@@ -2731,7 +2849,7 @@ CANARY_COMPOUNDS = [
     ),
     (
         "CC(=O)[C@H]([NH3+])C(=O)[O-]",  # acyclic,small
-        "(2S)-2-amino-3-oxobutanoic acid",
+        "(2S)-2-azaniumyl-3-oxobutanoate",  # RB-ZWIT (BB rule); was '(2S)-2-amino-3-oxobutanoic acid'
     ),
     (
         "CC(C)=CCC/C(C)=C/C=C/C(C)=C/C=C/C(C)=C/C=C/C=C(C)/C=C/C=C(\\C)C=O",  # acyclic,large
@@ -2787,7 +2905,7 @@ CANARY_COMPOUNDS = [
     ),
     (
         "CCCCCCCCCCCCC(O)CO",  # acyclic,medium
-        "2-hydroxytetradecan-1-ol",
+        "tetradecane-1,2-diol",  # RB-SFX (BB rule); was '2-hydroxytetradecan-1-ol'
     ),
     (
         "O=C(/C=C/c1ccc(O)c(O)c1)c1cc(O)c(O)cc1O",  # aromatic,medium
@@ -2795,7 +2913,7 @@ CANARY_COMPOUNDS = [
     ),
     (
         "[NH3+]C(CC(=O)[O-])c1ccc(O)cc1",  # aromatic,small
-        "3-amino-3-(4-hydroxyphenyl)propanoic acid",
+        "3-azaniumyl-3-(4-hydroxyphenyl)propanoate",  # RB-ZWIT (BB rule); was '3-amino-3-(4-hydroxyphenyl)propanoic acid'
     ),
     (
         "O=C(CO)c1ccc(O)cc1",  # aromatic,small
@@ -2891,11 +3009,11 @@ CANARY_COMPOUNDS = [
     ),
     (
         "COc1c(O)c(CO)c(Cl)c(OC)c1OC",  # aromatic,medium
-        "5-chloro-6-(hydroxymethyl)-2,3,4-trimethoxyphenol",
+        "3-chloro-2-(hydroxymethyl)-4,5,6-trimethoxyphenol",  # RB-P14 (BB rule); was '5-chloro-6-(hydroxymethyl)-2,3,4-trimethoxyphenol'
     ),
     (
         "CC(C)(C)OC(=O)c1cccc(N)c1",  # aromatic,small
-        "2-methylpropan-2-yl 3-aminobenzoate",
+        "tert-butyl 3-aminobenzoate",  # RB-P29 (BB rule); was '2-methylpropan-2-yl 3-aminobenzoate'
     ),
     (
         "CCCCOc1ccc(CC(=O)NO)cc1",  # aromatic,medium
@@ -2965,7 +3083,7 @@ CANARY_COMPOUNDS = [
     ),
     (
         "C=CCCCCCCCCCCCC(=O)CC(O)COC(C)=O",  # acyclic,polyfunctional,medium
-        "1-(acetyloxy)-2-hydroxyheptadec-16-en-4-one",
+        "2-hydroxy-4-oxoheptadec-16-en-1-yl acetate",  # RB-R5 (R5); was '1-(acetyloxy)-2-hydroxyheptadec-16-en-4-one'
     ),
     (
         "C[C@@H](O)[C@H](O)C(=O)O",  # acyclic,small
@@ -3002,7 +3120,7 @@ CANARY_COMPOUNDS = [
     # §Q1: all HA<<15, well inside the rescue branch.
     (
         "C1CC2CC1CC2",
-        "norbornane",
+        "bicyclo[2.2.1]heptane",  # RB-R11 (R11); was 'norbornane'
     ),  # complex_ring handler, HA=7, ratio=0.9524 (non-boosted)
     (
         "Fc1ccccc1",

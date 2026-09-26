@@ -956,7 +956,7 @@ def _p_ester_owner_group(mol, o_idx: int, p_idx: int) -> Optional[str]:
             return None
         from ..assembly.naming_utils import apply_enclosing_marks, is_complex_substituent
         if is_complex_substituent(r_token):
-            r_token = apply_enclosing_marks(r_token, 0)
+            r_token = apply_enclosing_marks(r_token, -1)
         return f"{r_token}sulfanyl", frozenset(r_frag | {s_idx})
 
     c0 = root.GetIdx()
@@ -1731,18 +1731,22 @@ def name_phosphoanhydride_oxy_substituent(
     # then 'phosphoryl', wrapped and attached via the linking O -> '...oxy'
     # method 1). Enclose each branch that is complex (carries a locant or
     # its own enclosure); a bare 'hydroxy' stays unenclosed.
-    from ..assembly.naming_utils import alpha_sort_key
+    from ..assembly.naming_utils import (_is_fully_enclosed, alpha_sort_key,
+                                         apply_enclosing_marks)
     ordered = sorted(branches, key=alpha_sort_key)
 
+    # The marks ESCALATE past any inside the branch and inside the body
+    #, the Blue Book: nesting '{[({})]}'). A raw '(...)' /
+    # '[...]' put '[' directly around '[' for a nested P-O-P bridge
+    # ('[hydroxy[hydroxy(phosphonooxy)phosphoryl]oxyphosphoryl]oxy', where the
+    # inner composed prefix was not even enclosed as a unit).
     def _enc(tok: str) -> str:
-        if tok == 'hydroxy':
+        if tok == 'hydroxy' or _is_fully_enclosed(tok):
             return tok
-        if tok.startswith('[') or tok.startswith('('):
-            return tok
-        return f'({tok})'
+        return apply_enclosing_marks(tok, -1)
 
     body = ''.join(_enc(t) for t in ordered) + 'phosphoryl'
-    return f'[{body}]oxy'
+    return apply_enclosing_marks(body, -1) + 'oxy'
 
 
 _PHOSPHOXANE_MULT = {2: 'di', 3: 'tri', 4: 'tetra', 5: 'penta', 6: 'hexa',

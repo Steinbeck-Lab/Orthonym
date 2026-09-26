@@ -193,13 +193,15 @@ class TestAdductDispatch:
         assert self._nc("c1ccccc1.c1ccncc1") == "benzene—pyridine (1/1)"
 
     def test_mixed_hydrochloride(self):
-        # pattern (the Blue Book). DIVERGENCE from the plan's stale
-        # expected: at this HEAD the organic fragment names to the RETAINED
-        # name 'nicotine' (not '3-(1-methylpyrrolidin-2-yl)pyridine'); the
-        # resulting 'nicotine—hydrogen chloride (1/1)' OPSIN-RTs cleanly to
-        # Cl.N1=CC(C2N(C)CCC2)=CC=C1 (== input). Verified 2026-07-09.
+        # pattern (the Blue Book).
+        # 2026-09-26 (wp7) change-asserted-value: the Blue Book names this very
+        # adduct with the systematic component -- '3-[(2S)-1-methylpyrrolidin-2-yl]-
+        # pyridine—hydrogen chloride (1/1)' (the Blue Book; this input has no
+        # stereo). 'nicotine' is an OPSIN-import trivial name without PIN evidence and
+        # left the PIN lookup. Was 'nicotine—hydrogen chloride (1/1)'. OPSIN 2.9.0
+        # full-InChIKey exact.
         assert self._nc("Cl.CN1CCCC1c1cccnc1") == (
-            "nicotine—hydrogen chloride (1/1)")
+            "3-(1-methylpyrrolidin-2-yl)pyridine—hydrogen chloride (1/1)")
 
     def test_mixed_phosphoric_1_2(self):
         # -a/-b (the Blue Book pattern; OPSIN verified)

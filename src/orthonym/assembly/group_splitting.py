@@ -161,10 +161,10 @@ def _decompose_carbonyl_ester(
     # name. Substituted benzyl is out of v1. A FULLY-wrapped
     # compound prefix '(3-hydroxypropoxy)' (single level) and the bare
     # benzyloxy/methoxy/acyl-sulfanyl prefixes are unaffected.
-    _fully_wrapped = (
-        (linker_prefix.startswith("(") and linker_prefix.endswith(")"))
-        or (linker_prefix.startswith("[") and linker_prefix.endswith("]"))
-    )
+    # Any matched outer pair counts escalates by nesting depth, so a
+    # compound linker can arrive as '{2-[(prop-2-enoyl)oxy]ethoxy}').
+    from ..assembly.naming_utils import _is_fully_enclosed
+    _fully_wrapped = _is_fully_enclosed(linker_prefix)
     if ("(" in linker_prefix or "[" in linker_prefix) and not _fully_wrapped:
         return None
 
@@ -219,10 +219,10 @@ def _decompose_iminoester(
     # Same v1 conservatism as the ester split: a not-fully-wrapped compound
     # alkoxy needs nested brackets the single-level emit path cannot render ->
     # fail closed (the molecule then stays 'unknown' via the validity gate).
-    _fully_wrapped = (
-        (linker_prefix.startswith("(") and linker_prefix.endswith(")"))
-        or (linker_prefix.startswith("[") and linker_prefix.endswith("]"))
-    )
+    # Any matched outer pair counts escalates by nesting depth, so a
+    # compound linker can arrive as '{2-[(prop-2-enoyl)oxy]ethoxy}').
+    from ..assembly.naming_utils import _is_fully_enclosed
+    _fully_wrapped = _is_fully_enclosed(linker_prefix)
     if ("(" in linker_prefix or "[" in linker_prefix) and not _fully_wrapped:
         return None
 

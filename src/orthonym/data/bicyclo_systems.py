@@ -21,13 +21,16 @@ from typing import Dict, Optional
 # Mapping from canonical SMILES to retained names
 # Keys MUST be in RDKit canonical SMILES format
 BICYCLO_RETAINED_NAMES: Dict[str, str] = {
-    # === Bicyclo[2.2.1]heptane (norbornane) ===
-    # Most important bridged bicyclic - common in natural products
-    "C1CC2CCC1C2": "norbornane",
-
-    # === Bicyclo[2.2.1]hept-2-ene (norbornene) ===
-    # Unsaturated norbornane, common in polymer chemistry
-    "C1=CC2CCC1C2": "norbornene",
+    # NO norbornane / norbornene rows. "RETAINED NAMES FOR VON BAEYER
+    # PARENT HYDRIDES" (the Blue Book; sentence:9881): "The retained names
+    # adamantane and cubane are used in general nomenclature and as preferred
+    # IUPAC names." No other von Baeyer hydride keeps a retained PIN. The Blue
+    # Book's only 'norbornane' is the subtractive '10-norbornane' of bornane in
+    # Table 1.2, next to 'bicyclo[2.2.1]heptane (PIN)' (:2037-2038). The rows
+    # "C1CC2CCC1C2": "norbornane", "C1=CC2CCC1C2": "norbornene"
+    # made the PIN tier emit the non-PIN trivial name (gold row
+    # DD7-bridged-protect-norbornane). With them gone the von Baeyer namer
+    # emits 'bicyclo[2.2.1]heptane' / 'bicyclo[2.2.1]hept-2-ene'.
 
     # === Bicyclo[1.1.0]butane ===
     # Smallest bicyclic hydrocarbon (4 carbons)
@@ -115,8 +118,10 @@ def get_retained_bicyclo_name(canonical_smiles: str) -> Optional[str]:
         Retained name if exists, None otherwise
 
     Examples:
-        >>> get_retained_bicyclo_name("C1CC2CCC1C2")
-        'norbornane'
+        >>> get_retained_bicyclo_name("C1C2CC3CC1CC(C2)C3")
+        'adamantane'
+        >>> get_retained_bicyclo_name("C1CC2CCC1C2") # bicyclo[2.2.1]heptane,
+        None
         >>> get_retained_bicyclo_name("C1CC2CCC1CN2") # isoquinuclidine, PA1 R6
         None
         >>> get_retained_bicyclo_name("C1CC2CCC1CC2") # bicyclo[2.2.2]octane
@@ -157,8 +162,10 @@ def is_retained_bicyclo(canonical_smiles: str) -> bool:
         True if compound has a retained name
 
     Examples:
-        >>> is_retained_bicyclo("C1CC2CCC1C2") # norbornane
+        >>> is_retained_bicyclo("C1C2CC3CC1CC(C2)C3") # adamantane
         True
+        >>> is_retained_bicyclo("C1CC2CCC1C2") # bicyclo[2.2.1]heptane,
+        False
         >>> is_retained_bicyclo("C1CC2CCC1CC2") # bicyclo[2.2.2]octane
         False
     """

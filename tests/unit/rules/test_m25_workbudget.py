@@ -82,12 +82,24 @@ _NAME_CONTROLS = {
         "[3,3',3'',3'''-[(7S,8S,12S,13S)-3,8,13,17-tetrakis(carboxymethyl)-"
         "8,13-dimethyl-7,8,12,13-tetrahydroporphyrin-2,7,12,18-tetrayl-"
         "kappaN(21),kappaN(22),kappaN(23),kappaN(24)]tetrapropanoato(2-)]iron"),
+    # 2026-09-25 (pre-existing-failures plan, Task 5) change-asserted-value:
+    # nesting (the Blue Book) counts the stereo and compound-locant
+    # parentheses,:7478) and ignores the von Baeyer brackets
+    #,:7469), so the substituent is one level deep and takes '['
+    # -- not the old '({...})', '(' around a '{' that nothing inside called for.
+    # OPSIN RT exact.
+    # 2026-09-26 (wp7) change-asserted-value: (the Blue Book) the
+    # multiplier 'bis' is ignored, so 'bis(methoxycarbonyl)' keys at 'methoxycarbonyl',
+    # before 'methoxyoxopropyl' ('c' < 'o'); the BB's '1-chloro-1,1-bis(4-methylphenyl)-
+    # 3,3-bis(trifluoromethyl)-...benzoxabismole (PIN)' (:39307) orders bis prefixes the
+    # same way. Was '...-14-ethenyl-5-(3-methoxy-3-oxopropyl)-22,23-bis(methoxycarbonyl)-...'.
+    # OPSIN RT exact.
     "porphyrin": (
         _PORPHYRIN,
-        "3-({(23S,24R)-14-ethenyl-5-(3-methoxy-3-oxopropyl)-22,23-"
-        "bis(methoxycarbonyl)-4,10,15,24-tetramethyl-25,26,27,28-"
+        "3-[(23S,24R)-14-ethenyl-22,23-bis(methoxycarbonyl)-5-(3-methoxy-3-"
+        "oxopropyl)-4,10,15,24-tetramethyl-25,26,27,28-"
         "tetraazahexacyclo[16.6.1.1^3,6.1^8,11.1^13,16.0^19,24]octacosa-"
-        "1,3(28),4,6,8,10,12,14,16(26),17,19,21-dodecaen-9-yl})propanoic acid"),
+        "1,3(28),4,6,8,10,12,14,16(26),17,19,21-dodecaen-9-yl]propanoic acid"),
     "chlorophyll": (
         _CHLOROPHYLL,
         "[methyl (3S,4S)-4,8,13,18-tetramethyl-20-oxo-3-(3-oxo-3-{[(2E,7R,11R)-"

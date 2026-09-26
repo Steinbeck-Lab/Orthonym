@@ -314,7 +314,7 @@ def get_alkoxy_prefix(
                       if _r_name.endswith('yl') else _r_name + 'oxy')
             if _r_oxy is None:
                 return None
-            return apply_enclosing_marks(_r_oxy, 0)
+            return apply_enclosing_marks(_r_oxy, -1)
         return None  # un-nameable ether-bearing R -> fail closed (never drop a hetero)
 
     # Name the R group by its CONSTITUTION, then apply the alkoxy
@@ -1048,7 +1048,7 @@ def get_sulfanyl_prefix(
     # BB 27828). The caller (format_fg_prefix / composer) supplies the OUTER
     # enclosure + locant and escalates '(...)sulfanyl' -> '[(...)sulfanyl]'.
     if is_complex_substituent(arm):
-        arm = apply_enclosing_marks(arm, 0)
+        arm = apply_enclosing_marks(arm, -1)
     return f"{arm}{suffix}"
 
 
@@ -1192,7 +1192,7 @@ def get_phosphoryl_prefix(
         core = f"{name}phosphoryl"
     else:
         mult = get_multiplier_prefix(count, name)
-        core = f"{mult}{apply_enclosing_marks(name, 0)}phosphoryl"
+        core = f"{mult}{apply_enclosing_marks(name, -1)}phosphoryl"
     return core
 
 
@@ -1854,6 +1854,47 @@ def get_carbamoyloxy_prefix(
     return f"({alkoxy_part}carbonyl)amino"
 
 
+def get_guanidine_prefix(mol, atoms, principal_chain=None) -> Optional[str]:
+    """Prefix for an unsubstituted guanidine group cited as a substituent.
+
+     (the Blue Book): "In the presence of a characteristic group
+    having seniority over guanidine [...], the following prefixes are used. The prefix
+    guanidino may be used in general nomenclature." H2N-C(=NH)-NH- is 'carbamimidoylamino
+    (preferred prefix)' (:34268); (H2N)2C=N- is '(diaminomethylidene)amino (preferred
+    prefix)' (:34270-34272; '4-[(diaminomethylidene)amino]butanoic acid (PIN)':34282).
+    7. Prefixes (g) (:1700): "The prefix 'guanidino' is no longer acceptable in preferred
+    IUPAC names".
+
+    ``atoms`` is the guanidine match ``[NX3][CX3](=[NX2])[NX3]``. The attachment N is the
+    one N with a heavy neighbour outside the group; the other two N must carry no
+    further heavy atom. Anything else (a substituted guanidine) falls back to the static
+    table entry, which is the same 'carbamimidoylamino' string as before this row
+    existed for the NH-attached form."""
+    try:
+        idx = [int(i) for i in atoms]
+        group = set(idx)
+        carbon = next(i for i in idx if mol.GetAtomWithIdx(i).GetAtomicNum() == 6)
+        n_atoms = [i for i in idx if mol.GetAtomWithIdx(i).GetAtomicNum() == 7]
+        if len(n_atoms) != 3:
+            return PREFIX_FORMS.get("guanidine")
+        attach = [n for n in n_atoms
+                  if any(nb.GetIdx() not in group and nb.GetAtomicNum() > 1
+                         for nb in mol.GetAtomWithIdx(n).GetNeighbors())]
+        if len(attach) != 1:
+            return PREFIX_FORMS.get("guanidine")
+        n_att = attach[0]
+        if mol.GetAtomWithIdx(n_att).GetDegree() != 2:
+            return PREFIX_FORMS.get("guanidine")
+        bond = mol.GetBondBetweenAtoms(n_att, carbon)
+        if bond is None:
+            return PREFIX_FORMS.get("guanidine")
+        if bond.GetBondTypeAsDouble() == 2.0:
+            return "(diaminomethylidene)amino"
+        return "carbamimidoylamino"
+    except (StopIteration, ValueError, AttributeError):
+        return PREFIX_FORMS.get("guanidine")
+
+
 def get_substituent_prefix_form(
     fg_name: str,
     mol,
@@ -1946,6 +1987,8 @@ def get_substituent_prefix_form(
     # R8b: amidine as non-principal substituent → "carbamimidoyl"
     if fg_name == "amidine":
         return PREFIX_FORMS.get("amidine")  # "carbamimidoyl"
+    if fg_name == "guanidine":
+        return get_guanidine_prefix(mol, atoms, principal_chain)
 
     # Wave2: UNSUBSTITUTED -NH-OH as a non-principal
     # substituent → 'hydroxyamino' (preselected prefix; BB PIN
@@ -2167,11 +2210,21 @@ def _check_substituent_prefix_form(
             # methoxymethyl), the ether is internal to the chain and must be named
             # (R-oxy)alkyl by the downstream chain handler — NOT collapsed to
             # 'methoxy' (which drops the attachment carbon -> a different
-            # constitution). Fall through. Scoped to O-ethers only: the
-            # thioether/selenoether/telluroether SMARTS put a CARBON at match[0]
-            # (S/Se/Te at match[1]), so this match[0] test does not apply to them,
-            # and no carbon-attached chalcogen-ether handler exists yet (C- is O).
-            if (fg_name in ("ether", "vinyl_ether", "aromatic_ether")
+            # constitution). Fall through.
+            # fix a performance pass: the same holds for the S/Se/Te ethers. The note
+            # that used to stand here said their SMARTS put a CARBON at match[0];
+            # they do not -- 'thioether' is '[SX2]([#6])[#6]' (and Se/Te alike,
+            # perception/functional_groups.py), the chalcogen at match[0] exactly
+            # as for 'ether'. Unguarded, the 3-atom fragment -CH2-S-CH3 attached
+            # through its CH2 reached get_sulfanyl_prefix, which named the other
+            # side and returned 'methylsulfanyl' -- the attachment carbon DROPPED,
+            # a different molecule (seen as the self-consistency-rejected
+            # '[(methylsulfanyl)disulfanyl]ethane' for CCSSCSC). An exact-match
+            # fragment can never attach through its S (it would be [SX3]), so
+            # this only ever removes that wrong name; the fragment falls through
+            # to the chain namers ('(methylsulfanyl)methyl').
+            if (fg_name in ("ether", "vinyl_ether", "aromatic_ether",
+                            "thioether", "selenoether", "telluroether")
                     and attach_idx is not None
                     and len(match) >= 1 and attach_idx != match[0]):
                 continue

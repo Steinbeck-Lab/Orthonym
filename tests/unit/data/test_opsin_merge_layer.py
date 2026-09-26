@@ -20,18 +20,31 @@ class TestMergeLayerBehavior:
         assert ALL_RETAINED_NAMES.get("c1ccccc1") == "benzene"
 
     def test_opsin_entries_accessible_via_merged(self):
-        """OPSIN-only entries are accessible through ALL_RETAINED_NAMES."""
-        from orthonym.data import ALL_RETAINED_NAMES
+        """OPSIN-only entries are accessible through the retained-name surfaces.
+
+        2026-09-26 (wp7) change-asserted-value: was 'more than 50 OPSIN-only
+        entries in ALL_RETAINED_NAMES'. An OPSIN-import name now enters the PIN
+        lookup only with Blue Book PIN evidence (data._OPSIN_IMPORT_PIN_EVIDENCE:
+        printed '(PIN)', prose such as:41017, or a ruling); the other
+        promoted names ('lepidine',...) live in OPSIN_UNVERIFIED_RETAINED_NAMES,
+        still served by get_retained_name (recorded non-PIN) and as the last-resort
+        whole-molecule name. Mutation: reverting the split puts all of them back in
+        ALL_RETAINED_NAMES and fails the disjointness below."""
+        from orthonym.data import ALL_RETAINED_NAMES, OPSIN_UNVERIFIED_RETAINED_NAMES
         from orthonym.data.retained_names import RETAINED_NAMES as hand_curated
 
-        # Find an entry in ALL_RETAINED_NAMES that is NOT in hand-curated
         opsin_only = {
             k: v for k, v in ALL_RETAINED_NAMES.items()
             if k not in hand_curated
         }
-        assert len(opsin_only) > 50, (
-            f"Expected 50+ OPSIN-only entries, got {len(opsin_only)}"
+        assert len(opsin_only) >= 40, (
+            f"Expected 40+ evidence-backed OPSIN-only entries, got {len(opsin_only)}"
         )
+        assert len(OPSIN_UNVERIFIED_RETAINED_NAMES) > 400
+        assert "Cc1ccnc2ccccc12" not in ALL_RETAINED_NAMES  # lepidine
+        assert OPSIN_UNVERIFIED_RETAINED_NAMES["Cc1ccnc2ccccc12"] == "lepidine"
+        unverified_only = set(OPSIN_UNVERIFIED_RETAINED_NAMES) - set(hand_curated)
+        assert not (unverified_only & set(ALL_RETAINED_NAMES))
 
     def test_backward_compatible_alias(self):
         """RETAINED_NAMES is the same object as ALL_RETAINED_NAMES ."""
@@ -102,12 +115,17 @@ class TestMergeLayerBehavior:
                 )
 
     def test_merged_count_reasonable(self):
-        """ALL_RETAINED_NAMES has 350+ entries (hand-curated + OPSIN)."""
-        from orthonym.data import ALL_RETAINED_NAMES
+        """ALL_RETAINED_NAMES has 300+ entries (hand-curated + evidence-backed OPSIN).
 
-        assert len(ALL_RETAINED_NAMES) >= 350, (
-            f"Expected >= 350 merged entries, got {len(ALL_RETAINED_NAMES)}"
+        2026-09-26 (wp7) change-asserted-value: was '>= 350'; 488 OPSIN-import
+        trivial names without Blue Book PIN evidence left the PIN lookup (see
+        test_opsin_entries_accessible_via_merged)."""
+        from orthonym.data import ALL_RETAINED_NAMES, OPSIN_UNVERIFIED_RETAINED_NAMES
+
+        assert len(ALL_RETAINED_NAMES) >= 300, (
+            f"Expected >= 300 merged entries, got {len(ALL_RETAINED_NAMES)}"
         )
+        assert len(ALL_RETAINED_NAMES) + len(OPSIN_UNVERIFIED_RETAINED_NAMES) >= 800
 
     def test_namer_uses_expanded_retained_names(self):
         """namer.py accesses the merged retained names dictionary."""

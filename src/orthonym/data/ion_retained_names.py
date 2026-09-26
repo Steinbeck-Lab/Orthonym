@@ -324,14 +324,16 @@ INORGANIC_ANIONS = {
     # ('methyl dihydrogen phosphate (PIN)',:35940). Each OPSIN-parses to
     # exactly this anion. Without these rows a hydrogen arsorate salt fell
     # through to a neutral-acid name ('lead(II) arsoric acid', a different
-    # molecule).
+    # molecule). The anion names are DERIVED by that rule from the acid names
+    # ('arsoric acid As(O)(OH)3',:18417); 'arsorate' itself has 0 Blue Book hits.
     'O=[As]([O-])([O-])[O-]': 'arsorate',
     'O=[As]([O-])([O-])O': 'hydrogen arsorate',
     'O=[As]([O-])(O)O': 'dihydrogen arsorate',
     # The same rule for the two other oxoacids that leaked a
     # neutral-acid name ('stiboric acid', 'silicic acid') through the same
     # multi-anion fallback: stiboric acid Sb(O)(OH)3 and silicic acid Si(OH)4
-    # (the Blue Book). Each OPSIN-parses to exactly this anion.
+    # (the Blue Book). Each OPSIN-parses to exactly this anion. 'stiborate' is
+    # derived the same way,:35900; 0 Blue Book hits for the word).
     'O=[Sb]([O-])([O-])[O-]': 'stiborate',
     'O=[Sb]([O-])([O-])O': 'hydrogen stiborate',
     'O=[Sb]([O-])(O)O': 'dihydrogen stiborate',

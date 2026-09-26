@@ -153,7 +153,8 @@ class TestBasicAminoAcids:
     def test_arginine(self):
         """Arginine, stereo-UNDEFINED input: the systematic name (see module note)."""
         result = name_compound("NC(CCCNC(N)=N)C(=O)O")
-        assert result == "2-amino-5-guanidinopentanoic acid"
+        # (the Blue Book-34268): 'carbamimidoylamino (preferred prefix)'; 7. Prefixes (g) (:1700) 'guanidino' is no longer acceptable in PINs
+        assert result == "2-amino-5-(carbamimidoylamino)pentanoic acid"
 
     def test_histidine(self):
         """Histidine, stereo-UNDEFINED input: the systematic name (see module note)."""
@@ -615,7 +616,8 @@ class TestExpandedAminoAcidPipeline:
             ("NC(CC(N)=O)C(=O)O", "2,4-diamino-4-oxobutanoic acid"),
             ("NC(CCC(N)=O)C(=O)O", "2,5-diamino-5-oxopentanoic acid"),
             ("NCCCCC(N)C(=O)O", "2,6-diaminohexanoic acid"),
-            ("NC(CCCNC(N)=N)C(=O)O", "2-amino-5-guanidinopentanoic acid"),
+            # (the Blue Book-34268): 'carbamimidoylamino (preferred prefix)'; 7. Prefixes (g) (:1700) 'guanidino' is no longer acceptable in PINs
+            ("NC(CCCNC(N)=N)C(=O)O", "2-amino-5-(carbamimidoylamino)pentanoic acid"),
             ("NC(Cc1cnc[nH]1)C(=O)O", "2-amino-3-(1H-imidazol-5-yl)propanoic acid"),
             ("NC(Cc1ccccc1)C(=O)O", "2-amino-3-phenylpropanoic acid"),
             ("NC(Cc1ccc(O)cc1)C(=O)O", "2-amino-3-(4-hydroxyphenyl)propanoic acid"),

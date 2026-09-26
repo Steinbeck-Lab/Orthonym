@@ -296,7 +296,7 @@ def _assemble(mol, parent, numbering, suffix_carbons, prefix_on) -> Optional[str
     for tok in sorted(groups, key=alpha_sort_key):
         locs = sorted(groups[tok])
         # a compound (enclosed) token multiplies bis/tris; a bare one di/tri
-        compound = tok.startswith('(') or tok.startswith('[')
+        compound = tok[:1] in '([{'  # any enclosing mark
         table = COMPLEX_MULTIPLIERS if compound else SIMPLE_MULTIPLIERS
         mult = '' if len(locs) == 1 else table.get(len(locs))
         if mult is None:
@@ -314,7 +314,10 @@ def _assemble(mol, parent, numbering, suffix_carbons, prefix_on) -> Optional[str
     loc_str = ','.join(str(x) for x in ol_locs)
     suffix = f"-{loc_str}-{ol_mult}ol"
 
-    name = f"{prefix_str}{stem}ane{suffix}" if prefix_str else f"{stem}ane{suffix}"
+    # (a) (the Blue Book): the parent's final 'e' is elided before
+    # a vowel-initial suffix ('propan-2-ol'); a multiplier keeps it ('-2,3-diol').
+    base = f"{stem}an" if not ol_mult else f"{stem}ane"
+    name = f"{prefix_str}{base}{suffix}" if prefix_str else f"{base}{suffix}"
     # tidy a stray leading hyphen / double hyphen
     name = name.replace('--', '-').lstrip('-')
     return name

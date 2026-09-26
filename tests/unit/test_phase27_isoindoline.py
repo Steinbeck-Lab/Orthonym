@@ -23,9 +23,11 @@ class TestIsoindolineDioneLocants:
 
     @pytest.mark.unit
     def test_bare_phthalimide(self):
-        """Bare phthalimide returns retained name 'phthalimide'."""
+        """Bare phthalimide -> the pseudoketone PIN (phthalimide is general only)."""
+        # 2026-09-25 (pre-existing-failures plan, Task 5) change-asserted-value:
+        # R21: (the Blue Book) "Cyclic imides are preferably named as heterocyclic pseudoketones"; "2-phenyl-1H-isoindole-1,3(2H)-dione (PIN)... N-phenylphthalimide" (:33853); (:24689) added indicated hydrogen is preferred over hydro prefixes for PINs. OPSIN RT exact.
         name = name_compound("O=C1NC(=O)c2ccccc21")
-        assert name == "phthalimide" or "isoindole-1,3-dione" in name
+        assert name == "1H-isoindole-1,3(2H)-dione"
 
     @pytest.mark.unit
     def test_hydroxy_phthalimide(self):
@@ -57,8 +59,11 @@ class TestIsoindolineDioneLocants:
     @pytest.mark.unit
     def test_phthalimide_with_pyrazole(self):
         """Phthalimide bearing pyrazole substituent."""
+        # 2026-09-25 (pre-existing-failures plan, Task 5, TRIAGE row 87)
+        # change-asserted-value: R21: (the Blue Book) "Cyclic imides are preferably named as heterocyclic pseudoketones"; "2-phenyl-1H-isoindole-1,3(2H)-dione (PIN)... N-phenylphthalimide" (:33853); (:24689) added indicated hydrogen is preferred over hydro prefixes for PINs; the pyrazolyl keeps its indicated hydrogen
+        #. OPSIN RT exact.
         name = name_compound("Cc1cc(N2C(=O)c3ccccc3C2=O)n(C)n1")
-        assert "isoindole-1,3-dione" in name
+        assert name == "2-(1,3-dimethyl-1H-pyrazol-5-yl)-1H-isoindole-1,3(2H)-dione"
 
 
 # ---------------------------------------------------------------------------
@@ -95,10 +100,15 @@ class TestIsoindolineIndex200:
 
     @pytest.mark.unit
     def test_index_200_correct_prefix_locants(self):
-        """Index 200: prefix locants now correct (4-methoxy, not 1-methoxy)."""
+        """Index 200: prefix locants follow the 1-one numbering (7-methoxy)."""
+        # 2026-09-25 (pre-existing-failures plan, Task 5, TRIAGE rows 146-147)
+        # change-asserted-value: "NUMBERING" (the Blue Book) numbers the
+        # suffix "(c)" (:3256) before the prefixes "(f)" (:3301), so the -one takes 1:
+        # (3S)-5-hydroxy-7-methoxy-3,6-dimethyl-2,3-dihydro-1H-isoindol-1-one, cf.
+        # "3-imino-2,3-dihydro-1H-isoindol-1-one (PIN)" (:29609). OPSIN RT exact.
+        # The old 4-methoxy / 6-hydroxy held only in the wrong 3-one numbering.
         name = name_compound("COc1c(C)c(O)cc2c1C(=O)N[C@H]2C")
-        # Methoxy should be at position 4 (not 1)
-        assert "4-methoxy" in name
+        assert "7-methoxy" in name
         # Position 1 should be the C=O (suffix), not methoxy
         assert "1-methoxy" not in name
 
@@ -135,10 +145,14 @@ class TestIsoindolineIndex200:
     @pytest.mark.unit
     def test_index_200_full_name(self):
         """Index 200: full name with all substituents correctly placed."""
+        # 2026-09-25 (pre-existing-failures plan, Task 5, TRIAGE rows 146-147)
+        # change-asserted-value: "NUMBERING" (the Blue Book) numbers the
+        # suffix "(c)" (:3256) before the prefixes "(f)" (:3301), so the -one takes 1:
+        # (3S)-5-hydroxy-7-methoxy-3,6-dimethyl-2,3-dihydro-1H-isoindol-1-one, cf.
+        # "3-imino-2,3-dihydro-1H-isoindol-1-one (PIN)" (:29609). OPSIN RT exact.
+        # The old 4-methoxy / 6-hydroxy held only in the wrong 3-one numbering.
         name = name_compound("COc1c(C)c(O)cc2c1C(=O)N[C@H]2C")
-        assert "6-hydroxy" in name
-        assert "4-methoxy" in name
-        assert "isoindol-1-one" in name
+        assert name == "(3S)-5-hydroxy-7-methoxy-3,6-dimethyl-2,3-dihydro-1H-isoindol-1-one"
 
 
 # ---------------------------------------------------------------------------

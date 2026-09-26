@@ -1140,8 +1140,23 @@ def name_ester(mol, ester_match: tuple) -> Optional[str]:
     if _carbonyl_is_ring_bonded(mol, ester_match[0]):
         ring_acid_name = get_ring_acid_name(mol, acid_atoms)
         if ring_acid_name is None:
-            # Complex ring acid (fused heterocycle etc.) - defer to complex naming
-            return None
+            # A ring acid the stem table cannot spell (a fused ring,
+            # 'methyl 1H-indole-3-carboxylate'). (the Blue Book:
+            # 31663): "All preferred IUPAC names for esters are named by
+            # functional class nomenclature"; the 'alkoxycarbonyl' prefix is for
+            # an ester beside a senior group,:31698). Deferring
+            # here handed the molecule to the ring producers, which cite the
+            # ester as a prefix ('3-methoxycarbonyl-1H-indole' at the PIN tier).
+            # Name the acid analog with the general pipeline instead (the same
+            # fail-closed acid-analog route the polyfunctional esters take);
+            # None still defers. ONE ester only: with a second ester the acid
+            # analog would cite it as a prefix, and a polyester from one acid
+            # is 'dimethyl...dicarboxylate'.
+            if len(mol.GetSubstructMatches(
+                    _compiled_smarts("[CX3](=O)[OX2][#6]"))) != 1:
+                return None
+            return name_polyfunctional_ester_via_acid(mol, ester_match,
+                                                      verified_acid=True)
 
     # Ensure CIP labels are assigned (idempotent guard)
     from ..perception.stereo import assign_stereochemistry
@@ -2773,7 +2788,8 @@ def _name_ring_dicarboxylic_diester(mol, ester_matches: list) -> Optional[str]:
     return f"{first} {second} {ate}"
 
 
-def name_polyfunctional_ester_via_acid(mol, ester_match: tuple) -> Optional[str]:
+def name_polyfunctional_ester_via_acid(mol, ester_match: tuple,
+                                       verified_acid: bool = False) -> Optional[str]:
     """Name a polyfunctional compound whose most-senior group is a SINGLE ester.
 
     The ester stays the principal group (suffix '-oate'); every junior group
@@ -2865,8 +2881,32 @@ def name_polyfunctional_ester_via_acid(mol, ester_match: tuple) -> Optional[str]
     # analog is the exact table SMILES (no substituents to drop).
     from .inorganic_acids import lookup_exact_acid_name
     retained = lookup_exact_acid_name(acid_smiles)
+    if retained is None:
+        # (BB:29717): an EXACT unsubstituted formic / oxalic / acetic
+        # / benzoic / oxamic acid analog takes its retained PIN, as the bare acid
+        # does upstream of the composer ('acetic acid'); assemble_name alone
+        # builds the systematic 'ethanoic acid', which made
+        # 'CC(=O)OCC(N)C' -> '2-aminopropyl ethanoate' (PIN: '... acetate',
+        # 'ethyl acetate (PIN)':31667). A substituted acetic acid is already
+        # 'chloroacetic acid' etc. from the composer (retained_acetic_from_prefixes).
+        from ..data.trivial_acids import retained_pin_carboxylic_acid
+        retained = retained_pin_carboxylic_acid(acid_smiles)
     if retained is not None:
         acid_name = retained
+    elif verified_acid:
+        # The whole naming pipeline (its own validity gate included) names the
+        # acid analog, not the bare composer: the composer alone can name a
+        # decorated ring acid while silently dropping a branch (measured:
+        # '2-amino-4-phenylthiophene-3-carboxylic acid' for an N-acylated
+        # 2-aminothiophene acid), which only the final whole-name gate caught.
+        from orthonym import name_compound  # lazy: re-entrant on the acid analog
+        from ..errors import is_failure_name
+        try:
+            acid_name = name_compound(acid_smiles)
+        except Exception:
+            return None
+        if not acid_name or is_failure_name(acid_name):
+            return None
     else:
         try:
             feats = compute_features(acid_mol, acid_smiles)
@@ -3086,6 +3126,20 @@ def name_polyfunctional_diester_free_hydroxy(
     if not acylate_word:
         return None
 
+    # This is METHOD (2) of (the Blue Book) "When anions are
+    # different, two methods are used": one anion is principal and the other
+    # ester is a prefix of the organyl. "Method (1) generates preferred IUPAC
+    # names but names formed by using method (2) are acceptable in general
+    # nomenclature" (:31836); even the worked example it follows is the (2) form
+    # of '(1) propane-1,2,3-triyl 2-acetate 1-hexadecanoate 3-[(9Z)-octadec-9-
+    # enoate] (PIN)' (:31846). The method (1) name of a partial ester
+    # ('2-hydroxypropane-1,3-diyl 1-decanoate 3-docosanoate') cannot be verified
+    # (OPSIN 2.9.0 does not parse it), so it is not built; this valid, round-
+    # tripping name ships at the general tier, never as pin_verified.
+    from ..assembly.fragment_naming import is_top_level_naming
+    if is_top_level_naming():
+        from ..metrics.provenance import record_general_ring_prefix
+        record_general_ring_prefix()
     return f"{yl_word} {acylate_word}"
 
 

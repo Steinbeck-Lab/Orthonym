@@ -113,7 +113,8 @@ def test_spiro_systems(smiles, expected_name):
 @pytest.mark.unit
 @pytest.mark.parametrize("smiles, expected_name", [
     ("C1CC2CCC1CC2", "bicyclo[2.2.2]octane"),
-    ("C1CC2CC1CC2", "norbornane"),
+    # PIN per R11: "RETAINED NAMES FOR VON BAEYER PARENT HYDRIDES" the Blue Book "The retained names adamantane and cubane are used in general nomenclature and as preferred IUPAC names."; "bicyclo[2.2.1]heptane (PIN)":2038; OPSIN RT exact.
+    ("C1CC2CC1CC2", "bicyclo[2.2.1]heptane"),
 ])
 def test_bicyclo_systems(smiles, expected_name):
     """Bicyclo systems produce correct bicyclo/retained names."""
@@ -230,7 +231,7 @@ def test_no_spurious_cyclo_names(smiles, must_not_contain):
     ("c1cc2ccc3cccc4ccc(c1)c2c34", "pyrene"),
     ("c1ccc(-c2ccccc2)cc1", "biphenyl"),
     ("C1CC2CCC1CC2", "bicyclo"),
-    ("C1CC2CC1CC2", "norborn"),
+    ("C1CC2CC1CC2", "bicyclo[2.2.1]heptane"),  # R11::9881, no retained PIN
     ("C1CCC2(CC1)CCCCC2", "spiro"),
     ("c1ccc2[nH]c3ccccc3c2c1", "carbazole"),
     ("O=c1c2ccccc2oc2ccccc12", "xanth"),

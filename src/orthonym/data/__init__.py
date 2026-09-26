@@ -280,10 +280,74 @@ def _governed_out(smiles: str, name: str) -> bool:
 
 
 # a phase: REFACTORED _OPSIN_NAMES filter (single-signal -> 3-signal AND).
-_OPSIN_NAMES: Dict[str, str] = {
+_OPSIN_NAMES_PROMOTED: Dict[str, str] = {
     smi: name for smi, name in _OPSIN_NAMES_RAW.items()
     if _is_promotable(smi, name) and not _governed_out(smi, name)
 }
+
+# fix a performance pass (wp7; whole-branch verification panel NIT, TODO 'Open from T12
+# fix a performance pass (wp6)' item 2): an OPSIN-import name is a PIN candidate only with
+# Blue Book evidence. The promotion gate above cannot tell a retained PIN from a
+# trivial name ('lepidine' for 4-methylquinoline passed it and shipped at
+# pin_verified), and the import's is_pin flag is a uniform generator default (see
+# the PA1 R5 note above). Measured 2026-09-26: 530 promoted OPSIN-import names are
+# neither hand-curated nor on the PIN allow-list; 34 of them are printed
+# '<name> (PIN)' or '<name> (preselected...)' in the Blue Book, and 13 are
+# retained as PINs in prose:41017 "The traditional names
+# methoxide, ethoxide, propoxide, butoxide, tert-butoxide, phenoxide... and
+# aminoxide... are retained as preferred IUPAC names or preselected name";
+#:41640 "The names methoxylium, ethoxylium, propoxylium, butoxylium,
+# phenoxylium, and aminoxylium are retained as preferred IUPAC names"). The other
+# promoted names ('lepidine', 'nicotine', 'bisphenol a', 'curcumin',...) leave
+# the PIN lookup: the systematic pipeline names the molecule, and only when it
+# derives nothing does the trivial name ship, labelled non-PIN
+# (OPSIN_UNVERIFIED_RETAINED_NAMES, Orthonym._apply_trivial_fallback).
+_OPSIN_IMPORT_PIN_EVIDENCE = frozenset({
+    # printed '(PIN)' / '(preselected...)' in the Blue Book
+    "2-benzofuran", "aceanthrylene", "acephenanthrylene", "arsanthrene",
+    "arsanthridine", "arsinoline", "biphenylene", "boranthrene", "cyanamide",
+    "cyanic acid", "cyclopentadienide", "isoarsinoline", "isophosphinoline",
+    "methoxide", "methoxylium", "oxamide", "oxanthrene", "phenanthridine",
+    "phenazine", "phenoxatellurine", "phosphanthrene", "phosphanthridine",
+    "phosphinoline", "propoxide", "pteridine", "pyranthrene", "pyrylium",
+    "quinazoline", "selenanthrene", "silanthrene", "telluranthrene",
+    "thianthrene", "trinaphthylene", "xanthylium",
+    # retained as PINs in prose (:41017,:41640)
+    "ethoxide", "butoxide", "tert-butoxide", "phenoxide", "aminoxide",
+    "ethoxylium", "propoxylium", "butoxylium", "phenoxylium", "aminoxylium",
+    # (:55227) "The retained name 'sphinganine' is preferred to the
+    # systematic name (2S,3R)-2-aminooctadecane-1,3-diol"
+    "sphinganine",
+    # Table 10.1 fundamental stereoparents (:51383,:51409), kept at the PIN tier
+    # by the controller ruling on stereoparent names (plan 'Controller
+    # rulings';:50943 identifies no PIN for the chapter)
+    "bufanolide", "cardanolide", "ergoline",
+})
+
+
+def _opsin_pin_evidence(smiles: str, name: str) -> bool:
+    """A promoted OPSIN-import name may serve as a PIN: on the PIN allow-list or
+    with Blue Book evidence (_OPSIN_IMPORT_PIN_EVIDENCE). (A hand-curated entry
+    for the same SMILES wins the merge below anyway.)"""
+    low = name.lower().strip()
+    return low in _PIN_ALLOW or low in _OPSIN_IMPORT_PIN_EVIDENCE
+
+
+_OPSIN_NAMES: Dict[str, str] = {
+    smi: name for smi, name in _OPSIN_NAMES_PROMOTED.items()
+    if _opsin_pin_evidence(smi, name)
+}
+# Promoted but without PIN evidence: a last-resort name for the whole molecule,
+# never a PIN-tier lookup (see above).
+OPSIN_UNVERIFIED_RETAINED_NAMES: Dict[str, str] = {
+    smi: name for smi, name in _OPSIN_NAMES_PROMOTED.items()
+    if not _opsin_pin_evidence(smi, name)
+}
+
+
+def get_unverified_retained_name(canonical_smiles: str) -> Optional[str]:
+    """A promoted OPSIN-import trivial name without PIN evidence, or None."""
+    return OPSIN_UNVERIFIED_RETAINED_NAMES.get(canonical_smiles)
 
 _stem_count = len(_OPSIN_NAMES_RAW) - len(_OPSIN_NAMES)
 if _stem_count > 0:
@@ -373,8 +437,23 @@ def get_general_retained_name(canonical_smiles: str) -> Optional[str]:
 
 
 def get_retained_name(canonical_smiles: str) -> Optional[str]:
-    """Look up retained name from merged dictionary."""
-    return ALL_RETAINED_NAMES.get(canonical_smiles)
+    """Look up retained name from merged dictionary.
+
+     wp7: a producer that builds a larger name AROUND a retained component
+    (a nucleotide around 'xanthosine', a ring assembly, an anhydride,...) may
+    still use an OPSIN-import trivial name without Blue Book PIN evidence; the
+    component is recorded as a non-PIN fragment, so any shipped name that carries
+    it is labelled below pin_verified. The whole-molecule PIN lookup
+    (routing.dispatch_table._handle_retained_name) reads ALL_RETAINED_NAMES only.
+    """
+    name = ALL_RETAINED_NAMES.get(canonical_smiles)
+    if name is not None:
+        return name
+    trivial = OPSIN_UNVERIFIED_RETAINED_NAMES.get(canonical_smiles)
+    if trivial is not None:
+        from ..metrics.provenance import record_non_pin_fragment
+        record_non_pin_fragment(trivial)
+    return trivial
 
 
 def has_retained_name(canonical_smiles: str) -> bool:
@@ -407,4 +486,5 @@ if _conflict_count > 0:
 
 __all__ = ["RETAINED_NAMES", "ALL_RETAINED_NAMES", "get_retained_name",
            "has_retained_name", "register_retained_name",
-           "GENERAL_RETAINED_NAMES", "get_general_retained_name"]
+           "GENERAL_RETAINED_NAMES", "get_general_retained_name",
+           "OPSIN_UNVERIFIED_RETAINED_NAMES", "get_unverified_retained_name"]

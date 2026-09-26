@@ -69,5 +69,7 @@ def test_genuine_skeletal_replacement_unaffected(namer):
     # a real oxa chain (no prefix-only FG) must STILL skeletal-replace.
     # R4 /: CCOCCOCC has exactly 2 embedded O-ethers with no terminal
     # -ol suffix; the substitutive PIN is '1,2-diethoxyethane' (not skeletal).
-    # Updated from pre-R4 '3,6-dioxaoctane'. A 3-O chain still keeps skeletal:
-    assert namer.name("COCCOCCOC") == "2,5,8-trioxanonane"
+    # Updated from pre-R4 '3,6-dioxaoctane'. fix a performance pass: a 3-O chain is
+    # substitutive too, the Blue Book, four heterounits needed);
+    # the BB's four-O chain keeps skeletal, "(4) 2,5,8,11-tetraoxadodecane (PIN)" (:27762).
+    assert namer.name("COCCOCCOCCOC") == "2,5,8,11-tetraoxadodecane"

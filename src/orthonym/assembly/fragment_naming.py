@@ -73,6 +73,13 @@ def _get_visited() -> set:
 #
 # Every entry was verified against name_compound at depth 0 (2026-02-25).
 # Only fragments with CORRECT verified names are included.
+# fix a performance pass (wp7, 2026-09-26): ten entries had drifted to non-PIN names the
+# top-level namer no longer gives ('2-hydroxyethanoic acid' made the carboxylate
+# namer ship 'sodium 2-hydroxyethanoate' / 'disodium 2-oxidoethanoate' at
+# pin_verified; 'cumene', 'glycerol', 'acetone',...). They now hold the PIN, each
+# cited at its line; tests/unit/assembly/test_fragment_cache_pin_names.py keeps
+# every entry equal to name_compound except the amino acids, which rest on
+# user decision D-a (semisystematic amino-acid names are kept at the PIN tier).
 FRAGMENT_NAME_CACHE: Dict[str, str] = {
     # --- Simple alkanes ---
     "CC": "ethane",
@@ -107,7 +114,7 @@ FRAGMENT_NAME_CACHE: Dict[str, str] = {
     "CCC=O": "propanal",
     "CCCC=O": "butanal",
     # --- Simple ketones ---
-    "CC(C)=O": "acetone",
+    "CC(C)=O": "propan-2-one",  # wp7: 'acetone propan-2-one (PIN)' the Blue Book
     "CCC(C)=O": "butan-2-one",
     # --- Simple amines ---
     # methylamine/ethylamine are general-nomenclature (non-PIN) functional-class
@@ -124,13 +131,13 @@ FRAGMENT_NAME_CACHE: Dict[str, str] = {
     "Oc1ccccc1": "phenol",
     "Nc1ccccc1": "aniline",
     "O=Cc1ccccc1": "benzaldehyde",
-    "CC(=O)c1ccccc1": "acetophenone",
+    "CC(=O)c1ccccc1": "1-phenylethan-1-one",  # wp7: '1-phenylethan-1-one (PIN) acetophenone':28369
     "c1ccc(-c2ccccc2)cc1": "1,1'-biphenyl",
     "c1ccc2ccccc2c1": "naphthalene",
     # --- Common heterocycles ---
     "c1ccncc1": "pyridine",
     "c1ccoc1": "furan",
-    "c1cc[nH]c1": "pyrrole",
+    "c1cc[nH]c1": "1H-pyrrole",  # wp7: '1H-pyrrole (PIN)':24645
     "c1ccsc1": "thiophene",
     # --- Amino acids (retained names, common in peptide fragments) ---
     "NCC(=O)O": "glycine",
@@ -148,7 +155,7 @@ FRAGMENT_NAME_CACHE: Dict[str, str] = {
     # --- Other common fragments ---
     "CCCCC(CC)CO": "2-ethylhexan-1-ol",
     "ClCCCl": "1,2-dichloroethane",
-    "ClC(Cl)Cl": "chloroform",
+    "ClC(Cl)Cl": "trichloromethane",  # wp7: 'chloroform' general only, PINs substitutive:25911
     # --- Fatty acids (common in phospholipids/sphingolipids) ---
     "CCCCCC(=O)O": "hexanoic acid",
     "CCCCCCC(=O)O": "heptanoic acid",
@@ -161,9 +168,9 @@ FRAGMENT_NAME_CACHE: Dict[str, str] = {
     "CCCCCCCCCCCCCCCCCC(=O)O": "octadecanoic acid",
     "CCCCCCCCCCCCCCCCCCCC(=O)O": "icosanoic acid",
     # --- Common biological fragments ---
-    "OCC(O)CO": "glycerol",
-    "OCCO": "ethylene glycol",
-    "NCCO": "2-aminoethanol",
+    "OCC(O)CO": "propane-1,2,3-triol",  # wp7: 'glycerol propane-1,2,3-triol (PIN)':26776
+    "OCCO": "ethane-1,2-diol",  # wp7: 'ethylene glycol ethane-1,2-diol (PIN)':26774
+    "NCCO": "2-aminoethan-1-ol",  # wp7: '2-aminoethan-1-ol (PIN)':28156
     "O=P(O)(O)O": "phosphoric acid",
     # --- Unsaturated fatty acids (benchmark-driven, verified 2026-03-09) ---
     "CC/C=C\\C/C=C\\C/C=C\\C/C=C\\C/C=C\\C/C=C\\CCC(=O)O": "(4Z,7Z,10Z,13Z,16Z,19Z)-docosa-4,7,10,13,16,19-hexaenoic acid",
@@ -203,7 +210,7 @@ FRAGMENT_NAME_CACHE: Dict[str, str] = {
     # --- Substituted aromatics (verified 2026-03-28, a phase-03) ---
     "Cc1ccccc1": "toluene",
     "CCc1ccccc1": "ethylbenzene",
-    "CC(C)c1ccccc1": "cumene",
+    "CC(C)c1ccccc1": "(propan-2-yl)benzene",  # wp7: 'cumene... not retained':8093
     "COc1ccccc1": "anisole",
     "Clc1ccccc1": "chlorobenzene",
     "Fc1ccccc1": "fluorobenzene",
@@ -221,10 +228,10 @@ FRAGMENT_NAME_CACHE: Dict[str, str] = {
     # sulfide"; this cache holds PIN names (see the comment at the FRAGMENT_NAME_CACHE
     # lookup site), so the sulfide is emitted by the substitutive path, not here.
     # --- Dicarboxylic acids (verified 2026-03-28, a phase-03) ---
-    "O=C(O)CO": "2-hydroxyethanoic acid",
+    "O=C(O)CO": "hydroxyacetic acid",  # wp7: 'hydroxyacetic acid (PIN)':29854
     "O=C(O)CC(=O)O": "propanedioic acid",
     "O=C(O)CCC(=O)O": "butanedioic acid",
-    "O=C(O)C(=O)O": "ethanedioic acid",
+    "O=C(O)C(=O)O": "oxalic acid",  # wp7: 'oxalic acid (PIN)':29723
     "O=C(O)CCCC(=O)O": "pentanedioic acid",
 }
 
@@ -587,6 +594,41 @@ def isolated_naming_session(reset_cache: bool = False):
         _fragment_guard.visited = saved_visited
         if reset_cache:
             _fragment_guard.cache = saved_cache
+
+
+_SPECULATIVE_STATE = ('cache', 'session_depth', 'visited',
+                      'work_budget', 'perf_budget', 'analysis_budget')
+_UNSET = object()
+
+
+@_contextlib.contextmanager
+def speculative_fragment_naming():
+    """Run a nested naming whose ONLY product is its return value.
+
+    For a caller that names a prefix merely to SORT by it (a (g) key built
+    before the real assembly runs): every piece of per-molecule fragment state the
+    nested call could leave behind is put back on exit -- the fragment memo cache
+    (the body works on a copy, so it still reads what is cached but its writes are
+    dropped; the cache is not context-free, see ``isolated_naming_session``), the
+    depth counters and the three work budgets (they still bound the body, so a
+    runaway still stops, but the spend is not charged to the real naming).
+    """
+    saved = {attr: getattr(_fragment_guard, attr, _UNSET) for attr in _SPECULATIVE_STATE}
+    cache = saved['cache']
+    if cache is not _UNSET and cache is not None:
+        _fragment_guard.cache = dict(cache)
+    visited = saved['visited']
+    if visited is not _UNSET and visited is not None:
+        _fragment_guard.visited = set(visited)
+    try:
+        yield
+    finally:
+        for attr, value in saved.items():
+            if value is _UNSET:
+                if hasattr(_fragment_guard, attr):
+                    delattr(_fragment_guard, attr)
+            else:
+                setattr(_fragment_guard, attr, value)
 
 
 def get_naming_depth() -> int:

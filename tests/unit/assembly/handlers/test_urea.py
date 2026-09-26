@@ -151,6 +151,19 @@ class TestHalogenSubstitutedUrea:
         'carbamoylaminomethane') — is suppressed to an honest abstention. That
         0-wrong outcome is the invariant to pin; the exact raw gate-off string is
         an implementation detail that must NOT be asserted (it drifts). Citing
-        these with N,N'/N,N locants is the documented Phase-7 deferral."""
+        these with N,N'/N,N locants is the documented Phase-7 deferral.
+
+        2026-09-26 (wp7) change-asserted-value, policy D-b ("where a wider-tier
+        name round-trips EXACTLY, change the test to assert an exact round-trip"):
+        with the OPSIN-import trivial 'difluoramine' out of the PIN lookup (no Blue
+        Book PIN evidence), the N,N-difluoro isomer now ships the RT-exact general
+        name 'N-carbamoyl-1,1-difluoro-1-azamethane', labelled non-PIN, instead of
+        abstaining. The invariant pinned is unchanged: never a halogen-dropping
+        (wrong) name, and never a pin_verified label on a non-PIN spelling (the PIN,
+        'N,N-difluorourea', is not built). Mutation: a halogen-dropping name
+        ('urea') injected for the molecule fails the round trip."""
         from orthonym.errors import is_failure_name
-        assert is_failure_name(Orthonym().name(smiles))
+        from tests.support.rt_assert import name_is_rt_exact
+        r = Orthonym().name_tiered(smiles)
+        assert is_failure_name(r["name"]) or name_is_rt_exact(r["name"], smiles), r
+        assert r["tier"] != "pin_verified", r

@@ -274,9 +274,13 @@ class TestCompleteBicycloNaming:
 
     @pytest.mark.unit
     def test_norbornane_retained_name(self):
-        """Unsubstituted norbornane should use retained name."""
+        """Unsubstituted norbornane takes its von Baeyer PIN, not the retained name.
+
+        Task 12 fix a performance pass (wp6-tests; whole-branch review nit 17): the assertion
+        compared name.lower, which would accept a case error; it is exact now."""
         name = name_compound('C1CC2CCC1C2')
-        assert name.lower() == 'norbornane'
+        # R11 (2026-09-25, pre-existing-failures plan, Task 5)::9881, only adamantane/cubane are retained; "bicyclo[2.2.1]heptane (PIN)":2038
+        assert name == 'bicyclo[2.2.1]heptane'
 
     @pytest.mark.unit
     def test_bicyclo_410_heptane_name(self):

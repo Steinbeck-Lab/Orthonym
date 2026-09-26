@@ -1776,6 +1776,39 @@ def _mancude_ring_parent(mol, ring_atoms):
     return parent, old_to_new
 
 
+def _mancude_ring_parent_nh(mol, ring_atoms):
+    """The mancude parent of a monocycle whose ONLY ring nitrogen must carry the
+    indicated hydrogen for the ring to be mancude (the 1H-pyrrole type, which
+    _mancude_ring_parent cannot build: a bare aromatic 'n' in a 5-ring does not
+    kekulize). Returns ``(parent_mol, old_to_new, n_atom)`` or
+    ``(None, None, None)``."""
+    ring = set(ring_atoms)
+    ns = [i for i in ring if mol.GetAtomWithIdx(i).GetAtomicNum() == 7]
+    if len(ns) != 1:
+        return None, None, None
+    em = Chem.RWMol()
+    old_to_new = {}
+    for idx in sorted(ring):
+        at = Chem.Atom(mol.GetAtomWithIdx(idx).GetAtomicNum())
+        if idx == ns[0]:
+            at.SetNumExplicitHs(1)
+        old_to_new[idx] = em.AddAtom(at)
+    for bond in bonds_of(mol):
+        i, j = bond.GetBeginAtomIdx(), bond.GetEndAtomIdx()
+        if i in ring and j in ring:
+            em.AddBond(old_to_new[i], old_to_new[j], Chem.BondType.AROMATIC)
+            em.GetAtomWithIdx(old_to_new[i]).SetIsAromatic(True)
+            em.GetAtomWithIdx(old_to_new[j]).SetIsAromatic(True)
+    parent = em.GetMol()
+    try:
+        Chem.SanitizeMol(parent)
+    except Exception:
+        return None, None, None
+    if not all(a.GetIsAromatic() for a in parent.GetAtoms()):
+        return None, None, None
+    return parent, old_to_new, ns[0]
+
+
 # Single-chalcogen pyran family: 2H-/4H-pyran and chalcogen analogues are PINs
 # (BB Table 2.2, lines 2164/8141). These mancude parents do NOT aromatize, so
 # they are built here rather than via _mancude_ring_parent.
@@ -1823,7 +1856,7 @@ def _monocyclic_intrinsic_ih_oxo_parents(mol, ring_set):
     return out
 
 
-def _resolve_oxo_parent(mol, ring_atoms):
+def _resolve_oxo_parent(mol, ring_atoms, monocyclic: Optional[bool] = None):
     """Resolve the mancude parent(s) of a ring-ketone's ring system.
 
     Returns a list of ``(parent_name, [(locant_map, parentH_map),...], ih_locants)``
@@ -1848,9 +1881,13 @@ def _resolve_oxo_parent(mol, ring_atoms):
     ring_set = set(ring_atoms)
     n = len(ring_set)
     rings = mol.GetRingInfo().AtomRings()
+    if monocyclic is None:
+        # historical test: the WHOLE molecule has one ring (a pendant ring sends
+        # a monocycle to the fused-catalog branch below, which declines it)
+        monocyclic = len(rings) == 1
 
     # --- monocyclic: build the mancude (aromatic) parent + free numbering ---
-    if len(rings) == 1:
+    if monocyclic:
         if all(mol.GetAtomWithIdx(i).GetSymbol() == 'C' for i in ring_set):
             return []  # carbocyclic monocycle -> cycloalkanone path
         # a phase (A): "mancude parent + added indicated hydrogen"
@@ -1871,6 +1908,14 @@ def _resolve_oxo_parent(mol, ring_atoms):
         if n > 10:
             return []
         parent, old_to_new = _mancude_ring_parent(mol, ring_set)
+        nh_atom = None
+        if parent is None:
+            # A 1H-pyrrole-type monocycle: mancude only with the indicated
+            # hydrogen on its ring nitrogen. The candidate declares that N's
+            # locant as its intrinsic indicated hydrogen; name_cyclic_oxo_compound
+            # uses it only in the case (the suffix pair just removes
+            # ring double bonds: '1H-pyrrole-2,5-dione (PIN)', the Blue Book).
+            parent, old_to_new, nh_atom = _mancude_ring_parent_nh(mol, ring_set)
         if parent is None:
             # non-aromatizing mancude monocycle (pyran-type intrinsic-IH parent)
             return _monocyclic_intrinsic_ih_oxo_parents(mol, ring_set)
@@ -1897,6 +1942,18 @@ def _resolve_oxo_parent(mol, ring_atoms):
         if het:
             best_h = min(_hk(l) for l in nums)
             nums = [l for l in nums if _hk(l) == best_h]
+        if nh_atom is not None:
+            # The parent name spells its indicated hydrogen ('1H-pyrrole'); keep
+            # only the numberings that put that locant on the ring nitrogen.
+            import re as _re
+            _m = _re.match(r'^(\d+)H-', pname)
+            if not _m:
+                return []
+            ih = int(_m.group(1))
+            nums = [l for l in nums if l[nh_atom] == ih]
+            if not nums:
+                return []
+            return [(pname, [(l, parentH) for l in nums], frozenset({ih}))]
         # An aromatic mancude monocycle has no intrinsic indicated hydrogen.
         return [(pname, [(l, parentH) for l in nums], frozenset())]
 
@@ -2197,7 +2254,18 @@ def name_cyclic_oxo_compound(mol: Chem.Mol) -> Optional[str]:
         # lactone chromen-2-ones in scope while excluding senior substituents.)
         _pcg_name, _pcg_atoms = get_principal_group(mol, detect_functional_groups(mol))
         _pcg_idx = {i for tup in (_pcg_atoms or []) for i in tup}
-        if _pcg_idx & substituent_atoms:
+        # Only the group's CORE locates it: its heteroatoms and its carbons that carry
+        # a double bond to a heteroatom. A lactam's tertiary-amide match also lists
+        # the N-alkyl carbon (1-methylisatin: (C=O, O, N, CH3, ring C)), which is a
+        # substituent on the ring N, not a senior group outside the ring.
+        def _is_core(i):
+            at = mol.GetAtomWithIdx(i)
+            if at.GetAtomicNum() != 6:
+                return True
+            return any(b.GetBondType() == Chem.BondType.DOUBLE
+                       and b.GetOtherAtom(at).GetAtomicNum() not in (1, 6)
+                       for b in at.GetBonds())
+        if {i for i in _pcg_idx if _is_core(i)} & substituent_atoms:
             return None
         # Belt-and-braces for an EQUAL-class rival the PCG union may not localise: a
         # substituent bearing its own acyl / imine / nitrile / thiocarbonyl carbon.
@@ -2225,7 +2293,15 @@ def name_cyclic_oxo_compound(mol: Chem.Mol) -> Optional[str]:
     if not has_residual:
         return None
 
-    candidates = _resolve_oxo_parent(mol, ring_set)
+    # The parent is the ring system bearing the carbonyl(s), so a single-ring
+    # parent is a monocycle even when a PENDANT ring exists elsewhere (a 1-benzyl
+    # or 1-glycosyl uracil, a 1-phenylmaleimide). The historical whole-molecule
+    # ring count sent those to the fused catalog, which declines them, and the
+    # composer then spelled a Hantzsch-Widman or dihydro form at the PIN tier
+    # ('1-benzyl-1H-1,3-diazine-2,4-dione', '1-phenyl-2,5-dihydro-1H-pyrrole-
+    # 2,5-dione'). Same test as oxo_prefix_parent_numberings.
+    single_ring = any(set(r) == ring_set for r in rings)
+    candidates = _resolve_oxo_parent(mol, ring_set, monocyclic=single_ring)
     if not candidates:
         return None
 
@@ -2257,6 +2333,38 @@ def name_cyclic_oxo_compound(mol: Chem.Mol) -> Optional[str]:
             adj[i].add(j)
             adj[j].add(i)
 
+    # (g) (the Blue Book): when every earlier criterion ties,
+    # "lowest locants for the substituent cited first as a prefix in the name".
+    # Name each ring substituent once (its real prefix name, as cited) so the
+    # numbering key below can end with (alpha key, locant) pairs -- without it a
+    # tie fell to candidate order: COc1cc(OC)c2c(=O)c3c(O)cc(C)cc3oc2c1 shipped
+    # '8-hydroxy-1,3-dimethoxy-6-methyl-9H-xanthen-9-one' (PIN '1-hydroxy-6,8-
+    # dimethoxy-3-methyl-...', both sets {1,3,6,8}; hydroxy is cited first).
+    _sub_names = []  # (ring atom, prefix name)
+    if substituent_atoms:
+        from ..assembly.naming_utils import alpha_sort_key as _alpha_sort_key
+        from ..assembly.substituent_enumerator import name_substituent as _name_sub
+        from ..errors import is_refusal_sentinel as _is_refusal
+        for _r in ring_set:
+            for _nb in mol.GetAtomWithIdx(_r).GetNeighbors():
+                _start = _nb.GetIdx()
+                if _start not in substituent_atoms:
+                    continue
+                _frag, _stack = {_start}, [_start]
+                while _stack:
+                    _x = _stack.pop()
+                    for _y in mol.GetAtomWithIdx(_x).GetNeighbors():
+                        _yi = _y.GetIdx()
+                        if _yi in substituent_atoms and _yi not in _frag:
+                            _frag.add(_yi)
+                            _stack.append(_yi)
+                try:
+                    _nm = _name_sub(mol, sorted(_frag), _start)
+                except Exception:  # noqa: BLE001 -- no name: no (g) key for it
+                    _nm = None
+                if _nm and not _is_refusal(_nm):
+                    _sub_names.append((_r, _alpha_sort_key(_nm)))
+
     best = None
     for parent_name, pairs, ih_locants in candidates:
         for loc, parentH in pairs:
@@ -2268,18 +2376,47 @@ def name_cyclic_oxo_compound(mol: Chem.Mol) -> Optional[str]:
             # direction. No constraint for a fully mancude parent (ih_locants
             # empty) — its added-IH comes from the maximum matching below.
             if ih_locants and not any(loc[c] in ih_locants for c in carbonyls):
-                continue
-            matched, unmatched = _max_oxo_matching(adj, sat, loc)
+                # (the Blue Book): "'Added indicated hydrogen'
+                # atoms are not cited when the accommodation of a pair of
+                # principal characteristic groups or free valences simply
+                # removes a double bond (directly or after rearrangement of
+                # double bonds) from the parent ring structure." A parent whose
+                # indicated hydrogen sits on a ring NITROGEN keeps it (the N-H or
+                # N-R of the molecule), and the suffixes take the other ring
+                # positions: '1H-pyrrole-2,5-dione (PIN)' (:33843), '1-hydroxy-
+                # 1H-pyrrole-2,5-dione (PIN)' (:29597). Only that case is named
+                # here: every indicated-H atom is an N at a saturated position
+                # and NO other ring atom is saturated (no added indicated
+                # hydrogen, no hydro prefix); anything else stays declined.
+                ih_atoms = {a for a in ring_set if loc[a] in ih_locants}
+                if not (ih_atoms and ih_atoms <= sat and not (sat - ih_atoms)
+                        and all(mol.GetAtomWithIdx(a).GetSymbol() == 'N'
+                                for a in ih_atoms)):
+                    continue
+                matched, unmatched = set(), set()
+            else:
+                matched, unmatched = _max_oxo_matching(adj, sat, loc)
             added_ih, hydro = unmatched, matched
             # Substituent locants are the LAST numbering criterion: after
             # the suffix, added-IH and hydro).
             sub_ring = {i for i in ring_set
                         if any(nb.GetIdx() in substituent_atoms
                                for nb in mol.GetAtomWithIdx(i).GetNeighbors())}
+            # (4) (the Blue Book): "indicated hydrogen atoms
+            #... ha[ve] seniority over 'added indicated hydrogen' for lower
+            # locants", and (1) (:24808) puts the parent's indicated hydrogen at the
+            # lowest locant consistent with the mancude system: so between two
+            # tautomeric parents of one ring system the lower indicated-H locant
+            # wins before added-indicated-H is compared ('1H-isoindole-1,3(2H)-
+            # dione (PIN)':33853 over '2H-isoindole-1,3-dione'; '1H-cyclopenta
+            # [a]naphthalene-1,2(3H)-dione (PIN) (not 3H-...-1,2-dione)':24822).
+            # Empty for a fully mancude parent, so it never reorders those.
             key = (sorted(_locant_key(loc[c]) for c in carbonyls),
+                   sorted(_locant_key(l) for l in ih_locants),
                    sorted(_locant_key(loc[a]) for a in added_ih),
                    sorted(_locant_key(loc[a]) for a in hydro),
-                   sorted(_locant_key(loc[a]) for a in sub_ring))
+                   sorted(_locant_key(loc[a]) for a in sub_ring),
+                   sorted((_ak, _locant_key(loc[_r])) for _r, _ak in _sub_names))
             if best is None or key < best[0]:
                 best = (key, loc, added_ih, hydro, parent_name)
     if best is None:
@@ -2366,6 +2503,111 @@ def name_cyclic_oxo_compound(mol: Chem.Mol) -> Optional[str]:
         if filtered:
             name = name_substituted_heterocycle(mol, list(ring_set), name, filtered, loc)
     return name
+
+
+def oxo_prefix_parent_numberings(mol: Chem.Mol, ring_atoms) -> List[tuple]:
+    """Parent hydrides for a ring system whose ring C=O is NOT the principal
+    characteristic group, so the =O is an 'oxo' PREFIX (the prefix-mode sibling
+    of:func:`name_cyclic_oxo_compound`).
+
+     "Prefix nomenclature" (the Blue Book): "After the
+    introduction of indicated and 'added indicated hydrogen' atoms, all
+    substituent groups not expressed as suffixes are cited as prefixes". An oxo
+    prefix substitutes the two hydrogen atoms of a saturated ring position, so
+    every ring carbonyl carbon is a SATURATED position of the parent hydride,
+    exactly like a ring >CH2 or >N-R: the parent's own indicated hydrogen
+     :24639, "in preferred IUPAC names indicated hydrogen must always
+    be cited") sits on one of them and the rest are hydro prefixes, cited in
+    front of the parent. (PIN) examples: '9,10-dioxo-9,10-
+    dihydroanthracene-2-carboxylic acid' (:29471), '5,8-dioxo-5,6,7,8-
+    tetrahydronaphthalene-2-carboxylic acid' (:24890), '5-oxo-2,5-dihydrofuran-
+    2-carboxylic acid' (:29276), '1,3-dioxo-1,3-dihydro-2H-isoindole-2,5-diyl'
+    (:24868), '2,2-dimethyl-1,3-dioxo-2,3-dihydro-1H-isoindol-2-ium' (:41447),
+    '2-methyl-4-oxo-3,4-dihydro-1H-2-benzoselenopyran-2-ium-3-ide' (:42439).
+
+    Returns ``[(parent_name, locant_map, ih_atoms, hydro_atoms),...]`` -- one
+    entry per mancude parent and numbering the structure allows -- or ````
+    (fail closed). ``parent_name`` already carries the hydro prefixes and the
+    indicated hydrogen ('3,4-dihydro-2H-1-benzopyran', '1,4-dihydroquinoline',
+    '4H-1-benzopyran'); the caller chooses the numbering (b) indicated
+    hydrogen, (c) suffixes, (e) hydro prefixes, (f) detachable prefixes).
+
+    Scope (everything else returns ````): ``ring_atoms`` is one whole fused
+    (or monocyclic) ring system bearing >=1 ring C=O; every ring atom is
+    neutral; every saturated ring position is a C=O carbon, an sp3 carbon or a
+    neutral single-bonded nitrogen (no =NR / =S / =CR2 on the ring); the
+    mancude parent resolves (:func:`_resolve_oxo_parent`); the parent's
+    indicated-hydrogen atoms are saturated in the molecule; the hydro count is
+    even (a single left-over position needs 'added indicated hydrogen', which
+    only a suffix position may carry,.
+    """
+    ring_set = set(ring_atoms)
+    if not ring_set:
+        return []
+    rings = mol.GetRingInfo().AtomRings()
+    for r in rings:
+        rs = set(r)
+        if (rs & ring_set) and not rs <= ring_set:
+            return []  # part of a larger (fused/spiro/bridged) ring system
+    carbonyls = set(_ring_carbonyl_carbons(mol, ring_set))
+    if not carbonyls:
+        return []
+    kek = Chem.Mol(mol)
+    try:
+        Chem.Kekulize(kek, clearAromaticFlags=True)
+    except Exception:
+        return []
+    ring_db: Set[int] = set()
+    for bond in kek.GetBonds():
+        if bond.GetBondType() == Chem.BondType.DOUBLE:
+            i, j = bond.GetBeginAtomIdx(), bond.GetEndAtomIdx()
+            if i in ring_set and j in ring_set:
+                ring_db.update((i, j))
+    sat: Set[int] = set()
+    for a in ring_set:
+        at = mol.GetAtomWithIdx(a)
+        if at.GetFormalCharge() != 0 or at.GetNumRadicalElectrons() != 0:
+            return []
+        if a in ring_db:
+            continue
+        if a in carbonyls:
+            sat.add(a)
+            continue
+        kat = kek.GetAtomWithIdx(a)
+        if any(b.GetBondType() != Chem.BondType.SINGLE for b in kat.GetBonds()):
+            return []  # an exocyclic =X other than the carbonyl O
+        sym = at.GetSymbol()
+        if sym in ('C', 'N'):
+            sat.add(a)
+            continue
+        ring_deg = sum(1 for nb in at.GetNeighbors() if nb.GetIdx() in ring_set)
+        if sym in ('O', 'S', 'Se', 'Te') and ring_deg == 2 and at.GetTotalNumHs() == 0:
+            continue  # divalent ring chalcogen: never a hydro position
+        return []
+    out = []
+    single_ring = any(set(r) == ring_set for r in rings)
+    for parent_name, pairs, ih_locants in _resolve_oxo_parent(
+            mol, ring_set, monocyclic=single_ring):
+        for loc, _parent_h in pairs:
+            if set(loc) != ring_set:
+                continue
+            ih_atoms = {a for a in ring_set if loc[a] in ih_locants}
+            if len(ih_atoms) != len(ih_locants) or not ih_atoms <= sat:
+                continue
+            hydro = sat - ih_atoms
+            if len(hydro) % 2:
+                continue
+            name = parent_name
+            if hydro:
+                prefix = SATURATION_PREFIXES.get(len(hydro))
+                if prefix is None:
+                    continue
+                hy = ','.join(_locant_display(loc[a]) for a in
+                              sorted(hydro, key=lambda a: _locant_key(loc[a])))
+                sep = '-' if name[:1].isdigit() else ''
+                name = f"{hy}-{prefix}{sep}{name}"
+            out.append((name, dict(loc), frozenset(ih_atoms), frozenset(hydro)))
+    return out
 
 
 # Back-compat alias: the original (narrower) Phase-2 entry point, now backed by

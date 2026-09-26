@@ -169,10 +169,16 @@ class TestPrefixForms:
         assert "carbamoylamino" in result or "ureido" in result
 
     def test_guanidine_as_prefix_with_acid(self):
-        """Guanidine subordinate to carboxylic acid should use guanidino prefix."""
+        """Guanidine subordinate to carboxylic acid takes the carbamimidoylamino prefix."""
         result = name_compound("NC(=N)NCCCC(=O)O")
-        # The polyfunctional assembly produces a name containing "guanidino"
-        assert "guanidino" in result
+        # (the Blue Book-34268): 'carbamimidoylamino (preferred prefix)'; 7. Prefixes (g) (:1700) 'guanidino' is no longer acceptable in PINs
+        assert result == "4-(carbamimidoylamino)butanoic acid"
+
+    def test_diaminomethylidene_tautomer_prefix(self):
+        """(H2N)2C=N- takes '(diaminomethylidene)amino (preferred prefix)'
+        (the Blue Book-34272); '4-[(diaminomethylidene)amino]butanoic acid (PIN)'
+        (:34282) verbatim."""
+        assert name_compound("NC(N)=NCCCC(=O)O") == "4-[(diaminomethylidene)amino]butanoic acid"
 
 
 # ---------------------------------------------------------------------------

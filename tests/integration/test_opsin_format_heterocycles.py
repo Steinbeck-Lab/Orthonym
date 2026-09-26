@@ -118,7 +118,11 @@ class TestRetainedHeterocycleNames:
         # 5-membered aromatic heterocycles
         ("c1ccoc1", "furan"),
         ("c1ccsc1", "thiophene"),
-        ("c1cc[nH]c1", "pyrrole"),
+        # PIN per R1: "in preferred IUPAC names indicated hydrogen must always be
+        # cited when present in the corresponding structure" the Blue Book; "1H-pyrrole
+        # (PIN)":24645; OPSIN RT exact (TRIAGE.csv; re-checked in Task 7/8). The test id is
+        # now 'c1cc[nH]c1-1H-pyrrole'.
+        ("c1cc[nH]c1", "1H-pyrrole"),
         # Saturated heterocycles
         ("C1CCOCC1", "oxane"),
         ("C1CCNCC1", "piperidine"),

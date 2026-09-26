@@ -56,7 +56,9 @@ class TestP6461ThioneKetoneParent:
     def test_di_c_imidazolyl_methanethione(self):
         # imidazole attached via ring CARBON (position 2) -> substitutive works.
         smi = "S=C(c1nccn1C)c1nccn1C"
-        assert name_compound(smi) == "di(1-methylimidazol-2-yl)methanethione"
+        # 2026-09-25 (pre-existing-failures plan, Task 5) change-asserted-value:
+        # cites indicated hydrogen for the mancude parent whatever sits on the pyrrole-type atom; a substituent group keeps it: "(1H-indol-1-yl)acetic acid (PIN)" (the Blue Book). OPSIN RT exact.
+        assert name_compound(smi) == "di(1-methyl-1H-imidazol-2-yl)methanethione"
 
     def test_diphenylmethanone(self):
         assert name_compound("O=C(c1ccccc1)c1ccccc1") == "diphenylmethanone"

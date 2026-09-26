@@ -99,6 +99,24 @@ def pop_scope(token):
         _cache_var.reset(token)
 
 
+def push_sandbox():
+    """Open a throwaway COPY of the current scope for a speculative computation.
+
+    Reads still hit what the enclosing scope already holds; writes land in the
+    copy and are discarded by:func:`pop_sandbox`, so the enclosing naming can
+    never be served a value the speculation computed in its own context. With no
+    scope open, nothing changes (no caching, as before). Always returns a token
+    for:func:`pop_sandbox`.
+    """
+    cur = _cache_var.get()
+    return _cache_var.set(dict(cur) if cur is not None else None)
+
+
+def pop_sandbox(token):
+    """Discard the sandbox opened by the matching:func:`push_sandbox`."""
+    _cache_var.reset(token)
+
+
 # Scope-bound SIDE store (a performance pass a lever verify-honesty). The nested replay-memo
 # needs to keep per-key metadata (the provenance vars a call touched + the budget
 # units it charged) that is internal notes-RELATIVE, so it must NOT go through

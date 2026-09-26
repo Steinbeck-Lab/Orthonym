@@ -248,6 +248,48 @@ class TestAcidToAcyl:
         assert _acid_to_acyl("butanoic acid") == "butanoyl"
 
 
+class TestAcidToAcylOylEndings:
+    """ fix a performance pass: '-amic' / '-imidic' acids take '-oyl', never '-yl'.
+
+    Blue Book 2013, prefix list: "H2N-CO- carbamoyl (preferred
+    prefix)" (the Blue Book); "H2N-C(=NH)- carbamimidoyl (preferred
+    prefix)" (:17772); "oxamoyl (preferred prefix)" (:17784); "sulfamoyl
+    (preselected prefix)" (:31330); "butanimidoyl (PIN)" (:40610).
+    The shared converter used to strip '-ic' to '-yl' ('carbamyl').
+    """
+
+    @pytest.mark.parametrize("acid,acyl", [
+        ("carbamic acid", "carbamoyl"),
+        ("N-methylcarbamic acid", "N-methylcarbamoyl"),
+        ("N-(4,6-dimethylpyrimidin-2-yl)carbamic acid",
+         "N-(4,6-dimethylpyrimidin-2-yl)carbamoyl"),
+        ("sulfamic acid", "sulfamoyl"),
+        ("oxamic acid", "oxamoyl"),
+        ("butanimidic acid", "butanimidoyl"),
+        ("carbamimidic acid", "carbamimidoyl"),
+    ])
+    def test_shared_and_lipid_converters(self, acid, acyl):
+        from orthonym.rules.lipids import _acid_to_acyl as lipid_acid_to_acyl
+        from orthonym.rules.radicals import _acyl_from_acid_name
+        assert _acid_to_acyl(acid) == acyl
+        assert lipid_acid_to_acyl(acid) == acyl
+        assert _acyl_from_acid_name(acid) == acyl
+
+    @pytest.mark.parametrize("smiles", [
+        "COC(=O)c1ccccc1S(=O)(=O)NC(=O)N(C)c1nc(C)nc(OC)n1",
+        "COC(=O)c1ccccc1S(=O)(=O)NC(=O)Nc1nc(C)cc(C)n1",
+    ])
+    def test_sulfonylurea_esters_spell_carbamoyl(self, smiles):
+        """The two PIN-tier ester names of the report carried
+        '...-N-methylcarbamyl]-2-sulfamoylbenzoate'. OPSIN 2.9.0 full-InChIKey
+        round trip of the new names: exact (fix a performance pass)."""
+        from orthonym import name_compound
+        from tests.support.rt_assert import assert_full_rt
+        name = name_compound(smiles)
+        assert "carbamyl" not in name and "carbamoyl]-2-sulfamoylbenzoate" in name, name
+        assert_full_rt(name, smiles)
+
+
 # ============================================================================
 # Amine-to-prefix conversion tests
 # ============================================================================

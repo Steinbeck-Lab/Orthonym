@@ -39,13 +39,26 @@ def _is_refused(smiles: str) -> bool:
 # NOTE (Phase G1, DD7): the three single-bridge naphthalene systems
 # G0 refused (benzonorbornadiene / 1,4-epoxy- / 1,4-ethano-) are now named
 # CORRECTLY by the constructor (see tests/unit/test_g1_bridged_fused.py),
-# so they left the fail-closed family. The polyspiro spirobi-indane stays refused
-# (its spirobi[indane] PIN is a Phase-G4 build; is_spiro_system rejects
-# polycyclic-component spiro, so it still routes to von Baeyer and the aromaticity
-# veto fires).
+# so they left the fail-closed family.
+#
+# Task 12 fix a performance pass (wp6-tests; t12-research rest-of-suite item 32, user decision
+# D-b): the spirobi-indane (DD7-spiro-1) left the family too -- it is now named
+# "1',2,3,3'-tetrahydro-1,2'-spirobi[indene]" (pin_verified, OPSIN 2.9.0
+# full-InChIKey exact; the Blue Book, component indicated hydrogen not
+# cited, cf. '1,1'-spirobi[indene] (PIN)':10164), asserted below. The veto keeps
+# two witnesses that still reach it (trace 2026-09-26, fresh process per input:
+# vonbaeyer_cage_has_aromaticity returns True on the naming path, and the default
+# path refuses with UNSUPPORTED_RING_SYSTEM): triptycene (PIN
+# '9,10-dihydro-9,10-[1,2]benzenoanthracene', a bridged fused name, not
+# built) and the benzo-fused bicyclo[2.2.2]octadiene. Best-effort names both
+# RT-exact (von Baeyer), so breadth holds.
 AROMATIC_IN_CAGE = [
-    "C1Cc2ccccc2C13Cc1ccccc1C3",  # spirobi-indane (DD7-spiro-1; polyspiro -> G4)
+    "c1ccc2c(c1)C1c3ccccc3C2c2ccccc21",  # triptycene
+    "C1=CC2CCC1c1ccccc12",               # benzo-fused bicyclo[2.2.2]octa-2,5-diene
 ]
+
+SPIROBI_INDANE = "C1Cc2ccccc2C13Cc1ccccc1C3"   # DD7-spiro-1
+SPIROBI_INDANE_NAME = "1',2,3,3'-tetrahydro-1,2'-spirobi[indene]"
 
 
 @pytest.mark.parametrize("smiles", AROMATIC_IN_CAGE)
@@ -76,6 +89,21 @@ def test_aromatic_in_cage_is_deterministic(smiles):
     names.add(namer(Chem.MolToSmiles(mol)))  # canonical
     assert len(names) == 1, f"{smiles} non-deterministic: {names}"
     assert is_failure_name(next(iter(names)))
+
+
+def test_spirobi_indane_is_named_exactly_and_deterministically():
+    """DD7-spiro-1 left the fail-closed family (D-b): every spelling gives one name,
+    and that name round-trips to the input's full InChIKey. This replaces the three
+    refusal assertions it had (test_aromatic_in_cage_*[C1Cc2ccccc2C13Cc1ccccc1C3])."""
+    from tests.support.jars import jar_or_skip
+    from tests.support.rt_assert import assert_full_rt
+    namer = Orthonym().name
+    mol = Chem.MolFromSmiles(SPIROBI_INDANE)
+    names = {namer(Chem.MolToSmiles(mol, doRandom=True)) for _ in range(4)}
+    names.add(namer(Chem.MolToSmiles(mol)))
+    assert names == {SPIROBI_INDANE_NAME}, names
+    jar_or_skip()
+    assert_full_rt(SPIROBI_INDANE_NAME, SPIROBI_INDANE)
 
 
 # --------------------------------------------------------------------------- #
@@ -158,19 +186,43 @@ def test_metal_species_do_not_crash(smiles):
         pytest.fail(f"{smiles} crashed with {type(exc).__name__}: {exc}")
 
 
-def test_general_acyclic_empty_pool_returns_none_not_crash():
-    """The direct.name API must not raise a raw AttributeError when the
-    general_acyclic catch-all builds no candidate (the masked crash).
+def test_general_acyclic_empty_pool_returns_none_not_crash(monkeypatch):
+    """The general_acyclic catch-all must return None, not raise a raw
+    AttributeError, when its candidate pool stays empty (the masked crash).
 
-    .name returns the bare failure signal (empty string) — the descriptive
-    'mercury compound (not supported)' wrapper is applied by name_compound;
-    what matters here is that no exception escapes."""
+    Task 12 fix a performance pass (wp6-tests; t12-research rest-of-suite item 33): the old
+    witness, the Hg + Sb gold species, no longer reaches that branch -- an earlier
+    producer now names it '[4-(diphenylstibanyl)phenyl](phenyl)mercury' (OPSIN 2.9.0
+    full-InChIKey exact; D-b), and no other input was found that does (a line
+    trace, fresh process, over 8 metal/noble-gas candidates: 0 hits on the
+    empty-pool return; the tracer itself was validated on 3 inputs that reach the
+    check). So the branch is exercised directly: a pool whose best is None, as
+    when RATIO_REJECT_FLOOR refuses the only candidate. The molecule-level half
+    keeps the old witness's no-crash intent and asserts its exact round trip."""
+    from tests.support.jars import jar_or_skip
+    from tests.support.rt_assert import assert_full_rt
     smiles = "c1ccc(cc1)[Hg]c1ccc(cc1)[Sb](c1ccccc1)c1ccccc1"
     out = Orthonym().name(smiles)  # raise_on_limit=False -> must return a string, no crash
     assert isinstance(out, str)
-    assert is_failure_name(out)  # empty / 'unknown' — a failure signal, not a wrong name
-    # name_compound applies the descriptive fallback wrapper
-    assert "not supported" in name_compound(smiles)
+    jar_or_skip()
+    assert_full_rt(out, smiles)
+
+    import orthonym.assembly.candidate_pool as _cp
+    from orthonym.assembly.handlers.general_acyclic import name_general_acyclic
+
+    class _EmptyPool:
+        def add(self, *a, **k):
+            return None          # every candidate refused
+
+        def best(self):
+            return None
+
+    namer = Orthonym(style="pin")
+    mol = Chem.MolFromSmiles("CCCC")
+    features = namer._perceive(mol, "CCCC", Chem.CanonSmiles("CCCC"))
+    namer._classify(features)
+    monkeypatch.setattr(_cp, "get_current_pool", lambda: _EmptyPool())
+    assert name_general_acyclic(features, mol=features.mol, style="pin") is None
 
 
 # --------------------------------------------------------------------------- #
@@ -179,7 +231,7 @@ def test_general_acyclic_empty_pool_returns_none_not_crash():
 PROTECT = {
     "C1C2CC3CC1CC(C2)C3": "adamantane",
     "C1CCC2CCCCC2C1": "decahydronaphthalene",
-    "C1CC2CCC1C2": "norbornane",
+    "C1CC2CCC1C2": "bicyclo[2.2.1]heptane",  # R11 (2026-09-25, pre-existing-failures plan, Task 5)::9881, only adamantane/cubane are retained; "bicyclo[2.2.1]heptane (PIN)":2038
     "C1CC2CC1C=C2": "bicyclo[2.2.1]hept-2-ene",
     "c1ccc2ncccc2c1": "quinoline",
     "Cc1ccc2ccccc2n1": "2-methylquinoline",

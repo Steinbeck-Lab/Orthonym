@@ -102,7 +102,7 @@ class TestProductionEndToEnd:
         ("c1ccc(-c2cccc3ccccc23)cc1", "1-phenylnaphthalene"),
         ("c1ccc2ccccc2c1", "naphthalene"),
         ("C1Cc2cccc3cccc1c23", "acenaphthene"),
-        ("c1ccc2c(c1)Cc1ccccc12", "fluorene"),
+        ("c1ccc2c(c1)Cc1ccccc12", "9H-fluorene"),  # (the Blue Book) 'the PIN is 9H-fluorene'
         ("c1ccc2c(c1)oc1ccccc12", "dibenzo[b,d]furan"),
         ("c1ccc2c(c1)sc1ccccc12", "dibenzo[b,d]thiophene"),
     ])

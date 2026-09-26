@@ -374,6 +374,21 @@ _HETEROATOM_SENIORITY: Dict[str, int] = {
 }
 
 
+def _indicated_h_ring_atom(mol, idx: int) -> bool:
+    """Is this aromatic ring heteroatom the mancude ring's indicated-hydrogen
+    (pyrrole-type) position? An NH, OR a neutral three-connected ring N whose
+    hydrogen is substituted or replaced by the free valence. cites
+    indicated hydrogen for the mancude parent whatever sits on that atom
+    ('1-methyl-1H-pyrrole'), and a substituent group keeps it: '(1H-indol-1-yl)
+    acetic acid (PIN)' (the Blue Book). Keying on an actual H dropped it
+    from every N-substituted or N-attached azolyl ('pyrazol-1-yl',
+    '2,5-dimethylpyrazol-3-yl' for 1,3-dimethyl-1H-pyrazol-5-yl)."""
+    a = mol.GetAtomWithIdx(idx)
+    if a.GetTotalNumHs() >= 1:
+        return True
+    return a.GetSymbol() == 'N' and a.GetFormalCharge() == 0 and a.GetDegree() == 3
+
+
 def pin_heteroaryl_substituent_name(
     mol,
     ring_atoms: Tuple[int, ...],
@@ -483,8 +498,7 @@ def pin_heteroaryl_substituent_name(
     # --- Indicated-hydrogen atom (the ring NH, if any; AROMATIC only) --------
     if _is_aromatic_ring:
         indicated_h_atoms = [
-            i for i in het_atoms
-            if mol.GetAtomWithIdx(i).GetTotalNumHs() >= 1
+            i for i in het_atoms if _indicated_h_ring_atom(mol, i)
         ]
         if len(indicated_h_atoms) > 1:
             return None  # ambiguous indicated H; do not guess
@@ -626,10 +640,10 @@ def _decorated_heteroaryl_substituent_name(
     if stem is None and not is_carbocyclic:
         return None
 
-    # Indicated hydrogen: a ring NH (only when an actual H is present — an
-    # N-substituted position carries no indicated H and no nH prefix).
-    ih_candidates = [i for i in het_atoms
-                     if mol.GetAtomWithIdx(i).GetTotalNumHs() >= 1]
+    # Indicated hydrogen: the ring's pyrrole-type heteroatom (see
+    # _indicated_h_ring_atom); it takes the low locant before the free valence
+    #: Cc1cc(-R)n(C)n1 is '1,3-dimethyl-1H-pyrazol-5-yl'.
+    ih_candidates = [i for i in het_atoms if _indicated_h_ring_atom(mol, i)]
     if len(ih_candidates) > 1:
         return None  # ambiguous indicated H; do not guess
     indicated_h_atom = ih_candidates[0] if ih_candidates else None

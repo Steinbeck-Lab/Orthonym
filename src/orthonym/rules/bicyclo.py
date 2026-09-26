@@ -609,6 +609,33 @@ def get_bicyclo_numbering(mol, suffix_ring_atoms: Optional[Set[int]] = None) -> 
         )
         return tuple(loc for _rank, loc in ranked)
 
+    # (the Blue Book, '## HETEROCYCLIC POLYALICYCLIC PARENT
+    # HYDRIDES HAVING HETEROATOMS WITH NONSTANDARD BONDING NUMBERS'): "When there is
+    # a choice for numbering, low locants are assigned to heteroatoms with
+    # nonstandard bonding numbers expressed by the λn symbol in order of decreasing
+    # numerical value of the bonding number; for example, in the case of arsenic,
+    # the lower locant is given to a λ5 arsenic atom" -- '2λ5,3-diarsabicyclo
+    # [2.2.1]heptane (PIN)' (:9877). This is part of the PARENT HYDRIDE's own
+    # numbering (a), fixed numbering), so it ranks right after the
+    # heteroatom tiers and before the suffix, as (:8034) orders the
+    # acyclic analogue ('Low numbering is first given to the heteroatoms... When
+    # there is a choice, lower locants are given to a higher nonstandard bonding
+    # number'; skeletal_replacement._orient_for_lowest_locants). Without it the
+    # numbering tie fell to the input order, then to canonical ranks,
+    # which gave '2,3λ5-'. The λ read is the one the name cites (vb_lambda_for_atom).
+    from .ring_replacement import vb_lambda_for_atom
+
+    _ring_lambda = {}
+    for i in hetero:
+        _lam = vb_lambda_for_atom(mol, i)
+        if _lam is not None:
+            _ring_lambda[i] = _lam
+
+    def _lambda_vector(a2l):
+        # Sorted (locant, -bonding number): the lowest locants to the λ atoms as a
+        # set, then the higher bonding number at the lower locant (λ6 before λ4).
+        return sorted((a2l[i], -lam) for i, lam in _ring_lambda.items() if i in a2l)
+
     def _key_lists(a2l):
         het = sorted(a2l[i] for i in hetero if i in a2l)
         suf = sorted(a2l[i] for i in suffix_set if i in a2l)
@@ -659,6 +686,11 @@ def get_bicyclo_numbering(mol, suffix_ring_atoms: Optional[Set[int]] = None) -> 
         vx, vy = _sen_vector(x), _sen_vector(y)
         if vx != vy:
             return -1 if vx < vy else 1
+        # Tier 1b: λ heteroatoms, part of the parent hydride numbering.
+        if _ring_lambda:
+            lx, ly = _lambda_vector(x), _lambda_vector(y)
+            if lx != ly:
+                return -1 if lx < ly else 1
         # Tier 2: suffix locant SET.
         c = compare_locant_sets(kx[1], ky[1])
         if c != 0:
@@ -698,7 +730,60 @@ def get_bicyclo_numbering(mol, suffix_ring_atoms: Optional[Set[int]] = None) -> 
         return 0
 
     candidates.sort(key=cmp_to_key(_cmp))
+    tied = [c for c in candidates if _cmp(c, candidates[0]) == 0]
+    if len(tied) > 1:
+        # Every tier above ties. The first candidate (the legacy numbering, built
+        # from the input atom order) used to win, so one molecule got two names by
+        # SMILES spelling: '(1S,2R,3S,4S)-' and '(1S,2S,3R,4S)-bicyclo[2.2.1]-
+        # heptane-2,3-diol'. Finish the ladder instead: (g) the prefix
+        # cited first (the Blue Book; only when every prefix can be named),
+        # (j) the CIP stereodescriptors with their locants (:3346), then the
+        # canonical atom ranks, which decide nothing the Blue Book decides and
+        # only stop the atom order from deciding.
+        tied.sort(key=_bicyclo_tie_key(mol, ring_atoms, sub_bearing, suffix_set,
+                                       ring_double_bonds))
+        return tied[0]
     return candidates[0]
+
+
+def _bicyclo_tie_key(mol, ring_atoms, sub_bearing, suffix_set, ring_double_bonds):
+    """Sort key over fully tied von Baeyer numberings: (g), (j), canon."""
+    from .heterocycles import _ring_prefix_names
+    prefix_names = _ring_prefix_names(mol, set(ring_atoms), sub_bearing, suffix_set)
+    has_stereo = (any(a.GetChiralTag() != Chem.ChiralType.CHI_UNSPECIFIED
+                      for a in mol.GetAtoms())
+                  or any(b.GetStereo() != Chem.BondStereo.STEREONONE
+                         for b in mol.GetBonds()))
+    if has_stereo:
+        try:
+            from ..perception.stereo import assign_stereochemistry
+            assign_stereochemistry(mol)
+        except Exception:
+            has_stereo = False
+    ranks = list(Chem.CanonicalRankAtoms(mol, breakTies=True))
+
+    def key(a2l):
+        canon = tuple(ranks[i] for i in sorted(a2l, key=a2l.get))
+        if prefix_names is None:
+            # A prefix could not be named: (g) is unknown, so (j) must not decide
+            # a tie (g) might break; the canonical ranks alone keep determinism.
+            return ((), (), canon)
+        g_key = tuple(sorted((name, a2l[idx])
+                             for idx, names in prefix_names.items()
+                             if idx in a2l for name in names))
+        j_key = ()
+        if has_stereo:
+            from ..assembly.naming_utils import cip_locant_rank_key
+            items = [(a2l[i], mol.GetAtomWithIdx(i).GetProp('_CIPCode'))
+                     for i in a2l if mol.GetAtomWithIdx(i).HasProp('_CIPCode')]
+            for a, b in ring_double_bonds:
+                bond = mol.GetBondBetweenAtoms(a, b)
+                if a in a2l and b in a2l and bond is not None and bond.HasProp('_CIPCode'):
+                    items.append((min(a2l[a], a2l[b]), bond.GetProp('_CIPCode')))
+            j_key = cip_locant_rank_key(items)
+        return (g_key, j_key, canon)
+
+    return key
 
 
 def _legacy_bicyclo_numbering(mol) -> Optional[Dict[int, int]]:

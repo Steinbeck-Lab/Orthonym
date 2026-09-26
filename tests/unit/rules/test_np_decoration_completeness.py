@@ -29,11 +29,25 @@ pytestmark = pytest.mark.unit
     # row 93
     "C=C(CC[C@@H](C)[C@H]1CC[C@H]2[C@@H]3C(=O)C[C@H]4[C@](C)(C(=O)O)[C@@H](O)"
     "CC[C@]4(C)C3=C[C@@H](OC(C)=O)[C@]12C)C(C)C",
-    # canary call 182 (free base; the salt names the same component)
-    "CN1[C@@H]2CC[C@H]1C[C@@H](OC(=O)c1c[nH]c3ccccc13)C2",
 ])
 def test_np_scaffold_declines_an_unnameable_decoration(smiles):
     assert name_natural_product(Chem.MolFromSmiles(smiles)) is None
+
+
+# fix a performance pass (wp6-tests), change-asserted-value: canary call 182 (tropisetron, free
+# base) moved out of the 'declines' list. 28e1d520b (esters.py: name_ester names a fused
+# ring acid through name_polyfunctional_ester_via_acid) lets the NP producer name its
+# indole-3-carboxylate, so it now returns the complete name instead of None (archive
+# bisect, t12-research rest-of-suite item 29). What the old assertion protected is
+# (the Blue Book, every substituent is cited): the producer may decline, or return
+# the complete, verified name -- never the bare 'tropane' or a 'nonanoate'.
+def test_np_scaffold_names_tropisetron_completely_or_declines():
+    from orthonym.namer import _pseudoasymmetric_name_verified
+    smiles = "CN1[C@@H]2CC[C@H]1C[C@@H](OC(=O)c1c[nH]c3ccccc13)C2"
+    np = name_natural_product(Chem.MolFromSmiles(smiles))
+    assert np is None or (
+        np == "(1R,3r,5S)-tropan-3-yl 1H-indole-3-carboxylate"
+        and _pseudoasymmetric_name_verified(np, smiles)), np
 
 
 @pytest.mark.parametrize("smiles,expected", [

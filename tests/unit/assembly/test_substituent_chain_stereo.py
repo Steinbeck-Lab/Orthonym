@@ -65,15 +65,20 @@ def _find_opsin_jar():
 
 
 @pytest.fixture
-def production_gate(monkeypatch):
+def production_gate(opsin_gate):
     """Re-enable the production OPSIN validity gate; the suite's autouse
     fixture disables it. Without the gate this witness ships an EARLIER,
     wrong-molecule candidate ('6-hexyloxy...15-octyl...') that exists to
-    suppress, so the tier under test is never reached. Mirrors the fixture in
-    ``test_v26_p7_stereo_failclosed.py``."""
+    suppress, so the tier under test is never reached.
+
+    It uses the conftest ``opsin_gate`` fixture (the supported form, which also
+    skips -- or fails under ORTHONYM_REQUIRE_JARS=1 -- when the jar is absent)
+    instead of a hand-rolled setattr, which the ratchet in
+    tests/unit/test_opsin_gate_test_harness.py refuses in new files (Task 12 fix
+    a performance pass, wp6-tests; TRIAGE.md ' outcome')."""
     if not shutil.which("java") or _find_opsin_jar() is None:
         pytest.skip("OPSIN/Java not available for production-gate semantics")
-    monkeypatch.setattr(_namer_mod, "_DISABLE_VALIDITY_GATE", False)
+    assert _namer_mod._DISABLE_VALIDITY_GATE is False
 
 
 def _mol(smiles):

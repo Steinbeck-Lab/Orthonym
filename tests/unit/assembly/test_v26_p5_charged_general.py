@@ -20,8 +20,10 @@ split 2026-08-21):
      + and EMIT at the default pin tier.
   - PIN_ABSTAIN_CASES: pin (default) ABSTAINS; ``complete`` emits an
     OPSIN-round-tripping charged name.
-  - FAIL-CLOSED cases: ``complete`` abstains (never a wrong / charge-dropped
+  - FAIL-CLOSED cases: the engine abstains (never a wrong / charge-dropped
     name) -- charge on a substituent, a radical-cation, an unexpressible charge.
+    Since 2026-09-26 (decision D-b) the full ``complete`` tier names the first
+    two through another producer, RT-exact; it still abstains on the third.
 
 Harness mirrors test_v26_p3_failclosed_routing: ``conftest`` force-disables the
 production gate for the whole suite; the full-namer cases here re-enable
@@ -41,6 +43,7 @@ from orthonym.validation import binding_spine as bs
 from orthonym.validation.binding_spine import BindingSpine, verify_spine
 from orthonym.validation.e1_certificate import verify_certificate
 from tests.support.jars import jar_or_none
+from tests.support.rt_assert import assert_full_rt
 
 
 pytestmark = pytest.mark.unit
@@ -110,12 +113,29 @@ ENGINE_DIRECT_CASES = [
     ("C[n+]1cc[n+](C)cc1", "1,4-dimethyl-1,4-diazine-1,4-diium"),
 ]
 
-# FAIL-CLOSED: complete must ABSTAIN (never a wrong / charge-dropped name).
+# FAIL-CLOSED at the ENGINE (``name_general`` returns None; never a wrong /
+# charge-dropped name).
 FAILCLOSED_CASES = [
     "[CH2+]Cc1ccccc1",       # charge on a substituent carbon (parent = ring)
-    "[CH2+]C[CH2]",          # radical-cation (radical refusal stays)
+    "[CH2+]C[CH2]",          # radical-cation (the engine's radical refusal stays)
     "[SiH3][CH-]c1ccccc1",   # charge not expressible as a parent suffix
 ]
+
+# The full complete tier still abstains on this one.
+COMPLETE_FAILCLOSED_CASES = ["[SiH3][CH-]c1ccccc1"]
+
+# The engine still refuses these two, but the full complete tier now NAMES them
+# through another producer. Pre-existing-failures plan, Task 9 (TRIAGE.csv rows
+# 120, 121; they were test_complete_fails_closed[...]), user decision D-b (plan
+# 'User decisions (answered 2026-09-24)'): "D-b -> the policy wins: where a
+# wider-tier name round-trips EXACTLY, change the test to assert an exact
+# round-trip." Both names are OPSIN 2.9.0 RT exact (full InChIKey; the radical
+# with OPSIN -r): 'propan-3-ylium-1-yl' (spelling as "Radical ions derived
+# from parent hydrides", the Blue Book) and
+# '1-(ethan-2-ylium-1-yl)cyclohexa-1,3,5-triene' (RT exact, but benzene is
+# spelled as cyclohexatriene: a best-effort name, not a PIN). The test asserts
+# the round trip, not those spellings.
+COMPLETE_RT_CASES = ["[CH2+]Cc1ccccc1", "[CH2+]C[CH2]"]
 
 # Round-trip the names the full namer actually ships.
 _RT_NAMES = dict(FULL_NAMER_CASES)
@@ -324,12 +344,20 @@ def test_complete_emits(smiles, expected, production_gate):
     assert out == expected, f"{smiles}: complete gave {out!r} != {expected!r}"
 
 
-@pytest.mark.parametrize("smiles", FAILCLOSED_CASES)
+@pytest.mark.parametrize("smiles", COMPLETE_FAILCLOSED_CASES)
 def test_complete_fails_closed(smiles, production_gate):
     comp = Orthonym(style="pin", general_fallback=True,
                      allow_aromatic_general=True)
     out = comp.name(Chem.CanonSmiles(smiles))
     assert is_failure_name(out), f"{smiles}: expected abstention, got {out!r}"
+
+
+@pytest.mark.parametrize("smiles", COMPLETE_RT_CASES)
+def test_complete_names_rt_exact(smiles, production_gate):
+    comp = Orthonym(style="pin", general_fallback=True,
+                     allow_aromatic_general=True)
+    canon = Chem.CanonSmiles(smiles)
+    assert_full_rt(comp.name(canon), canon, what="complete tier: ")
 
 
 # --------------------------------------------------------------------------

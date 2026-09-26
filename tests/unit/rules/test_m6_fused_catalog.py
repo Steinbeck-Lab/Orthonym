@@ -44,7 +44,8 @@ from orthonym.data.fused_heterocycles import match_fused_heterocycle_core
         # per the existing engine convention once the ring is substituted
         # only in the way that keeps 9H unambiguous -- OPSIN round-trip is
         # the authority checked below, not this string).
-        ("C1c2ccccc2-c2ccccc21", "fluorene"),
+        # (the Blue Book-11400): '(9H-isomer shown; the PIN is 9H-fluorene)'
+        ("C1c2ccccc2-c2ccccc21", "9H-fluorene"),
         # 3,4-dihydro-2H-1,4-benzoxazine: bare parent.
         ("C1COc2ccccc2N1", "3,4-dihydro-2H-1,4-benzoxazine"),
         # pyrazolo[1,5-a]pyrazine: bare parent and a methyl derivative

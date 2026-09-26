@@ -22,8 +22,9 @@ def test_tail21_hexitol_trimethacrylate_names_and_round_trips():
     smi = ("CC(=C)C(=O)OCC(COCC(C(C(C(COCC(COC(=O)C(=C)C)O)OCC("
            "COC(=O)C(=C)C)O)O)O)O)O")
     name = name_acyclic_polyol_polyester(Chem.MolFromSmiles(smi))
+    # 2026-09-25 (pre-existing-failures plan, Task 5) change-asserted-value: (a compound organyl is cited inside its own marks, the composing suffix outside: "4-[(3-ethoxy-3-oxopropanoyl)oxy]phenyl" the Blue Book, "4-[(4-carboxycyclohexyl)oxy]":23198) and nesting order "{[({})]}" (the Blue Book). OPSIN RT exact.
     assert name == (
-        "1,5,6-tris(2-hydroxy-3-(2-methylprop-2-enoyloxy)propoxy)"
+        "1,5,6-tris{2-hydroxy-3-[(2-methylprop-2-enoyl)oxy]propoxy}"
         "hexane-2,3,4-triol")
     assert _full_rt(smi, name)
 

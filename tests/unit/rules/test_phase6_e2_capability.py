@@ -180,7 +180,10 @@ def test_task8_name_integration_and_rt(namer):
     smi = "OC(=O)c1ccc(CCC(=O)NCCS)cc1"
     assert _key14(smi) == "CTUBSZMLRVDFKF"
     name = namer.name(smi)
-    assert name == "4-{3-[(2-sulfanylethyl)amino]-3-oxopropyl}benzoic acid", name
+    # 2026-09-25 (pre-existing-failures plan, Task 5) change-asserted-value: a prefix "is considered to begin with the first letter of its complete name" (the Blue Book): 'oxo' (o) is cited before
+    # '[(2-sulfanylethyl)amino]' (s), and (g) (:3307) then gives oxo the lower
+    # locant -- here both sit on C3. OPSIN RT exact.
+    assert name == "4-{3-oxo-3-[(2-sulfanylethyl)amino]propyl}benzoic acid", name
     assert _full_rt(smi, name), name
 
 

@@ -888,7 +888,13 @@ def _alpha_key(prefix: str) -> str:
     # left Greek out, so a sugar prefix sorted by 'd...' (β-D-) vs 'betad...' (ASCII):
     # the same substituent alphabetised differently by spelling (the greek-emit
     # regression). strip_alphanumerical_noise removes exactly what bars.
-    return re.sub(r"[^a-z]", "", strip_alphanumerical_noise(remainder).lower())
+    # The letters are tier-1 letters (naming_utils._key_letters): an
+    # italic 'tert'/'sec' INSIDE a compound prefix ('{2-[(tert-butoxy...)amino]
+    #...propyl}') and an isolated locant letter are not counted, exactly as in
+    # alpha_sort_key / prefix_citation_sort_key -- the Blue Book cites
+    # '2-(tert-butylimino)-3-methyl-...butanoic acid (PIN)', 'b' before 'm'.
+    from .naming_utils import _key_letters
+    return _key_letters(strip_alphanumerical_noise(remainder).lower())
 
 
 def _is_complex_prefix(name: str) -> bool:
@@ -935,14 +941,21 @@ def _mult_prefix(n: int, name: str) -> Optional[str]:
     # primitive (-> [ -> { instead of a raw f"({name})", which produced a
     # double `((...)...)` when the name already held an inner mark (e.g. a
     # stereo-led substituent '(7S)-7-hydroxyoctyl').
-    from .naming_utils import apply_enclosing_marks
+    from .naming_utils import apply_enclosing_marks, _is_fully_enclosed
+
+    def _enclose(nm: str) -> str:
+        # A prefix that already arrives in its own marks ('{2-[...]ethoxy}', a
+        # composed prefix enclosed by its producer, is not wrapped a
+        # second time: '({2-[...]ethoxy})' is a mark directly around a mark.
+        return nm if _is_fully_enclosed(nm) else apply_enclosing_marks(nm, -1)
+
     if n == 1:
-        return apply_enclosing_marks(name, -1) if _is_complex_prefix(name) else name
+        return _enclose(name) if _is_complex_prefix(name) else name
     table = _MULT_COMPLEX if _is_complex_prefix(name) else _MULT_SIMPLE
     if n not in table:
         return None
     if table is _MULT_COMPLEX:
-        return f"{table[n]}{apply_enclosing_marks(name, -1)}"
+        return f"{table[n]}{_enclose(name)}"
     # (b)/(d) second leg: 'di-tert-butyl', never 'ditert-butyl'.
     from .naming_utils import multiplier_needs_hyphen
     return f"{table[n]}{'-' if multiplier_needs_hyphen(name) else ''}{name}"
@@ -984,7 +997,32 @@ def _apply_parent_stereo(name: str, mol, locant_map) -> str:
     """
     from .fragment_naming import is_top_level_naming
     if is_top_level_naming():
-        from ..rules.stereochemistry import inject_stereo_reanchored_rt_gated
+        from ..rules.stereochemistry import (
+            _STEREO_PREFIX_RE,
+            inject_stereo_reanchored_rt_gated,
+            needs_stereo_injection,
+        )
+        # The shared injector skips a name that already SHOWS a descriptor
+        # anywhere (needs_stereo_injection, patterns) -- right for a name
+        # that is complete, wrong for one whose only descriptors belong to a
+        # SUBSTITUENT: '6-(beta-D-glucopyranosyloxy)-...-15-{(1S)-1-[(2S)-...]
+        # ethyl}pentacyclo[...]...' carries the glycosyl and carrier
+        # configuration but not the parent's nine centres: every
+        # stereogenic centre is specified). This path owns the parent numbering,
+        # so when the parent block is missing and the injector declined, offer
+        # the parent block here and keep it only if the whole name round-trips
+        # full-InChIKey exact (the contributor guide a project rule); otherwise the shared path
+        # below decides exactly as before.
+        prefix = _stereo_prefix(mol, locant_map)
+        if (prefix and not _STEREO_PREFIX_RE.match(name)
+                and not needs_stereo_injection(mol, name)):
+            candidate = prefix + name
+            try:
+                from ..validation.opsin_roundtrip import opsin_roundtrip_check
+                if opsin_roundtrip_check(Chem.MolToSmiles(mol), candidate)["passed"]:
+                    return candidate
+            except Exception:
+                pass
         return inject_stereo_reanchored_rt_gated(name, mol, locant_map)
     return _stereo_prefix(mol, locant_map) + name
 
@@ -2164,13 +2202,36 @@ def name_general_monocycle(
         frag_bindings.append(TokenBinding(tuple(sorted(frag)), prefix,
                                           'prefix'))
 
+    # (c) (the Blue Book): "The locant '1' is omitted:...
+    # (c) in monosubstituted homogeneous monocyclic rings" -- 'bromobenzene (PIN)'
+    # (:2919), '[(1R)-1-chloropropyl]benzene (PIN)' (:44668). Decided by the shared
+    # licence checker over the PARENT HYDRIDE (ring + unsaturation,
+    # substituents stripped), exactly as the composer does (composer.py -06):
+    # one prefix instance, no suffix, no charge, an all-carbon ring whose every
+    # substitutable position is equivalent. Anything else keeps its locants
+    # (DENY by default,:2869).
+    _omit_ring_locant = False
+    if (len(subs) == 1 and not suffix_core and not has_hetero
+            and Chem.GetFormalCharge(mol) == 0 and not _has_ionic_centres(mol)):
+        from .naming_utils import (is_only_one_substitutable_position,
+                                   should_omit_locant_one)
+        try:
+            _hydride = Chem.MolFromSmiles(
+                Chem.MolFragmentToSmiles(mol, atomsToUse=sorted(ring_set)))
+        except Exception:  # noqa: BLE001 -- fail closed: keep the locant
+            _hydride = None
+        _omit_ring_locant = _hydride is not None and should_omit_locant_one(
+            context="prefix", is_ring=True, is_heterocyclic=False,
+            is_monosubstituted=is_only_one_substitutable_position(_hydride))
+
     prefix_parts = []
     for prefix in sorted(groups, key=_alpha_key):
         locs = sorted(groups[prefix])
         text = _mult_prefix(len(locs), prefix)
         if text is None:
             return _refuse("multiplicity beyond table")
-        prefix_parts.append(','.join(map(str, locs)) + '-' + text)
+        prefix_parts.append(text if _omit_ring_locant
+                            else ','.join(map(str, locs)) + '-' + text)
 
     # --- suffix text + parent-'e' elision ---
     bindings = frag_bindings
@@ -2179,6 +2240,14 @@ def name_general_monocycle(
         suffix_text = _ring_suffix_text(suffix_core, pg_locants)
         if suffix_text is None:
             return _refuse("unsupported suffix multiplicity/placement")
+        # (c) for a lone suffix ('cyclohexanone (PIN)' the Blue Book,
+        # 'cyclohexanethiol (PIN)':2917): the same deny-by-default licence the
+        # composer's ring-suffix path uses (bare saturated carbocycle + one
+        # suffix heteroatom, BB-evidenced suffix classes only).
+        if not prefix_parts and len(pg_locants) == 1 and features is not None:
+            from .handlers._handler_shared import _ring_suffix_locant_is_trivial
+            if _ring_suffix_locant_is_trivial(features, oriented, atom_to_locant):
+                suffix_text = suffix_core
         first_alpha = next((c for c in suffix_text if c.isalpha()), '')
         if core.endswith('e') and first_alpha in 'aeiouy':
             core = core[:-1]
@@ -2232,6 +2301,46 @@ def name_general_monocycle(
     bindings.append(TokenBinding(tuple(sorted(ring_set)), parent_token, 'parent'))
     return GeneralEngineResult(name=name, bindings=tuple(bindings),
                                stereo_atom_to_locant=dict(atom_to_locant))
+
+
+def _principal_group_ring_atoms(mol, features, ring_atoms) -> Optional[set]:
+    """Ring atoms of ``ring_atoms`` that carry the principal characteristic group: a
+    ring atom of a principal-group match, or the ring atom bonded to an exocyclic atom
+    of one. None when no principal group is perceived (the numbering then keeps its
+    previous criteria)."""
+    matches = getattr(features, 'principal_group_atoms', None) or []
+    if not getattr(features, 'principal_group', None) or not matches:
+        return None
+    ring_atoms = set(ring_atoms)
+    out = set()
+    for match in matches:
+        for a in match:
+            if a in ring_atoms:
+                if mol.GetAtomWithIdx(a).GetAtomicNum() == 6:
+                    out.add(a)
+                continue
+            for nb in mol.GetAtomWithIdx(a).GetNeighbors():
+                if nb.GetIdx() in ring_atoms:
+                    out.add(nb.GetIdx())
+    return out or None
+
+
+def _prefix_ring_atoms(mol, features, ring_atoms) -> list:
+    """One entry per substituent prefix on ``ring_atoms``: each ring atom once for every
+    exocyclic heavy neighbour that is not part of a principal-group match (a gem-
+    dimethyl carbon appears twice). Feeds the (f) prefix tier of the monospiro
+    numbering."""
+    ring_atoms = set(ring_atoms)
+    pg = {a for m in (getattr(features, 'principal_group_atoms', None) or [])
+          for a in m} if getattr(features, 'principal_group', None) else set()
+    out = []
+    for a in sorted(ring_atoms):
+        for nb in mol.GetAtomWithIdx(a).GetNeighbors():
+            j = nb.GetIdx()
+            if j in ring_atoms or nb.GetAtomicNum() <= 1 or j in pg:
+                continue
+            out.append(a)
+    return out
 
 
 def name_general_spiro(
@@ -2289,8 +2398,17 @@ def name_general_spiro(
     if cage_seed is None:
         return _refuse("senior ring system not in any cluster")
 
+    # NUMBERING (the Blue Book): after indicated hydrogen comes "(c)
+    # principal characteristic groups and free valences (suffixes)" (:3256), before
+    # the 'ene'/'yne' endings of (e). The monospiro numbering ranks heteroatoms, then
+    # its suffix-atom tier, then ring multiple bonds (spiro.get_spiro_numbering), so
+    # hand it the ring atoms that carry the principal characteristic group; without
+    # them 'spiro[4.5]dec-1-en-3-one' was chosen over 'spiro[4.5]dec-3-en-2-one'.
+    _pg_ring = _principal_group_ring_atoms(mol, features, cage_seed)
     spiro = analyze_spiro_universal(
-        mol, cage_atoms=cage_seed, allow_mancude=allow_aromatic_general)
+        mol, cage_atoms=cage_seed, allow_mancude=allow_aromatic_general,
+        free_valence_atoms=_pg_ring,
+        prefix_atoms=_prefix_ring_atoms(mol, features, cage_seed))
     if spiro is None:
         # fallback: analyze_spiro_universal handles a PURE spiro system;
         # a MIXED fused+spiro one (a fused/tricyclic cage spiro-joined to a

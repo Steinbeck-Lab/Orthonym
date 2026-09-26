@@ -47,7 +47,13 @@ def _best_effort(smiles: str) -> str:
 # because the RT gate proves the constitution+stereo (spelling-layer numbering
 # is a separate, out-of-scope concern). Each expected name RT-verifies.
 BORNYL_GLUCOSIDE = "CC1(C)C2CCC1(C)C(O[C@@H]1O[C@H](CO)[C@@H](O)[C@H](O)[C@H]1O)C2"
-BORNYL_EXPECTED = "(4,7,7-trimethylbicyclo[2.2.1]heptan-5-yl) β-D-glucopyranoside"
+# 2026-09-26 (wp7) change-asserted-value: was '(4,7,7-trimethylbicyclo[2.2.1]heptan-
+# 5-yl) β-D-glucopyranoside'. With the OPSIN-import trivial 'borneol' out of the PIN lookup
+# (no Blue Book PIN evidence; 0 BB hits) the aglycone is named from structure: the free
+# valence takes the lowest locant the von Baeyer numbering allows (2 < 5,,
+# exactly as the Blue Book numbers camphor, '(1R,4R)-1,7,7-trimethylbicyclo[2.2.1]heptan-
+# 2-one' (the Blue Book). OPSIN 2.9.0 full-InChIKey exact.
+BORNYL_EXPECTED = "1,7,7-trimethylbicyclo[2.2.1]heptan-2-yl β-D-glucopyranoside"
 
 TERPINEOL_GLUCOSIDE = (
     "CC1=CCC(CC1)C(C)(C)O[C@@H]1O[C@H](CO)[C@@H](O)[C@H](O)[C@H]1O"
@@ -153,8 +159,12 @@ class TestGlycosideByteIdentityControls:
             "cyclohexyl β-D-glucopyranoside",
         "OC[C@H]1O[C@@H](Oc2ccccc2)[C@H](O)[C@@H](O)[C@@H]1O":
             "phenyl β-D-glucopyranoside",
+        # wp7 change-asserted-value: was 'menthyl β-D-glucopyranoside'; 'menthyl' came
+        # from the OPSIN-import trivial 'menthol' (0 Blue Book hits, no PIN evidence), which
+        # left the PIN lookup, so the aglycone is named from structure. OPSIN 2.9.0
+        # full-InChIKey exact.
         "CC(C)C1CCC(C)CC1O[C@@H]1O[C@H](CO)[C@@H](O)[C@H](O)[C@H]1O":
-            "menthyl β-D-glucopyranoside",
+            "5-methyl-2-(propan-2-yl)cyclohexyl β-D-glucopyranoside",
         "OC[C@H]1O[C@@H](OC2CCCC3CCCCC23)[C@H](O)[C@@H](O)[C@@H]1O":
             "decahydronaphthalenyl β-D-glucopyranoside",
         "OC[C@H]1O[C@@H](OC23CC4CC(CC(C4)C2)C3)[C@H](O)[C@@H](O)[C@@H]1O":

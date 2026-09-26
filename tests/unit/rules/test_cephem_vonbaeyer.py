@@ -89,7 +89,7 @@ def test_cephem_acid_core_is_not_seven_oxo():
 # --------------------------------------------------------------------------
 
 VONBAEYER_REGRESSION = [
-    ("C1CC2CCC1C2", "norbornane"),
+    ("C1CC2CCC1C2", "bicyclo[2.2.1]heptane"),  # R11 (2026-09-25, pre-existing-failures plan, Task 5)::9881, only adamantane/cubane are retained; "bicyclo[2.2.1]heptane (PIN)":2038
     ("O=C1CC2CCC1C2", "bicyclo[2.2.1]heptan-2-one"),
     ("C1CC2CCCC1CC2", "bicyclo[3.2.2]nonane"),
     ("C1=CC2CC1CC2", "bicyclo[2.2.1]hept-2-ene"),

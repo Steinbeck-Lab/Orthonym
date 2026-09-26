@@ -138,15 +138,15 @@
     },
     {
       "canonical_smiles": "c1ccc2c(c1)Cc1ccccc1-2",
-      "retained_pin_name": "fluorene",
+      "retained_pin_name": "9H-fluorene",
       "substitution_type": "type_1",
-      "iupac_p_section": "P-22.1.2",
+      "iupac_p_section": "P-25.1.1",
       "locant_context": null,
       "compulsory_prefix_smarts": null,
       "principal_group_required": null,
       "locus_override_rule_id": null,
       "stereo_in_key": false,
-      "notes": "Retained dibenzo-fused cyclopentane PIN",
+      "notes": "Retained fusion name with its indicated hydrogen: P-25.1.1 '(14) fluorene (9H-isomer shown; the PIN is 9H-fluorene)' (BlueBookV2.md:11398-11400). Was 'fluorene' (now a deny row in iupac_2013_pin_list.json, which the D-11 load check refuses), T12 fix round 2 wp5; OPSIN 2.9.0 full-InChIKey round trip of '9H-fluorene' exact",
       "opsin_rt_verified_at": "2026-05-29T07:29:13Z"
     },
     {

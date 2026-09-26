@@ -116,11 +116,15 @@ class TestSubgap2ProtonOrphanedPolyacid:
         assert _rt_matches(name, smi)
 
     def test_oxalate_dianion_plus_two_protons(self):
-        # Reconstructs to the systematic PIN (ethanedioic acid), not the retained
-        # 'oxalic acid' -- the ordinary namer's parent decision, RT-verified.
+        # Reconstructs the neutral acid, RT-verified.
+        # wp7 change-asserted-value: the retained name IS the PIN -- the Blue Book
+        # 'HOOC-COOH oxalic acid (PIN) ethanedioic acid'; (:29860) "Except for
+        # formic acid, acetic acid, oxalic acid..., systematically formed names are
+        # preferred IUPAC names". Was 'ethanedioic acid' (the fragment cache's stale
+        # entry, which the reconstruction reached). OPSIN 2.9.0 full-InChIKey exact.
         smi = "[O-]C(=O)C(=O)[O-].[H+].[H+]"
         name = name_compound(smi, style="pin")
-        assert name == "ethanedioic acid"
+        assert name == "oxalic acid"
         assert _rt_matches(name, smi)
 
     def test_adipate_dianion_plus_two_protons(self):

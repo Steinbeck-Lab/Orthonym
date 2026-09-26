@@ -86,6 +86,131 @@ _ALKANE_NAMES = {
 }
 
 
+def fusion_nomenclature_applies(mol, ring_atoms) -> bool:
+    """True when the ring system ``ring_atoms`` holds an ortho-fused cluster with at
+    least two rings of five or more members, i.e. when a fusion (or bridged fusion)
+    name exists and a von Baeyer name of the system is therefore NOT its PIN.
+
+     "Five-membered ring requirement" (the Blue Book,:23710): "Fusion
+    nomenclature gives preferred IUPAC names only to compounds having at least two
+    rings of at least five or more members. [...] When fusion names are not allowed,
+    unsaturated von Baeyer ring system names are preferred IUPAC names."
+    (:19532) ranks (c) fused and (d) bridged fused ring systems above (e) nonfused
+    bridged (von Baeyer) systems, and:23883 "the bridged fused ring name is
+    preferred to the von Baeyer name". BB rows: 'decahydronaphthalene (PIN)' over
+    'bicyclo[4.4.0]decane' (:24233); 'hexadecahydro-1H-8,12-methanobenzo[13]annulene
+    (PIN)' over 'tricyclo[12.3.1.0^5,10]octadecane' (:23875-23879); 'hexahydro-1H-
+    4,7-methanoindene (PIN)' (:49311, the tricyclo[5.2.1.0^2,6] skeleton);
+    'tetrahydro-4,8-ethanopyrano[4,3-c]pyran-...-tetrone (PIN) {not 4,9-dioxatricyclo
+    [4.4.2.0^2,7]dodecane-...}' (:32535). Boundary rows where the von Baeyer name IS
+    the PIN (this returns False for each): 'bicyclo[4.1.0]hepta-1,3,5-triene',
+    'bicyclo[4.2.0]octa-1,3,5,7-tetraene' (:23718,:23725; one ring of five or more),
+    'tetracyclo[3.2.0.0^2,7.0^4,6]heptane' (:10824: its two five-membered rings meet
+    a four-membered ring each by one bond but share three atoms with each other, so
+    they are bridged, not fused), 'cubane (PIN) pentacyclo[4.2.0.0^2,5.0^3,8.0^4,7]
+    octane' (:9889), 'tetracyclo[2.2.0.0^2,6.0^3,5]hexane (PIN)' (:9897),
+    '3,6,8-trioxatricyclo[3.2.1.0^2,4]octane (PIN)' (:48763).
+
+    A cluster is grown along rings that share exactly one bond (ortho-fusion); every
+    ring in it must meet every other ring in at most one atom or exactly one bond, as
+    in a fused ring system. Smallest rings come from RDKit's symmetrized SSSR. A miss
+    only leaves a label as it was; it never changes a name."""
+    ring_atoms = frozenset(ring_atoms)
+
+    def _fresh():
+        rings = []
+        for r in Chem.GetSymmSSSR(mol):
+            fr = frozenset(r)
+            if fr <= ring_atoms and fr not in rings:
+                rings.append(fr)
+        n = len(rings)
+
+        def _one_bond(i, j):
+            s = rings[i] & rings[j]
+            if len(s) != 2:
+                return False
+            a, b = tuple(s)
+            return mol.GetBondBetweenAtoms(a, b) is not None
+
+        def _compatible(i, j):
+            s = rings[i] & rings[j]
+            return len(s) <= 1 or _one_bond(i, j)
+
+        for start in range(n):
+            if len(rings[start]) < 5:
+                continue
+            stack = [(start, (start,))]
+            while stack:
+                cur, path = stack.pop()
+                for j in range(n):
+                    if j in path or not _one_bond(cur, j):
+                        continue
+                    if not all(_compatible(j, k) for k in path):
+                        continue
+                    if len(rings[j]) >= 5:
+                        return True
+                    if len(path) < 8:
+                        stack.append((j, path + (j,)))
+        return False
+
+    return cached_by_key(mol, "vb_fusion_applies", ring_atoms, _fresh)
+
+
+#: "RETAINED NAMES FOR VON BAEYER PARENT HYDRIDES" (the Blue Book,:9881):
+#: "The retained names adamantane and cubane are used in general nomenclature and as
+#: preferred IUPAC names." Table 2.6: 'adamantane (PIN) tricyclo[3.3.1.1^3,7]decane'
+#: (:9885), 'cubane (PIN) pentacyclo[4.2.0.0^2,5.0^3,8.0^4,7]octane' (:9889). Keys: the
+#: RDKit canonical SMILES of the all-carbon, all-single-bond skeleton.
+_RETAINED_VON_BAEYER_SKELETONS = {
+    "C1C2CC3CC1CC(C2)C3": "adamantane",
+    "C12C3C4C1C1C2C3C41": "cubane",
+}
+
+
+def retained_von_baeyer_parent(mol, ring_atoms) -> Optional[str]:
+    """'adamantane' / 'cubane' when the all-carbon ring system ``ring_atoms`` is that
+    retained parent hydride, else None. A ring heteroatom returns None."""
+    ring_atoms = frozenset(ring_atoms)
+
+    def _fresh():
+        if any(mol.GetAtomWithIdx(i).GetAtomicNum() != 6 for i in ring_atoms):
+            return None
+        if len(ring_atoms) not in (8, 10):
+            return None
+        rw = Chem.RWMol()
+        index = {i: rw.AddAtom(Chem.Atom(6)) for i in sorted(ring_atoms)}
+        for bond in mol.GetBonds():
+            a, b = bond.GetBeginAtomIdx(), bond.GetEndAtomIdx()
+            if a in index and b in index:
+                rw.AddBond(index[a], index[b], Chem.BondType.SINGLE)
+        skeleton = rw.GetMol()
+        Chem.SanitizeMol(skeleton)
+        return _RETAINED_VON_BAEYER_SKELETONS.get(Chem.MolToSmiles(skeleton))
+
+    return cached_by_key(mol, "vb_retained_parent", ring_atoms, _fresh)
+
+
+def _record_if_fusion_nameable(mol, ring_atoms, result) -> None:
+    """Mark a legal von Baeyer descriptor as a non-PIN fragment when the ring system has
+    a preferred name of another kind: a fusion name (``fusion_nomenclature_applies``) or
+    a retained name (``retained_von_baeyer_parent``: adamantane, cubane). Name-scoped:
+    only a shipped name that CONTAINS this descriptor is demoted from pin_verified, and a
+    von Baeyer descriptor fixes its skeleton, so every name carrying it names such a
+    system. The name itself is unchanged."""
+    if result is None or result.legality is not True:
+        return
+    descriptor = getattr(result, "descriptor_string", None)
+    if not descriptor:
+        return
+    try:
+        if (fusion_nomenclature_applies(mol, ring_atoms)
+                or retained_von_baeyer_parent(mol, ring_atoms)):
+            from ..metrics.provenance import record_non_pin_fragment
+            record_non_pin_fragment(descriptor)
+    except Exception:  # a label helper must never break naming
+        logger.debug("fusion_nomenclature_applies failed", exc_info=True)
+
+
 def von_baeyer_ring_count(mol, cage_atoms) -> Optional[int]:
     """The number of rings counts over ``cage_atoms``, or ``None``.
 
@@ -595,7 +720,9 @@ class VonBaeyerAnalyzer:
             finally:
                 self._allow_multiatom_bridge = True
             if legacy is not None and legacy.legality:
+                _record_if_fusion_nameable(mol, ring_atoms, legacy)
                 return legacy
+        _record_if_fusion_nameable(mol, ring_atoms, result)
         return result
 
     def _analyze_once(self, mol, ring_atoms: Set[int],

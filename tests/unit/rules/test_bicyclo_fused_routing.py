@@ -211,7 +211,8 @@ class TestEndToEndFusedRouting:
     def test_norbornane_still_retained(self):
         """Norbornane should still use its retained name."""
         result = name_compound('C1CC2CCC1C2')
-        assert result == 'norbornane'
+        # R11 (2026-09-25, pre-existing-failures plan, Task 5)::9881, only adamantane/cubane are retained; "bicyclo[2.2.1]heptane (PIN)":2038
+        assert result == 'bicyclo[2.2.1]heptane'
 
     @pytest.mark.integration
     def test_bicyclo_222_still_systematic(self):

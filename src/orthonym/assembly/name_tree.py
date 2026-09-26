@@ -165,8 +165,11 @@ def _alphabetize_prefixes(
     # Lazy import to avoid an import cycle if naming_utils imports back from
     # name_tree (unlikely today, but mirrors the lazy-import pattern in
     # composer.py:146 + handlers/* per PATTERNS § Lazy Import).
-    from .naming_utils import alpha_sort_key
-    return tuple(sorted(prefixes, key=lambda p: alpha_sort_key(p.parent_stem)))
+    from .naming_utils import alpha_sort_key, cip_descriptor_rank_key
+    # (the Blue Book): prefixes that differ only in configuration
+    # tie on alpha_sort_key and are then ordered by their descriptors, R before S.
+    return tuple(sorted(prefixes, key=lambda p: (alpha_sort_key(p.parent_stem),
+                                                 cip_descriptor_rank_key(p.parent_stem))))
 
 
 def is_coarse_node(node: NameTreeNode) -> bool:

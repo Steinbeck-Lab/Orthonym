@@ -570,9 +570,9 @@ def orient_chain(
     # locants their CIP stereodescriptors receive (meso-type / symmetric chains).
     # BB (j) (the Blue Book): the lower locant is assigned to the
     # PREFERRED descriptor of each pair -- Z over E, R over S, M over P, and r
-    # over s (pseudoasymmetry). This REUSES cip_descriptor_rank_key (via
-    # _cip_numbering_key) so this numbering decision and the citation tie-break
-    # (prefix_citation_sort_key tier 3) share ONE preference table; a second,
+    # over s (pseudoasymmetry). _cip_numbering_key ranks through
+    # cip_locant_rank_key, which reads the SAME preference table as the citation
+    # tie-break (prefix_citation_sort_key tier 3) and keeps the locants; a second,
     # disagreeing comparator here was the defect this replaced. Both atom
     # stereocentres AND stereogenic double bonds are ranked -- the old key saw
     # only atoms, so a Z-vs-E numbering choice fell through to input order (it
@@ -814,8 +814,18 @@ def _alphabetical_tiebreaker(
             # 1-phenyl-4-(thiophen-2-yl)butane-1,4-dione). Derive the
             # attachment as the fragment atom bonded to the chain atom
             # (sub_atoms comes from a set — position 0 is arbitrary).
-            if sub_atoms and any(
-                    mol.GetAtomWithIdx(a).IsInRing() for a in sub_atoms):
+            #
+            # 2026-09-25 (pre-existing-failures plan, Task 5, R26): the same holds
+            # for EVERY substituent. (g) (the Blue Book) "lowest locants
+            # for the substituent cited first as a prefix in the name" -- cited
+            # first by its real prefix name. The fabricated keys were the
+            # lower-case element symbol for a carbon-free group and 'alkyl by carbon
+            # count' otherwise, so hydroxy and oxo were both 'o' (a tie decided by
+            # input order: '4-hydroxy-2-oxopentanedioate', PIN '2-hydroxy-4-oxo...'),
+            # amino ('n') sorted after chloro ('cl') ('4-amino-2-chloro...'), iodo
+            # ('i') before hydroxy ('o'), and methoxy was 'methyl'. The fabricated
+            # key is now only the fallback when the prefix namer declines.
+            if sub_atoms:
                 try:
                     attach_idx = next(
                         (a for a in sub_atoms
@@ -828,6 +838,9 @@ def _alphabetical_tiebreaker(
                             name_substituent,
                         )
                         name = name_substituent(mol, list(sub_atoms), attach_idx)
+                        from ..errors import is_refusal_sentinel
+                        if name and is_refusal_sentinel(name):
+                            name = None
                 except Exception:
                     name = None
             if not name:
@@ -890,24 +903,26 @@ def _get_bond_locant_atoms(
 def _cip_numbering_key(chain: List[int], atom_to_locant: Dict[int, int],
                        double_bonds: List[Tuple[int, int]],
                        chain_set: Set[int], mol) -> tuple:
-    """(j) rank tuple of a chain's CIP stereodescriptors, in locant order.
+    """(j) key of a chain's CIP stereodescriptors WITH their locants.
 
     Collects every stereodescriptor the assembled name would cite for this
     orientation -- atom stereocentres (R/S/r/s/M/P) and stereogenic double bonds
-    (Z/E) -- as (locant, code) pairs, orders them by locant exactly as the name
-    cites them, then ranks the sequence with
-    :func:`orthonym.assembly.naming_utils.cip_descriptor_rank_key`. Reusing that
-    one function is deliberate: this numbering tie-break and the citation
-    tie-break (``prefix_citation_sort_key`` tier 3) must never disagree -- and a
-    plain string comparison silently gets Z-vs-E backwards, because 'Z' is senior
-    to 'E' although 'E' < 'Z' alphabetically (j) /:45363).
+    (Z/E) -- as (locant, code) pairs and ranks them with
+    :func:`orthonym.assembly.naming_utils.cip_locant_rank_key`, the key the ring
+    numbering (``cycloalkanes._cip_orientation_key``) shares. It shares the rank
+    TABLE with the citation tie-break (``prefix_citation_sort_key`` tier 3), so the
+    two never disagree -- and a plain string comparison silently gets Z-vs-E
+    backwards, because 'Z' is senior to 'E' although 'E' < 'Z' alphabetically
+    (j) /:45363). The locants are part of the key: ranking the codes alone
+    tied '(2S)-' with '(4S)-pentane-2,4-diol' (one specified centre) and let the
+    input direction decide; (j) gives the lower locant to the descriptor.
 
     Returns an empty tuple when the orientation cites no stereodescriptor, so
-    achiral chains tie and fall through. Lower tuple sorts first, i.e. is cited
-    first and takes the lower locant. ``mol`` must already carry CIP labels (the
-    caller routes them through ``perception.stereo.assign_stereochemistry``).
+    achiral chains tie and fall through. Lower key sorts first, i.e. takes the
+    lower locant. ``mol`` must already carry CIP labels (the caller routes them
+    through ``perception.stereo.assign_stereochemistry``).
     """
-    from ..assembly.naming_utils import cip_descriptor_rank_key
+    from ..assembly.naming_utils import cip_locant_rank_key
     items: List[Tuple[int, str]] = []
     for a in chain:
         atom = mol.GetAtomWithIdx(a)
@@ -919,10 +934,4 @@ def _cip_numbering_key(chain: List[int], atom_to_locant: Dict[int, int],
             if bond is not None and bond.HasProp('_CIPCode'):
                 items.append((min(atom_to_locant[i], atom_to_locant[j]),
                               bond.GetProp('_CIPCode')))
-    if not items:
-        return ()
-    # Locant order is the citation order; the (locant, code) secondary key only
-    # guards determinism if two descriptors ever shared a locant (they cannot).
-    items.sort(key=lambda t: (t[0], t[1]))
-    block = '(' + ','.join('%d%s' % (loc, code) for loc, code in items) + ')'
-    return cip_descriptor_rank_key(block)
+    return cip_locant_rank_key(items)

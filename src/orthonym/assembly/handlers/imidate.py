@@ -341,7 +341,13 @@ def _name_chain_with_imidate_suffix(mol: Any, atoms: "tuple[int, ...]",
     (CC(C)(C)C(=N)OC; correct stem is 2,2-dimethylpropanimidate).
 
     Naming rules per IUPAC:
-    - aromatic ring at anchor -> "benzimidate" (retained PIN, FRN-)
+    - phenyl at anchor -> "benzenecarboximidate" (FRN-).
+      (the Blue Book): "Preferred names of imidic acids are those derived
+      from systematic substitutive preferred IUPAC names of carboxylic acids";
+      "The use of systematic substitutive names for imidic acids is a change for
+      formic acid, acetic acid, benzoic acid, and oxalic acid" (:29986);
+      "benzenecarboximidic acid (PIN) benzimidic acid" (:30000). So
+      'benzimidate' is general nomenclature only, like 'acetimidate'.
     - N-C linear stem -> "{chainprefix}animidate" (SYSTEMATIC PIN; BBv2 L31993:
       'methyl ethanimidate (PIN) methyl acetimidate' -> acetimidate is general-
       nomenclature only, so 2C uses 'ethanimidate' like every other length)
@@ -353,7 +359,7 @@ def _name_chain_with_imidate_suffix(mol: Any, atoms: "tuple[int, ...]",
         return None
 
     # Aromatic-ring case: phenyl ring (6 aromatic C) plus the anchor C
-    # gives 7 C atoms total -> "benzimidate"
+    # gives 7 C atoms total -> "benzenecarboximidate",:30000)
     n_aromatic_c = sum(
         1 for idx in atoms
         if mol.GetAtomWithIdx(idx).GetIsAromatic()
@@ -364,7 +370,7 @@ def _name_chain_with_imidate_suffix(mol: Any, atoms: "tuple[int, ...]",
         if mol.GetAtomWithIdx(idx).GetAtomicNum() == 6
     )
     if n_aromatic_c == 6 and n_carbons == 7:
-        return "benzimidate"
+        return "benzenecarboximidate"
 
     # Find longest carbon chain from C(=N) through the stem subgraph.
     frag_set = set(atoms)

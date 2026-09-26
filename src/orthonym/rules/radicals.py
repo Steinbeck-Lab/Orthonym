@@ -314,8 +314,13 @@ def _name_carboxy_alkyl_radical(mol, radical_idx: int) -> Optional[str]:
     # A single-carbon stem carries no locant ambiguity: 'carboxymethyl'
     # (not '1-carboxymethyl').
     if len(chain) == 1:
-        return f"carboxy{stem}yl"
-    return f"{acid_locant}-carboxy{stem}yl"
+        candidate = f"carboxy{stem}yl"
+    else:
+        candidate = f"{acid_locant}-carboxy{stem}yl"
+    # The shape walk ignores isotopes and hydrogen counts ([13CH2]CC(=O)O would
+    # be '2-carboxyethyl', a different isotopologue): ship only what the strict
+    # radical round trip confirms.
+    return candidate if _radical_identity_round_trips(mol, candidate) else None
 
 
 # 169.6-03 (CHOKE-01, kill-list): the carbon-counting chain-counter that
@@ -392,13 +397,16 @@ def name_acyl_radical(mol, radical_site: Dict[str, Any]) -> str:
     }
 
     # Check for aromatic acyl (benzoyl)
-    for neighbor in radical_atom.GetNeighbors():
-        if neighbor.GetIsAromatic():
-            return 'benzoyl'
-
-    if carbon_count in ACYL_NAMES:
-        return ACYL_NAMES[carbon_count]
-    return _get_chain_prefix(carbon_count) + 'anoyl'
+    if any(neighbor.GetIsAromatic() for neighbor in radical_atom.GetNeighbors()):
+        candidate = 'benzoyl'
+    elif carbon_count in ACYL_NAMES:
+        candidate = ACYL_NAMES[carbon_count]
+    else:
+        candidate = _get_chain_prefix(carbon_count) + 'anoyl'
+    # A carbon count sees neither substituents, heteroatoms nor isotopes
+    # (O=[C]C(=O)O would be 'acetyl'; any aryl would be 'benzoyl'): ship only
+    # what the strict radical round trip confirms.
+    return candidate if _radical_identity_round_trips(mol, candidate) else ''
 
 
 def _collect_fragment_excluding(mol, start_idx: int, exclude: set) -> List[int]:
@@ -737,18 +745,15 @@ def _name_n_oxyl_radical(mol, radical_idx: int, n_atom) -> str:
 
 def _acyl_from_acid_name(acid: str) -> str:
     """The acyl group name of an acid name,,: the
-    shared converter plus the forms it gets wrong -- 'carbamic acid' ->
-    'carbamoyl', 'butanimidic acid' ->
-    'butanimidoyl (PIN)' and 'dimethylphosphinic acid' -> 'dimethylphosphinoyl
+    shared converter (which also owns 'carbamic acid' -> 'carbamoyl' and
+    'butanimidic acid' -> 'butanimidoyl (PIN)') plus the forms it leaves to
+    this radical context -- 'dimethylphosphinic acid' -> 'dimethylphosphinoyl
     (PIN)', the Blue Book-40610), and a thioic acid ->
     '...thioyl' ('ethanethioyl (PIN)'). '' if the name is not an acid name."""
     import re
     if not acid:
         return ''
-    # 'carbamoyl (preferred prefix)' (the Blue Book); the shared converter
-    # gives the obsolete 'carbamyl'.
-    for end, acyl in (("carbamic acid", "carbamoyl"),
-                      ("imidic acid", "imidoyl"), ("phosphinic acid", "phosphinoyl"),
+    for end, acyl in (("phosphinic acid", "phosphinoyl"),
                       ("phosphonic acid", "phosphonoyl"), ("arsinic acid", "arsinoyl"),
                       ("arsonic acid", "arsonoyl")):
         if acid.endswith(end):
@@ -1006,8 +1011,14 @@ def _name_carbon_radical(mol, idx: int) -> str:
     if prefix == 'benzyl':
         prefix = 'phenylmethyl'
     elif prefix.endswith('phenyl') and c.GetIsAromatic() and '(' not in prefix:
-        # phenyl is exactly benzen-1-yl (same numbering, attachment at 1); with a
-        # substituent every locant is cited: 4-methylbenzen-1-yl.
+        # A radical is named with the suffix 'yl' on the parent hydride name, not
+        # with the substituent prefix: (the Blue Book) "named by
+        # adding the suffix 'yl' to the name of the parent hydride, eliding the final
+        # letter 'e'", so C6H5* is 'benzenyl'; the cation in the same table is
+        # 'phenyl cation... benzenylium (PIN)' (:41537). 'phenyl' (preferred prefix,
+        #:24450) is the substituent-prefix form. The numbering is phenyl's
+        # (attachment at 1); with a substituent every locant is cited:
+        # 4-methylbenzen-1-yl.
         base = prefix[:-len('phenyl')]
         prefix = f"{base}benzen-1-yl" if base else 'benzenyl'
     if prefix.rstrip(')]}').endswith(_CONTRACTED_PREFIX_ENDINGS):
@@ -1354,7 +1365,31 @@ def _name_mononuclear_radical_ion(mol) -> str:
         prefixes.append(prefix)
     name = _aminoxyl_prefix_string(prefixes) + parent[:-1] + suffix if parent.endswith('e') \
         else _aminoxyl_prefix_string(prefixes) + parent + suffix
-    return _ship(mol, name, False)
+    return _ship(mol, name, _n_radical_ion_has_suffix_parent(mol, x))
+
+
+def _n_radical_ion_has_suffix_parent(mol, x) -> bool:
+    """True when the PIN of this N radical ion is built on a SUFFIX-derived ion,
+    so the azanium/azanide name above is valid but not the PIN.
+
+     "Radical ions on ionic suffix groups" (the Blue Book,:43497):
+    "When ions may be named by using modified suffixes (see and
+    , the suffixes denoting radical centers are added to the name of
+    the cationic or anionic parent hydride": 'benzenaminiumyl (PIN)' (:43501),
+    'methanaminidyl (PIN)' (:43503), and 'methanaminiumyl (PIN)' (:17608).
+    A carbon group on N+ makes an amine (or, for an acyl group, an amide: Table
+    7.4:41421 'amidium') cation, and a non-acyl carbon group on N- an amine anion
+     :41049 'aminide'). Those '-aminiumyl'/'-aminidyl' PINs cannot be
+    verified (the round-trip parser reads none of them), so the verified azanium
+    name ships at a general tier. An acyl group on N- stays the PIN: 'amidide' is
+    not recommended:41071) and the Blue Book names CH3-CO-N(.-)
+    'acetylazanidyl (PIN)':43517). H-only N ('azanidyl (preselected
+    name)',:43426) and the other elements have no suffix-derived ion here."""
+    if x.GetSymbol() != 'N' or not x.GetDegree():
+        return False
+    if x.GetFormalCharge() > 0:
+        return True
+    return not all(_is_acyl_atom(mol, sub.GetIdx()) for sub in x.GetNeighbors())
 
 
 def _acid_name_with_oh_replacing(mol, idx: int) -> str:
@@ -1539,8 +1574,11 @@ def name_oxyl_radical(mol, radical_site: Dict[str, Any]) -> str:
     radical_atom = mol.GetAtomWithIdx(radical_idx)
 
     heavy_neighbors = list(radical_atom.GetNeighbors())
+    # The bare 'oxyl' denotes HO. / O.. only; every fallback to it below is
+    # shipped only when the strict round trip confirms it (C[Si](C)(C)[O] would
+    # otherwise be named 'oxyl', which drops the whole R side).
     if len(heavy_neighbors) != 1:
-        return 'oxyl'
+        return _ship(mol, 'oxyl', False)
 
     neighbor = heavy_neighbors[0]
 
@@ -1552,7 +1590,7 @@ def name_oxyl_radical(mol, radical_site: Dict[str, Any]) -> str:
         peroxyl_name = _name_peroxyl_radical(mol, radical_idx, neighbor.GetIdx())
         if peroxyl_name:
             return peroxyl_name
-        return 'oxyl'
+        return _ship(mol, 'oxyl', False)
 
     if neighbor.GetSymbol() == 'N':
         # R2N-O. aminoxyl radicals. When the producer declines, the
@@ -1562,7 +1600,7 @@ def name_oxyl_radical(mol, radical_site: Dict[str, Any]) -> str:
         return _name_n_oxyl_radical(mol, radical_idx, neighbor)
 
     if neighbor.GetSymbol() != 'C':
-        return 'oxyl'
+        return _ship(mol, 'oxyl', False)
 
     attach_idx = neighbor.GetIdx()
 
@@ -1580,7 +1618,7 @@ def name_oxyl_radical(mol, radical_site: Dict[str, Any]) -> str:
         if not parent:
             return ''
         if parent == 'phenyl':
-            return 'phenoxyl'
+            return _ship(mol, 'phenoxyl', False)
         return _compose_oxyl_name(mol, parent, 'oxyl', 'oxidanyl')
 
     # Aliphatic R: keep the existing retained '-oxyl' contraction for a PLAIN
@@ -1791,7 +1829,11 @@ def _name_amine_family_radical(mol, radical_site: Dict[str, Any]) -> str:
             short = re.sub(r'^([A-Z][a-z]?)(?:,\1)*-', '', name)
             if short != name and _radical_identity_round_trips(mol, short):
                 return short
-            return name
+            # The neutral parent's principal group may sit on ANOTHER nitrogen
+            # (NC(=O)CC[NH]: '3-aminopropanamide' -> '3-aminopropanamidyl', whose
+            # radical is on the amide N, a different molecule). Ship only what
+            # the strict round trip confirms.
+            return name if _radical_identity_round_trips(mol, name) else ''
     return ''
 
 
@@ -1845,7 +1887,10 @@ def _name_multiplicative_amine_radical(mol, radical_sites: List[Dict[str, Any]])
     central = emit_parent_hydride_polyvalent_suffixes(frag, centers)
     if not central:
         return ''
-    return f"({central}){mult}(aminyl)"
+    # The central group is built on a stripped copy, so isotopes on the removed
+    # nitrogens and stereo on the skeleton are not in it ([NH]C[C@H](C)[NH] would
+    # lose its stereo): the strict round trip decides.
+    return _ship(mol, f"({central}){mult}(aminyl)", False)
 
 
 def name_heteroatom_radical(mol, radical_sites: List[Dict[str, Any]],
@@ -1878,7 +1923,10 @@ def name_heteroatom_radical(mol, radical_sites: List[Dict[str, Any]],
     heavy_nbrs = [nb for nb in atom.GetNeighbors() if nb.GetSymbol() != 'H']
     # (A) Mononuclear heteroatom parent-hydride radical (only H neighbours).
     if not heavy_nbrs and mol.GetNumHeavyAtoms() == 1:
-        return _parent_hydride_radical_name(element, site['n_electrons'])
+        # The element name ignores the hydrogen count and isotopes ([SH3] and
+        # [15NH2] would be 'sulfanyl' / 'azanyl'): the strict round trip decides.
+        return _ship(mol, _parent_hydride_radical_name(element, site['n_electrons']),
+                     False)
     # (B) Substituted nitrogen -> amine / imine / amide compound suffix.
     if element == 'N':
         return _name_amine_family_radical(mol, site)

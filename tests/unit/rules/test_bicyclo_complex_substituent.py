@@ -138,7 +138,8 @@ class TestPureHydrocarbonSubstituentUnchanged:
 
     def test_norbornane_unchanged(self):
         smiles = "C1CC2CCC1C2"
-        assert name_compound(smiles) == "norbornane"
+        # R11 (2026-09-25, pre-existing-failures plan, Task 5)::9881, only adamantane/cubane are retained; "bicyclo[2.2.1]heptane (PIN)":2038
+        assert name_compound(smiles) == "bicyclo[2.2.1]heptane"
 
 
 # ============================================================================

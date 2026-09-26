@@ -19,7 +19,7 @@ from typing import Optional
 
 from rdkit import Chem
 
-from ..assembly.naming_utils import get_multiplier_prefix, is_complex_substituent
+from ..assembly.naming_utils import apply_enclosing_marks, get_multiplier_prefix, is_complex_substituent
 from ..data.chain_names import get_chain_prefix
 from ..data.sugar_names import sugar_to_glycosyloxy_prefix
 from .stereochemistry import collect_stereodescriptors, format_stereodescriptor_string
@@ -73,6 +73,12 @@ def _acid_to_oate(acid_name: str) -> Optional[str]:
 
 
 def _acid_to_acyl(acid_name: str) -> Optional[str]:
+    # '-amic' / '-imidic' acids take '-oyl' ('carbamoyl (preferred prefix)',
+    # the Blue Book); the table and its rules live with the shared converter.
+    from ..decomposition.fragment_assembly import ACID_ENDINGS_TO_OYL_ACYL
+    for end, acyl in ACID_ENDINGS_TO_OYL_ACYL:
+        if acid_name.endswith(end):
+            return acid_name[:-len(end)] + acyl
     s = acid_name[:-5] if acid_name.endswith(" acid") else acid_name
     if s.endswith("oic"):
         return s[:-3] + "oyl"
@@ -91,7 +97,16 @@ def _acyloxy_for_site(mol, site) -> Optional[str]:
     """site = ('acyl', carbonyl_idx, ester_o_idx) → '<acyl>oyloxy' (acyloxy prefix) or None."""
     acid = _acid_fragment_name(mol, site[1], site[2])
     acyl = _acid_to_acyl(acid) if acid else None
-    return f"{acyl}oxy" if acyl else None
+    if not acyl:
+        return None
+    #: a compound acyl is cited inside its own marks with 'oxy' outside,
+    # '4-[(3-ethoxy-3-oxopropanoyl)oxy]phenyl...' (the Blue Book),
+    # '3-[(pyridine-3-carbonyl)oxy]propanoic acid (PIN)' (:31723); a simple acyl
+    # stays bare, '3-(benzoyloxy)propanoic acid (PIN)' (:31711). So
+    # '(4-hydroxybenzoyl)oxy', never '4-hydroxybenzoyloxy'.
+    from ..assembly.substituent_enumerator import cite_organyl_in_composed_prefix
+    cited = cite_organyl_in_composed_prefix(acyl)
+    return f"{cited}oxy" if cited else None
 
 
 def _multiplied_acylate(acylate: str, count: int) -> str:
@@ -99,7 +114,8 @@ def _multiplied_acylate(acylate: str, count: int) -> str:
         return acylate
     mult = get_multiplier_prefix(count, acylate)
     if is_complex_substituent(acylate):
-        return f"{mult}[{acylate}]"
+        # (the Blue Book): the mark follows the acylate's own depth
+        return f"{mult}{apply_enclosing_marks(acylate, -1)}"
     return f"{mult}{acylate}"
 
 
@@ -265,7 +281,10 @@ def _build_glycerol_prefixes(num, oh_atoms, glyco_atoms, atom_site, phospho_atom
             return None  # neutral substitutive form not RT-verified for this head → defer
         # nesting ORDER (BB 7444; escalation, BB 7509) under the marks requirement (BB 7232): {[(<head-alkoxy>)hydroxyphosphoryl]oxy}
         rendered = f"{num[a]}-{{[({head_alkoxy})hydroxyphosphoryl]oxy}}"
-        subs.append(("phosphoryl", rendered))
+        #: a composed prefix sorts at the first letter of its COMPLETE
+        # name ('aminoethoxy...'), not at 'phosphoryl'.
+        from ..assembly.naming_utils import alpha_sort_key as _ask
+        subs.append((_ask(f"[({head_alkoxy})hydroxyphosphoryl]oxy"), rendered))
     if not subs:
         return ""
     subs.sort(key=lambda t: t[0])  # alphabetical by substituent name
@@ -287,10 +306,10 @@ _HEAD_GROUP_ALKYL = {
 
 
 def _bis_enclose(inner: str, mult: str) -> str:
-    """Enclose a multiplied compound substituent: brackets if it has parens, else parens."""
-    if "(" in inner or "[" in inner:
-        return f"{mult}[{inner}]"
-    return f"{mult}({inner})"
+    """Enclose a multiplied compound substituent at its nesting level
+    (the Blue Book): '(' for a bare one, then '[', '{' as the inner marks
+    deepen -- 'bis{[(9Z)-hexadec-9-enoyl]oxy}', never 'bis[[(9Z)-...]oxy]'."""
+    return f"{mult}{apply_enclosing_marks(inner, -1)}"
 
 
 # Multiplier word for free acidic -OH on the functional-class phosphate ester.
@@ -424,8 +443,16 @@ def _assemble_phospholipid(mol, match, style) -> Optional[str]:
     glyceryl = _diacyl_glyceryl(mol, match, central, phospho_atom, acyl_atoms, atom_site)
     if glyceryl is None:
         return None
+    if head_desc == "choline":
+        # The choline head '2-(trimethylazaniumyl)ethyl' cites a carbon-substituted
+        # N+ as azaniumyl; its PIN form is '2-(N,N-dimethylmethanaminiumyl)ethyl'
+        # method (1),; prints no PIN for the
+        # zwitterion), which cannot be verified -- the same rule and the same
+        # label as every other such prefix.
+        from ..assembly.substituent_naming import record_amine_cation_prefix
+        record_amine_cation_prefix(head_alkyl)
     # functional-class diester: [<glyceryl>] <head-alkyl> phosphate (glyceryl bracketed first)
-    return f"[{glyceryl}] {head_alkyl} phosphate"
+    return f"{apply_enclosing_marks(glyceryl, -1)} {head_alkyl} phosphate"
 
 
 def _diacyl_glyceryl(mol, match, central, phospho_atom, acyl_atoms, atom_site) -> Optional[str]:
@@ -451,9 +478,11 @@ def _diacyl_glyceryl(mol, match, central, phospho_atom, acyl_atoms, atom_site) -
         gly_subs = f"{locant_str}-{_bis_enclose(names[0], 'bis')}"
     else:
         parts = sorted(((l, acyloxy_by_loc[l]) for l in acyl_locs), key=lambda t: _alpha_key(t[1]))
-        gly_subs = "".join(
-            f"{l}-{('[' + ax + ']') if ('(' in ax or '[' in ax) else '(' + ax + ')'}"
-            for l, ax in parts
+        # marks at each prefix's own depth (the Blue Book), and
+        # (b) (:6944): a hyphen after the closing mark when a locant
+        # follows -- '3-(hexadecanoyloxy)-2-{...}propyl', never '...oxy)2-[...'.
+        gly_subs = "-".join(
+            f"{l}-{apply_enclosing_marks(ax, -1)}" for l, ax in parts
         )
     glyceryl = f"{gly_subs}propyl"
     # backbone C-2 R/S (local locant 2 = central) inside the glyceryl substituent

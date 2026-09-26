@@ -70,9 +70,11 @@ STOUTCLASS_REPRESENTATIVES: "OrderedDict[StoutClass, tuple]" = OrderedDict(
         (StoutClass.PEPTIDE,                 ("NCC(=O)NCC(=O)O",        "(2-aminoacetamido)acetic acid")),
         (StoutClass.RETAINED_NAME,           ("CCO",                    "ethanol")),
         (StoutClass.AMINO_ACID,              ("C[C@H](N)C(=O)O",        "alanine")),  # -07: retained PIN (was systematic '(2S)-2-aminopropanoic acid')
-        # R4/: COCCOC now routes substitutive ('1,2-dimethoxyethane'); use
-        # a 3-O chain (>= 3 O keeps skeletal) as the SKELETAL_REPLACEMENT representative.
-        (StoutClass.SKELETAL_REPLACEMENT,    ("COCCOCCOC",              "2,5,8-trioxanonane")),
+        # fix a performance pass: (the Blue Book) -- the 'a' name is the PIN
+        # only with four or more heterounits, so the representative is the BB's own
+        # four-O chain, "(4) 2,5,8,11-tetraoxadodecane (PIN)" (:27762); the former
+        # 3-O representative COCCOCCOC is now substitutive (:27756).
+        (StoutClass.SKELETAL_REPLACEMENT,    ("COCCOCCOCCOC",           "2,5,8,11-tetraoxadodecane")),
         # Wave2 fail-closed: the CYCLOPHANE entry still matches and
         # dispatches, but production REFUSES the composed bracket-prefix name
         # ('[3.3]orthocyclophane' — no phane form is OPSIN-parseable) via the

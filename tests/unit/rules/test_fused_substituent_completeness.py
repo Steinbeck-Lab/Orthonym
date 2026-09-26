@@ -34,7 +34,8 @@ def test_fused_catalog_name_keeps_every_substituent(smiles):
 
 @pytest.mark.parametrize("smiles,expected", [
     # controls: every branch nameable at the PIN tier -> unchanged PIN names
-    ("O=C1c2ccc(O)cc2C(=O)N1C", "5-hydroxy-2-methyl-2,3-dihydro-1H-isoindole-1,3-dione"),
+    # 2026-09-25 (pre-existing-failures plan, Task 5) change-asserted-value: R21: (the Blue Book) "Cyclic imides are preferably named as heterocyclic pseudoketones"; "2-phenyl-1H-isoindole-1,3(2H)-dione (PIN)... N-phenylphthalimide" (:33853); (:24689) added indicated hydrogen is preferred over hydro prefixes for PINs.
+    ("O=C1c2ccc(O)cc2C(=O)N1C", "5-hydroxy-2-methyl-1H-isoindole-1,3(2H)-dione"),
     ("OB(O)c1ccc2ncccc2c1", "(quinolin-6-yl)boronic acid"),
     ("Cc1ccc2[nH]ccc2c1", "5-methyl-1H-indole"),
 ])

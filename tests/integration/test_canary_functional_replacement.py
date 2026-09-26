@@ -86,6 +86,15 @@ _PHASE_163_1_BACKLOG_TIER_A = frozenset({
 _PHASE_163_1_BACKLOG_TIER_B = _PHASE_163_1_BACKLOG_TIER_A
 
 
+# FRN- / FRN- expected names (canary CSV) are 'methyl ethanimidate' / 'ethyl
+# ethanimidate'. PIN per R14: "Preferred names of imidic acids are those derived
+# from systematic substitutive preferred IUPAC names of carboxylic acids."
+# the Blue Book ("The use of systematic substitutive names for imidic acids is a change
+# for formic acid, acetic acid, benzoic acid, and oxalic acid.":29986); "methyl ethanimidate
+# (PIN) methyl acetimidate":31993. OPSIN RT exact (TRIAGE.csv; re-checked in Task 7/8).
+# FRN- expected name is 'methyl benzenecarboximidate' (fix a performance pass; was 'methyl
+# benzimidate'): same rule, "benzenecarboximidic acid (PIN) benzimidic acid":30000.
+# OPSIN 2.9.0 full-InChIKey RT exact (batch call outside the engine).
 @pytest.mark.integration
 @pytest.mark.parametrize("row", TIER_A_PARAMS)
 def test_tier_a_name_string_equality(row):

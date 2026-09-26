@@ -128,9 +128,12 @@ def test_single_exocyclic_bond_does_not_veto_a_ring_nitrogen():
 
 @pytest.mark.unit
 @pytest.mark.parametrize("smiles,expected", [
-    # the exact molecule the corpus A/B found lost
-    ("C1=CC(=CC(=C1)F)C2=CNC(=O)C=C2", "5-(3-fluorophenyl)-1H-pyridin-2-one"),
-    ("c1ccc(-c2ccc(=O)[nH]c2)cc1", "5-phenyl-1H-pyridin-2-one"),
+    # the exact molecule the corpus A/B found lost. fix a performance pass (wp5): with a
+    # pendant ring the ring ketone now takes the same added-hydrogen form as the
+    # alkyl members below (were '...-1H-pyridin-2-one'): 'pyridin-2(1H)-one (PIN)'
+    # (the Blue Book), added indicated hydrogen.
+    ("C1=CC(=CC(=C1)F)C2=CNC(=O)C=C2", "5-(3-fluorophenyl)pyridin-2(1H)-one"),
+    ("c1ccc(-c2ccc(=O)[nH]c2)cc1", "5-phenylpyridin-2(1H)-one"),
     #... and the unsubstituted / alkyl / N-substituted members must not move
     ("O=c1cccc[nH]1", "pyridin-2(1H)-one"),
     ("CC1=CC(=O)NC=C1", "4-methylpyridin-2(1H)-one"),

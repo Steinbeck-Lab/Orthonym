@@ -873,7 +873,13 @@ PREFIX_FORMS = {
     "isothiocyanate": "isothiocyanato",
     "urea": "carbamoylamino",
     "thiourea": "carbamothioylamino",  # Wave-2 completion (thio-urea prefix)
-    "guanidine": "guanidino",
+    # (the Blue Book-34268): "the following prefixes are used. The
+    # prefix guanidino may be used in general nomenclature." -- 'carbamimidoylamino
+    # (preferred prefix)' for H2N-C(=NH)-NH-; 7. Prefixes (g) (:1700) "The prefix
+    # 'guanidino' is no longer acceptable in preferred IUPAC names". The (H2N)2C=N-
+    # tautomer takes '(diaminomethylidene)amino' (:34270-34272); the atom-aware choice is
+    # substituent_prefix_forms.get_guanidine_prefix.
+    "guanidine": "carbamimidoylamino",
     # Wave2 T2b: terminal N-heteroatom preselected prefixes. BB verbatim:
     # 'aminooxy (preselected prefix) (note that there is no elision of the
     # final letter o of amino)' + '2-(aminooxy)ethan-1-amine (PIN)'

@@ -28,13 +28,22 @@ class TestRingAtomLeakageFixed:
     """Verify ring-atom leakage is fixed for amino acids and phenyl compounds."""
 
     def test_tyrosine_has_phenyl_not_hexyl(self):
-        """Tyrosine: ring should be phenyl substituent, not counted in chain."""
-        # N[C@H](Cc1ccc(O)cc1)C(=O)O -- was "2-aminononanoic acid" (9C = 3+6 ring)
-        name = name_compound("N[C@H](Cc1ccc(O)cc1)C(=O)O")
-        assert "phenyl" in name, f"Expected 'phenyl' in name, got: {name}"
+        """Tyrosine: ring should be phenyl substituent, not counted in chain.
+
+        2026-09-26 (wp7) change-asserted-value: this test asked for a substitutive
+        'phenyl... amino... propanoic acid' spelling and failed on the retained
+        amino-acid name since before the pre-existing-failures plan (identical at
+        4e0e5c29b). User decision D-a keeps the semisystematic amino-acid names at the
+        PIN tier (TRIAGE.md 'User decisions'; retained alpha-amino acids,
+         the Blue Book identifies no PIN for them), as for 'D-proline'.
+        'D-tyrosine' is OPSIN 2.9.0 full-InChIKey exact (the ring is intact: no
+        '2-aminononanoic acid' leak). Mutation: the old leak injected fails."""
+        from tests.support.rt_assert import assert_full_rt
+        smiles = "N[C@H](Cc1ccc(O)cc1)C(=O)O"
+        name = name_compound(smiles)
         assert "nonan" not in name, f"Ring atoms leaked into chain: {name}"
-        assert "amino" in name, f"Expected amino group in name, got: {name}"
-        assert "propan" in name, f"Expected propanoic acid chain, got: {name}"
+        assert name == "D-tyrosine", name
+        assert_full_rt(name, smiles)
 
     def test_bromophenylalanine_has_phenyl_not_hexyl(self):
         """Bromophenylalanine: ring should be phenyl substituent."""
@@ -139,13 +148,22 @@ class TestChainScoringTiebreakers:
         assert "pentanedio" in name or "glutar" in name, \
             f"Expected diacid name, got: {name}"
 
+    @pytest.mark.opsin_gate
     def test_dimethylcyclohexyl_pentanoic_acid(self):
-        """A cyclohexyl pentanoic acid where chain should be parent."""
-        # CC1C/C(=C\\CC(CC(N)=O)CC(=O)O)C(=O)C(C)C1 -- parent_mismatch #9
-        name = name_compound(r"CC1C/C(=C\CC(CC(N)=O)CC(=O)O)C(=O)C(C)C1")
-        # After fix, this should still be an acid name
-        assert "oic acid" in name or "anoic" in name, \
-            f"Expected acid naming, got: {name}"
+        """A cyclohexyl pentanoic acid where chain should be parent.
+
+        2026-09-26 (wp7) change-asserted-value: red since before the
+        pre-existing-failures plan (identical at 4e0e5c29b) -- the raw producer gives
+        the failure sentinel, and the name the sibling test below used to pin,
+        '3-(2-aminoethyl)-5-(3,5-dimethylcyclohexyl)pentanoic acid', is a DIFFERENT
+        molecule (OPSIN 2.9.0: C15H29NO2 vs the input's C15H23NO4; the ketone, the
+        exocyclic C=C and the amide are gone). No PIN producer builds it (the same
+        molecule is a tier-contract row of test_stereo_benchmark, 'a phase-01'):
+        the tier contract is asserted, gate on -- the PIN tier fails closed and
+        best-effort names it RT-exact ('(1E)-1-[5-amino-3-(carboxymethyl)-5-oxo-
+        pentylidene]-3,5-dimethyl-2-oxocyclohexane')."""
+        from tests.support.rt_assert import assert_tier_contract
+        assert_tier_contract(r"CC1C/C(=C\CC(CC(N)=O)CC(=O)O)C(=O)C(C)C1")
 
 
 # ---------------------------------------------------------------------------
@@ -268,13 +286,22 @@ class TestParentMismatchBenchmarkCompounds:
         assert "guanidin" in name or "amino" in name, \
             f"Expected guanidine or amino group, got: {name}"
 
+    @pytest.mark.opsin_gate
     def test_quaternary_ammonium_amide(self):
-        """Quaternary ammonium propenamide -- parent_mismatch #26 (T=0.278)."""
-        name = name_compound("C=CC(=O)NCCC[N+](C)(C)C")
-        assert name != "" and name != "unknown", f"Failed to name compound"
-        # Should have amide feature
-        assert "amid" in name or "amide" in name or "amino" in name, \
-            f"Expected amide naming, got: {name}"
+        """Quaternary ammonium propenamide -- parent_mismatch #26 (T=0.278).
+
+        2026-09-26 (wp7) change-asserted-value: this used to pass on the raw name
+        'N-[3-(trimethylazaniumyl)propyl]prop-2-enamidium', which OPSIN 2.9.0 parses
+        to a DICATION (C[N+](CCC[NH2+]C(C=C)=O)(C)C): 'amidium' is the cationic form OF
+        the amide the Blue Book, Table 7.4:41417), so the name adds
+        a hydron the input does not have. The amidium swap now requires the charge on
+        the suffix nitrogen. The cation is the principal group
+        :18169), so the PIN is 'N,N,N-trimethyl-3-(prop-2-enamido)propan-1-aminium'
+        (OPSIN full-InChIKey exact), which no producer builds yet: the tier contract
+        (the PIN tier fails closed, best-effort names it RT-exact) is asserted, gate on.
+        """
+        from tests.support.rt_assert import assert_tier_contract
+        assert_tier_contract("C=CC(=O)NCCC[N+](C)(C)C")
 
     def test_dihydropyridine_carboxylic_acid(self):
         """Dihydropyridine carboxylic acid -- parent_mismatch #6 (T=0.362)."""
@@ -289,14 +316,19 @@ class TestParentMismatchBenchmarkCompounds:
         assert "carboxylic acid" in name or "oic acid" in name, \
             f"Expected acid naming, got: {name}"
 
+    @pytest.mark.opsin_gate
     def test_tricyclic_ketone(self):
-        """Tricyclic ketone -- parent_mismatch #4 (T=0.375)."""
-        smi = "C[C@H]1C[C@@H](O)[C@H]2C(=O)c3c(O)cccc3O[C@]2(C)[C@@H]1O"
-        name = name_compound(smi)
-        assert name != "" and name != "unknown", f"Failed to name tricyclic ketone"
-        assert "one" in name or "oxo" in name, f"Expected ketone in name, got: {name}"
-        assert "hydroxy" in name or "ol" in name, \
-            f"Expected hydroxyl in name, got: {name}"
+        """Tricyclic ketone -- parent_mismatch #4 (T=0.375).
+
+        2026-09-26 (wp7): red since before the pre-existing-failures plan
+        (identical at 4e0e5c29b; the raw producer gives the failure sentinel, which
+        contains 'one' only by accident of spelling). The fused-ring PIN is not built;
+        the molecule is a tier-contract row of test_stereo_benchmark too. The tier
+        contract is asserted, gate on: the PIN tier fails closed and best-effort names
+        it RT-exact ('(3S,4R,5S,7R,8R)-4,7,11-trihydroxy-3,5-dimethyl-2-oxatricyclo
+        [8.4.0.0^3,8]tetradeca-1(14),10,12-trien-9-one')."""
+        from tests.support.rt_assert import assert_tier_contract
+        assert_tier_contract("C[C@H]1C[C@@H](O)[C@H]2C(=O)c3c(O)cccc3O[C@]2(C)[C@@H]1O")
 
     def test_sodium_glutamate(self):
         """Sodium glutamate -- parent_mismatch #35 (T=0.219)."""
@@ -347,11 +379,17 @@ class TestImprovementTracking:
     # and a phase fixes produce demonstrably better names.
 
     def test_tyrosine_improved(self):
-        """Tyrosine: was '2-aminononanoic acid', now has correct phenyl."""
-        name = name_compound("N[C@H](Cc1ccc(O)cc1)C(=O)O")
+        """Tyrosine: was '2-aminononanoic acid', now names the right molecule.
+
+        2026-09-26 (wp7) change-asserted-value: 'D-tyrosine' by user decision D-a
+        (see test_tyrosine_has_phenyl_not_hexyl); OPSIN 2.9.0 full-InChIKey exact."""
+        from tests.support.rt_assert import assert_full_rt
+        smiles = "N[C@H](Cc1ccc(O)cc1)C(=O)O"
+        name = name_compound(smiles)
         old = "2-aminononanoic acid"
         assert name != old, f"Not improved: still {name}"
-        assert "phenyl" in name, f"Improvement: name has correct phenyl group"
+        assert name == "D-tyrosine", name
+        assert_full_rt(name, smiles)
 
     def test_bromophenylalanine_improved(self):
         """Bromophenylalanine: was '2-aminononanoic acid', now correct."""
@@ -374,13 +412,20 @@ class TestImprovementTracking:
         assert name != old, f"Not improved: still {name}"
         assert "hexyl" not in name, f"Improvement: hexyl removed"
 
+    @pytest.mark.opsin_gate
     def test_dimethylcyclohexyl_pentanoic_acid_changed(self):
         """Cyclohexyl pentanoic acid: name unchanged (chain exclusion does not affect this path).
 
         a phase-01: chain exclusion only affects non-principal FG terminal carbons
         whose prefix includes the carbon. This compound's amide C is not terminal
         on the principal chain, so the name is unchanged.
+
+        2026-09-26 (wp7) change-asserted-value: the pinned value
+        '3-(2-aminoethyl)-5-(3,5-dimethylcyclohexyl)pentanoic acid' is a DIFFERENT
+        molecule (OPSIN 2.9.0: C15H29NO2 vs the input's C15H23NO4), and the test has
+        been red since before the pre-existing-failures plan. A wrong
+        name is never accepted as a value: the tier contract is asserted, gate on
+        (see test_dimethylcyclohexyl_pentanoic_acid).
         """
-        name = name_compound(r"CC1C/C(=C\CC(CC(N)=O)CC(=O)O)C(=O)C(C)C1")
-        expected = "3-(2-aminoethyl)-5-(3,5-dimethylcyclohexyl)pentanoic acid"
-        assert name == expected, f"Unexpected change: got {name}"
+        from tests.support.rt_assert import assert_tier_contract
+        assert_tier_contract(r"CC1C/C(=C\CC(CC(N)=O)CC(=O)O)C(=O)C(C)C1")

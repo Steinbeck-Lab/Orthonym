@@ -840,6 +840,85 @@ def _walk_linear_carbon_bridge(mol, n1_idx: int, n2_idx: int) -> Optional[List[i
     return None  # runaway walk -> fail closed
 
 
+def emit_bis_quaternary_aminium(mol, cation_sites: List[Dict[str, Any]]) -> str:
+    """Substitutive '-bis(aminium)' PIN for two quaternary ammonium centres on the
+    ends of a straight carbon chain::
+
+        C[N+](C)(C)CCCCCC[N+](C)(C)C
+            -> N1,N1,N1,N6,N6,N6-hexamethylhexane-1,6-bis(aminium)
+
+    The rule: an N+ carrying carbon groups is a cationic AMINE, named by the
+    cationic suffix 'aminium', the Blue Book; '*N*,*N*,*N*-
+    trimethylmethanaminium (PIN)':41438, not 'tetramethylazanium':41354).
+    Two of them on one chain take the suffix twice: "Polycations with
+    cationic centers on characteristic groups are named by substitutive
+    nomenclature or multiplicative nomenclature" (:42138), with the quaternary
+    '*N*^1,*N*^1,*N*^3,*N*^3,*N*^3-hexamethylpropanebis(amidium) (PIN)' (:42154)
+    and 'butanebis(nitrilium) (PIN)' beside the non-PIN multiplicative
+    'butanediylidynebis(azanium)' (:42160,:42162); '3-(azaniumylmethyl)
+    pentane-1,5-bis(aminium) (PIN)' (:42366). The chain between the two N is the
+    parent: it is the only chain that carries both suffixes. The
+    N-substituents take N-locants with the chain locant as superscript (written
+    'N1', 'N6';:26348), in alphanumerical order.
+
+    SCOPE (fail closed, '' on anything else): exactly two acyclic N+ with no H
+    and four carbon neighbours; one unbranched saturated all-carbon bridge of
+    >= 2 atoms between them (``_walk_linear_carbon_bridge``); the same multiset of
+    N-substituent names on both ends, so the bridge's two numbering directions
+    are equivalent. The name ships only on a full-InChIKey round trip.
+    """
+    if mol is None or len(cation_sites) != 2:
+        return ''
+    idxs = [c['atom_idx'] for c in cation_sites]
+    if len(set(idxs)) != 2:
+        return ''
+    for i in idxs:
+        a = mol.GetAtomWithIdx(i)
+        if (a.GetSymbol() != 'N' or a.GetFormalCharge() != 1
+                or a.GetTotalNumHs() != 0 or a.GetDegree() != 4
+                or a.IsInRing() or a.GetNumRadicalElectrons()
+                or any(nb.GetSymbol() != 'C' for nb in a.GetNeighbors())):
+            return ''
+    n1_idx, n2_idx = idxs
+    path = _walk_linear_carbon_bridge(mol, n1_idx, n2_idx)
+    if not path or len(path) < 2:
+        return ''
+    from collections import Counter
+
+    from ..assembly.naming_utils import alpha_sort_key, format_substituent_prefix
+    from ..assembly.substituent_naming import (
+        _collect_branch_atoms,
+        name_substituent_fragment,
+    )
+    per_n = []
+    for n_idx, attach in ((n1_idx, path[0]), (n2_idx, path[-1])):
+        names = []
+        for nb in mol.GetAtomWithIdx(n_idx).GetNeighbors():
+            if nb.GetIdx() == attach:
+                continue
+            frag = _collect_branch_atoms(mol, start_idx=nb.GetIdx(), block_idx=n_idx)
+            sub = name_substituent_fragment(mol, frag, nb.GetIdx(), [])
+            if not sub:
+                return ''
+            names.append(sub)
+        per_n.append(Counter(names))
+    if per_n[0] != per_n[1]:
+        return ''  # different ends: the numbering direction would need
+    from ..data.chain_names import get_chain_prefix
+    n = len(path)
+    try:
+        stem = get_chain_prefix(n)
+    except ValueError:
+        return ''
+    parts = []
+    for sub in sorted(per_n[0], key=lambda s: (alpha_sort_key(s), s)):
+        k = per_n[0][sub]
+        parts.append(format_substituent_prefix(sub, ['N1'] * k + [f'N{n}'] * k, 2 * k))
+    name = '-'.join(parts) + f"{stem}ane-1,{n}-bis(aminium)"
+    from .charged_router import _cation_name_rt_ok
+    return name if _cation_name_rt_ok(name, mol) else ''
+
+
 def emit_bis_quaternary_ammonium(mol, cation_sites: List[Dict[str, Any]]) -> str:
     """ / (a phase): a SYMMETRIC dication with
     exactly two IDENTICAL quaternary-ammonium centres joined by a straight,
@@ -5557,28 +5636,34 @@ def _apply_anionic_substituent_prefixes(mol, anions, name: str) -> str:
         return name  # mixed junior classes -> fail closed (prefix-reordering risk)
 
     out = name
+    swapped = []   # (neutral token, anionic token) pairs actually swapped
     if junior_carb >= 1:
         # 'carboxy' NOT part of 'carboxyl…' (the parent 'carboxylate'/'carboxylato').
         if len(re.findall(r'carboxy(?!l)', out)) == junior_carb:
             out = re.sub(r'carboxy(?!l)', 'carboxylato', out, count=junior_carb)
+            swapped.append(('carboxy', 'carboxylato'))
     if junior_ox >= 1:
         # Convert only when EVERY 'hydroxy' prefix is an anionic O- (so a
         # genuine neutral -OH is never turned into 'oxido').
         if out.count('hydroxy') == junior_ox:
             out = out.replace('hydroxy', 'oxido', junior_ox)
+            swapped.append(('hydroxy', 'oxido'))
     if junior_sulfonate >= 1:
         # 'sulfo' NOT part of 'sulfon…' (the neutral 'sulfonic'/'sulfonyl' or an
         # already-anionic 'sulfonato'/'sulfonate' stem elsewhere in the name).
         if len(re.findall(r'sulfo(?!n)', out)) == junior_sulfonate:
             out = re.sub(r'sulfo(?!n)', 'sulfonato', out, count=junior_sulfonate)
+            swapped.append(('sulfo', 'sulfonato'))
     if junior_sulfinate >= 1:
         # 'sulfino' is a distinct token (does not overlap 'sulfinato').
         if out.count('sulfino') == junior_sulfinate:
             out = out.replace('sulfino', 'sulfinato', junior_sulfinate)
+            swapped.append(('sulfino', 'sulfinato'))
     if junior_phosphonate >= 1:
         # 'phosphono' is a distinct token (does not overlap 'phosphonate').
         if out.count('phosphono') == junior_phosphonate:
             out = out.replace('phosphono', 'phosphonato', junior_phosphonate)
+            swapped.append(('phosphono', 'phosphonato'))
     if junior_thiolate >= 1:
         # 'sulfanyl' is the neutral -SH substituent prefix; swap the anionic
         # occurrences to 'sulfido' (mirrors the sulfinato/sulfonato/
@@ -5586,6 +5671,140 @@ def _apply_anionic_substituent_prefixes(mol, anions, name: str) -> str:
         # genuine neutral -SH elsewhere in the name is never mis-converted.
         if out.count('sulfanyl') == junior_thiolate:
             out = out.replace('sulfanyl', 'sulfido', junior_thiolate)
+            swapped.append(('sulfanyl', 'sulfido'))
+    _demote_if_swap_changes_citation_rank(out, swapped)
+    return out
+
+
+# Multiplying prefixes a alphanumerical key ignores for a simple prefix
+# ('3,5-dimethyl' is alphabetized at 'methyl'). Used only by the conservative
+# rank guard below, which checks a run with AND without the multiplier.
+_RANK_GUARD_MULTIPLIER_RE = re.compile(
+    r'^(?:di|tri|tetra|penta|hexa|hepta|octa|nona|deca|'
+    r'bis|tris|tetrakis|pentakis|hexakis)')
+
+
+def _prefix_swap_may_change_rank(name: str, old_tok: str, new_tok: str) -> bool:
+    """Could replacing the neutral prefix ``old_tok`` by the anionic prefix
+    ``new_tok`` (already done in ``name``) change the citation order or the
+    numbering of the name?
+
+     (the Blue Book, "Simple prefixes... are arranged
+    alphabetically") orders the prefixes by their names, and (g) (:3306,
+    "lowest locants for the substituent cited first as a prefix in the name")
+    lets that order decide the numbering when the earlier criteria tie. The
+    textual swap renames a prefix without re-ordering or re-numbering, so it is
+    sound only if no other prefix's name sorts BETWEEN the two tokens:
+    'hydroxy' -> 'oxido' across a 'methyl' turns '3-hydroxy-5-methylbenzoate'
+    into the misordered '3-oxido-5-methylbenzoate' (the PIN is
+    '3-methyl-5-oxidobenzoate', by (g) as well as by order).
+
+    Conservative on purpose: every letter run that starts a prefix at ANY
+    nesting level (after the start, a hyphen or an opening mark) is compared,
+    with and without a leading multiplying prefix; a run that sorts strictly
+    between the two tokens, or shares either token as a string prefix, returns
+    True. A run right after a closing mark is the parent or the rest of a
+    compound prefix, never a new sibling, so it is skipped. A False answer is
+    therefore safe; a True answer may be a false alarm, which costs only the
+    PIN label (the caller demotes, it never changes the name)."""
+    lo, hi = sorted((old_tok, new_tok))
+    for m in re.finditer(r'(?:^|(?<=[-(\[{]))([a-z]+)', name):
+        run = m.group(1)
+        stripped = _RANK_GUARD_MULTIPLIER_RE.sub('', run, count=1)
+        if run.startswith(new_tok) or stripped.startswith(new_tok):
+            continue   # the swapped prefix itself
+        for key in {run, stripped}:
+            if not key:
+                continue
+            if (lo < key < hi or key.startswith(lo) or key.startswith(hi)
+                    or lo.startswith(key) or hi.startswith(key)):
+                return True
+    return False
+
+
+def _demote_if_swap_changes_citation_rank(name: str, swapped) -> None:
+    """A textual neutral->anionic prefix swap that may change the
+    citation order or the (g) numbering keeps its name (the round trip
+    still decides the molecule) but must not ship as pin_verified: the spelling
+    is not certified as the PIN. Same demotion the other non-PIN producers use
+    (``record_general_ring_prefix``: tier systematic_verified, is_pin False)."""
+    if any(_prefix_swap_may_change_rank(name, old, new) for old, new in swapped):
+        from ..metrics.provenance import record_general_ring_prefix
+        record_general_ring_prefix()
+
+
+# (the Blue Book) anionic chalcogen prefixes, keyed by the
+# classify_anion class of a JUNIOR centre -> (neutral prefix, anionic prefix).
+_JUNIOR_CHALCOGEN_SWAP = {
+    'phenolate': ('hydroxy', 'oxido'),
+    'alkoxide': ('hydroxy', 'oxido'),
+    'thiolate': ('sulfanyl', 'sulfido'),
+}
+# S/P-oxoacid anion classes that name the parent anion (the ionized suffix).
+_OXOACID_PARENT_CLASSES = ('sulfonate', 'sulfinate', 'phosphonate')
+
+
+def express_junior_anionic_chalcogens(mol, anions, ionized: str) -> str:
+    """The name of a multi-anion whose parent is an S/P-oxoacid anion and whose
+    other anionic centres are chalcogen anions (-O-/-S-): the junior centres are
+    cited by their anionic prefixes, 'oxido' / 'sulfido',:41223
+    "–O– oxido (preselected prefix)",:41225 "–S– sulfido (preselected
+    prefix)"), never by the neutral 'hydroxy' / 'sulfanyl', which drops a charge
+    and denotes a different molecule ('5-hydroxybenzene-1,3-disulfonate' is the
+    dianion, not the trianion).
+
+    ``ionized`` is the neutral acid name with its parent suffix already made
+    anionic ('5-hydroxybenzene-1,3-disulfonate'). Returns '' unless:
+
+    * every anionic centre is either an S/P-oxoacid centre (sulfonate /
+      sulfinate / phosphonate: the parent) or a chalcogen anion of ONE kind
+      (phenolate/alkoxide -> oxido, or thiolate -> sulfido); a carboxylate
+      belongs to the carboxylate path;
+    * (:41261, "CHOICE OF AN ANIONIC PARENT STRUCTURE") picks the
+      oxoacid parent: (a):41265 "parent with the maximum number of anionic
+      centers, including anionic suffixes" -- so the junior centres may not
+      outnumber the oxoacid centres (for [O-]CC([O-])CS(=O)(=O)[O-] the
+      bis(olate) parent has more centres; that shape is left to a producer that
+      builds it); a tie goes on to (d):41281 (O > S: a sulfonate beats a
+      thiolate) and (e):41289, the suffix seniority of (sulfonic and
+      phosphonic acids are senior to alcohols), as in the BB's
+      "3-oxidonaphthalene-2-carboxylate (PIN) (carboxylate senior to olate)"
+      (:41295);
+    * the neutral prefix occurs exactly as often as there are junior centres
+      (a genuine neutral -OH / -SH is never converted);
+    * the result round-trips to the input at the full InChIKey.
+
+    A swap that may change the prefix citation order is shipped demoted, never
+    as pin_verified (``_demote_if_swap_changes_citation_rank``).
+    """
+    if not ionized or not anions:
+        return ''
+    classes = [classify_anion(mol, a) for a in anions]
+    parent = [c for c in classes if c in _OXOACID_PARENT_CLASSES]
+    junior = [c for c in classes if c not in _OXOACID_PARENT_CLASSES]
+    if not parent or not junior:
+        return ''
+    swaps = {_JUNIOR_CHALCOGEN_SWAP.get(c) for c in junior}
+    if None in swaps or len(swaps) != 1:
+        return ''   # a carboxylate / other class, or mixed O-/S- juniors
+    if len(junior) > len(parent):
+        return ''   # (a): the chalcogen anion would be the parent
+    old_tok, new_tok = next(iter(swaps))
+    if new_tok in ionized or ionized.count(old_tok) != len(junior):
+        return ''
+    out = ionized.replace(old_tok, new_tok, len(junior))
+    from .charged_router import _full_inchikey_rt_ok
+    if not _full_inchikey_rt_ok(mol, out):
+        return ''
+    _demote_if_swap_changes_citation_rank(out, [(old_tok, new_tok)])
+    if re.search(r'\d-(?:di|tri|tetra)?phosphonate$', out):
+        # The neutral namer gives a chain phosphonic acid the suffix form
+        # ('2-hydroxyethane-1-phosphonic acid'); the PIN is the functional-parent
+        # form, the Blue Book "ethylphosphonic acid (PIN) (not
+        # ethanephosphonic acid)". The name is the right molecule (RT above) but
+        # not the PIN: ship it demoted.
+        from ..metrics.provenance import record_general_ring_prefix
+        record_general_ring_prefix()
     return out
 
 

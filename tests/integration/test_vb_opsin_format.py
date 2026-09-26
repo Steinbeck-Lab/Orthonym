@@ -230,7 +230,7 @@ class TestVBRegressionGuard:
 
     @pytest.mark.parametrize("smiles,expected_substr", [
         ("C12CC3CC(CC(C3)C1)C2", "adamantane"),  # retained name per IUPAC
-        ("C1CC2CC1CC2", "norbornane"),  # retained name
+        ("C1CC2CC1CC2", "bicyclo[2.2.1]heptane"),  # R11 (2026-09-25, pre-existing-failures plan, Task 5)::9881, only adamantane/cubane are retained; "bicyclo[2.2.1]heptane (PIN)":2038
     ])
     def test_regression_compounds(self, smiles, expected_substr):
         """Known-good polycyclic names should not change."""

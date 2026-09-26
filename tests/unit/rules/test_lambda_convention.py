@@ -84,3 +84,40 @@ class TestFormatLambdaToken:
     def test_lambda_absent(self):
         assert format_lambda_token(2, None) == "2"
         assert format_lambda_token(11, None) == "11"
+
+
+class TestLambdaHeteroatomNumberingTier:
+    """T12 fix round 3 (BB-measure loss P-23.6.2). The λ low-locant rule is part
+    of the ring parent hydride's own numbering, so it decides before the suffix,
+    ene, prefix, (g), (j) and canonical-rank tiers.
+
+    von Baeyer, P-23.6.2 ('## P-23.6 HETEROCYCLIC POLYALICYCLIC PARENT HYDRIDES
+    HAVING HETEROATOMS WITH NONSTANDARD BONDING NUMBERS', BlueBookV2.md:9873):
+    "When there is a choice for numbering, low locants are assigned to heteroatoms
+    with nonstandard bonding numbers expressed by the λn symbol in order of
+    decreasing numerical value of the bonding number; for example, in the case of
+    arsenic, the lower locant is given to a λ5 arsenic atom" -- "2λ5,3-diarsa
+    bicyclo[2.2.1]heptane (PIN)" (:9877). c10268e95 sent this full tie to the
+    canonical ranks, which gave '2,3λ5-'.
+
+    Spiro, P-24.8.1.1 (:10841) "Heteroatoms having nonstandard bonding numbers
+    receive lowest locants in accordance with the numbering of the corresponding
+    spiro ring system" and P-24.8.1.2 (:10857) "If there is a choice, lower
+    locants are assigned to heteroatoms with the higher bonding number" --
+    "2λ6,4λ4-dithiaspiro[5.5]undecane (PIN)" (:10863), which the engine spelled
+    '2λ4,4λ6-' before and after the branch (same missing tier)."""
+
+    @pytest.mark.opsin_gate
+    @pytest.mark.parametrize("smiles,expected", [
+        ("C1CC2CC1[AsH][AsH3]2", "2λ5,3-diarsabicyclo[2.2.1]heptane"),
+        ("C1CC2CC1[AsH3][AsH]2", "2λ5,3-diarsabicyclo[2.2.1]heptane"),
+        ("[AsH3]1[AsH]C2CCC1C2", "2λ5,3-diarsabicyclo[2.2.1]heptane"),
+        ("C1CCC2(CC1)C[SH2]C[SH4]C2", "2λ6,4λ4-dithiaspiro[5.5]undecane"),
+        ("C1CCC2(CC1)C[SH4]C[SH2]C2", "2λ6,4λ4-dithiaspiro[5.5]undecane"),
+    ])
+    def test_lambda_atom_takes_the_lower_locant(self, smiles, expected):
+        from orthonym import name_compound
+        from tests.support.rt_assert import assert_full_rt
+        name = name_compound(smiles)
+        assert name == expected
+        assert_full_rt(name, smiles)
