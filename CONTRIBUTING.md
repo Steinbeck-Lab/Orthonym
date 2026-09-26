@@ -6,23 +6,24 @@ development environment, run the tests, and contribute a change.
 ## Development setup
 
 ```bash
-git clone https://github.com/Kohulan/Orthonym.git
+git clone https://github.com/Beilstein-Institut/Orthonym.git
 cd Orthonym
 python -m venv .venv && source .venv/bin/activate
 pip install -e ".[dev]"
 ```
 
-A **Java runtime (JRE 11+)** must be on your `PATH` — Orthonym validates candidate names
-by round-tripping them through OPSIN, which runs on the JVM. The OPSIN jar ships with the
-package.
+A **Java runtime (JRE 11+)** must be on your `PATH`: Orthonym validates candidate names
+by round-tripping them through OPSIN, which is a Java program. The OPSIN and centres jars are
+not part of the repository; `pip install` fetches them, and `orthonym --fetch-jars` fetches or
+re-checks them at any time (see the README, "The OPSIN and centres jars").
 
 ## Running tests
 
-Run tests on targeted file sets (OPSIN-backed tests require a JVM):
+Run tests on targeted file sets (the OPSIN-backed tests need a Java runtime and the jars):
 
 ```bash
-python -m pytest tests/unit/rules/test_chain_names.py -q
 python -m pytest tests/unit/assembly -q
+python -m pytest tests/unit/rules/test_multiplicative.py -q
 ```
 
 Markers (`unit`, `integration`, `roundtrip`, `slow`, `benchmark`) are defined in
@@ -31,8 +32,25 @@ Markers (`unit`, `integration`, `roundtrip`, `slow`, `benchmark`) are defined in
 ## How Orthonym is built
 
 The engine perceives structure (`perception/`), applies nomenclature rules (`rules/`), and
-assembles the name (`assembly/`), drawing on naming tables in `data/`. See
-[`CONTRIBUTING.md`](CONTRIBUTING.md) for the engineering conventions.
+assembles the name (`assembly/`), drawing on naming tables in `data/`; `validation/` holds the
+OPSIN round trip and the atom-coverage check. [`guide/how-it-works.md`](guide/how-it-works.md)
+describes the four parts.
+
+```
+Orthonym/
+├── src/orthonym/
+│   ├── perception/   # structure perception: rings, characteristic groups, CIP stereo
+│   ├── rules/        # IUPAC nomenclature rules
+│   ├── assembly/     # name assembly: locants, ordering, selection
+│   ├── validation/   # OPSIN round-trip and atom-coverage checks
+│   └── data/         # naming tables
+└── tests/            # unit and integration tests
+```
+
+To add a compound class, add a test that pins the expected name and cites the governing IUPAC
+rule. Release notes are in [`CHANGELOG.md`](CHANGELOG.md), vulnerability reports go by
+[`SECURITY.md`](SECURITY.md), and questions and bug reports go to
+[open an issue](https://github.com/Beilstein-Institut/Orthonym/issues/new/choose).
 
 ## Contribution guidelines
 
@@ -45,8 +63,6 @@ assembles the name (`assembly/`), drawing on naming tables in `data/`. See
    that pins the expected name, and cite the governing IUPAC rule in the code or test.
 4. **Keep it deterministic.** Any algorithm that resolves a choice (ring numbering, locant
    assignment, ordering) must be deterministic.
-5. **Do not modify the evaluation splits** under  — they are the measurement
-   contract.
 
 ## Submitting a change
 
